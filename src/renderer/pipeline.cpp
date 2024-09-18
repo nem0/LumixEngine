@@ -22,7 +22,6 @@
 #include "engine/world.h"
 #include "font.h"
 #include "gpu/gpu.h"
-#include "lua_script/lua_script.h"
 #include "material.h"
 #include "model.h"
 #include "particle_system.h"
@@ -33,7 +32,8 @@
 #include "shader.h"
 #include "terrain.h"
 #include "texture.h"
-#include <imgui/imgui.h>
+
+// TODO vsync
 
 // TODO crashes:
 	// TODO crash when context menu is outside of main window
@@ -43,13 +43,10 @@
 	// TODO semaphore in job system to wake workers?
 	// TODO 3d ui in scene view
 	// TODO property groups in property grid
-	// TODO render graph
 	// TODO vertex pulling
-	// TODO 200 MB in memory profiler
 	// TODO temporal upsample
 	// TODO temporal SSAO
 	// TODO shader cleanup
-	// TODO remove meta, ...
 	// TODO static samplers
 	// TODO icons over some debugs, e.g. TDAO 
 	// TODO switch plugins to use new genie stuff like plugin() function
@@ -59,6 +56,7 @@
 	// TODO "static" srv+urv == "constant" bindless index
 	// TODO bindless terrain
 	// TODO shadow atlas -> bindless?
+	// TODO render graph
 	// TODO releaseRenderBuffer -> so they can be reused in the same frame
 
 namespace Lumix {

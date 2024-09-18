@@ -30,12 +30,12 @@
 #include "engine/component_uid.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
-#include "engine/lua_wrapper.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
-#include "lua_script/lua_script_system.h"
-#include "lua_script/lua_script.h"
+#include "lua_script.h"
+#include "lua_script_system.h"
+#include "lua_wrapper.h"
 #include "renderer/editor/game_view.h"
 #include "renderer/editor/scene_view.h"
 
@@ -194,7 +194,8 @@ struct LuauAnalysis :Luau::FileResolver {
 
 struct StudioLuaPlugin : StudioApp::GUIPlugin {
 	static void create(StudioApp& app, StringView content, const Path& path) {
-		lua_State* L = app.getEngine().getState();
+		LuaScriptSystem* system = (LuaScriptSystem*)app.getEngine().getSystemManager().getSystem("lua_script");
+		lua_State* L = system->getState();
 		LuaWrapper::DebugGuard guard(L);
 		if (!LuaWrapper::execute(L, content, path.c_str(), 1)) return;
 
@@ -260,7 +261,8 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 	}
 
 	void runWindowAction() {
-		lua_State* L = m_app.getEngine().getState();
+		LuaScriptSystem* system = (LuaScriptSystem*)m_app.getEngine().getSystemManager().getSystem("lua_script");
+		lua_State* L = system->getState();
 		LuaWrapper::DebugGuard guard(L);
 		lua_rawgeti(L, LUA_REGISTRYINDEX, m_plugin_ref);
 		lua_getfield(L, -1, "windowMenuAction");
@@ -297,7 +299,8 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 	}
 
 	void onGUI() override {
-		lua_State* L = m_app.getEngine().getState();
+		LuaScriptSystem* system = (LuaScriptSystem*)m_app.getEngine().getSystemManager().getSystem("lua_script");
+		lua_State* L = system->getState();
 		LuaWrapper::DebugGuard guard(L);
 		lua_rawgeti(L, LUA_REGISTRYINDEX, m_plugin_ref);
 		lua_getfield(L, -1, "gui");
@@ -845,7 +848,8 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 		, m_asset_plugin(m_luau_analysis, app)
 		, m_lua_actions(app.getAllocator())
 	{
-		lua_State* L = app.getEngine().getState();
+		LuaScriptSystem* system = (LuaScriptSystem*)app.getEngine().getSystemManager().getSystem("lua_script");
+		lua_State* L = system->getState();
 		LuaWrapper::createSystemClosure(L, "Editor", this, "addAction", &LUA_addAction);
 		initPlugins();
 	}
@@ -1162,6 +1166,137 @@ struct SetPropertyVisitor : reflection::IPropertyVisitor {
 		}
 	}
 
+	static void luaImGuiTable(const char* prefix, lua_State* L) {
+		lua_pushnil(L);
+		while (lua_next(L, -2)) {
+			const char* name = lua_tostring(L, -2);
+			if (!lua_isfunction(L, -1) && !equalStrings(name, "__index")) {
+				if (lua_istable(L, -1)) {
+					luaImGuiTable(StaticString<128>(prefix, name, "."), L);
+				}
+				else {
+					ImGui::TableNextRow();
+					ImGui::TableNextColumn();
+					ImGui::Text("%s%s", prefix, name);
+					ImGui::TableNextColumn();
+					switch (lua_type(L, -1)) {
+						case LUA_TLIGHTUSERDATA:
+							ImGui::TextUnformatted("light user data");
+							break;
+						case LUA_TBOOLEAN: {
+							const bool b = lua_toboolean(L, -1) != 0;
+							ImGui::TextUnformatted(b ? "true" : "false");
+							break;
+						}
+						case LUA_TNUMBER: {
+							const double val = lua_tonumber(L, -1);
+							ImGui::Text("%f", val);
+							break;
+						}
+						case LUA_TSTRING: 
+							ImGui::TextUnformatted(lua_tostring(L, -1));
+							break;
+					}
+				}
+			}
+			lua_pop(L, 1);
+		}
+	}
+
+	// asserts once if called between ImGui::Begin/End, can be safely skipped
+	void luaDebugLoop(lua_State* L, const char* error_msg) {
+		// TODO custom imgui context?
+		// TODO can we somehow keep running normal loop while lua is being debugged?
+		// end normal loop
+		ImGui::PopFont();
+		ImGui::Render();
+		ImGui::UpdatePlatformWindows();
+		m_app.beginCustomTicking();
+
+		// debug loop
+		// we have special loop for debug, because we don't want world or lua state to change while we debug
+		bool finished = false;
+		while (!finished) {
+			m_app.beginCustomTick();
+
+			const ImGuiID dockspace_id = ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
+
+			static int selected_stack_level = -1;
+
+			ImGui::SetNextWindowDockID(dockspace_id, ImGuiCond_FirstUseEver);			
+			if (ImGui::Begin("REPL")) {
+				LuaWrapper::DebugGuard guard(L);
+				static char repl[4096] = "";
+				ImGui::SetNextItemWidth(-1);
+				ImGui::InputTextMultiline("##repl", repl, sizeof(repl));
+				if (ImGui::Button("Run")) {
+					const bool errors = LuaWrapper::luaL_loadbuffer(L, repl, strlen(repl), "REPL");
+					if (!errors) {
+						if (selected_stack_level >= 0) {
+							lua_Debug ar;
+							if (0 != lua_getinfo(L, selected_stack_level + 1, "f", &ar)) {
+								lua_getfenv(L, -1);
+								lua_setfenv(L, -3);
+								lua_pop(L, 1);
+							}
+						}
+						if (::lua_pcall(L, 0, 0, 0) != 0) {
+							const char* msg = lua_tostring(L, -1); 
+							ASSERT(false); // TODO
+						}
+					}
+				}
+			}
+			ImGui::End();
+
+			ImGui::SetNextWindowDockID(dockspace_id, ImGuiCond_FirstUseEver);
+			if (ImGui::Begin("Callstack")) {
+				LuaWrapper::DebugGuard guard(L);
+				lua_Debug ar;
+				for (u32 stack_level = 1/*skip traceback fn*/; ;++stack_level) {
+					if (0 == lua_getinfo(L, stack_level + 1, "nsl", &ar)) break;
+					const bool selected = selected_stack_level == stack_level;
+					const StaticString<MAX_PATH + 128> label(ar.source, ": ", ar.name, " Line ", ar.currentline);
+					if (ImGui::Selectable(label, selected)) selected_stack_level = stack_level;
+				}
+			}
+			ImGui::End();
+			
+			ImGui::SetNextWindowDockID(dockspace_id, ImGuiCond_FirstUseEver);
+			if (ImGui::Begin("Locals") && selected_stack_level >= 0) {
+				if (ImGui::BeginTable("locals", 2, ImGuiTableFlags_Resizable)) {
+					lua_Debug ar;
+					if (0 != lua_getinfo(L, selected_stack_level + 1, "nslf", &ar)) {
+						lua_getfenv(L, -1);
+
+						luaImGuiTable("", L);
+
+						lua_pop(L, 2);
+					}
+					ImGui::EndTable();
+				}
+			}
+			ImGui::End();
+
+			ImGui::SetNextWindowDockID(dockspace_id, ImGuiCond_FirstUseEver);
+			if (ImGui::Begin("Lua debugger")) {
+				ImGui::TextUnformatted(error_msg);
+				ImGui::Checkbox("Enable debugger", &m_lua_debug_enabled);
+				ImGui::SameLine();
+				if (ImGui::Button("Resume")) finished = true;
+			}
+			ImGui::End();
+		
+			ImGui::PopFont();
+			ImGui::Render();
+			ImGui::UpdatePlatformWindows();
+
+			m_app.endCustomTick();
+		}
+
+		m_app.endCustomTicking();
+	}
+
 	static int LUA_debugCallback(lua_State* L) {
 		const char* error_msg = lua_tostring(L, 1);
 		if (lua_getglobal(L, "Editor") != LUA_TTABLE) {
@@ -1174,7 +1309,8 @@ struct SetPropertyVisitor : reflection::IPropertyVisitor {
 		}
 		StudioApp* app = (StudioApp*)lua_tolightuserdata(L, -1);
 		lua_pop(L, 2);
-		app->luaDebugLoop(L, error_msg);
+		StudioAppPlugin* plugin = (StudioAppPlugin*)app->getIPlugin("lua_script");
+		plugin->luaDebugLoop(L, error_msg);
 		return 0;
 	}
 
@@ -1198,7 +1334,8 @@ struct SetPropertyVisitor : reflection::IPropertyVisitor {
 
 		// lua API
 		// TODO cleanup
-		lua_State* L = m_app.getEngine().getState();
+		LuaScriptSystem* system = (LuaScriptSystem*)m_app.getEngine().getSystemManager().getSystem("lua_script");
+		lua_State* L = system->getState();
 
 		{
 			StudioApp::GUIPlugin* game_view = m_app.getGUIPlugin("game_view");
@@ -1252,7 +1389,8 @@ struct SetPropertyVisitor : reflection::IPropertyVisitor {
 	}
 
 	void runScript(const char* src, const char* script_name) {
-		lua_State* L = m_app.getEngine().getState();
+		LuaScriptSystem* system = (LuaScriptSystem*)m_app.getEngine().getSystemManager().getSystem("lua_script");
+		lua_State* L = system->getState();
 		bool errors = LuaWrapper::luaL_loadbuffer(L, src, stringLength(src), script_name) != 0;
 		errors = errors || lua_pcall(L, 0, 0, 0) != 0;
 		if (errors)
@@ -1297,6 +1435,7 @@ struct SetPropertyVisitor : reflection::IPropertyVisitor {
 	AssetPlugin m_asset_plugin;
 	PropertyGridPlugin m_property_grid_plugin;
 	Array<LuaAction*> m_lua_actions;
+	bool m_lua_debug_enabled = true;
 };
 
 

@@ -18,7 +18,6 @@
 #include "engine/component_uid.h"
 #include "engine/core.h"
 #include "engine/engine.h"
-#include "engine/lua_wrapper.h"
 #include "engine/prefab.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"

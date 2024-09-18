@@ -18,15 +18,11 @@
 #include "engine/prefab.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
-#include <lua.h>
-#include <lualib.h>
 
 namespace Lumix
 {
 
 static const u32 SERIALIZED_PROJECT_MAGIC = 0x5f50524c;
-
-void registerEngineAPI(lua_State* L, Engine* engine);
 
 struct PrefabResourceManager final : ResourceManager {
 	explicit PrefabResourceManager(IAllocator& allocator)
@@ -55,14 +51,11 @@ struct EngineImpl final : Engine {
 		, m_page_allocator(allocator)
 		, m_prefab_resource_manager(m_allocator)
 		, m_resource_manager(m_allocator)
-		, m_lua_resources(m_allocator)
-		, m_last_lua_resource_idx(-1)
 		, m_is_game_running(false)
 		, m_smooth_time_delta(1/60.f)
 		, m_time_multiplier(1.0f)
 		, m_paused(false)
 		, m_next_frame(false)
-		, m_lua_allocator(allocator, "lua")
 	{
 		PROFILE_FUNCTION();
 		for (float& f : m_last_time_deltas) f = 1/60.f;
@@ -81,14 +74,6 @@ struct EngineImpl final : Engine {
 		logInfo("Command line: ", cmd_line);
 
 		os::logInfo();
-
-		#ifdef _WIN32
-			m_state = lua_newstate(luaAlloc, this);
-		#else 
-			m_state = luaL_newstate();
-		#endif
-		luaL_openlibs(m_state);
-		registerEngineAPI(m_state, this);
 
 		if (init_data.file_system.get()) {
 			m_file_system = static_cast<UniquePtr<FileSystem>&&>(init_data.file_system);
@@ -145,36 +130,15 @@ struct EngineImpl final : Engine {
 		}
 
 		m_prefab_resource_manager.destroy();
-		for (Resource* res : m_lua_resources) {
-			res->decRefCount();
-		}
 
 		m_system_manager.reset();
 		m_input_system.reset();
 		m_file_system.reset();
 
-		lua_close(m_state);
-
 		unregisterLogCallback<&EngineImpl::logToFile>(this);
 		m_log_file.close();
 		m_is_log_file_open = false;
 		os::destroyWindow(m_window_handle);
-	}
-
-	static void* luaAlloc(void* ud, void* ptr, size_t osize, size_t nsize) {
-		EngineImpl* engine = (EngineImpl*)ud;
-		engine->m_lua_allocated = engine->m_lua_allocated + nsize - osize;
-		if (nsize == 0) {
-			if (osize > 0) engine->m_lua_allocator.deallocate(ptr);
-			return nullptr;
-		}
-		if (!ptr) {
-			ASSERT(osize == 0);
-			return engine->m_lua_allocator.allocate(nsize, 8);
-		}
-
-		ASSERT(osize > 0);
-		return engine->m_lua_allocator.reallocate(ptr, nsize, osize, 8);
 	}
 
 	static void logToDebugOutput(LogLevel level, const char* message)
@@ -227,22 +191,8 @@ struct EngineImpl final : Engine {
 		return root;
 	}
 
-	World& createWorld(bool is_main_world) override {
-		World* world = LUMIX_NEW(m_allocator, World)(*this);
-
-		if (is_main_world) {
-			lua_State* L = m_state;
-			lua_getglobal(L, "Lumix"); // [ Lumix ]
-			lua_getfield(L, -1, "World"); // [ Lumix, World ]
-			lua_getfield(L, -1, "new"); // [ Lumix, World, new ]
-			lua_insert(L, -2); // [ Lumix, new, World ]
-			lua_pushlightuserdata(L, world); // [ Lumix, new, World, c_world]
-			lua_call(L, 2, 1); // [ Lumix, world ]
-			lua_setfield(L, -2, "main_world");
-			lua_pop(L, 1);
-		}
-
-		return *world;
+	World& createWorld() override {
+		return *LUMIX_NEW(m_allocator, World)(*this);
 	}
 
 
@@ -333,9 +283,6 @@ struct EngineImpl final : Engine {
 		}
 
 		PROFILE_FUNCTION();
-		static u32 lua_mem_counter = profiler::createCounter("Lua Memory (KB)", 0);
-		profiler::pushCounter(lua_mem_counter, float(double(m_lua_allocated) / 1024.0));
-
 		debug::Allocator* debug_allocator = getDebugAllocator();
 		if (debug_allocator) {
 			static u32 mem_counter = profiler::createCounter("Main allocator (MB)", 0);
@@ -438,45 +385,14 @@ struct EngineImpl final : Engine {
 		}
 	}
 
-	void unloadLuaResource(LuaResourceHandle resource) override
-	{
-		auto iter = m_lua_resources.find(resource);
-		if (!iter.isValid()) return;
-		Resource* res = iter.value();
-		m_lua_resources.erase(iter);
-		res->decRefCount();
-	}
-
-
-	LuaResourceHandle addLuaResource(const Path& path, ResourceType type) override
-	{
-		Resource* res = m_resource_manager.load(type, path);
-		if (!res) return 0xffFFffFF;
-		++m_last_lua_resource_idx;
-		ASSERT(m_last_lua_resource_idx != 0xffFFffFF);
-		m_lua_resources.insert(m_last_lua_resource_idx, res);
-		return m_last_lua_resource_idx;
-	}
-
-
-	Resource* getLuaResource(LuaResourceHandle resource) const override
-	{
-		auto iter = m_lua_resources.find(resource);
-		if (iter.isValid()) return iter.value();
-		return nullptr;
-	}
-
 	SystemManager& getSystemManager() override { return *m_system_manager; }
 	FileSystem& getFileSystem() override { return *m_file_system; }
 	InputSystem& getInputSystem() override { return *m_input_system; }
 	ResourceManagerHub& getResourceManager() override { return m_resource_manager; }
-	lua_State* getState() override { return m_state; }
 	float getLastTimeDelta() const override { return m_smooth_time_delta / m_time_multiplier; }
 
 private:
 	TagAllocator m_allocator;
-	TagAllocator m_lua_allocator;
-	size_t m_lua_allocated = 0;
 	PageAllocator m_page_allocator;
 	UniquePtr<FileSystem> m_file_system;
 	ResourceManagerHub m_resource_manager;
@@ -492,11 +408,8 @@ private:
 	bool m_paused;
 	bool m_next_frame;
 	os::WindowHandle m_window_handle = os::INVALID_WINDOW;
-	lua_State* m_state;
 	os::OutputFile m_log_file;
 	bool m_is_log_file_open = false;
-	HashMap<int, Resource*> m_lua_resources;
-	u32 m_last_lua_resource_idx;
 };
 
 

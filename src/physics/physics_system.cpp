@@ -14,7 +14,6 @@
 #include "cooking/PxCooking.h"
 #include "engine/engine.h"
 #include "core/log.h"
-#include "engine/lua_wrapper.h"
 #include "core/profiler.h"
 #include "engine/resource_manager.h"
 #include "core/string.h"

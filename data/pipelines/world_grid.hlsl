@@ -9,19 +9,20 @@
 //@uniform "Translucency", "normalized_float", 0
 
 Surface getSurface(VSOutput input) {
-	Surface data;
-	float3 t = fmod(abs(input.wpos.xyz + Global_camera_world_pos.xyz + 0.5), float3(2.0f.xxx));
-	float ff = dot(floor(t), float3(1.0f.xxx));
+	float3 t = fmod(abs(input.wpos.xyz + Global_camera_world_pos.xyz + 0.5), 2.0f.xxx);
+	float ff = dot(floor(t), 1.0f.xxx);
 	ff = fmod(ff, 2);
 	float4 c = float4(u_material_color.xyzw);
-	data.albedo = c.rgb * (ff < 1 ? 1.0f.xxx : 0.75f.xxx);
-	data.alpha = c.a;
-	data.ao = 1;
-	data.roughness = u_roughness;
-	data.metallic  = u_metallic;
-	data.N = input.normal;
-	data.emission = u_emission;
-	data.translucency = u_translucency;
-	data.shadow = 1;
-	return data;
+	
+	Surface surface;
+	surface.albedo = c.rgb * (ff < 1 ? 1.0 : 0.75);
+	surface.alpha = c.a;
+	surface.ao = 1;
+	surface.roughness = u_roughness;
+	surface.metallic  = u_metallic;
+	surface.N = input.normal;
+	surface.emission = u_emission;
+	surface.translucency = u_translucency;
+	surface.shadow = 1;
+	return surface;
 }

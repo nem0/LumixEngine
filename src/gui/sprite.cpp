@@ -52,43 +52,20 @@ void Sprite::serialize(OutputMemoryStream& out) {
 }
 
 bool Sprite::load(Span<const u8> mem) {
-	Tokenizer tokenizer(StringView((const char*)mem.begin(), (u32)mem.length()), getPath().c_str());
-
-	for (;;) {
-		Tokenizer::Token token = tokenizer.tryNextToken();
-		switch (token.type) {
-			case Tokenizer::Token::ERROR: return false;
-			case Tokenizer::Token::EOF: return true;
-			default: break;
-		}
-
-		StringView value;
-		if (token == "type") {
-			if (!tokenizer.consume(value)) return false;
-			type = equalIStrings(value, "patch9") ? PATCH9 : SIMPLE;
-		}
-		else if (token == "top") {
-			if (!tokenizer.consume(top)) return false;
-		}
-		else if (token == "bottom") {
-			if (!tokenizer.consume(bottom)) return false;
-		}
-		else if (token == "left") {
-			if (!tokenizer.consume(left)) return false;
-		}
-		else if (token == "right") {
-			if (!tokenizer.consume(right)) return false;
-		}
-		else if (token == "texture") {
-			if (!tokenizer.consume(value)) return false;
-			setTexture(Path(value));
-		}
-		else {
-			logError(getPath(), "(", tokenizer.getLine(), "): Unknown token ", token.value);
-			return false;
-		}
-	}
-
+	StringView type_str, texture_str;
+	const ParseItemDesc descs[] = {
+		{"type", &type_str},
+		{"top", &top},
+		{"bottom", &bottom},
+		{"left", &left},
+		{"right", &right},
+		{"texture", &texture_str}
+	};
+	
+	if (!parse(mem, getPath().c_str(), descs)) return false;
+	
+	type = equalIStrings(type_str, "patch9") ? PATCH9 : SIMPLE;
+	setTexture(Path(texture_str));
 	return true;
 }
 

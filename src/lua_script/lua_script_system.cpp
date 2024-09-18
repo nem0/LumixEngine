@@ -10,7 +10,6 @@
 #include "core/string.h"
 #include "engine/engine.h"
 #include "engine/input_system.h"
-#include "engine/lua_wrapper.h"
 #include "engine/plugin.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
@@ -18,6 +17,7 @@
 #include "gui/gui_module.h"
 #include "lua_script_system.h"
 #include "lua_script/lua_script.h"
+#include "lua_wrapper.h"
 #include "physics/physics_module.h"
 #include "renderer/model.h"
 #include "renderer/render_module.h"
@@ -491,22 +491,289 @@ struct LuaScriptManager final : ResourceManager
 	IAllocator& m_allocator;
 };
 
+void registerEngineAPI(lua_State* L, Engine* engine);
 
-struct LuaScriptSystemImpl final : ISystem
+
+static void registerRendererAPI(lua_State* L, Engine& engine) {
+	auto renderer = (Renderer*)engine.getSystemManager().getSystem("renderer");
+	LuaWrapper::createSystemClosure(L, "Renderer", renderer, "setLODMultiplier", &LuaWrapper::wrapMethodClosure<&Renderer::setLODMultiplier>);
+	LuaWrapper::createSystemClosure(L, "Renderer", renderer, "getLODMultiplier", &LuaWrapper::wrapMethodClosure<&Renderer::getLODMultiplier>);
+}
+
+static void registerInputAPI(lua_State* state) {
+	#define REGISTER_KEYCODE(KEYCODE) \
+		LuaWrapper::createSystemVariable(state, "LumixAPI", "INPUT_KEYCODE_" #KEYCODE, (int)os::Keycode::KEYCODE);
+
+		REGISTER_KEYCODE(LBUTTON); 
+		REGISTER_KEYCODE(RBUTTON); 
+		REGISTER_KEYCODE(CANCEL);
+		REGISTER_KEYCODE(MBUTTON);
+		REGISTER_KEYCODE(BACKSPACE);
+		REGISTER_KEYCODE(TAB);
+		REGISTER_KEYCODE(CLEAR);
+		REGISTER_KEYCODE(RETURN);
+		REGISTER_KEYCODE(SHIFT);
+		REGISTER_KEYCODE(CTRL);
+		REGISTER_KEYCODE(ALT);
+		REGISTER_KEYCODE(PAUSE);
+		REGISTER_KEYCODE(CAPITAL);
+		REGISTER_KEYCODE(KANA);
+		REGISTER_KEYCODE(HANGEUL);
+		REGISTER_KEYCODE(HANGUL);
+		REGISTER_KEYCODE(JUNJA);
+		REGISTER_KEYCODE(FINAL);
+		REGISTER_KEYCODE(HANJA);
+		REGISTER_KEYCODE(KANJI);
+		REGISTER_KEYCODE(ESCAPE);
+		REGISTER_KEYCODE(CONVERT);
+		REGISTER_KEYCODE(NONCONVERT);
+		REGISTER_KEYCODE(ACCEPT);
+		REGISTER_KEYCODE(MODECHANGE);
+		REGISTER_KEYCODE(SPACE);
+		REGISTER_KEYCODE(PAGEUP);
+		REGISTER_KEYCODE(PAGEDOWN);
+		REGISTER_KEYCODE(END);
+		REGISTER_KEYCODE(HOME);
+		REGISTER_KEYCODE(LEFT);
+		REGISTER_KEYCODE(UP);
+		REGISTER_KEYCODE(RIGHT);
+		REGISTER_KEYCODE(DOWN);
+		REGISTER_KEYCODE(SELECT);
+		REGISTER_KEYCODE(PRINT);
+		REGISTER_KEYCODE(EXECUTE);
+		REGISTER_KEYCODE(SNAPSHOT);
+		REGISTER_KEYCODE(INSERT);
+		REGISTER_KEYCODE(DEL);
+		REGISTER_KEYCODE(HELP);
+		REGISTER_KEYCODE(LWIN);
+		REGISTER_KEYCODE(RWIN);
+		REGISTER_KEYCODE(APPS);
+		REGISTER_KEYCODE(SLEEP);
+		REGISTER_KEYCODE(NUMPAD0);
+		REGISTER_KEYCODE(NUMPAD1);
+		REGISTER_KEYCODE(NUMPAD2);
+		REGISTER_KEYCODE(NUMPAD3);
+		REGISTER_KEYCODE(NUMPAD4);
+		REGISTER_KEYCODE(NUMPAD5);
+		REGISTER_KEYCODE(NUMPAD6);
+		REGISTER_KEYCODE(NUMPAD7);
+		REGISTER_KEYCODE(NUMPAD8);
+		REGISTER_KEYCODE(NUMPAD9);
+		REGISTER_KEYCODE(MULTIPLY);
+		REGISTER_KEYCODE(ADD);
+		REGISTER_KEYCODE(SEPARATOR);
+		REGISTER_KEYCODE(SUBTRACT);
+		REGISTER_KEYCODE(DECIMAL);
+		REGISTER_KEYCODE(DIVIDE);
+		REGISTER_KEYCODE(F1);
+		REGISTER_KEYCODE(F2);
+		REGISTER_KEYCODE(F3);
+		REGISTER_KEYCODE(F4);
+		REGISTER_KEYCODE(F5);
+		REGISTER_KEYCODE(F6);
+		REGISTER_KEYCODE(F7);
+		REGISTER_KEYCODE(F8);
+		REGISTER_KEYCODE(F9);
+		REGISTER_KEYCODE(F10);
+		REGISTER_KEYCODE(F11);
+		REGISTER_KEYCODE(F12);
+		REGISTER_KEYCODE(F13);
+		REGISTER_KEYCODE(F14);
+		REGISTER_KEYCODE(F15);
+		REGISTER_KEYCODE(F16);
+		REGISTER_KEYCODE(F17);
+		REGISTER_KEYCODE(F18);
+		REGISTER_KEYCODE(F19);
+		REGISTER_KEYCODE(F20);
+		REGISTER_KEYCODE(F21);
+		REGISTER_KEYCODE(F22);
+		REGISTER_KEYCODE(F23);
+		REGISTER_KEYCODE(F24);
+		REGISTER_KEYCODE(NUMLOCK);
+		REGISTER_KEYCODE(SCROLL);
+		REGISTER_KEYCODE(OEM_NEC_EQUAL);
+		REGISTER_KEYCODE(OEM_FJ_JISHO);
+		REGISTER_KEYCODE(OEM_FJ_MASSHOU);
+		REGISTER_KEYCODE(OEM_FJ_TOUROKU);
+		REGISTER_KEYCODE(OEM_FJ_LOYA);
+		REGISTER_KEYCODE(OEM_FJ_ROYA);
+		REGISTER_KEYCODE(LSHIFT);
+		REGISTER_KEYCODE(RSHIFT);
+		REGISTER_KEYCODE(LCTRL);
+		REGISTER_KEYCODE(RCTRL);
+		REGISTER_KEYCODE(LALT);
+		REGISTER_KEYCODE(RALT);
+		REGISTER_KEYCODE(BROWSER_BACK);
+		REGISTER_KEYCODE(BROWSER_FORWARD);
+		REGISTER_KEYCODE(BROWSER_REFRESH);
+		REGISTER_KEYCODE(BROWSER_STOP);
+		REGISTER_KEYCODE(BROWSER_SEARCH);
+		REGISTER_KEYCODE(BROWSER_FAVORITES);
+		REGISTER_KEYCODE(BROWSER_HOME);
+		REGISTER_KEYCODE(VOLUME_MUTE);
+		REGISTER_KEYCODE(VOLUME_DOWN);
+		REGISTER_KEYCODE(VOLUME_UP);
+		REGISTER_KEYCODE(MEDIA_NEXT_TRACK);
+		REGISTER_KEYCODE(MEDIA_PREV_TRACK);
+		REGISTER_KEYCODE(MEDIA_STOP);
+		REGISTER_KEYCODE(MEDIA_PLAY_PAUSE);
+		REGISTER_KEYCODE(LAUNCH_MAIL);
+		REGISTER_KEYCODE(LAUNCH_MEDIA_SELECT);
+		REGISTER_KEYCODE(LAUNCH_APP1);
+		REGISTER_KEYCODE(LAUNCH_APP2);
+		REGISTER_KEYCODE(OEM_1);
+		REGISTER_KEYCODE(OEM_PLUS);
+		REGISTER_KEYCODE(OEM_COMMA);
+		REGISTER_KEYCODE(OEM_MINUS);
+		REGISTER_KEYCODE(OEM_PERIOD);
+		REGISTER_KEYCODE(OEM_2);
+		REGISTER_KEYCODE(OEM_3);
+		REGISTER_KEYCODE(OEM_4);
+		REGISTER_KEYCODE(OEM_5);
+		REGISTER_KEYCODE(OEM_6);
+		REGISTER_KEYCODE(OEM_7);
+		REGISTER_KEYCODE(OEM_8);
+		REGISTER_KEYCODE(OEM_AX);
+		REGISTER_KEYCODE(OEM_102);
+		REGISTER_KEYCODE(ICO_HELP);
+		REGISTER_KEYCODE(ICO_00);
+		REGISTER_KEYCODE(PROCESSKEY);
+		REGISTER_KEYCODE(ICO_CLEAR);
+		REGISTER_KEYCODE(PACKET);
+		REGISTER_KEYCODE(OEM_RESET);
+		REGISTER_KEYCODE(OEM_JUMP);
+		REGISTER_KEYCODE(OEM_PA1);
+		REGISTER_KEYCODE(OEM_PA2);
+		REGISTER_KEYCODE(OEM_PA3);
+		REGISTER_KEYCODE(OEM_WSCTRL);
+		REGISTER_KEYCODE(OEM_CUSEL);
+		REGISTER_KEYCODE(OEM_ATTN);
+		REGISTER_KEYCODE(OEM_FINISH);
+		REGISTER_KEYCODE(OEM_COPY);
+		REGISTER_KEYCODE(OEM_AUTO);
+		REGISTER_KEYCODE(OEM_ENLW);
+		REGISTER_KEYCODE(OEM_BACKTAB);
+		REGISTER_KEYCODE(ATTN);
+		REGISTER_KEYCODE(CRSEL);
+		REGISTER_KEYCODE(EXSEL);
+		REGISTER_KEYCODE(EREOF);
+		REGISTER_KEYCODE(PLAY);
+		REGISTER_KEYCODE(ZOOM);
+		REGISTER_KEYCODE(NONAME);
+		REGISTER_KEYCODE(PA1);
+		REGISTER_KEYCODE(OEM_CLEAR);
+
+	#undef REGISTER_KEYCODE
+}
+static int LUA_raycast(lua_State* L)
+{
+	auto* module = LuaWrapper::checkArg<PhysicsModule*>(L, 1);
+	Vec3 origin = LuaWrapper::checkArg<Vec3>(L, 2);
+	Vec3 dir = LuaWrapper::checkArg<Vec3>(L, 3);
+	const int layer = lua_gettop(L) > 3 ? LuaWrapper::checkArg<int>(L, 4) : -1;
+	RaycastHit hit;
+	if (module->raycastEx(origin, dir, FLT_MAX, hit, INVALID_ENTITY, layer))
+	{
+		LuaWrapper::push(L, hit.entity != INVALID_ENTITY);
+		LuaWrapper::pushEntity(L, hit.entity, &module->getWorld());
+		LuaWrapper::push(L, hit.position);
+		LuaWrapper::push(L, hit.normal);
+		return 4;
+	}
+	LuaWrapper::push(L, false);
+	return 1;
+}
+
+
+static int LUA_castCameraRay(lua_State* L)
+{
+	LuaWrapper::checkTableArg(L, 1);
+	if (LuaWrapper::getField(L, 1, "_module") != LUA_TLIGHTUSERDATA) {
+		LuaWrapper::argError(L, 1, "module");
+	}
+	RenderModule* module = LuaWrapper::toType<RenderModule*>(L, -1);
+	lua_pop(L, 1);
+	EntityRef camera_entity = LuaWrapper::checkArg<EntityRef>(L, 2);
+	float x, y;
+	if (lua_gettop(L) > 3) {
+		x = LuaWrapper::checkArg<float>(L, 3);
+		y = LuaWrapper::checkArg<float>(L, 4);
+	}
+	else {
+		x = module->getCameraScreenWidth(camera_entity) * 0.5f;
+		y = module->getCameraScreenHeight(camera_entity) * 0.5f;
+	}
+
+	const Ray ray = module->getCameraRay(camera_entity, {x, y});
+
+	RayCastModelHit hit = module->castRay(ray, INVALID_ENTITY);
+	LuaWrapper::push(L, hit.is_hit);
+	LuaWrapper::push(L, hit.is_hit ? hit.origin + hit.dir * hit.t : DVec3(0));
+	LuaWrapper::pushEntity(L, hit.is_hit ? hit.entity : INVALID_ENTITY, &module->getWorld());
+
+	return 3;
+}
+
+struct LuaScriptSystemImpl final : LuaScriptSystem
 {
 	explicit LuaScriptSystemImpl(Engine& engine);
 	virtual ~LuaScriptSystemImpl();
 
-	void initBegin() override;
+	void initEnd() {
+		PROFILE_FUNCTION();
+		registerEngineAPI(m_state, &m_engine);
+		registerInputAPI(m_state);
+		registerRendererAPI(m_state, m_engine);
+		LuaWrapper::createSystemFunction(m_state, "Physics", "raycast", &LUA_raycast);
+		createClasses(m_state);
+	}
+
 	void createModules(World& world) override;
 	const char* getName() const override { return "lua_script"; }
 	LuaScriptManager& getScriptManager() { return m_script_manager; }
 	void serialize(OutputMemoryStream& stream) const override {}
 	bool deserialize(i32 version, InputMemoryStream& stream) override { return version == 0; }
+	lua_State* getState() override { return m_state; }
+
+	void update(float dt) override {
+		static u32 lua_mem_counter = profiler::createCounter("Lua Memory (KB)", 0);
+		profiler::pushCounter(lua_mem_counter, float(double(m_lua_allocated) / 1024.0));
+	}
+
+	void unloadLuaResource(LuaResourceHandle resource) override
+	{
+		auto iter = m_lua_resources.find(resource);
+		if (!iter.isValid()) return;
+		Resource* res = iter.value();
+		m_lua_resources.erase(iter);
+		res->decRefCount();
+	}
+
+	LuaResourceHandle addLuaResource(const Path& path, ResourceType type) override
+	{
+		Resource* res = m_engine.getResourceManager().load(type, path);
+		if (!res) return 0xffFFffFF;
+		++m_last_lua_resource_idx;
+		ASSERT(m_last_lua_resource_idx != 0xffFFffFF);
+		m_lua_resources.insert(m_last_lua_resource_idx, res);
+		return m_last_lua_resource_idx;
+	}
+
+	Resource* getLuaResource(LuaResourceHandle resource) const override
+	{
+		auto iter = m_lua_resources.find(resource);
+		if (iter.isValid()) return iter.value();
+		return nullptr;
+	}
 
 	TagAllocator m_allocator;
+	TagAllocator m_lua_allocator;
+	lua_State* m_state;
 	Engine& m_engine;
 	LuaScriptManager m_script_manager;
+	size_t m_lua_allocated = 0;
+	HashMap<int, Resource*> m_lua_resources;
+	u32 m_last_lua_resource_idx = -1;
 };
 
 
@@ -548,7 +815,7 @@ struct LuaScriptModuleImpl final : LuaScriptModule
 		{
 			LuaScriptModuleImpl& module = cmp.m_module;
 			Engine& engine = module.m_system.m_engine;
-			lua_State* L = engine.getState();
+			lua_State* L = module.m_system.m_state;
 			LuaWrapper::DebugGuard guard(L);
 			m_state = lua_newthread(L);
 			m_thread_ref = LuaWrapper::createRef(L);
@@ -629,8 +896,7 @@ struct LuaScriptModuleImpl final : LuaScriptModule
 
 				m_cmp->m_module.disableScript(*this);
 
-				Engine& engine = m_cmp->m_module.m_system.m_engine;
-				lua_State* L = engine.getState();
+				lua_State* L = m_cmp->m_module.m_system.m_state;
 				LuaWrapper::releaseRef(L, m_thread_ref);
 				LuaWrapper::releaseRef(m_state, m_environment);
 			}
@@ -651,8 +917,7 @@ struct LuaScriptModuleImpl final : LuaScriptModule
 			, m_entity(entity)
 			, m_module(module)
 		{
-			Engine& engine = module.m_system.m_engine;
-			lua_State* L = engine.getState();
+			lua_State* L = module.m_system.m_state;
 			m_state = lua_newthread(L);
 			m_thread_ref = LuaWrapper::createRef(L);
 			lua_pop(L, 1); // []
@@ -698,8 +963,7 @@ struct LuaScriptModuleImpl final : LuaScriptModule
 			
 			m_module.disableScript(*this);
 
-			Engine& engine = m_module.m_system.m_engine;
-			lua_State* L = engine.getState();
+			lua_State* L = m_module.m_system.m_state;
 			LuaWrapper::releaseRef(L, m_thread_ref);
 			LuaWrapper::releaseRef(m_state, m_environment);
 		}
@@ -1105,7 +1369,7 @@ public:
 
 	void registerPropertyAPI()
 	{
-		lua_State* L = m_system.m_engine.getState();
+		lua_State* L = m_system.m_state;
 		auto f = &LuaWrapper::wrap<&setPropertyType>;
 		LuaWrapper::createSystemFunction(L, "Editor", "setPropertyType", f);
 		LuaWrapper::createSystemVariable(L, "Editor", "BOOLEAN_PROPERTY", Property::BOOLEAN);
@@ -1542,7 +1806,7 @@ public:
 
 	void registerProperties()
 	{
-		lua_State* L = m_system.m_engine.getState();
+		lua_State* L = m_system.m_state;
 		LuaWrapper::DebugGuard guard(L);
 
 		reflection::Module* module = reflection::getFirstModule();
@@ -1632,7 +1896,7 @@ public:
 
 		m_is_api_registered = true;
 
-		lua_State* engine_state = m_system.m_engine.getState();
+		lua_State* engine_state = m_system.m_state;
 			
 		registerProperties();
 		registerPropertyAPI();
@@ -1701,10 +1965,10 @@ public:
 		ASSERT(lua_type(script.m_state, -1));
 		lua_getfield(script.m_state, -1, name);
 		int res_idx = LuaWrapper::toType<int>(script.m_state, -1);
-		m_system.m_engine.unloadLuaResource(res_idx);
+		m_system.unloadLuaResource(res_idx);
 		lua_pop(script.m_state, 1);
 
-		int new_res = path[0] ? m_system.m_engine.addLuaResource(Path(path), prop.resource_type) : -1;
+		int new_res = path[0] ? m_system.addLuaResource(Path(path), prop.resource_type) : -1;
 		lua_pushinteger(script.m_state, new_res);
 		lua_setfield(script.m_state, -2, name);
 		lua_pop(script.m_state, 1);
@@ -2147,7 +2411,7 @@ public:
 			case Property::RESOURCE:
 			{
 				int res_idx = LuaWrapper::toType<int>(scr.m_state, -1);
-				Resource* res = m_system.m_engine.getLuaResource(res_idx);
+				Resource* res = m_system.getLuaResource(res_idx);
 				copyString(out, res ? res->getPath() : Path());
 			}
 			break;
@@ -2736,7 +3000,7 @@ struct LuaProperties : reflection::DynamicProperties {
 					reflection::set(v, ""); 
 				}
 				else {
-					Resource* res = module.m_system.m_engine.getLuaResource(res_idx);
+					Resource* res = module.m_system.getLuaResource(res_idx);
 					reflection::set(v, res ? res->getPath().c_str() : ""); 
 				}
 				break;
@@ -2913,12 +3177,37 @@ static int LUA_dofile(lua_State* L) {
 	return finishrequire(L);
 }
 
+static void* luaAlloc(void* ud, void* ptr, size_t osize, size_t nsize) {
+	LuaScriptSystemImpl* system = (LuaScriptSystemImpl*)ud;
+	system->m_lua_allocated = system->m_lua_allocated + nsize - osize;
+	if (nsize == 0) {
+		if (osize > 0) system->m_lua_allocator.deallocate(ptr);
+		return nullptr;
+	}
+	if (!ptr) {
+		ASSERT(osize == 0);
+		return system->m_lua_allocator.allocate(nsize, 8);
+	}
+
+	ASSERT(osize > 0);
+	return system->m_lua_allocator.reallocate(ptr, nsize, osize, 8);
+}
+
 LuaScriptSystemImpl::LuaScriptSystemImpl(Engine& engine)
 	: m_engine(engine)
 	, m_allocator(engine.getAllocator(), "lua system")
 	, m_script_manager(m_allocator)
+	, m_lua_allocator(engine.getAllocator(), "luau")
+	, m_lua_resources(m_allocator)
 {
-	lua_State* L = engine.getState();
+	#ifdef _WIN32
+		m_state = lua_newstate(luaAlloc, this);
+	#else 
+		m_state = luaL_newstate();
+	#endif
+	luaL_openlibs(m_state);
+	
+	lua_State* L = m_state;
 	lua_pushlightuserdata(L, &engine);
 	lua_pushcclosure(L, &LUA_require, "require", 1);
 	lua_setglobal(L, "require");
@@ -2941,238 +3230,13 @@ LuaScriptSystemImpl::LuaScriptSystemImpl(Engine& engine)
 			.end_array();
 }
 
-static int LUA_raycast(lua_State* L)
-{
-	auto* module = LuaWrapper::checkArg<PhysicsModule*>(L, 1);
-	Vec3 origin = LuaWrapper::checkArg<Vec3>(L, 2);
-	Vec3 dir = LuaWrapper::checkArg<Vec3>(L, 3);
-	const int layer = lua_gettop(L) > 3 ? LuaWrapper::checkArg<int>(L, 4) : -1;
-	RaycastHit hit;
-	if (module->raycastEx(origin, dir, FLT_MAX, hit, INVALID_ENTITY, layer))
-	{
-		LuaWrapper::push(L, hit.entity != INVALID_ENTITY);
-		LuaWrapper::pushEntity(L, hit.entity, &module->getWorld());
-		LuaWrapper::push(L, hit.position);
-		LuaWrapper::push(L, hit.normal);
-		return 4;
-	}
-	LuaWrapper::push(L, false);
-	return 1;
-}
-
-
-static int LUA_castCameraRay(lua_State* L)
-{
-	LuaWrapper::checkTableArg(L, 1);
-	if (LuaWrapper::getField(L, 1, "_module") != LUA_TLIGHTUSERDATA) {
-		LuaWrapper::argError(L, 1, "module");
-	}
-	RenderModule* module = LuaWrapper::toType<RenderModule*>(L, -1);
-	lua_pop(L, 1);
-	EntityRef camera_entity = LuaWrapper::checkArg<EntityRef>(L, 2);
-	float x, y;
-	if (lua_gettop(L) > 3) {
-		x = LuaWrapper::checkArg<float>(L, 3);
-		y = LuaWrapper::checkArg<float>(L, 4);
-	}
-	else {
-		x = module->getCameraScreenWidth(camera_entity) * 0.5f;
-		y = module->getCameraScreenHeight(camera_entity) * 0.5f;
-	}
-
-	const Ray ray = module->getCameraRay(camera_entity, {x, y});
-
-	RayCastModelHit hit = module->castRay(ray, INVALID_ENTITY);
-	LuaWrapper::push(L, hit.is_hit);
-	LuaWrapper::push(L, hit.is_hit ? hit.origin + hit.dir * hit.t : DVec3(0));
-	LuaWrapper::pushEntity(L, hit.is_hit ? hit.entity : INVALID_ENTITY, &module->getWorld());
-
-	return 3;
-}
-
-
-static void registerRendererAPI(lua_State* L, Engine& engine) {
-	auto renderer = (Renderer*)engine.getSystemManager().getSystem("renderer");
-	LuaWrapper::createSystemClosure(L, "Renderer", renderer, "setLODMultiplier", &LuaWrapper::wrapMethodClosure<&Renderer::setLODMultiplier>);
-	LuaWrapper::createSystemClosure(L, "Renderer", renderer, "getLODMultiplier", &LuaWrapper::wrapMethodClosure<&Renderer::getLODMultiplier>);
-}
-
-static void registerInputAPI(lua_State* state) {
-	#define REGISTER_KEYCODE(KEYCODE) \
-		LuaWrapper::createSystemVariable(state, "LumixAPI", "INPUT_KEYCODE_" #KEYCODE, (int)os::Keycode::KEYCODE);
-
-		REGISTER_KEYCODE(LBUTTON); 
-		REGISTER_KEYCODE(RBUTTON); 
-		REGISTER_KEYCODE(CANCEL);
-		REGISTER_KEYCODE(MBUTTON);
-		REGISTER_KEYCODE(BACKSPACE);
-		REGISTER_KEYCODE(TAB);
-		REGISTER_KEYCODE(CLEAR);
-		REGISTER_KEYCODE(RETURN);
-		REGISTER_KEYCODE(SHIFT);
-		REGISTER_KEYCODE(CTRL);
-		REGISTER_KEYCODE(ALT);
-		REGISTER_KEYCODE(PAUSE);
-		REGISTER_KEYCODE(CAPITAL);
-		REGISTER_KEYCODE(KANA);
-		REGISTER_KEYCODE(HANGEUL);
-		REGISTER_KEYCODE(HANGUL);
-		REGISTER_KEYCODE(JUNJA);
-		REGISTER_KEYCODE(FINAL);
-		REGISTER_KEYCODE(HANJA);
-		REGISTER_KEYCODE(KANJI);
-		REGISTER_KEYCODE(ESCAPE);
-		REGISTER_KEYCODE(CONVERT);
-		REGISTER_KEYCODE(NONCONVERT);
-		REGISTER_KEYCODE(ACCEPT);
-		REGISTER_KEYCODE(MODECHANGE);
-		REGISTER_KEYCODE(SPACE);
-		REGISTER_KEYCODE(PAGEUP);
-		REGISTER_KEYCODE(PAGEDOWN);
-		REGISTER_KEYCODE(END);
-		REGISTER_KEYCODE(HOME);
-		REGISTER_KEYCODE(LEFT);
-		REGISTER_KEYCODE(UP);
-		REGISTER_KEYCODE(RIGHT);
-		REGISTER_KEYCODE(DOWN);
-		REGISTER_KEYCODE(SELECT);
-		REGISTER_KEYCODE(PRINT);
-		REGISTER_KEYCODE(EXECUTE);
-		REGISTER_KEYCODE(SNAPSHOT);
-		REGISTER_KEYCODE(INSERT);
-		REGISTER_KEYCODE(DEL);
-		REGISTER_KEYCODE(HELP);
-		REGISTER_KEYCODE(LWIN);
-		REGISTER_KEYCODE(RWIN);
-		REGISTER_KEYCODE(APPS);
-		REGISTER_KEYCODE(SLEEP);
-		REGISTER_KEYCODE(NUMPAD0);
-		REGISTER_KEYCODE(NUMPAD1);
-		REGISTER_KEYCODE(NUMPAD2);
-		REGISTER_KEYCODE(NUMPAD3);
-		REGISTER_KEYCODE(NUMPAD4);
-		REGISTER_KEYCODE(NUMPAD5);
-		REGISTER_KEYCODE(NUMPAD6);
-		REGISTER_KEYCODE(NUMPAD7);
-		REGISTER_KEYCODE(NUMPAD8);
-		REGISTER_KEYCODE(NUMPAD9);
-		REGISTER_KEYCODE(MULTIPLY);
-		REGISTER_KEYCODE(ADD);
-		REGISTER_KEYCODE(SEPARATOR);
-		REGISTER_KEYCODE(SUBTRACT);
-		REGISTER_KEYCODE(DECIMAL);
-		REGISTER_KEYCODE(DIVIDE);
-		REGISTER_KEYCODE(F1);
-		REGISTER_KEYCODE(F2);
-		REGISTER_KEYCODE(F3);
-		REGISTER_KEYCODE(F4);
-		REGISTER_KEYCODE(F5);
-		REGISTER_KEYCODE(F6);
-		REGISTER_KEYCODE(F7);
-		REGISTER_KEYCODE(F8);
-		REGISTER_KEYCODE(F9);
-		REGISTER_KEYCODE(F10);
-		REGISTER_KEYCODE(F11);
-		REGISTER_KEYCODE(F12);
-		REGISTER_KEYCODE(F13);
-		REGISTER_KEYCODE(F14);
-		REGISTER_KEYCODE(F15);
-		REGISTER_KEYCODE(F16);
-		REGISTER_KEYCODE(F17);
-		REGISTER_KEYCODE(F18);
-		REGISTER_KEYCODE(F19);
-		REGISTER_KEYCODE(F20);
-		REGISTER_KEYCODE(F21);
-		REGISTER_KEYCODE(F22);
-		REGISTER_KEYCODE(F23);
-		REGISTER_KEYCODE(F24);
-		REGISTER_KEYCODE(NUMLOCK);
-		REGISTER_KEYCODE(SCROLL);
-		REGISTER_KEYCODE(OEM_NEC_EQUAL);
-		REGISTER_KEYCODE(OEM_FJ_JISHO);
-		REGISTER_KEYCODE(OEM_FJ_MASSHOU);
-		REGISTER_KEYCODE(OEM_FJ_TOUROKU);
-		REGISTER_KEYCODE(OEM_FJ_LOYA);
-		REGISTER_KEYCODE(OEM_FJ_ROYA);
-		REGISTER_KEYCODE(LSHIFT);
-		REGISTER_KEYCODE(RSHIFT);
-		REGISTER_KEYCODE(LCTRL);
-		REGISTER_KEYCODE(RCTRL);
-		REGISTER_KEYCODE(LALT);
-		REGISTER_KEYCODE(RALT);
-		REGISTER_KEYCODE(BROWSER_BACK);
-		REGISTER_KEYCODE(BROWSER_FORWARD);
-		REGISTER_KEYCODE(BROWSER_REFRESH);
-		REGISTER_KEYCODE(BROWSER_STOP);
-		REGISTER_KEYCODE(BROWSER_SEARCH);
-		REGISTER_KEYCODE(BROWSER_FAVORITES);
-		REGISTER_KEYCODE(BROWSER_HOME);
-		REGISTER_KEYCODE(VOLUME_MUTE);
-		REGISTER_KEYCODE(VOLUME_DOWN);
-		REGISTER_KEYCODE(VOLUME_UP);
-		REGISTER_KEYCODE(MEDIA_NEXT_TRACK);
-		REGISTER_KEYCODE(MEDIA_PREV_TRACK);
-		REGISTER_KEYCODE(MEDIA_STOP);
-		REGISTER_KEYCODE(MEDIA_PLAY_PAUSE);
-		REGISTER_KEYCODE(LAUNCH_MAIL);
-		REGISTER_KEYCODE(LAUNCH_MEDIA_SELECT);
-		REGISTER_KEYCODE(LAUNCH_APP1);
-		REGISTER_KEYCODE(LAUNCH_APP2);
-		REGISTER_KEYCODE(OEM_1);
-		REGISTER_KEYCODE(OEM_PLUS);
-		REGISTER_KEYCODE(OEM_COMMA);
-		REGISTER_KEYCODE(OEM_MINUS);
-		REGISTER_KEYCODE(OEM_PERIOD);
-		REGISTER_KEYCODE(OEM_2);
-		REGISTER_KEYCODE(OEM_3);
-		REGISTER_KEYCODE(OEM_4);
-		REGISTER_KEYCODE(OEM_5);
-		REGISTER_KEYCODE(OEM_6);
-		REGISTER_KEYCODE(OEM_7);
-		REGISTER_KEYCODE(OEM_8);
-		REGISTER_KEYCODE(OEM_AX);
-		REGISTER_KEYCODE(OEM_102);
-		REGISTER_KEYCODE(ICO_HELP);
-		REGISTER_KEYCODE(ICO_00);
-		REGISTER_KEYCODE(PROCESSKEY);
-		REGISTER_KEYCODE(ICO_CLEAR);
-		REGISTER_KEYCODE(PACKET);
-		REGISTER_KEYCODE(OEM_RESET);
-		REGISTER_KEYCODE(OEM_JUMP);
-		REGISTER_KEYCODE(OEM_PA1);
-		REGISTER_KEYCODE(OEM_PA2);
-		REGISTER_KEYCODE(OEM_PA3);
-		REGISTER_KEYCODE(OEM_WSCTRL);
-		REGISTER_KEYCODE(OEM_CUSEL);
-		REGISTER_KEYCODE(OEM_ATTN);
-		REGISTER_KEYCODE(OEM_FINISH);
-		REGISTER_KEYCODE(OEM_COPY);
-		REGISTER_KEYCODE(OEM_AUTO);
-		REGISTER_KEYCODE(OEM_ENLW);
-		REGISTER_KEYCODE(OEM_BACKTAB);
-		REGISTER_KEYCODE(ATTN);
-		REGISTER_KEYCODE(CRSEL);
-		REGISTER_KEYCODE(EXSEL);
-		REGISTER_KEYCODE(EREOF);
-		REGISTER_KEYCODE(PLAY);
-		REGISTER_KEYCODE(ZOOM);
-		REGISTER_KEYCODE(NONAME);
-		REGISTER_KEYCODE(PA1);
-		REGISTER_KEYCODE(OEM_CLEAR);
-
-	#undef REGISTER_KEYCODE
-}
-
-void LuaScriptSystemImpl::initBegin() {
-	PROFILE_FUNCTION();
-	createClasses(m_engine.getState());
-	registerInputAPI(m_engine.getState());
-	registerRendererAPI(m_engine.getState(), m_engine);
-	LuaWrapper::createSystemFunction(m_engine.getState(), "Physics", "raycast", &LUA_raycast);
-}
 
 LuaScriptSystemImpl::~LuaScriptSystemImpl()
 {
+	for (Resource* res : m_lua_resources) {
+		res->decRefCount();
+	}
+	lua_close(m_state);
 	m_script_manager.destroy();
 }
 

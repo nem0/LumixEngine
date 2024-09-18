@@ -164,7 +164,7 @@ struct Runner final
 			captureMouse(true);
 		}
 
-		m_world = &m_engine->createWorld(true);
+		m_world = &m_engine->createWorld();
 		initRenderPipeline();
 		
 		auto* gui = static_cast<GUISystem*>(m_engine->getSystemManager().getSystem("gui"));

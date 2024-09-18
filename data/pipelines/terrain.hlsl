@@ -24,14 +24,6 @@ cbuffer Drawcall : register(b4) {
 	float4 u_terrain_scale;
 	float2 u_hm_size;
 	float u_cell_size;
-	/*
-	layout(binding=0) uniform sampler2D u_hm;
-	layout(binding=1) uniform sampler2DArray t_albedo;
-	layout(binding=2) uniform sampler2DArray t_normal;
-	layout(binding=3) uniform sampler2D t_splatmap;
-	layout(binding=4) uniform sampler2D t_satellite;
-	layout(binding=5) uniform sampler2D t_noise;
-	*/
 };
 
 struct VSOutput {

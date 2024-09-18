@@ -345,7 +345,10 @@ struct ShaderCompiler {
 			program.attributes[i].InstanceDataStepRate = instanced ? 1 : 0;
 		}
 
-		const StableHash32 hash(src, stringLength(src));
+		RollingStableHasher hasher;
+		hasher.update(src, stringLength(src));
+		hasher.update(&program.primitive_topology, sizeof(program.primitive_topology));
+		const StableHash32 hash = hasher.end();
 		program.shader_hash = hash;
 		if (type == ShaderType::SURFACE) {
 			// TODO surface shader cache

@@ -314,7 +314,7 @@ public:
 
 	World& createPrefabWorld(EntityRef src_e, Array<EntityRef>& entities) {
 		Engine& engine = m_editor.getEngine();
-		World& dst = engine.createWorld(false);
+		World& dst = engine.createWorld();
 		World& src = *m_editor.getWorld();
 
 		HashMap<EntityPtr, EntityPtr> map(m_editor.getAllocator());

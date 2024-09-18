@@ -9,13 +9,16 @@
 // some functions can return unexpected results e.g. stringLength returns number of bytes for utf-8, not number of characters
 
 namespace Lumix {
+	
 struct IAllocator;
 template <int SIZE> struct StaticString;
 
 LUMIX_CORE_API int stringLength(const char* str);
 
+// a range of characters between begin (inclusive) and end (exclusive)
 struct LUMIX_CORE_API StringView {
 	StringView() {}
+	StringView(Span<const u8> str) : begin((const char*)str.m_begin), end((const char*)str.m_end) {}
 	StringView(const char* str) : begin(str), end(str ? str + stringLength(str) : 0) {}
 	StringView(const char* str, u32 len) : begin(str), end(str + len) {}
 	StringView(const char* begin, const char* end) : begin(begin), end(end) {}

@@ -159,14 +159,6 @@ struct AnimationModuleImpl final : AnimationModule {
 	}
 
 
-	float getAnimationLength(int animation_idx) override
-	{
-		auto* animation = static_cast<Animation*>(animation_idx > 0 ? m_engine.getLuaResource(animation_idx) : nullptr);
-		if (animation) return animation->getLength().seconds();
-		return 0;
-	}
-
-
 	Animable& getAnimable(EntityRef entity) override
 	{
 		return m_animables[entity];

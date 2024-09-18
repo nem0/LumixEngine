@@ -1,6 +1,7 @@
 // global space - topmost space, objects in the engine are placed in this space
 // world space - centered on camera, orientation same as global space, we send position from cpu to gpu in this space (in most cases)
 // view space - centered on camera, orientation matches camera orientation
+// local space - a.k.a. object space, centered on object, orientation matches object orientation 
 // NDC space - normalized device coordinates, z is in [0, 1] range
 // we use reverse z with infinite far plane
 // space is usually specified in the name of the variable by postfix, WS for world space, VS for view space, etc.

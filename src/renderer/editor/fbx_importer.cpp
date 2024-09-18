@@ -2645,7 +2645,7 @@ bool FBXImporter::writePhysics(const Path& src, const ImportConfig& cfg, bool sp
 bool FBXImporter::writePrefab(const Path& src, const ImportConfig& cfg, bool split_meshes)
 {
 	Engine& engine = m_app.getEngine();
-	World& world = engine.createWorld(false);
+	World& world = engine.createWorld();
 
 	os::OutputFile file;
 	PathInfo file_info(src);

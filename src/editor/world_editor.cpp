@@ -2391,7 +2391,7 @@ public:
 			m_entity_folders.destroy();
 			m_engine.destroyWorld(*m_world);
 			
-			m_world = &m_engine.createWorld(true);
+			m_world = &m_engine.createWorld();
 			m_entity_folders.create(*m_world, m_allocator);
 			m_prefab_system->setWorld(m_world);
 			m_world_created.invoke();
@@ -2997,7 +2997,7 @@ public:
 
 		m_is_world_changed = false;
 		clearUndoStack();
-		m_world = &m_engine.createWorld(true);
+		m_world = &m_engine.createWorld();
 		World* world = m_world;
 
 		world->entityDestroyed().bind<&WorldEditorImpl::onEntityDestroyed>(this);

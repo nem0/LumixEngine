@@ -77,7 +77,10 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 			if (m_model) m_model->decRefCount();
 		}
 
-		void deserialize(InputMemoryStream& blob) override { m_parent_meta.deserialize(blob, Path("undo/redo")); }
+		void deserialize(InputMemoryStream& blob) override {
+			StringView sv((const char*)blob.getData(), (u32)blob.size());
+			m_parent_meta.deserialize(sv, Path("undo/redo"));
+		}
 		void serialize(OutputMemoryStream& blob) override { m_parent_meta.serialize(blob, Path()); }
 
 		void saveUndo(bool changed) {
