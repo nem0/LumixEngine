@@ -5,7 +5,7 @@
 
 struct VSInput {
 	float3 position : TEXCOORD0;
-	float3 i_pos : TEXCOORD1;
+	float3 i_pos_ws : TEXCOORD1;
 	float4 i_rot : TEXCOORD2;
 	float3 i_half_extents : TEXCOORD3;
 	float2 i_uv_scale : TEXCOORD4;
@@ -13,7 +13,7 @@ struct VSInput {
 
 struct VSOutput {
 	float3 half_extents : TEXCOORD0;
-	float3 pos : TEXCOORD1;
+	float3 pos_ws : TEXCOORD1;
 	float4 rot : TEXCOORD2;
 	float2 uv_scale : TEXCOORD3;
 	float4 position : SV_POSITION;
@@ -25,25 +25,26 @@ cbuffer DC : register(b4) {
 
 VSOutput mainVS(VSInput input) {
 	VSOutput output;
-	output.pos = input.i_pos;
+	output.pos_ws = input.i_pos_ws;
 	output.rot = input.i_rot;
 	output.rot.w = -output.rot.w;
 	output.half_extents = input.i_half_extents;
-	float3 pos = rotateByQuat(input.i_rot, input.position * input.i_half_extents);
-	pos += input.i_pos;
+	float3 pos_ws = rotateByQuat(input.i_rot, input.position * input.i_half_extents);
+	pos_ws += input.i_pos_ws;
 	output.uv_scale = input.i_uv_scale;
-	output.position = mul(float4(pos, 1), mul(Global_view, Global_projection));
+	output.position = mul(float4(pos_ws, 1), mul(Global_view, Global_projection));
 	return output;
 }
 
 GBufferOutput mainPS(VSOutput input) {
 	float2 screen_uv = input.position.xy / Global_framebuffer_size;
-	float3 wpos = getPositionWS(u_gbuffer_depth, screen_uv);
-	
-	float3 lpos = rotateByQuat(input.rot, wpos - input.pos);
-	if (any(abs(lpos) > input.half_extents)) discard;
+	float3 pos_ws = getPositionWS(u_gbuffer_depth, screen_uv);
+	float3 pos_ls = rotateByQuat(input.rot, pos_ws - input.pos_ws);
 
-	float2 uv = (lpos.xz / input.half_extents.xz * 0.5 + 0.5) * input.uv_scale;	
+	bool is_in_decal_volume = any(abs(pos_ls) > input.half_extents);
+	if (is_in_decal_volume) discard;
+
+	float2 uv = (pos_ls.xz / input.half_extents.xz * 0.5 + 0.5) * input.uv_scale;	
 	float4 color = sampleBindless(LinearSampler, t_texture, uv);
 	//if (color.a < 0.01) discard;
 	color.rgb *= u_material_color.rgb;

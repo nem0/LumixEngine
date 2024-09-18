@@ -92,13 +92,13 @@ struct HashMap
 private:
 	struct Slot {
 		alignas(Key) u8 key_mem[sizeof(Key)];
-		alignas(Value) Value value_mem[sizeof(Value)];
+		alignas(Value) u8 value_mem[sizeof(Value)];
+		bool valid;
 		
 		Value& value() { return *(Value*)value_mem; }
 		Key& key() { return *(Key*)key_mem; }
 		const Value& value() const { return *(Value*)value_mem; }
 		const Key& key() const { return *(Key*)key_mem; }
-		bool valid;
 	};
 
 	template <typename HM, typename K, typename V>

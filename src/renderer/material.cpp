@@ -430,7 +430,7 @@ bool Material::load(Span<const u8> mem) {
 	m_render_states = gpu::StateFlags::CULL_BACK;
 	m_custom_flags = 0;
 
-	Tokenizer tokenizer(StringView((const char*)mem.begin(), (u32)mem.length()), getPath().c_str());
+	Tokenizer tokenizer(mem, getPath().c_str());
 
 	for (;;) {
 		Tokenizer::Token key = tokenizer.tryNextToken();
@@ -444,7 +444,8 @@ bool Material::load(Span<const u8> mem) {
 
 		if (key == "shader") {
 			if (!tokenizer.consume(value)) return false;
-			if (startsWith(value, "/") || startsWith(value, "\\")) value.removePrefix(1);
+			// TODO does not Path::normalize already do this?
+			if (startsWith(value, "/") || startsWith(value, "\\")) value.removePrefix(1); 
 			setShader(Path(value));
 		}
 		else if (key == "custom_flag") {
@@ -512,7 +513,7 @@ bool Material::load(Span<const u8> mem) {
 			m_uniforms.push(u);
 		}
 		else {
-			logError(getPath(), "(", tokenizer.getLine(), "): Unknown identifier ", key);
+			logError(getPath(), "(", tokenizer.getLine(), "): Unexpected token ", key);
 			tokenizer.logErrorPosition(key.value.begin);
 			return false;
 		}

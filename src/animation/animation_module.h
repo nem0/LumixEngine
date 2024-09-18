@@ -51,7 +51,6 @@ struct AnimationModule : IModule {
 	virtual u32 getAnimatorDefaultSet(EntityRef entity) = 0;
 	virtual anim::Controller* getAnimatorController(EntityRef entity) = 0;
 	virtual anim::RuntimeContext* getAnimatorRuntimeContext(EntityRef entity) = 0;
-	virtual float getAnimationLength(int animation_idx) = 0;
 	virtual OutputMemoryStream& beginBlendstackUpdate(EntityRef entity) = 0;
 	virtual void endBlendstackUpdate(EntityRef entity) = 0;
 };

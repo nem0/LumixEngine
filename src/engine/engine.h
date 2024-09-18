@@ -5,8 +5,6 @@
 #include "core/allocator.h"
 #include "core/span.h"
 
-struct lua_State;
-
 namespace Lumix {
 
 struct Path;
@@ -30,14 +28,12 @@ struct LUMIX_ENGINE_API Engine {
 		UniquePtr<struct FileSystem> file_system;
 	};
 
-	using LuaResourceHandle = u32;
-
 	virtual ~Engine() {}
 
 	static UniquePtr<Engine> create(InitArgs&& init_data, struct IAllocator& allocator);
 
 	virtual void init() = 0;
-	virtual struct World& createWorld(bool is_main_world) = 0;
+	virtual struct World& createWorld() = 0;
 	virtual void destroyWorld(World& world) = 0;
 	virtual void setMainWindow(os::WindowHandle win) = 0;
 	virtual os::WindowHandle getMainWindow() = 0;
@@ -66,11 +62,6 @@ struct LUMIX_ENGINE_API Engine {
 	virtual void pause(bool pause) = 0;
 	virtual bool isPaused() const = 0;
 	virtual void nextFrame() = 0;
-	virtual lua_State* getState() = 0;
-
-	virtual struct Resource* getLuaResource(LuaResourceHandle idx) const = 0;
-	virtual LuaResourceHandle addLuaResource(const struct Path& path, struct ResourceType type) = 0;
-	virtual void unloadLuaResource(LuaResourceHandle resource_idx) = 0;
 
 protected:
 	Engine() {}

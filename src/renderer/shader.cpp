@@ -268,7 +268,7 @@ bool Shader::load(Span<const u8> mem) {
 	
 	m_type = is_surface ? gpu::ShaderType::SURFACE : gpu::ShaderType::COMPUTE;
 	m_code.append("#line 1 \"", getPath(), "\"\n");
-	m_code.append(StringView((const char*)mem.begin(), (u32)mem.length()));
+	m_code.append(mem);
 
 	RollingHasher hasher;
 	hasher.begin();

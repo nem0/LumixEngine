@@ -17,6 +17,14 @@ namespace Lumix
 
 struct LuaScript;
 
+struct LuaScriptSystem : ISystem {
+	using LuaResourceHandle = u32;
+	
+	virtual lua_State* getState() = 0;
+	virtual struct Resource* getLuaResource(LuaResourceHandle idx) const = 0;
+	virtual LuaResourceHandle addLuaResource(const struct Path& path, struct ResourceType type) = 0;
+	virtual void unloadLuaResource(LuaResourceHandle resource_idx) = 0;
+};
 
 struct LuaScriptModule : IModule
 {

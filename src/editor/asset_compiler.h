@@ -1,7 +1,5 @@
 #pragma once
 
-struct lua_State;
-
 #include "core/hash.h"
 #include "core/hash_map.h"
 #include "engine/resource.h"
@@ -35,8 +33,7 @@ struct LUMIX_EDITOR_API AssetCompiler {
 	virtual void addPlugin(IPlugin& plugin, Span<const char*> extensions) = 0;
 	virtual void removePlugin(IPlugin& plugin) = 0;
 	virtual bool compile(const Path& path) = 0;
-	// load meta for `res` and returns it as lua_State*. Must call lua_close on the state after you are done using it.
-	virtual lua_State* getMeta(const Path& res) = 0;
+	virtual bool getMeta(const Path& res, OutputMemoryStream& blob) = 0;
 	virtual void updateMeta(const Path& resource, Span<const u8> data) const = 0;
 	virtual const HashMap<FilePathHash, ResourceItem>& lockResources() = 0;
 	virtual void unlockResources() = 0;

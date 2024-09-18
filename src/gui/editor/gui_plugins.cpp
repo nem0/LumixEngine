@@ -20,7 +20,6 @@
 #include "engine/world.h"
 #include "gui/gui_module.h"
 #include "gui/sprite.h"
-#include "lua_script/lua_script.h"
 #include "renderer/draw2d.h"
 #include "renderer/gpu/gpu.h"
 #include "renderer/pipeline.h"

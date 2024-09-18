@@ -1,33 +1,26 @@
+#include "asset_compiler.h"
+#include "core/atomic.h"
 #include "core/atomic.h"
 #include "core/hash.h"
 #include "core/job_system.h"
 #include "core/log.h"
-#include "core/atomic.h"
-#include "core/sync.h"
-#include "core/thread.h"
 #include "core/os.h"
 #include "core/path.h"
 #include "core/profiler.h"
-#include "asset_compiler.h"
+#include "core/sync.h"
+#include "core/thread.h"
+#include "core/tokenizer.h"
 #include "editor/file_system_watcher.h"
 #include "editor/log_ui.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
-#include "engine/lua_wrapper.h"
-#include "engine/resource.h"
 #include "engine/resource_manager.h"
-#include "lz4/lz4.h"
-#include <luacode.h>
+#include "engine/resource.h"
+#include <lz4/lz4.h>
 
-// use this if you want to be able to use cached resources without having the original
-// #define CACHE_MASTER
-
-
-namespace Lumix
-{
-
+namespace Lumix {
 
 struct AssetCompilerImpl;
 
@@ -150,28 +143,28 @@ struct AssetCompilerImpl : AssetCompiler {
 		m_allocator.deallocate(m_lz4_state);
 		os::OutputFile file;
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		if (fs.open(".lumix/resources/_list.txt_tmp", file)) {
-			file << "resources = {\n";
+		if (fs.open(".lumix/resources/_resources.txt_tmp", file)) {
+			file << "resources = [\n";
 			for (const ResourceItem& ri : m_resources) {
 				file << "\"" << ri.path << "\",\n";
 			}
-			file << "}\n\n";
+			file << "]\n\n";
 			file << "dependencies = {\n";
 			for (auto iter : m_dependencies.iterated()) {
-				file << "\t[\"" << iter.key() << "\"] = {\n";
+				file << "\t\"" << iter.key() << "\" = [\n";
 				for (const Path& p : iter.value()) {
 					file << "\t\t\"" << p << "\",\n";
 				}
-				file << "\t},\n";
+				file << "\t],\n";
 			}
 			file << "}\n";
 
 			file.close();
-			fs.deleteFile(".lumix/resources/_list.txt");
-			fs.moveFile(".lumix/resources/_list.txt_tmp", ".lumix/resources/_list.txt");
+			fs.deleteFile(".lumix/resources/_resources.txt");
+			fs.moveFile(".lumix/resources/_resources.txt_tmp", ".lumix/resources/_resources.txt");
 		}
 		else {
-			logError("Could not save .lumix/resources/_list.txt");
+			logError("Could not save .lumix/resources/_resources.txt");
 		}
 
 		ASSERT(m_plugins.empty());
@@ -374,91 +367,107 @@ struct AssetCompilerImpl : AssetCompiler {
 
 	void fillDB() {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		const Path list_path(fs.getBasePath(), ".lumix/resources/_list.txt");
+		const Path list_path(fs.getBasePath(), ".lumix/resources/_resources.txt");
 		OutputMemoryStream content(m_allocator);
-		if (fs.getContentSync(Path(".lumix/resources/_list.txt"), content)) {
-			lua_State* L = luaL_newstate();
-			[&](){
-				size_t bytecode_size = 0;
-				char* bytecode = luau_compile((const char*)content.data(), content.size(), NULL, &bytecode_size);
-				if (bytecode_size == 0) {
-					logError(list_path, ": ", bytecode);
-					free(bytecode);
-					return;
-				}
-				int res = luau_load(L, "lumix_asset_list", bytecode, bytecode_size, 0);
-				free(bytecode);
-				if (res != 0) {
-					logError(list_path, ": ", lua_tostring(L, -1));
-					return;
-				}
-
-				if (lua_pcall(L, 0, 0, 0) != 0) {
-					logError(list_path, ": ", lua_tostring(L, -1));
-					return;
-				}
-
-				lua_getglobal(L, "resources");
-				if (lua_type(L, -1) != LUA_TTABLE) return;
-
-				{
-					jobs::MutexGuard lock(m_resources_mutex);
-					LuaWrapper::forEachArrayItem<Path>(L, -1, "array of strings expected", [this, &fs](const Path& p){
-						const ResourceType type = getResourceType(p);
-						#ifdef CACHE_MASTER 
-							const Path res_path(".lumix/resources/", p.getHash(), ".res");
-							if (type.isValid() && fs.fileExists(res_path)) {
-								m_resources.insert(p.getHash(), {p, type, dirHash(p)});
+		if (fs.getContentSync(Path(".lumix/resources/_resources.txt"), content)) {
+			Tokenizer tokenizer(StringView(content), ".lumix/resources/_resources.txt");
+			for (;;) {
+				Tokenizer::Token t = tokenizer.tryNextToken(Tokenizer::Token::IDENTIFIER);
+				if (!t) break;
+				if (t == "resources") {
+					if (!tokenizer.consume("=", "[")) goto end_tokenizing;
+					for (;;) {
+						t = tokenizer.nextToken();
+						if (!t) goto end_tokenizing;
+						if (t == "]") break;
+						if (t.type != Tokenizer::Token::STRING) {
+							logError(tokenizer.filename, "(", tokenizer.getLine(), "): string expected, got ", t.value);
+							tokenizer.logErrorPosition(t.value.begin);
+							goto end_tokenizing;
+						}
+						const Path path(t.value);
+						const ResourceType type = getResourceType(path);
+						if (type.isValid()) {
+							if (fs.fileExists(ResourcePath::getResource(path))) {
+								m_resources.insert(path.getHash(), {path, type, dirHash(path)});
 							}
-						#else
-							if (type.isValid()) {
-								if (fs.fileExists(ResourcePath::getResource(p))) {
-									m_resources.insert(p.getHash(), {p, type, dirHash(p)});
-								}
-								else {
-									const Path res_path(".lumix/resources/", p.getHash(), ".res");
-									fs.deleteFile(res_path);
-								}
+							else {
+								const Path res_path(".lumix/resources/", path.getHash(), ".res");
+								fs.deleteFile(res_path);
 							}
-						#endif
-					});
-				}
-				lua_pop(L, 1);
-
-				lua_getglobal(L, "dependencies");
-				if (lua_type(L, -1) != LUA_TTABLE) return;
-
-				lua_pushnil(L);
-				while (lua_next(L, -2) != 0) {
-					if (!lua_isstring(L, -2) || !lua_istable(L, -1)) {
-						logError("Invalid dependencies in _list.txt");
-						lua_pop(L, 1);
-						continue;
+						}
+						t = tokenizer.nextToken();
+						if (!t) goto end_tokenizing;
+						if (t == "]") break;
+						if (t != ",") {
+							logError(tokenizer.filename, "(", tokenizer.getLine(), "): expected ',' or ']', got ", t.value);
+							tokenizer.logErrorPosition(t.value.begin);
+							goto end_tokenizing;
+						}
 					}
-					
-					const char* key = lua_tostring(L, -2);
-					const Path key_path(key);
-					m_dependencies.insert(key_path, Array<Path>(m_allocator));
-					Array<Path>& values = m_dependencies.find(key_path).value();
-
-					LuaWrapper::forEachArrayItem<Path>(L, -1, "array of strings expected", [&values](const Path& p){ 
-						values.push(p); 
-					});
-
-					lua_pop(L, 1);
 				}
-				lua_pop(L, 1);
+				else if (t == "dependencies") {
+					if (!tokenizer.consume("=", "{")) goto end_tokenizing;
+					for (;;) {
+						t = tokenizer.nextToken();
+						if (!t) goto end_tokenizing;
+						if (t == "}") break;
 
-			}();
-		
-			lua_close(L);
-			for (IPlugin* plugin : m_plugins) {
-				plugin->listLoaded();
+						if (t.type != Tokenizer::Token::STRING) {
+							logError(tokenizer.filename, "(", tokenizer.getLine(), "): string expected, got ", t.value);
+							tokenizer.logErrorPosition(t.value.begin);
+							goto end_tokenizing;
+						}
+						if (!tokenizer.consume("=", "[")) goto end_tokenizing;
+
+						const Path key(t.value);
+						auto iter = m_dependencies.find(key);
+						if (!iter.isValid()) {
+							m_dependencies.insert(key, Array<Path>(m_allocator));
+							iter = m_dependencies.find(key);
+						}
+
+						for (;;) {
+							t = tokenizer.nextToken();
+							if (!t) goto end_tokenizing;
+							if (t == "]") break;
+							if (t.type != Tokenizer::Token::STRING) {
+								logError(tokenizer.filename, "(", tokenizer.getLine(), "): string expected, got ", t.value);
+								tokenizer.logErrorPosition(t.value.begin);
+								goto end_tokenizing;
+							}
+							iter.value().push(Path(t.value));
+							t = tokenizer.nextToken();
+							if (!t) goto end_tokenizing;
+							if (t == "]") break;
+							if (t != ",") {
+								logError(tokenizer.filename, "(", tokenizer.getLine(), "): expected ',' or ']', got ", t.value);
+								tokenizer.logErrorPosition(t.value.begin);
+								goto end_tokenizing;
+							}
+						}
+
+						t = tokenizer.nextToken();
+						if (!t) goto end_tokenizing;
+						if (t == "}") break;
+						if (t != ",") {
+							logError(tokenizer.filename, "(", tokenizer.getLine(), "): expected ',' or '}', got ", t.value);
+							tokenizer.logErrorPosition(t.value.begin);
+							goto end_tokenizing;
+						}
+					}
+				}
+				else {
+					logError(tokenizer.filename, "(", tokenizer.getLine(), "): unknown token ", t.value);
+					tokenizer.logErrorPosition(t.value.begin);
+					goto end_tokenizing;
+				}
 			}
 		}
 
-		const u64 list_last_modified = os::getLastModified(list_path);
-		processDir("", list_last_modified);
+		end_tokenizing:
+			const u64 list_last_modified = os::getLastModified(list_path);
+			processDir("", list_last_modified);
 	}
 
 	void onInitFinished() override
@@ -491,20 +500,11 @@ struct AssetCompilerImpl : AssetCompiler {
 		}
 	}
 
-	lua_State* getMeta(const Path& res) override {
+	bool getMeta(const Path& res, OutputMemoryStream& blob) override {
 		const Path meta_path(res, ".meta");
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		OutputMemoryStream buf(m_allocator);
 		
-		if (!fs.getContentSync(meta_path, buf)) return nullptr;
-
-		lua_State* L = luaL_newstate();
-		if (!LuaWrapper::execute(L, StringView((const char*)buf.data(), (u32)buf.size()), meta_path.c_str(), 0)) {
-			lua_close(L);
-			return nullptr;
-		}
-
-		return L;
+		return fs.getContentSync(meta_path, blob);
 	}
 
 	void updateMeta(const Path& res, Span<const u8> data) const override {
@@ -699,7 +699,7 @@ struct AssetCompilerImpl : AssetCompiler {
 
 			if (!path_obj.isEmpty()) {
 				FileSystem& fs = m_app.getEngine().getFileSystem();
-				const Path list_path(fs.getBasePath(), ".lumix/resources/_list.txt");
+				const Path list_path(fs.getBasePath(), ".lumix/resources/_resources.txt");
 				const u64 list_last_modified = os::getLastModified(list_path);
 				const Path fullpath(fs.getBasePath(), path_obj);
 				if (os::dirExists(fullpath)) {

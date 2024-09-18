@@ -3,7 +3,6 @@
 #include "core/log.h"
 #include "core/stream.h"
 #include "core/tokenizer.h"
-#include "engine/lua_wrapper.h"
 #include "engine/reflection.h"
 
 
@@ -89,7 +88,7 @@ static bool consumeNumberArray(Tokenizer& tokenizer, Array<T>& array) {
 		...
 */
 bool PropertyAnimation::load(Span<const u8> mem) {
-	Tokenizer tokenizer(StringView((const char*)mem.begin(), mem.length()), getPath().c_str());
+	Tokenizer tokenizer(mem, getPath().c_str());
 	for (;;) {
 		Tokenizer::Token token = tokenizer.tryNextToken();
 		switch (token.type) {

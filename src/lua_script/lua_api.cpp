@@ -1,22 +1,21 @@
-#include <imgui/imgui.h>
-
 #include "core/delegate.h"
-#include "engine/file_system.h"
 #include "core/log.h"
-#include "core/profiler.h"
 #include "core/math.h"
 #include "core/os.h"
+#include "core/profiler.h"
 #include "core/string.h"
-
-#include "engine.h"
-#include "input_system.h"
+#include "engine/engine.h"
+#include "engine/file_system.h"
+#include "engine/input_system.h"
+#include "engine/plugin.h"
+#include "engine/prefab.h"
+#include "engine/reflection.h"
+#include "engine/world.h"
+#include "lua_script/lua_script_system.h"
 #include "lua_wrapper.h"
-#include "plugin.h"
-#include "prefab.h"
-#include "reflection.h"
-#include "world.h"
 #include <lua.h>
 #include <luacode.h>
+#include <imgui/imgui.h>
 
 
 namespace Lumix {
@@ -702,15 +701,15 @@ static IModule* LUA_getModule(World* world, const char* name)
 }
 
 
-static int LUA_loadResource(Engine* engine, const char* path, const char* type)
+static int LUA_loadResource(LuaScriptSystem* system, const char* path, const char* type)
 {
-	return engine->addLuaResource(Path(path), ResourceType(type));
+	return system->addLuaResource(Path(path), ResourceType(type));
 }
 
 
-static const char* LUA_getResourcePath(Engine* engine, i32 resource_handle)
+static const char* LUA_getResourcePath(LuaScriptSystem* system, i32 resource_handle)
 {
-	Resource* res = engine->getLuaResource(resource_handle);
+	Resource* res = system->getLuaResource(resource_handle);
 	return res->getPath().c_str();
 }
 
@@ -758,8 +757,8 @@ static const char* LUA_getEntityName(World* univ, i32 entity) { return univ->get
 static void LUA_setEntityName(World* univ, i32 entity, const char* name) { univ->setEntityName({entity}, name); }
 static void LUA_setEntityScale(World* univ, i32 entity, const Vec3& scale) { univ->setScale({entity}, scale); }
 static void LUA_setEntityPosition(World* univ, i32 entity, const DVec3& pos) { univ->setPosition({entity}, pos); }
-static void LUA_unloadResource(Engine* engine, int resource_idx) { engine->unloadLuaResource(resource_idx); }
-static World* LUA_createWorld(Engine* engine) { return &engine->createWorld(false); }
+static void LUA_unloadResource(LuaScriptSystem* system, int resource_idx) { system->unloadLuaResource(resource_idx); }
+static World* LUA_createWorld(Engine* engine) { return &engine->createWorld(); }
 static void LUA_destroyWorld(Engine* engine, World* world) { engine->destroyWorld(*world); }
 static void LUA_destroyEntity(World* world, i32 entity) { world->destroyEntity({entity}); }
 static void LUA_logError(const char* text) { logError(text); }
@@ -861,7 +860,8 @@ static int LUA_instantiatePrefab(lua_State* L) {
 	lua_pop(L, 1);
 	DVec3 position = LuaWrapper::checkArg<DVec3>(L, 2);
 	int prefab_id = LuaWrapper::checkArg<int>(L, 3);
-	PrefabResource* prefab = static_cast<PrefabResource*>(engine->getLuaResource(prefab_id));
+	LuaScriptSystem* system = (LuaScriptSystem*)engine->getSystemManager().getSystem("lua_script");
+	PrefabResource* prefab = static_cast<PrefabResource*>(system->getLuaResource(prefab_id));
 	if (!prefab) {
 		luaL_argerror(L, 3, "Unknown prefab.");
 	}

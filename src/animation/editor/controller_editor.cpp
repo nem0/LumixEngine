@@ -284,12 +284,13 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				if (a.animation.isEmpty()) continue;
 
 				ModelMeta model_meta(m_allocator);
-				if (lua_State* L = m_app.getAssetCompiler().getMeta(Path(ResourcePath::getResource(a.animation)))) {
-					model_meta.deserialize(L, a.animation);
+				OutputMemoryStream blob(m_allocator);
+				if (m_app.getAssetCompiler().getMeta(Path(ResourcePath::getResource(a.animation)), blob)) {
+					StringView sv((const char*)blob.data(), (u32)blob.size());
+					model_meta.deserialize(sv, a.animation);
 					if (model_meta.skeleton != m_controller.m_skeleton) {
 						m_to_fix_skeleton.push(a.animation);
 					}
-					lua_close(L);
 				}
 				else {
 					m_to_fix_skeleton.push(a.animation);
@@ -996,22 +997,23 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		void fixSkeleton(const Path& anim_path) {
 			ModelMeta model_meta(m_allocator);
 			Path src_path(ResourcePath::getResource(anim_path));
-			if (lua_State* L = m_app.getAssetCompiler().getMeta(src_path)) {
-				model_meta.deserialize(L, src_path);
-				lua_close(L);
+			OutputMemoryStream blob(m_allocator);
+			if (m_app.getAssetCompiler().getMeta(src_path, blob)) {
+				StringView sv((const char*)blob.data(), (u32)blob.size());
+				model_meta.deserialize(sv, src_path);
 
 				model_meta.skeleton = m_controller.m_skeleton;
-				OutputMemoryStream blob(m_allocator);
-				model_meta.serialize(blob, src_path);
-				m_app.getAssetCompiler().updateMeta(src_path, blob);
+				OutputMemoryStream out_blob(m_allocator);
+				model_meta.serialize(out_blob, src_path);
+				m_app.getAssetCompiler().updateMeta(src_path, out_blob);
 			}
 			else {
 				ModelMeta new_meta(m_allocator);
 				new_meta.skeleton = m_controller.m_skeleton;
 
-				OutputMemoryStream blob(m_allocator);
-				new_meta.serialize(blob, src_path);
-				m_app.getAssetCompiler().updateMeta(src_path, blob);
+				OutputMemoryStream out_blob(m_allocator);
+				new_meta.serialize(out_blob, src_path);
+				m_app.getAssetCompiler().updateMeta(src_path, out_blob);
 			}
 		}
 
@@ -1199,9 +1201,10 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		if (!ctrl.deserialize(input)) return false;
 
 		ModelMeta model_meta(m_allocator);
-		if (lua_State* L = m_app.getAssetCompiler().getMeta(ctrl.m_skeleton)) {
-			model_meta.deserialize(L, ctrl.m_skeleton);
-			lua_close(L);
+		OutputMemoryStream meta_blob(m_allocator);
+		if (m_app.getAssetCompiler().getMeta(ctrl.m_skeleton, meta_blob)) {
+			StringView sv((const char*)meta_blob.data(), (u32)meta_blob.size());
+			model_meta.deserialize(sv, ctrl.m_skeleton);
 		}
 		if (!ctrl.compile(m_app, output)) return false;
 		

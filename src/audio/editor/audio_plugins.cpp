@@ -1,12 +1,13 @@
 #include <imgui/imgui.h>
 
-#include "core/profiler.h"
-#include "core/stream.h"
-
 #include "audio_device.h"
 #include "audio_module.h"
 #include "audio_system.h"
 #include "clip.h"
+#include "core/log.h"
+#include "core/profiler.h"
+#include "core/stream.h"
+#include "core/tokenizer.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
 #include "editor/editor_asset.h"
@@ -15,7 +16,6 @@
 #include "editor/world_editor.h"
 #include "engine/component_uid.h"
 #include "engine/engine.h"
-#include "engine/lua_wrapper.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
 
@@ -33,10 +33,14 @@ struct AssetBrowserPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin 
 		float volume = 1.f;
 
 		void load(const Path& path, StudioApp& app) {
-			if (lua_State* L = app.getAssetCompiler().getMeta(path)) {
-				LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "looped", &looped);
-				LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "volume", &volume);
-				lua_close(L);
+			OutputMemoryStream blob(app.getAllocator());
+			if (app.getAssetCompiler().getMeta(path, blob)) {
+				StringView sv((const char*)blob.data(), (u32)blob.size());
+				const ParseItemDesc descs[] = {
+					{"looped", &looped},
+					{"volume", &volume},
+				};
+				parse(sv, path.c_str(), descs);
 			}
 		}
 	};

@@ -29,7 +29,9 @@ static bool isIdentifierChar(char c) {
 
 Tokenizer::Token Tokenizer::nextToken() {
 	Token t = tryNextToken();
-	if (t.type == Token::EOF) logError(filename, "(", getLine(), "): unexpected end of file."); 
+	if (t.type == Token::EOF) {
+		logError(filename, "(", getLine(), "): unexpected end of file."); 
+	}
 	return t;
 }
 
@@ -54,8 +56,8 @@ Tokenizer::Token Tokenizer::tryNextToken() {
 	if (*cursor == '`') {
 		// string
 		Token token(Token::STRING);
-		token.value.begin = cursor;
 		++cursor;
+		token.value.begin = cursor;
 		while (cursor < content.end && *cursor != '`') {
 			++cursor;
 		}
@@ -63,16 +65,16 @@ Tokenizer::Token Tokenizer::tryNextToken() {
 			logError(filename, "(", getLine(), "): unexpected end of file.");
 			return Token::ERROR;
 		}
-		++cursor;
 		token.value.end = cursor;
+		++cursor;
 		return token;
 	}
 
 	if (*cursor == '"') {
 		// string
 		Token token(Token::STRING);
-		token.value.begin = cursor;
 		++cursor;
+		token.value.begin = cursor;
 		while (cursor < content.end && *cursor != '"') {
 			++cursor;
 		}
@@ -80,8 +82,8 @@ Tokenizer::Token Tokenizer::tryNextToken() {
 			logError(filename, "(", getLine(), "): unexpected end of file.");
 			return Token::ERROR;
 		}
-		++cursor;
 		token.value.end = cursor;
+		++cursor;
 		return token;
 	}
 
@@ -188,7 +190,21 @@ bool Tokenizer::consume(bool& out) {
 	return false;
 }
 
-bool Tokenizer::consume(int& out) {
+bool Tokenizer::consume(i32& out) {
+	Token token = nextToken();
+	if (!token) return false;
+	
+	if (token.type == Token::NUMBER) {
+		fromCString(token.value, out);
+		return true;
+	}
+
+	logError(filename, "(", getLine(), "): number expected.");
+	logErrorPosition(token.value.begin);
+	return false;
+}
+
+bool Tokenizer::consume(u32& out) {
 	Token token = nextToken();
 	if (!token) return false;
 	
@@ -328,9 +344,68 @@ bool Tokenizer::consume(StringView& out) {
 		return false;
 	}
 	out = token.value;
-	++out.begin;
-	--out.end;
 	return true;
 }	
+
+bool parse(StringView content, const char* path, Span<const ParseItemDesc> descs) {
+	Tokenizer t(content, path);
+	for (;;) {
+		Tokenizer::Token token = t.tryNextToken(Tokenizer::Token::IDENTIFIER);
+		if (!token) return true;
+
+		bool found_any = false;
+		for (const ParseItemDesc& desc : descs) {
+			if (token == desc.name) {
+				found_any = true;
+				switch(desc.type) {
+					case ParseItemDesc::BOOL:
+						if (!t.consume("=", *desc.bool_value)) return false;
+						break;
+					case ParseItemDesc::I32:
+						if (!t.consume("=", *desc.i32_value)) return false;
+						break;
+					case ParseItemDesc::U32:
+						if (!t.consume("=", *desc.u32_value)) return false;
+						break;
+					case ParseItemDesc::STRING:
+						if (!t.consume("=", *desc.string_value)) return false;
+						break;
+					case ParseItemDesc::FLOAT: 
+						if (!t.consume("=", *desc.float_value)) return false;
+						break;
+					case ParseItemDesc::ARRAY: {
+						if (!t.consume("=")) return false;
+						Tokenizer::Token next = t.nextToken();
+						if (!next) return false;
+						if (next.value[0] != '[') {
+							logError(t.filename, "(", t.getLine(), "): '[' expected, got ", next.value);
+							t.logErrorPosition(next.value.begin);
+							return false;
+						}
+						*desc.string_value = next.value;
+						u32 depth = 1;
+						for (;;) {
+							next = t.nextToken();
+							if (!next) return false;
+							if (next.value[0] == '[') ++depth;
+							else if (next.value[0] == ']') {
+								--depth;
+								if (depth == 0) {
+									desc.string_value->end = next.value.end;
+									break;
+								}
+							}
+						}
+						break;
+					}
+				}
+			}
+		}
+		if (!found_any) {
+			logError(t.filename, "(", t.getLine(), "): Unknown token ", token.value);
+			t.logErrorPosition(token.value.begin);
+		}
+	}
+}
 
 } // namespace

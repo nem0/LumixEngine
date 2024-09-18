@@ -131,36 +131,21 @@ void PhysicsMaterial::deserialize(InputMemoryStream& blob) {
 }
 
 bool PhysicsMaterial::load(Span<const u8> mem) {
-	Tokenizer tokenizer(StringView((const char*)mem.begin(), mem.length()), getPath().c_str());
-	for (;;) {
-		Tokenizer::Token token = tokenizer.tryNextToken();
-		switch (token.type) {
-			case Tokenizer::Token::EOF: return true;
-			case Tokenizer::Token::ERROR: return false;
-			default: break;
-		}
+	float sf = material->getStaticFriction();
+	float df = material->getDynamicFriction();
+	float rest = material->getRestitution();
+	const ParseItemDesc descs[] = {
+		{"static_friction", &sf},
+		{"dynamic_friction", &df},
+		{"restitution", &rest},
+	};
+	if (!parse(mem, getPath().c_str(), descs)) return false;
 
-		if (token == "static_friction") {
-			float v;
-			if (!tokenizer.consume(v)) return false;
-			material->setStaticFriction(v);
-		}
-		else if (token == "dynamic_friction") {
-			float v;
-			if (!tokenizer.consume(v)) return false;
-			material->setDynamicFriction(v);
-		}
-		else if (token == "restitution") {
-			float v;
-			if (!tokenizer.consume(v)) return false;
-			material->setRestitution(v);
-		}
-		else {
-			logError(tokenizer.filename, "(", tokenizer.getLine(), "): Unknown token ", token.value);
-			tokenizer.logErrorPosition(token.value.begin);
-			return false;
-		}
-	}
+	material->setStaticFriction(sf);
+	material->setDynamicFriction(df);
+	material->setRestitution(rest);
+
+	return true;
 }
 
 PhysicsMaterialManager::PhysicsMaterialManager(PhysicsSystem& system, IAllocator& allocator)

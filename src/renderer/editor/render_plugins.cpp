@@ -20,6 +20,7 @@
 #include "core/profiler.h"
 #include "core/queue.h"
 #include "core/string.h"
+#include "core/tokenizer.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
 #include "editor/gizmo.h"
@@ -34,13 +35,11 @@
 #include "engine/core.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
-#include "engine/lua_wrapper.h"
 #include "engine/prefab.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
 #include "fbx_importer.h"
 #include "game_view.h"
-#include "lua_script/lua_script.h"
 #include "model_meta.h"
 #include "renderer/culling_system.h"
 #include "renderer/editor/composite_texture.h"
@@ -980,37 +979,27 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 };
 
 struct TextureMeta {
-	void deserialize(lua_State* L) {
-		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "srgb", &srgb);
-		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "compress", &compress);
-		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "mip_scale_coverage", &scale_coverage);
-		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "stochastic_mip", &stochastic_mipmap);
-		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "normalmap", &is_normalmap);
-		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "invert_green", &invert_normal_y);
-		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "mips", &mips);
-	}
-
-	bool deserialize(InputMemoryStream& blob, const char* path) {
-		ASSERT(blob.getPosition() == 0);
-		lua_State* L = luaL_newstate();
-		if (!LuaWrapper::execute(L, StringView((const char*)blob.getData(), (u32)blob.size()), path, 0)) {
-			return false;
-		}
-		
-		deserialize(L);
-
-		lua_close(L);
-		return true;	
+	void deserialize(StringView mem, const char* path) {
+		const ParseItemDesc descs[] = {
+			{ "srgb", &srgb },
+			{ "compress", &compress },
+			{ "mip_scale_coverage", &mip_scale_coverage },
+			{ "stochastic_mip", &stochastic_mip },
+			{ "normalmap", &normalmap },
+			{ "invert_green", &invert_green },
+			{ "mips", &mips },
+		};
+		parse(mem, path, descs);
 	}
 
 	void serialize(OutputMemoryStream& blob, const Path&) {
 		blob << "srgb = " << (srgb ? "true" : "false")
 			<< "\ncompress = " << (compress ? "true" : "false")
-			<< "\nstochastic_mip = " << (stochastic_mipmap ? "true" : "false")
-			<< "\nmip_scale_coverage = " << scale_coverage
+			<< "\nstochastic_mip = " << (stochastic_mip ? "true" : "false")
+			<< "\nmip_scale_coverage = " << mip_scale_coverage
 			<< "\nmips = " << (mips ? "true" : "false")
-			<< "\nnormalmap = " << (is_normalmap ? "true" : "false")
-			<< "\ninvert_green = " << (invert_normal_y ? "true" : "false");
+			<< "\nnormalmap = " << (normalmap ? "true" : "false")
+			<< "\ninvert_green = " << (invert_green ? "true" : "false");
 	}
 
 	void load(const Path& path, StudioApp& app) {
@@ -1019,18 +1008,19 @@ struct TextureMeta {
 			mips = false;
 		}
 
-		if (lua_State* L = app.getAssetCompiler().getMeta(path)) {
-			deserialize(L);
-			lua_close(L);
+		OutputMemoryStream blob(app.getAllocator());
+		if (app.getAssetCompiler().getMeta(path, blob)) {
+			StringView sv((const char*)blob.data(), (u32)blob.size());
+			deserialize(sv, path.c_str());
 		}
 	}
 
 	bool srgb = false;
-	bool is_normalmap = false;
-	bool invert_normal_y = false;
+	bool normalmap = false;
+	bool invert_green = false;
 	bool mips = true;
-	float scale_coverage = -0.5f;
-	bool stochastic_mipmap = false;
+	float mip_scale_coverage = -0.5f;
+	bool stochastic_mip = false;
 	bool compress = true;
 };
 
@@ -1066,9 +1056,8 @@ struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
 	}
 
 	void deserialize(InputMemoryStream& blob) override {
-		if (!m_meta.deserialize(blob, "undo/redo")) {
-			logError("Failed to deserialize texture meta data for undo/redo");
-		}
+		StringView sv((const char*)blob.skip(0), (u32)blob.remaining());
+		m_meta.deserialize(sv, "undo/redo");
 	}
 	void serialize(OutputMemoryStream& blob) override { m_meta.serialize(blob, m_texture->getPath()); }
 
@@ -1179,7 +1168,7 @@ struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
 		saveUndo(ImGui::Checkbox("##mip", &m_meta.mips));
 		if (m_meta.mips) {
 			ImGuiEx::Label("Stochastic mipmap");
-			saveUndo(ImGui::Checkbox("##stomip", &m_meta.stochastic_mipmap));
+			saveUndo(ImGui::Checkbox("##stomip", &m_meta.stochastic_mip));
 		}
 
 		ImGuiEx::Label("Compress");
@@ -1189,22 +1178,22 @@ struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
 			ImGui::TextUnformatted(ICON_FA_EXCLAMATION_TRIANGLE " Block compression will not be used because texture size is not multiple of 4");
 		}
 
-		bool scale_coverage = m_meta.scale_coverage >= 0;
+		bool scale_coverage = m_meta.mip_scale_coverage >= 0;
 		ImGuiEx::Label("Mipmap scale coverage");
 		if (ImGui::Checkbox("##mmapsccov", &scale_coverage)) {
-			m_meta.scale_coverage *= -1;
+			m_meta.mip_scale_coverage *= -1;
 			saveUndo(true);
 		}
-		if (m_meta.scale_coverage >= 0) {
+		if (m_meta.mip_scale_coverage >= 0) {
 			ImGuiEx::Label("Coverage alpha ref");
-			saveUndo(ImGui::SliderFloat("##covaref", &m_meta.scale_coverage, 0, 1));
+			saveUndo(ImGui::SliderFloat("##covaref", &m_meta.mip_scale_coverage, 0, 1));
 		}
 		ImGuiEx::Label("Is normalmap");
-		saveUndo(ImGui::Checkbox("##nrmmap", &m_meta.is_normalmap));
+		saveUndo(ImGui::Checkbox("##nrmmap", &m_meta.normalmap));
 
-		if (m_meta.is_normalmap) {
+		if (m_meta.normalmap) {
 			ImGuiEx::Label("Invert normalmap Y");
-			saveUndo(ImGui::Checkbox("##nrmmapinvy", &m_meta.invert_normal_y));
+			saveUndo(ImGui::Checkbox("##nrmmapinvy", &m_meta.invert_green));
 		}
 
 		ImGui::TableNextColumn();
@@ -1304,7 +1293,7 @@ template <typename T> struct Acceptor;
 template <> struct Acceptor<TextureMeta> {
 	template <typename V> static void accept(V visitor) {
 		visitor(R{"Compress", &TextureMeta::compress});
-		visitor(R{"Is normalmap", &TextureMeta::is_normalmap});
+		visitor(R{"Is normalmap", &TextureMeta::normalmap});
 		visitor(R{"Mips", &TextureMeta::mips});
 		visitor(R{"SRGB", &TextureMeta::srgb});
 	}
@@ -1611,7 +1600,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		const u32 h = img.layers[0].h;
 
 		TextureCompressor::Input input(w, h, img.is_cubemap ? 1 : img.layers.size(), 1, m_allocator);
-		input.is_normalmap = meta.is_normalmap;
+		input.is_normalmap = meta.normalmap;
 		input.is_srgb = meta.srgb;
 		input.is_cubemap = img.is_cubemap;
 		input.has_alpha = img.layers[0].channels == 4;
@@ -1642,8 +1631,8 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		dst.write(&flags, sizeof(flags));
 		TextureCompressor::Options options;
 		options.generate_mipmaps = meta.mips;
-		options.stochastic_mipmap = meta.stochastic_mipmap;
-		options.scale_coverage_ref = meta.scale_coverage;
+		options.stochastic_mipmap = meta.stochastic_mip;
+		options.scale_coverage_ref = meta.mip_scale_coverage;
 		return TextureCompressor::compress(input, options, dst, m_allocator);
 	}
 
@@ -1659,7 +1648,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 		const u8* data;
 		Array<u8> inverted_y_data(m_allocator);
-		if (meta.is_normalmap && meta.invert_normal_y) {
+		if (meta.normalmap && meta.invert_green) {
 			inverted_y_data.resize(w * h * 4);
 			for (i32 y = 0; y < h; ++y) {
 				for (i32 x = 0; x < w; ++x) {
@@ -1724,12 +1713,12 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			TextureCompressor::Input input(w, h, 1, 1, m_allocator);
 			input.add(Span(data, w * h * 4), 0, 0, 0);
 			input.is_srgb = meta.srgb;
-			input.is_normalmap = meta.is_normalmap;
+			input.is_normalmap = meta.normalmap;
 			input.has_alpha = comps == 4;
 			TextureCompressor::Options options;
 			options.generate_mipmaps = meta.mips;
-			options.stochastic_mipmap = meta.stochastic_mipmap; 
-			options.scale_coverage_ref = meta.scale_coverage;
+			options.stochastic_mipmap = meta.stochastic_mip; 
+			options.scale_coverage_ref = meta.mip_scale_coverage;
 			options.compress = meta.compress;
 			const bool res = TextureCompressor::compress(input, options, dst, m_allocator);
 			stbi_image_free(stb_data);
@@ -1750,7 +1739,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		TextureMeta meta;
 		meta.load(src, m_app);
 		if (equalStrings(ext, "raw")) {
-			if (meta.scale_coverage >= 0) logError(src, ": RAW can not scale coverage");
+			if (meta.mip_scale_coverage >= 0) logError(src, ": RAW can not scale coverage");
 			if (meta.compress) logError(src, ": RAW can not be copressed");
 			if (meta.mips) logError(src, ": RAW can not have mipmaps");
 			
@@ -2121,7 +2110,10 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			fbx_scene->destroy();
 		}
 
-		void deserialize(InputMemoryStream& blob) override { m_meta.deserialize(blob, Path("undo/redo")); }
+		void deserialize(InputMemoryStream& blob) override { 
+			StringView sv((const char*)blob.getData(), (u32)blob.size());
+			m_meta.deserialize(sv, Path("undo/redo"));
+		}
 		void serialize(OutputMemoryStream& blob) override { m_meta.serialize(blob, Path()); }
 
 		void saveUndo(bool changed) {
@@ -2763,7 +2755,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	void createTileWorld()
 	{
 		Engine& engine = m_app.getEngine();
-		m_tile.world = &engine.createWorld(false);
+		m_tile.world = &engine.createWorld();
 		m_tile.pipeline = Pipeline::create(*m_renderer, PipelineType::PREVIEW);
 
 		RenderModule* render_module = (RenderModule*)m_tile.world->getModule(MODEL_INSTANCE_TYPE);
@@ -2806,10 +2798,11 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			TileData::AnimationJob* job = LUMIX_NEW(m_app.getAllocator(), TileData::AnimationJob)(path);
 			ModelMeta model_meta(m_app.getAllocator());
 			Path src_path(ResourcePath::getResource(path));
-			if (lua_State* L = m_app.getAssetCompiler().getMeta(src_path)) {
-				model_meta.deserialize(L, src_path);
+			OutputMemoryStream blob(m_app.getAllocator());
+			if (m_app.getAssetCompiler().getMeta(src_path, blob)) {
+				StringView sv((const char*)blob.data(), (u32)blob.size());
+				model_meta.deserialize(sv, src_path);
 				job->model = resource_manager.load<Model>(model_meta.skeleton);
-				lua_close(L);
 			}
 			else {
 				job->model = resource_manager.load<Model>(Path(ResourcePath::getResource(path)));

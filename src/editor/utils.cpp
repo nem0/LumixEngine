@@ -479,6 +479,8 @@ static bool tokenize(const char* str, u32& token_len, u8& token_type, u8 prev_to
 		"cbuffer",
 		"register",
 		"numthreads",
+		"static",
+		"const",
 	};
 
 	const char* c = str;
@@ -572,6 +574,10 @@ static bool tokenize(const char* str, u32& token_len, u8& token_type, u8 prev_to
 	if (*c >= '0' && *c <= '9') {
 		token_type = (u8)TokenType::NUMBER;
 		while (*c >= '0' && *c <= '9') ++c;
+		if (*c == '.') {
+			++c;
+			while (*c >= '0' && *c <= '9') ++c;
+		}
 		token_len = u32(c - str);
 		return *c;
 	}
@@ -915,14 +921,14 @@ struct CodeEditorImpl final : CodeEditor {
 	}
 	
 	void moveCursorLeft(Cursor& cursor, bool word) {
-		if (word) cursor = getLeftWord(cursor);
+		if (word) cursor = getPrevTokenStartPoint(cursor);
 		else cursor = getLeft(cursor);
 		cursorMoved(cursor, true);
 		if (&cursor == &m_cursors[0]) ensurePointVisible(cursor);
 	}
 
 	void moveCursorRight(Cursor& cursor, bool word) {
-		if (word) cursor = getRightWord(cursor);
+		if (word) cursor = getNextTokenEndPoint(cursor);
 		else cursor = getRight(cursor);
 		cursorMoved(cursor, true);
 		if (&cursor == &m_cursors[0]) ensurePointVisible(cursor);
@@ -1041,7 +1047,7 @@ struct CodeEditorImpl final : CodeEditor {
 		const i32 prev_col = cursor.col;
 		const String& line = m_lines[cursor.line].value;
 		cursor.col = 0;
-		while (cursor.col < (i32)line.length() && !isWordChar(line[cursor.col])) {
+		while (cursor.col < (i32)line.length() && isWhitespace(line[cursor.col])) {
 			++cursor.col;
 		}
 		if (cursor.col >= prev_col && prev_col != 0) cursor.col = 0;
@@ -1251,6 +1257,9 @@ struct CodeEditorImpl final : CodeEditor {
 		return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
 	}
 
+	static bool isWhitespace(char c) { return c == ' ' || c == '\n' || c == '\r' || c == '\t'; }
+
+
 	Cursor getWord(TextPoint& point) const {
 		Cursor cursor;
 		cursor = point;
@@ -1367,7 +1376,7 @@ struct CodeEditorImpl final : CodeEditor {
 	StringView getPrefix() override {
 		ASSERT(m_cursors.size() == 1);
 		if (m_cursors[0].col == 0) return {};
-		TextPoint left = getLeftWord(m_cursors[0]);
+		TextPoint left = getPrevTokenStartPoint(m_cursors[0]);
 		const char* line_str = m_lines[m_cursors[0].line].value.c_str();
 		StringView res;
 		res.begin = line_str + left.col;
@@ -1375,32 +1384,25 @@ struct CodeEditorImpl final : CodeEditor {
 		return res;
 	}
 
-	TextPoint getLeftWord(TextPoint point) {
+	TextPoint getPrevTokenStartPoint(TextPoint point) {
 		TextPoint p = getLeft(point);
-		if (p.col == 0) return p;
-		const bool is_word = isWordChar(getChar(p));
-		for (;;) {
-			p = getLeft(p);
-			char c = getChar(p);
-			if (isWordChar(c) != is_word) {
-				p = getRight(p);
-				return p;
-			}
-			if (p.col == 0) return p;
+		const Line& line = m_lines[p.line];
+		for (i32 i = line.tokens.size() - 1; i >= 0; --i) {
+			const Token& token = line.tokens[i];
+			if (p.col > (i32)token.from) return TextPoint(i32(token.from), i32(p.line));
 		}
+
 		return p;
 	}
 
-	TextPoint getRightWord(TextPoint point) {
-		TextPoint p = point;
-		const bool is_word = isWordChar(getChar(p));
-		char c;
-		do {
-			p = getRight(p);
-			c = getChar(p);
-			if (c == '\n') return p;
-			if (p.line == m_lines.size() - 1 && p.col == m_lines.back().length()) return p;
-		} while (isWordChar(c) == is_word);
+	TextPoint getNextTokenEndPoint(TextPoint point) {
+		TextPoint p = getRight(point);
+		const Line& line = m_lines[p.line];
+		for (const Token& token : line.tokens) {
+			const i32 token_end = i32(token.from + token.len);
+			if (p.col < i32(token.from)) return TextPoint(token_end, i32(p.line));
+			if (p.col < token_end) return TextPoint(i32(token.from + token.len), i32(p.line));
+		}
 		return p;
 	}
 
@@ -1432,8 +1434,8 @@ struct CodeEditorImpl final : CodeEditor {
 
 	void selectToLeft(Cursor& c, bool word) {
 		if (word) {
-			if (c.sel < c) c.sel = getLeftWord(c.sel);
-			else c = getLeftWord(c);
+			if (c.sel < c) c.sel = getPrevTokenStartPoint(c.sel);
+			else c = getPrevTokenStartPoint(c);
 		}
 		else {
 			if (c.sel < c) c.sel = getLeft(c.sel);
@@ -1443,8 +1445,8 @@ struct CodeEditorImpl final : CodeEditor {
 
 	void selectToRight(Cursor& c, bool word) {
 		if (word) {
-			if (c.sel > c) c.sel = getRightWord(c.sel);
-			else c = getRightWord(c);
+			if (c.sel > c) c.sel = getNextTokenEndPoint(c.sel);
+			else c = getNextTokenEndPoint(c);
 		}
 		else {
 			if (c.sel > c) c.sel = getRight(c.sel);

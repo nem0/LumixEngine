@@ -10,7 +10,7 @@ cbuffer Drawcall : register(b4) {
 	uint u_output;
 };
 
-static const float GOLDEN_ANGLE = 2.39996323; 
+static const float GOLDEN_ANGLE = 2.39996323;
 static const float RAD_SCALE = 0.5; 
 
 float getBlurSize(float depth, float focus_point) {

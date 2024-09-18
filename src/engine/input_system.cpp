@@ -159,8 +159,6 @@ struct InputSystemImpl final : InputSystem
 
 	Span<Device*> getDevices() override { return m_devices; }
 	
-	void registerLuaAPI();
-
 	Engine& m_engine;
 	IAllocator& m_allocator;
 	MouseDevice* m_mouse_device;
