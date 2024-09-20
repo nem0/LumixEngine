@@ -13,8 +13,8 @@ jobs:
             - name: make dirs
               run: |
                 mkdir plugins
-                mkdir projects\3rdparty
-                mkdir projects\itch_io
+                mkdir scripts\3rdparty
+                mkdir scripts\itch_io
                 
             - name: fetch procedural geometry plugin
               working-directory: plugins
@@ -37,34 +37,34 @@ jobs:
                 git.exe clone https://github.com/nem0/lumixengine_market.git market
             
             - name: download physx
-              working-directory: projects\3rdparty
+              working-directory: scripts\3rdparty
               run: |
                 git.exe clone --depth=1 https://github.com/nem0/PhysX.git physx
 
             - name: download Luau
-              working-directory: projects\3rdparty
+              working-directory: scripts\3rdparty
               run: |
                 git.exe clone --depth=1 https://github.com/nem0/luau.git luau
             
             - name: make VS project
-              working-directory: projects
+              working-directory: scripts
               run: |
                 ./genie.exe --force-build-physx --force-build-luau --with-app vs2022
                 
             - name: get butler
-              working-directory: projects
+              working-directory: scripts
               run: |
                 curl -L -o butler.zip https://broth.itch.ovh/butler/windows-amd64/LATEST/archive/default
                 7z x butler.zip
 
             - name: build engine
-              working-directory: projects
+              working-directory: scripts
               shell: cmd
               run: |
                 "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/MSBuild/Current/Bin/MSBuild.exe" tmp/vs2022/LumixEngine.sln /p:Configuration=RelWithDebInfo
 
             - name: Publish Windows version
-              working-directory: projects
+              working-directory: scripts
               run: |
                 copy tmp\vs2022\bin\RelWithDebInfo\studio.exe itch_io\
                 copy tmp\vs2022\bin\RelWithDebInfo\app.exe itch_io\
@@ -77,4 +77,4 @@ jobs:
             - uses: actions/upload-artifact@v3
               with:
                 name: itch-io-dx
-                path: projects/itch_io
+                path: scripts/itch_io

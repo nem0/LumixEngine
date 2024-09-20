@@ -13,10 +13,10 @@ data/lumix.log
 data/studio.ini
 .lumixuser
 *.unv.bak
-projects/3rdparty
-!projects/bin/
+scripts/3rdparty
+!scripts/bin/
 plugins/
 src/engine/plugins.inl
 data/.shader_cache_dx11
-projects/itch_io/
+scripts/itch_io/
 !data/editor/scripts/plugins/

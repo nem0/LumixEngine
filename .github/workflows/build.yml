@@ -8,7 +8,7 @@ jobs:
               with:
                 fetch-depth: 1
             - name: fetch maps plugin
-              working-directory: projects
+              working-directory: scripts
               run: |
                 mkdir ..\plugins
                 pushd ..\plugins
@@ -50,11 +50,11 @@ jobs:
               run: |
                 git.exe clone https://github.com/nem0/lumix_plugin_template.git myplugin
             - name: make VS project with plugins and app
-              working-directory: projects
+              working-directory: scripts
               run: |
                 ./genie.exe --with-app vs2022
             - name: build
-              working-directory: projects
+              working-directory: scripts
               shell: cmd
               run: |
                 "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/MSBuild/Current/Bin/MSBuild.exe" -v:m tmp/vs2022/LumixEngine.sln /p:Configuration=RelWithDebInfo
@@ -78,7 +78,7 @@ jobs:
     #           sudo apt-get install libgtk-3-dev
     #       - name: Download 3rdparties
     #         run: |
-    #           cd projects
+    #           cd scripts
     #           mkdir -p ../external/freetype/lib/linux64_gmake/release
     #           mkdir -p 3rdparty/
     #           mkdir -p ../external/physx/lib/linux
@@ -90,7 +90,7 @@ jobs:
     #           cp lumixengine_linux_3rdparty_bin/recast/* ../external/recast/lib/linux64_gmake/release
     #       - name: build
     #         run: |
-    #           cd projects
+    #           cd scripts
     #           ./genie --force-build-luau gmake
     #           cd tmp/gmake
     #           make -j

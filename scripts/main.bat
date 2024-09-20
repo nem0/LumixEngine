@@ -10,7 +10,7 @@ if not %errorlevel%==0 set msbuild_cmd="C:\Program Files (x86)\Microsoft Visual 
 
 :begin
 	cls
-
+echo %cd%
 	echo Wut?
 	echo ===============================
 	echo   1. Exit
@@ -530,8 +530,8 @@ exit /B 0
 :run_studio
 	if not exist "tmp/vs2022/bin/RelWithDebInfo/studio.exe" call :build
 	cd ..\data
-	start "" "../projects/tmp/vs2022/bin/RelWithDebInfo/studio.exe"
-	cd ..\projects
+	start "" "../scripts/tmp/vs2022/bin/RelWithDebInfo/studio.exe"
+	cd ..\scripts
 	pause
 exit /B 0
 
@@ -545,7 +545,7 @@ exit /B 0
 	cd ..\data
 	tar -cvf data.tar .
 	move data.tar ../src/studio
-	cd ..\projects\
+	cd ..\scripts\
 	%msbuild_cmd% tmp/vs2022/LumixEngine.sln /p:Configuration=RelWithDebInfo
 	del ..\src\studio\data.tar
 	pause
