@@ -6,6 +6,12 @@
 #include <PxVisualizationParameter.h>
 #include <PxMaterial.h>
 
+#include "core/geometry.h"
+#include "core/log.h"
+#include "core/math.h"
+#include "core/path.h"
+#include "core/profiler.h"
+#include "core/tokenizer.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
 #include "editor/editor_asset.h"
@@ -17,14 +23,9 @@
 #include "editor/world_editor.h"
 #include "engine/component_uid.h"
 #include "engine/engine.h"
-#include "core/geometry.h"
-#include "core/log.h"
-#include "core/math.h"
-#include "core/path.h"
-#include "core/profiler.h"
 #include "engine/world.h"
-#include "physics/physics_resources.h"
 #include "physics/physics_module.h"
+#include "physics/physics_resources.h"
 #include "physics/physics_system.h"
 #include "renderer/model.h"
 #include "renderer/render_module.h"
@@ -849,9 +850,9 @@ struct PhysicsMaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlug
 
 		void save() {
 			OutputMemoryStream blob(m_app.getAllocator());
-			blob << "static_friction " << m_resource->material->getStaticFriction() << "\n";
-			blob << "dynamic_friction " << m_resource->material->getDynamicFriction() << "\n";
-			blob << "restitution " << m_resource->material->getRestitution() << "\n";
+			blob << "static_friction = " << m_resource->material->getStaticFriction() << "\n";
+			blob << "dynamic_friction = " << m_resource->material->getDynamicFriction() << "\n";
+			blob << "restitution = " << m_resource->material->getRestitution() << "\n";
 
 			m_app.getAssetBrowser().saveResource(*m_resource, blob);
 			m_dirty = false;
@@ -915,7 +916,35 @@ struct PhysicsMaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlug
 	const char* getDefaultExtension() const override { return "pma"; }
 	void createResource(OutputMemoryStream& blob) override {}
 
-	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
+	bool compile(const Path& src) override {
+		// load
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		OutputMemoryStream src_data(m_app.getAllocator());
+		if (!fs.getContentSync(src, src_data)) return false;
+
+		// parse
+		float sf = 0.5f;
+		float df = 0.5f;
+		float rest = 0.1f;
+		const ParseItemDesc descs[] = {
+			{"static_friction", &sf},
+			{"dynamic_friction", &df},
+			{"restitution", &rest},
+		};
+		StringView sv((const char*)src_data.data(), (u32)src_data.size());
+		if (!parse(sv, src.c_str(), descs)) return false;
+
+		char tmp[64];
+		OutputMemoryStream compiled(tmp, sizeof(tmp));
+		PhysicsMaterial::Header header;
+		compiled.write(header);
+		compiled.write(sf);
+		compiled.write(df);
+		compiled.write(rest);
+
+		return m_app.getAssetCompiler().writeCompiledResource(src, compiled);
+	}
+
 	const char* getLabel() const override { return "Physics material"; }
 
 	void openEditor(const Path& path) override {

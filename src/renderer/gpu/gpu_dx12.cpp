@@ -265,7 +265,7 @@ struct Program {
 	D3D12_PRIMITIVE_TOPOLOGY_TYPE primitive_topology_type;
 	// for CS, there's 1:1 mapping from `shader_hash` to PSO
 	// for VS/PS, there's 1:1 mapping from `shader_hash` and RT formats to PSO
-	StableHash32 shader_hash;
+	StableHash shader_hash;
 	#ifdef LUMIX_DEBUG
 		StaticString<64> name;
 	#endif
@@ -346,9 +346,10 @@ struct ShaderCompiler {
 		}
 
 		RollingStableHasher hasher;
+		hasher.begin();
 		hasher.update(src, stringLength(src));
 		hasher.update(&program.primitive_topology, sizeof(program.primitive_topology));
-		const StableHash32 hash = hasher.end();
+		const StableHash hash = hasher.end64();
 		program.shader_hash = hash;
 		if (type == ShaderType::SURFACE) {
 			// TODO surface shader cache
@@ -378,7 +379,7 @@ struct ShaderCompiler {
 		return true;
 	}
 
-	ID3DBlob* compileStage(StableHash32 hash, const char* src, const char* target, const char* name, const char* entry_point) {
+	ID3DBlob* compileStage(StableHash hash, const char* src, const char* target, const char* name, const char* entry_point) {
 		ID3DBlob* output = NULL;
 		ID3DBlob* errors = NULL;
 		HRESULT hr = D3DCompile(src,
@@ -396,7 +397,7 @@ struct ShaderCompiler {
 			if (SUCCEEDED(hr)) {
 				logInfo("gpu: ", (LPCSTR)errors->GetBufferPointer());
 			} else {
-				logError(name, ": ", (LPCSTR)errors->GetBufferPointer());
+				logError((LPCSTR)errors->GetBufferPointer());
 			}
 			errors->Release();
 			if (FAILED(hr)) return nullptr;
@@ -416,7 +417,7 @@ struct ShaderCompiler {
 			u32 version = 0;
 			bool success = file.write(&version, sizeof(version));
 			for (auto iter = m_cache.begin(), end = m_cache.end(); iter != end; ++iter) {
-				const StableHash32 hash = iter.key();
+				const StableHash hash = iter.key();
 				ID3DBlob* blob = iter.value();
 				const u32 size = (u32)blob->GetBufferSize();
 				success = file.write(&hash, sizeof(hash)) && success;
@@ -439,7 +440,7 @@ struct ShaderCompiler {
 				logError("Could not read ", filename);
 			}
 			ASSERT(version == 0);
-			StableHash32 hash;
+			StableHash hash;
 			while (file.read(&hash, sizeof(hash))) {
 				u32 size;
 				if (file.read(&size, sizeof(size))) {
@@ -466,7 +467,7 @@ struct ShaderCompiler {
 	TagAllocator m_allocator;
 	
 	// cache source code -> binary blob
-	HashMap<StableHash32, ID3DBlob*> m_cache;
+	HashMap<StableHash, ID3DBlob*> m_cache;
 };
 
 struct PSOCache {
@@ -507,7 +508,7 @@ struct PSOCache {
 		hasher.update(&p.shader_hash, sizeof(p.shader_hash));
 		hasher.update(&fb.ds_format, sizeof(fb.ds_format));
 		hasher.update(&fb.formats[0], sizeof(fb.formats[0]) * fb.count);
-		const StableHash32 hash = hasher.end();
+		const StableHash hash = hasher.end64();
 
 		auto iter = cache.find(hash);
 		if (iter.isValid()) {
@@ -663,7 +664,7 @@ struct PSOCache {
 
 	// TODO separate compute and graphics cache
 	// TODO graphics cache should be [framebuffer][shader_hash] -> PSO, and [framebuffer] can be computed once in setFramebuffer
-	HashMap<StableHash32, ID3D12PipelineState*> cache;
+	HashMap<StableHash, ID3D12PipelineState*> cache;
 	ID3D12PipelineState* last = nullptr;
 };
 
@@ -1064,6 +1065,7 @@ struct D3D {
 	u64 frame_number = 0;
 	u32 debug_groups_depth = 0;
 	StaticString<128> debug_groups_queue[8];
+	D3D12_GPU_DESCRIPTOR_HANDLE bound_shader_buffers = {};
 
 	bool vsync = true;
 	bool vsync_dirty = false;
@@ -2545,6 +2547,7 @@ static void applyComputeUniformBlocks() {
 		g_last_program = d3d->current_program;
 		d3d->cmd_list->SetComputeRootDescriptorTable(BINDLESS_SRV_ROOT_PARAMETER_INDEX, d3d->srv_heap.gpu_begin);
 		d3d->cmd_list->SetComputeRootDescriptorTable(BINDLESS_SAMPLERS_ROOT_PARAMETER_INDEX, d3d->sampler_heap.gpu_begin);
+		if (d3d->bound_shader_buffers.ptr) d3d->cmd_list->SetComputeRootDescriptorTable(SRV_ROOT_PARAMETER_INDEX, d3d->bound_shader_buffers);
 	}
 	applyComputeUniformBlocks();
 	return true;
@@ -2562,6 +2565,7 @@ static void applyComputeUniformBlocks() {
 	g_last_pipeline_type = PipelineType::GRAPHICS;
 	d3d->cmd_list->SetGraphicsRootDescriptorTable(BINDLESS_SRV_ROOT_PARAMETER_INDEX, d3d->srv_heap.gpu_begin);
 	d3d->cmd_list->SetGraphicsRootDescriptorTable(BINDLESS_SAMPLERS_ROOT_PARAMETER_INDEX, d3d->sampler_heap.gpu_begin);
+	if (d3d->bound_shader_buffers.ptr) d3d->cmd_list->SetGraphicsRootDescriptorTable(SRV_ROOT_PARAMETER_INDEX, d3d->bound_shader_buffers);
 	applyGFXUniformBlocks();
 	return true;
 }
@@ -2615,8 +2619,7 @@ void bindShaderBuffers(Span<BufferHandle> buffers) {
 			buffers[i]->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_GENERIC_READ);
 		}
 	}
-	D3D12_GPU_DESCRIPTOR_HANDLE descriptor = d3d->srv_heap.allocTransient(d3d->device, Span(resources, buffers.length()), Span(descs, buffers.length()));
-	d3d->cmd_list->SetGraphicsRootDescriptorTable(SRV_ROOT_PARAMETER_INDEX, descriptor);
+	d3d->bound_shader_buffers = d3d->srv_heap.allocTransient(d3d->device, Span(resources, buffers.length()), Span(descs, buffers.length()));
 }
 
 void bindUniformBuffer(u32 index, BufferHandle buffer, size_t offset, size_t size) {

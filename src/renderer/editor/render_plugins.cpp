@@ -1667,6 +1667,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		#ifdef LUMIX_BASIS_UNIVERSAL
 			dst.write("bsu", 3);
 			u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
+			// TODO wrap_mode
 			flags |= meta.wrap_mode_u == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_U : 0;
 			flags |= meta.wrap_mode_v == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_V : 0;
 			flags |= meta.wrap_mode_w == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_W : 0;
@@ -3229,6 +3230,7 @@ struct CodeEditorWindow : AssetEditorWindow {
 		else {
 			m_editor = createLuaCodeEditor(m_app);
 		}
+		m_editor->focus();
 			
 		OutputMemoryStream blob(app.getAllocator());
 		if (app.getEngine().getFileSystem().getContentSync(path, blob)) {
@@ -3332,7 +3334,200 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		m_app.getAssetBrowser().addWindow(win.move());
 	}
 
-	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
+	static StringView getLine(StringView& src) {
+		const char* b = src.begin;
+		while (b < src.end && *b != '\n') ++b;
+		StringView ret(src.begin, b);
+		src.begin = b < src.end ? b + 1 : b;
+		return ret;
+	}
+
+	static bool assign(Shader::Uniform& u, Tokenizer::Variant v) {
+		switch (u.type) {
+			case Shader::Uniform::NORMALIZED_FLOAT:
+			case Shader::Uniform::FLOAT:
+			case Shader::Uniform::INT:
+				if (v.type != Tokenizer::Variant::NUMBER) return false;
+				u.default_value.float_value = (float)v.number;
+				return true;
+			case Shader::Uniform::FLOAT2:
+				if (v.type != Tokenizer::Variant::VEC2) return false;
+				memcpy(u.default_value.vec2, v.vector, sizeof(u.default_value.vec2));
+				return true;
+			case Shader::Uniform::FLOAT3:
+				if (v.type != Tokenizer::Variant::VEC3) return false;
+				memcpy(u.default_value.vec3, v.vector, sizeof(u.default_value.vec3));
+				return true;
+			case Shader::Uniform::COLOR:
+			case Shader::Uniform::FLOAT4:
+				if (v.type != Tokenizer::Variant::VEC4) return false;
+				memcpy(u.default_value.vec4, v.vector, sizeof(u.default_value.vec4));
+				return true;
+		}
+		ASSERT(false);
+		return false;
+	}
+
+	bool compile(const Path& src) override {
+		// load
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		OutputMemoryStream src_data(m_app.getAllocator());
+		if (!fs.getContentSync(src, src_data)) return false;
+		
+		// parse
+		struct TextureSlot {
+			TextureSlot(IAllocator& allocator) : name(allocator), define(allocator) {}
+			String name;
+			Path default_texture;
+			String define;
+		};
+
+		StringView preprocess((const char*)src_data.data(), (u32)src_data.size());
+		bool is_surface = false;
+		Array<Shader::Uniform> uniforms(m_app.getAllocator());
+		Array<String> defines(m_app.getAllocator());
+		Array<TextureSlot> textures(m_app.getAllocator());
+		OutputMemoryStream compiled(m_app.getAllocator());
+		compiled.reserve(src_data.size() + 1024);
+		u32 line_idx = 0;
+		for (;;) {
+			++line_idx;
+			StringView line = getLine(preprocess);
+			if (line.begin == preprocess.end) break;
+
+			if (startsWith(line, "//@")) {
+				line.removePrefix(3);
+				if (startsWith(line, "surface")) {
+					is_surface = true;
+				}
+				else if (startsWith(line, "define \"")) {
+					line.removePrefix(8);
+					line.end = line.begin + 1;
+					while (line.end < preprocess.end && *line.end != '"') ++line.end;
+					
+					char tmp[64];
+					copyString(tmp, line);
+					defines.push(String(tmp, m_app.getAllocator()));
+				}
+				else if (startsWith(line, "uniform")) {
+					line.removePrefix(7);
+					Tokenizer t(preprocess, src.c_str());
+					t.cursor = line.begin;
+					StringView name;
+					StringView type;
+					if (!t.consume(name, ",", type, ",")) return false;
+
+					Shader::Uniform& u = uniforms.emplace();
+					copyString(Span(u.name), name);
+									
+					if (equalStrings(type, "normalized_float")) u.type = Shader::Uniform::FLOAT;
+					else if (equalStrings(type, "float")) u.type = Shader::Uniform::FLOAT;
+					else if (equalStrings(type, "int")) u.type = Shader::Uniform::INT;
+					else if (equalStrings(type, "color")) u.type = Shader::Uniform::COLOR;
+					else if (equalStrings(type, "float2")) u.type = Shader::Uniform::FLOAT2;
+					else if (equalStrings(type, "float3")) u.type = Shader::Uniform::FLOAT3;
+					else if (equalStrings(type, "float4")) u.type = Shader::Uniform::FLOAT4;
+					else {
+						logError(src, "(", getLine(type), "): Unknown uniform type ", type);
+						t.logErrorPosition(type.begin);
+						return false;
+					}
+
+					Tokenizer::Variant v = t.consumeVariant();
+					if (v.type == Tokenizer::Variant::NONE) return false;
+					if (!assign(u, v)) {
+						logError(src, "(", getLine(type), "): Uniform ", name, " has incompatible type ", type);
+						t.logErrorPosition(type.begin);
+						return false;
+					}
+
+					if (uniforms.size() == 1) {
+						u.offset = 0;
+					}
+					else {
+						const Shader::Uniform& prev = uniforms[uniforms.size() - 2];
+						u.offset = prev.offset + prev.size();
+						const u32 align = u.size();
+						u.offset += (align - u.offset % align) % align;
+					}
+				}
+				else if (startsWith(line, "texture_slot")) {
+					line.removePrefix(12);
+					Tokenizer t(preprocess, src.c_str());
+					t.content.end = line.end;
+					t.cursor = line.begin;
+					StringView name;
+					StringView default_texture;
+					if (!t.consume(name, ",", default_texture)) return false;
+					
+					TextureSlot& slot = textures.emplace(m_app.getAllocator());
+					slot.name = name;
+					slot.default_texture = Path(default_texture);
+				
+					Tokenizer::Token n = t.tryNextToken();
+					if (n && n.value[0] == ',') {
+						StringView def;
+						if (!t.consume(def)) return false;
+						slot.define = def;
+					}
+				}
+				else if (startsWith(line, "include \"")) {
+					StringView path;
+					path.begin = line.begin + 9;
+					path.end = path.begin + 1;
+					while (path.end < preprocess.end && *path.end != '"') ++path.end;
+
+					ResourceManagerHub& rm = m_app.getEngine().getResourceManager();
+					OutputMemoryStream include_content(m_app.getAllocator());
+					if (!fs.getContentSync(Path(path), include_content)) {
+						logError(src, ": Failed to open/read include ", path);
+						return false;
+					}
+					
+					if (!include_content.empty()) {
+						include_content << "\n";
+						compiled << "#line 1 \"" << path << "\"\n";
+						compiled.write(include_content.data(), include_content.size());
+						compiled << "#line " << line_idx + 1 << " \"" << src << "\"\n";
+					}
+				}
+			}
+			else {
+				compiled << line << "\n";
+			}
+		}
+		
+		// write compiled
+		OutputMemoryStream preamble(m_app.getAllocator());
+		Shader::Header header;
+		preamble.write(header);
+		preamble.write((u32)is_surface);
+		preamble.write((u32)uniforms.size());
+		for (const Shader::Uniform& u : uniforms) {
+			preamble.writeString(u.name);
+			preamble.write(u.type);
+			preamble.write(u.offset);
+			preamble.write(u.default_value);
+		}
+		preamble.write((u32)defines.size());
+		for (const String& def : defines) {
+			preamble.writeString(def);
+		}
+		preamble.write((u32)textures.size());
+		for (const TextureSlot& slot : textures) {
+			preamble.writeString(slot.name);
+			preamble.writeString(slot.default_texture);
+			preamble.writeString(slot.define);
+		}
+		RollingStableHasher hasher;
+		hasher.begin();
+		hasher.update(src_data.data(), (u32)src_data.size());
+		preamble.write(hasher.end64());
+		preamble.write(compiled.data(), (u32)compiled.size());
+
+		return m_app.getAssetCompiler().writeCompiledResource(src, preamble);
+	}
+	
 	const char* getLabel() const override { return "Shader"; }
 
 	StudioApp& m_app;

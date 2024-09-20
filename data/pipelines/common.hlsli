@@ -144,16 +144,16 @@ cbuffer GlobalState : register(b0) {
 };
 
 cbuffer PassState : register(b1) {
-	float4x4 Pass_projection : packoffset(c0);
-	float4x4 Pass_inv_projection : packoffset(c4);
-	float4x4 Pass_view : packoffset(c8);
-	float4x4 Pass_inv_view : packoffset(c12);
-	float4x4 Pass_view_projection : packoffset(c16);
-	float4x4 Pass_inv_view_projection : packoffset(c20);
-	float4 Pass_view_dir : packoffset(c24);
-	float4 Pass_camera_up : packoffset(c25);
-	float4 Pass_camera_planes[6] : packoffset(c26);
-	float4 Pass_shadow_to_camera : packoffset(c32);
+	float4x4 Pass_projection;
+	float4x4 Pass_inv_projection;
+	float4x4 Pass_view;
+	float4x4 Pass_inv_view;
+	float4x4 Pass_view_projection;
+	float4x4 Pass_inv_view_projection;
+	float4 Pass_view_dir;
+	float4 Pass_camera_up;
+	float4 Pass_camera_planes[6];
+	float4 Pass_shadow_to_camera;
 };
 
 cbuffer ShadowAtlas : register(b3) {
@@ -300,7 +300,7 @@ float toLinearDepth(float ndc_depth) {
 }
 
 StructuredBuffer<Light> b_lights : register(t0);
-StructuredBuffer<Cluster> b_clusters : register(t1, space0);
+StructuredBuffer<Cluster> b_clusters : register(t1);
 StructuredBuffer<int> b_cluster_map : register(t2);
 StructuredBuffer<EnvProbe> b_env_probes : register(t3);
 StructuredBuffer<ReflectionProbe> b_refl_probes : register(t4);
@@ -320,6 +320,7 @@ Cluster getClusterLinearDepth(float linear_depth, float2 frag_coord) {
 	return b_clusters[idx];
 }
 
+// TODO uint2 frag_coord
 Cluster getCluster(float ndc_depth, float2 frag_coord) {
 	int2 ifrag_coord = int2(frag_coord.xy);
 	#ifndef _ORIGIN_BOTTOM_LEFT
@@ -335,6 +336,56 @@ Cluster getCluster(float ndc_depth, float2 frag_coord) {
 	cluster = clamp(cluster, 0, int3(tiles - 1, 15));
 	uint idx = cluster.x + cluster.y * tiles.x + cluster.z * tiles.x * tiles.y;
 	return b_clusters[idx];
+}
+
+Cluster getCluster(float ndc_depth, uint2 frag_coord, out uint3 cluster_coord) {
+	#ifndef _ORIGIN_BOTTOM_LEFT
+		frag_coord.y = Global_framebuffer_size.y - frag_coord.y - 1;
+	#endif
+
+	uint3 cluster = uint3(frag_coord.xy / 64.0, 0);
+	float linear_depth = toLinearDepth(ndc_depth);
+	cluster.z = int(log(linear_depth) * 16 / (log(10000 / 0.1)) - log(0.1) * 16 / log(10000 / 0.1));
+	cluster.z = min(cluster.z, 15);
+	int2 tiles = int2((Global_framebuffer_size + 63) / 64.0);
+	cluster.y = tiles.y - 1 - cluster.y;
+	cluster = clamp(cluster, 0, int3(tiles - 1, 15));
+	uint idx = cluster.x + cluster.y * tiles.x + cluster.z * tiles.x * tiles.y;
+	cluster_coord = cluster;
+	return b_clusters[idx];
+}
+
+#define GLYPH_WIDTH 4
+#define GLYPH_HEIGHT 6
+
+// https://www.shadertoy.com/view/MfsBWf
+// mask for single digit
+int getGlyphMask(int2 pos, int glyph) {
+	if (pos.x >= 0 && pos.x < GLYPH_WIDTH && pos.y >= 0 && pos.y < GLYPH_HEIGHT) {
+		glyph >>= GLYPH_WIDTH * (GLYPH_HEIGHT - 1 - pos.y) + GLYPH_WIDTH - 1 - pos.x;
+		return glyph & 1;
+	}
+	return 0;
+}
+
+// mask for whole number
+int getNumberMask(int2 pos, uint number) {
+	static const int char_spacing = 1;
+	static const int glyphs[] = { 6920598, 2499111, 6885967, 6889878, 1268209, 16310678, 6875542, 15803460, 6908310, 6919958 };
+	uint num_digits = uint(log10(number)) + 1;
+	uint index = pos.x / (GLYPH_WIDTH + char_spacing);
+	pos.x -= index * (GLYPH_WIDTH + char_spacing);
+
+	if (index >= num_digits) return 0;
+	int glyph = (number / pow(10, num_digits - index - 1)) % 10;
+	if (index == 0 && glyph == 0) return 0;
+	return getGlyphMask(pos, glyphs[glyph]);
+}
+
+// use this to print numbers in a shader
+// usage: color = computeColor(frag_coord); print(color, frag_coord - number_origin, number_to_print);
+void print(in out float3 color, int2 pos_glyph_space, uint number) {
+	if (getNumberMask(pos_glyph_space, number)) color = 1;
 }
 
 float hash(float3 seed) {

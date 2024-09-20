@@ -7,6 +7,7 @@
 #include "core/os.h"
 #include "core/path.h"
 #include "core/profiler.h"
+#include "core/tokenizer.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
 #include "editor/editor_asset.h"
@@ -51,9 +52,24 @@ struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			m_resource->decRefCount();
 		}
 
+		static void serialize(Sprite& sprite, OutputMemoryStream& out) {
+			ASSERT(sprite.isReady());
+			out << "type = " << (sprite.type == Sprite::PATCH9 ? "patch9\n" : "simple\n");
+			out << "top = " << sprite.top << "\n";
+			out << "bottom = " << sprite.bottom << "\n";
+			out << "left = " << sprite.left << "\n";
+			out << "right = " << sprite.right << "\n";
+			if (sprite.getTexture()) {
+				out << "texture = \"/" << sprite.getTexture()->getPath() << "\"";
+			} else {
+				out << "texture = \"\"";
+			}
+		}
+
+
 		void save() {
 			OutputMemoryStream blob(m_app.getAllocator());
-			m_resource->serialize(blob);
+			serialize(*m_resource, blob);
 			m_app.getAssetBrowser().saveResource(*m_resource, blob);
 			m_dirty = false;
 		}
@@ -200,10 +216,42 @@ struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		m_app.getAssetCompiler().registerExtension("spr", Sprite::TYPE);
 	}
 
-	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
+	bool compile(const Path& src) override {
+		// load
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		OutputMemoryStream src_data(m_app.getAllocator());
+		if (!fs.getContentSync(src, src_data)) return false;
+
+		// parse
+		StringView type_str, texture_str;
+		i32 top, bottom, left, right;
+		const ParseItemDesc descs[] = {
+			{"type", &type_str},
+			{"top", &top},
+			{"bottom", &bottom},
+			{"left", &left},
+			{"right", &right},
+			{"texture", &texture_str}
+		};
+		StringView sv((const char*)src_data.data(), (u32)src_data.size());
+		if (!parse(sv, src.c_str(), descs)) return false;
+
+		// write compiled
+		OutputMemoryStream compiled(m_app.getAllocator());
+		Sprite::Header header;
+		compiled.write(header);
+		compiled.write(top);
+		compiled.write(bottom);
+		compiled.write(left);
+		compiled.write(right);
+		compiled.writeString(texture_str);
+		compiled.write(equalIStrings(type_str, "patch9") ? Sprite::PATCH9 : Sprite::SIMPLE);
+		return m_app.getAssetCompiler().writeCompiledResource(src, compiled);
+	}
+
 	bool canCreateResource() const override { return true; }
 	const char* getDefaultExtension() const override { return "spr"; }
-	void createResource(OutputMemoryStream& blob) override { blob << "type \"simple\""; }
+	void createResource(OutputMemoryStream& blob) override { blob << "type = simple"; }
 
 	void openEditor(const Path& path) override {
 		IAllocator& allocator = m_app.getAllocator();

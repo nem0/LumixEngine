@@ -29,14 +29,19 @@ struct PhysicsMaterialManager : ResourceManager {
 };
 
 struct PhysicsMaterial : Resource {
+	struct Header {
+		static const u32 MAGIC = '_PMA';
+		u32 magic = MAGIC;
+		u32 version = 0;
+	};
+
 	PhysicsMaterial(const Path& path, ResourceManager& resource_manager, struct PhysicsSystem& system, IAllocator& allocator);
 	~PhysicsMaterial();
 
 	ResourceType getType() const override { return TYPE; }
 	void unload() override;
 	bool load(Span<const u8> mem) override;
-	void serialize(OutputMemoryStream& blob);
-	void deserialize(struct InputMemoryStream& blob);
+	//void serialize(OutputMemoryStream& blob);
 
 	PhysicsSystem& system;
 	physx::PxMaterial* material;

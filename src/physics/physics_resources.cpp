@@ -9,7 +9,6 @@
 #include "core/profiler.h"
 #include "core/stream.h"
 #include "core/string.h"
-#include "core/tokenizer.h"
 #include "engine/resource_manager.h"
 #include "physics_resources.h"
 #include "physics/physics_system.h"
@@ -107,45 +106,26 @@ ResourceType PhysicsMaterial::TYPE("physics_material");
 
 void PhysicsMaterial::unload() {}
 
-struct PhysicsMaterialLoadData {
-	float static_friction = 0.5f;
-	float dynamic_friction = 0.5f;
-	float restitution = 0.1f;
-};
-
-void PhysicsMaterial::serialize(OutputMemoryStream& blob) {
-	PhysicsMaterialLoadData data;
-	data.static_friction = material->getStaticFriction();
-	data.dynamic_friction = material->getDynamicFriction();
-	data.restitution = material->getRestitution();
-	blob.write(data);
-}
-
-void PhysicsMaterial::deserialize(InputMemoryStream& blob) {
-	PhysicsMaterialLoadData data;
-	blob.read(data);
-
-	material->setStaticFriction(data.static_friction);
-	material->setDynamicFriction(data.dynamic_friction);
-	material->setRestitution(data.restitution);
-}
-
 bool PhysicsMaterial::load(Span<const u8> mem) {
-	float sf = material->getStaticFriction();
-	float df = material->getDynamicFriction();
-	float rest = material->getRestitution();
-	const ParseItemDesc descs[] = {
-		{"static_friction", &sf},
-		{"dynamic_friction", &df},
-		{"restitution", &rest},
-	};
-	if (!parse(mem, getPath().c_str(), descs)) return false;
-
+	InputMemoryStream stream(mem);
+	Header header;
+	stream.read(header);
+	if (header.magic != Header::MAGIC) {
+		logError(getPath(), ": invalid file");
+		return false;
+	}
+	if (header.version != 0) {
+		logError(getPath(), ": unsupported version");
+		return false;
+	}
+	float sf, df, rest;
+	stream.read(sf);
+	stream.read(df);
+	stream.read(rest);
 	material->setStaticFriction(sf);
 	material->setDynamicFriction(df);
 	material->setRestitution(rest);
-
-	return true;
+	return !stream.hasOverflow();
 }
 
 PhysicsMaterialManager::PhysicsMaterialManager(PhysicsSystem& system, IAllocator& allocator)

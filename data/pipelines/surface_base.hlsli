@@ -1,5 +1,3 @@
-//include "pipelines/common.hlsli"
-
 // you can include this file and implement getSurface function for custom surface shaders
 
 #if !defined GRASS
