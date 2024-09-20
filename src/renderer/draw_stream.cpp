@@ -30,6 +30,7 @@ enum class DrawStream::Instruction : u8 {
 	SET_FRAMEBUFFER_CUBE,
 	SET_CURRENT_WINDOW,
 	CREATE_PROGRAM,
+	REQUEST_DISASSEMBLY,
 	DRAW_ARRAYS,
 	PUSH_DEBUG_GROUP,
 	POP_DEBUG_GROUP,
@@ -487,6 +488,10 @@ void DrawStream::bindIndexBuffer(gpu::BufferHandle buffer) {
 	m_cache.dirty |= Dirty::INDEX_BUFFER;
 }
 
+void DrawStream::requestDisassembly(gpu::ProgramHandle program) {
+	write(Instruction::REQUEST_DISASSEMBLY, program);
+}
+
 void DrawStream::useProgram(gpu::ProgramHandle program) {
 	m_cache.program = program;
 	m_cache.dirty |= Dirty::PROGRAM;
@@ -825,6 +830,11 @@ void DrawStream::run() {
 				case Instruction::DRAW_ARRAYS: {
 					READ(DrawArraysData, data);
 					gpu::drawArrays(data.offset, data.count);
+					break;
+				}
+				case Instruction::REQUEST_DISASSEMBLY: {
+					READ(gpu::ProgramHandle, program);
+					gpu::requestDisassembly(program);
 					break;
 				}
 				case Instruction::DRAW_INDEXED_INSTANCED: {

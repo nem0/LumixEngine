@@ -65,11 +65,10 @@ VSOutput mainVS(uint vertex_id : SV_VertexID, uint instance_id : SV_InstanceID) 
 	#ifndef DEPTH
 		output.pos_ws = pos_ws;
 	#endif
-	float4 p = mul(float4(pos_ws, 1), Pass_view);
 	#ifndef DEPTH
-		output.dist2 = dot(p.xyz, p.xyz);
+		output.dist2 = dot(pos_ws.xyz, pos_ws.xyz);
 	#endif
-	output.position = mul(p, Pass_projection);
+	output.position = transformPosition(pos_ws, Pass_ws_to_ndc);
 	return output;
 }
 

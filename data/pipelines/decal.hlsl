@@ -32,7 +32,7 @@ VSOutput mainVS(VSInput input) {
 	float3 pos_ws = rotateByQuat(input.i_rot, input.position * input.i_half_extents);
 	pos_ws += input.i_pos_ws;
 	output.uv_scale = input.i_uv_scale;
-	output.position = mul(float4(pos_ws, 1), mul(Global_view, Global_projection));
+	output.position = transformPosition(pos_ws, Global_ws_to_ndc);
 	return output;
 }
 

@@ -110,7 +110,7 @@ VSOutput mainVS(VSInput input) {
 	#ifdef AUTOINSTANCED
 		float3 p = input.position.xyz * input.i_scale.xyz;
 		output.pos_ws = float4(input.i_pos_lod.xyz + rotateByQuat(input.i_rot, p), 1);
-		output.position = mul(output.pos_ws, Pass_view_projection);
+		output.position = mul(output.pos_ws, Pass_ws_to_ndc);
 		output.normal = rotateByQuat(input.i_rot, input.normal);
 		#ifdef HAS_LOD
 			output.lod = input.i_pos_lod.w;
@@ -124,7 +124,7 @@ VSOutput mainVS(VSInput input) {
 		#endif
 		float3 p = input.position * input.i_pos_scale.w;
 		output.pos_ws = float4(input.i_pos_scale.xyz + rotateByQuat(rot_quat, p), 1);
-		output.position = mul(output.pos_ws, Pass_view_projection);
+		output.position = mul(output.pos_ws, Pass_ws_to_ndc);
 	#elif defined GRASS
 		output.normal = rotateByQuat(input.i_rot, input.normal);
 		#ifdef TANGENT_ATTR
@@ -137,16 +137,16 @@ VSOutput mainVS(VSInput input) {
 		#ifdef COLOR0_ATTR
 			//output.color = input.color;
 		#endif
-		output.position = mul(output.pos_ws, Pass_view_projection);
+		output.position = mul(output.pos_ws, Pass_ws_to_ndc);
 	#elif defined DYNAMIC
 		output.normal = rotateByQuat(input.i_rot, input.normal);
 		#ifdef TANGENT_ATTR
 			output.tangent = rotateByQuat(input.i_rot, input.tangent);
 		#endif
 		output.pos_ws = float4(input.i_pos_lod.xyz + rotateByQuat(input.i_rot, input.position * input.i_scale.xyz), 1);
-		output.position = mul(output.pos_ws, Pass_view_projection);
+		output.position = mul(output.pos_ws, Pass_ws_to_ndc);
 		output.prev_ndcpos_no_jitter = float4(input.i_prev_pos_lod.xyz + rotateByQuat(input.i_prev_rot, input.position * input.i_prev_scale.xyz), 1);
-		output.prev_ndcpos_no_jitter = mul(output.prev_ndcpos_no_jitter, mul(Global_view_projection_no_jitter, Global_reprojection));
+		output.prev_ndcpos_no_jitter = mul(output.prev_ndcpos_no_jitter, mul(Global_ws_to_ndc_no_jitter, Global_reprojection));
 	#elif defined SKINNED
 		float2x4 dq = mul(bones[input.indices.x], input.weights.x);
 		float w = dot(bones[input.indices.y][0], bones[input.indices.x][0]) < 0 ? -input.weights.y : input.weights.y;
@@ -170,26 +170,26 @@ VSOutput mainVS(VSInput input) {
 		#else
 			mpos = input.position;
 		#endif
-		output.pos_ws = mul(float4(transformByDualQuat(dq, mpos), 1), mtx);
-		output.position = mul(output.pos_ws, Pass_view_projection);
+		output.pos_ws = transformPosition(transformByDualQuat(dq, mpos), mtx);
+		output.position = mul(output.pos_ws, Pass_ws_to_ndc);
 		// TODO previous frame bone positions
-		output.prev_ndcpos_no_jitter = mul(float4(transformByDualQuat(dq, mpos), 1), prev_matrix);
-		output.prev_ndcpos_no_jitter = mul(output.prev_ndcpos_no_jitter, mul(Global_view_projection_no_jitter, Global_reprojection));
+		output.prev_ndcpos_no_jitter = transformPosition(transformByDualQuat(dq, mpos), prev_matrix);
+		output.prev_ndcpos_no_jitter = mul(output.prev_ndcpos_no_jitter, mul(Global_ws_to_ndc_no_jitter, Global_reprojection));
 	#else
 		float3x3 rot_mtx = (float3x3)model_mtx;
 		output.normal =  mul(input.normal, rot_mtx);
 		#ifdef TANGENT_ATTR
 			output.tangent = mul(input.tangent, rot_mtx);
 		#endif
-		output.pos_ws = mul(float4(input.position, 1), model_mtx);
-		output.position = mul(output.pos_ws, Pass_view_projection);
+		output.pos_ws = transformPosition(input.position, model_mtx);
+		output.position = mul(output.pos_ws, Pass_ws_to_ndc);
 	#endif
 	return output;
 }
 
 Surface getSurfaceEx(VSOutput input) {
 	Surface data = getSurface(input);
-	float4 p = mul(input.pos_ws, Global_view_projection_no_jitter);
+	float4 p = mul(input.pos_ws, Global_ws_to_ndc_no_jitter);
 	#if defined DYNAMIC || defined SKINNED
 		float2 prev_pos_projected = input.prev_ndcpos_no_jitter.xy / input.prev_ndcpos_no_jitter.w;
 		data.motion = prev_pos_projected.xy - p.xy / p.w;

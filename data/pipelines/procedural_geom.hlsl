@@ -14,7 +14,7 @@
 //@texture_slot "Ambient occlusion", "", "HAS_AMBIENT_OCCLUSION_TEX"
 
 cbuffer Drawcall : register(b4) {
-	float4x4 u_local_to_world;
+	float4x4 u_ls_to_ws;
 };
 
 struct VSOutput {
@@ -35,10 +35,10 @@ struct VSInput {
 
 VSOutput mainVS(VSInput input) {
 	VSOutput output;
-	output.pos_ws = mul(float4(input.position, 1), u_local_to_world).xyz;
-	output.position = mul(float4(output.pos_ws, 1), Pass_view_projection);
-	output.normal = mul(float4(input.normal, 0), u_local_to_world).xyz;
-	output.tangent = mul(float4(input.tangent, 0), u_local_to_world).xyz;
+	output.pos_ws = transformPosition(input.position, u_ls_to_ws).xyz;
+	output.position = transformPosition(output.pos_ws, Pass_ws_to_ndc);
+	output.normal = mul(float4(input.normal, 0), u_ls_to_ws).xyz;
+	output.tangent = mul(float4(input.tangent, 0), u_ls_to_ws).xyz;
 	output.uv = input.uv;
 	return output;
 }

@@ -2,7 +2,7 @@
 //@include "pipelines/common.hlsli"
 
 cbuffer Model : register(b4) {
-	float4x4 u_model;
+	float4x4 u_ls_to_ws;
 };
 
 struct VSOutput {
@@ -18,7 +18,7 @@ struct VSInput {
 VSOutput mainVS(VSInput input) {
 	VSOutput output;
 	output.color = float4(pow(abs(input.color.rgb), 2.2f.xxx), input.color.a);
-	output.position = mul(float4(input.position, 1), mul(u_model, Pass_view_projection));
+	output.position = transformPosition(input.position, u_ls_to_ws, Pass_ws_to_ndc);
 	return output;
 }
 

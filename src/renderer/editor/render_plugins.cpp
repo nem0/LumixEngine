@@ -3223,13 +3223,9 @@ struct CodeEditorWindow : AssetEditorWindow {
 		: AssetEditorWindow(app)
 		, m_app(app)
 		, m_path(path)
+		, m_disassembly(app.getAllocator())
 	{
-		if (Path::hasExtension(path, "hlsl") || Path::hasExtension(path, "hlsli")) {
-			m_editor = createHLSLCodeEditor(m_app);
-		}
-		else {
-			m_editor = createLuaCodeEditor(m_app);
-		}
+		m_editor = createHLSLCodeEditor(m_app);
 		m_editor->focus();
 			
 		OutputMemoryStream blob(app.getAllocator());
@@ -3237,6 +3233,10 @@ struct CodeEditorWindow : AssetEditorWindow {
 			StringView v((const char*)blob.data(), (u32)blob.size());
 			m_editor->setText(v);
 		}
+	}
+
+	~CodeEditorWindow() {
+		if (m_shader) m_shader->decRefCount();
 	}
 
 	void save() {
@@ -3252,14 +3252,44 @@ struct CodeEditorWindow : AssetEditorWindow {
 		return true;
 	}
 
+	void showDisassembly() {
+		if (!m_shader) m_shader = m_app.getEngine().getResourceManager().load<Shader>(m_path);
+		m_disassembly = "";
+		m_program = gpu::INVALID_PROGRAM;
+	}
+
+	void onGUI() override {
+		if (m_shader) {
+			ImGui::SetNextWindowSizeConstraints(ImVec2(200, 100), ImVec2(FLT_MAX, FLT_MAX));
+			if (ImGui::Begin("Disassembly")) {
+				if (m_shader->isFailure()) ImGui::TextUnformatted("Failed to load shader.");
+				else if (m_shader->isEmpty()) ImGui::TextUnformatted("Loading...");
+				else {
+					if (!m_program) {
+						m_program = m_shader->m_programs.empty() ? m_shader->getProgram(gpu::StateFlags::NONE, gpu::VertexDecl(gpu::PrimitiveType::TRIANGLES), 0, nullptr) : m_shader->m_programs[0].program;
+						m_shader->m_renderer.getDrawStream().requestDisassembly(m_program);
+					}
+					if (m_disassembly.length() == 0) {
+						gpu::getDisassembly(m_program, m_disassembly);
+					}
+					else {
+						ImGui::TextUnformatted(m_disassembly.c_str(), m_disassembly.c_str() + m_disassembly.length());
+					}
+				}
+			}
+			ImGui::End();
+		}
+		AssetEditorWindow::onGUI();
+	}
+
 	void windowGUI() override {
 		if (ImGui::BeginMenuBar()) {
 			if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
 			if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_path);
 			if (ImGuiEx::IconButton(ICON_FA_SEARCH, "View in browser")) m_app.getAssetBrowser().locate(m_path);
+			if (ImGuiEx::IconButton(ICON_FA_ENVELOPE_OPEN, "View disassembly")) showDisassembly();
 			ImGui::EndMenuBar();
 		}
-
 
 		ImGui::PushFont(m_app.getMonospaceFont());
 		if (m_editor->gui("codeeditor")) m_dirty = true;
@@ -3272,6 +3302,9 @@ struct CodeEditorWindow : AssetEditorWindow {
 	StudioApp& m_app;
 	UniquePtr<CodeEditor> m_editor;
 	Path m_path;
+	Shader* m_shader = nullptr;
+	gpu::ProgramHandle m_program;
+	String m_disassembly;
 };
 
 struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {

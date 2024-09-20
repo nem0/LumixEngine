@@ -12,7 +12,7 @@ Output mainVS(uint vertex_id : SV_VertexID) {
 	local_pos.y = 0;
 	output.lpos = float4(local_pos, 1);
 	float4 p = float4(local_pos - Global_camera_world_pos.xyz,  1);
-	output.position = mul(p, mul(Global_view, Global_projection_no_jitter));
+	output.position = mul(p, mul(Global_ws_to_vs, Global_vs_to_ndc_no_jitter));
 	return output;
 }
 

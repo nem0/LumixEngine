@@ -12,8 +12,8 @@ cbuffer Data : register(b4) {
 void raycast(float3 csOrig, float3 csDir, float stride, float jitter, uint2 ip0) {
 	float3 csEndPoint = csOrig + abs(csOrig.z * 0.1) * csDir;
 
-	float4 H0 = mul(float4(csOrig, 1), Global_projection);
-	float4 H1 = mul(float4(csEndPoint, 1), Global_projection);
+	float4 H0 = transformPosition(csOrig, Global_vs_to_ndc);
+	float4 H1 = transformPosition(csEndPoint, Global_vs_to_ndc);
 
 	float k0 = 1 / H0.w, k1 = 1 / H1.w;
 
@@ -73,8 +73,8 @@ void main(uint3 thread_id : SV_DispatchThreadID) {
 	float2 inv_size = 1 / u_size;
 	float2 uv = float2(thread_id.xy) * inv_size;
 	float3 p = getPositionWS(u_depth, uv);
-	float4 o = mul(float4(p, 1), Global_view);
-	float3 d = mul(Global_light_dir.xyz, (float3x3)Global_view);
+	float4 o = mul(float4(p, 1), Global_ws_to_vs);
+	float3 d = mul(Global_light_dir.xyz, (float3x3)Global_ws_to_vs);
 	float rr = hash(float2(thread_id.xy) + 0.1 * Global_time);
 	raycast(o.xyz, d.xyz, u_stride, rr, thread_id.xy);
 }

@@ -39,7 +39,8 @@ VSOutput mainVS(VSInput input) {
 	
 	output.color = input.i_color;
 	output.emission = input.i_emission;
-	output.position = mul((mul(float4(input.i_position.xyz, 1), mul(u_model, Pass_view)) + float4(pos.xy, 0, 0)), Pass_projection);
+	float4 pos_vs = transformPosition(input.i_position.xyz, u_model, Pass_ws_to_vs) + float4(pos.xy, 0, 0);
+	output.position = transformPosition(pos_vs, Pass_vs_to_ndc);
 	return output;
 }
 

@@ -1,3 +1,22 @@
+/*
+BEGIN_SHADER_DECLARATIONS
+{
+    "Shaders": [
+        {
+            "ShaderName": "mainPS",
+            "ShaderCompiler": "fxc",
+            "ShaderType": "ps",
+            "ShaderModel": "5_0",
+            "EntryPoint": "mainPS",
+            "Defines": [],
+            "Optimization": "3",
+            "AdditionalArgs": []
+        }
+    ]
+}
+END_SHADER_DECLARATIONS
+*/
+
 //@surface
 //@include "pipelines/common.hlsli"
 //@texture_slot "Texture", "textures/common/white.tga"
@@ -30,7 +49,7 @@ VSOutput mainVS(VSInput input) {
 	pos += input.i_pos;
 	output.uv_scale = input.i_uv_scale;
 	output.bezier = input.i_bezier;
-	output.position = mul(float4(pos, 1), mul(Global_view, Global_projection));
+	output.position = transformPosition(pos, Global_ws_to_ndc);
 	return output;
 }
 

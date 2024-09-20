@@ -90,14 +90,14 @@ float2 dirToGrid(float3 vec) {
 		#else
 			float3 p = u_center.xyz + mul(input.position - u_center.xyz, tangent_space);
 		#endif
-		p = mul(float4(p, 1), model_mtx).xyz;
+		p = transformPosition(p, model_mtx).xyz;
 		
 		output.lod = 1;
 		output.tangent = tangent_space[0];
 		output.normal = tangent_space[2];
 		output.pos_ws = float4(p, 1);
 
-		output.position = mul(output.pos_ws, Pass_view_projection);
+		output.position = mul(output.pos_ws, Pass_ws_to_ndc);
 		return output;
 	}
 #else
@@ -147,7 +147,7 @@ float2 dirToGrid(float3 vec) {
 		output.normal = tangent_space[2];
 		output.pos_ws = float4(instance_pos + p, 1);
 
-		output.position = mul(output.pos_ws, Pass_view_projection);
+		output.position = mul(output.pos_ws, Pass_ws_to_ndc);
 		return output;
 	}
 #endif

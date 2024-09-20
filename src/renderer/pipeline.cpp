@@ -33,10 +33,14 @@
 #include "terrain.h"
 #include "texture.h"
 
+// TODO shader disassembly cleanup
 // TODO vsync
 // TODO env probe lighting is off
 // TODO temporal upsample
 // TODO shader cleanup
+
+// TODO shader - check what's better - float4 * (mat * mat) or (float4 * mat) * mat 
+// TODO float3 vs float4 * matrix
 
 // TODO crashes:
 	// TODO crash when context menu is outside of main window
@@ -52,7 +56,6 @@
 	// TODO icons over some debugs, e.g. TDAO 
 	// TODO switch plugins to use new genie stuff like plugin() function
 	// TODO gpu::readTexture with destination memory, so it does not have to allocate it
-	// TODO matrix rename A_to_B
 	// TODO fsr2
 	// TODO "static" srv+urv == "constant" bindless index
 	// TODO bindless terrain

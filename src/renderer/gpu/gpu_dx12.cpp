@@ -1,14 +1,15 @@
 //https://microsoft.github.io/DirectX-Specs/
 
 #include "core/allocator.h"
-#include "core/atomic.h"
 #include "core/array.h"
-#include "core/hash.h"
+#include "core/atomic.h"
 #include "core/hash_map.h"
+#include "core/hash.h"
 #include "core/job_system.h"
 #include "core/log.h"
 #include "core/math.h"
 #include "core/os.h"
+#include "core/path.h"
 #include "core/profiler.h"
 #include "core/stream.h"
 #include "core/string.h"
@@ -253,7 +254,7 @@ struct Query {
 };
 
 struct Program {
-	Program(IAllocator& allocator) {}
+	Program(IAllocator& allocator) : disassembly(allocator) {}
 
 	ID3DBlob* vs = nullptr;
 	ID3DBlob* ps = nullptr;
@@ -266,6 +267,7 @@ struct Program {
 	// for CS, there's 1:1 mapping from `shader_hash` to PSO
 	// for VS/PS, there's 1:1 mapping from `shader_hash` and RT formats to PSO
 	StableHash shader_hash;
+	String disassembly;
 	#ifdef LUMIX_DEBUG
 		StaticString<64> name;
 	#endif
@@ -408,6 +410,21 @@ struct ShaderCompiler {
 			return nullptr;
 		}
 		m_cache.insert(hash, output);
+
+		// save disassembled files
+		#if 0
+			ID3DBlob* disassembly;
+			HRESULT res = D3DDisassemble(output->GetBufferPointer(), output->GetBufferSize(), 0, NULL, &disassembly);
+			ASSERT(res == S_OK);
+			const char* dism = (const char*)disassembly->GetBufferPointer();
+			//logInfo(name, ": ", StringView(dism, (u32)disassembly->GetBufferSize()));
+
+			os::OutputFile out;
+			if (out.open(StaticString<MAX_PATH>("hlsl_", Path::getBasename(name), "-", entry_point, ".asm"))) {
+				(void)out.write(dism, disassembly->GetBufferSize());
+				out.close();
+			}
+		#endif
 		return output;
 	};
 
@@ -1070,6 +1087,7 @@ struct D3D {
 	bool vsync = true;
 	bool vsync_dirty = false;
 	Mutex vsync_mutex;
+	Mutex disassembly_mutex;
 };
 
 static Local<D3D> d3d;
@@ -2490,6 +2508,30 @@ void viewport(u32 x, u32 y, u32 w, u32 h) {
 	scissor.bottom = y + h;
 	d3d->cmd_list->RSSetScissorRects(1, &scissor);
 }
+
+void requestDisassembly(ProgramHandle program) {
+	if (!program->vs || !program->ps) return; // TODO
+	ID3DBlob* vs_blob;
+	ID3DBlob* ps_blob;
+	HRESULT hr = D3DDisassemble(program->vs->GetBufferPointer(), program->vs->GetBufferSize(), 0, NULL, &vs_blob);
+	ASSERT(hr == S_OK);
+	hr = D3DDisassemble(program->ps->GetBufferPointer(), program->ps->GetBufferSize(), 0, NULL, &ps_blob);
+	ASSERT(hr == S_OK);
+	MutexGuard guard(d3d->disassembly_mutex);
+	program->disassembly = "";
+	program->disassembly.append("====VS====\n", StringView((const char*)vs_blob->GetBufferPointer(), (u32)vs_blob->GetBufferSize()));
+	program->disassembly.append("====PS====\n", StringView((const char*)ps_blob->GetBufferPointer(), (u32)ps_blob->GetBufferSize()));
+	vs_blob->Release();
+	ps_blob->Release();
+}
+
+bool getDisassembly(ProgramHandle program, String& output) {
+	MutexGuard guard(d3d->disassembly_mutex);
+	if (program->disassembly.length() == 0) return false;
+	output = program->disassembly;
+	return true;
+}
+
 
 void useProgram(ProgramHandle handle) {
 	if (handle != d3d->current_program) {
