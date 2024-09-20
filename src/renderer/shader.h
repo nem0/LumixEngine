@@ -25,6 +25,12 @@ struct ShaderKey {
 };
 
 struct LUMIX_RENDERER_API Shader final : Resource {
+	struct Header {
+		static const u32 MAGIC = '_SHD';
+		u32 magic = MAGIC;
+		u32 version = 0;
+	};
+	
 	struct TextureSlot
 	{
 		TextureSlot()
@@ -41,7 +47,7 @@ struct LUMIX_RENDERER_API Shader final : Resource {
 
 	struct Uniform
 	{
-		enum Type
+		enum Type : u8
 		{
 			INT,
 			FLOAT,
@@ -95,7 +101,7 @@ struct LUMIX_RENDERER_API Shader final : Resource {
 	String m_code;
 
 	static const ResourceType TYPE;
-	RuntimeHash32 m_content_hash;
+	StableHash m_content_hash;
 
 private:
 	void unload() override;

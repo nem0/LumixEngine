@@ -5,7 +5,3 @@ mip_scale_coverage = -0.500000
 mips = true
 normalmap = false
 invert_green = false
-wrap_mode_u = "repeat"
-wrap_mode_v = "repeat"
-wrap_mode_w = "repeat"
-filter = "linear"

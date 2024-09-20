@@ -1292,6 +1292,9 @@ void SceneView::onToolbar()
 		option("Normal", Pipeline::DebugShow::NORMAL);
 		option("Roughness", Pipeline::DebugShow::ROUGHNESS);
 		option("Metallic", Pipeline::DebugShow::METALLIC);
+		option("Velocity", Pipeline::DebugShow::VELOCITY);
+		option("Light clusters", Pipeline::DebugShow::LIGHT_CLUSTERS);
+		option("Probe clusters", Pipeline::DebugShow::PROBE_CLUSTERS);
 		option("AO", Pipeline::DebugShow::AO);
 		Renderer& renderer = m_pipeline->getRenderer();
 		for (Lumix::RenderPlugin* plugin : renderer.getPlugins()) {

@@ -481,6 +481,7 @@ static bool tokenize(const char* str, u32& token_len, u8& token_type, u8 prev_to
 		"numthreads",
 		"static",
 		"const",
+		"struct"
 	};
 
 	const char* c = str;
@@ -628,7 +629,7 @@ struct CodeEditorImpl final : CodeEditor {
 
 		void operator =(const TextPoint& rhs) { col = rhs.col; line = rhs.line; }
 		TextPoint sel;
-		u32 virtual_x;
+		u32 virtual_x = 0;
 
 		bool hasSelection() const { return *this != sel; }
 		void cancelSelection() { sel = *this; }
@@ -1037,7 +1038,8 @@ struct CodeEditorImpl final : CodeEditor {
 	void moveCursorPageDown(u32 lines_count, float line_height) {
 		m_cursors.resize(1);
 		i32 old_line = m_cursors[0].line;
-		m_cursors[0].line += lines_count;
+		m_cursors[0].line = minimum(m_cursors[0].line + lines_count, m_lines.size() - 1);
+
 		m_scroll_y += (m_cursors[0].line - old_line) * line_height;
 		cursorMoved(m_cursors[0], false);
 	}
@@ -1505,8 +1507,9 @@ struct CodeEditorImpl final : CodeEditor {
 		StringView sel_view = m_search_text;
 		if (sel_view.size() == 0) return;
 
-		i32 line = from.line;
-		while (line < m_lines.size()) {
+		const i32 start_line = from.line;
+		for (u32 i = 0, c = m_lines.size(); i < c; ++i) {
+			u32 line = (start_line + i) % c;
 			StringView line_str = m_lines[line].value;
 			if (line == from.line) line_str.removePrefix(from.col);
 			if (const char* found = findInsensitive(line_str, sel_view)) {
@@ -1664,7 +1667,7 @@ struct CodeEditorImpl final : CodeEditor {
 		const bool clicked = hovered && ImGui::IsItemClicked();
 		if (m_focus_editor || (clicked && !ImGui::IsItemActive())) {
 			m_focus_editor = false;
-	        ImGuiWindow* window =  ImGui::GetCurrentWindow();
+			ImGuiWindow* window =  ImGui::GetCurrentWindow();
 			ImGui::SetActiveID(id, window);
 			ImGui::SetFocusID(id, window);
 			ImGui::FocusWindow(window);
@@ -1803,7 +1806,7 @@ struct CodeEditorImpl final : CodeEditor {
 				else if (ImGui::IsKeyPressed(ImGuiKey_End)) moveCursorEnd(c, io.KeyCtrl);
 				else if (ImGui::IsKeyPressed(ImGuiKey_Home)) moveCursorBegin(c, io.KeyCtrl);
 			}
-	        const ImGuiInputFlags f_repeat = ImGuiInputFlags_Repeat;
+			const ImGuiInputFlags f_repeat = ImGuiInputFlags_Repeat;
 			
 			if (ImGui::IsKeyPressed(ImGuiKey_Escape)) m_cursors.resize(1);
 			else if (ImGui::IsKeyPressed(ImGuiKey_Delete)) del(io.KeyCtrl);
@@ -1845,7 +1848,7 @@ struct CodeEditorImpl final : CodeEditor {
 			}
 
 			m_scroll_y -= io.MouseWheel * line_height * 5;
-			m_scroll_y = maximum(0.f, m_scroll_y);
+			m_scroll_y = clamp(m_scroll_y, 0.f, line_height * (m_lines.size() - 2));
 
 			// text input
 			if (io.KeyCtrl && !io.KeyAlt) {

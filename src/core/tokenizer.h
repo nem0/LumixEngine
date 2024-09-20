@@ -75,11 +75,11 @@ struct Tokenizer {
 
 	static float toFloat(Token token);
 
-	// if token is a vec2/3/4, put it in `out_vec` and its size in out_size and returns true
+	// if token is a vec2/3/4, put it in `out_vec` and its size in `out_size` and returns true
 	// otherwise prints error and returns false
 	[[nodiscard]] bool consumeVector(float* out_vec, u32& out_size);
 
-	// if token is a string, put it in `out` (excluding ") and returns true
+	// if token is a string or identifier, put it in `out` (excluding ") and returns true
 	// otherwise prints error and returns false
 	[[nodiscard]] bool consume(StringView& out);
 

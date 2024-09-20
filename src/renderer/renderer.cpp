@@ -140,7 +140,7 @@ struct FrameData {
 
 	struct ShaderToCompile {
 		Shader* shader;
-		RuntimeHash32 content_hash;
+		StableHash content_hash;
 		gpu::VertexDecl decl;
 		gpu::ProgramHandle program;
 		ShaderKey key;

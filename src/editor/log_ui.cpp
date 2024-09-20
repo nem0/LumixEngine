@@ -114,6 +114,7 @@ void LogUI::showNotifications()
 	if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_SQUARE_ALT, nullptr)) m_focus_request = true;
 	ImGui::PopFont();
 	if (ImGui::BeginChild("scrollarea", ImVec2(0, 0), false, ImGuiWindowFlags_NoBackground)) {
+		ImGui::PushFont(m_app.getMonospaceFont());
 		if (m_move_notifications_to_front) ImGuiEx::BringToFront();
 		m_move_notifications_to_front = false;
 		for (int i = 0; i < m_notifications.size(); ++i)
@@ -121,6 +122,7 @@ void LogUI::showNotifications()
 			if (i > 0) ImGui::Separator();
 			ImGuiEx::TextUnformatted(m_notifications[i].message);
 		}
+		ImGui::PopFont();
 	}
 	ImGui::EndChild();
 
@@ -191,6 +193,7 @@ void LogUI::onGUI()
 
 		if (ImGui::BeginChild("log_messages", ImVec2(0, 0), true))
 		{
+			ImGui::PushFont(m_app.getMonospaceFont());
 			for (int i = 0; i < m_messages.size(); ++i)
 			{
 				if ((m_level_filter & (1 << (int)m_messages[i].level)) == 0) continue;
@@ -203,6 +206,7 @@ void LogUI::onGUI()
 				m_scroll_to_bottom = false;
 				ImGui::SetScrollHereY();
 			}
+			ImGui::PopFont();
 		}
 		ImGui::EndChild();
 		if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(1)) ImGui::OpenPopup("Context");

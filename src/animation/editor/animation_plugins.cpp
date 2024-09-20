@@ -40,6 +40,30 @@ static const ComponentType ENVIRONMENT_TYPE = reflection::getComponentType("envi
 
 namespace {
 	
+template <typename T>
+static bool consumeNumberArray(Tokenizer& tokenizer, Array<T>& array) {
+	if (!tokenizer.consume("[")) return false;
+	for (;;) {
+		Tokenizer::Token token = tokenizer.nextToken();
+		if (!token) return false;
+		if (token == "]") return true;
+		T value;
+		if (!fromCString(token.value, value)) {
+			logError(tokenizer.filename, "(", tokenizer.getLine(), "): Expected a number, got ", token.value);
+			tokenizer.logErrorPosition(token.value.begin);
+			return false;
+		}
+		array.push(value);
+		token = tokenizer.nextToken();
+		if (!token) return false;
+		if (token == "]") return true;
+		if (token != ",") {
+			logError(tokenizer.filename, "(", tokenizer.getLine(), "): Expected ',' or ']', got ", token.value);
+			tokenizer.logErrorPosition(token.value.begin);
+			return false;
+		}
+	}
+}
 
 struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 	struct EditorWindow : AssetEditorWindow, SimpleUndoRedo {
@@ -370,9 +394,31 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			m_resource->decRefCount();
 		}
 
+		static void serialize(PropertyAnimation& anim, OutputMemoryStream& blob) {
+			ASSERT(anim.isReady());
+
+			for (PropertyAnimation::Curve& curve : anim.curves) {
+				blob << "{\n";
+				blob << "\t component = \"" << reflection::getComponent(curve.cmp_type)->name << "\",\n";
+				blob << "\t property = \"" << curve.property->name << "\",\n";
+				blob << "\tkeyframes = [\n";
+				for (int i = 0; i < curve.frames.size(); ++i) {
+					if (i != 0) blob << ", ";
+					blob << curve.frames[i];
+				}
+				blob << "],\n";
+				blob << "\tvalues = [\n";
+				for (int i = 0; i < curve.values.size(); ++i) {
+					if (i != 0) blob << ", ";
+					blob << curve.values[i];
+				}
+				blob << "]\n},\n\n";
+			}
+		}
+
 		void save() {
 			OutputMemoryStream blob(m_app.getAllocator());
-			m_resource->serialize(blob);
+			serialize(*m_resource, blob);
 			m_app.getAssetBrowser().saveResource(*m_resource, blob);
 			m_dirty = false;
 		}
@@ -548,7 +594,114 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	bool canCreateResource() const override { return true; }
 	const char* getDefaultExtension() const override { return "anp"; }
 	void createResource(OutputMemoryStream& blob) override {}
-	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
+	bool compile(const Path& src) override {
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		OutputMemoryStream src_data(m_app.getAllocator());
+		if (!fs.getContentSync(src, src_data)) return false;
+		
+		StringView sv((const char*)src_data.data(), (u32)src_data.size());
+		Tokenizer tokenizer(sv, src.c_str());
+		Array<PropertyAnimation::Curve> curves(m_app.getAllocator());
+		
+		for (;;) {
+			Tokenizer::Token token = tokenizer.tryNextToken();
+			switch (token.type) {
+				case Tokenizer::Token::EOF: goto tokenizer_finished;
+				case Tokenizer::Token::ERROR: return false;
+				case Tokenizer::Token::SYMBOL:
+					if (token != "{") {
+						logError(tokenizer.filename, "(", tokenizer.getLine(), "): Expected '{', got ", token.value);
+						tokenizer.logErrorPosition(token.value.begin);
+						return false;
+					}
+					break;
+				default:
+					logError(tokenizer.filename, "(", tokenizer.getLine(), "): Expected '{', got ", token.value);
+					tokenizer.logErrorPosition(token.value.begin);
+					return false;
+			}
+
+			// single curve
+			PropertyAnimation::Curve curve(m_app.getAllocator());
+			for (;;) {
+				Tokenizer::Token key = tokenizer.nextToken();
+				if (!key) return false;
+				if (key == "}") {
+					curves.push(static_cast<PropertyAnimation::Curve&&>(curve));
+					continue;
+				}
+				
+				if (!tokenizer.consume("=")) return false;
+
+				if (key == "component") {
+					StringView value;
+					if (!tokenizer.consume(value)) return false;
+					curve.cmp_type = reflection::getComponentType(value);
+				}
+				else if (key == "property") {
+					StringView value;
+					if (!tokenizer.consume(value)) return false;
+					curve.property = static_cast<const reflection::Property<float>*>(reflection::getProperty(curve.cmp_type, value));
+				}
+				else if (key == "keyframes") {
+					if (!consumeNumberArray(tokenizer, curve.frames)) return false;
+				}
+				else if (key == "values") {
+					if (!consumeNumberArray(tokenizer, curve.values)) return false;
+				}
+				else {
+					logError(tokenizer.filename, "(", tokenizer.getLine(), "): Unknown identifier ", key.value);
+					tokenizer.logErrorPosition(key.value.begin);
+					return false;
+				}
+
+				Tokenizer::Token next = tokenizer.nextToken();
+				if (!next) return false;
+				if (next == "}") {
+					curves.push(static_cast<PropertyAnimation::Curve&&>(curve));
+					break;
+				}
+				if (next != ",") {
+					logError(tokenizer.filename, "(", tokenizer.getLine(), "): Expected ',' or '}', got ", next.value);
+					tokenizer.logErrorPosition(next.value.begin);
+					return false;
+				}
+			}
+			token = tokenizer.tryNextToken();
+			switch (token.type) {
+				case Tokenizer::Token::EOF: goto tokenizer_finished;
+				case Tokenizer::Token::ERROR: return false;
+				case Tokenizer::Token::SYMBOL:
+					if (!equalStrings(token.value, ",")) {
+						logError(tokenizer.filename, "(", tokenizer.getLine(), "): Expected ',', got ", token.value);
+						tokenizer.logErrorPosition(token.value.begin);
+						return false;
+					}
+					break;
+				default:
+					logError(tokenizer.filename, "(", tokenizer.getLine(), "): Expected ',', got ", token.value);
+					tokenizer.logErrorPosition(token.value.begin);
+					return false;
+			}
+		}
+		
+		tokenizer_finished:
+
+		OutputMemoryStream compiled(m_app.getAllocator());
+		PropertyAnimation::Header header;
+		compiled.write(header);
+		compiled.write((u32)curves.size());
+		for (PropertyAnimation::Curve& curve : curves) {
+			const char* cmp_typename = reflection::getComponent(curve.cmp_type)->name;
+			compiled.writeString(cmp_typename);
+			compiled.writeString(curve.property->name);
+			compiled.write((u32)curve.frames.size());
+			for (i32 frame : curve.frames) compiled.write(frame);
+			for (float value : curve.values) compiled.write(value);
+		}
+
+		return m_app.getAssetCompiler().writeCompiledResource(src, compiled);
+	}
 	const char* getLabel() const override { return "Property animation"; }
 	
 	void openEditor(const Path& path) override {

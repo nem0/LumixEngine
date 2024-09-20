@@ -33,20 +33,22 @@
 #include "terrain.h"
 #include "texture.h"
 
+// TODO remaining .shd shaders
 // TODO vsync
+// TODO env probe lighting is off
+// TODO temporal upsample
+// TODO shader cleanup
 
 // TODO crashes:
 	// TODO crash when context menu is outside of main window
-	// TODO env probe lighting is off
 
 // TODO nice to have:
+	// TODO split common.hlsli
 	// TODO semaphore in job system to wake workers?
 	// TODO 3d ui in scene view
 	// TODO property groups in property grid
 	// TODO vertex pulling
-	// TODO temporal upsample
 	// TODO temporal SSAO
-	// TODO shader cleanup
 	// TODO static samplers
 	// TODO icons over some debugs, e.g. TDAO 
 	// TODO switch plugins to use new genie stuff like plugin() function
@@ -512,6 +514,8 @@ struct PipelineImpl final : Pipeline {
 		m_lighting_shader = rm.load<Shader>(Path("pipelines/lighting.hlsl"));
 		m_draw2d_shader = rm.load<Shader>(Path("pipelines/draw2d.hlsl"));
 		m_debug_shape_shader = rm.load<Shader>(Path("pipelines/debug_shape.hlsl"));
+		m_debug_clusters_shader = rm.load<Shader>(Path("pipelines/debug_clusters.hlsl"));
+		m_debug_velocity_shader = rm.load<Shader>(Path("pipelines/debug_velocity.hlsl"));
 		m_instancing_shader = rm.load<Shader>(Path("pipelines/instancing.hlsl"));
 		
 		m_draw2d.clear({1, 1});
@@ -595,6 +599,8 @@ struct PipelineImpl final : Pipeline {
 		m_lighting_shader->decRefCount();
 		m_draw2d_shader->decRefCount();
 		m_debug_shape_shader->decRefCount();
+		m_debug_clusters_shader->decRefCount();
+		m_debug_velocity_shader->decRefCount();
 		m_instancing_shader->decRefCount();
 
 		for (const Renderbuffer& rb : m_renderbuffers) {
@@ -1347,6 +1353,32 @@ struct PipelineImpl final : Pipeline {
 		}
 		if (m_debug_show == DebugShow::NORMAL) {
 			copy(result, gbuffer.B, size, {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 0});
+			return true;
+		}
+		if (m_debug_show == DebugShow::VELOCITY) {
+			DrawStream& stream = m_renderer.getDrawStream();
+			struct {
+				gpu::BindlessHandle depth;
+				gpu::RWBindlessHandle output;
+			} ub {
+				toBindless(gbuffer.D, stream),
+				toRWBindless(result, stream)
+			};
+			setUniform(ub);
+			dispatch(*m_debug_velocity_shader, (m_viewport.w + 15) / 16, (m_viewport.h + 15) / 16, 1);
+			return true;
+		}
+		if (m_debug_show == DebugShow::LIGHT_CLUSTERS || m_debug_show == DebugShow::PROBE_CLUSTERS) {	
+			DrawStream& stream = m_renderer.getDrawStream();
+			struct {
+				gpu::BindlessHandle depth;
+				gpu::RWBindlessHandle output;
+			} ub {
+				toBindless(gbuffer.DS, stream),
+				toRWBindless(result, stream)
+			};
+			setUniform(ub);
+			dispatch(*m_debug_clusters_shader, (m_viewport.w + 15) / 16, (m_viewport.h + 15) / 16, 1, m_debug_show == DebugShow::LIGHT_CLUSTERS  ? "LIGHTS" : nullptr);
 			return true;
 		}
 		if (m_debug_show == DebugShow::ROUGHNESS) {
@@ -3658,6 +3690,8 @@ struct PipelineImpl final : Pipeline {
 	bool m_first_set_viewport = true;
 	RenderBufferHandle m_output = INVALID_RENDERBUFFER;
 	Shader* m_debug_shape_shader;
+	Shader* m_debug_clusters_shader;
+	Shader* m_debug_velocity_shader;
 	Shader* m_instancing_shader;
 	Array<Renderbuffer> m_renderbuffers;
 	Array<gpu::TextureHandle> m_textures;

@@ -1,9 +1,4 @@
 srgb = false
 compress = true
-convert_to_raw = false
 mip_scale_coverage = -1.000
 normalmap = true
-wrap_mode_u = "repeat"
-wrap_mode_v = "repeat"
-wrap_mode_w = "repeat"
-filter = "linear"

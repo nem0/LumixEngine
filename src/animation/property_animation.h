@@ -17,11 +17,17 @@ struct PropertyAnimation final : Resource {
 		Array<float> values;
 	};
 
+	struct Header {
+		static const u32 MAGIC = '_PRA';
+		
+		u32 magic = MAGIC;
+		u32 version = 0;
+	};
+
 	PropertyAnimation(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 
 	ResourceType getType() const override { return TYPE; }
 	Curve& addCurve();
-	void serialize(OutputMemoryStream& blob);
 	void deserialize(struct InputMemoryStream& blob);
 
 	IAllocator& m_allocator;

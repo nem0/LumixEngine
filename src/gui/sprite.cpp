@@ -1,7 +1,6 @@
 #include "core/log.h"
 #include "core/stream.h"
 #include "core/string.h"
-#include "core/tokenizer.h"
 #include "engine/resource_manager.h"
 #include "renderer/texture.h"
 #include "sprite.h"
@@ -36,37 +35,27 @@ void Sprite::setTexture(const Path& path) {
 	}
 }
 
-
-void Sprite::serialize(OutputMemoryStream& out) {
-	ASSERT(isReady());
-	out << "type " << (type == PATCH9 ? "\"patch9\"\n" : "\"simple\"\n");
-	out << "top " << top << "\n";
-	out << "bottom " << bottom << "\n";
-	out << "left " << left << "\n";
-	out << "right " << right << "\n";
-	if (m_texture) {
-		out << "texture \"/" << m_texture->getPath() << "\"";
-	} else {
-		out << "texture \"\"";
-	}
-}
-
 bool Sprite::load(Span<const u8> mem) {
-	StringView type_str, texture_str;
-	const ParseItemDesc descs[] = {
-		{"type", &type_str},
-		{"top", &top},
-		{"bottom", &bottom},
-		{"left", &left},
-		{"right", &right},
-		{"texture", &texture_str}
-	};
-	
-	if (!parse(mem, getPath().c_str(), descs)) return false;
-	
-	type = equalIStrings(type_str, "patch9") ? PATCH9 : SIMPLE;
-	setTexture(Path(texture_str));
-	return true;
+	InputMemoryStream stream(mem);
+	Header header;
+	stream.read(header);
+	if (header.magic != Header::MAGIC) {
+		logError(getPath(), ": invalid file");
+		return false;
+	}
+	if (header.version != 0) {
+		logError(getPath(), ": unsupported version");
+		return false;
+	}
+
+	stream.read(top);
+	stream.read(bottom);
+	stream.read(left);
+	stream.read(right);
+	const char* texture = stream.readString();
+	setTexture(Path(texture));
+	type = stream.read<Type>();
+	return !stream.hasOverflow();
 }
 
 

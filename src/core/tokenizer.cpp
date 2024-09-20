@@ -338,7 +338,7 @@ bool Tokenizer::consumeVector(float* out_vec, u32& out_size) {
 bool Tokenizer::consume(StringView& out) {
 	Token token = nextToken();
 	if (!token) return false;
-	if (token.type != Token::STRING) {
+	if (token.type != Token::STRING && token.type != Token::IDENTIFIER) {
 		logError(filename, "(", getLine(), "): string expected.");
 		logErrorPosition(token.value.begin);
 		return false;
