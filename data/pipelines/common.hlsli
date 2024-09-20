@@ -100,7 +100,7 @@ struct Surface {
 	float shadow;
 	float3 N;
 	float3 V;
-	float3 wpos;
+	float3 pos_ws;
 	float2 motion;
 };
 
@@ -250,8 +250,8 @@ Surface unpackSurface(float2 uv, uint gbuffer0, uint gbuffer1, uint gbuffer2, ui
 	surface.roughness = gb0.a;
 	surface.metallic = gb2.z;
 	surface.emission = unpackEmission(gb2.x);
-	surface.wpos = getPositionWS(gbuffer_depth, uv, ndc_depth);
-	surface.V = normalize(-surface.wpos);
+	surface.pos_ws = getPositionWS(gbuffer_depth, uv, ndc_depth);
+	surface.V = normalize(-surface.pos_ws);
 	surface.translucency = gb2.y;
 	surface.ao = gb1.w;
 	surface.shadow = gb2.w;
@@ -491,7 +491,7 @@ float3 pointLightsLighting(Cluster cluster, Surface surface, uint shadow_atlas, 
 	float3 res = 0;
 	for (int i = cluster.offset; i < cluster.offset + cluster.lights_count; ++i) {
 		Light light = b_lights[b_cluster_map[i]];
-		float3 lpos = surface.wpos.xyz - light.pos_radius.xyz;
+		float3 lpos = surface.pos_ws.xyz - light.pos_radius.xyz;
 		float dist = length(lpos);
 		float attn = pow(max(0, 1 - dist / light.pos_radius.w), light.color_attn.w);
 		float3 L = -lpos / dist;
@@ -569,7 +569,7 @@ float3 envProbesLighting(Cluster cluster, Surface surface) {
 	int to = from + cluster.env_probes_count;
 	for (int i = from; i < to; ++i) {
 		int probe_idx = b_cluster_map[i]; 
-		float3 lpos = b_env_probes[probe_idx].pos.xyz - surface.wpos.xyz;
+		float3 lpos = b_env_probes[probe_idx].pos.xyz - surface.pos_ws.xyz;
 		float4 rot = b_env_probes[probe_idx].rot;
 		float3 outer_range = b_env_probes[probe_idx].outer_range.xyz;
 		float3 inner_range = b_env_probes[probe_idx].inner_range.xyz;
@@ -618,7 +618,7 @@ float3 reflProbesLighting(Cluster cluster, Surface surface, uint reflection_prob
 		int probe_idx = b_cluster_map[i];
 		ReflectionProbe probe = b_refl_probes[probe_idx];
 		float4 rot = probe.rot;
-		float3 lpos = probe.pos_layer.xyz - surface.wpos;
+		float3 lpos = probe.pos_layer.xyz - surface.pos_ws;
 		uint layer = asuint(probe.pos_layer.w);
 		float4 radiance_rgbm = sampleCubeArrayBindlessLod(LinearSamplerClamp, reflection_probes, float4(RV, layer), lod);
 		float3 radiance = radiance_rgbm.rgb * radiance_rgbm.a * 4;
@@ -656,9 +656,9 @@ float distanceInFog(float3 a, float3 b) {
 }
 
 float3 computeLighting(Cluster cluster, Surface surface, float3 light_direction, float3 light, uint shadowmap, uint shadow_atlas, uint reflection_probes, float2 frag_coord) {
-	float shadow = min(surface.shadow, getShadow(shadowmap, surface.wpos, surface.N, frag_coord));
+	float shadow = min(surface.shadow, getShadow(shadowmap, surface.pos_ws, surface.N, frag_coord));
 
-	float dist = max(0, (Global_fog_top - surface.wpos.y - Global_camera_world_pos.y) * Global_light_dir.y);
+	float dist = max(0, (Global_fog_top - surface.pos_ws.y - Global_camera_world_pos.y) * Global_light_dir.y);
 	float3 fog_transmittance = Global_fog_enabled > 0 ? exp(-dist * Global_fog_scattering.rgb * 10) : 1;
 
 	float3 res = computeDirectLight(surface, light_direction, light * shadow * fog_transmittance);

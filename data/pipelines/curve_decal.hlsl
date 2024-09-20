@@ -97,11 +97,11 @@ cbuffer Dc : register(b4) {
 
 GBufferOutput mainPS(VSOutput input) {
 	float2 screen_uv = input.position.xy / Global_framebuffer_size;
-	float3 wpos = getPositionWS(u_gbuffer_depth, screen_uv);
+	float3 pos_ws = getPositionWS(u_gbuffer_depth, screen_uv);
 	
 	float4 r = input.rot;
 	r.w = -r.w;
-	float3 lpos = rotateByQuat(r, wpos - input.pos);
+	float3 lpos = rotateByQuat(r, pos_ws - input.pos);
 	if (any(abs(lpos) > input.half_extents)) discard;
 	
 	float2 bezier_dist = sdBezier(lpos.xz, input.bezier.xy, 0, input.bezier.zw);
