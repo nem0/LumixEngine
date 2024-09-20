@@ -22,7 +22,7 @@ VSOutput mainVS(VSInput input) {
 	VSOutput output;
 	output.color = input.color;
 	output.uv = input.uv;
-	output.position = mul(float4(input.position, 0, 1), u_matrix);
+	output.position = transformPosition(float3(input.position, 0), u_matrix);
 	return output;
 }
 

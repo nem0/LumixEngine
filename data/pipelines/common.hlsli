@@ -106,17 +106,17 @@ struct Surface {
 
 cbuffer GlobalState : register(b0) {
 	SMSlice Global_sm_slices[4];
-	float4x4 Global_projection;
-	float4x4 Global_prev_projection;
-	float4x4 Global_projection_no_jitter;
-	float4x4 Global_prev_projection_no_jitter;
-	float4x4 Global_inv_projection;
-	float4x4 Global_view;
-	float4x4 Global_inv_view;
-	float4x4 Global_view_projection;
-	float4x4 Global_view_projection_no_jitter;
-	float4x4 Global_prev_view_projection_no_jitter;
-	float4x4 Global_inv_view_projection;
+	float4x4 Global_vs_to_ndc; // a.k.a. projection matrix
+	float4x4 Global_prev_vs_to_ndc; // previous frame vs_to_ndc
+	float4x4 Global_vs_to_ndc_no_jitter;
+	float4x4 Global_prev_vs_to_ndc_no_jitter;
+	float4x4 Global_ndc_to_vs;
+	float4x4 Global_ws_to_vs; // a.k.a. view matrix
+	float4x4 Global_vs_to_ws;
+	float4x4 Global_ws_to_ndc; // a.k.a. view-projection matrix
+	float4x4 Global_ws_to_ndc_no_jitter;
+	float4x4 Global_prev_ws_to_ndc_no_jitter;
+	float4x4 Global_ndc_to_ws;
 	float4x4 Global_reprojection;
 	float4 Global_camera_world_pos;
 	float4 Global_view_dir;
@@ -144,12 +144,12 @@ cbuffer GlobalState : register(b0) {
 };
 
 cbuffer PassState : register(b1) {
-	float4x4 Pass_projection;
-	float4x4 Pass_inv_projection;
-	float4x4 Pass_view;
-	float4x4 Pass_inv_view;
-	float4x4 Pass_view_projection;
-	float4x4 Pass_inv_view_projection;
+	float4x4 Pass_vs_to_ndc;
+	float4x4 Pass_ndc_to_vs;
+	float4x4 Pass_ws_to_vs;
+	float4x4 Pass_vs_to_ws;
+	float4x4 Pass_ws_to_ndc;
+	float4x4 Pass_ndc_to_ws;
 	float4 Pass_view_dir;
 	float4 Pass_camera_up;
 	float4 Pass_camera_planes[6];
@@ -159,6 +159,18 @@ cbuffer PassState : register(b1) {
 cbuffer ShadowAtlas : register(b3) {
 	float4x4 u_shadow_atlas_matrices[128];
 };
+
+// optimized mul(float4(pos, 1), m)
+float4 transformPosition(float3 pos, float4x4 m) {
+	return pos.x * m[0] + (pos.y * m[1] + (pos.z * m[2] + m[3]));
+}
+
+// assumes transformPosition(pos, m0).w == 1
+// so dont use with something like ws_to_ndc in m0
+float4 transformPosition(float3 pos, float4x4 m0, float4x4 m1) {
+	float4 p = transformPosition(pos, m0);
+	return p.x * m1[0] + (p.y * m1[1] + (p.z * m1[2] + m1[3]));
+}
 
 float3 rotateByQuat(float4 rot, float3 pos) {
 	float3 uv = cross(rot.xyz, pos);
@@ -217,7 +229,7 @@ uint2 textureSize(TextureCube<float4> Tex, uint Level) {
 // returns view vector, i.e. normalized vector in world-space pointing from camera to pixel
 float3 getViewDirection(float2 screen_uv) {
 	float4 pos_ndc = float4(toScreenUV(screen_uv) * 2 - 1, 1, 1.0);
-	float4 pos_ws = mul(pos_ndc, Global_inv_view_projection);
+	float4 pos_ws = mul(pos_ndc, Global_ndc_to_ws);
 	return normalize(pos_ws.xyz);
 }
 
@@ -225,7 +237,7 @@ float3 getViewDirection(float2 screen_uv) {
 float3 getPositionWS(uint depth_buffer, float2 screen_uv) {
 	float z = sampleBindlessLod(LinearSamplerClamp, depth_buffer, screen_uv, 0).r;
 	float4 pos_ndc = float4(toScreenUV(screen_uv) * 2 - 1, z, 1.0);
-	float4 pos_ws = mul(pos_ndc, Global_inv_view_projection);
+	float4 pos_ws = mul(pos_ndc, Global_ndc_to_ws);
 	return pos_ws.xyz / pos_ws.w;
 }
 
@@ -233,7 +245,7 @@ float3 getPositionWS(uint depth_buffer, float2 screen_uv) {
 float3 getPositionWS(uint depth_buffer, float2 screen_uv, out float ndc_depth) {
 	float z = sampleBindlessLod(LinearSamplerClamp, depth_buffer, screen_uv, 0).r;
 	float4 pos_ndc = float4(toScreenUV(screen_uv) * 2 - 1, z, 1.0);
-	float4 pos_ws = mul(pos_ndc, Global_inv_view_projection);
+	float4 pos_ws = mul(pos_ndc, Global_ndc_to_ws);
 	ndc_depth = z;
 	return pos_ws.xyz / pos_ws.w;
 }
@@ -277,9 +289,9 @@ float3 ACESFilm(float3 x) {
 	return saturate((x*(a*x+b))/(x*(c*x+d)+e));
 }
 
-float2 computeStaticObjectMotionVector(float3 wpos) {
-	float4 p = mul(float4(wpos, 1), Global_view_projection_no_jitter);
-	float4 pos_projected = mul(float4(wpos + Global_to_prev_frame_camera_translation.xyz, 1), Global_prev_view_projection_no_jitter);
+float2 computeStaticObjectMotionVector(float3 pos_ws) {
+	float4 p = transformPosition(pos_ws, Global_ws_to_ndc_no_jitter);
+	float4 pos_projected = transformPosition(pos_ws + Global_to_prev_frame_camera_translation.xyz, Global_prev_ws_to_ndc_no_jitter);
 	return pos_projected.xy / pos_projected.w - p.xy / p.w;	
 }
 
@@ -289,14 +301,14 @@ float4 fullscreenQuad(int vertexID, out float2 screen_uv) {
 	return float4(toScreenUV(screen_uv) * 2 - 1, 0, 1);
 }
 
-// converts ndc depth to linear depth, using Global_projection
+// converts ndc depth to linear depth, using Global_vs_to_ndc
 // we assume reversed z with infinite far plane
 float toLinearDepth(float ndc_depth) {
 	// float4 pos_proj = float4(0, 0, ndc_depth, 1.0);
 	// float4 view_pos = mul(pos_proj, inv_proj);
 	// return view_pos.z / view_pos.w;
 	// for reversed z with infinite far plane, this is equivalent to:
-	return Global_projection[3].z / ndc_depth;
+	return Global_vs_to_ndc[3].z / ndc_depth;
 }
 
 StructuredBuffer<Light> b_lights : register(t0);
@@ -499,7 +511,7 @@ float3 pointLightsLighting(Cluster cluster, Surface surface, uint shadow_atlas, 
 			float3 direct_light = computeDirectLight(surface, L, light.color_attn.rgb);
 			int atlas_idx = light.atlas_idx;
 			if (atlas_idx >= 0) {
-				float4 proj_pos = mul(float4(lpos, 1), u_shadow_atlas_matrices[atlas_idx]);
+				float4 proj_pos = transformPosition(lpos, u_shadow_atlas_matrices[atlas_idx]);
 				proj_pos /= proj_pos.w;
 
 				float2 shadow_uv = proj_pos.xy;
@@ -670,7 +682,7 @@ float3 computeLighting(Cluster cluster, Surface surface, float3 light_direction,
 }
 
 float2 cameraReproject(float2 uv, float ndc_depth) {
-	float4 v = mul(float4(toScreenUV(uv) * 2 - 1, ndc_depth, 1), Global_reprojection);
+	float4 v = transformPosition(float3(toScreenUV(uv) * 2 - 1, ndc_depth), Global_reprojection);
 	float2 res = (v.xy / v.w) * 0.5 + 0.5;
 	return toScreenUV(res);
 }

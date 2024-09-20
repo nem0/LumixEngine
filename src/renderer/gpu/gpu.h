@@ -77,8 +77,6 @@ enum class PrimitiveType : u8 {
 };
 
 enum class ShaderType : u32 {
-	VERTEX,
-	FRAGMENT,
 	COMPUTE,
 	SURFACE
 };
@@ -286,6 +284,14 @@ void scissor(u32 x,u32 y,u32 w,u32 h);
 void clear(ClearFlags flags, const float* color, float depth);
 	
 void useProgram(ProgramHandle program);
+
+// call this on render thread, the call getDisassembly periodically to get the result (it returns true)
+void requestDisassembly(ProgramHandle program);
+
+// safe to call from any thread
+// if disassembly is not available, returns false
+// otherwise returns true and writes disassembly to the `output`
+bool getDisassembly(ProgramHandle program, struct String& output);
 
 BindlessHandle getBindlessHandle(BufferHandle buffer); // safe to call from any job
 BindlessHandle getBindlessHandle(TextureHandle texture); // safe to call from any job

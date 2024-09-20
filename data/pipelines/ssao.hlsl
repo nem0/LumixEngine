@@ -15,7 +15,7 @@ cbuffer UB : register(b4) {
 // get normal in view space
 float3 getNormalVS(float2 tex_coord) {
 	float3 wnormal = sampleBindlessLod(LinearSamplerClamp, u_normal_buffer, tex_coord, 0).xyz * 2 - 1;
-	float4 vnormal = mul(float4(wnormal, 0), Global_view);
+	float4 vnormal = mul(float4(wnormal, 0), Global_ws_to_vs);
 	return vnormal.xyz;
 }	
 
@@ -23,7 +23,7 @@ float3 getNormalVS(float2 tex_coord) {
 float3 getPositionVS(uint depth_buffer, float2 screen_uv) {
 	float depth_ndc = sampleBindlessLod(LinearSamplerClamp, depth_buffer, screen_uv, 0).r;
 	float4 pos_ndc = float4(toScreenUV(screen_uv) * 2 - 1, depth_ndc, 1.0);
-	float4 pos_vs = mul(pos_ndc, Global_inv_projection);
+	float4 pos_vs = mul(pos_ndc, Global_ndc_to_vs);
 	return pos_vs.xyz / pos_vs.w;
 }
 

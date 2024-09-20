@@ -37,6 +37,8 @@ struct DrawStream {
 	void endProfileBlock();
 
 	void useProgram(gpu::ProgramHandle program);
+	// Program will be disassembled sometime in the future, use gpu::getDisassembly to get the disassembly
+	void requestDisassembly(gpu::ProgramHandle program);
 	
 	void bindIndexBuffer(gpu::BufferHandle buffer);
 	void bindVertexBuffer(u32 binding_idx, gpu::BufferHandle buffer, u32 buffer_offset, u32 stride);
