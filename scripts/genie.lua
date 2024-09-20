@@ -288,7 +288,7 @@ function defaultConfigurations()
 		
 	configuration {}
 		files {
-			path.join(ROOT_DIR, "projects/lumix.natvis"),
+			path.join(ROOT_DIR, "scripts/lumix.natvis"),
 			path.join(ROOT_DIR, ".editorconfig")
 		}
 		defines { "_ITERATOR_DEBUG_LEVEL=0", "STBI_NO_STDIO" }
