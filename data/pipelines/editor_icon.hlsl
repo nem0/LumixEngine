@@ -4,7 +4,7 @@
 
 struct VSOutput {
 	float2 uv : TEXCOORD0;
-	float3 wpos : TEXCOORD1;
+	float3 pos_ws : TEXCOORD1;
 	float3 normal : TEXCOORD2;
 	float4 position : SV_POSITION;
 };
@@ -34,7 +34,7 @@ VSOutput mainVS(Input input) {
 		output.uv = 0;
 	#endif
 	float4 p = mul(float4(input.position, 1), mul(u_model, Global_view));
-	output.wpos = p.xyz;
+	output.pos_ws = p.xyz;
 	output.normal = input.normal;
 	output.position = mul(p, Global_projection_no_jitter);
 	return output;
@@ -42,7 +42,7 @@ VSOutput mainVS(Input input) {
 
 float4 mainPS(VSOutput input) : SV_TARGET {
 	float2 screen_uv = input.position.xy / Global_framebuffer_size;
-	float3 wpos = getPositionWS(u_gbuffer_depth, screen_uv);
+	float3 pos_ws = getPositionWS(u_gbuffer_depth, screen_uv);
 	float4 albedo = sampleBindless(LinearSampler, t_albedo, input.uv);
 	#ifdef ALPHA_CUTOUT
 		if (albedo.a < 0.5) discard;
@@ -51,6 +51,6 @@ float4 mainPS(VSOutput input) : SV_TARGET {
 	float4 o_color;
 	o_color.rgb = albedo.rgb * saturate(max(0, -d) + 0.25 * max(0, d) + 0.25);
 	o_color.a = 1;
-	if(length(wpos) < length(input.wpos)) o_color.rgb *= 0.25;
+	if(length(pos_ws) < length(input.pos_ws)) o_color.rgb *= 0.25;
 	return o_color;
 }

@@ -20,7 +20,7 @@ struct VSOutput {
 	float2 uv : TEXCOORD0;
 	float3 normal : TEXCOORD1;
 	float3 tangent : TEXCOORD2;
-	float4 wpos : TEXCOORD3;
+	float4 pos_ws : TEXCOORD3;
 	#if !defined DEPTH && defined HAS_SELFSHADOW
 		float4 shadow_coefs : TEXCOORD4;
 	#endif
@@ -95,9 +95,9 @@ float2 dirToGrid(float3 vec) {
 		output.lod = 1;
 		output.tangent = tangent_space[0];
 		output.normal = tangent_space[2];
-		output.wpos = float4(p, 1);
+		output.pos_ws = float4(p, 1);
 
-		output.position = mul(output.wpos, Pass_view_projection);
+		output.position = mul(output.pos_ws, Pass_view_projection);
 		return output;
 	}
 #else
@@ -145,9 +145,9 @@ float2 dirToGrid(float3 vec) {
 		p *= scale;
 		output.tangent = tangent_space[0];
 		output.normal = tangent_space[2];
-		output.wpos = float4(instance_pos + p, 1);
+		output.pos_ws = float4(instance_pos + p, 1);
 
-		output.position = mul(output.wpos, Pass_view_projection);
+		output.position = mul(output.pos_ws, Pass_view_projection);
 		return output;
 	}
 #endif
@@ -166,8 +166,8 @@ Surface getSurface(VSOutput input) {
 		normalize(cross(input.normal, input.tangent))
 	);
 	
-	data.wpos = input.wpos.xyz;
-	data.V = normalize(-data.wpos);
+	data.pos_ws = input.pos_ws.xyz;
+	data.V = normalize(-data.pos_ws);
 	data.roughness = u_roughness;
 	data.metallic = u_metallic;
 	#ifdef HAS_NORMAL
@@ -180,7 +180,7 @@ Surface getSurface(VSOutput input) {
 	data.emission = u_emission;
 	data.translucency = u_translucency;
 	data.ao = 1;
-	data.motion = computeStaticObjectMotionVector(input.wpos.xyz);
+	data.motion = computeStaticObjectMotionVector(input.pos_ws.xyz);
 	
 	#if !defined DEPTH && defined HAS_SELFSHADOW
 		float4 self_shadow = sampleBindless(LinearSampler, t_self_shadow, input.uv);
@@ -242,7 +242,7 @@ Surface getSurface(VSOutput input) {
 			, Global_light_color.rgb * Global_light_intensity * surface.shadow);
 		res += surface.emission * surface.albedo;
 
-		float linear_depth = dot(surface.wpos.xyz, Pass_view_dir.xyz);
+		float linear_depth = dot(surface.pos_ws.xyz, Pass_view_dir.xyz);
 		Cluster cluster = getClusterLinearDepth(linear_depth);
 		//res += pointLightsLighting(cluster, surface, shadow_atlas);
 		res += envProbesLighting(cluster, surface);

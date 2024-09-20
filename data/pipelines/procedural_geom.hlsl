@@ -66,8 +66,8 @@ Surface getSurface(VSOutput input) {
 	surface.alpha = 1;
 	surface.emission = u_emission;
 	surface.translucency = u_translucency;
-	surface.wpos = input.pos_ws.xyz;
-	surface.V = normalize(-surface.wpos);
+	surface.pos_ws = input.pos_ws.xyz;
+	surface.V = normalize(-surface.pos_ws);
 	surface.motion = computeStaticObjectMotionVector(input.pos_ws.xyz);
 	return surface;
 }
@@ -85,7 +85,7 @@ Surface getSurface(VSOutput input) {
 	float4 mainPS(VSOutput input) : SV_TARGET {
 		Surface surface = getSurface();
 
-		float linear_depth = dot(surface.wpos.xyz, Pass_view_dir.xyz);
+		float linear_depth = dot(surface.pos_ws.xyz, Pass_view_dir.xyz);
 		Cluster cluster = getClusterLinearDepth(linear_depth, input.position.xy);
 		float4 result;
 		result.rgb = computeLighting(cluster, surface, Global_light_dir.xyz, Global_light_color.rgb * Global_light_intensity, u_shadowmap, u_shadow_atlas, u_reflection_probes, input.position.xy);

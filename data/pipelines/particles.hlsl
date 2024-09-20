@@ -48,7 +48,7 @@ float4 mainPS(VSOutput input) : SV_TARGET {
 	float4 c = sampleBindless(LinearSampler, t_texture, input.uv) * saturate(input.color);
 	data.N = 0;
 	data.V = 0;
-	data.wpos = 0;
+	data.pos_ws = 0;
 	data.albedo = c.rgb;
 	data.alpha = c.a;
 	data.emission = input.emission;
@@ -58,7 +58,7 @@ float4 mainPS(VSOutput input) : SV_TARGET {
 	data.metallic = 0;
 	data.translucency = 0;
 
-	float linear_depth = dot(data.wpos.xyz, Pass_view_dir.xyz);
+	float linear_depth = dot(data.pos_ws.xyz, Pass_view_dir.xyz);
 	Cluster cluster = getClusterLinearDepth(linear_depth, input.position.xy);
 	float4 o_color;
 	o_color.rgb = computeLighting(cluster, data, Global_light_dir.xyz, Global_light_color.rgb * Global_light_intensity, Global_shadowmap, Global_shadow_atlas, Global_reflection_probes, input.position.xy);

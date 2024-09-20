@@ -39,7 +39,7 @@ struct VSOutput {
 	float2 uv : TEXCOORD0;
 	float3 normal : TEXCOORD1;
 	float3 tangent : TEXCOORD2;
-	float4 wpos : TEXCOORD3;
+	float4 pos_ws : TEXCOORD3;
 	#ifdef _HAS_ATTR2 
 		//float2 masks : TEXCOORD4;
 	#endif
@@ -62,20 +62,20 @@ VSOutput mainVS(VSInput input) {
 		output.normal = rotateByQuat(input.i_rot, normal);
 		output.tangent = rotateByQuat(input.i_rot, tangent);
 		float3 p = input.position * input.i_scale.xyz;
-		output.wpos = float4(input.i_pos_lod.xyz + rotateByQuat(input.i_rot, p), 1);
+		output.pos_ws = float4(input.i_pos_lod.xyz + rotateByQuat(input.i_rot, p), 1);
 	#elif defined GRASS
 		#error TODO
 	#else 
 		float4x4 model_mtx = u_model;
 		output.normal = float3x3(model_mtx) * normal;
 		output.tangent = float3x3(model_mtx) * tangent;
-		output.wpos = mul(float4(input.position,  1), model_mtx);
+		output.pos_ws = mul(float4(input.position,  1), model_mtx);
 	#endif
 	
 	#ifdef _HAS_ATTR2 
 		//output.masks = a_masks;
 	#endif
-	output.position = mul(output.wpos, Pass_view_projection);
+	output.position = mul(output.pos_ws, Pass_view_projection);
 	return output;
 }
 
@@ -142,12 +142,12 @@ float2 raycast(float3 csOrig, float3 csDir, float stride, float jitter) {
 	return -1.0f.xx;
 }
 
-float3 getReflectionColor(float3 view, float3 normal, float dist, float3 wpos)
+float3 getReflectionColor(float3 view, float3 normal, float dist, float3 pos_ws)
 {
 	#ifdef SSR
-		float4 o = mul(float4(wpos, 1), Global_view);
+		float4 o = mul(float4(pos_ws, 1), Global_view);
 		float3 d = mul(reflect(-view, normal), float3x3(Global_view));
-		float2 hit = raycast(o.xyz, d, 4, hash(wpos.xy + Global_time));
+		float2 hit = raycast(o.xyz, d, 4, hash(pos_ws.xy + Global_time));
 		if (hit.x >= 0) {
 			return sampleBindless(LinearSamplerClamp, u_bg, hit.xy / Global_framebuffer_size.xy).rgb;
 		}
@@ -158,17 +158,17 @@ float3 getReflectionColor(float3 view, float3 normal, float dist, float3 wpos)
 	return radiance_rgbm.rgb * radiance_rgbm.a * 4;
 }
 
-float getWaterDepth(float3 wpos, float3 view, float3 normal)
+float getWaterDepth(float3 pos_ws, float3 view, float3 normal)
 {
-	float4 screen_pos = mul(float4(wpos, 1), Global_view_projection);
+	float4 screen_pos = mul(float4(pos_ws, 1), Global_view_projection);
 	screen_pos /= screen_pos.w;
 	float depth = sampleBindless(LinearSamplerClamp, u_depthbuffer, toScreenUV(screen_pos.xy * 0.5 + 0.5)).x;
 	return toLinearDepth(depth) - toLinearDepth(screen_pos.z);
 }
 
-float4 getRefraction(float3 wpos)
+float4 getRefraction(float3 pos_ws)
 {
-	float4 screen_pos = mul(float4(wpos, 1), Global_view_projection);
+	float4 screen_pos = mul(float4(pos_ws, 1), Global_view_projection);
 	screen_pos /= screen_pos.w;
 	return sampleBindless(LinearSamplerClamp, u_bg, toScreenUV(screen_pos.xy * 0.5 + 0.5));
 }
@@ -201,7 +201,7 @@ float3 getSurfaceNormal(float2 uv, float normal_strength, out float h00)
 
 float4 mainPS(VSOutput input) : SV_TARGET
 {
-	float3 V = normalize(-input.wpos.xyz);
+	float3 V = normalize(-input.pos_ws.xyz);
 	float3 L = Global_light_dir.xyz;
 	
 	float3x3 tbn = float3x3(
@@ -219,12 +219,12 @@ float4 mainPS(VSOutput input) : SV_TARGET
 	float3 wnormal = getSurfaceNormal(input.uv, normal_strength, h);
 	wnormal = normalize(mul(wnormal, tbn));
 
-	//float shadow = getShadow(u_shadowmap, input.wpos.xyz, wnormal);
+	//float shadow = getShadow(u_shadowmap, input.pos_ws.xyz, wnormal);
 
-	float dist = length(input.wpos.xyz);
-	float3 view = normalize(-input.wpos.xyz);
-	float3 refl_color = getReflectionColor(view, wnormal, dist * normal_strength, input.wpos.xyz) * u_reflection_multiplier;
-	float water_depth = getWaterDepth(input.wpos.xyz, view, wnormal)- saturate(h * 0.4);
+	float dist = length(input.pos_ws.xyz);
+	float3 view = normalize(-input.pos_ws.xyz);
+	float3 refl_color = getReflectionColor(view, wnormal, dist * normal_strength, input.pos_ws.xyz) * u_reflection_multiplier;
+	float water_depth = getWaterDepth(input.pos_ws.xyz, view, wnormal)- saturate(h * 0.4);
 	
 
 	float3 halfvec = normalize(view + Global_light_dir.xyz);
@@ -243,7 +243,7 @@ float4 mainPS(VSOutput input) : SV_TARGET
 
 	float refraction_distortion = u_refraction_distortion;
 
-	float3 refraction = getRefraction(input.wpos.xyz + float3(wnormal.xz, 0) * u_refraction_distortion * t).rgb;
+	float3 refraction = getRefraction(input.pos_ws.xyz + float3(wnormal.xz, 0) * u_refraction_distortion * t).rgb;
 
 	refraction *= lerp(1.0f.xxx, u_ground_tint.rgb, t);
 	refraction *= transmittance;

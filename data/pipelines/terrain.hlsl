@@ -30,7 +30,7 @@ struct VSOutput {
 	#ifndef DEPTH
 		float2 uv : TEXCOORD0;
 		float dist2 : TEXCOORD1;
-		float3 wpos : TEXCOORD2;
+		float3 pos_ws : TEXCOORD2;
 	#endif
 	float4 position : SV_POSITION;
 };
@@ -61,11 +61,11 @@ VSOutput mainVS(uint vertex_id : SV_VertexID, uint instance_id : SV_InstanceID) 
 		float h = sampleBindlessLod(LinearSamplerClamp, t_heightmap, hm_uv, 0).x * u_terrain_scale.y;
 	#endif
 
-	float3 wpos = u_position.xyz + v + float3(0, h, 0);		
+	float3 pos_ws = u_position.xyz + v + float3(0, h, 0);		
 	#ifndef DEPTH
-		output.wpos = wpos;
+		output.pos_ws = pos_ws;
 	#endif
-	float4 p = mul(float4(wpos, 1), Pass_view);
+	float4 p = mul(float4(pos_ws, 1), Pass_view);
 	#ifndef DEPTH
 		output.dist2 = dot(p.xyz, p.xyz);
 	#endif
@@ -202,10 +202,10 @@ VSOutput mainVS(uint vertex_id : SV_VertexID, uint instance_id : SV_InstanceID) 
 		}
 
 		#ifndef DEPTH
-			surface.motion = computeStaticObjectMotionVector(input.wpos);
+			surface.motion = computeStaticObjectMotionVector(input.pos_ws);
 		#endif
 
-		surface.wpos = 0;
+		surface.pos_ws = 0;
 		surface.roughness = u_roughness;
 		surface.metallic  = u_metallic;
 		surface.emission = u_emission;

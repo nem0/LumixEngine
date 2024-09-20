@@ -9,7 +9,7 @@
 //@uniform "Translucency", "normalized_float", 0
 
 Surface getSurface(VSOutput input) {
-	float3 t = fmod(abs(input.wpos.xyz + Global_camera_world_pos.xyz + 0.5), 2.0f.xxx);
+	float3 t = fmod(abs(input.pos_ws.xyz + Global_camera_world_pos.xyz + 0.5), 2.0f.xxx);
 	float ff = dot(floor(t), 1.0f.xxx);
 	ff = fmod(ff, 2);
 	float4 c = float4(u_material_color.xyzw);

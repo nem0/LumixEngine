@@ -5,7 +5,7 @@
 #endif
 
 struct VSOutput {
-	float4 wpos : TEXCOORD0;
+	float4 pos_ws : TEXCOORD0;
 	float3 normal : TEXCOORD1;
 	#ifdef UV0_ATTR
 		float2 uv : TEXCOORD2;
@@ -109,8 +109,8 @@ VSOutput mainVS(VSInput input) {
 	#endif
 	#ifdef AUTOINSTANCED
 		float3 p = input.position.xyz * input.i_scale.xyz;
-		output.wpos = float4(input.i_pos_lod.xyz + rotateByQuat(input.i_rot, p), 1);
-		output.position = mul(output.wpos, Pass_view_projection);
+		output.pos_ws = float4(input.i_pos_lod.xyz + rotateByQuat(input.i_rot, p), 1);
+		output.position = mul(output.pos_ws, Pass_view_projection);
 		output.normal = rotateByQuat(input.i_rot, input.normal);
 		#ifdef HAS_LOD
 			output.lod = input.i_pos_lod.w;
@@ -123,8 +123,8 @@ VSOutput mainVS(VSInput input) {
 			output.tangent = rotateByQuat(rot_quat, input.tangent);
 		#endif
 		float3 p = input.position * input.i_pos_scale.w;
-		output.wpos = float4(input.i_pos_scale.xyz + rotateByQuat(rot_quat, p), 1);
-		output.position = mul(output.wpos, Pass_view_projection);
+		output.pos_ws = float4(input.i_pos_scale.xyz + rotateByQuat(rot_quat, p), 1);
+		output.position = mul(output.pos_ws, Pass_view_projection);
 	#elif defined GRASS
 		output.normal = rotateByQuat(input.i_rot, input.normal);
 		#ifdef TANGENT_ATTR
@@ -132,19 +132,19 @@ VSOutput mainVS(VSInput input) {
 		#endif
 		float3 p = input.position;
 		output.pos_y = p.y;
-		output.wpos = float4(input.i_pos_scale.xyz + rotateByQuat(input.i_rot, input.position * input.i_pos_scale.w), 1);
-		output.wpos.xyz += u_grass_origin;
+		output.pos_ws = float4(input.i_pos_scale.xyz + rotateByQuat(input.i_rot, input.position * input.i_pos_scale.w), 1);
+		output.pos_ws.xyz += u_grass_origin;
 		#ifdef COLOR0_ATTR
 			//output.color = input.color;
 		#endif
-		output.position = mul(output.wpos, Pass_view_projection);
+		output.position = mul(output.pos_ws, Pass_view_projection);
 	#elif defined DYNAMIC
 		output.normal = rotateByQuat(input.i_rot, input.normal);
 		#ifdef TANGENT_ATTR
 			output.tangent = rotateByQuat(input.i_rot, input.tangent);
 		#endif
-		output.wpos = float4(input.i_pos_lod.xyz + rotateByQuat(input.i_rot, input.position * input.i_scale.xyz), 1);
-		output.position = mul(output.wpos, Pass_view_projection);
+		output.pos_ws = float4(input.i_pos_lod.xyz + rotateByQuat(input.i_rot, input.position * input.i_scale.xyz), 1);
+		output.position = mul(output.pos_ws, Pass_view_projection);
 		output.prev_ndcpos_no_jitter = float4(input.i_prev_pos_lod.xyz + rotateByQuat(input.i_prev_rot, input.position * input.i_prev_scale.xyz), 1);
 		output.prev_ndcpos_no_jitter = mul(output.prev_ndcpos_no_jitter, mul(Global_view_projection_no_jitter, Global_reprojection));
 	#elif defined SKINNED
@@ -170,8 +170,8 @@ VSOutput mainVS(VSInput input) {
 		#else
 			mpos = input.position;
 		#endif
-		output.wpos = mul(float4(transformByDualQuat(dq, mpos), 1), mtx);
-		output.position = mul(output.wpos, Pass_view_projection);
+		output.pos_ws = mul(float4(transformByDualQuat(dq, mpos), 1), mtx);
+		output.position = mul(output.pos_ws, Pass_view_projection);
 		// TODO previous frame bone positions
 		output.prev_ndcpos_no_jitter = mul(float4(transformByDualQuat(dq, mpos), 1), prev_matrix);
 		output.prev_ndcpos_no_jitter = mul(output.prev_ndcpos_no_jitter, mul(Global_view_projection_no_jitter, Global_reprojection));
@@ -181,22 +181,22 @@ VSOutput mainVS(VSInput input) {
 		#ifdef TANGENT_ATTR
 			output.tangent = mul(input.tangent, rot_mtx);
 		#endif
-		output.wpos = mul(float4(input.position, 1), model_mtx);
-		output.position = mul(output.wpos, Pass_view_projection);
+		output.pos_ws = mul(float4(input.position, 1), model_mtx);
+		output.position = mul(output.pos_ws, Pass_view_projection);
 	#endif
 	return output;
 }
 
 Surface getSurfaceEx(VSOutput input) {
 	Surface data = getSurface(input);
-	float4 p = mul(input.wpos, Global_view_projection_no_jitter);
+	float4 p = mul(input.pos_ws, Global_view_projection_no_jitter);
 	#if defined DYNAMIC || defined SKINNED
 		float2 prev_pos_projected = input.prev_ndcpos_no_jitter.xy / input.prev_ndcpos_no_jitter.w;
 		data.motion = prev_pos_projected.xy - p.xy / p.w;
 	#else
-		data.motion = computeStaticObjectMotionVector(input.wpos.xyz);
+		data.motion = computeStaticObjectMotionVector(input.pos_ws.xyz);
 	#endif
-	data.V = normalize(-data.wpos);
+	data.V = normalize(-data.pos_ws);
 	return data;
 }
 
@@ -228,7 +228,7 @@ Surface getSurfaceEx(VSOutput input) {
 		
 		Surface data = getSurfaceEx(input);
 	
-		float linear_depth = dot(data.wpos.xyz, Pass_view_dir.xyz);
+		float linear_depth = dot(data.pos_ws.xyz, Pass_view_dir.xyz);
 		Cluster cluster = getClusterLinearDepth(linear_depth, frag_coord.xy);
 		float4 result;
 		result.rgb = computeLighting(cluster, data, Global_light_dir.xyz, Global_light_color.rgb * Global_light_intensity, u_shadowmap, u_shadow_atlas, u_reflection_probes, frag_coord);
