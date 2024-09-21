@@ -865,6 +865,10 @@ struct CodeEditorImpl final : CodeEditor {
 		m_cursors[0].sel.col = to_col;
 		if (ensure_visibility) ensurePointVisible(m_cursors[0], true);
 	}
+	
+	void setReadOnly(bool readonly) {
+		m_is_readonly = readonly;
+	}
 
 	void setText(StringView text) override {
 		m_cursors.clear();
@@ -952,6 +956,7 @@ struct CodeEditorImpl final : CodeEditor {
 	}
 
 	void moveLinesUp() {
+		if (m_is_readonly) return;
 		TextPoint from = m_cursors[0];
 		TextPoint to = m_cursors[0].sel;
 		if (from > to) swap(from, to);
@@ -972,6 +977,7 @@ struct CodeEditorImpl final : CodeEditor {
 	}
 
 	void moveLinesDown() {
+		if (m_is_readonly) return;
 		m_cursors.resize(1);
 		TextPoint from = m_cursors[0];
 		TextPoint to = m_cursors[0].sel;
@@ -1072,6 +1078,7 @@ struct CodeEditorImpl final : CodeEditor {
 	}
 
 	void insertNewLine() {
+		if (m_is_readonly) return;
 		beginUndoGroup();
 		deleteSelections();
 
@@ -1190,6 +1197,7 @@ struct CodeEditorImpl final : CodeEditor {
 	}
 
 	void indent(TextPoint from, TextPoint to) {
+		if (m_is_readonly) return;
 		beginUndoGroup();
 		if (from > to) swap(from, to);
 		if (to.col == 0 && to.line != from.line) --to.line;
@@ -1205,6 +1213,7 @@ struct CodeEditorImpl final : CodeEditor {
 	}
 
 	void unindent(TextPoint from, TextPoint to) {
+		if (m_is_readonly) return;
 		beginUndoGroup();
 		if (from > to) swap(from, to);
 		if (to.col == 0 && to.line != from.line) --to.line;
@@ -1223,6 +1232,7 @@ struct CodeEditorImpl final : CodeEditor {
 	}
 
 	void insertCharacter(u32 character, bool shift) {
+		if (m_is_readonly) return;
 		if (character < 0x20 && character != 0x09) return;
 		if (character > 0x7f) return;
 		
@@ -1342,6 +1352,7 @@ struct CodeEditorImpl final : CodeEditor {
 	}
 
 	void deleteSelection(Cursor& cursor, bool ensure_visibility = true) {
+		if (m_is_readonly) return;
 		if (!cursor.hasSelection()) return;
 		
 		TextPoint from = cursor.sel;
@@ -1572,6 +1583,7 @@ struct CodeEditorImpl final : CodeEditor {
 	u32 getNumCursors() override { return m_cursors.size(); }
 
 	void insertText(const char* text) override {
+		if (m_is_readonly) return;
 		u32 len = stringLength(text);
 
 		beginUndoGroup();
@@ -1981,6 +1993,7 @@ struct CodeEditorImpl final : CodeEditor {
 	i32 m_undo_stack_idx = -1;
 	ImVec2 m_text_area_screen_pos;
 	
+	bool m_is_readonly = false;
 	bool m_handle_input = false;
 	bool m_focus_search = false;
 	bool m_search_visible = false;
