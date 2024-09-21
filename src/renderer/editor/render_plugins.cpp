@@ -3261,7 +3261,11 @@ struct CodeEditorWindow : AssetEditorWindow {
 	void onGUI() override {
 		if (m_shader) {
 			ImGui::SetNextWindowSizeConstraints(ImVec2(200, 100), ImVec2(FLT_MAX, FLT_MAX));
-			if (ImGui::Begin("Disassembly")) {
+			StringView basename = Path::getBasename(m_shader->getPath());
+			StaticString<256> disasm_label("Disassembly ", basename, "##disasm", (u64)(uintptr)m_shader);
+			bool open = true;
+			ImGui::SetNextWindowDockID(m_dock_id, ImGuiCond_Appearing);
+			if (ImGui::Begin(disasm_label, &open)) {
 				if (m_shader->isFailure()) ImGui::TextUnformatted("Failed to load shader.");
 				else if (m_shader->isEmpty()) ImGui::TextUnformatted("Loading...");
 				else {
@@ -3271,13 +3275,20 @@ struct CodeEditorWindow : AssetEditorWindow {
 					}
 					if (m_disassembly.length() == 0) {
 						gpu::getDisassembly(m_program, m_disassembly);
+						m_disassembly_view = createHLSLCodeEditor(m_app);
+						m_disassembly_view->setText(m_disassembly);
+						m_disassembly_view->setReadOnly(true);
 					}
 					else {
-						ImGui::TextUnformatted(m_disassembly.c_str(), m_disassembly.c_str() + m_disassembly.length());
+						m_disassembly_view->gui("disasm");
 					}
 				}
 			}
 			ImGui::End();
+			if (!open) {
+				m_shader->decRefCount();
+				m_shader = nullptr;
+			}
 		}
 		AssetEditorWindow::onGUI();
 	}
@@ -3301,6 +3312,7 @@ struct CodeEditorWindow : AssetEditorWindow {
 
 	StudioApp& m_app;
 	UniquePtr<CodeEditor> m_editor;
+	UniquePtr<CodeEditor> m_disassembly_view;
 	Path m_path;
 	Shader* m_shader = nullptr;
 	gpu::ProgramHandle m_program;

@@ -33,7 +33,6 @@
 #include "terrain.h"
 #include "texture.h"
 
-// TODO shader disassembly cleanup
 // TODO vsync
 // TODO env probe lighting is off
 // TODO temporal upsample
