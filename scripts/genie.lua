@@ -197,7 +197,6 @@ if _ACTION == "gmake" or _ACTION == "ninja" then
 	BINARY_DIR = LOCATION .. "/bin/"
 end
 
-
 local ROOT_DIR = path.getabsolute("../")
 local BINARY_DIR = LOCATION .. "/bin/"
 local plugin_creators = {}

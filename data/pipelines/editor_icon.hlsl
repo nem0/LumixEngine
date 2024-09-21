@@ -40,7 +40,7 @@ VSOutput mainVS(VSInput input) {
 	return output;
 }
 
-float3 mainPS(VSOutput input) : SV_TARGET {
+float4 mainPS(VSOutput input) : SV_TARGET {
 	float2 screen_uv = input.position.xy / Global_framebuffer_size;
 	float3 pos_ws = getPositionWS(u_gbuffer_depth, screen_uv);
 	float4 albedo = sampleBindless(LinearSampler, t_albedo, input.uv);
@@ -55,5 +55,5 @@ float3 mainPS(VSOutput input) : SV_TARGET {
 	bool is_behind = distance_squared < input.distance_squared;
 	if (is_behind) output *= 0.25;
 	
-	return output;
+	return float4(output, 1);
 }
