@@ -1672,7 +1672,7 @@ ID3D12RootSignature* createRootSignature() {
 }
 
 // TODO srgb window swapchain views
-static bool createSwapchain(HWND hwnd, D3D::Window& window, bool vsync) {
+[[nodiscard]] static bool createSwapchain(HWND hwnd, D3D::Window& window, bool vsync) {
 	PROFILE_FUNCTION();
 	DXGI_SWAP_CHAIN_DESC1 sd = {};
 	sd.BufferCount = NUM_BACKBUFFERS;
@@ -1956,6 +1956,9 @@ void* map(BufferHandle buffer, size_t size) {
 	ASSERT(buffer);
 	ASSERT(!buffer->mapped_ptr);
 	HRESULT hr = buffer->resource->Map(0, nullptr, (void**)&buffer->mapped_ptr);
+	// if you get random device removal errors here, see: 
+	// https://github.com/microsoft/D3D11On12/issues/25
+	// it's a bug in debug layer, either disable debug layer or use new sdk version - agility SDK or Win 11
 	ASSERT(hr == S_OK);
 	ASSERT(buffer->mapped_ptr);
 	return buffer->mapped_ptr;
@@ -2005,7 +2008,9 @@ void setCurrentWindow(void* window_handle) {
 		GetClientRect((HWND)window_handle, &rect);
 		window.size = IVec2(rect.right - rect.left, rect.bottom - rect.top);
 
-		createSwapchain((HWND)window_handle, window, vsync);
+		if (!createSwapchain((HWND)window_handle, window, vsync)) {
+			logError("Failed to create swapchain");
+		}
 		return;
 	}
 
@@ -2034,7 +2039,7 @@ void enableVSync(bool enable) {
 	d3d->vsync_dirty = true;
 }
 
-u32 swapBuffers() {
+u32 present() {
 	d3d->vsync_mutex.enter();
 	const bool vsync = d3d->vsync;
 	const bool vsync_dirty = d3d->vsync_dirty;

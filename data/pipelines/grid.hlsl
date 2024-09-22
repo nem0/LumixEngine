@@ -1,5 +1,5 @@
 //@surface
-//@include "pipelines/common.hlsli"
+#include "pipelines/common.hlsli"
 
 struct Output {
 	float4 lpos : TEXCOORD0;

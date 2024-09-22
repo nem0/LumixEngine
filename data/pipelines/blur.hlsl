@@ -1,5 +1,5 @@
 //@surface
-//@include "pipelines/common.hlsli"
+#include "pipelines/common.hlsli"
 
 cbuffer Drawcall : register(b4) {
 	float4 u_inv_sm_size;

@@ -1,4 +1,4 @@
-//@include "pipelines/common.hlsli"
+#include "pipelines/common.hlsli"
 
 #ifdef EXTRACT
 	cbuffer Data : register(b4) {

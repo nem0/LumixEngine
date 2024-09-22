@@ -1,4 +1,4 @@
-//@include "pipelines/common.hlsli"
+#include "pipelines/common.hlsli"
 
 cbuffer Data : register (b4) {
 	float u_bot;
@@ -51,7 +51,7 @@ void main(uint3 thread_id : SV_DispatchThreadID) {
 	
 	float3 sunlight = u_sunlight.rgb * u_sunlight.a;
 	float ndc_depth = bindless_textures[u_depth_buffer][thread_id.xy].r;
-	float2 uv = thread_id.xy / (float2)Global_framebuffer_size.xy;
+	float2 uv = thread_id.xy * Global_rcp_framebuffer_size;
 	float3 eyedir = getViewDirection(uv);
 	const float cos_theta = dot(eyedir, Global_light_dir.xyz);
 

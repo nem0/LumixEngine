@@ -234,7 +234,7 @@ struct GPUProfiler
 
 		u32 try_num = 0;
 		while (!gpu::isQueryReady(q) && try_num < 10) {
-			gpu::swapBuffers();
+			gpu::present();
 			++try_num;
 		}
 		if (try_num == 10) {
@@ -454,9 +454,9 @@ struct RendererImpl final : Renderer {
 			}
 			gpu::destroy(m_material_buffer.buffer);
 			m_profiler.clear();
-			gpu::swapBuffers();
-			gpu::swapBuffers();
-			gpu::swapBuffers();
+			gpu::present();
+			gpu::present();
+			gpu::present();
 		}, &signal, 1);
 		jobs::wait(&signal);
 
@@ -932,7 +932,7 @@ struct RendererImpl final : Renderer {
 
 		{
 			PROFILE_BLOCK("swap buffers");
-			frame.gpu_frame = gpu::swapBuffers();
+			frame.gpu_frame = gpu::present();
 		}
 		
 		jobs::enableBackupWorker(false);

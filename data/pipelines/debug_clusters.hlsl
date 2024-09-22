@@ -1,4 +1,4 @@
-//@include "pipelines/common.hlsli"
+#include "pipelines/common.hlsli"
 
 cbuffer Data : register(b4) {
 	uint u_deptbuffer;
@@ -23,7 +23,7 @@ float3 countToDebugColor(int c, uint2 thread_id) {
 
 [numthreads(16, 16, 1)]
 void main(uint3 thread_id : SV_DispatchThreadID) {
-	float2 screen_uv = thread_id.xy / (float2)Global_framebuffer_size;
+	float2 screen_uv = thread_id.xy * Global_rcp_framebuffer_size;
 	float depth_ndc;
 	float3 pos_ws = getPositionWS(u_deptbuffer, screen_uv, depth_ndc);
 

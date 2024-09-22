@@ -14,6 +14,7 @@ char toLower(char c) {
 bool isLetter(char c) { return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'); }
 bool isNumeric(char c) { return c >= '0' && c <= '9'; }
 bool isUpperCase(char c) { return c >= 'A' && c <= 'Z'; }
+bool isWhitespace(char c) { return c == ' ' || c == '\n' || c == '\r' || c == '\t'; }
 
 String::String(IAllocator& allocator)
 	: m_allocator(allocator)

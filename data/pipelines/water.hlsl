@@ -1,5 +1,5 @@
 //@surface
-//@include "pipelines/common.hlsli"
+#include "pipelines/common.hlsli"
 //@texture_slot "Normal", "textures/common/default_normal.tga"
 //@texture_slot "Noise", "textures/common/white.tga"
 //@texture_slot "Foam", "", "HAS_FOAM"
@@ -123,10 +123,10 @@ float2 raycast(float3 csOrig, float3 csDir, float stride, float jitter) {
 			float rayZFar = 1 / k;
 
 			float2 p = permute ? P.yx : P;
-			if (any(p < 0.0f.xx)) break;
+			if (any(p < 0.0)) break;
 			if (any(p > float2(Global_framebuffer_size))) break;
 
-			float depth = sampleBindless(LinearSamplerClamp, u_depthbuffer, p / Global_framebuffer_size).x;
+			float depth = sampleBindless(LinearSamplerClamp, u_depthbuffer, p * Global_rcp_framebuffer_size).x;
 			depth = toLinearDepth(depth);
 			
 			float dif = rayZFar - depth;
@@ -150,7 +150,7 @@ float3 getReflectionColor(float3 view, float3 normal, float dist, float3 pos_ws)
 		float3 d = mul(reflect(-view, normal), float3x3(Global_ws_to_vs));
 		float2 hit = raycast(o.xyz, d, 4, hash(pos_ws.xy + Global_time));
 		if (hit.x >= 0) {
-			return sampleBindless(LinearSamplerClamp, u_bg, hit.xy / Global_framebuffer_size.xy).rgb;
+			return sampleBindless(LinearSamplerClamp, u_bg, hit.xy * Global_rcp_framebuffer_size).rgb;
 		}
 	#endif
 

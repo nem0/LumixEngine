@@ -3327,7 +3327,7 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	}
 
 	void findHLSLIncludes(StringView content, const Path& path) {
-		const StringView needle = "//@include \"";
+		const StringView needle = "#include \"";
 		for (;;) {
 			const char* inc = find(content, needle);
 			if (!inc) return;
@@ -3354,7 +3354,7 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		}
 		file.close();
 
-		const StringView needle = "//@include \"";
+		const StringView needle = "#include \"";
 		StringView view((const char*)content.data(), (u32)content.size());
 		for (;;) {
 			const char* inc = find(view, needle);
@@ -3413,6 +3413,10 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		return false;
 	}
 
+	static void skipWhitespaces(StringView& str) {
+		while (str.begin != str.end && isWhitespace(*str.begin)) ++str.begin;
+	}
+
 	bool compile(const Path& src) override {
 		// load
 		FileSystem& fs = m_app.getEngine().getFileSystem();
@@ -3439,8 +3443,29 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			++line_idx;
 			StringView line = getLine(preprocess);
 			if (line.begin == preprocess.end) break;
+			
+			skipWhitespaces(line);
+			if (startsWith(line, "#include \"")) {
+				StringView path;
+				path.begin = line.begin + 10;
+				path.end = path.begin + 1;
+				while (path.end < preprocess.end && *path.end != '"') ++path.end;
 
-			if (startsWith(line, "//@")) {
+				ResourceManagerHub& rm = m_app.getEngine().getResourceManager();
+				OutputMemoryStream include_content(m_app.getAllocator());
+				if (!fs.getContentSync(Path(path), include_content)) {
+					logError(src, ": Failed to open/read include ", path);
+					return false;
+				}
+				
+				if (!include_content.empty()) {
+					include_content << "\n";
+					compiled << "#line 1 \"" << path << "\"\n";
+					compiled.write(include_content.data(), include_content.size());
+					compiled << "#line " << line_idx + 1 << " \"" << src << "\"\n";
+				}
+			}
+			else if (startsWith(line, "//@")) {
 				line.removePrefix(3);
 				if (startsWith(line, "surface")) {
 					is_surface = true;
@@ -3516,25 +3541,8 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 						slot.define = def;
 					}
 				}
-				else if (startsWith(line, "include \"")) {
-					StringView path;
-					path.begin = line.begin + 9;
-					path.end = path.begin + 1;
-					while (path.end < preprocess.end && *path.end != '"') ++path.end;
-
-					ResourceManagerHub& rm = m_app.getEngine().getResourceManager();
-					OutputMemoryStream include_content(m_app.getAllocator());
-					if (!fs.getContentSync(Path(path), include_content)) {
-						logError(src, ": Failed to open/read include ", path);
-						return false;
-					}
-					
-					if (!include_content.empty()) {
-						include_content << "\n";
-						compiled << "#line 1 \"" << path << "\"\n";
-						compiled.write(include_content.data(), include_content.size());
-						compiled << "#line " << line_idx + 1 << " \"" << src << "\"\n";
-					}
+				else {
+					logError(src, ": Unknown token ", line);
 				}
 			}
 			else {

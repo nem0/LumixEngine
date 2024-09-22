@@ -1,6 +1,6 @@
 //@surface
-//@include "pipelines/common.hlsli"
-//@include "pipelines/surface_base.hlsli"
+#include "pipelines/common.hlsli"
+#include "pipelines/surface_base.hlsli"
 
 //@uniform "Material color", "color", {1, 1, 1, 1}
 //@uniform "Roughness", "normalized_float", 1
