@@ -1,5 +1,5 @@
 //@surface
-//@include "pipelines/common.hlsli"
+#include "pipelines/common.hlsli"
 
 cbuffer DC : register(b4) {
 	float4x4 u_matrix;

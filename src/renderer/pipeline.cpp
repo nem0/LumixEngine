@@ -38,12 +38,6 @@
 // TODO temporal upsample
 // TODO shader cleanup
 
-// TODO shader - check what's better - float4 * (mat * mat) or (float4 * mat) * mat 
-// TODO float3 vs float4 * matrix
-
-// TODO crashes:
-	// TODO crash when context menu is outside of main window
-
 // TODO nice to have:
 	// TODO split common.hlsli
 	// TODO semaphore in job system to wake workers?
@@ -119,9 +113,9 @@ struct GlobalState {
 	Vec4 light_color;
 	IVec2 random_uint2;
 	IVec2 framebuffer_size;
+	Vec2 rcp_framebuffer_size;
 	Vec2 pixel_jitter;
 	Vec2 prev_pixel_jitter;
-	Vec2 padding_;
 	float fog_enabled;
 	float fog_top;
 	float light_intensity;
@@ -1530,8 +1524,8 @@ struct PipelineImpl final : Pipeline {
 		global_state.shadow_atlas_bindless = m_shadow_atlas.texture ? gpu::getBindlessHandle(m_shadow_atlas.texture) : gpu::INVALID_BINDLESS_HANDLE;
 		global_state.frame_idx = m_renderer.frameNumber();
 		global_state.random_uint2 = IVec2((i32)rand(), (i32)rand());
-		global_state.framebuffer_size.x = m_viewport.w;
-		global_state.framebuffer_size.y = m_viewport.h;
+		global_state.framebuffer_size = IVec2(m_viewport.w, m_viewport.h);
+		global_state.rcp_framebuffer_size = Vec2(1.f / m_viewport.w, 1.f / m_viewport.h);
 		global_state.cam_world_pos = Vec4(Vec3(m_viewport.pos), 1);
 		global_state.view_dir = Vec4(m_viewport.rot * Vec3(0, 0, -1), 0);
 		global_state.to_prev_frame_camera_translation = Vec4(Vec3(m_viewport.pos - m_prev_viewport.pos), 1);

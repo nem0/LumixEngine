@@ -1,4 +1,4 @@
-//@include "pipelines/common.hlsli"
+#include "pipelines/common.hlsli"
 
 // possible future optimizations https://software.intel.com/content/www/us/en/develop/articles/adaptive-screen-space-ambient-occlusion.html
 // inspired by https://github.com/tobspr/RenderPipeline/blob/master/rpplugins/ao/shader/ue4ao.kernel.glsl

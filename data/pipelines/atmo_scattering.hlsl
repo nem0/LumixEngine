@@ -1,4 +1,4 @@
-//@include "pipelines/common.hlsli"
+#include "pipelines/common.hlsli"
 
 // https://media.contentapi.ea.com/content/dam/eacom/frostbite/files/s2016-pbs-frostbite-sky-clouds-new.pdf
 

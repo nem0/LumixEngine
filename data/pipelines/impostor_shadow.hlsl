@@ -1,4 +1,4 @@
-//@include "pipelines/common.hlsli"
+#include "pipelines/common.hlsli"
 
 cbuffer Data : register(b4){
 	float4x4 u_projection;

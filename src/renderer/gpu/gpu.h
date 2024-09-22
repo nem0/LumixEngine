@@ -241,7 +241,7 @@ IAllocator& getAllocator();
 bool init(void* window_handle, InitFlags flags);
 void captureFrame();
 bool getMemoryStats(MemoryStats& stats);
-u32 swapBuffers();
+u32 present();
 void enableVSync(bool enable);
 bool isVSyncEnabled();
 void waitFrame(u32 frame);

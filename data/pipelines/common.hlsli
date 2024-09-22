@@ -126,9 +126,9 @@ cbuffer GlobalState : register(b0) {
 	float4 Global_light_color;
 	uint2 Global_random_uint2;
 	int2 Global_framebuffer_size;
+	float2 Global_rcp_framebuffer_size;
 	float2 Global_pixel_jitter;
 	float2 Global_prev_pixel_jitter;
-	float2 Global_padding_;
 	float Global_fog_enabled;
 	float Global_fog_top;
 	float Global_light_intensity;

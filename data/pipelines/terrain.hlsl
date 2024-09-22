@@ -1,5 +1,5 @@
 //@surface
-//@include "pipelines/common.hlsli"
+#include "pipelines/common.hlsli"
 //@texture_slot "Heightmap", "textures/common/white.tga"
 //@texture_slot "Detail albedo", "textures/common/white.tga"
 //@texture_slot "Detail normal", "textures/common/white.tga"

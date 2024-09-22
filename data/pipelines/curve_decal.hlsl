@@ -18,7 +18,7 @@ END_SHADER_DECLARATIONS
 */
 
 //@surface
-//@include "pipelines/common.hlsli"
+#include "pipelines/common.hlsli"
 //@texture_slot "Texture", "textures/common/white.tga"
 //@uniform "Material color", "color", {1, 1, 1, 1}
 
@@ -115,7 +115,7 @@ cbuffer Dc : register(b4) {
 };
 
 GBufferOutput mainPS(VSOutput input) {
-	float2 screen_uv = input.position.xy / Global_framebuffer_size;
+	float2 screen_uv = input.position.xy * Global_rcp_framebuffer_size;
 	float3 pos_ws = getPositionWS(u_gbuffer_depth, screen_uv);
 	
 	float4 r = input.rot;

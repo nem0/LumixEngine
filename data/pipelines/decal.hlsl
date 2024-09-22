@@ -1,5 +1,5 @@
 //@surface
-//@include "pipelines/common.hlsli"
+#include "pipelines/common.hlsli"
 //@texture_slot "Texture", "textures/common/white.tga"
 //@uniform "Material color", "color", {1, 1, 1, 1}
 
@@ -37,7 +37,7 @@ VSOutput mainVS(VSInput input) {
 }
 
 GBufferOutput mainPS(VSOutput input) {
-	float2 screen_uv = input.position.xy / Global_framebuffer_size;
+	float2 screen_uv = input.position.xy * Global_rcp_framebuffer_size;
 	float3 pos_ws = getPositionWS(u_gbuffer_depth, screen_uv);
 	float3 pos_ls = rotateByQuat(input.rot, pos_ws - input.pos_ws);
 

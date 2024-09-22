@@ -1,4 +1,4 @@
-//@include "pipelines/common.hlsli"
+#include "pipelines/common.hlsli"
 
 cbuffer DC : register(b4) {
 	uint u_mask;

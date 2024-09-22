@@ -1276,6 +1276,7 @@ ExecuteOpenResult shellExecuteOpen(StringView path, StringView args, StringView 
 	const WCharStr<MAX_PATH> wargs(args);
 	const WCharStr<MAX_PATH> wdir(working_dir);
 	SHELLEXECUTEINFOW exec_info = {};
+	exec_info.lpVerb = NULL;
 	exec_info.cbSize = sizeof(exec_info);
 	exec_info.lpFile = wpath;
 	exec_info.lpParameters = args.empty() ? NULL : wargs.data;

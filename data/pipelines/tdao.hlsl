@@ -1,4 +1,4 @@
-//@include "pipelines/common.hlsli"
+#include "pipelines/common.hlsli"
 
 // top-down ambient occlusion
 

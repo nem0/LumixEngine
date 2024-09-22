@@ -1,28 +1,22 @@
 //@surface
-//@include "pipelines/common.hlsli"
-//@include "pipelines/surface_base.hlsli"
-
-//@uniform "Material color", "color", {1, 1, 1, 1}
-//@uniform "Roughness", "normalized_float", 1
-//@uniform "Metallic", "normalized_float", 0
-//@uniform "Emission", "float", 0
-//@uniform "Translucency", "normalized_float", 0
+#include "pipelines/common.hlsli"
+#include "pipelines/surface_base.hlsli"
 
 Surface getSurface(VSOutput input) {
-	float3 t = fmod(abs(input.pos_ws.xyz + Global_camera_world_pos.xyz + 0.5), 2.0f.xxx);
-	float ff = dot(floor(t), 1.0f.xxx);
-	ff = fmod(ff, 2);
-	float4 c = float4(u_material_color.xyzw);
+	float3 pos_gs = input.pos_ws.xyz + Global_camera_world_pos.xyz;
+	float3 cell_pos = floor(pos_gs);
+	float mask = dot(cell_pos, 1.0);
+	mask = fmod(abs(mask), 2);
 	
 	Surface surface;
-	surface.albedo = c.rgb * (ff < 1 ? 1.0 : 0.75);
-	surface.alpha = c.a;
+	surface.albedo = mask < 1 ? 1.0 : 0.75;
+	surface.alpha = 1;
 	surface.ao = 1;
-	surface.roughness = u_roughness;
-	surface.metallic  = u_metallic;
+	surface.roughness = 1;
+	surface.metallic  = 0;
 	surface.N = input.normal;
-	surface.emission = u_emission;
-	surface.translucency = u_translucency;
+	surface.emission = 0;
+	surface.translucency = 0;
 	surface.shadow = 1;
 	return surface;
 }

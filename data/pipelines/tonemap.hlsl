@@ -1,4 +1,4 @@
-//@include "pipelines/common.hlsli"
+#include "pipelines/common.hlsli"
 
 struct Output {
 	float2 uv : TEXCOORD0;

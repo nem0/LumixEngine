@@ -1,5 +1,5 @@
 //@surface
-//@include "pipelines/common.hlsli"
+#include "pipelines/common.hlsli"
 
 struct VSOutput {
 	float2 uv : TEXCOORD0;

@@ -1269,9 +1269,6 @@ struct CodeEditorImpl final : CodeEditor {
 		return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
 	}
 
-	static bool isWhitespace(char c) { return c == ' ' || c == '\n' || c == '\r' || c == '\t'; }
-
-
 	Cursor getWord(TextPoint& point) const {
 		Cursor cursor;
 		cursor = point;

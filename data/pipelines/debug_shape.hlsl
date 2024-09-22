@@ -1,5 +1,5 @@
 //@surface
-//@include "pipelines/common.hlsli"
+#include "pipelines/common.hlsli"
 
 cbuffer Model : register(b4) {
 	float4x4 u_ls_to_ws;

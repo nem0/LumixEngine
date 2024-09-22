@@ -1,5 +1,5 @@
 //@surface
-//@include "pipelines/common.hlsli"
+#include "pipelines/common.hlsli"
 //@uniform "Frames cols", "int", 1
 //@uniform "Frames rows", "int", 1
 //@texture_slot "Texture", "textures/common/white.tga"

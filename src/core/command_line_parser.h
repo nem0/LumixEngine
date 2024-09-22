@@ -3,6 +3,7 @@
 
 #include "core.h"
 #include "span.h"
+#include "string.h"
 
 
 namespace Lumix {
@@ -103,11 +104,7 @@ struct CommandLineParser {
 		return *rhs == 0 && (*lhs == 0 || isWhitespace(*lhs));
 	}
 
-
 private:
-	static bool isWhitespace(char c) { return c == ' ' || c == '\n' || c == '\r' || c == '\t'; }
-
-
 	void skipWhitespaces()
 	{
 		while (*m_current && isWhitespace(*m_current))

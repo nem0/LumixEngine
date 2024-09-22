@@ -78,6 +78,7 @@ LUMIX_CORE_API bool endsWithInsensitive(StringView str, StringView suffix);
 LUMIX_CORE_API bool isLetter(char c);
 LUMIX_CORE_API bool isNumeric(char c);
 LUMIX_CORE_API bool isUpperCase(char c);
+LUMIX_CORE_API bool isWhitespace(char c);
 
 // string with included fixed-size storage - i.e. it does not allocate
 // example usage: StaticString<MAX_PATH> path(dir, "/", basename, ".", extension);
