@@ -1,16 +1,22 @@
 @echo off
 
-REM detect paths
-set msbuild_cmd=msbuild.exe
-set devenv_cmd=devenv.exe
-where /q devenv.exe
-if not %errorlevel%==0 set devenv_cmd="C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\Common7\IDE\devenv.exe"
-where /q msbuild.exe
-if not %errorlevel%==0 set msbuild_cmd="C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Current\Bin\MSBuild.exe"
+REM all path are relative to the script, so run in the script's directory
+REM in case user runs the script from another directory
+pushd %~dp0
+
+setlocal
+	set dir_3rdparty_src="../external/_repos/"
+	REM detect paths
+	set msbuild_cmd=msbuild.exe
+	set devenv_cmd=devenv.exe
+	where /q devenv.exe
+	if not %errorlevel%==0 set devenv_cmd="C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\Common7\IDE\devenv.exe"
+	where /q msbuild.exe
+	if not %errorlevel%==0 set msbuild_cmd="C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Current\Bin\MSBuild.exe"
 
 :begin
 	cls
-echo %cd%
+
 	echo Wut?
 	echo ===============================
 	echo   1. Exit
@@ -25,7 +31,10 @@ echo %cd%
 	choice /C 12345678 /N /M "Your choice:"
 	echo.
 
-	if %errorlevel%==1 goto :EOF
+	if %errorlevel%==1 (
+		popd
+		goto :EOF
+	)
 	if %errorlevel%==2 call :create_project
 	if %errorlevel%==3 call :run_studio
 	if %errorlevel%==4 call :open_in_vs
@@ -265,52 +274,27 @@ exit /B 0
 	popd
 exit /B 0
 
-:third_party 
+:third_party
 	REM we should use specific 3rd party revision
 	cls
 	echo Wut2?
 	echo ===============================
 	echo  1. Go back
-	echo  2. Download, build and deploy all
-	echo  3. Recast navigation
-	echo  4. PhysX
-	echo  5. Download Luau
-	echo  6. FreeType2
-	echo  7. Basis Universal
+	echo  2. PhysX
+	echo  3. Download Luau
+	echo  4. Basis Universal
 	echo ===============================
-	choice /C 1234567 /N /M "Your choice:"
+	choice /C 1234 /N /M "Your choice:"
 	echo.
 	if %errorlevel%==1 exit /B 0
-	if %errorlevel%==2 call :all_3rdparty
-	if %errorlevel%==3 call :recast
-	if %errorlevel%==4 call :physx
-	if %errorlevel%==5 call :download_luau
-	if %errorlevel%==6 call :freetype
-	if %errorlevel%==7 call :basisu
+	if %errorlevel%==2 call :physx
+	if %errorlevel%==3 call :download_luau
+	if %errorlevel%==4 call :basisu
 goto :third_party
 
-:all_3rdparty
-	call :download_physx
-	call :download_recast
-	call :download_freetype
-	call :download_basisu
-	
-	call :build_physx
-	call :build_recast
-	call :build_freetype
-	call :build_basisu
-	
-	call :deploy_physx
-	call :deploy_recast
-	call :deploy_freetype
-	call :deploy_basisu
-	pause
-
-exit /B 0
-
 :download_luau
-	if not exist 3rdparty mkdir 3rdparty
-	cd 3rdparty
+	if not exist %dir_3rdparty_src% mkdir %dir_3rdparty_src%
+	pushd 3rdparty
 	if not exist luau (
 		git.exe clone https://github.com/nem0/Luau.git luau
 	) else (
@@ -318,7 +302,7 @@ exit /B 0
 		git pull
 		cd ..
 	)
-	cd ..
+	podp
 exit /B 0
 
 :basisu
@@ -327,7 +311,7 @@ exit /B 0
 	echo ===============================
 	echo  1. Go back
 	echo  2. Download
-	if exist "3rdparty\basisu\" (
+	if exist "../external/_repos/basisu/" (
 		echo  3. Build
 		echo  4. Deploy
 		echo  5. Open in VS
@@ -339,50 +323,13 @@ exit /B 0
 	if %errorlevel%==2 call :download_basisu
 	if %errorlevel%==3 call :build_basisu
 	if %errorlevel%==4 call :deploy_basisu
-	if %errorlevel%==5 start "" %devenv_cmd% "3rdparty\basisu\lumix\vs2022\basis_lumix.sln"
+	if %errorlevel%==5 "../external/_repos/basisu/lumix/vs2022/basis_lumix.sln"
 	pause
 goto :basisu
 
-:freetype
-	cls
-	echo FreeType2
-	echo ===============================
-	echo  1. Go back
-	echo  2. Download
-	if exist "3rdparty\freetype\" (
-		echo  3. Build
-		echo  4. Deploy
-		echo  5. Open in VS
-	)
-	echo ===============================
-	choice /C 12345 /N /M "Your choice:"
-	echo.
-	if %errorlevel%==1 exit /B 0
-	if %errorlevel%==2 call :download_freetype
-	if %errorlevel%==3 call :build_freetype
-	if %errorlevel%==4 call :deploy_freetype
-	if %errorlevel%==5 start "" %devenv_cmd% "3rdparty\freetype\builds\windows\vc2010\freetype.sln"
-	pause
-goto :freetype
-
-:build_freetype
-	%msbuild_cmd% 3rdparty\freetype\builds\windows\vc2010\freetype.sln /p:Configuration="Release Static" /p:Platform=x64
-exit /B 0
-
 :build_basisu
-	pushd 3rdparty\basisu\lumix\
-		..\..\..\genie.exe vs2022
-	popd
-	%msbuild_cmd% 3rdparty\basisu\lumix\vs2022\basis_lumix.sln /p:Configuration="Release" /p:Platform=x64
-exit /B 0
-
-:deploy_freetype
-	echo %CD%
-	del /Q ..\external\freetype\lib\win64_vs2017\release\*
-	copy "3rdparty\freetype\objs\x64\Release Static\freetype.lib" ..\external\freetype\lib\win64_vs2017\release\
-	copy "3rdparty\freetype\objs\x64\Release Static\freetype.pdb" ..\external\freetype\lib\win64_vs2017\release\
-	del /Q ..\external\freetype\include\*
-	xcopy /E /Y "3rdparty\freetype\include\*" ..\external\freetype\include\
+	.\genie.exe --file=../external/_repos/basisu/lumix/genie.lua vs2022
+	%msbuild_cmd% ..\external\_repos\basisu\lumix\vs2022\basis_lumix.sln /p:Configuration="Release" /p:Platform=x64
 exit /B 0
 
 :deploy_basisu
@@ -475,45 +422,6 @@ exit /B 0
 
 exit /B 0
 
-:recast
-	cls
-	echo Recast ^& Detour
-	echo ===============================
-	echo  1. Go back
-	echo  2. Download
-	if exist "3rdparty\recast\" (
-		echo  3. Build
-		echo  4. Deploy
-		echo  5. Open in VS
-	)
-	echo ===============================
-	choice /C 12345 /N /M "Your choice:"
-	echo.
-	if %errorlevel%==1 exit /B 0
-	if %errorlevel%==2 call :download_recast
-	if %errorlevel%==3 call :build_recast
-	if %errorlevel%==4 call :deploy_recast
-	if %errorlevel%==5 start "" %devenv_cmd% "3rdparty\recast\_project\RecastDetour.sln"
-	pause
-goto :recast
-
-:deploy_recast
-	del /Q ..\external\recast\include\*
-	del /Q ..\external\recast\src\*
-	copy 3rdparty\recast\Recast\Include\* ..\external\recast\include\
-	copy 3rdparty\recast\Detour\Include\* ..\external\recast\include\
-	copy 3rdparty\recast\DetourCrowd\Include\* ..\external\recast\include\
-	copy 3rdparty\recast\DetourCrowd\Source\* ..\external\recast\src\
-	copy 3rdparty\recast\DebugUtils\Include\* ..\external\recast\include\
-	copy 3rdparty\recast\_build\Recast.lib ..\external\recast\lib\win64_vs2017\release\recast.lib
-	copy 3rdparty\recast\_build\Recast.pdb ..\external\recast\lib\win64_vs2017\release\recast.pdb
-exit /B 0
-
-:build_recast
-	.\genie.exe --file=recastnavigation.lua vs2022
-	%msbuild_cmd% 3rdparty\recast\_project\RecastDetour.sln /p:Configuration=Release /p:Platform=x64
-exit /B 0
-
 :create_project
 	echo Creating project...
 	.\genie.exe --with-app vs2022 
@@ -551,56 +459,40 @@ exit /B 0
 	pause
 exit /B 0
 
-:download_freetype
-	if not exist 3rdparty mkdir 3rdparty
-	cd 3rdparty
-	if not exist freetype (
-		git.exe clone --depth=1 https://github.com/nem0/freetype2.git freetype
-	) else (
-		cd freetype
-		git pull
-		cd ..
-	)
-	cd ..
-exit /B 0
-
 :download_basisu
-	if not exist 3rdparty mkdir 3rdparty
-	cd 3rdparty
+	if not exist %dir_3rdparty_src% mkdir %dir_3rdparty_src%
+	pushd %dir_3rdparty_src%
 	if not exist basisu (
 		git.exe clone --depth=1 https://github.com/nem0/basis_universal.git basisu
 	) else (
 		cd basisu
 		git pull
-		cd ..
 	)
-	cd ..
+	popd
 exit /B 0
 
 :download_recast
-	if not exist 3rdparty mkdir 3rdparty
-	cd 3rdparty
+	if not exist %dir_3rdparty_src% mkdir %dir_3rdparty_src%
+	pushd %dir_3rdparty_src%
 	if not exist recast (
 		git.exe clone --depth=1  https://github.com/nem0/recastnavigation.git recast
 	) else (
 		cd recast
 		git pull
-		cd ..
 	)
-	cd ..
+	popd
 exit /B 0
 
 :download_physx
-	if not exist 3rdparty mkdir 3rdparty
-	cd 3rdparty
+	if not exist %dir_3rdparty_src% mkdir %dir_3rdparty_src%
+	pushd %dir_3rdparty_src%
 	if not exist physx (
 		git.exe clone --depth=1 https://github.com/nem0/PhysX.git physx
 	) else (
 		cd physx
 		git pull
-		cd ..
 	)
-	cd ..
+	popd
 exit /B 0
 
 :open_discord

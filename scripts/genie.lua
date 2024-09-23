@@ -89,16 +89,6 @@ newoption {
 }
 
 newoption {
-	trigger = "force-build-freetype",
-	description = "Add FreeType project to solution. Do not use the prebuilt library."
-}
-
-newoption {
-	trigger = "force-build-recast",
-	description = "Add Recast to solution. Do not use the prebuilt library."
-}
-
-newoption {
 	trigger = "force-build-luau-dynamic",
 	description = "Add Luau project to solution. Do not use the prebuilt library. Build luau as dynamic library"
 }
@@ -127,9 +117,7 @@ local embed_resources = _OPTIONS["embed-resources"]
 local working_dir = _OPTIONS["working-dir"]
 local debug_args = _OPTIONS["debug-args"]
 local release_args = _OPTIONS["release-args"]
-local force_build_recast = _OPTIONS["force-build-recast"]
 local force_build_luau = _OPTIONS["force-build-luau"]
-local force_build_freetype = _OPTIONS["force-build-freetype"]
 local force_build_luau_dynamic = _OPTIONS["force-build-luau-dynamic"]
 local force_build_physx = _OPTIONS["force-build-physx"]
 local use_basisu =  _OPTIONS["with-basis-universal"]
@@ -207,14 +195,6 @@ function linkEditor()
 	if build_studio then
 		links { "editor" }
 	end
-end
-
-function linkOpenGL()
-	configuration { "windows" }
-		links { "opengl32" }
-	configuration { "not windows" }
-		links { "GL" }
-	configuration {}
 end
 
 function has_plugin(plugin)
@@ -297,18 +277,15 @@ end
 function linkLib(lib)
 	links {lib}
 
-	--if lib == "freetype" then
-		--libdirs { "external/freetype/lib/win" }
-	--else
-		for conf,conf_dir in pairs({Debug="release", RelWithDebInfo="release"}) do
-			for platform,target_platform in pairs({win="windows", linux="linux", }) do
-				configuration { "x64", conf, target_platform }
-					libdirs { path.join(ROOT_DIR, "./external/" .. lib .. "/lib/" .. platform .. "64" .. "_" .. binary_api_dir .. "/" .. conf_dir) }
-					libdirs { path.join(ROOT_DIR, "./external/" .. lib .. "/dll/" .. platform .. "64" .. "_" .. binary_api_dir .. "/" .. conf_dir) }
-			end
+	local use_prebuilt = not os.isdir("../external/_repos/" .. lib)
+	if use_prebuilt then
+		for platform,target_platform in pairs({win="windows", linux="linux", }) do
+			configuration { "x64", target_platform }
+				libdirs { path.join(ROOT_DIR, "./external/" .. lib .. "/lib/" .. platform) }
+				libdirs { path.join(ROOT_DIR, "./external/" .. lib .. "/dll/" .. platform) }
 		end
-	--end
-	configuration {}
+		configuration {}
+	end
 end
 
 function useLua()
@@ -595,7 +572,6 @@ if plugin "renderer" then
 	end
 
 	linkLib "freetype"
-	linkOpenGL()
 	useLua()
 
 	configuration { "linux" }
@@ -632,27 +608,42 @@ if plugin "audio" then
 end
 
 if plugin "navigation" then
-	excludes { 
+	files {
+		"../src/navigation/**.h",
+		"../src/navigation/**.cpp",
+		"../external/recast/src/**.cpp",
+		"../external/recast/include/**.h"
+	}
+
+	-- use unity build for recast
+	excludes {
+		"../external/recast/src/DetourAlloc.cpp",
+		"../external/recast/src/DetourAssert.cpp",
+		"../external/recast/src/DetourCommon.cpp",
 		"../external/recast/src/DetourCrowd.cpp",
 		"../external/recast/src/DetourLocalBoundary.cpp",
+		"../external/recast/src/DetourNavMesh.cpp",
+		"../external/recast/src/DetourNavMeshBuilder.cpp",
+		"../external/recast/src/DetourNavMeshQuery.cpp",
+		"../external/recast/src/DetourNode.cpp",
 		"../external/recast/src/DetourObstacleAvoidance.cpp",
 		"../external/recast/src/DetourPathCorridor.cpp",
 		"../external/recast/src/DetourPathQueue.cpp",
 		"../external/recast/src/DetourProximityGrid.cpp",
+		"../external/recast/src/Recast.cpp",
+		"../external/recast/src/RecastAlloc.cpp",
+		"../external/recast/src/RecastArea.cpp",
+		"../external/recast/src/RecastAssert.cpp",
+		"../external/recast/src/RecastFilter.cpp",
+		"../external/recast/src/RecastLayers.cpp",
+		"../external/recast/src/RecastMesh.cpp",
+		"../external/recast/src/RecastRasterization.cpp",
+		"../external/recast/src/RecastRegion.cpp",
+		-- don't include following files in unity build because they have conflicting symbols with RecastMesh.cpp and each other
+		--"../external/recast/src/RecastContour.cpp",
+		--"../external/recast/src/RecastMeshDetail.cpp",
 	}
 
-	if force_build_recast then
-		files { "3rdparty/recast/Recast/Source/**.cpp"
-			, "3rdparty/recast/Recast/Include/**.h"
-			,"3rdparty/recast/Detour/Source/**.cpp"
-			, "3rdparty/recast/Detour/Include/**.h"
-		}
-		includedirs { "3rdparty/recast/Recast/Include" }
-	else		
-		linkLib "recast"
-	end
-
-	files { "../src/navigation/**.h", "../src/navigation/**.cpp", "../external/recast/src/**.cpp" }
 	includedirs { "../src", "../src/navigation", "../external/recast/include" }
 	links { "core", "engine", "renderer" }
 	linkEditor()
@@ -734,9 +725,6 @@ if build_app then
 		end
 
 		if not dynamic_plugins then	
-			if has_plugin("renderer") then
-				linkOpenGL()
-			end
 			if has_plugin("physics") then
 				linkPhysX()
 			end
@@ -750,9 +738,6 @@ if build_app then
 				linkLib "basisu"
 			end
 			linkLib "freetype"
-			if not force_build_recast then
-				linkLib "recast"
-			end
 			
 			configuration { "vs*" }
 				links { "psapi", "dxguid", "winmm" }
@@ -766,10 +751,6 @@ if build_app then
 			linkLib "basisu"
 		end
 		
-		if not force_build_recast then
-			linkLib "recast"
-		end
-
 		configuration { "windows" }
 			kind "WindowedApp"
 			libdirs { path.join(ROOT_DIR, "./external/pix/bin/x64") }
@@ -859,8 +840,6 @@ if build_studio then
 			linkLib "freetype"
 			useLua()
 			if use_basisu then linkLib "basisu" end
-			if not force_build_recast then linkLib "recast" end
-			if has_plugin "renderer" then linkOpenGL() end
 			if has_plugin "physics" then linkPhysX() end
 
 			configuration { "linux" }
@@ -916,69 +895,68 @@ if force_build_physx == true then
 	end
 end
 
-if force_build_freetype then
-	if os.isdir("3rdparty/freetype") then
-		project "freetype"
-			kind "StaticLib"
-			files { --"3rdparty/freetype/src/**.c", "3rdparty/freetype/include/**.h", 
-			"3rdparty/freetype/src/autofit/autofit.c",
-			"3rdparty/freetype/src/base/ftbase.c",
-			"3rdparty/freetype/src/base/ftbbox.c",
-			"3rdparty/freetype/src/base/ftbdf.c",
-			"3rdparty/freetype/src/base/ftbitmap.c",
-			"3rdparty/freetype/src/base/ftcid.c",
-			"3rdparty/freetype/src/base/ftfstype.c",
-			"3rdparty/freetype/src/base/ftgasp.c",
-			"3rdparty/freetype/src/base/ftglyph.c",
-			"3rdparty/freetype/src/base/ftgxval.c",
-			"3rdparty/freetype/src/base/ftinit.c",
-			"3rdparty/freetype/src/base/ftmm.c",
-			"3rdparty/freetype/src/base/ftotval.c",
-			"3rdparty/freetype/src/base/ftpatent.c",
-			"3rdparty/freetype/src/base/ftpfr.c",
-			"3rdparty/freetype/src/base/ftstroke.c",
-			"3rdparty/freetype/src/base/ftsynth.c",
-			"3rdparty/freetype/src/base/ftsystem.c",
-			"3rdparty/freetype/src/base/fttype1.c",
-			"3rdparty/freetype/src/base/ftwinfnt.c",
-			"3rdparty/freetype/src/bdf/bdf.c",
-			"3rdparty/freetype/src/cache/ftcache.c",
-			"3rdparty/freetype/src/cff/cff.c",
-			"3rdparty/freetype/src/cid/type1cid.c",
-			"3rdparty/freetype/src/gzip/ftgzip.c",
-			"3rdparty/freetype/src/lzw/ftlzw.c",
-			"3rdparty/freetype/src/pcf/pcf.c",
-			"3rdparty/freetype/src/pfr/pfr.c",
-			"3rdparty/freetype/src/psaux/psaux.c",
-			"3rdparty/freetype/src/pshinter/pshinter.c",
-			"3rdparty/freetype/src/psnames/psmodule.c",
-			"3rdparty/freetype/src/raster/raster.c",
-			"3rdparty/freetype/src/sfnt/sfnt.c",
-			"3rdparty/freetype/src/smooth/smooth.c",
-			"3rdparty/freetype/src/truetype/truetype.c",
-			"3rdparty/freetype/src/type1/type1.c",
-			"3rdparty/freetype/src/type42/type42.c",
-			"3rdparty/freetype/src/winfonts/winfnt.c",
-			"3rdparty/freetype/builds/windows/ftdebug.c"
+if os.isdir("../external/_repos/freetype") then
+	printf("Using FreeType from external/_repos/freetype (build from source code)")
+	project "freetype"
+		kind "StaticLib"
+		files {
+			"../external/_repos/freetype/src/autofit/autofit.c",
+			"../external/_repos/freetype/src/base/ftbase.c",
+			"../external/_repos/freetype/src/base/ftbbox.c",
+			"../external/_repos/freetype/src/base/ftbdf.c",
+			"../external/_repos/freetype/src/base/ftbitmap.c",
+			"../external/_repos/freetype/src/base/ftcid.c",
+			"../external/_repos/freetype/src/base/ftfstype.c",
+			"../external/_repos/freetype/src/base/ftgasp.c",
+			"../external/_repos/freetype/src/base/ftglyph.c",
+			"../external/_repos/freetype/src/base/ftgxval.c",
+			"../external/_repos/freetype/src/base/ftinit.c",
+			"../external/_repos/freetype/src/base/ftmm.c",
+			"../external/_repos/freetype/src/base/ftotval.c",
+			"../external/_repos/freetype/src/base/ftpatent.c",
+			"../external/_repos/freetype/src/base/ftpfr.c",
+			"../external/_repos/freetype/src/base/ftstroke.c",
+			"../external/_repos/freetype/src/base/ftsynth.c",
+			"../external/_repos/freetype/src/base/ftsystem.c",
+			"../external/_repos/freetype/src/base/fttype1.c",
+			"../external/_repos/freetype/src/base/ftwinfnt.c",
+			"../external/_repos/freetype/src/bdf/bdf.c",
+			"../external/_repos/freetype/src/cache/ftcache.c",
+			"../external/_repos/freetype/src/cff/cff.c",
+			"../external/_repos/freetype/src/cid/type1cid.c",
+			"../external/_repos/freetype/src/gzip/ftgzip.c",
+			"../external/_repos/freetype/src/lzw/ftlzw.c",
+			"../external/_repos/freetype/src/pcf/pcf.c",
+			"../external/_repos/freetype/src/pfr/pfr.c",
+			"../external/_repos/freetype/src/psaux/psaux.c",
+			"../external/_repos/freetype/src/pshinter/pshinter.c",
+			"../external/_repos/freetype/src/psnames/psmodule.c",
+			"../external/_repos/freetype/src/raster/raster.c",
+			"../external/_repos/freetype/src/sfnt/sfnt.c",
+			"../external/_repos/freetype/src/smooth/smooth.c",
+			"../external/_repos/freetype/src/truetype/truetype.c",
+			"../external/_repos/freetype/src/type1/type1.c",
+			"../external/_repos/freetype/src/type42/type42.c",
+			"../external/_repos/freetype/src/winfonts/winfnt.c",
+			"../external/_repos/freetype/builds/windows/ftdebug.c"
 		}
-			includedirs { "3rdparty/freetype/include" }
-			defines { "NDEBUG", "FT2_BUILD_LIBRARY", "_CRT_SECURE_NO_WARNINGS" }
-			flags { "OptimizeSize", "ReleaseRuntime", "MinimumWarnings" }
-			targetname "freetype"
-			targetprefix ""
-			targetextension ".lib"
-			
-			configuration { "linux" }
+		includedirs { "../external/_repos/freetype/include" }
+		defines { "NDEBUG", "FT2_BUILD_LIBRARY", "_CRT_SECURE_NO_WARNINGS" }
+		flags { "ReleaseRuntime", "MinimumWarnings" }
+		targetname "freetype"
+		
+		-- TODO release/debug target dirs
+		configuration { "linux" }
 			targetdir "../external/freetype/lib/linux"
-			
-			configuration { "windows" }
-				buildoptions { "/wd4312"}
-				targetdir "../external/freetype/lib/win"
-	else
-		printf("--force-build-freetype used but FreeType source code not found")
-	end
-end
+		
+		configuration { "windows" }
+			buildoptions { "/wd4312"}
+			targetdir "../external/freetype/lib/win"
 
+		defaultConfigurations()
+else
+	printf("Using FreeType from external/freetype (prebuilt)")
+end
 
 if force_build_luau == true then
 	if os.isdir("3rdparty/luau") then
@@ -1026,7 +1004,7 @@ if force_build_luau == true then
 
 			configuration { "windows" }
 				targetdir "../external/luau/lib/win"
-				defines { 
+				defines {
 					"_CRT_SECURE_NO_WARNINGS",
 					"LUA_API=__declspec(dllexport)",
 					"LUACODE_API=__declspec(dllexport)"
