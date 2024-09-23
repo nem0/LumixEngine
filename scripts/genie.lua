@@ -118,6 +118,9 @@ local use_basisu =  _OPTIONS["with-basis-universal"]
 local dynamic_plugins = _OPTIONS["dynamic-plugins"]
 local build_luau = os.isdir("../external/_repos/luau")
 
+if luau_dynamic and not build_luau then
+	printf("Luau source code not found, can't build Luau as dynamic library.")
+end
 
 local plugins = {}
 local base_plugins = {}
@@ -263,7 +266,7 @@ function defaultConfigurations()
 		
 	configuration {}
 		files {
-			path.join(ROOT_DIR, "scripts/lumix.natvis"),
+			path.join(ROOT_DIR, "src/lumix.natvis"),
 			path.join(ROOT_DIR, ".editorconfig")
 		}
 		defines { "_ITERATOR_DEBUG_LEVEL=0", "STBI_NO_STDIO" }

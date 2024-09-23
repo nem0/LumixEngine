@@ -24,11 +24,10 @@ setlocal
 	echo   3. Run Studio
 	echo   4. Open in VS
 	echo   5. Create bundle
-	echo   6. Open live help / discord chat
-	echo   7. 3rd party
-	echo   8. Plugins
+	echo   6. 3rd party
+	echo   7. Plugins
 	echo ===============================
-	choice /C 12345678 /N /M "Your choice:"
+	choice /C 1234567 /N /M "Your choice:"
 	echo.
 
 	if %errorlevel%==1 (
@@ -39,9 +38,8 @@ setlocal
 	if %errorlevel%==3 call :run_studio
 	if %errorlevel%==4 call :open_in_vs
 	if %errorlevel%==5 call :create_bundle
-	if %errorlevel%==6 call :open_discord
-	if %errorlevel%==7 call :third_party
-	if %errorlevel%==8 call :plugins
+	if %errorlevel%==6 call :third_party
+	if %errorlevel%==7 call :plugins
 goto :begin
 
 :plugins
@@ -494,9 +492,3 @@ exit /B 0
 	)
 	popd
 exit /B 0
-
-:open_discord
-	start "" "https://discord.gg/RgFybs6"
-	pause
-exit /B 0
-
