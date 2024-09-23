@@ -1,6 +1,7 @@
 @echo off
 
 REM This script downloads the FreeType2 source code from the official repository
+REM GENie automatically detects FreeType2 source code and uses it instead of the prebuilt version
 
 setlocal 
 	
