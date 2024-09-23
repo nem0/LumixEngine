@@ -84,13 +84,8 @@ newoption {
 }
 
 newoption {
-	trigger = "force-build-luau",
-	description = "Add Luau project to solution. Do not use the prebuilt library."
-}
-
-newoption {
-	trigger = "force-build-luau-dynamic",
-	description = "Add Luau project to solution. Do not use the prebuilt library. Build luau as dynamic library"
+	trigger = "luau-dynamic",
+	description = "Build luau as dynamic library. Only valid if Luau source code is available."
 }
 
 newoption {
@@ -117,11 +112,12 @@ local embed_resources = _OPTIONS["embed-resources"]
 local working_dir = _OPTIONS["working-dir"]
 local debug_args = _OPTIONS["debug-args"]
 local release_args = _OPTIONS["release-args"]
-local force_build_luau = _OPTIONS["force-build-luau"]
-local force_build_luau_dynamic = _OPTIONS["force-build-luau-dynamic"]
+local luau_dynamic = _OPTIONS["luau-dynamic"]
 local force_build_physx = _OPTIONS["force-build-physx"]
 local use_basisu =  _OPTIONS["with-basis-universal"]
 local dynamic_plugins = _OPTIONS["dynamic-plugins"]
+local build_luau = os.isdir("../external/_repos/luau")
+
 
 local plugins = {}
 local base_plugins = {}
@@ -663,7 +659,7 @@ if plugin "gui" then
 end
 	
 if plugin "lua_script" then
-	if force_build_luau and not force_build_luau_dynamic then
+	if build_luau and not luau_dynamic then
 		defines { "LUMIX_STATIC_LUAU" }
 	end
 
@@ -861,7 +857,7 @@ if build_studio then
 			callback()
 		end
 		
-		if not force_build_luau or force_build_luau_dynamic then
+		if not build_luau or luau_dynamic then
 			configuration { "windows" }
 				files { "../external/luau/lib/win/Luau.dll" }
 				copy { "../external/luau/lib/win/Luau.dll" }
@@ -958,68 +954,67 @@ else
 	printf("Using FreeType from external/freetype (prebuilt)")
 end
 
-if force_build_luau == true then
-	if os.isdir("3rdparty/luau") then
-		project "Luau"
-			if force_build_luau_dynamic == true then
-				kind "SharedLib"
-			else
-				kind "StaticLib"
-			end
-			files { "3rdparty/luau/Ast/src/**.cpp"
-				, "3rdparty/luau/Ast/src/**.h"
-				, "3rdparty/luau/CodeGen/src/**.cpp"
-				, "3rdparty/luau/CodeGen/src/**.h"
-				, "3rdparty/luau/Compiler/src/**.cpp"
-				, "3rdparty/luau/Compiler/src/**.h"
-				, "3rdparty/luau/VM/src/**.cpp"
-				, "3rdparty/luau/VM/src/**.h"
-			}
-
-			if not force_build_luau_dynamic then
-				files { "3rdparty/luau/Analysis/src/**.cpp"
-					, "3rdparty/luau/Analysis/src/**.h"
-					, "3rdparty/luau/Config/src/**.cpp"
-					, "3rdparty/luau/Config/src/**.h"
-				}
-
-				includedirs { "3rdparty/luau/Analysis/include/" 
-					, "3rdparty/luau/Config/include/"
-				}
-			end
-
-			includedirs { "3rdparty/luau/Ast/include/"
-				, "3rdparty/luau/CodeGen/include/"
-				, "3rdparty/luau/Common/include/"
-				, "3rdparty/luau/Compiler/include/"
-				, "3rdparty/luau/VM/include/"
-				, "3rdparty/luau/VM/src/"
-			}
-
-			removeflags { "NoExceptions", "NoRTTI" }
-			flags { "OptimizeSize", "ReleaseRuntime" }
-
-			configuration { "linux"}
-				targetdir "../external/luau/lib/linux"
-
-			configuration { "windows" }
-				targetdir "../external/luau/lib/win"
-				defines {
-					"_CRT_SECURE_NO_WARNINGS",
-					"LUA_API=__declspec(dllexport)",
-					"LUACODE_API=__declspec(dllexport)"
-				}
-			configuration {}
-
-		if not force_build_luau_dynamic then
-			solution "LumixEngine"
-				configuration { "vs20*" }
-				defines { "LUMIX_LUAU_ANALYSIS" }
-				configuration {}
+if build_luau then
+	printf("Using Luau from external/_repos/luau (build from source code)")
+	project "Luau"
+		if luau_dynamic then
+			kind "SharedLib"
+		else
+			kind "StaticLib"
 		end
-	else	
-		printf("--force-build-luau used but Luau source code not found")
+		files { "../external/_repos/luau/Ast/src/**.cpp"
+			, "../external/_repos/luau/Ast/src/**.h"
+			, "../external/_repos/luau/CodeGen/src/**.cpp"
+			, "../external/_repos/luau/CodeGen/src/**.h"
+			, "../external/_repos/luau/Compiler/src/**.cpp"
+			, "../external/_repos/luau/Compiler/src/**.h"
+			, "../external/_repos/luau/VM/src/**.cpp"
+			, "../external/_repos/luau/VM/src/**.h"
+		}
+
+		if not luau_dynamic then
+			files { "../external/_repos/luau/Analysis/src/**.cpp"
+				, "../external/_repos/luau/Analysis/src/**.h"
+				, "../external/_repos/luau/Config/src/**.cpp"
+				, "../external/_repos/luau/Config/src/**.h"
+			}
+
+			includedirs { "../external/_repos/luau/Analysis/include/" 
+				, "../external/_repos/luau/Config/include/"
+			}
+		end
+
+		includedirs { "../external/_repos/luau/Ast/include/"
+			, "../external/_repos/luau/CodeGen/include/"
+			, "../external/_repos/luau/Common/include/"
+			, "../external/_repos/luau/Compiler/include/"
+			, "../external/_repos/luau/VM/include/"
+			, "../external/_repos/luau/VM/src/"
+		}
+
+		removeflags { "NoExceptions", "NoRTTI" }
+		flags { "OptimizeSize", "ReleaseRuntime" }
+
+		configuration { "linux"}
+			targetdir "../external/luau/lib/linux"
+
+		configuration { "windows" }
+			targetdir "../external/luau/lib/win"
+			defines {
+				"_CRT_SECURE_NO_WARNINGS",
+				"LUA_API=__declspec(dllexport)",
+				"LUACODE_API=__declspec(dllexport)"
+			}
+		configuration {}
+
+	if not luau_dynamic then
+		solution "LumixEngine"
+			configuration { "vs20*" }
+			defines { "LUMIX_LUAU_ANALYSIS" }
+			configuration {}
 	end
+else	
+	printf("Using Luau from external/luau (prebuilt)")
 end
 
 for _, plugin in ipairs(base_plugins) do

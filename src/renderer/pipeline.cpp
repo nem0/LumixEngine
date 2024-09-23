@@ -33,6 +33,7 @@
 #include "terrain.h"
 #include "texture.h"
 
+// TODO decal disappear when camera is inside the decal volume
 // TODO vsync
 // TODO env probe lighting is off
 // TODO temporal upsample
