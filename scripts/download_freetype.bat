@@ -3,8 +3,6 @@
 REM This script downloads the FreeType2 source code from the official repository
 REM GENie automatically detects FreeType2 source code and uses it instead of the prebuilt version
 
-setlocal 
-	
 setlocal
 	set dir_3rdparty_src="..\external\_repos\"
 
