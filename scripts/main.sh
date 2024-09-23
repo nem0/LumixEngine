@@ -31,8 +31,6 @@ download_plugin()
 	cd ../scripts
 }
 
-
-
 build_recast()
 {
 	./genie --file=recastnavigation.lua gmake

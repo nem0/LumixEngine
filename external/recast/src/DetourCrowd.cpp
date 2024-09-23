@@ -1403,6 +1403,7 @@ m_velocitySampleCount += ns;
 void dtCrowd::doMove(float dt)
 {
 	int nagents = m_numActiveAgents;
+	dtCrowdAgent** agents = m_activeAgents;
 	for (int i = 0; i < nagents; ++i)
 	{
 		dtCrowdAgent* ag = m_activeAgents[i];
