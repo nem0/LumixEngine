@@ -3,8 +3,6 @@
 REM This script downloads the Luau source code from the official repository
 REM GENie automatically detects Luau source code and uses it instead of the prebuilt version
 
-setlocal 
-	
 setlocal
 	set dir_3rdparty_src="..\external\_repos\"
 
@@ -16,7 +14,6 @@ pushd %~dp0
 	) else (
 		cd luau
 		git pull
-		cd ..
 	)
 	popd
 popd
