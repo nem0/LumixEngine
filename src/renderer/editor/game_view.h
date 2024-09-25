@@ -17,7 +17,7 @@ struct PlatformData;
 struct RenderModule;
 struct StudioApp;
 
-struct GameView : StudioApp::GUIPlugin {
+struct LUMIX_RENDERER_API GameView : StudioApp::GUIPlugin {
 	friend struct GUIInterface;
 
 	explicit GameView(StudioApp& app);

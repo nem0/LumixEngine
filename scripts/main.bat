@@ -278,30 +278,13 @@ exit /B 0
 	echo Wut2?
 	echo ===============================
 	echo  1. Go back
-	echo  2. PhysX
-	echo  3. Download Luau
-	echo  4. Basis Universal
+	echo  2. Basis Universal
 	echo ===============================
-	choice /C 1234 /N /M "Your choice:"
+	choice /C 123 /N /M "Your choice:"
 	echo.
 	if %errorlevel%==1 exit /B 0
-	if %errorlevel%==2 call :physx
-	if %errorlevel%==3 call :download_luau
-	if %errorlevel%==4 call :basisu
+	if %errorlevel%==2 call :basisu
 goto :third_party
-
-:download_luau
-	if not exist %dir_3rdparty_src% mkdir %dir_3rdparty_src%
-	pushd 3rdparty
-	if not exist luau (
-		git.exe clone https://github.com/nem0/Luau.git luau
-	) else (
-		cd luau
-		git pull
-		cd ..
-	)
-	podp
-exit /B 0
 
 :basisu
 	cls
@@ -337,87 +320,6 @@ exit /B 0
 	del /Q ..\external\basisu\include\*
 	xcopy /E /Y "3rdparty\basisu\transcoder\*.h" ..\external\basisu\include\transcoder
 	xcopy /E /Y "3rdparty\basisu\encoder\*.h" ..\external\basisu\include\encoder
-exit /B 0
-
-:physx
-	cls
-	echo PhysX
-	echo ===============================
-	echo  1. Go back
-	echo  2. Download
-	if exist "3rdparty\PhysX\" (
-		echo  3. Build
-		echo  4. Build and deploy static
-		echo  5. Deploy
-		echo  6. Open in VS
-	)
-	echo ===============================
-	choice /C 123456 /N /M "Your choice:"
-	echo.
-	if %errorlevel%==1 exit /B 0
-	if %errorlevel%==2 call :download_physx
-	if %errorlevel%==3 call :build_physx
-	if %errorlevel%==4 call :build_deploy_physx_static
-	if %errorlevel%==5 call :deploy_physx
-	if %errorlevel%==6 start "" %devenv_cmd% "3rdparty\PhysX\physx\compiler\vc15win64\PhysXSDK.sln"
-	pause
-goto :physx
-
-:deploy_physx
-	REM lib
-	del /Q ..\external\physx\lib\vs2017\win64\release\*
-	copy 3rdparty\PhysX\physx\compiler\vc15win64\sdk_source_bin\FastXml.dir\release\FastXml.lib ..\external\physx\lib\vs2017\win64\release\FastXml_static_64.lib 
-	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\LowLevelAABB_static_64.lib ..\external\physx\lib\vs2017\win64\release\
-	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\LowLevelDynamics_static_64.lib ..\external\physx\lib\vs2017\win64\release\
-	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\LowLevel_static_64.lib ..\external\physx\lib\vs2017\win64\release\
-	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXCharacterKinematic_static_64.lib ..\external\physx\lib\vs2017\win64\release\
-	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXCommon_64.lib ..\external\physx\lib\vs2017\win64\release\
-	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXCooking_64.lib ..\external\physx\lib\vs2017\win64\release\
-	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXExtensions_static_64.lib ..\external\physx\lib\vs2017\win64\release\
-	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXFoundation_64.lib ..\external\physx\lib\vs2017\win64\release\
-	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXPvdSDK_static_64.lib ..\external\physx\lib\vs2017\win64\release\
-	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXTask_static_64.lib ..\external\physx\lib\vs2017\win64\release\
-	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXVehicle_static_64.lib ..\external\physx\lib\vs2017\win64\release\
-	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysX_64.lib ..\external\physx\lib\vs2017\win64\release\
-	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\SceneQuery_static_64.lib ..\external\physx\lib\vs2017\win64\release\
-	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\SimulationController_static_64.lib ..\external\physx\lib\vs2017\win64\release\
-	REM include
-	for /D %%e in (..\external\physx\include\*) do rmdir /Q /S %%e
-	del /Q ..\external\physx\include\*
-	xcopy /E /Y 3rdparty\PhysX\physx\include\* ..\external\physx\include\
-	xcopy /E /Y 3rdparty\PhysX\pxshared\include\* ..\external\physx\include\
-	REM dll
-	del /Q ..\external\physx\dll\vs2017\win64\release\*
-	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXCommon_64.dll ..\external\physx\dll\vs2017\win64\release\
-	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXCooking_64.dll ..\external\physx\dll\vs2017\win64\release\
-	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXFoundation_64.dll ..\external\physx\dll\vs2017\win64\release\
-	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysX_64.dll ..\external\physx\dll\vs2017\win64\release\
-exit /B 0
-
-:build_physx
-	cd 3rdparty\PhysX\physx
-	call generate_projects.bat lumix_vc15win64
-	%msbuild_cmd% "compiler\vc15win64\PhysXSDK.sln" /p:Configuration=Release /p:Platform=x64
-	cd ..\..\..\
-exit /B 0
-
-:build_deploy_physx_static
-	cd 3rdparty\PhysX\physx
-	call generate_projects.bat lumix_vc16win64_static
-	%msbuild_cmd% "compiler\vc16win64\PhysXSDK.sln" /p:Configuration=Release /p:Platform=x64
-	cd ..\..\..\
-
-	if not exist "..\external\physx\lib\vs2017\win64\release_static\" mkdir ..\external\physx\lib\vs2017\win64\release_static\
-	del /Q ..\external\physx\lib\vs2017\win64\release_static\*
-	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXCharacterKinematic_static_64.lib ..\external\physx\lib\vs2017\win64\release_static\
-	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXCommon_static_64.lib			   ..\external\physx\lib\vs2017\win64\release_static\
-	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXCooking_static_64.lib			   ..\external\physx\lib\vs2017\win64\release_static\
-	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXExtensions_static_64.lib		   ..\external\physx\lib\vs2017\win64\release_static\
-	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXFoundation_static_64.lib		   ..\external\physx\lib\vs2017\win64\release_static\
-	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXPvdSDK_static_64.lib			   ..\external\physx\lib\vs2017\win64\release_static\
-	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXVehicle_static_64.lib			   ..\external\physx\lib\vs2017\win64\release_static\
-	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysX_static_64.lib				   ..\external\physx\lib\vs2017\win64\release_static\
-
 exit /B 0
 
 :create_project
@@ -469,26 +371,3 @@ exit /B 0
 	popd
 exit /B 0
 
-:download_recast
-	if not exist %dir_3rdparty_src% mkdir %dir_3rdparty_src%
-	pushd %dir_3rdparty_src%
-	if not exist recast (
-		git.exe clone --depth=1  https://github.com/nem0/recastnavigation.git recast
-	) else (
-		cd recast
-		git pull
-	)
-	popd
-exit /B 0
-
-:download_physx
-	if not exist %dir_3rdparty_src% mkdir %dir_3rdparty_src%
-	pushd %dir_3rdparty_src%
-	if not exist physx (
-		git.exe clone --depth=1 https://github.com/nem0/PhysX.git physx
-	) else (
-		cd physx
-		git pull
-	)
-	popd
-exit /B 0

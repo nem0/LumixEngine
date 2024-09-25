@@ -44,7 +44,6 @@ Surface getSurface(VSOutput input) {
 		data.alpha = saturate(data.alpha - input.fur_layer);
 	#endif
 
-	
 	data.roughness = sampleBindless(LinearSampler, t_roughness, uv).g * u_roughness;
 	#ifdef HAS_METALLICMAP
 		data.metallic = sampleBindless(LinearSampler, t_metallic, uv).b * u_metallic;

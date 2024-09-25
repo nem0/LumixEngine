@@ -50,7 +50,7 @@ struct CoreModuleImpl : CoreModule {
 		}
 	}
 	
-	i32 getVersion() const { return (i32)CoreModuleVersion::LATEST; }
+	i32 getVersion() const override { return (i32)CoreModuleVersion::LATEST; }
 
 	reflection::Module* findReflectionModule(const char* name) {
 		reflection::Module* module = reflection::getFirstModule();
@@ -140,7 +140,7 @@ struct CoreModuleImpl : CoreModule {
 		CoreModuleImpl* core;
 	};
 
-	void startGame() {
+	void startGame() override {
 		// connect signals
 		m_signal_dispatchers.clear();
 		for (auto iter : m_signals.iterated()) {

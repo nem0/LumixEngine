@@ -13,7 +13,7 @@ template <> struct HashFunc<ComponentType> {
 };
 
 template <> struct HashFunc<EntityRef> {
-	static u32 get(const EntityRef& key) {
+	LUMIX_ENGINE_API static u32 get(const EntityRef& key) {
 		static_assert(sizeof(i32) == sizeof(key.index), "Check this");
 		return HashFunc<i32>::get(key.index);
 	}

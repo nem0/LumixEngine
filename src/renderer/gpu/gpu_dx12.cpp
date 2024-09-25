@@ -32,7 +32,7 @@
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "dxgi.lib")
 
-#ifdef LUMIX_DEBUG
+#if defined LUMIX_DEBUG && !defined __clang__
 	#define USE_PIX
 	#pragma comment(lib, "WinPixEventRuntime.lib")
 	#include "pix3.h"
@@ -1171,7 +1171,7 @@ void Frame::end(ID3D12CommandQueue* cmd_queue, ID3D12GraphicsCommandList* cmd_li
 	cmd_queue->ExecuteCommandLists(1, (ID3D12CommandList* const*)&cmd_list);
 	if (capture_requested) {
 		capture_requested = false;
-		#ifdef LUMIX_DEBUG
+		#ifdef USE_PIX
 			if (PIXIsAttachedForGpuCapture()) PIXEndCapture(FALSE);
 		#endif
 	}
@@ -1853,7 +1853,7 @@ bool init(void* hwnd, InitFlags flags) {
 }
 
 void pushDebugGroup(const char* msg) {
-	#ifdef LUMIX_DEBUG
+	#ifdef USE_PIX
 		if (d3d->debug_groups_depth < lengthOf(d3d->debug_groups_queue)) {
 			d3d->debug_groups_queue[d3d->debug_groups_depth] = msg;
 		}
@@ -1865,7 +1865,7 @@ void pushDebugGroup(const char* msg) {
 }
 
 void popDebugGroup() {
-	#ifdef LUMIX_DEBUG
+	#ifdef USE_PIX
 		--d3d->debug_groups_depth;
 		PIXEndEvent(d3d->cmd_list);
 	#endif

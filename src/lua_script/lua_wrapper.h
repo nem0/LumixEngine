@@ -20,7 +20,7 @@ namespace LuaWrapper {
 
 
 #ifdef LUMIX_DEBUG
-	struct LUMIX_ENGINE_API DebugGuard {
+	struct DebugGuard {
 		DebugGuard(lua_State* L);
 		DebugGuard(lua_State* L, int offset);
 		~DebugGuard();
@@ -30,7 +30,7 @@ namespace LuaWrapper {
 		int top;
 	};
 #else
-	struct LUMIX_ENGINE_API DebugGuard { 
+	struct DebugGuard { 
 		DebugGuard(lua_State* L) {} 
 		DebugGuard(lua_State* L, int offset) {} 
 	};
@@ -54,18 +54,18 @@ struct Optional {
 
 using RefHandle = i32;
 
-LUMIX_ENGINE_API int traceback (lua_State *L);
-LUMIX_ENGINE_API bool pcall(lua_State* L, int nargs, int nres);
-LUMIX_ENGINE_API bool execute(lua_State* L, StringView content, const char* name, int nresults);
-LUMIX_ENGINE_API int getField(lua_State* L, int idx, const char* k);
-LUMIX_ENGINE_API void convertPropertyToLuaName(const char* src, Span<char> out);
+int traceback (lua_State *L);
+bool pcall(lua_State* L, int nargs, int nres);
+bool execute(lua_State* L, StringView content, const char* name, int nresults);
+int getField(lua_State* L, int idx, const char* k);
+void convertPropertyToLuaName(const char* src, Span<char> out);
 
 // create reference to a value on top of stack, so it's not garbage collected and can be easily pushed to stack. Similar to luaL_ref
-LUMIX_ENGINE_API RefHandle createRef(lua_State* L);
+RefHandle createRef(lua_State* L);
 // release the reference, so it can be GCed
-LUMIX_ENGINE_API void releaseRef(lua_State* L, RefHandle ref);
+void releaseRef(lua_State* L, RefHandle ref);
 // push the reference on top of stack
-LUMIX_ENGINE_API void pushRef(lua_State* L, RefHandle ref);
+void pushRef(lua_State* L, RefHandle ref);
 
 // get closure objects passed to `createSystemClosure`
 template <typename T>
@@ -78,8 +78,8 @@ T* getClosureObject(lua_State* L) {
 	return (T*)lua_tolightuserdata(L, upvalue_index);
 }
 
-LUMIX_ENGINE_API int luaL_loadbuffer(lua_State* L, const char* buff, size_t size, const char* name);
-LUMIX_ENGINE_API void pushObject(lua_State* L, void* obj, StringView type_name);
+int luaL_loadbuffer(lua_State* L, const char* buff, size_t size, const char* name);
+void pushObject(lua_State* L, void* obj, StringView type_name);
 
 template <typename T> inline bool isType(lua_State* L, int index)
 {
@@ -581,18 +581,18 @@ template <> inline void push(lua_State* L, void* value)
 	lua_pushlightuserdata(L, value);
 }
 
-LUMIX_ENGINE_API void createSystemVariable(lua_State* L, const char* system, const char* var_name, void* value);
-LUMIX_ENGINE_API void createSystemVariable(lua_State* L, const char* system, const char* var_name, int value);
-LUMIX_ENGINE_API void createSystemFunction(lua_State* L, const char* system, const char* var_name, lua_CFunction fn);
-LUMIX_ENGINE_API void createSystemClosure(lua_State* L, const char* system, void* system_ptr, const char* var_name, lua_CFunction fn);
-LUMIX_ENGINE_API const char* luaTypeToString(int type);
-LUMIX_ENGINE_API void argError(lua_State* L, int index, const char* expected_type);
-LUMIX_ENGINE_API void checkTableArg(lua_State* L, int index);
-LUMIX_ENGINE_API bool getOptionalStringField(lua_State* L, int idx, const char* field_name, Span<char> out);
-LUMIX_ENGINE_API void push(lua_State* L, EntityRef value);
-LUMIX_ENGINE_API bool toEntity(lua_State* L, int idx, World*& world, EntityRef& entity);
-LUMIX_ENGINE_API void pushEntity(lua_State* L, EntityPtr value, World* world);
-LUMIX_ENGINE_API bool checkStringField(lua_State* L, int idx, const char* k, Span<char> out);
+void createSystemVariable(lua_State* L, const char* system, const char* var_name, void* value);
+void createSystemVariable(lua_State* L, const char* system, const char* var_name, int value);
+void createSystemFunction(lua_State* L, const char* system, const char* var_name, lua_CFunction fn);
+void createSystemClosure(lua_State* L, const char* system, void* system_ptr, const char* var_name, lua_CFunction fn);
+const char* luaTypeToString(int type);
+void argError(lua_State* L, int index, const char* expected_type);
+void checkTableArg(lua_State* L, int index);
+bool getOptionalStringField(lua_State* L, int idx, const char* field_name, Span<char> out);
+void push(lua_State* L, EntityRef value);
+bool toEntity(lua_State* L, int idx, World*& world, EntityRef& entity);
+void pushEntity(lua_State* L, EntityPtr value, World* world);
+bool checkStringField(lua_State* L, int idx, const char* k, Span<char> out);
 
 template <typename T> inline void setField(lua_State* L, int table_idx, const char* name, T value)
 {
