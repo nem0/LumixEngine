@@ -160,6 +160,10 @@ local plugin_creators = {}
 build_studio_callbacks = {}
 build_app_callbacks = {}
 
+-- TODO remove this once bindless branch is merged (plugins use this)
+function useLua()
+end
+
 function hasPlugin(plugin)
 	for _, v in ipairs(plugins) do
     if v == plugin then
