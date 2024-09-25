@@ -866,7 +866,7 @@ struct CodeEditorImpl final : CodeEditor {
 		if (ensure_visibility) ensurePointVisible(m_cursors[0], true);
 	}
 	
-	void setReadOnly(bool readonly) {
+	void setReadOnly(bool readonly) override {
 		m_is_readonly = readonly;
 	}
 

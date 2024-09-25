@@ -1037,7 +1037,7 @@ template <typename F> void forEachProperty(ComponentType cmp_type, const F& f) {
 			parent = nullptr;
 		}
 		void visit(const struct BlobProperty& prop) override { f(prop, parent); }
-		void visit(const DynamicProperties& prop) { f(prop, parent); }
+		void visit(const DynamicProperties& prop) override { f(prop, parent); }
 		const F& f;
 		const ArrayProperty* parent = nullptr;
 	};

@@ -89,11 +89,6 @@ newoption {
 }
 
 newoption {
-	trigger = "force-build-physx",
-	description = "Add PhysX project to solution. Do not use the prebuilt library."
-}
-
-newoption {
 	trigger = "gcc",
 	value = "GCC",
 	description = "Choose GCC flavor",
@@ -113,10 +108,10 @@ local working_dir = _OPTIONS["working-dir"]
 local debug_args = _OPTIONS["debug-args"]
 local release_args = _OPTIONS["release-args"]
 local luau_dynamic = _OPTIONS["luau-dynamic"]
-local force_build_physx = _OPTIONS["force-build-physx"]
 local use_basisu =  _OPTIONS["with-basis-universal"]
 local dynamic_plugins = _OPTIONS["dynamic-plugins"]
 local build_luau = os.isdir("../external/_repos/luau")
+local build_physx = os.isdir("../external/_repos/physx")
 
 if luau_dynamic and not build_luau then
 	printf("Luau source code not found, can't build Luau as dynamic library.")
@@ -141,62 +136,31 @@ for	_, v in ipairs { "physics", "renderer", "audio", "gui", "animation", "naviga
 	end
 end
 
-local LOCATION = "tmp/"
-if _ACTION == nil then
-	LOCATION = LOCATION .. "vs2019"
-	binary_api_dir = "vs2017"
-elseif "linux-gcc" == _OPTIONS["gcc"] then
-	LOCATION = LOCATION .. "gcc"
-	binary_api_dir = "gmake"
-elseif "linux-gcc-5" == _OPTIONS["gcc"] then
-	LOCATION = LOCATION .. "gcc"
-	binary_api_dir = "gmake"
-elseif "linux-clang" == _OPTIONS["gcc"] then
-	LOCATION = LOCATION .. "clang"
-	binary_api_dir = "gmake"
-else
-	LOCATION = LOCATION .. _ACTION
-	binary_api_dir = iif(_ACTION == "vs2022" or _ACTION == "vs2019" or _ACTION == "vs2017", "vs2017", "gmake")
-end
-
 if _ACTION == "gmake" or _ACTION == "ninja" then
-	if "linux-gcc" == _OPTIONS["gcc"] then
-		LOCATION = "tmp/gcc"
-
-	elseif "linux-gcc-5" == _OPTIONS["gcc"] then
+	if "linux-gcc-5" == _OPTIONS["gcc"] then
 		premake.gcc.cc  = "gcc-5"
 		premake.gcc.cxx = "g++-5"
 		premake.gcc.ar  = "ar"
-		LOCATION = "tmp/gcc5"
 		
 	elseif "linux-clang" == _OPTIONS["gcc"] then
 		premake.gcc.cc  = "clang"
 		premake.gcc.cxx = "clang++"
 		premake.gcc.ar  = "ar"
-		LOCATION = LOCATION .. "_clang"
 
 	elseif "windows-clang" == _OPTIONS["gcc"] then
 		premake.gcc.cc  = "clang"
 		premake.gcc.cxx = "clang++"
 		premake.gcc.ar  = "llvm-ar"
-		LOCATION = LOCATION .. "_clang"
 	end
-	BINARY_DIR = LOCATION .. "/bin/"
 end
 
-local ROOT_DIR = path.getabsolute("../")
+local LOCATION = "tmp/" .. _ACTION
 local BINARY_DIR = LOCATION .. "/bin/"
 local plugin_creators = {}
 build_studio_callbacks = {}
 build_app_callbacks = {}
 
-function linkEditor()
-	if build_studio then
-		links { "editor" }
-	end
-end
-
-function has_plugin(plugin)
+function hasPlugin(plugin)
 	for _, v in ipairs(plugins) do
     if v == plugin then
       return true
@@ -206,7 +170,7 @@ function has_plugin(plugin)
 end
 
 function plugin(plugin_name)
-	if not has_plugin(plugin_name) then return false end
+	if not hasPlugin(plugin_name) then return false end
 
 	if build_studio then
 		project "studio"
@@ -219,6 +183,11 @@ function plugin(plugin_name)
 	end
 	project(plugin_name)
 	libType()
+
+	if build_studio then
+		links { "editor" }
+	end
+
 	defaultConfigurations()
 	return true
 end
@@ -266,8 +235,8 @@ function defaultConfigurations()
 		
 	configuration {}
 		files {
-			path.join(ROOT_DIR, "src/lumix.natvis"),
-			path.join(ROOT_DIR, ".editorconfig")
+			"../src/lumix.natvis",
+			".editorconfig"
 		}
 		defines { "_ITERATOR_DEBUG_LEVEL=0", "STBI_NO_STDIO" }
 		flags { "FullSymbols" } -- VS can't set brekpoints from time to time, only rebuilding several times or using FullSymbols helps
@@ -280,38 +249,24 @@ function linkLib(lib)
 	if use_prebuilt then
 		for platform,target_platform in pairs({win="windows", linux="linux", }) do
 			configuration { "x64", target_platform }
-				libdirs { path.join(ROOT_DIR, "./external/" .. lib .. "/lib/" .. platform) }
-				libdirs { path.join(ROOT_DIR, "./external/" .. lib .. "/dll/" .. platform) }
+				libdirs { "../external/" .. lib .. "/lib/" .. platform }
+				libdirs { "../external/" .. lib .. "/dll/" .. platform }
 		end
 		configuration {}
 	end
 end
 
-function useLua()
-	configuration { "vs20*" }
-		libdirs {  path.join(ROOT_DIR, "./external/luau/lib/win") }
-		links "Luau"
-
-	configuration { "linux" }
-		libdirs {  path.join(ROOT_DIR, "./external/luau/lib/linux") }
-		links "Luau"
-
-	configuration {}
-	
-	includedirs { path.join(ROOT_DIR, "./external/luau/include") }
-end
-
 function libType()
-	if not dynamic_plugins then
-		kind "StaticLib"
-	else
+	if dynamic_plugins then
 		kind "SharedLib"
+	else
+		kind "StaticLib"
 	end
 end
 
 function linkPhysX()
-	if has_plugin("physics") then
-		if force_build_physx then
+	if hasPlugin("physics") then
+		if build_physx then
 			configuration { "vs20*" }
 				links { "PhysX" }
 				defines { "PX_PHYSX_STATIC_LIB", "PX_PHYSX_CHARACTER_STATIC_LIB" }
@@ -465,8 +420,7 @@ project "engine"
 	defines { "BUILDING_ENGINE" }
 	links { "core" }
 	defaultConfigurations()
-	useLua()
-	includedirs { "../src", "../external/luau/include", "../external/freetype/include" }
+	includedirs { "../src", "../external/freetype/include" }
 
 	if dynamic_plugins then
 		linkLib "freetype"
@@ -497,7 +451,7 @@ project "engine"
 		buildoptions { "`pkg-config --cflags gtk+-3.0`" }
 
 if plugin "physics" then
-	if force_build_physx then
+	if build_physx then
 		defines { "LUMIX_STATIC_PHYSX" }
 	else
 		configuration { "vs*" }
@@ -517,8 +471,6 @@ if plugin "physics" then
 	includedirs { "../external/physx/include/" }
 	defines { "BUILDING_PHYSICS" }
 	links { "core", "engine", "renderer" }
-	linkEditor()
-	useLua()
 	linkPhysX()
 end
 
@@ -559,25 +511,20 @@ if plugin "renderer" then
 	includedirs { "../src", "../external/freetype/include", "../external/", "../external/dx12/", "../external/pix/include/WinPixEventRuntime" }
 	
 	defines { "BUILDING_RENDERER" }
+	libdirs { "../external/pix/bin/x64" }
 	links { "core", "engine" }
 
-	if _OPTIONS["no-lua-script"] == nil then
-		links { "lua_script" }
-	end
-
-	linkEditor()
 	if build_studio and use_basisu then
 		linkLib "basisu"
 	end
 
 	linkLib "freetype"
-	useLua()
 
 	configuration { "linux" }
 		links { "GL", "X11", "Xi" }
 	
 	configuration { "windows" }
-		links { "psapi" }
+		links { "psapi", "dxguid" }
 end
 		
 if plugin "animation" then
@@ -585,8 +532,6 @@ if plugin "animation" then
 	includedirs { "../src" }
 	defines { "BUILDING_ANIMATION" }
 	links { "core", "engine", "renderer" }
-	linkEditor()
-	useLua()
 end
 
 if plugin "audio" then
@@ -599,8 +544,6 @@ if plugin "audio" then
 	includedirs { "../src", "../src/audio" }
 	defines { "BUILDING_AUDIO" }
 	links { "core", "engine" }
-	linkEditor()
-	useLua()
 
 	configuration "windows"
 		links { "dxguid" }
@@ -645,16 +588,12 @@ if plugin "navigation" then
 
 	includedirs { "../src", "../src/navigation", "../external/recast/include" }
 	links { "core", "engine", "renderer" }
-	linkEditor()
-	useLua()
 end
 
 if plugin "gui" then
 	files { "../src/gui/**.h", "../src/gui/**.cpp" }
 	includedirs { "../src", "../src/gui" }
 	links { "core", "engine", "renderer" }
-	linkEditor()
-	useLua()
 	defines { "BUILDING_GUI" }
 	
 	configuration { "vs*" }
@@ -666,12 +605,36 @@ if plugin "lua_script" then
 		defines { "LUMIX_STATIC_LUAU" }
 	end
 
+	configuration { "vs20*" }
+		libdirs {  "../external/luau/lib/win" }
+		links "Luau"
+		
+	configuration { "linux" }
+		libdirs {  "../external/luau/lib/linux" }
+		links "Luau"
+
+	configuration {}
+
 	files { "../src/lua_script/**.h", "../src/lua_script/**.cpp" }
-	includedirs { "../src", "../src/lua_script" }
+	includedirs { "../external/luau/include"
+		, "../src"
+		, "../src/lua_script"
+	}
 	defines { "BUILDING_LUA_SCRIPT" }
 	links { "core", "engine" }
-	linkEditor()
-	useLua()
+
+	if hasPlugin "renderer" then
+		links { "renderer" }
+	end
+
+	if build_luau and build_studio then
+		project "studio"
+			links {"Luau"}
+	end
+	if build_luau and build_app then
+		project "app"
+			links {"Luau"}
+	end
 end
 
 if _OPTIONS["with-game"] ~= nil then
@@ -700,10 +663,8 @@ end
 if build_app then
 	project "app"
 		kind "ConsoleApp"
-		useLua()
 		defaultConfigurations()
 		includedirs { "../src", "../src/app" }
-		useLua()
 		files { "../src/app/main.cpp" }
 
 		if working_dir then
@@ -724,14 +685,13 @@ if build_app then
 		end
 
 		if not dynamic_plugins then	
-			if has_plugin("physics") then
+			if hasPlugin("physics") then
 				linkPhysX()
 			end
 			links { "core", "engine" }
 			if _OPTIONS["no-lua-script"] == nil then
 				links { "lua_script" }
 			end
-			linkEditor()
 
 			if use_basisu then
 				linkLib "basisu"
@@ -743,8 +703,11 @@ if build_app then
 
 			configuration {}
 		else
-			linkEditor()
 			links { "core", "engine" }
+		end
+		
+		if build_studio then
+			links { "editor" }
 		end
 		if build_studio and use_basisu then
 			linkLib "basisu"
@@ -752,7 +715,7 @@ if build_app then
 		
 		configuration { "windows" }
 			kind "WindowedApp"
-			libdirs { path.join(ROOT_DIR, "./external/pix/bin/x64") }
+			libdirs { "../external/pix/bin/x64" }
 
 		configuration { "linux" }
 			links { "GL", "X11", "dl", "rt", "Xi" }
@@ -769,7 +732,6 @@ end
 if build_studio then
 	project "editor"
 		libType()
-		useLua()
 		defaultConfigurations()
 		defines { "BUILDING_EDITOR" }
 		links { "core", "engine" }
@@ -800,7 +762,7 @@ if build_studio then
 
 		if dynamic_plugins then	
 			configuration {"vs*"}
-				links { "winmm", "imm32", "version" }
+				links { "imm32", "version" }
 			configuration {}
 		end
 
@@ -809,7 +771,6 @@ if build_studio then
 		files { "../src/studio/**.cpp" }
 		dbgHelp()
 		includedirs { "../src" }
-		useLua()
 		defaultConfigurations()
 		links { "editor", "core", "engine", "renderer" }
 
@@ -837,9 +798,8 @@ if build_studio then
 
 		if not dynamic_plugins then	
 			linkLib "freetype"
-			useLua()
 			if use_basisu then linkLib "basisu" end
-			if has_plugin "physics" then linkPhysX() end
+			if hasPlugin "physics" then linkPhysX() end
 
 			configuration { "linux" }
 				links { "dl", "GL", "X11", "rt", "Xi" }
@@ -847,9 +807,11 @@ if build_studio then
 					linkoptions { "-Wl,-rpath '-Wl,$$ORIGIN'" }
 				end
 
-			configuration { "vs*" }
+			configuration { "windows" }
 				links { "psapi", "dxguid", "winmm" }
-				libdirs { path.join(ROOT_DIR, "./external/pix/bin/x64") }
+
+			configuration { "vs*" }
+				libdirs { "../external/pix/bin/x64" }
 				files { "../external/pix/bin/x64/WinPixEventRuntime.dll" }
 				copy { "../external/pix/bin/x64/WinPixEventRuntime.dll" }
 			
@@ -869,29 +831,74 @@ if build_studio then
 		configuration { "linux" }
 			links {"gtk-3", "gobject-2.0"}
 
-		configuration {"vs*"}
-			links { "winmm", "imm32", "version" }
+		configuration {"windows"}
+			links { "winmm", "imm32", "version", "shell32", "gdi32", "comdlg32", "advapi32", "ole32" }
 end
 
-if force_build_physx == true then
-	if os.isdir("3rdparty/physx") then	
-		project "PhysX"
-			kind "StaticLib"
-			files { "3rdparty/physx/physx/source/**.cpp", "3rdparty/physx/physx/include/**.h", "3rdparty/physx/pxshared/**.h" }
-			removefiles { "**/unix/*", "3rdparty/physx/**/linux/*" }
-			includedirs { "3rdparty/physx/physx/include"
-				, "3rdparty/physx/pxshared/include"
-				, "3rdparty/physx/physx/source/**"
-			}
-			defines { "NDEBUG", "PX_PHYSX_STATIC_LIB", "_WINSOCK_DEPRECATED_NO_WARNINGS", "_CRT_SECURE_NO_WARNINGS", "PX_COOKING" }
-			flags { "OptimizeSize", "ReleaseRuntime" }
+if build_physx and hasPlugin("physics") then
+	printf("Using PhysX from external/_repos/physx (build from source code)")
+	project "PhysX"
+		kind "StaticLib"
+		files { "../external/_repos/physx/physx/source/**.cpp", "../external/_repos/physx/physx/include/**.h", "../external/_repos/physx/pxshared/**.h" }
+		removefiles { "../**/unix/*", "../**/linux/*" }
+		includedirs { "../external/_repos/physx/physx/include"
+			, "../external/_repos/physx/pxshared/include"
+			
+			, "../external/_repos/physx/physx/source/common/include"
+			, "../external/_repos/physx/physx/source/fastxml/include"
+			, "../external/_repos/physx/physx/source/filebuf/include"
+			, "../external/_repos/physx/physx/source/foundation/include"
+			, "../external/_repos/physx/physx/source/geomutils/include"
+			, "../external/_repos/physx/physx/source/lowlevel/api/include"
+			, "../external/_repos/physx/physx/source/lowlevel/common/include"
+			, "../external/_repos/physx/physx/source/lowlevel/common/include/collision"
+			, "../external/_repos/physx/physx/source/lowlevel/common/include/pipeline"
+			, "../external/_repos/physx/physx/source/lowlevel/common/include/utils"
+			, "../external/_repos/physx/physx/source/lowlevel/software/include"
+			, "../external/_repos/physx/physx/source/lowlevelaabb/include"
+			, "../external/_repos/physx/physx/source/lowleveldynamics/include"
+			, "../external/_repos/physx/physx/source/physx/src"
+			, "../external/_repos/physx/physx/source/physx/src/buffering"
+			, "../external/_repos/physx/physx/source/physx/src/device"
+			, "../external/_repos/physx/physx/source/physx/src/gpu"
+			, "../external/_repos/physx/physx/source/physx/src/windows"
+			, "../external/_repos/physx/physx/source/physxgpu/include"
+			, "../external/_repos/physx/physx/source/physxmetadata/core/include"
+			, "../external/_repos/physx/physx/source/physxmetadata/extensions/include"
+			, "../external/_repos/physx/physx/source/physxvehicle/src/physxmetadata/include"
+			, "../external/_repos/physx/physx/source/pvd/include"
+			, "../external/_repos/physx/physx/source/scenequery/include"
+			, "../external/_repos/physx/physx/source/simulationcontroller/include"
+			
+			, "../external/_repos/physx/physx/source/physxcooking/src/"
+			, "../external/_repos/physx/physx/source/physxcooking/src/convex"
+			, "../external/_repos/physx/physx/source/physxcooking/src/mesh"
+			
+			, "../external/_repos/physx/physx/source/physxextensions/src"
+			, "../external/_repos/physx/physx/source/physxextensions/src/serialization"
+			, "../external/_repos/physx/physx/source/physxextensions/src/serialization/Binary"
+			, "../external/_repos/physx/physx/source/physxextensions/src/serialization/File"
+			, "../external/_repos/physx/physx/source/physxextensions/src/serialization/Xml"
+			
+			, "../external/_repos/physx/physx/source/physxvehicle/src"
+			
+			, "../external/_repos/physx/physx/source/simulationcontroller/src"
+			
+			, "../external/_repos/physx/physx/source/foundation/src"
+			, "../external/_repos/physx/physx/source/common/src"
+			, "../external/_repos/physx/physx/source/fastxml/src"
+			, "../external/_repos/physx/physx/source/geomutils/src"
 
-			configuration { "windows" }
-				targetdir "../external/physx/lib/win"
-				buildoptions { "/wd5055"}
-	else
-		printf("--force-build-physx used but PhysX source code not found")
-	end
+			, "../external/_repos/physx/physx/source/geomutils/src/**"
+		}
+		defines { "NDEBUG", "PX_PHYSX_STATIC_LIB", "_WINSOCK_DEPRECATED_NO_WARNINGS", "_CRT_SECURE_NO_WARNINGS", "PX_COOKING" }
+		flags { "OptimizeSize", "ReleaseRuntime" }
+
+		configuration { "windows" }
+			targetdir "../external/physx/lib/win"
+		
+		configuration { "vs20*" }
+			buildoptions { "/wd5055"}
 end
 
 if os.isdir("../external/_repos/freetype") then
@@ -949,8 +956,10 @@ if os.isdir("../external/_repos/freetype") then
 			targetdir "../external/freetype/lib/linux"
 		
 		configuration { "windows" }
-			buildoptions { "/wd4312"}
 			targetdir "../external/freetype/lib/win"
+
+		configuration { "vs20*" }
+			buildoptions { "/wd4312"}
 
 		defaultConfigurations()
 else

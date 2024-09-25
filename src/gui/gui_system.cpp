@@ -96,7 +96,7 @@ struct GUISystemImpl final : GUISystem
 		renderer->addPlugin(m_render_plugin);
 	}
 
-	void shutdownStarted() {
+	void shutdownStarted() override {
 		auto* renderer = (Renderer*)m_engine.getSystemManager().getSystem("renderer");
 		renderer->removePlugin(m_render_plugin);
 	}

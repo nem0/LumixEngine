@@ -719,7 +719,7 @@ struct LuaScriptSystemImpl final : LuaScriptSystem
 	explicit LuaScriptSystemImpl(Engine& engine);
 	virtual ~LuaScriptSystemImpl();
 
-	void initEnd() {
+	void initEnd() override {
 		PROFILE_FUNCTION();
 		registerEngineAPI(m_state, &m_engine);
 		registerInputAPI(m_state);

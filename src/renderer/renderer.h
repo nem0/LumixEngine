@@ -18,7 +18,7 @@ enum class AttributeSemantic : u8;
 struct RenderBufferHandle;
 struct GBuffer;
 
-struct RenderPlugin {
+struct LUMIX_RENDERER_API RenderPlugin {
 	virtual ~RenderPlugin() {}
 	// all `RenderPlugin` functions are called during execution of every `Pipeline`
 	virtual void renderUI(struct Pipeline& pipeline) {}
