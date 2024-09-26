@@ -8,7 +8,7 @@ cbuffer Drawcall : register(b4) {
 };
 
 cbuffer Drawcall2 : register(b5) {
-	uint u_gbuffer_depth;
+	TextureHandle u_gbuffer_depth;
 };
 
 #define ATTR(X) TEXCOORD##X
@@ -44,11 +44,12 @@ VSOutput mainVS(VSInput input) {
 float4 mainPS(VSOutput input) : SV_TARGET {
 	float2 screen_uv = input.position.xy * Global_rcp_framebuffer_size;
 	float3 pos_ws = getPositionWS(u_gbuffer_depth, screen_uv);
-	float4 albedo = sampleBindless(LinearSampler, t_albedo, input.uv);
+	float4 albedo = bindless_textures[t_albedo].Sample(LinearSampler, input.uv);
 	#ifdef ALPHA_CUTOUT
 		if (albedo.a < 0.5) discard;
 	#endif
-	float NdotL = dot(Global_light_dir.xyz, input.normal);
+	// just some fake shading to make 3d icons look better
+	float NdotL = dot(input.normal, 1);
 	float shading = saturate(max(0, -NdotL) + 0.25 * max(0, NdotL) + 0.25);
 	float3 output = albedo.rgb * shading;
 	

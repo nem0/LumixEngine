@@ -1,10 +1,9 @@
 #include "pipelines/common.hlsli"
 
 cbuffer Data : register(b4) {
-	uint u_deptbuffer;
-	uint u_output;
+	TextureHandle u_deptbuffer;
+	RWTextureHandle u_output;
 };
-
 
 float3 countToDebugColor(int c, uint2 thread_id) {
 	float3 res;

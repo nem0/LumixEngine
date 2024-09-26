@@ -413,6 +413,7 @@ void DrawStream::createProgram(gpu::ProgramHandle prog
 	}
 	data->source = R"#(
 		#define TextureHandle int
+		#define RWTextureHandle int
 		#define TextureCubeArrayHandle int
 
 		Texture2D<float4> bindless_textures[] : register(t0, space1);

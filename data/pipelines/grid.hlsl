@@ -1,18 +1,17 @@
 //@surface
 #include "pipelines/common.hlsli"
 
-struct Output {
-	float4 lpos : TEXCOORD0;
+struct VSOutput {
+	float2 uv : TEXCOORD0;
 	float4 position : SV_POSITION;
 };
 
-Output mainVS(uint vertex_id : SV_VertexID) {
-	Output output;
-	float3 local_pos = float3(vertex_id & 1, 0, vertex_id >> 1) * 1000 - 500;
-	local_pos.y = 0;
-	output.lpos = float4(local_pos, 1);
-	float4 p = float4(local_pos - Global_camera_world_pos.xyz,  1);
-	output.position = mul(p, mul(Global_ws_to_vs, Global_vs_to_ndc_no_jitter));
+VSOutput mainVS(uint vertex_id : SV_VertexID) {
+	VSOutput output;
+	output.uv = float2(vertex_id & 1, vertex_id >> 1) * 1000 - 500;
+	float3 pos_ls = float3(output.uv.x, 0, output.uv.y);
+	float3 p = pos_ls - Global_camera_world_pos.xyz;
+	output.position = transformPosition(p, Global_ws_to_vs, Global_vs_to_ndc_no_jitter);
 	return output;
 }
 
@@ -35,8 +34,7 @@ float PristineGrid(float2 uv, float2 lineWidth) {
 	return lerp(grid2.x, 1.0, grid2.y);
 }
 
-float4 mainPS(float4 lpos : TEXCOORD0) : SV_TARGET {
-	float2 uv = lpos.xz / lpos.w;
+float4 mainPS(float2 uv : TEXCOORD0) : SV_TARGET {
 	float grid = PristineGrid(uv, 0.02);
 	if (grid < 0.0) discard;
 	return float4(0, 0, 0, grid);

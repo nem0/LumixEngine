@@ -113,6 +113,7 @@ struct GlobalState {
 	Vec4 light_direction;
 	Vec4 light_color;
 	IVec2 random_uint2;
+	Vec2 random_vec2_normalized;
 	IVec2 framebuffer_size;
 	Vec2 rcp_framebuffer_size;
 	Vec2 pixel_jitter;
@@ -1525,6 +1526,7 @@ struct PipelineImpl final : Pipeline {
 		global_state.shadow_atlas_bindless = m_shadow_atlas.texture ? gpu::getBindlessHandle(m_shadow_atlas.texture) : gpu::INVALID_BINDLESS_HANDLE;
 		global_state.frame_idx = m_renderer.frameNumber();
 		global_state.random_uint2 = IVec2((i32)rand(), (i32)rand());
+		global_state.random_vec2_normalized = Vec2(randFloat(), randFloat());
 		global_state.framebuffer_size = IVec2(m_viewport.w, m_viewport.h);
 		global_state.rcp_framebuffer_size = Vec2(1.f / m_viewport.w, 1.f / m_viewport.h);
 		global_state.cam_world_pos = Vec4(Vec3(m_viewport.pos), 1);

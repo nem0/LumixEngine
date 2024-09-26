@@ -1,7 +1,8 @@
 //@surface
-#include "pipelines/common.hlsli"
 //@texture_slot "Texture", "textures/common/white.tga"
 //@uniform "Material color", "color", {1, 1, 1, 1}
+
+#include "pipelines/common.hlsli"
 
 struct VSInput {
 	float3 position : TEXCOORD0;
@@ -13,19 +14,19 @@ struct VSInput {
 
 struct VSOutput {
 	float3 half_extents : TEXCOORD0;
-	float3 pos_ws : TEXCOORD1;
+	float3 i_pos_ws : TEXCOORD1;
 	float4 rot : TEXCOORD2;
 	float2 uv_scale : TEXCOORD3;
 	float4 position : SV_POSITION;
 };
 
 cbuffer DC : register(b4) {
-	uint u_gbuffer_depth;
+	TextureHandle u_gbuffer_depth;
 };
 
 VSOutput mainVS(VSInput input) {
 	VSOutput output;
-	output.pos_ws = input.i_pos_ws;
+	output.i_pos_ws = input.i_pos_ws;
 	output.rot = input.i_rot;
 	output.rot.w = -output.rot.w;
 	output.half_extents = input.i_half_extents;
@@ -39,7 +40,7 @@ VSOutput mainVS(VSInput input) {
 GBufferOutput mainPS(VSOutput input) {
 	float2 screen_uv = input.position.xy * Global_rcp_framebuffer_size;
 	float3 pos_ws = getPositionWS(u_gbuffer_depth, screen_uv);
-	float3 pos_ls = rotateByQuat(input.rot, pos_ws - input.pos_ws);
+	float3 pos_ls = rotateByQuat(input.rot, pos_ws - input.i_pos_ws);
 
 	bool is_in_decal_volume = any(abs(pos_ls) > input.half_extents);
 	if (is_in_decal_volume) discard;

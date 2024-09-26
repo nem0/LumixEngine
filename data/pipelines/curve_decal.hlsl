@@ -1,26 +1,8 @@
-/*
-BEGIN_SHADER_DECLARATIONS
-{
-    "Shaders": [
-        {
-            "ShaderName": "mainPS",
-            "ShaderCompiler": "fxc",
-            "ShaderType": "ps",
-            "ShaderModel": "5_0",
-            "EntryPoint": "mainPS",
-            "Defines": [],
-            "Optimization": "3",
-            "AdditionalArgs": []
-        }
-    ]
-}
-END_SHADER_DECLARATIONS
-*/
-
 //@surface
-#include "pipelines/common.hlsli"
 //@texture_slot "Texture", "textures/common/white.tga"
 //@uniform "Material color", "color", {1, 1, 1, 1}
+
+#include "pipelines/common.hlsli"
 
 struct VSOutput {
 	float3 half_extents : TEXCOORD0;
@@ -45,11 +27,11 @@ VSOutput mainVS(VSInput input) {
 	output.pos = input.i_pos;
 	output.rot = input.i_rot;
 	output.half_extents = input.i_half_extents;
-	float3 pos = rotateByQuat(input.i_rot, input.position * input.i_half_extents);
-	pos += input.i_pos;
+	float3 pos_ws = rotateByQuat(input.i_rot, input.position * input.i_half_extents);
+	pos_ws += input.i_pos;
 	output.uv_scale = input.i_uv_scale;
 	output.bezier = input.i_bezier;
-	output.position = transformPosition(pos, Global_ws_to_ndc);
+	output.position = transformPosition(pos_ws, Global_ws_to_ndc);
 	return output;
 }
 
@@ -111,7 +93,7 @@ float2 sdBezier(float2 pos, float2 A, float2 B, float2 C) {
 }
 
 cbuffer Dc : register(b4) {
-	uint u_gbuffer_depth;
+	TextureHandle u_gbuffer_depth;
 };
 
 GBufferOutput mainPS(VSOutput input) {

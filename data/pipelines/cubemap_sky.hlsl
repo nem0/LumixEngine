@@ -8,7 +8,7 @@ struct VSOutput {
 
 cbuffer Drawcall : register(b4) {
 	float u_intensity;
-	uint u_sky;
+	TextureHandle u_sky;
 };
 
 // TODO use this

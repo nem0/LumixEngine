@@ -5,9 +5,9 @@ cbuffer Drawcall : register(b4) {
 	float u_range;
 	float u_max_blur_size;
 	float u_sharp_range;
-	uint u_texture;
-	uint u_depth;
-	uint u_output;
+	TextureHandle u_texture;
+	TextureHandle u_depth;
+	RWTextureHandle u_output;
 };
 
 static const float GOLDEN_ANGLE = 2.39996323;
@@ -22,7 +22,8 @@ float getBlurSize(float depth, float focus_point) {
 
 // https://blog.voxagon.se/2018/05/04/bokeh-depth-of-field-in-single-pass.html
 float3 depthOfField(float2 tex_coord, float focus_point) {
-	float center_depth = toLinearDepth(sampleBindlessLod(LinearSamplerClamp, u_depth, tex_coord, 0).r);
+	float ndc_depth = sampleBindlessLod(LinearSamplerClamp, u_depth, tex_coord, 0).r;
+	float center_depth = toLinearDepth(ndc_depth);
 	float center_size = getBlurSize(center_depth, focus_point);
 	float3 color = sampleBindlessLod(LinearSamplerClamp, u_texture, tex_coord, 0).rgb;
 	float tot = 1.0;
