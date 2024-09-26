@@ -165,6 +165,12 @@ float4 transformPosition(float3 pos, float4x4 m) {
 	return pos.x * m[0] + (pos.y * m[1] + (pos.z * m[2] + m[3]));
 }
 
+
+// assumes pos.w == 1
+float4 transformPosition(float4 pos, float4x4 m) {
+	return pos.x * m[0] + (pos.y * m[1] + (pos.z * m[2] + m[3]));
+}
+
 // assumes transformPosition(pos, m0).w == 1
 // so dont use with something like ws_to_ndc in m0
 float4 transformPosition(float3 pos, float4x4 m0, float4x4 m1) {
@@ -194,6 +200,7 @@ float2 raySphereIntersect(float3 r0, float3 rd, float3 s0, float sr) {
 	float tc = dot(s0_r0, rd);
 	float d2 = dot(s0_r0, s0_r0) - tc * tc;
 	float sr2 = sr * sr;
+	[flatten] // to avoid compiler warning
 	if (d2 > sr2) return -1;
 	float td2 = sr2 - d2;
 	float td = sqrt(td2);
@@ -490,10 +497,11 @@ float3 computeDirectLight(Surface surface, float3 L, float3 light_color) {
 	float3 diffuse = kD * surface.albedo / M_PI;
 	return (diffuse + specular) * light_color * ndotl
 		+ surface.translucency * diffuse * light_color * max(0, -ndotl_full);
-}	
+}
 
 // must match ShadowAtlas::getUV
 float getShadowAtlasResolution(int idx) {
+	[flatten] // to avoid compiler warning
 	if (idx == 0) return 1024;
 	if (idx < 5) return 512;
 	return 256;
@@ -658,6 +666,7 @@ void makeAscending(inout float3 a, inout float3 b) {
 float distanceInFog(float3 a, float3 b) {
 	makeAscending(a, b); // TODO remove and make sure argument are correct
 
+	[flatten] // to avoid compiler warning
 	if (a.y > Global_fog_top) return 0;
 	if (b.y > Global_fog_top) {
 		float3 dir = b - a;
