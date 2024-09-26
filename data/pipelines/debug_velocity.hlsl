@@ -1,6 +1,5 @@
 #include "pipelines/common.hlsli"
 
-
 // arrow from https://www.shadertoy.com/view/4s23DG
 static const int   ARROW_V_STYLE = 1;
 static const int   ARROW_LINE_STYLE = 2;
@@ -74,8 +73,8 @@ float arrow(float2 p, float2 v) {
 }
 
 cbuffer Constants : register(b4) {
-	uint u_velocity_buffer;
-	uint u_output;
+	TextureHandle u_velocity_buffer;
+	RWTextureHandle u_output;
 };
 
 [numthreads(16, 16, 1)]

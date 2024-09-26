@@ -130,24 +130,21 @@ struct Atmo : public RenderPlugin {
 struct FilmGrain : public RenderPlugin {
 	Renderer& m_renderer;
 	Shader* m_shader = nullptr;
-	Texture* m_noise = nullptr;
+	float m_noise_scale = 2.f;
 
 	FilmGrain(Renderer& renderer) : m_renderer(renderer) {}
 
 	void shutdown() {
 		m_shader->decRefCount();
-		m_noise->decRefCount();
 	}
 
 	void init() {
 		ResourceManagerHub& rm = m_renderer.getEngine().getResourceManager();
 		m_shader = rm.load<Shader>(Path("pipelines/film_grain.hlsl"));
-		m_noise = rm.load<Texture>(Path("textures/common/blue_noise.tga"));
 	}
 
 	RenderBufferHandle renderAfterTonemap(const GBuffer& gbuffer, RenderBufferHandle input, Pipeline& pipeline) override {
 		if (!m_shader->isReady()) return input;
-		if (!m_noise->isReady()) return input;
 		if (pipeline.getType() != PipelineType::GAME_VIEW) return input;
 
 		RenderModule* module = pipeline.getModule();
@@ -161,18 +158,16 @@ struct FilmGrain : public RenderPlugin {
 		pipeline.beginBlock("film_grain");
 
 		DrawStream& stream = pipeline.getRenderer().getDrawStream();
+		const Viewport& vp = pipeline.getViewport();
 		struct {
 			float intensity;
 			float lumamount;
 			gpu::RWBindlessHandle source;
-			gpu::BindlessHandle noise;
 		} ubdata = {
 			camera.film_grain_intensity,
 			0.1f,
 			pipeline.toRWBindless(input, stream),
-			gpu::getBindlessHandle(m_noise->handle),
 		};
-		const Viewport& vp = pipeline.getViewport();
 		pipeline.setUniform(ubdata);
 		pipeline.dispatch(*m_shader, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
 

@@ -1,8 +1,8 @@
 #include "pipelines/common.hlsli"
 
 cbuffer DC : register(b4) {
-	uint u_mask;
-	uint u_output;
+	TextureHandle u_mask;
+	RWTextureHandle u_output;
 }
 
 [numthreads(16, 16, 1)]

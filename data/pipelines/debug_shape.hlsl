@@ -17,7 +17,8 @@ struct VSInput {
 
 VSOutput mainVS(VSInput input) {
 	VSOutput output;
-	output.color = float4(pow(abs(input.color.rgb), 2.2f.xxx), input.color.a);
+	float3 color_srgb = pow(abs(input.color.rgb), 2.2);
+	output.color = float4(color_srgb, input.color.a);
 	output.position = transformPosition(input.position, u_ls_to_ws, Pass_ws_to_ndc);
 	return output;
 }

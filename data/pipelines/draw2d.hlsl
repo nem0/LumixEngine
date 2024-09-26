@@ -3,7 +3,7 @@
 
 cbuffer DC : register(b4) {
 	float4x4 u_matrix;
-	uint u_texture;
+	TextureHandle u_texture;
 };
 
 struct VSInput {
