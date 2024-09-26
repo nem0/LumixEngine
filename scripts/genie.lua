@@ -689,7 +689,8 @@ if build_app then
 		end
 
 		if not dynamic_plugins then	
-			if hasPlugin("physics") then
+			if hasPlugin "lua_script" then linkLib "Luau" end
+			if hasPlugin "physics" then
 				linkPhysX()
 			end
 			links { "core", "engine" }
@@ -804,6 +805,7 @@ if build_studio then
 			linkLib "freetype"
 			if use_basisu then linkLib "basisu" end
 			if hasPlugin "physics" then linkPhysX() end
+			if hasPlugin "lua_script" then linkLib "Luau" end
 
 			configuration { "linux" }
 				links { "dl", "GL", "X11", "rt", "Xi" }
