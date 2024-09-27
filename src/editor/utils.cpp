@@ -1684,7 +1684,7 @@ struct CodeEditorImpl final : CodeEditor {
 		if (ImGui::IsItemActive()) {
 			if (!io.MouseDown[0]) ImGui::SetItemAllowOverlap(); // because of search gui
 			if (io.MouseClicked[0] && !clicked) ImGuiEx::ResetActiveID();
-			ImGui::SetShortcutRouting(ImGuiKey_Tab, id);
+			ImGui::SetShortcutRouting(ImGuiKey_Tab, 0, id);
 		}
 		if (ImGui::IsItemHovered()) ImGui::SetMouseCursor(ImGuiMouseCursor_TextInput);
 
