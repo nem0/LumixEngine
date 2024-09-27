@@ -3616,10 +3616,18 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 		, m_probes(app.getAllocator())
 		, m_model_plugin(model_plugin)
 	{
+		m_generate_action.init("Generate probes", "Generate probes", "generate_probes", "", Action::IMGUI_PRIORITY);
+		m_generate_action.func.bind<&EnvironmentProbePlugin::onGenerateProbes>(this);
+		m_add_bounce_action.init("Add bounce", "Add light bounce to probes", "probes_add_bounce", "", Action::IMGUI_PRIORITY);
+		m_add_bounce_action.func.bind<&EnvironmentProbePlugin::onAddBounce>(this);
+		m_app.addToolAction(&m_generate_action);
+		m_app.addToolAction(&m_add_bounce_action);
 	}
 
 	~EnvironmentProbePlugin()
 	{
+		m_app.removeAction(&m_generate_action);
+		m_app.removeAction(&m_add_bounce_action);
 		m_ibl_filter_shader->decRefCount();
 	}
 
@@ -3677,7 +3685,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 	}
 
 
-	void generateCubemaps(bool bounce, World& world) {
+	void generateProbes(bool bounce, World& world) {
 		ASSERT(m_probes.empty());
 
 		m_pipeline->setIndirectLightMultiplier(bounce ? 1.f : 0.f);
@@ -3962,6 +3970,18 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 		}
 	}
 
+	void onGenerateProbes() {
+		WorldEditor& editor = m_app.getWorldEditor();
+		World& world = *editor.getWorld();
+		generateProbes(false, world);
+	}
+
+	void onAddBounce() {
+		WorldEditor& editor = m_app.getWorldEditor();
+		World& world = *editor.getWorld();
+		generateProbes(true, world);
+	}
+
 	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, const TextFilter& filter, WorldEditor& editor) override {
 		if (filter.isActive()) return;
 		if (entities.length() != 1) return;
@@ -3969,36 +3989,14 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 		World& world = *editor.getWorld();
 		const EntityRef e = entities[0];
 		auto* module = static_cast<RenderModule*>(world.getModule(cmp_type));
-		if (cmp_type == ENVIRONMENT_PROBE_TYPE) {
-			if (m_probe_counter) ImGui::Text("Generating...");
-			else {
-				if (ImGui::CollapsingHeader("Generator")) {
-					if (ImGui::Button("Generate")) generateCubemaps(false, world);
-					ImGui::SameLine();
-					if (ImGui::Button("Add bounce")) generateCubemaps(true, world);
-				}
-			}
-		}
-
 		if (cmp_type == REFLECTION_PROBE_TYPE) {
-			if (m_probe_counter) ImGui::Text("Generating...");
-			else {
-				const ReflectionProbe& probe = module->getReflectionProbe(e);
-				if (probe.flags & ReflectionProbe::ENABLED) {
-					const Path path("probes/", probe.guid, ".lbc");
-					ImGuiEx::Label("Path");
-					ImGuiEx::TextUnformatted(path);
-					if (ImGui::Button("View radiance")) m_app.getAssetBrowser().openEditor(path);
-				}
-				if (ImGui::CollapsingHeader("Generator")) {
-					if (ImGui::Button("Generate")) generateCubemaps(false, world);
-					ImGui::SameLine();
-					if (ImGui::Button("Add bounce")) generateCubemaps(true, world);
-				}
+			const ReflectionProbe& probe = module->getReflectionProbe(e);
+			if (probe.flags & ReflectionProbe::ENABLED) {
+				ImGuiEx::Label("GUID");
+				ImGuiEx::TextUnformatted(StaticString<64>(probe.guid));
 			}
 		}
 	}
-
 
 	StudioApp& m_app;
 	ModelPlugin& m_model_plugin;
@@ -4010,6 +4008,8 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 	Array<ProbeJob*> m_probes;
 	u32 m_done_counter = 0;
 	u32 m_probe_counter = 0;
+	Action m_generate_action;
+	Action m_add_bounce_action;
 };
 
 struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugin {
