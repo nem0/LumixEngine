@@ -30,15 +30,18 @@ private:
 	void showCoreProperties(const Array<EntityRef>& entities, WorldEditor& editor) const;
 	void toggleUI() { m_is_open = !m_is_open; }
 	bool isOpen() const { return m_is_open; }
+	void focusFilter() { m_is_open = true; m_focus_filter_request = true; }
 
 	StudioApp& m_app;
 	Array<IPlugin*> m_plugins;
 	EntityPtr m_deferred_select;
 	
 	bool m_is_open = false;
+	bool m_focus_filter_request = false;
 	TextFilter m_component_filter;
 	TextFilter m_property_filter;
 	Action m_toggle_ui;
+	Action m_focus_filter_action;
 };
 
 
