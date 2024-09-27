@@ -19,3 +19,11 @@ We utilize [Luau](https://github.com/luau-lang/luau) for scripting. On Windows, 
 3. Build the project.
 
 If you build Luau from source code like this, it's built as a static library by default. To build a dynamic library, pass `--luau-dynamic` to GENie. The static library version of Luau includes Luau analysis, which is used by Studio to report type errors in Luau scripts. The dynamic library does not include this analysis.
+
+## PhysX
+
+We utilize [PhysX](https://github.com/nem0/PhysX.git) for physical simulation. On Windows, the prebuilt static library is included in [external/physx/lib/win](../external/physx/lib/win) and is used by default. If you want to build PhysX from source code, use the following steps:
+
+1. Run [download_physx.bat](../scripts/download_physx.bat) to download the PhysX source code.
+2. Regenerate the project using *GENie*.
+3. Build the project.

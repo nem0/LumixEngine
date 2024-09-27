@@ -270,49 +270,8 @@ end
 
 function linkPhysX()
 	if hasPlugin("physics") then
-		if build_physx then
-			configuration { "vs20*" }
-				links { "PhysX" }
-				defines { "PX_PHYSX_STATIC_LIB", "PX_PHYSX_CHARACTER_STATIC_LIB" }
-		else 
-			configuration { "x64", "vs20*" }
-				links { 
-					"FastXml_static_64",
-					"LowLevel_static_64",
-					"LowLevelAABB_static_64",
-					"LowLevelDynamics_static_64",
-					"PhysX_64",
-					"PhysXCommon_64",
-					"PhysXCooking_64",
-					"PhysXExtensions_static_64",
-					"PhysXFoundation_64",
-					"PhysXCharacterKinematic_static_64",
-					"PhysXPvdSDK_static_64",
-					"PhysXTask_static_64",
-					"PhysXVehicle_static_64",
-					"SceneQuery_static_64",
-					"SimulationController_static_64"
-				}
-			configuration { "linux" }
-				libdirs {"../external/physx/lib/linux"}	
-				links { 
-					"PhysX_static_64",
-					"PhysXCharacterKinematic_static_64",
-					"PhysXCommon_static_64",
-					"PhysXCooking_static_64",
-					"PhysXExtensions_static_64",
-					"PhysXFoundation_static_64",
-					"PhysXPvdSDK_static_64",
-					--"PhysXTask_static_64",
-					"PhysXVehicle_static_64",
-					--"SceneQuery_static_64",
-					--"SimulationController_static_64"
-				}
-
-			configuration {}
-				libdirs {"../external/physx/lib/win"}
-				defines {"PX_PHYSX_CHARACTER_STATIC_LIB"}
-		end
+		defines { "PX_PHYSX_STATIC_LIB", "PX_PHYSX_CHARACTER_STATIC_LIB" }
+		linkLib "PhysX"
 	end
 end
 
@@ -455,25 +414,9 @@ project "engine"
 		buildoptions { "`pkg-config --cflags gtk+-3.0`" }
 
 if plugin "physics" then
-	if build_physx then
-		defines { "LUMIX_STATIC_PHYSX" }
-	else
-		configuration { "vs*" }
-			files { "../external/physx/dll/vs2017/win64/release/PhysXCommon_64.dll" }
-			files { "../external/physx/dll/vs2017/win64/release/PhysXCooking_64.dll" }
-			files { "../external/physx/dll/vs2017/win64/release/PhysXFoundation_64.dll" }
-			files { "../external/physx/dll/vs2017/win64/release/PhysX_64.dll" }
-			copy { "../external/physx/dll/vs2017/win64/release/PhysXCommon_64.dll" }
-			copy { "../external/physx/dll/vs2017/win64/release/PhysXCooking_64.dll" }
-			copy { "../external/physx/dll/vs2017/win64/release/PhysXFoundation_64.dll" }
-			copy { "../external/physx/dll/vs2017/win64/release/PhysX_64.dll" }
-		configuration {}
-	end
-
 	files { "../src/physics/**.h", "../src/physics/**.cpp" }
-
 	includedirs { "../external/physx/include/" }
-	defines { "BUILDING_PHYSICS" }
+	defines { "BUILDING_PHYSICS", "LUMIX_STATIC_PHYSX" }
 	links { "core", "engine", "renderer" }
 	linkPhysX()
 end
