@@ -1219,7 +1219,7 @@ struct SetPropertyVisitor : reflection::IPropertyVisitor {
 		while (!finished) {
 			m_app.beginCustomTick();
 
-			const ImGuiID dockspace_id = ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
+			const ImGuiID dockspace_id = ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
 
 			static int selected_stack_level = -1;
 

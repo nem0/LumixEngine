@@ -791,13 +791,13 @@ struct StudioAppImpl final : StudioApp
 	{
 		PROFILE_FUNCTION();
 		if (m_is_welcome_screen_open) {
-			m_dockspace_id = ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
+			m_dockspace_id = ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
 			guiWelcomeScreen();
 		}
 		else {
 			mainMenu();
 
-			m_dockspace_id = ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
+			m_dockspace_id = ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
 			m_asset_compiler->onGUI();
 			guiAllActions();
 			guiEntityList();
