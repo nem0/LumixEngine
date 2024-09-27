@@ -1060,20 +1060,19 @@ struct PipelineImpl final : Pipeline {
 
 		beginBlock("tonemap");
 		const RenderBufferHandle rb = createRenderbuffer({
-			.format = gpu::TextureFormat::RGBA8,
-			.flags = gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE,
+			.format = gpu::TextureFormat::SRGBA,
+			.flags = gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::NO_MIPS,
 			.debug_name = "tonemap"
 		});
 		DrawStream& stream = m_renderer.getDrawStream();
 		struct {
 			gpu::BindlessHandle input;
-			gpu::RWBindlessHandle output;
 		} ubdata {
 			toBindless(input, stream),
-			toRWBindless(rb, stream)
 		};
 		setUniform(ubdata);
-		dispatch(*m_tonemap_shader, (m_viewport.w + 15) / 16, (m_viewport.h + 15) / 16, 1);
+		setRenderTargets(Span(&rb, 1));
+		drawArray(0, 3, *m_tonemap_shader, 0, gpu::StateFlags::NONE);
 		endBlock();
 		return rb;
 	}
