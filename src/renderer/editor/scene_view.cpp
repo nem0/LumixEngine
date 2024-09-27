@@ -627,6 +627,7 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 
 	RenderBufferHandle renderBeforeTonemap(const GBuffer& gbuffer, RenderBufferHandle input, Pipeline& pipeline) override {
 		if (m_scene_view.m_pipeline.get() != &pipeline) return input;
+		if (pipeline.m_debug_show == Pipeline::DebugShow::PLUGIN) return input;
 		Renderer& renderer = pipeline.getRenderer();
 
 		// selection
@@ -1017,6 +1018,7 @@ bool SceneView::onAction(const Action& action) {
 		for (u32 i = 0; i < lengthOf(m_debug_show_actions); ++i) {
 			if (&action == &m_debug_show_actions[i]) {
 				m_pipeline->m_debug_show = (Pipeline::DebugShow)i;
+				m_pipeline->m_debug_show_plugin = nullptr;
 				return true;
 			}
 		}
