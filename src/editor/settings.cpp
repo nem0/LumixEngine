@@ -486,7 +486,7 @@ void Settings::load() {
 						break;
 					default: 
 						m_variables.erase(var_name.value);
-						logError("Unexpected token in settings: ", value.value);
+						logError(tokenizer.filename, "(", tokenizer.getLine(), "): Unexpected token in settings: ", value.value);
 						tokenizer.logErrorPosition(value.value.begin);
 						return false;
 				}
