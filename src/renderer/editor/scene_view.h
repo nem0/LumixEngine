@@ -6,6 +6,7 @@
 #include "editor/utils.h"
 #include "core/allocator.h"
 #include "renderer/gpu/gpu.h"
+#include "renderer/pipeline.h"
 
 
 namespace Lumix
@@ -16,7 +17,6 @@ template <typename T> struct Delegate;
 struct LogUI;
 struct Model;
 struct StudioApp;
-struct Pipeline;
 struct RayCastModelHit;
 struct Shader;
 struct World;
@@ -56,6 +56,7 @@ private:
 
 private:
 	StudioApp& m_app;
+	Action m_debug_show_actions[(u32)Pipeline::DebugShow::BUILTIN_COUNT];
 	Action m_insert_model_action;
 	Action m_set_pivot_action;
 	Action m_toggle_gizmo_step_action;
