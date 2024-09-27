@@ -8,8 +8,8 @@ cbuffer Drawcall : register(b4) {
 	float4 u_offsets;
 	uint2 u_position;
 	int2 u_scale;
-	uint u_input;
-	uint u_output;
+	TextureHandle u_input;
+	RWTextureHandle u_output;
 };
 
 [numthreads(16, 16, 1)]

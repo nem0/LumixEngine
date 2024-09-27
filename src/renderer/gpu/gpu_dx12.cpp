@@ -351,6 +351,7 @@ struct ShaderCompiler {
 		hasher.begin();
 		hasher.update(src, stringLength(src));
 		hasher.update(&program.primitive_topology, sizeof(program.primitive_topology));
+		hasher.update(&program.state, sizeof(program.state));
 		const StableHash hash = hasher.end64();
 		program.shader_hash = hash;
 		if (type == ShaderType::SURFACE) {

@@ -2,9 +2,9 @@
 #include "pipelines/common.hlsli"
 
 cbuffer Drawcall : register(b4) {
-	float4 u_inv_sm_size;
-	uint u_big;
-	uint u_small;
+	float4 u_rcp_size;
+	TextureHandle u_big;
+	TextureHandle u_small;
 };
 
 struct VSOutput {
@@ -21,21 +21,21 @@ VSOutput mainVS(uint vertex_id : SV_VertexID) {
 	output.tc0 = uv;
 	#ifdef BLUR_H
 		output.tc1 = float4(
-			uv.x + 1.3846153846 * u_inv_sm_size.x, uv.y, 
-			uv.x + 3.2307692308 * u_inv_sm_size.x, uv.y
+			uv.x + 1.3846153846 * u_rcp_size.x, uv.y, 
+			uv.x + 3.2307692308 * u_rcp_size.x, uv.y
 		);
 		output.tc2 = float4(
-			uv.x - 1.3846153846 * u_inv_sm_size.x, uv.y, 
-			uv.x - 3.2307692308 * u_inv_sm_size.x, uv.y
+			uv.x - 1.3846153846 * u_rcp_size.x, uv.y, 
+			uv.x - 3.2307692308 * u_rcp_size.x, uv.y
 		);
 	#else
 		output.tc1 = float4(
-			uv.x, uv.y + 1.3846153846 * u_inv_sm_size.y,
-			uv.x, uv.y + 3.2307692308 * u_inv_sm_size.y
+			uv.x, uv.y + 1.3846153846 * u_rcp_size.y,
+			uv.x, uv.y + 3.2307692308 * u_rcp_size.y
 		);
 		output.tc2 = float4(
-			uv.x, uv.y - 1.3846153846 * u_inv_sm_size.y, 
-			uv.x, uv.y - 3.2307692308 * u_inv_sm_size.y
+			uv.x, uv.y - 1.3846153846 * u_rcp_size.y, 
+			uv.x, uv.y - 3.2307692308 * u_rcp_size.y
 		);
 	#endif
 	return output;

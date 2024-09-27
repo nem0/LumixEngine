@@ -37,8 +37,8 @@ VSOutput mainVS(VSInput input) {
 	VSOutput output;
 	output.pos_ws = transformPosition(input.position, u_ls_to_ws).xyz;
 	output.position = transformPosition(output.pos_ws, Pass_ws_to_ndc);
-	output.normal = mul(float4(input.normal, 0), u_ls_to_ws).xyz;
-	output.tangent = mul(float4(input.tangent, 0), u_ls_to_ws).xyz;
+	output.normal = mul(input.normal, (float3x3)u_ls_to_ws);
+	output.tangent = mul(input.tangent, (float3x3)u_ls_to_ws);
 	output.uv = input.uv;
 	return output;
 }
@@ -47,7 +47,12 @@ Surface getSurface(VSOutput input) {
 	Surface surface;
 	surface.albedo = sampleBindless(LinearSampler, t_albedo, input.uv).rgb;
 
-	float3x3 tbn = float3x3(input.tangent, input.normal, normalize(cross(input.normal, input.tangent)));
+	float3x3 tbn = float3x3(
+		input.tangent, 
+		input.normal, 
+		normalize(cross(input.normal, input.tangent))
+	);
+	
 	surface.N.xz = sampleBindless(LinearSampler, t_normal, input.uv).xy * 2 - 1;
 	surface.N.y = sqrt(saturate(1 - dot(surface.N.xz, surface.N.xz))); 
 	surface.N = mul(surface.N, tbn);
@@ -66,7 +71,7 @@ Surface getSurface(VSOutput input) {
 	surface.alpha = 1;
 	surface.emission = u_emission;
 	surface.translucency = u_translucency;
-	surface.pos_ws = input.pos_ws.xyz;
+	surface.pos_ws = input.pos_ws;
 	surface.V = normalize(-surface.pos_ws);
 	surface.motion = computeStaticObjectMotionVector(input.pos_ws.xyz);
 	return surface;

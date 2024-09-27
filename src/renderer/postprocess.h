@@ -286,6 +286,8 @@ struct CubemapSky : public RenderPlugin {
 struct Bloom : public RenderPlugin {
 	Renderer& m_renderer;
 	Shader* m_shader = nullptr;
+	Shader* m_extract_shader = nullptr;
+	Shader* m_downscale_shader = nullptr;
 	Shader* m_tonemap_shader = nullptr;
 	Shader* m_blur_shader = nullptr;
 	Shader* m_avg_luminance_shader = nullptr;
@@ -299,6 +301,8 @@ struct Bloom : public RenderPlugin {
 
 	void shutdown() {
 		m_shader->decRefCount();
+		m_extract_shader->decRefCount();
+		m_downscale_shader->decRefCount();
 		m_tonemap_shader->decRefCount();
 		m_blur_shader->decRefCount();
 		m_avg_luminance_shader->decRefCount();
@@ -309,6 +313,8 @@ struct Bloom : public RenderPlugin {
 	void init() {
 		ResourceManagerHub& rm = m_renderer.getEngine().getResourceManager();
 		m_shader = rm.load<Shader>(Path("pipelines/bloom.hlsl"));
+		m_extract_shader = rm.load<Shader>(Path("pipelines/bloom_extract.hlsl"));
+		m_downscale_shader = rm.load<Shader>(Path("pipelines/bloom_downscale.hlsl"));
 		m_tonemap_shader = rm.load<Shader>(Path("pipelines/bloom_tonemap.hlsl"));
 		m_blur_shader = rm.load<Shader>(Path("pipelines/blur.hlsl"));
 		m_avg_luminance_shader = rm.load<Shader>(Path("pipelines/avg_luminance.hlsl"));
@@ -338,12 +344,10 @@ struct Bloom : public RenderPlugin {
 		DrawStream& stream = pipeline.getRenderer().getDrawStream();
 
 		struct {
-			Vec2 size;
 			float accomodation_speed;
 			gpu::BindlessHandle image;
 			gpu::RWBindlessHandle histogram;
 		} ubdata = {
-			Vec2((float)vp.w, (float)vp.h),
 			accomodation_speed,
 			pipeline.toBindless(input, stream),
 			gpu::getRWBindlessHandle(m_lum_buf)
@@ -375,7 +379,7 @@ struct Bloom : public RenderPlugin {
 		};
 		stream.memoryBarrier(pipeline.toTexture(big));
 		pipeline.setUniform(ubdata);
-		pipeline.dispatch(*m_shader, (small_desc.fixed_size.x + 15) / 16, (small_desc.fixed_size.y + 15 ) / 16, 1, "DOWNSCALE");
+		pipeline.dispatch(*m_downscale_shader, (small_desc.fixed_size.x + 15) / 16, (small_desc.fixed_size.y + 15 ) / 16, 1);
 		return small;
 	}
 
@@ -483,7 +487,7 @@ struct Bloom : public RenderPlugin {
 		};
 		stream.barrierRead(m_lum_buf);
 		pipeline.setUniform(ubdata);
-		pipeline.dispatch(*m_shader, ((vp.w >> 1) + 15) / 16, ((vp.h >> 1) + 15) / 16, 1, "EXTRACT");
+		pipeline.dispatch(*m_extract_shader, ((vp.w >> 1) + 15) / 16, ((vp.h >> 1) + 15) / 16, 1);
 		m_extracted_rt = bloom_rb;
 
 		if (pipeline.m_debug_show_plugin == this) {
@@ -653,13 +657,11 @@ struct SSS : public RenderPlugin {
 		DrawStream& stream = pipeline.getRenderer().getDrawStream();
 
 		struct {
-			Vec2 size;
 			float max_steps;
 			float stride;
 			gpu::BindlessHandle depth;
 			gpu::RWBindlessHandle sss_buffer;
 		} ubdata = {
-			Vec2((float)vp.w, (float)vp.h),
 			(float)m_max_steps,
 			m_stride,
 			pipeline.toBindless(gbuffer.DS, stream),
@@ -670,14 +672,12 @@ struct SSS : public RenderPlugin {
 		stream.memoryBarrier(pipeline.toTexture(sss));
 
 		struct {
-			Vec2 size;
 			float current_frame_weight;
 			gpu::RWBindlessHandle sss;
 			gpu::BindlessHandle history;
 			gpu::BindlessHandle depthbuf;
 			gpu::RWBindlessHandle gbufferC;
 		} ubdata2 = {
-			Vec2((float)vp.w, (float)vp.h),
 			m_current_frame_weight,
 			pipeline.toRWBindless(sss, stream),
 			pipeline.toBindless(data->history, stream),
@@ -735,14 +735,12 @@ struct SSAO : public RenderPlugin {
 		DrawStream& stream = pipeline.getRenderer().getDrawStream();
 
 		struct {
-			Vec2 rcp_size;
 			float radius = 0.2f;
 			float intensity = 3;
 			gpu::BindlessHandle normal_buffer;
 			gpu::BindlessHandle depth_buffer;
 			gpu::RWBindlessHandle output;
 		} udata = {
-			.rcp_size = Vec2(1.f / vp.w, 1.f / vp.h),
 			.normal_buffer = pipeline.toBindless(gbuffer.B, stream),
 			.depth_buffer = pipeline.toBindless(gbuffer.DS, stream),
 			.output = pipeline.toRWBindless(ssao_rb, stream)
@@ -751,11 +749,9 @@ struct SSAO : public RenderPlugin {
 		pipeline.dispatch(*m_shader, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
 
 		struct {
-			Vec2 size;
 			gpu::BindlessHandle ssao_buf;
 			gpu::RWBindlessHandle gbufferB;
 		} udata2 = {
-			.size = Vec2((float)vp.w, (float)vp.h),
 			.ssao_buf = pipeline.toBindless(ssao_rb, stream),
 			.gbufferB = pipeline.toRWBindless(gbuffer.B, stream)
 		};

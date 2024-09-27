@@ -14,10 +14,10 @@ cbuffer Data : register (b4) {
 	float u_fog_top;
 	float u_fog_enabled;
 	float u_godrays_enabled;
-	uint u_output;
-	uint u_optical_depth;
-	uint u_depth_buffer;
-	uint u_inscatter;
+	RWTextureHandle u_output;
+	TextureHandle u_optical_depth;
+	TextureHandle u_depth_buffer;
+	TextureHandle u_inscatter;
 };
 
 // mie - Schlick appoximation phase function of Henyey-Greenstein

@@ -3,7 +3,7 @@
 
 cbuffer Drawcall : register(b4) {
 	float4 u_inv_sm_size;
-	uint u_input;
+	TextureHandle u_input;
 };
 
 struct VSOutput {
@@ -41,11 +41,11 @@ VSOutput mainVS(uint vertex_id : SV_VertexID) {
 }
 
 float4 mainPS(VSOutput input) : SV_Target {
-	float2 uv0 = saturate(input.tc0.xy);
-	float2 uv1 = saturate(input.tc1.xy);
-	float2 uv2 = saturate(input.tc1.zw);
-	float2 uv3 = saturate(input.tc2.xy);
-	float2 uv4 = saturate(input.tc2.zw);
+	float2 uv0 = input.tc0.xy;
+	float2 uv1 = input.tc1.xy;
+	float2 uv2 = input.tc1.zw;
+	float2 uv3 = input.tc2.xy;
+	float2 uv4 = input.tc2.zw;
 	float4 c0 = sampleBindless(LinearSamplerClamp, u_input, uv0);
 	float4 c1 = sampleBindless(LinearSamplerClamp, u_input, uv1);
 	float4 c2 = sampleBindless(LinearSamplerClamp, u_input, uv2);

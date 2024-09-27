@@ -1,6 +1,4 @@
 //@surface
-#include "pipelines/common.hlsli"
-#include "pipelines/surface_base.hlsli"
 
 //@uniform "Material color", "color", {1, 1, 1, 1}
 //@uniform "Roughness", "normalized_float", 1
@@ -13,6 +11,9 @@
 //@texture_slot "Roughness", "textures/common/white.tga"
 //@texture_slot "Metallic", "", "HAS_METALLICMAP"
 //@texture_slot "Ambient occlusion", "", "HAS_AMBIENT_OCCLUSION_TEX"
+
+#include "pipelines/common.hlsli"
+#include "pipelines/surface_base.hlsli"
 
 Surface getSurface(VSOutput input) {
 	Surface data;

@@ -14,7 +14,7 @@ cbuffer Data :register(b4) {
 	float u_fog_top;
 	float u_fog_enabled;
 	float u_godarys_enabled;
-	uint u_output;
+	RWTextureHandle u_output;
 };
 
 float3 getTopAtmo(float3 p, float3 dir) {

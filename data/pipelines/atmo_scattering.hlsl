@@ -16,8 +16,8 @@ cbuffer Data : register(b4) {
 	float u_fog_top;
 	float u_fog_enabled;
 	float u_godarys_enabled;
-	uint u_inscatter;
-	uint u_optical_depth;
+	RWTextureHandle u_inscatter;
+	TextureHandle u_optical_depth;
 };
 
 float getOptDepthY(float3 position) {

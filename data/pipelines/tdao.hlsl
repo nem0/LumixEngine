@@ -10,9 +10,9 @@ cbuffer Drawcall : register(b4) {
 	float u_half_depth_range;
 	float u_scale;
 	float u_depth_offset;
-	uint u_depth_buffer;
-	uint u_gbufferB;
-	uint u_topdown_depthmap;
+	TextureHandle u_depth_buffer;
+	RWTextureHandle u_gbufferB;
+	TextureHandle u_topdown_depthmap;
 };
 
 [numthreads(16, 16, 1)]

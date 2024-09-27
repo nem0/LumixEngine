@@ -2,10 +2,10 @@
 
 cbuffer Data : register(b4) {
 	float2 u_size;
-	uint u_history;
-	uint u_current;
-	uint u_motion_vectors;
-	uint u_output;
+	TextureHandle u_history;
+	TextureHandle u_current;
+	TextureHandle u_motion_vectors;
+	RWTextureHandle u_output;
 };
 
 // https://gist.github.com/TheRealMJP/c83b8c0f46b63f3a88a5986f4fa982b1
@@ -68,7 +68,6 @@ float4 getTexel(uint tex, float2 p, float2 res) {
 [numthreads(16, 16, 1)]
 void main(uint3 thread_id : SV_DispatchThreadID) {
 	int2 ij = int2(thread_id.xy);
-	if (any(ij >= int2(u_size.xy))) return;
 
 	float2 uv = (float2(ij) + 0.5) / u_size.xy;
 	float2 motionvec = sampleBindlessLod(LinearSamplerClamp, u_motion_vectors, uv, 0).xy;

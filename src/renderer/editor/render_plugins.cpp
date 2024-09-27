@@ -3755,7 +3755,6 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 		Vec3 ups_opengl[] = { { 0, -1, 0 },{ 0, -1, 0 },{ 0, 0, 1 },{ 0, 0, -1 },{ 0, -1, 0 },{ 0, -1, 0 } };
 
 		DrawStream& stream = renderer.getDrawStream();
-		stream.captureFrame();
 		const bool ndc_bottom_left = gpu::isOriginBottomLeft();
 
 		// capture cubemap
@@ -5443,6 +5442,13 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_model_plugin.init();
 
 		m_particle_editor = ParticleEditor::create(m_app);
+		Delegate<void()> vsync_delegate;
+		vsync_delegate.bind<&StudioAppPlugin::onVsyncSet>(this);
+		m_app.getSettings().registerPtr("VSync", &m_vsync, "General", &vsync_delegate);
+	}
+
+	void onVsyncSet() {
+		gpu::enableVSync(m_vsync);
 	}
 
 	void captureRenderDoc() {
@@ -5687,6 +5693,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	TerrainPlugin m_terrain_plugin;
 	ProceduralGeomPlugin m_procedural_geom_plugin;
 	InstancedModelPlugin m_instanced_model_plugin;
+	bool m_vsync = true;
 };
 
 }
