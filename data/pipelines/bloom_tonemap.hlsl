@@ -2,9 +2,9 @@
 
 cbuffer Drawcall : register (b4) {
 	float u_exposure;
-	uint u_input;
+	TextureHandle u_input;
 	uint u_accum;
-	uint u_output;
+	RWTextureHandle u_output;
 };
 
 [numthreads(16, 16, 1)]

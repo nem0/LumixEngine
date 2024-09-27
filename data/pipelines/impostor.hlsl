@@ -1,5 +1,4 @@
 //@surface
-#include "pipelines/common.hlsli"
 
 //@texture_slot "Albedo", "textures/common/white.tga"
 //@texture_slot "Normal", "", "HAS_NORMAL"
@@ -16,6 +15,8 @@
 //@uniform "Center", "float3", {0, 0, 0}
 //@uniform "Radius", "float", 1
 
+#include "pipelines/common.hlsli"
+
 struct VSOutput {
 	float2 uv : TEXCOORD0;
 	float3 normal : TEXCOORD1;
@@ -27,7 +28,7 @@ struct VSOutput {
 	float lod : TEXCOORD5;
 	float4 position : SV_POSITION;
 };
-struct Input {
+struct VSInput {
 	float3 position : TEXCOORD0;
 	float2 uv  : TEXCOORD1;
 	#define ATTR(X) TEXCOORD##X
@@ -59,7 +60,7 @@ float2 dirToGrid(float3 vec) {
 
 
 #ifdef USE_MATRIX
-	VSOutput mainVS(Input input) {
+	VSOutput mainVS(VSInput input) {
 		VSOutput output;
 		float3x3 to_model_space = (float3x3)model_mtx;
 		#ifdef DEPTH
@@ -101,7 +102,7 @@ float2 dirToGrid(float3 vec) {
 		return output;
 	}
 #else
-	VSOutput mainVS(Input input) {
+	VSOutput mainVS(VSInput input) {
 		VSOutput output;
 		float3x3 tangent_space;
 

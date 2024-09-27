@@ -1,8 +1,9 @@
 //@surface
-#include "pipelines/common.hlsli"
 //@uniform "Frames cols", "int", 1
 //@uniform "Frames rows", "int", 1
 //@texture_slot "Texture", "textures/common/white.tga"
+
+#include "pipelines/common.hlsli"
 
 struct VSInput {
 	float3 i_position : TEXCOORD0;
@@ -39,7 +40,7 @@ VSOutput mainVS(VSInput input) {
 	
 	output.color = input.i_color;
 	output.emission = input.i_emission;
-	float4 pos_vs = transformPosition(input.i_position.xyz, u_model, Pass_ws_to_vs) + float4(pos.xy, 0, 0);
+	float4 pos_vs = transformPosition(input.i_position, u_model, Pass_ws_to_vs) + float4(pos.xy, 0, 0);
 	output.position = transformPosition(pos_vs, Pass_vs_to_ndc);
 	return output;
 }

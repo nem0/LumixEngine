@@ -461,6 +461,7 @@ void Settings::load() {
 						break;
 					}
 				}
+				if (var->set_callback.isValid()) var->set_callback.invoke();
 			}
 			else {
 				var = &createVar(*this, var_name.value);
@@ -478,7 +479,7 @@ void Settings::load() {
 							var->type = Variable::BOOL;
 						} else {
 							m_variables.erase(var_name.value);
-							logError("Unexpected token in settings: ", value.value);
+							logError(tokenizer.filename, "(", tokenizer.getLine(), "): Unexpected token in settings: ", value.value);
 							tokenizer.logErrorPosition(value.value.begin);
 							return false;
 						}
@@ -514,10 +515,6 @@ void Settings::load() {
 		}
 		file.close();
 	}
-	else {
-		logError("Failed to read ", m_app_data_path);
-	}
-
 }
 
 static void saveShortcuts(Settings& settings, OutputMemoryStream& blob) {
@@ -962,26 +959,28 @@ void Settings::gui() {
 					
 					ImGuiEx::Label(iter.key().c_str());
 					ImGui::PushID(&var);
+					auto CB = [&](bool changed) { if (changed && var.set_callback.isValid()) var.set_callback.invoke(); };
 					switch (var.type) {
-						case Variable::BOOL: ImGui::Checkbox("##var", &var.bool_value); break;
-						case Variable::BOOL_PTR: ImGui::Checkbox("##var", var.bool_ptr); break;
-						case Variable::I32: ImGui::InputInt("##var", &var.i32_value); break;
-						case Variable::I32_PTR: ImGui::InputInt("##var", var.i32_ptr); break;
-						case Variable::FLOAT: ImGui::DragFloat("##var", &var.float_value); break;
+						case Variable::BOOL: CB(ImGui::Checkbox("##var", &var.bool_value)); break;
+						case Variable::BOOL_PTR: CB(ImGui::Checkbox("##var", var.bool_ptr)); break;
+						case Variable::I32: CB(ImGui::InputInt("##var", &var.i32_value)); break;
+						case Variable::I32_PTR: CB(ImGui::InputInt("##var", var.i32_ptr)); break;
+						case Variable::FLOAT: CB(ImGui::DragFloat("##var", &var.float_value)); break;
 						case Variable::FLOAT_PTR: {
 							if (var.is_angle) {
 								float deg = radiansToDegrees(*var.float_ptr);
 								if (ImGui::DragFloat("##var", &deg)) {
 									*var.float_ptr = degreesToRadians(deg);
+									if (var.set_callback.isValid()) var.set_callback.invoke();
 								}
 							}
 							else {
-								ImGui::DragFloat("##var", var.float_ptr);
+								CB(ImGui::DragFloat("##var", var.float_ptr));
 							}
 							break;
 						}
-						case Variable::STRING_PTR: inputString("##var", var.string_ptr); break;
-						case Variable::STRING: inputString("##var", &var.string_value); break;
+						case Variable::STRING_PTR: CB(inputString("##var", var.string_ptr)); break;
+						case Variable::STRING: CB(inputString("##var", &var.string_value)); break;
 					}
 					ImGui::PopID();
 				}
@@ -1108,7 +1107,7 @@ void Settings::registerPtr(const char* name, String* value, const char* category
 	new_var.category = getCategory(*this, category);
 }
 
-void Settings::registerPtr(const char* name, bool* value, const char* category) {
+void Settings::registerPtr(const char* name, bool* value, const char* category, Delegate<void()>* callback) {
 	// if variable already exists
 	Variable* var = findVar(*this, name);
 	if (var) {
@@ -1120,6 +1119,7 @@ void Settings::registerPtr(const char* name, bool* value, const char* category) 
 		*value = var->bool_value;
 		var->bool_ptr = value;
 		var->type = Variable::BOOL_PTR;
+		if (callback) var->set_callback = *callback;
 		return;
 	}
 
@@ -1128,6 +1128,7 @@ void Settings::registerPtr(const char* name, bool* value, const char* category) 
 	new_var.bool_ptr = value;
 	new_var.type = Variable::BOOL_PTR;
 	new_var.storage = WORKSPACE;
+	if (callback) new_var.set_callback = *callback;
 	new_var.category = getCategory(*this, category);
 }
 

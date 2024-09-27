@@ -39,10 +39,10 @@ VSOutput mainVS(uint vertex_id : SV_VertexID, uint instance_id : SV_InstanceID) 
 	int2 ij = u_from_to.xy + int2((vertex_id >> 1), instance_id + (vertex_id & 1));
 
 	float3 v = 0;
-	v.xz = float2(ij) * u_cell_size;
+	v.xz = ij * u_cell_size;
 	int mask = ~1;
 	float3 npos = 0;
-	npos.xz = float2(ij & mask) * u_cell_size;
+	npos.xz = (ij & mask) * u_cell_size;
 
 	float2 size = float2(u_from_to_sup.zw - u_from_to_sup.xy);
 	float2 rel = (ij - u_from_to_sup.xy) / size;
@@ -53,16 +53,11 @@ VSOutput mainVS(uint vertex_id : SV_VertexID, uint instance_id : SV_InstanceID) 
 
 	float2 hm_uv = (v.xz + 0.5 * u_terrain_scale.x) / (u_hm_size + u_terrain_scale.x);
 	VSOutput output;
-	#ifndef DEPTH
-		output.uv = v.xz / u_hm_size;
-	
-		float h = sampleBindlessLod(LinearSamplerClamp, t_heightmap, hm_uv, 0).x * u_terrain_scale.y;
-	#else
-		float h = sampleBindlessLod(LinearSamplerClamp, t_heightmap, hm_uv, 0).x * u_terrain_scale.y;
-	#endif
+	float h = sampleBindlessLod(LinearSamplerClamp, t_heightmap, hm_uv, 0).x * u_terrain_scale.y;
 
 	float3 pos_ws = u_position.xyz + v + float3(0, h, 0);		
 	#ifndef DEPTH
+		output.uv = v.xz / u_hm_size;
 		output.pos_ws = pos_ws;
 	#endif
 	#ifndef DEPTH
@@ -178,7 +173,7 @@ VSOutput mainVS(uint vertex_id : SV_VertexID, uint instance_id : SV_InstanceID) 
 			surface.albedo = (c00.albedo * bicoef.x + c01.albedo * bicoef.y + c10.albedo * bicoef.z + c11.albedo * bicoef.w).rgb;
 			float3 n = (c00.normal * bicoef.x + c01.normal * bicoef.y + c10.normal * bicoef.z + c11.normal * bicoef.w).xzy;
 
-			surface.N = normalize(mul(getTBN(input.uv), n));
+			surface.N = normalize(mul(n, getTBN(input.uv)));
 			surface.alpha = 1;
 
 			// blend between detail and satellite

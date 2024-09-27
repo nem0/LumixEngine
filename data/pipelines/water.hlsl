@@ -1,5 +1,4 @@
 //@surface
-#include "pipelines/common.hlsli"
 //@texture_slot "Normal", "textures/common/default_normal.tga"
 //@texture_slot "Noise", "textures/common/white.tga"
 //@texture_slot "Foam", "", "HAS_FOAM"
@@ -17,6 +16,8 @@
 //@uniform "Water scattering", "float", 8
 //@uniform "Refraction distortion", "float", 0.4
 //@define "SSR"
+
+#include "pipelines/common.hlsli"
 
 #define ATTR(X) TEXCOORD##X
 
@@ -65,11 +66,10 @@ VSOutput mainVS(VSInput input) {
 		output.pos_ws = input.i_pos_lod.xyz + rotateByQuat(input.i_rot, p);
 	#elif defined GRASS
 		#error TODO
-	#else 
-		float4x4 ls_to_ws = u_ls_to_ws;
-		output.normal = float3x3(ls_to_ws) * normal;
-		output.tangent = float3x3(ls_to_ws) * tangent;
-		output.pos_ws = transformPosition(input.position, ls_to_ws).xyz;
+	#else
+		output.normal = float3x3(u_ls_to_ws) * normal;
+		output.tangent = float3x3(u_ls_to_ws) * tangent;
+		output.pos_ws = transformPosition(input.position, u_ls_to_ws).xyz;
 	#endif
 	
 	#ifdef _HAS_ATTR2 
@@ -80,18 +80,17 @@ VSOutput mainVS(VSInput input) {
 }
 
 cbuffer Textures : register(b5) {
-	uint u_shadowmap;
-	uint u_depthbuffer;
-	uint u_reflection_probes;
-	uint u_bg;
+	TextureHandle u_shadowmap;
+	TextureHandle u_depthbuffer;
+	TextureHandle u_reflection_probes;
+	TextureHandle u_bg;
 };
 
-// TODO is this not the same as raycast in sss.hlsl?
-float2 raycast(float3 csOrig, float3 csDir, float stride, float jitter) {
-	float3 csEndPoint = csOrig + abs(csOrig.z * 0.1) * csDir;
+float2 raycast(float3 ray_origin, float3 ray_dir, float stride, float jitter) {
+	float3 ray_end_point = ray_origin + abs(ray_origin.z * 0.1) * ray_dir;
 
-	float4 H0 = transformPosition(csOrig, Global_vs_to_ndc);
-	float4 H1 = transformPosition(csEndPoint, Global_vs_to_ndc);
+	float4 H0 = transformPosition(ray_origin, Global_vs_to_ndc);
+	float4 H1 = transformPosition(ray_end_point, Global_vs_to_ndc);
 
 	float k0 = 1 / H0.w, k1 = 1 / H1.w;
 
@@ -106,11 +105,11 @@ float2 raycast(float3 csOrig, float3 csDir, float stride, float jitter) {
 		delta = delta.yx;
 	}
 
-	float stepDir = sign(delta.x);
-	float invdx = stepDir / delta.x;
+	float step_dir = sign(delta.x);
+	float invdx = step_dir / delta.x;
 
 	float dk = ((k1 - k0) * invdx) * stride;
-	float2  dP = (float2(stepDir, delta.y * invdx)) * stride;
+	float2  dP = (float2(step_dir, delta.y * invdx)) * stride;
 
 	float2 P = P0;
 	float k = k0;
@@ -120,16 +119,16 @@ float2 raycast(float3 csOrig, float3 csDir, float stride, float jitter) {
 		P += dP * jitter / stride;
 		k += dk * jitter / stride;
 		for (uint i = 0; i < max_steps; ++i) {
-			float rayZFar = 1 / k;
+			float ray_z_far = 1 / k;
 
 			float2 p = permute ? P.yx : P;
 			if (any(p < 0.0)) break;
 			if (any(p > float2(Global_framebuffer_size))) break;
 
-			float depth = sampleBindless(LinearSamplerClamp, u_depthbuffer, p * Global_rcp_framebuffer_size).x;
-			depth = toLinearDepth(depth);
+			float depth_ndc = sampleBindless(LinearSamplerClamp, u_depthbuffer, p * Global_rcp_framebuffer_size).x;
+			float depth_linear = toLinearDepth(depth_ndc);
 			
-			float dif = rayZFar - depth;
+			float dif = ray_z_far - depth_linear;
 			if (dif > 1e-3) {
 				return p;
 			}
@@ -140,15 +139,16 @@ float2 raycast(float3 csOrig, float3 csDir, float stride, float jitter) {
 		dP *= 2;
 		dk *= 2;
 	}
-	return -1.0f.xx;
+	return -1.0;
 }
 
 float3 getReflectionColor(float3 view, float3 normal, float dist, float3 pos_ws)
 {
 	#ifdef SSR
-		float4 o = transformPosition(pos_ws, Global_ws_to_vs);
-		float3 d = mul(reflect(-view, normal), float3x3(Global_ws_to_vs));
-		float2 hit = raycast(o.xyz, d, 4, hash(pos_ws.xy + Global_time));
+		float4 pos_vs = transformPosition(pos_ws, Global_ws_to_vs);
+		float3 ray_dir = mul(reflect(-view, normal), (float3x3)Global_ws_to_vs);
+		float jitter = hash(pos_ws.xy + Global_random_float2_normalized);
+		float2 hit = raycast(pos_vs.xyz, ray_dir, 4, jitter);
 		if (hit.x >= 0) {
 			return sampleBindless(LinearSamplerClamp, u_bg, hit.xy * Global_rcp_framebuffer_size).rgb;
 		}
@@ -163,7 +163,8 @@ float getWaterDepth(float3 pos_ws, float3 view, float3 normal)
 {
 	float4 screen_pos = transformPosition(pos_ws, Global_ws_to_ndc);
 	screen_pos /= screen_pos.w;
-	float depth = sampleBindless(LinearSamplerClamp, u_depthbuffer, toScreenUV(screen_pos.xy * 0.5 + 0.5)).x;
+	screen_pos.xy = toScreenUV(screen_pos.xy * 0.5 + 0.5);
+	float depth = sampleBindless(LinearSamplerClamp, u_depthbuffer, screen_pos.xy).x;
 	return toLinearDepth(depth) - toLinearDepth(screen_pos.z);
 }
 
@@ -171,13 +172,14 @@ float4 getRefraction(float3 pos_ws)
 {
 	float4 screen_pos = transformPosition(pos_ws, Global_ws_to_ndc);
 	screen_pos /= screen_pos.w;
-	return sampleBindless(LinearSamplerClamp, u_bg, toScreenUV(screen_pos.xy * 0.5 + 0.5));
+	screen_pos.xy = toScreenUV(screen_pos.xy * 0.5 + 0.5);
+	return sampleBindless(LinearSamplerClamp, u_bg, screen_pos.xy);
 }
 
 float getHeight(float2 uv) {
 	return 
-			(cos(sampleBindless(LinearSampler, t_normal, uv).x * 2 * M_PI + Global_time * 5) 
-			+ sin(sampleBindless(LinearSampler, t_normal, -uv.yx * 2 + 0.1).x * M_PI - Global_time * 3)) * 0.5 + 0.5
+		(cos(sampleBindless(LinearSampler, t_normal, uv).x * 2 * M_PI + Global_time * 5) 
+		+ sin(sampleBindless(LinearSampler, t_normal, -uv.yx * 2 + 0.1).x * M_PI - Global_time * 3)) * 0.5 + 0.5
 ;
 }
 

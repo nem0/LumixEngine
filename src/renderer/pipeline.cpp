@@ -33,13 +33,8 @@
 #include "terrain.h"
 #include "texture.h"
 
-// TODO decal disappear when camera is inside the decal volume
-// TODO vsync
-// TODO env probe lighting is off
-// TODO temporal upsample
-// TODO shader cleanup
-
-// TODO nice to have:
+// TODO nice to have (again):
+	// TODO temporal upsample
 	// TODO split common.hlsli
 	// TODO semaphore in job system to wake workers?
 	// TODO 3d ui in scene view
@@ -1156,9 +1151,9 @@ struct PipelineImpl final : Pipeline {
 			renderBucket(shadow_view, 1);
 
 			const u32 grass_depth_defines = 1 << m_renderer.getShaderDefineIdx("GRASS") | 1 << m_renderer.getShaderDefineIdx("DEPTH");
-			const gpu::StateFlags shadow_grass_state = gpu::StateFlags::DEPTH_FUNCTION | gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::CULL_BACK;
-			renderGrass(view_params, shadow_grass_state, grass_depth_defines);
-			renderTerrains(view_params, gpu::StateFlags::NONE, "DEPTH");
+			const gpu::StateFlags shadow_state = gpu::StateFlags::DEPTH_FUNCTION | gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::CULL_BACK;
+			renderGrass(view_params, shadow_state, grass_depth_defines);
+			renderTerrains(view_params, shadow_state, "DEPTH");
 		}
 		endBlock();
 		stream.barrierRead(m_renderbuffers[shadowmap_rb].handle);

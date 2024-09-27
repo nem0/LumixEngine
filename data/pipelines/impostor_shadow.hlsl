@@ -9,9 +9,9 @@ cbuffer Data : register(b4){
 	int2 u_tile_size;
 	int u_size;
 	float u_radius;
-	uint u_depth;
-	uint u_normalmap;
-	uint u_output;
+	TextureHandle u_depth;
+	TextureHandle u_normalmap;
+	RWTextureHandle u_output;
 };
 
 float3 impostorToWorld(float2 uv) {

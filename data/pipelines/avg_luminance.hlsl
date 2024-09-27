@@ -1,10 +1,9 @@
 #include "pipelines/common.hlsli"
 
 cbuffer Data : register (b4) {
-	float2 u_size;
 	float u_accomodation_speed;
-	uint u_image;
-	uint b_histogram;
+	TextureHandle u_image;
+	uint u_histogram;
 };
 
 groupshared uint histogram[256];
@@ -30,7 +29,7 @@ void main(uint3 local_thread_id : SV_GroupThreadID, uint3 thread_id : SV_Dispatc
 	const float range = 12.0;
 	const float min = -6;
 	#ifdef PASS0
-		bindless_rw_buffers[b_histogram].Store(local_thread_id.x * 4, 0);
+		bindless_rw_buffers[u_histogram].Store(local_thread_id.x * 4, 0);
 	#elif !defined PASS2
 		uint idx = local_thread_id.x + local_thread_id.y * 16;
 		histogram[idx] = 0;
@@ -38,8 +37,8 @@ void main(uint3 local_thread_id : SV_GroupThreadID, uint3 thread_id : SV_Dispatc
 		AllMemoryBarrier();
 		GroupMemoryBarrierWithGroupSync();
 
-		if (all(thread_id.xy < uint2(u_size + 0.5))) {
-			float _luminance = luminance(sampleBindlessLod(LinearSamplerClamp, u_image, int2(thread_id.xy) / u_size, 0).rgb);
+		if (all(thread_id.xy < uint2(Global_framebuffer_size + 0.5))) {
+			float _luminance = luminance(sampleBindlessLod(LinearSamplerClamp, u_image, thread_id.xy * Global_rcp_framebuffer_size, 0).rgb);
 			uint bin = luminanceToBin(_luminance, min, 1 / range);
 			InterlockedAdd(histogram[bin], 1);
 		}
@@ -47,10 +46,10 @@ void main(uint3 local_thread_id : SV_GroupThreadID, uint3 thread_id : SV_Dispatc
 		GroupMemoryBarrierWithGroupSync();
 		
 		uint dummy;
-		bindless_rw_buffers[b_histogram].InterlockedAdd(idx * 4, histogram[idx], dummy);
+		bindless_rw_buffers[u_histogram].InterlockedAdd(idx * 4, histogram[idx], dummy);
 	#else
 		uint idx = local_thread_id.x;
-		histogram[idx] = bindless_rw_buffers[b_histogram].Load(idx * 4) * idx;
+		histogram[idx] = bindless_rw_buffers[u_histogram].Load(idx * 4) * idx;
 		
 		AllMemoryBarrier();
 		GroupMemoryBarrierWithGroupSync();
@@ -65,12 +64,12 @@ void main(uint3 local_thread_id : SV_GroupThreadID, uint3 thread_id : SV_Dispatc
 
 		if (idx == 0) {
 			uint sum = histogram[0];
-			float avg_bin = sum / float(u_size.x * u_size.y);
+			float avg_bin = sum / float(Global_framebuffer_size.x * Global_framebuffer_size.y);
 			float avg_lum = binToLuminance(avg_bin, min, range);
-			float accumulator = asfloat(bindless_rw_buffers[b_histogram].Load(256 * 4));
+			float accumulator = asfloat(bindless_rw_buffers[u_histogram].Load(256 * 4));
 			accumulator += (avg_lum - accumulator) * (1 - exp(-Global_frame_time_delta * u_accomodation_speed));
 
-			bindless_rw_buffers[b_histogram].Store(256 * 4, asuint(accumulator));
+			bindless_rw_buffers[u_histogram].Store(256 * 4, asuint(accumulator));
 		}
 	#endif
 }

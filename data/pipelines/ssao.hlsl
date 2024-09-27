@@ -4,19 +4,17 @@
 // inspired by https://github.com/tobspr/RenderPipeline/blob/master/rpplugins/ao/shader/ue4ao.kernel.glsl
 
 cbuffer UB : register(b4) {
-	float2 u_rcp_size;
 	float u_radius;
 	float u_intensity;
-	uint u_normal_buffer;
-	uint u_depth_buffer;
-	uint u_output;
+	TextureHandle u_normal_buffer;
+	TextureHandle u_depth_buffer;
+	RWTextureHandle u_output;
 };
 
 // get normal in view space
 float3 getNormalVS(float2 tex_coord) {
-	float3 wnormal = sampleBindlessLod(LinearSamplerClamp, u_normal_buffer, tex_coord, 0).xyz * 2 - 1;
-	float4 vnormal = mul(float4(wnormal, 0), Global_ws_to_vs);
-	return vnormal.xyz;
+	float3 normal_ws = sampleBindlessLod(LinearSamplerClamp, u_normal_buffer, tex_coord, 0).xyz * 2 - 1;
+	return mul(normal_ws, (float3x3)Global_ws_to_vs);
 }	
 
 // get view-space position of pixel at `screen_uv`
@@ -29,24 +27,24 @@ float3 getPositionVS(uint depth_buffer, float2 screen_uv) {
 
 [numthreads(16, 16, 1)]
 void main(uint3 thread_id : SV_DispatchThreadID) {
-	float2 uv = thread_id.xy * u_rcp_size;
-	float3 pos_vs = getPositionVS(u_depth_buffer, uv);
-	float3 normal_vs = getNormalVS(uv);
+	float2 screen_uv = thread_id.xy * Global_rcp_framebuffer_size;
+	float3 pos_vs = getPositionVS(u_depth_buffer, screen_uv);
+	float3 normal_vs = getNormalVS(screen_uv);
 	float occlusion = 0;
 	float occlusion_count = 0;
 
-	float c = hash(float2(thread_id.xy) * 0.01 + frac(Global_time)) * 2 - 1;
+	float c = hash(float2(thread_id.xy) * 0.01 + Global_random_float2_normalized) * 2 - 1;
 	float depth_scale = u_radius / pos_vs.z * (c * 2 + 0.1);
 	float s = sqrt(1 - c * c); 
-	float2x2 rot = float2x2(c, s, -s, c); 
-	rot *= depth_scale;
+	float2x2 rot_scale = float2x2(c, s, -s, c); 
+	rot_scale *= depth_scale;
 
 	for (int i = 0; i < 4; ++i) {
 		float2 poisson = POISSON_DISK_4[i];
-		float2 s = mul(poisson, rot);
+		float2 s = mul(poisson, rot_scale);
 		
-		float3 pos_a_vs = getPositionVS(u_depth_buffer, uv + s) - pos_vs;
-		float3 pos_b_vs = getPositionVS(u_depth_buffer, uv - s) - pos_vs;
+		float3 pos_a_vs = getPositionVS(u_depth_buffer, screen_uv + s) - pos_vs;
+		float3 pos_b_vs = getPositionVS(u_depth_buffer, screen_uv - s) - pos_vs;
 
 		float3 sample_vec_a = normalize(pos_a_vs);
 		float3 sample_vec_b = normalize(pos_b_vs);

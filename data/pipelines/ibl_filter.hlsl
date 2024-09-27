@@ -1,20 +1,21 @@
 //@surface
+
 #include "pipelines/common.hlsli"
 
 cbuffer Drawcall : register(b4) {
 	float u_filter_roughness;
 	int u_face;
 	int u_mip;
-	uint u_texture;
+	TextureHandle u_texture;
 };
 
-struct Output {
+struct VSOutput {
 	float2 uv : TEXCOORD0;
 	float4 position : SV_POSITION;
 };
 
-Output mainVS(uint vertex_id : SV_VertexID) {
-	Output output;
+VSOutput mainVS(uint vertex_id : SV_VertexID) {
+	VSOutput output;
 	float4 pos = fullscreenQuad(vertex_id, output.uv);
 	pos.xy = pos.xy;
 	pos.y = -pos.y;

@@ -6,24 +6,20 @@ struct VSOutput {
 	float4 position : SV_POSITION;
 };
 
-struct VSInput {
-	uint vertexID : SV_VertexID;
-};
-
 cbuffer Textures : register(b4) {
-	uint u_gbuffer0;
-	uint u_gbuffer1;
-	uint u_gbuffer2;
-	uint u_gbuffer3;
-	uint u_gbuffer_depth;
-	uint u_shadowmap;
-	uint u_shadow_atlas;
-	uint u_reflection_probes;
+	TextureHandle u_gbuffer0;
+	TextureHandle u_gbuffer1;
+	TextureHandle u_gbuffer2;
+	TextureHandle u_gbuffer3;
+	TextureHandle u_gbuffer_depth;
+	TextureHandle u_shadowmap;
+	TextureHandle u_shadow_atlas;
+	TextureHandle u_reflection_probes;
 };
 
-VSOutput mainVS(VSInput input) {
+VSOutput mainVS(uint vertexID : SV_VertexID) {
 	VSOutput output;
-	output.position = fullscreenQuad(input.vertexID, output.uv);
+	output.position = fullscreenQuad(vertexID, output.uv);
 	return output;
 }
 
