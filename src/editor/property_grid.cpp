@@ -36,6 +36,10 @@ PropertyGrid::PropertyGrid(StudioApp& app)
 	m_toggle_ui.func.bind<&PropertyGrid::toggleUI>(this);
 	m_toggle_ui.is_selected.bind<&PropertyGrid::isOpen>(this);
 	
+	m_focus_filter_action.init("Focus filter", "Focus inspector filter", "focus_inspector_filter", "", (os::Keycode)'B', Action::CTRL, Action::IMGUI_PRIORITY);
+	m_focus_filter_action.func.bind<&PropertyGrid::focusFilter>(this);
+	m_app.addAction(&m_focus_filter_action);
+
 	m_app.addWindowAction(&m_toggle_ui);
 	m_app.getSettings().registerPtr("property_grid_open", &m_is_open);
 }
@@ -44,6 +48,7 @@ PropertyGrid::PropertyGrid(StudioApp& app)
 PropertyGrid::~PropertyGrid()
 {
 	m_app.removeAction(&m_toggle_ui);
+	m_app.removeAction(&m_focus_filter_action);
 	ASSERT(m_plugins.empty());
 }
 
@@ -937,10 +942,15 @@ void PropertyGrid::onGUI()
 
 	WorldEditor& editor = m_app.getWorldEditor();
 	const Array<EntityRef>& ents = editor.getSelectedEntities();
+	if (m_focus_filter_request) ImGui::SetNextWindowFocus();
 	if (ImGui::Begin(ICON_FA_INFO_CIRCLE "Inspector##inspector", &m_is_open) && !ents.empty()) {
 		showCoreProperties(ents, editor);
-
-		m_property_filter.gui("Filter", -1, ImGui::IsWindowAppearing());
+		
+		if (m_focus_filter_request) {
+			ImGui::SetKeyboardFocusHere();
+			m_focus_filter_request = false;
+		}
+		m_property_filter.gui("Filter", -1, ImGui::IsWindowAppearing(), &m_focus_filter_action);
 		World& world = *editor.getWorld();
 		for (ComponentUID cmp = world.getFirstComponent(ents[0]); cmp.isValid(); cmp = world.getNextComponent(cmp)) {
 			showComponentProperties(ents, cmp.type, editor);

@@ -2838,7 +2838,16 @@ void TextFilter::build() {
 	}
 }
 
-bool TextFilter::gui(const char* hint, float width, bool set_keyboard_focus) {
+bool TextFilter::gui(const char* hint, float width, bool set_keyboard_focus, Action* focus_action) {
+	if (focus_action) {
+		StaticString<64> hint_shortcut(hint);
+		char shortcut[32];
+		if (focus_action->shortcutText(shortcut)) {
+			hint_shortcut.append(" (", shortcut, ")");
+			return gui(hint_shortcut, width, set_keyboard_focus);
+		}
+	}
+
 	if (ImGuiEx::Filter(hint, filter, sizeof(filter), width, set_keyboard_focus)) {
 		build();
 		return true;

@@ -236,6 +236,7 @@ struct StudioAppImpl final : StudioApp
 			m_engine->getFileSystem().processCallbacks();
 		}
 
+		removeAction(&m_focus_hierarchy_action);
 		removeAction(&m_start_standalone_app);
 		removeAction(&m_show_all_actions_action);
 		removePlugin(*m_asset_browser.get());
@@ -2008,11 +2009,21 @@ struct StudioAppImpl final : StudioApp
 		const Array<EntityRef>& entities = m_editor->getSelectedEntities();
 		static TextFilter filter;
 		if (!m_is_entity_list_open) return;
-		if (ImGui::Begin(ICON_FA_STREAM "Hierarchy##hierarchy", &m_is_entity_list_open))
-		{
-			World* world = m_editor->getWorld();
-			filter.gui(ICON_FA_SEARCH "Filter");
+
+		if (m_request_focus_hierarchy_filter) ImGui::SetNextWindowFocus();
+		if (ImGui::Begin(ICON_FA_STREAM "Hierarchy##hierarchy", &m_is_entity_list_open)) {
+			if (m_request_focus_hierarchy_filter) {
+				ImGui::SetKeyboardFocusHere();
+				m_request_focus_hierarchy_filter = false;
+			}
 			
+			bool select_first = false;
+			World* world = m_editor->getWorld();
+			filter.gui(ICON_FA_SEARCH "Filter", -1, false, &m_focus_hierarchy_action);
+			if (ImGui::IsItemDeactivatedAfterEdit() && ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+				select_first = true;
+			}
+
 			if (ImGui::BeginChild("entities")) {
 				ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().FramePadding.x);
 				
@@ -2024,6 +2035,11 @@ struct StudioAppImpl final : StudioApp
 
 						ImGui::PushID(e.index);
 						const EntityRef e_ref = (EntityRef)e;
+						if (select_first) {
+							select_first = false;
+							m_editor->selectEntities(Span(&e_ref, 1), false);
+						}
+
 						bool selected = entities.indexOf(e_ref) >= 0;
 						if (ImGui::Selectable(buffer, &selected, ImGuiSelectableFlags_SpanAvailWidth)) {
 							m_editor->selectEntities(Span(&e_ref, 1), ImGui::GetIO().KeyCtrl);
@@ -2334,6 +2350,11 @@ struct StudioAppImpl final : StudioApp
 		}
 	}
 
+	void focusHierarchyFilter() {
+		m_request_focus_hierarchy_filter = true;
+		m_is_entity_list_open = true;
+	}
+
 	void showAllActionsGUI() { m_show_all_actions_request = true; }
 
 	void addActions()
@@ -2370,6 +2391,10 @@ struct StudioAppImpl final : StudioApp
 		m_show_all_actions_action.func.bind<&StudioAppImpl::showAllActionsGUI>(this);
 		addAction(&m_show_all_actions_action);
 		
+		m_focus_hierarchy_action.init("Focus hierarchy", "Focus hierarchy filter", "focus_hierarchy", "", os::Keycode::F, Action::Modifiers::CTRL, Action::Type::IMGUI_PRIORITY);
+		m_focus_hierarchy_action.func.bind<&StudioAppImpl::focusHierarchyFilter>(this);
+		addAction(&m_focus_hierarchy_action);
+
 		m_start_standalone_app.init("Start standalone app", "Start standalone app", "start_standalone_app", "", Action::Type::IMGUI_PRIORITY);
 		m_start_standalone_app.func.bind<&StudioAppImpl::startStandaloneApp>(this);
 		addToolAction(&m_start_standalone_app);
@@ -3176,6 +3201,7 @@ struct StudioAppImpl final : StudioApp
 	CommonActions m_common_actions;
 	Action m_show_all_actions_action;
 	Action m_start_standalone_app;
+	Action m_focus_hierarchy_action;
 
 	Array<GUIPlugin*> m_gui_plugins;
 	Array<MousePlugin*> m_mouse_plugins;
@@ -3273,6 +3299,7 @@ struct StudioAppImpl final : StudioApp
 	TextFilter m_all_actions_filter;
 	bool m_sleep_when_inactive = true;
 	bool m_crash_reporting = true;
+	bool m_request_focus_hierarchy_filter = false;
 	i32 m_font_size = 13;
 };
 
