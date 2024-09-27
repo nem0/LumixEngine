@@ -176,7 +176,8 @@ struct LUMIX_RENDERER_API Pipeline {
 		PROBE_CLUSTERS,
 		VELOCITY,
 
-		PLUGIN
+		BUILTIN_COUNT,
+		PLUGIN,
 	};
 
 	DebugShow m_debug_show = DebugShow::NONE;

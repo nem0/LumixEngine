@@ -33,25 +33,6 @@
 #include "terrain.h"
 #include "texture.h"
 
-// TODO nice to have (again):
-	// TODO temporal upsample
-	// TODO split common.hlsli
-	// TODO semaphore in job system to wake workers?
-	// TODO 3d ui in scene view
-	// TODO property groups in property grid
-	// TODO vertex pulling
-	// TODO temporal SSAO
-	// TODO static samplers
-	// TODO icons over some debugs, e.g. TDAO 
-	// TODO switch plugins to use new genie stuff like plugin() function
-	// TODO gpu::readTexture with destination memory, so it does not have to allocate it
-	// TODO fsr2/dlss
-	// TODO "static" srv+urv == "constant" bindless index
-	// TODO bindless terrain
-	// TODO shadow atlas -> bindless?
-	// TODO render graph
-	// TODO releaseRenderBuffer -> so they can be reused in the same frame
-
 namespace Lumix {
 
 // sort key:

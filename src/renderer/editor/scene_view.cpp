@@ -843,6 +843,16 @@ SceneView::SceneView(StudioApp& app)
 	m_reset_pivot_action.init("Reset pivot", "Reset pivot", "reset_pivot", "", os::Keycode::K, Action::Modifiers::SHIFT, Action::IMGUI_PRIORITY);
 	m_insert_model_action.init("Insert model", "Insert model or prefab", "insert_model", ICON_FA_SEARCH, (os::Keycode)'P', Action::Modifiers::CTRL, Action::IMGUI_PRIORITY);
 
+	m_debug_show_actions[(u32)Pipeline::DebugShow::NONE].init("No debug", "Disabled debug view", "disable_debug_view", "", Action::IMGUI_PRIORITY);
+	m_debug_show_actions[(u32)Pipeline::DebugShow::ALBEDO].init("Albedo", "Show albedo debug", "show_albedo_debug", "", Action::IMGUI_PRIORITY);
+	m_debug_show_actions[(u32)Pipeline::DebugShow::NORMAL].init("Normal", "Show normal debug", "show_normal_debug", "", Action::IMGUI_PRIORITY);
+	m_debug_show_actions[(u32)Pipeline::DebugShow::ROUGHNESS].init("Roughness", "Show roughness debug", "show_roughness_debug", "", Action::IMGUI_PRIORITY);
+	m_debug_show_actions[(u32)Pipeline::DebugShow::METALLIC].init("Metallic", "Show metallic debug", "show_metalic_debug", "", Action::IMGUI_PRIORITY);
+	m_debug_show_actions[(u32)Pipeline::DebugShow::AO].init("AO", "Show AO debug", "show_ao_debug", "", Action::IMGUI_PRIORITY);
+	m_debug_show_actions[(u32)Pipeline::DebugShow::VELOCITY].init("Velocity", "Show velocity debug", "show_velocity_debug", "", Action::IMGUI_PRIORITY);
+	m_debug_show_actions[(u32)Pipeline::DebugShow::LIGHT_CLUSTERS].init("Light clusters", "Show light clusters debug", "show_light_clusters_debug", "", Action::IMGUI_PRIORITY);
+	m_debug_show_actions[(u32)Pipeline::DebugShow::PROBE_CLUSTERS].init("Probe clusters", "Show probe clusters debug", "show_probe_clusters_debug", "", Action::IMGUI_PRIORITY);
+
 	m_top_view_action.init("Top", "Set top camera view", "viewTop", "", Action::IMGUI_PRIORITY);
 	m_side_view_action.init("Side", "Set side camera view", "viewSide", "", Action::IMGUI_PRIORITY);
 	m_front_view_action.init("Front", "Set front camera view", "viewFront", "", Action::IMGUI_PRIORITY);
@@ -860,6 +870,17 @@ SceneView::SceneView(StudioApp& app)
 	m_app.addAction(&m_insert_model_action);
 	m_app.addAction(&m_set_pivot_action);
 	m_app.addAction(&m_reset_pivot_action);
+	
+	m_app.addAction(&m_debug_show_actions[(u32)Pipeline::DebugShow::NONE]);
+	m_app.addAction(&m_debug_show_actions[(u32)Pipeline::DebugShow::ALBEDO]);
+	m_app.addAction(&m_debug_show_actions[(u32)Pipeline::DebugShow::NORMAL]);
+	m_app.addAction(&m_debug_show_actions[(u32)Pipeline::DebugShow::ROUGHNESS]);
+	m_app.addAction(&m_debug_show_actions[(u32)Pipeline::DebugShow::METALLIC]);
+	m_app.addAction(&m_debug_show_actions[(u32)Pipeline::DebugShow::AO]);
+	m_app.addAction(&m_debug_show_actions[(u32)Pipeline::DebugShow::VELOCITY]);
+	m_app.addAction(&m_debug_show_actions[(u32)Pipeline::DebugShow::LIGHT_CLUSTERS]);
+	m_app.addAction(&m_debug_show_actions[(u32)Pipeline::DebugShow::PROBE_CLUSTERS]);
+	
 	m_app.addAction(&m_top_view_action);
 	m_app.addAction(&m_side_view_action);
 	m_app.addAction(&m_front_view_action);
@@ -904,6 +925,9 @@ SceneView::~SceneView()
 	auto* renderer = static_cast<Renderer*>(engine.getSystemManager().getSystem("renderer"));
 	renderer->removePlugin(*m_render_plugin.get());
 
+	for (u32 i = 0; i < lengthOf(m_debug_show_actions); ++i) {
+		m_app.removeAction(&m_debug_show_actions[i]);
+	}
 	m_app.removeAction(&m_copy_move_action);
 	m_app.removeAction(&m_toggle_gizmo_step_action);
 	m_app.removeAction(&m_insert_model_action);
@@ -989,7 +1013,15 @@ bool SceneView::onAction(const Action& action) {
 	else if (&action == &m_move_entity_N_action) moveEntity(Vec2(0, 1));
 	else if (&action == &m_move_entity_S_action) moveEntity(Vec2(0, -1));
 	else if (&action == &m_move_entity_W_action) moveEntity(Vec2(1, 0));
-	else return false;
+	else {
+		for (u32 i = 0; i < lengthOf(m_debug_show_actions); ++i) {
+			if (&action == &m_debug_show_actions[i]) {
+				m_pipeline->m_debug_show = (Pipeline::DebugShow)i;
+				return true;
+			}
+		}
+		return false;
+	}
 	return true;
 }
 
@@ -1282,7 +1314,12 @@ void SceneView::onToolbar()
 	if (ImGui::Button("Debug")) ImGui::OpenPopup("Debug");
 	if (ImGui::BeginPopup("Debug")) {
 		auto option = [&](const char* label, Pipeline::DebugShow value) {
-			if (ImGui::RadioButton(label, m_pipeline->m_debug_show == value)) {
+			StaticString<64> tmp(label);
+			char shortcut[32];
+			if (m_debug_show_actions[(u32)value].shortcutText(shortcut)) {
+				tmp.append(" (", shortcut, ")");
+			}
+			if (ImGui::RadioButton(tmp, m_pipeline->m_debug_show == value)) {
 				m_pipeline->m_debug_show = value;
 				m_pipeline->m_debug_show_plugin = nullptr;
 			}
@@ -1292,10 +1329,10 @@ void SceneView::onToolbar()
 		option("Normal", Pipeline::DebugShow::NORMAL);
 		option("Roughness", Pipeline::DebugShow::ROUGHNESS);
 		option("Metallic", Pipeline::DebugShow::METALLIC);
+		option("AO", Pipeline::DebugShow::AO);
 		option("Velocity", Pipeline::DebugShow::VELOCITY);
 		option("Light clusters", Pipeline::DebugShow::LIGHT_CLUSTERS);
 		option("Probe clusters", Pipeline::DebugShow::PROBE_CLUSTERS);
-		option("AO", Pipeline::DebugShow::AO);
 		Renderer& renderer = m_pipeline->getRenderer();
 		for (Lumix::RenderPlugin* plugin : renderer.getPlugins()) {
 			plugin->debugUI(*m_pipeline);
