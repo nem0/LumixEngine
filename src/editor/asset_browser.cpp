@@ -126,6 +126,8 @@ struct AssetBrowserImpl : AssetBrowser {
 		addPlugin(m_world_asset_plugin, Span(world_exts));
 		m_app.getAssetCompiler().addPlugin(m_world_asset_plugin, Span(world_exts));
 		m_app.getSettings().registerPtr("asset_browser_open", &m_is_open);
+		m_app.getSettings().registerPtr("asset_browser_thumbnails", &m_show_thumbnails);
+		m_app.getSettings().registerPtr("asset_browser_thumbnail_size", &m_thumbnail_size);
 	}
 
 	void focusSearch() {
@@ -172,10 +174,19 @@ struct AssetBrowserImpl : AssetBrowser {
 		ASSERT(m_plugins.size() == 0);
 	}
 
+	void selectAll() {
+		m_selected_resources.clear();
+		for (const FileInfo& info : m_file_infos) {
+			m_selected_resources.push(info.filepath);
+		}
+	}
+
 	bool onAction(const Action& action) override {
+		CommonActions& common = m_app.getCommonActions();
 		if (&action == &m_back_action) goBackDir();
 		else if (&action == &m_forward_action) goForwardDir();
-		else if (&action == &m_app.getCommonActions().del && !m_selected_resources.empty()) m_request_delete = true;
+		else if (&action == &common.del && !m_selected_resources.empty()) m_request_delete = true;
+		else if (&action == &common.select_all) selectAll(); 
 		else return false;
 		return true;
 	}
