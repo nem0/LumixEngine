@@ -14,7 +14,7 @@ namespace Lumix {
 
 struct LUMIX_EDITOR_API MouseSensitivity {
 	MouseSensitivity(IAllocator& allocator);
-	void gui(const char* label);
+	void gui();
 	float eval(float value);
 	void save(const char* name, OutputMemoryStream& blob);
 	bool load(struct Tokenizer& tokenizer);

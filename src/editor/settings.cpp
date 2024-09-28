@@ -99,15 +99,14 @@ void MouseSensitivity::save(const char* name, OutputMemoryStream& blob) {
 	blob << "]\n";
 }
 
-void MouseSensitivity::gui(const char* label) {
+void MouseSensitivity::gui() {
 	ImGui::PushID(this);
-	ImGuiEx::Label(label);
-	if (ImGuiEx::CurvePreviewButton("curve", &values.begin()->x, &values.begin()->y, values.size(), ImVec2(130, ImGui::GetTextLineHeight()), sizeof(values[0]))) ImGui::OpenPopup(label);
+	if (ImGuiEx::CurvePreviewButton("curve", &values.begin()->x, &values.begin()->y, values.size(), ImVec2(130, ImGui::GetTextLineHeight()), sizeof(values[0]))) ImGui::OpenPopup("sensitivity_popup");
 	ImGui::SameLine();
-	if (ImGui::Button(ICON_FA_PENCIL_ALT)) ImGui::OpenPopup(label);
+	if (ImGui::Button(ICON_FA_PENCIL_ALT)) ImGui::OpenPopup("sensitivity_popup");
 	bool open = true;
 	ImGui::SetNextWindowSize(ImVec2(300, 300), ImGuiCond_FirstUseEver);
-	if (ImGui::BeginPopupModal(label, &open)) {
+	if (ImGui::BeginPopupModal("sensitivity_popup", &open)) {
 		i32 new_count;
 		ImU32 flags = ImU32(ImGuiEx::CurveEditorFlags::NO_TANGENTS | ImGuiEx::CurveEditorFlags::SHOW_GRID);
 		if (ImGuiEx::IconButton(ICON_FA_EXPAND, "Fit to view")) flags |= (ImU32)ImGuiEx::CurveEditorFlags::RESET;
@@ -787,9 +786,8 @@ static void Theme_Lumix(ImGuiStyle* dst = NULL) {
 	style->DisplaySafeAreaPadding = {3.000000, 3.000000};
 }
 
-bool ShowStyleSelector(const char* label) {
+bool ShowStyleSelector() {
 	static int style_idx = -1;
-	ImGuiEx::Label(label);
 	if (ImGui::Combo("##themes", &style_idx, "Classic\0Dark\0Light\0Blender\0Nord\0Lumix\0")) {
 		switch (style_idx) {
 			case 0: ImGui::StyleColorsClassic(); break;
@@ -837,19 +835,27 @@ void Settings::shortcutsGUI() {
 	static TextFilter filter;
 	filter.gui("Filter");
 
-	for (int i = 0; i < actions.size(); ++i)
-	{
-		Action& a = *actions[i];
-		char button_label[64];
-		a.shortcutText(Span(button_label));
-		if (filter.pass(a.label_long) || filter.pass(button_label)) {
-			ImGui::PushID(&a);
-			ImGuiEx::Label(a.label_long);
-			if (shortcutInput(button_label, a, &a == m_edit_action)) {
-				m_edit_action = &a;
+	if (ImGui::BeginChild("shortcuts_scrollarea")) {
+		if (ImGui::BeginTable("shortcuts", 2, ImGuiTableFlags_RowBg)) {
+			for (int i = 0; i < actions.size(); ++i) {
+				Action& a = *actions[i];
+				char button_label[64];
+				a.shortcutText(Span(button_label));
+				if (filter.pass(a.label_long) || filter.pass(button_label)) {
+					ImGui::TableNextRow();
+					ImGui::TableNextColumn();
+					ImGui::PushID(&a);
+					ImGuiEx::Label(a.label_long);
+					ImGui::TableNextColumn();
+					if (shortcutInput(button_label, a, &a == m_edit_action)) {
+						m_edit_action = &a;
+					}
+					ImGui::PopID();
+				}
 			}
-			ImGui::PopID();
+			ImGui::EndTable();
 		}
+		ImGui::EndChild();
 	}
 
 	ImGui::EndTabItem();
@@ -900,6 +906,9 @@ static void styleGUI() {
 	}
 	
 	if (ImGui::BeginTabItem("Colors")) {
+		ImGuiEx::Label("Themes");
+		ShowStyleSelector();
+
 		static TextFilter filter;
 		filter.gui("Filter");
 		ImGui::BeginChild("##colors", ImVec2(0, 0), true, ImGuiWindowFlags_AlwaysVerticalScrollbar | ImGuiWindowFlags_AlwaysHorizontalScrollbar | ImGuiWindowFlags_NavFlattened);
@@ -922,67 +931,84 @@ static void styleGUI() {
 }
 
 static void generalGUI(Settings& settings) {
-	ShowStyleSelector("Themes");
+	ImGui::TableNextRow();
+	ImGui::TableNextColumn();
+	ImGuiEx::Label("Global settings path");
+	ImGui::TableNextColumn();
 	if (ImGui::Button(ICON_FA_FOLDER "##open global")) {
 		os::openExplorer(settings.m_app.getEngine().getFileSystem().getBasePath());
 	}
 	ImGui::SameLine();
-	ImGui::Text("Global settings path: %s", SETTINGS_PATH);
+	ImGui::TextUnformatted(SETTINGS_PATH);
 
+	ImGui::TableNextColumn();
+	ImGuiEx::Label("Local settings path");
+	ImGui::TableNextColumn();
 	if (ImGui::Button(ICON_FA_FOLDER "##open_local")) {
 		os::openExplorer(Path::getDir(settings.m_app_data_path.c_str()));
 	}
 	ImGui::SameLine();
-	ImGui::Text("Local settings path: %s", settings.m_app_data_path.c_str());
+	ImGui::TextUnformatted(settings.m_app_data_path.c_str());
 
-	settings.m_mouse_sensitivity_x.gui("Mouse sensitivity X");
-	settings.m_mouse_sensitivity_y.gui("Mouse sensitivity Y");
+	ImGui::TableNextColumn();
+	ImGuiEx::Label("Mouse sensitivity X");
+	ImGui::TableNextColumn();
+	settings.m_mouse_sensitivity_x.gui();
+
+	ImGui::TableNextColumn();
+	ImGuiEx::Label("Mouse sensitivity Y");
+	ImGui::TableNextColumn();
+	settings.m_mouse_sensitivity_y.gui();
 }
 
 void Settings::gui() {
 	if (!m_is_open) return;
 	if (ImGui::Begin(ICON_FA_COG "Settings##settings", &m_is_open)) {
 		if (ImGui::BeginTabBar("tabs")) {
-			styleGUI();
 			shortcutsGUI();
+			styleGUI();
 
 			u32 cat_idx = -1;
 			for (Category& cat : m_categories) {
 				++cat_idx;
 				if (!ImGui::BeginTabItem(cat.name.c_str())) continue;
 
-				if (cat.name == "General") generalGUI(*this);
-
-				for (auto iter = m_variables.begin(), end = m_variables.end(); iter != end; ++iter) {
-					Variable& var = iter.value();
-					if (var.category != cat_idx) continue;
-					
-					ImGuiEx::Label(iter.key().c_str());
-					ImGui::PushID(&var);
-					auto CB = [&](bool changed) { if (changed && var.set_callback.isValid()) var.set_callback.invoke(); };
-					switch (var.type) {
-						case Variable::BOOL: CB(ImGui::Checkbox("##var", &var.bool_value)); break;
-						case Variable::BOOL_PTR: CB(ImGui::Checkbox("##var", var.bool_ptr)); break;
-						case Variable::I32: CB(ImGui::InputInt("##var", &var.i32_value)); break;
-						case Variable::I32_PTR: CB(ImGui::InputInt("##var", var.i32_ptr)); break;
-						case Variable::FLOAT: CB(ImGui::DragFloat("##var", &var.float_value)); break;
-						case Variable::FLOAT_PTR: {
-							if (var.is_angle) {
-								float deg = radiansToDegrees(*var.float_ptr);
-								if (ImGui::DragFloat("##var", &deg)) {
-									*var.float_ptr = degreesToRadians(deg);
-									if (var.set_callback.isValid()) var.set_callback.invoke();
+				if (ImGui::BeginTable("settings_table", 2, ImGuiTableFlags_RowBg)) {
+					if (cat.name == "General") generalGUI(*this);
+					for (auto iter = m_variables.begin(), end = m_variables.end(); iter != end; ++iter) {
+						Variable& var = iter.value();
+						if (var.category != cat_idx) continue;
+						ImGui::TableNextRow();
+						ImGui::TableNextColumn();
+						ImGuiEx::Label(iter.key().c_str());
+						ImGui::TableNextColumn();
+						ImGui::PushID(&var);
+						auto CB = [&](bool changed) { if (changed && var.set_callback.isValid()) var.set_callback.invoke(); };
+						switch (var.type) {
+							case Variable::BOOL: CB(ImGui::Checkbox("##var", &var.bool_value)); break;
+							case Variable::BOOL_PTR: CB(ImGui::Checkbox("##var", var.bool_ptr)); break;
+							case Variable::I32: CB(ImGui::InputInt("##var", &var.i32_value)); break;
+							case Variable::I32_PTR: CB(ImGui::InputInt("##var", var.i32_ptr)); break;
+							case Variable::FLOAT: CB(ImGui::DragFloat("##var", &var.float_value)); break;
+							case Variable::FLOAT_PTR: {
+								if (var.is_angle) {
+									float deg = radiansToDegrees(*var.float_ptr);
+									if (ImGui::DragFloat("##var", &deg)) {
+										*var.float_ptr = degreesToRadians(deg);
+										if (var.set_callback.isValid()) var.set_callback.invoke();
+									}
 								}
+								else {
+									CB(ImGui::DragFloat("##var", var.float_ptr));
+								}
+								break;
 							}
-							else {
-								CB(ImGui::DragFloat("##var", var.float_ptr));
-							}
-							break;
+							case Variable::STRING_PTR: CB(inputString("##var", var.string_ptr)); break;
+							case Variable::STRING: CB(inputString("##var", &var.string_value)); break;
 						}
-						case Variable::STRING_PTR: CB(inputString("##var", var.string_ptr)); break;
-						case Variable::STRING: CB(inputString("##var", &var.string_value)); break;
+						ImGui::PopID();
 					}
-					ImGui::PopID();
+					ImGui::EndTable();
 				}
 				ImGui::EndTabItem();
 			}
