@@ -23,7 +23,6 @@ EditorAssetPlugin::~EditorAssetPlugin() {
 
 void AssetEditorWindow::onGUI() {
 	bool open = true;
-	m_has_focus = false;
 
 	ImGui::SetNextWindowDockID(m_dock_id ? m_dock_id : m_app.getDockspaceID(), ImGuiCond_Appearing);
 
@@ -39,7 +38,6 @@ void AssetEditorWindow::onGUI() {
 	StaticString<128> title(basename, "##ae", (uintptr)this);
 
 	if (ImGui::Begin(title, &open, flags)) {
-		m_has_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 		m_dock_id = ImGui::GetWindowDockID();
 		windowGUI();
 	}

@@ -413,16 +413,6 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 
 		void serialize(OutputMemoryStream& blob) override { m_controller.serialize(blob); }
 
-		bool onAction(const Action& action) override {
-			const CommonActions& actions = m_app.getCommonActions();
-			if (&action == &actions.save) saveAs(m_path);
-			else if (&action == &actions.undo) undo();
-			else if (&action == &actions.del) deleteSelectedNodes();
-			else if (&action == &actions.redo) redo();
-			else return false;
-			return true;
-		}
-
 		void previewUI() { 
 			auto* anim_module = (AnimationModule*)m_viewer.m_world->getModule("animation");
 			if (ImGui::CollapsingHeader("Preview", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -1018,6 +1008,12 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		}
 
 		void windowGUI() override {
+			CommonActions& actions = m_app.getCommonActions();
+			if (m_app.checkShortcut(actions.save)) saveAs(m_path);
+			else if (m_app.checkShortcut(actions.undo)) undo();
+			else if (m_app.checkShortcut(actions.del)) deleteSelectedNodes();
+			else if (m_app.checkShortcut(actions.redo)) redo();
+
 			if (!m_to_fix_skeleton.empty()) {
 				ImGui::OpenPopup(ICON_FA_EXCLAMATION_TRIANGLE " Fix skeleton");
 			}

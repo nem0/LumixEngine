@@ -37,7 +37,6 @@ struct LUMIX_RENDERER_API GameView : StudioApp::GUIPlugin {
 	bool m_is_open;
 
 private:
-	bool onAction(const Action& action) override;
 	void toggleFullscreen();
 	void processInputEvents();
 	void onFullscreenGUI(WorldEditor& editor);

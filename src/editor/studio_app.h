@@ -53,8 +53,6 @@ struct LUMIX_EDITOR_API StudioApp {
 	struct LUMIX_EDITOR_API GUIPlugin {
 		virtual ~GUIPlugin() {}
 		virtual void onGUI() = 0;
-		virtual bool hasFocus() const { return false; }
-		virtual bool onAction(const Action& action) { return false; }
 		virtual void update(float) {}
 		virtual void pluginAdded(GUIPlugin& plugin) {}
 		virtual const char* getName() const = 0;
@@ -147,6 +145,7 @@ struct LUMIX_EDITOR_API StudioApp {
 	// if true, shortcuts are not processed
 	// use case - when there's active game in game view, we don't want delete keypress to delete entities
 	virtual void setCaptureInput(bool capture) = 0;
+	virtual bool checkShortcut(Action& action, bool global = false) = 0;
 
 	virtual Span<const os::Event> getEvents() const = 0;
 	virtual ImFont* getDefaultFont() = 0;

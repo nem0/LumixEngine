@@ -30,7 +30,7 @@ LogUI::LogUI(StudioApp& app, IAllocator& allocator)
 		m_new_message_count[i] = 0;
 	}
 
-	m_toggle_ui.init("Log", "Toggle Log UI", "log", "", Action::IMGUI_PRIORITY);
+	m_toggle_ui.init("Log", "Toggle Log UI", "log", "");
 	m_toggle_ui.func.bind<&LogUI::toggleUI>(this);
 	m_toggle_ui.is_selected.bind<&LogUI::isOpen>(this);
 

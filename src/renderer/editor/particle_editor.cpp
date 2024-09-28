@@ -2719,7 +2719,7 @@ struct ParticleEditorImpl : ParticleEditor {
 		, m_particle_system_plugin(*this, app)
 		, m_functions(m_allocator)
 	{
-		m_apply_action.init("Apply", "Particle editor apply", "particle_editor_apply", "", os::Keycode::E, Action::Modifiers::CTRL, Action::IMGUI_PRIORITY);
+		m_apply_action.init("Apply", "Particle editor apply", "particle_editor_apply", "", os::Keycode::E, Action::Modifiers::CTRL);
 		app.addAction(&m_apply_action);
 
 		const char* particle_emitter_exts[] = {"par" };
@@ -3431,8 +3431,14 @@ struct ParticleEditorWindow : AssetEditorWindow, NodeEditor {
 	}
 
 	void windowGUI() override {
+		CommonActions& actions = m_app.getCommonActions();
+		if (m_app.checkShortcut(m_editor.m_apply_action)) apply();
+		else if (m_app.checkShortcut(actions.del)) deleteSelectedNodes();
+		else if (m_app.checkShortcut(actions.save)) saveAs(m_resource.m_path);
+		else if (m_app.checkShortcut(actions.undo)) undo();
+		else if (m_app.checkShortcut(actions.redo)) redo();
+
 		debugUI();
-		const CommonActions& actions = m_app.getCommonActions();
 
 		if (ImGui::BeginMenuBar()) {
 			if (ImGui::BeginMenu("File")) {
@@ -3513,17 +3519,6 @@ struct ParticleEditorWindow : AssetEditorWindow, NodeEditor {
 	}
 
 	const Path& getPath() override { return m_resource.m_path; }
-
-	bool onAction(const Action& action) override {
-		const CommonActions& actions = m_app.getCommonActions();
-		if (&action == &m_editor.m_apply_action) apply();
-		else if (&action == &actions.del) deleteSelectedNodes();
-		else if (&action == &actions.save) saveAs(m_resource.m_path);
-		else if (&action == &actions.undo) undo();
-		else if (&action == &actions.redo) redo();
-		else return false;
-		return true;
-	}
 
 	Node* addNode(Node::Type type) {
 		return m_active_emitter->addNode(type);

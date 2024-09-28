@@ -32,12 +32,11 @@ PropertyGrid::PropertyGrid(StudioApp& app)
 	, m_plugins(app.getAllocator())
 	, m_deferred_select(INVALID_ENTITY)
 {
-	m_toggle_ui.init("Inspector", "Toggle Inspector UI", "inspector", "", Action::IMGUI_PRIORITY);
+	m_toggle_ui.init("Inspector", "Toggle Inspector UI", "inspector", "");
 	m_toggle_ui.func.bind<&PropertyGrid::toggleUI>(this);
 	m_toggle_ui.is_selected.bind<&PropertyGrid::isOpen>(this);
 	
-	m_focus_filter_action.init("Focus filter", "Focus inspector filter", "focus_inspector_filter", "", (os::Keycode)'B', Action::CTRL, Action::IMGUI_PRIORITY);
-	m_focus_filter_action.func.bind<&PropertyGrid::focusFilter>(this);
+	m_focus_filter_action.init("Focus filter", "Focus inspector filter", "focus_inspector_filter", "", (os::Keycode)'B', Action::CTRL);
 	m_app.addAction(&m_focus_filter_action);
 
 	m_app.addWindowAction(&m_toggle_ui);
@@ -932,10 +931,14 @@ static void showAddComponentNode(const StudioApp::AddCmpTreeNode* node, const Te
 	showAddComponentNode(node->next, filter, parent, editor);
 }
 
-void PropertyGrid::onGUI()
-{
+void PropertyGrid::onGUI() {
 	for (IPlugin* i : m_plugins) {
 		i->update();
+	}
+
+	if (m_app.checkShortcut(m_focus_filter_action, true)) {
+		m_focus_filter_request = true;
+		m_is_open = true;
 	}
 
 	if (!m_is_open) return;

@@ -222,7 +222,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		m_is_open = false;
 		m_is_paused = true;
 
-		m_toggle_ui.init("Profiler", "Toggle profiler UI", "profiler", "", Action::IMGUI_PRIORITY);
+		m_toggle_ui.init("Profiler", "Toggle profiler UI", "profiler", "");
 		m_toggle_ui.func.bind<&ProfilerUIImpl::toggleUI>(this);
 		m_toggle_ui.is_selected.bind<&ProfilerUIImpl::isOpen>(this);
 

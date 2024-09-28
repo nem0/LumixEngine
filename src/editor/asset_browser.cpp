@@ -26,7 +26,7 @@
 
 namespace Lumix {
 
-		
+
 static void clampText(char* text, int width) {
 	char* end = text + stringLength(text);
 	ImVec2 size = ImGui::CalcTextSize(text);
@@ -108,13 +108,11 @@ struct AssetBrowserImpl : AssetBrowser {
 
 		onBasePathChanged();
 
-		m_back_action.init("Back", "Back in asset history", "back", ICON_FA_ARROW_LEFT, Action::IMGUI_PRIORITY);
-		m_forward_action.init("Forward", "Forward in asset history", "forward", ICON_FA_ARROW_RIGHT, Action::IMGUI_PRIORITY);
+		m_back_action.init("Back", "Back in asset history", "back", ICON_FA_ARROW_LEFT);
+		m_forward_action.init("Forward", "Forward in asset history", "forward", ICON_FA_ARROW_RIGHT);
+		m_focus_search.init("Focus asset search", "Focus asset search", "focus_asset_search", ICON_FA_SEARCH, (os::Keycode)'O', Action::CTRL);
 
-		m_focus_search.init("Focus asset search", "Focus asset search", "focus_asset_search", ICON_FA_SEARCH, (os::Keycode)'O', Action::CTRL, Action::GLOBAL);
-		m_focus_search.func.bind<&AssetBrowserImpl::focusSearch>(this);
-
-		m_toggle_ui.init("Asset browser", "Toggle Asset Browser UI", "asset_browser", "", Action::IMGUI_PRIORITY);
+		m_toggle_ui.init("Asset browser", "Toggle Asset Browser UI", "asset_browser", "");
 		m_toggle_ui.func.bind<&AssetBrowserImpl::toggleUI>(this);
 		m_toggle_ui.is_selected.bind<&AssetBrowserImpl::isOpen>(this);
 
@@ -128,11 +126,6 @@ struct AssetBrowserImpl : AssetBrowser {
 		m_app.getSettings().registerPtr("asset_browser_open", &m_is_open);
 		m_app.getSettings().registerPtr("asset_browser_thumbnails", &m_show_thumbnails);
 		m_app.getSettings().registerPtr("asset_browser_thumbnail_size", &m_thumbnail_size);
-	}
-
-	void focusSearch() {
-		m_request_focus_search = true;
-		m_is_open = true;
 	}
 
 	void onBasePathChanged() {
@@ -179,16 +172,6 @@ struct AssetBrowserImpl : AssetBrowser {
 		for (const FileInfo& info : m_file_infos) {
 			m_selected_resources.push(info.filepath);
 		}
-	}
-
-	bool onAction(const Action& action) override {
-		CommonActions& common = m_app.getCommonActions();
-		if (&action == &m_back_action) goBackDir();
-		else if (&action == &m_forward_action) goForwardDir();
-		else if (&action == &common.del && !m_selected_resources.empty()) m_request_delete = true;
-		else if (&action == &common.select_all) selectAll(); 
-		else return false;
-		return true;
 	}
 
 	void onInitFinished() override {
@@ -267,8 +250,6 @@ struct AssetBrowserImpl : AssetBrowser {
 		addTile(path);
 		sortTiles();
 	}
-
-	bool hasFocus() const override { return m_has_focus; }
 
 	void update(float) override
 	{
@@ -901,8 +882,6 @@ struct AssetBrowserImpl : AssetBrowser {
 	const char* getName() const override { return "asset_browser"; }
 
 	void checkExtendedMouseButtons() {
-		if (!m_has_focus) return;
-		
 		for (const os::Event e : m_app.getEvents()) {
 			if (e.type == os::Event::Type::MOUSE_BUTTON && !e.mouse_button.down) {
 				switch (e.mouse_button.button) {
@@ -918,47 +897,55 @@ struct AssetBrowserImpl : AssetBrowser {
 		if (m_create_tile_cooldown > 0) {
 			m_create_tile_cooldown -= m_app.getEngine().getLastTimeDelta();
 		}
-		m_has_focus = false;
 		if (m_dir.isEmpty()) changeDir(".", true);
 
-		if(m_is_open) {
-			if (m_request_focus_search) ImGui::SetNextWindowFocus();
-			if (!ImGui::Begin("Assets", &m_is_open)) {
-				ImGui::End();
-				return;
-			}
-			m_has_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) || m_has_focus;
-
-			if (m_request_focus_search) {
-				ImGui::SetKeyboardFocusHere();
-				m_request_focus_search = false;
-			}
-
-			if (m_filter.gui(ICON_FA_SEARCH " Search", 300, false, &m_focus_search)) {
-				m_create_tile_cooldown = 0.2f;
-				changeDir(m_dir, false);
-			}
-			if (ImGui::IsItemDeactivatedAfterEdit() && ImGui::IsKeyPressed(ImGuiKey_Enter) && !m_file_infos.empty()) {
-				openEditor(m_file_infos[0].filepath);
-			}
-
-			ImGui::SameLine();
-			breadcrumbs();
-			ImGui::Separator();
-
-			if (ImGui::BeginTable("cols", 2, ImGuiTableFlags_Resizable)) {
-				ImGui::TableNextRow();
-				ImGui::TableNextColumn();
-				dirColumn();
-				ImGui::TableNextColumn();
-				fileColumn();
-				ImGui::EndTable();
-			}
-
-			ImGui::End();
+		bool request_focus_search = false;
+		if (m_app.checkShortcut(m_focus_search, true)) {
+			request_focus_search = true;
+			m_is_open = true;
 		}
-	
+
+		if(!m_is_open) return;
+
+		if (request_focus_search) ImGui::SetNextWindowFocus();
+		if (!ImGui::Begin("Assets", &m_is_open)) {
+			ImGui::End();
+			return;
+		}
+
 		checkExtendedMouseButtons();
+		CommonActions& common = m_app.getCommonActions();
+		if (m_app.checkShortcut(m_back_action)) goBackDir();
+		if (m_app.checkShortcut(m_forward_action)) goForwardDir();
+		if (m_app.checkShortcut(common.del) && !m_selected_resources.empty()) m_request_delete = true;
+		if (m_app.checkShortcut(common.select_all)) selectAll();
+
+		if (request_focus_search) {
+			ImGui::SetKeyboardFocusHere();
+		}
+
+		if (m_filter.gui(ICON_FA_SEARCH " Search", 300, false, &m_focus_search)) {
+			m_create_tile_cooldown = 0.2f;
+			changeDir(m_dir, false);
+		}
+		if (ImGui::IsItemDeactivatedAfterEdit() && ImGui::IsKeyPressed(ImGuiKey_Enter) && !m_file_infos.empty()) {
+			openEditor(m_file_infos[0].filepath);
+		}
+
+		ImGui::SameLine();
+		breadcrumbs();
+		ImGui::Separator();
+
+		if (ImGui::BeginTable("cols", 2, ImGuiTableFlags_Resizable)) {
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn();
+			dirColumn();
+			ImGui::TableNextColumn();
+			fileColumn();
+			ImGui::EndTable();
+		}
+
+		ImGui::End();
 	}
 
 	void pushDirHistory(const Path& path) {
@@ -1340,9 +1327,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	float m_create_tile_cooldown = 0.f;
 	bool m_show_thumbnails;
 	bool m_show_subresources;
-	bool m_has_focus = false;
 	bool m_request_delete = false;
-	bool m_request_focus_search = false;
 	float m_thumbnail_size = 1.f;
 	Action m_focus_search;
 	Action m_toggle_ui;
