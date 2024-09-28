@@ -114,15 +114,6 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 			m_dirty = true;
 		}
 		
-		bool onAction(const Action& action) override { 
-			const CommonActions& actions = m_app.getCommonActions();
-			if (&action == &actions.save) save();
-			else if (&action == &actions.undo) undo();
-			else if (&action == &actions.redo) redo();
-			else return false;
-			return true;
-		}
-
 		void save() {
 			OutputMemoryStream blob(m_app.getAllocator());
 			m_parent_meta.serialize(blob, m_resource->getPath());
@@ -131,6 +122,11 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 		}
 
 		void windowGUI() override {
+			CommonActions& actions = m_app.getCommonActions();
+			if (m_app.checkShortcut(actions.save)) save();
+			else if (m_app.checkShortcut(actions.undo)) undo();
+			else if (m_app.checkShortcut(actions.redo)) redo();
+
 			if (ImGui::BeginMenuBar()) {
 				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
 				if (ImGuiEx::IconButton(ICON_FA_SEARCH, "View in browser")) m_app.getAssetBrowser().locate(*m_resource);
@@ -423,13 +419,9 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			m_dirty = false;
 		}
 		
-		bool onAction(const Action& action) override { 
-			if (&action == &m_app.getCommonActions().save) save();
-			else return false;
-			return true;
-		}
-
 		void windowGUI() override {
+			if (m_app.checkShortcut(m_app.getCommonActions().save)) save();
+
 			if (ImGui::BeginMenuBar()) {
 				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
 				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_resource);

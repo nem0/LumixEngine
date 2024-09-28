@@ -133,6 +133,10 @@ float MouseSensitivity::eval(float value) {
 	return M * values.last().y;
 }
 
+Settings::~Settings() {
+	m_app.removeAction(&m_toggle_ui_action);
+}
+
 Settings::Settings(StudioApp& app)
 	: m_app(app)
 	, m_allocator(app.getAllocator(), "settings")
@@ -160,6 +164,9 @@ Settings::Settings(StudioApp& app)
 	m_last_save_time = os::Timer::getRawTimestamp();
 	registerPtr("imgui_state", &m_imgui_state);
 	registerPtr("settings_open", &m_is_open);
+
+	m_toggle_ui_action.init("Settings", "Toggle settings window", "settings_toggle_ui", "", os::Keycode::OEM_COMMA, Action::Modifiers::CTRL);
+	m_app.addAction(&m_toggle_ui_action);
 }
 
 float Settings::getTimeSinceLastSave() const {
@@ -833,7 +840,7 @@ void Settings::shortcutsGUI() {
 
 	auto& actions = m_app.getActions();
 	static TextFilter filter;
-	filter.gui("Filter");
+	filter.gui("Filter", -1, ImGui::IsWindowAppearing());
 
 	if (ImGui::BeginChild("shortcuts_scrollarea")) {
 		if (ImGui::BeginTable("shortcuts", 2, ImGuiTableFlags_RowBg)) {
@@ -961,7 +968,12 @@ static void generalGUI(Settings& settings) {
 	settings.m_mouse_sensitivity_y.gui();
 }
 
+void Settings::menuItemUI() {
+	if (Lumix::menuItem(m_toggle_ui_action, true)) m_is_open = !m_is_open;
+}
+
 void Settings::gui() {
+	if (m_app.checkShortcut(m_toggle_ui_action, true)) m_is_open = !m_is_open;
 	if (!m_is_open) return;
 	if (ImGui::Begin(ICON_FA_COG "Settings##settings", &m_is_open)) {
 		if (ImGui::BeginTabBar("tabs")) {

@@ -41,7 +41,6 @@ struct SceneView : StudioApp::GUIPlugin
 
 private:
 	void cameraPreviewGUI(Vec2 size);
-	bool onAction(const Action& action) override;
 	void manipulate();
 	void captureMouse(bool capture);
 	RayCastModelHit castRay(float x, float y);
@@ -50,7 +49,6 @@ private:
 	void handleEvents();
 	void insertModelUI();
 	void toggleProjection();
-	bool hasFocus() const override { return m_has_focus; }
 	void rotate90Degrees();
 	void moveEntity(Vec2 v);
 
@@ -73,7 +71,6 @@ private:
 	Action m_move_entity_S_action;
 	Action m_move_entity_E_action;
 	Action m_move_entity_W_action;
-	bool m_has_focus = false;
 	bool m_is_mouse_captured = false;
 	bool m_copy_moved = false;
 	bool m_insert_model_request = false;

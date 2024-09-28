@@ -57,12 +57,12 @@ GameView::GameView(StudioApp& app)
 
 
 void GameView::init() {
-	m_toggle_ui.init("Game View", "Toggle game view", "game_view", "", Action::IMGUI_PRIORITY);
+	m_toggle_ui.init("Game View", "Toggle game view", "game_view", "");
 	m_toggle_ui.func.bind<&GameView::onToggleOpen>(this);
 	m_toggle_ui.is_selected.bind<&GameView::isOpen>(this);
 	m_app.addWindowAction(&m_toggle_ui);
 
-	m_fullscreen_action.init("Game View fullscreen", "Game View fullscreen", "game_view_fullscreen", "", Action::IMGUI_PRIORITY);
+	m_fullscreen_action.init("Game View fullscreen", "Game View fullscreen", "game_view_fullscreen", "");
 	m_app.addAction(&m_fullscreen_action);
 
 	Engine& engine = m_app.getEngine();
@@ -87,12 +87,6 @@ GameView::~GameView()
 	if (gui) {
 		gui->setInterface(nullptr);
 	}
-}
-
-bool GameView::onAction(const Action& action) {
-	if (&action == &m_fullscreen_action) toggleFullscreen();
-	else return false;
-	return true;
 }
 
 void GameView::setCursor(os::CursorType type)
@@ -140,6 +134,8 @@ void GameView::onFullscreenGUI(WorldEditor& editor)
 		return;
 	}
 
+	if (m_app.checkShortcut(m_fullscreen_action)) toggleFullscreen();
+	
 	RenderModule* render_module = m_pipeline->getModule();
 	EntityPtr camera = render_module->getActiveCamera();
 	if (camera.isValid()) {
@@ -282,6 +278,8 @@ void GameView::onGUI()
 	bool is_game_view_visible = false;
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 	if (ImGui::Begin(window_name, &m_is_open, ImGuiWindowFlags_NoNavInputs)) {
+		if (m_app.checkShortcut(m_fullscreen_action)) toggleFullscreen();
+
 		is_game_view_visible = true;
 
 		const ImVec2 content_min = ImGui::GetCursorScreenPos();

@@ -78,13 +78,16 @@ struct StudioAppImpl final : StudioApp {
 			m_app.getSettings().registerPtr("entity_list_open", &m_is_open);
 			m_app.getWorldEditor().entitySelectionChanged().bind<&HierarchyGUI::onEntitySelectionChanged>(this);
 	
-			m_focus_filter_action.init("Focus hierarchy", "Focus hierarchy filter", "focus_hierarchy", "", os::Keycode::F, Action::Modifiers::CTRL, Action::Type::IMGUI_PRIORITY);
-			m_focus_filter_action.func.bind<&HierarchyGUI::focusHierarchyFilter>(this);
+			m_focus_filter_action.init("Focus hierarchy", "Focus hierarchy filter", "focus_hierarchy", "", os::Keycode::F, Action::Modifiers::CTRL);
 			m_app.addAction(&m_focus_filter_action);
+
+			m_toggle_ui_action.init("Hierarchy", "Toggle hierarchy window", "hierarchy_toggle_ui", "");
+			m_app.addAction(&m_toggle_ui_action);
 		}
 
 		~HierarchyGUI() {
 			m_app.removeAction(&m_focus_filter_action);
+			m_app.removeAction(&m_toggle_ui_action);
 		}
 
 		void renameGUI() {
@@ -405,13 +408,19 @@ struct StudioAppImpl final : StudioApp {
 			}
 		}
 
-		void focusHierarchyFilter() {
-			m_request_focus_filter = true;
-			m_is_open = true;
+		void menuItemUI() {
+			if (Lumix::menuItem(m_toggle_ui_action, true)) m_is_open = !m_is_open;
 		}
 
 		void onGUI() override {
 			PROFILE_FUNCTION();
+
+			if (m_app.checkShortcut(m_toggle_ui_action, true)) m_is_open = !m_is_open;
+
+			if (m_app.checkShortcut(m_focus_filter_action, true)) {
+				m_request_focus_filter = true;
+				m_is_open = true;
+			}
 
 			WorldEditor& editor = m_app.getWorldEditor();
 			if (m_confirm_destroy_partition) {
@@ -431,12 +440,20 @@ struct StudioAppImpl final : StudioApp {
 
 			const Array<EntityRef>& entities = editor.getSelectedEntities();
 			static TextFilter filter;
-			m_has_focus = false;
 			if (!m_is_open) return;
 
 			if (m_request_focus_filter) ImGui::SetNextWindowFocus();
 			if (ImGui::Begin(ICON_FA_STREAM "Hierarchy##hierarchy", &m_is_open)) {
-				m_has_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+				if (m_app.checkShortcut(m_app.m_common_actions.rename)) {
+					const Array<EntityRef>& selected_entities = editor.getSelectedEntities();
+					m_renaming_entity = selected_entities.empty() ? INVALID_ENTITY : selected_entities[0];
+					if (m_renaming_entity.isValid()) {
+						m_set_rename_focus = true;
+						const char* name = editor.getWorld()->getEntityName(selected_entities[0]);
+						copyString(m_rename_buf, name);
+					}
+				}
+
 				if (m_request_focus_filter) {
 					ImGui::SetKeyboardFocusHere();
 					m_request_focus_filter = false;
@@ -498,23 +515,6 @@ struct StudioAppImpl final : StudioApp {
 			ImGui::End();
 		}
 
-		bool hasFocus() const override { return m_has_focus; }
-		
-		bool onAction(const Action& action) override {
-			if (&action == &m_app.m_common_actions.rename) {
-				WorldEditor& editor = m_app.getWorldEditor();
-				const Array<EntityRef>& selected_entities = editor.getSelectedEntities();
-				m_renaming_entity = selected_entities.empty() ? INVALID_ENTITY : selected_entities[0];
-				if (m_renaming_entity.isValid()) {
-					m_set_rename_focus = true;
-					const char* name = editor.getWorld()->getEntityName(selected_entities[0]);
-					copyString(m_rename_buf, name);
-				}
-				return true;
-			}
-			return false;
-		}
-
 		const char* getName() const override { return "hierarchy"; }
 
 		void onEntitySelectionChanged() {
@@ -523,9 +523,9 @@ struct StudioAppImpl final : StudioApp {
 
 		StudioAppImpl& m_app;
 		bool m_is_open = true;
-		bool m_has_focus = false;
 		bool m_entity_selection_changed = false;
 		Action m_focus_filter_action;
+		Action m_toggle_ui_action;
 		bool m_request_focus_filter = false;
 		EntityPtr m_renaming_entity = INVALID_ENTITY;
 		EntityFolders::FolderHandle m_renaming_folder = EntityFolders::INVALID_FOLDER;
@@ -590,18 +590,57 @@ struct StudioAppImpl final : StudioApp {
 		m_imgui_key_map[(int)os::Keycode::END] = ImGuiKey_End;
 		m_imgui_key_map[(int)os::Keycode::DEL] = ImGuiKey_Delete;
 		m_imgui_key_map[(int)os::Keycode::BACKSPACE] = ImGuiKey_Backspace;
-		m_imgui_key_map[(int)os::Keycode::F3] = ImGuiKey_F3;
-		m_imgui_key_map[(int)os::Keycode::F11] = ImGuiKey_F11;
 		m_imgui_key_map[(int)os::Keycode::RETURN] = ImGuiKey_Enter;
 		m_imgui_key_map[(int)os::Keycode::ESCAPE] = ImGuiKey_Escape;
-		m_imgui_key_map[(int)os::Keycode::A] = ImGuiKey_A;
-		m_imgui_key_map[(int)os::Keycode::C] = ImGuiKey_C;
-		m_imgui_key_map[(int)os::Keycode::D] = ImGuiKey_D;
-		m_imgui_key_map[(int)os::Keycode::F] = ImGuiKey_F;
-		m_imgui_key_map[(int)os::Keycode::V] = ImGuiKey_V;
-		m_imgui_key_map[(int)os::Keycode::X] = ImGuiKey_X;
-		m_imgui_key_map[(int)os::Keycode::Y] = ImGuiKey_Y;
-		m_imgui_key_map[(int)os::Keycode::Z] = ImGuiKey_Z;
+		m_imgui_key_map[(int)os::Keycode::NUMPAD0] = ImGuiKey_Keypad0;
+		m_imgui_key_map[(int)os::Keycode::NUMPAD1] = ImGuiKey_Keypad1;
+		m_imgui_key_map[(int)os::Keycode::NUMPAD2] = ImGuiKey_Keypad2;
+		m_imgui_key_map[(int)os::Keycode::NUMPAD3] = ImGuiKey_Keypad3;
+		m_imgui_key_map[(int)os::Keycode::NUMPAD4] = ImGuiKey_Keypad4;
+		m_imgui_key_map[(int)os::Keycode::NUMPAD5] = ImGuiKey_Keypad5;
+		m_imgui_key_map[(int)os::Keycode::NUMPAD6] = ImGuiKey_Keypad6;
+		m_imgui_key_map[(int)os::Keycode::NUMPAD7] = ImGuiKey_Keypad7;
+		m_imgui_key_map[(int)os::Keycode::NUMPAD8] = ImGuiKey_Keypad8;
+		m_imgui_key_map[(int)os::Keycode::NUMPAD9] = ImGuiKey_Keypad9;
+		m_imgui_key_map[(int)os::Keycode::OEM_COMMA] = ImGuiKey_Comma;
+		m_imgui_key_map[(int)os::Keycode::F1] = ImGuiKey_F1;
+		m_imgui_key_map[(int)os::Keycode::F2] = ImGuiKey_F2;
+		m_imgui_key_map[(int)os::Keycode::F3] = ImGuiKey_F3;
+		m_imgui_key_map[(int)os::Keycode::F4] = ImGuiKey_F4;
+		m_imgui_key_map[(int)os::Keycode::F5] = ImGuiKey_F5;
+		m_imgui_key_map[(int)os::Keycode::F6] = ImGuiKey_F6;
+		m_imgui_key_map[(int)os::Keycode::F7] = ImGuiKey_F7;
+		m_imgui_key_map[(int)os::Keycode::F8] = ImGuiKey_F8;
+		m_imgui_key_map[(int)os::Keycode::F9] = ImGuiKey_F9;
+		m_imgui_key_map[(int)os::Keycode::F10] = ImGuiKey_F10;
+		m_imgui_key_map[(int)os::Keycode::F11] = ImGuiKey_F11;
+		m_imgui_key_map[(int)os::Keycode::F12] = ImGuiKey_F12;
+		m_imgui_key_map['A'] = ImGuiKey_A;
+		m_imgui_key_map['B'] = ImGuiKey_B;
+		m_imgui_key_map['C'] = ImGuiKey_C;
+		m_imgui_key_map['D'] = ImGuiKey_D;
+		m_imgui_key_map['E'] = ImGuiKey_E;
+		m_imgui_key_map['F'] = ImGuiKey_F;
+		m_imgui_key_map['G'] = ImGuiKey_G;
+		m_imgui_key_map['H'] = ImGuiKey_H;
+		m_imgui_key_map['I'] = ImGuiKey_I;
+		m_imgui_key_map['J'] = ImGuiKey_J;
+		m_imgui_key_map['K'] = ImGuiKey_K;
+		m_imgui_key_map['L'] = ImGuiKey_L;
+		m_imgui_key_map['M'] = ImGuiKey_M;
+		m_imgui_key_map['N'] = ImGuiKey_N;
+		m_imgui_key_map['O'] = ImGuiKey_O;
+		m_imgui_key_map['P'] = ImGuiKey_P;
+		m_imgui_key_map['Q'] = ImGuiKey_Q;
+		m_imgui_key_map['R'] = ImGuiKey_R;
+		m_imgui_key_map['S'] = ImGuiKey_S;
+		m_imgui_key_map['T'] = ImGuiKey_T;
+		m_imgui_key_map['U'] = ImGuiKey_U;
+		m_imgui_key_map['V'] = ImGuiKey_V;
+		m_imgui_key_map['W'] = ImGuiKey_W;
+		m_imgui_key_map['X'] = ImGuiKey_X;
+		m_imgui_key_map['Y'] = ImGuiKey_Y;
+		m_imgui_key_map['Z'] = ImGuiKey_Z;
 	}
 
 	~StudioAppImpl() {
@@ -666,8 +705,6 @@ struct StudioAppImpl final : StudioApp {
 					ImGuiIO& io = ImGui::GetIO();
 					ImGuiKey key = m_imgui_key_map[(int)event.key.keycode];
 					if (key != ImGuiKey_None) io.AddKeyEvent(key, event.key.down);
-
-					checkShortcuts();
 				}
 				break;
 			case os::Event::Type::DROP_FILE:
@@ -1252,6 +1289,8 @@ struct StudioAppImpl final : StudioApp {
 			mainMenu();
 
 			m_dockspace_id = ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
+			if (checkShortcut(m_show_all_actions_action, true)) showAllActionsGUI();
+			
 			m_asset_compiler->onGUI();
 			guiAllActions();
 			guiSaveAsDialog();
@@ -1592,13 +1631,6 @@ struct StudioAppImpl final : StudioApp {
 		}
 	}
 
-	GUIPlugin* getFocusedWindow() {
-		for (GUIPlugin* win : m_gui_plugins) {
-			if (win->hasFocus()) return win;
-		}
-		return nullptr;
-	}
-
 	Gizmo::Config& getGizmoConfig() override { return m_gizmo_config; }
 	
 	void clipMouseCursor() override { m_cursor_clipped = true; }
@@ -1625,10 +1657,6 @@ struct StudioAppImpl final : StudioApp {
 	void duplicate() { m_editor->duplicateEntities(); }
 	void setLocalCoordSystem() { getGizmoConfig().coord_system = Gizmo::Config::LOCAL; }
 	void setGlobalCoordSystem() { getGizmoConfig().coord_system = Gizmo::Config::GLOBAL; }
-	void toggleSettings() { m_settings.m_is_open = !m_settings.m_is_open; }
-	bool areSettingsOpen() const { return m_settings.m_is_open; }
-	void toggleEntityList() { m_hierarchy->m_is_open = !m_hierarchy->m_is_open; }
-	bool isEntityListOpen() const { return m_hierarchy->m_is_open; }
 	int getExitCode() const override { return m_exit_code; }
 	
 	DirSelector& getDirSelector() override {
@@ -1766,7 +1794,7 @@ struct StudioAppImpl final : StudioApp {
 	Action& addAction(const char* label_short, const char* label_long, const char* name, const char* font_icon = "")
 	{
 		Action* a = LUMIX_NEW(m_allocator, Action);
-		a->init(label_short, label_long, name, font_icon, Action::IMGUI_PRIORITY);
+		a->init(label_short, label_long, name, font_icon);
 		a->func.bind<Func>(this);
 		addAction(a);
 		m_owned_actions.push(a);
@@ -1783,7 +1811,7 @@ struct StudioAppImpl final : StudioApp {
 		Action::Modifiers modifiers)
 	{
 		Action* a = LUMIX_NEW(m_allocator, Action);
-		a->init(label_short, label_long, name, font_icon, shortcut, modifiers, Action::IMGUI_PRIORITY);
+		a->init(label_short, label_long, name, font_icon, shortcut, modifiers);
 		a->func.bind<Func>(this);
 		m_owned_actions.push(a);
 		addAction(a);
@@ -1987,8 +2015,8 @@ struct StudioAppImpl final : StudioApp {
 	void viewMenu() {
 		if (!ImGui::BeginMenu("View")) return;
 
-		menuItem("entityList", true);
-		menuItem("settings", true);
+		m_hierarchy->menuItemUI();
+		m_settings.menuItemUI();
 		ImGui::Separator();
 		for (Action* action : m_window_actions) {
 			if (Lumix::menuItem(*action, true)) action->func.invoke();
@@ -2405,43 +2433,43 @@ struct StudioAppImpl final : StudioApp {
 
 	void addActions()
 	{
-		m_common_actions.save.init("Save", "Save", "save", ICON_FA_SAVE, os::Keycode::S, Action::Modifiers::CTRL, Action::GLOBAL);
+		m_common_actions.save.init("Save", "Save", "save", ICON_FA_SAVE, os::Keycode::S, Action::Modifiers::CTRL);
 		m_common_actions.save.func.bind<&StudioAppImpl::save>(this);
 		addAction(&m_common_actions.save);
-		m_common_actions.undo.init("Undo", "Undo", "undo", ICON_FA_UNDO, os::Keycode::Z, Action::Modifiers::CTRL, Action::IMGUI_PRIORITY);
+		m_common_actions.undo.init("Undo", "Undo", "undo", ICON_FA_UNDO, os::Keycode::Z, Action::Modifiers::CTRL);
 		m_common_actions.undo.func.bind<&StudioAppImpl::undo>(this);
 		addAction(&m_common_actions.undo);
-		m_common_actions.redo.init("Redo", "Redo", "redo", ICON_FA_REDO, os::Keycode::Z, Action::Modifiers::CTRL | Action::Modifiers::SHIFT, Action::IMGUI_PRIORITY);
+		m_common_actions.redo.init("Redo", "Redo", "redo", ICON_FA_REDO, os::Keycode::Z, Action::Modifiers::CTRL | Action::Modifiers::SHIFT);
 		m_common_actions.redo.func.bind<&StudioAppImpl::redo>(this);
 		addAction(&m_common_actions.redo);
-		m_common_actions.del.init("Delete", "Delete", "delete", ICON_FA_MINUS_SQUARE, os::Keycode::DEL, Action::Modifiers::NONE, Action::IMGUI_PRIORITY);
+		m_common_actions.del.init("Delete", "Delete", "delete", ICON_FA_MINUS_SQUARE, os::Keycode::DEL, Action::Modifiers::NONE);
 		m_common_actions.del.func.bind<&StudioAppImpl::destroySelectedEntity>(this);
 		addAction(&m_common_actions.del);
 
-		m_common_actions.cam_orbit.init("Orbit", "Orbit with RMB", "orbitRMB", "", Action::LOCAL);
+		m_common_actions.cam_orbit.init("Orbit", "Orbit with RMB", "orbitRMB", "");
 		addAction(&m_common_actions.cam_orbit);
-		m_common_actions.cam_forward.init("Move forward", "Move camera forward", "moveForward", "", Action::LOCAL);
+		m_common_actions.cam_forward.init("Move forward", "Move camera forward", "moveForward", "");
 		addAction(&m_common_actions.cam_forward);
-		m_common_actions.cam_backward.init("Move back", "Move camera back", "moveBack", "", Action::LOCAL);
+		m_common_actions.cam_backward.init("Move back", "Move camera back", "moveBack", "");
 		addAction(&m_common_actions.cam_backward);
-		m_common_actions.cam_left.init("Move left", "Move camera left", "moveLeft", "", Action::LOCAL);
+		m_common_actions.cam_left.init("Move left", "Move camera left", "moveLeft", "");
 		addAction(&m_common_actions.cam_left);
-		m_common_actions.cam_right.init("Move right", "Move camera right", "moveRight", "", Action::LOCAL);
+		m_common_actions.cam_right.init("Move right", "Move camera right", "moveRight", "");
 		addAction(&m_common_actions.cam_right);
-		m_common_actions.cam_up.init("Move up", "Move camera up", "moveUp", "", Action::LOCAL);
+		m_common_actions.cam_up.init("Move up", "Move camera up", "moveUp", "");
 		addAction(&m_common_actions.cam_up);
-		m_common_actions.cam_down.init("Move down", "Move camera down", "moveDown", "", Action::LOCAL);
+		m_common_actions.cam_down.init("Move down", "Move camera down", "moveDown", "");
 		addAction(&m_common_actions.cam_down);
-		m_common_actions.select_all.init("Select all", "Select all", "select_all", "", Action::IMGUI_PRIORITY);
+		m_common_actions.select_all.init("Select all", "Select all", "select_all", "");
 		addAction(&m_common_actions.select_all);
-		m_common_actions.rename.init("Rename", "Rename", "rename", "", os::Keycode::F2, Action::NONE, Action::IMGUI_PRIORITY);
+		m_common_actions.rename.init("Rename", "Rename", "rename", "", os::Keycode::F2, Action::NONE);
 		addAction(&m_common_actions.rename);
 
-		m_show_all_actions_action.init("Show all actions", "Show all actions", "show_all_actions", "", os::Keycode::P, Action::Modifiers::CTRL | Action::Modifiers::SHIFT, Action::Type::IMGUI_PRIORITY);
+		m_show_all_actions_action.init("Show all actions", "Show all actions", "show_all_actions", "", os::Keycode::P, Action::Modifiers::CTRL | Action::Modifiers::SHIFT);
 		m_show_all_actions_action.func.bind<&StudioAppImpl::showAllActionsGUI>(this);
 		addAction(&m_show_all_actions_action);
 		
-		m_start_standalone_app.init("Start standalone app", "Start standalone app", "start_standalone_app", "", Action::Type::IMGUI_PRIORITY);
+		m_start_standalone_app.init("Start standalone app", "Start standalone app", "start_standalone_app", "");
 		m_start_standalone_app.func.bind<&StudioAppImpl::startStandaloneApp>(this);
 		addToolAction(&m_start_standalone_app);
 
@@ -2475,10 +2503,6 @@ struct StudioAppImpl final : StudioApp {
 		addAction<&StudioAppImpl::autosnapDown>("Autosnap down", "Toggle autosnap down", "autosnapDown")
 			.is_selected.bind<&Gizmo::Config::isAutosnapDown>(&getGizmoConfig());
 		addAction<&StudioAppImpl::snapDown>("Snap down", "Snap entities down", "snapDown");
-		addAction<&StudioAppImpl::toggleEntityList>("Hierarchy", "Toggle hierarchy", "entityList", ICON_FA_STREAM)
-			.is_selected.bind<&StudioAppImpl::isEntityListOpen>(this);
-		addAction<&StudioAppImpl::toggleSettings>("Settings", "Toggle settings UI", "settings", ICON_FA_COG)
-			.is_selected.bind<&StudioAppImpl::areSettingsOpen>(this);
 		addAction<&StudioAppImpl::showExportGameDialog>("Export game", "Export game", "export_game", ICON_FA_FILE_EXPORT);
 	}
 
@@ -2860,12 +2884,7 @@ struct StudioAppImpl final : StudioApp {
 						bool selected = idx == m_all_actions_selected;
 						if (ImGui::Selectable(StaticString<128>(act->font_icon, act->label_long, buf), selected) || (selected && insert_enter)) {
 							ImGui::CloseCurrentPopup();
-							GUIPlugin* window = getFocusedWindow();
-							if (!window || !window->onAction(*act)) {
-								if (act->func.isValid()) {
-									act->func.invoke();
-								}
-							}
+							act->request = true;
 							break;
 						}
 						++idx;
@@ -3177,30 +3196,22 @@ struct StudioAppImpl final : StudioApp {
 		m_capture_input = capture;
 	}
 
-	void checkShortcuts() {
-		if (m_capture_input) return;
-		u8 pressed_modifiers = 0;
-		if (os::isKeyDown(os::Keycode::SHIFT)) pressed_modifiers |= Action::Modifiers::SHIFT;
-		if (os::isKeyDown(os::Keycode::CTRL)) pressed_modifiers |= Action::Modifiers::CTRL;
-		if (os::isKeyDown(os::Keycode::ALT)) pressed_modifiers |= Action::Modifiers::ALT;
-		GUIPlugin* window = getFocusedWindow();
-		
-		ImGuiIO& io = ImGui::GetIO();
-		for (Action*& a : m_actions) {
-			if (a->type == Action::LOCAL) continue;
-			if (a->type == Action::IMGUI_PRIORITY && io.WantCaptureKeyboard) continue;
-			if (a->shortcut == os::Keycode::INVALID && a->modifiers == 0) continue;
-			if (a->shortcut != os::Keycode::INVALID && !os::isKeyDown(a->shortcut)) continue;
-			if (a->modifiers != pressed_modifiers) continue;
-			
-			if (window && window->onAction(*a))
-				return;
+	bool checkShortcut(Action& action, bool global = false) override {
+		if (m_capture_input) return false;
 
-			if (a->func.isValid()) {
-				a->func.invoke();
-				return;
-			}
+		if(action.request) {
+			action.request = false;
+			return true;
 		}
+		if (action.shortcut == os::Keycode::INVALID && action.modifiers == 0) return false;
+
+		ImGuiKeyChord chord = m_imgui_key_map[(u32)action.shortcut];
+		ASSERT(chord != 0 || action.shortcut == os::Keycode::INVALID);
+		if (action.modifiers & Action::Modifiers::CTRL) chord |= ImGuiMod_Ctrl;
+		if (action.modifiers & Action::Modifiers::SHIFT) chord |= ImGuiMod_Shift;
+		if (action.modifiers & Action::Modifiers::ALT) chord |= ImGuiMod_Alt;
+
+		return ImGui::Shortcut(chord, global ? ImGuiInputFlags_RouteGlobal : ImGuiInputFlags_RouteFocused);
 	}
 
 	IAllocator& getAllocator() override { return m_allocator; }

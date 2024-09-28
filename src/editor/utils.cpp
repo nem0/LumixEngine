@@ -2069,12 +2069,11 @@ Action::Action() {
 	shortcut = os::Keycode::INVALID;
 }
 
-void Action::init(const char* label_short, const char* label_long, const char* name, const char* font_icon, Type type) {
+void Action::init(const char* label_short, const char* label_long, const char* name, const char* font_icon) {
 	this->label_long = label_long;
 	this->label_short = label_short;
 	this->font_icon = font_icon;
 	this->name = name;
-	this->type = type;
 	shortcut = os::Keycode::INVALID;
 	is_selected.bind<falseConst>();
 }
@@ -2085,14 +2084,12 @@ void Action::init(const char* label_short,
 	const char* name,
 	const char* font_icon,
 	os::Keycode shortcut,
-	Modifiers modifiers,
-	Type type)
+	Modifiers modifiers)
 {
 	this->label_long = label_long;
 	this->label_short = label_short;
 	this->name = name;
 	this->font_icon = font_icon;
-	this->type = type;
 	this->shortcut = shortcut;
 	this->modifiers = modifiers;
 	is_selected.bind<falseConst>();

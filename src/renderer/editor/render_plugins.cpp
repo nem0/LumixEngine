@@ -726,18 +726,6 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			m_dirty = false;
 		}
 		
-		bool onAction(const Action& action) override { 
-			const CommonActions& actions = m_app.getCommonActions();
-			if (&action == &actions.save) save();
-			else if (m_resource->isReady()) {
-				if (&action == &actions.undo) undo();
-				else if (&action == &actions.redo) redo();
-				else return false;
-			}
-			else return false;
-			return true;
-		}
-
 		bool saveUndo(bool changed) {
 			if (changed) {
 				m_dirty = true;
@@ -747,6 +735,11 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		}
 
 		void windowGUI() override {
+			CommonActions& actions = m_app.getCommonActions();
+			if (m_app.checkShortcut(actions.save)) save();
+			else if (m_app.checkShortcut(actions.undo) && m_resource->isReady()) undo();
+			else if (m_app.checkShortcut(actions.redo) && m_resource->isReady()) redo();
+
 			if (ImGui::BeginMenuBar()) {
 				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
 				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_resource);
@@ -919,7 +912,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		: m_app(app)
 		, m_allocator(app.getAllocator(), "material editor")
 	{
-		m_wireframe_action.init("Wireframe", "Wireframe", "wireframe", "", (os::Keycode)'W', Action::Modifiers::CTRL, Action::IMGUI_PRIORITY);
+		m_wireframe_action.init("Wireframe", "Wireframe", "wireframe", "", (os::Keycode)'W', Action::Modifiers::CTRL);
 		m_wireframe_action.func.bind<&MaterialPlugin::toggleWireframe>(this);
 
 		app.getAssetCompiler().registerExtension("mat", Material::TYPE);
@@ -1110,17 +1103,13 @@ struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
 		return "Unknown";
 	}
 
-	bool onAction(const Action& action) override {
-		const CommonActions& actions = m_app.getCommonActions();
-		if (&actions.save == &action) save();
-		else if (&actions.undo == &action) m_composite_editor ? m_composite_editor->doUndo() : undo();
-		else if (&actions.redo == &action) m_composite_editor ? m_composite_editor->doRedo() : redo();
-		else if (&actions.del == &action && m_composite_editor) m_composite_editor->deleteSelectedNodes();
-		else return false;
-		return true;
-	}
-
 	void windowGUI() override {
+		CommonActions& actions = m_app.getCommonActions();
+		if (m_app.checkShortcut(actions.save)) save();
+		else if (m_app.checkShortcut(actions.undo)) m_composite_editor ? m_composite_editor->doUndo() : undo();
+		else if (m_app.checkShortcut(actions.redo)) m_composite_editor ? m_composite_editor->doRedo() : redo();
+		else if (m_app.checkShortcut(actions.del) && m_composite_editor) m_composite_editor->deleteSelectedNodes();
+
 		if (ImGui::BeginMenuBar()) {
 			if (m_composite_editor) m_composite_editor->menu();
 			if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
@@ -2131,15 +2120,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			m_dirty = false;
 		}
 		
-		bool onAction(const Action& action) override { 
-			const CommonActions& actions = m_app.getCommonActions();
-			if (&action == &actions.save) save();
-			else if (&action == &actions.undo) undo();
-			else if (&action == &actions.redo) redo();
-			else return false;
-			return true;
-		}
-
 		void importGUI() {
 			if (m_has_meshes) {
 				ImGuiEx::Label("Bake vertex AO");
@@ -2501,6 +2481,11 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		}
 
 		void windowGUI() override {
+			CommonActions& actions = m_app.getCommonActions();
+			if (m_app.checkShortcut(actions.save)) save();
+			else if (m_app.checkShortcut(actions.undo)) undo();
+			else if (m_app.checkShortcut(actions.redo)) redo();
+
 			if (ImGui::BeginMenuBar()) {
 				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
 				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_resource);
@@ -3245,12 +3230,6 @@ struct CodeEditorWindow : AssetEditorWindow {
 		m_app.getAssetBrowser().saveResource(m_path, blob);
 		m_dirty = false;
 	}
-	
-	bool onAction(const Action& action) override { 
-		if (&action == &m_app.getCommonActions().save) save();
-		else return false;
-		return true;
-	}
 
 	void showDisassembly() {
 		if (!m_shader) m_shader = m_app.getEngine().getResourceManager().load<Shader>(m_path);
@@ -3294,6 +3273,8 @@ struct CodeEditorWindow : AssetEditorWindow {
 	}
 
 	void windowGUI() override {
+		if (m_app.checkShortcut(m_app.getCommonActions().save)) save();
+
 		if (ImGui::BeginMenuBar()) {
 			if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
 			if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_path);
@@ -3616,9 +3597,9 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 		, m_probes(app.getAllocator())
 		, m_model_plugin(model_plugin)
 	{
-		m_generate_action.init("Generate probes", "Generate probes", "generate_probes", "", Action::IMGUI_PRIORITY);
+		m_generate_action.init("Generate probes", "Generate probes", "generate_probes", "");
 		m_generate_action.func.bind<&EnvironmentProbePlugin::onGenerateProbes>(this);
-		m_add_bounce_action.init("Add bounce", "Add light bounce to probes", "probes_add_bounce", "", Action::IMGUI_PRIORITY);
+		m_add_bounce_action.init("Add bounce", "Add light bounce to probes", "probes_add_bounce", "");
 		m_add_bounce_action.func.bind<&EnvironmentProbePlugin::onAddBounce>(this);
 		m_app.addToolAction(&m_generate_action);
 		m_app.addToolAction(&m_add_bounce_action);
@@ -5382,7 +5363,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		// TODO
 		//m_app.getSettings().registerVariable("Renderer", "VSync", makeDelegate<&gpu::isVSyncEnabled>(), makeDelegate<&gpu::enableVSync>());
 		m_fbx_importer.init();
-		m_renderdoc_capture_action.init("Capture RenderDoc", "Capture with RenderDoc", "capture_renderdoc", "", Action::GLOBAL);
+		m_renderdoc_capture_action.init("Capture RenderDoc", "Capture with RenderDoc", "capture_renderdoc", "");
 		m_renderdoc_capture_action.func.bind<&StudioAppPlugin::captureRenderDoc>(this);
 
 		if (CommandLineParser::isOn("-renderdoc")) {

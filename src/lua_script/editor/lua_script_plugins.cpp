@@ -217,7 +217,7 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 		if (lua_getfield(L, -1, "windowMenuAction") == LUA_TFUNCTION) {
 			char tmp[64];
 			convertToLuaName(name, tmp);
-			plugin->m_action.init(name, name, tmp, "", Action::IMGUI_PRIORITY);
+			plugin->m_action.init(name, name, tmp, "");
 			plugin->m_action.func.bind<&StudioLuaPlugin::runWindowAction>(plugin);
 			app.addWindowAction(&plugin->m_action);
 		}
@@ -269,7 +269,9 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 		LuaWrapper::pcall(L, 0, 0);
 		lua_pop(L, 1);
 	}
-
+	
+	// TODO
+/*
 	bool onAction(const Action& action) override {
 		if (&action == &m_action) {
 			runWindowAction();
@@ -277,7 +279,7 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 		}
 		return false;
 	}
-
+*/
 	bool exportData(const char* dest_dir) override
 	{
 		#ifndef LUMIX_STATIC_LUAU
@@ -483,13 +485,9 @@ struct EditorWindow : AssetEditorWindow {
 		m_dirty = false;
 	}
 	
-	bool onAction(const Action& action) override { 
-		if (&action == &m_app.getCommonActions().save) save();
-		else return false;
-		return true;
-	}
-
 	void windowGUI() override {
+		if (m_app.checkShortcut(m_app.getCommonActions().save)) save();
+
 		if (ImGui::BeginMenuBar()) {
 			if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
 			if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_path);
@@ -873,7 +871,7 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 		lua_pushvalue(L, 1);
 		action->ref_action = LuaWrapper::createRef(L);
 		lua_pop(L, 2);
-		action->action.init(label, label, name, "", Action::Type::IMGUI_PRIORITY);
+		action->action.init(label, label, name, "");
 		action->action.func.bind<&LuaAction::run>(action);
 		action->L = L;
 		app.addAction(&action->action);

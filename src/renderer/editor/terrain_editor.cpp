@@ -703,10 +703,10 @@ TerrainEditor::TerrainEditor(StudioApp& app)
 	, m_y_spread(0, 0)
 	, m_layer_views(app.getAllocator())
 {
-	m_smooth_terrain_action.init("Smooth terrain", "Terrain editor - smooth", "smoothTerrain", "", Action::LOCAL);
-	m_lower_terrain_action.init("Lower terrain", "Terrain editor - lower", "lowerTerrain", "", Action::LOCAL);
-	m_remove_grass_action.init("Remove grass from terrain", "Terrain editor - remove grass", "removeGrassFromTerrain", "", Action::LOCAL);
-	m_remove_entity_action.init("Remove entities from terrain", "Terrain editor - remove entities", "removeEntitiesFromTerrain", "", Action::LOCAL);
+	m_smooth_terrain_action.init("Smooth terrain", "Terrain editor - smooth", "smoothTerrain", "");
+	m_lower_terrain_action.init("Lower terrain", "Terrain editor - lower", "lowerTerrain", "");
+	m_remove_grass_action.init("Remove grass from terrain", "Terrain editor - remove grass", "removeGrassFromTerrain", "");
+	m_remove_entity_action.init("Remove entities from terrain", "Terrain editor - remove entities", "removeEntitiesFromTerrain", "");
 
 	app.addAction(&m_smooth_terrain_action);
 	app.addAction(&m_lower_terrain_action);

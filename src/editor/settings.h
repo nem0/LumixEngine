@@ -8,6 +8,7 @@
 #include "core/stack_array.h"
 #include "core/string.h"
 #include "core/tag_allocator.h"
+#include "editor/utils.h"
 #include "engine/lumix.h"
 
 namespace Lumix {
@@ -35,8 +36,10 @@ struct LUMIX_EDITOR_API Settings {
 	enum : u32 { INVALID_CATEGORY = 0xFFffFFff };
 
 	Settings(struct StudioApp& app);
+	~Settings();
 
 	void gui();
+	void menuItemUI();
 	void load();
 	void save();
 
@@ -99,7 +102,8 @@ struct LUMIX_EDITOR_API Settings {
 	MouseSensitivity m_mouse_sensitivity_y;
 	bool m_is_open = false;
 	u64 m_last_save_time = 0;
-	struct Action* m_edit_action = nullptr;
+	Action* m_edit_action = nullptr;
+	Action m_toggle_ui_action;
 private:
 	void shortcutsGUI();
 };

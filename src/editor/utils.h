@@ -28,13 +28,6 @@ struct LUMIX_EDITOR_API ResourceLocator {
 
 
 struct LUMIX_EDITOR_API Action {
-	// what should `StudioAppImpl::checkShortcuts` do
-	enum Type : u8 {
-		LOCAL, // ignore, must manually check isActive()
-		IMGUI_PRIORITY, // check only when imgui does not want input
-		GLOBAL // check even when imgui wants input
-	};
-
 	enum Modifiers : u8 {
 		NONE = 0,
 
@@ -44,8 +37,8 @@ struct LUMIX_EDITOR_API Action {
 	};
 
 	Action();
-	void init(const char* label_short, const char* label_long, const char* name, const char* font_icon, os::Keycode key0, Modifiers modifiers, Type type);
-	void init(const char* label_short, const char* label_long, const char* name, const char* font_icon, Type type);
+	void init(const char* label_short, const char* label_long, const char* name, const char* font_icon, os::Keycode key0, Modifiers modifiers);
+	void init(const char* label_short, const char* label_long, const char* name, const char* font_icon);
 	bool toolbarButton(struct ImFont* font);
 	bool isActive() const;
 	bool shortcutText(Span<char> out) const;
@@ -55,8 +48,8 @@ struct LUMIX_EDITOR_API Action {
 	StaticString<32> name;
 	StaticString<32> label_short;
 	StaticString<64> label_long;
-	Type type = Type::LOCAL;
 	Modifiers modifiers = Modifiers::NONE;
+	bool request = false; // programatically request to invoke the action
 	os::Keycode shortcut;
 	StaticString<5> font_icon;
 	Delegate<void ()> func;
