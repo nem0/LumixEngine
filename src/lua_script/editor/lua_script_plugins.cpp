@@ -1205,6 +1205,7 @@ struct SetPropertyVisitor : reflection::IPropertyVisitor {
 
 	// asserts once if called between ImGui::Begin/End, can be safely skipped
 	void luaDebugLoop(lua_State* L, const char* error_msg) {
+		if (!m_lua_debug_enabled) return;
 		// TODO custom imgui context?
 		// TODO can we somehow keep running normal loop while lua is being debugged?
 		// end normal loop
