@@ -302,6 +302,10 @@ struct AssetBrowserImpl : AssetBrowser {
 			filename = Path::getBasename(path);
 		}
 
+		if (!m_show_thumbnails) {
+			filename.append(".", Path::getExtension(path));
+		}
+
 		tile.filepath = path;
 		tile.clamped_filename = filename;
 		StringView ext = Path::getExtension(subres);
@@ -687,7 +691,7 @@ struct AssetBrowserImpl : AssetBrowser {
 				{
 					FileInfo& tile = m_file_infos[j];
 					bool b = m_selected_resources.find([&](const Path& p){ return p == tile.filepath; }) >= 0;
-					ImGui::Selectable(tile.filepath.c_str(), b);
+					ImGui::Selectable(tile.clamped_filename, b);
 					callbacks(tile, j, b);
 				}
 			}
@@ -699,7 +703,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		static char tmp[MAX_PATH] = "";
 		const char* base_path = fs.getBasePath();
 		auto common_popup = [&](){
-			ImGui::Checkbox("Thumbnails", &m_show_thumbnails);
+			if (ImGui::Checkbox("Thumbnails", &m_show_thumbnails)) refreshLabels();
 			if (ImGui::Checkbox("Subresources", &m_show_subresources)) {
 				ImGui::CloseCurrentPopup();
 				changeDir(m_dir, false);
@@ -882,7 +886,13 @@ struct AssetBrowserImpl : AssetBrowser {
 			} else {
 				filename = Path::getBasename(tile.filepath);
 			}
-			clampText(filename.data, int(TILE_SIZE * m_thumbnail_size));
+			if (m_show_thumbnails) {
+				clampText(filename.data, int(TILE_SIZE * m_thumbnail_size));
+			}
+			else {
+				filename.append(".");
+				filename.append(Path::getExtension(tile.filepath));
+			}
 
 			tile.clamped_filename = filename;
 		}

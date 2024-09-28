@@ -70,12 +70,473 @@ struct TarHeader {
 	char prefix[155];   
 };
 
+struct StudioAppImpl final : StudioApp {
+	struct HierarchyGUI : StudioApp::GUIPlugin {
+		HierarchyGUI(StudioAppImpl& app)
+			: m_app(app)
+		{
+			m_app.getSettings().registerPtr("entity_list_open", &m_is_open);
+			m_app.getWorldEditor().entitySelectionChanged().bind<&HierarchyGUI::onEntitySelectionChanged>(this);
+	
+			m_focus_filter_action.init("Focus hierarchy", "Focus hierarchy filter", "focus_hierarchy", "", os::Keycode::F, Action::Modifiers::CTRL, Action::Type::IMGUI_PRIORITY);
+			m_focus_filter_action.func.bind<&HierarchyGUI::focusHierarchyFilter>(this);
+			m_app.addAction(&m_focus_filter_action);
+		}
 
-struct StudioAppImpl final : StudioApp
-{
+		~HierarchyGUI() {
+			m_app.removeAction(&m_focus_filter_action);
+		}
+
+		void renameGUI() {
+			WorldEditor& editor = m_app.getWorldEditor();
+			ImGui::SameLine();
+			ImGui::SetNextItemWidth(-1);
+			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {0, 0});
+			ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0);
+			ImGui::PushStyleColor(ImGuiCol_FrameBg, 0);
+			if (m_set_rename_focus) {
+				ImGui::SetKeyboardFocusHere();
+				m_set_rename_focus = false;
+			}
+			if (ImGui::InputText("##renamed_val", m_rename_buf, sizeof(m_rename_buf), ImGuiInputTextFlags_EnterReturnsTrue)) {
+				editor.setEntityName((EntityRef)m_renaming_entity, m_rename_buf);
+				m_renaming_entity = INVALID_ENTITY;
+			}
+			if (ImGui::IsItemDeactivated() && m_renaming_entity.isValid()) {
+				if (ImGui::IsItemDeactivatedAfterEdit() && m_rename_buf[0]) {
+					editor.setEntityName((EntityRef)m_renaming_entity, m_rename_buf);
+				}
+				m_renaming_entity = INVALID_ENTITY;
+			}
+			m_set_rename_focus = false;
+			ImGui::PopStyleVar(2);
+			ImGui::PopStyleColor();			
+		}
+
+		void showHierarchy(EntityRef entity, const Array<EntityRef>& selected_entities, Span<const EntityRef> selection_chain) {
+			WorldEditor& editor = m_app.getWorldEditor();
+			World* world = editor.getWorld();
+			bool is_selected = selected_entities.indexOf(entity) >= 0;
+			ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_AllowItemOverlap;
+			bool has_child = world->getFirstChild(entity).isValid();
+			if (!has_child) flags = ImGuiTreeNodeFlags_Leaf;
+			if (is_selected) flags |= ImGuiTreeNodeFlags_Selected;
+			flags |= ImGuiTreeNodeFlags_SpanAvailWidth;
+			
+			bool node_open;
+			if (m_renaming_entity == entity) {
+				node_open = ImGui::TreeNodeEx((void*)(intptr_t)entity.index, flags, "%s", "");
+				renameGUI();
+			}
+			else {
+				const ImVec2 cp = ImGui::GetCursorPos();
+				ImGui::Dummy(ImVec2(1.f, ImGui::GetTextLineHeightWithSpacing()));
+				if (selection_chain.length() > 0 && selection_chain[0] == entity) {
+					ImGui::SetNextItemOpen(true);
+					selection_chain.removePrefix(1);
+					if (selection_chain.length() == 0) {
+						ImGui::SetScrollHereY();
+					}
+				}
+				if (ImGui::IsItemVisible()) {
+					ImGui::SetCursorPos(cp);
+					char buffer[1024];
+					getEntityListDisplayName(m_app, *world, Span(buffer), entity);
+					node_open = ImGui::TreeNodeEx((void*)(intptr_t)entity.index, flags, "%s", buffer);
+				}
+				else {
+					const char* dummy = "";
+					const ImGuiID id = ImGui::GetCurrentWindow()->GetID((void*)(intptr_t)entity.index);
+					if (ImGui::TreeNodeUpdateNextOpen(id, flags)) {
+						ImGui::SetCursorPos(cp);
+						node_open = ImGui::TreeNodeBehavior(id, flags, dummy, dummy);
+					}
+					else {
+						node_open = false;
+					}
+				}
+			}
+			
+			if (ImGui::IsItemVisible()) {
+				ImGui::PushID(entity.index);
+				if (ImGui::IsMouseReleased(1) && ImGui::IsItemHovered()) ImGui::OpenPopup("entity_context_menu");
+				if (ImGui::BeginPopup("entity_context_menu"))
+				{
+					if (ImGui::BeginMenu("Create child")) {
+						m_app.onCreateEntityWithComponentGUI(entity);
+						ImGui::EndMenu();
+					}
+
+					if (ImGui::MenuItem("Select all children")) {
+						Array<EntityRef> tmp(m_app.m_allocator);
+						for (EntityRef e : world->childrenOf(entity)) {
+							tmp.push(e);
+						}
+						editor.selectEntities(tmp, false);
+					}
+					ImGui::EndPopup();
+				}
+				ImGui::PopID();
+				if (ImGui::BeginDragDropTarget()) {
+					if (auto* payload = ImGui::AcceptDragDropPayload("entity")) {
+						EntityRef dropped_entity = *(EntityRef*)payload->Data;
+						if (dropped_entity != entity) {
+							editor.makeParent(entity, dropped_entity);
+							ImGui::EndDragDropTarget();
+							if (node_open) ImGui::TreePop();
+							return;
+						}
+					}
+
+					if (auto* payload = ImGui::AcceptDragDropPayload("selected_entities")) {
+						const Array<EntityRef>& selected = editor.getSelectedEntities();
+						for (EntityRef e : selected) {
+							if (e != entity) {
+								editor.makeParent(entity, e);
+							}
+						}
+						ImGui::EndDragDropTarget();
+						if (node_open) ImGui::TreePop();
+						return;
+					}
+
+					ImGui::EndDragDropTarget();
+				}
+
+				if (ImGui::BeginDragDropSource())
+				{
+					char buffer[1024];
+					getEntityListDisplayName(m_app, *world, Span(buffer), entity);
+					ImGui::TextUnformatted(buffer);
+					
+					const Array<EntityRef>& selected = editor.getSelectedEntities();
+					if (selected.size() > 0 && selected.indexOf(entity) >= 0) {
+						ImGui::SetDragDropPayload("selected_entities", nullptr, 0);
+					}
+					else {	
+						ImGui::SetDragDropPayload("entity", &entity, sizeof(entity));
+					}
+					ImGui::EndDragDropSource();
+				}
+				else {
+					if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+						editor.selectEntities(Span(&entity, 1), ImGui::GetIO().KeyCtrl);
+					}
+				}
+			}
+
+			if (node_open) {
+				for (EntityRef e : world->childrenOf(entity)) {
+					showHierarchy(e, selected_entities, selection_chain);
+				}
+
+				ImGui::TreePop();
+			}
+		}
+
+		void folderUI(EntityFolders::FolderHandle folder_id, EntityFolders& folders, u32 level, Span<const EntityRef> selection_chain, const char* name_override, World::PartitionHandle partition) {
+			WorldEditor& editor = m_app.getWorldEditor();
+			static EntityFolders::FolderHandle force_open_folder = EntityFolders::INVALID_FOLDER;
+			const EntityFolders::Folder* folder = &folders.getFolder(folder_id);
+			ImGui::PushID((const char*)&folder->id, (const char*)&folder->id + sizeof(folder->id));
+			bool node_open;
+			ImGuiTreeNodeFlags flags = level == 0 ? ImGuiTreeNodeFlags_DefaultOpen : 0;
+			flags |= ImGuiTreeNodeFlags_OpenOnArrow;
+			if (folders.getSelectedFolder() == folder_id) flags |= ImGuiTreeNodeFlags_Selected;
+			if (force_open_folder == folder_id) {
+				ImGui::SetNextItemOpen(true);
+				force_open_folder = EntityFolders::INVALID_FOLDER;
+			}
+			if (m_renaming_folder == folder_id) {
+				node_open = ImGui::TreeNodeEx((void*)folder, flags, "%s", ICON_FA_FOLDER);
+				ImGui::SameLine();
+				ImGui::SetNextItemWidth(-1);
+				ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {0, 0});
+				ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0);
+				ImGui::PushStyleColor(ImGuiCol_FrameBg, 0);
+				if (m_set_rename_focus) {
+					ImGui::SetKeyboardFocusHere();
+					m_set_rename_focus = false;
+				}
+				if (ImGui::InputText("##renamed_val", m_rename_buf, sizeof(m_rename_buf), ImGuiInputTextFlags_EnterReturnsTrue)) {
+					editor.renameEntityFolder(m_renaming_folder, m_rename_buf);
+					m_rename_buf[0] = 0;
+				}
+				if (ImGui::IsItemDeactivated()) {
+					if (ImGui::IsItemDeactivatedAfterEdit() && m_rename_buf[0]) {
+						editor.renameEntityFolder(m_renaming_folder, m_rename_buf);
+					}
+					m_renaming_folder = EntityFolders::INVALID_FOLDER;
+				}
+				m_set_rename_focus = false;
+				ImGui::PopStyleVar(2);
+				ImGui::PopStyleColor();
+			}
+			else {
+				if (name_override) {
+					node_open = ImGui::TreeNodeEx((void*)folder, flags, "%s%s", ICON_FA_HOME, name_override);
+				}
+				else {
+					node_open = ImGui::TreeNodeEx((void*)folder, flags, "%s%s", ICON_FA_FOLDER, folder->name);
+				}
+			}
+			
+			if (ImGui::BeginDragDropTarget()) {
+				if (auto* payload = ImGui::AcceptDragDropPayload("entity")) {
+					EntityRef dropped_entity = *(EntityRef*)payload->Data;
+					editor.beginCommandGroup("move_entity_to_folder_group");
+					editor.makeParent(INVALID_ENTITY, dropped_entity);
+					editor.moveEntityToFolder(dropped_entity, folder_id);
+					editor.endCommandGroup();
+				}
+				ImGui::EndDragDropTarget();
+			}
+
+			if (ImGui::IsMouseClicked(0) && ImGui::IsItemHovered()) {
+				folders.selectFolder(folder_id);
+			}
+
+			if (ImGui::IsMouseReleased(1) && ImGui::IsItemHovered()) {
+				ImGui::OpenPopup("folder_context_menu");
+			}
+			if (ImGui::BeginPopup("folder_context_menu")) {
+				if (ImGui::Selectable("New folder")) {
+					force_open_folder = folder_id;
+					EntityFolders::FolderHandle new_folder = editor.createEntityFolder(folder_id);
+					folder = &folders.getFolder(folder_id);
+					m_renaming_folder = new_folder;
+					m_set_rename_focus = true;
+				}
+				const bool is_root = folder->parent == EntityFolders::INVALID_FOLDER;
+				World* world = editor.getWorld();
+
+				if (is_root) {
+					const bool is_partition_named = world->getPartition(partition).name[0];
+					if (is_partition_named) {
+						if (ImGui::Selectable("Save")) {
+							if (editor.isGameMode()) {
+								logError("Could not save while the game is running");
+							}
+							else {
+								editor.savePartition(partition);
+							}
+						}
+					}
+					else {
+						if (ImGui::Selectable("Save As")) {
+							EntityFolders& folders = editor.getEntityFolders();
+							EntityFolders::FolderHandle root = folders.getRoot(partition);
+							folders.selectFolder(root);
+							m_app.saveAs();
+						}
+					}
+				}
+
+				if (!is_root || world->getPartitions().size() > 1) {
+					if (ImGui::Selectable(is_root ? "Unload" : "Delete")) {
+						if (is_root) {
+							m_confirm_destroy_partition = true;
+							m_partition_to_destroy = partition;
+						}
+						else {
+							editor.destroyEntityFolder(folder_id);
+							ImGui::EndPopup();
+							if (node_open) ImGui::TreePop();
+							ImGui::PopID();
+							return;
+						}
+					}
+				}
+
+				const bool has_children = folders.getFolder(folder_id).first_entity.isValid();
+				if (ImGui::Selectable("Select entities", false, has_children ? 0 : ImGuiSelectableFlags_Disabled)) {
+					Array<EntityRef> entities(m_app.m_allocator);
+					EntityPtr e = folders.getFolder(folder_id).first_entity;
+					while (e.isValid()) {
+						entities.push((EntityRef)e);
+						const EntityPtr next = folders.getNextEntity((EntityRef)e);
+						e = next;
+					}
+					editor.selectEntities(entities, false);
+				}
+				if (level > 0 && ImGui::Selectable("Rename")) {
+					m_renaming_folder = folder_id;
+					m_set_rename_focus = true;
+				}
+				ImGui::EndPopup();
+			}
+
+			if (!node_open) {
+				ImGui::PopID();
+				return;
+			}
+
+			EntityFolders::FolderHandle child_id = folder->first_child;
+			while (child_id != EntityFolders::INVALID_FOLDER) {
+				const EntityFolders::Folder& child = folders.getFolder(child_id);
+				const EntityFolders::FolderHandle next = child.next;
+				folderUI(child_id, folders, level + 1, selection_chain, nullptr, partition);
+				child_id = next;
+			}
+
+			EntityPtr child_e = folder->first_entity;
+			while (child_e.isValid()) {
+				if (!editor.getWorld()->getParent((EntityRef)child_e).isValid()) {
+					showHierarchy((EntityRef)child_e, editor.getSelectedEntities(), selection_chain);
+				}
+				child_e = folders.getNextEntity((EntityRef)child_e);
+			}
+
+			ImGui::TreePop();
+			ImGui::PopID();
+		}
+
+		void getSelectionChain(Array<EntityRef>& chain, EntityPtr e) const {
+			if (!e.isValid()) return;
+			
+			WorldEditor& editor = m_app.getWorldEditor();
+			e = editor.getWorld()->getParent(*e);
+			while (e.isValid()) {
+				chain.push(*e);
+				e = editor.getWorld()->getParent(*e);
+			}
+			for (i32 i = 0; i < chain.size() / 2; ++i) {
+				swap(chain[i], chain[chain.size() - 1 - i]); 
+			}
+		}
+
+		void focusHierarchyFilter() {
+			m_request_focus_filter = true;
+			m_is_open = true;
+		}
+
+		void onGUI() override {
+			PROFILE_FUNCTION();
+
+			WorldEditor& editor = m_app.getWorldEditor();
+			if (m_confirm_destroy_partition) {
+				ImGui::OpenPopup("Confirm##confirm_destroy_partition");
+				m_confirm_destroy_partition = false;
+			}
+			if (ImGui::BeginPopupModal("Confirm##confirm_destroy_partition")) {
+				ImGui::Text("All unsaved changes will be lost, do you want to continue?");
+				if (ImGui::Button("Continue")) {
+					editor.destroyWorldPartition(m_partition_to_destroy);
+					ImGui::CloseCurrentPopup();
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+				ImGui::EndPopup();
+			}
+
+			const Array<EntityRef>& entities = editor.getSelectedEntities();
+			static TextFilter filter;
+			m_has_focus = false;
+			if (!m_is_open) return;
+
+			if (m_request_focus_filter) ImGui::SetNextWindowFocus();
+			if (ImGui::Begin(ICON_FA_STREAM "Hierarchy##hierarchy", &m_is_open)) {
+				m_has_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+				if (m_request_focus_filter) {
+					ImGui::SetKeyboardFocusHere();
+					m_request_focus_filter = false;
+				}
+				
+				bool select_first = false;
+				World* world = editor.getWorld();
+				filter.gui(ICON_FA_SEARCH "Filter", -1, false, &m_focus_filter_action);
+				if (ImGui::IsItemDeactivatedAfterEdit() && ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+					select_first = true;
+				}
+
+				if (ImGui::BeginChild("entities")) {
+					ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().FramePadding.x);
+					
+					if (filter.isActive()) {
+						for (EntityPtr e = world->getFirstEntity(); e.isValid(); e = world->getNextEntity((EntityRef)e)) {
+							char buffer[1024];
+							getEntityListDisplayName(m_app, *world, Span(buffer), e);
+							if (!filter.pass(buffer)) continue;
+
+							ImGui::PushID(e.index);
+							const EntityRef e_ref = (EntityRef)e;
+							if (select_first) {
+								select_first = false;
+								editor.selectEntities(Span(&e_ref, 1), false);
+							}
+
+							if (m_renaming_entity == e_ref) {
+								renameGUI();
+							} else {
+								bool selected = entities.indexOf(e_ref) >= 0;
+								if (ImGui::Selectable(buffer, &selected, ImGuiSelectableFlags_SpanAvailWidth)) {
+									editor.selectEntities(Span(&e_ref, 1), ImGui::GetIO().KeyCtrl);
+								}
+								if (ImGui::BeginDragDropSource()) {
+									ImGui::TextUnformatted(buffer);
+									ImGui::SetDragDropPayload("entity", &e, sizeof(e));
+									ImGui::EndDragDropSource();
+								}
+							}
+							ImGui::PopID();
+						}
+					} else {
+						EntityFolders& folders = editor.getEntityFolders();
+						Array<EntityRef> selection_chain(m_app.getAllocator());
+						if (m_entity_selection_changed && !editor.getSelectedEntities().empty()) {
+							getSelectionChain(selection_chain, editor.getSelectedEntities()[0]);
+							m_entity_selection_changed = false;
+						}
+						for (const World::Partition& p : world->getPartitions()) {
+							folderUI(folders.getRoot(p.handle), folders, 0, selection_chain, p.name, p.handle);
+						}
+					}
+					ImGui::PopItemWidth();
+				}
+				ImGui::EndChild();
+			}
+			ImGui::End();
+		}
+
+		bool hasFocus() const override { return m_has_focus; }
+		
+		bool onAction(const Action& action) override {
+			if (&action == &m_app.m_common_actions.rename) {
+				WorldEditor& editor = m_app.getWorldEditor();
+				const Array<EntityRef>& selected_entities = editor.getSelectedEntities();
+				m_renaming_entity = selected_entities.empty() ? INVALID_ENTITY : selected_entities[0];
+				if (m_renaming_entity.isValid()) {
+					m_set_rename_focus = true;
+					const char* name = editor.getWorld()->getEntityName(selected_entities[0]);
+					copyString(m_rename_buf, name);
+				}
+				return true;
+			}
+			return false;
+		}
+
+		const char* getName() const override { return "hierarchy"; }
+
+		void onEntitySelectionChanged() {
+			m_entity_selection_changed = true;
+		}
+
+		StudioAppImpl& m_app;
+		bool m_is_open = true;
+		bool m_has_focus = false;
+		bool m_entity_selection_changed = false;
+		Action m_focus_filter_action;
+		bool m_request_focus_filter = false;
+		EntityPtr m_renaming_entity = INVALID_ENTITY;
+		EntityFolders::FolderHandle m_renaming_folder = EntityFolders::INVALID_FOLDER;
+		bool m_set_rename_focus = false;
+		char m_rename_buf[World::ENTITY_NAME_MAX_LENGTH];
+		bool m_confirm_destroy_partition = false;
+		World::PartitionHandle m_partition_to_destroy;
+	};
+
 	StudioAppImpl()
-		: m_is_entity_list_open(true)
-		, m_finished(false)
+		: m_finished(false)
 		, m_deferred_game_mode_exit(false)
 		, m_actions(m_allocator)
 		, m_owned_actions(m_allocator)
@@ -206,9 +667,6 @@ struct StudioAppImpl final : StudioApp
 					ImGuiKey key = m_imgui_key_map[(int)event.key.keycode];
 					if (key != ImGuiKey_None) io.AddKeyEvent(key, event.key.down);
 
-					if (event.key.down && event.key.keycode == os::Keycode::F2) {
-						m_is_f2_pressed = true;
-					}
 					checkShortcuts();
 				}
 				break;
@@ -236,7 +694,6 @@ struct StudioAppImpl final : StudioApp
 			m_engine->getFileSystem().processCallbacks();
 		}
 
-		removeAction(&m_focus_hierarchy_action);
 		removeAction(&m_start_standalone_app);
 		removeAction(&m_show_all_actions_action);
 		removePlugin(*m_asset_browser.get());
@@ -276,6 +733,7 @@ struct StudioAppImpl final : StudioApp
 		}
 		m_add_cmp_plugins.clear();
 
+		m_hierarchy.destroy();
 		m_profiler_ui.reset();
 		m_asset_browser.reset();
 		m_property_grid.destroy();
@@ -296,6 +754,7 @@ struct StudioAppImpl final : StudioApp
 		removeAction(&m_common_actions.cam_up);
 		removeAction(&m_common_actions.cam_down);
 		removeAction(&m_common_actions.select_all);
+		removeAction(&m_common_actions.rename);
 
 		for (Action* action : m_owned_actions) {
 			removeAction(action);
@@ -369,7 +828,6 @@ struct StudioAppImpl final : StudioApp
 
 		profiler::frame();
 		m_events.clear();
-		m_is_f2_pressed = false;
 	}
 
 	void run() override {
@@ -408,10 +866,6 @@ struct StudioAppImpl final : StudioApp
 	static void imguiFree(void* ptr, void* user_data) {
 		StudioAppImpl* app = (StudioAppImpl*)user_data;
 		return app->m_imgui_allocator.deallocate(ptr);
-	}
-
-	void onEntitySelectionChanged() {
-		m_entity_selection_changed = true;
 	}
 
 	static os::HitTestResult childHitTestCallback(void* user_data, os::WindowHandle window, os::Point mp) {
@@ -466,7 +920,6 @@ struct StudioAppImpl final : StudioApp
 		init_data.plugins = Span(plugins, plugins + lengthOf(plugins) - 1);
 		m_engine = Engine::create(static_cast<Engine::InitArgs&&>(init_data), m_allocator);
 		m_settings.registerPtr("report_crashes", &m_crash_reporting, "General");
-		m_settings.registerPtr("entity_list_open", &m_is_entity_list_open);
 		m_settings.registerPtr("sleep_when_inactive", &m_sleep_when_inactive);
 		m_settings.registerPtr("fileselector_dir", &m_file_selector.m_current_dir);
 		m_settings.registerPtr("font_size", &m_font_size, "General");
@@ -502,11 +955,11 @@ struct StudioAppImpl final : StudioApp
 		extractBundled();
 
 		m_editor = WorldEditor::create(*m_engine, m_allocator);
-		m_editor->entitySelectionChanged().bind<&StudioAppImpl::onEntitySelectionChanged>(this);
 		loadUserPlugins();
 		addActions();
 
 		m_asset_browser = AssetBrowser::create(*this);
+		m_hierarchy.create(*this);
 		m_property_grid.create(*this);
 		m_profiler_ui = createProfilerUI(*this);
 		m_log_ui.create(*this, m_allocator);
@@ -801,7 +1254,6 @@ struct StudioAppImpl final : StudioApp
 			m_dockspace_id = ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
 			m_asset_compiler->onGUI();
 			guiAllActions();
-			guiEntityList();
 			guiSaveAsDialog();
 			for (i32 i = m_gui_plugins.size() - 1; i >= 0; --i) {
 				GUIPlugin* win = m_gui_plugins[i];
@@ -1175,8 +1627,8 @@ struct StudioAppImpl final : StudioApp
 	void setGlobalCoordSystem() { getGizmoConfig().coord_system = Gizmo::Config::GLOBAL; }
 	void toggleSettings() { m_settings.m_is_open = !m_settings.m_is_open; }
 	bool areSettingsOpen() const { return m_settings.m_is_open; }
-	void toggleEntityList() { m_is_entity_list_open = !m_is_entity_list_open; }
-	bool isEntityListOpen() const { return m_is_entity_list_open; }
+	void toggleEntityList() { m_hierarchy->m_is_open = !m_hierarchy->m_is_open; }
+	bool isEntityListOpen() const { return m_hierarchy->m_is_open; }
 	int getExitCode() const override { return m_exit_code; }
 	
 	DirSelector& getDirSelector() override {
@@ -1565,21 +2017,6 @@ struct StudioAppImpl final : StudioApp
 			endCenterStrip();
 		}
 
-		if (m_confirm_destroy_partition) {
-			ImGui::OpenPopup("Confirm##confirm_destroy_partition");
-			m_confirm_destroy_partition = false;
-		}
-		if (ImGui::BeginPopupModal("Confirm##confirm_destroy_partition")) {
-			ImGui::Text("All unsaved changes will be lost, do you want to continue?");
-			if (ImGui::Button("Continue")) {
-				m_editor->destroyWorldPartition(m_partition_to_destroy);
-				ImGui::CloseCurrentPopup();
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
-			ImGui::EndPopup();
-		}
-
 		if (m_confirm_new) {
 			openCenterStrip("Confirm##confirm_new");
 			m_confirm_new = false;
@@ -1681,393 +2118,6 @@ struct StudioAppImpl final : StudioApp
 
 			ImGui::EndMainMenuBar();
 		}
-	}
-
-	void getSelectionChain(Array<EntityRef>& chain, EntityPtr e) const {
-		if (!e.isValid()) return;
-		
-		e = m_editor->getWorld()->getParent(*e);
-		while (e.isValid()) {
-			chain.push(*e);
-			e = m_editor->getWorld()->getParent(*e);
-		}
-		for (i32 i = 0; i < chain.size() / 2; ++i) {
-			swap(chain[i], chain[chain.size() - 1 - i]); 
-		}
-	}
-
-	void showHierarchy(EntityRef entity, const Array<EntityRef>& selected_entities, Span<const EntityRef> selection_chain)
-	{
-		World* world = m_editor->getWorld();
-		bool is_selected = selected_entities.indexOf(entity) >= 0;
-		ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_AllowItemOverlap;
-		bool has_child = world->getFirstChild(entity).isValid();
-		if (!has_child) flags = ImGuiTreeNodeFlags_Leaf;
-		if (is_selected) flags |= ImGuiTreeNodeFlags_Selected;
-		flags |= ImGuiTreeNodeFlags_SpanAvailWidth;
-		
-		bool node_open;
-		if (m_renaming_entity == entity) {
-			node_open = ImGui::TreeNodeEx((void*)(intptr_t)entity.index, flags, "%s", "");
-			ImGui::SameLine();
-			ImGui::SetNextItemWidth(-1);
-			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {0, 0});
-			ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0);
-			ImGui::PushStyleColor(ImGuiCol_FrameBg, 0);
-			if (m_set_rename_focus) {
-				ImGui::SetKeyboardFocusHere();
-				m_set_rename_focus = false;
-			}
-			if (ImGui::InputText("##renamed_val", m_rename_buf, sizeof(m_rename_buf), ImGuiInputTextFlags_EnterReturnsTrue)) {
-				m_editor->setEntityName((EntityRef)m_renaming_entity, m_rename_buf);
-				m_renaming_entity = INVALID_ENTITY;
-			}
-			if (ImGui::IsItemDeactivated() && m_renaming_entity.isValid()) {
-				if (ImGui::IsItemDeactivatedAfterEdit() && m_rename_buf[0]) {
-					m_editor->setEntityName((EntityRef)m_renaming_entity, m_rename_buf);
-				}
-				m_renaming_entity = INVALID_ENTITY;
-			}
-			m_set_rename_focus = false;
-			ImGui::PopStyleVar(2);
-			ImGui::PopStyleColor();
-		}
-		else {
-			const ImVec2 cp = ImGui::GetCursorPos();
-			ImGui::Dummy(ImVec2(1.f, ImGui::GetTextLineHeightWithSpacing()));
-			if (selection_chain.length() > 0 && selection_chain[0] == entity) {
-				ImGui::SetNextItemOpen(true);
-				selection_chain.removePrefix(1);
-				if (selection_chain.length() == 0) {
-					ImGui::SetScrollHereY();
-				}
-			}
-			if (ImGui::IsItemVisible()) {
-				ImGui::SetCursorPos(cp);
-				char buffer[1024];
-				getEntityListDisplayName(*this, *world, Span(buffer), entity);
-				node_open = ImGui::TreeNodeEx((void*)(intptr_t)entity.index, flags, "%s", buffer);
-			}
-			else {
-				const char* dummy = "";
-				const ImGuiID id = ImGui::GetCurrentWindow()->GetID((void*)(intptr_t)entity.index);
-				if (ImGui::TreeNodeUpdateNextOpen(id, flags)) {
-					ImGui::SetCursorPos(cp);
-					node_open = ImGui::TreeNodeBehavior(id, flags, dummy, dummy);
-				}
-				else {
-					node_open = false;
-				}
-			}
-		}
-		
-		if (ImGui::IsItemVisible()) {
-			ImGui::PushID(entity.index);
-			if (ImGui::IsMouseReleased(1) && ImGui::IsItemHovered()) ImGui::OpenPopup("entity_context_menu");
-			if (ImGui::BeginPopup("entity_context_menu"))
-			{
-				if (ImGui::BeginMenu("Create child")) {
-					onCreateEntityWithComponentGUI(entity);
-					ImGui::EndMenu();
-				}
-
-				if (ImGui::MenuItem("Select all children")) {
-					Array<EntityRef> tmp(m_allocator);
-					for (EntityRef e : world->childrenOf(entity)) {
-						tmp.push(e);
-					}
-					m_editor->selectEntities(tmp, false);
-				}
-				ImGui::EndPopup();
-			}
-			ImGui::PopID();
-			if (ImGui::BeginDragDropTarget()) {
-				if (auto* payload = ImGui::AcceptDragDropPayload("entity")) {
-					EntityRef dropped_entity = *(EntityRef*)payload->Data;
-					if (dropped_entity != entity) {
-						m_editor->makeParent(entity, dropped_entity);
-						ImGui::EndDragDropTarget();
-						if (node_open) ImGui::TreePop();
-						return;
-					}
-				}
-
-				if (auto* payload = ImGui::AcceptDragDropPayload("selected_entities")) {
-					const Array<EntityRef>& selected = m_editor->getSelectedEntities();
-					for (EntityRef e : selected) {
-						if (e != entity) {
-							m_editor->makeParent(entity, e);
-						}
-					}
-					ImGui::EndDragDropTarget();
-					if (node_open) ImGui::TreePop();
-					return;
-				}
-
-				ImGui::EndDragDropTarget();
-			}
-
-			if (ImGui::BeginDragDropSource())
-			{
-				char buffer[1024];
-				getEntityListDisplayName(*this, *world, Span(buffer), entity);
-				ImGui::TextUnformatted(buffer);
-				
-				const Array<EntityRef>& selected = m_editor->getSelectedEntities();
-				if (selected.size() > 0 && selected.indexOf(entity) >= 0) {
-					ImGui::SetDragDropPayload("selected_entities", nullptr, 0);
-				}
-				else {	
-					ImGui::SetDragDropPayload("entity", &entity, sizeof(entity));
-				}
-				ImGui::EndDragDropSource();
-			}
-			else {
-				if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
-					m_editor->selectEntities(Span(&entity, 1), ImGui::GetIO().KeyCtrl);
-				}
-			}
-		}
-
-		if (node_open)
-		{
-			for (EntityRef e : world->childrenOf(entity))
-			{
-				showHierarchy(e, selected_entities, selection_chain);
-			}
-			if (ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && m_is_f2_pressed) {
-				m_renaming_entity = selected_entities.empty() ? INVALID_ENTITY : selected_entities[0];
-				if (m_renaming_entity.isValid()) {
-					m_set_rename_focus = true;
-					const char* name = m_editor->getWorld()->getEntityName(selected_entities[0]);
-					copyString(m_rename_buf, name);
-				}
-			}
-
-			ImGui::TreePop();
-		}
-	}
-
-
-	void folderUI(EntityFolders::FolderHandle folder_id, EntityFolders& folders, u32 level, Span<const EntityRef> selection_chain, const char* name_override, World::PartitionHandle partition) {
-		static EntityFolders::FolderHandle force_open_folder = EntityFolders::INVALID_FOLDER;
-		const EntityFolders::Folder* folder = &folders.getFolder(folder_id);
-		ImGui::PushID((const char*)&folder->id, (const char*)&folder->id + sizeof(folder->id));
-		bool node_open;
-		ImGuiTreeNodeFlags flags = level == 0 ? ImGuiTreeNodeFlags_DefaultOpen : 0;
-		flags |= ImGuiTreeNodeFlags_OpenOnArrow;
-		if (folders.getSelectedFolder() == folder_id) flags |= ImGuiTreeNodeFlags_Selected;
-		if (force_open_folder == folder_id) {
-			ImGui::SetNextItemOpen(true);
-			force_open_folder = EntityFolders::INVALID_FOLDER;
-		}
-		if (m_renaming_folder == folder_id) {
-			node_open = ImGui::TreeNodeEx((void*)folder, flags, "%s", ICON_FA_FOLDER);
-			ImGui::SameLine();
-			ImGui::SetNextItemWidth(-1);
-			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {0, 0});
-			ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0);
-			ImGui::PushStyleColor(ImGuiCol_FrameBg, 0);
-			if (m_set_rename_focus) {
-				ImGui::SetKeyboardFocusHere();
-				m_set_rename_focus = false;
-			}
-			if (ImGui::InputText("##renamed_val", m_rename_buf, sizeof(m_rename_buf), ImGuiInputTextFlags_EnterReturnsTrue)) {
-				m_editor->renameEntityFolder(m_renaming_folder, m_rename_buf);
-				m_rename_buf[0] = 0;
-			}
-			if (ImGui::IsItemDeactivated()) {
-				if (ImGui::IsItemDeactivatedAfterEdit() && m_rename_buf[0]) {
-					m_editor->renameEntityFolder(m_renaming_folder, m_rename_buf);
-				}
-				m_renaming_folder = EntityFolders::INVALID_FOLDER;
-			}
-			m_set_rename_focus = false;
-			ImGui::PopStyleVar(2);
-			ImGui::PopStyleColor();
-		}
-		else {
-			if (name_override) {
-				node_open = ImGui::TreeNodeEx((void*)folder, flags, "%s%s", ICON_FA_HOME, name_override);
-			}
-			else {
-				node_open = ImGui::TreeNodeEx((void*)folder, flags, "%s%s", ICON_FA_FOLDER, folder->name);
-			}
-		}
-		
-		if (ImGui::BeginDragDropTarget()) {
-			if (auto* payload = ImGui::AcceptDragDropPayload("entity")) {
-				EntityRef dropped_entity = *(EntityRef*)payload->Data;
-				m_editor->beginCommandGroup("move_entity_to_folder_group");
-				m_editor->makeParent(INVALID_ENTITY, dropped_entity);
-				m_editor->moveEntityToFolder(dropped_entity, folder_id);
-				m_editor->endCommandGroup();
-			}
-			ImGui::EndDragDropTarget();
-		}
-
-		if (ImGui::IsMouseClicked(0) && ImGui::IsItemHovered()) {
-			folders.selectFolder(folder_id);
-		}
-
-		if (ImGui::IsMouseReleased(1) && ImGui::IsItemHovered()) {
-			ImGui::OpenPopup("folder_context_menu");
-		}
-		if (ImGui::BeginPopup("folder_context_menu")) {
-			if (ImGui::Selectable("New folder")) {
-				force_open_folder = folder_id;
-				EntityFolders::FolderHandle new_folder = m_editor->createEntityFolder(folder_id);
-				folder = &folders.getFolder(folder_id);
-				m_renaming_folder = new_folder;
-				m_set_rename_focus = true;
-			}
-			const bool is_root = folder->parent == EntityFolders::INVALID_FOLDER;
-			World* world = m_editor->getWorld();
-
-			if (is_root) {
-				const bool is_partition_named = world->getPartition(partition).name[0];
-				if (is_partition_named) {
-					if (ImGui::Selectable("Save")) {
-						if (m_editor->isGameMode()) {
-							logError("Could not save while the game is running");
-						}
-						else {
-							m_editor->savePartition(partition);
-						}
-					}
-				}
-				else {
-					if (ImGui::Selectable("Save As")) {
-						EntityFolders& folders = m_editor->getEntityFolders();
-						EntityFolders::FolderHandle root = folders.getRoot(partition);
-						folders.selectFolder(root);
-						saveAs();
-					}
-				}
-			}
-
-			if (!is_root || world->getPartitions().size() > 1) {
-				if (ImGui::Selectable(is_root ? "Unload" : "Delete")) {
-					if (is_root) {
-						m_confirm_destroy_partition = true;
-						m_partition_to_destroy = partition;
-					}
-					else {
-						m_editor->destroyEntityFolder(folder_id);
-						ImGui::EndPopup();
-						if (node_open) ImGui::TreePop();
-						ImGui::PopID();
-						return;
-					}
-				}
-			}
-
-			const bool has_children = folders.getFolder(folder_id).first_entity.isValid();
-			if (ImGui::Selectable("Select entities", false, has_children ? 0 : ImGuiSelectableFlags_Disabled)) {
-				Array<EntityRef> entities(m_allocator);
-				EntityPtr e = folders.getFolder(folder_id).first_entity;
-				while (e.isValid()) {
-					entities.push((EntityRef)e);
-					const EntityPtr next = folders.getNextEntity((EntityRef)e);
-					e = next;
-				}
-				m_editor->selectEntities(entities, false);
-			}
-			if (level > 0 && ImGui::Selectable("Rename")) {
-				m_renaming_folder = folder_id;
-				m_set_rename_focus = true;
-			}
-			ImGui::EndPopup();
-		}
-
-		if (!node_open) {
-			ImGui::PopID();
-			return;
-		}
-
-		EntityFolders::FolderHandle child_id = folder->first_child;
-		while (child_id != EntityFolders::INVALID_FOLDER) {
-			const EntityFolders::Folder& child = folders.getFolder(child_id);
-			const EntityFolders::FolderHandle next = child.next;
-			folderUI(child_id, folders, level + 1, selection_chain, nullptr, partition);
-			child_id = next;
-		}
-
-		EntityPtr child_e = folder->first_entity;
-		while (child_e.isValid()) {
-			if (!m_editor->getWorld()->getParent((EntityRef)child_e).isValid()) {
-				showHierarchy((EntityRef)child_e, m_editor->getSelectedEntities(), selection_chain);
-			}
-			child_e = folders.getNextEntity((EntityRef)child_e);
-		}
-
-		ImGui::TreePop();
-		ImGui::PopID();
-	}
-
-	void guiEntityList() {
-		PROFILE_FUNCTION();
-		const Array<EntityRef>& entities = m_editor->getSelectedEntities();
-		static TextFilter filter;
-		if (!m_is_entity_list_open) return;
-
-		if (m_request_focus_hierarchy_filter) ImGui::SetNextWindowFocus();
-		if (ImGui::Begin(ICON_FA_STREAM "Hierarchy##hierarchy", &m_is_entity_list_open)) {
-			if (m_request_focus_hierarchy_filter) {
-				ImGui::SetKeyboardFocusHere();
-				m_request_focus_hierarchy_filter = false;
-			}
-			
-			bool select_first = false;
-			World* world = m_editor->getWorld();
-			filter.gui(ICON_FA_SEARCH "Filter", -1, false, &m_focus_hierarchy_action);
-			if (ImGui::IsItemDeactivatedAfterEdit() && ImGui::IsKeyPressed(ImGuiKey_Enter)) {
-				select_first = true;
-			}
-
-			if (ImGui::BeginChild("entities")) {
-				ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().FramePadding.x);
-				
-				if (filter.isActive()) {
-					for (EntityPtr e = world->getFirstEntity(); e.isValid(); e = world->getNextEntity((EntityRef)e)) {
-						char buffer[1024];
-						getEntityListDisplayName(*this, *world, Span(buffer), e);
-						if (!filter.pass(buffer)) continue;
-
-						ImGui::PushID(e.index);
-						const EntityRef e_ref = (EntityRef)e;
-						if (select_first) {
-							select_first = false;
-							m_editor->selectEntities(Span(&e_ref, 1), false);
-						}
-
-						bool selected = entities.indexOf(e_ref) >= 0;
-						if (ImGui::Selectable(buffer, &selected, ImGuiSelectableFlags_SpanAvailWidth)) {
-							m_editor->selectEntities(Span(&e_ref, 1), ImGui::GetIO().KeyCtrl);
-						}
-						if (ImGui::BeginDragDropSource()) {
-							ImGui::TextUnformatted(buffer);
-							ImGui::SetDragDropPayload("entity", &e, sizeof(e));
-							ImGui::EndDragDropSource();
-						}
-						ImGui::PopID();
-					}
-				} else {
-					EntityFolders& folders = m_editor->getEntityFolders();
-					Array<EntityRef> selection_chain(m_allocator);
-					if (m_entity_selection_changed && !m_editor->getSelectedEntities().empty()) {
-						getSelectionChain(selection_chain, m_editor->getSelectedEntities()[0]);
-						m_entity_selection_changed = false;
-					}
-					for (const World::Partition& p : world->getPartitions()) {
-						folderUI(folders.getRoot(p.handle), folders, 0, selection_chain, p.name, p.handle);
-					}
-				}
-				ImGui::PopItemWidth();
-			}
-			ImGui::EndChild();
-		}
-		ImGui::End();
 	}
 
 	void setFullscreen(bool fullscreen) override
@@ -2351,11 +2401,6 @@ struct StudioAppImpl final : StudioApp
 		}
 	}
 
-	void focusHierarchyFilter() {
-		m_request_focus_hierarchy_filter = true;
-		m_is_entity_list_open = true;
-	}
-
 	void showAllActionsGUI() { m_show_all_actions_request = true; }
 
 	void addActions()
@@ -2389,16 +2434,13 @@ struct StudioAppImpl final : StudioApp
 		addAction(&m_common_actions.cam_down);
 		m_common_actions.select_all.init("Select all", "Select all", "select_all", "", Action::IMGUI_PRIORITY);
 		addAction(&m_common_actions.select_all);
-
+		m_common_actions.rename.init("Rename", "Rename", "rename", "", os::Keycode::F2, Action::NONE, Action::IMGUI_PRIORITY);
+		addAction(&m_common_actions.rename);
 
 		m_show_all_actions_action.init("Show all actions", "Show all actions", "show_all_actions", "", os::Keycode::P, Action::Modifiers::CTRL | Action::Modifiers::SHIFT, Action::Type::IMGUI_PRIORITY);
 		m_show_all_actions_action.func.bind<&StudioAppImpl::showAllActionsGUI>(this);
 		addAction(&m_show_all_actions_action);
 		
-		m_focus_hierarchy_action.init("Focus hierarchy", "Focus hierarchy filter", "focus_hierarchy", "", os::Keycode::F, Action::Modifiers::CTRL, Action::Type::IMGUI_PRIORITY);
-		m_focus_hierarchy_action.func.bind<&StudioAppImpl::focusHierarchyFilter>(this);
-		addAction(&m_focus_hierarchy_action);
-
 		m_start_standalone_app.init("Start standalone app", "Start standalone app", "start_standalone_app", "", Action::Type::IMGUI_PRIORITY);
 		m_start_standalone_app.func.bind<&StudioAppImpl::startStandaloneApp>(this);
 		addToolAction(&m_start_standalone_app);
@@ -2693,6 +2735,8 @@ struct StudioAppImpl final : StudioApp
 				}
 			}
 		#endif
+
+		addPlugin(*m_hierarchy.get());
 		addPlugin(*createSplineEditor(*this));
 		addPlugin(*createSignalEditor(*this));
 		addPlugin(*m_property_grid.get());
@@ -3205,7 +3249,6 @@ struct StudioAppImpl final : StudioApp
 	CommonActions m_common_actions;
 	Action m_show_all_actions_action;
 	Action m_start_standalone_app;
-	Action m_focus_hierarchy_action;
 
 	Array<GUIPlugin*> m_gui_plugins;
 	Array<MousePlugin*> m_mouse_plugins;
@@ -3223,17 +3266,16 @@ struct StudioAppImpl final : StudioApp
 	bool m_confirm_exit = false;
 	bool m_confirm_load = false;
 	bool m_confirm_new = false;
-	bool m_confirm_destroy_partition = false;
 	bool m_is_caption_hovered = false;
 	bool m_capture_input = false;
 	
-	World::PartitionHandle m_partition_to_destroy;
 	Path m_world_to_load;
 	
 	ImTextureID m_logo = nullptr;
 	UniquePtr<AssetBrowser> m_asset_browser;
 	UniquePtr<AssetCompiler> m_asset_compiler;
 	Local<PropertyGrid> m_property_grid;
+	Local<HierarchyGUI> m_hierarchy;
 	UniquePtr<GUIPlugin> m_profiler_ui;
 	Local<LogUI> m_log_ui;
 	Settings m_settings;
@@ -3275,14 +3317,7 @@ struct StudioAppImpl final : StudioApp
 
 	bool m_is_welcome_screen_open;
 	bool m_is_export_game_dialog_open;
-	bool m_is_entity_list_open;
-	
-	EntityPtr m_renaming_entity = INVALID_ENTITY;
-	EntityFolders::FolderHandle m_renaming_folder = EntityFolders::INVALID_FOLDER;
-	bool m_set_rename_focus = false;
-	char m_rename_buf[World::ENTITY_NAME_MAX_LENGTH];
-	bool m_is_f2_pressed = false;
-	
+
 	ImFont* m_font;
 	ImFont* m_big_icon_font;
 	ImFont* m_bold_font;
@@ -3303,8 +3338,7 @@ struct StudioAppImpl final : StudioApp
 	TextFilter m_all_actions_filter;
 	bool m_sleep_when_inactive = true;
 	bool m_crash_reporting = true;
-	bool m_request_focus_hierarchy_filter = false;
-	i32 m_font_size = 13;
+	i32 m_font_size = 16;
 };
 
 static Local<StudioAppImpl> g_studio;
