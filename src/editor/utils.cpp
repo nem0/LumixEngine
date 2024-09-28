@@ -1820,16 +1820,16 @@ struct CodeEditorImpl final : CodeEditor {
 			if (ImGui::IsKeyPressed(ImGuiKey_Escape)) m_cursors.resize(1);
 			else if (ImGui::IsKeyPressed(ImGuiKey_Delete)) del(io.KeyCtrl);
 			else if (ImGui::IsKeyPressed(ImGuiKey_Backspace)) backspace(io.KeyCtrl);
-			else if (ImGui::Shortcut(ImGuiMod_Shortcut | ImGuiKey_Z, id, f_repeat)) undo();
-			else if (ImGui::Shortcut(ImGuiMod_Shortcut | ImGuiMod_Shift | ImGuiKey_Z, id, f_repeat)) redo();
-			else if (ImGui::Shortcut(ImGuiMod_Shortcut | ImGuiKey_C, id)) copyToClipboard();
-			else if (ImGui::Shortcut(ImGuiMod_Shortcut | ImGuiKey_X, id)) { copyToClipboard(); deleteSelections(); }
-			else if (ImGui::Shortcut(ImGuiMod_Shortcut | ImGuiKey_V, id, f_repeat)) pasteFromClipboard();
-			else if (ImGui::Shortcut(ImGuiMod_Shortcut | ImGuiKey_A, id)) selectAll();
+			else if (ImGui::Shortcut(ImGuiMod_Shortcut | ImGuiKey_Z, f_repeat, id)) undo();
+			else if (ImGui::Shortcut(ImGuiMod_Shortcut | ImGuiMod_Shift | ImGuiKey_Z, f_repeat, id)) redo();
+			else if (ImGui::Shortcut(ImGuiMod_Shortcut | ImGuiKey_C, 0, id)) copyToClipboard();
+			else if (ImGui::Shortcut(ImGuiMod_Shortcut | ImGuiKey_X, 0, id)) { copyToClipboard(); deleteSelections(); }
+			else if (ImGui::Shortcut(ImGuiMod_Shortcut | ImGuiKey_V, f_repeat, id)) pasteFromClipboard();
+			else if (ImGui::Shortcut(ImGuiMod_Shortcut | ImGuiKey_A, 0, id)) selectAll();
 			else if (ImGui::IsKeyPressed(ImGuiKey_Enter)) insertNewLine();
 			else if (ImGui::IsKeyPressed(ImGuiKey_PageUp)) moveCursorPageUp(u32(content_size.y / line_height + 1), line_height);
 			else if (ImGui::IsKeyPressed(ImGuiKey_PageDown)) moveCursorPageDown(u32(content_size.y / line_height + 1), line_height);
-			else if (ImGui::Shortcut(ImGuiMod_Shortcut | ImGuiKey_F, id)) {
+			else if (ImGui::Shortcut(ImGuiMod_Shortcut | ImGuiKey_F, 0, id)) {
 				m_search_visible = true;
 				m_focus_search = true;
 				m_search_from = m_cursors[0];
