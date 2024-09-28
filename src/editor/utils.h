@@ -75,6 +75,7 @@ struct CommonActions {
 	Action cam_right;
 	Action cam_up;
 	Action cam_down;
+	Action select_all;
 };
 
 inline Action::Modifiers operator |(Action::Modifiers a, Action::Modifiers b) { return Action::Modifiers((u8)a | (u8)b); }

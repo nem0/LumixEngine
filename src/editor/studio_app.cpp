@@ -295,6 +295,7 @@ struct StudioAppImpl final : StudioApp
 		removeAction(&m_common_actions.cam_left);
 		removeAction(&m_common_actions.cam_up);
 		removeAction(&m_common_actions.cam_down);
+		removeAction(&m_common_actions.select_all);
 
 		for (Action* action : m_owned_actions) {
 			removeAction(action);
@@ -2386,6 +2387,9 @@ struct StudioAppImpl final : StudioApp
 		addAction(&m_common_actions.cam_up);
 		m_common_actions.cam_down.init("Move down", "Move camera down", "moveDown", "", Action::LOCAL);
 		addAction(&m_common_actions.cam_down);
+		m_common_actions.select_all.init("Select all", "Select all", "select_all", "", Action::IMGUI_PRIORITY);
+		addAction(&m_common_actions.select_all);
+
 
 		m_show_all_actions_action.init("Show all actions", "Show all actions", "show_all_actions", "", os::Keycode::P, Action::Modifiers::CTRL | Action::Modifiers::SHIFT, Action::Type::IMGUI_PRIORITY);
 		m_show_all_actions_action.func.bind<&StudioAppImpl::showAllActionsGUI>(this);
