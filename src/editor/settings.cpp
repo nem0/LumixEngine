@@ -61,7 +61,6 @@ static bool shortcutInput(char* button_label, Action& action, bool edit, StudioA
 				if (a->modifiers == editing.modifiers && a->shortcut == editing.shortcut) {
 					first_collision = a;
 					++num_collisions;
-					break;
 				}
 			}
 			if (num_collisions > 0) {
