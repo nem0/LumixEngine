@@ -3555,8 +3555,8 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 		: m_app(app)
 		, m_probes(app.getAllocator())
 		, m_model_plugin(model_plugin)
-		, m_generate_action("Generate probes", "Generate probes", "generate_probes", "")
-		, m_add_bounce_action("Add bounce", "Add light bounce to probes", "probes_add_bounce", "")
+		, m_generate_action("Generate probes", "Tools - generate probes", "generate_probes", "")
+		, m_add_bounce_action("Add bounce", "Tools - add light bounce to probes", "probes_add_bounce", "")
 	{
 		m_app.addToolAction(&m_generate_action);
 		m_app.addToolAction(&m_add_bounce_action);
@@ -5313,7 +5313,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		, m_model_plugin(app)
 		, m_fbx_importer(app)
 		, m_procedural_geom_plugin(app)
-		, m_renderdoc_capture_action("Capture frame", "Capture frame with RenderDoc", "capture_renderdoc", "")
+		, m_renderdoc_capture_action("Capture frame", "Tools - capture frame with RenderDoc", "capture_renderdoc", "")
 	{}
 
 	const char* getName() const override { return "renderer"; }

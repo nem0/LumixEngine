@@ -37,7 +37,7 @@ struct LUMIX_EDITOR_API Action {
 	};
 
 	Action(const char* label_short, const char* label_long, const char* name, const char* font_icon);
-	bool toolbarButton(struct ImFont* font);
+	bool toolbarButton(struct ImFont* font, bool is_selected = false);
 	bool isActive() const;
 	bool shortcutText(Span<char> out) const;
 

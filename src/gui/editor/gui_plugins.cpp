@@ -278,7 +278,7 @@ struct GUIEditor final : StudioApp::GUIPlugin
 public:
 	GUIEditor(StudioApp& app)
 		: m_app(app)
-		, m_toggle_ui("GUI Editor", "Toggle gui editor", "gui_editor", "")
+		, m_toggle_ui("GUI Editor", "GUI editor - toggle UI", "gui_editor", "")
 		, m_hcenter_action("Center horizontally", "GUI editor - center horizontally", "guied_hcenter", "")
 		, m_vcenter_action("Center vertically", "GUI editor - center vertically", "guied_vcenter", "")
 		, m_hexpand_action("Expand horizontally", "GUI editor - expand horizontally", "guied_hexpand", "")

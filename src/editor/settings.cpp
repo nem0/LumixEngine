@@ -32,25 +32,84 @@ struct HashFunc<StringView> {
 	}
 };
 
-static bool shortcutInput(char* button_label, Action& action, bool edit) {
+static bool shortcutInput(char* button_label, Action& action, bool edit, StudioApp& app) {
 	bool res = false;
-	ImGui::SetNextItemWidth(-30);
-	ImGui::InputText("", button_label, sizeof(button_label), ImGuiInputTextFlags_ReadOnly);
-	if (ImGui::IsItemActive()) {
-		if (os::isKeyDown(os::Keycode::SHIFT)) action.modifiers |= Action::Modifiers::SHIFT;
-		if (os::isKeyDown(os::Keycode::ALT)) action.modifiers |= Action::Modifiers::ALT;
-		if (os::isKeyDown(os::Keycode::CTRL)) action.modifiers |= Action::Modifiers::CTRL;
+	ImGuiStyle& style = ImGui::GetStyle();
+	ImVec2 prev = style.ButtonTextAlign;
+	style.ButtonTextAlign.x = 0;
+	static Action editing = action;
+	if (ImGui::Button(button_label, ImVec2(-30, 0))) {
+		openCenterStrip("edit_shortcut_popup");
+		editing = action;
+	}
+	style.ButtonTextAlign = prev;
+	if (beginCenterStrip("edit_shortcut_popup")) {
+		ImGui::NewLine();
+		alignGUICenter([&](){ ImGui::TextUnformatted("Press a key combination and then press Enter"); });
+		char shortcut_text[64];
+		editing.shortcutText(Span(shortcut_text));
+		alignGUICenter([&](){
+			ImGui::TextUnformatted(shortcut_text);
+		});
 
-		for (int i = 0; i < (int)os::Keycode::MAX; ++i) {
-			const auto kc = (os::Keycode)i;
-			const bool is_mouse = kc == os::Keycode::LBUTTON || kc == os::Keycode::RBUTTON || kc == os::Keycode::MBUTTON;
-			const bool is_modifier = kc == os::Keycode::SHIFT || kc == os::Keycode::LSHIFT || kc == os::Keycode::RSHIFT || kc == os::Keycode::ALT || kc == os::Keycode::LALT ||
-									 kc == os::Keycode::RALT || kc == os::Keycode::CTRL || kc == os::Keycode::LCTRL || kc == os::Keycode::RCTRL;
-			if (os::isKeyDown(kc) && !is_mouse && !is_modifier) {
-				action.shortcut = (os::Keycode)i;
-				break;
+		const Array<Action*>& actions = app.getActions();
+		if (editing.modifiers != Action::NONE || editing.shortcut != os::Keycode::INVALID) {
+			u32 num_collisions = 0;
+			const Action* first_collision = nullptr;
+			for (const Action* a : actions) {
+				if (a == &action) continue;
+				if (a->modifiers == editing.modifiers && a->shortcut == editing.shortcut) {
+					first_collision = a;
+					++num_collisions;
+					break;
+				}
+			}
+			if (num_collisions > 0) {
+				alignGUICenter([&](){ 
+					ImGui::Text("This shortcut is already used by %s and %d other(s)", first_collision->label_long.data, num_collisions - 1);
+				});
 			}
 		}
+
+		Span<const os::Event> events = app.getEvents();
+		for (const os::Event& event : events) {
+			if (event.type != os::Event::Type::KEY) continue;
+			if (!event.key.down) continue;
+
+			switch (event.key.keycode) {
+				case os::Keycode::ESCAPE: 
+					if (editing.modifiers == Action::NONE && editing.shortcut == os::Keycode::INVALID) {
+						ImGui::CloseCurrentPopup();
+						break;
+					}
+					editing.modifiers = Action::NONE;
+					editing.shortcut = os::Keycode::INVALID;
+					break;
+				case os::Keycode::RETURN:
+					action = editing;
+					ImGui::CloseCurrentPopup();
+					break;
+				case os::Keycode::SHIFT:
+					editing.modifiers |= Action::Modifiers::SHIFT;
+					break;
+				case os::Keycode::ALT:
+					editing.modifiers |= Action::Modifiers::ALT;
+					break;
+				case os::Keycode::CTRL:
+					editing.modifiers |= Action::Modifiers::CTRL;
+					break;
+				default:
+					os::Keycode kc = event.key.keycode;
+					const bool is_mouse = kc == os::Keycode::LBUTTON || kc == os::Keycode::RBUTTON || kc == os::Keycode::MBUTTON;
+					const bool is_modifier = kc == os::Keycode::SHIFT || kc == os::Keycode::LSHIFT || kc == os::Keycode::RSHIFT || kc == os::Keycode::ALT || kc == os::Keycode::LALT ||
+											kc == os::Keycode::RALT || kc == os::Keycode::CTRL || kc == os::Keycode::LCTRL || kc == os::Keycode::RCTRL;
+					if (!is_mouse && !is_modifier) {
+						editing.shortcut = kc;
+					}
+					break;
+			}
+		}
+		endCenterStrip();
 	}
 	ImGui::SameLine();
 	if (ImGuiEx::IconButton(ICON_FA_TRASH, "Clear")) {
@@ -146,7 +205,7 @@ Settings::Settings(StudioApp& app)
 	, m_mouse_sensitivity_y(m_allocator)
 	, m_variables(m_allocator)
 	, m_app_data_path(m_allocator)
-	, m_toggle_ui_action("Settings", "Toggle settings window", "settings_toggle_ui", "")
+	, m_toggle_ui_action("Settings", "Toggle settings UI", "settings_toggle_ui", "")
 {
 	char tmp[MAX_PATH];
 	if (!os::getAppDataDir(Span(tmp))) {
@@ -166,7 +225,7 @@ Settings::Settings(StudioApp& app)
 	registerPtr("imgui_state", &m_imgui_state);
 	registerPtr("settings_open", &m_is_open);
 
-	m_app.addAction(&m_toggle_ui_action);
+	m_app.addWindowAction(&m_toggle_ui_action);
 }
 
 float Settings::getTimeSinceLastSave() const {
@@ -809,32 +868,6 @@ bool ShowStyleSelector() {
 	return false;
 }
 
-// Demo helper function to select among loaded fonts.
-// Here we use the regular BeginCombo()/EndCombo() api which is more the more flexible one.
-static void ShowFontSelector(const char* label)
-{
-	ImGuiIO& io = ImGui::GetIO();
-	ImFont* font_current = ImGui::GetFont();
-	if (ImGui::BeginCombo(label, font_current->GetDebugName()))
-	{
-		for (int n = 0; n < io.Fonts->Fonts.Size; n++)
-		{
-			ImFont* font = io.Fonts->Fonts[n];
-			ImGui::PushID((void*)font);
-			if (ImGui::Selectable(font->GetDebugName(), font == font_current))
-				io.FontDefault = font;
-			ImGui::PopID();
-		}
-		ImGui::EndCombo();
-	}
-	ImGui::SameLine();
-	HelpMarker(
-		"- Load additional fonts with io.Fonts->AddFontFromFileTTF().\n"
-		"- The font atlas is built when calling io.Fonts->GetTexDataAsXXXX() or io.Fonts->Build().\n"
-		"- Read FAQ and docs/FONTS.md for more details.\n"
-		"- If you need to add/remove fonts at runtime (e.g. for DPI change), do it before calling NewFrame().");
-}
-
 void Settings::shortcutsGUI() {
 	if (!ImGui::BeginTabItem("Shortcuts")) return;
 
@@ -843,7 +876,7 @@ void Settings::shortcutsGUI() {
 	filter.gui("Filter", -1, ImGui::IsWindowAppearing());
 
 	if (ImGui::BeginChild("shortcuts_scrollarea")) {
-		if (ImGui::BeginTable("shortcuts", 2, ImGuiTableFlags_RowBg)) {
+		if (ImGui::BeginTable("shortcuts", 2, ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable)) {
 			for (int i = 0; i < actions.size(); ++i) {
 				Action& a = *actions[i];
 				char button_label[64];
@@ -852,9 +885,9 @@ void Settings::shortcutsGUI() {
 					ImGui::TableNextRow();
 					ImGui::TableNextColumn();
 					ImGui::PushID(&a);
-					ImGuiEx::Label(a.label_long);
+					ImGui::TextUnformatted(a.label_long);
 					ImGui::TableNextColumn();
-					if (shortcutInput(button_label, a, &a == m_edit_action)) {
+					if (shortcutInput(button_label, a, &a == m_edit_action, m_app)) {
 						m_edit_action = &a;
 					}
 					ImGui::PopID();
@@ -967,10 +1000,6 @@ static void generalGUI(Settings& settings) {
 	ImGuiEx::Label("Mouse sensitivity Y");
 	ImGui::TableNextColumn();
 	settings.m_mouse_sensitivity_y.gui();
-}
-
-void Settings::menuItemUI() {
-	if (Lumix::menuItem(m_toggle_ui_action, true)) m_is_open = !m_is_open;
 }
 
 void Settings::gui() {
