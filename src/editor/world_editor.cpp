@@ -2524,8 +2524,6 @@ public:
 
 
 	void pasteEntities() override;
-	void duplicateEntities() override;
-
 
 	void destroyComponent(Span<const EntityRef> entities, ComponentType cmp_type) override
 	{
@@ -3238,15 +3236,6 @@ void WorldEditorImpl::pasteEntities()
 {
 	if (!canPasteEntities()) return;
 	UniquePtr<PasteEntityCommand> command = UniquePtr<PasteEntityCommand>::create(m_allocator, *this, m_copy_buffer);
-	executeCommand(command.move());
-}
-
-
-void WorldEditorImpl::duplicateEntities()
-{
-	copyEntities();
-
-	UniquePtr<PasteEntityCommand> command = UniquePtr<PasteEntityCommand>::create(m_allocator, *this, m_copy_buffer, true);
 	executeCommand(command.move());
 }
 

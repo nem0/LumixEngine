@@ -912,52 +912,12 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		: m_app(app)
 		, m_allocator(app.getAllocator(), "material editor")
 	{
-		m_wireframe_action.init("Wireframe", "Wireframe", "wireframe", "", (os::Keycode)'W', Action::Modifiers::CTRL);
-		m_wireframe_action.func.bind<&MaterialPlugin::toggleWireframe>(this);
-
 		app.getAssetCompiler().registerExtension("mat", Material::TYPE);
-		app.addToolAction(&m_wireframe_action);
-	}
-
-	~MaterialPlugin() {
-		m_app.removeAction(&m_wireframe_action);
 	}
 
 	void openEditor(const Path& path) override {
 		UniquePtr<EditorWindow> win = UniquePtr<EditorWindow>::create(m_allocator, path, m_app, m_allocator);
 		m_app.getAssetBrowser().addWindow(win.move());
-	}
-
-	void toggleWireframe() {
-		WorldEditor& editor = m_app.getWorldEditor();
-		const Array<EntityRef>& selected = editor.getSelectedEntities();
-		if (selected.empty()) return;
-
-		World& world = *editor.getWorld();
-		RenderModule& module = *(RenderModule*)world.getModule(MODEL_INSTANCE_TYPE);
-
-		Array<Material*> materials(m_allocator);
-		for (EntityRef e : selected) {
-			if (world.hasComponent(e, MODEL_INSTANCE_TYPE)) {
-				Model* model = module.getModelInstanceModel(e);
-				if (!model->isReady()) continue;
-				
-				for (u32 i = 0; i < (u32)model->getMeshCount(); ++i) {
-					Mesh& mesh = model->getMesh(i);
-					materials.push(mesh.material);
-				}
-			}
-			if (world.hasComponent(e, TERRAIN_TYPE)) {
-				materials.push(module.getTerrainMaterial(e));
-			}
-			if (world.hasComponent(e, PROCEDURAL_GEOM_TYPE)) {
-				materials.push(module.getProceduralGeometry(e).material);
-			}
-		}
-		materials.removeDuplicates();
-		for (Material* m : materials) {
-			m->setWireframe(!m->wireframe());
-		}
 	}
 
 	bool canCreateResource() const override { return true; }
@@ -968,7 +928,6 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 	StudioApp& m_app;
 	TagAllocator m_allocator;
-	Action m_wireframe_action;
 };
 
 struct TextureMeta {
@@ -3596,11 +3555,9 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 		: m_app(app)
 		, m_probes(app.getAllocator())
 		, m_model_plugin(model_plugin)
+		, m_generate_action("Generate probes", "Generate probes", "generate_probes", "")
+		, m_add_bounce_action("Add bounce", "Add light bounce to probes", "probes_add_bounce", "")
 	{
-		m_generate_action.init("Generate probes", "Generate probes", "generate_probes", "");
-		m_generate_action.func.bind<&EnvironmentProbePlugin::onGenerateProbes>(this);
-		m_add_bounce_action.init("Add bounce", "Add light bounce to probes", "probes_add_bounce", "");
-		m_add_bounce_action.func.bind<&EnvironmentProbePlugin::onAddBounce>(this);
 		m_app.addToolAction(&m_generate_action);
 		m_app.addToolAction(&m_add_bounce_action);
 	}
@@ -3862,8 +3819,11 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 		stream.endProfileBlock();
 	}
 
-	void update() override
-	{
+	void update() override {
+		World& world = *m_app.getWorldEditor().getWorld();
+		if (m_app.checkShortcut(m_add_bounce_action)) generateProbes(true, world);
+		if (m_app.checkShortcut(m_generate_action)) generateProbes(false, world);
+
 		if (m_ibl_filter_shader->isReady() && !m_ibl_filter_program) {
 			m_ibl_filter_program = m_ibl_filter_shader->getProgram(gpu::StateFlags::NONE, gpu::VertexDecl(gpu::PrimitiveType::TRIANGLE_STRIP), 0, "");
 		}
@@ -5353,6 +5313,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		, m_model_plugin(app)
 		, m_fbx_importer(app)
 		, m_procedural_geom_plugin(app)
+		, m_renderdoc_capture_action("Capture RenderDoc", "Capture with RenderDoc", "capture_renderdoc", "")
 	{}
 
 	const char* getName() const override { return "renderer"; }
@@ -5360,11 +5321,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	void init() override
 	{
 		PROFILE_FUNCTION();
-		// TODO
-		//m_app.getSettings().registerVariable("Renderer", "VSync", makeDelegate<&gpu::isVSyncEnabled>(), makeDelegate<&gpu::enableVSync>());
 		m_fbx_importer.init();
-		m_renderdoc_capture_action.init("Capture RenderDoc", "Capture with RenderDoc", "capture_renderdoc", "");
-		m_renderdoc_capture_action.func.bind<&StudioAppPlugin::captureRenderDoc>(this);
 
 		if (CommandLineParser::isOn("-renderdoc")) {
 			m_app.addToolAction(&m_renderdoc_capture_action);

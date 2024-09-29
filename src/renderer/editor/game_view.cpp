@@ -49,6 +49,8 @@ GameView::GameView(StudioApp& app)
 	, m_is_mouse_captured(false)
 	, m_is_ingame_cursor(false)
 	, m_time_multiplier(1.0f)
+	, m_toggle_ui("Game View", "Toggle game view", "game_view", "")
+	, m_fullscreen_action("Game View fullscreen", "Game View fullscreen", "game_view_fullscreen", "")
 {
 	Engine& engine = app.getEngine();
 	m_app.getSettings().registerPtr("game_view_open", &m_is_open);
@@ -57,12 +59,7 @@ GameView::GameView(StudioApp& app)
 
 
 void GameView::init() {
-	m_toggle_ui.init("Game View", "Toggle game view", "game_view", "");
-	m_toggle_ui.func.bind<&GameView::onToggleOpen>(this);
-	m_toggle_ui.is_selected.bind<&GameView::isOpen>(this);
 	m_app.addWindowAction(&m_toggle_ui);
-
-	m_fullscreen_action.init("Game View fullscreen", "Game View fullscreen", "game_view_fullscreen", "");
 	m_app.addAction(&m_fullscreen_action);
 
 	Engine& engine = m_app.getEngine();
@@ -246,6 +243,8 @@ void GameView::onGUI()
 	PROFILE_FUNCTION();
 	WorldEditor& editor = m_app.getWorldEditor();
 	m_pipeline->setWorld(editor.getWorld());
+
+	if (m_app.checkShortcut(m_toggle_ui, true)) m_is_open = !m_is_open;
 
 	const bool is_game_mode = m_app.getWorldEditor().isGameMode();
 	if (is_game_mode && !m_was_game_mode && m_focus_on_game_start) {

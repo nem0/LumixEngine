@@ -36,6 +36,7 @@ struct LUMIX_EDITOR_API StudioApp {
 		virtual void init() = 0;
 		virtual bool dependsOn(IPlugin& plugin) const { return false; }
 		virtual const char* getName() const = 0;
+		virtual void update(float time_delta) {}
 
 		virtual bool showGizmo(struct WorldView& view, struct ComponentUID cmp) = 0;
 	};
@@ -123,7 +124,6 @@ struct LUMIX_EDITOR_API StudioApp {
 	
 	virtual void newWorld() = 0;
 	virtual void setFullscreen(bool fullscreen) = 0;
-	virtual void snapDown() = 0;
 	virtual float getFOV() const = 0;
 	virtual void setFOV(float fov_radians) = 0;
 	virtual Gizmo::Config& getGizmoConfig() = 0;

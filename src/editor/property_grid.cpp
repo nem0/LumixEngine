@@ -31,15 +31,12 @@ PropertyGrid::PropertyGrid(StudioApp& app)
 	, m_is_open(true)
 	, m_plugins(app.getAllocator())
 	, m_deferred_select(INVALID_ENTITY)
+	, m_toggle_ui("Inspector", "Toggle Inspector UI", "inspector", "")
+	, m_focus_filter_action("Focus filter", "Focus inspector filter", "focus_inspector_filter", "")
 {
-	m_toggle_ui.init("Inspector", "Toggle Inspector UI", "inspector", "");
-	m_toggle_ui.func.bind<&PropertyGrid::toggleUI>(this);
-	m_toggle_ui.is_selected.bind<&PropertyGrid::isOpen>(this);
-	
-	m_focus_filter_action.init("Focus filter", "Focus inspector filter", "focus_inspector_filter", "", (os::Keycode)'B', Action::CTRL);
 	m_app.addAction(&m_focus_filter_action);
-
 	m_app.addWindowAction(&m_toggle_ui);
+
 	m_app.getSettings().registerPtr("property_grid_open", &m_is_open);
 }
 
@@ -935,6 +932,8 @@ void PropertyGrid::onGUI() {
 	for (IPlugin* i : m_plugins) {
 		i->update();
 	}
+
+	if (m_app.checkShortcut(m_toggle_ui, true)) m_is_open = !m_is_open;
 
 	if (m_app.checkShortcut(m_focus_filter_action, true)) {
 		m_focus_filter_request = true;

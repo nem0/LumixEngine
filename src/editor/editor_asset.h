@@ -1,5 +1,6 @@
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
+#include "editor/utils.h"
 
 namespace Lumix {
 
@@ -23,7 +24,7 @@ protected:
 
 // common funcitonality for asset editor windows
 struct LUMIX_EDITOR_API AssetEditorWindow : StudioApp::GUIPlugin {
-	AssetEditorWindow(StudioApp& app) : m_app(app) {}
+	AssetEditorWindow(StudioApp& app);
 
 	virtual void windowGUI() = 0;
 	virtual const Path& getPath() = 0;
@@ -31,6 +32,7 @@ struct LUMIX_EDITOR_API AssetEditorWindow : StudioApp::GUIPlugin {
 	void onGUI() override;
 
 	StudioApp& m_app;
+	static Action s_close_window_action;
 	u32 m_dock_id = 0;
 	bool m_focus_request = false;
 	bool m_dirty = false;

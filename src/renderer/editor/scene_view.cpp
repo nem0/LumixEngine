@@ -42,6 +42,8 @@ static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("m
 static const ComponentType PARTICLE_EMITTER_TYPE = reflection::getComponentType("particle_emitter");
 static const ComponentType MESH_ACTOR_TYPE = reflection::getComponentType("rigid_actor");
 static const ComponentType CAMERA_TYPE = reflection::getComponentType("camera");
+static const ComponentType TERRAIN_TYPE = reflection::getComponentType("terrain");
+static const ComponentType PROCEDURAL_GEOM_TYPE = reflection::getComponentType("procedural_geom");
 
 struct WorldViewImpl final : WorldView {
 	enum class MouseMode
@@ -834,53 +836,73 @@ SceneView::SceneView(StudioApp& app)
 	: m_app(app)
 	, m_log_ui(app.getLogUI())
 	, m_editor(m_app.getWorldEditor())
+	, m_copy_move_action("Duplicate move", "Duplicate entity when moving with gizmo", "duplicateEntityMove", "")
+	, m_toggle_gizmo_step_action("Enable/disable gizmo step", "Enable/disable gizmo step", "toggleGizmoStep", "")
+	, m_set_pivot_action("Set custom pivot", "Set custom pivot", "set_custom_pivot", "")
+	, m_reset_pivot_action("Reset pivot", "Reset pivot", "reset_pivot", "")
+	, m_insert_model_action("Insert model", "Insert model or prefab", "insert_model", ICON_FA_SEARCH)
+	, m_top_view_action("Top", "Set top camera view", "viewTop", "")
+	, m_side_view_action("Side", "Set side camera view", "viewSide", "")
+	, m_front_view_action("Front", "Set front camera view", "viewFront", "")
+	, m_toggle_projection_action("Ortho/perspective", "Toggle ortho/perspective projection", "toggleProjection", "")
+	, m_look_at_selected_action("Look at selected", "Look at selected entity", "lookAtSelected", "")
+	, m_copy_view_action("Copy view transform", "Copy view transform", "copyViewTransform", "")
+	, m_rotate_entity_90_action("Rotate 90 degrees", "Rotate selected entities by 90 degrees", "rotate90deg", "")
+	, m_move_entity_E_action("Move entity east", "Move selected entity east", "moveEntityE", "")
+	, m_move_entity_N_action("Move entity north", "Move selected entity north", "moveEntityN", "")
+	, m_move_entity_S_action("Move entity south", "Move selected entity south", "moveEntityS", "")
+	, m_move_entity_W_action("Move entity west", "Move selected entity west", "moveEntityW", "")
+	, m_translate_gizmo_mode("Translate", "Set translate mode", "setTranslateGizmoMode", ICON_FA_ARROWS_ALT)
+	, m_rotate_gizmo_mode("Rotate", "Set rotate mode", "setRotateGizmoMode", ICON_FA_UNDO)
+	, m_scale_gizmo_mode("Scale", "Set scale mode", "setScaleGizmoMode", ICON_FA_EXPAND_ALT)
+	, m_local_coord_gizmo("Local", "Set local transform system", "setLocalCoordSystem", ICON_FA_HOME)
+	, m_global_coord_gizmo("Global", "Set global transform system", "setGlobalCoordSystem", ICON_FA_GLOBE)
+	, m_create_entity("Create empty", "Create empty entity", "createEntity", ICON_FA_PLUS_SQUARE)
+	, m_make_parent("Make parent", "Make entity parent", "makeParent", ICON_FA_OBJECT_GROUP)
+	, m_unparent("Unparent", "Unparent entity", "unparent", ICON_FA_OBJECT_UNGROUP)
+	, m_autosnap_down("Autosnap down", "Toggle autosnap down", "autosnapDown", "")
+	, m_snap_down("Snap down", "Snap entities down", "snapDown", "")
+	, m_wireframe_action("Wireframe", "Wireframe", "wireframe", "")
 {
 	m_camera_speed = 0.1f;
 	m_is_mouse_captured = false;
 
-	m_copy_move_action.init("Duplicate move", "Duplicate entity when moving with gizmo", "duplicateEntityMove", "");
-	m_toggle_gizmo_step_action.init("Enable/disable gizmo step", "Enable/disable gizmo step", "toggleGizmoStep", "");
-	m_set_pivot_action.init("Set custom pivot", "Set custom pivot", "set_custom_pivot", "", os::Keycode::K, Action::Modifiers::NONE);
-	m_reset_pivot_action.init("Reset pivot", "Reset pivot", "reset_pivot", "", os::Keycode::K, Action::Modifiers::SHIFT);
-	m_insert_model_action.init("Insert model", "Insert model or prefab", "insert_model", ICON_FA_SEARCH, (os::Keycode)'P', Action::Modifiers::CTRL);
+	m_debug_show_actions[(u32)Pipeline::DebugShow::NONE].create("No debug", "Disabled debug view", "disable_debug_view", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::ALBEDO].create("Albedo", "Show albedo debug", "show_albedo_debug", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::NORMAL].create("Normal", "Show normal debug", "show_normal_debug", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::ROUGHNESS].create("Roughness", "Show roughness debug", "show_roughness_debug", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::METALLIC].create("Metallic", "Show metallic debug", "show_metalic_debug", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::AO].create("AO", "Show AO debug", "show_ao_debug", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::VELOCITY].create("Velocity", "Show velocity debug", "show_velocity_debug", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::LIGHT_CLUSTERS].create("Light clusters", "Show light clusters debug", "show_light_clusters_debug", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::PROBE_CLUSTERS].create("Probe clusters", "Show probe clusters debug", "show_probe_clusters_debug", "");
 
-	m_debug_show_actions[(u32)Pipeline::DebugShow::NONE].init("No debug", "Disabled debug view", "disable_debug_view", "");
-	m_debug_show_actions[(u32)Pipeline::DebugShow::ALBEDO].init("Albedo", "Show albedo debug", "show_albedo_debug", "");
-	m_debug_show_actions[(u32)Pipeline::DebugShow::NORMAL].init("Normal", "Show normal debug", "show_normal_debug", "");
-	m_debug_show_actions[(u32)Pipeline::DebugShow::ROUGHNESS].init("Roughness", "Show roughness debug", "show_roughness_debug", "");
-	m_debug_show_actions[(u32)Pipeline::DebugShow::METALLIC].init("Metallic", "Show metallic debug", "show_metalic_debug", "");
-	m_debug_show_actions[(u32)Pipeline::DebugShow::AO].init("AO", "Show AO debug", "show_ao_debug", "");
-	m_debug_show_actions[(u32)Pipeline::DebugShow::VELOCITY].init("Velocity", "Show velocity debug", "show_velocity_debug", "");
-	m_debug_show_actions[(u32)Pipeline::DebugShow::LIGHT_CLUSTERS].init("Light clusters", "Show light clusters debug", "show_light_clusters_debug", "");
-	m_debug_show_actions[(u32)Pipeline::DebugShow::PROBE_CLUSTERS].init("Probe clusters", "Show probe clusters debug", "show_probe_clusters_debug", "");
-
-	m_top_view_action.init("Top", "Set top camera view", "viewTop", "");
-	m_side_view_action.init("Side", "Set side camera view", "viewSide", "");
-	m_front_view_action.init("Front", "Set front camera view", "viewFront", "");
-	m_toggle_projection_action.init("Ortho/perspective", "Toggle ortho/perspective projection", "toggleProjection", "");
-	m_look_at_selected_action.init("Look at selected", "Look at selected entity", "lookAtSelected", "");
-	m_copy_view_action.init("Copy view transform", "Copy view transform", "copyViewTransform", "");
-	m_rotate_entity_90_action.init("Rotate 90 degrees", "Rotate selected entities by 90 degrees", "rotate90deg", "", os::Keycode::R, Action::Modifiers::NONE);
-	m_move_entity_E_action.init("Move entity east", "Move selected entity east", "moveEntityE", "", os::Keycode::RIGHT, Action::Modifiers::CTRL);
-	m_move_entity_N_action.init("Move entity north", "Move selected entity north", "moveEntityN", "", os::Keycode::UP, Action::Modifiers::CTRL);
-	m_move_entity_S_action.init("Move entity south", "Move selected entity south", "moveEntityS", "", os::Keycode::DOWN, Action::Modifiers::CTRL);
-	m_move_entity_W_action.init("Move entity west", "Move selected entity west", "moveEntityW", "", os::Keycode::LEFT, Action::Modifiers::CTRL);
-
+	m_app.addToolAction(&m_wireframe_action);
 	m_app.addAction(&m_copy_move_action);
 	m_app.addAction(&m_toggle_gizmo_step_action);
 	m_app.addAction(&m_insert_model_action);
 	m_app.addAction(&m_set_pivot_action);
 	m_app.addAction(&m_reset_pivot_action);
+	m_app.addAction(&m_translate_gizmo_mode);
+	m_app.addAction(&m_rotate_gizmo_mode);
+	m_app.addAction(&m_scale_gizmo_mode);
+	m_app.addAction(&m_local_coord_gizmo);
+	m_app.addAction(&m_global_coord_gizmo);
+	m_app.addAction(&m_create_entity);
+	m_app.addAction(&m_make_parent);
+	m_app.addAction(&m_unparent);
+	m_app.addAction(&m_autosnap_down);
+	m_app.addAction(&m_snap_down);
 	
-	m_app.addAction(&m_debug_show_actions[(u32)Pipeline::DebugShow::NONE]);
-	m_app.addAction(&m_debug_show_actions[(u32)Pipeline::DebugShow::ALBEDO]);
-	m_app.addAction(&m_debug_show_actions[(u32)Pipeline::DebugShow::NORMAL]);
-	m_app.addAction(&m_debug_show_actions[(u32)Pipeline::DebugShow::ROUGHNESS]);
-	m_app.addAction(&m_debug_show_actions[(u32)Pipeline::DebugShow::METALLIC]);
-	m_app.addAction(&m_debug_show_actions[(u32)Pipeline::DebugShow::AO]);
-	m_app.addAction(&m_debug_show_actions[(u32)Pipeline::DebugShow::VELOCITY]);
-	m_app.addAction(&m_debug_show_actions[(u32)Pipeline::DebugShow::LIGHT_CLUSTERS]);
-	m_app.addAction(&m_debug_show_actions[(u32)Pipeline::DebugShow::PROBE_CLUSTERS]);
+	m_app.addAction(m_debug_show_actions[(u32)Pipeline::DebugShow::NONE].get());
+	m_app.addAction(m_debug_show_actions[(u32)Pipeline::DebugShow::ALBEDO].get());
+	m_app.addAction(m_debug_show_actions[(u32)Pipeline::DebugShow::NORMAL].get());
+	m_app.addAction(m_debug_show_actions[(u32)Pipeline::DebugShow::ROUGHNESS].get());
+	m_app.addAction(m_debug_show_actions[(u32)Pipeline::DebugShow::METALLIC].get());
+	m_app.addAction(m_debug_show_actions[(u32)Pipeline::DebugShow::AO].get());
+	m_app.addAction(m_debug_show_actions[(u32)Pipeline::DebugShow::VELOCITY].get());
+	m_app.addAction(m_debug_show_actions[(u32)Pipeline::DebugShow::LIGHT_CLUSTERS].get());
+	m_app.addAction(m_debug_show_actions[(u32)Pipeline::DebugShow::PROBE_CLUSTERS].get());
 	
 	m_app.addAction(&m_top_view_action);
 	m_app.addAction(&m_side_view_action);
@@ -927,8 +949,20 @@ SceneView::~SceneView()
 	renderer->removePlugin(*m_render_plugin.get());
 
 	for (u32 i = 0; i < lengthOf(m_debug_show_actions); ++i) {
-		m_app.removeAction(&m_debug_show_actions[i]);
+		m_app.removeAction(m_debug_show_actions[i].get());
 	}
+
+	m_app.removeAction(&m_wireframe_action);
+	m_app.removeAction(&m_create_entity);
+	m_app.removeAction(&m_make_parent);
+	m_app.removeAction(&m_unparent);
+	m_app.removeAction(&m_autosnap_down);
+	m_app.removeAction(&m_snap_down);
+	m_app.removeAction(&m_local_coord_gizmo);
+	m_app.removeAction(&m_global_coord_gizmo);
+	m_app.removeAction(&m_translate_gizmo_mode);
+	m_app.removeAction(&m_rotate_gizmo_mode);
+	m_app.removeAction(&m_scale_gizmo_mode);
 	m_app.removeAction(&m_copy_move_action);
 	m_app.removeAction(&m_toggle_gizmo_step_action);
 	m_app.removeAction(&m_insert_model_action);
@@ -947,6 +981,39 @@ SceneView::~SceneView()
 	m_app.removeAction(&m_toggle_projection_action);
 	m_editor.setView(nullptr);
 	LUMIX_DELETE(m_app.getAllocator(), m_view);
+}
+
+
+void SceneView::toggleWireframe() {
+	WorldEditor& editor = m_app.getWorldEditor();
+	const Array<EntityRef>& selected = editor.getSelectedEntities();
+	if (selected.empty()) return;
+
+	World& world = *editor.getWorld();
+	RenderModule& module = *(RenderModule*)world.getModule(MODEL_INSTANCE_TYPE);
+
+	Array<Material*> materials(m_app.getAllocator());
+	for (EntityRef e : selected) {
+		if (world.hasComponent(e, MODEL_INSTANCE_TYPE)) {
+			Model* model = module.getModelInstanceModel(e);
+			if (!model->isReady()) continue;
+			
+			for (u32 i = 0; i < (u32)model->getMeshCount(); ++i) {
+				Mesh& mesh = model->getMesh(i);
+				materials.push(mesh.material);
+			}
+		}
+		if (world.hasComponent(e, TERRAIN_TYPE)) {
+			materials.push(module.getTerrainMaterial(e));
+		}
+		if (world.hasComponent(e, PROCEDURAL_GEOM_TYPE)) {
+			materials.push(module.getProceduralGeometry(e).material);
+		}
+	}
+	materials.removeDuplicates();
+	for (Material* m : materials) {
+		m->setWireframe(!m->wireframe());
+	}
 }
 
 void SceneView::rotate90Degrees() {
@@ -1020,7 +1087,8 @@ void SceneView::manipulate() {
 	if (!Gizmo::manipulate((*selected)[0].index, *m_view, tr, cfg)) return;
 
 	if (copy_move && !m_copy_moved) {
-		m_editor.duplicateEntities();
+		m_editor.copyEntities();
+		m_editor.pasteEntities();
 		selected = &m_editor.getSelectedEntities();
 		Gizmo::setDragged((*selected)[0].index);
 		m_copy_moved = true;
@@ -1064,7 +1132,7 @@ void SceneView::manipulate() {
 			break;
 		}
 	}
-	if (cfg.isAutosnapDown()) m_app.snapDown();
+	if (cfg.isAutosnapDown()) snapDown();
 }
 
 void SceneView::update(float time_delta)
@@ -1218,22 +1286,21 @@ void SceneView::handleDrop(const char* path, float x, float y)
 
 void SceneView::onToolbar()
 {
-	static const char* actions_names[] = { "setTranslateGizmoMode",
-		"setRotateGizmoMode",
-		"setScaleGizmoMode",
-		"setLocalCoordSystem",
-		"setGlobalCoordSystem",
-		"viewTop",
-		"viewFront",
-		"viewSide" };
+	Action* actions[] = {
+		&m_translate_gizmo_mode,
+		&m_rotate_gizmo_mode,
+		&m_scale_gizmo_mode,
+		&m_local_coord_gizmo,
+		&m_global_coord_gizmo,
+		&m_top_view_action,
+		&m_front_view_action,
+		&m_side_view_action,
+	};
 
 	auto pos = ImGui::GetCursorScreenPos();
 	const float toolbar_height = ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().FramePadding.y * 2;
-	if (ImGuiEx::BeginToolbar("scene_view_toolbar", pos, ImVec2(0, toolbar_height)))
-	{
-		for (auto* action_name : actions_names)
-		{
-			auto* action = m_app.getAction(action_name);
+	if (ImGuiEx::BeginToolbar("scene_view_toolbar", pos, ImVec2(0, toolbar_height))) {
+		for (Action* action : actions) {
 			action->toolbarButton(m_app.getBigIconFont());
 		}
 	}
@@ -1251,13 +1318,11 @@ void SceneView::onToolbar()
 	float offset = (toolbar_height - ImGui::GetTextLineHeightWithSpacing()) / 2;
 	
 	Action* mode_action;
-	if (m_app.getGizmoConfig().isTranslateMode())
-	{
-		mode_action = m_app.getAction("setTranslateGizmoMode");
+	if (m_app.getGizmoConfig().isTranslateMode()) {
+		mode_action = &m_translate_gizmo_mode;
 	}
-	else
-	{
-		mode_action = m_app.getAction("setRotateGizmoMode");
+	else {
+		mode_action = &m_rotate_gizmo_mode;
 	}
 	
 	ImGui::SameLine();
@@ -1268,7 +1333,6 @@ void SceneView::onToolbar()
 
 	ImGui::SameLine();
 	pos = ImGui::GetCursorPos();
-	//pos.y -= offset;
 	ImGui::SetCursorPos(pos);
 	ImGui::TextUnformatted(mode_action->font_icon);
 
@@ -1290,7 +1354,7 @@ void SceneView::onToolbar()
 		auto option = [&](const char* label, Pipeline::DebugShow value) {
 			StaticString<64> tmp(label);
 			char shortcut[32];
-			if (m_debug_show_actions[(u32)value].shortcutText(shortcut)) {
+			if (m_debug_show_actions[(u32)value]->shortcutText(shortcut)) {
 				tmp.append(" (", shortcut, ")");
 			}
 			if (ImGui::RadioButton(tmp, m_pipeline->m_debug_show == value)) {
@@ -1509,9 +1573,38 @@ void SceneView::cameraPreviewGUI(Vec2 size) {
 	}
 }
 
+void SceneView::snapDown() {
+	WorldEditor& editor = m_app.getWorldEditor();
+	const Array<EntityRef>& selected = editor.getSelectedEntities();
+	if (selected.empty()) return;
+
+	Array<DVec3> new_positions(m_app.getAllocator());
+	World* world = editor.getWorld();
+
+	for (EntityRef entity : selected) {
+		const DVec3 origin = world->getPosition(entity);
+		auto hit = m_app.getRenderInterface()->castRay(*world, Ray{origin, Vec3(0, -1, 0)}, entity);
+		if (hit.is_hit) {
+			new_positions.push(origin + Vec3(0, -hit.t, 0));
+		}
+		else {
+			hit = m_app.getRenderInterface()->castRay(*world, Ray{origin, Vec3(0, 1, 0)}, entity);
+			if (hit.is_hit) {
+				new_positions.push(origin + Vec3(0, hit.t, 0));
+			}
+			else {
+				new_positions.push(world->getPosition(entity));
+			}
+		}
+	}
+	editor.setEntitiesPositions(&selected[0], &new_positions[0], new_positions.size());
+}
+
+
 void SceneView::onGUI() {
 	PROFILE_FUNCTION();
 	if (m_is_mouse_captured && !m_app.isMouseCursorClipped()) captureMouse(false);
+	if (m_app.checkShortcut(m_wireframe_action, true)) toggleWireframe();
 
 	m_pipeline->setWorld(m_editor.getWorld());
 	bool is_open = false;
@@ -1522,6 +1615,7 @@ void SceneView::onGUI() {
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 	ImVec2 view_size;
 	if (ImGui::Begin(title, nullptr, ImGuiWindowFlags_NoScrollWithMouse)) {
+		WorldEditor& editor = m_app.getWorldEditor();		
 		if (m_app.checkShortcut(m_top_view_action)) m_view->setTopView();
 		else if (m_app.checkShortcut(m_side_view_action)) m_view->setSideView();
 		else if (m_app.checkShortcut(m_front_view_action)) m_view->setFrontView();
@@ -1536,9 +1630,30 @@ void SceneView::onGUI() {
 		else if (m_app.checkShortcut(m_move_entity_N_action)) moveEntity(Vec2(0, 1));
 		else if (m_app.checkShortcut(m_move_entity_S_action)) moveEntity(Vec2(0, -1));
 		else if (m_app.checkShortcut(m_move_entity_W_action)) moveEntity(Vec2(1, 0));
+		else if (m_app.checkShortcut(m_local_coord_gizmo)) m_app.getGizmoConfig().coord_system = Gizmo::Config::LOCAL;
+		else if (m_app.checkShortcut(m_global_coord_gizmo)) m_app.getGizmoConfig().coord_system = Gizmo::Config::GLOBAL;
+		else if (m_app.checkShortcut(m_translate_gizmo_mode)) m_app.getGizmoConfig().mode = Gizmo::Config::TRANSLATE;
+		else if (m_app.checkShortcut(m_rotate_gizmo_mode)) m_app.getGizmoConfig().mode = Gizmo::Config::ROTATE;
+		else if (m_app.checkShortcut(m_scale_gizmo_mode)) m_app.getGizmoConfig().mode = Gizmo::Config::SCALE;
+		else if (m_app.checkShortcut(m_snap_down)) snapDown();
+		else if (m_app.checkShortcut(m_create_entity)) {
+			const EntityRef e = editor.addEntity();
+			editor.selectEntities(Span(&e, 1), false);
+		} else if (m_app.checkShortcut(m_make_parent)) {
+			const auto& entities = editor.getSelectedEntities();
+			if (entities.size() == 2) editor.makeParent(entities[0], entities[1]);
+		} else if (m_app.checkShortcut(m_unparent)) {
+			const auto& entities = editor.getSelectedEntities();
+			if (entities.size() != 1) return;
+			editor.makeParent(INVALID_ENTITY, entities[0]);
+		}
+		else if (m_app.checkShortcut(m_autosnap_down)) {
+			Gizmo::Config& cfg = m_app.getGizmoConfig();
+			cfg.setAutosnapDown(!cfg.isAutosnapDown());
+		}
 		else {
 			for (u32 i = 0; i < lengthOf(m_debug_show_actions); ++i) {
-				if (m_app.checkShortcut(m_debug_show_actions[i])) {
+				if (m_app.checkShortcut(*m_debug_show_actions[i])) {
 					m_pipeline->m_debug_show = (Pipeline::DebugShow)i;
 					m_pipeline->m_debug_show_plugin = nullptr;
 					break;

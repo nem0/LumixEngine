@@ -2065,34 +2065,12 @@ ResourceLocator::ResourceLocator(StringView path) {
 	resource.end = ext.end;
 }
 
-Action::Action() {
-	shortcut = os::Keycode::INVALID;
-}
-
-void Action::init(const char* label_short, const char* label_long, const char* name, const char* font_icon) {
+Action::Action(const char* label_short, const char* label_long, const char* name, const char* font_icon) {
 	this->label_long = label_long;
 	this->label_short = label_short;
 	this->font_icon = font_icon;
 	this->name = name;
 	shortcut = os::Keycode::INVALID;
-	is_selected.bind<falseConst>();
-}
-
-
-void Action::init(const char* label_short,
-	const char* label_long,
-	const char* name,
-	const char* font_icon,
-	os::Keycode shortcut,
-	Modifiers modifiers)
-{
-	this->label_long = label_long;
-	this->label_short = label_short;
-	this->name = name;
-	this->font_icon = font_icon;
-	this->shortcut = shortcut;
-	this->modifiers = modifiers;
-	is_selected.bind<falseConst>();
 }
 
 bool Action::shortcutText(Span<char> out) const {
@@ -2115,16 +2093,21 @@ bool Action::shortcutText(Span<char> out) const {
 	return true;
 }
 
-bool Action::toolbarButton(ImFont* font)
-{
+bool Action::toolbarButton(ImFont* font) {
 	const ImVec4 col_active = ImGui::GetStyle().Colors[ImGuiCol_ButtonActive];
-	const ImVec4 bg_color = is_selected.invoke() ? col_active : ImGui::GetStyle().Colors[ImGuiCol_Text];
+	// TODO	
+	const ImVec4 bg_color = /*is_selected.invoke() ? col_active :*/ ImGui::GetStyle().Colors[ImGuiCol_Text];
 
 	if (!font_icon[0]) return false;
 
 	ImGui::SameLine();
-	if(ImGuiEx::ToolbarButton(font, font_icon, bg_color, label_long)) {
-		func.invoke();
+	StaticString<128> tooltip(label_long);
+	char shortcut[32];	
+	if (shortcutText(shortcut)) {
+		tooltip.append(" ", shortcut);
+	}
+	if(ImGuiEx::ToolbarButton(font, font_icon, bg_color, tooltip)) {
+		request = true;
 		return true;
 	}
 	return false;
@@ -2165,7 +2148,8 @@ void getShortcut(const Action& action, Span<char> buf) {
 bool menuItem(const Action& a, bool enabled) {
 	char buf[20];
 	getShortcut(a, Span(buf));
-	return ImGuiEx::MenuItemEx(a.label_short, a.font_icon, buf, a.is_selected.invoke(), enabled);
+	// TODO
+	return ImGuiEx::MenuItemEx(a.label_short, a.font_icon, buf, false, enabled);
 }
 
 void getEntityListDisplayName(StudioApp& app, World& world, Span<char> buf, EntityPtr entity, bool force_display_index)
@@ -2869,5 +2853,23 @@ bool beginCenterStrip(const char* str_id, u32 lines) {
 void endCenterStrip() {
 	ImGui::EndPopup();
 }
+
+CommonActions::CommonActions()
+	: save("Save", "Save", "save", ICON_FA_SAVE)
+	, undo("Undo", "Undo", "undo", ICON_FA_UNDO)
+	, redo("Redo", "Redo", "redo", ICON_FA_REDO)
+	, del("Delete", "Delete", "delete", ICON_FA_MINUS_SQUARE)
+	, cam_orbit("Orbit", "Orbit with RMB", "orbitRMB", "")
+	, cam_forward("Move forward", "Move camera forward", "moveForward", "")
+	, cam_backward("Move back", "Move camera back", "moveBack", "")
+	, cam_left("Move left", "Move camera left", "moveLeft", "")
+	, cam_right("Move right", "Move camera right", "moveRight", "")
+	, cam_up("Move up", "Move camera up", "moveUp", "")
+	, cam_down("Move down", "Move camera down", "moveDown", "")
+	, select_all("Select all", "Select all", "select_all", "")
+	, rename("Rename", "Rename", "rename", "")
+	, copy("Copy", "Copy", "copy", ICON_FA_CLIPBOARD)
+	, paste("Paste", "Paste", "paste", ICON_FA_PASTE)
+{}
 
 } // namespace Lumix
