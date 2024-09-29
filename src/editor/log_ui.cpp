@@ -22,7 +22,7 @@ LogUI::LogUI(StudioApp& app, IAllocator& allocator)
 	, m_is_open(false)
 	, m_are_notifications_hovered(false)
 	, m_move_notifications_to_front(false)
-	, m_toggle_ui("Log", "Toggle Log UI", "log", "")
+	, m_toggle_ui("Log", "Toggle log UI", "log_toggle_ui", "")
 {
 	registerLogCallback<&LogUI::onLog>(this);
 

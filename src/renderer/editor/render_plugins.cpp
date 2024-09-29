@@ -5313,7 +5313,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		, m_model_plugin(app)
 		, m_fbx_importer(app)
 		, m_procedural_geom_plugin(app)
-		, m_renderdoc_capture_action("Capture RenderDoc", "Capture with RenderDoc", "capture_renderdoc", "")
+		, m_renderdoc_capture_action("Capture frame", "Capture frame with RenderDoc", "capture_renderdoc", "")
 	{}
 
 	const char* getName() const override { return "renderer"; }

@@ -21,7 +21,7 @@ EditorAssetPlugin::~EditorAssetPlugin() {
 	m_app.getAssetCompiler().removePlugin(*this);
 }
 
-Action AssetEditorWindow::s_close_window_action("Close", "Close asset editor", "close_asset_editor", "");
+Action AssetEditorWindow::s_close_window_action("Close", "Close asset editor", "asset_editor_close", "");
 
 AssetEditorWindow::AssetEditorWindow(StudioApp& app)
 	: m_app(app)
