@@ -49,8 +49,8 @@ GameView::GameView(StudioApp& app)
 	, m_is_mouse_captured(false)
 	, m_is_ingame_cursor(false)
 	, m_time_multiplier(1.0f)
-	, m_toggle_ui("Game View", "Toggle game view", "game_view_toggle_ui", "")
-	, m_fullscreen_action("Game view fullscreen", "Game view fullscreen", "game_view_fullscreen", "")
+	, m_toggle_ui("Game View", "Game view - toggle UI", "game_view_toggle_ui", "")
+	, m_fullscreen_action("Fullscreen", "Game view - fullscreen", "game_view_fullscreen", "")
 {
 	Engine& engine = app.getEngine();
 	m_app.getSettings().registerPtr("game_view_open", &m_is_open);

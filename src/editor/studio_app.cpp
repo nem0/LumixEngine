@@ -74,13 +74,13 @@ struct StudioAppImpl final : StudioApp {
 	struct HierarchyGUI : StudioApp::GUIPlugin {
 		HierarchyGUI(StudioAppImpl& app)
 			: m_app(app)
-			, m_focus_filter_action("Focus hierarchy", "Focus hierarchy filter", "hierarchy_focus_filter", "")
-			, m_toggle_ui_action("Hierarchy", "Toggle hierarchy", "hierarchy_toggle_ui", "")
+			, m_focus_filter_action("Focus filter", "Hierarchy - focus filter", "hierarchy_focus_filter", "")
+			, m_toggle_ui_action("Hierarchy", "Hierarchy - toggle UI", "hierarchy_toggle_ui", "")
 		{
 			m_app.getSettings().registerPtr("entity_list_open", &m_is_open);
 			m_app.getWorldEditor().entitySelectionChanged().bind<&HierarchyGUI::onEntitySelectionChanged>(this);
 			m_app.addAction(&m_focus_filter_action);
-			m_app.addAction(&m_toggle_ui_action);
+			m_app.addWindowAction(&m_toggle_ui_action);
 		}
 
 		~HierarchyGUI() {
@@ -406,10 +406,6 @@ struct StudioAppImpl final : StudioApp {
 			}
 		}
 
-		void menuItemUI() {
-			if (Lumix::menuItem(m_toggle_ui_action, true)) m_is_open = !m_is_open;
-		}
-
 		void onGUI() override {
 			PROFILE_FUNCTION();
 
@@ -560,12 +556,12 @@ struct StudioAppImpl final : StudioApp {
 		, m_export(m_allocator)
 		, m_show_all_actions_action("Show all commands", "Show all commands", "show_all_commands", "")
 		, m_start_standalone_app("Start standalone app", "Start standalone app", "start_standalone_app", "")
-		, m_next_frame("Next frame", "Next frame", "next_frame", ICON_FA_STEP_FORWARD)
-		, m_pause_game("Pause", "Pause game", "game_pause", ICON_FA_PAUSE)
-		, m_toggle_game_mode("Game Mode", "Toggle game mode", "game_mode_toggle", ICON_FA_PLAY)
+		, m_next_frame("Next frame", "Game - next frame", "game_next_frame", ICON_FA_STEP_FORWARD)
+		, m_pause_game("Pause", "Game - pause", "game_pause", ICON_FA_PAUSE)
+		, m_toggle_game_mode("Run game", "Game - run", "game_run", ICON_FA_PLAY)
 		, m_new_world_action("New", "New world", "world_new", ICON_FA_PLUS)
 		, m_exit_action("Exit", "Exit Studio", "studio_exit", ICON_FA_SIGN_OUT_ALT)
-		, m_show_export_action("Package game", "Package game", "package_game", ICON_FA_FILE_EXPORT)
+		, m_show_export_action("Package game", "Tools - package game", "package_game", ICON_FA_FILE_EXPORT)
 	{
 		PROFILE_FUNCTION();
 		u32 cpus_count = minimum(os::getCPUsCount(), 64);
@@ -1837,9 +1833,9 @@ struct StudioAppImpl final : StudioApp {
 			ImGui::EndMenu();
 		}
 		
-		menuItem("makeParent", selected_entities.size() == 2);
+		menuItem("entity_parent", selected_entities.size() == 2);
 		bool can_unparent = selected_entities.size() == 1 && m_editor->getWorld()->getParent(selected_entities[0]).isValid();
-		menuItem("unparent", can_unparent);
+		menuItem("entity_unparent", can_unparent);
 		ImGui::EndMenu();
 	}
 
@@ -1863,17 +1859,17 @@ struct StudioAppImpl final : StudioApp {
 		menuItem("copy", is_any_entity_selected);
 		menuItem("paste", m_editor->canPasteEntities());
 		ImGui::Separator();
-		menuItem("setTranslateGizmoMode", true);
-		menuItem("setRotateGizmoMode", true);
-		menuItem("setScaleGizmoMode", true);
-		menuItem("setLocalCoordSystem", true);
-		menuItem("setGlobalCoordSystem", true);
+		menuItem("gizmo_translate_mode", true);
+		menuItem("gizmo_rotate_mode", true);
+		menuItem("gizmo_scale_mode", true);
+		menuItem("gizmo_local_coord", true);
+		menuItem("gizmo_global_coord", true);
 		if (ImGuiEx::BeginMenuEx("View", ICON_FA_CAMERA, true))
 		{
-			menuItem("toggleProjection", true);
-			menuItem("viewTop", true);
-			menuItem("viewFront", true);
-			menuItem("viewSide", true);
+			menuItem("toggle_projection", true);
+			menuItem("view_top", true);
+			menuItem("view_front", true);
+			menuItem("view_side", true);
 			ImGui::EndMenu();
 		}
 		ImGui::EndMenu();
@@ -1895,7 +1891,7 @@ struct StudioAppImpl final : StudioApp {
 	{
 		if (!ImGui::BeginMenu("File")) return;
 
-		menuItem("newWorld", true);
+		menuItem("world_new", true);
 		const Array<World::Partition>& partitions = m_editor->getWorld()->getPartitions();
 		auto open_ui = [&](const char* label, bool additive){
 			if (ImGui::BeginMenu(label)) {
@@ -1923,20 +1919,19 @@ struct StudioAppImpl final : StudioApp {
 			}
 		}
 		menuItem("save", !m_editor->isGameMode());
-		menuItem("exit", true);
+		menuItem("studio_exit", true);
 		ImGui::EndMenu();
 	}
 
 
-	void toolsMenu()
-	{
+	void toolsMenu() {
 		if (!ImGui::BeginMenu("Tools")) return;
 
 		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
-		menuItem("focus_asset_search", true);
-		menuItem("snapDown", is_any_entity_selected);
-		menuItem("autosnapDown", true);
-		menuItem("export_game", true);
+		menuItem("asset_browser_focus_search", true);
+		menuItem("entity_snap_down", is_any_entity_selected);
+		menuItem("autosnap_down", true);
+		menuItem("package_game", true);
 		for (Action* action : m_tools_actions) {
 			if (Lumix::menuItem(*action, true)) {
 				action->request = true;
@@ -1947,10 +1942,6 @@ struct StudioAppImpl final : StudioApp {
 
 	void viewMenu() {
 		if (!ImGui::BeginMenu("View")) return;
-
-		m_hierarchy->menuItemUI();
-		m_settings.menuItemUI();
-		ImGui::Separator();
 		for (Action* action : m_window_actions) {
 			if (Lumix::menuItem(*action, true)) action->request = true;
 		}
@@ -2040,8 +2031,8 @@ struct StudioAppImpl final : StudioApp {
 			float w = (ImGui::GetWindowContentRegionMax().x - ImGui::GetWindowContentRegionMin().x) * 0.5f - 30 - ImGui::GetCursorPosX();
 			ImGui::Dummy(ImVec2(w, ImGui::GetTextLineHeightWithSpacing()));
 			
-			m_toggle_game_mode.toolbarButton(m_big_icon_font);
-			m_pause_game.toolbarButton(m_big_icon_font);
+			m_toggle_game_mode.toolbarButton(m_big_icon_font, m_editor->isGameMode());
+			m_pause_game.toolbarButton(m_big_icon_font, m_engine->isPaused());
 			m_next_frame.toolbarButton(m_big_icon_font);
 
 			// we don't have custom titlebar on linux

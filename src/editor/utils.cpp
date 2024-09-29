@@ -2093,10 +2093,9 @@ bool Action::shortcutText(Span<char> out) const {
 	return true;
 }
 
-bool Action::toolbarButton(ImFont* font) {
+bool Action::toolbarButton(ImFont* font, bool is_selected) {
 	const ImVec4 col_active = ImGui::GetStyle().Colors[ImGuiCol_ButtonActive];
-	// TODO	
-	const ImVec4 bg_color = /*is_selected.invoke() ? col_active :*/ ImGui::GetStyle().Colors[ImGuiCol_Text];
+	const ImVec4 bg_color = is_selected ? col_active : ImGui::GetStyle().Colors[ImGuiCol_Text];
 
 	if (!font_icon[0]) return false;
 
@@ -2855,21 +2854,21 @@ void endCenterStrip() {
 }
 
 CommonActions::CommonActions()
-	: save("Save", "Save", "save", ICON_FA_SAVE)
-	, undo("Undo", "Undo", "undo", ICON_FA_UNDO)
-	, redo("Redo", "Redo", "redo", ICON_FA_REDO)
-	, del("Delete", "Delete", "delete", ICON_FA_MINUS_SQUARE)
-	, cam_orbit("Orbit", "Orbit with RMB", "orbit_rmb", "")
-	, cam_forward("Move forward", "Move camera forward", "camera_move_forward", "")
-	, cam_backward("Move back", "Move camera back", "camera_move_back", "")
-	, cam_left("Move left", "Move camera left", "camera_move_left", "")
-	, cam_right("Move right", "Move camera right", "camera_move_right", "")
-	, cam_up("Move up", "Move camera up", "camera_move_up", "")
-	, cam_down("Move down", "Move camera down", "camera_move_down", "")
-	, select_all("Select all", "Select all", "select_all", "")
-	, rename("Rename", "Rename", "rename", "")
-	, copy("Copy", "Copy", "copy", ICON_FA_CLIPBOARD)
-	, paste("Paste", "Paste", "paste", ICON_FA_PASTE)
+	: save("Save", "Common - Save", "save", ICON_FA_SAVE)
+	, undo("Undo", "Common - Undo", "undo", ICON_FA_UNDO)
+	, redo("Redo", "Common - Redo", "redo", ICON_FA_REDO)
+	, del("Delete", "Common - Delete", "delete", ICON_FA_MINUS_SQUARE)
+	, cam_orbit("Orbit", "Camera - orbit with RMB", "orbit_rmb", "")
+	, cam_forward("Move forward", "Camera - move forward", "camera_move_forward", "")
+	, cam_backward("Move back", "Camera - move backward", "camera_move_back", "")
+	, cam_left("Move left", "Camera - move left", "camera_move_left", "")
+	, cam_right("Move right", "Camera - move right", "camera_move_right", "")
+	, cam_up("Move up", "Camera - move up", "camera_move_up", "")
+	, cam_down("Move down", "Camera - move down", "camera_move_down", "")
+	, select_all("Select all", "Common - Select all", "select_all", "")
+	, rename("Rename", "Common - Rename", "rename", "")
+	, copy("Copy", "Common - Copy", "copy", ICON_FA_CLIPBOARD)
+	, paste("Paste", "Common - Paste", "paste", ICON_FA_PASTE)
 {}
 
 } // namespace Lumix

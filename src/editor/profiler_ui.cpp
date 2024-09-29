@@ -217,7 +217,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		// we can't use m_allocator for tags, because it would create circular dependency and deadlock
 		, m_allocation_tags(getGlobalAllocator())
 		, m_engine(engine)
-		, m_toggle_ui("Profiler", "Toggle profiler", "profiler_toggle_ui", "")
+		, m_toggle_ui("Profiler", "Toggle profiler UI", "profiler_toggle_ui", "")
 	{
 		m_current_frame = -1;
 		m_is_open = false;

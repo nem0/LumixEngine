@@ -841,41 +841,41 @@ SceneView::SceneView(StudioApp& app)
 	, m_set_pivot_action("Set custom pivot", "Set custom pivot", "set_custom_pivot", "")
 	, m_reset_pivot_action("Reset pivot", "Reset pivot", "reset_pivot", "")
 	, m_insert_model_action("Insert model", "Insert model or prefab", "insert_model", ICON_FA_SEARCH)
-	, m_top_view_action("Top", "Set top camera view", "view_top", "")
-	, m_side_view_action("Side", "Set side camera view", "view_side", "")
-	, m_front_view_action("Front", "Set front camera view", "view_front", "")
-	, m_toggle_projection_action("Ortho/perspective", "Toggle ortho/perspective projection", "toggle_projection", "")
-	, m_look_at_selected_action("Look at selected", "Look at selected entity", "look_at_selected", "")
-	, m_copy_view_action("Copy view transform", "Copy view transform", "copy_view_transform", "")
-	, m_rotate_entity_90_action("Rotate 90 degrees", "Rotate selected entities by 90 degrees", "rotate_90_deg", "")
-	, m_move_entity_E_action("Move entity east", "Move selected entity east", "move_entity_E", "")
-	, m_move_entity_N_action("Move entity north", "Move selected entity north", "move_entity_N", "")
-	, m_move_entity_S_action("Move entity south", "Move selected entity south", "move_entity_S", "")
-	, m_move_entity_W_action("Move entity west", "Move selected entity west", "move_entity_W", "")
-	, m_translate_gizmo_mode("Translate", "Set translate mode", "gizmo_translate_mode", ICON_FA_ARROWS_ALT)
-	, m_rotate_gizmo_mode("Rotate", "Set rotate mode", "gizmo_rotate_mode", ICON_FA_UNDO)
-	, m_scale_gizmo_mode("Scale", "Set scale mode", "gizmo_scale_mode", ICON_FA_EXPAND_ALT)
-	, m_local_coord_gizmo("Local", "Set local transform system", "gizmo_local_coord", ICON_FA_HOME)
-	, m_global_coord_gizmo("Global", "Set global transform system", "gizmo_global_coord", ICON_FA_GLOBE)
-	, m_create_entity("Create empty", "Create empty entity", "entity_create", ICON_FA_PLUS_SQUARE)
-	, m_make_parent("Make parent", "Make entity parent", "entity_parent", ICON_FA_OBJECT_GROUP)
-	, m_unparent("Unparent", "Unparent entity", "entity_unparent", ICON_FA_OBJECT_UNGROUP)
-	, m_autosnap_down("Autosnap down", "Toggle autosnap down", "autosnap_down", "")
-	, m_snap_down("Snap down", "Snap entities down", "entity_snap_down", "")
-	, m_wireframe_action("Wireframe", "Wireframe", "wireframe", "")
+	, m_top_view_action("Top", "Camera - top view", "view_top", "")
+	, m_side_view_action("Side", "Camera - side view", "view_side", "")
+	, m_front_view_action("Front", "Camera - front view", "view_front", "")
+	, m_toggle_projection_action("Ortho/perspective", "Camera - toggle ortho/perspective projection", "toggle_projection", "")
+	, m_look_at_selected_action("Look at selected", "Camera - look at selected entity", "look_at_selected", "")
+	, m_copy_view_action("Copy view transform", "Camera - copy transform to entity", "copy_view_transform", "")
+	, m_rotate_entity_90_action("Rotate 90 degrees", "Entity - Rotate by 90 degrees", "rotate_90_deg", "")
+	, m_move_entity_E_action("Move entity east", "Entity - move east", "move_entity_E", "")
+	, m_move_entity_N_action("Move entity north", "Entity - move north", "move_entity_N", "")
+	, m_move_entity_S_action("Move entity south", "Entity - move south", "move_entity_S", "")
+	, m_move_entity_W_action("Move entity west", "Entity - move west", "move_entity_W", "")
+	, m_translate_gizmo_mode("Translate", "Gizmo - translate mode", "gizmo_translate_mode", ICON_FA_ARROWS_ALT)
+	, m_rotate_gizmo_mode("Rotate", "Gizmo - rotate mode", "gizmo_rotate_mode", ICON_FA_UNDO)
+	, m_scale_gizmo_mode("Scale", "Gizmo - scale mode", "gizmo_scale_mode", ICON_FA_EXPAND_ALT)
+	, m_local_coord_gizmo("Local", "Gizmo - local transform system", "gizmo_local_coord", ICON_FA_HOME)
+	, m_global_coord_gizmo("Global", "Gizmo - global transform system", "gizmo_global_coord", ICON_FA_GLOBE)
+	, m_create_entity("Create empty", "Entity - create new", "entity_create", ICON_FA_PLUS_SQUARE)
+	, m_make_parent("Make parent", "Entity - make parent", "entity_parent", ICON_FA_OBJECT_GROUP)
+	, m_unparent("Unparent", "Entity - unparent", "entity_unparent", ICON_FA_OBJECT_UNGROUP)
+	, m_autosnap_down("Autosnap down", "Entity - toggle autosnap down", "autosnap_down", "")
+	, m_snap_down("Snap down", "Entity - snap down", "entity_snap_down", "")
+	, m_wireframe_action("Wireframe", "Tools - wireframe", "wireframe", "")
 {
 	m_camera_speed = 0.1f;
 	m_is_mouse_captured = false;
 
-	m_debug_show_actions[(u32)Pipeline::DebugShow::NONE].create("No debug", "Disabled debug view", "debug_view_disable", "");
-	m_debug_show_actions[(u32)Pipeline::DebugShow::ALBEDO].create("Albedo", "Show albedo debug", "debug_view_albedo", "");
-	m_debug_show_actions[(u32)Pipeline::DebugShow::NORMAL].create("Normal", "Show normal debug", "debug_view_normal", "");
-	m_debug_show_actions[(u32)Pipeline::DebugShow::ROUGHNESS].create("Roughness", "Show roughness debug", "debug_view_roughness", "");
-	m_debug_show_actions[(u32)Pipeline::DebugShow::METALLIC].create("Metallic", "Show metallic debug", "debug_view_metalic", "");
-	m_debug_show_actions[(u32)Pipeline::DebugShow::AO].create("AO", "Show AO debug", "debug_view_ao", "");
-	m_debug_show_actions[(u32)Pipeline::DebugShow::VELOCITY].create("Velocity", "Show velocity debug", "debug_view_velocity", "");
-	m_debug_show_actions[(u32)Pipeline::DebugShow::LIGHT_CLUSTERS].create("Light clusters", "Show light clusters debug", "debug_view_light_clusters", "");
-	m_debug_show_actions[(u32)Pipeline::DebugShow::PROBE_CLUSTERS].create("Probe clusters", "Show probe clusters debug", "debug_view_probe_clusters", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::NONE].create("No debug", "Debug view - none", "debug_view_disable", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::ALBEDO].create("Albedo", "Debug view - albedo", "debug_view_albedo", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::NORMAL].create("Normal", "Debug view - normal", "debug_view_normal", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::ROUGHNESS].create("Roughness", "Debug view - roughness", "debug_view_roughness", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::METALLIC].create("Metallic", "Debug view - metallic", "debug_view_metalic", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::AO].create("AO", "Debug view - AO", "debug_view_ao", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::VELOCITY].create("Velocity", "Debug view - velocity", "debug_view_velocity", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::LIGHT_CLUSTERS].create("Light clusters", "Debug view - light clusters", "debug_view_light_clusters", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::PROBE_CLUSTERS].create("Probe clusters", "Debug view - probe clusters", "debug_view_probe_clusters", "");
 
 	m_app.addToolAction(&m_wireframe_action);
 	m_app.addAction(&m_copy_move_action);

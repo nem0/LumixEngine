@@ -39,7 +39,6 @@ struct LUMIX_EDITOR_API Settings {
 	~Settings();
 
 	void gui();
-	void menuItemUI();
 	void load();
 	void save();
 
