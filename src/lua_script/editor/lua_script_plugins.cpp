@@ -214,6 +214,7 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 		StudioLuaPlugin* plugin = LUMIX_NEW(app.getAllocator(), StudioLuaPlugin)(app, name);
 		lua_pop(L, 1);
 		
+/*
 		if (lua_getfield(L, -1, "windowMenuAction") == LUA_TFUNCTION) {
 			char tmp[64];
 			convertToLuaName(name, tmp);
@@ -222,7 +223,7 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 			app.addWindowAction(&plugin->m_action);
 		}
 		lua_pop(L, 1);
-		
+*/
 		plugin->m_plugin_ref = LuaWrapper::createRef(L);
 		lua_pop(L, 1);
 		app.addPlugin(*plugin);
@@ -257,7 +258,7 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 	{}
 	
 	~StudioLuaPlugin() {
-		m_app.removeAction(&m_action);
+		m_app.removeAction(m_action.get());
 	}
 
 	void runWindowAction() {
@@ -418,7 +419,7 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 	const char* getName() const override { return m_name.c_str(); }
 
 	StudioApp& m_app;
-	Action m_action;
+	Local<Action> m_action;
 	String m_name;
 	i32 m_plugin_ref;
 };
@@ -831,7 +832,7 @@ struct LuaAction {
 		LuaWrapper::pcall(L, 0, 0);
 		lua_pop(L, 1);
 	}
-	Action action;
+	Local<Action> action;
 	lua_State* L;
 	int ref_thread;
 	int ref_action;
@@ -850,6 +851,12 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 		lua_State* L = system->getState();
 		LuaWrapper::createSystemClosure(L, "Editor", this, "addAction", &LUA_addAction);
 		initPlugins();
+	}
+
+	void update(float) override {
+		for (LuaAction* action : m_lua_actions) {
+			if (m_app.checkShortcut(*action->action, true)) action->run();
+		}
 	}
 
 	static int LUA_addAction(lua_State* L) {
@@ -871,10 +878,9 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 		lua_pushvalue(L, 1);
 		action->ref_action = LuaWrapper::createRef(L);
 		lua_pop(L, 2);
-		action->action.init(label, label, name, "");
-		action->action.func.bind<&LuaAction::run>(action);
+		action->action.create(label, label, name, "");
 		action->L = L;
-		app.addAction(&action->action);
+		app.addAction(action->action.get());
 		return 0;
 	}
 
@@ -1406,7 +1412,7 @@ struct SetPropertyVisitor : reflection::IPropertyVisitor {
 		m_app.getPropertyGrid().removePlugin(m_property_grid_plugin);
 
 		for (LuaAction* action : m_lua_actions) {
-			m_app.removeAction(&action->action);
+			m_app.removeAction(action->action.get());
 			LUMIX_DELETE(m_app.getAllocator(), action);
 		}
 	}

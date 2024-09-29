@@ -36,9 +36,7 @@ struct LUMIX_EDITOR_API Action {
 		CTRL = 1 << 2
 	};
 
-	Action();
-	void init(const char* label_short, const char* label_long, const char* name, const char* font_icon, os::Keycode key0, Modifiers modifiers);
-	void init(const char* label_short, const char* label_long, const char* name, const char* font_icon);
+	Action(const char* label_short, const char* label_long, const char* name, const char* font_icon);
 	bool toolbarButton(struct ImFont* font);
 	bool isActive() const;
 	bool shortcutText(Span<char> out) const;
@@ -52,11 +50,12 @@ struct LUMIX_EDITOR_API Action {
 	bool request = false; // programatically request to invoke the action
 	os::Keycode shortcut;
 	StaticString<5> font_icon;
-	Delegate<void ()> func;
-	Delegate<bool ()> is_selected;
 };
 
 struct CommonActions {
+	CommonActions();
+	Action copy;
+	Action paste;
 	Action save;
 	Action undo;
 	Action redo;

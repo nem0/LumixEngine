@@ -278,17 +278,15 @@ struct GUIEditor final : StudioApp::GUIPlugin
 public:
 	GUIEditor(StudioApp& app)
 		: m_app(app)
+		, m_toggle_ui("GUI Editor", "Toggle gui editor", "gui_editor", "")
+		, m_hcenter_action("Center horizontally", "GUI editor - center horizontally", "guied_hcenter", "")
+		, m_vcenter_action("Center vertically", "GUI editor - center vertically", "guied_vcenter", "")
+		, m_hexpand_action("Expand horizontally", "GUI editor - expand horizontally", "guied_hexpand", "")
+		, m_vexpand_action("Expand vertically", "GUI editor - expand vertically", "guied_vexpand", "")
+		, m_make_rel_action("Make relative", "GUI editor - make relative", "guied_makerel", "")
 	{
-		m_toggle_ui.init("GUI Editor", "Toggle gui editor", "gui_editor", "");
-		m_toggle_ui.func.bind<&GUIEditor::onToggleOpen>(this);
-		m_toggle_ui.is_selected.bind<&GUIEditor::isOpen>(this);
 		app.addWindowAction(&m_toggle_ui);
 
-		m_hcenter_action.init("Center horizontally", "GUI editor - center horizontally", "guied_hcenter", "");
-		m_vcenter_action.init("Center vertically", "GUI editor - center vertically", "guied_vcenter", "");
-		m_hexpand_action.init("Expand horizontally", "GUI editor - expand horizontally", "guied_hexpand", "");
-		m_vexpand_action.init("Expand vertically", "GUI editor - expand vertically", "guied_vexpand", "");
-		m_make_rel_action.init("Make relative", "GUI editor - make relative", "guied_makerel", "");
 		m_app.addAction(&m_hcenter_action);
 		m_app.addAction(&m_vcenter_action);
 		m_app.addAction(&m_hexpand_action);
@@ -557,6 +555,8 @@ private:
 	}
 
 	void onGUI() override {
+		if (m_app.checkShortcut(m_toggle_ui, true)) m_is_window_open = !m_is_window_open;
+
 		if (!m_is_window_open) return;
 
 		if (!ImGui::Begin("GUIEditor", &m_is_window_open)) {

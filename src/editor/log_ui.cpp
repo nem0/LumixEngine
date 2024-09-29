@@ -22,6 +22,7 @@ LogUI::LogUI(StudioApp& app, IAllocator& allocator)
 	, m_is_open(false)
 	, m_are_notifications_hovered(false)
 	, m_move_notifications_to_front(false)
+	, m_toggle_ui("Log", "Toggle Log UI", "log", "")
 {
 	registerLogCallback<&LogUI::onLog>(this);
 
@@ -29,10 +30,6 @@ LogUI::LogUI(StudioApp& app, IAllocator& allocator)
 	{
 		m_new_message_count[i] = 0;
 	}
-
-	m_toggle_ui.init("Log", "Toggle Log UI", "log", "");
-	m_toggle_ui.func.bind<&LogUI::toggleUI>(this);
-	m_toggle_ui.is_selected.bind<&LogUI::isOpen>(this);
 
 	m_app.addWindowAction(&m_toggle_ui);
 	m_app.getSettings().registerPtr("log_open", &m_is_open);
@@ -158,6 +155,8 @@ void LogUI::onGUI()
 {
 	MutexGuard lock(m_guard);
 	showNotifications();
+
+	if (m_app.checkShortcut(m_toggle_ui, true)) m_is_open = !m_is_open;
 
 	if (m_focus_request) {
 		ImGui::SetNextWindowFocus();

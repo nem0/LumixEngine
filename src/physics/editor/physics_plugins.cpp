@@ -356,15 +356,9 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		: m_app(app)
 		, m_simulated_entities(app.getAllocator())
 		, m_reset_dynamic_entities(app.getAllocator())
+		, m_toggle_ui("Physics", "Toggle physics UI", "physics", "")
+		, m_simulate_selected("Simulate physics", "Simulate physics for selected object", "simulate_physics_selected_obj", "")
 	{
-		m_toggle_ui.init("Physics", "Toggle physics UI", "physics", "");
-		m_toggle_ui.func.bind<&PhysicsUIPlugin::toggleUI>(this);
-		m_toggle_ui.is_selected.bind<&PhysicsUIPlugin::isOpen>(this);
-		
-		m_simulate_selected.init("Simulate physics", "Simulate physics for selected object", "simulate_physics_selected_obj", "", (os::Keycode)'L', Action::Modifiers::CTRL);
-		m_simulate_selected.func.bind<&PhysicsUIPlugin::toggleSimulateSelected>(this);
-		m_simulate_selected.is_selected.bind<&PhysicsUIPlugin::isSimulatingSelected>(this);
-		
 		app.addWindowAction(&m_toggle_ui);
 		app.addToolAction(&m_simulate_selected);
 		app.getWorldEditor().worldDestroyed().bind<&PhysicsUIPlugin::onWorldDestroyed>(this);
@@ -796,6 +790,9 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 
 	void onGUI() override
 	{
+		if (m_app.checkShortcut(m_simulate_selected, true)) toggleSimulateSelected();
+		if (m_app.checkShortcut(m_toggle_ui, true)) m_is_window_open = !m_is_window_open;
+
 		if (!m_is_window_open) return;
 		if (ImGui::Begin("Physics", &m_is_window_open))
 		{

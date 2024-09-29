@@ -51,10 +51,12 @@ private:
 	void toggleProjection();
 	void rotate90Degrees();
 	void moveEntity(Vec2 v);
+	void snapDown();
+	void toggleWireframe();
 
 private:
 	StudioApp& m_app;
-	Action m_debug_show_actions[(u32)Pipeline::DebugShow::BUILTIN_COUNT];
+	Local<Action> m_debug_show_actions[(u32)Pipeline::DebugShow::BUILTIN_COUNT];
 	Action m_insert_model_action;
 	Action m_set_pivot_action;
 	Action m_toggle_gizmo_step_action;
@@ -71,6 +73,18 @@ private:
 	Action m_move_entity_S_action;
 	Action m_move_entity_E_action;
 	Action m_move_entity_W_action;
+	Action m_translate_gizmo_mode;
+	Action m_rotate_gizmo_mode;
+	Action m_scale_gizmo_mode;
+	Action m_local_coord_gizmo;
+	Action m_global_coord_gizmo;
+	Action m_create_entity;
+	Action m_make_parent;
+	Action m_unparent;
+	Action m_autosnap_down;
+	Action m_snap_down;
+	Action m_wireframe_action;
+
 	bool m_is_mouse_captured = false;
 	bool m_copy_moved = false;
 	bool m_insert_model_request = false;

@@ -103,19 +103,16 @@ struct AssetBrowserImpl : AssetBrowser {
 		, m_subdirs(m_allocator)
 		, m_windows(m_allocator)
 		, m_world_asset_plugin(app)
+		, m_back_action("Back", "Back in asset history", "back", ICON_FA_ARROW_LEFT)
+		, m_forward_action("Forward", "Forward in asset history", "forward", ICON_FA_ARROW_RIGHT)
+		, m_focus_search("Focus asset search", "Focus asset search", "focus_asset_search", ICON_FA_SEARCH)
+		, m_toggle_ui("Asset browser", "Toggle Asset Browser UI", "asset_browser", "")
 	{
 		PROFILE_FUNCTION();
 
 		onBasePathChanged();
 
-		m_back_action.init("Back", "Back in asset history", "back", ICON_FA_ARROW_LEFT);
-		m_forward_action.init("Forward", "Forward in asset history", "forward", ICON_FA_ARROW_RIGHT);
-		m_focus_search.init("Focus asset search", "Focus asset search", "focus_asset_search", ICON_FA_SEARCH, (os::Keycode)'O', Action::CTRL);
-
-		m_toggle_ui.init("Asset browser", "Toggle Asset Browser UI", "asset_browser", "");
-		m_toggle_ui.func.bind<&AssetBrowserImpl::toggleUI>(this);
-		m_toggle_ui.is_selected.bind<&AssetBrowserImpl::isOpen>(this);
-
+		m_app.addAction(&AssetEditorWindow::s_close_window_action);
 		m_app.addAction(&m_focus_search);
 		m_app.addAction(&m_back_action);
 		m_app.addAction(&m_forward_action);
@@ -157,6 +154,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	~AssetBrowserImpl() override {
 		removePlugin(m_world_asset_plugin);
 		m_app.getAssetCompiler().removePlugin(m_world_asset_plugin);
+		m_app.removeAction(&AssetEditorWindow::s_close_window_action);
 		m_app.removeAction(&m_focus_search);
 		m_app.removeAction(&m_toggle_ui);
 		m_app.removeAction(&m_back_action);
@@ -900,6 +898,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		if (m_dir.isEmpty()) changeDir(".", true);
 
 		bool request_focus_search = false;
+		if (m_app.checkShortcut(m_toggle_ui, true)) m_is_open = !m_is_open;
 		if (m_app.checkShortcut(m_focus_search, true)) {
 			request_focus_search = true;
 			m_is_open = true;

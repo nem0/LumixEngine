@@ -74,14 +74,12 @@ struct StudioAppImpl final : StudioApp {
 	struct HierarchyGUI : StudioApp::GUIPlugin {
 		HierarchyGUI(StudioAppImpl& app)
 			: m_app(app)
+			, m_focus_filter_action("Focus hierarchy", "Focus hierarchy filter", "focus_hierarchy", "")
+			, m_toggle_ui_action("Hierarchy", "Toggle hierarchy window", "hierarchy_toggle_ui", "")
 		{
 			m_app.getSettings().registerPtr("entity_list_open", &m_is_open);
 			m_app.getWorldEditor().entitySelectionChanged().bind<&HierarchyGUI::onEntitySelectionChanged>(this);
-	
-			m_focus_filter_action.init("Focus hierarchy", "Focus hierarchy filter", "focus_hierarchy", "", os::Keycode::F, Action::Modifiers::CTRL);
 			m_app.addAction(&m_focus_filter_action);
-
-			m_toggle_ui_action.init("Hierarchy", "Toggle hierarchy window", "hierarchy_toggle_ui", "");
 			m_app.addAction(&m_toggle_ui_action);
 		}
 
@@ -539,7 +537,6 @@ struct StudioAppImpl final : StudioApp {
 		: m_finished(false)
 		, m_deferred_game_mode_exit(false)
 		, m_actions(m_allocator)
-		, m_owned_actions(m_allocator)
 		, m_window_actions(m_allocator)
 		, m_tools_actions(m_allocator)
 		, m_is_welcome_screen_open(true)
@@ -561,6 +558,14 @@ struct StudioAppImpl final : StudioApp {
 		, m_imgui_allocator(m_debug_allocator, "imgui")
 		, m_allocator(m_debug_allocator, "studio")
 		, m_export(m_allocator)
+		, m_show_all_actions_action("Show all actions", "Show all actions", "show_all_actions", "")
+		, m_start_standalone_app("Start standalone app", "Start standalone app", "start_standalone_app", "")
+		, m_next_frame("Next frame", "Next frame", "nextFrame", ICON_FA_STEP_FORWARD)
+		, m_pause_game("Pause", "Pause game", "pauseGameMode", ICON_FA_PAUSE)
+		, m_toggle_game_mode("Game Mode", "Toggle game mode", "toggleGameMode", ICON_FA_PLAY)
+		, m_new_world_action("New", "New world", "newWorld", ICON_FA_PLUS)
+		, m_exit_action("Exit", "Exit Studio", "exit", ICON_FA_SIGN_OUT_ALT)
+		, m_show_export_action("Export game", "Export game", "export_game", ICON_FA_FILE_EXPORT)
 	{
 		PROFILE_FUNCTION();
 		u32 cpus_count = minimum(os::getCPUsCount(), 64);
@@ -615,6 +620,16 @@ struct StudioAppImpl final : StudioApp {
 		m_imgui_key_map[(int)os::Keycode::F10] = ImGuiKey_F10;
 		m_imgui_key_map[(int)os::Keycode::F11] = ImGuiKey_F11;
 		m_imgui_key_map[(int)os::Keycode::F12] = ImGuiKey_F12;
+		m_imgui_key_map['1'] = ImGuiKey_1;
+		m_imgui_key_map['2'] = ImGuiKey_2;
+		m_imgui_key_map['3'] = ImGuiKey_3;
+		m_imgui_key_map['4'] = ImGuiKey_4;
+		m_imgui_key_map['5'] = ImGuiKey_5;
+		m_imgui_key_map['6'] = ImGuiKey_6;
+		m_imgui_key_map['7'] = ImGuiKey_7;
+		m_imgui_key_map['8'] = ImGuiKey_8;
+		m_imgui_key_map['9'] = ImGuiKey_9;
+		m_imgui_key_map['0'] = ImGuiKey_0;
 		m_imgui_key_map['A'] = ImGuiKey_A;
 		m_imgui_key_map['B'] = ImGuiKey_B;
 		m_imgui_key_map['C'] = ImGuiKey_C;
@@ -731,6 +746,12 @@ struct StudioAppImpl final : StudioApp {
 			m_engine->getFileSystem().processCallbacks();
 		}
 
+		removeAction(&m_show_export_action);
+		removeAction(&m_exit_action);
+		removeAction(&m_new_world_action);
+		removeAction(&m_toggle_game_mode);
+		removeAction(&m_next_frame);
+		removeAction(&m_pause_game);
 		removeAction(&m_start_standalone_app);
 		removeAction(&m_show_all_actions_action);
 		removePlugin(*m_asset_browser.get());
@@ -779,6 +800,8 @@ struct StudioAppImpl final : StudioApp {
 		m_asset_compiler.reset();
 		m_editor.reset();
 
+		removeAction(&m_common_actions.copy);
+		removeAction(&m_common_actions.paste);
 		removeAction(&m_common_actions.save);
 		removeAction(&m_common_actions.undo);
 		removeAction(&m_common_actions.redo);
@@ -793,11 +816,6 @@ struct StudioAppImpl final : StudioApp {
 		removeAction(&m_common_actions.select_all);
 		removeAction(&m_common_actions.rename);
 
-		for (Action* action : m_owned_actions) {
-			removeAction(action);
-			LUMIX_DELETE(m_allocator, action);
-		}
-		m_owned_actions.clear();
 		ASSERT(m_actions.empty());
 		m_actions.clear();
 
@@ -833,6 +851,9 @@ struct StudioAppImpl final : StudioApp {
 		}
 
 		float time_delta = m_engine->getLastTimeDelta();
+		for (auto* plugin : m_plugins) {
+			plugin->update(time_delta);
+		}
 		for (auto* plugin : m_gui_plugins) {
 			plugin->update(time_delta);
 		}
@@ -1290,7 +1311,19 @@ struct StudioAppImpl final : StudioApp {
 
 			m_dockspace_id = ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
 			if (checkShortcut(m_show_all_actions_action, true)) showAllActionsGUI();
-			
+			else if (checkShortcut(m_next_frame, true)) m_engine->nextFrame();
+			else if (checkShortcut(m_pause_game, true)) m_engine->pause(!m_engine->isPaused());
+			else if (checkShortcut(m_toggle_game_mode, true)) m_editor->toggleGameMode();
+			else if (checkShortcut(m_new_world_action, true)) newWorld();
+			else if (checkShortcut(m_exit_action, true)) exit();
+			else if (checkShortcut(m_show_export_action, true)) m_is_export_game_dialog_open = true;
+			else if (checkShortcut(m_common_actions.copy, true)) m_editor->copyEntities();
+			else if (checkShortcut(m_common_actions.paste, true)) m_editor->pasteEntities();
+			else if (checkShortcut(m_common_actions.undo, true)) m_editor->undo();
+			else if (checkShortcut(m_common_actions.redo, true)) m_editor->redo();
+			else if (checkShortcut(m_common_actions.save, true)) save();
+			else if (checkShortcut(m_common_actions.del, true)) destroySelectedEntity();
+
 			m_asset_compiler->onGUI();
 			guiAllActions();
 			guiSaveAsDialog();
@@ -1645,18 +1678,6 @@ struct StudioAppImpl final : StudioApp {
 		os::clipCursor(win, screen_rect);
 	}
 
-	void addEntity() {
-		const EntityRef e = m_editor->addEntity();
-		m_editor->selectEntities(Span(&e, 1), false);
-	}
-
-	void undo() { m_editor->undo(); }
-	void redo() { m_editor->redo(); }
-	void copy() { m_editor->copyEntities(); }
-	void paste() { m_editor->pasteEntities(); }
-	void duplicate() { m_editor->duplicateEntities(); }
-	void setLocalCoordSystem() { getGizmoConfig().coord_system = Gizmo::Config::LOCAL; }
-	void setGlobalCoordSystem() { getGizmoConfig().coord_system = Gizmo::Config::GLOBAL; }
 	int getExitCode() const override { return m_exit_code; }
 	
 	DirSelector& getDirSelector() override {
@@ -1687,64 +1708,6 @@ struct StudioAppImpl final : StudioApp {
 		ASSERT(m_log_ui.get());
 		return *m_log_ui;
 	}
-
-	void nextFrame() { m_engine->nextFrame(); }
-	void pauseGame() { m_engine->pause(!m_engine->isPaused()); }
-	void toggleGameMode() { m_editor->toggleGameMode(); }
-	void setTranslateGizmoMode() { getGizmoConfig().mode = Gizmo::Config::TRANSLATE; }
-	void setRotateGizmoMode() { getGizmoConfig().mode = Gizmo::Config::ROTATE; }
-	void setScaleGizmoMode() { getGizmoConfig().mode = Gizmo::Config::SCALE; }
-
-
-	void makeParent()
-	{
-		const auto& entities = m_editor->getSelectedEntities();
-		if (entities.size() == 2) {
-			m_editor->makeParent(entities[0], entities[1]);
-		}
-	}
-
-
-	void unparent()
-	{
-		const auto& entities = m_editor->getSelectedEntities();
-		if (entities.size() != 1) return;
-		m_editor->makeParent(INVALID_ENTITY, entities[0]);
-	}
-
-
-	void snapDown() override {
-		const Array<EntityRef>& selected = m_editor->getSelectedEntities();
-		if (selected.empty()) return;
-
-		Array<DVec3> new_positions(m_allocator);
-		World* world = m_editor->getWorld();
-
-		for (EntityRef entity : selected) {
-			const DVec3 origin = world->getPosition(entity);
-			auto hit = getRenderInterface()->castRay(*world, Ray{origin, Vec3(0, -1, 0)}, entity);
-			if (hit.is_hit) {
-				new_positions.push(origin + Vec3(0, -hit.t, 0));
-			}
-			else {
-				hit = getRenderInterface()->castRay(*world, Ray{origin, Vec3(0, 1, 0)}, entity);
-				if (hit.is_hit) {
-					new_positions.push(origin + Vec3(0, hit.t, 0));
-				}
-				else {
-					new_positions.push(world->getPosition(entity));
-				}
-			}
-		}
-		m_editor->setEntitiesPositions(&selected[0], &new_positions[0], new_positions.size());
-	}
-
-	void autosnapDown()
-	{
-		Gizmo::Config& cfg = getGizmoConfig();
-		cfg.setAutosnapDown(!cfg.isAutosnapDown());
-	}
-
 
 	void destroySelectedEntity()
 	{
@@ -1789,34 +1752,6 @@ struct StudioAppImpl final : StudioApp {
 		}
 		m_actions.push(action);
 	}
-
-	template <void (StudioAppImpl::*Func)()>
-	Action& addAction(const char* label_short, const char* label_long, const char* name, const char* font_icon = "")
-	{
-		Action* a = LUMIX_NEW(m_allocator, Action);
-		a->init(label_short, label_long, name, font_icon);
-		a->func.bind<Func>(this);
-		addAction(a);
-		m_owned_actions.push(a);
-		return *a;
-	}
-
-
-	template <void (StudioAppImpl::*Func)()>
-	void addAction(const char* label_short,
-		const char* label_long,
-		const char* name,
-		const char* font_icon,
-		os::Keycode shortcut,
-		Action::Modifiers modifiers)
-	{
-		Action* a = LUMIX_NEW(m_allocator, Action);
-		a->init(label_short, label_long, name, font_icon, shortcut, modifiers);
-		a->func.bind<Func>(this);
-		m_owned_actions.push(a);
-		addAction(a);
-	}
-
 
 	Action* getAction(const char* name) override
 	{
@@ -1914,7 +1849,7 @@ struct StudioAppImpl final : StudioApp {
 			ASSERT(false);
 			return;
 		}
-		if (Lumix::menuItem(*action, enabled)) action->func.invoke();
+		if (Lumix::menuItem(*action, enabled)) action->request = true;
 	}
 
 	void editMenu()
@@ -1927,7 +1862,6 @@ struct StudioAppImpl final : StudioApp {
 		ImGui::Separator();
 		menuItem("copy", is_any_entity_selected);
 		menuItem("paste", m_editor->canPasteEntities());
-		menuItem("duplicate", is_any_entity_selected);
 		ImGui::Separator();
 		menuItem("setTranslateGizmoMode", true);
 		menuItem("setRotateGizmoMode", true);
@@ -1989,7 +1923,6 @@ struct StudioAppImpl final : StudioApp {
 			}
 		}
 		menuItem("save", !m_editor->isGameMode());
-		menuItem("saveAs", !m_editor->isGameMode());
 		menuItem("exit", true);
 		ImGui::EndMenu();
 	}
@@ -2006,7 +1939,7 @@ struct StudioAppImpl final : StudioApp {
 		menuItem("export_game", true);
 		for (Action* action : m_tools_actions) {
 			if (Lumix::menuItem(*action, true)) {
-				action->func.invoke();
+				action->request = true;
 			}
 		}
 		ImGui::EndMenu();
@@ -2019,7 +1952,7 @@ struct StudioAppImpl final : StudioApp {
 		m_settings.menuItemUI();
 		ImGui::Separator();
 		for (Action* action : m_window_actions) {
-			if (Lumix::menuItem(*action, true)) action->func.invoke();
+			if (Lumix::menuItem(*action, true)) action->request = true;
 		}
 		ImGui::EndMenu();
 	}
@@ -2106,9 +2039,10 @@ struct StudioAppImpl final : StudioApp {
 
 			float w = (ImGui::GetWindowContentRegionMax().x - ImGui::GetWindowContentRegionMin().x) * 0.5f - 30 - ImGui::GetCursorPosX();
 			ImGui::Dummy(ImVec2(w, ImGui::GetTextLineHeightWithSpacing()));
-			getAction("toggleGameMode")->toolbarButton(m_big_icon_font);
-			getAction("pauseGameMode")->toolbarButton(m_big_icon_font);
-			getAction("nextFrame")->toolbarButton(m_big_icon_font);
+			
+			m_toggle_game_mode.toolbarButton(m_big_icon_font);
+			m_pause_game.toolbarButton(m_big_icon_font);
+			m_next_frame.toolbarButton(m_big_icon_font);
 
 			// we don't have custom titlebar on linux
 			#ifdef _WIN32
@@ -2431,79 +2365,30 @@ struct StudioAppImpl final : StudioApp {
 
 	void showAllActionsGUI() { m_show_all_actions_request = true; }
 
-	void addActions()
-	{
-		m_common_actions.save.init("Save", "Save", "save", ICON_FA_SAVE, os::Keycode::S, Action::Modifiers::CTRL);
-		m_common_actions.save.func.bind<&StudioAppImpl::save>(this);
+	void addActions() {
+		addAction(&m_common_actions.copy);
+		addAction(&m_common_actions.paste);
 		addAction(&m_common_actions.save);
-		m_common_actions.undo.init("Undo", "Undo", "undo", ICON_FA_UNDO, os::Keycode::Z, Action::Modifiers::CTRL);
-		m_common_actions.undo.func.bind<&StudioAppImpl::undo>(this);
 		addAction(&m_common_actions.undo);
-		m_common_actions.redo.init("Redo", "Redo", "redo", ICON_FA_REDO, os::Keycode::Z, Action::Modifiers::CTRL | Action::Modifiers::SHIFT);
-		m_common_actions.redo.func.bind<&StudioAppImpl::redo>(this);
 		addAction(&m_common_actions.redo);
-		m_common_actions.del.init("Delete", "Delete", "delete", ICON_FA_MINUS_SQUARE, os::Keycode::DEL, Action::Modifiers::NONE);
-		m_common_actions.del.func.bind<&StudioAppImpl::destroySelectedEntity>(this);
 		addAction(&m_common_actions.del);
-
-		m_common_actions.cam_orbit.init("Orbit", "Orbit with RMB", "orbitRMB", "");
 		addAction(&m_common_actions.cam_orbit);
-		m_common_actions.cam_forward.init("Move forward", "Move camera forward", "moveForward", "");
 		addAction(&m_common_actions.cam_forward);
-		m_common_actions.cam_backward.init("Move back", "Move camera back", "moveBack", "");
 		addAction(&m_common_actions.cam_backward);
-		m_common_actions.cam_left.init("Move left", "Move camera left", "moveLeft", "");
 		addAction(&m_common_actions.cam_left);
-		m_common_actions.cam_right.init("Move right", "Move camera right", "moveRight", "");
 		addAction(&m_common_actions.cam_right);
-		m_common_actions.cam_up.init("Move up", "Move camera up", "moveUp", "");
 		addAction(&m_common_actions.cam_up);
-		m_common_actions.cam_down.init("Move down", "Move camera down", "moveDown", "");
 		addAction(&m_common_actions.cam_down);
-		m_common_actions.select_all.init("Select all", "Select all", "select_all", "");
 		addAction(&m_common_actions.select_all);
-		m_common_actions.rename.init("Rename", "Rename", "rename", "", os::Keycode::F2, Action::NONE);
 		addAction(&m_common_actions.rename);
-
-		m_show_all_actions_action.init("Show all actions", "Show all actions", "show_all_actions", "", os::Keycode::P, Action::Modifiers::CTRL | Action::Modifiers::SHIFT);
-		m_show_all_actions_action.func.bind<&StudioAppImpl::showAllActionsGUI>(this);
 		addAction(&m_show_all_actions_action);
-		
-		m_start_standalone_app.init("Start standalone app", "Start standalone app", "start_standalone_app", "");
-		m_start_standalone_app.func.bind<&StudioAppImpl::startStandaloneApp>(this);
+		addAction(&m_next_frame);
+		addAction(&m_pause_game);
+		addAction(&m_toggle_game_mode);
+		addAction(&m_new_world_action);
+		addAction(&m_exit_action);
+		addAction(&m_show_export_action);
 		addToolAction(&m_start_standalone_app);
-
-		addAction<&StudioAppImpl::newWorld>("New", "New world", "newWorld", ICON_FA_PLUS);
-		addAction<&StudioAppImpl::saveAs>("Save As", "Save world as", "saveAs", "", os::Keycode::S, Action::Modifiers::CTRL | Action::Modifiers::SHIFT);
-		addAction<&StudioAppImpl::exit>("Exit", "Exit Studio", "exit", ICON_FA_SIGN_OUT_ALT);
-		addAction<&StudioAppImpl::copy>("Copy", "Copy entity", "copy", ICON_FA_CLIPBOARD, os::Keycode::C, Action::Modifiers::CTRL);
-		addAction<&StudioAppImpl::paste>("Paste", "Paste entity", "paste", ICON_FA_PASTE, os::Keycode::V, Action::Modifiers::CTRL);
-		addAction<&StudioAppImpl::duplicate>("Duplicate", "Duplicate entity", "duplicate", ICON_FA_CLONE, os::Keycode::D, Action::Modifiers::CTRL);
-		addAction<&StudioAppImpl::setTranslateGizmoMode>("Translate", "Set translate mode", "setTranslateGizmoMode", ICON_FA_ARROWS_ALT)
-			.is_selected.bind<&Gizmo::Config::isTranslateMode>(&getGizmoConfig());
-		addAction<&StudioAppImpl::setRotateGizmoMode>("Rotate", "Set rotate mode", "setRotateGizmoMode", ICON_FA_UNDO)
-			.is_selected.bind<&Gizmo::Config::isRotateMode>(&getGizmoConfig());
-		addAction<&StudioAppImpl::setScaleGizmoMode>("Scale", "Set scale mode", "setScaleGizmoMode", ICON_FA_EXPAND_ALT)
-			.is_selected.bind<&Gizmo::Config::isScaleMode>(&getGizmoConfig());
-		addAction<&StudioAppImpl::setLocalCoordSystem>("Local", "Set local transform system", "setLocalCoordSystem", ICON_FA_HOME)
-			.is_selected.bind<&Gizmo::Config::isLocalCoordSystem>(&getGizmoConfig());
-		addAction<&StudioAppImpl::setGlobalCoordSystem>("Global", "Set global transform system", "setGlobalCoordSystem", ICON_FA_GLOBE)
-			.is_selected.bind<&Gizmo::Config::isGlobalCoordSystem>(&getGizmoConfig());
-
-		addAction<&StudioAppImpl::addEntity>("Create empty", "Create empty entity", "createEntity", ICON_FA_PLUS_SQUARE);
-		
-		addAction<&StudioAppImpl::makeParent>("Make parent", "Make entity parent", "makeParent", ICON_FA_OBJECT_GROUP);
-		addAction<&StudioAppImpl::unparent>("Unparent", "Unparent entity", "unparent", ICON_FA_OBJECT_UNGROUP);
-
-		addAction<&StudioAppImpl::nextFrame>("Next frame", "Next frame", "nextFrame", ICON_FA_STEP_FORWARD);
-		addAction<&StudioAppImpl::pauseGame>("Pause", "Pause game mode", "pauseGameMode", ICON_FA_PAUSE)
-			.is_selected.bind<&Engine::isPaused>(m_engine.get());
-		addAction<&StudioAppImpl::toggleGameMode>("Game Mode", "Toggle game mode", "toggleGameMode", ICON_FA_PLAY)
-			.is_selected.bind<&WorldEditor::isGameMode>(m_editor.get());
-		addAction<&StudioAppImpl::autosnapDown>("Autosnap down", "Toggle autosnap down", "autosnapDown")
-			.is_selected.bind<&Gizmo::Config::isAutosnapDown>(&getGizmoConfig());
-		addAction<&StudioAppImpl::snapDown>("Snap down", "Snap entities down", "snapDown");
-		addAction<&StudioAppImpl::showExportGameDialog>("Export game", "Export game", "export_game", ICON_FA_FILE_EXPORT);
 	}
 
 
@@ -3026,10 +2911,6 @@ struct StudioAppImpl final : StudioApp {
 		exportDataScan("universes/", infos);
 	}
 
-
-	void showExportGameDialog() { m_is_export_game_dialog_open = true; }
-
-
 	void guiExportData() {
 		if (!m_is_export_game_dialog_open) {
 			m_export_msg_timer = -1;
@@ -3203,7 +3084,7 @@ struct StudioAppImpl final : StudioApp {
 			action.request = false;
 			return true;
 		}
-		if (action.shortcut == os::Keycode::INVALID && action.modifiers == 0) return false;
+		if (action.shortcut == os::Keycode::INVALID) return false;
 
 		ImGuiKeyChord chord = m_imgui_key_map[(u32)action.shortcut];
 		ASSERT(chord != 0 || action.shortcut == os::Keycode::INVALID);
@@ -3252,7 +3133,6 @@ struct StudioAppImpl final : StudioApp {
 	os::WindowState m_fullscreen_restore_state;
 	jobs::Signal m_init_imgui_signal;
 
-	Array<Action*> m_owned_actions;
 	Array<Action*> m_tools_actions;
 	Array<Action*> m_actions;
 	Array<Action*> m_window_actions;
@@ -3260,6 +3140,12 @@ struct StudioAppImpl final : StudioApp {
 	CommonActions m_common_actions;
 	Action m_show_all_actions_action;
 	Action m_start_standalone_app;
+	Action m_toggle_game_mode;
+	Action m_pause_game;
+	Action m_next_frame;
+	Action m_new_world_action;
+	Action m_exit_action;
+	Action m_show_export_action;
 
 	Array<GUIPlugin*> m_gui_plugins;
 	Array<MousePlugin*> m_mouse_plugins;

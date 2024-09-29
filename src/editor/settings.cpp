@@ -146,6 +146,7 @@ Settings::Settings(StudioApp& app)
 	, m_mouse_sensitivity_y(m_allocator)
 	, m_variables(m_allocator)
 	, m_app_data_path(m_allocator)
+	, m_toggle_ui_action("Settings", "Toggle settings window", "settings_toggle_ui", "")
 {
 	char tmp[MAX_PATH];
 	if (!os::getAppDataDir(Span(tmp))) {
@@ -165,7 +166,6 @@ Settings::Settings(StudioApp& app)
 	registerPtr("imgui_state", &m_imgui_state);
 	registerPtr("settings_open", &m_is_open);
 
-	m_toggle_ui_action.init("Settings", "Toggle settings window", "settings_toggle_ui", "", os::Keycode::OEM_COMMA, Action::Modifiers::CTRL);
 	m_app.addAction(&m_toggle_ui_action);
 }
 
@@ -887,6 +887,7 @@ static void styleGUI() {
 		ImGui::SliderFloat("PopupBorderSize", &style.PopupBorderSize, 0.0f, 1.0f, "%.0f");
 		ImGui::SliderFloat("FrameBorderSize", &style.FrameBorderSize, 0.0f, 1.0f, "%.0f");
 		ImGui::SliderFloat("TabBorderSize", &style.TabBorderSize, 0.0f, 1.0f, "%.0f");
+		ImGui::SliderFloat("TabBarOverlineSize", &style.TabBarOverlineSize, 0.0f, 2.0f, "%.0f");
 		ImGui::Text("Rounding");
 		ImGui::SliderFloat("WindowRounding", &style.WindowRounding, 0.0f, 12.0f, "%.0f");
 		ImGui::SliderFloat("ChildRounding", &style.ChildRounding, 0.0f, 12.0f, "%.0f");
