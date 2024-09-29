@@ -32,7 +32,7 @@ PropertyGrid::PropertyGrid(StudioApp& app)
 	, m_plugins(app.getAllocator())
 	, m_deferred_select(INVALID_ENTITY)
 	, m_toggle_ui("Inspector", "Toggle Inspector UI", "inspector", "")
-	, m_focus_filter_action("Focus filter", "Focus inspector filter", "focus_inspector_filter", "")
+	, m_focus_filter_action("Focus filter", "Focus inspector filter", "inspector_focus_filter", "")
 {
 	m_app.addAction(&m_focus_filter_action);
 	m_app.addWindowAction(&m_toggle_ui);

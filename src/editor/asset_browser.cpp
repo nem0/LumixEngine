@@ -103,10 +103,10 @@ struct AssetBrowserImpl : AssetBrowser {
 		, m_subdirs(m_allocator)
 		, m_windows(m_allocator)
 		, m_world_asset_plugin(app)
-		, m_back_action("Back", "Back in asset history", "back", ICON_FA_ARROW_LEFT)
-		, m_forward_action("Forward", "Forward in asset history", "forward", ICON_FA_ARROW_RIGHT)
-		, m_focus_search("Focus asset search", "Focus asset search", "focus_asset_search", ICON_FA_SEARCH)
-		, m_toggle_ui("Asset browser", "Toggle Asset Browser UI", "asset_browser", "")
+		, m_back_action("Back", "Back in asset browser history", "asset_browser_back", ICON_FA_ARROW_LEFT)
+		, m_forward_action("Forward", "Forward in asset browser history", "asset_browser_forward", ICON_FA_ARROW_RIGHT)
+		, m_focus_search("Focus asset search", "Focus asset search", "asset_browser_focus_search", ICON_FA_SEARCH)
+		, m_toggle_ui("Asset browser", "Toggle asset browser", "asset_browser_toggle_ui", "")
 	{
 		PROFILE_FUNCTION();
 

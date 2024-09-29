@@ -356,7 +356,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		: m_app(app)
 		, m_simulated_entities(app.getAllocator())
 		, m_reset_dynamic_entities(app.getAllocator())
-		, m_toggle_ui("Physics", "Toggle physics UI", "physics", "")
+		, m_toggle_ui("Physics", "Toggle physics UI", "physics_toggle_ui", "")
 		, m_simulate_selected("Simulate physics", "Simulate physics for selected object", "simulate_physics_selected_obj", "")
 	{
 		app.addWindowAction(&m_toggle_ui);

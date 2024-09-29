@@ -74,8 +74,8 @@ struct StudioAppImpl final : StudioApp {
 	struct HierarchyGUI : StudioApp::GUIPlugin {
 		HierarchyGUI(StudioAppImpl& app)
 			: m_app(app)
-			, m_focus_filter_action("Focus hierarchy", "Focus hierarchy filter", "focus_hierarchy", "")
-			, m_toggle_ui_action("Hierarchy", "Toggle hierarchy window", "hierarchy_toggle_ui", "")
+			, m_focus_filter_action("Focus hierarchy", "Focus hierarchy filter", "hierarchy_focus_filter", "")
+			, m_toggle_ui_action("Hierarchy", "Toggle hierarchy", "hierarchy_toggle_ui", "")
 		{
 			m_app.getSettings().registerPtr("entity_list_open", &m_is_open);
 			m_app.getWorldEditor().entitySelectionChanged().bind<&HierarchyGUI::onEntitySelectionChanged>(this);
@@ -558,14 +558,14 @@ struct StudioAppImpl final : StudioApp {
 		, m_imgui_allocator(m_debug_allocator, "imgui")
 		, m_allocator(m_debug_allocator, "studio")
 		, m_export(m_allocator)
-		, m_show_all_actions_action("Show all actions", "Show all actions", "show_all_actions", "")
+		, m_show_all_actions_action("Show all commands", "Show all commands", "show_all_commands", "")
 		, m_start_standalone_app("Start standalone app", "Start standalone app", "start_standalone_app", "")
-		, m_next_frame("Next frame", "Next frame", "nextFrame", ICON_FA_STEP_FORWARD)
-		, m_pause_game("Pause", "Pause game", "pauseGameMode", ICON_FA_PAUSE)
-		, m_toggle_game_mode("Game Mode", "Toggle game mode", "toggleGameMode", ICON_FA_PLAY)
-		, m_new_world_action("New", "New world", "newWorld", ICON_FA_PLUS)
-		, m_exit_action("Exit", "Exit Studio", "exit", ICON_FA_SIGN_OUT_ALT)
-		, m_show_export_action("Export game", "Export game", "export_game", ICON_FA_FILE_EXPORT)
+		, m_next_frame("Next frame", "Next frame", "next_frame", ICON_FA_STEP_FORWARD)
+		, m_pause_game("Pause", "Pause game", "game_pause", ICON_FA_PAUSE)
+		, m_toggle_game_mode("Game Mode", "Toggle game mode", "game_mode_toggle", ICON_FA_PLAY)
+		, m_new_world_action("New", "New world", "world_new", ICON_FA_PLUS)
+		, m_exit_action("Exit", "Exit Studio", "studio_exit", ICON_FA_SIGN_OUT_ALT)
+		, m_show_export_action("Package game", "Package game", "package_game", ICON_FA_FILE_EXPORT)
 	{
 		PROFILE_FUNCTION();
 		u32 cpus_count = minimum(os::getCPUsCount(), 64);

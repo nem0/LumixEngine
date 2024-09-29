@@ -2065,13 +2065,13 @@ ResourceLocator::ResourceLocator(StringView path) {
 	resource.end = ext.end;
 }
 
-Action::Action(const char* label_short, const char* label_long, const char* name, const char* font_icon) {
-	this->label_long = label_long;
-	this->label_short = label_short;
-	this->font_icon = font_icon;
-	this->name = name;
-	shortcut = os::Keycode::INVALID;
-}
+Action::Action(const char* label_short, const char* label_long, const char* name, const char* font_icon)
+	: label_long(label_long)
+	, label_short(label_short)
+	, name(name)
+	, font_icon(font_icon)
+	, shortcut(os::Keycode::INVALID)
+{}
 
 bool Action::shortcutText(Span<char> out) const {
 	if (shortcut == os::Keycode::INVALID && modifiers == 0) {
@@ -2859,13 +2859,13 @@ CommonActions::CommonActions()
 	, undo("Undo", "Undo", "undo", ICON_FA_UNDO)
 	, redo("Redo", "Redo", "redo", ICON_FA_REDO)
 	, del("Delete", "Delete", "delete", ICON_FA_MINUS_SQUARE)
-	, cam_orbit("Orbit", "Orbit with RMB", "orbitRMB", "")
-	, cam_forward("Move forward", "Move camera forward", "moveForward", "")
-	, cam_backward("Move back", "Move camera back", "moveBack", "")
-	, cam_left("Move left", "Move camera left", "moveLeft", "")
-	, cam_right("Move right", "Move camera right", "moveRight", "")
-	, cam_up("Move up", "Move camera up", "moveUp", "")
-	, cam_down("Move down", "Move camera down", "moveDown", "")
+	, cam_orbit("Orbit", "Orbit with RMB", "orbit_rmb", "")
+	, cam_forward("Move forward", "Move camera forward", "camera_move_forward", "")
+	, cam_backward("Move back", "Move camera back", "camera_move_back", "")
+	, cam_left("Move left", "Move camera left", "camera_move_left", "")
+	, cam_right("Move right", "Move camera right", "camera_move_right", "")
+	, cam_up("Move up", "Move camera up", "camera_move_up", "")
+	, cam_down("Move down", "Move camera down", "camera_move_down", "")
 	, select_all("Select all", "Select all", "select_all", "")
 	, rename("Rename", "Rename", "rename", "")
 	, copy("Copy", "Copy", "copy", ICON_FA_CLIPBOARD)
