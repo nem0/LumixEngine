@@ -615,7 +615,8 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 	}
 
 	void onGUIResources() {
-		m_resource_filter.gui("Filter");
+		if (m_app.checkShortcut(m_focus_filter)) ImGui::SetKeyboardFocusHere();
+		m_resource_filter.gui("Filter", -1, false, &m_focus_filter);
 	
 		ImGuiEx::Label("Filter size (KB)");
 		ImGui::DragScalar("##fs", ImGuiDataType_U64, &m_resource_size_filter, 1000);
@@ -760,7 +761,8 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		ImGui::SameLine();
 
 		size_t total = 0;
-		m_filter.gui("Filter", 150, false);
+		if (m_app.checkShortcut(m_focus_filter)) ImGui::SetKeyboardFocusHere();
+		m_filter.gui("Filter", 150, false, &m_focus_filter);
 		for (AllocationTag& tag : m_allocation_tags) {
 			total += tag.m_size;
 			gui(tag);
@@ -794,7 +796,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 			onPause();
 		}
 
-		if (ImGui::Button(m_is_paused ? ICON_FA_PLAY : ICON_FA_PAUSE)) {
+		if (ImGui::Button(m_is_paused ? ICON_FA_PLAY : ICON_FA_PAUSE) || m_app.checkShortcut(m_play_pause)) {
 			m_is_paused = !m_is_paused;
 			profiler::pause(m_is_paused);
 			if (m_is_paused) onPause();
@@ -843,7 +845,8 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 			ImGui::EndPopup();
 		}
 		ImGui::SameLine();
-		m_filter.gui("Filter", 150, false);
+		if (m_app.checkShortcut(m_focus_filter)) ImGui::SetKeyboardFocusHere();
+		m_filter.gui("Filter", 150, false, &m_focus_filter);
 		ImGui::SameLine();
 		if (m_filter.isActive()) {
 			ImGui::SameLine();
@@ -1446,7 +1449,9 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 	bool m_show_frames = true;
 	Array<Counter> m_counters;
 	bool m_is_open = false;
-	Action m_toggle_ui{"Profiler", "Toggle profiler UI", "profiler_toggle_ui", "", Action::WINDOW};
+	Action m_toggle_ui{"Profiler", "Profiler - toggle UI", "profiler_toggle_ui", "", Action::WINDOW};
+	Action m_play_pause{"Play/pause", "Profiler - play/pause", "profiler_play_pause", ""};
+	Action m_focus_filter{"Focus filter", "Profiler - focus filter", "profiler_focus_filter", ""};
 	HashMap<i32, Block> m_blocks;
 	u32 m_frame_idx = 0;
 

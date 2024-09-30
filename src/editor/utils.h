@@ -80,6 +80,7 @@ struct CommonActions {
 	Action rename{"Rename", "Common - Rename", "rename", ""};
 	Action copy{"Copy", "Common - Copy", "copy", ICON_FA_CLIPBOARD};
 	Action paste{"Paste", "Common - Paste", "paste", ICON_FA_PASTE};
+	Action close_window{"Close", "Close window", "close_window", ""};
 };
 
 inline Action::Modifiers operator |(Action::Modifiers a, Action::Modifiers b) { return Action::Modifiers((u8)a | (u8)b); }

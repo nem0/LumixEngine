@@ -21,8 +21,6 @@ EditorAssetPlugin::~EditorAssetPlugin() {
 	m_app.getAssetCompiler().removePlugin(*this);
 }
 
-Action AssetEditorWindow::s_close_window_action("Close", "Close asset editor", "asset_editor_close", "");
-
 AssetEditorWindow::AssetEditorWindow(StudioApp& app)
 	: m_app(app)
 {}
@@ -45,7 +43,7 @@ void AssetEditorWindow::onGUI() {
 
 	if (ImGui::Begin(title, &open, flags)) {
 		m_dock_id = ImGui::GetWindowDockID();
-		if (m_app.checkShortcut(s_close_window_action)) open = false;
+		if (m_app.checkShortcut(m_app.getCommonActions().close_window)) open = false;
 		windowGUI();
 	}
 	if (!open) {
