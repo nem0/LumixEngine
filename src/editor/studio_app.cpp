@@ -2143,7 +2143,7 @@ struct StudioAppImpl final : StudioApp {
 				io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 				io.BackendFlags = ImGuiBackendFlags_HasMouseCursors;
 			#else
-				io.ConfigFlags |= ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable;
+				io.ConfigFlags |= ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable | ImGuiConfigFlags_NavEnableKeyboard;
 				io.BackendFlags = ImGuiBackendFlags_PlatformHasViewports | ImGuiBackendFlags_RendererHasViewports | ImGuiBackendFlags_HasMouseCursors;
 			#endif
 

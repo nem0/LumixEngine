@@ -1517,7 +1517,7 @@ void SceneView::onGUI() {
 
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 	ImVec2 view_size;
-	if (ImGui::Begin(title, nullptr, ImGuiWindowFlags_NoScrollWithMouse)) {
+	if (ImGui::Begin(title, nullptr, ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoNavInputs)) {
 		WorldEditor& editor = m_app.getWorldEditor();		
 		if (m_app.checkShortcut(m_top_view_action)) m_view->setTopView();
 		else if (m_app.checkShortcut(m_side_view_action)) m_view->setSideView();

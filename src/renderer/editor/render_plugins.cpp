@@ -3556,7 +3556,6 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 		, m_probes(app.getAllocator())
 		, m_model_plugin(model_plugin)
 		, m_generate_action("Generate probes", "Tools - generate probes", "generate_probes", "", Action::TOOL)
-		// TODO only when -renderdoc is enabled
 		, m_add_bounce_action("Add bounce", "Tools - add light bounce to probes", "probes_add_bounce", "", Action::TOOL)
 	{}
 
