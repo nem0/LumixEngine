@@ -1,6 +1,5 @@
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
-#include "editor/utils.h"
 
 namespace Lumix {
 
@@ -32,7 +31,6 @@ struct LUMIX_EDITOR_API AssetEditorWindow : StudioApp::GUIPlugin {
 	void onGUI() override;
 
 	StudioApp& m_app;
-	static Action s_close_window_action;
 	u32 m_dock_id = 0;
 	bool m_focus_request = false;
 	bool m_dirty = false;

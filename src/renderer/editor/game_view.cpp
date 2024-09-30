@@ -52,7 +52,7 @@ GameView::GameView(StudioApp& app)
 {
 	Engine& engine = app.getEngine();
 	m_app.getSettings().registerPtr("game_view_open", &m_is_open);
-	m_app.getSettings().registerPtr("focus_game_view_on_game_mode_start", &m_focus_on_game_start);
+	m_app.getSettings().registerPtr("game_view_focus_on_game_start", &m_focus_on_game_start, "Game view");
 }
 
 

@@ -301,6 +301,7 @@ static void saveStyle(OutputMemoryStream& blob) {
 	SAVE_FLOAT(GrabRounding);
 	SAVE_FLOAT(TabRounding);
 	SAVE_FLOAT(TabBorderSize);
+	SAVE_FLOAT(TabBarOverlineSize);
 	SAVE_VEC2(ButtonTextAlign);
 	SAVE_VEC2(SelectableTextAlign);
 	SAVE_VEC2(DisplayWindowPadding);
@@ -430,6 +431,7 @@ static bool loadStyle(Tokenizer& tokenizer) {
 		LOAD_FLOAT(GrabRounding)
 		LOAD_FLOAT(TabRounding)
 		LOAD_FLOAT(TabBorderSize)
+		LOAD_FLOAT(TabBarOverlineSize)
 		LOAD_VEC2(ButtonTextAlign)
 		LOAD_VEC2(SelectableTextAlign)
 		LOAD_VEC2(DisplayWindowPadding)
@@ -888,7 +890,8 @@ void Settings::shortcutsGUI() {
 	if (!ImGui::BeginTabItem("Shortcuts")) return;
 
 	static TextFilter filter;
-	filter.gui("Filter", -1, ImGui::IsWindowAppearing());
+	if (m_app.checkShortcut(m_focus_search)) ImGui::SetKeyboardFocusHere();
+	filter.gui("Filter", -1, false, &m_focus_search);
 
 	if (ImGui::BeginChild("shortcuts_scrollarea")) {
 		if (ImGui::BeginTable("shortcuts", 2, ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable)) {
