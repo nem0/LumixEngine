@@ -3,6 +3,7 @@
 #include "core/log.h"
 #include "core/os.h"
 #include "core/path.h"
+#include "core/profiler.h"
 #include "core/tokenizer.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
@@ -52,11 +53,10 @@ static bool shortcutInput(char* button_label, Action& action, bool edit, StudioA
 			ImGui::TextUnformatted(shortcut_text);
 		});
 
-		const Array<Action*>& actions = app.getActions();
 		if (editing.modifiers != Action::NONE || editing.shortcut != os::Keycode::INVALID) {
 			u32 num_collisions = 0;
 			const Action* first_collision = nullptr;
-			for (const Action* a : actions) {
+			for (const Action* a = Action::first_action; a; a = a->next) {
 				if (a == &action) continue;
 				if (a->modifiers == editing.modifiers && a->shortcut == editing.shortcut) {
 					first_collision = a;
@@ -191,10 +191,6 @@ float MouseSensitivity::eval(float value) {
 	return M * values.last().y;
 }
 
-Settings::~Settings() {
-	m_app.removeAction(&m_toggle_ui_action);
-}
-
 Settings::Settings(StudioApp& app)
 	: m_app(app)
 	, m_allocator(app.getAllocator(), "settings")
@@ -204,7 +200,6 @@ Settings::Settings(StudioApp& app)
 	, m_mouse_sensitivity_y(m_allocator)
 	, m_variables(m_allocator)
 	, m_app_data_path(m_allocator)
-	, m_toggle_ui_action("Settings", "Toggle settings UI", "settings_toggle_ui", "")
 {
 	char tmp[MAX_PATH];
 	if (!os::getAppDataDir(Span(tmp))) {
@@ -223,8 +218,6 @@ Settings::Settings(StudioApp& app)
 	m_last_save_time = os::Timer::getRawTimestamp();
 	registerPtr("imgui_state", &m_imgui_state);
 	registerPtr("settings_open", &m_is_open);
-
-	m_app.addWindowAction(&m_toggle_ui_action);
 }
 
 float Settings::getTimeSinceLastSave() const {
@@ -331,7 +324,6 @@ static ImGuiStyle g_imgui_style;
 
 static bool loadShortcuts(Settings& settings, Tokenizer& tokenizer) {
 	if (!tokenizer.consume("{")) return false;
-	auto& actions = settings.m_app.getActions();
 	// TODO O(n^2)
 	for (;;) {
 		Tokenizer::Token token = tokenizer.nextToken();
@@ -348,9 +340,9 @@ static bool loadShortcuts(Settings& settings, Tokenizer& tokenizer) {
 		if (!tokenizer.consume("=", "{", "key", "=", key, ",", "modifiers", "=", modifiers,"}")) return	false;
 
 		Action* action = nullptr;
-		for (int i = 0; i < actions.size(); ++i) {
-			if (actions[i]->name == token) {
-				action = actions[i];
+		for (Action* a = Action::first_action; a; a = a->next) {
+			if (a->name == token) {
+				action = a;
 				break;
 			}
 		}
@@ -582,13 +574,11 @@ void Settings::load() {
 }
 
 static void saveShortcuts(Settings& settings, OutputMemoryStream& blob) {
-	auto& actions = settings.m_app.getActions();
 	blob << "keybindings = {\n";
-	for (int i = 0; i < actions.size(); ++i)
-	{
-		blob << "\t" << actions[i]->name << " = { key = " 
-			<< (int)actions[i]->shortcut << ", modifiers = "
-			<< (int)actions[i]->modifiers << "},\n";
+	for (Action* a = Action::first_action; a; a = a->next) {
+		blob << "\t" << a->name << " = { key = " 
+			<< (int)a->shortcut << ", modifiers = "
+			<< (int)a->modifiers << "},\n";
 	}
 	blob << "}\n";
 
@@ -867,27 +857,53 @@ bool ShowStyleSelector() {
 	return false;
 }
 
+static void sortActions() {
+	PROFILE_FUNCTION();
+	if (!Action::first_action) return;
+	for (;;) {
+		bool sorted = true;
+		for (Action* a = Action::first_action; a->next; a = a->next) {
+			if (compareString(a->label_long, a->next->label_long) <= 0) continue;
+
+			sorted = false;
+			if (a == Action::first_action) Action::first_action = a->next;
+
+			Action* tmp = a->next;
+			// remove a from the list
+			if (a->prev) a->prev->next = a->next;
+			a->next->prev = a->prev;
+			// push it in new position
+			a->next = tmp->next;
+			a->prev = tmp;
+			a->prev->next = a;
+			if (a->next) a->next->prev = a;
+
+			a = a->prev;
+		}
+		if (sorted) break;
+	}
+}
+
 void Settings::shortcutsGUI() {
 	if (!ImGui::BeginTabItem("Shortcuts")) return;
 
-	auto& actions = m_app.getActions();
 	static TextFilter filter;
 	filter.gui("Filter", -1, ImGui::IsWindowAppearing());
 
 	if (ImGui::BeginChild("shortcuts_scrollarea")) {
 		if (ImGui::BeginTable("shortcuts", 2, ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable)) {
-			for (int i = 0; i < actions.size(); ++i) {
-				Action& a = *actions[i];
+			sortActions();
+			for (Action* a = Action::first_action; a; a = a->next) {
 				char button_label[64];
-				a.shortcutText(Span(button_label));
-				if (filter.pass(a.label_long) || filter.pass(button_label)) {
+				a->shortcutText(Span(button_label));
+				if (filter.pass(a->label_long) || filter.pass(button_label)) {
 					ImGui::TableNextRow();
 					ImGui::TableNextColumn();
-					ImGui::PushID(&a);
-					ImGui::TextUnformatted(a.label_long);
+					ImGui::PushID(a);
+					ImGui::TextUnformatted(a->label_long);
 					ImGui::TableNextColumn();
-					if (shortcutInput(button_label, a, &a == m_edit_action, m_app)) {
-						m_edit_action = &a;
+					if (shortcutInput(button_label, *a, a == m_edit_action, m_app)) {
+						m_edit_action = a;
 					}
 					ImGui::PopID();
 				}

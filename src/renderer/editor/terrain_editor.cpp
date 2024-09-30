@@ -670,11 +670,6 @@ private:
 
 TerrainEditor::~TerrainEditor()
 {
-	m_app.removeAction(&m_smooth_terrain_action);
-	m_app.removeAction(&m_lower_terrain_action);
-	m_app.removeAction(&m_remove_grass_action);
-	m_app.removeAction(&m_remove_entity_action);
-
 	if (m_brush_texture)
 	{
 		m_brush_texture->destroy();
@@ -707,12 +702,6 @@ TerrainEditor::TerrainEditor(StudioApp& app)
 	, m_remove_grass_action("Remove grass from terrain", "Terrain editor - remove grass", "removeGrassFromTerrain", "")
 	, m_remove_entity_action("Remove entities from terrain", "Terrain editor - remove entities", "removeEntitiesFromTerrain", "")
 {
-
-	app.addAction(&m_smooth_terrain_action);
-	app.addAction(&m_lower_terrain_action);
-	app.addAction(&m_remove_grass_action);
-	app.addAction(&m_remove_entity_action);
-
 	app.addPlugin(*this);
 
 	m_terrain_brush_size = 10;

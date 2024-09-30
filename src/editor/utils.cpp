@@ -2065,13 +2065,28 @@ ResourceLocator::ResourceLocator(StringView path) {
 	resource.end = ext.end;
 }
 
-Action::Action(const char* label_short, const char* label_long, const char* name, const char* font_icon)
+Action* Action::first_action = nullptr;
+
+Action::Action(const char* label_short, const char* label_long, const char* name, const char* font_icon, Type type)
 	: label_long(label_long)
 	, label_short(label_short)
 	, name(name)
 	, font_icon(font_icon)
 	, shortcut(os::Keycode::INVALID)
-{}
+	, type(type)
+{
+	if (first_action) {
+		first_action->prev = this;
+	}
+	next = first_action;
+	first_action = this;
+}
+
+Action::~Action() {
+	if (first_action == this) first_action = next;
+	if (prev) prev->next = next;
+	if (next) next->prev = prev;
+}
 
 bool Action::shortcutText(Span<char> out) const {
 	if (shortcut == os::Keycode::INVALID && modifiers == 0) {
@@ -2852,23 +2867,5 @@ bool beginCenterStrip(const char* str_id, u32 lines) {
 void endCenterStrip() {
 	ImGui::EndPopup();
 }
-
-CommonActions::CommonActions()
-	: save("Save", "Common - Save", "save", ICON_FA_SAVE)
-	, undo("Undo", "Common - Undo", "undo", ICON_FA_UNDO)
-	, redo("Redo", "Common - Redo", "redo", ICON_FA_REDO)
-	, del("Delete", "Common - Delete", "delete", ICON_FA_MINUS_SQUARE)
-	, cam_orbit("Orbit", "Camera - orbit with RMB", "orbit_rmb", "")
-	, cam_forward("Move forward", "Camera - move forward", "camera_move_forward", "")
-	, cam_backward("Move back", "Camera - move backward", "camera_move_back", "")
-	, cam_left("Move left", "Camera - move left", "camera_move_left", "")
-	, cam_right("Move right", "Camera - move right", "camera_move_right", "")
-	, cam_up("Move up", "Camera - move up", "camera_move_up", "")
-	, cam_down("Move down", "Camera - move down", "camera_move_down", "")
-	, select_all("Select all", "Common - Select all", "select_all", "")
-	, rename("Rename", "Common - Rename", "rename", "")
-	, copy("Copy", "Common - Copy", "copy", ICON_FA_CLIPBOARD)
-	, paste("Paste", "Common - Paste", "paste", ICON_FA_PASTE)
-{}
 
 } // namespace Lumix

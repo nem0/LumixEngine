@@ -217,18 +217,15 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		// we can't use m_allocator for tags, because it would create circular dependency and deadlock
 		, m_allocation_tags(getGlobalAllocator())
 		, m_engine(engine)
-		, m_toggle_ui("Profiler", "Toggle profiler UI", "profiler_toggle_ui", "")
 	{
 		m_current_frame = -1;
 		m_is_open = false;
 		m_is_paused = true;
 
-		m_app.addWindowAction(&m_toggle_ui);
 		m_app.getSettings().registerPtr("profiler_open", &m_is_open);
 	}
 
 	~ProfilerUIImpl() {
-		m_app.removeAction(&m_toggle_ui);
 		while (m_engine.getFileSystem().hasWork()) {
 			m_engine.getFileSystem().processCallbacks();
 		}
@@ -1449,7 +1446,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 	bool m_show_frames = true;
 	Array<Counter> m_counters;
 	bool m_is_open = false;
-	Action m_toggle_ui;
+	Action m_toggle_ui{"Profiler", "Toggle profiler UI", "profiler_toggle_ui", "", Action::WINDOW};
 	HashMap<i32, Block> m_blocks;
 	u32 m_frame_idx = 0;
 

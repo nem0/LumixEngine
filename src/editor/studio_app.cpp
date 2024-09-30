@@ -74,18 +74,9 @@ struct StudioAppImpl final : StudioApp {
 	struct HierarchyGUI : StudioApp::GUIPlugin {
 		HierarchyGUI(StudioAppImpl& app)
 			: m_app(app)
-			, m_focus_filter_action("Focus filter", "Hierarchy - focus filter", "hierarchy_focus_filter", "")
-			, m_toggle_ui_action("Hierarchy", "Hierarchy - toggle UI", "hierarchy_toggle_ui", "")
 		{
 			m_app.getSettings().registerPtr("entity_list_open", &m_is_open);
 			m_app.getWorldEditor().entitySelectionChanged().bind<&HierarchyGUI::onEntitySelectionChanged>(this);
-			m_app.addAction(&m_focus_filter_action);
-			m_app.addWindowAction(&m_toggle_ui_action);
-		}
-
-		~HierarchyGUI() {
-			m_app.removeAction(&m_focus_filter_action);
-			m_app.removeAction(&m_toggle_ui_action);
 		}
 
 		void renameGUI() {
@@ -518,8 +509,8 @@ struct StudioAppImpl final : StudioApp {
 		StudioAppImpl& m_app;
 		bool m_is_open = true;
 		bool m_entity_selection_changed = false;
-		Action m_focus_filter_action;
-		Action m_toggle_ui_action;
+		Action m_focus_filter_action{"Focus filter", "Hierarchy - focus filter", "hierarchy_focus_filter", ""};
+		Action m_toggle_ui_action{"Hierarchy", "Hierarchy - toggle UI", "hierarchy_toggle_ui", "", Action::WINDOW};
 		bool m_request_focus_filter = false;
 		EntityPtr m_renaming_entity = INVALID_ENTITY;
 		EntityFolders::FolderHandle m_renaming_folder = EntityFolders::INVALID_FOLDER;
@@ -532,9 +523,6 @@ struct StudioAppImpl final : StudioApp {
 	StudioAppImpl()
 		: m_finished(false)
 		, m_deferred_game_mode_exit(false)
-		, m_actions(m_allocator)
-		, m_window_actions(m_allocator)
-		, m_tools_actions(m_allocator)
 		, m_is_welcome_screen_open(true)
 		, m_is_export_game_dialog_open(false)
 		, m_settings(*this)
@@ -554,14 +542,6 @@ struct StudioAppImpl final : StudioApp {
 		, m_imgui_allocator(m_debug_allocator, "imgui")
 		, m_allocator(m_debug_allocator, "studio")
 		, m_export(m_allocator)
-		, m_show_all_actions_action("Show all commands", "Show all commands", "show_all_commands", "")
-		, m_start_standalone_app("Start standalone app", "Start standalone app", "start_standalone_app", "")
-		, m_next_frame("Next frame", "Game - next frame", "game_next_frame", ICON_FA_STEP_FORWARD)
-		, m_pause_game("Pause", "Game - pause", "game_pause", ICON_FA_PAUSE)
-		, m_toggle_game_mode("Run game", "Game - run", "game_run", ICON_FA_PLAY)
-		, m_new_world_action("New", "New world", "world_new", ICON_FA_PLUS)
-		, m_exit_action("Exit", "Exit Studio", "studio_exit", ICON_FA_SIGN_OUT_ALT)
-		, m_show_export_action("Package game", "Tools - package game", "package_game", ICON_FA_FILE_EXPORT)
 	{
 		PROFILE_FUNCTION();
 		u32 cpus_count = minimum(os::getCPUsCount(), 64);
@@ -742,19 +722,6 @@ struct StudioAppImpl final : StudioApp {
 			m_engine->getFileSystem().processCallbacks();
 		}
 
-		removeAction(&m_show_export_action);
-		removeAction(&m_exit_action);
-		removeAction(&m_new_world_action);
-		removeAction(&m_toggle_game_mode);
-		removeAction(&m_next_frame);
-		removeAction(&m_pause_game);
-		removeAction(&m_start_standalone_app);
-		removeAction(&m_show_all_actions_action);
-		removePlugin(*m_asset_browser.get());
-		removePlugin(*m_log_ui.get());
-		removePlugin(*m_property_grid.get());
-		removePlugin(*m_profiler_ui.get());
-
 		m_asset_browser->releaseResources();
 		m_watched_plugin.watcher.reset();
 
@@ -795,26 +762,6 @@ struct StudioAppImpl final : StudioApp {
 		ASSERT(!m_render_interface);
 		m_asset_compiler.reset();
 		m_editor.reset();
-
-		removeAction(&m_common_actions.copy);
-		removeAction(&m_common_actions.paste);
-		removeAction(&m_common_actions.save);
-		removeAction(&m_common_actions.undo);
-		removeAction(&m_common_actions.redo);
-		removeAction(&m_common_actions.del);
-		removeAction(&m_common_actions.cam_orbit);
-		removeAction(&m_common_actions.cam_forward);
-		removeAction(&m_common_actions.cam_backward);
-		removeAction(&m_common_actions.cam_right);
-		removeAction(&m_common_actions.cam_left);
-		removeAction(&m_common_actions.cam_up);
-		removeAction(&m_common_actions.cam_down);
-		removeAction(&m_common_actions.select_all);
-		removeAction(&m_common_actions.rename);
-
-		ASSERT(m_actions.empty());
-		m_actions.clear();
-
 		m_engine.reset();
 	}
 
@@ -1010,7 +957,6 @@ struct StudioAppImpl final : StudioApp {
 
 		m_editor = WorldEditor::create(*m_engine, m_allocator);
 		loadUserPlugins();
-		addActions();
 
 		m_asset_browser = AssetBrowser::create(*this);
 		m_hierarchy.create(*this);
@@ -1236,9 +1182,6 @@ struct StudioAppImpl final : StudioApp {
 			m_component_icons.insert(plugin->type, icon);
 		}
 	}
-
-
-	const Array<Action*>& getActions() override { return m_actions; }
 
 
 	void guiBeginFrame()
@@ -1712,52 +1655,13 @@ struct StudioAppImpl final : StudioApp {
 		m_editor->destroyEntities(&selected_entities[0], selected_entities.size());
 	}
 
-
-	void removeAction(Action* action) override
-	{
-		m_actions.eraseItem(action);
-		m_window_actions.eraseItem(action);
-		m_tools_actions.eraseItem(action);
-	}
-
-	void addToolAction(Action* action) override {
-		addAction(action);
-		m_tools_actions.push(action);
-	}
-
-	void addWindowAction(Action* action) override
-	{
-		addAction(action);
-		for (int i = 0; i < m_window_actions.size(); ++i)
-		{
-			if (compareString(m_window_actions[i]->label_short, action->label_short) > 0)
-			{
-				m_window_actions.insert(i, action);
-				return;
-			}
-		}
-		m_window_actions.push(action);
-	}
-
-	void addAction(Action* action) override {
-		for (int i = 0; i < m_actions.size(); ++i) {
-			if (compareString(m_actions[i]->label_long, action->label_long) > 0) {
-				m_actions.insert(i, action);
-				return;
-			}
-		}
-		m_actions.push(action);
-	}
-
 	Action* getAction(const char* name) override
 	{
-		for (auto* a : m_actions)
-		{
+		for (Action* a = Action::first_action; a; a = a->next) {
 			if (equalStrings(a->name, name)) return a;
 		}
 		return nullptr;
 	}
-
 
 	static void showAddComponentNode(const StudioApp::AddCmpTreeNode* node, const TextFilter& filter, EntityPtr parent, WorldEditor& editor)
 	{
@@ -1932,17 +1836,17 @@ struct StudioAppImpl final : StudioApp {
 		menuItem("entity_snap_down", is_any_entity_selected);
 		menuItem("autosnap_down", true);
 		menuItem("package_game", true);
-		for (Action* action : m_tools_actions) {
-			if (Lumix::menuItem(*action, true)) {
-				action->request = true;
-			}
+		for (Action* action = Action::first_action; action; action = action->next) {
+			if (action->type != Action::Type::TOOL) continue;
+			if (Lumix::menuItem(*action, true)) action->request = true;
 		}
 		ImGui::EndMenu();
 	}
 
 	void viewMenu() {
 		if (!ImGui::BeginMenu("View")) return;
-		for (Action* action : m_window_actions) {
+		for (Action* action = Action::first_action; action; action = action->next) {
+			if (action->type != Action::WINDOW) continue;
 			if (Lumix::menuItem(*action, true)) action->request = true;
 		}
 		ImGui::EndMenu();
@@ -2356,32 +2260,6 @@ struct StudioAppImpl final : StudioApp {
 
 	void showAllActionsGUI() { m_show_all_actions_request = true; }
 
-	void addActions() {
-		addAction(&m_common_actions.copy);
-		addAction(&m_common_actions.paste);
-		addAction(&m_common_actions.save);
-		addAction(&m_common_actions.undo);
-		addAction(&m_common_actions.redo);
-		addAction(&m_common_actions.del);
-		addAction(&m_common_actions.cam_orbit);
-		addAction(&m_common_actions.cam_forward);
-		addAction(&m_common_actions.cam_backward);
-		addAction(&m_common_actions.cam_left);
-		addAction(&m_common_actions.cam_right);
-		addAction(&m_common_actions.cam_up);
-		addAction(&m_common_actions.cam_down);
-		addAction(&m_common_actions.select_all);
-		addAction(&m_common_actions.rename);
-		addAction(&m_show_all_actions_action);
-		addAction(&m_next_frame);
-		addAction(&m_pause_game);
-		addAction(&m_toggle_game_mode);
-		addAction(&m_new_world_action);
-		addAction(&m_exit_action);
-		addAction(&m_show_export_action);
-		addToolAction(&m_start_standalone_app);
-	}
-
 
 	static bool copyPlugin(const char* src, int iteration, char (&out)[MAX_PATH])
 	{
@@ -2746,7 +2624,7 @@ struct StudioAppImpl final : StudioApp {
 			if (m_all_actions_filter.isActive()) {
 				if (ImGui::BeginChild("##list")) {
 					u32 idx = 0;
-					for (Action* act : m_actions) {
+					for (Action* act = Action::first_action; act; act = act->next) {
 						if (!m_all_actions_filter.pass(act->label_long)) continue;
 
 						char buf[20] = " (";
@@ -3124,19 +3002,15 @@ struct StudioAppImpl final : StudioApp {
 	os::WindowState m_fullscreen_restore_state;
 	jobs::Signal m_init_imgui_signal;
 
-	Array<Action*> m_tools_actions;
-	Array<Action*> m_actions;
-	Array<Action*> m_window_actions;
-
 	CommonActions m_common_actions;
-	Action m_show_all_actions_action;
-	Action m_start_standalone_app;
-	Action m_toggle_game_mode;
-	Action m_pause_game;
-	Action m_next_frame;
-	Action m_new_world_action;
-	Action m_exit_action;
-	Action m_show_export_action;
+	Action m_show_all_actions_action{"Show all commands", "Show all commands", "show_all_commands", ""};
+	Action m_start_standalone_app{"Start standalone app", "Start standalone app", "start_standalone_app", "", Action::TOOL};
+	Action m_next_frame{"Next frame", "Game - next frame", "game_next_frame", ICON_FA_STEP_FORWARD};
+	Action m_pause_game{"Pause", "Game - pause", "game_pause", ICON_FA_PAUSE};
+	Action m_toggle_game_mode{"Run game", "Game - run", "game_run", ICON_FA_PLAY};
+	Action m_new_world_action{"New", "New world", "world_new", ICON_FA_PLUS};
+	Action m_exit_action{"Exit", "Exit Studio", "studio_exit", ICON_FA_SIGN_OUT_ALT};
+	Action m_show_export_action{"Package game", "Tools - package game", "package_game", ICON_FA_FILE_EXPORT};
 
 	Array<GUIPlugin*> m_gui_plugins;
 	Array<MousePlugin*> m_mouse_plugins;

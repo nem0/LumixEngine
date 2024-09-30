@@ -115,11 +115,6 @@ struct LUMIX_EDITOR_API StudioApp {
 	virtual void registerComponent(const char* icon, const char* id, IAddComponentPlugin& plugin) = 0;
 	virtual const AddCmpTreeNode& getAddComponentTreeRoot() const = 0;
 
-	virtual const Array<Action*>& getActions() = 0;
-	virtual void addAction(Action* action) = 0;
-	virtual void removeAction(Action* action) = 0;
-	virtual void addToolAction(Action* action) = 0;
-	virtual void addWindowAction(Action* action) = 0;
 	virtual Action* getAction(const char* name) = 0;
 	
 	virtual void newWorld() = 0;

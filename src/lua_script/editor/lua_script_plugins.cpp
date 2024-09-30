@@ -257,9 +257,7 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 		, m_name(name, app.getAllocator())
 	{}
 	
-	~StudioLuaPlugin() {
-		m_app.removeAction(m_action.get());
-	}
+	~StudioLuaPlugin() {}
 
 	void runWindowAction() {
 		LuaScriptSystem* system = (LuaScriptSystem*)m_app.getEngine().getSystemManager().getSystem("lua_script");
@@ -880,7 +878,6 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 		lua_pop(L, 2);
 		action->action.create(label, label, name, "");
 		action->L = L;
-		app.addAction(action->action.get());
 		return 0;
 	}
 
@@ -1412,7 +1409,6 @@ struct SetPropertyVisitor : reflection::IPropertyVisitor {
 		m_app.getPropertyGrid().removePlugin(m_property_grid_plugin);
 
 		for (LuaAction* action : m_lua_actions) {
-			m_app.removeAction(action->action.get());
 			LUMIX_DELETE(m_app.getAllocator(), action);
 		}
 	}
