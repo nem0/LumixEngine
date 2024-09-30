@@ -49,8 +49,6 @@ GameView::GameView(StudioApp& app)
 	, m_is_mouse_captured(false)
 	, m_is_ingame_cursor(false)
 	, m_time_multiplier(1.0f)
-	, m_toggle_ui("Game View", "Game view - toggle UI", "game_view_toggle_ui", "")
-	, m_fullscreen_action("Fullscreen", "Game view - fullscreen", "game_view_fullscreen", "")
 {
 	Engine& engine = app.getEngine();
 	m_app.getSettings().registerPtr("game_view_open", &m_is_open);
@@ -59,9 +57,6 @@ GameView::GameView(StudioApp& app)
 
 
 void GameView::init() {
-	m_app.addWindowAction(&m_toggle_ui);
-	m_app.addAction(&m_fullscreen_action);
-
 	Engine& engine = m_app.getEngine();
 	auto* renderer = (Renderer*)engine.getSystemManager().getSystem("renderer");
 	m_pipeline = Pipeline::create(*renderer, PipelineType::GAME_VIEW);
@@ -74,11 +69,7 @@ void GameView::init() {
 	}
 }
 
-
-GameView::~GameView()
-{
-	m_app.removeAction(&m_toggle_ui);
-	m_app.removeAction(&m_fullscreen_action);
+GameView::~GameView() {
 	Engine& engine = m_app.getEngine();
 	auto* gui = static_cast<GUISystem*>(engine.getSystemManager().getSystem("gui"));
 	if (gui) {

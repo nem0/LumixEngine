@@ -356,18 +356,12 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		: m_app(app)
 		, m_simulated_entities(app.getAllocator())
 		, m_reset_dynamic_entities(app.getAllocator())
-		, m_toggle_ui("Physics", "Physics - toggle UI", "physics_toggle_ui", "")
-		, m_simulate_selected("Simulate physics", "Physics - simulate physics for selected object", "simulate_physics_selected_obj", "")
 	{
-		app.addWindowAction(&m_toggle_ui);
-		app.addToolAction(&m_simulate_selected);
 		app.getWorldEditor().worldDestroyed().bind<&PhysicsUIPlugin::onWorldDestroyed>(this);
 		app.getSettings().registerPtr("physics_ui_open", &m_is_window_open);
 	}
 
 	~PhysicsUIPlugin() {
-		m_app.removeAction(&m_toggle_ui);
-		m_app.removeAction(&m_simulate_selected);
 		m_app.getWorldEditor().worldDestroyed().unbind<&PhysicsUIPlugin::onWorldDestroyed>(this);
 	}
 
@@ -813,8 +807,8 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 
 	StudioApp& m_app;
 	bool m_is_window_open = false;
-	Action m_toggle_ui;
-	Action m_simulate_selected;
+	Action m_toggle_ui{"Physics", "Physics - toggle UI", "physics_toggle_ui", "", Action::WINDOW};
+	Action m_simulate_selected{"Simulate physics", "Physics - simulate physics for selected object", "simulate_physics_selected_obj", "", Action::TOOL};
 	bool m_is_simulating_selected = false;
 	Array<SimulatedEntity> m_simulated_entities;
 	Array<EntityRef> m_reset_dynamic_entities;

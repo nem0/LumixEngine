@@ -103,26 +103,17 @@ struct AssetBrowserImpl : AssetBrowser {
 		, m_subdirs(m_allocator)
 		, m_windows(m_allocator)
 		, m_world_asset_plugin(app)
-		, m_back_action("Back", "Asset browser - back in history", "asset_browser_back", ICON_FA_ARROW_LEFT)
-		, m_forward_action("Forward", "Asset browser - forward in history", "asset_browser_forward", ICON_FA_ARROW_RIGHT)
-		, m_focus_search("Focus search", "Asset browser - focus search", "asset_browser_focus_search", ICON_FA_SEARCH)
-		, m_toggle_ui("Asset browser", "Asset browser - toggle UI", "asset_browser_toggle_ui", "")
 	{
 		PROFILE_FUNCTION();
 
 		onBasePathChanged();
 
-		m_app.addAction(&AssetEditorWindow::s_close_window_action);
-		m_app.addAction(&m_focus_search);
-		m_app.addAction(&m_back_action);
-		m_app.addAction(&m_forward_action);
-		m_app.addWindowAction(&m_toggle_ui);
 		const char* world_exts[] = { "unv" };
 		addPlugin(m_world_asset_plugin, Span(world_exts));
 		m_app.getAssetCompiler().addPlugin(m_world_asset_plugin, Span(world_exts));
-		m_app.getSettings().registerPtr("asset_browser_open", &m_is_open);
-		m_app.getSettings().registerPtr("asset_browser_thumbnails", &m_show_thumbnails);
-		m_app.getSettings().registerPtr("asset_browser_thumbnail_size", &m_thumbnail_size);
+		m_app.getSettings().registerPtr("asset_browser_open", &m_is_open, "Asset browser");
+		m_app.getSettings().registerPtr("asset_browser_thumbnails", &m_show_thumbnails, "Asset browser");
+		m_app.getSettings().registerPtr("asset_browser_thumbnail_size", &m_thumbnail_size, "Asset browser");
 	}
 
 	void onBasePathChanged() {
@@ -154,11 +145,6 @@ struct AssetBrowserImpl : AssetBrowser {
 	~AssetBrowserImpl() override {
 		removePlugin(m_world_asset_plugin);
 		m_app.getAssetCompiler().removePlugin(m_world_asset_plugin);
-		m_app.removeAction(&AssetEditorWindow::s_close_window_action);
-		m_app.removeAction(&m_focus_search);
-		m_app.removeAction(&m_toggle_ui);
-		m_app.removeAction(&m_back_action);
-		m_app.removeAction(&m_forward_action);
 		m_app.getAssetCompiler().listChanged().unbind<&AssetBrowserImpl::onResourceListChanged>(this);
 		m_app.getAssetCompiler().resourceCompiled().unbind<&AssetBrowserImpl::onResourceCompiled>(this);
 
@@ -1328,10 +1314,10 @@ struct AssetBrowserImpl : AssetBrowser {
 	bool m_show_subresources;
 	bool m_request_delete = false;
 	float m_thumbnail_size = 1.f;
-	Action m_focus_search;
-	Action m_toggle_ui;
-	Action m_back_action;
-	Action m_forward_action;
+	Action m_focus_search{"Focus search", "Asset browser - focus search", "asset_browser_focus_search", ICON_FA_SEARCH};
+	Action m_back_action{"Back", "Asset browser - back in history", "asset_browser_back", ICON_FA_ARROW_LEFT};
+	Action m_forward_action{"Forward", "Asset browser - forward in history", "asset_browser_forward", ICON_FA_ARROW_RIGHT};
+	Action m_toggle_ui{"Asset browser", "Asset browser - toggle UI", "asset_browser_toggle_ui", "", Action::WINDOW};
 	WorldAssetPlugin m_world_asset_plugin;
 };
 

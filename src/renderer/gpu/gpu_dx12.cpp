@@ -1715,9 +1715,9 @@ ID3D12RootSignature* createRootSignature() {
 bool init(void* hwnd, InitFlags flags) {
 	PROFILE_FUNCTION();
 	bool debug = u32(flags & InitFlags::DEBUG_OUTPUT);
-#ifdef LUMIX_DEBUG
-	debug = true;
-#endif
+	#ifdef LUMIX_DEBUG
+		debug = true;
+	#endif
 
 	d3d->vsync = true;
 	d3d->thread = GetCurrentThreadId();

@@ -278,21 +278,7 @@ struct GUIEditor final : StudioApp::GUIPlugin
 public:
 	GUIEditor(StudioApp& app)
 		: m_app(app)
-		, m_toggle_ui("GUI Editor", "GUI editor - toggle UI", "gui_editor", "")
-		, m_hcenter_action("Center horizontally", "GUI editor - center horizontally", "guied_hcenter", "")
-		, m_vcenter_action("Center vertically", "GUI editor - center vertically", "guied_vcenter", "")
-		, m_hexpand_action("Expand horizontally", "GUI editor - expand horizontally", "guied_hexpand", "")
-		, m_vexpand_action("Expand vertically", "GUI editor - expand vertically", "guied_vexpand", "")
-		, m_make_rel_action("Make relative", "GUI editor - make relative", "guied_makerel", "")
 	{
-		app.addWindowAction(&m_toggle_ui);
-
-		m_app.addAction(&m_hcenter_action);
-		m_app.addAction(&m_vcenter_action);
-		m_app.addAction(&m_hexpand_action);
-		m_app.addAction(&m_vexpand_action);
-		m_app.addAction(&m_make_rel_action);
-
 		m_app.getSettings().registerPtr("gui_editor_open", &m_is_window_open);
 	}
 
@@ -301,17 +287,6 @@ public:
 		Renderer& renderer = *static_cast<Renderer*>(engine.getSystemManager().getSystem("renderer"));
 		m_pipeline = Pipeline::create(renderer, PipelineType::GUI_EDITOR);
 	}
-
-
-	~GUIEditor() {
-		m_app.removeAction(&m_toggle_ui);
-		m_app.removeAction(&m_hcenter_action);
-		m_app.removeAction(&m_vcenter_action);
-		m_app.removeAction(&m_hexpand_action);
-		m_app.removeAction(&m_vexpand_action);
-		m_app.removeAction(&m_make_rel_action);
-	}
-
 
 private:
 	enum class ResizeSide {
@@ -1128,7 +1103,6 @@ private:
 
 
 	StudioApp& m_app;
-	Action m_toggle_ui;
 	UniquePtr<Pipeline> m_pipeline;
 	bool m_is_window_open = false;
 	gpu::TextureHandle m_texture_handle;
@@ -1140,11 +1114,12 @@ private:
 	EntityPtr m_canvas_entity = INVALID_ENTITY;
 	Vec3 m_clear_color = Vec3(0);
 
-	Action m_hcenter_action;
-	Action m_vcenter_action;
-	Action m_hexpand_action;
-	Action m_vexpand_action;
-	Action m_make_rel_action;
+	Action m_toggle_ui{"GUI Editor", "GUI editor - toggle UI", "gui_editor", "", Action::WINDOW};
+	Action m_hcenter_action{"Center horizontally", "GUI editor - center horizontally", "guied_hcenter", ""};
+	Action m_vcenter_action{"Center vertically", "GUI editor - center vertically", "guied_vcenter", ""};
+	Action m_hexpand_action{"Expand horizontally", "GUI editor - expand horizontally", "guied_hexpand", ""};
+	Action m_vexpand_action{"Expand vertically", "GUI editor - expand vertically", "guied_vexpand", ""};
+	Action m_make_rel_action{"Make relative", "GUI editor - make relative", "guied_makerel", ""};
 };
 
 

@@ -3555,17 +3555,12 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 		: m_app(app)
 		, m_probes(app.getAllocator())
 		, m_model_plugin(model_plugin)
-		, m_generate_action("Generate probes", "Tools - generate probes", "generate_probes", "")
-		, m_add_bounce_action("Add bounce", "Tools - add light bounce to probes", "probes_add_bounce", "")
-	{
-		m_app.addToolAction(&m_generate_action);
-		m_app.addToolAction(&m_add_bounce_action);
-	}
+		, m_generate_action("Generate probes", "Tools - generate probes", "generate_probes", "", Action::TOOL)
+		// TODO only when -renderdoc is enabled
+		, m_add_bounce_action("Add bounce", "Tools - add light bounce to probes", "probes_add_bounce", "", Action::TOOL)
+	{}
 
-	~EnvironmentProbePlugin()
-	{
-		m_app.removeAction(&m_generate_action);
-		m_app.removeAction(&m_add_bounce_action);
+	~EnvironmentProbePlugin() {
 		m_ibl_filter_shader->decRefCount();
 	}
 
@@ -5313,8 +5308,17 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		, m_model_plugin(app)
 		, m_fbx_importer(app)
 		, m_procedural_geom_plugin(app)
-		, m_renderdoc_capture_action("Capture frame", "Tools - capture frame with RenderDoc", "capture_renderdoc", "")
 	{}
+
+	void update(float time_delta) override {
+		if (m_renderdoc_capture_action.get()) {
+			if (m_app.checkShortcut(*m_renderdoc_capture_action, true)) {
+				auto* renderer = (Renderer*)m_app.getEngine().getSystemManager().getSystem("renderer");
+				renderer->getDrawStream().captureFrame();
+			}
+		}
+		//Local<Action> m_renderdoc_capture_action{"Capture frame", "Tools - capture frame with RenderDoc", "capture_renderdoc", "", Action::TOOL};
+	}
 
 	const char* getName() const override { return "renderer"; }
 
@@ -5323,11 +5327,11 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		PROFILE_FUNCTION();
 		m_fbx_importer.init();
 
-		if (CommandLineParser::isOn("-renderdoc")) {
-			m_app.addToolAction(&m_renderdoc_capture_action);
-		}
-
 		IAllocator& allocator = m_app.getAllocator();
+
+		if (CommandLineParser::isOn("-renderdoc")) {
+			m_renderdoc_capture_action.create("Capture frame", "Tools - capture frame with RenderDoc", "capture_renderdoc", "", Action::TOOL);
+		}
 
 		AddTerrainComponentPlugin* add_terrain_plugin = LUMIX_NEW(allocator, AddTerrainComponentPlugin)(m_app);
 		m_app.registerComponent(ICON_FA_MAP, "terrain", *add_terrain_plugin);
@@ -5387,11 +5391,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	void onVsyncSet() {
 		gpu::enableVSync(m_vsync);
-	}
-
-	void captureRenderDoc() {
-		auto* renderer = (Renderer*)m_app.getEngine().getSystemManager().getSystem("renderer");
-		renderer->getDrawStream().captureFrame();
 	}
 
 	void showEnvironmentProbeGizmo(WorldView& view, ComponentUID cmp) {
@@ -5579,8 +5578,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	~StudioAppPlugin()
 	{
-		m_app.removeAction(&m_renderdoc_capture_action);
-
 		AssetBrowser& asset_browser = m_app.getAssetBrowser();
 		asset_browser.removePlugin(m_model_plugin);
 		asset_browser.removePlugin(m_material_plugin);
@@ -5614,7 +5611,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	StudioApp& m_app;
 	FBXImporter m_fbx_importer; // only for preloading impostor shadow shader // TODO do this in a better way
-	Action m_renderdoc_capture_action;
+	Local<Action> m_renderdoc_capture_action;
 	UniquePtr<ParticleEditor> m_particle_editor;
 	EditorUIRenderPlugin m_editor_ui_render_plugin;
 	MaterialPlugin m_material_plugin;

@@ -26,7 +26,6 @@ struct LUMIX_EDITOR_API ResourceLocator {
 	StringView full;
 };
 
-
 struct LUMIX_EDITOR_API Action {
 	enum Modifiers : u8 {
 		NONE = 0,
@@ -36,39 +35,51 @@ struct LUMIX_EDITOR_API Action {
 		CTRL = 1 << 2
 	};
 
-	Action(const char* label_short, const char* label_long, const char* name, const char* font_icon);
+	enum Type {
+		NORMAL,
+		TOOL,
+		WINDOW
+	};
+
+	Action(const char* label_short, const char* label_long, const char* name, const char* font_icon, Type type = NORMAL);
+	~Action();
 	bool toolbarButton(struct ImFont* font, bool is_selected = false);
 	bool isActive() const;
 	bool shortcutText(Span<char> out) const;
 
 	static bool falseConst() { return false; }
 
-	StaticString<32> name;
-	StaticString<32> label_short;
-	StaticString<64> label_long;
+	StaticString<32> name;			// used for serialization
+	StaticString<32> label_short;	// used in menus
+	StaticString<64> label_long;	// used in shortcut editor
+	bool request = false;			// programatically request to invoke the action
 	Modifiers modifiers = Modifiers::NONE;
-	bool request = false; // programatically request to invoke the action
 	os::Keycode shortcut;
 	StaticString<5> font_icon;
+	Type type;
+
+	// linked list of all actions
+	static Action* first_action;
+	Action* next = nullptr;
+	Action* prev = nullptr;
 };
 
 struct CommonActions {
-	CommonActions();
-	Action copy;
-	Action paste;
-	Action save;
-	Action undo;
-	Action redo;
-	Action del;
-	Action cam_orbit;
-	Action cam_forward;
-	Action cam_backward;
-	Action cam_left;
-	Action cam_right;
-	Action cam_up;
-	Action cam_down;
-	Action select_all;
-	Action rename;
+	Action save{"Save", "Common - Save", "save", ICON_FA_SAVE};
+	Action undo{"Undo", "Common - Undo", "undo", ICON_FA_UNDO};
+	Action redo{"Redo", "Common - Redo", "redo", ICON_FA_REDO};
+	Action del{"Delete", "Common - Delete", "delete", ICON_FA_MINUS_SQUARE};
+	Action cam_orbit{"Orbit", "Camera - orbit with RMB", "orbit_rmb", ""};
+	Action cam_forward{"Move forward", "Camera - move forward", "camera_move_forward", ""};
+	Action cam_backward{"Move back", "Camera - move backward", "camera_move_back", ""};
+	Action cam_left{"Move left", "Camera - move left", "camera_move_left", ""};
+	Action cam_right{"Move right", "Camera - move right", "camera_move_right", ""};
+	Action cam_up{"Move up", "Camera - move up", "camera_move_up", ""};
+	Action cam_down{"Move down", "Camera - move down", "camera_move_down", ""};
+	Action select_all{"Select all", "Common - Select all", "select_all", ""};
+	Action rename{"Rename", "Common - Rename", "rename", ""};
+	Action copy{"Copy", "Common - Copy", "copy", ICON_FA_CLIPBOARD};
+	Action paste{"Paste", "Common - Paste", "paste", ICON_FA_PASTE};
 };
 
 inline Action::Modifiers operator |(Action::Modifiers a, Action::Modifiers b) { return Action::Modifiers((u8)a | (u8)b); }

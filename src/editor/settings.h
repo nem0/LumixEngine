@@ -36,7 +36,6 @@ struct LUMIX_EDITOR_API Settings {
 	enum : u32 { INVALID_CATEGORY = 0xFFffFFff };
 
 	Settings(struct StudioApp& app);
-	~Settings();
 
 	void gui();
 	void load();
@@ -102,7 +101,8 @@ struct LUMIX_EDITOR_API Settings {
 	bool m_is_open = false;
 	u64 m_last_save_time = 0;
 	Action* m_edit_action = nullptr;
-	Action m_toggle_ui_action;
+	Action m_toggle_ui_action{"Settings", "Toggle settings UI", "settings_toggle_ui", "", Action::WINDOW};
+
 private:
 	void shortcutsGUI();
 };

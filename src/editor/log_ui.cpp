@@ -22,7 +22,6 @@ LogUI::LogUI(StudioApp& app, IAllocator& allocator)
 	, m_is_open(false)
 	, m_are_notifications_hovered(false)
 	, m_move_notifications_to_front(false)
-	, m_toggle_ui("Log", "Toggle log UI", "log_toggle_ui", "")
 {
 	registerLogCallback<&LogUI::onLog>(this);
 
@@ -31,14 +30,12 @@ LogUI::LogUI(StudioApp& app, IAllocator& allocator)
 		m_new_message_count[i] = 0;
 	}
 
-	m_app.addWindowAction(&m_toggle_ui);
 	m_app.getSettings().registerPtr("log_open", &m_is_open);
 }
 
 
 LogUI::~LogUI()
 {
-	m_app.removeAction(&m_toggle_ui);
 	unregisterLogCallback<&LogUI::onLog>(this);
 }
 
@@ -187,7 +184,7 @@ void LogUI::onGUI()
 		}
 
 		ImGui::SameLine();
-		m_filter.gui(ICON_FA_SEARCH " Filter");
+		m_filter.gui(ICON_FA_SEARCH " Filter", -1, ImGui::IsWindowAppearing());
 		int len = 0;
 
 		if (ImGui::BeginChild("log_messages", ImVec2(0, 0), true))

@@ -18,7 +18,6 @@ struct LUMIX_EDITOR_API PropertyGrid : StudioApp::GUIPlugin {
 	};
 
 	explicit PropertyGrid(StudioApp& app);
-	~PropertyGrid();
 
 	void addPlugin(IPlugin& plugin) { m_plugins.push(&plugin); }
 	void removePlugin(IPlugin& plugin) { m_plugins.eraseItem(&plugin); }
@@ -39,8 +38,8 @@ private:
 	bool m_focus_filter_request = false;
 	TextFilter m_component_filter;
 	TextFilter m_property_filter;
-	Action m_toggle_ui;
-	Action m_focus_filter_action;
+	Action m_toggle_ui{"Inspector", "Inspector - toggle UI", "inspector_toggle_ui", "", Action::WINDOW};
+	Action m_focus_filter_action{"Focus filter", "Inspector - focus filter", "inspector_focus_filter", ""};
 };
 
 
