@@ -196,10 +196,6 @@ void GameView::controlsGUI(WorldEditor& editor) {
 	if (ImGui::DragFloat("Time multiplier", &m_time_multiplier, 0.01f, 0.01f, 30.0f)) {
 		engine.setTimeMultiplier(m_time_multiplier);
 	}
-	if(editor.isGameMode()) {
-		ImGui::SameLine();
-		if (ImGui::Button("Fullscreen")) setFullscreen(true);
-	}
 
 	ImGui::SameLine();
 	if (ImGui::Button("Debug")) ImGui::OpenPopup("Debug");
