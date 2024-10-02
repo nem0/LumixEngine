@@ -16,34 +16,6 @@ setlocal
 
 :begin
 	cls
-
-	echo Wut?
-	echo ===============================
-	echo   1. Exit
-	echo   2. Create project
-	echo   3. Run Studio
-	echo   4. Open in VS
-	echo   5. Create bundle
-	echo   6. 3rd party
-	echo   7. Plugins
-	echo ===============================
-	choice /C 1234567 /N /M "Your choice:"
-	echo.
-
-	if %errorlevel%==1 (
-		popd
-		goto :EOF
-	)
-	if %errorlevel%==2 call :create_project
-	if %errorlevel%==3 call :run_studio
-	if %errorlevel%==4 call :open_in_vs
-	if %errorlevel%==5 call :create_bundle
-	if %errorlevel%==6 call :third_party
-	if %errorlevel%==7 call :plugins
-goto :begin
-
-:plugins
-	cls
 	echo Wut?
 	echo ===============================
 	echo  1. Go back
@@ -60,8 +32,9 @@ goto :begin
 	echo  C. Procedural geometry
 	echo  D. Marketplace
 	echo  E. LiveCode 
+	echo  F. Basis Universal
 	echo ===============================
-	choice /C 123456789ABCDE /N /M "Your choice:"
+	choice /C 123456789ABCDEF /N /M "Your choice:"
 	echo.
 	if %errorlevel%==1 exit /B 0
 	if %errorlevel%==2 call :empty_plugin
@@ -77,8 +50,8 @@ goto :begin
 	if %errorlevel%==12 call :procedural_geom_plugin
 	if %errorlevel%==13 call :marketplace_plugin
 	if %errorlevel%==14 call :livecode_plugin
-	call :create_project
-goto :plugins
+	if %errorlevel%==15 call :basisu
+goto :begin
 
 :dx_plugin
 	if not exist ..\plugins mkdir ..\plugins
@@ -272,20 +245,6 @@ exit /B 0
 	popd
 exit /B 0
 
-:third_party
-	REM we should use specific 3rd party revision
-	cls
-	echo Wut2?
-	echo ===============================
-	echo  1. Go back
-	echo  2. Basis Universal
-	echo ===============================
-	choice /C 123 /N /M "Your choice:"
-	echo.
-	if %errorlevel%==1 exit /B 0
-	if %errorlevel%==2 call :basisu
-goto :third_party
-
 :basisu
 	cls
 	echo Basis Universal
@@ -320,43 +279,6 @@ exit /B 0
 	del /Q ..\external\basisu\include\*
 	xcopy /E /Y "3rdparty\basisu\transcoder\*.h" ..\external\basisu\include\transcoder
 	xcopy /E /Y "3rdparty\basisu\encoder\*.h" ..\external\basisu\include\encoder
-exit /B 0
-
-:create_project
-	echo Creating project...
-	.\genie.exe --with-app vs2022 
-	pause
-exit /B 0
-
-:build
-	if not exist "tmp/vs2022/LumixEngine.sln" call :create_project
-	echo Building...
-	%msbuild_cmd% tmp/vs2022/LumixEngine.sln /p:Configuration=RelWithDebInfo
-	pause
-exit /B 0
-
-:run_studio
-	if not exist "tmp/vs2022/bin/RelWithDebInfo/studio.exe" call :build
-	cd ..\data
-	start "" "../scripts/tmp/vs2022/bin/RelWithDebInfo/studio.exe"
-	cd ..\scripts
-	pause
-exit /B 0
-
-:open_in_vs
-	"tmp/vs2022/LumixEngine.sln"
-exit /B 0
-
-:create_bundle
-	echo Creating bundle...
-	.\genie.exe --embed-resources --static-physx vs2022
-	cd ..\data
-	tar -cvf data.tar .
-	move data.tar ../src/studio
-	cd ..\scripts\
-	%msbuild_cmd% tmp/vs2022/LumixEngine.sln /p:Configuration=RelWithDebInfo
-	del ..\src\studio\data.tar
-	pause
 exit /B 0
 
 :download_basisu

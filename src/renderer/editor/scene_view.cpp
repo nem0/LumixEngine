@@ -1503,11 +1503,72 @@ void SceneView::snapDown() {
 	editor.setEntitiesPositions(&selected[0], &new_positions[0], new_positions.size());
 }
 
+static void selectParent(WorldEditor& editor) {
+	const Array<EntityRef>& selected = editor.getSelectedEntities();
+	if (selected.size() != 1) return;
+
+	const EntityPtr parent = editor.getWorld()->getParent(selected[0]);
+	if (parent.isValid()) {
+		EntityRef parent_ref = *parent;
+		editor.selectEntities(Span(&parent_ref, 1), false);
+	}
+}
+
+static void selectFirstChild(WorldEditor& editor) {
+	const Array<EntityRef>& selected = editor.getSelectedEntities();
+	if (selected.size() != 1) return;
+
+	const EntityPtr child = editor.getWorld()->getFirstChild(selected[0]);
+	if (child.isValid()) {
+		EntityRef child_ref = *child;
+		editor.selectEntities(Span(&child_ref, 1), false);
+	}
+}
+
+static void selectNextSibling(WorldEditor& editor) {
+	const Array<EntityRef>& selected = editor.getSelectedEntities();
+	if (selected.size() != 1) return;
+
+	const EntityPtr sibling = editor.getWorld()->getNextSibling(selected[0]);
+	if (sibling.isValid()) {
+		EntityRef sibling_ref = *sibling;
+		editor.selectEntities(Span(&sibling_ref, 1), false);
+	}
+}
+
+static void selectPrevSibling(WorldEditor& editor) {
+	const Array<EntityRef>& selected = editor.getSelectedEntities();
+	if (selected.size() != 1) return;
+
+	const World& world = *editor.getWorld();
+	const EntityRef e = selected[0];
+	const EntityPtr parent = world.getParent(e);
+	if (!parent) return;
+
+	EntityPtr child = world.getFirstChild(*parent);
+	ASSERT(child);
+	// we do not cycle, so if we are at the first child, we do not select the last one, we do nothing
+	if (child == e) return;
+	for (;;) {
+		const EntityPtr next = world.getNextSibling(*child);
+		if (next == e) {
+			EntityRef child_ref = *child;
+			editor.selectEntities(Span(&child_ref, 1), false);
+			return;
+		}
+		child = next;
+	}
+}
 
 void SceneView::onGUI() {
 	PROFILE_FUNCTION();
+	WorldEditor& editor = m_app.getWorldEditor();		
 	if (m_is_mouse_captured && !m_app.isMouseCursorClipped()) captureMouse(false);
 	if (m_app.checkShortcut(m_wireframe_action, true)) toggleWireframe();
+	else if (m_app.checkShortcut(m_select_parent, true)) selectParent(editor);
+	else if (m_app.checkShortcut(m_select_child, true)) selectFirstChild(editor);
+	else if (m_app.checkShortcut(m_select_next_sibling, true)) selectNextSibling(editor);
+	else if (m_app.checkShortcut(m_select_prev_sibling, true)) selectPrevSibling(editor);
 
 	m_pipeline->setWorld(m_editor.getWorld());
 	bool is_open = false;
@@ -1518,7 +1579,6 @@ void SceneView::onGUI() {
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 	ImVec2 view_size;
 	if (ImGui::Begin(title, nullptr, ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoNavInputs)) {
-		WorldEditor& editor = m_app.getWorldEditor();		
 		if (m_app.checkShortcut(m_top_view_action)) m_view->setTopView();
 		else if (m_app.checkShortcut(m_side_view_action)) m_view->setSideView();
 		else if (m_app.checkShortcut(m_front_view_action)) m_view->setFrontView();
