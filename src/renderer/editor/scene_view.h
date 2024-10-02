@@ -83,6 +83,10 @@ private:
 	Action m_unparent{"Unparent", "Entity - unparent", "entity_unparent", ICON_FA_OBJECT_UNGROUP};
 	Action m_autosnap_down{"Autosnap down", "Entity - toggle autosnap down", "autosnap_down", ""};
 	Action m_snap_down{"Snap down", "Entity - snap down", "entity_snap_down", ""};
+	Action m_select_parent{"Select parent", "Entity - select parent", "entity_select_parent", ICON_FA_ARROW_UP};
+	Action m_select_child{"Select first child", "Entity - select first child", "entity_select_first_child", ICON_FA_ARROW_DOWN};
+	Action m_select_next_sibling{"Select next sibling", "Entity - select next sibling", "entity_select_next_sibling", ICON_FA_ARROW_RIGHT};
+	Action m_select_prev_sibling{"Select previous sibling", "Entity - select previous sibling", "entity_select_prev_sibling", ICON_FA_ARROW_LEFT};
 	Action m_wireframe_action{"Wireframe", "Tools - wireframe", "wireframe", "", Action::TOOL};
 
 	bool m_is_mouse_captured = false;

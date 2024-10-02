@@ -2162,7 +2162,6 @@ void getShortcut(const Action& action, Span<char> buf) {
 bool menuItem(const Action& a, bool enabled) {
 	char buf[20];
 	getShortcut(a, Span(buf));
-	// TODO
 	return ImGuiEx::MenuItemEx(a.label_short, a.font_icon, buf, false, enabled);
 }
 

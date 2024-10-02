@@ -512,12 +512,6 @@ private:
 		editor.endCommandGroup();
 	}
 
-	[[nodiscard]] bool menuActionItem(const Action& action, const char* label = nullptr) {
-		char shortcut[64];
-		getShortcut(action, Span(shortcut));
-		return ImGui::MenuItem(label ? label : action.label_short.data, shortcut);
-	}
-
 	bool isInCanvas(EntityRef entity, EntityRef canvas) {
 		WorldEditor& editor = m_app.getWorldEditor();
 		World& world = *editor.getWorld();
@@ -739,13 +733,12 @@ private:
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Align")) {
-			if (ImGui::MenuItem("Top")) align(e, (u8)EdgeMask::TOP, editor);
-			if (ImGui::MenuItem("Right")) align(e, (u8)EdgeMask::RIGHT, editor);
-			if (ImGui::MenuItem("Bottom")) align(e, (u8)EdgeMask::BOTTOM, editor);
-			if (ImGui::MenuItem("Left")) align(e, (u8)EdgeMask::LEFT, editor);
-
-			if (menuActionItem(m_hcenter_action)) align(e, (u8)EdgeMask::CENTER_HORIZONTAL, editor);
-			if (menuActionItem(m_vcenter_action)) align(e, (u8)EdgeMask::CENTER_VERTICAL, editor);
+			if (menuItem(m_align_top_action, true)) align(e, (u8)EdgeMask::TOP, editor);
+			if (menuItem(m_align_right_action, true)) align(e, (u8)EdgeMask::RIGHT, editor);
+			if (menuItem(m_align_bottom_action, true)) align(e, (u8)EdgeMask::BOTTOM, editor);
+			if (menuItem(m_align_left_action, true)) align(e, (u8)EdgeMask::LEFT, editor);
+			if (menuItem(m_hcenter_action, true)) align(e, (u8)EdgeMask::CENTER_HORIZONTAL, editor);
+			if (menuItem(m_vcenter_action, true)) align(e, (u8)EdgeMask::CENTER_VERTICAL, editor);
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Expand")) {
@@ -754,12 +747,12 @@ private:
 			if (ImGui::MenuItem("Right")) expand(e, (u8)EdgeMask::RIGHT, editor);
 			if (ImGui::MenuItem("Bottom")) expand(e, (u8)EdgeMask::BOTTOM, editor);
 			if (ImGui::MenuItem("Left")) expand(e, (u8)EdgeMask::LEFT, editor);
-			if (menuActionItem(m_hexpand_action, "Horizontal")) expand(e, (u8)EdgeMask::HORIZONTAL, editor);
-			if (menuActionItem(m_vexpand_action, "Vertical")) expand(e, (u8)EdgeMask::VERTICAL, editor);
+			if (menuItem(m_hexpand_action, true)) expand(e, (u8)EdgeMask::HORIZONTAL, editor);
+			if (menuItem(m_vexpand_action, true)) expand(e, (u8)EdgeMask::VERTICAL, editor);
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Make relative")) {
-			if (menuActionItem(m_make_rel_action, "All")) makeRelative(e, canvas_size, (u8)EdgeMask::ALL, editor);
+			if (menuItem(m_make_rel_action, true)) makeRelative(e, canvas_size, (u8)EdgeMask::ALL, editor);
 			if (ImGui::MenuItem("Top")) makeRelative(e, canvas_size, (u8)EdgeMask::TOP, editor);
 			if (ImGui::MenuItem("Right")) makeRelative(e, canvas_size, (u8)EdgeMask::RIGHT, editor);
 			if (ImGui::MenuItem("Bottom")) makeRelative(e, canvas_size, (u8)EdgeMask::BOTTOM, editor);
@@ -1115,10 +1108,14 @@ private:
 	Vec3 m_clear_color = Vec3(0);
 
 	Action m_toggle_ui{"GUI Editor", "GUI editor - toggle UI", "gui_editor", "", Action::WINDOW};
+	Action m_align_top_action{"Top", "GUI editor - align top", "guied_align_top", ""};
+	Action m_align_right_action{"Right", "GUI editor - align right", "guied_align_right", ""};
+	Action m_align_bottom_action{"Bottom", "GUI editor - align bottom", "guied_align_bottom", ""};
+	Action m_align_left_action{"Left", "GUI editor - align left", "guied_align_left", ""};
 	Action m_hcenter_action{"Center horizontally", "GUI editor - center horizontally", "guied_hcenter", ""};
 	Action m_vcenter_action{"Center vertically", "GUI editor - center vertically", "guied_vcenter", ""};
-	Action m_hexpand_action{"Expand horizontally", "GUI editor - expand horizontally", "guied_hexpand", ""};
-	Action m_vexpand_action{"Expand vertically", "GUI editor - expand vertically", "guied_vexpand", ""};
+	Action m_hexpand_action{"Horizontally", "GUI editor - expand horizontally", "guied_hexpand", ""};
+	Action m_vexpand_action{"Vertically", "GUI editor - expand vertically", "guied_vexpand", ""};
 	Action m_make_rel_action{"Make relative", "GUI editor - make relative", "guied_makerel", ""};
 };
 
