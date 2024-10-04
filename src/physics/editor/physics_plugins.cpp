@@ -850,12 +850,12 @@ struct PhysicsMaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlug
 		}
 		
 		void windowGUI() override {
-			if (m_app.checkShortcut(m_app.getCommonActions().save)) save();
+			CommonActions& actions = m_app.getCommonActions();
 		
 			if (ImGui::BeginMenuBar()) {
-				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
-				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_resource);
-				if (ImGuiEx::IconButton(ICON_FA_SEARCH, "View in browser")) m_app.getAssetBrowser().locate(*m_resource);
+				if (actions.save.iconButton(m_dirty, &m_app)) save();
+				if (actions.open_externally.iconButton(true, &m_app)) m_app.getAssetBrowser().openInExternalEditor(m_resource);
+				if (actions.view_in_browser.iconButton(true, &m_app)) m_app.getAssetBrowser().locate(*m_resource);
 				ImGui::EndMenuBar();
 			}
 

@@ -1008,12 +1008,6 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		}
 
 		void windowGUI() override {
-			CommonActions& actions = m_app.getCommonActions();
-			if (m_app.checkShortcut(actions.save)) saveAs(m_path);
-			else if (m_app.checkShortcut(actions.undo)) undo();
-			else if (m_app.checkShortcut(actions.del)) deleteSelectedNodes();
-			else if (m_app.checkShortcut(actions.redo)) redo();
-
 			if (!m_to_fix_skeleton.empty()) {
 				ImGui::OpenPopup(ICON_FA_EXCLAMATION_TRIANGLE " Fix skeleton");
 			}
@@ -1050,11 +1044,14 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				ImGui::EndPopup();
 			}
 
+			CommonActions& actions = m_app.getCommonActions();
+			if (m_app.checkShortcut(actions.del)) deleteSelectedNodes();
+
 			if (ImGui::BeginMenuBar()) {
-				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) saveAs(m_path);
-				if (ImGuiEx::IconButton(ICON_FA_UNDO, "Undo")) undo();
-				if (ImGuiEx::IconButton(ICON_FA_REDO, "Redo")) redo();
-				if (ImGuiEx::IconButton(ICON_FA_SEARCH, "View in browser")) m_app.getAssetBrowser().locate(m_path);
+				if (actions.save.iconButton(m_dirty, &m_app)) saveAs(m_path);
+				if (actions.undo.iconButton(canUndo(), &m_app)) undo();
+				if (actions.redo.iconButton(canRedo(), &m_app)) redo();
+				if (actions.view_in_browser.iconButton(true, &m_app)) m_app.getAssetBrowser().locate(m_path);
 				ImGui::EndMenuBar();
 			}
 

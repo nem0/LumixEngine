@@ -45,9 +45,8 @@ struct LUMIX_EDITOR_API Action {
 	~Action();
 	bool toolbarButton(struct ImFont* font, bool is_selected = false);
 	bool isActive() const;
+	bool iconButton(bool enabled = true, struct StudioApp* app = nullptr);
 	bool shortcutText(Span<char> out) const;
-
-	static bool falseConst() { return false; }
 
 	StaticString<32> name;			// used for serialization
 	StaticString<32> label_short;	// used in menus
@@ -81,6 +80,8 @@ struct CommonActions {
 	Action copy{"Copy", "Common - Copy", "copy", ICON_FA_CLIPBOARD};
 	Action paste{"Paste", "Common - Paste", "paste", ICON_FA_PASTE};
 	Action close_window{"Close", "Close window", "close_window", ""};
+	Action open_externally{"Open externally", "Common - open externally", "open_externally", ICON_FA_EXTERNAL_LINK_ALT};
+	Action view_in_browser{"View in browser", "Common - view in asset browser", "view_in_asset_browser", ICON_FA_SEARCH};
 };
 
 inline Action::Modifiers operator |(Action::Modifiers a, Action::Modifiers b) { return Action::Modifiers((u8)a | (u8)b); }
@@ -88,7 +89,7 @@ inline void operator |= (Action::Modifiers& a, Action::Modifiers b) { a = a | b;
 
 LUMIX_EDITOR_API void getShortcut(const Action& action, Span<char> buf);
 LUMIX_EDITOR_API [[nodiscard]] bool menuItem(const Action& a, bool enabled);
-LUMIX_EDITOR_API void getEntityListDisplayName(struct StudioApp& app, struct World& editor, Span<char> buf, EntityPtr entity, bool force_display_index = false);
+LUMIX_EDITOR_API void getEntityListDisplayName(StudioApp& app, struct World& editor, Span<char> buf, EntityPtr entity, bool force_display_index = false);
 LUMIX_EDITOR_API bool inputRotation(const char* label, struct Quat* value);
 LUMIX_EDITOR_API bool inputString(const char* label, String* value);
 LUMIX_EDITOR_API bool inputString(const char* str_id, const char* label, String* value);

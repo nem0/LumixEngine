@@ -3431,9 +3431,6 @@ struct ParticleEditorWindow : AssetEditorWindow, NodeEditor {
 		CommonActions& actions = m_app.getCommonActions();
 		if (m_app.checkShortcut(m_editor.m_apply_action)) apply();
 		else if (m_app.checkShortcut(actions.del)) deleteSelectedNodes();
-		else if (m_app.checkShortcut(actions.save)) saveAs(m_resource.m_path);
-		else if (m_app.checkShortcut(actions.undo)) undo();
-		else if (m_app.checkShortcut(actions.redo)) redo();
 
 		debugUI();
 
@@ -3455,9 +3452,9 @@ struct ParticleEditorWindow : AssetEditorWindow, NodeEditor {
 				if (ImGui::MenuItem(ICON_FA_BRUSH "Clear")) deleteUnreachable();
 				ImGui::EndMenu();
 			}
-			if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) saveAs(m_resource.m_path);
-			if (ImGuiEx::IconButton(ICON_FA_UNDO, "Undo", canUndo())) undo();
-			if (ImGuiEx::IconButton(ICON_FA_REDO, "Redo", canRedo())) redo();
+			if (actions.save.iconButton(m_dirty, &m_app)) saveAs(m_resource.m_path);
+			if (actions.undo.iconButton(canUndo(), &m_app)) undo();
+			if (actions.redo.iconButton(canRedo(), &m_app)) redo();
 			if (ImGuiEx::IconButton(ICON_FA_BRUSH, "Clear")) deleteUnreachable();
 			ImGui::EndMenuBar();
 		}
