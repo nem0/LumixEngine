@@ -736,16 +736,13 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 		void windowGUI() override {
 			CommonActions& actions = m_app.getCommonActions();
-			if (m_app.checkShortcut(actions.save)) save();
-			else if (m_app.checkShortcut(actions.undo) && m_resource->isReady()) undo();
-			else if (m_app.checkShortcut(actions.redo) && m_resource->isReady()) redo();
-
+			AssetBrowser& browser = m_app.getAssetBrowser();
 			if (ImGui::BeginMenuBar()) {
-				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
-				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_resource);
-				if (ImGuiEx::IconButton(ICON_FA_SEARCH, "View in browser")) m_app.getAssetBrowser().locate(*m_resource);
-				if (ImGuiEx::IconButton(ICON_FA_UNDO, "Undo", canUndo())) undo();
-				if (ImGuiEx::IconButton(ICON_FA_REDO, "Redo", canRedo())) redo();
+				if (actions.save.iconButton(m_dirty, &m_app)) save();
+				if (actions.open_externally.iconButton(true, &m_app)) browser.openInExternalEditor(m_resource);
+				if (actions.view_in_browser.iconButton(true, &m_app)) browser.locate(*m_resource);
+				if (actions.undo.iconButton(canUndo(), &m_app)) undo();
+				if (actions.redo.iconButton(canRedo(), &m_app)) redo();
 				ImGui::EndMenuBar();
 			}
 
@@ -1064,23 +1061,20 @@ struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
 
 	void windowGUI() override {
 		CommonActions& actions = m_app.getCommonActions();
-		if (m_app.checkShortcut(actions.save)) save();
-		else if (m_app.checkShortcut(actions.undo)) m_composite_editor ? m_composite_editor->doUndo() : undo();
-		else if (m_app.checkShortcut(actions.redo)) m_composite_editor ? m_composite_editor->doRedo() : redo();
-		else if (m_app.checkShortcut(actions.del) && m_composite_editor) m_composite_editor->deleteSelectedNodes();
+		if (m_app.checkShortcut(actions.del) && m_composite_editor) m_composite_editor->deleteSelectedNodes();
 
 		if (ImGui::BeginMenuBar()) {
 			if (m_composite_editor) m_composite_editor->menu();
-			if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
+			if (actions.save.iconButton(m_dirty, &m_app)) save();
 			if (!m_composite_editor) {
-				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_texture);
-				if (ImGuiEx::IconButton(ICON_FA_SEARCH, "View in browser")) m_app.getAssetBrowser().locate(*m_texture);
+				if (actions.open_externally.iconButton(true, &m_app)) m_app.getAssetBrowser().openInExternalEditor(m_texture);
+				if (actions.view_in_browser.iconButton(true, &m_app)) m_app.getAssetBrowser().locate(*m_texture);
 				if (ImGuiEx::IconButton(ICON_FA_FOLDER_OPEN, "Open folder")) {
 					StaticString<MAX_PATH> dir(m_app.getEngine().getFileSystem().getBasePath(), Path::getDir(m_texture->getPath()));
 					os::openExplorer(dir);
 				}
-				if (ImGuiEx::IconButton(ICON_FA_UNDO, "Undo", canUndo())) undo();
-				if (ImGuiEx::IconButton(ICON_FA_REDO, "Redo", canRedo())) redo();
+				if (actions.undo.iconButton(canUndo(), &m_app)) undo();
+				if (actions.redo.iconButton(canRedo(), &m_app)) redo();
 			}
 			ImGui::EndMenuBar();
 		}
@@ -1091,12 +1085,6 @@ struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
 		ImGui::TableNextRow();
 		ImGui::TableNextColumn();
 		
-		if (m_composite_editor) {
-			if (ImGuiEx::IconButton(ICON_FA_UNDO, "Undo", canUndo())) undo();
-			ImGui::SameLine();
-			if (ImGuiEx::IconButton(ICON_FA_REDO, "Redo", canRedo())) redo();
-		}
-
 		ImGuiEx::Label("Path");
 		ImGuiEx::TextUnformatted(m_texture->getPath());
 		ImGuiEx::Label("Size");
@@ -2023,6 +2011,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		EditorWindow(const Path& path, ModelPlugin& plugin, StudioApp& app, IAllocator& allocator)
 			: AssetEditorWindow(app)
 			, SimpleUndoRedo(allocator)
+			, m_allocator(allocator)
 			, m_app(app)
 			, m_plugin(plugin)
 			, m_meta(allocator)
@@ -2061,6 +2050,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 		void deserialize(InputMemoryStream& blob) override { 
 			StringView sv((const char*)blob.getData(), (u32)blob.size());
+			m_meta = ModelMeta(m_allocator);
 			m_meta.deserialize(sv, Path("undo/redo"));
 		}
 		void serialize(OutputMemoryStream& blob) override { m_meta.serialize(blob, Path()); }
@@ -2441,16 +2431,12 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 		void windowGUI() override {
 			CommonActions& actions = m_app.getCommonActions();
-			if (m_app.checkShortcut(actions.save)) save();
-			else if (m_app.checkShortcut(actions.undo)) undo();
-			else if (m_app.checkShortcut(actions.redo)) redo();
-
 			if (ImGui::BeginMenuBar()) {
-				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
-				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_resource);
-				if (ImGuiEx::IconButton(ICON_FA_SEARCH, "View in browser")) m_app.getAssetBrowser().locate(*m_resource);
-				if (ImGuiEx::IconButton(ICON_FA_UNDO, "Undo", canUndo())) undo();
-				if (ImGuiEx::IconButton(ICON_FA_REDO, "Redo", canRedo())) redo();
+				if (actions.save.iconButton(m_dirty, &m_app)) save();
+				if (actions.open_externally.iconButton(true, &m_app)) m_app.getAssetBrowser().openInExternalEditor(m_resource);
+				if (actions.view_in_browser.iconButton(true, &m_app)) m_app.getAssetBrowser().locate(*m_resource);
+				if (actions.undo.iconButton(canUndo(), &m_app)) undo();
+				if (actions.redo.iconButton(canRedo(), &m_app)) redo();
 				ImGui::EndMenuBar();
 			}
 
@@ -2523,6 +2509,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		const Path& getPath() override { return m_resource->getPath(); }
 		const char* getName() const override { return "model editor"; }
 
+		IAllocator& m_allocator;
 		StudioApp& m_app;
 		ModelPlugin& m_plugin;
 		Model* m_resource;
@@ -3232,12 +3219,12 @@ struct CodeEditorWindow : AssetEditorWindow {
 	}
 
 	void windowGUI() override {
-		if (m_app.checkShortcut(m_app.getCommonActions().save)) save();
+		CommonActions& actions = m_app.getCommonActions();
 
 		if (ImGui::BeginMenuBar()) {
-			if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
-			if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_path);
-			if (ImGuiEx::IconButton(ICON_FA_SEARCH, "View in browser")) m_app.getAssetBrowser().locate(m_path);
+			if (actions.save.iconButton(m_dirty, &m_app)) save();
+			if (actions.open_externally.iconButton(true, &m_app)) m_app.getAssetBrowser().openInExternalEditor(m_path);
+			if (actions.view_in_browser.iconButton(true, &m_app)) m_app.getAssetBrowser().locate(m_path);
 			if (ImGuiEx::IconButton(ICON_FA_ENVELOPE_OPEN, "View disassembly")) showDisassembly();
 			ImGui::EndMenuBar();
 		}

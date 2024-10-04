@@ -123,15 +123,12 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 
 		void windowGUI() override {
 			CommonActions& actions = m_app.getCommonActions();
-			if (m_app.checkShortcut(actions.save)) save();
-			else if (m_app.checkShortcut(actions.undo)) undo();
-			else if (m_app.checkShortcut(actions.redo)) redo();
 
 			if (ImGui::BeginMenuBar()) {
-				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
-				if (ImGuiEx::IconButton(ICON_FA_SEARCH, "View in browser")) m_app.getAssetBrowser().locate(*m_resource);
-				if (ImGuiEx::IconButton(ICON_FA_UNDO, "Undo", canUndo())) undo();
-				if (ImGuiEx::IconButton(ICON_FA_REDO, "Redo", canRedo())) redo();
+				if (actions.save.iconButton(m_dirty, &m_app)) save();
+				if (actions.view_in_browser.iconButton(true, &m_app)) m_app.getAssetBrowser().locate(*m_resource);
+				if (actions.undo.iconButton(canUndo(), &m_app)) undo();
+				if (actions.redo.iconButton(canRedo(), &m_app)) redo();
 				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Go to parent")) {
 					m_app.getAssetBrowser().openEditor(Path(ResourcePath::getResource(m_resource->getPath())));
 				}
@@ -378,9 +375,10 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 
 
 struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
-	struct EditorWindow : AssetEditorWindow {
+	struct EditorWindow : AssetEditorWindow, SimpleUndoRedo {
 		EditorWindow(const Path& path, StudioApp& app)
 			: AssetEditorWindow(app)
+			, SimpleUndoRedo(app.getAllocator())
 			, m_app(app)
 		{
 			m_resource = app.getEngine().getResourceManager().load<PropertyAnimation>(path);
@@ -388,6 +386,34 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 		~EditorWindow() {
 			m_resource->decRefCount();
+		}
+
+		void deserialize(InputMemoryStream& blob) override {
+			const u32 count = blob.read<u32>();
+			m_resource->curves.clear();
+			m_resource->curves.reserve(count);
+			for (u32 i = 0; i < count; ++i) {
+				PropertyAnimation::Curve& curve = m_resource->curves.emplace(m_app.getAllocator());
+				blob.read(curve.cmp_type);
+				blob.read(curve.property);
+				const u32 frames_count = blob.read<u32>();
+				curve.frames.resize(frames_count);
+				curve.values.resize(frames_count);
+				blob.read(curve.frames.begin(), curve.frames.byte_size());
+				blob.read(curve.values.begin(), curve.values.byte_size());
+			}
+
+		}
+
+		void serialize(OutputMemoryStream& blob) override {
+			blob.write((u32)m_resource->curves.size());
+			for (PropertyAnimation::Curve& curve : m_resource->curves) {
+				blob.write(curve.cmp_type);
+				blob.write(curve.property);
+				blob.write((u32)curve.frames.size());
+				blob.write(curve.frames.begin(), curve.frames.byte_size());
+				blob.write(curve.values.begin(), curve.values.byte_size());
+			}
 		}
 
 		static void serialize(PropertyAnimation& anim, OutputMemoryStream& blob) {
@@ -420,12 +446,14 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		}
 		
 		void windowGUI() override {
-			if (m_app.checkShortcut(m_app.getCommonActions().save)) save();
+			CommonActions& actions = m_app.getCommonActions();
 
 			if (ImGui::BeginMenuBar()) {
-				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
-				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_resource);
-				if (ImGuiEx::IconButton(ICON_FA_SEARCH, "View in browser")) m_app.getAssetBrowser().locate(*m_resource);
+				if (actions.save.iconButton(m_dirty, &m_app)) save();
+				if (actions.open_externally.iconButton(true, &m_app)) m_app.getAssetBrowser().openInExternalEditor(m_resource);
+				if (actions.view_in_browser.iconButton(true, &m_app)) m_app.getAssetBrowser().locate(*m_resource);
+				if (actions.undo.iconButton(canUndo(), &m_app)) undo();
+				if (actions.redo.iconButton(canRedo(), &m_app)) redo();
 				ImGui::EndMenuBar();
 			}
 
@@ -436,17 +464,18 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 			if (!m_resource->isReady()) return;
 
+			if (!SimpleUndoRedo::isReady()) pushUndo(NO_MERGE_UNDO);
+
 			ShowAddCurveMenu(m_resource);
 
-			bool changed = false;
 			if (!m_resource->curves.empty()) {
 				int frames = m_resource->curves[0].frames.back();
 				ImGuiEx::Label("Frames");
 				if (ImGui::InputInt("##frames", &frames)) {
 					for (auto& curve : m_resource->curves) {
 						curve.frames.back() = frames;
-						changed = true;
 					}
+					saveUndo(true);
 				}
 			}
 
@@ -486,6 +515,7 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				curve.values[changed_idx] = points[changed_idx].y;
 				curve.frames.back() = last_frame;
 				curve.frames[0] = 0;
+				saveUndo(true);
 			}
 			if (new_count != curve.frames.size())
 			{
@@ -496,6 +526,7 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 					curve.frames[i] = int(points[i].x + 0.5f);
 					curve.values[i] = points[i].y;
 				}
+				saveUndo(true);
 			}
 
 			ImGui::PopItemWidth();
@@ -510,12 +541,17 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			if (m_selected_point >= 0 && m_selected_point < curve.frames.size())
 			{
 				ImGuiEx::Label("Frame");
-				changed = ImGui::InputInt("##frame", &curve.frames[m_selected_point]) || changed;
+				saveUndo(ImGui::InputInt("##frame", &curve.frames[m_selected_point]));
 				ImGuiEx::Label("Value");
-				changed = ImGui::InputFloat("##val", &curve.values[m_selected_point]) || changed;
+				saveUndo(ImGui::InputFloat("##val", &curve.values[m_selected_point]));
 			}
+		}
 
-			ImGuiEx::HSplitter("sizer", &size);
+		void saveUndo(bool changed) {
+			if (!changed) return;
+
+			pushUndo(ImGui::GetItemID());
+			m_dirty = true;
 		}
 
 		void ShowAddCurveMenu(PropertyAnimation* animation) {

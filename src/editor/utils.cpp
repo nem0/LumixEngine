@@ -2119,6 +2119,11 @@ bool Action::shortcutText(Span<char> out) const {
 	return true;
 }
 
+bool Action::iconButton(bool enabled, StudioApp* app) {
+	const bool result = app ? app->checkShortcut(*this) : false;
+	return ImGuiEx::IconButton(font_icon, label_short, enabled) || result;
+}
+
 bool Action::toolbarButton(ImFont* font, bool is_selected) {
 	const ImVec4 col_active = ImGui::GetStyle().Colors[ImGuiCol_ButtonActive];
 	const ImVec4 bg_color = is_selected ? col_active : ImGui::GetStyle().Colors[ImGuiCol_Text];

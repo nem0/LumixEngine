@@ -3402,8 +3402,11 @@ struct CompositeTextureEditorImpl : CompositeTextureEditor, NodeEditor {
 	void save() override { saveAs(m_path); }
 
 	void menu() override {
+		CommonActions& actions = m_app.getCommonActions();
+		if (m_app.checkShortcut(actions.undo)) undo();
+		else if (m_app.checkShortcut(actions.redo)) redo();
+		
 		if (ImGui::BeginMenu("Graph")) {
-			const CommonActions& actions = m_app.getCommonActions();
 			if (ImGui::MenuItem("Export")) exportAs();
 			if (menuItem(actions.undo, canUndo())) undo();
 			if (menuItem(actions.redo, canRedo())) redo();
