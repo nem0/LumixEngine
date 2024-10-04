@@ -481,7 +481,8 @@ static bool tokenize(const char* str, u32& token_len, u8& token_type, u8 prev_to
 		"numthreads",
 		"static",
 		"const",
-		"struct"
+		"struct",
+		"void"
 	};
 
 	const char* c = str;
@@ -1483,18 +1484,14 @@ struct CodeEditorImpl final : CodeEditor {
 	}
 
 	void pasteFromClipboard() {
-		ImGuiIO& io = ImGui::GetIO();
-		if (!io.GetClipboardTextFn) return;
-
-		const char* text = io.GetClipboardTextFn(io.ClipboardUserData);
+		const char* text = ImGui::GetClipboardText();
+		if (!text) return;
 		insertText(text);
 		ensurePointVisible(m_cursors[0]);
 	}
 
 	void copyToClipboard() {
 		if (m_cursors.size() != 1) return;
-		ImGuiIO& io = ImGui::GetIO();
-		if (!io.SetClipboardTextFn) return;
 
 		TextPoint from = m_cursors[0];
 		TextPoint to = m_cursors[0].sel;
@@ -1502,7 +1499,7 @@ struct CodeEditorImpl final : CodeEditor {
 		OutputMemoryStream blob(m_allocator);
 		serializeText(from, to, blob);
 		blob.write('\0');
-		io.SetClipboardTextFn(io.ClipboardUserData, (const char*)blob.data());
+		ImGui::SetClipboardText((const char*)blob.data());
 	}
 
 	void selectAll() {
@@ -1817,19 +1814,22 @@ struct CodeEditorImpl final : CodeEditor {
 			}
 			const ImGuiInputFlags f_repeat = ImGuiInputFlags_Repeat;
 			
+			CommonActions& actions = m_app.getCommonActions();
+
 			if (ImGui::IsKeyPressed(ImGuiKey_Escape)) m_cursors.resize(1);
-			else if (ImGui::IsKeyPressed(ImGuiKey_Delete)) del(io.KeyCtrl);
-			else if (ImGui::IsKeyPressed(ImGuiKey_Backspace)) backspace(io.KeyCtrl);
-			else if (ImGui::Shortcut(ImGuiMod_Shortcut | ImGuiKey_Z, f_repeat, id)) undo();
-			else if (ImGui::Shortcut(ImGuiMod_Shortcut | ImGuiMod_Shift | ImGuiKey_Z, f_repeat, id)) redo();
-			else if (ImGui::Shortcut(ImGuiMod_Shortcut | ImGuiKey_C, 0, id)) copyToClipboard();
-			else if (ImGui::Shortcut(ImGuiMod_Shortcut | ImGuiKey_X, 0, id)) { copyToClipboard(); deleteSelections(); }
-			else if (ImGui::Shortcut(ImGuiMod_Shortcut | ImGuiKey_V, f_repeat, id)) pasteFromClipboard();
-			else if (ImGui::Shortcut(ImGuiMod_Shortcut | ImGuiKey_A, 0, id)) selectAll();
-			else if (ImGui::IsKeyPressed(ImGuiKey_Enter)) insertNewLine();
-			else if (ImGui::IsKeyPressed(ImGuiKey_PageUp)) moveCursorPageUp(u32(content_size.y / line_height + 1), line_height);
-			else if (ImGui::IsKeyPressed(ImGuiKey_PageDown)) moveCursorPageDown(u32(content_size.y / line_height + 1), line_height);
-			else if (ImGui::Shortcut(ImGuiMod_Shortcut | ImGuiKey_F, 0, id)) {
+			else if (m_app.checkShortcut(actions.del)) del(io.KeyCtrl);
+			else if (m_app.checkShortcut(s_delete_left)) backspace(false);
+			else if (m_app.checkShortcut(s_delete_word_left)) backspace(true);
+			else if (m_app.checkShortcut(actions.undo)) undo();
+			else if (m_app.checkShortcut(actions.redo)) redo();
+			else if (m_app.checkShortcut(actions.copy)) copyToClipboard();
+			else if (m_app.checkShortcut(s_cut)) { copyToClipboard(); deleteSelections(); }
+			else if (m_app.checkShortcut(actions.paste)) pasteFromClipboard();
+			else if (m_app.checkShortcut(actions.select_all)) selectAll();
+			else if (ImGui::Shortcut(ImGuiKey_Enter)) insertNewLine();
+			else if (ImGui::Shortcut(ImGuiKey_PageUp)) moveCursorPageUp(u32(content_size.y / line_height + 1), line_height);
+			else if (ImGui::Shortcut(ImGuiKey_PageDown)) moveCursorPageDown(u32(content_size.y / line_height + 1), line_height);
+			else if (m_app.checkShortcut(s_search)) {
 				m_search_visible = true;
 				m_focus_search = true;
 				m_search_from = m_cursors[0];
@@ -1859,11 +1859,9 @@ struct CodeEditorImpl final : CodeEditor {
 			m_scroll_y -= io.MouseWheel * line_height * 5;
 			m_scroll_y = clamp(m_scroll_y, 0.f, line_height * (m_lines.size() - 2));
 
+			if (m_app.checkShortcut(s_add_match_to_selection)) addNextOccurence();
+
 			// text input
-			if (io.KeyCtrl && !io.KeyAlt) {
-				if (ImGui::IsKeyPressed(ImGuiKey_D)) addNextOccurence();
-			}
-		
 			const bool ignore_char_inputs = (io.KeyCtrl && !io.KeyAlt);
 			if (!ignore_char_inputs && io.InputQueueCharacters.Size > 0) {
 				for (int n = 0; n < io.InputQueueCharacters.Size; n++) {
@@ -1997,7 +1995,20 @@ struct CodeEditorImpl final : CodeEditor {
 	bool m_focus_editor = false;
 	char m_search_text[64] = "";
 	TextPoint m_search_from;
+
+	static Action s_delete_left;
+	static Action s_delete_word_left;
+	static Action s_search;
+	static Action s_cut;
+	static Action s_add_match_to_selection;
 };
+
+Action CodeEditorImpl::s_delete_left{"Delete left", "Code editor - delete left", "delete_left", ICON_FA_BACKSPACE};
+Action CodeEditorImpl::s_delete_word_left{"Delete word left", "Code editor - delete word left", "delete_word_left", ""};
+Action CodeEditorImpl::s_search{"Search", "Code editor - search", "code_editor_search", ICON_FA_SEARCH};
+Action CodeEditorImpl::s_cut{"Cut", "Code editor - cut", "code_editor_cut", ICON_FA_CUT};
+Action CodeEditorImpl::s_add_match_to_selection{"Add match to selection", "Code editor - add match to selection", "code_editor_add_match_to_selection", ""};
+
 
 UniquePtr<CodeEditor> createCodeEditor(StudioApp& app) {
 	UniquePtr<CodeEditorImpl> editor = UniquePtr<CodeEditorImpl>::create(app.getAllocator(), app);
