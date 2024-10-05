@@ -193,27 +193,26 @@ struct LuauAnalysis :Luau::FileResolver {
 #endif
 
 struct StudioLuaPlugin : StudioApp::GUIPlugin {
-	static void create(StudioApp& app, StringView content, const Path& path) {
+	static StudioLuaPlugin* create(StudioApp& app, StringView content, const Path& path) {
 		LuaScriptSystem* system = (LuaScriptSystem*)app.getEngine().getSystemManager().getSystem("lua_script");
 		lua_State* L = system->getState();
 		LuaWrapper::DebugGuard guard(L);
-		if (!LuaWrapper::execute(L, content, path.c_str(), 1)) return;
+		if (!LuaWrapper::execute(L, content, path.c_str(), 1)) return nullptr;
 
 		if (lua_isnil(L, -1)) {
 			lua_pop(L, 1);
-			return;
+			return nullptr;
 		}
 
 		if (lua_getfield(L, -1, "name") != LUA_TSTRING) {
 			logError(path, ": missing `name` or `name` is not a string");
-			return;
+			return nullptr;
 		}
 		const char* name = LuaWrapper::toType<const char*>(L, -1);
 
-
 		StudioLuaPlugin* plugin = LUMIX_NEW(app.getAllocator(), StudioLuaPlugin)(app, name);
 		lua_pop(L, 1);
-		
+
 /*
 		if (lua_getfield(L, -1, "windowMenuAction") == LUA_TFUNCTION) {
 			char tmp[64];
@@ -227,7 +226,7 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 		plugin->m_plugin_ref = LuaWrapper::createRef(L);
 		lua_pop(L, 1);
 		app.addPlugin(*plugin);
-
+		return plugin;
 	} 
 	
 	static void convertToLuaName(const char* src, Span<char> out) {
@@ -257,8 +256,6 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 		, m_name(name, app.getAllocator())
 	{}
 	
-	~StudioLuaPlugin() {}
-
 	void runWindowAction() {
 		LuaScriptSystem* system = (LuaScriptSystem*)m_app.getEngine().getSystemManager().getSystem("lua_script");
 		lua_State* L = system->getState();
@@ -844,6 +841,7 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 		, m_luau_analysis(app)
 		, m_asset_plugin(m_luau_analysis, app)
 		, m_lua_actions(app.getAllocator())
+		, m_plugins(app.getAllocator())
 	{
 		LuaScriptSystem* system = (LuaScriptSystem*)app.getEngine().getSystemManager().getSystem("lua_script");
 		lua_State* L = system->getState();
@@ -897,7 +895,8 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 			StringView content;
 			content.begin = (const char*)blob.data();
 			content.end = content.begin + blob.size();
-			StudioLuaPlugin::create(m_app, content, path);
+			StudioLuaPlugin* plugin = StudioLuaPlugin::create(m_app, content, path);
+			if (plugin) m_plugins.push(plugin);
 		}
 		os::destroyFileIterator(iter);
 	}
@@ -1408,6 +1407,11 @@ struct SetPropertyVisitor : reflection::IPropertyVisitor {
 		m_app.getAssetBrowser().removePlugin(m_asset_plugin);
 		m_app.getPropertyGrid().removePlugin(m_property_grid_plugin);
 
+		for (StudioLuaPlugin* plugin : m_plugins) {
+			m_app.removePlugin(*plugin);
+			LUMIX_DELETE(m_app.getAllocator(), plugin);
+		}
+
 		for (LuaAction* action : m_lua_actions) {
 			LUMIX_DELETE(m_app.getAllocator(), action);
 		}
@@ -1436,6 +1440,7 @@ struct SetPropertyVisitor : reflection::IPropertyVisitor {
 	AssetPlugin m_asset_plugin;
 	PropertyGridPlugin m_property_grid_plugin;
 	Array<LuaAction*> m_lua_actions;
+	Array<StudioLuaPlugin*> m_plugins;
 	bool m_lua_debug_enabled = true;
 };
 
