@@ -1288,6 +1288,7 @@ ExecuteOpenResult shellExecuteOpen(StringView path, StringView args, StringView 
 		exec_info.fMask = SEE_MASK_NO_CONSOLE;
 	}
 	BOOL res = ShellExecuteEx(&exec_info);
+	// for unknown reason ShellExecuteEx returns TRUE but nothing happens when debugging with VS Code
 	if (res) return ExecuteOpenResult::SUCCESS;
 	DWORD err = GetLastError();
 	if (err == ERROR_NO_ASSOCIATION) return ExecuteOpenResult::NO_ASSOCIATION;

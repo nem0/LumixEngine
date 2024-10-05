@@ -2602,7 +2602,7 @@ struct StudioAppImpl final : StudioApp {
 	void guiAllActions() {
 		if (m_show_all_actions_request) ImGui::OpenPopup("Action palette");
 
-		if (ImGuiEx::BeginResizablePopup("Action palette", ImVec2(300, 200))) {
+		if (ImGuiEx::BeginResizablePopup("Action palette", ImVec2(300, 200), ImGuiWindowFlags_NoNavInputs)) {
 			if (ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
 
 			if(m_show_all_actions_request) m_all_actions_selected = 0;
@@ -2643,6 +2643,7 @@ struct StudioAppImpl final : StudioApp {
 						}
 						++idx;
 					}
+					m_all_actions_selected = m_all_actions_selected % idx;
 				}
 				ImGui::EndChild();
 			}
