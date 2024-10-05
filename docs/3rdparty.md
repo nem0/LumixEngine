@@ -31,3 +31,30 @@ We utilize [PhysX](https://github.com/nem0/PhysX.git) for physical simulation. O
 1. Run [download_physx.bat](../scripts/download_physx.bat) to download the PhysX source code.
 2. Regenerate the project using *GENie*.
 3. Build the project.
+
+## LZ4
+
+We utilize [LZ4](https://github.com/lz4/lz4) for asset compression due to its exceptional speed and efficient compression ratio.  The source code for LZ4 is includede in our repository under [external/lz4](../external/lz4/).
+
+## meshoptimizer
+
+We utilize [meshoptimizer](https://github.com/zeux/meshoptimizer) for automatic LOD generation. The source code for meshoptimizer is included in our repository under [external/meshoptimizer](../external/meshoptimizer/). 
+
+## MikkTSpace
+We utilize [MikkTSpace](https://github.com/mmikk/MikkTSpace) for generating tangent space as it is the de-facto standard. The source code for MikkTSpace is included in our repository under [external/mikktspace](../external/mikktspace/).
+
+## OpenFBX
+
+We utilize [OpenFBX](https://github.com/nem0/OpenFBX/) for loading FBX files due to its high quality and open-source nature. The source code for OpenFBX is included in our repository under [external/openfbx](../external/openfbx/).
+
+## rgbcx
+
+We utilize [rgbcx](https://github.com/richgel999/bc7enc) for efficient BC texture compression due to its best-in-class speed and compression quality. The source code for rgbcx is included in our repository under [external/rgbcx](../external/rgbcx/).
+
+## stb
+
+We utilize [stb](https://github.com/nothings/stb) for image manipulation and loading Vorbis files. The source code for stb is included in our repository under [external/stb](../external/stb/).
+
+## xxHash
+
+We utilize [xxHash](https://github.com/Cyan4973/xxHash) for its exceptional speed and hash quality. The source code for xxHash is included in our repository under [external/xxhash](../external/xxhash/).
