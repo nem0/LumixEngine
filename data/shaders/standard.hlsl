@@ -12,6 +12,8 @@
 //@texture_slot "Metallic", "", "HAS_METALLICMAP"
 //@texture_slot "Ambient occlusion", "", "HAS_AMBIENT_OCCLUSION_TEX"
 
+//@define "ALPHA_CUTOUT"
+
 #include "shaders/common.hlsli"
 #include "shaders/surface_base.hlsli"
 
