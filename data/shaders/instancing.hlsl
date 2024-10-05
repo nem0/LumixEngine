@@ -123,7 +123,7 @@ void main(uint3 thread_id : SV_DispatchThreadID, uint3 group_thread_id : SV_Grou
 			uint4 batch_offset = getBatchOffset();
 			batch_offset.x += uint(dot(getLodCount(), 1));
 			setBatchOffset(batch_offset);
-			setLodOffset(uint4(batch_offset.xxxx));
+			setLodOffset(batch_offset);
 			setLodCount(0);
 		}
 	#elif defined PASS1
