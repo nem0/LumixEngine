@@ -933,28 +933,31 @@ void PropertyGrid::onGUI() {
 	WorldEditor& editor = m_app.getWorldEditor();
 	const Array<EntityRef>& ents = editor.getSelectedEntities();
 	if (m_focus_filter_request) ImGui::SetNextWindowFocus();
-	if (ImGui::Begin(ICON_FA_INFO_CIRCLE "Inspector##inspector", &m_is_open) && !ents.empty()) {
-		showCoreProperties(ents, editor);
+	if (ImGui::Begin(ICON_FA_INFO_CIRCLE "Inspector##inspector", &m_is_open)) {
 		
 		if (m_focus_filter_request) {
 			ImGui::SetKeyboardFocusHere();
 			m_focus_filter_request = false;
 		}
-		m_property_filter.gui("Filter", -1, ImGui::IsWindowAppearing(), &m_focus_filter_action);
-		World& world = *editor.getWorld();
-		for (ComponentUID cmp = world.getFirstComponent(ents[0]); cmp.isValid(); cmp = world.getNextComponent(cmp)) {
-			showComponentProperties(ents, cmp.type, editor);
-		}
 
-		ImGui::Separator();
-		const float x = (ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(ICON_FA_PLUS "Add component").x - ImGui::GetStyle().FramePadding.x * 2) * 0.5f;
-		ImGui::SetCursorPosX(x);
-		if (ImGui::Button(ICON_FA_PLUS "Add component")) ImGui::OpenPopup("AddComponentPopup");
+		if (!ents.empty()) {
+			showCoreProperties(ents, editor);
+			m_property_filter.gui("Filter", -1, ImGui::IsWindowAppearing(), &m_focus_filter_action);
+			World& world = *editor.getWorld();
+			for (ComponentUID cmp = world.getFirstComponent(ents[0]); cmp.isValid(); cmp = world.getNextComponent(cmp)) {
+				showComponentProperties(ents, cmp.type, editor);
+			}
 
-		if (ImGui::BeginPopup("AddComponentPopup", ImGuiWindowFlags_AlwaysAutoResize)) {
-			m_component_filter.gui("Filter", 200, ImGui::IsWindowAppearing());
-			showAddComponentNode(m_app.getAddComponentTreeRoot().child, m_component_filter, INVALID_ENTITY, editor);
-			ImGui::EndPopup();
+			ImGui::Separator();
+			const float x = (ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(ICON_FA_PLUS "Add component").x - ImGui::GetStyle().FramePadding.x * 2) * 0.5f;
+			ImGui::SetCursorPosX(x);
+			if (ImGui::Button(ICON_FA_PLUS "Add component")) ImGui::OpenPopup("AddComponentPopup");
+
+			if (ImGui::BeginPopup("AddComponentPopup", ImGuiWindowFlags_AlwaysAutoResize)) {
+				m_component_filter.gui("Filter", 200, ImGui::IsWindowAppearing());
+				showAddComponentNode(m_app.getAddComponentTreeRoot().child, m_component_filter, INVALID_ENTITY, editor);
+				ImGui::EndPopup();
+			}
 		}
 	}
 	ImGui::End();
