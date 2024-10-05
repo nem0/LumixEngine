@@ -205,6 +205,10 @@ Surface getSurfaceEx(VSOutput input) {
 		#ifdef HAS_LOD
 			if (ditherLOD(input.lod, input.position.xy)) discard;
 		#endif
+		#ifdef ALPHA_CUTOUT
+			Surface surface = getSurfaceEx(input);
+			if(surface.alpha < 0.5) discard;
+		#endif
 	}
 #elif defined DEFERRED || defined GRASS
 	GBufferOutput mainPS(VSOutput input) {
@@ -212,7 +216,12 @@ Surface getSurfaceEx(VSOutput input) {
 			if (ditherLOD(input.lod, input.position.xy)) discard;
 		#endif
 
-		return packSurface(getSurfaceEx(input));
+		Surface surface = getSurfaceEx(input);
+		#ifdef ALPHA_CUTOUT
+			if(surface.alpha < 0.5) discard;
+		#endif
+
+		return packSurface(surface);
 	}
 #else
 	cbuffer Drawcall2 : register(b5) {
@@ -233,7 +242,7 @@ Surface getSurfaceEx(VSOutput input) {
 		float4 result;
 		result.rgb = computeLighting(cluster, data, Global_light_dir.xyz, Global_light_color.rgb * Global_light_intensity, u_shadowmap, u_shadow_atlas, u_reflection_probes, frag_coord);
 
-		#if defined ALPHA_CUTOUT
+		#ifdef ALPHA_CUTOUT
 			if(data.alpha < 0.5) discard;
 		#endif
 		result.a = data.alpha;
