@@ -978,7 +978,7 @@ struct TAA : public RenderPlugin {
 		};
 
 		pipeline.setUniform(ub_data);
-		pipeline.dispatch(*m_shader, (display_size.x + 15) / 16, (display_size.y + 15) / 16, 11);
+		pipeline.dispatch(*m_shader, (display_size.x + 15) / 16, (display_size.y + 15) / 16, 1);
 
 		const RenderBufferHandle taa_output = pipeline.createRenderbuffer({
 			.format = gpu::TextureFormat::RGBA16F,
