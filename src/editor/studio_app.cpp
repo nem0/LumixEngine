@@ -740,9 +740,7 @@ struct StudioAppImpl final : StudioApp {
 		}
 		m_plugins.clear();
 
-		for (auto* i : m_gui_plugins) {
-			LUMIX_DELETE(m_allocator, i);
-		}
+		removePlugin(*m_hierarchy.get());
 		m_gui_plugins.clear();
 
 		PrefabSystem::destroyEditorPlugins(*this);
