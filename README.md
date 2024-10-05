@@ -8,11 +8,12 @@
 
 3D Game Engine
 
-* [Getting started](https://github.com/nem0/LumixEngine/wiki/Getting-started) | [Video](https://www.youtube.com/watch?v=OjQKTA5ia2U)
+* [Getting started](docs/getting_started.md) | [Video](https://www.youtube.com/watch?v=OjQKTA5ia2U)
 * [Features](https://github.com/nem0/LumixEngine/wiki/Features)
 * [Videos](https://www.youtube.com/channel/UCtjtIy0ldsq-9siM1Gm_rXg/videos)
 * [Plugins](https://github.com/nem0/LumixEngine/wiki/available-plugins)
-* [Documentation](https://github.com/nem0/LumixEngine/wiki)
+* [Documentation](docs/)
+* [3rd party libraries](docs/3rdparty.md)
 
 ![Editor screenshot](https://raw.githubusercontent.com/wiki/nem0/LumixEngine/files/features/editor.jpg)
 
@@ -26,19 +27,6 @@ Who is using it?
 
 ![YAP](https://img.itch.zone/aW1nLzQ2NzExMjkucG5n/original/6nkV%2B%2B.png)
 
-3rd party libraries
-
-* [Luau](https://github.com/Roblox/luau)
-* [rgbcx](https://github.com/richgel999/bc7enc/blob/master/rgbcx.h)
-* [PhysX](https://developer.nvidia.com/physx-sdk)
-* [dear imgui](https://github.com/ocornut/imgui)
-* [stb](https://github.com/nothings/stb)
-* [freetype](https://github.com/aseprite/freetype2)
-* [meshoptimizer](https://github.com/zeux/meshoptimizer)
-* [mikktspace](https://github.com/mmikk/MikkTSpace)
-* [OpenFBX](https://github.com/nem0/OpenFBX/)
-* [LZ4](https://github.com/lz4/lz4)
-* [xxhash](https://github.com/Cyan4973/xxHash)
 
 Project generator
 
