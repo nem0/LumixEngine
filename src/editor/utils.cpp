@@ -1816,7 +1816,7 @@ struct CodeEditorImpl final : CodeEditor {
 			
 			CommonActions& actions = m_app.getCommonActions();
 
-			if (ImGui::IsKeyPressed(ImGuiKey_Escape)) m_cursors.resize(1);
+			if (ImGui::Shortcut(ImGuiKey_Escape)) m_cursors.resize(1);
 			else if (m_app.checkShortcut(actions.del)) del(io.KeyCtrl);
 			else if (m_app.checkShortcut(s_delete_left)) backspace(false);
 			else if (m_app.checkShortcut(s_delete_word_left)) backspace(true);
@@ -1827,8 +1827,8 @@ struct CodeEditorImpl final : CodeEditor {
 			else if (m_app.checkShortcut(actions.paste)) pasteFromClipboard();
 			else if (m_app.checkShortcut(actions.select_all)) selectAll();
 			else if (ImGui::Shortcut(ImGuiKey_Enter)) insertNewLine();
-			else if (ImGui::Shortcut(ImGuiKey_PageUp)) moveCursorPageUp(u32(content_size.y / line_height + 1), line_height);
-			else if (ImGui::Shortcut(ImGuiKey_PageDown)) moveCursorPageDown(u32(content_size.y / line_height + 1), line_height);
+			else if (ImGui::IsKeyPressed(ImGuiKey_PageUp)) moveCursorPageUp(u32(content_size.y / line_height + 1), line_height);
+			else if (ImGui::IsKeyPressed(ImGuiKey_PageDown)) moveCursorPageDown(u32(content_size.y / line_height + 1), line_height);
 			else if (m_app.checkShortcut(s_search)) {
 				m_search_visible = true;
 				m_focus_search = true;
