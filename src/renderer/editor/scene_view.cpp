@@ -1363,7 +1363,7 @@ void SceneView::handleEvents() {
 void SceneView::insertModelUI() {
 	if (m_insert_model_request) ImGui::OpenPopup("Insert model");
 
-	if (ImGuiEx::BeginResizablePopup("Insert model", ImVec2(300, 200))) {
+	if (ImGuiEx::BeginResizablePopup("Insert model", ImVec2(300, 200), ImGuiWindowFlags_NoNavInputs)) {
 		if (ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
 
 		ImGui::AlignTextToFramePadding();

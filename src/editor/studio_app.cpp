@@ -2643,7 +2643,7 @@ struct StudioAppImpl final : StudioApp {
 						}
 						++idx;
 					}
-					m_all_actions_selected = m_all_actions_selected % idx;
+					m_all_actions_selected = m_all_actions_selected > 0 ? m_all_actions_selected % idx : 0;
 				}
 				ImGui::EndChild();
 			}
