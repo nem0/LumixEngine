@@ -1817,7 +1817,8 @@ struct CodeEditorImpl final : CodeEditor {
 			CommonActions& actions = m_app.getCommonActions();
 
 			if (ImGui::Shortcut(ImGuiKey_Escape)) m_cursors.resize(1);
-			else if (m_app.checkShortcut(actions.del)) del(io.KeyCtrl);
+			else if (m_app.checkShortcut(actions.del)) del(false);
+			else if (m_app.checkShortcut(s_delete_word)) del(true);
 			else if (m_app.checkShortcut(s_delete_left)) backspace(false);
 			else if (m_app.checkShortcut(s_delete_word_left)) backspace(true);
 			else if (m_app.checkShortcut(actions.undo)) undo();
@@ -1997,6 +1998,7 @@ struct CodeEditorImpl final : CodeEditor {
 	TextPoint m_search_from;
 
 	static Action s_delete_left;
+	static Action s_delete_word;
 	static Action s_delete_word_left;
 	static Action s_search;
 	static Action s_cut;
@@ -2004,6 +2006,7 @@ struct CodeEditorImpl final : CodeEditor {
 };
 
 Action CodeEditorImpl::s_delete_left{"Delete left", "Code editor - delete left", "delete_left", ICON_FA_BACKSPACE};
+Action CodeEditorImpl::s_delete_word{"Delete word", "Code editor - delete word", "delete_word", ""};
 Action CodeEditorImpl::s_delete_word_left{"Delete word left", "Code editor - delete word left", "delete_word_left", ""};
 Action CodeEditorImpl::s_search{"Search", "Code editor - search", "code_editor_search", ICON_FA_SEARCH};
 Action CodeEditorImpl::s_cut{"Cut", "Code editor - cut", "code_editor_cut", ICON_FA_CUT};
