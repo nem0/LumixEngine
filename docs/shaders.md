@@ -22,6 +22,15 @@ float4 mainPS() :SV_Target {
 
 If there's **no** `//@surface` directive, the HLSL file is considered as a compute shader. Compute shader entry point must be named `main`.
 
+```hlsl
+#include "shaders/common.hlsli"
+
+[numthreads(16, 16, 1)]
+void main(uint3 thread_id : SV_DispatchThreadID) {
+    ...
+}
+```
+
 ## Includes
 
 HLSL files can include another files with standard include directive. Included files must have `.hlsli` extension to be recognized by the editor - i.e. so they can be visible in asset browser and editable.
@@ -32,7 +41,7 @@ HLSL files can include another files with standard include directive. Included f
 
 ## Directives
 
-We supports specific directives within HLSL source code. These directives begin with `//@` and must be the only content on the line, aside from any leading whitespace. For details on how these directives are parsed, refer to `ShaderPlugin::compile`.
+We support specific directives within HLSL source code. These directives begin with `//@` and must be the only content on the line, aside from any leading whitespace. For details on how these directives are parsed, refer to `ShaderPlugin::compile`. Directives serve as an interface for materials. They also inform the shader compiler whether the HLSL files contain a compute shader or a vertex + pixel shader.
 
 ```hlsl
 // this is just a comment
