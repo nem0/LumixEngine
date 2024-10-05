@@ -42,7 +42,7 @@ IMGUI_API int CurveEditor(const char* label
 	, int* new_count = nullptr
 	, int* selected_point = nullptr
 	, int* hovered_point = nullptr);
-IMGUI_API bool BeginResizablePopup(const char* str_id, const ImVec2& size_on_first_use);
+IMGUI_API bool BeginResizablePopup(const char* str_id, const ImVec2& size_on_first_use, ImGuiWindowFlags flags = 0);
 IMGUI_API void HSplitter(const char* str_id, ImVec2* size);
 IMGUI_API void Rect(float w, float h, ImU32 color);
 IMGUI_API bool MenuItemEx(const char* label, const char* icon, const char* shortcut = nullptr, bool selected = false, bool enabled = true);

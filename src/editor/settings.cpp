@@ -42,6 +42,7 @@ static bool shortcutInput(char* button_label, Action& action, bool edit, StudioA
 	if (ImGui::Button(button_label, ImVec2(-30, 0))) {
 		openCenterStrip("edit_shortcut_popup");
 		editing = action;
+		app.setCaptureInput(true);
 	}
 	style.ButtonTextAlign = prev;
 	if (beginCenterStrip("edit_shortcut_popup")) {
@@ -78,6 +79,7 @@ static bool shortcutInput(char* button_label, Action& action, bool edit, StudioA
 			switch (event.key.keycode) {
 				case os::Keycode::ESCAPE: 
 					if (editing.modifiers == Action::NONE && editing.shortcut == os::Keycode::INVALID) {
+						app.setCaptureInput(false);
 						ImGui::CloseCurrentPopup();
 						break;
 					}
@@ -86,6 +88,7 @@ static bool shortcutInput(char* button_label, Action& action, bool edit, StudioA
 					break;
 				case os::Keycode::RETURN:
 					action = editing;
+					app.setCaptureInput(false);
 					ImGui::CloseCurrentPopup();
 					break;
 				case os::Keycode::SHIFT:
