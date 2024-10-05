@@ -1,4 +1,4 @@
-shader "/pipelines/standard.hlsl"
+shader "/shaders/standard.hlsl"
 backface_culling true
 layer "default"
 

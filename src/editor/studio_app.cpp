@@ -2694,7 +2694,7 @@ struct StudioAppImpl final : StudioApp {
 			catString(rec.path, info.filename);
 			infos.insert(rec.hash, rec);
 		}
-		exportDataScan("pipelines/", infos);
+		exportDataScan("shaders/", infos);
 		exportDataScan("universes/", infos);
 		
 		os::destroyFileIterator(iter);
@@ -2777,7 +2777,7 @@ struct StudioAppImpl final : StudioApp {
 				}
 			}
 		}
-		exportDataScan("pipelines/", infos);
+		exportDataScan("shaders/", infos);
 		exportDataScan("universes/", infos);
 	}
 

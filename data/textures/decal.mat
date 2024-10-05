@@ -1,4 +1,4 @@
-shader "/pipelines/decal.hlsl"
+shader "/shaders/decal.hlsl"
 backface_culling true
 layer "decal"
 

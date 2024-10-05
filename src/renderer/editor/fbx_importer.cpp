@@ -1055,7 +1055,7 @@ static void ofbx_job_processor(ofbx::JobFunction fn, void*, void* data, u32 size
 }
 
 void FBXImporter::init() {
-	m_impostor_shadow_shader = m_app.getEngine().getResourceManager().load<Shader>(Path("pipelines/impostor_shadow.hlsl"));
+	m_impostor_shadow_shader = m_app.getEngine().getResourceManager().load<Shader>(Path("shaders/impostor_shadow.hlsl"));
 }
 
 bool FBXImporter::setSource(const Path& filename, ReadFlags read_flags) {
@@ -1330,7 +1330,7 @@ void FBXImporter::createImpostorTextures(Model* model, ImpostorTexturesContext& 
 		else {
 			const AABB& aabb = model->getAABB();
 			const Vec3 center = (aabb.max + aabb.min) * 0.5f;
-			f << "shader \"/pipelines/impostor.hlsl\"\n";
+			f << "shader \"/shaders/impostor.hlsl\"\n";
 			f << "texture \"" << src_info.basename << "_impostor0.tga\"\n";
 			f << "texture \"" << src_info.basename << "_impostor1.tga\"\n";
 			f << "texture \"" << src_info.basename << "_impostor2.tga\"\n";
@@ -1377,7 +1377,7 @@ bool FBXImporter::writeMaterials(const Path& src, const ImportConfig& cfg, bool 
 		}
 		m_out_file.clear();
 
-		writeString("shader \"/pipelines/standard.hlsl\"\n");
+		writeString("shader \"/shaders/standard.hlsl\"\n");
 		if (material.alpha_cutout) writeString("define \"ALPHA_CUTOUT\"\n");
 		if (material.textures[2].is_valid) writeString("uniform \"Metallic\", 1.000000");
 

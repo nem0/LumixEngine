@@ -427,7 +427,7 @@ if plugin "renderer" then
 		"../src/renderer/**.cpp",
 		"../src/renderer/**.c",
 	}
-	files { "../data/pipelines/**.*" }
+	files { "../data/shaders/**.*" }
 	excludes { 
 		"../external/meshoptimizer/clusterizer.cpp",
 		"../external/meshoptimizer/overdrawanalyzer.cpp",

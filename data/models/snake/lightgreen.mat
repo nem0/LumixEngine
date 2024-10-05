@@ -1,4 +1,4 @@
-shader "/pipelines/standard.hlsl"
+shader "/shaders/standard.hlsl"
 texture ""
 texture ""
 texture ""
