@@ -1762,41 +1762,6 @@ struct PipelineImpl final : Pipeline {
 		--m_renderbuffers[idx].frame_counter;
 	}
 
-	// TODO is this needed?
-	void setOrthoCustomCameraParams(const DVec3 pos
-		, const Quat& rot
-		, u32 w
-		, u32 h
-		, float ortho_size
-		, float z_near
-		, float z_far
-		, bool reversed_z
-	) {
-		m_custom_camera_params.pos = pos;
-		ShiftedFrustum frustum;
-		const float ratio = h > 0 ? w / (float)h : 1;
-		frustum.computeOrtho({ 0, 0, 0 },
-			rot * Vec3(0, 0, 1),
-			rot * Vec3(0, 1, 0),
-			ortho_size * ratio,
-			ortho_size,
-			z_near,
-			z_far);
-		frustum.origin = pos;
-		m_custom_camera_params.frustum = frustum;
-		m_custom_camera_params.lod_multiplier = 1;
-		m_custom_camera_params.is_shadow = false;
-
-		m_custom_camera_params.view = rot.toMatrix().fastInverted();
-		m_custom_camera_params.projection.setOrtho(-ortho_size * ratio,
-			ortho_size * ratio,
-			-ortho_size,
-			ortho_size,
-			z_near,
-			z_far,
-			reversed_z);
-	}
-
 	void renderTerrains(const CameraParams& cp, gpu::StateFlags state, const char* define) {
 		const u32 define_mask = define ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
 		m_renderer.pushJob("terrain", [this, cp, state, define_mask](DrawStream& stream){

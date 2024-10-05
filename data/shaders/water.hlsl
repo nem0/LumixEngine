@@ -239,8 +239,8 @@ float4 mainPS(VSOutput input) : SV_TARGET
 	float3 spec_color = Global_light_color.rgb * spec_strength * u_specular_multiplier;
 	float fresnel = u_r0 + (1.0 - u_r0) * pow(saturate(1.0 - dot(normalize(view), wnormal)), 5);
 
-	float3 water_color = pow(u_water_color.rgb, 2.2f.xxx); // TODO do not do this in shader
-	float3 transmittance = saturate(exp(-water_depth * u_water_scattering * (1.0f.xxx - water_color)));
+	float3 water_color = pow(u_water_color.rgb, 2.2); // TODO do not do this in shader
+	float3 transmittance = saturate(exp(-water_depth * u_water_scattering * (1.0f - water_color)));
 
 	float t = saturate(water_depth * 5); // no hard edge
 
@@ -248,7 +248,7 @@ float4 mainPS(VSOutput input) : SV_TARGET
 
 	float3 refraction = getRefraction(input.pos_ws + float3(wnormal.xz, 0) * u_refraction_distortion * t).rgb;
 
-	refraction *= lerp(1.0f.xxx, u_ground_tint.rgb, t);
+	refraction *= lerp(1.0, u_ground_tint.rgb, t);
 	refraction *= transmittance;
 
 	float3 reflection = refl_color + spec_color;
