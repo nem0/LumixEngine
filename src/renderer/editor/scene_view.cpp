@@ -852,6 +852,7 @@ SceneView::SceneView(StudioApp& app)
 
 	m_app.getSettings().registerPtr("quicksearch_preview", &m_search_preview, "Scene view");
 	m_app.getSettings().registerPtr("show_camera_preview", &m_show_camera_preview, "Scene view");
+	m_app.getSettings().registerPtr("mouse_wheel_changes_speed", &m_mouse_wheel_changes_speed, "Scene view");
 }
 
 void SceneView::toggleProjection() {
@@ -1062,18 +1063,24 @@ void SceneView::update(float time_delta)
 
 	if (ImGui::IsAnyItemActive()) return;
 	if (!m_is_mouse_captured) return;
-	if (ImGui::GetIO().KeyCtrl) return;
+	if (io.KeyCtrl) return;
 
-	int screen_x = int(ImGui::GetIO().MousePos.x);
-	int screen_y = int(ImGui::GetIO().MousePos.y);
+	int screen_x = int(io.MousePos.x);
+	int screen_y = int(io.MousePos.y);
 	bool is_inside = screen_x >= m_screen_x && screen_y >= m_screen_y && screen_x <= m_screen_x + m_width &&
 					 screen_y <= m_screen_y + m_height;
 	if (!is_inside) return;
 
-	m_camera_speed = maximum(0.01f, m_camera_speed + ImGui::GetIO().MouseWheel / 20.0f);
+	if (m_mouse_wheel_changes_speed) {
+		m_camera_speed = maximum(0.01f, m_camera_speed + io.MouseWheel / 20.0f);
+	}
+	else {
+		if (io.MouseWheel > 0) m_view->moveCamera(1.0f, 0, 0, io.MouseWheel);
+		if (io.MouseWheel < 0) m_view->moveCamera(-1.0f, 0, 0, -io.MouseWheel);
+	}
 
 	float speed = m_camera_speed * time_delta * 60.f;
-	if (ImGui::GetIO().KeyShift) speed *= 10;
+	if (io.KeyShift) speed *= 10;
 	const CommonActions& actions = m_app.getCommonActions();
 	if (actions.cam_forward.isActive()) m_view->moveCamera(1.0f, 0, 0, speed);
 	if (actions.cam_backward.isActive()) m_view->moveCamera(-1.0f, 0, 0, speed);

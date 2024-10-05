@@ -106,6 +106,7 @@ private:
 	UniquePtr<Pipeline> m_camera_preview_pipeline;
 	LogUI& m_log_ui;
 	bool m_show_camera_preview = true;
+	bool m_mouse_wheel_changes_speed = true;
 	
 	WorldEditor& m_editor;
 	struct WorldViewImpl* m_view;
