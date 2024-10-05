@@ -21,6 +21,9 @@ pushd %~dp0
 			git pull
 		)
 
+		for /f "tokens=*" %%i in ('git rev-parse HEAD') do set GIT_REVISION=%%i
+		echo %GIT_REVISION% > %dst_src_dir%\recast_revision.txt
+
 		xcopy "Detour\Source\DetourProximityGrid.cpp" %dst_src_dir% /y
 		
 		xcopy "Detour\Source\*" %dst_src_dir% /y
