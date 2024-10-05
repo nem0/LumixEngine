@@ -482,14 +482,14 @@ struct PipelineImpl final : Pipeline {
 	{
 		m_viewport.w = m_viewport.h = 800;
 		ResourceManagerHub& rm = renderer.getEngine().getResourceManager();
-		m_tonemap_shader = rm.load<Shader>(Path("pipelines/tonemap.hlsl"));
-		m_blit_shader = rm.load<Shader>(Path("pipelines/blit.hlsl"));
-		m_lighting_shader = rm.load<Shader>(Path("pipelines/lighting.hlsl"));
-		m_draw2d_shader = rm.load<Shader>(Path("pipelines/draw2d.hlsl"));
-		m_debug_shape_shader = rm.load<Shader>(Path("pipelines/debug_shape.hlsl"));
-		m_debug_clusters_shader = rm.load<Shader>(Path("pipelines/debug_clusters.hlsl"));
-		m_debug_velocity_shader = rm.load<Shader>(Path("pipelines/debug_velocity.hlsl"));
-		m_instancing_shader = rm.load<Shader>(Path("pipelines/instancing.hlsl"));
+		m_tonemap_shader = rm.load<Shader>(Path("shaders/tonemap.hlsl"));
+		m_blit_shader = rm.load<Shader>(Path("shaders/blit.hlsl"));
+		m_lighting_shader = rm.load<Shader>(Path("shaders/lighting.hlsl"));
+		m_draw2d_shader = rm.load<Shader>(Path("shaders/draw2d.hlsl"));
+		m_debug_shape_shader = rm.load<Shader>(Path("shaders/debug_shape.hlsl"));
+		m_debug_clusters_shader = rm.load<Shader>(Path("shaders/debug_clusters.hlsl"));
+		m_debug_velocity_shader = rm.load<Shader>(Path("shaders/debug_velocity.hlsl"));
+		m_instancing_shader = rm.load<Shader>(Path("shaders/instancing.hlsl"));
 		
 		m_draw2d.clear({1, 1});
 

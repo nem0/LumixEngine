@@ -1,4 +1,4 @@
-shader "/pipelines/particles.hlsl"
+shader "/shaders/particles.hlsl"
 backface_culling true
 layer "transparent"
 

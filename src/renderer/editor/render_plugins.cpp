@@ -919,7 +919,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 	bool canCreateResource() const override { return true; }
 	const char* getDefaultExtension() const override { return "mat"; }
-	void createResource(OutputMemoryStream& blob) override { blob << "shader \"/pipelines/standard.hlsl\""; }
+	void createResource(OutputMemoryStream& blob) override { blob << "shader \"/shaders/standard.hlsl\""; }
 	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
 	const char* getLabel() const override { return "Material"; }
 
@@ -3556,7 +3556,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 		Renderer* renderer = static_cast<Renderer*>(system_manager.getSystem("renderer"));
 		ResourceManagerHub& rm = engine.getResourceManager();
 		m_pipeline = Pipeline::create(*renderer, PipelineType::PROBE);
-		m_ibl_filter_shader = rm.load<Shader>(Path("pipelines/ibl_filter.hlsl"));
+		m_ibl_filter_shader = rm.load<Shader>(Path("shaders/ibl_filter.hlsl"));
 	}
 
 	bool saveCubemap(u64 probe_guid, const Vec4* data, u32 texture_size, u32 num_src_mips, u32 num_saved_mips) {
@@ -5149,7 +5149,6 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin {
 
 		file << "compress = false\n";
 		file << "mips = false\n";
-		file << "filter = \"point\"";
 		file.close();
 
 		if (!fs.open(splatmap_path, file)) {
@@ -5201,7 +5200,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin {
 		}
 
 		file << R"#(
-			shader "/pipelines/terrain.hlsl"
+			shader "/shaders/terrain.hlsl"
 			texture ")#";
 		file << info.basename;
 		file << R"#(.raw"
