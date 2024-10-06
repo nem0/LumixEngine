@@ -4,7 +4,7 @@ You can get Lumix Engine from [itch.io](https://mikulasflorek.itch.io/lumix-engi
 
 # Programmers - Windows
 
-### Prerequisites
+## Prerequisites
 
 * [Visual Studio 2022](https://www.visualstudio.com/en-us/downloads/download-visual-studio-vs.aspx) or compatible - MinGW is not supported
 
@@ -15,6 +15,17 @@ Download [bootstrap batch file](../scripts/bootstrap.bat) and run it. The bootst
 3. Open VS solution `scripts\tmp\vs2022\LumixEngine.sln`.
 
 [Video tutorial](https://www.youtube.com/watch?v=OjQKTA5ia2U)
+
+
+# Making game in C++
+
+1. Download Lumix Engine source code.
+2. Run [scripts/plugins.bat](../scripts/plugins.bat).
+3. Choose `Empty plugin template`.
+4. Create a solution (e.g. run [scripts/create_vs22_sln.bat](../scripts/create_vs22_sln.bat)).
+5. Put your game code in `plugins/myplugin/src`.
+6. Build and run the project.
+
 
 # Programmers - Linux
 
@@ -27,4 +38,3 @@ See [this shell script](https://raw.githubusercontent.com/wiki/nem0/LumixEngine/
 * Note: to build using clang & ninja, call `./genie --gcc=linux-clang ninja`
 
 [Video tutorial](https://www.youtube.com/watch?v=ic5ejjY6wZs)
-
