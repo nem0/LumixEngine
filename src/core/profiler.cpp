@@ -366,7 +366,7 @@ void endGPUBlock(u64 timestamp)
 
 i64 createNewLinkID()
 {
-	AtomicI64 counter = 0;
+	static AtomicI64 counter = 1;
 	return counter.inc();
 }
 
