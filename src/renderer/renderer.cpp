@@ -446,6 +446,10 @@ struct RendererImpl final : Renderer {
 		frame();
 		waitForRender();
 
+		m_frame_thread.finished = true;
+		m_frame_thread.semaphore.signal();
+		m_frame_thread.destroy();
+
 		jobs::Signal signal;
 		jobs::runLambda([this]() {
 			for (const Local<FrameData>& frame : m_frames) {
@@ -459,10 +463,6 @@ struct RendererImpl final : Renderer {
 			gpu::present();
 		}, &signal, 1);
 		jobs::wait(&signal);
-
-		m_frame_thread.finished = true;
-		m_frame_thread.semaphore.signal();
-		m_frame_thread.destroy();
 
 		jobs::runLambda([]() {
 			gpu::shutdown();

@@ -1775,7 +1775,7 @@ bool init(void* hwnd, InitFlags flags) {
 		if (SUCCEEDED(hr)) {
 			info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
 			info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
-			info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true);
+			//info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true);
 			D3D12_INFO_QUEUE_FILTER filter = {};
 
 			D3D12_MESSAGE_CATEGORY catlist[] = {
