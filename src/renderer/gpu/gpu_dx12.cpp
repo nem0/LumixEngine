@@ -2520,6 +2520,17 @@ void viewport(u32 x, u32 y, u32 w, u32 h) {
 }
 
 void requestDisassembly(ProgramHandle program) {
+	if (program->cs) {
+		ID3DBlob* cs_blob;
+		HRESULT hr = D3DDisassemble(program->cs->GetBufferPointer(), program->cs->GetBufferSize(), 0, NULL, &cs_blob);
+		ASSERT(hr == S_OK);
+		MutexGuard guard(d3d->disassembly_mutex);
+		program->disassembly = "";
+		program->disassembly.append(StringView((const char*)cs_blob->GetBufferPointer(), (u32)cs_blob->GetBufferSize()));
+		cs_blob->Release();
+		return;
+	}
+
 	if (!program->vs || !program->ps) return; // TODO
 	ID3DBlob* vs_blob;
 	ID3DBlob* ps_blob;
