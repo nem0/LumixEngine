@@ -22,6 +22,12 @@ namespace detail {
 
 	struct Log {
 		Log() : message(getGlobalAllocator()) { message.reserve(4096); }
+		~Log() {
+			// this struct is only destroyed on shutdown,
+			// so to prevent crash, we release ownership
+			// because the allocator might have been already destroyed
+			message.releaseOwnership();
+		}
 		OutputMemoryStream message;
 	};
 
