@@ -5371,7 +5371,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_particle_editor = ParticleEditor::create(m_app);
 		Delegate<void()> vsync_delegate;
 		vsync_delegate.bind<&StudioAppPlugin::onVsyncSet>(this);
-		m_app.getSettings().registerPtr("VSync", &m_vsync, "General", &vsync_delegate);
+		m_app.getSettings().registerOption("vsync", &m_vsync, "General", "Vsync", &vsync_delegate);
 	}
 
 	void onVsyncSet() {

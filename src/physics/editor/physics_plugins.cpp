@@ -358,7 +358,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		, m_reset_dynamic_entities(app.getAllocator())
 	{
 		app.getWorldEditor().worldDestroyed().bind<&PhysicsUIPlugin::onWorldDestroyed>(this);
-		app.getSettings().registerPtr("physics_ui_open", &m_is_window_open);
+		app.getSettings().registerOption("physics_ui_open", &m_is_window_open);
 	}
 
 	~PhysicsUIPlugin() {

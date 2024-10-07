@@ -279,7 +279,7 @@ public:
 	GUIEditor(StudioApp& app)
 		: m_app(app)
 	{
-		m_app.getSettings().registerPtr("gui_editor_open", &m_is_window_open);
+		m_app.getSettings().registerOption("gui_editor_open", &m_is_window_open);
 	}
 
 	void init() {

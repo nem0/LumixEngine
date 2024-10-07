@@ -30,7 +30,7 @@ LogUI::LogUI(StudioApp& app, IAllocator& allocator)
 		m_new_message_count[i] = 0;
 	}
 
-	m_app.getSettings().registerPtr("log_open", &m_is_open);
+	m_app.getSettings().registerOption("log_open", &m_is_open);
 }
 
 
