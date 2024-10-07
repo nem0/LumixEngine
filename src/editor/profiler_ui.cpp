@@ -275,7 +275,10 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		m_is_open = false;
 		m_is_paused = true;
 
-		m_app.getSettings().registerPtr("profiler_open", &m_is_open);
+		Settings& settings = m_app.getSettings();
+		settings.registerOption("profiler_open", &m_is_open);
+		settings.registerOption("profiler_show_frames", &m_show_frames, "Profiler", "Show frames");
+		settings.registerOption("profiler_show_context_switches", &m_show_context_switches, "Profiler", "Show context switches");
 	}
 
 	void onPause() {

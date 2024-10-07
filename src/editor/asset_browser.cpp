@@ -111,9 +111,10 @@ struct AssetBrowserImpl : AssetBrowser {
 		const char* world_exts[] = { "unv" };
 		addPlugin(m_world_asset_plugin, Span(world_exts));
 		m_app.getAssetCompiler().addPlugin(m_world_asset_plugin, Span(world_exts));
-		m_app.getSettings().registerPtr("asset_browser_open", &m_is_open, "Asset browser");
-		m_app.getSettings().registerPtr("asset_browser_thumbnails", &m_show_thumbnails, "Asset browser");
-		m_app.getSettings().registerPtr("asset_browser_thumbnail_size", &m_thumbnail_size, "Asset browser");
+		Settings& settings = m_app.getSettings();
+		settings.registerOption("asset_browser_open", &m_is_open);
+		settings.registerOption("asset_browser_thumbnails", &m_show_thumbnails, "Asset browser", "Show thumbnails");
+		settings.registerOption("asset_browser_thumbnail_size", &m_thumbnail_size, "Asset browser", "Thumbnail size");
 	}
 
 	void onBasePathChanged() {

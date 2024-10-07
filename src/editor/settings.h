@@ -48,10 +48,10 @@ struct LUMIX_EDITOR_API Settings {
 	// register variable with memory storage not in Settings
 	// if category is null, the variable is not visible in settings UI
 	// otherwise it's grouped in the category
-	void registerPtr(const char* name, bool* value, const char* category = nullptr, Delegate<void()>* set_callback = nullptr);
-	void registerPtr(const char* name, String* value, const char* category = nullptr);
-	void registerPtr(const char* name, i32* value, const char* category = nullptr);
-	void registerPtr(const char* name, float* value, const char* category = nullptr, bool is_angle = false);
+	void registerOption(const char* name, bool* value, const char* category = nullptr, const char* label = nullptr, Delegate<void()>* set_callback = nullptr);
+	void registerOption(const char* name, String* value, const char* category = nullptr, const char* label = nullptr);
+	void registerOption(const char* name, i32* value, const char* category = nullptr, const char* label = nullptr);
+	void registerOption(const char* name, float* value, const char* category = nullptr, const char* label = nullptr, bool is_angle = false);
 
 	float getTimeSinceLastSave() const;
 
@@ -82,6 +82,7 @@ struct LUMIX_EDITOR_API Settings {
 		u32 category = INVALID_CATEGORY;
 		Delegate<void()> set_callback; // only called by settings
 		bool is_angle = false; // is angle in radians
+		const char* label = "N/A"; // for GUI
 	};
 
 	// category is only to group variables in the settings window

@@ -75,7 +75,7 @@ struct StudioAppImpl final : StudioApp {
 		HierarchyGUI(StudioAppImpl& app)
 			: m_app(app)
 		{
-			m_app.getSettings().registerPtr("entity_list_open", &m_is_open);
+			m_app.getSettings().registerOption("entity_list_open", &m_is_open);
 			m_app.getWorldEditor().entitySelectionChanged().bind<&HierarchyGUI::onEntitySelectionChanged>(this);
 		}
 
@@ -918,14 +918,14 @@ struct StudioAppImpl final : StudioApp {
 		};
 		init_data.plugins = Span(plugins, plugins + lengthOf(plugins) - 1);
 		m_engine = Engine::create(static_cast<Engine::InitArgs&&>(init_data), m_allocator);
-		m_settings.registerPtr("report_crashes", &m_crash_reporting, "General");
-		m_settings.registerPtr("sleep_when_inactive", &m_sleep_when_inactive);
-		m_settings.registerPtr("fileselector_dir", &m_file_selector.m_current_dir);
-		m_settings.registerPtr("font_size", &m_font_size, "General");
-		m_settings.registerPtr("export_pack", &m_export.pack);
-		m_settings.registerPtr("export_dir", &m_export.dest_dir);
-		m_settings.registerPtr("gizmo_scale", &m_gizmo_config.scale, "General");
-		m_settings.registerPtr("fov", &m_fov, "General", true);
+		m_settings.registerOption("report_crashes", &m_crash_reporting, "General", "Report crashes");
+		m_settings.registerOption("sleep_when_inactive", &m_sleep_when_inactive, "General", "Sleep when inactive");
+		m_settings.registerOption("fileselector_dir", &m_file_selector.m_current_dir);
+		m_settings.registerOption("font_size", &m_font_size, "General", "Font size");
+		m_settings.registerOption("export_pack", &m_export.pack);
+		m_settings.registerOption("export_dir", &m_export.dest_dir);
+		m_settings.registerOption("gizmo_scale", &m_gizmo_config.scale, "General", "Gizmo scale");
+		m_settings.registerOption("fov", &m_fov, "General", "FOV", true);
 		// we need some stuff (font_size) from settings at this point
 		m_settings.load();
 

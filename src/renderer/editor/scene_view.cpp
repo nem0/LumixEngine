@@ -850,9 +850,9 @@ SceneView::SceneView(StudioApp& app)
 	m_debug_show_actions[(u32)Pipeline::DebugShow::LIGHT_CLUSTERS].create("Light clusters", "Debug view - light clusters", "debug_view_light_clusters", "");
 	m_debug_show_actions[(u32)Pipeline::DebugShow::PROBE_CLUSTERS].create("Probe clusters", "Debug view - probe clusters", "debug_view_probe_clusters", "");
 
-	m_app.getSettings().registerPtr("quicksearch_preview", &m_search_preview, "Scene view");
-	m_app.getSettings().registerPtr("show_camera_preview", &m_show_camera_preview, "Scene view");
-	m_app.getSettings().registerPtr("mouse_wheel_changes_speed", &m_mouse_wheel_changes_speed, "Scene view");
+	m_app.getSettings().registerOption("quicksearch_preview", &m_search_preview, "Scene view", "Show previews in quick search");
+	m_app.getSettings().registerOption("show_camera_preview", &m_show_camera_preview, "Scene view", "Show camera preview");
+	m_app.getSettings().registerOption("mouse_wheel_changes_speed", &m_mouse_wheel_changes_speed, "Scene view", "Mouse wheel changes speed");
 }
 
 void SceneView::toggleProjection() {
@@ -869,7 +869,7 @@ void SceneView::init() {
 	auto* renderer = static_cast<Renderer*>(engine.getSystemManager().getSystem("renderer"));
 	m_render_plugin = UniquePtr<RenderPlugin>::create(renderer->getAllocator(), *this, *renderer);
 	renderer->addPlugin(*m_render_plugin.get());
-	m_app.getSettings().registerPtr("show_grid", &m_render_plugin->m_show_grid, "Scene view");
+	m_app.getSettings().registerOption("show_grid", &m_render_plugin->m_show_grid, "Scene view", "Show grid");
 	
 	m_camera_preview_pipeline = Pipeline::create(*renderer, PipelineType::GAME_VIEW);
 

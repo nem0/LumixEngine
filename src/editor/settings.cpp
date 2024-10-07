@@ -219,8 +219,8 @@ Settings::Settings(StudioApp& app)
 	}
 
 	m_last_save_time = os::Timer::getRawTimestamp();
-	registerPtr("imgui_state", &m_imgui_state);
-	registerPtr("settings_open", &m_is_open);
+	registerOption("imgui_state", &m_imgui_state);
+	registerOption("settings_open", &m_is_open);
 }
 
 float Settings::getTimeSinceLastSave() const {
@@ -1043,7 +1043,7 @@ void Settings::gui() {
 						if (var.category != cat_idx) continue;
 						ImGui::TableNextRow();
 						ImGui::TableNextColumn();
-						ImGuiEx::Label(iter.key().c_str());
+						ImGuiEx::Label(var.label);
 						ImGui::TableNextColumn();
 						ImGui::PushID(&var);
 						auto CB = [&](bool changed) { if (changed && var.set_callback.isValid()) var.set_callback.invoke(); };
@@ -1173,10 +1173,11 @@ static u32 getCategory(Settings& settings, const char* category) {
 	return settings.m_categories.size() - 1;
 }
 
-void Settings::registerPtr(const char* name, String* value, const char* category) {
+void Settings::registerOption(const char* name, String* value, const char* category, const char* label) {
 	// if variable already exists
 	Variable* var = findVar(*this, name);
 	if (var) {
+		var->label = label;
 		var->category = getCategory(*this, category);
 		if (var->type != Variable::STRING) {
 			logError("Setting ", name, " already exists but is not a string");
@@ -1190,16 +1191,18 @@ void Settings::registerPtr(const char* name, String* value, const char* category
 
 	// create variable
 	Variable& new_var = m_variables.insert(String(name, m_allocator));
+	new_var.label = label;
 	new_var.string_ptr = value;
 	new_var.type = Variable::STRING_PTR;
 	new_var.storage = WORKSPACE;
 	new_var.category = getCategory(*this, category);
 }
 
-void Settings::registerPtr(const char* name, bool* value, const char* category, Delegate<void()>* callback) {
+void Settings::registerOption(const char* name, bool* value, const char* category, const char* label, Delegate<void()>* callback) {
 	// if variable already exists
 	Variable* var = findVar(*this, name);
 	if (var) {
+		var->label = label;
 		var->category = getCategory(*this, category);
 		if (var->type != Variable::BOOL) {
 			logError("Setting ", name, " already exists but is not a bool");
@@ -1214,6 +1217,7 @@ void Settings::registerPtr(const char* name, bool* value, const char* category, 
 
 	// create variable
 	Variable& new_var = m_variables.insert(String(name, m_allocator));
+	new_var.label = label;
 	new_var.bool_ptr = value;
 	new_var.type = Variable::BOOL_PTR;
 	new_var.storage = WORKSPACE;
@@ -1221,10 +1225,11 @@ void Settings::registerPtr(const char* name, bool* value, const char* category, 
 	new_var.category = getCategory(*this, category);
 }
 
-void Settings::registerPtr(const char* name, i32* value, const char* category) {
+void Settings::registerOption(const char* name, i32* value, const char* category, const char* label) {
 	// if variable already exists
 	Variable* var = findVar(*this, name);
 	if (var) {
+		var->label = label;
 		var->category = getCategory(*this, category);
 		if (var->type != Variable::I32) {
 			logError("Setting ", name, " already exists but is not a bool");
@@ -1238,16 +1243,18 @@ void Settings::registerPtr(const char* name, i32* value, const char* category) {
 
 	// create variable
 	Variable& new_var = m_variables.insert(String(name, m_allocator));
+	new_var.label = label;
 	new_var.i32_ptr = value;
 	new_var.type = Variable::I32_PTR;
 	new_var.storage = WORKSPACE;
 	new_var.category = getCategory(*this, category);
 }
 
-void Settings::registerPtr(const char* name, float* value, const char* category, bool is_angle) {
+void Settings::registerOption(const char* name, float* value, const char* category, const char* label, bool is_angle) {
 	// if variable already exists
 	Variable* var = findVar(*this, name);
 	if (var) {
+		var->label = label;
 		var->is_angle = is_angle;
 		var->category = getCategory(*this, category);
 		if (var->type != Variable::FLOAT) {
@@ -1262,6 +1269,7 @@ void Settings::registerPtr(const char* name, float* value, const char* category,
 
 	// create variable
 	Variable& new_var = m_variables.insert(String(name, m_allocator));
+	new_var.label = label;
 	new_var.is_angle = is_angle;
 	new_var.float_ptr = value;
 	new_var.type = Variable::FLOAT_PTR;

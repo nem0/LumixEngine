@@ -32,7 +32,7 @@ PropertyGrid::PropertyGrid(StudioApp& app)
 	, m_plugins(app.getAllocator())
 	, m_deferred_select(INVALID_ENTITY)
 {
-	m_app.getSettings().registerPtr("property_grid_open", &m_is_open);
+	m_app.getSettings().registerOption("property_grid_open", &m_is_open);
 }
 
 
