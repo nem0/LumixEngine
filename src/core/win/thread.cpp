@@ -3,6 +3,7 @@
 #include "core/sync.h"
 #include "core/thread.h"
 #include "core/os.h"
+#include "core/string.h"
 #include "core/win/simple_win.h"
 #include "core/profiler.h"
 
@@ -27,7 +28,7 @@ struct ThreadImpl
 	u32 m_priority;
 	volatile bool m_is_running;
 	volatile bool m_exited;
-	const char* m_thread_name;
+	StaticString<64> m_thread_name;
 	ConditionVariable m_cv;
 	Thread* m_owner;
 };

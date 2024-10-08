@@ -32,6 +32,11 @@ struct LUMIX_CORE_API Semaphore {
 
 	void signal();
 	void wait();
+	// return false on timeout
+	bool wait(u32 timeout_ms);
+
+	// returns -1 on error, otherwise index of the semaphore that was signaled
+	static i32 waitMultiple(Semaphore& a, Semaphore& b);
 
 private:
 	#if defined _WIN32

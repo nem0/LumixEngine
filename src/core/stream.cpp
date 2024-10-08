@@ -223,7 +223,7 @@ static_assert(sizeof(OutputPagedStream::Page) == PageAllocator::PAGE_SIZE);
 OutputPagedStream::OutputPagedStream(struct PageAllocator& allocator)
 	: m_allocator(allocator)
 {
-	m_tail = m_head = new (NewPlaceholder(), m_allocator.allocate(true)) Page;
+	m_tail = m_head = new (NewPlaceholder(), m_allocator.allocate()) Page;
 }
 
 OutputPagedStream::~OutputPagedStream() {
@@ -231,13 +231,13 @@ OutputPagedStream::~OutputPagedStream() {
 	while (p) {
 		Page* tmp = p;
 		p = p->next;
-		m_allocator.deallocate(tmp, true);
+		m_allocator.deallocate(tmp);
 	}
 }
 
 Span<u8> OutputPagedStream::reserve(u32 size) {
 	if (m_tail->size == lengthOf(m_tail->data)) {
-		Page* new_page = new (NewPlaceholder(), m_allocator.allocate(true)) Page;
+		Page* new_page = new (NewPlaceholder(), m_allocator.allocate()) Page;
 		m_tail->next = new_page;
 		m_tail = new_page;
 	}

@@ -231,13 +231,11 @@ static_assert(sizeof(DrawStream::Page) == PageAllocator::PAGE_SIZE);
 } // anonymous namespace
 
 DrawStream::~DrawStream() {
-	allocator.lock();
 	while (first) {
 		Page* next = first->header.next;
-		allocator.deallocate(first, false);
+		allocator.deallocate(first);
 		first = next;
 	}
-	allocator.unlock();
 }
 
 DrawStream::DrawStream(DrawStream&& rhs)
@@ -253,7 +251,7 @@ DrawStream::DrawStream(Renderer& renderer)
 	: renderer(renderer)
 	, allocator(renderer.getEngine().getPageAllocator())
 {
-	first = new (NewPlaceholder(), allocator.allocate(true)) Page;
+	first = new (NewPlaceholder(), allocator.allocate()) Page;
 	current = first;
 }
 
@@ -322,7 +320,7 @@ u8* DrawStream::alloc(u32 size) {
 		const Instruction end_instr = Instruction::END;
 		memcpy(current->data + current->header.size, &end_instr, sizeof(end_instr));
 		
-		Page* new_page = new (NewPlaceholder(), allocator.allocate(true)) Page;
+		Page* new_page = new (NewPlaceholder(), allocator.allocate()) Page;
 		current->header.next = new_page;
 		current = new_page;
 		start = 0;
@@ -638,14 +636,12 @@ void DrawStream::freeAlignedMemory(void* ptr, IAllocator& allocator) {
 }
 
 void DrawStream::reset() {
-	allocator.lock();
 	while (first) {
 		Page* next = first->header.next;
-		allocator.deallocate(first, false);
+		allocator.deallocate(first);
 		first = next;
 	}
-	first = new (NewPlaceholder(), allocator.allocate(false)) Page;
-	allocator.unlock();
+	first = new (NewPlaceholder(), allocator.allocate()) Page;
 	
 	current = first;
 	run_called = false;
