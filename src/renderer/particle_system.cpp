@@ -828,13 +828,13 @@ struct ParticleSystem::ChunkProcessorContext {
 	{
 		ASSERT(emitter.resource_emitter.registers_count <= lengthOf(registers));
 		for (u32 i = 0; i < emitter.resource_emitter.registers_count; ++i) {
-			registers[i] = (float4*)page_allocator.allocate(true);
+			registers[i] = (float4*)page_allocator.allocate();
 		}
 	}
 
 	~ChunkProcessorContext() {
 		for (u32 i = 0; i < emitter.resource_emitter.registers_count; ++i) {
-			page_allocator.deallocate(registers[i], true);
+			page_allocator.deallocate(registers[i]);
 		}
 	}
 
@@ -1114,7 +1114,7 @@ void ParticleSystem::update(float dt, u32 emitter_idx, PageAllocator& page_alloc
 
 	m_constants[1] = m_total_time;
 	profiler::pushInt("particle count", emitter.particles_count);
-	u32* kill_counter = (u32*)page_allocator.allocate(true);
+	u32* kill_counter = (u32*)page_allocator.allocate();
 	const u32 chunks_count = (emitter.particles_count + 1023) / 1024;
 	ASSERT(chunks_count <= PageAllocator::PAGE_SIZE / sizeof(u32));
 	memset(kill_counter, 0, chunks_count * sizeof(u32));
@@ -1183,7 +1183,7 @@ void ParticleSystem::update(float dt, u32 emitter_idx, PageAllocator& page_alloc
 		m_last_update_stats.killed.add(total_killed);
 		emitter.particles_count -= total_killed;
 		profiler::pushInt("kill count", total_killed);
-		page_allocator.deallocate(kill_counter, true);
+		page_allocator.deallocate(kill_counter);
 	}
 
 	InputPagedStream blob(emit_stream);

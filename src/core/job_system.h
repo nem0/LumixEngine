@@ -90,25 +90,55 @@ void runOnWorkers(const F& f)
 
 
 template <typename F>
-void forEach(i32 count, i32 step, const F& f)
-{
+void forEach(u32 count, u32 step, const F& f) {
 	if (count == 0) return;
 	if (count <= step) {
 		f(0, count);
 		return;
 	}
 
-	AtomicI32 offset = 0;
+	const u32 steps = (count + step - 1) / step;
+	const u32 num_workers = u32(getWorkersCount());
+	const u32 num_jobs = steps > num_workers ? num_workers : steps;
+	
+	Signal signal;
+	struct Data {
+		const F* f;
+		AtomicI32 offset = 0;
+		u32 step;
+		u32 count;
+	} data = {
+		.f = &f,
+		.step = step,
+		.count = count
+	};
+	
+	for (u32 i = 1; i < num_jobs; ++i) {
+		jobs::run((void*)&data, [](void* user_ptr){
+			Data* data = (Data*)user_ptr;
+			const u32 count = data->count;
+			const u32 step = data->step;
+			const F* f = data->f;
 
-	jobs::runOnWorkers([&](){
-		for(;;) {
-			const i32 idx = offset.add(step);
-			if (idx >= count) break;
-			i32 to = idx + step;
-			to = to > count ? count : to;
-			f(idx, to);
-		}
-	});
+			for(;;) {
+				const i32 idx = data->offset.add(step);
+				if ((u32)idx >= count) break;
+				u32 to = idx + step;
+				to = to > count ? count : to;
+				(*f)(idx, to);
+			}			
+		}, &signal);
+	}
+
+	for(;;) {
+		const i32 idx = data.offset.add(step);
+		if ((u32)idx >= count) break;
+		u32 to = idx + step;
+		to = to > count ? count : to;
+		f(idx, to);
+	}			
+	
+	wait(&signal);
 }
 
 } // namespace jobs

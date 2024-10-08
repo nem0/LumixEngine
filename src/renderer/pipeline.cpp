@@ -218,7 +218,7 @@ struct PipelineImpl final : Pipeline {
 			}
 
 			Page* getNewPage() {
-				void* mem = sorter.page_allocator.allocate(true);
+				void* mem = sorter.page_allocator.allocate();
 				return new (NewPlaceholder(), mem) Page;
 			}
 
@@ -273,13 +273,11 @@ struct PipelineImpl final : Pipeline {
 
 		~Sorter() {
 			Page* p = first_page;
-			page_allocator.lock();
 			while (p) {
 				Page* n = p->header.next;
-				page_allocator.deallocate(p, false);
+				page_allocator.deallocate(p);
 				p = n;
 			}
-			page_allocator.unlock();
 		}
 
 		void operator=(Sorter&&) = delete;
@@ -307,13 +305,11 @@ struct PipelineImpl final : Pipeline {
 			}
 
 			p = first_page;
-			page_allocator.lock();
 			while (p) {
 				Page* n = p->header.next;
-				page_allocator.deallocate(p, false);
+				page_allocator.deallocate(p);
 				p = n;
 			}
-			page_allocator.unlock();
 			first_page = last_page = nullptr;
 		}
 
@@ -372,13 +368,11 @@ struct PipelineImpl final : Pipeline {
 
 		~AutoInstancer() {
 			Page* p = first_page;
-			page_allocator.lock();
 			while (p) {
 				Page* next = p->header.next;
-				page_allocator.deallocate(p, false);
+				page_allocator.deallocate(p);
 				p = next;
 			}
-			page_allocator.unlock();
 		}
 
 		void add(u32 sort_key, u64 renderable) {
@@ -402,7 +396,7 @@ struct PipelineImpl final : Pipeline {
 		}
 
 		Page* getNewPage() {
-			void* mem = page_allocator.allocate(true);
+			void* mem = page_allocator.allocate();
 			Page* p = new (NewPlaceholder(), mem) Page;
 			return p;
 		}

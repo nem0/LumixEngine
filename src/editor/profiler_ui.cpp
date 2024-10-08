@@ -1085,12 +1085,13 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 								r.line = line;
 								if (!properties.empty()) {
 									r.first_property = thread.properties.size();
-									r.num_properties = properties.size();
+									r.num_properties = 0;
 									for (i32 i = properties.size() - 1; i >= 0; --i) {
 										const Property& prop = properties[i];
 										if (prop.level == line + 1) {
 											thread.properties.push(prop.offset);
 											properties.pop();
+											++r.num_properties;
 										}
 									}
 								}
