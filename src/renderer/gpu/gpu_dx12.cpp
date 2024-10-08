@@ -350,33 +350,50 @@ struct ShaderCompiler {
 		RollingStableHasher hasher;
 		hasher.begin();
 		hasher.update(src, stringLength(src));
-		hasher.update(&program.primitive_topology, sizeof(program.primitive_topology));
-		hasher.update(&program.state, sizeof(program.state));
+		if (type == ShaderType::SURFACE) {
+			hasher.update(&program.primitive_topology, sizeof(program.primitive_topology));
+			hasher.update(&program.state, sizeof(program.state));
+		}
+
 		const StableHash hash = hasher.end64();
 		program.shader_hash = hash;
-		if (type == ShaderType::SURFACE) {
-			// TODO surface shader cache
-			program.vs = compileStage(hash, src, "vs_5_1", name, "mainVS");
-			if (!program.vs) return false;
 
-			program.ps = compileStage(hash, src, "ps_5_1", name, "mainPS");
-			if (!program.ps) return false;
-		}
-		else {
-			ASSERT(type == ShaderType::COMPUTE);
+		if (type == ShaderType::SURFACE) {
 			auto iter = m_cache.find(hash);
 			if (iter.isValid()) {
-				program.cs = iter.value();
-				return true;
+				program.vs = iter.value();
+			}
+			else {
+				program.vs = compileStage(hash, src, "vs_5_1", name, "mainVS");
+				if (!program.vs) return false;
 			}
 
-			program.cs = compileStage(hash, src, "cs_5_1", name, "main");
-			if (!program.cs) return false;
-			if (program.cs->GetBufferSize() == 0) {
-				program.cs->Release();
-				program.cs = nullptr;
-				return false;
+			const StableHash ps_hash = StableHash::fromU64(hash.getHashValue() + 1);
+
+			iter = m_cache.find(ps_hash);
+			if (iter.isValid()) {
+				program.ps = iter.value();
 			}
+			else {
+				program.ps = compileStage(ps_hash, src, "ps_5_1", name, "mainPS");
+				if (!program.ps) return false;
+			}
+			return true;
+		}
+
+		ASSERT(type == ShaderType::COMPUTE);
+		auto iter = m_cache.find(hash);
+		if (iter.isValid()) {
+			program.cs = iter.value();
+			return true;
+		}
+
+		program.cs = compileStage(hash, src, "cs_5_1", name, "main");
+		if (!program.cs) return false;
+		if (program.cs->GetBufferSize() == 0) {
+			program.cs->Release();
+			program.cs = nullptr;
+			return false;
 		}
 
 		return true;
@@ -558,7 +575,6 @@ struct PSOCache {
 		desc.pRootSignature = root_signature;
 		desc.RasterizerState.FrontCounterClockwise = TRUE;
 		desc.RasterizerState.FillMode = u64(state & StateFlags::WIREFRAME) ? D3D12_FILL_MODE_WIREFRAME : D3D12_FILL_MODE_SOLID;
-		// TODO enable/disable scissor
 		desc.RasterizerState.DepthClipEnable = FALSE;
 
 		desc.DepthStencilState.DepthEnable = u64(state & StateFlags::DEPTH_FUNCTION) != 0;
@@ -2044,6 +2060,8 @@ void enableVSync(bool enable) {
 	d3d->vsync_dirty = true;
 }
 
+static ProgramHandle g_last_program = INVALID_PROGRAM;
+
 u32 present() {
 	d3d->vsync_mutex.enter();
 	const bool vsync = d3d->vsync;
@@ -2154,6 +2172,7 @@ u32 present() {
 		}
 	}
 
+	g_last_program = INVALID_PROGRAM;
 	return frame_idx;
 }
 
@@ -2531,7 +2550,7 @@ void requestDisassembly(ProgramHandle program) {
 		return;
 	}
 
-	if (!program->vs || !program->ps) return; // TODO
+	if (!program->vs || !program->ps) return;
 	ID3DBlob* vs_blob;
 	ID3DBlob* ps_blob;
 	HRESULT hr = D3DDisassemble(program->vs->GetBufferPointer(), program->vs->GetBufferSize(), 0, NULL, &vs_blob);
@@ -2576,9 +2595,6 @@ enum class PipelineType {
 	GRAPHICS
 };
 
-static PipelineType g_last_pipeline_type = PipelineType::NONE;
-static ProgramHandle g_last_program = INVALID_PROGRAM;
-
 static void applyGFXUniformBlocks() {
 	if (d3d->dirty_gfx_uniform_blocks == 0) return;
 	for (u32 i = 0; i < 6; ++i) {
@@ -2600,14 +2616,13 @@ static void applyComputeUniformBlocks() {
 }
 
 [[nodiscard]] static bool setPipelineStateCompute() {
-	if (g_last_pipeline_type != PipelineType::COMPUTE || g_last_program != d3d->current_program) {
+	if (g_last_program != d3d->current_program) {
+		g_last_program = d3d->current_program;
 		ID3D12PipelineState* pso = d3d->pso_cache.getPipelineStateCompute(d3d->device, d3d->root_signature, d3d->current_program);
 		#ifdef LUMIX_DEBUG
 			if (!pso) return false;
 		#endif
 		d3d->cmd_list->SetPipelineState(pso);
-		g_last_pipeline_type = PipelineType::COMPUTE;
-		g_last_program = d3d->current_program;
 		d3d->cmd_list->SetComputeRootDescriptorTable(BINDLESS_SRV_ROOT_PARAMETER_INDEX, d3d->srv_heap.gpu_begin);
 		d3d->cmd_list->SetComputeRootDescriptorTable(BINDLESS_SAMPLERS_ROOT_PARAMETER_INDEX, d3d->sampler_heap.gpu_begin);
 		if (d3d->bound_shader_buffers.ptr) d3d->cmd_list->SetComputeRootDescriptorTable(SRV_ROOT_PARAMETER_INDEX, d3d->bound_shader_buffers);
@@ -2617,18 +2632,20 @@ static void applyComputeUniformBlocks() {
 }
 
 [[nodiscard]] static bool setPipelineStateGraphics() {
-	const u8 stencil_ref = u8(u64(d3d->current_program->state) >> 34);
-	d3d->cmd_list->OMSetStencilRef(stencil_ref);
+	if (g_last_program != d3d->current_program) {
+		g_last_program = d3d->current_program;
+		const u8 stencil_ref = u8(u64(d3d->current_program->state) >> 34);
+		d3d->cmd_list->OMSetStencilRef(stencil_ref);
 
-	ID3D12PipelineState* pso = d3d->pso_cache.getPipelineState(d3d->device, d3d->current_program, d3d->current_framebuffer, d3d->root_signature);
-	#ifdef LUMIX_DEBUG
-		if (!pso) return false;
-	#endif
-	d3d->cmd_list->SetPipelineState(pso);
-	g_last_pipeline_type = PipelineType::GRAPHICS;
-	d3d->cmd_list->SetGraphicsRootDescriptorTable(BINDLESS_SRV_ROOT_PARAMETER_INDEX, d3d->srv_heap.gpu_begin);
-	d3d->cmd_list->SetGraphicsRootDescriptorTable(BINDLESS_SAMPLERS_ROOT_PARAMETER_INDEX, d3d->sampler_heap.gpu_begin);
-	if (d3d->bound_shader_buffers.ptr) d3d->cmd_list->SetGraphicsRootDescriptorTable(SRV_ROOT_PARAMETER_INDEX, d3d->bound_shader_buffers);
+		ID3D12PipelineState* pso = d3d->pso_cache.getPipelineState(d3d->device, d3d->current_program, d3d->current_framebuffer, d3d->root_signature);
+		#ifdef LUMIX_DEBUG
+			if (!pso) return false;
+		#endif
+		d3d->cmd_list->SetPipelineState(pso);
+		d3d->cmd_list->SetGraphicsRootDescriptorTable(BINDLESS_SRV_ROOT_PARAMETER_INDEX, d3d->srv_heap.gpu_begin);
+		d3d->cmd_list->SetGraphicsRootDescriptorTable(BINDLESS_SAMPLERS_ROOT_PARAMETER_INDEX, d3d->sampler_heap.gpu_begin);
+		if (d3d->bound_shader_buffers.ptr) d3d->cmd_list->SetGraphicsRootDescriptorTable(SRV_ROOT_PARAMETER_INDEX, d3d->bound_shader_buffers);
+	}
 	applyGFXUniformBlocks();
 	return true;
 }
