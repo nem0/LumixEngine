@@ -5072,8 +5072,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 				decl.addAttribute(0, 2, gpu::AttributeType::FLOAT, 0);
 				decl.addAttribute(8, 2, gpu::AttributeType::FLOAT, 0);
 				decl.addAttribute(16, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
-				const gpu::StateFlags blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
-				const gpu::StateFlags state = gpu::StateFlags::SCISSOR_TEST | blend_state;
+				const gpu::StateFlags state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
 				stream.createProgram(program, state, decl, src, gpu::ShaderType::SURFACE, nullptr, 0, "imgui shader");
 			}
 

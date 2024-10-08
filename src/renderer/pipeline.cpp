@@ -1661,7 +1661,6 @@ struct PipelineImpl final : Pipeline {
 		memcpy(vtx_buffer_mem.ptr, data.getVertices().begin(), data.getVertices().byte_size());
 
 		gpu::StateFlags state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
-		state = state | gpu::StateFlags::SCISSOR_TEST;
 		if (is_3d) state = state | gpu::StateFlags::DEPTH_FN_GREATER; 
 		const gpu::ProgramHandle program = m_draw2d_shader->getProgram(state, m_2D_decl, 0, "");
 
@@ -2883,6 +2882,7 @@ struct PipelineImpl final : Pipeline {
 			(m_viewport.w + 63) / 64,
 			(m_viewport.h + 63) / 64,
 			16);
+
 		const u32 clusters_count = size.x * size.y * size.z;
 		Cluster* clusters = (Cluster*)frame_allocator.allocate(sizeof(Cluster) * clusters_count, alignof(Cluster));
 		memset(clusters, 0, sizeof(Cluster) * clusters_count);
@@ -2934,7 +2934,6 @@ struct PipelineImpl final : Pipeline {
 		if (!m_shadow_atlas.texture) {
 			m_shadow_atlas.texture = m_renderer.createTexture(ShadowAtlas::SIZE, ShadowAtlas::SIZE, 1, gpu::TextureFormat::D32, gpu::TextureFlags::NO_MIPS, Renderer::MemRef(), "shadow_atlas");
 		}
-
 		Matrix shadow_atlas_matrices[128];
 		for (u32 i = 0; i < atlas_sorter.count; ++i) {
 			ClusterLight& light = lights[atlas_sorter.lights[i].idx];

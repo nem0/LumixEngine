@@ -55,8 +55,7 @@ enum class StateFlags : u64 {
 	DEPTH_FUNCTION = DEPTH_FN_GREATER | DEPTH_FN_EQUAL,
 	CULL_FRONT = 1 << 3,
 	CULL_BACK = 1 << 4,
-	SCISSOR_TEST = 1 << 5,
-	DEPTH_WRITE = 1 << 6,
+	DEPTH_WRITE = 1 << 5,
 
 	/* 16 bits reserved for blending*/
 	/* 40 bits reserver for stencil*/ 
