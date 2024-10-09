@@ -1850,8 +1850,8 @@ struct StudioAppImpl final : StudioApp {
 		ImGui::EndMenu();
 	}
 
-	void mainMenu()
-	{
+	void mainMenu() {
+		PROFILE_FUNCTION();
 		if (m_confirm_exit) {
 			openCenterStrip("Confirm##confirm_exit");
 			m_confirm_exit = false;
@@ -1939,11 +1939,12 @@ struct StudioAppImpl final : StudioApp {
 
 			// we don't have custom titlebar on linux
 			#ifdef _WIN32
+				StaticString<200> stats;
+				if (m_engine->getFileSystem().hasWork()) stats.append(ICON_FA_HOURGLASS_HALF "Loading... | ");
+				stats.append("FPS: ", u32(m_fps + 0.5f));
+				if (m_frames_since_focused > 10) stats.append(" - inactive window");
+
 				alignGUIRight([&](){
-					StaticString<200> stats;
-					if (m_engine->getFileSystem().hasWork()) stats.append(ICON_FA_HOURGLASS_HALF "Loading... | ");
-					stats.append("FPS: ", u32(m_fps + 0.5f));
-					if (m_frames_since_focused > 10) stats.append(" - inactive window");
 					ImGuiEx::TextUnformatted(stats);
 
 					if (m_log_ui->getUnreadErrorCount() == 1) {

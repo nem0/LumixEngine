@@ -106,7 +106,6 @@ struct System {
 		: m_allocator(allocator, "job system")
 		, m_workers(m_allocator)
 		, m_free_fibers(m_allocator)
-		, m_backup_workers(m_allocator)
 		, m_work_queue(m_allocator)
 	{}
 
@@ -114,7 +113,6 @@ struct System {
 	TagAllocator m_allocator;
 	Lumix::Mutex m_sync;
 	Array<WorkerTask*> m_workers;
-	Array<WorkerTask*> m_backup_workers;
 	FiberDecl m_fiber_pool[512];
 	Array<FiberDecl*> m_free_fibers;
 	WorkQueue<64> m_work_queue;
@@ -178,7 +176,6 @@ struct WorkerTask : Thread {
 	WorkQueue<4> m_work_queue;
 	u8 m_worker_index;
 	bool m_is_enabled = false;
-	bool m_is_backup = false;
 };
 
 // linked list of  fibers waiting on a signal
@@ -232,30 +229,6 @@ LUMIX_FORCE_INLINE static bool trigger(Signal* signal)
 	}
 
 	return true;
-}
-
-void enableBackupWorker(bool enable)
-{
-	Lumix::MutexGuard lock(g_system->m_sync);
-
-	for (WorkerTask* task : g_system->m_backup_workers) {
-		if (task->m_is_enabled != enable) {
-			task->m_is_enabled = enable;
-			return;
-		}
-	}
-
-	ASSERT(enable);
-	WorkerTask* task = LUMIX_NEW(g_system->m_allocator, WorkerTask)(*g_system, 0xff);
-	if (task->create("Backup worker", false)) {
-		g_system->m_backup_workers.push(task);
-		task->m_is_enabled = true;
-		task->m_is_backup = true;
-	}
-	else {
-		logError("Job system backup worker failed to initialize.");
-		LUMIX_DELETE(g_system->m_allocator, task);
-	}
 }
 
 LUMIX_FORCE_INLINE static bool setRedEx(Signal* signal) {
@@ -344,20 +317,8 @@ static bool tryPopWork(Work& work, WorkerTask* worker) {
 		
 	WorkerTask* worker = getWorker();
 	while (!worker->m_finished) {
-		if (worker->m_is_backup) {
-			Lumix::MutexGuard guard(g_system->m_sync);
-			while (!worker->m_is_enabled && !worker->m_finished) {
-				PROFILE_BLOCK("disabled");
-				profiler::blockColor(0xff, 0, 0xff);
-				worker->sleep(g_system->m_sync);
-			}
-		}
-
 		Work work;
-		while (!worker->m_finished) {
-			if (tryPopWork(work, worker)) break;
-			if (worker->m_is_backup) break;
-		}
+		while (!worker->m_finished && !tryPopWork(work, worker)) {}
 		if (worker->m_finished) break;
 
 		if (work.type == Work::FIBER) {
@@ -388,7 +349,7 @@ static bool tryPopWork(Work& work, WorkerTask* worker) {
 			worker = getWorker();
 			profiler::endBlock();
 		}
-		else ASSERT(worker->m_is_backup);
+		else ASSERT(false);
 	}
 	Fiber::switchTo(&this_fiber->fiber, getWorker()->m_primary_fiber);
 }
@@ -444,18 +405,6 @@ void shutdown()
 	{
 		WorkerTask* wt = (WorkerTask*)task;
 		wt->m_finished = true;
-	}
-	for (Thread* task : g_system->m_backup_workers) {
-		WorkerTask* wt = (WorkerTask*)task;
-		wt->m_finished = true;
-		wt->wakeup();
-	}
-
-	for (Thread* task : g_system->m_backup_workers)
-	{
-		while (!task->isFinished()) task->wakeup();
-		task->destroy();
-		LUMIX_DELETE(allocator, task);
 	}
 
 	for (WorkerTask* task : g_system->m_workers)

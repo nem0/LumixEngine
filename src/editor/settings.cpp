@@ -890,6 +890,7 @@ static void sortActions() {
 }
 
 void Settings::shortcutsGUI() {
+	PROFILE_FUNCTION();
 	if (!ImGui::BeginTabItem("Shortcuts")) return;
 
 	static TextFilter filter;
