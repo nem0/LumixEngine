@@ -61,34 +61,38 @@ struct WorkQueue {
 	{}
 
 	LUMIX_FORCE_INLINE void push(const Work& obj) {
-		Lumix::MutexGuard guard(mutex);
-		if (write - read >= lengthOf(objects)) {
-			// ring buffer full, push to fallback
-			fallback.push(obj);
-			semaphore.signal();
-			return;
+		{
+			Lumix::MutexGuard guard(mutex);
+			if (write - read >= lengthOf(objects)) {
+				// ring buffer full, push to fallback
+				fallback.push(obj);
+				semaphore.signal();
+				return;
+			}
+			
+			objects[write % lengthOf(objects)] = obj;
+			++write;
 		}
-		
-		objects[write % lengthOf(objects)] = obj;
-		++write;
 		semaphore.signal();
 	}
 	
 	LUMIX_FORCE_INLINE bool pop(Work& obj) {
-		Lumix::MutexGuard guard(mutex);
-		if (read == write) {
-			// ring buffer empty, check fallback lifo
-			if (fallback.empty()) return false;
+		{
+			Lumix::MutexGuard guard(mutex);
+			if (read == write) {
+				// ring buffer empty, check fallback lifo
+				if (fallback.empty()) return false;
 
-			obj = fallback.back();
-			fallback.pop();
-			semaphore.wait(0);
-			return true;
+				obj = fallback.back();
+				fallback.pop();
+				semaphore.wait(0);
+				return true;
+			}
+
+			// pop from ring buffer
+			obj = objects[read % lengthOf(objects)];
+			++read;
 		}
-
-		// pop from ring buffer
-		obj = objects[read % lengthOf(objects)];
-		++read;
 		semaphore.wait(0);
 		return true;
 	}
