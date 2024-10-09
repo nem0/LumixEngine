@@ -931,7 +931,7 @@ struct RendererImpl final : Renderer {
 		jobs::enableBackupWorker(true);
 
 		{
-			PROFILE_BLOCK("swap buffers");
+			PROFILE_BLOCK("gpu present");
 			frame.gpu_frame = gpu::present();
 		}
 		

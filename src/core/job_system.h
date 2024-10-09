@@ -30,24 +30,23 @@ LUMIX_CORE_API void exit(Mutex* mutex);
 
 LUMIX_CORE_API void setRed(Signal* signal);
 LUMIX_CORE_API void setGreen(Signal* signal);
-
-LUMIX_CORE_API void run(void* data, void(*task)(void*), Signal* on_finish);
-LUMIX_CORE_API void runEx(void* data, void (*task)(void*), Signal* on_finish, u8 worker_index);
 LUMIX_CORE_API void wait(Signal* signal);
+
+LUMIX_CORE_API void run(void* data, void(*task)(void*), Signal* on_finish, u8 worker_index = ANY_WORKER);
 
 template <typename F>
 void runLambda(F&& f, Signal* on_finish, u8 worker = ANY_WORKER) {
 	void* arg;
 	if constexpr (sizeof(f) == sizeof(void*) && __is_trivially_copyable(F)) {
 		memcpy(&arg, &f, sizeof(arg));
-		runEx(arg, [](void* arg){
+		run(arg, [](void* arg){
 			F* f = (F*)&arg;
 			(*f)();
 		}, on_finish, worker);
 	}
 	else {
 		F* tmp = LUMIX_NEW(getAllocator(), F)(static_cast<F&&>(f));
-		runEx(tmp, [](void* arg){
+		run(tmp, [](void* arg){
 			F* f = (F*)arg;
 			(*f)();
 			LUMIX_DELETE(getAllocator(), f);
@@ -130,7 +129,7 @@ void forEach(u32 count, u32 step, const F& f) {
 		}, &signal);
 	}
 
-	for(;;) {
+	for (;;) {
 		const i32 idx = data.offset.add(step);
 		if ((u32)idx >= count) break;
 		u32 to = idx + step;

@@ -530,7 +530,7 @@ void Settings::load() {
 				Tokenizer::Token value = tokenizer.nextToken();
 				switch (value.type) {
 					case Tokenizer::Token::NUMBER: fromCString(value.value, var->i32_value); var->type = Variable::I32; break;
-					case Tokenizer::Token::STRING: var->string_value = value.value; break;
+					case Tokenizer::Token::STRING: var->string_value = value.value; var->type = Variable::STRING; break;
 					case Tokenizer::Token::IDENTIFIER:
 						if (value == "true") {
 							var->bool_value = true;
@@ -1097,6 +1097,38 @@ bool Settings::getBool(const char* var_name, bool default_value) {
 	}
 }
 
+const char* Settings::getString(const char* var_name, const char* default_value) {
+	Settings::Variable* var = findVar(*this, var_name);
+	if (!var) return default_value;
+
+	switch(var->type) {
+		case Variable::STRING: return var->string_value.c_str();
+		case Variable::STRING_PTR:
+			// use direct access through pointer, not getString
+			ASSERT(false);
+			return var->string_ptr->c_str();
+		default:
+			logError("Variable ", var_name, " in settings is not a string");
+			return default_value;
+	}
+}
+
+float Settings::getFloat(const char* var_name, float default_value) {
+	Settings::Variable* var = findVar(*this, var_name);
+	if (!var) return default_value;
+
+	switch(var->type) {
+		case Variable::FLOAT: return var->float_value;
+		case Variable::FLOAT_PTR:
+			// use direct access through pointer, not getBool
+			ASSERT(false);
+			return *var->float_ptr;
+		default:
+			logError("Variable ", var_name, " in settings is not a float");
+			return default_value;
+	}
+}
+
 i32 Settings::getI32(const char* var_name, i32 default_value) {
 	Settings::Variable* var = findVar(*this, var_name);
 	if (!var) return default_value;
@@ -1135,6 +1167,56 @@ void Settings::setBool(const char* var_name, bool value, Storage storage) {
 	Variable& new_var = m_variables.insert(String(var_name, m_allocator));
 	new_var.bool_value = value;
 	new_var.type = Variable::BOOL;
+	new_var.storage = storage;
+}
+
+void Settings::setString(const char* var_name, const char* value, Storage storage) {
+	// find existing
+	Variable* var =  findVar(*this, var_name);
+	if (var) {
+		var->storage = storage;
+		switch(var->type) {
+			case Variable::STRING: var->string_value = value; return;
+			case Variable::STRING_PTR: 
+				// use direct access through pointer, not setString
+				ASSERT(false);
+				return;
+			default:
+				logError("Variable ", var_name, " in settings is not a string");
+				return;
+		}
+		return;
+	}
+
+	// create new
+	Variable& new_var = m_variables.insert(String(var_name, m_allocator));
+	new_var.string_value = value;
+	new_var.type = Variable::STRING;
+	new_var.storage = storage;
+}
+
+void Settings::setFloat(const char* var_name, float value, Storage storage) {
+	// find existing
+	Variable* var =  findVar(*this, var_name);
+	if (var) {
+		var->storage = storage;
+		switch(var->type) {
+			case Variable::FLOAT: var->float_value = value; return;
+			case Variable::FLOAT_PTR: 
+				// use direct access through pointer, not setFloat
+				ASSERT(false);
+				return;
+			default:
+				logError("Variable ", var_name, " in settings is not a float");
+				return;
+		}
+		return;
+	}
+
+	// create new
+	Variable& new_var = m_variables.insert(String(var_name, m_allocator));
+	new_var.float_value = value;
+	new_var.type = Variable::FLOAT;
 	new_var.storage = storage;
 }
 

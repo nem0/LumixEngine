@@ -213,16 +213,14 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 		StudioLuaPlugin* plugin = LUMIX_NEW(app.getAllocator(), StudioLuaPlugin)(app, name);
 		lua_pop(L, 1);
 
-/*
+
 		if (lua_getfield(L, -1, "windowMenuAction") == LUA_TFUNCTION) {
 			char tmp[64];
 			convertToLuaName(name, tmp);
-			plugin->m_action.init(name, name, tmp, "");
-			plugin->m_action.func.bind<&StudioLuaPlugin::runWindowAction>(plugin);
-			app.addWindowAction(&plugin->m_action);
+			plugin->m_action.create(name, name, tmp, "", Action::WINDOW);
 		}
 		lua_pop(L, 1);
-*/
+
 		plugin->m_plugin_ref = LuaWrapper::createRef(L);
 		lua_pop(L, 1);
 		app.addPlugin(*plugin);
@@ -256,26 +254,6 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 		, m_name(name, app.getAllocator())
 	{}
 	
-	void runWindowAction() {
-		LuaScriptSystem* system = (LuaScriptSystem*)m_app.getEngine().getSystemManager().getSystem("lua_script");
-		lua_State* L = system->getState();
-		LuaWrapper::DebugGuard guard(L);
-		lua_rawgeti(L, LUA_REGISTRYINDEX, m_plugin_ref);
-		lua_getfield(L, -1, "windowMenuAction");
-		LuaWrapper::pcall(L, 0, 0);
-		lua_pop(L, 1);
-	}
-	
-	// TODO
-/*
-	bool onAction(const Action& action) override {
-		if (&action == &m_action) {
-			runWindowAction();
-			return true;
-		}
-		return false;
-	}
-*/
 	bool exportData(const char* dest_dir) override
 	{
 		#ifndef LUMIX_STATIC_LUAU
@@ -299,6 +277,17 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 	void onGUI() override {
 		LuaScriptSystem* system = (LuaScriptSystem*)m_app.getEngine().getSystemManager().getSystem("lua_script");
 		lua_State* L = system->getState();
+		
+		// check window action
+		if (m_action.get() && m_app.checkShortcut(*m_action.get(), true)) {
+			LuaWrapper::DebugGuard guard(L);
+			lua_rawgeti(L, LUA_REGISTRYINDEX, m_plugin_ref);
+			lua_getfield(L, -1, "windowMenuAction");
+			LuaWrapper::pcall(L, 0, 0);
+			lua_pop(L, 1);
+		}
+
+		// gui
 		LuaWrapper::DebugGuard guard(L);
 		lua_rawgeti(L, LUA_REGISTRYINDEX, m_plugin_ref);
 		lua_getfield(L, -1, "gui");
@@ -307,9 +296,9 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 	}
 
 	void onSettingsLoaded() override {
-		// TODO
-		/*
-		lua_State* L = m_app.getEngine().getState();
+		LuaScriptSystem* system = (LuaScriptSystem*)m_app.getEngine().getSystemManager().getSystem("lua_script");
+		lua_State* L = system->getState();
+		
 		LuaWrapper::DebugGuard guard(L);
 		lua_rawgeti(L, LUA_REGISTRYINDEX, m_plugin_ref);
 		if (lua_getfield(L, -1, "settings") == LUA_TNIL) {
@@ -333,36 +322,39 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 			switch (lua_type(L, -1)) {
 				case LUA_TBOOLEAN: {
 					bool val = lua_toboolean(L, -1);
-					val = m_app.getSettings().getValue(Settings::LOCAL, setting_name, val);
+					val = m_app.getSettings().getBool(setting_name, val);
 					lua_pushboolean(L, val);
 					lua_setfield(L, -4, setting_name);
 					break;
 				}
 				case LUA_TNUMBER: {
 					float val = (float)lua_tonumber(L, -1);
-					val = m_app.getSettings().getValue(Settings::LOCAL, setting_name, val);
+					val = m_app.getSettings().getFloat(setting_name, val);
 					lua_pushnumber(L, val);
 					lua_setfield(L, -4, setting_name);
 					break;
 				}
 				case LUA_TSTRING: {
 					const char* val = lua_tostring(L, -1);
-					val = m_app.getSettings().getStringValue(Settings::LOCAL, setting_name, val);
+					val = m_app.getSettings().getString(setting_name, val);
 					lua_pushstring(L, val);
 					lua_setfield(L, -4, setting_name);
 					break;
 				}
-				default: break;
+				default:
+					logError(m_path, ": ", setting_name, " has unsupported type");
+					break;
 			}
 			lua_pop(L, 1);
 		}
 
-		lua_pop(L, 2);*/
+		lua_pop(L, 2);
 	}
 	
 	void onBeforeSettingsSaved() override {
-		/*
-		lua_State* L = m_app.getEngine().getState();
+		LuaScriptSystem* system = (LuaScriptSystem*)m_app.getEngine().getSystemManager().getSystem("lua_script");
+		lua_State* L = system->getState();
+
 		LuaWrapper::DebugGuard guard(L);
 		lua_rawgeti(L, LUA_REGISTRYINDEX, m_plugin_ref);
 		if (lua_getfield(L, -1, "settings") == LUA_TNIL) {
@@ -386,34 +378,33 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 			switch (lua_type(L, -1)) {
 				case LUA_TBOOLEAN: {
 					bool val = lua_toboolean(L, -1);
-					m_app.getSettings().setValue(Settings::LOCAL, setting_name, val);
+					m_app.getSettings().setBool(setting_name, val, Settings::Storage::WORKSPACE);
 					break;
 				}
 				case LUA_TNUMBER: {
 					float val = (float)lua_tonumber(L, -1);
-					m_app.getSettings().setValue(Settings::LOCAL, setting_name, val);
+					m_app.getSettings().setFloat(setting_name, val, Settings::Storage::WORKSPACE);
 					break;
 				}
 				case LUA_TSTRING: {
 					const char* val = lua_tostring(L, -1);
-					m_app.getSettings().setValue(Settings::LOCAL, setting_name, val);
+					m_app.getSettings().setString(setting_name, val, Settings::Storage::WORKSPACE);
 					break;
 				}
 				default:
-					logError(m_name, "settings: ", setting_name, " has unsupported type");
+					logError(m_path, ": ", setting_name, " has unsupported type");
 					break;
 			}
 			lua_pop(L, 1);
 		}
 
 		lua_pop(L, 2);
-		*/
-		// TODO
 	}
 
 	const char* getName() const override { return m_name.c_str(); }
 
 	StudioApp& m_app;
+	Path m_path;
 	Local<Action> m_action;
 	String m_name;
 	i32 m_plugin_ref;
