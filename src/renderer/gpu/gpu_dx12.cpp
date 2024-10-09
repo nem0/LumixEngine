@@ -2063,6 +2063,7 @@ void enableVSync(bool enable) {
 static ProgramHandle g_last_program = INVALID_PROGRAM;
 
 u32 present() {
+	PROFILE_FUNCTION();
 	d3d->vsync_mutex.enter();
 	const bool vsync = d3d->vsync;
 	const bool vsync_dirty = d3d->vsync_dirty;

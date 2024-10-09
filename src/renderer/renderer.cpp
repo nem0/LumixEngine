@@ -928,14 +928,7 @@ struct RendererImpl final : Renderer {
 		frame.arena_allocator.reset();
 		m_profiler.endQuery();
 
-		jobs::enableBackupWorker(true);
-
-		{
-			PROFILE_BLOCK("gpu present");
-			frame.gpu_frame = gpu::present();
-		}
-		
-		jobs::enableBackupWorker(false);
+		frame.gpu_frame = gpu::present();
 		m_profiler.frame();
 
 		if (gpu::frameFinished(frame.gpu_frame)) {

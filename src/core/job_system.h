@@ -19,7 +19,6 @@ LUMIX_CORE_API IAllocator& getAllocator();
 LUMIX_CORE_API void shutdown();
 LUMIX_CORE_API u8 getWorkersCount();
 
-LUMIX_CORE_API void enableBackupWorker(bool enable);
 // yield current job and push it to worker queue
 LUMIX_CORE_API void moveJobToWorker(u8 worker_index);
 // yield current job, push it to global queue
