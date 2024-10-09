@@ -1493,7 +1493,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		if (!m_jobs_tail) m_jobs_head = nullptr;
 
 		// to keep editor responsive, we don't want to create too many tiles per frame 
-		jobs::runEx(job, &TextureTileJob::execute, nullptr, jobs::getWorkersCount() - 1);
+		jobs::run(job, &TextureTileJob::execute, nullptr, jobs::getWorkersCount() - 1);
 	}
 
 	bool createTile(const char* in_path, const char* out_path, Color tint) {

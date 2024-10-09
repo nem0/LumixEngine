@@ -7,7 +7,6 @@
 #include "core/math.h"
 #include "core/os.h"
 #include "core/profiler.h"
-#include "core/ring_buffer.h"
 #include "core/string.h"
 #include "core/sync.h"
 #include "core/thread.h"
@@ -54,29 +53,52 @@ struct Work {
 
 // Thread-safe, mutex-guarded ring buffer, with a fallback array for overflow
 // with added semaphore for waiting on new work
-template <int N>
-struct WaitableWorkQueue : RingBuffer<Work, N> {
-	WaitableWorkQueue(IAllocator& allocator) 
-		: RingBuffer<Work, N>(allocator)
-		, semaphore(0, 0x7fffFFff)
+template <int CAPACITY>
+struct WorkQueue {
+	WorkQueue(IAllocator& allocator) 
+		: semaphore(0, 0x7fffFFff)
+		, fallback(allocator)
 	{}
 
-	LUMIX_FORCE_INLINE void pushAndSignal(const Work& obj) {
-		RingBuffer<Work, N>::push(obj);
+	LUMIX_FORCE_INLINE void push(const Work& obj) {
+		Lumix::MutexGuard guard(mutex);
+		if (write - read >= lengthOf(objects)) {
+			// ring buffer full, push to fallback
+			fallback.push(obj);
+			semaphore.signal();
+			return;
+		}
+		
+		objects[write % lengthOf(objects)] = obj;
+		++write;
 		semaphore.signal();
 	}
 	
-	LUMIX_FORCE_INLINE bool tryPop(Work& obj) {
-		if (!RingBuffer<Work, N>::pop(obj)) return false;
+	LUMIX_FORCE_INLINE bool pop(Work& obj) {
+		Lumix::MutexGuard guard(mutex);
+		if (read == write) {
+			// ring buffer empty, check fallback lifo
+			if (fallback.empty()) return false;
 
-		// Try to consume signal
-		// The semaphore might not be signaled at this point because
-		// the producer might have been preempted between push and signal
+			obj = fallback.back();
+			fallback.pop();
+			semaphore.wait(0);
+			return true;
+		}
+
+		// pop from ring buffer
+		obj = objects[read % lengthOf(objects)];
+		++read;
 		semaphore.wait(0);
 		return true;
 	}
 
 	Semaphore semaphore;
+	Array<Work> fallback;
+	Work objects[CAPACITY];
+	u32 read = 0;
+	u32 write = 0;
+	Lumix::Mutex mutex;
 };
 
 struct System {
@@ -95,7 +117,7 @@ struct System {
 	Array<WorkerTask*> m_backup_workers;
 	FiberDecl m_fiber_pool[512];
 	Array<FiberDecl*> m_free_fibers;
-	WaitableWorkQueue<64> m_work_queue;
+	WorkQueue<64> m_work_queue;
 };
 
 
@@ -117,25 +139,20 @@ WorkerTask* getWorker()
 	#pragma clang optimize on
 #endif
 
-struct WorkerTask : Thread
-{
+struct WorkerTask : Thread {
 	WorkerTask(System& system, u8 worker_index) 
 		: Thread(system.m_allocator)
 		, m_system(system)
 		, m_worker_index(worker_index)
 		, m_work_queue(system.m_allocator)
-	{
-	}
+	{}
 
-
-	int task() override
-	{
+	i32 task() override {
 		profiler::showInProfiler(true);
 		g_worker = this;
 		Fiber::initThread(start, &m_primary_fiber);
 		return 0;
 	}
-
 
 	#ifdef _WIN32
 		static void __stdcall start(void* data)
@@ -158,17 +175,21 @@ struct WorkerTask : Thread
 	FiberDecl* m_current_fiber = nullptr;
 	Fiber::Handle m_primary_fiber;
 	System& m_system;
-	WaitableWorkQueue<4> m_work_queue;
+	WorkQueue<4> m_work_queue;
 	u8 m_worker_index;
 	bool m_is_enabled = false;
 	bool m_is_backup = false;
 };
 
+// linked list of  fibers waiting on a signal
 struct Waitor {
 	Waitor* next;
 	FiberDecl* fiber;
 };
 
+// decrement signal counter
+// if new value == 0, schedule all fibers waiting on a signal
+// returns true if any fiber was scheduled
 template <bool ZERO>
 LUMIX_FORCE_INLINE static bool trigger(Signal* signal)
 {
@@ -176,6 +197,7 @@ LUMIX_FORCE_INLINE static bool trigger(Signal* signal)
 	{
 		Lumix::MutexGuard lock(g_system->m_sync);
 
+		// decrement signal counter
 		if constexpr (ZERO) {
 			signal->counter = 0;
 		}
@@ -185,21 +207,25 @@ LUMIX_FORCE_INLINE static bool trigger(Signal* signal)
 			if (counter > 1) return false;
 		}
 
+		// store waitor in local variable, since it can change once we unlock the mutex
 		waitor = signal->waitor;
 		signal->waitor = nullptr;
 	}
 	if (!waitor) return false;
 
 	{
+		// schedule all fibers waiting on the signal
 		while (waitor) {
+			// store `next` in local variable, since it can be invalidated after we push the fiber to the queue
 			Waitor* next = waitor->next;
 			const u8 worker_idx = waitor->fiber->current_job.worker_index;
+			// push to queue
 			if (worker_idx == ANY_WORKER) {
-				g_system->m_work_queue.pushAndSignal(waitor->fiber);
+				g_system->m_work_queue.push(waitor->fiber);
 			}
 			else {
 				WorkerTask* worker = g_system->m_workers[worker_idx % g_system->m_workers.size()];
-				worker->m_work_queue.pushAndSignal(waitor->fiber);
+				worker->m_work_queue.push(waitor->fiber);
 			}
 			waitor = next;
 		}
@@ -250,19 +276,13 @@ void setGreen(Signal* signal) {
 	ASSERT(signal);
 	ASSERT(signal->counter <= 1);
 	const u32 gen = signal->generation;
-	if (trigger<true>(signal)){
+	if (trigger<true>(signal)) {
 		profiler::signalTriggered(gen);
 	}
 }
 
 
-void run(void* data, void(*task)(void*), Signal* on_finished)
-{
-	runEx(data, task, on_finished, ANY_WORKER);
-}
-
-
-void runEx(void* data, void(*task)(void*), Signal* on_finished, u8 worker_index)
+void run(void* data, void(*task)(void*), Signal* on_finished, u8 worker_index)
 {
 	Job job;
 	job.data = data;
@@ -279,17 +299,17 @@ void runEx(void* data, void(*task)(void*), Signal* on_finished, u8 worker_index)
 
 	if (worker_index != ANY_WORKER) {
 		WorkerTask* worker = g_system->m_workers[worker_index % g_system->m_workers.size()];
-		worker->m_work_queue.pushAndSignal(job);
+		worker->m_work_queue.push(job);
 		return;
 	}
 
-	g_system->m_work_queue.pushAndSignal(job);
+	g_system->m_work_queue.push(job);
 }
 
-// try to pop a job from the queues (worker, global), if no job is available, go to sleep
-static bool popWork(Work& work, WorkerTask* worker) {
-	if (worker->m_work_queue.tryPop(work)) return true;
-	if (g_system->m_work_queue.tryPop(work)) return true;
+// try to pop a job from the queues (first worker, then global), if no job is available, go to sleep
+static bool tryPopWork(Work& work, WorkerTask* worker) {
+	if (worker->m_work_queue.pop(work)) return true;
+	if (g_system->m_work_queue.pop(work)) return true;
 
 	{
 		// no jobs, let's go to sleep
@@ -335,7 +355,7 @@ static bool popWork(Work& work, WorkerTask* worker) {
 
 		Work work;
 		while (!worker->m_finished) {
-			if (popWork(work, worker)) break;
+			if (tryPopWork(work, worker)) break;
 			if (worker->m_is_backup) break;
 		}
 		if (worker->m_finished) break;
@@ -518,7 +538,7 @@ void moveJobToWorker(u8 worker_index) {
 	g_system->m_sync.enter();
 	FiberDecl* this_fiber = getWorker()->m_current_fiber;
 	WorkerTask* worker = g_system->m_workers[worker_index % g_system->m_workers.size()];
-	worker->m_work_queue.pushAndSignal(this_fiber);
+	worker->m_work_queue.push(this_fiber);
 	FiberDecl* new_fiber = g_system->m_free_fibers.back();
 	g_system->m_free_fibers.pop();
 	if (!Fiber::isValid(new_fiber->fiber)) {
@@ -535,7 +555,7 @@ void moveJobToWorker(u8 worker_index) {
 void yield() {
 	g_system->m_sync.enter();
 	FiberDecl* this_fiber = getWorker()->m_current_fiber;
-	g_system->m_work_queue.pushAndSignal(this_fiber);
+	g_system->m_work_queue.push(this_fiber);
 
 	FiberDecl* new_fiber = g_system->m_free_fibers.back();
 	g_system->m_free_fibers.pop();

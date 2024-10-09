@@ -43,8 +43,14 @@ struct LUMIX_EDITOR_API Settings {
 
 	i32 getI32(const char* var_name, i32 default_value);
 	bool getBool(const char* var_name, bool default_value);
+	float getFloat(const char* var_name, float default_value);
+	const char* getString(const char* var_name, const char* default_value);
+
 	void setI32(const char* var_name, i32 value, Storage storage);
 	void setBool(const char* var_name, bool value, Storage storage);
+	void setFloat(const char* var_name, float value, Storage storage);
+	void setString(const char* var_name, const char* value, Storage storage);
+
 	// register variable with memory storage not in Settings
 	// if category is null, the variable is not visible in settings UI
 	// otherwise it's grouped in the category
