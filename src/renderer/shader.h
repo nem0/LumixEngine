@@ -8,9 +8,6 @@
 #include "gpu/gpu.h"
 
 
-struct lua_State;
-
-
 namespace Lumix
 {
 
@@ -28,6 +25,12 @@ struct ShaderKey {
 };
 
 struct LUMIX_RENDERER_API Shader final : Resource {
+	struct Header {
+		static const u32 MAGIC = '_SHD';
+		u32 magic = MAGIC;
+		u32 version = 0;
+	};
+	
 	struct TextureSlot
 	{
 		TextureSlot()
@@ -44,14 +47,14 @@ struct LUMIX_RENDERER_API Shader final : Resource {
 
 	struct Uniform
 	{
-		enum Type
+		enum Type : u8
 		{
 			INT,
 			FLOAT,
 			COLOR,
-			VEC2,
-			VEC3,
-			VEC4,
+			FLOAT2,
+			FLOAT3,
+			FLOAT4,
 			NORMALIZED_FLOAT
 		};
 
@@ -68,37 +71,6 @@ struct LUMIX_RENDERER_API Shader final : Resource {
 		Type type;
 		u32 offset;
 		u32 size() const;
-	};
-
-	struct Stage {
-		Stage(IAllocator& allocator) : code(allocator) {}
-		Stage(const Stage& rhs)
-			: type(rhs.type)
-			, code(rhs.code.getAllocator())
-		{
-			rhs.code.copyTo(code);
-		}
-
-		gpu::ShaderType type;
-		Array<char> code;
-	};
-
-	struct Sources {
-		Sources(IAllocator& allocator) 
-			: stages(allocator)
-			, common(allocator)
-		{}
-		Sources(const Sources& rhs)
-			: stages(rhs.stages.getAllocator())
-			, common(rhs.common)
-			, path(rhs.path)
-		{
-			rhs.stages.copyTo(stages);
-		}
-
-		Path path;
-		Array<Shader::Stage> stages;
-		String common;
 	};
 
 	Shader(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& allocator);
@@ -125,9 +97,11 @@ struct LUMIX_RENDERER_API Shader final : Resource {
 		gpu::ProgramHandle program;
 	};
 	Array<ProgramPair> m_programs;
-	Sources m_sources;
+	gpu::ShaderType m_type;
+	String m_code;
 
 	static const ResourceType TYPE;
+	StableHash m_content_hash;
 
 private:
 	void unload() override;

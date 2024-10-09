@@ -1,9 +1,7 @@
 #pragma once
 
 #include "core/span.h"
-
 #include "engine/lumix.h"
-
 
 struct ImFont;
 
@@ -38,6 +36,7 @@ struct LUMIX_EDITOR_API StudioApp {
 		virtual void init() = 0;
 		virtual bool dependsOn(IPlugin& plugin) const { return false; }
 		virtual const char* getName() const = 0;
+		virtual void update(float time_delta) {}
 
 		virtual bool showGizmo(struct WorldView& view, struct ComponentUID cmp) = 0;
 	};
@@ -55,8 +54,6 @@ struct LUMIX_EDITOR_API StudioApp {
 	struct LUMIX_EDITOR_API GUIPlugin {
 		virtual ~GUIPlugin() {}
 		virtual void onGUI() = 0;
-		virtual bool hasFocus() const { return false; }
-		virtual bool onAction(const Action& action) { return false; }
 		virtual void update(float) {}
 		virtual void pluginAdded(GUIPlugin& plugin) {}
 		virtual const char* getName() const = 0;
@@ -88,6 +85,8 @@ struct LUMIX_EDITOR_API StudioApp {
 	virtual WorldEditor& getWorldEditor() = 0;
 	virtual void run() = 0;
 	virtual int getExitCode() const = 0;
+	virtual void exitWithCode(int exit_code) = 0;
+	virtual void exitGameMode() = 0;
 	
 	virtual struct PropertyGrid& getPropertyGrid() = 0;
 	virtual struct LogUI& getLogUI() = 0;
@@ -116,22 +115,20 @@ struct LUMIX_EDITOR_API StudioApp {
 	virtual void registerComponent(const char* icon, const char* id, IAddComponentPlugin& plugin) = 0;
 	virtual const AddCmpTreeNode& getAddComponentTreeRoot() const = 0;
 
-	virtual const Array<Action*>& getActions() = 0;
-	virtual void addAction(Action* action) = 0;
-	virtual void removeAction(Action* action) = 0;
-	virtual void addToolAction(Action* action) = 0;
-	virtual void addWindowAction(Action* action) = 0;
 	virtual Action* getAction(const char* name) = 0;
 	
-	virtual void runScript(const char* src, const char* script_name) = 0;
+	virtual void newWorld() = 0;
 	virtual void setFullscreen(bool fullscreen) = 0;
-	virtual void snapDown() = 0;
 	virtual float getFOV() const = 0;
 	virtual void setFOV(float fov_radians) = 0;
 	virtual Gizmo::Config& getGizmoConfig() = 0;
 	virtual void saveSettings() = 0;
 	virtual int getImGuiKey(int keycode) const = 0;
 	virtual u32 getDockspaceID() const = 0;
+	virtual void beginCustomTicking() = 0;
+	virtual void endCustomTicking() = 0;
+	virtual void beginCustomTick() = 0;
+	virtual void endCustomTick() = 0;
 
 	// clip mouse cursor = keep it in specified rectangle
 	// cursor is automatically unclipped when app is inactive
@@ -143,6 +140,7 @@ struct LUMIX_EDITOR_API StudioApp {
 	// if true, shortcuts are not processed
 	// use case - when there's active game in game view, we don't want delete keypress to delete entities
 	virtual void setCaptureInput(bool capture) = 0;
+	virtual bool checkShortcut(Action& action, bool global = false) = 0;
 
 	virtual Span<const os::Event> getEvents() const = 0;
 	virtual ImFont* getDefaultFont() = 0;

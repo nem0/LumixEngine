@@ -1,6 +1,7 @@
 #include <imgui/imgui.h>
 
-#include "game_view.h"
+#include "core/geometry.h"
+#include "core/profiler.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
 #include "editor/settings.h"
@@ -8,14 +9,11 @@
 #include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
-#include "core/geometry.h"
 #include "engine/input_system.h"
-#include "engine/lua_wrapper.h"
-#include "core/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
+#include "game_view.h"
 #include "gui/gui_system.h"
-#include "lua_script/lua_script.h"
 #include "renderer/gpu/gpu.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_module.h"
@@ -53,24 +51,15 @@ GameView::GameView(StudioApp& app)
 	, m_time_multiplier(1.0f)
 {
 	Engine& engine = app.getEngine();
-	auto f = &LuaWrapper::wrapMethodClosure<&GameView::forceViewport>;
-	LuaWrapper::createSystemClosure(engine.getState(), "GameView", this, "forceViewport", f);
+	m_app.getSettings().registerOption("game_view_open", &m_is_open);
+	m_app.getSettings().registerOption("game_view_focus_on_game_start", &m_focus_on_game_start, "Game view", "Focus on game start");
 }
 
 
 void GameView::init() {
-	m_toggle_ui.init("Game View", "Toggle game view", "game_view", "", Action::IMGUI_PRIORITY);
-	m_toggle_ui.func.bind<&GameView::onToggleOpen>(this);
-	m_toggle_ui.is_selected.bind<&GameView::isOpen>(this);
-	m_app.addWindowAction(&m_toggle_ui);
-
-	m_fullscreen_action.init("Game View fullscreen", "Game View fullscreen", "game_view_fullscreen", "", Action::IMGUI_PRIORITY);
-	m_app.addAction(&m_fullscreen_action);
-
 	Engine& engine = m_app.getEngine();
 	auto* renderer = (Renderer*)engine.getSystemManager().getSystem("renderer");
-	LuaScript* pres = engine.getResourceManager().load<LuaScript>(Path("pipelines/main.lua"));
-	m_pipeline = Pipeline::create(*renderer, pres, "GAME_VIEW");
+	m_pipeline = Pipeline::create(*renderer, PipelineType::GAME_VIEW);
 
 	auto* gui = static_cast<GUISystem*>(engine.getSystemManager().getSystem("gui"));
 	if (gui)
@@ -80,22 +69,12 @@ void GameView::init() {
 	}
 }
 
-
-GameView::~GameView()
-{
-	m_app.removeAction(&m_toggle_ui);
-	m_app.removeAction(&m_fullscreen_action);
+GameView::~GameView() {
 	Engine& engine = m_app.getEngine();
 	auto* gui = static_cast<GUISystem*>(engine.getSystemManager().getSystem("gui"));
 	if (gui) {
 		gui->setInterface(nullptr);
 	}
-}
-
-bool GameView::onAction(const Action& action) {
-	if (&action == &m_fullscreen_action) toggleFullscreen();
-	else return false;
-	return true;
 }
 
 void GameView::setCursor(os::CursorType type)
@@ -122,14 +101,6 @@ void GameView::captureMouse(bool capture) {
 	else m_app.unclipMouseCursor();
 }
 
-void GameView::onSettingsLoaded() {
-	m_is_open = m_app.getSettings().getValue(Settings::GLOBAL, "is_game_view_open", false);
-}
-
-void GameView::onBeforeSettingsSaved() {
-	m_app.getSettings().setValue(Settings::GLOBAL, "is_game_view_open", m_is_open);
-}
-
 void GameView::onFullscreenGUI(WorldEditor& editor)
 {
 	processInputEvents();
@@ -151,6 +122,8 @@ void GameView::onFullscreenGUI(WorldEditor& editor)
 		return;
 	}
 
+	if (m_app.checkShortcut(m_fullscreen_action)) toggleFullscreen();
+	
 	RenderModule* render_module = m_pipeline->getModule();
 	EntityPtr camera = render_module->getActiveCamera();
 	if (camera.isValid()) {
@@ -223,12 +196,32 @@ void GameView::controlsGUI(WorldEditor& editor) {
 	if (ImGui::DragFloat("Time multiplier", &m_time_multiplier, 0.01f, 0.01f, 30.0f)) {
 		engine.setTimeMultiplier(m_time_multiplier);
 	}
-	if(editor.isGameMode()) {
-		ImGui::SameLine();
-		if (ImGui::Button("Fullscreen")) setFullscreen(true);
-	}
+
 	ImGui::SameLine();
-	m_pipeline->callLuaFunction("onGUI");
+	if (ImGui::Button("Debug")) ImGui::OpenPopup("Debug");
+	if (ImGui::BeginPopup("Debug")) {
+		auto option = [&](const char* label, Pipeline::DebugShow value) {
+			if (ImGui::RadioButton(label, m_pipeline->m_debug_show == value)) {
+				m_pipeline->m_debug_show = value;
+				m_pipeline->m_debug_show_plugin = nullptr;
+			}
+		};
+		option("No debug", Pipeline::DebugShow::NONE);
+		option("Albedo", Pipeline::DebugShow::ALBEDO);
+		option("Normal", Pipeline::DebugShow::NORMAL);
+		option("Roughness", Pipeline::DebugShow::ROUGHNESS);
+		option("Metallic", Pipeline::DebugShow::METALLIC);
+		option("Velocity", Pipeline::DebugShow::VELOCITY);
+		option("Light clusters", Pipeline::DebugShow::LIGHT_CLUSTERS);
+		option("Probe clusters", Pipeline::DebugShow::PROBE_CLUSTERS);
+		option("AO", Pipeline::DebugShow::AO);
+		Renderer& renderer = m_pipeline->getRenderer();
+		for (Lumix::RenderPlugin* plugin : renderer.getPlugins()) {
+			plugin->debugUI(*m_pipeline);
+		}
+		ImGui::EndPopup();
+	}
+
 }
 
 
@@ -238,8 +231,10 @@ void GameView::onGUI()
 	WorldEditor& editor = m_app.getWorldEditor();
 	m_pipeline->setWorld(editor.getWorld());
 
+	if (m_app.checkShortcut(m_toggle_ui, true)) m_is_open = !m_is_open;
+
 	const bool is_game_mode = m_app.getWorldEditor().isGameMode();
-	if (is_game_mode && !m_was_game_mode && m_app.getSettings().m_focus_game_view_on_game_mode_start) {
+	if (is_game_mode && !m_was_game_mode && m_focus_on_game_start) {
 		ImGui::SetNextWindowFocus();
 		m_is_open = true;
 	}
@@ -255,7 +250,7 @@ void GameView::onGUI()
 		os::setCursor(m_cursor_type);
 	}
 	
-	if (m_is_fullscreen && m_pipeline->isReady()) {
+	if (m_is_fullscreen) {
 		onFullscreenGUI(editor);
 		return;
 	}
@@ -265,12 +260,12 @@ void GameView::onGUI()
 		return;
 	}
 
-	if (!m_pipeline->isReady()) captureMouse(false);
-
 	ImVec2 view_size;
 	bool is_game_view_visible = false;
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 	if (ImGui::Begin(window_name, &m_is_open, ImGuiWindowFlags_NoNavInputs)) {
+		if (m_app.checkShortcut(m_fullscreen_action)) toggleFullscreen();
+
 		is_game_view_visible = true;
 
 		const ImVec2 content_min = ImGui::GetCursorScreenPos();

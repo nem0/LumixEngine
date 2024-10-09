@@ -11,27 +11,21 @@ namespace Lumix
 {
 
 
-struct LUMIX_CORE_API PageAllocator final
-{
-public:
+struct LUMIX_CORE_API PageAllocator final {
 	enum { PAGE_SIZE = 4096 };
 
 	PageAllocator(IAllocator& fallback);
 	~PageAllocator();
 		
-	void* allocate(bool lock);
-	void deallocate(void* mem, bool lock);
+	void* allocate();
+	void deallocate(void* mem);
 	u32 getAllocatedCount() const { return allocated_count; }
 	u32 getReservedCount() const { return reserved_count; }
 
-	void lock();
-	void unlock();
-		
 private:
 	AtomicI32 allocated_count = 0;
 	u32 reserved_count = 0;
 	RingBuffer<void*, 512> free_pages;
-	Mutex mutex;
 };
 
 
@@ -70,7 +64,7 @@ struct PagedList
 		while(i) {
 			T* tmp = i;
 			i = i->header.next;
-			allocator.deallocate(tmp, true);
+			allocator.deallocate(tmp);
 		}
 	}
 
@@ -89,8 +83,8 @@ struct PagedList
 
 	T* push()
 	{
-		allocator.lock();
-		void* mem = allocator.allocate(false);
+		MutexGuard guard(mutex);
+		void* mem = allocator.allocate();
 		T* page = new (NewPlaceholder(), mem) T;
 		if(!begin) {
 			begin = end = page;
@@ -100,7 +94,6 @@ struct PagedList
 			page->header.next = nullptr;
 			end = page;
 		}
-		allocator.unlock();
 		return page;
 	}
 
@@ -108,6 +101,7 @@ struct PagedList
 	T* begin = nullptr;
 	T* end = nullptr;
 	PageAllocator& allocator;
+	Mutex mutex;
 };
 
 

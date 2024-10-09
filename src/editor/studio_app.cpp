@@ -30,7 +30,6 @@
 #include "engine/engine.h"
 #include "engine/engine_hash_funcs.h"
 #include "engine/input_system.h"
-#include "engine/lua_wrapper.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
@@ -71,17 +70,459 @@ struct TarHeader {
 	char prefix[155];   
 };
 
+struct StudioAppImpl final : StudioApp {
+	struct HierarchyGUI : StudioApp::GUIPlugin {
+		HierarchyGUI(StudioAppImpl& app)
+			: m_app(app)
+		{
+			m_app.getSettings().registerOption("entity_list_open", &m_is_open);
+			m_app.getWorldEditor().entitySelectionChanged().bind<&HierarchyGUI::onEntitySelectionChanged>(this);
+		}
 
-struct StudioAppImpl final : StudioApp
-{
+		void renameGUI() {
+			WorldEditor& editor = m_app.getWorldEditor();
+			ImGui::SameLine();
+			ImGui::SetNextItemWidth(-1);
+			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {0, 0});
+			ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0);
+			ImGui::PushStyleColor(ImGuiCol_FrameBg, 0);
+			if (m_set_rename_focus) {
+				ImGui::SetKeyboardFocusHere();
+				m_set_rename_focus = false;
+			}
+			if (ImGui::InputText("##renamed_val", m_rename_buf, sizeof(m_rename_buf), ImGuiInputTextFlags_EnterReturnsTrue)) {
+				editor.setEntityName((EntityRef)m_renaming_entity, m_rename_buf);
+				m_renaming_entity = INVALID_ENTITY;
+			}
+			if (ImGui::IsItemDeactivated() && m_renaming_entity.isValid()) {
+				if (ImGui::IsItemDeactivatedAfterEdit() && m_rename_buf[0]) {
+					editor.setEntityName((EntityRef)m_renaming_entity, m_rename_buf);
+				}
+				m_renaming_entity = INVALID_ENTITY;
+			}
+			m_set_rename_focus = false;
+			ImGui::PopStyleVar(2);
+			ImGui::PopStyleColor();			
+		}
+
+		void showHierarchy(EntityRef entity, const Array<EntityRef>& selected_entities, Span<const EntityRef> selection_chain) {
+			WorldEditor& editor = m_app.getWorldEditor();
+			World* world = editor.getWorld();
+			bool is_selected = selected_entities.indexOf(entity) >= 0;
+			ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_AllowItemOverlap;
+			bool has_child = world->getFirstChild(entity).isValid();
+			if (!has_child) flags = ImGuiTreeNodeFlags_Leaf;
+			if (is_selected) flags |= ImGuiTreeNodeFlags_Selected;
+			flags |= ImGuiTreeNodeFlags_SpanAvailWidth;
+			
+			bool node_open;
+			if (m_renaming_entity == entity) {
+				node_open = ImGui::TreeNodeEx((void*)(intptr_t)entity.index, flags, "%s", "");
+				renameGUI();
+			}
+			else {
+				const ImVec2 cp = ImGui::GetCursorPos();
+				ImGui::Dummy(ImVec2(1.f, ImGui::GetTextLineHeightWithSpacing()));
+				if (selection_chain.length() > 0 && selection_chain[0] == entity) {
+					ImGui::SetNextItemOpen(true);
+					selection_chain.removePrefix(1);
+					if (selection_chain.length() == 0) {
+						ImGui::SetScrollHereY();
+					}
+				}
+				if (ImGui::IsItemVisible()) {
+					ImGui::SetCursorPos(cp);
+					char buffer[1024];
+					getEntityListDisplayName(m_app, *world, Span(buffer), entity);
+					node_open = ImGui::TreeNodeEx((void*)(intptr_t)entity.index, flags, "%s", buffer);
+				}
+				else {
+					const char* dummy = "";
+					const ImGuiID id = ImGui::GetCurrentWindow()->GetID((void*)(intptr_t)entity.index);
+					if (ImGui::TreeNodeUpdateNextOpen(id, flags)) {
+						ImGui::SetCursorPos(cp);
+						node_open = ImGui::TreeNodeBehavior(id, flags, dummy, dummy);
+					}
+					else {
+						node_open = false;
+					}
+				}
+			}
+			
+			if (ImGui::IsItemVisible()) {
+				ImGui::PushID(entity.index);
+				if (ImGui::IsMouseReleased(1) && ImGui::IsItemHovered()) ImGui::OpenPopup("entity_context_menu");
+				if (ImGui::BeginPopup("entity_context_menu"))
+				{
+					if (ImGui::BeginMenu("Create child")) {
+						m_app.onCreateEntityWithComponentGUI(entity);
+						ImGui::EndMenu();
+					}
+
+					if (ImGui::MenuItem("Select all children")) {
+						Array<EntityRef> tmp(m_app.m_allocator);
+						for (EntityRef e : world->childrenOf(entity)) {
+							tmp.push(e);
+						}
+						editor.selectEntities(tmp, false);
+					}
+					ImGui::EndPopup();
+				}
+				ImGui::PopID();
+				if (ImGui::BeginDragDropTarget()) {
+					if (auto* payload = ImGui::AcceptDragDropPayload("entity")) {
+						EntityRef dropped_entity = *(EntityRef*)payload->Data;
+						if (dropped_entity != entity) {
+							editor.makeParent(entity, dropped_entity);
+							ImGui::EndDragDropTarget();
+							if (node_open) ImGui::TreePop();
+							return;
+						}
+					}
+
+					if (auto* payload = ImGui::AcceptDragDropPayload("selected_entities")) {
+						const Array<EntityRef>& selected = editor.getSelectedEntities();
+						for (EntityRef e : selected) {
+							if (e != entity) {
+								editor.makeParent(entity, e);
+							}
+						}
+						ImGui::EndDragDropTarget();
+						if (node_open) ImGui::TreePop();
+						return;
+					}
+
+					ImGui::EndDragDropTarget();
+				}
+
+				if (ImGui::BeginDragDropSource())
+				{
+					char buffer[1024];
+					getEntityListDisplayName(m_app, *world, Span(buffer), entity);
+					ImGui::TextUnformatted(buffer);
+					
+					const Array<EntityRef>& selected = editor.getSelectedEntities();
+					if (selected.size() > 0 && selected.indexOf(entity) >= 0) {
+						ImGui::SetDragDropPayload("selected_entities", nullptr, 0);
+					}
+					else {	
+						ImGui::SetDragDropPayload("entity", &entity, sizeof(entity));
+					}
+					ImGui::EndDragDropSource();
+				}
+				else {
+					if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+						editor.selectEntities(Span(&entity, 1), ImGui::GetIO().KeyCtrl);
+					}
+				}
+			}
+
+			if (node_open) {
+				for (EntityRef e : world->childrenOf(entity)) {
+					showHierarchy(e, selected_entities, selection_chain);
+				}
+
+				ImGui::TreePop();
+			}
+		}
+
+		void folderUI(EntityFolders::FolderHandle folder_id, EntityFolders& folders, u32 level, Span<const EntityRef> selection_chain, const char* name_override, World::PartitionHandle partition) {
+			WorldEditor& editor = m_app.getWorldEditor();
+			static EntityFolders::FolderHandle force_open_folder = EntityFolders::INVALID_FOLDER;
+			const EntityFolders::Folder* folder = &folders.getFolder(folder_id);
+			ImGui::PushID((const char*)&folder->id, (const char*)&folder->id + sizeof(folder->id));
+			bool node_open;
+			ImGuiTreeNodeFlags flags = level == 0 ? ImGuiTreeNodeFlags_DefaultOpen : 0;
+			flags |= ImGuiTreeNodeFlags_OpenOnArrow;
+			if (folders.getSelectedFolder() == folder_id) flags |= ImGuiTreeNodeFlags_Selected;
+			if (force_open_folder == folder_id) {
+				ImGui::SetNextItemOpen(true);
+				force_open_folder = EntityFolders::INVALID_FOLDER;
+			}
+			if (m_renaming_folder == folder_id) {
+				node_open = ImGui::TreeNodeEx((void*)folder, flags, "%s", ICON_FA_FOLDER);
+				ImGui::SameLine();
+				ImGui::SetNextItemWidth(-1);
+				ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {0, 0});
+				ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0);
+				ImGui::PushStyleColor(ImGuiCol_FrameBg, 0);
+				if (m_set_rename_focus) {
+					ImGui::SetKeyboardFocusHere();
+					m_set_rename_focus = false;
+				}
+				if (ImGui::InputText("##renamed_val", m_rename_buf, sizeof(m_rename_buf), ImGuiInputTextFlags_EnterReturnsTrue)) {
+					editor.renameEntityFolder(m_renaming_folder, m_rename_buf);
+					m_rename_buf[0] = 0;
+				}
+				if (ImGui::IsItemDeactivated()) {
+					if (ImGui::IsItemDeactivatedAfterEdit() && m_rename_buf[0]) {
+						editor.renameEntityFolder(m_renaming_folder, m_rename_buf);
+					}
+					m_renaming_folder = EntityFolders::INVALID_FOLDER;
+				}
+				m_set_rename_focus = false;
+				ImGui::PopStyleVar(2);
+				ImGui::PopStyleColor();
+			}
+			else {
+				if (name_override) {
+					node_open = ImGui::TreeNodeEx((void*)folder, flags, "%s%s", ICON_FA_HOME, name_override);
+				}
+				else {
+					node_open = ImGui::TreeNodeEx((void*)folder, flags, "%s%s", ICON_FA_FOLDER, folder->name);
+				}
+			}
+			
+			if (ImGui::BeginDragDropTarget()) {
+				if (auto* payload = ImGui::AcceptDragDropPayload("entity")) {
+					EntityRef dropped_entity = *(EntityRef*)payload->Data;
+					editor.beginCommandGroup("move_entity_to_folder_group");
+					editor.makeParent(INVALID_ENTITY, dropped_entity);
+					editor.moveEntityToFolder(dropped_entity, folder_id);
+					editor.endCommandGroup();
+				}
+				ImGui::EndDragDropTarget();
+			}
+
+			if (ImGui::IsMouseClicked(0) && ImGui::IsItemHovered()) {
+				folders.selectFolder(folder_id);
+			}
+
+			if (ImGui::IsMouseReleased(1) && ImGui::IsItemHovered()) {
+				ImGui::OpenPopup("folder_context_menu");
+			}
+			if (ImGui::BeginPopup("folder_context_menu")) {
+				if (ImGui::Selectable("New folder")) {
+					force_open_folder = folder_id;
+					EntityFolders::FolderHandle new_folder = editor.createEntityFolder(folder_id);
+					folder = &folders.getFolder(folder_id);
+					m_renaming_folder = new_folder;
+					m_set_rename_focus = true;
+				}
+				const bool is_root = folder->parent == EntityFolders::INVALID_FOLDER;
+				World* world = editor.getWorld();
+
+				if (is_root) {
+					const bool is_partition_named = world->getPartition(partition).name[0];
+					if (is_partition_named) {
+						if (ImGui::Selectable("Save")) {
+							if (editor.isGameMode()) {
+								logError("Could not save while the game is running");
+							}
+							else {
+								editor.savePartition(partition);
+							}
+						}
+					}
+					else {
+						if (ImGui::Selectable("Save As")) {
+							EntityFolders& folders = editor.getEntityFolders();
+							EntityFolders::FolderHandle root = folders.getRoot(partition);
+							folders.selectFolder(root);
+							m_app.saveAs();
+						}
+					}
+				}
+
+				if (!is_root || world->getPartitions().size() > 1) {
+					if (ImGui::Selectable(is_root ? "Unload" : "Delete")) {
+						if (is_root) {
+							m_confirm_destroy_partition = true;
+							m_partition_to_destroy = partition;
+						}
+						else {
+							editor.destroyEntityFolder(folder_id);
+							ImGui::EndPopup();
+							if (node_open) ImGui::TreePop();
+							ImGui::PopID();
+							return;
+						}
+					}
+				}
+
+				const bool has_children = folders.getFolder(folder_id).first_entity.isValid();
+				if (ImGui::Selectable("Select entities", false, has_children ? 0 : ImGuiSelectableFlags_Disabled)) {
+					Array<EntityRef> entities(m_app.m_allocator);
+					EntityPtr e = folders.getFolder(folder_id).first_entity;
+					while (e.isValid()) {
+						entities.push((EntityRef)e);
+						const EntityPtr next = folders.getNextEntity((EntityRef)e);
+						e = next;
+					}
+					editor.selectEntities(entities, false);
+				}
+				if (level > 0 && ImGui::Selectable("Rename")) {
+					m_renaming_folder = folder_id;
+					m_set_rename_focus = true;
+				}
+				ImGui::EndPopup();
+			}
+
+			if (!node_open) {
+				ImGui::PopID();
+				return;
+			}
+
+			EntityFolders::FolderHandle child_id = folder->first_child;
+			while (child_id != EntityFolders::INVALID_FOLDER) {
+				const EntityFolders::Folder& child = folders.getFolder(child_id);
+				const EntityFolders::FolderHandle next = child.next;
+				folderUI(child_id, folders, level + 1, selection_chain, nullptr, partition);
+				child_id = next;
+			}
+
+			EntityPtr child_e = folder->first_entity;
+			while (child_e.isValid()) {
+				if (!editor.getWorld()->getParent((EntityRef)child_e).isValid()) {
+					showHierarchy((EntityRef)child_e, editor.getSelectedEntities(), selection_chain);
+				}
+				child_e = folders.getNextEntity((EntityRef)child_e);
+			}
+
+			ImGui::TreePop();
+			ImGui::PopID();
+		}
+
+		void getSelectionChain(Array<EntityRef>& chain, EntityPtr e) const {
+			if (!e.isValid()) return;
+			
+			WorldEditor& editor = m_app.getWorldEditor();
+			e = editor.getWorld()->getParent(*e);
+			while (e.isValid()) {
+				chain.push(*e);
+				e = editor.getWorld()->getParent(*e);
+			}
+			for (i32 i = 0; i < chain.size() / 2; ++i) {
+				swap(chain[i], chain[chain.size() - 1 - i]); 
+			}
+		}
+
+		void onGUI() override {
+			PROFILE_FUNCTION();
+
+			if (m_app.checkShortcut(m_toggle_ui_action, true)) m_is_open = !m_is_open;
+
+			if (m_app.checkShortcut(m_focus_filter_action, true)) {
+				m_request_focus_filter = true;
+				m_is_open = true;
+			}
+
+			WorldEditor& editor = m_app.getWorldEditor();
+			if (m_confirm_destroy_partition) {
+				ImGui::OpenPopup("Confirm##confirm_destroy_partition");
+				m_confirm_destroy_partition = false;
+			}
+			if (ImGui::BeginPopupModal("Confirm##confirm_destroy_partition")) {
+				ImGui::Text("All unsaved changes will be lost, do you want to continue?");
+				if (ImGui::Button("Continue")) {
+					editor.destroyWorldPartition(m_partition_to_destroy);
+					ImGui::CloseCurrentPopup();
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+				ImGui::EndPopup();
+			}
+
+			const Array<EntityRef>& entities = editor.getSelectedEntities();
+			static TextFilter filter;
+			if (!m_is_open) return;
+
+			if (m_request_focus_filter) ImGui::SetNextWindowFocus();
+			if (ImGui::Begin(ICON_FA_STREAM "Hierarchy##hierarchy", &m_is_open)) {
+				if (m_app.checkShortcut(m_app.m_common_actions.rename)) {
+					const Array<EntityRef>& selected_entities = editor.getSelectedEntities();
+					m_renaming_entity = selected_entities.empty() ? INVALID_ENTITY : selected_entities[0];
+					if (m_renaming_entity.isValid()) {
+						m_set_rename_focus = true;
+						const char* name = editor.getWorld()->getEntityName(selected_entities[0]);
+						copyString(m_rename_buf, name);
+					}
+				}
+
+				if (m_request_focus_filter) {
+					ImGui::SetKeyboardFocusHere();
+					m_request_focus_filter = false;
+				}
+				
+				bool select_first = false;
+				World* world = editor.getWorld();
+				filter.gui(ICON_FA_SEARCH "Filter", -1, false, &m_focus_filter_action);
+				if (ImGui::IsItemDeactivatedAfterEdit() && ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+					select_first = true;
+				}
+
+				if (ImGui::BeginChild("entities")) {
+					ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().FramePadding.x);
+					
+					if (filter.isActive()) {
+						for (EntityPtr e = world->getFirstEntity(); e.isValid(); e = world->getNextEntity((EntityRef)e)) {
+							char buffer[1024];
+							getEntityListDisplayName(m_app, *world, Span(buffer), e);
+							if (!filter.pass(buffer)) continue;
+
+							ImGui::PushID(e.index);
+							const EntityRef e_ref = (EntityRef)e;
+							if (select_first) {
+								select_first = false;
+								editor.selectEntities(Span(&e_ref, 1), false);
+							}
+
+							if (m_renaming_entity == e_ref) {
+								renameGUI();
+							} else {
+								bool selected = entities.indexOf(e_ref) >= 0;
+								if (ImGui::Selectable(buffer, &selected, ImGuiSelectableFlags_SpanAvailWidth)) {
+									editor.selectEntities(Span(&e_ref, 1), ImGui::GetIO().KeyCtrl);
+								}
+								if (ImGui::BeginDragDropSource()) {
+									ImGui::TextUnformatted(buffer);
+									ImGui::SetDragDropPayload("entity", &e, sizeof(e));
+									ImGui::EndDragDropSource();
+								}
+							}
+							ImGui::PopID();
+						}
+					} else {
+						EntityFolders& folders = editor.getEntityFolders();
+						Array<EntityRef> selection_chain(m_app.getAllocator());
+						if (m_entity_selection_changed && !editor.getSelectedEntities().empty()) {
+							getSelectionChain(selection_chain, editor.getSelectedEntities()[0]);
+							m_entity_selection_changed = false;
+						}
+						for (const World::Partition& p : world->getPartitions()) {
+							folderUI(folders.getRoot(p.handle), folders, 0, selection_chain, p.name, p.handle);
+						}
+					}
+					ImGui::PopItemWidth();
+				}
+				ImGui::EndChild();
+			}
+			ImGui::End();
+		}
+
+		const char* getName() const override { return "hierarchy"; }
+
+		void onEntitySelectionChanged() {
+			m_entity_selection_changed = true;
+		}
+
+		StudioAppImpl& m_app;
+		bool m_is_open = true;
+		bool m_entity_selection_changed = false;
+		Action m_focus_filter_action{"Focus filter", "Hierarchy - focus filter", "hierarchy_focus_filter", ""};
+		Action m_toggle_ui_action{"Hierarchy", "Hierarchy - toggle UI", "hierarchy_toggle_ui", "", Action::WINDOW};
+		bool m_request_focus_filter = false;
+		EntityPtr m_renaming_entity = INVALID_ENTITY;
+		EntityFolders::FolderHandle m_renaming_folder = EntityFolders::INVALID_FOLDER;
+		bool m_set_rename_focus = false;
+		char m_rename_buf[World::ENTITY_NAME_MAX_LENGTH];
+		bool m_confirm_destroy_partition = false;
+		World::PartitionHandle m_partition_to_destroy;
+	};
+
 	StudioAppImpl()
-		: m_is_entity_list_open(true)
-		, m_finished(false)
+		: m_finished(false)
 		, m_deferred_game_mode_exit(false)
-		, m_actions(m_allocator)
-		, m_owned_actions(m_allocator)
-		, m_window_actions(m_allocator)
-		, m_tools_actions(m_allocator)
 		, m_is_welcome_screen_open(true)
 		, m_is_export_game_dialog_open(false)
 		, m_settings(*this)
@@ -100,6 +541,7 @@ struct StudioAppImpl final : StudioApp
 		, m_debug_allocator(m_main_allocator)
 		, m_imgui_allocator(m_debug_allocator, "imgui")
 		, m_allocator(m_debug_allocator, "studio")
+		, m_export(m_allocator)
 	{
 		PROFILE_FUNCTION();
 		u32 cpus_count = minimum(os::getCPUsCount(), 64);
@@ -129,18 +571,67 @@ struct StudioAppImpl final : StudioApp
 		m_imgui_key_map[(int)os::Keycode::END] = ImGuiKey_End;
 		m_imgui_key_map[(int)os::Keycode::DEL] = ImGuiKey_Delete;
 		m_imgui_key_map[(int)os::Keycode::BACKSPACE] = ImGuiKey_Backspace;
-		m_imgui_key_map[(int)os::Keycode::F3] = ImGuiKey_F3;
-		m_imgui_key_map[(int)os::Keycode::F11] = ImGuiKey_F11;
 		m_imgui_key_map[(int)os::Keycode::RETURN] = ImGuiKey_Enter;
 		m_imgui_key_map[(int)os::Keycode::ESCAPE] = ImGuiKey_Escape;
-		m_imgui_key_map[(int)os::Keycode::A] = ImGuiKey_A;
-		m_imgui_key_map[(int)os::Keycode::C] = ImGuiKey_C;
-		m_imgui_key_map[(int)os::Keycode::D] = ImGuiKey_D;
-		m_imgui_key_map[(int)os::Keycode::F] = ImGuiKey_F;
-		m_imgui_key_map[(int)os::Keycode::V] = ImGuiKey_V;
-		m_imgui_key_map[(int)os::Keycode::X] = ImGuiKey_X;
-		m_imgui_key_map[(int)os::Keycode::Y] = ImGuiKey_Y;
-		m_imgui_key_map[(int)os::Keycode::Z] = ImGuiKey_Z;
+		m_imgui_key_map[(int)os::Keycode::NUMPAD0] = ImGuiKey_Keypad0;
+		m_imgui_key_map[(int)os::Keycode::NUMPAD1] = ImGuiKey_Keypad1;
+		m_imgui_key_map[(int)os::Keycode::NUMPAD2] = ImGuiKey_Keypad2;
+		m_imgui_key_map[(int)os::Keycode::NUMPAD3] = ImGuiKey_Keypad3;
+		m_imgui_key_map[(int)os::Keycode::NUMPAD4] = ImGuiKey_Keypad4;
+		m_imgui_key_map[(int)os::Keycode::NUMPAD5] = ImGuiKey_Keypad5;
+		m_imgui_key_map[(int)os::Keycode::NUMPAD6] = ImGuiKey_Keypad6;
+		m_imgui_key_map[(int)os::Keycode::NUMPAD7] = ImGuiKey_Keypad7;
+		m_imgui_key_map[(int)os::Keycode::NUMPAD8] = ImGuiKey_Keypad8;
+		m_imgui_key_map[(int)os::Keycode::NUMPAD9] = ImGuiKey_Keypad9;
+		m_imgui_key_map[(int)os::Keycode::OEM_COMMA] = ImGuiKey_Comma;
+		m_imgui_key_map[(int)os::Keycode::F1] = ImGuiKey_F1;
+		m_imgui_key_map[(int)os::Keycode::F2] = ImGuiKey_F2;
+		m_imgui_key_map[(int)os::Keycode::F3] = ImGuiKey_F3;
+		m_imgui_key_map[(int)os::Keycode::F4] = ImGuiKey_F4;
+		m_imgui_key_map[(int)os::Keycode::F5] = ImGuiKey_F5;
+		m_imgui_key_map[(int)os::Keycode::F6] = ImGuiKey_F6;
+		m_imgui_key_map[(int)os::Keycode::F7] = ImGuiKey_F7;
+		m_imgui_key_map[(int)os::Keycode::F8] = ImGuiKey_F8;
+		m_imgui_key_map[(int)os::Keycode::F9] = ImGuiKey_F9;
+		m_imgui_key_map[(int)os::Keycode::F10] = ImGuiKey_F10;
+		m_imgui_key_map[(int)os::Keycode::F11] = ImGuiKey_F11;
+		m_imgui_key_map[(int)os::Keycode::F12] = ImGuiKey_F12;
+		m_imgui_key_map['1'] = ImGuiKey_1;
+		m_imgui_key_map['2'] = ImGuiKey_2;
+		m_imgui_key_map['3'] = ImGuiKey_3;
+		m_imgui_key_map['4'] = ImGuiKey_4;
+		m_imgui_key_map['5'] = ImGuiKey_5;
+		m_imgui_key_map['6'] = ImGuiKey_6;
+		m_imgui_key_map['7'] = ImGuiKey_7;
+		m_imgui_key_map['8'] = ImGuiKey_8;
+		m_imgui_key_map['9'] = ImGuiKey_9;
+		m_imgui_key_map['0'] = ImGuiKey_0;
+		m_imgui_key_map['A'] = ImGuiKey_A;
+		m_imgui_key_map['B'] = ImGuiKey_B;
+		m_imgui_key_map['C'] = ImGuiKey_C;
+		m_imgui_key_map['D'] = ImGuiKey_D;
+		m_imgui_key_map['E'] = ImGuiKey_E;
+		m_imgui_key_map['F'] = ImGuiKey_F;
+		m_imgui_key_map['G'] = ImGuiKey_G;
+		m_imgui_key_map['H'] = ImGuiKey_H;
+		m_imgui_key_map['I'] = ImGuiKey_I;
+		m_imgui_key_map['J'] = ImGuiKey_J;
+		m_imgui_key_map['K'] = ImGuiKey_K;
+		m_imgui_key_map['L'] = ImGuiKey_L;
+		m_imgui_key_map['M'] = ImGuiKey_M;
+		m_imgui_key_map['N'] = ImGuiKey_N;
+		m_imgui_key_map['O'] = ImGuiKey_O;
+		m_imgui_key_map['P'] = ImGuiKey_P;
+		m_imgui_key_map['Q'] = ImGuiKey_Q;
+		m_imgui_key_map['R'] = ImGuiKey_R;
+		m_imgui_key_map['S'] = ImGuiKey_S;
+		m_imgui_key_map['T'] = ImGuiKey_T;
+		m_imgui_key_map['U'] = ImGuiKey_U;
+		m_imgui_key_map['V'] = ImGuiKey_V;
+		m_imgui_key_map['W'] = ImGuiKey_W;
+		m_imgui_key_map['X'] = ImGuiKey_X;
+		m_imgui_key_map['Y'] = ImGuiKey_Y;
+		m_imgui_key_map['Z'] = ImGuiKey_Z;
 	}
 
 	~StudioAppImpl() {
@@ -205,11 +696,6 @@ struct StudioAppImpl final : StudioApp
 					ImGuiIO& io = ImGui::GetIO();
 					ImGuiKey key = m_imgui_key_map[(int)event.key.keycode];
 					if (key != ImGuiKey_None) io.AddKeyEvent(key, event.key.down);
-
-					if (event.key.down && event.key.keycode == os::Keycode::F2) {
-						m_is_f2_pressed = true;
-					}
-					checkShortcuts();
 				}
 				break;
 			case os::Event::Type::DROP_FILE:
@@ -236,13 +722,6 @@ struct StudioAppImpl final : StudioApp
 			m_engine->getFileSystem().processCallbacks();
 		}
 
-		removeAction(&m_start_standalone_app);
-		removeAction(&m_show_all_actions_action);
-		removePlugin(*m_asset_browser.get());
-		removePlugin(*m_log_ui.get());
-		removePlugin(*m_property_grid.get());
-		removePlugin(*m_profiler_ui.get());
-
 		m_asset_browser->releaseResources();
 		m_watched_plugin.watcher.reset();
 
@@ -261,9 +740,7 @@ struct StudioAppImpl final : StudioApp
 		}
 		m_plugins.clear();
 
-		for (auto* i : m_gui_plugins) {
-			LUMIX_DELETE(m_allocator, i);
-		}
+		removePlugin(*m_hierarchy.get());
 		m_gui_plugins.clear();
 
 		PrefabSystem::destroyEditorPlugins(*this);
@@ -275,6 +752,7 @@ struct StudioAppImpl final : StudioApp
 		}
 		m_add_cmp_plugins.clear();
 
+		m_hierarchy.destroy();
 		m_profiler_ui.reset();
 		m_asset_browser.reset();
 		m_property_grid.destroy();
@@ -282,46 +760,61 @@ struct StudioAppImpl final : StudioApp
 		ASSERT(!m_render_interface);
 		m_asset_compiler.reset();
 		m_editor.reset();
-
-		removeAction(&m_common_actions.save);
-		removeAction(&m_common_actions.undo);
-		removeAction(&m_common_actions.redo);
-		removeAction(&m_common_actions.del);
-		removeAction(&m_common_actions.cam_orbit);
-		removeAction(&m_common_actions.cam_forward);
-		removeAction(&m_common_actions.cam_backward);
-		removeAction(&m_common_actions.cam_right);
-		removeAction(&m_common_actions.cam_left);
-		removeAction(&m_common_actions.cam_up);
-		removeAction(&m_common_actions.cam_down);
-
-		for (Action* action : m_owned_actions) {
-			removeAction(action);
-			LUMIX_DELETE(m_allocator, action);
-		}
-		m_owned_actions.clear();
-		ASSERT(m_actions.empty());
-		m_actions.clear();
-
 		m_engine.reset();
 	}
 
 
 	void onIdle() {
-		update();
+		PROFILE_FUNCTION();
+		profiler::blockColor(0x7f, 0x7f, 0x7f);
+
+		updateGizmoOffset();
+		processDeferredWindowDestroy();
+
+		if (m_watched_plugin.reload_request) tryReloadPlugin();
+
+		guiBeginFrame();
+		m_asset_compiler->update();
+		m_editor->update();
+		showGizmos();
+
+		m_engine->update(*m_editor->getWorld());
+
+		++m_fps_frame;
+		if (m_fps_timer.getTimeSinceTick() > 1.0f) {
+			m_fps = m_fps_frame / m_fps_timer.tick();
+			m_fps_frame = 0;
+		}
+
+		if (m_deferred_game_mode_exit) {
+			m_deferred_game_mode_exit = false;
+			m_editor->toggleGameMode();
+		}
+
+		float time_delta = m_engine->getLastTimeDelta();
+		for (auto* plugin : m_plugins) {
+			plugin->update(time_delta);
+		}
+		for (auto* plugin : m_gui_plugins) {
+			plugin->update(time_delta);
+		}
+
+		if (m_settings.getTimeSinceLastSave() > 30.f) saveSettings();
+
+		guiEndFrame();
 
 		if (m_first_update) {
 			// we show window after the first update, so it does not show default (white) background
 			// only to be replace with actual (potentially dark) content
 			os::showWindow(m_main_window);
-			if (m_settings.m_is_maximized) os::maximizeWindow(m_main_window);
+			if (m_settings.getBool("is_maximized", false)) os::maximizeWindow(m_main_window);
 			m_first_update = false;
 		}
 
 		if (!isFocused()) ++m_frames_since_focused;
 		else m_frames_since_focused = 0;
 
-		if (m_settings.m_sleep_when_inactive && m_frames_since_focused > 10) {
+		if (m_sleep_when_inactive && m_frames_since_focused > 10) {
 			const float frame_time = m_inactive_fps_timer.tick();
 			const float wanted_fps = 5.0f;
 
@@ -334,7 +827,6 @@ struct StudioAppImpl final : StudioApp
 
 		profiler::frame();
 		m_events.clear();
-		m_is_f2_pressed = false;
 	}
 
 	void run() override {
@@ -373,10 +865,6 @@ struct StudioAppImpl final : StudioApp
 	static void imguiFree(void* ptr, void* user_data) {
 		StudioAppImpl* app = (StudioAppImpl*)user_data;
 		return app->m_imgui_allocator.deallocate(ptr);
-	}
-
-	void onEntitySelectionChanged() {
-		m_entity_selection_changed = true;
 	}
 
 	static os::HitTestResult childHitTestCallback(void* user_data, os::WindowHandle window, os::Point mp) {
@@ -430,6 +918,15 @@ struct StudioAppImpl final : StudioApp
 		};
 		init_data.plugins = Span(plugins, plugins + lengthOf(plugins) - 1);
 		m_engine = Engine::create(static_cast<Engine::InitArgs&&>(init_data), m_allocator);
+		m_settings.registerOption("report_crashes", &m_crash_reporting, "General", "Report crashes");
+		m_settings.registerOption("sleep_when_inactive", &m_sleep_when_inactive, "General", "Sleep when inactive");
+		m_settings.registerOption("fileselector_dir", &m_file_selector.m_current_dir);
+		m_settings.registerOption("font_size", &m_font_size, "General", "Font size");
+		m_settings.registerOption("export_pack", &m_export.pack);
+		m_settings.registerOption("export_dir", &m_export.dest_dir);
+		m_settings.registerOption("gizmo_scale", &m_gizmo_config.scale, "General", "Gizmo scale");
+		m_settings.registerOption("fov", &m_fov, "General", "FOV", true);
+		// we need some stuff (font_size) from settings at this point
 		m_settings.load();
 
 		os::InitWindowArgs init_window_args;
@@ -446,34 +943,33 @@ struct StudioAppImpl final : StudioApp
 		m_engine->setMainWindow(m_main_window);
 		
 		beginInitIMGUI();
+		// we need to create the asset compiler before plugins, since asset compiler installs a hook for asset loading
+		// and plugins can try to load stuf, e.g. renderer loads postprocess shaders
+		m_asset_compiler = AssetCompiler::create(*this);
 		m_engine->init();
 		jobs::wait(&m_init_imgui_signal);
 		
 		logInfo("Current directory: ", current_dir);
 
-		registerLuaAPI();
 		extractBundled();
 
-		m_asset_compiler = AssetCompiler::create(*this);
 		m_editor = WorldEditor::create(*m_engine, m_allocator);
-		m_editor->entitySelectionChanged().bind<&StudioAppImpl::onEntitySelectionChanged>(this);
 		loadUserPlugins();
-		addActions();
 
 		m_asset_browser = AssetBrowser::create(*this);
+		m_hierarchy.create(*this);
 		m_property_grid.create(*this);
 		m_profiler_ui = createProfilerUI(*this);
 		m_log_ui.create(*this, m_allocator);
 
 		initPlugins(); // needs initialized imgui
-		loadSettings();
+		loadSettings(); // we can load settings now, we have everything (i.e. actions, imgui context) available
 
 		loadWorldFromCommandLine();
 
 		m_asset_compiler->onInitFinished();
 		m_asset_browser->onInitFinished();
 		
-		checkScriptCommandLine();
 		loadLogo();
 
 		logInfo("Init took ", init_timer.getTimeSinceStart(), " s");
@@ -686,9 +1182,6 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	const Array<Action*>& getActions() override { return m_actions; }
-
-
 	void guiBeginFrame()
 	{
 		PROFILE_FUNCTION();
@@ -747,23 +1240,36 @@ struct StudioAppImpl final : StudioApp
 	{
 		PROFILE_FUNCTION();
 		if (m_is_welcome_screen_open) {
-			m_dockspace_id = ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
+			m_dockspace_id = ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
 			guiWelcomeScreen();
 		}
 		else {
 			mainMenu();
 
-			m_dockspace_id = ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
+			m_dockspace_id = ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
+			if (checkShortcut(m_show_all_actions_action, true)) showAllActionsGUI();
+			else if (checkShortcut(m_next_frame, true)) m_engine->nextFrame();
+			else if (checkShortcut(m_pause_game, true)) m_engine->pause(!m_engine->isPaused());
+			else if (checkShortcut(m_toggle_game_mode, true)) m_editor->toggleGameMode();
+			else if (checkShortcut(m_new_world_action, true)) newWorld();
+			else if (checkShortcut(m_exit_action, true)) exit();
+			else if (checkShortcut(m_show_export_action, true)) m_is_export_game_dialog_open = true;
+			else if (checkShortcut(m_common_actions.copy, true)) m_editor->copyEntities();
+			else if (checkShortcut(m_common_actions.paste, true)) m_editor->pasteEntities();
+			else if (checkShortcut(m_common_actions.undo, true)) m_editor->undo();
+			else if (checkShortcut(m_common_actions.redo, true)) m_editor->redo();
+			else if (checkShortcut(m_common_actions.save, true)) save();
+			else if (checkShortcut(m_common_actions.del, true)) destroySelectedEntity();
+
 			m_asset_compiler->onGUI();
 			guiAllActions();
-			guiEntityList();
 			guiSaveAsDialog();
 			for (i32 i = m_gui_plugins.size() - 1; i >= 0; --i) {
 				GUIPlugin* win = m_gui_plugins[i];
 				win->onGUI();
 			}
 
-			m_settings.onGUI();
+			m_settings.gui();
 			guiExportData();
 		}
 		ImGui::PopFont();
@@ -815,159 +1321,27 @@ struct StudioAppImpl final : StudioApp
 		}
 	}
 
-	static int LUA_debugCallback(lua_State* L) {
-		const char* error_msg = lua_tostring(L, 1);
-		if (lua_getglobal(L, "Editor") != LUA_TTABLE) {
-			lua_pop(L, 1);
-			return 0;
-		}
-		if (lua_getfield(L, -1, "editor") != LUA_TLIGHTUSERDATA) {
-			lua_pop(L, 2);
-			return 0;
-		}
-		StudioAppImpl* app = (StudioAppImpl*)lua_tolightuserdata(L, -1);
-		lua_pop(L, 2);
-		if (app->m_lua_debug_enabled) app->luaDebugLoop(L, error_msg);
-		return 0;
-	}
-
-	void luaImGuiTable(const char* prefix, lua_State* L) {
-		lua_pushnil(L);
-		while (lua_next(L, -2)) {
-			const char* name = lua_tostring(L, -2);
-			if (!lua_isfunction(L, -1) && !equalStrings(name, "__index")) {
-				if (lua_istable(L, -1)) {
-					luaImGuiTable(StaticString<128>(prefix, name, "."), L);
-				}
-				else {
-					ImGui::TableNextRow();
-					ImGui::TableNextColumn();
-					ImGui::Text("%s%s", prefix, name);
-					ImGui::TableNextColumn();
-					switch (lua_type(L, -1)) {
-						case LUA_TLIGHTUSERDATA:
-							ImGui::TextUnformatted("light user data");
-							break;
-						case LUA_TBOOLEAN: {
-							const bool b = lua_toboolean(L, -1) != 0;
-							ImGui::TextUnformatted(b ? "true" : "false");
-							break;
-						}
-						case LUA_TNUMBER: {
-							const double val = lua_tonumber(L, -1);
-							ImGui::Text("%f", val);
-							break;
-						}
-						case LUA_TSTRING: 
-							ImGui::TextUnformatted(lua_tostring(L, -1));
-							break;
-					}
-				}
-			}
-			lua_pop(L, 1);
-		}
-	}
-
-	// asserts once if called between ImGui::Begin/End, can be safely skipped
-	void luaDebugLoop(lua_State* L, const char* error_msg) {
-		// end normal loop
-		ImGui::PopFont();
-		ImGui::Render();
-		ImGui::UpdatePlatformWindows();
+	void endCustomTick() override {
 		for (auto* plugin : m_gui_plugins) plugin->guiEndFrame();
+	}
 
-		// debug loop
-		// we have special loop for debug, because we don't want world or lua state to change while we debug
-		bool finished = false;
-		while (!finished) {
-			os::Event e;
-			while (os::getEvent(e)) {
-				// pass events to imgui
-				onEvent(e);
-				m_events.clear();
-			}
+	void endCustomTicking() override {
+		guiBeginFrame();
+	}
 
-			processDeferredWindowDestroy();
-			guiBeginFrame();
+	void beginCustomTicking() override {
+		for (auto* plugin : m_gui_plugins) plugin->guiEndFrame();
+	}
 
-			const ImGuiID dockspace_id = ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
-
-			static int selected_stack_level = -1;
-
-			ImGui::SetNextWindowDockID(dockspace_id, ImGuiCond_FirstUseEver);			
-			if (ImGui::Begin("REPL")) {
-				LuaWrapper::DebugGuard guard(L);
-				static char repl[4096] = "";
-				ImGui::SetNextItemWidth(-1);
-				ImGui::InputTextMultiline("##repl", repl, sizeof(repl));
-				if (ImGui::Button("Run")) {
-					const bool errors = LuaWrapper::luaL_loadbuffer(L, repl, strlen(repl), "REPL");
-					if (!errors) {
-						if (selected_stack_level >= 0) {
-							lua_Debug ar;
-							if (0 != lua_getinfo(L, selected_stack_level + 1, "f", &ar)) {
-								lua_getfenv(L, -1);
-								lua_setfenv(L, -3);
-								lua_pop(L, 1);
-							}
-						}
-						if (::lua_pcall(L, 0, 0, 0) != 0) {
-							const char* msg = lua_tostring(L, -1); 
-							ASSERT(false); // TODO
-						}
-					}
-				}
-			}
-			ImGui::End();
-
-			ImGui::SetNextWindowDockID(dockspace_id, ImGuiCond_FirstUseEver);
-			if (ImGui::Begin("Callstack")) {
-				LuaWrapper::DebugGuard guard(L);
-				lua_Debug ar;
-				for (u32 stack_level = 1/*skip traceback fn*/; ;++stack_level) {
-					if (0 == lua_getinfo(L, stack_level + 1, "nsl", &ar)) break;
-					const bool selected = selected_stack_level == stack_level;
-					const StaticString<MAX_PATH + 128> label(ar.source, ": ", ar.name, " Line ", ar.currentline);
-					if (ImGui::Selectable(label, selected)) selected_stack_level = stack_level;
-				}
-			}
-			ImGui::End();
-			
-			ImGui::SetNextWindowDockID(dockspace_id, ImGuiCond_FirstUseEver);
-			if (ImGui::Begin("Locals") && selected_stack_level >= 0) {
-				if (ImGui::BeginTable("locals", 2, ImGuiTableFlags_Resizable)) {
-					lua_Debug ar;
-					if (0 != lua_getinfo(L, selected_stack_level + 1, "nslf", &ar)) {
-						lua_getfenv(L, -1);
-
-						luaImGuiTable("", L);
-
-						lua_pop(L, 2);
-					}
-					ImGui::EndTable();
-				}
-			}
-			ImGui::End();
-
-			ImGui::SetNextWindowDockID(dockspace_id, ImGuiCond_FirstUseEver);
-			if (ImGui::Begin("Lua debugger")) {
-				ImGui::TextUnformatted(error_msg);
-				ImGui::Checkbox("Enable debugger", &m_lua_debug_enabled);
-				ImGui::SameLine();
-				if (ImGui::Button("Resume")) finished = true;
-			}
-			ImGui::End();
-		
-			ImGui::PopFont();
-			ImGui::Render();
-			ImGui::UpdatePlatformWindows();
-
-			for (auto* plugin : m_gui_plugins) {
-				plugin->guiEndFrame();
-			}
+	void beginCustomTick() override {
+		os::Event e;
+		while (os::getEvent(e)) {
+			// pass events to imgui
+			onEvent(e);
+			m_events.clear();
 		}
 
-		// restart normal loop
+		processDeferredWindowDestroy();
 		guiBeginFrame();
 	}
 
@@ -980,44 +1354,6 @@ struct StudioAppImpl final : StudioApp
 			}
 		}
 	}
-
-	void update() {
-		PROFILE_FUNCTION();
-		profiler::blockColor(0x7f, 0x7f, 0x7f);
-		
-		updateGizmoOffset();
-		processDeferredWindowDestroy();
-
-		if (m_watched_plugin.reload_request) tryReloadPlugin();
-
-		guiBeginFrame();
-		m_asset_compiler->update();
-		m_editor->update();
-		showGizmos();
-		
-		m_engine->update(*m_editor->getWorld());
-
-		++m_fps_frame;
-		if (m_fps_timer.getTimeSinceTick() > 1.0f) {
-			m_fps = m_fps_frame / m_fps_timer.tick();
-			m_fps_frame = 0;
-		}
-
-		if (m_deferred_game_mode_exit) {
-			m_deferred_game_mode_exit = false;
-			m_editor->toggleGameMode();
-		}
-
-		float time_delta = m_engine->getLastTimeDelta();
-		for (auto* plugin : m_gui_plugins) {
-			plugin->update(time_delta);
-		}
-
-		if (m_settings.getTimeSinceLastSave() > 30.f) saveSettings();
-
-		guiEndFrame();
-	}
-
 
 	void extractBundled() {
 		#ifdef _WIN32
@@ -1073,17 +1409,11 @@ struct StudioAppImpl final : StudioApp
 		EntityRef env = m_editor->addEntity();
 		m_editor->setEntityName(env, "environment");
 		ComponentType env_cmp_type = reflection::getComponentType("environment");
-		ComponentType lua_script_cmp_type = reflection::getComponentType("lua_script");
 		Span<EntityRef> entities(&env, 1);
 		m_editor->addComponent(entities, env_cmp_type);
-		m_editor->addComponent(entities, lua_script_cmp_type);
 		Quat rot;
 		rot.fromEuler(Vec3(degreesToRadians(45.f), 0, 0));
 		m_editor->setEntitiesRotations(&env, &rot, 1);
-		const ComponentUID cmp = m_editor->getWorld()->getComponent(env, lua_script_cmp_type);
-		m_editor->addArrayPropertyItem(cmp, "scripts");
-		m_editor->setProperty(lua_script_cmp_type, "scripts", 0, "Path", entities, Path("pipelines/atmo.lua"));
-		m_editor->endCommandGroup();
 	}
 
 	void tryLoadWorld(const Path& path, bool additive) override {
@@ -1261,7 +1591,7 @@ struct StudioAppImpl final : StudioApp
 		}
 	}
 
-	void newWorld() {
+	void newWorld() override {
 		if (m_editor->isWorldChanged()) {
 			m_confirm_new = true;
 		}
@@ -1269,14 +1599,6 @@ struct StudioAppImpl final : StudioApp
 			m_editor->newWorld();
 			initDefaultWorld();
 		}
-	}
-
-
-	GUIPlugin* getFocusedWindow() {
-		for (GUIPlugin* win : m_gui_plugins) {
-			if (win->hasFocus()) return win;
-		}
-		return nullptr;
 	}
 
 	Gizmo::Config& getGizmoConfig() override { return m_gizmo_config; }
@@ -1293,22 +1615,6 @@ struct StudioAppImpl final : StudioApp
 		os::clipCursor(win, screen_rect);
 	}
 
-	void addEntity() {
-		const EntityRef e = m_editor->addEntity();
-		m_editor->selectEntities(Span(&e, 1), false);
-	}
-
-	void undo() { m_editor->undo(); }
-	void redo() { m_editor->redo(); }
-	void copy() { m_editor->copyEntities(); }
-	void paste() { m_editor->pasteEntities(); }
-	void duplicate() { m_editor->duplicateEntities(); }
-	void setLocalCoordSystem() { getGizmoConfig().coord_system = Gizmo::Config::LOCAL; }
-	void setGlobalCoordSystem() { getGizmoConfig().coord_system = Gizmo::Config::GLOBAL; }
-	void toggleSettings() { m_settings.m_is_open = !m_settings.m_is_open; }
-	bool areSettingsOpen() const { return m_settings.m_is_open; }
-	void toggleEntityList() { m_is_entity_list_open = !m_is_entity_list_open; }
-	bool isEntityListOpen() const { return m_is_entity_list_open; }
 	int getExitCode() const override { return m_exit_code; }
 	
 	DirSelector& getDirSelector() override {
@@ -1340,64 +1646,6 @@ struct StudioAppImpl final : StudioApp
 		return *m_log_ui;
 	}
 
-	void nextFrame() { m_engine->nextFrame(); }
-	void pauseGame() { m_engine->pause(!m_engine->isPaused()); }
-	void toggleGameMode() { m_editor->toggleGameMode(); }
-	void setTranslateGizmoMode() { getGizmoConfig().mode = Gizmo::Config::TRANSLATE; }
-	void setRotateGizmoMode() { getGizmoConfig().mode = Gizmo::Config::ROTATE; }
-	void setScaleGizmoMode() { getGizmoConfig().mode = Gizmo::Config::SCALE; }
-
-
-	void makeParent()
-	{
-		const auto& entities = m_editor->getSelectedEntities();
-		if (entities.size() == 2) {
-			m_editor->makeParent(entities[0], entities[1]);
-		}
-	}
-
-
-	void unparent()
-	{
-		const auto& entities = m_editor->getSelectedEntities();
-		if (entities.size() != 1) return;
-		m_editor->makeParent(INVALID_ENTITY, entities[0]);
-	}
-
-
-	void snapDown() override {
-		const Array<EntityRef>& selected = m_editor->getSelectedEntities();
-		if (selected.empty()) return;
-
-		Array<DVec3> new_positions(m_allocator);
-		World* world = m_editor->getWorld();
-
-		for (EntityRef entity : selected) {
-			const DVec3 origin = world->getPosition(entity);
-			auto hit = getRenderInterface()->castRay(*world, Ray{origin, Vec3(0, -1, 0)}, entity);
-			if (hit.is_hit) {
-				new_positions.push(origin + Vec3(0, -hit.t, 0));
-			}
-			else {
-				hit = getRenderInterface()->castRay(*world, Ray{origin, Vec3(0, 1, 0)}, entity);
-				if (hit.is_hit) {
-					new_positions.push(origin + Vec3(0, hit.t, 0));
-				}
-				else {
-					new_positions.push(world->getPosition(entity));
-				}
-			}
-		}
-		m_editor->setEntitiesPositions(&selected[0], &new_positions[0], new_positions.size());
-	}
-
-	void autosnapDown()
-	{
-		Gizmo::Config& cfg = getGizmoConfig();
-		cfg.setAutosnapDown(!cfg.isAutosnapDown());
-	}
-
-
 	void destroySelectedEntity()
 	{
 		auto& selected_entities = m_editor->getSelectedEntities();
@@ -1405,80 +1653,13 @@ struct StudioAppImpl final : StudioApp
 		m_editor->destroyEntities(&selected_entities[0], selected_entities.size());
 	}
 
-
-	void removeAction(Action* action) override
-	{
-		m_actions.eraseItem(action);
-		m_window_actions.eraseItem(action);
-		m_tools_actions.eraseItem(action);
-	}
-
-	void addToolAction(Action* action) override {
-		addAction(action);
-		m_tools_actions.push(action);
-	}
-
-	void addWindowAction(Action* action) override
-	{
-		addAction(action);
-		for (int i = 0; i < m_window_actions.size(); ++i)
-		{
-			if (compareString(m_window_actions[i]->label_short, action->label_short) > 0)
-			{
-				m_window_actions.insert(i, action);
-				return;
-			}
-		}
-		m_window_actions.push(action);
-	}
-
-	void addAction(Action* action) override {
-		for (int i = 0; i < m_actions.size(); ++i) {
-			if (compareString(m_actions[i]->label_long, action->label_long) > 0) {
-				m_actions.insert(i, action);
-				return;
-			}
-		}
-		m_actions.push(action);
-	}
-
-	template <void (StudioAppImpl::*Func)()>
-	Action& addAction(const char* label_short, const char* label_long, const char* name, const char* font_icon = "")
-	{
-		Action* a = LUMIX_NEW(m_allocator, Action);
-		a->init(label_short, label_long, name, font_icon, Action::IMGUI_PRIORITY);
-		a->func.bind<Func>(this);
-		addAction(a);
-		m_owned_actions.push(a);
-		return *a;
-	}
-
-
-	template <void (StudioAppImpl::*Func)()>
-	void addAction(const char* label_short,
-		const char* label_long,
-		const char* name,
-		const char* font_icon,
-		os::Keycode shortcut,
-		Action::Modifiers modifiers)
-	{
-		Action* a = LUMIX_NEW(m_allocator, Action);
-		a->init(label_short, label_long, name, font_icon, shortcut, modifiers, Action::IMGUI_PRIORITY);
-		a->func.bind<Func>(this);
-		m_owned_actions.push(a);
-		addAction(a);
-	}
-
-
 	Action* getAction(const char* name) override
 	{
-		for (auto* a : m_actions)
-		{
+		for (Action* a = Action::first_action; a; a = a->next) {
 			if (equalStrings(a->name, name)) return a;
 		}
 		return nullptr;
 	}
-
 
 	static void showAddComponentNode(const StudioApp::AddCmpTreeNode* node, const TextFilter& filter, EntityPtr parent, WorldEditor& editor)
 	{
@@ -1554,9 +1735,9 @@ struct StudioAppImpl final : StudioApp
 			ImGui::EndMenu();
 		}
 		
-		menuItem("makeParent", selected_entities.size() == 2);
+		menuItem("entity_parent", selected_entities.size() == 2);
 		bool can_unparent = selected_entities.size() == 1 && m_editor->getWorld()->getParent(selected_entities[0]).isValid();
-		menuItem("unparent", can_unparent);
+		menuItem("entity_unparent", can_unparent);
 		ImGui::EndMenu();
 	}
 
@@ -1566,7 +1747,7 @@ struct StudioAppImpl final : StudioApp
 			ASSERT(false);
 			return;
 		}
-		if (Lumix::menuItem(*action, enabled)) action->func.invoke();
+		if (Lumix::menuItem(*action, enabled)) action->request = true;
 	}
 
 	void editMenu()
@@ -1579,19 +1760,18 @@ struct StudioAppImpl final : StudioApp
 		ImGui::Separator();
 		menuItem("copy", is_any_entity_selected);
 		menuItem("paste", m_editor->canPasteEntities());
-		menuItem("duplicate", is_any_entity_selected);
 		ImGui::Separator();
-		menuItem("setTranslateGizmoMode", true);
-		menuItem("setRotateGizmoMode", true);
-		menuItem("setScaleGizmoMode", true);
-		menuItem("setLocalCoordSystem", true);
-		menuItem("setGlobalCoordSystem", true);
+		menuItem("gizmo_translate_mode", true);
+		menuItem("gizmo_rotate_mode", true);
+		menuItem("gizmo_scale_mode", true);
+		menuItem("gizmo_local_coord", true);
+		menuItem("gizmo_global_coord", true);
 		if (ImGuiEx::BeginMenuEx("View", ICON_FA_CAMERA, true))
 		{
-			menuItem("toggleProjection", true);
-			menuItem("viewTop", true);
-			menuItem("viewFront", true);
-			menuItem("viewSide", true);
+			menuItem("toggle_projection", true);
+			menuItem("view_top", true);
+			menuItem("view_front", true);
+			menuItem("view_side", true);
 			ImGui::EndMenu();
 		}
 		ImGui::EndMenu();
@@ -1613,14 +1793,16 @@ struct StudioAppImpl final : StudioApp
 	{
 		if (!ImGui::BeginMenu("File")) return;
 
-		menuItem("newWorld", true);
+		menuItem("world_new", true);
 		const Array<World::Partition>& partitions = m_editor->getWorld()->getPartitions();
 		auto open_ui = [&](const char* label, bool additive){
 			if (ImGui::BeginMenu(label)) {
 				m_open_filter.gui("Filter", 150);
 	
 				forEachWorld([&](const Path& path){
-					if (m_open_filter.pass(path.c_str()) && ImGui::MenuItem(path.c_str())) {
+					StringView basename = Path::getBasename(path);
+					StaticString<MAX_PATH> tmp(basename);
+					if (m_open_filter.pass(path.c_str()) && ImGui::MenuItem(tmp)) {
 						tryLoadWorld(path, additive);
 					}
 				});
@@ -1639,43 +1821,37 @@ struct StudioAppImpl final : StudioApp
 			}
 		}
 		menuItem("save", !m_editor->isGameMode());
-		menuItem("saveAs", !m_editor->isGameMode());
-		menuItem("exit", true);
+		menuItem("studio_exit", true);
 		ImGui::EndMenu();
 	}
 
 
-	void toolsMenu()
-	{
+	void toolsMenu() {
 		if (!ImGui::BeginMenu("Tools")) return;
 
 		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
-		menuItem("focus_asset_search", true);
-		menuItem("snapDown", is_any_entity_selected);
-		menuItem("autosnapDown", true);
-		menuItem("export_game", true);
-		for (Action* action : m_tools_actions) {
-			if (Lumix::menuItem(*action, true)) {
-				action->func.invoke();
-			}
+		menuItem("asset_browser_focus_search", true);
+		menuItem("entity_snap_down", is_any_entity_selected);
+		menuItem("autosnap_down", true);
+		menuItem("package_game", true);
+		for (Action* action = Action::first_action; action; action = action->next) {
+			if (action->type != Action::Type::TOOL) continue;
+			if (Lumix::menuItem(*action, true)) action->request = true;
 		}
 		ImGui::EndMenu();
 	}
 
 	void viewMenu() {
 		if (!ImGui::BeginMenu("View")) return;
-
-		menuItem("entityList", true);
-		menuItem("settings", true);
-		ImGui::Separator();
-		for (Action* action : m_window_actions) {
-			if (Lumix::menuItem(*action, true)) action->func.invoke();
+		for (Action* action = Action::first_action; action; action = action->next) {
+			if (action->type != Action::WINDOW) continue;
+			if (Lumix::menuItem(*action, true)) action->request = true;
 		}
 		ImGui::EndMenu();
 	}
 
-	void mainMenu()
-	{
+	void mainMenu() {
+		PROFILE_FUNCTION();
 		if (m_confirm_exit) {
 			openCenterStrip("Confirm##confirm_exit");
 			m_confirm_exit = false;
@@ -1693,21 +1869,6 @@ struct StudioAppImpl final : StudioApp
 				if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
 			});
 			endCenterStrip();
-		}
-
-		if (m_confirm_destroy_partition) {
-			ImGui::OpenPopup("Confirm##confirm_destroy_partition");
-			m_confirm_destroy_partition = false;
-		}
-		if (ImGui::BeginPopupModal("Confirm##confirm_destroy_partition")) {
-			ImGui::Text("All unsaved changes will be lost, do you want to continue?");
-			if (ImGui::Button("Continue")) {
-				m_editor->destroyWorldPartition(m_partition_to_destroy);
-				ImGui::CloseCurrentPopup();
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
-			ImGui::EndPopup();
 		}
 
 		if (m_confirm_new) {
@@ -1771,17 +1932,19 @@ struct StudioAppImpl final : StudioApp
 
 			float w = (ImGui::GetWindowContentRegionMax().x - ImGui::GetWindowContentRegionMin().x) * 0.5f - 30 - ImGui::GetCursorPosX();
 			ImGui::Dummy(ImVec2(w, ImGui::GetTextLineHeightWithSpacing()));
-			getAction("toggleGameMode")->toolbarButton(m_big_icon_font);
-			getAction("pauseGameMode")->toolbarButton(m_big_icon_font);
-			getAction("nextFrame")->toolbarButton(m_big_icon_font);
+			
+			m_toggle_game_mode.toolbarButton(m_big_icon_font, m_editor->isGameMode());
+			m_pause_game.toolbarButton(m_big_icon_font, m_engine->isPaused());
+			m_next_frame.toolbarButton(m_big_icon_font);
 
 			// we don't have custom titlebar on linux
 			#ifdef _WIN32
+				StaticString<200> stats;
+				if (m_engine->getFileSystem().hasWork()) stats.append(ICON_FA_HOURGLASS_HALF "Loading... | ");
+				stats.append("FPS: ", u32(m_fps + 0.5f));
+				if (m_frames_since_focused > 10) stats.append(" - inactive window");
+
 				alignGUIRight([&](){
-					StaticString<200> stats;
-					if (m_engine->getFileSystem().hasWork()) stats.append(ICON_FA_HOURGLASS_HALF "Loading... | ");
-					stats.append("FPS: ", u32(m_fps + 0.5f));
-					if (m_frames_since_focused > 10) stats.append(" - inactive window");
 					ImGuiEx::TextUnformatted(stats);
 
 					if (m_log_ui->getUnreadErrorCount() == 1) {
@@ -1813,378 +1976,6 @@ struct StudioAppImpl final : StudioApp
 		}
 	}
 
-	void getSelectionChain(Array<EntityRef>& chain, EntityPtr e) const {
-		if (!e.isValid()) return;
-		
-		e = m_editor->getWorld()->getParent(*e);
-		while (e.isValid()) {
-			chain.push(*e);
-			e = m_editor->getWorld()->getParent(*e);
-		}
-		for (i32 i = 0; i < chain.size() / 2; ++i) {
-			swap(chain[i], chain[chain.size() - 1 - i]); 
-		}
-	}
-
-	void showHierarchy(EntityRef entity, const Array<EntityRef>& selected_entities, Span<const EntityRef> selection_chain)
-	{
-		World* world = m_editor->getWorld();
-		bool is_selected = selected_entities.indexOf(entity) >= 0;
-		ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_AllowItemOverlap;
-		bool has_child = world->getFirstChild(entity).isValid();
-		if (!has_child) flags = ImGuiTreeNodeFlags_Leaf;
-		if (is_selected) flags |= ImGuiTreeNodeFlags_Selected;
-		flags |= ImGuiTreeNodeFlags_SpanAvailWidth;
-		
-		bool node_open;
-		if (m_renaming_entity == entity) {
-			node_open = ImGui::TreeNodeEx((void*)(intptr_t)entity.index, flags, "%s", "");
-			ImGui::SameLine();
-			ImGui::SetNextItemWidth(-1);
-			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {0, 0});
-			ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0);
-			ImGui::PushStyleColor(ImGuiCol_FrameBg, 0);
-			if (m_set_rename_focus) {
-				ImGui::SetKeyboardFocusHere();
-				m_set_rename_focus = false;
-			}
-			if (ImGui::InputText("##renamed_val", m_rename_buf, sizeof(m_rename_buf), ImGuiInputTextFlags_EnterReturnsTrue)) {
-				m_editor->setEntityName((EntityRef)m_renaming_entity, m_rename_buf);
-				m_renaming_entity = INVALID_ENTITY;
-			}
-			if (ImGui::IsItemDeactivated() && m_renaming_entity.isValid()) {
-				if (ImGui::IsItemDeactivatedAfterEdit() && m_rename_buf[0]) {
-					m_editor->setEntityName((EntityRef)m_renaming_entity, m_rename_buf);
-				}
-				m_renaming_entity = INVALID_ENTITY;
-			}
-			m_set_rename_focus = false;
-			ImGui::PopStyleVar(2);
-			ImGui::PopStyleColor();
-		}
-		else {
-			const ImVec2 cp = ImGui::GetCursorPos();
-			ImGui::Dummy(ImVec2(1.f, ImGui::GetTextLineHeightWithSpacing()));
-			if (selection_chain.length() > 0 && selection_chain[0] == entity) {
-				ImGui::SetNextItemOpen(true);
-				selection_chain.removePrefix(1);
-				if (selection_chain.length() == 0) {
-					ImGui::SetScrollHereY();
-				}
-			}
-			if (ImGui::IsItemVisible()) {
-				ImGui::SetCursorPos(cp);
-				char buffer[1024];
-				getEntityListDisplayName(*this, *world, Span(buffer), entity);
-				node_open = ImGui::TreeNodeEx((void*)(intptr_t)entity.index, flags, "%s", buffer);
-			}
-			else {
-				const char* dummy = "";
-				const ImGuiID id = ImGui::GetCurrentWindow()->GetID((void*)(intptr_t)entity.index);
-				if (ImGui::TreeNodeUpdateNextOpen(id, flags)) {
-					ImGui::SetCursorPos(cp);
-					node_open = ImGui::TreeNodeBehavior(id, flags, dummy, dummy);
-				}
-				else {
-					node_open = false;
-				}
-			}
-		}
-		
-		if (ImGui::IsItemVisible()) {
-			ImGui::PushID(entity.index);
-			if (ImGui::IsMouseReleased(1) && ImGui::IsItemHovered()) ImGui::OpenPopup("entity_context_menu");
-			if (ImGui::BeginPopup("entity_context_menu"))
-			{
-				if (ImGui::BeginMenu("Create child")) {
-					onCreateEntityWithComponentGUI(entity);
-					ImGui::EndMenu();
-				}
-
-				if (ImGui::MenuItem("Select all children")) {
-					Array<EntityRef> tmp(m_allocator);
-					for (EntityRef e : world->childrenOf(entity)) {
-						tmp.push(e);
-					}
-					m_editor->selectEntities(tmp, false);
-				}
-				ImGui::EndPopup();
-			}
-			ImGui::PopID();
-			if (ImGui::BeginDragDropTarget()) {
-				if (auto* payload = ImGui::AcceptDragDropPayload("entity")) {
-					EntityRef dropped_entity = *(EntityRef*)payload->Data;
-					if (dropped_entity != entity) {
-						m_editor->makeParent(entity, dropped_entity);
-						ImGui::EndDragDropTarget();
-						if (node_open) ImGui::TreePop();
-						return;
-					}
-				}
-
-				if (auto* payload = ImGui::AcceptDragDropPayload("selected_entities")) {
-					const Array<EntityRef>& selected = m_editor->getSelectedEntities();
-					for (EntityRef e : selected) {
-						if (e != entity) {
-							m_editor->makeParent(entity, e);
-						}
-					}
-					ImGui::EndDragDropTarget();
-					if (node_open) ImGui::TreePop();
-					return;
-				}
-
-				ImGui::EndDragDropTarget();
-			}
-
-			if (ImGui::BeginDragDropSource())
-			{
-				char buffer[1024];
-				getEntityListDisplayName(*this, *world, Span(buffer), entity);
-				ImGui::TextUnformatted(buffer);
-				
-				const Array<EntityRef>& selected = m_editor->getSelectedEntities();
-				if (selected.size() > 0 && selected.indexOf(entity) >= 0) {
-					ImGui::SetDragDropPayload("selected_entities", nullptr, 0);
-				}
-				else {	
-					ImGui::SetDragDropPayload("entity", &entity, sizeof(entity));
-				}
-				ImGui::EndDragDropSource();
-			}
-			else {
-				if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
-					m_editor->selectEntities(Span(&entity, 1), ImGui::GetIO().KeyCtrl);
-				}
-			}
-		}
-
-		if (node_open)
-		{
-			for (EntityRef e : world->childrenOf(entity))
-			{
-				showHierarchy(e, selected_entities, selection_chain);
-			}
-			if (ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && m_is_f2_pressed) {
-				m_renaming_entity = selected_entities.empty() ? INVALID_ENTITY : selected_entities[0];
-				if (m_renaming_entity.isValid()) {
-					m_set_rename_focus = true;
-					const char* name = m_editor->getWorld()->getEntityName(selected_entities[0]);
-					copyString(m_rename_buf, name);
-				}
-			}
-
-			ImGui::TreePop();
-		}
-	}
-
-
-	void folderUI(EntityFolders::FolderHandle folder_id, EntityFolders& folders, u32 level, Span<const EntityRef> selection_chain, const char* name_override, World::PartitionHandle partition) {
-		static EntityFolders::FolderHandle force_open_folder = EntityFolders::INVALID_FOLDER;
-		const EntityFolders::Folder* folder = &folders.getFolder(folder_id);
-		ImGui::PushID((const char*)&folder->id, (const char*)&folder->id + sizeof(folder->id));
-		bool node_open;
-		ImGuiTreeNodeFlags flags = level == 0 ? ImGuiTreeNodeFlags_DefaultOpen : 0;
-		flags |= ImGuiTreeNodeFlags_OpenOnArrow;
-		if (folders.getSelectedFolder() == folder_id) flags |= ImGuiTreeNodeFlags_Selected;
-		if (force_open_folder == folder_id) {
-			ImGui::SetNextItemOpen(true);
-			force_open_folder = EntityFolders::INVALID_FOLDER;
-		}
-		if (m_renaming_folder == folder_id) {
-			node_open = ImGui::TreeNodeEx((void*)folder, flags, "%s", ICON_FA_FOLDER);
-			ImGui::SameLine();
-			ImGui::SetNextItemWidth(-1);
-			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {0, 0});
-			ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0);
-			ImGui::PushStyleColor(ImGuiCol_FrameBg, 0);
-			if (m_set_rename_focus) {
-				ImGui::SetKeyboardFocusHere();
-				m_set_rename_focus = false;
-			}
-			if (ImGui::InputText("##renamed_val", m_rename_buf, sizeof(m_rename_buf), ImGuiInputTextFlags_EnterReturnsTrue)) {
-				m_editor->renameEntityFolder(m_renaming_folder, m_rename_buf);
-				m_rename_buf[0] = 0;
-			}
-			if (ImGui::IsItemDeactivated()) {
-				if (ImGui::IsItemDeactivatedAfterEdit() && m_rename_buf[0]) {
-					m_editor->renameEntityFolder(m_renaming_folder, m_rename_buf);
-				}
-				m_renaming_folder = EntityFolders::INVALID_FOLDER;
-			}
-			m_set_rename_focus = false;
-			ImGui::PopStyleVar(2);
-			ImGui::PopStyleColor();
-		}
-		else {
-			if (name_override) {
-				node_open = ImGui::TreeNodeEx((void*)folder, flags, "%s%s", ICON_FA_HOME, name_override);
-			}
-			else {
-				node_open = ImGui::TreeNodeEx((void*)folder, flags, "%s%s", ICON_FA_FOLDER, folder->name);
-			}
-		}
-		
-		if (ImGui::BeginDragDropTarget()) {
-			if (auto* payload = ImGui::AcceptDragDropPayload("entity")) {
-				EntityRef dropped_entity = *(EntityRef*)payload->Data;
-				m_editor->beginCommandGroup("move_entity_to_folder_group");
-				m_editor->makeParent(INVALID_ENTITY, dropped_entity);
-				m_editor->moveEntityToFolder(dropped_entity, folder_id);
-				m_editor->endCommandGroup();
-			}
-			ImGui::EndDragDropTarget();
-		}
-
-		if (ImGui::IsMouseClicked(0) && ImGui::IsItemHovered()) {
-			folders.selectFolder(folder_id);
-		}
-
-		if (ImGui::IsMouseReleased(1) && ImGui::IsItemHovered()) {
-			ImGui::OpenPopup("folder_context_menu");
-		}
-		if (ImGui::BeginPopup("folder_context_menu")) {
-			if (ImGui::Selectable("New folder")) {
-				force_open_folder = folder_id;
-				EntityFolders::FolderHandle new_folder = m_editor->createEntityFolder(folder_id);
-				folder = &folders.getFolder(folder_id);
-				m_renaming_folder = new_folder;
-				m_set_rename_focus = true;
-			}
-			const bool is_root = folder->parent == EntityFolders::INVALID_FOLDER;
-			World* world = m_editor->getWorld();
-
-			if (is_root) {
-				const bool is_partition_named = world->getPartition(partition).name[0];
-				if (is_partition_named) {
-					if (ImGui::Selectable("Save")) {
-						if (m_editor->isGameMode()) {
-							logError("Could not save while the game is running");
-						}
-						else {
-							m_editor->savePartition(partition);
-						}
-					}
-				}
-				else {
-					if (ImGui::Selectable("Save As")) {
-						EntityFolders& folders = m_editor->getEntityFolders();
-						EntityFolders::FolderHandle root = folders.getRoot(partition);
-						folders.selectFolder(root);
-						saveAs();
-					}
-				}
-			}
-
-			if (!is_root || world->getPartitions().size() > 1) {
-				if (ImGui::Selectable(is_root ? "Unload" : "Delete")) {
-					if (is_root) {
-						m_confirm_destroy_partition = true;
-						m_partition_to_destroy = partition;
-					}
-					else {
-						m_editor->destroyEntityFolder(folder_id);
-						ImGui::EndPopup();
-						if (node_open) ImGui::TreePop();
-						ImGui::PopID();
-						return;
-					}
-				}
-			}
-
-			const bool has_children = folders.getFolder(folder_id).first_entity.isValid();
-			if (ImGui::Selectable("Select entities", false, has_children ? 0 : ImGuiSelectableFlags_Disabled)) {
-				Array<EntityRef> entities(m_allocator);
-				EntityPtr e = folders.getFolder(folder_id).first_entity;
-				while (e.isValid()) {
-					entities.push((EntityRef)e);
-					const EntityPtr next = folders.getNextEntity((EntityRef)e);
-					e = next;
-				}
-				m_editor->selectEntities(entities, false);
-			}
-			if (level > 0 && ImGui::Selectable("Rename")) {
-				m_renaming_folder = folder_id;
-				m_set_rename_focus = true;
-			}
-			ImGui::EndPopup();
-		}
-
-		if (!node_open) {
-			ImGui::PopID();
-			return;
-		}
-
-		EntityFolders::FolderHandle child_id = folder->first_child;
-		while (child_id != EntityFolders::INVALID_FOLDER) {
-			const EntityFolders::Folder& child = folders.getFolder(child_id);
-			const EntityFolders::FolderHandle next = child.next;
-			folderUI(child_id, folders, level + 1, selection_chain, nullptr, partition);
-			child_id = next;
-		}
-
-		EntityPtr child_e = folder->first_entity;
-		while (child_e.isValid()) {
-			if (!m_editor->getWorld()->getParent((EntityRef)child_e).isValid()) {
-				showHierarchy((EntityRef)child_e, m_editor->getSelectedEntities(), selection_chain);
-			}
-			child_e = folders.getNextEntity((EntityRef)child_e);
-		}
-
-		ImGui::TreePop();
-		ImGui::PopID();
-	}
-
-	void guiEntityList() {
-		PROFILE_FUNCTION();
-		const Array<EntityRef>& entities = m_editor->getSelectedEntities();
-		static TextFilter filter;
-		if (!m_is_entity_list_open) return;
-		if (ImGui::Begin(ICON_FA_STREAM "Hierarchy##hierarchy", &m_is_entity_list_open))
-		{
-			World* world = m_editor->getWorld();
-			filter.gui(ICON_FA_SEARCH "Filter");
-			
-			if (ImGui::BeginChild("entities")) {
-				ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().FramePadding.x);
-				
-				if (filter.isActive()) {
-					for (EntityPtr e = world->getFirstEntity(); e.isValid(); e = world->getNextEntity((EntityRef)e)) {
-						char buffer[1024];
-						getEntityListDisplayName(*this, *world, Span(buffer), e);
-						if (!filter.pass(buffer)) continue;
-
-						ImGui::PushID(e.index);
-						const EntityRef e_ref = (EntityRef)e;
-						bool selected = entities.indexOf(e_ref) >= 0;
-						if (ImGui::Selectable(buffer, &selected, ImGuiSelectableFlags_SpanAvailWidth)) {
-							m_editor->selectEntities(Span(&e_ref, 1), ImGui::GetIO().KeyCtrl);
-						}
-						if (ImGui::BeginDragDropSource()) {
-							ImGui::TextUnformatted(buffer);
-							ImGui::SetDragDropPayload("entity", &e, sizeof(e));
-							ImGui::EndDragDropSource();
-						}
-						ImGui::PopID();
-					}
-				} else {
-					EntityFolders& folders = m_editor->getEntityFolders();
-					Array<EntityRef> selection_chain(m_allocator);
-					if (m_entity_selection_changed && !m_editor->getSelectedEntities().empty()) {
-						getSelectionChain(selection_chain, m_editor->getSelectedEntities()[0]);
-						m_entity_selection_changed = false;
-					}
-					for (const World::Partition& p : world->getPartitions()) {
-						folderUI(folders.getRoot(p.handle), folders, 0, selection_chain, p.name, p.handle);
-					}
-				}
-				ImGui::PopItemWidth();
-			}
-			ImGui::EndChild();
-		}
-		ImGui::End();
-	}
-
 	void setFullscreen(bool fullscreen) override
 	{
 		if (fullscreen) {
@@ -2202,28 +1993,21 @@ struct StudioAppImpl final : StudioApp
 			m_settings.m_imgui_state = data;
 			io.WantSaveIniSettings = false;
 		}
-		m_settings.m_is_entity_list_open = m_is_entity_list_open;
-		m_settings.setValue(Settings::LOCAL, "fileselector_dir", m_file_selector.m_current_dir.c_str());
 
-		m_settings.m_is_maximized = os::isMaximized(m_main_window);
+		m_settings.setBool("is_maximized", os::isMaximized(m_main_window), Settings::WORKSPACE);
 		if (!os::isMinimized(m_main_window)) {
 			os::Rect win_rect = os::getWindowScreenRect(m_main_window);
-			m_settings.m_window.x = win_rect.left;
-			m_settings.m_window.y = win_rect.top;
-			m_settings.m_window.w = win_rect.width;
-			m_settings.m_window.h = win_rect.height;
+			m_settings.setI32("window_x", win_rect.left, Settings::WORKSPACE);
+			m_settings.setI32("window_y", win_rect.top, Settings::WORKSPACE);
+			m_settings.setI32("window_w", win_rect.width, Settings::WORKSPACE);
+			m_settings.setI32("window_h", win_rect.height, Settings::WORKSPACE);
 		}
 
 		for (auto* i : m_gui_plugins) {
 			i->onBeforeSettingsSaved();
 		}
 
-		if (m_settings.save()) {
-			logInfo("Settings saved");
-		}
-		else {
-			logError("Settings failed to save");
-		}
+		m_settings.save();
 	}
 
 	ImFont* addFontFromFile(const char* path, float size, bool merge_icons) {
@@ -2277,7 +2061,7 @@ struct StudioAppImpl final : StudioApp
 		};
 		pio.Platform_DestroyWindow = [](ImGuiViewport* vp){
 			os::WindowHandle w = (os::WindowHandle)vp->PlatformHandle;
-			that->m_deferred_destroy_windows.push({w, 4});
+			that->m_deferred_destroy_windows.push({w, 8});
 			vp->PlatformHandle = nullptr;
 			vp->PlatformUserData = nullptr;
 			that->m_windows.eraseItem(w);
@@ -2358,7 +2142,7 @@ struct StudioAppImpl final : StudioApp
 				io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 				io.BackendFlags = ImGuiBackendFlags_HasMouseCursors;
 			#else
-				io.ConfigFlags |= ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable;
+				io.ConfigFlags |= ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable | ImGuiConfigFlags_NavEnableKeyboard;
 				io.BackendFlags = ImGuiBackendFlags_PlatformHasViewports | ImGuiBackendFlags_RendererHasViewports | ImGuiBackendFlags_HasMouseCursors;
 			#endif
 
@@ -2370,13 +2154,13 @@ struct StudioAppImpl final : StudioApp
 		
 			ImGui::LoadIniSettingsFromMemory(m_settings.m_imgui_state.c_str());
 
-			m_font = addFontFromFile("editor/fonts/notosans-regular.ttf", (float)m_settings.m_font_size * font_scale, true);
-			m_bold_font = addFontFromFile("editor/fonts/notosans-bold.ttf", (float)m_settings.m_font_size * font_scale, true);
-			m_monospace_font = addFontFromFile("editor/fonts/sourcecodepro-regular.ttf", (float)m_settings.m_font_size * font_scale, false);
+			m_font = addFontFromFile("editor/fonts/notosans-regular.ttf", (float)m_font_size * font_scale, true);
+			m_bold_font = addFontFromFile("editor/fonts/notosans-bold.ttf", (float)m_font_size * font_scale, true);
+			m_monospace_font = addFontFromFile("editor/fonts/sourcecodepro-regular.ttf", (float)m_font_size * font_scale, false);
 
 			OutputMemoryStream data(m_allocator);
 			if (fs.getContentSync(Path("editor/fonts/fa-solid-900.ttf"), data)) {
-				const float size = (float)m_settings.m_font_size * font_scale * 1.25f;
+				const float size = (float)m_font_size * font_scale * 1.25f;
 				ImFontConfig cfg;
 				copyString(cfg.Name, "editor/fonts/fa-solid-900.ttf");
 				cfg.FontDataOwnedByAtlas = false;
@@ -2427,32 +2211,27 @@ struct StudioAppImpl final : StudioApp
 		PROFILE_FUNCTION();
 		logInfo("Loading settings...");
 
-		if (CommandLineParser::isOn("-no_crash_report")) m_settings.m_force_no_crash_report = true;
+		m_settings.load();
+		if (CommandLineParser::isOn("-no_crash_report")) enableCrashReporting(false);
+		else enableCrashReporting(m_crash_reporting);
 
-		m_settings.postLoad();
 		for (auto* i : m_gui_plugins) {
 			i->onSettingsLoaded();
 		}
 
-		m_is_entity_list_open = m_settings.m_is_entity_list_open;
-
-		if (m_settings.m_is_maximized)
-		{
+		if (m_settings.getBool("is_maximized", false)){
 			os::maximizeWindow(m_main_window);
 		}
-		else if (m_settings.m_window.w > 0)
-		{
+		else {
 			os::Rect r;
-			r.left = m_settings.m_window.x;
-			r.top = m_settings.m_window.y;
-			r.width = m_settings.m_window.w;
-			r.height = m_settings.m_window.h;
-			os::setWindowScreenRect(m_main_window, r);
+			r.width = m_settings.getI32("window_w", -1);
+			if (r.width > 0) {
+				r.left = m_settings.getI32("window_x", -1);
+				r.top = m_settings.getI32("window_y", -1);
+				r.height = m_settings.getI32("window_h", -1);
+				os::setWindowScreenRect(m_main_window, r);
+			}
 		}
-		m_export.dest_dir = "";
-		m_settings.getValue(Settings::LOCAL, "export_dir", Span(m_export.dest_dir.data));
-		m_settings.getValue(Settings::LOCAL, "export_pack", m_export.pack);
-		m_file_selector.m_current_dir = m_settings.getStringValue(Settings::LOCAL, "fileselector_dir", "");
 	}
 
 	CommonActions& getCommonActions() override { return m_common_actions; }
@@ -2479,81 +2258,6 @@ struct StudioAppImpl final : StudioApp
 	}
 
 	void showAllActionsGUI() { m_show_all_actions_request = true; }
-
-	void addActions()
-	{
-		m_common_actions.save.init("Save", "Save", "save", ICON_FA_SAVE, os::Keycode::S, Action::Modifiers::CTRL, Action::GLOBAL);
-		m_common_actions.save.func.bind<&StudioAppImpl::save>(this);
-		addAction(&m_common_actions.save);
-		m_common_actions.undo.init("Undo", "Undo", "undo", ICON_FA_UNDO, os::Keycode::Z, Action::Modifiers::CTRL, Action::IMGUI_PRIORITY);
-		m_common_actions.undo.func.bind<&StudioAppImpl::undo>(this);
-		addAction(&m_common_actions.undo);
-		m_common_actions.redo.init("Redo", "Redo", "redo", ICON_FA_REDO, os::Keycode::Z, Action::Modifiers::CTRL | Action::Modifiers::SHIFT, Action::IMGUI_PRIORITY);
-		m_common_actions.redo.func.bind<&StudioAppImpl::redo>(this);
-		addAction(&m_common_actions.redo);
-		m_common_actions.del.init("Delete", "Delete", "delete", ICON_FA_MINUS_SQUARE, os::Keycode::DEL, Action::Modifiers::NONE, Action::IMGUI_PRIORITY);
-		m_common_actions.del.func.bind<&StudioAppImpl::destroySelectedEntity>(this);
-		addAction(&m_common_actions.del);
-
-		m_common_actions.cam_orbit.init("Orbit", "Orbit with RMB", "orbitRMB", "", Action::LOCAL);
-		addAction(&m_common_actions.cam_orbit);
-		m_common_actions.cam_forward.init("Move forward", "Move camera forward", "moveForward", "", Action::LOCAL);
-		addAction(&m_common_actions.cam_forward);
-		m_common_actions.cam_backward.init("Move back", "Move camera back", "moveBack", "", Action::LOCAL);
-		addAction(&m_common_actions.cam_backward);
-		m_common_actions.cam_left.init("Move left", "Move camera left", "moveLeft", "", Action::LOCAL);
-		addAction(&m_common_actions.cam_left);
-		m_common_actions.cam_right.init("Move right", "Move camera right", "moveRight", "", Action::LOCAL);
-		addAction(&m_common_actions.cam_right);
-		m_common_actions.cam_up.init("Move up", "Move camera up", "moveUp", "", Action::LOCAL);
-		addAction(&m_common_actions.cam_up);
-		m_common_actions.cam_down.init("Move down", "Move camera down", "moveDown", "", Action::LOCAL);
-		addAction(&m_common_actions.cam_down);
-
-		m_show_all_actions_action.init("Show all actions", "Show all actions", "show_all_actions", "", os::Keycode::P, Action::Modifiers::CTRL | Action::Modifiers::SHIFT, Action::Type::IMGUI_PRIORITY);
-		m_show_all_actions_action.func.bind<&StudioAppImpl::showAllActionsGUI>(this);
-		addAction(&m_show_all_actions_action);
-		
-		m_start_standalone_app.init("Start standalone app", "Start standalone app", "start_standalone_app", "", Action::Type::IMGUI_PRIORITY);
-		m_start_standalone_app.func.bind<&StudioAppImpl::startStandaloneApp>(this);
-		addToolAction(&m_start_standalone_app);
-
-		addAction<&StudioAppImpl::newWorld>("New", "New world", "newWorld", ICON_FA_PLUS);
-		addAction<&StudioAppImpl::saveAs>("Save As", "Save world as", "saveAs", "", os::Keycode::S, Action::Modifiers::CTRL | Action::Modifiers::SHIFT);
-		addAction<&StudioAppImpl::exit>("Exit", "Exit Studio", "exit", ICON_FA_SIGN_OUT_ALT);
-		addAction<&StudioAppImpl::copy>("Copy", "Copy entity", "copy", ICON_FA_CLIPBOARD, os::Keycode::C, Action::Modifiers::CTRL);
-		addAction<&StudioAppImpl::paste>("Paste", "Paste entity", "paste", ICON_FA_PASTE, os::Keycode::V, Action::Modifiers::CTRL);
-		addAction<&StudioAppImpl::duplicate>("Duplicate", "Duplicate entity", "duplicate", ICON_FA_CLONE, os::Keycode::D, Action::Modifiers::CTRL);
-		addAction<&StudioAppImpl::setTranslateGizmoMode>("Translate", "Set translate mode", "setTranslateGizmoMode", ICON_FA_ARROWS_ALT)
-			.is_selected.bind<&Gizmo::Config::isTranslateMode>(&getGizmoConfig());
-		addAction<&StudioAppImpl::setRotateGizmoMode>("Rotate", "Set rotate mode", "setRotateGizmoMode", ICON_FA_UNDO)
-			.is_selected.bind<&Gizmo::Config::isRotateMode>(&getGizmoConfig());
-		addAction<&StudioAppImpl::setScaleGizmoMode>("Scale", "Set scale mode", "setScaleGizmoMode", ICON_FA_EXPAND_ALT)
-			.is_selected.bind<&Gizmo::Config::isScaleMode>(&getGizmoConfig());
-		addAction<&StudioAppImpl::setLocalCoordSystem>("Local", "Set local transform system", "setLocalCoordSystem", ICON_FA_HOME)
-			.is_selected.bind<&Gizmo::Config::isLocalCoordSystem>(&getGizmoConfig());
-		addAction<&StudioAppImpl::setGlobalCoordSystem>("Global", "Set global transform system", "setGlobalCoordSystem", ICON_FA_GLOBE)
-			.is_selected.bind<&Gizmo::Config::isGlobalCoordSystem>(&getGizmoConfig());
-
-		addAction<&StudioAppImpl::addEntity>("Create empty", "Create empty entity", "createEntity", ICON_FA_PLUS_SQUARE);
-		
-		addAction<&StudioAppImpl::makeParent>("Make parent", "Make entity parent", "makeParent", ICON_FA_OBJECT_GROUP);
-		addAction<&StudioAppImpl::unparent>("Unparent", "Unparent entity", "unparent", ICON_FA_OBJECT_UNGROUP);
-
-		addAction<&StudioAppImpl::nextFrame>("Next frame", "Next frame", "nextFrame", ICON_FA_STEP_FORWARD);
-		addAction<&StudioAppImpl::pauseGame>("Pause", "Pause game mode", "pauseGameMode", ICON_FA_PAUSE)
-			.is_selected.bind<&Engine::isPaused>(m_engine.get());
-		addAction<&StudioAppImpl::toggleGameMode>("Game Mode", "Toggle game mode", "toggleGameMode", ICON_FA_PLAY)
-			.is_selected.bind<&WorldEditor::isGameMode>(m_editor.get());
-		addAction<&StudioAppImpl::autosnapDown>("Autosnap down", "Toggle autosnap down", "autosnapDown")
-			.is_selected.bind<&Gizmo::Config::isAutosnapDown>(&getGizmoConfig());
-		addAction<&StudioAppImpl::snapDown>("Snap down", "Snap entities down", "snapDown");
-		addAction<&StudioAppImpl::toggleEntityList>("Hierarchy", "Toggle hierarchy", "entityList", ICON_FA_STREAM)
-			.is_selected.bind<&StudioAppImpl::isEntityListOpen>(this);
-		addAction<&StudioAppImpl::toggleSettings>("Settings", "Toggle settings UI", "settings", ICON_FA_COG)
-			.is_selected.bind<&StudioAppImpl::areSettingsOpen>(this);
-		addAction<&StudioAppImpl::showExportGameDialog>("Export game", "Export game", "export_game", ICON_FA_FILE_EXPORT);
-	}
 
 
 	static bool copyPlugin(const char* src, int iteration, char (&out)[MAX_PATH])
@@ -2808,6 +2512,8 @@ struct StudioAppImpl final : StudioApp
 				}
 			}
 		#endif
+
+		addPlugin(*m_hierarchy.get());
 		addPlugin(*createSplineEditor(*this));
 		addPlugin(*createSignalEditor(*this));
 		addPlugin(*m_property_grid.get());
@@ -2885,181 +2591,17 @@ struct StudioAppImpl final : StudioApp
 	void removePlugin(GUIPlugin& plugin) override { m_gui_plugins.swapAndPopItem(&plugin); }
 	void removePlugin(MousePlugin& plugin) override { m_mouse_plugins.swapAndPopItem(&plugin); }
 
-	void runScript(const char* src, const char* script_name) override
-	{
-		lua_State* L = m_engine->getState();
-		bool errors = LuaWrapper::luaL_loadbuffer(L, src, stringLength(src), script_name) != 0;
-		errors = errors || lua_pcall(L, 0, 0, 0) != 0;
-		if (errors)
-		{
-			logError(script_name, ": ", lua_tostring(L, -1));
-			lua_pop(L, 1);
-		}
-	}
+	void exitGameMode() override { m_deferred_game_mode_exit = true; }
 
-
-	void savePrefabAs(const char* path) {
-		auto& selected_entities = m_editor->getSelectedEntities();
-		if (selected_entities.size() != 1) return;
-
-		EntityRef entity = selected_entities[0];
-		m_editor->getPrefabSystem().savePrefab(entity, Path(path)); 
-	}
-
-
-	void destroyEntity(EntityRef e) { m_editor->destroyEntities(&e, 1); }
-
-
-	void selectEntity(EntityRef e) { m_editor->selectEntities(Span(&e, 1), false); }
-
-
-	EntityRef createEntity() { return m_editor->addEntity(); }
-
-	void createComponent(EntityRef e, const char* type)
-	{
-		const ComponentType cmp_type = reflection::getComponentType(type);
-		m_editor->addComponent(Span(&e, 1), cmp_type);
-	}
-
-	i32 getSelectedEntitiesCount() const { return m_editor->getSelectedEntities().size(); }
-	EntityRef getSelectedEntity(u32 idx) const { return m_editor->getSelectedEntities()[idx]; }
-
-	void exitGameMode() { m_deferred_game_mode_exit = true; }
-
-
-	void exitWithCode(int exit_code)
-	{
+	void exitWithCode(int exit_code) override {
 		m_finished = true;
 		m_exit_code = exit_code;
 	}
 
-
-	struct SetPropertyVisitor : reflection::IPropertyVisitor {
-		static bool isSameProperty(const char* name, const char* lua_name) {
-			char tmp[128];
-			LuaWrapper::convertPropertyToLuaName(name, Span(tmp));
-			return equalStrings(tmp, lua_name);
-		}
-
-		void visit(const reflection::Property<int>& prop) override
-		{
-			if (!isSameProperty(prop.name, property_name)) return;
-			if (!lua_isnumber(L, -1)) return;
-
-			if(reflection::getAttribute(prop, reflection::IAttribute::ENUM)) {
-				notSupported(prop);
-			}
-
-			int val = (int)lua_tointeger(L, -1);
-			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
-		}
-
-		void visit(const reflection::Property<u32>& prop) override
-		{
-			if (!isSameProperty(prop.name, property_name)) return;
-			if (!lua_isnumber(L, -1)) return;
-
-			const u32 val = (u32)lua_tointeger(L, -1);
-			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
-		}
-
-		void visit(const reflection::Property<float>& prop) override
-		{
-			if (!isSameProperty(prop.name, property_name)) return;
-			if (!lua_isnumber(L, -1)) return;
-
-			float val = (float)lua_tonumber(L, -1);
-			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
-		}
-
-		void visit(const reflection::Property<Vec2>& prop) override
-		{
-			if (!isSameProperty(prop.name, property_name)) return;
-			if (!LuaWrapper::isType<Vec2>(L, -1)) return;
-
-			const Vec2 val = LuaWrapper::toType<Vec2>(L, -1);
-			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
-		}
-
-		void visit(const reflection::Property<Vec3>& prop) override
-		{
-			if (!isSameProperty(prop.name, property_name)) return;
-			if (!LuaWrapper::isType<Vec3>(L, -1)) return;
-
-			const Vec3 val = LuaWrapper::toType<Vec3>(L, -1);
-			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
-		}
-
-		void visit(const reflection::Property<IVec3>& prop) override
-		{
-			if (!isSameProperty(prop.name, property_name)) return;
-			if (!LuaWrapper::isType<IVec3>(L, -1)) return;
-
-			const IVec3 val = LuaWrapper::toType<IVec3>(L, -1);
-			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
-		}
-
-		void visit(const reflection::Property<Vec4>& prop) override
-		{
-			if (!isSameProperty(prop.name, property_name)) return;
-			if (!LuaWrapper::isType<Vec4>(L, -1)) return;
-
-			const Vec4 val = LuaWrapper::toType<Vec4>(L, -1);
-			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
-		}
-		
-		void visit(const reflection::Property<const char*>& prop) override
-		{
-			if (!isSameProperty(prop.name, property_name)) return;
-			if (!lua_isstring(L, -1)) return;
-
-			const char* str = lua_tostring(L, -1);
-			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), str);
-		}
-
-
-		void visit(const reflection::Property<Path>& prop) override
-		{
-			if (!isSameProperty(prop.name, property_name)) return;
-			if (!lua_isstring(L, -1)) return;
-
-			const char* str = lua_tostring(L, -1);
-			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), Path(str));
-		}
-
-
-		void visit(const reflection::Property<bool>& prop) override
-		{
-			if (!isSameProperty(prop.name, property_name)) return;
-			if (!lua_isboolean(L, -1)) return;
-
-			bool val = lua_toboolean(L, -1) != 0;
-			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
-		}
-
-		void visit(const reflection::Property<EntityPtr>& prop) override { notSupported(prop); }
-		void visit(const reflection::ArrayProperty& prop) override { notSupported(prop); }
-		void visit(const reflection::BlobProperty& prop) override { notSupported(prop); }
-
-		template <typename T>
-		void notSupported(const T& prop)
-		{
-			if (!equalStrings(property_name, prop.name)) return;
-			logError("Property ", prop.name, " has unsupported type");
-		}
-
-
-		lua_State* L;
-		EntityRef entity;
-		ComponentType cmp_type;
-		const char* property_name;
-		WorldEditor* editor;
-	};
-
 	void guiAllActions() {
 		if (m_show_all_actions_request) ImGui::OpenPopup("Action palette");
 
-		if (ImGuiEx::BeginResizablePopup("Action palette", ImVec2(300, 200))) {
+		if (ImGuiEx::BeginResizablePopup("Action palette", ImVec2(300, 200), ImGuiWindowFlags_NoNavInputs)) {
 			if (ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
 
 			if(m_show_all_actions_request) m_all_actions_selected = 0;
@@ -3081,7 +2623,7 @@ struct StudioAppImpl final : StudioApp
 			if (m_all_actions_filter.isActive()) {
 				if (ImGui::BeginChild("##list")) {
 					u32 idx = 0;
-					for (Action* act : m_actions) {
+					for (Action* act = Action::first_action; act; act = act->next) {
 						if (!m_all_actions_filter.pass(act->label_long)) continue;
 
 						char buf[20] = " (";
@@ -3095,197 +2637,18 @@ struct StudioAppImpl final : StudioApp
 						bool selected = idx == m_all_actions_selected;
 						if (ImGui::Selectable(StaticString<128>(act->font_icon, act->label_long, buf), selected) || (selected && insert_enter)) {
 							ImGui::CloseCurrentPopup();
-							GUIPlugin* window = getFocusedWindow();
-							if (!window || !window->onAction(*act)) {
-								if (act->func.isValid()) {
-									act->func.invoke();
-								}
-							}
+							act->request = true;
 							break;
 						}
 						++idx;
 					}
+					m_all_actions_selected = m_all_actions_selected > 0 ? m_all_actions_selected % idx : 0;
 				}
 				ImGui::EndChild();
 			}
 			ImGui::EndPopup();
 		}
 		m_show_all_actions_request = false;
-	}
-
-	static void LUA_makeParent(lua_State* L, EntityPtr parent, EntityRef child) {
-		StudioAppImpl* studio = LuaWrapper::getClosureObject<StudioAppImpl>(L);
-		studio->m_editor->makeParent(parent, child);
-	}
-
-	static int LUA_createEntityEx(lua_State* L) {
-		StudioAppImpl* studio = LuaWrapper::getClosureObject<StudioAppImpl>(L);
-		LuaWrapper::checkTableArg(L, 1);
-
-		WorldEditor& editor = *studio->m_editor;
-		editor.beginCommandGroup("createEntityEx");
-		EntityRef e = editor.addEntity();
-		editor.selectEntities(Span(&e, 1), false);
-
-		lua_pushvalue(L, 1);
-		lua_pushnil(L);
-		while (lua_next(L, -2) != 0)
-		{
-			const char* parameter_name = LuaWrapper::toType<const char*>(L, -2);
-			if (equalStrings(parameter_name, "name"))
-			{
-				const char* name = LuaWrapper::toType<const char*>(L, -1);
-				editor.setEntityName(e, name);
-			}
-			else if (equalStrings(parameter_name, "position"))
-			{
-				const DVec3 pos = LuaWrapper::toType<DVec3>(L, -1);
-				editor.setEntitiesPositions(&e, &pos, 1);
-			}
-			else if (equalStrings(parameter_name, "rotation"))
-			{
-				const Quat rot = LuaWrapper::toType<Quat>(L, -1);
-				editor.setEntitiesRotations(&e, &rot, 1);
-			}
-			else
-			{
-				ComponentType cmp_type = reflection::getComponentType(parameter_name);
-				editor.addComponent(Span(&e, 1), cmp_type);
-
-				IModule* module = editor.getWorld()->getModule(cmp_type);
-				if (module)
-				{
-					ComponentUID cmp(e, cmp_type, module);
-					const reflection::ComponentBase* cmp_des = reflection::getComponent(cmp_type);
-					if (cmp.isValid())
-					{
-						lua_pushvalue(L, -1);
-						lua_pushnil(L);
-						while (lua_next(L, -2) != 0)
-						{
-							const char* property_name = LuaWrapper::toType<const char*>(L, -2);
-							SetPropertyVisitor v;
-							v.property_name = property_name;
-							v.entity = (EntityRef)cmp.entity;
-							v.cmp_type = cmp.type;
-							v.L = L;
-							v.editor = &editor;
-							cmp_des->visit(v);
-
-							lua_pop(L, 1);
-						}
-						lua_pop(L, 1);
-					}
-				}
-			}
-			lua_pop(L, 1);
-		}
-		lua_pop(L, 1);
-
-		editor.endCommandGroup();
-		LuaWrapper::pushEntity(L, e, editor.getWorld());
-		return 1;
-	}
-
-	static int LUA_getSelectedEntity(lua_State* L) {
-		LuaWrapper::DebugGuard guard(L, 1);
-		i32 entity_idx = LuaWrapper::checkArg<i32>(L, 1);
-		
-		StudioAppImpl* inst = LuaWrapper::getClosureObject<StudioAppImpl>(L);
-		EntityRef entity = inst->m_editor->getSelectedEntities()[entity_idx];
-
-		lua_getglobal(L, "Lumix");
-		lua_getfield(L, -1, "Entity");
-		lua_remove(L, -2);
-		lua_getfield(L, -1, "new");
-		lua_pushvalue(L, -2); // [Lumix.Entity, Entity.new, Lumix.Entity]
-		lua_remove(L, -3); // [Entity.new, Lumix.Entity]
-		World* world = inst->m_editor->getWorld();
-		LuaWrapper::push(L, world); // [Entity.new, Lumix.Entity, world]
-		LuaWrapper::push(L, entity.index); // [Entity.new, Lumix.Entity, world, entity_index]
-		const bool error = !LuaWrapper::pcall(L, 3, 1); // [entity]
-		return error ? 0 : 1;
-	}
-
-	static int LUA_getResources(lua_State* L)
-	{
-		auto* studio = LuaWrapper::checkArg<StudioAppImpl*>(L, 1);
-		auto* type = LuaWrapper::checkArg<const char*>(L, 2);
-
-		AssetCompiler& compiler = studio->getAssetCompiler();
-		if (!ResourceType(type).isValid()) return 0;
-		const auto& resources = compiler.lockResources();
-
-		lua_createtable(L, resources.size(), 0);
-		int i = 0;
-		for (const AssetCompiler::ResourceItem& res : resources)
-		{
-			LuaWrapper::push(L, res.path.c_str());
-			lua_rawseti(L, -2, i + 1);
-			++i;
-		}
-
-		compiler.unlockResources();
-		return 1;
-	}
-
-
-	void registerLuaAPI()
-	{
-		lua_State* L = m_engine->getState();
-
-		LuaWrapper::createSystemVariable(L, "Editor", "editor", this);
-		
-		lua_pushcfunction(L, &LUA_debugCallback, "LumixDebugCallback");
-		lua_setglobal(L, "LumixDebugCallback");
-
-#define REGISTER_FUNCTION(F)                                                                                    \
-	do                                                                                                          \
-	{                                                                                                           \
-		auto f = &LuaWrapper::wrapMethodClosure<&StudioAppImpl::F>; \
-		LuaWrapper::createSystemClosure(L, "Editor", this, #F, f);                                              \
-	} while (false)
-
-		REGISTER_FUNCTION(savePrefabAs);
-		REGISTER_FUNCTION(selectEntity);
-		REGISTER_FUNCTION(createEntity);
-		REGISTER_FUNCTION(createComponent);
-		REGISTER_FUNCTION(destroyEntity);
-		REGISTER_FUNCTION(newWorld);
-		REGISTER_FUNCTION(exitWithCode);
-		REGISTER_FUNCTION(exitGameMode);
-		REGISTER_FUNCTION(getSelectedEntitiesCount);
-
-#undef REGISTER_FUNCTION
-
-		LuaWrapper::createSystemClosure(L, "Editor", this, "getSelectedEntity", &LUA_getSelectedEntity);
-		LuaWrapper::createSystemFunction(L, "Editor", "getResources", &LUA_getResources);
-		LuaWrapper::createSystemClosure(L, "Editor", this, "createEntityEx", &LUA_createEntityEx);
-		LuaWrapper::createSystemClosure(L, "Editor", this, "makeParent", &LuaWrapper::wrap<LUA_makeParent>);
-	}
-
-	void checkScriptCommandLine() {
-		char command_line[1024];
-		os::getCommandLine(Span(command_line));
-		CommandLineParser parser(command_line);
-		while (parser.next()) {
-			if (parser.currentEquals("-run_script")) {
-				if (!parser.next()) break;
-
-				char tmp[MAX_PATH];
-				parser.getCurrent(tmp, lengthOf(tmp));
-				OutputMemoryStream content(m_allocator);
-				
-				if (m_engine->getFileSystem().getContentSync(Path(tmp), content)) {
-					content.write('\0');
-					runScript((const char*)content.data(), tmp);
-				}
-				else {
-					logError("Could not read ", tmp);
-				}
-				break;
-			}
-		}
 	}
 
 	static bool includeFileInExport(const char* filename) {
@@ -3330,7 +2693,7 @@ struct StudioAppImpl final : StudioApp
 			catString(rec.path, info.filename);
 			infos.insert(rec.hash, rec);
 		}
-		exportDataScan("pipelines/", infos);
+		exportDataScan("shaders/", infos);
 		exportDataScan("universes/", infos);
 		
 		os::destroyFileIterator(iter);
@@ -3413,13 +2776,9 @@ struct StudioAppImpl final : StudioApp
 				}
 			}
 		}
-		exportDataScan("pipelines/", infos);
+		exportDataScan("shaders/", infos);
 		exportDataScan("universes/", infos);
 	}
-
-
-	void showExportGameDialog() { m_is_export_game_dialog_open = true; }
-
 
 	void guiExportData() {
 		if (!m_is_export_game_dialog_open) {
@@ -3430,20 +2789,17 @@ struct StudioAppImpl final : StudioApp
 		ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
 		if (ImGui::Begin("Export game", &m_is_export_game_dialog_open)) {
 			ImGuiEx::Label("Destination dir");
-			if (ImGui::Button(m_export.dest_dir.empty() ? "..." : m_export.dest_dir.data)) {
-				if (os::getOpenDirectory(Span(m_export.dest_dir.data), m_engine->getFileSystem().getBasePath())) {
-					m_settings.setValue(Settings::LOCAL, "export_dir", m_export.dest_dir);
+			if (ImGui::Button(m_export.dest_dir.length() == 0 ? "..." : m_export.dest_dir.c_str())) {
+				char tmp[MAX_PATH];
+				if (os::getOpenDirectory(Span(tmp), m_engine->getFileSystem().getBasePath())) {
+					m_export.dest_dir = tmp;
 				}
 			}
 
 			ImGuiEx::Label("Pack data");
-			if (ImGui::Checkbox("##pack", &m_export.pack)) {
-				m_settings.setValue(Settings::LOCAL, "export_pack", m_export.pack);
-			}
+			ImGui::Checkbox("##pack", &m_export.pack);
 			ImGuiEx::Label("Mode");
-			if (ImGui::Combo("##mode", (int*)&m_export.mode, "All files\0Loaded world\0")) {
-				m_settings.setValue(Settings::LOCAL, "export_pack", (i32)m_export.mode);
-			}
+			ImGui::Combo("##mode", (int*)&m_export.mode, "All files\0Loaded world\0");
 
 			ImGuiEx::Label("Startup world");
 			if (ImGui::BeginCombo("##startunv", m_export.startup_world.c_str())) {
@@ -3475,7 +2831,7 @@ struct StudioAppImpl final : StudioApp
 
 
 	bool exportData() {
-		if (m_export.dest_dir.empty()) return false;
+		if (m_export.dest_dir.length() == 0) return false;
 
 		FileSystem& fs = m_engine->getFileSystem(); 
 		{
@@ -3576,7 +2932,7 @@ struct StudioAppImpl final : StudioApp
 		}
 
 		for (GUIPlugin* plugin : m_gui_plugins)	{
-			if (!plugin->exportData(m_export.dest_dir)) {
+			if (!plugin->exportData(m_export.dest_dir.c_str())) {
 				logError("Plugin ", plugin->getName(), " failed to pack data.");
 			}
 		}
@@ -3590,30 +2946,22 @@ struct StudioAppImpl final : StudioApp
 		m_capture_input = capture;
 	}
 
-	void checkShortcuts() {
-		if (m_capture_input) return;
-		u8 pressed_modifiers = 0;
-		if (os::isKeyDown(os::Keycode::SHIFT)) pressed_modifiers |= Action::Modifiers::SHIFT;
-		if (os::isKeyDown(os::Keycode::CTRL)) pressed_modifiers |= Action::Modifiers::CTRL;
-		if (os::isKeyDown(os::Keycode::ALT)) pressed_modifiers |= Action::Modifiers::ALT;
-		GUIPlugin* window = getFocusedWindow();
-		
-		ImGuiIO& io = ImGui::GetIO();
-		for (Action*& a : m_actions) {
-			if (a->type == Action::LOCAL) continue;
-			if (a->type == Action::IMGUI_PRIORITY && io.WantCaptureKeyboard) continue;
-			if (a->shortcut == os::Keycode::INVALID && a->modifiers == 0) continue;
-			if (a->shortcut != os::Keycode::INVALID && !os::isKeyDown(a->shortcut)) continue;
-			if (a->modifiers != pressed_modifiers) continue;
-			
-			if (window && window->onAction(*a))
-				return;
+	bool checkShortcut(Action& action, bool global = false) override {
+		if (m_capture_input) return false;
 
-			if (a->func.isValid()) {
-				a->func.invoke();
-				return;
-			}
+		if(action.request) {
+			action.request = false;
+			return true;
 		}
+		if (action.shortcut == os::Keycode::INVALID) return false;
+
+		ImGuiKeyChord chord = m_imgui_key_map[(u32)action.shortcut];
+		ASSERT(chord != 0 || action.shortcut == os::Keycode::INVALID);
+		if (action.modifiers & Action::Modifiers::CTRL) chord |= ImGuiMod_Ctrl;
+		if (action.modifiers & Action::Modifiers::SHIFT) chord |= ImGuiMod_Shift;
+		if (action.modifiers & Action::Modifiers::ALT) chord |= ImGuiMod_Alt;
+
+		return ImGui::Shortcut(chord, global ? ImGuiInputFlags_RouteGlobal : ImGuiInputFlags_RouteFocused);
 	}
 
 	IAllocator& getAllocator() override { return m_allocator; }
@@ -3654,14 +3002,15 @@ struct StudioAppImpl final : StudioApp
 	os::WindowState m_fullscreen_restore_state;
 	jobs::Signal m_init_imgui_signal;
 
-	Array<Action*> m_owned_actions;
-	Array<Action*> m_tools_actions;
-	Array<Action*> m_actions;
-	Array<Action*> m_window_actions;
-
 	CommonActions m_common_actions;
-	Action m_show_all_actions_action;
-	Action m_start_standalone_app;
+	Action m_show_all_actions_action{"Show all commands", "Show all commands", "show_all_commands", ""};
+	Action m_start_standalone_app{"Start standalone app", "Start standalone app", "start_standalone_app", "", Action::TOOL};
+	Action m_next_frame{"Next frame", "Game - next frame", "game_next_frame", ICON_FA_STEP_FORWARD};
+	Action m_pause_game{"Pause", "Game - pause", "game_pause", ICON_FA_PAUSE};
+	Action m_toggle_game_mode{"Run game", "Game - run", "game_run", ICON_FA_PLAY};
+	Action m_new_world_action{"New", "New world", "world_new", ICON_FA_PLUS};
+	Action m_exit_action{"Exit", "Exit Studio", "studio_exit", ICON_FA_SIGN_OUT_ALT};
+	Action m_show_export_action{"Package game", "Tools - package game", "package_game", ICON_FA_FILE_EXPORT};
 
 	Array<GUIPlugin*> m_gui_plugins;
 	Array<MousePlugin*> m_mouse_plugins;
@@ -3679,17 +3028,16 @@ struct StudioAppImpl final : StudioApp
 	bool m_confirm_exit = false;
 	bool m_confirm_load = false;
 	bool m_confirm_new = false;
-	bool m_confirm_destroy_partition = false;
 	bool m_is_caption_hovered = false;
 	bool m_capture_input = false;
 	
-	World::PartitionHandle m_partition_to_destroy;
 	Path m_world_to_load;
 	
 	ImTextureID m_logo = nullptr;
 	UniquePtr<AssetBrowser> m_asset_browser;
 	UniquePtr<AssetCompiler> m_asset_compiler;
 	Local<PropertyGrid> m_property_grid;
+	Local<HierarchyGUI> m_hierarchy;
 	UniquePtr<GUIPlugin> m_profiler_ui;
 	Local<LogUI> m_log_ui;
 	Settings m_settings;
@@ -3709,6 +3057,7 @@ struct StudioAppImpl final : StudioApp
 	u32 m_fps_frame = 0;
 
 	struct ExportConfig {
+		ExportConfig(IAllocator& allocator) : dest_dir(allocator) {}
 		enum class Mode : i32 {
 			ALL_FILES,
 			CURRENT_WORLD
@@ -3718,7 +3067,7 @@ struct StudioAppImpl final : StudioApp
 
 		bool pack = false;
 		Path startup_world;
-		StaticString<MAX_PATH> dest_dir;
+		String dest_dir;
 	};
 
 	ExportConfig m_export;
@@ -3730,15 +3079,7 @@ struct StudioAppImpl final : StudioApp
 
 	bool m_is_welcome_screen_open;
 	bool m_is_export_game_dialog_open;
-	bool m_is_entity_list_open;
-	
-	EntityPtr m_renaming_entity = INVALID_ENTITY;
-	EntityFolders::FolderHandle m_renaming_folder = EntityFolders::INVALID_FOLDER;
-	bool m_set_rename_focus = false;
-	char m_rename_buf[World::ENTITY_NAME_MAX_LENGTH];
-	bool m_is_f2_pressed = false;
-	bool m_lua_debug_enabled = true;
-	
+
 	ImFont* m_font;
 	ImFont* m_big_icon_font;
 	ImFont* m_bold_font;
@@ -3757,6 +3098,9 @@ struct StudioAppImpl final : StudioApp
 	bool m_show_all_actions_request = false;
 	i32 m_all_actions_selected = 0;
 	TextFilter m_all_actions_filter;
+	bool m_sleep_when_inactive = true;
+	bool m_crash_reporting = true;
+	i32 m_font_size = 16;
 };
 
 static Local<StudioAppImpl> g_studio;

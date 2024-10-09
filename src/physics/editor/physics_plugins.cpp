@@ -6,6 +6,12 @@
 #include <PxVisualizationParameter.h>
 #include <PxMaterial.h>
 
+#include "core/geometry.h"
+#include "core/log.h"
+#include "core/math.h"
+#include "core/path.h"
+#include "core/profiler.h"
+#include "core/tokenizer.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
 #include "editor/editor_asset.h"
@@ -17,14 +23,9 @@
 #include "editor/world_editor.h"
 #include "engine/component_uid.h"
 #include "engine/engine.h"
-#include "core/geometry.h"
-#include "core/log.h"
-#include "core/math.h"
-#include "core/path.h"
-#include "core/profiler.h"
 #include "engine/world.h"
-#include "physics/physics_resources.h"
 #include "physics/physics_module.h"
+#include "physics/physics_resources.h"
 #include "physics/physics_system.h"
 #include "renderer/model.h"
 #include "renderer/render_module.h"
@@ -356,22 +357,11 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		, m_simulated_entities(app.getAllocator())
 		, m_reset_dynamic_entities(app.getAllocator())
 	{
-		m_toggle_ui.init("Physics", "Toggle physics UI", "physics", "", Action::IMGUI_PRIORITY);
-		m_toggle_ui.func.bind<&PhysicsUIPlugin::toggleUI>(this);
-		m_toggle_ui.is_selected.bind<&PhysicsUIPlugin::isOpen>(this);
-		
-		m_simulate_selected.init("Simulate physics", "Simulate physics for selected object", "simulate_physics_selected_obj", "", (os::Keycode)'L', Action::Modifiers::CTRL, Action::IMGUI_PRIORITY);
-		m_simulate_selected.func.bind<&PhysicsUIPlugin::toggleSimulateSelected>(this);
-		m_simulate_selected.is_selected.bind<&PhysicsUIPlugin::isSimulatingSelected>(this);
-		
-		app.addWindowAction(&m_toggle_ui);
-		app.addToolAction(&m_simulate_selected);
 		app.getWorldEditor().worldDestroyed().bind<&PhysicsUIPlugin::onWorldDestroyed>(this);
+		app.getSettings().registerOption("physics_ui_open", &m_is_window_open);
 	}
 
 	~PhysicsUIPlugin() {
-		m_app.removeAction(&m_toggle_ui);
-		m_app.removeAction(&m_simulate_selected);
 		m_app.getWorldEditor().worldDestroyed().unbind<&PhysicsUIPlugin::onWorldDestroyed>(this);
 	}
 
@@ -792,16 +782,11 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		if (ImGui::Button("Autogenerate")) autogeneratePhySkeleton(entity, editor);
 	}
 
-	void onSettingsLoaded() override {
-		m_is_window_open = m_app.getSettings().getValue(Settings::GLOBAL, "is_physics_ui_open", false);
-	}
-
-	void onBeforeSettingsSaved() override {
-		m_app.getSettings().setValue(Settings::GLOBAL, "is_physics_ui_open", m_is_window_open);
-	}
-
 	void onGUI() override
 	{
+		if (m_app.checkShortcut(m_simulate_selected, true)) toggleSimulateSelected();
+		if (m_app.checkShortcut(m_toggle_ui, true)) m_is_window_open = !m_is_window_open;
+
 		if (!m_is_window_open) return;
 		if (ImGui::Begin("Physics", &m_is_window_open))
 		{
@@ -822,8 +807,8 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 
 	StudioApp& m_app;
 	bool m_is_window_open = false;
-	Action m_toggle_ui;
-	Action m_simulate_selected;
+	Action m_toggle_ui{"Physics", "Physics - toggle UI", "physics_toggle_ui", "", Action::WINDOW};
+	Action m_simulate_selected{"Simulate physics", "Physics - simulate physics for selected object", "simulate_physics_selected_obj", "", Action::TOOL};
 	bool m_is_simulating_selected = false;
 	Array<SimulatedEntity> m_simulated_entities;
 	Array<EntityRef> m_reset_dynamic_entities;
@@ -856,25 +841,21 @@ struct PhysicsMaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlug
 
 		void save() {
 			OutputMemoryStream blob(m_app.getAllocator());
-			blob << "static_friction(" << m_resource->material->getStaticFriction() << ")\n";
-			blob << "dynamic_friction(" << m_resource->material->getDynamicFriction() << ")\n";
-			blob << "restitution(" << m_resource->material->getRestitution() << ")\n";
+			blob << "static_friction = " << m_resource->material->getStaticFriction() << "\n";
+			blob << "dynamic_friction = " << m_resource->material->getDynamicFriction() << "\n";
+			blob << "restitution = " << m_resource->material->getRestitution() << "\n";
 
 			m_app.getAssetBrowser().saveResource(*m_resource, blob);
 			m_dirty = false;
 		}
 		
-		bool onAction(const Action& action) override { 
-			if (&action == &m_app.getCommonActions().save) save();
-			else return false;
-			return true;
-		}
-
 		void windowGUI() override {
+			CommonActions& actions = m_app.getCommonActions();
+		
 			if (ImGui::BeginMenuBar()) {
-				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
-				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_resource);
-				if (ImGuiEx::IconButton(ICON_FA_SEARCH, "View in browser")) m_app.getAssetBrowser().locate(*m_resource);
+				if (actions.save.iconButton(m_dirty, &m_app)) save();
+				if (actions.open_externally.iconButton(true, &m_app)) m_app.getAssetBrowser().openInExternalEditor(m_resource);
+				if (actions.view_in_browser.iconButton(true, &m_app)) m_app.getAssetBrowser().locate(*m_resource);
 				ImGui::EndMenuBar();
 			}
 
@@ -922,7 +903,35 @@ struct PhysicsMaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlug
 	const char* getDefaultExtension() const override { return "pma"; }
 	void createResource(OutputMemoryStream& blob) override {}
 
-	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
+	bool compile(const Path& src) override {
+		// load
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		OutputMemoryStream src_data(m_app.getAllocator());
+		if (!fs.getContentSync(src, src_data)) return false;
+
+		// parse
+		float sf = 0.5f;
+		float df = 0.5f;
+		float rest = 0.1f;
+		const ParseItemDesc descs[] = {
+			{"static_friction", &sf},
+			{"dynamic_friction", &df},
+			{"restitution", &rest},
+		};
+		StringView sv((const char*)src_data.data(), (u32)src_data.size());
+		if (!parse(sv, src.c_str(), descs)) return false;
+
+		char tmp[64];
+		OutputMemoryStream compiled(tmp, sizeof(tmp));
+		PhysicsMaterial::Header header;
+		compiled.write(header);
+		compiled.write(sf);
+		compiled.write(df);
+		compiled.write(rest);
+
+		return m_app.getAssetCompiler().writeCompiledResource(src, compiled);
+	}
+
 	const char* getLabel() const override { return "Physics material"; }
 
 	void openEditor(const Path& path) override {

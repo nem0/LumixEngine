@@ -1,0 +1,3 @@
+static_friction = 0.100000
+dynamic_friction = 0.100000
+restitution = 0.100000

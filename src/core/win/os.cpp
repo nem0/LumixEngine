@@ -1276,6 +1276,7 @@ ExecuteOpenResult shellExecuteOpen(StringView path, StringView args, StringView 
 	const WCharStr<MAX_PATH> wargs(args);
 	const WCharStr<MAX_PATH> wdir(working_dir);
 	SHELLEXECUTEINFOW exec_info = {};
+	exec_info.lpVerb = NULL;
 	exec_info.cbSize = sizeof(exec_info);
 	exec_info.lpFile = wpath;
 	exec_info.lpParameters = args.empty() ? NULL : wargs.data;
@@ -1287,6 +1288,7 @@ ExecuteOpenResult shellExecuteOpen(StringView path, StringView args, StringView 
 		exec_info.fMask = SEE_MASK_NO_CONSOLE;
 	}
 	BOOL res = ShellExecuteEx(&exec_info);
+	// for unknown reason ShellExecuteEx returns TRUE but nothing happens when debugging with VS Code
 	if (res) return ExecuteOpenResult::SUCCESS;
 	DWORD err = GetLastError();
 	if (err == ERROR_NO_ASSOCIATION) return ExecuteOpenResult::NO_ASSOCIATION;

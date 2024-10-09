@@ -1,9 +1,9 @@
 #pragma once
 
 #include "core/allocator.h"
-#include "engine/lua_wrapper.h"
 #include "core/stream.h"
 #include "core/string.h"
+#include "core/tokenizer.h"
 #include "fbx_importer.h"
 
 
@@ -106,7 +106,7 @@ struct ModelMeta {
 		}
 
 		if (!clips.empty()) {
-			blob << "\nclips = {";
+			blob << "\nclips = [";
 			for (const FBXImporter::ImportConfig::Clip& clip : clips) {
 				blob << "\n\n{";
 				blob << "\n\n\nname = \"" << clip.name << "\",";
@@ -114,7 +114,7 @@ struct ModelMeta {
 				blob << "\n\n\nto_frame = " << clip.to_frame;
 				blob << "\n\n},";
 			}
-			blob << "\n}";
+			blob << "\n]";
 		}
 
 		if (autolod_mask & 1) blob << "\nautolod0 = " << autolod_coefs[0];
@@ -129,99 +129,134 @@ struct ModelMeta {
 		}
 	}
 
-	bool deserialize(InputMemoryStream& blob, const Path& path) {
-		ASSERT(blob.getPosition() == 0);
-		lua_State* L = luaL_newstate();
-		if (!LuaWrapper::execute(L, StringView((const char*)blob.getData(), (u32)blob.size()), path.c_str(), 0)) {
-			return false;
-		}
-		
-		deserialize(L, path);
+	void deserialize(StringView content, const Path& path) {
+		autolod_coefs[0] = -1;
+		autolod_coefs[1] = -1;
+		autolod_coefs[2] = -1;
+		autolod_coefs[3] = -1;
+		StringView tmp_root_motion_bone, tmp_skeleton, tmp_skeleton_rel, tmp_physics, tmp_origin, tmp_clips;
+		const ParseItemDesc descs[] = {
+			{ "root_motion_flags", (i32*)&root_motion_flags },
+			{ "use_mikktspace", &use_mikktspace },
+			{ "force_recompute_normals", &force_recompute_normals },
+			{ "force_skin", &force_skin },
+			{ "anim_rotation_error", &anim_rotation_error },
+			{ "anim_translation_error", &anim_translation_error },
+			{ "scale", &scale },
+			{ "culling_scale", &culling_scale },
+			{ "split", &split },
+			{ "bake_impostor_normals", &bake_impostor_normals },
+			{ "bake_vertex_ao", &bake_vertex_ao },
+			{ "min_bake_vertex_ao", &min_bake_vertex_ao },
+			{ "create_impostor", &create_impostor },
+			{ "import_vertex_colors", &import_vertex_colors },
+			{ "use_specular_as_roughness", &use_specular_as_roughness },
+			{ "use_specular_as_metallic", &use_specular_as_metallic },
+			{ "ignore_animations", &ignore_animations },
+			{ "vertex_color_is_ao", &vertex_color_is_ao },
+			{ "lod_count", &lod_count },
+			{ "create_prefab_with_physics", &create_prefab_with_physics },
+			{ "autolod0", &autolod_coefs[0] },
+			{ "autolod1", &autolod_coefs[1] },
+			{ "autolod2", &autolod_coefs[2] },
+			{ "autolod3", &autolod_coefs[3] },
+			{ "lod0_distance", &lods_distances[0] },
+			{ "lod1_distance", &lods_distances[1] },
+			{ "lod2_distance", &lods_distances[2] },
+			{ "lod3_distance", &lods_distances[3] },
+			{ "root_motion_bone", &tmp_root_motion_bone },
+			{ "skeleton", &tmp_skeleton },
+			{ "skeleton_rel", &tmp_skeleton_rel },
+			{ "physics", &tmp_physics },
+			{ "origin", &tmp_origin },
+			{ "clips", &tmp_clips, true },
+		};
+		if (!parse(content, path.c_str(), descs)) return;
 
-		lua_close(L);
-		return true;	
-	}
+		if (autolod_coefs[0] >= 0) autolod_mask |= 1;
+		if (autolod_coefs[1] >= 0) autolod_mask |= 2;
+		if (autolod_coefs[2] >= 0) autolod_mask |= 4;
+		if (autolod_coefs[3] >= 0) autolod_mask |= 8;
 
-	void deserialize(lua_State* L, const Path& path) {
-		LuaWrapper::DebugGuard guard(L);
-		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "root_motion_flags", (i32*)&root_motion_flags);
-		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "use_mikktspace", &use_mikktspace);
-		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "force_recompute_normals", &force_recompute_normals);
-		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "force_skin", &force_skin);
-		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "anim_rotation_error", &anim_rotation_error);
-		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "anim_translation_error", &anim_translation_error);
-		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "scale", &scale);
-		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "culling_scale", &culling_scale);
-		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "split", &split);
-		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "bake_impostor_normals", &bake_impostor_normals);
-		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "bake_vertex_ao", &bake_vertex_ao);
-		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "min_bake_vertex_ao", &min_bake_vertex_ao);
-		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "create_impostor", &create_impostor);
-		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "import_vertex_colors", &import_vertex_colors);
-		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "use_specular_as_roughness", &use_specular_as_roughness);
-		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "use_specular_as_metallic", &use_specular_as_metallic);
-		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "ignore_animations", &ignore_animations);
-		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "vertex_color_is_ao", &vertex_color_is_ao);
-		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "lod_count", &lod_count);
-		LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "create_prefab_with_physics", &create_prefab_with_physics);
-			
-		if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod0", &autolod_coefs[0])) autolod_mask |= 1;
-		if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod1", &autolod_coefs[1])) autolod_mask |= 2;
-		if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod2", &autolod_coefs[2])) autolod_mask |= 4;
-		if (LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "autolod3", &autolod_coefs[3])) autolod_mask |= 8;
-
-		clips.clear();
-		if (LuaWrapper::getField(L, LUA_GLOBALSINDEX, "clips") == LUA_TTABLE) {
-			const size_t count = lua_objlen(L, -1);
-			for (int i = 0; i < count; ++i) {
-				lua_rawgeti(L, -1, i + 1);
-				if (lua_istable(L, -1)) {
-					FBXImporter::ImportConfig::Clip& clip = clips.emplace();
-					char name[128];
-					if (!LuaWrapper::checkStringField(L, -1, "name", Span(name)) 
-						|| !LuaWrapper::checkField(L, -1, "from_frame", &clip.from_frame)
-						|| !LuaWrapper::checkField(L, -1, "to_frame", &clip.to_frame))
-					{
-						logError(path, ": clip ", i, " is invalid");
-						clips.pop();
-						continue;
-					}
-					clip.name = name;
-				}
-				lua_pop(L, 1);
-			}
-		}
-		lua_pop(L, 1);
-
-		char tmp[MAX_PATH];
-		if (LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "root_motion_bone", Span(tmp))) root_motion_bone = tmp;
-		if (LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "skeleton", Span(tmp))) skeleton = tmp;
-		if (LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "skeleton_rel", Span(tmp))) {
+		root_motion_bone = tmp_root_motion_bone;
+		if (!tmp_skeleton.empty()) skeleton = tmp_skeleton;
+		if (!tmp_skeleton_rel.empty()) {
 			StringView dir = Path::getDir(ResourcePath::getResource(path));
-			skeleton = Path(dir, "/", tmp);
+			skeleton = Path(dir, "/", tmp_skeleton_rel);
 		}
-		if (LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "physics", Span(tmp))) {
-			if (equalIStrings(tmp, "trimesh")) physics = FBXImporter::ImportConfig::Physics::TRIMESH;
-			else if (equalIStrings(tmp, "convex")) physics = FBXImporter::ImportConfig::Physics::CONVEX;
-			else physics = FBXImporter::ImportConfig::Physics::NONE;
-		}
+		if (equalIStrings(tmp_physics, "trimesh")) physics = FBXImporter::ImportConfig::Physics::TRIMESH;
+		else if (equalIStrings(tmp_physics, "convex")) physics = FBXImporter::ImportConfig::Physics::CONVEX;
+		else physics = FBXImporter::ImportConfig::Physics::NONE;
 
-		if (LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "origin", Span(tmp))) {
-			if (equalIStrings(tmp, "center")) origin = FBXImporter::ImportConfig::Origin::CENTER;
-			else if (equalIStrings(tmp, "bottom")) origin = FBXImporter::ImportConfig::Origin::BOTTOM;
-			else origin = FBXImporter::ImportConfig::Origin::SOURCE;
-			ASSERT(origin != FBXImporter::ImportConfig::Origin::CENTER_EACH_MESH);
-		}
+		if (equalIStrings(tmp_origin, "center")) origin = FBXImporter::ImportConfig::Origin::CENTER;
+		else if (equalIStrings(tmp_origin, "bottom")) origin = FBXImporter::ImportConfig::Origin::BOTTOM;
+		else origin = FBXImporter::ImportConfig::Origin::SOURCE;
 
-		for (u32 i = 0; i < lengthOf(lods_distances); ++i) {
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, StaticString<32>("lod", i, "_distance"), &lods_distances[i]);
+		clips.clear();	
+		if (!tmp_clips.empty()) {
+			Tokenizer t(StringView(content.begin, tmp_clips.end), path.c_str());
+			t.cursor = tmp_clips.begin;
+			Tokenizer::Token token = t.nextToken();
+			ASSERT(token && token.value[0] == '[');
+			for (;;) {
+				token = t.nextToken();
+				if (!token) return;
+				if (token == "]") break;
+				if (token != "{") {
+					logError(t.filename, "(", t.getLine(), "): expected ']' or '{', got ", token.value);
+					t.logErrorPosition(token.value.begin);
+					return;
+				}
+
+				FBXImporter::ImportConfig::Clip& clip = clips.emplace();
+				for (;;) {
+					token = t.nextToken();
+					if (!token) return;
+					if (token == "}") break;
+					if (!t.consume("=")) return;
+					if (token == "name") {
+						StringView name;
+						if (!t.consume(name)) return;
+						clip.name = name;
+					}
+					else if (token == "from_frame") {
+						if (!t.consume(clip.from_frame)) return;
+					}
+					else if (token == "to_frame") {
+						if (!t.consume(clip.to_frame)) return;
+					}
+					else {
+						logError(t.filename, "(", t.getLine(), "): unknown token ", token.value);
+						t.logErrorPosition(token.value.begin);
+						return;
+					}
+					token = t.nextToken();
+					if (!token) return;
+					if (token == "}") break;
+					if (token != ",") {
+						logError(t.filename, "(", t.getLine(), "): expected '}' or ',', got ", token.value);
+						t.logErrorPosition(token.value.begin);
+						return;
+					}
+				}
+				
+				token = t.nextToken();
+				if (!token) return;
+				if (token == "]") break;
+				if (token != ",") {
+					logError(t.filename, "(", t.getLine(), "): expected ']' or ',', got ", token.value);
+					t.logErrorPosition(token.value.begin);
+					return;
+				}
+			}
 		}
 	}
 
 	void load(const Path& path, StudioApp& app) {
-		if (lua_State* L = app.getAssetCompiler().getMeta(path)) {
-			deserialize(L, path);
-			lua_close(L);
+		OutputMemoryStream blob(app.getAllocator());
+		if (app.getAssetCompiler().getMeta(path, blob)) {
+			StringView sv((const char*)blob.data(), (u32)blob.size());
+			deserialize(sv, path);
 		}
 	}
 
