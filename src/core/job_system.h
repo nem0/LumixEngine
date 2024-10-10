@@ -32,6 +32,8 @@ LUMIX_CORE_API void setGreen(Signal* signal);
 LUMIX_CORE_API void wait(Signal* signal);
 
 LUMIX_CORE_API void run(void* data, void(*task)(void*), Signal* on_finish, u8 worker_index = ANY_WORKER);
+// optimized batch run multi jobs, useful for foreach and others
+LUMIX_CORE_API void runN(void* data, void(*task)(void*), Signal* on_finish, u8 worker_index, u32 num_jobs);
 
 template <typename F>
 void runLambda(F&& f, Signal* on_finish, u8 worker = ANY_WORKER) {
@@ -77,11 +79,9 @@ template <typename F>
 void runOnWorkers(const F& f)
 {
 	Signal signal;
-	for(int i = 1, c = getWorkersCount(); i < c; ++i) {
-		jobs::run((void*)&f, [](void* data){
-			(*(const F*)data)();
-		}, &signal);
-	}
+	jobs::runN((void*)&f, [](void* data){
+		(*(const F*)data)();
+	}, &signal, ANY_WORKER, getWorkersCount() - 1);
 	f();
 	wait(&signal);
 }
@@ -111,22 +111,21 @@ void forEach(u32 count, u32 step, const F& f) {
 		.count = count
 	};
 	
-	for (u32 i = 1; i < num_jobs; ++i) {
-		jobs::run((void*)&data, [](void* user_ptr){
-			Data* data = (Data*)user_ptr;
-			const u32 count = data->count;
-			const u32 step = data->step;
-			const F* f = data->f;
+	ASSERT(num_jobs > 1);
+	jobs::runN((void*)&data, [](void* user_ptr){
+		Data* data = (Data*)user_ptr;
+		const u32 count = data->count;
+		const u32 step = data->step;
+		const F* f = data->f;
 
-			for(;;) {
-				const i32 idx = data->offset.add(step);
-				if ((u32)idx >= count) break;
-				u32 to = idx + step;
-				to = to > count ? count : to;
-				(*f)(idx, to);
-			}			
-		}, &signal);
-	}
+		for(;;) {
+			const i32 idx = data->offset.add(step);
+			if ((u32)idx >= count) break;
+			u32 to = idx + step;
+			to = to > count ? count : to;
+			(*f)(idx, to);
+		}			
+	}, &signal, ANY_WORKER, num_jobs - 1);
 
 	for (;;) {
 		const i32 idx = data.offset.add(step);

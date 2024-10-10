@@ -10,8 +10,8 @@ local plugin = {
 	name = "Lua console",
 	-- settings are automatically saved/loaded
 	settings = {
-		is_lua_console_open = true,
-		code = ""
+		lua_console_open = true,
+		lua_console_code = ""
 	}
 }
 
@@ -21,7 +21,7 @@ plugin.windowMenuAction = function()
 end
 
 function execute()
-	local f, err = loadstring(plugin.settings.code)
+	local f, err = loadstring(plugin.settings.lua_console_code)
 	if f == nil then
 		LumixAPI.logError(err)
 	else 
@@ -94,8 +94,8 @@ plugin.gui = function()
 			ImGui.SetKeyboardFocusHere(0)
 		end
 
-		local changed, new_code = ImGui.InputTextMultilineWithCallback("##code", plugin.settings.code, callback)
-		if changed then plugin.settings.code = new_code end
+		local changed, new_code = ImGui.InputTextMultilineWithCallback("##code", plugin.settings.lua_console_code, callback)
+		if changed then plugin.settings.lua_console_code = new_code end
 		if open_popup then
 			open_popup = false
 			ImGui.OpenPopup("lua_console_autocomplete")

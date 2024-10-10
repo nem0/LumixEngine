@@ -75,6 +75,23 @@ struct WorkQueue {
 		}
 		semaphore.signal();
 	}
+
+	// optimized, batch push multiple jobs
+	LUMIX_FORCE_INLINE void pushN(const Work& obj, u32 num_jobs) {
+		{
+			Lumix::MutexGuard guard(mutex);
+			const u32 num_to_ring = minimum(num_jobs, lengthOf(objects) - write + read);
+			const u32 num_to_fallback = num_jobs - num_to_ring;
+			for (u32 i = 0; i < num_to_ring; ++i) {
+				objects[write % lengthOf(objects)] = obj;
+				++write;
+			}
+			for (u32 i = 0; i < num_to_fallback; ++i) {
+				fallback.push(obj);
+			}
+		}
+		semaphore.signal(num_jobs);
+	}
 	
 	LUMIX_FORCE_INLINE bool pop(Work& obj) {
 		{
@@ -119,7 +136,7 @@ struct System {
 	Array<WorkerTask*> m_workers;
 	FiberDecl m_fiber_pool[512];
 	Array<FiberDecl*> m_free_fibers;
-	WorkQueue<64> m_work_queue;
+	WorkQueue<256> m_work_queue;
 };
 
 
@@ -281,6 +298,30 @@ void run(void* data, void(*task)(void*), Signal* on_finished, u8 worker_index)
 	}
 
 	g_system->m_work_queue.push(job);
+}
+
+void runN(void* data, void(*task)(void*), Signal* on_finished, u8 worker_index, u32 num_jobs)
+{
+	Job job;
+	job.data = data;
+	job.task = task;
+	job.worker_index = worker_index != ANY_WORKER ? worker_index % getWorkersCount() : worker_index;
+	job.dec_on_finish = on_finished;
+
+	if (on_finished) {
+		Lumix::MutexGuard guard(g_system->m_sync);
+		if (on_finished->counter.add(num_jobs) == 0) {
+			on_finished->generation = g_generation.inc();
+		}
+	}
+
+	if (worker_index != ANY_WORKER) {
+		WorkerTask* worker = g_system->m_workers[worker_index % g_system->m_workers.size()];
+		worker->m_work_queue.pushN(job, num_jobs);
+		return;
+	}
+
+	g_system->m_work_queue.pushN(job, num_jobs);
 }
 
 // try to pop a job from the queues (first worker, then global), if no job is available, go to sleep
