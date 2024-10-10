@@ -22,9 +22,9 @@ Semaphore::~Semaphore()
 	::CloseHandle(m_id);
 }
 
-void Semaphore::signal()
+void Semaphore::signal(u32 count)
 {
-	BOOL res = ::ReleaseSemaphore(m_id, 1, nullptr);
+	BOOL res = ::ReleaseSemaphore(m_id, count, nullptr);
 	ASSERT(res);
 }
 

@@ -30,7 +30,7 @@ struct LUMIX_CORE_API Semaphore {
 	Semaphore(const Semaphore&) = delete;
 	~Semaphore();
 
-	void signal();
+	void signal(u32 count = 1);
 	void wait();
 	// return false on timeout
 	bool wait(u32 timeout_ms);
