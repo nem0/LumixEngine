@@ -13,6 +13,7 @@ constexpr u8 ANY_WORKER = 0xff;
 
 struct Mutex;
 struct Signal;
+struct BinarySignal;
 
 LUMIX_CORE_API bool init(u8 workers_count, IAllocator& allocator);
 LUMIX_CORE_API IAllocator& getAllocator();
@@ -27,8 +28,9 @@ LUMIX_CORE_API void yield();
 LUMIX_CORE_API void enter(Mutex* mutex);
 LUMIX_CORE_API void exit(Mutex* mutex);
 
-LUMIX_CORE_API void setRed(Signal* signal);
-LUMIX_CORE_API void setGreen(Signal* signal);
+LUMIX_CORE_API void setRed(BinarySignal* signal);
+LUMIX_CORE_API void setGreen(BinarySignal* signal);
+LUMIX_CORE_API void wait(BinarySignal* signal);
 LUMIX_CORE_API void wait(Signal* signal);
 
 LUMIX_CORE_API void run(void* data, void(*task)(void*), Signal* on_finish, u8 worker_index = ANY_WORKER);
@@ -63,16 +65,29 @@ struct MutexGuard {
 	Mutex& mutex;
 };
 
-struct Signal {
-	~Signal() { ASSERT(!waitor); ASSERT(!counter); }
+struct BinarySignal {
+	~BinarySignal() { ASSERT(!waitor); ASSERT(state == 0); }
 
 	struct Waitor* waitor = nullptr;
-	AtomicI32 counter = 0;
+	AtomicI32 state = 0;
 	i32 generation; // identify different red-green pairs on the same signal, used by profiler
 };
 
+struct Signal {
+	~Signal() {
+		ASSERT(!waitor);
+		ASSERT(!(i32)counter);
+	}
+
+	struct Waitor* waitor = nullptr;
+	AtomicI32 counter = 0;
+	i32 generation;
+};
+
 struct Mutex {
-	Signal signal; // do not access this outside of job_system.cpp
+	AtomicI32 state = 0;
+	Waitor* waitor = nullptr;
+	u32 generation = 0;
 };
 
 template <typename F>

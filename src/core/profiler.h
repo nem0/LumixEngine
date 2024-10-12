@@ -21,6 +21,7 @@ LUMIX_CORE_API void frame();
 LUMIX_CORE_API void pushJobInfo(i32 signal_on_finish);
 LUMIX_CORE_API void pushString(const char* value);
 LUMIX_CORE_API void pushInt(const char* key_literal, int value);
+LUMIX_CORE_API void pushMutexEvent(u64 mutex_id, u64 begin_enter_time, u64 end_enter_time, u64 begin_exit_time, u64 end_exit_time);
 
 LUMIX_CORE_API u32 createCounter(const char* key_literal, float min);
 LUMIX_CORE_API void pushCounter(u32 counter, float value);
@@ -102,6 +103,13 @@ struct FiberWaitRecord
 	bool is_mutex;
 };
 
+struct MutexEvent {
+	u64 mutex_id;
+	u64 begin_enter;
+	u64 end_enter;
+	u64 begin_exit;
+	u64 end_exit;
+};
 
 struct GPUBlock
 {
@@ -129,7 +137,8 @@ enum class EventType : u8
 	GPU_STATS,
 	CONTINUE_BLOCK,
 	SIGNAL_TRIGGERED,
-	COUNTER
+	COUNTER,
+	MUTEX_EVENT
 };
 
 #pragma pack(1)

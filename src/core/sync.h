@@ -82,4 +82,19 @@ private:
 	Mutex& m_mutex;
 };
 
+struct LUMIX_CORE_API MutexGuardProfiled {
+	explicit MutexGuardProfiled(Mutex& cs);
+	~MutexGuardProfiled();
+
+	MutexGuardProfiled(const MutexGuardProfiled&) = delete;
+	void operator=(const MutexGuardProfiled&) = delete;
+
+private:
+	Mutex& m_mutex;
+	u64 start_enter;
+	u64 end_enter;
+	u64 start_exit;
+	u64 end_exit;
+};
+
 } // namespace Lumix

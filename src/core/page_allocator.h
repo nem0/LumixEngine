@@ -41,7 +41,7 @@ struct PagedListIterator
 		for (;;) {
 			volatile T* tmp = value;
 			if(!tmp) return nullptr;
-			if (compareExchangePtr((volatile void**)&value, (void*)tmp->header.next, (void*)tmp)) return (T*)tmp;
+			if (compareExchangePtr((void*volatile*)&value, (void*)tmp->header.next, (void*)tmp)) return (T*)tmp;
 		}
 	}
 

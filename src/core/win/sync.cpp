@@ -1,9 +1,10 @@
 #include "core/allocator.h"
-#include "core/crt.h"
-#include "core/sync.h"
 #include "core/atomic.h"
+#include "core/crt.h"
+#include "core/os.h"
 #include "core/profiler.h"
 #include "core/string.h"
+#include "core/sync.h"
 #include "core/win/simple_win.h"
 
 
@@ -82,7 +83,22 @@ void Mutex::enter() {
 
 void Mutex::exit() {
 	SRWLOCK* lock = (SRWLOCK*)data;
-	ReleaseSRWLockExclusive (lock);
+	ReleaseSRWLockExclusive(lock);
+}
+
+MutexGuardProfiled::MutexGuardProfiled(Mutex& cs)
+	: m_mutex(cs)
+{
+	start_enter = os::Timer::getRawTimestamp();
+	cs.enter();
+	end_enter = os::Timer::getRawTimestamp();
+}
+
+MutexGuardProfiled::~MutexGuardProfiled() {
+	start_exit = os::Timer::getRawTimestamp();
+	m_mutex.exit();
+	end_exit = os::Timer::getRawTimestamp();
+	if (end_exit - start_enter > 20) profiler::pushMutexEvent(u64(&m_mutex), start_enter, end_enter, start_exit, end_exit);
 }
 
 

@@ -415,6 +415,13 @@ LUMIX_FORCE_INLINE Vec2 minimum(const Vec2& a, const Vec2& b) {
 	};
 }
 
+LUMIX_FORCE_INLINE IVec2 minimum(const IVec2& a, const IVec2& b) {
+	return {
+		minimum(a.x, b.x),
+		minimum(a.y, b.y),
+	};
+}
+
 LUMIX_FORCE_INLINE DVec3 minimum(const DVec3& a, const DVec3& b) {
 	return {
 		minimum(a.x, b.x),
