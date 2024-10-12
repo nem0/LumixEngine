@@ -9,3 +9,4 @@
 # Editor
 
 * [Editor actions](editor_action.md)
+* [Profiler](profiler.md)
