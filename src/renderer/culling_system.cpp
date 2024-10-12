@@ -318,9 +318,7 @@ struct CullingSystemImpl final : CullingSystem
 		return cullInternal(frustum, 0xff);
 	}
 	
-	CullResult* cullInternal(const ShiftedFrustum& frustum, u8 type)
-	{
-		PROFILE_FUNCTION();
+	CullResult* cullInternal(const ShiftedFrustum& frustum, u8 type) {
 		if (m_cells.empty()) return nullptr;
 
 		PagedList<CullResult> list(m_page_allocator);

@@ -11,6 +11,7 @@ i32 AtomicI32::inc() { return _InterlockedExchangeAdd((volatile long*)&value, 1)
 i32 AtomicI32::dec() { return _InterlockedExchangeAdd((volatile long*)&value, -1); }
 i32 AtomicI32::add(i32 v) { return _InterlockedExchangeAdd((volatile long*)&value, v); }
 i32 AtomicI32::subtract(i32 v) { return _InterlockedExchangeAdd((volatile long*)&value, -v); }
+i32 AtomicI32::setBits(i32 v) { return _InterlockedOr((volatile long*)&value, v); }
 
 bool AtomicI32::compareExchange(i32 exchange, i32 comperand) { 
 	return _InterlockedCompareExchange((volatile long*)&value, exchange, comperand) == comperand;
@@ -28,10 +29,15 @@ bool AtomicI64::compareExchange(i64 exchange, i64 comperand) {
 	return _InterlockedCompareExchange64((volatile long long*)&value, exchange, comperand) == comperand;
 }
 
-bool compareExchangePtr(volatile void** value, void* exchange, void* comperand) {
-	static_assert(sizeof(comperand) == sizeof(long long));
-	return _InterlockedCompareExchange64((volatile long long*)value, (long long)exchange, (long long)comperand) == (long long)comperand;
+bool compareExchangePtr(void*volatile* value, void* exchange, void* comperand) {
+	return _InterlockedCompareExchangePointer(value, exchange, comperand) == comperand;
 }
+
+void* exchangePtr(void* volatile* value, void* exchange) {
+	return _InterlockedExchangePointer(value, exchange);
+
+}
+
 
 LUMIX_CORE_API void memoryBarrier()
 {

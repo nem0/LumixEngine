@@ -491,6 +491,19 @@ void frame()
 }
 
 
+void pushMutexEvent(u64 mutex_id, u64 begin_enter_time, u64 end_enter_time, u64 begin_exit_time, u64 end_exit_time) {
+	ThreadContext* ctx = g_instance.getThreadContext();
+	ASSERT(ctx);
+	MutexEvent r = {
+		.mutex_id = mutex_id,
+		.begin_enter = begin_enter_time,
+		.end_enter = end_enter_time,
+		.begin_exit = begin_exit_time,
+		.end_exit = end_exit_time
+	};
+	write(*ctx, EventType::MUTEX_EVENT, r);
+}
+
 void showInProfiler(bool show)
 {
 	ThreadContext* ctx = g_instance.getThreadContext();

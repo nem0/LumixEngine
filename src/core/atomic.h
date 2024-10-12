@@ -16,6 +16,7 @@ struct LUMIX_CORE_API AtomicI32 {
 	i32 dec();
 	i32 add(i32 v);
 	i32 subtract(i32 v);
+	i32 setBits(i32 v);
 
 	bool compareExchange(i32 exchange, i32 comperand);
 private:
@@ -39,7 +40,8 @@ private:
 	volatile i64 value;
 };
 
-LUMIX_CORE_API bool compareExchangePtr(volatile void** value, void* exchange, void* comperand);
+LUMIX_CORE_API void* exchangePtr(void* volatile* value, void* exchange);
+LUMIX_CORE_API bool compareExchangePtr(void*volatile* value, void* exchange, void* comperand);
 LUMIX_CORE_API void memoryBarrier();
 
 } // namespace Lumix

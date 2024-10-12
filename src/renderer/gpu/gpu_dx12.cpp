@@ -2028,6 +2028,9 @@ void setCurrentWindow(void* window_handle) {
 		RECT rect;
 		GetClientRect((HWND)window_handle, &rect);
 		window.size = IVec2(rect.right - rect.left, rect.bottom - rect.top);
+		
+		// window can get bigger than what driver allows for swapchains
+		window.size = minimum(window.size, IVec2(16384));
 
 		if (!createSwapchain((HWND)window_handle, window, vsync)) {
 			logError("Failed to create swapchain");
@@ -2118,7 +2121,10 @@ u32 present() {
 		RECT rect;
 		GetClientRect((HWND)window.handle, &rect);
 
-		const IVec2 size(rect.right - rect.left, rect.bottom - rect.top);
+		IVec2 size(rect.right - rect.left, rect.bottom - rect.top);
+		// window can get bigger than what driver allows for swapchains
+		size = minimum(size, IVec2(16384));
+
 		if (vsync_dirty) {
 			for (Frame& f : d3d->frames) f.wait();
 

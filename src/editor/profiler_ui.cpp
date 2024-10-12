@@ -62,6 +62,10 @@ struct ThreadData {
 		u32 line;
 	};
 
+	struct MutexEvent : profiler::MutexEvent {
+		u32 line;
+	};
+
 	ThreadData(IAllocator& allocator, u32 thread_id, const char* name, bool show)
 		: rects(allocator)
 		, signals(allocator)
@@ -69,6 +73,7 @@ struct ThreadData {
 		, properties(allocator)
 		, frames(allocator)
 		, context_switches(allocator)
+		, mutex_events(allocator)
 		, gpu_blocks(allocator)
 		, show(show)
 		, name(name)
@@ -81,7 +86,7 @@ struct ThreadData {
 	bool open = false; // is treenode open
 	u32 lines = 0;
 	u64 last_cswitch_time = 0;
-	bool last_cswitch_is_enter;
+	u32 last_cswitch_offset = 0;
 	float y;
 
 	// visible stuff
@@ -91,6 +96,7 @@ struct ThreadData {
 	Array<Signal> signals;
 	Array<u64> frames;
 	Array<u32> context_switches;
+	Array<MutexEvent> mutex_events;
 	Array<GPUBlock> gpu_blocks;
 };
 
@@ -467,6 +473,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		settings.registerOption("profiler_open", &m_is_open);
 		settings.registerOption("profiler_show_frames", &m_show_frames, "Profiler", "Show frames");
 		settings.registerOption("profiler_show_context_switches", &m_show_context_switches, "Profiler", "Show context switches");
+		settings.registerOption("profiler_show_mutex_events", &m_show_mutex_events, "Profiler", "Show mutex events");
 	}
 
 	void onPause() {
@@ -743,6 +750,9 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		m_blocks.clear();
 		m_blocks.reserve(16 * 1024);
 		forEachThread([&](ThreadContextProxy& ctx){
+			if (!m_threads.find(ctx.thread_id).isValid()) {
+				m_threads.insert(ctx.thread_id, ThreadData(m_allocator, ctx.thread_id, ctx.name, ctx.default_show));
+			}
 			u32 p = ctx.begin;
 			const u32 end = ctx.end;
 			while (p != end) {
@@ -943,18 +953,23 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 	void cacheVisibleBlocks() {
 		const u64 from_time = m_end - m_range;
 		const u64 to_time = m_end;
-		forEachThread([&](ThreadContextProxy& ctx){
-			auto iter = m_threads.find(ctx.thread_id);
-			if (!iter.isValid()) return;
-			if (!iter.value().open && ctx.thread_id != 0) return;
-
+		for (auto iter = m_threads.begin(); iter.isValid(); ++iter) {
 			ThreadData& thread = iter.value();
+			thread.context_switches.clear();
 			thread.rects.clear();
 			thread.signals.clear();
 			thread.fiber_waits.clear();
 			thread.frames.clear();
-			thread.context_switches.clear();
+			thread.mutex_events.clear();
 			thread.gpu_blocks.clear();
+		}
+		
+		forEachThread([&](ThreadContextProxy& ctx){
+			auto iter = m_threads.find(ctx.thread_id);
+			if (!iter.isValid()) return;
+			if (!iter.value().open && ctx.thread_id != 0) return;
+			
+			ThreadData& thread = iter.value();
 			
 			struct OpenBlock {
 				i32 id;
@@ -1008,10 +1023,42 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 						open_gpu_blocks.push(p);
 						lines = maximum(lines, open_gpu_blocks.size());
 						break;
-					case profiler::EventType::CONTEXT_SWITCH:
-						if (header.time < from_time || header.time > to_time) break;
-						thread.context_switches.push(p);
+					case profiler::EventType::MUTEX_EVENT: {
+						profiler::MutexEvent r;
+						read(ctx, p + sizeof(profiler::EventHeader), r);
+						if ((r.begin_enter < from_time || r.begin_enter > to_time) && (r.end_exit < from_time || r.end_exit > to_time)) break;
+						thread.mutex_events.push({r, line});
 						break;
+					}
+					case profiler::EventType::CONTEXT_SWITCH: {
+						profiler::ContextSwitchRecord r;
+						read(ctx, p + sizeof(profiler::EventHeader), r);
+
+						auto new_iter = m_threads.find(r.new_thread_id);
+						auto old_iter = m_threads.find(r.old_thread_id);
+
+						// exit timestamp
+						if (old_iter.isValid()) {
+							ThreadData& t = *old_iter;
+							// if we have previeous (enter) switch timestamp
+							if (t.last_cswitch_time) {
+								if (r.timestamp > from_time && t.last_cswitch_time < to_time) {
+									t.context_switches.push(t.last_cswitch_offset);
+									t.context_switches.push(p);
+									t.last_cswitch_time = 0;
+								}
+							}
+						}
+
+						// enter timestamp
+						if (new_iter.isValid()) {
+							ThreadData& t = *new_iter;
+							t.last_cswitch_offset = p;
+							t.last_cswitch_time = r.timestamp;
+						}
+
+						break;
+					}
 					case profiler::EventType::FRAME:
 						if (header.time < from_time || header.time > to_time) break;
 						thread.frames.push(header.time);
@@ -1159,6 +1206,40 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		const float line_height = ImGui::GetTextLineHeightWithSpacing();
 		ImDrawList* dl = ImGui::GetWindowDrawList();
 		const u64 freq = profiler::frequency();
+
+		// mutex events
+		if (m_show_mutex_events) {
+			for (ThreadData::MutexEvent& event : thread.mutex_events) {
+				const float begin_enter_x = getViewX(event.begin_enter, from_x, to_x);
+				const float end_enter_x = getViewX(event.end_enter, from_x, to_x);
+				const float begin_exit_x = getViewX(event.begin_exit, from_x, to_x);
+				const float end_exit_x = getViewX(event.end_exit, from_x, to_x);
+				
+				const float y = thread_base_y + event.line * line_height;
+				const u32 color = 0xff0000ff;
+				const u32 color_short = 0xffff0000;
+				const bool entered_long = event.begin_exit - event.end_enter > 20;
+				const bool held_long = event.begin_enter - event.end_exit > 20;
+				const float thickness = m_hovered_mutex.id == event.mutex_id && m_hovered_mutex.frame > m_frame_idx - 2 ? 3.f : 1.f;
+				dl->AddLine(ImVec2(begin_enter_x, y), ImVec2(end_enter_x, y + 5), held_long ? color : color_short, thickness);
+				dl->AddLine(ImVec2(end_enter_x, y + 5), ImVec2(begin_exit_x, y + 5), entered_long ? color : color_short, thickness);
+				dl->AddLine(ImVec2(begin_exit_x, y + 5), ImVec2(end_exit_x, y), held_long ? color : color_short, thickness);
+				const bool mouse_hovered = ImGui::IsMouseHoveringRect(ImVec2(begin_enter_x - 2, y - 2), ImVec2(end_exit_x + 2, y + 7));
+
+				if (mouse_hovered) {
+					m_hovered_mutex.id = event.mutex_id;
+					m_hovered_mutex.frame = m_frame_idx;
+
+					ImGui::BeginTooltip();
+					ImGui::Text("Mutex %" PRId64, event.mutex_id);
+					ImGui::Text("Entered in %.2f us", 1000000 * (event.end_enter - event.begin_enter) / double(freq));
+					ImGui::Text("Held for %.2f us", 1000000 * (event.begin_exit - event.end_enter) / double(freq));
+					ImGui::Text("Exited in %.2f us", 1000000 * (event.end_exit - event.begin_exit) / double(freq));
+					ImGui::EndTooltip();
+					
+				}
+			}
+		}
 
 		// fiber wait
 		for (ThreadData::FiberWait& wait : thread.fiber_waits) {
@@ -1333,66 +1414,50 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 
 		ThreadData& global = m_threads[0];
 		const ThreadContextProxy& ctx = getGlobalThreadContextProxy();
-		for (u32 cs_offset : global.context_switches) {
-			profiler::EventHeader header;
-			read(ctx, cs_offset, header);
-			profiler::ContextSwitchRecord r;
-			read(ctx, cs_offset + sizeof(profiler::EventHeader), r);
+		
+		for (auto iter = m_threads.begin(); iter.isValid(); ++iter) {
+			ThreadData& thread = iter.value();
+			for (i32 i = 0; i < thread.context_switches.size(); i += 2) {
+				const u32 offset0 = thread.context_switches[i];
+				profiler::EventHeader header0;
+				read(ctx, offset0, header0);
+				profiler::ContextSwitchRecord r0;
+				read(ctx, offset0 + sizeof(profiler::EventHeader), r0);
 
-			auto new_iter = m_threads.find(r.new_thread_id);
-			auto old_iter = m_threads.find(r.old_thread_id);
-			const float x = getViewX(header.time, from_x, to_x);
-			if (new_iter.isValid()) {
-				const float prev_x = getViewX(new_iter.value().last_cswitch_time, from_x, to_x);
-				contextSwitch(x, r, new_iter.value(), true, dl, prev_x);
-			}
-			if (old_iter.isValid()) {
-				const float prev_x = getViewX(old_iter.value().last_cswitch_time, from_x, to_x);
-				contextSwitch(x, r, old_iter.value(), false, dl, prev_x);
-			}
-		}
+				const u32 offset1 = thread.context_switches[i + 1];
+				profiler::EventHeader header1;
+				read(ctx, offset1, header1);
+				profiler::ContextSwitchRecord r1;
+				read(ctx, offset1 + sizeof(profiler::EventHeader), r1);
 
-		for (ThreadData& tr : m_threads) {
-			if (tr.last_cswitch_is_enter) {
-				const float x = getViewX(tr.last_cswitch_time, from_x, to_x);
-				dl->AddLine(ImVec2(x + 10, tr.y + 10), ImVec2(x, tr.y + 10), 0xffffff00);
-			}
-			tr.last_cswitch_time = 0;
-		}
-	}
+				const float x0 = getViewX(header0.time, from_x, to_x);
+				const float x1 = getViewX(header1.time, from_x, to_x);
+				const float y = thread.y + 10;
+				
+				dl->AddLine(ImVec2(x0 - 2, y - 5), ImVec2(x0, y), 0xff00ff00);
+				dl->AddLine(ImVec2(x0, y), ImVec2(x1, y), 0xff00ff00);
+				dl->AddLine(ImVec2(x1 + 2, y - 5), ImVec2(x1, y), 0xff00ff00);
 
-	void contextSwitch(float x, const profiler::ContextSwitchRecord& r, ThreadData& tr, bool is_enter, ImDrawList* dl, float prev_x) {
-		const float y = tr.y + 10;
-		dl->AddLine(ImVec2(x + (is_enter ? -2.f : 2.f), y - 5), ImVec2(x, y), 0xff00ff00);
-		if (!is_enter) {
-			const u64 prev_switch = tr.last_cswitch_time;
-			if (prev_switch) {
-				if (tr.last_cswitch_is_enter) {
-					dl->AddLine(ImVec2(prev_x, y), ImVec2(x, y), 0xff00ff00);
+				if (ImGui::IsMouseHoveringRect(ImVec2(x0 - 5, y - 10), ImVec2(x1 + 5, y + 5))) {
+					ImGui::BeginTooltip();
+					ImGui::Text("Context switch:");
+					ImGui::Text("  active duration: %.2f ms", 1000 * float((header1.time - header0.time) / double(profiler::frequency())));
+					ImGui::Text("  entered from: %s (%d)", getThreadName(r0.old_thread_id), r0.old_thread_id);
+					ImGui::Text("  reason to enter: %s", getContexSwitchReasonString(r0.reason));
+					ImGui::Text("  exited to: %s (%d)", getThreadName(r1.new_thread_id), r1.new_thread_id);
+					ImGui::Text("  reason to exit: %s", getContexSwitchReasonString(r1.reason));
+					ImGui::EndTooltip();
 				}
 			}
-			else {
-				dl->AddLine(ImVec2(x, y), ImVec2(0, y), 0xff00ff00);
-			}
 		}
-
-		if (ImGui::IsMouseHoveringRect(ImVec2(x - 3, y - 3), ImVec2(x + 3, y + 3))) {
-			ImGui::BeginTooltip();
-			ImGui::Text("Context switch:");
-			ImGui::Text("  from: %s (%d)", getThreadName(r.old_thread_id), r.old_thread_id);
-			ImGui::Text("  to: %s (%d)", getThreadName(r.new_thread_id), r.new_thread_id);
-			ImGui::Text("  reason: %s", getContexSwitchReasonString(r.reason));
-			ImGui::EndTooltip();
-		}
-		tr.last_cswitch_time = r.timestamp;
-		tr.last_cswitch_is_enter = is_enter;
 	}
 
 	float getViewX(u64 time, float from_x, float to_x) const {
 		const u64 view_start = m_end - m_range;
-		const float t = time > view_start
+		float t = time > view_start
 			? float((time - view_start) / double(m_range))
 			: -float((view_start - time) / double(m_range));
+		t = clamp(t, 0.f, 1.f);
 		return from_x * (1 - t) + to_x * t;
 	};
 
@@ -1477,6 +1542,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 			if (ImGui::MenuItem("Load")) load();
 			if (ImGui::MenuItem("Save")) save();
 			ImGui::Checkbox("Show frames", &m_show_frames);
+			ImGui::Checkbox("Show mutex events", &m_show_mutex_events);
 			ImGui::Text("Zoom: %f", m_range / double(DEFAULT_RANGE));
 			if (ImGui::MenuItem("Reset zoom")) m_range = DEFAULT_RANGE;
 			bool do_autopause = m_autopause >= 0;
@@ -1588,6 +1654,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 	bool m_is_open = false;
 	bool m_is_paused;
 	bool m_show_context_switches = false;
+	bool m_show_mutex_events = true;
 	bool m_show_frames = true;
 	
 	u32 m_frame_idx = 0; // incremented every frame gui is drawn
@@ -1625,6 +1692,11 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		i32 signal = 0;
 		ImVec2 pos;
 	} m_hovered_signal_trigger;
+
+	struct {
+		u64 id = 0;
+		u32 frame = 0;
+	} m_hovered_mutex;
 
 	struct {
 		u32 frame = 0;
