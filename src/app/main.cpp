@@ -285,7 +285,7 @@ int main(int args, char* argv[])
 		Semaphore semaphore;
 	} data;
 
-	jobs::runEx(&data, [](void* ptr) {
+	jobs::run(&data, [](void* ptr) {
 		Data* data = (Data*)ptr;
 
 		data->app.onInit();
