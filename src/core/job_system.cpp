@@ -1,8 +1,7 @@
-#include "core/tag_allocator.h"
+#include "core/allocator.h"
 #include "core/array.h"
 #include "core/atomic.h"
 #include "core/fibers.h"
-#include "core/allocator.h"
 #include "core/log.h"
 #include "core/math.h"
 #include "core/os.h"
@@ -10,28 +9,22 @@
 #include "core/ring_buffer.h"
 #include "core/string.h"
 #include "core/sync.h"
+#include "core/tag_allocator.h"
 #include "core/thread.h"
 #include "job_system.h"
 
 namespace Lumix::jobs {
 
-static constexpr i32 is_red_bit = 1; // can be changed only only when signal_frozen_bit is not set
-static constexpr i32 signal_frozen_bit = 1 << 30; // can be changed only when m_sync is locked
-
-static constexpr i32 is_locked_bit = 1; // can only be changed only when mutex_frozen_bit is not set
-static constexpr i32 mutex_frozen_bit = 2; // can only be changed only when m_sync is locked
-
 struct Job {
 	void (*task)(void*) = nullptr;
 	void* data = nullptr;
-	Signal* dec_on_finish;
+	Counter* dec_on_finish;
 	u8 worker_index;
 };
 
 struct WorkerTask;
 
-struct FiberDecl {
-	int idx;
+struct FiberJobPair {
 	Fiber::Handle fiber = Fiber::INVALID_FIBER;
 	Job current_job;
 };
@@ -45,10 +38,10 @@ struct FiberDecl {
 struct Work {
 	Work() : type(NONE) {}
 	Work(const Job& job) : job(job), type(JOB) {}
-	Work(FiberDecl* fiber) : fiber(fiber), type(FIBER) {}
+	Work(FiberJobPair* fiber) : fiber(fiber), type(FIBER) {}
 	union {
 		Job job;
-		FiberDecl* fiber;
+		FiberJobPair* fiber;
 	};
 	enum Type {
 		FIBER,
@@ -99,10 +92,9 @@ struct System {
 
 
 	TagAllocator m_allocator;
-	Lumix::Mutex m_sync;
 	Array<WorkerTask*> m_workers;
-	FiberDecl m_fiber_pool[512];
-	Array<FiberDecl*> m_free_fibers;
+	FiberJobPair m_fiber_pool[512];
+	RingBuffer<FiberJobPair*, 512> m_free_fibers;
 	WorkQueue<256> m_work_queue;
 };
 
@@ -125,6 +117,22 @@ WorkerTask* getWorker()
 	#pragma clang optimize on
 #endif
 
+LUMIX_FORCE_INLINE static FiberJobPair* popFreeFiber() {
+	FiberJobPair* new_fiber;
+	bool popped = g_system->m_free_fibers.pop(new_fiber);
+	ASSERT(popped);
+	if (!Fiber::isValid(new_fiber->fiber)) {
+		new_fiber->fiber = Fiber::create(64 * 1024, manage, new_fiber);
+	}
+	return new_fiber;
+}
+
+// intrusive linked list of fibers waiting on a signal/mutex
+struct WaitingFiber {
+	WaitingFiber* next;
+	FiberJobPair* fiber;
+};
+
 struct WorkerTask : Thread {
 	WorkerTask(System& system, u8 worker_index) 
 		: Thread(system.m_allocator)
@@ -146,19 +154,19 @@ struct WorkerTask : Thread {
 		static void start(void* data)
 	#endif
 	{
-		g_system->m_sync.enter();
-		FiberDecl* fiber = g_system->m_free_fibers.back();
-		g_system->m_free_fibers.pop();
-		if (!Fiber::isValid(fiber->fiber)) {
-			fiber->fiber = Fiber::create(64 * 1024, manage, fiber);
-		}
-		getWorker()->m_current_fiber = fiber;
-		Fiber::switchTo(&getWorker()->m_primary_fiber, fiber->fiber);
+		FiberJobPair* fiber = popFreeFiber();
+		WorkerTask* worker = getWorker();
+		worker->m_current_fiber = fiber;
+		Fiber::switchTo(&worker->m_primary_fiber, fiber->fiber);
 	}
 
 
 	bool m_finished = false;
-	FiberDecl* m_current_fiber = nullptr;
+	FiberJobPair* m_current_fiber = nullptr;
+	
+	Signal* m_signal_to_check = nullptr;
+	WaitingFiber* m_waiting_fiber_to_push = nullptr;
+	
 	Fiber::Handle m_primary_fiber;
 	System& m_system;
 	WorkQueue<4> m_work_queue;
@@ -166,49 +174,24 @@ struct WorkerTask : Thread {
 	bool m_is_enabled = false;
 };
 
-// linked list of fibers waiting on a signal
-struct Waitor {
-	Waitor* next;
-	FiberDecl* fiber;
-};
-
-void setRed(Signal* signal) {
-	const bool changed = (signal->counter.setBits(is_red_bit) & is_red_bit) == 0;
-	if (changed) {
-		signal->generation = g_generation.inc();
-	}
+void addCounter(Counter* counter, u32 value) {
+	if (counter->value.add(value) == 0) {
+		counter->signal.generation = g_generation.inc();
+		turnRed(&counter->signal);
+	};
 }
 
-void setGreen(Signal* signal) {
-	// fast path - not frozen
-	if (signal->counter == 0) return;
-	if (signal->counter.compareExchange(0, is_red_bit)) return;
-	
-	// unlink waitors from signal
-	Waitor* waitor = [&](){
-		Lumix::MutexGuardProfiled guard(g_system->m_sync);
-		Waitor* waitor = signal->waitor;
-		signal->waitor = nullptr;
-		signal->counter = 0;
-		return waitor;
-	}();
-	
-	// schedule unlinked fibers
-	while (waitor) {
-		Waitor* next = waitor->next;
-		const u8 worker_idx = waitor->fiber->current_job.worker_index;
-		// push to queue
-		if (worker_idx == ANY_WORKER) {
-			g_system->m_work_queue.push(waitor->fiber);
-		}
-		else {
-			WorkerTask* worker = g_system->m_workers[worker_idx % g_system->m_workers.size()];
-			worker->m_work_queue.push(waitor->fiber);
-		}
-		waitor = next;
+
+// push fiber to work queue
+LUMIX_FORCE_INLINE static void scheduleFiber(FiberJobPair* fiber) {
+	const u8 worker_idx = fiber->current_job.worker_index;
+	if (worker_idx == ANY_WORKER) {
+		g_system->m_work_queue.push(fiber);
+	} else {
+		WorkerTask* worker = g_system->m_workers[worker_idx % g_system->m_workers.size()];
+		worker->m_work_queue.push(fiber);
 	}
 }
-
 
 // try to pop a job from the queues (first worker, then global), if no job is available, go to sleep
 static bool tryPopWork(Work& work, WorkerTask* worker) {
@@ -236,134 +219,49 @@ static bool tryPopWork(Work& work, WorkerTask* worker) {
 	return false;
 }
 
-void addCounter(Signal* signal, u32 value) {
-	i32 counter = signal->counter;
+// check if the fiber before us wanted to be parked on mutex
+static void afterSwitch() {
+	WorkerTask* worker = getWorker();
+	
+	if (!worker->m_signal_to_check) return;
 
-	// fast path - counter is not frozen
-	if ((counter & signal_frozen_bit) == 0 && signal->counter.compareExchange(counter + value, counter)) {
-		if (counter == 0) {
-			signal->generation = g_generation.inc();
-		}
-		return;
-	}
+	Signal* signal = worker->m_signal_to_check;
+	WaitingFiber* fiber = worker->m_waiting_fiber_to_push;
+	worker->m_signal_to_check = nullptr;
 
-	// slow path
-	Lumix::MutexGuard lock(g_system->m_sync);
-
-	// set the frozen bit so nobody else can change the counter
-	signal->counter.setBits(signal_frozen_bit);
-	// add value
-	signal->counter.add(value);
-	// clear the parked bit if noone is waiting
-	if (!signal->waitor) {
-		signal->counter.clearBits(signal_frozen_bit);
-		ASSERT(signal->counter >= 0); 
-	}
-}
-
-// decrement signal counter
-// if new value == 0, schedule all fibers waiting on a signal
-LUMIX_FORCE_INLINE static void trigger(Signal* signal) {
-	i32 counter = signal->counter;
-	// fast path - signal is not frozen
-	if ((counter & signal_frozen_bit) == 0 && signal->counter.compareExchange(counter - 1, counter)) return;
-	// fast path - still red even if we decrement
-	// if you have a deadlock in job system, it is likely related to this line
-	if (counter > signal_frozen_bit + 1 && signal->counter.compareExchange(counter - 1, counter)) return;
-
-	Waitor* waitor = nullptr;
-	// slow path
-	{
-		Lumix::MutexGuardProfiled lock(g_system->m_sync);
-
-		// set the parked bit so nobody else can change the counter
-		signal->counter.setBits(signal_frozen_bit);
+	for (;;) {
+		const i64 counter = signal->state;
 		
-		// decrement signal counter - only here can be the frozen signal turned green
-		counter = signal->counter.dec() - 1;
-		ASSERT(counter >= signal_frozen_bit);
-		if (!signal->waitor) {
-			// no one is waiting
-			// clear the frozen bit
-			signal->counter.clearBits(signal_frozen_bit);
+		// signal is green, repush the fiber
+		if ((counter & 1) == 0) {
+			scheduleFiber(fiber->fiber);
 			return;
 		}
 
-		// if we have green signal
-		if (counter == signal_frozen_bit) {
-			// pop the wait queue
-			waitor = signal->waitor;
-			signal->waitor = nullptr;
-			signal->counter.clearBits(signal_frozen_bit);
-		}
+		// sigal is red, let's try to actually park the fiber
+		fiber->next = (WaitingFiber*)u64(counter & ~i64(1));
+		i64 new_counter = 1 | i64(fiber);
+		// try to update the signal state, if nobody changed it in the meantime
+		if (signal->state.compareExchange(new_counter, counter)) return;
+		
+		// somebody changed the signal state, let's try again
 	}
-
-	// schedule all fibers waiting on the signal
-	while (waitor) {
-		// store `next` in local variable, since it can be invalidated after we push the fiber to the queue
-		Waitor* next = waitor->next;
-		const u8 worker_idx = waitor->fiber->current_job.worker_index;
-		// push to queue
-		if (worker_idx == ANY_WORKER) {
-			g_system->m_work_queue.push(waitor->fiber);
-		}
-		else {
-			WorkerTask* worker = g_system->m_workers[worker_idx % g_system->m_workers.size()];
-			worker->m_work_queue.push(waitor->fiber);
-		}
-		waitor = next;
-	}
-
 }
 
-void wait(Signal* signal) {
-	// signal is green
-	if (signal->counter == 0) return;
-
-	g_system->m_sync.enter();
-
-	if (!getWorker()) {
-		while (signal->counter > 0) {
-			g_system->m_sync.exit();
-			os::sleep(1);
-			g_system->m_sync.enter();
-		}
-		g_system->m_sync.exit();
-		return;
-	}
-
-	// set the frozen bit so nobody can make the signal green
-	signal->counter.setBits(signal_frozen_bit);
-
-	// recheck if the signal is green, as it might have changed before setting the frozen bit
-	if (signal->counter == signal_frozen_bit) {
-		// signal is green
-		ASSERT(!signal->waitor);
-		signal->counter = 0;
-		g_system->m_sync.exit();
-		return;
-	}
-
-	// signal is red, park the fiber
-	FiberDecl* this_fiber = getWorker()->m_current_fiber;
-
-	Waitor waitor;
-	waitor.fiber = this_fiber;
-	waitor.next = signal->waitor;
-	signal->waitor = &waitor;
-
-	const profiler::FiberSwitchData switch_data = profiler::beginFiberWait(signal->generation, false);
-	FiberDecl* new_fiber = g_system->m_free_fibers.back();
-	g_system->m_free_fibers.pop();
-	if (!Fiber::isValid(new_fiber->fiber)) {
-		new_fiber->fiber = Fiber::create(64 * 1024, manage, new_fiber);
-	}
-	getWorker()->m_current_fiber = new_fiber;
+// switch from current fiber to a new, free fiber (into `manage` function)
+LUMIX_FORCE_INLINE static void switchFibers(i32 profiler_id) {
+	WorkerTask* worker = getWorker();
+	FiberJobPair* this_fiber = worker->m_current_fiber;
+	
+	const profiler::FiberSwitchData switch_data = profiler::beginFiberWait(profiler_id, false);
+	FiberJobPair* new_fiber = popFreeFiber();
+	worker->m_current_fiber = new_fiber;
 	
 	Fiber::switchTo(&this_fiber->fiber, new_fiber->fiber);
+	afterSwitch();
 	
+	// we ca be on different worker than before fiber switch, must call getWorker()
 	getWorker()->m_current_fiber = this_fiber;
-	g_system->m_sync.exit();
 	profiler::endFiberWait(switch_data);
 }
 
@@ -373,9 +271,9 @@ void wait(Signal* signal) {
 	static void manage(void* data)
 #endif
 {
-	g_system->m_sync.exit();
+	afterSwitch();
 
-	FiberDecl* this_fiber = (FiberDecl*)data;
+	FiberJobPair* this_fiber = (FiberJobPair*)data;
 		
 	WorkerTask* worker = getWorker();
 	while (!worker->m_finished) {
@@ -386,10 +284,9 @@ void wait(Signal* signal) {
 		if (work.type == Work::FIBER) {
 			worker->m_current_fiber = work.fiber;
 
-			g_system->m_sync.enter();
 			g_system->m_free_fibers.push(this_fiber);
 			Fiber::switchTo(&this_fiber->fiber, work.fiber->fiber);
-			g_system->m_sync.exit();
+			afterSwitch();
 
 			worker = getWorker();
 			worker->m_current_fiber = this_fiber;
@@ -400,13 +297,15 @@ void wait(Signal* signal) {
 			profiler::beginBlock("job");
 			profiler::blockColor(0x60, 0x60, 0x60);
 			if (work.job.dec_on_finish) {
-				profiler::pushJobInfo(work.job.dec_on_finish->generation);
+				profiler::pushJobInfo(work.job.dec_on_finish->signal.generation);
 			}
 			this_fiber->current_job = work.job;
 			work.job.task(work.job.data);
 			this_fiber->current_job.task = nullptr;
 			if (work.job.dec_on_finish) {
-				trigger(work.job.dec_on_finish);
+				if (work.job.dec_on_finish->value.dec() == 1) {
+					turnGreen(&work.job.dec_on_finish->signal);
+				}
 			}
 			worker = getWorker();
 			profiler::endBlock();
@@ -420,19 +319,11 @@ IAllocator& getAllocator() {
 	return g_system->m_allocator;
 }
 
-bool init(u8 workers_count, IAllocator& allocator)
-{
+bool init(u8 workers_count, IAllocator& allocator) {
 	g_system.create(allocator);
 
-	g_system->m_free_fibers.reserve(lengthOf(g_system->m_fiber_pool));
-	for (FiberDecl& fiber : g_system->m_fiber_pool) {
+	for (FiberJobPair& fiber : g_system->m_fiber_pool) {
 		g_system->m_free_fibers.push(&fiber);
-	}
-
-	const int fiber_num = lengthOf(g_system->m_fiber_pool);
-	for(int i = 0; i < fiber_num; ++i) { 
-		FiberDecl& decl = g_system->m_fiber_pool[i];
-		decl.idx = i;
 	}
 
 	int count = maximum(1, int(workers_count));
@@ -476,7 +367,7 @@ void shutdown()
 		LUMIX_DELETE(allocator, task);
 	}
 
-	for (FiberDecl& fiber : g_system->m_fiber_pool)
+	for (FiberJobPair& fiber : g_system->m_fiber_pool)
 	{
 		if(Fiber::isValid(fiber.fiber)) {
 			Fiber::destroy(fiber.fiber);
@@ -486,133 +377,147 @@ void shutdown()
 	g_system.destroy();
 }
 
-void enter(Mutex* mutex) {
+void turnRed(Signal* signal) {
+	if ((signal->state.setBits(1) & 1) == 0) {
+		signal->generation = g_generation.inc();
+	}
+}
+
+void wait(Counter* counter) {
+	wait(&counter->signal);
+}
+
+void wait(Signal* signal) {
+	ASSERT(getWorker());
+
+	// spin for a bit
+	for (u32 i = 0; i < 40; ++i) {
+		// fast path
+		if ((signal->state & 1) == 0) return;
+	}
+
+	// we busy-waited too long, let's park the fiber
+	// the signal state is rechecked after we switch to other fiber
+	// we can't park the fiber here, because it could get unparked before we switch to another fiber
+	WorkerTask* worker = getWorker();
+
+	WaitingFiber waiting_fiber;
+	waiting_fiber.fiber = worker->m_current_fiber;
+	worker->m_signal_to_check = signal;
+	worker->m_waiting_fiber_to_push = &waiting_fiber;
+	
+	switchFibers(signal->generation);
+}
+
+void waitAndTurnRed(Signal* signal) {
 	ASSERT(getWorker());
 	for (;;) {
-		// fast path - if not locked and no one is waiting, lock it
-		const bool is_locked = mutex->state & is_locked_bit;
-		if (!is_locked && mutex->state.compareExchange(is_locked_bit, 0)) return;
-
-		// spin a bit
-		for (u32 i = 0; i < 40; ++i) {
-			// do not spin if someone is already waiting
-			if (mutex->state & mutex_frozen_bit) break;
-			// try to lock
-			if (mutex->state.compareExchange(is_locked_bit, 0)) return;
-		}
-
-		// let's park the fiber
-		g_system->m_sync.enter();
-
-		// set the parked bit so noone can change is_locked_bit
-		mutex->state.setBits(mutex_frozen_bit);
-		
-		// at this point, has_parked_bit is set, and noone but us can clear it (since we are holding `m_sync`)
-		// and since has_parked_bit_is set, noone can change is_locked_bit either
-		
-		// is is_locked_bit is not set, we can lock the mutex
-		if (mutex->state.compareExchange(mutex->waitor ? mutex_frozen_bit | is_locked_bit : is_locked_bit, mutex_frozen_bit)) {
-			// we manged to lock the mutex
-			g_system->m_sync.exit();
+		// fastest path
+		if (signal->state.bitTestAndSet(0)) {
+			signal->generation = g_generation.inc();
+			ASSERT(signal->state & 1);
 			return;
 		}
 
-		// we made sure parked bit is set, and then we made sure locked bit is set
-		// so until we release `m_sync`, only we can change the state of the mutex
-
-		Waitor waitor;
-		FiberDecl* this_fiber = getWorker()->m_current_fiber;
-		waitor.fiber = this_fiber;
-		waitor.next = mutex->waitor;
-		mutex->waitor = &waitor;
-
-		// switch fibers
-		mutex->generation = g_generation.inc();
-		const profiler::FiberSwitchData& switch_data = profiler::beginFiberWait(mutex->generation, true);
-		FiberDecl* new_fiber = g_system->m_free_fibers.back();
-		g_system->m_free_fibers.pop();
-		if (!Fiber::isValid(new_fiber->fiber)) {
-			new_fiber->fiber = Fiber::create(64 * 1024, manage, new_fiber);
+		// spin for a bit
+		for (u32 i = 0; i < 40; ++i) {
+			// only read
+			if (signal->state == 0) break;
+			cpuRelax(); // rep nop, hint to cpu core to conserve resources (switch to lower power state)
 		}
-		getWorker()->m_current_fiber = new_fiber;
-		ASSERT(mutex->state == (is_locked_bit | mutex_frozen_bit));
-		Fiber::switchTo(&this_fiber->fiber, new_fiber->fiber);
-		getWorker()->m_current_fiber = this_fiber;
-		g_system->m_sync.exit();
-		profiler::endFiberWait(switch_data);
-		// somebody exited the mutex, let's try to lock again
-		// somebody else might have been faster, so we need to do the whole checking again
+		
+		// check once again before parking the fiber
+		if (signal->state.bitTestAndSet(0)) {
+			signal->generation = g_generation.inc();
+			ASSERT(signal->state & 1);
+			return;
+		}
+
+		// we busy-waited too long, let's park the fiber
+		// the mutex state is rechecked after we switch to other fiber
+		// we can't park the fiber here, because it could get unparked before we switch to another fiber
+		WorkerTask* worker = getWorker();
+
+		WaitingFiber waiting_fiber;
+		waiting_fiber.fiber = worker->m_current_fiber;
+		worker->m_signal_to_check = signal;
+		worker->m_waiting_fiber_to_push = &waiting_fiber;
+		
+		switchFibers(signal->generation);
 	}
+}
+
+void enter(Mutex* mutex) {
+	waitAndTurnRed(&mutex->signal);
 }
 
 void exit(Mutex* mutex) {
+	// this is almost the same as turnGreen, but it **pops only** one of the waiting fibers, since only one can enter the mutex
 	ASSERT(getWorker());
-	ASSERT(mutex->state & is_locked_bit);
+	ASSERT(mutex->signal.state & 1);
 
-	// fast path - if no one is waiting, just unlock the mutex
-	if (mutex->state.compareExchange(0, is_locked_bit)) return;
+	for (;;) {
+		const i64 state = mutex->signal.state;
 
-	// since fast path failed, there must be at least one fiber waiting
-	// and only we can push it to the queue
-	ASSERT(mutex->state == (is_locked_bit | mutex_frozen_bit));
+		// prepare to pop one waiting fiber from the mutex and unlock the mutex
+		WaitingFiber* waiting_fiber = (WaitingFiber*)(state & ~i64(1));
+		const i64 new_state_value = i64(waiting_fiber ? waiting_fiber->next : nullptr);
 
-	// slow path - unpark one waiting fiber, so it can try to enter the mutex
-	Lumix::MutexGuard guard(g_system->m_sync);
-	
-	Waitor* waitor = mutex->waitor;
-	// pop one waitor
-	mutex->waitor = waitor->next;
-	
-	// push it to a queue
-	const u8 worker_idx = waitor->fiber->current_job.worker_index;
-	if (worker_idx == ANY_WORKER) {
-		g_system->m_work_queue.push(waitor->fiber);
+		// if something changed (there's a new fiber waiting), try again
+		if (!mutex->signal.state.compareExchange(new_state_value, state)) continue;
+
+		if (waiting_fiber) {
+			// we managed to pop one waiting fiber from the mutex
+			// push the popped fiber to the work queue
+			// so it can try to enter the mutex
+			scheduleFiber(waiting_fiber->fiber);
+		}
+		return;
 	}
-	else {
-		WorkerTask* worker = g_system->m_workers[worker_idx % g_system->m_workers.size()];
-		worker->m_work_queue.push(waitor->fiber);
-	}
+}
 
-	// clear the locked bit, clear also the parked bit if no one is left waiting
-	bool cleared = mutex->state.compareExchange(mutex->waitor ? mutex_frozen_bit : 0, is_locked_bit | mutex_frozen_bit);
-	ASSERT(cleared);
+void turnGreen(Signal* signal) {
+	ASSERT(getWorker());
+
+	// turn the signal green
+	const i64 old_state = signal->state.exchange(0);
+	
+	// wake up all waiting fibers
+	WaitingFiber* fiber = (WaitingFiber*)(old_state & ~i64(1));
+	while (fiber) {
+		WaitingFiber* next = fiber->next;
+		scheduleFiber(fiber->fiber);
+		fiber = next;
+	}
 }
 
 void moveJobToWorker(u8 worker_index) {
-	g_system->m_sync.enter();
-	FiberDecl* this_fiber = getWorker()->m_current_fiber;
+	FiberJobPair* this_fiber = getWorker()->m_current_fiber;
 	WorkerTask* worker = g_system->m_workers[worker_index % g_system->m_workers.size()];
 	worker->m_work_queue.push(this_fiber);
-	FiberDecl* new_fiber = g_system->m_free_fibers.back();
-	g_system->m_free_fibers.pop();
-	if (!Fiber::isValid(new_fiber->fiber)) {
-		new_fiber->fiber = Fiber::create(64 * 1024, manage, new_fiber);
-	}
+	FiberJobPair* new_fiber = popFreeFiber();
 	getWorker()->m_current_fiber = new_fiber;
 	this_fiber->current_job.worker_index = worker_index;
+	
 	Fiber::switchTo(&this_fiber->fiber, new_fiber->fiber);
+	afterSwitch();
 	getWorker()->m_current_fiber = this_fiber;
 	ASSERT(getWorker()->m_worker_index == worker_index);
-	g_system->m_sync.exit();
 }
 
 void yield() {
-	g_system->m_sync.enter();
-	FiberDecl* this_fiber = getWorker()->m_current_fiber;
+	FiberJobPair* this_fiber = getWorker()->m_current_fiber;
 	g_system->m_work_queue.push(this_fiber);
 
-	FiberDecl* new_fiber = g_system->m_free_fibers.back();
-	g_system->m_free_fibers.pop();
-	if (!Fiber::isValid(new_fiber->fiber)) {
-		new_fiber->fiber = Fiber::create(64 * 1024, manage, new_fiber);
-	}
+	FiberJobPair* new_fiber = popFreeFiber();
 	this_fiber->current_job.worker_index = ANY_WORKER;
 	getWorker()->m_current_fiber = new_fiber;
 	Fiber::switchTo(&this_fiber->fiber, new_fiber->fiber);
-	g_system->m_sync.exit();
+	afterSwitch();
+	getWorker()->m_current_fiber = this_fiber;
 }
 
-void run(void* data, void(*task)(void*), Signal* on_finished, u8 worker_index)
+void run(void* data, void(*task)(void*), Counter* on_finished, u8 worker_index)
 {
 	Job job;
 	job.data = data;
@@ -633,7 +538,7 @@ void run(void* data, void(*task)(void*), Signal* on_finished, u8 worker_index)
 	g_system->m_work_queue.push(job);
 }
 
-void runN(void* data, void(*task)(void*), Signal* on_finished, u8 worker_index, u32 num_jobs)
+void runN(void* data, void(*task)(void*), Counter* on_finished, u8 worker_index, u32 num_jobs)
 {
 	Job job;
 	job.data = data;

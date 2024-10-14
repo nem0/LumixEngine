@@ -155,7 +155,7 @@ struct FrameData {
 	Array<ShaderToCompile> to_compile_shaders;
 	RendererImpl& renderer;
 	jobs::Signal can_setup;
-	jobs::Signal setup_done;
+	jobs::Counter setup_done;
 	u32 frame_number = 0;
 	DrawStream begin_frame_draw_stream;
 	DrawStream draw_stream;
@@ -450,7 +450,7 @@ struct RendererImpl final : Renderer {
 		m_frame_thread.semaphore.signal();
 		m_frame_thread.destroy();
 
-		jobs::Signal signal;
+		jobs::Counter counter;
 		jobs::runLambda([this]() {
 			for (const Local<FrameData>& frame : m_frames) {
 				gpu::destroy(frame->transient_buffer.m_buffer);
@@ -461,13 +461,13 @@ struct RendererImpl final : Renderer {
 			gpu::present();
 			gpu::present();
 			gpu::present();
-		}, &signal, 1);
-		jobs::wait(&signal);
-
+		}, &counter, 1);
+		jobs::wait(&counter);
+		// TODO can't we merge these two jobs?
 		jobs::runLambda([]() {
 			gpu::shutdown();
-		}, &signal, 1);
-		jobs::wait(&signal);
+		}, &counter, 1);
+		jobs::wait(&counter);
 	}
 
 	static void add(String& res, const char* a, u32 b) {
@@ -936,7 +936,7 @@ struct RendererImpl final : Renderer {
 			frame.gpu_frame = 0xFFffFFff;
 			frame.transient_buffer.renderDone();
 			frame.uniform_buffer.renderDone();
-			jobs::setGreen(&frame.can_setup);
+			jobs::turnGreen(&frame.can_setup);
 			pushFreeFrame(frame);
 		}
 		else {
@@ -974,7 +974,7 @@ struct RendererImpl final : Renderer {
 	void pushFreeFrame(FrameData& frame) {
 		jobs::MutexGuard guard(m_frames_mutex);
 		m_free_frames.push(&frame);
-		jobs::setGreen(&m_has_free_frames);
+		jobs::turnGreen(&m_has_free_frames);
 	}
 
 	FrameData* popFreeFrame() {
@@ -986,7 +986,7 @@ struct RendererImpl final : Renderer {
 		}
 		FrameData* frame = m_free_frames.back();
 		m_free_frames.pop();
-		if (m_free_frames.empty()) jobs::setRed(&m_has_free_frames);
+		if (m_free_frames.empty()) jobs::turnRed(&m_has_free_frames);
 		return frame;
 	}
 
@@ -994,7 +994,7 @@ struct RendererImpl final : Renderer {
 		jobs::MutexGuard guard(m_frames_mutex);
 		FrameData* f = m_gpu_queue;
 		m_gpu_queue = nullptr;
-		jobs::setGreen(&m_gpu_queue_empty);
+		jobs::turnGreen(&m_gpu_queue_empty);
 		ASSERT(f);
 		return *f;
 	}
@@ -1008,7 +1008,7 @@ struct RendererImpl final : Renderer {
 			ASSERT(!m_gpu_queue);
 		}
 		m_gpu_queue = &frame;
-		jobs::setRed(&m_gpu_queue_empty);
+		jobs::turnRed(&m_gpu_queue_empty);
 	}
 
 	void frame() override
@@ -1039,7 +1039,7 @@ struct RendererImpl final : Renderer {
 		static u32 frame_data_counter = profiler::createCounter("Render frame data (kB)", 0);
 		profiler::pushCounter(frame_data_counter, float(double(frame_data_mem) / 1024.0));
 
-		jobs::setRed(&m_cpu_frame->can_setup);
+		jobs::turnRed(&m_cpu_frame->can_setup);
 		pushToGPUQueue(*m_cpu_frame);
 
 		m_cpu_frame = popFreeFrame();
@@ -1088,7 +1088,7 @@ struct RendererImpl final : Renderer {
 					f->gpu_frame = 0xFFffFFff;
 					f->transient_buffer.renderDone();
 					f->uniform_buffer.renderDone();
-					jobs::setGreen(&f->can_setup);
+					jobs::turnGreen(&f->can_setup);
 					renderer.pushFreeFrame(*f);
 				}, nullptr, 1);
 			}
@@ -1124,7 +1124,7 @@ struct RendererImpl final : Renderer {
 	u32 m_max_sort_key = 0;
 	u32 m_frame_number = 0;
 	float m_lod_multiplier = 1;
-	jobs::Signal m_init_signal;
+	jobs::Counter m_init_signal;
 	HashMap<RuntimeHash, String> m_semantic_defines;
 
 	Array<RenderPlugin*> m_plugins;
@@ -1135,7 +1135,7 @@ struct RendererImpl final : Renderer {
 	StackArray<FrameData*, 3> m_free_frames;
 	jobs::Mutex m_frames_mutex;
 	jobs::Signal m_has_free_frames;
-	jobs::Signal m_last_render;
+	jobs::Counter m_last_render;
 
 	GPUProfiler m_profiler;
 	FrameThread m_frame_thread;

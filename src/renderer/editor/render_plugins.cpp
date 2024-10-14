@@ -3144,7 +3144,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	StudioApp& m_app;
 	Renderer* m_renderer = nullptr;
 	TexturePlugin* m_texture_plugin;
-	jobs::Signal m_subres_signal;
+	jobs::Counter m_subres_signal;
 	gpu::ProgramHandle m_downscale_program = gpu::INVALID_PROGRAM;
 	UniquePtr<MultiEditor<Asset>> m_multi_editor;
 };

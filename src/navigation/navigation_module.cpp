@@ -1349,7 +1349,7 @@ struct NavigationModuleImpl final : NavigationModule
 		EntityRef zone_entity;
 		NavigationModuleImpl* module;
 
-		jobs::Signal signal;
+		jobs::Counter signal;
 	};
 
 	NavmeshBuildJob* generateNavmesh(EntityRef zone_entity) override {

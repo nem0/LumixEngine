@@ -29,50 +29,57 @@ jobs::run(&data, sum, nullptr);
 
 ## Signal
 
-**Signals** are one of the synchronization primitives of the Job System. They can be used to wait for two types of events:
+**Signals** are the primary synchronization primitive in the Job System. A signal can be either **red** or **green**. A red signal blocks all `wait()` callers until it turns green. The four basic operations on signals are:
 
-### Job finished
+* `jobs::turnRed` - Turns the signal red. This can be called at any time and is a no-op if the signal is already red.
+* `jobs::turnGreen` - Turns the signal green, scheduling all waiting fibers to execute. This can be called at any time and is a no-op if the signal is already green.
+* `jobs::wait` - Waits until the signal turns green. If the signal is already green, it continues. While waiting, the job system runs other jobs.
+* `jobs::waitAndTurnRed` - Waits until the signal turns green and then atomically turns it red. If the signal is already green, it is equivalent to `jobs::turnRed`. If multiple fibers are `waitAndTurnRed`-ing on the same signal and it turns green, only one fiber proceeds with execution.
+
+While **waiting** on a signal, a **worker thread** will attempt to **execute another job** from the queue. If no jobs are available, the thread will go to sleep to conserve resources. Signals are not copyable. It means the following code is invalid:
+
 ```cpp
-jobs::Signal signal;
-// run some job
-jobs::run(data, function, &signal);
-// wait till the job is finished
-jobs::wait(&signal);
-// no need to cleanup `signal`
+jobs::Signal other_signal = signal;
 ```
-While **waiting** on a signal, a **worker thread** will attempt to **execute another job** from the queue. If no jobs are available, the thread will go to sleep to conserve resources. The Job System retains pointers to signals until the associated jobs are completed. It is the **user's responsibility** to ensure that the **signal remains valid** until the job is finished. Consequently, signals **cannot be assigned** to other signals, making the following code invalid:
+
+### Counters
+
+Counters are a specialized type of signal that maintain a numeric value. They are considered green when this value is zero and red when it is non-zero. Counters are used to wait until one or more jobs are finished. There are two operations on counters:
+
+* `jobs::run` - can increment value of a provided counter. 
+* `jobs::wait` - waits until the signal turns green. 
 
 ```cpp
-jobs::Signal other_signal = signal; // invalid
+jobs::Counter counter;
+// run some job
+jobs::run(data, function, &counter);
+
+// wait till the job is finished
+jobs::wait(&counter);
+// no need to cleanup `counter`
+```
+
+The Job System retains pointers to counters until the associated jobs are completed. It is the **user's responsibility** to ensure that the **counter remains valid** until the job is finished. Consequently, counters **cannot be assigned** to other counter, making the following code invalid:
+
+```cpp
+jobs::Counter other_counter = counter; // invalid
 
 void foo() {
-    jobs::Signal signal;
-    jobs::run(&data, fn, &signal);
-    // `signal` gets destroyed here, but there's no guarantee the job is finished, so this is invalid
+    jobs::Counter counter;
+    jobs::run(&data, fn, &counter);
+    // `counter` gets destroyed here, but there's no guarantee the job is finished, so this is invalid
 }
 ```
 
-Multiple jobs can use the same signal:
+Multiple jobs can use the same counter:
 
 ```cpp
-jobs::Signal signal;
+jobs::Counter counter;
 // run two jobs
-jobs::run(&dataA, fnA, &signal);
-jobs::run(&dataB, fnB, &signal);
+jobs::run(&dataA, fnA, &counter);
+jobs::run(&dataB, fnB, &counter);
 // wait till both jobs are finished
-jobs::wait(&signal);
-```
-
-### User triggered signals
-
-Signals can also be used to trigger events based on user requests. It is **strongly advised not to mix** user-triggered signals with signals used as job counters. User-triggered signal can be in one of two states: green or red. Waiting on **green** signal is a **does not block**. Waiting on **red signal blocks** the caller until the signal turns green.
-
-```cpp
-jobs::Signal is_ready; // signal is green by default
-jobs::setRed(&is_ready); // signal is red, any called of wait(&is_ready) is blocked
-...
-jobs::setRed(&is_ready); // this unblocks anybody waiting on `is_ready`
-// from this point, wait(&is_ready) does not block the callers
+jobs::wait(&counter);
 ```
 
 ## Mutex
