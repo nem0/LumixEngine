@@ -81,6 +81,8 @@ struct DrawStream {
 	void reset();
 	void merge(DrawStream& rhs);
 
+	u32 num_drawcalls;
+
 	struct Page;
 private:
 	enum class Instruction : u8;

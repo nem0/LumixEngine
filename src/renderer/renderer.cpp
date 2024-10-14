@@ -154,7 +154,7 @@ struct FrameData {
 	jobs::Mutex shader_mutex;
 	Array<ShaderToCompile> to_compile_shaders;
 	RendererImpl& renderer;
-	jobs::BinarySignal can_setup;
+	jobs::Signal can_setup;
 	jobs::Signal setup_done;
 	u32 frame_number = 0;
 	DrawStream begin_frame_draw_stream;
@@ -919,6 +919,7 @@ struct RendererImpl final : Renderer {
 		{
 			PROFILE_BLOCK("draw stream");
 			frame.draw_stream.run();
+			profiler::pushInt("Drawcalls", frame.draw_stream.num_drawcalls);
 			frame.draw_stream.reset();
 		}
 
@@ -1128,12 +1129,12 @@ struct RendererImpl final : Renderer {
 
 	Array<RenderPlugin*> m_plugins;
 	Local<FrameData> m_frames[2];
-	jobs::BinarySignal m_gpu_queue_empty;
+	jobs::Signal m_gpu_queue_empty;
 	FrameData* m_gpu_queue = nullptr;
 	FrameData* m_cpu_frame = nullptr;
 	StackArray<FrameData*, 3> m_free_frames;
 	jobs::Mutex m_frames_mutex;
-	jobs::BinarySignal m_has_free_frames;
+	jobs::Signal m_has_free_frames;
 	jobs::Signal m_last_render;
 
 	GPUProfiler m_profiler;

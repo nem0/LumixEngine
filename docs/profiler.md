@@ -45,7 +45,11 @@ Blocks are defined using `profiler::beginBlock` and `profiler::endBlock`. These 
     }
 ```
 
-### Fiber switch
+### Fiber wait
+
+Switching fibers due to a [blocking wait](job_system.md) is represented by small squares. A green square marks the start of the wait, while a blue square marks the end. Hover over these squares to view additional information, including links to the jobs the fiber was waiting on.
+
+![alt text](images/profiler/fiber_switch.png)
 
 ### Properties
 
@@ -108,11 +112,12 @@ Context switches are represented by green lines above each thread, showing the a
 
 ### Mutex
 
-TODO
+OS-level mutexes are visualized as red lines beneath a block. Only mutexes recorded with `MutexGuardProfiled` and those that exceed a certain duration are displayed in the profiler.
+
+![alt text](images/profiler/mutex.png)
 
 ### GPU
 
-TODO
 
 ## Memory
 

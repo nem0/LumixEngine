@@ -441,7 +441,7 @@ struct PipelineImpl final : Pipeline {
 		CullResult* renderables = nullptr;
 		CameraParams cp;
 		u8 layer_to_bucket[255];
-		jobs::BinarySignal ready;
+		jobs::Signal ready;
 	};
 
 	// converts float to u32 so it can be used in radix sort

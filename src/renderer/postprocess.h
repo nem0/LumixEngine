@@ -769,7 +769,7 @@ struct TDAO : public RenderPlugin {
 	Shader* m_shader = nullptr;
 	float m_xz_range = 100;
 	float m_y_range = 200;
-	float m_intensity = 0.3f;
+	float m_intensity = 0.9f;
 	bool m_enabled = true;
 	DVec3 m_last_camera_pos = DVec3(DBL_MAX);
 	
