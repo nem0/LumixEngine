@@ -900,7 +900,7 @@ struct PipelineImpl final : Pipeline {
 		}
 
 		View* view_ptr = view.get();
-		jobs::setRed(&view->ready);
+		jobs::turnRed(&view->ready);
 		m_renderer.pushJob("prepare view", [this, view_ptr](DrawStream& stream) {
 			setupFur(*view_ptr);
 			setupParticles(*view_ptr);
@@ -920,7 +920,7 @@ struct PipelineImpl final : Pipeline {
 				createCommands(*view_ptr);
 			}
 
-			jobs::setGreen(&view_ptr->ready);
+			jobs::turnGreen(&view_ptr->ready);
 		});
 
 		return m_views.size() - 1;

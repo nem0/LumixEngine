@@ -1246,7 +1246,11 @@ struct StudioAppImpl final : StudioApp {
 		else {
 			mainMenu();
 
-			m_dockspace_id = ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
+			{
+				PROFILE_BLOCK("ImGui::DockSpaceOverViewport");
+				m_dockspace_id = ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
+			}
+			
 			if (checkShortcut(m_show_all_actions_action, true)) showAllActionsGUI();
 			else if (checkShortcut(m_next_frame, true)) m_engine->nextFrame();
 			else if (checkShortcut(m_pause_game, true)) m_engine->pause(!m_engine->isPaused());
@@ -3000,7 +3004,7 @@ struct StudioAppImpl final : StudioApp {
 	Array<WindowToDestroy> m_deferred_destroy_windows;
 	os::WindowHandle m_main_window;
 	os::WindowState m_fullscreen_restore_state;
-	jobs::Signal m_init_imgui_signal;
+	jobs::Counter m_init_imgui_signal;
 
 	CommonActions m_common_actions;
 	Action m_show_all_actions_action{"Show all commands", "Show all commands", "show_all_commands", ""};

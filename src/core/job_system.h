@@ -3,16 +3,34 @@
 #include "allocator.h"
 #include "atomic.h"
 
-namespace Lumix {
-
-struct IAllocator;
-
-namespace jobs {
+namespace Lumix::jobs {
 
 constexpr u8 ANY_WORKER = 0xff;
 
-struct Mutex;
+// can be in two states: red and green, red signal blocks wait() callers, green does not
 struct Signal;
+
+// same as OS mutex, but can be used in Job System context
+struct Mutex;
+
+// has numeric value, which is incremented by running a job, and decremented when job is done
+// if the value is 0, counter is green, otherwise it's red
+struct Counter;
+
+// turn signal red from whatevere state it's in
+LUMIX_CORE_API void turnRed(Signal* signal);
+// turn signal green from whatever state it's in, all waiting fibers are scheduled to execute
+LUMIX_CORE_API void turnGreen(Signal* signal);
+// wait for signal to become green, or continues if it's already green, does not change state of the signal
+LUMIX_CORE_API void wait(Signal* signal);
+// wait for signal to become green and turn it red, then continue
+// if several fibers are waiting on the same signal, and the signal turns green, only one of the waiting fibers will continue
+LUMIX_CORE_API void waitAndTurnRed(Signal* signal);
+
+LUMIX_CORE_API void wait(Counter* counter);
+
+LUMIX_CORE_API void enter(Mutex* mutex);
+LUMIX_CORE_API void exit(Mutex* mutex);
 
 LUMIX_CORE_API bool init(u8 workers_count, IAllocator& allocator);
 LUMIX_CORE_API IAllocator& getAllocator();
@@ -24,26 +42,61 @@ LUMIX_CORE_API void moveJobToWorker(u8 worker_index);
 // yield current job, push it to global queue
 LUMIX_CORE_API void yield();
 
-LUMIX_CORE_API void enter(Mutex* mutex);
-LUMIX_CORE_API void exit(Mutex* mutex);
 
-// avoid mixing red/green signals with job counter signals
-// red signal blocks wait() callers
-LUMIX_CORE_API void setRed(Signal* signal);
-// green signal does not block wait() callers
-LUMIX_CORE_API void setGreen(Signal* signal);
-// wait for signal to become green, or continues if it's already green
-LUMIX_CORE_API void wait(Signal* signal);
-
-// run single job, increment on_finished signal counter, decrement it when job is done
-LUMIX_CORE_API void run(void* data, void(*task)(void*), Signal* on_finish, u8 worker_index = ANY_WORKER);
+// run single job, increment on_finished counter, decrement it when job is done
+LUMIX_CORE_API void run(void* data, void(*task)(void*), Counter* on_finish, u8 worker_index = ANY_WORKER);
 // optimized batch run multi jobs, useful for foreach and others
-LUMIX_CORE_API void runN(void* data, void(*task)(void*), Signal* on_finish, u8 worker_index, u32 num_jobs);
+LUMIX_CORE_API void runN(void* data, void(*task)(void*), Counter* on_finish, u8 worker_index, u32 num_jobs);
+
+
+// spawn as many jobs as there are worker threads, and call `f`
+template <typename F> void runOnWorkers(const F& f);
 
 // same as run, but uses lambda instead of function and data pointer
 // it can allocate memory for lambda, if the lambda is too big to fit in pointer
+template <typename F> void runLambda(F&& f, Counter* on_finish, u8 worker = ANY_WORKER);
+
+// call F for each element in range [0, `count`) in steps of `step`
+// F is called in parallel
+template <typename F> void forEach(u32 count, u32 step, const F& f);
+
+// RAII mutex guard
+struct MutexGuard;
+
+// implementation
+struct MutexGuard {
+	MutexGuard(Mutex& mutex) : mutex(mutex) { enter(&mutex); }
+	~MutexGuard() { exit(&mutex); }
+
+	Mutex& mutex;
+};
+
+struct Signal {
+	Signal() {}
+	
+	// stores locked bit in the first bit, and pointer to instrusive linked list of waiting fibers in the rest
+	AtomicI64 state = 0;
+	// used in profiler to identify matching red/green pairs, every times signal is turns from green to red, generation is changed
+	u32 generation = 0;
+
+private:
+	Signal(const Signal&) = delete;
+	Signal(Signal&&) = delete;
+};
+
+struct Mutex {
+	Signal signal;
+};
+
+struct Counter {
+	~Counter() { ASSERT(!(i32)value); }
+
+	Signal signal;
+	AtomicI32 value = 0; // number of jobs running, once this gets to 0, signal turns green
+};
+
 template <typename F>
-void runLambda(F&& f, Signal* on_finish, u8 worker = ANY_WORKER) {
+void runLambda(F&& f, Counter* on_finish, u8 worker) {
 	void* arg;
 	if constexpr (sizeof(f) == sizeof(void*) && __is_trivially_copyable(F)) {
 		memcpy(&arg, &f, sizeof(arg));
@@ -63,48 +116,19 @@ void runLambda(F&& f, Signal* on_finish, u8 worker = ANY_WORKER) {
 	}
 }
 
-// RAII mutex guard
-struct MutexGuard {
-	MutexGuard(Mutex& mutex) : mutex(mutex) { enter(&mutex); }
-	~MutexGuard() { exit(&mutex); }
-
-	Mutex& mutex;
-};
-
-struct Signal {
-	Signal() {}
-	Signal(const Signal&) = delete;
-	Signal(Signal&&) = delete;
-	~Signal() {
-		ASSERT(!waitor);
-		ASSERT(!(i32)counter);
-	}
-
-	struct Waitor* waitor = nullptr;
-	AtomicI32 counter = 0;
-	i32 generation;
-};
-
-struct Mutex {
-	AtomicI32 state = 0;
-	Waitor* waitor = nullptr;
-	u32 generation = 0;
-};
 
 template <typename F>
 void runOnWorkers(const F& f)
 {
-	Signal signal;
+	Counter counter;
 	jobs::runN((void*)&f, [](void* data){
 		(*(const F*)data)();
-	}, &signal, ANY_WORKER, getWorkersCount() - 1);
+	}, &counter, ANY_WORKER, getWorkersCount() - 1);
 	f();
-	wait(&signal);
+	wait(&counter);
 }
 
 
-// call F for each element in range [0, `count`) in steps of `step`
-// F is called in parallel
 template <typename F>
 void forEach(u32 count, u32 step, const F& f) {
 	if (count == 0) return;
@@ -117,21 +141,18 @@ void forEach(u32 count, u32 step, const F& f) {
 	const u32 num_workers = u32(getWorkersCount());
 	const u32 num_jobs = steps > num_workers ? num_workers : steps;
 	
+	Counter counter;
 	struct Data {
 		const F* f;
-		Signal signal;
-		AtomicI32 countdown;
 		AtomicI32 offset = 0;
 		u32 step;
 		u32 count;
 	} data = {
 		.f = &f,
-		.countdown = AtomicI32(num_jobs - 1),
 		.step = step,
 		.count = count
 	};
 	
-	jobs::setRed(&data.signal);
 	ASSERT(num_jobs > 1);
 	jobs::runN((void*)&data, [](void* user_ptr){
 		Data* data = (Data*)user_ptr;
@@ -146,10 +167,7 @@ void forEach(u32 count, u32 step, const F& f) {
 			to = to > count ? count : to;
 			(*f)(idx, to);
 		}
-		if (data->countdown.dec() == 1) {
-			jobs::setGreen(&data->signal);
-		}
-	}, nullptr, ANY_WORKER, num_jobs - 1);
+	}, &counter, ANY_WORKER, num_jobs - 1);
 
 	for (;;) {
 		const i32 idx = data.offset.add(step);
@@ -158,10 +176,8 @@ void forEach(u32 count, u32 step, const F& f) {
 		to = to > count ? count : to;
 		f(idx, to);
 	}			
-	
-	wait(&data.signal);
+
+	jobs::wait(&counter);
 }
 
-} // namespace jobs
-
-} // namespace Lumix
+} // namespace

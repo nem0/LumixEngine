@@ -35,14 +35,18 @@ struct LUMIX_CORE_API AtomicI64 {
 	i64 dec();
 	i64 add(i64 v);
 	i64 subtract(i64 v);
+	i64 exchange(i64 new_value);
+	i64 setBits(i64 v);
+	i64 clearBits(i64 v);
+	bool bitTestAndSet(u32 bit_position);
 
 	bool compareExchange(i64 exchange, i64 comperand);
-private:
 	volatile i64 value;
 };
 
 LUMIX_CORE_API void* exchangePtr(void* volatile* value, void* exchange);
 LUMIX_CORE_API bool compareExchangePtr(void*volatile* value, void* exchange, void* comperand);
 LUMIX_CORE_API void memoryBarrier();
+LUMIX_CORE_API void cpuRelax(); // rep nop, can be used in busy wait to conserve resources
 
 } // namespace Lumix

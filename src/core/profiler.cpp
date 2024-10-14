@@ -467,14 +467,19 @@ void endFiberWait(const FiberSwitchData& switch_data)
 	r.job_system_signal = switch_data.signal;
 	r.is_mutex = false;
 
-	write(*ctx, EventType::END_FIBER_WAIT, r);
+	MutexGuard lock(ctx->mutex);
+	const u64 now = os::Timer::getRawTimestamp();
+	writeNoLock(*ctx, now, EventType::END_FIBER_WAIT, r);
 	const u32 count = switch_data.count;
 	
 	for (u32 i = 0; i < count; ++i) {
 		if(i < lengthOf(switch_data.blocks)) {
-			continueBlock(switch_data.blocks[i]);
+			const i32 block_id = switch_data.blocks[i];
+			ctx->open_blocks.push(block_id);
+			writeNoLock(*ctx, now, EventType::CONTINUE_BLOCK, block_id);
 		} else {
-			continueBlock(-1);
+			ctx->open_blocks.push(-1);
+			writeNoLock(*ctx, now, EventType::CONTINUE_BLOCK, -1);
 		}
 	}
 }
