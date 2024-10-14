@@ -17,6 +17,7 @@ struct LUMIX_CORE_API AtomicI32 {
 	i32 add(i32 v);
 	i32 subtract(i32 v);
 	i32 setBits(i32 v);
+	i32 clearBits(i32 v);
 
 	bool compareExchange(i32 exchange, i32 comperand);
 private:

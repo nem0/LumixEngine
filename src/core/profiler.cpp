@@ -186,6 +186,37 @@ static struct Instance
 	ThreadContext global_context;
 } g_instance;
 
+template <typename T>
+void writeNoLock(ThreadContext& ctx, u64 timestamp, EventType type, const T& value)
+{
+	if (g_instance.paused && timestamp > g_instance.paused_time) return;
+
+	u8 tmp[sizeof(EventHeader) + sizeof(T)];
+	EventHeader* header = (EventHeader*)tmp;
+	header->type = type;
+	header->size = sizeof(T) + sizeof(EventHeader);
+	header->time = timestamp;
+	memcpy(tmp + sizeof(*header), &value, sizeof(value));
+
+	u8* buf = ctx.buffer.getMutableData();
+	const u32 buf_size = (u32)ctx.buffer.size();
+
+	while (sizeof(tmp) + ctx.end - ctx.begin > buf_size) {
+		const u8 size = buf[ctx.begin % buf_size];
+		ctx.begin += size;
+	}
+
+	const u32 lend = ctx.end % buf_size;
+	if (buf_size - lend >= sizeof(tmp)) {
+		memcpy(buf + lend, tmp, sizeof(tmp));
+	}
+	else {
+		memcpy(buf + lend, tmp, buf_size - lend);
+		memcpy(buf, tmp + buf_size - lend, sizeof(tmp) - (buf_size - lend));
+	}
+
+	ctx.end += sizeof(tmp);
+};
 
 template <typename T>
 void write(ThreadContext& ctx, u64 timestamp, EventType type, const T& value)
@@ -384,11 +415,12 @@ float getLastFrameDuration()
 }
 
 
-void beforeFiberSwitch()
-{
+void beforeFiberSwitch() {
 	ThreadContext* ctx = g_instance.getThreadContext();
+	MutexGuard lock(ctx->mutex);
+	const u64 now = os::Timer::getRawTimestamp();
 	while(!ctx->open_blocks.empty()) {
-		write(*ctx, EventType::END_BLOCK, 0);
+		writeNoLock(*ctx, now, EventType::END_BLOCK, 0);
 		ctx->open_blocks.pop();
 	}
 }

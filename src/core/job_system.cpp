@@ -15,11 +15,11 @@
 
 namespace Lumix::jobs {
 
-static constexpr i32 is_red_bit = 1; // can be changed only if inner lock is not set
-static constexpr i32 signal_has_parked_bit = 1 << 30; // can be changed only when m_sync is locked
+static constexpr i32 is_red_bit = 1; // can be changed only only when signal_frozen_bit is not set
+static constexpr i32 signal_frozen_bit = 1 << 30; // can be changed only when m_sync is locked
 
-static constexpr i32 is_locked_bit = 1; // can only be changed when has_parked_bit is not set
-static constexpr i32 mutex_has_parked_bit = 2; // can only be changed when m_sync is locked
+static constexpr i32 is_locked_bit = 1; // can only be changed only when mutex_frozen_bit is not set
+static constexpr i32 mutex_frozen_bit = 2; // can only be changed only when m_sync is locked
 
 struct Job {
 	void (*task)(void*) = nullptr;
@@ -172,25 +172,24 @@ struct Waitor {
 	FiberDecl* fiber;
 };
 
-void setRed(BinarySignal* signal) {
-	const bool changed = (signal->state.setBits(is_red_bit) & is_red_bit) == 0;
+void setRed(Signal* signal) {
+	const bool changed = (signal->counter.setBits(is_red_bit) & is_red_bit) == 0;
 	if (changed) {
 		signal->generation = g_generation.inc();
 	}
 }
 
-void setGreen(BinarySignal* signal) {
-	// fast path - no one is waiting and already green
-	if (signal->state == 0) return;
-	// fast path - red, but no one is waiting
-	if (signal->state.compareExchange(0, is_red_bit)) return;
+void setGreen(Signal* signal) {
+	// fast path - not frozen
+	if (signal->counter == 0) return;
+	if (signal->counter.compareExchange(0, is_red_bit)) return;
 	
 	// unlink waitors from signal
 	Waitor* waitor = [&](){
-		Lumix::MutexGuard guard(g_system->m_sync);
+		Lumix::MutexGuardProfiled guard(g_system->m_sync);
 		Waitor* waitor = signal->waitor;
 		signal->waitor = nullptr;
-		signal->state = 0;
+		signal->counter = 0;
 		return waitor;
 	}();
 	
@@ -210,44 +209,6 @@ void setGreen(BinarySignal* signal) {
 	}
 }
 
-void wait(BinarySignal* signal) {
-	// fast path - is green
-	if ((signal->state & is_red_bit) == 0) return;
-
-	g_system->m_sync.enter();
-
-	signal->state.setBits(signal_has_parked_bit);
-
-	// has_parked_bit is set, so only we can change is_red_bit
-	
-	// if somebody set the signal green while we got here
-	if (signal->state.compareExchange(0, signal_has_parked_bit)) {
-		ASSERT(!signal->waitor);
-		g_system->m_sync.exit();
-		return;
-	}
-
-	// signal is red, park the fiber
-	Waitor waitor;
-	waitor.next = signal->waitor;
-	waitor.fiber = getWorker()->m_current_fiber;
-	signal->waitor = &waitor;
-	
-	// switch fibers
-	FiberDecl* this_fiber = getWorker()->m_current_fiber;
-	const profiler::FiberSwitchData& switch_data = profiler::beginFiberWait(signal->generation, true);
-	FiberDecl* new_fiber = g_system->m_free_fibers.back();
-	g_system->m_free_fibers.pop();
-	if (!Fiber::isValid(new_fiber->fiber)) {
-		new_fiber->fiber = Fiber::create(64 * 1024, manage, new_fiber);
-	}
-	getWorker()->m_current_fiber = new_fiber;
-	ASSERT(signal->state == (is_red_bit | signal_has_parked_bit));
-	Fiber::switchTo(&this_fiber->fiber, new_fiber->fiber);
-	getWorker()->m_current_fiber = this_fiber;
-	g_system->m_sync.exit();
-	profiler::endFiberWait(switch_data);
-}
 
 // try to pop a job from the queues (first worker, then global), if no job is available, go to sleep
 static bool tryPopWork(Work& work, WorkerTask* worker) {
@@ -278,8 +239,8 @@ static bool tryPopWork(Work& work, WorkerTask* worker) {
 void addCounter(Signal* signal, u32 value) {
 	i32 counter = signal->counter;
 
-	// fast path - counter is not locked
-	if ((counter & signal_has_parked_bit) == 0 && signal->counter.compareExchange(counter + value, counter)) {
+	// fast path - counter is not frozen
+	if ((counter & signal_frozen_bit) == 0 && signal->counter.compareExchange(counter + value, counter)) {
 		if (counter == 0) {
 			signal->generation = g_generation.inc();
 		}
@@ -289,13 +250,13 @@ void addCounter(Signal* signal, u32 value) {
 	// slow path
 	Lumix::MutexGuard lock(g_system->m_sync);
 
-	// set the parked bit so nobody else can change the counter
-	signal->counter.setBits(signal_has_parked_bit);
+	// set the frozen bit so nobody else can change the counter
+	signal->counter.setBits(signal_frozen_bit);
 	// add value
-	counter = signal->counter.add(value);
+	signal->counter.add(value);
 	// clear the parked bit if noone is waiting
 	if (!signal->waitor) {
-		signal->counter = (counter + value) & ~signal_has_parked_bit;
+		signal->counter.clearBits(signal_frozen_bit);
 		ASSERT(signal->counter >= 0); 
 	}
 }
@@ -303,17 +264,12 @@ void addCounter(Signal* signal, u32 value) {
 // decrement signal counter
 // if new value == 0, schedule all fibers waiting on a signal
 LUMIX_FORCE_INLINE static void trigger(Signal* signal) {
-	PROFILE_FUNCTION();
-
 	i32 counter = signal->counter;
-	// fast path - no one is waiting
-	if ((counter & signal_has_parked_bit) == 0 && signal->counter.compareExchange(counter - 1, counter)) return;
-
-	// spin a bit
-	for (u32 i = 0; i < 10; ++i) {
-		counter = signal->counter;
-		if ((counter & signal_has_parked_bit) == 0 && signal->counter.compareExchange(counter - 1, counter)) return;
-	}
+	// fast path - signal is not frozen
+	if ((counter & signal_frozen_bit) == 0 && signal->counter.compareExchange(counter - 1, counter)) return;
+	// fast path - still red even if we decrement
+	// if you have a deadlock in job system, it is likely related to this line
+	if (counter > signal_frozen_bit + 1 && signal->counter.compareExchange(counter - 1, counter)) return;
 
 	Waitor* waitor = nullptr;
 	// slow path
@@ -321,31 +277,26 @@ LUMIX_FORCE_INLINE static void trigger(Signal* signal) {
 		Lumix::MutexGuardProfiled lock(g_system->m_sync);
 
 		// set the parked bit so nobody else can change the counter
-		signal->counter.setBits(signal_has_parked_bit);
+		signal->counter.setBits(signal_frozen_bit);
 		
-		// decrement signal counter
+		// decrement signal counter - only here can be the frozen signal turned green
 		counter = signal->counter.dec() - 1;
-		ASSERT(counter >= 0);
+		ASSERT(counter >= signal_frozen_bit);
 		if (!signal->waitor) {
 			// no one is waiting
-			// clear the parked bit
-			const u32 new_value = counter & ~signal_has_parked_bit;
-			signal->counter = new_value;
-			ASSERT(signal->counter >= 0);
+			// clear the frozen bit
+			signal->counter.clearBits(signal_frozen_bit);
 			return;
 		}
 
 		// if we have green signal
-		if (signal->counter == signal_has_parked_bit) {
+		if (counter == signal_frozen_bit) {
 			// pop the wait queue
 			waitor = signal->waitor;
 			signal->waitor = nullptr;
-			signal->counter = counter & ~signal_has_parked_bit;
-			ASSERT(signal->counter >= 0);
+			signal->counter.clearBits(signal_frozen_bit);
 		}
 	}
-
-	if (!waitor) return;
 
 	// schedule all fibers waiting on the signal
 	while (waitor) {
@@ -366,12 +317,9 @@ LUMIX_FORCE_INLINE static void trigger(Signal* signal) {
 }
 
 void wait(Signal* signal) {
-	PROFILE_FUNCTION();
-
-	// fast path
+	// signal is green
 	if (signal->counter == 0) return;
 
-	// slow path
 	g_system->m_sync.enter();
 
 	if (!getWorker()) {
@@ -384,11 +332,11 @@ void wait(Signal* signal) {
 		return;
 	}
 
-	// set the parked bit so nobody else can change the counter
-	signal->counter.setBits(signal_has_parked_bit);
+	// set the frozen bit so nobody can make the signal green
+	signal->counter.setBits(signal_frozen_bit);
 
-	// we checked for green signal in fast path, but it could have changed in the meantime
-	if (signal->counter == signal_has_parked_bit) {
+	// recheck if the signal is green, as it might have changed before setting the frozen bit
+	if (signal->counter == signal_frozen_bit) {
 		// signal is green
 		ASSERT(!signal->waitor);
 		signal->counter = 0;
@@ -404,14 +352,16 @@ void wait(Signal* signal) {
 	waitor.next = signal->waitor;
 	signal->waitor = &waitor;
 
-	const profiler::FiberSwitchData& switch_data = profiler::beginFiberWait(signal->generation, false);
+	const profiler::FiberSwitchData switch_data = profiler::beginFiberWait(signal->generation, false);
 	FiberDecl* new_fiber = g_system->m_free_fibers.back();
 	g_system->m_free_fibers.pop();
 	if (!Fiber::isValid(new_fiber->fiber)) {
 		new_fiber->fiber = Fiber::create(64 * 1024, manage, new_fiber);
 	}
 	getWorker()->m_current_fiber = new_fiber;
+	
 	Fiber::switchTo(&this_fiber->fiber, new_fiber->fiber);
+	
 	getWorker()->m_current_fiber = this_fiber;
 	g_system->m_sync.exit();
 	profiler::endFiberWait(switch_data);
@@ -546,7 +496,7 @@ void enter(Mutex* mutex) {
 		// spin a bit
 		for (u32 i = 0; i < 40; ++i) {
 			// do not spin if someone is already waiting
-			if (mutex->state & mutex_has_parked_bit) break;
+			if (mutex->state & mutex_frozen_bit) break;
 			// try to lock
 			if (mutex->state.compareExchange(is_locked_bit, 0)) return;
 		}
@@ -555,13 +505,13 @@ void enter(Mutex* mutex) {
 		g_system->m_sync.enter();
 
 		// set the parked bit so noone can change is_locked_bit
-		mutex->state.setBits(mutex_has_parked_bit);
+		mutex->state.setBits(mutex_frozen_bit);
 		
 		// at this point, has_parked_bit is set, and noone but us can clear it (since we are holding `m_sync`)
 		// and since has_parked_bit_is set, noone can change is_locked_bit either
 		
 		// is is_locked_bit is not set, we can lock the mutex
-		if (mutex->state.compareExchange(mutex->waitor ? mutex_has_parked_bit | is_locked_bit : is_locked_bit, mutex_has_parked_bit)) {
+		if (mutex->state.compareExchange(mutex->waitor ? mutex_frozen_bit | is_locked_bit : is_locked_bit, mutex_frozen_bit)) {
 			// we manged to lock the mutex
 			g_system->m_sync.exit();
 			return;
@@ -585,7 +535,7 @@ void enter(Mutex* mutex) {
 			new_fiber->fiber = Fiber::create(64 * 1024, manage, new_fiber);
 		}
 		getWorker()->m_current_fiber = new_fiber;
-		ASSERT(mutex->state == (is_locked_bit | mutex_has_parked_bit));
+		ASSERT(mutex->state == (is_locked_bit | mutex_frozen_bit));
 		Fiber::switchTo(&this_fiber->fiber, new_fiber->fiber);
 		getWorker()->m_current_fiber = this_fiber;
 		g_system->m_sync.exit();
@@ -604,7 +554,7 @@ void exit(Mutex* mutex) {
 
 	// since fast path failed, there must be at least one fiber waiting
 	// and only we can push it to the queue
-	ASSERT(mutex->state == (is_locked_bit | mutex_has_parked_bit));
+	ASSERT(mutex->state == (is_locked_bit | mutex_frozen_bit));
 
 	// slow path - unpark one waiting fiber, so it can try to enter the mutex
 	Lumix::MutexGuard guard(g_system->m_sync);
@@ -624,7 +574,7 @@ void exit(Mutex* mutex) {
 	}
 
 	// clear the locked bit, clear also the parked bit if no one is left waiting
-	bool cleared = mutex->state.compareExchange(mutex->waitor ? mutex_has_parked_bit : 0, is_locked_bit | mutex_has_parked_bit);
+	bool cleared = mutex->state.compareExchange(mutex->waitor ? mutex_frozen_bit : 0, is_locked_bit | mutex_frozen_bit);
 	ASSERT(cleared);
 }
 

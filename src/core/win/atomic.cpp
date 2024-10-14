@@ -12,6 +12,7 @@ i32 AtomicI32::dec() { return _InterlockedExchangeAdd((volatile long*)&value, -1
 i32 AtomicI32::add(i32 v) { return _InterlockedExchangeAdd((volatile long*)&value, v); }
 i32 AtomicI32::subtract(i32 v) { return _InterlockedExchangeAdd((volatile long*)&value, -v); }
 i32 AtomicI32::setBits(i32 v) { return _InterlockedOr((volatile long*)&value, v); }
+i32 AtomicI32::clearBits(i32 v) { return _InterlockedAnd((volatile long*)&value, ~v); }
 
 bool AtomicI32::compareExchange(i32 exchange, i32 comperand) { 
 	return _InterlockedCompareExchange((volatile long*)&value, exchange, comperand) == comperand;

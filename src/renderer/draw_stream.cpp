@@ -681,6 +681,7 @@ void DrawStream::submitCached() {
 }
 
 void DrawStream::run() {
+	num_drawcalls = 0;
 	ASSERT(!run_called);
 	const Instruction end_instr = Instruction::END;
 	memcpy(current->data + current->header.size, &end_instr, sizeof(end_instr));
@@ -837,6 +838,7 @@ void DrawStream::run() {
 				case Instruction::DRAW_INDEXED_INSTANCED: {
 					READ(DrawIndexedInstancedDat, data);
 					gpu::drawIndexedInstanced(data.indices_count, data.instances_count, data.index_type);
+					++num_drawcalls;
 					break;
 				}
 				case Instruction::DRAW_ARRAYS_INSTANCED: {
@@ -945,6 +947,7 @@ void DrawStream::run() {
 				case Instruction::SUBSTREAM: {
 					DrawStream* stream = (DrawStream*)ptr;
 					stream->run();
+					num_drawcalls += stream->num_drawcalls;
 					stream->~DrawStream();
 					ptr += sizeof(DrawStream);
 					break;
