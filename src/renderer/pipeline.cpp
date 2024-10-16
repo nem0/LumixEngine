@@ -2547,34 +2547,39 @@ struct PipelineImpl final : Pipeline {
 						const gpu::StateFlags state = material->m_render_states | render_state;
 
 						if (mi->flags & ModelInstance::MOVED) {
-							// we could merge drawcalls here, same as we do for transparent meshes in next `else`
-							const Renderer::TransientSlice slice = m_renderer.allocTransient((sizeof(Vec4) * 6));
+							const i32 start_i = i;
+							const u64 key = sort_keys[i] & instance_key_mask;
+							while (i < keys_count && (sort_keys[i] & instance_key_mask) == key) {
+								++i;
+							}
+
+							const u32 count = u32(i - start_i);
+							const Renderer::TransientSlice slice = m_renderer.allocTransient(count * (sizeof(Vec4) * 6));
 							u8* instance_data = slice.ptr;
-							const EntityRef e = { i32(renderables[i] & 0xFFffFFff) };
-							const Transform& tr = transforms[e.index];
-							const Vec3 lpos = Vec3(tr.pos - camera_pos);
-							const float lod_d = model_instances[e.index].lod - mesh_lod;
-							
-							memcpy(instance_data, &tr.rot, sizeof(tr.rot));
-							instance_data += sizeof(tr.rot);
-							memcpy(instance_data, &lpos, sizeof(lpos));
-							instance_data += sizeof(lpos);
-							memcpy(instance_data, &lod_d, sizeof(lod_d));
-							instance_data += sizeof(lod_d);
-							memcpy(instance_data, &tr.scale, sizeof(tr.scale));
-							instance_data += sizeof(tr.scale) + sizeof(float)/*padding*/;
 
-							const Transform prev_tr = mi->prev_frame_transform;
-							const Vec3 prev_lpos = Vec3(prev_tr.pos - camera_pos);
-
-							memcpy(instance_data, &prev_tr.rot, sizeof(prev_tr.rot));
-							instance_data += sizeof(prev_tr.rot);
-							memcpy(instance_data, &prev_lpos, sizeof(prev_lpos));
-							instance_data += sizeof(prev_lpos);
-							memcpy(instance_data, &lod_d, sizeof(lod_d));
-							instance_data += sizeof(lod_d);
-							memcpy(instance_data, &prev_tr.scale, sizeof(prev_tr.scale));
-							instance_data += sizeof(prev_tr.scale) + sizeof(float)/*padding*/;
+							for (i32 j = start_i; j < start_i + (i32)count; ++j) {
+								const EntityRef e = { i32(renderables[j] & 0xFFffFFff) };
+								const Transform& tr = transforms[e.index];
+								const Vec3 pos_ws = Vec3(tr.pos - camera_pos);
+								const float lod_d = model_instances[e.index].lod - mesh_lod;
+								ModelInstance* LUMIX_RESTRICT mi2 = &model_instances[e.index];
+								const Transform prev_tr = mi2->prev_frame_transform;
+								const Vec3 prev_pos_ws = Vec3(prev_tr.pos - camera_pos);
+								
+								#define WRITE(X) memcpy(instance_data, &X, sizeof(X)); instance_data += sizeof(X)
+								WRITE(tr.rot);
+								WRITE(pos_ws);
+								WRITE(lod_d);
+								WRITE(tr.scale);
+								instance_data += sizeof(float); // padding
+								
+								WRITE(prev_tr.rot);
+								WRITE(prev_pos_ws);
+								WRITE(lod_d);
+								WRITE(prev_tr.scale);
+								instance_data += sizeof(float); // padding
+								#undef WRITE
+							}
 
 							const u32 defines = dynamic_define_mask | material->getDefineMask();
 							const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, dyn_instance_decl, defines, mesh.semantics_defines);
@@ -2583,8 +2588,9 @@ struct PipelineImpl final : Pipeline {
 							material->bind(*stream);
 							stream->bindIndexBuffer(mesh.index_buffer_handle);
 							stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
-							stream->bindVertexBuffer(1, slice.buffer, slice.offset, 96);
-							stream->drawIndexedInstanced(mesh.indices_count, 1, mesh.index_type);
+							stream->bindVertexBuffer(1, slice.buffer, slice.offset, sizeof(Vec4) * 6);
+							stream->drawIndexedInstanced(mesh.indices_count, count, mesh.index_type);
+							--i;
 						}
 						else {
 							int start_i = i;
@@ -2617,7 +2623,7 @@ struct PipelineImpl final : Pipeline {
 							material->bind(*stream);
 							stream->bindIndexBuffer(mesh.index_buffer_handle);
 							stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
-							stream->bindVertexBuffer(1, slice.buffer, slice.offset, 48);
+							stream->bindVertexBuffer(1, slice.buffer, slice.offset, sizeof(Vec3) * 3);
 							stream->drawIndexedInstanced(mesh.indices_count, count, mesh.index_type);
 							--i;
 						}
