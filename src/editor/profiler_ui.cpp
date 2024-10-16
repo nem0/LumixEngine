@@ -1087,7 +1087,6 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 
 						ThreadData::FiberWait& wait = thread.fiber_waits.emplace();
 						wait.id = r.id;
-						wait.is_mutex = r.is_mutex;
 						wait.job_system_signal = r.job_system_signal;
 						wait.time = header.time;
 						wait.line = line;
@@ -1245,7 +1244,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		for (ThreadData::FiberWait& wait : thread.fiber_waits) {
 			const float x = getViewX(wait.time, from_x, to_x);
 			const float y = thread_base_y + wait.line * line_height;
-			const u32 color = wait.is_mutex ? 0xff0000ff : wait.is_begin ? 0xff00ff00 : 0xffff0000;
+			const u32 color = wait.is_begin ? 0xff00ff00 : 0xffff0000;
 			dl->AddRect(ImVec2(x - 2, y - 2), ImVec2(x + 2, y + 2), color);
 			const bool mouse_hovered = ImGui::IsMouseHoveringRect(ImVec2(x - 2, y - 2), ImVec2(x + 2, y + 2));
 			

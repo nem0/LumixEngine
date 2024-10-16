@@ -440,12 +440,11 @@ void signalTriggered(i32 job_system_signal) {
 }
 
 
-FiberSwitchData beginFiberWait(i32 job_system_signal, bool is_mutex)
+FiberSwitchData beginFiberWait(i32 job_system_signal)
 {
 	FiberWaitRecord r;
 	r.id = g_instance.fiber_wait_id.inc();
 	r.job_system_signal = job_system_signal;
-	r.is_mutex = is_mutex;
 
 	FiberSwitchData res;
 
@@ -465,7 +464,6 @@ void endFiberWait(const FiberSwitchData& switch_data)
 	FiberWaitRecord r;
 	r.id = switch_data.id;
 	r.job_system_signal = switch_data.signal;
-	r.is_mutex = false;
 
 	MutexGuard lock(ctx->mutex);
 	const u64 now = os::Timer::getRawTimestamp();

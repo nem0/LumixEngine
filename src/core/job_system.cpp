@@ -51,7 +51,7 @@ struct Work {
 	Type type;
 };
 
-// Thread-safe, mutex-guarded ring buffer, with a fallback array for overflow
+// Thread-safe, lockless ring buffer, with a mutex-guarded fallback array for overflow
 // with added semaphore for waiting on new work
 template <int CAPACITY>
 struct WorkQueue : RingBuffer<Work, CAPACITY> {
@@ -90,7 +90,6 @@ struct System {
 		, m_work_queue(m_allocator)
 	{}
 
-
 	TagAllocator m_allocator;
 	Array<WorkerTask*> m_workers;
 	FiberJobPair m_fiber_pool[512];
@@ -108,6 +107,7 @@ static thread_local WorkerTask* g_worker = nullptr;
 	#pragma clang optimize off 
 #endif
 #pragma optimize( "", off )
+// optimizer can mess up g_worker value across fiber switches, but it seems to work fine with when using getWorker()
 WorkerTask* getWorker()
 {
 	return g_worker;
@@ -160,10 +160,9 @@ struct WorkerTask : Thread {
 		Fiber::switchTo(&worker->m_primary_fiber, fiber->fiber);
 	}
 
-
 	bool m_finished = false;
 	FiberJobPair* m_current_fiber = nullptr;
-	
+
 	Signal* m_signal_to_check = nullptr;
 	WaitingFiber* m_waiting_fiber_to_push = nullptr;
 	
@@ -219,7 +218,10 @@ static bool tryPopWork(Work& work, WorkerTask* worker) {
 	return false;
 }
 
-// check if the fiber before us wanted to be parked on mutex
+// check if the fiber before us wanted to be parked on a signal
+// fibers can not park themselves locklessly, because 
+// they could get unparked before actually switching fibers
+// so they need other fibers to actually park them
 static void afterSwitch() {
 	WorkerTask* worker = getWorker();
 	
@@ -238,9 +240,9 @@ static void afterSwitch() {
 			return;
 		}
 
-		// sigal is red, let's try to actually park the fiber
+		// signal is red, let's try to actually park the fiber
 		fiber->next = (WaitingFiber*)u64(counter & ~i64(1));
-		i64 new_counter = 1 | i64(fiber);
+		const i64 new_counter = 1 | i64(fiber);
 		// try to update the signal state, if nobody changed it in the meantime
 		if (signal->state.compareExchange(new_counter, counter)) return;
 		
@@ -253,14 +255,14 @@ LUMIX_FORCE_INLINE static void switchFibers(i32 profiler_id) {
 	WorkerTask* worker = getWorker();
 	FiberJobPair* this_fiber = worker->m_current_fiber;
 	
-	const profiler::FiberSwitchData switch_data = profiler::beginFiberWait(profiler_id, false);
+	const profiler::FiberSwitchData switch_data = profiler::beginFiberWait(profiler_id);
 	FiberJobPair* new_fiber = popFreeFiber();
 	worker->m_current_fiber = new_fiber;
 	
 	Fiber::switchTo(&this_fiber->fiber, new_fiber->fiber);
 	afterSwitch();
 	
-	// we ca be on different worker than before fiber switch, must call getWorker()
+	// we can be on different worker than before fiber switch, must call getWorker()
 	getWorker()->m_current_fiber = this_fiber;
 	profiler::endFiberWait(switch_data);
 }

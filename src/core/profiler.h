@@ -42,7 +42,7 @@ struct FiberSwitchData {
 
 LUMIX_CORE_API void beforeFiberSwitch();
 LUMIX_CORE_API void signalTriggered(i32 job_system_signal);
-LUMIX_CORE_API FiberSwitchData beginFiberWait(i32 job_system_signal, bool is_mutex);
+LUMIX_CORE_API FiberSwitchData beginFiberWait(i32 job_system_signal);
 LUMIX_CORE_API void endFiberWait(const FiberSwitchData& switch_data);
 LUMIX_CORE_API float getLastFrameDuration();
 
@@ -100,7 +100,6 @@ struct FiberWaitRecord
 {
 	i32 id;
 	i32 job_system_signal;
-	bool is_mutex;
 };
 
 struct MutexEvent {
