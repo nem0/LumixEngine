@@ -18,7 +18,6 @@
 #include "engine/component_uid.h"
 #include "engine/core.h"
 #include "engine/engine.h"
-#include "engine/lua_wrapper.h"
 #include "engine/prefab.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
@@ -671,11 +670,6 @@ private:
 
 TerrainEditor::~TerrainEditor()
 {
-	m_app.removeAction(&m_smooth_terrain_action);
-	m_app.removeAction(&m_lower_terrain_action);
-	m_app.removeAction(&m_remove_grass_action);
-	m_app.removeAction(&m_remove_entity_action);
-
 	if (m_brush_texture)
 	{
 		m_brush_texture->destroy();
@@ -703,17 +697,11 @@ TerrainEditor::TerrainEditor(StudioApp& app)
 	, m_size_spread(1, 1)
 	, m_y_spread(0, 0)
 	, m_layer_views(app.getAllocator())
+	, m_smooth_terrain_action("Smooth terrain", "Terrain editor - smooth", "smoothTerrain", "")
+	, m_lower_terrain_action("Lower terrain", "Terrain editor - lower", "lowerTerrain", "")
+	, m_remove_grass_action("Remove grass from terrain", "Terrain editor - remove grass", "removeGrassFromTerrain", "")
+	, m_remove_entity_action("Remove entities from terrain", "Terrain editor - remove entities", "removeEntitiesFromTerrain", "")
 {
-	m_smooth_terrain_action.init("Smooth terrain", "Terrain editor - smooth", "smoothTerrain", "", Action::LOCAL);
-	m_lower_terrain_action.init("Lower terrain", "Terrain editor - lower", "lowerTerrain", "", Action::LOCAL);
-	m_remove_grass_action.init("Remove grass from terrain", "Terrain editor - remove grass", "removeGrassFromTerrain", "", Action::LOCAL);
-	m_remove_entity_action.init("Remove entities from terrain", "Terrain editor - remove entities", "removeEntitiesFromTerrain", "", Action::LOCAL);
-
-	app.addAction(&m_smooth_terrain_action);
-	app.addAction(&m_lower_terrain_action);
-	app.addAction(&m_remove_grass_action);
-	app.addAction(&m_remove_entity_action);
-
 	app.addPlugin(*this);
 
 	m_terrain_brush_size = 10;
@@ -1536,7 +1524,7 @@ void TerrainEditor::layerGUI(ComponentUID cmp) {
 		for (u32 layer = 0; layer < albedo->depth; ++layer) {
 			gpu::TextureHandle view = gpu::allocTextureHandle();
 			m_layer_views.push(view);
-			stream.createTextureView(view, albedo->handle, layer);
+			stream.createTextureView(view, albedo->handle, layer, 0);
 		}
 	}
 

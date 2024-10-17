@@ -5,6 +5,8 @@
 
 namespace Lumix {
 
+#if 1
+
 template <typename T, u32 CAPACITY>
 struct RingBuffer {
 	struct Item {
@@ -23,27 +25,31 @@ struct RingBuffer {
 	}
 
 	LUMIX_FORCE_INLINE bool pop(T& obj) {
-		i32 pos = rd;
-		Item* j;
 		for (;;) {
-			j = &objects[pos % CAPACITY];
+			const i32 pos = rd;
+			Item* j = &objects[pos % CAPACITY];
 			const i32 seq = j->seq;
 			if (seq < pos + 1) {
-				return false;
+				// nothing to pop, try fallback
+				MutexGuard guard(mutex);
+				if (m_fallback.empty()) return false;
+				obj = m_fallback.back();
+				m_fallback.pop();
+				return true;
 			}
 			else if (seq == pos + 1) {
-				if (rd.compareExchange(pos + 1, pos)) break;
+				// try to pop
+				if (rd.compareExchange(pos + 1, pos)) {
+					obj = j->value;
+					j->seq = pos + CAPACITY;
+					return true;
+				}
 			}
-			else {
-				pos = rd;
-			}
+			// somebody poped before us, try again
 		}
-		obj = j->value;
-		j->seq = pos + CAPACITY;
-		return true;
 	}
 
-	LUMIX_FORCE_INLINE void push(const T& obj, Lumix::Mutex* mutex) {
+	LUMIX_FORCE_INLINE void push(const T& obj) {
 		volatile i32 pos = wr;
 		Item* j;
 		for (;;) {
@@ -51,9 +57,9 @@ struct RingBuffer {
 			const i32 seq = j->seq;
 			if (seq < pos) {
 				// buffer full
-				if (mutex) mutex->enter();
+				mutex.enter();
 				m_fallback.push(obj);
-				if (mutex) mutex->exit();
+				mutex.exit();
 				return;
 			}
 			else if (seq == pos) {
@@ -80,6 +86,56 @@ struct RingBuffer {
 	AtomicI32 rd = 0;
 	AtomicI32 wr = 0;
 	Array<T> m_fallback;
+	Lumix::Mutex mutex;
 };
+
+#else 
+
+// Thread-safe, mutex-guarded ring buffer, with a fallback array for overflow
+template <typename T, u32 CAPACITY>
+struct RingBuffer {
+	static_assert(__is_trivially_copyable(T));
+	RingBuffer(IAllocator& allocator)
+		: m_fallback(allocator)
+	{
+		static_assert(CAPACITY > 2);
+	}
+
+	LUMIX_FORCE_INLINE bool pop(T& obj) {
+		MutexGuardProfiled lock(mutex);
+		const bool is_ring_buffer_empty = wr == rd;
+		if (is_ring_buffer_empty) {
+			if (m_fallback.empty()) return false;
+			
+			obj = m_fallback.back();
+			m_fallback.pop();
+			return true;
+		}
+
+		obj = objects[rd % CAPACITY];
+		++rd;
+		return true;
+	}
+
+	LUMIX_FORCE_INLINE void push(const T& obj) {
+		MutexGuardProfiled lock(this->mutex);
+		if (wr - rd >= CAPACITY) {
+			// buffer full
+			m_fallback.push(obj);
+			return;
+		}
+		
+		objects[wr % CAPACITY] = obj;
+		++wr;
+	}
+
+	Lumix::Mutex mutex;
+	T objects[CAPACITY];
+	u32 rd = 0;
+	u32 wr = 0;
+	Array<T> m_fallback;
+};
+
+#endif
 
 } // namespace Lumix

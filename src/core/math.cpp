@@ -477,7 +477,7 @@ Vec2 Vec3::xz() const { return {x, z}; }
 Vec2 Vec3::yz() const { return {y, z}; }
 Vec2 Vec3::xy() const { return {x, y}; }
 
-DVec3::DVec3(float a) : x(a), y(a), z(a) {}
+DVec3::DVec3(double a) : x(a), y(a), z(a) {}
 
 DVec3::DVec3(double x, double y, double z) : x(x), y(y), z(z) {}
 
@@ -1276,7 +1276,9 @@ float angleDiff(float a, float b) {
 
 // Marsaglia simple rng
 
-RandomGenerator::RandomGenerator(u32 u, u32 v) : u(u), v(v) {}
+RandomGenerator::RandomGenerator(u32 u, u32 v) : u(u), v(v) {
+	ASSERT(u != 0 && v != 0);
+}
 
 u32 RandomGenerator::rand() {
 	u = 36969 * (u & 65535) + (u >> 16);

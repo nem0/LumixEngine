@@ -6,7 +6,7 @@
 namespace Lumix
 {
 
-static char toLower(char c) {
+char toLower(char c) {
 	if (c >= 'A' && c <= 'Z') return c - 'A' + 'a';
 	return c;
 }
@@ -14,6 +14,7 @@ static char toLower(char c) {
 bool isLetter(char c) { return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'); }
 bool isNumeric(char c) { return c >= '0' && c <= '9'; }
 bool isUpperCase(char c) { return c >= 'A' && c <= 'Z'; }
+bool isWhitespace(char c) { return c == ' ' || c == '\n' || c == '\r' || c == '\t'; }
 
 String::String(IAllocator& allocator)
 	: m_allocator(allocator)
@@ -327,6 +328,30 @@ const char* find(StringView haystack, char needle) {
 	return nullptr;
 }
 
+const char* find(StringView haystack, StringView needle) {
+	ASSERT(!needle.empty());
+	if (needle.size() > haystack.size()) return nullptr;
+
+	const char* search_end = haystack.end - needle.size() + 1;
+	const char needle0 = needle[0];
+
+	const char* c = haystack.begin;
+	while (c != search_end) {
+		if (*c == needle0) {
+			const char* n = needle.begin + 1;
+			const char* c2 = c + 1;
+			while (n != needle.end && c2 != haystack.end) {
+				if (*n != *c2) break;
+				++n;
+				++c2;
+			}
+			if (n == needle.end) return c;
+		}
+		++c;
+	}
+	return nullptr;
+}
+
 bool contains(StringView haystack, char needle) {
 	return find(haystack, needle) != nullptr;
 }
@@ -404,6 +429,35 @@ const char* fromCString(StringView input, i64& value) {
 	value = input[0] == '-' ? -i64(tmp) : i64(tmp);
 
 	return res;
+}
+
+const char* fromCString(StringView input, float& value) {
+	if (input.empty()) return nullptr;
+	
+	const char* c = input.begin;
+	if (*c == '-') ++c;
+	
+	if (*c < '0' || *c > '9') return nullptr;
+
+	value = 0;
+	while (c != input.end && *c >= '0' && *c <= '9') {
+		value *= 10;
+		value += *c - '0';
+		++c;
+	}
+	if (c != input.end && *c == '.') {
+		++c;
+		float d = 0.1f;
+		while (c != input.end && *c >= '0' && *c <= '9') {
+			value += d * (*c - '0');
+			d *= 0.1f;
+			++c;
+		}
+	}
+
+	value = input[0] == '-' ? -value : value;
+
+	return c;
 }
 
 const char* fromCString(StringView input, u16& value) {

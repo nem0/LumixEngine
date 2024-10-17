@@ -2,7 +2,6 @@
 #include "engine/file_system.h"
 #include "engine/engine.h"
 #include "core/hash.h"
-#include "engine/lua_wrapper.h"
 #include "core/log.h"
 #include "core/path.h"
 #include "core/profiler.h"
@@ -11,13 +10,9 @@
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
 
-
-namespace Lumix
-{
-
+namespace Lumix {
 
 const ResourceType Shader::TYPE("shader");
-
 
 u32 Shader::Uniform::size() const {
 	switch (type) {
@@ -25,14 +20,13 @@ u32 Shader::Uniform::size() const {
 		case NORMALIZED_FLOAT: return 4;
 		case FLOAT: return 4;
 		case COLOR: return 16;
-		case VEC2: return 8;
-		case VEC3: return 16; // pad to vec4
-		case VEC4: return 16;	
+		case FLOAT2: return 8;
+		case FLOAT3: return 16; // pad to vec4
+		case FLOAT4: return 16;	
 	}
 	ASSERT(false);
 	return 0;
 }
-
 
 Shader::Shader(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
@@ -43,11 +37,8 @@ Shader::Shader(const Path& path, ResourceManager& resource_manager, Renderer& re
 	, m_all_defines_mask(0)
 	, m_defines(m_allocator)
 	, m_programs(m_allocator)
-	, m_sources(m_allocator)
-{
-	m_sources.path = path;
-}
-
+	, m_code(m_allocator)
+{}
 
 bool Shader::hasDefine(u8 define) const {
 	return m_defines.indexOf(define) >= 0;
@@ -59,14 +50,6 @@ bool ShaderKey::operator==(const ShaderKey& rhs) const {
 
 void Shader::compile(gpu::ProgramHandle program, const ShaderKey& key, gpu::VertexDecl decl, DrawStream& stream) {
 	PROFILE_BLOCK("compile_shader");
-
-	const char* codes[64];
-	gpu::ShaderType types[64];
-	ASSERT((int)lengthOf(types) >= m_sources.stages.size());
-	for (int i = 0; i < m_sources.stages.size(); ++i) {
-		codes[i] = &m_sources.stages[i].code[0];
-		types[i] = m_sources.stages[i].type;
-	}
 	const char* prefixes[36];
 	StaticString<128> defines_code[32];
 	int defines_count = 0;
@@ -79,9 +62,8 @@ void Shader::compile(gpu::ProgramHandle program, const ShaderKey& key, gpu::Vert
 			++defines_count;
 		}
 	}
-	prefixes[defines_count + 1] = m_sources.common.length() == 0 ? "" : m_sources.common.c_str();
 
-	stream.createProgram(program, key.state, decl, codes, types, m_sources.stages.size(), prefixes, 2 + defines_count, m_sources.path.c_str());
+	stream.createProgram(program, key.state, decl, m_code.c_str(), m_type, prefixes, 1 + defines_count, getPath().c_str());
 }
 
 gpu::ProgramHandle Shader::getProgram(gpu::StateFlags state, const gpu::VertexDecl& decl, u32 defines, const char* semantic_defines) {
@@ -123,7 +105,7 @@ gpu::ProgramHandle Shader::getProgram(gpu::StateFlags state, const gpu::VertexDe
 }
 
 gpu::ProgramHandle Shader::getProgram(u32 defines) {
-	ASSERT(m_sources.stages.empty() || m_sources.stages[0].type == gpu::ShaderType::COMPUTE);
+	ASSERT(m_type == gpu::ShaderType::COMPUTE);
 	const gpu::VertexDecl dummy_decl(gpu::PrimitiveType::NONE);
 	ShaderKey key;
 	static const char* no_def = "";
@@ -137,283 +119,63 @@ gpu::ProgramHandle Shader::getProgram(u32 defines) {
 	return m_renderer.queueShaderCompile(*this, key, dummy_decl);
 }
 
-static Shader* getShader(lua_State* L)
-{
-	lua_getfield(L, LUA_GLOBALSINDEX, "this");
-	ASSERT(lua_type(L, -1) == LUA_TLIGHTUSERDATA);
-	Shader* shader = (Shader*)lua_touserdata(L, -1);
-	lua_pop(L, 1);
-	return shader;
-}
-
-
-namespace LuaAPI
-{
-
-int uniform(lua_State* L)
-{
-	const char* name = LuaWrapper::checkArg<const char*>(L, 1); 
-	const char* type = LuaWrapper::checkArg<const char*>(L, 2);
-	Shader* shader = getShader(L);
-	ASSERT(shader);
-
-	Shader::Uniform& u = shader->m_uniforms.emplace();
-	copyString(u.name, name);
-	u.name_hash = RuntimeHash(name);
-	memset(&u.default_value, 0, sizeof(u.default_value));
-	const struct {
-		const char* str;
-		Shader::Uniform::Type type;
-	} types[] = {
-		{ "normalized_float", Shader::Uniform::NORMALIZED_FLOAT },
-		{ "float", Shader::Uniform::FLOAT },
-		{ "color", Shader::Uniform::COLOR },
-		{ "int", Shader::Uniform::INT },
-		{ "vec2", Shader::Uniform::VEC2 },
-		{ "vec3", Shader::Uniform::VEC3 },
-		{ "vec4", Shader::Uniform::VEC4 },
-	};
-
-	bool valid = false;
-	for (auto& t : types) {
-		if (equalStrings(type, t.str)) {
-			valid = true;
-			u.type = t.type;
-			break;
-		}
-	}
-
-	if (!valid) {
-		logError("Unknown uniform type ", type, " in ", shader->getPath());
-		shader->m_uniforms.pop();
-		return 0;
-	}
-
-	if (lua_gettop(L) > 2) {
-		switch (lua_type(L, 3)) {
-			case LUA_TNUMBER: u.default_value.float_value = LuaWrapper::toType<float>(L, 3); break;
-			case LUA_TTABLE: {
-				const size_t len = lua_objlen(L, 3);
-				switch (len) {
-					case 2:	*(Vec2*)u.default_value.vec2 = LuaWrapper::toType<Vec2>(L, 3); break;
-					case 3: *(Vec3*)u.default_value.vec3 = LuaWrapper::toType<Vec3>(L, 3); break;
-					case 4: *(Vec4*)u.default_value.vec4 = LuaWrapper::toType<Vec4>(L, 3); break;
-					case 16: *(Matrix*)u.default_value.vec4 = LuaWrapper::toType<Matrix>(L, 3); break;
-					default: luaL_error(L, "Uniform %s has unsupported type", name); break;
-				}
-				break;
-			}
-			default: luaL_error(L, "Uniform %s has unsupported type", name); break;
-		}
-	}
-
-	if(shader->m_uniforms.size() == 1) {
-		u.offset = 0;
-	}
-	else {
-		const Shader::Uniform& prev = shader->m_uniforms[shader->m_uniforms.size() - 2];
-		u.offset = prev.offset + prev.size();
-		const u32 align = u.size();
-		u.offset += (align - u.offset % align) % align;
-	}
-	return 0;
-}
-
-
-int define(lua_State* L)
-{
-	Shader* shader = getShader(L);
-	const char* def = LuaWrapper::checkArg<const char*>(L, 1);
-
-	const u8 def_idx = shader->m_renderer.getShaderDefineIdx(def);
-	shader->m_defines.push(def_idx);
-
-	return 0;
-}
-
-
-int texture_slot(lua_State* L)
-{
-	LuaWrapper::checkTableArg(L, 1);
-	Shader* shader = getShader(L);
-
-	if(shader->m_texture_slot_count >= lengthOf(shader->m_texture_slots)) {
-		logError("Too many texture slots in ", shader->getPath());
-		return 0;
-	}
-
-	Shader::TextureSlot& slot = shader->m_texture_slots[shader->m_texture_slot_count];
-	LuaWrapper::getOptionalStringField(L, -1, "name", Span(slot.name));
-	char define[64];
-	if (LuaWrapper::getOptionalStringField(L, -1, "define", Span(define))) {
-		slot.define_idx = shader->m_renderer.getShaderDefineIdx(define);
-	}
-
-	Path tmp;
-	if(LuaWrapper::getOptionalStringField(L, -1, "default_texture", Span(tmp.beginUpdate(), tmp.capacity()))) {
-		tmp.endUpdate();
-		ResourceManagerHub& manager = shader->getResourceManager().getOwner();
-		slot.default_texture = manager.load<Texture>(tmp);
-	}
-
-	++shader->m_texture_slot_count;
-
-	return 0;
-}
-
-
-static void source(lua_State* L, gpu::ShaderType shader_type)
-{
-	const char* src = LuaWrapper::checkArg<const char*>(L, 1);
-	
-	Shader* shader = getShader(L);
-	Shader::Stage& stage = shader->m_sources.stages.emplace(shader->m_allocator);
-	stage.type = shader_type;
-
-	lua_Debug ar;
-	lua_getinfo(L, 1, "nsl", &ar);
-	const int line = ar.currentline;
-	ASSERT(line >= 0);
-
-	const StaticString<32> line_str("#line ", line, "\n");
-	const int line_str_len = stringLength(line_str);
-	const int src_len = stringLength(src);
-
-	stage.code.resize(line_str_len + src_len + 1);
-	memcpy(&stage.code[0], line_str, line_str_len);
-	memcpy(&stage.code[line_str_len], src, src_len);
-	stage.code.back() = '\0';
-}
-
-
-static int common(lua_State* L)
-{
-	const char* src = LuaWrapper::checkArg<const char*>(L, 1);
-	
-	Shader* shader = getShader(L);
-
-	lua_Debug ar;
-	lua_getinfo(L, 1, "nsl", &ar);
-	const int line = ar.currentline;
-	ASSERT(line >= 0);
-
-	const StaticString<32> line_str("#line ", line, "\n");
-
-	shader->m_sources.common.append(line_str, src);
-	return 0;
-}
-
-
-int vertex_shader(lua_State* L)
-{
-	source(L, gpu::ShaderType::VERTEX);
-	return 0;
-}
-
-
-int fragment_shader(lua_State* L)
-{
-	source(L, gpu::ShaderType::FRAGMENT);
-	return 0;
-}
-
-
-int compute_shader(lua_State* L)
-{
-	source(L, gpu::ShaderType::COMPUTE);
-	return 0;
-}
-
-
-int geometry_shader(lua_State* L)
-{
-	source(L, gpu::ShaderType::GEOMETRY);
-	return 0;
-}
-
-int import(lua_State* L)
-{
-	const char* path = LuaWrapper::checkArg<const char*>(L, 1);
-	Shader* shader = getShader(L);
-
-	OutputMemoryStream content(shader->m_allocator);
-	ResourceManagerHub& rm = shader->getResourceManager().getOwner();
-	
-	if (!rm.loadRaw(shader->getPath(), Path(path), content)) {
-		logError("Failed to open/read import ", path, " imported from ", shader->getPath());
-		return 0;
-	}
-	
-	if (!content.empty()) {
-		LuaWrapper::execute(L, StringView((const char*)content.data(), (u32)content.size()), path, 0);
-	}
-
-	return 0;
-}
-
-int include(lua_State* L)
-{
-	const char* path = LuaWrapper::checkArg<const char*>(L, 1);
-
-	Shader* shader = getShader(L);
-
-	ResourceManagerHub& rm = shader->getResourceManager().getOwner();
-
-	OutputMemoryStream content(shader->m_allocator);
-	if (!rm.loadRaw(shader->getPath(), Path(path), content)) {
-		logError("Failed to open/read include ", path, " included from ", shader->getPath());
-		return 0;
-	}
-	
-	if (!content.empty()) {
-		content << "\n";
-		shader->m_sources.common.append("#line 0\n", StringView((const char*)content.data(), (u32)content.size()));
-	}
-
-	return 0;
-}
-
-
-} // namespace LuaAPI
-
-
 bool Shader::load(Span<const u8> mem) {
-	lua_State* root_state = m_renderer.getEngine().getState();
-	lua_State* L = lua_newthread(root_state);
-	const int state_ref = LuaWrapper::createRef(root_state);
-	lua_pop(root_state, 1);
-	
-	lua_pushlightuserdata(L, this);
-	lua_setfield(L, LUA_GLOBALSINDEX, "this");
-	lua_pushcfunction(L, LuaAPI::common, "common");
-	lua_setfield(L, LUA_GLOBALSINDEX, "common");
-	lua_pushcfunction(L, LuaAPI::vertex_shader, "vertex_shader");
-	lua_setfield(L, LUA_GLOBALSINDEX, "vertex_shader");
-	lua_pushcfunction(L, LuaAPI::fragment_shader, "fragment_shader");
-	lua_setfield(L, LUA_GLOBALSINDEX, "fragment_shader");
-	lua_pushcfunction(L, LuaAPI::compute_shader, "compute_shader");
-	lua_setfield(L, LUA_GLOBALSINDEX, "compute_shader");
-	lua_pushcfunction(L, LuaAPI::geometry_shader, "geometry_shader");
-	lua_setfield(L, LUA_GLOBALSINDEX, "geometry_shader");
-	lua_pushcfunction(L, LuaAPI::include, "include");
-	lua_setfield(L, LUA_GLOBALSINDEX, "include");
-	lua_pushcfunction(L, LuaAPI::import, "import");
-	lua_setfield(L, LUA_GLOBALSINDEX, "import");
-	lua_pushcfunction(L, LuaAPI::texture_slot, "texture_slot");
-	lua_setfield(L, LUA_GLOBALSINDEX, "texture_slot");
-	lua_pushcfunction(L, LuaAPI::define, "define");
-	lua_setfield(L, LUA_GLOBALSINDEX, "define");
-	lua_pushcfunction(L, LuaAPI::uniform, "uniform");
-	lua_setfield(L, LUA_GLOBALSINDEX, "uniform");
-
-	StringView content((const char*)mem.begin(), (u32)mem.length());
-	if (!LuaWrapper::execute(L, content, getPath().c_str(), 0)) {
-		LuaWrapper::releaseRef(root_state, state_ref);
+	InputMemoryStream stream(mem);
+	Header header;
+	stream.read(header);
+	if (header.magic != Header::MAGIC) {
+		logError(getPath(), " invalid file");
 		return false;
 	}
+	if (header.version != 0) {
+		logError(getPath(), " has unsupported version ", header.version);
+		return false;
+	}
+	u32 is_surface;
+	stream.read(is_surface);
+	m_type = is_surface ? gpu::ShaderType::SURFACE : gpu::ShaderType::COMPUTE;
 
-	LuaWrapper::releaseRef(root_state, state_ref);
-	return true;
+	const u32 num_uniforms = stream.read<u32>();
+	m_uniforms.resize(num_uniforms);
+	for (Uniform& u : m_uniforms) {
+		copyString(u.name, stream.readString());
+		u.name_hash = RuntimeHash(u.name, stringLength(u.name));
+		stream.read(u.type);
+		stream.read(u.offset);
+		stream.read(u.default_value);
+	}
+
+	const u32 num_defines = stream.read<u32>();
+	m_defines.resize(num_defines);
+	for (u32 i = 0; i < num_defines; ++i) {
+		const char* def = stream.readString();
+		const u8 def_idx = m_renderer.getShaderDefineIdx(def);
+		m_defines.push(def_idx);
+	}
+
+	const u32 num_texture_slots = stream.read<u32>();
+	if (num_texture_slots >= lengthOf(m_texture_slots)) {
+		logError(getPath(), " too many texture slots");
+		return false;
+	}
+	m_texture_slot_count = num_texture_slots;
+	for (u32 i = 0; i < num_texture_slots; ++i) {
+		TextureSlot& slot = m_texture_slots[i];
+		copyString(slot.name, stream.readString());
+
+		const char* default_texture = stream.readString();
+		ResourceManagerHub& manager = getResourceManager().getOwner();
+		slot.default_texture = default_texture[0] ? manager.load<Texture>(Path(default_texture)) : nullptr;
+
+		const char* define = stream.readString();
+		if (define[0]) slot.define_idx = m_renderer.getShaderDefineIdx(define);
+	}
+
+	stream.read(m_content_hash);
+
+	m_code = StringView((const char*)stream.skip(0), (u32)stream.remaining());
+
+	return !stream.hasOverflow();
 }
 
 
@@ -422,8 +184,7 @@ void Shader::unload()
 	for (const ProgramPair& p : m_programs) {
 		m_renderer.getEndFrameDrawStream().destroy(p.program);
 	}
-	m_sources.common = "";
-	m_sources.stages.clear();
+	m_code = "";
 	m_programs.clear();
 	m_uniforms.clear();
 	for (u32 i = 0; i < m_texture_slot_count; ++i) {
@@ -439,13 +200,13 @@ void Shader::unload()
 
 static const char* toString(Shader::Uniform::Type type) {
 	switch(type) {
-		case Shader::Uniform::COLOR: return "vec4";
+		case Shader::Uniform::COLOR: return "float4";
 		case Shader::Uniform::FLOAT: return "float";
 		case Shader::Uniform::NORMALIZED_FLOAT: return "float";
 		case Shader::Uniform::INT: return "int";
-		case Shader::Uniform::VEC2: return "vec2";
-		case Shader::Uniform::VEC3: return "vec4"; // vec4 because of padding
-		case Shader::Uniform::VEC4: return "vec4";
+		case Shader::Uniform::FLOAT2: return "float2";
+		case Shader::Uniform::FLOAT3: return "float4"; // float4 because of padding
+		case Shader::Uniform::FLOAT4: return "float4";
 	}
 	ASSERT(false);
 	return "unknown_type";
@@ -484,17 +245,25 @@ void Shader::toTextureVarName(Span<char> out, const char* in) {
 }
 
 void Shader::onBeforeReady() {
-	if (m_uniforms.empty()) return;
+	if (m_uniforms.empty() && m_texture_slot_count == 0) return;
 
-	m_sources.common.append("layout (std140, binding = 2) uniform MaterialState {");
+	String tmp(m_allocator);
+	tmp.append("cbuffer MaterialState : register(b2) {");
 
 	for (const Uniform& u : m_uniforms) {
 		char var_name[64];
 		toUniformVarName(Span(var_name), u.name);
-		m_sources.common.append(toString(u.type), " ", var_name, ";\n");
+		tmp.append(toString(u.type), " ", var_name, ";\n");
 	}
 
-	m_sources.common.append("};\n");
+	for (u32 i = 0; i < m_texture_slot_count; ++i) {
+		char var_name[64];
+		toTextureVarName(Span(var_name), m_texture_slots[i].name);
+		tmp.append("uint ", var_name, ";\n");
+	}
+
+	tmp.append("};\n");
+	m_code.insert(0, tmp);
 }
 
 

@@ -2,6 +2,7 @@
 #include "core/associative_array.h"
 #include "core/log.h"
 #include "core/math.h"
+#include "core/os.h"
 #include "core/string.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
@@ -2717,17 +2718,14 @@ struct ParticleEditorImpl : ParticleEditor {
 		, m_function_plugin(*this, app, m_allocator)
 		, m_particle_system_plugin(*this, app)
 		, m_functions(m_allocator)
+		, m_apply_action("Apply", "Particle editor apply", "particle_editor_apply", "")
 	{
-		m_apply_action.init("Apply", "Particle editor apply", "particle_editor_apply", "", os::Keycode::E, Action::Modifiers::CTRL, Action::IMGUI_PRIORITY);
-		app.addAction(&m_apply_action);
-
 		const char* particle_emitter_exts[] = {"par" };
 		m_app.getAssetCompiler().addPlugin(m_particle_system_plugin, Span(particle_emitter_exts));
 		m_app.getAssetBrowser().addPlugin(m_particle_system_plugin, Span(particle_emitter_exts));
 	}
 
 	~ParticleEditorImpl() {
-		m_app.removeAction(&m_apply_action);
 		m_app.getAssetCompiler().removePlugin(m_particle_system_plugin);
 		m_app.getAssetBrowser().removePlugin(m_particle_system_plugin);
 	}
@@ -3234,7 +3232,7 @@ struct ParticleEditorWindow : AssetEditorWindow, NodeEditor {
 						m_active_emitter->m_links.eraseItems([&](const NodeEditorLink& link){
 							return link.getFromNode() == n->m_id || link.getToNode() == n->m_id;
 						});
-						LUMIX_DELETE(m_allocator, n)
+						LUMIX_DELETE(m_allocator, n);
 						m_active_emitter->m_nodes.swapAndPop(i);
 					}
 					break;
@@ -3430,8 +3428,11 @@ struct ParticleEditorWindow : AssetEditorWindow, NodeEditor {
 	}
 
 	void windowGUI() override {
+		CommonActions& actions = m_app.getCommonActions();
+		if (m_app.checkShortcut(m_editor.m_apply_action)) apply();
+		else if (m_app.checkShortcut(actions.del)) deleteSelectedNodes();
+
 		debugUI();
-		const CommonActions& actions = m_app.getCommonActions();
 
 		if (ImGui::BeginMenuBar()) {
 			if (ImGui::BeginMenu("File")) {
@@ -3451,9 +3452,9 @@ struct ParticleEditorWindow : AssetEditorWindow, NodeEditor {
 				if (ImGui::MenuItem(ICON_FA_BRUSH "Clear")) deleteUnreachable();
 				ImGui::EndMenu();
 			}
-			if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) saveAs(m_resource.m_path);
-			if (ImGuiEx::IconButton(ICON_FA_UNDO, "Undo", canUndo())) undo();
-			if (ImGuiEx::IconButton(ICON_FA_REDO, "Redo", canRedo())) redo();
+			if (actions.save.iconButton(m_dirty, &m_app)) saveAs(m_resource.m_path);
+			if (actions.undo.iconButton(canUndo(), &m_app)) undo();
+			if (actions.redo.iconButton(canRedo(), &m_app)) redo();
 			if (ImGuiEx::IconButton(ICON_FA_BRUSH, "Clear")) deleteUnreachable();
 			ImGui::EndMenuBar();
 		}
@@ -3512,17 +3513,6 @@ struct ParticleEditorWindow : AssetEditorWindow, NodeEditor {
 	}
 
 	const Path& getPath() override { return m_resource.m_path; }
-
-	bool onAction(const Action& action) override {
-		const CommonActions& actions = m_app.getCommonActions();
-		if (&action == &m_editor.m_apply_action) apply();
-		else if (&action == &actions.del) deleteSelectedNodes();
-		else if (&action == &actions.save) saveAs(m_resource.m_path);
-		else if (&action == &actions.undo) undo();
-		else if (&action == &actions.redo) redo();
-		else return false;
-		return true;
-	}
 
 	Node* addNode(Node::Type type) {
 		return m_active_emitter->addNode(type);

@@ -1,9 +1,7 @@
+#include "animation/property_animation.h"
 #include "core/allocator.h"
 #include "core/log.h"
 #include "core/stream.h"
-
-#include "animation/property_animation.h"
-#include "engine/lua_wrapper.h"
 #include "engine/reflection.h"
 
 
@@ -32,66 +30,35 @@ void PropertyAnimation::deserialize(InputMemoryStream& blob) {
 	ASSERT(res);
 }
 
-void PropertyAnimation::serialize(OutputMemoryStream& blob) {
-	ASSERT(isReady());
-
-	for (Curve& curve : curves) {
-		blob << "curve {\n";
-		blob << "\t component = \"" << reflection::getComponent(curve.cmp_type)->name << "\",\n";
-		blob << "\t property = \"" << curve.property->name << "\",\n";
-		blob << "\tkeyframes = {\n";
-		for (int i = 0; i < curve.frames.size(); ++i) {
-			if (i != 0) blob << ", ";
-			blob << curve.frames[i];
-		}
-		blob << "},\n";
-		blob << "\tvalues = {\n";
-		for (int i = 0; i < curve.values.size(); ++i) {
-			if (i != 0) blob << ", ";
-			blob << curve.values[i];
-		}
-		blob << "}\n}\n\n";
-	}
-}
-
-void PropertyAnimation::LUA_curve(lua_State* L) {
-	LuaWrapper::DebugGuard guard(L);
-	LuaWrapper::checkTableArg(L, 1);
-	const char* cmp_name;
-	const char* prop_name;
-	if (!LuaWrapper::checkField<const char*>(L, 1, "component", &cmp_name)) {
-		luaL_argerror(L, 1, "`component` field must be a string");
-	}
-	if (!LuaWrapper::checkField<const char*>(L, 1, "property", &prop_name)) {
-		luaL_argerror(L, 1, "`property` field must be a string");
-	}
-	Curve& curve = curves.emplace(m_allocator);
-	curve.cmp_type = reflection::getComponentType(cmp_name);
-	curve.property = static_cast<const reflection::Property<float>*>(reflection::getProperty(curve.cmp_type, prop_name));
-	if (!LuaWrapper::getField(L, 1, "keyframes")) {
-		luaL_argerror(L, 1, "`keyframes` field must be an array");
-	}
-	LuaWrapper::forEachArrayItem<i32>(L, -1, "`keyframes` field must be an array of keyframes", [&](i32 v){
-		curve.frames.emplace(v);
-	});
-	lua_pop(L, 1);
-	if (!LuaWrapper::getField(L, 1, "values")) {
-		luaL_argerror(L, 1, "`values` field must be an array");
-	}
-	LuaWrapper::forEachArrayItem<float>(L, -1, "`values` field must be an array of numbers", [&](float v){
-		curve.values.emplace(v);
-	});
-	lua_pop(L, 1);
-}
-
 bool PropertyAnimation::load(Span<const u8> mem) {
-	lua_State* L = luaL_newstate(); // TODO reuse
-	auto fn = &LuaWrapper::wrapMethodClosure<&PropertyAnimation::LUA_curve>;
-	lua_pushlightuserdata(L, this);
-	lua_pushcclosure(L, fn, "curve", 1);
-	lua_setglobal(L, "curve");
+	InputMemoryStream stream(mem);
+	Header header;
+	stream.read(header);
+	if (header.magic != Header::MAGIC) {
+		logError(getPath(), ": invalid file");
+		return false;
+	}
+	if (header.version != 0) {
+		logError(getPath(), ": unsupported version");
+		return false;
+	}
 
-	return LuaWrapper::execute(L, StringView((const char*)mem.begin(), mem.length()), getPath().c_str(), 0);
+	const u32 num_curves = stream.read<u32>();
+	curves.reserve(num_curves);
+	for (u32 i = 0; i < num_curves; ++i) {
+		Curve& curve = curves.emplace(m_allocator);
+		const char* cmp_typename = stream.readString();
+		const char* property_name = stream.readString();
+		const u32 num_frames = stream.read<u32>();
+		curve.cmp_type = reflection::getComponentType(cmp_typename);
+		curve.property = static_cast<const reflection::Property<float>*>(reflection::getProperty(curve.cmp_type, property_name));
+		curve.frames.resize(num_frames);
+		curve.values.resize(num_frames);
+		stream.read(curve.frames.begin(), curve.frames.byte_size());
+		stream.read(curve.values.begin(), curve.values.byte_size());
+	}
+
+	return !stream.hasOverflow();
 }
 
 

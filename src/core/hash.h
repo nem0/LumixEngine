@@ -75,6 +75,7 @@ private:
 using FilePathHash = StableHash;
 using BoneNameHash = StableHash;
 
+// begin/end pair cannot cross thread boundaries
 struct LUMIX_CORE_API RollingStableHasher {
 	void begin();
 	void update(const void* data, u32 len);
@@ -82,6 +83,7 @@ struct LUMIX_CORE_API RollingStableHasher {
 	StableHash end64();
 };
 
+// begin/end pair cannot cross thread boundaries
 struct LUMIX_CORE_API RollingHasher {
 	void begin();
 	void update(const void* data, u32 len);
@@ -100,7 +102,7 @@ template<> struct HashFunc<RuntimeHash> {
 template<> struct HashFunc<StableHash> {
 	static u32 get(const StableHash& k) {
 		const u64 hash = k.getHashValue();
-		return u32(hash ^ (hash >> 16));
+		return u32(hash ^ (hash >> 32));
 	}
 };
 

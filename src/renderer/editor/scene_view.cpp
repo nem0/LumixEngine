@@ -13,7 +13,6 @@
 #include "core/delegate_list.h"
 #include "engine/engine.h"
 #include "core/geometry.h"
-#include "engine/lua_wrapper.h"
 #include "core/path.h"
 #include "core/path.h"
 #include "engine/prefab.h"
@@ -22,7 +21,6 @@
 #include "engine/resource_manager.h"
 #include "core/string.h"
 #include "engine/world.h"
-#include "lua_script/lua_script.h"
 #include "renderer/culling_system.h"
 #include "renderer/draw2d.h"
 #include "renderer/font.h"
@@ -44,6 +42,8 @@ static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("m
 static const ComponentType PARTICLE_EMITTER_TYPE = reflection::getComponentType("particle_emitter");
 static const ComponentType MESH_ACTOR_TYPE = reflection::getComponentType("rigid_actor");
 static const ComponentType CAMERA_TYPE = reflection::getComponentType("camera");
+static const ComponentType TERRAIN_TYPE = reflection::getComponentType("terrain");
+static const ComponentType PROCEDURAL_GEOM_TYPE = reflection::getComponentType("procedural_geom");
 
 struct WorldViewImpl final : WorldView {
 	enum class MouseMode
@@ -611,6 +611,227 @@ static volatile bool once = [](){
 	return true;
 }();
 
+struct SceneView::RenderPlugin : Lumix::RenderPlugin {
+	RenderPlugin(SceneView& view, Renderer& renderer)
+		: m_scene_view(view)
+	{
+		ResourceManagerHub& rm = renderer.getEngine().getResourceManager();
+		m_grid_shader = rm.load<Shader>(Path("shaders/grid.hlsl"));
+		m_debug_shape_shader = rm.load<Shader>(Path("shaders/debug_shape.hlsl"));
+		m_selection_outline_shader = rm.load<Shader>(Path("shaders/selection_outline.hlsl"));
+	}
+
+	~RenderPlugin() {
+		m_grid_shader->decRefCount();
+		m_debug_shape_shader->decRefCount();
+		m_selection_outline_shader->decRefCount();
+	}
+
+	RenderBufferHandle renderBeforeTonemap(const GBuffer& gbuffer, RenderBufferHandle input, Pipeline& pipeline) override {
+		if (m_scene_view.m_pipeline.get() != &pipeline) return input;
+		if (pipeline.m_debug_show == Pipeline::DebugShow::PLUGIN) return input;
+		Renderer& renderer = pipeline.getRenderer();
+
+		// selection
+		const Array<EntityRef>& entities = m_scene_view.m_editor.getSelectedEntities();
+		if (entities.size() < 5000) {
+			const RenderBufferHandle selection_mask = pipeline.createRenderbuffer({
+				.format = gpu::TextureFormat::D32,
+				.debug_name = "selection_depth"
+			});
+			pipeline.setRenderTargets({}, selection_mask);
+			pipeline.clear(gpu::ClearFlags::ALL, 0, 0, 0, 0, 0);
+	
+			renderer.pushJob("selection", [&pipeline, &renderer, this, &entities](DrawStream& stream) {
+				RenderModule* module = pipeline.getModule();
+				const World& world = module->getWorld();
+				const u32 skinned_define = 1 << renderer.getShaderDefineIdx("SKINNED");
+				const u32 depth_define = 1 << renderer.getShaderDefineIdx("DEPTH");
+				const DVec3 view_pos = m_scene_view.m_view->getViewport().pos;
+				Array<DualQuat> dq_pose(renderer.getAllocator());
+				for (EntityRef e : entities) {
+					if (!module->getWorld().hasComponent(e, MODEL_INSTANCE_TYPE)) continue;
+
+					const Model* model = module->getModelInstanceModel(e);
+					if (!model || !model->isReady()) continue;
+
+					const Pose* pose = module->lockPose(e);
+					for (int i = 0; i <= model->getLODIndices()[0].to; ++i) {
+						const Mesh& mesh = model->getMesh(i);
+					
+						Material* material = mesh.material;
+						u32 define_mask = material->getDefineMask() | depth_define;
+						const Matrix mtx = world.getRelativeMatrix(e, view_pos);
+						dq_pose.clear();
+						if (pose && pose->count > 0 && mesh.type == Mesh::SKINNED) {
+							define_mask |= skinned_define;
+							dq_pose.reserve(pose->count);
+							for (int j = 0, c = pose->count; j < c; ++j) {
+								const Model::Bone& bone = model->getBone(j);
+								const LocalRigidTransform tmp = {pose->positions[j], pose->rotations[j]};
+								dq_pose.push((tmp * bone.inv_bind_transform).toDualQuat());
+							}
+						}
+			
+						Renderer::TransientSlice ub;
+						if (dq_pose.empty()) {
+							ub = renderer.allocUniform(&mtx, sizeof(mtx));
+						}
+						else {
+							struct UBPrefix {
+								float layer;
+								float fur_scale;
+								float gravity;
+								float padding;
+								Matrix model_mtx;
+								// DualQuat bones[];
+							};
+
+							ub = renderer.allocUniform(sizeof(UBPrefix) + dq_pose.byte_size());
+							UBPrefix* dc = (UBPrefix*)ub.ptr;
+							dc->layer = 0;
+							dc->fur_scale = 0;
+							dc->gravity = 0;
+							dc->model_mtx = mtx;
+							memcpy(ub.ptr + sizeof(UBPrefix), dq_pose.begin(), dq_pose.byte_size());
+						}
+		
+						const gpu::StateFlags state = gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_FUNCTION;
+						gpu::ProgramHandle program = mesh.material->getShader()->getProgram(material->m_render_states | state, mesh.vertex_decl, define_mask, mesh.semantics_defines);
+						stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+						material->bind(stream);
+						stream.useProgram(program);
+						stream.bindIndexBuffer(mesh.index_buffer_handle);
+						stream.bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
+						stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+						stream.drawIndexed(0, mesh.indices_count, mesh.index_type);
+					}
+					module->unlockPose(e, false);
+				}
+			});
+
+			DrawStream& stream = pipeline.getRenderer().getDrawStream();
+			struct {
+				gpu::BindlessHandle mask;
+				gpu::RWBindlessHandle output;
+			} ub = {
+				pipeline.toBindless(selection_mask, stream),
+				pipeline.toRWBindless(input, stream)
+			};
+			pipeline.setUniform(ub);
+			const Viewport& vp = m_scene_view.m_view->getViewport();
+			pipeline.dispatch(*m_selection_outline_shader, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
+		}
+
+		// grid
+		pipeline.setRenderTargets(Span(&input, 1), gbuffer.DS, true);
+		if (m_grid_shader->isReady() && m_show_grid) {
+			pipeline.setRenderTargets(Span(&input, 1), gbuffer.DS);
+			pipeline.drawArray(0, 4, *m_grid_shader, 0, gpu::StateFlags::DEPTH_FUNCTION | gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA));
+		}
+
+		const RenderBufferHandle icons_ds = pipeline.createRenderbuffer({
+			.format = gpu::TextureFormat::D32,
+			.debug_name = "icons_ds"
+		});
+
+		pipeline.setRenderTargets({}, icons_ds);
+		pipeline.clear(gpu::ClearFlags::DEPTH, 0, 0, 0, 0, 0);
+
+		// icons
+		if (m_show_icons) {
+			pipeline.setRenderTargets(Span(&input, 1), icons_ds);
+			DrawStream& stream = pipeline.getRenderer().getDrawStream();
+			pipeline.setUniform(pipeline.toBindless(gbuffer.DS, stream), UniformBuffer::DRAWCALL2);
+
+			renderer.pushJob("icons", [this, &renderer](DrawStream& stream) {
+				const Viewport& vp = m_scene_view.m_view->getViewport();
+				const Matrix camera_mtx({ 0, 0, 0 }, vp.rot);
+
+				EditorIcons* icon_manager = m_scene_view.m_view->m_icons.get();
+				icon_manager->computeScales();
+				const HashMap<EntityRef, EditorIcons::Icon>& icons = icon_manager->getIcons();
+				for (const EditorIcons::Icon& icon : icons) {
+					const Model* model = icon_manager->getModel(icon.type);
+					if (!model || !model->isReady()) continue;
+
+					const Matrix mtx = icon_manager->getIconMatrix(icon, camera_mtx, vp.pos, vp.is_ortho, vp.ortho_size);
+					const Renderer::TransientSlice ub = renderer.allocUniform(&mtx, sizeof(Matrix));
+					stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+
+					for (int i = 0; i <= model->getLODIndices()[0].to; ++i) {
+						const Mesh& mesh = model->getMesh(i);
+						const Material* material = mesh.material;
+						material->bind(stream);
+						const gpu::StateFlags state = material->m_render_states | gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE;
+						gpu::ProgramHandle program = mesh.material->getShader()->getProgram(state, mesh.vertex_decl, material->getDefineMask(), mesh.semantics_defines);
+
+						stream.useProgram(program);
+						stream.bindIndexBuffer(mesh.index_buffer_handle);
+						stream.bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
+						stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+						stream.drawIndexed(0, mesh.indices_count, mesh.index_type);
+					}
+				}
+			});
+		}
+
+		// gizmo
+		auto& vertices = m_scene_view.m_view->m_draw_vertices;
+		if (m_debug_shape_shader->isReady() && !vertices.empty()) {
+			pipeline.setRenderTargets(Span(&input, 1), icons_ds);
+			pipeline.clear(gpu::ClearFlags::DEPTH, 0, 0, 0, 0, 0);
+
+			renderer.pushJob("gizmos", [&renderer, &vertices, this](DrawStream& stream) {
+				Renderer::TransientSlice vb = renderer.allocTransient(vertices.byte_size());
+				memcpy(vb.ptr, vertices.begin(), vertices.byte_size());
+				const Renderer::TransientSlice ub = renderer.allocUniform(&Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
+
+				gpu::VertexDecl lines_decl(gpu::PrimitiveType::LINES);
+				lines_decl.addAttribute(0, 3, gpu::AttributeType::FLOAT, 0);
+				lines_decl.addAttribute(12, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
+
+				gpu::VertexDecl tris_decl(gpu::PrimitiveType::TRIANGLES);
+				tris_decl.addAttribute(0, 3, gpu::AttributeType::FLOAT, 0);
+				tris_decl.addAttribute(12, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
+
+				const gpu::StateFlags state = gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE;
+				gpu::ProgramHandle lines_program = m_debug_shape_shader->getProgram(state, lines_decl, 0, "");
+				gpu::ProgramHandle triangles_program = m_debug_shape_shader->getProgram(state, tris_decl, 0, "");
+
+				u32 offset = 0;
+				stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+				for (const WorldViewImpl::DrawCmd& cmd : m_scene_view.m_view->m_draw_cmds) {
+					const gpu::ProgramHandle program = cmd.lines ? lines_program : triangles_program;
+					stream.useProgram(program);
+					stream.bindIndexBuffer(gpu::INVALID_BUFFER);
+					stream.bindVertexBuffer(0, vb.buffer, vb.offset + offset, sizeof(WorldView::Vertex));
+					stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+					stream.drawArrays(0, cmd.vertex_count);
+
+					offset += cmd.vertex_count * sizeof(WorldView::Vertex);
+				}
+
+				m_scene_view.m_view->m_draw_cmds.clear();
+			});
+		}
+
+		return input;
+	}
+
+	void debugUI(Pipeline& pipeline) override {
+		ImGui::Checkbox("Grid", &m_show_grid);
+		ImGui::Checkbox("Icons", &m_show_icons);
+	}
+
+	SceneView& m_scene_view;
+	Shader* m_grid_shader;
+	Shader* m_debug_shape_shader;
+	Shader* m_selection_outline_shader;
+	bool m_show_grid = true;
+	bool m_show_icons = true;
+};
+
 SceneView::SceneView(StudioApp& app)
 	: m_app(app)
 	, m_log_ui(app.getLogUI())
@@ -619,40 +840,19 @@ SceneView::SceneView(StudioApp& app)
 	m_camera_speed = 0.1f;
 	m_is_mouse_captured = false;
 
-	m_copy_move_action.init("Duplicate move", "Duplicate entity when moving with gizmo", "duplicateEntityMove", "", Action::LOCAL);
-	m_toggle_gizmo_step_action.init("Enable/disable gizmo step", "Enable/disable gizmo step", "toggleGizmoStep", "", Action::LOCAL);
-	m_set_pivot_action.init("Set custom pivot", "Set custom pivot", "set_custom_pivot", "", os::Keycode::K, Action::Modifiers::NONE, Action::IMGUI_PRIORITY);
-	m_reset_pivot_action.init("Reset pivot", "Reset pivot", "reset_pivot", "", os::Keycode::K, Action::Modifiers::SHIFT, Action::IMGUI_PRIORITY);
-	m_insert_model_action.init("Insert model", "Insert model or prefab", "insert_model", ICON_FA_SEARCH, (os::Keycode)'P', Action::Modifiers::CTRL, Action::IMGUI_PRIORITY);
+	m_debug_show_actions[(u32)Pipeline::DebugShow::NONE].create("No debug", "Debug view - none", "debug_view_disable", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::ALBEDO].create("Albedo", "Debug view - albedo", "debug_view_albedo", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::NORMAL].create("Normal", "Debug view - normal", "debug_view_normal", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::ROUGHNESS].create("Roughness", "Debug view - roughness", "debug_view_roughness", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::METALLIC].create("Metallic", "Debug view - metallic", "debug_view_metalic", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::AO].create("AO", "Debug view - AO", "debug_view_ao", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::VELOCITY].create("Velocity", "Debug view - velocity", "debug_view_velocity", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::LIGHT_CLUSTERS].create("Light clusters", "Debug view - light clusters", "debug_view_light_clusters", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::PROBE_CLUSTERS].create("Probe clusters", "Debug view - probe clusters", "debug_view_probe_clusters", "");
 
-	m_top_view_action.init("Top", "Set top camera view", "viewTop", "", Action::IMGUI_PRIORITY);
-	m_side_view_action.init("Side", "Set side camera view", "viewSide", "", Action::IMGUI_PRIORITY);
-	m_front_view_action.init("Front", "Set front camera view", "viewFront", "", Action::IMGUI_PRIORITY);
-	m_toggle_projection_action.init("Ortho/perspective", "Toggle ortho/perspective projection", "toggleProjection", "", Action::IMGUI_PRIORITY);
-	m_look_at_selected_action.init("Look at selected", "Look at selected entity", "lookAtSelected", "", Action::IMGUI_PRIORITY);
-	m_copy_view_action.init("Copy view transform", "Copy view transform", "copyViewTransform", "", Action::IMGUI_PRIORITY);
-	m_rotate_entity_90_action.init("Rotate 90 degrees", "Rotate selected entities by 90 degrees", "rotate90deg", "", os::Keycode::R, Action::Modifiers::NONE, Action::IMGUI_PRIORITY);
-	m_move_entity_E_action.init("Move entity east", "Move selected entity east", "moveEntityE", "", os::Keycode::RIGHT, Action::Modifiers::CTRL, Action::IMGUI_PRIORITY);
-	m_move_entity_N_action.init("Move entity north", "Move selected entity north", "moveEntityN", "", os::Keycode::UP, Action::Modifiers::CTRL, Action::IMGUI_PRIORITY);
-	m_move_entity_S_action.init("Move entity south", "Move selected entity south", "moveEntityS", "", os::Keycode::DOWN, Action::Modifiers::CTRL, Action::IMGUI_PRIORITY);
-	m_move_entity_W_action.init("Move entity west", "Move selected entity west", "moveEntityW", "", os::Keycode::LEFT, Action::Modifiers::CTRL, Action::IMGUI_PRIORITY);
-
-	m_app.addAction(&m_copy_move_action);
-	m_app.addAction(&m_toggle_gizmo_step_action);
-	m_app.addAction(&m_insert_model_action);
-	m_app.addAction(&m_set_pivot_action);
-	m_app.addAction(&m_reset_pivot_action);
-	m_app.addAction(&m_top_view_action);
-	m_app.addAction(&m_side_view_action);
-	m_app.addAction(&m_front_view_action);
-	m_app.addAction(&m_look_at_selected_action);
-	m_app.addAction(&m_copy_view_action);
-	m_app.addAction(&m_rotate_entity_90_action);
-	m_app.addAction(&m_move_entity_E_action);
-	m_app.addAction(&m_move_entity_N_action);
-	m_app.addAction(&m_move_entity_S_action);
-	m_app.addAction(&m_move_entity_W_action);
-	m_app.addAction(&m_toggle_projection_action);
+	m_app.getSettings().registerOption("quicksearch_preview", &m_search_preview, "Scene view", "Show previews in quick search");
+	m_app.getSettings().registerOption("show_camera_preview", &m_show_camera_preview, "Scene view", "Show camera preview");
+	m_app.getSettings().registerOption("mouse_wheel_changes_speed", &m_mouse_wheel_changes_speed, "Scene view", "Mouse wheel changes speed");
 }
 
 void SceneView::toggleProjection() {
@@ -667,48 +867,57 @@ void SceneView::init() {
 
 	Engine& engine = m_app.getEngine();
 	auto* renderer = static_cast<Renderer*>(engine.getSystemManager().getSystem("renderer"));
-	LuaScript* pres = engine.getResourceManager().load<LuaScript>(Path("pipelines/main.lua"));
+	m_render_plugin = UniquePtr<RenderPlugin>::create(renderer->getAllocator(), *this, *renderer);
+	renderer->addPlugin(*m_render_plugin.get());
+	m_app.getSettings().registerOption("show_grid", &m_render_plugin->m_show_grid, "Scene view", "Show grid");
 	
-	m_camera_preview_pipeline = Pipeline::create(*renderer, pres, "PREVIEW");
+	m_camera_preview_pipeline = Pipeline::create(*renderer, PipelineType::GAME_VIEW);
 
-	pres->incRefCount();
-	m_pipeline = Pipeline::create(*renderer, pres, "SCENE_VIEW");
-	m_pipeline->addCustomCommandHandler("renderSelection").callback.bind<&SceneView::renderSelection>(this);
-	m_pipeline->addCustomCommandHandler("renderGizmos").callback.bind<&SceneView::renderGizmos>(this);
-	m_pipeline->addCustomCommandHandler("renderIcons").callback.bind<&SceneView::renderIcons>(this);
-
-	ResourceManagerHub& rm = engine.getResourceManager();
-	m_debug_shape_shader = rm.load<Shader>(Path("pipelines/debug_shape.shd"));
-
-	lua_State* L = m_app.getEngine().getState();
-	lua_getglobal(L, "Editor");
-	LuaWrapper::pushObject(L, this, "SceneView");
-	lua_setfield(L, -2, "scene_view");
-	lua_pop(L, 1);
+	m_pipeline = Pipeline::create(*renderer, PipelineType::SCENE_VIEW);
 }
 
 
 SceneView::~SceneView()
 {
-	m_app.removeAction(&m_copy_move_action);
-	m_app.removeAction(&m_toggle_gizmo_step_action);
-	m_app.removeAction(&m_insert_model_action);
-	m_app.removeAction(&m_set_pivot_action);
-	m_app.removeAction(&m_reset_pivot_action);
-	m_app.removeAction(&m_top_view_action);
-	m_app.removeAction(&m_side_view_action);
-	m_app.removeAction(&m_front_view_action);
-	m_app.removeAction(&m_look_at_selected_action);
-	m_app.removeAction(&m_copy_view_action);
-	m_app.removeAction(&m_rotate_entity_90_action);
-	m_app.removeAction(&m_move_entity_E_action);
-	m_app.removeAction(&m_move_entity_N_action);
-	m_app.removeAction(&m_move_entity_S_action);
-	m_app.removeAction(&m_move_entity_W_action);
-	m_app.removeAction(&m_toggle_projection_action);
+	Engine& engine = m_app.getEngine();
+	auto* renderer = static_cast<Renderer*>(engine.getSystemManager().getSystem("renderer"));
+	renderer->removePlugin(*m_render_plugin.get());
+
 	m_editor.setView(nullptr);
 	LUMIX_DELETE(m_app.getAllocator(), m_view);
-	m_debug_shape_shader->decRefCount();
+}
+
+
+void SceneView::toggleWireframe() {
+	WorldEditor& editor = m_app.getWorldEditor();
+	const Array<EntityRef>& selected = editor.getSelectedEntities();
+	if (selected.empty()) return;
+
+	World& world = *editor.getWorld();
+	RenderModule& module = *(RenderModule*)world.getModule(MODEL_INSTANCE_TYPE);
+
+	Array<Material*> materials(m_app.getAllocator());
+	for (EntityRef e : selected) {
+		if (world.hasComponent(e, MODEL_INSTANCE_TYPE)) {
+			Model* model = module.getModelInstanceModel(e);
+			if (!model->isReady()) continue;
+			
+			for (u32 i = 0; i < (u32)model->getMeshCount(); ++i) {
+				Mesh& mesh = model->getMesh(i);
+				materials.push(mesh.material);
+			}
+		}
+		if (world.hasComponent(e, TERRAIN_TYPE)) {
+			materials.push(module.getTerrainMaterial(e));
+		}
+		if (world.hasComponent(e, PROCEDURAL_GEOM_TYPE)) {
+			materials.push(module.getProceduralGeometry(e).material);
+		}
+	}
+	materials.removeDuplicates();
+	for (Material* m : materials) {
+		m->setWireframe(!m->wireframe());
+	}
 }
 
 void SceneView::rotate90Degrees() {
@@ -761,25 +970,6 @@ void SceneView::moveEntity(Vec2 v) {
 	editor.endCommandGroup();
 }
 
-bool SceneView::onAction(const Action& action) {
-	if (&action == &m_insert_model_action) m_insert_model_request = true;
-	else if (&action == &m_set_pivot_action) m_view->setCustomPivot();
-	else if (&action == &m_reset_pivot_action) m_view->resetPivot();
-	else if (&action == &m_top_view_action) m_view->setTopView();
-	else if (&action == &m_side_view_action) m_view->setSideView();
-	else if (&action == &m_front_view_action) m_view->setFrontView();
-	else if (&action == &m_toggle_projection_action) toggleProjection();
-	else if (&action == &m_look_at_selected_action) m_view->lookAtSelected();
-	else if (&action == &m_copy_view_action) m_view->copyTransform();
-	else if (&action == &m_rotate_entity_90_action) rotate90Degrees();
-	else if (&action == &m_move_entity_E_action) moveEntity(Vec2(-1, 0));
-	else if (&action == &m_move_entity_N_action) moveEntity(Vec2(0, 1));
-	else if (&action == &m_move_entity_S_action) moveEntity(Vec2(0, -1));
-	else if (&action == &m_move_entity_W_action) moveEntity(Vec2(1, 0));
-	else return false;
-	return true;
-}
-
 void SceneView::manipulate() {
 	PROFILE_FUNCTION();
 	const Array<EntityRef>* selected = &m_editor.getSelectedEntities();
@@ -801,7 +991,9 @@ void SceneView::manipulate() {
 	if (!Gizmo::manipulate((*selected)[0].index, *m_view, tr, cfg)) return;
 
 	if (copy_move && !m_copy_moved) {
-		m_editor.duplicateEntities();
+		m_editor.copyEntities();
+		m_editor.pasteEntities();
+		m_editor.setEntitiesPositionsAndRotations(&(*selected)[0], &tr.pos, &tr.rot, 1);
 		selected = &m_editor.getSelectedEntities();
 		Gizmo::setDragged((*selected)[0].index);
 		m_copy_moved = true;
@@ -845,7 +1037,7 @@ void SceneView::manipulate() {
 			break;
 		}
 	}
-	if (cfg.isAutosnapDown()) m_app.snapDown();
+	if (cfg.isAutosnapDown()) snapDown();
 }
 
 void SceneView::update(float time_delta)
@@ -872,18 +1064,24 @@ void SceneView::update(float time_delta)
 
 	if (ImGui::IsAnyItemActive()) return;
 	if (!m_is_mouse_captured) return;
-	if (ImGui::GetIO().KeyCtrl) return;
+	if (io.KeyCtrl) return;
 
-	int screen_x = int(ImGui::GetIO().MousePos.x);
-	int screen_y = int(ImGui::GetIO().MousePos.y);
+	int screen_x = int(io.MousePos.x);
+	int screen_y = int(io.MousePos.y);
 	bool is_inside = screen_x >= m_screen_x && screen_y >= m_screen_y && screen_x <= m_screen_x + m_width &&
 					 screen_y <= m_screen_y + m_height;
 	if (!is_inside) return;
 
-	m_camera_speed = maximum(0.01f, m_camera_speed + ImGui::GetIO().MouseWheel / 20.0f);
+	if (m_mouse_wheel_changes_speed) {
+		m_camera_speed = maximum(0.01f, m_camera_speed + io.MouseWheel / 20.0f);
+	}
+	else {
+		if (io.MouseWheel > 0) m_view->moveCamera(1.0f, 0, 0, io.MouseWheel);
+		if (io.MouseWheel < 0) m_view->moveCamera(-1.0f, 0, 0, -io.MouseWheel);
+	}
 
 	float speed = m_camera_speed * time_delta * 60.f;
-	if (ImGui::GetIO().KeyShift) speed *= 10;
+	if (io.KeyShift) speed *= 10;
 	const CommonActions& actions = m_app.getCommonActions();
 	if (actions.cam_forward.isActive()) m_view->moveCamera(1.0f, 0, 0, speed);
 	if (actions.cam_backward.isActive()) m_view->moveCamera(-1.0f, 0, 0, speed);
@@ -892,163 +1090,6 @@ void SceneView::update(float time_delta)
 	if (actions.cam_down.isActive()) m_view->moveCamera(0, 0, -1.0f, speed);
 	if (actions.cam_up.isActive()) m_view->moveCamera(0, 0, 1.0f, speed);
 }
-
-
-void SceneView::renderIcons() {
-	Renderer& renderer = m_pipeline->getRenderer();
-	
-	renderer.pushJob("icons", [this, &renderer](DrawStream& stream) {
-		const Viewport& vp = m_view->getViewport();
-		const Matrix camera_mtx({0, 0, 0}, vp.rot);
-
-		EditorIcons* icon_manager = m_view->m_icons.get();
-		icon_manager->computeScales();
-		const HashMap<EntityRef, EditorIcons::Icon>& icons = icon_manager->getIcons();
-		for (const EditorIcons::Icon& icon : icons) {
-			const Model* model = icon_manager->getModel(icon.type);
-			if (!model || !model->isReady()) continue;
-
-			const Matrix mtx = icon_manager->getIconMatrix(icon, camera_mtx, vp.pos, vp.is_ortho, vp.ortho_size);
-			const Renderer::TransientSlice ub = renderer.allocUniform(&mtx, sizeof(Matrix));
-			stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
-		
-			for (int i = 0; i <= model->getLODIndices()[0].to; ++i) {
-				const Mesh& mesh = model->getMesh(i);
-				const Material* material = mesh.material;
-				stream.bind(0, material->m_bind_group);
-				const gpu::StateFlags state = material->m_render_states | gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE;
-				gpu::ProgramHandle program = mesh.material->getShader()->getProgram(state, mesh.vertex_decl, material->getDefineMask(), mesh.semantics_defines);
-				
-				stream.useProgram(program);
-				stream.bindIndexBuffer(mesh.index_buffer_handle);
-				stream.bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
-				stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-				stream.drawIndexed(0, mesh.indices_count, mesh.index_type);
-			}
-		}
-	});
-}
-
-
-void SceneView::renderSelection()
-{
-	PROFILE_FUNCTION();
-	Engine& engine = m_app.getEngine();
-	Renderer& renderer = m_pipeline->getRenderer();
-	const Array<EntityRef>& entities = m_editor.getSelectedEntities();
-	if (entities.size() > 5000) return;
-	
-	renderer.pushJob("selection", [&renderer, this, &engine, &entities](DrawStream& stream) {
-		RenderModule* module = m_pipeline->getModule();
-		const World& world = module->getWorld();
-		const u32 skinned_define = 1 << renderer.getShaderDefineIdx("SKINNED");
-		const u32 depth_define = 1 << renderer.getShaderDefineIdx("DEPTH");
-		const DVec3 view_pos = m_view->getViewport().pos;
-		Array<DualQuat> dq_pose(engine.getAllocator());
-		for (EntityRef e : entities) {
-			if (!module->getWorld().hasComponent(e, MODEL_INSTANCE_TYPE)) continue;
-
-			const Model* model = module->getModelInstanceModel(e);
-			if (!model || !model->isReady()) continue;
-
-			const Pose* pose = module->lockPose(e);
-			for (int i = 0; i <= model->getLODIndices()[0].to; ++i) {
-				const Mesh& mesh = model->getMesh(i);
-					
-				Material* material = mesh.material;
-				u32 define_mask = material->getDefineMask() | depth_define;
-				const Matrix mtx = world.getRelativeMatrix(e, view_pos);
-				dq_pose.clear();
-				if (pose && pose->count > 0 && mesh.type == Mesh::SKINNED) {
-					define_mask |= skinned_define;
-					dq_pose.reserve(pose->count);
-					for (int j = 0, c = pose->count; j < c; ++j) {
-						const Model::Bone& bone = model->getBone(j);
-						const LocalRigidTransform tmp = {pose->positions[j], pose->rotations[j]};
-						dq_pose.push((tmp * bone.inv_bind_transform).toDualQuat());
-					}
-				}
-			
-				Renderer::TransientSlice ub;
-				if (dq_pose.empty()) {
-					ub = renderer.allocUniform(&mtx, sizeof(mtx));
-				}
-				else {
-					struct UBPrefix {
-						float layer;
-						float fur_scale;
-						float gravity;
-						float padding;
-						Matrix model_mtx;
-						// DualQuat bones[];
-					};
-
-					ub = renderer.allocUniform(sizeof(UBPrefix) + dq_pose.byte_size());
-					UBPrefix* dc = (UBPrefix*)ub.ptr;
-					dc->layer = 0;
-					dc->fur_scale = 0;
-					dc->gravity = 0;
-					dc->model_mtx = mtx;
-					memcpy(ub.ptr + sizeof(UBPrefix), dq_pose.begin(), dq_pose.byte_size());
-				}
-		
-				const gpu::StateFlags state = gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_FUNCTION;
-				gpu::ProgramHandle program = mesh.material->getShader()->getProgram(material->m_render_states | state, mesh.vertex_decl, define_mask, mesh.semantics_defines);
-				stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
-				stream.bind(0, material->m_bind_group);
-				stream.useProgram(program);
-				stream.bindIndexBuffer(mesh.index_buffer_handle);
-				stream.bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
-				stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-				stream.drawIndexed(0, mesh.indices_count, mesh.index_type);
-			}
-			module->unlockPose(e, false);
-		}
-	});
-}
-
-
-void SceneView::renderGizmos()
-{
-	if (!m_debug_shape_shader || !m_debug_shape_shader->isReady()) return;
-	auto& vertices = m_view->m_draw_vertices;
-	if (vertices.empty()) return;
-
-	Renderer& renderer = m_pipeline->getRenderer();
-	renderer.pushJob("gizmos", [&renderer, &vertices, this](DrawStream& stream){
-		Renderer::TransientSlice vb = renderer.allocTransient(vertices.byte_size());
-		memcpy(vb.ptr, vertices.begin(), vertices.byte_size());
-		const Renderer::TransientSlice ub = renderer.allocUniform(&Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
-
-		gpu::VertexDecl lines_decl(gpu::PrimitiveType::LINES);
-		lines_decl.addAttribute(0, 3, gpu::AttributeType::FLOAT, 0);
-		lines_decl.addAttribute(12, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
-
-		gpu::VertexDecl tris_decl(gpu::PrimitiveType::TRIANGLES);
-		tris_decl.addAttribute(0, 3, gpu::AttributeType::FLOAT, 0);
-		tris_decl.addAttribute(12, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
-
-		const gpu::StateFlags state = gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE;
-		gpu::ProgramHandle lines_program = m_debug_shape_shader->getProgram(state, lines_decl, 0, "");
-		gpu::ProgramHandle triangles_program = m_debug_shape_shader->getProgram(state, tris_decl, 0, "");
-	
-		u32 offset = 0;
-		stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
-		for (const WorldViewImpl::DrawCmd& cmd : m_view->m_draw_cmds) {
-			const gpu::ProgramHandle program = cmd.lines ? lines_program : triangles_program;
-			stream.useProgram(program);
-			stream.bindIndexBuffer(gpu::INVALID_BUFFER);
-			stream.bindVertexBuffer(0, vb.buffer, vb.offset + offset, sizeof(WorldView::Vertex));
-			stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-			stream.drawArrays(0, cmd.vertex_count);
-
-			offset += cmd.vertex_count * sizeof(WorldView::Vertex);
-		}
-
-		m_view->m_draw_cmds.clear();
-	});
-}
-
 
 void SceneView::captureMouse(bool capture) {
 	if (m_is_mouse_captured == capture) return;
@@ -1156,22 +1197,21 @@ void SceneView::handleDrop(const char* path, float x, float y)
 
 void SceneView::onToolbar()
 {
-	static const char* actions_names[] = { "setTranslateGizmoMode",
-		"setRotateGizmoMode",
-		"setScaleGizmoMode",
-		"setLocalCoordSystem",
-		"setGlobalCoordSystem",
-		"viewTop",
-		"viewFront",
-		"viewSide" };
+	Action* actions[] = {
+		&m_translate_gizmo_mode,
+		&m_rotate_gizmo_mode,
+		&m_scale_gizmo_mode,
+		&m_local_coord_gizmo,
+		&m_global_coord_gizmo,
+		&m_top_view_action,
+		&m_front_view_action,
+		&m_side_view_action,
+	};
 
 	auto pos = ImGui::GetCursorScreenPos();
 	const float toolbar_height = ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().FramePadding.y * 2;
-	if (ImGuiEx::BeginToolbar("scene_view_toolbar", pos, ImVec2(0, toolbar_height)))
-	{
-		for (auto* action_name : actions_names)
-		{
-			auto* action = m_app.getAction(action_name);
+	if (ImGuiEx::BeginToolbar("scene_view_toolbar", pos, ImVec2(0, toolbar_height))) {
+		for (Action* action : actions) {
 			action->toolbarButton(m_app.getBigIconFont());
 		}
 	}
@@ -1189,13 +1229,11 @@ void SceneView::onToolbar()
 	float offset = (toolbar_height - ImGui::GetTextLineHeightWithSpacing()) / 2;
 	
 	Action* mode_action;
-	if (m_app.getGizmoConfig().isTranslateMode())
-	{
-		mode_action = m_app.getAction("setTranslateGizmoMode");
+	if (m_app.getGizmoConfig().isTranslateMode()) {
+		mode_action = &m_translate_gizmo_mode;
 	}
-	else
-	{
-		mode_action = m_app.getAction("setRotateGizmoMode");
+	else {
+		mode_action = &m_rotate_gizmo_mode;
 	}
 	
 	ImGui::SameLine();
@@ -1206,7 +1244,6 @@ void SceneView::onToolbar()
 
 	ImGui::SameLine();
 	pos = ImGui::GetCursorPos();
-	//pos.y -= offset;
 	ImGui::SetCursorPos(pos);
 	ImGui::TextUnformatted(mode_action->font_icon);
 
@@ -1215,6 +1252,7 @@ void SceneView::onToolbar()
 	pos.y += offset;
 	ImGui::SetCursorPos(pos);
 	float step = m_app.getGizmoConfig().getStep();
+	// TODO followin two widgets are not valigned
 	if (ImGui::DragFloat("##gizmoStep", &step, 1.0f, 0, 200))
 	{
 		m_app.getGizmoConfig().setStep(step);
@@ -1222,7 +1260,34 @@ void SceneView::onToolbar()
 	if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Snap amount");
 
 	ImGui::SameLine();
-	m_pipeline->callLuaFunction("onGUI");
+	if (ImGui::Button("Debug")) ImGui::OpenPopup("Debug");
+	if (ImGui::BeginPopup("Debug")) {
+		auto option = [&](const char* label, Pipeline::DebugShow value) {
+			StaticString<64> tmp(label);
+			char shortcut[32];
+			if (m_debug_show_actions[(u32)value]->shortcutText(shortcut)) {
+				tmp.append(" (", shortcut, ")");
+			}
+			if (ImGui::RadioButton(tmp, m_pipeline->m_debug_show == value)) {
+				m_pipeline->m_debug_show = value;
+				m_pipeline->m_debug_show_plugin = nullptr;
+			}
+		};
+		option("No debug", Pipeline::DebugShow::NONE);
+		option("Albedo", Pipeline::DebugShow::ALBEDO);
+		option("Normal", Pipeline::DebugShow::NORMAL);
+		option("Roughness", Pipeline::DebugShow::ROUGHNESS);
+		option("Metallic", Pipeline::DebugShow::METALLIC);
+		option("AO", Pipeline::DebugShow::AO);
+		option("Velocity", Pipeline::DebugShow::VELOCITY);
+		option("Light clusters", Pipeline::DebugShow::LIGHT_CLUSTERS);
+		option("Probe clusters", Pipeline::DebugShow::PROBE_CLUSTERS);
+		Renderer& renderer = m_pipeline->getRenderer();
+		for (Lumix::RenderPlugin* plugin : renderer.getPlugins()) {
+			plugin->debugUI(*m_pipeline);
+		}
+		ImGui::EndPopup();
+	}
 
 	ImGui::PopItemWidth();
 	ImGuiEx::EndToolbar();
@@ -1303,22 +1368,10 @@ void SceneView::handleEvents() {
 	}
 }
 
-void SceneView::onSettingsLoaded() {
-	Settings& settings = m_app.getSettings();
-	m_search_preview = settings.getValue(Settings::GLOBAL, "quicksearch_preview", false);
-	m_show_camera_preview = settings.getValue(Settings::GLOBAL, "show_camera_preview", true);
-}
-
-void SceneView::onBeforeSettingsSaved() {
-	Settings& settings = m_app.getSettings();
-	settings.setValue(Settings::GLOBAL, "quicksearch_preview", m_search_preview);
-	settings.setValue(Settings::GLOBAL, "show_camera_preview", m_show_camera_preview);
-}
-
 void SceneView::insertModelUI() {
 	if (m_insert_model_request) ImGui::OpenPopup("Insert model");
 
-	if (ImGuiEx::BeginResizablePopup("Insert model", ImVec2(300, 200))) {
+	if (ImGuiEx::BeginResizablePopup("Insert model", ImVec2(300, 200), ImGuiWindowFlags_NoNavInputs)) {
 		if (ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
 
 		ImGui::AlignTextToFramePadding();
@@ -1431,14 +1484,101 @@ void SceneView::cameraPreviewGUI(Vec2 size) {
 	}
 }
 
-void SceneView::onGUI()
-{
-	if (m_is_mouse_captured && !m_app.isMouseCursorClipped()) captureMouse(false);
+void SceneView::snapDown() {
+	WorldEditor& editor = m_app.getWorldEditor();
+	const Array<EntityRef>& selected = editor.getSelectedEntities();
+	if (selected.empty()) return;
 
-	m_has_focus = false;
+	Array<DVec3> new_positions(m_app.getAllocator());
+	World* world = editor.getWorld();
+
+	for (EntityRef entity : selected) {
+		const DVec3 origin = world->getPosition(entity);
+		auto hit = m_app.getRenderInterface()->castRay(*world, Ray{origin, Vec3(0, -1, 0)}, entity);
+		if (hit.is_hit) {
+			new_positions.push(origin + Vec3(0, -hit.t, 0));
+		}
+		else {
+			hit = m_app.getRenderInterface()->castRay(*world, Ray{origin, Vec3(0, 1, 0)}, entity);
+			if (hit.is_hit) {
+				new_positions.push(origin + Vec3(0, hit.t, 0));
+			}
+			else {
+				new_positions.push(world->getPosition(entity));
+			}
+		}
+	}
+	editor.setEntitiesPositions(&selected[0], &new_positions[0], new_positions.size());
+}
+
+static void selectParent(WorldEditor& editor) {
+	const Array<EntityRef>& selected = editor.getSelectedEntities();
+	if (selected.size() != 1) return;
+
+	const EntityPtr parent = editor.getWorld()->getParent(selected[0]);
+	if (parent.isValid()) {
+		EntityRef parent_ref = *parent;
+		editor.selectEntities(Span(&parent_ref, 1), false);
+	}
+}
+
+static void selectFirstChild(WorldEditor& editor) {
+	const Array<EntityRef>& selected = editor.getSelectedEntities();
+	if (selected.size() != 1) return;
+
+	const EntityPtr child = editor.getWorld()->getFirstChild(selected[0]);
+	if (child.isValid()) {
+		EntityRef child_ref = *child;
+		editor.selectEntities(Span(&child_ref, 1), false);
+	}
+}
+
+static void selectNextSibling(WorldEditor& editor) {
+	const Array<EntityRef>& selected = editor.getSelectedEntities();
+	if (selected.size() != 1) return;
+
+	const EntityPtr sibling = editor.getWorld()->getNextSibling(selected[0]);
+	if (sibling.isValid()) {
+		EntityRef sibling_ref = *sibling;
+		editor.selectEntities(Span(&sibling_ref, 1), false);
+	}
+}
+
+static void selectPrevSibling(WorldEditor& editor) {
+	const Array<EntityRef>& selected = editor.getSelectedEntities();
+	if (selected.size() != 1) return;
+
+	const World& world = *editor.getWorld();
+	const EntityRef e = selected[0];
+	const EntityPtr parent = world.getParent(e);
+	if (!parent) return;
+
+	EntityPtr child = world.getFirstChild(*parent);
+	ASSERT(child);
+	// we do not cycle, so if we are at the first child, we do not select the last one, we do nothing
+	if (child == e) return;
+	for (;;) {
+		const EntityPtr next = world.getNextSibling(*child);
+		if (next == e) {
+			EntityRef child_ref = *child;
+			editor.selectEntities(Span(&child_ref, 1), false);
+			return;
+		}
+		child = next;
+	}
+}
+
+void SceneView::onGUI() {
 	PROFILE_FUNCTION();
-	m_pipeline->setWorld(m_editor.getWorld());
+	WorldEditor& editor = m_app.getWorldEditor();		
+	if (m_is_mouse_captured && !m_app.isMouseCursorClipped()) captureMouse(false);
+	if (m_app.checkShortcut(m_wireframe_action, true)) toggleWireframe();
+	else if (m_app.checkShortcut(m_select_parent, true)) selectParent(editor);
+	else if (m_app.checkShortcut(m_select_child, true)) selectFirstChild(editor);
+	else if (m_app.checkShortcut(m_select_next_sibling, true)) selectNextSibling(editor);
+	else if (m_app.checkShortcut(m_select_prev_sibling, true)) selectPrevSibling(editor);
 
+	m_pipeline->setWorld(m_editor.getWorld());
 	bool is_open = false;
 	ImVec2 view_pos;
 	const char* title = ICON_FA_GLOBE "Scene View###Scene View";
@@ -1446,9 +1586,52 @@ void SceneView::onGUI()
 
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 	ImVec2 view_size;
-	if (ImGui::Begin(title, nullptr, ImGuiWindowFlags_NoScrollWithMouse)) {
-		m_has_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) || m_has_focus;
-		
+	if (ImGui::Begin(title, nullptr, ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoNavInputs)) {
+		if (m_app.checkShortcut(m_top_view_action)) m_view->setTopView();
+		else if (m_app.checkShortcut(m_side_view_action)) m_view->setSideView();
+		else if (m_app.checkShortcut(m_front_view_action)) m_view->setFrontView();
+		else if (m_app.checkShortcut(m_insert_model_action)) m_insert_model_request = true;
+		else if (m_app.checkShortcut(m_set_pivot_action)) m_view->setCustomPivot();
+		else if (m_app.checkShortcut(m_reset_pivot_action)) m_view->resetPivot();
+		else if (m_app.checkShortcut(m_toggle_projection_action)) toggleProjection();
+		else if (m_app.checkShortcut(m_look_at_selected_action)) m_view->lookAtSelected();
+		else if (m_app.checkShortcut(m_copy_view_action)) m_view->copyTransform();
+		else if (m_app.checkShortcut(m_rotate_entity_90_action)) rotate90Degrees();
+		else if (m_app.checkShortcut(m_move_entity_E_action)) moveEntity(Vec2(-1, 0));
+		else if (m_app.checkShortcut(m_move_entity_N_action)) moveEntity(Vec2(0, 1));
+		else if (m_app.checkShortcut(m_move_entity_S_action)) moveEntity(Vec2(0, -1));
+		else if (m_app.checkShortcut(m_move_entity_W_action)) moveEntity(Vec2(1, 0));
+		else if (m_app.checkShortcut(m_local_coord_gizmo)) m_app.getGizmoConfig().coord_system = Gizmo::Config::LOCAL;
+		else if (m_app.checkShortcut(m_global_coord_gizmo)) m_app.getGizmoConfig().coord_system = Gizmo::Config::GLOBAL;
+		else if (m_app.checkShortcut(m_translate_gizmo_mode)) m_app.getGizmoConfig().mode = Gizmo::Config::TRANSLATE;
+		else if (m_app.checkShortcut(m_rotate_gizmo_mode)) m_app.getGizmoConfig().mode = Gizmo::Config::ROTATE;
+		else if (m_app.checkShortcut(m_scale_gizmo_mode)) m_app.getGizmoConfig().mode = Gizmo::Config::SCALE;
+		else if (m_app.checkShortcut(m_snap_down)) snapDown();
+		else if (m_app.checkShortcut(m_create_entity)) {
+			const EntityRef e = editor.addEntity();
+			editor.selectEntities(Span(&e, 1), false);
+		} else if (m_app.checkShortcut(m_make_parent)) {
+			const auto& entities = editor.getSelectedEntities();
+			if (entities.size() == 2) editor.makeParent(entities[0], entities[1]);
+		} else if (m_app.checkShortcut(m_unparent)) {
+			const auto& entities = editor.getSelectedEntities();
+			if (entities.size() != 1) return;
+			editor.makeParent(INVALID_ENTITY, entities[0]);
+		}
+		else if (m_app.checkShortcut(m_autosnap_down)) {
+			Gizmo::Config& cfg = m_app.getGizmoConfig();
+			cfg.setAutosnapDown(!cfg.isAutosnapDown());
+		}
+		else {
+			for (u32 i = 0; i < lengthOf(m_debug_show_actions); ++i) {
+				if (m_app.checkShortcut(*m_debug_show_actions[i])) {
+					m_pipeline->m_debug_show = (Pipeline::DebugShow)i;
+					m_pipeline->m_debug_show_plugin = nullptr;
+					break;
+				}
+			}
+		}
+
 		ImGui::PopStyleVar();
 		is_open = true;
 		ImGui::Dummy(ImVec2(2, 2));

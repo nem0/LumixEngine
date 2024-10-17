@@ -2391,7 +2391,7 @@ public:
 			m_entity_folders.destroy();
 			m_engine.destroyWorld(*m_world);
 			
-			m_world = &m_engine.createWorld(true);
+			m_world = &m_engine.createWorld();
 			m_entity_folders.create(*m_world, m_allocator);
 			m_prefab_system->setWorld(m_world);
 			m_world_created.invoke();
@@ -2524,8 +2524,6 @@ public:
 
 
 	void pasteEntities() override;
-	void duplicateEntities() override;
-
 
 	void destroyComponent(Span<const EntityRef> entities, ComponentType cmp_type) override
 	{
@@ -2997,7 +2995,7 @@ public:
 
 		m_is_world_changed = false;
 		clearUndoStack();
-		m_world = &m_engine.createWorld(true);
+		m_world = &m_engine.createWorld();
 		World* world = m_world;
 
 		world->entityDestroyed().bind<&WorldEditorImpl::onEntityDestroyed>(this);
@@ -3238,15 +3236,6 @@ void WorldEditorImpl::pasteEntities()
 {
 	if (!canPasteEntities()) return;
 	UniquePtr<PasteEntityCommand> command = UniquePtr<PasteEntityCommand>::create(m_allocator, *this, m_copy_buffer);
-	executeCommand(command.move());
-}
-
-
-void WorldEditorImpl::duplicateEntities()
-{
-	copyEntities();
-
-	UniquePtr<PasteEntityCommand> command = UniquePtr<PasteEntityCommand>::create(m_allocator, *this, m_copy_buffer, true);
 	executeCommand(command.move());
 }
 

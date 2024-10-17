@@ -26,15 +26,7 @@ struct LUMIX_EDITOR_API ResourceLocator {
 	StringView full;
 };
 
-
 struct LUMIX_EDITOR_API Action {
-	// what should `StudioAppImpl::checkShortcuts` do
-	enum Type : u8 {
-		LOCAL, // ignore, must manually check isActive()
-		IMGUI_PRIORITY, // check only when imgui does not want input
-		GLOBAL // check even when imgui wants input
-	};
-
 	enum Modifiers : u8 {
 		NONE = 0,
 
@@ -43,38 +35,53 @@ struct LUMIX_EDITOR_API Action {
 		CTRL = 1 << 2
 	};
 
-	Action();
-	void init(const char* label_short, const char* label_long, const char* name, const char* font_icon, os::Keycode key0, Modifiers modifiers, Type type);
-	void init(const char* label_short, const char* label_long, const char* name, const char* font_icon, Type type);
-	bool toolbarButton(struct ImFont* font);
+	enum Type {
+		NORMAL,
+		TOOL,
+		WINDOW
+	};
+
+	Action(const char* label_short, const char* label_long, const char* name, const char* font_icon, Type type = NORMAL);
+	~Action();
+	bool toolbarButton(struct ImFont* font, bool is_selected = false);
 	bool isActive() const;
+	bool iconButton(bool enabled = true, struct StudioApp* app = nullptr);
 	bool shortcutText(Span<char> out) const;
 
-	static bool falseConst() { return false; }
-
-	StaticString<32> name;
-	StaticString<32> label_short;
-	StaticString<64> label_long;
-	Type type = Type::LOCAL;
+	StaticString<32> name;			// used for serialization
+	StaticString<32> label_short;	// used in menus
+	StaticString<64> label_long;	// used in shortcut editor
+	bool request = false;			// programatically request to invoke the action
 	Modifiers modifiers = Modifiers::NONE;
 	os::Keycode shortcut;
 	StaticString<5> font_icon;
-	Delegate<void ()> func;
-	Delegate<bool ()> is_selected;
+	Type type;
+
+	// linked list of all actions
+	static Action* first_action;
+	Action* next = nullptr;
+	Action* prev = nullptr;
 };
 
 struct CommonActions {
-	Action save;
-	Action undo;
-	Action redo;
-	Action del;
-	Action cam_orbit;
-	Action cam_forward;
-	Action cam_backward;
-	Action cam_left;
-	Action cam_right;
-	Action cam_up;
-	Action cam_down;
+	Action save{"Save", "Common - Save", "save", ICON_FA_SAVE};
+	Action undo{"Undo", "Common - Undo", "undo", ICON_FA_UNDO};
+	Action redo{"Redo", "Common - Redo", "redo", ICON_FA_REDO};
+	Action del{"Delete", "Common - Delete", "delete", ICON_FA_MINUS_SQUARE};
+	Action cam_orbit{"Orbit", "Camera - orbit with RMB", "orbit_rmb", ""};
+	Action cam_forward{"Move forward", "Camera - move forward", "camera_move_forward", ""};
+	Action cam_backward{"Move back", "Camera - move backward", "camera_move_back", ""};
+	Action cam_left{"Move left", "Camera - move left", "camera_move_left", ""};
+	Action cam_right{"Move right", "Camera - move right", "camera_move_right", ""};
+	Action cam_up{"Move up", "Camera - move up", "camera_move_up", ""};
+	Action cam_down{"Move down", "Camera - move down", "camera_move_down", ""};
+	Action select_all{"Select all", "Common - Select all", "select_all", ""};
+	Action rename{"Rename", "Common - Rename", "rename", ""};
+	Action copy{"Copy", "Common - Copy", "copy", ICON_FA_CLIPBOARD};
+	Action paste{"Paste", "Common - Paste", "paste", ICON_FA_PASTE};
+	Action close_window{"Close", "Close window", "close_window", ""};
+	Action open_externally{"Open externally", "Common - open externally", "open_externally", ICON_FA_EXTERNAL_LINK_ALT};
+	Action view_in_browser{"View in browser", "Common - view in asset browser", "view_in_asset_browser", ICON_FA_SEARCH};
 };
 
 inline Action::Modifiers operator |(Action::Modifiers a, Action::Modifiers b) { return Action::Modifiers((u8)a | (u8)b); }
@@ -82,7 +89,7 @@ inline void operator |= (Action::Modifiers& a, Action::Modifiers b) { a = a | b;
 
 LUMIX_EDITOR_API void getShortcut(const Action& action, Span<char> buf);
 LUMIX_EDITOR_API [[nodiscard]] bool menuItem(const Action& a, bool enabled);
-LUMIX_EDITOR_API void getEntityListDisplayName(struct StudioApp& app, struct World& editor, Span<char> buf, EntityPtr entity, bool force_display_index = false);
+LUMIX_EDITOR_API void getEntityListDisplayName(StudioApp& app, struct World& editor, Span<char> buf, EntityPtr entity, bool force_display_index = false);
 LUMIX_EDITOR_API bool inputRotation(const char* label, struct Quat* value);
 LUMIX_EDITOR_API bool inputString(const char* label, String* value);
 LUMIX_EDITOR_API bool inputString(const char* str_id, const char* label, String* value);
@@ -184,8 +191,13 @@ struct LUMIX_EDITOR_API TextFilter {
 	bool isActive() const { return count != 0; }
 	void clear() { count = 0; filter[0] = 0; }
 	bool pass(StringView text) const;
+	// if filter is empty, returns 1
+	// returns 0 if does not pass, otherwise returns score
+	u32 passWithScore(StringView text) const;
 	void build();
-	bool gui(const char* label, float width = -1, bool set_keyboard_focus = false);
+	// show filter input, returns true if filter changed
+	// add `focus_action`'s shortcut to label
+	bool gui(const char* label, float width = -1, bool set_keyboard_focus = false, Action* focus_action = nullptr);
 
 	char filter[128] = "";
 	StringView subfilters[8];
@@ -231,6 +243,7 @@ struct CodeEditor {
 	// get part of word left of cursor, usable for example for autocomplete
 	virtual StringView getPrefix() = 0;
 	
+	virtual void setReadOnly(bool readonly) = 0;
 	virtual void setText(StringView text) = 0;
 	virtual void serializeText(OutputMemoryStream& blob) = 0;
 	virtual void setTokenColors(Span<const u32> colors) = 0; // keep colors alive while CodeEditor uses them
@@ -241,7 +254,7 @@ struct CodeEditor {
 LUMIX_EDITOR_API UniquePtr<CodeEditor> createCodeEditor(StudioApp& app);
 LUMIX_EDITOR_API UniquePtr<CodeEditor> createCppCodeEditor(StudioApp& app);
 LUMIX_EDITOR_API UniquePtr<CodeEditor> createLuaCodeEditor(StudioApp& app);
-LUMIX_EDITOR_API UniquePtr<CodeEditor> createGLSLCodeEditor(StudioApp& app);
+LUMIX_EDITOR_API UniquePtr<CodeEditor> createHLSLCodeEditor(StudioApp& app);
 
 template <typename F> void alignGUI(float align, const F& f) {
 	const ImVec2 container_size = ImGui::GetContentRegionAvail();

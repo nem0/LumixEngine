@@ -186,6 +186,37 @@ static struct Instance
 	ThreadContext global_context;
 } g_instance;
 
+template <typename T>
+void writeNoLock(ThreadContext& ctx, u64 timestamp, EventType type, const T& value)
+{
+	if (g_instance.paused && timestamp > g_instance.paused_time) return;
+
+	u8 tmp[sizeof(EventHeader) + sizeof(T)];
+	EventHeader* header = (EventHeader*)tmp;
+	header->type = type;
+	header->size = sizeof(T) + sizeof(EventHeader);
+	header->time = timestamp;
+	memcpy(tmp + sizeof(*header), &value, sizeof(value));
+
+	u8* buf = ctx.buffer.getMutableData();
+	const u32 buf_size = (u32)ctx.buffer.size();
+
+	while (sizeof(tmp) + ctx.end - ctx.begin > buf_size) {
+		const u8 size = buf[ctx.begin % buf_size];
+		ctx.begin += size;
+	}
+
+	const u32 lend = ctx.end % buf_size;
+	if (buf_size - lend >= sizeof(tmp)) {
+		memcpy(buf + lend, tmp, sizeof(tmp));
+	}
+	else {
+		memcpy(buf + lend, tmp, buf_size - lend);
+		memcpy(buf, tmp + buf_size - lend, sizeof(tmp) - (buf_size - lend));
+	}
+
+	ctx.end += sizeof(tmp);
+};
 
 template <typename T>
 void write(ThreadContext& ctx, u64 timestamp, EventType type, const T& value)
@@ -366,7 +397,7 @@ void endGPUBlock(u64 timestamp)
 
 i64 createNewLinkID()
 {
-	AtomicI64 counter = 0;
+	static AtomicI64 counter = 1;
 	return counter.inc();
 }
 
@@ -384,11 +415,12 @@ float getLastFrameDuration()
 }
 
 
-void beforeFiberSwitch()
-{
+void beforeFiberSwitch() {
 	ThreadContext* ctx = g_instance.getThreadContext();
+	MutexGuard lock(ctx->mutex);
+	const u64 now = os::Timer::getRawTimestamp();
 	while(!ctx->open_blocks.empty()) {
-		write(*ctx, EventType::END_BLOCK, 0);
+		writeNoLock(*ctx, now, EventType::END_BLOCK, 0);
 		ctx->open_blocks.pop();
 	}
 }
@@ -408,12 +440,11 @@ void signalTriggered(i32 job_system_signal) {
 }
 
 
-FiberSwitchData beginFiberWait(i32 job_system_signal, bool is_mutex)
+FiberSwitchData beginFiberWait(i32 job_system_signal)
 {
 	FiberWaitRecord r;
 	r.id = g_instance.fiber_wait_id.inc();
 	r.job_system_signal = job_system_signal;
-	r.is_mutex = is_mutex;
 
 	FiberSwitchData res;
 
@@ -433,16 +464,20 @@ void endFiberWait(const FiberSwitchData& switch_data)
 	FiberWaitRecord r;
 	r.id = switch_data.id;
 	r.job_system_signal = switch_data.signal;
-	r.is_mutex = false;
 
-	write(*ctx, EventType::END_FIBER_WAIT, r);
+	MutexGuard lock(ctx->mutex);
+	const u64 now = os::Timer::getRawTimestamp();
+	writeNoLock(*ctx, now, EventType::END_FIBER_WAIT, r);
 	const u32 count = switch_data.count;
 	
 	for (u32 i = 0; i < count; ++i) {
 		if(i < lengthOf(switch_data.blocks)) {
-			continueBlock(switch_data.blocks[i]);
+			const i32 block_id = switch_data.blocks[i];
+			ctx->open_blocks.push(block_id);
+			writeNoLock(*ctx, now, EventType::CONTINUE_BLOCK, block_id);
 		} else {
-			continueBlock(-1);
+			ctx->open_blocks.push(-1);
+			writeNoLock(*ctx, now, EventType::CONTINUE_BLOCK, -1);
 		}
 	}
 }
@@ -490,6 +525,19 @@ void frame()
 	write(g_instance.global_context, EventType::FRAME, 0);
 }
 
+
+void pushMutexEvent(u64 mutex_id, u64 begin_enter_time, u64 end_enter_time, u64 begin_exit_time, u64 end_exit_time) {
+	ThreadContext* ctx = g_instance.getThreadContext();
+	ASSERT(ctx);
+	MutexEvent r = {
+		.mutex_id = mutex_id,
+		.begin_enter = begin_enter_time,
+		.end_enter = end_enter_time,
+		.begin_exit = begin_exit_time,
+		.end_exit = end_exit_time
+	};
+	write(*ctx, EventType::MUTEX_EVENT, r);
+}
 
 void showInProfiler(bool show)
 {

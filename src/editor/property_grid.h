@@ -18,15 +18,12 @@ struct LUMIX_EDITOR_API PropertyGrid : StudioApp::GUIPlugin {
 	};
 
 	explicit PropertyGrid(StudioApp& app);
-	~PropertyGrid();
 
 	void addPlugin(IPlugin& plugin) { m_plugins.push(&plugin); }
 	void removePlugin(IPlugin& plugin) { m_plugins.eraseItem(&plugin); }
 
 private:
 	void onGUI() override;
-	void onSettingsLoaded() override;
-	void onBeforeSettingsSaved() override;
 	const char* getName() const override { return "property_grid"; }
 	void showComponentProperties(const Array<EntityRef>& entities, ComponentType cmp_type, WorldEditor& editor);
 	void showCoreProperties(const Array<EntityRef>& entities, WorldEditor& editor) const;
@@ -38,9 +35,11 @@ private:
 	EntityPtr m_deferred_select;
 	
 	bool m_is_open = false;
+	bool m_focus_filter_request = false;
 	TextFilter m_component_filter;
 	TextFilter m_property_filter;
-	Action m_toggle_ui;
+	Action m_toggle_ui{"Inspector", "Inspector - toggle UI", "inspector_toggle_ui", "", Action::WINDOW};
+	Action m_focus_filter_action{"Focus filter", "Inspector - focus filter", "inspector_focus_filter", ""};
 };
 
 
