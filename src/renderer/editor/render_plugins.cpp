@@ -3802,8 +3802,8 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 
 	void update() override {
 		World& world = *m_app.getWorldEditor().getWorld();
-		if (m_app.checkShortcut(m_add_bounce_action)) generateProbes(true, world);
-		if (m_app.checkShortcut(m_generate_action)) generateProbes(false, world);
+		if (m_app.checkShortcut(m_add_bounce_action, true)) generateProbes(true, world);
+		if (m_app.checkShortcut(m_generate_action, true)) generateProbes(false, world);
 
 		if (m_ibl_filter_shader->isReady() && !m_ibl_filter_program) {
 			m_ibl_filter_program = m_ibl_filter_shader->getProgram(gpu::StateFlags::NONE, gpu::VertexDecl(gpu::PrimitiveType::TRIANGLE_STRIP), 0, "");
