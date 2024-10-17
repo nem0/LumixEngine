@@ -2548,8 +2548,8 @@ struct PipelineImpl final : Pipeline {
 
 						if (mi->flags & ModelInstance::MOVED) {
 							const i32 start_i = i;
-							const u64 key = sort_keys[i] & instance_key_mask;
-							while (i < keys_count && (sort_keys[i] & instance_key_mask) == key) {
+							const u64 key = sort_keys[i];
+							while (i < keys_count && sort_keys[i] == key) {
 								++i;
 							}
 
@@ -3365,7 +3365,7 @@ struct PipelineImpl final : Pipeline {
 										// moved and unmoved meshes can't be drawn in single drawcall as they need different instance data
 										// but autoinstancer groups all instances of a mesh in single drawcall
 										// so we don't autoinstance moved meshes, only unmoved
-										const u64 key = ((u64)bucket << SORT_KEY_BUCKET_SHIFT);
+										const u64 key = ((u64)bucket << SORT_KEY_BUCKET_SHIFT) | mesh.sort_key;
 										inserter.push(key, subrenderable);
 									}
 									else if (bucket < 0xff) {
