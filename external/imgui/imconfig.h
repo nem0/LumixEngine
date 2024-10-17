@@ -83,3 +83,4 @@ namespace ImGui
 }
 */
 
+#define ImTextureID void*
