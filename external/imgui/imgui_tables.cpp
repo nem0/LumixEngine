@@ -1,4 +1,4 @@
-// dear imgui, v1.91.3
+// dear imgui, v1.91.4 WIP
 // (tables and columns code)
 
 /*
@@ -1160,7 +1160,7 @@ void ImGui::TableUpdateLayout(ImGuiTable* table)
         }
 
         // Don't decrement auto-fit counters until container window got a chance to submit its items
-        if (table->HostSkipItems == false)
+        if (table->HostSkipItems == false && table->InstanceCurrent == 0)
         {
             column->AutoFitQueue >>= 1;
             column->CannotSkipItemsQueue >>= 1;
