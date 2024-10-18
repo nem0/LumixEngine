@@ -179,8 +179,13 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 
-	~RenderModuleImpl()
-	{
+	~RenderModuleImpl() {
+		m_world.componentTransformed(MODEL_INSTANCE_TYPE).unbind<&RenderModuleImpl::onModelInstanceMoved>(this);
+		m_world.componentTransformed(DECAL_TYPE).unbind<&RenderModuleImpl::onDecalMoved>(this);
+		m_world.componentTransformed(CURVE_DECAL_TYPE).unbind<&RenderModuleImpl::onCurveDecalMoved>(this);
+		m_world.componentTransformed(PARTICLE_EMITTER_TYPE).unbind<&RenderModuleImpl::onParticleEmitterMoved>(this);
+		m_world.componentTransformed(POINT_LIGHT_TYPE).unbind<&RenderModuleImpl::onPointLightMoved>(this);
+
 		for (Decal& decal : m_decals) {
 			if (decal.material) decal.material->decRefCount();
 		}
@@ -230,7 +235,6 @@ struct RenderModuleImpl final : RenderModule {
 		}
 
 		m_renderer.getEndFrameDrawStream().destroy(m_reflection_probes_texture);
-		m_world.entityTransformed().unbind<&RenderModuleImpl::onEntityMoved>(this);
 		m_world.entityDestroyed().unbind<&RenderModuleImpl::onEntityDestroyed>(this);
 		m_culling_system.reset();
 	}
@@ -1543,57 +1547,8 @@ struct RenderModuleImpl final : RenderModule {
 		}
 	}
 
-
-	void onEntityMoved(EntityRef entity)
-	{
-		const u64 cmp_mask = m_world.getComponentsMask(entity);
-		if ((cmp_mask & m_render_cmps_mask) == 0) {
-			return;
-		}
-
-		if (m_culling_system->isAdded(entity)) {
-			if (m_world.hasComponent(entity, MODEL_INSTANCE_TYPE)) {
-				const Transform& tr = m_world.getTransform(entity);
-				ModelInstance& mi = m_model_instances[entity.index];
-				m_moved_instances.push(entity);
-				mi.flags |= ModelInstance::MOVED;
-				const Model* model = mi.model;
-				ASSERT(model);
-				const float bounding_radius = model->getOriginBoundingRadius();
-				m_culling_system->set(entity, tr.pos, bounding_radius * maximum(tr.scale.x, tr.scale.y, tr.scale.z));
-			}
-			else if (m_world.hasComponent(entity, DECAL_TYPE)) {
-				auto iter = m_decals.find(entity);
-				updateDecalInfo(iter.value());
-				const DVec3 position = m_world.getPosition(entity);
-				m_culling_system->setPosition(entity, position);
-			}
-			else if (m_world.hasComponent(entity, CURVE_DECAL_TYPE)) {
-				auto iter = m_curve_decals.find(entity);
-				updateDecalInfo(iter.value());
-				const DVec3 position = m_world.getPosition(entity);
-				m_culling_system->setPosition(entity, position);
-			}
-			else if (m_world.hasComponent(entity, POINT_LIGHT_TYPE)) {
-				const DVec3 pos = m_world.getPosition(entity);
-				m_culling_system->setPosition(entity, pos);
-			}
-		}
-		else if (m_world.hasComponent(entity, PARTICLE_EMITTER_TYPE)) {
-			m_particle_emitters[entity].applyTransform(m_world.getTransform(entity));
-		}
-
-		bool was_updating = m_is_updating_attachments;
-		m_is_updating_attachments = true;
-		for (auto& attachment : m_bone_attachments)
-		{
-			if (attachment.parent_entity == entity)
-			{
-				updateBoneAttachment(attachment);
-			}
-		}
-		m_is_updating_attachments = was_updating;
-
+// TODO update bont attachment's relative matrix if the attachment is moved not by moving its parent
+#if 0
 		if (m_is_updating_attachments || m_is_game_running) return;
 		
 		if(m_world.hasComponent(entity, BONE_ATTACHMENT_TYPE)) {
@@ -1606,8 +1561,61 @@ struct RenderModuleImpl final : RenderModule {
 				}
 			}
 		}
+#endif
+
+	void onModelInstanceMoved(EntityRef entity) {
+		if (!m_culling_system->isAdded(entity)) return;
+		
+		const Transform& tr = m_world.getTransform(entity);
+		ModelInstance& mi = m_model_instances[entity.index];
+		m_moved_instances.push(entity);
+		mi.flags |= ModelInstance::MOVED;
+		const Model* model = mi.model;
+		ASSERT(model);
+		const float bounding_radius = model->getOriginBoundingRadius();
+		m_culling_system->set(entity, tr.pos, bounding_radius * maximum(tr.scale.x, tr.scale.y, tr.scale.z));
+
+		if (mi.flags & ModelInstance::IS_BONE_ATTACHMENT_PARENT) {
+			bool was_updating = m_is_updating_attachments;
+			m_is_updating_attachments = true;
+			for (auto& attachment : m_bone_attachments) {
+				if (attachment.parent_entity == entity) {
+					updateBoneAttachment(attachment);
+				}
+			}
+			m_is_updating_attachments = was_updating;
+		}
 	}
 
+	void onDecalMoved(EntityRef entity) {
+		if (!m_culling_system->isAdded(entity)) return;
+
+		auto iter = m_decals.find(entity);
+		updateDecalInfo(iter.value());
+		const DVec3 position = m_world.getPosition(entity);
+		m_culling_system->setPosition(entity, position);
+	}
+
+
+	void onCurveDecalMoved(EntityRef entity) {
+		if (!m_culling_system->isAdded(entity)) return;
+
+		auto iter = m_curve_decals.find(entity);
+		updateDecalInfo(iter.value());
+		const DVec3 position = m_world.getPosition(entity);
+		m_culling_system->setPosition(entity, position);
+	}
+
+	void onPointLightMoved(EntityRef entity) {
+		if (!m_culling_system->isAdded(entity)) return;
+
+		const DVec3 pos = m_world.getPosition(entity);
+		m_culling_system->setPosition(entity, pos);
+	}
+
+	void onParticleEmitterMoved(EntityRef entity) {
+		m_particle_emitters[entity].applyTransform(m_world.getTransform(entity));
+	}
 
 	Engine& getEngine() const override { return m_engine; }
 
@@ -3284,7 +3292,6 @@ struct RenderModuleImpl final : RenderModule {
 	Renderer& m_renderer;
 	Engine& m_engine;
 	UniquePtr<CullingSystem> m_culling_system;
-	u64 m_render_cmps_mask;
 
 	EntityPtr m_active_global_light_entity;
 	HashMap<EntityRef, PointLight> m_point_lights;
@@ -3565,23 +3572,18 @@ RenderModuleImpl::RenderModuleImpl(Renderer& renderer,
 	, m_material_curve_decal_map(m_allocator)
 	, m_furs(m_allocator)
 {
+	m_world.componentTransformed(MODEL_INSTANCE_TYPE).bind<&RenderModuleImpl::onModelInstanceMoved>(this);
+	m_world.componentTransformed(DECAL_TYPE).bind<&RenderModuleImpl::onDecalMoved>(this);
+	m_world.componentTransformed(CURVE_DECAL_TYPE).bind<&RenderModuleImpl::onCurveDecalMoved>(this);
+	m_world.componentTransformed(PARTICLE_EMITTER_TYPE).bind<&RenderModuleImpl::onParticleEmitterMoved>(this);
+	m_world.componentTransformed(POINT_LIGHT_TYPE).bind<&RenderModuleImpl::onPointLightMoved>(this);
 
-	m_world.entityTransformed().bind<&RenderModuleImpl::onEntityMoved>(this);
 	m_world.entityDestroyed().bind<&RenderModuleImpl::onEntityDestroyed>(this);
 	m_culling_system = CullingSystem::create(m_allocator, engine.getPageAllocator());
 	m_model_instances.reserve(1024);
 
-	m_render_cmps_mask = 0;
-
 	Renderer::MemRef mem;
 	m_reflection_probes_texture = renderer.createTexture(128, 128, 32, gpu::TextureFormat::BC3, gpu::TextureFlags::IS_CUBE, mem, "reflection_probes");
-
-	const RuntimeHash hash("renderer");
-	for (const reflection::RegisteredComponent& cmp : reflection::getComponents()) {
-		if (cmp.module_hash == hash) {
-			m_render_cmps_mask |= (u64)1 << cmp.cmp->component_type.index;
-		}
-	}
 }
 
 UniquePtr<RenderModule> RenderModule::createInstance(Renderer& renderer,

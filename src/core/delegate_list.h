@@ -73,7 +73,7 @@ template <typename R, typename... Args> struct DelegateList<R(Args...)> {
 		}
 	}
 
-	void invoke(Args... args)
+	void invoke(Args... args) const
 	{
 		for (i32 i = 0, c = m_delegates.size(); i < c; ++i) m_delegates[i].invoke(args...);
 	}

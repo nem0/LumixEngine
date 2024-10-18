@@ -730,14 +730,14 @@ struct SSAO : public RenderPlugin {
 		if (!m_blur_shader->isReady()) return;
 		if (!m_enabled) return;
 
-		pipeline.beginBlock("ssao");
+		const Viewport& vp = pipeline.getViewport();
+		pipeline.beginBlock(StaticString<64>("ssao ", vp.w, "x", vp.h));
 		RenderBufferHandle ssao_rb = pipeline.createRenderbuffer({ 
 			.format = gpu::TextureFormat::RGBA8, 
 			.flags = gpu::TextureFlags::COMPUTE_WRITE, 
 			.debug_name = "ssao" 
 		});
 
-		const Viewport& vp = pipeline.getViewport();
 		DrawStream& stream = pipeline.getRenderer().getDrawStream();
 
 		struct {
@@ -755,6 +755,7 @@ struct SSAO : public RenderPlugin {
 		pipeline.dispatch(*m_shader, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
 
 		if (m_blur) {
+			pipeline.beginBlock("blur");
 			const RenderBufferHandle ssao_blurred_rb = pipeline.createRenderbuffer({ 
 				.format = gpu::TextureFormat::RGBA8, 
 				.flags = gpu::TextureFlags::COMPUTE_WRITE, 
@@ -769,7 +770,7 @@ struct SSAO : public RenderPlugin {
 				gpu::RWBindlessHandle output;
 			} blur_data = {
 				.rcp_size = Vec2(1.0f / vp.w, 1.0f / vp.h),
-				.weight_scale = 1.0f,
+				.weight_scale = 0.01f,
 				.input = pipeline.toBindless(ssao_rb, stream),
 				.depth_buffer = pipeline.toBindless(gbuffer.DS, stream),
 				.output = pipeline.toRWBindless(ssao_blurred_rb, stream)
@@ -779,6 +780,7 @@ struct SSAO : public RenderPlugin {
 			pipeline.setUniform(blur_data);
 			pipeline.dispatch(*m_blur_shader, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
 			ssao_rb = ssao_blurred_rb;
+			pipeline.endBlock();
 		}
 
 

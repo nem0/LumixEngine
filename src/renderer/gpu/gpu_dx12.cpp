@@ -749,6 +749,7 @@ struct SamplerHeap {
 
 		alloc(device, 0, SamplerFlags::CLAMP_U | SamplerFlags::CLAMP_V | SamplerFlags::CLAMP_W);
 		alloc(device, 1, SamplerFlags::NONE);
+		alloc(device, 2, SamplerFlags::CLAMP_U | SamplerFlags::CLAMP_V | SamplerFlags::CLAMP_W | SamplerFlags::POINT_FILTER);
 
 		return true;
 	}
