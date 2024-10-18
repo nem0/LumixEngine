@@ -1305,7 +1305,8 @@ struct StudioAppImpl final : StudioApp {
 			return;
 		}
 
-		for (ComponentUID cmp = world->getFirstComponent(ents[0]); cmp.isValid(); cmp = world->getNextComponent(cmp)) {
+		for (ComponentType cmp_type : world->getComponents(ents[0])) {
+			ComponentUID cmp(ents[0], cmp_type, world->getModule(cmp_type));
 			for (auto* plugin : m_plugins) {
 				if (plugin->showGizmo(view, cmp)) break;
 			}

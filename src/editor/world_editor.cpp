@@ -1234,8 +1234,7 @@ public:
 		const reflection::ComponentBase* cmp_desc = reflection::getComponent(component_type);
 
 		for (u32 i = 0; i < entities.length(); ++i) {
-			ComponentUID component = world->getComponent(entities[i], component_type);
-			if (!component.isValid()) continue;
+			ComponentUID component(entities[i], component_type, world->getModule(component_type));
 
 			PropertySerializeVisitor v(m_old_values, component);
 			v.idx = -1;
@@ -1263,8 +1262,9 @@ public:
 				if (array[0] != '\0') return;
 				if (!equalIStrings(prop_name, prop.name)) return;
 				found = true;
+				World* world = cmd->m_editor.getWorld();
 				for (EntityPtr entity : cmd->m_entities) {
-					const ComponentUID cmp = cmd->m_editor.getWorld()->getComponent((EntityRef)entity, cmd->m_component_type);
+					const ComponentUID cmp(entity, cmd->m_component_type, world->getModule(cmd->m_component_type));
 					ASSERT(prop.setter);
 					prop.set(cmp, cmd->m_index, StoredType<T>::get(cmd->m_new_value));
 				}
@@ -1280,8 +1280,9 @@ public:
 			}
 
 			void visit(const reflection::DynamicProperties& prop) override { 
+				World* world = cmd->m_editor.getWorld();
 				for (EntityPtr entity : cmd->m_entities) {
-					const ComponentUID cmp = cmd->m_editor.getWorld()->getComponent((EntityRef)entity, cmd->m_component_type);
+					const ComponentUID cmp(*entity, cmd->m_component_type, world->getModule(cmd->m_component_type));
 					const u32 c = prop.getCount(cmp, cmd->m_index);
 					for (u32 i = 0; i < c; ++i) {
 						const char* name = prop.getName(cmp, cmd->m_index, i);
@@ -1315,7 +1316,7 @@ public:
 		World* world = m_editor.getWorld();
 		Span<const EntityRef> entities(nullptr, nullptr);
 		for (int i = 0; i < m_entities.size(); ++i) {
-			const ComponentUID cmp = world->getComponent(m_entities[i], m_component_type);
+			const ComponentUID cmp(m_entities[i], m_component_type, world->getModule(m_component_type));
 			PropertyDeserializeVisitor v(blob, cmp, map, entities);	
 			cmp_desc->visit(v);
 		}
@@ -1685,13 +1686,7 @@ private:
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
 				m_transformations.emplace(world->getTransform(m_entities[i]));
-				int count = 0;
-				for (ComponentUID cmp = world->getFirstComponent(m_entities[i]);
-					cmp.isValid();
-					cmp = world->getNextComponent(cmp))
-				{
-					++count;
-				}
+				const u32 count = world->getComponents(m_entities[i]).length();
 				m_old_values.writeString(world->getEntityName(m_entities[i]));
 				EntityPtr parent = world->getParent(m_entities[i]);
 				const EntityFolders::FolderHandle folder = m_editor.m_entity_folders->getFolder(m_entities[i]);
@@ -1711,10 +1706,8 @@ private:
 				m_old_values.write(INVALID_ENTITY);
 
 				m_old_values.write(count);
-				for (ComponentUID cmp = world->getFirstComponent(m_entities[i]);
-					cmp.isValid();
-					cmp = world->getNextComponent(cmp))
-				{
+				for (ComponentType cmp_type : world->getComponents(m_entities[i])) {
+					ComponentUID cmp(m_entities[i], cmp_type, world->getModule(cmp_type));
 					m_old_values.write(cmp.type);
 					const reflection::ComponentBase* cmp_desc = reflection::getComponent(cmp.type);
 
@@ -2477,10 +2470,8 @@ public:
 			serializer.writeString(m_world->getEntityName(entity));
 			serializer.write(m_world->getParent(entity));
 
-			for (ComponentUID cmp = m_world->getFirstComponent(entity);
-				cmp.isValid();
-				cmp = m_world->getNextComponent(cmp))
-			{
+			for (ComponentType type : m_world->getComponents(entity)) {
+				ComponentUID cmp(entity, type, m_world->getModule(type));
 				const RuntimeHash cmp_type(reflection::getComponent(cmp.type)->name);
 				serializer.write(cmp_type);
 				const reflection::ComponentBase* cmp_desc = reflection::getComponent(cmp.type);
@@ -2804,7 +2795,8 @@ public:
 			}
 		}
 
-		for (ComponentUID cmp = src_world.getFirstComponent(src_e); cmp.isValid(); cmp = src_world.getNextComponent(cmp)) {
+		for (ComponentType cmp_type : src_world.getComponents(src_e)) {
+			ComponentUID cmp(src_e, cmp_type, src_world.getModule(cmp_type));
 			dst_world.createComponent(cmp.type, dst_e);
 
 			const reflection::ComponentBase* cmp_tpl = reflection::getComponent(cmp.type);

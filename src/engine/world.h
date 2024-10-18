@@ -48,6 +48,7 @@ struct LUMIX_ENGINE_API EntityMap final {
 struct LUMIX_ENGINE_API World {
 	enum { ENTITY_NAME_MAX_LENGTH = 32 };
 	using PartitionHandle = u16;
+	using ArchetypeHandle = u16;
 
 	// `Partition` is a set of entities, single world can have multiple partitions
 	// used for additive loading/unloading
@@ -68,11 +69,8 @@ struct LUMIX_ENGINE_API World {
 	void destroyComponent(EntityRef entity, ComponentType type);
 	void onComponentCreated(EntityRef entity, ComponentType component_type, IModule* module);
 	void onComponentDestroyed(EntityRef entity, ComponentType component_type, IModule* module);
-	u64 getComponentsMask(EntityRef entity) const;
 	bool hasComponent(EntityRef entity, ComponentType component_type) const;
-	ComponentUID getComponent(EntityRef entity, ComponentType type) const;
-	ComponentUID getFirstComponent(EntityRef entity) const;
-	ComponentUID getNextComponent(const ComponentUID& cmp) const;
+	Span<const ComponentType> getComponents(EntityRef entity) const;
 
 	PartitionHandle createPartition(const char* name);
 	void destroyPartition(PartitionHandle partition);
@@ -118,10 +116,10 @@ struct LUMIX_ENGINE_API World {
 	const Quat& getRotation(EntityRef entity) const;
 
 	DelegateList<void(EntityRef)>& entityCreated() { return m_entity_created; }
-	DelegateList<void(EntityRef)>& entityTransformed() { return m_entity_moved; }
 	DelegateList<void(EntityRef)>& entityDestroyed() { return m_entity_destroyed; }
 	DelegateList<void(const ComponentUID&)>& componentDestroyed() { return m_component_destroyed; }
 	DelegateList<void(const ComponentUID&)>& componentAdded() { return m_component_added; }
+	DelegateList<void(EntityRef)>& componentTransformed(ComponentType type);
 
 	void serialize(struct OutputMemoryStream& serializer, WorldSerializeFlags flags);
 	[[nodiscard]] bool deserialize(struct InputMemoryStream& serializer, EntityMap& entity_map, WorldVersion& version);
@@ -142,16 +140,17 @@ private:
 		i32 name; // index into m_names, < 0 if no name
 
 		union {
-			u64 components; // bitmask of attached components
-			static_assert(sizeof(components) * 8 == ComponentType::MAX_TYPES_COUNT);
+			struct {
+				PartitionHandle partition;
+				ArchetypeHandle archetype;
+			};
 			struct {
 				// freelist indices
 				int prev; 
 				int next;
 			};
 		};
-		PartitionHandle partition;
-		bool valid;
+		bool valid = false;
 	};
 
 	struct Hierarchy {
@@ -169,16 +168,20 @@ private:
 	};
 
 	struct ComponentTypeEntry {
+		ComponentTypeEntry(IAllocator& allocator) : transformed(allocator) {}
 		IModule* module = nullptr;
 		void (*create)(IModule*, EntityRef);
 		void (*destroy)(IModule*, EntityRef);
+		DelegateList<void(EntityRef)> transformed;
 	};
+
 
 	TagAllocator m_allocator;
 	Engine& m_engine;
-	// TODO get rid of MAX_TYPES_COUNT limit (index archetypes maybe)
-	ComponentTypeEntry m_component_type_map[ComponentType::MAX_TYPES_COUNT];
+	Local<ComponentTypeEntry> m_component_type_map[ComponentType::MAX_TYPES_COUNT];
 	Array<UniquePtr<IModule>> m_modules;
+	struct ArchetypeManager;
+	UniquePtr<ArchetypeManager> m_archetype_manager;
 	
 	// m_entities/m_transforms are indexed by EntityRef::index
 	// not in single array (==EntityData does not contain Transform) because of cache/performance
@@ -196,7 +199,6 @@ private:
 	PartitionHandle m_active_partition = 0;
 	
 	DelegateList<void(EntityRef)> m_entity_created;
-	DelegateList<void(EntityRef)> m_entity_moved;
 	DelegateList<void(EntityRef)> m_entity_destroyed;
 	DelegateList<void(const ComponentUID&)> m_component_destroyed;
 	DelegateList<void(const ComponentUID&)> m_component_added;
