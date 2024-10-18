@@ -5,6 +5,7 @@
 namespace Lumix {
 
 struct EntityRef;
+struct StringView;
 
 struct EntityPtr
 {
@@ -78,6 +79,8 @@ inline EntityRef EntityPtr::operator*() const {
 	#define LUMIX_RENDERER_API LUMIX_LIBRARY_IMPORT
 #endif
 
-namespace reflection { LUMIX_ENGINE_API ComponentType getComponentType(const char* id); }
+namespace reflection { 
+	LUMIX_ENGINE_API ComponentType getComponentType(StringView id);
+}
 
 } // namespace Lumix

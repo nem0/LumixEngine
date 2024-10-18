@@ -1,0 +1,43 @@
+include "shaders/common.hlsli"
+
+vertex_shader [[
+	layout(location = 0) in vec2 a_position;
+	layout(location = 1) in vec4 a_color;
+	layout(location = 2) in vec2 a_uv;
+	
+	layout(std140, binding = 4) uniform Data {
+		vec4 u_rot;
+		vec4 u_pos;
+		vec2 u_canvas_size;
+		vec2 u_translation;
+	};
+
+	layout(location = 0) out vec4 v_color;
+	layout(location = 1) out vec2 v_uv;
+	
+	void main() {
+		v_color = a_color;
+		v_uv = a_uv;
+		#ifdef SPATIAL
+			vec2 pos = (u_translation + a_position) / u_canvas_size;
+			pos.y = 1 - pos.y;
+			vec3 p = rotateByQuat(u_rot, vec3(pos, 0)) + u_pos.xyz;
+			gl_Position = Pass.view_projection * vec4(p, 1);
+		#else
+			vec2 pos = (u_translation + a_position) / u_canvas_size * 2 - 1;
+			pos.y = - pos.y;
+			gl_Position = vec4(pos, 0, 1);
+		#endif
+	}
+]]
+
+
+fragment_shader [[
+	layout (binding=0) uniform sampler2D u_texture;
+	layout(location = 0) in vec4 v_color;
+	layout(location = 1) in vec2 v_uv;
+	layout(location = 0) out vec4 o_color;
+	void main() {
+		o_color = v_color * textureLod(u_texture, v_uv, 0);
+	}
+]]

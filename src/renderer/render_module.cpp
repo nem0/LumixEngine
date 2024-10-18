@@ -9,7 +9,6 @@
 #include "core/hash.h"
 #include "core/job_system.h"
 #include "core/log.h"
-#include "engine/lua_wrapper.h"
 #include "core/math.h"
 #include "core/page_allocator.h"
 #include "core/profiler.h"
@@ -180,8 +179,13 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 
-	~RenderModuleImpl()
-	{
+	~RenderModuleImpl() {
+		m_world.componentTransformed(MODEL_INSTANCE_TYPE).unbind<&RenderModuleImpl::onModelInstanceMoved>(this);
+		m_world.componentTransformed(DECAL_TYPE).unbind<&RenderModuleImpl::onDecalMoved>(this);
+		m_world.componentTransformed(CURVE_DECAL_TYPE).unbind<&RenderModuleImpl::onCurveDecalMoved>(this);
+		m_world.componentTransformed(PARTICLE_EMITTER_TYPE).unbind<&RenderModuleImpl::onParticleEmitterMoved>(this);
+		m_world.componentTransformed(POINT_LIGHT_TYPE).unbind<&RenderModuleImpl::onPointLightMoved>(this);
+
 		for (Decal& decal : m_decals) {
 			if (decal.material) decal.material->decRefCount();
 		}
@@ -231,7 +235,6 @@ struct RenderModuleImpl final : RenderModule {
 		}
 
 		m_renderer.getEndFrameDrawStream().destroy(m_reflection_probes_texture);
-		m_world.entityTransformed().unbind<&RenderModuleImpl::onEntityMoved>(this);
 		m_world.entityDestroyed().unbind<&RenderModuleImpl::onEntityDestroyed>(this);
 		m_culling_system.reset();
 	}
@@ -582,23 +585,54 @@ struct RenderModuleImpl final : RenderModule {
 	void serializeCameras(OutputMemoryStream& serializer)
 	{
 		serializer.write((i32)m_cameras.size());
-		for (Camera& camera : m_cameras)
-		{
-			serializer.write(camera);
+		for (Camera& camera : m_cameras) {
+			serializer.write(camera.entity);
+			serializer.write(camera.fov);
+			serializer.write(camera.near);
+			serializer.write(camera.far);
+			serializer.write(camera.ortho_size);
+			serializer.write(camera.screen_width);
+			serializer.write(camera.screen_height);
+			serializer.write(camera.is_ortho);
+			serializer.write(camera.film_grain_intensity);
+			serializer.write(camera.dof_enabled);
+			serializer.write(camera.dof_distance);
+			serializer.write(camera.dof_range);
+			serializer.write(camera.dof_max_blur_size);
+			serializer.write(camera.dof_sharp_range);
 		}
 	}
 
-	void serializeLights(OutputMemoryStream& serializer)
-	{
+	void serializeLights(OutputMemoryStream& serializer) {
 		serializer.write((i32)m_point_lights.size());
 		for (const PointLight& pl : m_point_lights) {
 			serializer.write(pl);
 		}
 
 		serializer.write((i32)m_environments.size());
-		for (const Environment& light : m_environments)
-		{
-			serializer.write(light);
+		for (const Environment& env : m_environments) {
+			serializer.write(env.light_color);
+			serializer.write(env.direct_intensity);
+			serializer.write(env.indirect_intensity);
+			serializer.write(env.entity);
+			serializer.write(env.cascades);
+			serializer.write(env.flags);
+			serializer.writeString(env.cubemap_sky ? env.cubemap_sky->getPath().c_str() : "");
+			serializer.write(env.sky_intensity);
+			serializer.write(env.scatter_rayleigh);
+			serializer.write(env.scatter_mie);
+			serializer.write(env.absorb_mie);
+			serializer.write(env.sunlight_color);
+			serializer.write(env.fog_scattering);
+			serializer.write(env.sunlight_strength);
+			serializer.write(env.height_distribution_rayleigh);
+			serializer.write(env.height_distribution_mie);
+			serializer.write(env.ground_r);
+			serializer.write(env.atmo_r);
+			serializer.write(env.fog_top);
+			serializer.write(env.atmo_enabled);
+			serializer.write(env.godrays_enabled);
+			serializer.write(env.fog_density);
 		}
 		serializer.write(m_active_global_light_entity);
 	}
@@ -936,7 +970,7 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 
-	void deserializeCameras(InputMemoryStream& serializer, const EntityMap& entity_map)
+	void deserializeCameras(InputMemoryStream& serializer, const EntityMap& entity_map, i32 version)
 	{
 		u32 size;
 		serializer.read(size);
@@ -944,7 +978,27 @@ struct RenderModuleImpl final : RenderModule {
 		for (u32 i = 0; i < size; ++i)
 		{
 			Camera camera;
-			serializer.read(camera);
+			serializer.read(camera.entity);
+			serializer.read(camera.fov);
+			serializer.read(camera.near);
+			serializer.read(camera.far);
+			serializer.read(camera.ortho_size);
+			serializer.read(camera.screen_width);
+			serializer.read(camera.screen_height);
+			serializer.read(camera.is_ortho);
+			if (version > (i32)RenderModuleVersion::POSTPROCESS) {
+				serializer.read(camera.film_grain_intensity);
+				serializer.read(camera.dof_enabled);
+				serializer.read(camera.dof_distance);
+				serializer.read(camera.dof_range);
+				serializer.read(camera.dof_max_blur_size);
+				serializer.read(camera.dof_sharp_range);
+			}
+			else {
+				u8 padding[3];
+				serializer.read(padding);
+			}
+
 			camera.entity = entity_map.get(camera.entity);
 
 			m_cameras.insert(camera.entity, camera);
@@ -1041,8 +1095,7 @@ struct RenderModuleImpl final : RenderModule {
 		}
 	}
 
-	void deserializeLights(IInputStream& serializer, const EntityMap& entity_map)
-	{
+	void deserializeLights(InputMemoryStream& serializer, const EntityMap& entity_map, i32 version) {
 		u32 size = 0;
 		serializer.read(size);
 		m_point_lights.reserve(size + m_point_lights.size());
@@ -1058,11 +1111,45 @@ struct RenderModuleImpl final : RenderModule {
 
 		serializer.read(size);
 		for (u32 i = 0; i < size; ++i) {
-			Environment light;
-			serializer.read(light);
-			light.entity = entity_map.get(light.entity);
-			m_environments.insert(light.entity, light);
-			m_world.onComponentCreated(light.entity, ENVIRONMENT_TYPE, this);
+			Environment env;
+			serializer.read(env.light_color);
+			serializer.read(env.direct_intensity);
+			serializer.read(env.indirect_intensity);
+			serializer.read(env.entity);
+			serializer.read(env.cascades);
+			serializer.read(env.flags);
+			if (version > (i32)RenderModuleVersion::POSTPROCESS) {
+				const char* sky_path = serializer.readString();
+				if (sky_path[0]) {
+					env.cubemap_sky = m_engine.getResourceManager().load<Texture>(Path(sky_path));
+				}
+				serializer.read(env.sky_intensity);
+				serializer.read(env.scatter_rayleigh);
+				serializer.read(env.scatter_mie);
+				serializer.read(env.absorb_mie);
+				serializer.read(env.sunlight_color);
+				serializer.read(env.fog_scattering);
+				serializer.read(env.sunlight_strength);
+				serializer.read(env.height_distribution_rayleigh);
+				serializer.read(env.height_distribution_mie);
+				serializer.read(env.ground_r);
+				serializer.read(env.atmo_r);
+				serializer.read(env.fog_top);
+				serializer.read(env.atmo_enabled);
+				if (version <= (i32)RenderModuleVersion::FOG_DENSITY) {
+					bool fog_enabled;
+					serializer.read(fog_enabled);
+					env.fog_density = fog_enabled ? 1.f : 0.0f;
+				}
+				serializer.read(env.godrays_enabled);
+				if (version > (i32)RenderModuleVersion::FOG_DENSITY) {
+					serializer.read(env.fog_density);
+				}
+			}
+
+			env.entity = entity_map.get(env.entity);
+			m_environments.insert(env.entity, env);
+			m_world.onComponentCreated(env.entity, ENVIRONMENT_TYPE, this);
 		}
 		
 		EntityPtr tmp;
@@ -1102,11 +1189,11 @@ struct RenderModuleImpl final : RenderModule {
 			pg.vertex_decl.computeHash();
 			if (!pg.vertex_data.empty()) {
 				const Renderer::MemRef mem = m_renderer.copy(pg.vertex_data.data(), (u32)pg.vertex_data.size());
-				pg.vertex_buffer = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE);			
+				pg.vertex_buffer = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE, "pg_vb");			
 			}
 			if (!pg.index_data.empty()) {
 				const Renderer::MemRef mem = m_renderer.copy(pg.index_data.data(), (u32)pg.index_data.size());
-				pg.index_buffer = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE);			
+				pg.index_buffer = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE, "pg_ib");			
 			}
 			computeAABB(pg);
 			m_procedural_geometries.insert(e, static_cast<ProceduralGeometry&&>(pg));
@@ -1131,14 +1218,14 @@ struct RenderModuleImpl final : RenderModule {
 
 	void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map, i32 version) override
 	{
-		deserializeCameras(serializer, entity_map);
+		deserializeCameras(serializer, entity_map, version);
 		if (version > (i32)RenderModuleVersion::SMALLER_MODEL_INSTANCES) {
 			deserializeModelInstances(serializer, entity_map);
 		}
 		else {
 			deserializeModelInstancesOld(serializer, entity_map);
 		}
-		deserializeLights(serializer, entity_map);
+		deserializeLights(serializer, entity_map, version);
 		deserializeTerrains(serializer, entity_map, version);
 		deserializeParticleSystems(serializer, entity_map, version);
 		deserializeBoneAttachments(serializer, entity_map);
@@ -1266,7 +1353,7 @@ struct RenderModuleImpl final : RenderModule {
 			}
 			else {
 				Renderer::MemRef mem = m_renderer.copy(im.instances.begin(), im.instances.capacity() * sizeof(im.instances[0]));
-				im.gpu_data = m_renderer.createBuffer(mem, gpu::BufferFlags::SHADER_BUFFER | gpu::BufferFlags::COMPUTE_WRITE);
+				im.gpu_data = m_renderer.createBuffer(mem, gpu::BufferFlags::SHADER_BUFFER, "instances");
 				im.gpu_capacity = im.instances.capacity();
 			}
 		}
@@ -1294,15 +1381,16 @@ struct RenderModuleImpl final : RenderModule {
 		m_world.onComponentDestroyed(entity, MODEL_INSTANCE_TYPE, this);
 	}
 
-	void destroyEnvironment(EntityRef entity)
-	{
-		m_world.onComponentDestroyed(entity, ENVIRONMENT_TYPE, this);
-
-		if ((EntityPtr)entity == m_active_global_light_entity)
-		{
+	void destroyEnvironment(EntityRef entity) {
+		if ((EntityPtr)entity == m_active_global_light_entity) {
 			m_active_global_light_entity = INVALID_ENTITY;
 		}
+
+		Environment& env = m_environments[entity];
+		if (env.cubemap_sky) env.cubemap_sky->decRefCount();
 		m_environments.erase(entity);
+
+		m_world.onComponentDestroyed(entity, ENVIRONMENT_TYPE, this);
 	}
 
 	void destroyFur(EntityRef entity) {
@@ -1394,6 +1482,16 @@ struct RenderModuleImpl final : RenderModule {
 		m_world.onComponentCreated(entity, PARTICLE_EMITTER_TYPE, this);
 	}
 
+	Path getSkyTexturePath(EntityRef entity)	const {
+		return m_environments[entity].cubemap_sky ? m_environments[entity].cubemap_sky->getPath() : Path();
+	}
+
+	void setSkyTexturePath(EntityRef entity, const Path& path) {
+		auto& env = m_environments[entity];
+		if (env.cubemap_sky) env.cubemap_sky->decRefCount();
+		env.cubemap_sky = path.isEmpty() ? nullptr : m_engine.getResourceManager().load<Texture>(path);
+	}
+
 	bool getEnvironmentCastShadows(EntityRef entity) override {
 		return m_environments[entity].flags & Environment::CAST_SHADOWS;
 	}
@@ -1437,13 +1535,6 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 
-	Vec3 getPoseBonePosition(EntityRef model_instance, int bone_index)
-	{
-		Pose* pose = m_model_instances[model_instance.index].pose;
-		return pose->positions[bone_index];
-	}
-
-
 	void onEntityDestroyed(EntityRef entity)
 	{
 		for (auto& i : m_bone_attachments)
@@ -1456,57 +1547,8 @@ struct RenderModuleImpl final : RenderModule {
 		}
 	}
 
-
-	void onEntityMoved(EntityRef entity)
-	{
-		const u64 cmp_mask = m_world.getComponentsMask(entity);
-		if ((cmp_mask & m_render_cmps_mask) == 0) {
-			return;
-		}
-
-		if (m_culling_system->isAdded(entity)) {
-			if (m_world.hasComponent(entity, MODEL_INSTANCE_TYPE)) {
-				const Transform& tr = m_world.getTransform(entity);
-				ModelInstance& mi = m_model_instances[entity.index];
-				m_moved_instances.push(entity);
-				mi.flags |= ModelInstance::MOVED;
-				const Model* model = mi.model;
-				ASSERT(model);
-				const float bounding_radius = model->getOriginBoundingRadius();
-				m_culling_system->set(entity, tr.pos, bounding_radius * maximum(tr.scale.x, tr.scale.y, tr.scale.z));
-			}
-			else if (m_world.hasComponent(entity, DECAL_TYPE)) {
-				auto iter = m_decals.find(entity);
-				updateDecalInfo(iter.value());
-				const DVec3 position = m_world.getPosition(entity);
-				m_culling_system->setPosition(entity, position);
-			}
-			else if (m_world.hasComponent(entity, CURVE_DECAL_TYPE)) {
-				auto iter = m_curve_decals.find(entity);
-				updateDecalInfo(iter.value());
-				const DVec3 position = m_world.getPosition(entity);
-				m_culling_system->setPosition(entity, position);
-			}
-			else if (m_world.hasComponent(entity, POINT_LIGHT_TYPE)) {
-				const DVec3 pos = m_world.getPosition(entity);
-				m_culling_system->setPosition(entity, pos);
-			}
-		}
-		else if (m_world.hasComponent(entity, PARTICLE_EMITTER_TYPE)) {
-			m_particle_emitters[entity].applyTransform(m_world.getTransform(entity));
-		}
-
-		bool was_updating = m_is_updating_attachments;
-		m_is_updating_attachments = true;
-		for (auto& attachment : m_bone_attachments)
-		{
-			if (attachment.parent_entity == entity)
-			{
-				updateBoneAttachment(attachment);
-			}
-		}
-		m_is_updating_attachments = was_updating;
-
+// TODO update bont attachment's relative matrix if the attachment is moved not by moving its parent
+#if 0
 		if (m_is_updating_attachments || m_is_game_running) return;
 		
 		if(m_world.hasComponent(entity, BONE_ATTACHMENT_TYPE)) {
@@ -1519,8 +1561,61 @@ struct RenderModuleImpl final : RenderModule {
 				}
 			}
 		}
+#endif
+
+	void onModelInstanceMoved(EntityRef entity) {
+		if (!m_culling_system->isAdded(entity)) return;
+		
+		const Transform& tr = m_world.getTransform(entity);
+		ModelInstance& mi = m_model_instances[entity.index];
+		m_moved_instances.push(entity);
+		mi.flags |= ModelInstance::MOVED;
+		const Model* model = mi.model;
+		ASSERT(model);
+		const float bounding_radius = model->getOriginBoundingRadius();
+		m_culling_system->set(entity, tr.pos, bounding_radius * maximum(tr.scale.x, tr.scale.y, tr.scale.z));
+
+		if (mi.flags & ModelInstance::IS_BONE_ATTACHMENT_PARENT) {
+			bool was_updating = m_is_updating_attachments;
+			m_is_updating_attachments = true;
+			for (auto& attachment : m_bone_attachments) {
+				if (attachment.parent_entity == entity) {
+					updateBoneAttachment(attachment);
+				}
+			}
+			m_is_updating_attachments = was_updating;
+		}
 	}
 
+	void onDecalMoved(EntityRef entity) {
+		if (!m_culling_system->isAdded(entity)) return;
+
+		auto iter = m_decals.find(entity);
+		updateDecalInfo(iter.value());
+		const DVec3 position = m_world.getPosition(entity);
+		m_culling_system->setPosition(entity, position);
+	}
+
+
+	void onCurveDecalMoved(EntityRef entity) {
+		if (!m_culling_system->isAdded(entity)) return;
+
+		auto iter = m_curve_decals.find(entity);
+		updateDecalInfo(iter.value());
+		const DVec3 position = m_world.getPosition(entity);
+		m_culling_system->setPosition(entity, position);
+	}
+
+	void onPointLightMoved(EntityRef entity) {
+		if (!m_culling_system->isAdded(entity)) return;
+
+		const DVec3 pos = m_world.getPosition(entity);
+		m_culling_system->setPosition(entity, pos);
+	}
+
+	void onParticleEmitterMoved(EntityRef entity) {
+		m_particle_emitters[entity].applyTransform(m_world.getTransform(entity));
+	}
 
 	Engine& getEngine() const override { return m_engine; }
 
@@ -1805,7 +1900,7 @@ struct RenderModuleImpl final : RenderModule {
 			pg.vertex_data.resize(size);
 			value.read(pg.vertex_data.getMutableData(), pg.vertex_data.size());
 			const Renderer::MemRef mem = m_renderer.copy(pg.vertex_data.data(), (u32)pg.vertex_data.size());
-			pg.vertex_buffer = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE);
+			pg.vertex_buffer = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE, "pg_vb");
 		}
 
 		size = value.read<u32>();
@@ -1813,7 +1908,7 @@ struct RenderModuleImpl final : RenderModule {
 			pg.index_data.resize(size);
 			value.read(pg.index_data.getMutableData(), pg.index_data.size());
 			const Renderer::MemRef mem = m_renderer.copy(pg.index_data.data(), (u32)pg.index_data.size());
-			pg.index_buffer = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE);
+			pg.index_buffer = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE, "pg_ib");
 		}
 	}
 
@@ -1854,11 +1949,11 @@ struct RenderModuleImpl final : RenderModule {
 		if (indices.length() > 0) {
 			pg.index_data.write(indices.begin(), indices.length());
 			const Renderer::MemRef mem = m_renderer.copy(indices.begin(), indices.length());
-			pg.index_buffer = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE);
+			pg.index_buffer = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE, "pg_ib");
 		}
 		
 		const Renderer::MemRef mem = m_renderer.copy(vertex_data.begin(), vertex_data.length());
-		pg.vertex_buffer = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE);
+		pg.vertex_buffer = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE, "pg_vb");
 		computeAABB(pg);
 	}
 	
@@ -2007,53 +2102,9 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 
-	static int LUA_castCameraRay(lua_State* L)
-	{
-		LuaWrapper::checkTableArg(L, 1);
-		if (LuaWrapper::getField(L, 1, "_module") != LUA_TLIGHTUSERDATA) {
-			LuaWrapper::argError(L, 1, "module");
-		}
-		RenderModule* module = LuaWrapper::toType<RenderModule*>(L, -1);
-		lua_pop(L, 1);
-		EntityRef camera_entity = LuaWrapper::checkArg<EntityRef>(L, 2);
-		float x, y;
-		if (lua_gettop(L) > 3) {
-			x = LuaWrapper::checkArg<float>(L, 3);
-			y = LuaWrapper::checkArg<float>(L, 4);
-		}
-		else {
-			x = module->getCameraScreenWidth(camera_entity) * 0.5f;
-			y = module->getCameraScreenHeight(camera_entity) * 0.5f;
-		}
-
-		const Ray ray = module->getCameraRay(camera_entity, {x, y});
-
-		RayCastModelHit hit = module->castRay(ray, INVALID_ENTITY);
-		LuaWrapper::push(L, hit.is_hit);
-		LuaWrapper::push(L, hit.is_hit ? hit.origin + hit.dir * hit.t : DVec3(0));
-		LuaWrapper::pushEntity(L, hit.is_hit ? hit.entity : INVALID_ENTITY, &module->getWorld());
-
-		return 3;
-	}
-
-
 	void setTerrainHeightAt(EntityRef entity, int x, int z, float height)
 	{
 		m_terrains[entity]->setHeight(x, z, height);
-	}
-
-
-	static void LUA_setModelInstancePath(IModule* module, int component, const char* path)
-	{
-		RenderModule* render_module = (RenderModule*)module;
-		render_module->setModelInstancePath({component}, Path(path));
-	}
-
-
-	static int LUA_getModelBoneIndex(Model* model, const char* bone)
-	{
-		if (!model) return 0;
-		return model->getBoneIndex(BoneNameHash(bone)).value();
 	}
 
 
@@ -3241,7 +3292,6 @@ struct RenderModuleImpl final : RenderModule {
 	Renderer& m_renderer;
 	Engine& m_engine;
 	UniquePtr<CullingSystem> m_culling_system;
-	u64 m_render_cmps_mask;
 
 	EntityPtr m_active_global_light_entity;
 	HashMap<EntityRef, PointLight> m_point_lights;
@@ -3408,6 +3458,20 @@ void RenderModule::reflect() {
 			.var_prop<&RenderModule::getCamera, &Camera::far>("Far").minAttribute(0)
 			.var_prop<&RenderModule::getCamera, &Camera::is_ortho>("Orthographic")
 			.var_prop<&RenderModule::getCamera, &Camera::ortho_size>("Orthographic size").minAttribute(0)
+
+			.var_prop<&RenderModule::getCamera, &Camera::film_grain_intensity>("Film Grain intensity")
+			.var_prop<&RenderModule::getCamera, &Camera::dof_enabled>("DOF enabled")
+			.var_prop<&RenderModule::getCamera, &Camera::dof_distance>("DOF distance").minAttribute(0)
+			.var_prop<&RenderModule::getCamera, &Camera::dof_range>("DOF range").minAttribute(0)
+			.var_prop<&RenderModule::getCamera, &Camera::dof_max_blur_size>("DOF max blur size").minAttribute(0)
+			.var_prop<&RenderModule::getCamera, &Camera::dof_sharp_range>("DOF sharp range").minAttribute(0)
+
+			.var_prop<&RenderModule::getCamera, &Camera::bloom_enabled>("Bloom enabled")
+			.var_prop<&RenderModule::getCamera, &Camera::bloom_tonemap_enabled>("Bloom tonemap enabled")
+			.var_prop<&RenderModule::getCamera, &Camera::bloom_accomodation_speed>("Bloom accomodation speed")
+			.var_prop<&RenderModule::getCamera, &Camera::bloom_avg_bloom_multiplier>("Bloom avg bloom multiplier")
+			.var_prop<&RenderModule::getCamera, &Camera::bloom_exposure>("Bloom exposure")
+
 		.LUMIX_CMP(InstancedModel, "instanced_model", "Render / Instanced model")
 			.LUMIX_PROP(InstancedModelPath, "Model").resourceAttribute(Model::TYPE)
 			.blob_property<&RenderModuleImpl::getInstancedModelBlob, &RenderModuleImpl::setInstancedModelBlob>("Blob")
@@ -3423,6 +3487,22 @@ void RenderModule::reflect() {
 			.var_prop<&RenderModule::getEnvironment, &Environment::indirect_intensity>("Indirect intensity").minAttribute(0)
 			.LUMIX_PROP(ShadowmapCascades, "Shadow cascades")
 			.LUMIX_PROP(EnvironmentCastShadows, "Cast shadows")
+			.LUMIX_PROP(SkyTexturePath, "Sky texture").resourceAttribute(Texture::TYPE)
+			.var_prop<&RenderModule::getEnvironment, &Environment::atmo_enabled>("Atmosphere enabled")
+			.var_prop<&RenderModule::getEnvironment, &Environment::godrays_enabled>("Godrays enabled")
+			.var_prop<&RenderModule::getEnvironment, &Environment::sky_intensity>("Sky intensity").minAttribute(0)
+			.var_prop<&RenderModule::getEnvironment, &Environment::scatter_rayleigh>("Scatter Rayleigh").colorAttribute()
+			.var_prop<&RenderModule::getEnvironment, &Environment::scatter_mie>("Scatter Mie").colorAttribute()
+			.var_prop<&RenderModule::getEnvironment, &Environment::absorb_mie>("Absorb Mie").colorAttribute()
+			.var_prop<&RenderModule::getEnvironment, &Environment::sunlight_color>("Sunlight color").colorAttribute()
+			.var_prop<&RenderModule::getEnvironment, &Environment::sunlight_strength>("Sunlight strength").minAttribute(0)
+			.var_prop<&RenderModule::getEnvironment, &Environment::height_distribution_rayleigh>("Height distribution Rayleigh")
+			.var_prop<&RenderModule::getEnvironment, &Environment::height_distribution_mie>("Height distribution Mie")
+			.var_prop<&RenderModule::getEnvironment, &Environment::ground_r>("Ground radius").minAttribute(0)
+			.var_prop<&RenderModule::getEnvironment, &Environment::atmo_r>("Atmosphere radius").minAttribute(0)
+			.var_prop<&RenderModule::getEnvironment, &Environment::fog_density>("Fog density").minAttribute(0)
+			.var_prop<&RenderModule::getEnvironment, &Environment::fog_scattering>("Fog scattering").colorAttribute()
+			.var_prop<&RenderModule::getEnvironment, &Environment::fog_top>("Fog top")
 		.LUMIX_CMP(PointLight, "point_light", "Render / Point light")
 			.icon(ICON_FA_LIGHTBULB)
 			.LUMIX_PROP(PointLightCastShadows, "Cast shadows")
@@ -3492,23 +3572,18 @@ RenderModuleImpl::RenderModuleImpl(Renderer& renderer,
 	, m_material_curve_decal_map(m_allocator)
 	, m_furs(m_allocator)
 {
+	m_world.componentTransformed(MODEL_INSTANCE_TYPE).bind<&RenderModuleImpl::onModelInstanceMoved>(this);
+	m_world.componentTransformed(DECAL_TYPE).bind<&RenderModuleImpl::onDecalMoved>(this);
+	m_world.componentTransformed(CURVE_DECAL_TYPE).bind<&RenderModuleImpl::onCurveDecalMoved>(this);
+	m_world.componentTransformed(PARTICLE_EMITTER_TYPE).bind<&RenderModuleImpl::onParticleEmitterMoved>(this);
+	m_world.componentTransformed(POINT_LIGHT_TYPE).bind<&RenderModuleImpl::onPointLightMoved>(this);
 
-	m_world.entityTransformed().bind<&RenderModuleImpl::onEntityMoved>(this);
 	m_world.entityDestroyed().bind<&RenderModuleImpl::onEntityDestroyed>(this);
 	m_culling_system = CullingSystem::create(m_allocator, engine.getPageAllocator());
 	m_model_instances.reserve(1024);
 
-	m_render_cmps_mask = 0;
-
 	Renderer::MemRef mem;
 	m_reflection_probes_texture = renderer.createTexture(128, 128, 32, gpu::TextureFormat::BC3, gpu::TextureFlags::IS_CUBE, mem, "reflection_probes");
-
-	const RuntimeHash hash("renderer");
-	for (const reflection::RegisteredComponent& cmp : reflection::getComponents()) {
-		if (cmp.module_hash == hash) {
-			m_render_cmps_mask |= (u64)1 << cmp.cmp->component_type.index;
-		}
-	}
 }
 
 UniquePtr<RenderModule> RenderModule::createInstance(Renderer& renderer,
@@ -3519,34 +3594,6 @@ UniquePtr<RenderModule> RenderModule::createInstance(Renderer& renderer,
 	return UniquePtr<RenderModuleImpl>::create(allocator, renderer, engine, world, allocator);
 }
 
-void RenderModule::registerLuaAPI(lua_State* L, Renderer& renderer)
-{
-	#define REGISTER_FUNCTION(F)\
-		do { \
-			auto f = &LuaWrapper::wrapMethod<&RenderModuleImpl::F>; \
-			LuaWrapper::createSystemFunction(L, "Renderer", #F, f); \
-		} while(false) \
-
-	REGISTER_FUNCTION(getTerrainMaterial);
-	REGISTER_FUNCTION(getPoseBonePosition);
-
-	#undef REGISTER_FUNCTION
-
-	#define REGISTER_FUNCTION(F)\
-		do { \
-		auto f = &LuaWrapper::wrap<&RenderModuleImpl::LUA_##F>; \
-		LuaWrapper::createSystemFunction(L, "Renderer", #F, f); \
-		} while(false) \
-
-	REGISTER_FUNCTION(getModelBoneIndex);
-
-	LuaWrapper::createSystemFunction(L, "Renderer", "castCameraRay", &RenderModuleImpl::LUA_castCameraRay);
-
-	LuaWrapper::createSystemClosure(L, "Renderer", &renderer, "setLODMultiplier", &LuaWrapper::wrapMethodClosure<&Renderer::setLODMultiplier>);
-	LuaWrapper::createSystemClosure(L, "Renderer", &renderer, "getLODMultiplier", &LuaWrapper::wrapMethodClosure<&Renderer::getLODMultiplier>);
-
-	#undef REGISTER_FUNCTION
-}
 
 
 } // namespace Lumix

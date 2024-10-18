@@ -7,6 +7,7 @@
 #include "core/os.h"
 #include "core/path.h"
 #include "core/profiler.h"
+#include "core/tokenizer.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
 #include "editor/editor_asset.h"
@@ -20,7 +21,6 @@
 #include "engine/world.h"
 #include "gui/gui_module.h"
 #include "gui/sprite.h"
-#include "lua_script/lua_script.h"
 #include "renderer/draw2d.h"
 #include "renderer/gpu/gpu.h"
 #include "renderer/pipeline.h"
@@ -52,19 +52,27 @@ struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			m_resource->decRefCount();
 		}
 
+		static void serialize(Sprite& sprite, OutputMemoryStream& out) {
+			ASSERT(sprite.isReady());
+			out << "type = " << (sprite.type == Sprite::PATCH9 ? "patch9\n" : "simple\n");
+			out << "top = " << sprite.top << "\n";
+			out << "bottom = " << sprite.bottom << "\n";
+			out << "left = " << sprite.left << "\n";
+			out << "right = " << sprite.right << "\n";
+			if (sprite.getTexture()) {
+				out << "texture = \"/" << sprite.getTexture()->getPath() << "\"";
+			} else {
+				out << "texture = \"\"";
+			}
+		}
+
 		void save() {
 			OutputMemoryStream blob(m_app.getAllocator());
-			m_resource->serialize(blob);
+			serialize(*m_resource, blob);
 			m_app.getAssetBrowser().saveResource(*m_resource, blob);
 			m_dirty = false;
 		}
 		
-		bool onAction(const Action& action) override { 
-			if (&action == &m_app.getCommonActions().save) save();
-			else return false;
-			return true;
-		}
-
 		bool patch9edit(Sprite* sprite) {
 			Texture* texture = sprite->getTexture();
 
@@ -136,10 +144,12 @@ struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		}
 
 		void windowGUI() override {
+			CommonActions& actions = m_app.getCommonActions();
+
 			if (ImGui::BeginMenuBar()) {
-				if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
-				if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_resource);
-				if (ImGuiEx::IconButton(ICON_FA_SEARCH, "View in browser")) m_app.getAssetBrowser().locate(*m_resource);
+				if (actions.save.iconButton(m_dirty, &m_app)) save();
+				if (actions.open_externally.iconButton(true, &m_app)) m_app.getAssetBrowser().openInExternalEditor(m_resource);
+				if (actions.view_in_browser.iconButton(true, &m_app)) m_app.getAssetBrowser().locate(*m_resource);
 				ImGui::EndMenuBar();
 			}
 
@@ -201,10 +211,42 @@ struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		m_app.getAssetCompiler().registerExtension("spr", Sprite::TYPE);
 	}
 
-	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
+	bool compile(const Path& src) override {
+		// load
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		OutputMemoryStream src_data(m_app.getAllocator());
+		if (!fs.getContentSync(src, src_data)) return false;
+
+		// parse
+		StringView type_str, texture_str;
+		i32 top, bottom, left, right;
+		const ParseItemDesc descs[] = {
+			{"type", &type_str},
+			{"top", &top},
+			{"bottom", &bottom},
+			{"left", &left},
+			{"right", &right},
+			{"texture", &texture_str}
+		};
+		StringView sv((const char*)src_data.data(), (u32)src_data.size());
+		if (!parse(sv, src.c_str(), descs)) return false;
+
+		// write compiled
+		OutputMemoryStream compiled(m_app.getAllocator());
+		Sprite::Header header;
+		compiled.write(header);
+		compiled.write(top);
+		compiled.write(bottom);
+		compiled.write(left);
+		compiled.write(right);
+		compiled.writeString(texture_str);
+		compiled.write(equalIStrings(type_str, "patch9") ? Sprite::PATCH9 : Sprite::SIMPLE);
+		return m_app.getAssetCompiler().writeCompiledResource(src, compiled);
+	}
+
 	bool canCreateResource() const override { return true; }
 	const char* getDefaultExtension() const override { return "spr"; }
-	void createResource(OutputMemoryStream& blob) override { blob << "type \"simple\""; }
+	void createResource(OutputMemoryStream& blob) override { blob << "type = simple"; }
 
 	void openEditor(const Path& path) override {
 		IAllocator& allocator = m_app.getAllocator();
@@ -237,40 +279,14 @@ public:
 	GUIEditor(StudioApp& app)
 		: m_app(app)
 	{
-		m_toggle_ui.init("GUI Editor", "Toggle gui editor", "gui_editor", "", Action::IMGUI_PRIORITY);
-		m_toggle_ui.func.bind<&GUIEditor::onToggleOpen>(this);
-		m_toggle_ui.is_selected.bind<&GUIEditor::isOpen>(this);
-		app.addWindowAction(&m_toggle_ui);
-
-		m_hcenter_action.init("Center horizontally", "GUI editor - center horizontally", "guied_hcenter", "", Action::IMGUI_PRIORITY);
-		m_vcenter_action.init("Center vertically", "GUI editor - center vertically", "guied_vcenter", "", Action::IMGUI_PRIORITY);
-		m_hexpand_action.init("Expand horizontally", "GUI editor - expand horizontally", "guied_hexpand", "", Action::IMGUI_PRIORITY);
-		m_vexpand_action.init("Expand vertically", "GUI editor - expand vertically", "guied_vexpand", "", Action::IMGUI_PRIORITY);
-		m_make_rel_action.init("Make relative", "GUI editor - make relative", "guied_makerel", "", Action::IMGUI_PRIORITY);
-		m_app.addAction(&m_hcenter_action);
-		m_app.addAction(&m_vcenter_action);
-		m_app.addAction(&m_hexpand_action);
-		m_app.addAction(&m_vexpand_action);
-		m_app.addAction(&m_make_rel_action);
+		m_app.getSettings().registerOption("gui_editor_open", &m_is_window_open);
 	}
 
 	void init() {
 		Engine& engine = m_app.getEngine();
 		Renderer& renderer = *static_cast<Renderer*>(engine.getSystemManager().getSystem("renderer"));
-		LuaScript* pres = engine.getResourceManager().load<LuaScript>(Path("pipelines/gui_editor.lua"));
-		m_pipeline = Pipeline::create(renderer, pres, "");
+		m_pipeline = Pipeline::create(renderer, PipelineType::GUI_EDITOR);
 	}
-
-
-	~GUIEditor() {
-		m_app.removeAction(&m_toggle_ui);
-		m_app.removeAction(&m_hcenter_action);
-		m_app.removeAction(&m_vcenter_action);
-		m_app.removeAction(&m_hexpand_action);
-		m_app.removeAction(&m_vexpand_action);
-		m_app.removeAction(&m_make_rel_action);
-	}
-
 
 private:
 	enum class ResizeSide {
@@ -293,30 +309,6 @@ private:
 		MOVE
 	};
 
-	bool onAction(const Action& action) override { 
-		WorldEditor& editor = m_app.getWorldEditor();
-		if (editor.getSelectedEntities().size() != 1) return false;
-
-		const EntityRef e = editor.getSelectedEntities()[0];
-
-		if (&action == &m_hcenter_action) align(e, (u8)EdgeMask::CENTER_HORIZONTAL, editor);
-		else if (&action == &m_vcenter_action) align(e, (u8)EdgeMask::CENTER_VERTICAL, editor);
-		else if (&action == &m_hexpand_action) expand(e, (u8)EdgeMask::HORIZONTAL, editor);
-		else if (&action == &m_vexpand_action) expand(e, (u8)EdgeMask::VERTICAL, editor);
-		else if (&action == &m_make_rel_action) makeRelative(e, m_canvas_size, (u8)EdgeMask::ALL, editor);
-		else return false;
-		return true;
-	}
-
-	bool hasFocus() const override { return m_has_focus; }
-
-	void onSettingsLoaded() override {
-		m_is_window_open = m_app.getSettings().getValue(Settings::GLOBAL, "is_gui_editor_open", false);
-	}
-
-	void onBeforeSettingsSaved() override {
-		m_app.getSettings().setValue(Settings::GLOBAL, "is_gui_editor_open", m_is_window_open);
-	}
 
 	void onToggleOpen() { m_is_window_open = !m_is_window_open; }
 	bool isOpen() const { return m_is_window_open; }
@@ -520,14 +512,6 @@ private:
 		editor.endCommandGroup();
 	}
 
-	void menuActionItem(const Action& action, const char* label = nullptr) {
-		char shortcut[64];
-		getShortcut(action, Span(shortcut));
-		if (ImGui::MenuItem(label ? label : action.label_short.data, shortcut)) {
-			onAction(action);
-		}
-	}
-
 	bool isInCanvas(EntityRef entity, EntityRef canvas) {
 		WorldEditor& editor = m_app.getWorldEditor();
 		World& world = *editor.getWorld();
@@ -540,15 +524,25 @@ private:
 	}
 
 	void onGUI() override {
-		m_has_focus = false;
+		if (m_app.checkShortcut(m_toggle_ui, true)) m_is_window_open = !m_is_window_open;
+
 		if (!m_is_window_open) return;
 
 		if (!ImGui::Begin("GUIEditor", &m_is_window_open)) {
 			ImGui::End();
 			return;
 		}
-		m_has_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+
 		WorldEditor& editor = m_app.getWorldEditor();
+		if (editor.getSelectedEntities().size() == 1) {
+			const EntityRef e = editor.getSelectedEntities()[0];
+			if (m_app.checkShortcut(m_hcenter_action)) align(e, (u8)EdgeMask::CENTER_HORIZONTAL, editor);
+			else if (m_app.checkShortcut(m_vcenter_action)) align(e, (u8)EdgeMask::CENTER_VERTICAL, editor);
+			else if (m_app.checkShortcut(m_hexpand_action)) expand(e, (u8)EdgeMask::HORIZONTAL, editor);
+			else if (m_app.checkShortcut(m_vexpand_action)) expand(e, (u8)EdgeMask::VERTICAL, editor);
+			else if (m_app.checkShortcut(m_make_rel_action)) makeRelative(e, m_canvas_size, (u8)EdgeMask::ALL, editor);
+		}
+
 		World& world = *editor.getWorld();
 		if (m_canvas_entity.isValid() && (!world.hasEntity(*m_canvas_entity) || !world.hasComponent(*m_canvas_entity, GUI_CANVAS_TYPE))) {
 			// new world or entity deleted or component deleted
@@ -599,7 +593,7 @@ private:
 
 		const ImVec2 size = ImGui::GetContentRegionAvail();
 		m_canvas_size = size;
-		if (!m_pipeline->isReady() || size.x == 0 || size.y == 0) {
+		if (size.x == 0 || size.y == 0) {
 			ImGui::End();
 			return;
 		}
@@ -660,7 +654,7 @@ private:
 		vp.w = (int)size.x;
 		vp.h = (int)size.y;
 		m_pipeline->setViewport(vp);
-		m_pipeline->setLuaGlobal("GUI_EDITOR_CLEAR_COLOR", m_clear_color);	
+		m_pipeline->setClearColor(m_clear_color);	
 
 		if (m_pipeline->render(true)) {
 			m_texture_handle = m_pipeline->getOutput();
@@ -739,12 +733,12 @@ private:
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Align")) {
-			if (ImGui::MenuItem("Top")) align(e, (u8)EdgeMask::TOP, editor);
-			if (ImGui::MenuItem("Right")) align(e, (u8)EdgeMask::RIGHT, editor);
-			if (ImGui::MenuItem("Bottom")) align(e, (u8)EdgeMask::BOTTOM, editor);
-			if (ImGui::MenuItem("Left")) align(e, (u8)EdgeMask::LEFT, editor);
-			menuActionItem(m_hcenter_action);
-			menuActionItem(m_vcenter_action);
+			if (menuItem(m_align_top_action, true)) align(e, (u8)EdgeMask::TOP, editor);
+			if (menuItem(m_align_right_action, true)) align(e, (u8)EdgeMask::RIGHT, editor);
+			if (menuItem(m_align_bottom_action, true)) align(e, (u8)EdgeMask::BOTTOM, editor);
+			if (menuItem(m_align_left_action, true)) align(e, (u8)EdgeMask::LEFT, editor);
+			if (menuItem(m_hcenter_action, true)) align(e, (u8)EdgeMask::CENTER_HORIZONTAL, editor);
+			if (menuItem(m_vcenter_action, true)) align(e, (u8)EdgeMask::CENTER_VERTICAL, editor);
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Expand")) {
@@ -753,12 +747,12 @@ private:
 			if (ImGui::MenuItem("Right")) expand(e, (u8)EdgeMask::RIGHT, editor);
 			if (ImGui::MenuItem("Bottom")) expand(e, (u8)EdgeMask::BOTTOM, editor);
 			if (ImGui::MenuItem("Left")) expand(e, (u8)EdgeMask::LEFT, editor);
-			menuActionItem(m_hexpand_action, "Horizontal");
-			menuActionItem(m_vexpand_action, "Vertical");
+			if (menuItem(m_hexpand_action, true)) expand(e, (u8)EdgeMask::HORIZONTAL, editor);
+			if (menuItem(m_vexpand_action, true)) expand(e, (u8)EdgeMask::VERTICAL, editor);
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Make relative")) {
-			menuActionItem(m_make_rel_action, "All");
+			if (menuItem(m_make_rel_action, true)) makeRelative(e, canvas_size, (u8)EdgeMask::ALL, editor);
 			if (ImGui::MenuItem("Top")) makeRelative(e, canvas_size, (u8)EdgeMask::TOP, editor);
 			if (ImGui::MenuItem("Right")) makeRelative(e, canvas_size, (u8)EdgeMask::RIGHT, editor);
 			if (ImGui::MenuItem("Bottom")) makeRelative(e, canvas_size, (u8)EdgeMask::BOTTOM, editor);
@@ -1102,10 +1096,8 @@ private:
 
 
 	StudioApp& m_app;
-	Action m_toggle_ui;
 	UniquePtr<Pipeline> m_pipeline;
 	bool m_is_window_open = false;
-	bool m_has_focus = false;
 	gpu::TextureHandle m_texture_handle;
 	MouseMode m_mouse_mode = MouseMode::NONE;
 	ResizeSide m_resize_side = ResizeSide::NONE;
@@ -1115,11 +1107,16 @@ private:
 	EntityPtr m_canvas_entity = INVALID_ENTITY;
 	Vec3 m_clear_color = Vec3(0);
 
-	Action m_hcenter_action;
-	Action m_vcenter_action;
-	Action m_hexpand_action;
-	Action m_vexpand_action;
-	Action m_make_rel_action;
+	Action m_toggle_ui{"GUI Editor", "GUI editor - toggle UI", "gui_editor", "", Action::WINDOW};
+	Action m_align_top_action{"Top", "GUI editor - align top", "guied_align_top", ""};
+	Action m_align_right_action{"Right", "GUI editor - align right", "guied_align_right", ""};
+	Action m_align_bottom_action{"Bottom", "GUI editor - align bottom", "guied_align_bottom", ""};
+	Action m_align_left_action{"Left", "GUI editor - align left", "guied_align_left", ""};
+	Action m_hcenter_action{"Center horizontally", "GUI editor - center horizontally", "guied_hcenter", ""};
+	Action m_vcenter_action{"Center vertically", "GUI editor - center vertically", "guied_vcenter", ""};
+	Action m_hexpand_action{"Horizontally", "GUI editor - expand horizontally", "guied_hexpand", ""};
+	Action m_vexpand_action{"Vertically", "GUI editor - expand vertically", "guied_vexpand", ""};
+	Action m_make_rel_action{"Make relative", "GUI editor - make relative", "guied_makerel", ""};
 };
 
 

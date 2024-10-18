@@ -2,7 +2,9 @@
 
 #include "editor/world_editor.h"
 
-using ImTextureID = void*;
+#ifndef ImTextureID
+	using ImTextureID = void*;
+#endif
 struct ImDrawData;
 
 namespace Lumix {

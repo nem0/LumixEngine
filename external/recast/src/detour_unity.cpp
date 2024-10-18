@@ -1,6 +1,0 @@
-#include "DetourCrowd.cpp"
-#include "DetourLocalBoundary.cpp"
-#include "DetourObstacleAvoidance.cpp"
-#include "DetourPathCorridor.cpp"
-#include "DetourPathQueue.cpp"
-#include "DetourProximityGrid.cpp"

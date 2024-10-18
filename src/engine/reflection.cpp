@@ -66,7 +66,7 @@ const ComponentBase* getComponent(ComponentType cmp_type) {
 	return getContext().component_bases[cmp_type.index].cmp;
 }
 
-const PropertyBase* getProperty(ComponentType cmp_type, const char* prop_name) {
+const PropertyBase* getProperty(ComponentType cmp_type, StringView prop_name) {
 	const ComponentBase* cmp = getComponent(cmp_type);
 	if (!cmp) return nullptr;
 	for (PropertyBase* prop : cmp->props) {
@@ -142,11 +142,10 @@ bool componentTypeExists(const char* id) {
 	return false;
 }
 
-
-ComponentType getComponentType(const char* name)
+ComponentType getComponentType(StringView name)
 {
 	Context& ctx = getContext();
-	const RuntimeHash name_hash(name);
+	const RuntimeHash name_hash(name.begin, name.size());
 	for (u32 i = 0, c = ctx.components_count; i < c; ++i) {
 		if (ctx.component_bases[i].name_hash == name_hash) {
 			return {(i32)i};

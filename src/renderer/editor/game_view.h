@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "core/allocator.h"
@@ -8,13 +7,9 @@
 #include "core/os.h"
 #include "renderer/gpu/gpu.h"
 
-
 struct ImVec2;
 
-
-namespace Lumix
-{
-
+namespace Lumix {
 
 struct Path;
 struct Pipeline;
@@ -22,11 +17,9 @@ struct PlatformData;
 struct RenderModule;
 struct StudioApp;
 
+struct LUMIX_RENDERER_API GameView : StudioApp::GUIPlugin {
+	friend struct GUIInterface;
 
-struct GameView : StudioApp::GUIPlugin
-{
-friend struct GUIInterface;
-public:
 	explicit GameView(StudioApp& app);
 	~GameView();
 
@@ -41,20 +34,15 @@ public:
 	void onGUI() override;
 	void init();
 
-public:
 	bool m_is_open;
 
 private:
-	bool onAction(const Action& action) override;
-	void onSettingsLoaded() override;
-	void onBeforeSettingsSaved() override;
 	void toggleFullscreen();
 	void processInputEvents();
 	void onFullscreenGUI(WorldEditor& editor);
 	void setFullscreen(bool fullscreen);
 	void controlsGUI(WorldEditor& editor);
 
-private:
 	UniquePtr<Pipeline> m_pipeline;
 	StudioApp& m_app;
 	float m_time_multiplier;
@@ -65,6 +53,7 @@ private:
 	bool m_is_ingame_cursor;
 	bool m_is_fullscreen;
 	bool m_was_game_mode = false;
+	bool m_focus_on_game_start = false;
 	os::CursorType m_cursor_type = os::CursorType::DEFAULT;
 	struct
 	{
@@ -72,8 +61,8 @@ private:
 		int width;
 		int height;
 	} m_forced_viewport;
-	Action m_toggle_ui;
-	Action m_fullscreen_action;
+	Action m_toggle_ui{"Game View", "Game view - toggle UI", "game_view_toggle_ui", "", Action::WINDOW};
+	Action m_fullscreen_action{"Fullscreen", "Game view - fullscreen", "game_view_fullscreen", ""};
 };
 
 

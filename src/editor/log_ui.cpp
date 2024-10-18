@@ -3,9 +3,9 @@
 #include "core/delegate_list.h"
 #include "core/log_callback.h"
 #include "core/math.h"
-
-#include "log_ui.h"
+#include "core/os.h"
 #include "editor/settings.h"
+#include "log_ui.h"
 
 
 namespace Lumix
@@ -30,17 +30,12 @@ LogUI::LogUI(StudioApp& app, IAllocator& allocator)
 		m_new_message_count[i] = 0;
 	}
 
-	m_toggle_ui.init("Log", "Toggle Log UI", "log", "", Action::IMGUI_PRIORITY);
-	m_toggle_ui.func.bind<&LogUI::toggleUI>(this);
-	m_toggle_ui.is_selected.bind<&LogUI::isOpen>(this);
-
-	m_app.addWindowAction(&m_toggle_ui);
+	m_app.getSettings().registerOption("log_open", &m_is_open);
 }
 
 
 LogUI::~LogUI()
 {
-	m_app.removeAction(&m_toggle_ui);
 	unregisterLogCallback<&LogUI::onLog>(this);
 }
 
@@ -113,6 +108,7 @@ void LogUI::showNotifications()
 	if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_SQUARE_ALT, nullptr)) m_focus_request = true;
 	ImGui::PopFont();
 	if (ImGui::BeginChild("scrollarea", ImVec2(0, 0), false, ImGuiWindowFlags_NoBackground)) {
+		ImGui::PushFont(m_app.getMonospaceFont());
 		if (m_move_notifications_to_front) ImGuiEx::BringToFront();
 		m_move_notifications_to_front = false;
 		for (int i = 0; i < m_notifications.size(); ++i)
@@ -120,6 +116,7 @@ void LogUI::showNotifications()
 			if (i > 0) ImGui::Separator();
 			ImGuiEx::TextUnformatted(m_notifications[i].message);
 		}
+		ImGui::PopFont();
 	}
 	ImGui::EndChild();
 
@@ -151,13 +148,12 @@ int LogUI::getUnreadErrorCount() const
 	return m_new_message_count[(int)LogLevel::ERROR];
 }
 
-void LogUI::onSettingsLoaded() { m_is_open = m_app.getSettings().m_is_log_open; }
-void LogUI::onBeforeSettingsSaved() { m_app.getSettings().m_is_log_open  = m_is_open; }
-
 void LogUI::onGUI()
 {
 	MutexGuard lock(m_guard);
 	showNotifications();
+
+	if (m_app.checkShortcut(m_toggle_ui, true)) m_is_open = !m_is_open;
 
 	if (m_focus_request) {
 		ImGui::SetNextWindowFocus();
@@ -188,11 +184,12 @@ void LogUI::onGUI()
 		}
 
 		ImGui::SameLine();
-		m_filter.gui(ICON_FA_SEARCH " Filter");
+		m_filter.gui(ICON_FA_SEARCH " Filter", -1, ImGui::IsWindowAppearing());
 		int len = 0;
 
 		if (ImGui::BeginChild("log_messages", ImVec2(0, 0), true))
 		{
+			ImGui::PushFont(m_app.getMonospaceFont());
 			for (int i = 0; i < m_messages.size(); ++i)
 			{
 				if ((m_level_filter & (1 << (int)m_messages[i].level)) == 0) continue;
@@ -205,6 +202,7 @@ void LogUI::onGUI()
 				m_scroll_to_bottom = false;
 				ImGui::SetScrollHereY();
 			}
+			ImGui::PopFont();
 		}
 		ImGui::EndChild();
 		if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(1)) ImGui::OpenPopup("Context");

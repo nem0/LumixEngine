@@ -12,6 +12,18 @@
 
 namespace Lumix {
 
+struct ImpostorTexturesContext {
+	virtual ~ImpostorTexturesContext() {}
+	virtual void readCallback0(Span<const u8> data) = 0;
+	virtual void readCallback1(Span<const u8> data) = 0;
+	virtual void readCallback2(Span<const u8> data) = 0;
+	virtual void readCallback3(Span<const u8> data) = 0;
+	virtual void start() = 0;
+
+	IVec2 tile_size;
+	Path path;
+};
+
 struct FBXImporter {
 	struct VertexLayout {
 		u32 size;
@@ -154,13 +166,7 @@ struct FBXImporter {
 	bool writePrefab(const Path& src, const ImportConfig& cfg, bool split_meshes);
 	bool writeModel(const Path& src, const ImportConfig& cfg);
 	bool writePhysics(const Path& src, const ImportConfig& cfg, bool split_meshes);
-	bool createImpostorTextures(struct Model* model
-		, Array<u32>& gb0_rgba
-		, Array<u32>& gb1_rgba
-		, Array<u16>& gb_depth
-		, Array<u32>& shadow
-		, IVec2& size
-		, bool bake_normals);
+	void createImpostorTextures(struct Model* model, ImpostorTexturesContext& ctx, bool bake_normals);
 
 	u32 getBoneCount() const { return (u32)m_bones.size(); }
 	const Array<ImportMesh>& getMeshes() const { return m_meshes; }
