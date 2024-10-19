@@ -1075,7 +1075,7 @@ struct PipelineImpl final : Pipeline {
 
 	RenderBufferHandle shadowPass() {
 		PROFILE_FUNCTION();
-		beginBlock("shadow pass");
+		beginBlock("shadow pass", true);
 		DrawStream& stream = m_renderer.getDrawStream();
 
 		const BucketDesc buckets[] = {

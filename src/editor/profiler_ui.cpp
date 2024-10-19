@@ -1530,7 +1530,8 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 	void GPUUI() {
 		profiler::GPUScopeStats stats[256];
 		const u32 num_stats = profiler::getGPUScopeStats(Span(stats));
-		m_filter.gui("Filter");
+		if (m_app.checkShortcut(m_focus_filter)) ImGui::SetKeyboardFocusHere();
+		m_filter.gui("Filter", -1, false, &m_focus_filter);
 		if (ImGui::BeginTable("gpu", 4, ImGuiTableFlags_Resizable)) {
 			ImGui::TableSetupColumn("Name");
 			ImGui::TableSetupColumn("Min (ms)");

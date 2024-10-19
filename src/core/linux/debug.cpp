@@ -207,6 +207,7 @@ void Allocator::unlock() {
 void Allocator::checkGuards() {
 	if (m_are_guards_enabled) return;
 
+	MutexGuard lock(m_mutex);
 	auto* info = m_root;
 	while (info) {
 		auto user_ptr = getUserPtrFromAllocationInfo(info);
