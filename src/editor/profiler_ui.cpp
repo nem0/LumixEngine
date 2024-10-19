@@ -838,8 +838,8 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		if (ImGui::Begin(ICON_FA_CHART_AREA "Profiler##profiler", &m_is_open))
 		{
 			if (ImGui::BeginTabBar("tb")) {
-				if (ImGui::BeginTabItem("GPU/CPU")) {
-					CPUGPUProfilerUI();
+				if (ImGui::BeginTabItem("Flamegraph")) {
+					flamegraphUI();
 					ImGui::EndTabItem();
 				}
 				if (ImGui::BeginTabItem("Memory")) {
@@ -1520,7 +1520,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		}
 	}
 
-	void CPUGPUProfilerUI() {
+	void flamegraphUI() {
 		profileStart();
 
 		if (m_autopause > 0 && !m_is_paused && profiler::getLastFrameDuration() * 1000.f > m_autopause) {
