@@ -185,6 +185,7 @@ struct RenderModuleImpl final : RenderModule {
 		m_world.componentTransformed(CURVE_DECAL_TYPE).unbind<&RenderModuleImpl::onCurveDecalMoved>(this);
 		m_world.componentTransformed(PARTICLE_EMITTER_TYPE).unbind<&RenderModuleImpl::onParticleEmitterMoved>(this);
 		m_world.componentTransformed(POINT_LIGHT_TYPE).unbind<&RenderModuleImpl::onPointLightMoved>(this);
+		m_world.componentTransformed(BONE_ATTACHMENT_TYPE).unbind<&RenderModuleImpl::onBoneAttachmentMoved>(this);
 
 		for (Decal& decal : m_decals) {
 			if (decal.material) decal.material->decRefCount();
@@ -445,54 +446,44 @@ struct RenderModuleImpl final : RenderModule {
 		unlockPose(model_instance, false);
 	}
 
-
-	Vec3 getBoneAttachmentPosition(EntityRef entity) override
-	{
+	Vec3 getBoneAttachmentPosition(EntityRef entity) override {
 		return m_bone_attachments[entity].relative_transform.pos;
-		
 	}
 
-
-	void setBoneAttachmentPosition(EntityRef entity, const Vec3& pos) override
-	{
+	void setBoneAttachmentPosition(EntityRef entity, const Vec3& pos) override {
 		BoneAttachment& attachment = m_bone_attachments[entity];
 		attachment.relative_transform.pos = pos;
-		m_is_updating_attachments = true;
+		EntityPtr backup = m_updating_attachment;
+		m_updating_attachment = entity;
 		updateBoneAttachment(attachment);
-		m_is_updating_attachments = false;
+		m_updating_attachment = backup;
 	}
 
-
-	Vec3 getBoneAttachmentRotation(EntityRef entity) override
-	{
+	Vec3 getBoneAttachmentRotation(EntityRef entity) override {
 		return m_bone_attachments[entity].relative_transform.rot.toEuler();
 	}
 
-
-	void setBoneAttachmentRotation(EntityRef entity, const Vec3& rot) override
-	{
+	void setBoneAttachmentRotation(EntityRef entity, const Vec3& rot) override {
 		BoneAttachment& attachment = m_bone_attachments[entity];
 		Vec3 euler = rot;
 		euler.x = clamp(euler.x, -PI * 0.5f, PI * 0.5f);
 		attachment.relative_transform.rot.fromEuler(euler);
-		m_is_updating_attachments = true;
+		EntityPtr backup = m_updating_attachment;
+		m_updating_attachment = entity;
 		updateBoneAttachment(attachment);
-		m_is_updating_attachments = false;
+		m_updating_attachment = backup;
 	}
 
-
-	void setBoneAttachmentRotationQuat(EntityRef entity, const Quat& rot) override
-	{
+	void setBoneAttachmentRotationQuat(EntityRef entity, const Quat& rot) override {
 		BoneAttachment& attachment = m_bone_attachments[entity];
 		attachment.relative_transform.rot = rot;
-		m_is_updating_attachments = true;
+		EntityPtr backup = m_updating_attachment;
+		m_updating_attachment = entity;
 		updateBoneAttachment(attachment);
-		m_is_updating_attachments = false;
+		m_updating_attachment = backup;
 	}
 
-
-	int getBoneAttachmentBone(EntityRef entity) override
-	{
+	int getBoneAttachmentBone(EntityRef entity) override {
 		return m_bone_attachments[entity].bone_index;
 	}
 
@@ -1547,6 +1538,8 @@ struct RenderModuleImpl final : RenderModule {
 		}
 	}
 
+	void onBoneAttachmentMoved(EntityRef entity) {
+		updateRelativeMatrix(m_bone_attachments[entity]);
 // TODO update bont attachment's relative matrix if the attachment is moved not by moving its parent
 #if 0
 		if (m_is_updating_attachments || m_is_game_running) return;
@@ -1562,6 +1555,7 @@ struct RenderModuleImpl final : RenderModule {
 			}
 		}
 #endif
+	}
 
 	void onModelInstanceMoved(EntityRef entity) {
 		if (!m_culling_system->isAdded(entity)) return;
@@ -1576,14 +1570,14 @@ struct RenderModuleImpl final : RenderModule {
 		m_culling_system->set(entity, tr.pos, bounding_radius * maximum(tr.scale.x, tr.scale.y, tr.scale.z));
 
 		if (mi.flags & ModelInstance::IS_BONE_ATTACHMENT_PARENT) {
-			bool was_updating = m_is_updating_attachments;
-			m_is_updating_attachments = true;
 			for (auto& attachment : m_bone_attachments) {
 				if (attachment.parent_entity == entity) {
+					EntityPtr backup = m_updating_attachment;
+					m_updating_attachment = attachment.entity;
 					updateBoneAttachment(attachment);
+					m_updating_attachment = backup;
 				}
 			}
-			m_is_updating_attachments = was_updating;
 		}
 	}
 
@@ -1982,6 +1976,7 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 	Pose* lockPose(EntityRef entity) override { return m_model_instances[entity.index].pose; }
+
 	void unlockPose(EntityRef entity, bool changed) override {
 		if (!changed) return;
 		if (entity.index < m_model_instances.size()
@@ -1994,9 +1989,10 @@ struct RenderModuleImpl final : RenderModule {
 		for (BoneAttachment& ba : m_bone_attachments)
 		{
 			if (ba.parent_entity != parent) continue;
-			m_is_updating_attachments = true;
+			EntityPtr backup = m_updating_attachment;
+			m_updating_attachment = ba.entity;
 			updateBoneAttachment(ba);
-			m_is_updating_attachments = false;
+			m_updating_attachment = backup;
 		}
 	}
 
@@ -3315,7 +3311,7 @@ struct RenderModuleImpl final : RenderModule {
 	Array<DebugLine> m_debug_lines;
 	HashMap<EntityRef, FurComponent> m_furs;
 
-	bool m_is_updating_attachments;
+	EntityPtr m_updating_attachment = INVALID_ENTITY;
 	bool m_is_game_running;
 
 	HashMap<Model*, EntityRef> m_model_entity_map;
@@ -3567,7 +3563,6 @@ RenderModuleImpl::RenderModuleImpl(Renderer& renderer,
 	, m_environment_probes(m_allocator)
 	, m_reflection_probes(m_allocator)
 	, m_procedural_geometries(m_allocator)
-	, m_is_updating_attachments(false)
 	, m_material_decal_map(m_allocator)
 	, m_material_curve_decal_map(m_allocator)
 	, m_furs(m_allocator)
@@ -3577,6 +3572,7 @@ RenderModuleImpl::RenderModuleImpl(Renderer& renderer,
 	m_world.componentTransformed(CURVE_DECAL_TYPE).bind<&RenderModuleImpl::onCurveDecalMoved>(this);
 	m_world.componentTransformed(PARTICLE_EMITTER_TYPE).bind<&RenderModuleImpl::onParticleEmitterMoved>(this);
 	m_world.componentTransformed(POINT_LIGHT_TYPE).bind<&RenderModuleImpl::onPointLightMoved>(this);
+	m_world.componentTransformed(BONE_ATTACHMENT_TYPE).bind<&RenderModuleImpl::onBoneAttachmentMoved>(this);
 
 	m_world.entityDestroyed().bind<&RenderModuleImpl::onEntityDestroyed>(this);
 	m_culling_system = CullingSystem::create(m_allocator, engine.getPageAllocator());
