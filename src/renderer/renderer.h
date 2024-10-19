@@ -134,7 +134,7 @@ void Renderer::pushJob(const char* name, const T& func) {
 				const i64 link = profiler::createNewLinkID();
 				profiler::link(link);
 				profiler::blockColor(0x7f, 0, 0x7f);
-				that->stream.beginProfileBlock(that->name, link);
+				that->stream.beginProfileBlock(that->name, link, false);
 			}
 			that->func(that->stream);
 			if (that->name) {

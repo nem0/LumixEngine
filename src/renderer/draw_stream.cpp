@@ -443,11 +443,12 @@ void DrawStream::createProgram(gpu::ProgramHandle prog
 	write(Instruction::CREATE_PROGRAM, data);
 }
 
-void DrawStream::beginProfileBlock(const char* name, i64 link) {
+void DrawStream::beginProfileBlock(const char* name, i64 link, bool stats) {
 	u32 len = stringLength(name) + 1;
-	u8* data = alloc(sizeof(Instruction) + sizeof(i64) + sizeof(len) + len);
+	u8* data = alloc(sizeof(Instruction) + sizeof(i64) + sizeof(len) + sizeof(bool) + len);
 	WRITE_CONST(Instruction::BEGIN_PROFILE_BLOCK);
 	WRITE(link);
+	WRITE(stats);
 	WRITE(len);
 	WRITE_ARRAY(name, len);
 }
@@ -963,8 +964,9 @@ void DrawStream::run() {
 				}
 				case Instruction::BEGIN_PROFILE_BLOCK: {
 					READ(i64, link);
+					READ(bool, stats);
 					READ(u32, len);
-					renderer.beginProfileBlock((const char*)ptr, link);
+					renderer.beginProfileBlock((const char*)ptr, link, stats);
 					ptr += len;
 					break;
 				}

@@ -126,7 +126,7 @@ struct LUMIX_RENDERER_API Pipeline {
 
 	virtual PipelineType getType() const = 0;
 	virtual void copy(RenderBufferHandle dst, RenderBufferHandle src, IVec2 size, Vec4 r = Vec4(1, 0, 0, 0), Vec4 g = Vec4(0, 1, 0, 0), Vec4 b = Vec4(0, 0, 1, 0)) = 0;
-	virtual void beginBlock(const char* name) = 0;
+	virtual void beginBlock(const char* name, bool stats = false) = 0;
 	virtual void endBlock() = 0;
 	virtual void drawArray(u32 indices_offset, u32 indices_count, Shader& shader, u32 define_mask = 0, gpu::StateFlags state = gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_FN_GREATER) = 0;
 	virtual void setRenderTargets(Span<const RenderBufferHandle> renderbuffers, RenderBufferHandle ds = INVALID_RENDERBUFFER, gpu::FramebufferFlags flags = gpu::FramebufferFlags::NONE) = 0;

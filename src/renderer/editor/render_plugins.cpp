@@ -3686,7 +3686,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 
 		// capture cubemap
 		gpu::TextureHandle cubemap = gpu::allocTextureHandle();
-		stream.beginProfileBlock("probe job", 0);
+		stream.beginProfileBlock("probe job", 0, false);
 		gpu::TextureFlags flags = gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::IS_CUBE | gpu::TextureFlags::COMPUTE_WRITE;
 		if (!job.is_reflection) flags |= gpu::TextureFlags::NO_MIPS;
 		stream.createTexture(cubemap, texture_size, texture_size, 1, gpu::TextureFormat::RGBA32F, flags, "probe");
@@ -5019,7 +5019,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 		Renderer* renderer = static_cast<Renderer*>(m_engine.getSystemManager().getSystem("renderer"));
 
 		DrawStream& stream = renderer->getDrawStream();
-		stream.beginProfileBlock("imgui", 0);
+		stream.beginProfileBlock("imgui", 0, true);
 
 		ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
 		for (const ImGuiViewport* vp : platform_io.Viewports) {

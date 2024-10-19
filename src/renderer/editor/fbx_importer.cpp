@@ -1203,7 +1203,7 @@ void FBXImporter::createImpostorTextures(Model* model, ImpostorTexturesContext& 
 		tile_size.x = (tile_size.x + 3) & ~3;
 		tile_size.y = (tile_size.y + 3) & ~3;
 		const IVec2 texture_size = tile_size * IMPOSTOR_COLS;
-		stream.beginProfileBlock("create impostor textures", 0);
+		stream.beginProfileBlock("create impostor textures", 0, false);
 		stream.createTexture(gbs[0], texture_size.x, texture_size.y, 1, gpu::TextureFormat::SRGBA, gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET, "impostor_gb0");
 		stream.createTexture(gbs[1], texture_size.x, texture_size.y, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET, "impostor_gb1");
 		stream.createTexture(gbs[2], texture_size.x, texture_size.y, 1, gpu::TextureFormat::D32, gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET, "impostor_gbd");
