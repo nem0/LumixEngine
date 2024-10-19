@@ -56,7 +56,7 @@ struct Atmo : public RenderPlugin {
 			m_inscatter_precomputed = pipeline.getRenderer().createTexture(64, 128, 1, gpu::TextureFormat::RGBA32F, flags, {}, "inscatter_precomputed");
 		}
 		
-		DrawStream& stream = pipeline.getRenderer().getEndFrameDrawStream();
+		DrawStream& stream = pipeline.getRenderer().getDrawStream();
 		pipeline.beginBlock("atmo");
 
 		struct {
@@ -92,8 +92,9 @@ struct Atmo : public RenderPlugin {
 			env.fog_density > 0 ? 1.f : 0.f,
 			env.godrays_enabled ? 1.f : 0.f,
 			gpu::getRWBindlessHandle(m_optical_depth_precomputed),
-			gpu::getBindlessHandle(m_optical_depth_precomputed),
-			pipeline.toBindless(gbuffer.DS, stream)
+			gpu::INVALID_BINDLESS_HANDLE,
+			pipeline.toBindless(gbuffer.DS, stream),
+			gpu::INVALID_BINDLESS_HANDLE
 		};
 
 		stream.barrierWrite(m_optical_depth_precomputed);
@@ -103,8 +104,8 @@ struct Atmo : public RenderPlugin {
 		pipeline.endBlock();
 		
 		stream.barrierWrite(m_inscatter_precomputed);
-		stream.barrierRead(m_optical_depth_precomputed);
 		stream.memoryBarrier(m_optical_depth_precomputed);
+		stream.barrierRead(m_optical_depth_precomputed);
 
 		pipeline.beginBlock("precompute_inscatter");
 		ub_data.resolution = Vec4(64, 128, 1, 0);
@@ -113,10 +114,11 @@ struct Atmo : public RenderPlugin {
 		pipeline.dispatch(*m_scattering_shader, 64 / 16, 128 / 16, 1);
 		pipeline.endBlock();
 		
-		stream.barrierRead(m_inscatter_precomputed);
 		stream.memoryBarrier(m_inscatter_precomputed);
+		stream.barrierRead(m_inscatter_precomputed);
 		
 		ub_data.inscatter_precomputed = gpu::getBindlessHandle(m_inscatter_precomputed);
+		ub_data.optical_depth = gpu::getBindlessHandle(m_optical_depth_precomputed);
 		ub_data.output = pipeline.toRWBindless(hdr_rb, stream);
 		pipeline.setUniform(ub_data);
 		const Viewport& vp = pipeline.getViewport();

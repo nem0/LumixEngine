@@ -724,7 +724,7 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 		}
 
 		// grid
-		pipeline.setRenderTargets(Span(&input, 1), gbuffer.DS, true);
+		pipeline.setRenderTargets(Span(&input, 1), gbuffer.DS, gpu::FramebufferFlags::READONLY_DEPTH_STENCIL);
 		if (m_grid_shader->isReady() && m_show_grid) {
 			pipeline.setRenderTargets(Span(&input, 1), gbuffer.DS);
 			pipeline.drawArray(0, 4, *m_grid_shader, 0, gpu::StateFlags::DEPTH_FUNCTION | gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA));

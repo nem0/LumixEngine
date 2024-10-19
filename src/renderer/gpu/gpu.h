@@ -44,7 +44,10 @@ enum class InitFlags : u32 {
 enum class FramebufferFlags : u32 {
 	NONE = 0,
 	SRGB = 1 << 0,
-	READONLY_DEPTH_STENCIL = 1 << 1
+	READONLY_DEPTH = 1 << 1,
+	READONLY_STENCIL = 1 << 2,
+
+	READONLY_DEPTH_STENCIL = READONLY_DEPTH | READONLY_STENCIL,
 };
 
 enum class StateFlags : u64 {

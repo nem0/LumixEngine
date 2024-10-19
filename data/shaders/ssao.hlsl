@@ -20,7 +20,7 @@ void main(uint3 thread_id : SV_DispatchThreadID) {
 	float occlusion_count = 0;
 
 	float c = hash(float2(thread_id.xy) * 0.01 + Global_random_float2_normalized) * 2 - 1;
-	float depth_scale = u_radius / length(pos_ws.z) * (c * 2 + 0.1)/**/;
+	float depth_scale = u_radius / length(pos_ws) * (c * 2 + 0.1)/**/;
 	float s = sqrt(1 - c * c); 
 	float2x2 rot_scale = float2x2(c, s, -s, c);
 	rot_scale *= depth_scale;
@@ -29,16 +29,15 @@ void main(uint3 thread_id : SV_DispatchThreadID) {
 		float2 poisson = POISSON_DISK_4[i];
 		float2 s = mul(poisson, rot_scale);
 		
-	if (0) {
+	if (1) {
 			float3 pos_a_ws = getPositionWS(u_depth_buffer, screen_uv + s) - pos_ws;
 			float3 sample_vec_a = normalize(pos_a_ws);
 			float dist_a = length(pos_a_ws);
 			float angle_a = saturate(dot(sample_vec_a, normal_ws));
 
-			if (dist_a < 1) {
-				occlusion += (angle_a ) * dist_a;
-				occlusion_count += 1.0;
-			}
+			float w = saturate(0.07 / dist_a);
+			occlusion = occlusion + angle_a * w;
+			occlusion_count += w;
 	}	
 	else {
 		float3 pos_a_ws = getPositionWS(u_depth_buffer, screen_uv + s) - pos_ws;

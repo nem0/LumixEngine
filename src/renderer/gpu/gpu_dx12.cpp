@@ -865,7 +865,7 @@ struct SRVUAVHeap {
 };
 
 struct RTVDSVHeap {
-	D3D12_CPU_DESCRIPTOR_HANDLE allocDSV(ID3D12Device* device, const Texture& texture) {
+	D3D12_CPU_DESCRIPTOR_HANDLE allocDSV(ID3D12Device* device, const Texture& texture, gpu::FramebufferFlags flags) {
 		ASSERT(num_resources + 1 <= max_resource_count);
 
 		D3D12_CPU_DESCRIPTOR_HANDLE cpu = cpu_begin;
@@ -874,6 +874,9 @@ struct RTVDSVHeap {
 
 		D3D12_DEPTH_STENCIL_VIEW_DESC desc = {};
 		desc.Format = toDSViewFormat(texture.dxgi_format);
+		desc.Flags = D3D12_DSV_FLAG_NONE;
+		if (isFlagSet(flags, gpu::FramebufferFlags::READONLY_DEPTH)) desc.Flags |= D3D12_DSV_FLAG_READ_ONLY_DEPTH;
+		if (isFlagSet(flags, gpu::FramebufferFlags::READONLY_STENCIL)) desc.Flags |= D3D12_DSV_FLAG_READ_ONLY_STENCIL;
 		desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 		desc.Texture2D.MipSlice = 0;
 		device->CreateDepthStencilView(texture.resource, &desc, cpu);
@@ -1140,7 +1143,7 @@ void barrierWrite(TextureHandle texture) {
 
 void barrierRead(TextureHandle texture) {
 	if (isDepthFormat(texture->dxgi_format)) {
-		texture->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_DEPTH_READ);
+		texture->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_DEPTH_READ |  D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 	}
 	else {
 		texture->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_GENERIC_READ);
@@ -1922,7 +1925,7 @@ void setFramebuffer(const TextureHandle* attachments, u32 num, TextureHandle dep
 		if (texture) texture->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_GENERIC_READ);
 	}
 
-	const bool readonly_ds = u32(flags & FramebufferFlags::READONLY_DEPTH_STENCIL);
+	const bool readonly_depth = u32(flags & FramebufferFlags::READONLY_DEPTH);
 	if (num == 0 && !depth_stencil) {
 		d3d->current_framebuffer.count = 1;
 		d3d->current_framebuffer.formats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -1942,8 +1945,10 @@ void setFramebuffer(const TextureHandle* attachments, u32 num, TextureHandle dep
 			++d3d->current_framebuffer.count;
 		}
 		if (depth_stencil) {
-			depth_stencil->setState(d3d->cmd_list, readonly_ds ? D3D12_RESOURCE_STATE_DEPTH_READ | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE : D3D12_RESOURCE_STATE_DEPTH_WRITE);
-			d3d->current_framebuffer.depth_stencil = d3d->ds_heap.allocDSV(d3d->device, *depth_stencil);
+			depth_stencil->setState(d3d->cmd_list, readonly_depth 
+				? D3D12_RESOURCE_STATE_DEPTH_READ | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
+				 : D3D12_RESOURCE_STATE_DEPTH_WRITE);
+			d3d->current_framebuffer.depth_stencil = d3d->ds_heap.allocDSV(d3d->device, *depth_stencil, flags);
 			d3d->current_framebuffer.ds_format = toDSViewFormat(depth_stencil->dxgi_format);
 		}
 		else {
