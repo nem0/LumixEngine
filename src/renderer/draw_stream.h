@@ -33,7 +33,7 @@ struct DrawStream {
 	void captureFrame();
 	void pushDebugGroup(const char* msg);
 	void popDebugGroup();
-	void beginProfileBlock(const char* name, i64 link);
+	void beginProfileBlock(const char* name, i64 link, bool stats);
 	void endProfileBlock();
 
 	void useProgram(gpu::ProgramHandle program);

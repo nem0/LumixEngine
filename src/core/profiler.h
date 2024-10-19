@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core.h"
+#include "span.h"
 
 namespace Lumix {
 
@@ -59,6 +60,14 @@ LUMIX_CORE_API bool contextSwitchesEnabled();
 LUMIX_CORE_API u64 frequency();
 LUMIX_CORE_API u64 getThreadContextMemorySize();
 
+struct GPUScopeStats {
+	const char* name;
+	float min;
+	float max;
+	float avg;
+};
+
+LUMIX_CORE_API u32 getGPUScopeStats(Span<GPUScopeStats> out);
 
 struct ContextSwitchRecord
 {

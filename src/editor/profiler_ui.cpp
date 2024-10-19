@@ -842,6 +842,10 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 					flamegraphUI();
 					ImGui::EndTabItem();
 				}
+				if (ImGui::BeginTabItem("GPU")) {
+					GPUUI();
+					ImGui::EndTabItem();
+				}
 				if (ImGui::BeginTabItem("Memory")) {
 					m_memory_ui.gui();
 					ImGui::EndTabItem();
@@ -1490,6 +1494,9 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 				const float t = 1000 * float((block.end - block.start) / double(freq));
 				ImGui::BeginTooltip();
 				ImGui::Text("%s (%.4f ms)", block.name.data, t);
+				if (block.primitives_generated > 0) {
+					ImGui::Text("Primitives generated: %d", block.primitives_generated);
+				}
 				if (block.profiler_link) {
 					ImGui::Text("Link: %" PRId64, block.profiler_link);
 					m_hovered_link.frame = m_frame_idx;
@@ -1518,6 +1525,34 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 			dl->AddLine(ImVec2(x, y), ImVec2(x, bottom), 0xffff0000);
 			dl->ChannelsSetCurrent(0);
 		}
+	}
+
+	void GPUUI() {
+		profiler::GPUScopeStats stats[256];
+		const u32 num_stats = profiler::getGPUScopeStats(Span(stats));
+		m_filter.gui("Filter");
+		if (ImGui::BeginTable("gpu", 4, ImGuiTableFlags_Resizable)) {
+			ImGui::TableSetupColumn("Name");
+			ImGui::TableSetupColumn("Min (ms)");
+			ImGui::TableSetupColumn("Max (ms)");
+			ImGui::TableSetupColumn("Avg (ms)");
+			ImGui::TableHeadersRow();
+			for (u32 i = 0; i < num_stats; ++i) {
+				const profiler::GPUScopeStats& s = stats[i];
+				if (!m_filter.pass(s.name)) continue;
+				ImGui::TableNextRow();
+				ImGui::TableNextColumn();
+				ImGui::Text("%s", s.name);
+				ImGui::TableNextColumn();
+				ImGui::Text("%.3f", s.min * 1000);
+				ImGui::TableNextColumn();
+				ImGui::Text("%.3f", s.max * 1000);
+				ImGui::TableNextColumn();
+				ImGui::Text("%.3f", s.avg * 1000);
+			}
+			ImGui::EndTable();
+		}
+		
 	}
 
 	void flamegraphUI() {

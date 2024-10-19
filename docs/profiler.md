@@ -10,7 +10,7 @@ The **Recorder** is embedded within the engine and is responsible for capturing 
 
 The **Viewer** is integrated into the editor and enables developers to visualize and analyze the captured performance data. You can find its source code in [src/editor/profiler_ui.cpp](../src/editor/profiler_ui.cpp).
 
-To access the Viewer user interface, navigate to **Main Menu -> View -> Profiler** in the editor. The Viewer UI consists of three tabs: **Flamegraph, Memory and Resources**.
+To access the Viewer user interface, navigate to **Main Menu -> View -> Profiler** in the editor. The Viewer UI consists of three tabs: **Flamegraph, GPU, Memory and Resources**.
 
 ## Flamegraph
 
@@ -116,7 +116,7 @@ OS-level mutexes are visualized as red lines beneath a block. Only mutexes recor
 
 ![alt text](images/profiler/mutex.png)
 
-### GPU
+## GPU
 
 
 ## Memory

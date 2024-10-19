@@ -733,7 +733,7 @@ struct SSAO : public RenderPlugin {
 		if (!m_enabled) return;
 
 		const Viewport& vp = pipeline.getViewport();
-		pipeline.beginBlock(StaticString<64>("ssao ", vp.w, "x", vp.h));
+		pipeline.beginBlock("ssao");
 		RenderBufferHandle ssao_rb = pipeline.createRenderbuffer({ 
 			.format = gpu::TextureFormat::RGBA8, 
 			.flags = gpu::TextureFlags::COMPUTE_WRITE, 

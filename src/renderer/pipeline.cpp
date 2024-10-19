@@ -1136,7 +1136,7 @@ struct PipelineImpl final : Pipeline {
 		PROFILE_FUNCTION();
 		GBuffer gbuffer;
 		DrawStream& stream = m_renderer.getDrawStream();
-		beginBlock("geom pass");
+		beginBlock("geom pass", true);
 		const gpu::TextureFlags flags = gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE;
 		gbuffer.A = createRenderbuffer({ .format = gpu::TextureFormat::SRGBA, .debug_name = "gbufferA" });
 		gbuffer.B = createRenderbuffer({ .format = gpu::TextureFormat::RGBA16, .flags = flags, .debug_name = "gbufferB" });
@@ -1387,7 +1387,7 @@ struct PipelineImpl final : Pipeline {
 		DrawStream& stream = m_renderer.getDrawStream();
 		DrawStream& end_frame_stream = m_renderer.getEndFrameDrawStream();
 
-		stream.beginProfileBlock("downscale_depth", 0);
+		stream.beginProfileBlock("downscale_depth", 0, false);
 		gpu::TextureHandle* mip_views = m_downscale_depth_mips;
 		gpu::TextureHandle tex = toTexture(m_downscaled_depth);
 		for (u32 i = 0; i < lengthOf(m_downscale_depth_mips); ++i) {
@@ -3613,9 +3613,9 @@ struct PipelineImpl final : Pipeline {
 		return m_type;
 	}
 
-	void beginBlock(const char* name) override {
+	void beginBlock(const char* name, bool stats = false) override {
 		DrawStream& stream = m_renderer.getDrawStream();
-		stream.beginProfileBlock(name, 0);
+		stream.beginProfileBlock(name, 0, stats);
 	}
 
 	void endBlock() override {
