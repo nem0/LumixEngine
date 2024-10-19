@@ -1083,13 +1083,13 @@ struct RendererImpl final : Renderer {
 
 				gpu::waitFrame(f->gpu_frame);
 				PROFILE_BLOCK("frame finished");
-				jobs::runLambda([f, this]() {
+				jobs::runLambda([f]() {
 					PROFILE_BLOCK("reuse frame");
 					f->gpu_frame = 0xFFffFFff;
 					f->transient_buffer.renderDone();
 					f->uniform_buffer.renderDone();
 					jobs::turnGreen(&f->can_setup);
-					renderer.pushFreeFrame(*f);
+					f->renderer.pushFreeFrame(*f);
 				}, nullptr, 1);
 			}
 			return 0;
