@@ -1340,6 +1340,12 @@ void Settings::registerOption(const char* name, float* value, const char* catego
 		var->label = label;
 		var->is_angle = is_angle;
 		var->category = getCategory(*this, category);
+		if (var->type == Variable::I32) {
+			*value = (float)var->i32_value;
+			var->float_ptr = value;
+			var->type = Variable::FLOAT_PTR;
+			return;
+		}
 		if (var->type != Variable::FLOAT) {
 			logError("Setting ", name, " already exists but is not float");
 			return;
