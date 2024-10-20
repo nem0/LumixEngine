@@ -10,10 +10,12 @@
 
 #include "core/allocator.h"
 #include "core/array.h"
+#include "core/command_line_parser.h"
 #include "core/crt.h"
 #include "core/hash.h"
 #include "core/log.h"
 #include "core/math.h"
+#include "core/os.h"
 #include "core/path.h"
 #include "core/profiler.h"
 #include "core/stream.h"
@@ -28,11 +30,14 @@
 #include "engine/component_uid.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
-#include "engine/lua_wrapper.h"
+#include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
-#include "lua_script/lua_script.h"
-#include "lua_script/lua_script_system.h"
+#include "lua_script.h"
+#include "lua_script_system.h"
+#include "lua_wrapper.h"
+#include "renderer/editor/game_view.h"
+#include "renderer/editor/scene_view.h"
 
 
 using namespace Lumix;
@@ -188,39 +193,38 @@ struct LuauAnalysis :Luau::FileResolver {
 #endif
 
 struct StudioLuaPlugin : StudioApp::GUIPlugin {
-	static void create(StudioApp& app, StringView content, const Path& path) {
-		lua_State* L = app.getEngine().getState();
+	static StudioLuaPlugin* create(StudioApp& app, StringView content, const Path& path) {
+		LuaScriptSystem* system = (LuaScriptSystem*)app.getEngine().getSystemManager().getSystem("lua_script");
+		lua_State* L = system->getState();
 		LuaWrapper::DebugGuard guard(L);
-		if (!LuaWrapper::execute(L, content, path.c_str(), 1)) return;
+		if (!LuaWrapper::execute(L, content, path.c_str(), 1)) return nullptr;
 
 		if (lua_isnil(L, -1)) {
 			lua_pop(L, 1);
-			return;
+			return nullptr;
 		}
 
 		if (lua_getfield(L, -1, "name") != LUA_TSTRING) {
 			logError(path, ": missing `name` or `name` is not a string");
-			return;
+			return nullptr;
 		}
 		const char* name = LuaWrapper::toType<const char*>(L, -1);
 
-
 		StudioLuaPlugin* plugin = LUMIX_NEW(app.getAllocator(), StudioLuaPlugin)(app, name);
 		lua_pop(L, 1);
-		
+
+
 		if (lua_getfield(L, -1, "windowMenuAction") == LUA_TFUNCTION) {
 			char tmp[64];
 			convertToLuaName(name, tmp);
-			plugin->m_action.init(name, name, tmp, "", Action::IMGUI_PRIORITY);
-			plugin->m_action.func.bind<&StudioLuaPlugin::runWindowAction>(plugin);
-			app.addWindowAction(&plugin->m_action);
+			plugin->m_action.create(name, name, tmp, "", Action::WINDOW);
 		}
 		lua_pop(L, 1);
-		
+
 		plugin->m_plugin_ref = LuaWrapper::createRef(L);
 		lua_pop(L, 1);
 		app.addPlugin(*plugin);
-
+		return plugin;
 	} 
 	
 	static void convertToLuaName(const char* src, Span<char> out) {
@@ -250,27 +254,6 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 		, m_name(name, app.getAllocator())
 	{}
 	
-	~StudioLuaPlugin() {
-		m_app.removeAction(&m_action);
-	}
-
-	void runWindowAction() {
-		lua_State* L = m_app.getEngine().getState();
-		LuaWrapper::DebugGuard guard(L);
-		lua_rawgeti(L, LUA_REGISTRYINDEX, m_plugin_ref);
-		lua_getfield(L, -1, "windowMenuAction");
-		LuaWrapper::pcall(L, 0, 0);
-		lua_pop(L, 1);
-	}
-
-	bool onAction(const Action& action) override {
-		if (&action == &m_action) {
-			runWindowAction();
-			return true;
-		}
-		return false;
-	}
-
 	bool exportData(const char* dest_dir) override
 	{
 		#ifndef LUMIX_STATIC_LUAU
@@ -292,7 +275,19 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 	}
 
 	void onGUI() override {
-		lua_State* L = m_app.getEngine().getState();
+		LuaScriptSystem* system = (LuaScriptSystem*)m_app.getEngine().getSystemManager().getSystem("lua_script");
+		lua_State* L = system->getState();
+		
+		// check window action
+		if (m_action.get() && m_app.checkShortcut(*m_action.get(), true)) {
+			LuaWrapper::DebugGuard guard(L);
+			lua_rawgeti(L, LUA_REGISTRYINDEX, m_plugin_ref);
+			lua_getfield(L, -1, "windowMenuAction");
+			LuaWrapper::pcall(L, 0, 0);
+			lua_pop(L, 1);
+		}
+
+		// gui
 		LuaWrapper::DebugGuard guard(L);
 		lua_rawgeti(L, LUA_REGISTRYINDEX, m_plugin_ref);
 		lua_getfield(L, -1, "gui");
@@ -301,7 +296,9 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 	}
 
 	void onSettingsLoaded() override {
-		lua_State* L = m_app.getEngine().getState();
+		LuaScriptSystem* system = (LuaScriptSystem*)m_app.getEngine().getSystemManager().getSystem("lua_script");
+		lua_State* L = system->getState();
+		
 		LuaWrapper::DebugGuard guard(L);
 		lua_rawgeti(L, LUA_REGISTRYINDEX, m_plugin_ref);
 		if (lua_getfield(L, -1, "settings") == LUA_TNIL) {
@@ -325,26 +322,28 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 			switch (lua_type(L, -1)) {
 				case LUA_TBOOLEAN: {
 					bool val = lua_toboolean(L, -1);
-					val = m_app.getSettings().getValue(Settings::LOCAL, setting_name, val);
+					val = m_app.getSettings().getBool(setting_name, val);
 					lua_pushboolean(L, val);
 					lua_setfield(L, -4, setting_name);
 					break;
 				}
 				case LUA_TNUMBER: {
 					float val = (float)lua_tonumber(L, -1);
-					val = m_app.getSettings().getValue(Settings::LOCAL, setting_name, val);
+					val = m_app.getSettings().getFloat(setting_name, val);
 					lua_pushnumber(L, val);
 					lua_setfield(L, -4, setting_name);
 					break;
 				}
 				case LUA_TSTRING: {
 					const char* val = lua_tostring(L, -1);
-					val = m_app.getSettings().getStringValue(Settings::LOCAL, setting_name, val);
+					val = m_app.getSettings().getString(setting_name, val);
 					lua_pushstring(L, val);
 					lua_setfield(L, -4, setting_name);
 					break;
 				}
-				default: break;
+				default:
+					logError(m_path, ": ", setting_name, " has unsupported type");
+					break;
 			}
 			lua_pop(L, 1);
 		}
@@ -353,7 +352,9 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 	}
 	
 	void onBeforeSettingsSaved() override {
-		lua_State* L = m_app.getEngine().getState();
+		LuaScriptSystem* system = (LuaScriptSystem*)m_app.getEngine().getSystemManager().getSystem("lua_script");
+		lua_State* L = system->getState();
+
 		LuaWrapper::DebugGuard guard(L);
 		lua_rawgeti(L, LUA_REGISTRYINDEX, m_plugin_ref);
 		if (lua_getfield(L, -1, "settings") == LUA_TNIL) {
@@ -377,21 +378,21 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 			switch (lua_type(L, -1)) {
 				case LUA_TBOOLEAN: {
 					bool val = lua_toboolean(L, -1);
-					m_app.getSettings().setValue(Settings::LOCAL, setting_name, val);
+					m_app.getSettings().setBool(setting_name, val, Settings::Storage::WORKSPACE);
 					break;
 				}
 				case LUA_TNUMBER: {
 					float val = (float)lua_tonumber(L, -1);
-					m_app.getSettings().setValue(Settings::LOCAL, setting_name, val);
+					m_app.getSettings().setFloat(setting_name, val, Settings::Storage::WORKSPACE);
 					break;
 				}
 				case LUA_TSTRING: {
 					const char* val = lua_tostring(L, -1);
-					m_app.getSettings().setValue(Settings::LOCAL, setting_name, val);
+					m_app.getSettings().setString(setting_name, val, Settings::Storage::WORKSPACE);
 					break;
 				}
 				default:
-					logError(m_name, "settings: ", setting_name, " has unsupported type");
+					logError(m_path, ": ", setting_name, " has unsupported type");
 					break;
 			}
 			lua_pop(L, 1);
@@ -403,7 +404,8 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 	const char* getName() const override { return m_name.c_str(); }
 
 	StudioApp& m_app;
-	Action m_action;
+	Path m_path;
+	Local<Action> m_action;
 	String m_name;
 	i32 m_plugin_ref;
 };
@@ -470,17 +472,13 @@ struct EditorWindow : AssetEditorWindow {
 		m_dirty = false;
 	}
 	
-	bool onAction(const Action& action) override { 
-		if (&action == &m_app.getCommonActions().save) save();
-		else return false;
-		return true;
-	}
-
 	void windowGUI() override {
+		CommonActions& actions = m_app.getCommonActions();
+
 		if (ImGui::BeginMenuBar()) {
-			if (ImGuiEx::IconButton(ICON_FA_SAVE, "Save")) save();
-			if (ImGuiEx::IconButton(ICON_FA_EXTERNAL_LINK_ALT, "Open externally")) m_app.getAssetBrowser().openInExternalEditor(m_path);
-			if (ImGuiEx::IconButton(ICON_FA_SEARCH, "View in browser")) m_app.getAssetBrowser().locate(m_path);
+			if (actions.save.iconButton(m_dirty, &m_app)) save();
+			if (actions.open_externally.iconButton(true, &m_app)) m_app.getAssetBrowser().openInExternalEditor(m_path);
+			if (actions.view_in_browser.iconButton(true, &m_app)) m_app.getAssetBrowser().locate(m_path);
 			ImGui::EndMenuBar();
 		}
 
@@ -751,7 +749,7 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 				editor.addComponent(Span(&entity, 1), LUA_SCRIPT_TYPE);
 			}
 
-			const ComponentUID cmp = editor.getWorld()->getComponent(entity, LUA_SCRIPT_TYPE);
+			const ComponentUID cmp(entity, LUA_SCRIPT_TYPE, editor.getWorld()->getModule(LUA_SCRIPT_TYPE));
 			editor.addArrayPropertyItem(cmp, "scripts");
 
 			if (!create_empty) {
@@ -820,7 +818,7 @@ struct LuaAction {
 		LuaWrapper::pcall(L, 0, 0);
 		lua_pop(L, 1);
 	}
-	Action action;
+	Local<Action> action;
 	lua_State* L;
 	int ref_thread;
 	int ref_action;
@@ -834,10 +832,18 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 		, m_luau_analysis(app)
 		, m_asset_plugin(m_luau_analysis, app)
 		, m_lua_actions(app.getAllocator())
+		, m_plugins(app.getAllocator())
 	{
-		lua_State* L = app.getEngine().getState();
+		LuaScriptSystem* system = (LuaScriptSystem*)app.getEngine().getSystemManager().getSystem("lua_script");
+		lua_State* L = system->getState();
 		LuaWrapper::createSystemClosure(L, "Editor", this, "addAction", &LUA_addAction);
 		initPlugins();
+	}
+
+	void update(float) override {
+		for (LuaAction* action : m_lua_actions) {
+			if (m_app.checkShortcut(*action->action, true)) action->run();
+		}
 	}
 
 	static int LUA_addAction(lua_State* L) {
@@ -859,10 +865,8 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 		lua_pushvalue(L, 1);
 		action->ref_action = LuaWrapper::createRef(L);
 		lua_pop(L, 2);
-		action->action.init(label, label, name, "", Action::Type::IMGUI_PRIORITY);
-		action->action.func.bind<&LuaAction::run>(action);
+		action->action.create(label, label, name, "");
 		action->L = L;
-		app.addAction(&action->action);
 		return 0;
 	}
 
@@ -882,12 +886,433 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 			StringView content;
 			content.begin = (const char*)blob.data();
 			content.end = content.begin + blob.size();
-			StudioLuaPlugin::create(m_app, content, path);
+			StudioLuaPlugin* plugin = StudioLuaPlugin::create(m_app, content, path);
+			if (plugin) m_plugins.push(plugin);
 		}
 		os::destroyFileIterator(iter);
 	}
 
 	const char* getName() const override { return "lua_script"; }
+
+
+	static int LUA_getSelectedEntity(lua_State* L) {
+		LuaWrapper::DebugGuard guard(L, 1);
+		i32 entity_idx = LuaWrapper::checkArg<i32>(L, 1);
+		
+		StudioApp* inst = LuaWrapper::getClosureObject<StudioApp>(L);
+		WorldEditor& editor = inst->getWorldEditor();
+		EntityRef entity = editor.getSelectedEntities()[entity_idx];
+
+		lua_getglobal(L, "Lumix");
+		lua_getfield(L, -1, "Entity");
+		lua_remove(L, -2);
+		lua_getfield(L, -1, "new");
+		lua_pushvalue(L, -2); // [Lumix.Entity, Entity.new, Lumix.Entity]
+		lua_remove(L, -3); // [Entity.new, Lumix.Entity]
+		World* world = editor.getWorld();
+		LuaWrapper::push(L, world); // [Entity.new, Lumix.Entity, world]
+		LuaWrapper::push(L, entity.index); // [Entity.new, Lumix.Entity, world, entity_index]
+		const bool error = !LuaWrapper::pcall(L, 3, 1); // [entity]
+		return error ? 0 : 1;
+	}
+
+	static int LUA_getResources(lua_State* L) {
+		auto* studio = LuaWrapper::checkArg<StudioApp*>(L, 1);
+		auto* type = LuaWrapper::checkArg<const char*>(L, 2);
+
+		AssetCompiler& compiler = studio->getAssetCompiler();
+		if (!ResourceType(type).isValid()) return 0;
+		const auto& resources = compiler.lockResources();
+
+		lua_createtable(L, resources.size(), 0);
+		int i = 0;
+		for (const AssetCompiler::ResourceItem& res : resources)
+		{
+			LuaWrapper::push(L, res.path.c_str());
+			lua_rawseti(L, -2, i + 1);
+			++i;
+		}
+
+		compiler.unlockResources();
+		return 1;
+	}
+
+	static void LUA_makeParent(lua_State* L, EntityPtr parent, EntityRef child) {
+		StudioApp* studio = LuaWrapper::getClosureObject<StudioApp>(L);
+		studio->getWorldEditor().makeParent(parent, child);
+	}
+
+struct SetPropertyVisitor : reflection::IPropertyVisitor {
+		static bool isSameProperty(const char* name, const char* lua_name) {
+			char tmp[128];
+			LuaWrapper::convertPropertyToLuaName(name, Span(tmp));
+			return equalStrings(tmp, lua_name);
+		}
+
+		void visit(const reflection::Property<int>& prop) override
+		{
+			if (!isSameProperty(prop.name, property_name)) return;
+			if (!lua_isnumber(L, -1)) return;
+
+			if(reflection::getAttribute(prop, reflection::IAttribute::ENUM)) {
+				notSupported(prop);
+			}
+
+			int val = (int)lua_tointeger(L, -1);
+			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
+		}
+
+		void visit(const reflection::Property<u32>& prop) override
+		{
+			if (!isSameProperty(prop.name, property_name)) return;
+			if (!lua_isnumber(L, -1)) return;
+
+			const u32 val = (u32)lua_tointeger(L, -1);
+			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
+		}
+
+		void visit(const reflection::Property<float>& prop) override
+		{
+			if (!isSameProperty(prop.name, property_name)) return;
+			if (!lua_isnumber(L, -1)) return;
+
+			float val = (float)lua_tonumber(L, -1);
+			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
+		}
+
+		void visit(const reflection::Property<Vec2>& prop) override
+		{
+			if (!isSameProperty(prop.name, property_name)) return;
+			if (!LuaWrapper::isType<Vec2>(L, -1)) return;
+
+			const Vec2 val = LuaWrapper::toType<Vec2>(L, -1);
+			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
+		}
+
+		void visit(const reflection::Property<Vec3>& prop) override
+		{
+			if (!isSameProperty(prop.name, property_name)) return;
+			if (!LuaWrapper::isType<Vec3>(L, -1)) return;
+
+			const Vec3 val = LuaWrapper::toType<Vec3>(L, -1);
+			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
+		}
+
+		void visit(const reflection::Property<IVec3>& prop) override
+		{
+			if (!isSameProperty(prop.name, property_name)) return;
+			if (!LuaWrapper::isType<IVec3>(L, -1)) return;
+
+			const IVec3 val = LuaWrapper::toType<IVec3>(L, -1);
+			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
+		}
+
+		void visit(const reflection::Property<Vec4>& prop) override
+		{
+			if (!isSameProperty(prop.name, property_name)) return;
+			if (!LuaWrapper::isType<Vec4>(L, -1)) return;
+
+			const Vec4 val = LuaWrapper::toType<Vec4>(L, -1);
+			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
+		}
+		
+		void visit(const reflection::Property<const char*>& prop) override
+		{
+			if (!isSameProperty(prop.name, property_name)) return;
+			if (!lua_isstring(L, -1)) return;
+
+			const char* str = lua_tostring(L, -1);
+			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), str);
+		}
+
+
+		void visit(const reflection::Property<Path>& prop) override
+		{
+			if (!isSameProperty(prop.name, property_name)) return;
+			if (!lua_isstring(L, -1)) return;
+
+			const char* str = lua_tostring(L, -1);
+			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), Path(str));
+		}
+
+
+		void visit(const reflection::Property<bool>& prop) override
+		{
+			if (!isSameProperty(prop.name, property_name)) return;
+			if (!lua_isboolean(L, -1)) return;
+
+			bool val = lua_toboolean(L, -1) != 0;
+			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
+		}
+
+		void visit(const reflection::Property<EntityPtr>& prop) override { notSupported(prop); }
+		void visit(const reflection::ArrayProperty& prop) override { notSupported(prop); }
+		void visit(const reflection::BlobProperty& prop) override { notSupported(prop); }
+
+		template <typename T>
+		void notSupported(const T& prop)
+		{
+			if (!equalStrings(property_name, prop.name)) return;
+			logError("Property ", prop.name, " has unsupported type");
+		}
+
+
+		lua_State* L;
+		EntityRef entity;
+		ComponentType cmp_type;
+		const char* property_name;
+		WorldEditor* editor;
+	};
+
+	static int LUA_createEntityEx(lua_State* L) {
+		StudioApp* studio = LuaWrapper::getClosureObject<StudioApp>(L);
+		LuaWrapper::checkTableArg(L, 1);
+
+		WorldEditor& editor = studio->getWorldEditor();
+		editor.beginCommandGroup("createEntityEx");
+		EntityRef e = editor.addEntity();
+		editor.selectEntities(Span(&e, 1), false);
+
+		lua_pushvalue(L, 1);
+		lua_pushnil(L);
+		while (lua_next(L, -2) != 0)
+		{
+			const char* parameter_name = LuaWrapper::toType<const char*>(L, -2);
+			if (equalStrings(parameter_name, "name"))
+			{
+				const char* name = LuaWrapper::toType<const char*>(L, -1);
+				editor.setEntityName(e, name);
+			}
+			else if (equalStrings(parameter_name, "position"))
+			{
+				const DVec3 pos = LuaWrapper::toType<DVec3>(L, -1);
+				editor.setEntitiesPositions(&e, &pos, 1);
+			}
+			else if (equalStrings(parameter_name, "rotation"))
+			{
+				const Quat rot = LuaWrapper::toType<Quat>(L, -1);
+				editor.setEntitiesRotations(&e, &rot, 1);
+			}
+			else
+			{
+				ComponentType cmp_type = reflection::getComponentType(parameter_name);
+				editor.addComponent(Span(&e, 1), cmp_type);
+
+				IModule* module = editor.getWorld()->getModule(cmp_type);
+				if (module)
+				{
+					ComponentUID cmp(e, cmp_type, module);
+					const reflection::ComponentBase* cmp_des = reflection::getComponent(cmp_type);
+					if (cmp.isValid())
+					{
+						lua_pushvalue(L, -1);
+						lua_pushnil(L);
+						while (lua_next(L, -2) != 0)
+						{
+							const char* property_name = LuaWrapper::toType<const char*>(L, -2);
+							SetPropertyVisitor v;
+							v.property_name = property_name;
+							v.entity = (EntityRef)cmp.entity;
+							v.cmp_type = cmp.type;
+							v.L = L;
+							v.editor = &editor;
+							cmp_des->visit(v);
+
+							lua_pop(L, 1);
+						}
+						lua_pop(L, 1);
+					}
+				}
+			}
+			lua_pop(L, 1);
+		}
+		lua_pop(L, 1);
+
+		editor.endCommandGroup();
+		LuaWrapper::pushEntity(L, e, editor.getWorld());
+		return 1;
+	}
+	
+	void checkScriptCommandLine() {
+		char command_line[1024];
+		os::getCommandLine(Span(command_line));
+		CommandLineParser parser(command_line);
+		while (parser.next()) {
+			if (parser.currentEquals("-run_script")) {
+				if (!parser.next()) break;
+
+				char tmp[MAX_PATH];
+				parser.getCurrent(tmp, lengthOf(tmp));
+				OutputMemoryStream content(m_app.getAllocator());
+				
+				if (m_app.getEngine().getFileSystem().getContentSync(Path(tmp), content)) {
+					content.write('\0');
+					runScript((const char*)content.data(), tmp);
+				}
+				else {
+					logError("Could not read ", tmp);
+				}
+				break;
+			}
+		}
+	}
+
+	static void luaImGuiTable(const char* prefix, lua_State* L) {
+		lua_pushnil(L);
+		while (lua_next(L, -2)) {
+			const char* name = lua_tostring(L, -2);
+			if (!lua_isfunction(L, -1) && !equalStrings(name, "__index")) {
+				if (lua_istable(L, -1)) {
+					luaImGuiTable(StaticString<128>(prefix, name, "."), L);
+				}
+				else {
+					ImGui::TableNextRow();
+					ImGui::TableNextColumn();
+					ImGui::Text("%s%s", prefix, name);
+					ImGui::TableNextColumn();
+					switch (lua_type(L, -1)) {
+						case LUA_TLIGHTUSERDATA:
+							ImGui::TextUnformatted("light user data");
+							break;
+						case LUA_TBOOLEAN: {
+							const bool b = lua_toboolean(L, -1) != 0;
+							ImGui::TextUnformatted(b ? "true" : "false");
+							break;
+						}
+						case LUA_TNUMBER: {
+							const double val = lua_tonumber(L, -1);
+							ImGui::Text("%f", val);
+							break;
+						}
+						case LUA_TSTRING: 
+							ImGui::TextUnformatted(lua_tostring(L, -1));
+							break;
+					}
+				}
+			}
+			lua_pop(L, 1);
+		}
+	}
+
+	// asserts once if called between ImGui::Begin/End, can be safely skipped
+	void luaDebugLoop(lua_State* L, const char* error_msg) {
+		if (!m_lua_debug_enabled) return;
+		// TODO custom imgui context?
+		// TODO can we somehow keep running normal loop while lua is being debugged?
+		// end normal loop
+		ImGui::PopFont();
+		ImGui::Render();
+		ImGui::UpdatePlatformWindows();
+		m_app.beginCustomTicking();
+
+		// debug loop
+		// we have special loop for debug, because we don't want world or lua state to change while we debug
+		bool finished = false;
+		while (!finished) {
+			m_app.beginCustomTick();
+
+			const ImGuiID dockspace_id = ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
+
+			static int selected_stack_level = -1;
+
+			ImGui::SetNextWindowDockID(dockspace_id, ImGuiCond_FirstUseEver);			
+			if (ImGui::Begin("REPL")) {
+				LuaWrapper::DebugGuard guard(L);
+				static char repl[4096] = "";
+				ImGui::SetNextItemWidth(-1);
+				ImGui::InputTextMultiline("##repl", repl, sizeof(repl));
+				if (ImGui::Button("Run")) {
+					const bool errors = LuaWrapper::luaL_loadbuffer(L, repl, strlen(repl), "REPL");
+					if (!errors) {
+						if (selected_stack_level >= 0) {
+							lua_Debug ar;
+							if (0 != lua_getinfo(L, selected_stack_level + 1, "f", &ar)) {
+								lua_getfenv(L, -1);
+								lua_setfenv(L, -3);
+								lua_pop(L, 1);
+							}
+						}
+						if (::lua_pcall(L, 0, 0, 0) != 0) {
+							const char* msg = lua_tostring(L, -1); 
+							ASSERT(false); // TODO
+						}
+					}
+				}
+			}
+			ImGui::End();
+
+			ImGui::SetNextWindowDockID(dockspace_id, ImGuiCond_FirstUseEver);
+			if (ImGui::Begin("Callstack")) {
+				LuaWrapper::DebugGuard guard(L);
+				lua_Debug ar;
+				for (u32 stack_level = 1/*skip traceback fn*/; ;++stack_level) {
+					if (0 == lua_getinfo(L, stack_level + 1, "nsl", &ar)) break;
+					const bool selected = selected_stack_level == stack_level;
+					const StaticString<MAX_PATH + 128> label(ar.source, ": ", ar.name, " Line ", ar.currentline);
+					if (ImGui::Selectable(label, selected)) selected_stack_level = stack_level;
+				}
+			}
+			ImGui::End();
+			
+			ImGui::SetNextWindowDockID(dockspace_id, ImGuiCond_FirstUseEver);
+			if (ImGui::Begin("Locals") && selected_stack_level >= 0) {
+				if (ImGui::BeginTable("locals", 2, ImGuiTableFlags_Resizable)) {
+					lua_Debug ar;
+					if (0 != lua_getinfo(L, selected_stack_level + 1, "nslf", &ar)) {
+						lua_getfenv(L, -1);
+
+						luaImGuiTable("", L);
+
+						lua_pop(L, 2);
+					}
+					ImGui::EndTable();
+				}
+			}
+			ImGui::End();
+
+			ImGui::SetNextWindowDockID(dockspace_id, ImGuiCond_FirstUseEver);
+			if (ImGui::Begin("Lua debugger")) {
+				ImGui::TextUnformatted(error_msg);
+				ImGui::Checkbox("Enable debugger", &m_lua_debug_enabled);
+				ImGui::SameLine();
+				if (ImGui::Button("Resume")) finished = true;
+			}
+			ImGui::End();
+		
+			ImGui::PopFont();
+			ImGui::Render();
+			ImGui::UpdatePlatformWindows();
+
+			m_app.endCustomTick();
+		}
+
+		m_app.endCustomTicking();
+	}
+
+	static int LUA_debugCallback(lua_State* L) {
+		const char* error_msg = lua_tostring(L, 1);
+		if (lua_getglobal(L, "Editor") != LUA_TTABLE) {
+			lua_pop(L, 1);
+			return 0;
+		}
+		if (lua_getfield(L, -1, "editor") != LUA_TLIGHTUSERDATA) {
+			lua_pop(L, 2);
+			return 0;
+		}
+		StudioApp* app = (StudioApp*)lua_tolightuserdata(L, -1);
+		lua_pop(L, 2);
+		StudioAppPlugin* plugin = (StudioAppPlugin*)app->getIPlugin("lua_script");
+		plugin->luaDebugLoop(L, error_msg);
+		return 0;
+	}
+
+	i32 getSelectedEntitiesCount() { return m_app.getWorldEditor().getSelectedEntities().size(); }
+	EntityRef getSelectedEntity(u32 idx) { return m_app.getWorldEditor().getSelectedEntities()[idx]; }
+	EntityRef createEntity() { return m_app.getWorldEditor().addEntity(); }
+	void createComponent(EntityRef e, const char* type) {
+		const ComponentType cmp_type = reflection::getComponentType(type);
+		m_app.getWorldEditor().addComponent(Span(&e, 1), cmp_type);
+	}
 
 	void init() override
 	{
@@ -898,6 +1323,73 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 		m_app.getAssetCompiler().addPlugin(m_asset_plugin, Span(exts));
 		m_app.getAssetBrowser().addPlugin(m_asset_plugin, Span(exts));
 		m_app.getPropertyGrid().addPlugin(m_property_grid_plugin);
+
+		// lua API
+		// TODO cleanup
+		LuaScriptSystem* system = (LuaScriptSystem*)m_app.getEngine().getSystemManager().getSystem("lua_script");
+		lua_State* L = system->getState();
+
+		{
+			StudioApp::GUIPlugin* game_view = m_app.getGUIPlugin("game_view");
+			auto f = &LuaWrapper::wrapMethodClosure<&GameView::forceViewport>;
+			LuaWrapper::createSystemClosure(L, "GameView", game_view, "forceViewport", f);
+		}
+		
+		lua_getglobal(L, "Editor");
+		StudioApp::GUIPlugin* scene_view = m_app.getGUIPlugin("scene_view");
+		LuaWrapper::pushObject(L, scene_view, "SceneView");
+		lua_setfield(L, -2, "scene_view");
+
+		LuaWrapper::pushObject(L, &m_app.getAssetBrowser(), "AssetBrowser");
+		lua_setfield(L, -2, "asset_browser");
+		lua_pop(L, 1);
+
+		LuaWrapper::createSystemVariable(L, "Editor", "editor", &m_app);
+		
+		lua_pushcfunction(L, &LUA_debugCallback, "LumixDebugCallback");
+		lua_setglobal(L, "LumixDebugCallback");
+
+		#define REGISTER_FUNCTION(F)                                    \
+		do {                                                            \
+			auto f = &LuaWrapper::wrapMethodClosure<&StudioApp::F>; \
+			LuaWrapper::createSystemClosure(L, "Editor", this, #F, f);  \
+		} while (false)
+
+		REGISTER_FUNCTION(exitGameMode);
+		REGISTER_FUNCTION(exitWithCode);
+		REGISTER_FUNCTION(newWorld);
+
+		#undef REGISTER_FUNCTION
+
+		#define REGISTER_FUNCTION(F)                                    \
+		do {                                                            \
+			auto f = &LuaWrapper::wrapMethodClosure<&StudioAppPlugin::F>; \
+			LuaWrapper::createSystemClosure(L, "Editor", this, #F, f);  \
+		} while (false)
+		REGISTER_FUNCTION(createEntity);
+		REGISTER_FUNCTION(createComponent);
+		REGISTER_FUNCTION(getSelectedEntitiesCount);
+		REGISTER_FUNCTION(getSelectedEntity);
+		#undef REGISTER_FUNCTION
+
+		LuaWrapper::createSystemClosure(L, "Editor", &m_app, "getSelectedEntity", &LUA_getSelectedEntity);
+		LuaWrapper::createSystemFunction(L, "Editor", "getResources", &LUA_getResources);
+		LuaWrapper::createSystemClosure(L, "Editor", &m_app, "createEntityEx", &LUA_createEntityEx);
+		LuaWrapper::createSystemClosure(L, "Editor", &m_app, "makeParent", &LuaWrapper::wrap<LUA_makeParent>);
+
+		checkScriptCommandLine();
+	}
+
+	void runScript(const char* src, const char* script_name) {
+		LuaScriptSystem* system = (LuaScriptSystem*)m_app.getEngine().getSystemManager().getSystem("lua_script");
+		lua_State* L = system->getState();
+		bool errors = LuaWrapper::luaL_loadbuffer(L, src, stringLength(src), script_name) != 0;
+		errors = errors || lua_pcall(L, 0, 0, 0) != 0;
+		if (errors)
+		{
+			logError(script_name, ": ", lua_tostring(L, -1));
+			lua_pop(L, 1);
+		}
 	}
 
 	~StudioAppPlugin()
@@ -906,8 +1398,12 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 		m_app.getAssetBrowser().removePlugin(m_asset_plugin);
 		m_app.getPropertyGrid().removePlugin(m_property_grid_plugin);
 
+		for (StudioLuaPlugin* plugin : m_plugins) {
+			m_app.removePlugin(*plugin);
+			LUMIX_DELETE(m_app.getAllocator(), plugin);
+		}
+
 		for (LuaAction* action : m_lua_actions) {
-			m_app.removeAction(&action->action);
 			LUMIX_DELETE(m_app.getAllocator(), action);
 		}
 	}
@@ -935,6 +1431,8 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 	AssetPlugin m_asset_plugin;
 	PropertyGridPlugin m_property_grid_plugin;
 	Array<LuaAction*> m_lua_actions;
+	Array<StudioLuaPlugin*> m_plugins;
+	bool m_lua_debug_enabled = true;
 };
 
 

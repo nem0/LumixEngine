@@ -308,9 +308,15 @@ namespace ImGuiEx {
 	void EndNode()
 	{
 		PopItemWidth();
-		EndGroup();
+		
+		ImGuiGroupData& group_data = GImGui->GroupStack.back();
+		ImGuiWindow* window = GImGui->CurrentWindow;
+		ImRect rect(group_data.BackupCursorPos, ImMax(window->DC.CursorMaxPos, group_data.BackupCursorPos));
 		const ImGuiStyle& style = GetStyle();
-		const ImRect rect(GetItemRectMin() - style.WindowPadding, GetItemRectMax() + style.WindowPadding);
+		rect.Min -= style.WindowPadding;
+		rect.Max += style.WindowPadding;
+		EndGroup();
+
 		const ImVec2 size = rect.GetSize();
 		bool draw_selected = g_node_editor.is_node_selected ? *g_node_editor.is_node_selected : false;
 		
@@ -1058,7 +1064,7 @@ namespace ImGuiEx {
 	}
 
 
-	bool BeginResizablePopup(const char* str_id, const ImVec2& size_on_first_use)
+	bool BeginResizablePopup(const char* str_id, const ImVec2& size_on_first_use, ImGuiWindowFlags flags)
 	{
 		if (!IsPopupOpen(str_id))
 		{
@@ -1066,7 +1072,7 @@ namespace ImGuiEx {
 			return false;
 		}
 
-		ImGuiWindowFlags flags = ImGuiWindowFlags_Popup | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
+		flags |= ImGuiWindowFlags_Popup | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
 
 		char name[32];
 		ImFormatString(name, IM_ARRAYSIZE(name), "##popup_%s", str_id);

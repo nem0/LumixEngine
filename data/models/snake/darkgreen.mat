@@ -1,5 +1,5 @@
-shader "/pipelines/standard.shd"
+shader "/shaders/standard.hlsl"
 texture ""
 texture ""
 texture ""
-color {0.191894,0.486891,0.331816,1}
+uniform "Material color", {0.191894,0.486891,0.331816,1}

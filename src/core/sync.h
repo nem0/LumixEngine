@@ -30,8 +30,13 @@ struct LUMIX_CORE_API Semaphore {
 	Semaphore(const Semaphore&) = delete;
 	~Semaphore();
 
-	void signal();
+	void signal(u32 count = 1);
 	void wait();
+	// return false on timeout
+	bool wait(u32 timeout_ms);
+
+	// returns -1 on error, otherwise index of the semaphore that was signaled
+	static i32 waitMultiple(Semaphore& a, Semaphore& b);
 
 private:
 	#if defined _WIN32
@@ -75,6 +80,21 @@ struct MutexGuard {
 
 private:
 	Mutex& m_mutex;
+};
+
+struct LUMIX_CORE_API MutexGuardProfiled {
+	explicit MutexGuardProfiled(Mutex& cs);
+	~MutexGuardProfiled();
+
+	MutexGuardProfiled(const MutexGuardProfiled&) = delete;
+	void operator=(const MutexGuardProfiled&) = delete;
+
+private:
+	Mutex& m_mutex;
+	u64 start_enter;
+	u64 end_enter;
+	u64 start_exit;
+	u64 end_exit;
 };
 
 } // namespace Lumix

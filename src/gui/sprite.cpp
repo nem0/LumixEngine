@@ -1,28 +1,21 @@
-#include "sprite.h"
 #include "core/log.h"
-#include "engine/lua_wrapper.h"
-#include "engine/resource_manager.h"
 #include "core/stream.h"
 #include "core/string.h"
+#include "engine/resource_manager.h"
 #include "renderer/texture.h"
+#include "sprite.h"
 
-
-namespace Lumix
-{
-
+namespace Lumix {
 
 const ResourceType Sprite::TYPE("sprite");
-
 
 Sprite::Sprite(const Path& path, ResourceManager& manager, IAllocator& allocator)
 	: Resource(path, manager, allocator)
 	, m_texture(nullptr)
-{
-}
+{}
 
 
-void Sprite::unload()
-{
+void Sprite::unload() {
 	if (!m_texture) return;
 	
 	m_texture->decRefCount();
@@ -30,8 +23,7 @@ void Sprite::unload()
 }
 
 
-void Sprite::setTexture(const Path& path)
-{
+void Sprite::setTexture(const Path& path) {
 	if (m_texture) {
 		m_texture->decRefCount();
 	}
@@ -39,114 +31,31 @@ void Sprite::setTexture(const Path& path)
 	if (path.isEmpty()) {
 		m_texture = nullptr;
 	} else {
-		if (path.c_str()[0] == '\\' || path.c_str()[0] == '/') {
-			m_texture = (Texture*)getResourceManager().getOwner().load<Texture>(path);
-		} else {
-			StringView dir = Path::getDir(getPath());
-			StaticString<MAX_PATH> tmp(dir, "/", path);
-			m_texture = (Texture*)getResourceManager().getOwner().load<Texture>(Path(tmp));
-		}
-	}
-}
-
-
-void Sprite::serialize(OutputMemoryStream& out)
-{
-	ASSERT(isReady());
-	out << "type " << (type == PATCH9 ? "\"patch9\"\n" : "\"simple\"\n");
-	out << "top(" << top << ")\n";
-	out << "bottom(" << bottom << ")\n";
-	out << "left(" << left << ")\n";
-	out << "right(" << right << ")\n";
-	if (m_texture) {
-		StringView dir = Path::getDir(getPath());
-		if (startsWith(m_texture->getPath(), dir)) {
-			StringView path = m_texture->getPath();
-			path.removePrefix(dir.size());
-			out << "texture \"" << path << "\"";
-		} else {
-			out << "texture \"/" << m_texture->getPath() << "\"";
-		}
-	} else {
-		out << "texture \"\"";
-	}
-}
-
-namespace LuaSpriteAPI {
-	static int type(lua_State* L) {
-		lua_getfield(L, LUA_GLOBALSINDEX, "this");
-		Sprite* sprite = (Sprite*)lua_touserdata(L, -1);
-		lua_pop(L, 1);
-		const char* tmp = LuaWrapper::checkArg<const char*>(L, 1);
-		sprite->type = equalIStrings(tmp, "simple") ? Sprite::SIMPLE : Sprite::PATCH9; 
-		return 0;
-	}
-
-	static int texture(lua_State* L) {
-		lua_getfield(L, LUA_GLOBALSINDEX, "this");
-		Sprite* sprite = (Sprite*)lua_touserdata(L, -1);
-		lua_pop(L, 1);
-		const char* tmp = LuaWrapper::checkArg<const char*>(L, 1);
-		sprite->setTexture(Path(tmp));
-		return 0;
-	}
-
-	static int top(lua_State* L) {
-		lua_getfield(L, LUA_GLOBALSINDEX, "this");
-		Sprite* sprite = (Sprite*)lua_touserdata(L, -1);
-		lua_pop(L, 1);
-		sprite->top = LuaWrapper::checkArg<i32>(L, 1);
-		return 0;
-	}
-
-	static int bottom(lua_State* L) {
-		lua_getfield(L, LUA_GLOBALSINDEX, "this");
-		Sprite* sprite = (Sprite*)lua_touserdata(L, -1);
-		lua_pop(L, 1);
-		sprite->bottom = LuaWrapper::checkArg<i32>(L, 1);
-		return 0;
-	}
-
-	static int left(lua_State* L) {
-		lua_getfield(L, LUA_GLOBALSINDEX, "this");
-		Sprite* sprite = (Sprite*)lua_touserdata(L, -1);
-		lua_pop(L, 1);
-		sprite->left = LuaWrapper::checkArg<i32>(L, 1);
-		return 0;
-	}
-
-	static int right(lua_State* L) {
-		lua_getfield(L, LUA_GLOBALSINDEX, "this");
-		Sprite* sprite = (Sprite*)lua_touserdata(L, -1);
-		lua_pop(L, 1);
-		sprite->right = LuaWrapper::checkArg<i32>(L, 1);
-		return 0;
+		m_texture = getResourceManager().getOwner().load<Texture>(path);
 	}
 }
 
 bool Sprite::load(Span<const u8> mem) {
-	lua_State* L = luaL_newstate();
+	InputMemoryStream stream(mem);
+	Header header;
+	stream.read(header);
+	if (header.magic != Header::MAGIC) {
+		logError(getPath(), ": invalid file");
+		return false;
+	}
+	if (header.version != 0) {
+		logError(getPath(), ": unsupported version");
+		return false;
+	}
 
-	#define DEFINE_LUA_FUNC(func) \
-		lua_pushcfunction(L, LuaSpriteAPI::func, #func); \
-		lua_setfield(L, LUA_GLOBALSINDEX, #func); 
-	
-	DEFINE_LUA_FUNC(type);
-	DEFINE_LUA_FUNC(texture);
-	DEFINE_LUA_FUNC(top);
-	DEFINE_LUA_FUNC(bottom);
-	DEFINE_LUA_FUNC(left);
-	DEFINE_LUA_FUNC(right);
-
-	lua_pushlightuserdata(L, this);
-	lua_setfield(L, LUA_GLOBALSINDEX, "this"); 
-
-	#undef DEFINE_LUA_FUNC
-
-	bool res = LuaWrapper::execute(L, StringView((const char*)mem.begin(), mem.length()), getPath().c_str(), 0);
-	lua_close(L);
-
-	return res;
+	stream.read(top);
+	stream.read(bottom);
+	stream.read(left);
+	stream.read(right);
+	const char* texture = stream.readString();
+	setTexture(Path(texture));
+	type = stream.read<Type>();
+	return !stream.hasOverflow();
 }
 
 

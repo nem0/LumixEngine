@@ -14,9 +14,6 @@
 #include "gpu/gpu.h"
 
 
-struct lua_State;
-
-
 namespace Lumix {
 
 struct Material;

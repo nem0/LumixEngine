@@ -23,18 +23,16 @@ protected:
 
 // common funcitonality for asset editor windows
 struct LUMIX_EDITOR_API AssetEditorWindow : StudioApp::GUIPlugin {
-	AssetEditorWindow(StudioApp& app) : m_app(app) {}
+	AssetEditorWindow(StudioApp& app);
 
 	virtual void windowGUI() = 0;
 	virtual const Path& getPath() = 0;
 
-	bool hasFocus() const override { return m_has_focus; }
 	void onGUI() override;
 
 	StudioApp& m_app;
 	u32 m_dock_id = 0;
 	bool m_focus_request = false;
-	bool m_has_focus = false;
 	bool m_dirty = false;
 };
 

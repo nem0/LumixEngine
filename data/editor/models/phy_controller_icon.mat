@@ -1,2 +1,2 @@
-shader "/pipelines/editor_icon.shd"
+shader "/shaders/editor_icon.hlsl"
 texture "/editor/models/phy_controller_icon.tga"

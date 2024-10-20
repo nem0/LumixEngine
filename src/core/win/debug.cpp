@@ -336,18 +336,26 @@ void Allocator::unlock()
 	m_mutex.exit();
 }
 
+void Allocator::checkGuards() {
+	if (!m_are_guards_enabled) return;
 
-void Allocator::checkGuards()
-{
-	if (m_are_guards_enabled) return;
-
+	MutexGuard lock(m_mutex);
 	auto* info = m_root;
-	while (info)
-	{
-		auto user_ptr = getUserPtrFromAllocationInfo(info);
-		void* system_ptr = getSystemFromUser(user_ptr);
-		ASSERT(*(u32*)system_ptr == ALLOCATION_GUARD);
-		ASSERT(*(u32*)((u8*)user_ptr + info->size) == ALLOCATION_GUARD);
+	while (info) {
+		if (info != &m_sentinels[0] && info != &m_sentinels[1]) {
+			auto user_ptr = getUserPtrFromAllocationInfo(info);
+			void* system_ptr = getSystemFromUser(user_ptr);
+			if (*(u32*)system_ptr != ALLOCATION_GUARD) {
+				ASSERT(false);
+				debugOutput("Error: Memory was overwritten\n");
+				m_stack_tree.printCallstack(info->stack_leaf);
+			}
+			if (*(u32*)((u8*)user_ptr + info->size) != ALLOCATION_GUARD) {
+				ASSERT(false);
+				debugOutput("Error: Memory was overwritten\n");
+				m_stack_tree.printCallstack(info->stack_leaf);
+			}
+		}
 
 		info = info->next;
 	}
@@ -445,7 +453,7 @@ void* Allocator::allocate(size_t size, size_t align)
 	if (m_are_guards_enabled)
 	{
 		*(u32*)system_ptr = ALLOCATION_GUARD;
-		*(u32*)((u8*)system_ptr + system_size - sizeof(ALLOCATION_GUARD)) = ALLOCATION_GUARD;
+		*(u32*)((u8*)user_ptr + info->size) = ALLOCATION_GUARD;
 	}
 
 	return user_ptr;
@@ -462,7 +470,7 @@ void Allocator::deallocate(void* user_ptr)
 		{
 			ASSERT(*(u32*)system_ptr == ALLOCATION_GUARD);
 			size_t system_size = getNeededMemory(info->size, info->align);
-			ASSERT(*(u32*)((u8*)system_ptr + system_size - sizeof(ALLOCATION_GUARD)) == ALLOCATION_GUARD);
+			ASSERT(*(u32*)((u8*)user_ptr + info->size) == ALLOCATION_GUARD);
 		}
 
 		if (m_is_fill_enabled)

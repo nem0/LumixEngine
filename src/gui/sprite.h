@@ -7,11 +7,14 @@
 namespace Lumix
 {
 
-struct Sprite final : Resource
-{
-public:
-	enum Type
-	{
+struct Sprite final : Resource {
+	struct Header {
+		static const u32 MAGIC = '_SPR';
+		u32 magic = MAGIC;
+		u32 version = 0;
+	};
+
+	enum Type : u8 {
 		PATCH9,
 		SIMPLE
 	};
@@ -22,16 +25,15 @@ public:
 
 	void unload() override;
 	bool load(Span<const u8> mem) override;
-	void serialize(struct OutputMemoryStream& serializer);
 	
 	void setTexture(const Path& path);
 	struct Texture* getTexture() const { return m_texture; }
 
 	Type type = SIMPLE;
-	int top = 0;
-	int bottom = 0;
-	int left = 0;
-	int right = 0;
+	i32 top = 0;
+	i32 bottom = 0;
+	i32 left = 0;
+	i32 right = 0;
 
 	static const ResourceType TYPE;
 
