@@ -1372,13 +1372,13 @@ struct PipelineImpl final : Pipeline {
 		return gpu::getBindlessHandle(m_renderbuffers[rb_idx].handle);
 	}
 
-	RenderBufferHandle getDownscaledDepth(RenderBufferHandle depth_buffer) {
+	RenderBufferHandle getDownscaledDepth(RenderBufferHandle depth_buffer) override {
 		if (m_downscaled_depth != INVALID_RENDERBUFFER) return m_downscaled_depth;
 		if (!m_downscale_depth_shader->isReady()) return INVALID_RENDERBUFFER;
 
 		m_downscaled_depth = createRenderbuffer({
 			.type = RenderbufferDesc::FIXED,
-			.fixed_size = IVec2(maximum(m_viewport.w >> 1, 1), maximum(m_viewport.h >> 1, 1)),
+			.fixed_size = IVec2(m_viewport.w, m_viewport.h),
 			.format = gpu::TextureFormat::R32F,
 			.flags = gpu::TextureFlags::COMPUTE_WRITE,
 			.debug_name = "downscaled_depth"
@@ -1388,9 +1388,9 @@ struct PipelineImpl final : Pipeline {
 		DrawStream& end_frame_stream = m_renderer.getEndFrameDrawStream();
 
 		stream.beginProfileBlock("downscale_depth", 0, false);
-		gpu::TextureHandle* mip_views = m_downscale_depth_mips;
+		gpu::TextureHandle mip_views[5];
 		gpu::TextureHandle tex = toTexture(m_downscaled_depth);
-		for (u32 i = 0; i < lengthOf(m_downscale_depth_mips); ++i) {
+		for (u32 i = 0; i < lengthOf(mip_views); ++i) {
 			mip_views[i] = gpu::allocTextureHandle();
 			stream.createTextureView(mip_views[i], tex, 0, i); 
 			end_frame_stream.destroy(mip_views[i]);
@@ -1402,22 +1402,22 @@ struct PipelineImpl final : Pipeline {
 			gpu::RWBindlessHandle mip1;
 			gpu::RWBindlessHandle mip2;
 			gpu::RWBindlessHandle mip3;
+			gpu::RWBindlessHandle mip4;
 		} udata = {
 			toBindless(depth_buffer, stream),
 			gpu::getRWBindlessHandle(mip_views[0]),
 			gpu::getRWBindlessHandle(mip_views[1]),
 			gpu::getRWBindlessHandle(mip_views[2]),
 			gpu::getRWBindlessHandle(mip_views[3]),
+			gpu::getRWBindlessHandle(mip_views[4]),
 		};
 
-		stream.barrierWrite(mip_views[0]);
-		stream.barrierWrite(mip_views[1]);
-		stream.barrierWrite(mip_views[2]);
-		stream.barrierWrite(mip_views[3]);
+		stream.barrierWrite(toTexture(m_downscaled_depth));
 
 		setUniform(udata);
 		dispatch(*m_downscale_depth_shader, (m_viewport.w + 7) / 8, (m_viewport.h + 7) / 8, 1);
 		stream.endProfileBlock();
+
 		return m_downscaled_depth;
 	}
 
@@ -1450,7 +1450,6 @@ struct PipelineImpl final : Pipeline {
 		
 		u32 view_idx;
 		GBuffer gbuffer = geomPass(view_idx);
-		//getDownscaledDepth(gbuffer.DS);
 
 		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
 			plugin->renderBeforeLightPass(gbuffer, *this);
@@ -3668,7 +3667,6 @@ struct PipelineImpl final : Pipeline {
 	bool m_first_set_viewport = true;
 	RenderBufferHandle m_output = INVALID_RENDERBUFFER;
 	RenderBufferHandle m_downscaled_depth = INVALID_RENDERBUFFER;
-	gpu::TextureHandle m_downscale_depth_mips[4];
 	Shader* m_debug_shape_shader;
 	Shader* m_debug_clusters_shader;
 	Shader* m_debug_velocity_shader;

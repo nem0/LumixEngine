@@ -5,6 +5,7 @@
 cbuffer UB : register(b4) {
 	float2 u_rcp_size;
 	float u_weight_scale;
+	uint u_stride;
 	TextureHandle u_input;
 	TextureHandle u_depth_buffer;
 	RWTextureHandle u_output;
@@ -19,11 +20,12 @@ void main(uint3 thread_id : SV_DispatchThreadID) {
 	float depth = 0.1 / ndc_depth;
 
 	float sum_weight = 1;
-	for (int i = -2; i <= 2; ++i) {
-		for (int j = -2; j <= 2; ++j) {
-			float sample_depth = 0.1 / bindless_textures[u_depth_buffer][(thread_id.xy + int2(i, j))].r;
+	#define BLUR_RADIUS 1
+	for (int i = -BLUR_RADIUS; i <= BLUR_RADIUS; ++i) {
+		for (int j = -BLUR_RADIUS; j <= BLUR_RADIUS; ++j) {
+			float sample_depth = 0.1 / bindless_textures[u_depth_buffer][(thread_id.xy + int2(i, j) * u_stride)].r;
 			float w = saturate(u_weight_scale * depth / abs(sample_depth - depth));
-			sum += bindless_textures[u_input][thread_id.xy + int2(i, j)] * w;
+			sum += bindless_textures[u_input][thread_id.xy + int2(i, j) * u_stride] * w;
 			sum_weight += w;
 		}
 	}

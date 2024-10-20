@@ -28,8 +28,8 @@ void main(uint3 thread_id : SV_DispatchThreadID) {
 	for (int i = 0; i < 4; ++i) {
 		float2 poisson = POISSON_DISK_4[i];
 		float2 s = mul(poisson, rot_scale);
-		
-	if (1) {
+
+		#if 1
 			float3 pos_a_ws = getPositionWS(u_depth_buffer, screen_uv + s) - pos_ws;
 			float3 sample_vec_a = normalize(pos_a_ws);
 			float dist_a = length(pos_a_ws);
@@ -38,28 +38,27 @@ void main(uint3 thread_id : SV_DispatchThreadID) {
 			float w = saturate(0.07 / dist_a);
 			occlusion = occlusion + angle_a * w;
 			occlusion_count += w;
-	}	
-	else {
-		float3 pos_a_ws = getPositionWS(u_depth_buffer, screen_uv + s) - pos_ws;
-		float3 pos_b_ws = getPositionWS(u_depth_buffer, screen_uv - s) - pos_ws;
+		#else
+			float3 pos_a_ws = getPositionWS(u_depth_buffer, screen_uv + s) - pos_ws;
+			float3 pos_b_ws = getPositionWS(u_depth_buffer, screen_uv - s) - pos_ws;
 
-		float3 sample_vec_a = normalize(pos_a_ws);
-		float3 sample_vec_b = normalize(pos_b_ws);
+			float3 sample_vec_a = normalize(pos_a_ws);
+			float3 sample_vec_b = normalize(pos_b_ws);
 
-		float dist_a = length(pos_a_ws);
-		float dist_b = length(pos_b_ws);
+			float dist_a = length(pos_a_ws);
+			float dist_b = length(pos_b_ws);
 
-		float valid_a = step(dist_a, 1);
-		float valid_b = step(dist_b, 1);
+			float valid_a = step(dist_a, 1);
+			float valid_b = step(dist_b, 1);
 
-		float angle_a = saturate(dot(sample_vec_a, normal_ws));
-		float angle_b = saturate(dot(sample_vec_b, normal_ws));
+			float angle_a = saturate(dot(sample_vec_a, normal_ws));
+			float angle_b = saturate(dot(sample_vec_b, normal_ws));
 
-		if (valid_a + valid_b > 1) {
-			occlusion += (angle_a + angle_b) * (0.5 - 0.25 * (dist_a + dist_b));
-			occlusion_count += 1.0;
-		}
-	}
+			if (valid_a + valid_b > 1) {
+				occlusion += (angle_a + angle_b) * (0.5 - 0.25 * (dist_a + dist_b));
+				occlusion_count += 1.0;
+			}
+		#endif
 	}
 
 	occlusion /= max(1.0, occlusion_count);
