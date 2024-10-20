@@ -11,6 +11,7 @@
 #include "core/os.h"
 #include "core/path.h"
 #include "core/profiler.h"
+#include "core/ring_buffer.h"
 #include "core/stream.h"
 #include "core/string.h"
 #include "core/sync.h"
@@ -796,18 +797,15 @@ struct SRVUAVHeap {
 	}
 
 	u32 reserveID() {
-		// TODO mutex?
-		//jobs::MutexGuard guard(mutex);
-		ASSERT(!free_list.empty());
-		u32 id = free_list.back();
-		free_list.pop();
+		u32 id;
+		bool popped = free_list.pop(id);
+		ASSERT(popped);
 		return id;
 	}
 
 	void preinit(u32 num_resources, u32 num_transient) {
 		max_transient_count = num_transient;
 		max_resource_count = num_resources;
-		free_list.reserve(max_resource_count);
 		for (u32 i = 2; i < max_resource_count; ++i) {
 			free_list.push(i * 2 + max_transient_count * NUM_BACKBUFFERS);
 		}
@@ -851,7 +849,7 @@ struct SRVUAVHeap {
 		frame = (frame + 1) % NUM_BACKBUFFERS;
 	}
 
-	Array<u32> free_list;
+	RingBuffer<u32, 1024> free_list;
 	ID3D12DescriptorHeap* heap = nullptr;
 	D3D12_GPU_DESCRIPTOR_HANDLE gpu_begin;
 	D3D12_CPU_DESCRIPTOR_HANDLE cpu_begin;
