@@ -703,7 +703,9 @@ struct SSAO : public RenderPlugin {
 	Shader* m_blit_shader = nullptr;
 	Shader* m_blur_shader = nullptr;
 	bool m_enabled = true;
-	bool m_blur = true;
+	// this combinations works best with TAA
+	u32 m_blur_stride = 3;
+	u32 m_blur_iterations = 2;
 
 	SSAO(Renderer& renderer) : m_renderer(renderer) {}
 	
@@ -721,8 +723,12 @@ struct SSAO : public RenderPlugin {
 	}
 
 	void debugUI(Pipeline& pipeline) override {
-		ImGui::Checkbox("SSAO", &m_enabled);
-		ImGui::Checkbox("SSAO blur" , &m_blur);
+		if (ImGui::BeginMenu("SSAO")) {
+			ImGui::Checkbox("Enabled", &m_enabled);
+			ImGui::DragInt("Blur stride", (i32*)&m_blur_stride);
+			ImGui::DragInt("Blur iterations", (i32*)&m_blur_iterations);
+			ImGui::EndMenu();
+		}
 	}
 
 	void renderBeforeLightPass(const GBuffer& gbuffer, Pipeline& pipeline) override {
@@ -756,32 +762,48 @@ struct SSAO : public RenderPlugin {
 		pipeline.setUniform(udata);
 		pipeline.dispatch(*m_shader, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
 
-		if (m_blur) {
-			pipeline.beginBlock("blur");
-			const RenderBufferHandle ssao_blurred_rb = pipeline.createRenderbuffer({ 
+		if (m_blur_stride > 0 && m_blur_iterations > 0) {
+			pipeline.beginBlock("ssao_blur");
+			RenderBufferHandle ssao_blurred_rb = pipeline.createRenderbuffer({ 
 				.format = gpu::TextureFormat::RGBA8, 
 				.flags = gpu::TextureFlags::COMPUTE_WRITE, 
 				.debug_name = "ssao_blurred" 
 			});
 
+
+			RenderBufferHandle ssao_blurred2_rb;
+			if (m_blur_iterations > 1) {
+				ssao_blurred2_rb = pipeline.createRenderbuffer({ 
+					.format = gpu::TextureFormat::RGBA8, 
+					.flags = gpu::TextureFlags::COMPUTE_WRITE, 
+					.debug_name = "ssao_blurred2" 
+				});
+			}
+
 			struct {
 				Vec2 rcp_size;
 				float weight_scale;
+				u32 stride;
 				gpu::BindlessHandle input;
 				gpu::BindlessHandle depth_buffer;
 				gpu::RWBindlessHandle output;
 			} blur_data = {
 				.rcp_size = Vec2(1.0f / vp.w, 1.0f / vp.h),
 				.weight_scale = 0.01f,
-				.input = pipeline.toBindless(ssao_rb, stream),
+				.stride = m_blur_stride,
 				.depth_buffer = pipeline.toBindless(gbuffer.DS, stream),
-				.output = pipeline.toRWBindless(ssao_blurred_rb, stream)
 			};
 
 			stream.memoryBarrier(pipeline.toTexture(ssao_rb));
-			pipeline.setUniform(blur_data);
-			pipeline.dispatch(*m_blur_shader, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
-			ssao_rb = ssao_blurred_rb;
+			for (u32 i = 0; i < m_blur_iterations; ++i) {
+				blur_data.input = pipeline.toBindless(ssao_rb, stream);
+				blur_data.output = pipeline.toRWBindless(ssao_blurred_rb, stream);
+				pipeline.setUniform(blur_data);
+				pipeline.dispatch(*m_blur_shader, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
+				ssao_rb = ssao_blurred_rb;
+				stream.memoryBarrier(pipeline.toTexture(ssao_rb));
+				swap(ssao_blurred_rb, ssao_blurred2_rb);
+			}
 			pipeline.endBlock();
 		}
 
@@ -794,7 +816,6 @@ struct SSAO : public RenderPlugin {
 			.gbufferB = pipeline.toRWBindless(gbuffer.B, stream)
 		};
 
-		stream.memoryBarrier(pipeline.toTexture(ssao_rb));
 		pipeline.setUniform(udata2);
 		stream.barrierWrite(pipeline.toTexture(gbuffer.B));
 		pipeline.dispatch(*m_blit_shader, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);

@@ -137,6 +137,7 @@ struct LUMIX_RENDERER_API Pipeline {
 	// also emits barriers
 	virtual gpu::BindlessHandle toBindless(RenderBufferHandle rb_idx, struct DrawStream& stream) = 0;
 	virtual gpu::RWBindlessHandle toRWBindless(RenderBufferHandle rb_idx, DrawStream& stream) = 0;
+	virtual RenderBufferHandle getDownscaledDepth(RenderBufferHandle depth_buffer) = 0;
 
 	virtual void setUniformRaw(Span<const u8> mem, UniformBuffer::Enum bind_point = UniformBuffer::DRAWCALL) = 0;
 	virtual void blit(gpu::BindlessHandle src, gpu::RWBindlessHandle dst, IVec2 size, bool flip_x = false, bool flip_y = false) = 0;

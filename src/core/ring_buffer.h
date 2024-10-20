@@ -75,13 +75,6 @@ struct RingBuffer {
 		j->seq = pos + 1;
 	}
 
-	LUMIX_FORCE_INLINE bool popSecondary(T& obj) {
-		if (m_fallback.empty()) return false;
-		obj = m_fallback.back();
-		m_fallback.pop();
-		return true;
-	}
-
 	Item objects[CAPACITY];
 	AtomicI32 rd = 0;
 	AtomicI32 wr = 0;
