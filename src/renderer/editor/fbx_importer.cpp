@@ -1379,7 +1379,7 @@ bool FBXImporter::writeMaterials(const Path& src, const ImportConfig& cfg, bool 
 
 		writeString("shader \"/shaders/standard.hlsl\"\n");
 		if (material.alpha_cutout) writeString("define \"ALPHA_CUTOUT\"\n");
-		if (material.textures[2].is_valid) writeString("uniform \"Metallic\", 1.000000");
+		if (material.textures[2].is_valid) writeString("uniform \"Metallic\", 1.000000\n");
 
 		auto writeTexture = [this](const ImportTexture& texture, u32 idx) {
 			if (texture.is_valid && idx < 2) {

@@ -702,10 +702,12 @@ struct SSAO : public RenderPlugin {
 	Shader* m_shader = nullptr;
 	Shader* m_blit_shader = nullptr;
 	Shader* m_blur_shader = nullptr;
+	Shader* m_downscale_shader = nullptr;
 	bool m_enabled = true;
-	// this combinations works best with TAA
-	u32 m_blur_stride = 3;
-	u32 m_blur_iterations = 2;
+	u32 m_blur_iterations = 3;
+	u32 m_downscale = 1;
+	float m_radius = 0.4f;
+	float m_intensity = 1.f;
 
 	SSAO(Renderer& renderer) : m_renderer(renderer) {}
 	
@@ -713,6 +715,7 @@ struct SSAO : public RenderPlugin {
 		m_shader->decRefCount();
 		m_blit_shader->decRefCount();
 		m_blur_shader->decRefCount();
+		m_downscale_shader->decRefCount();
 	}
 
 	void init() {
@@ -720,13 +723,22 @@ struct SSAO : public RenderPlugin {
 		m_shader = rm.load<Shader>(Path("shaders/ssao.hlsl"));
 		m_blit_shader = rm.load<Shader>(Path("shaders/ssao_blit.hlsl"));
 		m_blur_shader = rm.load<Shader>(Path("shaders/ssao_blur.hlsl"));
+		m_downscale_shader = rm.load<Shader>(Path("shaders/ssao_downscale_depth.hlsl"));
 	}
 
 	void debugUI(Pipeline& pipeline) override {
 		if (ImGui::BeginMenu("SSAO")) {
 			ImGui::Checkbox("Enabled", &m_enabled);
-			ImGui::DragInt("Blur stride", (i32*)&m_blur_stride);
+			ImGui::DragFloat("Radius", &m_radius);
+			ImGui::DragFloat("Intensity", &m_intensity);
 			ImGui::DragInt("Blur iterations", (i32*)&m_blur_iterations);
+			const char* downscale_values[] = { "Disabled", "2x", "4x" };
+			ImGui::TextUnformatted("Downscale");
+			for (const char*& v : downscale_values) {
+				const u32 idx = u32(&v - downscale_values);
+				ImGui::SameLine();
+				if (ImGui::RadioButton(v, m_downscale == idx)) m_downscale = idx;
+			} 
 			ImGui::EndMenu();
 		}
 	}
@@ -736,44 +748,81 @@ struct SSAO : public RenderPlugin {
 		if (!m_shader->isReady()) return;
 		if (!m_blit_shader->isReady()) return;
 		if (!m_blur_shader->isReady()) return;
+		if (!m_downscale_shader->isReady()) return;
 		if (!m_enabled) return;
 
 		const Viewport& vp = pipeline.getViewport();
-		pipeline.beginBlock("ssao");
+		const u32 width = vp.w >> m_downscale;
+		const u32 height = vp.h >> m_downscale;
 		RenderBufferHandle ssao_rb = pipeline.createRenderbuffer({ 
-			.format = gpu::TextureFormat::RGBA8, 
-			.flags = gpu::TextureFlags::COMPUTE_WRITE, 
-			.debug_name = "ssao" 
+			.type = RenderbufferDesc::FIXED,
+			.fixed_size = IVec2(width, height),
+			.format = gpu::TextureFormat::RGBA8,
+			.flags = gpu::TextureFlags::COMPUTE_WRITE,
+			.debug_name = "ssao"
 		});
 
 		DrawStream& stream = pipeline.getRenderer().getDrawStream();
+		RenderBufferHandle depth_buffer = gbuffer.DS;
+		pipeline.beginBlock("ssao");
+		if (m_downscale > 0) {
+			depth_buffer = pipeline.createRenderbuffer({ 
+				.type = RenderbufferDesc::FIXED,
+				.fixed_size = IVec2(width, height),
+				.format = gpu::TextureFormat::R32F, 
+				.flags = gpu::TextureFlags::COMPUTE_WRITE | gpu::TextureFlags::NO_MIPS, 
+				.debug_name = "ssao downscaled depth"
+			});
+			pipeline.beginBlock("ssao downscale depth");
+			struct {
+				u32 scale;
+				gpu::BindlessHandle input;
+				gpu::RWBindlessHandle output;
+			} udata = {
+				.scale = u32(1 << m_downscale),
+				.input = pipeline.toBindless(gbuffer.DS, stream),
+				.output = pipeline.toRWBindless(depth_buffer, stream)
+			};
+			pipeline.setUniform(udata);
+			pipeline.dispatch(*m_downscale_shader, (width + 7) / 8, (height + 7) / 8, 1);
+			pipeline.endBlock();
+		}
 
 		struct {
-			float radius = 0.2f;
-			float intensity = 3;
+			Vec2 rcp_size;
+			float radius;
+			float intensity;
+			u32 downscale;
 			gpu::BindlessHandle normal_buffer;
 			gpu::BindlessHandle depth_buffer;
 			gpu::RWBindlessHandle output;
 		} udata = {
+			.rcp_size = Vec2(1.0f / width, 1.0f / height),
+			.radius = m_radius,
+			.intensity = m_intensity,
+			.downscale = m_downscale,
 			.normal_buffer = pipeline.toBindless(gbuffer.B, stream),
-			.depth_buffer = pipeline.toBindless(gbuffer.DS, stream),
+			.depth_buffer = pipeline.toBindless(depth_buffer, stream),
 			.output = pipeline.toRWBindless(ssao_rb, stream)
 		};
 		pipeline.setUniform(udata);
-		pipeline.dispatch(*m_shader, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
+		pipeline.dispatch(*m_shader, (width + 15) / 16, (height + 15) / 16, 1);
 
-		if (m_blur_stride > 0 && m_blur_iterations > 0) {
+		if (m_blur_iterations > 0) {
 			pipeline.beginBlock("ssao_blur");
 			RenderBufferHandle ssao_blurred_rb = pipeline.createRenderbuffer({ 
+				.type = RenderbufferDesc::FIXED,
+				.fixed_size = IVec2(width, height),
 				.format = gpu::TextureFormat::RGBA8, 
 				.flags = gpu::TextureFlags::COMPUTE_WRITE, 
 				.debug_name = "ssao_blurred" 
 			});
 
-
 			RenderBufferHandle ssao_blurred2_rb;
 			if (m_blur_iterations > 1) {
 				ssao_blurred2_rb = pipeline.createRenderbuffer({ 
+					.type = RenderbufferDesc::FIXED,
+					.fixed_size = IVec2(width, height),
 					.format = gpu::TextureFormat::RGBA8, 
 					.flags = gpu::TextureFlags::COMPUTE_WRITE, 
 					.debug_name = "ssao_blurred2" 
@@ -784,22 +833,24 @@ struct SSAO : public RenderPlugin {
 				Vec2 rcp_size;
 				float weight_scale;
 				u32 stride;
+				u32 downscale;
 				gpu::BindlessHandle input;
 				gpu::BindlessHandle depth_buffer;
 				gpu::RWBindlessHandle output;
 			} blur_data = {
-				.rcp_size = Vec2(1.0f / vp.w, 1.0f / vp.h),
+				.rcp_size = Vec2(1.0f / width, 1.0f / height),
 				.weight_scale = 0.01f,
-				.stride = m_blur_stride,
-				.depth_buffer = pipeline.toBindless(gbuffer.DS, stream),
+				.downscale = m_downscale,
+				.depth_buffer = pipeline.toBindless(depth_buffer, stream),
 			};
 
 			stream.memoryBarrier(pipeline.toTexture(ssao_rb));
 			for (u32 i = 0; i < m_blur_iterations; ++i) {
 				blur_data.input = pipeline.toBindless(ssao_rb, stream);
 				blur_data.output = pipeline.toRWBindless(ssao_blurred_rb, stream);
+				blur_data.stride = m_blur_iterations - i;
 				pipeline.setUniform(blur_data);
-				pipeline.dispatch(*m_blur_shader, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
+				pipeline.dispatch(*m_blur_shader, (width + 15) / 16, (height + 15) / 16, 1);
 				ssao_rb = ssao_blurred_rb;
 				stream.memoryBarrier(pipeline.toTexture(ssao_rb));
 				swap(ssao_blurred_rb, ssao_blurred2_rb);
@@ -809,16 +860,22 @@ struct SSAO : public RenderPlugin {
 
 
 		struct {
+			u32 downscale;
 			gpu::BindlessHandle ssao_buf;
+			gpu::BindlessHandle depth_buffer;
 			gpu::RWBindlessHandle gbufferB;
 		} udata2 = {
+			.downscale = m_downscale,
 			.ssao_buf = pipeline.toBindless(ssao_rb, stream),
+			.depth_buffer = pipeline.toBindless(gbuffer.DS, stream),
 			.gbufferB = pipeline.toRWBindless(gbuffer.B, stream)
 		};
 
+		pipeline.beginBlock("ssao_blit");
 		pipeline.setUniform(udata2);
 		stream.barrierWrite(pipeline.toTexture(gbuffer.B));
 		pipeline.dispatch(*m_blit_shader, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
+		pipeline.endBlock();
 		pipeline.endBlock();
 	}
 };
