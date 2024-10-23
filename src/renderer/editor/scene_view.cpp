@@ -1643,6 +1643,8 @@ void SceneView::onGUI() {
 		m_view->setViewport(vp);
 		m_pipeline->setViewport(vp);
 		m_pipeline->render(false);
+		profiler::pushInt("Width", vp.w);
+		profiler::pushInt("Height", vp.h);
 		m_view->m_draw_vertices.clear();
 		m_view->m_draw_cmds.clear();
 		m_view->inputFrame();

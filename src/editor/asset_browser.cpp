@@ -554,9 +554,11 @@ struct AssetBrowserImpl : AssetBrowser {
 
 	IPlugin* getPluginFor(const Path& path) {
 		StringView ext = Path::getExtension(ResourcePath::getSubresource(path));
+		char ext_str[9];
+		makeLowercase(ext_str, ext);
 		u64 key = 0;
 		ASSERT(ext.size() <= sizeof(key));
-		memcpy(&key, ext.begin, ext.size());
+		memcpy(&key, ext_str, ext.size());
 		auto iter = m_plugin_map.find(key);
 		return iter.isValid() ? iter.value() : nullptr;
 	}
