@@ -106,7 +106,7 @@ struct LUMIX_RENDERER_API Mesh {
 	u32 vb_stride;
 	gpu::BufferHandle index_buffer_handle;
 	gpu::DataType index_type;
-	int indices_count;
+	u32 indices_count;
 };
 
 struct LODMeshIndices

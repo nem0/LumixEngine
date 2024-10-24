@@ -29,7 +29,6 @@
 #include <malloc.h>
 
 #include "renderer/gpu/renderdoc_app.h"
-
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "dxgi.lib")
 
@@ -284,6 +283,7 @@ struct Buffer {
 	}
 
 	ID3D12Resource* resource = nullptr;
+	D3D12_GPU_VIRTUAL_ADDRESS gpu_address = 0;
 	u8* mapped_ptr = nullptr;
 	u32 size = 0;
 	D3D12_RESOURCE_STATES state;
@@ -1332,6 +1332,7 @@ void destroy(QueryHandle query) {
 }
 
 void update(TextureHandle texture, u32 mip, u32 x, u32 y, u32 z, u32 w, u32 h, TextureFormat format, const void* buf, u32 buf_size) {
+	PROFILE_FUNCTION();
 	const D3D12_RESOURCE_STATES prev_state = texture->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_COPY_DEST);
 
 	const FormatDesc& fd = FormatDesc::get(format);
@@ -2188,6 +2189,7 @@ u32 present() {
 }
 
 void createBuffer(BufferHandle buffer, BufferFlags flags, size_t size, const void* data, const char* debug_name) {
+	PROFILE_FUNCTION();
 	ASSERT(buffer);
 	ASSERT(!buffer->resource);
 	ASSERT(size < UINT_MAX);
@@ -2254,6 +2256,9 @@ void createBuffer(BufferHandle buffer, BufferFlags flags, size_t size, const voi
 		buffer->setState(d3d->cmd_list, old_state);
 		d3d->frame->to_release.push(upload_buffer);
 	}
+
+	buffer->gpu_address = buffer->resource->GetGPUVirtualAddress();
+
 	if (debug_name) {
 		WCHAR tmp[MAX_PATH];
 		toWChar(tmp, debug_name);
@@ -2606,16 +2611,6 @@ enum class PipelineType {
 	GRAPHICS
 };
 
-static void applyGFXUniformBlocks() {
-	if (d3d->dirty_gfx_uniform_blocks == 0) return;
-	for (u32 i = 0; i < 6; ++i) {
-		if (d3d->dirty_gfx_uniform_blocks & (1 << i)) {
-			d3d->cmd_list->SetGraphicsRootConstantBufferView(i, d3d->uniform_blocks[i]);
-		}
-	}
-	d3d->dirty_gfx_uniform_blocks = 0;
-}
-
 static void applyComputeUniformBlocks() {
 	if (d3d->dirty_compute_uniform_blocks == 0) return;
 	for (u32 i = 0; i < 6; ++i) {
@@ -2657,7 +2652,15 @@ static void applyComputeUniformBlocks() {
 		d3d->cmd_list->SetGraphicsRootDescriptorTable(BINDLESS_SAMPLERS_ROOT_PARAMETER_INDEX, d3d->sampler_heap.gpu_begin);
 		if (d3d->bound_shader_buffers.ptr) d3d->cmd_list->SetGraphicsRootDescriptorTable(SRV_ROOT_PARAMETER_INDEX, d3d->bound_shader_buffers);
 	}
-	applyGFXUniformBlocks();
+	
+	if (d3d->dirty_gfx_uniform_blocks == 0) return true;
+	for (u32 i = 0; i < 6; ++i) {
+		if (d3d->dirty_gfx_uniform_blocks & (1 << i)) {
+			d3d->cmd_list->SetGraphicsRootConstantBufferView(i, d3d->uniform_blocks[i]);
+		}
+	}
+	d3d->dirty_gfx_uniform_blocks = 0;
+	
 	return true;
 }
 
@@ -2716,9 +2719,7 @@ void bindShaderBuffers(Span<BufferHandle> buffers) {
 void bindUniformBuffer(u32 index, BufferHandle buffer, size_t offset, size_t size) {
 	ASSERT(index < lengthOf(d3d->uniform_blocks));
 	if (buffer) {
-		ID3D12Resource* b = buffer->resource;
-		ASSERT(b);
-		d3d->uniform_blocks[index] = b->GetGPUVirtualAddress() + offset;
+		d3d->uniform_blocks[index] = buffer->gpu_address + offset;
 	} else {
 		D3D12_GPU_VIRTUAL_ADDRESS dummy = {};
 		d3d->uniform_blocks[index] = dummy;
@@ -2747,7 +2748,7 @@ void dispatch(u32 num_groups_x, u32 num_groups_y, u32 num_groups_z) {
 void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride_in_bytes) {
 	if (buffer) {
 		D3D12_VERTEX_BUFFER_VIEW vbv;
-		vbv.BufferLocation = buffer->resource->GetGPUVirtualAddress() + buffer_offset;
+		vbv.BufferLocation = buffer->gpu_address + buffer_offset;
 		vbv.StrideInBytes = stride_in_bytes;
 		vbv.SizeInBytes = UINT(buffer->size - buffer_offset);
 		d3d->cmd_list->IASetVertexBuffers(binding_idx, 1, &vbv);
@@ -2794,9 +2795,8 @@ void drawIndirect(DataType index_type, u32 indirect_buffer_offset) {
 	}
 
 	ASSERT(d3d->current_index_buffer);
-	ID3D12Resource* b = d3d->current_index_buffer->resource;
 	D3D12_INDEX_BUFFER_VIEW ibv = {};
-	ibv.BufferLocation = b->GetGPUVirtualAddress();
+	ibv.BufferLocation = d3d->current_index_buffer->gpu_address;
 	ibv.Format = dxgi_index_type;
 	ibv.SizeInBytes = d3d->current_index_buffer->size;
 	d3d->cmd_list->IASetIndexBuffer(&ibv);
@@ -2819,8 +2819,61 @@ void drawIndirect(DataType index_type, u32 indirect_buffer_offset) {
 	d3d->cmd_list->ExecuteIndirect(signature, 1, d3d->current_indirect_buffer->resource, indirect_buffer_offset, nullptr, 0);
 }
 
-void drawIndexedInstanced(u32 indices_count, u32 instances_count, DataType index_type) {
+void draw(const Drawcall& draw) {
+	D3D* d = d3d.get();
+	if (draw.program != d->current_program) {
+		d->pso_cache.last = nullptr;
+		d->current_program = draw.program;
+	}
 
+	d->cmd_list->SetGraphicsRootConstantBufferView(2, draw.uniform_buffer2->gpu_address + draw.uniform_buffer2_offset);
+
+	if (!setPipelineStateGraphics()) return;
+
+	gpu::BufferHandle vb0 = draw.vertex_buffers[0];
+	const u32 vb0_offset = draw.vertex_buffer_offsets[0];
+	gpu::BufferHandle vb1 = draw.vertex_buffers[1];
+	const u32 vb1_offset = draw.vertex_buffer_offsets[1];
+
+	D3D12_VERTEX_BUFFER_VIEW vbv[] = {
+		{
+			.BufferLocation = vb0->gpu_address + vb0_offset,
+			.SizeInBytes = UINT(vb0->size - vb0_offset),
+			.StrideInBytes = draw.vertex_buffer_sizes[0],
+		},
+		{
+			.BufferLocation = vb1->gpu_address + vb1_offset,
+			.SizeInBytes = UINT(vb1->size - vb1_offset),
+			.StrideInBytes = draw.vertex_buffer_sizes[1],
+		}
+	};
+
+	d->cmd_list->IASetVertexBuffers(0, 2, vbv);
+
+	DXGI_FORMAT dxgi_index_type;
+	u32 offset_shift = 0;
+	switch (draw.index_type) {
+		case DataType::U32:
+			dxgi_index_type = DXGI_FORMAT_R32_UINT;
+			offset_shift = 2;
+			break;
+		case DataType::U16:
+			dxgi_index_type = DXGI_FORMAT_R16_UINT;
+			offset_shift = 1;
+			break;
+	}
+
+	D3D12_INDEX_BUFFER_VIEW ibv = {
+		.BufferLocation = draw.index_buffer->gpu_address,
+		.SizeInBytes = draw.indices_count * (1 << offset_shift),
+		.Format = dxgi_index_type,
+	};
+	d->cmd_list->IASetIndexBuffer(&ibv);
+	d->cmd_list->IASetPrimitiveTopology(draw.program->primitive_topology);
+	d->cmd_list->DrawIndexedInstanced(draw.indices_count, draw.instances_count, 0, 0, 0);
+}
+
+void drawIndexedInstanced(u32 indices_count, u32 instances_count, DataType index_type) {
 	ASSERT(d3d->current_program);
 	if (!setPipelineStateGraphics()) return;
 
@@ -2838,9 +2891,8 @@ void drawIndexedInstanced(u32 indices_count, u32 instances_count, DataType index
 	}
 
 	ASSERT(d3d->current_index_buffer);
-	ID3D12Resource* b = d3d->current_index_buffer->resource;
 	D3D12_INDEX_BUFFER_VIEW ibv = {};
-	ibv.BufferLocation = b->GetGPUVirtualAddress();
+	ibv.BufferLocation = d3d->current_index_buffer->gpu_address;
 	ibv.Format = dxgi_index_type;
 	ibv.SizeInBytes = indices_count * (1 << offset_shift);
 	d3d->cmd_list->IASetIndexBuffer(&ibv);
@@ -2866,9 +2918,8 @@ void drawIndexed(u32 offset_bytes, u32 count, DataType index_type) {
 
 	ASSERT((offset_bytes & (offset_shift - 1)) == 0);
 	ASSERT(d3d->current_index_buffer);
-	ID3D12Resource* b = d3d->current_index_buffer->resource;
 	D3D12_INDEX_BUFFER_VIEW ibv = {};
-	ibv.BufferLocation = b->GetGPUVirtualAddress() + offset_bytes;
+	ibv.BufferLocation = d3d->current_index_buffer->gpu_address + offset_bytes;
 	ibv.Format = dxgi_index_type;
 	ibv.SizeInBytes = count * (1 << offset_shift);
 	d3d->cmd_list->IASetIndexBuffer(&ibv);
@@ -2889,6 +2940,7 @@ void copy(BufferHandle dst, BufferHandle src, u32 dst_offset, u32 src_offset, u3
 }
 
 void update(BufferHandle buffer, const void* data, size_t size) {
+	PROFILE_FUNCTION();
 	checkThread();
 	ASSERT(buffer);
 

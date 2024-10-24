@@ -920,6 +920,12 @@ struct RendererImpl final : Renderer {
 			PROFILE_BLOCK("draw stream");
 			frame.draw_stream.run();
 			profiler::pushInt("Drawcalls", frame.draw_stream.num_drawcalls);
+			
+			static u32 counter_time = profiler::createCounter("GPU upload (ms/frame)", 0);
+			static u32 counter_size = profiler::createCounter("GPU upload (MB/frame)", 0);
+			const float upload_duration = 1000.f *  float(frame.draw_stream.upload_duration / double(profiler::frequency()));
+			profiler::pushCounter(counter_time, upload_duration);
+			profiler::pushCounter(counter_size, frame.draw_stream.upload_size / (1024.f * 1024.f));
 			frame.draw_stream.reset();
 		}
 

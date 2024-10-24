@@ -83,6 +83,7 @@ struct LUMIX_RENDERER_API Material final : Resource {
 	void deserialize(struct InputMemoryStream& blob);
 	void serialize(struct OutputMemoryStream& blob);
 	void bind(struct DrawStream& stream) const;
+	u32 getBufferOffset() const { return m_material_constants * MAX_UNIFORMS_BYTES; }
 
 	gpu::StateFlags m_render_states;
 

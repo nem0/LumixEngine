@@ -46,6 +46,7 @@ struct DrawStream {
 	void bindIndirectBuffer(gpu::BufferHandle buffer);
 	void bindShaderBuffers(Span<gpu::BufferHandle> buffers);
 	
+	gpu::Drawcall& draw();
 	void drawArrays(u32 offset, u32 count);
 	void drawIndirect(gpu::DataType index_type, u32 indirect_buffer_offset);
 	void drawIndexed(u32 offset, u32 count, gpu::DataType type);
@@ -82,6 +83,8 @@ struct DrawStream {
 	void merge(DrawStream& rhs);
 
 	u32 num_drawcalls;
+	u64 upload_duration;
+	u64 upload_size;
 
 	struct Page;
 private:
@@ -114,18 +117,11 @@ private:
 			u32 offset;
 			u32 stride;
 		} vertex_buffers[2];
-		struct UniformBuffer {
-			gpu::BufferHandle buffer;
-			u32 offset;
-			u32 size;
-		} uniform_buffer4;
-	};
-
-	struct CacheEx : Cache {
 		gpu::BufferHandle indirect_buffer;
 		u32 dirty = 0;
 	};
-	CacheEx m_cache;
+
+	Cache m_cache;
 };
 
 template <typename F>

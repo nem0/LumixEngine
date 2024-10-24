@@ -2579,12 +2579,20 @@ struct PipelineImpl final : Pipeline {
 						const u32 defines = autoinstanced_define_mask | material->getDefineMask();
 						const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_decl, defines, mesh.semantics_defines);
 						
-						stream->useProgram(program);
-						material->bind(*stream);
-						stream->bindIndexBuffer(mesh.index_buffer_handle);
-						stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
-						stream->bindVertexBuffer(1, instances.slice.buffer, instances.slice.offset, 48);
-						stream->drawIndexedInstanced(mesh.indices_count, total_count, mesh.index_type);
+						gpu::Drawcall& dc = stream->draw();
+						dc = {
+							.program = program,
+							.index_buffer = mesh.index_buffer_handle,
+							.vertex_buffers = { mesh.vertex_buffer_handle, instances.slice.buffer },
+							.vertex_buffer_offsets = { 0, instances.slice.offset },
+							.vertex_buffer_sizes = { mesh.vb_stride, 48 },
+							.uniform_buffer2 = m_renderer.getMaterialUniformBuffer(),
+							.uniform_buffer2_offset = material->getBufferOffset(),
+							.uniform_buffer2_size = Material::MAX_UNIFORMS_BYTES,
+							.indices_count = mesh.indices_count,
+							.instances_count = total_count,
+							.index_type = mesh.index_type,
+						};
 					}
 					else {
 						const u32 mesh_idx = u32(renderables[i] >> SORT_KEY_MESH_IDX_SHIFT);

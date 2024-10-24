@@ -1,6 +1,7 @@
 #include "draw_stream.h"
 #include "core/array.h"
 #include "core/math.h"
+#include "core/os.h"
 #include "core/page_allocator.h"
 #include "core/string.h"
 #include "engine/engine.h"
@@ -20,7 +21,7 @@ struct DrawStream::Page {
 
 enum class DrawStream::Instruction : u8 {
 	END,
-	BIND,
+	DRAW,
 	SCISSOR,
 	DRAW_INDEXED,
 	CLEAR,
@@ -78,9 +79,8 @@ namespace Dirty {
 		INDIRECT_BUFFER = 0b11 << 6,
 		VERTEX_BUFFER0 = 0b1111 << 8,
 		VERTEX_BUFFER1 = 0b1111 << 12,
-		UNIFORM_BUFFER4 = 0b11 << 16,
 
-		BIND = PROGRAM | INDEX_BUFFER | VERTEX_BUFFER0 | VERTEX_BUFFER1 | UNIFORM_BUFFER4
+		BIND = PROGRAM | INDEX_BUFFER | VERTEX_BUFFER0 | VERTEX_BUFFER1
 	};
 }
 
@@ -621,6 +621,15 @@ void DrawStream::update(gpu::BufferHandle buffer, const void* data, size_t size)
 	write(Instruction::UPDATE_BUFFER, tmp);
 }
 
+gpu::Drawcall& DrawStream::draw() {
+	submitCached();
+	u8* data = alloc(sizeof(Instruction) + sizeof(gpu::Drawcall));
+	const Instruction instr = Instruction::DRAW;
+	memcpy(data, &instr, sizeof(instr));
+	gpu::Drawcall& drawcall = *reinterpret_cast<gpu::Drawcall*>(data + sizeof(Instruction));
+	return drawcall;
+}
+
 void DrawStream::drawArrays(u32 offset, u32 count) {
 	submitCached();
 	DrawArraysData data = { offset, count };
@@ -654,15 +663,6 @@ void DrawStream::submitCached() {
 	if (dirty == 0) return;
 	
 	m_cache.dirty = 0;
-	if (dirty == Dirty::BIND) {
-		u8* ptr = alloc(sizeof(Instruction) + sizeof(Cache));
-		const Instruction instr = Instruction::BIND;
-		memcpy(ptr, &instr, sizeof(instr));
-		ptr += sizeof(instr);
-		memcpy(ptr, &m_cache, sizeof(Cache));
-		return;
-	}
-
 	#ifdef _WIN32
 		const u32 count = __popcnt(dirty);
 	#else
@@ -678,12 +678,13 @@ void DrawStream::submitCached() {
 	if (dirty & Dirty::INDIRECT_BUFFER) WRITE(m_cache.indirect_buffer);
 	if (dirty & Dirty::VERTEX_BUFFER0) WRITE(m_cache.vertex_buffers[0]);
 	if (dirty & Dirty::VERTEX_BUFFER1) WRITE(m_cache.vertex_buffers[1]);
-	if (dirty & Dirty::UNIFORM_BUFFER4) WRITE(m_cache.uniform_buffer4);
 	#undef WRITE
 }
 
 void DrawStream::run() {
 	num_drawcalls = 0;
+	upload_duration = 0;
+	upload_size = 0;
 	ASSERT(!run_called);
 	const Instruction end_instr = Instruction::END;
 	memcpy(current->data + current->header.size, &end_instr, sizeof(end_instr));
@@ -697,13 +698,10 @@ void DrawStream::run() {
 			READ(Instruction, instr);
 			switch(instr) {
 				case Instruction::END: goto next_page;
-				case Instruction::BIND: {
-					READ(Cache, cache);
-					gpu::bindUniformBuffer(4, cache.uniform_buffer4.buffer, cache.uniform_buffer4.offset, cache.uniform_buffer4.size);
-					gpu::useProgram(cache.program);
-					gpu::bindIndexBuffer(cache.index_buffer);
-					gpu::bindVertexBuffer(0, cache.vertex_buffers[0].buffer, cache.vertex_buffers[0].offset, cache.vertex_buffers[0].stride);
-					gpu::bindVertexBuffer(1, cache.vertex_buffers[1].buffer, cache.vertex_buffers[1].offset, cache.vertex_buffers[1].stride);
+				case Instruction::DRAW: {
+					READ(gpu::Drawcall, drawcall);
+					gpu::draw(drawcall);
+					++num_drawcalls;
 					break;
 				}
 				case Instruction::DIRTY_CACHE: {
@@ -727,10 +725,6 @@ void DrawStream::run() {
 					if (dirty & Dirty::VERTEX_BUFFER1) {
 						READ(Cache::VertexBuffer, buf);
 						gpu::bindVertexBuffer(1, buf.buffer, buf.offset, buf.stride);
-					}
-					if (dirty & (Dirty::UNIFORM_BUFFER4)) {
-						READ(Cache::UniformBuffer, buf);
-						gpu::bindUniformBuffer(4, buf.buffer, buf.offset, buf.size);
 					}
 					break;
 				}
@@ -779,12 +773,18 @@ void DrawStream::run() {
 				}
 				case Instruction::UPDATE_BUFFER: {
 					READ(UpdateBufferData, data);
+					const u64 begin = os::Timer::getRawTimestamp();
 					gpu::update(data.buffer, data.data, data.size);
+					upload_size += data.size;
+					upload_duration += os::Timer::getRawTimestamp() - begin;
 					break;
 				}
 				case Instruction::UPDATE_TEXTURE: {
 					READ(UpdateTextureData, data);
+					const u64 begin = os::Timer::getRawTimestamp();
 					gpu::update(data.texture, data.mip, data.x, data.y, data.z, data.w, data.h, data.format, data.buf, data.size);
+					upload_size += data.size;
+					upload_duration += os::Timer::getRawTimestamp() - begin;
 					break;
 				}
 				case Instruction::BIND_SHADER_BUFFER: {
@@ -884,7 +884,12 @@ void DrawStream::run() {
 					READ(u32, len);
 					const char* debug_name = (const char*)ptr;
 					ptr += len;
+					const u64 begin = os::Timer::getRawTimestamp();
 					gpu::createBuffer(data.buffer, data.flags, data.size, data.data, debug_name);
+					if (data.size > 0) {
+						upload_size += data.size;
+						upload_duration += os::Timer::getRawTimestamp() - begin;
+					}
 					break;
 				}
 				case Instruction::COPY_TEXTURE_TO_BUFFER: {
@@ -950,6 +955,8 @@ void DrawStream::run() {
 					DrawStream* stream = (DrawStream*)ptr;
 					stream->run();
 					num_drawcalls += stream->num_drawcalls;
+					upload_duration += stream->upload_duration;
+					upload_size += stream->upload_size;
 					stream->~DrawStream();
 					ptr += sizeof(DrawStream);
 					break;
