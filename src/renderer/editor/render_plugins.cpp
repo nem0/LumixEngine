@@ -5016,11 +5016,13 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 	};
 
 	void guiEndFrame() override {
+		PROFILE_FUNCTION();
 		Renderer* renderer = static_cast<Renderer*>(m_engine.getSystemManager().getSystem("renderer"));
 
 		DrawStream& stream = renderer->getDrawStream();
 		stream.beginProfileBlock("imgui", 0, true);
 
+		u32 drawcalls = 0;
 		ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
 		for (const ImGuiViewport* vp : platform_io.Viewports) {
 			ImDrawData* draw_data = vp->DrawData;
@@ -5083,9 +5085,11 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 			stream.clear(gpu::ClearFlags::COLOR | gpu::ClearFlags::DEPTH, &clear_color.x, 1.0);
 				
 			for (int i = 0; i < draw_data->CmdListsCount; ++i) {
+				drawcalls += draw_data->CmdLists[i]->CmdBuffer.size();
 				encode(draw_data->CmdLists[i], vp, renderer, stream, program, scale, offset);
 			}
 		}
+		profiler::pushInt("Drawcalls", drawcalls);
 		stream.setCurrentWindow(nullptr);
 		stream.endProfileBlock();
 		renderer->frame();

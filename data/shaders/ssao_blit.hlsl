@@ -4,6 +4,7 @@ cbuffer Data : register(b4) {
 	uint u_downscale;
 	TextureHandle u_ssao_buf;
 	TextureHandle u_depthbuffer; // full-size
+	TextureHandle u_depthbuffer_small; // downscaled, if available
 	RWTextureHandle u_gbufferB;
 };
 
@@ -16,16 +17,18 @@ void main(uint3 thread_id : SV_DispatchThreadID) {
 		uint downscale_mask = (1 << u_downscale) - 1;
 		uint step = 1 << u_downscale;
 		uint2 ij = thread_id.xy & ~downscale_mask;
+		uint2 ssao_xy = thread_id.xy >> u_downscale;
 
 		// depths
-		float d = 0.1 / bindless_textures[u_depthbuffer][thread_id.xy].r;
-		float d00 = 0.1 / bindless_textures[u_depthbuffer][ij + int2(0, 0)].r;
-		float d10 = 0.1 / bindless_textures[u_depthbuffer][ij + uint2(step, 0)].r;
-		float d01 = 0.1 / bindless_textures[u_depthbuffer][ij + uint2(0, step)].r;
-		float d11 = 0.1 / bindless_textures[u_depthbuffer][ij + uint2(step, step)].r;
+		// sky/background has depth == 0, we use small value instead to avoid division by 0
+		float d = 0.1 / max(10e-30, bindless_textures[u_depthbuffer][thread_id.xy].r);
+		// u_depthbuffer_small does not contain 0, see ssao_downscale_depth.hlsl
+		float d00 = 0.1 / bindless_textures[u_depthbuffer_small][ssao_xy + int2(0, 0)].r;
+		float d10 = 0.1 / bindless_textures[u_depthbuffer_small][ssao_xy + uint2(1, 0)].r;
+		float d01 = 0.1 / bindless_textures[u_depthbuffer_small][ssao_xy + uint2(0, 1)].r;
+		float d11 = 0.1 / bindless_textures[u_depthbuffer_small][ssao_xy + uint2(1, 1)].r;
 
 		// ssao values
-		uint2 ssao_xy = thread_id.xy >> u_downscale;
 		float ssao00 = bindless_textures[u_ssao_buf][ssao_xy + int2(0, 0)].r;
 		float ssao10 = bindless_textures[u_ssao_buf][ssao_xy + int2(1, 0)].r;
 		float ssao01 = bindless_textures[u_ssao_buf][ssao_xy + int2(0, 1)].r;
