@@ -706,6 +706,7 @@ struct SSAO : public RenderPlugin {
 	bool m_enabled = true;
 	u32 m_blur_iterations = 3;
 	u32 m_downscale = 1;
+	float m_depth_diff_weight = 2;
 	float m_radius = 0.4f;
 	float m_intensity = 1.f;
 
@@ -729,9 +730,10 @@ struct SSAO : public RenderPlugin {
 	void debugUI(Pipeline& pipeline) override {
 		if (ImGui::BeginMenu("SSAO")) {
 			ImGui::Checkbox("Enabled", &m_enabled);
-			ImGui::DragFloat("Radius", &m_radius);
-			ImGui::DragFloat("Intensity", &m_intensity);
-			ImGui::DragInt("Blur iterations", (i32*)&m_blur_iterations);
+			ImGui::DragFloat("Radius", &m_radius, 0.1f, FLT_MIN, FLT_MAX);
+			ImGui::DragFloat("Intensity", &m_intensity, 0.1f, FLT_MIN, FLT_MAX);
+			ImGui::DragFloat("Depth difference weight", &m_depth_diff_weight, 0.1f, FLT_MIN, FLT_MAX);
+			ImGui::DragInt("Blur iterations", (i32*)&m_blur_iterations, 1, 0, 50);
 			const char* downscale_values[] = { "Disabled", "2x", "4x" };
 			ImGui::TextUnformatted("Downscale");
 			for (const char*& v : downscale_values) {
@@ -861,12 +863,14 @@ struct SSAO : public RenderPlugin {
 
 		struct {
 			u32 downscale;
+			float depth_diff_weight;
 			gpu::BindlessHandle ssao_buf;
 			gpu::BindlessHandle depth_buffer;
 			gpu::BindlessHandle depth_buffer_small;
 			gpu::RWBindlessHandle gbufferB;
 		} udata2 = {
 			.downscale = m_downscale,
+			.depth_diff_weight = m_depth_diff_weight,
 			.ssao_buf = pipeline.toBindless(ssao_rb, stream),
 			.depth_buffer = pipeline.toBindless(gbuffer.DS, stream),
 			.depth_buffer_small = pipeline.toBindless(depth_buffer, stream),
