@@ -2,6 +2,7 @@
 
 cbuffer Data : register(b4) {
 	uint u_downscale;
+	float u_depth_diff_weight;
 	TextureHandle u_ssao_buf;
 	TextureHandle u_depthbuffer; // full-size
 	TextureHandle u_depthbuffer_small; // downscaled, if available
@@ -43,19 +44,24 @@ void main(uint3 thread_id : SV_DispatchThreadID) {
 
 		// compute weights as combination of depth differences and bilinear coefs
 		// depth difference added to bilinear coefs to fixed artifacts at depth discontinuities
-		float w00 = r00 - r00 * abs(d - d00);
-		float w10 = r10 - r10 * abs(d - d10);
-		float w01 = r01 - r01 * abs(d - d01);
-		float w11 = r11 - r11 * abs(d - d11);
+		float w00 = saturate(r00 - saturate(r00 * abs(d - d00) * u_depth_diff_weight));
+		float w10 = saturate(r10 - saturate(r10 * abs(d - d10) * u_depth_diff_weight));
+		float w01 = saturate(r01 - saturate(r01 * abs(d - d01) * u_depth_diff_weight));
+		float w11 = saturate(r11 - saturate(r11 * abs(d - d11) * u_depth_diff_weight));
 	
 		ssao = ssao00 * w00
 			+ ssao10 * w10
 			+ ssao01 * w01
 			+ ssao11 * w11;
 			
-		// normalize weight (because of depth differences)
 		float sum_w = w00 + w01 + w10 + w11;
-		ssao /= sum_w; 
+		if (sum_w < 10e-6) {
+			// our depth is not close to any from the four sampled depths, just use the first one
+			ssao = ssao00;
+		} else {
+			// normalize weight (because of depth differences)
+			ssao = saturate(ssao / (sum_w + 10e-6)); 
+		}
 	} else {
 		// ssao is at full resolution, just sample it
 		float2 uv = (thread_id.xy + 0.5) * Global_rcp_framebuffer_size;
