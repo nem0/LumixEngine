@@ -863,11 +863,13 @@ struct SSAO : public RenderPlugin {
 			u32 downscale;
 			gpu::BindlessHandle ssao_buf;
 			gpu::BindlessHandle depth_buffer;
+			gpu::BindlessHandle depth_buffer_small;
 			gpu::RWBindlessHandle gbufferB;
 		} udata2 = {
 			.downscale = m_downscale,
 			.ssao_buf = pipeline.toBindless(ssao_rb, stream),
 			.depth_buffer = pipeline.toBindless(gbuffer.DS, stream),
+			.depth_buffer_small = pipeline.toBindless(depth_buffer, stream),
 			.gbufferB = pipeline.toRWBindless(gbuffer.B, stream)
 		};
 
