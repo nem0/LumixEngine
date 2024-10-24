@@ -751,12 +751,15 @@ struct SSAO : public RenderPlugin {
 
 	void renderBeforeLightPass(const GBuffer& gbuffer, Pipeline& pipeline) override {
 		PROFILE_FUNCTION();
-		if (!m_shader->isReady()) return;
-		if (!m_blit_shader->isReady()) return;
-		if (!m_blur_shader->isReady()) return;
-		if (!m_downscale_shader->isReady()) return;
-		if (!m_enabled) return;
-
+		if (!m_shader->isReady() 
+			|| !m_blit_shader->isReady() 
+			|| !m_blur_shader->isReady()
+			|| !m_downscale_shader->isReady()
+			|| !m_enabled)
+		{
+			m_temporal_rb = INVALID_RENDERBUFFER;
+			return;
+		}
 		const Viewport& vp = pipeline.getViewport();
 		const u32 width = vp.w >> m_downscale;
 		const u32 height = vp.h >> m_downscale;

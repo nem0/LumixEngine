@@ -238,6 +238,22 @@ struct MemoryStats {
 	u64 texture_mem;
 };
 
+// Most common combination of arguments, can be drawn with single function call
+// useful especially in debug build
+struct Drawcall {
+	gpu::ProgramHandle program;
+	gpu::BufferHandle index_buffer;
+	gpu::BufferHandle vertex_buffers[2];
+	u32 vertex_buffer_offsets[2];
+	u32 vertex_buffer_sizes[2];
+	gpu::BufferHandle uniform_buffer2;
+	u32 uniform_buffer2_offset;
+	u32 uniform_buffer2_size;
+	u32 indices_count;
+	u32 instances_count;
+	DataType index_type;
+};
+
 void preinit(IAllocator& allocator, bool load_renderdoc);
 IAllocator& getAllocator();
 bool init(void* window_handle, InitFlags flags);
@@ -310,6 +326,7 @@ void drawIndirect(DataType index_type, u32 indirect_buffer_offset);
 void drawIndexed(u32 offset, u32 count, DataType type);
 void drawArraysInstanced(u32 indices_count, u32 instances_count);
 void drawIndexedInstanced(u32 indices_count, u32 instances_count, DataType index_type);
+void draw(const Drawcall& draw);
 void dispatch(u32 num_groups_x, u32 num_groups_y, u32 num_groups_z);
 
 void copy(TextureHandle dst, TextureHandle src, u32 dst_x, u32 dst_y);

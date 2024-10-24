@@ -579,7 +579,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 			char text_min[32];
 			toCString(counter.min, Span(text_min), 2);
 			float text_width = ImGui::CalcTextSize(text_max).x;
-			dl->AddText(ImVec2(to_x - text_width, top), text_color, text_max);
+			dl->AddText(ImVec2(to_x - text_width - ImGui::GetStyle().ScrollbarSize, top), text_color, text_max);
 			
 			text_width = ImGui::CalcTextSize(text_min).x;
 			dl->AddText(ImVec2(to_x - text_width, top + 100 - ImGui::GetTextLineHeightWithSpacing()), text_color, text_min);
