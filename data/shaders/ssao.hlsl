@@ -10,6 +10,8 @@ cbuffer UB : register(b4) {
 	uint u_downscale;
 	TextureHandle u_normal_buffer;
 	TextureHandle u_depth_buffer;
+	TextureHandle u_history; // valid if temporal ssao is enabled
+	TextureHandle u_motion_vectors;
 	RWTextureHandle u_output;
 };
 
@@ -22,18 +24,33 @@ static const float2 PATTERN[4] = {
   float2( -PATTERN_SCALE * M * M * M, 0 )
 };
 
+// https://www.iquilezles.org/www/articles/texture/texture.htm
+float4 getTexel(uint tex, float2 p, float2 rcp_size) {
+	p = p / rcp_size + 0.5;
+
+	float2 i = floor(p);
+	float2 f = p - i;
+	f = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+	p = i + f;
+
+	p = (p - 0.5) * rcp_size;
+	return sampleBindlessLod(LinearSamplerClamp, tex, p, 0);
+}
 
 [numthreads(16, 16, 1)]
 void main(uint3 thread_id : SV_DispatchThreadID) {
 	float2 screen_uv = (thread_id.xy + 0.5) * u_rcp_size;
 	
-	float3 pos_ws = getPositionWS(u_depth_buffer, screen_uv);
+	float ndc_depth;
+	float3 pos_ws = getPositionWS(u_depth_buffer, screen_uv, ndc_depth);
 	float3 normal_ws = bindless_textures[u_normal_buffer][thread_id.xy << u_downscale].xyz * 2 - 1;
 	float occlusion = 0;
 	float weight_sum = 0;
 
 	float random_angle = 2 * M_PI * hash(float2(thread_id.xy) * 0.01 
-		+ Global_random_float2_normalized
+		#ifdef TEMPORAL
+			+ Global_random_float2_normalized
+		#endif
 	);
 	float depth_scale = u_radius / length(pos_ws);
 
@@ -59,6 +76,22 @@ void main(uint3 thread_id : SV_DispatchThreadID) {
 
 	occlusion /= max(1.0, weight_sum);
 	float value = 1 - occlusion * u_intensity;
+
+	#ifdef TEMPORAL
+		float2 motionvec = sampleBindlessLod(LinearSamplerClamp, u_motion_vectors, screen_uv, 0).xy;
+		#ifdef _ORIGIN_BOTTOM_LEFT
+			motionvec *= 0.5;
+		#else
+			motionvec *= float2(0.5, -0.5);
+		#endif
+		float2 uv_prev = screen_uv + motionvec;
+
+		if (all(uv_prev < 1) && all(uv_prev > 0)) {
+			// TODO depth-based rejection
+			float prev_frame_value = getTexel(u_history, uv_prev, u_rcp_size).r;
+			value = lerp(prev_frame_value, value, 0.1);
+		}
+	#endif
 
 	bindless_rw_textures[u_output][thread_id.xy] = value;
 }
