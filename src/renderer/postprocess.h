@@ -704,11 +704,14 @@ struct SSAO : public RenderPlugin {
 	Shader* m_blur_shader = nullptr;
 	Shader* m_downscale_shader = nullptr;
 	bool m_enabled = true;
-	u32 m_blur_iterations = 3;
+	bool m_temporal = true;
+	u32 m_blur_iterations = 1;
 	u32 m_downscale = 1;
 	float m_depth_diff_weight = 2;
 	float m_radius = 0.4f;
 	float m_intensity = 1.f;
+	RenderBufferHandle m_temporal_rb;
+	IVec2 m_temporal_size;
 
 	SSAO(Renderer& renderer) : m_renderer(renderer) {}
 	
@@ -730,6 +733,7 @@ struct SSAO : public RenderPlugin {
 	void debugUI(Pipeline& pipeline) override {
 		if (ImGui::BeginMenu("SSAO")) {
 			ImGui::Checkbox("Enabled", &m_enabled);
+			ImGui::Checkbox("Temporal", &m_temporal);
 			ImGui::DragFloat("Radius", &m_radius, 0.1f, FLT_MIN, FLT_MAX);
 			ImGui::DragFloat("Intensity", &m_intensity, 0.1f, FLT_MIN, FLT_MAX);
 			ImGui::DragFloat("Depth difference weight", &m_depth_diff_weight, 0.1f, FLT_MIN, FLT_MAX);
@@ -790,6 +794,26 @@ struct SSAO : public RenderPlugin {
 			pipeline.endBlock();
 		}
 
+		if (m_temporal) {
+			if (m_temporal_rb == INVALID_RENDERBUFFER || width != m_temporal_size.x || height != m_temporal_size.y) {
+				m_temporal_rb = pipeline.createRenderbuffer({
+					.type = RenderbufferDesc::FIXED,
+					.fixed_size = IVec2(width, height),
+					.format = gpu::TextureFormat::R8,
+					.flags = gpu::TextureFlags::COMPUTE_WRITE | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET,
+					.debug_name = "ssao_temporal"
+				});
+				m_temporal_size = IVec2(width, height);
+				// TODO compute shader
+				pipeline.setRenderTargets(Span(&m_temporal_rb, 1), INVALID_RENDERBUFFER);
+				pipeline.clear(gpu::ClearFlags::ALL, 1, 1, 1, 1, 1);
+			}
+			pipeline.keepRenderbufferAlive(m_temporal_rb);
+		}
+		else {
+			m_temporal_rb = INVALID_RENDERBUFFER;
+		}
+
 		struct {
 			Vec2 rcp_size;
 			float radius;
@@ -797,6 +821,8 @@ struct SSAO : public RenderPlugin {
 			u32 downscale;
 			gpu::BindlessHandle normal_buffer;
 			gpu::BindlessHandle depth_buffer;
+			gpu::BindlessHandle history;
+			gpu::BindlessHandle motion_vectors;
 			gpu::RWBindlessHandle output;
 		} udata = {
 			.rcp_size = Vec2(1.0f / width, 1.0f / height),
@@ -805,17 +831,20 @@ struct SSAO : public RenderPlugin {
 			.downscale = m_downscale,
 			.normal_buffer = pipeline.toBindless(gbuffer.B, stream),
 			.depth_buffer = pipeline.toBindless(depth_buffer, stream),
+			.history = pipeline.toBindless(m_temporal_rb, stream),
+			.motion_vectors = pipeline.toBindless(gbuffer.D, stream),
 			.output = pipeline.toRWBindless(ssao_rb, stream)
 		};
 		pipeline.setUniform(udata);
-		pipeline.dispatch(*m_shader, (width + 15) / 16, (height + 15) / 16, 1);
+		pipeline.dispatch(*m_shader, (width + 15) / 16, (height + 15) / 16, 1, m_temporal ? "TEMPORAL" : nullptr);
+		if (m_temporal) swap(ssao_rb, m_temporal_rb);
 
 		if (m_blur_iterations > 0) {
 			pipeline.beginBlock("ssao_blur");
 			RenderBufferHandle ssao_blurred_rb = pipeline.createRenderbuffer({ 
 				.type = RenderbufferDesc::FIXED,
 				.fixed_size = IVec2(width, height),
-				.format = gpu::TextureFormat::RGBA8, 
+				.format = gpu::TextureFormat::R8, 
 				.flags = gpu::TextureFlags::COMPUTE_WRITE, 
 				.debug_name = "ssao_blurred" 
 			});
@@ -825,7 +854,7 @@ struct SSAO : public RenderPlugin {
 				ssao_blurred2_rb = pipeline.createRenderbuffer({ 
 					.type = RenderbufferDesc::FIXED,
 					.fixed_size = IVec2(width, height),
-					.format = gpu::TextureFormat::RGBA8, 
+					.format = gpu::TextureFormat::R8, 
 					.flags = gpu::TextureFlags::COMPUTE_WRITE, 
 					.debug_name = "ssao_blurred2" 
 				});
@@ -859,7 +888,6 @@ struct SSAO : public RenderPlugin {
 			}
 			pipeline.endBlock();
 		}
-
 
 		struct {
 			u32 downscale;

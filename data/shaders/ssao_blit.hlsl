@@ -22,12 +22,12 @@ void main(uint3 thread_id : SV_DispatchThreadID) {
 
 		// depths
 		// sky/background has depth == 0, we use small value instead to avoid division by 0
-		float d = 0.1 / max(10e-30, bindless_textures[u_depthbuffer][thread_id.xy].r);
+		float d = 1 / max(10e-30, bindless_textures[u_depthbuffer][thread_id.xy].r);
 		// u_depthbuffer_small does not contain 0, see ssao_downscale_depth.hlsl
-		float d00 = 0.1 / bindless_textures[u_depthbuffer_small][ssao_xy + int2(0, 0)].r;
-		float d10 = 0.1 / bindless_textures[u_depthbuffer_small][ssao_xy + uint2(1, 0)].r;
-		float d01 = 0.1 / bindless_textures[u_depthbuffer_small][ssao_xy + uint2(0, 1)].r;
-		float d11 = 0.1 / bindless_textures[u_depthbuffer_small][ssao_xy + uint2(1, 1)].r;
+		float d00 = 1 / bindless_textures[u_depthbuffer_small][ssao_xy + int2(0, 0)].r;
+		float d10 = 1 / bindless_textures[u_depthbuffer_small][ssao_xy + uint2(1, 0)].r;
+		float d01 = 1 / bindless_textures[u_depthbuffer_small][ssao_xy + uint2(0, 1)].r;
+		float d11 = 1 / bindless_textures[u_depthbuffer_small][ssao_xy + uint2(1, 1)].r;
 
 		// ssao values
 		float ssao00 = bindless_textures[u_ssao_buf][ssao_xy + int2(0, 0)].r;
@@ -60,7 +60,7 @@ void main(uint3 thread_id : SV_DispatchThreadID) {
 			ssao = ssao00;
 		} else {
 			// normalize weight (because of depth differences)
-			ssao = saturate(ssao / (sum_w + 10e-6)); 
+			ssao = saturate(ssao / sum_w); 
 		}
 	} else {
 		// ssao is at full resolution, just sample it
