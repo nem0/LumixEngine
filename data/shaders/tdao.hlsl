@@ -32,8 +32,9 @@ void main(uint3 thread_id : SV_DispatchThreadID) {
 	uv = saturate(uv * 0.5 + 0.5);
 
 	// create random rotation matrix
-	float c = hash(float2(thread_id.xy) * 0.01) * 2 - 1;
-	float s = sqrt(1 - c * c);
+	float random_angle = 2 * M_PI * hash(float2(thread_id.xy) * 0.01);
+	float c = cos(random_angle);
+	float s = sin(random_angle);
 	float2x2 rot = u_scale * float2x2(c, s, -s, c); 
 
 	// compute tdao
@@ -42,7 +43,7 @@ void main(uint3 thread_id : SV_DispatchThreadID) {
 		float2 uv_iter = uv + mul(POISSON_DISK_16[i], rot);
 		float td_depth_ndc = sampleBindlessLod(LinearSamplerClamp, u_topdown_depthmap, uv_iter, 0).r;
 		float td_depth = (td_depth_ndc * 2 - 1) * u_half_depth_range;
-		ao += saturate(td_depth - pos_td.y);
+		ao += saturate((td_depth - pos_td.y));
 	}
 	ao *= u_intensity / 16;
 

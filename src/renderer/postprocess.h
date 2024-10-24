@@ -921,6 +921,7 @@ struct TDAO : public RenderPlugin {
 	float m_y_range = 200;
 	float m_intensity = 0.9f;
 	bool m_enabled = true;
+	float m_scale = 0.01f;
 	DVec3 m_last_camera_pos = DVec3(DBL_MAX);
 	
 	struct PipelineInstanceData {
@@ -941,7 +942,8 @@ struct TDAO : public RenderPlugin {
 	void debugUI(Pipeline& pipeline) override {
 		if (!ImGui::BeginMenu("TDAO")) return;
 		ImGui::Checkbox("Enable", &m_enabled);
-		
+		ImGui::DragFloat("Intensity", &m_intensity, 0.01f, FLT_MIN, FLT_MAX);
+		ImGui::DragFloat("Scale", &m_scale, 0.01f, FLT_MIN, FLT_MAX);
 		if (ImGui::RadioButton("Debug", pipeline.m_debug_show_plugin == this)) {
 			pipeline.m_debug_show_plugin = this;
 			pipeline.m_debug_show = Pipeline::DebugShow::PLUGIN;
@@ -1043,7 +1045,7 @@ struct TDAO : public RenderPlugin {
 			m_intensity,
 			1.f / m_xz_range,
 			m_y_range * 0.5f,
-			0.01f,
+			m_scale,
 			0.02f,
 			pipeline.toBindless(gbuffer.DS, stream),
 			pipeline.toRWBindless(gbuffer.B, stream),
