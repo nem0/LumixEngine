@@ -2456,43 +2456,31 @@ struct PhysicsModuleImpl final : PhysicsModule
 		}
 	}
 
-	void onEntityMoved(EntityRef entity)
-	{
-		const u64 cmp_mask = m_world.getComponentsMask(entity);
-		if ((cmp_mask & m_physics_cmps_mask) == 0) return;
-		
-		if (m_world.hasComponent(entity, CONTROLLER_TYPE)) {
-			auto iter = m_controllers.find(entity);
-			if (iter.isValid())
-			{
-				Controller& controller = iter.value();
-				DVec3 pos = m_world.getPosition(entity);
-				PxExtendedVec3 pvec(pos.x, pos.y, pos.z);
-				controller.controller->setFootPosition(pvec);
-			}
-		}
+	void onControllerMoved(EntityRef entity) {
+		auto iter = m_controllers.find(entity);
+		ASSERT(iter.isValid());
 
-		if (m_world.hasComponent(entity, RIGID_ACTOR_TYPE)) {
-			auto iter = m_actors.find(entity);
-			if (iter.isValid()) {
-				RigidActor& actor = iter.value();
-				if (actor.physx_actor && m_update_in_progress != &actor)
-				{
-					Transform trans = m_world.getTransform(entity);
-					if (actor.dynamic_type == DynamicType::KINEMATIC)
-					{
-						auto* rigid_dynamic = (PxRigidDynamic*)actor.physx_actor;
-						rigid_dynamic->setKinematicTarget(toPhysx(trans.getRigidPart()));
-					}
-					else
-					{
-						actor.physx_actor->setGlobalPose(toPhysx(trans.getRigidPart()), false);
-					}
-					if (actor.mesh && (actor.scale != trans.scale))
-					{
-						actor.rescale();
-					}
-				}
+		Controller& controller = iter.value();
+		DVec3 pos = m_world.getPosition(entity);
+		PxExtendedVec3 pvec(pos.x, pos.y, pos.z);
+		controller.controller->setFootPosition(pvec);
+	}
+
+	void onActorMoved(EntityRef entity) {
+		auto iter = m_actors.find(entity);
+		ASSERT(iter.isValid());
+		RigidActor& actor = iter.value();
+		if (actor.physx_actor && m_update_in_progress != &actor) {
+			Transform trans = m_world.getTransform(entity);
+			if (actor.dynamic_type == DynamicType::KINEMATIC) {
+				auto* rigid_dynamic = (PxRigidDynamic*)actor.physx_actor;
+				rigid_dynamic->setKinematicTarget(toPhysx(trans.getRigidPart()));
+			}
+			else {
+				actor.physx_actor->setGlobalPose(toPhysx(trans.getRigidPart()), false);
+			}
+			if (actor.mesh && (actor.scale != trans.scale)) {
+				actor.rescale();
 			}
 		}
 	}
@@ -3831,7 +3819,6 @@ struct PhysicsModuleImpl final : PhysicsModule
 	PxBatchQuery* m_vehicle_batch_query;
 	u8 m_vehicle_query_mem[sizeof(PxRaycastQueryResult) * 64 + sizeof(PxRaycastHit) * 64];
 	PxRaycastQueryResult* m_vehicle_results;
-	u64 m_physics_cmps_mask;
 
 	Array<EntityRef> m_dynamic_actors;
 	RigidActor* m_update_in_progress;
@@ -3867,15 +3854,6 @@ PhysicsModuleImpl::PhysicsModuleImpl(Engine& engine, World& world, PhysicsSystem
 	, m_layers(m_system->getCollisionLayers())
 	, m_resource_actor_map(m_allocator)
 {
-	m_physics_cmps_mask = 0;
-
-	const RuntimeHash hash("physics");
-	for (const reflection::RegisteredComponent& cmp : reflection::getComponents()) {
-		if (cmp.module_hash == hash) {
-			m_physics_cmps_mask |= (u64)1 << cmp.cmp->component_type.index;
-		}
-	}
-
 	m_vehicle_frictions = createFrictionPairs();
 }
 
@@ -3883,7 +3861,9 @@ PhysicsModuleImpl::PhysicsModuleImpl(Engine& engine, World& world, PhysicsSystem
 UniquePtr<PhysicsModule> PhysicsModule::create(PhysicsSystem& system, World& world, Engine& engine, IAllocator& allocator)
 {
 	PhysicsModuleImpl* impl = LUMIX_NEW(allocator, PhysicsModuleImpl)(engine, world, system, allocator);
-	impl->m_world.entityTransformed().bind<&PhysicsModuleImpl::onEntityMoved>(impl);
+	impl->m_world.componentTransformed(CONTROLLER_TYPE).bind<&PhysicsModuleImpl::onControllerMoved>(impl);
+	impl->m_world.componentTransformed(RIGID_ACTOR_TYPE).bind<&PhysicsModuleImpl::onActorMoved>(impl);
+	
 	impl->m_world.entityDestroyed().bind<&PhysicsModuleImpl::onEntityDestroyed>(impl);
 	PxSceneDesc sceneDesc(system.getPhysics()->getTolerancesScale());
 	sceneDesc.gravity = PxVec3(0.0f, -9.8f, 0.0f);

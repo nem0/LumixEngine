@@ -63,7 +63,10 @@ struct LUMIX_ENGINE_API ISystem
 	virtual void initBegin() {}
 	// wait for all async stuff to finish, called after initBegin is called on all system
 	virtual void initEnd() {}
-	
+
+	// shutdown is in progress, other systems still exists
+	virtual void shutdownStarted() {}
+
 	virtual void update(float) {}
 	virtual const char* getName() const = 0;
 	virtual i32 getVersion() const { return 0; }

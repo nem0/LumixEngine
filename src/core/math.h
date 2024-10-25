@@ -148,7 +148,7 @@ struct LUMIX_CORE_API Vec3 {
 struct LUMIX_CORE_API DVec3
 {
 	DVec3() {}
-	DVec3(float a);
+	DVec3(double a);
 	DVec3(double x, double y, double z);
 	DVec3(const DVec3& rhs) = default;
 	explicit DVec3(const Vec3& rhs);
@@ -409,6 +409,13 @@ template <typename T> LUMIX_FORCE_INLINE T minimum(T a, T b) {
 }
 
 LUMIX_FORCE_INLINE Vec2 minimum(const Vec2& a, const Vec2& b) {
+	return {
+		minimum(a.x, b.x),
+		minimum(a.y, b.y),
+	};
+}
+
+LUMIX_FORCE_INLINE IVec2 minimum(const IVec2& a, const IVec2& b) {
 	return {
 		minimum(a.x, b.x),
 		minimum(a.y, b.y),

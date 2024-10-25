@@ -4,14 +4,13 @@
 #include <PxMaterial.h>
 #include <PxPhysics.h>
 
-#include "physics_resources.h"
 #include "core/log.h"
-#include "engine/lua_wrapper.h"
+#include "core/math.h"
 #include "core/profiler.h"
-#include "engine/resource_manager.h"
 #include "core/stream.h"
 #include "core/string.h"
-#include "core/math.h"
+#include "engine/resource_manager.h"
+#include "physics_resources.h"
 #include "physics/physics_system.h"
 
 
@@ -107,97 +106,35 @@ ResourceType PhysicsMaterial::TYPE("physics_material");
 
 void PhysicsMaterial::unload() {}
 
-namespace LuaAPI {
-	int static_friction(lua_State* L) {
-		lua_getfield(L, LUA_GLOBALSINDEX, "this");
-		PhysicsMaterialLoadData* material = (PhysicsMaterialLoadData*)lua_touserdata(L, -1);
-		lua_pop(L, 1);
-
-		material->static_friction = LuaWrapper::checkArg<float>(L, 1);
-
-		return 0;
-	}
-
-	int dynamic_friction(lua_State* L) {
-		lua_getfield(L, LUA_GLOBALSINDEX, "this");
-		PhysicsMaterialLoadData* material = (PhysicsMaterialLoadData*)lua_touserdata(L, -1);
-		lua_pop(L, 1);
-
-		material->dynamic_friction = LuaWrapper::checkArg<float>(L, 1);
-
-		return 0;
-	}
-
-	int restitution(lua_State* L) {
-		lua_getfield(L, LUA_GLOBALSINDEX, "this");
-		PhysicsMaterialLoadData* material = (PhysicsMaterialLoadData*)lua_touserdata(L, -1);
-		lua_pop(L, 1);
-
-		material->restitution = LuaWrapper::checkArg<float>(L, 1);
-
-		return 0;
-	}
-} // namespace LuaAPI
-
-void PhysicsMaterial::serialize(OutputMemoryStream& blob) {
-	PhysicsMaterialLoadData data;
-	data.static_friction = material->getStaticFriction();
-	data.dynamic_friction = material->getDynamicFriction();
-	data.restitution = material->getRestitution();
-	blob.write(data);
-}
-
-void PhysicsMaterial::deserialize(InputMemoryStream& blob) {
-	PhysicsMaterialLoadData data;
-	blob.read(data);
-
-	material->setStaticFriction(data.static_friction);
-	material->setDynamicFriction(data.dynamic_friction);
-	material->setRestitution(data.restitution);
-}
-
 bool PhysicsMaterial::load(Span<const u8> mem) {
-	PhysicsMaterialManager& mng = static_cast<PhysicsMaterialManager&>(getResourceManager());
-	PhysicsMaterialLoadData tmp;
-	lua_State* L = mng.getState(tmp);
-
-	StringView content((const char*)mem.begin(), mem.length());
-	if (!LuaWrapper::execute(L, content, getPath().c_str(), 0)) {
+	InputMemoryStream stream(mem);
+	Header header;
+	stream.read(header);
+	if (header.magic != Header::MAGIC) {
+		logError(getPath(), ": invalid file");
 		return false;
 	}
-
-	material->setStaticFriction(tmp.static_friction);
-	material->setDynamicFriction(tmp.dynamic_friction);
-	material->setRestitution(tmp.restitution);
-
-	return true;
+	if (header.version != 0) {
+		logError(getPath(), ": unsupported version");
+		return false;
+	}
+	float sf, df, rest;
+	stream.read(sf);
+	stream.read(df);
+	stream.read(rest);
+	material->setStaticFriction(sf);
+	material->setDynamicFriction(df);
+	material->setRestitution(rest);
+	return !stream.hasOverflow();
 }
 
 PhysicsMaterialManager::PhysicsMaterialManager(PhysicsSystem& system, IAllocator& allocator)
 	: ResourceManager(allocator)
 	, system(system)
 	, allocator(allocator)
-{
-	state = luaL_newstate();
-	#define DEFINE_LUA_FUNC(func) \
-		lua_pushcfunction(state, LuaAPI::func, #func); \
-		lua_setfield(state, LUA_GLOBALSINDEX, #func); 
-	
-	DEFINE_LUA_FUNC(static_friction);
-	DEFINE_LUA_FUNC(dynamic_friction);
-	DEFINE_LUA_FUNC(restitution);
-
-	#undef DEFINE_LUA_FUNC
-}
+{}
 
 PhysicsMaterialManager::~PhysicsMaterialManager() {
-	lua_close(state);
-}
-
-lua_State* PhysicsMaterialManager::getState(PhysicsMaterialLoadData& material) {
-	lua_pushlightuserdata(state, &material);
-	lua_setfield(state, LUA_GLOBALSINDEX, "this");
-	return state;
 }
 
 Resource* PhysicsMaterialManager::createResource(const Path& path) {

@@ -136,7 +136,7 @@ StableHash32::StableHash32(const char* string) {
 	hash = crc32(string);
 }
 
-static struct RollingHasherState {
+thread_local struct RollingHasherState {
 	RollingHasherState() {
 		state = XXH3_createState();
 	}

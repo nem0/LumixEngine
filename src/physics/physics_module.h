@@ -15,11 +15,7 @@
 #endif
 
 
-struct lua_State;
-
-
-namespace physx
-{
+namespace physx {
 	class PxJoint;
 }
 

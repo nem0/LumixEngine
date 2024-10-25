@@ -16,6 +16,82 @@ static constexpr int RESERVED_ENTITIES_COUNT = 1024;
 
 const ComponentUID ComponentUID::INVALID(INVALID_ENTITY, { -1 }, 0);
 
+
+static constexpr u32 EMPTY_ARCHETYPE = 0;
+
+// archetype is a unique set of component types
+struct World::ArchetypeManager {
+	struct Archetype {
+		Archetype(IAllocator& allocator)
+			: types(allocator)
+		{}
+
+		RuntimeHash32 hash;
+		Array<ComponentType> types;
+	};
+
+	using ArchetypeHandle = u32;
+	
+	ArchetypeManager(IAllocator& allocator)
+		: m_archetypes(allocator)
+		, m_allocator(allocator)
+	{
+		m_archetypes.reserve(1024);
+		m_archetypes.emplace(m_allocator); // 0-th archetype is reserved for invalid archetype
+	}
+
+	const Archetype& get(ArchetypeHandle handle) {
+		return m_archetypes[handle];
+	}
+
+	bool hasComponent(ArchetypeHandle archetype, ComponentType type) {
+		const Archetype& a = m_archetypes[archetype];
+		for (ComponentType t : a.types) {
+			if (t == type) return true;
+		}
+		return false;
+	}
+
+	ArchetypeHandle get(Span<ComponentType> types) {
+		RollingHasher hasher;
+
+		// we sort to get the same hash for different order
+		qsort(types.begin(), types.length(), sizeof(ComponentType), [](const void* a, const void* b) {
+			return ((const ComponentType*)a)->index - ((const ComponentType*)b)->index;
+		});
+
+		hasher.begin();
+		for (ComponentType type : types) {
+			hasher.update(&type, sizeof(type));
+		}
+		const RuntimeHash32 hash = hasher.end();
+
+		for (u32 i = 0, c = m_archetypes.size(); i < c; ++i) {
+			if (m_archetypes[i].hash == hash) {
+				Archetype& a = m_archetypes[i];
+				if (a.types.size() != types.length()) continue;
+				bool equal = true;
+				for (u32 j = 0; j < types.length(); ++j) {
+					if (a.types[j] != types[j]) {
+						equal = false;
+						break;
+					}
+				}
+				if (equal) return i;
+			}
+		}
+
+		Archetype& a = m_archetypes.emplace(m_allocator);
+		a.hash = hash;
+		a.types.resize(types.length());
+		memcpy(a.types.begin(), types.begin(), types.length() * sizeof(ComponentType));
+		return m_archetypes.size() - 1;
+	}
+
+	IAllocator& m_allocator;
+	Array<Archetype> m_archetypes;
+};
+
 EntityMap::EntityMap(IAllocator& allocator) 
 	: m_map(allocator)
 {}
@@ -52,7 +128,6 @@ World::World(Engine& engine)
 	, m_component_added(m_allocator)
 	, m_component_destroyed(m_allocator)
 	, m_entity_destroyed(m_allocator)
-	, m_entity_moved(m_allocator)
 	, m_entity_created(m_allocator)
 	, m_first_free_slot(-1)
 	, m_modules(m_allocator)
@@ -60,6 +135,7 @@ World::World(Engine& engine)
 	, m_transforms(m_allocator)
 	, m_partitions(m_allocator)
 {
+	m_archetype_manager = UniquePtr<ArchetypeManager>::create(m_allocator, m_allocator);
 	m_entities.reserve(RESERVED_ENTITIES_COUNT);
 	m_transforms.reserve(RESERVED_ENTITIES_COUNT);
 	memset(m_component_type_map, 0, sizeof(m_component_type_map));
@@ -116,7 +192,7 @@ World::PartitionHandle World::getPartition(EntityRef entity) {
 }
 
 IModule* World::getModule(ComponentType type) const {
-	return m_component_type_map[type.index].module;
+	return m_component_type_map[type.index]->module;
 }
 
 
@@ -144,9 +220,11 @@ void World::addModule(UniquePtr<IModule>&& module)
 	const RuntimeHash hash(module->getName());
 	for (const reflection::RegisteredComponent& cmp : reflection::getComponents()) {
 		if (cmp.module_hash == hash) {
-			m_component_type_map[cmp.cmp->component_type.index].module = module.get();
-			m_component_type_map[cmp.cmp->component_type.index].create = cmp.cmp->creator;
-			m_component_type_map[cmp.cmp->component_type.index].destroy = cmp.cmp->destroyer;
+			u32 i = cmp.cmp->component_type.index;
+			if (!m_component_type_map[i].get()) m_component_type_map[i].create(m_allocator);
+			m_component_type_map[i]->module = module.get();
+			m_component_type_map[i]->create = cmp.cmp->creator;
+			m_component_type_map[i]->destroy = cmp.cmp->destroyer;
 		}
 	}
 
@@ -169,10 +247,19 @@ const Quat& World::getRotation(EntityRef entity) const
 }
 
 
+DelegateList<void(EntityRef)>& World::componentTransformed(ComponentType type) {
+	if (!m_component_type_map[type.index].get()) m_component_type_map[type.index].create(m_allocator);
+	return m_component_type_map[type.index]->transformed;
+}
+
 void World::transformEntity(EntityRef entity, bool update_local)
 {
-	const int hierarchy_idx = m_entities[entity.index].hierarchy;
-	m_entity_moved.invoke(entity);
+	const ArchetypeManager::Archetype& archetype = m_archetype_manager->get(m_entities[entity.index].archetype);
+	for (ComponentType type : archetype.types) {
+		m_component_type_map[type.index]->transformed.invoke(entity);
+	}
+	
+	const i32 hierarchy_idx = m_entities[entity.index].hierarchy;
 	if (hierarchy_idx >= 0) {
 		Hierarchy& h = m_hierarchy[hierarchy_idx];
 		const Transform my_transform = getTransform(entity);
@@ -222,7 +309,10 @@ void World::setTransformKeepChildren(EntityRef entity, const Transform& transfor
 	tmp = transform;
 	
 	int hierarchy_idx = m_entities[entity.index].hierarchy;
-	entityTransformed().invoke(entity);
+	const ArchetypeManager::Archetype& archetype = m_archetype_manager->get(m_entities[entity.index].archetype);
+	for (ComponentType type : archetype.types) {
+		m_component_type_map[type.index]->transformed.invoke(entity);
+	}
 	if (hierarchy_idx >= 0)
 	{
 		Hierarchy& h = m_hierarchy[hierarchy_idx];
@@ -390,7 +480,7 @@ void World::emplaceEntity(EntityRef entity)
 	tr.scale = Vec3(1);
 	data.name = -1;
 	data.hierarchy = -1;
-	data.components = 0;
+	data.archetype = EMPTY_ARCHETYPE;
 	data.valid = true;
 
 	m_entity_created.invoke(entity);
@@ -422,7 +512,7 @@ EntityRef World::createEntity(const DVec3& position, const Quat& rotation)
 	data->partition = m_active_partition;
 	data->name = -1;
 	data->hierarchy = -1;
-	data->components = 0;
+	data->archetype = EMPTY_ARCHETYPE;
 	data->valid = true;
 	m_entity_created.invoke(entity);
 
@@ -439,18 +529,11 @@ void World::destroyEntity(EntityRef entity)
 	}
 	setParent(INVALID_ENTITY, entity);
 
-	u64 mask = entity_data.components;
-	for (int i = 0; i < ComponentType::MAX_TYPES_COUNT; ++i)
-	{
-		if ((mask & ((u64)1 << i)) != 0)
-		{
-			auto original_mask = mask;
-			IModule* module = m_component_type_map[i].module;
-			auto destroy_method = m_component_type_map[i].destroy;
-			destroy_method(module, entity);
-			mask = entity_data.components;
-			ASSERT(original_mask != mask);
-		}
+	const ArchetypeManager::Archetype& archetype = m_archetype_manager->get(entity_data.archetype);
+	for (ComponentType type : archetype.types) {
+		IModule* module = m_component_type_map[type.index]->module;
+		auto destroy_method = m_component_type_map[type.index]->destroy;
+		destroy_method(module, entity);
 	}
 
 	entity_data.next = m_first_free_slot;
@@ -942,89 +1025,75 @@ const Vec3& World::getScale(EntityRef entity) const
 }
 
 
-ComponentUID World::getFirstComponent(EntityRef entity) const
+Span<const ComponentType> World::getComponents(EntityRef entity) const
 {
-	u64 mask = m_entities[entity.index].components;
-	for (int i = 0; i < ComponentType::MAX_TYPES_COUNT; ++i)
-	{
-		if ((mask & (u64(1) << i)) != 0)
-		{
-			IModule* module = m_component_type_map[i].module;
-			return ComponentUID(entity, {i}, module);
-		}
-	}
-	return ComponentUID::INVALID;
-}
+	ArchetypeHandle archetype = m_entities[entity.index].archetype;
+	if (archetype == EMPTY_ARCHETYPE) return {};
 
-
-ComponentUID World::getNextComponent(const ComponentUID& cmp) const
-{
-	u64 mask = m_entities[cmp.entity.index].components;
-	for (int i = cmp.type.index + 1; i < ComponentType::MAX_TYPES_COUNT; ++i)
-	{
-		if ((mask & (u64(1) << i)) != 0)
-		{
-			IModule* module = m_component_type_map[i].module;
-			return ComponentUID(cmp.entity, {i}, module);
-		}
-	}
-	return ComponentUID::INVALID;
-}
-
-
-ComponentUID World::getComponent(EntityRef entity, ComponentType component_type) const
-{
-	u64 mask = m_entities[entity.index].components;
-	if ((mask & (u64(1) << component_type.index)) == 0) return ComponentUID::INVALID;
-	IModule* module = m_component_type_map[component_type.index].module;
-	return ComponentUID(entity, component_type, module);
-}
-
-
-u64 World::getComponentsMask(EntityRef entity) const
-{
-	return m_entities[entity.index].components;
+	const ArchetypeManager::Archetype& a = m_archetype_manager->get(archetype);
+	return a.types;
 }
 
 
 bool World::hasComponent(EntityRef entity, ComponentType component_type) const
 {
-	u64 mask = m_entities[entity.index].components;
-	return (mask & (u64(1) << component_type.index)) != 0;
+	const ArchetypeHandle archetype = m_entities[entity.index].archetype;
+	return m_archetype_manager->hasComponent(archetype, component_type);
 }
 
 
-void World::onComponentDestroyed(EntityRef entity, ComponentType component_type, IModule* module)
-{
-	auto mask = m_entities[entity.index].components;
-	auto old_mask = mask;
-	mask &= ~((u64)1 << component_type.index);
-	ASSERT(old_mask != mask);
-	m_entities[entity.index].components = mask;
+void World::onComponentDestroyed(EntityRef entity, ComponentType component_type, IModule* module) {
+	ComponentType tmp[64];
+	const ArchetypeHandle archetype = m_entities[entity.index].archetype;
+	const ArchetypeManager::Archetype& a = m_archetype_manager->get(archetype);
+	ASSERT(a.types.size() <= (i32)lengthOf(tmp));
+	u32 count = 0;
+	for (ComponentType t : a.types) {
+		if (t == component_type) continue;
+		tmp[count] = t;
+		++count;
+	}
+
+	m_entities[entity.index].archetype = m_archetype_manager->get(Span(tmp, count));
+
 	m_component_destroyed.invoke(ComponentUID(entity, component_type, module));
 }
 
 
 void World::createComponent(ComponentType type, EntityRef entity)
 {
-	IModule* module = m_component_type_map[type.index].module;
-	auto& create_method = m_component_type_map[type.index].create;
+	IModule* module = m_component_type_map[type.index]->module;
+	auto& create_method = m_component_type_map[type.index]->create;
 	create_method(module, entity);
 }
 
 
 void World::destroyComponent(EntityRef entity, ComponentType type)
 {
-	IModule* module = m_component_type_map[type.index].module;
-	auto& destroy_method = m_component_type_map[type.index].destroy;
+	IModule* module = m_component_type_map[type.index]->module;
+	auto& destroy_method = m_component_type_map[type.index]->destroy;
 	destroy_method(module, entity);
 }
 
 
 void World::onComponentCreated(EntityRef entity, ComponentType component_type, IModule* module)
 {
+	ComponentType tmp[64];
+	const ArchetypeHandle archetype = m_entities[entity.index].archetype;
+	const ArchetypeManager::Archetype& a = m_archetype_manager->get(archetype);
+	ASSERT(a.types.size() + 1 <= (i32)lengthOf(tmp));
+	u32 count = 0;
+	for (ComponentType t : a.types) {
+		if (t == component_type) continue;
+		tmp[count] = t;
+		++count;
+	}
+	tmp[count] = component_type;
+	++count;
+
+	m_entities[entity.index].archetype = m_archetype_manager->get(Span(tmp, count));
+
 	ComponentUID cmp(entity, component_type, module);
-	m_entities[entity.index].components |= (u64)1 << component_type.index;
 	m_component_added.invoke(cmp);
 }
 

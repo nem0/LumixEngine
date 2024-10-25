@@ -1,9 +1,10 @@
 #include "core/allocator.h"
-#include "core/crt.h"
-#include "core/sync.h"
 #include "core/atomic.h"
+#include "core/crt.h"
+#include "core/os.h"
 #include "core/profiler.h"
 #include "core/string.h"
+#include "core/sync.h"
 #include "core/win/simple_win.h"
 
 
@@ -22,10 +23,23 @@ Semaphore::~Semaphore()
 	::CloseHandle(m_id);
 }
 
-void Semaphore::signal()
+void Semaphore::signal(u32 count)
 {
-	BOOL res = ::ReleaseSemaphore(m_id, 1, nullptr);
+	BOOL res = ::ReleaseSemaphore(m_id, count, nullptr);
 	ASSERT(res);
+}
+
+i32 Semaphore::waitMultiple(Semaphore& a, Semaphore& b) {
+	HANDLE handles[] = {a.m_id, b.m_id};
+	DWORD res = ::WaitForMultipleObjects(2, handles, FALSE, INFINITE);
+	if (res == WAIT_OBJECT_0) return 0;
+	if (res == WAIT_OBJECT_0 + 1) return 1;
+	return -1;
+}
+
+bool Semaphore::wait(u32 timeout_ms) {
+	auto res = ::WaitForSingleObject(m_id, timeout_ms);
+	return WAIT_OBJECT_0 == res;
 }
 
 void Semaphore::wait()
@@ -69,7 +83,22 @@ void Mutex::enter() {
 
 void Mutex::exit() {
 	SRWLOCK* lock = (SRWLOCK*)data;
-	ReleaseSRWLockExclusive (lock);
+	ReleaseSRWLockExclusive(lock);
+}
+
+MutexGuardProfiled::MutexGuardProfiled(Mutex& cs)
+	: m_mutex(cs)
+{
+	start_enter = os::Timer::getRawTimestamp();
+	cs.enter();
+	end_enter = os::Timer::getRawTimestamp();
+}
+
+MutexGuardProfiled::~MutexGuardProfiled() {
+	start_exit = os::Timer::getRawTimestamp();
+	m_mutex.exit();
+	end_exit = os::Timer::getRawTimestamp();
+	if (end_exit - start_enter > 20) profiler::pushMutexEvent(u64(&m_mutex), start_enter, end_enter, start_exit, end_exit);
 }
 
 

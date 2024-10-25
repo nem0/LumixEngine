@@ -10,9 +10,6 @@
 #include "engine/world.h"
 
 
-struct lua_State;
-
-
 namespace Lumix
 {
 
@@ -147,7 +144,6 @@ struct LUMIX_EDITOR_API WorldEditor
 	virtual void copyEntities() = 0;
 	virtual bool canPasteEntities() const = 0;
 	virtual void pasteEntities() = 0;
-    virtual void duplicateEntities() = 0;
 
 	virtual void loadWorld(struct InputMemoryStream& blob, const char* basename, bool additive) = 0;
 	virtual void savePartition(World::PartitionHandle partition) = 0;

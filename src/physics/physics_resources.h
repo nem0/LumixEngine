@@ -11,42 +11,37 @@ namespace physx
 	class PxTriangleMesh;
 }
 
-struct lua_State;
-
 namespace Lumix
 {
 
 
 struct PhysicsSystem;
 
-struct PhysicsMaterialLoadData {
-	float static_friction = 0.5f;
-	float dynamic_friction = 0.5f;
-	float restitution = 0.1f;
-};
-
 struct PhysicsMaterialManager : ResourceManager {
 	PhysicsMaterialManager(PhysicsSystem& system, IAllocator& allocator);
 	~PhysicsMaterialManager();
 
-	lua_State* getState(PhysicsMaterialLoadData& material);
 	Resource* createResource(const Path& path) override;
 	void destroyResource(Resource& resource) override;
 
 	IAllocator& allocator;
 	PhysicsSystem& system;
-	lua_State* state;
 };
 
 struct PhysicsMaterial : Resource {
+	struct Header {
+		static const u32 MAGIC = '_PMA';
+		u32 magic = MAGIC;
+		u32 version = 0;
+	};
+
 	PhysicsMaterial(const Path& path, ResourceManager& resource_manager, struct PhysicsSystem& system, IAllocator& allocator);
 	~PhysicsMaterial();
 
 	ResourceType getType() const override { return TYPE; }
 	void unload() override;
 	bool load(Span<const u8> mem) override;
-	void serialize(OutputMemoryStream& blob);
-	void deserialize(struct InputMemoryStream& blob);
+	//void serialize(OutputMemoryStream& blob);
 
 	PhysicsSystem& system;
 	physx::PxMaterial* material;

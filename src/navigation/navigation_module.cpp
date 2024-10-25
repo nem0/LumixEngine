@@ -95,7 +95,7 @@ struct NavigationModuleImpl final : NavigationModule
 		, m_zones(m_allocator)
 		, m_script_module(nullptr)
 	{
-		m_world.entityTransformed().bind<&NavigationModuleImpl::onEntityMoved>(this);
+		m_world.componentTransformed(NAVMESH_AGENT_TYPE).bind<&NavigationModuleImpl::onAgentMoved>(this);
 	}
 
 
@@ -103,14 +103,13 @@ struct NavigationModuleImpl final : NavigationModule
 		for(RecastZone& zone : m_zones) {
 			clearNavmesh(zone);
 		}
-		m_world.entityTransformed().unbind<&NavigationModuleImpl::onEntityMoved>(this);
+		m_world.componentTransformed(NAVMESH_AGENT_TYPE).unbind<&NavigationModuleImpl::onAgentMoved>(this);
 	}
 
 
-	void onEntityMoved(EntityRef entity)
-	{
+	void onAgentMoved(EntityRef entity) {
 		auto iter = m_agents.find(entity);
-		if (!iter.isValid()) return;
+		ASSERT(iter.isValid());
 		if (m_moving_agent == entity) return;
 		Agent& agent = iter.value();
 		
@@ -1349,7 +1348,7 @@ struct NavigationModuleImpl final : NavigationModule
 		EntityRef zone_entity;
 		NavigationModuleImpl* module;
 
-		jobs::Signal signal;
+		jobs::Counter signal;
 	};
 
 	NavmeshBuildJob* generateNavmesh(EntityRef zone_entity) override {

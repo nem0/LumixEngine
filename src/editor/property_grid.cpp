@@ -32,19 +32,9 @@ PropertyGrid::PropertyGrid(StudioApp& app)
 	, m_plugins(app.getAllocator())
 	, m_deferred_select(INVALID_ENTITY)
 {
-	m_toggle_ui.init("Inspector", "Toggle Inspector UI", "inspector", "", Action::IMGUI_PRIORITY);
-	m_toggle_ui.func.bind<&PropertyGrid::toggleUI>(this);
-	m_toggle_ui.is_selected.bind<&PropertyGrid::isOpen>(this);
-	
-	m_app.addWindowAction(&m_toggle_ui);
+	m_app.getSettings().registerOption("property_grid_open", &m_is_open);
 }
 
-
-PropertyGrid::~PropertyGrid()
-{
-	m_app.removeAction(&m_toggle_ui);
-	ASSERT(m_plugins.empty());
-}
 
 struct GridUIVisitor final : reflection::IPropertyVisitor
 {
@@ -926,37 +916,48 @@ static void showAddComponentNode(const StudioApp::AddCmpTreeNode* node, const Te
 	showAddComponentNode(node->next, filter, parent, editor);
 }
 
-void PropertyGrid::onSettingsLoaded() { m_is_open = m_app.getSettings().m_is_properties_open; }
-void PropertyGrid::onBeforeSettingsSaved() { m_app.getSettings().m_is_properties_open  = m_is_open; }
-
-void PropertyGrid::onGUI()
-{
+void PropertyGrid::onGUI() {
 	for (IPlugin* i : m_plugins) {
 		i->update();
+	}
+
+	if (m_app.checkShortcut(m_toggle_ui, true)) m_is_open = !m_is_open;
+
+	if (m_app.checkShortcut(m_focus_filter_action, true)) {
+		m_focus_filter_request = true;
+		m_is_open = true;
 	}
 
 	if (!m_is_open) return;
 
 	WorldEditor& editor = m_app.getWorldEditor();
 	const Array<EntityRef>& ents = editor.getSelectedEntities();
-	if (ImGui::Begin(ICON_FA_INFO_CIRCLE "Inspector##inspector", &m_is_open) && !ents.empty()) {
-		showCoreProperties(ents, editor);
-
-		m_property_filter.gui("Filter", -1, ImGui::IsWindowAppearing());
-		World& world = *editor.getWorld();
-		for (ComponentUID cmp = world.getFirstComponent(ents[0]); cmp.isValid(); cmp = world.getNextComponent(cmp)) {
-			showComponentProperties(ents, cmp.type, editor);
+	if (m_focus_filter_request) ImGui::SetNextWindowFocus();
+	if (ImGui::Begin(ICON_FA_INFO_CIRCLE "Inspector##inspector", &m_is_open)) {
+		
+		if (m_focus_filter_request) {
+			ImGui::SetKeyboardFocusHere();
+			m_focus_filter_request = false;
 		}
 
-		ImGui::Separator();
-		const float x = (ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(ICON_FA_PLUS "Add component").x - ImGui::GetStyle().FramePadding.x * 2) * 0.5f;
-		ImGui::SetCursorPosX(x);
-		if (ImGui::Button(ICON_FA_PLUS "Add component")) ImGui::OpenPopup("AddComponentPopup");
+		if (!ents.empty()) {
+			showCoreProperties(ents, editor);
+			m_property_filter.gui("Filter", -1, ImGui::IsWindowAppearing(), &m_focus_filter_action);
+			World& world = *editor.getWorld();
+			for (ComponentType cmp_type : world.getComponents(ents[0])) {
+				showComponentProperties(ents, cmp_type, editor);
+			}
 
-		if (ImGui::BeginPopup("AddComponentPopup", ImGuiWindowFlags_AlwaysAutoResize)) {
-			m_component_filter.gui("Filter", 200, ImGui::IsWindowAppearing());
-			showAddComponentNode(m_app.getAddComponentTreeRoot().child, m_component_filter, INVALID_ENTITY, editor);
-			ImGui::EndPopup();
+			ImGui::Separator();
+			const float x = (ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(ICON_FA_PLUS "Add component").x - ImGui::GetStyle().FramePadding.x * 2) * 0.5f;
+			ImGui::SetCursorPosX(x);
+			if (ImGui::Button(ICON_FA_PLUS "Add component")) ImGui::OpenPopup("AddComponentPopup");
+
+			if (ImGui::BeginPopup("AddComponentPopup", ImGuiWindowFlags_AlwaysAutoResize)) {
+				m_component_filter.gui("Filter", 200, ImGui::IsWindowAppearing());
+				showAddComponentNode(m_app.getAddComponentTreeRoot().child, m_component_filter, INVALID_ENTITY, editor);
+				ImGui::EndPopup();
+			}
 		}
 	}
 	ImGui::End();

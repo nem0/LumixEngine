@@ -23,8 +23,9 @@
 #include "renderer/font.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
-#include "renderer/pipeline.h"
 #include "renderer/particle_system.h"
+#include "renderer/pipeline.h"
+#include "renderer/postprocess.h"
 #include "renderer/render_module.h"
 #include "renderer/shader.h"
 #include "renderer/terrain.h"
@@ -35,19 +36,26 @@ namespace Lumix {
 
 static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
 
+RenderBufferHandle RenderPlugin::renderBeforeTonemap(const GBuffer& gbuffer, RenderBufferHandle input, Pipeline& pipeline) { return input; }
+RenderBufferHandle RenderPlugin::renderBeforeTransparent(const GBuffer& gbuffer, RenderBufferHandle input, Pipeline& pipeline) { return input; }
+RenderBufferHandle RenderPlugin::renderAfterTonemap(const GBuffer& gbuffer, RenderBufferHandle input, Pipeline& pipeline) { return input; }
+bool RenderPlugin::tonemap(RenderBufferHandle input, RenderBufferHandle& output, Pipeline& pipeline) { return false; }
+bool RenderPlugin::debugOutput(RenderBufferHandle input, Pipeline& pipeline) { return false; }
+RenderBufferHandle RenderPlugin::renderAA(const GBuffer& gbuffer, RenderBufferHandle input, Pipeline& pipeline) { return INVALID_RENDERBUFFER; }
+
 
 template <u32 ALIGN>
 struct TransientBuffer {
 	static constexpr u32 INIT_SIZE = 1024 * 1024;
 	static constexpr u32 OVERFLOW_BUFFER_SIZE = 512 * 1024 * 1024;
 	
-	void init(gpu::BufferFlags flags) {
-		m_flags = flags;
+	void init() {
 		m_buffer = gpu::allocBufferHandle();
 		m_offset = 0;
-		gpu::createBuffer(m_buffer, gpu::BufferFlags::MAPPABLE | flags, INIT_SIZE, nullptr);
+		gpu::createBuffer(m_buffer, gpu::BufferFlags::MAPPABLE, INIT_SIZE, nullptr, "transient");
 		m_size = INIT_SIZE;
 		m_ptr = (u8*)gpu::map(m_buffer, INIT_SIZE);
+		memset(m_ptr, 0, INIT_SIZE);
 	}
 
 	Renderer::TransientSlice alloc(u32 size) {
@@ -85,7 +93,7 @@ struct TransientBuffer {
 		m_ptr = nullptr;
 
 		if (m_overflow.buffer) {
-			gpu::createBuffer(m_overflow.buffer, gpu::BufferFlags::MAPPABLE | m_flags, nextPow2(m_overflow.size + m_size), nullptr);
+			gpu::createBuffer(m_overflow.buffer, gpu::BufferFlags::MAPPABLE, nextPow2(m_overflow.size + m_size), nullptr, "transient");
 			void* mem = gpu::map(m_overflow.buffer, m_overflow.size + m_size);
 			if (mem) {
 				memcpy(mem, m_overflow.data, m_overflow.size);
@@ -117,7 +125,6 @@ struct TransientBuffer {
 	u32 m_size = 0;
 	u8* m_ptr = nullptr;
 	jobs::Mutex m_mutex;
-	gpu::BufferFlags m_flags = gpu::BufferFlags::NONE;
 
 	struct {
 		gpu::BufferHandle buffer = gpu::INVALID_BUFFER;
@@ -133,6 +140,7 @@ struct FrameData {
 
 	struct ShaderToCompile {
 		Shader* shader;
+		StableHash content_hash;
 		gpu::VertexDecl decl;
 		gpu::ProgramHandle program;
 		ShaderKey key;
@@ -147,7 +155,7 @@ struct FrameData {
 	Array<ShaderToCompile> to_compile_shaders;
 	RendererImpl& renderer;
 	jobs::Signal can_setup;
-	jobs::Signal setup_done;
+	jobs::Counter setup_done;
 	u32 frame_number = 0;
 	DrawStream begin_frame_draw_stream;
 	DrawStream draw_stream;
@@ -226,7 +234,7 @@ struct GPUProfiler
 
 		u32 try_num = 0;
 		while (!gpu::isQueryReady(q) && try_num < 10) {
-			gpu::swapBuffers();
+			gpu::present();
 			++try_num;
 		}
 		if (try_num == 10) {
@@ -364,15 +372,14 @@ struct GPUProfiler
 };
 
 
-struct RendererImpl final : Renderer
-{
+struct RendererImpl final : Renderer {
 	explicit RendererImpl(Engine& engine)
 		: m_engine(engine)
 		, m_allocator(engine.getAllocator(), "renderer")
 		, m_texture_manager("textures", *this, m_allocator)
 		, m_model_manager("models", *this, m_allocator)
 		, m_particle_emitter_manager("particle emitters", *this, m_allocator)
-		, m_material_manager(*this, m_allocator)
+		, m_material_manager("materials", *this, m_allocator)
 		, m_shader_manager("shaders", *this, m_allocator)
 		, m_font_manager(nullptr)
 		, m_shader_defines(m_allocator)
@@ -385,6 +392,15 @@ struct RendererImpl final : Renderer
 		, m_semantic_defines(m_allocator)
 		, m_free_frames(m_allocator)
 		, m_frame_thread(*this)
+		, m_atmo(*this)
+		, m_cubemap_sky(*this)
+		, m_tdao(*this)
+		, m_sss(*this)
+		, m_film_grain(*this)
+		, m_dof(*this)
+		, m_bloom(*this)
+		, m_ssao(*this)
+		, m_taa(*this)
 	{
 		RenderModule::reflect();
 
@@ -399,6 +415,15 @@ struct RendererImpl final : Renderer
 		for (Local<FrameData>& f : m_frames) f.create(*this, m_allocator, m_engine.getPageAllocator());
 
 		m_frame_thread.create("frame_thread", true);
+		addPlugin(m_cubemap_sky);
+		addPlugin(m_atmo);
+		addPlugin(m_tdao);
+		addPlugin(m_sss);
+		addPlugin(m_film_grain);
+		addPlugin(m_dof);
+		addPlugin(m_bloom);
+		addPlugin(m_ssao);
+		addPlugin(m_taa);
 	}
 
 	float getLODMultiplier() const override { return m_lod_multiplier; }
@@ -407,8 +432,7 @@ struct RendererImpl final : Renderer
 	void serialize(OutputMemoryStream& stream) const override {}
 	bool deserialize(i32 version, InputMemoryStream& stream) override { return version == 0; }
 
-	~RendererImpl()
-	{
+	~RendererImpl() {
 		m_particle_emitter_manager.destroy();
 		m_texture_manager.destroy();
 		m_model_manager.destroy();
@@ -420,10 +444,13 @@ struct RendererImpl final : Renderer
 		frame();
 		frame();
 		frame();
-
 		waitForRender();
-		
-		jobs::Signal signal;
+
+		m_frame_thread.finished = true;
+		m_frame_thread.semaphore.signal();
+		m_frame_thread.destroy();
+
+		jobs::Counter counter;
 		jobs::runLambda([this]() {
 			for (const Local<FrameData>& frame : m_frames) {
 				gpu::destroy(frame->transient_buffer.m_buffer);
@@ -431,13 +458,16 @@ struct RendererImpl final : Renderer
 			}
 			gpu::destroy(m_material_buffer.buffer);
 			m_profiler.clear();
+			gpu::present();
+			gpu::present();
+			gpu::present();
+		}, &counter, 1);
+		jobs::wait(&counter);
+		// TODO can't we merge these two jobs?
+		jobs::runLambda([]() {
 			gpu::shutdown();
-		}, &signal, 1);
-		jobs::wait(&signal);
-
-		m_frame_thread.finished = true;
-		m_frame_thread.semaphore.signal();
-		m_frame_thread.destroy();
+		}, &counter, 1);
+		jobs::wait(&counter);
 	}
 
 	static void add(String& res, const char* a, u32 b) {
@@ -484,7 +514,27 @@ struct RendererImpl final : Renderer
 	}
 
 	void initEnd() override {
-		jobs::wait(&m_init_signal);
+		m_bloom.init();
+		m_atmo.init();
+		m_cubemap_sky.init();
+		m_dof.init();
+		m_film_grain.init();
+		m_tdao.init();
+		m_sss.init();
+		m_ssao.init();
+		m_taa.init();
+	}
+
+	void shutdownStarted() override {
+		m_bloom.shutdown();
+		m_atmo.shutdown();
+		m_cubemap_sky.shutdown();
+		m_dof.shutdown();
+		m_film_grain.shutdown();
+		m_tdao.shutdown();
+		m_sss.shutdown();
+		m_ssao.shutdown();
+		m_taa.shutdown();
 	}
 
 	void initBegin() override {
@@ -521,8 +571,8 @@ struct RendererImpl final : Renderer
 			}
 
 			for (const Local<FrameData>& frame : m_frames) {
-				frame->transient_buffer.init(gpu::BufferFlags::NONE);
-				frame->uniform_buffer.init(gpu::BufferFlags::UNIFORM_BUFFER);
+				frame->transient_buffer.init();
+				frame->uniform_buffer.init();
 			}
 			m_profiler.init();
 		}, &m_init_signal, 1);
@@ -548,9 +598,10 @@ struct RendererImpl final : Renderer
 			
 		DrawStream& stream = m_cpu_frame->draw_stream;
 		stream.createBuffer(mb.buffer
-			, gpu::BufferFlags::UNIFORM_BUFFER
+			, gpu::BufferFlags::NONE
 			, Material::MAX_UNIFORMS_BYTES * MAX_MATERIAL_CONSTS_COUNT
 			, nullptr
+			, "materials"
 		);
 
 		float default_mat[Material::MAX_UNIFORMS_FLOATS] = {};
@@ -564,9 +615,6 @@ struct RendererImpl final : Renderer
 		m_shader_manager.create(Shader::TYPE, manager);
 		m_font_manager = LUMIX_NEW(m_allocator, FontManager)(*this, m_allocator);
 		m_font_manager->create(FontResource::TYPE, manager);
-
-		RenderModule::registerLuaAPI(m_engine.getState(), *this);
-
 		m_layers.emplace("default");
 	}
 
@@ -677,13 +725,13 @@ struct RendererImpl final : Renderer
 	}
 
 
-	gpu::BufferHandle createBuffer(const MemRef& memory, gpu::BufferFlags flags) override
+	gpu::BufferHandle createBuffer(const MemRef& memory, gpu::BufferFlags flags, const char* debug_name) override
 	{
 		gpu::BufferHandle handle = gpu::allocBufferHandle();
 		if(!handle) return handle;
 
 		DrawStream& stream = getDrawStream();
-		stream.createBuffer(handle, flags, memory.size, memory.data);
+		stream.createBuffer(handle, flags, memory.size, memory.data, debug_name);
 		if (memory.own) stream.freeMemory(memory.data, m_allocator);
 		return handle;
 	}
@@ -754,7 +802,7 @@ struct RendererImpl final : Renderer
 		if (memory.data && memory.size) {
 			ASSERT(depth == 1);
 			stream.update(handle, 0, 0, 0, 0, w, h, format, memory.data, memory.size);
-			if (u32(flags & gpu::TextureFlags::NO_MIPS) == 0) stream.generateMipmaps(handle);
+			ASSERT(isFlagSet(flags, gpu::TextureFlags::NO_MIPS));
 		}
 		if (memory.own) stream.freeMemory(memory.data, m_allocator);
 		return handle;
@@ -805,13 +853,13 @@ struct RendererImpl final : Renderer
 		jobs::MutexGuard lock(m_cpu_frame->shader_mutex);
 		
 		for (const auto& i : m_cpu_frame->to_compile_shaders) {
-			if (i.shader == &shader && key == i.key) {
+			if (i.content_hash == shader.m_content_hash && key == i.key) {
 				return i.program;
 			}
 		}
 		gpu::ProgramHandle program = gpu::allocProgramHandle();
 		shader.compile(program, key, decl, m_cpu_frame->begin_frame_draw_stream);
-		m_cpu_frame->to_compile_shaders.push({&shader, decl, program, key});
+		m_cpu_frame->to_compile_shaders.push({&shader, shader.m_content_hash, decl, program, key});
 		return program;
 	}
 
@@ -842,6 +890,7 @@ struct RendererImpl final : Renderer
 		jobs::MutexGuard guard(m_render_mutex);
 
 		FrameData& frame = popGPUQueue();
+		profiler::pushInt("Frame", frame.frame_number);
 		frame.transient_buffer.prepareToRender();
 		frame.uniform_buffer.prepareToRender();
 		
@@ -871,6 +920,13 @@ struct RendererImpl final : Renderer
 		{
 			PROFILE_BLOCK("draw stream");
 			frame.draw_stream.run();
+			profiler::pushInt("Drawcalls", frame.draw_stream.num_drawcalls);
+			
+			static u32 counter_time = profiler::createCounter("GPU upload (ms/frame)", 0);
+			static u32 counter_size = profiler::createCounter("GPU upload (MB/frame)", 0);
+			const float upload_duration = 1000.f *  float(frame.draw_stream.upload_duration / double(profiler::frequency()));
+			profiler::pushCounter(counter_time, upload_duration);
+			profiler::pushCounter(counter_size, frame.draw_stream.upload_size / (1024.f * 1024.f));
 			frame.draw_stream.reset();
 		}
 
@@ -880,21 +936,14 @@ struct RendererImpl final : Renderer
 		frame.arena_allocator.reset();
 		m_profiler.endQuery();
 
-		jobs::enableBackupWorker(true);
-
-		{
-			PROFILE_BLOCK("swap buffers");
-			frame.gpu_frame = gpu::swapBuffers();
-		}
-		
-		jobs::enableBackupWorker(false);
+		frame.gpu_frame = gpu::present();
 		m_profiler.frame();
 
 		if (gpu::frameFinished(frame.gpu_frame)) {
 			frame.gpu_frame = 0xFFffFFff;
 			frame.transient_buffer.renderDone();
 			frame.uniform_buffer.renderDone();
-			jobs::setGreen(&frame.can_setup);
+			jobs::turnGreen(&frame.can_setup);
 			pushFreeFrame(frame);
 		}
 		else {
@@ -932,7 +981,7 @@ struct RendererImpl final : Renderer
 	void pushFreeFrame(FrameData& frame) {
 		jobs::MutexGuard guard(m_frames_mutex);
 		m_free_frames.push(&frame);
-		jobs::setGreen(&m_has_free_frames);
+		jobs::turnGreen(&m_has_free_frames);
 	}
 
 	FrameData* popFreeFrame() {
@@ -944,7 +993,7 @@ struct RendererImpl final : Renderer
 		}
 		FrameData* frame = m_free_frames.back();
 		m_free_frames.pop();
-		if (m_free_frames.empty()) jobs::setRed(&m_has_free_frames);
+		if (m_free_frames.empty()) jobs::turnRed(&m_has_free_frames);
 		return frame;
 	}
 
@@ -952,7 +1001,7 @@ struct RendererImpl final : Renderer
 		jobs::MutexGuard guard(m_frames_mutex);
 		FrameData* f = m_gpu_queue;
 		m_gpu_queue = nullptr;
-		jobs::setGreen(&m_gpu_queue_empty);
+		jobs::turnGreen(&m_gpu_queue_empty);
 		ASSERT(f);
 		return *f;
 	}
@@ -966,7 +1015,7 @@ struct RendererImpl final : Renderer
 			ASSERT(!m_gpu_queue);
 		}
 		m_gpu_queue = &frame;
-		jobs::setRed(&m_gpu_queue_empty);
+		jobs::turnRed(&m_gpu_queue_empty);
 	}
 
 	void frame() override
@@ -997,12 +1046,14 @@ struct RendererImpl final : Renderer
 		static u32 frame_data_counter = profiler::createCounter("Render frame data (kB)", 0);
 		profiler::pushCounter(frame_data_counter, float(double(frame_data_mem) / 1024.0));
 
-		jobs::setRed(&m_cpu_frame->can_setup);
+		jobs::turnRed(&m_cpu_frame->can_setup);
 		pushToGPUQueue(*m_cpu_frame);
 
 		m_cpu_frame = popFreeFrame();
 		++m_frame_number;
+		profiler::pushInt("Frame", m_cpu_frame->frame_number);
 		m_cpu_frame->frame_number = m_frame_number;
+		profiler::pushInt("Reused as", m_cpu_frame->frame_number);
 
 		for (RenderPlugin* plugin : m_plugins) {
 			plugin->frame(*this);
@@ -1026,27 +1077,43 @@ struct RendererImpl final : Renderer
 		int task() {
 			for (;;) {
 				semaphore.wait();
-				if (finished) break;
+				FrameData* f = [&]() -> FrameData* {
+					MutexGuard guard(mutex);
+					if (frames.empty()) return nullptr;
+					FrameData* res = frames[0];
+					frames.erase(0);
+					return res;
+				}();
 
-				FrameData* f = frames[0];
-				frames.erase(0);
+				if (!f) {
+					ASSERT(finished);
+					break;
+				}
+
 				gpu::waitFrame(f->gpu_frame);
 				PROFILE_BLOCK("frame finished");
-				jobs::runLambda([f, this]() {
+				jobs::runLambda([f]() {
 					PROFILE_BLOCK("reuse frame");
+					profiler::pushInt("Frame", f->frame_number);
 					f->gpu_frame = 0xFFffFFff;
 					f->transient_buffer.renderDone();
 					f->uniform_buffer.renderDone();
-					jobs::setGreen(&f->can_setup);
-					renderer.pushFreeFrame(*f);
-					}, nullptr, 1);
+					jobs::turnGreen(&f->can_setup);
+					f->renderer.pushFreeFrame(*f);
+				}, nullptr, 1);
 			}
 			return 0;
+		}
+
+		void push(FrameData* frame) {
+			MutexGuard guard(mutex);
+			frames.push(frame);
 		}
 
 		RendererImpl& renderer;
 		Semaphore semaphore;
 		Array<FrameData*> frames;
+		Mutex mutex;
 		volatile bool finished = false;
 	};
 
@@ -1057,17 +1124,17 @@ struct RendererImpl final : Renderer
 	jobs::Mutex m_shader_defines_mutex;
 	Array<StaticString<32>> m_layers;
 	FontManager* m_font_manager;
-	MaterialManager m_material_manager;
 	RenderResourceManager<Model> m_model_manager;
 	RenderResourceManager<ParticleSystemResource> m_particle_emitter_manager;
 	RenderResourceManager<Shader> m_shader_manager;
 	RenderResourceManager<Texture> m_texture_manager;
+	RenderResourceManager<Material> m_material_manager;
 	Array<u32> m_free_sort_keys;
 	Array<const Mesh*> m_sort_key_to_mesh_map;
 	u32 m_max_sort_key = 0;
 	u32 m_frame_number = 0;
 	float m_lod_multiplier = 1;
-	jobs::Signal m_init_signal;
+	jobs::Counter m_init_signal;
 	HashMap<RuntimeHash, String> m_semantic_defines;
 
 	Array<RenderPlugin*> m_plugins;
@@ -1078,7 +1145,7 @@ struct RendererImpl final : Renderer
 	StackArray<FrameData*, 3> m_free_frames;
 	jobs::Mutex m_frames_mutex;
 	jobs::Signal m_has_free_frames;
-	jobs::Signal m_last_render;
+	jobs::Counter m_last_render;
 
 	GPUProfiler m_profiler;
 	FrameThread m_frame_thread;
@@ -1103,6 +1170,20 @@ struct RendererImpl final : Renderer
 		int first_free;
 		HashMap<RuntimeHash, u32> map;
 	} m_material_buffer;
+
+	// built-in postprocesses
+	// environment
+	Atmo m_atmo;
+	CubemapSky m_cubemap_sky;
+	// camera
+	DOF m_dof;
+	FilmGrain m_film_grain;
+	Bloom m_bloom;
+	// global
+	TDAO m_tdao;
+	SSS m_sss;
+	SSAO m_ssao;
+	TAA m_taa;
 };
 
 FrameData::FrameData(struct RendererImpl& renderer, IAllocator& allocator, PageAllocator& page_allocator) 

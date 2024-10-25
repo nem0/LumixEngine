@@ -112,36 +112,29 @@ struct EditorIconsImpl final : EditorIcons
 	{
 		World& world = *m_editor.getWorld();
 		
-		const u64 mask = world.getComponentsMask(entity);
-		if (mask & ((u64)1 << (u64)MODEL_INSTANCE_TYPE.index)) return;
+		if (world.hasComponent(entity, MODEL_INSTANCE_TYPE)) return;
 
 		auto& icon = m_icons.insert(entity);
 		icon.entity = entity;
 		icon.type = IconType::ENTITY;
-		for (ComponentUID cmp = world.getFirstComponent(entity); cmp.isValid(); cmp = world.getNextComponent(cmp))
-		{
-			if(cmp.type == PHYSICAL_CONTROLLER_TYPE)
-			{
+		for (ComponentType cmp_type : world.getComponents(entity)) {
+			if(cmp_type == PHYSICAL_CONTROLLER_TYPE) {
 				icon.type = IconType::PHYSICAL_CONTROLLER;
 				break;
 			}
-			if(cmp.type == CAMERA_TYPE)
-			{
+			if(cmp_type == CAMERA_TYPE) {
 				icon.type = IconType::CAMERA;
 				break;
 			}
-			if(cmp.type == ENVIRONMENT_TYPE || cmp.type == POINT_LIGHT_TYPE)
-			{
+			if(cmp_type == ENVIRONMENT_TYPE || cmp_type == POINT_LIGHT_TYPE) {
 				icon.type = IconType::LIGHT;
 				break;
 			}
-			if(cmp.type == TERRAIN_TYPE)
-			{
+			if(cmp_type == TERRAIN_TYPE) {
 				icon.type = IconType::TERRAIN;
 				break;
 			}
-			if(cmp.type == CURVE_DECAL_TYPE)
-			{
+			if(cmp_type == CURVE_DECAL_TYPE) {
 				icon.type = IconType::CURVE_DECAL;
 				break;
 			}
