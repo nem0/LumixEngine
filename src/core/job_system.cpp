@@ -267,6 +267,26 @@ LUMIX_FORCE_INLINE static void switchFibers(i32 profiler_id) {
 	profiler::endFiberWait(switch_data);
 }
 
+void turnGreenEx(Signal* signal) {
+	ASSERT(getWorker());
+
+	// turn the signal green
+	const i64 old_state = signal->state.exchange(0);
+	
+	// wake up all waiting fibers
+	WaitingFiber* fiber = (WaitingFiber*)(old_state & ~i64(1));
+	while (fiber) {
+		WaitingFiber* next = fiber->next;
+		scheduleFiber(fiber->fiber);
+		fiber = next;
+	}
+}
+
+void turnGreen(Signal* signal) {
+	turnGreenEx(signal);
+	profiler::signalTriggered(signal->generation);
+}
+
 #ifdef _WIN32
 	static void __stdcall manage(void* data)
 #else
@@ -306,7 +326,7 @@ LUMIX_FORCE_INLINE static void switchFibers(i32 profiler_id) {
 			this_fiber->current_job.task = nullptr;
 			if (work.job.dec_on_finish) {
 				if (work.job.dec_on_finish->value.dec() == 1) {
-					turnGreen(&work.job.dec_on_finish->signal);
+					turnGreenEx(&work.job.dec_on_finish->signal);
 				}
 			}
 			worker = getWorker();
@@ -364,7 +384,9 @@ void shutdown()
 
 	for (WorkerTask* task : g_system->m_workers)
 	{
-		while (!task->isFinished()) task->wakeup();
+		while (!task->isFinished()) {
+			g_system->m_work_queue.semaphore.signal();
+		}
 		task->destroy();
 		LUMIX_DELETE(allocator, task);
 	}
@@ -475,21 +497,6 @@ void exit(Mutex* mutex) {
 			scheduleFiber(waiting_fiber->fiber);
 		}
 		return;
-	}
-}
-
-void turnGreen(Signal* signal) {
-	ASSERT(getWorker());
-
-	// turn the signal green
-	const i64 old_state = signal->state.exchange(0);
-	
-	// wake up all waiting fibers
-	WaitingFiber* fiber = (WaitingFiber*)(old_state & ~i64(1));
-	while (fiber) {
-		WaitingFiber* next = fiber->next;
-		scheduleFiber(fiber->fiber);
-		fiber = next;
 	}
 }
 

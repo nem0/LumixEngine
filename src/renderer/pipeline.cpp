@@ -3469,10 +3469,13 @@ struct PipelineImpl final : Pipeline {
 			}
 
 			PROFILE_BLOCK("fill instance data");
+			u32 num_instances = 0;
+			u32 num_meshes = 0;
 			for (AutoInstancer::Instances& instances : instancer.instances) {
 				const AutoInstancer::Page::Group* group = instances.begin;
 				if (!group) continue;
 
+				++num_meshes;
 				const u32 count = instances.end->offset + instances.end->count;
 				instances.slice = m_renderer.allocTransient(count * (3 * sizeof(Vec4)));
 				u8* instance_data = instances.slice.ptr;
@@ -3498,7 +3501,10 @@ struct PipelineImpl final : Pipeline {
 					}
 					group = group->next;
 				}
+				num_instances += count;
 			}
+			profiler::pushInt("Instances", num_instances);
+			profiler::pushInt("Meshes", num_meshes);
 		});
 	}
 
