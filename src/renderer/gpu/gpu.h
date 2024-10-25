@@ -39,6 +39,9 @@ static constexpr RWBindlessHandle INVALID_RW_BINDLESS_HANDLE = {};
 enum class InitFlags : u32 {
 	NONE = 0,
 	DEBUG = 1 << 0,
+	// disable dynamic frequency scaling
+	// can crash gpu if PC is not in developer mode
+	STABLE_POWER_STATE = 1 << 1
 };
 
 enum class FramebufferFlags : u32 {
@@ -270,6 +273,10 @@ void shutdown();
 int getSize(AttributeType type);
 u32 getSize(TextureFormat format, u32 w, u32 h);
 u32 getBytesPerPixel(TextureFormat format);
+
+// using profiler::pushCounter to push some gpu stats (clocks, memory, etc)
+// the stats might not be available on all platforms
+void pushGPUCounters();
 
 TextureHandle allocTextureHandle();
 BufferHandle allocBufferHandle();
