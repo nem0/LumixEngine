@@ -16,6 +16,7 @@
 #include "core/string.h"
 #include "core/sync.h"
 #include "core/tag_allocator.h"
+#include "nvml.h"
 #include "renderer/gpu/gpu.h"
 #include <Windows.h>
 #include <cassert>
@@ -37,6 +38,7 @@
 	#pragma comment(lib, "WinPixEventRuntime.lib")
 	#include "pix3.h"
 #endif
+
 
 namespace Lumix::gpu {
 
@@ -809,7 +811,7 @@ struct SRVUAVHeap {
 		for (u32 i = 2; i < max_resource_count; ++i) {
 			free_list.push(i * 2 + max_transient_count * NUM_BACKBUFFERS);
 		}
-	}
+}
 
 	bool init(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type) {
 		D3D12_DESCRIPTOR_HEAP_DESC desc;
@@ -1106,6 +1108,8 @@ struct D3D {
 	u32 debug_groups_depth = 0;
 	StaticString<128> debug_groups_queue[8];
 	D3D12_GPU_DESCRIPTOR_HANDLE bound_shader_buffers = {};
+	void* nvml_lib = nullptr;
+	nvmlDevice_t nvml_device;
 
 	bool vsync = true;
 	bool vsync_dirty = false;
@@ -1588,10 +1592,76 @@ void preinit(IAllocator& allocator, bool load_renderdoc) {
 		d3d->frames.push(allocator);
 	}
 	d3d->frame = d3d->frames.begin();
+
+	d3d->nvml_lib = []() -> void* {
+		void* lib = os::loadLibrary("nvml.dll");
+		if (!lib) return nullptr;
+		
+		logInfo("NVML loaded");
+		#define LOAD_FN(X) do { \
+			X = (decltype(X))os::getLibrarySymbol(lib, #X); \
+			if (!X) { \
+				logWarning("Failed to get " #X " from nvml.dll"); \
+				os::unloadLibrary(lib); \
+				return nullptr; \
+			} \
+		} while(false)
+
+		LOAD_FN(nvmlInit_v2);
+		LOAD_FN(nvmlShutdown);
+		LOAD_FN(nvmlDeviceGetHandleByIndex_v2);
+		LOAD_FN(nvmlDeviceGetName);
+		LOAD_FN(nvmlDeviceGetClockInfo);
+		LOAD_FN(nvmlDeviceGetMemoryInfo);
+		LOAD_FN(nvmlDeviceSetApplicationsClocks);
+		LOAD_FN(nvmlDeviceGetMaxClockInfo);
+		LOAD_FN(nvmlDeviceResetApplicationsClocks);
+		LOAD_FN(nvmlDeviceGetSupportedGraphicsClocks);
+		LOAD_FN(nvmlDeviceGetSupportedMemoryClocks);
+
+		#undef LOAD_FN
+		
+		nvmlReturn_t result = nvmlInit_v2();
+		if (result != NVML_SUCCESS) {
+			logWarning("Failed to init NVML");
+			os::unloadLibrary(lib);
+			return nullptr;
+		}
+		
+		nvmlDevice_t nvml_device;
+		result = nvmlDeviceGetHandleByIndex_v2(0, &nvml_device);
+		if (result != NVML_SUCCESS) {
+			logWarning("Failed to get NVML device");
+			nvmlShutdown();
+			os::unloadLibrary(lib);
+			return nullptr;
+		}
+		
+		char name[96];
+		result = nvmlDeviceGetName(nvml_device, name, sizeof(name));
+		if (result == NVML_SUCCESS) {
+			logInfo("NVML device: ", name);
+		}
+		else {
+			logWarning("Failed to get NVML device name");
+		}
+
+		nvmlDeviceResetApplicationsClocks(nvml_device);
+
+		d3d->nvml_device = nvml_device;
+		return lib;
+	}();
 }
 
 void shutdown() {
 	d3d->shader_compiler.saveCache(".lumix/shader_cache_dx");
+
+	if (d3d->nvml_lib) {
+		nvmlDeviceResetApplicationsClocks(d3d->nvml_device);
+		nvmlShutdown();
+		os::unloadLibrary(d3d->nvml_lib);
+		d3d->nvml_lib = nullptr;
+	}
 
 	for (Frame& frame : d3d->frames) {
 		frame.clear();
@@ -1737,7 +1807,7 @@ ID3D12RootSignature* createRootSignature() {
 
 bool init(void* hwnd, InitFlags flags) {
 	PROFILE_FUNCTION();
-	bool debug = u32(flags & InitFlags::DEBUG_OUTPUT);
+	bool debug = u32(flags & InitFlags::DEBUG);
 	#ifdef LUMIX_DEBUG
 		debug = true;
 	#endif
@@ -2077,6 +2147,23 @@ u32 present() {
 	const bool vsync_dirty = d3d->vsync_dirty;
 	d3d->vsync_dirty = false;
 	d3d->vsync_mutex.exit();
+
+	if (d3d->nvml_lib) {
+		u32 clock;
+		nvmlReturn_t result = nvmlDeviceGetClockInfo(d3d->nvml_device, NVML_CLOCK_GRAPHICS, &clock);
+		if (result == NVML_SUCCESS) {
+			static u32 counter = profiler::createCounter("GPU clock (MHz)", 0);
+			profiler::pushCounter(counter, (float)clock);
+		}
+		nvmlMemory_t mem;
+		result = nvmlDeviceGetMemoryInfo(d3d->nvml_device, &mem);
+		if (result == NVML_SUCCESS) {
+			static u32 used_counter = profiler::createCounter("GPU used memory (GB)", 0);
+			static u32 free_counter = profiler::createCounter("GPU free memory (GB)", 0);
+			profiler::pushCounter(used_counter, (float)(mem.used / 1024.f / 1024 / 1024));
+			profiler::pushCounter(free_counter, (float)(mem.free / 1024.f / 1024 / 1024));
+		}
+	}
 
 	d3d->pso_cache.last = nullptr;
 	for (auto& window : d3d->windows) {

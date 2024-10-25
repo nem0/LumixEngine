@@ -545,8 +545,8 @@ struct RendererImpl final : Renderer {
 		os::getCommandLine(Span(cmd_line));
 		CommandLineParser cmd_line_parser(cmd_line);
 		while (cmd_line_parser.next()) {
-			if (cmd_line_parser.currentEquals("-debug_opengl")) {
-				flags = flags | gpu::InitFlags::DEBUG_OUTPUT;
+			if (cmd_line_parser.currentEquals("-debug_gpu")) {
+				flags = flags | gpu::InitFlags::DEBUG;
 			}
 		}
 
@@ -1023,7 +1023,6 @@ struct RendererImpl final : Renderer {
 		PROFILE_FUNCTION();
 		
 		// we have to wait for `can_setup` in case somebody calls frame() several times in a row
-		jobs::wait(&m_cpu_frame->can_setup);
 		jobs::wait(&m_cpu_frame->setup_done);
 
 		m_cpu_frame->draw_stream.useProgram(gpu::INVALID_PROGRAM);
@@ -1062,7 +1061,6 @@ struct RendererImpl final : Renderer {
 		jobs::runLambda([this](){
 			render();
 		}, &m_last_render, 1);
-
 	}
 
 	// wait till gpu is done with a frame and reuse it

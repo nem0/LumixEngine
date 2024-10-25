@@ -1334,7 +1334,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 
 			if (m_hovered_fiber_wait.signal == block.job_info.signal_on_finish && m_hovered_fiber_wait.frame > m_frame_idx - 2) {
 					dl->ChannelsSetCurrent(1);
-				dl->AddLine(m_hovered_fiber_wait.pos, ImVec2(x_start, block_y), 0xff0000ff);
+				dl->AddLine(m_hovered_fiber_wait.pos, ImVec2(x_end, block_y), 0xff0000ff);
 				dl->ChannelsSetCurrent(0);
 			}
 
@@ -1376,7 +1376,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 				if (block.job_info.signal_on_finish) {
 					ImGui::Text("Signal on finish: %" PRIx64, (u64)block.job_info.signal_on_finish);
 					m_hovered_job.frame = m_frame_idx;
-					m_hovered_job.pos = ImVec2(x_start, block_y);
+					m_hovered_job.pos = ImVec2(x_end, block_y);
 					m_hovered_job.signal = block.job_info.signal_on_finish;
 				}
 				if (r.num_properties > 0) {
@@ -1464,7 +1464,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		return from_x * (1 - t) + to_x * t;
 	};
 
-	void gpuUI(float from_x, float to_x) {
+	void gpuGraph(float from_x, float to_x) {
 		ThreadData& global = m_threads[0];
 		ImDrawList* dl = ImGui::GetWindowDrawList();
 		const ThreadContextProxy& ctx = getGlobalThreadContextProxy();
@@ -1532,6 +1532,11 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		const u32 num_stats = profiler::getGPUScopeStats(Span(stats));
 		if (m_app.checkShortcut(m_focus_filter)) ImGui::SetKeyboardFocusHere();
 		m_filter.gui("Filter", -1, false, &m_focus_filter);
+		float gpu_clock = 0;
+		if (profiler::getCounterHandle("GPU clock (MHz)", &gpu_clock) != profiler::INVALID_COUNTER) {
+			ImGuiEx::Label("GPU clock");
+			ImGui::Text("%d MHz", u32(gpu_clock));
+		}
 		if (ImGui::BeginTable("gpu", 4, ImGuiTableFlags_Resizable)) {
 			ImGui::TableSetupColumn("Name");
 			ImGui::TableSetupColumn("Min (ms)");
@@ -1643,7 +1648,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 			forEachThread([&](ThreadContextProxy& ctx){ threadUI(ctx, from_x, to_x); });
 			contextSwitches(from_x, to_x);
 			frames(from_x, to_x, from_y, timeline_start_t);
-			gpuUI(from_x, to_x);
+			gpuGraph(from_x, to_x);
 					
 			if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && m_hovered_block.frame < m_frame_idx - 2) {
 				m_filter.clear();

@@ -38,7 +38,7 @@ static constexpr RWBindlessHandle INVALID_RW_BINDLESS_HANDLE = {};
 
 enum class InitFlags : u32 {
 	NONE = 0,
-	DEBUG_OUTPUT = 1 << 0,
+	DEBUG = 1 << 0,
 };
 
 enum class FramebufferFlags : u32 {
