@@ -24,7 +24,9 @@ LUMIX_CORE_API void pushString(const char* value);
 LUMIX_CORE_API void pushInt(const char* key_literal, int value);
 LUMIX_CORE_API void pushMutexEvent(u64 mutex_id, u64 begin_enter_time, u64 end_enter_time, u64 begin_exit_time, u64 end_exit_time);
 
+enum { INVALID_COUNTER = 0xffFFffFF };
 LUMIX_CORE_API u32 createCounter(const char* key_literal, float min);
+LUMIX_CORE_API u32 getCounterHandle(const char* key, float* last_value = nullptr);
 LUMIX_CORE_API void pushCounter(u32 counter, float value);
 
 LUMIX_CORE_API void beginGPUBlock(const char* name, u64 timestamp, i64 profiler_link);
@@ -85,6 +87,7 @@ struct BlockRecord {
 struct Counter {
 	char name[64];
 	float min;
+	float last_value = -1;
 };
 
 struct CounterRecord {

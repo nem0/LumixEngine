@@ -351,7 +351,19 @@ void write(ThreadContext& ctx, EventType type, const u8* data, int size)
 	};
 #endif
 
+u32 getCounterHandle(const char* key, float* last_value) {
+	MutexGuard lock(g_instance.mutex);
+	for (Counter& c : g_instance.counters) {
+		if (equalStrings(c.name, key)) {
+			if (last_value) *last_value = c.last_value;	
+			return u32(&c - g_instance.counters.begin());
+		}
+	}
+	return INVALID_COUNTER;
+}
+
 u32 createCounter(const char* key_literal, float min) {
+	MutexGuard lock(g_instance.mutex);
 	Counter& c = g_instance.counters.emplace();
 	copyString(Span(c.name), key_literal);
 	c.min = min;
@@ -359,6 +371,10 @@ u32 createCounter(const char* key_literal, float min) {
 }
 
 void pushCounter(u32 counter, float value) {
+	{
+		MutexGuard lock(g_instance.mutex);
+		g_instance.counters[counter].last_value = value;
+	}
 	CounterRecord r;
 	r.counter = counter;
 	r.value = value;
