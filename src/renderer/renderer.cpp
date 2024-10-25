@@ -890,6 +890,7 @@ struct RendererImpl final : Renderer {
 		jobs::MutexGuard guard(m_render_mutex);
 
 		FrameData& frame = popGPUQueue();
+		profiler::pushInt("Frame", frame.frame_number);
 		frame.transient_buffer.prepareToRender();
 		frame.uniform_buffer.prepareToRender();
 		
@@ -1050,7 +1051,9 @@ struct RendererImpl final : Renderer {
 
 		m_cpu_frame = popFreeFrame();
 		++m_frame_number;
+		profiler::pushInt("Frame", m_cpu_frame->frame_number);
 		m_cpu_frame->frame_number = m_frame_number;
+		profiler::pushInt("Reused as", m_cpu_frame->frame_number);
 
 		for (RenderPlugin* plugin : m_plugins) {
 			plugin->frame(*this);
@@ -1091,6 +1094,7 @@ struct RendererImpl final : Renderer {
 				PROFILE_BLOCK("frame finished");
 				jobs::runLambda([f]() {
 					PROFILE_BLOCK("reuse frame");
+					profiler::pushInt("Frame", f->frame_number);
 					f->gpu_frame = 0xFFffFFff;
 					f->transient_buffer.renderDone();
 					f->uniform_buffer.renderDone();
