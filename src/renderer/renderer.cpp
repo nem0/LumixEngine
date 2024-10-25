@@ -89,35 +89,31 @@ struct TransientBuffer {
 	} 
 
 	void prepareToRender() {
-		gpu::unmap(m_buffer);
-		m_ptr = nullptr;
+		if (!m_overflow.buffer) return;
 
-		if (m_overflow.buffer) {
-			gpu::createBuffer(m_overflow.buffer, gpu::BufferFlags::MAPPABLE, nextPow2(m_overflow.size + m_size), nullptr, "transient");
-			void* mem = gpu::map(m_overflow.buffer, m_overflow.size + m_size);
-			if (mem) {
-				memcpy(mem, m_overflow.data, m_overflow.size);
-				gpu::unmap(m_overflow.buffer);
-			}
-			os::memRelease(m_overflow.data, OVERFLOW_BUFFER_SIZE);
-			m_overflow.data = nullptr;
-			m_overflow.commit = 0;
+		gpu::createBuffer(m_overflow.buffer, gpu::BufferFlags::MAPPABLE, nextPow2(m_overflow.size + m_size), nullptr, "transient");
+		void* mem = gpu::map(m_overflow.buffer, m_overflow.size + m_size);
+		if (mem) {
+			memcpy(mem, m_overflow.data, m_overflow.size);
+			gpu::unmap(m_overflow.buffer);
 		}
+		os::memRelease(m_overflow.data, OVERFLOW_BUFFER_SIZE);
+		m_overflow.data = nullptr;
+		m_overflow.commit = 0;
 	}
 
 	void renderDone() {
-		if (m_overflow.buffer) {
-			m_size = nextPow2(m_overflow.size + m_size);
-			gpu::destroy(m_buffer);
-			m_buffer = m_overflow.buffer;
-			m_overflow.buffer = gpu::INVALID_BUFFER;
-			m_overflow.size = 0;
-		}
-
-		ASSERT(!m_ptr);
-		m_ptr = (u8*)gpu::map(m_buffer, m_size);
-		ASSERT(m_ptr);
 		m_offset = 0;
+		if (!m_overflow.buffer) return;
+
+		ASSERT(m_size < 1024*1024*1024);
+		m_size = nextPow2(m_overflow.size + m_size);
+		ASSERT(m_size < 1024*1024*1024);
+		gpu::destroy(m_buffer);
+		m_buffer = m_overflow.buffer;
+		m_overflow.buffer = gpu::INVALID_BUFFER;
+		m_overflow.size = 0;
+		m_ptr = (u8*)gpu::map(m_buffer, m_size);
 	}
 
 	gpu::BufferHandle m_buffer = gpu::INVALID_BUFFER;
@@ -548,6 +544,9 @@ struct RendererImpl final : Renderer {
 			if (cmd_line_parser.currentEquals("-debug_gpu")) {
 				flags = flags | gpu::InitFlags::DEBUG;
 			}
+			else if (cmd_line_parser.currentEquals("-gpu_stable_power_state")) {
+				flags = flags | gpu::InitFlags::STABLE_POWER_STATE;
+			}
 		}
 
 		jobs::Signal signal;
@@ -886,7 +885,7 @@ struct RendererImpl final : Renderer {
 	}
 
 	void render() {
-		PROFILE_FUNCTION();
+		PROFILE_BLOCK("render submit");
 		jobs::MutexGuard guard(m_render_mutex);
 
 		FrameData& frame = popGPUQueue();
@@ -1016,13 +1015,15 @@ struct RendererImpl final : Renderer {
 		}
 		m_gpu_queue = &frame;
 		jobs::turnRed(&m_gpu_queue_empty);
+		jobs::runLambda([this](){
+			render();
+		}, &m_last_render, 1);
 	}
 
 	void frame() override
 	{
 		PROFILE_FUNCTION();
 		
-		// we have to wait for `can_setup` in case somebody calls frame() several times in a row
 		jobs::wait(&m_cpu_frame->setup_done);
 
 		m_cpu_frame->draw_stream.useProgram(gpu::INVALID_PROGRAM);
@@ -1058,9 +1059,6 @@ struct RendererImpl final : Renderer {
 			plugin->frame(*this);
 		}
 
-		jobs::runLambda([this](){
-			render();
-		}, &m_last_render, 1);
 	}
 
 	// wait till gpu is done with a frame and reuse it
@@ -1088,8 +1086,20 @@ struct RendererImpl final : Renderer {
 					break;
 				}
 
+				gpu::pushGPUCounters();
+
+				// wait until gpu is done with the frame, so we are sure it's not accessing frame's buffers anymore
 				gpu::waitFrame(f->gpu_frame);
+				
 				PROFILE_BLOCK("frame finished");
+				profiler::pushInt("Frame", f->frame_number);
+				
+				// If overflowed buffers exist, we must reuse the frame in the render thread
+				// because TransientBuffer::renderDone calls gpu::destroy
+				const bool can_run_on_any_worker = !f->transient_buffer.m_overflow.buffer && !f->uniform_buffer.m_overflow.buffer;
+
+				// running this on render thread might wait till other jobs are done on render thread, causing delay
+				// therefore we try to run on any worker if we can
 				jobs::runLambda([f]() {
 					PROFILE_BLOCK("reuse frame");
 					profiler::pushInt("Frame", f->frame_number);
@@ -1098,7 +1108,7 @@ struct RendererImpl final : Renderer {
 					f->uniform_buffer.renderDone();
 					jobs::turnGreen(&f->can_setup);
 					f->renderer.pushFreeFrame(*f);
-				}, nullptr, 1);
+				}, nullptr, can_run_on_any_worker ? jobs::ANY_WORKER : 1);
 			}
 			return 0;
 		}

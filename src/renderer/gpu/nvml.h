@@ -54,11 +54,7 @@ nvmlReturn_t (*nvmlDeviceGetHandleByIndex_v2)(unsigned int index, nvmlDevice_t* 
 nvmlReturn_t (*nvmlDeviceGetName)(nvmlDevice_t device, char* name, unsigned int length);
 nvmlReturn_t (*nvmlDeviceGetMemoryInfo)(nvmlDevice_t device, nvmlMemory_t* memory);
 nvmlReturn_t (*nvmlDeviceGetClockInfo)(nvmlDevice_t device, nvmlClockType_t type, unsigned int* clock);
-nvmlReturn_t (*nvmlDeviceSetApplicationsClocks)(nvmlDevice_t device, unsigned int memClockMHz, unsigned int graphicsClockMHz);
 nvmlReturn_t (*nvmlDeviceGetMaxClockInfo)(nvmlDevice_t device, nvmlClockType_t type, unsigned int *clock);
-nvmlReturn_t (*nvmlDeviceResetApplicationsClocks)(nvmlDevice_t device);
-nvmlReturn_t (*nvmlDeviceGetSupportedMemoryClocks)(nvmlDevice_t device, unsigned int *count, unsigned int *clocksMHz);
-nvmlReturn_t (*nvmlDeviceGetSupportedGraphicsClocks)(nvmlDevice_t device, unsigned int memoryClockMHz, unsigned int *count, unsigned int *clocksMHz);
 
 
 }

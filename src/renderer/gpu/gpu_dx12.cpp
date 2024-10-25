@@ -1024,6 +1024,8 @@ struct Frame {
 
 	void wait() {
 		if (fence_value != 0) {
+			PROFILE_BLOCK("wait for gpu fence");
+			profiler::pushInt("Fence value", (u32)fence_value);
 			fence->SetEventOnCompletion(fence_value, nullptr);
 		}
 	}
@@ -1079,6 +1081,7 @@ struct D3D {
 	ID3D12RootSignature* root_signature = nullptr;
 	ID3D12Debug* debug = nullptr;
 	ID3D12CommandQueue* cmd_queue = nullptr;
+	u64 fence_value = 0;
 	u64 query_frequency = 1;
 	BufferHandle current_indirect_buffer = INVALID_BUFFER;
 	BufferHandle current_index_buffer = INVALID_BUFFER;
@@ -1170,6 +1173,7 @@ void memoryBarrier(TextureHandle texture) {
 }
 
 void Frame::end(ID3D12CommandQueue* cmd_queue, ID3D12GraphicsCommandList* cmd_list, ID3D12QueryHeap* timestamp_query_heap, ID3D12QueryHeap* stats_query_heap) {
+	PROFILE_FUNCTION();
 	timestamp_query_buffer->Unmap(0, nullptr);
 	for (u32 i = 0, c = to_resolve.size(); i < c; ++i) {
 		QueryHandle q = to_resolve[i];
@@ -1193,7 +1197,9 @@ void Frame::end(ID3D12CommandQueue* cmd_queue, ID3D12GraphicsCommandList* cmd_li
 			}
 			d3d->rdoc_api->TriggerCapture();
 		}
-		//if (PIXIsAttachedForGpuCapture()) PIXBeginCapture(PIX_CAPTURE_GPU, {});
+		#ifdef USE_PIX
+			if (PIXIsAttachedForGpuCapture()) PIXBeginCapture(PIX_CAPTURE_GPU, {});
+		#endif
 	}
 	cmd_queue->ExecuteCommandLists(1, (ID3D12CommandList* const*)&cmd_list);
 	if (capture_requested) {
@@ -1203,8 +1209,9 @@ void Frame::end(ID3D12CommandQueue* cmd_queue, ID3D12GraphicsCommandList* cmd_li
 		#endif
 	}
 
-
-	++fence_value;
+	++d3d->fence_value;
+	fence_value = d3d->fence_value;
+	profiler::pushInt("Signal fence", (u32)fence_value);
 	hr = cmd_queue->Signal(fence, fence_value);
 	ASSERT(hr == S_OK);
 }
@@ -1613,11 +1620,7 @@ void preinit(IAllocator& allocator, bool load_renderdoc) {
 		LOAD_FN(nvmlDeviceGetName);
 		LOAD_FN(nvmlDeviceGetClockInfo);
 		LOAD_FN(nvmlDeviceGetMemoryInfo);
-		LOAD_FN(nvmlDeviceSetApplicationsClocks);
 		LOAD_FN(nvmlDeviceGetMaxClockInfo);
-		LOAD_FN(nvmlDeviceResetApplicationsClocks);
-		LOAD_FN(nvmlDeviceGetSupportedGraphicsClocks);
-		LOAD_FN(nvmlDeviceGetSupportedMemoryClocks);
 
 		#undef LOAD_FN
 		
@@ -1646,7 +1649,21 @@ void preinit(IAllocator& allocator, bool load_renderdoc) {
 			logWarning("Failed to get NVML device name");
 		}
 
-		nvmlDeviceResetApplicationsClocks(nvml_device);
+		u32 max_mem_clock;
+		if (nvmlDeviceGetMaxClockInfo(nvml_device, NVML_CLOCK_MEM, &max_mem_clock) == NVML_SUCCESS) {
+			logInfo("Max GPU memory clock: ", max_mem_clock, " MHz");
+		}
+		else {
+			logWarning("Failed to get max GPU memory clock");
+		}
+
+		u32 max_graphics_clock;
+		if (nvmlDeviceGetMaxClockInfo(nvml_device, NVML_CLOCK_GRAPHICS, &max_graphics_clock) == NVML_SUCCESS) {
+			logInfo("Max GPU graphics clock: ", max_graphics_clock, " MHz");
+		}
+		else {
+			logWarning("Failed to get max GPU graphics clock");
+		}
 
 		d3d->nvml_device = nvml_device;
 		return lib;
@@ -1657,7 +1674,6 @@ void shutdown() {
 	d3d->shader_compiler.saveCache(".lumix/shader_cache_dx");
 
 	if (d3d->nvml_lib) {
-		nvmlDeviceResetApplicationsClocks(d3d->nvml_device);
 		nvmlShutdown();
 		os::unloadLibrary(d3d->nvml_lib);
 		d3d->nvml_lib = nullptr;
@@ -1943,6 +1959,12 @@ bool init(void* hwnd, InitFlags flags) {
 		if (d3d->device->CreateQueryHeap(&queryHeapDesc, IID_PPV_ARGS(&d3d->stats_query_heap)) != S_OK) return false;
 	}
 
+	if (isFlagSet(flags, InitFlags::STABLE_POWER_STATE)) {
+		logInfo("GPU: trying to enable stable power state");
+		d3d->device->SetStablePowerState(TRUE);
+		logInfo("GPU: stable power state is enabled");
+	}
+
 	return true;
 }
 
@@ -2140,6 +2162,26 @@ void enableVSync(bool enable) {
 
 static ProgramHandle g_last_program = INVALID_PROGRAM;
 
+void pushGPUCounters() {
+	if (!d3d->nvml_lib) return;
+
+	PROFILE_BLOCK("nvml read stats");
+	u32 clock;
+	nvmlReturn_t result = nvmlDeviceGetClockInfo(d3d->nvml_device, NVML_CLOCK_GRAPHICS, &clock);
+	if (result == NVML_SUCCESS) {
+		static u32 counter = profiler::createCounter("GPU clock (MHz)", 0);
+		profiler::pushCounter(counter, (float)clock);
+	}
+	nvmlMemory_t mem;
+	result = nvmlDeviceGetMemoryInfo(d3d->nvml_device, &mem);
+	if (result == NVML_SUCCESS) {
+		static u32 used_counter = profiler::createCounter("GPU used memory (GB)", 0);
+		static u32 free_counter = profiler::createCounter("GPU free memory (GB)", 0);
+		profiler::pushCounter(used_counter, (float)(mem.used / 1024.f / 1024 / 1024));
+		profiler::pushCounter(free_counter, (float)(mem.free / 1024.f / 1024 / 1024));
+	}
+}
+
 u32 present() {
 	PROFILE_FUNCTION();
 	d3d->vsync_mutex.enter();
@@ -2147,24 +2189,6 @@ u32 present() {
 	const bool vsync_dirty = d3d->vsync_dirty;
 	d3d->vsync_dirty = false;
 	d3d->vsync_mutex.exit();
-
-	if (d3d->nvml_lib) {
-		u32 clock;
-		nvmlReturn_t result = nvmlDeviceGetClockInfo(d3d->nvml_device, NVML_CLOCK_GRAPHICS, &clock);
-		if (result == NVML_SUCCESS) {
-			static u32 counter = profiler::createCounter("GPU clock (MHz)", 0);
-			profiler::pushCounter(counter, (float)clock);
-		}
-		nvmlMemory_t mem;
-		result = nvmlDeviceGetMemoryInfo(d3d->nvml_device, &mem);
-		if (result == NVML_SUCCESS) {
-			static u32 used_counter = profiler::createCounter("GPU used memory (GB)", 0);
-			static u32 free_counter = profiler::createCounter("GPU free memory (GB)", 0);
-			profiler::pushCounter(used_counter, (float)(mem.used / 1024.f / 1024 / 1024));
-			profiler::pushCounter(free_counter, (float)(mem.free / 1024.f / 1024 / 1024));
-		}
-	}
-
 	d3d->pso_cache.last = nullptr;
 	for (auto& window : d3d->windows) {
 		if (!window.handle) continue;
@@ -2195,9 +2219,9 @@ u32 present() {
 	}
 	++d3d->frame_number;
 
-	d3d->frame->begin();
 	for (TextureHandle& h : d3d->current_framebuffer.attachments) h = INVALID_TEXTURE;
-
+	
+	d3d->frame->begin();
 	d3d->frame->scratch_buffer_ptr = d3d->frame->scratch_buffer_begin;
 	d3d->frame->cmd_allocator->Reset();
 	d3d->cmd_list->Reset(d3d->frame->cmd_allocator, nullptr);
@@ -2257,9 +2281,11 @@ u32 present() {
 			if (window.last_used_frame + 1 != d3d->frame_number && &window != d3d->windows) continue;
 
 			if (vsync) {
+				PROFILE_BLOCK("IDXGISwapChain3::Present");
 				window.swapchain->Present(1, 0);
 			}
 			else {
+				PROFILE_BLOCK("IDXGISwapChain3::Present");
 				window.swapchain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
 			}
 		
@@ -3017,8 +3043,6 @@ void drawIndexed(u32 offset_bytes, u32 count, DataType index_type) {
 void copy(BufferHandle dst, BufferHandle src, u32 dst_offset, u32 src_offset, u32 size) {
 	ASSERT(src);
 	ASSERT(dst);
-	ASSERT(!dst->mapped_ptr);
-	ASSERT(!src->mapped_ptr);
 	D3D12_RESOURCE_STATES prev_dst = dst->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_COPY_DEST);
 	D3D12_RESOURCE_STATES prev_src = src->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_GENERIC_READ);
 	d3d->cmd_list->CopyBufferRegion(dst->resource, dst_offset, src->resource, src_offset, size);
