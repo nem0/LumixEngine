@@ -1099,6 +1099,7 @@ struct PipelineImpl final : Pipeline {
 			setRenderTargets({}, shadowmap_rb);
 			clear(gpu::ClearFlags::DEPTH, 0, 0, 0, 0, 0);
 			stream.barrierRead(m_renderbuffers[shadowmap_rb].handle);
+			endBlock();
 			return shadowmap_rb;
 		}
 
