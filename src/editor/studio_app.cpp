@@ -1800,6 +1800,7 @@ struct StudioAppImpl final : StudioApp {
 
 		menuItem("world_new", true);
 		const Array<World::Partition>& partitions = m_editor->getWorld()->getPartitions();
+		const bool can_load_additive = partitions.size() != 1 || partitions[0].name[0] != '\0';
 		auto open_ui = [&](const char* label, bool additive){
 			if (ImGui::BeginMenu(label)) {
 				m_open_filter.gui("Filter", 150);
@@ -1815,7 +1816,6 @@ struct StudioAppImpl final : StudioApp {
 			}
 		};
 		open_ui("Open", false);
-		const bool can_load_additive = partitions.size() != 1 || partitions[0].name[0] != '\0';
 		if (can_load_additive) {
 			open_ui("Open additive", true);
 		}
