@@ -404,12 +404,6 @@ void blockColor(u8 r, u8 g, u8 b)
 	write(*ctx, EventType::BLOCK_COLOR, color);
 }
 
-static void continueBlock(i32 block_id) {
-	ThreadContext* ctx = g_instance.getThreadContext();
-	ctx->open_blocks.push(block_id);
-	write(*ctx, EventType::CONTINUE_BLOCK, block_id);
-}
-
 static AtomicI32 last_block_id = 0;
 
 void beginBlock(const char* name)

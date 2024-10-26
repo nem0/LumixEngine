@@ -1046,7 +1046,6 @@ void Node::outputSlot(ImGuiEx::PinShape shape) {
 bool Node::nodeGUI() {
 	m_input_counter = 0;
 	m_output_counter = 0;
-	const ImVec2 old_pos = m_pos;
 	ImGuiEx::BeginNode(m_id, m_pos, &m_selected);
 	bool res = onGUI();
 	if (m_error.length() > 0) {

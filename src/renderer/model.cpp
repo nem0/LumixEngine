@@ -295,7 +295,6 @@ static bool parseVertexDecl(IInputStream& file, gpu::VertexDecl* vertex_decl, At
 	vertex_decl->attributes_count = 0;
 
 	u8 offset = 0;
-	bool is_skinned = false;
 	for (u32 i = 0; i < attribute_count; ++i) {
 		gpu::AttributeType type;
 		u8 cmp_count;
@@ -323,7 +322,6 @@ static bool parseVertexDecl(IInputStream& file, gpu::VertexDecl* vertex_decl, At
 				}
 				break;
 			case AttributeSemantic::INDICES:
-				is_skinned = true;
 				vertex_decl->addAttribute(offset, cmp_count, type, gpu::Attribute::AS_INT);
 				break;
 			default: ASSERT(false); break;

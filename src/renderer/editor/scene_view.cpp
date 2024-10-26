@@ -1051,7 +1051,6 @@ void SceneView::update(float time_delta)
 	else {
 		m_view->setSnapMode(io.KeyShift, io.KeyCtrl);
 	}
-	Settings& settings = m_app.getSettings();
 	m_view->update(time_delta);
 
 	if (m_is_measure_active) {

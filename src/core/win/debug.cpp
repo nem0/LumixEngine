@@ -469,7 +469,6 @@ void Allocator::deallocate(void* user_ptr)
 		if (m_are_guards_enabled)
 		{
 			ASSERT(*(u32*)system_ptr == ALLOCATION_GUARD);
-			size_t system_size = getNeededMemory(info->size, info->align);
 			ASSERT(*(u32*)((u8*)user_ptr + info->size) == ALLOCATION_GUARD);
 		}
 
