@@ -2880,15 +2880,7 @@ struct PipelineImpl final : Pipeline {
 		}
 	}
 
-	void renderBucket(u32 viewbucket_id) {
-		View* view = m_views[viewbucket_id >> 16].get();
-		const u16 bucket_id = viewbucket_id & 0xffFF;
-		m_renderer.pushJob("render bucket", [view, bucket_id](DrawStream& stream){
-			jobs::wait(&view->ready);
-			Bucket& bucket= view->buckets[bucket_id];
-			stream.merge(bucket.stream);
-		});
-	}
+	
 	
 	static float computeShadowPriority(float light_radius, const DVec3& light_pos, const DVec3& cam_pos) {
 		return float(light_radius / length(cam_pos - light_pos));
