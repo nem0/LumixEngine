@@ -35,6 +35,7 @@ struct InputSystemImpl final : InputSystem
 		, m_events(m_allocator)
 		, m_devices(m_allocator)
 		, m_to_remove(m_allocator)
+		, m_down_keys(m_allocator)
 	{
 		m_mouse_device = LUMIX_NEW(m_allocator, MouseDevice);
 		m_mouse_device->type = Device::MOUSE;
@@ -103,8 +104,8 @@ struct InputSystemImpl final : InputSystem
 	{
 		switch (event.type) {
 			case os::Event::Type::MOUSE_BUTTON: {
-				InputSystem::Event input_event;
-				input_event.type = InputSystem::Event::BUTTON;
+				Event input_event;
+				input_event.type = Event::BUTTON;
 				input_event.device = m_mouse_device;
 				input_event.data.button.key_id = (int)event.mouse_button.button;
 				input_event.data.button.is_repeat = false;
@@ -116,8 +117,8 @@ struct InputSystemImpl final : InputSystem
 				break;
 			}
 			case os::Event::Type::MOUSE_MOVE: {
-				InputSystem::Event input_event;
-				input_event.type = InputSystem::Event::AXIS;
+				Event input_event;
+				input_event.type = Event::AXIS;
 				input_event.device = m_mouse_device;
 				const os::Point cp = os::getMouseScreenPos();
 				input_event.data.axis.x_abs = (float)cp.x - mouse_base_x;
@@ -128,18 +129,28 @@ struct InputSystemImpl final : InputSystem
 				break;
 			}
 			case os::Event::Type::KEY: {
-				InputSystem::Event input_event;
-				input_event.type = InputSystem::Event::BUTTON;
+				Event input_event;
+				input_event.type = Event::BUTTON;
 				input_event.device = m_keyboard_device;
 				input_event.data.button.down = event.key.down;
 				input_event.data.button.key_id = (int)event.key.keycode;
 				input_event.data.button.is_repeat = (int)event.key.is_repeat;
 				injectEvent(input_event);
+				if (event.key.down) {
+					m_down_keys.push(input_event.data.button);
+				}
+				else {
+					for (i32 i = m_down_keys.size() - 1; i >= 0; --i) {
+						if (m_down_keys[i].key_id == input_event.data.button.key_id) {
+							m_down_keys.swapAndPop(i);
+						}
+					}
+				}
 				break;
 			}
 			case os::Event::Type::CHAR: {
-				InputSystem::Event input_event;
-				input_event.type = InputSystem::Event::TEXT_INPUT;
+				Event input_event;
+				input_event.type = Event::TEXT_INPUT;
 				input_event.device = m_keyboard_device;
 				input_event.data.text.utf8 = event.text_input.utf8;
 				injectEvent(input_event);
@@ -149,7 +160,20 @@ struct InputSystemImpl final : InputSystem
 		}
 	}
 
-	
+	void resetDownKeys() override {
+		for (const ButtonEvent& e :  m_down_keys) {
+			Event event;
+			event.type = Event::BUTTON;
+			event.device = m_keyboard_device;
+			event.data.button.down = false;
+			event.data.button.x = e.x;
+			event.data.button.y = e.y;
+			event.data.button.key_id = e.key_id;
+			event.data.button.is_repeat = false;
+			injectEvent(event);
+		}
+	}
+
 	void injectEvent(const Event& event) override
 	{
 		m_events.push(event);
@@ -166,6 +190,7 @@ struct InputSystemImpl final : InputSystem
 	Array<Event> m_events;
 	Array<Device*> m_devices;
 	Array<Device*> m_to_remove;
+	Array<ButtonEvent> m_down_keys;
 };
 
 

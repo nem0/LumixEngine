@@ -604,9 +604,6 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 						G.key_states[(u32)os::Keycode::LCTRL] = false;
 						G.key_states[(u32)os::Keycode::LALT] = false;
 					}
-					else {
-						showCursor(was_cursor_shown);
-					}
 
 					e.type = Event::Type::FOCUS;
 					e.focus.gained = wParam != WA_INACTIVE;
