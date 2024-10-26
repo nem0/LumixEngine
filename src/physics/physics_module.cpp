@@ -3944,15 +3944,15 @@ void PhysicsModule::reflect() {
 	};
 	
 	reflection::structure<RaycastHit>("RaycastHit")
-		.member<&RaycastHit::position>("position")
-		.member<&RaycastHit::normal>("normal")
-		.member<&RaycastHit::entity>("entity");
+		.LUMIX_MEMBER(RaycastHit::position, "position")
+		.LUMIX_MEMBER(RaycastHit::normal, "normal")
+		.LUMIX_MEMBER(RaycastHit::entity, "entity");
 
 	reflection::structure<SweepHit>("SweepHit")
-		.member<&SweepHit::position>("position")
-		.member<&SweepHit::normal>("normal")
-		.member<&SweepHit::distance>("distance")
-		.member<&SweepHit::entity>("entity");
+		.LUMIX_MEMBER(SweepHit::position, "position")
+		.LUMIX_MEMBER(SweepHit::normal, "normal")
+		.LUMIX_MEMBER(SweepHit::distance, "distance")
+		.LUMIX_MEMBER(SweepHit::entity, "entity");
 
 	LUMIX_MODULE(PhysicsModuleImpl, "physics")
 		.LUMIX_FUNC(raycast)

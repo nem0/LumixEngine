@@ -848,6 +848,15 @@ if build_physx and hasPlugin("physics") then
 		
 		configuration { "vs20*" }
 			buildoptions { "/wd5055"}
+
+		configuration {}
+		if _OPTIONS["gcc"] == "windows-clang" then
+			-- there's a lot of warnings in physx when compiling with clang
+			-- so we disable all of them, since we can't fix them
+			buildoptions { "-Wno-everything" }
+			-- clang can't compile simd code in physx
+			defines { "PX_SIMD_DISABLED" }
+		end
 end
 
 if os.isdir("../external/_repos/freetype") then

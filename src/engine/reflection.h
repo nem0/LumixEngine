@@ -23,6 +23,9 @@
 #define LUMIX_ENUM_PROP(Property, Label) enum_prop<&ReflModule::get##Property, &ReflModule::set##Property>(Label)
 #define LUMIX_GLOBAL_FUNC(Func) reflection::function<&Func>(#Func, nullptr)
 
+// see member function for explanation
+#define LUMIX_MEMBER(V, Name) member<&V, __LINE__>(Name)
+
 namespace Lumix
 {
 
@@ -693,7 +696,9 @@ struct StructBase {
 	virtual void* createInstance(IAllocator& allocator) = 0;
 	virtual void destroyInstance(void* obj, IAllocator& allocator) = 0;
 
-	template <auto Getter> 
+	// clang (at least on windows) has an issue with multiple definitions with same mangled name
+	// so we need to add a dummy template parameter, see LUMIX_MEMBER macro
+	template <auto Getter, int V = 0> 
 	StructBase& member(const char* name) {
 		StructVar<Getter>* member = LUMIX_NEW(allocator, StructVar<Getter>);
 		member->name = name;

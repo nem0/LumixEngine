@@ -43,7 +43,6 @@ struct GPUScope {
 
 	GPUScope(IAllocator& allocator)
 		: name(allocator)
-		, pairs(allocator)
 	{}
 
 	void pushBegin(u64 timestamp) {
