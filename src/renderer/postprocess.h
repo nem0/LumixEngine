@@ -156,7 +156,6 @@ struct FilmGrain : public RenderPlugin {
 		Camera& camera = module->getCamera(*camera_entity);
 		if (camera.film_grain_intensity <= 1e-5) return input;
 
-		const RenderBufferHandle ldr_buffer = INVALID_RENDERBUFFER;
 		pipeline.beginBlock("film_grain");
 
 		DrawStream& stream = pipeline.getRenderer().getDrawStream();

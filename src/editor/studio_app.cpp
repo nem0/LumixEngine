@@ -2613,16 +2613,13 @@ struct StudioAppImpl final : StudioApp {
 			if (m_all_actions_filter.gui(ICON_FA_SEARCH " Search", -1, m_show_all_actions_request)) {
 				m_all_actions_selected = 0;
 			}
-			bool scroll = false;
 			const bool insert_enter = ImGui::IsItemFocused() && ImGui::IsKeyPressed(ImGuiKey_Enter);
 			if (ImGui::IsItemFocused()) {
 				if (ImGui::IsKeyPressed(ImGuiKey_UpArrow) && m_all_actions_selected > 0) {
 					--m_all_actions_selected;
-					scroll =  true;
 				}
 				if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
 					++m_all_actions_selected;
-					scroll =  true;
 				}
 			}
 			if (m_all_actions_filter.isActive()) {

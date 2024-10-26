@@ -386,18 +386,6 @@ private:
 		drawAnchor(Vec2(parent_rect.x + parent_rect.w * rr, parent_rect.y + parent_rect.h * br), false, false);
 		drawAnchor(Vec2(parent_rect.x + parent_rect.w * rr, parent_rect.y + parent_rect.h * tr), true, false);
 
-		auto drawHandle = [&](const Vec2& pos, const ImVec2& mouse_pos) {
-			const float SIZE = 5;
-			float dx = pos.x - mouse_pos.x;
-			float dy = pos.y - mouse_pos.y;
-			bool is_hovered = fabsf(dx) < SIZE && fabsf(dy) < SIZE;
-			
-			draw.addRectFilled(pos - Vec2(SIZE, SIZE), pos + Vec2(SIZE, SIZE), is_hovered ? Color::WHITE : Color{0xff, 0xff, 0xff, 0x77});
-			draw.addRect(pos - Vec2(SIZE, SIZE), pos + Vec2(SIZE, SIZE), Color::BLACK, 1);
-
-			return is_hovered;
-		};
-
 		constexpr float RESIZE_EDGE_SIZE = 5;
 		if (mouse_canvas_pos.x < rect.x - RESIZE_EDGE_SIZE) return MouseMode::NONE;
 		if (mouse_canvas_pos.y < rect.y - RESIZE_EDGE_SIZE) return MouseMode::NONE;

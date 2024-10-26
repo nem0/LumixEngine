@@ -814,7 +814,6 @@ struct LuaScriptModuleImpl final : LuaScriptModule
 			, m_cmp(&cmp)
 		{
 			LuaScriptModuleImpl& module = cmp.m_module;
-			Engine& engine = module.m_system.m_engine;
 			lua_State* L = module.m_system.m_state;
 			LuaWrapper::DebugGuard guard(L);
 			m_state = lua_newthread(L);

@@ -724,7 +724,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 
 		ThreadContextProxy global(m_data.getMutableData() + blob.getPosition());
 		if (!m_threads.find(0).isValid()) {
-			auto iter = m_threads.insert(0, ThreadData(m_allocator, 0, "Global", true));
+			m_threads.insert(0, ThreadData(m_allocator, 0, "Global", true));
 		}
 		u32 p = global.begin;
 		const u32 end = global.end;
@@ -988,7 +988,6 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 			StackArray<Property, 16> properties(m_allocator);
 			u32 lines = 0;
 			u32 line = 0;
-			float top = 0;
 			u32 p = ctx.begin;
 			u64 primitives_generated = 0;
 			i32 gpu_stats_line = -1;
@@ -1125,7 +1124,6 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 					case profiler::EventType::END_BLOCK:
 						if (line > 0) --line;
 						if (open_blocks.size() > 0) {
-							const Block& block = m_blocks[open_blocks.last().id];
 							const bool in_view = open_blocks.last().start_time < to_time && header.time > from_time;
 							if (in_view) {
 								ThreadData::Rect& r = thread.rects.emplace();
@@ -1169,7 +1167,6 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 			// close all open blocks
 			while (open_blocks.size() > 0) {
 				--line;
-				const Block& block = m_blocks[open_blocks.last().id];
 				const bool in_view = open_blocks.last().start_time < to_time;
 				if (in_view) {
 					ThreadData::Rect& r = thread.rects.emplace();
@@ -1415,7 +1412,6 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 
 		ImDrawList* dl = ImGui::GetWindowDrawList();
 
-		ThreadData& global = m_threads[0];
 		const ThreadContextProxy& ctx = getGlobalThreadContextProxy();
 		
 		for (auto iter = m_threads.begin(); iter.isValid(); ++iter) {
@@ -1495,7 +1491,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 				ImGui::BeginTooltip();
 				ImGui::Text("%s (%.4f ms)", block.name.data, t);
 				if (block.primitives_generated > 0) {
-					ImGui::Text("Primitives generated: %d", block.primitives_generated);
+					ImGui::Text("Primitives generated: %" PRId64, block.primitives_generated);
 				}
 				if (block.profiler_link) {
 					ImGui::Text("Link: %" PRId64, block.profiler_link);

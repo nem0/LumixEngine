@@ -80,6 +80,8 @@ struct DrawStream {
 
 	void run();
 	void reset();
+	
+	// merge rhs into this, rhs is left empty
 	void merge(DrawStream& rhs);
 
 	u32 num_drawcalls;

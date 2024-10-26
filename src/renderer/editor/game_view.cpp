@@ -50,7 +50,6 @@ GameView::GameView(StudioApp& app)
 	, m_is_ingame_cursor(false)
 	, m_time_multiplier(1.0f)
 {
-	Engine& engine = app.getEngine();
 	m_app.getSettings().registerOption("game_view_open", &m_is_open);
 	m_app.getSettings().registerOption("game_view_focus_on_game_start", &m_focus_on_game_start, "Game view", "Focus on game start");
 }

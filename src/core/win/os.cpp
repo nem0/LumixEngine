@@ -593,9 +593,7 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 					G.event_queue.pushBack(e);
 					return 0;
 				case WM_ACTIVATE: {
-					static bool was_cursor_shown = true;
 					if (wParam == WA_INACTIVE) {
-						was_cursor_shown = G.is_cursor_shown;
 						showCursor(true);
 						G.key_states[(u32)os::Keycode::SHIFT] = false;
 						G.key_states[(u32)os::Keycode::CTRL] = false;

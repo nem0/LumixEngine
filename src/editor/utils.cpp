@@ -1812,7 +1812,6 @@ struct CodeEditorImpl final : CodeEditor {
 				else if (ImGui::IsKeyPressed(ImGuiKey_End)) moveCursorEnd(c, io.KeyCtrl);
 				else if (ImGui::IsKeyPressed(ImGuiKey_Home)) moveCursorBegin(c, io.KeyCtrl);
 			}
-			const ImGuiInputFlags f_repeat = ImGuiInputFlags_Repeat;
 			
 			CommonActions& actions = m_app.getCommonActions();
 

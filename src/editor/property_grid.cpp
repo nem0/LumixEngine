@@ -343,10 +343,8 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 		}
 		
 		const float icons_w = ImGui::CalcTextSize(ICON_FA_BULLSEYE ICON_FA_TRASH).x;
-		bool recently_opened_popup = false;
 		if (ImGui::Button(buf, ImVec2(entity.isValid() ? -icons_w : -1.f, 0))) {
 			ImGui::OpenPopup("popup");
-			recently_opened_popup = true;
 		}
 		if (!entity.isValid()) {
 			ImGui::PopStyleColor();

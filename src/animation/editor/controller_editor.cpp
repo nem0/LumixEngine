@@ -1068,12 +1068,10 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 						ImGui::TableSetupColumn(nullptr, ImGuiTableColumnFlags_WidthFixed, 250);
 						ImGui::TableNextRow();
 						ImGui::TableNextColumn();
-						bool any_selected = false;
 						if (m_current_node) {
 							for (Node* n : m_current_node->m_nodes) {
 								if (n->m_selected) {
 									n->propertiesGUI(*m_skeleton);
-									any_selected = true;
 									break;
 								}
 							}

@@ -3378,7 +3378,6 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				path.end = path.begin + 1;
 				while (path.end < preprocess.end && *path.end != '"') ++path.end;
 
-				ResourceManagerHub& rm = m_app.getEngine().getResourceManager();
 				OutputMemoryStream include_content(m_app.getAllocator());
 				if (!fs.getContentSync(Path(path), include_content)) {
 					logError(src, ": Failed to open/read include ", path);
@@ -3663,7 +3662,6 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 	};
 
 	void render(ProbeJob& job) {
-		Engine& engine = m_app.getEngine();
 		Renderer& renderer = m_pipeline->getRenderer();
 		const u32 texture_size = job.is_reflection ? job.reflection_probe.size : 128;
 

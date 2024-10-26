@@ -920,8 +920,6 @@ struct RTVDSVHeap {
 	}
 
 	bool init(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type, u32 num_resources) {
-		const bool is_rtv = type == D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-		const bool is_dsv = type == D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
 		D3D12_DESCRIPTOR_HEAP_DESC desc;
 		desc.NumDescriptors = num_resources * NUM_BACKBUFFERS;
 		desc.Type = type;
@@ -1713,7 +1711,6 @@ void shutdown() {
 ID3D12RootSignature* createRootSignature() {
 	PROFILE_FUNCTION();
 
-	constexpr u32 MAX_CBV = 16;
 	D3D12_DESCRIPTOR_RANGE bindless_srv_desc_ranges[] = {
 		{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, (UINT)-1, 0, 1, D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND},
 		{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, (UINT)-1, 0, 2, 0},
@@ -1837,8 +1834,6 @@ bool init(void* hwnd, InitFlags flags) {
 	d3d->windows[0].handle = hwnd;
 	d3d->current_window = &d3d->windows[0];
 
-	const int width = rect.right - rect.left;
-	const int height = rect.bottom - rect.top;
 	{
 		PROFILE_BLOCK("load libs");
 		d3d->d3d_dll = LoadLibrary("d3d12.dll");
@@ -1883,9 +1878,6 @@ bool init(void* hwnd, InitFlags flags) {
 			//info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true);
 			D3D12_INFO_QUEUE_FILTER filter = {};
 
-			D3D12_MESSAGE_CATEGORY catlist[] = {
-				D3D12_MESSAGE_CATEGORY_STATE_CREATION,
-			};
 			filter.DenyList.NumCategories = 0;
 			filter.DenyList.pCategoryList = nullptr;
 
@@ -2255,7 +2247,6 @@ u32 present() {
 		}
 		else if ((size != window.size && size.x != 0)) {
 			window.size = size;
-			bool has_ds = false;
 
 			for (Frame& f : d3d->frames) f.wait();
 
@@ -2266,7 +2257,6 @@ u32 present() {
 			HRESULT hr = window.swapchain->ResizeBuffers(0, size.x, size.y, DXGI_FORMAT_UNKNOWN, DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT | (vsync ? 0 : DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING));
 			ASSERT(hr == S_OK);
 
-			SIZE_T rtvDescriptorSize = d3d->device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 			for (u32 i = 0; i < NUM_BACKBUFFERS; ++i) {
 				hr = window.swapchain->GetBuffer(i, IID_PPV_ARGS(&window.backbuffers[i]));
 				ASSERT(hr == S_OK);
@@ -2407,7 +2397,6 @@ void createTextureView(TextureHandle view_handle, TextureHandle texture_handle, 
 	view.state = texture.state;
 	view.is_view = true;
 	
-	const bool is_srgb = u32(texture.flags & TextureFlags::SRGB);
 	const bool no_mips = u32(texture.flags & TextureFlags::NO_MIPS);
 	const bool is_3d = u32(texture.flags & TextureFlags::IS_3D);
 	const bool is_cubemap = u32(texture.flags & TextureFlags::IS_CUBE);
@@ -2487,7 +2476,6 @@ void createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 
 	const bool is_srgb = u32(flags & TextureFlags::SRGB);
 	const bool no_mips = u32(flags & TextureFlags::NO_MIPS);
-	const bool readback = u32(flags & TextureFlags::READBACK);
 	const bool is_3d = u32(flags & TextureFlags::IS_3D);
 	const bool is_cubemap = u32(flags & TextureFlags::IS_CUBE);
 	const bool compute_write = u32(flags & TextureFlags::COMPUTE_WRITE);
@@ -2895,15 +2883,12 @@ void drawIndirect(DataType index_type, u32 indirect_buffer_offset) {
 	if (!setPipelineStateGraphics()) return;
 
 	DXGI_FORMAT dxgi_index_type;
-	u32 offset_shift = 0;
 	switch (index_type) {
 		case DataType::U32:
 			dxgi_index_type = DXGI_FORMAT_R32_UINT;
-			offset_shift = 2;
 			break;
 		case DataType::U16:
 			dxgi_index_type = DXGI_FORMAT_R16_UINT;
-			offset_shift = 1;
 			break;
 	}
 
