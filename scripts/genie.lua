@@ -309,7 +309,6 @@ solution "LumixEngine"
 		}
 	end
 
-
 	configuration { "linux" }
 		buildoptions {
 			"-m64",
@@ -361,6 +360,11 @@ solution "LumixEngine"
 		
 	configuration "not windows"
 		removefiles { "../src/**/win/*"}
+
+	configuration {}
+	if _OPTIONS["gcc"] == "windows-clang" then
+		linkoptions { "-g" }
+	end
 
 project "core"
 	libType()
