@@ -1024,7 +1024,7 @@ struct Frame {
 
 	void wait() {
 		if (fence_value != 0) {
-			PROFILE_BLOCK("wait for gpu fence");
+			PROFILE_BLOCK("wait for gpu");
 			profiler::pushInt("Fence value", (u32)fence_value);
 			fence->SetEventOnCompletion(fence_value, nullptr);
 		}

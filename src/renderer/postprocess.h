@@ -710,8 +710,11 @@ struct SSAO : public RenderPlugin {
 	float m_depth_diff_weight = 2;
 	float m_radius = 0.4f;
 	float m_intensity = 1.f;
-	RenderBufferHandle m_temporal_rb;
 	IVec2 m_temporal_size;
+
+	struct PipelineInstanceData {
+		RenderBufferHandle m_history_rb = INVALID_RENDERBUFFER;
+	};
 
 	SSAO(Renderer& renderer) : m_renderer(renderer) {}
 	
@@ -751,13 +754,15 @@ struct SSAO : public RenderPlugin {
 
 	void renderBeforeLightPass(const GBuffer& gbuffer, Pipeline& pipeline) override {
 		PROFILE_FUNCTION();
+		auto* data = pipeline.getData<PipelineInstanceData>();
+
 		if (!m_shader->isReady() 
 			|| !m_blit_shader->isReady() 
 			|| !m_blur_shader->isReady()
 			|| !m_downscale_shader->isReady()
 			|| !m_enabled)
 		{
-			m_temporal_rb = INVALID_RENDERBUFFER;
+			data->m_history_rb = INVALID_RENDERBUFFER;
 			return;
 		}
 		const Viewport& vp = pipeline.getViewport();
@@ -798,8 +803,8 @@ struct SSAO : public RenderPlugin {
 		}
 
 		if (m_temporal) {
-			if (m_temporal_rb == INVALID_RENDERBUFFER || width != m_temporal_size.x || height != m_temporal_size.y) {
-				m_temporal_rb = pipeline.createRenderbuffer({
+			if (data->m_history_rb == INVALID_RENDERBUFFER || width != m_temporal_size.x || height != m_temporal_size.y) {
+				data->m_history_rb = pipeline.createRenderbuffer({
 					.type = RenderbufferDesc::FIXED,
 					.fixed_size = IVec2(width, height),
 					.format = gpu::TextureFormat::R8,
@@ -808,13 +813,13 @@ struct SSAO : public RenderPlugin {
 				});
 				m_temporal_size = IVec2(width, height);
 				// TODO compute shader
-				pipeline.setRenderTargets(Span(&m_temporal_rb, 1), INVALID_RENDERBUFFER);
+				pipeline.setRenderTargets(Span(&data->m_history_rb, 1), INVALID_RENDERBUFFER);
 				pipeline.clear(gpu::ClearFlags::ALL, 1, 1, 1, 1, 1);
 			}
-			pipeline.keepRenderbufferAlive(m_temporal_rb);
+			pipeline.keepRenderbufferAlive(data->m_history_rb);
 		}
 		else {
-			m_temporal_rb = INVALID_RENDERBUFFER;
+			data->m_history_rb = INVALID_RENDERBUFFER;
 		}
 
 		struct {
@@ -834,13 +839,13 @@ struct SSAO : public RenderPlugin {
 			.downscale = m_downscale,
 			.normal_buffer = pipeline.toBindless(gbuffer.B, stream),
 			.depth_buffer = pipeline.toBindless(depth_buffer, stream),
-			.history = pipeline.toBindless(m_temporal_rb, stream),
+			.history = pipeline.toBindless(data->m_history_rb, stream),
 			.motion_vectors = pipeline.toBindless(gbuffer.D, stream),
 			.output = pipeline.toRWBindless(ssao_rb, stream)
 		};
 		pipeline.setUniform(udata);
 		pipeline.dispatch(*m_shader, (width + 15) / 16, (height + 15) / 16, 1, m_temporal ? "TEMPORAL" : nullptr);
-		if (m_temporal) swap(ssao_rb, m_temporal_rb);
+		if (m_temporal) swap(ssao_rb, data->m_history_rb);
 
 		if (m_blur_iterations > 0) {
 			pipeline.beginBlock("ssao_blur");

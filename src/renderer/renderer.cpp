@@ -1086,7 +1086,14 @@ struct RendererImpl final : Renderer {
 					break;
 				}
 
-				gpu::pushGPUCounters();
+				{
+					static int i = 0;
+					++i;
+					if (i == 10) {
+						i = 0;
+						gpu::pushGPUCounters();
+					}
+				}
 
 				// wait until gpu is done with the frame, so we are sure it's not accessing frame's buffers anymore
 				gpu::waitFrame(f->gpu_frame);

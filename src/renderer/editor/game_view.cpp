@@ -97,8 +97,14 @@ void GameView::captureMouse(bool capture) {
 	m_app.setCaptureInput(capture);
 	m_is_mouse_captured = capture;
 	os::showCursor(!capture || m_is_ingame_cursor);
-	if (capture) m_app.clipMouseCursor();
-	else m_app.unclipMouseCursor();
+	if (capture) {
+		m_app.clipMouseCursor();
+	} else {
+		Engine& engine = m_app.getEngine();
+		InputSystem& input = engine.getInputSystem();
+		input.resetDownKeys();
+		m_app.unclipMouseCursor();
+	}
 }
 
 void GameView::onFullscreenGUI(WorldEditor& editor)
@@ -179,13 +185,12 @@ void GameView::forceViewport(bool enable, int w, int h)
 	m_forced_viewport.height = h;
 }
 
-void GameView::processInputEvents()
-{
+void GameView::processInputEvents() {
 	if (!m_is_mouse_captured) return;
-	
+
 	Engine& engine = m_app.getEngine();
 	InputSystem& input = engine.getInputSystem();
-	for (const os::Event e : m_app.getEvents()) {
+	for (const os::Event& e : m_app.getEvents()) {
 		input.injectEvent(e, int(m_pos.x), int(m_pos.y));
 	}
 }
