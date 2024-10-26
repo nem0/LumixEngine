@@ -299,15 +299,23 @@ inline Icon icon(const char* name) { return {name}; }
 
 namespace detail {
 
-static const unsigned int FRONT_SIZE = sizeof("Lumix::reflection::detail::GetTypeNameHelper<") - 1u;
-static const unsigned int BACK_SIZE = sizeof(">::GetTypeName") - 1u;
+#if defined __clang__ && defined _WIN32
+	static const u32 FRONT_SIZE = (u32)sizeof("static StringView Lumix::reflection::detail::GetTypeNameHelper<") - 1u;
+#else
+	static const u32 FRONT_SIZE = sizeof("Lumix::reflection::detail::GetTypeNameHelper<") - 1u;
+	static const u32 BACK_SIZE = sizeof(">::GetTypeName") - 1u;
+#endif
 
 template <typename T>
 struct GetTypeNameHelper
 {
 	static StringView GetTypeName()
 	{
-		#if defined(_MSC_VER) && !defined(__clang__)
+		#if defined __clang__ && defined _WIN32
+			const char* fn = __PRETTY_FUNCTION__;
+			static const char* end = strstr(fn, ">::GetTypeName() [T = ");
+			return StringView(fn + FRONT_SIZE, end);
+		#elif defined(_MSC_VER) && !defined(__clang__)
 			static const size_t size = sizeof(__FUNCTION__) - FRONT_SIZE - BACK_SIZE;
 			return StringView(__FUNCTION__ + FRONT_SIZE, size - 1);
 		#else
