@@ -11,7 +11,7 @@
 #include "engine/prefab.h"
 #include "engine/reflection.h"
 #include "engine/world.h"
-#include "lua_script/lua_script_system.h"
+#include "lua_script_system.h"
 #include "lua_wrapper.h"
 #include <lua.h>
 #include <luacode.h>

@@ -45,7 +45,7 @@
 #include "engine/resource_manager.h"
 #include "core/stream.h"
 #include "engine/world.h"
-#include "lua_script/lua_script_system.h"
+#include "lua/lua_script_system.h"
 #include "physics/physics_resources.h"
 #include "physics/physics_system.h"
 #include "renderer/model.h"
@@ -478,7 +478,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		m_scene->release();
 	}
 
-
+	// TODO move to lua plugin
 	void onTrigger(EntityRef e1, EntityRef e2, bool touch_lost)
 	{
 		if (!m_script_module) return;

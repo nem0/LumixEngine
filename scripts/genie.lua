@@ -39,8 +39,8 @@ newoption {
 }
 
 newoption {
-	trigger = "no-lua-script",
-	description = "Do not build lua script plugin."
+	trigger = "no-lua",
+	description = "Do not build lua plugin."
 }
 
 newoption {
@@ -124,12 +124,7 @@ if _OPTIONS["plugins"] then
 	plugins = string.explode( _OPTIONS["plugins"], ",")
 end
 
-if _OPTIONS["no-lua-script"] == nil then
-	table.insert(plugins, "lua_script")
-	table.insert(base_plugins, "lua_script")
-end
-
-for	_, v in ipairs { "physics", "renderer", "audio", "gui", "animation", "navigation" } do
+for	_, v in ipairs { "physics", "renderer", "audio", "gui", "animation", "navigation", "lua" } do
 	if _OPTIONS["no-" .. v] == nil then
 		table.insert(plugins, v)
 		table.insert(base_plugins, v)
@@ -159,10 +154,6 @@ local BINARY_DIR = LOCATION .. "/bin/"
 local plugin_creators = {}
 build_studio_callbacks = {}
 build_app_callbacks = {}
-
--- TODO remove this once bindless branch is merged (plugins use this)
-function useLua()
-end
 
 function hasPlugin(plugin)
 	for _, v in ipairs(plugins) do
@@ -551,7 +542,7 @@ if plugin "gui" then
 		links { "winmm", "psapi" }
 end
 	
-if plugin "lua_script" then
+if plugin "lua" then
 	if build_luau and not luau_dynamic then
 		defines { "LUMIX_STATIC_LUAU" }
 	end
@@ -566,12 +557,12 @@ if plugin "lua_script" then
 
 	configuration {}
 
-	files { "../src/lua_script/**.h", "../src/lua_script/**.cpp" }
+	files { "../src/lua/**.h", "../src/lua/**.cpp" }
 	includedirs { "../external/luau/include"
 		, "../src"
-		, "../src/lua_script"
+		, "../src/lua"
 	}
-	defines { "BUILDING_LUA_SCRIPT" }
+	defines { "BUILDING_LUA" }
 	links { "core", "engine" }
 
 	if hasPlugin "renderer" then
@@ -636,14 +627,11 @@ if build_app then
 		end
 
 		if not dynamic_plugins then	
-			if hasPlugin "lua_script" then linkLib "Luau" end
+			if hasPlugin "lua" then linkLib "Luau" end
 			if hasPlugin "physics" then
 				linkPhysX()
 			end
 			links { "core", "engine" }
-			if _OPTIONS["no-lua-script"] == nil then
-				links { "lua_script" }
-			end
 
 			if use_basisu then
 				linkLib "basisu"
@@ -752,7 +740,7 @@ if build_studio then
 			linkLib "freetype"
 			if use_basisu then linkLib "basisu" end
 			if hasPlugin "physics" then linkPhysX() end
-			if hasPlugin "lua_script" then linkLib "Luau" end
+			if hasPlugin "lua" then linkLib "Luau" end
 
 			configuration { "linux" }
 				links { "dl", "GL", "X11", "rt", "Xi" }

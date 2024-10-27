@@ -15,7 +15,7 @@
 #include "engine/reflection.h"
 #include "engine/world.h"
 #include "imgui/IconsFontAwesome5.h"
-#include "lua_script/lua_script_system.h"
+#include "lua/lua_script_system.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/render_module.h"
@@ -330,7 +330,7 @@ struct NavigationModuleImpl final : NavigationModule
 		}
 	}
 
-
+	// TODO move to lua plugin
 	void onPathFinished(const Agent& agent)
 	{
 		if (!m_script_module) return;
