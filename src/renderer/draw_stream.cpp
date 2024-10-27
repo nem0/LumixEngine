@@ -39,10 +39,8 @@ enum class DrawStream::Instruction : u8 {
 	DRAW_INDEXED_INSTANCED,
 	MEMORY_BARRIER,
 	MEMORY_BARRIER_TEXTURE,
-	BARRIER_READ,
-	BARRIER_WRITE,
-	BARRIER_READ_BUF,
-	BARRIER_WRITE_BUF,
+	TEXTURE_BARRIER,
+	BUFFER_BARRIER,
 	DRAW_INDIRECT,
 	BIND_SHADER_BUFFER,
 	DISPATCH,
@@ -134,6 +132,17 @@ struct DrawIndexedInstancedDat {
 	u32 instances_count;
 	gpu::DataType index_type;
 };
+
+struct TextureBarrierData {
+	gpu::TextureHandle texture;
+	gpu::BarrierType type;
+};
+
+struct BufferBarrierData {
+	gpu::BufferHandle buffer;
+	gpu::BarrierType type;
+};
+
 struct DrawIndirectData {
 	gpu::DataType index_type;
 	u32 indirect_buffer_offset;
@@ -537,20 +546,14 @@ void DrawStream::drawIndirect(gpu::DataType index_type, u32 indirect_buffer_offs
 	write(Instruction::DRAW_INDIRECT, data);
 }
 
-void DrawStream::barrierRead(gpu::TextureHandle texture) {
-	write(Instruction::BARRIER_READ, texture);
+void DrawStream::barrier(gpu::TextureHandle texture, gpu::BarrierType type) {
+	TextureBarrierData data = {texture, type};
+	write(Instruction::TEXTURE_BARRIER, data);
 }
 
-void DrawStream::barrierWrite(gpu::TextureHandle texture) {
-	write(Instruction::BARRIER_WRITE, texture);
-}
-
-void DrawStream::barrierRead(gpu::BufferHandle buffer) {
-	write(Instruction::BARRIER_READ_BUF, buffer);
-}
-
-void DrawStream::barrierWrite(gpu::BufferHandle buffer) {
-	write(Instruction::BARRIER_WRITE_BUF, buffer);
+void DrawStream::barrier(gpu::BufferHandle buffer, gpu::BarrierType type) {
+	BufferBarrierData data = {buffer, type};
+	write(Instruction::BUFFER_BARRIER, data);
 }
 
 void DrawStream::memoryBarrier(gpu::BufferHandle buffer) {
@@ -743,24 +746,14 @@ void DrawStream::run() {
 					gpu::memoryBarrier(texture);
 					break;
 				}
-				case Instruction::BARRIER_READ: {
-					READ(gpu::TextureHandle, texture);
-					gpu::barrierRead(texture);
+				case Instruction::TEXTURE_BARRIER: {
+					READ(TextureBarrierData, data);
+					gpu::barrier(data.texture, data.type);
 					break;
 				}
-				case Instruction::BARRIER_WRITE: {
-					READ(gpu::TextureHandle, texture);
-					gpu::barrierWrite(texture);
-					break;
-				}
-				case Instruction::BARRIER_READ_BUF: {
-					READ(gpu::BufferHandle, buffer);
-					gpu::barrierRead(buffer);
-					break;
-				}
-				case Instruction::BARRIER_WRITE_BUF: {
-					READ(gpu::BufferHandle, buffer);
-					gpu::barrierWrite(buffer);
+				case Instruction::BUFFER_BARRIER: {
+					READ(BufferBarrierData, data);
+					gpu::barrier(data.buffer, data.type);
 					break;
 				}
 				case Instruction::POP_DEBUG_GROUP:

@@ -97,15 +97,15 @@ struct Atmo : public RenderPlugin {
 			gpu::INVALID_BINDLESS_HANDLE
 		};
 
-		stream.barrierWrite(m_optical_depth_precomputed);
+		stream.barrier(m_optical_depth_precomputed, gpu::BarrierType::WRITE);
 		pipeline.beginBlock("precompute_transmittance");
 		pipeline.setUniform(ub_data);
 		pipeline.dispatch(*m_optical_depth_shader, 128 / 16, 128 / 16, 1);
 		pipeline.endBlock();
 		
-		stream.barrierWrite(m_inscatter_precomputed);
+		stream.barrier(m_inscatter_precomputed, gpu::BarrierType::WRITE);
 		stream.memoryBarrier(m_optical_depth_precomputed);
-		stream.barrierRead(m_optical_depth_precomputed);
+		stream.barrier(m_optical_depth_precomputed, gpu::BarrierType::READ);
 
 		pipeline.beginBlock("precompute_inscatter");
 		ub_data.resolution = Vec4(64, 128, 1, 0);
@@ -115,7 +115,7 @@ struct Atmo : public RenderPlugin {
 		pipeline.endBlock();
 		
 		stream.memoryBarrier(m_inscatter_precomputed);
-		stream.barrierRead(m_inscatter_precomputed);
+		stream.barrier(m_inscatter_precomputed, gpu::BarrierType::READ);
 		
 		ub_data.inscatter_precomputed = gpu::getBindlessHandle(m_inscatter_precomputed);
 		ub_data.optical_depth = gpu::getBindlessHandle(m_optical_depth_precomputed);
@@ -354,7 +354,7 @@ struct Bloom : public RenderPlugin {
 			gpu::getRWBindlessHandle(m_lum_buf)
 		};
 		pipeline.setUniform(ubdata);
-		stream.barrierWrite(m_lum_buf);
+		stream.barrier(m_lum_buf, gpu::BarrierType::WRITE);
 		stream.memoryBarrier(m_lum_buf);
 		pipeline.dispatch(*m_avg_luminance_shader, 1, 1, 1, "PASS0");
 		stream.memoryBarrier(m_lum_buf);
@@ -362,7 +362,7 @@ struct Bloom : public RenderPlugin {
 		stream.memoryBarrier(m_lum_buf);
 		pipeline.dispatch(*m_avg_luminance_shader, 1, 1, 1, "PASS2");
 		stream.memoryBarrier(m_lum_buf);
-		stream.barrierRead(m_lum_buf);
+		stream.barrier(m_lum_buf, gpu::BarrierType::READ);
 
 		pipeline.endBlock();
 	}
@@ -486,7 +486,7 @@ struct Bloom : public RenderPlugin {
 			pipeline.toBindless(input, stream),
 			pipeline.toRWBindless(bloom_rb, stream)
 		};
-		stream.barrierRead(m_lum_buf);
+		stream.barrier(m_lum_buf, gpu::BarrierType::READ);
 		pipeline.setUniform(ubdata);
 		pipeline.dispatch(*m_extract_shader, ((vp.w >> 1) + 15) / 16, ((vp.h >> 1) + 15) / 16, 1);
 		m_extracted_rt = bloom_rb;
@@ -572,7 +572,7 @@ struct Bloom : public RenderPlugin {
 			pipeline.toRWBindless(rb, stream)
 		};
 
-		stream.barrierRead(m_lum_buf);
+		stream.barrier(m_lum_buf, gpu::BarrierType::READ);
 		pipeline.setUniform(ubdata); 
 		const Viewport& vp = pipeline.getViewport();
 		pipeline.dispatch(*m_tonemap_shader, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
@@ -914,7 +914,7 @@ struct SSAO : public RenderPlugin {
 
 		pipeline.beginBlock("ssao_blit");
 		pipeline.setUniform(udata2);
-		stream.barrierWrite(pipeline.toTexture(gbuffer.B));
+		stream.barrier(pipeline.toTexture(gbuffer.B), gpu::BarrierType::WRITE);
 		pipeline.dispatch(*m_blit_shader, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
 		pipeline.endBlock();
 		pipeline.endBlock();
@@ -1098,7 +1098,7 @@ struct TAA : public RenderPlugin {
 		if (!m_enabled) {
 			data->history_rb = INVALID_RENDERBUFFER;
 			pipeline.enablePixelJitter(false);
-			return hdr_buffer;
+			return INVALID_RENDERBUFFER;
 		}
 
 		pipeline.enablePixelJitter(true);

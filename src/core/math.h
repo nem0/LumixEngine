@@ -25,6 +25,7 @@ struct LUMIX_CORE_API IVec2 {
 	IVec2 operator / (const IVec2& rhs) const { return IVec2(x / rhs.x, y / rhs.y); }
 	inline Vec2 operator / (const Vec2& rhs) const;
 	bool operator !=(const IVec2& rhs) const { return rhs.x != x || rhs.y != y; }
+	bool operator ==(const IVec2& rhs) const { return rhs.x == x && rhs.y == y; }
 
 	i32 x;
 	i32 y;

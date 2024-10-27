@@ -3729,7 +3729,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 			// radiance filter
 			enum { roughness_levels = 5 };
 			stream.useProgram(m_ibl_filter_program);
-			stream.barrierRead(cubemap);
+			stream.barrier(cubemap, gpu::BarrierType::READ);
 
 			gpu::TextureHandle filtered = gpu::allocTextureHandle();
 			stream.createTexture(filtered, job.reflection_probe.size, job.reflection_probe.size, 1, gpu::TextureFormat::RGBA32F, gpu::TextureFlags::IS_CUBE | gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::COMPUTE_WRITE, "probe_filtered");

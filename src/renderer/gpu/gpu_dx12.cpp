@@ -1120,6 +1120,13 @@ struct D3D {
 
 static Local<D3D> d3d;
 
+void resetCommandList() {
+	d3d->cmd_list->SetGraphicsRootSignature(d3d->root_signature);
+	d3d->cmd_list->SetComputeRootSignature(d3d->root_signature);
+	ID3D12DescriptorHeap* heaps[] = {d3d->srv_heap.heap, d3d->sampler_heap.heap};
+	d3d->cmd_list->SetDescriptorHeaps(lengthOf(heaps), heaps);
+}
+
 void* getDX12CommandList() {
 	return d3d->cmd_list;
 }
@@ -1132,24 +1139,26 @@ void* getDX12Resource(TextureHandle h) {
 	return h->resource;
 }
 
-void barrierWrite(BufferHandle buffer) {
-	buffer->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-}
-
-void barrierRead(BufferHandle buffer) {
-	buffer->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_GENERIC_READ);
-}
-
-void barrierWrite(TextureHandle texture) {
-	texture->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-}
-
-void barrierRead(TextureHandle texture) {
-	if (isDepthFormat(texture->dxgi_format)) {
-		texture->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_DEPTH_READ |  D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+void barrier(BufferHandle buffer, BarrierType type) {
+	switch(type) {
+		case BarrierType::WRITE: buffer->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_UNORDERED_ACCESS); break;
+		case BarrierType::READ: buffer->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_GENERIC_READ); break;
+		case BarrierType::COMMON: buffer->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_COMMON); break;
 	}
-	else {
-		texture->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_GENERIC_READ);
+}
+
+void barrier(TextureHandle texture, BarrierType type) {
+	switch(type) {
+		case BarrierType::WRITE: texture->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_UNORDERED_ACCESS); break;
+		case BarrierType::READ: 
+			if (isDepthFormat(texture->dxgi_format)) {
+				texture->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_DEPTH_READ |  D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			}
+			else {
+				texture->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_GENERIC_READ);
+			}
+			break;
+		case BarrierType::COMMON: texture->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_COMMON); break;
 	}
 }
 
@@ -1921,10 +1930,8 @@ bool init(void* hwnd, InitFlags flags) {
 	d3d->frame->stats_query_buffer->Map(0, nullptr, (void**)&d3d->frame->stats_query_buffer_ptr);
 	d3d->frame->cmd_allocator->Reset();
 	d3d->cmd_list->Reset(d3d->frame->cmd_allocator, nullptr);
-	d3d->cmd_list->SetGraphicsRootSignature(d3d->root_signature);
-	d3d->cmd_list->SetComputeRootSignature(d3d->root_signature);
-	ID3D12DescriptorHeap* heaps[] = {d3d->srv_heap.heap, d3d->sampler_heap.heap };
-	d3d->cmd_list->SetDescriptorHeaps(lengthOf(heaps), heaps);
+	
+	resetCommandList();
 
 	if (!createSwapchain((HWND)hwnd, d3d->windows[0], d3d->vsync)) return false;
 

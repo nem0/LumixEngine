@@ -54,10 +54,8 @@ struct DrawStream {
 	void drawIndexedInstanced(u32 indices_count, u32 instances_count, gpu::DataType index_type);
 	void dispatch(u32 num_groups_x, u32 num_groups_y, u32 num_groups_z);
 	
-	void barrierRead(gpu::TextureHandle texture);
-	void barrierWrite(gpu::TextureHandle texture);
-	void barrierRead(gpu::BufferHandle buffer);
-	void barrierWrite(gpu::BufferHandle buffer);
+	void barrier(gpu::TextureHandle texture, gpu::BarrierType type);
+	void barrier(gpu::BufferHandle buffer, gpu::BarrierType type);
 	void memoryBarrier(gpu::BufferHandle buffer);
 	void memoryBarrier(gpu::TextureHandle texture);
 	

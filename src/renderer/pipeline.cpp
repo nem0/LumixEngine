@@ -1098,7 +1098,7 @@ struct PipelineImpl final : Pipeline {
 			});
 			setRenderTargets({}, shadowmap_rb);
 			clear(gpu::ClearFlags::DEPTH, 0, 0, 0, 0, 0);
-			stream.barrierRead(m_renderbuffers[shadowmap_rb].handle);
+			stream.barrier(m_renderbuffers[shadowmap_rb].handle, gpu::BarrierType::READ);
 			endBlock();
 			return shadowmap_rb;
 		}
@@ -1129,7 +1129,7 @@ struct PipelineImpl final : Pipeline {
 			renderTerrains(view_params, shadow_state, "DEPTH");
 		}
 		endBlock();
-		stream.barrierRead(m_renderbuffers[shadowmap_rb].handle);
+		stream.barrier(m_renderbuffers[shadowmap_rb].handle, gpu::BarrierType::READ);
 		return shadowmap_rb;
 	}
 
@@ -1369,7 +1369,7 @@ struct PipelineImpl final : Pipeline {
 
 	gpu::BindlessHandle toBindless(RenderBufferHandle rb_idx, DrawStream& stream) override { 
 		if (rb_idx == INVALID_RENDERBUFFER) return gpu::INVALID_BINDLESS_HANDLE;
-		stream.barrierRead(m_renderbuffers[rb_idx].handle);
+		stream.barrier(m_renderbuffers[rb_idx].handle, gpu::BarrierType::READ);
 		return gpu::getBindlessHandle(m_renderbuffers[rb_idx].handle);
 	}
 
@@ -1413,7 +1413,7 @@ struct PipelineImpl final : Pipeline {
 			gpu::getRWBindlessHandle(mip_views[4]),
 		};
 
-		stream.barrierWrite(toTexture(m_downscaled_depth));
+		stream.barrier(toTexture(m_downscaled_depth), gpu::BarrierType::WRITE);
 
 		setUniform(udata);
 		dispatch(*m_downscale_depth_shader, (m_viewport.w + 7) / 8, (m_viewport.h + 7) / 8, 1);
@@ -1424,7 +1424,7 @@ struct PipelineImpl final : Pipeline {
 
 	gpu::RWBindlessHandle toRWBindless(RenderBufferHandle rb_idx, DrawStream& stream) override { 
 		if (rb_idx == INVALID_RENDERBUFFER) return gpu::INVALID_RW_BINDLESS_HANDLE;
-		stream.barrierWrite(m_renderbuffers[rb_idx].handle);
+		stream.barrier(m_renderbuffers[rb_idx].handle, gpu::BarrierType::WRITE);
 		return gpu::getRWBindlessHandle(m_renderbuffers[rb_idx].handle);
 	}
 
@@ -2358,20 +2358,20 @@ struct PipelineImpl final : Pipeline {
 
 			stream.bindUniformBuffer(UniformBuffer::DRAWCALL, drawcall_ub.buffer, drawcall_ub.offset, sizeof(UBValues));
 
-			stream.barrierWrite(m_instanced_meshes_buffer);
-			stream.barrierWrite(m_indirect_buffer);
-			stream.barrierWrite(culled_buffer);
+			stream.barrier(m_instanced_meshes_buffer, gpu::BarrierType::WRITE);
+			stream.barrier(m_indirect_buffer, gpu::BarrierType::WRITE);
+			stream.barrier(culled_buffer, gpu::BarrierType::WRITE);
 			//stream.bindShaderBuffer(culled_buffer, 1, gpu::BindShaderBufferFlags::OUTPUT);
 			stream.useProgram(init_shader);
 			stream.dispatch(1, 1, 1);
 			stream.memoryBarrier(culled_buffer);
 
 			if (view.cp.is_shadow) {
-				stream.barrierRead(im.gpu_data);
+				stream.barrier(im.gpu_data, gpu::BarrierType::READ);
 				//stream.bindShaderBuffer(im.gpu_data, 0, gpu::BindShaderBufferFlags::NONE);
 			}
 			else {
-				stream.barrierWrite(im.gpu_data);
+				stream.barrier(im.gpu_data, gpu::BarrierType::WRITE);
 				//stream.bindShaderBuffer(im.gpu_data, 0, gpu::BindShaderBufferFlags::OUTPUT);
 				stream.useProgram(update_lods_shader);
 				for (u32 i = 0; i < cell_count; ++i) {
@@ -2392,7 +2392,7 @@ struct PipelineImpl final : Pipeline {
 			stream.memoryBarrier(culled_buffer);
 
 			if (!view.cp.is_shadow) {
-				stream.barrierRead(im.gpu_data);
+				stream.barrier(im.gpu_data, gpu::BarrierType::READ);
 				//stream.bindShaderBuffer(im.gpu_data, 0, gpu::BindShaderBufferFlags::NONE);
 			}
 
@@ -3012,7 +3012,7 @@ struct PipelineImpl final : Pipeline {
 					buffer.capacity = capacity;
 				}
 				stream.update(buffer.buffer, data, size);
-				stream.barrierRead(buffer.buffer);
+				stream.barrier(buffer.buffer, gpu::BarrierType::READ);
 			};
 			const Span<const ReflectionProbe> module_refl_probes = m_module->getReflectionProbes();
 			const Span<const EnvironmentProbe> module_env_probes = m_module->getEnvironmentProbes();
