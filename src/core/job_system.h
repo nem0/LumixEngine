@@ -89,10 +89,7 @@ struct Mutex {
 };
 
 struct Counter {
-	~Counter() { ASSERT(!(i32)value); }
-
 	Signal signal;
-	AtomicI32 value = 0; // number of jobs running, once this gets to 0, signal turns green
 };
 
 template <typename F>
