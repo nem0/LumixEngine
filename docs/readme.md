@@ -9,6 +9,7 @@
 # Renderer
 
 * [Shaders](shaders.md)
+* [FSR3](fsr3.md)
 
 # Editor
 
