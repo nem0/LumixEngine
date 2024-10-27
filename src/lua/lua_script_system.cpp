@@ -15,8 +15,8 @@
 #include "engine/resource_manager.h"
 #include "engine/world.h"
 #include "gui/gui_module.h"
+#include "lua_script.h"
 #include "lua_script_system.h"
-#include "lua_script/lua_script.h"
 #include "lua_wrapper.h"
 #include "physics/physics_module.h"
 #include "renderer/model.h"
@@ -3246,7 +3246,7 @@ void LuaScriptSystemImpl::createModules(World& world)
 }
 
 
-LUMIX_PLUGIN_ENTRY(lua_script) {
+LUMIX_PLUGIN_ENTRY(lua) {
 	PROFILE_FUNCTION();
 	return LUMIX_NEW(engine.getAllocator(), LuaScriptSystemImpl)(engine);
 }

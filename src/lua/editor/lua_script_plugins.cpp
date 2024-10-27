@@ -1439,7 +1439,7 @@ struct SetPropertyVisitor : reflection::IPropertyVisitor {
 } // anonymous namespace
 
 
-LUMIX_STUDIO_ENTRY(lua_script) {
+LUMIX_STUDIO_ENTRY(lua) {
 	PROFILE_FUNCTION();
 	IAllocator& allocator = app.getAllocator();
 	return LUMIX_NEW(allocator, StudioAppPlugin)(app);

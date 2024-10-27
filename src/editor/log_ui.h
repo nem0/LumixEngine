@@ -59,15 +59,19 @@ struct LUMIX_EDITOR_API LogUI : StudioApp::GUIPlugin
 		Array<Message> m_messages;
 		Array<Notification> m_notifications;
 		int m_new_message_count[(int)LogLevel::COUNT];
-		u8 m_level_filter;
 		int m_last_uid;
 		bool m_move_notifications_to_front;
 		bool m_are_notifications_hovered;
 		bool m_scroll_to_bottom = false;
-		bool m_autoscroll = true;
 		Mutex m_guard;
-		bool m_is_open = false;
 		bool m_focus_request = false;
+		
+		bool m_autoscroll = true;
+		bool m_is_open = false;
+		bool m_show_info = true;
+		bool m_show_warnings = true;
+		bool m_show_errors = true;
+
 		Action m_toggle_ui{"Log", "Toggle log UI", "log_toggle_ui", "", Action::WINDOW};
 		TextFilter m_filter;
 };

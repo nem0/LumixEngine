@@ -11,12 +11,16 @@
 namespace Lumix
 {
 
+enum class LevelFilter : u8 {
+	INFO = 1 << 0,
+	WARNING = 1 << 1,
+	ERROR = 1 << 2
+};
 
 LogUI::LogUI(StudioApp& app, IAllocator& allocator)
 	: m_allocator(allocator, "log ui")
 	, m_app(app)
 	, m_messages(m_allocator)
-	, m_level_filter(2 | 4)
 	, m_notifications(m_allocator)
 	, m_last_uid(1)
 	, m_is_open(false)
@@ -30,7 +34,12 @@ LogUI::LogUI(StudioApp& app, IAllocator& allocator)
 		m_new_message_count[i] = 0;
 	}
 
-	m_app.getSettings().registerOption("log_open", &m_is_open);
+	Settings& settings = m_app.getSettings();
+	settings.registerOption("log_open", &m_is_open);
+	settings.registerOption("log_autoscroll", &m_autoscroll, "Log", "Autoscroll");
+	settings.registerOption("log_show_info", &m_show_info, "Log", "Show info messages");
+	settings.registerOption("log_show_warnings", &m_show_warnings, "Log", "Show warnings");
+	settings.registerOption("log_show_errors", &m_show_errors, "Log", "Show errors");
 }
 
 
@@ -164,21 +173,16 @@ void LogUI::onGUI()
 	if (ImGui::Begin(ICON_FA_COMMENT_ALT "Log##log", &m_is_open)) {
 		if (ImGuiEx::IconButton(ICON_FA_COG, "Settings")) ImGui::OpenPopup("Settings");
 		if (ImGui::BeginPopup("Settings")) {
-			const char* labels[] = {"Info", "Warning", "Error"};
-			for (u32 i = 0; i < lengthOf(labels); ++i)
-			{
-				char label[40];
-				fillLabel(Span(label), labels[i], m_new_message_count[i]);
-				bool b = m_level_filter & (1 << i);
-				if (ImGui::Checkbox(label, &b))
-				{
-					if (b)
-						m_level_filter |= 1 << i;
-					else
-						m_level_filter &= ~(1 << i);
-					m_new_message_count[i] = 0;
-				}
-			}
+			char label[64];
+			fillLabel(Span(label), "Info ", m_new_message_count[0]);
+			if (ImGui::Checkbox(label, &m_show_info)) m_new_message_count[0] = 0;
+
+			fillLabel(Span(label), "Warnings ", m_new_message_count[1]);
+			if (ImGui::Checkbox(label, &m_show_warnings)) m_new_message_count[1] = 0;
+
+			fillLabel(Span(label), "Errors ", m_new_message_count[2]);
+			if (ImGui::Checkbox(label, &m_show_errors)) m_new_message_count[2] = 0;
+
 			ImGui::Checkbox("Autoscroll", &m_autoscroll);
 			ImGui::EndPopup();
 		}
@@ -187,12 +191,15 @@ void LogUI::onGUI()
 		m_filter.gui(ICON_FA_SEARCH " Filter", -1, ImGui::IsWindowAppearing());
 		int len = 0;
 
-		if (ImGui::BeginChild("log_messages", ImVec2(0, 0), true))
-		{
+		u8 level_filter = m_show_info ? (1 << (u8)LogLevel::INFO) : 0;
+		level_filter |= m_show_warnings ? (1 << (u8)LogLevel::WARNING) : 0;
+		level_filter |= m_show_errors ? (1 << (u8)LogLevel::ERROR) : 0;
+		
+		if (ImGui::BeginChild("log_messages", ImVec2(0, 0), true)) {
 			ImGui::PushFont(m_app.getMonospaceFont());
 			for (int i = 0; i < m_messages.size(); ++i)
 			{
-				if ((m_level_filter & (1 << (int)m_messages[i].level)) == 0) continue;
+				if ((level_filter & (1 << (int)m_messages[i].level)) == 0) continue;
 				const char* msg = m_messages[i].text.c_str();
 				if (m_filter.pass(msg)) {
 					ImGui::TextUnformatted(msg);
@@ -240,7 +247,7 @@ void LogUI::onGUI()
 				Array<Message> filtered_messages(m_allocator);
 				for (int i = 0; i < m_messages.size(); ++i)
 				{
-					if ((m_level_filter & (1 << (int)m_messages[i].level)) == 0) {
+					if ((level_filter & (1 << (int)m_messages[i].level)) == 0) {
 						filtered_messages.emplace(m_messages[i]);
 					}
 					else {
