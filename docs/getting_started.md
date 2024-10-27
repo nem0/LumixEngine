@@ -16,7 +16,6 @@ Download [bootstrap batch file](../scripts/bootstrap.bat) and run it. The bootst
 
 [Video tutorial](https://www.youtube.com/watch?v=OjQKTA5ia2U)
 
-
 # Making game in C++
 
 1. Download Lumix Engine source code.
@@ -38,3 +37,21 @@ See [this shell script](https://raw.githubusercontent.com/wiki/nem0/LumixEngine/
 * Note: to build using clang & ninja, call `./genie --gcc=linux-clang ninja`
 
 [Video tutorial](https://www.youtube.com/watch?v=ic5ejjY6wZs)
+
+# Programmers - Windows + Ninja + Clang
+
+As an alternative to building with MSVC, Clang can be used. Since it's not the primary way to build the engine, it's a bit more involved. 
+
+## Prerequisities
+
+* [Clang](https://clang.llvm.org/)
+* [Ninja](https://ninja-build.org/)
+
+Both can be installed with Visual Studio installer or in any other way. Unlike when building with MSVC, there's no bootstrap script for clang, neither are there prebuilt 3rd party libraries. 
+
+1. Download [source code](https://github.com/nem0/lumixengine).
+2. Run [scripts/download_physx.bat](../scripts/download_physx.bat) to download Physx.
+3. Run [scripts/download_luau.bat](../scripts/download_luau.bat) to Download Luau.
+4. Run [scripts/download_freetype.bat](../scripts/download_freetype.bat) to Download FreeType2.
+5. Run `scripts\genie.exe --gcc=windows-clang ninja`, it genereates ninja files in `tmp/ninja`.
+6. Run `ninja` in `scripts\tmp\ninja\debug64` or `scripts\tmp\ninja\relwithdebinfo64`.
