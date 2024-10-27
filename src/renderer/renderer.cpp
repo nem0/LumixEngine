@@ -33,7 +33,6 @@
 
 namespace Lumix {
 
-
 static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
 
 RenderBufferHandle RenderPlugin::renderBeforeTonemap(const GBuffer& gbuffer, RenderBufferHandle input, Pipeline& pipeline) { return input; }
@@ -43,6 +42,7 @@ bool RenderPlugin::tonemap(RenderBufferHandle input, RenderBufferHandle& output,
 bool RenderPlugin::debugOutput(RenderBufferHandle input, Pipeline& pipeline) { return false; }
 RenderBufferHandle RenderPlugin::renderAA(const GBuffer& gbuffer, RenderBufferHandle input, Pipeline& pipeline) { return INVALID_RENDERBUFFER; }
 
+void initFSR3(Renderer& renderer, IAllocator& allocator);
 
 template <u32 ALIGN>
 struct TransientBuffer {
@@ -615,6 +615,8 @@ struct RendererImpl final : Renderer {
 		m_font_manager = LUMIX_NEW(m_allocator, FontManager)(*this, m_allocator);
 		m_font_manager->create(FontResource::TYPE, manager);
 		m_layers.emplace("default");
+
+		initFSR3(*this, m_allocator);
 	}
 
 
@@ -757,6 +759,10 @@ struct RendererImpl final : Renderer {
 		m_layers.emplace(name);
 		return m_layers.size() - 1;
 	}
+
+	void enableBuiltinTAA(bool enable) {
+		m_taa.m_enabled = enable;
+		}
 
 	const Mesh** getSortKeyToMeshMap() const override {
 		return m_sort_key_to_mesh_map.begin();

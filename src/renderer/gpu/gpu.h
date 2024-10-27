@@ -44,6 +44,12 @@ enum class InitFlags : u32 {
 	STABLE_POWER_STATE = 1 << 1
 };
 
+enum class BarrierType : u8 {
+	READ,
+	WRITE,
+	COMMON,
+};
+
 enum class FramebufferFlags : u32 {
 	NONE = 0,
 	SRGB = 1 << 0,
@@ -291,10 +297,8 @@ void createTextureView(TextureHandle view, TextureHandle texture, u32 layer, u32
 
 void memoryBarrier(BufferHandle buffer);
 void memoryBarrier(TextureHandle texture);
-void barrierWrite(TextureHandle texture);
-void barrierRead(TextureHandle texture);
-void barrierWrite(BufferHandle buffer);
-void barrierRead(BufferHandle buffer);
+void barrier(TextureHandle texture, BarrierType type);
+void barrier(BufferHandle buffer, BarrierType type);
 
 void destroy(TextureHandle texture);
 void destroy(BufferHandle buffer);
