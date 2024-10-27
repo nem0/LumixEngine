@@ -23,6 +23,8 @@ struct Job {
 };
 
 struct WorkerTask;
+static constexpr u64 STATE_COUNTER_MASK = 0xffFF;
+static constexpr u64 STATE_WAITING_FIBER_MASK = (~u64(0)) & ~STATE_COUNTER_MASK;
 
 struct FiberJobPair {
 	Fiber::Handle fiber = Fiber::INVALID_FIBER;
@@ -133,6 +135,18 @@ struct WaitingFiber {
 	FiberJobPair* fiber;
 };
 
+LUMIX_FORCE_INLINE WaitingFiber* getWaitingFiberFromState(u64 state) {
+	return (WaitingFiber*)((state & STATE_WAITING_FIBER_MASK) >> 16);
+}
+
+LUMIX_FORCE_INLINE u16 getCounterFromState(u64 state) {
+	return u16(state & STATE_COUNTER_MASK);
+}
+
+LUMIX_FORCE_INLINE u64 makeStateValue(WaitingFiber* fiber, u16 counter) {
+	return (u64(fiber) << 16) | counter;
+}
+
 struct WorkerTask : Thread {
 	WorkerTask(System& system, u8 worker_index) 
 		: Thread(system.m_allocator)
@@ -172,14 +186,6 @@ struct WorkerTask : Thread {
 	u8 m_worker_index;
 	bool m_is_enabled = false;
 };
-
-void addCounter(Counter* counter, u32 value) {
-	if (counter->value.add(value) == 0) {
-		counter->signal.generation = g_generation.inc();
-		turnRed(&counter->signal);
-	};
-}
-
 
 // push fiber to work queue
 LUMIX_FORCE_INLINE static void scheduleFiber(FiberJobPair* fiber) {
@@ -232,19 +238,20 @@ static void afterSwitch() {
 	worker->m_signal_to_check = nullptr;
 
 	for (;;) {
-		const i64 counter = signal->state;
+		const u64 state = (u64)signal->state;
+		const u16 counter = getCounterFromState(state);
 		
 		// signal is green, repush the fiber
-		if ((counter & 1) == 0) {
+		if (counter == 0) {
 			scheduleFiber(fiber->fiber);
 			return;
 		}
 
 		// signal is red, let's try to actually park the fiber
-		fiber->next = (WaitingFiber*)u64(counter & ~i64(1));
-		const i64 new_counter = 1 | i64(fiber);
+		fiber->next = getWaitingFiberFromState(state);
+		const u64 new_state = makeStateValue(fiber, counter);
 		// try to update the signal state, if nobody changed it in the meantime
-		if (signal->state.compareExchange(new_counter, counter)) return;
+		if (signal->state.compareExchange(new_state, state)) return;
 		
 		// somebody changed the signal state, let's try again
 	}
@@ -271,10 +278,10 @@ void turnGreenEx(Signal* signal) {
 	ASSERT(getWorker());
 
 	// turn the signal green
-	const i64 old_state = signal->state.exchange(0);
+	const u64 old_state = signal->state.exchange(0);
 	
 	// wake up all waiting fibers
-	WaitingFiber* fiber = (WaitingFiber*)(old_state & ~i64(1));
+	WaitingFiber* fiber = getWaitingFiberFromState(old_state);
 	while (fiber) {
 		WaitingFiber* next = fiber->next;
 		scheduleFiber(fiber->fiber);
@@ -285,6 +292,41 @@ void turnGreenEx(Signal* signal) {
 void turnGreen(Signal* signal) {
 	turnGreenEx(signal);
 	profiler::signalTriggered(signal->generation);
+}
+
+void decCounter(Counter* counter) {
+	for (;;) {
+		const u64 state = counter->signal.state;
+		WaitingFiber* fiber;
+		u64 new_state;
+		
+		if (getCounterFromState(state) == 1) {
+			// if we are going to turn the signal green
+			fiber = getWaitingFiberFromState(state);
+			new_state = 0;
+		}
+		else {
+			// signal still red even after we decrement the counter
+			fiber = nullptr;
+			new_state = state - 1;
+		}
+		
+		// decrement the counter if nobody changed the state in the meantime
+		if (counter->signal.state.compareExchange(new_state, state)) {
+			if (fiber) scheduleFiber(fiber->fiber);
+			return;
+		}
+	}
+}
+
+void addCounter(Counter* counter, u32 value) {
+	const u64 prev_state = counter->signal.state.add(value);
+	ASSERT(getCounterFromState(prev_state) + value < 0xffFF);
+	
+	// if we turned the signal red
+	if (getCounterFromState(prev_state) == 0) {
+		counter->signal.generation = g_generation.inc();
+	}
 }
 
 #ifdef _WIN32
@@ -324,11 +366,7 @@ void turnGreen(Signal* signal) {
 			this_fiber->current_job = work.job;
 			work.job.task(work.job.data);
 			this_fiber->current_job.task = nullptr;
-			if (work.job.dec_on_finish) {
-				if (work.job.dec_on_finish->value.dec() == 1) {
-					turnGreenEx(&work.job.dec_on_finish->signal);
-				}
-			}
+			if (work.job.dec_on_finish) decCounter(work.job.dec_on_finish);
 			worker = getWorker();
 			profiler::endBlock();
 		}
@@ -403,6 +441,7 @@ void shutdown()
 
 void turnRed(Signal* signal) {
 	if ((signal->state.setBits(1) & 1) == 0) {
+		// it was green and we turned it red, so we need to increment generation
 		signal->generation = g_generation.inc();
 	}
 }
@@ -417,7 +456,7 @@ void wait(Signal* signal) {
 	// spin for a bit
 	for (u32 i = 0; i < 40; ++i) {
 		// fast path
-		if ((signal->state & 1) == 0) return;
+		if (getCounterFromState(signal->state) == 0) return;
 	}
 
 	// we busy-waited too long, let's park the fiber
@@ -481,11 +520,11 @@ void exit(Mutex* mutex) {
 	ASSERT(mutex->signal.state & 1);
 
 	for (;;) {
-		const i64 state = mutex->signal.state;
+		const u64 state = mutex->signal.state;
 
 		// prepare to pop one waiting fiber from the mutex and unlock the mutex
-		WaitingFiber* waiting_fiber = (WaitingFiber*)(state & ~i64(1));
-		const i64 new_state_value = i64(waiting_fiber ? waiting_fiber->next : nullptr);
+		WaitingFiber* waiting_fiber = getWaitingFiberFromState(state);
+		const u64 new_state_value = makeStateValue(waiting_fiber ? waiting_fiber->next : nullptr, 0);
 
 		// if something changed (there's a new fiber waiting), try again
 		if (!mutex->signal.state.compareExchange(new_state_value, state)) continue;

@@ -3539,7 +3539,7 @@ struct ShaderIncludePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 	explicit EnvironmentProbePlugin(ModelPlugin& model_plugin, StudioApp& app)
 		: m_app(app)
-		, m_probes(app.getAllocator())
+		, m_probe_jobs(app.getAllocator())
 		, m_model_plugin(model_plugin)
 		, m_generate_action("Generate probes", "Tools - generate probes", "generate_probes", "", Action::TOOL)
 		, m_add_bounce_action("Add bounce", "Tools - add light bounce to probes", "probes_add_bounce", "", Action::TOOL)
@@ -3604,14 +3604,14 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 
 
 	void generateProbes(bool bounce, World& world) {
-		ASSERT(m_probes.empty());
+		if (!m_probe_jobs.empty()) return;
 
 		m_pipeline->setIndirectLightMultiplier(bounce ? 1.f : 0.f);
 
 		RenderModule* module = (RenderModule*)world.getModule(ENVIRONMENT_PROBE_TYPE);
 		const Span<EntityRef> env_probes = module->getEnvironmentProbesEntities();
 		const Span<EntityRef> reflection_probes = module->getReflectionProbesEntities();
-		m_probes.reserve(env_probes.length() + reflection_probes.length());
+		m_probe_jobs.reserve(env_probes.length() + reflection_probes.length());
 		IAllocator& allocator = m_app.getAllocator();
 		for (EntityRef p : env_probes) {
 			ProbeJob* job = LUMIX_NEW(m_app.getAllocator(), ProbeJob)(*this, world, p, allocator);
@@ -3620,7 +3620,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 			job->is_reflection = false;
 			job->position = world.getPosition(p);
 
-			m_probes.push(job);
+			m_probe_jobs.push(job);
 		}
 
 		for (EntityRef p : reflection_probes) {
@@ -3630,10 +3630,10 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 			job->is_reflection = true;
 			job->position = world.getPosition(p);
 
-			m_probes.push(job);
+			m_probe_jobs.push(job);
 		}
 
-		m_probe_counter += m_probes.size();
+		m_probe_counter += m_probe_jobs.size();
 	}
 
 	struct ProbeJob {
@@ -3832,7 +3832,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 			m_done_counter = 0;
 		}
 
-		for (ProbeJob* j : m_probes) {
+		for (ProbeJob* j : m_probe_jobs) {
 			if (!j->render_dispatched) {
 				j->render_dispatched = true;
 				render(*j);
@@ -3841,23 +3841,23 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 		}
 
 		memoryBarrier();
-		for (ProbeJob* j : m_probes) {
+		for (ProbeJob* j : m_probe_jobs) {
 			if (j->done && !j->done_counted) {
 				j->done_counted = true;
 				++m_done_counter;
 			}
 		}
 
-		if (m_done_counter == m_probe_counter && !m_probes.empty()) {
+		if (m_done_counter == m_probe_counter && !m_probe_jobs.empty()) {
 			const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
 			Path dir_path(base_path, "probes/");
 			if (!os::dirExists(dir_path) && !os::makePath(dir_path.c_str())) {
 				logError("Failed to create ", dir_path);
 			}
 			RenderModule* module = nullptr;
-			while (!m_probes.empty()) {
-				ProbeJob& job = *m_probes.back();
-				m_probes.pop();
+			while (!m_probe_jobs.empty()) {
+				ProbeJob& job = *m_probe_jobs.back();
+				m_probe_jobs.pop();
 				ASSERT(job.done);
 				ASSERT(job.done_counted);
 
@@ -3925,7 +3925,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 	gpu::ProgramHandle m_ibl_filter_program = gpu::INVALID_PROGRAM;
 	
 	// TODO to be used with http://casual-effects.blogspot.com/2011/08/plausible-environment-lighting-in-two.html
-	Array<ProbeJob*> m_probes;
+	Array<ProbeJob*> m_probe_jobs;
 	u32 m_done_counter = 0;
 	u32 m_probe_counter = 0;
 	Action m_generate_action;

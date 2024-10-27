@@ -240,6 +240,7 @@ static_assert(sizeof(DrawStream::Page) == PageAllocator::PAGE_SIZE);
 } // anonymous namespace
 
 DrawStream::~DrawStream() {
+	ASSERT(run_called);
 	while (first) {
 		Page* next = first->header.next;
 		allocator.deallocate(first);

@@ -430,6 +430,9 @@ struct PipelineImpl final : Pipeline {
 			, instancers(allocator)
 			, buckets(allocator)
 		{}
+		~View() {
+			ASSERT((ready.state & 1) == 0);
+		}
 
 		View(View&& rhs) = delete;
 		View(const View& rhs) = delete;
