@@ -520,7 +520,11 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 
 		while (x < to_x) {
 			const ImVec2 p(x, top);
-			if (step_len_us < 2000) {
+			if (step_len_us < 2) {
+				StaticString<64> text(u32(t * 1000), "ns");
+				dl->AddText(ImVec2(1, 0) + p, border_color, text);
+			}
+			else if (step_len_us < 2000) {
 				StaticString<64> text(u32(t), "us");
 				dl->AddText(ImVec2(1, 0) + p, border_color, text);
 			}

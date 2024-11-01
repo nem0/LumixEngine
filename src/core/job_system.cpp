@@ -13,6 +13,12 @@
 #include "core/thread.h"
 #include "job_system.h"
 
+/* Invariants:
+	* Jobs are executed in undefined order, i.e. if we push jobs A and B, we can't be sure that A will be executed before B. 
+	* tryPop in sequence "push(), tryPop()" is guaranteed to pop a job. The consumer in this case can be on a different thread, if we are sure that push() returned.
+	* If a thread calls push(jobA), tryPop() running in parallel on another thread might or might not pop jobA.
+*/
+
 namespace Lumix::jobs {
 
 struct Job {
@@ -41,62 +47,63 @@ struct Work {
 	Work() : type(NONE) {}
 	Work(const Job& job) : job(job), type(JOB) {}
 	Work(FiberJobPair* fiber) : fiber(fiber), type(FIBER) {}
-	union {
-		Job job;
-		FiberJobPair* fiber;
-	};
 	enum Type {
 		FIBER,
 		JOB,
 		NONE
 	};
 	Type type;
+	union {
+		Job job;
+		FiberJobPair* fiber;
+	};
 };
 
-// Thread-safe, lockless ring buffer, with a mutex-guarded fallback array for overflow
-// with added semaphore for waiting on new work
+
+LUMIX_FORCE_INLINE static void wake(WorkerTask* to_wake);
+LUMIX_FORCE_INLINE static void wake(u32 num_jobs, WorkerTask* to_wake);
+
 template <int CAPACITY>
-struct WorkQueue : RingBuffer<Work, CAPACITY> {
+struct WorkQueue {
 	WorkQueue(IAllocator& allocator) 
-		: semaphore(0, 0x7fffFFff)
-		, RingBuffer<Work, CAPACITY>(allocator)
+		: queue(allocator)
 	{}
 
-	LUMIX_FORCE_INLINE void push(const Work& obj) {
-		RingBuffer<Work, CAPACITY>::push(obj);
-		semaphore.signal();
+	LUMIX_FORCE_INLINE void push(const Work& obj, WorkerTask* to_wake) {
+		queue.push(obj);
+		wake(to_wake);
 	}
 
-	// optimized, batch push multiple jobs
-	LUMIX_FORCE_INLINE void pushN(const Work& obj, u32 num_jobs) {
+	LUMIX_FORCE_INLINE void pushN(const Work& obj, u32 num_jobs, WorkerTask* to_wake) {
 		for (u32 i = 0; i < num_jobs; ++i) {
-			RingBuffer<Work, CAPACITY>::push(obj);
+			queue.push(obj);
 		}
-		semaphore.signal(num_jobs);
-	}
-	
-	LUMIX_FORCE_INLINE bool pop(Work& obj) {
-		if (!RingBuffer<Work, CAPACITY>::pop(obj)) return false;
-		semaphore.wait(0);
-		return true;
+		wake(num_jobs, to_wake);
 	}
 
-	Semaphore semaphore;
+	LUMIX_FORCE_INLINE bool tryPop(Work& obj) {
+		return queue.pop(obj);
+	}
+
+	RingBuffer<Work, CAPACITY> queue;
 };
-
 struct System {
 	System(IAllocator& allocator) 
 		: m_allocator(allocator, "job system")
 		, m_workers(m_allocator)
 		, m_free_fibers(m_allocator)
 		, m_work_queue(m_allocator)
+		, m_sleeping_workers(m_allocator)
 	{}
 
 	TagAllocator m_allocator;
 	Array<WorkerTask*> m_workers;
 	FiberJobPair m_fiber_pool[512];
 	RingBuffer<FiberJobPair*, 512> m_free_fibers;
-	WorkQueue<256> m_work_queue;
+	WorkQueue<512> m_work_queue;
+	Lumix::Mutex m_sleeping_sync;
+	AtomicI32 m_num_sleeping = 0; // if 0, we are sure that no worker is sleeping; if not 0, workers can be in any state
+	Array<WorkerTask*> m_sleeping_workers;
 };
 
 
@@ -184,41 +191,53 @@ struct WorkerTask : Thread {
 	System& m_system;
 	WorkQueue<4> m_work_queue;
 	u8 m_worker_index;
-	bool m_is_enabled = false;
+	
+	// if m_is_sleeping == 0, we are sure that we are not sleeping
+	// but if m_is_sleeping == 1, we are not sure if we are sleeping or not
+	AtomicI32 m_is_sleeping = 0; 
 };
 
 // push fiber to work queue
 LUMIX_FORCE_INLINE static void scheduleFiber(FiberJobPair* fiber) {
 	const u8 worker_idx = fiber->current_job.worker_index;
 	if (worker_idx == ANY_WORKER) {
-		g_system->m_work_queue.push(fiber);
+		g_system->m_work_queue.push(fiber, nullptr);
 	} else {
 		WorkerTask* worker = g_system->m_workers[worker_idx % g_system->m_workers.size()];
-		worker->m_work_queue.push(fiber);
+		worker->m_work_queue.push(fiber, worker);
 	}
 }
 
 // try to pop a job from the queues (first worker, then global), if no job is available, go to sleep
 static bool tryPopWork(Work& work, WorkerTask* worker) {
-	if (worker->m_work_queue.pop(work)) return true;
-	if (g_system->m_work_queue.pop(work)) return true;
+	if (worker->m_work_queue.tryPop(work)) return true;
+	if (g_system->m_work_queue.tryPop(work)) return true;
 
 	{
+		g_system->m_num_sleeping.inc();
+		worker->m_is_sleeping = 1;
+		
+		Lumix::MutexGuard guard(g_system->m_sleeping_sync);
+		if (worker->m_work_queue.tryPop(work)) {
+			g_system->m_num_sleeping.dec();
+			worker->m_is_sleeping = 0;
+			return true;
+		}
+
+		if (g_system->m_work_queue.tryPop(work)) {
+			g_system->m_num_sleeping.dec();
+			worker->m_is_sleeping = 0;
+			return true;
+		}
+
 		// no jobs, let's go to sleep
 		PROFILE_BLOCK("sleeping");
 		profiler::blockColor(0x30, 0x30, 0x30);
-		
-		const i32 signaled_obj = Semaphore::waitMultiple(worker->m_work_queue.semaphore, g_system->m_work_queue.semaphore);
-		// somebody push a job to the queue, so we woke up
-		if (signaled_obj == 0) {
-			return worker->m_work_queue.pop(work);
-		}
-		else if (signaled_obj == 1) {
-			return g_system->m_work_queue.pop(work);
-		}
-		else {
-			ASSERT(false);
-		}
+
+		g_system->m_sleeping_workers.push(worker);
+		worker->sleep(g_system->m_sleeping_sync);
+		g_system->m_num_sleeping.dec();
+		worker->m_is_sleeping = 0;
 	}
 
 	return false;
@@ -358,17 +377,17 @@ void addCounter(Counter* counter, u32 value) {
 		else if (work.type == Work::JOB) {
 			if (!work.job.task) continue;
 
-			profiler::beginBlock("job");
-			profiler::blockColor(0x60, 0x60, 0x60);
 			if (work.job.dec_on_finish) {
 				profiler::pushJobInfo(work.job.dec_on_finish->signal.generation);
 			}
 			this_fiber->current_job = work.job;
+			profiler::beginBlock("job");
+			profiler::blockColor(0x60, 0x60, 0x60);
 			work.job.task(work.job.data);
+			profiler::endBlock();
 			this_fiber->current_job.task = nullptr;
 			if (work.job.dec_on_finish) decCounter(work.job.dec_on_finish);
 			worker = getWorker();
-			profiler::endBlock();
 		}
 		else ASSERT(false);
 	}
@@ -390,7 +409,6 @@ bool init(u8 workers_count, IAllocator& allocator) {
 	for (int i = 0; i < count; ++i) {
 		WorkerTask* task = LUMIX_NEW(getAllocator(), WorkerTask)(*g_system, i);
 		if (task->create(StaticString<64>("Worker #", i), false)) {
-			task->m_is_enabled = true;
 			g_system->m_workers.push(task);
 			task->setAffinityMask((u64)1 << i);
 		}
@@ -423,7 +441,7 @@ void shutdown()
 	for (WorkerTask* task : g_system->m_workers)
 	{
 		while (!task->isFinished()) {
-			g_system->m_work_queue.semaphore.signal();
+			task->wakeup();
 		}
 		task->destroy();
 		LUMIX_DELETE(allocator, task);
@@ -542,7 +560,7 @@ void exit(Mutex* mutex) {
 void moveJobToWorker(u8 worker_index) {
 	FiberJobPair* this_fiber = getWorker()->m_current_fiber;
 	WorkerTask* worker = g_system->m_workers[worker_index % g_system->m_workers.size()];
-	worker->m_work_queue.push(this_fiber);
+	worker->m_work_queue.push(this_fiber, worker);
 	FiberJobPair* new_fiber = popFreeFiber();
 	getWorker()->m_current_fiber = new_fiber;
 	this_fiber->current_job.worker_index = worker_index;
@@ -555,7 +573,7 @@ void moveJobToWorker(u8 worker_index) {
 
 void yield() {
 	FiberJobPair* this_fiber = getWorker()->m_current_fiber;
-	g_system->m_work_queue.push(this_fiber);
+	g_system->m_work_queue.push(this_fiber, nullptr);
 
 	FiberJobPair* new_fiber = popFreeFiber();
 	this_fiber->current_job.worker_index = ANY_WORKER;
@@ -579,11 +597,11 @@ void run(void* data, void(*task)(void*), Counter* on_finished, u8 worker_index)
 
 	if (worker_index != ANY_WORKER) {
 		WorkerTask* worker = g_system->m_workers[worker_index % g_system->m_workers.size()];
-		worker->m_work_queue.push(job);
+		worker->m_work_queue.push(job, worker);
 		return;
 	}
 
-	g_system->m_work_queue.push(job);
+	g_system->m_work_queue.push(job, nullptr);
 }
 
 void runN(void* data, void(*task)(void*), Counter* on_finished, u8 worker_index, u32 num_jobs)
@@ -600,11 +618,54 @@ void runN(void* data, void(*task)(void*), Counter* on_finished, u8 worker_index,
 
 	if (worker_index != ANY_WORKER) {
 		WorkerTask* worker = g_system->m_workers[worker_index % g_system->m_workers.size()];
-		worker->m_work_queue.pushN(job, num_jobs);
+		worker->m_work_queue.pushN(job, num_jobs, worker);
 		return;
 	}
 
-	g_system->m_work_queue.pushN(job, num_jobs);
+	g_system->m_work_queue.pushN(job, num_jobs, nullptr);
 }
+
+LUMIX_FORCE_INLINE static void wake(WorkerTask* to_wake) {
+	if (to_wake) {
+		if (to_wake->m_is_sleeping) {
+			Lumix::MutexGuard guard(g_system->m_sleeping_sync);
+			g_system->m_sleeping_workers.eraseItem(to_wake);
+			to_wake->wakeup();
+		}
+		return;
+	}
+
+	if (g_system->m_num_sleeping > 0) {		
+		Lumix::MutexGuard guard(g_system->m_sleeping_sync);
+		if (g_system->m_sleeping_workers.empty()) return;
+		
+		WorkerTask* to_wake = g_system->m_sleeping_workers.back();
+		g_system->m_sleeping_workers.pop();
+		to_wake->wakeup();
+	}
+};
+
+LUMIX_FORCE_INLINE static void wake(u32 num_jobs, WorkerTask* to_wake) {
+	if (to_wake) {
+		if (to_wake->m_is_sleeping) {
+			Lumix::MutexGuard guard(g_system->m_sleeping_sync);
+			g_system->m_sleeping_workers.eraseItem(to_wake);
+			to_wake->wakeup();
+		}
+		return;
+	}
+
+	if (g_system->m_num_sleeping > 0) {
+		Lumix::MutexGuard guard(g_system->m_sleeping_sync);
+		for (u32 i = 0; i < num_jobs; ++i) {
+			if (g_system->m_sleeping_workers.empty()) return;
+			
+			WorkerTask* to_wake = g_system->m_sleeping_workers.back();
+			g_system->m_sleeping_workers.pop();
+			to_wake->wakeup();
+		}
+	}
+}
+
 
 } // namespace Lumix::jobs
