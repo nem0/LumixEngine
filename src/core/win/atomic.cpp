@@ -21,6 +21,10 @@ bool AtomicI32::compareExchange(i32 exchange, i32 comperand) {
 	return _InterlockedCompareExchange((volatile long*)&value, exchange, comperand) == comperand;
 }
 
+bool AtomicI32::compareExchange(volatile i32* value, i32 exchange, i32 comperand) { 
+	return _InterlockedCompareExchange((volatile long*)value, exchange, comperand) == comperand;
+}
+
 void AtomicI64::operator =(i64 v) { _InterlockedExchange64((volatile long long*)&value, v); }
 
 AtomicI64::operator i64() const { 
