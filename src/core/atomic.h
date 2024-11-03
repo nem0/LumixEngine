@@ -20,6 +20,7 @@ struct LUMIX_CORE_API AtomicI32 {
 	i32 clearBits(i32 v);
 
 	bool compareExchange(i32 exchange, i32 comperand);
+	static bool compareExchange(volatile i32* value, i32 exchange, i32 comperand);
 private:
 	volatile i32 value;
 };

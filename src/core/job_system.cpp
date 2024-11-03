@@ -75,6 +75,8 @@ LUMIX_FORCE_INLINE static void wake(u32 num_jobs);
 LUMIX_FORCE_INLINE static void wake();
 LUMIX_FORCE_INLINE static void executeJob(const Job& job);
 
+// TODO we don't need full memory barriers
+// we assume strong memory model
 // single producer, multiple consumer queue
 // producer can call only push and tryPop - produce and consume on one end of the queue
 // others can call only trySteal - consume from the other end of the queue
@@ -103,6 +105,7 @@ struct WorkStealingQueue {
 		for (u32 i = 0; i < num; ++i) {
 			m_queue[(producing_end + i) & SIZE_MASK] = obj;
 		}
+		memoryBarrier();
 		m_producing_end = producing_end + num;
 		wake(num);
 	}
@@ -123,6 +126,7 @@ struct WorkStealingQueue {
 		}
 
 		m_queue[producing_end & SIZE_MASK] = obj;
+		memoryBarrier();
 		m_producing_end = producing_end + 1;
 		wake();
 	}
@@ -132,6 +136,7 @@ struct WorkStealingQueue {
 			const i32 producing_end = m_producing_end - 1;
 			m_producing_end = producing_end;
 			// decrement producing_end first so that concurrent stealers can't pop the same element without us knowing
+			memoryBarrier();
 			const i32 stealing_end = m_stealing_end;
 			
 			// queue is empty
@@ -154,7 +159,7 @@ struct WorkStealingQueue {
 			// we are trying to pop the last element
 			// we need to handle concurrent stealers
 			// we try to change m_stealing_end because that's the only thing that can be changed by stealers
-			if (m_stealing_end.compareExchange(stealing_end + 1, stealing_end)) {
+			if (AtomicI32::compareExchange(&m_stealing_end, stealing_end + 1, stealing_end)) {
 				// we were faster, reset to normal empty state (m_producing_end == m_stealing_end)
 				m_producing_end = stealing_end + 1;
 				return true;
@@ -169,6 +174,7 @@ struct WorkStealingQueue {
 	bool trySteal(Work& obj) {
 		for (;;) {
 			const i32 stealing_end = m_stealing_end;
+			memoryBarrier();
 			const i32 producing_end = m_producing_end;
 			
 			const bool is_empty = stealing_end >= producing_end;
@@ -177,7 +183,7 @@ struct WorkStealingQueue {
 			obj = m_queue[stealing_end & SIZE_MASK];
 			
 			// sync with other concurrent stealers, or tryPop in case of the last remaining element
-			if (m_stealing_end.compareExchange(stealing_end + 1, stealing_end)) {
+			if (AtomicI32::compareExchange(&m_stealing_end, stealing_end + 1, stealing_end)) {
 				// we managed to pop the element
 				return true;
 			}
@@ -186,10 +192,9 @@ struct WorkStealingQueue {
 		}
 	}
 
-	// TODO this does not have to be full atomic, we could use barriers instead
 	// align, so they are not on the same cacheline, since they have different access patterns
-	alignas(64) AtomicI32 m_stealing_end = 0; 	// both producer and consumers can write this
-	alignas(64) AtomicI32 m_producing_end = 0; 	// only producer modifies this, consumers can read it
+	alignas(64) volatile i32 m_stealing_end = 0; 	// both producer and consumers can write this
+	alignas(64) volatile i32 m_producing_end = 0; 	// only producer modifies this, consumers can read it
 	// if m_producing_end > m_stealing_end, queue is not empty
 	Work m_queue[QUEUE_SIZE];
 };
@@ -208,7 +213,7 @@ struct WorkQueue {
 		// fastest path - empty queue is just one atomic read
 		if (empty) return false;
 
-		Lumix::MutexGuard guard(mutex);
+		Lumix::MutexGuardProfiled guard(mutex);
 		if (queue.empty()) {
 			empty = 1;
 			return false;
@@ -222,7 +227,7 @@ struct WorkQueue {
 
 	LUMIX_FORCE_INLINE void pushAndWakeN(const Work& obj, u32 num) {
 		{
-			Lumix::MutexGuard guard(mutex);
+			Lumix::MutexGuardProfiled guard(mutex);
 			for (u32 i = 0; i < num; ++i) {
 				queue.push(obj);
 			}
@@ -233,7 +238,7 @@ struct WorkQueue {
 
 	LUMIX_FORCE_INLINE void pushAndWake(const Work& obj, WorkerTask* to_wake) {
 		{
-			Lumix::MutexGuard guard(mutex);
+			Lumix::MutexGuardProfiled guard(mutex);
 			queue.push(obj);
 			empty = 0;
 		}
@@ -402,12 +407,16 @@ LUMIX_FORCE_INLINE static bool tryPopWork(Work& work, WorkerTask* worker) {
 // return false if the worker should shutdown
 LUMIX_FORCE_INLINE static bool popWork(Work& work, WorkerTask* worker) {
 	while (!worker->m_finished) {
-		if (tryPopWork(work, worker)) return true;
+		// spin a few times before we go to sleep
+		for (u32 i = 0; i < 20; ++i) {
+			if (tryPopWork(work, worker)) return true;
+		}
 
 		// no jobs, let's mark the worker as going to sleep / sleeping
 		g_system->m_num_sleeping.inc();
 		worker->m_is_sleeping = 1;
 		
+		// this mutex is not profile-guarded, because we can go to sleep while holding it
 		Lumix::MutexGuard guard(g_system->m_sleeping_sync);
 		
 		// we must recheck the queues while holding the mutex, because somebody might have pushed a job in the meantime
@@ -418,7 +427,7 @@ LUMIX_FORCE_INLINE static bool popWork(Work& work, WorkerTask* worker) {
 		}
 
 		// no jobs, let's go to sleep
-		// even if somebody pushed a job in the meantime, we are sure that we will be woken up, since we hold the mutex
+		// even if somebody pushed a job since we locked the mutex, we are sure that we will be woken up, since we hold the mutex
 		#ifdef LUMIX_PROFILE_JOBS
 			PROFILE_BLOCK("sleeping");
 			profiler::blockColor(0x30, 0x30, 0x30);
@@ -842,7 +851,7 @@ void runN(void* data, void(*task)(void*), Counter* on_finished, u32 num_jobs)
 LUMIX_FORCE_INLINE static void wake(WorkerTask& worker) {
 	if (!worker.m_is_sleeping) return;
 
-	Lumix::MutexGuard guard(g_system->m_sleeping_sync);
+	Lumix::MutexGuardProfiled guard(g_system->m_sleeping_sync);
 	g_system->m_sleeping_workers.eraseItem(&worker);
 	worker.wakeup();
 }
@@ -851,7 +860,7 @@ LUMIX_FORCE_INLINE static void wake(WorkerTask& worker) {
 LUMIX_FORCE_INLINE static void wake() {
 	if (g_system->m_num_sleeping == 0) return;
 
-	Lumix::MutexGuard guard(g_system->m_sleeping_sync);
+	Lumix::MutexGuardProfiled guard(g_system->m_sleeping_sync);
 	if (g_system->m_sleeping_workers.empty()) return;
 	
 	WorkerTask* to_wake = g_system->m_sleeping_workers.back();
@@ -865,7 +874,7 @@ LUMIX_FORCE_INLINE static void wake(u32 num) {
 	// fast path, no workers are sleeping
 	if (g_system->m_num_sleeping == 0) return;
 
-	Lumix::MutexGuard guard(g_system->m_sleeping_sync);
+	Lumix::MutexGuardProfiled guard(g_system->m_sleeping_sync);
 	for (u32 i = 0; i < num; ++i) {
 		if (g_system->m_sleeping_workers.empty()) return;
 		
