@@ -547,11 +547,11 @@ LUMIX_FORCE_INLINE static void addCounter(Counter* counter, u32 value) {
 
 LUMIX_FORCE_INLINE static void executeJob(const Job& job) {
 	#ifdef LUMIX_PROFILE_JOBS
+		profiler::beginBlock("job");
+		profiler::blockColor(0x60, 0x60, 0x60);
 		if (job.dec_on_finish) {
 			profiler::pushJobInfo(job.dec_on_finish->signal.generation);
 		}
-		profiler::beginBlock("job");
-		profiler::blockColor(0x60, 0x60, 0x60);
 	#endif
 	job.task(job.data);
 	#ifdef LUMIX_PROFILE_JOBS
