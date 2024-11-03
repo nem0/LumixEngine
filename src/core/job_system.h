@@ -46,7 +46,7 @@ LUMIX_CORE_API void yield();
 // run single job, increment on_finished counter, decrement it when job is done
 LUMIX_CORE_API void run(void* data, void(*task)(void*), Counter* on_finish, u8 worker_index = ANY_WORKER);
 // optimized batch run multi jobs, useful for foreach and others
-LUMIX_CORE_API void runN(void* data, void(*task)(void*), Counter* on_finish, u8 worker_index, u32 num_jobs);
+LUMIX_CORE_API void runN(void* data, void(*task)(void*), Counter* on_finish, u32 num_jobs);
 
 
 // spawn as many jobs as there are worker threads, and call `f`
@@ -120,7 +120,7 @@ void runOnWorkers(const F& f)
 	Counter counter;
 	jobs::runN((void*)&f, [](void* data){
 		(*(const F*)data)();
-	}, &counter, ANY_WORKER, getWorkersCount() - 1);
+	}, &counter, getWorkersCount() - 1);
 	f();
 	wait(&counter);
 }
@@ -164,7 +164,7 @@ void forEach(u32 count, u32 step, const F& f) {
 			to = to > count ? count : to;
 			(*f)(idx, to);
 		}
-	}, &counter, ANY_WORKER, num_jobs - 1);
+	}, &counter, num_jobs - 1);
 
 	for (;;) {
 		const i32 idx = data.offset.add(step);
