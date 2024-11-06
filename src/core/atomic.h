@@ -48,6 +48,8 @@ struct LUMIX_CORE_API AtomicI64 {
 LUMIX_CORE_API void* exchangePtr(void* volatile* value, void* exchange);
 LUMIX_CORE_API bool compareExchangePtr(void*volatile* value, void* exchange, void* comperand);
 LUMIX_CORE_API void memoryBarrier();
+LUMIX_CORE_API void readBarrier();
+LUMIX_CORE_API void writeBarrier();
 LUMIX_CORE_API void cpuRelax(); // rep nop, can be used in busy wait to conserve resources
 
 } // namespace Lumix

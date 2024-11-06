@@ -3,6 +3,7 @@
 #include "engine/lumix.h"
 
 #include "core/allocator.h"
+#include "core/color.h"
 #include "core/profiler.h"
 #include "draw_stream.h"
 #include "engine/plugin.h"
@@ -134,7 +135,7 @@ void Renderer::pushJob(const char* name, const T& func) {
 				profiler::beginBlock(that->name);
 				const i64 link = profiler::createNewLinkID();
 				profiler::link(link);
-				profiler::blockColor(0x7f, 0, 0x7f);
+				profiler::blockColor(Color(0x7f, 0, 0x7f, 0xff).abgr());
 				that->stream.beginProfileBlock(that->name, link, false);
 			}
 			that->func(that->stream);

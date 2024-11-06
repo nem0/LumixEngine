@@ -30,29 +30,30 @@
 #include <vehicle/PxVehicleUtilControl.h>
 #include <vehicle/PxVehicleUtilSetup.h>
 
-#include "physics/physics_module.h"
 #include "animation/animation_module.h"
 #include "core/associative_array.h"
 #include "core/atomic.h"
-#include "engine/engine.h"
+#include "core/color.h"
 #include "core/hash.h"
 #include "core/job_system.h"
 #include "core/log.h"
 #include "core/math.h"
 #include "core/path.h"
 #include "core/profiler.h"
+#include "core/stream.h"
+#include "engine/engine.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "core/stream.h"
 #include "engine/world.h"
+#include "imgui/IconsFontAwesome5.h"
 #include "lua/lua_script_system.h"
+#include "physics/physics_module.h"
 #include "physics/physics_resources.h"
 #include "physics/physics_system.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
 #include "renderer/render_module.h"
 #include "renderer/texture.h"
-#include "imgui/IconsFontAwesome5.h"
 
 
 using namespace physx;
@@ -258,7 +259,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		{
 			jobs::runLambda([&task]() {
 					PROFILE_BLOCK(task.getName());
-					profiler::blockColor(0x50, 0xff, 0x50);
+					profiler::blockColor(Color(0x50, 0xff, 0x50, 0xff).abgr());
 					task.run();
 					task.release();
 				},

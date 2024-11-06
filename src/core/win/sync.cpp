@@ -29,14 +29,6 @@ void Semaphore::signal(u32 count)
 	ASSERT(res);
 }
 
-i32 Semaphore::waitMultiple(Semaphore& a, Semaphore& b) {
-	HANDLE handles[] = {a.m_id, b.m_id};
-	DWORD res = ::WaitForMultipleObjects(2, handles, FALSE, INFINITE);
-	if (res == WAIT_OBJECT_0) return 0;
-	if (res == WAIT_OBJECT_0 + 1) return 1;
-	return -1;
-}
-
 bool Semaphore::wait(u32 timeout_ms) {
 	auto res = ::WaitForSingleObject(m_id, timeout_ms);
 	return WAIT_OBJECT_0 == res;

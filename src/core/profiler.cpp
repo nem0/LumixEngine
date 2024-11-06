@@ -9,6 +9,7 @@
 #include "core/atomic.h"
 #include "core/array.h"
 #include "core/command_line_parser.h"
+#include "core/color.h"
 #include "core/crt.h"
 #include "core/hash_map.h"
 #include "core/atomic.h"
@@ -62,22 +63,29 @@ struct GPUScope {
 	u32 write = 0;
 };
 
-struct ThreadContext
-{
+struct ThreadContext {
 	ThreadContext(u32 buffer_size, IAllocator& allocator) 
 		: buffer(allocator)
-		, open_blocks(allocator)
 	{
 		buffer.resize(buffer_size);
-		open_blocks.reserve(64);
 	}
 
-	Array<i32> open_blocks;
+	i32 open_block_stack[16];
+	u32 open_block_stack_size = 0;
+	
+	// we write to `tmp` until it's full, then we flush it to the `buffer`
+	// tmp is only accessed by the thread that owns the context
+	u8 tmp[512];
+	u32 tmp_pos = 0;
+	
+	// ring buffer, access only while holding the mutex
+	// the ring buffer can be read by profiler UI
+	Mutex mutex;
 	OutputMemoryStream buffer;
 	u32 begin = 0;
 	u32 end = 0;
-	Mutex mutex;
-	StaticString<64> name;
+	
+	StaticString<64> thread_name;
 	bool show_in_profiler = false;
 	u32 thread_id;
 };
@@ -187,7 +195,7 @@ static struct Instance
 	}
 
 
-	ThreadContext* getThreadContext()
+	LUMIX_FORCE_INLINE ThreadContext* getThreadContext()
 	{
 		thread_local ThreadContext* ctx = [&](){
 			ThreadContext* new_ctx = LUMIX_NEW(getGlobalAllocator(), ThreadContext)(default_context_size, getGlobalAllocator());
@@ -216,112 +224,85 @@ static struct Instance
 	ThreadContext global_context;
 } g_instance;
 
-template <typename T>
-void writeNoLock(ThreadContext& ctx, u64 timestamp, EventType type, const T& value)
-{
-	if (g_instance.paused && timestamp > g_instance.paused_time) return;
-
-	u8 tmp[sizeof(EventHeader) + sizeof(T)];
-	EventHeader* header = (EventHeader*)tmp;
-	header->type = type;
-	header->size = sizeof(T) + sizeof(EventHeader);
-	header->time = timestamp;
-	memcpy(tmp + sizeof(*header), &value, sizeof(value));
+// move data from temporary buffer to the main buffer
+template <bool lock>
+static void flush(ThreadContext& ctx) {
+	if constexpr (lock) ctx.mutex.enter();
 
 	u8* buf = ctx.buffer.getMutableData();
 	const u32 buf_size = (u32)ctx.buffer.size();
 
-	while (sizeof(tmp) + ctx.end - ctx.begin > buf_size) {
+	// make sure we have enough space, discard oldest events if necessary
+	while (ctx.tmp_pos + ctx.end - ctx.begin > buf_size) {
 		const u8 size = buf[ctx.begin % buf_size];
 		ctx.begin += size;
 	}
 
 	const u32 lend = ctx.end % buf_size;
-	if (buf_size - lend >= sizeof(tmp)) {
-		memcpy(buf + lend, tmp, sizeof(tmp));
+	const u32 bytes_to_end = buf_size - lend;
+	// if we do not wrap
+	if (ctx.tmp_pos <= bytes_to_end) {
+		memcpy(buf + lend, ctx.tmp, ctx.tmp_pos);
 	}
 	else {
-		memcpy(buf + lend, tmp, buf_size - lend);
-		memcpy(buf, tmp + buf_size - lend, sizeof(tmp) - (buf_size - lend));
+		memcpy(buf + lend, ctx.tmp, bytes_to_end);
+		const u32 remaining = ctx.tmp_pos - bytes_to_end;
+		memcpy(buf, ctx.tmp + bytes_to_end, remaining);
 	}
 
-	ctx.end += sizeof(tmp);
-};
+	memset(ctx.tmp, 0xcd, sizeof(ctx.tmp));
+	ctx.end += ctx.tmp_pos;
+	ctx.tmp_pos = 0;
 
-template <typename T>
-void write(ThreadContext& ctx, u64 timestamp, EventType type, const T& value)
-{
-	if (g_instance.paused && timestamp > g_instance.paused_time) return;
+	if constexpr (lock) ctx.mutex.exit();
+}
 
-	u8 tmp[sizeof(EventHeader) + sizeof(T)];
-	EventHeader* header = (EventHeader*)tmp;
+template <bool lock, typename T>
+LUMIX_FORCE_INLINE static void write(ThreadContext& ctx, u64 timestamp, EventType type, const T& value) {
+	if (g_instance.paused && timestamp > g_instance.paused_time) {
+		if (ctx.tmp_pos != 0) flush<true>(ctx);
+		return;
+	}
+
+	enum { num_bytes_to_write = sizeof(T) + sizeof(EventHeader) };
+	ASSERT(num_bytes_to_write <= lengthOf(ctx.tmp));
+	
+	if constexpr (lock) ctx.mutex.enter();
+	if (ctx.tmp_pos + num_bytes_to_write > lengthOf(ctx.tmp)) {
+		flush<!lock>(ctx);
+	}
+
+	EventHeader* header = (EventHeader*)(ctx.tmp + ctx.tmp_pos);
 	header->type = type;
-	header->size = sizeof(T) + sizeof(EventHeader);
+	header->size = num_bytes_to_write;
 	header->time = timestamp;
-	memcpy(tmp + sizeof(*header), &value, sizeof(value));
-
-	MutexGuard lock(ctx.mutex);
-	u8* buf = ctx.buffer.getMutableData();
-	const u32 buf_size = (u32)ctx.buffer.size();
-
-	while (sizeof(tmp) + ctx.end - ctx.begin > buf_size) {
-		const u8 size = buf[ctx.begin % buf_size];
-		ctx.begin += size;
-	}
-
-	const u32 lend = ctx.end % buf_size;
-	if (buf_size - lend >= sizeof(tmp)) {
-		memcpy(buf + lend, tmp, sizeof(tmp));
-	}
-	else {
-		memcpy(buf + lend, tmp, buf_size - lend);
-		memcpy(buf, tmp + buf_size - lend, sizeof(tmp) - (buf_size - lend));
-	}
-
-	ctx.end += sizeof(tmp);
+	memcpy((u8*)header + sizeof(*header), &value, sizeof(value));
+	ctx.tmp_pos += num_bytes_to_write;
+	if constexpr (lock) ctx.mutex.exit();
 };
 
-template <typename T>
-void write(ThreadContext& ctx, EventType type, const T& value)
-{
-	write(ctx, os::Timer::getRawTimestamp(), type, value);
-};
-
-
-void write(ThreadContext& ctx, EventType type, const u8* data, int size)
-{
-	if (g_instance.paused) return;
-
-	EventHeader header;
-	header.type = type;
-	ASSERT(sizeof(header) + size <= 0xffff);
-	header.size = u16(sizeof(header) + size);
-	header.time = os::Timer::getRawTimestamp();
-
-	MutexGuard lock(ctx.mutex);
-	u8* buf = ctx.buffer.getMutableData();
-	const u32 buf_size = (u32)ctx.buffer.size();
-
-	while (header.size + ctx.end - ctx.begin > buf_size) {
-		const u8 size = buf[ctx.begin % buf_size];
-		ctx.begin += size;
+template <bool lock>
+LUMIX_FORCE_INLINE static void write(ThreadContext& ctx, u64 timestamp, EventType type, Span<const u8> data) {
+	if (g_instance.paused && timestamp > g_instance.paused_time) {
+		if (ctx.tmp_pos != 0) flush<true>(ctx);
+		return;
 	}
 
-	auto cpy = [&](const u8* ptr, u32 size) {
-		const u32 lend = ctx.end % buf_size;
-		if (buf_size - lend >= size) {
-			memcpy(buf + lend, ptr, size);
-		}
-		else {
-			memcpy(buf + lend, ptr, buf_size - lend);
-			memcpy(buf, ((u8*)ptr) + buf_size - lend, size - (buf_size - lend));
-		}
+	const u32 num_bytes_to_write = (u32)data.length() + sizeof(EventHeader);
+	ASSERT(num_bytes_to_write <= lengthOf(ctx.tmp));
+	
+	if constexpr (lock) ctx.mutex.enter();
+	if (ctx.tmp_pos + num_bytes_to_write > lengthOf(ctx.tmp)) {
+		flush<!lock>(ctx);
+	}
 
-		ctx.end += size;
-	};
-
-	cpy((u8*)&header, sizeof(header));
-	cpy(data, size);
+	EventHeader* header = (EventHeader*)(ctx.tmp + ctx.tmp_pos);
+	header->type = type;
+	header->size = num_bytes_to_write;
+	header->time = timestamp;
+	memcpy((u8*)header + sizeof(*header), data.begin(), data.length());
+	ctx.tmp_pos += num_bytes_to_write;
+	if constexpr (lock) ctx.mutex.exit();
 };
 
 #ifdef _WIN32
@@ -346,7 +327,7 @@ void write(ThreadContext& ctx, EventType type, const u8* data, int size)
 		rec.new_thread_id = cs->NewThreadId;
 		rec.old_thread_id = cs->OldThreadId;
 		rec.reason = cs->OldThreadWaitReason;
-		write(g_instance.global_context, rec.timestamp, profiler::EventType::CONTEXT_SWITCH, rec);
+		write<true>(g_instance.global_context, rec.timestamp, profiler::EventType::CONTEXT_SWITCH, rec);
 	};
 #endif
 
@@ -377,7 +358,7 @@ void pushCounter(u32 counter, float value) {
 	CounterRecord r;
 	r.counter = counter;
 	r.value = value;
-	write(g_instance.global_context, EventType::COUNTER, (u8*)&r, sizeof(r));
+	write<true>(g_instance.global_context, os::Timer::getRawTimestamp(), EventType::COUNTER, r);
 }
 
 void pushInt(const char* key, int value)
@@ -386,34 +367,59 @@ void pushInt(const char* key, int value)
 	IntRecord r;
 	r.key = key;
 	r.value = value;
-	write(*ctx, EventType::INT, (u8*)&r, sizeof(r));
+	write<false>(*ctx, os::Timer::getRawTimestamp(), EventType::INT, r);
 }
 
 
 void pushString(const char* value)
 {
 	ThreadContext* ctx = g_instance.getThreadContext();
-	write(*ctx, EventType::STRING, (u8*)value, stringLength(value) + 1);
+	write<false>(*ctx, os::Timer::getRawTimestamp(), EventType::STRING, Span((const u8*)value, stringLength(value) + 1));
 }
 
-
-void blockColor(u8 r, u8 g, u8 b)
-{
-	const u32 color = 0xff000000 + r + (g << 8) + (b << 16);
+void blockColor(u32 abgr) {
 	ThreadContext* ctx = g_instance.getThreadContext();
-	write(*ctx, EventType::BLOCK_COLOR, color);
+	write<false>(*ctx, os::Timer::getRawTimestamp(), EventType::BLOCK_COLOR, abgr);
 }
 
 static AtomicI32 last_block_id = 0;
 
-void beginBlock(const char* name)
-{
+void beginJob(i32 signal_on_finish) {
+	ThreadContext* ctx = g_instance.getThreadContext();
+
+	JobRecord r;
+	r.id = last_block_id.inc();
+	r.signal_on_finish = signal_on_finish;
+
+	if (ctx->open_block_stack_size < lengthOf(ctx->open_block_stack)) {
+		ctx->open_block_stack[ctx->open_block_stack_size] = r.id;
+	}
+	++ctx->open_block_stack_size;
+
+	write<false>(*ctx, os::Timer::getRawTimestamp(), EventType::BEGIN_JOB, r);
+}
+
+void beginBlock(const char* name) {
 	BlockRecord r;
 	r.id = last_block_id.inc();
 	r.name = name;
 	ThreadContext* ctx = g_instance.getThreadContext();
-	ctx->open_blocks.push(r.id);
-	write(*ctx, EventType::BEGIN_BLOCK, r);
+
+	if (ctx->open_block_stack_size < lengthOf(ctx->open_block_stack)) {
+		ctx->open_block_stack[ctx->open_block_stack_size] = r.id;
+	}
+	++ctx->open_block_stack_size;
+	
+	write<false>(*ctx, os::Timer::getRawTimestamp(), EventType::BEGIN_BLOCK, r);
+}
+
+void endBlock()
+{
+	ThreadContext* ctx = g_instance.getThreadContext();
+	if (ctx->open_block_stack_size > 0) {
+		--ctx->open_block_stack_size;
+		write<false>(*ctx, os::Timer::getRawTimestamp(), EventType::END_BLOCK, 0);
+	}
 }
 
 static GPUScope& getGPUScope(const char* name, u32& scope_id) {
@@ -435,7 +441,7 @@ void beginGPUBlock(const char* name, u64 timestamp, i64 profiler_link) {
 	data.timestamp = timestamp;
 	copyString(data.name, name);
 	data.profiler_link = profiler_link;
-	write(g_instance.global_context, EventType::BEGIN_GPU_BLOCK, data);
+	write<true>(g_instance.global_context, os::Timer::getRawTimestamp(), EventType::BEGIN_GPU_BLOCK, data);
 	MutexGuard lock(g_instance.global_context.mutex);
 	u32 scope_id;
 	getGPUScope(name, scope_id).pushBegin(timestamp);
@@ -443,11 +449,11 @@ void beginGPUBlock(const char* name, u64 timestamp, i64 profiler_link) {
 }
 
 void gpuStats(u64 primitives_generated) {
-	write(g_instance.global_context, EventType::GPU_STATS, primitives_generated);
+	write<true>(g_instance.global_context, os::Timer::getRawTimestamp(), EventType::GPU_STATS, primitives_generated);
 }
 
 void endGPUBlock(u64 timestamp) {
-	write(g_instance.global_context, EventType::END_GPU_BLOCK, timestamp);
+	write<true>(g_instance.global_context, os::Timer::getRawTimestamp(), EventType::END_GPU_BLOCK, timestamp);
 	MutexGuard lock(g_instance.global_context.mutex);
 
 	if (g_instance.gpu_scope_stack.empty()) return;
@@ -493,7 +499,7 @@ i64 createNewLinkID()
 void link(i64 link)
 {
 	ThreadContext* ctx = g_instance.getThreadContext();
-	write(*ctx, EventType::LINK, link);
+	write<false>(*ctx, os::Timer::getRawTimestamp(), EventType::LINK, link);
 }
 
 
@@ -505,31 +511,20 @@ float getLastFrameDuration()
 
 void beforeFiberSwitch() {
 	ThreadContext* ctx = g_instance.getThreadContext();
-	MutexGuard lock(ctx->mutex);
 	const u64 now = os::Timer::getRawTimestamp();
-	while(!ctx->open_blocks.empty()) {
-		writeNoLock(*ctx, now, EventType::END_BLOCK, 0);
-		ctx->open_blocks.pop();
+	while(ctx->open_block_stack_size > 0) {
+		write<false>(*ctx, now, EventType::END_BLOCK, 0);
+		--ctx->open_block_stack_size;
 	}
 }
 
 
-void pushJobInfo(i32 signal_on_finish)
-{
-	JobRecord r;
-	r.signal_on_finish = signal_on_finish;
-	ThreadContext* ctx = g_instance.getThreadContext();
-	write(*ctx, EventType::JOB_INFO, r);
-}
-
 void signalTriggered(i32 job_system_signal) {
 	ThreadContext* ctx = g_instance.getThreadContext();
-	write(*ctx, EventType::SIGNAL_TRIGGERED, job_system_signal);
+	write<false>(*ctx, os::Timer::getRawTimestamp(), EventType::SIGNAL_TRIGGERED, job_system_signal);
 }
 
-
-FiberSwitchData beginFiberWait(i32 job_system_signal)
-{
+FiberSwitchData beginFiberWait(i32 job_system_signal) {
 	FiberWaitRecord r;
 	r.id = g_instance.fiber_wait_id.inc();
 	r.job_system_signal = job_system_signal;
@@ -537,49 +532,33 @@ FiberSwitchData beginFiberWait(i32 job_system_signal)
 	FiberSwitchData res;
 
 	ThreadContext* ctx = g_instance.getThreadContext();
-	res.count = ctx->open_blocks.size();
+	res.count = ctx->open_block_stack_size;
 	res.id = r.id;
 	res.signal = job_system_signal;
-	memcpy(res.blocks, ctx->open_blocks.begin(), minimum(res.count, lengthOf(res.blocks)) * sizeof(res.blocks[0]));
-	write(*ctx, EventType::BEGIN_FIBER_WAIT, r);
+	memcpy(res.blocks, ctx->open_block_stack, minimum(res.count, lengthOf(res.blocks), lengthOf(ctx->open_block_stack)) * sizeof(res.blocks[0]));
+	write<false>(*ctx, os::Timer::getRawTimestamp(), EventType::BEGIN_FIBER_WAIT, r);
 	return res;
 }
 
-
-void endFiberWait(const FiberSwitchData& switch_data)
-{
+void endFiberWait(const FiberSwitchData& switch_data) {
 	ThreadContext* ctx = g_instance.getThreadContext();
 	FiberWaitRecord r;
 	r.id = switch_data.id;
 	r.job_system_signal = switch_data.signal;
 
-	MutexGuard lock(ctx->mutex);
 	const u64 now = os::Timer::getRawTimestamp();
-	writeNoLock(*ctx, now, EventType::END_FIBER_WAIT, r);
+	write<false>(*ctx, now, EventType::END_FIBER_WAIT, r);
 	const u32 count = switch_data.count;
 	
 	for (u32 i = 0; i < count; ++i) {
-		if(i < lengthOf(switch_data.blocks)) {
-			const i32 block_id = switch_data.blocks[i];
-			ctx->open_blocks.push(block_id);
-			writeNoLock(*ctx, now, EventType::CONTINUE_BLOCK, block_id);
-		} else {
-			ctx->open_blocks.push(-1);
-			writeNoLock(*ctx, now, EventType::CONTINUE_BLOCK, -1);
+		const i32 block_id = i < lengthOf(switch_data.blocks) ? switch_data.blocks[i] : -1;
+		if (ctx->open_block_stack_size < lengthOf(ctx->open_block_stack)) {
+			ctx->open_block_stack[ctx->open_block_stack_size] = block_id;
 		}
+		++ctx->open_block_stack_size;
+		write<false>(*ctx, now, EventType::CONTINUE_BLOCK, block_id);
 	}
 }
-
-
-void endBlock()
-{
-	ThreadContext* ctx = g_instance.getThreadContext();
-	if(!ctx->open_blocks.empty()) {
-		ctx->open_blocks.pop();
-		write(*ctx, EventType::END_BLOCK, 0);
-	}
-}
-
 
 u64 getThreadContextMemorySize() {
 	u64 res = 0;
@@ -610,7 +589,7 @@ void frame()
 		g_instance.last_frame_duration = n - g_instance.last_frame_time;
 	}
 	g_instance.last_frame_time = n;
-	write(g_instance.global_context, EventType::FRAME, 0);
+	write<true>(g_instance.global_context, os::Timer::getRawTimestamp(), EventType::FRAME, 0);
 }
 
 
@@ -624,7 +603,7 @@ void pushMutexEvent(u64 mutex_id, u64 begin_enter_time, u64 end_enter_time, u64 
 		.begin_exit = begin_exit_time,
 		.end_exit = end_exit_time
 	};
-	write(*ctx, EventType::MUTEX_EVENT, r);
+	write<false>(*ctx, os::Timer::getRawTimestamp(), EventType::MUTEX_EVENT, r);
 }
 
 void showInProfiler(bool show)
@@ -641,7 +620,7 @@ void setThreadName(const char* name)
 	ThreadContext* ctx = g_instance.getThreadContext();
 	MutexGuard lock(ctx->mutex);
 
-	ctx->name = name;
+	ctx->thread_name = name;
 }
 
 template <typename T>
@@ -705,7 +684,7 @@ static void saveStrings(OutputMemoryStream& blob) {
 
 void serialize(OutputMemoryStream& blob, ThreadContext& ctx) {
 	MutexGuard lock(ctx.mutex);
-	blob.writeString(ctx.name);
+	blob.writeString(ctx.thread_name);
 	blob.write(ctx.thread_id);
 	blob.write(ctx.begin);
 	blob.write(ctx.end);
@@ -732,7 +711,7 @@ void serialize(OutputMemoryStream& blob) {
 
 void pause(bool paused)
 {
-	if (paused) write(g_instance.global_context, EventType::PAUSE, 0);
+	if (paused) write<true>(g_instance.global_context, os::Timer::getRawTimestamp(), EventType::PAUSE, 0);
 
 	g_instance.paused = paused;
 	if (paused) g_instance.paused_time = os::Timer::getRawTimestamp();
