@@ -5,6 +5,7 @@
 #include "core/default_allocator.h"
 #include "core/associative_array.h"
 #include "core/atomic.h"
+#include "core/color.h"
 #include "core/command_line_parser.h"
 #include "core/debug.h"
 #include "engine/file_system.h"
@@ -766,7 +767,7 @@ struct StudioAppImpl final : StudioApp {
 
 	void onIdle() {
 		PROFILE_FUNCTION();
-		profiler::blockColor(0x7f, 0x7f, 0x7f);
+		profiler::blockColor(Color(0x7f, 0x7f, 0x7f, 0xff).abgr());
 
 		updateGizmoOffset();
 		processDeferredWindowDestroy();

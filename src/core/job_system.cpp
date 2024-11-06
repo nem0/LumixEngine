@@ -1,6 +1,7 @@
 #include "core/allocator.h"
 #include "core/array.h"
 #include "core/atomic.h"
+#include "core/color.h"
 #include "core/fibers.h"
 #include "core/log.h"
 #include "core/math.h"
@@ -13,16 +14,16 @@
 #include "core/thread.h"
 #include "job_system.h"
 
-/* There are three types of queues:
-* 1. Work Stealing Queue - Each worker has its own. Jobs can only be pushed by the worker itself but can be consumed by any worker.
-* 2. Worker Queue - Each worker has its own queue for jobs pinned to that worker.
+/* 
+There are three types of queues:
+	1. Work Stealing Queue - Each worker has its own. Jobs can only be pushed by the worker itself but can be consumed by any worker.
+	2. Worker Queue - Each worker has its own queue for jobs pinned to that worker.
 		Jobs in this queue are executed only by the owning worker.
 		Any thread, including those outside the job system, can push jobs to this queue.
-* 3. Global Queue - A single global queue where jobs can be executed by any worker (unlike queue 2.).
+	3. Global Queue - A single global queue where jobs can be executed by any worker (unlike queue 2.).
 		Any thread, including those outside the job system, can push jobs to this queue (unlike queue 1.).
-*/
 
-/* Invariants:
+Invariants:
 	* Jobs are executed in undefined order, i.e. if we push jobs A and B, we can't be sure that A will be executed before B. 
 	* tryPop in sequence "push(), tryPop()" is guaranteed to pop a job. The consumer in this case can be on a different thread, if we are sure that push() returned.
 	* If a thread calls push(jobA), tryPop() running in parallel on another thread might or might not pop jobA.
@@ -75,67 +76,25 @@ LUMIX_FORCE_INLINE static void wake(u32 num_jobs);
 LUMIX_FORCE_INLINE static void wake();
 LUMIX_FORCE_INLINE static void executeJob(const Job& job);
 
-// TODO we don't need full memory barriers
-// we assume strong memory model
 // single producer, multiple consumer queue
+// we assume strong memory model, so we can don't need to use full barriers in some cases
 // producer can call only push and tryPop - produce and consume on one end of the queue
 // others can call only trySteal - consume from the other end of the queue
+// backed by a ring buffer, using global queue if the ring buffer is full
 struct WorkStealingQueue {
-	static constexpr u32 QUEUE_SIZE = 512;
-	// Once we reach OVERFLOW_GUARD items in queue, we start executing jobs directly
-	// instead of pushing them in queue. This is to prevent queue overflow.
-	// Queue should be big enough for this to never happen.
-	// Be aware that an overflow can still occur if a fiber is pushed to an already full queue. // TODO handle fiber overflow
-	static constexpr u32 OVERFLOW_GUARD = QUEUE_SIZE - 4;
-	static constexpr u32 SIZE_MASK = QUEUE_SIZE - 1;
+	static constexpr u32 RING_BUFFER_SIZE = 512;
+	static constexpr u32 SIZE_MASK = RING_BUFFER_SIZE - 1;
 
+	LUMIX_FORCE_INLINE void pushAndWake(const Work& obj);
 	// optimized batch push
-	LUMIX_FORCE_INLINE void pushAndWakeN(const Work& obj, u32 num) {
-		const i32 producing_end = m_producing_end;
-		const i32 size = producing_end - m_stealing_end;
+	LUMIX_FORCE_INLINE void pushAndWakeN(const Work& obj, u32 num);
 
-		if (size + num > OVERFLOW_GUARD && obj.type == Work::JOB) {
-			for (u32 i = 0; i < num; ++i) {
-				executeJob(obj.job);
-			}
-			return;
-		}
-		
-		ASSERT(size + num <= QUEUE_SIZE);
-		for (u32 i = 0; i < num; ++i) {
-			m_queue[(producing_end + i) & SIZE_MASK] = obj;
-		}
-		memoryBarrier();
-		m_producing_end = producing_end + num;
-		wake(num);
-	}
-
-	LUMIX_FORCE_INLINE void pushAndWake(const Work& obj) {
-		// there's only one producer so we don't need to worry about concurrent push or tryPop
-		// and stealers do not modify m_producing_end
-		// worst case scenario is that a concurrent stealer will not be able to steal the element we are pushing right now
-		const i32 producing_end = m_producing_end;
-		const i32 size = producing_end - m_stealing_end;
-		ASSERT(size < QUEUE_SIZE);
-
-		if (size > OVERFLOW_GUARD && obj.type == Work::JOB) {
-			// queue is near full, execute the job directly so we won't overflow
-			// queue should be big enough for this to never happen
-			executeJob(obj.job);
-			return;
-		}
-
-		m_queue[producing_end & SIZE_MASK] = obj;
-		memoryBarrier();
-		m_producing_end = producing_end + 1;
-		wake();
-	}
-
-	bool tryPop(Work& obj) {
+	LUMIX_FORCE_INLINE bool tryPop(Work& obj) {
 		for (;;) {
 			const i32 producing_end = m_producing_end - 1;
 			m_producing_end = producing_end;
 			// decrement producing_end first so that concurrent stealers can't pop the same element without us knowing
+			// we need full memory barrier because we can't allow the store and load to be reordered
 			memoryBarrier();
 			const i32 stealing_end = m_stealing_end;
 			
@@ -171,10 +130,11 @@ struct WorkStealingQueue {
 		}
 	}
 
-	bool trySteal(Work& obj) {
+	LUMIX_FORCE_INLINE bool trySteal(Work& obj) {
 		for (;;) {
 			const i32 stealing_end = m_stealing_end;
-			memoryBarrier();
+			// read stealing_end first, so we won't miss concurrent trySteal, or tryPop popping the last element
+			readBarrier(); 
 			const i32 producing_end = m_producing_end;
 			
 			const bool is_empty = stealing_end >= producing_end;
@@ -196,7 +156,7 @@ struct WorkStealingQueue {
 	alignas(64) volatile i32 m_stealing_end = 0; 	// both producer and consumers can write this
 	alignas(64) volatile i32 m_producing_end = 0; 	// only producer modifies this, consumers can read it
 	// if m_producing_end > m_stealing_end, queue is not empty
-	Work m_queue[QUEUE_SIZE];
+	Work m_queue[RING_BUFFER_SIZE];
 };
 
 // MPMC queue
@@ -213,7 +173,7 @@ struct WorkQueue {
 		// fastest path - empty queue is just one atomic read
 		if (empty) return false;
 
-		Lumix::MutexGuardProfiled guard(mutex);
+		Lumix::MutexGuard guard(mutex);
 		if (queue.empty()) {
 			empty = 1;
 			return false;
@@ -227,7 +187,7 @@ struct WorkQueue {
 
 	LUMIX_FORCE_INLINE void pushAndWakeN(const Work& obj, u32 num) {
 		{
-			Lumix::MutexGuardProfiled guard(mutex);
+			Lumix::MutexGuard guard(mutex);
 			for (u32 i = 0; i < num; ++i) {
 				queue.push(obj);
 			}
@@ -238,7 +198,7 @@ struct WorkQueue {
 
 	LUMIX_FORCE_INLINE void pushAndWake(const Work& obj, WorkerTask* to_wake) {
 		{
-			Lumix::MutexGuardProfiled guard(mutex);
+			Lumix::MutexGuard guard(mutex);
 			queue.push(obj);
 			empty = 0;
 		}
@@ -261,9 +221,9 @@ struct System {
 	FiberJobPair m_fiber_pool[512];
 	RingBuffer<FiberJobPair*, 512> m_free_fibers;
 	WorkQueue m_global_queue; // non-worker threads must push here
-	Lumix::Mutex m_sleeping_sync;
 	AtomicI32 m_num_sleeping = 0; // if 0, we are sure that no worker is sleeping; if not 0, workers can be in any state
-	Array<WorkerTask*> m_sleeping_workers;
+	Lumix::Mutex m_sleeping_sync;
+	Array<WorkerTask*> m_sleeping_workers; // only access while holding m_sleeping_sync
 };
 
 
@@ -407,7 +367,6 @@ LUMIX_FORCE_INLINE static bool tryPopWork(Work& work, WorkerTask* worker) {
 // return false if the worker should shutdown
 LUMIX_FORCE_INLINE static bool popWork(Work& work, WorkerTask* worker) {
 	while (!worker->m_finished) {
-		// spin a few times before we go to sleep
 		for (u32 i = 0; i < 20; ++i) {
 			if (tryPopWork(work, worker)) return true;
 		}
@@ -416,7 +375,6 @@ LUMIX_FORCE_INLINE static bool popWork(Work& work, WorkerTask* worker) {
 		g_system->m_num_sleeping.inc();
 		worker->m_is_sleeping = 1;
 		
-		// this mutex is not profile-guarded, because we can go to sleep while holding it
 		Lumix::MutexGuard guard(g_system->m_sleeping_sync);
 		
 		// we must recheck the queues while holding the mutex, because somebody might have pushed a job in the meantime
@@ -427,10 +385,10 @@ LUMIX_FORCE_INLINE static bool popWork(Work& work, WorkerTask* worker) {
 		}
 
 		// no jobs, let's go to sleep
-		// even if somebody pushed a job since we locked the mutex, we are sure that we will be woken up, since we hold the mutex
+		// even if somebody pushed a job in the meantime, we are sure that we will be woken up, since we hold the mutex
 		#ifdef LUMIX_PROFILE_JOBS
 			PROFILE_BLOCK("sleeping");
-			profiler::blockColor(0x30, 0x30, 0x30);
+			profiler::blockColor(Color(0x30, 0x30, 0x30, 0xff).abgr());
 		#endif
 
 		g_system->m_sleeping_workers.push(worker);
@@ -556,11 +514,7 @@ LUMIX_FORCE_INLINE static void addCounter(Counter* counter, u32 value) {
 
 LUMIX_FORCE_INLINE static void executeJob(const Job& job) {
 	#ifdef LUMIX_PROFILE_JOBS
-		profiler::beginBlock("job");
-		profiler::blockColor(0x60, 0x60, 0x60);
-		if (job.dec_on_finish) {
-			profiler::pushJobInfo(job.dec_on_finish->signal.generation);
-		}
+		profiler::beginJob(job.dec_on_finish ? job.dec_on_finish->signal.generation : 0);
 	#endif
 	job.task(job.data);
 	#ifdef LUMIX_PROFILE_JOBS
@@ -622,11 +576,15 @@ bool init(u8 workers_count, IAllocator& allocator) {
 		g_system->m_free_fibers.push(&fiber);
 	}
 
-	int count = maximum(1, int(workers_count));
-	for (int i = 0; i < count; ++i) {
+	const u32 count = maximum(1, workers_count);
+	for (u32 i = 0; i < count; ++i) {
 		WorkerTask* task = LUMIX_NEW(getAllocator(), WorkerTask)(*g_system, i);
+		g_system->m_workers.push(task);
+	}
+
+	for (u32 i = 0; i < count; ++i) {
+		WorkerTask* task = g_system->m_workers[i];
 		if (task->create(StaticString<64>("Worker #", i), false)) {
-			g_system->m_workers.push(task);
 			task->setAffinityMask((u64)1 << i);
 		}
 		else {
@@ -851,7 +809,7 @@ void runN(void* data, void(*task)(void*), Counter* on_finished, u32 num_jobs)
 LUMIX_FORCE_INLINE static void wake(WorkerTask& worker) {
 	if (!worker.m_is_sleeping) return;
 
-	Lumix::MutexGuardProfiled guard(g_system->m_sleeping_sync);
+	Lumix::MutexGuard guard(g_system->m_sleeping_sync);
 	g_system->m_sleeping_workers.eraseItem(&worker);
 	worker.wakeup();
 }
@@ -860,7 +818,7 @@ LUMIX_FORCE_INLINE static void wake(WorkerTask& worker) {
 LUMIX_FORCE_INLINE static void wake() {
 	if (g_system->m_num_sleeping == 0) return;
 
-	Lumix::MutexGuardProfiled guard(g_system->m_sleeping_sync);
+	Lumix::MutexGuard guard(g_system->m_sleeping_sync);
 	if (g_system->m_sleeping_workers.empty()) return;
 	
 	WorkerTask* to_wake = g_system->m_sleeping_workers.back();
@@ -874,7 +832,7 @@ LUMIX_FORCE_INLINE static void wake(u32 num) {
 	// fast path, no workers are sleeping
 	if (g_system->m_num_sleeping == 0) return;
 
-	Lumix::MutexGuardProfiled guard(g_system->m_sleeping_sync);
+	Lumix::MutexGuard guard(g_system->m_sleeping_sync);
 	for (u32 i = 0; i < num; ++i) {
 		if (g_system->m_sleeping_workers.empty()) return;
 		
@@ -884,5 +842,46 @@ LUMIX_FORCE_INLINE static void wake(u32 num) {
 	}
 }
 
+// same as pushAndWake, but pushed the job `num` times
+void WorkStealingQueue::pushAndWakeN(const Work& obj, u32 num) {
+	const i32 producing_end = m_producing_end;
+	const i32 size = producing_end - m_stealing_end;
+
+	if (size + num > RING_BUFFER_SIZE) {
+		g_system->m_global_queue.pushAndWakeN(obj, num);
+		return;
+	}
+	
+	for (u32 i = 0; i < num; ++i) {
+		m_queue[(producing_end + i) & SIZE_MASK] = obj;
+	}
+	writeBarrier();
+	m_producing_end = producing_end + num;
+	wake(num);
+}
+
+void WorkStealingQueue::pushAndWake(const Work& obj) {
+	// there's only one producer so we don't need to worry about concurrent push or tryPop
+	// and stealers do not modify m_producing_end
+	// worst case scenario is that a concurrent stealer will not be able to steal the element we are pushing right now
+	const i32 producing_end = m_producing_end;
+	// no need for barrier or any sync, worst case we overestimate current size (m_stealing_end can only increase, m_producing_end can't change)
+	// if we overestimate and overflow because of that, we will push to global queue, which is fine
+	const i32 size = producing_end - m_stealing_end;
+
+	if (size == RING_BUFFER_SIZE) {
+		// queue is full, push to global queue instead
+		// queue should be big enough for this to never happen
+		g_system->m_global_queue.pushAndWake(obj, nullptr);
+		return;
+	}
+
+	m_queue[producing_end & SIZE_MASK] = obj;
+	// ensure m_queue is written before m_producing_end
+	// so concurrent trySteal won't steal not fully written m_queue element
+	writeBarrier();
+	m_producing_end = producing_end + 1;
+	wake();
+}
 
 } // namespace Lumix::jobs

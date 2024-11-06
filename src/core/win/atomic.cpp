@@ -1,6 +1,11 @@
 #include "core/atomic.h"
 #include <intrin.h>
 
+extern "C" {
+	void _ReadBarrier(void);
+	void _WriteBarrier(void);
+}
+
 namespace Lumix
 {
 
@@ -17,12 +22,12 @@ i32 AtomicI32::subtract(i32 v) { return _InterlockedExchangeAdd((volatile long*)
 i32 AtomicI32::setBits(i32 v) { return _InterlockedOr((volatile long*)&value, v); }
 i32 AtomicI32::clearBits(i32 v) { return _InterlockedAnd((volatile long*)&value, ~v); }
 
-bool AtomicI32::compareExchange(i32 exchange, i32 comperand) { 
-	return _InterlockedCompareExchange((volatile long*)&value, exchange, comperand) == comperand;
+bool AtomicI32::compareExchange(volatile i32* value, i32 exchange, i32 comperand) {
+	return _InterlockedCompareExchange((volatile long*)value, exchange, comperand) == comperand;
 }
 
-bool AtomicI32::compareExchange(volatile i32* value, i32 exchange, i32 comperand) { 
-	return _InterlockedCompareExchange((volatile long*)value, exchange, comperand) == comperand;
+bool AtomicI32::compareExchange(i32 exchange, i32 comperand) { 
+	return _InterlockedCompareExchange((volatile long*)&value, exchange, comperand) == comperand;
 }
 
 void AtomicI64::operator =(i64 v) { _InterlockedExchange64((volatile long long*)&value, v); }
@@ -56,6 +61,14 @@ void* exchangePtr(void* volatile* value, void* exchange) {
 
 void cpuRelax() {
 	_mm_pause();
+}
+
+void readBarrier() {
+	_ReadBarrier();
+}
+
+void writeBarrier() {
+	_WriteBarrier();
 }
 
 void memoryBarrier()

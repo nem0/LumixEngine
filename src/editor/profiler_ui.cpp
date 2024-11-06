@@ -2,6 +2,7 @@
 
 #include "core/arena_allocator.h"
 #include "core/atomic.h"
+#include "core/color.h"
 #include "core/command_line_parser.h"
 #include "core/crt.h"
 #include "core/debug.h"
@@ -773,6 +774,22 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 						}
 						break;
 					}
+					case profiler::EventType::BEGIN_JOB: {
+						profiler::JobRecord tmp;
+						read(ctx, p + sizeof(profiler::EventHeader), tmp);
+						auto iter = m_blocks.find(tmp.id);
+						if (iter.isValid()) {
+							iter.value().color = Color(0x60, 0x60, 0x60, 0xff).abgr();
+						}
+						else {
+							Block& b = m_blocks.insert(tmp.id);
+							b.color = Color(0x60, 0x60, 0x60, 0xff).abgr();
+							b.name = "job";
+							if (startsWith(b.name, "Lumix::")) b.name += 7;
+							else if (startsWith(b.name, "`anonymous-namespace'::")) b.name += 23;
+						}
+						break;
+					}
 					case profiler::EventType::BEGIN_BLOCK: {
 						profiler::BlockRecord tmp;
 						read(ctx, p + sizeof(profiler::EventHeader), tmp);
@@ -1074,11 +1091,15 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 					case profiler::EventType::INT:
 						properties.push({p, line});
 						break;
-					case profiler::EventType::JOB_INFO:
-						if (open_blocks.size() > 0) {
-							read(ctx, p + sizeof(profiler::EventHeader), m_blocks[open_blocks.last().id].job_info);
-						}
+					case profiler::EventType::BEGIN_JOB: {
+						profiler::JobRecord tmp;
+						read(ctx, p + sizeof(profiler::EventHeader), tmp);
+						open_blocks.push({tmp.id, header.time});
+						lines = maximum(lines, open_blocks.size());
+						++line;
+						m_blocks[tmp.id].job_info = tmp;
 						break;
+					}
 					case profiler::EventType::LINK:
 						if (open_blocks.size() > 0) {
 							read(ctx, p + sizeof(profiler::EventHeader), m_blocks[open_blocks.last().id].link);

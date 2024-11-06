@@ -16,10 +16,11 @@ LUMIX_CORE_API void setThreadName(const char* name);
 LUMIX_CORE_API void showInProfiler(bool show);
 
 LUMIX_CORE_API void beginBlock(const char* name_literal);
-LUMIX_CORE_API void blockColor(u8 r, u8 g, u8 b);
+LUMIX_CORE_API void beginJob(i32 signal_on_finish);
+LUMIX_CORE_API void blockColor(u32 abgr);
 LUMIX_CORE_API void endBlock();
+LUMIX_FORCE_INLINE void endJob() { endBlock(); }
 LUMIX_CORE_API void frame();
-LUMIX_CORE_API void pushJobInfo(i32 signal_on_finish);
 LUMIX_CORE_API void pushString(const char* value);
 LUMIX_CORE_API void pushInt(const char* key_literal, int value);
 LUMIX_CORE_API void pushMutexEvent(u64 mutex_id, u64 begin_enter_time, u64 end_enter_time, u64 begin_exit_time, u64 end_exit_time);
@@ -102,8 +103,8 @@ struct IntRecord
 };
 
 
-struct JobRecord
-{
+struct JobRecord {
+	i32 id;
 	i32 signal_on_finish;
 };
 
@@ -140,7 +141,7 @@ enum class EventType : u8
 	BEGIN_FIBER_WAIT,
 	END_FIBER_WAIT,
 	CONTEXT_SWITCH,
-	JOB_INFO,
+	BEGIN_JOB,
 	BEGIN_GPU_BLOCK,
 	END_GPU_BLOCK,
 	LINK,
