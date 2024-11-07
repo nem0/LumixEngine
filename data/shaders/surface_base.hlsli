@@ -19,6 +19,9 @@ struct VSOutput {
 	#ifdef HAS_LOD
 		float lod : TEXCOORD5;
 	#endif
+	#ifdef AO_ATTR
+		float ao : TEXCOORD6;
+	#endif
 	#ifdef GRASS
 		#ifdef COLOR0_ATTR
 			//float4 color : TEXCOORD6;
@@ -35,6 +38,10 @@ struct VSInput {
 	
 	#ifdef UV0_ATTR
 		float2 uv : ATTR(UV0_ATTR);
+	#endif
+
+	#ifdef AO_ATTR
+		float ao : ATTR(AO_ATTR);
 	#endif
 	
 	#ifdef TANGENT_ATTR
@@ -103,6 +110,9 @@ VSOutput mainVS(VSInput input) {
 	#endif
 	#ifdef TANGENT_ATTR
 		output.tangent = input.tangent;
+	#endif
+	#ifdef AO_ATTR
+		output.ao = input.ao;
 	#endif
 	#ifdef UV0_ATTR
 		output.uv = input.uv;
