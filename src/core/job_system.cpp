@@ -3,9 +3,6 @@
 #include "core/atomic.h"
 #include "core/color.h"
 #include "core/fibers.h"
-#include "core/log.h"
-#include "core/math.h"
-#include "core/os.h"
 #include "core/profiler.h"
 #include "core/ring_buffer.h"
 #include "core/string.h"
@@ -147,7 +144,6 @@ struct WorkStealingQueue {
 				// we managed to pop the element
 				return true;
 			}
-
 			// concurrent stealer or tryPop was faster, retry
 		}
 	}
@@ -312,6 +308,7 @@ struct WorkerTask : Thread {
 	WorkQueue m_work_queue; // for jobs that need to be pinned to a worker
 	WorkStealingQueue m_wsq;
 	u8 m_worker_index;
+	u8 m_last_steal_idx = 0; // index of the last worker we managed to steal from
 	
 	// if m_is_sleeping == 0, we are sure that we are not sleeping
 	// but if m_is_sleeping == 1, we are not sure if we are sleeping or not
@@ -331,14 +328,21 @@ LUMIX_FORCE_INLINE static void scheduleFiber(FiberJobPair* fiber) {
 
 // try to steal a job from any other worker
 // we have to try all workers, otherwise we could miss a job
-LUMIX_FORCE_INLINE static bool trySteal(Work& work) {
+LUMIX_FORCE_INLINE static bool trySteal(Work& work, WorkerTask* stealing_worker) {
 	Array<WorkerTask*>& workers = g_system->m_workers;
 	const u32 num_workers = workers.size();	
-	const u32 start = rand() % num_workers;
-	for (u32 i = 0; i < num_workers; ++i) {
-		const u32 idx = (start + i) % num_workers;
-		if (workers[idx]->m_wsq.trySteal(work))
+	const u32 start = stealing_worker->m_last_steal_idx;
+	for (u32 i = stealing_worker->m_last_steal_idx; i < num_workers; ++i) {
+		if (workers[i]->m_wsq.trySteal(work)) {
+			stealing_worker->m_last_steal_idx = i;
 			return true;
+		}
+	}
+	for (u32 i = 0; i < stealing_worker->m_last_steal_idx; ++i) {
+		if (workers[i]->m_wsq.trySteal(work)) {
+			stealing_worker->m_last_steal_idx = i;
+			return true;
+		}
 	}
 	return false;
 }
@@ -353,7 +357,7 @@ LUMIX_FORCE_INLINE static bool tryPopWork(Work& work, WorkerTask* worker) {
 	if (worker->m_wsq.tryPop(work)) return true;
 	
 	// then try to steal a job from other workers, this is slower than tryPop
-	if (trySteal(work)) return true;
+	if (trySteal(work, worker)) return true;
 	
 	// it's very rare to have a job in the global queue, so we check it last
 	if (g_system->m_global_queue.tryPop(work)) return true;
@@ -576,7 +580,7 @@ bool init(u8 workers_count, IAllocator& allocator) {
 		g_system->m_free_fibers.push(&fiber);
 	}
 
-	const u32 count = maximum(1, workers_count);
+	const u32 count = workers_count > 1 ? workers_count : 1;
 	for (u32 i = 0; i < count; ++i) {
 		WorkerTask* task = LUMIX_NEW(getAllocator(), WorkerTask)(*g_system, i);
 		g_system->m_workers.push(task);
@@ -588,7 +592,6 @@ bool init(u8 workers_count, IAllocator& allocator) {
 			task->setAffinityMask((u64)1 << i);
 		}
 		else {
-			logError("Job system worker failed to initialize.");
 			LUMIX_DELETE(getAllocator(), task);
 		}
 	}

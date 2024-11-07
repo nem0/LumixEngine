@@ -1353,6 +1353,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 				fill_color = tmp_c;
 			}
 			if (m_hovered_link.link == block.link && m_hovered_link.frame > m_frame_idx - 2) fill_color = 0xff0000ff;
+			if (m_hovered_block.id == r.id && m_hovered_block.frame > m_frame_idx - 2) fill_color = 0xff0000ff;
 
 			if (m_hovered_fiber_wait.signal == block.job_info.signal_on_finish && m_hovered_fiber_wait.frame > m_frame_idx - 2) {
 					dl->ChannelsSetCurrent(1);

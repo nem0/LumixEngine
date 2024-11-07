@@ -1,9 +1,12 @@
 #pragma once
 #include "core.h"
-#include "allocator.h"
 #include "atomic.h"
 
-namespace Lumix::jobs {
+namespace Lumix {
+
+struct IAllocator;
+
+namespace jobs {
 
 constexpr u8 ANY_WORKER = 0xff;
 
@@ -42,12 +45,10 @@ LUMIX_CORE_API void moveJobToWorker(u8 worker_index);
 // yield current job, push it to global queue
 LUMIX_CORE_API void yield();
 
-
 // run single job, increment on_finished counter, decrement it when job is done
 LUMIX_CORE_API void run(void* data, void(*task)(void*), Counter* on_finish, u8 worker_index = ANY_WORKER);
-// optimized batch run multi jobs, useful for foreach and others
+// same as calling `run` `num_jobs` times, except it's faster
 LUMIX_CORE_API void runN(void* data, void(*task)(void*), Counter* on_finish, u32 num_jobs);
-
 
 // spawn as many jobs as there are worker threads, and call `f`
 template <typename F> void runOnWorkers(const F& f);
@@ -177,4 +178,6 @@ void forEach(u32 count, u32 step, const F& f) {
 	jobs::wait(&counter);
 }
 
-} // namespace
+} // namespace jobs
+
+} // namespace Lumix
