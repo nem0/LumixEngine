@@ -600,8 +600,8 @@ struct AnimationModuleImpl final : AnimationModule {
 		m_render_module->unlockPose(entity, true);
 	}
 
-	void updateAnimator(Animator& animator, float time_delta)
-	{
+	void updateAnimator(Animator& animator, float time_delta) {
+		PROFILE_FUNCTION();
 		if (!animator.resource || !animator.resource->isReady()) return;
 		if (!animator.ctx) {
 			animator.ctx = animator.resource->createRuntime(animator.default_set);

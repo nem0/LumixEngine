@@ -367,7 +367,10 @@ struct NavigationModuleImpl final : NavigationModule
 
 	void update(RecastZone& zone, float time_delta) {
 		if (!zone.crowd) return;
-		zone.crowd->update(time_delta, nullptr);
+		{
+			PROFILE_BLOCK("dtCrowd::update");
+			zone.crowd->update(time_delta, nullptr);
+		}
 
 		for (auto& agent : m_agents) {
 			if (agent.agent < 0) continue;
@@ -982,7 +985,7 @@ struct NavigationModuleImpl final : NavigationModule
 		ASSERT(!zone.crowd);
 
 		zone.crowd = dtAllocCrowd();
-		if (!zone.crowd->init(1000, 4.0f, zone.navmesh)) {
+		if (!zone.crowd->init(2000, 4.0f, zone.navmesh)) {
 			dtFreeCrowd(zone.crowd);
 			zone.crowd = nullptr;
 			return false;
@@ -1484,8 +1487,8 @@ struct NavigationModuleImpl final : NavigationModule
 		if (agent.zone.isValid()) {
 			RecastZone& zone = m_zones[(EntityRef)agent.zone];
 			if (zone.crowd && agent.agent >= 0) zone.crowd->removeAgent(agent.agent);
-			m_agents.erase(iter);
 		}
+		m_agents.erase(iter);
 		m_world.onComponentDestroyed(entity, NAVMESH_AGENT_TYPE, this);
 	}
 
