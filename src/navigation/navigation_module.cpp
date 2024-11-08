@@ -440,8 +440,10 @@ struct NavigationModuleImpl final : NavigationModule
 				}
 			}
 			else if (dt_agent->ncorners == 1 && agent.stop_distance > 0) {
-				Vec3 diff = *(Vec3*)dt_agent->targetPos - *(Vec3*)dt_agent->npos;
-				if (squaredLength(diff) < agent.stop_distance * agent.stop_distance) {
+				float dif[3];
+				rcVsub(dif, dt_agent->cornerVerts, dt_agent->npos);
+				const float dist_squared = rcVdot(dif, dif);
+				if (dist_squared < agent.stop_distance * agent.stop_distance) {
 					zone.crowd->resetMoveTarget(agent.agent);
 					agent.is_finished = true;
 					onPathFinished(agent);
