@@ -12,43 +12,43 @@ jobs:
               run: |
                 mkdir ..\plugins
                 pushd ..\plugins
-                git.exe clone -b bindless https://github.com/nem0/lumixengine_maps.git maps
+                git.exe clone --depth=1 https://github.com/nem0/lumixengine_maps.git maps
             - name: fetch gltf plugin
               working-directory: plugins
               run: |
-                git.exe clone https://github.com/nem0/lumixengine_gltf.git gltf_import
+                git.exe clone --depth=1  https://github.com/nem0/lumixengine_gltf.git gltf_import
             - name: fetch shader_editor plugin
               working-directory: plugins
               run: |
-                git.exe clone https://github.com/nem0/lumixengine_shader_editor.git shader_editor
+                git.exe clone --depth=1 https://github.com/nem0/lumixengine_shader_editor.git shader_editor
             - name: fetch network plugin
               working-directory: plugins
               run: |
-                git.exe clone https://github.com/nem0/lumixengine_net.git net
+                git.exe clone --depth=1 https://github.com/nem0/lumixengine_net.git net
             - name: fetch js plugin
               working-directory: plugins
               run: |
-                git.exe clone -b bindless https://github.com/nem0/lumixengine_js.git js
+                git.exe clone --depth=1 https://github.com/nem0/lumixengine_js.git js
             - name: fetch marketplace plugin
               working-directory: plugins
               run: |
-                git.exe clone -b bindless https://github.com/nem0/lumixengine_market.git market
+                git.exe clone --depth=1 https://github.com/nem0/lumixengine_market.git market
             - name: fetch procedural geometry plugin
               working-directory: plugins
               run: |
-                git.exe clone -b bindless https://github.com/nem0/lumixengine_procedural_geom.git procedural_geom
+                git.exe clone --depth=1 https://github.com/nem0/lumixengine_procedural_geom.git procedural_geom
             - name: fetch visual script plugin
               working-directory: plugins
               run: |
-                git.exe clone https://github.com/nem0/lumixengine_visualscript.git visual_script
+                git.exe clone --depth=1 https://github.com/nem0/lumixengine_visualscript.git visual_script
             - name: fetch livecode plugin
               working-directory: plugins
               run: |
-                git.exe clone -b bindless https://github.com/nem0/lumixengine_livecode.git livecode
+                git.exe clone --depth=1 https://github.com/nem0/lumixengine_livecode.git livecode
             - name: fetch empty plugin template
               working-directory: plugins
               run: |
-                git.exe clone https://github.com/nem0/lumix_plugin_template.git myplugin
+                git.exe clone --depth=1 https://github.com/nem0/lumix_plugin_template.git myplugin
             - name: make VS project with plugins and app
               working-directory: scripts
               run: |

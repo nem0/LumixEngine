@@ -23,50 +23,31 @@ setlocal
 	echo  3. Maps
 	echo  4. Shader editor
 	echo  5. GLTF importer
-	echo  6. DX11 and DX12
-	echo  7. Rml UI
-	echo  8. Network
-	echo  9. JS
-	echo  A. C#
-	echo  B. Visual script
-	echo  C. Procedural geometry
-	echo  D. Marketplace
-	echo  E. LiveCode 
-	echo  F. Basis Universal
+	echo  6. Network
+	echo  7. JS
+	echo  8. C#
+	echo  9. Visual script
+	echo  A. Procedural geometry
+	echo  B. Marketplace
+	echo  C. LiveCode 
+	echo  D. Basis Universal
 	echo ===============================
-	choice /C 123456789ABCDEF /N /M "Your choice:"
+	choice /C 123456789ABCD /N /M "Your choice:"
 	echo.
 	if %errorlevel%==1 exit /B 0
 	if %errorlevel%==2 call :empty_plugin
 	if %errorlevel%==3 call :map_plugin
 	if %errorlevel%==4 call :shader_editor_plugin
 	if %errorlevel%==5 call :glft_import_plugin
-	if %errorlevel%==6 call :dx_plugin
-	if %errorlevel%==7 call :rml_ui_plugin
-	if %errorlevel%==8 call :network_plugin
-	if %errorlevel%==9 call :js_plugin
-	if %errorlevel%==10 call :cs_plugin
-	if %errorlevel%==11 call :visual_script_plugin
-	if %errorlevel%==12 call :procedural_geom_plugin
-	if %errorlevel%==13 call :marketplace_plugin
-	if %errorlevel%==14 call :livecode_plugin
-	if %errorlevel%==15 call :basisu
+	if %errorlevel%==6 call :network_plugin
+	if %errorlevel%==7 call :js_plugin
+	if %errorlevel%==8 call :cs_plugin
+	if %errorlevel%==9 call :visual_script_plugin
+	if %errorlevel%==10 call :procedural_geom_plugin
+	if %errorlevel%==11 call :marketplace_plugin
+	if %errorlevel%==12 call :livecode_plugin
+	if %errorlevel%==13 call :basisu
 goto :begin
-
-:dx_plugin
-	if not exist ..\plugins mkdir ..\plugins
-	pushd ..\plugins
-	if not exist dx (
-		git.exe clone https://github.com/nem0/lumixengine_dx.git dx
-		pushd dx
-		git remote add origin2 git@github.com:nem0/lumixengine_dx.git
-		popd
-	) else (
-		cd dx
-		git pull
-	)
-	popd
-exit /B 0
 
 :glft_import_plugin
 	if not exist ..\plugins mkdir ..\plugins
@@ -78,21 +59,6 @@ exit /B 0
 		popd
 	) else (
 		cd gltf_import
-		git pull
-	)
-	popd
-exit /B 0
-
-:rml_ui_plugin
-	if not exist ..\plugins mkdir ..\plugins
-	pushd ..\plugins
-	if not exist rml (
-		git.exe clone https://github.com/nem0/lumixengine_rml.git rml
-		pushd rml
-		git remote add origin2 git@github.com:nem0/lumixengine_rml.git
-		popd
-	) else (
-		cd rml
 		git pull
 	)
 	popd

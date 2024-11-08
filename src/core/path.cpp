@@ -32,7 +32,7 @@ char* Path::normalize(char* path) {
 	if (src[0] == '.' && (src[1] == '\\' || src[1] == '/')) src += 2;
 	
 	#ifdef _WIN32
-		if (src[0] == '\\' || src[0] == '/') ++src;
+		while (src[0] == '\\' || src[0] == '/') ++src;
 	#endif
 
 	while (*src) {

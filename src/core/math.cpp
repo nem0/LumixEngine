@@ -1289,7 +1289,7 @@ u32 RandomGenerator::rand() {
 static RandomGenerator initRandomGenerator() {
 	// TODO improve entropy
 	thread_local u64 dummy;
-	const u64 seed = uintptr(&dummy) ^ os::Timer::getRawTimestamp();
+	const u64 seed = ((uintptr(&dummy) << 32) | (uintptr(&dummy) >> 32)) ^ os::Timer::getRawTimestamp();
 	RandomGenerator res(u32(seed), u32(seed >> 32));
 	return res;
 }
