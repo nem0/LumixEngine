@@ -38,7 +38,6 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 	void onAgentGUI(EntityRef entity, WorldEditor& editor) {
 		World& world = *editor.getWorld();
 		auto* module = static_cast<NavigationModule*>(world.getModule("navigation"));
-		static bool debug_draw_path = false;
 		const dtCrowdAgent* agent = module->getDetourAgent(entity);
 		if (agent) {
 			ImGui::LabelText("Desired speed", "%f", agent->desiredSpeed);
@@ -56,8 +55,11 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 			if (agent->targetState < lengthOf(TARGET_STATES)) ImGui::LabelText("Target state", "%s", TARGET_STATES[agent->targetState]);
 		}
 
-		ImGui::Checkbox("Draw path", &debug_draw_path);
-		if (debug_draw_path) module->debugDrawPath(entity);
+		ImGui::Checkbox("Draw path", &m_debug_draw_path);
+		if (m_debug_draw_path) {
+			ImGui::Checkbox("Draw path polygons", &m_debug_draw_path_polys);
+		}
+		if (m_debug_draw_path) module->debugDrawPath(entity, m_debug_draw_path_polys);
 	}
 
 	void update() override {
@@ -164,6 +166,8 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 
 	StudioApp& m_app;
 	NavmeshBuildJob* m_job = nullptr;
+	bool m_debug_draw_path = false;
+	bool m_debug_draw_path_polys = false;
 };
 
 

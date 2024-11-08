@@ -541,7 +541,7 @@ struct NavigationModuleImpl final : NavigationModule
 	}
 
 
-	void debugDrawPath(EntityRef entity) override
+	void debugDrawPath(EntityRef entity, bool include_polygons) override
 	{
 		auto render_module = static_cast<RenderModule*>(m_world.getModule("renderer"));
 		if (!render_module) return;
@@ -560,13 +560,16 @@ struct NavigationModuleImpl final : NavigationModule
 
 		const dtPolyRef* path = dt_agent->corridor.getPath();
 		const int npath = dt_agent->corridor.getPathCount();
-		for (int j = 0; j < npath; ++j) {
-			dtPolyRef ref = path[j];
-			const dtMeshTile* tile = nullptr;
-			const dtPoly* poly = nullptr;
-			if (dtStatusFailed(zone.navmesh->getTileAndPolyByRef(ref, &tile, &poly))) continue;
 
-			drawPoly(render_module, zone_tr, *tile, *poly);
+		if (include_polygons) {
+			for (int j = 0; j < npath; ++j) {
+				dtPolyRef ref = path[j];
+				const dtMeshTile* tile = nullptr;
+				const dtPoly* poly = nullptr;
+				if (dtStatusFailed(zone.navmesh->getTileAndPolyByRef(ref, &tile, &poly))) continue;
+
+				drawPoly(render_module, zone_tr, *tile, *poly);
+			}
 		}
 
 		Vec3 prev = *(Vec3*)dt_agent->npos;
