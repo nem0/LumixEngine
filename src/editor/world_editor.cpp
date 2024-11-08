@@ -2514,7 +2514,7 @@ public:
 	}
 
 
-	void pasteEntities() override;
+	void pasteEntities(const DVec3* base_position) override;
 
 	void destroyComponent(Span<const EntityRef> entities, ComponentType cmp_type) override
 	{
@@ -3093,11 +3093,8 @@ private:
 	OutputMemoryStream m_copy_buffer;
 };
 
-
-struct PasteEntityCommand final : IEditorCommand
-{
-public:
-	PasteEntityCommand(WorldEditorImpl& editor, const OutputMemoryStream& copy_buffer, bool identity = false)
+struct PasteEntityCommand final : IEditorCommand {
+	PasteEntityCommand(WorldEditorImpl& editor, const OutputMemoryStream& copy_buffer, bool identity = false, const DVec3* position = nullptr)
 		: m_copy_buffer(copy_buffer)
 		, m_editor(editor)
 		, m_entities(editor.getAllocator())
@@ -3105,20 +3102,23 @@ public:
 		, m_identity(identity)
 	{
 		WorldView& view = editor.getView();
-		const WorldView::RayHit hit = view.getCameraRaycastHit(view.getViewport().w >> 1, view.getViewport().h >> 1, INVALID_ENTITY);
-		m_position = hit.pos;
+		if (position) {
+			m_position = *position;
+		}
+		else {
+			const WorldView::RayHit hit = view.getCameraRaycastHit(view.getViewport().w >> 1, view.getViewport().h >> 1, INVALID_ENTITY);
+			m_position = hit.pos;
+		}
 	}
 
-	bool execute() override
-	{
+	bool execute() override {
 		InputMemoryStream blob(m_copy_buffer);
 
 		World& world = *m_editor.getWorld();
 		int entity_count;
 		blob.read(entity_count);
 		bool is_redo = !m_entities.empty();
-		if (is_redo)
-		{
+		if (is_redo) {
 			for (int i = 0; i < entity_count; ++i) {
 				world.emplaceEntity(m_entities[i]);
 			}
@@ -3141,8 +3141,7 @@ public:
 			blob.read(orig_e);
 			if (!is_redo) m_map.insert(orig_e, i);
 		}
-		for (int i = 0; i < entity_count; ++i)
-		{
+		for (int i = 0; i < entity_count; ++i) {
 			Transform tr;
 			blob.read(tr);
 			const char* name = blob.readString();
@@ -3224,10 +3223,9 @@ private:
 };
 
 
-void WorldEditorImpl::pasteEntities()
-{
+void WorldEditorImpl::pasteEntities(const DVec3* base_position) {
 	if (!canPasteEntities()) return;
-	UniquePtr<PasteEntityCommand> command = UniquePtr<PasteEntityCommand>::create(m_allocator, *this, m_copy_buffer);
+	UniquePtr<PasteEntityCommand> command = UniquePtr<PasteEntityCommand>::create(m_allocator, *this, m_copy_buffer, false, base_position);
 	executeCommand(command.move());
 }
 

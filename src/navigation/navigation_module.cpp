@@ -1068,7 +1068,7 @@ struct NavigationModuleImpl final : NavigationModule
 			agent.is_finished = false;
 		}
 		else {
-			logError("requestMoveTarget failed");
+			logError("requestMoveTarget failed, entity ", entity.index);
 			agent.is_finished = true;
 		}
 		return !agent.is_finished;

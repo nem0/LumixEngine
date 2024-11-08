@@ -992,8 +992,7 @@ void SceneView::manipulate() {
 
 	if (copy_move && !m_copy_moved) {
 		m_editor.copyEntities();
-		m_editor.pasteEntities();
-		m_editor.setEntitiesPositionsAndRotations(&(*selected)[0], &tr.pos, &tr.rot, 1);
+		m_editor.pasteEntities(&tr.pos);
 		selected = &m_editor.getSelectedEntities();
 		Gizmo::setDragged((*selected)[0].index);
 		m_copy_moved = true;
