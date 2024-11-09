@@ -7,9 +7,30 @@ namespace Lumix {
 namespace reflection { template <typename T> struct Property; }
 
 struct PropertyAnimation final : Resource {
+	enum class Version {
+		TRANSFORM,
+		
+		LATEST
+	};
+
+	enum class CurveType : u32 {
+		NOT_SET,
+		PROPERTY,
+		LOCAL_POS_X,
+		LOCAL_POS_Y,
+		LOCAL_POS_Z,
+		POS_X,
+		POS_Y,
+		POS_Z,
+		SCALE_X,
+		SCALE_Y,
+		SCALE_Z,
+	};
+
 	struct Curve {
 		Curve(IAllocator& allocator) : frames(allocator), values(allocator) {}
 
+		CurveType type = CurveType::NOT_SET;
 		ComponentType cmp_type;
 		const reflection::Property<float>* property = nullptr;
 		
@@ -21,7 +42,7 @@ struct PropertyAnimation final : Resource {
 		static const u32 MAGIC = '_PRA';
 		
 		u32 magic = MAGIC;
-		u32 version = 0;
+		Version version = Version::LATEST;
 	};
 
 	PropertyAnimation(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);

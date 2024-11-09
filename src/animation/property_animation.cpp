@@ -7,7 +7,6 @@
 
 namespace Lumix {
 
-
 const ResourceType PropertyAnimation::TYPE("property_animation");
 
 PropertyAnimation::PropertyAnimation(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
@@ -34,11 +33,13 @@ bool PropertyAnimation::load(Span<const u8> mem) {
 	InputMemoryStream stream(mem);
 	Header header;
 	stream.read(header);
+	
 	if (header.magic != Header::MAGIC) {
 		logError(getPath(), ": invalid file");
 		return false;
 	}
-	if (header.version != 0) {
+
+	if (header.version > Version::LATEST) {
 		logError(getPath(), ": unsupported version");
 		return false;
 	}
@@ -47,15 +48,34 @@ bool PropertyAnimation::load(Span<const u8> mem) {
 	curves.reserve(num_curves);
 	for (u32 i = 0; i < num_curves; ++i) {
 		Curve& curve = curves.emplace(m_allocator);
-		const char* cmp_typename = stream.readString();
-		const char* property_name = stream.readString();
-		const u32 num_frames = stream.read<u32>();
-		curve.cmp_type = reflection::getComponentType(cmp_typename);
-		curve.property = static_cast<const reflection::Property<float>*>(reflection::getProperty(curve.cmp_type, property_name));
-		curve.frames.resize(num_frames);
-		curve.values.resize(num_frames);
-		stream.read(curve.frames.begin(), curve.frames.byte_size());
-		stream.read(curve.values.begin(), curve.values.byte_size());
+		if (header.version > Version::TRANSFORM) {
+			curve.type = stream.read<CurveType>();
+		}
+		else {
+			curve.type = CurveType::PROPERTY;
+		}
+		switch (curve.type) {
+			case CurveType::PROPERTY: {
+				const char* cmp_typename = stream.readString();
+				const char* property_name = stream.readString();
+				const u32 num_frames = stream.read<u32>();
+				curve.cmp_type = reflection::getComponentType(cmp_typename);
+				curve.property = static_cast<const reflection::Property<float>*>(reflection::getProperty(curve.cmp_type, property_name));
+				curve.frames.resize(num_frames);
+				curve.values.resize(num_frames);
+				stream.read(curve.frames.begin(), curve.frames.byte_size());
+				stream.read(curve.values.begin(), curve.values.byte_size());
+				break;
+			}
+			default: {
+				const u32 num_frames = stream.read<u32>();
+				curve.frames.resize(num_frames);
+				curve.values.resize(num_frames);
+				stream.read(curve.frames.begin(), curve.frames.byte_size());
+				stream.read(curve.values.begin(), curve.values.byte_size());
+				break;
+			}
+		}
 	}
 
 	return !stream.hasOverflow();

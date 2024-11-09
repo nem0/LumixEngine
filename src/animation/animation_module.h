@@ -28,6 +28,8 @@ struct AnimationModule : IModule {
 	virtual void setPropertyAnimation(EntityRef entity, const Path& path) = 0;
 	virtual bool isPropertyAnimatorEnabled(EntityRef entity) = 0;
 	virtual void enablePropertyAnimator(EntityRef entity, bool enabled) = 0;
+	virtual bool isPropertyAnimatorLooped(EntityRef entity) = 0;
+	virtual void setPropertyAnimatorLooped(EntityRef entity, bool looped) = 0;
 	virtual struct Animation* getAnimableAnimation(EntityRef entity) = 0;
 	virtual Path getAnimation(EntityRef entity) = 0;
 	virtual void setAnimation(EntityRef entity, const Path& path) = 0;

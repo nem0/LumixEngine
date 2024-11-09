@@ -39,7 +39,50 @@ static const ComponentType ENVIRONMENT_PROBE_TYPE = reflection::getComponentType
 static const ComponentType ENVIRONMENT_TYPE = reflection::getComponentType("environment");
 
 namespace {
-	
+
+static struct {
+	const char* label;
+	PropertyAnimation::CurveType type;
+} g_transform_descs[] = {
+	{ "Local position X", PropertyAnimation::CurveType::LOCAL_POS_X },
+	{ "Local position Y", PropertyAnimation::CurveType::LOCAL_POS_Y },
+	{ "Local position Z", PropertyAnimation::CurveType::LOCAL_POS_Z },
+	{ "Position X", PropertyAnimation::CurveType::POS_X },
+	{ "Position Y", PropertyAnimation::CurveType::POS_Y },
+	{ "Position Z", PropertyAnimation::CurveType::POS_Z },
+	//{ "Rotation X", PropertyAnimation::CurveType::ROT_X },
+	//{ "Rotation Y", PropertyAnimation::CurveType::ROT_Y },
+	//{ "Rotation Z", PropertyAnimation::CurveType::ROT_Z },
+	{ "Scale X", PropertyAnimation::CurveType::SCALE_X },
+	{ "Scale Y", PropertyAnimation::CurveType::SCALE_Y },
+	{ "Scale Z", PropertyAnimation::CurveType::SCALE_Z },
+};
+
+static PropertyAnimation::CurveType toCurveType(StringView str) {
+	for (auto& desc : g_transform_descs) {
+		if (equalStrings(str, desc.label)) return desc.type;
+	}
+	return PropertyAnimation::CurveType::NOT_SET;
+}
+
+static const char* toString(PropertyAnimation::CurveType type) {
+	switch (type) {
+		case PropertyAnimation::CurveType::LOCAL_POS_X: return "Local position X";
+		case PropertyAnimation::CurveType::LOCAL_POS_Y: return "Local position Y";
+		case PropertyAnimation::CurveType::LOCAL_POS_Z: return "Local position Z";
+		case PropertyAnimation::CurveType::POS_X: return "Position X";
+		case PropertyAnimation::CurveType::POS_Y: return "Position Y";
+		case PropertyAnimation::CurveType::POS_Z: return "Position Z";
+		case PropertyAnimation::CurveType::SCALE_X: return "Scale X";
+		case PropertyAnimation::CurveType::SCALE_Y: return "Scale Y";
+		case PropertyAnimation::CurveType::SCALE_Z: return "Scale Z";
+		case PropertyAnimation::CurveType::NOT_SET: return "Not set";
+		case PropertyAnimation::CurveType::PROPERTY: return "Property";
+	}
+	return "ERROR";
+} 
+
+
 template <typename T>
 static bool consumeNumberArray(Tokenizer& tokenizer, Array<T>& array) {
 	if (!tokenizer.consume("[")) return false;
@@ -421,8 +464,11 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 			for (PropertyAnimation::Curve& curve : anim.curves) {
 				blob << "{\n";
-				blob << "\t component = \"" << reflection::getComponent(curve.cmp_type)->name << "\",\n";
-				blob << "\t property = \"" << curve.property->name << "\",\n";
+				blob << "\t type = \"" << toString(curve.type) << "\",\n";
+				if (curve.type == PropertyAnimation::CurveType::PROPERTY) {
+					blob << "\t component = \"" << reflection::getComponent(curve.cmp_type)->name << "\",\n";
+					blob << "\t property = \"" << curve.property->name << "\",\n";
+				}
 				blob << "\tkeyframes = [\n";
 				for (int i = 0; i < curve.frames.size(); ++i) {
 					if (i != 0) blob << ", ";
@@ -481,9 +527,42 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 			for (int i = 0, n = m_resource->curves.size(); i < n; ++i) {
 				PropertyAnimation::Curve& curve = m_resource->curves[i];
-				const char* cmp_name = m_app.getComponentTypeName(curve.cmp_type);
-				StaticString<64> tmp(cmp_name, " - ", curve.property->name);
-				if (ImGui::Selectable(tmp, m_selected_curve == i)) m_selected_curve = i;
+				switch (curve.type) {
+					case PropertyAnimation::CurveType::PROPERTY: {
+						const char* cmp_name = m_app.getComponentTypeName(curve.cmp_type);
+						StaticString<64> tmp(cmp_name, " - ", curve.property->name);
+						if (ImGui::Selectable(tmp, m_selected_curve == i)) m_selected_curve = i;
+						break;
+					}
+					case PropertyAnimation::CurveType::LOCAL_POS_X:
+						if (ImGui::Selectable("Local position X", m_selected_curve == i)) m_selected_curve = i;
+						break;
+					case PropertyAnimation::CurveType::LOCAL_POS_Y:
+						if (ImGui::Selectable("Local position Y", m_selected_curve == i)) m_selected_curve = i;
+						break;
+					case PropertyAnimation::CurveType::LOCAL_POS_Z:
+						if (ImGui::Selectable("Local position Z", m_selected_curve == i)) m_selected_curve = i;
+						break;
+					case PropertyAnimation::CurveType::POS_X:
+						if (ImGui::Selectable("Position X", m_selected_curve == i)) m_selected_curve = i;
+						break;
+					case PropertyAnimation::CurveType::POS_Y:
+						if (ImGui::Selectable("Position Y", m_selected_curve == i)) m_selected_curve = i;
+						break;
+					case PropertyAnimation::CurveType::POS_Z:
+						if (ImGui::Selectable("Position Z", m_selected_curve == i)) m_selected_curve = i;
+						break;
+					case PropertyAnimation::CurveType::SCALE_X:
+						if (ImGui::Selectable("Scale X", m_selected_curve == i)) m_selected_curve = i;
+						break;
+					case PropertyAnimation::CurveType::SCALE_Y:
+						if (ImGui::Selectable("Scale Y", m_selected_curve == i)) m_selected_curve = i;
+						break;
+					case PropertyAnimation::CurveType::SCALE_Z:
+						if (ImGui::Selectable("Scale Z", m_selected_curve == i)) m_selected_curve = i;
+						break;
+					case PropertyAnimation::CurveType::NOT_SET: ASSERT(false); break;
+				}
 			}
 
 			if (m_selected_curve >= m_resource->curves.size()) m_selected_curve = -1;
@@ -556,7 +635,22 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 		void ShowAddCurveMenu(PropertyAnimation* animation) {
 			if (!ImGui::BeginMenu("Add curve")) return;
-		
+
+			if (ImGui::BeginMenu("Transform")) {
+				for (auto& v : g_transform_descs) {
+					if (ImGui::MenuItem(v.label)) {
+						PropertyAnimation::Curve& curve = animation->addCurve();
+						curve.type = v.type;
+						curve.frames.push(0);
+						curve.frames.push(animation->curves.size() > 1 ? animation->curves[0].frames.back() : 1);
+						curve.values.push(0);
+						curve.values.push(0);
+					}
+				}
+				ImGui::EndMenu();
+			}
+
+
 			for (const reflection::RegisteredComponent& cmp_type : reflection::getComponents()) {
 				const char* cmp_type_name = cmp_type.cmp->name;
 				if (!hasFloatProperty(cmp_type.cmp)) continue;
@@ -661,7 +755,12 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				
 				if (!tokenizer.consume("=")) return false;
 
-				if (key == "component") {
+				if (key == "type") {
+					StringView value;
+					if (!tokenizer.consume(value)) return false;
+					curve.type = toCurveType(value);
+				}
+				else if (key == "component") {
 					StringView value;
 					if (!tokenizer.consume(value)) return false;
 					curve.cmp_type = reflection::getComponentType(value);
@@ -720,9 +819,12 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		compiled.write(header);
 		compiled.write((u32)curves.size());
 		for (PropertyAnimation::Curve& curve : curves) {
-			const char* cmp_typename = reflection::getComponent(curve.cmp_type)->name;
-			compiled.writeString(cmp_typename);
-			compiled.writeString(curve.property->name);
+			compiled.write(curve.type);
+			if (curve.type == PropertyAnimation::CurveType::PROPERTY) {
+				const char* cmp_typename = reflection::getComponent(curve.cmp_type)->name;
+				compiled.writeString(cmp_typename);
+				compiled.writeString(curve.property->name);
+			}
 			compiled.write((u32)curve.frames.size());
 			for (i32 frame : curve.frames) compiled.write(frame);
 			for (float value : curve.values) compiled.write(value);

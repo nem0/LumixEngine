@@ -44,4 +44,18 @@ return {
 	    return {a[1] * f, a[2] * f, a[3] * f}
 	end,
 
+	distSquared = function(a, b)
+		local xd = a[1] - b[1]
+		local yd = a[2] - b[2]
+		local zd = a[3] - b[3]
+		
+		return xd * xd + yd * yd + zd * zd
+	end,
+
+	distXZSquared = function(a, b)
+		local xd = a[1] - b[1]
+		local zd = a[3] - b[3]
+		
+		return xd * xd + zd * zd
+	end,
 }

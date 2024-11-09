@@ -386,21 +386,29 @@ struct AnimationModuleImpl final : AnimationModule {
 		return animator.resource ? animator.resource->getPath() : Path("");
 	}
 
-	bool isPropertyAnimatorEnabled(EntityRef entity) override
-	{
+	bool isPropertyAnimatorLooped(EntityRef entity) {
+		return isFlagSet(m_property_animators[entity].flags, PropertyAnimator::LOOPED);
+	}
+
+	bool isPropertyAnimatorEnabled(EntityRef entity) override {
 		return !isFlagSet(m_property_animators[entity].flags, PropertyAnimator::DISABLED);
 	}
 
-
-	void enablePropertyAnimator(EntityRef entity, bool enabled) override
-	{
+	void enablePropertyAnimator(EntityRef entity, bool enabled) override {
 		PropertyAnimator& animator = m_property_animators[entity];
+		bool is_enabled = !isFlagSet(animator.flags, PropertyAnimator::DISABLED);
+		if (enabled == is_enabled) return;
+
 		setFlag(animator.flags, PropertyAnimator::DISABLED, !enabled);
 		animator.time = 0;
-		if (!enabled)
-		{
+		if (!enabled) {
 			applyPropertyAnimator(entity, animator);
 		}
+	}
+
+	void setPropertyAnimatorLooped(EntityRef entity, bool looped) {
+		PropertyAnimator& animator = m_property_animators[entity];
+		setFlag(animator.flags, PropertyAnimator::LOOPED, looped);
 	}
 
 
@@ -636,38 +644,90 @@ struct AnimationModuleImpl final : AnimationModule {
 		}
 	}
 
-	void applyPropertyAnimator(EntityRef entity, PropertyAnimator& animator)
-	{
+	void applyPropertyAnimator(EntityRef entity, PropertyAnimator& animator) {
+		const bool is_looped = animator.flags & PropertyAnimator::LOOPED;
 		const PropertyAnimation* animation = animator.animation;
-		int frame = int(animator.time * animation->fps + 0.5f);
-		frame = frame % animation->curves[0].frames.back();
-		for (PropertyAnimation::Curve& curve : animation->curves)
-		{
+		float frame = animator.time * animation->fps;
+		DVec3 local_pos = m_world.getLocalTransform(entity).pos;
+		DVec3 pos = m_world.getPosition(entity);
+		Vec3 scale = m_world.getScale(entity);
+		bool set_local_pos = false;
+		bool set_pos = false;
+		bool set_scale = false;
+		if (is_looped) {
+			frame = fmodf(frame, (float)animation->curves[0].frames.back());
+		}
+		else {
+			frame = minimum(frame, (float)animation->curves[0].frames.back());
+		}
+		for (PropertyAnimation::Curve& curve : animation->curves) {
 			if (curve.frames.size() < 2) continue;
-			for (int i = 1, n = curve.frames.size(); i < n; ++i)
-			{
-				if (frame <= curve.frames[i])
-				{
+			for (int i = 1, n = curve.frames.size(); i < n; ++i) {
+				if (frame <= curve.frames[i]) {
 					float t = (frame - curve.frames[i - 1]) / float(curve.frames[i] - curve.frames[i - 1]);
 					float v = curve.values[i] * t + curve.values[i - 1] * (1 - t);
-					ComponentUID cmp;
-					cmp.type = curve.cmp_type;
-					cmp.module = m_world.getModule(cmp.type);
-					cmp.entity = entity;
-					ASSERT(curve.property->setter);
-					curve.property->set(cmp, -1, v);
+					switch (curve.type) {
+						case PropertyAnimation::CurveType::PROPERTY: {
+							ComponentUID cmp;
+							cmp.type = curve.cmp_type;
+							cmp.module = m_world.getModule(cmp.type);
+							cmp.entity = entity;
+							ASSERT(curve.property->setter);
+							curve.property->set(cmp, -1, v);
+							break;
+						}
+						case PropertyAnimation::CurveType::LOCAL_POS_X:
+							local_pos.x = v;
+							set_local_pos = true;
+							break;
+						case PropertyAnimation::CurveType::LOCAL_POS_Y:
+							local_pos.y = v;
+							set_local_pos = true;
+							break;
+						case PropertyAnimation::CurveType::LOCAL_POS_Z:
+							local_pos.z = v;
+							set_local_pos = true;
+							break;
+						case PropertyAnimation::CurveType::POS_X:
+							pos.x = v;
+							set_pos = true;
+							break;
+						case PropertyAnimation::CurveType::POS_Y:
+							pos.y = v;
+							set_pos = true;
+							break;
+						case PropertyAnimation::CurveType::POS_Z:
+							set_pos = true;
+							pos.z = v;
+							break;
+						case PropertyAnimation::CurveType::NOT_SET:
+							ASSERT(false);
+							break;
+						case PropertyAnimation::CurveType::SCALE_X:
+							scale.x = v;
+							set_scale = true;
+							break;
+						case PropertyAnimation::CurveType::SCALE_Y:
+							scale.y = v;
+							set_scale = true;
+							break;
+						case PropertyAnimation::CurveType::SCALE_Z:
+							scale.z = v;
+							set_scale = true;
+							break;
+					}
 					break;
 				}
 			}
 		}
+		if (set_pos) m_world.setPosition(entity, pos);
+		if (set_local_pos) m_world.setLocalPosition(entity, local_pos);
+		if (set_scale) m_world.setScale(entity, scale);
 	}
 
-
-	void updatePropertyAnimators(float time_delta)
-	{
+	void updatePropertyAnimators(float time_delta) {
 		PROFILE_FUNCTION();
-		for (int anim_idx = 0, c = m_property_animators.size(); anim_idx < c; ++anim_idx)
-		{
+		for (int anim_idx = 0, c = m_property_animators.size(); anim_idx < c; ++anim_idx) {
 			EntityRef entity = m_property_animators.getKey(anim_idx);
 			PropertyAnimator& animator = m_property_animators.at(anim_idx);
 			const PropertyAnimation* animation = animator.animation;
@@ -787,6 +847,7 @@ void AnimationModule::reflect(Engine& engine) {
 		.LUMIX_CMP(PropertyAnimator, "property_animator", "Animation / Property animator")
 			.LUMIX_PROP(PropertyAnimation, "Animation").resourceAttribute(PropertyAnimation::TYPE)
 			.prop<&AnimationModule::isPropertyAnimatorEnabled, &AnimationModule::enablePropertyAnimator>("Enabled")
+			.prop<&AnimationModule::isPropertyAnimatorLooped, &AnimationModule::setPropertyAnimatorLooped>("Looped")
 		.LUMIX_CMP(Animator, "animator", "Animation / Animator")
 			.function<(void (AnimationModule::*)(EntityRef, u32, float))&AnimationModule::setAnimatorInput>("setFloatInput", "AnimationModule::setAnimatorInput")
 			.function<(void (AnimationModule::*)(EntityRef, u32, bool))&AnimationModule::setAnimatorInput>("setBoolInput", "AnimationModule::setAnimatorInput")

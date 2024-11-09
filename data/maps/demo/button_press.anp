@@ -1,0 +1,8 @@
+{
+	 type = "Local position Z",
+	keyframes = [
+0, 8, 15],
+	values = [
+-0.220000, -0.150000, -0.220000]
+},
+
