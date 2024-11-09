@@ -32,7 +32,8 @@ Surface getSurface(VSOutput input) {
 		data.ao = 1;
 	#endif
 
-	float4 c = sampleBindless(LinearSampler, t_albedo, uv/*, -1*/) * u_material_color;
+	float4 c = bindless_textures[t_albedo].SampleBias(LinearSampler, uv, -1) * u_material_color;
+
 	data.albedo = c.rgb;
 	data.alpha = c.a;
 	#ifdef COLOR0_ATTR

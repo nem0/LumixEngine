@@ -1173,13 +1173,13 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 				return Lumix.World[key]
 			else
 				if Lumix[key] == nil then return nil end
-				local module = LumixAPI.getModule(table.value, key)	
-				return Lumix[key]:new(module)
+				local module = LumixAPI.getModule(table.value, key)
+				return LumixModules[key]:new(module)
 			end
 		end
 		function Lumix.World:getModule(name)
 			local module = LumixAPI.getModule(self.value, name)	
-			return Lumix[name]:new(module)
+			return LumixModules[name]:new(module)
 		end
 		function Lumix.World:findEntityByName(parent, name)
 			local p = LumixAPI.findByName(self.value, parent._entity or -1, name)

@@ -1196,6 +1196,11 @@ public:
 
 	const char* getName() const override { return "lua_script"; }
 
+	const char* getResourcePath(i32 resource_handle) {
+		Resource* res = m_system.getLuaResource(resource_handle);
+		return res ? res->getPath().c_str() : "";
+	}
+
 	IFunctionCall* beginFunctionCall(const ScriptEnvironment& env, const char* function) {
 		lua_rawgeti(env.m_state, LUA_REGISTRYINDEX, env.m_environment);
 		ASSERT(lua_type(env.m_state, -1) == LUA_TTABLE);
@@ -1809,9 +1814,11 @@ public:
 		LuaWrapper::DebugGuard guard(L);
 
 		reflection::Module* module = reflection::getFirstModule();
+		lua_newtable(L);
+		lua_setglobal(L, "LumixModules");
 		while (module) {
 			lua_newtable(L); // [ module ]
-			lua_getglobal(L, "Lumix"); // [ module, Lumix ]
+			lua_getglobal(L, "LumixModules"); // [ module, Lumix ]
 			lua_pushvalue(L, -2); // [ module, Lumix, module]
 			lua_setfield(L, -2, module->name); // [ module, Lumix ]
 			lua_pop(L, 1); // [ module ]
@@ -3218,6 +3225,7 @@ LuaScriptSystemImpl::LuaScriptSystemImpl(Engine& engine)
 	m_script_manager.create(LuaScript::TYPE, engine.getResourceManager());
 
 	LUMIX_MODULE(LuaScriptModuleImpl, "lua_script")
+		.function<&LuaScriptModuleImpl::getResourcePath>("getResourcePath", "LuaScriptModuleImpl::getResourcePath")
 		.LUMIX_CMP(InlineScriptComponent, "lua_script_inline", "Lua Script / Inline") 
 			.LUMIX_PROP(InlineScriptCode, "Code").multilineAttribute()
 		.LUMIX_CMP(ScriptComponent, "lua_script", "Lua Script / File") 
