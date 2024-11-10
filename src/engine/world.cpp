@@ -618,7 +618,7 @@ void World::setParent(EntityPtr new_parent, EntityRef child)
 	bool would_create_cycle = new_parent.isValid() && isDescendant(child, (EntityRef)new_parent);
 	if (would_create_cycle)
 	{
-		logError("Hierarchy can not contains a cycle.");
+		logError("Hierarchy can not contain a cycle.");
 		return;
 	}
 

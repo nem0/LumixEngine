@@ -998,41 +998,58 @@ void SceneView::manipulate() {
 		m_copy_moved = true;
 	}
 
+	// keep only topmost entities in selection
+	Array<EntityRef> filtered_selection(m_app.getAllocator());
+	World& world = *m_editor.getWorld();
+	for (EntityRef& e : *selected) {
+		bool is_topmost = true;
+		for (u32 i = 0; i < (u32)filtered_selection.size(); ++i) {
+			if (world.isDescendant(e, filtered_selection[i])) {
+				filtered_selection.swapAndPop(i);
+				--i;
+			}
+			else if (world.isDescendant(filtered_selection[i], e)) {
+				is_topmost = false;
+				break;
+			}
+		}
+		if (is_topmost) filtered_selection.push(e);
+	}
+
 	const Transform new_pivot_tr = tr;
 	tr.pos -= tr.rot.rotate(cfg.getOffset());
-	World& world = *m_editor.getWorld();
 	switch (cfg.mode) {
 		case Gizmo::Config::TRANSLATE: {
 			const DVec3 diff = new_pivot_tr.pos - old_pivot_tr.pos;
 			Array<DVec3> positions(m_app.getAllocator());
-			positions.resize(selected->size());
-			for (u32 i = 0, c = selected->size(); i < c; ++i) {
-				positions[i] = world.getPosition((*selected)[i]) + diff;
+			positions.resize(filtered_selection.size());
+			for (u32 i = 0, c = filtered_selection.size(); i < c; ++i) {
+				positions[i] = world.getPosition(filtered_selection[i]) + diff;
 			}
-			m_editor.setEntitiesPositions(selected->begin(), positions.begin(), positions.size());
+			m_editor.setEntitiesPositions(filtered_selection.begin(), positions.begin(), positions.size());
 			break;
 		}
 		case Gizmo::Config::ROTATE: {
 			Array<DVec3> poss(m_app.getAllocator());
 			Array<Quat> rots(m_app.getAllocator());
-			rots.resize(selected->size());
-			poss.resize(selected->size());
-			for (u32 i = 0, c = selected->size(); i < c; ++i) {
-				const Transform t = new_pivot_tr * old_pivot_tr.inverted() * world.getTransform((*selected)[i]);
+			rots.resize(filtered_selection.size());
+			poss.resize(filtered_selection.size());
+			for (u32 i = 0, c = filtered_selection.size(); i < c; ++i) {
+				const Transform t = new_pivot_tr * old_pivot_tr.inverted() * world.getTransform(filtered_selection[i]);
 				poss[i] = t.pos;
 				rots[i] = normalize(t.rot);
 			}
-			m_editor.setEntitiesPositionsAndRotations(selected->begin(), poss.begin(), rots.begin(), rots.size());
+			m_editor.setEntitiesPositionsAndRotations(filtered_selection.begin(), poss.begin(), rots.begin(), rots.size());
 			break;
 		}
 		case Gizmo::Config::SCALE: {
 			const Vec3 diff = new_pivot_tr.scale / old_pivot_tr.scale;
 			Array<Vec3> scales(m_app.getAllocator());
-			scales.resize(selected->size());
-			for (u32 i = 0, c = selected->size(); i < c; ++i) {
-				scales[i] = world.getScale((*selected)[i]) * diff;
+			scales.resize(filtered_selection.size());
+			for (u32 i = 0, c = filtered_selection.size(); i < c; ++i) {
+				scales[i] = world.getScale(filtered_selection[i]) * diff;
 			}
-			m_editor.setEntitiesScales(selected->begin(), scales.begin(), scales.size());
+			m_editor.setEntitiesScales(filtered_selection.begin(), scales.begin(), scales.size());
 			break;
 		}
 	}

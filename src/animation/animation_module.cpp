@@ -401,7 +401,7 @@ struct AnimationModuleImpl final : AnimationModule {
 
 		setFlag(animator.flags, PropertyAnimator::DISABLED, !enabled);
 		animator.time = 0;
-		if (!enabled) {
+		if (enabled) {
 			applyPropertyAnimator(entity, animator);
 		}
 	}

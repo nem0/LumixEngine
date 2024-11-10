@@ -3169,7 +3169,7 @@ struct PasteEntityCommand final : IEditorCommand {
 			}
 
 			const EntityRef new_entity = m_entities[i];
-			world.setTransform(new_entity, tr);
+			world.setTransformKeepChildren(new_entity, tr);
 			world.setParent(parent, new_entity);
 			for (;;) {
 				RuntimeHash hash;
