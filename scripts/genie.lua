@@ -157,9 +157,9 @@ build_app_callbacks = {}
 
 function hasPlugin(plugin)
 	for _, v in ipairs(plugins) do
-    if v == plugin then
-      return true
-    end
+	if v == plugin then
+	  return true
+	end
   end
   return false
 end
@@ -176,6 +176,8 @@ function plugin(plugin_name)
 		project "app"
 			links {plugin_name}
 	end
+	linkPlugin(plugin_name)
+	
 	project(plugin_name)
 	libType()
 
@@ -977,10 +979,6 @@ if build_luau then
 	end
 else	
 	printf("Using Luau from external/luau (prebuilt)")
-end
-
-for _, plugin in ipairs(base_plugins) do
-	linkPlugin(plugin)
 end
 
 -- write plugins.inl
