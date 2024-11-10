@@ -659,8 +659,10 @@ struct AssetBrowserImpl : AssetBrowser {
 				{
 					FileInfo& tile = m_file_infos[j];
 					bool b = m_selected_resources.find([&](const Path& p){ return p == tile.filepath; }) >= 0;
+					ImGui::PushID(&tile);
 					ImGui::Selectable(tile.clamped_filename, b);
 					callbacks(tile, j, b);
+					ImGui::PopID();
 				}
 			}
 		}

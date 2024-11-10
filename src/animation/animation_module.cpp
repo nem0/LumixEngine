@@ -851,6 +851,7 @@ void AnimationModule::reflect(Engine& engine) {
 		.LUMIX_CMP(Animator, "animator", "Animation / Animator")
 			.function<(void (AnimationModule::*)(EntityRef, u32, float))&AnimationModule::setAnimatorInput>("setFloatInput", "AnimationModule::setAnimatorInput")
 			.function<(void (AnimationModule::*)(EntityRef, u32, bool))&AnimationModule::setAnimatorInput>("setBoolInput", "AnimationModule::setAnimatorInput")
+			.function<(void (AnimationModule::*)(EntityRef, u32, Vec3))&AnimationModule::setAnimatorInput>("setVec3Input", "AnimationModule::setAnimatorInput")
 			.LUMIX_FUNC_EX(AnimationModule::getAnimatorInputIndex, "getInputIndex")
 			.LUMIX_PROP(AnimatorSource, "Source").resourceAttribute(anim::Controller::TYPE)
 			.LUMIX_PROP(AnimatorDefaultSet, "Default set")
