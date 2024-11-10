@@ -2306,43 +2306,29 @@ public:
 		++m_undo_index;
 	}
 
-	void executeCommand(UniquePtr<IEditorCommand>&& command) override
-	{
-		doExecute(command.move());
-	}
-
-
-	void doExecute(UniquePtr<IEditorCommand>&& command)
-	{
+	void executeCommand(UniquePtr<IEditorCommand>&& command) override {
 		m_is_world_changed = true;
-		if (m_undo_index >= 0 && command->getType() == m_undo_stack[m_undo_index]->getType())
-		{
-			if (command->merge(*m_undo_stack[m_undo_index]))
-			{
+		if (m_undo_index >= 0 && command->getType() == m_undo_stack[m_undo_index]->getType()) {
+			if (command->merge(*m_undo_stack[m_undo_index])) {
 				m_undo_stack[m_undo_index]->execute();
 				return;
 			}
 		}
 
-		if (command->execute())
-		{
-			if (m_undo_index < m_undo_stack.size() - 1) {
-				m_undo_stack.resize(m_undo_index + 1);
-			}
-			m_undo_stack.emplace(command.move());
-			if (m_is_game_mode) ++m_game_mode_commands;
-			++m_undo_index;
+		if (!command->execute()) {
+			command.reset();
 			return;
 		}
-		else {
-			logError("Editor command failed");
+
+		if (m_undo_index < m_undo_stack.size() - 1) {
+			m_undo_stack.resize(m_undo_index + 1);
 		}
-		command.reset();
+		m_undo_stack.emplace(command.move());
+		if (m_is_game_mode) ++m_game_mode_commands;
+		++m_undo_index;
 	}
 
-
 	bool isGameMode() const override { return m_is_game_mode; }
-
 
 	void toggleGameMode() override
 	{
