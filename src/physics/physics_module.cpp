@@ -502,6 +502,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		send(e2, e1);
 	}
 
+	// TODO move to lua plugin
 	void onControllerHit(EntityRef controller, EntityRef obj) {
 		if (!m_script_module) return;
 		if (!m_script_module->getWorld().hasComponent(controller, LUA_SCRIPT_TYPE)) return;
@@ -1695,8 +1696,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 	void updateDynamicActors(bool vehicles)
 	{
 		PROFILE_FUNCTION();
-		for (EntityRef e : m_dynamic_actors)
-		{
+		for (EntityRef e : m_dynamic_actors) {
 			RigidActor& actor = m_actors[e];
 			m_update_in_progress = &actor;
 			PxTransform trans = actor.physx_actor->getGlobalPose();
@@ -1746,8 +1746,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 	void updateControllers(float time_delta)
 	{
 		PROFILE_FUNCTION();
-		for (auto& controller : m_controllers)
-		{
+		for (auto& controller : m_controllers) {
 			Vec3 dif = controller.frame_change;
 			controller.frame_change = Vec3(0, 0, 0);
 
@@ -1764,24 +1763,23 @@ struct PhysicsModuleImpl final : PhysicsModule
 			}
 
 			bool apply_gravity = (state.collisionFlags & PxControllerCollisionFlag::eCOLLISION_DOWN) == 0;
-			if (apply_gravity)
-			{
+			if (apply_gravity) {
 				dif.y += controller.gravity_speed * time_delta;
 				controller.gravity_speed += time_delta * gravity_acceleration;
 			}
-			else
-			{
+			else {
 				controller.gravity_speed = 0;
+				// we need to apply gravity here otherwise the controller won't ride on horizontally moving platforms
+				dif.y = 0.5f * gravity_acceleration * time_delta * time_delta;
 			}
 
-			if (squaredLength(dif) > 0.00001f) {
-				m_filter_callback.m_filter_data = controller.filter_data;
-				PxControllerFilters filters(nullptr, &m_filter_callback);
-				controller.controller->move(toPhysx(dif), 0.001f, time_delta, filters);
-				PxExtendedVec3 p = controller.controller->getFootPosition();
-
-				m_world.setPosition(controller.entity, {p.x, p.y, p.z});
-			}
+			m_moving_controller = controller.entity;
+			m_filter_callback.m_filter_data = controller.filter_data;
+			PxControllerFilters filters(nullptr, &m_filter_callback);
+			controller.controller->move(toPhysx(dif), 0.001f, time_delta, filters);
+			PxExtendedVec3 p = controller.controller->getFootPosition();
+			m_world.setPosition(controller.entity, {p.x, p.y, p.z});
+			m_moving_controller = INVALID_ENTITY;
 		}
 	}
 
@@ -2458,6 +2456,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 	void onControllerMoved(EntityRef entity) {
+		if (m_moving_controller == entity) return;
 		auto iter = m_controllers.find(entity);
 		ASSERT(iter.isValid());
 
@@ -3823,6 +3822,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 
 	Array<EntityRef> m_dynamic_actors;
 	RigidActor* m_update_in_progress;
+	EntityPtr m_moving_controller = INVALID_ENTITY;
 	DelegateList<void(const ContactData&)> m_contact_callbacks;
 	bool m_is_game_running;
 	u32 m_debug_visualization_flags;
