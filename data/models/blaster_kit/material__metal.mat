@@ -1,0 +1,6 @@
+shader "/shaders/standard.hlsl"
+texture ""
+texture ""
+texture ""
+texture ""
+uniform "Material color", {0.605484,0.638779,0.751895,1}
