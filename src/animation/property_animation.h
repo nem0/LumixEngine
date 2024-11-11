@@ -1,6 +1,7 @@
 #pragma once
 
 #include "engine/resource.h"
+#include "animation.h"
 
 namespace Lumix {
 
@@ -9,6 +10,7 @@ namespace reflection { template <typename T> struct Property; }
 struct PropertyAnimation final : Resource {
 	enum class Version {
 		TRANSFORM,
+		TIME,
 		
 		LATEST
 	};
@@ -34,7 +36,7 @@ struct PropertyAnimation final : Resource {
 		ComponentType cmp_type;
 		const reflection::Property<float>* property = nullptr;
 		
-		Array<i32> frames;
+		Array<Time> frames;
 		Array<float> values;
 	};
 
@@ -53,7 +55,7 @@ struct PropertyAnimation final : Resource {
 
 	IAllocator& m_allocator;
 	Array<Curve> curves;
-	u32 fps;
+	Time length;
 
 	static const ResourceType TYPE;
 

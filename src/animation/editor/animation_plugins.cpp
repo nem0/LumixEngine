@@ -3,6 +3,7 @@
 #include "core/hash_map.h"
 #include "core/log.h"
 #include "core/profiler.h"
+#include "core/string.h"
 
 #include "animation/animation.h"
 #include "animation/animation_module.h"
@@ -82,8 +83,14 @@ static const char* toString(PropertyAnimation::CurveType type) {
 	return "ERROR";
 } 
 
+static const char* fromCString(StringView input, Time& value) {
+	float seconds;
+	const char* ret_value = fromCString(input, seconds);
+	value = Time::fromSeconds(seconds);
+	return ret_value;
+}
 
-template <typename T>
+template <bool use_frames, typename T>
 static bool consumeNumberArray(Tokenizer& tokenizer, Array<T>& array) {
 	if (!tokenizer.consume("[")) return false;
 	for (;;) {
@@ -91,10 +98,21 @@ static bool consumeNumberArray(Tokenizer& tokenizer, Array<T>& array) {
 		if (!token) return false;
 		if (token == "]") return true;
 		T value;
-		if (!fromCString(token.value, value)) {
-			logError(tokenizer.filename, "(", tokenizer.getLine(), "): Expected a number, got ", token.value);
-			tokenizer.logErrorPosition(token.value.begin);
-			return false;
+		if constexpr (use_frames) {
+			u32 frame;
+			if (!fromCString(token.value, frame)) {
+				logError(tokenizer.filename, "(", tokenizer.getLine(), "): Expected a number, got ", token.value);
+				tokenizer.logErrorPosition(token.value.begin);
+				return false;
+			}
+			value = Time::fromSeconds(frame / 30.f);
+		}
+		else {
+			if (!fromCString(token.value, value)) {
+				logError(tokenizer.filename, "(", tokenizer.getLine(), "): Expected a number, got ", token.value);
+				tokenizer.logErrorPosition(token.value.begin);
+				return false;
+			}
 		}
 		array.push(value);
 		token = tokenizer.nextToken();
@@ -432,11 +450,13 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		}
 
 		void deserialize(InputMemoryStream& blob) override {
+			blob.read(m_resource->length);
 			const u32 count = blob.read<u32>();
 			m_resource->curves.clear();
 			m_resource->curves.reserve(count);
 			for (u32 i = 0; i < count; ++i) {
 				PropertyAnimation::Curve& curve = m_resource->curves.emplace(m_app.getAllocator());
+				blob.read(curve.type);
 				blob.read(curve.cmp_type);
 				blob.read(curve.property);
 				const u32 frames_count = blob.read<u32>();
@@ -445,12 +465,13 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				blob.read(curve.frames.begin(), curve.frames.byte_size());
 				blob.read(curve.values.begin(), curve.values.byte_size());
 			}
-
 		}
 
 		void serialize(OutputMemoryStream& blob) override {
+			blob.write(m_resource->length);
 			blob.write((u32)m_resource->curves.size());
 			for (PropertyAnimation::Curve& curve : m_resource->curves) {
+				blob.write(curve.type);
 				blob.write(curve.cmp_type);
 				blob.write(curve.property);
 				blob.write((u32)curve.frames.size());
@@ -459,34 +480,32 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			}
 		}
 
-		static void serialize(PropertyAnimation& anim, OutputMemoryStream& blob) {
-			ASSERT(anim.isReady());
+		void save() {
+			OutputMemoryStream blob(m_app.getAllocator());
+			ASSERT(m_resource->isReady());
 
-			for (PropertyAnimation::Curve& curve : anim.curves) {
+			for (PropertyAnimation::Curve& curve : m_resource->curves) {
 				blob << "{\n";
-				blob << "\t type = \"" << toString(curve.type) << "\",\n";
+				blob << "\tversion = 1,\n";
+				blob << "\ttype = \"" << toString(curve.type) << "\",\n";
 				if (curve.type == PropertyAnimation::CurveType::PROPERTY) {
 					blob << "\t component = \"" << reflection::getComponent(curve.cmp_type)->name << "\",\n";
 					blob << "\t property = \"" << curve.property->name << "\",\n";
 				}
-				blob << "\tkeyframes = [\n";
+				blob << "\tkeyframes = [ ";
 				for (int i = 0; i < curve.frames.size(); ++i) {
 					if (i != 0) blob << ", ";
-					blob << curve.frames[i];
+					// we store the time in seconds, so it's easy to edit the file manually, or see the change in diff
+					blob << curve.frames[i].seconds();
 				}
-				blob << "],\n";
-				blob << "\tvalues = [\n";
+				blob << " ],\n";
+				blob << "\tvalues = [ ";
 				for (int i = 0; i < curve.values.size(); ++i) {
 					if (i != 0) blob << ", ";
 					blob << curve.values[i];
 				}
-				blob << "]\n},\n\n";
+				blob << " ]\n},\n\n";
 			}
-		}
-
-		void save() {
-			OutputMemoryStream blob(m_app.getAllocator());
-			serialize(*m_resource, blob);
 			m_app.getAssetBrowser().saveResource(*m_resource, blob);
 			m_dirty = false;
 		}
@@ -514,86 +533,107 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 			ShowAddCurveMenu(m_resource);
 
-			if (!m_resource->curves.empty()) {
-				int frames = m_resource->curves[0].frames.back();
-				ImGuiEx::Label("Frames");
-				if (ImGui::InputInt("##frames", &frames)) {
-					for (auto& curve : m_resource->curves) {
-						curve.frames.back() = frames;
-					}
-					saveUndo(true);
-				}
+			if (m_resource->curves.empty()) return;
+
+			ImGui::SameLine();
+			float length = m_resource->length.seconds();
+			ImGuiEx::Label("Length (s)");
+			if (ImGui::DragFloat("##len", &length, 0.01f, 0, FLT_MAX)) {
+				m_resource->length = Time::fromSeconds(length);
+				saveUndo(true);
 			}
 
-			for (int i = 0, n = m_resource->curves.size(); i < n; ++i) {
-				PropertyAnimation::Curve& curve = m_resource->curves[i];
-				switch (curve.type) {
-					case PropertyAnimation::CurveType::PROPERTY: {
-						const char* cmp_name = m_app.getComponentTypeName(curve.cmp_type);
-						StaticString<64> tmp(cmp_name, " - ", curve.property->name);
-						if (ImGui::Selectable(tmp, m_selected_curve == i)) m_selected_curve = i;
-						break;
+			if (!ImGui::BeginTable("main", 2, ImGuiTableFlags_Resizable)) return;
+			ImGui::TableSetupColumn(nullptr, ImGuiTableColumnFlags_WidthFixed, 200);
+			ImGui::TableNextColumn();
+			if (ImGui::BeginTable("left_col", 2, ImGuiTableFlags_Resizable)) {
+				ImGui::TableSetupColumn(nullptr, ImGuiTableColumnFlags_WidthFixed, 30);
+				for (int i = 0, n = m_resource->curves.size(); i < n; ++i) {
+					ImGui::TableNextColumn();
+					ImGui::PushID(i);
+					if (ImGuiEx::IconButton(ICON_FA_TRASH, "Remove curve")) {
+						m_resource->curves.erase(i);
+						saveUndo(true);
+						--n;
+						ImGui::PopID();
+						ImGui::TableNextColumn();
+						continue;
 					}
-					case PropertyAnimation::CurveType::LOCAL_POS_X:
-						if (ImGui::Selectable("Local position X", m_selected_curve == i)) m_selected_curve = i;
-						break;
-					case PropertyAnimation::CurveType::LOCAL_POS_Y:
-						if (ImGui::Selectable("Local position Y", m_selected_curve == i)) m_selected_curve = i;
-						break;
-					case PropertyAnimation::CurveType::LOCAL_POS_Z:
-						if (ImGui::Selectable("Local position Z", m_selected_curve == i)) m_selected_curve = i;
-						break;
-					case PropertyAnimation::CurveType::POS_X:
-						if (ImGui::Selectable("Position X", m_selected_curve == i)) m_selected_curve = i;
-						break;
-					case PropertyAnimation::CurveType::POS_Y:
-						if (ImGui::Selectable("Position Y", m_selected_curve == i)) m_selected_curve = i;
-						break;
-					case PropertyAnimation::CurveType::POS_Z:
-						if (ImGui::Selectable("Position Z", m_selected_curve == i)) m_selected_curve = i;
-						break;
-					case PropertyAnimation::CurveType::SCALE_X:
-						if (ImGui::Selectable("Scale X", m_selected_curve == i)) m_selected_curve = i;
-						break;
-					case PropertyAnimation::CurveType::SCALE_Y:
-						if (ImGui::Selectable("Scale Y", m_selected_curve == i)) m_selected_curve = i;
-						break;
-					case PropertyAnimation::CurveType::SCALE_Z:
-						if (ImGui::Selectable("Scale Z", m_selected_curve == i)) m_selected_curve = i;
-						break;
-					case PropertyAnimation::CurveType::NOT_SET: ASSERT(false); break;
+					ImGui::TableNextColumn();
+					PropertyAnimation::Curve& curve = m_resource->curves[i];
+					switch (curve.type) {
+						case PropertyAnimation::CurveType::PROPERTY: {
+							const char* cmp_name = m_app.getComponentTypeName(curve.cmp_type);
+							StaticString<64> tmp(cmp_name, " - ", curve.property->name);
+							if (ImGui::Selectable(tmp, m_selected_curve == i)) m_selected_curve = i;
+							break;
+						}
+						case PropertyAnimation::CurveType::LOCAL_POS_X:
+							if (ImGui::Selectable("Local position X", m_selected_curve == i)) m_selected_curve = i;
+							break;
+						case PropertyAnimation::CurveType::LOCAL_POS_Y:
+							if (ImGui::Selectable("Local position Y", m_selected_curve == i)) m_selected_curve = i;
+							break;
+						case PropertyAnimation::CurveType::LOCAL_POS_Z:
+							if (ImGui::Selectable("Local position Z", m_selected_curve == i)) m_selected_curve = i;
+							break;
+						case PropertyAnimation::CurveType::POS_X:
+							if (ImGui::Selectable("Position X", m_selected_curve == i)) m_selected_curve = i;
+							break;
+						case PropertyAnimation::CurveType::POS_Y:
+							if (ImGui::Selectable("Position Y", m_selected_curve == i)) m_selected_curve = i;
+							break;
+						case PropertyAnimation::CurveType::POS_Z:
+							if (ImGui::Selectable("Position Z", m_selected_curve == i)) m_selected_curve = i;
+							break;
+						case PropertyAnimation::CurveType::SCALE_X:
+							if (ImGui::Selectable("Scale X", m_selected_curve == i)) m_selected_curve = i;
+							break;
+						case PropertyAnimation::CurveType::SCALE_Y:
+							if (ImGui::Selectable("Scale Y", m_selected_curve == i)) m_selected_curve = i;
+							break;
+						case PropertyAnimation::CurveType::SCALE_Z:
+							if (ImGui::Selectable("Scale Z", m_selected_curve == i)) m_selected_curve = i;
+							break;
+						case PropertyAnimation::CurveType::NOT_SET: ASSERT(false); break;
+					}
+					ImGui::PopID();
 				}
+				ImGui::EndTable();
 			}
+
+			ImGui::TableNextColumn();
 
 			if (m_selected_curve >= m_resource->curves.size()) m_selected_curve = -1;
-			if (m_selected_curve < 0) return;
+			if (m_selected_curve < 0) {
+				ImGui::EndTable();
+				return;
+			}
 
-			ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - 20);
 			static ImVec2 size(-1, 200);
 			
 			PropertyAnimation::Curve& curve = m_resource->curves[m_selected_curve];
-			ImVec2 points[16];
+			ImVec2 points[64];
 			ASSERT((u32)curve.frames.size() < lengthOf(points));
-			for (int i = 0; i < curve.frames.size(); ++i)
-			{
-				points[i].x = (float)curve.frames[i];
+			for (int i = 0; i < curve.frames.size(); ++i) {
+				points[i].x = curve.frames[i].seconds();
 				points[i].y = curve.values[i];
 			}
+
 			int new_count;
-			int last_frame = curve.frames.back();
 			int flags = (int)ImGuiEx::CurveEditorFlags::NO_TANGENTS | (int)ImGuiEx::CurveEditorFlags::SHOW_GRID;
 			if (m_fit_curve_in_editor)
 			{
 				flags |= (int)ImGuiEx::CurveEditorFlags::RESET;
 				m_fit_curve_in_editor = false;
 			}
-			int changed_idx = ImGuiEx::CurveEditor("curve", (float*)points, curve.frames.size(), lengthOf(points), size, flags, &new_count, &m_selected_point);
-			if (changed_idx >= 0)
-			{
-				curve.frames[changed_idx] = int(points[changed_idx].x + 0.5f);
+			ImGui::SetNextItemWidth(-1);
+			int changed_idx = ImGuiEx::CurveEditor("##curve", (float*)points, curve.frames.size(), lengthOf(points), size, flags, &new_count, &m_selected_point);
+			if (changed_idx >= 0) {
+				curve.frames[changed_idx] = Time::fromSeconds(points[changed_idx].x);
 				curve.values[changed_idx] = points[changed_idx].y;
-				curve.frames.back() = last_frame;
-				curve.frames[0] = 0;
+				curve.frames.back() = m_resource->length;
+				curve.frames[0] = Time(0);
 				saveUndo(true);
 			}
 			if (new_count != curve.frames.size())
@@ -602,13 +642,11 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				curve.values.resize(new_count);
 				for (int i = 0; i < new_count; ++i)
 				{
-					curve.frames[i] = int(points[i].x + 0.5f);
+					curve.frames[i] = Time::fromSeconds(points[i].x);
 					curve.values[i] = points[i].y;
 				}
 				saveUndo(true);
 			}
-
-			ImGui::PopItemWidth();
 
 			if (ImGui::BeginPopupContextItem("curve"))
 			{
@@ -617,13 +655,36 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				ImGui::EndPopup();
 			}
 
-			if (m_selected_point >= 0 && m_selected_point < curve.frames.size())
-			{
-				ImGuiEx::Label("Frame");
-				saveUndo(ImGui::InputInt("##frame", &curve.frames[m_selected_point]));
-				ImGuiEx::Label("Value");
-				saveUndo(ImGui::InputFloat("##val", &curve.values[m_selected_point]));
+			if (ImGui::BeginTable("curves_table", 2)) {
+				ImGui::TableNextRow(ImGuiTableRowFlags_Headers);
+				ImGui::TableNextColumn();
+				ImGui::Text("Time");
+				ImGui::TableNextColumn();
+				ImGui::Text("Value");
+				for (u32 i = 0; i < (u32)curve.frames.size(); ++i) {
+					ImGui::PushID(i);
+					ImGui::TableNextRow();
+					if (m_selected_point == i) {
+						ImU32 row_bg_color = ImGui::GetColorU32(ImGui::GetStyle().Colors[ImGuiCol_TabSelected]);
+						ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, row_bg_color);
+					}
+					ImGui::TableNextColumn();
+					float f = curve.frames[i].seconds();
+					ImGui::SetNextItemWidth(-1);
+					if (ImGui::DragFloat("##f", &f)) {
+						curve.frames[i] = Time::fromSeconds(f);
+						saveUndo(true);
+					}
+					ImGui::TableNextColumn();
+					ImGui::SetNextItemWidth(-1);
+					saveUndo(ImGui::InputFloat("##v", &curve.values[i]));
+					ImGui::PopID();
+				}
+				
+				ImGui::EndTable();
 			}
+			
+			ImGui::EndTable();
 		}
 
 		void saveUndo(bool changed) {
@@ -634,22 +695,23 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		}
 
 		void ShowAddCurveMenu(PropertyAnimation* animation) {
-			if (!ImGui::BeginMenu("Add curve")) return;
+			if (ImGuiEx::IconButton(ICON_FA_PLUS_CIRCLE, "Add curve")) ImGui::OpenPopup("add_curve_popup");
+
+			if (!ImGui::BeginPopup("add_curve_popup")) return;
 
 			if (ImGui::BeginMenu("Transform")) {
 				for (auto& v : g_transform_descs) {
 					if (ImGui::MenuItem(v.label)) {
 						PropertyAnimation::Curve& curve = animation->addCurve();
 						curve.type = v.type;
-						curve.frames.push(0);
-						curve.frames.push(animation->curves.size() > 1 ? animation->curves[0].frames.back() : 1);
+						curve.frames.push(Time(0));
+						curve.frames.push(animation->length);
 						curve.values.push(0);
-						curve.values.push(0);
+						curve.values.push(1);
 					}
 				}
 				ImGui::EndMenu();
 			}
-
 
 			for (const reflection::RegisteredComponent& cmp_type : reflection::getComponents()) {
 				const char* cmp_type_name = cmp_type.cmp->name;
@@ -669,10 +731,10 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 							PropertyAnimation::Curve& curve = animation->addCurve();
 							curve.cmp_type = cmp_type;
 							curve.property = &prop;
-							curve.frames.push(0);
-							curve.frames.push(animation->curves.size() > 1 ? animation->curves[0].frames.back() : 1);
+							curve.frames.push(Time(0));
+							curve.frames.push(animation->length);
 							curve.values.push(0);
-							curve.values.push(0);
+							curve.values.push(1);
 						}
 					}
 					PropertyAnimation* animation;
@@ -686,8 +748,9 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				ImGui::EndMenu();
 			}
 
-			ImGui::EndMenu();
+			ImGui::EndPopup();
 		}
+
 		static bool hasFloatProperty(const reflection::ComponentBase* cmp) {
 			struct : reflection::IEmptyPropertyVisitor {
 				void visit(const reflection::Property<float>& prop) override { result = true; }
@@ -724,7 +787,8 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		StringView sv((const char*)src_data.data(), (u32)src_data.size());
 		Tokenizer tokenizer(sv, src.c_str());
 		Array<PropertyAnimation::Curve> curves(m_app.getAllocator());
-		
+		Time length;
+
 		for (;;) {
 			Tokenizer::Token token = tokenizer.tryNextToken();
 			switch (token.type) {
@@ -745,6 +809,8 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 			// single curve
 			PropertyAnimation::Curve curve(m_app.getAllocator());
+			bool first = true;
+			u32 version = 0;
 			for (;;) {
 				Tokenizer::Token key = tokenizer.nextToken();
 				if (!key) return false;
@@ -755,7 +821,25 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				
 				if (!tokenizer.consume("=")) return false;
 
-				if (key == "type") {
+				if (key == "version") {
+					if (!first) {
+						logError(tokenizer.filename, "(", tokenizer.getLine(), "): 'version' must be first");
+						tokenizer.logErrorPosition(key.value.begin);
+						return false;
+					}
+					if (!tokenizer.consume(version)) return false;
+					if (version > 1) {
+						logError(tokenizer.filename, "(", tokenizer.getLine(), "): Unsupported version ", version);
+						tokenizer.logErrorPosition(key.value.begin);
+						return false;
+					}
+				}
+				else if (key == "length") {
+					u32 raw;
+					if (!tokenizer.consume(raw)) return false;
+					length = Time(raw);
+				}
+				else if (key == "type") {
 					StringView value;
 					if (!tokenizer.consume(value)) return false;
 					curve.type = toCurveType(value);
@@ -771,10 +855,15 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 					curve.property = static_cast<const reflection::Property<float>*>(reflection::getProperty(curve.cmp_type, value));
 				}
 				else if (key == "keyframes") {
-					if (!consumeNumberArray(tokenizer, curve.frames)) return false;
+					if (version == 0) {
+						if (!consumeNumberArray<true>(tokenizer, curve.frames)) return false;
+					}
+					else {
+						if (!consumeNumberArray<false>(tokenizer, curve.frames)) return false;
+					}
 				}
 				else if (key == "values") {
-					if (!consumeNumberArray(tokenizer, curve.values)) return false;
+					if (!consumeNumberArray<false>(tokenizer, curve.values)) return false;
 				}
 				else {
 					logError(tokenizer.filename, "(", tokenizer.getLine(), "): Unknown identifier ", key.value);
@@ -793,6 +882,7 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 					tokenizer.logErrorPosition(next.value.begin);
 					return false;
 				}
+				first = false;
 			}
 			token = tokenizer.tryNextToken();
 			switch (token.type) {
@@ -817,6 +907,13 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		OutputMemoryStream compiled(m_app.getAllocator());
 		PropertyAnimation::Header header;
 		compiled.write(header);
+		if (length.raw() == 0) {
+			for (PropertyAnimation::Curve& curve : curves) {
+				if (curve.frames.empty()) continue;
+				length = maximum(length, curve.frames.back());
+			}
+		}
+		compiled.write(length);
 		compiled.write((u32)curves.size());
 		for (PropertyAnimation::Curve& curve : curves) {
 			compiled.write(curve.type);
@@ -826,7 +923,7 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				compiled.writeString(curve.property->name);
 			}
 			compiled.write((u32)curve.frames.size());
-			for (i32 frame : curve.frames) compiled.write(frame);
+			for (Time frame : curve.frames) compiled.write(frame);
 			for (float value : curve.values) compiled.write(value);
 		}
 

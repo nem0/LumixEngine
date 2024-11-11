@@ -33,9 +33,10 @@ struct Time {
 	bool operator>=(const Time& rhs) const { return value >= rhs.value; }
 	Time operator%(const Time& rhs) const { return Time{value % rhs.value}; }
 	u32 raw() const { return value; }
+	u32* rawPtr() { return &value; }
 
 private:
-	u32 value;
+	u32 value = 0;
 	static constexpr u32 ONE_SECOND = 1 << 15;
 };
 

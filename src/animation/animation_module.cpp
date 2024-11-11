@@ -647,7 +647,7 @@ struct AnimationModuleImpl final : AnimationModule {
 	void applyPropertyAnimator(EntityRef entity, PropertyAnimator& animator) {
 		const bool is_looped = animator.flags & PropertyAnimator::LOOPED;
 		const PropertyAnimation* animation = animator.animation;
-		float frame = animator.time * animation->fps;
+		Time time = Time::fromSeconds(animator.time);
 		DVec3 local_pos = m_world.getLocalTransform(entity).pos;
 		DVec3 pos = m_world.getPosition(entity);
 		Vec3 scale = m_world.getScale(entity);
@@ -655,16 +655,16 @@ struct AnimationModuleImpl final : AnimationModule {
 		bool set_pos = false;
 		bool set_scale = false;
 		if (is_looped) {
-			frame = fmodf(frame, (float)animation->curves[0].frames.back());
+			time = time % animation->length;
 		}
 		else {
-			frame = minimum(frame, (float)animation->curves[0].frames.back());
+			time = minimum(time, animation->length);
 		}
 		for (PropertyAnimation::Curve& curve : animation->curves) {
 			if (curve.frames.size() < 2) continue;
 			for (int i = 1, n = curve.frames.size(); i < n; ++i) {
-				if (frame <= curve.frames[i]) {
-					float t = (frame - curve.frames[i - 1]) / float(curve.frames[i] - curve.frames[i - 1]);
+				if (time <= curve.frames[i]) {
+					float t = (time - curve.frames[i - 1]) / (curve.frames[i] - curve.frames[i - 1]);
 					float v = curve.values[i] * t + curve.values[i - 1] * (1 - t);
 					switch (curve.type) {
 						case PropertyAnimation::CurveType::PROPERTY: {
