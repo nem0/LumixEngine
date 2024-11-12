@@ -719,6 +719,11 @@ static DVec3 LUA_getEntityPosition(World* world, i32 entity)
 	return world->getPosition({entity});
 }
 
+static DVec3 LUA_getEntityLocalPosition(World* world, i32 entity)
+{
+	return world->getLocalTransform({entity}).pos;
+}
+
 
 static Quat LUA_getEntityRotation(World* world, i32 entity)
 {
@@ -757,6 +762,7 @@ static const char* LUA_getEntityName(World* univ, i32 entity) { return univ->get
 static void LUA_setEntityName(World* univ, i32 entity, const char* name) { univ->setEntityName({entity}, name); }
 static void LUA_setEntityScale(World* univ, i32 entity, const Vec3& scale) { univ->setScale({entity}, scale); }
 static void LUA_setEntityPosition(World* univ, i32 entity, const DVec3& pos) { univ->setPosition({entity}, pos); }
+static void LUA_setEntityLocalPosition(World* univ, i32 entity, const DVec3& pos) { univ->setLocalPosition({entity}, pos); }
 static void LUA_unloadResource(LuaScriptSystem* system, int resource_idx) { system->unloadLuaResource(resource_idx); }
 static World* LUA_createWorld(Engine* engine) { return &engine->createWorld(); }
 static void LUA_destroyWorld(Engine* engine, World* world) { engine->destroyWorld(*world); }
@@ -904,6 +910,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	REGISTER_FUNCTION(setActivePartition);
 	REGISTER_FUNCTION(createPartition);
 	REGISTER_FUNCTION(getEntityName);
+	REGISTER_FUNCTION(getEntityLocalPosition);
 	REGISTER_FUNCTION(getEntityPosition);
 	REGISTER_FUNCTION(getEntityRotation);
 	REGISTER_FUNCTION(getEntityScale);
@@ -916,6 +923,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	REGISTER_FUNCTION(logError);
 	REGISTER_FUNCTION(logInfo);
 	REGISTER_FUNCTION(setEntityName);
+	REGISTER_FUNCTION(setEntityLocalPosition);
 	REGISTER_FUNCTION(setEntityPosition);
 	REGISTER_FUNCTION(setEntityRotation);
 	REGISTER_FUNCTION(setEntityScale);
@@ -1090,6 +1098,8 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 		Lumix.Entity.__index = function(table, key)
 			if key == "position" then
 				return LumixAPI.getEntityPosition(table._world, table._entity)
+			elseif key == "local_position" then
+				return LumixAPI.getEntityLocalPosition(table._world, table._entity)
 			elseif key == "parent" then
 				local p = LumixAPI.getParent(table._world, table._entity)
 				if p < 0 then return nil end
@@ -1124,6 +1134,8 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 		Lumix.Entity.__newindex = function(table, key, value)
 			if key == "position" then
 				LumixAPI.setEntityPosition(table._world, table._entity, value)
+			elseif key == "local_position" then
+				LumixAPI.setEntityLocalPosition(table._world, table._entity, value)
 			elseif key == "name" then
 				LumixAPI.setEntityName(table._world, table._entity, value)
 			elseif key == "rotation" then
