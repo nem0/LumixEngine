@@ -1,3 +1,4 @@
+local co = require "scripts/coroutine"
 local lumix_math = require "scripts/math"
 local interactive = false
 
@@ -58,33 +59,31 @@ function onInputEvent(event : InputEvent)
 	if interactive and event.type == "button" and event.device.type == "keyboard" then
 		if event.key_id == string.byte("F") then
 			if event.down then
-				-- start by moving the hand to button
 				ik_target_input = player.animator:getInputIndex("left_hand_ik_target")
 				ik_alpha_input = player.animator:getInputIndex("left_hand_ik_alpha")
-				local ik_time = 0
 				
-				ik_co = coroutine.create(function()
-					local td = 0
-					while ik_time < 1 do
-						player.animator:setVec3Input(ik_target_input, calcIKTarget())
-						if ik_time < 0.2 then
-							if ik_time + td >= 0.2 then
-								-- play the sound
-								playSound(sound)
-								-- press (move) the button
-								this.property_animator.enabled = false
-								this.property_animator.enabled = true
-							end
-							player.animator:setFloatInput(ik_alpha_input, easeOutBack(ik_time / 0.2))
-						else 
-							player.animator:setFloatInput(ik_alpha_input, 1 - easeOutBack((ik_time - 0.2) / 0.8))
+				player.animator:setVec3Input(ik_target_input, calcIKTarget())
+				co.run(function()
+					co.parallel(
+						-- move hand to the button
+						function() co.lerpAnimatorFloat(player, ik_alpha_input, 0, 1, 0.3) end,
+						-- wait a bit and then press the button
+						function() 
+							co.wait(0.2)
+							co.lerpVec3(this, "local_position", {0, 0, 0}, {0, 0, 0.1}, 0.1)
 						end
-						td = coroutine.yield(true)
-						ik_time = ik_time + td
-					end
+					)
+					-- play a sound and wait a bit
+					playSound(sound)
+					co.wait(0.1)
+					co.parallel(	
+						-- move hand back
+						function() co.lerpAnimatorFloat(player, ik_alpha_input, 1, 0, 0.3) end,
+						-- release the button
+						function() co.lerpVec3(this, "local_position", {0, 0, 0.1}, {0, 0, 0}, 0.1) end
+					)
 					return false
 				end)
-
 			end
 		end
 	end
