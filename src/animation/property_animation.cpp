@@ -41,7 +41,7 @@ bool PropertyAnimation::load(Span<const u8> mem) {
 		logError(getPath(), ": unsupported version");
 		return false;
 	}
-
+ 
 	if (header.version > Version::TIME) {
 		stream.read(length);
 	}

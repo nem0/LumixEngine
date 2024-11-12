@@ -543,6 +543,7 @@ struct StudioAppImpl final : StudioApp {
 		, m_imgui_allocator(m_debug_allocator, "imgui")
 		, m_allocator(m_debug_allocator, "studio")
 		, m_export(m_allocator)
+		, m_recent_folders(m_allocator)
 	{
 		PROFILE_FUNCTION();
 		u32 cpus_count = minimum(os::getCPUsCount(), 64);
@@ -895,15 +896,6 @@ struct StudioAppImpl final : StudioApp {
 		os::Timer init_timer;
 		m_add_cmp_root.label[0] = '\0';
 
-		char saved_data_dir[MAX_PATH] = {};
-		os::InputFile cfg_file;
-		if (cfg_file.open(".lumixuser")) {
-			if (!cfg_file.read(saved_data_dir, minimum(lengthOf(saved_data_dir), (int)cfg_file.size()))) {
-				logError("Failed to read .lumixuser");
-			}
-			cfg_file.close();
-		}
-
 		char current_dir[MAX_PATH] = "";
 		os::getCurrentDirectory(Span(current_dir));
 
@@ -911,7 +903,7 @@ struct StudioAppImpl final : StudioApp {
 		checkDataDirCommandLine(data_dir, lengthOf(data_dir));
 
 		Engine::InitArgs init_data = {};
-		init_data.working_dir = data_dir[0] ? data_dir : (saved_data_dir[0] ? saved_data_dir : current_dir);
+		init_data.working_dir = data_dir[0] ? data_dir : current_dir;
 		const char* plugins[] = {
 			#define LUMIX_PLUGINS_STRINGS
 				#include "engine/plugins.inl"
@@ -1447,10 +1439,18 @@ struct StudioAppImpl final : StudioApp {
 		m_editor->loadWorld(blob, path.c_str(), additive);
 	}
 
-	void guiWelcomeScreen()
-	{
-		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
-		ImGuiViewport* viewport = ImGui::GetMainViewport();
+	void changeRootFolder(const char* dir) {
+		m_engine->getFileSystem().setBasePath(dir);
+		extractBundled();
+		m_editor->loadProject();
+		m_asset_compiler->onBasePathChanged();
+		m_engine->getResourceManager().reloadAll();
+		initDefaultWorld();
+	}
+
+	void guiWelcomeScreen() {
+		const ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
+		const ImGuiViewport* viewport = ImGui::GetMainViewport();
 		ImGui::SetNextWindowPos(viewport->WorkPos);
 		ImGui::SetNextWindowSize(viewport->WorkSize);
 		ImGui::SetNextWindowViewport(viewport->ID);
@@ -1474,76 +1474,36 @@ struct StudioAppImpl final : StudioApp {
 				});
 			#endif
 
-			ImGui::Text("Welcome to Lumix Studio");
-
-			ImVec2 half_size = ImGui::GetContentRegionAvail();
-			half_size.x = half_size.x * 0.5f - ImGui::GetStyle().FramePadding.x;
-			half_size.y *= 0.99f;
-			auto right_pos = ImGui::GetCursorPos();
-			right_pos.x += half_size.x + ImGui::GetStyle().FramePadding.x;
-			if (ImGui::BeginChild("left", half_size, true))
-			{
-				ImGui::Text("Working directory: %s", m_engine->getFileSystem().getBasePath());
+			alignGUICenter([&](){
+				ImGui::Image(*(void**)m_logo, ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight()));
 				ImGui::SameLine();
-				if (ImGui::Button("Change...")) {
-					char dir[MAX_PATH];
-					if (os::getOpenDirectory(Span(dir), m_engine->getFileSystem().getBasePath())) {
-						os::OutputFile cfg_file;
-						if (cfg_file.open(".lumixuser")) {
-							cfg_file << dir;
-							cfg_file.close();
-						}
-						m_engine->getFileSystem().setBasePath(dir);
-						extractBundled();
-						m_editor->loadProject();
-						m_asset_compiler->onBasePathChanged();
-						m_engine->getResourceManager().reloadAll();
+				ImGui::Text("Welcome to Lumix Studio");
+			});
+			ImGui::Separator();
+
+			ImGui::PushStyleVar(ImGuiStyleVar_SelectableTextAlign, ImVec2(0.5f, 0.5f));
+			if (ImGui::Selectable(ICON_FA_FOLDER_OPEN " Open / Create folder", false, 0, ImVec2(ImGui::GetContentRegionAvail().x, 0))) {
+				char dir[MAX_PATH];
+				if (os::getOpenDirectory(Span(dir), m_engine->getFileSystem().getBasePath())) {
+					m_is_welcome_screen_open = false;
+					StringView sv = dir;
+					sv.removeSuffix(1); // remove trailing slash
+					
+					if (m_recent_folders.find([&](const String& s){ return s == sv; }) < 0) {
+						m_recent_folders.pop();
+						m_recent_folders.insert(0, String(sv, m_allocator));
 					}
+					changeRootFolder(dir);
 				}
-				ImGui::Separator();
-				if (ImGui::Button("New world")) {
-					initDefaultWorld();
+			}
+
+			for (String& path : m_recent_folders) {
+				if (ImGui::Selectable(path.c_str(), false, 0, ImVec2(ImGui::GetContentRegionAvail().x, 0))) {
+					changeRootFolder(path.c_str());
 					m_is_welcome_screen_open = false;
 				}
-				ImGui::Text("Open world:");
-				ImGui::Indent();
-				forEachWorld([&](const Path& path){
-					if (ImGui::MenuItem(path.c_str())) {
-						loadWorld(path, false);
-						m_is_welcome_screen_open = false;
-					}
-				});
-				ImGui::Unindent();
 			}
-			ImGui::EndChild();
-
-			ImGui::SetCursorPos(right_pos);
-
-			if (ImGui::BeginChild("right", half_size, true))
-			{
-				ImGui::Text("Using NVidia PhysX");
-
-				if (ImGui::Button("Wiki"))
-				{
-					os::shellExecuteOpen("https://github.com/nem0/LumixEngine/wiki", {}, {});
-				}
-
-				if (ImGui::Button("Show major releases"))
-				{
-					os::shellExecuteOpen("https://github.com/nem0/LumixEngine/releases", {}, {});
-				}
-
-				if (ImGui::Button("Show latest commits"))
-				{
-					os::shellExecuteOpen("https://github.com/nem0/LumixEngine/commits/master", {}, {});
-				}
-
-				if (ImGui::Button("Show issues"))
-				{
-					os::shellExecuteOpen("https://github.com/nem0/lumixengine/issues", {}, {});
-				}
-			}
-			ImGui::EndChild();
+			ImGui::PopStyleVar();
 		}
 		ImGui::End();
 	}
@@ -2000,6 +1960,11 @@ struct StudioAppImpl final : StudioApp {
 			io.WantSaveIniSettings = false;
 		}
 
+		for (u32 i = 0; i < (u32)m_recent_folders.size(); ++i) {
+			const String& path = m_recent_folders[i];
+			m_settings.setString(StaticString<64>("recent_root_folder_", i), path.c_str(), Settings::USER);
+		}
+
 		m_settings.setBool("is_maximized", os::isMaximized(m_main_window), Settings::WORKSPACE);
 		if (!os::isMinimized(m_main_window)) {
 			os::Rect win_rect = os::getWindowScreenRect(m_main_window);
@@ -2220,6 +2185,13 @@ struct StudioAppImpl final : StudioApp {
 		m_settings.load();
 		if (CommandLineParser::isOn("-no_crash_report")) enableCrashReporting(false);
 		else enableCrashReporting(m_crash_reporting);
+
+		m_recent_folders.clear();
+		for (u32 i = 0; i < 5; ++i) {
+			const char* path = m_settings.getString(StaticString<64>("recent_root_folder_", i), "");
+			if (!path || !path[0]) continue;
+			if (os::dirExists(path)) m_recent_folders.emplace(path, m_allocator);
+		}
 
 		for (auto* i : m_gui_plugins) {
 			i->onSettingsLoaded();
@@ -3044,6 +3016,7 @@ struct StudioAppImpl final : StudioApp {
 	UniquePtr<GUIPlugin> m_profiler_ui;
 	Local<LogUI> m_log_ui;
 	Settings m_settings;
+	Array<String> m_recent_folders;
 	
 	FileSelector m_file_selector;
 	DirSelector m_dir_selector;
