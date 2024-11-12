@@ -1,6 +1,6 @@
 * [Getting started](getting_started.md)
 * [Plugins](plugins.md)
-* [3rd party libraries](3rd_party.md)
+* [3rd party libraries](3rdparty.md)
 
 # Engine
 * [Job System](job_system.md)

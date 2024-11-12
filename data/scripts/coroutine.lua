@@ -48,8 +48,6 @@ lerpVec3 = function(obj, property, start_val, end_val, length)
 	end
 end,
 
-
-
 lerpAnimatorFloat = function(obj, property, from, to, length)
 	local time = 0
 	while time < length do
