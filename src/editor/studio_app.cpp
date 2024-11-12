@@ -2192,6 +2192,9 @@ struct StudioAppImpl final : StudioApp {
 			if (!path || !path[0]) continue;
 			if (os::dirExists(path)) m_recent_folders.emplace(path, m_allocator);
 		}
+		if (m_recent_folders.empty()) {
+			m_recent_folders.emplace(m_engine->getFileSystem().getBasePath(), m_allocator);
+		}
 
 		for (auto* i : m_gui_plugins) {
 			i->onSettingsLoaded();
