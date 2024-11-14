@@ -54,7 +54,7 @@ struct LUMIX_EDITOR_API Settings {
 	// register variable with memory storage not in Settings
 	// if category is null, the variable is not visible in settings UI
 	// otherwise it's grouped in the category
-	void registerOption(const char* name, bool* value, const char* category = nullptr, const char* label = nullptr, Delegate<void()>* set_callback = nullptr);
+	void registerOption(const char* name, bool* value, const char* category = nullptr, const char* label = nullptr, const Delegate<void()>* set_callback = nullptr);
 	void registerOption(const char* name, String* value, const char* category = nullptr, const char* label = nullptr);
 	void registerOption(const char* name, i32* value, const char* category = nullptr, const char* label = nullptr);
 	void registerOption(const char* name, float* value, const char* category = nullptr, const char* label = nullptr, bool is_angle = false);

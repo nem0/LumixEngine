@@ -917,8 +917,8 @@ void Settings::shortcutsGUI() {
 			}
 			ImGui::EndTable();
 		}
-		ImGui::EndChild();
 	}
+	ImGui::EndChild();
 
 	ImGui::EndTabItem();
 }
@@ -1281,7 +1281,7 @@ void Settings::registerOption(const char* name, String* value, const char* categ
 	new_var.category = getCategory(*this, category);
 }
 
-void Settings::registerOption(const char* name, bool* value, const char* category, const char* label, Delegate<void()>* callback) {
+void Settings::registerOption(const char* name, bool* value, const char* category, const char* label, const Delegate<void()>* callback) {
 	// if variable already exists
 	Variable* var = findVar(*this, name);
 	if (var) {

@@ -889,6 +889,10 @@ struct StudioAppImpl final : StudioApp {
 		return os::HitTestResult::NONE;
 	}
 
+	void onUseTitlebarChanged() {
+		os::enableDecoration(m_main_window, m_use_native_titlebar);
+	}
+
 	void onInit()
 	{
 		PROFILE_FUNCTION();
@@ -919,6 +923,9 @@ struct StudioAppImpl final : StudioApp {
 		m_settings.registerOption("export_dir", &m_export.dest_dir);
 		m_settings.registerOption("gizmo_scale", &m_gizmo_config.scale, "General", "Gizmo scale");
 		m_settings.registerOption("fov", &m_fov, "General", "FOV", true);
+		
+		const Delegate<void()> del = makeDelegate<&StudioAppImpl::onUseTitlebarChanged>(this);
+		m_settings.registerOption("use_native_titlebar", &m_use_native_titlebar, "General", "Native titlebar (requires restart)", &del);
 		// we need some stuff (font_size) from settings at this point
 		m_settings.load();
 
@@ -926,7 +933,7 @@ struct StudioAppImpl final : StudioApp {
 		init_window_args.icon = "editor/logo.ico";
 		init_window_args.user_data = this;
 		init_window_args.hit_test_callback = &StudioAppImpl::hitTestCallback;
-		init_window_args.flags = os::InitWindowArgs::NO_DECORATION;
+		init_window_args.flags = m_use_native_titlebar ? 0 : os::InitWindowArgs::NO_DECORATION;
 		init_window_args.handle_file_drops = true;
 		init_window_args.name = "Lumix Studio";
 		init_window_args.is_hidden = true;
@@ -1456,22 +1463,24 @@ struct StudioAppImpl final : StudioApp {
 		ImGui::SetNextWindowViewport(viewport->ID);
 		if (ImGui::Begin("Welcome", nullptr, flags)) {
 			#ifdef _WIN32
-				const ImVec2 cp = ImGui::GetCursorPos();
-				ImGui::InvisibleButton("titlebardrag", ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetFrameHeight()), ImGuiButtonFlags_AllowOverlap);
-				m_is_caption_hovered = ImGui::IsItemHovered();
-				ImGui::SetCursorPos(cp);
-				alignGUIRight([&](){
-					if (ImGuiEx::IconButton(ICON_FA_WINDOW_MINIMIZE, nullptr)) os::minimizeWindow(m_main_window);
-					ImGui::SameLine();
-					if (os::isMaximized(m_main_window)) {
-						if (ImGuiEx::IconButton(ICON_FA_WINDOW_RESTORE, nullptr)) os::restore(m_main_window);
-					}
-					else {
-						if (ImGuiEx::IconButton(ICON_FA_WINDOW_MAXIMIZE, nullptr)) os::maximizeWindow(m_main_window);
-					}
-					ImGui::SameLine();
-					if (ImGuiEx::IconButton(ICON_FA_WINDOW_CLOSE, nullptr)) exit();
-				});
+				if (!m_use_native_titlebar) {
+					const ImVec2 cp = ImGui::GetCursorPos();
+					ImGui::InvisibleButton("titlebardrag", ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetFrameHeight()), ImGuiButtonFlags_AllowOverlap);
+					m_is_caption_hovered = ImGui::IsItemHovered();
+					ImGui::SetCursorPos(cp);
+					alignGUIRight([&](){
+						if (ImGuiEx::IconButton(ICON_FA_WINDOW_MINIMIZE, nullptr)) os::minimizeWindow(m_main_window);
+						ImGui::SameLine();
+						if (os::isMaximized(m_main_window)) {
+							if (ImGuiEx::IconButton(ICON_FA_WINDOW_RESTORE, nullptr)) os::restore(m_main_window);
+						}
+						else {
+							if (ImGuiEx::IconButton(ICON_FA_WINDOW_MAXIMIZE, nullptr)) os::maximizeWindow(m_main_window);
+						}
+						ImGui::SameLine();
+						if (ImGuiEx::IconButton(ICON_FA_WINDOW_CLOSE, nullptr)) exit();
+					});
+				}
 			#endif
 
 			alignGUICenter([&](){
@@ -1910,32 +1919,34 @@ struct StudioAppImpl final : StudioApp {
 				stats.append("FPS: ", u32(m_fps + 0.5f));
 				if (m_frames_since_focused > 10) stats.append(" - inactive window");
 
-				alignGUIRight([&](){
-					ImGuiEx::TextUnformatted(stats);
+				if (!m_use_native_titlebar) {
+					alignGUIRight([&](){
+						ImGuiEx::TextUnformatted(stats);
 
-					if (m_log_ui->getUnreadErrorCount() == 1) {
-						ImGui::SameLine();
-						ImGui::TextColored(ImVec4(1, 0, 0, 1), ICON_FA_EXCLAMATION_TRIANGLE "1 error | ");
-					}
-					else if (m_log_ui->getUnreadErrorCount() > 1)
-					{
-						StaticString<50> error_stats(ICON_FA_EXCLAMATION_TRIANGLE, m_log_ui->getUnreadErrorCount(), " errors | ");
-						ImGui::SameLine();
-						ImGui::TextColored(ImVec4(1, 0, 0, 1), "%s", (const char*)error_stats);
-					}
+						if (m_log_ui->getUnreadErrorCount() == 1) {
+							ImGui::SameLine();
+							ImGui::TextColored(ImVec4(1, 0, 0, 1), ICON_FA_EXCLAMATION_TRIANGLE "1 error | ");
+						}
+						else if (m_log_ui->getUnreadErrorCount() > 1)
+						{
+							StaticString<50> error_stats(ICON_FA_EXCLAMATION_TRIANGLE, m_log_ui->getUnreadErrorCount(), " errors | ");
+							ImGui::SameLine();
+							ImGui::TextColored(ImVec4(1, 0, 0, 1), "%s", (const char*)error_stats);
+						}
 
-					ImGui::SameLine();
-					if (ImGuiEx::IconButton(ICON_FA_WINDOW_MINIMIZE, nullptr)) os::minimizeWindow(m_main_window);
-					ImGui::SameLine();
-					if (os::isMaximized(m_main_window)) {
-						if (ImGuiEx::IconButton(ICON_FA_WINDOW_RESTORE, nullptr)) os::restore(m_main_window);
-					}
-					else {
-						if (ImGuiEx::IconButton(ICON_FA_WINDOW_MAXIMIZE, nullptr)) os::maximizeWindow(m_main_window);
-					}
-					ImGui::SameLine();
-					if (ImGuiEx::IconButton(ICON_FA_WINDOW_CLOSE, nullptr)) exit();
-				});
+						ImGui::SameLine();
+						if (ImGuiEx::IconButton(ICON_FA_WINDOW_MINIMIZE, nullptr)) os::minimizeWindow(m_main_window);
+						ImGui::SameLine();
+						if (os::isMaximized(m_main_window)) {
+							if (ImGuiEx::IconButton(ICON_FA_WINDOW_RESTORE, nullptr)) os::restore(m_main_window);
+						}
+						else {
+							if (ImGuiEx::IconButton(ICON_FA_WINDOW_MAXIMIZE, nullptr)) os::maximizeWindow(m_main_window);
+						}
+						ImGui::SameLine();
+						if (ImGuiEx::IconButton(ICON_FA_WINDOW_CLOSE, nullptr)) exit();
+					});
+				}
 			#endif
 
 			ImGui::EndMainMenuBar();
@@ -3025,6 +3036,7 @@ struct StudioAppImpl final : StudioApp {
 	DirSelector m_dir_selector;
 	
 	float m_fov = degreesToRadians(60);
+	bool m_use_native_titlebar = false;
 	RenderInterface* m_render_interface = nullptr;
 	Array<os::Event> m_events;
 	TextFilter m_open_filter;

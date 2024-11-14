@@ -549,6 +549,23 @@ Point clientToScreen(WindowHandle win, int x, int y)
 	return res;
 }
 
+void enableDecoration(WindowHandle wnd, bool enable) {
+	if (!wnd) return;
+	HWND hwnd = (HWND)wnd;
+	WindowData* win = (WindowData*)GetWindowLongPtrW(hwnd, GWLP_USERDATA);
+	ASSERT(win);
+
+	LONG style = GetWindowLong(hwnd, GWL_STYLE);
+	if (enable) {
+		style |= WS_OVERLAPPEDWINDOW;
+	} else {
+		style &= ~WS_OVERLAPPEDWINDOW;
+	}
+	win->init_args.flags = enable ? win->init_args.flags & ~InitWindowArgs::NO_DECORATION : win->init_args.flags | InitWindowArgs::NO_DECORATION;
+	SetWindowLong(hwnd, GWL_STYLE, style);
+	SetWindowPos(hwnd, NULL, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER);
+}
+
 WindowHandle createWindow(const InitWindowArgs& args) {
 	PROFILE_FUNCTION();
 	WCharStr<MAX_PATH> cls_name("lunex_window");

@@ -225,6 +225,7 @@ LUMIX_CORE_API Point clientToScreen(WindowHandle win, int x, int y);
 LUMIX_CORE_API WindowHandle createWindow(const InitWindowArgs& args);
 LUMIX_CORE_API void showWindow(WindowHandle wnd);
 LUMIX_CORE_API void hideWindow(WindowHandle wnd);
+LUMIX_CORE_API void enableDecoration(WindowHandle wnd, bool enable);
 LUMIX_CORE_API bool getEvent(Event& event);
 LUMIX_CORE_API void destroyWindow(WindowHandle wnd);
 LUMIX_CORE_API Rect getWindowScreenRect(WindowHandle win);
