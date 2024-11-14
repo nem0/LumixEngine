@@ -889,10 +889,6 @@ struct StudioAppImpl final : StudioApp {
 		return os::HitTestResult::NONE;
 	}
 
-	void onUseTitlebarChanged() {
-		os::enableDecoration(m_main_window, m_use_native_titlebar);
-	}
-
 	void onInit()
 	{
 		PROFILE_FUNCTION();
@@ -923,11 +919,11 @@ struct StudioAppImpl final : StudioApp {
 		m_settings.registerOption("export_dir", &m_export.dest_dir);
 		m_settings.registerOption("gizmo_scale", &m_gizmo_config.scale, "General", "Gizmo scale");
 		m_settings.registerOption("fov", &m_fov, "General", "FOV", true);
-		
-		const Delegate<void()> del = makeDelegate<&StudioAppImpl::onUseTitlebarChanged>(this);
-		m_settings.registerOption("use_native_titlebar", &m_use_native_titlebar, "General", "Native titlebar (requires restart)", &del);
+		static bool use_native_titlebar = false;
+		m_settings.registerOption("use_native_titlebar", &use_native_titlebar, "General", "Native titlebar (restart required)");
 		// we need some stuff (font_size) from settings at this point
 		m_settings.load();
+		m_use_native_titlebar = use_native_titlebar;
 
 		os::InitWindowArgs init_window_args;
 		init_window_args.icon = "editor/logo.ico";

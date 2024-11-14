@@ -549,23 +549,6 @@ Point clientToScreen(WindowHandle win, int x, int y)
 	return res;
 }
 
-void enableDecoration(WindowHandle wnd, bool enable) {
-	if (!wnd) return;
-	HWND hwnd = (HWND)wnd;
-	WindowData* win = (WindowData*)GetWindowLongPtrW(hwnd, GWLP_USERDATA);
-	ASSERT(win);
-
-	LONG style = GetWindowLong(hwnd, GWL_STYLE);
-	if (enable) {
-		style |= WS_OVERLAPPEDWINDOW;
-	} else {
-		style &= ~WS_OVERLAPPEDWINDOW;
-	}
-	win->init_args.flags = enable ? win->init_args.flags & ~InitWindowArgs::NO_DECORATION : win->init_args.flags | InitWindowArgs::NO_DECORATION;
-	SetWindowLong(hwnd, GWL_STYLE, style);
-	SetWindowPos(hwnd, NULL, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER);
-}
-
 WindowHandle createWindow(const InitWindowArgs& args) {
 	PROFILE_FUNCTION();
 	WCharStr<MAX_PATH> cls_name("lunex_window");
@@ -720,7 +703,7 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 
 	WCharStr<MAX_PATH> wname(args.name);
 	DWORD style =  args.flags & InitWindowArgs::NO_DECORATION 
-		? (args.hit_test_callback ? WS_THICKFRAME | WS_SYSMENU | WS_MAXIMIZEBOX | WS_MINIMIZEBOX : WS_POPUP)
+		? (args.hit_test_callback ? WS_THICKFRAME | WS_SYSMENU | WS_MAXIMIZEBOX | WS_MINIMIZEBOX : 0)
 		: WS_OVERLAPPEDWINDOW;
 	DWORD ext_style = args.flags & InitWindowArgs::NO_TASKBAR_ICON ? WS_EX_TOOLWINDOW : WS_EX_APPWINDOW;
 	WindowData* window_data = LUMIX_NEW(getGlobalAllocator(), WindowData);
@@ -970,7 +953,7 @@ void restore(WindowHandle win, WindowState state) {
 WindowState setFullscreen(WindowHandle win) {
 	WindowState res;
 	res.rect = getWindowScreenRect(win);
-	res.style = SetWindowLongPtr((HWND)win, GWL_STYLE, WS_VISIBLE | WS_POPUP);
+	res.style = SetWindowLongPtr((HWND)win, GWL_STYLE, WS_VISIBLE);
 	DEBUG_CHECK(res.style);
 	int w = GetSystemMetrics(SM_CXSCREEN);
 	int h = GetSystemMetrics(SM_CYSCREEN);
