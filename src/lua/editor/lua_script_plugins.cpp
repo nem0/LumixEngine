@@ -605,7 +605,8 @@ static bool gatherRequires(Span<const u8> src, Lumix::Array<Path>& dependencies,
 		const char* path = LuaWrapper::checkArg<const char*>(L, 1);
 		Path lua_path(path, ".lua");
 		deps->push(lua_path);
-		return 0;
+		lua_newtable(L);
+		return 1;
 	};
 
 	auto index_fn = [](lua_State* L) -> int {
@@ -618,10 +619,13 @@ static bool gatherRequires(Span<const u8> src, Lumix::Array<Path>& dependencies,
 		return 1;
 	};
 
-	lua_pushcclosure(L, reg_dep, "require", 0);
+	lua_pushcfunction(L, reg_dep, "inherit");
+	lua_setfield(L, LUA_GLOBALSINDEX, "inherit");
+
+	lua_pushcfunction(L, reg_dep, "require");
 	lua_setfield(L, LUA_GLOBALSINDEX, "require");
 
-	lua_pushcclosure(L, reg_dep, "dofile", 0);
+	lua_pushcfunction(L, reg_dep, "dofile");
 	lua_setfield(L, LUA_GLOBALSINDEX, "dofile");
 
 	lua_pushlightuserdata(L, &dependencies);
@@ -639,6 +643,8 @@ static bool gatherRequires(Span<const u8> src, Lumix::Array<Path>& dependencies,
 	lua_setfield(L, -2, "require"); // metatable, new_g
 	lua_getglobal(L, "dofile"); // metatable, new_g, require
 	lua_setfield(L, -2, "dofile"); // metatable, new_g
+	lua_getglobal(L, "inherit"); // metatable, new_g, require
+	lua_setfield(L, -2, "inherit"); // metatable, new_g
 
 	lua_insert(L, -2); // new_g, meta
 	lua_setmetatable(L, -2); //new_g

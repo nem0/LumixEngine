@@ -3051,26 +3051,60 @@ struct LuaProperties : reflection::DynamicProperties {
 
 static int finishrequire(lua_State* L)
 {
-    if (lua_isstring(L, -1))
-        lua_error(L);
+	if (lua_isstring(L, -1))
+		lua_error(L);
 
-    return 1;
+	return 1;
+}
+
+static int LUA_inherit(lua_State* L) {
+	LuaWrapper::DebugGuard guard(L);
+	const char* name = luaL_checkstring(L, 1);
+	Engine* engine = LuaWrapper::getClosureObject<Engine>(L);
+	Path path(name, ".lua");
+	LuaScript* dep = engine->getResourceManager().load<LuaScript>(path);
+	if (!dep->isReady()) {
+		ASSERT(false); // inherited-d files should be registered as dependencies, so it should be impossible to get here
+		luaL_argerrorL(L, 1, "failed to inherit file, it's not ready");
+	}
+
+	const StringView src = dep->getSourceCode();
+	bool errors = LuaWrapper::luaL_loadbuffer(L, src.begin, src.size(), name);
+	if (errors) {
+		lua_error(L);
+		return 0;
+	}
+
+	// set the environment of the inherited file to the environment of the calling function
+	lua_Debug ar;
+	lua_getinfo(L, 1, "f", &ar); // fn, cur fn
+	lua_getfenv(L, -1); 		 // fn, cur fn, env
+	lua_setfenv(L, -3);			 // fn, cur fn
+	lua_pop(L, 1);				 // fn
+
+	errors = lua_pcall(L, 0, 0, 0) != 0;
+	if (errors) {
+		lua_error(L);
+		return 0;
+	}
+
+	return 0;
 }
 
 static int LUA_require(lua_State* L) {
-    const char* name = luaL_checkstring(L, 1);
+	const char* name = luaL_checkstring(L, 1);
 
-    luaL_findtable(L, LUA_REGISTRYINDEX, "_MODULES", 1);
+	luaL_findtable(L, LUA_REGISTRYINDEX, "_MODULES", 1);
 
-    // return the module from the cache
-    lua_getfield(L, -1, name);
-    if (!lua_isnil(L, -1))
-    {
-        // L stack: _MODULES result
-        return finishrequire(L);
-    }
+	// return the module from the cache
+	lua_getfield(L, -1, name);
+	if (!lua_isnil(L, -1))
+	{
+		// L stack: _MODULES result
+		return finishrequire(L);
+	}
 
-    lua_pop(L, 1);
+	lua_pop(L, 1);
 
 	Engine* engine = LuaWrapper::getClosureObject<Engine>(L);
 	Path path(name, ".lua");
@@ -3080,16 +3114,16 @@ static int LUA_require(lua_State* L) {
 		luaL_argerrorL(L, 1, "error loading module");
 	}
 
-    // module needs to run in a new thread, isolated from the rest
-    // note: we create ML on main thread so that it doesn't inherit environment of L
-    lua_State* GL = lua_mainthread(L);
-    lua_State* ML = lua_newthread(GL);
-    lua_xmove(GL, L, 1);
+	// module needs to run in a new thread, isolated from the rest
+	// note: we create ML on main thread so that it doesn't inherit environment of L
+	lua_State* GL = lua_mainthread(L);
+	lua_State* ML = lua_newthread(GL);
+	lua_xmove(GL, L, 1);
 
-    // new thread needs to have the globals sandboxed
-    luaL_sandboxthread(ML);
+	// new thread needs to have the globals sandboxed
+	luaL_sandboxthread(ML);
 
-    // now we can compile & run module on the new thread
+	// now we can compile & run module on the new thread
 	size_t bytecode_size;
 	char* bytecode = luau_compile((const char*)dep->getSourceCode().begin, dep->getSourceCode().size(), nullptr, &bytecode_size);
 	if (bytecode_size == 0) {
@@ -3098,35 +3132,35 @@ static int LUA_require(lua_State* L) {
 		lua_error(L);
 	}
 
-    if (luau_load(ML, name, bytecode, bytecode_size, 0) == 0)
-    {
-        int status = lua_resume(ML, L, 0);
+	if (luau_load(ML, name, bytecode, bytecode_size, 0) == 0)
+	{
+		int status = lua_resume(ML, L, 0);
 
-        if (status == 0)
-        {
-            if (lua_gettop(ML) == 0)
-                lua_pushstring(ML, "module must return a value");
-            else if (!lua_istable(ML, -1) && !lua_isfunction(ML, -1))
-                lua_pushstring(ML, "module must return a table or function");
-        }
-        else if (status == LUA_YIELD)
-        {
-            lua_pushstring(ML, "module can not yield");
-        }
-        else if (!lua_isstring(ML, -1))
-        {
-            lua_pushstring(ML, "unknown error while running module");
-        }
-    }
+		if (status == 0)
+		{
+			if (lua_gettop(ML) == 0)
+				lua_pushstring(ML, "module must return a value");
+			else if (!lua_istable(ML, -1) && !lua_isfunction(ML, -1))
+				lua_pushstring(ML, "module must return a table or function");
+		}
+		else if (status == LUA_YIELD)
+		{
+			lua_pushstring(ML, "module can not yield");
+		}
+		else if (!lua_isstring(ML, -1))
+		{
+			lua_pushstring(ML, "unknown error while running module");
+		}
+	}
 	free(bytecode);
 
-    // there's now a return value on top of ML; L stack: _MODULES ML
-    lua_xmove(ML, L, 1);
-    lua_pushvalue(L, -1);
-    lua_setfield(L, -4, name);
+	// there's now a return value on top of ML; L stack: _MODULES ML
+	lua_xmove(ML, L, 1);
+	lua_pushvalue(L, -1);
+	lua_setfield(L, -4, name);
 
-    // L stack: _MODULES ML result
-    return finishrequire(L);
+	// L stack: _MODULES ML result
+	return finishrequire(L);
 }
 
 static int LUA_dofile(lua_State* L) {
@@ -3217,6 +3251,10 @@ LuaScriptSystemImpl::LuaScriptSystemImpl(Engine& engine)
 	lua_pushlightuserdata(L, &engine);
 	lua_pushcclosure(L, &LUA_require, "require", 1);
 	lua_setglobal(L, "require");
+
+	lua_pushlightuserdata(L, &engine);
+	lua_pushcclosure(L, &LUA_inherit, "inherit", 1);
+	lua_setglobal(L, "inherit");
 
 	lua_pushlightuserdata(L, &engine);
 	lua_pushcclosure(L, &LUA_dofile, "dofile", 1);

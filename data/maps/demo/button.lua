@@ -1,34 +1,14 @@
 local co = require "scripts/coroutine"
 local lumix_math = require "scripts/math"
-local interactive = false
 
 label = {}
 player = {}
-cubeA = {}
-cubeB = {}
-sphereA = {}
-sphereB = {}
 sound = -1
-local cubeA_pos = {}
-local cubeB_pos = {}
-local sphereA_pos = {}
-local sphereB_pos = {}
+local interactive = false
 
 Editor.setPropertyType(this, "label", Editor.ENTITY_PROPERTY)
 Editor.setPropertyType(this, "player", Editor.ENTITY_PROPERTY)
-Editor.setPropertyType(this, "cubeA", Editor.ENTITY_PROPERTY)
-Editor.setPropertyType(this, "cubeB", Editor.ENTITY_PROPERTY)
-Editor.setPropertyType(this, "sphereA", Editor.ENTITY_PROPERTY)
-Editor.setPropertyType(this, "sphereB", Editor.ENTITY_PROPERTY)
 Editor.setPropertyType(this, "sound", Editor.RESOURCE_PROPERTY, "clip")
-
-function start()
-	-- remember initial positions so we can reset them when button is pressed
-	cubeA_pos = cubeA.position
-	cubeB_pos = cubeB.position
-	sphereA_pos = sphereA.position
-	sphereB_pos = sphereB.position
-end
 
 function playSound(sound)
 	local path = this.world.lua_script:getResourcePath(sound)
@@ -77,11 +57,7 @@ function onInputEvent(event : InputEvent)
 				co.lerpVec3(this, "local_position", {0, 0, 0}, {0, 0, 0.1}, 0.1)
 			end
 		)
-		-- reset objects' positions
-		cubeA.position = cubeA_pos
-		cubeB.position = cubeB_pos
-		sphereA.position = sphereA_pos
-		sphereB.position = sphereB_pos
+		buttonPressed()
 		-- play a sound and wait a bit
 		playSound(sound)
 		co.wait(0.1)
@@ -94,3 +70,4 @@ function onInputEvent(event : InputEvent)
 		return false
 	end)
 end
+
