@@ -957,7 +957,7 @@ if build_luau then
 		}
 
 		removeflags { "NoExceptions", "NoRTTI" }
-		flags { "OptimizeSize", "ReleaseRuntime" }
+		flags { "OptimizeSize", "ReleaseRuntime", "Symbols" }
 
 		configuration { "linux"}
 			targetdir "../external/luau/lib/linux"
