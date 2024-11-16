@@ -355,6 +355,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 				EntityRef dropped_entity = *(EntityRef*)payload->Data;
 				m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, dropped_entity);
 			}
+			ImGui::EndDragDropTarget();
 		}
 
 		if (entity.isValid()) {
