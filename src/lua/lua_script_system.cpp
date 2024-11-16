@@ -1400,7 +1400,6 @@ public:
 			return 0;
 		}
 
-		/////
 		const ScriptInstance& instance = module->m_scripts[entity]->m_scripts[scr_index];
 		LuaWrapper::DebugGuard guard(instance.m_state);
 		lua_rawgeti(instance.m_state, LUA_REGISTRYINDEX, instance.m_environment);
@@ -1759,7 +1758,7 @@ public:
 		lua_pop(L, 2);
 
 		if (lua_isnumber(L, 2)) {
-			const i32 scr_index = LuaWrapper::toType<i32>(L, 2);
+			const i32 scr_index = LuaWrapper::toType<i32>(L, 2) - 1;
 			int env = module->getEnvironment(entity, scr_index);
 			if (env < 0) {
 				lua_pushnil(L);

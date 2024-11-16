@@ -60,6 +60,19 @@ To add a new item to an array property, use the `add` method:
 this.lua_script.scripts:add()
 ```
 
+Environments of other entities can be accessed through `Entity.lua_script[index]`:
+
+```lua
+-- entityA.lua
+some_prop = 1
+
+-- entityB.lua
+local entityA = getEntityA()
+local env = entityA.lua_script[1]
+env.some_prop = 2
+```
+
+
 ## World
 
 ```lua
