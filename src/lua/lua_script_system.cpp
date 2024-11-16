@@ -1545,7 +1545,7 @@ public:
 				return 0;
 			}
 
-			const int idx = LuaWrapper::checkArg<int>(L, 2);
+			const int idx = LuaWrapper::checkArg<int>(L, 2) - 1;
 			lua_newtable(L); // {}
 			lua_newtable(L); // {}, mt
 
