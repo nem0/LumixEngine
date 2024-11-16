@@ -4,66 +4,66 @@ export type Color = {number}
 export type Quat = {number}
 export type DVec3 = {number}
 declare ImGui: {
-    AlignTextToFramePadding : () -> (),
-    Begin : (string, boolean?) -> (boolean, boolean?),
-    BeginChildFrame : (string, number, number) -> boolean,
-    BeginMenu : (string, boolean) -> boolean,
-    BeginPopup : (string) -> boolean,
-    Button : (string) -> boolean,
-    CalcTextSize : (string) -> (number, number),
-    Checkbox : (string, boolean) -> (boolean, boolean),
-    CloseCurrentPopup : () -> (),
-    CollapsingHeader : (string) -> boolean,
-    Columns : (number) -> (),
-    DragFloat : (string, number) -> (boolean, number),
-    DragInt : (string, number) -> (boolean, number),
-    Dummy : (number, number) -> (),
-    End : () -> (),
-    EndChildFrame : () -> (),
-    EndCombo : () -> (),
-    EndMenu : () -> (),
-    EndPopup : () -> (),
-    GetColumnWidth : (number) -> number,
-    GetDisplayWidth : () -> number,
-    GetDisplayHeight : () -> number,
-    GetOsImePosRequest : () -> (number, number),
-    GetWindowWidth : () -> (),
-    GetWindowHeight : () -> (),
-    GetWindowPos : () -> any,
-    Indent : (number) -> (),
-    InputTextMultiline : (string, string) -> (boolean, string?),
-    InputTextMultilineWithCallback : (string, string, (string, number, boolean) -> ()) -> (boolean, string?),
-    IsItemHovered : () -> boolean,
-    IsKeyPressed : (number, boolean) -> boolean,
-    IsMouseClicked : (number) -> boolean,
-    IsMouseDown : (number) -> boolean,
-    LabelText : (string, string) -> (),
-    NewLine : () -> (),
-    NextColumn : () -> (),
-    OpenPopup : (string) -> (),
-    PlotLines : (string, {number}, Vec2) -> (),
-    PopItemWidth : () -> (),
-    PopID : () -> (),
-    PopStyleColor : (number) -> (),
-    PopStyleVar : (number) -> (),
-    PopItemWidth : () -> (),
-    PushItemWidth : (number) -> (),
-    PushID : (number) -> (),
-    PushStyleColor : (number, any) -> (),
-    PushStyleVar : (number, number, number) -> () | (number, number) -> () ,
-    Rect : (number, number, number) -> (),
-    SameLine : () -> (),
-    Selectable : (string, boolean) -> boolean | (string) -> boolean,
-    Separator : () -> (),
-    SetCursorScreenPos : (number, number) -> (),
-    SetKeyboardFocusHere : (number) -> (),
-    SetNextWindowPos : (number, number) -> (),
-    SetNextWindowPosCenter : () -> (),
-    SetNextWindowSize : (number, number) -> (),
-    SetStyleColor : (number, any) -> (),
-    SliderFloat : (string, number, number, number) -> (boolean, number),
-    Text : (string) -> (),
-    Unindent : (number) -> (),
+	AlignTextToFramePadding : () -> (),
+	Begin : (string, boolean?) -> (boolean, boolean?),
+	BeginChildFrame : (string, number, number) -> boolean,
+	BeginMenu : (string, boolean) -> boolean,
+	BeginPopup : (string) -> boolean,
+	Button : (string) -> boolean,
+	CalcTextSize : (string) -> (number, number),
+	Checkbox : (string, boolean) -> (boolean, boolean),
+	CloseCurrentPopup : () -> (),
+	CollapsingHeader : (string) -> boolean,
+	Columns : (number) -> (),
+	DragFloat : (string, number) -> (boolean, number),
+	DragInt : (string, number) -> (boolean, number),
+	Dummy : (number, number) -> (),
+	End : () -> (),
+	EndChildFrame : () -> (),
+	EndCombo : () -> (),
+	EndMenu : () -> (),
+	EndPopup : () -> (),
+	GetColumnWidth : (number) -> number,
+	GetDisplayWidth : () -> number,
+	GetDisplayHeight : () -> number,
+	GetOsImePosRequest : () -> (number, number),
+	GetWindowWidth : () -> (),
+	GetWindowHeight : () -> (),
+	GetWindowPos : () -> any,
+	Indent : (number) -> (),
+	InputTextMultiline : (string, string) -> (boolean, string?),
+	InputTextMultilineWithCallback : (string, string, (string, number, boolean) -> ()) -> (boolean, string?),
+	IsItemHovered : () -> boolean,
+	IsKeyPressed : (number, boolean) -> boolean,
+	IsMouseClicked : (number) -> boolean,
+	IsMouseDown : (number) -> boolean,
+	LabelText : (string, string) -> (),
+	NewLine : () -> (),
+	NextColumn : () -> (),
+	OpenPopup : (string) -> (),
+	PlotLines : (string, {number}, Vec2) -> (),
+	PopItemWidth : () -> (),
+	PopID : () -> (),
+	PopStyleColor : (number) -> (),
+	PopStyleVar : (number) -> (),
+	PopItemWidth : () -> (),
+	PushItemWidth : (number) -> (),
+	PushID : (number) -> (),
+	PushStyleColor : (number, any) -> (),
+	PushStyleVar : (number, number, number) -> () | (number, number) -> () ,
+	Rect : (number, number, number) -> (),
+	SameLine : () -> (),
+	Selectable : (string, boolean) -> boolean | (string) -> boolean,
+	Separator : () -> (),
+	SetCursorScreenPos : (number, number) -> (),
+	SetKeyboardFocusHere : (number) -> (),
+	SetNextWindowPos : (number, number) -> (),
+	SetNextWindowPosCenter : () -> (),
+	SetNextWindowSize : (number, number) -> (),
+	SetStyleColor : (number, any) -> (),
+	SliderFloat : (string, number, number, number) -> (boolean, number),
+	Text : (string) -> (),
+	Unindent : (number) -> (),
 
 	Key_DownArrow : number,
 	Key_Enter : number,
@@ -72,17 +72,20 @@ declare ImGui: {
 }
 
 declare class World
-    getActivePartition : (World) -> number
-    setActivePartition : (World, number) -> ()
-    createPartition : (World, string) -> number
-    load : (World, string, any) -> ()
-    getModule : (string) -> any
+	getActivePartition : (World) -> number
+	setActivePartition : (World, number) -> ()
+	createPartition : (World, string) -> number
+	load : (World, string, any) -> ()
+	getModule : (string) -> any,
+	createEntity : () -> Entity,
+	createEntityEx : (any) -> Entity,
+	findEntityByName : (string) -> Entity?
 	core : core_module
-	navigation : navigation_module
-	animation : animation_module
-	gui : gui_module
 	lua_script : lua_script_module
+	gui : gui_module
+	navigation : navigation_module
 	audio : audio_module
+	animation : animation_module
 	renderer : renderer_module
 	physics : physics_module
 
@@ -136,10 +139,8 @@ end
 declare class core_module
 end
 
-declare class navigation_module
-end
-
-declare class animation_module
+declare class lua_script_module
+	getResourcePath : (lua_script_module, number) -> any --[[char]]
 end
 
 declare class gui_module
@@ -148,7 +149,7 @@ declare class gui_module
 	getSystem : (gui_module) -> GUISystem
 end
 
-declare class lua_script_module
+declare class navigation_module
 end
 
 declare class audio_module
@@ -159,6 +160,9 @@ declare class audio_module
 	setFrequency : (audio_module, number, number) -> ()
 	setVolume : (audio_module, number, number) -> ()
 	setEcho : (audio_module, number, number, number, number, number) -> ()
+end
+
+declare class animation_module
 end
 
 declare class renderer_module
@@ -174,9 +178,6 @@ declare class physics_module
 	raycastEx : (physics_module, Vec3, Vec3, number, any --[[void*]], Entity?, number) -> boolean
 	sweepSphere : (physics_module, DVec3, number, Vec3, number, any --[[void*]], Entity?, number) -> boolean
 	setGravity : (physics_module, Vec3) -> ()
-end
-
-declare class spline_component
 end
 
 declare class gui_rect_component
@@ -197,9 +198,12 @@ declare class gui_canvas_component
 	virtual_size: any
 end
 
-declare class lua_script_component
-	scripts: any
-	getScriptPath : (lua_script_component, number) -> string
+declare class signal_component
+	blob: any
+end
+
+declare class spline_component
+	blob: any
 end
 
 declare class particle_emitter_component
@@ -224,6 +228,17 @@ declare class camera_component
 	far: number
 	orthographic: boolean
 	orthographic_size: number
+	film_grain_intensity: number
+	dof_enabled: boolean
+	dof_distance: number
+	dof_range: number
+	dof_max_blur_size: number
+	dof_sharp_range: number
+	bloom_enabled: boolean
+	bloom_tonemap_enabled: boolean
+	bloom_accomodation_speed: number
+	bloom_avg_bloom_multiplier: number
+	bloom_exposure: number
 	getRay : (camera_component, Vec2) -> any --[[Ray]]
 end
 
@@ -255,6 +270,22 @@ declare class environment_component
 	indirect_intensity: number
 	shadow_cascades: any
 	cast_shadows: boolean
+	sky_texture: string
+	atmosphere_enabled: boolean
+	godrays_enabled: boolean
+	sky_intensity: number
+	scatter_rayleigh: Vec3
+	scatter_mie: Vec3
+	absorb_mie: Vec3
+	sunlight_color: Vec3
+	sunlight_strength: number
+	height_distribution_rayleigh: number
+	height_distribution_mie: number
+	ground_radius: number
+	atmosphere_radius: number
+	fog_density: number
+	fog_scattering: Vec3
+	fog_top: number
 end
 
 declare class instanced_model_component
@@ -365,6 +396,7 @@ end
 declare class property_animator_component
 	animation: string
 	enabled: boolean
+	looped: boolean
 end
 
 declare class animator_component
@@ -373,6 +405,7 @@ declare class animator_component
 	use_root_motion: boolean
 	setFloatInput : (animator_component, number, number) -> ()
 	setBoolInput : (animator_component, number, boolean) -> ()
+	setVec3Input : (animator_component, number, Vec3) -> ()
 	getInputIndex : (animator_component, string) -> number
 end
 
@@ -455,7 +488,7 @@ declare class navmesh_agent_component
 	setActive : (navmesh_agent_component, boolean) -> ()
 	navigate : (navmesh_agent_component, DVec3, number, number) -> boolean
 	cancelNavigation : (navmesh_agent_component) -> ()
-	drawPath : (navmesh_agent_component) -> ()
+	drawPath : (navmesh_agent_component, boolean) -> ()
 end
 
 declare class navmesh_zone_component
@@ -476,8 +509,9 @@ declare class navmesh_zone_component
 	generateNavmesh : (navmesh_zone_component) -> any --[[NavmeshBuildJob]]
 end
 
-declare class lua_script_inline_component
-	code: string
+declare class lua_script_component
+	scripts: any
+	getScriptPath : (lua_script_component, number) -> string
 end
 
 declare class gui_input_field_component
@@ -512,23 +546,27 @@ declare class chorus_zone_component
 	delay__ms_: number
 end
 
+declare class lua_script_inline_component
+	code: string
+end
+
 
 
 declare class Entity 
-    world : World
-    name : string
-    parent : Entity?
-    rotation : any
-    position : Vec3
-    scale : Vec3
-    hasComponent : (Entity, any) -> boolean
-    getComponent : (Entity, any) -> any
-    destroy : (Entity) -> ()
-    createComponent : (Entity, any) -> any
-	spline: spline_component
+	world : World
+	name : string
+	parent : Entity?
+	rotation : any
+	position : Vec3
+	scale : Vec3
+	hasComponent : (Entity, any) -> boolean
+	getComponent : (Entity, any) -> any
+	destroy : (Entity) -> ()
+	createComponent : (Entity, any) -> any
 	gui_rect: gui_rect_component
 	gui_canvas: gui_canvas_component
-	lua_script: lua_script_component
+	signal: signal_component
+	spline: spline_component
 	particle_emitter: particle_emitter_component
 	terrain: terrain_component
 	camera: camera_component
@@ -561,7 +599,7 @@ declare class Entity
 	wheel: wheel_component
 	navmesh_agent: navmesh_agent_component
 	navmesh_zone: navmesh_zone_component
-	lua_script_inline: lua_script_inline_component
+	lua_script: lua_script_component
 	gui_input_field: gui_input_field_component
 	physical_instanced_cube: physical_instanced_cube_component
 	physical_instanced_mesh: physical_instanced_mesh_component
@@ -569,6 +607,7 @@ declare class Entity
 	ambient_sound: ambient_sound_component
 	echo_zone: echo_zone_component
 	chorus_zone: chorus_zone_component
+	lua_script_inline: lua_script_inline_component
 
 end
 
@@ -576,23 +615,23 @@ end
 declare this:Entity
 
 type ActionDesc = {
-    name : string,
-    label : string,
-    run : () -> ()
+	name : string,
+	label : string,
+	run : () -> ()
 }
 
 declare Editor: {
-    RESOURCE_PROPERTY : number,
-    COLOR_PROPERTY : number,
-    ENTITY_PROPERTY : number,
-    BOOLEAN_PROPERTY : number,
-    setPropertyType : (any, string, number, string?) -> (),
+	RESOURCE_PROPERTY : number,
+	COLOR_PROPERTY : number,
+	ENTITY_PROPERTY : number,
+	BOOLEAN_PROPERTY : number,
+	setPropertyType : (any, string, number, string?) -> (),
 	getSelectedEntitiesCount : () -> number,
 	getSelectedEntity : (number) -> Entity,
-    addAction : (ActionDesc) -> (),
-    createEntityEx : (any) -> Entity,
-    scene_view : SceneView,
-    asset_browser : AssetBrowser
+	addAction : (ActionDesc) -> (),
+	createEntityEx : (any) -> Entity,
+	scene_view : SceneView,
+	asset_browser : AssetBrowser
 }
 
 declare LumixAPI: {
@@ -601,12 +640,12 @@ declare LumixAPI: {
 	Ray : { create : () -> Ray, destroy : (Ray) -> () },
 	RayCastModelHit : { create : () -> RayCastModelHit, destroy : (RayCastModelHit) -> () },
 
-    INPUT_KEYCODE_SHIFT: number,
-    INPUT_KEYCODE_LEFT : number,
-    INPUT_KEYCODE_RIGHT : number,
+	INPUT_KEYCODE_SHIFT: number,
+	INPUT_KEYCODE_LEFT : number,
+	INPUT_KEYCODE_RIGHT : number,
 	engine : any,
-    logError : (string) -> (),
-    logInfo : (string) -> (),
+	logError : (string) -> (),
+	logInfo : (string) -> (),
 	loadResource : (any, path:string, restype:string) -> any,
 	writeFile : (string, string) -> boolean
 }
@@ -630,31 +669,31 @@ declare class ModuleReflection
 end
 
 declare LumixReflection: {
-    getComponent : (number) -> ComponentBase,
-    getComponentName : (ComponentBase) -> string,
-    getNumComponents : () -> number,
-    getNumProperties : (ComponentBase) -> number,
-    getNumComponentFunctions : (ComponentBase) -> number,
-    getProperty : (ComponentBase, number) -> PropertyBase,
-    getComponentFunction : (ComponentBase, number) -> FunctionBase,
-    getFunctionName : (FunctionBase) -> string,
-    getFunctionArgCount : (FunctionBase) -> number,
-    getFunctionArgType : (FunctionBase, number) -> string,
-    getFunctionReturnType : (FunctionBase) -> string,
-    getPropertyType : (PropertyBase) -> number,
-    getPropertyName : (PropertyBase) -> string,
+	getComponent : (number) -> ComponentBase,
+	getComponentName : (ComponentBase) -> string,
+	getNumComponents : () -> number,
+	getNumProperties : (ComponentBase) -> number,
+	getNumComponentFunctions : (ComponentBase) -> number,
+	getProperty : (ComponentBase, number) -> PropertyBase,
+	getComponentFunction : (ComponentBase, number) -> FunctionBase,
+	getFunctionName : (FunctionBase) -> string,
+	getFunctionArgCount : (FunctionBase) -> number,
+	getFunctionArgType : (FunctionBase, number) -> string,
+	getFunctionReturnType : (FunctionBase) -> string,
+	getPropertyType : (PropertyBase) -> number,
+	getPropertyName : (PropertyBase) -> string,
 	getFirstModule  : () -> ModuleReflection,
 	getNextModule  : (ModuleReflection) -> ModuleReflection?,
 	getNumModuleFunctions : (ModuleReflection) -> number,
 	getModuleFunction : (ModuleReflection, number) -> FunctionBase,
-    getModuleName : (ModuleReflection) -> string,
-    getNumFunctions : () -> number,
-    getFunction : (number) -> FunctionBase,
-    getThisTypeName : (FunctionBase) -> string,
-    getReturnTypeName : (FunctionBase) -> string,
-    getNumStructs : () -> number,
-    getStruct : (number) -> StructBase,
-    getStructName : (StructBase) -> string,
+	getModuleName : (ModuleReflection) -> string,
+	getNumFunctions : () -> number,
+	getFunction : (number) -> FunctionBase,
+	getThisTypeName : (FunctionBase) -> string,
+	getReturnTypeName : (FunctionBase) -> string,
+	getNumStructs : () -> number,
+	getStruct : (number) -> StructBase,
+	getStructName : (StructBase) -> string,
 	getNumStructMembers : (StructBase) -> number,
 	getStructMember : (StructBase, number) -> StructVarBase,
 	getStructMemberName : (StructVarBase) -> string,
@@ -662,27 +701,27 @@ declare LumixReflection: {
 }
 
 type InputDevice = {
-    type : "mouse" | "keyboard",
-    index : number
+	type : "mouse" | "keyboard",
+	index : number
 }
 
 type AxisInputEvent = {
-    type : "axis",
-    device : InputDevice,
-    x : number,
-    y : number,
-    x_abs : number,
-    y_abs : number
+	type : "axis",
+	device : InputDevice,
+	x : number,
+	y : number,
+	x_abs : number,
+	y_abs : number
 }
 
 type ButtonInputEvent = {
-    type : "button",
-    device : InputDevice,
-    key_id : number,
-    down : boolean,
-    is_repeat : boolean,
-    x : number,
-    y : number
+	type : "button",
+	device : InputDevice,
+	key_id : number,
+	down : boolean,
+	is_repeat : boolean,
+	x : number,
+	y : number
 }
 
 export type InputEvent = ButtonInputEvent | AxisInputEvent

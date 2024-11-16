@@ -1476,8 +1476,8 @@ struct NavigationModuleImpl final : NavigationModule
 		agent.agent = -1;
 		agent.flags = Agent::MOVE_ENTITY;
 		agent.is_finished = true;
-		m_agents.insert(entity, agent);
 		assignZone(agent);
+		m_agents.insert(entity, agent);
 		m_world.onComponentCreated(entity, NAVMESH_AGENT_TYPE, this);
 	}
 

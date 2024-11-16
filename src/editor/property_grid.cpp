@@ -379,12 +379,14 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 			if (ImGui::BeginChild("list", ImVec2(0, ImGui::GetContentRegionAvail().y))) {
 				for (EntityPtr i = world.getFirstEntity(); i.isValid(); i = world.getNextEntity((EntityRef)i))
 				{
+					ImGui::PushID(i.index);
 					getEntityListDisplayName(m_app, world, Span(buf), i);
 					bool show = entity_filter.pass(buf);
 					if (show && ImGui::Selectable(buf))
 					{
 						m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, i);
 					}
+					ImGui::PopID();
 				}
 			}
 			ImGui::EndChild();

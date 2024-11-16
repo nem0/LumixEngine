@@ -1,9 +1,9 @@
 inherit "maps/demo/button"
 
-cubeA = {}
-cubeB = {}
-sphereA = {}
-sphereB = {}
+cubeA = cubeA or {}
+cubeB = cubeB or {}
+sphereA = sphereA or {}
+sphereB = sphereB or {}
 
 local cubeA_pos = {}
 local cubeB_pos = {}

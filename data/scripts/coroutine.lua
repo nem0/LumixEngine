@@ -2,7 +2,7 @@
 local cores = function(co, ...)
 	local res, err = coroutine.resume(co, ...)
 	if not res and err then
-		LumixAPI.logError(err)
+		error(err .. "\nCallstack:\n" .. debug.traceback())
 	end
 	return res and err ~= false
 end

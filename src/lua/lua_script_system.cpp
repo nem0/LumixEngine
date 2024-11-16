@@ -1185,6 +1185,7 @@ public:
 		, m_property_names(system.m_allocator)
 		, m_is_game_running(false)
 		, m_is_api_registered(false)
+		, m_to_start(system.m_allocator)
 	{
 		m_function_call.is_in_progress = false;
 			
@@ -2263,12 +2264,14 @@ public:
 		}
 	}
 
-	void startGame() override
-	{
+	void startGame() override {
+		// the same script can be added multiple times to m_to_start (e.g. by enabling and disabling the script several time in editor)
+		// so we need to remove duplicates
+		m_to_start.removeDuplicates();
+
 		m_is_game_running = true;
 		m_gui_module = (GUIModule*)m_world.getModule("gui");
-		if (m_gui_module)
-		{
+		if (m_gui_module) {
 			m_gui_module->buttonClicked().bind<&LuaScriptModuleImpl::onButtonClicked>(this);
 			m_gui_module->rectHovered().bind<&LuaScriptModuleImpl::onRectHovered>(this);
 			m_gui_module->rectHoveredOut().bind<&LuaScriptModuleImpl::onRectHoveredOut>(this);
@@ -2287,7 +2290,6 @@ public:
 			m_gui_module->rectMouseDown().unbind<&LuaScriptModuleImpl::onRectMouseDown>(this);
 		}
 		m_gui_module = nullptr;
-		m_scripts_start_called = false;
 		m_is_game_running = false;
 		m_updates.clear();
 		m_input_handlers.clear();
@@ -2502,9 +2504,7 @@ public:
 				auto iter = m_inline_scripts.insert(entity, InlineScriptComponent(entity, *this, m_system.m_allocator));
 				serializer.read(iter.value().m_source);
 				m_world.onComponentCreated(entity, LUA_SCRIPT_INLINE_TYPE, this);
-				if (m_is_game_running) {
-					startScript(entity, iter.value(), false);
-				}
+				m_to_start.push({entity, (u32)i, true, false});
 			}
 		}
 
@@ -2555,6 +2555,7 @@ public:
 					}
 				}
 				setPath(*script, scr, Path(path));
+				m_to_start.push({entity, (u32)scr_idx, false, false});
 			}
 			m_world.onComponentCreated(script->m_entity, LUA_SCRIPT_TYPE, this);
 		}
@@ -2564,30 +2565,21 @@ public:
 	ISystem& getSystem() const override { return m_system; }
 
 
-	void startScripts()
-	{
-		ASSERT(!m_scripts_start_called && m_is_game_running);
-		// copy m_scripts to tmp, because scripts can create other scripts -> m_scripts is not const
-		Array<ScriptComponent*> tmp(m_system.m_allocator);
-		tmp.reserve(m_scripts.size());
-		for (auto* scr : m_scripts) tmp.push(scr);
-
-		for (auto* scr : tmp) {
-			for (int j = 0; j < scr->m_scripts.size(); ++j) {
-				auto& instance = scr->m_scripts[j];
-				if (!instance.m_script) continue;
-				if (!instance.m_script->isReady()) continue;
-				if (!(instance.m_flags & ScriptInstance::ENABLED)) continue;
-
-				startScript(instance.m_cmp->m_entity, instance, false);
+	void startScripts() {
+		for (auto& s : m_to_start) {
+			if (s.is_inline) {
+				InlineScriptComponent& scr = m_inline_scripts[s.entity];
+				startScript(s.entity, scr, s.is_reload);
+			}
+			else {
+				ScriptInstance& scr = m_scripts[s.entity]->m_scripts[s.scr_index];
+				if (!scr.m_script) continue;
+				if (!scr.m_script->isReady()) continue;
+				startScript(s.entity, scr, s.is_reload);
 			}
 		}
 
-		for (auto iter : m_inline_scripts.iterated()) {
-			startScript(iter.key(), iter.value(), false);
-		}
-
-		m_scripts_start_called = true;
+		m_to_start.clear();
 	}
 
 
@@ -2716,7 +2708,7 @@ public:
 		PROFILE_FUNCTION();
 
 		if (!m_is_game_running) return;
-		if (!m_scripts_start_called) startScripts();
+		startScripts();
 
 		processInputEvents();
 		updateTimers(time_delta);
@@ -2835,12 +2827,10 @@ public:
 
 		setEnableProperty(entity, scr_index, inst, enable);
 
-		if(enable)
-		{
-			startScript(entity, inst, false);
+		if(enable) {
+			m_to_start.push({entity, (u32)scr_index, false, false});
 		}
-		else
-		{
+		else {
 			disableScript(inst);
 		}
 	}
@@ -2864,17 +2854,29 @@ public:
 		m_inline_scripts[entity].m_source = value;
 	}
 
+	struct DeferredStart {
+		EntityRef entity;
+		u32 scr_index;
+		bool is_inline;
+		bool is_reload;
+		bool operator==(const DeferredStart& rhs) const { 
+			return entity == rhs.entity 
+			&& is_inline == rhs.is_inline
+			&& scr_index == rhs.scr_index;
+		}
+	};
+
 	LuaScriptSystemImpl& m_system;
 	HashMap<EntityRef, ScriptComponent*> m_scripts;
 	HashMap<EntityRef, InlineScriptComponent> m_inline_scripts;
 	HashMap<StableHash, String> m_property_names;
 	Array<CallbackData> m_input_handlers;
 	World& m_world;
+	Array<DeferredStart> m_to_start;
 	Array<CallbackData> m_updates;
 	Array<TimerData> m_timers;
 	FunctionCall m_function_call;
 	ScriptInstance* m_current_script_instance;
-	bool m_scripts_start_called = false;
 	bool m_is_api_registered = false;
 	bool m_is_game_running = false;
 	GUIModule* m_gui_module = nullptr;
@@ -2959,7 +2961,7 @@ void LuaScriptModuleImpl::ScriptInstance::onScriptLoaded(LuaScriptModuleImpl& mo
 		lua_pop(m_state, 1); // []
 	}
 
-	if (module.m_is_game_running) module.startScript(m_cmp->m_entity, *this, is_reload);
+	module.m_to_start.push({cmp.m_entity, (u32)scr_index, false, is_reload});
 }
 
 
