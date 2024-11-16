@@ -6,6 +6,9 @@
 * [Job System](job_system.md)
 * [Profiler](profiler.md)
 
+# Lua
+* [Type checking](lua/type_checking.md)
+
 # Renderer
 
 * [Shaders](shaders.md)
