@@ -1196,7 +1196,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 		function Lumix.World:findEntityByName(parent, name)
 			local p = LumixAPI.findByName(self.value, parent._entity or -1, name)
 			if p < 0 then return nil end
-			return Lumix.Entity:new(self.value, p)			
+			return Lumix.Entity:new(self.value, p)
 		end
 		function Lumix.World:createEntityEx(desc)
 			local ent = self:createEntity()

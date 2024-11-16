@@ -7,7 +7,9 @@
 * [Profiler](profiler.md)
 
 # Lua
+* [Engine API](lua/engine_API.md)
 * [Type checking](lua/type_checking.md)
+* [Snippets](lua/snippets.md)
 
 # Renderer
 

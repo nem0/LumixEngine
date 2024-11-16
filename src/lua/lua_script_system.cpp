@@ -1513,13 +1513,38 @@ public:
 				prop->visitChildren(visitor);
 				return visitor.found ? 1 : 0;
 			};
-				
+			
+			auto adder = [](lua_State* L) -> int {
+				LuaWrapper::DebugGuard guard(L);
+				auto* prop = LuaWrapper::toType<const reflection::ArrayProperty*>(L, lua_upvalueindex(1));
+				auto* module = LuaWrapper::toType<IModule*>(L, lua_upvalueindex(2));
+				int entity_index = LuaWrapper::toType<i32>(L, lua_upvalueindex(3));
+				ComponentType cmp_type = LuaWrapper::toType<ComponentType>(L, lua_upvalueindex(4));
+				ComponentUID cmp(EntityRef{ entity_index }, cmp_type, module);
+				prop->addItem(cmp, -1);
+				return 0;
+			};
+
 			LuaWrapper::DebugGuard guard(L, 1);
 			auto* prop = LuaWrapper::toType<const reflection::ArrayProperty*>(L, lua_upvalueindex(1));
 			auto* module = LuaWrapper::toType<IModule*>(L, lua_upvalueindex(2));
 			int entity_index = LuaWrapper::toType<i32>(L, lua_upvalueindex(3));
 			ComponentType cmp_type = LuaWrapper::toType<ComponentType>(L, lua_upvalueindex(4));
 			LuaWrapper::checkTableArg(L, 1); // self
+			
+			if (lua_type(L, 2) == LUA_TSTRING) {
+				const char* method = LuaWrapper::checkArg<const char*>(L, 2);
+				if (equalStrings(method, "add")) {
+					lua_pushlightuserdata(L, (void*)prop);
+					lua_pushlightuserdata(L, (void*)module);
+					LuaWrapper::push(L, entity_index);
+					LuaWrapper::push(L, cmp_type);
+					lua_pushcclosure(L, adder, "array_add", 4);
+					return 1;
+				}
+				return 0;
+			}
+
 			const int idx = LuaWrapper::checkArg<int>(L, 2);
 			lua_newtable(L); // {}
 			lua_newtable(L); // {}, mt
