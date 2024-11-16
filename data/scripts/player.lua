@@ -16,8 +16,11 @@ local crouched = false
 local aiming = false
 camera_pivot = -1
 Editor.setPropertyType(this, "camera_pivot", Editor.ENTITY_PROPERTY)
+handle_input = true
 
 function onInputEvent(event : InputEvent)
+	if not handle_input then return end
+	
 	if event.type == "axis" and event.device.type == "mouse" then
 		yaw = yaw + event.x * -0.01
 		pitch = pitch + event.y * -0.01
