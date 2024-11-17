@@ -124,7 +124,7 @@ struct NavigationModuleImpl final : NavigationModule
 		const DVec3 agent_pos = m_world.getPosition(iter.key());
 		const dtCrowdAgent* dt_agent = zone.crowd->getAgent(agent.agent);
 		const Transform zone_tr = m_world.getTransform((EntityRef)agent.zone);
-		const Vec3 pos = Vec3(zone_tr.inverted().transform(agent_pos));
+		const Vec3 pos = Vec3(zone_tr.invTransform(agent_pos));
 		if (squaredLength(pos.xz() - (*(Vec3*)dt_agent->npos).xz()) > 0.1f) {
 			const Transform old_zone_tr = m_world.getTransform(zone.entity);
 			const DVec3 target_pos = old_zone_tr.transform(*(Vec3*)dt_agent->targetPos);
@@ -161,8 +161,7 @@ struct NavigationModuleImpl final : NavigationModule
 	}
 
 
-	void rasterizeTerrains(const Transform& zone_tr, const AABB& tile_aabb, rcContext& ctx, rcConfig& cfg, rcHeightfield& solid)
-	{
+	void rasterizeTerrains(const Transform& zone_tr, const AABB& tile_aabb, rcContext& ctx, rcConfig& cfg, rcHeightfield& solid) {
 		PROFILE_FUNCTION();
 		const float walkable_threshold = cosf(degreesToRadians(60));
 
@@ -172,10 +171,10 @@ struct NavigationModuleImpl final : NavigationModule
 		EntityPtr entity_ptr = render_module->getFirstTerrain();
 		while (entity_ptr.isValid()) {
 			const EntityRef entity = (EntityRef)entity_ptr;
-			const Transform terrain_tr = m_world.getTransform(entity);
-			const Transform to_zone = zone_tr.inverted() * terrain_tr;
+			const DVec3 terrain_pos = m_world.getPosition(entity);
+			const Transform to_zone = Transform::computeLocal(zone_tr, Transform(terrain_pos, Quat::IDENTITY, {1, 1, 1}));
+			const Transform to_terrain = Transform::computeLocal(Transform(terrain_pos, Quat::IDENTITY, {1, 1, 1}), zone_tr);
 			float scaleXZ = render_module->getTerrainXZScale(entity);
-			const Transform to_terrain = to_zone.inverted();
 			Matrix mtx = to_terrain.rot.toMatrix();
 			mtx.setTranslation(Vec3(to_terrain.pos));
 			AABB aabb = tile_aabb;
@@ -221,7 +220,7 @@ struct NavigationModuleImpl final : NavigationModule
 	LUMIX_FORCE_INLINE void rasterizeModel(Model* model
 		, const Transform& tr
 		, const AABB& zone_aabb
-		, const Transform& inv_zone_tr
+		, const Transform& zone_tr
 		, u32 no_navigation_flag
 		, u32 nonwalkable_flag
 		, rcContext& ctx
@@ -230,7 +229,7 @@ struct NavigationModuleImpl final : NavigationModule
 		ASSERT(model->isReady());
 
 		AABB model_aabb = model->getAABB();
-		const Transform rel_tr = inv_zone_tr * tr;
+		const Transform rel_tr = Transform::computeLocal(zone_tr, tr);
 		Matrix mtx = rel_tr.rot.toMatrix();
 		mtx.setTranslation(Vec3(rel_tr.pos));
 		mtx.multiply3x3(rel_tr.scale);
@@ -277,8 +276,6 @@ struct NavigationModuleImpl final : NavigationModule
 	{
 		PROFILE_FUNCTION();
 
-		const Transform inv_zone_tr = zone_tr.inverted();
-
 		auto render_module = static_cast<RenderModule*>(m_world.getModule("renderer"));
 		if (!render_module) return;
 
@@ -293,7 +290,7 @@ struct NavigationModuleImpl final : NavigationModule
 			if (!model) return;
 		
 			const Transform tr = m_world.getTransform(entity);
-			rasterizeModel(model, tr, aabb, inv_zone_tr, no_navigation_flag, nonwalkable_flag, ctx, solid);
+			rasterizeModel(model, tr, aabb, zone_tr, no_navigation_flag, nonwalkable_flag, ctx, solid);
 		}
 
 		const HashMap<EntityRef, InstancedModel>& ims = render_module->getInstancedModels();
@@ -324,8 +321,8 @@ struct NavigationModuleImpl final : NavigationModule
 				tr.rot = Quat(i.rot_quat.x, i.rot_quat.y, i.rot_quat.z, 0);
 				tr.rot.w = sqrtf(1 - dot(i.rot_quat, i.rot_quat));
 				tr.scale = Vec3(i.scale);
-				tr = im_tr * tr;
-				rasterizeModel(im.model, tr, aabb, inv_zone_tr, no_navigation_flag, nonwalkable_flag, ctx, solid);
+				tr = im_tr.compose(tr);
+				rasterizeModel(im.model, tr, aabb, zone_tr, no_navigation_flag, nonwalkable_flag, ctx, solid);
 			}
 		}
 	}
@@ -432,7 +429,7 @@ struct NavigationModuleImpl final : NavigationModule
 				}
 			}
 			else {
-				*(Vec3*)dt_agent->npos = Vec3(zone_tr.inverted().transform(m_world.getPosition(agent.entity)));
+				*(Vec3*)dt_agent->npos = Vec3(zone_tr.invTransform(m_world.getPosition(agent.entity)));
 			}
 
 			if (dt_agent->ncorners == 0 && dt_agent->targetState != DT_CROWDAGENT_TARGET_REQUESTING) {
@@ -924,7 +921,7 @@ struct NavigationModuleImpl final : NavigationModule
 		if (!zone.navmesh) return;
 
 		const Transform tr = m_world.getTransform(zone_entity);
-		const Vec3 pos(tr.inverted().transform(world_pos));
+		const Vec3 pos(tr.invTransform(world_pos));
 
 		const Vec3 min = -zone.zone.extents;
 		const Vec3 max = zone.zone.extents;
@@ -991,7 +988,7 @@ struct NavigationModuleImpl final : NavigationModule
 			return false;
 		}
 
-		const Transform inv_zone_tr = m_world.getTransform(zone.entity).inverted();
+		const Transform zone_tr = m_world.getTransform(zone.entity);
 		const Vec3 min = -zone.zone.extents;
 		const Vec3 max = zone.zone.extents;
 
@@ -999,7 +996,7 @@ struct NavigationModuleImpl final : NavigationModule
 			Agent& agent = iter.value();
 			if (agent.zone.isValid() && agent.agent >= 0) continue;
 
-			const Vec3 pos = Vec3(inv_zone_tr.transform(m_world.getPosition(agent.entity)));
+			const Vec3 pos = Vec3(zone_tr.invTransform(m_world.getPosition(agent.entity)));
 			if (pos.x > min.x && pos.y > min.y && pos.z > min.z 
 				&& pos.x < max.x && pos.y < max.y && pos.z < max.z)
 			{
@@ -1065,7 +1062,7 @@ struct NavigationModuleImpl final : NavigationModule
 		static const float ext[] = { 1.0f, 20.0f, 1.0f };
 
 		const Transform zone_tr = m_world.getTransform(zone.entity);
-		const Vec3 dest = Vec3(zone_tr.inverted().transform(world_dest));
+		const Vec3 dest = Vec3(zone_tr.invTransform(world_dest));
 
 		zone.navquery->findNearestPoly(&dest.x, ext, &filter, &end_poly_ref, 0);
 		dtCrowdAgentParams params = zone.crowd->getAgent(agent.agent)->params;
@@ -1087,7 +1084,7 @@ struct NavigationModuleImpl final : NavigationModule
 		if (!zone.navmesh) return false;
 
 		const Transform tr = m_world.getTransform(zone_entity);
-		const Vec3 pos = Vec3(tr.inverted().transform(world_pos));
+		const Vec3 pos = Vec3(tr.invTransform(world_pos));
 		const Vec3 min = -zone.zone.extents;
 		const int x = int((pos.x - min.x + (1 + zone.getBorderSize()) * zone.zone.cell_size) / (CELLS_PER_TILE_SIDE * zone.zone.cell_size));
 		const int z = int((pos.z - min.z + (1 + zone.getBorderSize()) * zone.zone.cell_size) / (CELLS_PER_TILE_SIDE * zone.zone.cell_size));
@@ -1405,7 +1402,7 @@ struct NavigationModuleImpl final : NavigationModule
 		ASSERT(zone.crowd);
 
 		const Transform zone_tr = m_world.getTransform(zone.entity);
-		const Vec3 pos = Vec3(zone_tr.inverted().transform(m_world.getPosition(agent.entity)));
+		const Vec3 pos = Vec3(zone_tr.invTransform(m_world.getPosition(agent.entity)));
 		dtCrowdAgentParams params = {};
 		params.radius = agent.radius;
 		params.height = agent.height;
@@ -1453,10 +1450,10 @@ struct NavigationModuleImpl final : NavigationModule
 	void assignZone(Agent& agent) {
 		const DVec3 agent_pos = m_world.getPosition(agent.entity);
 		for (RecastZone& zone : m_zones) {
-			const Transform inv_zone_tr = m_world.getTransform(zone.entity).inverted();
+			const Transform zone_tr = m_world.getTransform(zone.entity);
 			const Vec3 min = -zone.zone.extents;
 			const Vec3 max = zone.zone.extents;
-			const Vec3 pos = Vec3(inv_zone_tr.transform(agent_pos));
+			const Vec3 pos = Vec3(zone_tr.invTransform(agent_pos));
 			if (pos.x > min.x && pos.y > min.y && pos.z > min.z 
 				&& pos.x < max.x && pos.y < max.y && pos.z < max.z)
 			{

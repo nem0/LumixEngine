@@ -483,26 +483,23 @@ RayCastModelHit Terrain::castRay(const Ray& ray)
 	if (!m_heightmap || !m_heightmap->isReady()) return hit;
 
 	const World& world = m_module.getWorld();
-	const Quat rot = world.getRotation(m_entity);
 	const DVec3 pos = world.getPosition(m_entity);
-	const Vec3 rel_dir = rot.rotate(ray.dir);
-	const Vec3 terrain_to_ray = Vec3(ray.origin - pos);
-	const Vec3 rel_origin = rot.conjugated().rotate(terrain_to_ray);
+	const Vec3 rel_origin = Vec3(ray.origin - pos);
 
 	Vec3 start;
 	const Vec3 size(m_width * m_scale.x, m_scale.y * 65535.0f, m_height * m_scale.x);
-	if (!getRayAABBIntersection(rel_origin, rel_dir, Vec3::ZERO, size, start)) return hit;
+	if (!getRayAABBIntersection(rel_origin, ray.dir, Vec3::ZERO, size, start)) return hit;
 
 	int hx = (int)(start.x / m_scale.x);
 	int hz = (int)(start.z / m_scale.x);
 
-	float next_x = fabs(rel_dir.x) < 0.01f ? hx : ((hx + (rel_dir.x < 0 ? 0 : 1)) * m_scale.x - rel_origin.x) / rel_dir.x;
-	float next_z = fabs(rel_dir.z) < 0.01f ? hz : ((hz + (rel_dir.z < 0 ? 0 : 1)) * m_scale.x - rel_origin.z) / rel_dir.z;
+	float next_x = fabs(ray.dir.x) < 0.01f ? hx : ((hx + (ray.dir.x < 0 ? 0 : 1)) * m_scale.x - rel_origin.x) / ray.dir.x;
+	float next_z = fabs(ray.dir.z) < 0.01f ? hz : ((hz + (ray.dir.z < 0 ? 0 : 1)) * m_scale.x - rel_origin.z) / ray.dir.z;
 
-	float delta_x = fabsf(rel_dir.x) < 0.01f ? 0 : m_scale.x / fabsf(rel_dir.x);
-	float delta_z = fabsf(rel_dir.z) < 0.01f ? 0 : m_scale.z / fabsf(rel_dir.z);
-	int step_x = (int)signum(rel_dir.x);
-	int step_z = (int)signum(rel_dir.z);
+	float delta_x = fabsf(ray.dir.x) < 0.01f ? 0 : m_scale.x / fabsf(ray.dir.x);
+	float delta_z = fabsf(ray.dir.z) < 0.01f ? 0 : m_scale.z / fabsf(ray.dir.z);
+	int step_x = (int)signum(ray.dir.x);
+	int step_z = (int)signum(ray.dir.z);
 
 	while (hx >= 0 && hz >= 0 && hx + step_x < m_width && hz + step_z < m_height) {
 		float t;
@@ -512,14 +509,14 @@ RayCastModelHit Terrain::castRay(const Ray& ray)
 		Vec3 p1(x + m_scale.x, getHeight(x + m_scale.x, z), z);
 		Vec3 p2(x + m_scale.x, getHeight(x + m_scale.x, z + m_scale.x), z + m_scale.x);
 		Vec3 p3(x, getHeight(x, z + m_scale.x), z + m_scale.x);
-		if (getRayTriangleIntersection(rel_origin, rel_dir, p0, p1, p2, &t)) {
+		if (getRayTriangleIntersection(rel_origin, ray.dir, p0, p1, p2, &t)) {
 			hit.is_hit = true;
 			hit.origin = ray.origin;
 			hit.dir = ray.dir;
 			hit.t = t;
 			return hit;
 		}
-		if (getRayTriangleIntersection(rel_origin, rel_dir, p0, p2, p3, &t)) {
+		if (getRayTriangleIntersection(rel_origin, ray.dir, p0, p2, p3, &t)) {
 			hit.is_hit = true;
 			hit.origin = ray.origin;
 			hit.dir = ray.dir;

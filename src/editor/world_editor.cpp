@@ -3117,16 +3117,14 @@ struct PasteEntityCommand final : IEditorCommand {
 		}
 		m_editor.selectEntities(m_entities, false);
 
-		Transform base_tr;
-		base_tr.pos = m_position;
-		base_tr.scale = Vec3(1);
-		base_tr.rot = Quat(0, 0, 0, 1);
+		DVec3 diff_pos(0, 0, 0);
 		m_map.reserve(entity_count);
 		for (int i = 0; i < entity_count; ++i) {
 			EntityRef orig_e;
 			blob.read(orig_e);
 			if (!is_redo) m_map.insert(orig_e, i);
 		}
+		
 		for (int i = 0; i < entity_count; ++i) {
 			Transform tr;
 			blob.read(tr);
@@ -3138,19 +3136,13 @@ struct PasteEntityCommand final : IEditorCommand {
 			auto iter = m_map.find(parent);
 			if (iter.isValid()) parent = m_entities[iter.value()];
 
-			if (!m_identity)
-			{
-				if (i == 0)
-				{
-					const Transform inv = tr.inverted();
-					base_tr.rot = tr.rot;
-					base_tr.scale = tr.scale;
-					base_tr = base_tr * inv;
+			if (!m_identity) {
+				if (i == 0) {
+					diff_pos = m_position - tr.pos;
 					tr.pos = m_position;
 				}
-				else
-				{
-					tr = base_tr * tr;
+				else {
+					tr.pos += diff_pos;
 				}
 			}
 
@@ -3194,10 +3186,6 @@ struct PasteEntityCommand final : IEditorCommand {
 		ASSERT(command.getType() == getType());
 		return false;
 	}
-
-
-	const Array<EntityRef>& getEntities() { return m_entities; }
-
 
 private:
 	OutputMemoryStream m_copy_buffer;

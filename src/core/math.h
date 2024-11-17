@@ -283,6 +283,7 @@ struct LUMIX_CORE_API RigidTransform {
 };
 
 
+// single precision position, uniform scale
 struct LUMIX_CORE_API LocalTransform {
 	LocalTransform() {}
 	LocalTransform(const Vec3& pos, const Quat& rot, float scale);
@@ -297,17 +298,26 @@ struct LUMIX_CORE_API LocalTransform {
 };
 
 
+// double precision position, quaternion rotation, nonuniform scale
+// this is NOT the same as Matrix
+// 	* it behaves like a matrix only when the scale is uniform
+// 	* when composing multiple transforms with nonuniform scale, there's no skew
+// 	* it behaves like transforms in most other engines (e.g. Unreal)
+// 	* scale is lossy, i.e. when composing multiple transforms, "direction" of the original scale is lost
 struct LUMIX_CORE_API Transform {
 	Transform() {}
 	Transform(const DVec3& pos, const Quat& rot, Vec3 scale);
+	
+	static Transform computeLocal(const Transform& parent, const Transform& child);
 
-	Transform inverted() const;
-
-	Transform operator*(const Transform& rhs) const;
-	Transform operator*(const LocalRigidTransform& rhs) const;
-	DVec3 transform(const Vec3& value) const;
-	Vec3 transformVector(const Vec3& value) const;
+	Transform compose(const Transform& rhs) const;
+	Transform compose(const LocalRigidTransform& rhs) const;
 	DVec3 transform(const DVec3& value) const;
+	DVec3 transform(const Vec3& value) const;
+	DVec3 invTransform(const DVec3& value) const;
+	DVec3 invTransform(const Vec3& value) const;
+	Vec3 transformVector(const Vec3& value) const;
+	Vec3 invTransformVector(const Vec3& value) const;
 	RigidTransform getRigidPart() const;
 
 	DVec3 pos;

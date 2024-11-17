@@ -1913,7 +1913,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 			wheels[idx].mWidth = w.width;
 
 			const Transform& wheel_tr = m_world.getTransform((EntityRef)e);
-			offsets[idx] = toPhysx((chassis_tr.inverted() * wheel_tr).pos - vehicle.center_of_mass);
+			offsets[idx] = toPhysx(Transform::computeLocal(chassis_tr, wheel_tr).pos - vehicle.center_of_mass);
 			
 			wheel_sim_data->setTireData(idx, tire);
 			wheel_sim_data->setSuspTravelDirection(idx, PxVec3(0, -1, 0));

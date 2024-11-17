@@ -265,14 +265,13 @@ void World::transformEntity(EntityRef entity, bool update_local)
 		const Transform my_transform = getTransform(entity);
 		if (update_local && h.parent.isValid()) {
 			const Transform parent_tr = getTransform((EntityRef)h.parent);
-			h.local_transform = (parent_tr.inverted() * my_transform);
+			h.local_transform = Transform::computeLocal(parent_tr, my_transform);
 		}
 
 		EntityPtr child = h.first_child;
-		while (child.isValid())
-		{
+		while (child.isValid()) {
 			const Hierarchy& child_h = m_hierarchy[m_entities[child.index].hierarchy];
-			const Transform abs_tr = my_transform * child_h.local_transform;
+			const Transform abs_tr = my_transform.compose(child_h.local_transform);
 			Transform& child_data = m_transforms[child.index];
 			child_data = abs_tr;
 			transformEntity((EntityRef)child, false);
@@ -320,7 +319,7 @@ void World::setTransformKeepChildren(EntityRef entity, const Transform& transfor
 		if (h.parent.isValid())
 		{
 			Transform parent_tr = getTransform((EntityRef)h.parent);
-			h.local_transform = parent_tr.inverted() * my_transform;
+			h.local_transform = Transform::computeLocal(parent_tr, my_transform);
 		}
 
 		EntityPtr child = h.first_child;
@@ -328,7 +327,7 @@ void World::setTransformKeepChildren(EntityRef entity, const Transform& transfor
 		{
 			Hierarchy& child_h = m_hierarchy[m_entities[child.index].hierarchy];
 
-			child_h.local_transform = my_transform.inverted() * getTransform((EntityRef)child);
+			child_h.local_transform = Transform::computeLocal(my_transform, getTransform((EntityRef)child));
 			child = child_h.next_sibling;
 		}
 	}
@@ -687,7 +686,7 @@ void World::setParent(EntityPtr new_parent, EntityRef child)
 		m_hierarchy[child_idx].parent = new_parent;
 		Transform parent_tr = getTransform((EntityRef)new_parent);
 		Transform child_tr = getTransform(child);
-		m_hierarchy[child_idx].local_transform = parent_tr.inverted() * child_tr;
+		m_hierarchy[child_idx].local_transform = Transform::computeLocal(parent_tr, child_tr);
 		m_hierarchy[child_idx].next_sibling = m_hierarchy[new_parent_idx].first_child;
 		m_hierarchy[new_parent_idx].first_child = child;
 	}
@@ -704,7 +703,7 @@ void World::updateGlobalTransform(EntityRef entity)
 	ASSERT(h.parent.isValid());
 	Transform parent_tr = getTransform((EntityRef)h.parent);
 	
-	Transform new_tr = parent_tr * h.local_transform;
+	Transform new_tr = parent_tr.compose(h.local_transform);
 	setTransform(entity, new_tr);
 }
 

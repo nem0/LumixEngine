@@ -1068,7 +1068,7 @@ void ParticleSystem::applyTransform(const Transform& new_tr) {
 	if (m_total_time == 0) {
 		m_prev_frame_transform = new_tr;
 	}
-	const Transform delta_tr = new_tr.inverted() * m_prev_frame_transform;
+	const Transform delta_tr = Transform::computeLocal(new_tr, m_prev_frame_transform);
 	for (i32 emitter_idx = 0; emitter_idx < m_emitters.size(); ++emitter_idx) {
 		Emitter& emitter = m_emitters[emitter_idx];
 		if ((u32)m_resource->getFlags() & (u32)ParticleSystemResource::Flags::WORLD_SPACE) {

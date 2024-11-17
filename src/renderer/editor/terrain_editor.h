@@ -72,7 +72,6 @@ private:
 	void increaseBrushSize();
 	void decreaseBrushSize();
 	u16 getHeight(const DVec3& world_pos, RenderModule* module, EntityRef terrain) const;
-	DVec3 getRelativePosition(const DVec3& world_pos, EntityRef terrain, World& world) const;
 	void exportToOBJ(ComponentUID cmp) const;
 	Renderer& getRenderer();
 

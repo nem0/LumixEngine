@@ -757,30 +757,43 @@ Transform::Transform(const DVec3& pos, const Quat& rot, Vec3 scale)
 	, rot(rot)
 	, scale(scale) {}
 
-Transform Transform::operator*(const LocalRigidTransform& rhs) const { return {pos + rot.rotate(rhs.pos) * scale, rot * rhs.rot, scale}; }
+Transform Transform::compose(const LocalRigidTransform& rhs) const { return {pos + rot.rotate(rhs.pos * scale), rot * rhs.rot, scale}; }
 
-DVec3 Transform::transform(const Vec3& value) const { return pos + rot.rotate(value) * scale; }
+DVec3 Transform::transform(const Vec3& value) const { return pos + rot.rotate(value * scale); }
 
-DVec3 Transform::transform(const DVec3& value) const { return pos + rot.rotate(value) * scale; }
+DVec3 Transform::invTransform(const DVec3& value) const {
+	return rot.conjugated().rotate(value - pos) / scale;
+}
 
-Vec3 Transform::transformVector(const Vec3& value) const { return rot.rotate(value) * scale; }
+DVec3 Transform::invTransform(const Vec3& value) const {
+	return rot.conjugated().rotate(DVec3(value) - pos) / scale;
+}
+
+DVec3 Transform::transform(const DVec3& value) const { return pos + rot.rotate(value * scale); }
+
+Vec3 Transform::transformVector(const Vec3& value) const { return rot.rotate(value * scale); }
+
+Vec3 Transform::invTransformVector(const Vec3& value) const {
+	return rot.conjugated().rotate(value) / scale;
+}
 
 RigidTransform Transform::getRigidPart() const { return {pos, rot}; }
 
-Transform Transform::operator*(const Transform& rhs) const {
+Transform Transform::compose(const Transform& rhs) const {
 	return {
-		rot.rotate(rhs.pos) * scale + pos,
+		rot.rotate(rhs.pos * scale) + pos,
 		rot * rhs.rot,
 		scale * rhs.scale
 	};
 }
 
-Transform Transform::inverted() const {
-	Transform result;
-	result.rot = rot.conjugated();
-	result.pos = result.rot.rotate(-pos) / scale;
-	result.scale = Vec3(1.0f) / scale;
-	return result;
+Transform Transform::computeLocal(const Transform& parent, const Transform& child) {
+	const DVec3 inv_parent_pos = parent.rot.conjugated().rotate(-parent.pos) / parent.scale;
+	return {
+		parent.rot.conjugated().rotate(child.pos) / parent.scale + inv_parent_pos,
+		parent.rot.conjugated() * child.rot,
+		child.scale / parent.scale
+	};
 }
 
 LocalTransform::LocalTransform(const Vec3& pos, const Quat& rot, float scale)
@@ -798,7 +811,7 @@ LocalTransform LocalTransform::inverted() const {
 }
 
 LocalTransform LocalTransform::operator*(const LocalTransform& rhs) const {
-	return {pos + rot.rotate(rhs.pos) * scale, rot * rhs.rot, scale};
+	return {pos + rot.rotate(rhs.pos * scale), rot * rhs.rot, scale};
 }
 
 LocalRigidTransform LocalRigidTransform::inverted() const {

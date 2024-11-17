@@ -406,7 +406,7 @@ struct RenderModuleImpl final : RenderModule {
 		Vec3 original_scale = m_world.getScale(bone_attachment.entity);
 		const LocalRigidTransform bone_transform = {parent_pose->positions[idx], parent_pose->rotations[idx] };
 		const LocalRigidTransform relative_transform = { bone_attachment.relative_transform.pos, bone_attachment.relative_transform.rot };
-		Transform result = parent_entity_transform * bone_transform * relative_transform;
+		Transform result = parent_entity_transform.compose(bone_transform * relative_transform);
 		result.scale = original_scale;
 		m_world.setTransform(bone_attachment.entity, result);
 		unlockPose(model_instance, false);
@@ -438,10 +438,9 @@ struct RenderModuleImpl final : RenderModule {
 		const LocalRigidTransform bone_transform = {pose->positions[attachment.bone_index], pose->rotations[attachment.bone_index]};
 
 		const EntityRef parent = (EntityRef)attachment.parent_entity;
-		Transform inv_parent_transform = m_world.getTransform(parent) * bone_transform;
-		inv_parent_transform = inv_parent_transform.inverted();
+		Transform parent_transform = m_world.getTransform(parent).compose(bone_transform);
 		const Transform child_transform = m_world.getTransform(attachment.entity);
-		const Transform res = inv_parent_transform * child_transform;
+		const Transform res = Transform::computeLocal(parent_transform, child_transform);
 		attachment.relative_transform = {Vec3(res.pos), res.rot};
 		unlockPose(model_instance, false);
 	}
@@ -2640,10 +2639,10 @@ struct RenderModuleImpl final : RenderModule {
 			Vec3 a, b, c;
 			RayCastModelHit pg_hit;
 
-			const DVec3& pos = m_world.getPosition(iter.key());
-			const Quat rot = m_world.getRotation(iter.key()).conjugated();
-			const Vec3 rd = rot.rotate(ray.dir);
-			Vec3 ro = Vec3(ray.origin - pos);
+			const Transform& tr = m_world.getTransform(iter.key());
+			
+			const Vec3 rd = tr.invTransformVector(ray.dir);
+ 			Vec3 ro = Vec3(tr.invTransform(ray.origin));
 
 			Vec3 dummy;
 			if (!pg.aabb.contains(ro) && !getRayAABBIntersection(ro, rd, pg.aabb.min, pg.aabb.max - pg.aabb.min, dummy)) continue;
@@ -2710,9 +2709,8 @@ struct RenderModuleImpl final : RenderModule {
 			const double dist = length(tr.pos - ray.origin);
 			if (dist - radius * maximum(tr.scale.x, tr.scale.y, tr.scale.z) > cur_dist) continue;
 			
-			const Transform& inv_tr = tr.inverted();
-			const Vec3 ray_origin_model_space = Vec3(inv_tr.transform(ray.origin));
-			const Vec3 ray_dir_model_space = normalize(inv_tr.transformVector(ray.dir));
+			const Vec3 ray_origin_model_space = Vec3(tr.invTransform(ray.origin));
+			const Vec3 ray_dir_model_space = normalize(tr.invTransformVector(ray.dir));
 
 			float intersection_t;
 			if (getRaySphereIntersection(ray_origin_model_space, ray_dir_model_space, Vec3::ZERO, radius, intersection_t) && intersection_t >= 0) {

@@ -1034,10 +1034,13 @@ void SceneView::manipulate() {
 			Array<Quat> rots(m_app.getAllocator());
 			rots.resize(filtered_selection.size());
 			poss.resize(filtered_selection.size());
+			const Quat rot_diff = new_pivot_tr.rot * old_pivot_tr.rot.conjugated();
+			const DVec3 pivot_pos = old_pivot_tr.pos;
 			for (u32 i = 0, c = filtered_selection.size(); i < c; ++i) {
-				const Transform t = new_pivot_tr * old_pivot_tr.inverted() * world.getTransform(filtered_selection[i]);
-				poss[i] = t.pos;
-				rots[i] = normalize(t.rot);
+				const Transform old_tr = world.getTransform(filtered_selection[i]);
+				
+				poss[i] = rot_diff.rotate(old_tr.pos - pivot_pos) + pivot_pos;
+				rots[i] = normalize(rot_diff * old_tr.rot);
 			}
 			m_editor.setEntitiesPositionsAndRotations(filtered_selection.begin(), poss.begin(), rots.begin(), rots.size());
 			break;

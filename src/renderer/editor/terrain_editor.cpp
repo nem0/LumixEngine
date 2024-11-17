@@ -172,9 +172,9 @@ struct PaintTerrainCommand final : IEditorCommand
 
 		m_width = m_height = m_x = m_y = -1;
 		World& world = *editor.getWorld();
-		const Transform entity_transform = world.getTransform(terrain).inverted();
+		const Transform terrain_tr = world.getTransform(terrain);
 		RenderModule* module = (RenderModule*)world.getModule(TERRAIN_TYPE);
-		DVec3 local_pos = entity_transform.transform(hit_pos);
+		DVec3 local_pos = hit_pos - terrain_tr.pos;
 		float terrain_size = module->getTerrainSize(terrain).x;
 		local_pos = local_pos / terrain_size;
 		local_pos.y = -1;
@@ -814,25 +814,24 @@ void TerrainEditor::drawCursor(RenderModule& module, EntityRef entity, const DVe
 	}
 
 	float brush_size = m_terrain_brush_size;
-	const Vec3 local_center = Vec3(getRelativePosition(center, entity, module.getWorld()));
-	const Transform terrain_transform = module.getWorld().getTransform(entity);
+	const DVec3 terrain_origin = module.getWorld().getPosition(entity);
+	const Vec3 rel_pos = Vec3(center - terrain_origin);
 
 	for (int i = 0; i < SLICE_COUNT + 1; ++i) {
 		const float angle = i * angle_step;
 		const float next_angle = i * angle_step + angle_step;
-		Vec3 local_from = local_center + Vec3(cosf(angle), 0, sinf(angle)) * brush_size;
+		Vec3 local_from = rel_pos + Vec3(cosf(angle), 0, sinf(angle)) * brush_size;
 		local_from.y = terrain->getHeight(local_from.x, local_from.z);
 		local_from.y += 0.25f;
-		Vec3 local_to = local_center + Vec3(cosf(next_angle), 0, sinf(next_angle)) * brush_size;
+		Vec3 local_to = rel_pos + Vec3(cosf(next_angle), 0, sinf(next_angle)) * brush_size;
 		local_to.y = terrain->getHeight(local_to.x, local_to.z);
 		local_to.y += 0.25f;
 
-		const DVec3 from = terrain_transform.transform(local_from);
-		const DVec3 to = terrain_transform.transform(local_to);
+		const DVec3 from = terrain_origin + local_from;
+		const DVec3 to = terrain_origin + local_to;
 		module.addDebugLine(from, to, Color::RED);
 	}
 
-	const Vec3 rel_pos = Vec3(terrain_transform.inverted().transform(center));
 	const float scale = terrain->getXZScale();
 	const IVec3 p = IVec3(rel_pos / scale);
 	const i32 half_extents = i32(1 + brush_size / scale);
@@ -848,10 +847,10 @@ void TerrainEditor::drawCursor(RenderModule& module, EntityRef entity, const DVe
 			p11.y = terrain->getHeight(i + 1, j + 1);
 			p01.y = terrain->getHeight(i, j + 1);
 
-			p00 = terrain_transform.transform(p00);
-			p10 = terrain_transform.transform(p10);
-			p01 = terrain_transform.transform(p01);
-			p11 = terrain_transform.transform(p11);
+			p00 = terrain_origin + p00;
+			p10 = terrain_origin + p10;
+			p01 = terrain_origin + p01;
+			p11 = terrain_origin + p11;
 
 			module.addDebugLine(p10, p01, Color(0x80, 0, 0, 0xff));
 			module.addDebugLine(p10, p11, Color(0x80, 0, 0, 0xff));
@@ -863,18 +862,10 @@ void TerrainEditor::drawCursor(RenderModule& module, EntityRef entity, const DVe
 }
 
 
-DVec3 TerrainEditor::getRelativePosition(const DVec3& world_pos, EntityRef terrain, World& world) const
-{
-	const Transform transform = world.getTransform(terrain);
-	const Transform inv_transform = transform.inverted();
-
-	return inv_transform.transform(world_pos);
-}
-
-
 u16 TerrainEditor::getHeight(const DVec3& world_pos, RenderModule* module, EntityRef terrain) const
 {
-	const DVec3 rel_pos = getRelativePosition(world_pos, terrain, module->getWorld());
+	const DVec3 terrain_pos =  module->getWorld().getPosition(terrain);
+	const DVec3 rel_pos = world_pos - terrain_pos;
 	ComponentUID cmp;
 	cmp.entity = terrain;
 	cmp.module = module;
@@ -1022,7 +1013,7 @@ static bool isOBBCollision(RenderModule& module,
 	World& world = module.getWorld();
 	Span<const ModelInstance> model_instances = module.getModelInstances();
 	const Transform* transforms = world.getTransforms();
-	while(meshes) {
+	while (meshes) {
 		const EntityRef* entities = meshes->entities;
 		for (u32 i = 0, c = meshes->header.count; i < c; ++i) {
 			const EntityRef mesh = entities[i];
@@ -1035,10 +1026,9 @@ static bool isOBBCollision(RenderModule& module,
 			const float radius_b = model_instance.model->getOriginBoundingRadius() * maximum(tr_b.scale.x, tr_b.scale.y, tr_b.scale.z);
 			const float radius_squared = radius_a_squared + radius_b * radius_b;
 			if (squaredLength(model_tr.pos - tr_b.pos) < radius_squared) {
-				const Transform rel_tr = model_tr.inverted() * tr_b;
-				Matrix mtx = rel_tr.rot.toMatrix();
+				const Transform rel_tr = Transform::computeLocal(model_tr, tr_b);
+				Matrix mtx(Vec3(rel_tr.pos), rel_tr.rot);
 				mtx.multiply3x3(rel_tr.scale);
-				mtx.setTranslation(Vec3(rel_tr.pos));
 
 				if (testOBBCollision(model->getAABB(), mtx, model_instance.model->getAABB())) {
 					if (ignore_not_in_folder && folders.getFolder(EntityRef{mesh.index}) != folder) {
@@ -1071,8 +1061,7 @@ void TerrainEditor::paintEntities(const DVec3& hit_pos, WorldEditor& editor, Ent
 	{
 		World& world = *editor.getWorld();
 		RenderModule* module = static_cast<RenderModule*>(world.getModule(TERRAIN_TYPE));
-		const Transform terrain_tr = world.getTransform(terrain);
-		const Transform inv_terrain_tr = terrain_tr.inverted();
+		const DVec3 terrain_pos = world.getPosition(terrain);
 
 		ShiftedFrustum frustum;
 		frustum.computeOrtho(hit_pos,
@@ -1098,15 +1087,15 @@ void TerrainEditor::paintEntities(const DVec3& hit_pos, WorldEditor& editor, Ent
 			const float dist = randFloat(0, 1.0f) * m_terrain_brush_size;
 			const float y = randFloat(m_y_spread.x, m_y_spread.y);
 			DVec3 pos(hit_pos.x + cosf(angle) * dist, 0, hit_pos.z + sinf(angle) * dist);
-			const Vec3 terrain_pos = Vec3(inv_terrain_tr.transform(pos));
-			if (terrain_pos.x >= 0 && terrain_pos.z >= 0 && terrain_pos.x <= terrain_size.x && terrain_pos.z <= terrain_size.y)
+			const Vec3 rel_pos = Vec3(pos - terrain_pos);
+			if (rel_pos.x >= 0 && rel_pos.z >= 0 && rel_pos.x <= terrain_size.x && rel_pos.z <= terrain_size.y)
 			{
-				pos.y = module->getTerrainHeightAt(terrain, terrain_pos.x, terrain_pos.z) + y;
-				pos.y += terrain_tr.pos.y;
+				pos.y = module->getTerrainHeightAt(terrain, rel_pos.x, rel_pos.z) + y;
+				pos.y += terrain_pos.y;
 				Quat rot(0, 0, 0, 1);
 				if(m_is_align_with_normal)
 				{
-					Vec3 normal = module->getTerrainNormalAt(terrain, terrain_pos.x, terrain_pos.z);
+					Vec3 normal = module->getTerrainNormalAt(terrain, rel_pos.x, rel_pos.z);
 					Vec3 dir = normalize(cross(normal, Vec3(1, 0, 0)));
 					Matrix mtx = Matrix::IDENTITY;
 					mtx.setXVector(cross(normal, dir));

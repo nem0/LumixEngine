@@ -4169,7 +4169,6 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 			case Brush::TERRAIN: {
 				const EntityRef terrain = *hit.entity;
 				const Transform terrain_tr = editor.getWorld()->getTransform(terrain);
-				const Transform inv_terrain_tr = terrain_tr.inverted();
 
 				const bool remove = ImGui::GetIO().KeyCtrl; // TODO
 
@@ -4190,7 +4189,7 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 						const float angle = randFloat(0, PI * 2);
 						const float dist = randFloat(0, 1.0f) * m_brush_radius;
 						DVec3 pos(hit_pos.x + cosf(angle) * dist, 0, hit_pos.z + sinf(angle) * dist);
-						const Vec3 terrain_pos = Vec3(inv_terrain_tr.transform(pos));
+						const Vec3 terrain_pos = Vec3(pos - terrain_tr.pos);
 						pos.y = cmp.module->getTerrainHeightAt(terrain, terrain_pos.x, terrain_pos.z) + terrain_tr.pos.y;
 						pos.y += randFloat(m_y_spread.x, m_y_spread.y);
 						
@@ -4477,7 +4476,7 @@ struct ProceduralGeomPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		// TODO undo/redo
 
 		const Transform tr = world.getTransform(entity);
-		const Vec3 center(tr.inverted().transform(pos));
+		const Vec3 center(tr.invTransform(pos));
 
 		const float R2 = m_brush_size * m_brush_size;
 
@@ -4567,7 +4566,7 @@ struct ProceduralGeomPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		const float R2 = m_brush_size * m_brush_size;
 
 		const Transform tr = module.getWorld().getTransform(entity);
-		const Vec3 center_local = Vec3(tr.inverted().transform(center));
+		const Vec3 center_local = Vec3(tr.invTransform(center));
 
 		for (u32 i = 0, c = pg.getVertexCount(); i < c; ++i) {
 			Vec3 p;
@@ -5502,14 +5501,14 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		Transform p0_tr = { pos0, Quat::IDENTITY, Vec3(1) };
 		WorldEditor& editor = view.getEditor();
 		if (Gizmo::manipulate((u64(1) << 32) | cmp.entity.index, view, p0_tr, cfg)) {
-			const Vec2 p0 = Vec2(tr.inverted().transform(p0_tr.pos).xz());
+			const Vec2 p0 = Vec2(tr.invTransform(p0_tr.pos).xz());
 			editor.setProperty(CURVE_DECAL_TYPE, "", 0, "Bezier P0", Span(&e, 1), p0);
 		}
 
 		const DVec3 pos2 = tr.transform(DVec3(decal.bezier_p2.x, 0, decal.bezier_p2.y));
 		Transform p2_tr = { pos2, Quat::IDENTITY, Vec3(1) };
 		if (Gizmo::manipulate((u64(2) << 32) | cmp.entity.index, view, p2_tr, cfg)) {
-			const Vec2 p2 = Vec2(tr.inverted().transform(p2_tr.pos).xz());
+			const Vec2 p2 = Vec2(tr.invTransform(p2_tr.pos).xz());
 			editor.setProperty(CURVE_DECAL_TYPE, "", 0, "Bezier P2", Span(&e, 1), p2);
 		}
 

@@ -717,12 +717,12 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		for (int i = 0; i < model->getBoneCount(); ++i) {
 			const Model::Bone& bone = model->getBone(i);
 
-			const Transform tr = root_tr * bone.transform;
+			const Transform tr = root_tr.compose(bone.transform);
 
 			if (bone.parent_idx >= 0) {
 				const Model::Bone& parent_bone = model->getBone(bone.parent_idx);
 				const Vec3 parent_pos = parent_bone.transform.pos;
-				const DVec3 pos = (root_tr * parent_bone.transform).pos;
+				const DVec3 pos = (root_tr.compose(parent_bone.transform)).pos;
 
 				Quat rot = Quat::IDENTITY;
 				if (squaredLength(parent_pos - bone.transform.pos) > 0.01f) {
