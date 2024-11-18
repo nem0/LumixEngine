@@ -2471,7 +2471,8 @@ public:
 	}
 
 	void gatherHierarchy(EntityRef e, Array<EntityRef>& entities) {
-		entities.push(e);
+		if (entities.indexOf(e) < 0) entities.push(e);
+
 		for (EntityRef child : m_world->childrenOf(e)) {
 			if (entities.indexOf(child) < 0) {
 				gatherHierarchy(child, entities);
@@ -2920,7 +2921,18 @@ public:
 				}
 			}
 		}
-		fastRemoveDuplicates(m_selected_entities);
+		if (!m_selected_entities.empty()) {
+			const EntityRef first = m_selected_entities[0];
+			fastRemoveDuplicates(m_selected_entities);
+			// fastRemoveDuplicates changed order of the entities, but we need 
+			// to keep the first entity, because it's used for the transform gizmo
+			for (u32 i = 0, c = m_selected_entities.size(); i < c; ++i) {
+				if (m_selected_entities[i] == first) {
+					swap(m_selected_entities[i], m_selected_entities[0]);
+					break;
+				}
+			}
+		}
 		m_entity_selection_changed.invoke();
 	}
 
