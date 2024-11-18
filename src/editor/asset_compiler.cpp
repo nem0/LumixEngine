@@ -76,64 +76,9 @@ struct AssetCompilerImpl : AssetCompiler {
 		, m_resource_compiled(m_allocator)
 		, m_on_init_load(m_allocator)
 	{
+		onBasePathChanged();
+		
 		Engine& engine = app.getEngine();
-		FileSystem& fs = engine.getFileSystem();
-		const char* base_path = fs.getBasePath();
-		m_watcher = FileSystemWatcher::create(base_path, m_allocator);
-		m_watcher->getCallback().bind<&AssetCompilerImpl::onFileChanged>(this);
-		Path path(base_path, ".lumix/resources");
-		if (!os::dirExists(path)) {
-			if (!os::makePath(path.c_str())) logError("Could not create ", path);
-			else {
-				os::OutputFile file;
-				path.append("/_version.bin");
-				if (!file.open(path.c_str())) {
-					logError("Could not open ", path);
-				}
-				else {
-					file.write(0);
-					file.close();
-				}
-			}
-		}
-		os::InputFile file;
-		if (!file.open(".lumix/resources/_version.bin")) {
-			logError("Could not open .lumix/resources/_version.bin");
-		}
-		else {
-			u32 version;
-			file.read(version);
-			file.close();
-			if (version != 0) {
-				logWarning("Unsupported version of .lumix/resources. Rebuilding all assets.");
-				os::FileIterator* iter = os::createFileIterator(".lumix/resources", m_allocator);
-				os::FileInfo info;
-				bool all_deleted = true;
-				while (os::getNextFile(iter, &info)) {
-					if (!info.is_directory) {
-						const Path filepath(".lumix/resources/", info.filename);
-						if (!os::deleteFile(filepath)) {
-							all_deleted = false;
-						}
-					}
-				}
-				os::destroyFileIterator(iter);
-
-				if (!all_deleted) {
-					logError("Could not delete all files in .lumix/resources, please delete the directory and restart the editor.");
-				}
-
-				os::OutputFile out_file;
-				if (!out_file.open(".lumix/resources/_version.bin")) {
-					logError("Could not open .lumix/resources/_version.bin");
-				}
-				else {
-					out_file.write(0);
-					out_file.close();
-				}
-			}
-		}
-
 		ResourceManagerHub& rm = engine.getResourceManager();
 		rm.setLoadHook(&m_load_hook);
 	}
@@ -173,13 +118,74 @@ struct AssetCompilerImpl : AssetCompiler {
 	}
 	
 	void onBasePathChanged() override {
-		Engine& engine = m_app.getEngine();
+ 		Engine& engine = m_app.getEngine();
 		FileSystem& fs = engine.getFileSystem();
 		const char* base_path = fs.getBasePath();
 		m_watcher = FileSystemWatcher::create(base_path, m_allocator);
 		m_watcher->getCallback().bind<&AssetCompilerImpl::onFileChanged>(this);
+
 		m_dependencies.clear();
 		m_resources.clear();
+
+
+		Path path(base_path, ".lumix");
+		bool success = os::makePath(path.c_str());
+		if (!success) logError("Could not create ", path);
+
+		path.append("/resources");
+		if (!os::dirExists(path)) {
+			if (!os::makePath(path.c_str())) logError("Could not create ", path);
+			else {
+				os::OutputFile file;
+				path.append("/_version.bin");
+				if (!file.open(path.c_str())) {
+					logError("Could not open ", path);
+				}
+				else {
+					file.write(0);
+					file.close();
+				}
+			}
+		}
+
+		os::InputFile file;
+		if (!file.open(".lumix/resources/_version.bin")) {
+			logError("Could not open .lumix/resources/_version.bin");
+		}
+		else {
+			u32 version;
+			file.read(version);
+			file.close();
+			if (version != 0) {
+				logWarning("Unsupported version of .lumix/resources. Rebuilding all assets.");
+				os::FileIterator* iter = os::createFileIterator(".lumix/resources", m_allocator);
+				os::FileInfo info;
+				bool all_deleted = true;
+				while (os::getNextFile(iter, &info)) {
+					if (!info.is_directory) {
+						const Path filepath(".lumix/resources/", info.filename);
+						if (!os::deleteFile(filepath)) {
+							all_deleted = false;
+						}
+					}
+				}
+				os::destroyFileIterator(iter);
+
+				if (!all_deleted) {
+					logError("Could not delete all files in .lumix/resources, please delete the directory and restart the editor.");
+				}
+
+				os::OutputFile out_file;
+				if (!out_file.open(".lumix/resources/_version.bin")) {
+					logError("Could not open .lumix/resources/_version.bin");
+				}
+				else {
+					out_file.write(0);
+					out_file.close();
+				}
+			}
+		}
+
 		fillDB();
 	}
 
