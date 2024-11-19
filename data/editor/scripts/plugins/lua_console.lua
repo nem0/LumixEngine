@@ -33,7 +33,7 @@ function execute()
 			for i = 1, selected_count do
 				local entity = Editor.getSelectedEntity(i - 1)
 				if entity.lua_script == nil then continue end
-				local env = entity.lua_script[0]
+				local env = entity.lua_script[1]
 				if env ~= nil then
 					setfenv(f, env)
 					f()
