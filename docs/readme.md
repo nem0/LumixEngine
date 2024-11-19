@@ -3,6 +3,7 @@
 * [3rd party libraries](3rdparty.md)
 
 # Engine
+* [File paths](file_paths.md)
 * [Transform](transform.md)
 * [Job System](job_system.md)
 * [Profiler](profiler.md)
