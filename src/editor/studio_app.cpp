@@ -456,6 +456,12 @@ struct StudioAppImpl final : StudioApp {
 					ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().FramePadding.x);
 					
 					if (filter.isActive()) {
+						bool select_all = false;
+						if (m_app.checkShortcut(m_app.getCommonActions().select_all)) {
+							select_all = true;
+							editor.selectEntities({}, false);
+						}
+						
 						for (EntityPtr e = world->getFirstEntity(); e.isValid(); e = world->getNextEntity((EntityRef)e)) {
 							char buffer[1024];
 							getEntityListDisplayName(m_app, *world, Span(buffer), e);
@@ -463,6 +469,9 @@ struct StudioAppImpl final : StudioApp {
 
 							ImGui::PushID(e.index);
 							const EntityRef e_ref = (EntityRef)e;
+							if (select_all) {
+								editor.selectEntities(Span(&e_ref, 1), true);
+							}
 							if (select_first) {
 								select_first = false;
 								editor.selectEntities(Span(&e_ref, 1), false);
