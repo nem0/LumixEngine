@@ -14,9 +14,11 @@ struct LUMIX_EDITOR_API EditorAssetPlugin : AssetBrowser::IPlugin, AssetCompiler
 	bool canCreateResource() const override { return true; }
 	const char* getDefaultExtension() const override { return m_extension; }
 	const char* getLabel() const override { return m_name; }
+	ResourceType getResourceType() const override { return m_type; }
 
 protected:
 	StudioApp& m_app;
+	ResourceType m_type;
 	const char* m_extension;
 	const char* m_name;
 };

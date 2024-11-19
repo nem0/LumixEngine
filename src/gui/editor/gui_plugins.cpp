@@ -255,6 +255,7 @@ struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	}
 
 	const char* getLabel() const override { return "Sprite"; }
+	ResourceType getResourceType() const override { return Sprite::TYPE; }
 
 	StudioApp& m_app;
 };

@@ -34,6 +34,7 @@ struct AssetBrowserPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin 
 	
 	bool compile(const Path& src) override { return app.getAssetCompiler().copyCompile(src); }
 	const char* getLabel() const override { return "Prefab"; }
+	ResourceType getResourceType() const override { return PrefabResource::TYPE; }
 
 	PrefabSystem& system;
 	StudioApp& app;

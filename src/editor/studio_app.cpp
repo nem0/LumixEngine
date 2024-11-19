@@ -1442,7 +1442,7 @@ struct StudioAppImpl final : StudioApp {
 		m_editor->loadWorld(blob, path.c_str(), additive);
 	}
 
-	void changeRootFolder(const char* dir) {
+	void changeBasePath(const char* dir) {
 		m_engine->getFileSystem().setBasePath(dir);
 		extractBundled();
 		m_editor->loadProject();
@@ -1493,18 +1493,20 @@ struct StudioAppImpl final : StudioApp {
 					m_is_welcome_screen_open = false;
 					StringView sv = dir;
 					sv.removeSuffix(1); // remove trailing slash
-					
-					if (m_recent_folders.find([&](const String& s){ return s == sv; }) < 0) {
+
+					m_recent_folders.eraseItems([&](const String& s){ return s == sv; });
+					if (m_recent_folders.size() > 10) {
 						m_recent_folders.pop();
-						m_recent_folders.insert(0, String(sv, m_allocator));
 					}
-					changeRootFolder(dir);
+
+					m_recent_folders.insert(0, String(sv, m_allocator));
+					changeBasePath(dir);
 				}
 			}
 
 			for (String& path : m_recent_folders) {
 				if (ImGui::Selectable(path.c_str(), false, 0, ImVec2(ImGui::GetContentRegionAvail().x, 0))) {
-					changeRootFolder(path.c_str());
+					changeBasePath(path.c_str());
 					m_is_welcome_screen_open = false;
 				}
 			}

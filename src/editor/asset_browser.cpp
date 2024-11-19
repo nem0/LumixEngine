@@ -64,6 +64,7 @@ struct WorldAssetPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 	bool compile(const Path& src) override { return true; }
 	const char* getLabel() const override { return "World"; }
+	ResourceType getResourceType() const override { return WORLD_TYPE; }
 
 	StudioApp& m_app;
 };
@@ -958,6 +959,10 @@ struct AssetBrowserImpl : AssetBrowser {
 	void removePlugin(IPlugin& plugin) override {
 		m_plugins.eraseItem(&plugin);
 		m_plugin_map.eraseIf([&plugin](IPlugin* p){ return p == &plugin; });
+	}
+
+	Span<IPlugin*> getPlugins() override {
+		return m_plugins;
 	}
 
 	void addPlugin(IPlugin& plugin, Span<const char*> extensions) override {

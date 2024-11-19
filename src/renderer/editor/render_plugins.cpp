@@ -656,6 +656,7 @@ struct FontPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
 	const char* getLabel() const override { return "Font"; }
+	ResourceType getResourceType() const override { return FontResource::TYPE; }
 
 	StudioApp& m_app;
 };
@@ -922,6 +923,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	void createResource(OutputMemoryStream& blob) override { blob << "shader \"/shaders/standard.hlsl\""; }
 	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
 	const char* getLabel() const override { return "Material"; }
+	ResourceType getResourceType() const override { return Material::TYPE; }
 
 	StudioApp& m_app;
 	TagAllocator m_allocator;
@@ -1699,6 +1701,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	}
 
 	const char* getLabel() const override { return "Texture"; }
+	ResourceType getResourceType() const override { return Texture::TYPE; }
 
 	struct Asset {
 		Asset(IAllocator& allocator) {}
@@ -2707,6 +2710,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	}
 
 	const char* getLabel() const override { return "Model"; }
+	ResourceType getResourceType() const override { return Model::TYPE; }
 
 	void pushTileQueue(const Path& path) {
 		Engine& engine = m_app.getEngine();
@@ -3508,6 +3512,7 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	}
 	
 	const char* getLabel() const override { return "Shader"; }
+	ResourceType getResourceType() const override { return Shader::TYPE; }
 
 	StudioApp& m_app;
 };
@@ -3532,6 +3537,7 @@ struct ShaderIncludePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
 	const char* getLabel() const override { return "Shader include"; }
+	ResourceType getResourceType() const override { return SHADER_INCLUDE_TYPE; }
 
 	StudioApp& m_app;
 };

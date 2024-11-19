@@ -173,6 +173,7 @@ struct AssetBrowserPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin 
 	}
 
 	const char* getLabel() const override { return "Audio"; }
+	ResourceType getResourceType() const override { return Clip::TYPE; }
 	
 	StudioApp& m_app;
 	AssetBrowser& m_browser;

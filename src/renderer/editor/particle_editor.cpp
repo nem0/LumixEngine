@@ -2684,6 +2684,7 @@ struct ParticleEditorImpl : ParticleEditor {
 		const char* getDefaultExtension() const override { return "par"; }
 		void openEditor(const Path& path) override { m_editor.open(path); }
 		const char* getLabel() const override { return "Particle system"; }
+		ResourceType getResourceType() const override { return ParticleSystemResource::TYPE; }
 
 		StudioApp& m_app;
 		ParticleEditorImpl& m_editor;

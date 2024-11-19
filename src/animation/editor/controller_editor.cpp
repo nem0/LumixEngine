@@ -1205,6 +1205,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 	bool canCreateResource() const override { return true; }
 	const char* getDefaultExtension() const override { return "act"; }
 	const char* getLabel() const override { return "Animation Controller"; }
+	ResourceType getResourceType() const override { return anim::Controller::TYPE; }
 
 	TagAllocator m_allocator;
 	StudioApp& m_app;

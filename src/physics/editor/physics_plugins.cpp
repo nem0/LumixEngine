@@ -824,6 +824,7 @@ struct PhysicsGeometryPlugin final : AssetBrowser::IPlugin
 	}
 
 	const char* getLabel() const override { return "Physics geometry"; }
+	ResourceType getResourceType() const override { return PhysicsGeometry::TYPE; }
 
 	StudioApp& m_app;
 };
@@ -933,6 +934,7 @@ struct PhysicsMaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlug
 	}
 
 	const char* getLabel() const override { return "Physics material"; }
+	ResourceType getResourceType() const override { return PhysicsMaterial::TYPE; }
 
 	void openEditor(const Path& path) override {
 		IAllocator& allocator = m_app.getAllocator();

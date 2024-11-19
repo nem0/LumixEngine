@@ -423,6 +423,7 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 	}
 
 	const char* getLabel() const override { return "Animation"; }
+	ResourceType getResourceType() const override { return Animation::TYPE; }
 
 	void openEditor(const Path& path) override {
 		IAllocator& allocator = m_app.getAllocator();
@@ -930,6 +931,7 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		return m_app.getAssetCompiler().writeCompiledResource(src, compiled);
 	}
 	const char* getLabel() const override { return "Property animation"; }
+	ResourceType getResourceType() const override { return PropertyAnimation::TYPE; }
 	
 	void openEditor(const Path& path) override {
 		IAllocator& allocator = m_app.getAllocator();

@@ -77,7 +77,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		, m_on_init_load(m_allocator)
 	{
 		onBasePathChanged();
-		
+
 		Engine& engine = app.getEngine();
 		ResourceManagerHub& rm = engine.getResourceManager();
 		rm.setLoadHook(&m_load_hook);
@@ -126,7 +126,6 @@ struct AssetCompilerImpl : AssetCompiler {
 
 		m_dependencies.clear();
 		m_resources.clear();
-
 
 		Path path(base_path, ".lumix");
 		bool success = os::makePath(path.c_str());
@@ -672,14 +671,25 @@ struct AssetCompilerImpl : AssetCompiler {
 			// this can take some time, mutex is probably not the best option
 			jobs::MutexGuard lock(m_resources_mutex);
 			// reload/continue loading resource and its subresources
+			bool found_any = false;
 			for (const ResourceItem& ri : m_resources) {
-				if (!endsWithInsensitive(ri.path, job.path)) continue;
-				
+				if (!endsWith(ri.path, job.path)) continue;
+
+				found_any = true;
 				Resource* r = getResource(ri.path);
-				if (r) {
-					if (r->isReady() || r->isFailure()) r->getResourceManager().reload(*r);
-					else if (r->isHooked()) m_load_hook.continueLoad(*r, job.compiled);
-					m_resource_compiled.invoke(*r, job.compiled);
+				if (!r) continue;
+
+				if (r->isReady() || r->isFailure()) r->getResourceManager().reload(*r);
+				else if (r->isHooked()) m_load_hook.continueLoad(*r, job.compiled);
+
+				m_resource_compiled.invoke(*r, job.compiled);
+			}
+			if (!found_any) {
+				logError("Resource ", job.path, " not found");
+				for (const ResourceItem& ri : m_resources) {
+					if (endsWithInsensitive(ri.path, job.path)) {
+						logError("Do you mean ", ri.path, "?");
+					}
 				}
 			}
 

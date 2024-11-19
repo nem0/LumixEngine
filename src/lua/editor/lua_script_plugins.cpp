@@ -695,6 +695,7 @@ struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	}
 
 	const char* getLabel() const override { return "Lua script"; }
+	ResourceType getResourceType() const override { return LuaScript::TYPE; }
 	bool canCreateResource() const override { return true; }
 	const char* getDefaultExtension() const override { return "lua"; }
 

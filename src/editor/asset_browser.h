@@ -6,6 +6,7 @@
 namespace Lumix {
 
 template <typename T> struct UniquePtr;
+struct ResourceType;
 
 struct LUMIX_EDITOR_API AssetBrowser : StudioApp::GUIPlugin {
 	static constexpr int TILE_SIZE = 96;
@@ -17,6 +18,7 @@ struct LUMIX_EDITOR_API AssetBrowser : StudioApp::GUIPlugin {
 		virtual const char* getDefaultExtension() const { return ""; }
 
 		virtual const char* getLabel() const = 0;
+		virtual ResourceType getResourceType() const = 0;
 		virtual bool createTile(const char* in_path, const char* out_path, struct ResourceType type);
 		virtual void update() {}
 		virtual void openEditor(const struct Path& path) {}
@@ -31,6 +33,7 @@ struct LUMIX_EDITOR_API AssetBrowser : StudioApp::GUIPlugin {
 	virtual bool resourceInput(const char* str_id, Path& buf, ResourceType type, float width = -1) = 0;
 	virtual void addPlugin(IPlugin& plugin, Span<const char*> extensions) = 0;
 	virtual void removePlugin(IPlugin& plugin) = 0;
+	virtual Span<IPlugin*> getPlugins() = 0;
 	virtual void openInExternalEditor(struct Resource* resource) const = 0;
 	virtual void openInExternalEditor(struct StringView path) const = 0;
 	virtual void locate(const Resource& resource) = 0;

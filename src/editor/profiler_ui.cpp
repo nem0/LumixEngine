@@ -16,6 +16,7 @@
 #include "core/string.h"
 #include "core/tag_allocator.h"
 #include "editor/asset_browser.h"
+#include "editor/asset_compiler.h"
 #include "editor/settings.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
@@ -898,66 +899,58 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		ImGuiEx::Label("Filter size (KB)");
 		ImGui::DragScalar("##fs", ImGuiDataType_U64, &m_resource_size_filter, 1000);
 
-		static const struct {
-			ResourceType type;
-			const char* name;
-		} RESOURCE_TYPES[] = { 
-			{ ResourceType("animation"), "Animations" },
-			{ ResourceType("material"), "Materials" },
-			{ ResourceType("model"), "Models" },
-			{ ResourceType("physics_geometry"), "Physics geometries" },
-			{ ResourceType("physics_material"), "Physics materials" },
-			{ ResourceType("shader"), "Shaders" },
-			{ ResourceType("texture"), "Textures" }
-		};
 		ImGui::Indent();
-		for (u32 i = 0; i < lengthOf(RESOURCE_TYPES); ++i)
-		{
-			if (!ImGui::CollapsingHeader(RESOURCE_TYPES[i].name)) continue;
+		for (const AssetBrowser::IPlugin* plugin : m_app.getAssetBrowser().getPlugins()) {
+			ResourceManager* resource_manager = m_engine.getResourceManager().get(plugin->getResourceType());
+			if (!resource_manager) continue;
+			if (!ImGui::CollapsingHeader(plugin->getLabel())) continue;
 
-			ResourceManager* resource_manager = m_engine.getResourceManager().get(RESOURCE_TYPES[i].type);
 			ResourceManager::ResourceTable& resources = resource_manager->getResourceTable();
+			if (!ImGui::BeginTable("resc", 4)) continue;
 
-			if (ImGui::BeginTable("resc", 4)) {
-				ImGui::TableSetupColumn("Path");
-				ImGui::TableSetupColumn("Size");
-				ImGui::TableSetupColumn("State");
-				ImGui::TableSetupColumn("References");
-				ImGui::TableHeadersRow();
+			ImGui::TableSetupColumn("Path");
+			ImGui::TableSetupColumn("Size");
+			ImGui::TableSetupColumn("State");
+			ImGui::TableSetupColumn("References");
+			ImGui::TableHeadersRow();
 
-				size_t sum = 0;
-				for (const Resource* res  : resources) {
-					if (res->isEmpty()) continue;
-					if (!m_resource_filter.pass(res->getPath())) continue;
-					if (m_resource_size_filter > res->getFileSize() / 1024) continue;
-				
-					ImGui::TableNextColumn();
-					ImGui::PushID(res);
-					if (ImGuiEx::IconButton(ICON_FA_BULLSEYE, "Go to")) {
-						m_app.getAssetBrowser().openEditor(res->getPath());
-					}
-					ImGui::PopID();
-					ImGui::SameLine();
-					ImGuiEx::TextUnformatted(res->getPath());
-					ImGui::TableNextColumn();
-					ImGui::Text("%.3fKB", res->getFileSize() / 1024.0f);
-					sum += res->getFileSize();
-					ImGui::TableNextColumn();
-					ImGui::TextUnformatted(toString(res->getState()));
-					ImGui::TableNextColumn();
-					ImGui::Text("%u", res->getRefCount());
+			u64 sum = 0;
+			for (const Resource* res  : resources) {
+				if (res->isEmpty()) continue;
+				if (!m_resource_filter.pass(res->getPath())) continue;
+				if (m_resource_size_filter > res->getFileSize() / 1024) continue;
+
+				ImGui::TableNextColumn();
+				ImGui::PushID(res);
+				if (ImGuiEx::IconButton(ICON_FA_BULLSEYE, "Go to")) {
+					m_app.getAssetBrowser().openEditor(res->getPath());
 				}
+				ImGui::PopID();
+				ImGui::SameLine();
+				ImGuiEx::TextUnformatted(res->getPath());
 
 				ImGui::TableNextColumn();
-				ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ImColor(ImGui::GetStyle().Colors[ImGuiCol_FrameBgHovered]));
-				ImGui::Text("All");
-				ImGui::TableNextColumn();
-				ImGui::Text("%.3fKB", sum / 1024.0f);
-				ImGui::TableNextColumn();
-				ImGui::TableNextColumn();
+				ImGui::Text("%.3fKB", res->getFileSize() / 1024.0f);
+				sum += res->getFileSize();
 
-				ImGui::EndTable();
+				ImGui::TableNextColumn();
+				ImGui::TextUnformatted(toString(res->getState()));
+
+				ImGui::TableNextColumn();
+				ImGui::Text("%u", res->getRefCount());
 			}
+
+			ImGui::TableNextColumn();
+			ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ImColor(ImGui::GetStyle().Colors[ImGuiCol_FrameBgHovered]));
+			ImGui::Text("All");
+
+			ImGui::TableNextColumn();
+			ImGui::Text("%.3fKB", sum / 1024.0f);
+
+			ImGui::TableNextColumn();
+			ImGui::TableNextColumn();
+
+			ImGui::EndTable();
 		}
 		ImGui::Unindent();
 	}

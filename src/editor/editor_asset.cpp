@@ -7,6 +7,7 @@ EditorAssetPlugin::EditorAssetPlugin(const char* name, const char* ext, Resource
 	: m_app(app)
 	, m_name(name)
 	, m_extension(ext)
+	, m_type(type)
 {
 	AssetCompiler& compiler = app.getAssetCompiler();
 	compiler.registerExtension(ext, type);

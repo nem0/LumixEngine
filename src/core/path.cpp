@@ -89,6 +89,7 @@ char* Path::normalize(StringView path, Span<char> output) {
 	ASSERT(max_size > 0);
 	char* out = output.begin();
 	
+	// empty path
 	if (path.size() == 0) {
 		*out = '\0';
 		return out;
@@ -98,9 +99,11 @@ char* Path::normalize(StringView path, Span<char> output) {
 	bool is_prev_slash = false;
 
 	const char* c = path.begin;
+	// skip "./" or ".\"
 	if (c[0] == '.' && path.size() > 1 && (c[1] == '\\' || c[1] == '/')) c += 2;
 	
 	#ifdef _WIN32
+		// skip slashes at the beginning
 		if (c != path.end && (c[0] == '\\' || c[0] == '/')) ++c;
 	#endif
 
@@ -108,10 +111,12 @@ char* Path::normalize(StringView path, Span<char> output) {
 		bool is_current_slash = *c == '\\' || *c == '/';
 
 		if (is_current_slash && is_prev_slash) {
+			// skip double slashes
 			++c;
 			continue;
 		}
 
+		// replace "\" with "/"
 		*out = *c == '\\' ? '/' : *c;
 
 		c++;
