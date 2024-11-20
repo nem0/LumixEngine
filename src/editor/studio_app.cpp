@@ -2,13 +2,13 @@
 #include <imgui/imgui_freetype.h>
 #include <imgui/imgui_internal.h>
 
-#include "core/default_allocator.h"
+#include "audio/audio_module.h"
 #include "core/associative_array.h"
 #include "core/atomic.h"
 #include "core/color.h"
 #include "core/command_line_parser.h"
 #include "core/debug.h"
-#include "engine/file_system.h"
+#include "core/default_allocator.h"
 #include "core/geometry.h"
 #include "core/hash.h"
 #include "core/job_system.h"
@@ -16,8 +16,6 @@
 #include "core/os.h"
 #include "core/path.h"
 #include "core/profiler.h"
-
-#include "audio/audio_module.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
 #include "editor/entity_folders.h"
@@ -28,8 +26,9 @@
 #include "editor/signal_editor.h"
 #include "editor/spline_editor.h"
 #include "editor/world_editor.h"
-#include "engine/engine.h"
 #include "engine/engine_hash_funcs.h"
+#include "engine/engine.h"
+#include "engine/file_system.h"
 #include "engine/input_system.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
@@ -282,8 +281,22 @@ struct StudioAppImpl final : StudioApp {
 					editor.moveEntityToFolder(dropped_entity, folder_id);
 					editor.endCommandGroup();
 				}
+
+				if (auto* payload = ImGui::AcceptDragDropPayload("selected_entities")) {
+					const Array<EntityRef>& selected = editor.getSelectedEntities();
+					if (!selected.empty()) {
+						editor.beginCommandGroup("move_entities_to_folder_group");
+						for (EntityRef e : selected) {
+							editor.makeParent(INVALID_ENTITY, e);
+							editor.moveEntityToFolder(e, folder_id);
+						}
+						editor.endCommandGroup();
+					}
+				}
+
 				ImGui::EndDragDropTarget();
 			}
+
 
 			if (ImGui::IsMouseClicked(0) && ImGui::IsItemHovered()) {
 				folders.selectFolder(folder_id);
@@ -1075,62 +1088,6 @@ struct StudioAppImpl final : StudioApp {
 		copyString(Span(new_group->label), StringView(node->label, u32(slash - node->label)));
 		insertAddCmpNodeOrdered(parent, new_group);
 		insertAddCmpNode(*new_group, node);
-	}
-
-	void registerComponent(const char* icon, ComponentType cmp_type, const char* label, ResourceType resource_type, const char* property) {
-		struct Plugin final : IAddComponentPlugin {
-			void onGUI(bool create_entity, bool from_filter, EntityPtr parent, WorldEditor& editor) override {
-				const char* last = reverseFind(label, '/');
-				last = last && !from_filter ? last + 1 : label;
-				if (last[0] == ' ') ++last;
-				if (!ImGui::BeginMenu(last)) return;
-				Path path;
-				bool create_empty = ImGui::MenuItem(ICON_FA_BROOM " Empty");
-				static FilePathHash selected_res_hash;
-				if (asset_browser->resourceList(path, selected_res_hash, resource_type, true) || create_empty) {
-					editor.beginCommandGroup("createEntityWithComponent");
-					if (create_entity) {
-						EntityRef entity = editor.addEntity();
-						editor.selectEntities(Span(&entity, 1), false);
-					}
-
-					const Array<EntityRef>& selected_entites = editor.getSelectedEntities();
-					editor.addComponent(selected_entites, type);
-					if (!create_empty) {
-						editor.setProperty(type, "", -1, property, editor.getSelectedEntities(), path);
-					}
-					if (parent.isValid()) editor.makeParent(parent, selected_entites[0]);
-					editor.endCommandGroup();
-					editor.lockGroupCommand();
-					ImGui::CloseCurrentPopup();
-				}
-				ImGui::EndMenu();
-			}
-
-
-			const char* getLabel() const override { return label; }
-
-			PropertyGrid* property_grid;
-			AssetBrowser* asset_browser;
-			ComponentType type;
-			ResourceType resource_type;
-			StaticString<64> property;
-			char label[50];
-		};
-
-		Plugin* plugin = LUMIX_NEW(m_allocator, Plugin);
-		plugin->property_grid = m_property_grid.get();
-		plugin->asset_browser = m_asset_browser.get();
-		plugin->type = cmp_type;
-		plugin->property = property;
-		plugin->resource_type = resource_type;
-		copyString(plugin->label, label);
-		addPlugin(*plugin);
-
-		m_component_labels.insert(plugin->type, String(label, m_allocator));
-		if (icon && icon[0]) {
-			m_component_icons.insert(plugin->type, icon);
-		}
 	}
 
 	void registerComponent(const char* icon, const char* id, IAddComponentPlugin& plugin) override {
@@ -2544,30 +2501,7 @@ struct StudioAppImpl final : StudioApp {
 			const reflection::ComponentBase* r = cmp.cmp;
 			
 			if (m_component_labels.find(r->component_type).isValid()) continue;
-
-			struct : reflection::IEmptyPropertyVisitor {
-				void visit(const reflection::Property<Path>& prop) override {
-					for (const reflection::IAttribute* attr : prop.attributes) {
-						if (attr->getType() == reflection::IAttribute::RESOURCE) {
-							is_res = true;
-							reflection::ResourceAttribute* a = (reflection::ResourceAttribute*)attr;
-							res_type = a->resource_type;
-							prop_name = prop.name;
-						}
-					}
-				}
-				bool is_res = false;
-				const char* prop_name;
-				ResourceType res_type;
-			} visitor;
-
-			r->visit(visitor);
-			if (visitor.is_res) {
-				registerComponent(r->icon, r->component_type, r->label, visitor.res_type, visitor.prop_name);
-			}
-			else {
-				registerComponent(r->icon, r->component_type, r->label);
-			}
+			registerComponent(r->icon, r->component_type, r->label);
 		}
 		PrefabSystem::createEditorPlugins(*this, m_editor->getPrefabSystem());
 	}
