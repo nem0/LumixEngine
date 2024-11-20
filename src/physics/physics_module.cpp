@@ -1469,7 +1469,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		{
 			PxControllerBehaviorFlags getBehaviorFlags(const PxShape& shape, const PxActor& actor) override
 			{
-				return PxControllerBehaviorFlag::eCCT_CAN_RIDE_ON_OBJECT | PxControllerBehaviorFlag::eCCT_SLIDE;
+				return PxControllerBehaviorFlag::eCCT_CAN_RIDE_ON_OBJECT /*| PxControllerBehaviorFlag::eCCT_SLIDE*/;
 			}
 
 
@@ -1769,17 +1769,19 @@ struct PhysicsModuleImpl final : PhysicsModule
 			}
 			else {
 				controller.gravity_speed = 0;
-				// if dif.y > 0, somebody is trying to move the controller up (e.g. jump), we should not allow that
-				if (dif.y <= 0) {
-					// we need to apply gravity here otherwise the controller won't ride on horizontally moving platforms
-					dif.y = -0.05f;
-				}
 			}
 
 			m_moving_controller = controller.entity;
 			m_filter_callback.m_filter_data = controller.filter_data;
 			PxControllerFilters filters(nullptr, &m_filter_callback);
 			controller.controller->move(toPhysx(dif), 0.001f, time_delta, filters);
+
+			// if dif.y > 0, somebody is trying to move the controller up (e.g. jump), we should allow that
+			if (!apply_gravity && dif.y <= 0) {
+				// we need to apply gravity here otherwise the controller won't ride on horizontally moving platforms
+				controller.controller->move(physx::PxVec3(0, -0.05f, 0), 0.001f, time_delta, filters);
+			}
+
 			PxExtendedVec3 p = controller.controller->getFootPosition();
 			m_world.setPosition(controller.entity, {p.x, p.y, p.z});
 			m_moving_controller = INVALID_ENTITY;
