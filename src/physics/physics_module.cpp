@@ -1769,8 +1769,11 @@ struct PhysicsModuleImpl final : PhysicsModule
 			}
 			else {
 				controller.gravity_speed = 0;
-				// we need to apply gravity here otherwise the controller won't ride on horizontally moving platforms
-				dif.y = 0.5f * gravity_acceleration * time_delta * time_delta;
+				// if dif.y > 0, somebody is trying to move the controller up (e.g. jump), we should not allow that
+				if (dif.y <= 0) {
+					// we need to apply gravity here otherwise the controller won't ride on horizontally moving platforms
+					dif.y = -0.05f;
+				}
 			}
 
 			m_moving_controller = controller.entity;
