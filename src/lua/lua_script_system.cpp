@@ -2961,7 +2961,7 @@ void LuaScriptModuleImpl::ScriptInstance::onScriptLoaded(LuaScriptModuleImpl& mo
 		lua_pop(m_state, 1); // []
 	}
 
-	module.m_to_start.push({cmp.m_entity, (u32)scr_index, false, is_reload});
+	module.m_to_start.push({cmp.m_entity, (u32)scr_index, false, module.m_is_game_running});
 }
 
 

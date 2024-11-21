@@ -371,19 +371,42 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 		ImGui::PopStyleVar();
 
 		World& world = *m_editor.getWorld();
-		if (ImGuiEx::BeginResizablePopup("popup", ImVec2(200, 300))) {
+		if (ImGuiEx::BeginResizablePopup("popup", ImVec2(200, 300), ImGuiWindowFlags_NoNavInputs)) {
 			static TextFilter entity_filter;
+			static i32 selected_idx = -1;
 			entity_filter.gui("Filter", -1, ImGui::IsWindowAppearing());
+			const bool insert_enter = ImGui::IsItemFocused() && ImGui::IsKeyPressed(ImGuiKey_Enter);
+			bool scroll = false;
+			if (ImGui::IsItemFocused()) {
+				if (ImGui::IsKeyPressed(ImGuiKey_UpArrow) && selected_idx > 0) {
+					--selected_idx;
+					scroll = true;
+				}
+				if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
+					++selected_idx;
+					scroll = true;
+				}
+			}
 			
 			if (ImGui::BeginChild("list", ImVec2(0, ImGui::GetContentRegionAvail().y))) {
+				i32 idx = -1;
+				// TODO imgui clipper
 				for (EntityPtr i = world.getFirstEntity(); i.isValid(); i = world.getNextEntity(*i)) {
-					ImGui::PushID(i.index);
 					getEntityListDisplayName(m_app, world, Span(buf), i);
-					bool show = entity_filter.pass(buf);
-					if (show && ImGui::Selectable(buf))
-					{
+					const bool show = entity_filter.pass(buf);
+					if (!show) continue;
+
+					ImGui::PushID(i.index);
+					++idx;
+					const bool selected = selected_idx == idx;
+					if (show && (ImGui::Selectable(buf, selected) || (selected && insert_enter))) {
 						m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, i);
 						ImGui::CloseCurrentPopup();
+						ImGui::PopID();
+						break;
+					}
+					if (selected && scroll) {
+						ImGui::SetScrollHereY();
 					}
 					ImGui::PopID();
 				}
@@ -933,7 +956,6 @@ void PropertyGrid::onGUI() {
 	const Array<EntityRef>& ents = editor.getSelectedEntities();
 	if (m_focus_filter_request) ImGui::SetNextWindowFocus();
 	if (ImGui::Begin(ICON_FA_INFO_CIRCLE "Inspector##inspector", &m_is_open)) {
-		
 		if (m_focus_filter_request) {
 			ImGui::SetKeyboardFocusHere();
 			m_focus_filter_request = false;
