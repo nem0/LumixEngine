@@ -363,12 +363,6 @@ struct NavigationModuleImpl final : NavigationModule
 
 
 	void update(RecastZone& zone, float time_delta) {
-		if (!zone.crowd) return;
-		{
-			PROFILE_BLOCK("dtCrowd::update");
-			zone.crowd->update(time_delta, nullptr);
-		}
-
 		for (auto& agent : m_agents) {
 			if (agent.agent < 0) continue;
 			if (agent.zone != zone.entity) continue;
@@ -395,6 +389,16 @@ struct NavigationModuleImpl final : NavigationModule
 		
 		for (RecastZone& zone : m_zones) {
 			update(zone, time_delta);
+		}
+	}
+
+	void updateParallel(float time_delta) override {
+		if (!m_is_game_running) return;
+		
+		for (RecastZone& zone : m_zones) {
+			if (!zone.crowd) continue;
+			PROFILE_BLOCK("dtCrowd::update");
+			zone.crowd->update(time_delta, nullptr);
 		}
 	}
 

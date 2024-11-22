@@ -1836,14 +1836,18 @@ struct PhysicsModuleImpl final : PhysicsModule
 		updateDynamicActors(false);
 	}
 
-	void update(float time_delta) override
-	{
+	void updateParallel(float time_delta) override {
 		if (!m_is_game_running) return;
 
 		time_delta = minimum(1 / 20.0f, time_delta);
 		updateVehicles(time_delta);
 		simulateScene(time_delta);
 		fetchResults();
+	}
+
+	void update(float time_delta) override {
+		if (!m_is_game_running) return;
+
 		updateDynamicActors(true);
 		updateControllers(time_delta);
 

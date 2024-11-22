@@ -309,16 +309,20 @@ struct EngineImpl final : Engine {
 		computeSmoothTimeDelta();
 
 		if (!m_paused || m_next_frame) {
+			auto& modules =  world.getModules();
+			jobs::forEach(modules.size(), 1, [&](u32 idx, u32){
+				modules[idx]->updateParallel(dt);
+			});
 			{
 				PROFILE_BLOCK("update modules");
-				for (UniquePtr<IModule>& module : world.getModules())
+				for (UniquePtr<IModule>& module : modules)
 				{
 					module->update(dt);
 				}
 			}
 			{
 				PROFILE_BLOCK("late update modules");
-				for (UniquePtr<IModule>& module : world.getModules())
+				for (UniquePtr<IModule>& module : modules)
 				{
 					module->lateUpdate(dt);
 				}

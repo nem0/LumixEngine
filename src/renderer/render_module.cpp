@@ -528,6 +528,7 @@ struct RenderModuleImpl final : RenderModule {
 		StackArray<EntityRef, 16> to_delete(m_allocator);
 		jobs::Mutex mutex;
 		ParticleSystem::Stats stats = {};
+		// TODO move to parallel update?
 		jobs::forEach(m_particle_emitters.capacity(), 1, [&](i32 idx, i32){
 			ParticleSystem* ps = m_particle_emitters.getFromIndex(idx);
 			if (!ps) return;

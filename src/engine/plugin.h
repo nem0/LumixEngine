@@ -45,8 +45,14 @@ struct LUMIX_ENGINE_API IModule
 	virtual void afterReload(InputMemoryStream& serializer) {}
 	virtual const char* getName() const = 0;
 	virtual ISystem& getSystem() const = 0;
+	
+	// called for all modules at once, i.e. all modules are updated in parallel
+	virtual void updateParallel(float time_delta) {}
+	// called after all updateParallel calls are finished, called on "main thread"
 	virtual void update(float time_delta) = 0;
+	// called after all update calls are finished, called on "main thread"
 	virtual void lateUpdate(float time_delta) {}
+	
 	virtual void endFrame() {}
 	virtual struct World& getWorld() = 0;
 	virtual void startGame() {}
