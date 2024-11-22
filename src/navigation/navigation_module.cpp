@@ -1,7 +1,3 @@
-#include "engine/lumix.h"
-
-#include "navigation_module.h"
-
 #include "core/array.h"
 #include "core/atomic.h"
 #include "core/crt.h"
@@ -10,12 +6,13 @@
 #include "core/os.h"
 #include "core/profiler.h"
 #include "core/sync.h"
-
 #include "engine/engine.h"
+#include "engine/lumix.h"
 #include "engine/reflection.h"
 #include "engine/world.h"
 #include "imgui/IconsFontAwesome5.h"
 #include "lua/lua_script_system.h"
+#include "navigation_module.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/render_module.h"
@@ -25,6 +22,7 @@
 #include <DetourNavMesh.h>
 #include <DetourNavMeshBuilder.h>
 #include <DetourNavMeshQuery.h>
+#include <lz4/lz4.h>
 #include <Recast.h>
 
 
@@ -39,6 +37,15 @@ enum class NavigationModuleVersion : i32 {
 	LATEST
 };
 
+struct NavmeshHeader {
+	enum Version : u32 {
+		LATEST
+	};
+
+	static constexpr u32 MAGIC = 'NAVM';
+	u32 magic = MAGIC;
+	Version version = LATEST;
+};
 
 static const ComponentType LUA_SCRIPT_TYPE = reflection::getComponentType("lua_script");
 static const ComponentType NAVMESH_ZONE_TYPE = reflection::getComponentType("navmesh_zone");
@@ -656,7 +663,17 @@ struct NavigationModuleImpl final : NavigationModule
 			}
 
 			InputMemoryStream file(mem);
-			file.read(zone.m_num_tiles_x);
+			NavmeshHeader header;
+			bool has_header = false;
+			file.read(header.magic);
+			if (header.magic == NavmeshHeader::MAGIC) {
+				has_header = true;
+				file.read(header.version);
+				file.read(zone.m_num_tiles_x);
+			}
+			else {
+				zone.m_num_tiles_x = header.magic;
+			}
 			file.read(zone.m_num_tiles_z);
 			dtNavMeshParams params;
 			file.read(&params, sizeof(params));
@@ -665,16 +682,33 @@ struct NavigationModuleImpl final : NavigationModule
 				LUMIX_DELETE(module.m_allocator, this);
 				return;
 			}
+			OutputMemoryStream tmp(module.m_allocator);
 			for (u32 j = 0; j < zone.m_num_tiles_z; ++j) {
 				for (u32 i = 0; i < zone.m_num_tiles_x; ++i) {
-					int data_size;
-					file.read(&data_size, sizeof(data_size));
+					i32 data_size;
+					u32 compressed_size;
+					file.read(data_size);
 					u8* data = (u8*)dtAlloc(data_size, DT_ALLOC_PERM);
-					file.read(data, data_size);
+
+					if (has_header) {
+						file.read(compressed_size);
+						tmp.resize(compressed_size);
+						file.read(tmp.getMutableData(), compressed_size);
+
+						const i32 res = LZ4_decompress_safe((const char*)tmp.data(), (char*)data, compressed_size, data_size);
+						if (res != data_size) {
+							LUMIX_DELETE(module.m_allocator, this);
+							return; // TODO error message
+						}
+					}
+					else {
+						file.read(data, data_size);
+					}
+
 					if (dtStatusFailed(zone.navmesh->addTile(data, data_size, DT_TILE_FREE_DATA, 0, 0))) {
 						dtFree(data);
 						LUMIX_DELETE(module.m_allocator, this);
-						return;
+						return; // TODO error message
 					}
 				}
 			}
@@ -699,27 +733,54 @@ struct NavigationModuleImpl final : NavigationModule
 		return fs.getContent(path, makeDelegate<&LoadCallback::fileLoaded>(lcb)).isValid();
 	}
 
+	bool compress(Span<const u8> mem, OutputMemoryStream& output) const {
+		static u8* m_lz4_state = nullptr; // TODO
+		if (!m_lz4_state) {
+			m_lz4_state = (u8*)m_allocator.allocate(LZ4_sizeofState(), 8);
+		}
+		const i32 cap = LZ4_compressBound(mem.length());
+		output.resize(cap);
+		const i32 compressed_size = LZ4_compress_fast_extState(m_lz4_state, (const char*)mem.begin(), (char*)output.getMutableData(), mem.length(), cap, 1); 
+		if (compressed_size == 0) return false;
+		output.resize(compressed_size);
+		return true;
+	}
+
 	bool saveZone(EntityRef zone_entity) override {
 		RecastZone& zone = m_zones[zone_entity];
 		if (!zone.navmesh) return false;
 
 		FileSystem& fs = m_engine.getFileSystem();
 		
+		OutputMemoryStream blob(m_allocator);
+		blob.reserve(64 * 1024);
+		NavmeshHeader header;
+		blob.write(header);
+		blob.write(zone.m_num_tiles_x);
+		blob.write(zone.m_num_tiles_z);
+		const dtNavMeshParams* params = zone.navmesh->getParams();
+		blob.write(params, sizeof(*params));
+		OutputMemoryStream compressed(m_allocator);
+		for (u32 j = 0; j < zone.m_num_tiles_z; ++j) {
+			for (u32 i = 0; i < zone.m_num_tiles_x; ++i) {
+				const auto* tile = zone.navmesh->getTileAt(i, j, 0);
+				blob.write(tile->dataSize);
+
+				if (!compress(Span<const u8>((const u8*)tile->data, tile->dataSize), compressed)) {
+					logError("Could not compress navmesh, entity", zone_entity.index);
+					return false;
+				}
+				
+				blob.write((u32)compressed.size());
+				blob.write(compressed.data(), compressed.size());
+			}
+		}
+
 		os::OutputFile file;
 		const Path path("navzones/", zone.zone.guid, ".nav");
 		if (!fs.open(path, file)) return false;
 
-		bool success = file.write(zone.m_num_tiles_x);
-		success = success && file.write(zone.m_num_tiles_z);
-		const dtNavMeshParams* params = zone.navmesh->getParams();
-		success = success && file.write(params, sizeof(*params));
-		for (u32 j = 0; j < zone.m_num_tiles_z; ++j) {
-			for (u32 i = 0; i < zone.m_num_tiles_x; ++i) {
-				const auto* tile = zone.navmesh->getTileAt(i, j, 0);
-				success = success && file.write(&tile->dataSize, sizeof(tile->dataSize));
-				success = success && file.write(tile->data, tile->dataSize);
-			}
-		}
+		bool success = file.write(blob.data(), blob.size());
 
 		file.close();
 		return success;
