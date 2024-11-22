@@ -62,6 +62,8 @@ struct LUMIX_ENGINE_API Engine {
 	virtual void pause(bool pause) = 0;
 	virtual bool isPaused() const = 0;
 	virtual void nextFrame() = 0;
+	virtual bool decompress(Span<const u8> src, Span<u8> dst) = 0;
+	virtual bool compress(Span<const u8> src, OutputMemoryStream& dst) = 0;
 
 protected:
 	Engine() {}

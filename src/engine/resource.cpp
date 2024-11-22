@@ -5,12 +5,9 @@
 #include "core/path.h"
 #include "core/stream.h"
 #include "core/string.h"
-
+#include "engine/engine.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
-
-#include "lz4/lz4.h"
-
 
 namespace Lumix
 {
@@ -143,8 +140,9 @@ void Resource::fileLoaded(Span<const u8> blob, bool success) {
 	else if (header->flags & CompiledResourceHeader::COMPRESSED) {
 		OutputMemoryStream tmp(m_resource_manager.m_allocator);
 		tmp.resize(header->decompressed_size);
-		const i32 res = LZ4_decompress_safe((const char*)blob.begin() + sizeof(*header), (char*)tmp.getMutableData(), i32(blob.length() - sizeof(*header)), (i32)tmp.size());
-		if (res != header->decompressed_size || !load(tmp)) {
+		Engine& engine = m_resource_manager.getOwner().getEngine();
+		const Span<const u8> src((const u8*)blob.begin() + sizeof(*header), u64(blob.length() - sizeof(*header)));
+		if (!engine.decompress(src, Span<u8>(tmp.getMutableData(), tmp.size())) || !load(tmp)) {
 			++m_failed_dep_count;
 		}
 	}

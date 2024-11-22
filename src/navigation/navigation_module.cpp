@@ -22,7 +22,6 @@
 #include <DetourNavMesh.h>
 #include <DetourNavMeshBuilder.h>
 #include <DetourNavMeshQuery.h>
-#include <lz4/lz4.h>
 #include <Recast.h>
 
 
@@ -682,7 +681,6 @@ struct NavigationModuleImpl final : NavigationModule
 				LUMIX_DELETE(module.m_allocator, this);
 				return;
 			}
-			OutputMemoryStream tmp(module.m_allocator);
 			for (u32 j = 0; j < zone.m_num_tiles_z; ++j) {
 				for (u32 i = 0; i < zone.m_num_tiles_x; ++i) {
 					i32 data_size;
@@ -692,13 +690,12 @@ struct NavigationModuleImpl final : NavigationModule
 
 					if (has_header) {
 						file.read(compressed_size);
-						tmp.resize(compressed_size);
-						file.read(tmp.getMutableData(), compressed_size);
+						const u8* tmp = (const u8*)file.skip(compressed_size);
 
-						const i32 res = LZ4_decompress_safe((const char*)tmp.data(), (char*)data, compressed_size, data_size);
-						if (res != data_size) {
+						if (!module.m_engine.decompress(Span<const u8>(tmp, compressed_size), Span<u8>(data, data_size))) {
 							LUMIX_DELETE(module.m_allocator, this);
-							return; // TODO error message
+							logError("Failed to decompress navmesh");
+							return;
 						}
 					}
 					else {
@@ -733,19 +730,6 @@ struct NavigationModuleImpl final : NavigationModule
 		return fs.getContent(path, makeDelegate<&LoadCallback::fileLoaded>(lcb)).isValid();
 	}
 
-	bool compress(Span<const u8> mem, OutputMemoryStream& output) const {
-		static u8* m_lz4_state = nullptr; // TODO
-		if (!m_lz4_state) {
-			m_lz4_state = (u8*)m_allocator.allocate(LZ4_sizeofState(), 8);
-		}
-		const i32 cap = LZ4_compressBound(mem.length());
-		output.resize(cap);
-		const i32 compressed_size = LZ4_compress_fast_extState(m_lz4_state, (const char*)mem.begin(), (char*)output.getMutableData(), mem.length(), cap, 1); 
-		if (compressed_size == 0) return false;
-		output.resize(compressed_size);
-		return true;
-	}
-
 	bool saveZone(EntityRef zone_entity) override {
 		RecastZone& zone = m_zones[zone_entity];
 		if (!zone.navmesh) return false;
@@ -766,7 +750,8 @@ struct NavigationModuleImpl final : NavigationModule
 				const auto* tile = zone.navmesh->getTileAt(i, j, 0);
 				blob.write(tile->dataSize);
 
-				if (!compress(Span<const u8>((const u8*)tile->data, tile->dataSize), compressed)) {
+				compressed.clear();
+				if (!m_engine.compress(Span<const u8>((const u8*)tile->data, tile->dataSize), compressed)) {
 					logError("Could not compress navmesh, entity", zone_entity.index);
 					return false;
 				}

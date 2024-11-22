@@ -6,9 +6,7 @@
 #include "core/hash_map.h"
 
 
-namespace Lumix
-{
-
+namespace Lumix {
 
 struct LUMIX_ENGINE_API ResourceManager {
 	friend struct Resource;
@@ -55,12 +53,13 @@ struct LUMIX_ENGINE_API ResourceManagerHub {
 		void continueLoad(Resource& res, bool success);
 	};
 
-	explicit ResourceManagerHub(IAllocator& allocator);
+	explicit ResourceManagerHub(struct Engine& engine, IAllocator& allocator);
 	~ResourceManagerHub();
 	ResourceManagerHub(const ResourceManagerHub& rhs) = delete;
 
 	void init(struct FileSystem& fs);
 
+	Engine& getEngine() { return m_engine; }
 	IAllocator& getAllocator() { return m_allocator; }
 	ResourceManager* get(ResourceType type);
 	const ResourceManagerTable& getAll() const { return m_resource_managers; }
@@ -93,6 +92,7 @@ private:
 	IAllocator& m_allocator;
 	ResourceManagerTable m_resource_managers;
 	FileSystem* m_file_system;
+	Engine& m_engine;
 	LoadHook* m_load_hook;
 };
 

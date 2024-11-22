@@ -18,7 +18,6 @@
 #include "engine/engine.h"
 #include "engine/resource_manager.h"
 #include "engine/resource.h"
-#include <lz4/lz4.h>
 
 namespace Lumix {
 
@@ -85,7 +84,6 @@ struct AssetCompilerImpl : AssetCompiler {
 
 	~AssetCompilerImpl()
 	{
-		m_allocator.deallocate(m_lz4_state);
 		os::OutputFile file;
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (fs.open(".lumix/resources/_resources.txt_tmp", file)) {
@@ -210,24 +208,14 @@ struct AssetCompilerImpl : AssetCompiler {
 
 	bool writeCompiledResource(const Path& path, Span<const u8> data) override {
 		PROFILE_FUNCTION();
-		jobs::enter(&m_lz4_mutex);
 		constexpr u32 COMPRESSION_SIZE_LIMIT = 4096;
 		OutputMemoryStream compressed(m_allocator);
-		i32 compressed_size = 0;
 		if (data.length() > COMPRESSION_SIZE_LIMIT) {
-			if (!m_lz4_state) {
-				m_lz4_state = (u8*)m_allocator.allocate(LZ4_sizeofState(), 8);
-			}
-			const i32 cap = LZ4_compressBound((i32)data.length());
-			compressed.resize(cap);
-			compressed_size = LZ4_compress_fast_extState(m_lz4_state, (const char*)data.begin(), (char*)compressed.getMutableData(), (i32)data.length(), cap, 1); 
-			if (compressed_size == 0) {
+			if (!m_app.getEngine().compress(data, compressed)) {
 				logError("Could not compress ", path);
 				return false;
 			}
-			compressed.resize(compressed_size);
 		}
-		jobs::exit(&m_lz4_mutex);
 
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		const Path out_path(".lumix/resources/", path.getHash().getHashValue(), ".res");
@@ -238,6 +226,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		}
 		CompiledResourceHeader header;
 		header.decompressed_size = data.length();
+		const u32 compressed_size = (u32)compressed.size();
 		if (data.length() > COMPRESSION_SIZE_LIMIT && compressed_size < i32(data.length() / 4 * 3)) {
 			header.flags |= CompiledResourceHeader::COMPRESSED;
 			(void)file.write(&header, sizeof(header));
@@ -829,8 +818,6 @@ struct AssetCompilerImpl : AssetCompiler {
 	DelegateList<void(Resource&, bool)> m_resource_compiled;
 	bool m_init_finished = false;
 	Array<Resource*> m_on_init_load;
-	u8* m_lz4_state = nullptr;
-	jobs::Mutex m_lz4_mutex;
 
 	u32 m_compile_batch_count = 0;
 	u32 m_batch_remaining_count = 0;

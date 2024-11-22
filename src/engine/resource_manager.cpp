@@ -137,8 +137,9 @@ ResourceManager::~ResourceManager()
 	ASSERT(m_resources.empty());
 }
 
-ResourceManagerHub::ResourceManagerHub(IAllocator& allocator) 
+ResourceManagerHub::ResourceManagerHub(Engine& engine, IAllocator& allocator) 
 	: m_resource_managers(allocator)
+	, m_engine(engine)
 	, m_allocator(allocator)
 	, m_load_hook(nullptr)
 	, m_file_system(nullptr)

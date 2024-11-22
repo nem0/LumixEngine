@@ -20,13 +20,14 @@ enum class WorldVersion : u32 {
 	HASH64,
 	NEW_ENTITY_FOLDERS,
 	MERGED_HEADERS,
+	COMPRESSED,
 
 	LATEST
 };
 
 enum class WorldSerializeFlags : u32 { 
 	HAS_PARTITIONS = 1 << 0,
-	
+
 	NONE = 0
 };
 

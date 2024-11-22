@@ -836,65 +836,75 @@ void World::serialize(OutputMemoryStream& serializer, WorldSerializeFlags flags)
 	serializer.write(header);
 	serializeModuleList(*this, serializer);
 	serializer.write(flags);
-	serializer.write((u32)m_entities.size());
+
+	OutputMemoryStream blob(m_allocator);
+	blob.write((u32)m_entities.size());
 
 	for (u32 i = 0, c = m_entities.size(); i < c; ++i) {
 		if (!m_entities[i].valid) continue;
 		const EntityRef e = {(i32)i};
-		serializer.write(e);
-		serializer.write(m_transforms[i].pos);
-		serializer.write(m_transforms[i].rot);
-		serializer.write(m_transforms[i].scale);
-		if (serialize_partitions) serializer.write(m_entities[i].partition);
+		blob.write(e);
+		blob.write(m_transforms[i].pos);
+		blob.write(m_transforms[i].rot);
+		blob.write(m_transforms[i].scale);
+		if (serialize_partitions) blob.write(m_entities[i].partition);
 	}
-	serializer.write(INVALID_ENTITY);
+	blob.write(INVALID_ENTITY);
 
-	serializer.write((u32)m_names.size());
+	blob.write((u32)m_names.size());
 	for (const EntityName& name : m_names) {
-		serializer.write(name.entity);
-		serializer.writeString(name.name);
+		blob.write(name.entity);
+		blob.writeString(name.name);
 	}
 
-	serializer.write((u32)m_hierarchy.size());
+	blob.write((u32)m_hierarchy.size());
 	if (!m_hierarchy.empty()) {
 		for (const Hierarchy& h : m_hierarchy) {
-			serializer.write(h.entity);
-			serializer.write(h.parent);
-			serializer.write(h.first_child);
-			serializer.write(h.next_sibling);
-			serializer.write(h.local_transform.pos);
-			serializer.write(h.local_transform.rot);
-			serializer.write(h.local_transform.scale);
+			blob.write(h.entity);
+			blob.write(h.parent);
+			blob.write(h.first_child);
+			blob.write(h.next_sibling);
+			blob.write(h.local_transform.pos);
+			blob.write(h.local_transform.rot);
+			blob.write(h.local_transform.scale);
 		}
 	}
 
-	serializer.write((i32)m_modules.size());
+	blob.write((i32)m_modules.size());
 	for (const UniquePtr<IModule>& module : m_modules) {
-		serializer.writeString(module->getName());
-		serializer.write(module->getVersion());
-		module->serialize(serializer);
+		blob.writeString(module->getName());
+		blob.write(module->getVersion());
+		module->serialize(blob);
 	}
 
 	if (serialize_partitions) {
-		serializer.write((u32)m_partitions.size());
-		serializer.write(m_partitions.begin(), m_partitions.byte_size());
-		serializer.write(m_active_partition);
+		blob.write((u32)m_partitions.size());
+		blob.write(m_partitions.begin(), m_partitions.byte_size());
+		blob.write(m_active_partition);
 	}
+
+	const u64 offset = serializer.size();
+	serializer.write((u32)0);
+	serializer.write((u32)0);
+	m_engine.compress(blob, serializer);
+	u32* sizes = (u32*)(serializer.getMutableData() + offset);
+	sizes[0] = (u32)blob.size(); // uncompressed size
+	sizes[1] = u32(serializer.size() - offset - sizeof(u32) * 2); // compressed size
 }
 
-bool World::deserialize(InputMemoryStream& serializer, EntityMap& entity_map, WorldVersion& version)
+bool World::deserialize(InputMemoryStream& input, EntityMap& entity_map, WorldVersion& version)
 {
 	WorldHeader header;
 	WorldHeaderLegacy::Version legacy_version = WorldHeaderLegacy::Version::LAST;
-	serializer.read(header);
+	input.read(header);
 	if (header.magic == WorldEditorHeaderLegacy::MAGIC || header.magic == 0xffFFffFF) {
 		header.magic = WorldHeader::MAGIC;
 		// WorldEditorHeaderLegacy::Version matches first values of WorldHeaderVersion, so we can just use header.version as is
 		static_assert(sizeof(WorldEditorHeaderLegacy) == sizeof(WorldHeader));
-		serializer.read<u64>(); // hash
+		input.read<u64>(); // hash
 		WorldHeaderLegacy legacy_header;
-		serializer.read(legacy_header);
-		if (serializer.hasOverflow() || legacy_header.magic != WorldHeaderLegacy::MAGIC) {
+		input.read(legacy_header);
+		if (input.hasOverflow() || legacy_header.magic != WorldHeaderLegacy::MAGIC) {
 			logError("Wrong or corrupted file");
 			return false;
 		}
@@ -908,7 +918,7 @@ bool World::deserialize(InputMemoryStream& serializer, EntityMap& entity_map, Wo
 
 	version = header.version;
 
-	if (serializer.hasOverflow() || header.magic != WorldHeader::MAGIC) {
+	if (input.hasOverflow() || header.magic != WorldHeader::MAGIC) {
 		logError("Wrong or corrupted file");
 		return false;
 	}
@@ -916,15 +926,28 @@ bool World::deserialize(InputMemoryStream& serializer, EntityMap& entity_map, Wo
 		logError("Unsupported version of world");
 		return false;
 	}
-	if (!hasSerializedModules(*this, serializer)) return false;
+	if (!hasSerializedModules(*this, input)) return false;
 
 	bool deserialize_partitions = false;
 	if (legacy_version > WorldHeaderLegacy::Version::FLAGS) {
 		WorldSerializeFlags flags;
-		serializer.read(flags);
+		input.read(flags);
 		deserialize_partitions = (u32)flags & (u32)WorldSerializeFlags::HAS_PARTITIONS;
 	}
-	
+
+	InputMemoryStream serializer(input.skip(0), input.remaining());
+	OutputMemoryStream uncompressed(m_allocator);
+	if (header.version > WorldVersion::COMPRESSED) { 
+		u32 uncompressed_size;
+		u32 compressed_size;
+		input.read(uncompressed_size);
+		input.read(compressed_size);
+		uncompressed.resize(uncompressed_size);
+		m_engine.decompress(Span((const u8*)input.skip(0), compressed_size), Span(uncompressed.getMutableData(), uncompressed.size()));
+		serializer = InputMemoryStream(uncompressed);
+		input.skip(compressed_size);
+	}
+
 	u32 to_reserve;
 	serializer.read(to_reserve);
 	entity_map.reserve(to_reserve);
@@ -1007,6 +1030,10 @@ bool World::deserialize(InputMemoryStream& serializer, EntityMap& entity_map, Wo
 	if (serializer.hasOverflow()) {
 		logError("End of file encountered while trying to read data");
 		return false;
+	}
+
+	if (header.version <= WorldVersion::COMPRESSED) { 
+		input.skip(serializer.getPosition());
 	}
 	return true;
 }

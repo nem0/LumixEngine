@@ -18,6 +18,7 @@
 #include "engine/prefab.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
+#include <lz4/lz4.h>
 
 namespace Lumix
 {
@@ -50,7 +51,7 @@ struct EngineImpl final : Engine {
 		: m_allocator(allocator, "engine")
 		, m_page_allocator(allocator)
 		, m_prefab_resource_manager(m_allocator)
-		, m_resource_manager(m_allocator)
+		, m_resource_manager(*this, m_allocator)
 		, m_is_game_running(false)
 		, m_smooth_time_delta(1/60.f)
 		, m_time_multiplier(1.0f)
@@ -113,6 +114,8 @@ struct EngineImpl final : Engine {
 				logInfo(plugin_name, " plugin has not been loaded");
 			}
 		}
+
+		m_lz4_state = (u8*)m_allocator.allocate(LZ4_sizeofState(), 8);
 	}
 
 	void setMainWindow(os::WindowHandle wnd) override {
@@ -125,6 +128,8 @@ struct EngineImpl final : Engine {
 
 	~EngineImpl()
 	{
+		m_allocator.deallocate(m_lz4_state);
+		
 		for (ISystem* system : m_system_manager->getSystems()) {
 			system->shutdownStarted();
 		}
@@ -243,6 +248,21 @@ struct EngineImpl final : Engine {
 		m_next_frame = true;
 	}
 
+	bool decompress(Span<const u8> src, Span<u8> output) override {
+		const i32 result = LZ4_decompress_safe((const char*)src.begin(), (char*)output.begin(), src.length(), output.length());
+		return result == output.length();
+	}
+
+	bool compress(Span<const u8> mem, OutputMemoryStream& output) override {
+		const i32 cap = LZ4_compressBound(mem.length());
+		const u32 start_size = (u32)output.size();
+		output.resize(cap + start_size);
+		jobs::MutexGuard guard(m_lz4_mutex);
+		const i32 compressed_size = LZ4_compress_fast_extState(m_lz4_state, (const char*)mem.begin(), (char*)output.getMutableData() + start_size, mem.length(), cap, 1); 
+		if (compressed_size == 0) return false;
+		output.resize(compressed_size + start_size);
+		return true;
+	}
 
 	void setTimeMultiplier(float multiplier) override
 	{
@@ -414,6 +434,8 @@ private:
 	os::WindowHandle m_window_handle = os::INVALID_WINDOW;
 	os::OutputFile m_log_file;
 	bool m_is_log_file_open = false;
+	u8* m_lz4_state = nullptr;
+	jobs::Mutex m_lz4_mutex;
 };
 
 
