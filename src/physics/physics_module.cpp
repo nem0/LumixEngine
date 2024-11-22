@@ -1393,8 +1393,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		joint.connected_body = INVALID_ENTITY;
 		joint.local_frame0.p = PxVec3(0, 0, 0);
 		joint.local_frame0.q = PxQuat(0, 0, 0, 1);
-		joint.physx = PxDistanceJointCreate(
-			m_scene->getPhysics(), m_dummy_actor, PxTransform(PxIdentity), nullptr, PxTransform(PxIdentity));
+		joint.physx = PxDistanceJointCreate(m_scene->getPhysics(), m_dummy_actor, PxTransform(PxIdentity), nullptr, PxTransform(PxIdentity));
 		joint.physx->setConstraintFlag(PxConstraintFlag::eVISUALIZATION, true);
 		static_cast<PxDistanceJoint*>(joint.physx)->setDistanceJointFlag(PxDistanceJointFlag::eSPRING_ENABLED, true);
 
