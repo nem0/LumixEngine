@@ -1077,7 +1077,7 @@ struct SetPropertyVisitor : reflection::IPropertyVisitor {
 
 		WorldEditor& editor = studio->getWorldEditor();
 		editor.beginCommandGroup("createEntityEx");
-		EntityRef e = editor.addEntity();
+		EntityRef e = editor.addEntityAt(DVec3(0, 0, 0));
 		editor.selectEntities(Span(&e, 1), false);
 
 		lua_pushvalue(L, 1);
