@@ -138,7 +138,6 @@ struct FBXImporter {
 		const ofbx::Material* fbx_mat = nullptr;
 		bool is_skinned = false;
 		int bone_idx = -1;
-		bool import = true;
 		u32 lod = 0;
 		int submesh = -1;
 		OutputMemoryStream vertex_data;

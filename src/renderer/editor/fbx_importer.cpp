@@ -863,10 +863,7 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const Path& path)
 			const ofbx::GeometryData& geom = mesh->getGeometryData();
 
 			ofbx::GeometryPartition partition = geom.getPartition(import_mesh.submesh == -1 ? 0 : import_mesh.submesh);
-			if (partition.polygon_count == 0) {
-				import_mesh.import = false;
-				continue;
-			}
+			ASSERT(partition.polygon_count > 0); // gatherMeshes should filter out such meshes
 		
 			PROFILE_BLOCK("FBX convert vertex data")
 			profiler::pushInt("Triangle count", partition.triangles_count);
@@ -1002,6 +999,10 @@ void FBXImporter::gatherMeshes()
 		const ofbx::Mesh* fbx_mesh = (const ofbx::Mesh*)m_scene->getMesh(mesh_idx);
 		const int mat_count = fbx_mesh->getMaterialCount();
 		for (int j = 0; j < mat_count; ++j) {
+			const ofbx::GeometryData& geom = fbx_mesh->getGeometryData();
+			ofbx::GeometryPartition partition = geom.getPartition(mat_count > 1 ? j : 0);
+			if (partition.polygon_count == 0) continue;
+
 			ImportMesh& mesh = m_meshes.emplace(m_allocator);
 			mesh.is_skinned = false;
 			const ofbx::Skin* skin = fbx_mesh->getSkin();
@@ -2132,7 +2133,6 @@ void FBXImporter::writeGeometry(const ImportConfig& cfg) {
 
 	Vec2 bounding_cylinder = Vec2(0);
 	for (const ImportMesh& import_mesh : m_meshes) {
-		if (!import_mesh.import) continue;
 		if (import_mesh.lod != 0) continue;
 
 		origin_radius_squared = maximum(origin_radius_squared, import_mesh.origin_radius_squared);
@@ -2142,7 +2142,6 @@ void FBXImporter::writeGeometry(const ImportConfig& cfg) {
 	const Vec3 center = (aabb.min + aabb.max) * 0.5f;
 	const Vec3 center_xz0(0, center.y, 0);
 	for (const ImportMesh& import_mesh : m_meshes) {
-		if (!import_mesh.import) continue;
 		if (import_mesh.lod != 0) continue;
 
 		const u8* positions = import_mesh.vertex_data.data();
@@ -2165,7 +2164,6 @@ void FBXImporter::writeGeometry(const ImportConfig& cfg) {
 
 	for (u32 lod = 0; lod < cfg.lod_count - (cfg.create_impostor ? 1 : 0); ++lod) {
 		for (const ImportMesh& import_mesh : m_meshes) {
-			if (!import_mesh.import) continue;
 
 			const bool are_indices_16_bit = areIndices16Bit(import_mesh, cfg);
 			
@@ -2222,8 +2220,6 @@ void FBXImporter::writeGeometry(const ImportConfig& cfg) {
 
 	for (u32 lod = 0; lod < cfg.lod_count - (cfg.create_impostor ? 1 : 0); ++lod) {
 		for (const ImportMesh& import_mesh : m_meshes) {
-			if (!import_mesh.import) continue;
-			
 			if ((import_mesh.lod == lod && !hasAutoLOD(cfg, lod)) || (import_mesh.lod == 0 && hasAutoLOD(cfg, lod))) {
 				write((i32)import_mesh.vertex_data.size());
 				write(import_mesh.vertex_data.data(), import_mesh.vertex_data.size());
@@ -2284,7 +2280,7 @@ void FBXImporter::writeMeshes(const Path& src, int mesh_idx, const ImportConfig&
 	else {
 		for (ImportMesh& mesh : m_meshes) {
 			if (mesh.lod >= cfg.lod_count - (cfg.create_impostor ? 1 : 0)) continue;
-			if (mesh.import && (mesh.lod == 0 || !hasAutoLOD(cfg, mesh.lod))) ++mesh_count;
+			if (mesh.lod == 0 || !hasAutoLOD(cfg, mesh.lod)) ++mesh_count;
 			for (u32 i = 1; i < cfg.lod_count - (cfg.create_impostor ? 1 : 0); ++i) {
 				if (mesh.lod == 0 && hasAutoLOD(cfg, i)) ++mesh_count;
 			}
@@ -2294,7 +2290,6 @@ void FBXImporter::writeMeshes(const Path& src, int mesh_idx, const ImportConfig&
 	write(mesh_count);
 	
 	auto writeMesh = [&](const ImportMesh& import_mesh ) {
-			
 		const ofbx::Mesh& mesh = *import_mesh.fbx;
 		const ofbx::GeometryData& geom = mesh.getGeometryData();
 
@@ -2365,8 +2360,8 @@ void FBXImporter::writeMeshes(const Path& src, int mesh_idx, const ImportConfig&
 	else {
 		for (u32 lod = 0; lod < cfg.lod_count - (cfg.create_impostor ? 1 : 0); ++lod) {
 			for (ImportMesh& import_mesh : m_meshes) {
-				if (import_mesh.import && import_mesh.lod == lod && !hasAutoLOD(cfg, lod)) writeMesh(import_mesh);
-				else if (import_mesh.lod == 0 && import_mesh.import && hasAutoLOD(cfg, lod)) writeMesh(import_mesh);
+				if (import_mesh.lod == lod && !hasAutoLOD(cfg, lod)) writeMesh(import_mesh);
+				else if (import_mesh.lod == 0 && hasAutoLOD(cfg, lod)) writeMesh(import_mesh);
 			}
 		}
 	}
@@ -2419,7 +2414,6 @@ void FBXImporter::writeLODs(const ImportConfig& cfg)
 {
 	i32 lods[4] = {};
 	for (auto& mesh : m_meshes) {
-		if (!mesh.import) continue;
 		if (mesh.lod >= cfg.lod_count - (cfg.create_impostor ? 1 : 0)) continue;
 
 		if (mesh.lod == 0 || !hasAutoLOD(cfg, mesh.lod)) {
@@ -2464,7 +2458,7 @@ int FBXImporter::getAttributeCount(const ImportMesh& mesh, const ImportConfig& c
 bool FBXImporter::areIndices16Bit(const ImportMesh& mesh, const ImportConfig& cfg) const
 {
 	int vertex_size = getVertexSize(*mesh.fbx, mesh.is_skinned, cfg);
-	return !(mesh.import && mesh.vertex_data.size() / vertex_size > (1 << 16));
+	return mesh.vertex_data.size() / vertex_size < (1 << 16);
 }
 
 void FBXImporter::bakeVertexAO(const ImportConfig& cfg) {
@@ -2752,11 +2746,7 @@ bool FBXImporter::writeModel(const Path& src, const ImportConfig& cfg)
 	PROFILE_FUNCTION();
 	postprocessMeshes(cfg, src);
 
-	bool import_any_mesh = false;
-	for (const ImportMesh& m : m_meshes) {
-		if (m.import) import_any_mesh = true;
-	}
-	if (!import_any_mesh && m_animations.empty()) return false;
+	if (m_meshes.empty() && m_animations.empty()) return false;
 
 	m_out_file.clear();
 	writeModelHeader();
