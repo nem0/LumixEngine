@@ -83,6 +83,11 @@ static DXGI_FORMAT getDXGIFormat(const Attribute& attr) {
 				case 4: return as_int ? DXGI_FORMAT_R16G16B16A16_SINT : DXGI_FORMAT_R16G16B16A16_SNORM;
 			}
 			break;
+		case AttributeType::U16: 
+			switch(attr.components_count) {
+				case 4: return as_int ? DXGI_FORMAT_R16G16B16A16_UINT : DXGI_FORMAT_R16G16B16A16_UNORM;
+			}
+			break;
 	}
 	ASSERT(false);
 	return DXGI_FORMAT_R32_FLOAT;
@@ -2747,7 +2752,6 @@ static void applyComputeUniformBlocks() {
 
 [[nodiscard]] static bool setPipelineStateGraphics() {
 	if (g_last_program != d3d->current_program) {
-		g_last_program = d3d->current_program;
 		const u8 stencil_ref = u8(u64(d3d->current_program->state) >> 34);
 		d3d->cmd_list->OMSetStencilRef(stencil_ref);
 
@@ -2759,6 +2763,7 @@ static void applyComputeUniformBlocks() {
 		d3d->cmd_list->SetGraphicsRootDescriptorTable(BINDLESS_SRV_ROOT_PARAMETER_INDEX, d3d->srv_heap.gpu_begin);
 		d3d->cmd_list->SetGraphicsRootDescriptorTable(BINDLESS_SAMPLERS_ROOT_PARAMETER_INDEX, d3d->sampler_heap.gpu_begin);
 		if (d3d->bound_shader_buffers.ptr) d3d->cmd_list->SetGraphicsRootDescriptorTable(SRV_ROOT_PARAMETER_INDEX, d3d->bound_shader_buffers);
+		g_last_program = d3d->current_program;
 	}
 	
 	if (d3d->dirty_gfx_uniform_blocks == 0) return true;

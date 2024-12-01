@@ -21,8 +21,6 @@
 namespace Lumix
 {
 
-static constexpr u32 FILE_MAGIC = 0x5f4c4d4f;
-
 static LocalRigidTransform invert(const LocalRigidTransform& tr)
 {
 	LocalRigidTransform result;
@@ -321,7 +319,7 @@ static bool parseVertexDecl(IInputStream& file, gpu::VertexDecl* vertex_decl, At
 					vertex_decl->addAttribute(offset, cmp_count, type, gpu::Attribute::NORMALIZED);
 				}
 				break;
-			case AttributeSemantic::INDICES:
+			case AttributeSemantic::JOINTS:
 				vertex_decl->addAttribute(offset, cmp_count, type, gpu::Attribute::AS_INT);
 				break;
 			default: ASSERT(false); break;
@@ -500,8 +498,8 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 
 		int position_attribute_offset = getAttributeOffset(mesh, AttributeSemantic::POSITION);
 		int weights_attribute_offset = getAttributeOffset(mesh, AttributeSemantic::WEIGHTS);
-		int bone_indices_attribute_offset = getAttributeOffset(mesh, AttributeSemantic::INDICES);
-		bool keep_skin = hasAttribute(mesh, AttributeSemantic::WEIGHTS) && hasAttribute(mesh, AttributeSemantic::INDICES);
+		int bone_indices_attribute_offset = getAttributeOffset(mesh, AttributeSemantic::JOINTS);
+		bool keep_skin = hasAttribute(mesh, AttributeSemantic::WEIGHTS) && hasAttribute(mesh, AttributeSemantic::JOINTS);
 
 		int vertex_size = mesh.vb_stride;
 		int mesh_vertex_count = data_size / vertex_size;
@@ -559,19 +557,19 @@ bool Model::load(Span<const u8> mem)
 	InputMemoryStream file(mem);
 	file.read(header);
 
-	if (header.magic != FILE_MAGIC)
+	if (header.magic != FileHeader::MAGIC)
 	{
 		logWarning("Corrupted model ", getPath());
 		return false;
 	}
 
-	if(header.version > (u32)FileVersion::LATEST)
+	if(header.version > FileVersion::LATEST)
 	{
 		logWarning("Unsupported version of model ", getPath());
 		return false;
 	}
 
-	if (header.version > (u32)FileVersion::ROOT_MOTION_BONE) {
+	if (header.version > FileVersion::ROOT_MOTION_BONE) {
 		file.read(m_root_motion_bone);
 	}
 

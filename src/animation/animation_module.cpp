@@ -444,8 +444,8 @@ struct AnimationModuleImpl final : AnimationModule {
 	}
 
 
-	void updateAnimable(Animable& animable, float time_delta) const
-	{
+	void updateAnimable(Animable& animable, float time_delta) const {
+		PROFILE_FUNCTION();
 		if (!animable.animation || !animable.animation->isReady()) return;
 		EntityRef entity = animable.entity;
 		if (!m_world.hasComponent(entity, MODEL_INSTANCE_TYPE)) return;

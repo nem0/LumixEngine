@@ -1,6 +1,11 @@
 #include <imgui/imgui.h>
 
-#include "scene_view.h"
+#include "core/delegate_list.h"
+#include "core/geometry.h"
+#include "core/path.h"
+#include "core/path.h"
+#include "core/profiler.h"
+#include "core/string.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
 #include "editor/gizmo.h"
@@ -10,30 +15,27 @@
 #include "editor/settings.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
-#include "core/delegate_list.h"
 #include "engine/engine.h"
-#include "core/geometry.h"
-#include "core/path.h"
-#include "core/path.h"
 #include "engine/prefab.h"
-#include "core/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "core/string.h"
 #include "engine/world.h"
+#include "physics/physics_resources.h"
 #include "renderer/culling_system.h"
+#include "renderer/draw_stream.h"
 #include "renderer/draw2d.h"
+#include "renderer/editor/editor_icon.h"
 #include "renderer/font.h"
 #include "renderer/gpu/gpu.h"
-#include "renderer/draw_stream.h"
-#include "renderer/editor/editor_icon.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
+#include "renderer/particle_system.h"
 #include "renderer/pipeline.h"
 #include "renderer/pose.h"
 #include "renderer/render_module.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
+#include "scene_view.h"
 
 namespace Lumix
 {
@@ -1141,7 +1143,9 @@ void SceneView::handleDrop(const char* path, float x, float y)
 {
 	const RayCastModelHit hit = castRay(x, y);
 
-	if (Path::hasExtension(path, "par")) {
+	const ResourceType type = m_app.getAssetCompiler().getResourceType(path);
+
+	if (type == ParticleSystemResource::TYPE) {
 		const DVec3 pos = hit.origin + (hit.is_hit ? hit.t : 5) * hit.dir;
 		
 		m_editor.beginCommandGroup("insert_particle");
@@ -1152,45 +1156,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 		m_editor.endCommandGroup();
 		m_editor.selectEntities(Span(&entity, 1), false);
 	}
-	else if (Path::hasExtension(path, "fbx"))
-	{
-		if (findInsensitive(path, ".phy:"))
-		{
-			if (hit.is_hit && hit.entity.isValid())
-			{
-				m_editor.beginCommandGroup("insert_phy_component");
-				const EntityRef e = (EntityRef)hit.entity;
-				m_editor.selectEntities(Span(&e, 1), false);
-				m_editor.addComponent(Span(&e, 1), MESH_ACTOR_TYPE);
-				m_editor.setProperty(MESH_ACTOR_TYPE, "", -1, "Mesh", Span(&e, 1), Path(path));
-				m_editor.endCommandGroup();
-			}
-			else
-			{
-				const DVec3 pos = hit.origin + (hit.is_hit ? hit.t : 1) * hit.dir;
-				m_editor.beginCommandGroup("insert_phy");
-				EntityRef entity = m_editor.addEntity();
-				m_editor.setEntitiesPositions(&entity, &pos, 1);
-				m_editor.selectEntities(Span(&entity, 1), false);
-				m_editor.addComponent(Span(&entity, 1), MESH_ACTOR_TYPE);
-				m_editor.setProperty(MESH_ACTOR_TYPE, "", -1, "Mesh", Span(&entity, 1), Path(path));
-				m_editor.endCommandGroup();
-			}
-		}
-		else {
-			const DVec3 pos = hit.origin + (hit.is_hit ? hit.t : 5) * hit.dir;
-
-			m_editor.beginCommandGroup("insert_mesh");
-			EntityRef entity = m_editor.addEntity();
-			m_editor.selectEntities(Span(&entity, 1), false);
-			m_editor.setEntitiesPositions(&entity, &pos, 1);
-			m_editor.addComponent(Span(&entity, 1), MODEL_INSTANCE_TYPE);
-			m_editor.setProperty(MODEL_INSTANCE_TYPE, "", -1, "Source", Span(&entity, 1), Path(path));
-			m_editor.endCommandGroup();
-		}
-	}
-	else if (Path::hasExtension(path, "fab"))
-	{
+	else if (type == PrefabResource::TYPE) {
 		ResourceManagerHub& manager = m_editor.getEngine().getResourceManager();
 		PrefabResource* prefab = manager.load<PrefabResource>(Path(path));
 		const DVec3 pos = hit.origin + (hit.is_hit ? hit.t : 1) * hit.dir;
@@ -1208,6 +1174,39 @@ void SceneView::handleDrop(const char* path, float x, float y)
 		else {
 			ASSERT(prefab->isFailure());
 			logError("Failed to load ", prefab->getPath());
+		}
+	}
+	else if (type == Model::TYPE) {
+		const DVec3 pos = hit.origin + (hit.is_hit ? hit.t : 5) * hit.dir;
+
+		m_editor.beginCommandGroup("insert_mesh");
+		EntityRef entity = m_editor.addEntity();
+		m_editor.selectEntities(Span(&entity, 1), false);
+		m_editor.setEntitiesPositions(&entity, &pos, 1);
+		m_editor.addComponent(Span(&entity, 1), MODEL_INSTANCE_TYPE);
+		m_editor.setProperty(MODEL_INSTANCE_TYPE, "", -1, "Source", Span(&entity, 1), Path(path));
+		m_editor.endCommandGroup();
+	}
+	else if (type == PhysicsGeometry::TYPE) {
+		if (hit.is_hit && hit.entity.isValid())
+		{
+			m_editor.beginCommandGroup("insert_phy_component");
+			const EntityRef e = (EntityRef)hit.entity;
+			m_editor.selectEntities(Span(&e, 1), false);
+			m_editor.addComponent(Span(&e, 1), MESH_ACTOR_TYPE);
+			m_editor.setProperty(MESH_ACTOR_TYPE, "", -1, "Mesh", Span(&e, 1), Path(path));
+			m_editor.endCommandGroup();
+		}
+		else
+		{
+			const DVec3 pos = hit.origin + (hit.is_hit ? hit.t : 1) * hit.dir;
+			m_editor.beginCommandGroup("insert_phy");
+			EntityRef entity = m_editor.addEntity();
+			m_editor.setEntitiesPositions(&entity, &pos, 1);
+			m_editor.selectEntities(Span(&entity, 1), false);
+			m_editor.addComponent(Span(&entity, 1), MESH_ACTOR_TYPE);
+			m_editor.setProperty(MESH_ACTOR_TYPE, "", -1, "Mesh", Span(&entity, 1), Path(path));
+			m_editor.endCommandGroup();
 		}
 	}
 }

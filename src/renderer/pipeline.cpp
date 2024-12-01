@@ -1680,7 +1680,6 @@ struct PipelineImpl final : Pipeline {
 	}
 
 	void renderDebugShapes() {
-		if (m_type == PipelineType::PREVIEW) return;
 		renderDebugTriangles();
 		renderDebugLines();
 		//renderDebugPoints();

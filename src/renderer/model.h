@@ -30,7 +30,7 @@ enum class AttributeSemantic : u8 {
 	BITANGENT,
 	COLOR0,
 	COLOR1,
-	INDICES,
+	JOINTS,
 	WEIGHTS,
 	TEXCOORD0,
 	TEXCOORD1,
@@ -120,21 +120,21 @@ struct LUMIX_RENDERER_API Model final : Resource
 {
 public:
 	using BoneMap = HashMap<BoneNameHash, int>;
-	
-#pragma pack(1)
-	struct FileHeader
-	{
-		u32 magic;
-		u32 version;
-	};
-#pragma pack()
 
-	enum class FileVersion : u32
-	{
+	enum class FileVersion : u32 {
 		ROOT_MOTION_BONE,
 
 		LATEST // keep this last
 	};
+	
+#pragma pack(1)
+	struct FileHeader {
+		static constexpr u32 MAGIC = 0x5f4c4d4f;
+
+		u32 magic = FileHeader::MAGIC;
+		FileVersion version = FileVersion::LATEST;
+	};
+#pragma pack()
 
 	struct Bone
 	{

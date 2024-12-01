@@ -2576,13 +2576,11 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			if(meta.split) {
 				const Array<FBXImporter::ImportMesh>& meshes = importer.getMeshes();
 				for (int i = 0; i < meshes.size(); ++i) {
-					char mesh_name[256];
-					importer.getImportMeshName(meshes[i], mesh_name);
-					Path tmp(mesh_name, ".fbx:", path);
+					Path tmp(meshes[i].name, ".fbx:", path);
 					compiler.addResource(Model::TYPE, tmp);
 					if (meta.physics != FBXImporter::ImportConfig::Physics::NONE) {
 						ResourceType physics_geom("physics_geometry");
-						compiler.addResource(physics_geom, Path(mesh_name, ".phy:", path));
+						compiler.addResource(physics_geom, Path(meshes[i].name, ".phy:", path));
 					}
 				}
 			}

@@ -489,7 +489,7 @@ struct RendererImpl final : Renderer {
 					case AttributeSemantic::BITANGENT: add(s, "#define BITANGENT_ATTR ", i); break;
 					case AttributeSemantic::COLOR0: add(s, "#define COLOR0_ATTR ", i); break;
 					case AttributeSemantic::COLOR1: add(s, "#define COLOR1_ATTR ", i); break;
-					case AttributeSemantic::INDICES: add(s, "#define INDICES_ATTR ", i); break;
+					case AttributeSemantic::JOINTS: add(s, "#define INDICES_ATTR ", i); break;
 					case AttributeSemantic::WEIGHTS: add(s, "#define WEIGHTS_ATTR ", i); break;
 					case AttributeSemantic::TEXCOORD0: add(s, "#define UV0_ATTR ", i); break;
 					case AttributeSemantic::TEXCOORD1: add(s, "#define UV1_ATTR ", i); break;
