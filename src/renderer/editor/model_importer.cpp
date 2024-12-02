@@ -8,13 +8,16 @@
 #include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/plugin.h"
+#include "engine/world.h"
 #include "meshoptimizer/meshoptimizer.h"
 #include "model_importer.h"
+#include "physics/physics_module.h"
 #include "physics/physics_resources.h"
 #include "physics/physics_system.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/pipeline.h"
+#include "renderer/render_module.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
 #include "renderer/voxels.h"
@@ -282,6 +285,7 @@ ModelImporter::ModelImporter(struct StudioApp& app)
 	, m_bones(app.getAllocator())
 	, m_meshes(app.getAllocator())
 	, m_animations(app.getAllocator())
+	, m_lights(app.getAllocator())
 {}
 
 void ModelImporter::writeString(const char* str) { m_out_file.write(str, stringLength(str)); }
@@ -344,6 +348,43 @@ void ModelImporter::postprocessCommon(const ImportConfig& cfg) {
 	m_out_file.reserve(128 * 1024 + mesh_data_size);
 }
 
+bool ModelImporter::writeSubmodels(const Path& src, const ImportConfig& cfg) {
+	PROFILE_FUNCTION();
+	bool result = true;
+
+	for (int i = 0; i < m_meshes.size(); ++i) {
+		m_out_file.clear();
+		writeModelHeader();
+		write(cfg.root_motion_bone);
+		writeMeshes(src, i, cfg);
+		writeGeometry(i, cfg);
+		if (m_meshes[i].is_skinned) {
+			writeSkeleton(cfg);
+		}
+		else {
+			write((i32)0);
+		}
+
+		// lods
+		const i32 lod_count = 1;
+		const i32 to_mesh = 0;
+		const float factor = FLT_MAX;
+		write(lod_count);
+		write(to_mesh);
+		write(factor);
+
+		Path path(m_meshes[i].name, ".fbx:", src);
+
+		AssetCompiler& compiler = m_app.getAssetCompiler();
+		result = compiler.writeCompiledResource(path, Span(m_out_file.data(), (i32)m_out_file.size())) && result;
+	}
+	return !m_meshes.empty() && result;
+}
+
+// TODO move this to the constructor?
+void ModelImporter::init() {
+	m_impostor_shadow_shader = m_app.getEngine().getResourceManager().load<Shader>(Path("shaders/impostor_shadow.hlsl"));
+}
 
 void ModelImporter::createImpostorTextures(Model* model, ImpostorTexturesContext& ctx, bool bake_normals)
 {
@@ -537,9 +578,35 @@ void ModelImporter::createImpostorTextures(Model* model, ImpostorTexturesContext
 	}
 }
 
+bool ModelImporter::write(const Path& src, const ImportConfig& cfg, WriteFlags flags) {
+	bool any_written = false;
+	const bool split = isFlagSet(flags, WriteFlags::SPLIT);
+	const Path filepath = Path(ResourcePath::getResource(src));
+	if (split) {
+		ImportConfig split_cfg = cfg;
+		split_cfg.origin = ModelImporter::ImportConfig::Origin::CENTER_EACH_MESH;
+		any_written = writeSubmodels(filepath, split_cfg) || any_written;
+		any_written = writePhysics(filepath, split_cfg, true) || any_written;
+	}
+	any_written = writeModel(src, cfg) || any_written;
+	any_written = writeMaterials(filepath, cfg, false) || any_written;
+	if (!isFlagSet(flags, WriteFlags::IGNORE_ANIMATIONS)) {
+		any_written = writeAnimations(filepath, cfg) || any_written;
+	}
+	if (!split) {
+		any_written = writePhysics(filepath, cfg, false) || any_written;
+	}
+	if (split || isFlagSet(flags, WriteFlags::PREFAB_WITH_PHYSICS)) {
+		jobs::moveJobToWorker(0);
+		any_written = writePrefab(filepath, cfg, split) || any_written;
+		jobs::yield();
+	}
+	return any_written;
+}
 
-bool ModelImporter::writeMaterials(const Path& src, const ImportConfig& cfg, bool force) const {
+bool ModelImporter::writeMaterials(const Path& src, const ImportConfig& cfg, bool force) {
 	PROFILE_FUNCTION()
+
 	FileSystem& filesystem = m_app.getEngine().getFileSystem();
 	bool failed = false;
 	StringView dir = Path::getDir(src);
@@ -701,6 +768,68 @@ void ModelImporter::writeGeometry(int mesh_idx, const ImportConfig& cfg) {
 	write(import_mesh.aabb);
 }
 
+bool ModelImporter::writePrefab(const Path& src, const ImportConfig& cfg, bool split_meshes) {
+	Engine& engine = m_app.getEngine();
+	World& world = engine.createWorld();
+
+	os::OutputFile file;
+	PathInfo file_info(src);
+	Path tmp(file_info.dir, "/", file_info.basename, ".fab");
+	FileSystem& fs = engine.getFileSystem();
+	if (!fs.open(tmp, file)) {
+		logError("Could not create ", tmp);
+		return false;
+	}
+
+	OutputMemoryStream blob(m_allocator);
+	static const ComponentType RIGID_ACTOR_TYPE = reflection::getComponentType("rigid_actor");
+	static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
+	const bool with_physics = cfg.physics != ImportConfig::Physics::NONE;
+	RenderModule* rmodule = (RenderModule*)world.getModule(MODEL_INSTANCE_TYPE);
+	PhysicsModule* pmodule = (PhysicsModule*)world.getModule(RIGID_ACTOR_TYPE);
+	
+	const EntityRef root = world.createEntity({0, 0, 0}, Quat::IDENTITY);
+	if (!split_meshes) {
+		world.createComponent(MODEL_INSTANCE_TYPE, root);
+		rmodule->setModelInstancePath(root, src);
+
+		ASSERT(with_physics);
+		world.createComponent(RIGID_ACTOR_TYPE, root);
+		pmodule->setMeshGeomPath(root, Path(".phy:", src));
+	}
+	else {
+		for(int i  = 0; i < m_meshes.size(); ++i) {
+			const EntityRef e = world.createEntity(DVec3(m_meshes[i].origin), Quat::IDENTITY);
+			world.createComponent(MODEL_INSTANCE_TYPE, e);
+			world.setParent(root, e);
+			Path mesh_path(m_meshes[i].name, ".fbx:", src);
+			rmodule->setModelInstancePath(e, mesh_path);
+	
+			if (with_physics) {
+				world.createComponent(RIGID_ACTOR_TYPE, e);
+				pmodule->setMeshGeomPath(e, Path(m_meshes[i].name, ".phy:", src));
+			}
+		}
+
+		static const ComponentType POINT_LIGHT_TYPE = reflection::getComponentType("point_light");
+		for (i32 i = 0, c = (i32)m_lights.size(); i < c; ++i) {
+			const DVec3 pos = m_lights[i];
+			const EntityRef e = world.createEntity(pos, Quat::IDENTITY);
+			world.createComponent(POINT_LIGHT_TYPE, e);
+			world.setParent(root, e);
+		}
+	}
+
+	world.serialize(blob, WorldSerializeFlags::NONE);
+	engine.destroyWorld(world);
+	if (!file.write(blob.data(), blob.size())) {
+		logError("Could not write ", tmp);
+		file.close();
+		return false;
+	}
+	file.close();
+	return true;
+}
 
 void ModelImporter::writeGeometry(const ImportConfig& cfg) {
 	PROFILE_FUNCTION();
@@ -1028,8 +1157,7 @@ void ModelImporter::writeModelHeader()
 	write(header);
 }
 
-bool ModelImporter::writePhysics(const Path& src, const ImportConfig& cfg, bool split_meshes)
-{
+bool ModelImporter::writePhysics(const Path& src, const ImportConfig& cfg, bool split_meshes) {
 	if (m_meshes.empty()) return false;
 	if (cfg.physics == ImportConfig::Physics::NONE) return false;
 
@@ -1139,8 +1267,6 @@ bool ModelImporter::writePhysics(const Path& src, const ImportConfig& cfg, bool 
 
 bool ModelImporter::writeModel(const Path& src, const ImportConfig& cfg) {
 	PROFILE_FUNCTION();
-	postprocess(cfg, src);
-
 	if (m_meshes.empty() && m_animations.empty()) return false;
 
 	m_out_file.clear();
@@ -1154,7 +1280,6 @@ bool ModelImporter::writeModel(const Path& src, const ImportConfig& cfg) {
 	AssetCompiler& compiler = m_app.getAssetCompiler();
 	return compiler.writeCompiledResource(Path(src), Span(m_out_file.data(), (i32)m_out_file.size()));
 }
-
 
 bool ModelImporter::writeAnimations(const Path& src, const ImportConfig& cfg) {
 	PROFILE_FUNCTION();

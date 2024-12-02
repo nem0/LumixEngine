@@ -474,9 +474,15 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 		int index_size;
 		int indices_count;
 		file.read(index_size);
-		if (index_size != 2 && index_size != 4) return false;
+		if (index_size != 2 && index_size != 4) {
+			logError(m_path, ": invalid index size");
+			return false;
+		}
 		file.read(indices_count);
-		if (indices_count <= 0) return false;
+		if (indices_count <= 0) {
+			logError(m_path, ": has no geometry data");
+			return false;
+		}
 		mesh.indices.resize(index_size * indices_count);
 		mesh.indices_count = indices_count;
 		file.read(mesh.indices.getMutableData(), mesh.indices.size());
@@ -485,7 +491,10 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 		const Renderer::MemRef mem = m_renderer.copy(mesh.indices.data(), (u32)mesh.indices.size());
 		mesh.index_buffer_handle = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE, "indices");
 		mesh.index_type = index_size == 2 ? gpu::DataType::U16 : gpu::DataType::U32;
-		if (!mesh.index_buffer_handle) return false;
+		if (!mesh.index_buffer_handle) {
+			logError(m_path, ": failed to create index buffer");
+			return false;
+		}
 	}
 
 	for (int i = 0; i < object_count; ++i)
@@ -519,7 +528,10 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 			mesh.vertices[j] = *(const Vec3*)&vertices[offset + position_attribute_offset];
 		}
 		mesh.vertex_buffer_handle = m_renderer.createBuffer(vertices_mem, gpu::BufferFlags::IMMUTABLE, "vertices");
-		if (!mesh.vertex_buffer_handle) return false;
+		if (!mesh.vertex_buffer_handle) {
+			logError(m_path, ": failed to create vertex buffer");
+			return false;
+		}
 	}
 	file.read(m_origin_bounding_radius);
 	file.read(m_center_bounding_radius);

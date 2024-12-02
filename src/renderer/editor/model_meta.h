@@ -5,49 +5,49 @@
 #include "core/string.h"
 #include "core/tokenizer.h"
 #include "fbx_importer.h"
-
+#include "renderer/editor/model_importer.h"
 
 namespace Lumix {
 
 struct ModelMeta {
-	static const char* toString(FBXImporter::ImportConfig::Physics value) {
+	static const char* toString(ModelImporter::ImportConfig::Physics value) {
 		switch (value) {
-			case FBXImporter::ImportConfig::Physics::TRIMESH: return "trimesh";
-			case FBXImporter::ImportConfig::Physics::CONVEX: return "convex";
-			case FBXImporter::ImportConfig::Physics::NONE: return "none";
+			case ModelImporter::ImportConfig::Physics::TRIMESH: return "trimesh";
+			case ModelImporter::ImportConfig::Physics::CONVEX: return "convex";
+			case ModelImporter::ImportConfig::Physics::NONE: return "none";
 		}
 		ASSERT(false);
 		return "none";
 	}
 
-	static const char* toString(FBXImporter::ImportConfig::Origin value) {
+	static const char* toString(ModelImporter::ImportConfig::Origin value) {
 		switch (value) {
-			case FBXImporter::ImportConfig::Origin::SOURCE: return "source";
-			case FBXImporter::ImportConfig::Origin::BOTTOM: return "bottom";
-			case FBXImporter::ImportConfig::Origin::CENTER: return "center";
-			case FBXImporter::ImportConfig::Origin::CENTER_EACH_MESH: return "center_each_mesh";
+			case ModelImporter::ImportConfig::Origin::SOURCE: return "source";
+			case ModelImporter::ImportConfig::Origin::BOTTOM: return "bottom";
+			case ModelImporter::ImportConfig::Origin::CENTER: return "center";
+			case ModelImporter::ImportConfig::Origin::CENTER_EACH_MESH: return "center_each_mesh";
 		}
 		ASSERT(false);
 		return "none";
 	}
 
-	static const char* toUIString(FBXImporter::ImportConfig::Physics value) {
+	static const char* toUIString(ModelImporter::ImportConfig::Physics value) {
 		switch (value) {
-			case FBXImporter::ImportConfig::Physics::TRIMESH: return "Triangle mesh";
-			case FBXImporter::ImportConfig::Physics::CONVEX: return "Convex";
-			case FBXImporter::ImportConfig::Physics::NONE: return "None";
+			case ModelImporter::ImportConfig::Physics::TRIMESH: return "Triangle mesh";
+			case ModelImporter::ImportConfig::Physics::CONVEX: return "Convex";
+			case ModelImporter::ImportConfig::Physics::NONE: return "None";
 		}
 		ASSERT(false);
 		return "none";
 	}
 
-	static const char* toUIString(FBXImporter::ImportConfig::Origin value) {
+	static const char* toUIString(ModelImporter::ImportConfig::Origin value) {
 		switch (value) {
-			case FBXImporter::ImportConfig::Origin::SOURCE: return "Keep";
-			case FBXImporter::ImportConfig::Origin::BOTTOM: return "Bottom";
-			case FBXImporter::ImportConfig::Origin::CENTER: return "Center";
+			case ModelImporter::ImportConfig::Origin::SOURCE: return "Keep";
+			case ModelImporter::ImportConfig::Origin::BOTTOM: return "Bottom";
+			case ModelImporter::ImportConfig::Origin::CENTER: return "Center";
 		
-			case FBXImporter::ImportConfig::Origin::CENTER_EACH_MESH:
+			case ModelImporter::ImportConfig::Origin::CENTER_EACH_MESH:
 				ASSERT(false); // this should not be exposed in UI / meta files so there should be no reason to convert to string
 				return "Center each mesh";
 		}
@@ -58,8 +58,8 @@ struct ModelMeta {
 	ModelMeta(IAllocator& allocator) : clips(allocator), root_motion_bone(allocator) {}
 
 	void serialize(OutputMemoryStream& blob, const Path& path) {
-		if (physics != FBXImporter::ImportConfig::Physics::NONE) blob << "\nphysics = \"" << toString(physics) << "\"";
-		if (origin != FBXImporter::ImportConfig::Origin::SOURCE) blob << "\norigin = \"" << toString(origin) << "\"";
+		if (physics != ModelImporter::ImportConfig::Physics::NONE) blob << "\nphysics = \"" << toString(physics) << "\"";
+		if (origin != ModelImporter::ImportConfig::Origin::SOURCE) blob << "\norigin = \"" << toString(origin) << "\"";
 		blob << "\nlod_count = " << lod_count;
 
 		#define WRITE_BOOL(id, default_value) \
@@ -107,7 +107,7 @@ struct ModelMeta {
 
 		if (!clips.empty()) {
 			blob << "\nclips = [";
-			for (const FBXImporter::ImportConfig::Clip& clip : clips) {
+			for (const ModelImporter::ImportConfig::Clip& clip : clips) {
 				blob << "\n\n{";
 				blob << "\n\n\nname = \"" << clip.name << "\",";
 				blob << "\n\n\nfrom_frame = " << clip.from_frame << ",";
@@ -184,13 +184,13 @@ struct ModelMeta {
 			StringView dir = Path::getDir(ResourcePath::getResource(path));
 			skeleton = Path(dir, "/", tmp_skeleton_rel);
 		}
-		if (equalIStrings(tmp_physics, "trimesh")) physics = FBXImporter::ImportConfig::Physics::TRIMESH;
-		else if (equalIStrings(tmp_physics, "convex")) physics = FBXImporter::ImportConfig::Physics::CONVEX;
-		else physics = FBXImporter::ImportConfig::Physics::NONE;
+		if (equalIStrings(tmp_physics, "trimesh")) physics = ModelImporter::ImportConfig::Physics::TRIMESH;
+		else if (equalIStrings(tmp_physics, "convex")) physics = ModelImporter::ImportConfig::Physics::CONVEX;
+		else physics = ModelImporter::ImportConfig::Physics::NONE;
 
-		if (equalIStrings(tmp_origin, "center")) origin = FBXImporter::ImportConfig::Origin::CENTER;
-		else if (equalIStrings(tmp_origin, "bottom")) origin = FBXImporter::ImportConfig::Origin::BOTTOM;
-		else origin = FBXImporter::ImportConfig::Origin::SOURCE;
+		if (equalIStrings(tmp_origin, "center")) origin = ModelImporter::ImportConfig::Origin::CENTER;
+		else if (equalIStrings(tmp_origin, "bottom")) origin = ModelImporter::ImportConfig::Origin::BOTTOM;
+		else origin = ModelImporter::ImportConfig::Origin::SOURCE;
 
 		clips.clear();	
 		if (!tmp_clips.empty()) {
@@ -208,7 +208,7 @@ struct ModelMeta {
 					return;
 				}
 
-				FBXImporter::ImportConfig::Clip& clip = clips.emplace();
+				ModelImporter::ImportConfig::Clip& clip = clips.emplace();
 				for (;;) {
 					token = t.nextToken();
 					if (!token) return;
@@ -283,9 +283,9 @@ struct ModelMeta {
 	float autolod_coefs[4] = { 0.75f, 0.5f, 0.25f, 0.125f };
 	float lods_distances[4] = { 10'000, 0, 0, 0 };
 	Animation::Flags root_motion_flags = Animation::Flags::NONE;
-	FBXImporter::ImportConfig::Origin origin = FBXImporter::ImportConfig::Origin::SOURCE;
-	FBXImporter::ImportConfig::Physics physics = FBXImporter::ImportConfig::Physics::NONE;
-	Array<FBXImporter::ImportConfig::Clip> clips;
+	ModelImporter::ImportConfig::Origin origin = ModelImporter::ImportConfig::Origin::SOURCE;
+	ModelImporter::ImportConfig::Physics physics = ModelImporter::ImportConfig::Physics::NONE;
+	Array<ModelImporter::ImportConfig::Clip> clips;
 	String root_motion_bone;
 	Path skeleton;
 };

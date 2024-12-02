@@ -41,8 +41,10 @@
 #include "fbx_importer.h"
 #include "game_view.h"
 #include "model_meta.h"
+#include "openfbx/ofbx.h"
 #include "renderer/culling_system.h"
 #include "renderer/editor/composite_texture.h"
+#include "renderer/editor/model_importer.h"
 #include "renderer/editor/particle_editor.h"
 #include "renderer/draw_stream.h"
 #include "renderer/font.h"
@@ -1266,7 +1268,7 @@ struct MultiEditor {
 
 	LUMIX_FORCE_INLINE void ui(const char* label, bool* value, auto v) { ImGui::Checkbox(label, value); }
 	LUMIX_FORCE_INLINE void ui(const char* label, float* value, auto v) { ImGui::DragFloat(label, value); }
-	LUMIX_FORCE_INLINE void ui(const char* label, FBXImporter::ImportConfig::Physics* value, auto v) {
+	LUMIX_FORCE_INLINE void ui(const char* label, ModelImporter::ImportConfig::Physics* value, auto v) {
 		ImGui::Combo(label, (int*)value, "None\0Convex\0Triangle mesh\0");
 	}
 	LUMIX_FORCE_INLINE void ui(const char* label, Path* value, auto v) {
@@ -2106,9 +2108,10 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 					}
 					ImGui::SameLine();
 					if (ImGui::Button("Create impostor texture")) {
-						FBXImporter importer(m_app);
-						importer.init();
-						importer.createImpostorTextures(m_resource, m_impostor_texture_context, m_meta.bake_impostor_normals);
+						ModelImporter* importer = createFBXImporter(m_app, m_app.getAllocator());
+						importer->init();
+						importer->createImpostorTextures(m_resource, m_impostor_texture_context, m_meta.bake_impostor_normals);
+						destroyFBXImporter(*importer);
 					}
 				}
 				ImGuiEx::Label("Scale");
@@ -2123,15 +2126,15 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				ImGuiEx::Label("Origin");
 				if (ImGui::BeginCombo("##origin", ModelMeta::toUIString(m_meta.origin))) {
 					if (ImGui::Selectable("Keep")) {
-						m_meta.origin = FBXImporter::ImportConfig::Origin::SOURCE;
+						m_meta.origin = ModelImporter::ImportConfig::Origin::SOURCE;
 						saveUndo(true);
 					}
 					if (ImGui::Selectable("Center")) {
-						m_meta.origin = FBXImporter::ImportConfig::Origin::CENTER;
+						m_meta.origin = ModelImporter::ImportConfig::Origin::CENTER;
 						saveUndo(true);
 					}
 					if (ImGui::Selectable("Bottom")) {
-						m_meta.origin = FBXImporter::ImportConfig::Origin::BOTTOM;
+						m_meta.origin = ModelImporter::ImportConfig::Origin::BOTTOM;
 						saveUndo(true);
 					}
 					ImGui::EndCombo();
@@ -2159,21 +2162,21 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				ImGuiEx::Label("Physics");
 				if (ImGui::BeginCombo("##phys", ModelMeta::toUIString(m_meta.physics))) {
 					if (ImGui::Selectable("None")) {
-						m_meta.physics = FBXImporter::ImportConfig::Physics::NONE;
+						m_meta.physics = ModelImporter::ImportConfig::Physics::NONE;
 						saveUndo(true);
 					}
 					if (ImGui::Selectable("Convex")) {
-						m_meta.physics = FBXImporter::ImportConfig::Physics::CONVEX;
+						m_meta.physics = ModelImporter::ImportConfig::Physics::CONVEX;
 						saveUndo(true);
 					}
 					if (ImGui::Selectable("Triangle mesh")) {
-						m_meta.physics = FBXImporter::ImportConfig::Physics::TRIMESH;
+						m_meta.physics = ModelImporter::ImportConfig::Physics::TRIMESH;
 						saveUndo(true);
 					}
 					ImGui::EndCombo();
 				}
 
-				if (m_meta.physics != FBXImporter::ImportConfig::Physics::NONE) {
+				if (m_meta.physics != ModelImporter::ImportConfig::Physics::NONE) {
 					ImGuiEx::Label("Create prefab with physics");
 					ImGui::Checkbox("##cpwf", &m_meta.create_prefab_with_physics);
 				}
@@ -2186,16 +2189,17 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				}
 
 				if (ImGui::Button("Reimport materials")) {
-					FBXImporter fbx_importer(m_app);
-					if (fbx_importer.setSource(m_resource->getPath(), FBXImporter::ReadFlags::IGNORE_GEOMETRY)) {
-						FBXImporter::ImportConfig cfg = metaToImportConfig(m_meta, m_resource->getPath());
-						if (!fbx_importer.writeMaterials(m_resource->getPath(), cfg, true)) {
+					ModelImporter* fbx_importer = createFBXImporter(m_app, m_app.getAllocator());
+					ModelImporter::ImportConfig cfg = metaToImportConfig(m_meta, m_resource->getPath());
+					if (fbx_importer->parse(m_resource->getPath(), ModelImporter::ReadFlags::IGNORE_GEOMETRY, &cfg)) {
+						if (!fbx_importer->writeMaterials(m_resource->getPath(), cfg, true)) {
 							logError("Failed to write materials for ", m_resource->getPath());
 						}
 					}
 					else {
 						logError("Failed to load ", m_resource->getPath());
 					}
+					destroyFBXImporter(*fbx_importer);
 				}
 
 				ImGui::SeparatorText("LODs");
@@ -2292,7 +2296,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 					ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoResize);
 					ImGui::TableHeadersRow();
 
-					for (FBXImporter::ImportConfig::Clip& clip : m_meta.clips) {
+					for (ModelImporter::ImportConfig::Clip& clip : m_meta.clips) {
 						ImGui::TableNextColumn();
 						ImGui::PushID(&clip);
 						ImGui::SetNextItemWidth(-1);
@@ -2566,26 +2570,30 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		ModelMeta meta(m_app.getAllocator());
 		meta.load(_path, m_app);
 		jobs::runLambda([this, _path, meta = static_cast<ModelMeta&&>(meta)]() {
-			FBXImporter importer(m_app);
+			ModelImporter* importer = createFBXImporter(m_app, m_app.getAllocator());
 			AssetCompiler& compiler = m_app.getAssetCompiler();
 
 			const char* path = _path.c_str();
 			if (path[0] == '/') ++path;
-			importer.setSource(Path(path), FBXImporter::ReadFlags::IGNORE_GEOMETRY);
+			if (!importer->parse(Path(path), ModelImporter::ReadFlags::IGNORE_GEOMETRY, nullptr)) {
+				logError("Failed to parse ", path);
+				destroyFBXImporter(*importer);
+				return;
+			}
 
 			if(meta.split) {
-				const Array<FBXImporter::ImportMesh>& meshes = importer.getMeshes();
+				const Array<ModelImporter::ImportMesh>& meshes = importer->getMeshes();
 				for (int i = 0; i < meshes.size(); ++i) {
 					Path tmp(meshes[i].name, ".fbx:", path);
 					compiler.addResource(Model::TYPE, tmp);
-					if (meta.physics != FBXImporter::ImportConfig::Physics::NONE) {
+					if (meta.physics != ModelImporter::ImportConfig::Physics::NONE) {
 						ResourceType physics_geom("physics_geometry");
 						compiler.addResource(physics_geom, Path(meshes[i].name, ".phy:", path));
 					}
 				}
 			}
 
-			if (meta.physics != FBXImporter::ImportConfig::Physics::NONE && !meta.split) {
+			if (meta.physics != ModelImporter::ImportConfig::Physics::NONE && !meta.split) {
 				Path tmp(".phy:", path);
 				ResourceType physics_geom("physics_geometry");
 				compiler.addResource(physics_geom, tmp);
@@ -2593,25 +2601,25 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 			if (!meta.ignore_animations) {
 				if (meta.clips.empty()) {
-					const Array<FBXImporter::ImportAnimation>& animations = importer.getAnimations();
-					for (const FBXImporter::ImportAnimation& anim : animations) {
+					const Array<ModelImporter::ImportAnimation>& animations = importer->getAnimations();
+					for (const ModelImporter::ImportAnimation& anim : animations) {
 						Path tmp(anim.name, ".ani:", path);
 						compiler.addResource(ResourceType("animation"), tmp);
 					}
 				}
 				else {
-					for (const FBXImporter::ImportConfig::Clip& clip : meta.clips) {
+					for (const ModelImporter::ImportConfig::Clip& clip : meta.clips) {
 						Path tmp(clip.name, ".ani:", Path(path));
 						compiler.addResource(ResourceType("animation"), tmp);
 					}
 				}
 			}
-
+			destroyFBXImporter(*importer);
 		}, &m_subres_signal, 2);			
 	}
 
-	static FBXImporter::ImportConfig metaToImportConfig(const ModelMeta& meta, const Path& src) {
-		FBXImporter::ImportConfig cfg;
+	static ModelImporter::ImportConfig metaToImportConfig(const ModelMeta& meta, const Path& src) {
+		ModelImporter::ImportConfig cfg;
 		cfg.autolod_mask = meta.autolod_mask;
 		memcpy(cfg.autolod_coefs, meta.autolod_coefs, sizeof(meta.autolod_coefs));
 		cfg.mikktspace_tangents = meta.use_mikktspace;
@@ -2642,46 +2650,21 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	bool compile(const Path& src) override {
 		ASSERT(Path::hasExtension(src, "fbx"));
 		Path filepath = Path(ResourcePath::getResource(src));
-		ModelMeta meta(m_app.getAllocator()); 
+		ModelMeta meta(m_app.getAllocator());
 		meta.load(Path(filepath), m_app);
 		
-		FBXImporter::ImportConfig cfg = metaToImportConfig(meta, src);
-		FBXImporter importer(m_app);
-		if (!importer.setSource(filepath, meta.force_skin ? FBXImporter::ReadFlags::FORCE_SKINNED : FBXImporter::ReadFlags::NONE)) return false;
-		if (importer.getBoneCount() == 0 && importer.getMeshes().empty() && importer.getAnimations().empty()) {
-			if (importer.getOFBXScene()) {
-				if (importer.getOFBXScene()->getMeshCount() > 0) {
-					logError("No meshes with materials found in ", src);
-				}
-				else {
-					if (importer.getBoneCount() == 0) {
-						logError("No meshes or animations found in ", src);
-					}
-				}
-			}
-		}
+		ModelImporter::ImportConfig cfg = metaToImportConfig(meta, src);
+		ModelImporter* importer = createFBXImporter(m_app, m_app.getAllocator());
+		ModelImporter::WriteFlags write_flags = ModelImporter::WriteFlags::NONE;
+		if (meta.split) write_flags = ModelImporter::WriteFlags::SPLIT;
+		if (meta.create_prefab_with_physics) write_flags = ModelImporter::WriteFlags::PREFAB_WITH_PHYSICS;
+		if (meta.ignore_animations) write_flags = ModelImporter::WriteFlags::IGNORE_ANIMATIONS;
 
-		bool any_written = false;
-		if (meta.split) {
-			cfg.origin = FBXImporter::ImportConfig::Origin::CENTER_EACH_MESH;
-			any_written = importer.writeSubmodels(filepath, cfg) || any_written;
-			any_written = importer.writePhysics(filepath, cfg, true) || any_written;
-		}
-		cfg.origin = meta.origin;
-		any_written = importer.writeModel(src, cfg) || any_written;
-		any_written = importer.writeMaterials(filepath, cfg, false) || any_written;
-		if (!meta.ignore_animations) {
-			any_written = importer.writeAnimations(filepath, cfg) || any_written;
-		}
-		if (!meta.split) {
-			any_written = importer.writePhysics(filepath, cfg, false) || any_written;
-		}
-		if (meta.split || meta.create_prefab_with_physics) {
-			jobs::moveJobToWorker(0);
-			any_written = importer.writePrefab(filepath, cfg, meta.split) || any_written;
-			jobs::yield();
-		}
-		return any_written;
+		bool result = importer->parse(filepath, meta.force_skin ? ModelImporter::ReadFlags::FORCE_SKINNED : ModelImporter::ReadFlags::NONE, &cfg);
+		result = result && importer->write(src, cfg, write_flags);
+
+		destroyFBXImporter(*importer);
+		return result;
 	}
 
 
@@ -5295,9 +5278,10 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		, m_terrain_plugin(app)
 		, m_instanced_model_plugin(app)
 		, m_model_plugin(app)
-		, m_fbx_importer(app)
 		, m_procedural_geom_plugin(app)
-	{}
+	{
+		m_fbx_importer = createFBXImporter(app, app.getAllocator());
+	}
 
 	void update(float time_delta) override {
 		if (m_renderdoc_capture_action.get()) {
@@ -5314,7 +5298,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	void init() override
 	{
 		PROFILE_FUNCTION();
-		m_fbx_importer.init();
+		m_fbx_importer->init();
 
 		IAllocator& allocator = m_app.getAllocator();
 
@@ -5567,6 +5551,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	~StudioAppPlugin()
 	{
+		destroyFBXImporter(*m_fbx_importer);
+
 		AssetBrowser& asset_browser = m_app.getAssetBrowser();
 		asset_browser.removePlugin(m_model_plugin);
 		asset_browser.removePlugin(m_material_plugin);
@@ -5599,7 +5585,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	}
 
 	StudioApp& m_app;
-	FBXImporter m_fbx_importer; // only for preloading impostor shadow shader // TODO do this in a better way
+	ModelImporter* m_fbx_importer = nullptr; // only for preloading impostor shadow shader // TODO do this in a better way
 	Local<Action> m_renderdoc_capture_action;
 	UniquePtr<ParticleEditor> m_particle_editor;
 	EditorUIRenderPlugin m_editor_ui_render_plugin;

@@ -25,12 +25,24 @@ struct ImpostorTexturesContext {
 
 enum class AttributeSemantic : u8;
 
-// Base class for all model importers
-// To implement new importer:
-// * inherit from this class
-// * see comments next to members, which must be filled by importer (e.g. m_bones)
-// TODO finish this comment
+// Base class for model importers
+// To add a new importer, derive from this class and implement all pure virtual functions
 struct ModelImporter {
+	enum class ReadFlags : u32 {
+		NONE = 0,
+		FORCE_SKINNED = 1 << 0,
+		IGNORE_GEOMETRY = 1 << 1,
+	};
+
+	enum class WriteFlags {
+		SPLIT = 1 << 0,
+		IGNORE_ANIMATIONS = 1 << 1,
+		PREFAB_WITH_PHYSICS = 1 << 2,
+
+		NONE = 0
+	};
+
+	// TODO can we use ModelMeta instead of (most of) this?
 	struct ImportConfig {
 		struct Clip {
 			StaticString<64> name;
@@ -43,7 +55,7 @@ struct ModelImporter {
 			CENTER, // center all meshes as a group
 			BOTTOM, // same as center, but don't change Y coordinate
 			
-			CENTER_EACH_MESH // center each mesh in fbx separately, when exporting each mesh as a subresources
+			CENTER_EACH_MESH // center each mesh in file separately, when exporting each mesh as a subresources
 		};
 
 		enum class Physics : i32 {
@@ -153,16 +165,18 @@ struct ModelImporter {
 		Matrix bind_pose_matrix;
 	};
 
+	void init(); // TODO get rid of this?
+
+	virtual bool parse(const Path& filename, ReadFlags flags, const ImportConfig* cfg) = 0;
+	
+	// cfg must be the same as in parse
+	// TODO fix this (remove cfg from these functions?)
+	bool write(const Path& src, const ImportConfig& cfg, WriteFlags flags);
+	bool writeMaterials(const Path& src, const ImportConfig& cfg, bool force);
+	void createImpostorTextures(struct Model* model, ImpostorTexturesContext& ctx, bool bake_normals);
+	
 	const Array<ImportMesh>& getMeshes() const { return m_meshes; }
 	const Array<ImportAnimation>& getAnimations() const { return m_animations; }
-
-	bool writeModel(const Path& src, const ImportConfig& cfg);
-	bool writeAnimations(const Path& src, const ImportConfig& cfg);
-	bool writeMaterials(const Path& src, const ImportConfig& cfg, bool force) const;
-	bool writePhysics(const Path& src, const ImportConfig& cfg, bool split_meshes);
-	void createImpostorTextures(struct Model* model, ImpostorTexturesContext& ctx, bool bake_normals);
-	virtual void postprocess(const ImportConfig& cfg, const Path& path) = 0;
-	u32 getBoneCount() const { return (u32)m_bones.size(); }
 
 protected:
 	ModelImporter(struct StudioApp& app);
@@ -177,16 +191,18 @@ protected:
 	Array<ImportMaterial> m_materials;
 	Array<ImportMesh> m_meshes;
 	Array<ImportAnimation> m_animations;
+	Array<DVec3> m_lights;
 	float m_scene_scale = 1.f;
 
 	template <typename T> void write(const T& obj) { m_out_file.write(&obj, sizeof(obj)); }
 	void write(const void* ptr, size_t size) { m_out_file.write(ptr, size); }
 	void writeString(const char* str);
 	
+	// this is called when writing animations, importer must fill tracks array with keyframes
 	virtual void fillTracks(const ImportAnimation& anim
 		, Array<Array<Key>>& tracks
-		, u32 from_sample
-		, u32 num_samples
+		, u32 from_frame
+		, u32 num_frames
 	) const = 0;
 
 	// TODO cleanup
@@ -198,10 +214,16 @@ protected:
 	void writeGeometry(const ImportConfig& cfg);
 	void writeGeometry(int mesh_idx, const ImportConfig& cfg);
 	void writeSkeleton(const ImportConfig& cfg);
+	bool writePrefab(const Path& src, const ImportConfig& cfg, bool split_meshes);
 	bool findTexture(StringView src_dir, StringView ext, ImportTexture& tex) const;
 	void bakeVertexAO(const ImportConfig& cfg);
+	bool writeSubmodels(const Path& src, const ImportConfig& cfg);
+	bool writeModel(const Path& src, const ImportConfig& cfg);
+	bool writeAnimations(const Path& src, const ImportConfig& cfg);
+	bool writePhysics(const Path& src, const ImportConfig& cfg, bool split_meshes);
 	
 	// compute AO, auto LODs, etc.
+	// call this from parse when appropriate
 	void postprocessCommon(const ImportConfig& cfg);
 };
 
