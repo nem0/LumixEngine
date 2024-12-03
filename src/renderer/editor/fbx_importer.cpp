@@ -34,82 +34,6 @@
 
 namespace Lumix {
 
-static StringView toStringView(ofbx::DataView data) {
-	return StringView(
-		(const char*)data.begin,
-		(const char*)data.end
-	);
-}
-
-static bool isConstCurve(const ofbx::AnimationCurve* curve) {
-	if (!curve) return true;
-	if (curve->getKeyCount() <= 1) return true;
-	const float* values = curve->getKeyValue();
-	if (curve->getKeyCount() == 2 && fabsf(values[1] - values[0]) < 1e-6) return true;
-	return false;
-}
-
-static Vec3 toLumixVec3(const ofbx::DVec3& v) { return {(float)v.x, (float)v.y, (float)v.z}; }
-static Vec3 toLumixVec3(const ofbx::FVec3& v) { return {(float)v.x, (float)v.y, (float)v.z}; }
-
-static Matrix toLumix(const ofbx::DMatrix& mtx) {
-	Matrix res;
-	for (int i = 0; i < 16; ++i) (&res.columns[0].x)[i] = (float)mtx.m[i];
-	return res;
-}
-
-static u32 packColor(const ofbx::Vec4& vec) {
-	const i8 xx = i8(clamp((vec.x * 0.5f + 0.5f) * 255, 0.f, 255.f) - 128);
-	const i8 yy = i8(clamp((vec.y * 0.5f + 0.5f) * 255, 0.f, 255.f) - 128);
-	const i8 zz = i8(clamp((vec.z * 0.5f + 0.5f) * 255, 0.f, 255.f) - 128);
-	const i8 ww = i8(clamp((vec.w * 0.5f + 0.5f) * 255, 0.f, 255.f) - 128);
-
-	union {
-		u32 ui32;
-		i8 arr[4];
-	} un;
-
-	un.arr[0] = xx;
-	un.arr[1] = yy;
-	un.arr[2] = zz;
-	un.arr[3] = ww;
-
-	return un.ui32;
-}
-
-static u32 packF4u(const Vec3& vec) {
-	const i8 xx = i8(clamp((vec.x * 0.5f + 0.5f) * 255, 0.f, 255.f) - 128);
-	const i8 yy = i8(clamp((vec.y * 0.5f + 0.5f) * 255, 0.f, 255.f) - 128);
-	const i8 zz = i8(clamp((vec.z * 0.5f + 0.5f) * 255, 0.f, 255.f) - 128);
-	const i8 ww = i8(0);
-
-	union {
-		u32 ui32;
-		i8 arr[4];
-	} un;
-
-	un.arr[0] = xx;
-	un.arr[1] = yy;
-	un.arr[2] = zz;
-	un.arr[3] = ww;
-
-	return un.ui32;
-}
-
-static Vec3 unpackF4u(u32 packed) {
-	union {
-		u32 ui32;
-		i8 arr[4];
-	} un;
-
-	un.ui32 = packed;
-	Vec3 res;
-	res.x = un.arr[0];
-	res.y = un.arr[1];
-	res.z = un.arr[2];
-	return ((res + Vec3(128.f)) / 255) * 2.f - 0.5f;
-}
-
 struct FBXImporter : ModelImporter {
 	struct Skin {
 		float weights[4];
@@ -145,6 +69,82 @@ struct FBXImporter : ModelImporter {
 		if (m_impostor_shadow_shader) m_impostor_shadow_shader->decRefCount();
 	}
 
+	static StringView toStringView(ofbx::DataView data) {
+		return StringView(
+			(const char*)data.begin,
+			(const char*)data.end
+		);
+	}
+
+	static bool isConstCurve(const ofbx::AnimationCurve* curve) {
+		if (!curve) return true;
+		if (curve->getKeyCount() <= 1) return true;
+		const float* values = curve->getKeyValue();
+		if (curve->getKeyCount() == 2 && fabsf(values[1] - values[0]) < 1e-6) return true;
+		return false;
+	}
+
+	static Vec3 toLumixVec3(const ofbx::DVec3& v) { return {(float)v.x, (float)v.y, (float)v.z}; }
+	static Vec3 toLumixVec3(const ofbx::FVec3& v) { return {(float)v.x, (float)v.y, (float)v.z}; }
+
+	static Matrix toLumix(const ofbx::DMatrix& mtx) {
+		Matrix res;
+		for (int i = 0; i < 16; ++i) (&res.columns[0].x)[i] = (float)mtx.m[i];
+		return res;
+	}
+
+	static u32 packColor(const ofbx::Vec4& vec) {
+		const i8 xx = i8(clamp((vec.x * 0.5f + 0.5f) * 255, 0.f, 255.f) - 128);
+		const i8 yy = i8(clamp((vec.y * 0.5f + 0.5f) * 255, 0.f, 255.f) - 128);
+		const i8 zz = i8(clamp((vec.z * 0.5f + 0.5f) * 255, 0.f, 255.f) - 128);
+		const i8 ww = i8(clamp((vec.w * 0.5f + 0.5f) * 255, 0.f, 255.f) - 128);
+
+		union {
+			u32 ui32;
+			i8 arr[4];
+		} un;
+
+		un.arr[0] = xx;
+		un.arr[1] = yy;
+		un.arr[2] = zz;
+		un.arr[3] = ww;
+
+		return un.ui32;
+	}
+
+	static u32 packF4u(const Vec3& vec) {
+		const i8 xx = i8(clamp((vec.x * 0.5f + 0.5f) * 255, 0.f, 255.f) - 128);
+		const i8 yy = i8(clamp((vec.y * 0.5f + 0.5f) * 255, 0.f, 255.f) - 128);
+		const i8 zz = i8(clamp((vec.z * 0.5f + 0.5f) * 255, 0.f, 255.f) - 128);
+		const i8 ww = i8(0);
+
+		union {
+			u32 ui32;
+			i8 arr[4];
+		} un;
+
+		un.arr[0] = xx;
+		un.arr[1] = yy;
+		un.arr[2] = zz;
+		un.arr[3] = ww;
+
+		return un.ui32;
+	}
+
+	static Vec3 unpackF4u(u32 packed) {
+		union {
+			u32 ui32;
+			i8 arr[4];
+		} un;
+
+		un.ui32 = packed;
+		Vec3 res;
+		res.x = un.arr[0];
+		res.y = un.arr[1];
+		res.z = un.arr[2];
+		return ((res + Vec3(128.f)) / 255) * 2.f - 0.5f;
+	}
+
 	static bool doesFlipHandness(const Matrix& mtx) {
 		Vec3 x(1, 0, 0);
 		Vec3 y(0, 1, 0);
@@ -159,7 +159,7 @@ struct FBXImporter : ModelImporter {
 		return false;
 	}
 
-	static int getVertexSize(const ofbx::Mesh& mesh, bool is_skinned, const ImportConfig& cfg) {
+	static int getVertexSize(const ofbx::Mesh& mesh, bool is_skinned, const ModelMeta& meta) {
 		static const int POSITION_SIZE = sizeof(float) * 3;
 		static const int NORMAL_SIZE = sizeof(u8) * 4;
 		static const int TANGENT_SIZE = sizeof(u8) * 4;
@@ -172,8 +172,8 @@ struct FBXImporter : ModelImporter {
 		const ofbx::GeometryData& geom = mesh.getGeometryData();
 
 		if (geom.getUVs().values) size += UV_SIZE;
-		if (cfg.bake_vertex_ao) size += AO_SIZE;
-		if (geom.getColors().values && cfg.import_vertex_colors) size += cfg.vertex_color_is_ao ? AO_SIZE : COLOR_SIZE;
+		if (meta.bake_vertex_ao) size += AO_SIZE;
+		if (geom.getColors().values && meta.import_vertex_colors) size += meta.vertex_color_is_ao ? AO_SIZE : COLOR_SIZE;
 		if (hasTangents(mesh)) size += TANGENT_SIZE;
 		if (is_skinned) size += BONE_INDICES_WEIGHTS_SIZE;
 
@@ -182,7 +182,7 @@ struct FBXImporter : ModelImporter {
 
 	static bool areIndices16Bit(const ImportMesh& mesh) {
 		int vertex_size = mesh.vertex_size;
-		return mesh.vertex_data.size() / vertex_size < (1 << 16);
+		return mesh.vertex_buffer.size() / vertex_size < (1 << 16);
 	}
 
 	// flat shading
@@ -320,25 +320,24 @@ struct FBXImporter : ModelImporter {
 		}
 	}
 
-
-	static void remap(const OutputMemoryStream& unindexed_triangles, ImportMesh& mesh, u32 vertex_size, const ImportConfig& cfg) {
+	static void remap(const OutputMemoryStream& unindexed_triangles, ImportMesh& mesh) {
 		PROFILE_FUNCTION();
-		const u32 vertex_count = u32(unindexed_triangles.size() / vertex_size);
+		const u32 vertex_count = u32(unindexed_triangles.size() / mesh.vertex_size);
 		mesh.indices.resize(vertex_count);
 
-		u32 unique_vertex_count = (u32)meshopt_generateVertexRemap(mesh.indices.begin(), nullptr, vertex_count, unindexed_triangles.data(), vertex_count, vertex_size);
+		u32 unique_vertex_count = (u32)meshopt_generateVertexRemap(mesh.indices.begin(), nullptr, vertex_count, unindexed_triangles.data(), vertex_count, mesh.vertex_size);
 
-		mesh.vertex_data.resize(unique_vertex_count * vertex_size);
+		mesh.vertex_buffer.resize(unique_vertex_count * mesh.vertex_size);
 
 		for (u32 i = 0; i < vertex_count; ++i) {
-			const u8* src = unindexed_triangles.data() + i * vertex_size;
-			u8* dst = mesh.vertex_data.getMutableData() + mesh.indices[i] * vertex_size;
-			memcpy(dst, src, vertex_size);
+			const u8* src = unindexed_triangles.data() + i * mesh.vertex_size;
+			u8* dst = mesh.vertex_buffer.getMutableData() + mesh.indices[i] * mesh.vertex_size;
+			memcpy(dst, src, mesh.vertex_size);
 		}
 	}
 
 	// convert from ofbx to runtime vertex data, compute missing info (normals, tangents, ao, ...)
-	void postprocess(const ImportConfig& cfg, const Path& path) {
+	void postprocess(const ModelMeta& meta, const Path& path) {
 		AtomicI32 mesh_idx_getter = 0;
 		jobs::runOnWorkers([&](){
 			Array<Skin> skinning(m_allocator);
@@ -352,7 +351,7 @@ struct FBXImporter : ModelImporter {
 				ImportMesh& import_mesh = m_meshes[mesh_idx];
 				import_mesh.index_size = areIndices16Bit(import_mesh) ? 2 : 4;
 				const ofbx::Mesh* mesh = m_fbx_meshes[import_mesh.mesh_index];
-				import_mesh.vertex_size = getVertexSize(*mesh, import_mesh.is_skinned, cfg);
+				import_mesh.vertex_size = getVertexSize(*mesh, import_mesh.is_skinned, meta);
 				const ofbx::GeometryData& geom = mesh->getGeometryData();
 				ofbx::GeometryPartition partition = geom.getPartition(import_mesh.submesh == -1 ? 0 : import_mesh.submesh);
 				if (partition.polygon_count == 0) continue;
@@ -377,15 +376,15 @@ struct FBXImporter : ModelImporter {
 					});
 				}
 
-				if (cfg.bake_vertex_ao) {
+				if (meta.bake_vertex_ao) {
 					import_mesh.attributes.push({
 						.semantic = AttributeSemantic::AO,
 						.type = gpu::AttributeType::U8,
 						.num_components = 4 // 1+3 because of padding
 					});
 				}
-				if (geom.getColors().values && cfg.import_vertex_colors) {
-					if (cfg.vertex_color_is_ao) {
+				if (geom.getColors().values && meta.import_vertex_colors) {
+					if (meta.vertex_color_is_ao) {
 						import_mesh.attributes.push({
 							.semantic = AttributeSemantic::AO,
 							.type = gpu::AttributeType::U8,
@@ -435,7 +434,7 @@ struct FBXImporter : ModelImporter {
 
 				ofbx::Vec3Attributes normals = geom.getNormals();
 				ofbx::Vec3Attributes tangents = geom.getTangents();
-				ofbx::Vec4Attributes colors = cfg.import_vertex_colors ? geom.getColors() : ofbx::Vec4Attributes{};
+				ofbx::Vec4Attributes colors = meta.import_vertex_colors ? geom.getColors() : ofbx::Vec4Attributes{};
 				ofbx::Vec2Attributes uvs = geom.getUVs();
 
 				VertexLayout vertex_layout;
@@ -447,20 +446,20 @@ struct FBXImporter : ModelImporter {
 				vertex_layout.size += sizeof(u32); // normals
 				vertex_layout.uv_offset = vertex_layout.size;
 				if (uvs.values) vertex_layout.size += sizeof(Vec2);
-				if (cfg.bake_vertex_ao) vertex_layout.size += sizeof(u32);
-				if (colors.values && cfg.import_vertex_colors) vertex_layout.size += sizeof(u32);
+				if (meta.bake_vertex_ao) vertex_layout.size += sizeof(u32);
+				if (colors.values && meta.import_vertex_colors) vertex_layout.size += sizeof(u32);
 				vertex_layout.tangent_offset = vertex_layout.size;
 				if (tangents.values || compute_tangents) vertex_layout.size += sizeof(u32);
 				if (import_mesh.is_skinned) vertex_layout.size += sizeof(Vec4) + 4 * sizeof(u16);
 
 				if (import_mesh.is_skinned) fillSkinInfo(skinning, import_mesh, m_fbx_meshes[import_mesh.mesh_index]);
 
-				triangulate(unindexed_triangles, import_mesh, partition, vertex_layout.size, skinning, cfg, transform_matrix, tri_indices_tmp);
+				triangulate(unindexed_triangles, import_mesh, partition, skinning, meta, transform_matrix, tri_indices_tmp);
 
-				if (!normals.values || cfg.force_normal_recompute) computeNormals(unindexed_triangles, vertex_layout);
+				if (!normals.values || meta.force_recompute_normals) computeNormals(unindexed_triangles, vertex_layout);
 
 				if (compute_tangents) {
-					if (cfg.mikktspace_tangents) {
+					if (meta.use_mikktspace) {
 						computeTangents(import_mesh, unindexed_triangles, vertex_layout, path);
 					}
 					else {
@@ -468,19 +467,12 @@ struct FBXImporter : ModelImporter {
 					}
 				}
 
-				remap(unindexed_triangles, import_mesh, vertex_layout.size, cfg);
+				remap(unindexed_triangles, import_mesh);
 			}
 		});
 
-		for (i32 i = 0, c = m_scene->getLightCount(); i < c; ++i) {
-			const ofbx::Light* light = m_scene->getLight(i);
-			const Matrix mtx = toLumix(light->getGlobalTransform());
-			const DVec3 pos = DVec3(mtx.getTranslation() * cfg.mesh_scale * m_scene_scale);
-			m_lights.push(pos);
-		}
-
-		postprocessCommon(cfg);
-	}
+		postprocessCommon(meta);
+}
 
 	void insertHierarchy(const ofbx::Object* node) {
 		if (!node) return;
@@ -493,10 +485,10 @@ struct FBXImporter : ModelImporter {
 	}
 
 
-	static ofbx::DMatrix getBindPoseMatrix(const ImportMesh* mesh, Span<const ofbx::Mesh*> fbx_meshes, const ofbx::Object* node) {
+	ofbx::DMatrix getBindPoseMatrix(const ImportMesh* mesh, const ofbx::Object* node) const {
 		if (!mesh) return node->getGlobalTransform();
 
-		auto* skin = fbx_meshes[mesh->mesh_index]->getSkin();
+		auto* skin = m_fbx_meshes[mesh->mesh_index]->getSkin();
 		if (!skin) return node->getGlobalTransform();
 
 		for (int i = 0, c = skin->getClusterCount(); i < c; ++i) {
@@ -554,18 +546,13 @@ struct FBXImporter : ModelImporter {
 		for (Bone& bone : m_bones) {
 			const ofbx::Object* node = (const ofbx::Object*)bone.id;
 			const ImportMesh* mesh = getAnyMeshFromBone(node, i32(&bone - m_bones.begin()));
-			Matrix tr = toLumix(getBindPoseMatrix(mesh, m_fbx_meshes, node));
+			Matrix tr = toLumix(getBindPoseMatrix(mesh, node));
 			tr.normalizeScale();
 			bone.bind_pose_matrix = fixOrientation(tr);
 			bone.name = node->name;
 		}
 	}
 	
-	IAllocator& m_allocator;
-	Array<const ofbx::Mesh*> m_fbx_meshes;
-	ofbx::IScene* m_scene;
-	Orientation m_orientation = Orientation::Y_UP;
-
 	LUMIX_FORCE_INLINE Quat fixOrientation(const Quat& v) const {
 		switch (m_orientation) {
 			case Orientation::Y_UP: return v;
@@ -612,10 +599,7 @@ struct FBXImporter : ModelImporter {
 		return packF4u(v);
 	}
 
-	void fillSkinInfo(Array<Skin>& skinning
-		, const ImportMesh& import_mesh
-		, const ofbx::Mesh* mesh
-	) const {
+	void fillSkinInfo(Array<Skin>& skinning, const ImportMesh& import_mesh, const ofbx::Mesh* mesh) const {
 		const ofbx::Skin* fbx_skin = mesh->getSkin();
 		const ofbx::GeometryData& geom = mesh->getGeometryData();
 		skinning.resize(geom.getPositions().values_count);
@@ -681,9 +665,8 @@ struct FBXImporter : ModelImporter {
 	void triangulate(OutputMemoryStream& unindexed_triangles
 		, ImportMesh& mesh
 		, const ofbx::GeometryPartition& partition
-		, u32 vertex_size
 		, const Array<Skin>& skinning
-		, const ImportConfig& cfg
+		, const ModelMeta& meta
 		, const Matrix& matrix
 		, Array<i32>& tri_indices) const
 	{
@@ -693,13 +676,13 @@ struct FBXImporter : ModelImporter {
 		ofbx::Vec3Attributes positions = geom.getPositions();
 		ofbx::Vec3Attributes normals = geom.getNormals();
 		ofbx::Vec3Attributes tangents = geom.getTangents();
-		ofbx::Vec4Attributes colors = cfg.import_vertex_colors ? geom.getColors() : ofbx::Vec4Attributes{};
+		ofbx::Vec4Attributes colors = meta.import_vertex_colors ? geom.getColors() : ofbx::Vec4Attributes{};
 		ofbx::Vec2Attributes uvs = geom.getUVs();
 		const bool compute_tangents = !tangents.values && uvs.values;
 
 		tri_indices.resize(partition.max_polygon_triangles * 3);
 		unindexed_triangles.clear();
-		unindexed_triangles.resize(vertex_size * 3 * partition.triangles_count);
+		unindexed_triangles.resize(mesh.vertex_size * 3 * partition.triangles_count);
 		u8* dst = unindexed_triangles.getMutableData();
 		// convert to interleaved vertex data of unindexed triangles
 		//	tri[0].v[0].pos, tri[0].v[0].normal, ... tri[0].v[2].tangent, tri[1].v[0].pos, ...
@@ -713,7 +696,7 @@ struct FBXImporter : ModelImporter {
 			u32 tri_count = ofbx::triangulate(geom, polygon, tri_indices.begin());
 			for (u32 i = 0; i < tri_count; ++i) {
 				ofbx::Vec3 cp = positions.get(tri_indices[i]);
-				Vec3 pos = matrix.transformPoint(toLumixVec3(cp)) * cfg.mesh_scale * m_scene_scale;
+				Vec3 pos = matrix.transformPoint(toLumixVec3(cp)) * meta.scene_scale * m_scene_scale;
 				pos = fixOrientation(pos);
 				write(pos);
 		
@@ -723,10 +706,10 @@ struct FBXImporter : ModelImporter {
 					ofbx::Vec2 uv = uvs.get(tri_indices[i]);
 					write(Vec2(uv.x, 1 - uv.y));
 				}
-				if (cfg.bake_vertex_ao) write(u32(0));
-				if (colors.values && cfg.import_vertex_colors) {
+				if (meta.bake_vertex_ao) write(u32(0));
+				if (colors.values && meta.import_vertex_colors) {
 					ofbx::Vec4 color = colors.get(tri_indices[i]);
-					if (cfg.vertex_color_is_ao) {
+					if (meta.vertex_color_is_ao) {
 						const u8 ao[4] = { u8(color.x * 255.f + 0.5f) };
 						memcpy(dst, ao, sizeof(ao));
 						dst += sizeof(ao);
@@ -1039,6 +1022,16 @@ struct FBXImporter : ModelImporter {
 		return lod;
 	}
 
+	void gatherLights(const ModelMeta& meta) {
+		m_lights.reserve(m_scene->getLightCount());
+		for (i32 i = 0, c = m_scene->getLightCount(); i < c; ++i) {
+			const ofbx::Light* light = m_scene->getLight(i);
+			const Matrix mtx = toLumix(light->getGlobalTransform());
+			const DVec3 pos = DVec3(mtx.getTranslation() * meta.scene_scale * m_scene_scale);
+			m_lights.push(pos);
+		}
+	}
+
 	void gatherMeshes(StringView fbx_filename, StringView src_dir) {
 		PROFILE_FUNCTION();
 		int c = m_scene->getMeshCount();
@@ -1250,21 +1243,11 @@ struct FBXImporter : ModelImporter {
 		});
 	}
 
-	bool parse(const Path& filename, ReadFlags read_flags, const ImportConfig* cfg) override {
+	bool parse(const Path& filename, const ModelMeta* meta) override {
 		PROFILE_FUNCTION();
-		bool ignore_geometry = isFlagSet(read_flags, ReadFlags::IGNORE_GEOMETRY);
-		bool force_skinned = isFlagSet(read_flags, ReadFlags::FORCE_SKINNED);
+		const bool ignore_geometry = meta == nullptr;
 
-		if (m_scene) {
-			PROFILE_BLOCK("clear previous data");
-			m_scene->destroy();
-			m_scene = nullptr;
-			m_meshes.clear();
-			m_materials.clear();
-			m_animations.clear();
-			m_bones.clear();
-		}
-
+		ASSERT(!m_scene);
 		OutputMemoryStream data(m_allocator);
 		{
 			PROFILE_BLOCK("load file");
@@ -1297,12 +1280,13 @@ struct FBXImporter : ModelImporter {
 
 		gatherMeshes(filename, src_dir);
 		gatherAnimations(filename);
+		if (meta) gatherLights(*meta);
 
 		if (!ignore_geometry) {
 			bool any_skinned = false;
 			for (const ImportMesh& m : m_meshes) any_skinned = any_skinned || m.is_skinned;
 			// TODO why do we need this here?
-			gatherBones(force_skinned || any_skinned);
+			gatherBones(meta->force_skin || any_skinned);
 		}
 
 		if (m_bones.empty() && m_meshes.empty() && m_animations.empty()) {
@@ -1310,10 +1294,15 @@ struct FBXImporter : ModelImporter {
 			return false;
 		}
 
-		if (cfg) postprocess(*cfg, filename);
+		if (meta) postprocess(*meta, filename);
 
 		return true;
 	}
+
+	IAllocator& m_allocator;
+	Array<const ofbx::Mesh*> m_fbx_meshes;
+	ofbx::IScene* m_scene;
+	Orientation m_orientation = Orientation::Y_UP;
 };
 
 ModelImporter* createFBXImporter(StudioApp& app, IAllocator& allocator) {

@@ -5,51 +5,63 @@
 #include "core/string.h"
 #include "core/tokenizer.h"
 #include "fbx_importer.h"
-#include "renderer/editor/model_importer.h"
 
 namespace Lumix {
 
 struct ModelMeta {
-	static const char* toString(ModelImporter::ImportConfig::Physics value) {
+	struct Clip {
+		StaticString<64> name;
+		u32 from_frame;
+		u32 to_frame;
+	};
+
+	enum class Physics : i32 {
+		NONE,
+		CONVEX,
+		TRIMESH
+	};
+
+	enum class Origin : i32 {
+		SOURCE, // keep vertex data as is
+		CENTER, // center all meshes as a group
+		BOTTOM, // same as center, but don't change Y coordinate
+	};
+
+	static const char* toString(Physics value) {
 		switch (value) {
-			case ModelImporter::ImportConfig::Physics::TRIMESH: return "trimesh";
-			case ModelImporter::ImportConfig::Physics::CONVEX: return "convex";
-			case ModelImporter::ImportConfig::Physics::NONE: return "none";
+			case Physics::TRIMESH: return "trimesh";
+			case Physics::CONVEX: return "convex";
+			case Physics::NONE: return "none";
 		}
 		ASSERT(false);
 		return "none";
 	}
 
-	static const char* toString(ModelImporter::ImportConfig::Origin value) {
+	static const char* toString(Origin value) {
 		switch (value) {
-			case ModelImporter::ImportConfig::Origin::SOURCE: return "source";
-			case ModelImporter::ImportConfig::Origin::BOTTOM: return "bottom";
-			case ModelImporter::ImportConfig::Origin::CENTER: return "center";
-			case ModelImporter::ImportConfig::Origin::CENTER_EACH_MESH: return "center_each_mesh";
+			case Origin::SOURCE: return "source";
+			case Origin::BOTTOM: return "bottom";
+			case Origin::CENTER: return "center";
 		}
 		ASSERT(false);
 		return "none";
 	}
 
-	static const char* toUIString(ModelImporter::ImportConfig::Physics value) {
+	static const char* toUIString(Physics value) {
 		switch (value) {
-			case ModelImporter::ImportConfig::Physics::TRIMESH: return "Triangle mesh";
-			case ModelImporter::ImportConfig::Physics::CONVEX: return "Convex";
-			case ModelImporter::ImportConfig::Physics::NONE: return "None";
+			case Physics::TRIMESH: return "Triangle mesh";
+			case Physics::CONVEX: return "Convex";
+			case Physics::NONE: return "None";
 		}
 		ASSERT(false);
 		return "none";
 	}
 
-	static const char* toUIString(ModelImporter::ImportConfig::Origin value) {
+	static const char* toUIString(Origin value) {
 		switch (value) {
-			case ModelImporter::ImportConfig::Origin::SOURCE: return "Keep";
-			case ModelImporter::ImportConfig::Origin::BOTTOM: return "Bottom";
-			case ModelImporter::ImportConfig::Origin::CENTER: return "Center";
-		
-			case ModelImporter::ImportConfig::Origin::CENTER_EACH_MESH:
-				ASSERT(false); // this should not be exposed in UI / meta files so there should be no reason to convert to string
-				return "Center each mesh";
+			case Origin::SOURCE: return "Keep";
+			case Origin::BOTTOM: return "Bottom";
+			case Origin::CENTER: return "Center";
 		}
 		ASSERT(false);
 		return "none";
@@ -58,8 +70,8 @@ struct ModelMeta {
 	ModelMeta(IAllocator& allocator) : clips(allocator), root_motion_bone(allocator) {}
 
 	void serialize(OutputMemoryStream& blob, const Path& path) {
-		if (physics != ModelImporter::ImportConfig::Physics::NONE) blob << "\nphysics = \"" << toString(physics) << "\"";
-		if (origin != ModelImporter::ImportConfig::Origin::SOURCE) blob << "\norigin = \"" << toString(origin) << "\"";
+		if (physics != Physics::NONE) blob << "\nphysics = \"" << toString(physics) << "\"";
+		if (origin != Origin::SOURCE) blob << "\norigin = \"" << toString(origin) << "\"";
 		blob << "\nlod_count = " << lod_count;
 
 		#define WRITE_BOOL(id, default_value) \
@@ -86,7 +98,7 @@ struct ModelMeta {
 		WRITE_VALUE(min_bake_vertex_ao, 0.f);
 		WRITE_VALUE(anim_translation_error, 1.f);
 		WRITE_VALUE(anim_rotation_error, 1.f);
-		WRITE_VALUE(scale, 1.f);
+		if (scene_scale != 1.f) blob << "\nscale = " << scene_scale;
 		WRITE_VALUE(culling_scale, 1.f);
 		WRITE_VALUE(root_motion_flags, Animation::Flags::NONE);
 
@@ -107,7 +119,7 @@ struct ModelMeta {
 
 		if (!clips.empty()) {
 			blob << "\nclips = [";
-			for (const ModelImporter::ImportConfig::Clip& clip : clips) {
+			for (const Clip& clip : clips) {
 				blob << "\n\n{";
 				blob << "\n\n\nname = \"" << clip.name << "\",";
 				blob << "\n\n\nfrom_frame = " << clip.from_frame << ",";
@@ -142,7 +154,7 @@ struct ModelMeta {
 			{ "force_skin", &force_skin },
 			{ "anim_rotation_error", &anim_rotation_error },
 			{ "anim_translation_error", &anim_translation_error },
-			{ "scale", &scale },
+			{ "scale", &scene_scale },
 			{ "culling_scale", &culling_scale },
 			{ "split", &split },
 			{ "bake_impostor_normals", &bake_impostor_normals },
@@ -184,13 +196,13 @@ struct ModelMeta {
 			StringView dir = Path::getDir(ResourcePath::getResource(path));
 			skeleton = Path(dir, "/", tmp_skeleton_rel);
 		}
-		if (equalIStrings(tmp_physics, "trimesh")) physics = ModelImporter::ImportConfig::Physics::TRIMESH;
-		else if (equalIStrings(tmp_physics, "convex")) physics = ModelImporter::ImportConfig::Physics::CONVEX;
-		else physics = ModelImporter::ImportConfig::Physics::NONE;
+		if (equalIStrings(tmp_physics, "trimesh")) physics = Physics::TRIMESH;
+		else if (equalIStrings(tmp_physics, "convex")) physics = Physics::CONVEX;
+		else physics = Physics::NONE;
 
-		if (equalIStrings(tmp_origin, "center")) origin = ModelImporter::ImportConfig::Origin::CENTER;
-		else if (equalIStrings(tmp_origin, "bottom")) origin = ModelImporter::ImportConfig::Origin::BOTTOM;
-		else origin = ModelImporter::ImportConfig::Origin::SOURCE;
+		if (equalIStrings(tmp_origin, "center")) origin = Origin::CENTER;
+		else if (equalIStrings(tmp_origin, "bottom")) origin = Origin::BOTTOM;
+		else origin = Origin::SOURCE;
 
 		clips.clear();	
 		if (!tmp_clips.empty()) {
@@ -208,7 +220,7 @@ struct ModelMeta {
 					return;
 				}
 
-				ModelImporter::ImportConfig::Clip& clip = clips.emplace();
+				Clip& clip = clips.emplace();
 				for (;;) {
 					token = t.nextToken();
 					if (!token) return;
@@ -260,34 +272,36 @@ struct ModelMeta {
 		}
 	}
 
-	float scale = 1.f;
-	float culling_scale = 1.f;
-	bool split = false;
-	bool create_impostor = false;
-	bool bake_impostor_normals = false;
-	bool bake_vertex_ao = false;
-	bool use_mikktspace = false;
+	Path skeleton;
 	bool force_recompute_normals = false;
-	bool force_skin = false;
+	bool use_mikktspace = false;
 	bool import_vertex_colors = false;
+	bool bake_vertex_ao = false;
 	bool use_specular_as_roughness = true;
 	bool use_specular_as_metallic = false;
 	bool vertex_color_is_ao = false;
-	bool ignore_animations = false;
-	bool create_prefab_with_physics = false;
-	u8 autolod_mask = 0;
+	bool create_impostor = false;
 	u32 lod_count = 1;
 	float min_bake_vertex_ao = 0.f;
-	float anim_rotation_error = 1.f;
 	float anim_translation_error = 1.f;
-	float autolod_coefs[4] = { 0.75f, 0.5f, 0.25f, 0.125f };
+	float anim_rotation_error = 1.f;
+	float culling_scale = 1.f;
+	float scene_scale = 1.f;
+	Origin origin = Origin::SOURCE;
+	Physics physics = Physics::NONE;
 	float lods_distances[4] = { 10'000, 0, 0, 0 };
+	float autolod_coefs[4] = { 0.75f, 0.5f, 0.25f, 0.125f };
+	u8 autolod_mask = 0;
 	Animation::Flags root_motion_flags = Animation::Flags::NONE;
-	ModelImporter::ImportConfig::Origin origin = ModelImporter::ImportConfig::Origin::SOURCE;
-	ModelImporter::ImportConfig::Physics physics = ModelImporter::ImportConfig::Physics::NONE;
-	Array<ModelImporter::ImportConfig::Clip> clips;
+	
+	Array<Clip> clips;
 	String root_motion_bone;
-	Path skeleton;
+
+	bool bake_impostor_normals = false;
+	bool split = false;
+	bool force_skin = false;
+	bool ignore_animations = false;
+	bool create_prefab_with_physics = false;
 };
 
 }

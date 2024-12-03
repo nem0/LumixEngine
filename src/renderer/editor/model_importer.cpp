@@ -175,13 +175,13 @@ static i32 getParentIndex(Span<const ModelImporter::Bone> bones, const ModelImpo
 	return -1;
 }
 
-static bool hasAutoLOD(const ModelImporter::ImportConfig& cfg, u32 idx) {
-	return cfg.autolod_mask & (1 << idx);
+static bool hasAutoLOD(const ModelMeta& meta, u32 idx) {
+	return meta.autolod_mask & (1 << idx);
 }
 
 static bool areIndices16Bit(const ModelImporter::ImportMesh& mesh) {
 	int vertex_size = mesh.vertex_size;
-	return mesh.vertex_data.size() / vertex_size < (1 << 16);
+	return mesh.vertex_buffer.size() / vertex_size < (1 << 16);
 }
 
 static Vec3 impostorToWorld(Vec2 uv) {
@@ -227,8 +227,8 @@ static void computeBoundingShapes(ModelImporter::ImportMesh& mesh) {
 	PROFILE_FUNCTION();
 	AABB aabb(Vec3(FLT_MAX), Vec3(-FLT_MAX));
 	float max_squared_dist = 0;
-	const u32 vertex_count = u32(mesh.vertex_data.size() / mesh.vertex_size);
-	const u8* positions = mesh.vertex_data.data();
+	const u32 vertex_count = u32(mesh.vertex_buffer.size() / mesh.vertex_size);
+	const u8* positions = mesh.vertex_buffer.data();
 	for (u32 i = 0; i < vertex_count; ++i) {
 		Vec3 p;
 		memcpy(&p, positions, sizeof(p));
@@ -242,11 +242,11 @@ static void computeBoundingShapes(ModelImporter::ImportMesh& mesh) {
 	mesh.origin_radius_squared = max_squared_dist;
 }
 
-static AABB computeMeshAABB(const ModelImporter::ImportMesh& mesh, const ModelImporter::ImportConfig& cfg) {
-	const u32 vertex_count = u32(mesh.vertex_data.size() / mesh.vertex_size);
+static AABB computeMeshAABB(const ModelImporter::ImportMesh& mesh) {
+	const u32 vertex_count = u32(mesh.vertex_buffer.size() / mesh.vertex_size);
 	if (vertex_count <= 0) return { Vec3(0), Vec3(0) };
 
-	const u8* ptr = mesh.vertex_data.data();
+	const u8* ptr = mesh.vertex_buffer.data();
 	
 	Vec3 min(FLT_MAX);
 	Vec3 max(-FLT_MAX);
@@ -262,11 +262,11 @@ static AABB computeMeshAABB(const ModelImporter::ImportMesh& mesh, const ModelIm
 	return { min, max };
 }
 
-static void offsetMesh(ModelImporter::ImportMesh& mesh, const ModelImporter::ImportConfig& cfg, const Vec3& offset) {
-	const u32 vertex_count = u32(mesh.vertex_data.size() / mesh.vertex_size);
+static void offsetMesh(ModelImporter::ImportMesh& mesh, const Vec3& offset) {
+	const u32 vertex_count = u32(mesh.vertex_buffer.size() / mesh.vertex_size);
 	if (vertex_count <= 0) return;
 
-	u8* ptr = mesh.vertex_data.getMutableData();
+	u8* ptr = mesh.vertex_buffer.getMutableData();
 	mesh.origin = offset;
 	
 	for (u32 i = 0; i < vertex_count; ++i) {
@@ -275,6 +275,8 @@ static void offsetMesh(ModelImporter::ImportMesh& mesh, const ModelImporter::Imp
 		v -= offset;
 		memcpy(ptr + mesh.vertex_size * i, &v, sizeof(v));
 	}
+
+	computeBoundingShapes(mesh);
 }
 
 ModelImporter::ModelImporter(struct StudioApp& app)
@@ -290,17 +292,18 @@ ModelImporter::ModelImporter(struct StudioApp& app)
 
 void ModelImporter::writeString(const char* str) { m_out_file.write(str, stringLength(str)); }
 
-void ModelImporter::postprocessCommon(const ImportConfig& cfg) {
+void ModelImporter::centerMeshes() {
 	jobs::forEach(m_meshes.size(), 1, [&](i32 mesh_idx, i32){
-		ImportMesh& import_mesh = m_meshes[mesh_idx];
+		ImportMesh& mesh = m_meshes[mesh_idx];
+		const AABB aabb = computeMeshAABB(mesh);
+		const Vec3 offset = (aabb.max + aabb.min) * 0.5f;
+		offsetMesh(mesh, offset);
+	});
+}	
 
-		if (cfg.origin == ImportConfig::Origin::CENTER_EACH_MESH) {
-			const AABB aabb = computeMeshAABB(import_mesh, cfg);
-			Vec3 offset = (aabb.max + aabb.min) * 0.5f;
-			offsetMesh(import_mesh, cfg, offset);
-		}
-
-		computeBoundingShapes(import_mesh);
+void ModelImporter::postprocessCommon(const ModelMeta& meta) {
+	jobs::forEach(m_meshes.size(), 1, [&](i32 mesh_idx, i32){
+		computeBoundingShapes(m_meshes[mesh_idx]);
 	});
 	
 	AABB merged_aabb(Vec3(FLT_MAX), Vec3(-FLT_MAX));
@@ -309,57 +312,55 @@ void ModelImporter::postprocessCommon(const ImportConfig& cfg) {
 	}
 
 	jobs::forEach(m_meshes.size(), 1, [&](i32 mesh_idx, i32){
-		ImportMesh& import_mesh = m_meshes[mesh_idx];
-		const i32 vertex_size = import_mesh.vertex_size;
+		ImportMesh& mesh = m_meshes[mesh_idx];
 
-		if (cfg.origin != ImportConfig::Origin::SOURCE && cfg.origin != ImportConfig::Origin::CENTER_EACH_MESH) {
-			const bool bottom = cfg.origin == ModelImporter::ImportConfig::Origin::BOTTOM;
+		if (meta.origin != ModelMeta::Origin::SOURCE) {
 			Vec3 offset = (merged_aabb.max + merged_aabb.min) * 0.5f;
-			if (bottom) offset.y = merged_aabb.min.y;
-			offsetMesh(import_mesh, cfg, offset);
-			computeBoundingShapes(import_mesh);
+			if (meta.origin == ModelMeta::Origin::BOTTOM) offset.y = merged_aabb.min.y;
+			offsetMesh(mesh, offset);
 		}
 
-		for (u32 i = 0; i < cfg.lod_count; ++i) {
-			if ((cfg.autolod_mask & (1 << i)) == 0) continue;
-			if (import_mesh.lod != 0) continue;
+		for (u32 i = 0; i < meta.lod_count; ++i) {
+			if ((meta.autolod_mask & (1 << i)) == 0) continue;
+			if (mesh.lod != 0) continue;
 			
-			import_mesh.autolod_indices[i].create(m_allocator);
-			import_mesh.autolod_indices[i]->resize(import_mesh.indices.size());
-			const size_t lod_index_count = meshopt_simplifySloppy(import_mesh.autolod_indices[i]->begin()
-				, import_mesh.indices.begin()
-				, import_mesh.indices.size()
-				, (const float*)import_mesh.vertex_data.data()
-				, u32(import_mesh.vertex_data.size() / vertex_size)
-				, vertex_size
-				, size_t(import_mesh.indices.size() * cfg.autolod_coefs[i])
+			mesh.autolod_indices[i].create(m_allocator);
+			mesh.autolod_indices[i]->resize(mesh.indices.size());
+			const size_t lod_index_count = meshopt_simplifySloppy(mesh.autolod_indices[i]->begin()
+				, mesh.indices.begin()
+				, mesh.indices.size()
+				, (const float*)mesh.vertex_buffer.data()
+				, u32(mesh.vertex_buffer.size() / mesh.vertex_size)
+				, mesh.vertex_size
+				, size_t(mesh.indices.size() * meta.autolod_coefs[i])
 				);
-			import_mesh.autolod_indices[i]->resize((u32)lod_index_count);
+			mesh.autolod_indices[i]->resize((u32)lod_index_count);
 		}
 	});
 
 	// TODO check this
-	if (cfg.bake_vertex_ao) bakeVertexAO(cfg);
+	if (meta.bake_vertex_ao) bakeVertexAO(meta.min_bake_vertex_ao);
 
 	u32 mesh_data_size = 0;
 	for (const ImportMesh& m : m_meshes) {
-		mesh_data_size += u32(m.vertex_data.size() + m.indices.byte_size());
+		mesh_data_size += u32(m.vertex_buffer.size() + m.indices.byte_size());
 	}
 	m_out_file.reserve(128 * 1024 + mesh_data_size);
 }
 
-bool ModelImporter::writeSubmodels(const Path& src, const ImportConfig& cfg) {
+bool ModelImporter::writeSubmodels(const Path& src, const ModelMeta& meta) {
 	PROFILE_FUNCTION();
 	bool result = true;
 
 	for (int i = 0; i < m_meshes.size(); ++i) {
 		m_out_file.clear();
 		writeModelHeader();
-		write(cfg.root_motion_bone);
-		writeMeshes(src, i, cfg);
-		writeGeometry(i, cfg);
+		const BoneNameHash root_motion_bone(meta.root_motion_bone.c_str());
+		write(root_motion_bone);
+		writeMeshes(src, i, meta);
+		writeGeometry(i);
 		if (m_meshes[i].is_skinned) {
-			writeSkeleton(cfg);
+			writeSkeleton(meta);
 		}
 		else {
 			write((i32)0);
@@ -578,33 +579,26 @@ void ModelImporter::createImpostorTextures(Model* model, ImpostorTexturesContext
 	}
 }
 
-bool ModelImporter::write(const Path& src, const ImportConfig& cfg, WriteFlags flags) {
+bool ModelImporter::write(const Path& src, const ModelMeta& meta) {
 	bool any_written = false;
-	const bool split = isFlagSet(flags, WriteFlags::SPLIT);
 	const Path filepath = Path(ResourcePath::getResource(src));
-	if (split) {
-		ImportConfig split_cfg = cfg;
-		split_cfg.origin = ModelImporter::ImportConfig::Origin::CENTER_EACH_MESH;
-		any_written = writeSubmodels(filepath, split_cfg) || any_written;
-		any_written = writePhysics(filepath, split_cfg, true) || any_written;
+	any_written = writeModel(src, meta) || any_written;
+	any_written = writeMaterials(filepath, meta, false) || any_written;
+	if (!meta.ignore_animations) any_written = writeAnimations(filepath, meta) || any_written;
+	if (meta.split) {
+		centerMeshes();
+		any_written = writeSubmodels(filepath, meta) || any_written;
 	}
-	any_written = writeModel(src, cfg) || any_written;
-	any_written = writeMaterials(filepath, cfg, false) || any_written;
-	if (!isFlagSet(flags, WriteFlags::IGNORE_ANIMATIONS)) {
-		any_written = writeAnimations(filepath, cfg) || any_written;
-	}
-	if (!split) {
-		any_written = writePhysics(filepath, cfg, false) || any_written;
-	}
-	if (split || isFlagSet(flags, WriteFlags::PREFAB_WITH_PHYSICS)) {
+	any_written = writePhysics(filepath, meta, meta.split) || any_written;
+	if (meta.split || meta.create_prefab_with_physics) {
 		jobs::moveJobToWorker(0);
-		any_written = writePrefab(filepath, cfg, split) || any_written;
+		any_written = writePrefab(filepath, meta, meta.split) || any_written;
 		jobs::yield();
 	}
 	return any_written;
 }
 
-bool ModelImporter::writeMaterials(const Path& src, const ImportConfig& cfg, bool force) {
+bool ModelImporter::writeMaterials(const Path& src, const ModelMeta& meta, bool force) {
 	PROFILE_FUNCTION()
 
 	FileSystem& filesystem = m_app.getEngine().getFileSystem();
@@ -649,13 +643,13 @@ bool ModelImporter::writeMaterials(const Path& src, const ImportConfig& cfg, boo
 
 		writeTexture(material.textures[0], 0);
 		writeTexture(material.textures[1], 1);
-		if (cfg.use_specular_as_roughness) {
+		if (meta.use_specular_as_roughness) {
 			writeTexture(material.textures[2], 2);
 		}
 		else {
 			blob << "texture \"\"\n";
 		}
-		if (cfg.use_specular_as_metallic) {
+		if (meta.use_specular_as_metallic) {
 			writeTexture(material.textures[2], 3);
 		}
 		else {
@@ -726,7 +720,7 @@ void ModelImporter::writeImpostorVertices(float center_y, Vec2 bounding_cylinder
 	}
 }
 
-void ModelImporter::writeGeometry(int mesh_idx, const ImportConfig& cfg) {
+void ModelImporter::writeGeometry(int mesh_idx) {
 	PROFILE_FUNCTION();
 	// TODO lods
 	OutputMemoryStream vertices_blob(m_allocator);
@@ -749,9 +743,9 @@ void ModelImporter::writeGeometry(int mesh_idx, const ImportConfig& cfg) {
 	
 	const Vec3 center = (import_mesh.aabb.max + import_mesh.aabb.min) * 0.5f;
 	float max_center_dist_squared = 0;
-	const u8* positions = import_mesh.vertex_data.data();
+	const u8* positions = import_mesh.vertex_buffer.data();
 	const i32 vertex_size = import_mesh.vertex_size;
-	const u32 vertex_count = u32(import_mesh.vertex_data.size() / vertex_size);
+	const u32 vertex_count = u32(import_mesh.vertex_buffer.size() / vertex_size);
 	for (u32 i = 0; i < vertex_count; ++i) {
 		Vec3 p;
 		memcpy(&p, positions, sizeof(p));
@@ -760,15 +754,15 @@ void ModelImporter::writeGeometry(int mesh_idx, const ImportConfig& cfg) {
 		max_center_dist_squared = maximum(d, max_center_dist_squared);
 	}
 
-	write((i32)import_mesh.vertex_data.size());
-	write(import_mesh.vertex_data.data(), import_mesh.vertex_data.size());
+	write((i32)import_mesh.vertex_buffer.size());
+	write(import_mesh.vertex_buffer.data(), import_mesh.vertex_buffer.size());
 
 	write(sqrtf(import_mesh.origin_radius_squared));
 	write(sqrtf(max_center_dist_squared));
 	write(import_mesh.aabb);
 }
 
-bool ModelImporter::writePrefab(const Path& src, const ImportConfig& cfg, bool split_meshes) {
+bool ModelImporter::writePrefab(const Path& src, const ModelMeta& meta, bool split_meshes) {
 	Engine& engine = m_app.getEngine();
 	World& world = engine.createWorld();
 
@@ -784,7 +778,7 @@ bool ModelImporter::writePrefab(const Path& src, const ImportConfig& cfg, bool s
 	OutputMemoryStream blob(m_allocator);
 	static const ComponentType RIGID_ACTOR_TYPE = reflection::getComponentType("rigid_actor");
 	static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
-	const bool with_physics = cfg.physics != ImportConfig::Physics::NONE;
+	const bool with_physics = meta.physics != ModelMeta::Physics::NONE;
 	RenderModule* rmodule = (RenderModule*)world.getModule(MODEL_INSTANCE_TYPE);
 	PhysicsModule* pmodule = (PhysicsModule*)world.getModule(RIGID_ACTOR_TYPE);
 	
@@ -831,7 +825,7 @@ bool ModelImporter::writePrefab(const Path& src, const ImportConfig& cfg, bool s
 	return true;
 }
 
-void ModelImporter::writeGeometry(const ImportConfig& cfg) {
+void ModelImporter::writeGeometry(const ModelMeta& meta) {
 	PROFILE_FUNCTION();
 	AABB aabb = {{0, 0, 0}, {0, 0, 0}};
 	float origin_radius_squared = 0;
@@ -851,9 +845,9 @@ void ModelImporter::writeGeometry(const ImportConfig& cfg) {
 	for (const ImportMesh& import_mesh : m_meshes) {
 		if (import_mesh.lod != 0) continue;
 
-		const u8* positions = import_mesh.vertex_data.data();
+		const u8* positions = import_mesh.vertex_buffer.data();
 		const i32 vertex_size = import_mesh.vertex_size;
-		const u32 vertex_count = u32(import_mesh.vertex_data.size() / vertex_size);
+		const u32 vertex_count = u32(import_mesh.vertex_buffer.size() / vertex_size);
 		for (u32 i = 0; i < vertex_count; ++i) {
 			Vec3 p;
 			memcpy(&p, positions, sizeof(p));
@@ -869,12 +863,12 @@ void ModelImporter::writeGeometry(const ImportConfig& cfg) {
 	}
 	bounding_cylinder.x = sqrtf(bounding_cylinder.x);
 
-	for (u32 lod = 0; lod < cfg.lod_count - (cfg.create_impostor ? 1 : 0); ++lod) {
+	for (u32 lod = 0; lod < meta.lod_count - (meta.create_impostor ? 1 : 0); ++lod) {
 		for (const ImportMesh& import_mesh : m_meshes) {
 
 			const bool are_indices_16_bit = areIndices16Bit(import_mesh);
 			
-			if (import_mesh.lod == lod && !hasAutoLOD(cfg, lod)) { 
+			if (import_mesh.lod == lod && !hasAutoLOD(meta, lod)) { 
 				if (are_indices_16_bit) {
 					const i32 index_size = sizeof(u16);
 					write(index_size);
@@ -893,7 +887,7 @@ void ModelImporter::writeGeometry(const ImportConfig& cfg) {
 					write(&import_mesh.indices[0], sizeof(import_mesh.indices[0]) * import_mesh.indices.size());
 				}
 			}
-			else if (import_mesh.lod == 0 && hasAutoLOD(cfg, lod)) {
+			else if (import_mesh.lod == 0 && hasAutoLOD(meta, lod)) {
 				const auto& lod_indices = *import_mesh.autolod_indices[lod].get();
 				if (are_indices_16_bit) {
 					const i32 index_size = sizeof(u16);
@@ -916,7 +910,7 @@ void ModelImporter::writeGeometry(const ImportConfig& cfg) {
 		}
 	}
 
-	if (cfg.create_impostor) {
+	if (meta.create_impostor) {
 		const int index_size = sizeof(u16);
 		write(index_size);
 		const u16 indices[] = {0, 1, 2, 0, 2, 3};
@@ -925,30 +919,30 @@ void ModelImporter::writeGeometry(const ImportConfig& cfg) {
 		write(indices, sizeof(indices));
 	}
 
-	for (u32 lod = 0; lod < cfg.lod_count - (cfg.create_impostor ? 1 : 0); ++lod) {
+	for (u32 lod = 0; lod < meta.lod_count - (meta.create_impostor ? 1 : 0); ++lod) {
 		for (const ImportMesh& import_mesh : m_meshes) {
-			if ((import_mesh.lod == lod && !hasAutoLOD(cfg, lod)) || (import_mesh.lod == 0 && hasAutoLOD(cfg, lod))) {
-				write((i32)import_mesh.vertex_data.size());
-				write(import_mesh.vertex_data.data(), import_mesh.vertex_data.size());
+			if ((import_mesh.lod == lod && !hasAutoLOD(meta, lod)) || (import_mesh.lod == 0 && hasAutoLOD(meta, lod))) {
+				write((i32)import_mesh.vertex_buffer.size());
+				write(import_mesh.vertex_buffer.data(), import_mesh.vertex_buffer.size());
 			}
 		}
 	}
 
-	if (cfg.create_impostor) writeImpostorVertices((aabb.max.y + aabb.min.y) * 0.5f, bounding_cylinder);
+	if (meta.create_impostor) writeImpostorVertices((aabb.max.y + aabb.min.y) * 0.5f, bounding_cylinder);
 
 	if (m_meshes.empty()) {
 		for (const Bone& bone : m_bones) {
 			// TODO check if this works with different values of m_orientation
-			const Vec3 p = bone.bind_pose_matrix.getTranslation() * cfg.mesh_scale * m_scene_scale;
+			const Vec3 p = bone.bind_pose_matrix.getTranslation() * meta.scene_scale * m_scene_scale;
 			origin_radius_squared = maximum(origin_radius_squared, squaredLength(p));
 			aabb.addPoint(p);
 		}
 		center_radius_squared = squaredLength(aabb.max - aabb.min) * 0.5f;
 	}
 
-	write(sqrtf(origin_radius_squared) * cfg.bounding_scale);
-	write(sqrtf(center_radius_squared) * cfg.bounding_scale);
-	write(aabb * cfg.bounding_scale);
+	write(sqrtf(origin_radius_squared) * meta.culling_scale);
+	write(sqrtf(center_radius_squared) * meta.culling_scale);
+	write(aabb * meta.culling_scale);
 }
 
 
@@ -977,7 +971,7 @@ void ModelImporter::writeImpostorMesh(StringView dir, StringView model_name)
 }
 
 
-void ModelImporter::writeMeshes(const Path& src, int mesh_idx, const ImportConfig& cfg) {
+void ModelImporter::writeMeshes(const Path& src, int mesh_idx, const ModelMeta& meta) {
 	PROFILE_FUNCTION();
 	const PathInfo src_info(src);
 	i32 mesh_count = 0;
@@ -986,13 +980,13 @@ void ModelImporter::writeMeshes(const Path& src, int mesh_idx, const ImportConfi
 	}
 	else {
 		for (ImportMesh& mesh : m_meshes) {
-			if (mesh.lod >= cfg.lod_count - (cfg.create_impostor ? 1 : 0)) continue;
-			if (mesh.lod == 0 || !hasAutoLOD(cfg, mesh.lod)) ++mesh_count;
-			for (u32 i = 1; i < cfg.lod_count - (cfg.create_impostor ? 1 : 0); ++i) {
-				if (mesh.lod == 0 && hasAutoLOD(cfg, i)) ++mesh_count;
+			if (mesh.lod >= meta.lod_count - (meta.create_impostor ? 1 : 0)) continue;
+			if (mesh.lod == 0 || !hasAutoLOD(meta, mesh.lod)) ++mesh_count;
+			for (u32 i = 1; i < meta.lod_count - (meta.create_impostor ? 1 : 0); ++i) {
+				if (mesh.lod == 0 && hasAutoLOD(meta, i)) ++mesh_count;
 			}
 		}
-		if (cfg.create_impostor) ++mesh_count;
+		if (meta.create_impostor) ++mesh_count;
 	}
 	write(mesh_count);
 	
@@ -1019,21 +1013,21 @@ void ModelImporter::writeMeshes(const Path& src, int mesh_idx, const ImportConfi
 		writeMesh(m_meshes[mesh_idx]);
 	}
 	else {
-		for (u32 lod = 0; lod < cfg.lod_count - (cfg.create_impostor ? 1 : 0); ++lod) {
+		for (u32 lod = 0; lod < meta.lod_count - (meta.create_impostor ? 1 : 0); ++lod) {
 			for (ImportMesh& import_mesh : m_meshes) {
-				if (import_mesh.lod == lod && !hasAutoLOD(cfg, lod)) writeMesh(import_mesh);
-				else if (import_mesh.lod == 0 && hasAutoLOD(cfg, lod)) writeMesh(import_mesh);
+				if (import_mesh.lod == lod && !hasAutoLOD(meta, lod)) writeMesh(import_mesh);
+				else if (import_mesh.lod == 0 && hasAutoLOD(meta, lod)) writeMesh(import_mesh);
 			}
 		}
 	}
 
-	if (mesh_idx < 0 && cfg.create_impostor) {
+	if (mesh_idx < 0 && meta.create_impostor) {
 		writeImpostorMesh(src_info.dir, src_info.basename);
 	}
 }
 
 
-void ModelImporter::writeSkeleton(const ImportConfig& cfg) {
+void ModelImporter::writeSkeleton(const ModelMeta& meta) {
 	write(m_bones.size());
 
 	u32 idx = 0;
@@ -1049,7 +1043,7 @@ void ModelImporter::writeSkeleton(const ImportConfig& cfg) {
 		const Matrix& tr = node.bind_pose_matrix;
 
 		const Quat q = tr.getRotation();
-		const Vec3 t = tr.getTranslation() * cfg.mesh_scale * m_scene_scale;
+		const Vec3 t = tr.getTranslation() * meta.scene_scale * m_scene_scale;
 		write(t);
 		write(q);
 		++idx;
@@ -1057,46 +1051,45 @@ void ModelImporter::writeSkeleton(const ImportConfig& cfg) {
 }
 
 
-void ModelImporter::writeLODs(const ImportConfig& cfg)
-{
+void ModelImporter::writeLODs(const ModelMeta& meta) {
 	i32 lods[4] = {};
 	for (auto& mesh : m_meshes) {
-		if (mesh.lod >= cfg.lod_count - (cfg.create_impostor ? 1 : 0)) continue;
+		if (mesh.lod >= meta.lod_count - (meta.create_impostor ? 1 : 0)) continue;
 
-		if (mesh.lod == 0 || !hasAutoLOD(cfg, mesh.lod)) {
+		if (mesh.lod == 0 || !hasAutoLOD(meta, mesh.lod)) {
 			++lods[mesh.lod];
 		}
-		for (u32 i = 1; i < cfg.lod_count - (cfg.create_impostor ? 1 : 0); ++i) {
-			if (mesh.lod == 0 && hasAutoLOD(cfg, i)) {
+		for (u32 i = 1; i < meta.lod_count - (meta.create_impostor ? 1 : 0); ++i) {
+			if (mesh.lod == 0 && hasAutoLOD(meta, i)) {
 				++lods[i];
 			}
 		}
 	}
 
-	if (cfg.create_impostor) {
-		lods[cfg.lod_count - 1] = 1;
+	if (meta.create_impostor) {
+		lods[meta.lod_count - 1] = 1;
 	}
 
-	write(cfg.lod_count);
+	write(meta.lod_count);
 
 	u32 to_mesh = 0;
-	for (u32 i = 0; i < cfg.lod_count; ++i) {
+	for (u32 i = 0; i < meta.lod_count; ++i) {
 		to_mesh += lods[i];
 		const i32 tmp = to_mesh - 1;
 		write((const char*)&tmp, sizeof(tmp));
-		float factor = cfg.lods_distances[i] < 0 ? FLT_MAX : cfg.lods_distances[i] * cfg.lods_distances[i];
+		float factor = meta.lods_distances[i] < 0 ? FLT_MAX : meta.lods_distances[i] * meta.lods_distances[i];
 		write((const char*)&factor, sizeof(factor));
 	}
 }
 
-void ModelImporter::bakeVertexAO(const ImportConfig& cfg) {
+void ModelImporter::bakeVertexAO(float min_ao) {
 	PROFILE_FUNCTION();
 
 	AABB aabb(Vec3(FLT_MAX), Vec3(-FLT_MAX));
 	for (ImportMesh& mesh : m_meshes) {
-		const u8* positions = mesh.vertex_data.data();
+		const u8* positions = mesh.vertex_buffer.data();
 		const i32 vertex_size = mesh.vertex_size;
-		const i32 vertex_count = i32(mesh.vertex_data.size() / vertex_size);
+		const i32 vertex_count = i32(mesh.vertex_buffer.size() / vertex_size);
 		for (i32 i = 0; i < vertex_count; ++i) {
 			Vec3 p;
 			memcpy(&p, positions + i * vertex_size, sizeof(p));
@@ -1107,7 +1100,7 @@ void ModelImporter::bakeVertexAO(const ImportConfig& cfg) {
 	Voxels voxels(m_allocator);
 	voxels.beginRaster(aabb, 64);
 	for (ImportMesh& mesh : m_meshes) {
-		const u8* positions = mesh.vertex_data.data();
+		const u8* positions = mesh.vertex_buffer.data();
 		const i32 vertex_size = mesh.vertex_size;
 		const i32 count = mesh.indices.size();
 		const u32* indices = mesh.indices.data();
@@ -1124,16 +1117,16 @@ void ModelImporter::bakeVertexAO(const ImportConfig& cfg) {
 	voxels.blurAO();
 
 	for (ImportMesh& mesh : m_meshes) {
-		const u8* positions = mesh.vertex_data.data();
+		const u8* positions = mesh.vertex_buffer.data();
 		u32 ao_offset = 0;
 		for (const AttributeDesc& desc :  mesh.attributes) {
 			if (desc.semantic == AttributeSemantic::AO) break;
 			ao_offset += desc.num_components * gpu::getSize(desc.type);
 		}
 
-		u8* AOs = mesh.vertex_data.getMutableData() + ao_offset;
+		u8* AOs = mesh.vertex_buffer.getMutableData() + ao_offset;
 		const i32 vertex_size = mesh.vertex_size;
-		const i32 vertex_count = i32(mesh.vertex_data.size() / vertex_size);
+		const i32 vertex_count = i32(mesh.vertex_buffer.size() / vertex_size);
 
 		for (i32 i = 0; i < vertex_count; ++i) {
 			Vec3 p;
@@ -1142,7 +1135,7 @@ void ModelImporter::bakeVertexAO(const ImportConfig& cfg) {
 			bool res = voxels.sampleAO(p, &ao);
 			ASSERT(res);
 			if (res) {
-				const u8 ao8 = u8(clamp((ao + cfg.min_bake_vertex_ao) * 255, 0.f, 255.f) + 0.5f);
+				const u8 ao8 = u8(clamp((ao + min_ao) * 255, 0.f, 255.f) + 0.5f);
 				memcpy(AOs + i * vertex_size, &ao8, sizeof(ao8));
 			}
 		}
@@ -1157,9 +1150,9 @@ void ModelImporter::writeModelHeader()
 	write(header);
 }
 
-bool ModelImporter::writePhysics(const Path& src, const ImportConfig& cfg, bool split_meshes) {
+bool ModelImporter::writePhysics(const Path& src, const ModelMeta& meta, bool split_meshes) {
 	if (m_meshes.empty()) return false;
-	if (cfg.physics == ImportConfig::Physics::NONE) return false;
+	if (meta.physics == ModelMeta::Physics::NONE) return false;
 
 	Array<Vec3> verts(m_allocator);
 	PhysicsSystem* ps = (PhysicsSystem*)m_app.getEngine().getSystemManager().getSystem("physics");
@@ -1171,7 +1164,7 @@ bool ModelImporter::writePhysics(const Path& src, const ImportConfig& cfg, bool 
 	PhysicsGeometry::Header header;
 	header.m_magic = PhysicsGeometry::HEADER_MAGIC;
 	header.m_version = (u32)PhysicsGeometry::Versions::LAST;
-	const bool to_convex = cfg.physics == ImportConfig::Physics::CONVEX;
+	const bool to_convex = meta.physics == ModelMeta::Physics::CONVEX;
 	header.m_convex = (u32)to_convex;
 
 	if (split_meshes) {
@@ -1181,9 +1174,9 @@ bool ModelImporter::writePhysics(const Path& src, const ImportConfig& cfg, bool 
 
 			verts.clear();
 			int vertex_size = mesh.vertex_size;
-			int vertex_count = (i32)(mesh.vertex_data.size() / vertex_size);
+			int vertex_count = (i32)(mesh.vertex_buffer.size() / vertex_size);
 
-			const u8* vd = mesh.vertex_data.data();
+			const u8* vd = mesh.vertex_buffer.data();
 
 			for (int i = 0; i < vertex_count; ++i) {
 				verts.push(*(Vec3*)(vd + i * vertex_size));
@@ -1217,15 +1210,15 @@ bool ModelImporter::writePhysics(const Path& src, const ImportConfig& cfg, bool 
 
 	i32 total_vertex_count = 0;
 	for (const ImportMesh& mesh : m_meshes)	{
-		total_vertex_count += (i32)(mesh.vertex_data.size() / mesh.vertex_size);
+		total_vertex_count += (i32)(mesh.vertex_buffer.size() / mesh.vertex_size);
 	}
 	verts.reserve(total_vertex_count);
 
 	for (const ImportMesh& mesh : m_meshes) {
 		int vertex_size = mesh.vertex_size;
-		int vertex_count = (i32)(mesh.vertex_data.size() / vertex_size);
+		int vertex_count = (i32)(mesh.vertex_buffer.size() / vertex_size);
 
-		const u8* src = mesh.vertex_data.data();
+		const u8* src = mesh.vertex_buffer.data();
 
 		for (int i = 0; i < vertex_count; ++i) {
 			verts.push(*(Vec3*)(src + i * vertex_size));
@@ -1250,7 +1243,7 @@ bool ModelImporter::writePhysics(const Path& src, const ImportConfig& cfg, bool 
 				u32 index = mesh.indices[j] + offset;
 				indices.push(index);
 			}
-			int vertex_count = (i32)(mesh.vertex_data.size() / mesh.vertex_size);
+			int vertex_count = (i32)(mesh.vertex_buffer.size() / mesh.vertex_size);
 			offset += vertex_count;
 		}
 
@@ -1265,23 +1258,24 @@ bool ModelImporter::writePhysics(const Path& src, const ImportConfig& cfg, bool 
 	return compiler.writeCompiledResource(phy_path, Span(m_out_file.data(), (i32)m_out_file.size()));
 }
 
-bool ModelImporter::writeModel(const Path& src, const ImportConfig& cfg) {
+bool ModelImporter::writeModel(const Path& src, const ModelMeta& meta) {
 	PROFILE_FUNCTION();
 	if (m_meshes.empty() && m_animations.empty()) return false;
 
 	m_out_file.clear();
 	writeModelHeader();
-	write(cfg.root_motion_bone);
-	writeMeshes(src, -1, cfg);
-	writeGeometry(cfg);
-	writeSkeleton(cfg);
-	writeLODs(cfg);
+	const BoneNameHash root_motion_bone(meta.root_motion_bone.c_str());
+	write(root_motion_bone);
+	writeMeshes(src, -1, meta);
+	writeGeometry(meta);
+	writeSkeleton(meta);
+	writeLODs(meta);
 
 	AssetCompiler& compiler = m_app.getAssetCompiler();
 	return compiler.writeCompiledResource(Path(src), Span(m_out_file.data(), (i32)m_out_file.size()));
 }
 
-bool ModelImporter::writeAnimations(const Path& src, const ImportConfig& cfg) {
+bool ModelImporter::writeAnimations(const Path& src, const ModelMeta& meta) {
 	PROFILE_FUNCTION();
 	u32 written_count = 0;
 	for (const ImportAnimation& anim : m_animations) { 
@@ -1298,10 +1292,10 @@ bool ModelImporter::writeAnimations(const Path& src, const ImportConfig& cfg) {
 			header.magic = Animation::HEADER_MAGIC;
 			header.version = Animation::Version::LAST;
 			write(header);
-			m_out_file.writeString(cfg.skeleton.c_str());
+			m_out_file.writeString(meta.skeleton.c_str());
 			write(anim.fps);
 			write(samples_count - 1);
-			write(cfg.animation_flags);
+			write(meta.root_motion_flags);
 
 			Array<Array<Key>> all_keys(m_allocator);
 			fillTracks(anim, all_keys, from_sample, samples_count);
@@ -1334,21 +1328,21 @@ bool ModelImporter::writeAnimations(const Path& src, const ImportConfig& cfg) {
 
 					Vec3 min(FLT_MAX), max(-FLT_MAX);
 					for (const Key& k : keys) {
-						const Vec3 p = k.pos * cfg.mesh_scale * m_scene_scale;
+						const Vec3 p = k.pos * meta.scene_scale * m_scene_scale;
 						min = minimum(p, min);
 						max = maximum(p, max);
 					}
 					const u8 bitsizes[] = {
-						(u8)log2(u32((max.x - min.x) / 0.00005f / cfg.anim_translation_error)),
-						(u8)log2(u32((max.y - min.y) / 0.00005f / cfg.anim_translation_error)),
-						(u8)log2(u32((max.z - min.z) / 0.00005f / cfg.anim_translation_error))
+						(u8)log2(u32((max.x - min.x) / 0.00005f / meta.anim_translation_error)),
+						(u8)log2(u32((max.y - min.y) / 0.00005f / meta.anim_translation_error)),
+						(u8)log2(u32((max.z - min.z) / 0.00005f / meta.anim_translation_error))
 					};
 					const u8 bitsize = (bitsizes[0] + bitsizes[1] + bitsizes[2]);
 
 					if (bitsize == 0) {
 						translation_tracks[bone_idx].is_const = true;
 						write(Animation::TrackType::CONSTANT);
-						write(keys[0].pos * cfg.mesh_scale * m_scene_scale);
+						write(keys[0].pos * meta.scene_scale * m_scene_scale);
 					}
 					else {
 						translation_tracks[bone_idx].is_const = false;
@@ -1380,7 +1374,7 @@ bool ModelImporter::writeAnimations(const Path& src, const ImportConfig& cfg) {
 
 						if (!keys.empty() && !track.is_const) {
 							const Key& k = keys[i];
-							Vec3 p = k.pos * cfg.mesh_scale * m_scene_scale;
+							Vec3 p = k.pos * meta.scene_scale * m_scene_scale;
 							const u64 packed = pack(p, track);
 							const u32 bitsize = (track.bitsizes[0] + track.bitsizes[1] + track.bitsizes[2]);
 							ASSERT(bitsize <= 64);
@@ -1412,7 +1406,7 @@ bool ModelImporter::writeAnimations(const Path& src, const ImportConfig& cfg) {
 					bind_rot = (m_bones[parent_idx].bind_pose_matrix.inverted() * m_bones[bone_idx].bind_pose_matrix).getRotation();
 				}
 
-				//if (isBindPoseRotationTrack(count, keys, bind_rot, cfg.rotation_error)) continue;
+				//if (isBindPoseRotationTrack(count, keys, bind_rot, meta.rotation_error)) continue;
 
 				const BoneNameHash name_hash(bone.name.c_str());
 				write(name_hash);
@@ -1427,10 +1421,10 @@ bool ModelImporter::writeAnimations(const Path& src, const ImportConfig& cfg) {
 				}
 				
 				u8 bitsizes[] = {
-					(u8)log2(u32((max.x - min.x) / 0.000001f / cfg.anim_rotation_error)),
-					(u8)log2(u32((max.y - min.y) / 0.000001f / cfg.anim_rotation_error)),
-					(u8)log2(u32((max.z - min.z) / 0.000001f / cfg.anim_rotation_error)),
-					(u8)log2(u32((max.w - min.w) / 0.000001f / cfg.anim_rotation_error))
+					(u8)log2(u32((max.x - min.x) / 0.000001f / meta.anim_rotation_error)),
+					(u8)log2(u32((max.y - min.y) / 0.000001f / meta.anim_rotation_error)),
+					(u8)log2(u32((max.z - min.z) / 0.000001f / meta.anim_rotation_error)),
+					(u8)log2(u32((max.w - min.w) / 0.000001f / meta.anim_rotation_error))
 				};
 				if (clampBitsizes(bitsizes)) {
 					logWarning("Clamping bone ", bone.name, " in ", src);
@@ -1508,11 +1502,11 @@ bool ModelImporter::writeAnimations(const Path& src, const ImportConfig& cfg) {
 				++written_count;
 			}
 		};
-		if (cfg.clips.length() == 0) {
+		if (meta.clips.empty()) {
 			write_animation(anim.name, 0, u32(anim.length * anim.fps + 0.5f) + 1);
 		}
 		else {
-			for (const ImportConfig::Clip& clip : cfg.clips) {
+			for (const ModelMeta::Clip& clip : meta.clips) {
 				write_animation(clip.name, clip.from_frame, clip.to_frame - clip.from_frame + 1);
 			}
 		}
