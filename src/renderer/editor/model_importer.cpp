@@ -14,6 +14,7 @@
 #include "physics/physics_module.h"
 #include "physics/physics_resources.h"
 #include "physics/physics_system.h"
+#include "renderer/editor/model_meta.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/pipeline.h"
@@ -584,15 +585,15 @@ bool ModelImporter::write(const Path& src, const ModelMeta& meta) {
 	const Path filepath = Path(ResourcePath::getResource(src));
 	any_written = writeModel(src, meta) || any_written;
 	any_written = writeMaterials(filepath, meta, false) || any_written;
-	if (!meta.ignore_animations) any_written = writeAnimations(filepath, meta) || any_written;
+	any_written = writeAnimations(filepath, meta) || any_written;
 	if (meta.split) {
 		centerMeshes();
 		any_written = writeSubmodels(filepath, meta) || any_written;
 	}
-	any_written = writePhysics(filepath, meta, meta.split) || any_written;
+	any_written = writePhysics(filepath, meta) || any_written;
 	if (meta.split || meta.create_prefab_with_physics) {
 		jobs::moveJobToWorker(0);
-		any_written = writePrefab(filepath, meta, meta.split) || any_written;
+		any_written = writePrefab(filepath, meta) || any_written;
 		jobs::yield();
 	}
 	return any_written;
@@ -762,7 +763,7 @@ void ModelImporter::writeGeometry(int mesh_idx) {
 	write(import_mesh.aabb);
 }
 
-bool ModelImporter::writePrefab(const Path& src, const ModelMeta& meta, bool split_meshes) {
+bool ModelImporter::writePrefab(const Path& src, const ModelMeta& meta) {
 	Engine& engine = m_app.getEngine();
 	World& world = engine.createWorld();
 
@@ -783,7 +784,7 @@ bool ModelImporter::writePrefab(const Path& src, const ModelMeta& meta, bool spl
 	PhysicsModule* pmodule = (PhysicsModule*)world.getModule(RIGID_ACTOR_TYPE);
 	
 	const EntityRef root = world.createEntity({0, 0, 0}, Quat::IDENTITY);
-	if (!split_meshes) {
+	if (!meta.split) {
 		world.createComponent(MODEL_INSTANCE_TYPE, root);
 		rmodule->setModelInstancePath(root, src);
 
@@ -933,7 +934,7 @@ void ModelImporter::writeGeometry(const ModelMeta& meta) {
 	if (m_meshes.empty()) {
 		for (const Bone& bone : m_bones) {
 			// TODO check if this works with different values of m_orientation
-			const Vec3 p = bone.bind_pose_matrix.getTranslation() * meta.scene_scale * m_scene_scale;
+			const Vec3 p = bone.bind_pose_matrix.getTranslation();
 			origin_radius_squared = maximum(origin_radius_squared, squaredLength(p));
 			aabb.addPoint(p);
 		}
@@ -1030,23 +1031,25 @@ void ModelImporter::writeMeshes(const Path& src, int mesh_idx, const ModelMeta& 
 void ModelImporter::writeSkeleton(const ModelMeta& meta) {
 	write(m_bones.size());
 
-	u32 idx = 0;
-	for (const Bone& node : m_bones) {
+	for (i32 idx = 0, num = m_bones.size(); idx < num; ++idx) {
+		const Bone& node = m_bones[idx];
 		const char* name = node.name.c_str();
-		int len = (int)stringLength(name);
+		const i32 len = stringLength(name);
 		write(len);
 		writeString(name);
 
 		const i32 parent_index = getParentIndex(m_bones, node);
+		// m_bones must have parents before children
+		// i.e. importers must sort them that way
+		ASSERT(parent_index < idx);
 		write(parent_index);
 
 		const Matrix& tr = node.bind_pose_matrix;
 
 		const Quat q = tr.getRotation();
-		const Vec3 t = tr.getTranslation() * meta.scene_scale * m_scene_scale;
+		const Vec3 t = tr.getTranslation();
 		write(t);
 		write(q);
-		++idx;
 	}
 }
 
@@ -1150,7 +1153,7 @@ void ModelImporter::writeModelHeader()
 	write(header);
 }
 
-bool ModelImporter::writePhysics(const Path& src, const ModelMeta& meta, bool split_meshes) {
+bool ModelImporter::writePhysics(const Path& src, const ModelMeta& meta) {
 	if (m_meshes.empty()) return false;
 	if (meta.physics == ModelMeta::Physics::NONE) return false;
 
@@ -1167,7 +1170,7 @@ bool ModelImporter::writePhysics(const Path& src, const ModelMeta& meta, bool sp
 	const bool to_convex = meta.physics == ModelMeta::Physics::CONVEX;
 	header.m_convex = (u32)to_convex;
 
-	if (split_meshes) {
+	if (meta.split) {
 		for (const ImportMesh& mesh : m_meshes) {
 			m_out_file.clear();
 			m_out_file.write(&header, sizeof(header));
@@ -1328,7 +1331,7 @@ bool ModelImporter::writeAnimations(const Path& src, const ModelMeta& meta) {
 
 					Vec3 min(FLT_MAX), max(-FLT_MAX);
 					for (const Key& k : keys) {
-						const Vec3 p = k.pos * meta.scene_scale * m_scene_scale;
+						const Vec3 p = k.pos;
 						min = minimum(p, min);
 						max = maximum(p, max);
 					}
@@ -1342,7 +1345,7 @@ bool ModelImporter::writeAnimations(const Path& src, const ModelMeta& meta) {
 					if (bitsize == 0) {
 						translation_tracks[bone_idx].is_const = true;
 						write(Animation::TrackType::CONSTANT);
-						write(keys[0].pos * meta.scene_scale * m_scene_scale);
+						write(keys[0].pos);
 					}
 					else {
 						translation_tracks[bone_idx].is_const = false;
@@ -1355,7 +1358,7 @@ bool ModelImporter::writeAnimations(const Path& src, const ModelMeta& meta) {
 						write(bitsizes);
 						write(offset_bits);
 						offset_bits += bitsize;
-				
+
 						memcpy(translation_tracks[bone_idx].bitsizes, bitsizes, sizeof(bitsizes));
 						translation_tracks[bone_idx].max = max;
 						translation_tracks[bone_idx].min = min;
@@ -1374,7 +1377,7 @@ bool ModelImporter::writeAnimations(const Path& src, const ModelMeta& meta) {
 
 						if (!keys.empty() && !track.is_const) {
 							const Key& k = keys[i];
-							Vec3 p = k.pos * meta.scene_scale * m_scene_scale;
+							Vec3 p = k.pos;
 							const u64 packed = pack(p, track);
 							const u32 bitsize = (track.bitsizes[0] + track.bitsizes[1] + track.bitsizes[2]);
 							ASSERT(bitsize <= 64);

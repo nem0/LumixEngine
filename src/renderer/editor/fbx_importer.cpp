@@ -25,6 +25,7 @@
 #include "physics/physics_system.h"
 #include "renderer/draw_stream.h"
 #include "renderer/editor/model_importer.h"
+#include "renderer/editor/model_meta.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/pipeline.h"
@@ -547,7 +548,8 @@ struct FBXImporter : ModelImporter {
 			const ofbx::Object* node = (const ofbx::Object*)bone.id;
 			const ImportMesh* mesh = getAnyMeshFromBone(node, i32(&bone - m_bones.begin()));
 			Matrix tr = toLumix(getBindPoseMatrix(mesh, node));
-			tr.normalizeScale();
+			tr.normalizeScale(); // TODO why?
+			tr.setTranslation(tr.getTranslation() * m_scene_scale);
 			bone.bind_pose_matrix = fixOrientation(tr);
 			bone.name = node->name;
 		}
@@ -696,7 +698,7 @@ struct FBXImporter : ModelImporter {
 			u32 tri_count = ofbx::triangulate(geom, polygon, tri_indices.begin());
 			for (u32 i = 0; i < tri_count; ++i) {
 				ofbx::Vec3 cp = positions.get(tri_indices[i]);
-				Vec3 pos = matrix.transformPoint(toLumixVec3(cp)) * meta.scene_scale * m_scene_scale;
+				Vec3 pos = matrix.transformPoint(toLumixVec3(cp)) * m_scene_scale;
 				pos = fixOrientation(pos);
 				write(pos);
 		
@@ -955,14 +957,18 @@ struct FBXImporter : ModelImporter {
 
 		for (const Bone& bone : m_bones) {
 			const Bone* parent = getParent(bone);
-			if (!parent) continue;
-
-			// parent_scale - animated scale is not supported, but we can get rid of static scale if we ignore
-			// it in writeSkeleton() and use `parent_scale` in this function
-			const ofbx::Object* fbx_parent = (const ofbx::Object*)(parent->id);
-			const float parent_scale = (float)getScaleX(fbx_parent->getGlobalTransform());
+			float scale = m_scene_scale;
+			if (parent) {
+				// parent_scale - animated scale is not supported, but we can get rid of static scale if we ignore
+				// it in writeSkeleton() and use `parent_scale` in this function
+				const ofbx::Object* fbx_parent = (const ofbx::Object*)(parent->id);
+				const float parent_scale = (float)getScaleX(fbx_parent->getGlobalTransform());
+				scale *= parent_scale;
+			}
+			if (fabsf(scale - 1) < 1e-5f) continue;
+			
 			Array<Key>& keys = tracks[u32(&bone - m_bones.begin())];
-			for (Key& k : keys) k.pos *= parent_scale;
+			for (Key& k : keys) k.pos *= scale;
 		}
 
 		if (m_orientation != Orientation::Y_UP) {
@@ -1243,7 +1249,15 @@ struct FBXImporter : ModelImporter {
 		});
 	}
 
-	bool parse(const Path& filename, const ModelMeta* meta) override {
+	bool parse(const Path& filename, const ModelMeta& meta) override {
+		return parseInternal(filename, &meta);
+	}
+
+	bool parseSimple(const Path& filename) override {
+		return parseInternal(filename, nullptr);
+	}
+	
+	bool parseInternal(const Path& filename, const ModelMeta* meta) {
 		PROFILE_FUNCTION();
 		const bool ignore_geometry = meta == nullptr;
 
@@ -1267,6 +1281,7 @@ struct FBXImporter : ModelImporter {
 			return false;
 		}
 		m_scene_scale = m_scene->getGlobalSettings()->UnitScaleFactor * 0.01f;
+		if (meta) m_scene_scale *= meta->scene_scale;
 
 		const ofbx::GlobalSettings* settings = m_scene->getGlobalSettings();
 		switch (settings->UpAxis) {
@@ -1279,7 +1294,7 @@ struct FBXImporter : ModelImporter {
 		if (!ignore_geometry) extractEmbedded(*m_scene, src_dir, m_allocator);
 
 		gatherMeshes(filename, src_dir);
-		gatherAnimations(filename);
+		if(!meta || !meta->ignore_animations) gatherAnimations(filename);
 		if (meta) gatherLights(*meta);
 
 		if (!ignore_geometry) {
@@ -1303,6 +1318,7 @@ struct FBXImporter : ModelImporter {
 	Array<const ofbx::Mesh*> m_fbx_meshes;
 	ofbx::IScene* m_scene;
 	Orientation m_orientation = Orientation::Y_UP;
+	float m_scene_scale = 1.f;
 };
 
 ModelImporter* createFBXImporter(StudioApp& app, IAllocator& allocator) {

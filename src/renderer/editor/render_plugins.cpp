@@ -2190,7 +2190,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 				if (ImGui::Button("Reimport materials")) {
 					ModelImporter* fbx_importer = createFBXImporter(m_app, m_app.getAllocator());
-					if (fbx_importer->parse(m_resource->getPath(), nullptr)) {
+					if (fbx_importer->parseSimple(m_resource->getPath())) {
 						if (!fbx_importer->writeMaterials(m_resource->getPath(), m_meta, true)) {
 							logError("Failed to write materials for ", m_resource->getPath());
 						}
@@ -2574,7 +2574,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 			const char* path = _path.c_str();
 			if (path[0] == '/') ++path; // TODO why is this here?
-			if (!importer->parse(Path(path), nullptr)) {
+			if (!importer->parseSimple(Path(path))) {
 				logError("Failed to parse ", path);
 				destroyFBXImporter(*importer);
 				return;
@@ -2624,7 +2624,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		meta.load(Path(filepath), m_app);
 		
 		ModelImporter* importer = createFBXImporter(m_app, m_app.getAllocator());
-		bool result = importer->parse(filepath, &meta);
+		bool result = importer->parse(filepath, meta);
 		result = result && importer->write(src, meta);
 		destroyFBXImporter(*importer);
 

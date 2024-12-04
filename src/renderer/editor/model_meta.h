@@ -4,7 +4,6 @@
 #include "core/stream.h"
 #include "core/string.h"
 #include "core/tokenizer.h"
-#include "fbx_importer.h"
 
 namespace Lumix {
 

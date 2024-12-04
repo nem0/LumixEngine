@@ -4,25 +4,13 @@
 #include "core/geometry.h"
 #include "core/math.h"
 #include "core/path.h"
-#include "core/span.h"
 #include "core/stream.h"
-#include "engine/lumix.h"
 #include "renderer/gpu/gpu.h"
-#include "renderer/editor/model_meta.h"
 
 namespace Lumix {
 
-struct ImpostorTexturesContext {
-	virtual ~ImpostorTexturesContext() {}
-	virtual void readCallback0(Span<const u8> data) = 0;
-	virtual void readCallback1(Span<const u8> data) = 0;
-	virtual void readCallback2(Span<const u8> data) = 0;
-	virtual void readCallback3(Span<const u8> data) = 0;
-	virtual void start() = 0;
-
-	IVec2 tile_size;
-	Path path;
-};
+struct ImpostorTexturesContext;
+struct ModelMeta;
 
 enum class AttributeSemantic : u8;
 
@@ -79,9 +67,9 @@ struct ModelImporter {
 		u32 mesh_index = 0xFFffFFff;
 		u32 material_index = 0xffFFffFF;
 		bool is_skinned = false;
-		int bone_idx = -1;
+		i32 bone_idx = -1;
 		u32 lod = 0;
-		int submesh = -1;
+		i32 submesh = -1;
 		OutputMemoryStream vertex_buffer;
 		u32 vertex_size = 0xffFFffFF;
 		Array<AttributeDesc> attributes;
@@ -107,7 +95,14 @@ struct ModelImporter {
 
 	void init(); // TODO get rid of this?
 
-	virtual bool parse(const Path& filename, const ModelMeta* meta) = 0;
+	// simple parsing - you can get only the list of objects (mesh, materials, animations, etc.),
+	// but not their content (geometry, embedded textures, etc.)
+	// calling write(...) after this is invalid
+	// used for to get a list of subresources (addSubresources) and to reimport materials
+	virtual bool parseSimple(const Path& filename) = 0;
+	
+	// full parsing - parse all data, including geometry
+	virtual bool parse(const Path& filename, const ModelMeta& meta) = 0;
 	
 	// meta must be the same as in parse
 	// TODO fix this (remove meta from these functions?)
@@ -142,13 +137,13 @@ protected:
 	void writeGeometry(const ModelMeta& meta);
 	void writeGeometry(int mesh_idx);
 	void writeSkeleton(const ModelMeta& meta);
-	bool writePrefab(const Path& src, const ModelMeta& meta, bool split_meshes);
+	bool writePrefab(const Path& src, const ModelMeta& meta);
 	bool findTexture(StringView src_dir, StringView ext, ImportTexture& tex) const;
 	void bakeVertexAO(float min_ao);
 	bool writeSubmodels(const Path& src, const ModelMeta& meta);
 	bool writeModel(const Path& src, const ModelMeta& meta);
 	bool writeAnimations(const Path& src, const ModelMeta& meta);
-	bool writePhysics(const Path& src, const ModelMeta& meta, bool split_meshes);
+	bool writePhysics(const Path& src, const ModelMeta& meta);
 	void centerMeshes();
 
 	// compute AO, auto LODs, etc.
@@ -166,7 +161,18 @@ protected:
 	Array<ImportMesh> m_meshes;
 	Array<ImportAnimation> m_animations;
 	Array<DVec3> m_lights;
-	float m_scene_scale = 1.f;
+};
+
+struct ImpostorTexturesContext {
+	virtual ~ImpostorTexturesContext() {}
+	virtual void readCallback0(Span<const u8> data) = 0;
+	virtual void readCallback1(Span<const u8> data) = 0;
+	virtual void readCallback2(Span<const u8> data) = 0;
+	virtual void readCallback3(Span<const u8> data) = 0;
+	virtual void start() = 0;
+
+	IVec2 tile_size;
+	Path path;
 };
 
 } // namespace Lumix
