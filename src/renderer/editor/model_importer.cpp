@@ -351,8 +351,6 @@ void ModelImporter::postprocessCommon(const ModelMeta& meta) {
 
 bool ModelImporter::writeSubmodels(const Path& src, const ModelMeta& meta) {
 	PROFILE_FUNCTION();
-	bool result = true;
-
 	for (int i = 0; i < m_meshes.size(); ++i) {
 		m_out_file.clear();
 		writeModelHeader();
@@ -378,9 +376,11 @@ bool ModelImporter::writeSubmodels(const Path& src, const ModelMeta& meta) {
 		Path path(m_meshes[i].name, ".fbx:", src);
 
 		AssetCompiler& compiler = m_app.getAssetCompiler();
-		result = compiler.writeCompiledResource(path, Span(m_out_file.data(), (i32)m_out_file.size())) && result;
+		if (!compiler.writeCompiledResource(path, Span(m_out_file.data(), (i32)m_out_file.size()))) {
+			return false;
+		}
 	}
-	return !m_meshes.empty() && result;
+	return true;
 }
 
 // TODO move this to the constructor?
@@ -581,22 +581,22 @@ void ModelImporter::createImpostorTextures(Model* model, ImpostorTexturesContext
 }
 
 bool ModelImporter::write(const Path& src, const ModelMeta& meta) {
-	bool any_written = false;
 	const Path filepath = Path(ResourcePath::getResource(src));
-	any_written = writeModel(src, meta) || any_written;
-	any_written = writeMaterials(filepath, meta, false) || any_written;
-	any_written = writeAnimations(filepath, meta) || any_written;
+	if (!writeModel(src, meta)) return false;
+	if (!writeMaterials(filepath, meta, false)) return false;
+	if (!writeAnimations(filepath, meta)) return false;
 	if (meta.split) {
 		centerMeshes();
-		any_written = writeSubmodels(filepath, meta) || any_written;
+		if (!writeSubmodels(filepath, meta)) return false;
 	}
-	any_written = writePhysics(filepath, meta) || any_written;
+	if (!writePhysics(filepath, meta)) return false;
 	if (meta.split || meta.create_prefab_with_physics) {
 		jobs::moveJobToWorker(0);
-		any_written = writePrefab(filepath, meta) || any_written;
+		bool res = writePrefab(filepath, meta);
 		jobs::yield();
+		if (!res) return false;
 	}
-	return any_written;
+	return true;
 }
 
 bool ModelImporter::writeMaterials(const Path& src, const ModelMeta& meta, bool force) {
@@ -1154,8 +1154,8 @@ void ModelImporter::writeModelHeader()
 }
 
 bool ModelImporter::writePhysics(const Path& src, const ModelMeta& meta) {
-	if (m_meshes.empty()) return false;
-	if (meta.physics == ModelMeta::Physics::NONE) return false;
+	if (m_meshes.empty()) return true;
+	if (meta.physics == ModelMeta::Physics::NONE) return true;
 
 	Array<Vec3> verts(m_allocator);
 	PhysicsSystem* ps = (PhysicsSystem*)m_app.getEngine().getSystemManager().getSystem("physics");
@@ -1201,7 +1201,6 @@ bool ModelImporter::writePhysics(const Path& src, const ModelMeta& meta) {
 			Path phy_path(mesh.name, ".phy:", src);
 			AssetCompiler& compiler = m_app.getAssetCompiler();
 			if (!compiler.writeCompiledResource(phy_path, Span(m_out_file.data(), (i32)m_out_file.size()))) {
-				logError("Failed to write ", phy_path);
 				return false;
 			}
 		}
@@ -1280,7 +1279,7 @@ bool ModelImporter::writeModel(const Path& src, const ModelMeta& meta) {
 
 bool ModelImporter::writeAnimations(const Path& src, const ModelMeta& meta) {
 	PROFILE_FUNCTION();
-	u32 written_count = 0;
+	bool any_failed = false;
 	for (const ImportAnimation& anim : m_animations) { 
 		if (anim.length <= 0) continue;
 
@@ -1501,8 +1500,8 @@ bool ModelImporter::writeAnimations(const Path& src, const ModelMeta& meta) {
 
 			Path anim_path(name, ".ani:", src);
 			AssetCompiler& compiler = m_app.getAssetCompiler();
-			if (compiler.writeCompiledResource(anim_path, Span(m_out_file.data(), (i32)m_out_file.size()))) {
-				++written_count;
+			if (!compiler.writeCompiledResource(anim_path, Span(m_out_file.data(), (i32)m_out_file.size()))) {
+				any_failed = true;
 			}
 		};
 		if (meta.clips.empty()) {
@@ -1514,7 +1513,7 @@ bool ModelImporter::writeAnimations(const Path& src, const ModelMeta& meta) {
 			}
 		}
 	}
-	return written_count > 0;
+	return !any_failed;
 }
 
 } // namespace Lumix
