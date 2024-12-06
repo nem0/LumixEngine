@@ -427,10 +427,6 @@ struct FBXImporter : ModelImporter {
 				Matrix transform_matrix = Matrix::IDENTITY;
 				Matrix geometry_matrix = toLumix(mesh->getGeometricMatrix());
 				transform_matrix = toLumix(mesh->getGlobalTransform()) * geometry_matrix;
-				const bool flip_handness = doesFlipHandness(transform_matrix);
-				if (flip_handness) {
-					logError("Mesh ", mesh->name, " in ", path, " flips handness. This is not supported and the mesh will not display correctly.");
-				}
 
 				ofbx::Vec3Attributes normals = geom.getNormals();
 				ofbx::Vec3Attributes tangents = geom.getTangents();
@@ -469,6 +465,13 @@ struct FBXImporter : ModelImporter {
 
 				remap(unindexed_triangles, import_mesh);
 				import_mesh.index_size = areIndices16Bit(import_mesh) ? 2 : 4;
+
+				const bool flip_handness = doesFlipHandness(transform_matrix);
+				if (flip_handness) {
+					for (i32 i = 0, n = import_mesh.indices.size(); i < n; i += 3) {
+						swap(import_mesh.indices[i], import_mesh.indices[i+1]);
+					}
+				}
 			}
 		});
 
