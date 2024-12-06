@@ -1033,7 +1033,9 @@ struct FBXImporter : ModelImporter {
 		for (i32 i = 0, c = m_scene->getLightCount(); i < c; ++i) {
 			const ofbx::Light* light = m_scene->getLight(i);
 			const Matrix mtx = toLumix(light->getGlobalTransform());
-			const DVec3 pos = DVec3(mtx.getTranslation() * meta.scene_scale * m_scene_scale);
+			Vec3 v = mtx.getTranslation() * meta.scene_scale * m_scene_scale;
+			v = fixOrientation(v);
+			const DVec3 pos = DVec3(v);
 			m_lights.push(pos);
 		}
 	}
