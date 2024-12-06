@@ -74,7 +74,7 @@ struct ModelImporter {
 		u32 vertex_size = 0xffFFffFF;
 		Array<AttributeDesc> attributes;
 		Array<u32> indices;
-		u32 index_size;
+		u32 index_size = 0;
 		Local<Array<u32>> autolod_indices[4];
 		AABB aabb;
 		float origin_radius_squared;

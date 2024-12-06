@@ -900,13 +900,22 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		ImGui::DragScalar("##fs", ImGuiDataType_U64, &m_resource_size_filter, 1000);
 
 		ImGui::Indent();
+		// TODO multiple plugins can handle the same resource type (e.g. fbx plugin and gltf plugin)
+		// this duplicates the UI for that resource type
 		for (const AssetBrowser::IPlugin* plugin : m_app.getAssetBrowser().getPlugins()) {
 			ResourceManager* resource_manager = m_engine.getResourceManager().get(plugin->getResourceType());
 			if (!resource_manager) continue;
-			if (!ImGui::CollapsingHeader(plugin->getLabel())) continue;
+			ImGui::PushID(plugin);
+			if (!ImGui::CollapsingHeader(plugin->getLabel())) {
+				ImGui::PopID();
+				continue;
+			}
 
 			ResourceManager::ResourceTable& resources = resource_manager->getResourceTable();
-			if (!ImGui::BeginTable("resc", 4)) continue;
+			if (!ImGui::BeginTable("resc", 4)) {
+				ImGui::PopID();
+				continue;
+			}
 
 			ImGui::TableSetupColumn("Path");
 			ImGui::TableSetupColumn("Size");
@@ -916,7 +925,6 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 
 			u64 sum = 0;
 			for (const Resource* res  : resources) {
-				if (res->isEmpty()) continue;
 				if (!m_resource_filter.pass(res->getPath())) continue;
 				if (m_resource_size_filter > res->getFileSize() / 1024) continue;
 
@@ -951,6 +959,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 			ImGui::TableNextColumn();
 
 			ImGui::EndTable();
+			ImGui::PopID();
 		}
 		ImGui::Unindent();
 	}

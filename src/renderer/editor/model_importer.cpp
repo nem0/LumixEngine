@@ -582,7 +582,7 @@ void ModelImporter::createImpostorTextures(Model* model, ImpostorTexturesContext
 
 bool ModelImporter::write(const Path& src, const ModelMeta& meta) {
 	const Path filepath = Path(ResourcePath::getResource(src));
-	if (!writeModel(src, meta)) return false;
+	if (!meta.split && !writeModel(src, meta)) return false;
 	if (!writeMaterials(filepath, meta, false)) return false;
 	if (!writeAnimations(filepath, meta)) return false;
 	if (meta.split) {
@@ -1274,7 +1274,7 @@ bool ModelImporter::writeModel(const Path& src, const ModelMeta& meta) {
 	writeLODs(meta);
 
 	AssetCompiler& compiler = m_app.getAssetCompiler();
-	return compiler.writeCompiledResource(Path(src), Span(m_out_file.data(), (i32)m_out_file.size()));
+	return compiler.writeCompiledResource(Path(src), Span(m_out_file.data(), m_out_file.size()));
 }
 
 bool ModelImporter::writeAnimations(const Path& src, const ModelMeta& meta) {

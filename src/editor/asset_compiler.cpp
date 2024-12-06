@@ -212,8 +212,8 @@ struct AssetCompilerImpl : AssetCompiler {
 		OutputMemoryStream compressed(m_allocator);
 		if (data.length() > COMPRESSION_SIZE_LIMIT) {
 			if (!m_app.getEngine().compress(data, compressed)) {
-				logError("Could not compress ", path);
-				return false;
+				logWarning("Could not compress ", path, ", using uncompressed file.");
+				compressed.clear();
 			}
 		}
 
@@ -227,7 +227,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		CompiledResourceHeader header;
 		header.decompressed_size = data.length();
 		const u32 compressed_size = (u32)compressed.size();
-		if (data.length() > COMPRESSION_SIZE_LIMIT && compressed_size < i32(data.length() / 4 * 3)) {
+		if (data.length() > COMPRESSION_SIZE_LIMIT && compressed_size > 0 && compressed_size < i32(data.length() / 4 * 3)) {
 			header.flags |= CompiledResourceHeader::COMPRESSED;
 			(void)file.write(&header, sizeof(header));
 			(void)file.write(compressed.data(), compressed_size);
@@ -238,6 +238,13 @@ struct AssetCompilerImpl : AssetCompiler {
 		}
 		file.close();
 		if (file.isError()) logError("Could not write ", out_path);
+		jobs::MutexGuard guard(m_resources_mutex);
+		auto iter = m_resources.find(path.getHash());
+		if (!iter.isValid()) {
+			// Resource scane is async, so it's not guaranteed that the resource is in the m_resources list at this point
+			// If it's not, we don't need to add it to the list
+			m_resources.insert(path.getHash(), {path, getResourceType(path), dirHash(path)});
+		}
 		return !file.isError();
 	}
 

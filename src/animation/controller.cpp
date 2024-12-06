@@ -27,7 +27,10 @@ Controller::~Controller() {
 
 void Controller::unload() {
 	for (const AnimationEntry& entry : m_animation_entries) {
-		if (entry.animation) entry.animation->decRefCount();
+		if (entry.animation) {
+			removeDependency(*entry.animation);
+			entry.animation->decRefCount();
+		}
 	}
 	m_animation_entries.clear();
 	m_bone_masks.clear();
@@ -122,6 +125,9 @@ bool Controller::deserialize(InputMemoryStream& stream) {
 		stream.read(entry.set);
 		const char* path = stream.readString();
 		entry.animation = path[0] ? m_resource_manager.getOwner().load<Animation>(Path(path)) : nullptr;
+		if(entry.animation) {
+			addDependency(*entry.animation);
+		}
 	}
 
 	NodeType type;

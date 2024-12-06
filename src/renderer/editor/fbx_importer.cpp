@@ -350,7 +350,6 @@ struct FBXImporter : ModelImporter {
 				if (mesh_idx >= m_meshes.size()) break;
 				
 				ImportMesh& import_mesh = m_meshes[mesh_idx];
-				import_mesh.index_size = areIndices16Bit(import_mesh) ? 2 : 4;
 				const ofbx::Mesh* mesh = m_fbx_meshes[import_mesh.mesh_index];
 				import_mesh.vertex_size = getVertexSize(*mesh, import_mesh.is_skinned, meta);
 				const ofbx::GeometryData& geom = mesh->getGeometryData();
@@ -469,6 +468,7 @@ struct FBXImporter : ModelImporter {
 				}
 
 				remap(unindexed_triangles, import_mesh);
+				import_mesh.index_size = areIndices16Bit(import_mesh) ? 2 : 4;
 			}
 		});
 
