@@ -20,6 +20,7 @@ Note: plugins in this section are compilable/runnable, but some of them are only
 * [Marketplace](https://github.com/nem0/lumixengine_market)
 * [C#](https://github.com/nem0/lumixengine_csharp)
 * [LiveCode](https://github.com/nem0/lumixengine_livecode)
+* [GLTF importer](https://github.com/nem0/lumixengine_gltf)
 
 # Deprecated
 
