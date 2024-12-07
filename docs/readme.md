@@ -13,6 +13,11 @@
 * [Type checking](lua/type_checking.md)
 * [Snippets](lua/snippets.md)
 
+# Animation
+
+* [Animation graph](animation/graph.md)
+* [Inverse kinematics](animation/inverse_kinematics.md)
+
 # Renderer
 
 * [Shaders](shaders.md)
