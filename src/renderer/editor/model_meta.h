@@ -85,6 +85,7 @@ struct ModelMeta {
 		WRITE_BOOL(create_impostor, false);
 		WRITE_BOOL(use_mikktspace, false);
 		WRITE_BOOL(force_recompute_normals, false);
+		WRITE_BOOL(force_recompute_tangents, false);
 		WRITE_BOOL(force_skin, false);
 		WRITE_BOOL(bake_vertex_ao, false);
 		WRITE_BOOL(bake_impostor_normals, false);
@@ -94,6 +95,7 @@ struct ModelMeta {
 		WRITE_BOOL(import_vertex_colors, false);
 		WRITE_BOOL(vertex_color_is_ao, false);
 		WRITE_BOOL(ignore_animations, false);
+		WRITE_BOOL(ignore_material_colors, false);
 		WRITE_VALUE(min_bake_vertex_ao, 0.f);
 		WRITE_VALUE(anim_translation_error, 1.f);
 		WRITE_VALUE(anim_rotation_error, 1.f);
@@ -150,6 +152,7 @@ struct ModelMeta {
 			{ "root_motion_flags", (i32*)&root_motion_flags },
 			{ "use_mikktspace", &use_mikktspace },
 			{ "force_recompute_normals", &force_recompute_normals },
+			{ "force_recompute_tangents", &force_recompute_tangents },
 			{ "force_skin", &force_skin },
 			{ "anim_rotation_error", &anim_rotation_error },
 			{ "anim_translation_error", &anim_translation_error },
@@ -164,6 +167,7 @@ struct ModelMeta {
 			{ "use_specular_as_roughness", &use_specular_as_roughness },
 			{ "use_specular_as_metallic", &use_specular_as_metallic },
 			{ "ignore_animations", &ignore_animations },
+			{ "ignore_material_colors", &ignore_material_colors },
 			{ "vertex_color_is_ao", &vertex_color_is_ao },
 			{ "lod_count", &lod_count },
 			{ "create_prefab_with_physics", &create_prefab_with_physics },
@@ -273,6 +277,7 @@ struct ModelMeta {
 
 	Path skeleton;
 	bool force_recompute_normals = false;
+	bool force_recompute_tangents = false;
 	bool use_mikktspace = false;
 	bool import_vertex_colors = false;
 	bool bake_vertex_ao = false;
@@ -300,6 +305,7 @@ struct ModelMeta {
 	bool split = false;
 	bool force_skin = false;
 	bool ignore_animations = false;
+	bool ignore_material_colors = false;
 	bool create_prefab_with_physics = false;
 };
 

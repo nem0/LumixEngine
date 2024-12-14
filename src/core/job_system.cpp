@@ -302,6 +302,7 @@ struct WorkerTask : Thread {
 
 	Signal* m_signal_to_check = nullptr;
 	WaitingFiber* m_waiting_fiber_to_push = nullptr;
+	i32 m_deferred_push_to_worker = -1;
 	
 	Fiber::Handle m_primary_fiber;
 	System& m_system;
@@ -412,6 +413,17 @@ LUMIX_FORCE_INLINE static bool popWork(Work& work, WorkerTask* worker) {
 static void afterSwitch() {
 	WorkerTask* worker = getWorker();
 	
+	if (worker->m_deferred_push_to_worker >= 0) {
+		if (worker->m_deferred_push_to_worker != ANY_WORKER) {
+			WorkerTask* dst_worker = g_system->m_workers[worker->m_deferred_push_to_worker % g_system->m_workers.size()];
+			dst_worker->m_work_queue.pushAndWake(worker->m_waiting_fiber_to_push->fiber, dst_worker);
+		}
+		else {
+			g_system->m_global_queue.pushAndWake(worker->m_waiting_fiber_to_push->fiber, nullptr);
+		}
+		worker->m_deferred_push_to_worker = -1;
+	}
+
 	if (!worker->m_signal_to_check) return;
 
 	Signal* signal = worker->m_signal_to_check;
@@ -737,31 +749,29 @@ void exit(Mutex* mutex) {
 
 // TODO race condition in both moveJobToWorker and yield, we could be poppped while we are still inside
 void moveJobToWorker(u8 worker_index) {
-	FiberJobPair* this_fiber = getWorker()->m_current_fiber;
-	WorkerTask* worker = g_system->m_workers[worker_index % g_system->m_workers.size()];
-	worker->m_work_queue.pushAndWake(this_fiber, worker);
-	
+	WorkerTask* worker = getWorker();
+	if (worker->m_worker_index == worker_index) return;
+
+	FiberJobPair* this_fiber = worker->m_current_fiber;
+	WaitingFiber waiting_fiber;
+	waiting_fiber.fiber = worker->m_current_fiber;
+	waiting_fiber.next = nullptr;
+	worker->m_waiting_fiber_to_push = &waiting_fiber;
+	worker->m_deferred_push_to_worker = worker_index;
+
 	FiberJobPair* new_fiber = popFreeFiber();
-	getWorker()->m_current_fiber = new_fiber;
+	worker->m_current_fiber = new_fiber;
 	this_fiber->current_job.worker_index = worker_index;
 	
 	Fiber::switchTo(&this_fiber->fiber, new_fiber->fiber);
 	afterSwitch();
-	getWorker()->m_current_fiber = this_fiber;
-	ASSERT(getWorker()->m_worker_index == worker_index);
+	worker = getWorker();
+	worker->m_current_fiber = this_fiber;
+	ASSERT(worker->m_worker_index == worker_index || worker_index == ANY_WORKER);
 }
 
 void yield() {
-	FiberJobPair* this_fiber = getWorker()->m_current_fiber;
-	WorkerTask* worker = getWorker();
-	g_system->m_global_queue.pushAndWake(this_fiber, nullptr);
-
-	FiberJobPair* new_fiber = popFreeFiber();
-	this_fiber->current_job.worker_index = ANY_WORKER;
-	getWorker()->m_current_fiber = new_fiber;
-	Fiber::switchTo(&this_fiber->fiber, new_fiber->fiber);
-	afterSwitch();
-	getWorker()->m_current_fiber = this_fiber;
+	moveJobToWorker(ANY_WORKER);
 }
 
 void run(void* data, void(*task)(void*), Counter* on_finished, u8 worker_index)

@@ -102,6 +102,7 @@ struct FileSystemImpl : FileSystem {
 	}
 
 	bool getContentSync(const Path& path, OutputMemoryStream& content) override {
+		PROFILE_FUNCTION();
 		os::InputFile file;
 		const Path full_path(m_base_path, path);
 

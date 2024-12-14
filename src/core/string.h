@@ -30,6 +30,7 @@ struct LUMIX_CORE_API StringView {
 	void removeSuffix(u32 count) { ASSERT(count <= size()); end -= count; }
 	void removePrefix(u32 count) { ASSERT(count <= size()); begin += count; }
 	bool empty() const { return begin == end || !begin[0]; }
+	bool operator==(const StringView& rhs) const;
 
 	const char* begin = nullptr;
 	const char* end = nullptr;

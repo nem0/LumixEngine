@@ -57,29 +57,36 @@ struct ModelImporter {
 
 	struct ImportMesh {
 		ImportMesh(IAllocator& allocator)
+			: name(allocator)
+		{}
+
+		Matrix matrix = Matrix::IDENTITY;
+		u32 mesh_index = 0xFFffFFff;
+		u32 geometry_idx = 0xffFFffFF;
+		u32 lod = 0;
+		String name;
+	};
+
+	struct ImportGeometry {
+		ImportGeometry(IAllocator& allocator)
 			: vertex_buffer(allocator)
 			, indices(allocator)
-			, name(allocator)
 			, attributes(allocator)
-		{
-		}
-
-		u32 mesh_index = 0xFFffFFff;
-		u32 material_index = 0xffFFffFF;
-		bool is_skinned = false;
-		i32 bone_idx = -1;
-		u32 lod = 0;
-		i32 submesh = -1;
+			, name(allocator)
+		{}
+		
 		OutputMemoryStream vertex_buffer;
 		u32 vertex_size = 0xffFFffFF;
 		Array<AttributeDesc> attributes;
 		Array<u32> indices;
 		u32 index_size = 0;
 		Local<Array<u32>> autolod_indices[4];
-		AABB aabb;
-		float origin_radius_squared;
-		Vec3 origin = Vec3(0);
+		i32 submesh = -1;
+		u32 material_index;
+		bool is_skinned;
+		bool flip_handness;
 		String name;
+		alignas(8) u8 user_data[64];
 	};
 
 	struct Bone {
@@ -108,8 +115,10 @@ struct ModelImporter {
 	// TODO fix this (remove meta from these functions?)
 	bool write(const Path& src, const ModelMeta& meta);
 	bool writeMaterials(const Path& src, const ModelMeta& meta, bool force);
+	bool writePrefab(const Path& src, const ModelMeta& meta);
 	void createImpostorTextures(struct Model* model, ImpostorTexturesContext& ctx, bool bake_normals);
 	
+	const Array<ImportGeometry>& getGeometries() const { return m_geometries; }
 	const Array<ImportMesh>& getMeshes() const { return m_meshes; }
 	const Array<ImportAnimation>& getAnimations() const { return m_animations; }
 
@@ -120,6 +129,9 @@ protected:
 	template <typename T> void write(const T& obj) { m_out_file.write(&obj, sizeof(obj)); }
 	void write(const void* ptr, size_t size) { m_out_file.write(ptr, size); }
 	void writeString(const char* str);
+
+	static u32 packF4u(const Vec3& vec);
+	static Vec3 unpackF4u(u32 packed);
 
 	// this is called when writing animations, importer must fill tracks array with keyframes
 	virtual void fillTracks(const ImportAnimation& anim
@@ -132,19 +144,19 @@ protected:
 	void writeModelHeader();
 	void writeImpostorVertices(float center_y, Vec2 bounding_cylinder);
 	void writeImpostorMesh(StringView dir, StringView model_name);
-	void writeMeshes(const Path& src, int mesh_idx, const ModelMeta& meta);
+	void writeSubmesh(const Path& src, i32 geom_idx, const ModelMeta& meta);
+	void writeMeshes(const Path& src, const ModelMeta& meta);
 	void writeLODs(const ModelMeta& meta);
 	void writeGeometry(const ModelMeta& meta);
-	void writeGeometry(int mesh_idx);
+	void writeGeometry(u32 geom_idx);
 	void writeSkeleton(const ModelMeta& meta);
-	bool writePrefab(const Path& src, const ModelMeta& meta);
 	bool findTexture(StringView src_dir, StringView ext, ImportTexture& tex) const;
 	void bakeVertexAO(float min_ao);
 	bool writeSubmodels(const Path& src, const ModelMeta& meta);
+	bool writeDummyModel(const Path& src);
 	bool writeModel(const Path& src, const ModelMeta& meta);
 	bool writeAnimations(const Path& src, const ModelMeta& meta);
 	bool writePhysics(const Path& src, const ModelMeta& meta);
-	void centerMeshes();
 
 	// compute AO, auto LODs, etc.
 	// call this from parse when appropriate
@@ -159,6 +171,7 @@ protected:
 	Array<Bone> m_bones; // parent must be before children
 	Array<ImportMaterial> m_materials;
 	Array<ImportMesh> m_meshes;
+	Array<ImportGeometry> m_geometries;
 	Array<ImportAnimation> m_animations;
 	Array<DVec3> m_lights;
 };

@@ -30,7 +30,7 @@ using JobProcessor = void (*)(JobFunction, void*, void*, u32, u32);
 enum class LoadFlags : u16
 {
 	NONE = 0,
-	UNUSED = 1 << 0, // can be reused
+	KEEP_MATERIAL_MAP = 1 << 0, // keep material map even if IGNORE_GEOMETRY is used
 	IGNORE_GEOMETRY = 1 << 1,
 	IGNORE_BLEND_SHAPES = 1 << 2,
 	IGNORE_CAMERAS = 1 << 3,
@@ -544,6 +544,8 @@ struct GeometryData {
 	virtual Vec2Attributes getUVs(int index = 0) const = 0;
 	virtual Vec4Attributes getColors() const = 0;
 	virtual Vec3Attributes getTangents() const = 0;
+	virtual const int getMaterialMapSize() const = 0;
+	virtual const int* getMaterialMap() const = 0;
 	virtual int getPartitionCount() const = 0;
 	virtual GeometryPartition getPartition(int partition_index) const = 0;
 };

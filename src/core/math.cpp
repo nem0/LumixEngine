@@ -976,6 +976,22 @@ void Matrix::setPerspective(float fov, float ratio, float near_plane, float far_
 	}
 }
 
+// assumes ortho matrix
+void Matrix::decompose(Vec3& position, Quat& rotation, Vec3& scale) const {
+	position = getTranslation();
+	Vec3 x = getXVector();
+	Vec3 y = getYVector();
+	Vec3 z = getZVector();
+	scale.x = length(x);
+	scale.y = length(y);
+	scale.z = length(z);
+	Matrix mtx = Matrix::IDENTITY;
+	mtx.setXVector(x / scale.x);
+	mtx.setYVector(y / scale.y);
+	mtx.setZVector(z / scale.z);
+	rotation = mtx.getRotation();
+}
+
 void Matrix::decompose(Vec3& position, Quat& rotation, float& scale) const {
 	position = getTranslation();
 	scale = length(getXVector());

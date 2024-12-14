@@ -809,4 +809,9 @@ bool startsWithInsensitive(StringView str, StringView prefix) {
 	return equalIStrings(str, prefix);
 }
 
+bool StringView::operator==(const StringView& rhs) const {
+	return equalStrings(*this, rhs);
+}
+
+
 } // namespace Lumix

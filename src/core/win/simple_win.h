@@ -667,6 +667,10 @@ __inline DWORD GetCurrentDirectory(DWORD nBufferLength, LPSTR lpBuffer)
 {
 	return GetCurrentDirectoryA(nBufferLength, lpBuffer);
 }
+
+WINBASEAPI DWORD WINAPI GetFinalPathNameByHandleA(HANDLE hFile, LPSTR lpszFilePath, DWORD cchFilePath, DWORD dwFlags);
+WINBASEAPI DWORD WINAPI GetFullPathNameA(LPCSTR lpFileName, DWORD nBufferLength, LPSTR lpBuffer, LPSTR* lpFilePart);
+
 WINBASEAPI HANDLE WINAPI FindFirstFileA(LPCSTR lpFileName, LPWIN32_FIND_DATAA lpFindFileData);
 WINUSERAPI BOOL WINAPI
 PeekMessageA(LPMSG lpMsg, HWND hWnd, UINT wMsgFilterMin, UINT wMsgFilterMax, UINT wRemoveMsg);

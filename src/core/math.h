@@ -338,6 +338,7 @@ struct alignas(16) LUMIX_CORE_API Matrix {
 	Matrix(const Vec3& pos, const Quat& rot);
 
 	void decompose(Vec3& position, Quat& rotation, float& scale) const;
+	void decompose(Vec3& position, Quat& rotation, Vec3& scale) const;
 
 	float operator[](int index) const { return (&columns[0].x)[index]; }
 	float& operator[](int index) { return (&columns[0].x)[index]; }

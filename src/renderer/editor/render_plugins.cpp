@@ -2090,12 +2090,29 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				saveUndo(ImGui::Checkbox("##mikktspace", &m_meta.use_mikktspace));
 				ImGuiEx::Label("Recompute normals");
 				saveUndo(ImGui::Checkbox("##recomputenormals", &m_meta.force_recompute_normals));
+				ImGuiEx::Label("Recompute tangents");
+				saveUndo(ImGui::Checkbox("##recomputetangents", &m_meta.force_recompute_tangents));
 				ImGuiEx::Label("Force skinned");
 				saveUndo(ImGui::Checkbox("##frcskn", &m_meta.force_skin));
 				ImGuiEx::Label("Split");
 				saveUndo(ImGui::Checkbox("##split", &m_meta.split));
+				if (m_meta.split && ImGui::Button("Recreate prefab")) {
+					ModelImporter* fbx_importer = createFBXImporter(m_app, m_app.getAllocator());
+					if (fbx_importer->parseSimple(m_resource->getPath())) {
+						if (!fbx_importer->writePrefab(m_resource->getPath(), m_meta)) {
+							logError("Failed to write materials for ", m_resource->getPath());
+						}
+					}
+					else {
+						logError("Failed to load ", m_resource->getPath());
+					}
+					destroyFBXImporter(*fbx_importer);
+				}
+
 				ImGuiEx::Label("Ignore animations");
 				saveUndo(ImGui::Checkbox("##ignoreanim", &m_meta.ignore_animations));
+				ImGuiEx::Label("Ignore material colors");
+				saveUndo(ImGui::Checkbox("##ignorematcol", &m_meta.ignore_material_colors));
 				ImGuiEx::Label("Create impostor mesh");
 				saveUndo(ImGui::Checkbox("##creimp", &m_meta.create_impostor));
 				if (m_meta.create_impostor) {
@@ -2446,11 +2463,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				ImGui::EndMenuBar();
 			}
 
-			if (m_resource->isEmpty()) {
-				ImGui::TextUnformatted("Loading...");
-				return;
-			}
-
 			if (!ImGui::BeginTable("tab", 2, ImGuiTableFlags_Resizable)) return;
 
 			ImGui::TableSetupColumn(nullptr, ImGuiTableColumnFlags_WidthFixed, 250);
@@ -2481,6 +2493,11 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		}
 
 		void previewGUI() {
+			if (m_resource->isEmpty()) {
+				ImGui::TextUnformatted("Loading...");
+				return;
+			}
+
 			if (!m_resource->isReady()) return;
 
 			if (ImGui::Checkbox("Wireframe", &m_wireframe)) enableWireframe(*m_resource, m_wireframe);
@@ -2581,7 +2598,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			}
 
 			if(meta.split) {
-				const Array<ModelImporter::ImportMesh>& meshes = importer->getMeshes();
+				const Array<ModelImporter::ImportGeometry>& meshes = importer->getGeometries();
 				for (int i = 0; i < meshes.size(); ++i) {
 					Path tmp(meshes[i].name, ".fbx:", path);
 					compiler.addResource(Model::TYPE, tmp);
