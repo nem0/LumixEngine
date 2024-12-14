@@ -628,9 +628,9 @@ bool ModelImporter::writeMaterials(const Path& src, const ModelMeta& meta, bool 
 
 		if (!material.textures[0].import && !meta.ignore_material_colors) {
 			const Vec3 color = material.diffuse_color;
-			blob << "uniform \"Material color\", {" << powf(color.x, 2.2f) 
-				<< "," << powf(color.x, 2.2f)
-				<< "," << powf(color.z, 2.2f)
+			blob << "uniform \"Material color\", {" << color.x
+				<< "," << color.y
+				<< "," << color.z
 				<< ",1}\n";
 		}
 

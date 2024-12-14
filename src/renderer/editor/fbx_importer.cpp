@@ -1143,7 +1143,7 @@ struct FBXImporter : ModelImporter {
 					mat_idx = materials.size();
 					ImportMaterial& mat = m_materials.emplace(m_allocator);
 					const ofbx::Color diffuse_color = fbx_mat->getDiffuseColor();
-					mat.diffuse_color = { diffuse_color.r, diffuse_color.g, diffuse_color.b };
+					mat.diffuse_color = { powf(diffuse_color.r, 2.2f), powf(diffuse_color.g, 2.2f), powf(diffuse_color.b, 2.2f) };
 					materials.push(fbx_mat);
 				}
 
@@ -1235,6 +1235,7 @@ struct FBXImporter : ModelImporter {
 			mat.name = name;
 		}
 
+		// TODO move this to modelimporter?
 		// gather textures
 		// we don't support dds, but try it as last option, so user can get error message with filepath
 		const char* exts[] = { "png", "jpg", "jpeg", "tga", "bmp", "dds" };
