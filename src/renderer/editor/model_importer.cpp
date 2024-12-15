@@ -283,7 +283,40 @@ static i32 getAttributeOffset(const ModelImporter::ImportGeometry& mesh, Attribu
 	return -1;
 }
 
-void ModelImporter::postprocessCommon(const ModelMeta& meta) {
+void ModelImporter::postprocessCommon(const ModelMeta& meta, StringView src_filepath) {
+	StringView src_dir = Path::getDir(src_filepath);
+	FileSystem& filesystem = m_app.getEngine().getFileSystem();
+
+	for (ImportMaterial& mat : m_materials) {
+		// we don't support dds, but try it as last option, so user can get error message with filepath
+		const char* exts[] = { "png", "jpg", "jpeg", "tga", "bmp", "dds" };
+		for (ImportTexture& tex : mat.textures) {
+			if (tex.path.empty()) continue;
+			tex.src = tex.path;
+
+			const bool exists = filesystem.fileExists(tex.src);
+			StringView tex_ext = Path::getExtension(tex.path);
+
+			if (!exists && (equalStrings(tex_ext, "dds") || !findTexture(src_dir, tex_ext, tex))) {
+				for (const char*& ext : exts) {
+					if (findTexture(src_dir, ext, tex)) {
+						// we assume all texture have the same extension,
+						// so we move it to the beginning, so it's checked first
+						swap(ext, exts[0]);
+						break;
+					}
+				}
+			}
+
+			if (tex.src.empty()) {
+				logInfo(src_filepath, ": texture ", tex.path, " not found");
+				continue;
+			}
+			
+			Path::normalize(tex.src.data);
+		}
+	}
+	
 	jobs::forEach(m_meshes.size(), 1, [&](i32 mesh_idx, i32){
 		// TODO this can process the same geom multiple times
 
@@ -588,10 +621,10 @@ bool ModelImporter::writeMaterials(const Path& src, const ModelMeta& meta, bool 
 		blob.clear();
 
 		blob << "shader \"/shaders/standard.hlsl\"\n";
-		if (material.textures[2].import) blob << "uniform \"Metallic\", 1.000000\n";
+		if (!material.textures[2].src.empty()) blob << "uniform \"Metallic\", 1.000000\n";
 
 		auto writeTexture = [&](const ImportTexture& texture, u32 idx) {
-			if (texture.import && idx < 2) {
+			if (!texture.src.empty() && idx < 2) {
 				const Path meta_path(texture.src, ".meta");
 				if (!filesystem.fileExists(meta_path)) {
 					os::OutputFile file;
@@ -601,7 +634,7 @@ bool ModelImporter::writeMaterials(const Path& src, const ModelMeta& meta, bool 
 					}
 				}
 			}
-			if (texture.import) {
+			if (!texture.src.empty()) {
 				blob << "texture \"/"
 					 << texture.src
 					 << "\"\n";
@@ -626,7 +659,7 @@ bool ModelImporter::writeMaterials(const Path& src, const ModelMeta& meta, bool 
 			blob << "texture \"\"\n";
 		}
 
-		if (!material.textures[0].import && !meta.ignore_material_colors) {
+		if (material.textures[0].src.empty() && !meta.ignore_material_colors) {
 			const Vec3 color = material.diffuse_color;
 			blob << "uniform \"Material color\", {" << color.x
 				<< "," << color.y
@@ -648,20 +681,18 @@ bool ModelImporter::findTexture(StringView src_dir, StringView ext, ModelImporte
 	PathInfo file_info(tex.path);
 	tex.src = src_dir;
 	tex.src.append(file_info.basename, ".", ext);
-	tex.import = filesystem.fileExists(tex.src);
+	if (filesystem.fileExists(tex.src)) return true;
 
-	if (!tex.import) {
-		tex.src = src_dir;
-		tex.src.append(file_info.dir, "/", file_info.basename, ".", ext);
-		tex.import = filesystem.fileExists(tex.src);
+	tex.src = src_dir;
+	tex.src.append(file_info.dir, "/", file_info.basename, ".", ext);
+	if (filesystem.fileExists(tex.src)) return true;
 					
-		if (!tex.import) {
-			tex.src = src_dir;
-			tex.src.append("textures/", file_info.basename, ".", ext);
-			tex.import = filesystem.fileExists(tex.src);
-		}
-	}
-	return tex.import;
+	tex.src = src_dir;
+	tex.src.append("textures/", file_info.basename, ".", ext);
+	if (filesystem.fileExists(tex.src)) return true;
+
+	tex.src = "";
+	return false;
 }
 
 void ModelImporter::writeImpostorVertices(float center_y, Vec2 bounding_cylinder) {

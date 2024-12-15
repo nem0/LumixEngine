@@ -30,9 +30,8 @@ struct ModelImporter {
 			COUNT
 		};
 
-		bool import = true;
-		StringView path;
-		StaticString<MAX_PATH> src;
+		StringView path; // path as saved in source asset
+		StaticString<MAX_PATH> src; // path to actual file on disk
 	};
 
 	struct ImportAnimation {
@@ -160,7 +159,7 @@ protected:
 
 	// compute AO, auto LODs, etc.
 	// call this from parse when appropriate
-	void postprocessCommon(const ModelMeta& meta);
+	void postprocessCommon(const ModelMeta& meta, StringView src_dir);
 
 	StudioApp& m_app;
 	IAllocator& m_allocator;

@@ -491,7 +491,7 @@ struct FBXImporter : ModelImporter {
 			}
 		});
 
-		postprocessCommon(meta);
+		postprocessCommon(meta, path);
 }
 
 	void insertHierarchy(const ofbx::Object* node) {
@@ -1235,10 +1235,7 @@ struct FBXImporter : ModelImporter {
 			mat.name = name;
 		}
 
-		// TODO move this to modelimporter?
 		// gather textures
-		// we don't support dds, but try it as last option, so user can get error message with filepath
-		const char* exts[] = { "png", "jpg", "jpeg", "tga", "bmp", "dds" };
 		FileSystem& filesystem = m_app.getEngine().getFileSystem();
 		for (u32 i = 0, num_mats = (u32)m_materials.size(); i < num_mats; ++i) {
 			ImportMaterial& mat = m_materials[i];
@@ -1250,29 +1247,6 @@ struct FBXImporter : ModelImporter {
 				ofbx::DataView filename = texture->getRelativeFileName();
 				if (filename == "") filename = texture->getFileName();
 				tex.path = toStringView(filename);
-				tex.src = tex.path;
-				tex.import = filesystem.fileExists(tex.src);
-
-				StringView tex_ext = Path::getExtension(tex.path);
-				if (!tex.import && (equalStrings(tex_ext, "dds") || !findTexture(src_dir, tex_ext, tex))) {
-					for (const char*& ext : exts) {
-						if (findTexture(src_dir, ext, tex)) {
-							// we assume all texture have the same extension,
-							// so we move it to the beginning, so it's checked first
-							swap(ext, exts[0]);
-							break;
-						}
-					}
-				}
-
-				Path::normalize(tex.src.data);
-
-				if (!tex.import) {
-					logInfo(fbx_filename, ": texture ", tex.src, " not found");
-					tex.src = "";
-				}
-
-				tex.import = true;
 			};
 
 			gatherTexture(ofbx::Texture::DIFFUSE);
