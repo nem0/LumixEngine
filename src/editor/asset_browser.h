@@ -33,6 +33,7 @@ struct LUMIX_EDITOR_API AssetBrowser : StudioApp::GUIPlugin {
 	virtual bool resourceInput(const char* str_id, Path& buf, ResourceType type, float width = -1) = 0;
 	virtual void addPlugin(IPlugin& plugin, Span<const char*> extensions) = 0;
 	virtual void removePlugin(IPlugin& plugin) = 0;
+	virtual IPlugin* getPlugin(StringView extension) const = 0;
 	virtual Span<IPlugin*> getPlugins() = 0;
 	virtual void openInExternalEditor(struct Resource* resource) const = 0;
 	virtual void openInExternalEditor(struct StringView path) const = 0;

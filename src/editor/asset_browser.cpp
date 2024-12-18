@@ -961,6 +961,16 @@ struct AssetBrowserImpl : AssetBrowser {
 		m_plugin_map.eraseIf([&plugin](IPlugin* p){ return p == &plugin; });
 	}
 
+	IPlugin* getPlugin(StringView extension) const override {
+		char ext_str[9];
+		makeLowercase(ext_str, extension);
+		u64 key = 0;
+		ASSERT(extension.size() <= sizeof(key));
+		memcpy(&key, ext_str, extension.size());
+		auto iter = m_plugin_map.find(key);
+		return iter.isValid() ? iter.value() : nullptr;
+	}
+
 	Span<IPlugin*> getPlugins() override {
 		return m_plugins;
 	}

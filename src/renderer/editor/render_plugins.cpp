@@ -2033,7 +2033,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			auto* render_module = static_cast<RenderModule*>(m_viewer.m_world->getModule(MODEL_INSTANCE_TYPE));
 			render_module->setModelInstancePath(*m_viewer.m_mesh, m_resource->getPath());
 
-			m_fbx_async_handle = engine.getFileSystem().getContent(path, makeDelegate<&EditorWindow::onFBXLoaded>(this));
+			if (Path::hasExtension(path, "fbx")) {
+				m_fbx_async_handle = engine.getFileSystem().getContent(path, makeDelegate<&EditorWindow::onFBXLoaded>(this));
+			}
 		}
 
 		~EditorWindow() {
@@ -5586,6 +5588,21 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	InstancedModelPlugin m_instanced_model_plugin;
 	bool m_vsync = true;
 };
+
+} // anonymous namespace
+
+namespace Lumix {
+
+// ModelPlugin handles only fbx, but other formats
+// can use the same EditorWindow as ModelPlugin
+void createModelEditor(const Path& path, StudioApp& app) {
+	IAllocator& allocator = app.getAllocator();
+	AssetBrowser::IPlugin* plugin = app.getAssetBrowser().getPlugin("fbx");
+	ASSERT(plugin);
+	ModelPlugin* model_plugin = static_cast<ModelPlugin*>(plugin);
+	UniquePtr<ModelPlugin::EditorWindow> win = UniquePtr<ModelPlugin::EditorWindow>::create(allocator, path, *model_plugin, app, allocator);
+	app.getAssetBrowser().addWindow(win.move());
+}
 
 }
 
