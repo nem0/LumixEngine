@@ -1114,6 +1114,8 @@ struct FBXImporter : ModelImporter {
 			// mark used materials/partitions
 			StackArray<bool, 16> used_materials(m_allocator);
 			used_materials.resize(mat_count);
+			if (!geom.hasVertices()) continue;
+
 			if (mat_count == 1) {
 				used_materials[0] = true;
 			}

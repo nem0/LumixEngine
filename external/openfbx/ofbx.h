@@ -536,6 +536,7 @@ struct GeometryPartition {
 	const int triangles_count; // number of triangles after polygon triangulation, can be used for preallocation
 };
 
+// if we use LoadFlags::IGNORE_GEOMETRY, values here are empty/invalid, with a few exceptions
 struct GeometryData {
 	virtual ~GeometryData() {}
 	
@@ -544,10 +545,16 @@ struct GeometryData {
 	virtual Vec2Attributes getUVs(int index = 0) const = 0;
 	virtual Vec4Attributes getColors() const = 0;
 	virtual Vec3Attributes getTangents() const = 0;
-	virtual const int getMaterialMapSize() const = 0;
-	virtual const int* getMaterialMap() const = 0;
 	virtual int getPartitionCount() const = 0;
 	virtual GeometryPartition getPartition(int partition_index) const = 0;
+	
+	// if we use LoadFlags::KEEP_MATERIAL_MAP, following is valid even if we use IGNORE_GEOMETRY
+	virtual const int getMaterialMapSize() const = 0;
+	virtual const int* getMaterialMap() const = 0;
+
+	// returns true if there are vertices in the geometry
+	// this has valid value even if we use LoadFlags::IGNORE_GEOMETRY
+	virtual bool hasVertices() const = 0;
 };
 
 

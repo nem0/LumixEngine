@@ -1157,6 +1157,7 @@ struct GeometryPartitionImpl {
 };
 
 struct GeometryDataImpl : GeometryData {
+	bool has_vertices = false;
 	Vec3AttributesImpl positions;
 	Vec3AttributesImpl normals;
 	Vec3AttributesImpl tangents;
@@ -1175,6 +1176,8 @@ struct GeometryDataImpl : GeometryData {
 		}
 		return res;
 	}
+
+	bool hasVertices() const override { return has_vertices; }
 
 	Vec3Attributes getPositions() const override { return positions; }
 	Vec3Attributes getNormals() const override { return patchAttributes<Vec3Attributes>(normals); }
@@ -3126,16 +3129,22 @@ static OptionalError<Object*> parseAnimationCurve(const Scene& scene, const Elem
 	return curve;
 }
 
-static OptionalError<Object*> parseGeometry(const Element& element, GeometryImpl& geom, std::vector<ParseDataJob> &jobs, bool ignore_geometry, Allocator& allocator) {
+static OptionalError<Object*> parseGeometry(const Element& element, GeometryImpl& geom, std::vector<ParseDataJob> &jobs, u16 flags, Allocator& allocator) {
 	assert(element.first_property);
 
-	if (!parseGeometryMaterials(geom, element, jobs)) return Error("Invalid materials");
+	const bool ignore_geometry = (flags & (u16)LoadFlags::IGNORE_GEOMETRY) != 0;
+	const bool keep_matertial_map = (flags & (u16)LoadFlags::KEEP_MATERIAL_MAP) != 0;
+
+	if (keep_matertial_map || !ignore_geometry) {
+		if (!parseGeometryMaterials(geom, element, jobs)) return Error("Invalid materials");
+	}
 	
 	const Element* vertices_element = findChild(element, "Vertices");
 	if (!vertices_element || !vertices_element->first_property) {
 		return &geom;
 	}
 
+	geom.has_vertices = true;
 	const Element* polys_element = findChild(element, "PolygonVertexIndex");
 	if (!polys_element || !polys_element->first_property) return Error("Indices missing");
 
@@ -3451,9 +3460,7 @@ static bool parseObjects(const Element& root, Scene& scene, u16 flags, Allocator
 			if (last_prop && last_prop->value == "Mesh")
 			{
 				GeometryImpl* geom = allocator.allocate<GeometryImpl>(scene, *iter.second.element);
-				if (!ignore_geometry || keep_matertial_map) {
-					parseGeometry(*iter.second.element, *geom, jobs, ignore_geometry, allocator);
-				}
+				parseGeometry(*iter.second.element, *geom, jobs, flags, allocator);
 				obj = geom;
 				scene.m_geometries.push_back(geom);
 			}
