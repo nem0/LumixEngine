@@ -1855,6 +1855,7 @@ struct CameraImpl : public Camera
 
 	double nearPlane = 0.1;
 	double farPlane = 1000.0;
+	double orthoZoom = 1.f;
 	bool autoComputeClipPanes = true;
 	
 	GateFit gateFit = GateFit::HORIZONTAL;
@@ -1879,6 +1880,7 @@ struct CameraImpl : public Camera
 
 	double getNearPlane() const override { return nearPlane; }
 	double getFarPlane() const override { return farPlane; }
+	double getOrthoZoom() const override { return orthoZoom; }
 	bool doesAutoComputeClipPanes() const override { return autoComputeClipPanes; }
 
 	GateFit getGateFit() const override { return gateFit; }
@@ -2521,6 +2523,10 @@ struct OptionalError<Object*> parseCamera(Scene& scene, const Element& element, 
 			else if (prop->first_property->value == "FarPlane")
 			{
 				camera->farPlane = prop->getProperty(4)->getValue().toDouble();
+			}
+			else if (prop->first_property->value == "OrthoZoom" || prop->first_property->value == "CameraOrthoZoom")
+			{
+				camera->orthoZoom = prop->getProperty(4)->getValue().toDouble();
 			}
 		}
 		prop = prop->sibling;

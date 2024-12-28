@@ -394,6 +394,7 @@ struct Camera : Object
 
 	virtual double getNearPlane() const = 0;
 	virtual double getFarPlane() const = 0;
+	virtual double getOrthoZoom() const = 0;
 	virtual bool doesAutoComputeClipPanes() const = 0;
 
 	virtual GateFit getGateFit() const = 0;
