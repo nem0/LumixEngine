@@ -97,6 +97,7 @@ struct LUMIX_EDITOR_API WorldEditor
 	virtual void beginCommandGroup(const char* type) = 0;
 	virtual void endCommandGroup() = 0;
 	virtual void lockGroupCommand() = 0;
+	virtual void resetChangedFlag() = 0;
 	virtual void executeCommand(UniquePtr<IEditorCommand>&& command) = 0;
 	virtual bool isWorldChanged() const = 0;
 	virtual bool canUndo() const = 0;

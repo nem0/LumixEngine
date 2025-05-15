@@ -1381,6 +1381,8 @@ struct StudioAppImpl final : StudioApp {
 		Quat rot;
 		rot.fromEuler(Vec3(degreesToRadians(45.f), 0, 0));
 		m_editor->setEntitiesRotations(&env, &rot, 1);
+		m_editor->endCommandGroup();
+		m_editor->resetChangedFlag();
 	}
 
 	void tryLoadWorld(const Path& path, bool additive) override {

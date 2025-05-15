@@ -2288,6 +2288,8 @@ public:
 		((EndGroupCommand*)m_undo_stack.last().get())->locked = true;
 	}
 
+	void resetChangedFlag() override { m_is_world_changed = false; }
+
 	void endCommandGroup() override
 	{
 		if (m_undo_index < m_undo_stack.size() - 1)
