@@ -2591,7 +2591,7 @@ struct StudioAppImpl final : StudioApp {
 
 	static bool includeDirInExport(const char* filename) {
 		if (filename[0] == '.') return false;
-		if (startsWith(filename, "bin") == 0) return false;
+		if (startsWith(filename, "bin")) return false;
 		return true;
 	}
 
@@ -2624,7 +2624,7 @@ struct StudioAppImpl final : StudioApp {
 			infos.insert(rec.hash, rec);
 		}
 		exportDataScan("shaders/", infos);
-		exportDataScan("universes/", infos);
+		exportDataScan("maps/", infos);
 		
 		os::destroyFileIterator(iter);
 	}

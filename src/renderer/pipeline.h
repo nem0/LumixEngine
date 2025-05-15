@@ -124,6 +124,7 @@ struct LUMIX_RENDERER_API Pipeline {
 	virtual void clearDraw2D() = 0;
 	virtual gpu::TextureHandle getOutput() = 0;
 
+	virtual void blitOutputToScreen() = 0;
 	virtual PipelineType getType() const = 0;
 	virtual void copy(RenderBufferHandle dst, RenderBufferHandle src, IVec2 size, Vec4 r = Vec4(1, 0, 0, 0), Vec4 g = Vec4(0, 1, 0, 0), Vec4 b = Vec4(0, 0, 1, 0)) = 0;
 	virtual void beginBlock(const char* name, bool stats = false) = 0;

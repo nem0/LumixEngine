@@ -257,6 +257,7 @@ struct Runner final
 
 		m_pipeline->setViewport(m_viewport);
 		m_pipeline->render(false);
+		m_pipeline->blitOutputToScreen();
 		m_renderer->frame();
 	}
 

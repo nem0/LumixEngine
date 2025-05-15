@@ -589,6 +589,10 @@ struct PipelineImpl final : Pipeline {
 		stream.destroy(m_cluster_buffers.maps.buffer);
 		stream.destroy(m_cluster_buffers.env_probes.buffer);
 		stream.destroy(m_cluster_buffers.refl_probes.buffer);
+		
+		if (m_blit_screen_program) {
+			stream.destroy(m_blit_screen_program);
+		}
 
 		clearBuffers();
 	}
@@ -1496,6 +1500,63 @@ struct PipelineImpl final : Pipeline {
 		}
 
 		m_output = result;
+	}
+
+	void blitOutputToScreen() override {
+		PROFILE_FUNCTION();
+		DrawStream& stream = m_renderer.getDrawStream();
+		stream.beginProfileBlock("blit_to_screen", 0, true);
+
+		if (m_blit_screen_program == gpu::INVALID_PROGRAM) {
+			const char* src =
+				R"#(cbuffer State : register(b4) {
+						uint c_texture;
+					};
+
+					struct VSOutput {
+						float2 uv : TEXCOORD0;
+						float4 position : SV_POSITION;
+					};
+
+					float2 toScreenUV(float2 uv) {
+						#ifdef _ORIGIN_BOTTOM_LEFT
+							return uv;
+						#else
+							return float2(uv.x, 1 - uv.y);
+						#endif
+					}
+
+					float4 fullscreenQuad(int vertexID, out float2 screen_uv) {
+						screen_uv = float2((vertexID & 1) * 2, vertexID & 2);
+						return float4(toScreenUV(screen_uv) * 2 - 1, 0, 1);
+					}
+
+					VSOutput mainVS(uint vertex_id : SV_VertexID) {
+						VSOutput output;
+						output.position = fullscreenQuad(vertex_id, output.uv);
+						return output;
+					}
+
+					float4 mainPS(VSOutput input) : SV_Target {
+						return sampleBindlessLod(LinearSamplerClamp, c_texture, input.uv, 0);
+					}
+				)#";
+
+			gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLE_STRIP);
+			m_blit_screen_program = gpu::allocProgramHandle();
+			stream.createProgram(m_blit_screen_program, gpu::StateFlags::NONE, decl, src, gpu::ShaderType::SURFACE, nullptr, 0, "blit to screen");
+		}
+
+		stream.setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, gpu::FramebufferFlags::NONE);
+		stream.viewport(0, 0, m_viewport.w, m_viewport.h);
+		stream.useProgram(m_blit_screen_program);
+
+		gpu::BindlessHandle texture = gpu::getBindlessHandle(m_renderbuffers[m_output].handle);
+		
+		const Renderer::TransientSlice ub = m_renderer.allocUniform(&texture, sizeof(texture));
+		stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+		stream.drawArrays(0, 4);
+		stream.endProfileBlock();
 	}
 
 	bool render(bool only_2d) override {
@@ -3665,6 +3726,7 @@ struct PipelineImpl final : Pipeline {
 	Shader* m_lighting_shader = nullptr;
 	Shader* m_draw2d_shader = nullptr;
 	Shader* m_downscale_depth_shader = nullptr;
+	gpu::ProgramHandle m_blit_screen_program = gpu::INVALID_PROGRAM;
 	Array<UniquePtr<View>> m_views;
 	jobs::Signal m_buckets_ready;
 	Viewport m_viewport;
