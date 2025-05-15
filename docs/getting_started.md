@@ -8,7 +8,7 @@ You can get Lumix Engine from [itch.io](https://mikulasflorek.itch.io/lumix-engi
 
 * [Visual Studio 2022](https://www.visualstudio.com/en-us/downloads/download-visual-studio-vs.aspx) or compatible - MinGW is not supported
 
-Download [bootstrap batch file](../scripts/bootstrap.bat) and run it. The bootstrap file requires git in %PATH. It will fetch the repository, create Visual Studio solution and open it. After that you can build the solution and run the editor. If something fails or you do not want to use the batch file, [execute these 4 steps manually](../scripts/bootstrap.bat)
+Download [bootstrap batch file]([../scripts/bootstrap.bat](https://github.com/nem0/LumixEngine/blob/master/scripts/bootstrap.bat)) and run it. The bootstrap file requires git in %PATH. It will fetch the repository, create Visual Studio solution and open it. After that you can build the solution and run the editor. If something fails or you do not want to use the batch file, [execute these 4 steps manually](../scripts/bootstrap.bat)
 
 1. Download [source code](https://github.com/nem0/lumixengine).
 2. Run `scripts\genie.exe vs2022`, it genereates VS solution.
