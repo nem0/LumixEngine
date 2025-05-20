@@ -74,7 +74,7 @@ jobs:
               env:
                 BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
 
-            - uses: actions/upload-artifact@v3
+            - uses: actions/upload-artifact@v4
               with:
                 name: itch-io-dx
                 path: scripts/itch_io
