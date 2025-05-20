@@ -37,12 +37,12 @@ jobs:
                 git.exe clone https://github.com/nem0/lumixengine_market.git market
             
             - name: download physx
-              working-directory: scripts\3rdparty
+              working-directory: external\_repos
               run: |
                 git.exe clone --depth=1 https://github.com/nem0/PhysX.git physx
 
             - name: download Luau
-              working-directory: scripts\3rdparty
+              working-directory: external\_repos
               run: |
                 git.exe clone --depth=1 https://github.com/nem0/luau.git luau
             
