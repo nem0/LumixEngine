@@ -13,7 +13,7 @@ jobs:
             - name: make dirs
               run: |
                 mkdir plugins
-                mkdir scripts\3rdparty
+                mkdir external\_repos
                 mkdir scripts\itch_io
                 
             - name: fetch procedural geometry plugin
