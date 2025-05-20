@@ -49,7 +49,7 @@ jobs:
             - name: make VS project
               working-directory: scripts
               run: |
-                ./genie.exe --force-build-physx --force-build-luau --with-app vs2022
+                ./genie.exe --with-app vs2022
                 
             - name: get butler
               working-directory: scripts
