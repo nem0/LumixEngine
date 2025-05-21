@@ -145,6 +145,10 @@ void AnimationNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32
 
 SelectNode::~SelectNode() {
 	LUMIX_DELETE(m_allocator, m_value);
+	
+	for (PoseNode* child : m_children) {
+		LUMIX_DELETE(m_allocator, child);
+	}
 }
 
 SelectNode::SelectNode(IAllocator& allocator)
@@ -341,6 +345,7 @@ Time SwitchNode::time(const RuntimeContext& ctx) const { return Time(0); }
 IKNode::~IKNode() {
 	LUMIX_DELETE(m_allocator, m_alpha);
 	LUMIX_DELETE(m_allocator, m_input);
+	LUMIX_DELETE(m_allocator, m_effector_position);
 }
 
 IKNode::IKNode(IAllocator& allocator)
