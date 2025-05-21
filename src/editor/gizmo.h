@@ -35,7 +35,14 @@ struct LUMIX_EDITOR_API Config {
 	bool is_step = false;
 	Vec3 offset = {};
 	float scale = 1.f;
+	bool is_grab = false;
 
+	void grab();
+	void ungrab();
+	void lockXAxis();
+	void lockYAxis();
+	void lockZAxis();
+	
 	bool isTranslateMode() const { return mode == TRANSLATE; }
 	bool isRotateMode() const { return mode == ROTATE; }
 	bool isScaleMode() const { return mode == SCALE; }

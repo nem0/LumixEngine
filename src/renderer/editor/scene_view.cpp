@@ -990,6 +990,7 @@ void SceneView::manipulate() {
 		m_copy_moved = false;
 	}
 
+	if (m_view->isMouseClick(os::MouseButton::LEFT)) cfg.ungrab();
 	if (!Gizmo::manipulate((*selected)[0].index, *m_view, tr, cfg)) return;
 
 	if (copy_move && !m_copy_moved) {
@@ -1337,6 +1338,7 @@ void SceneView::handleEvents() {
 			case os::Event::Type::KEY: {
 				if (handle_input) {
 					if (event.key.down && event.key.keycode == os::Keycode::ESCAPE) {
+						m_app.getGizmoConfig().ungrab();
 						m_editor.selectEntities(Span((const EntityRef*)nullptr, (u64)0), false);
 					}
 				}
@@ -1623,6 +1625,10 @@ void SceneView::onGUI() {
 		else if (m_app.checkShortcut(m_translate_gizmo_mode)) m_app.getGizmoConfig().mode = Gizmo::Config::TRANSLATE;
 		else if (m_app.checkShortcut(m_rotate_gizmo_mode)) m_app.getGizmoConfig().mode = Gizmo::Config::ROTATE;
 		else if (m_app.checkShortcut(m_scale_gizmo_mode)) m_app.getGizmoConfig().mode = Gizmo::Config::SCALE;
+		else if (m_app.checkShortcut(m_grab_action)) m_app.getGizmoConfig().grab();
+		else if (m_app.checkShortcut(m_grab_x)) m_app.getGizmoConfig().lockXAxis();
+		else if (m_app.checkShortcut(m_grab_y)) m_app.getGizmoConfig().lockYAxis();
+		else if (m_app.checkShortcut(m_grab_z)) m_app.getGizmoConfig().lockZAxis();
 		else if (m_app.checkShortcut(m_snap_down)) snapDown();
 		else if (m_app.checkShortcut(m_create_entity)) {
 			const EntityRef e = editor.addEntity();

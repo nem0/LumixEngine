@@ -22,12 +22,12 @@ static const u32 SELECTED_COLOR = 0xff63cfcf;
 enum class Axis : u32
 {
 	NONE,
-	X,
-	Y,
-	Z,
-	XY,
-	XZ,
-	YZ
+	X = 1 << 0,
+	Y = 1 << 1,
+	Z = 1 << 2,
+	XY = X | Y,
+	XZ = X | Z,
+	YZ = Y | Z
 };
 
 enum class BoxAxis : u32 {
@@ -288,42 +288,71 @@ void draw(WorldView& view, const TranslationGizmo& gizmo, const Transform& tr, A
 	const Vec3 y = is_global ? gizmo.y : tr.rot.rotate(Vec3(0, scale, 0));
 	const Vec3 z = is_global ? gizmo.z : tr.rot.rotate(Vec3(0, 0, scale));
 
-	WorldView::Vertex* line_vertices = view.render(true, 6);
-	line_vertices[0].pos = rel_pos;
-	line_vertices[0].abgr = axis == Axis::X ? SELECTED_COLOR : X_COLOR;
-	line_vertices[1].pos = rel_pos + x;
-	line_vertices[1].abgr = line_vertices[0].abgr;
-	line_vertices[2].pos = rel_pos;
-	line_vertices[2].abgr = axis == Axis::Y ? SELECTED_COLOR : Y_COLOR;
-	line_vertices[3].pos = rel_pos + y;
-	line_vertices[3].abgr = line_vertices[2].abgr;
-	line_vertices[4].pos = rel_pos;
-	line_vertices[4].abgr = axis == Axis::Z ? SELECTED_COLOR : Z_COLOR;
-	line_vertices[5].pos = rel_pos + z;
-	line_vertices[5].abgr = line_vertices[4].abgr;
+	switch (cfg.is_grab ? axis : Axis::NONE) {
+		case Axis::X: {
+			WorldView::Vertex* line_vertices = view.render(true, 2);
+			line_vertices[0].pos = rel_pos - x * 10000;
+			line_vertices[0].abgr = SELECTED_COLOR;
+			line_vertices[1].pos = rel_pos + x * 10000;
+			line_vertices[1].abgr = SELECTED_COLOR;
+			break;
+		}
+		case Axis::Y: {
+			WorldView::Vertex* line_vertices = view.render(true, 2);
+			line_vertices[0].pos = rel_pos - y * 10000;
+			line_vertices[0].abgr = SELECTED_COLOR;
+			line_vertices[1].pos = rel_pos + y * 10000;
+			line_vertices[1].abgr = SELECTED_COLOR;
+			break;
+		}
+		case Axis::Z: {
+			WorldView::Vertex* line_vertices = view.render(true, 2);
+			line_vertices[0].pos = rel_pos - z * 10000;
+			line_vertices[0].abgr = SELECTED_COLOR;
+			line_vertices[1].pos = rel_pos + z * 10000;
+			line_vertices[1].abgr = SELECTED_COLOR;
+			break;
+		}
+		default: {
+			WorldView::Vertex* line_vertices = view.render(true, 6);
+			line_vertices[0].pos = rel_pos;
+			line_vertices[0].abgr = axis == Axis::X ? SELECTED_COLOR : X_COLOR;
+			line_vertices[1].pos = rel_pos + x;
+			line_vertices[1].abgr = line_vertices[0].abgr;
+			line_vertices[2].pos = rel_pos;
+			line_vertices[2].abgr = axis == Axis::Y ? SELECTED_COLOR : Y_COLOR;
+			line_vertices[3].pos = rel_pos + y;
+			line_vertices[3].abgr = line_vertices[2].abgr;
+			line_vertices[4].pos = rel_pos;
+			line_vertices[4].abgr = axis == Axis::Z ? SELECTED_COLOR : Z_COLOR;
+			line_vertices[5].pos = rel_pos + z;
+			line_vertices[5].abgr = line_vertices[4].abgr;
 
-	WorldView::Vertex* vertices = view.render(false, 9);
+			WorldView::Vertex* vertices = view.render(false, 9);
 
-	vertices[0].pos = rel_pos;
-	vertices[0].abgr = axis == Axis::XY ? SELECTED_COLOR : Z_COLOR;
-	vertices[1].pos = rel_pos + gizmo.x * 0.5f;
-	vertices[1].abgr = vertices[0].abgr;
-	vertices[2].pos = rel_pos + gizmo.y * 0.5f;
-	vertices[2].abgr = vertices[0].abgr;
+			vertices[0].pos = rel_pos;
+			vertices[0].abgr = axis == Axis::XY ? SELECTED_COLOR : Z_COLOR;
+			vertices[1].pos = rel_pos + gizmo.x * 0.5f;
+			vertices[1].abgr = vertices[0].abgr;
+			vertices[2].pos = rel_pos + gizmo.y * 0.5f;
+			vertices[2].abgr = vertices[0].abgr;
 
-	vertices[3].pos = rel_pos;
-	vertices[3].abgr = axis == Axis::YZ ? SELECTED_COLOR : X_COLOR;
-	vertices[4].pos = rel_pos + gizmo.y * 0.5f;
-	vertices[4].abgr = vertices[3].abgr;
-	vertices[5].pos = rel_pos + gizmo.z * 0.5f;
-	vertices[5].abgr = vertices[3].abgr;
+			vertices[3].pos = rel_pos;
+			vertices[3].abgr = axis == Axis::YZ ? SELECTED_COLOR : X_COLOR;
+			vertices[4].pos = rel_pos + gizmo.y * 0.5f;
+			vertices[4].abgr = vertices[3].abgr;
+			vertices[5].pos = rel_pos + gizmo.z * 0.5f;
+			vertices[5].abgr = vertices[3].abgr;
 
-	vertices[6].pos = rel_pos;
-	vertices[6].abgr = axis == Axis::XZ ? SELECTED_COLOR : Y_COLOR;
-	vertices[7].pos = rel_pos + gizmo.x * 0.5f;
-	vertices[7].abgr = vertices[6].abgr;
-	vertices[8].pos = rel_pos + gizmo.z * 0.5f;
-	vertices[8].abgr = vertices[6].abgr;
+			vertices[6].pos = rel_pos;
+			vertices[6].abgr = axis == Axis::XZ ? SELECTED_COLOR : Y_COLOR;
+			vertices[7].pos = rel_pos + gizmo.x * 0.5f;
+			vertices[7].abgr = vertices[6].abgr;
+			vertices[8].pos = rel_pos + gizmo.z * 0.5f;
+			vertices[8].abgr = vertices[6].abgr;
+			break;
+		}
+	}
 }
 
 void renderQuarterRing(WorldView& view, const Vec3& p, const Vec3& a, const Vec3& b, u32 color) {
@@ -547,20 +576,29 @@ bool translate(u64 id, WorldView& view, Transform& tr, const Gizmo::Config& cfg)
 	}
 
 	if (none_active) {
-		const Axis axis = collide(gizmo, tr, view, cfg);
-		if (axis != Axis::NONE) g_gizmo_state.active_id = id;
-		else if (g_gizmo_state.active_id == id) g_gizmo_state.active_id = ~(u64)0;
-		draw(view, gizmo, tr, axis, cfg);
-		if (view.isMouseClick(os::MouseButton::LEFT) && axis != Axis::NONE) {
+		if (cfg.is_grab) {
+			g_gizmo_state.active_id = id;
 			g_gizmo_state.dragged_id = id;
-			g_gizmo_state.axis = axis;
 			g_gizmo_state.prev_point = getMousePlaneIntersection(view, gizmo, g_gizmo_state.axis);
 			g_gizmo_state.start_pos = gizmo.pos;
+			draw(view, gizmo, tr, g_gizmo_state.axis, cfg);
+		}
+		else {
+			const Axis axis = collide(gizmo, tr, view, cfg);
+			if (axis != Axis::NONE) g_gizmo_state.active_id = id;
+			else if (g_gizmo_state.active_id == id) g_gizmo_state.active_id = ~(u64)0;
+			draw(view, gizmo, tr, axis, cfg);
+			if (view.isMouseClick(os::MouseButton::LEFT) && axis != Axis::NONE) {
+				g_gizmo_state.dragged_id = id;
+				g_gizmo_state.axis = axis;
+				g_gizmo_state.prev_point = getMousePlaneIntersection(view, gizmo, g_gizmo_state.axis);
+				g_gizmo_state.start_pos = gizmo.pos;
+			}
 		}
 		return false;
 	}
 
-	if (!view.isMouseDown(os::MouseButton::LEFT)) {
+	if (!view.isMouseDown(os::MouseButton::LEFT) && !cfg.is_grab) {
 		g_gizmo_state.dragged_id = ~(u64)0;
 		g_gizmo_state.axis = Axis::NONE;
 		return false;
@@ -851,6 +889,38 @@ bool manipulate(u64 id, WorldView& view, Transform& tr, const Config& cfg) {
 	}
 	ASSERT(false);
 	return false;
+}
+
+void Config::lockXAxis() {
+	if (!is_grab) return;
+
+	g_gizmo_state.dragged_id = ~(u64)0;
+	g_gizmo_state.axis = Axis::X;
+}
+
+void Config::lockYAxis() {
+	if (!is_grab) return;
+
+	g_gizmo_state.dragged_id = ~(u64)0;
+	g_gizmo_state.axis = Axis::Y;
+}
+
+void Config::lockZAxis() {
+	if (!is_grab) return;
+	
+	g_gizmo_state.dragged_id = ~(u64)0;
+	g_gizmo_state.axis = Axis::Z;
+}
+
+void Config::ungrab() {
+	is_grab = false;
+	g_gizmo_state.dragged_id = ~(u64)0;
+}
+
+void Config::grab() {
+	is_grab = true;
+	g_gizmo_state.axis = Axis::X;
+	g_gizmo_state.dragged_id = ~(u64)0;
 }
 
 } // namespace Gizmo

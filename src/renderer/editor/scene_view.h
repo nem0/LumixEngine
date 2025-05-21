@@ -76,6 +76,10 @@ private:
 	Action m_translate_gizmo_mode{"Translate", "Gizmo - translate mode", "gizmo_translate_mode", ICON_FA_ARROWS_ALT};
 	Action m_rotate_gizmo_mode{"Rotate", "Gizmo - rotate mode", "gizmo_rotate_mode", ICON_FA_UNDO};
 	Action m_scale_gizmo_mode{"Scale", "Gizmo - scale mode", "gizmo_scale_mode", ICON_FA_EXPAND_ALT};
+	Action m_grab_action{"Grab", "Gizmo - grab mode", "gizmo_grab_mode", ICON_FA_HAND_PAPER};
+	Action m_grab_x{"X", "Gizmo - grab X axis", "gizmo_grab_x", ""};
+	Action m_grab_y{"Y", "Gizmo - grab Y axis", "gizmo_grab_y", ""};
+	Action m_grab_z{"Z", "Gizmo - grab Z axis", "gizmo_grab_z", ""};
 	Action m_local_coord_gizmo{"Local", "Gizmo - local transform system", "gizmo_local_coord", ICON_FA_HOME};
 	Action m_global_coord_gizmo{"Global", "Gizmo - global transform system", "gizmo_global_coord", ICON_FA_GLOBE};
 	Action m_create_entity{"Create empty", "Entity - create new", "entity_create", ICON_FA_PLUS_SQUARE};
