@@ -59,6 +59,7 @@ struct Scope
 
 // reading API
 
+LUMIX_CORE_API u32 getOpenBlocks(Span<const char*> output);
 LUMIX_CORE_API bool contextSwitchesEnabled();
 LUMIX_CORE_API u64 frequency();
 LUMIX_CORE_API u64 getThreadContextMemorySize();

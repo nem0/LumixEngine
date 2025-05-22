@@ -5,7 +5,6 @@
 #pragma warning (disable: 4091) // declaration of 'xx' hides previous local declaration
 #include <DbgHelp.h>
 #pragma warning (pop)
-#include <mapi.h>
 
 #include "core/atomic.h"
 #include "core/crt.h"
@@ -13,6 +12,7 @@
 #include "core/log.h"
 #include "core/os.h"
 #include "core/path.h"
+#include "core/profiler.h"
 #include "core/string.h"
 #include "core/tag_allocator.h"
 
@@ -514,61 +514,6 @@ void* Allocator::reallocate(void* user_ptr, size_t new_size, size_t old_size, si
 
 } // namespace Debug
 
-
-BOOL SendFile(LPCSTR lpszSubject,
-	LPCSTR lpszTo,
-	LPCSTR lpszName,
-	LPCSTR lpszText,
-	LPCSTR lpszFullFileName)
-{
-	HINSTANCE hMAPI = ::LoadLibrary("mapi32.dll");
-	if (!hMAPI) return FALSE;
-	LPMAPISENDMAIL lpfnMAPISendMail = (LPMAPISENDMAIL)::GetProcAddress(hMAPI, "MAPISendMail");
-
-	PathInfo fi(lpszFullFileName);
-
-	StaticString<MAX_PATH> szFileName(fi.basename, ".", fi.extension);
-
-	char szFullFileName[MAX_PATH] = {0};
-	strcat_s(szFullFileName, lpszFullFileName);
-
-	MapiFileDesc MAPIfile = {0};
-	ZeroMemory(&MAPIfile, sizeof(MapiFileDesc));
-	MAPIfile.nPosition = 0xFFFFFFFF;
-	MAPIfile.lpszPathName = szFullFileName;
-	MAPIfile.lpszFileName = szFileName.data;
-
-	char szTo[MAX_PATH] = {0};
-	strcat_s(szTo, lpszTo);
-
-	char szNameTo[MAX_PATH] = {0};
-	strcat_s(szNameTo, lpszName);
-
-	MapiRecipDesc recipient = {0};
-	recipient.ulRecipClass = MAPI_TO;
-	recipient.lpszAddress = szTo;
-	recipient.lpszName = szNameTo;
-
-	char szSubject[MAX_PATH] = {0};
-	strcat_s(szSubject, lpszSubject);
-
-	char szText[MAX_PATH] = {0};
-	strcat_s(szText, lpszText);
-
-	MapiMessage MAPImsg = {0};
-	MAPImsg.lpszSubject = szSubject;
-	MAPImsg.lpRecips = &recipient;
-	MAPImsg.nRecipCount = 1;
-	MAPImsg.lpszNoteText = szText;
-	MAPImsg.nFileCount = 1;
-	MAPImsg.lpFiles = &MAPIfile;
-
-	ULONG nSent = lpfnMAPISendMail(0, 0, &MAPImsg, 0, 0);
-
-	FreeLibrary(hMAPI);
-	return (nSent == SUCCESS_SUCCESS || nSent == MAPI_E_USER_ABORT);
-}
-
 static void getStack(CONTEXT& context, Span<char> out)
 {
 	BOOL result;
@@ -576,7 +521,7 @@ static void getStack(CONTEXT& context, Span<char> out)
 	alignas(IMAGEHLP_SYMBOL64) char symbol_mem[sizeof(IMAGEHLP_SYMBOL64) + 256];
 	IMAGEHLP_SYMBOL64* symbol = (IMAGEHLP_SYMBOL64*)symbol_mem;
 	char name[256];
-	copyString(out, "Crash callstack:\n");
+	catString(out, "Crash callstack:\n");
 	memset(&stack, 0, sizeof(STACKFRAME64));
 
 	HANDLE process = GetCurrentProcess();
@@ -653,23 +598,33 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 	{
 		LPEXCEPTION_POINTERS info;
 		DWORD thread_id;
+		StaticString<4096> message;
 	};
 
+	CrashInfo crash_info = { info, GetCurrentThreadId() };
+
+	// add profiler stack to message for casses where we don't have PDBs
+	// we can't do this on dumper thread, because it does not have access to other thread's data
+	const char* open_blocks[16];
+	u32 num_open_blocks = profiler::getOpenBlocks(Span(open_blocks));
+	if (num_open_blocks > lengthOf(open_blocks)) num_open_blocks = lengthOf(open_blocks);
+	crash_info.message.append("Profiler stack:\n");
+	for (u32 i = 0; i < num_open_blocks; ++i) {
+		crash_info.message.append(open_blocks[i], "\n");
+	}
+	crash_info.message.append("\n");
+	
 	auto dumper = [](void* data) -> DWORD {
 		LPEXCEPTION_POINTERS info = ((CrashInfo*)data)->info;
+		auto& message = ((CrashInfo*)data)->message;
 		uintptr base = (uintptr)GetModuleHandle(NULL);
-		StaticString<4096> message;
-		if(info)
-		{
+
+		if (info) {
 			getStack(*info->ContextRecord, Span(message.data));
 			message.append("\nCode: ", (u32)info->ExceptionRecord->ExceptionCode);
 			message.append("\nAddress: ", (uintptr)info->ExceptionRecord->ExceptionAddress);
 			message.append("\nBase: ", (uintptr)base);
 			os::messageBox(message);
-		}
-		else
-		{
-			message = "";
 		}
 
 		char minidump_path[MAX_PATH];
@@ -678,8 +633,7 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 
 		HANDLE process = GetCurrentProcess();
 		DWORD process_id = GetProcessId(process);
-		HANDLE file = CreateFile(
-			minidump_path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+		HANDLE file = CreateFile(minidump_path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
 		MINIDUMP_TYPE minidump_type = (MINIDUMP_TYPE)(
 			MiniDumpWithFullMemoryInfo | MiniDumpFilterMemory | MiniDumpWithHandleData |
 			MiniDumpWithThreadInfo | MiniDumpWithUnloadedModules);
@@ -701,8 +655,7 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 		minidump_type = (MINIDUMP_TYPE)(MiniDumpWithFullMemory | MiniDumpWithFullMemoryInfo |
 			MiniDumpFilterMemory | MiniDumpWithHandleData |
 			MiniDumpWithThreadInfo | MiniDumpWithUnloadedModules);
-		file = CreateFile(
-			"fulldump.dmp", GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+		file = CreateFile("fulldump.dmp", GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
 		MiniDumpWriteDump(process,
 			process_id,
 			file,
@@ -712,23 +665,14 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 			nullptr);
 
 		CloseHandle(file);
-
-		SendFile("Lumix Studio crash",
-			"SMTP:mikulas.florek@gamedev.sk",
-			"Lumix Studio",
-			message,
-			minidump_path);
 		return 0;
 	};
 
 	DWORD thread_id;
-	CrashInfo crash_info = { info, GetCurrentThreadId() };
-	auto handle = CreateThread(0, 0x8000, dumper, &crash_info, 0, &thread_id);
+	HANDLE handle = CreateThread(0, 0x8000, dumper, &crash_info, 0, &thread_id);
 	WaitForSingleObject(handle, INFINITE);
 
-	StaticString<4096> message;
-	getStack(*info->ContextRecord, Span(message.data));
-	logError(message);
+	logError(crash_info.message);
 
 	return EXCEPTION_CONTINUE_SEARCH;
 }

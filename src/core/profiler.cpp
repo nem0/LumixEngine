@@ -70,7 +70,12 @@ struct ThreadContext {
 		buffer.resize(buffer_size);
 	}
 
-	i32 open_block_stack[16];
+	struct OpenBlock {
+		i32 id;
+		const char* name;
+	};
+
+	OpenBlock open_block_stack[16];
 	u32 open_block_stack_size = 0;
 	
 	// we write to `tmp` until it's full, then we flush it to the `buffer`
@@ -392,11 +397,24 @@ void beginJob(i32 signal_on_finish) {
 	r.signal_on_finish = signal_on_finish;
 
 	if (ctx->open_block_stack_size < lengthOf(ctx->open_block_stack)) {
-		ctx->open_block_stack[ctx->open_block_stack_size] = r.id;
+		ctx->open_block_stack[ctx->open_block_stack_size].id = r.id;
+		ctx->open_block_stack[ctx->open_block_stack_size].name = "job";
 	}
 	++ctx->open_block_stack_size;
 
 	write<false>(*ctx, os::Timer::getRawTimestamp(), EventType::BEGIN_JOB, r);
+}
+
+u32 getOpenBlocks(Span<const char*> output) {
+	ThreadContext* ctx = g_instance.getThreadContext();
+	
+	for (u32 i = 0; i < ctx->open_block_stack_size; ++i) {
+		if (i >= output.length()) break;
+
+		output[i] = ctx->open_block_stack[i].name;
+	}
+
+	return ctx->open_block_stack_size;
 }
 
 void beginBlock(const char* name) {
@@ -406,7 +424,7 @@ void beginBlock(const char* name) {
 	ThreadContext* ctx = g_instance.getThreadContext();
 
 	if (ctx->open_block_stack_size < lengthOf(ctx->open_block_stack)) {
-		ctx->open_block_stack[ctx->open_block_stack_size] = r.id;
+		ctx->open_block_stack[ctx->open_block_stack_size] = { r.id, name };
 	}
 	++ctx->open_block_stack_size;
 	
@@ -553,7 +571,7 @@ void endFiberWait(const FiberSwitchData& switch_data) {
 	for (u32 i = 0; i < count; ++i) {
 		const i32 block_id = i < lengthOf(switch_data.blocks) ? switch_data.blocks[i] : -1;
 		if (ctx->open_block_stack_size < lengthOf(ctx->open_block_stack)) {
-			ctx->open_block_stack[ctx->open_block_stack_size] = block_id;
+			ctx->open_block_stack[ctx->open_block_stack_size] = {block_id, "N/A"};
 		}
 		++ctx->open_block_stack_size;
 		write<false>(*ctx, now, EventType::CONTINUE_BLOCK, block_id);
