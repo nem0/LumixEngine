@@ -249,9 +249,11 @@ Span<u8> OutputPagedStream::reserve(u32 size) {
 }
 
 bool OutputPagedStream::write(const void* data, u64 size) {
+	const u8* src = (const u8*)data;
 	while (size > 0) {
 		Span<u8> dst = reserve((u32)size);
-		memcpy(dst.begin(), data, dst.length());
+		memcpy(dst.begin(), src, dst.length());
+		src += dst.length(); 
 		size -= dst.length();
 	}
 	return true;
@@ -275,6 +277,7 @@ bool InputPagedStream::read(void* buffer, u64 size) {
 		}
 		const u32 chunk_size = minimum(u32(size), m_page->size - m_page_pos);
 		memcpy(dst, m_page->data + m_page_pos, chunk_size);
+		dst += chunk_size;
 		m_page_pos += chunk_size;
 		size -= chunk_size;
 	}
