@@ -116,6 +116,7 @@ struct AssetCompilerImpl : AssetCompiler {
 	}
 	
 	void onBasePathChanged() override {
+		PROFILE_FUNCTION();
  		Engine& engine = m_app.getEngine();
 		FileSystem& fs = engine.getFileSystem();
 		const char* base_path = fs.getBasePath();
