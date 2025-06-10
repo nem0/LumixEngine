@@ -25,7 +25,7 @@ struct LUMIX_CORE_API IInputStream {
 	virtual bool read(void* buffer, u64 size) = 0;
 	virtual u64 size() const = 0;
 	
-	template <typename T> void read(T& value) { read(&value, sizeof(T)); }
+	template <typename T> bool read(T& value) { return read(&value, sizeof(T)); }
 	template <typename T> T read();
 	template <typename T> void readArray(Array<T>* array);
 };

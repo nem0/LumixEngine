@@ -73,6 +73,9 @@ struct Atmo : public RenderPlugin {
 			float fog_top;
 			float fog_enabled;
 			float godarys_enabled;
+			float clouds_enabled;
+			float clouds_top;
+			float clouds_bot;
 			gpu::RWBindlessHandle output;
 			gpu::BindlessHandle optical_depth;
 			gpu::BindlessHandle depth_buffer;
@@ -91,6 +94,9 @@ struct Atmo : public RenderPlugin {
 			env.fog_top,
 			env.fog_density > 0 ? 1.f : 0.f,
 			env.godrays_enabled ? 1.f : 0.f,
+			env.clouds_enabled ? 1.f : 0.f,
+			env.clouds_top,
+			env.clouds_bottom,
 			gpu::getRWBindlessHandle(m_optical_depth_precomputed),
 			gpu::INVALID_BINDLESS_HANDLE,
 			pipeline.toBindless(gbuffer.DS, stream),

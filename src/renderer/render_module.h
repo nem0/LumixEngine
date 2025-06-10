@@ -134,6 +134,9 @@ struct Environment {
 	float fog_top = 100;
 	bool godrays_enabled = false;
 	bool atmo_enabled = true;
+	bool clouds_enabled = false;
+	float clouds_top = 4000;
+	float clouds_bottom = 2000;
 };
 
 struct PointLight {
@@ -305,6 +308,7 @@ enum class RenderModuleVersion : i32 {
 	EMIT_RATE_REMOVED,
 	POSTPROCESS,
 	FOG_DENSITY,
+	CLOUDS,
 
 	LATEST
 };

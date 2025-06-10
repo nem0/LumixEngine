@@ -20,6 +20,9 @@ cbuffer Data : register (b4) {
 	float u_fog_top;
 	float u_fog_enabled;
 	float u_godrays_enabled;
+	float u_clouds_enabled;
+	float u_clouds_top;
+	float u_clouds_bottom;
 	RWTextureHandle u_output;
 	TextureHandle u_optical_depth;
 	TextureHandle u_depth_buffer;
@@ -136,9 +139,6 @@ float worleyNoise(float3 p) {
 	return min_dist;
 }
 
-static const float CLOUD_TOP = 4000;
-static const float CLOUD_BOT = 2000;
-
 float cloudPhase(float g, float cos_theta) {
 	// Double Henyey-Greenstein phase function with Schlick approximation
 	float w = 0.7;          // weight (favoring forward scattering)
@@ -180,7 +180,7 @@ float3 multipleOctaves(float extinction, float mu, float stepL){
 
 float cloudDensity(float3 pos, float coverage) {
 	// use perlin worley noise
-	float height = (pos.y - CLOUD_BOT) / (CLOUD_TOP - CLOUD_BOT);
+	float height = (pos.y - u_clouds_bottom) / (u_clouds_top - u_clouds_bottom);
 	float height_factor = 1.0 - abs(height - 0.2) * 1.25;
 	height_factor = saturate(height_factor);
 
@@ -222,7 +222,7 @@ Cloud cloud(float2 screen_uv) {
 	float3 cam_pos = Global_camera_world_pos.xyz/* + Global_time * float3(1000, 0, 1)*/;
 	
 	// Early exit if looking down and below clouds or looking up and above clouds
-	if ((eyedir.y < 0 && cam_pos.y < CLOUD_BOT) || (eyedir.y > 0 && cam_pos.y > CLOUD_TOP)) {
+	if ((eyedir.y < 0 && cam_pos.y < u_clouds_bottom) || (eyedir.y > 0 && cam_pos.y > u_clouds_top)) {
 		return result;
 	}
 	
@@ -232,8 +232,8 @@ Cloud cloud(float2 screen_uv) {
 	
 	if (abs(eyedir.y) > 0.0001) {
 		// Calculate intersections with cloud bottom and top planes
-		float t_bottom = (CLOUD_BOT - cam_pos.y) / eyedir.y;
-		float t_top = (CLOUD_TOP - cam_pos.y) / eyedir.y;
+		float t_bottom = (u_clouds_bottom - cam_pos.y) / eyedir.y;
+		float t_top = (u_clouds_top - cam_pos.y) / eyedir.y;
 		result.t_bottom = t_bottom;
 		
 		// Ensure correct order based on view direction
@@ -246,7 +246,7 @@ Cloud cloud(float2 screen_uv) {
 		}
 	} else {
 		// Looking parallel to horizon (no intersection with cloud layer)
-		if (cam_pos.y < CLOUD_BOT || cam_pos.y > CLOUD_TOP) {
+		if (cam_pos.y < u_clouds_bottom || cam_pos.y > u_clouds_top) {
 			return result;
 		}
 		// Inside cloud layer looking horizontally
@@ -280,7 +280,7 @@ Cloud cloud(float2 screen_uv) {
 		float3 pos = cam_pos + eyedir * t;
 		
 		// we are outside of clouds, abort
-		if (pos.y < CLOUD_BOT || pos.y > CLOUD_TOP) break;
+		if (pos.y < u_clouds_bottom || pos.y > u_clouds_top) break;
 		
 		float density = cloudDensity(pos, coverage);
 		
@@ -295,7 +295,7 @@ Cloud cloud(float2 screen_uv) {
 			for (int j = 0; j < LIGHT_SAMPLES; j++) {
 				light_pos += Global_light_dir.xyz * light_step;
 				// Skip shadow samples outside cloud layer
-				if (light_pos.y >= CLOUD_BOT && light_pos.y <= CLOUD_TOP) {
+				if (light_pos.y >= u_clouds_bottom && light_pos.y <= u_clouds_top) {
 					shadow += cloudDensity(light_pos, coverage) * light_step * 0.05;
 				}
 			}
@@ -308,7 +308,7 @@ Cloud cloud(float2 screen_uv) {
 			float3 sunlight = u_sunlight.rgb * u_sunlight.a;
 			
 			// Ambient sky color
-			float height = (pos.y - CLOUD_BOT) / (CLOUD_TOP - CLOUD_BOT);
+			float height = (pos.y - u_clouds_bottom) / (u_clouds_top - u_clouds_bottom);
 			float3 ambient = sunlight * lerp(0.01, 0.04, height);
 
 			float luminance = sunlight * light_transmittance * hg_phase + ambient;
@@ -361,8 +361,6 @@ void main(uint3 thread_id : SV_DispatchThreadID) {
 	}
 	else {
 		// sky is visible
-		float sun_spot = smoothstep(0.0, 1000.0, phase(cos_theta, 0.9995)) * 200;
-
 		float2 v = 1;
 		v.y = max(0, eyedir.y);
 	
@@ -374,20 +372,24 @@ void main(uint3 thread_id : SV_DispatchThreadID) {
 		float4 insc = sampleBindlessLod(LinearSamplerClamp, u_inscatter, v, 0);
 		float p_height = saturate((length(p) - u_bot) / (u_top - u_bot));
 		float2 opt_depth = sampleBindlessLod(LinearSamplerClamp, u_optical_depth, float2(abs(eyedir.y), p_height), 0).xy;
-		atmo.rgb = 
+		atmo.rgb =
 			insc.aaa * miePhase(0.75, -cos_theta) * sunlight * u_scatter_mie.rgb
 			+ insc.rgb * rayleighPhase(-cos_theta) * sunlight * u_scatter_rayleigh.rgb
 			;
 
-		/*
-		Cloud cl = cloud(uv);
-		float t = saturate(cl.t_bottom / 80000);
-		atmo.rgb = (1 - t) * atmo.rgb * cl.transmittance // atmo behind the cloud
-			+ cl.color // cloud
-			+ (t) * atmo.rgb; // atmo in front of the cloud
-		
-		atmo.rgb += sun_spot * exp(-opt_depth.x * extinction_rayleigh - opt_depth.y * extinction_mie) * (1 - t) * cl.transmittance;
-		*/
+		float sun_spot = smoothstep(0.0, 1000.0, phase(cos_theta, 0.9995)) * 200;
+		sun_spot *= exp(-opt_depth.x * extinction_rayleigh - opt_depth.y * extinction_mie);
+
+		if (u_clouds_enabled > 0) {
+			Cloud cl = cloud(uv);
+			float t = saturate(cl.t_bottom / 80000);
+			atmo.rgb = (1 - t) * atmo.rgb * cl.transmittance // atmo behind the cloud
+				+ cl.color // cloud
+				+ t * atmo.rgb; // atmo in front of the cloud
+			
+			sun_spot *= (1 - t) * cl.transmittance;
+		}
+		atmo.rgb += sun_spot;
 	}
 
 	if (u_fog_enabled > 0) {

@@ -14,6 +14,9 @@ cbuffer Data :register(b4) {
 	float u_fog_top;
 	float u_fog_enabled;
 	float u_godarys_enabled;
+	float u_clouds_enabled;
+	float u_clouds_top;
+	float u_clouds_bottom;
 	RWTextureHandle u_output;
 };
 

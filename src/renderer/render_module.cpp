@@ -623,6 +623,9 @@ struct RenderModuleImpl final : RenderModule {
 			serializer.write(env.fog_top);
 			serializer.write(env.atmo_enabled);
 			serializer.write(env.godrays_enabled);
+			serializer.write(env.clouds_enabled);
+			serializer.write(env.clouds_top);
+			serializer.write(env.clouds_bottom);
 			serializer.write(env.fog_density);
 		}
 		serializer.write(m_active_global_light_entity);
@@ -1133,6 +1136,11 @@ struct RenderModuleImpl final : RenderModule {
 					env.fog_density = fog_enabled ? 1.f : 0.0f;
 				}
 				serializer.read(env.godrays_enabled);
+				if (version > (i32)RenderModuleVersion::CLOUDS) {
+					serializer.read(env.clouds_enabled);
+					serializer.read(env.clouds_top);
+					serializer.read(env.clouds_bottom);
+				}
 				if (version > (i32)RenderModuleVersion::FOG_DENSITY) {
 					serializer.read(env.fog_density);
 				}
@@ -3485,6 +3493,9 @@ void RenderModule::reflect() {
 			.LUMIX_PROP(SkyTexturePath, "Sky texture").resourceAttribute(Texture::TYPE)
 			.var_prop<&RenderModule::getEnvironment, &Environment::atmo_enabled>("Atmosphere enabled")
 			.var_prop<&RenderModule::getEnvironment, &Environment::godrays_enabled>("Godrays enabled")
+			.var_prop<&RenderModule::getEnvironment, &Environment::clouds_enabled>("Clouds enabled")
+			.var_prop<&RenderModule::getEnvironment, &Environment::clouds_top>("Clouds top")
+			.var_prop<&RenderModule::getEnvironment, &Environment::clouds_bottom>("Clouds bottom")
 			.var_prop<&RenderModule::getEnvironment, &Environment::sky_intensity>("Sky intensity").minAttribute(0)
 			.var_prop<&RenderModule::getEnvironment, &Environment::scatter_rayleigh>("Scatter Rayleigh").colorAttribute()
 			.var_prop<&RenderModule::getEnvironment, &Environment::scatter_mie>("Scatter Mie").colorAttribute()
