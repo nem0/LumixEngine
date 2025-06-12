@@ -4943,7 +4943,18 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 
 		for (int i = 0, c = cmd_list->CmdBuffer.size(); i < c; ++i) {
 			const ImDrawCmd* pcmd = &cmd_list->CmdBuffer[i];
-			ASSERT(!pcmd->UserCallback);
+			if (pcmd->UserCallback) {
+				if (ImDrawCallback_ResetRenderState == pcmd->UserCallback) {
+					stream.useProgram(program);
+					stream.bindIndexBuffer(ib.buffer);
+					stream.bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(ImDrawVert));
+					stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+				}
+				else {
+					pcmd->UserCallback(cmd_list, pcmd);
+				}
+				continue;
+			}
 			if (0 == pcmd->ElemCount) continue;
 
 			gpu::TextureHandle tex = (gpu::TextureHandle)(intptr_t)pcmd->TextureId;
@@ -4954,6 +4965,8 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 			uniform_data->scale = scale;
 			uniform_data->offset = offset;
 			uniform_data->texture_handle = gpu::getBindlessHandle(tex);
+			static os::Timer timer;
+			uniform_data->time = timer.getTimeSinceStart();
 			stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 
 			const u32 h = u32(clamp((pcmd->ClipRect.w - pcmd->ClipRect.y), 0.f, 65535.f));
@@ -4980,6 +4993,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 		Vec2 scale;
 		Vec2 offset;
 		gpu::BindlessHandle texture_handle;
+		float time;
 	};
 
 	void guiEndFrame() override {
@@ -5012,6 +5026,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 							float2 c_scale;
 							float2 c_offset;
 							uint c_texture;
+							float c_time;
 						};
 
 						struct VSOutput {
