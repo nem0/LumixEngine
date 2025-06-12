@@ -368,6 +368,8 @@ struct AssetCompilerImpl : AssetCompiler {
 	}
 
 	void fillDB() {
+		if (m_plugins.empty()) return;
+
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		const Path list_path(fs.getBasePath(), ".lumix/resources/_resources.txt");
 		OutputMemoryStream content(m_allocator);
