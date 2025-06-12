@@ -225,7 +225,7 @@ struct System {
 
 static Local<System> g_system;
 
-static AtomicI32 g_generation = 0;
+static AtomicI32 g_generation = 1;
 static thread_local WorkerTask* g_worker = nullptr;
 
 #ifndef _WIN32
