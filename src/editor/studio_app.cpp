@@ -2597,8 +2597,11 @@ struct StudioAppImpl final : StudioApp {
 			}
 		}
 
-		for (IPlugin* plugin : m_plugins) {
-			plugin->init();
+		{
+			PROFILE_BLOCK("init plugins");
+			for (IPlugin* plugin : m_plugins) {
+				plugin->init();
+			}
 		}
 
 		for (const reflection::RegisteredComponent& cmp : reflection::getComponents()) {

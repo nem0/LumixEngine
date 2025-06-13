@@ -43,6 +43,8 @@ struct LUMIX_EDITOR_API Action {
 
 	Action(const char* label_short, const char* label_long, const char* name, const char* font_icon, Type type = NORMAL);
 	~Action();
+	Action(const Action&) = delete;
+	void operator =(const Action&) = delete;
 	bool toolbarButton(struct ImFont* font, bool is_selected = false);
 	bool isActive() const;
 	bool iconButton(bool enabled = true, struct StudioApp* app = nullptr);

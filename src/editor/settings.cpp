@@ -38,10 +38,11 @@ static bool shortcutInput(char* button_label, Action& action, bool edit, StudioA
 	ImGuiStyle& style = ImGui::GetStyle();
 	ImVec2 prev = style.ButtonTextAlign;
 	style.ButtonTextAlign.x = 0;
-	static Action editing = action;
+	static Action editing{"Temporary action", "Temporary action", "temporary_action", nullptr };
 	if (ImGui::Button(button_label, ImVec2(-30, 0))) {
 		openCenterStrip("edit_shortcut_popup");
-		editing = action;
+		editing.shortcut = action.shortcut;
+		editing.modifiers = action.modifiers;
 		app.setCaptureInput(true);
 	}
 	style.ButtonTextAlign = prev;
@@ -87,7 +88,8 @@ static bool shortcutInput(char* button_label, Action& action, bool edit, StudioA
 					editing.shortcut = os::Keycode::INVALID;
 					break;
 				case os::Keycode::RETURN:
-					action = editing;
+					action.shortcut = editing.shortcut;
+					action.modifiers = editing.modifiers;
 					app.setCaptureInput(false);
 					ImGui::CloseCurrentPopup();
 					break;
