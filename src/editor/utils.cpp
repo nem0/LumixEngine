@@ -2088,11 +2088,13 @@ Action::Action(const char* label_short, const char* label_long, const char* name
 	, shortcut(os::Keycode::INVALID)
 	, type(type)
 {
-	if (first_action) {
-		first_action->prev = this;
+	if (type != TEMPORARY) {
+		if (first_action) {
+			first_action->prev = this;
+		}
+		next = first_action;
+		first_action = this;
 	}
-	next = first_action;
-	first_action = this;
 }
 
 Action::~Action() {

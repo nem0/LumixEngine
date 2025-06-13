@@ -38,7 +38,8 @@ struct LUMIX_EDITOR_API Action {
 	enum Type {
 		NORMAL,
 		TOOL,
-		WINDOW
+		WINDOW,
+		TEMPORARY
 	};
 
 	Action(const char* label_short, const char* label_long, const char* name, const char* font_icon, Type type = NORMAL);

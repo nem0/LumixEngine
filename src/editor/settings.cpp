@@ -38,7 +38,7 @@ static bool shortcutInput(char* button_label, Action& action, bool edit, StudioA
 	ImGuiStyle& style = ImGui::GetStyle();
 	ImVec2 prev = style.ButtonTextAlign;
 	style.ButtonTextAlign.x = 0;
-	static Action editing{"Temporary action", "Temporary action", "temporary_action", nullptr };
+	static Action editing{"Temporary action", "Temporary action", "temporary_action", nullptr, Action::TEMPORARY };
 	if (ImGui::Button(button_label, ImVec2(-30, 0))) {
 		openCenterStrip("edit_shortcut_popup");
 		editing.shortcut = action.shortcut;
@@ -60,7 +60,7 @@ static bool shortcutInput(char* button_label, Action& action, bool edit, StudioA
 			const Action* first_collision = nullptr;
 			for (const Action* a = Action::first_action; a; a = a->next) {
 				if (a == &action) continue;
-				if (a->modifiers == editing.modifiers && a->shortcut == editing.shortcut) {
+				if (a->modifiers == editing.modifiers && a->shortcut == editing.shortcut && a->type != Action::TEMPORARY) {
 					first_collision = a;
 					++num_collisions;
 				}
