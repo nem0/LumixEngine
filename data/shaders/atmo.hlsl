@@ -153,51 +153,53 @@ float cloudPhase(float g, float cos_theta) {
 	return w * hg1 + (1.0 - w) * hg2;
 }
 
-float3 multipleOctaves(float extinction, float mu, float stepL){
-    float3 luminance = float3(0, 0, 0);
-    const float octaves = 4.0;
-    
-    // Attenuation
-    float a = 1.0;
-    // Contribution
-    float b = 1.0;
-    // Phase attenuation
-    float c = 1.0;
-    
-    float phase;
-    
-    for(float i = 0.0; i < octaves; i++){
-        phase = lerp(miePhase(-0.1 * c, mu), miePhase(0.3 * c, mu), 0.7);
-        luminance += b * phase * exp(-stepL * extinction * a);
-        // Lower is brighter
-        a *= 0.2;
-        // Higher is brighter
-        b *= 0.5;
-        c *= 0.5;
-    }
-    return luminance;
+float remap(float t, float min_from, float max_from, float min_to, float max_to) {
+	return min_to + (t - min_from) / (max_from - min_from) * (max_to - min_to);
 }
 
-float cloudDensity(float3 pos, float coverage) {
-	// use perlin worley noise
+float heightFalloff(float h) {
+	static const float UPPER_W = 2;
+	static const float LOWER_W = 25;
+	static const float BIAS = 0.02;
+	float r = 1 - exp(-UPPER_W * (1 - h));
+	     r *= 1 - exp(-LOWER_W * h);
+	r = max(0.01, r);
+	r = 1 / r;
+	r *= BIAS;
+	return saturate(r);
+}
+
+float cloudDensity(float3 pos, bool shadow) {
+	static const float coverage = 0.4;
+
 	float height = (pos.y - u_clouds_bottom) / (u_clouds_top - u_clouds_bottom);
-	float height_factor = 1.0 - abs(height - 0.2) * 1.25;
-	height_factor = saturate(height_factor);
 
-	float3 cloud_pos = pos * 0.0002;
+	float3 cloud_pos = pos * 0.00015;
 
-	// Base noise for cloud shape using 3D Perlin noise
-	float base_noise = perlinNoise(float3(cloud_pos.x, 0, cloud_pos.z)) * 0.5 + 0.5;
+	float height_factor = heightFalloff(height);
 
-	//cloud_pos += Global_time * float3(0.1, 0, 0.1);
+	float base_noise = perlinNoise(cloud_pos) * 0.5;
+	base_noise += perlinNoise(cloud_pos * 1.7) * 0.5;
+	base_noise = base_noise * 0.5 + 0.5;
+	base_noise = saturate(base_noise - height_factor);
+	base_noise -= 1 - remap(coverage, 0, 1, 0.4, 0.8);
 
-	float detail = worleyNoise(cloud_pos * 6.0) * 0.625 + 
-					worleyNoise(cloud_pos * 12.0) * 0.25 +
-					worleyNoise(cloud_pos * 24.0) * 0.125;
+	//cloud_pos += Global_time * 0.05;
+	float worley0 = worleyNoise(cloud_pos * 5.0);
+	float worley1 = 1 - worleyNoise(cloud_pos * 15.0);
+	float worley2 = worleyNoise(cloud_pos * 40.0);
+	float worleyFBM = 0;
+	worleyFBM += worley0 * 0.625;
+	worleyFBM += worley1 * 0.25;
+	if (!shadow) {
+		worleyFBM += worley2 * 0.125;
+	}
 
-	float den =  saturate((base_noise - 0.4) - detail * 0.35) ;
-	den *= height_factor * height_factor;
-	return den;
+	float density = base_noise - worleyFBM * 0.15;
+	density = saturate(density);
+	density *= 1;
+	
+	return density;
 }
 
 struct Cloud {
@@ -206,22 +208,15 @@ struct Cloud {
 	float t_bottom;
 };
 
-// raymarched cloud with shadowing for flat earth model
-// returns final cloud color
 Cloud cloud(float2 screen_uv) {
-	// Cloud coverage parameter [0-1]
 	Cloud result;
 	result.color = float3(0, 0, 0);
 	result.transmittance = 1;
-	float coverage = 0.6; // Default coverage - modify as needed
 	
-	// Get view direction based on screen UV
 	float3 eyedir = getViewDirection(screen_uv);
 	
-	// Camera position
 	float3 cam_pos = Global_camera_world_pos.xyz/* + Global_time * float3(1000, 0, 1)*/;
 	
-	// Early exit if looking down and below clouds or looking up and above clouds
 	if ((eyedir.y < 0 && cam_pos.y < u_clouds_bottom) || (eyedir.y > 0 && cam_pos.y > u_clouds_top)) {
 		return result;
 	}
@@ -260,7 +255,7 @@ Cloud cloud(float2 screen_uv) {
 	}
 	
 	// Number of steps for ray marching
-	const int STEP_COUNT = 16;
+	const int STEP_COUNT = 32;
 	float step_size = (t_end - t_start) / STEP_COUNT;
 	
 	// Add jitter to reduce banding
@@ -282,25 +277,24 @@ Cloud cloud(float2 screen_uv) {
 		// we are outside of clouds, abort
 		if (pos.y < u_clouds_bottom || pos.y > u_clouds_top) break;
 		
-		float density = cloudDensity(pos, coverage);
+		float density = cloudDensity(pos, false);
 		
 		if (density > 0.01) {
 			// Calculate light attenuation (shadowing)
 			float shadow = 0.0;
 			float3 light_pos = pos;
 			
-			const int LIGHT_SAMPLES = 2;
-			const float light_step = 400;
+			const int LIGHT_SAMPLES = 4;
+			const float light_step = 300;
 			
 			for (int j = 0; j < LIGHT_SAMPLES; j++) {
 				light_pos += Global_light_dir.xyz * light_step;
 				// Skip shadow samples outside cloud layer
 				if (light_pos.y >= u_clouds_bottom && light_pos.y <= u_clouds_top) {
-					shadow += cloudDensity(light_pos, coverage) * light_step * 0.05;
+					shadow += cloudDensity(light_pos, true) * light_step * 0.10;
 				}
 			}
 			
-			float3 beersLaw = multipleOctaves(shadow, cos_theta, light_step);
 			// Light transmission through cloud
 			float light_transmittance = exp(-shadow);
 			
