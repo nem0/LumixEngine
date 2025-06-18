@@ -1,11 +1,11 @@
 #pragma once
 
 #include "core.h"
-#include "span.h"
 
 namespace Lumix {
 
 struct OutputMemoryStream;
+template <typename T> struct Span;
 
 namespace profiler {
 // writing API

@@ -57,17 +57,21 @@ struct LUMIX_CORE_API GuardAllocator final : IAllocator {
 };
 #endif
 
-struct LUMIX_CORE_API Allocator final : IAllocator {
-	struct AllocationInfo
-	{
-		AllocationInfo* previous;
-		AllocationInfo* next;
-		size_t size;
-		StackNode* stack_leaf;
-		u16 align;
-		TagAllocator* tag;
+struct LUMIX_CORE_API AllocationInfo {
+	enum Flags : u16{
+		NONE = 0,
+		IS_GPU = 1 << 0
 	};
+	AllocationInfo* previous;
+	AllocationInfo* next;
+	StackNode* stack_leaf;
+	TagAllocator* tag;
+	size_t size;
+	u16 align;
+	Flags flags = Flags::NONE;
+};
 
+struct LUMIX_CORE_API Allocator final : IAllocator {
 	explicit Allocator(IAllocator& source);
 	~Allocator();
 
@@ -79,6 +83,8 @@ struct LUMIX_CORE_API Allocator final : IAllocator {
 	size_t getTotalSize() const { return m_total_size; }
 	void checkGuards();
 	void checkLeaks();
+	void registerExternal(AllocationInfo& info);
+	void unregisterExternal(const AllocationInfo& info);
 
 	IAllocator& getSourceAllocator() { return m_source; }
 	AllocationInfo* getFirstAllocationInfo() const { return m_root; }

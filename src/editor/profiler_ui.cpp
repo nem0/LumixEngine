@@ -406,7 +406,7 @@ struct MemoryProfilerUI {
 		m_allocation_tags.clear();
 
 		m_debug_allocator->lock();
-		const debug::Allocator::AllocationInfo* current_info = m_debug_allocator->getFirstAllocationInfo();
+		const debug::AllocationInfo* current_info = m_debug_allocator->getFirstAllocationInfo();
 
 		while (current_info) {
 			if (current_info->stack_leaf) {
@@ -447,7 +447,6 @@ struct MemoryProfilerUI {
 		ImGui::Text("Page allocator: %.1f MB", reserved_pages / 1024.f / 1024.f);
 		ImGui::Text("Arena allocators: %.1f MB", ArenaAllocator::getTotalCommitedBytes() / 1024.f / 1024.f);
 		ImGui::Text("Profiler contexts: %.1f MB", profiler::getThreadContextMemorySize() / 1024.f / 1024.f);
-		// TODO gpu mem
 	}
 
 	StudioApp& m_app;
@@ -918,7 +917,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 			}
 
 			ImGui::TableSetupColumn("Path");
-			ImGui::TableSetupColumn("Size");
+			ImGui::TableSetupColumn("Compiled file size");
 			ImGui::TableSetupColumn("State");
 			ImGui::TableSetupColumn("References");
 			ImGui::TableHeadersRow();

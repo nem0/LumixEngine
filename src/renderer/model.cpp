@@ -489,7 +489,7 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 
 		if (index_size == 2) mesh.flags |= Mesh::Flags::INDICES_16_BIT;
 		const Renderer::MemRef mem = m_renderer.copy(mesh.indices.data(), (u32)mesh.indices.size());
-		mesh.index_buffer_handle = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE, "indices");
+		mesh.index_buffer_handle = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE, m_path.c_str());
 		mesh.index_type = index_size == 2 ? gpu::DataType::U16 : gpu::DataType::U32;
 		if (!mesh.index_buffer_handle) {
 			logError(m_path, ": failed to create index buffer");
@@ -527,7 +527,7 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 			}
 			mesh.vertices[j] = *(const Vec3*)&vertices[offset + position_attribute_offset];
 		}
-		mesh.vertex_buffer_handle = m_renderer.createBuffer(vertices_mem, gpu::BufferFlags::IMMUTABLE, "vertices");
+		mesh.vertex_buffer_handle = m_renderer.createBuffer(vertices_mem, gpu::BufferFlags::IMMUTABLE, m_path.c_str());
 		if (!mesh.vertex_buffer_handle) {
 			logError(m_path, ": failed to create vertex buffer");
 			return false;

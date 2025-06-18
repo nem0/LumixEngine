@@ -342,7 +342,9 @@ void Allocator::checkGuards() {
 	MutexGuard lock(m_mutex);
 	auto* info = m_root;
 	while (info) {
-		if (info != &m_sentinels[0] && info != &m_sentinels[1]) {
+		const bool is_gpu = (info->flags & AllocationInfo::IS_GPU) != 0;
+		
+		if (info != &m_sentinels[0] && info != &m_sentinels[1] && !is_gpu) {
 			auto user_ptr = getUserPtrFromAllocationInfo(info);
 			void* system_ptr = getSystemFromUser(user_ptr);
 			if (*(u32*)system_ptr != ALLOCATION_GUARD) {
@@ -381,7 +383,7 @@ size_t Allocator::getNeededMemory(size_t size, size_t align)
 }
 
 
-Allocator::AllocationInfo* Allocator::getAllocationInfoFromSystem(void* system_ptr)
+AllocationInfo* Allocator::getAllocationInfoFromSystem(void* system_ptr)
 {
 	return (AllocationInfo*)(m_are_guards_enabled ? (u8*)system_ptr + sizeof(ALLOCATION_GUARD)
 												  : system_ptr);
@@ -394,7 +396,7 @@ void* Allocator::getUserPtrFromAllocationInfo(AllocationInfo* info)
 }
 
 
-Allocator::AllocationInfo* Allocator::getAllocationInfoFromUser(void* user_ptr)
+AllocationInfo* Allocator::getAllocationInfoFromUser(void* user_ptr)
 {
 	return (AllocationInfo*)((u8*)user_ptr - sizeof(AllocationInfo));
 }
@@ -415,6 +417,28 @@ u8* Allocator::getSystemFromUser(void* user_ptr)
 	size_t diff = (m_are_guards_enabled ? sizeof(ALLOCATION_GUARD) : 0) + sizeof(AllocationInfo);
 	if (info->align) diff += (info->align - diff % info->align) % info->align;
 	return (u8*)user_ptr - diff;
+}
+
+void Allocator::unregisterExternal(const AllocationInfo& info) {
+	MutexGuard lock(m_mutex);
+	if (&info == m_root) {
+		m_root = info.next;
+	}
+	info.previous->next = info.next;
+	info.next->previous = info.previous;
+}
+
+void Allocator::registerExternal(AllocationInfo& info) {
+	info.stack_leaf = m_stack_tree.record();
+
+	MutexGuard guard(m_mutex);
+	info.previous = m_root->previous;
+	m_root->previous->next = &info;
+
+	info.next = m_root;
+	m_root->previous = &info;
+
+	m_root = &info;
 }
 
 void* Allocator::allocate(size_t size, size_t align)

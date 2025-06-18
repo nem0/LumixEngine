@@ -20,3 +20,4 @@ src/engine/plugins.inl
 data/.shader_cache_dx11
 scripts/itch_io/
 !data/editor/scripts/plugins/
+*.dmp

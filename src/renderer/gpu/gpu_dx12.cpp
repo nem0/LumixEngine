@@ -3,6 +3,7 @@
 #include "core/allocator.h"
 #include "core/array.h"
 #include "core/atomic.h"
+#include "core/debug.h"
 #include "core/hash_map.h"
 #include "core/hash.h"
 #include "core/job_system.h"
@@ -296,6 +297,8 @@ struct Buffer {
 	D3D12_RESOURCE_STATES state;
 	u32 heap_id = INVALID_HEAP_ID;
 	#ifdef LUMIX_DEBUG
+		debug::AllocationInfo allocation_info;
+		Local<TagAllocator> tag_allocator;
 		StaticString<64> name;
 	#endif
 };
@@ -318,6 +321,8 @@ struct Texture {
 	u32 h;
 	bool is_view = false;
 	#ifdef LUMIX_DEBUG
+		debug::AllocationInfo allocation_info;
+		Local<TagAllocator> tag_allocator;
 		StaticString<64> name;
 	#endif
 };
@@ -947,7 +952,7 @@ struct RTVDSVHeap {
 	u32 frame = 0;
 };
 
-static ID3D12Resource* createBuffer(ID3D12Device* device, const void* data, u64 size, D3D12_HEAP_TYPE type) {
+static ID3D12Resource* createBuffer(ID3D12Device* device, const void* data, u64 size, D3D12_HEAP_TYPE type, const char* debug_name) {
 	D3D12_HEAP_PROPERTIES upload_heap_props;
 	upload_heap_props.Type = type;
 	upload_heap_props.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
@@ -1010,13 +1015,13 @@ struct Frame {
 		if (device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&cmd_allocator)) != S_OK) return false;
 		if (device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)) != S_OK) return false;
 
-		scratch_buffer = createBuffer(device, nullptr, SCRATCH_BUFFER_SIZE, D3D12_HEAP_TYPE_UPLOAD);
+		scratch_buffer = createBuffer(device, nullptr, SCRATCH_BUFFER_SIZE, D3D12_HEAP_TYPE_UPLOAD, "scratch buffer");
 
 		scratch_buffer->Map(0, nullptr, (void**)&scratch_buffer_begin);
 		scratch_buffer_ptr = scratch_buffer_begin;
 
-		timestamp_query_buffer = createBuffer(device, nullptr, sizeof(u64) * TIMESTAMP_QUERY_COUNT, D3D12_HEAP_TYPE_READBACK);
-		stats_query_buffer = createBuffer(device, nullptr, sizeof(D3D12_QUERY_DATA_PIPELINE_STATISTICS) * STATS_QUERY_COUNT, D3D12_HEAP_TYPE_READBACK);
+		timestamp_query_buffer = createBuffer(device, nullptr, sizeof(u64) * TIMESTAMP_QUERY_COUNT, D3D12_HEAP_TYPE_READBACK, "timestamps");
+		stats_query_buffer = createBuffer(device, nullptr, sizeof(D3D12_QUERY_DATA_PIPELINE_STATISTICS) * STATS_QUERY_COUNT, D3D12_HEAP_TYPE_READBACK, "stats");
 
 		return true;
 	}
@@ -1060,7 +1065,6 @@ struct SRV {
 };
 
 struct D3D {
-
 	struct Window {
 		void* handle = nullptr;
 		IDXGISwapChain3* swapchain = nullptr;
@@ -1070,14 +1074,22 @@ struct D3D {
 	};
 
 	D3D(IAllocator& allocator) 
-		: allocator(allocator) 
+		: allocator(allocator)
+		, tag_allocator(getRoot(allocator), "GPU")
 		, srv_heap(allocator)
 		, shader_compiler(allocator)
 		, frames(allocator)
 		, pso_cache(allocator)
 	{}
 
+	static IAllocator& getRoot(IAllocator& allocator) {
+		IAllocator* a = &allocator;
+		while (a->getParent()) a = a->getParent();
+		return *a;
+	}
+
 	IAllocator& allocator;
+	TagAllocator tag_allocator;
 	DWORD thread;
 	RENDERDOC_API_1_0_2* rdoc_api = nullptr;
 	ID3D12Device* device = nullptr;
@@ -1121,6 +1133,7 @@ struct D3D {
 	bool vsync_dirty = false;
 	Mutex vsync_mutex;
 	Mutex disassembly_mutex;
+	debug::Allocator* debug_allocator = nullptr;
 };
 
 static Local<D3D> d3d;
@@ -1249,7 +1262,9 @@ void Frame::begin() {
 	}
 	to_resolve_stats.clear();
 
-	for (IUnknown* res : to_release) res->Release();
+	for (IUnknown* res : to_release) {
+		res->Release();
+	}
 	for (u32 i : to_heap_release) d3d->srv_heap.free(i);
 	to_release.clear();
 	to_heap_release.clear();
@@ -1278,7 +1293,9 @@ void Frame::begin() {
 }
 
 void Frame::clear() {
-	for (IUnknown* res : to_release) res->Release();
+	for (IUnknown* res : to_release) {
+		res->Release();
+	}
 	for (u32 i : to_heap_release) d3d->srv_heap.free(i);
 	fence->Release();
 		
@@ -1344,6 +1361,11 @@ void destroy(TextureHandle texture) {
 	checkThread();
 	ASSERT(texture);
 	Texture& t = *texture;
+	#ifdef LUMIX_DEBUG
+		if (d3d->debug_allocator) {
+			d3d->debug_allocator->unregisterExternal(t.allocation_info);
+		}
+	#endif
 	if (t.resource && !t.is_view) d3d->frame->to_release.push(t.resource);
 	if (t.heap_id != INVALID_HEAP_ID) d3d->frame->to_heap_release.push(t.heap_id);
 	LUMIX_DELETE(d3d->allocator, texture);
@@ -1375,7 +1397,7 @@ void update(TextureHandle texture, u32 mip, u32 x, u32 y, u32 z, u32 w, u32 h, T
 
 	const u32 tmp_row_pitch = layout.Footprint.RowPitch;
 
-	ID3D12Resource* staging = createBuffer(d3d->device, nullptr, total_bytes, D3D12_HEAP_TYPE_UPLOAD);
+	ID3D12Resource* staging = createBuffer(d3d->device, nullptr, total_bytes, D3D12_HEAP_TYPE_UPLOAD, "staging");
 	u8* tmp;
 
 	staging->Map(0, nullptr, (void**)&tmp);
@@ -1520,7 +1542,7 @@ void readTexture(TextureHandle texture, TextureReadCallback callback) {
 		, &face_bytes
 	);
 
-	ID3D12Resource* staging = createBuffer(d3d->device, nullptr, face_bytes * (is_cubemap ? 6 : 1), D3D12_HEAP_TYPE_READBACK);
+	ID3D12Resource* staging = createBuffer(d3d->device, nullptr, face_bytes * (is_cubemap ? 6 : 1), D3D12_HEAP_TYPE_READBACK, "staging");
 	const D3D12_RESOURCE_STATES prev_state = texture->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_COPY_SOURCE);
 	
 	D3D12_TEXTURE_COPY_LOCATION src_location = {};
@@ -1604,6 +1626,12 @@ bool isQueryReady(QueryHandle query) {
 
 void preinit(IAllocator& allocator, bool load_renderdoc) {
 	d3d.create(allocator);
+	for (IAllocator* a = &allocator; a; a = a->getParent()) {
+		if (a->isDebug()) {
+			d3d->debug_allocator = (debug::Allocator*)a;
+			break;
+		}
+	}
 	d3d->srv_heap.preinit(MAX_SRV_DESCRIPTORS, 1024);
 	if (load_renderdoc) tryLoadRenderDoc();
 
@@ -2217,7 +2245,9 @@ u32 present() {
 		if (!window.handle) continue;
 		if (window.last_used_frame + 2 < d3d->frame_number && &window != d3d->windows) {
 			window.handle = nullptr;
-			for (ID3D12Resource* res : window.backbuffers) res->Release();
+			for (ID3D12Resource* res : window.backbuffers) {
+				res->Release();
+			}
 			window.swapchain->Release();
 		}
 	}
@@ -2365,7 +2395,7 @@ void createBuffer(BufferHandle buffer, BufferFlags flags, size_t size, const voi
 	}
 
 	if (data) {
-		ID3D12Resource* upload_buffer = createBuffer(d3d->device, data, size, D3D12_HEAP_TYPE_UPLOAD);
+		ID3D12Resource* upload_buffer = createBuffer(d3d->device, data, size, D3D12_HEAP_TYPE_UPLOAD, "upload");
 		D3D12_RESOURCE_STATES old_state = buffer->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_COPY_DEST);
 		d3d->cmd_list->CopyResource(buffer->resource, upload_buffer);
 		buffer->setState(d3d->cmd_list, old_state);
@@ -2373,6 +2403,15 @@ void createBuffer(BufferHandle buffer, BufferFlags flags, size_t size, const voi
 	}
 
 	buffer->gpu_address = buffer->resource->GetGPUVirtualAddress();
+
+	#ifdef LUMIX_DEBUG
+		buffer->allocation_info.align = 0;
+		buffer->allocation_info.size = size;
+		buffer->allocation_info.flags = debug::AllocationInfo::IS_GPU;
+		buffer->tag_allocator.create(d3d->tag_allocator, buffer->name);
+		buffer->allocation_info.tag = buffer->tag_allocator.get();
+		d3d->debug_allocator->registerExternal(buffer->allocation_info);
+	#endif
 
 	if (debug_name) {
 		WCHAR tmp[MAX_PATH];
@@ -2562,7 +2601,7 @@ void createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 
 	texture.state = isDepthFormat(desc.Format) ? D3D12_RESOURCE_STATE_COMMON : (compute_write ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS : D3D12_RESOURCE_STATE_GENERIC_READ);
 	if (d3d->device->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, texture.state, clear_val_ptr, IID_PPV_ARGS(&texture.resource)) != S_OK) return;
-
+	
 	#ifdef LUMIX_DEBUG
 		texture.name = debug_name;
 	#endif
@@ -2639,6 +2678,31 @@ void createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 		WCHAR tmp[MAX_PATH];
 		toWChar(tmp, debug_name);
 		texture.resource->SetName(tmp);
+	}
+
+	if (d3d->debug_allocator) {
+		D3D12_RESOURCE_DESC res_desc = {
+			.Dimension = desc.Dimension,
+			.Alignment = desc.Alignment,
+			.Width = desc.Width,
+			.Height = desc.Height,
+			.DepthOrArraySize = desc.DepthOrArraySize,
+			.MipLevels = desc.MipLevels,
+			.Format = desc.Format,
+			.SampleDesc = desc.SampleDesc,
+			.Layout = desc.Layout,
+			.Flags = desc.Flags
+		};
+		D3D12_RESOURCE_ALLOCATION_INFO info = d3d->device->GetResourceAllocationInfo(0, 1, &res_desc);
+
+		#ifdef LUMIX_DEBUG
+			texture.allocation_info.align = (u32)info.Alignment;
+			texture.allocation_info.size = info.SizeInBytes;
+			texture.allocation_info.flags = debug::AllocationInfo::IS_GPU;
+			texture.tag_allocator.create(d3d->tag_allocator, texture.name);
+			texture.allocation_info.tag = texture.tag_allocator.get();
+			d3d->debug_allocator->registerExternal(texture.allocation_info);
+		#endif
 	}
 }
 
@@ -2803,6 +2867,12 @@ void destroy(BufferHandle buffer) {
 	Buffer& t = *buffer;
 	if (t.resource) d3d->frame->to_release.push(t.resource);
 	if (t.heap_id != INVALID_HEAP_ID) d3d->frame->to_heap_release.push(t.heap_id);
+
+	#ifdef LUMIX_DEBUG
+		if (d3d->debug_allocator) {
+			d3d->debug_allocator->unregisterExternal(buffer->allocation_info);
+		}
+	#endif
 
 	LUMIX_DELETE(d3d->allocator, buffer);
 }

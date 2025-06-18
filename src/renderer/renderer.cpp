@@ -453,6 +453,7 @@ struct RendererImpl final : Renderer {
 				gpu::destroy(frame->uniform_buffer.m_buffer);
 			}
 			gpu::destroy(m_material_buffer.buffer);
+			gpu::destroy(m_instanced_meshes_buffer);
 			m_profiler.clear();
 			gpu::present();
 			gpu::present();
@@ -549,6 +550,7 @@ struct RendererImpl final : Renderer {
 			}
 		}
 
+		m_instanced_meshes_buffer = gpu::allocBufferHandle();
 		jobs::Signal signal;
 		jobs::runLambda([this, flags]() {
 			PROFILE_BLOCK("init_render");
@@ -573,6 +575,7 @@ struct RendererImpl final : Renderer {
 				frame->transient_buffer.init();
 				frame->uniform_buffer.init();
 			}
+			gpu::createBuffer(m_instanced_meshes_buffer, gpu::BufferFlags::SHADER_BUFFER, 64 * 1024 * 1024, nullptr, "instanced_meshes");
 			m_profiler.init();
 		}, &m_init_signal, 1);
 
@@ -725,6 +728,9 @@ struct RendererImpl final : Renderer {
 		m_material_buffer.map.erase(hash);
 	}
 
+	gpu::BufferHandle getInstancedMeshesBuffer() override {
+		return m_instanced_meshes_buffer;
+	}
 
 	gpu::BufferHandle createBuffer(const MemRef& memory, gpu::BufferFlags flags, const char* debug_name) override
 	{
@@ -1192,6 +1198,7 @@ struct RendererImpl final : Renderer {
 		HashMap<RuntimeHash, u32> map;
 	} m_material_buffer;
 
+	gpu::BufferHandle m_instanced_meshes_buffer = gpu::INVALID_BUFFER;
 	// built-in postprocesses
 	// environment
 	Atmo m_atmo;

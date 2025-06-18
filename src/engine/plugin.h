@@ -90,8 +90,8 @@ struct LUMIX_ENGINE_API ISystem
 
 
 #ifdef STATIC_PLUGINS
-	#define LUMIX_PLUGIN_ENTRY(plugin_name) extern "C" ISystem* createPlugin_##plugin_name(Engine& engine)
+	#define LUMIX_PLUGIN_ENTRY(plugin_name) extern "C" Lumix::ISystem* createPlugin_##plugin_name(Lumix::Engine& engine)
 #else
-	#define LUMIX_PLUGIN_ENTRY(plugin_name) extern "C" LUMIX_LIBRARY_EXPORT ISystem* createPlugin(Engine& engine)
+	#define LUMIX_PLUGIN_ENTRY(plugin_name) extern "C" LUMIX_LIBRARY_EXPORT Lumix::ISystem* createPlugin(Lumix::Engine& engine)
 #endif
 

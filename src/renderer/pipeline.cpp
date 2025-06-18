@@ -43,7 +43,6 @@ namespace Lumix {
 // instancer 31 - 16; if instanced
 // instance group 15 - 0; if instanced
 
-static constexpr u32 INSTANCED_MESHES_BUFFER_SIZE = 64 * 1024 * 1024; // TODO dynamic
 static constexpr u32 SORT_VALUE_TYPE_MASK = (1 << 5) - 1;
 static constexpr u64 SORT_KEY_BUCKET_SHIFT = 56;
 static constexpr u64 SORT_KEY_INSTANCED_FLAG = (u64)1 << 55;
@@ -522,9 +521,6 @@ struct PipelineImpl final : Pipeline {
 		const Renderer::MemRef ib_mem = m_renderer.copy(cube_indices, sizeof(cube_indices));
 		m_cube_ib = m_renderer.createBuffer(ib_mem, gpu::BufferFlags::IMMUTABLE, "cube_indices");
 
-		const Renderer::MemRef im_mem = { INSTANCED_MESHES_BUFFER_SIZE, nullptr, false };
-		m_instanced_meshes_buffer = m_renderer.createBuffer(im_mem, gpu::BufferFlags::SHADER_BUFFER, "instanced_meshes");
-
 		const Renderer::MemRef ind_mem = { 64 * 1024, nullptr, false }; // TODO size
 		m_indirect_buffer = m_renderer.createBuffer(ind_mem, gpu::BufferFlags::SHADER_BUFFER, "indirect");
 
@@ -581,7 +577,6 @@ struct PipelineImpl final : Pipeline {
 
 		stream.destroy(m_cube_ib);
 		stream.destroy(m_cube_vb);
-		stream.destroy(m_instanced_meshes_buffer);
 		stream.destroy(m_indirect_buffer);
 		stream.destroy(m_shadow_atlas.texture);
 		stream.destroy(m_cluster_buffers.clusters.buffer);
@@ -1156,6 +1151,8 @@ struct PipelineImpl final : Pipeline {
 		pass(cp);
 		const RenderBufferHandle gbuffer_rbs[] = { gbuffer.A, gbuffer.B, gbuffer.C, gbuffer.D };
 		setRenderTargets(Span(gbuffer_rbs), gbuffer.DS);
+		// TODO clear only depth?
+		// TODO refactor so we don't need setRenderTargets before clear
 		clear(gpu::ClearFlags::ALL, 0, 0, 0, 0, 0);
 
 		const gpu::StateFlags default_state = gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_FUNCTION | gpu::getStencilStateBits(0xff, gpu::StencilFuncs::ALWAYS, 1, 0xff, gpu::StencilOps::KEEP, gpu::StencilOps::KEEP, gpu::StencilOps::REPLACE);
@@ -1653,7 +1650,7 @@ struct PipelineImpl final : Pipeline {
 		stream.bindUniformBuffer(UniformBuffer::DRAWCALL, gpu::INVALID_BUFFER, 0, 0);
 		stream.bindUniformBuffer(UniformBuffer::SHADOW, gpu::INVALID_BUFFER, 0, 0);
 		static int tmp[12] = {};
-		stream.update(m_instanced_meshes_buffer, &tmp, sizeof(tmp));
+		stream.update(m_renderer.getInstancedMeshesBuffer(), &tmp, sizeof(tmp));
 
 		ASSERT(m_views.empty());
 		
@@ -2312,7 +2309,7 @@ struct PipelineImpl final : Pipeline {
 		UBValues ub_values;
 		toPlanes(view.cp, Span(ub_values.camera_planes));
 
-		const gpu::BufferHandle culled_buffer = m_instanced_meshes_buffer;
+		const gpu::BufferHandle culled_buffer = m_renderer.getInstancedMeshesBuffer();
 		//stream.bindShaderBuffer(m_indirect_buffer, 2, gpu::BindShaderBufferFlags::OUTPUT);
 		const gpu::ProgramHandle gather_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS3"));
 		const gpu::ProgramHandle indirect_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS2"));
@@ -2421,7 +2418,7 @@ struct PipelineImpl final : Pipeline {
 
 			stream.bindUniformBuffer(UniformBuffer::DRAWCALL, drawcall_ub.buffer, drawcall_ub.offset, sizeof(UBValues));
 
-			stream.barrier(m_instanced_meshes_buffer, gpu::BarrierType::WRITE);
+			stream.barrier(culled_buffer, gpu::BarrierType::WRITE);
 			stream.barrier(m_indirect_buffer, gpu::BarrierType::WRITE);
 			stream.barrier(culled_buffer, gpu::BarrierType::WRITE);
 			//stream.bindShaderBuffer(culled_buffer, 1, gpu::BindShaderBufferFlags::OUTPUT);
@@ -2490,7 +2487,7 @@ struct PipelineImpl final : Pipeline {
 				material->bind(bucket.stream);
 				bucket.stream.bindIndexBuffer(mesh.index_buffer_handle);
 				bucket.stream.bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
-				bucket.stream.bindVertexBuffer(1, m_instanced_meshes_buffer, 48, 32);
+				bucket.stream.bindVertexBuffer(1, culled_buffer, 48, 32);
 				
 				bucket.stream.bindIndirectBuffer(m_indirect_buffer);
 				bucket.stream.drawIndirect(mesh.index_type, u32(sizeof(Indirect) * (indirect_offset + i)));
@@ -3747,7 +3744,6 @@ struct PipelineImpl final : Pipeline {
 	Array<gpu::BufferHandle> m_buffers;
 	os::Timer m_timer;
 	AtomicI32 m_indirect_buffer_offset = 0;
-	gpu::BufferHandle m_instanced_meshes_buffer;
 	gpu::BufferHandle m_indirect_buffer;
 	gpu::VertexDecl m_base_vertex_decl;
 	gpu::VertexDecl m_base_line_vertex_decl;
