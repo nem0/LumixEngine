@@ -187,13 +187,27 @@ struct PipelineImpl final : Pipeline {
 	};
 
 	struct Renderbuffer {
+		// The buffer is created in the ACTIVE state.
+		// Once the user no longer needs the buffer, it can be marked as REUSABLE.
+		// At the end of a frame, every REUSABLE buffer is marked as TO_REMOVE,
+		// and every TO_REMOVE buffer is released.
+		// This ensures that unused buffers are not kept around longer than necessary,
+		// and buffers can be reused instead of being destroyed and recreated within the same frame.
+		enum State {
+			ACTIVE,
+			REUSABLE,
+			TO_REMOVE
+		};
+		
+		#ifdef LUMIX_DEBUG
+			StaticString<32> debug_name;
+		#endif
 		gpu::TextureHandle handle;
-		int frame_counter;
 		IVec2 size;
 		gpu::TextureFormat format;
 		gpu::TextureFlags flags;
+		State state;
 	};
-
 
 	struct Sorter {
 		struct alignas(4096) Page {
@@ -595,11 +609,23 @@ struct PipelineImpl final : Pipeline {
 	void clearBuffers() {
 		PROFILE_FUNCTION();
 		for (Renderbuffer& rb : m_renderbuffers) {
-			++rb.frame_counter;
-			if (rb.frame_counter > 2 && rb.handle) {
-				m_renderer.getEndFrameDrawStream().destroy(rb.handle);
-				rb.handle = gpu::INVALID_TEXTURE;
+			switch (rb.state) {
+				case Renderbuffer::ACTIVE: break;
+				case Renderbuffer::REUSABLE: 
+					rb.state = Renderbuffer::TO_REMOVE;
+					break;
+				case Renderbuffer::TO_REMOVE:
+					if (rb.handle) {
+						m_renderer.getEndFrameDrawStream().destroy(rb.handle);
+						rb.handle = gpu::INVALID_TEXTURE;
+					}
+					break;
 			}
+		}
+
+		while (!m_renderbuffers.empty()) {
+			if (m_renderbuffers.last().handle) break;
+			m_renderbuffers.pop();
 		}
 	}
 
@@ -763,7 +789,7 @@ struct PipelineImpl final : Pipeline {
 		endBlock();
 
 		const gpu::TextureHandle src = getOutput();
-		m_renderbuffers[m_output].frame_counter = 1;
+		releaseRenderbuffer(depthbuf);
 		if (!src) {
 			logError("Could not bake shadows because the pipeline had no output");
 			return false;
@@ -816,33 +842,39 @@ struct PipelineImpl final : Pipeline {
 			case RenderbufferDesc::DISPLAY_SIZE: size = m_display_size; break;
 		}
 		for (Renderbuffer& rb : m_renderbuffers) {
-			if (!rb.handle) {
-				rb.frame_counter = 0;
-				StaticString<128> name(desc.debug_name, " ", u32(&rb - m_renderbuffers.begin()));
-				rb.handle = m_renderer.createTexture(size.x, size.y, 1, desc.format, desc.flags, Renderer::MemRef(), name);
-				rb.flags = desc.flags;
-				rb.format = desc.format;
-				rb.size = size;
-				return RenderBufferHandle(u32(&rb - m_renderbuffers.begin()));
-			}
-			else {
-				if (rb.frame_counter < 2) continue;
-				if (rb.size != size) continue;
-				if (rb.format != desc.format) continue;
-				if (rb.flags != desc.flags) continue;
-			}
-			rb.frame_counter = 0;
+			if (!rb.handle) continue;
+
+			if (rb.state == Renderbuffer::ACTIVE) continue;
+			if (rb.size != size) continue;
+			if (rb.format != desc.format) continue;
+			if (rb.flags != desc.flags) continue;
+
+			rb.state = Renderbuffer::ACTIVE;
+			rb.debug_name = desc.debug_name;
 			StaticString<128> name(desc.debug_name, " ", u32(&rb - m_renderbuffers.begin()));
 			m_renderer.getDrawStream().setDebugName(rb.handle, name);
 			return RenderBufferHandle(u32(&rb - m_renderbuffers.begin()));
 		}
 
+		for (Renderbuffer& rb : m_renderbuffers) {
+			if (rb.handle) continue;
+
+			rb.handle = m_renderer.createTexture(size.x, size.y, 1, desc.format, desc.flags, Renderer::MemRef(), desc.debug_name);
+			rb.state = Renderbuffer::ACTIVE;
+			rb.flags = desc.flags;
+			rb.format = desc.format;
+			rb.size = size;
+			rb.debug_name = desc.debug_name;
+			return RenderBufferHandle(u32(&rb - m_renderbuffers.begin()));
+		}
+
 		Renderbuffer& rb = m_renderbuffers.emplace();
 		rb.handle = m_renderer.createTexture(size.x, size.y, 1, desc.format, desc.flags, Renderer::MemRef(), desc.debug_name);
-		rb.frame_counter = 0;
+		rb.state = Renderbuffer::ACTIVE;
 		rb.flags = desc.flags;
 		rb.format = desc.format;
 		rb.size = size;
+		rb.debug_name = desc.debug_name;
 		return RenderBufferHandle(m_renderbuffers.size() - 1);
 	}
 
@@ -1029,6 +1061,7 @@ struct PipelineImpl final : Pipeline {
 		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
 			RenderBufferHandle tonemapped;
 			if (plugin->tonemap(input, tonemapped, *this)) {
+				releaseRenderbuffer(input);
 				return tonemapped;
 			}
 		}
@@ -1049,6 +1082,7 @@ struct PipelineImpl final : Pipeline {
 		setRenderTargets(Span(&rb, 1));
 		drawArray(0, 3, *m_tonemap_shader, 0, gpu::StateFlags::NONE);
 		endBlock();
+		releaseRenderbuffer(input);
 		return rb;
 	}
 
@@ -1252,6 +1286,8 @@ struct PipelineImpl final : Pipeline {
 			plugin->renderTransparent(*this);
 		}
 
+		releaseRenderbuffer(color_copy);
+
 		endBlock();
 	}
 
@@ -1433,6 +1469,7 @@ struct PipelineImpl final : Pipeline {
 	}
 
 	void render2DOnly() {
+		releaseRenderbuffer(m_output);
 		const RenderBufferHandle rb = createRenderbuffer({
 			.type = RenderbufferDesc::DISPLAY_SIZE,
 			.format = gpu::TextureFormat::SRGBA,
@@ -1445,6 +1482,8 @@ struct PipelineImpl final : Pipeline {
 	}
 
 	void renderMain() {
+		releaseRenderbuffer(m_output);
+
 		DrawStream& stream = m_renderer.getDrawStream();
 		const RenderBufferHandle shadowmap = shadowPass();
 		
@@ -1495,6 +1534,13 @@ struct PipelineImpl final : Pipeline {
 		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
 			result = plugin->renderAfterTonemap(gbuffer, result, *this);
 		}
+
+		releaseRenderbuffer(gbuffer.A);
+		releaseRenderbuffer(gbuffer.B);
+		releaseRenderbuffer(gbuffer.C);
+		releaseRenderbuffer(gbuffer.D);
+		releaseRenderbuffer(gbuffer.DS);
+		releaseRenderbuffer(shadowmap);
 
 		m_output = result;
 	}
@@ -1569,7 +1615,6 @@ struct PipelineImpl final : Pipeline {
 		}
 
 		m_renderer.waitCanSetup();
-		clearBuffers();
 
 		m_viewport.pixel_offset = Vec2(0);
 
@@ -1667,6 +1712,7 @@ struct PipelineImpl final : Pipeline {
 		m_renderer.waitForCommandSetup();
 
 		m_views.clear();
+		clearBuffers();
 
 		return true;
 	}
@@ -1860,9 +1906,9 @@ struct PipelineImpl final : Pipeline {
 		return gpu::TextureFormat::RGBA8;
 	}
 
-	void keepRenderbufferAlive(RenderBufferHandle idx) override {
+	void releaseRenderbuffer(RenderBufferHandle idx) override {
 		if (idx == INVALID_RENDERBUFFER) return;
-		--m_renderbuffers[idx].frame_counter;
+		m_renderbuffers[idx].state = Renderbuffer::REUSABLE;
 	}
 
 	void renderTerrains(const CameraParams& cp, gpu::StateFlags state, const char* define) {

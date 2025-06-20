@@ -723,6 +723,7 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 			pipeline.setUniform(ub);
 			const Viewport& vp = m_scene_view.m_view->getViewport();
 			pipeline.dispatch(*m_selection_outline_shader, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
+			pipeline.releaseRenderbuffer(selection_mask);
 		}
 
 		// grid
@@ -816,7 +817,9 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 
 				m_scene_view.m_view->m_draw_cmds.clear();
 			});
+
 		}
+		pipeline.releaseRenderbuffer(icons_ds);
 
 		return input;
 	}

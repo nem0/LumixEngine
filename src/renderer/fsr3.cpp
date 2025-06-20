@@ -161,6 +161,7 @@ struct FSR3Plugin : RenderPlugin {
 			dispatch(color, depth, motion_vectors, output_tex, vp, time_delta, *ctx_ptr);
 		});
 		pipeline.endBlock();
+		pipeline.releaseRenderbuffer(input);
 
 		return output;
 	}

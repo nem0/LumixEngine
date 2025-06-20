@@ -132,8 +132,7 @@ struct LUMIX_RENDERER_API Pipeline {
 	virtual void drawArray(u32 indices_offset, u32 indices_count, Shader& shader, u32 define_mask = 0, gpu::StateFlags state = gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_FN_GREATER) = 0;
 	virtual void setRenderTargets(Span<const RenderBufferHandle> renderbuffers, RenderBufferHandle ds = INVALID_RENDERBUFFER, gpu::FramebufferFlags flags = gpu::FramebufferFlags::NONE) = 0;
 	virtual RenderBufferHandle createRenderbuffer(const RenderbufferDesc& desc) = 0;
-	// renderbuffers are released every frame, this function should be called to keep them alive for the next frame
-	virtual void keepRenderbufferAlive(RenderBufferHandle idx) = 0;
+	virtual void releaseRenderbuffer(RenderBufferHandle idx) = 0;
 	virtual void clear(gpu::ClearFlags flags, float r, float g, float b, float a, float depth) = 0;
 	// also emits barriers
 	virtual gpu::BindlessHandle toBindless(RenderBufferHandle rb_idx, struct DrawStream& stream) = 0;

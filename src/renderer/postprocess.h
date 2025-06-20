@@ -240,7 +240,7 @@ struct DOF : public RenderPlugin {
 		pipeline.dispatch(*m_shader, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
 
 		pipeline.blit(pipeline.toBindless(dof_rb, stream), pipeline.toRWBindless(input, stream), {(i32)vp.w, (i32)vp.h});
-
+		pipeline.releaseRenderbuffer(dof_rb);
 		pipeline.endBlock();
 		return input;
 	}
@@ -340,7 +340,6 @@ struct Bloom : public RenderPlugin {
 		if (pipeline.m_debug_show_plugin != this) return false;
 		const Viewport& vp = pipeline.getViewport();
 		pipeline.copy(input, m_extracted_rt, {(i32)vp.w, (i32)vp.h});
-		pipeline.keepRenderbufferAlive(m_extracted_rt);
 		return true;
 	}
 
@@ -417,6 +416,7 @@ struct Bloom : public RenderPlugin {
 		ubdata.input = pipeline.toBindless(blur_buf, stream);
 		pipeline.setUniform(ubdata);
 		pipeline.drawArray(0, 3, *m_blur_shader, 0, gpu::StateFlags::NONE);
+		pipeline.releaseRenderbuffer(blur_buf);
 	}
 
 	void blur(IVec2 size, RenderBufferHandle src, Pipeline& pipeline) {
@@ -445,6 +445,7 @@ struct Bloom : public RenderPlugin {
 		ubdata.input = pipeline.toBindless(blur_buf, stream);
 		pipeline.setUniform(ubdata);
 		pipeline.drawArray(0, 3, *m_blur_shader, 0, gpu::StateFlags::NONE);
+		pipeline.releaseRenderbuffer(blur_buf);
 	}
 
 	const Camera* getCamera(Pipeline& pipeline) {
@@ -536,6 +537,10 @@ struct Bloom : public RenderPlugin {
 		blurUpscale({ vp.w >> 3, vp.h >> 3 }, bloom4_rb, bloom8_rb, pipeline);
 		blurUpscale({ vp.w >> 2, vp.h >> 2 }, bloom2_rb, bloom4_rb, pipeline);
 		blurUpscale({ vp.w >> 1, vp.h >> 1 }, bloom_rb, bloom2_rb, pipeline);
+		pipeline.releaseRenderbuffer(bloom2_rb);
+		pipeline.releaseRenderbuffer(bloom4_rb);
+		pipeline.releaseRenderbuffer(bloom8_rb);
+		pipeline.releaseRenderbuffer(bloom16_rb);
 
 		struct {
 			gpu::BindlessHandle bloom;
@@ -546,6 +551,7 @@ struct Bloom : public RenderPlugin {
 		};
 		pipeline.setUniform(ub);
 		pipeline.dispatch(*m_shader, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
+		pipeline.releaseRenderbuffer(bloom_rb);
 
 		pipeline.endBlock();
 		return input;
@@ -652,7 +658,7 @@ struct SSS : public RenderPlugin {
 			.flags = gpu::TextureFlags::COMPUTE_WRITE | gpu::TextureFlags::RENDER_TARGET,
 			.debug_name = "sss"
 		};
-		const RenderBufferHandle sss =  pipeline.createRenderbuffer(rb_desc);
+		RenderBufferHandle sss =  pipeline.createRenderbuffer(rb_desc);
 
 		if (data->history == INVALID_RENDERBUFFER) {
 			data->history = pipeline.createRenderbuffer(rb_desc);
@@ -696,8 +702,8 @@ struct SSS : public RenderPlugin {
 		pipeline.dispatch(*m_shader_blit, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
 		stream.memoryBarrier(pipeline.toTexture(gbuffer.C));
 
-		data->history = sss;
-		pipeline.keepRenderbufferAlive(data->history);
+		swap(data->history, sss);
+		pipeline.releaseRenderbuffer(sss);
 		pipeline.endBlock();
 	}
 };
@@ -767,6 +773,7 @@ struct SSAO : public RenderPlugin {
 			|| !m_downscale_shader->isReady()
 			|| !m_enabled)
 		{
+			pipeline.releaseRenderbuffer(data->m_history_rb);
 			data->m_history_rb = INVALID_RENDERBUFFER;
 			return;
 		}
@@ -809,21 +816,22 @@ struct SSAO : public RenderPlugin {
 
 		if (m_temporal) {
 			if (data->m_history_rb == INVALID_RENDERBUFFER || width != m_temporal_size.x || height != m_temporal_size.y) {
+				pipeline.releaseRenderbuffer(data->m_history_rb);
 				data->m_history_rb = pipeline.createRenderbuffer({
 					.type = RenderbufferDesc::FIXED,
 					.fixed_size = IVec2(width, height),
 					.format = gpu::TextureFormat::R8,
 					.flags = gpu::TextureFlags::COMPUTE_WRITE | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET,
-					.debug_name = "ssao_temporal"
+					.debug_name = "ssao"
 				});
 				m_temporal_size = IVec2(width, height);
 				// TODO compute shader
 				pipeline.setRenderTargets(Span(&data->m_history_rb, 1), INVALID_RENDERBUFFER);
 				pipeline.clear(gpu::ClearFlags::ALL, 1, 1, 1, 1, 1);
 			}
-			pipeline.keepRenderbufferAlive(data->m_history_rb);
 		}
 		else {
+			pipeline.releaseRenderbuffer(data->m_history_rb);
 			data->m_history_rb = INVALID_RENDERBUFFER;
 		}
 
@@ -862,17 +870,6 @@ struct SSAO : public RenderPlugin {
 				.debug_name = "ssao_blurred" 
 			});
 
-			RenderBufferHandle ssao_blurred2_rb;
-			if (m_blur_iterations > 1) {
-				ssao_blurred2_rb = pipeline.createRenderbuffer({ 
-					.type = RenderbufferDesc::FIXED,
-					.fixed_size = IVec2(width, height),
-					.format = gpu::TextureFormat::R8, 
-					.flags = gpu::TextureFlags::COMPUTE_WRITE, 
-					.debug_name = "ssao_blurred2" 
-				});
-			}
-
 			struct {
 				Vec2 rcp_size;
 				float weight_scale;
@@ -895,11 +892,11 @@ struct SSAO : public RenderPlugin {
 				blur_data.stride = m_blur_iterations - i;
 				pipeline.setUniform(blur_data);
 				pipeline.dispatch(*m_blur_shader, (width + 15) / 16, (height + 15) / 16, 1);
-				ssao_rb = ssao_blurred_rb;
+				swap(ssao_rb, ssao_blurred_rb);
 				stream.memoryBarrier(pipeline.toTexture(ssao_rb));
-				swap(ssao_blurred_rb, ssao_blurred2_rb);
 			}
 			pipeline.endBlock();
+			pipeline.releaseRenderbuffer(ssao_blurred_rb);
 		}
 
 		struct {
@@ -924,6 +921,10 @@ struct SSAO : public RenderPlugin {
 		pipeline.dispatch(*m_blit_shader, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
 		pipeline.endBlock();
 		pipeline.endBlock();
+
+		pipeline.releaseRenderbuffer(ssao_rb);
+		if (depth_buffer != gbuffer.DS) pipeline.releaseRenderbuffer(depth_buffer);
+
 	}
 };
 
@@ -995,7 +996,6 @@ struct TDAO : public RenderPlugin {
 				.debug_name = "tdao"
 			});
 		}
-		pipeline.keepRenderbufferAlive(inst_data->rb);
 		DrawStream& stream = pipeline.getRenderer().getDrawStream();
 
 		const Viewport& vp = pipeline.getViewport();
@@ -1119,7 +1119,7 @@ struct TAA : public RenderPlugin {
 			pipeline.clear(gpu::ClearFlags::ALL, 1, 1, 1, 1, 0);
 		}
 
-		const RenderBufferHandle taa_tmp = pipeline.createRenderbuffer({
+		RenderBufferHandle taa_tmp = pipeline.createRenderbuffer({
 			.format = gpu::TextureFormat::RGBA16F,
 			.flags = gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE,
 			.debug_name = "taa2"
@@ -1156,8 +1156,9 @@ struct TAA : public RenderPlugin {
 		gpu::RWBindlessHandle dst = pipeline.toRWBindless(taa_output, stream);
 		pipeline.blit(src, dst, display_size);
 		
-		data->history_rb = taa_tmp;
-		pipeline.keepRenderbufferAlive(data->history_rb);
+		swap(data->history_rb, taa_tmp);
+		pipeline.releaseRenderbuffer(taa_tmp);
+		pipeline.releaseRenderbuffer(hdr_buffer);
 		pipeline.endBlock();
 		return taa_output;
 	}
