@@ -850,7 +850,9 @@ struct PipelineImpl final : Pipeline {
 			if (rb.flags != desc.flags) continue;
 
 			rb.state = Renderbuffer::ACTIVE;
-			rb.debug_name = desc.debug_name;
+			#ifdef LUMIX_DEBUG
+				rb.debug_name = desc.debug_name;
+			#endif
 			StaticString<128> name(desc.debug_name, " ", u32(&rb - m_renderbuffers.begin()));
 			m_renderer.getDrawStream().setDebugName(rb.handle, name);
 			return RenderBufferHandle(u32(&rb - m_renderbuffers.begin()));
@@ -864,7 +866,9 @@ struct PipelineImpl final : Pipeline {
 			rb.flags = desc.flags;
 			rb.format = desc.format;
 			rb.size = size;
-			rb.debug_name = desc.debug_name;
+			#ifdef LUMIX_DEBUG
+				rb.debug_name = desc.debug_name;
+			#endif
 			return RenderBufferHandle(u32(&rb - m_renderbuffers.begin()));
 		}
 
@@ -874,7 +878,9 @@ struct PipelineImpl final : Pipeline {
 		rb.flags = desc.flags;
 		rb.format = desc.format;
 		rb.size = size;
-		rb.debug_name = desc.debug_name;
+		#ifdef LUMIX_DEBUG		
+			rb.debug_name = desc.debug_name;
+		#endif
 		return RenderBufferHandle(m_renderbuffers.size() - 1);
 	}
 
