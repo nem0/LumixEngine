@@ -277,7 +277,7 @@ void DrawStream::destroy(gpu::TextureHandle texture) {
 }
 
 void DrawStream::destroy(gpu::ProgramHandle program) {
-	if(program) write(Instruction::DESTROY_PROGRAM, program);
+	if (program) write(Instruction::DESTROY_PROGRAM, program);
 }
 
 void DrawStream::destroy(gpu::BufferHandle buffer) {

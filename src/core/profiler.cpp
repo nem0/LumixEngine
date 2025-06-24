@@ -11,11 +11,13 @@
 #include "core/command_line_parser.h"
 #include "core/color.h"
 #include "core/crt.h"
+#include "core/debug.h"
 #include "core/hash_map.h"
 #include "core/atomic.h"
 #include "core/math.h"
 #include "core/string.h"
 #include "core/sync.h"
+#include "core/tag_allocator.h"
 #include "core/thread.h"
 #include "core/os.h"
 #include "profiler.h"
@@ -142,15 +144,15 @@ struct ThreadContext {
 	void CloseTrace(int) {}
 #endif
 
-static struct Instance
-{
-	Instance()
-		: contexts(getGlobalAllocator())
-		, trace_task(getGlobalAllocator())
-		, counters(getGlobalAllocator())
-		, global_context(default_global_context_size, getGlobalAllocator())
-		, gpu_scopes(getGlobalAllocator())
-		, gpu_scope_stack(getGlobalAllocator())
+struct Instance {
+	Instance(IAllocator& allocator)
+		: tag_allocator(allocator, "profiler")
+		, contexts(tag_allocator)
+		, trace_task(tag_allocator)
+		, counters(tag_allocator)
+		, global_context(default_global_context_size, tag_allocator)
+		, gpu_scopes(tag_allocator)
+		, gpu_scope_stack(tag_allocator)
 	{
 		startTrace();
 	}
@@ -160,6 +162,9 @@ static struct Instance
 	{
 		CloseTrace(trace_task.open_handle);
 		trace_task.destroy();
+		for (ThreadContext* ctx : contexts) {
+			LUMIX_DELETE(tag_allocator, ctx);
+		}
 	}
 
 
@@ -203,7 +208,7 @@ static struct Instance
 	LUMIX_FORCE_INLINE ThreadContext* getThreadContext()
 	{
 		thread_local ThreadContext* ctx = [&](){
-			ThreadContext* new_ctx = LUMIX_NEW(getGlobalAllocator(), ThreadContext)(default_context_size, getGlobalAllocator());
+			ThreadContext* new_ctx = LUMIX_NEW(tag_allocator, ThreadContext)(default_context_size, tag_allocator);
 			new_ctx->thread_id = os::getCurrentThreadID();
 			MutexGuard lock(mutex);
 			contexts.push(new_ctx);
@@ -213,6 +218,7 @@ static struct Instance
 		return ctx;
 	}
 
+	TagAllocator tag_allocator;
 	Array<u32> gpu_scope_stack;
 	Array<GPUScope> gpu_scopes;
 	Array<Counter> counters;
@@ -227,7 +233,9 @@ static struct Instance
 	AtomicI32 fiber_wait_id = 0;
 	TraceTask trace_task;
 	ThreadContext global_context;
-} g_instance;
+};
+
+Local<Instance> g_instance;
 
 // move data from temporary buffer to the main buffer
 template <bool lock>
@@ -264,7 +272,7 @@ static void flush(ThreadContext& ctx) {
 
 template <bool lock, typename T>
 LUMIX_FORCE_INLINE static void write(ThreadContext& ctx, u64 timestamp, EventType type, const T& value) {
-	if (g_instance.paused && timestamp > g_instance.paused_time) {
+	if (g_instance->paused && timestamp > g_instance->paused_time) {
 		if (ctx.tmp_pos != 0) flush<true>(ctx);
 		return;
 	}
@@ -288,7 +296,7 @@ LUMIX_FORCE_INLINE static void write(ThreadContext& ctx, u64 timestamp, EventTyp
 
 template <bool lock>
 LUMIX_FORCE_INLINE static void write(ThreadContext& ctx, u64 timestamp, EventType type, Span<const u8> data) {
-	if (g_instance.paused && timestamp > g_instance.paused_time) {
+	if (g_instance->paused && timestamp > g_instance->paused_time) {
 		if (ctx.tmp_pos != 0) flush<true>(ctx);
 		return;
 	}
@@ -332,43 +340,43 @@ LUMIX_FORCE_INLINE static void write(ThreadContext& ctx, u64 timestamp, EventTyp
 		rec.new_thread_id = cs->NewThreadId;
 		rec.old_thread_id = cs->OldThreadId;
 		rec.reason = cs->OldThreadWaitReason;
-		write<true>(g_instance.global_context, rec.timestamp, profiler::EventType::CONTEXT_SWITCH, rec);
+		write<true>(g_instance->global_context, rec.timestamp, profiler::EventType::CONTEXT_SWITCH, rec);
 	};
 #endif
 
 u32 getCounterHandle(const char* key, float* last_value) {
-	MutexGuard lock(g_instance.mutex);
-	for (Counter& c : g_instance.counters) {
+	MutexGuard lock(g_instance->mutex);
+	for (Counter& c : g_instance->counters) {
 		if (equalStrings(c.name, key)) {
 			if (last_value) *last_value = c.last_value;	
-			return u32(&c - g_instance.counters.begin());
+			return u32(&c - g_instance->counters.begin());
 		}
 	}
 	return INVALID_COUNTER;
 }
 
 u32 createCounter(const char* key_literal, float min) {
-	MutexGuard lock(g_instance.mutex);
-	Counter& c = g_instance.counters.emplace();
+	MutexGuard lock(g_instance->mutex);
+	Counter& c = g_instance->counters.emplace();
 	copyString(Span(c.name), key_literal);
 	c.min = min;
-	return g_instance.counters.size() - 1;
+	return g_instance->counters.size() - 1;
 }
 
 void pushCounter(u32 counter, float value) {
 	{
-		MutexGuard lock(g_instance.mutex);
-		g_instance.counters[counter].last_value = value;
+		MutexGuard lock(g_instance->mutex);
+		g_instance->counters[counter].last_value = value;
 	}
 	CounterRecord r;
 	r.counter = counter;
 	r.value = value;
-	write<true>(g_instance.global_context, os::Timer::getRawTimestamp(), EventType::COUNTER, r);
+	write<true>(g_instance->global_context, os::Timer::getRawTimestamp(), EventType::COUNTER, r);
 }
 
 void pushInt(const char* key, int value)
 {
-	ThreadContext* ctx = g_instance.getThreadContext();
+	ThreadContext* ctx = g_instance->getThreadContext();
 	IntRecord r;
 	r.key = key;
 	r.value = value;
@@ -378,19 +386,19 @@ void pushInt(const char* key, int value)
 
 void pushString(const char* value)
 {
-	ThreadContext* ctx = g_instance.getThreadContext();
+	ThreadContext* ctx = g_instance->getThreadContext();
 	write<false>(*ctx, os::Timer::getRawTimestamp(), EventType::STRING, Span((const u8*)value, stringLength(value) + 1));
 }
 
 void blockColor(u32 abgr) {
-	ThreadContext* ctx = g_instance.getThreadContext();
+	ThreadContext* ctx = g_instance->getThreadContext();
 	write<false>(*ctx, os::Timer::getRawTimestamp(), EventType::BLOCK_COLOR, abgr);
 }
 
 static AtomicI32 last_block_id = 0;
 
 void beginJob(i32 signal_on_finish) {
-	ThreadContext* ctx = g_instance.getThreadContext();
+	ThreadContext* ctx = g_instance->getThreadContext();
 
 	JobRecord r;
 	r.id = last_block_id.inc();
@@ -406,7 +414,7 @@ void beginJob(i32 signal_on_finish) {
 }
 
 u32 getOpenBlocks(Span<const char*> output) {
-	ThreadContext* ctx = g_instance.getThreadContext();
+	ThreadContext* ctx = g_instance->getThreadContext();
 	
 	for (u32 i = 0; i < ctx->open_block_stack_size; ++i) {
 		if (i >= output.length()) break;
@@ -421,7 +429,7 @@ void beginBlock(const char* name) {
 	BlockRecord r;
 	r.id = last_block_id.inc();
 	r.name = name;
-	ThreadContext* ctx = g_instance.getThreadContext();
+	ThreadContext* ctx = g_instance->getThreadContext();
 
 	if (ctx->open_block_stack_size < lengthOf(ctx->open_block_stack)) {
 		ctx->open_block_stack[ctx->open_block_stack_size] = { r.id, name };
@@ -433,7 +441,7 @@ void beginBlock(const char* name) {
 
 void endBlock()
 {
-	ThreadContext* ctx = g_instance.getThreadContext();
+	ThreadContext* ctx = g_instance->getThreadContext();
 	if (ctx->open_block_stack_size > 0) {
 		--ctx->open_block_stack_size;
 		write<false>(*ctx, os::Timer::getRawTimestamp(), EventType::END_BLOCK, 0);
@@ -441,16 +449,16 @@ void endBlock()
 }
 
 static GPUScope& getGPUScope(const char* name, u32& scope_id) {
-	for (GPUScope& scope : g_instance.gpu_scopes) {
+	for (GPUScope& scope : g_instance->gpu_scopes) {
 		if (scope.name == name) {
-			scope_id = u32(&scope - g_instance.gpu_scopes.begin());
+			scope_id = u32(&scope - g_instance->gpu_scopes.begin());
 			return scope;
 		}
 	}
 
-	GPUScope& scope = g_instance.gpu_scopes.emplace(getGlobalAllocator());
+	GPUScope& scope = g_instance->gpu_scopes.emplace(g_instance->tag_allocator);
 	scope.name = name;
-	scope_id = g_instance.gpu_scopes.size() - 1;
+	scope_id = g_instance->gpu_scopes.size() - 1;
 	return scope;
 }
 
@@ -459,36 +467,36 @@ void beginGPUBlock(const char* name, u64 timestamp, i64 profiler_link) {
 	data.timestamp = timestamp;
 	copyString(data.name, name);
 	data.profiler_link = profiler_link;
-	write<true>(g_instance.global_context, os::Timer::getRawTimestamp(), EventType::BEGIN_GPU_BLOCK, data);
-	MutexGuard lock(g_instance.global_context.mutex);
+	write<true>(g_instance->global_context, os::Timer::getRawTimestamp(), EventType::BEGIN_GPU_BLOCK, data);
+	MutexGuard lock(g_instance->global_context.mutex);
 	u32 scope_id;
 	getGPUScope(name, scope_id).pushBegin(timestamp);
-	g_instance.gpu_scope_stack.push(scope_id);
+	g_instance->gpu_scope_stack.push(scope_id);
 }
 
 void gpuStats(u64 primitives_generated) {
-	write<true>(g_instance.global_context, os::Timer::getRawTimestamp(), EventType::GPU_STATS, primitives_generated);
+	write<true>(g_instance->global_context, os::Timer::getRawTimestamp(), EventType::GPU_STATS, primitives_generated);
 }
 
 void endGPUBlock(u64 timestamp) {
-	write<true>(g_instance.global_context, os::Timer::getRawTimestamp(), EventType::END_GPU_BLOCK, timestamp);
-	MutexGuard lock(g_instance.global_context.mutex);
+	write<true>(g_instance->global_context, os::Timer::getRawTimestamp(), EventType::END_GPU_BLOCK, timestamp);
+	MutexGuard lock(g_instance->global_context.mutex);
 
-	if (g_instance.gpu_scope_stack.empty()) return;
-	const u32 scope_id = g_instance.gpu_scope_stack.back();
-	g_instance.gpu_scope_stack.pop();
+	if (g_instance->gpu_scope_stack.empty()) return;
+	const u32 scope_id = g_instance->gpu_scope_stack.back();
+	g_instance->gpu_scope_stack.pop();
 
-	g_instance.gpu_scopes[scope_id].pushEnd(timestamp);
+	g_instance->gpu_scopes[scope_id].pushEnd(timestamp);
 }
 
 u32 getGPUScopeStats(Span<GPUScopeStats> out) {
-	MutexGuard lock(g_instance.global_context.mutex);
-	if (out.length() == 0) return g_instance.gpu_scopes.size();
+	MutexGuard lock(g_instance->global_context.mutex);
+	if (out.length() == 0) return g_instance->gpu_scopes.size();
 
-	u32 num_outputs = minimum(out.length(), g_instance.gpu_scopes.size());
+	u32 num_outputs = minimum(out.length(), g_instance->gpu_scopes.size());
 	double freq = (double)frequency();
 	for (u32 i = 0; i < num_outputs; ++i) {
-		const GPUScope& scope = g_instance.gpu_scopes[i];
+		const GPUScope& scope = g_instance->gpu_scopes[i];
 		GPUScopeStats& stats = out[i];
 		stats.name = scope.name.c_str();
 		stats.min = scope.read == scope.write ? 0 : FLT_MAX;
@@ -516,19 +524,19 @@ i64 createNewLinkID()
 
 void link(i64 link)
 {
-	ThreadContext* ctx = g_instance.getThreadContext();
+	ThreadContext* ctx = g_instance->getThreadContext();
 	write<false>(*ctx, os::Timer::getRawTimestamp(), EventType::LINK, link);
 }
 
 
 float getLastFrameDuration()
 {
-	return float(g_instance.last_frame_duration / double(frequency()));
+	return float(g_instance->last_frame_duration / double(frequency()));
 }
 
 
 void beforeFiberSwitch() {
-	ThreadContext* ctx = g_instance.getThreadContext();
+	ThreadContext* ctx = g_instance->getThreadContext();
 	const u64 now = os::Timer::getRawTimestamp();
 	while(ctx->open_block_stack_size > 0) {
 		write<false>(*ctx, now, EventType::END_BLOCK, 0);
@@ -538,18 +546,18 @@ void beforeFiberSwitch() {
 
 
 void signalTriggered(i32 job_system_signal) {
-	ThreadContext* ctx = g_instance.getThreadContext();
+	ThreadContext* ctx = g_instance->getThreadContext();
 	write<false>(*ctx, os::Timer::getRawTimestamp(), EventType::SIGNAL_TRIGGERED, job_system_signal);
 }
 
 FiberSwitchData beginFiberWait(i32 job_system_signal) {
 	FiberWaitRecord r;
-	r.id = g_instance.fiber_wait_id.inc();
+	r.id = g_instance->fiber_wait_id.inc();
 	r.job_system_signal = job_system_signal;
 
 	FiberSwitchData res;
 
-	ThreadContext* ctx = g_instance.getThreadContext();
+	ThreadContext* ctx = g_instance->getThreadContext();
 	res.count = ctx->open_block_stack_size;
 	res.id = r.id;
 	res.signal = job_system_signal;
@@ -559,7 +567,7 @@ FiberSwitchData beginFiberWait(i32 job_system_signal) {
 }
 
 void endFiberWait(const FiberSwitchData& switch_data) {
-	ThreadContext* ctx = g_instance.getThreadContext();
+	ThreadContext* ctx = g_instance->getThreadContext();
 	FiberWaitRecord r;
 	r.id = switch_data.id;
 	r.job_system_signal = switch_data.signal;
@@ -578,41 +586,32 @@ void endFiberWait(const FiberSwitchData& switch_data) {
 	}
 }
 
-u64 getThreadContextMemorySize() {
-	u64 res = 0;
-	MutexGuard lock(g_instance.mutex);
-	for (ThreadContext* ctx : g_instance.contexts) {
-		MutexGuard lock2(ctx->mutex);
-		res += ctx->buffer.capacity();
-	}
-	return res;
-}
 
 u64 frequency()
 {
-	return g_instance.timer.getFrequency();
+	return g_instance->timer.getFrequency();
 }
 
 
 bool contextSwitchesEnabled()
 {
-	return g_instance.context_switches_enabled;
+	return g_instance->context_switches_enabled;
 }
 
 
 void frame()
 {
 	const u64 n = os::Timer::getRawTimestamp();
-	if (g_instance.last_frame_time != 0) {
-		g_instance.last_frame_duration = n - g_instance.last_frame_time;
+	if (g_instance->last_frame_time != 0) {
+		g_instance->last_frame_duration = n - g_instance->last_frame_time;
 	}
-	g_instance.last_frame_time = n;
-	write<true>(g_instance.global_context, os::Timer::getRawTimestamp(), EventType::FRAME, 0);
+	g_instance->last_frame_time = n;
+	write<true>(g_instance->global_context, os::Timer::getRawTimestamp(), EventType::FRAME, 0);
 }
 
 
 void pushMutexEvent(u64 mutex_id, u64 begin_enter_time, u64 end_enter_time, u64 begin_exit_time, u64 end_exit_time) {
-	ThreadContext* ctx = g_instance.getThreadContext();
+	ThreadContext* ctx = g_instance->getThreadContext();
 	ASSERT(ctx);
 	MutexEvent r = {
 		.mutex_id = mutex_id,
@@ -626,7 +625,7 @@ void pushMutexEvent(u64 mutex_id, u64 begin_enter_time, u64 end_enter_time, u64 
 
 void showInProfiler(bool show)
 {
-	ThreadContext* ctx = g_instance.getThreadContext();
+	ThreadContext* ctx = g_instance->getThreadContext();
 	MutexGuard lock(ctx->mutex);
 
 	ctx->show_in_profiler = show;
@@ -635,7 +634,7 @@ void showInProfiler(bool show)
 
 void setThreadName(const char* name)
 {
-	ThreadContext* ctx = g_instance.getThreadContext();
+	ThreadContext* ctx = g_instance->getThreadContext();
 	MutexGuard lock(ctx->mutex);
 
 	ctx->thread_name = name;
@@ -688,8 +687,8 @@ static void saveStrings(OutputMemoryStream& blob) {
 		}
 	};
 
-	gather(g_instance.global_context);
-	for (const ThreadContext* ctx : g_instance.contexts) {
+	gather(g_instance->global_context);
+	for (const ThreadContext* ctx : g_instance->contexts) {
 		gather(*ctx);
 	}
 
@@ -712,16 +711,16 @@ void serialize(OutputMemoryStream& blob, ThreadContext& ctx) {
 }
 
 void serialize(OutputMemoryStream& blob) {
-	MutexGuard lock(g_instance.mutex);
+	MutexGuard lock(g_instance->mutex);
 	
 	const u32 version = 0;
 	blob.write(version);
-	blob.write((u32)g_instance.counters.size());
-	blob.write(g_instance.counters.begin(), g_instance.counters.byte_size());
+	blob.write((u32)g_instance->counters.size());
+	blob.write(g_instance->counters.begin(), g_instance->counters.byte_size());
 
-	blob.write((u32)g_instance.contexts.size());
-	serialize(blob, g_instance.global_context);
-	for (ThreadContext* ctx : g_instance.contexts) {
+	blob.write((u32)g_instance->contexts.size());
+	serialize(blob, g_instance->global_context);
+	for (ThreadContext* ctx : g_instance->contexts) {
 		serialize(blob, *ctx);
 	}	
 	saveStrings(blob);
@@ -729,12 +728,19 @@ void serialize(OutputMemoryStream& blob) {
 
 void pause(bool paused)
 {
-	if (paused) write<true>(g_instance.global_context, os::Timer::getRawTimestamp(), EventType::PAUSE, 0);
+	if (paused) write<true>(g_instance->global_context, os::Timer::getRawTimestamp(), EventType::PAUSE, 0);
 
-	g_instance.paused = paused;
-	if (paused) g_instance.paused_time = os::Timer::getRawTimestamp();
+	g_instance->paused = paused;
+	if (paused) g_instance->paused_time = os::Timer::getRawTimestamp();
 }
 
+void init(IAllocator& allocator) {
+	g_instance.create(allocator);
+}
+
+void shutdown() {
+	g_instance.destroy();
+}
 
 } // namespace Lumix
 

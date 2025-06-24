@@ -4,12 +4,15 @@
 
 namespace Lumix {
 
+struct IAllocator;
 struct OutputMemoryStream;
 template <typename T> struct Span;
 
 namespace profiler {
 // writing API
 
+LUMIX_CORE_API void init(IAllocator& allocator);
+LUMIX_CORE_API void shutdown();
 LUMIX_CORE_API void pause(bool paused);
 
 LUMIX_CORE_API void setThreadName(const char* name);
@@ -62,7 +65,6 @@ struct Scope
 LUMIX_CORE_API u32 getOpenBlocks(Span<const char*> output);
 LUMIX_CORE_API bool contextSwitchesEnabled();
 LUMIX_CORE_API u64 frequency();
-LUMIX_CORE_API u64 getThreadContextMemorySize();
 
 struct GPUScopeStats {
 	const char* name;

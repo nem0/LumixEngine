@@ -546,8 +546,11 @@ struct StudioAppImpl final : StudioApp {
 		World::PartitionHandle m_partition_to_destroy;
 	};
 
-	StudioAppImpl()
-		: m_finished(false)
+	StudioAppImpl(IAllocator& allocator)
+		: m_main_allocator(allocator)
+		, m_allocator(m_main_allocator, "studio")
+		, m_imgui_allocator(m_allocator, "imgui")
+		, m_finished(false)
 		, m_deferred_game_mode_exit(false)
 		, m_is_welcome_screen_open(true)
 		, m_is_export_game_dialog_open(false)
@@ -564,9 +567,6 @@ struct StudioAppImpl final : StudioApp {
 		, m_deferred_destroy_windows(m_allocator)
 		, m_file_selector(*this)
 		, m_dir_selector(*this)
-		, m_debug_allocator(m_main_allocator)
-		, m_imgui_allocator(m_debug_allocator, "imgui")
-		, m_allocator(m_debug_allocator, "studio")
 		, m_export(m_allocator)
 		, m_recent_folders(m_allocator)
 	{
@@ -3025,8 +3025,7 @@ struct StudioAppImpl final : StudioApp {
 		u32 counter;
 	};
 
-	DefaultAllocator m_main_allocator;
-	debug::Allocator m_debug_allocator;
+	IAllocator& m_main_allocator;
 	TagAllocator m_allocator;
 	TagAllocator m_imgui_allocator;
 	
@@ -3147,9 +3146,11 @@ struct StudioAppImpl final : StudioApp {
 
 static Local<StudioAppImpl> g_studio;
 
-StudioApp* StudioApp::create()
+StudioApp* StudioApp::create(IAllocator& allocator)
 {
-	g_studio.create();
+	debug::init(allocator);
+	profiler::init(allocator);
+	g_studio.create(allocator);
 	return g_studio.get();
 }
 
@@ -3158,6 +3159,8 @@ void StudioApp::destroy(StudioApp& app)
 {
 	ASSERT(&app == g_studio.get());
 	g_studio.destroy();
+	profiler::shutdown();
+	debug::shutdown();
 }
 
 

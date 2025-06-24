@@ -48,6 +48,8 @@ struct Runner final
 	Runner() 
 		: m_allocator(m_main_allocator) 
 	{
+		debug::init(m_allocator);
+		profiler::init(m_allocator);
 		if (!jobs::init(os::getCPUsCount(), m_allocator)) {
 			logError("Failed to initialize job system.");
 		}
@@ -55,6 +57,8 @@ struct Runner final
 
 	~Runner() {
 		jobs::shutdown();
+		profiler::shutdown();
+		debug::shutdown();
 		ASSERT(!m_world); 
 	}
 
@@ -279,13 +283,13 @@ struct Runner final
 
 int main(int args, char* argv[])
 {
-	profiler::setThreadName("Main thread");
 	struct Data {
 		Data() : semaphore(0, 1) {}
 		Runner app;
 		Semaphore semaphore;
 	} data;
-
+	
+	profiler::setThreadName("Main thread");
 	jobs::run(&data, [](void* ptr) {
 		Data* data = (Data*)ptr;
 

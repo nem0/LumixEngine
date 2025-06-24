@@ -586,7 +586,9 @@ struct PipelineImpl final : Pipeline {
 		m_instancing_shader->decRefCount();
 
 		for (const Renderbuffer& rb : m_renderbuffers) {
+			volatile u32 idx = u32(&rb - m_renderbuffers.begin());
 			stream.destroy(rb.handle);
+			idx = idx;
 		}
 
 		stream.destroy(m_cube_ib);
@@ -602,8 +604,6 @@ struct PipelineImpl final : Pipeline {
 		if (m_blit_screen_program) {
 			stream.destroy(m_blit_screen_program);
 		}
-
-		clearBuffers();
 	}
 
 	void clearBuffers() {
@@ -3094,6 +3094,7 @@ struct PipelineImpl final : Pipeline {
 		}
 
 		if (!m_shadow_atlas.texture) {
+			// TODO render target flag?
 			m_shadow_atlas.texture = m_renderer.createTexture(ShadowAtlas::SIZE, ShadowAtlas::SIZE, 1, gpu::TextureFormat::D32, gpu::TextureFlags::NO_MIPS, Renderer::MemRef(), "shadow_atlas");
 		}
 		Matrix shadow_atlas_matrices[128];

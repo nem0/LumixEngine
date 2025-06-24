@@ -13,6 +13,7 @@
 #include "core/page_allocator.h"
 #include "core/profiler.h"
 #include "core/stack_array.h"
+#include "core/stack_tree.h"
 #include "core/string.h"
 #include "core/tag_allocator.h"
 #include "editor/asset_browser.h"
@@ -277,6 +278,7 @@ struct MemoryProfilerUI {
 	}
 
 	static void callstackTooltip(debug::StackNode* n) {
+		if (!n) return;
 		if (!ImGui::BeginTooltip()) return;
 
 		ImGui::TextUnformatted("Callstack:");
@@ -312,7 +314,7 @@ struct MemoryProfilerUI {
 				for (int j = clipper.DisplayStart; j < clipper.DisplayEnd; ++j) {
 					const AllocationTag::Allocation& a = tag.m_allocations[j];
 					char fn_name[256] = "N/A";
-					i32 line;
+					i32 line = 0;
 					debug::StackNode* n = a.stack_node;
 					do {
 						if (!debug::StackTree::getFunction(n, Span(fn_name), line)) {
@@ -405,20 +407,18 @@ struct MemoryProfilerUI {
 
 		m_allocation_tags.clear();
 
-		m_debug_allocator->lock();
-		const debug::AllocationInfo* current_info = m_debug_allocator->getFirstAllocationInfo();
-
+		const debug::AllocationInfo* current_info = debug::lockAllocationInfos();
 		while (current_info) {
-			if (current_info->stack_leaf) {
+			if (current_info->tag) {
 				AllocationTag& tag = getTag(current_info->tag);
-				AllocationTag::Allocation& a =  tag.m_allocations.emplace();
+				AllocationTag::Allocation& a = tag.m_allocations.emplace();
 				a.size = current_info->size;
 				a.stack_node = current_info->stack_leaf;
 				tag.m_size += a.size;
 			}
 			current_info = current_info->next;
 		}
-		m_debug_allocator->unlock();
+		debug::unlockAllocationInfos();
 
 		for (AllocationTag& tag : m_allocation_tags) postprocess(tag);
 	}
@@ -431,7 +431,7 @@ struct MemoryProfilerUI {
 
 		if (ImGui::Button("Capture")) captureAllocations();
 		ImGui::SameLine();
-		if (ImGui::Button("Check memory")) m_debug_allocator->checkGuards();
+		if (ImGui::Button("Check memory")) debug::checkGuards();
 		ImGui::SameLine();
 
 		size_t total = 0;
@@ -443,10 +443,6 @@ struct MemoryProfilerUI {
 		}
 		ImGui::Separator();
 		ImGui::Text("Total: %d MB", u32(total / 1024 / 1024));
-		const u32 reserved_pages = m_app.getEngine().getPageAllocator().getReservedCount() * PageAllocator::PAGE_SIZE;
-		ImGui::Text("Page allocator: %.1f MB", reserved_pages / 1024.f / 1024.f);
-		ImGui::Text("Arena allocators: %.1f MB", ArenaAllocator::getTotalCommitedBytes() / 1024.f / 1024.f);
-		ImGui::Text("Profiler contexts: %.1f MB", profiler::getThreadContextMemorySize() / 1024.f / 1024.f);
 	}
 
 	StudioApp& m_app;
@@ -458,7 +454,7 @@ struct MemoryProfilerUI {
 
 struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 	ProfilerUIImpl(StudioApp& app, debug::Allocator* allocator, Engine& engine)
-		: m_allocator(engine.getAllocator(), "profiler ui")
+		: m_allocator(app.getAllocator(), "profiler ui")
 		, m_app(app)
 		, m_threads(m_allocator)
 		, m_data(m_allocator)

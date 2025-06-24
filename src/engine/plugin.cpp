@@ -5,6 +5,7 @@
 #include "core/os.h"
 #include "core/path.h"
 #include "core/profiler.h"
+#include "core/stack_tree.h"
 #include "core/stream.h"
 #include "core/string.h"
 

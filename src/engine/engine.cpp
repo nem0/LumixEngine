@@ -49,7 +49,7 @@ struct EngineImpl final : Engine {
 
 	EngineImpl(InitArgs&& init_data, IAllocator& allocator)
 		: m_allocator(allocator, "engine")
-		, m_page_allocator(allocator)
+		, m_page_allocator(m_allocator)
 		, m_prefab_resource_manager(m_allocator)
 		, m_resource_manager(*this, m_allocator)
 		, m_is_game_running(false)
@@ -306,13 +306,9 @@ struct EngineImpl final : Engine {
 		debug::Allocator* debug_allocator = getDebugAllocator();
 		if (debug_allocator) {
 			static u32 mem_counter = profiler::createCounter("Main allocator (MB)", 0);
-			profiler::pushCounter(mem_counter, float(double(debug_allocator->getTotalSize()) / (1024.0 * 1024.0)));
+			profiler::pushCounter(mem_counter, float(double(debug::getRegisteredAllocsSize()) / (1024.0 * 1024.0)));
 		}
 
-		const float reserved_pages_size = (m_page_allocator.getReservedCount() * PageAllocator::PAGE_SIZE) / (1024.f * 1024.f);
-		static u32 page_allocator_counter = profiler::createCounter("Page allocator (MB)", 0);
-		profiler::pushCounter(page_allocator_counter , reserved_pages_size);
-		
 		#ifdef _WIN32
 			const float process_mem = os::getProcessMemory() / (1024.f * 1024.f);
 			static u32 process_mem_counter = profiler::createCounter("Process Memory (MB)", 0);

@@ -77,7 +77,7 @@ struct LUMIX_EDITOR_API StudioApp {
 		char label[50];
 	};
 
-	static StudioApp* create();
+	static StudioApp* create(struct IAllocator& allocator);
 	static void destroy(StudioApp& app);
 
 	virtual struct IAllocator& getAllocator() = 0;

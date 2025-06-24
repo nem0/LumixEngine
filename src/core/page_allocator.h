@@ -3,8 +3,10 @@
 
 #include "allocator.h"
 #include "atomic.h"
+#include "debug.h"
 #include "ring_buffer.h"
 #include "sync.h"
+#include "tag_allocator.h"
 
 
 namespace Lumix
@@ -19,13 +21,15 @@ struct LUMIX_CORE_API PageAllocator final {
 		
 	void* allocate();
 	void deallocate(void* mem);
-	u32 getAllocatedCount() const { return allocated_count; }
-	u32 getReservedCount() const { return reserved_count; }
 
 private:
 	AtomicI32 allocated_count = 0;
-	u32 reserved_count = 0;
+	AtomicI32 reserved_count = 0;
 	RingBuffer<void*, 512> free_pages;
+	debug::AllocationInfo allocation_info;
+	#ifdef LUMIX_DEBUG
+		TagAllocator tag_allocator;
+	#endif
 };
 
 

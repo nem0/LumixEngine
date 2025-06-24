@@ -17,16 +17,26 @@
 namespace Lumix
 {
 
-ArenaAllocator::ArenaAllocator(u32 reserved)
+ArenaAllocator::ArenaAllocator(u32 reserved, IAllocator& parent, const char* tag)
+	: m_parent(parent)
+	#ifdef LUMIX_DEBUG	
+		, m_tag_allocator(parent, tag)
+	#endif
 {
 	m_reserved = reserved;
 	m_mem = (u8*)os::memReserve(reserved);
+	#ifdef LUMIX_DEBUG	
+		m_allocation_info.flags = debug::AllocationInfo::IS_ARENA;
+		m_allocation_info.tag = &m_tag_allocator;
+	#endif
 }
 
 ArenaAllocator::~ArenaAllocator() {
 	ASSERT(m_end == 0);
 	os::memRelease(m_mem, m_reserved);
-	g_total_commited_bytes.subtract(m_commited_bytes);
+	#ifdef LUMIX_DEBUG	
+		debug::unregisterAlloc(m_allocation_info);
+	#endif
 }
 
 void ArenaAllocator::reset() {
@@ -55,8 +65,12 @@ void* ArenaAllocator::allocate(size_t size, size_t align) {
 	const u32 commited = roundUp(start + (u32)size, 4096);
 	ASSERT(commited < m_reserved);
 	os::memCommit(m_mem + m_commited_bytes, commited - m_commited_bytes);
-	g_total_commited_bytes.add(commited - m_commited_bytes);
 	m_commited_bytes = commited;
+
+	#ifdef LUMIX_DEBUG
+		if (m_allocation_info.size == 0) debug::registerAlloc(m_allocation_info);
+		debug::resizeAlloc(m_allocation_info, m_commited_bytes);
+	#endif
 
 	return m_mem + start;
 }

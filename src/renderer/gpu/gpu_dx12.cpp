@@ -1075,7 +1075,10 @@ struct D3D {
 
 	D3D(IAllocator& allocator) 
 		: allocator(allocator)
-		, tag_allocator(getRoot(allocator), "GPU")
+		, vram_tag_allocator(getRoot(allocator), "VRAM")
+		, texture_tag_allocator(vram_tag_allocator, "Textures")
+		, buffer_tag_allocator(vram_tag_allocator, "Buffers")
+		, rendertarget_tag_allocator(vram_tag_allocator, "Render targets")
 		, srv_heap(allocator)
 		, shader_compiler(allocator)
 		, frames(allocator)
@@ -1089,7 +1092,10 @@ struct D3D {
 	}
 
 	IAllocator& allocator;
-	TagAllocator tag_allocator;
+	TagAllocator vram_tag_allocator;
+	TagAllocator texture_tag_allocator;
+	TagAllocator buffer_tag_allocator;
+	TagAllocator rendertarget_tag_allocator;
 	DWORD thread;
 	RENDERDOC_API_1_0_2* rdoc_api = nullptr;
 	ID3D12Device* device = nullptr;
@@ -1133,7 +1139,6 @@ struct D3D {
 	bool vsync_dirty = false;
 	Mutex vsync_mutex;
 	Mutex disassembly_mutex;
-	debug::Allocator* debug_allocator = nullptr;
 };
 
 static Local<D3D> d3d;
@@ -1362,9 +1367,7 @@ void destroy(TextureHandle texture) {
 	ASSERT(texture);
 	Texture& t = *texture;
 	#ifdef LUMIX_DEBUG
-		if (d3d->debug_allocator) {
-			d3d->debug_allocator->unregisterExternal(t.allocation_info);
-		}
+		debug::unregisterAlloc(t.allocation_info);
 	#endif
 	if (t.resource && !t.is_view) d3d->frame->to_release.push(t.resource);
 	if (t.heap_id != INVALID_HEAP_ID) d3d->frame->to_heap_release.push(t.heap_id);
@@ -1626,12 +1629,6 @@ bool isQueryReady(QueryHandle query) {
 
 void preinit(IAllocator& allocator, bool load_renderdoc) {
 	d3d.create(allocator);
-	for (IAllocator* a = &allocator; a; a = a->getParent()) {
-		if (a->isDebug()) {
-			d3d->debug_allocator = (debug::Allocator*)a;
-			break;
-		}
-	}
 	d3d->srv_heap.preinit(MAX_SRV_DESCRIPTORS, 1024);
 	if (load_renderdoc) tryLoadRenderDoc();
 
@@ -2407,10 +2404,10 @@ void createBuffer(BufferHandle buffer, BufferFlags flags, size_t size, const voi
 	#ifdef LUMIX_DEBUG
 		buffer->allocation_info.align = 0;
 		buffer->allocation_info.size = size;
-		buffer->allocation_info.flags = debug::AllocationInfo::IS_GPU;
-		buffer->tag_allocator.create(d3d->tag_allocator, buffer->name);
+		buffer->allocation_info.flags = debug::AllocationInfo::IS_VRAM;
+		buffer->tag_allocator.create(d3d->buffer_tag_allocator, buffer->name);
 		buffer->allocation_info.tag = buffer->tag_allocator.get();
-		d3d->debug_allocator->registerExternal(buffer->allocation_info);
+		debug::registerAlloc(buffer->allocation_info);
 	#endif
 
 	if (debug_name) {
@@ -2680,7 +2677,7 @@ void createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 		texture.resource->SetName(tmp);
 	}
 
-	if (d3d->debug_allocator) {
+	#ifdef LUMIX_DEBUG
 		D3D12_RESOURCE_DESC res_desc = {
 			.Dimension = desc.Dimension,
 			.Alignment = desc.Alignment,
@@ -2695,15 +2692,18 @@ void createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 		};
 		D3D12_RESOURCE_ALLOCATION_INFO info = d3d->device->GetResourceAllocationInfo(0, 1, &res_desc);
 
-		#ifdef LUMIX_DEBUG
-			texture.allocation_info.align = (u32)info.Alignment;
-			texture.allocation_info.size = info.SizeInBytes;
-			texture.allocation_info.flags = debug::AllocationInfo::IS_GPU;
-			texture.tag_allocator.create(d3d->tag_allocator, texture.name);
-			texture.allocation_info.tag = texture.tag_allocator.get();
-			d3d->debug_allocator->registerExternal(texture.allocation_info);
-		#endif
-	}
+		texture.allocation_info.align = (u32)info.Alignment;
+		texture.allocation_info.size = info.SizeInBytes;
+		texture.allocation_info.flags = debug::AllocationInfo::IS_VRAM;
+		if (render_target) {
+			texture.tag_allocator.create(d3d->rendertarget_tag_allocator, texture.name);
+		}
+		else {
+			texture.tag_allocator.create(d3d->texture_tag_allocator, texture.name);
+		}
+		texture.allocation_info.tag = texture.tag_allocator.get();
+		debug::registerAlloc(texture.allocation_info);
+	#endif
 }
 
 void setDebugName(TextureHandle texture, const char* debug_name) {
@@ -2869,9 +2869,7 @@ void destroy(BufferHandle buffer) {
 	if (t.heap_id != INVALID_HEAP_ID) d3d->frame->to_heap_release.push(t.heap_id);
 
 	#ifdef LUMIX_DEBUG
-		if (d3d->debug_allocator) {
-			d3d->debug_allocator->unregisterExternal(buffer->allocation_info);
-		}
+		debug::unregisterAlloc(buffer->allocation_info);
 	#endif
 
 	LUMIX_DELETE(d3d->allocator, buffer);

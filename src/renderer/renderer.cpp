@@ -1051,13 +1051,6 @@ struct RendererImpl final : Renderer {
 		}
 		m_cpu_frame->to_compile_shaders.clear();
 
-		u32 frame_data_mem = 0;
-		for (const Local<FrameData>& fd : m_frames) {
-			frame_data_mem += fd->arena_allocator.getCommitedBytes();
-		}
-		static u32 frame_data_counter = profiler::createCounter("Render frame data (kB)", 0);
-		profiler::pushCounter(frame_data_counter, float(double(frame_data_mem) / 1024.0));
-
 		jobs::turnRed(&m_cpu_frame->can_setup);
 		pushToGPUQueue(*m_cpu_frame);
 
@@ -1217,7 +1210,7 @@ struct RendererImpl final : Renderer {
 FrameData::FrameData(struct RendererImpl& renderer, IAllocator& allocator, PageAllocator& page_allocator) 
 	: renderer(renderer)
 	, to_compile_shaders(allocator)
-	, arena_allocator(1024 * 1024 * 64)
+	, arena_allocator(1024 * 1024 * 64, allocator, "frame data")
 	, draw_stream(renderer)
 	, begin_frame_draw_stream(renderer)
 	, end_frame_draw_stream(renderer)

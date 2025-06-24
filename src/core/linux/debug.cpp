@@ -71,6 +71,7 @@ StackNode* StackTree::getParent(StackNode* node) {
 
 
 bool StackTree::getFunction(StackNode* node, Span<char> out, int& line) {
+	if (!node) return false;
 	char** str = backtrace_symbols(&node->m_instruction, 1);
 	if (!str) return false;
 
@@ -232,11 +233,6 @@ size_t Allocator::getNeededMemory(size_t size) {
 
 size_t Allocator::getNeededMemory(size_t size, size_t align) {
 	return size + sizeof(AllocationInfo) + (m_are_guards_enabled ? sizeof(ALLOCATION_GUARD) << 1 : 0) + align;
-}
-
-
-Allocator::AllocationInfo* Allocator::getAllocationInfoFromSystem(void* system_ptr) {
-	return (AllocationInfo*)(m_are_guards_enabled ? (u8*)system_ptr + sizeof(ALLOCATION_GUARD) : system_ptr);
 }
 
 
