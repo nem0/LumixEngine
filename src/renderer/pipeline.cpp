@@ -699,6 +699,7 @@ struct PipelineImpl final : Pipeline {
 
 	bool bakeShadow(const PointLight& light, u32 atlas_idx) {
 		PROFILE_FUNCTION();
+		m_renderer.releaseRenderbuffer(m_output);
 		const World& world = m_module->getWorld();
 		const Viewport backup_viewport = m_viewport;
 
@@ -1194,7 +1195,7 @@ struct PipelineImpl final : Pipeline {
 			, toBindless(gbuffer.D, stream)
 			, toBindless(gbuffer.DS, stream)
 			, toBindless(shadowmap, stream)
-			, gpu::getBindlessHandle(m_shadow_atlas.texture)
+			, m_shadow_atlas.texture ? gpu::getBindlessHandle(m_shadow_atlas.texture) : gpu::INVALID_BINDLESS_HANDLE
 			, gpu::getBindlessHandle(reflection_probes)
 		};
 		setUniform(ubdata);
@@ -2962,7 +2963,7 @@ struct PipelineImpl final : Pipeline {
 			}
 		}
 
-		if (!m_shadow_atlas.texture) {
+		if (!m_shadow_atlas.texture && atlas_sorter.count > 0) {
 			// TODO render target flag?
 			m_shadow_atlas.texture = m_renderer.createTexture(ShadowAtlas::SIZE, ShadowAtlas::SIZE, 1, gpu::TextureFormat::D32, gpu::TextureFlags::NO_MIPS, Renderer::MemRef(), "shadow_atlas");
 		}

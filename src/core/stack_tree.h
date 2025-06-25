@@ -15,6 +15,7 @@ struct LUMIX_CORE_API StackTree {
 
 	StackNode* record();
 	void printCallstack(StackNode* node);
+	const ArenaAllocator& getAllocator() const { return m_allocator; }
 	static bool getFunction(StackNode* node, Span<char> out, int& line);
 	static StackNode* getParent(StackNode* node);
 	static int getPath(StackNode* node, Span<StackNode*> output);

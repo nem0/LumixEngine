@@ -3160,6 +3160,7 @@ void StudioApp::destroy(StudioApp& app)
 	ASSERT(&app == g_studio.get());
 	g_studio.destroy();
 	profiler::shutdown();
+	debug::checkLeaks();
 	debug::shutdown();
 }
 

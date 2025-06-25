@@ -21,6 +21,7 @@ struct LUMIX_CORE_API ArenaAllocator : IAllocator {
 	void* allocate(size_t size, size_t align) override;
 	void deallocate(void* ptr) override;
 	void* reallocate(void* ptr, size_t new_size, size_t old_size, size_t align) override;
+	const debug::AllocationInfo& getAllocationInfo() const { return m_allocation_info; }
 
 private:
 	IAllocator& m_parent;

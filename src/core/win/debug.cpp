@@ -369,23 +369,23 @@ void shutdown() {
 
 void checkLeaks() {
 	if (s_allocation_debug.m_root) {
-		OutputDebugString("Memory leaks detected!\n");
+		bool first = true;
 		AllocationInfo* info = s_allocation_debug.m_root;
 		while (info) {
-			StaticString<2048> tmp("\nAllocation size : ", info->size, " , memory ", (u64)(info + sizeof(info)), "\n");
-			if (info->flags & debug::AllocationInfo::IS_VRAM) tmp.append("VRAM\n");
-			OutputDebugString(tmp);
-			s_stack_tree->printCallstack(info->stack_leaf);
+			 // s_stack_tree uses arena and we can't deallocate it because we might need it to print leak's callstack
+			 // so we ignore it "leaking"
+			if (info != &s_stack_tree->getAllocator().getAllocationInfo()) {
+				if (first) OutputDebugString("Memory leaks detected!\n");
+				first = false;
+				StaticString<2048> tmp("\nAllocation size : ", info->size, " , memory ", (u64)(info + sizeof(info)), "\n");
+				if (info->flags & debug::AllocationInfo::IS_VRAM) tmp.append("VRAM\n");
+				OutputDebugString(tmp);
+				s_stack_tree->printCallstack(info->stack_leaf);
+			}
 			info = info->next;
 		}
-		debugBreak();
+		if (!first) debugBreak();
 	}
-}
-
-
-Allocator::~Allocator()
-{
-	checkLeaks();
 }
 
 

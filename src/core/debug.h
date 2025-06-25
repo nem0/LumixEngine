@@ -40,7 +40,7 @@ struct LUMIX_CORE_API AllocationInfo {
 		NONE = 0,
 		IS_VRAM = 0b01 << 1,
 		IS_PAGED = 0b10 << 1,
-		IS_ARENA = 0b11 << 1,
+		IS_ARENA = 0b11 << 1
 	};
 	AllocationInfo* previous = nullptr;
 	AllocationInfo* next = nullptr;
@@ -63,7 +63,6 @@ LUMIX_CORE_API void unlockAllocationInfos();
 
 struct LUMIX_CORE_API Allocator final : IAllocator {
 	explicit Allocator(IAllocator& source);
-	~Allocator();
 
 	void* allocate(size_t size, size_t align) override;
 	void deallocate(void* ptr) override;
