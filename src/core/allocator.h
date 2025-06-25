@@ -14,7 +14,6 @@ namespace Lumix {
 
 struct LUMIX_CORE_API IAllocator {
 	virtual ~IAllocator() {}
-	virtual bool isDebug() const { return false; }
 	virtual bool isTagAllocator() const { return false; }
 	virtual IAllocator* getParent() const { return nullptr; }
 

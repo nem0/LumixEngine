@@ -6,6 +6,10 @@ namespace Lumix {
 
 template <typename T> struct UniquePtr;
 
-UniquePtr<StudioApp::GUIPlugin> createProfilerUI(StudioApp& app);
+struct ProfilerUI : StudioApp::GUIPlugin {
+	virtual void snapshot() = 0;
+};
+
+UniquePtr<ProfilerUI> createProfilerUI(StudioApp& app);
 
 }

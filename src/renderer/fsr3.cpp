@@ -138,22 +138,24 @@ struct FSR3Plugin : RenderPlugin {
 	}
 
 	RenderBufferHandle renderAA(const GBuffer& gbuffer, RenderBufferHandle input, Pipeline& pipeline) override {
-		DrawStream& stream = pipeline.getRenderer().getDrawStream();
+		Renderer& renderer = pipeline.getRenderer();
+		DrawStream& stream = renderer.getDrawStream();
 		
 		Context& ctx = getOrCreateContext(pipeline);
 
-		gpu::TextureHandle color = pipeline.toTexture(input);
-		gpu::TextureHandle depth = pipeline.toTexture(gbuffer.DS);
-		gpu::TextureHandle motion_vectors = pipeline.toTexture(gbuffer.D);
+		gpu::TextureHandle color = renderer.toTexture(input);
+		gpu::TextureHandle depth = renderer.toTexture(gbuffer.DS);
+		gpu::TextureHandle motion_vectors = renderer.toTexture(gbuffer.D);
+		const Viewport& vp = pipeline.getViewport();
 
-		RenderBufferHandle output = pipeline.createRenderbuffer({
+		RenderBufferHandle output = renderer.createRenderbuffer({
+			.size = {vp.w, vp.h},
 			.format = gpu::TextureFormat::RGBA16F,
 			.flags = gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE,
 			.debug_name = "fsr3_output"
 		});
-		const float time_delta = pipeline.getRenderer().getEngine().getLastTimeDelta();
-		gpu::TextureHandle output_tex = pipeline.toTexture(output);
-		const Viewport& vp = pipeline.getViewport();
+		const float time_delta = renderer.getEngine().getLastTimeDelta();
+		gpu::TextureHandle output_tex = renderer.toTexture(output);
 
 		pipeline.enablePixelJitter(true);
 		pipeline.beginBlock("FSR3 Upscale");
@@ -161,7 +163,7 @@ struct FSR3Plugin : RenderPlugin {
 			dispatch(color, depth, motion_vectors, output_tex, vp, time_delta, *ctx_ptr);
 		});
 		pipeline.endBlock();
-		pipeline.releaseRenderbuffer(input);
+		renderer.releaseRenderbuffer(input);
 
 		return output;
 	}

@@ -4,6 +4,7 @@
 
 #include "core/allocator.h"
 #include "core/color.h"
+#include "core/math.h"
 #include "core/profiler.h"
 #include "draw_stream.h"
 #include "engine/plugin.h"
@@ -18,6 +19,23 @@ namespace Lumix {
 enum class AttributeSemantic : u8;
 struct RenderBufferHandle;
 struct GBuffer;
+
+struct RenderbufferDesc {
+	IVec2 size;
+	gpu::TextureFormat format;
+	gpu::TextureFlags flags = gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::NO_MIPS;
+	const char* debug_name;
+};
+
+struct RenderBufferHandle {
+	constexpr RenderBufferHandle() : value(0xffFFffFF) {}
+	explicit constexpr RenderBufferHandle(u32 value) : value(value) {}
+	operator u32() const { return value; }
+	bool operator ==(const RenderBufferHandle& rhs) const { return value == rhs.value; }
+	u32 value;
+};
+
+static constexpr RenderBufferHandle INVALID_RENDERBUFFER = RenderBufferHandle();
 
 struct LUMIX_RENDERER_API RenderPlugin {
 	virtual ~RenderPlugin() {}
@@ -106,6 +124,11 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 	virtual gpu::BufferHandle getInstancedMeshesBuffer() = 0;
 	virtual gpu::BufferHandle createBuffer(const MemRef& memory, gpu::BufferFlags flags, const char* debug_name) = 0;
 	virtual gpu::TextureHandle createTexture(u32 w, u32 h, u32 depth, gpu::TextureFormat format, gpu::TextureFlags flags, const MemRef& memory, const char* debug_name) = 0;
+
+	virtual RenderBufferHandle createRenderbuffer(const RenderbufferDesc& desc) = 0;
+	virtual void releaseRenderbuffer(RenderBufferHandle idx) = 0;
+	virtual void setRenderTargets(Span<const RenderBufferHandle> renderbuffers, RenderBufferHandle ds = INVALID_RENDERBUFFER, gpu::FramebufferFlags flags = gpu::FramebufferFlags::NONE) = 0;
+	virtual gpu::TextureHandle toTexture(RenderBufferHandle handle) = 0;
 
 	virtual gpu::ProgramHandle queueShaderCompile(struct Shader& shader, const struct ShaderKey& key, gpu::VertexDecl decl) = 0;
 	virtual DrawStream& getDrawStream() = 0;

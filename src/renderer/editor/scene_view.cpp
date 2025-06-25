@@ -636,12 +636,14 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 
 		// selection
 		const Array<EntityRef>& entities = m_scene_view.m_editor.getSelectedEntities();
+		const Viewport& vp = m_scene_view.m_view->getViewport();
 		if (entities.size() < 5000) {
-			const RenderBufferHandle selection_mask = pipeline.createRenderbuffer({
+			const RenderBufferHandle selection_mask = renderer.createRenderbuffer({
+				.size = {vp.w, vp.h},
 				.format = gpu::TextureFormat::D32,
 				.debug_name = "selection_depth"
 			});
-			pipeline.setRenderTargets({}, selection_mask);
+			renderer.setRenderTargets({}, selection_mask);
 			pipeline.clear(gpu::ClearFlags::ALL, 0, 0, 0, 0, 0);
 	
 			renderer.pushJob("selection", [&pipeline, &renderer, this, &entities](DrawStream& stream) {
@@ -721,29 +723,29 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 				pipeline.toRWBindless(input, stream)
 			};
 			pipeline.setUniform(ub);
-			const Viewport& vp = m_scene_view.m_view->getViewport();
 			pipeline.dispatch(*m_selection_outline_shader, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
-			pipeline.releaseRenderbuffer(selection_mask);
+			renderer.releaseRenderbuffer(selection_mask);
 		}
 
 		// grid
-		pipeline.setRenderTargets(Span(&input, 1), gbuffer.DS, gpu::FramebufferFlags::READONLY_DEPTH_STENCIL);
+		renderer.setRenderTargets(Span(&input, 1), gbuffer.DS, gpu::FramebufferFlags::READONLY_DEPTH_STENCIL);
 		if (m_grid_shader->isReady() && m_show_grid) {
-			pipeline.setRenderTargets(Span(&input, 1), gbuffer.DS);
+			renderer.setRenderTargets(Span(&input, 1), gbuffer.DS);
 			pipeline.drawArray(0, 4, *m_grid_shader, 0, gpu::StateFlags::DEPTH_FUNCTION | gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA));
 		}
 
-		const RenderBufferHandle icons_ds = pipeline.createRenderbuffer({
+		const RenderBufferHandle icons_ds = renderer.createRenderbuffer({
+			.size = {vp.w, vp.h},
 			.format = gpu::TextureFormat::D32,
 			.debug_name = "icons_ds"
 		});
 
-		pipeline.setRenderTargets({}, icons_ds);
+		renderer.setRenderTargets({}, icons_ds);
 		pipeline.clear(gpu::ClearFlags::DEPTH, 0, 0, 0, 0, 0);
 
 		// icons
 		if (m_show_icons) {
-			pipeline.setRenderTargets(Span(&input, 1), icons_ds);
+			renderer.setRenderTargets(Span(&input, 1), icons_ds);
 			DrawStream& stream = pipeline.getRenderer().getDrawStream();
 			pipeline.setUniform(pipeline.toBindless(gbuffer.DS, stream), UniformBuffer::DRAWCALL2);
 
@@ -782,7 +784,7 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 		// gizmo
 		auto& vertices = m_scene_view.m_view->m_draw_vertices;
 		if (m_debug_shape_shader->isReady() && !vertices.empty()) {
-			pipeline.setRenderTargets(Span(&input, 1), icons_ds);
+			renderer.setRenderTargets(Span(&input, 1), icons_ds);
 			pipeline.clear(gpu::ClearFlags::DEPTH, 0, 0, 0, 0, 0);
 
 			renderer.pushJob("gizmos", [&renderer, &vertices, this](DrawStream& stream) {
@@ -819,7 +821,7 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 			});
 
 		}
-		pipeline.releaseRenderbuffer(icons_ds);
+		renderer.releaseRenderbuffer(icons_ds);
 
 		return input;
 	}

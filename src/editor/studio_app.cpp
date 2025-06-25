@@ -868,7 +868,7 @@ struct StudioAppImpl final : StudioApp {
 		jobs::runLambda([&data]() {
 			data.that->onInit();
 			if (CommandLineParser::isOn("-profile_start")) {
-				profiler::pause(true);
+				data.that->m_profiler_ui->snapshot();
 			}
 			while (!data.that->m_finished) {
 				os::Event e;
@@ -3075,7 +3075,7 @@ struct StudioAppImpl final : StudioApp {
 	UniquePtr<AssetCompiler> m_asset_compiler;
 	Local<PropertyGrid> m_property_grid;
 	Local<HierarchyGUI> m_hierarchy;
-	UniquePtr<GUIPlugin> m_profiler_ui;
+	UniquePtr<ProfilerUI> m_profiler_ui;
 	Local<LogUI> m_log_ui;
 	Settings m_settings;
 	Array<String> m_recent_folders;

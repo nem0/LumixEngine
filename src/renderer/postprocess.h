@@ -210,13 +210,16 @@ struct DOF : public RenderPlugin {
 		if (!camera.dof_enabled) return input;
 
 		pipeline.beginBlock("dof");
-		RenderBufferHandle dof_rb = pipeline.createRenderbuffer({
+		Renderer& renderer = pipeline.getRenderer();
+		const Viewport& vp = pipeline.getViewport();
+		RenderBufferHandle dof_rb = renderer.createRenderbuffer({
+			.size = {vp.w, vp.h},
 			.format = gpu::TextureFormat::RGBA16F,
 			.flags = gpu::TextureFlags::COMPUTE_WRITE | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET,
 			.debug_name = "dof"
 		});
 		
-		DrawStream& stream = pipeline.getRenderer().getDrawStream();
+		DrawStream& stream = renderer.getDrawStream();
 		struct {
 			float distance;
 			float range;
@@ -235,12 +238,11 @@ struct DOF : public RenderPlugin {
 			pipeline.toRWBindless(dof_rb, stream),
 		};
 
-		const Viewport& vp = pipeline.getViewport();
 		pipeline.setUniform(ub);
 		pipeline.dispatch(*m_shader, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
 
 		pipeline.blit(pipeline.toBindless(dof_rb, stream), pipeline.toRWBindless(input, stream), {(i32)vp.w, (i32)vp.h});
-		pipeline.releaseRenderbuffer(dof_rb);
+		renderer.releaseRenderbuffer(dof_rb);
 		pipeline.endBlock();
 		return input;
 	}
@@ -273,7 +275,7 @@ struct CubemapSky : public RenderPlugin {
 		if (!env.cubemap_sky->isReady()) return input;
 
 		pipeline.beginBlock("sky");
-		pipeline.setRenderTargets(Span(&input, 1), gbuffer.DS);
+		m_renderer.setRenderTargets(Span(&input, 1), gbuffer.DS);
 		const gpu::StateFlags state = gpu::getStencilStateBits(0, gpu::StencilFuncs::EQUAL, 0, 0xff, gpu::StencilOps::KEEP, gpu::StencilOps::KEEP, gpu::StencilOps::REPLACE);
 		struct {
 			float intensity;
@@ -373,9 +375,9 @@ struct Bloom : public RenderPlugin {
 	}
 
 	RenderBufferHandle downscale(RenderBufferHandle big, RenderbufferDesc small_desc, Pipeline& pipeline) {
-		ASSERT(small_desc.type == RenderbufferDesc::FIXED);
-		RenderBufferHandle small = pipeline.createRenderbuffer(small_desc);
-		DrawStream& stream = pipeline.getRenderer().getDrawStream();
+		Renderer& renderer = pipeline.getRenderer();
+		RenderBufferHandle small = renderer.createRenderbuffer(small_desc);
+		DrawStream& stream = renderer.getDrawStream();
 		struct {
 			gpu::BindlessHandle input;
 			gpu::RWBindlessHandle output;
@@ -383,23 +385,23 @@ struct Bloom : public RenderPlugin {
 			pipeline.toBindless(big, stream),
 			pipeline.toRWBindless(small, stream)
 		};
-		stream.memoryBarrier(pipeline.toTexture(big));
+		stream.memoryBarrier(renderer.toTexture(big));
 		pipeline.setUniform(ubdata);
-		pipeline.dispatch(*m_downscale_shader, (small_desc.fixed_size.x + 15) / 16, (small_desc.fixed_size.y + 15 ) / 16, 1);
+		pipeline.dispatch(*m_downscale_shader, (small_desc.size.x + 15) / 16, (small_desc.size.y + 15 ) / 16, 1);
 		return small;
 	}
 
 
 	void blurUpscale(IVec2 big_size, RenderBufferHandle big, RenderBufferHandle small, Pipeline& pipeline) {
-		RenderBufferHandle blur_buf = pipeline.createRenderbuffer({
-			.type = RenderbufferDesc::FIXED,
-			.fixed_size = big_size,
+		Renderer& renderer = pipeline.getRenderer();
+		RenderBufferHandle blur_buf = renderer.createRenderbuffer({
+			.size = big_size,
 			.format = gpu::TextureFormat::RGBA16F,
 			.debug_name = "bloom_blur"
 			});
-		pipeline.setRenderTargets(Span(&blur_buf, 1));
+		renderer.setRenderTargets(Span(&blur_buf, 1));
 		const u32 blur_h_mask = 1 << pipeline.getRenderer().getShaderDefineIdx("BLUR_H");
-		DrawStream& stream = pipeline.getRenderer().getDrawStream();
+		DrawStream& stream = renderer.getDrawStream();
 		struct {
 			Vec4 inv_sm_size;
 			gpu::BindlessHandle input;
@@ -412,17 +414,17 @@ struct Bloom : public RenderPlugin {
 		pipeline.setUniform(ubdata);
 		pipeline.drawArray(0, 3, *m_bloom_blur_shader, blur_h_mask, gpu::StateFlags::NONE);
 		
-		pipeline.setRenderTargets(Span(&big, 1));
+		renderer.setRenderTargets(Span(&big, 1));
 		ubdata.input = pipeline.toBindless(blur_buf, stream);
 		pipeline.setUniform(ubdata);
 		pipeline.drawArray(0, 3, *m_blur_shader, 0, gpu::StateFlags::NONE);
-		pipeline.releaseRenderbuffer(blur_buf);
+		renderer.releaseRenderbuffer(blur_buf);
 	}
 
 	void blur(IVec2 size, RenderBufferHandle src, Pipeline& pipeline) {
-		RenderBufferHandle blur_buf = pipeline.createRenderbuffer({
-			.type = RenderbufferDesc::FIXED,
-			.fixed_size = size,
+		Renderer& renderer = pipeline.getRenderer();
+		RenderBufferHandle blur_buf = renderer.createRenderbuffer({
+			.size = size,
 			.format = gpu::TextureFormat::RGBA16F, 
 			.debug_name = "bloom_blur"
 		});
@@ -437,15 +439,15 @@ struct Bloom : public RenderPlugin {
 			pipeline.toBindless(src, stream)
 		};
 
-		pipeline.setRenderTargets(Span(&blur_buf, 1));
+		renderer.setRenderTargets(Span(&blur_buf, 1));
 		pipeline.setUniform(ubdata);
 		pipeline.drawArray(0, 3, *m_blur_shader, blur_h_mask, gpu::StateFlags::NONE);
 
-		pipeline.setRenderTargets(Span(&src, 1));
+		renderer.setRenderTargets(Span(&src, 1));
 		ubdata.input = pipeline.toBindless(blur_buf, stream);
 		pipeline.setUniform(ubdata);
 		pipeline.drawArray(0, 3, *m_blur_shader, 0, gpu::StateFlags::NONE);
-		pipeline.releaseRenderbuffer(blur_buf);
+		renderer.releaseRenderbuffer(blur_buf);
 	}
 
 	const Camera* getCamera(Pipeline& pipeline) {
@@ -472,16 +474,17 @@ struct Bloom : public RenderPlugin {
 		pipeline.beginBlock("bloom");
 		computeAvgLuminance(input, camera->bloom_accomodation_speed, pipeline);
 
-		RenderBufferHandle bloom_rb = pipeline.createRenderbuffer({
-			.rel_size = {0.5f, 0.5f},
+		Renderer& renderer = pipeline.getRenderer();
+		const Viewport& vp = pipeline.getViewport();
+		RenderBufferHandle bloom_rb = renderer.createRenderbuffer({
+			.size = { vp.w >> 1, vp.h >> 1 },
 			.format = gpu::TextureFormat::RGBA16F, 
 			.flags = gpu::TextureFlags::COMPUTE_WRITE | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET,
 			.debug_name = "bloom" 
 		});
 	
-		const Viewport& vp = pipeline.getViewport();
 		pipeline.viewport(0, 0, vp.w >> 1, vp.h >> 1);
-		DrawStream& stream = pipeline.getRenderer().getDrawStream();
+		DrawStream& stream = renderer.getDrawStream();
 		struct {
 			float avg_lum_multiplier;
 			gpu::BindlessHandle histogram;
@@ -504,29 +507,25 @@ struct Bloom : public RenderPlugin {
 		}
 
 		RenderBufferHandle bloom2_rb = downscale(bloom_rb, { 
-			.type = RenderbufferDesc::FIXED,
-			.fixed_size = {vp.w >> 2, vp.h >> 2},
+			.size = {vp.w >> 2, vp.h >> 2},
 			.format = gpu::TextureFormat::RGBA16F,
 			.flags = gpu::TextureFlags::COMPUTE_WRITE | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET,
 			.debug_name = "bloom2"
 		}, pipeline);
 		RenderBufferHandle bloom4_rb = downscale(bloom2_rb, {
-			.type = RenderbufferDesc::FIXED, 
-			.fixed_size = {vp.w >> 3, vp.h >> 3}, 
+			.size = {vp.w >> 3, vp.h >> 3}, 
 			.format = gpu::TextureFormat::RGBA16F,
 			.flags = gpu::TextureFlags::COMPUTE_WRITE | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET,
 			.debug_name = "bloom4"	
 		}, pipeline);
 		RenderBufferHandle bloom8_rb = downscale(bloom4_rb, {
-			.type = RenderbufferDesc::FIXED, 
-			.fixed_size = {vp.w >> 4, vp.h >> 4}, 
+			.size = {vp.w >> 4, vp.h >> 4}, 
 			.format = gpu::TextureFormat::RGBA16F,
 			.flags = gpu::TextureFlags::COMPUTE_WRITE | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET,
 			.debug_name = "bloom8"
 		}, pipeline);
 		RenderBufferHandle bloom16_rb = downscale(bloom8_rb, {
-			.type = RenderbufferDesc::FIXED, 
-			.fixed_size = {vp.w >> 5, vp.h >> 5}, 
+			.size = {vp.w >> 5, vp.h >> 5}, 
 			.format = gpu::TextureFormat::RGBA16F,
 			.flags = gpu::TextureFlags::COMPUTE_WRITE | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET,
 			.debug_name = "bloom16"
@@ -537,10 +536,10 @@ struct Bloom : public RenderPlugin {
 		blurUpscale({ vp.w >> 3, vp.h >> 3 }, bloom4_rb, bloom8_rb, pipeline);
 		blurUpscale({ vp.w >> 2, vp.h >> 2 }, bloom2_rb, bloom4_rb, pipeline);
 		blurUpscale({ vp.w >> 1, vp.h >> 1 }, bloom_rb, bloom2_rb, pipeline);
-		pipeline.releaseRenderbuffer(bloom2_rb);
-		pipeline.releaseRenderbuffer(bloom4_rb);
-		pipeline.releaseRenderbuffer(bloom8_rb);
-		pipeline.releaseRenderbuffer(bloom16_rb);
+		renderer.releaseRenderbuffer(bloom2_rb);
+		renderer.releaseRenderbuffer(bloom4_rb);
+		renderer.releaseRenderbuffer(bloom8_rb);
+		renderer.releaseRenderbuffer(bloom16_rb);
 
 		struct {
 			gpu::BindlessHandle bloom;
@@ -551,7 +550,7 @@ struct Bloom : public RenderPlugin {
 		};
 		pipeline.setUniform(ub);
 		pipeline.dispatch(*m_shader, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
-		pipeline.releaseRenderbuffer(bloom_rb);
+		renderer.releaseRenderbuffer(bloom_rb);
 
 		pipeline.endBlock();
 		return input;
@@ -565,13 +564,16 @@ struct Bloom : public RenderPlugin {
 
 		const bool is_scene_view = pipeline.getType() == PipelineType::SCENE_VIEW;
 		pipeline.beginBlock("bloom tonemap");
-		RenderBufferHandle rb = pipeline.createRenderbuffer({
+		Renderer& renderer = pipeline.getRenderer();
+		const Viewport& vp = pipeline.getViewport();
+		RenderBufferHandle rb = renderer.createRenderbuffer({
+			.size = {vp.w, vp.h},
 			.format = is_scene_view ? gpu::TextureFormat::RGBA16F : gpu::TextureFormat::RGBA8,
 			.flags = gpu::TextureFlags::COMPUTE_WRITE | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET,
 			.debug_name = "tonemap_bloom"
 		});
 		
-		DrawStream& stream = pipeline.getRenderer().getDrawStream();
+		DrawStream& stream = renderer.getDrawStream();
 		struct {
 			float exposure;
 			gpu::BindlessHandle input;
@@ -586,7 +588,6 @@ struct Bloom : public RenderPlugin {
 
 		stream.barrier(m_lum_buf, gpu::BarrierType::READ);
 		pipeline.setUniform(ubdata); 
-		const Viewport& vp = pipeline.getViewport();
 		pipeline.dispatch(*m_tonemap_shader, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
 		pipeline.endBlock();
 		output = rb;
@@ -652,22 +653,25 @@ struct SSS : public RenderPlugin {
 			return;
 		}
 		
+		const Viewport& vp = pipeline.getViewport();
+
 		pipeline.beginBlock("SSS");
 		const RenderbufferDesc rb_desc = {
+			.size = {vp.w, vp.h},
 			.format = gpu::TextureFormat::R8,
 			.flags = gpu::TextureFlags::COMPUTE_WRITE | gpu::TextureFlags::RENDER_TARGET,
 			.debug_name = "sss"
 		};
-		RenderBufferHandle sss =  pipeline.createRenderbuffer(rb_desc);
+		Renderer& renderer = pipeline.getRenderer();
+		RenderBufferHandle sss =  renderer.createRenderbuffer(rb_desc);
 
 		if (data->history == INVALID_RENDERBUFFER) {
-			data->history = pipeline.createRenderbuffer(rb_desc);
-			pipeline.setRenderTargets(Span(&data->history, 1));
+			data->history = renderer.createRenderbuffer(rb_desc);
+			renderer.setRenderTargets(Span(&data->history, 1));
 			pipeline.clear(gpu::ClearFlags::ALL, 1, 1, 1, 1, 0);
 		}
 
-		const Viewport& vp = pipeline.getViewport();
-		DrawStream& stream = pipeline.getRenderer().getDrawStream();
+		DrawStream& stream = renderer.getDrawStream();
 
 		struct {
 			float max_steps;
@@ -682,7 +686,7 @@ struct SSS : public RenderPlugin {
 		};
 		pipeline.setUniform(ubdata);
 		pipeline.dispatch(*m_shader, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
-		stream.memoryBarrier(pipeline.toTexture(sss));
+		stream.memoryBarrier(renderer.toTexture(sss));
 
 		struct {
 			float current_frame_weight;
@@ -700,10 +704,10 @@ struct SSS : public RenderPlugin {
 
 		pipeline.setUniform(ubdata2);
 		pipeline.dispatch(*m_shader_blit, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
-		stream.memoryBarrier(pipeline.toTexture(gbuffer.C));
+		stream.memoryBarrier(renderer.toTexture(gbuffer.C));
 
 		swap(data->history, sss);
-		pipeline.releaseRenderbuffer(sss);
+		renderer.releaseRenderbuffer(sss);
 		pipeline.endBlock();
 	}
 };
@@ -766,6 +770,7 @@ struct SSAO : public RenderPlugin {
 	void renderBeforeLightPass(const GBuffer& gbuffer, Pipeline& pipeline) override {
 		PROFILE_FUNCTION();
 		auto* data = pipeline.getData<PipelineInstanceData>();
+		Renderer& renderer = pipeline.getRenderer();
 
 		if (!m_shader->isReady() 
 			|| !m_blit_shader->isReady() 
@@ -773,16 +778,15 @@ struct SSAO : public RenderPlugin {
 			|| !m_downscale_shader->isReady()
 			|| !m_enabled)
 		{
-			pipeline.releaseRenderbuffer(data->m_history_rb);
+			renderer.releaseRenderbuffer(data->m_history_rb);
 			data->m_history_rb = INVALID_RENDERBUFFER;
 			return;
 		}
 		const Viewport& vp = pipeline.getViewport();
 		const u32 width = vp.w >> m_downscale;
 		const u32 height = vp.h >> m_downscale;
-		RenderBufferHandle ssao_rb = pipeline.createRenderbuffer({ 
-			.type = RenderbufferDesc::FIXED,
-			.fixed_size = IVec2(width, height),
+		RenderBufferHandle ssao_rb = renderer.createRenderbuffer({ 
+			.size = IVec2(width, height),
 			.format = gpu::TextureFormat::RGBA8,
 			.flags = gpu::TextureFlags::COMPUTE_WRITE,
 			.debug_name = "ssao"
@@ -792,9 +796,8 @@ struct SSAO : public RenderPlugin {
 		RenderBufferHandle depth_buffer = gbuffer.DS;
 		pipeline.beginBlock("ssao");
 		if (m_downscale > 0) {
-			depth_buffer = pipeline.createRenderbuffer({ 
-				.type = RenderbufferDesc::FIXED,
-				.fixed_size = IVec2(width, height),
+			depth_buffer = renderer.createRenderbuffer({ 
+				.size = IVec2(width, height),
 				.format = gpu::TextureFormat::R32F, 
 				.flags = gpu::TextureFlags::COMPUTE_WRITE | gpu::TextureFlags::NO_MIPS, 
 				.debug_name = "ssao downscaled depth"
@@ -816,22 +819,21 @@ struct SSAO : public RenderPlugin {
 
 		if (m_temporal) {
 			if (data->m_history_rb == INVALID_RENDERBUFFER || width != m_temporal_size.x || height != m_temporal_size.y) {
-				pipeline.releaseRenderbuffer(data->m_history_rb);
-				data->m_history_rb = pipeline.createRenderbuffer({
-					.type = RenderbufferDesc::FIXED,
-					.fixed_size = IVec2(width, height),
+				renderer.releaseRenderbuffer(data->m_history_rb);
+				data->m_history_rb = renderer.createRenderbuffer({
+					.size = IVec2(width, height),
 					.format = gpu::TextureFormat::R8,
 					.flags = gpu::TextureFlags::COMPUTE_WRITE | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET,
 					.debug_name = "ssao"
 				});
 				m_temporal_size = IVec2(width, height);
 				// TODO compute shader
-				pipeline.setRenderTargets(Span(&data->m_history_rb, 1), INVALID_RENDERBUFFER);
+				renderer.setRenderTargets(Span(&data->m_history_rb, 1), INVALID_RENDERBUFFER);
 				pipeline.clear(gpu::ClearFlags::ALL, 1, 1, 1, 1, 1);
 			}
 		}
 		else {
-			pipeline.releaseRenderbuffer(data->m_history_rb);
+			renderer.releaseRenderbuffer(data->m_history_rb);
 			data->m_history_rb = INVALID_RENDERBUFFER;
 		}
 
@@ -862,9 +864,8 @@ struct SSAO : public RenderPlugin {
 
 		if (m_blur_iterations > 0) {
 			pipeline.beginBlock("ssao_blur");
-			RenderBufferHandle ssao_blurred_rb = pipeline.createRenderbuffer({ 
-				.type = RenderbufferDesc::FIXED,
-				.fixed_size = IVec2(width, height),
+			RenderBufferHandle ssao_blurred_rb = renderer.createRenderbuffer({ 
+				.size = IVec2(width, height),
 				.format = gpu::TextureFormat::R8, 
 				.flags = gpu::TextureFlags::COMPUTE_WRITE, 
 				.debug_name = "ssao_blurred" 
@@ -885,7 +886,7 @@ struct SSAO : public RenderPlugin {
 				.depth_buffer = pipeline.toBindless(depth_buffer, stream),
 			};
 
-			stream.memoryBarrier(pipeline.toTexture(ssao_rb));
+			stream.memoryBarrier(renderer.toTexture(ssao_rb));
 			for (u32 i = 0; i < m_blur_iterations; ++i) {
 				blur_data.input = pipeline.toBindless(ssao_rb, stream);
 				blur_data.output = pipeline.toRWBindless(ssao_blurred_rb, stream);
@@ -893,10 +894,10 @@ struct SSAO : public RenderPlugin {
 				pipeline.setUniform(blur_data);
 				pipeline.dispatch(*m_blur_shader, (width + 15) / 16, (height + 15) / 16, 1);
 				swap(ssao_rb, ssao_blurred_rb);
-				stream.memoryBarrier(pipeline.toTexture(ssao_rb));
+				stream.memoryBarrier(renderer.toTexture(ssao_rb));
 			}
 			pipeline.endBlock();
-			pipeline.releaseRenderbuffer(ssao_blurred_rb);
+			renderer.releaseRenderbuffer(ssao_blurred_rb);
 		}
 
 		struct {
@@ -917,13 +918,13 @@ struct SSAO : public RenderPlugin {
 
 		pipeline.beginBlock("ssao_blit");
 		pipeline.setUniform(udata2);
-		stream.barrier(pipeline.toTexture(gbuffer.B), gpu::BarrierType::WRITE);
+		stream.barrier(renderer.toTexture(gbuffer.B), gpu::BarrierType::WRITE);
 		pipeline.dispatch(*m_blit_shader, (vp.w + 15) / 16, (vp.h + 15) / 16, 1);
 		pipeline.endBlock();
 		pipeline.endBlock();
 
-		pipeline.releaseRenderbuffer(ssao_rb);
-		if (depth_buffer != gbuffer.DS) pipeline.releaseRenderbuffer(depth_buffer);
+		renderer.releaseRenderbuffer(ssao_rb);
+		if (depth_buffer != gbuffer.DS) renderer.releaseRenderbuffer(depth_buffer);
 
 	}
 };
@@ -987,22 +988,23 @@ struct TDAO : public RenderPlugin {
 			return;
 		}
 
+		Renderer& renderer = pipeline.getRenderer();
+
 		pipeline.beginBlock("tdao");
 		if (inst_data->rb == INVALID_RENDERBUFFER) {
-			inst_data->rb = pipeline.createRenderbuffer({
-				.type = RenderbufferDesc::FIXED,
-				.fixed_size = IVec2(512, 512),
+			inst_data->rb = renderer.createRenderbuffer({
+				.size = IVec2(512, 512),
 				.format = gpu::TextureFormat::D32,
 				.debug_name = "tdao"
 			});
 		}
-		DrawStream& stream = pipeline.getRenderer().getDrawStream();
+		DrawStream& stream = renderer.getDrawStream();
 
 		const Viewport& vp = pipeline.getViewport();
 		const bool camera_moved = fabs(vp.pos.x - m_last_camera_pos.x) > 3 || fabs(vp.pos.y - m_last_camera_pos.y) > 3 || fabs(vp.pos.z - m_last_camera_pos.z) > 3;
 		if (camera_moved) {
 			m_last_camera_pos = vp.pos;
-			pipeline.setRenderTargets({}, inst_data->rb);
+			renderer.setRenderTargets({}, inst_data->rb);
 			pipeline.clear(gpu::ClearFlags::ALL, 0, 0, 0, 1, 0);
 
 			CameraParams cp;
@@ -1107,19 +1109,23 @@ struct TAA : public RenderPlugin {
 			return INVALID_RENDERBUFFER;
 		}
 
+		Renderer& renderer = pipeline.getRenderer();
 		pipeline.enablePixelJitter(true);
 		pipeline.beginBlock("taa");
+		const Viewport& vp = pipeline.getViewport();
 		if (data->history_rb == INVALID_RENDERBUFFER) {
-			data->history_rb = pipeline.createRenderbuffer({
+			data->history_rb = renderer.createRenderbuffer({
+				.size = {vp.w, vp.h},
 				.format = gpu::TextureFormat::RGBA16F,
 				.flags = gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE,
 				.debug_name = "taa"
 			});
-			pipeline.setRenderTargets(Span(&data->history_rb, 1));
+			renderer.setRenderTargets(Span(&data->history_rb, 1));
 			pipeline.clear(gpu::ClearFlags::ALL, 1, 1, 1, 1, 0);
 		}
 
-		RenderBufferHandle taa_tmp = pipeline.createRenderbuffer({
+		RenderBufferHandle taa_tmp = renderer.createRenderbuffer({
+			.size = {vp.w, vp.h},
 			.format = gpu::TextureFormat::RGBA16F,
 			.flags = gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE,
 			.debug_name = "taa2"
@@ -1145,20 +1151,21 @@ struct TAA : public RenderPlugin {
 		pipeline.setUniform(ub_data);
 		pipeline.dispatch(*m_shader, (display_size.x + 15) / 16, (display_size.y + 15) / 16, 1);
 
-		const RenderBufferHandle taa_output = pipeline.createRenderbuffer({
+		const RenderBufferHandle taa_output = renderer.createRenderbuffer({
+			.size = {vp.w, vp.h},
 			.format = gpu::TextureFormat::RGBA16F,
 			.flags = gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE,
 			.debug_name = "taa_output"	
 		});
-		stream.memoryBarrier(pipeline.toTexture(taa_tmp));
+		stream.memoryBarrier(renderer.toTexture(taa_tmp));
 		// TODO blit does unnecessary computations
 		gpu::BindlessHandle src = pipeline.toBindless(taa_tmp, stream);
 		gpu::RWBindlessHandle dst = pipeline.toRWBindless(taa_output, stream);
 		pipeline.blit(src, dst, display_size);
 		
 		swap(data->history_rb, taa_tmp);
-		pipeline.releaseRenderbuffer(taa_tmp);
-		pipeline.releaseRenderbuffer(hdr_buffer);
+		renderer.releaseRenderbuffer(taa_tmp);
+		renderer.releaseRenderbuffer(hdr_buffer);
 		pipeline.endBlock();
 		return taa_output;
 	}

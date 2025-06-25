@@ -44,6 +44,29 @@ RenderBufferHandle RenderPlugin::renderAA(const GBuffer& gbuffer, RenderBufferHa
 
 void initFSR3(Renderer& renderer, IAllocator& allocator);
 
+struct Renderbuffer {
+	// The buffer is created in the ACTIVE state.
+	// Once the user no longer needs the buffer, it can be marked as REUSABLE.
+	// At the end of a frame, every REUSABLE buffer is marked as TO_REMOVE,
+	// and every TO_REMOVE buffer is released.
+	// This ensures that unused buffers are not kept around longer than necessary,
+	// and buffers can be reused instead of being destroyed and recreated within the same frame.
+	enum State {
+		ACTIVE,
+		REUSABLE,
+		TO_REMOVE
+	};
+	
+	#ifdef LUMIX_DEBUG
+		StaticString<32> debug_name;
+	#endif
+	gpu::TextureHandle handle;
+	IVec2 size;
+	gpu::TextureFormat format;
+	gpu::TextureFlags flags;
+	State state;
+};
+
 template <u32 ALIGN>
 struct TransientBuffer {
 	static constexpr u32 INIT_SIZE = 1024 * 1024;
@@ -387,6 +410,7 @@ struct RendererImpl final : Renderer {
 		, m_sort_key_to_mesh_map(m_allocator)
 		, m_semantic_defines(m_allocator)
 		, m_free_frames(m_allocator)
+		, m_renderbuffers(m_allocator)
 		, m_frame_thread(*this)
 		, m_atmo(*this)
 		, m_cubemap_sky(*this)
@@ -429,6 +453,12 @@ struct RendererImpl final : Renderer {
 	bool deserialize(i32 version, InputMemoryStream& stream) override { return version == 0; }
 
 	~RendererImpl() {
+		DrawStream& stream = getEndFrameDrawStream();
+		for (Renderbuffer& rb : m_renderbuffers) {
+			stream.destroy(rb.handle);
+			rb.handle = gpu::INVALID_TEXTURE;
+		}
+
 		m_particle_emitter_manager.destroy();
 		m_texture_manager.destroy();
 		m_model_manager.destroy();
@@ -687,6 +717,100 @@ struct RendererImpl final : Renderer {
 	
 	gpu::BufferHandle getMaterialUniformBuffer() override {
 		return m_material_buffer.buffer;
+	}
+
+	RenderBufferHandle createRenderbuffer(const RenderbufferDesc& desc) override {
+		for (Renderbuffer& rb : m_renderbuffers) {
+			if (!rb.handle) continue;
+
+			if (rb.state == Renderbuffer::ACTIVE) continue;
+			if (rb.size != desc.size) continue;
+			if (rb.format != desc.format) continue;
+			if (rb.flags != desc.flags) continue;
+
+			rb.state = Renderbuffer::ACTIVE;
+			#ifdef LUMIX_DEBUG
+				rb.debug_name = desc.debug_name;
+			#endif
+			StaticString<128> name(desc.debug_name, " ", u32(&rb - m_renderbuffers.begin()));
+			getDrawStream().setDebugName(rb.handle, name);
+			return RenderBufferHandle(u32(&rb - m_renderbuffers.begin()));
+		}
+
+		for (Renderbuffer& rb : m_renderbuffers) {
+			if (rb.handle) continue;
+
+			rb.handle = createTexture(desc.size.x, desc.size.y, 1, desc.format, desc.flags, Renderer::MemRef(), desc.debug_name);
+			rb.state = Renderbuffer::ACTIVE;
+			rb.flags = desc.flags;
+			rb.format = desc.format;
+			rb.size = desc.size;
+			#ifdef LUMIX_DEBUG
+				rb.debug_name = desc.debug_name;
+			#endif
+			return RenderBufferHandle(u32(&rb - m_renderbuffers.begin()));
+		}
+
+		Renderbuffer& rb = m_renderbuffers.emplace();
+		rb.handle = createTexture(desc.size.x, desc.size.y, 1, desc.format, desc.flags, Renderer::MemRef(), desc.debug_name);
+		rb.state = Renderbuffer::ACTIVE;
+		rb.flags = desc.flags;
+		rb.format = desc.format;
+		rb.size = desc.size;
+		#ifdef LUMIX_DEBUG		
+			rb.debug_name = desc.debug_name;
+		#endif
+		return RenderBufferHandle(m_renderbuffers.size() - 1);
+	}
+
+	void releaseRenderbuffer(RenderBufferHandle idx) override {
+		if (idx == INVALID_RENDERBUFFER) return;
+		m_renderbuffers[idx].state = Renderbuffer::REUSABLE;
+	}
+
+	gpu::TextureHandle toTexture(RenderBufferHandle handle) override {
+		if (handle >= (u32)m_renderbuffers.size()) return gpu::INVALID_TEXTURE;
+		return m_renderbuffers[handle].handle;
+	}
+
+	void setRenderTargets(Span<const RenderBufferHandle> renderbuffers, RenderBufferHandle ds = INVALID_RENDERBUFFER, gpu::FramebufferFlags flags = gpu::FramebufferFlags::NONE) override {
+		DrawStream& stream = getDrawStream();
+		if (ds == INVALID_RENDERBUFFER && renderbuffers.length() == 0) {
+			stream.setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, gpu::FramebufferFlags::NONE);
+			return;
+		}
+
+		const IVec2 viewport_size = m_renderbuffers[ds == INVALID_RENDERBUFFER ? renderbuffers[0] : ds].size;
+		gpu::TextureHandle attachments[16];
+		ASSERT(renderbuffers.length() <= lengthOf(attachments));
+		for (u32 i = 0; i < renderbuffers.length(); ++i) {
+			attachments[i] = m_renderbuffers[renderbuffers[i]].handle;
+		}
+		stream.setFramebuffer(attachments, renderbuffers.length(), ds != INVALID_RENDERBUFFER ? m_renderbuffers[ds].handle : gpu::INVALID_TEXTURE, flags);
+		stream.viewport(0, 0, viewport_size.x, viewport_size.y);
+	}
+
+	void clearBuffers() {
+		PROFILE_FUNCTION();
+		for (Renderbuffer& rb : m_renderbuffers) {
+			switch (rb.state) {
+				case Renderbuffer::ACTIVE: break;
+				case Renderbuffer::REUSABLE: 
+					rb.state = Renderbuffer::TO_REMOVE;
+					break;
+				case Renderbuffer::TO_REMOVE:
+					if (rb.handle) {
+						getEndFrameDrawStream().destroy(rb.handle);
+						rb.handle = gpu::INVALID_TEXTURE;
+					}
+					break;
+			}
+		}
+
+		while (!m_renderbuffers.empty()) {
+			if (m_renderbuffers.last().handle) break;
+			m_renderbuffers.pop();
+		}
 	}
 
 	u32 createMaterialConstants(Span<const float> data) override {
@@ -1037,6 +1161,7 @@ struct RendererImpl final : Renderer {
 		PROFILE_FUNCTION();
 		
 		jobs::wait(&m_cpu_frame->setup_done);
+		clearBuffers();
 
 		m_cpu_frame->draw_stream.useProgram(gpu::INVALID_PROGRAM);
 		m_cpu_frame->draw_stream.bindIndexBuffer(gpu::INVALID_BUFFER);
@@ -1191,6 +1316,7 @@ struct RendererImpl final : Renderer {
 		HashMap<RuntimeHash, u32> map;
 	} m_material_buffer;
 
+	Array<Renderbuffer> m_renderbuffers;
 	gpu::BufferHandle m_instanced_meshes_buffer = gpu::INVALID_BUFFER;
 	// built-in postprocesses
 	// environment

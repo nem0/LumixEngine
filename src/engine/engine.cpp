@@ -284,15 +284,6 @@ struct EngineImpl final : Engine {
 		profiler::pushCounter(counter, m_smooth_time_delta * 1000.f);
 	}
 
-	debug::Allocator* getDebugAllocator() {
-		IAllocator* a = &m_allocator;
-		while (a) {
-			if (a->isDebug()) return (debug::Allocator*)a;
-			a = a->getParent();
-		}
-		return nullptr;
-	}
-
 	void update(World& world) override
 	{
 		{
@@ -303,11 +294,8 @@ struct EngineImpl final : Engine {
 		}
 
 		PROFILE_FUNCTION();
-		debug::Allocator* debug_allocator = getDebugAllocator();
-		if (debug_allocator) {
-			static u32 mem_counter = profiler::createCounter("Main allocator (MB)", 0);
-			profiler::pushCounter(mem_counter, float(double(debug::getRegisteredAllocsSize()) / (1024.0 * 1024.0)));
-		}
+		static u32 mem_counter = profiler::createCounter("Main allocator (MB)", 0);
+		profiler::pushCounter(mem_counter, float(double(debug::getRegisteredAllocsSize()) / (1024.0 * 1024.0)));
 
 		#ifdef _WIN32
 			const float process_mem = os::getProcessMemory() / (1024.f * 1024.f);

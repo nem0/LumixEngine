@@ -65,14 +65,9 @@ struct LUMIX_CORE_API Allocator final : IAllocator {
 	explicit Allocator(IAllocator& source);
 	~Allocator();
 
-	bool isDebug() const override { return true; }
-
 	void* allocate(size_t size, size_t align) override;
 	void deallocate(void* ptr) override;
 	void* reallocate(void* ptr, size_t new_size, size_t old_size, size_t align) override;
-
-	IAllocator& getSourceAllocator() { return m_source; }
-	
 	IAllocator* getParent() const override { return &m_source; }
 
 private:

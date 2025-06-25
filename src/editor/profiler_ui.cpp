@@ -110,8 +110,6 @@ struct ThreadContextProxy {
 		InputMemoryStream blob(ptr, 9000);
 		name = blob.readString();
 		blob.read(thread_id);
-		blob.read(begin);
-		blob.read(end);
 		default_show = blob.read<u8>();
 		blob.read(buffer_size);
 		buffer = (u8*)blob.getData() + blob.getPosition();
@@ -121,8 +119,6 @@ struct ThreadContextProxy {
 
 	const char* name;
 	u32 thread_id;
-	u32 begin;
-	u32 end;
 	u32 buffer_size;
 	bool default_show;
 	u8* buffer;
@@ -268,10 +264,9 @@ struct Block {
 };
 
 struct MemoryProfilerUI {
-	MemoryProfilerUI(StudioApp& app, Action* focus_filter, debug::Allocator* allocator)
+	MemoryProfilerUI(StudioApp& app, Action* focus_filter)
 		: m_app(app)
 		, m_focus_filter(focus_filter)
-		, m_debug_allocator(allocator)
 		// we can't use m_allocator for tags, because it would create circular dependency and deadlock
 		, m_allocation_tags(getGlobalAllocator())
 	{
@@ -403,8 +398,6 @@ struct MemoryProfilerUI {
 	}
 
 	void captureAllocations() {
-		if (!m_debug_allocator) return;
-
 		m_allocation_tags.clear();
 
 		const debug::AllocationInfo* current_info = debug::lockAllocationInfos();
@@ -424,11 +417,6 @@ struct MemoryProfilerUI {
 	}
 
 	void gui() {
-		if (!m_debug_allocator) {
-			ImGui::TextUnformatted("Debug allocator not used, can't print memory stats.");
-			return;
-		}
-
 		if (ImGui::Button("Capture")) captureAllocations();
 		ImGui::SameLine();
 		if (ImGui::Button("Check memory")) debug::checkGuards();
@@ -446,25 +434,23 @@ struct MemoryProfilerUI {
 	}
 
 	StudioApp& m_app;
-	debug::Allocator* m_debug_allocator;
 	Array<AllocationTag> m_allocation_tags;
 	Action* m_focus_filter;
 	TextFilter m_filter;
 };
 
-struct ProfilerUIImpl final : StudioApp::GUIPlugin {
-	ProfilerUIImpl(StudioApp& app, debug::Allocator* allocator, Engine& engine)
+struct ProfilerUIImpl final : ProfilerUI {
+	ProfilerUIImpl(StudioApp& app)
 		: m_allocator(app.getAllocator(), "profiler ui")
 		, m_app(app)
 		, m_threads(m_allocator)
 		, m_data(m_allocator)
 		, m_blocks(m_allocator)
 		, m_counters(m_allocator)
-		, m_engine(engine)
-		, m_memory_ui(app, &m_focus_filter, allocator)
+		, m_engine(app.getEngine())
+		, m_memory_ui(app, &m_focus_filter)
 	{
 		m_is_open = false;
-		m_is_paused = true;
 
 		Settings& settings = m_app.getSettings();
 		settings.registerOption("profiler_open", &m_is_open);
@@ -473,8 +459,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		settings.registerOption("profiler_show_mutex_events", &m_show_mutex_events, "Profiler", "Show mutex events");
 	}
 
-	void onPause() {
-		ASSERT(m_is_paused);
+	void snapshot() override {
 		m_data.clear();
 		profiler::serialize(m_data);
 		patchStrings();
@@ -652,8 +637,8 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 
 		// patch strings in blocks
 		forEachThread([&](ThreadContextProxy& ctx){
-			u32 p = ctx.begin;
-			const u32 end = ctx.end;
+			u32 p = 0;
+			const u32 end = ctx.buffer_size;
 			while (p != end) {
 				profiler::EventHeader header;
 				read(ctx, p, header);
@@ -696,7 +681,6 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 				else {
 					patchStrings();
 					preprocess();
-					m_is_paused = true;
 				}
 				file.close();
 			}
@@ -727,8 +711,8 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		if (!m_threads.find(0).isValid()) {
 			m_threads.insert(0, ThreadData(m_allocator, 0, "Global", true));
 		}
-		u32 p = global.begin;
-		const u32 end = global.end;
+		u32 p = 0;
+		const u32 end = global.buffer_size;
 		while (p != end) {
 			profiler::EventHeader header;
 			read(global, p, header);
@@ -754,8 +738,8 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 			if (!m_threads.find(ctx.thread_id).isValid()) {
 				m_threads.insert(ctx.thread_id, ThreadData(m_allocator, ctx.thread_id, ctx.name, ctx.default_show));
 			}
-			u32 p = ctx.begin;
-			const u32 end = ctx.end;
+			u32 p = 0;
+			const u32 end = ctx.buffer_size;
 			while (p != end) {
 				profiler::EventHeader header;
 				read(ctx, p, header);
@@ -966,8 +950,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 		done = true;
 
 		if (CommandLineParser::isOn("-profile_start")) {
-			m_is_paused = true;
-			onPause();
+			snapshot();
 		}
 	}
 
@@ -1006,11 +989,11 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 			StackArray<Property, 16> properties(m_allocator);
 			u32 lines = 0;
 			u32 line = 0;
-			u32 p = ctx.begin;
+			u32 p = 0;
 			u64 primitives_generated = 0;
 			i32 gpu_stats_line = -1;
 			
-			while (p != ctx.end) {
+			while (p != ctx.buffer_size) {
 				profiler::EventHeader header;
 				read(ctx, p, header);
 				switch (header.type) {
@@ -1583,16 +1566,13 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 	void flamegraphUI() {
 		profileStart();
 
-		if (m_autopause > 0 && !m_is_paused && profiler::getLastFrameDuration() * 1000.f > m_autopause) {
-			m_is_paused = true;
-			profiler::pause(m_is_paused);
-			onPause();
+		if (m_autopause > 0 && profiler::getLastFrameDuration() * 1000.f > m_autopause) {
+			m_autopause = 0;
+			snapshot();
 		}
 
-		if (ImGui::Button(m_is_paused ? ICON_FA_PLAY : ICON_FA_PAUSE) || m_app.checkShortcut(m_play_pause)) {
-			m_is_paused = !m_is_paused;
-			profiler::pause(m_is_paused);
-			if (m_is_paused) onPause();
+		if (ImGui::Button(ICON_FA_DOWNLOAD) || m_app.checkShortcut(m_snapshot)) {
+			snapshot();
 		}
 
 		ImGui::SameLine();
@@ -1711,7 +1691,6 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 	u64 m_resource_size_filter = 0;
 
 	bool m_is_open = false;
-	bool m_is_paused;
 	bool m_show_context_switches = false;
 	bool m_show_mutex_events = true;
 	bool m_show_frames = true;
@@ -1731,7 +1710,7 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 	HashMap<i32, Block> m_blocks;
 
 	Action m_toggle_ui{"Profiler", "Profiler - toggle UI", "profiler_toggle_ui", "", Action::WINDOW};
-	Action m_play_pause{"Play/pause", "Profiler - play/pause", "profiler_play_pause", ""};
+	Action m_snapshot{"Make snapshot", "Profiler - make snapshot", "profiler_play_pause", ICON_FA_DOWNLOAD};
 	Action m_focus_filter{"Focus filter", "Profiler - focus filter", "profiler_focus_filter", ""};
 
 	struct {
@@ -1772,19 +1751,8 @@ struct ProfilerUIImpl final : StudioApp::GUIPlugin {
 } // anonymous namespace
 
 
-UniquePtr<StudioApp::GUIPlugin> createProfilerUI(StudioApp& app) {
-	Engine& engine = app.getEngine();
-	debug::Allocator* debug_allocator = nullptr;
-	IAllocator* allocator = &engine.getAllocator();
-	do {
-		if (allocator->isDebug()) {
-			debug_allocator = (debug::Allocator*)allocator;
-			break;
-		}
-		allocator = allocator->getParent();
-	} while(allocator);
-
-	return UniquePtr<ProfilerUIImpl>::create(app.getAllocator(), app, debug_allocator, engine);
+UniquePtr<ProfilerUI> createProfilerUI(StudioApp& app) {
+	return UniquePtr<ProfilerUIImpl>::create(app.getAllocator(), app);
 }
 
 

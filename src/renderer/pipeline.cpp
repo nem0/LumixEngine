@@ -186,29 +186,6 @@ struct PipelineImpl final : Pipeline {
 		DrawStream stream;
 	};
 
-	struct Renderbuffer {
-		// The buffer is created in the ACTIVE state.
-		// Once the user no longer needs the buffer, it can be marked as REUSABLE.
-		// At the end of a frame, every REUSABLE buffer is marked as TO_REMOVE,
-		// and every TO_REMOVE buffer is released.
-		// This ensures that unused buffers are not kept around longer than necessary,
-		// and buffers can be reused instead of being destroyed and recreated within the same frame.
-		enum State {
-			ACTIVE,
-			REUSABLE,
-			TO_REMOVE
-		};
-		
-		#ifdef LUMIX_DEBUG
-			StaticString<32> debug_name;
-		#endif
-		gpu::TextureHandle handle;
-		IVec2 size;
-		gpu::TextureFormat format;
-		gpu::TextureFlags flags;
-		State state;
-	};
-
 	struct Sorter {
 		struct alignas(4096) Page {
 			struct Header {
@@ -477,7 +454,6 @@ struct PipelineImpl final : Pipeline {
 		, m_module(nullptr)
 		, m_draw2d(m_allocator)
 		, m_output(-1)
-		, m_renderbuffers(m_allocator)
 		, m_shadow_atlas(m_allocator)
 		, m_textures(m_allocator)
 		, m_buffers(m_allocator)
@@ -585,12 +561,6 @@ struct PipelineImpl final : Pipeline {
 		m_debug_velocity_shader->decRefCount();
 		m_instancing_shader->decRefCount();
 
-		for (const Renderbuffer& rb : m_renderbuffers) {
-			volatile u32 idx = u32(&rb - m_renderbuffers.begin());
-			stream.destroy(rb.handle);
-			idx = idx;
-		}
-
 		stream.destroy(m_cube_ib);
 		stream.destroy(m_cube_vb);
 		stream.destroy(m_indirect_buffer);
@@ -603,29 +573,6 @@ struct PipelineImpl final : Pipeline {
 		
 		if (m_blit_screen_program) {
 			stream.destroy(m_blit_screen_program);
-		}
-	}
-
-	void clearBuffers() {
-		PROFILE_FUNCTION();
-		for (Renderbuffer& rb : m_renderbuffers) {
-			switch (rb.state) {
-				case Renderbuffer::ACTIVE: break;
-				case Renderbuffer::REUSABLE: 
-					rb.state = Renderbuffer::TO_REMOVE;
-					break;
-				case Renderbuffer::TO_REMOVE:
-					if (rb.handle) {
-						m_renderer.getEndFrameDrawStream().destroy(rb.handle);
-						rb.handle = gpu::INVALID_TEXTURE;
-					}
-					break;
-			}
-		}
-
-		while (!m_renderbuffers.empty()) {
-			if (m_renderbuffers.last().handle) break;
-			m_renderbuffers.pop();
 		}
 	}
 
@@ -768,14 +715,13 @@ struct PipelineImpl final : Pipeline {
 
 		beginBlock("bake_shadow");
 
-		RenderBufferHandle depthbuf = createRenderbuffer({
-			.type = RenderbufferDesc::FIXED,
-			.fixed_size = {m_viewport.w, m_viewport.h},
+		RenderBufferHandle depthbuf = m_renderer.createRenderbuffer({
+			.size = {m_viewport.w, m_viewport.h},
 			.format = gpu::TextureFormat::D32,
 			.debug_name = "bake_shadow_depth",
 
 		});
-		setRenderTargets({}, depthbuf);
+		m_renderer.setRenderTargets({}, depthbuf);
 		clear(gpu::ClearFlags::ALL, 0, 0, 0, 1, 0);
 		CameraParams cp = getMainCamera();
 		pass(cp);
@@ -789,7 +735,7 @@ struct PipelineImpl final : Pipeline {
 		endBlock();
 
 		const gpu::TextureHandle src = getOutput();
-		releaseRenderbuffer(depthbuf);
+		m_renderer.releaseRenderbuffer(depthbuf);
 		if (!src) {
 			logError("Could not bake shadows because the pipeline had no output");
 			return false;
@@ -832,73 +778,6 @@ struct PipelineImpl final : Pipeline {
 		const Vec4 color = Vec4(r, g, b, a);
 		DrawStream& stream = m_renderer.getDrawStream();
 		stream.clear(flags, &color.x, depth);
-	}
-
-	RenderBufferHandle createRenderbuffer(const RenderbufferDesc& desc) override {
-		IVec2 size;
-		switch (desc.type) {
-			case RenderbufferDesc::FIXED: size = desc.fixed_size; break;
-			case RenderbufferDesc::RELATIVE: size = IVec2(i32(desc.rel_size.x * m_viewport.w), i32(desc.rel_size.y * m_viewport.h)); break;
-			case RenderbufferDesc::DISPLAY_SIZE: size = m_display_size; break;
-		}
-		for (Renderbuffer& rb : m_renderbuffers) {
-			if (!rb.handle) continue;
-
-			if (rb.state == Renderbuffer::ACTIVE) continue;
-			if (rb.size != size) continue;
-			if (rb.format != desc.format) continue;
-			if (rb.flags != desc.flags) continue;
-
-			rb.state = Renderbuffer::ACTIVE;
-			#ifdef LUMIX_DEBUG
-				rb.debug_name = desc.debug_name;
-			#endif
-			StaticString<128> name(desc.debug_name, " ", u32(&rb - m_renderbuffers.begin()));
-			m_renderer.getDrawStream().setDebugName(rb.handle, name);
-			return RenderBufferHandle(u32(&rb - m_renderbuffers.begin()));
-		}
-
-		for (Renderbuffer& rb : m_renderbuffers) {
-			if (rb.handle) continue;
-
-			rb.handle = m_renderer.createTexture(size.x, size.y, 1, desc.format, desc.flags, Renderer::MemRef(), desc.debug_name);
-			rb.state = Renderbuffer::ACTIVE;
-			rb.flags = desc.flags;
-			rb.format = desc.format;
-			rb.size = size;
-			#ifdef LUMIX_DEBUG
-				rb.debug_name = desc.debug_name;
-			#endif
-			return RenderBufferHandle(u32(&rb - m_renderbuffers.begin()));
-		}
-
-		Renderbuffer& rb = m_renderbuffers.emplace();
-		rb.handle = m_renderer.createTexture(size.x, size.y, 1, desc.format, desc.flags, Renderer::MemRef(), desc.debug_name);
-		rb.state = Renderbuffer::ACTIVE;
-		rb.flags = desc.flags;
-		rb.format = desc.format;
-		rb.size = size;
-		#ifdef LUMIX_DEBUG		
-			rb.debug_name = desc.debug_name;
-		#endif
-		return RenderBufferHandle(m_renderbuffers.size() - 1);
-	}
-
-	void setRenderTargets(Span<const RenderBufferHandle> renderbuffers, RenderBufferHandle ds = INVALID_RENDERBUFFER, gpu::FramebufferFlags flags = gpu::FramebufferFlags::NONE) override {
-		DrawStream& stream = m_renderer.getDrawStream();
-		if (ds == INVALID_RENDERBUFFER && renderbuffers.length() == 0) {
-			stream.setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, gpu::FramebufferFlags::NONE);
-			return;
-		}
-
-		const IVec2 viewport_size = m_renderbuffers[ds == INVALID_RENDERBUFFER ? renderbuffers[0] : ds].size;
-		gpu::TextureHandle attachments[16];
-		ASSERT(renderbuffers.length() <= lengthOf(attachments));
-		for (u32 i = 0; i < renderbuffers.length(); ++i) {
-			attachments[i] = m_renderbuffers[renderbuffers[i]].handle;
-		}
-		stream.setFramebuffer(attachments, renderbuffers.length(), ds != INVALID_RENDERBUFFER ? m_renderbuffers[ds].handle : gpu::INVALID_TEXTURE, flags);
-		stream.viewport(0, 0, viewport_size.x, viewport_size.y);
 	}
 
 	u32 cull(const CameraParams& cp, Span<const BucketDesc> buckets) override {
@@ -1038,10 +917,6 @@ struct PipelineImpl final : Pipeline {
 		m_renderer.getDrawStream().bindUniformBuffer(bind_point, ub.buffer, ub.offset, ub.size);
 	}
 
-	gpu::TextureHandle toTexture(RenderBufferHandle handle) override {
-		return m_renderbuffers[handle].handle;
-	}
-
 	InstanceData getData(u32 idx, u32 size, u32 align) override {
 		auto iter = m_instance_data.find(idx);
 		if (iter.isValid()) return { iter.value(), false };
@@ -1067,13 +942,14 @@ struct PipelineImpl final : Pipeline {
 		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
 			RenderBufferHandle tonemapped;
 			if (plugin->tonemap(input, tonemapped, *this)) {
-				releaseRenderbuffer(input);
+				m_renderer.releaseRenderbuffer(input);
 				return tonemapped;
 			}
 		}
 
 		beginBlock("tonemap");
-		const RenderBufferHandle rb = createRenderbuffer({
+		const RenderBufferHandle rb = m_renderer.createRenderbuffer({
+			.size = {m_viewport.w, m_viewport.h},
 			.format = gpu::TextureFormat::SRGBA,
 			.flags = gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::NO_MIPS,
 			.debug_name = "tonemap"
@@ -1085,10 +961,10 @@ struct PipelineImpl final : Pipeline {
 			toBindless(input, stream),
 		};
 		setUniform(ubdata);
-		setRenderTargets(Span(&rb, 1));
+		m_renderer.setRenderTargets(Span(&rb, 1));
 		drawArray(0, 3, *m_tonemap_shader, 0, gpu::StateFlags::NONE);
 		endBlock();
-		releaseRenderbuffer(input);
+		m_renderer.releaseRenderbuffer(input);
 		return rb;
 	}
 
@@ -1132,26 +1008,24 @@ struct PipelineImpl final : Pipeline {
 		}
 
 		if (!cast_shadows) {
-			const RenderBufferHandle shadowmap_rb = createRenderbuffer({
-				.type = RenderbufferDesc::FIXED,
-				.fixed_size = {1, 1},
+			const RenderBufferHandle shadowmap_rb = m_renderer.createRenderbuffer({
+				.size = {1, 1},
 				.format = gpu::TextureFormat::D32,
 				.debug_name = "shadowmap"
 			});
-			setRenderTargets({}, shadowmap_rb);
+			m_renderer.setRenderTargets({}, shadowmap_rb);
 			clear(gpu::ClearFlags::DEPTH, 0, 0, 0, 0, 0);
-			stream.barrier(m_renderbuffers[shadowmap_rb].handle, gpu::BarrierType::READ);
+			stream.barrier(m_renderer.toTexture(shadowmap_rb), gpu::BarrierType::READ);
 			endBlock();
 			return shadowmap_rb;
 		}
 
-		const RenderBufferHandle shadowmap_rb = createRenderbuffer({
-			.type = RenderbufferDesc::FIXED,
-			.fixed_size = {4096, 1024},
+		const RenderBufferHandle shadowmap_rb = m_renderer.createRenderbuffer({
+			.size = {4096, 1024},
 			.format = gpu::TextureFormat::D32,
 			.debug_name = "shadowmap"
 			});
-		setRenderTargets({}, shadowmap_rb);
+		m_renderer.setRenderTargets({}, shadowmap_rb);
 		clear(gpu::ClearFlags::DEPTH, 0, 0, 0, 0, 0);
 
 		for (u32 slice = 0; slice < 4; ++slice) {
@@ -1171,7 +1045,7 @@ struct PipelineImpl final : Pipeline {
 			renderTerrains(view_params, shadow_state, "DEPTH");
 		}
 		endBlock();
-		stream.barrier(m_renderbuffers[shadowmap_rb].handle, gpu::BarrierType::READ);
+		stream.barrier(m_renderer.toTexture(shadowmap_rb), gpu::BarrierType::READ);
 		return shadowmap_rb;
 	}
 
@@ -1181,16 +1055,16 @@ struct PipelineImpl final : Pipeline {
 		DrawStream& stream = m_renderer.getDrawStream();
 		beginBlock("geom pass", true);
 		const gpu::TextureFlags flags = gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE;
-		gbuffer.A = createRenderbuffer({ .format = gpu::TextureFormat::SRGBA, .debug_name = "gbufferA" });
-		gbuffer.B = createRenderbuffer({ .format = gpu::TextureFormat::RGBA16, .flags = flags, .debug_name = "gbufferB" });
-		gbuffer.C = createRenderbuffer({ .format = gpu::TextureFormat::RGBA8, .flags = flags, .debug_name = "gbufferC" });
-		gbuffer.D = createRenderbuffer({ .format = gpu::TextureFormat::RG16F, .flags = flags, .debug_name = "gbufferD" });
-		gbuffer.DS = createRenderbuffer({ .format = gpu::TextureFormat::D24S8, .debug_name = "gbufferDS" });
+		gbuffer.A = m_renderer.createRenderbuffer({ .size = {m_viewport.w, m_viewport.h}, .format = gpu::TextureFormat::SRGBA, .debug_name = "gbufferA" });
+		gbuffer.B = m_renderer.createRenderbuffer({ .size = {m_viewport.w, m_viewport.h}, .format = gpu::TextureFormat::RGBA16, .flags = flags, .debug_name = "gbufferB" });
+		gbuffer.C = m_renderer.createRenderbuffer({ .size = {m_viewport.w, m_viewport.h}, .format = gpu::TextureFormat::RGBA8, .flags = flags, .debug_name = "gbufferC" });
+		gbuffer.D = m_renderer.createRenderbuffer({ .size = {m_viewport.w, m_viewport.h}, .format = gpu::TextureFormat::RG16F, .flags = flags, .debug_name = "gbufferD" });
+		gbuffer.DS = m_renderer.createRenderbuffer({ .size = {m_viewport.w, m_viewport.h}, .format = gpu::TextureFormat::D24S8, .debug_name = "gbufferDS" });
 
 		const CameraParams cp = getMainCamera();
 		pass(cp);
 		const RenderBufferHandle gbuffer_rbs[] = { gbuffer.A, gbuffer.B, gbuffer.C, gbuffer.D };
-		setRenderTargets(Span(gbuffer_rbs), gbuffer.DS);
+		m_renderer.setRenderTargets(Span(gbuffer_rbs), gbuffer.DS);
 		// TODO clear only depth?
 		// TODO refactor so we don't need setRenderTargets before clear
 		clear(gpu::ClearFlags::ALL, 0, 0, 0, 0, 0);
@@ -1239,7 +1113,7 @@ struct PipelineImpl final : Pipeline {
 
 
 		beginBlock("decals");
-		setRenderTargets(Span(gbuffer_rbs), gbuffer.DS, gpu::FramebufferFlags::READONLY_DEPTH_STENCIL);
+		m_renderer.setRenderTargets(Span(gbuffer_rbs), gbuffer.DS, gpu::FramebufferFlags::READONLY_DEPTH_STENCIL);
 		setUniform(toBindless(gbuffer.DS, stream));
 		renderBucket(view_idx, 3);
 		endBlock();
@@ -1250,9 +1124,8 @@ struct PipelineImpl final : Pipeline {
 	void transparentPass(GBuffer gbuffer, RenderBufferHandle shadowmap, RenderBufferHandle hdr_rb, u32 view_idx) {
 		PROFILE_FUNCTION();
 		beginBlock("water");
-		const RenderBufferHandle color_copy = createRenderbuffer({
-			.type = RenderbufferDesc::RELATIVE,
-			.rel_size = {1, 1},
+		const RenderBufferHandle color_copy = m_renderer.createRenderbuffer({
+			.size = {m_viewport.w, m_viewport.h},
 			.format = gpu::TextureFormat::R11G11B10F,
 			.flags = gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE,
 			.debug_name = "hdr_copy"
@@ -1263,7 +1136,7 @@ struct PipelineImpl final : Pipeline {
 		const IVec2 size = {m_viewport.w, m_viewport.h};
 		blit(toBindless(hdr_rb, stream), toRWBindless(color_copy, stream), size, false, false);
 
-		setRenderTargets(Span(&hdr_rb, 1), gbuffer.DS, gpu::FramebufferFlags::READONLY_DEPTH);
+		m_renderer.setRenderTargets(Span(&hdr_rb, 1), gbuffer.DS, gpu::FramebufferFlags::READONLY_DEPTH);
 
 		gpu::TextureHandle reflection_probes = m_module->getReflectionProbesTexture();
 		const gpu::BindlessHandle water_textures[] = { 
@@ -1278,7 +1151,7 @@ struct PipelineImpl final : Pipeline {
 
 		// TODO can we marge water + transparent pass?
 		beginBlock("transparent_pass");
-		setRenderTargets(Span(&hdr_rb, 1), gbuffer.DS, gpu::FramebufferFlags::READONLY_DEPTH);
+		m_renderer.setRenderTargets(Span(&hdr_rb, 1), gbuffer.DS, gpu::FramebufferFlags::READONLY_DEPTH);
 		const gpu::BindlessHandle transparent_pass_textures[] = { 
 			toBindless(shadowmap, stream), 
 			toBindless(gbuffer.DS, stream), 
@@ -1292,7 +1165,7 @@ struct PipelineImpl final : Pipeline {
 			plugin->renderTransparent(*this);
 		}
 
-		releaseRenderbuffer(color_copy);
+		m_renderer.releaseRenderbuffer(color_copy);
 
 		endBlock();
 	}
@@ -1304,15 +1177,16 @@ struct PipelineImpl final : Pipeline {
 
 		beginBlock("light pass");
 		const bool is_probe = m_type == PipelineType::PROBE;
-		const RenderBufferHandle hdr_rb = createRenderbuffer({ 
+		const RenderBufferHandle hdr_rb = m_renderer.createRenderbuffer({
+			.size = {m_viewport.w, m_viewport.h}, 
 			.format = is_probe ? gpu::TextureFormat::RGBA32F : gpu::TextureFormat::RGBA16F, 
 			.flags = gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE,
 			.debug_name = "hdr" });
 
-		setRenderTargets(Span(&hdr_rb, 1));
+		m_renderer.setRenderTargets(Span(&hdr_rb, 1));
 		clear(gpu::ClearFlags::ALL, m_clear_color.x, m_clear_color.y, m_clear_color.z, 0, 0);
 
-		setRenderTargets(Span(&hdr_rb, 1), gbuffer.DS, gpu::FramebufferFlags::READONLY_DEPTH);
+		m_renderer.setRenderTargets(Span(&hdr_rb, 1), gbuffer.DS, gpu::FramebufferFlags::READONLY_DEPTH);
 		gpu::TextureHandle reflection_probes = m_module->getReflectionProbesTexture();
 		const gpu::BindlessHandle ubdata[] = { toBindless(gbuffer.A, stream)
 			, toBindless(gbuffer.B, stream)
@@ -1415,17 +1289,17 @@ struct PipelineImpl final : Pipeline {
 
 	gpu::BindlessHandle toBindless(RenderBufferHandle rb_idx, DrawStream& stream) override { 
 		if (rb_idx == INVALID_RENDERBUFFER) return gpu::INVALID_BINDLESS_HANDLE;
-		stream.barrier(m_renderbuffers[rb_idx].handle, gpu::BarrierType::READ);
-		return gpu::getBindlessHandle(m_renderbuffers[rb_idx].handle);
+		gpu::TextureHandle tex = m_renderer.toTexture(rb_idx);
+		stream.barrier(tex, gpu::BarrierType::READ);
+		return gpu::getBindlessHandle(tex);
 	}
 
 	RenderBufferHandle getDownscaledDepth(RenderBufferHandle depth_buffer) override {
 		if (m_downscaled_depth != INVALID_RENDERBUFFER) return m_downscaled_depth;
 		if (!m_downscale_depth_shader->isReady()) return INVALID_RENDERBUFFER;
 
-		m_downscaled_depth = createRenderbuffer({
-			.type = RenderbufferDesc::FIXED,
-			.fixed_size = IVec2(m_viewport.w, m_viewport.h),
+		m_downscaled_depth = m_renderer.createRenderbuffer({
+			.size = {m_viewport.w, m_viewport.h},
 			.format = gpu::TextureFormat::R32F,
 			.flags = gpu::TextureFlags::COMPUTE_WRITE,
 			.debug_name = "downscaled_depth"
@@ -1436,7 +1310,7 @@ struct PipelineImpl final : Pipeline {
 
 		stream.beginProfileBlock("downscale_depth", 0, false);
 		gpu::TextureHandle mip_views[5];
-		gpu::TextureHandle tex = toTexture(m_downscaled_depth);
+		gpu::TextureHandle tex = m_renderer.toTexture(m_downscaled_depth);
 		for (u32 i = 0; i < lengthOf(mip_views); ++i) {
 			mip_views[i] = gpu::allocTextureHandle();
 			stream.createTextureView(mip_views[i], tex, 0, i); 
@@ -1459,7 +1333,7 @@ struct PipelineImpl final : Pipeline {
 			gpu::getRWBindlessHandle(mip_views[4]),
 		};
 
-		stream.barrier(toTexture(m_downscaled_depth), gpu::BarrierType::WRITE);
+		stream.barrier(m_renderer.toTexture(m_downscaled_depth), gpu::BarrierType::WRITE);
 
 		setUniform(udata);
 		dispatch(*m_downscale_depth_shader, (m_viewport.w + 7) / 8, (m_viewport.h + 7) / 8, 1);
@@ -1470,25 +1344,26 @@ struct PipelineImpl final : Pipeline {
 
 	gpu::RWBindlessHandle toRWBindless(RenderBufferHandle rb_idx, DrawStream& stream) override { 
 		if (rb_idx == INVALID_RENDERBUFFER) return gpu::INVALID_RW_BINDLESS_HANDLE;
-		stream.barrier(m_renderbuffers[rb_idx].handle, gpu::BarrierType::WRITE);
-		return gpu::getRWBindlessHandle(m_renderbuffers[rb_idx].handle);
+		gpu::TextureHandle tex = m_renderer.toTexture(rb_idx);
+		stream.barrier(tex, gpu::BarrierType::WRITE);
+		return gpu::getRWBindlessHandle(tex);
 	}
 
 	void render2DOnly() {
-		releaseRenderbuffer(m_output);
-		const RenderBufferHandle rb = createRenderbuffer({
-			.type = RenderbufferDesc::DISPLAY_SIZE,
+		m_renderer.releaseRenderbuffer(m_output);
+		const RenderBufferHandle rb = m_renderer.createRenderbuffer({
+			.size = m_display_size,
 			.format = gpu::TextureFormat::SRGBA,
 			.debug_name = "2D only"
 			});
-		setRenderTargets(Span(&rb, 1));
+		m_renderer.setRenderTargets(Span(&rb, 1));
 		clear(gpu::ClearFlags::ALL, 0, 0, 0, 0, 0);
 		render2D(rb);
 		m_output = rb;
 	}
 
 	void renderMain() {
-		releaseRenderbuffer(m_output);
+		m_renderer.releaseRenderbuffer(m_output);
 
 		DrawStream& stream = m_renderer.getDrawStream();
 		const RenderBufferHandle shadowmap = shadowPass();
@@ -1541,12 +1416,12 @@ struct PipelineImpl final : Pipeline {
 			result = plugin->renderAfterTonemap(gbuffer, result, *this);
 		}
 
-		releaseRenderbuffer(gbuffer.A);
-		releaseRenderbuffer(gbuffer.B);
-		releaseRenderbuffer(gbuffer.C);
-		releaseRenderbuffer(gbuffer.D);
-		releaseRenderbuffer(gbuffer.DS);
-		releaseRenderbuffer(shadowmap);
+		m_renderer.releaseRenderbuffer(gbuffer.A);
+		m_renderer.releaseRenderbuffer(gbuffer.B);
+		m_renderer.releaseRenderbuffer(gbuffer.C);
+		m_renderer.releaseRenderbuffer(gbuffer.D);
+		m_renderer.releaseRenderbuffer(gbuffer.DS);
+		m_renderer.releaseRenderbuffer(shadowmap);
 
 		m_output = result;
 	}
@@ -1600,7 +1475,7 @@ struct PipelineImpl final : Pipeline {
 		stream.viewport(0, 0, m_viewport.w, m_viewport.h);
 		stream.useProgram(m_blit_screen_program);
 
-		gpu::BindlessHandle texture = gpu::getBindlessHandle(m_renderbuffers[m_output].handle);
+		gpu::BindlessHandle texture = gpu::getBindlessHandle(m_renderer.toTexture(m_output));
 		
 		const Renderer::TransientSlice ub = m_renderer.allocUniform(&texture, sizeof(texture));
 		stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
@@ -1718,7 +1593,6 @@ struct PipelineImpl final : Pipeline {
 		m_renderer.waitForCommandSetup();
 
 		m_views.clear();
-		clearBuffers();
 
 		return true;
 	}
@@ -1798,7 +1672,7 @@ struct PipelineImpl final : Pipeline {
 	void render2D(RenderBufferHandle input) {
 		Matrix matrix;
 		matrix.setOrtho(0, (float)m_viewport.w, (float)m_viewport.h, 0, 0, 1, false);
-		setRenderTargets(Span(&input, 1));
+		m_renderer.setRenderTargets(Span(&input, 1));
 		renderUIHelper(m_draw2d, false, matrix);
 		m_draw2d.clear(getAtlasSize());
 	}
@@ -1910,11 +1784,6 @@ struct PipelineImpl final : Pipeline {
 		}
 		logError("Unknown texture format ", name);
 		return gpu::TextureFormat::RGBA8;
-	}
-
-	void releaseRenderbuffer(RenderBufferHandle idx) override {
-		if (idx == INVALID_RENDERBUFFER) return;
-		m_renderbuffers[idx].state = Renderbuffer::REUSABLE;
 	}
 
 	void renderTerrains(const CameraParams& cp, gpu::StateFlags state, const char* define) {
@@ -3756,8 +3625,7 @@ struct PipelineImpl final : Pipeline {
 	Draw2D& getDraw2D() override { return m_draw2d; }
 	
 	gpu::TextureHandle getOutput() override { 
-		if (m_output >= (u32)m_renderbuffers.size()) return gpu::INVALID_TEXTURE;
-		return m_renderbuffers[m_output].handle;
+		return m_renderer.toTexture(m_output);
 	}
 	
 	void setIndirectLightMultiplier(float value) override { m_indirect_light_multiplier = value; }
@@ -3792,7 +3660,6 @@ struct PipelineImpl final : Pipeline {
 	Shader* m_debug_clusters_shader;
 	Shader* m_debug_velocity_shader;
 	Shader* m_instancing_shader;
-	Array<Renderbuffer> m_renderbuffers;
 	Array<gpu::TextureHandle> m_textures;
 	Array<gpu::BufferHandle> m_buffers;
 	os::Timer m_timer;

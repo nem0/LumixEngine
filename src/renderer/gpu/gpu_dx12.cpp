@@ -276,9 +276,7 @@ struct Program {
 	// for VS/PS, there's 1:1 mapping from `shader_hash` and RT formats to PSO
 	StableHash shader_hash;
 	String disassembly;
-	#ifdef LUMIX_DEBUG
-		StaticString<64> name;
-	#endif
+	StaticString<64> name;
 };
 
 struct Buffer {
@@ -296,11 +294,10 @@ struct Buffer {
 	u32 size = 0;
 	D3D12_RESOURCE_STATES state;
 	u32 heap_id = INVALID_HEAP_ID;
-	#ifdef LUMIX_DEBUG
-		debug::AllocationInfo allocation_info;
-		Local<TagAllocator> tag_allocator;
-		StaticString<64> name;
-	#endif
+
+	debug::AllocationInfo allocation_info;
+	Local<TagAllocator> tag_allocator;
+	StaticString<64> name;
 };
 
 struct Texture {
@@ -320,11 +317,10 @@ struct Texture {
 	u32 w;
 	u32 h;
 	bool is_view = false;
-	#ifdef LUMIX_DEBUG
-		debug::AllocationInfo allocation_info;
-		Local<TagAllocator> tag_allocator;
-		StaticString<64> name;
-	#endif
+
+	debug::AllocationInfo allocation_info;
+	Local<TagAllocator> tag_allocator;
+	StaticString<64> name;
 };
 
 struct FrameBuffer {
@@ -1366,9 +1362,7 @@ void destroy(TextureHandle texture) {
 	checkThread();
 	ASSERT(texture);
 	Texture& t = *texture;
-	#ifdef LUMIX_DEBUG
-		debug::unregisterAlloc(t.allocation_info);
-	#endif
+	debug::unregisterAlloc(t.allocation_info);
 	if (t.resource && !t.is_view) d3d->frame->to_release.push(t.resource);
 	if (t.heap_id != INVALID_HEAP_ID) d3d->frame->to_heap_release.push(t.heap_id);
 	LUMIX_DELETE(d3d->allocator, texture);
@@ -2336,9 +2330,7 @@ void createBuffer(BufferHandle buffer, BufferFlags flags, size_t size, const voi
 	ASSERT(!buffer->resource);
 	ASSERT(size < UINT_MAX);
 	buffer->size = (u32)size;
-	#ifdef LUMIX_DEBUG
-		buffer->name = debug_name;
-	#endif
+	buffer->name = debug_name;
 	const bool mappable = u32(flags & BufferFlags::MAPPABLE);
 	const bool shader_buffer = isFlagSet(flags, BufferFlags::SHADER_BUFFER);
 	if (shader_buffer) {
@@ -2401,14 +2393,12 @@ void createBuffer(BufferHandle buffer, BufferFlags flags, size_t size, const voi
 
 	buffer->gpu_address = buffer->resource->GetGPUVirtualAddress();
 
-	#ifdef LUMIX_DEBUG
-		buffer->allocation_info.align = 0;
-		buffer->allocation_info.size = size;
-		buffer->allocation_info.flags = debug::AllocationInfo::IS_VRAM;
-		buffer->tag_allocator.create(d3d->buffer_tag_allocator, buffer->name);
-		buffer->allocation_info.tag = buffer->tag_allocator.get();
-		debug::registerAlloc(buffer->allocation_info);
-	#endif
+	buffer->allocation_info.align = 0;
+	buffer->allocation_info.size = size;
+	buffer->allocation_info.flags = debug::AllocationInfo::IS_VRAM;
+	buffer->tag_allocator.create(d3d->buffer_tag_allocator, buffer->name);
+	buffer->allocation_info.tag = buffer->tag_allocator.get();
+	debug::registerAlloc(buffer->allocation_info);
 
 	if (debug_name) {
 		WCHAR tmp[MAX_PATH];
@@ -2599,10 +2589,7 @@ void createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 	texture.state = isDepthFormat(desc.Format) ? D3D12_RESOURCE_STATE_COMMON : (compute_write ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS : D3D12_RESOURCE_STATE_GENERIC_READ);
 	if (d3d->device->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, texture.state, clear_val_ptr, IID_PPV_ARGS(&texture.resource)) != S_OK) return;
 	
-	#ifdef LUMIX_DEBUG
-		texture.name = debug_name;
-	#endif
-
+	texture.name = debug_name;
 	texture.is_view = false;
 	texture.flags = flags;
 	texture.w = w;
@@ -2677,33 +2664,31 @@ void createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 		texture.resource->SetName(tmp);
 	}
 
-	#ifdef LUMIX_DEBUG
-		D3D12_RESOURCE_DESC res_desc = {
-			.Dimension = desc.Dimension,
-			.Alignment = desc.Alignment,
-			.Width = desc.Width,
-			.Height = desc.Height,
-			.DepthOrArraySize = desc.DepthOrArraySize,
-			.MipLevels = desc.MipLevels,
-			.Format = desc.Format,
-			.SampleDesc = desc.SampleDesc,
-			.Layout = desc.Layout,
-			.Flags = desc.Flags
-		};
-		D3D12_RESOURCE_ALLOCATION_INFO info = d3d->device->GetResourceAllocationInfo(0, 1, &res_desc);
+	D3D12_RESOURCE_DESC res_desc = {
+		.Dimension = desc.Dimension,
+		.Alignment = desc.Alignment,
+		.Width = desc.Width,
+		.Height = desc.Height,
+		.DepthOrArraySize = desc.DepthOrArraySize,
+		.MipLevels = desc.MipLevels,
+		.Format = desc.Format,
+		.SampleDesc = desc.SampleDesc,
+		.Layout = desc.Layout,
+		.Flags = desc.Flags
+	};
+	D3D12_RESOURCE_ALLOCATION_INFO info = d3d->device->GetResourceAllocationInfo(0, 1, &res_desc);
 
-		texture.allocation_info.align = (u32)info.Alignment;
-		texture.allocation_info.size = info.SizeInBytes;
-		texture.allocation_info.flags = debug::AllocationInfo::IS_VRAM;
-		if (render_target) {
-			texture.tag_allocator.create(d3d->rendertarget_tag_allocator, texture.name);
-		}
-		else {
-			texture.tag_allocator.create(d3d->texture_tag_allocator, texture.name);
-		}
-		texture.allocation_info.tag = texture.tag_allocator.get();
-		debug::registerAlloc(texture.allocation_info);
-	#endif
+	texture.allocation_info.align = (u32)info.Alignment;
+	texture.allocation_info.size = info.SizeInBytes;
+	texture.allocation_info.flags = debug::AllocationInfo::IS_VRAM;
+	if (render_target) {
+		texture.tag_allocator.create(d3d->rendertarget_tag_allocator, texture.name);
+	}
+	else {
+		texture.tag_allocator.create(d3d->texture_tag_allocator, texture.name);
+	}
+	texture.allocation_info.tag = texture.tag_allocator.get();
+	debug::registerAlloc(texture.allocation_info);
 }
 
 void setDebugName(TextureHandle texture, const char* debug_name) {
@@ -2868,9 +2853,7 @@ void destroy(BufferHandle buffer) {
 	if (t.resource) d3d->frame->to_release.push(t.resource);
 	if (t.heap_id != INVALID_HEAP_ID) d3d->frame->to_heap_release.push(t.heap_id);
 
-	#ifdef LUMIX_DEBUG
-		debug::unregisterAlloc(buffer->allocation_info);
-	#endif
+	debug::unregisterAlloc(buffer->allocation_info);
 
 	LUMIX_DELETE(d3d->allocator, buffer);
 }
@@ -3139,9 +3122,7 @@ void createProgram(ProgramHandle program
 	, const char* name)
 {
 	ASSERT(program);
-	#ifdef LUMIX_DEBUG
-		program->name = name;
-	#endif
+	program->name = name;
 	program->state = state;
 	
 	switch (decl.primitive_type) {

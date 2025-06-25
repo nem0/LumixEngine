@@ -30,14 +30,6 @@ namespace profiler
 {
 
 
-#ifdef LUMIX_DEBUG
-	static constexpr u32 default_context_size = 5 * 1024 * 1024;
-	static constexpr u32 default_global_context_size = 10 * 1024 * 1024;
-#else
-	static constexpr u32 default_context_size = 1024 * 1024;
-	static constexpr u32 default_global_context_size = 2 * 1024 * 1024;
-#endif
-
 struct GPUScope {
 	struct Pair {
 		u64 begin;
@@ -66,10 +58,18 @@ struct GPUScope {
 };
 
 struct ThreadContext {
-	ThreadContext(u32 buffer_size, IAllocator& allocator) 
-		: buffer(allocator)
+	ThreadContext(IAllocator& allocator) 
+		: allocator(allocator)
 	{
-		buffer.resize(buffer_size);
+	}
+
+	~ThreadContext() {
+		Page* page = first_page;
+		while (page) {
+			Page* next = page->header.next;
+			LUMIX_DELETE(allocator, page);
+			page = next;
+		}
 	}
 
 	struct OpenBlock {
@@ -77,21 +77,31 @@ struct ThreadContext {
 		const char* name;
 	};
 
+	struct Page {
+		struct Header {
+			Page* next = nullptr;
+			u32 size = 0;
+		};
+		Header header;
+		u8 buffer[4096 - sizeof(Header)];
+	};
+
+	IAllocator& allocator;
 	OpenBlock open_block_stack[16];
 	u32 open_block_stack_size = 0;
 	
 	// we write to `tmp` until it's full, then we flush it to the `buffer`
 	// tmp is only accessed by the thread that owns the context
-	u8 tmp[512];
+	u8 tmp[sizeof(Page::buffer)];
 	u32 tmp_pos = 0;
 	
 	// ring buffer, access only while holding the mutex
 	// the ring buffer can be read by profiler UI
 	Mutex mutex;
-	OutputMemoryStream buffer;
-	u32 begin = 0;
-	u32 end = 0;
-	
+	Page* first_page = nullptr;
+	Page* last_page = nullptr;
+	u32 num_pages = 0;
+
 	StaticString<64> thread_name;
 	bool show_in_profiler = false;
 	u32 thread_id;
@@ -150,7 +160,7 @@ struct Instance {
 		, contexts(tag_allocator)
 		, trace_task(tag_allocator)
 		, counters(tag_allocator)
-		, global_context(default_global_context_size, tag_allocator)
+		, global_context(tag_allocator)
 		, gpu_scopes(tag_allocator)
 		, gpu_scope_stack(tag_allocator)
 	{
@@ -208,7 +218,7 @@ struct Instance {
 	LUMIX_FORCE_INLINE ThreadContext* getThreadContext()
 	{
 		thread_local ThreadContext* ctx = [&](){
-			ThreadContext* new_ctx = LUMIX_NEW(tag_allocator, ThreadContext)(default_context_size, tag_allocator);
+			ThreadContext* new_ctx = LUMIX_NEW(tag_allocator, ThreadContext)(tag_allocator);
 			new_ctx->thread_id = os::getCurrentThreadID();
 			MutexGuard lock(mutex);
 			contexts.push(new_ctx);
@@ -225,9 +235,7 @@ struct Instance {
 	Array<ThreadContext*> contexts;
 	Mutex mutex;
 	os::Timer timer;
-	bool paused = false;
 	bool context_switches_enabled = false;
-	u64 paused_time = 0;
 	u64 last_frame_duration = 0;
 	u64 last_frame_time = 0;
 	AtomicI32 fiber_wait_id = 0;
@@ -242,29 +250,26 @@ template <bool lock>
 static void flush(ThreadContext& ctx) {
 	if constexpr (lock) ctx.mutex.enter();
 
-	u8* buf = ctx.buffer.getMutableData();
-	const u32 buf_size = (u32)ctx.buffer.size();
-
-	// make sure we have enough space, discard oldest events if necessary
-	while (ctx.tmp_pos + ctx.end - ctx.begin > buf_size) {
-		const u8 size = buf[ctx.begin % buf_size];
-		ctx.begin += size;
-	}
-
-	const u32 lend = ctx.end % buf_size;
-	const u32 bytes_to_end = buf_size - lend;
-	// if we do not wrap
-	if (ctx.tmp_pos <= bytes_to_end) {
-		memcpy(buf + lend, ctx.tmp, ctx.tmp_pos);
+	if (ctx.num_pages < 500) {
+		auto* new_page = LUMIX_NEW(ctx.allocator, ThreadContext::Page)();
+		memcpy(new_page->buffer, ctx.tmp, ctx.tmp_pos);
+		new_page->header.size = ctx.tmp_pos;
+		if (!ctx.first_page) ctx.first_page = new_page;
+		if (ctx.last_page) ctx.last_page->header.next = new_page;
+		ctx.last_page = new_page;
+		++ctx.num_pages;
 	}
 	else {
-		memcpy(buf + lend, ctx.tmp, bytes_to_end);
-		const u32 remaining = ctx.tmp_pos - bytes_to_end;
-		memcpy(buf, ctx.tmp + bytes_to_end, remaining);
-	}
+		ThreadContext::Page* new_page = ctx.first_page;
+		ctx.first_page = new_page->header.next;
+		new_page->header.next = nullptr;
 
-	memset(ctx.tmp, 0xcd, sizeof(ctx.tmp));
-	ctx.end += ctx.tmp_pos;
+		memcpy(new_page->buffer, ctx.tmp, ctx.tmp_pos);
+		new_page->header.size = ctx.tmp_pos;
+
+		ctx.last_page->header.next = new_page;
+		ctx.last_page = new_page;
+	}
 	ctx.tmp_pos = 0;
 
 	if constexpr (lock) ctx.mutex.exit();
@@ -272,11 +277,6 @@ static void flush(ThreadContext& ctx) {
 
 template <bool lock, typename T>
 LUMIX_FORCE_INLINE static void write(ThreadContext& ctx, u64 timestamp, EventType type, const T& value) {
-	if (g_instance->paused && timestamp > g_instance->paused_time) {
-		if (ctx.tmp_pos != 0) flush<true>(ctx);
-		return;
-	}
-
 	enum { num_bytes_to_write = sizeof(T) + sizeof(EventHeader) };
 	ASSERT(num_bytes_to_write <= lengthOf(ctx.tmp));
 	
@@ -296,11 +296,6 @@ LUMIX_FORCE_INLINE static void write(ThreadContext& ctx, u64 timestamp, EventTyp
 
 template <bool lock>
 LUMIX_FORCE_INLINE static void write(ThreadContext& ctx, u64 timestamp, EventType type, Span<const u8> data) {
-	if (g_instance->paused && timestamp > g_instance->paused_time) {
-		if (ctx.tmp_pos != 0) flush<true>(ctx);
-		return;
-	}
-
 	const u32 num_bytes_to_write = (u32)data.length() + sizeof(EventHeader);
 	ASSERT(num_bytes_to_write <= lengthOf(ctx.tmp));
 	
@@ -640,50 +635,39 @@ void setThreadName(const char* name)
 	ctx->thread_name = name;
 }
 
-template <typename T>
-static void read(const ThreadContext& ctx, u32 p, T& value)
-{
-	const u8* buf = ctx.buffer.data();
-	const u32 buf_size = (u32)ctx.buffer.size();
-	const u32 l = p % buf_size;
-	if (l + sizeof(value) <= buf_size) {
-		memcpy(&value, buf + l, sizeof(value));
-		return;
-	}
-
-	memcpy(&value, buf + l, buf_size - l);
-	memcpy((u8*)&value + (buf_size - l), buf, sizeof(value) - (buf_size - l));
-}
-
 static void saveStrings(OutputMemoryStream& blob) {
 	HashMap<const char*, const char*> map(getGlobalAllocator());
 	map.reserve(512);
 	auto gather = [&](const ThreadContext& ctx){
-		u32 p = ctx.begin;
-		const u32 end = ctx.end;
-		while (p != end) {
-			profiler::EventHeader header;
-			read(ctx, p, header);
-			switch (header.type) {
-				case profiler::EventType::BEGIN_BLOCK: {
-					BlockRecord b;
-					read(ctx, p + sizeof(profiler::EventHeader), b);
-					if (!map.find(b.name).isValid()) {
-						map.insert(b.name, b.name);
+		const ThreadContext::Page* page = ctx.first_page;
+		while (page) {
+			u32 iter = 0;
+			while (iter < page->header.size) {
+				profiler::EventHeader header;
+				memcpy(&header, &page->buffer[iter], sizeof(header));
+				
+				switch (header.type) {
+					case profiler::EventType::BEGIN_BLOCK: {
+						BlockRecord b;
+						memcpy(&b, &page->buffer[iter + sizeof(profiler::EventHeader)], sizeof(b));
+						if (!map.find(b.name).isValid()) {
+							map.insert(b.name, b.name);
+						}
+						break;
 					}
-					break;
-				}
-				case profiler::EventType::INT: {
-					IntRecord r;
-					read(ctx, p + sizeof(profiler::EventHeader), r);
-					if (!map.find(r.key).isValid()) {
-						map.insert(r.key, r.key);
+					case profiler::EventType::INT: {
+						IntRecord r;
+						memcpy(&r, &page->buffer[iter + sizeof(profiler::EventHeader)], sizeof(r));
+						if (!map.find(r.key).isValid()) {
+							map.insert(r.key, r.key);
+						}
+						break;
 					}
-					break;
+					default: break;
 				}
-				default: break;
+				iter += header.size;
 			}
-			p += header.size;
+			page = page->header.next;
 		}
 	};
 
@@ -701,13 +685,24 @@ static void saveStrings(OutputMemoryStream& blob) {
 
 void serialize(OutputMemoryStream& blob, ThreadContext& ctx) {
 	MutexGuard lock(ctx.mutex);
+	flush<false>(ctx);
 	blob.writeString(ctx.thread_name);
 	blob.write(ctx.thread_id);
-	blob.write(ctx.begin);
-	blob.write(ctx.end);
 	blob.write((u8)ctx.show_in_profiler);
-	blob.write((u32)ctx.buffer.size());
-	blob.write(ctx.buffer.data(), ctx.buffer.size());
+	u32 size = 0;
+	const ThreadContext::Page* page = ctx.first_page;
+	while (page) {
+		size += page->header.size;
+		page = page->header.next;
+	}
+
+	blob.write(size);
+
+	page = ctx.first_page;
+	while (page) {
+		blob.write(page->buffer, page->header.size);
+		page = page->header.next;
+	}
 }
 
 void serialize(OutputMemoryStream& blob) {
@@ -724,14 +719,6 @@ void serialize(OutputMemoryStream& blob) {
 		serialize(blob, *ctx);
 	}	
 	saveStrings(blob);
-}
-
-void pause(bool paused)
-{
-	if (paused) write<true>(g_instance->global_context, os::Timer::getRawTimestamp(), EventType::PAUSE, 0);
-
-	g_instance->paused = paused;
-	if (paused) g_instance->paused_time = os::Timer::getRawTimestamp();
 }
 
 void init(IAllocator& allocator) {

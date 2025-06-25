@@ -13,7 +13,6 @@ namespace profiler {
 
 LUMIX_CORE_API void init(IAllocator& allocator);
 LUMIX_CORE_API void shutdown();
-LUMIX_CORE_API void pause(bool paused);
 
 LUMIX_CORE_API void setThreadName(const char* name);
 LUMIX_CORE_API void showInProfiler(bool show);

@@ -6,6 +6,7 @@
 #include "engine/resource.h"
 #include "core/string.h"
 #include "renderer/gpu/gpu.h"
+#include "renderer/renderer.h"
 
 
 namespace Lumix {
@@ -71,36 +72,12 @@ enum class PipelineType {
 	GUI_EDITOR
 };
 
-struct RenderBufferHandle {
-	constexpr RenderBufferHandle() : value(0xffFFffFF) {}
-	explicit constexpr RenderBufferHandle(u32 value) : value(value) {}
-	operator u32() const { return value; }
-	bool operator ==(const RenderBufferHandle& rhs) const { return value == rhs.value; }
-	u32 value;
-};
-
-static constexpr RenderBufferHandle INVALID_RENDERBUFFER = RenderBufferHandle();
-
 struct GBuffer {
 	RenderBufferHandle A;
 	RenderBufferHandle B;
 	RenderBufferHandle C;
 	RenderBufferHandle D;
 	RenderBufferHandle DS;
-};
-
-struct RenderbufferDesc {
-	enum Type {
-		FIXED,
-		RELATIVE,
-		DISPLAY_SIZE
-	};
-	Type type = RELATIVE;
-	IVec2 fixed_size;
-	Vec2 rel_size = Vec2(1, 1);
-	gpu::TextureFormat format;
-	gpu::TextureFlags flags = gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::NO_MIPS;
-	StaticString<32> debug_name;
 };
 
 struct LUMIX_RENDERER_API Pipeline {
@@ -130,9 +107,6 @@ struct LUMIX_RENDERER_API Pipeline {
 	virtual void beginBlock(const char* name, bool stats = false) = 0;
 	virtual void endBlock() = 0;
 	virtual void drawArray(u32 indices_offset, u32 indices_count, Shader& shader, u32 define_mask = 0, gpu::StateFlags state = gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_FN_GREATER) = 0;
-	virtual void setRenderTargets(Span<const RenderBufferHandle> renderbuffers, RenderBufferHandle ds = INVALID_RENDERBUFFER, gpu::FramebufferFlags flags = gpu::FramebufferFlags::NONE) = 0;
-	virtual RenderBufferHandle createRenderbuffer(const RenderbufferDesc& desc) = 0;
-	virtual void releaseRenderbuffer(RenderBufferHandle idx) = 0;
 	virtual void clear(gpu::ClearFlags flags, float r, float g, float b, float a, float depth) = 0;
 	// also emits barriers
 	virtual gpu::BindlessHandle toBindless(RenderBufferHandle rb_idx, struct DrawStream& stream) = 0;
@@ -146,7 +120,6 @@ struct LUMIX_RENDERER_API Pipeline {
 	virtual u32 cull(const CameraParams& cp, Span<const BucketDesc> buckets) = 0;
 	virtual void renderBucket(u32 view_idx, u32 bucket_idx) const = 0;
 	virtual void dispatch(Shader& shader, u32 x, u32 y, u32 z, const char* define = nullptr) = 0;
-	virtual gpu::TextureHandle toTexture(RenderBufferHandle handle) = 0;
 
 	// use this to store per pipeline data for e.g. postprocess effects
 	// data are own by pipeline, destructor is not called
