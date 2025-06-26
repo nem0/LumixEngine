@@ -23,11 +23,14 @@ pushd %~dp0
 		for /f "tokens=*" %%i in ('git rev-parse HEAD') do set GIT_REVISION=%%i
 		echo %GIT_REVISION% > %dst_src_dir%\imgui_revision.txt
 
-		xcopy "*.cpp" %dst_src_dir% /y /-I
-		xcopy "imgui.h" %dst_src_dir% /y /-I
-		xcopy "imgui_internal.h" %dst_src_dir% /y /-I
-		xcopy "imstb_rectpack.h" %dst_src_dir% /y /-I
-		xcopy "imstb_textedit.h" %dst_src_dir% /y /-I
-		xcopy "imstb_truetype.h" %dst_src_dir% /y /-I
+		xcopy "*.cpp" %dst_src_dir% /y 
+		xcopy "imgui.h" %dst_src_dir% /y 
+		xcopy "imgui_internal.h" %dst_src_dir% /y 
+		xcopy "imstb_rectpack.h" %dst_src_dir% /y 
+		xcopy "imstb_textedit.h" %dst_src_dir% /y 
+		xcopy "imstb_truetype.h" %dst_src_dir% /y 
+		cd misc/freetype
+		xcopy "imgui_freetype.cpp" %dst_src_dir% /y 
+		xcopy "imgui_freetype.h" %dst_src_dir% /y 
 	popd
 popd

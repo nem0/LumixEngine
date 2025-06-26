@@ -2191,10 +2191,10 @@ struct StudioAppImpl final : StudioApp {
 			io.IniFilename = nullptr;
 			#ifdef __linux__ 
 				io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-				io.BackendFlags = ImGuiBackendFlags_HasMouseCursors;
+				io.BackendFlags = ImGuiBackendFlags_HasMouseCursors | ImGuiBackendFlags_RendererHasTextures;
 			#else
 				io.ConfigFlags |= ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable | ImGuiConfigFlags_NavEnableKeyboard;
-				io.BackendFlags = ImGuiBackendFlags_PlatformHasViewports | ImGuiBackendFlags_RendererHasViewports | ImGuiBackendFlags_HasMouseCursors;
+				io.BackendFlags = ImGuiBackendFlags_PlatformHasViewports | ImGuiBackendFlags_RendererHasViewports | ImGuiBackendFlags_HasMouseCursors | ImGuiBackendFlags_RendererHasTextures;
 			#endif
 
 			initIMGUIPlatformIO();
@@ -2235,14 +2235,6 @@ struct StudioAppImpl final : StudioApp {
 				);
 			}
 			if (!m_monospace_font) logError("Failed to load monospace font");
-
-			{
-				PROFILE_BLOCK("build atlas");
-				ImFontAtlas* atlas = ImGui::GetIO().Fonts;
-				atlas->FontBuilderIO = ImGuiFreeType::GetBuilderForFreeType();
-				atlas->FontBuilderFlags = 0;
-				atlas->Build();
-			}
 
 			ImGuiStyle& style = ImGui::GetStyle();
 			style.FramePadding.y = 0;

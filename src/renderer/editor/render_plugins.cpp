@@ -519,7 +519,7 @@ struct SphericalHarmonics {
 
 	static SphericalHarmonics project(const Vec3& dir) {
 		SphericalHarmonics sh;
-    
+	
 		sh.coefs[0] = Vec3(0.282095f);
 		sh.coefs[1] = Vec3(0.488603f * dir.y);
 		sh.coefs[2] = Vec3(0.488603f * dir.z);
@@ -529,7 +529,7 @@ struct SphericalHarmonics {
 		sh.coefs[6] = Vec3(0.315392f * (3.0f * dir.z * dir.z - 1.0f));
 		sh.coefs[7] = Vec3(1.092548f * dir.x * dir.z);
 		sh.coefs[8] = Vec3(0.546274f * (dir.x * dir.x - dir.y * dir.y));
-    
+	
 		return sh;
 	}
 	
@@ -1188,7 +1188,7 @@ struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
 				ImGui::SetCursorPos(cp);
 			}
 
-			ImGui::Image(m_texture_view, texture_size, ImVec2(0, 0), ImVec2(1, 1), tint);
+			ImGui::ImageWithBg(m_texture_view, texture_size, ImVec2(0, 0), ImVec2(1, 1), ImVec4(0, 0, 0, 0), tint);
 			const float wheel = ImGui::GetIO().MouseWheel;
 			ImGui::EndChild();
 			if (ImGui::IsItemHovered() && wheel && ImGui::GetIO().KeyAlt)	{
@@ -4877,20 +4877,11 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 		: m_app(app)
 		, m_engine(app.getEngine())
 		, m_programs(app.getAllocator())
+		, m_imgui_textures(app.getAllocator())
 	{
 		PROFILE_FUNCTION();
 		SystemManager& system_manager = m_engine.getSystemManager();
 		Renderer* renderer = (Renderer*)system_manager.getSystem("renderer");
-
-		unsigned char* pixels;
-		int width, height;
-		ImFontAtlas* atlas = ImGui::GetIO().Fonts;
-		atlas->GetTexDataAsRGBA32(&pixels, &width, &height);
-
-		const Renderer::MemRef mem = renderer->copy(pixels, width * height * 4);
-		atlas->ClearTexData();
-		m_texture = renderer->createTexture(width, height, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::NO_MIPS, mem, "editor_font_atlas");
-		ImGui::GetIO().Fonts->TexID = m_texture;
 
 		m_render_interface.create(app, *renderer, *this);
 		app.setRenderInterface(m_render_interface.get());
@@ -4903,10 +4894,13 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 		shutdownImGui();
 		SystemManager& system_manager = m_engine.getSystemManager();
 		Renderer* renderer = (Renderer*)system_manager.getSystem("renderer");
-		for (gpu::ProgramHandle program : m_programs) {
-			renderer->getEndFrameDrawStream().destroy(program);
+		DrawStream& ds = renderer->getEndFrameDrawStream();
+		for (gpu::TextureHandle t : m_imgui_textures) {
+			ds.destroy(t);
 		}
-		if (m_texture) renderer->getEndFrameDrawStream().destroy(m_texture);
+		for (gpu::ProgramHandle program : m_programs) {
+			ds.destroy(program);
+		}
 	}
 
 	void onGUI() override {}
@@ -4957,8 +4951,8 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 			}
 			if (0 == pcmd->ElemCount) continue;
 
-			gpu::TextureHandle tex = (gpu::TextureHandle)(intptr_t)pcmd->TextureId;
-			if (!tex) tex = m_texture;
+			gpu::TextureHandle tex = (gpu::TextureHandle)(intptr_t)pcmd->GetTexID();
+			ASSERT(tex);
 
 			const Renderer::TransientSlice ub = renderer->allocUniform(sizeof(ImGuiUniformBuffer));
 			ImGuiUniformBuffer* uniform_data = (ImGuiUniformBuffer*)ub.ptr;
@@ -4995,6 +4989,42 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 		gpu::BindlessHandle texture_handle;
 		float time;
 	};
+
+	void imguiUpdateTexture(ImTextureData& tex) {
+		Renderer* renderer = static_cast<Renderer*>(m_engine.getSystemManager().getSystem("renderer"));
+
+		switch (tex.Status) {
+			case ImTextureStatus_Destroyed: break;
+			case ImTextureStatus_OK: break;
+			case ImTextureStatus_WantUpdates: {
+					gpu::TextureHandle texture = (gpu::TextureHandle)(intptr_t)tex.GetTexID();
+					DrawStream& draw_stream = renderer->getDrawStream();
+					draw_stream.update(texture, 0, 0, 0, 0, tex.Width, tex.Height, gpu::TextureFormat::RGBA8, tex.GetPixels(), tex.Width * tex.Height * 4);
+					tex.SetStatus(ImTextureStatus_OK);
+				break;
+			}
+			case ImTextureStatus_WantDestroy: {
+				DrawStream& draw_stream = renderer->getEndFrameDrawStream();
+				gpu::TextureHandle texture = (gpu::TextureHandle)tex.GetTexID();
+				draw_stream.destroy(texture);
+				tex.SetStatus(ImTextureStatus_Destroyed);
+				m_imgui_textures.eraseItem(texture);
+				break;
+			}
+			case ImTextureStatus_WantCreate: {
+				ASSERT(tex.Format == ImTextureFormat_RGBA32);
+			
+				auto* pixels = (const u8*)tex.GetPixels();
+
+				const Renderer::MemRef mem = renderer->copy(pixels, tex.Width * tex.Height * 4);
+				gpu::TextureHandle texture = renderer->createTexture(tex.Width, tex.Height, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::NO_MIPS, mem, "imgui_texture");
+				m_imgui_textures.push(texture);
+				tex.SetTexID((ImTextureID)(intptr_t)texture);
+				tex.SetStatus(ImTextureStatus_OK);
+				break;
+			}
+		}
+	}
 
 	void guiEndFrame() override {
 		PROFILE_FUNCTION();
@@ -5060,6 +5090,15 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 				stream.createProgram(program, state, decl, src, gpu::ShaderType::SURFACE, nullptr, 0, "imgui shader");
 			}
 
+			if (draw_data->Textures != nullptr) {
+				for (ImTextureData* tex : *draw_data->Textures) {
+					if (tex->Status != ImTextureStatus_OK) {
+						imguiUpdateTexture(*tex);
+					}
+				}
+			}
+
+
 			stream.setCurrentWindow(vp->PlatformHandle);
 			stream.setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, gpu::FramebufferFlags::NONE);
 			stream.viewport(0, 0, w, h);
@@ -5081,8 +5120,8 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 	StudioApp& m_app;
 	Engine& m_engine;
 	HashMap<void*, gpu::ProgramHandle> m_programs;
-	gpu::TextureHandle m_texture;
 	Local<RenderInterfaceImpl> m_render_interface;
+	Array<gpu::TextureHandle> m_imgui_textures;
 };
 
 struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin {

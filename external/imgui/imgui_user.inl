@@ -1142,7 +1142,7 @@ namespace ImGuiEx {
 		ImVec2 max = min;
 		max.y += GetTextLineHeight();
 		max.x += size;
-		RenderTextEllipsis(dl, min, max, max.x, max.x, text, nullptr, nullptr);
+		RenderTextEllipsis(dl, min, max, max.x, text, nullptr, nullptr);
 		ImRect text_rect;
 		text_rect.Min = min;
 		text_rect.Max = max;
@@ -1191,8 +1191,7 @@ namespace ImGuiEx {
 		ItemSize(textRect);
 		if (ImGui::ItemAdd(textRect, window->GetID(label)))
 		{
-			RenderTextEllipsis(GetWindowDrawList(), textRect.Min, textRect.Max, textRect.Max.x,
-				textRect.Max.x, label, nullptr, &textSize);
+			RenderTextEllipsis(GetWindowDrawList(), textRect.Min, textRect.Max, textRect.Max.x, label, nullptr, &textSize);
 
 			if (textRect.GetWidth() < textSize.x && IsItemHovered())
 				SetTooltip("%s", label);
