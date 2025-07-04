@@ -5008,6 +5008,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 				gpu::TextureHandle texture = (gpu::TextureHandle)tex.GetTexID();
 				draw_stream.destroy(texture);
 				tex.SetStatus(ImTextureStatus_Destroyed);
+				tex.SetTexID(ImTextureID_Invalid);
 				m_imgui_textures.eraseItem(texture);
 				break;
 			}
