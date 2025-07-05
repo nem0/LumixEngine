@@ -982,6 +982,7 @@ void ModelImporter::writeGeometry(const ModelMeta& meta) {
 	for (const ImportMesh& import_mesh : m_meshes) {
 		if (import_mesh.lod != 0) continue;
 		
+		const Matrix mtx = import_mesh.matrix;
 		const ImportGeometry& geom = m_geometries[import_mesh.geometry_idx];
 		const u8* positions = geom.vertex_buffer.data();
 		const i32 vertex_size = geom.vertex_size;
@@ -989,6 +990,8 @@ void ModelImporter::writeGeometry(const ModelMeta& meta) {
 		for (u32 i = 0; i < vertex_count; ++i) {
 			Vec3 p;
 			memcpy(&p, positions, sizeof(p));
+			p = mtx.transformPoint(p);
+
 			positions += vertex_size;
 			float d = squaredLength(p - center);
 			center_radius_squared = maximum(d, center_radius_squared);
