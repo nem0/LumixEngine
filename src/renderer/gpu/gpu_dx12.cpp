@@ -2987,10 +2987,9 @@ void draw(const Drawcall& draw) {
 		d->current_program = draw.program;
 	}
 
-	d->cmd_list->SetGraphicsRootConstantBufferView(2, draw.uniform_buffer2->gpu_address + draw.uniform_buffer2_offset);
-
 	if (!setPipelineStateGraphics()) return;
-
+	
+	d->cmd_list->SetGraphicsRootConstantBufferView(2, draw.uniform_buffer2->gpu_address + draw.uniform_buffer2_offset);
 	gpu::BufferHandle vb0 = draw.vertex_buffers[0];
 	const u32 vb0_offset = draw.vertex_buffer_offsets[0];
 	gpu::BufferHandle vb1 = draw.vertex_buffers[1];
