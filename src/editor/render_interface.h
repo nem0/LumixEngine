@@ -1,6 +1,7 @@
 #pragma once
 
 #include "editor/world_editor.h"
+#include "renderer/gpu/gpu.h"
 
 #ifndef ImTextureID
 	using ImTextureID = void*;
@@ -13,7 +14,7 @@ struct RenderInterface {
 	virtual ~RenderInterface() {}
 
 	virtual struct AABB getEntityAABB(World& world, EntityRef entity, const DVec3& base) = 0;
-	virtual ImTextureID createTexture(const char* name, const void* pixels, int w, int h) = 0;
+	virtual ImTextureID createTexture(const char* name, const void* pixels, int w, int h, gpu::TextureFormat format) = 0;
 	virtual void destroyTexture(ImTextureID handle) = 0;
 	virtual ImTextureID loadTexture(const struct Path& path) = 0;
 	virtual bool isValid(ImTextureID texture) = 0;

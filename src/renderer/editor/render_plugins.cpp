@@ -627,7 +627,7 @@ static void flipX(Vec4* data, int texture_size)
 	}
 }
 	
-static bool saveAsLBC(FileSystem& fs, const char* path, const u8* data, int w, int h, bool generate_mipmaps, bool is_origin_bottom_left, IAllocator& allocator) {
+static bool saveAsLBC(FileSystem& fs, const char* path, const u8* data, int w, int h, bool generate_mipmaps, bool is_origin_bottom_left, bool is_srgb, IAllocator& allocator) {
 	ASSERT(data);
 	
 	OutputMemoryStream blob(allocator);
@@ -641,7 +641,7 @@ static bool saveAsLBC(FileSystem& fs, const char* path, const u8* data, int w, i
 	os::OutputFile file;
 	if (!fs.open(path, file)) return false;
 	(void)file.write("lbc", 3);
-	(void)file.write(u32(0));
+	(void)file.write(is_srgb ? u32(Texture::Flags::SRGB) : 0);
 	(void)file.write(blob.data(), blob.size());
 	file.close();
 	return !file.isError();
@@ -1440,7 +1440,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 				applyTint();
 
-				if (!saveAsLBC(fs, m_out_path.c_str(), resized_data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, true, m_allocator)) {
+				if (!saveAsLBC(fs, m_out_path.c_str(), resized_data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, true, false, m_allocator)) {
 					logError("Failed to save ", m_out_path);
 				}
 			}
@@ -1466,7 +1466,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 				applyTint();
 
-				if (!saveAsLBC(fs, m_out_path.c_str(), resized_data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, true, m_allocator)) {
+				if (!saveAsLBC(fs, m_out_path.c_str(), resized_data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, true, false, m_allocator)) {
 					logError("Failed to save ", m_out_path);
 				}
 			}
@@ -2759,7 +2759,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 					}
 				}
 
-				saveAsLBC(fs, path.c_str(), m_tile.data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, gpu::isOriginBottomLeft(), m_app.getAllocator());
+				saveAsLBC(fs, path.c_str(), m_tile.data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, gpu::isOriginBottomLeft(), true, m_app.getAllocator());
 				memset(m_tile.data.getMutableData(), 0, m_tile.data.size());
 				m_renderer->getEndFrameDrawStream().destroy(m_tile.texture);
 				m_tile.entity = INVALID_ENTITY;
@@ -4772,14 +4772,14 @@ struct RenderInterfaceImpl final : RenderInterface
 		return true;
 	}
 
-	ImTextureID createTexture(const char* name, const void* pixels, int w, int h) override
+	ImTextureID createTexture(const char* name, const void* pixels, int w, int h, gpu::TextureFormat format) override
 	{
 		Engine& engine = m_app.getEngine();
 		auto& rm = engine.getResourceManager();
 		auto& allocator = m_app.getAllocator();
 
 		Texture* texture = LUMIX_NEW(allocator, Texture)(Path(name), *rm.get(Texture::TYPE), m_renderer, allocator);
-		texture->create(w, h, gpu::TextureFormat::RGBA8, pixels, w * h * 4);
+		texture->create(w, h, format, pixels, w * h * 4);
 		m_textures.insert(&texture->handle, {texture, false});
 		return texture->handle;
 	}

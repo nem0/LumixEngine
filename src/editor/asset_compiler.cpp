@@ -738,9 +738,9 @@ struct AssetCompilerImpl : AssetCompiler {
 				MutexGuard lock(m_changed_mutex);
 				if (m_changed_files.empty()) break;
 
-				m_changed_files.removeDuplicates();
 				path_obj = m_changed_files.back();
 				m_changed_files.pop();
+				m_changed_files.eraseItems([&](const Path& path) { return path == path_obj; });
 			}
 
 			if (Path::hasExtension(path_obj, "meta")) {
