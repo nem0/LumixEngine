@@ -4952,34 +4952,34 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 			if (0 == pcmd->ElemCount) continue;
 
 			gpu::TextureHandle tex = (gpu::TextureHandle)(intptr_t)pcmd->GetTexID();
-			ASSERT(tex);
+			if (tex) {
+				const Renderer::TransientSlice ub = renderer->allocUniform(sizeof(ImGuiUniformBuffer));
+				ImGuiUniformBuffer* uniform_data = (ImGuiUniformBuffer*)ub.ptr;
+				uniform_data->scale = scale;
+				uniform_data->offset = offset;
+				uniform_data->texture_handle = gpu::getBindlessHandle(tex);
+				static os::Timer timer;
+				uniform_data->time = timer.getTimeSinceStart();
+				stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 
-			const Renderer::TransientSlice ub = renderer->allocUniform(sizeof(ImGuiUniformBuffer));
-			ImGuiUniformBuffer* uniform_data = (ImGuiUniformBuffer*)ub.ptr;
-			uniform_data->scale = scale;
-			uniform_data->offset = offset;
-			uniform_data->texture_handle = gpu::getBindlessHandle(tex);
-			static os::Timer timer;
-			uniform_data->time = timer.getTimeSinceStart();
-			stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+				const u32 h = u32(clamp((pcmd->ClipRect.w - pcmd->ClipRect.y), 0.f, 65535.f));
 
-			const u32 h = u32(clamp((pcmd->ClipRect.w - pcmd->ClipRect.y), 0.f, 65535.f));
+				const ImVec2 pos = vp->DrawData->DisplayPos;
+				const u32 vp_height = u32(vp->Size.y);
+				if (gpu::isOriginBottomLeft()) {
+					stream.scissor(u32(maximum((pcmd->ClipRect.x - pos.x), 0.0f)),
+						vp_height - u32(maximum((pcmd->ClipRect.y - pos.y), 0.0f)) - h,
+						u32(clamp((pcmd->ClipRect.z - pcmd->ClipRect.x), 0.f, 65535.f)),
+						u32(clamp((pcmd->ClipRect.w - pcmd->ClipRect.y), 0.f, 65535.f)));
+				} else {
+					stream.scissor(u32(maximum((pcmd->ClipRect.x - pos.x), 0.0f)),
+						u32(maximum((pcmd->ClipRect.y - pos.y), 0.0f)),
+						u32(clamp((pcmd->ClipRect.z - pcmd->ClipRect.x), 0.f, 65535.f)),
+						u32(clamp((pcmd->ClipRect.w - pcmd->ClipRect.y), 0.f, 65535.f)));
+				}
 
-			const ImVec2 pos = vp->DrawData->DisplayPos;
-			const u32 vp_height = u32(vp->Size.y);
-			if (gpu::isOriginBottomLeft()) {
-				stream.scissor(u32(maximum((pcmd->ClipRect.x - pos.x), 0.0f)),
-					vp_height - u32(maximum((pcmd->ClipRect.y - pos.y), 0.0f)) - h,
-					u32(clamp((pcmd->ClipRect.z - pcmd->ClipRect.x), 0.f, 65535.f)),
-					u32(clamp((pcmd->ClipRect.w - pcmd->ClipRect.y), 0.f, 65535.f)));
-			} else {
-				stream.scissor(u32(maximum((pcmd->ClipRect.x - pos.x), 0.0f)),
-					u32(maximum((pcmd->ClipRect.y - pos.y), 0.0f)),
-					u32(clamp((pcmd->ClipRect.z - pcmd->ClipRect.x), 0.f, 65535.f)),
-					u32(clamp((pcmd->ClipRect.w - pcmd->ClipRect.y), 0.f, 65535.f)));
+				stream.drawIndexed(pcmd->IdxOffset * sizeof(u32) + ib.offset, pcmd->ElemCount, gpu::DataType::U32);
 			}
-
-			stream.drawIndexed(pcmd->IdxOffset * sizeof(u32) + ib.offset, pcmd->ElemCount, gpu::DataType::U32);
 		}
 	}
 
