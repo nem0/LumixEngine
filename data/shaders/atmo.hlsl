@@ -212,6 +212,7 @@ Cloud cloud(float2 screen_uv) {
 	Cloud result;
 	result.color = float3(0, 0, 0);
 	result.transmittance = 1;
+	result.t_bottom = 0;
 	
 	float3 eyedir = getViewDirection(screen_uv);
 	
