@@ -917,6 +917,7 @@ void ModelImporter::writeGeometry(const ModelMeta& meta) {
 	float origin_radius_squared = 0;
 	AABB aabb = { {FLT_MAX, FLT_MAX, FLT_MAX}, {-FLT_MAX, -FLT_MAX, -FLT_MAX} };
 
+	const u64 output_vertex_data_offset = m_out_file.size();
 	for (u32 lod = 0; lod < meta.lod_count - (meta.create_impostor ? 1 : 0); ++lod) {
 		for (const ImportMesh& import_mesh : m_meshes) {
 			if (!((import_mesh.lod == lod && !hasAutoLOD(meta, lod)) || (import_mesh.lod == 0 && hasAutoLOD(meta, lod)))) continue;
@@ -977,8 +978,44 @@ void ModelImporter::writeGeometry(const ModelMeta& meta) {
 		}
 	}
 
-	const Vec3 center = (aabb.min + aabb.max) * 0.5f;
-	const Vec3 center_xz0(0, center.y, 0);
+	Vec3 center = (aabb.min + aabb.max) * 0.5f;
+	Vec3 center_xz0(0, center.y, 0);
+
+	if (meta.origin != ModelMeta::Origin::SOURCE) {
+		u8* out = m_out_file.getMutableData() + output_vertex_data_offset;
+		for (u32 lod = 0; lod < meta.lod_count - (meta.create_impostor ? 1 : 0); ++lod) {
+			for (const ImportMesh& import_mesh : m_meshes) {
+				if (!((import_mesh.lod == lod && !hasAutoLOD(meta, lod)) || (import_mesh.lod == 0 && hasAutoLOD(meta, lod)))) continue;
+				
+				const ImportGeometry& geom = m_geometries[import_mesh.geometry_idx];
+				const u32 vertex_size = geom.vertex_size;
+				const u32 vertex_count = u32(geom.vertex_buffer.size() / geom.vertex_size);
+				out += sizeof(i32);
+				
+				for (u32 i = 0; i < vertex_count; ++i) {
+					Vec3 p;
+					memcpy(&p, out + vertex_size * i, sizeof(p));
+					p.x -= center.x;
+					p.z -= center.z;
+					if (meta.origin == ModelMeta::Origin::CENTER) {
+						p.y -= center.y;
+					}
+					memcpy(out + vertex_size * i, &p, sizeof(p));
+				}
+				out += geom.vertex_buffer.size();
+			}
+		}
+
+		aabb.min -= center;
+		aabb.max -= center;
+		if (meta.origin == ModelMeta::Origin::BOTTOM) {
+			aabb.min.y += center.y;
+			aabb.max.y += center.y;
+		}
+		center = (aabb.min + aabb.max) * 0.5f;
+		center_xz0 = Vec3(0, center.y, 0);
+	}
+
 	for (const ImportMesh& import_mesh : m_meshes) {
 		if (import_mesh.lod != 0) continue;
 		
