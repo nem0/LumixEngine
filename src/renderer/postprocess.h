@@ -772,19 +772,23 @@ struct SSAO : public RenderPlugin {
 		auto* data = pipeline.getData<PipelineInstanceData>();
 		Renderer& renderer = pipeline.getRenderer();
 
-		if (!m_shader->isReady() 
+		const Viewport& vp = pipeline.getViewport();
+		const u32 width = vp.w >> m_downscale;
+		const u32 height = vp.h >> m_downscale;
+
+		if (!m_shader->isReady()
 			|| !m_blit_shader->isReady() 
 			|| !m_blur_shader->isReady()
 			|| !m_downscale_shader->isReady()
-			|| !m_enabled)
+			|| !m_enabled
+			|| width == 0
+			|| height == 0)
 		{
 			renderer.releaseRenderbuffer(data->m_history_rb);
 			data->m_history_rb = INVALID_RENDERBUFFER;
 			return;
 		}
-		const Viewport& vp = pipeline.getViewport();
-		const u32 width = vp.w >> m_downscale;
-		const u32 height = vp.h >> m_downscale;
+
 		RenderBufferHandle ssao_rb = renderer.createRenderbuffer({ 
 			.size = IVec2(width, height),
 			.format = gpu::TextureFormat::RGBA8,
