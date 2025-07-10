@@ -1016,27 +1016,29 @@ void ModelImporter::writeGeometry(const ModelMeta& meta) {
 		center_xz0 = Vec3(0, center.y, 0);
 	}
 
-	for (const ImportMesh& import_mesh : m_meshes) {
-		if (import_mesh.lod != 0) continue;
-		
-		const Matrix mtx = import_mesh.matrix;
-		const ImportGeometry& geom = m_geometries[import_mesh.geometry_idx];
-		const u8* positions = geom.vertex_buffer.data();
-		const i32 vertex_size = geom.vertex_size;
-		const u32 vertex_count = u32(geom.vertex_buffer.size() / vertex_size);
-		for (u32 i = 0; i < vertex_count; ++i) {
-			Vec3 p;
-			memcpy(&p, positions, sizeof(p));
-			p = mtx.transformPoint(p);
+	const u8* out = m_out_file.getMutableData() + output_vertex_data_offset;
+	for (u32 lod = 0; lod < meta.lod_count - (meta.create_impostor ? 1 : 0); ++lod) {
+		for (const ImportMesh& import_mesh : m_meshes) {
+			if (!((import_mesh.lod == lod && !hasAutoLOD(meta, lod)) || (import_mesh.lod == 0 && hasAutoLOD(meta, lod)))) continue;
+			
+			const ImportGeometry& geom = m_geometries[import_mesh.geometry_idx];
+			const u32 vertex_size = geom.vertex_size;
+			const u32 vertex_count = u32(geom.vertex_buffer.size() / geom.vertex_size);
+			out += sizeof(i32);
+			
+			for (u32 i = 0; i < vertex_count; ++i) {
+				Vec3 p;
+				memcpy(&p, out + vertex_size * i, sizeof(p));
 
-			positions += vertex_size;
-			float d = squaredLength(p - center);
-			center_radius_squared = maximum(d, center_radius_squared);
+				float d = squaredLength(p - center);
+				center_radius_squared = maximum(d, center_radius_squared);
 
-			p -= center_xz0;
-			float xz_squared = p.x * p.x + p.z * p.z;
-			bounding_cylinder.x = maximum(bounding_cylinder.x, xz_squared);
-			bounding_cylinder.y = maximum(bounding_cylinder.y, fabsf(p.y));
+				p -= center_xz0;
+				float xz_squared = p.x * p.x + p.z * p.z;
+				bounding_cylinder.x = maximum(bounding_cylinder.x, xz_squared);
+				bounding_cylinder.y = maximum(bounding_cylinder.y, fabsf(p.y));
+			}
+			out += geom.vertex_buffer.size();
 		}
 	}
 	bounding_cylinder.x = sqrtf(bounding_cylinder.x);
