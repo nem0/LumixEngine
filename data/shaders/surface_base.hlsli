@@ -206,7 +206,7 @@ Surface getSurfaceEx(VSOutput input) {
 	#else
 		data.motion = computeStaticObjectMotionVector(input.pos_ws.xyz);
 	#endif
-	data.V = normalize(-data.pos_ws);
+	data.V = normalize(-input.pos_ws);
 	return data;
 }
 
@@ -246,6 +246,7 @@ Surface getSurfaceEx(VSOutput input) {
 		#endif
 		
 		Surface data = getSurfaceEx(input);
+		data.pos_ws = input.pos_ws;
 	
 		float linear_depth = dot(data.pos_ws.xyz, Pass_view_dir.xyz);
 		Cluster cluster = getClusterLinearDepth(linear_depth, frag_coord.xy);
