@@ -435,6 +435,7 @@ void DrawStream::createProgram(gpu::ProgramHandle prog
 		SamplerState LinearSamplerClamp : register(s0);
 		SamplerState LinearSampler : register(s1);
 		SamplerState NearestSamplerClamp : register(s2);
+		SamplerState NearestSampler : register(s3);
 
 		#define sampleCubeBindlessLod(sampler, index, uv, lod) bindless_cubemaps[index].Sample((sampler), (uv), (lod))
 		#define sampleCubeBindless(sampler, index, uv) bindless_cubemaps[index].Sample((sampler), (uv))
