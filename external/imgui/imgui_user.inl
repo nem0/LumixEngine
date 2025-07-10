@@ -465,7 +465,7 @@ namespace ImGuiEx {
 		ImVec2 size = GetWindowSize();
 		if (GImGui->CurrentWindowStack.Size == 2) End(); else EndChild();
 		PopStyleVar(3);
-		if (GImGui->CurrentWindowStack.Size > 1) SetCursorScreenPos(pos + ImVec2(0, size.y + GetStyle().FramePadding.y * 2));
+		ImGui::Dummy(ImVec2(1, GetStyle().FramePadding.y));
 	}
 
 
