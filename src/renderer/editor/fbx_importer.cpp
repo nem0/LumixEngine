@@ -800,7 +800,7 @@ struct FBXImporter : ModelImporter {
 		int anim_count = m_scene->getAnimationStackCount();
 		for (int i = 0; i < anim_count; ++i) {
 			ImportAnimation& anim = m_animations.emplace();
-			anim.index = m_animations.size() - 1;
+			anim.index = i;
 			const ofbx::AnimationStack* fbx_anim = (const ofbx::AnimationStack*)m_scene->getAnimationStack(i);
 			{
 				const ofbx::TakeInfo* take_info = m_scene->getTakeInfo(fbx_anim->name);
