@@ -53,7 +53,14 @@ bool Sprite::load(Span<const u8> mem) {
 	stream.read(left);
 	stream.read(right);
 	const char* texture = stream.readString();
-	setTexture(Path(texture));
+	StringView dir = Path::getDir(getPath());
+	StringView tex_dir = Path::getDir(texture);
+	if (tex_dir.empty()) {
+		setTexture(Path(dir, "/", texture));
+	}
+	else {
+		setTexture(Path(texture));
+	}
 	type = stream.read<Type>();
 	return !stream.hasOverflow();
 }
