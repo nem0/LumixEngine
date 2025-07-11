@@ -1,5 +1,6 @@
 #pragma once
-#include "core/allocator.h"
+
+#include "core/core.h"
 
 namespace Lumix {
 
@@ -14,8 +15,7 @@ struct GamepadState {
 	bool connected;
 };
 
-class IGamepadBackend {
-public:
+struct IGamepadBackend {
 	virtual ~IGamepadBackend() = default;
 	virtual bool init() = 0;
 	virtual void shutdown() = 0;
@@ -24,6 +24,6 @@ public:
 	virtual bool isControllerConnected(int index) = 0;
 };
 
-IGamepadBackend* createGamepadBackend(IAllocator& allocator);
+IGamepadBackend* createGamepadBackend(struct IAllocator& allocator);
 
 } // namespace Lumix

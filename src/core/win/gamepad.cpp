@@ -1,3 +1,4 @@
+#include "core/allocator.h"
 #include "core/gamepad.h"
 #include "core/os.h"
 #include "core/profiler.h"
@@ -7,8 +8,7 @@ namespace Lumix {
 
 typedef decltype(XInputGetState)* XInputGetState_fn_ptr;
 
-class XInputBackend : public IGamepadBackend {
-public:
+struct XInputBackend : public IGamepadBackend {
 	XInputBackend(IAllocator& allocator)
 		: m_allocator(allocator) {}
 
@@ -73,7 +73,6 @@ public:
 		return m_get_state(index, &xinput_state) == ERROR_SUCCESS;
 	}
 
-private:
 	IAllocator& m_allocator;
 	HMODULE m_lib = nullptr;
 	XInputGetState_fn_ptr m_get_state = nullptr;
