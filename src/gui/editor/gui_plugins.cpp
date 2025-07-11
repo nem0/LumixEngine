@@ -140,6 +140,7 @@ struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			changed = drawHandle("top", { a.x, a.y + sprite->top * scale }, { b.x, a.y + sprite->top * scale }, &sprite->top, true) || changed;
 			changed = drawHandle("bottom", { a.x, a.y + sprite->bottom * scale }, { b.x, a.y + sprite->bottom * scale }, &sprite->bottom, true) || changed;
 			ImGui::SetCursorScreenPos(cp);
+			ImGui::Dummy({0, 0});
 			return changed;
 		}
 
