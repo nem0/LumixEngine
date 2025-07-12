@@ -29,7 +29,7 @@ local done = false
 
 function update(time_delta)
 	if not done then
-		LumixAPI.instantiatePrefab(this.world, {0, 3, 0}, ext_prefab)
+		this.world:instantiatePrefab({0, 3, 0}, ext_prefab)
 		done = true
 	end
 end
