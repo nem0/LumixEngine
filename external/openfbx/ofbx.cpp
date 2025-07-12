@@ -1517,13 +1517,6 @@ struct ClusterImpl : Cluster
 	bool postprocess() {
 		assert(skin);
 
-		GeometryDataImpl* geom = static_cast<GeometryDataImpl*>(static_cast<GeometryImpl*>(skin->resolveObjectLinkReverse(Object::Type::GEOMETRY)));
-		if (!geom) {
-			MeshImpl* mesh = (MeshImpl*)skin->resolveObjectLinkReverse(Object::Type::MESH);
-			if(!mesh) return false;
-			geom = &mesh->geometry_data;
-		}
-
 		const Element* indexes = findChild((const Element&)element, "Indexes");
 		if (indexes && indexes->first_property)
 		{
