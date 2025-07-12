@@ -20,3 +20,17 @@ for i = 1, 7 do
 	end
 end
 ```
+
+### Instantiate a prefab
+```lua
+ext_prefab = -1
+Editor.setPropertyType(this, "ext_prefab", Editor.RESOURCE_PROPERTY, "prefab")
+local done = false
+
+function update(time_delta)
+	if not done then
+		LumixAPI.instantiatePrefab(this.world, {0, 3, 0}, ext_prefab)
+		done = true
+	end
+end
+```
