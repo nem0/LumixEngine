@@ -36,6 +36,7 @@ struct LUMIX_EDITOR_API Config {
 	Vec3 offset = {};
 	float scale = 1.f;
 	bool is_grab = false;
+	bool anisotropic_scale = false;
 
 	void grab();
 	void ungrab();
@@ -54,6 +55,7 @@ struct LUMIX_EDITOR_API Config {
 	float getStep() const { return steps[mode]; }
 	void setStep(float step) { steps[mode] = step; }
 	void enableStep(bool enable) { is_step = enable; }
+	void setAnisotropicScale(bool enable) { anisotropic_scale = enable; }
 	Vec3 getOffset() const  { return offset; }
 	void setOffset(Vec3 val) { offset = val; }
 };

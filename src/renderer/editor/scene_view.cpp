@@ -982,8 +982,11 @@ void SceneView::manipulate() {
 	const Array<EntityRef>* selected = &m_editor.getSelectedEntities();
 	if (selected->empty()) return;
 
-	const bool is_snap = m_toggle_gizmo_step_action.isActive();
+	const bool is_anisotropic_scale = m_anisotropic_scale_action.isActive();
 	Gizmo::Config& cfg = m_app.getGizmoConfig();
+	cfg.setAnisotropicScale(is_anisotropic_scale);
+
+	const bool is_snap = m_toggle_gizmo_step_action.isActive();
 	cfg.enableStep(is_snap);
 		
 	Transform tr = m_editor.getWorld()->getTransform((*selected)[0]);

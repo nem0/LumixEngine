@@ -675,7 +675,13 @@ bool scale(u64 id, WorldView& view, Transform& tr, const Gizmo::Config& cfg) {
 	draw(view, gizmo, g_gizmo_state.axis, cfg);
 	if (squaredLength(delta) > 0) {
 		g_gizmo_state.prev_point = p;
-		tr.scale += Vec3(length(delta) * sign);
+		const Axis axis = cfg.anisotropic_scale ? g_gizmo_state.axis : Axis::NONE;
+		switch (axis) {
+			case Axis::X: tr.scale.x += length(delta) * sign; break;
+			case Axis::Y: tr.scale.y += length(delta) * sign; break;
+			case Axis::Z: tr.scale.z += length(delta) * sign; break;
+			default: tr.scale += Vec3(length(delta) * sign); break;
+		}
 		return true;
 	}
 	return false;

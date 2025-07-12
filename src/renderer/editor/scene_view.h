@@ -58,6 +58,7 @@ private:
 	StudioApp& m_app;
 	Local<Action> m_debug_show_actions[(u32)Pipeline::DebugShow::BUILTIN_COUNT];
 	Action m_copy_move_action{"Duplicate move", "Duplicate entity when moving with gizmo", "duplicate_entity_move", ""};
+	Action m_anisotropic_scale_action{"Enable/disable anisotropic scale", "Enable/disable anisotropic gizmo scale", "toggle_gizmo_anisotropic_scale", ""};
 	Action m_toggle_gizmo_step_action{"Enable/disable gizmo step", "Enable/disable gizmo step", "toggle_gizmo_step", ""};
 	Action m_set_pivot_action{"Set custom pivot", "Set custom pivot", "set_custom_pivot", ""};
 	Action m_reset_pivot_action{"Reset pivot", "Reset pivot", "reset_pivot", ""};
