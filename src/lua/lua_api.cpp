@@ -1176,6 +1176,9 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 		function Lumix.World:createPartition(name)
 			return LumixAPI.createPartition(self.value, name)
 		end
+		function Lumix.World:instantiatePrefab(position, prefab_id)
+			return LumixAPI.instantiatePrefab(self, position, prefab_id)
+		end
 		function Lumix.World:createEntity()
 			local e = LumixAPI.createEntity(self.value)
 			return Lumix.Entity:new(self.value, e)
