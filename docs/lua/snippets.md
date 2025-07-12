@@ -29,7 +29,8 @@ local done = false
 
 function update(time_delta)
 	if not done then
-		this.world:instantiatePrefab({0, 3, 0}, ext_prefab)
+		local e = this.world:instantiatePrefab({0, 3, 0}, ext_prefab)
+		LumixAPI.logInfo("root entity of the instantiated prefab : " .. tostring(e))
 		done = true
 	end
 end
