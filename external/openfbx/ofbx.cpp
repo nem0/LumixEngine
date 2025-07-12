@@ -1949,6 +1949,7 @@ struct Scene : IScene
 	int getMeshCount() const override { return (int)m_meshes.size(); }
 	float getSceneFrameRate() const override { return m_scene_frame_rate; }
 	const GlobalSettings* getGlobalSettings() const override { return &m_settings; }
+	const Headers* getHeaders() const override { return &m_headers; }
 
 	const Object* const* getAllObjects() const override { return m_all_objects.empty() ? nullptr : &m_all_objects[0]; }
 
@@ -2052,6 +2053,7 @@ struct Scene : IScene
 	Root* m_root = nullptr;
 	float m_scene_frame_rate = -1;
 	GlobalSettings m_settings;
+	Headers m_headers;
 
 	std::unordered_map<std::string, u64> m_fake_ids;
 	std::unordered_map<u64, ObjectPair> m_object_map;
@@ -3396,6 +3398,100 @@ static void parseGlobalSettings(const Element& root, Scene* scene)
 	}
 }
 
+static void parseHeaders(const Element& root, Scene* scene)
+{
+	const Element* headers = findChild(root, "FBXHeaderExtension");
+	if (!headers) return;
+
+	const Element* sceneInfo = findChild(*headers, "SceneInfo");
+	if (sceneInfo)
+	{
+		bool is_p60 = false;
+		const Element* props = findChild(*sceneInfo, "Properties70");
+		if (!props)
+		{
+			is_p60 = true;
+			props = findChild(*sceneInfo, "Properties60");
+			if (!props) return;
+		}
+
+		for (Element* node = props->child; node; node = node->sibling)
+		{
+			if (!node->first_property) continue;
+
+			#define get_string_property(name, field) if (node->first_property->value == name) \
+			{ \
+				IElementProperty* prop = node->getProperty(scene->version <= 6100 ? 3 : 4); \
+				if (prop) \
+				{ \
+					DataView value = prop->getValue(); \
+					char tmp[255]; \
+					value.toString(tmp); \
+					tmp[sizeof(tmp) - 1] = '\0'; \
+					size_t len = strlen(tmp) + 1; \
+					scene->m_headers.field = new char[len]; \
+					memcpy(scene->m_headers.field, tmp, len); \
+				} \
+			}
+
+			get_string_property("DocumentUrl", documentUrl);
+			get_string_property("SrcDocumentUrl", srcDocumentUrl);
+			get_string_property("Original|ApplicationVendor", originalApplicationVendor);
+			get_string_property("Original|ApplicationName", originalApplicationName);
+			get_string_property("Original|ApplicationVersion", originalApplicationVersion);
+			get_string_property("Original|DateTime_GMT", originalDateTimeGMT); // datetime stored as string using local culture, dirty, could be improved
+			get_string_property("Original|Filename", originalFilename);
+			get_string_property("Original|ApplicationActiveProject", originalApplicationActiveProject);
+			get_string_property("Original|ApplicationNativeFile", originalApplicationNativeFile); // Blender FBX export only
+			get_string_property("LastSaved|ApplicationVendor", lastSavedApplicationVendor);
+			get_string_property("LastSaved|ApplicationName", lastSavedApplicationName);
+			get_string_property("LastSaved|ApplicationVersion", lastSavedApplicationVersion);
+			get_string_property("LastSaved|DateTime_GMT", lastSavedDateTimeGMT); // datetime stored as string using local culture, dirty, could be improved
+
+			#undef get_string_property
+		}
+	}
+
+	for (Element* node = headers->child; node; node = node->sibling)
+	{
+		if (!node->first_property) continue;
+
+		#define get_property(name, field, type, getter) if (node->id == name) \
+		{ \
+			IElementProperty* prop = node->getProperty(0); \
+			if (prop) \
+			{ \
+				DataView value = prop->getValue(); \
+				scene->m_headers.field = (type)value.getter(); \
+			} \
+		}
+
+		#define get_string_property(name, field) if (node->id == name) \
+		{ \
+			IElementProperty* prop = node->getProperty(0); \
+			if (prop) \
+			{ \
+				DataView value = prop->getValue(); \
+				char tmp[255]; \
+				value.toString(tmp); \
+				tmp[sizeof(tmp) - 1] = '\0'; \
+				size_t len = strlen(tmp) + 1; \
+				scene->m_headers.field = new char[len]; \
+				memcpy(scene->m_headers.field, tmp, len); \
+			} \
+		}
+
+		get_property("FBXHeaderVersion", fbxHeaderVersion, int, toInt);
+		get_property("FBXVersion", fbxVersion, int, toInt);
+		get_property("EncryptionType", encryptionType, int, toInt);
+		get_string_property("Creator", creator);
+		get_string_property("CreationTime", creationTime); // in Blender exports, not in 3ds max exports
+
+		#undef get_property
+		#undef get_string_property
+	}
+}
+
 void sync_job_processor(JobFunction fn, void*, void* data, u32 size, u32 count) {
 	u8* ptr = (u8*)data;
 	for(u32 i = 0; i < count; ++i) {
@@ -4113,6 +4209,7 @@ IScene* load(const u8* data, usize size, u16 flags, JobProcessor job_processor, 
 	if (!parseTakes(*scene.get())) return nullptr;
 	if (!parseObjects(*root.getValue(), *scene.get(), flags, scene->m_allocator, job_processor, job_user_ptr)) return nullptr;
 	parseGlobalSettings(*root.getValue(), scene.get());
+	parseHeaders(*root.getValue(), scene.get());
 	if (!scene->finalize()) return nullptr;
 
 	return scene.release();

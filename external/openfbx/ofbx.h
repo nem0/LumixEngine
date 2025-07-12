@@ -718,6 +718,31 @@ struct GlobalSettings
 	float CustomFrameRate = -1.0f;
 };
 
+struct Headers
+{
+	int fbxHeaderVersion = 0;
+	int fbxVersion = 0;
+	int encryptionType = 0;
+	char* creator;
+	char* creationTime;
+
+	char* documentUrl;
+	char* srcDocumentUrl;
+	char* originalApplicationVendor;
+	char* originalApplicationName;
+	char* originalApplicationVersion;
+
+	char* originalDateTimeGMT;
+
+	char* originalFilename;
+	char* originalApplicationActiveProject;
+	char* originalApplicationNativeFile;
+
+	char* lastSavedApplicationVendor;
+	char* lastSavedApplicationName;
+	char* lastSavedApplicationVersion;
+	char* lastSavedDateTimeGMT;
+};
 
 struct IScene
 {
@@ -763,6 +788,9 @@ struct IScene
 	virtual const TakeInfo* getTakeInfo(const char* name) const = 0;
 	virtual float getSceneFrameRate() const = 0;
 	virtual const GlobalSettings* getGlobalSettings() const = 0;
+	
+	// Headers
+	virtual const Headers* getHeaders() const = 0;
 
 protected:
 	virtual ~IScene() {}
