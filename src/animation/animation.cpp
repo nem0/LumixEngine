@@ -328,6 +328,7 @@ void Animation::onBeforeReady() {
 
 bool Animation::load(Span<const u8> mem) {
 	m_translations.clear();
+	m_const_translations.clear();
 	m_rotations.clear();
 	m_const_rotations.clear();
 	m_mem.clear();
@@ -429,6 +430,8 @@ void Animation::unload()
 	m_root_motion = RootMotion(m_allocator);
 	m_translations.clear();
 	m_rotations.clear();
+	m_const_rotations.clear();
+	m_const_translations.clear();
 	m_mem.clear();
 	m_frame_count = 0;
 	if (m_skeleton) {
