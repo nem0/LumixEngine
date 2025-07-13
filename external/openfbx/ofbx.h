@@ -426,6 +426,7 @@ struct Material : Object
     virtual double getAmbientFactor() const = 0;
     virtual double getBumpFactor() const = 0;
     virtual double getEmissiveFactor() const = 0;
+	virtual double getOpacity() const = 0;
 
 	virtual const Texture* getTexture(Texture::TextureType type) const = 0;
 };

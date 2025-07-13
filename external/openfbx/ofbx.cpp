@@ -1400,6 +1400,7 @@ struct MaterialImpl : Material
 	double getAmbientFactor() const override { return ambient_factor; };
 	double getBumpFactor() const override { return bump_factor; };
 	double getEmissiveFactor() const override { return emissive_factor; };
+	double getOpacity() const override { return opacity; };
 
 	const Texture* textures[Texture::TextureType::COUNT];
 	Color diffuse_color;
@@ -1416,6 +1417,7 @@ struct MaterialImpl : Material
 	double ambient_factor;
 	double bump_factor;
 	double emissive_factor;
+	double opacity;
  };
 
 
@@ -2698,6 +2700,10 @@ static OptionalError<Object*> parseMaterial(const Scene& scene, const Element& e
 			else if (prop->first_property->value == "EmissiveFactor")
 			{
 				material->emissive_factor = (float)prop->getProperty(property_offset)->getValue().toDouble();
+			}
+			else if (prop->first_property->value == "Opacity")
+			{
+				material->opacity = (float)prop->getProperty(property_offset)->getValue().toDouble();
 			}
 		}
 		prop = prop->sibling;
