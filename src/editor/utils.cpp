@@ -18,6 +18,23 @@
 
 namespace Lumix {
 
+// copied from imgui, but without the rounding
+static ImVec2 CalcTextSize(const char* text, const char* text_end = nullptr, float wrap_width = -1.f)
+{
+	ImGuiContext& g = *GImGui;
+
+	ImFont* font = g.Font;
+	const float font_size = g.FontSize;
+	if (text == text_end)
+		return ImVec2(0.0f, font_size);
+	ImVec2 text_size = font->CalcTextSizeA(font_size, FLT_MAX, wrap_width, text, text_end, NULL);
+
+	// imgui rounds up, which is not precise and does not match with how text is actually rendered
+	// text_size.x = IM_TRUNC(text_size.x + 0.99999f);
+
+	return text_size;
+}
+
 namespace LuaTokens {
 
 static inline const u32 token_colors[] = {
@@ -846,7 +863,7 @@ struct CodeEditorImpl final : CodeEditor {
 	ImVec2 toScreenPosition(u32 line, u32 col) {
 		float y = line * ImGui::GetTextLineHeight();
 		const char* line_str = m_lines[line].value.c_str();
-		float x = ImGui::CalcTextSize(line_str, line_str + col).x;
+		float x = CalcTextSize(line_str, line_str + col).x;
 		return m_text_area_screen_pos + ImVec2(x, y);
 	}
 
@@ -893,7 +910,7 @@ struct CodeEditorImpl final : CodeEditor {
 
 	u32 computeCursorX(const Cursor& cursor) {
 		const char* str = m_lines[cursor.line].value.c_str();
-		return (u32)ImGui::CalcTextSize(str, str + cursor.col).x;
+		return (u32)CalcTextSize(str, str + cursor.col).x;
 	}
 
 	Token getToken(TextPoint p) {
@@ -1006,7 +1023,7 @@ struct CodeEditorImpl final : CodeEditor {
 		u32 num_chars_in_line = m_lines[cursor.line].length();
 		line_str = m_lines[cursor.line].value.c_str();
 		for (cursor.col = 0; cursor.col < (i32)num_chars_in_line; ++cursor.col) {
-			float x = ImGui::CalcTextSize(line_str, line_str + cursor.col).x;
+			float x = CalcTextSize(line_str, line_str + cursor.col).x;
 			if (x >= cursor.virtual_x) {
 				break;
 			}
@@ -1024,7 +1041,7 @@ struct CodeEditorImpl final : CodeEditor {
 		u32 num_chars_in_line = m_lines[cursor.line].length();
 		line_str = m_lines[cursor.line].value.c_str();
 		for (cursor.col = 0; cursor.col < (i32)num_chars_in_line; ++cursor.col) {
-			float x = ImGui::CalcTextSize(line_str, line_str + cursor.col).x;
+			float x = CalcTextSize(line_str, line_str + cursor.col).x;
 			if (x >= cursor.virtual_x) {
 				break;
 			}
@@ -1660,7 +1677,7 @@ struct CodeEditorImpl final : CodeEditor {
 		const u32 line_num_color = ImGui::GetColorU32(ImGuiCol_TextDisabled);
 		const u32 code_color = ImGui::GetColorU32(ImGuiCol_Text);
 		const u32 selection_color = ImGui::GetColorU32(ImGuiCol_TextSelectedBg);
-		const float char_width = ImGui::CalcTextSize("x").x;
+		const float char_width = CalcTextSize("x").x;
 		const float line_num_width = u32(log10(m_lines.size()) + 1) * char_width + 2 * style.FramePadding.x;
 
 		guiSearch(min, content_size, ui_font);
@@ -1699,7 +1716,7 @@ struct CodeEditorImpl final : CodeEditor {
 			const float text_area_x = screen_x - text_area_pos.x;
 			while (*c) {
 				// TODO optimize this
-				if (ImGui::CalcTextSize(line_str, c).x > text_area_x) return i32(c - line_str);
+				if (CalcTextSize(line_str, c).x > text_area_x) return i32(c - line_str);
 				++c;
 			}
 			return (i32)m_lines[line].length();
@@ -1708,7 +1725,7 @@ struct CodeEditorImpl final : CodeEditor {
 		auto textToScreenPos = [&](i32 col, i32 line){
 			float y = line * line_height;
 			const char* line_str = m_lines[line].value.c_str();
-			float x = ImGui::CalcTextSize(line_str, line_str + col).x;
+			float x = CalcTextSize(line_str, line_str + col).x;
 			return text_area_pos + ImVec2(x, y);
 		};
 
@@ -1763,7 +1780,7 @@ struct CodeEditorImpl final : CodeEditor {
 			for (const Token& t : m_lines[j].tokens) {
 
 				ImVec2 start_p = p;
-				p.x += ImGui::CalcTextSize(str + t.from, str + t.from + t.len).x;
+				p.x += CalcTextSize(str + t.from, str + t.from + t.len).x;
 
 				if (equalStrings(toStringView(t, j), m_highlighted_str)) {
 					dl->AddRectFilled(start_p, p + ImVec2(0, line_height), IM_COL32(0x50, 0x50, 0x50, 0x7f));

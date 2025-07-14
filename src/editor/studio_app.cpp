@@ -2215,7 +2215,7 @@ struct StudioAppImpl final : StudioApp {
 				ImFontConfig cfg;
 				copyString(cfg.Name, "editor/fonts/fa-solid-900.ttf");
 				cfg.FontDataOwnedByAtlas = false;
-				cfg.GlyphMinAdvanceX = size; // Use if you want to make the icon monospaced
+				cfg.GlyphMinAdvanceX = size; // to align font icons
 				static const ImWchar icon_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
 				m_big_icon_font = io.Fonts->AddFontFromMemoryTTF((void*)data.data(), (i32)data.size(), size, &cfg, icon_ranges);
 				cfg.MergeMode = true;
