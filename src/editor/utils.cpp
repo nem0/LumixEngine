@@ -1856,7 +1856,9 @@ struct CodeEditorImpl final : CodeEditor {
 				m_cursors[0].col = screenToCol(io.MousePos.x, m_cursors[0].line);
 			}
 
-			m_scroll_y -= io.MouseWheel * line_height * 5;
+			if (hovered) {
+				m_scroll_y -= io.MouseWheel * line_height * 5;
+			}
 			m_scroll_y = clamp(m_scroll_y, 0.f, line_height * (m_lines.size() - 2));
 
 			if (m_app.checkShortcut(s_add_match_to_selection)) addNextOccurence();
