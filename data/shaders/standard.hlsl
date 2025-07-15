@@ -75,7 +75,7 @@ Surface getSurface(VSOutput input) {
 	data.shadow = 1;
 
 	#ifndef ALPHA_CUTOUT
-		float ndotv = abs(dot(data.N , normalize(-input.pos_ws))) + 1e-5f;
+		float ndotv = abs(dot(data.N , normalize(-input.pos_ws.xyz))) + 1e-5f;
 		data.alpha = lerp(data.alpha, 1, pow(saturate(1 - ndotv), 5));
 	#endif
 	return data;

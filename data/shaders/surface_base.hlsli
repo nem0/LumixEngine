@@ -206,7 +206,7 @@ Surface getSurfaceEx(VSOutput input) {
 	#else
 		data.motion = computeStaticObjectMotionVector(input.pos_ws.xyz);
 	#endif
-	data.V = normalize(-input.pos_ws);
+	data.V = normalize(-input.pos_ws.xyz);
 	return data;
 }
 
@@ -246,12 +246,12 @@ Surface getSurfaceEx(VSOutput input) {
 		#endif
 		
 		Surface data = getSurfaceEx(input);
-		data.pos_ws = input.pos_ws;
+		data.pos_ws = input.pos_ws.xyz;
 	
 		float linear_depth = dot(data.pos_ws.xyz, Pass_view_dir.xyz);
 		Cluster cluster = getClusterLinearDepth(linear_depth, frag_coord.xy);
 		float4 result;
-		result.rgb = computeLighting(cluster, data, Global_light_dir.xyz, Global_light_color.rgb * Global_light_intensity, u_shadowmap, u_shadow_atlas, u_reflection_probes, frag_coord);
+		result.rgb = computeLighting(cluster, data, Global_light_dir.xyz, Global_light_color.rgb * Global_light_intensity, u_shadowmap, u_shadow_atlas, u_reflection_probes, frag_coord.xy);
 
 		#ifdef ALPHA_CUTOUT
 			if(data.alpha < 0.5) discard;
