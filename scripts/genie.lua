@@ -228,7 +228,7 @@ function defaultConfigurations()
 
 	configuration { "vs20*"}
 		defines { "_SILENCE_ALL_CXX20_DEPRECATION_WARNINGS" }
-		buildoptions { "/wd4503 /wd4251"}
+		buildoptions_cpp { "/wd4503 /wd4251"}
 		
 	configuration {}
 		files {
@@ -338,7 +338,7 @@ solution "LumixEngine"
 
 	configuration { "vs*" }
 		defines { "_HAS_EXCEPTIONS=0" }
-		buildoptions { "/Zc:char8_t-" }
+		buildoptions_cpp { "/Zc:char8_t-" }
 
 	configuration { "vs*", "RelWithDebInfo" }
 		flags { "NoBufferSecurityCheck" }
