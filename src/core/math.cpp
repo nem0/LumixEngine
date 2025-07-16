@@ -75,6 +75,10 @@ Vec4 operator*(const Vec4& v, float s) {
 	return Vec4(v.x * s, v.y * s, v.z * s, v.w * s);
 }
 
+Vec4 operator/(const Vec4& v, float s) {
+	return Vec4(v.x / s, v.y / s, v.z / s, v.w / s);
+}
+
 Vec3 operator*(float f, const Vec3& v) {
 	return Vec3(f * v.x, f * v.y, f * v.z);
 }

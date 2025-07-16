@@ -225,6 +225,7 @@ struct LUMIX_CORE_API Vec4 {
 LUMIX_CORE_API Vec3 operator *(float f, const Vec3& v);
 LUMIX_CORE_API Vec4 operator *(float f, const Vec4& v);
 LUMIX_CORE_API Vec4 operator*(const Vec4& v, float s);
+LUMIX_CORE_API Vec4 operator/(const Vec4& v, float s);
 
 struct LUMIX_CORE_API Quat
 {
