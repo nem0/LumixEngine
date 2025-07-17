@@ -31,8 +31,9 @@ setlocal
 	echo  B. Marketplace
 	echo  C. LiveCode 
 	echo  D. Basis Universal
+	echo  E. Jolt
 	echo ===============================
-	choice /C 123456789ABCD /N /M "Your choice:"
+	choice /C 123456789ABCDE /N /M "Your choice:"
 	echo.
 	if %errorlevel%==1 exit /B 0
 	if %errorlevel%==2 call :empty_plugin
@@ -47,6 +48,7 @@ setlocal
 	if %errorlevel%==11 call :marketplace_plugin
 	if %errorlevel%==12 call :livecode_plugin
 	if %errorlevel%==13 call :basisu
+	if %errorlevel%==14 call :jolt_plugin
 goto :begin
 
 :glft_import_plugin
@@ -194,6 +196,21 @@ exit /B 0
 		popd
 	) else (
 		cd livecode
+		git pull
+	)
+	popd
+exit /B 0
+
+:jolt_plugin
+	if not exist ..\plugins mkdir ..\plugins
+	pushd ..\plugins
+	if not exist jolt (
+		git.exe clone https://github.com/nem0/lumixengine_jolt.git jolt
+		pushd jolt
+		git remote add origin2 git@github.com:nem0/lumixengine_jolt.git
+		popd
+	) else (
+		cd jolt
 		git pull
 	)
 	popd
