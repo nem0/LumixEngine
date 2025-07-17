@@ -717,6 +717,7 @@ struct StructBase {
 	IAllocator& allocator;
 	const char* name;
 	Array<StructVarBase*> members;
+	u32 size = 0;
 };
 
 LUMIX_ENGINE_API Array<FunctionBase*>& allFunctions();
@@ -740,6 +741,7 @@ auto& structure(const char* name)
 		void destroyInstance(void* obj, IAllocator& allocator) override { LUMIX_DELETE(allocator, (S*)obj); }
 	} ret;
 	ret.name = name;
+	ret.size = sizeof(S);
 	allStructs().push(&ret);
 	return ret;
 }
