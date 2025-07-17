@@ -5078,7 +5078,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 						float4 mainPS(VSOutput input) : SV_Target {
 							float4 tc = sampleBindlessLod(LinearSamplerClamp, c_texture, input.uv, 0);
 							return float4( 
-								pow(abs(tc.rgb)/*to silence warning*/, (1/2.2).xxx) * input.color.rgb,
+								abs(tc.rgb) * pow(abs(input.color.rgb) /*to silence warning*/, (2.2).xxx),
 								input.color.a * tc.a
 							);
 						}

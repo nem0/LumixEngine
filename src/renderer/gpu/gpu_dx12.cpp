@@ -1812,7 +1812,6 @@ ID3D12RootSignature* createRootSignature() {
 	return res;
 }
 
-// TODO srgb window swapchain views
 [[nodiscard]] static bool createSwapchain(HWND hwnd, D3D::Window& window, bool vsync) {
 	PROFILE_FUNCTION();
 	DXGI_SWAP_CHAIN_DESC1 sd = {};
@@ -2042,9 +2041,15 @@ void setFramebuffer(const TextureHandle* attachments, u32 num, TextureHandle dep
 
 	const bool readonly_depth = u32(flags & FramebufferFlags::READONLY_DEPTH);
 	if (num == 0 && !depth_stencil) {
+		D3D12_RENDER_TARGET_VIEW_DESC rtv_desc = {};
+		rtv_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+		rtv_desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+		rtv_desc.Texture2D.MipSlice = 0;
+		rtv_desc.Texture2D.PlaneSlice = 0;
+
 		d3d->current_framebuffer.count = 1;
-		d3d->current_framebuffer.formats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-		d3d->current_framebuffer.render_targets[0] = d3d->rtv_heap.allocRTV(d3d->device, d3d->current_window->backbuffers[d3d->current_window->swapchain->GetCurrentBackBufferIndex()]);
+		d3d->current_framebuffer.formats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+		d3d->current_framebuffer.render_targets[0] = d3d->rtv_heap.allocRTV(d3d->device, d3d->current_window->backbuffers[d3d->current_window->swapchain->GetCurrentBackBufferIndex()], &rtv_desc);
 		d3d->current_framebuffer.depth_stencil = {};
 		d3d->current_framebuffer.ds_format = DXGI_FORMAT_UNKNOWN;
 	} else {
