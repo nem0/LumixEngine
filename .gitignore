@@ -21,4 +21,3 @@ data/.shader_cache_dx11
 scripts/itch_io/
 !data/editor/scripts/plugins/
 *.dmp
-/data/lumix.prj
