@@ -718,6 +718,7 @@ struct FBXImporter : ModelImporter {
 		for (i32 polygon_idx = 0; polygon_idx < partition.polygon_count; ++polygon_idx) {
 			const ofbx::GeometryPartition::Polygon& polygon = partition.polygons[polygon_idx];
 			u32 tri_count = ofbx::triangulate(geom, polygon, tri_indices.begin());
+			ASSERT(tri_count == (polygon.vertex_count - 2) * 3);
 			for (u32 i = 0; i < tri_count; ++i) {
 				ofbx::Vec3 cp = positions.get(tri_indices[i]);
 				write(toLumixVec3(cp));
@@ -753,6 +754,7 @@ struct FBXImporter : ModelImporter {
 				}
 			}
 		}
+		ASSERT(dst - unindexed_triangles.data() == unindexed_triangles.size());
 	}
 
 	void sortBones() {
