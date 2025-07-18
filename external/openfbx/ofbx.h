@@ -803,34 +803,11 @@ const char* getError();
 double fbxTimeToSeconds(i64 value);
 i64 secondsToFbxTime(double value);
 
-// TODO nonconvex
-inline u32 triangulate(const GeometryData& geom, const GeometryPartition::Polygon& polygon, int* tri_indices) {
-	if (polygon.vertex_count < 3) return 0;
-	if (polygon.vertex_count == 3) {
-		tri_indices[0] = polygon.from_vertex;
-		tri_indices[1] = polygon.from_vertex + 1;
-		tri_indices[2] = polygon.from_vertex + 2;
-		return 3;
-	}
-	else if (polygon.vertex_count == 4) {
-		tri_indices[0] = polygon.from_vertex + 0;
-		tri_indices[1] = polygon.from_vertex + 1;
-		tri_indices[2] = polygon.from_vertex + 2;
-
-		tri_indices[3] = polygon.from_vertex + 0;
-		tri_indices[4] = polygon.from_vertex + 2;
-		tri_indices[5] = polygon.from_vertex + 3;
-		return 6;
-	}
-	
-	for (int tri = 0; tri < polygon.vertex_count - 2; ++tri) {
-		tri_indices[tri * 3 + 0] = polygon.from_vertex;
-		tri_indices[tri * 3 + 1] = polygon.from_vertex + 1 + tri;
-		tri_indices[tri * 3 + 2] = polygon.from_vertex + 2 + tri;
-	}
-	return 3 * (polygon.vertex_count - 2);
-}
-
+// You can pass temporary memory in `tmp` (must be at least as large as polygon.vertex_count)
+// If `tmp` is null, only concave polygons with polygon.vertex_count <= 128 are supported
+// `tri_indices` contains indices of triangles
+// Returns number of resulting indices
+u32 triangulate(const GeometryData& geom, const GeometryPartition::Polygon& polygon, int* tri_indices, int* tmp = nullptr);
 
 } // namespace ofbx
 

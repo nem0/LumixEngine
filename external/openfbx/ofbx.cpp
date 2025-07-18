@@ -4227,5 +4227,197 @@ const char* getError()
 	return Error::s_message;
 }
 
+static bool isConvex(const GeometryData& geom, const GeometryPartition::Polygon& polygon) {
+    if (polygon.vertex_count < 3) return false;
+    if (polygon.vertex_count == 3) return true;
+    
+    const Vec3Attributes positions = geom.getPositions();
+    if (!positions.values) return false;
+    
+	Vec3 normal = {0, 0, 0};
+	// Compute polygon normal using Newell's method for robustness
+	// https://www.khronos.org/opengl/wiki/Calculating_a_Surface_Normal
+	for (int i = 0; i < polygon.vertex_count; ++i) {
+		int curr_idx = polygon.from_vertex + i;
+		int next_idx = polygon.from_vertex + ((i + 1) % polygon.vertex_count);
+		
+		Vec3 v_curr = positions.get(curr_idx);
+		Vec3 v_next = positions.get(next_idx);
+		
+		normal.x += (v_curr.y - v_next.y) * (v_curr.z + v_next.z);
+		normal.y += (v_curr.z - v_next.z) * (v_curr.x + v_next.x);
+		normal.z += (v_curr.x - v_next.x) * (v_curr.y + v_next.y);
+	}
+	
+	float normal_lensq = normal.x * normal.x + normal.y * normal.y + normal.z * normal.z;
+	if (normal_lensq < 1e-6f) return false;
+	
+	bool sign_positive = false;
+	bool sign_negative = false;
+	
+	for (int i = 0; i < polygon.vertex_count; ++i) {
+		int prev_idx = polygon.from_vertex + ((i - 1 + polygon.vertex_count) % polygon.vertex_count);
+		int curr_idx = polygon.from_vertex + i;
+		int next_idx = polygon.from_vertex + ((i + 1) % polygon.vertex_count);
+		
+		Vec3 v_prev = positions.get(prev_idx);
+		Vec3 v_curr = positions.get(curr_idx);
+		Vec3 v_next = positions.get(next_idx);
+		
+		// Vectors from current vertex to adjacent vertices
+		Vec3 edge1 = {v_prev.x - v_curr.x, v_prev.y - v_curr.y, v_prev.z - v_curr.z};
+		Vec3 edge2 = {v_next.x - v_curr.x, v_next.y - v_curr.y, v_next.z - v_curr.z};
+		
+		// Cross product to get turn direction
+		Vec3 cross = {
+			edge1.y * edge2.z - edge1.z * edge2.y,
+			edge1.z * edge2.x - edge1.x * edge2.z,
+			edge1.x * edge2.y - edge1.y * edge2.x
+		};
+		
+		float dot = cross.x * normal.x + cross.y * normal.y + cross.z * normal.z;
+		
+		if (dot > 1e-6f) sign_positive = true;
+		else if (dot < -1e-6f) sign_negative = true;
+		
+		if (sign_positive && sign_negative) return false;
+	}
+    
+    return true;
+}
+
+u32 triangulate(const GeometryData& geom, const GeometryPartition::Polygon& polygon, int* tri_indices, int* tmp) {
+	if (polygon.vertex_count < 3) return 0;
+	if (polygon.vertex_count == 3) {
+		tri_indices[0] = polygon.from_vertex;
+		tri_indices[1] = polygon.from_vertex + 1;
+		tri_indices[2] = polygon.from_vertex + 2;
+		return 3;
+	}
+	
+	if (isConvex(geom, polygon)) {
+		for (int tri = 0; tri < polygon.vertex_count - 2; ++tri) {
+			tri_indices[tri * 3 + 0] = polygon.from_vertex;
+			tri_indices[tri * 3 + 1] = polygon.from_vertex + 1 + tri;
+			tri_indices[tri * 3 + 2] = polygon.from_vertex + 2 + tri;
+		}
+		return 3 * (polygon.vertex_count - 2);
+	}
+
+	// ear clipping - the simplest (and not the most efficient) implementation
+	int tmp_mem[128]; // temporary memory if use did not pass any in `tmp`
+	int* vertices = tmp ? tmp : tmp_mem;
+	
+	if (!tmp && polygon.vertex_count > 128) return 0;
+	
+	for (int i = 0; i < polygon.vertex_count; ++i) {
+		vertices[i] = polygon.from_vertex + i;
+	}
+	
+	int num_vertices = polygon.vertex_count;
+	int tri_count = 0;
+	
+	const Vec3Attributes positions = geom.getPositions();
+	if (!positions.values) return 0;
+	
+	Vec3 v0 = positions.get(vertices[0]);
+	Vec3 v1 = positions.get(vertices[1]);
+	Vec3 v2 = positions.get(vertices[2]);
+	
+	Vec3 edge1 = {v1.x - v0.x, v1.y - v0.y, v1.z - v0.z};
+	Vec3 edge2 = {v2.x - v0.x, v2.y - v0.y, v2.z - v0.z};
+	
+	Vec3 normal = {
+		edge1.y * edge2.z - edge1.z * edge2.y,
+		edge1.z * edge2.x - edge1.x * edge2.z,
+		edge1.x * edge2.y - edge1.y * edge2.x
+	};
+	
+	while (num_vertices > 3) {
+		bool ear_found = false;
+		
+		for (int i = 0; i < num_vertices; ++i) {
+			const int prev = (i - 1 + num_vertices) % num_vertices;
+			const int curr = i;
+			const int next = (i + 1) % num_vertices;
+			
+			const Vec3 vp = positions.get(vertices[prev]);
+			const Vec3 vc = positions.get(vertices[curr]);
+			const Vec3 vn = positions.get(vertices[next]);
+			
+			const Vec3 e1 = {vc.x - vp.x, vc.y - vp.y, vc.z - vp.z};
+			const Vec3 e2 = {vn.x - vc.x, vn.y - vc.y, vn.z - vc.z};
+			
+			const Vec3 cross = {
+				e1.y * e2.z - e1.z * e2.y,
+				e1.z * e2.x - e1.x * e2.z,
+				e1.x * e2.y - e1.y * e2.x
+			};
+			
+			const float dot = cross.x * normal.x + cross.y * normal.y + cross.z * normal.z;
+			
+			// 3 vertices with wrong winding order can not make an ear
+			if (dot <= 0) continue;
+			
+			// Check if any other vertex is inside this triangle
+			bool is_ear = true;
+			for (int j = 0; j < num_vertices; ++j) {
+				if (j == prev || j == curr || j == next) continue;
+				
+				Vec3 vt = positions.get(vertices[j]);
+				
+				// Barycentric coordinate test
+				Vec3 v0v1 = {vc.x - vp.x, vc.y - vp.y, vc.z - vp.z};
+				Vec3 v0v2 = {vn.x - vp.x, vn.y - vp.y, vn.z - vp.z};
+				Vec3 v0vt = {vt.x - vp.x, vt.y - vp.y, vt.z - vp.z};
+
+				float dot00 = v0v2.x * v0v2.x + v0v2.y * v0v2.y + v0v2.z * v0v2.z;
+				float dot01 = v0v2.x * v0v1.x + v0v2.y * v0v1.y + v0v2.z * v0v1.z;
+				float dot02 = v0v2.x * v0vt.x + v0v2.y * v0vt.y + v0v2.z * v0vt.z;
+				float dot11 = v0v1.x * v0v1.x + v0v1.y * v0v1.y + v0v1.z * v0v1.z;
+				float dot12 = v0v1.x * v0vt.x + v0v1.y * v0vt.y + v0v1.z * v0vt.z;
+				
+				float inv_denom = 1.0f / (dot00 * dot11 - dot01 * dot01);
+				float u = (dot11 * dot02 - dot01 * dot12) * inv_denom;
+				float v = (dot00 * dot12 - dot01 * dot02) * inv_denom;
+				
+				if (u > 0 && v > 0 && u + v < 1) {
+					is_ear = false;
+					break;
+				}
+			}
+			
+			if (is_ear) {
+				tri_indices[tri_count * 3 + 0] = vertices[prev];
+				tri_indices[tri_count * 3 + 1] = vertices[curr];
+				tri_indices[tri_count * 3 + 2] = vertices[next];
+				tri_count++;
+				
+				// Remove current vertex from polygon
+				for (int k = curr; k < num_vertices - 1; ++k) {
+					vertices[k] = vertices[k + 1];
+				}
+				num_vertices--;
+				ear_found = true;
+				break;
+			}
+		}
+		
+		if (!ear_found) {
+			// Fallback: couldn't find ear, add remaining triangle
+			break;
+		}
+	}
+	
+	// Add final triangle
+	if (num_vertices == 3) {
+		tri_indices[tri_count * 3 + 0] = vertices[0];
+		tri_indices[tri_count * 3 + 1] = vertices[1];
+		tri_indices[tri_count * 3 + 2] = vertices[2];
+		tri_count++;
+	}
+	
+	return tri_count * 3;
+}
 
 } // namespace ofbx
