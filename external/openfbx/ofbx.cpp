@@ -782,7 +782,7 @@ static OptionalError<Element*> readElement(Cursor* cursor, u32 version, Allocato
 static bool isEndLine(const Cursor& cursor)
 {
 	return (*cursor.current == '\n')
-    	|| (*cursor.current == '\r' && cursor.current + 1 < cursor.end && *(cursor.current + 1) != '\n');
+		|| (*cursor.current == '\r' && cursor.current + 1 < cursor.end && *(cursor.current + 1) != '\n');
 }
 
 
@@ -4233,12 +4233,12 @@ const char* getError()
 }
 
 static bool isConvex(const GeometryData& geom, const GeometryPartition::Polygon& polygon) {
-    if (polygon.vertex_count < 3) return false;
-    if (polygon.vertex_count == 3) return true;
-    
-    const Vec3Attributes positions = geom.getPositions();
-    if (!positions.values) return false;
-    
+	if (polygon.vertex_count < 3) return false;
+	if (polygon.vertex_count == 3) return true;
+	
+	const Vec3Attributes positions = geom.getPositions();
+	if (!positions.values) return false;
+	
 	Vec3 normal = {0, 0, 0};
 	// Compute polygon normal using Newell's method for robustness
 	// https://www.khronos.org/opengl/wiki/Calculating_a_Surface_Normal
@@ -4287,8 +4287,8 @@ static bool isConvex(const GeometryData& geom, const GeometryPartition::Polygon&
 		
 		if (sign_positive && sign_negative) return false;
 	}
-    
-    return true;
+	
+	return true;
 }
 
 u32 triangulate(const GeometryData& geom, const GeometryPartition::Polygon& polygon, int* tri_indices, int* tmp) {
@@ -4310,10 +4310,14 @@ u32 triangulate(const GeometryData& geom, const GeometryPartition::Polygon& poly
 	}
 
 	// ear clipping - the simplest (and not the most efficient) implementation
-	int tmp_mem[128]; // temporary memory if use did not pass any in `tmp`
+	int tmp_mem[128]; // temporary memory if user did not pass any in `tmp`
 	int* vertices = tmp ? tmp : tmp_mem;
 	
-	if (!tmp && polygon.vertex_count > 128) return 0;
+	if (!tmp && polygon.vertex_count > 128) {
+		// user should provide enough memory in `tmp`
+		assert(false);
+		return 0;
+	}
 	
 	for (int i = 0; i < polygon.vertex_count; ++i) {
 		vertices[i] = polygon.from_vertex + i;
@@ -4338,6 +4342,17 @@ u32 triangulate(const GeometryData& geom, const GeometryPartition::Polygon& poly
 		edge1.x * edge2.y - edge1.y * edge2.x
 	};
 	
+	float normal_len_sq = normal.x * normal.x + normal.y * normal.y + normal.z * normal.z;
+	if (normal_len_sq < 1e-12f) {
+		// Degenerate polygon, handle it like a convex polygon
+		for (int tri = 0; tri < polygon.vertex_count - 2; ++tri) {
+			tri_indices[tri * 3 + 0] = polygon.from_vertex;
+			tri_indices[tri * 3 + 1] = polygon.from_vertex + 1 + tri;
+			tri_indices[tri * 3 + 2] = polygon.from_vertex + 2 + tri;
+		}
+		return 3 * (polygon.vertex_count - 2);
+	}
+	
 	while (num_vertices > 3) {
 		bool ear_found = false;
 		
@@ -4361,7 +4376,7 @@ u32 triangulate(const GeometryData& geom, const GeometryPartition::Polygon& poly
 			
 			const float dot = cross.x * normal.x + cross.y * normal.y + cross.z * normal.z;
 			
-			// 3 vertices with wrong winding order can not make an ear
+			// Check if this forms a convex vertex (same orientation as polygon normal)
 			if (dot <= 0) continue;
 			
 			// Check if any other vertex is inside this triangle
@@ -4371,22 +4386,32 @@ u32 triangulate(const GeometryData& geom, const GeometryPartition::Polygon& poly
 				
 				Vec3 vt = positions.get(vertices[j]);
 				
-				// Barycentric coordinate test
-				Vec3 v0v1 = {vc.x - vp.x, vc.y - vp.y, vc.z - vp.z};
-				Vec3 v0v2 = {vn.x - vp.x, vn.y - vp.y, vn.z - vp.z};
-				Vec3 v0vt = {vt.x - vp.x, vt.y - vp.y, vt.z - vp.z};
-
-				float dot00 = v0v2.x * v0v2.x + v0v2.y * v0v2.y + v0v2.z * v0v2.z;
-				float dot01 = v0v2.x * v0v1.x + v0v2.y * v0v1.y + v0v2.z * v0v1.z;
-				float dot02 = v0v2.x * v0vt.x + v0v2.y * v0vt.y + v0v2.z * v0vt.z;
-				float dot11 = v0v1.x * v0v1.x + v0v1.y * v0v1.y + v0v1.z * v0v1.z;
-				float dot12 = v0v1.x * v0vt.x + v0v1.y * v0vt.y + v0v1.z * v0vt.z;
+				// Use point-in-triangle test with proper edge function
+				// Check if point is on the same side of all three edges
+				Vec3 edge0 = {vc.x - vp.x, vc.y - vp.y, vc.z - vp.z};
+				Vec3 edge1 = {vn.x - vc.x, vn.y - vc.y, vn.z - vc.z};
+				Vec3 edge2 = {vp.x - vn.x, vp.y - vn.y, vp.z - vn.z};
 				
-				float inv_denom = 1.0f / (dot00 * dot11 - dot01 * dot01);
-				float u = (dot11 * dot02 - dot01 * dot12) * inv_denom;
-				float v = (dot00 * dot12 - dot01 * dot02) * inv_denom;
+				Vec3 toPoint0 = {vt.x - vp.x, vt.y - vp.y, vt.z - vp.z};
+				Vec3 toPoint1 = {vt.x - vc.x, vt.y - vc.y, vt.z - vc.z};
+				Vec3 toPoint2 = {vt.x - vn.x, vt.y - vn.y, vt.z - vn.z};
 				
-				if (u > 0 && v > 0 && u + v < 1) {
+				Vec3 cross0 = {edge0.y * toPoint0.z - edge0.z * toPoint0.y,
+							   edge0.z * toPoint0.x - edge0.x * toPoint0.z,
+							   edge0.x * toPoint0.y - edge0.y * toPoint0.x};
+				Vec3 cross1 = {edge1.y * toPoint1.z - edge1.z * toPoint1.y,
+							   edge1.z * toPoint1.x - edge1.x * toPoint1.z,
+							   edge1.x * toPoint1.y - edge1.y * toPoint1.x};
+				Vec3 cross2 = {edge2.y * toPoint2.z - edge2.z * toPoint2.y,
+							   edge2.z * toPoint2.x - edge2.x * toPoint2.z,
+							   edge2.x * toPoint2.y - edge2.y * toPoint2.x};
+				
+				float dot0 = cross0.x * normal.x + cross0.y * normal.y + cross0.z * normal.z;
+				float dot1 = cross1.x * normal.x + cross1.y * normal.y + cross1.z * normal.z;
+				float dot2 = cross2.x * normal.x + cross2.y * normal.y + cross2.z * normal.z;
+				
+				// Point is inside if all cross products have the same sign as the normal
+				if (dot0 >= 0 && dot1 >= 0 && dot2 >= 0) {
 					is_ear = false;
 					break;
 				}
@@ -4408,20 +4433,22 @@ u32 triangulate(const GeometryData& geom, const GeometryPartition::Polygon& poly
 			}
 		}
 		
-		if (!ear_found) {
-			// Fallback: couldn't find ear, add remaining triangle
-			break;
+		if (!ear_found) break;
+	}
+	
+	if (num_vertices >= 3) {
+		// Add remaining triangles
+		// There can be more than 1 triangle in some cases, e.g., degenerate triangles
+		// We output those triangles so the output size matches what the user would expect based on polygon.vertex_count
+		for (int i = 1; i < num_vertices - 1; ++i) {
+			tri_indices[tri_count * 3 + 0] = vertices[0];
+			tri_indices[tri_count * 3 + 1] = vertices[i];
+			tri_indices[tri_count * 3 + 2] = vertices[i + 1];
+			tri_count++;
 		}
 	}
 	
-	// Add final triangle
-	if (num_vertices == 3) {
-		tri_indices[tri_count * 3 + 0] = vertices[0];
-		tri_indices[tri_count * 3 + 1] = vertices[1];
-		tri_indices[tri_count * 3 + 2] = vertices[2];
-		tri_count++;
-	}
-	
+	assert(tri_count == polygon.vertex_count - 2);
 	return tri_count * 3;
 }
 
