@@ -1401,8 +1401,10 @@ struct MaterialImpl : Material
 	double getBumpFactor() const override { return bump_factor; };
 	double getEmissiveFactor() const override { return emissive_factor; };
 	double getOpacity() const override { return opacity; };
+	DataView getShadingModel() const override { return shading_model; }
 
 	const Texture* textures[Texture::TextureType::COUNT];
+	DataView shading_model;
 	Color diffuse_color = {1, 1, 1};
 	Color specular_color = {1, 1, 1};
 	Color reflection_color = {1, 1, 1};
@@ -2639,7 +2641,10 @@ static OptionalError<Object*> parseMaterial(const Scene& scene, const Element& e
 	{
 		if (prop->id == property_id && prop->first_property)
 		{
-			if (prop->first_property->value == "DiffuseColor")
+			if (prop->first_property->value == "ShadingModel") {
+				material->shading_model = prop->getProperty(property_offset)->getValue();
+			}
+			else if (prop->first_property->value == "DiffuseColor")
 			{
 				material->diffuse_color.r = (float)prop->getProperty(property_offset + 0)->getValue().toDouble();
 				material->diffuse_color.g = (float)prop->getProperty(property_offset + 1)->getValue().toDouble();
