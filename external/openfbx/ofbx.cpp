@@ -1403,21 +1403,21 @@ struct MaterialImpl : Material
 	double getOpacity() const override { return opacity; };
 
 	const Texture* textures[Texture::TextureType::COUNT];
-	Color diffuse_color;
-	Color specular_color;
-	Color reflection_color;
-	Color ambient_color;
-	Color emissive_color;
+	Color diffuse_color = {1, 1, 1};
+	Color specular_color = {1, 1, 1};
+	Color reflection_color = {1, 1, 1};
+	Color ambient_color = {1, 1, 1};
+	Color emissive_color = {1, 1, 1};
 
-	double diffuse_factor;
-	double specular_factor;
-	double reflection_factor;
-	double shininess;
-	double shininess_exponent;
-	double ambient_factor;
-	double bump_factor;
-	double emissive_factor;
-	double opacity;
+	double diffuse_factor = 1;
+	double specular_factor = 1;
+	double reflection_factor = 1;
+	double shininess = 1;
+	double shininess_exponent = 1;
+	double ambient_factor = 1;
+	double bump_factor = 1;
+	double emissive_factor = 1;
+	double opacity = 1;
  };
 
 
