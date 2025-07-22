@@ -14,6 +14,7 @@
 #include "core/thread.h"
 #include "engine/engine.h"
 #include "engine/input_system.h"
+#include "engine/plugin.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
@@ -21,6 +22,7 @@
 #include "renderer/pipeline.h"
 #include "renderer/render_module.h"
 #include "renderer/renderer.h"
+#include "imgui_integration.h"
 
 #ifdef __linux__
 	#define STB_IMAGE_IMPLEMENTATION
@@ -46,7 +48,8 @@ struct GUIInterface : GUISystem::Interface {
 struct Runner final
 {
 	Runner() 
-		: m_allocator(m_main_allocator) 
+		: m_allocator(m_main_allocator)
+		, m_imgui(m_allocator)
 	{
 		debug::init(m_allocator);
 		profiler::init(m_allocator);
@@ -155,6 +158,7 @@ struct Runner final
 		init_data.log_path = "lumix_app.log";
 
 		m_engine = Engine::create(static_cast<Engine::InitArgs&&>(init_data), m_allocator);
+		m_imgui.m_engine = m_engine.get();
 
 		os::InitWindowArgs init_window_args;
 		init_window_args.name = "Lumix App";
@@ -192,6 +196,7 @@ struct Runner final
 		m_engine->startGame(*m_world);
 
 		os::showWindow(m_window);
+		m_imgui.init();
 	}
 
 	void shutdown() {
@@ -215,6 +220,8 @@ struct Runner final
 	}
 
 	void onEvent(const os::Event& event) {
+		m_imgui.injectEvent(event);
+
 		if (m_engine.get()) {
 			const bool is_mouse_up = event.type == os::Event::Type::MOUSE_BUTTON && !event.mouse_button.down;
 			const bool is_key_up = event.type == os::Event::Type::KEY && !event.key.down;
@@ -242,12 +249,14 @@ struct Runner final
 		}
 	}
 
+
 	void onIdle() {
 		if (m_mouse_captured) {
 			os::Rect r = os::getWindowScreenRect(m_engine->getMainWindow());
 			os::clipCursor(m_engine->getMainWindow(), r);
 		}
 
+		m_imgui.beginFrame();
 		m_engine->update(*m_world);
 
 		EntityPtr camera = m_pipeline->getModule()->getActiveCamera();
@@ -262,6 +271,7 @@ struct Runner final
 		m_pipeline->setViewport(m_viewport);
 		m_pipeline->render(false);
 		m_pipeline->blitOutputToScreen();
+		m_imgui.endFrame();
 		m_renderer->frame();
 	}
 
@@ -279,7 +289,10 @@ struct Runner final
 	bool m_focused = true;
 	bool m_mouse_captured = false;
 	GUIInterface m_gui_interface;
+
+	ImGuiIntegration m_imgui;
 };
+
 
 int main(int args, char* argv[])
 {

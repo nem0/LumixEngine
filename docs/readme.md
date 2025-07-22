@@ -26,3 +26,7 @@
 # Editor
 
 * [Editor actions](editor_action.md)
+
+# Packaged game
+
+* [ImGui in packaged game](app_imgui.md)
