@@ -3472,7 +3472,7 @@ void RenderModule::reflect() {
 			.var_prop<&RenderModule::getCamera, &Camera::bloom_enabled>("Bloom enabled")
 			.var_prop<&RenderModule::getCamera, &Camera::bloom_tonemap_enabled>("Bloom tonemap enabled")
 			.var_prop<&RenderModule::getCamera, &Camera::bloom_accomodation_speed>("Bloom accomodation speed")
-			.var_prop<&RenderModule::getCamera, &Camera::bloom_avg_bloom_multiplier>("Bloom avg bloom multiplier")
+			.var_prop<&RenderModule::getCamera, &Camera::bloom_avg_bloom_multiplier>("Bloom average bloom multiplier")
 			.var_prop<&RenderModule::getCamera, &Camera::bloom_exposure>("Bloom exposure")
 
 		.LUMIX_CMP(InstancedModel, "instanced_model", "Render / Instanced model")
