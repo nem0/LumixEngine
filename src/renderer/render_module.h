@@ -78,7 +78,7 @@ struct Camera {
 	bool bloom_enabled = false;
 	bool bloom_tonemap_enabled = false;
 	float bloom_accomodation_speed = 1;
-	float bloom_avg_bloom_multiplier = 0.2f;
+	float bloom_avg_bloom_multiplier = 16.0f;
 	float bloom_exposure = 1;
 };
 
