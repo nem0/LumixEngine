@@ -1,10 +1,10 @@
 # Shaders
 
-Shaders can be found in the [data/shaders](../data/shaders) directory and are written in [HLSL](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl). We support pixel, vertex and compute shaders. Shaders are compile with **FXC compiler** distributed with OS. Shader are compiled with **Shader model 5.1.**. Shader files must have `.hlsl` extension. Shaders can be edited by integrated shader editor or any text editor.
+Shaders can be found in the [data/shaders](../data/shaders) directory and are written in [HLSL](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl). We support pixel, vertex and compute shaders. Shaders are compiled with **FXC compiler** distributed with OS. Shaders are compiled with **Shader model 5.1.**. Shader files must have `.hlsl` extension. Shaders can be edited by integrated shader editor or any text editor.
 
 ## Vertex and pixel shader
 
-Vertex shader entry point must be named `mainVS` and pixel shader entry point must be named `mainPS`. Both can be in a single HLSL file. To distinguist vertex + pixel from compute shaders, shader compiler looks for `//@surface` directive.
+Vertex shader entry point must be named `mainVS` and pixel shader entry point must be named `mainPS`. Both can be in a single HLSL file. To distinguish vertex + pixel from compute shaders, shader compiler looks for `//@surface` directive.
 
 ```hlsl
 //@surface
@@ -13,7 +13,7 @@ float4 mainVS() : SV_Position {
     ...
 }
 
-float4 mainPS() :SV_Target {
+float4 mainPS() : SV_Target {
     ...
 }
 ```
@@ -33,7 +33,7 @@ void main(uint3 thread_id : SV_DispatchThreadID) {
 
 ## Includes
 
-HLSL files can include another files with standard include directive. Included files must have `.hlsli` extension to be recognized by the editor - i.e. so they can be visible in asset browser and editable.
+HLSL files can include other files with standard include directive. Included files must have `.hlsli` extension to be recognized by the editor - i.e. so they can be visible in asset browser and editable.
 
 ```hlsl
 #include "shaders/common.hlsli"
@@ -94,7 +94,7 @@ float4 mainPS() : SV_Target {
 
 ## Defines
 
-`//@define` directive allow enabling or disabling parts of a shader from the material editor UI, where they appear as checkboxes. Additionally, `#define` directives can be used directly within the shader code.
+`//@define` directive allows enabling or disabling parts of a shader from the material editor UI, where they appear as checkboxes. Additionally, `#define` directives can be used directly within the shader code.
 
 ```hlsl
 //@define "ALPHA_CUTOUT"
@@ -115,5 +115,5 @@ float4 mainPS() : SV_Target {
 
 * `Material::updateRenderData` - Updates material constant buffer.
 * `DrawStream::createProgram` - Adds some preamble to shaders.
-* `ShaderPlugin::compile` - Handle includes and directives. Outputs HLSL source code.
+* `ShaderPlugin::compile` - Handles includes and directives. Outputs HLSL source code.
 * `ShaderCompiler::compileStage` - Invokes **FXC** to compile HLSL to bytecode.
