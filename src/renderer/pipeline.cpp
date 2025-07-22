@@ -952,7 +952,7 @@ struct PipelineImpl final : Pipeline {
 		const RenderBufferHandle rb = m_renderer.createRenderbuffer({
 			.size = {m_viewport.w, m_viewport.h},
 			.format = gpu::TextureFormat::SRGBA,
-			.flags = gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::NO_MIPS,
+			.flags = gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE,
 			.debug_name = "tonemap"
 		});
 		DrawStream& stream = m_renderer.getDrawStream();

@@ -103,6 +103,7 @@ static u32 sizeDXTC(u32 w, u32 h, DXGI_FORMAT format) {
 struct FormatDesc {
 	bool compressed;
 	u32 block_bytes;
+	DXGI_FORMAT backing;
 	DXGI_FORMAT internal;
 	DXGI_FORMAT internal_srgb;
 
@@ -142,29 +143,29 @@ struct FormatDesc {
 
 	static FormatDesc get(TextureFormat format) {
 		switch(format) {
-			case TextureFormat::BC1: return {			true,		8,	DXGI_FORMAT_BC1_UNORM,				DXGI_FORMAT_BC1_UNORM_SRGB};
-			case TextureFormat::BC2: return {			true,		16,	DXGI_FORMAT_BC2_UNORM,				DXGI_FORMAT_BC2_UNORM_SRGB};
-			case TextureFormat::BC3: return {			true,		16,	DXGI_FORMAT_BC3_UNORM,				DXGI_FORMAT_BC3_UNORM_SRGB};
-			case TextureFormat::BC4: return {			true,		8,	DXGI_FORMAT_BC4_UNORM,				DXGI_FORMAT_UNKNOWN};
-			case TextureFormat::BC5: return {			true,		16,	DXGI_FORMAT_BC5_UNORM,				DXGI_FORMAT_UNKNOWN};
-			case TextureFormat::R16: return {			false,		2,	DXGI_FORMAT_R16_UNORM,				DXGI_FORMAT_UNKNOWN};
-			case TextureFormat::RG16: return {			false,		4,	DXGI_FORMAT_R16G16_UNORM,			DXGI_FORMAT_UNKNOWN};
-			case TextureFormat::R8: return {			false,		1,	DXGI_FORMAT_R8_UNORM,				DXGI_FORMAT_UNKNOWN};
-			case TextureFormat::RG8: return {			false,		2,	DXGI_FORMAT_R8G8_UNORM,				DXGI_FORMAT_UNKNOWN};
-			case TextureFormat::BGRA8: return {			false,		4,	DXGI_FORMAT_B8G8R8A8_UNORM,			DXGI_FORMAT_B8G8R8A8_UNORM_SRGB};
-			case TextureFormat::SRGBA: return {			false,		4,	DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,	DXGI_FORMAT_R8G8B8A8_UNORM_SRGB};
-			case TextureFormat::RGBA8: return {			false,		4,	DXGI_FORMAT_R8G8B8A8_UNORM,			DXGI_FORMAT_R8G8B8A8_UNORM_SRGB};
-			case TextureFormat::RGBA16: return {		false,		8,	DXGI_FORMAT_R16G16B16A16_UNORM,		DXGI_FORMAT_UNKNOWN};
-			case TextureFormat::R11G11B10F: return {	false,		4,	DXGI_FORMAT_R11G11B10_FLOAT,		DXGI_FORMAT_UNKNOWN};
-			case TextureFormat::RGBA16F: return {		false,		8,	DXGI_FORMAT_R16G16B16A16_FLOAT,		DXGI_FORMAT_UNKNOWN};
-			case TextureFormat::RGBA32F: return {		false,		16, DXGI_FORMAT_R32G32B32A32_FLOAT,		DXGI_FORMAT_UNKNOWN};
-			case TextureFormat::RG32F: return {			false,		8,	DXGI_FORMAT_R32G32_FLOAT,			DXGI_FORMAT_UNKNOWN};
-			case TextureFormat::RGB32F: return {		false,		12,	DXGI_FORMAT_R32G32B32_FLOAT,		DXGI_FORMAT_UNKNOWN};
-			case TextureFormat::R32F: return {			false,		4,	DXGI_FORMAT_R32_FLOAT,				DXGI_FORMAT_UNKNOWN};
-			case TextureFormat::RG16F: return {			false,		4,	DXGI_FORMAT_R16G16_FLOAT,			DXGI_FORMAT_UNKNOWN};
+			case TextureFormat::BC1: return {			true,		8,	DXGI_FORMAT_BC1_TYPELESS,			DXGI_FORMAT_BC1_UNORM,				DXGI_FORMAT_BC1_UNORM_SRGB};
+			case TextureFormat::BC2: return {			true,		16,	DXGI_FORMAT_BC2_TYPELESS,			DXGI_FORMAT_BC2_UNORM,				DXGI_FORMAT_BC2_UNORM_SRGB};
+			case TextureFormat::BC3: return {			true,		16,	DXGI_FORMAT_BC3_TYPELESS,			DXGI_FORMAT_BC3_UNORM,				DXGI_FORMAT_BC3_UNORM_SRGB};
+			case TextureFormat::BC4: return {			true,		8,	DXGI_FORMAT_BC4_TYPELESS,			DXGI_FORMAT_BC4_UNORM,				DXGI_FORMAT_UNKNOWN};
+			case TextureFormat::BC5: return {			true,		16,	DXGI_FORMAT_BC5_TYPELESS,			DXGI_FORMAT_BC5_UNORM,				DXGI_FORMAT_UNKNOWN};
+			case TextureFormat::R16: return {			false,		2,	DXGI_FORMAT_R16_TYPELESS,			DXGI_FORMAT_R16_UNORM,				DXGI_FORMAT_UNKNOWN};
+			case TextureFormat::RG16: return {			false,		4,	DXGI_FORMAT_R16G16_TYPELESS,		DXGI_FORMAT_R16G16_UNORM,			DXGI_FORMAT_UNKNOWN};
+			case TextureFormat::R8: return {			false,		1,	DXGI_FORMAT_R8_TYPELESS,			DXGI_FORMAT_R8_UNORM,				DXGI_FORMAT_UNKNOWN};
+			case TextureFormat::RG8: return {			false,		2,	DXGI_FORMAT_R8G8_TYPELESS,			DXGI_FORMAT_R8G8_UNORM,				DXGI_FORMAT_UNKNOWN};
+			case TextureFormat::BGRA8: return {			false,		4,	DXGI_FORMAT_B8G8R8A8_TYPELESS,		DXGI_FORMAT_B8G8R8A8_UNORM,			DXGI_FORMAT_B8G8R8A8_UNORM_SRGB};
+			case TextureFormat::SRGBA: return {			false,		4,	DXGI_FORMAT_R8G8B8A8_TYPELESS,		DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,	DXGI_FORMAT_R8G8B8A8_UNORM_SRGB};
+			case TextureFormat::RGBA8: return {			false,		4,	DXGI_FORMAT_R8G8B8A8_TYPELESS,		DXGI_FORMAT_R8G8B8A8_UNORM,			DXGI_FORMAT_R8G8B8A8_UNORM_SRGB};
+			case TextureFormat::RGBA16: return {		false,		8,	DXGI_FORMAT_R16G16B16A16_TYPELESS,	DXGI_FORMAT_R16G16B16A16_UNORM,		DXGI_FORMAT_UNKNOWN};
+			case TextureFormat::R11G11B10F: return {	false,		4,	DXGI_FORMAT_R11G11B10_FLOAT,		DXGI_FORMAT_R11G11B10_FLOAT,		DXGI_FORMAT_UNKNOWN};
+			case TextureFormat::RGBA16F: return {		false,		8,	DXGI_FORMAT_R16G16B16A16_TYPELESS,	DXGI_FORMAT_R16G16B16A16_FLOAT,		DXGI_FORMAT_UNKNOWN};
+			case TextureFormat::RGBA32F: return {		false,		16, DXGI_FORMAT_R32G32B32A32_TYPELESS,	DXGI_FORMAT_R32G32B32A32_FLOAT,		DXGI_FORMAT_UNKNOWN};
+			case TextureFormat::RG32F: return {			false,		8,	DXGI_FORMAT_R32G32_TYPELESS,		DXGI_FORMAT_R32G32_FLOAT,			DXGI_FORMAT_UNKNOWN};
+			case TextureFormat::RGB32F: return {		false,		12,	DXGI_FORMAT_R32G32B32_TYPELESS,		DXGI_FORMAT_R32G32B32_FLOAT,		DXGI_FORMAT_UNKNOWN};
+			case TextureFormat::R32F: return {			false,		4,	DXGI_FORMAT_R32_TYPELESS,			DXGI_FORMAT_R32_FLOAT,				DXGI_FORMAT_UNKNOWN};
+			case TextureFormat::RG16F: return {			false,		4,	DXGI_FORMAT_R16G16_TYPELESS,		DXGI_FORMAT_R16G16_FLOAT,			DXGI_FORMAT_UNKNOWN};
 
-			case TextureFormat::D32: return {			false,		4,	DXGI_FORMAT_R32_TYPELESS,			DXGI_FORMAT_UNKNOWN};
-			case TextureFormat::D24S8: return {			false,		4,	DXGI_FORMAT_R24G8_TYPELESS,			DXGI_FORMAT_UNKNOWN};
+			case TextureFormat::D32: return {			false,		4,	DXGI_FORMAT_R32_TYPELESS,			DXGI_FORMAT_R32_TYPELESS,			DXGI_FORMAT_UNKNOWN};
+			case TextureFormat::D24S8: return {			false,		4,	DXGI_FORMAT_R24G8_TYPELESS,			DXGI_FORMAT_R24G8_TYPELESS,			DXGI_FORMAT_UNKNOWN};
 			default: ASSERT(false); return {}; 
 		}
 	}
@@ -223,10 +224,24 @@ static bool isDepthFormat(DXGI_FORMAT format) {
 	}
 }
 
-static DXGI_FORMAT toViewFormat(DXGI_FORMAT format) {
+static DXGI_FORMAT toSRVFormat(DXGI_FORMAT format) {
 	switch (format) {
 		case DXGI_FORMAT_R24G8_TYPELESS: return DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
 		case DXGI_FORMAT_R32_TYPELESS: return DXGI_FORMAT_R32_FLOAT;
+		default: return format;
+	}
+}
+
+// UAV can not be srgb, so we use linear format (the conversion must be in the shader if necessary)
+static DXGI_FORMAT toUAVFormat(DXGI_FORMAT format) {
+	switch (format) {
+		case DXGI_FORMAT_BC1_UNORM_SRGB: return DXGI_FORMAT_BC1_UNORM;
+		case DXGI_FORMAT_BC2_UNORM_SRGB: return DXGI_FORMAT_BC2_UNORM;
+		case DXGI_FORMAT_BC3_UNORM_SRGB: return DXGI_FORMAT_BC3_UNORM;
+		case DXGI_FORMAT_BC7_UNORM_SRGB: return DXGI_FORMAT_BC7_UNORM;
+		case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB: return DXGI_FORMAT_B8G8R8A8_UNORM;
+		case DXGI_FORMAT_B8G8R8X8_UNORM_SRGB: return DXGI_FORMAT_B8G8R8X8_UNORM;
+		case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB: return DXGI_FORMAT_R8G8B8A8_UNORM;
 		default: return format;
 	}
 }
@@ -914,7 +929,7 @@ struct RTVDSVHeap {
 		frame = (frame + 1) % NUM_BACKBUFFERS;
 	}
 
-	D3D12_CPU_DESCRIPTOR_HANDLE allocRTV(ID3D12Device* device, ID3D12Resource* resource, D3D12_RENDER_TARGET_VIEW_DESC* view_desc = nullptr) {
+	D3D12_CPU_DESCRIPTOR_HANDLE allocRTV(ID3D12Device* device, ID3D12Resource* resource, const D3D12_RENDER_TARGET_VIEW_DESC& view_desc) {
 		ASSERT(resource);
 		ASSERT(num_resources + 1 <= max_resource_count);
 
@@ -922,7 +937,7 @@ struct RTVDSVHeap {
 		cpu.ptr += (max_resource_count * frame + num_resources) * handle_increment_size;
 		++num_resources;
 
-		device->CreateRenderTargetView(resource, view_desc, cpu);
+		device->CreateRenderTargetView(resource, &view_desc, cpu);
 		return cpu;
 	}
 
@@ -2021,7 +2036,7 @@ void setFramebufferCube(TextureHandle cube, u32 face, u32 mip) {
 	desc.Texture2DArray.ArraySize = 1;
 	desc.Texture2DArray.FirstArraySlice = face;
 
-	rt = d3d->rtv_heap.allocRTV(d3d->device, cube->resource, &desc);
+	rt = d3d->rtv_heap.allocRTV(d3d->device, cube->resource, desc);
 	d3d->current_framebuffer.count = 1;
 	d3d->current_framebuffer.formats[0] = cube->dxgi_format;
 	d3d->current_framebuffer.render_targets[0] = rt;
@@ -2049,7 +2064,7 @@ void setFramebuffer(const TextureHandle* attachments, u32 num, TextureHandle dep
 
 		d3d->current_framebuffer.count = 1;
 		d3d->current_framebuffer.formats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-		d3d->current_framebuffer.render_targets[0] = d3d->rtv_heap.allocRTV(d3d->device, d3d->current_window->backbuffers[d3d->current_window->swapchain->GetCurrentBackBufferIndex()], &rtv_desc);
+		d3d->current_framebuffer.render_targets[0] = d3d->rtv_heap.allocRTV(d3d->device, d3d->current_window->backbuffers[d3d->current_window->swapchain->GetCurrentBackBufferIndex()], rtv_desc);
 		d3d->current_framebuffer.depth_stencil = {};
 		d3d->current_framebuffer.ds_format = DXGI_FORMAT_UNKNOWN;
 	} else {
@@ -2061,7 +2076,14 @@ void setFramebuffer(const TextureHandle* attachments, u32 num, TextureHandle dep
 			ASSERT(d3d->current_framebuffer.count < (u32)lengthOf(d3d->current_framebuffer.render_targets));
 			t.setState(d3d->cmd_list, D3D12_RESOURCE_STATE_RENDER_TARGET);
 			d3d->current_framebuffer.formats[d3d->current_framebuffer.count] = t.dxgi_format;
-			d3d->current_framebuffer.render_targets[d3d->current_framebuffer.count] = d3d->rtv_heap.allocRTV(d3d->device, t.resource);
+			
+			D3D12_RENDER_TARGET_VIEW_DESC rtv_desc = {};
+			rtv_desc.Format = t.dxgi_format;
+			rtv_desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+			rtv_desc.Texture2D.MipSlice = 0;
+			rtv_desc.Texture2D.PlaneSlice = 0;
+
+			d3d->current_framebuffer.render_targets[d3d->current_framebuffer.count] = d3d->rtv_heap.allocRTV(d3d->device, t.resource, rtv_desc);
 			++d3d->current_framebuffer.count;
 		}
 		if (depth_stencil) {
@@ -2568,22 +2590,29 @@ void createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 	desc.Height = h;
 	desc.DepthOrArraySize = depth * (is_cubemap ? 6 : 1);
 	desc.MipLevels = mip_count;
-	desc.Format = getDXGIFormat(format, is_srgb);
+	desc.Format = FormatDesc::get(format).backing;
 	desc.SampleDesc.Count = 1;
 	desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 	desc.Flags = render_target ? (isDepthFormat(desc.Format) ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET) : D3D12_RESOURCE_FLAG_NONE;
 	if (compute_write) desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+
+	texture.name = debug_name;
+	texture.is_view = false;
+	texture.flags = flags;
+	texture.w = w;
+	texture.h = h;
+	texture.dxgi_format = getDXGIFormat(format, is_srgb);
 
 	D3D12_CLEAR_VALUE clear_val = {};
 	D3D12_CLEAR_VALUE* clear_val_ptr = nullptr;
 	if (render_target) {
 		clear_val_ptr = &clear_val;
 		if (isDepthFormat(desc.Format)) {
-			clear_val.Format = toDSViewFormat(desc.Format);
+			clear_val.Format = toDSViewFormat(texture.dxgi_format);
 			clear_val.DepthStencil.Depth = 0.0f;
 			clear_val.DepthStencil.Stencil = 0;
 		} else {
-			clear_val.Format = toViewFormat(desc.Format);
+			clear_val.Format = toSRVFormat(texture.dxgi_format);
 			clear_val_ptr = &clear_val;
 			clear_val.Color[0] = 0.0f;
 			clear_val.Color[1] = 0.0f;
@@ -2595,16 +2624,10 @@ void createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 	texture.state = isDepthFormat(desc.Format) ? D3D12_RESOURCE_STATE_COMMON : (compute_write ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS : D3D12_RESOURCE_STATE_GENERIC_READ);
 	if (d3d->device->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, texture.state, clear_val_ptr, IID_PPV_ARGS(&texture.resource)) != S_OK) return;
 	
-	texture.name = debug_name;
-	texture.is_view = false;
-	texture.flags = flags;
-	texture.w = w;
-	texture.h = h;
-	texture.dxgi_format = desc.Format;
 	D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
 	D3D12_UNORDERED_ACCESS_VIEW_DESC uav_desc = {};
-	srv_desc.Format = toViewFormat(desc.Format);
-	uav_desc.Format = srv_desc.Format;
+	srv_desc.Format = toSRVFormat(texture.dxgi_format);
+	uav_desc.Format = toUAVFormat(srv_desc.Format);
 	srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 	if (is_3d) {
 		srv_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
@@ -2677,7 +2700,7 @@ void createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 		.Height = desc.Height,
 		.DepthOrArraySize = desc.DepthOrArraySize,
 		.MipLevels = desc.MipLevels,
-		.Format = desc.Format,
+		.Format = texture.dxgi_format,
 		.SampleDesc = desc.SampleDesc,
 		.Layout = desc.Layout,
 		.Flags = desc.Flags

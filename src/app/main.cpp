@@ -317,8 +317,10 @@ int main(int args, char* argv[])
 
 #include "core/debug.h"
 #include "core/default_allocator.h"
+#include "core/job_system.h"
 #include "core/log_callback.h"
 #include "core/os.h"
+#include "core/profiler.h"
 #include "renderer/gpu/gpu.h"
 
 using namespace Lumix;
@@ -335,11 +337,14 @@ static void logToDebugOutput(LogLevel level, const char* message)
 int main(int args, char* argv[]) {
 	registerLogCallback<logToDebugOutput>();
 	os::init();
+	DefaultAllocator allocator;
+	debug::init(allocator);
+	profiler::init(allocator);
+	jobs::init(os::getCPUsCount(), allocator);
 	// create window
 	os::WindowHandle win = os::createWindow({ .width = 640, .height = 480 });
 
 	// init GPU
-	DefaultAllocator allocator;
 	gpu::preinit(allocator, true);
 	gpu::init(win, gpu::InitFlags::NONE);
 	gpu::ProgramHandle shader = gpu::allocProgramHandle();
@@ -354,22 +359,29 @@ int main(int args, char* argv[]) {
 	gpu::update(texture, 0, 0, 0, 0, 2, 2, gpu::TextureFormat::RGBA8, texels, sizeof(texels));
 
 	// create shader
-	const gpu::ShaderType types[] = {gpu::ShaderType::VERTEX, gpu::ShaderType::FRAGMENT};
-	const char* srcs[] = {
+	const char* src = 
 		R"#(
-			out vec2 uv;
-			void main() { uv = 10 * vec2(gl_VertexID & 1, (gl_VertexID >> 1) & 1); gl_Position = vec4(gl_VertexID & 1, (gl_VertexID >> 1) & 1, 0, 1); }
-		)#",
-		R"#(
-			in vec2 uv;
-			layout(location = 0) out vec4 color;
-			void main() {
-				color = sampleBindless(32766, uv);
+			SamplerState NearestSampler : register(s3);
+			Texture2D<float4> bindless_textures[] : register(t0, space1);
+
+			struct VSOutput {
+				float2 uv : TEXCOORD1;
+				float4 position : SV_POSITION;
+			};
+			
+			VSOutput mainVS(uint vertex_id : SV_VertexID) {
+				VSOutput output;
+				output.uv = 10 * float2(vertex_id & 1, (vertex_id >> 1) & 1);
+				output.position = float4(vertex_id & 1, (vertex_id >> 1) & 1, 0, 1);
+				return output;
 			}
-		)#",
-	};
+
+			float4 mainPS(VSOutput input) : SV_Target {
+				return bindless_textures[2052].Sample(NearestSampler, input.uv);
+			}
+		)#";
 	gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLES);
-	gpu::createProgram(shader, gpu::StateFlags::NONE, decl, srcs, types, 2, nullptr, 0, "shader");
+	gpu::createProgram(shader, gpu::StateFlags::NONE, decl, src, gpu::ShaderType::SURFACE, "shader");
 
 	// main loop
 	bool finished = false;
@@ -391,10 +403,9 @@ int main(int args, char* argv[]) {
 		const float clear_col[] = {0.1f, 0.1f, 0.1f, 1};
 		gpu::clear(gpu::ClearFlags::COLOR | gpu::ClearFlags::DEPTH, clear_col, 0);
 		gpu::useProgram(shader);
-		gpu::bindTextures(&texture, 0, 1);
 		gpu::drawArrays(0, 3);
 
-		u32 frame = gpu::swapBuffers();
+		u32 frame = gpu::present();
 		gpu::waitFrame(frame);
 	}
 
