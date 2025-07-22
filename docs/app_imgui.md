@@ -5,6 +5,7 @@ By default, ImGui is not enabled in packaged game. To enable ImGui integration, 
 1. Uncomment `#define LUMIX_APP_IMGUI_INTEGRATION` in [imgui_integration.h](../src/app/imgui_integration.h).
 2. Build the solution including `app` project.
 3. In your scene, add following script to an entity:
+
 ```lua
 local show_imgui = false
 function onInputEvent(event : InputEvent)
@@ -26,6 +27,7 @@ function update(time_delta)
 	end
 end
 ```
+
 4. Package your game.
 5. Run the packaged game.
 6. Press F11 to show ImGui in your packaged game.
