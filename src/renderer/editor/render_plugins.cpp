@@ -599,34 +599,6 @@ struct SphericalHarmonics {
 	}
 };
 
-static void flipY(Vec4* data, int texture_size)
-{
-	for (int y = 0; y < texture_size / 2; ++y)
-	{
-		for (int x = 0; x < texture_size; ++x)
-		{
-			const Vec4 t = data[x + y * texture_size];
-			data[x + y * texture_size] = data[x + (texture_size - y - 1) * texture_size];
-			data[x + (texture_size - y - 1) * texture_size] = t;
-		}
-	}
-}
-
-
-static void flipX(Vec4* data, int texture_size)
-{
-	for (int y = 0; y < texture_size; ++y)
-	{
-		Vec4* tmp = &data[y * texture_size];
-		for (int x = 0; x < texture_size / 2; ++x)
-		{
-			const Vec4 t = tmp[x];
-			tmp[x] = tmp[texture_size - x - 1];
-			tmp[texture_size - x - 1] = t;
-		}
-	}
-}
-	
 static bool saveAsLBC(FileSystem& fs, const char* path, const u8* data, int w, int h, bool generate_mipmaps, bool is_origin_bottom_left, bool is_srgb, IAllocator& allocator) {
 	ASSERT(data);
 	
