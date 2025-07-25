@@ -1,7 +1,7 @@
 #pragma once
 
 // see ../../docs/app_imgui.md for more info about this file
-// #define LUMIX_APP_IMGUI_INTEGRATION
+#define LUMIX_APP_IMGUI_INTEGRATION
 
 #include <imgui/imgui.h>
 #include "core/array.h"
