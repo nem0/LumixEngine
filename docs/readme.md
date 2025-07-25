@@ -23,6 +23,10 @@
 * [Shaders](shaders.md)
 * [FSR3](fsr3.md)
 
+# Physics
+
+* [Triggers](physics/trigger.md)
+
 # Editor
 
 * [Editor actions](editor_action.md)
