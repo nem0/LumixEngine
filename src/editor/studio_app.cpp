@@ -1222,6 +1222,7 @@ struct StudioAppImpl final : StudioApp {
 			}
 			
 			if (checkShortcut(m_show_all_actions_action, true)) showAllActionsGUI();
+			else if (checkShortcut(m_start_standalone_app, true)) startStandaloneApp();
 			else if (checkShortcut(m_next_frame, true)) m_engine->nextFrame();
 			else if (checkShortcut(m_pause_game, true)) m_engine->pause(!m_engine->isPaused());
 			else if (checkShortcut(m_toggle_game_mode, true)) m_editor->toggleGameMode();
