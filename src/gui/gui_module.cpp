@@ -314,6 +314,10 @@ struct GUIModuleImpl final : GUIModule {
 	void draw3D(GUICanvas& canvas, Pipeline& pipeline) {
 		m_draw_2d.clear({2, 2});
 
+		auto canvas_rect_iter = m_rects.find(canvas.entity);
+		if (!canvas_rect_iter.isValid()) return;
+		if (!isFlagSet(canvas_rect_iter.value()->flags, GUIRect::IS_ENABLED)) return;
+
 		for (EntityRef child : m_world.childrenOf(canvas.entity)) {
 			auto iter = m_rects.find(child);
 			if (iter.isValid()) {
