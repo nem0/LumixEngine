@@ -367,7 +367,8 @@ struct alignas(16) LUMIX_CORE_API Matrix {
 	void setTranslation(const Vec3& t);
 
 	void setOrtho(float left, float right, float bottom, float top, float z_near, float z_far, bool reversed_z);
-	void setPerspective(float fov, float ratio, float near_plane, float far_plane, bool invert_z);
+	// reversed z, infinite far plane
+	void setPerspective(float vertical_fov, float xy_ratio, float near_plane);
 	void fromEuler(float yaw, float pitch, float roll);
 	void lookAt(const Vec3& eye, const Vec3& at, const Vec3& up);
 	void normalizeScale();

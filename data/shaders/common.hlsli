@@ -508,6 +508,50 @@ float getShadowAtlasResolution(int idx) {
 	return 256;
 }
 
+// https://knarkowicz.wordpress.com/2014/04/16/octahedron-normal-vector-encoding/
+// https://x.com/Stubbesaurus/status/937994790553227264
+float3 fromOctahedral(float2 f) {
+	f = f * 2.0 - 1.0;
+	float3 n = float3(f.x, f.y, 1.0 - abs(f.x) - abs(f.y));
+	float t = saturate(-n.z);
+	n.xy += n.xy >= 0.0 ? -t : t;
+	return normalize(n);
+}
+
+float2 toOctahedral(float3 n)
+{
+	n /= (abs(n.x) + abs(n.y) + abs(n.z));
+	float2 wrapped = (1.0 - abs(n.yx)) * (n.xy >= 0.0 ? 1.0 : -1.0);
+	n.xy = n.z >= 0.0 ? n.xy : wrapped;
+	n.xy = n.xy * 0.5 + 0.5;
+	return n.xy;
+}
+
+struct AtlasTile {
+	float2 offset;
+	float scale;
+};
+
+AtlasTile getShadowAtlasTile(int atlas_idx) {
+	AtlasTile res;
+	if (atlas_idx < 1) {
+		res.offset = float2(0, 0);
+		res.scale = 0.5f;
+	}
+	else if (atlas_idx < 5) {
+		res.offset.x = 0.5f + ((atlas_idx - 1) % 2) * 0.25f;
+		res.offset.y = ((atlas_idx - 1) / 2) * 0.25f;
+		res.scale = 0.25f;
+	}
+	else {
+		res.offset.x = ((atlas_idx - 5) % 8) * 0.125f;
+		res.offset.y = 0.5f + ((atlas_idx - 5) / 8) * 0.125f;
+		res.scale = 0.125f;
+	}
+	return res;
+}
+
+// TODO clean this up
 float3 pointLightsLighting(Cluster cluster, Surface surface, uint shadow_atlas, float2 frag_coord) {
 	float3 res = 0;
 	for (int i = cluster.offset; i < cluster.offset + cluster.lights_count; ++i) {
@@ -519,28 +563,48 @@ float3 pointLightsLighting(Cluster cluster, Surface surface, uint shadow_atlas, 
 		if (attn > 1e-5) {
 			float3 direct_light = computeDirectLight(surface, L, light.color_attn.rgb);
 			int atlas_idx = light.atlas_idx;
+			float fov = light.fov;
+			
 			if (atlas_idx >= 0) {
-				float4 proj_pos = transformPosition(lpos, u_shadow_atlas_matrices[atlas_idx]);
-				proj_pos /= proj_pos.w;
+				if (fov > M_PI) {
+					AtlasTile tile = getShadowAtlasTile(atlas_idx);
+					float2 oct_uv = toOctahedral(-L) * tile.scale + tile.offset;
+					float3 abslpos = abs(lpos);
+					float receiver = max(abslpos.z, max(abslpos.x, abslpos.y)) * 0.99;
+					
+					float c = hash(frag_coord) * 2 - 1;
+					float s = sqrt(1 - c * c); 
+					float2x2 rot = float2x2(c, s, -s, c);
 
-				float2 shadow_uv = proj_pos.xy;
-
-				float c = hash(frag_coord) * 2 - 1;
-				float s = sqrt(1 - c * c); 
-				float2x2 rot = float2x2(c, s, -s, c);
-				float shadow = 0;
-				float receiver = proj_pos.z;
-				for (int j = 0; j < 16; ++j) {
-					float2 pcf_offset = mul(rot, POISSON_DISK_16[j]);
-					float2 uv = shadow_uv + pcf_offset * float2(0.25, 1) / getShadowAtlasResolution(atlas_idx) * 3;
-
-					float occluder = sampleBindlessLod(LinearSamplerClamp, shadow_atlas, uv, 0).r;
-					shadow += receiver * 1.02 > occluder ? 1 : 0;
+					// TODO PCF
+					// TODO do not hardcode near plane
+					float occluder = 0.1 / sampleBindlessLod(LinearSamplerClamp, shadow_atlas, oct_uv, 0).r;
+					float shadow = saturate((occluder - receiver) * 1e2);
+					
+					attn *= shadow;
 				}
-				attn *= shadow / 16.0;
+				else {
+					float4 proj_pos = transformPosition(lpos, u_shadow_atlas_matrices[atlas_idx]);
+					proj_pos /= proj_pos.w;
+
+					float2 shadow_uv = proj_pos.xy;
+
+					float c = hash(frag_coord) * 2 - 1;
+					float s = sqrt(1 - c * c); 
+					float2x2 rot = float2x2(c, s, -s, c);
+					float shadow = 0;
+					float receiver = proj_pos.z;
+					for (int j = 0; j < 16; ++j) {
+						float2 pcf_offset = mul(rot, POISSON_DISK_16[j]);
+						float2 uv = shadow_uv + pcf_offset * float2(0.25, 1) / getShadowAtlasResolution(atlas_idx) * 3;
+
+						float occluder = sampleBindlessLod(LinearSamplerClamp, shadow_atlas, uv, 0).r;
+						shadow += receiver * 1.02 > occluder ? 1 : 0;
+					}
+					attn *= shadow / 16.0;
+				}
 			}
 
-			float fov = light.fov;
 			if (fov < M_PI) {
 				// TODO replace rot with dir
 				float3 dir = rotateByQuat(light.rot, float3(0, 0, -1));
