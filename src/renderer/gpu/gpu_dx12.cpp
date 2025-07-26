@@ -2818,9 +2818,7 @@ static void applyComputeUniformBlocks() {
 	if (g_last_program != d3d->current_program) {
 		g_last_program = d3d->current_program;
 		ID3D12PipelineState* pso = d3d->pso_cache.getPipelineStateCompute(d3d->device, d3d->root_signature, d3d->current_program);
-		#ifdef LUMIX_DEBUG
-			if (!pso) return false;
-		#endif
+		if (!pso) return false;
 		d3d->cmd_list->SetPipelineState(pso);
 		d3d->cmd_list->SetComputeRootDescriptorTable(BINDLESS_SRV_ROOT_PARAMETER_INDEX, d3d->srv_heap.gpu_begin);
 		d3d->cmd_list->SetComputeRootDescriptorTable(BINDLESS_SAMPLERS_ROOT_PARAMETER_INDEX, d3d->sampler_heap.gpu_begin);
@@ -2836,9 +2834,7 @@ static void applyComputeUniformBlocks() {
 		d3d->cmd_list->OMSetStencilRef(stencil_ref);
 
 		ID3D12PipelineState* pso = d3d->pso_cache.getPipelineState(d3d->device, d3d->current_program, d3d->current_framebuffer, d3d->root_signature);
-		#ifdef LUMIX_DEBUG
-			if (!pso) return false;
-		#endif
+		if (!pso) return false;
 		d3d->cmd_list->SetPipelineState(pso);
 		d3d->cmd_list->SetGraphicsRootDescriptorTable(BINDLESS_SRV_ROOT_PARAMETER_INDEX, d3d->srv_heap.gpu_begin);
 		d3d->cmd_list->SetGraphicsRootDescriptorTable(BINDLESS_SAMPLERS_ROOT_PARAMETER_INDEX, d3d->sampler_heap.gpu_begin);
