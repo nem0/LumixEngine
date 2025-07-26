@@ -963,21 +963,15 @@ void Matrix::setOrtho(float left, float right, float bottom, float top, float z_
 	}
 }
 
-void Matrix::setPerspective(float fov, float ratio, float near_plane, float far_plane, bool reversed_z) {
+void Matrix::setPerspective(float fov, float ratio, float near_plane) {
 	*this = Matrix::IDENTITY;
 	float f = 1 / tanf(fov * 0.5f);
 	columns[0].x = f / ratio;
 	columns[1].y = f;
-	columns[3].w = 0;
+	columns[2].z = 0;
 	columns[2].w = -1.0f;
-
-	if (reversed_z) {
-		columns[2].z = 0;
-		columns[3].z = near_plane;
-	} else {
-		columns[2].z = -1;
-		columns[3].z = -near_plane;
-	}
+	columns[3].z = near_plane;
+	columns[3].w = 0;
 }
 
 // assumes ortho matrix

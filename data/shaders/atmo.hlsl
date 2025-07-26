@@ -306,7 +306,7 @@ Cloud cloud(float2 screen_uv) {
 			float height = (pos.y - u_clouds_bottom) / (u_clouds_top - u_clouds_bottom);
 			float3 ambient = sunlight * lerp(0.01, 0.04, height);
 
-			float luminance = sunlight * light_transmittance * hg_phase + ambient;
+			float3 luminance = sunlight * light_transmittance * hg_phase + ambient;
 
 			// Calculate lighting with enhanced powder effect
 			float3 scatter_light = luminance * density;
@@ -372,7 +372,7 @@ void main(uint3 thread_id : SV_DispatchThreadID) {
 			+ insc.rgb * rayleighPhase(-cos_theta) * sunlight * u_scatter_rayleigh.rgb
 			;
 
-		float sun_spot = smoothstep(0.0, 1000.0, phase(cos_theta, 0.9995)) * 200;
+		float3 sun_spot = smoothstep(0.0, 1000.0, phase(cos_theta, 0.9995)) * 200;
 		sun_spot *= exp(-opt_depth.x * extinction_rayleigh - opt_depth.y * extinction_mie);
 
 		if (u_clouds_enabled > 0) {

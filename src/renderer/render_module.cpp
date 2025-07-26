@@ -2246,7 +2246,7 @@ struct RenderModuleImpl final : RenderModule {
 				true);
 		}
 		else {
-			mtx.setPerspective(camera.fov, ratio, camera.near, camera.far, true);
+			mtx.setPerspective(camera.fov, ratio, camera.near);
 		}
 		return mtx;
 	}

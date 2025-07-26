@@ -668,7 +668,7 @@ Matrix Viewport::getProjectionWithJitter() const
 		return mtx;
 	}
 
-	mtx.setPerspective(fov, ratio, near, far, true);
+	mtx.setPerspective(fov, ratio, near);
 	mtx.columns[2].x = pixel_offset.x;
 	mtx.columns[2].y = pixel_offset.y;
 	return mtx;
@@ -690,7 +690,7 @@ Matrix Viewport::getProjectionNoJitter() const
 		return mtx;
 	}
 
-	mtx.setPerspective(fov, ratio, near, far, true);
+	mtx.setPerspective(fov, ratio, near);
 	return mtx;
 }
 

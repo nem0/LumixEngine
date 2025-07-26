@@ -116,6 +116,11 @@ struct ShadowAtlas {
 		for (EntityPtr& e : inv_map) e = INVALID_ENTITY;
 	}
 
+	void clear() {
+		for (EntityPtr& e : inv_map) e = INVALID_ENTITY;
+		map.clear();
+	}
+
 	// must match getShadowAtlasResolution in shader
 	static Vec4 getUV(u32 idx) {
 		switch(getGroup(idx)) {
@@ -477,6 +482,7 @@ struct PipelineImpl final : Pipeline {
 		m_debug_clusters_shader = rm.load<Shader>(Path("shaders/debug_clusters.hlsl"));
 		m_debug_velocity_shader = rm.load<Shader>(Path("shaders/debug_velocity.hlsl"));
 		m_instancing_shader = rm.load<Shader>(Path("shaders/instancing.hlsl"));
+		m_flatten_shader = rm.load<Shader>(Path("shaders/flatten_cube.hlsl"));
 		
 		m_draw2d.clear({1, 1});
 
@@ -560,6 +566,7 @@ struct PipelineImpl final : Pipeline {
 		m_debug_clusters_shader->decRefCount();
 		m_debug_velocity_shader->decRefCount();
 		m_instancing_shader->decRefCount();
+		m_flatten_shader->decRefCount();
 
 		stream.destroy(m_cube_ib);
 		stream.destroy(m_cube_vb);
@@ -699,55 +706,130 @@ struct PipelineImpl final : Pipeline {
 
 	bool bakeShadow(const PointLight& light, u32 atlas_idx) {
 		PROFILE_FUNCTION();
+		if (!m_flatten_shader->isReady()) return false;
+
 		m_renderer.releaseRenderbuffer(m_output);
+		m_output = INVALID_RENDERBUFFER;
 		const World& world = m_module->getWorld();
 		const Viewport backup_viewport = m_viewport;
 
+		beginBlock("bake_shadow");
 		const Vec4 uv = ShadowAtlas::getUV(atlas_idx);
 		m_viewport = {};
 		m_viewport.is_ortho = false;
 		m_viewport.pos = world.getPosition(light.entity);
-		m_viewport.rot = world.getRotation(light.entity);
-		m_viewport.fov = light.fov;
 		m_viewport.near = 0.1f;
 		m_viewport.far = light.range;
 		m_viewport.w = u32(ShadowAtlas::SIZE * uv.z + 0.5f);
-		m_viewport.h = u32(ShadowAtlas::SIZE * uv.w + 0.5f);;
+		m_viewport.h = u32(ShadowAtlas::SIZE * uv.w + 0.5f);
+		
+		const BucketDesc bucket[] = {{ .layer = "default", .define = "DEPTH"}};
 
-		beginBlock("bake_shadow");
+		// we treat every light with fov > PI as omnidirecitonal
+		if (light.fov > PI) {
+			const u32 face_size = m_viewport.w;
+			DrawStream& stream = m_renderer.getDrawStream();
+			RenderBufferHandle depthbuf = m_renderer.createRenderbuffer({
+				.size = {m_viewport.w, m_viewport.h},
+				.format = gpu::TextureFormat::D32,
+				.debug_name = "bake_shadow_depth",
+			});
 
-		RenderBufferHandle depthbuf = m_renderer.createRenderbuffer({
-			.size = {m_viewport.w, m_viewport.h},
-			.format = gpu::TextureFormat::D32,
-			.debug_name = "bake_shadow_depth",
+			const Quat faces_rot[] = {
+				Quat(Vec3(0, 1, 0), -PI * 0.5f),
+				Quat(Vec3(0, 1, 0), PI * 0.5f),
+				Quat(Vec3(1, 0, 0), PI * 0.5f),
+				Quat(Vec3(1, 0, 0), -PI * 0.5f),
+				Quat(Vec3(0, 1, 0), 0),
+				Quat(Vec3(0, 1, 0), PI)
+			};
+			
+			for (u32 i = 0; i < 6; ++i) {
+				// render scene
+				m_renderer.setRenderTargets({}, depthbuf);
+				clear(gpu::ClearFlags::ALL, 0, 0, 0, 1, 0);
+				
+				m_viewport.fov = PI * 0.5f;
+				m_viewport.rot = faces_rot[i];
+				CameraParams cp = getMainCamera();
+				pass(cp);
 
-		});
-		m_renderer.setRenderTargets({}, depthbuf);
-		clear(gpu::ClearFlags::ALL, 0, 0, 0, 1, 0);
-		CameraParams cp = getMainCamera();
-		pass(cp);
+				u32 view_idx = cull(cp, bucket);
+				renderBucket(view_idx, 0);
+				renderTerrains(cp, gpu::StateFlags::NONE, "DEPTH");
 
-		BucketDesc bucket[] = {{ .layer = "default", .define = "DEPTH"}};
+				// copy into atlas
+				const gpu::TextureHandle src = m_renderer.toTexture(depthbuf);
+				const gpu::TextureHandle dst = m_shadow_atlas.texture;
+				stream.barrier(dst, gpu::BarrierType::WRITE);
 
-		u32 view_idx = cull(cp, bucket);
-		renderBucket(view_idx, 0);
-		renderTerrains(cp, gpu::StateFlags::NONE, "DEPTH");
-		m_output = depthbuf;
-		endBlock();
+				struct UBData {
+					u32 dst_x;
+					u32 dst_y;
+					u32 w;
+					u32 h;
+					u32 face;
+					gpu::BindlessHandle src;
+					gpu::RWBindlessHandle dst;
+				} ub = {
+					.dst_x = u32(ShadowAtlas::SIZE * uv.x + 0.5f),
+					.dst_y = u32(ShadowAtlas::SIZE * uv.y + 0.5f),
+					.w = (u32)m_viewport.w,
+					.h = (u32)m_viewport.h,
+					.face = i,
+					.src = toBindless(depthbuf, stream),
+					.dst = gpu::getRWBindlessHandle(dst)
+				};
+				
+				const Renderer::TransientSlice ub_mem = m_renderer.allocUniform(&ub, sizeof(ub));
+				stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub_mem.buffer, ub_mem.offset, ub_mem.size);
 
-		const gpu::TextureHandle src = getOutput();
-		m_renderer.releaseRenderbuffer(depthbuf);
-		if (!src) {
-			logError("Could not bake shadows because the pipeline had no output");
-			return false;
+				ASSERT(m_viewport.w % 16 == 0);
+				ASSERT(m_viewport.h % 16 == 0);
+				const gpu::ProgramHandle shader = m_flatten_shader->getProgram(0);
+				stream.useProgram(shader);
+				stream.dispatch(m_viewport.w / 16, m_viewport.h / 16, 1);
+			}
+			
+			m_renderer.releaseRenderbuffer(depthbuf);
+
+
+			/*const gpu::TextureHandle dst = m_shadow_atlas.texture;
+			const u32 x = u32(ShadowAtlas::SIZE * uv.x + 0.5f);
+			const u32 y = u32(ShadowAtlas::SIZE * uv.y + 0.5f);
+			
+			// TODO this should be a single blit from cubemap to 2d texture array in GPU
+			for (u32 i = 0; i < 6; ++i) {
+				m_renderer.getDrawStream().copy(dst, src, x, y + i * face_size, i);
+			}*/
 		}
+		else {
+			m_viewport.fov = light.fov;
+			m_viewport.rot = world.getRotation(light.entity);
+			RenderBufferHandle depthbuf = m_renderer.createRenderbuffer({
+				.size = {m_viewport.w, m_viewport.h},
+				.format = gpu::TextureFormat::D32,
+				.debug_name = "bake_shadow_depth",
 
-		const gpu::TextureHandle dst = m_shadow_atlas.texture;
-		const u32 x = u32(ShadowAtlas::SIZE * uv.x + 0.5f);
-		const u32 y = u32(ShadowAtlas::SIZE * uv.y + 0.5f);
-		m_renderer.getDrawStream().copy(dst, src, x, y);
+			});
+			m_renderer.setRenderTargets({}, depthbuf);
+			clear(gpu::ClearFlags::ALL, 0, 0, 0, 1, 0);
+			CameraParams cp = getMainCamera();
+			pass(cp);
+
+			u32 view_idx = cull(cp, bucket);
+			renderBucket(view_idx, 0);
+			renderTerrains(cp, gpu::StateFlags::NONE, "DEPTH");
+			
+			const gpu::TextureHandle src = m_renderer.toTexture(depthbuf);
+			const gpu::TextureHandle dst = m_shadow_atlas.texture;
+			const u32 x = u32(ShadowAtlas::SIZE * uv.x + 0.5f);
+			const u32 y = u32(ShadowAtlas::SIZE * uv.y + 0.5f);
+			m_renderer.getDrawStream().copy(dst, src, x, y);
+			m_renderer.releaseRenderbuffer(depthbuf);
+		}
 		m_viewport = backup_viewport;
-
+		endBlock();
 		return true;
 	}
 
@@ -1746,6 +1828,7 @@ struct PipelineImpl final : Pipeline {
 		RenderModule* module = world ? (RenderModule*)world->getModule("renderer") : nullptr;
 		if (m_module == module) return;
 		m_module = module;
+		m_shadow_atlas.clear();
 	}
 	
 	Renderer& getRenderer() const override { return m_renderer; }
@@ -2076,7 +2159,7 @@ struct PipelineImpl final : Pipeline {
 
 	Matrix getShadowMatrix(const PointLight& light, u32 atlas_idx) {
 		Matrix prj;
-		prj.setPerspective(light.fov, 1, 0.1f, light.range, true);
+		prj.setPerspective(light.fov, 1, 0.1f);
 		const Quat rot = -m_module->getWorld().getRotation(light.entity);
 		
 		const float ymul = gpu::isOriginBottomLeft() ? 0.5f : -0.5f;
@@ -2862,8 +2945,6 @@ struct PipelineImpl final : Pipeline {
 		}
 	}
 
-	
-	
 	static float computeShadowPriority(float fov, float light_radius, const DVec3& light_pos, const DVec3& cam_pos) {
 		float lr3 = light_radius * light_radius * light_radius;
 		return float(fov * lr3 / length(cam_pos - light_pos));
@@ -2965,8 +3046,7 @@ struct PipelineImpl final : Pipeline {
 		}
 
 		if (!m_shadow_atlas.texture && atlas_sorter.count > 0) {
-			// TODO render target flag?
-			m_shadow_atlas.texture = m_renderer.createTexture(ShadowAtlas::SIZE, ShadowAtlas::SIZE, 1, gpu::TextureFormat::D32, gpu::TextureFlags::NO_MIPS, Renderer::MemRef(), "shadow_atlas");
+			m_shadow_atlas.texture = m_renderer.createTexture(ShadowAtlas::SIZE, ShadowAtlas::SIZE, 1, gpu::TextureFormat::D32, gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE, Renderer::MemRef(), "shadow_atlas");
 		}
 		Matrix shadow_atlas_matrices[128];
 		for (u32 i = 0; i < atlas_sorter.count; ++i) {
@@ -3662,6 +3742,7 @@ struct PipelineImpl final : Pipeline {
 	Shader* m_debug_clusters_shader;
 	Shader* m_debug_velocity_shader;
 	Shader* m_instancing_shader;
+	Shader* m_flatten_shader;
 	Array<gpu::TextureHandle> m_textures;
 	Array<gpu::BufferHandle> m_buffers;
 	os::Timer m_timer;
