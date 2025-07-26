@@ -1,7 +1,10 @@
 
-lod_count = 1
+lod_count = 4
 root_motion_bone = "mixamorig:Hips"
-lod0_distance = 5000.000000
-lod1_distance = 10000.009766
-lod2_distance = 10000.019531
+autolod1 = 0.300000
+autolod2 = 0.030000
+autolod3 = 0.010000
+lod0_distance = 20.000000
+lod1_distance = 50.000000
+lod2_distance = 150.000000
 lod3_distance = 10000.029297
