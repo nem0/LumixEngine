@@ -2864,8 +2864,9 @@ struct PipelineImpl final : Pipeline {
 
 	
 	
-	static float computeShadowPriority(float light_radius, const DVec3& light_pos, const DVec3& cam_pos) {
-		return float(light_radius / length(cam_pos - light_pos));
+	static float computeShadowPriority(float fov, float light_radius, const DVec3& light_pos, const DVec3& cam_pos) {
+		float lr3 = light_radius * light_radius * light_radius;
+		return float(fov * lr3 / length(cam_pos - light_pos));
 	};
 
 	void fillClusters(DrawStream& stream, const CameraParams& cp) {
@@ -2942,7 +2943,7 @@ struct PipelineImpl final : Pipeline {
 				auto iter = m_shadow_atlas.map.find(e);
 				if (pl.flags & PointLight::CAST_SHADOWS) {
 					light.atlas_idx = iter.isValid() ? iter.value() : -1;
-					atlas_sorter.push(i, computeShadowPriority(light.radius, light_pos, cam_pos), e);
+					atlas_sorter.push(i, computeShadowPriority(light.fov, light.radius, light_pos, cam_pos), e);
 				}
 				else {
 					light.atlas_idx = -1;
