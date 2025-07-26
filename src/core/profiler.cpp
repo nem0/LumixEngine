@@ -87,7 +87,7 @@ struct ThreadContext {
 	};
 
 	IAllocator& allocator;
-	OpenBlock open_block_stack[16];
+	OpenBlock open_block_stack[16] = {};
 	u32 open_block_stack_size = 0;
 	
 	// we write to `tmp` until it's full, then we flush it to the `buffer`
@@ -556,7 +556,10 @@ FiberSwitchData beginFiberWait(i32 job_system_signal) {
 	res.count = ctx->open_block_stack_size;
 	res.id = r.id;
 	res.signal = job_system_signal;
-	memcpy(res.blocks, ctx->open_block_stack, minimum(res.count, lengthOf(res.blocks), lengthOf(ctx->open_block_stack)) * sizeof(res.blocks[0]));
+	const u32 num = minimum(res.count, lengthOf(res.blocks), lengthOf(ctx->open_block_stack));
+	for (u32 i = 0; i < num; ++i) {
+		res.blocks[i] = ctx->open_block_stack[i].id;
+	}
 	write<false>(*ctx, os::Timer::getRawTimestamp(), EventType::BEGIN_FIBER_WAIT, r);
 	return res;
 }
