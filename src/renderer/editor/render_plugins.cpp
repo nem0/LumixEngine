@@ -2341,6 +2341,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 					ImGui::TableHeadersRow();
 
 					for (i32 i = 0; i < Model::MAX_LOD_COUNT && lods[i].to >= 0; ++i) {
+						ImGui::PushID(i);
 						ImGui::TableNextRow();
 						ImGui::TableNextColumn();
 						ImGui::Text("%d", i);
@@ -2361,6 +2362,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 							tri_count += indices_count / 3;
 						}
 						ImGui::Text("%d", tri_count);
+						ImGui::PopID();
 					}
 
 					ImGui::EndTable();
