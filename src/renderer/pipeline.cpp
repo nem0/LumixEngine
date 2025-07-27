@@ -182,13 +182,21 @@ static const float SHADOW_CAM_FAR = 500.0f;
 
 struct PipelineImpl final : Pipeline {
 	struct Bucket {
-		Bucket(Renderer& renderer) : stream(renderer) {}
+		Bucket(Renderer& renderer) 
+			: stream(renderer)
+		{
+			for (DrawStream*& s : substreams) {
+				s = &stream.createSubstream();
+			}
+		}
+
 		u8 layer;
 		char layer_name[32];
 		BucketDesc::Sort sort = BucketDesc::DEFAULT;
 		u32 define_mask = 0;
 		gpu::StateFlags state = gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_FN_GREATER;
 		DrawStream stream;
+		DrawStream* substreams[8];
 	};
 
 	struct Sorter {
@@ -2529,16 +2537,7 @@ struct PipelineImpl final : Pipeline {
 		const Transform* LUMIX_RESTRICT transforms = world.getTransforms(); 
 		const DVec3 camera_pos = view.cp.pos;
 		
-		u64 instance_key_mask;
-		u32 define_mask;
-		u32 autoinstanced_define_mask;
-		u32 dynamic_define_mask;
-		u32 skinned_define_mask;
-		u32 fur_define_mask;
 		const Mesh** sort_key_to_mesh = m_renderer.getSortKeyToMeshMap();
-		u8 prev_bucket = (sort_keys[0] >> SORT_KEY_BUCKET_SHIFT) + 1; // make sure it's different from the first bucket, so first iteration is properly initialized
-		DrawStream* stream = nullptr;
-		gpu::StateFlags render_state;
 
 		gpu::VertexDecl dyn_instance_decl(gpu::PrimitiveType::NONE);
 		dyn_instance_decl.addAttribute(0, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
@@ -2553,396 +2552,415 @@ struct PipelineImpl final : Pipeline {
 		instanced_decl.addAttribute(16, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 		instanced_decl.addAttribute(32, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 
-		for (u32 i = 0; i < keys_count; ++i) {
-			const EntityRef entity = {int(renderables[i] & 0xFFffFFff)};
-			const RenderableTypes type = RenderableTypes((renderables[i] >> 32) & SORT_VALUE_TYPE_MASK);
-			const u8 bucket = sort_keys[i] >> SORT_KEY_BUCKET_SHIFT;
 
-			if (bucket != prev_bucket) {
-				prev_bucket = bucket;
-				stream = &view.buckets[bucket].stream;
-				define_mask = view.buckets[bucket].define_mask;
-				autoinstanced_define_mask = define_mask | (1 << m_renderer.getShaderDefineIdx("AUTOINSTANCED"));
-				dynamic_define_mask = define_mask | (1 << m_renderer.getShaderDefineIdx("DYNAMIC"));
-				skinned_define_mask = define_mask | (1 << m_renderer.getShaderDefineIdx("SKINNED"));
-				fur_define_mask = define_mask | (1 << m_renderer.getShaderDefineIdx("FUR"));
-				const bool sort_depth = view.buckets[bucket].sort == BucketDesc::DEPTH;
-				instance_key_mask = sort_depth ? 0xff00'0000'00ff'ffff : 0xffff'ffff'0000'0000;
-				render_state = view.buckets[bucket].state;
-			}
+		const u32 num_batches = lengthOf(view.buckets[0].substreams);
+		jobs::forEach(num_batches, 1, [&](u32 batch_idx, u32){
+			PROFILE_BLOCK("create commands");
+			const u32 step = (keys_count + num_batches - 1) / num_batches;
+			const u32 from = batch_idx * step;
+			u32 to = from + step;
+			if (from >= keys_count) return;
+			if (to > keys_count) to = keys_count;
 
-			switch(type) {
-				case RenderableTypes::PARTICLES: {
-					const u32 emitter_idx = u32(renderables[i] >> SORT_KEY_EMITTER_SHIFT);
-					const ParticleSystem& particle_system = m_module->getParticleSystem(entity);
-					const ParticleSystem::Emitter& emitter = particle_system.getEmitter(emitter_idx);
-					const Material* material = emitter.resource_emitter.material;
-					const u32 particles_count = emitter.particles_count;
+			u64 instance_key_mask;
+			u32 define_mask;
+			u32 autoinstanced_define_mask;
+			u32 dynamic_define_mask;
+			u32 skinned_define_mask;
+			u32 fur_define_mask;
+			gpu::StateFlags render_state;
+			DrawStream* stream = nullptr;
+			u8 prev_bucket = (sort_keys[from] >> SORT_KEY_BUCKET_SHIFT) + 1; // make sure it's different from the first bucket, so first iteration is properly initialized
 
-					const Transform tr = world.getTransform(*particle_system.m_entity);
-					const Vec3 lpos = Vec3(tr.pos - camera_pos);
-					const gpu::VertexDecl& decl = emitter.resource_emitter.vertex_decl;
-					const gpu::StateFlags state = material->m_render_states | render_state;
-					gpu::ProgramHandle program = material->getShader()->getProgram(state, decl, define_mask | material->getDefineMask(), "");
-					const Renderer::TransientSlice slice = emitter.slice;
-					const Matrix mtx(lpos, tr.rot);
+			for (u32 i = from; i < to; ++i) {
+				const EntityRef entity = {int(renderables[i] & 0xFFffFFff)};
+				const RenderableTypes type = RenderableTypes((renderables[i] >> 32) & SORT_VALUE_TYPE_MASK);
+				const u8 bucket = sort_keys[i] >> SORT_KEY_BUCKET_SHIFT;
 
-					const Renderer::TransientSlice ub = m_renderer.allocUniform(&mtx, sizeof(Matrix));
-					stream->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
-					material->bind(*stream);
-					stream->useProgram(program);
-					stream->bindIndexBuffer(gpu::INVALID_BUFFER);
-					stream->bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
-					stream->bindVertexBuffer(1, slice.buffer, slice.offset, decl.getStride());
-					stream->drawArraysInstanced(4, particles_count);
-					break;
+				if (bucket != prev_bucket) {
+					prev_bucket = bucket;
+					stream = view.buckets[bucket].substreams[batch_idx];
+					define_mask = view.buckets[bucket].define_mask;
+					autoinstanced_define_mask = define_mask | (1 << m_renderer.getShaderDefineIdx("AUTOINSTANCED"));
+					dynamic_define_mask = define_mask | (1 << m_renderer.getShaderDefineIdx("DYNAMIC"));
+					skinned_define_mask = define_mask | (1 << m_renderer.getShaderDefineIdx("SKINNED"));
+					fur_define_mask = define_mask | (1 << m_renderer.getShaderDefineIdx("FUR"));
+					const bool sort_depth = view.buckets[bucket].sort == BucketDesc::DEPTH;
+					instance_key_mask = sort_depth ? 0xff00'0000'00ff'ffff : 0xffff'ffff'0000'0000;
+					render_state = view.buckets[bucket].state;
 				}
-				case RenderableTypes::MESH_MATERIAL_OVERRIDE: {
-					const u32 mesh_idx = u32(renderables[i] >> SORT_KEY_MESH_IDX_SHIFT);
-					const ModelInstance* LUMIX_RESTRICT mi = &model_instances[entity.index];
-					const Mesh& mesh = mi->meshes[mesh_idx];
 
-					const Renderer::TransientSlice slice = m_renderer.allocTransient(sizeof(Vec4) * 3);
-					u8* instance_data = slice.ptr;
-					const Transform& tr = transforms[entity.index];
-					const float lod_d = model_instances[entity.index].lod - mesh.lod;
-					const Vec3 lpos = Vec3(tr.pos - camera_pos);
-					memcpy(instance_data, &tr.rot, sizeof(tr.rot));
-					instance_data += sizeof(tr.rot);
-					memcpy(instance_data, &lpos, sizeof(lpos));
-					instance_data += sizeof(lpos);
-					memcpy(instance_data, &lod_d, sizeof(lod_d));
-					instance_data += sizeof(lod_d);
-					memcpy(instance_data, &tr.scale, sizeof(tr.scale));
-					instance_data += sizeof(tr.scale) + sizeof(float)/*padding*/;
+				switch(type) {
+					case RenderableTypes::PARTICLES: {
+						const u32 emitter_idx = u32(renderables[i] >> SORT_KEY_EMITTER_SHIFT);
+						const ParticleSystem& particle_system = m_module->getParticleSystem(entity);
+						const ParticleSystem::Emitter& emitter = particle_system.getEmitter(emitter_idx);
+						const Material* material = emitter.resource_emitter.material;
+						const u32 particles_count = emitter.particles_count;
 
-					if (mi->custom_material->isReady()) {
-						Shader* shader = mi->custom_material->getShader();
-						const Material* material =  mi->custom_material;
-
+						const Transform tr = world.getTransform(*particle_system.m_entity);
+						const Vec3 lpos = Vec3(tr.pos - camera_pos);
+						const gpu::VertexDecl& decl = emitter.resource_emitter.vertex_decl;
 						const gpu::StateFlags state = material->m_render_states | render_state;
-						const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_decl, autoinstanced_define_mask | material->getDefineMask(), mesh.semantics_defines);
+						gpu::ProgramHandle program = material->getShader()->getProgram(state, decl, define_mask | material->getDefineMask(), "");
+						const Renderer::TransientSlice slice = emitter.slice;
+						const Matrix mtx(lpos, tr.rot);
+
+						const Renderer::TransientSlice ub = m_renderer.allocUniform(&mtx, sizeof(Matrix));
+						stream->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+						material->bind(*stream);
+						stream->useProgram(program);
+						stream->bindIndexBuffer(gpu::INVALID_BUFFER);
+						stream->bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
+						stream->bindVertexBuffer(1, slice.buffer, slice.offset, decl.getStride());
+						stream->drawArraysInstanced(4, particles_count);
+						break;
+					}
+					case RenderableTypes::MESH_MATERIAL_OVERRIDE: {
+						const u32 mesh_idx = u32(renderables[i] >> SORT_KEY_MESH_IDX_SHIFT);
+						const ModelInstance* LUMIX_RESTRICT mi = &model_instances[entity.index];
+						const Mesh& mesh = mi->meshes[mesh_idx];
+
+						const Renderer::TransientSlice slice = m_renderer.allocTransient(sizeof(Vec4) * 3);
+						u8* instance_data = slice.ptr;
+						const Transform& tr = transforms[entity.index];
+						const float lod_d = model_instances[entity.index].lod - mesh.lod;
+						const Vec3 lpos = Vec3(tr.pos - camera_pos);
+						memcpy(instance_data, &tr.rot, sizeof(tr.rot));
+						instance_data += sizeof(tr.rot);
+						memcpy(instance_data, &lpos, sizeof(lpos));
+						instance_data += sizeof(lpos);
+						memcpy(instance_data, &lod_d, sizeof(lod_d));
+						instance_data += sizeof(lod_d);
+						memcpy(instance_data, &tr.scale, sizeof(tr.scale));
+						instance_data += sizeof(tr.scale) + sizeof(float)/*padding*/;
+
+						if (mi->custom_material->isReady()) {
+							Shader* shader = mi->custom_material->getShader();
+							const Material* material =  mi->custom_material;
+
+							const gpu::StateFlags state = material->m_render_states | render_state;
+							const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_decl, autoinstanced_define_mask | material->getDefineMask(), mesh.semantics_defines);
+							stream->useProgram(program);
+							material->bind(*stream);
+							stream->bindIndexBuffer(mesh.index_buffer_handle);
+							stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
+							stream->bindVertexBuffer(1, slice.buffer, slice.offset, 48);
+							stream->drawIndexedInstanced(mesh.indices_count, 1, mesh.index_type);
+						}
+						break;
+					}
+					case RenderableTypes::MESH: {
+						if (sort_keys[i] & SORT_KEY_INSTANCED_FLAG) {
+							const u32 group_idx = renderables[i] & 0xffFF;
+							const u32 instancer_idx = (renderables[i] >> SORT_KEY_INSTANCER_SHIFT) & 0xffFF;
+							const AutoInstancer::Instances& instances = view.instancers[instancer_idx].instances[group_idx];
+							const u32 total_count = instances.end->offset + instances.end->count;
+							const Mesh& mesh = *sort_key_to_mesh[group_idx];
+
+							const Material* material = mesh.material;
+							Shader* shader = material->getShader();
+							const gpu::StateFlags state = material->m_render_states | render_state;
+							const u32 defines = autoinstanced_define_mask | material->getDefineMask();
+							const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_decl, defines, mesh.semantics_defines);
+						
+							gpu::Drawcall& dc = stream->draw();
+							dc = {
+								.program = program,
+								.index_buffer = mesh.index_buffer_handle,
+								.vertex_buffers = { mesh.vertex_buffer_handle, instances.slice.buffer },
+								.vertex_buffer_offsets = { 0, instances.slice.offset },
+								.vertex_buffer_sizes = { mesh.vb_stride, 48 },
+								.uniform_buffer2 = m_renderer.getMaterialUniformBuffer(),
+								.uniform_buffer2_offset = material->getBufferOffset(),
+								.uniform_buffer2_size = Material::MAX_UNIFORMS_BYTES,
+								.indices_count = mesh.indices_count,
+								.instances_count = total_count,
+								.index_type = mesh.index_type,
+							};
+						}
+						else {
+							const u32 mesh_idx = u32(renderables[i] >> SORT_KEY_MESH_IDX_SHIFT);
+							ModelInstance* LUMIX_RESTRICT mi = &model_instances[entity.index];
+							const Mesh& mesh = mi->meshes[mesh_idx];
+							const float mesh_lod = mesh.lod;
+							const Material* material = mesh.material;
+							Shader* shader = material->getShader();
+							const gpu::StateFlags state = material->m_render_states | render_state;
+
+							if (mi->flags & ModelInstance::MOVED) {
+								const i32 start_i = i;
+								const u64 key = sort_keys[i];
+								while (i < keys_count && sort_keys[i] == key) {
+									++i;
+								}
+
+								const u32 count = u32(i - start_i);
+								const Renderer::TransientSlice slice = m_renderer.allocTransient(count * (sizeof(Vec4) * 6));
+								u8* instance_data = slice.ptr;
+
+								for (i32 j = start_i; j < start_i + (i32)count; ++j) {
+									const EntityRef e = { i32(renderables[j] & 0xFFffFFff) };
+									const Transform& tr = transforms[e.index];
+									const Vec3 pos_ws = Vec3(tr.pos - camera_pos);
+									const float lod_d = model_instances[e.index].lod - mesh_lod;
+									ModelInstance* LUMIX_RESTRICT mi2 = &model_instances[e.index];
+									const Transform prev_tr = mi2->prev_frame_transform;
+									const Vec3 prev_pos_ws = Vec3(prev_tr.pos - camera_pos);
+								
+									#define WRITE(X) memcpy(instance_data, &X, sizeof(X)); instance_data += sizeof(X)
+									WRITE(tr.rot);
+									WRITE(pos_ws);
+									WRITE(lod_d);
+									WRITE(tr.scale);
+									instance_data += sizeof(float); // padding
+								
+									WRITE(prev_tr.rot);
+									WRITE(prev_pos_ws);
+									WRITE(lod_d);
+									WRITE(prev_tr.scale);
+									instance_data += sizeof(float); // padding
+									#undef WRITE
+								}
+
+								const u32 defines = dynamic_define_mask | material->getDefineMask();
+								const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, dyn_instance_decl, defines, mesh.semantics_defines);
+						
+								stream->useProgram(program);
+								material->bind(*stream);
+								stream->bindIndexBuffer(mesh.index_buffer_handle);
+								stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
+								stream->bindVertexBuffer(1, slice.buffer, slice.offset, sizeof(Vec4) * 6);
+								stream->drawIndexedInstanced(mesh.indices_count, count, mesh.index_type);
+								--i;
+							}
+							else {
+								int start_i = i;
+								const u64 key = sort_keys[i] & instance_key_mask;
+								while (i < keys_count && (sort_keys[i] & instance_key_mask) == key) {
+									++i;
+								}
+								const u32 count = u32(i - start_i);
+								const Renderer::TransientSlice slice = m_renderer.allocTransient(count * (sizeof(Vec4) * 3));
+								u8* instance_data = slice.ptr;
+								for (int j = start_i; j < start_i + (i32)count; ++j) {
+									const EntityRef e = { i32(renderables[j] & 0xFFffFFff) };
+									const Transform& tr = transforms[e.index];
+									const Vec3 lpos = Vec3(tr.pos - camera_pos);
+									const float lod_d = model_instances[e.index].lod - mesh_lod;
+									memcpy(instance_data, &tr.rot, sizeof(tr.rot));
+									instance_data += sizeof(tr.rot);
+									memcpy(instance_data, &lpos, sizeof(lpos));
+									instance_data += sizeof(lpos);
+									memcpy(instance_data, &lod_d, sizeof(lod_d));
+									instance_data += sizeof(lod_d);
+									memcpy(instance_data, &tr.scale, sizeof(tr.scale));
+									instance_data += sizeof(tr.scale) + sizeof(float)/*padding*/;
+								}
+
+								const u32 defines = autoinstanced_define_mask | material->getDefineMask();
+								const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_decl, defines, mesh.semantics_defines);
+						
+								stream->useProgram(program);
+								material->bind(*stream);
+								stream->bindIndexBuffer(mesh.index_buffer_handle);
+								stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
+								stream->bindVertexBuffer(1, slice.buffer, slice.offset, sizeof(Vec3) * 3);
+								stream->drawIndexedInstanced(mesh.indices_count, count, mesh.index_type);
+								--i;
+							}
+						}
+						break;
+					}
+					case RenderableTypes::FUR:
+					case RenderableTypes::SKINNED: {
+						const u32 mesh_idx = u32(renderables[i] >> SORT_KEY_MESH_IDX_SHIFT);
+						ModelInstance* LUMIX_RESTRICT mi = &model_instances[entity.index];
+						const Transform& tr = transforms[entity.index];
+						const Vec3 rel_pos = Vec3(tr.pos - camera_pos);
+						const Mesh& mesh = mi->meshes[mesh_idx];
+						Shader* shader = mesh.material->getShader();
+						u32 defines = skinned_define_mask | mesh.material->getDefineMask();
+						if (type == RenderableTypes::FUR) defines |= fur_define_mask;
+
+						struct UBPrefix {
+							float fur_scale;
+							float gravity;
+							float layers;
+							float padding;
+							Matrix model_mtx;
+							Matrix prev_model_mtx;
+						};
+
+						const Renderer::TransientSlice ub = m_renderer.allocUniform(sizeof(DualQuat) * mi->pose->count + sizeof(UBPrefix));
+					
+						UBPrefix* prefix = (UBPrefix*)ub.ptr;
+						u32 layers = 1;
+						if (type == RenderableTypes::FUR) {
+							FurComponent& fur = m_module->getFur(entity);
+							layers = fur.layers;
+							prefix->fur_scale = fur.scale;
+							prefix->gravity = fur.gravity;
+						}
+						prefix->layers = float(layers);
+
+						prefix->model_mtx = Matrix(rel_pos, tr.rot, tr.scale);
+
+						const Vec3 prev_rel_pos = Vec3(mi->prev_frame_transform.pos - camera_pos);
+						prefix->prev_model_mtx = Matrix(prev_rel_pos, mi->prev_frame_transform.rot, mi->prev_frame_transform.scale);
+
+						const Quat* rotations = mi->pose->rotations;
+						const Vec3* positions = mi->pose->positions;
+						Model& model = *mi->model;
+
+						DualQuat* bones_ub_array = (DualQuat*)(ub.ptr + sizeof(UBPrefix));
+						for (int j = 0, c = mi->pose->count; j < c; ++j) {
+							const Model::Bone& bone = model.getBone(j);
+							const LocalRigidTransform tmp = {positions[j], rotations[j]};
+							bones_ub_array[j] = (tmp * bone.inv_bind_transform).toDualQuat();
+						}
+					
+						const Material* material = mesh.material;
+						stream->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+						const gpu::StateFlags state = material->m_render_states | render_state;
+						const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, defines, mesh.semantics_defines);
 						stream->useProgram(program);
 						material->bind(*stream);
 						stream->bindIndexBuffer(mesh.index_buffer_handle);
 						stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
-						stream->bindVertexBuffer(1, slice.buffer, slice.offset, 48);
-						stream->drawIndexedInstanced(mesh.indices_count, 1, mesh.index_type);
+						stream->bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+						stream->drawIndexedInstanced(mesh.indices_count, layers, mesh.index_type);
+						break;
 					}
-					break;
-				}
-				case RenderableTypes::MESH: {
-					if (sort_keys[i] & SORT_KEY_INSTANCED_FLAG) {
-						const u32 group_idx = renderables[i] & 0xffFF;
-						const u32 instancer_idx = (renderables[i] >> SORT_KEY_INSTANCER_SHIFT) & 0xffFF;
-						const AutoInstancer::Instances& instances = view.instancers[instancer_idx].instances[group_idx];
-						const u32 total_count = instances.end->offset + instances.end->count;
-						const Mesh& mesh = *sort_key_to_mesh[group_idx];
+					case RenderableTypes::DECAL: {
+						const Material* material = m_module->getDecal(entity).material;
 
-						const Material* material = mesh.material;
-						Shader* shader = material->getShader();
-						const gpu::StateFlags state = material->m_render_states | render_state;
-						const u32 defines = autoinstanced_define_mask | material->getDefineMask();
-						const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_decl, defines, mesh.semantics_defines);
-						
-						gpu::Drawcall& dc = stream->draw();
-						dc = {
-							.program = program,
-							.index_buffer = mesh.index_buffer_handle,
-							.vertex_buffers = { mesh.vertex_buffer_handle, instances.slice.buffer },
-							.vertex_buffer_offsets = { 0, instances.slice.offset },
-							.vertex_buffer_sizes = { mesh.vb_stride, 48 },
-							.uniform_buffer2 = m_renderer.getMaterialUniformBuffer(),
-							.uniform_buffer2_offset = material->getBufferOffset(),
-							.uniform_buffer2_size = Material::MAX_UNIFORMS_BYTES,
-							.indices_count = mesh.indices_count,
-							.instances_count = total_count,
-							.index_type = mesh.index_type,
+						int start_i = i;
+						const u64 key = sort_keys[i];
+						while (i < keys_count && sort_keys[i] == key) {
+							++i;
+						}
+						const u32 count = i - start_i;
+						struct DecalData {
+							Vec3 pos;
+							Quat rot;
+							Vec3 half_extents;
+							Vec2 uv_scale;
 						};
-					}
-					else {
-						const u32 mesh_idx = u32(renderables[i] >> SORT_KEY_MESH_IDX_SHIFT);
-						ModelInstance* LUMIX_RESTRICT mi = &model_instances[entity.index];
-						const Mesh& mesh = mi->meshes[mesh_idx];
-						const float mesh_lod = mesh.lod;
-						const Material* material = mesh.material;
-						Shader* shader = material->getShader();
-						const gpu::StateFlags state = material->m_render_states | render_state;
+						const Renderer::TransientSlice slice = m_renderer.allocTransient(count * (sizeof(DecalData)));
 
-						if (mi->flags & ModelInstance::MOVED) {
-							const i32 start_i = i;
-							const u64 key = sort_keys[i];
-							while (i < keys_count && sort_keys[i] == key) {
-								++i;
-							}
-
-							const u32 count = u32(i - start_i);
-							const Renderer::TransientSlice slice = m_renderer.allocTransient(count * (sizeof(Vec4) * 6));
-							u8* instance_data = slice.ptr;
-
-							for (i32 j = start_i; j < start_i + (i32)count; ++j) {
-								const EntityRef e = { i32(renderables[j] & 0xFFffFFff) };
-								const Transform& tr = transforms[e.index];
-								const Vec3 pos_ws = Vec3(tr.pos - camera_pos);
-								const float lod_d = model_instances[e.index].lod - mesh_lod;
-								ModelInstance* LUMIX_RESTRICT mi2 = &model_instances[e.index];
-								const Transform prev_tr = mi2->prev_frame_transform;
-								const Vec3 prev_pos_ws = Vec3(prev_tr.pos - camera_pos);
-								
-								#define WRITE(X) memcpy(instance_data, &X, sizeof(X)); instance_data += sizeof(X)
-								WRITE(tr.rot);
-								WRITE(pos_ws);
-								WRITE(lod_d);
-								WRITE(tr.scale);
-								instance_data += sizeof(float); // padding
-								
-								WRITE(prev_tr.rot);
-								WRITE(prev_pos_ws);
-								WRITE(lod_d);
-								WRITE(prev_tr.scale);
-								instance_data += sizeof(float); // padding
-								#undef WRITE
-							}
-
-							const u32 defines = dynamic_define_mask | material->getDefineMask();
-							const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, dyn_instance_decl, defines, mesh.semantics_defines);
+						DecalData* beg = (DecalData*)slice.ptr;
+						DecalData* end = (DecalData*)(slice.ptr + (count - 1) * sizeof(DecalData));
+						for(u32 j = start_i; j < i; ++j) {
+							const EntityRef e = {int(renderables[j] & 0x00ffFFff)};
+							const Transform& tr = transforms[e.index];
+							const Vec3 lpos = Vec3(tr.pos - camera_pos);
+							const Decal& decal = m_module->getDecal(e);
+							const float m = maximum(decal.half_extents.x, decal.half_extents.y, decal.half_extents.z);
+							const bool intersecting = frustum.intersectNearPlane(tr.pos, m * SQRT3);
 						
-							stream->useProgram(program);
-							material->bind(*stream);
-							stream->bindIndexBuffer(mesh.index_buffer_handle);
-							stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
-							stream->bindVertexBuffer(1, slice.buffer, slice.offset, sizeof(Vec4) * 6);
-							stream->drawIndexedInstanced(mesh.indices_count, count, mesh.index_type);
-							--i;
+							DecalData* iter = intersecting ? end : beg;
+							iter->pos = lpos;
+							iter->rot = tr.rot;
+							iter->half_extents = decal.half_extents;
+							iter->uv_scale = decal.uv_scale;
+							intersecting ? --end : ++beg;
 						}
-						else {
-							int start_i = i;
-							const u64 key = sort_keys[i] & instance_key_mask;
-							while (i < keys_count && (sort_keys[i] & instance_key_mask) == key) {
-								++i;
-							}
-							const u32 count = u32(i - start_i);
-							const Renderer::TransientSlice slice = m_renderer.allocTransient(count * (sizeof(Vec4) * 3));
-							u8* instance_data = slice.ptr;
-							for (int j = start_i; j < start_i + (i32)count; ++j) {
-								const EntityRef e = { i32(renderables[j] & 0xFFffFFff) };
-								const Transform& tr = transforms[e.index];
-								const Vec3 lpos = Vec3(tr.pos - camera_pos);
-								const float lod_d = model_instances[e.index].lod - mesh_lod;
-								memcpy(instance_data, &tr.rot, sizeof(tr.rot));
-								instance_data += sizeof(tr.rot);
-								memcpy(instance_data, &lpos, sizeof(lpos));
-								instance_data += sizeof(lpos);
-								memcpy(instance_data, &lod_d, sizeof(lod_d));
-								instance_data += sizeof(lod_d);
-								memcpy(instance_data, &tr.scale, sizeof(tr.scale));
-								instance_data += sizeof(tr.scale) + sizeof(float)/*padding*/;
-							}
 
-							const u32 defines = autoinstanced_define_mask | material->getDefineMask();
-							const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_decl, defines, mesh.semantics_defines);
-						
-							stream->useProgram(program);
-							material->bind(*stream);
-							stream->bindIndexBuffer(mesh.index_buffer_handle);
-							stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
-							stream->bindVertexBuffer(1, slice.buffer, slice.offset, sizeof(Vec3) * 3);
-							stream->drawIndexedInstanced(mesh.indices_count, count, mesh.index_type);
-							--i;
+						material->bind(*stream);
+						stream->bindIndexBuffer(m_cube_ib);
+						stream->bindVertexBuffer(0, m_cube_vb, 0, 12);
+
+						gpu::StateFlags state = material->m_render_states | render_state;
+						state = state & ~gpu::StateFlags::CULL_FRONT | gpu::StateFlags::CULL_BACK;
+						const u32 nonintersecting_count = u32(beg - (DecalData*)slice.ptr);
+						if (nonintersecting_count) {
+							stream->useProgram(material->getShader()->getProgram(state, m_decal_decl, define_mask | material->getDefineMask(), ""));
+							stream->bindVertexBuffer(1, slice.buffer, slice.offset, 48);
+							stream->drawIndexedInstanced(36, nonintersecting_count, gpu::DataType::U16);
 						}
+
+						if (count - nonintersecting_count) {
+							state = state & ~gpu::StateFlags::DEPTH_FUNCTION;
+							state = state & ~gpu::StateFlags::CULL_BACK;
+							state = state | gpu::StateFlags::CULL_FRONT;
+							stream->useProgram(material->getShader()->getProgram(state, m_decal_decl, define_mask | material->getDefineMask(), ""));
+							const u32 offs = slice.offset + sizeof(float) * 12 * nonintersecting_count;
+							stream->bindVertexBuffer(1, slice.buffer, offs, 48);
+							stream->drawIndexedInstanced(36, count - nonintersecting_count, gpu::DataType::U16);
+						}
+						--i;
+						break;
 					}
-					break;
-				}
-				case RenderableTypes::FUR:
-				case RenderableTypes::SKINNED: {
-					const u32 mesh_idx = u32(renderables[i] >> SORT_KEY_MESH_IDX_SHIFT);
-					ModelInstance* LUMIX_RESTRICT mi = &model_instances[entity.index];
-					const Transform& tr = transforms[entity.index];
-					const Vec3 rel_pos = Vec3(tr.pos - camera_pos);
-					const Mesh& mesh = mi->meshes[mesh_idx];
-					Shader* shader = mesh.material->getShader();
-					u32 defines = skinned_define_mask | mesh.material->getDefineMask();
-					if (type == RenderableTypes::FUR) defines |= fur_define_mask;
+					case RenderableTypes::CURVE_DECAL: {
+						const Material* material = m_module->getCurveDecal(entity).material;
 
-					const Quat* rotations = mi->pose->rotations;
-					const Vec3* positions = mi->pose->positions;
+						int start_i = i;
+						const u64 key = sort_keys[i];
+						while (i < keys_count && sort_keys[i] == key) {
+							++i;
+						}
+						const u32 count = i - start_i;
+						struct DecalData {
+							Vec3 pos;
+							Quat rot;
+							Vec3 half_extents;
+							Vec2 uv_scale;
+							Vec4 bezier;
+						};
+						const Renderer::TransientSlice slice = m_renderer.allocTransient(count * (sizeof(DecalData)));
 
-					Model& model = *mi->model;
-
-					struct UBPrefix {
-						float fur_scale;
-						float gravity;
-						float layers;
-						float padding;
-						Matrix model_mtx;
-						Matrix prev_model_mtx;
-					};
-
-					const Renderer::TransientSlice ub = m_renderer.allocUniform(sizeof(DualQuat) * mi->pose->count + sizeof(UBPrefix));
-					UBPrefix* prefix = (UBPrefix*)ub.ptr;
-					prefix->model_mtx = Matrix(rel_pos, tr.rot);
-					prefix->model_mtx.multiply3x3(tr.scale);
-
-					const Vec3 prev_rel_pos = Vec3(mi->prev_frame_transform.pos - camera_pos);
-					prefix->prev_model_mtx = Matrix(prev_rel_pos, mi->prev_frame_transform.rot);
-					prefix->prev_model_mtx.multiply3x3(mi->prev_frame_transform.scale);
-							
-					u32 layers = 1;
-					if (type == RenderableTypes::FUR) {
-						FurComponent& fur = m_module->getFur(entity);
-						layers = fur.layers;
-						prefix->fur_scale = fur.scale;
-						prefix->gravity = fur.gravity;
-					}
-					prefix->layers = float(layers);
-
-					DualQuat* bones_ub_array = (DualQuat*)(ub.ptr + sizeof(UBPrefix));
-					for (int j = 0, c = mi->pose->count; j < c; ++j) {
-						const Model::Bone& bone = model.getBone(j);
-						const LocalRigidTransform tmp = {positions[j], rotations[j]};
-						bones_ub_array[j] = (tmp * bone.inv_bind_transform).toDualQuat();
-					}
-					
-					const Material* material = mesh.material;
-					stream->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
-					const gpu::StateFlags state = material->m_render_states | render_state;
-					const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, defines, mesh.semantics_defines);
-					stream->useProgram(program);
-					material->bind(*stream);
-					stream->bindIndexBuffer(mesh.index_buffer_handle);
-					stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
-					stream->bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-					stream->drawIndexedInstanced(mesh.indices_count, layers, mesh.index_type);
-					break;
-				}
-				case RenderableTypes::DECAL: {
-					const Material* material = m_module->getDecal(entity).material;
-
-					int start_i = i;
-					const u64 key = sort_keys[i];
-					while (i < keys_count && sort_keys[i] == key) {
-						++i;
-					}
-					const u32 count = i - start_i;
-					struct DecalData {
-						Vec3 pos;
-						Quat rot;
-						Vec3 half_extents;
-						Vec2 uv_scale;
-					};
-					const Renderer::TransientSlice slice = m_renderer.allocTransient(count * (sizeof(DecalData)));
-
-					DecalData* beg = (DecalData*)slice.ptr;
-					DecalData* end = (DecalData*)(slice.ptr + (count - 1) * sizeof(DecalData));
-					for(u32 j = start_i; j < i; ++j) {
-						const EntityRef e = {int(renderables[j] & 0x00ffFFff)};
-						const Transform& tr = transforms[e.index];
-						const Vec3 lpos = Vec3(tr.pos - camera_pos);
-						const Decal& decal = m_module->getDecal(e);
-						const float m = maximum(decal.half_extents.x, decal.half_extents.y, decal.half_extents.z);
-						const bool intersecting = frustum.intersectNearPlane(tr.pos, m * SQRT3);
+						DecalData* beg = (DecalData*)slice.ptr;
+						DecalData* end = (DecalData*)(slice.ptr + (count - 1) * sizeof(DecalData));
+						for(u32 j = start_i; j < i; ++j) {
+							const EntityRef e = {int(renderables[j] & 0x00ffFFff)};
+							const Transform& tr = transforms[e.index];
+							const Vec3 lpos = Vec3(tr.pos - camera_pos);
+							const CurveDecal& decal = m_module->getCurveDecal(e);
+							const float m = maximum(decal.half_extents.x, decal.half_extents.y, decal.half_extents.z);
+							const bool intersecting = frustum.intersectNearPlane(tr.pos, m * SQRT3);
 						
-						DecalData* iter = intersecting ? end : beg;
-						iter->pos = lpos;
-						iter->rot = tr.rot;
-						iter->half_extents = decal.half_extents;
-						iter->uv_scale = decal.uv_scale;
-						intersecting ? --end : ++beg;
-					}
+							DecalData* iter = intersecting ? end : beg;
+							iter->pos = lpos;
+							iter->rot = tr.rot;
+							iter->half_extents = decal.half_extents;
+							iter->uv_scale = decal.uv_scale;
+							iter->bezier = Vec4(decal.bezier_p0, decal.bezier_p2);
+							intersecting ? --end : ++beg;
+						}
 
-					material->bind(*stream);
-					stream->bindIndexBuffer(m_cube_ib);
-					stream->bindVertexBuffer(0, m_cube_vb, 0, 12);
+						material->bind(*stream);
+						stream->bindIndexBuffer(m_cube_ib);
+						stream->bindVertexBuffer(0, m_cube_vb, 0, 12);
 
-					gpu::StateFlags state = material->m_render_states | render_state;
-					state = state & ~gpu::StateFlags::CULL_FRONT | gpu::StateFlags::CULL_BACK;
-					const u32 nonintersecting_count = u32(beg - (DecalData*)slice.ptr);
-					if (nonintersecting_count) {
-						stream->useProgram(material->getShader()->getProgram(state, m_decal_decl, define_mask | material->getDefineMask(), ""));
-						stream->bindVertexBuffer(1, slice.buffer, slice.offset, 48);
-						stream->drawIndexedInstanced(36, nonintersecting_count, gpu::DataType::U16);
-					}
+						gpu::StateFlags state = material->m_render_states | render_state;
+						state = state & ~gpu::StateFlags::CULL_FRONT | gpu::StateFlags::CULL_BACK;
+						const u32 nonintersecting_count = u32(beg - (DecalData*)slice.ptr);
+						if (nonintersecting_count) {
+							stream->useProgram(material->getShader()->getProgram(state, m_curve_decal_decl, define_mask | material->getDefineMask(), ""));
+							stream->bindVertexBuffer(1, slice.buffer, slice.offset, 64);
+							stream->drawIndexedInstanced(36, nonintersecting_count, gpu::DataType::U16);
+						}
 
-					if (count - nonintersecting_count) {
-						state = state & ~gpu::StateFlags::DEPTH_FUNCTION;
-						state = state & ~gpu::StateFlags::CULL_BACK;
-						state = state | gpu::StateFlags::CULL_FRONT;
-						stream->useProgram(material->getShader()->getProgram(state, m_decal_decl, define_mask | material->getDefineMask(), ""));
-						const u32 offs = slice.offset + sizeof(float) * 12 * nonintersecting_count;
-						stream->bindVertexBuffer(1, slice.buffer, offs, 48);
-						stream->drawIndexedInstanced(36, count - nonintersecting_count, gpu::DataType::U16);
+						if (count - nonintersecting_count) {
+							state = state & ~gpu::StateFlags::DEPTH_FUNCTION;
+							state = state & ~gpu::StateFlags::CULL_BACK;
+							state = state | gpu::StateFlags::CULL_FRONT;
+							stream->useProgram(material->getShader()->getProgram(state, m_curve_decal_decl, define_mask | material->getDefineMask(), ""));
+							const u32 offs = slice.offset + sizeof(float) * 16 * nonintersecting_count;
+							stream->bindVertexBuffer(1, slice.buffer, offs, 64);
+							stream->drawIndexedInstanced(36, count - nonintersecting_count, gpu::DataType::U16);
+						}
+						--i;
+						break;
 					}
-					--i;
-					break;
+					case RenderableTypes::COUNT:
+					case RenderableTypes::LOCAL_LIGHT:
+						ASSERT(false);
+						break;
 				}
-				case RenderableTypes::CURVE_DECAL: {
-					const Material* material = m_module->getCurveDecal(entity).material;
-
-					int start_i = i;
-					const u64 key = sort_keys[i];
-					while (i < keys_count && sort_keys[i] == key) {
-						++i;
-					}
-					const u32 count = i - start_i;
-					struct DecalData {
-						Vec3 pos;
-						Quat rot;
-						Vec3 half_extents;
-						Vec2 uv_scale;
-						Vec4 bezier;
-					};
-					const Renderer::TransientSlice slice = m_renderer.allocTransient(count * (sizeof(DecalData)));
-
-					DecalData* beg = (DecalData*)slice.ptr;
-					DecalData* end = (DecalData*)(slice.ptr + (count - 1) * sizeof(DecalData));
-					for(u32 j = start_i; j < i; ++j) {
-						const EntityRef e = {int(renderables[j] & 0x00ffFFff)};
-						const Transform& tr = transforms[e.index];
-						const Vec3 lpos = Vec3(tr.pos - camera_pos);
-						const CurveDecal& decal = m_module->getCurveDecal(e);
-						const float m = maximum(decal.half_extents.x, decal.half_extents.y, decal.half_extents.z);
-						const bool intersecting = frustum.intersectNearPlane(tr.pos, m * SQRT3);
-						
-						DecalData* iter = intersecting ? end : beg;
-						iter->pos = lpos;
-						iter->rot = tr.rot;
-						iter->half_extents = decal.half_extents;
-						iter->uv_scale = decal.uv_scale;
-						iter->bezier = Vec4(decal.bezier_p0, decal.bezier_p2);
-						intersecting ? --end : ++beg;
-					}
-
-					material->bind(*stream);
-					stream->bindIndexBuffer(m_cube_ib);
-					stream->bindVertexBuffer(0, m_cube_vb, 0, 12);
-
-					gpu::StateFlags state = material->m_render_states | render_state;
-					state = state & ~gpu::StateFlags::CULL_FRONT | gpu::StateFlags::CULL_BACK;
-					const u32 nonintersecting_count = u32(beg - (DecalData*)slice.ptr);
-					if (nonintersecting_count) {
-						stream->useProgram(material->getShader()->getProgram(state, m_curve_decal_decl, define_mask | material->getDefineMask(), ""));
-						stream->bindVertexBuffer(1, slice.buffer, slice.offset, 64);
-						stream->drawIndexedInstanced(36, nonintersecting_count, gpu::DataType::U16);
-					}
-
-					if (count - nonintersecting_count) {
-						state = state & ~gpu::StateFlags::DEPTH_FUNCTION;
-						state = state & ~gpu::StateFlags::CULL_BACK;
-						state = state | gpu::StateFlags::CULL_FRONT;
-						stream->useProgram(material->getShader()->getProgram(state, m_curve_decal_decl, define_mask | material->getDefineMask(), ""));
-						const u32 offs = slice.offset + sizeof(float) * 16 * nonintersecting_count;
-						stream->bindVertexBuffer(1, slice.buffer, offs, 64);
-						stream->drawIndexedInstanced(36, count - nonintersecting_count, gpu::DataType::U16);
-					}
-					--i;
-					break;
-				}
-				case RenderableTypes::COUNT:
-				case RenderableTypes::LOCAL_LIGHT:
-					ASSERT(false);
-					break;
 			}
-		}
+		});
 	}
 
 	static float computeShadowPriority(float fov, float light_radius, const DVec3& light_pos, const DVec3& cam_pos) {

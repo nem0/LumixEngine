@@ -189,6 +189,7 @@ static void downsampleNormal(Span<const u8> src, Span<u8> dst, u32 w, u32 h, u32
 	u32* dptr = (u32*)dst.begin();
 
 	jobs::forEach(dst_h, 1, [&](i32 j, i32) {
+		PROFILE_FUNCTION();
 		RandomGenerator rg(521288629, 362436069 + 1337 * j);
 		for (u32 i = 0; i < dst_w; ++i) {
 			float r = rg.randFloat(0, rh);

@@ -320,6 +320,7 @@ void ModelImporter::postprocessCommon(const ModelMeta& meta, StringView src_file
 	jobs::forEach(m_meshes.size(), 1, [&](i32 mesh_idx, i32){
 		// TODO this can process the same geom multiple times
 
+		PROFILE_FUNCTION();
 		ImportMesh& mesh = m_meshes[mesh_idx];
 		ImportGeometry& geom = m_geometries[mesh.geometry_idx];
 

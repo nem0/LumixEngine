@@ -874,6 +874,12 @@ Matrix::Matrix(const Vec3& pos, const Quat& rot) {
 	setTranslation(pos);
 }
 
+Matrix::Matrix(const Vec3& pos, const Quat& rot, const Vec3& scale) {
+	*this = rot.toMatrix();
+	setTranslation(pos);
+	multiply3x3(scale);
+}
+
 void Matrix::lookAt(const Vec3& eye, const Vec3& at, const Vec3& up) {
 	*this = Matrix::IDENTITY;
 	Vec3 f = normalize((eye - at));
