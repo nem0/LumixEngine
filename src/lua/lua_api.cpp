@@ -532,7 +532,6 @@ static i32 LUA_getPropertyType(reflection::PropertyBase* property) {
 		STRING,
 		ARRAY,
 		BLOB,
-		DYNAMIC
 	};
 	
 	struct : reflection::IPropertyVisitor {
@@ -549,7 +548,6 @@ static i32 LUA_getPropertyType(reflection::PropertyBase* property) {
 		void visit(const reflection::Property<const char*>& prop) override { type = PropertyType::STRING; }
 		void visit(const struct reflection::ArrayProperty& prop) override { type = PropertyType::ARRAY; }
 		void visit(const struct reflection::BlobProperty& prop) override { type = PropertyType::BLOB; }
-		void visit(const reflection::DynamicProperties& prop) override { type = PropertyType::DYNAMIC; }
 		PropertyType type;
 	} visitor;
 	property->visit(visitor);

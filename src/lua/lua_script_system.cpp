@@ -63,7 +63,6 @@ struct ArrayItemSetVisitor : reflection::IPropertyVisitor {
 	void visit(const reflection::Property<const char*>& prop) override { set(prop); }
 	void visit(const reflection::ArrayProperty& prop) override { ASSERT(false); }
 	void visit(const reflection::BlobProperty& prop) override { ASSERT(false); }
-	void visit(const reflection::DynamicProperties& prop) override { ASSERT(false); }
 
 	template <typename T>
 	void set(const reflection::Property<T>& prop) {
@@ -2854,6 +2853,140 @@ public:
 		m_inline_scripts[entity].m_source = value;
 	}
 
+	template <typename T>
+	T getPropertyValue(EntityRef entity, int scr_index, Property& prop) {
+		auto& inst = m_scripts[entity]->m_scripts[scr_index];
+		auto iter = m_property_names.find(prop.name_hash);
+		ASSERT(iter.isValid()); // TODO make sure this assert is never hit
+		const String& property_name = iter.value();
+		if (inst.m_script && inst.m_script->isReady()) return getProperty<T>(prop, property_name.c_str(), inst);
+		return fromString<T>(prop.stored_value.c_str());
+	}
+
+	void getScriptBlob(EntityRef e, u32 index, OutputMemoryStream& stream) {
+		ScriptInstance& inst = m_scripts[e]->m_scripts[index];
+		for (Property& prop : inst.m_properties) {
+			auto iter = m_property_names.find(prop.name_hash);
+			ASSERT(iter.isValid()); // TODO make sure this assert is never hit
+			const char* prop_name = iter.value().c_str();
+			stream.writeString(prop_name);
+			switch (prop.type) {
+				case Property::ANY: break;
+				case Property::BOOLEAN: {
+					const bool value = getPropertyValue<bool>(e, index, prop);
+					stream.write(value);
+					break;
+				}
+				case Property::FLOAT: {
+					const float value = getPropertyValue<float>(e, index, prop);
+					stream.write(value);
+					break;
+				}
+				case Property::INT: {
+					const i32 value = getPropertyValue<i32>(e, index, prop);
+					stream.write(value);
+					break;
+				}
+				case Property::ENTITY: {
+					const EntityPtr value = getPropertyValue<EntityPtr>(e, index, prop);
+					stream.write(value);
+					break;
+				}
+				case Property::RESOURCE:{
+					char tmp[MAX_PATH];
+					getProperty(prop, prop_name, inst, Span(tmp));
+					stream.writeString(tmp);
+					break;
+				}
+
+				case Property::STRING: {
+					// TODO
+					ASSERT(false);
+					break;
+				}
+				case Property::COLOR: {
+					Vec3 value = getPropertyValue<Vec3>(e, index, prop);
+					stream.write(value);
+					break;
+				}
+			}
+		}
+	}
+
+	void setScriptBlob(EntityRef entity, u32 index, InputMemoryStream& stream) {
+		ScriptInstance& inst = m_scripts[entity]->m_scripts[index];
+		for (u32 i = 0, n = inst.m_properties.size(); i < n; ++i) {
+			const char* prop_name = stream.readString();
+			Property& prop = getScriptProperty(entity, index, prop_name);
+
+			switch (prop.type) {
+				case Property::ANY: break;
+				case Property::BOOLEAN: {
+					bool value;
+					stream.read(value);
+					if (!inst.m_state) {
+						prop.stored_value = value ? "true" : "false";
+					}
+					else {
+						applyProperty(inst, prop, value);
+					}
+					break;
+				}
+				case Property::FLOAT: {
+					float value;
+					stream.read(value);
+					if (!inst.m_state) {
+						// TODO this is not lossless
+						toString(value, prop.stored_value);
+					} else {
+						applyProperty(inst, prop, value);
+					}
+					break;
+				}
+				case Property::INT: {
+					int value;
+					stream.read(value);
+					if (!inst.m_state) {
+						toString(value, prop.stored_value);
+					} else {
+						applyProperty(inst, prop, value);
+					}
+					break;
+				}
+				case Property::ENTITY: {
+					EntityPtr value;
+					stream.read(value);
+					if (!inst.m_state) {
+						toString(value, prop.stored_value);
+					} else {
+						applyProperty(inst, prop, value);
+					}
+					break;
+				}
+				case Property::RESOURCE:
+				case Property::STRING: {
+					const char* value = stream.readString();
+					if (!inst.m_state) {
+						prop.stored_value = value;
+					} else {
+						applyProperty(inst, prop, value);
+					}
+					break;
+				}
+				case Property::COLOR: {
+					Vec3 value;
+					stream.read(value);
+					if (!inst.m_state) {
+						toString(value, prop.stored_value);
+					} else {
+						applyProperty(inst, prop, value);
+					}
+					break;
+				}
+			}
+		}
+	}
+
 	struct DeferredStart {
 		EntityRef entity;
 		u32 scr_index;
@@ -2964,116 +3097,6 @@ void LuaScriptModuleImpl::ScriptInstance::onScriptLoaded(LuaScriptModuleImpl& mo
 	module.m_to_start.push({cmp.m_entity, (u32)scr_index, false, is_reload && module.m_is_game_running});
 }
 
-
-struct LuaProperties : reflection::DynamicProperties {
-	LuaProperties(IAllocator& allocator)
-		: DynamicProperties(allocator)
-	{
-		name = "lua_properties";
-	}
-		
-	u32 getCount(ComponentUID cmp, int index) const override { 
-		LuaScriptModuleImpl& module = (LuaScriptModuleImpl&)*cmp.module;
-		const EntityRef e = (EntityRef)cmp.entity;
-		return module.getPropertyCount(e, index);
-	}
-
-	Type getType(ComponentUID cmp, int array_idx, u32 idx) const override { 
-		LuaScriptModuleImpl& module = (LuaScriptModuleImpl&)*cmp.module;
-		const EntityRef e = (EntityRef)cmp.entity;
-		const LuaScriptModule::Property::Type type = module.getPropertyType(e, array_idx, idx);
-		switch(type) {
-			case LuaScriptModule::Property::Type::BOOLEAN: return BOOLEAN;
-			case LuaScriptModule::Property::Type::INT: return I32;
-			case LuaScriptModule::Property::Type::FLOAT: return FLOAT;
-			case LuaScriptModule::Property::Type::STRING: return STRING;
-			case LuaScriptModule::Property::Type::ENTITY: return ENTITY;
-			case LuaScriptModule::Property::Type::RESOURCE: return RESOURCE;
-			case LuaScriptModule::Property::Type::COLOR: return COLOR;
-			case LuaScriptModule::Property::Type::ANY: return NONE;
-		}
-		ASSERT(false);
-		return NONE;
-	}
-
-	const char* getName(ComponentUID cmp, int array_idx, u32 idx) const override {
-		LuaScriptModuleImpl& module = (LuaScriptModuleImpl&)*cmp.module;
-		const EntityRef e = (EntityRef)cmp.entity;
-		return module.getPropertyName(e, array_idx, idx);
-	}
-
-	reflection::ResourceAttribute getResourceAttribute(ComponentUID cmp, int array_idx, u32 idx) const override {
-		reflection::ResourceAttribute attr;
-		LuaScriptModuleImpl& module = (LuaScriptModuleImpl&)*cmp.module;
-		const EntityRef e = (EntityRef)cmp.entity;
-		const LuaScriptModule::Property::Type type = module.getPropertyType(e, array_idx, idx);
-		ASSERT(type == LuaScriptModule::Property::Type::RESOURCE);
-		attr.resource_type  = module.getPropertyResourceType(e, array_idx, idx);
-		return attr;
-	}
-
-
-	Value getValue(ComponentUID cmp, int array_idx, u32 idx) const override { 
-		LuaScriptModuleImpl& module = (LuaScriptModuleImpl&)*cmp.module;
-		const EntityRef e = (EntityRef)cmp.entity;
-		const LuaScriptModule::Property::Type type = module.getPropertyType(e, array_idx, idx);
-		const char* name = module.getPropertyName(e, array_idx, idx);
-		Value v = {};
-		switch(type) {
-			case LuaScriptModule::Property::Type::COLOR: reflection::set(v, module.getPropertyValue<Vec3>(e, array_idx, name)); break;
-			case LuaScriptModule::Property::Type::BOOLEAN: reflection::set(v, module.getPropertyValue<bool>(e, array_idx, name)); break;
-			case LuaScriptModule::Property::Type::INT: reflection::set(v, module.getPropertyValue<i32>(e, array_idx, name)); break;
-			case LuaScriptModule::Property::Type::FLOAT: reflection::set(v, module.getPropertyValue<float>(e, array_idx, name)); break;
-			case LuaScriptModule::Property::Type::STRING: reflection::set(v, module.getPropertyValue<const char*>(e, array_idx, name)); break;
-			case LuaScriptModule::Property::Type::ENTITY: reflection::set(v, module.getPropertyValue<EntityPtr>(e, array_idx, name)); break;
-			case LuaScriptModule::Property::Type::RESOURCE: {
-				const i32 res_idx = module.getPropertyValue<i32>(e, array_idx, name);
-				if (res_idx < 0) {
-					reflection::set(v, ""); 
-				}
-				else {
-					Resource* res = module.m_system.getLuaResource(res_idx);
-					reflection::set(v, res ? res->getPath().c_str() : ""); 
-				}
-				break;
-			}
-			case LuaScriptModule::Property::Type::ANY: reflection::set(v, module.getPropertyValue<const char*>(e, array_idx, name)); break;
-		}
-		return v;
-	}
-		
-	void set(ComponentUID cmp, int array_idx, const char* name, Type type, Value v) const override { 
-		LuaScriptModuleImpl& module = (LuaScriptModuleImpl&)*cmp.module;
-		const EntityRef e = (EntityRef)cmp.entity;
-		switch(type) {
-			case BOOLEAN: module.setPropertyValue(e, array_idx, name, v.b); break;
-			case I32: module.setPropertyValue(e, array_idx, name, v.i); break;
-			case FLOAT: module.setPropertyValue(e, array_idx, name, v.f); break;
-			case STRING: module.setPropertyValue(e, array_idx, name, v.s); break;
-			case ENTITY: module.setPropertyValue(e, array_idx, name, v.e); break;
-			case RESOURCE: module.setPropertyValue(e, array_idx, name, v.s); break;
-			case COLOR: module.setPropertyValue(e, array_idx, name, v.v3); break;
-			case NONE: break;
-		}
-	}
-
-	void set(ComponentUID cmp, int array_idx, u32 idx, Value v) const override {
-		LuaScriptModuleImpl& module = (LuaScriptModuleImpl&)*cmp.module;
-		const EntityRef e = (EntityRef)cmp.entity;
-		const LuaScriptModule::Property::Type type = module.getPropertyType(e, array_idx, idx);
-		const char* name = module.getPropertyName(e, array_idx, idx);
-		switch(type) {
-			case LuaScriptModule::Property::Type::BOOLEAN: module.setPropertyValue(e, array_idx, name, v.b); break;
-			case LuaScriptModule::Property::Type::INT: module.setPropertyValue(e, array_idx, name, v.i); break;
-			case LuaScriptModule::Property::Type::FLOAT: module.setPropertyValue(e, array_idx, name, v.f); break;
-			case LuaScriptModule::Property::Type::STRING: module.setPropertyValue(e, array_idx, name, v.s); break;
-			case LuaScriptModule::Property::Type::ENTITY: module.setPropertyValue(e, array_idx, name, v.e); break;
-			case LuaScriptModule::Property::Type::RESOURCE: module.setPropertyValue(e, array_idx, name, v.s); break;
-			case LuaScriptModule::Property::Type::COLOR: module.setPropertyValue(e, array_idx, name, v.v3); break;
-			case LuaScriptModule::Property::Type::ANY: ASSERT(false); break;
-		}
-	}
-};
 
 static int finishrequire(lua_State* L)
 {
@@ -3297,7 +3320,7 @@ LuaScriptSystemImpl::LuaScriptSystemImpl(Engine& engine)
 			.begin_array<&LuaScriptModule::getScriptCount, &LuaScriptModule::addScript, &LuaScriptModule::removeScript>("scripts")
 				.prop<&LuaScriptModule::isScriptEnabled, &LuaScriptModule::enableScript>("Enabled")
 				.LUMIX_PROP(ScriptPath, "Path").resourceAttribute(LuaScript::TYPE)
-				.property<LuaProperties>()
+				.blob_property<&LuaScriptModuleImpl::getScriptBlob, &LuaScriptModuleImpl::setScriptBlob>("script_blob")
 			.end_array();
 }
 

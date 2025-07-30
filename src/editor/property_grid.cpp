@@ -103,108 +103,6 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 		return attrs;
 	}
 
-	template <typename T>
-	void dynamicProperty(const ComponentUID& cmp, const reflection::DynamicProperties& prop, u32 prop_index) {
-		struct Prop : reflection::Property<T> {
-			Prop(IAllocator& allocator) : reflection::Property<T>(allocator) {}
-
-			T get(ComponentUID cmp, u32 array_index) const override {
-				return reflection::get<T>(prop->getValue(cmp, array_index, index));
-			}
-
-			void set(ComponentUID cmp, u32 array_index, T value) const override {
-				reflection::DynamicProperties::Value v;
-				reflection::set<T>(v, value);
-				prop->set(cmp, array_index, index, v);
-			}
-
-			bool isReadonly() const override { return false; }
-
-			const reflection::DynamicProperties* prop;
-			ComponentUID cmp;
-			int index;
-		} p(m_app.getAllocator());
-
-		p.name = prop.getName(cmp, m_index, prop_index);
-		p.prop = &prop;
-		p.index =  prop_index;
-		if (!m_grid.m_property_filter.pass(p.name)) return;
-		visit(p);
-	}
-
-	void visit(const reflection::DynamicProperties& prop) override {
-		ComponentUID cmp = getComponent();;
-		for (u32 i = 0, c = prop.getCount(cmp, m_index); i < c; ++i) {
-			const reflection::DynamicProperties::Type type = prop.getType(cmp, m_index, i);
-			switch(type) {
-				case reflection::DynamicProperties::NONE: break;
-				case reflection::DynamicProperties::FLOAT: dynamicProperty<float>(cmp, prop, i); break;
-				case reflection::DynamicProperties::BOOLEAN: dynamicProperty<bool>(cmp, prop, i); break;
-				case reflection::DynamicProperties::ENTITY: dynamicProperty<EntityPtr>(cmp, prop, i); break;
-				case reflection::DynamicProperties::I32: dynamicProperty<i32>(cmp, prop, i); break;
-				case reflection::DynamicProperties::STRING: dynamicProperty<const char*>(cmp, prop, i); break;
-				case reflection::DynamicProperties::COLOR: {
-					struct Prop : reflection::Property<Vec3> {
-						Prop(IAllocator& allocator) : Property<Vec3>(allocator) {}
-
-						Vec3 get(ComponentUID cmp, u32 array_index) const override {
-							return reflection::get<Vec3>(prop->getValue(cmp, array_index, index));
-						}
-						void set(ComponentUID cmp, u32 array_index, Vec3 value) const override {
-							reflection::DynamicProperties::Value v;
-							reflection::set(v, value);
-							prop->set(cmp, array_index, index, v);
-						}
-
-						bool isReadonly() const override { return false; }
-
-						const reflection::DynamicProperties* prop;
-						ComponentUID cmp;
-						int index;
-						reflection::ColorAttribute attr;
-					} p(m_app.getAllocator());
-
-					p.name = prop.getName(cmp, m_index, i);
-					p.prop = &prop;
-					p.index =  i;
-					p.attributes.push(&p.attr);
-					visit(p);
-					break;
-				}
-				case reflection::DynamicProperties::RESOURCE: {
-					struct Prop : reflection::Property<Path> {
-						Prop(IAllocator& allocator) : Property<Path>(allocator) {}
-
-						Path get(ComponentUID cmp, u32 array_index) const override {
-							return Path(reflection::get<const char*>(prop->getValue(cmp, array_index, index)));
-						}
-
-						void set(ComponentUID cmp, u32 array_index, Path value) const override {
-							reflection::DynamicProperties::Value v;
-							reflection::set(v, value);
-							prop->set(cmp, array_index, index, v);
-						}
-
-						bool isReadonly() const override { return false; }
-
-						const reflection::DynamicProperties* prop;
-						ComponentUID cmp;
-						int index;
-						reflection::ResourceAttribute attr;
-					} p(m_app.getAllocator());
-
-					p.attr = prop.getResourceAttribute(cmp, m_index, i);
-					p.name = prop.getName(cmp, m_index, i);
-					p.prop = &prop;
-					p.index =  i;
-					p.attributes.push(&p.attr);
-					visit(p);
-					break;
-				}
-			}
-		}
-	}
-
 	void visit(const reflection::Property<float>& prop) override
 	{
 		if (!m_filter.pass(prop.name)) return;
@@ -612,7 +510,11 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 		if (prop.isReadonly()) ImGuiEx::PopReadOnly();
 	}
 
-	void visit(const reflection::BlobProperty& prop) override {}
+	void visit(const reflection::BlobProperty& prop) override {
+		for (PropertyGrid::IPlugin* plugin : m_grid.m_plugins) {
+			plugin->blobGUI(m_grid, m_entities, m_cmp_type, m_index, m_filter, m_editor);
+		}
+	}
 
 	void visit(const reflection::ArrayProperty& prop) override
 	{
@@ -726,21 +628,6 @@ void PropertyGrid::showComponentProperties(const Array<EntityRef>& entities, Com
 			if (m_property_filter.pass(prop.name)) {
 				filter_properties = true;
 				return;
-			}
-			if constexpr (IsSame<RemoveCVR<decltype(prop)>, reflection::DynamicProperties>::Value) {
-				const reflection::DynamicProperties& dp = prop;
-				ComponentUID cuid(entities[0], cmp_type, editor.getWorld()->getModule(cmp_type));
-				const u32 array_count = parent ? parent->getCount(cuid) : 1;
-				for (u32 array_index = 0; array_index < array_count; ++array_index) {
-					const u32 count = dp.getCount(cuid, array_index);
-					for (u32 i = 0; i < count; ++i) {
-						const char* name = dp.getName(cuid, array_index, i);
-						if (m_property_filter.pass(name)) {
-							filter_properties = true;
-							return;
-						}
-					}
-				}
 			}
 		});
 

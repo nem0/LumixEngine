@@ -15,6 +15,7 @@ struct LUMIX_EDITOR_API PropertyGrid : StudioApp::GUIPlugin {
 		virtual ~IPlugin() {}
 		virtual void update() {}
 		virtual void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, const TextFilter& filter, WorldEditor& editor) = 0;
+		virtual void blobGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type,  u32 idx, const TextFilter& filter, WorldEditor& editor) {}
 	};
 
 	explicit PropertyGrid(StudioApp& app);
