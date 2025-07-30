@@ -168,8 +168,6 @@ Module* getFirstModule() {
 	return getContext().first_module;
 }
 
-void DynamicProperties::visit(IPropertyVisitor& visitor) const { visitor.visit(*this); }
-
 Span<const RegisteredComponent> getComponents() {
 	return Span(getContext().component_bases, getContext().components_count);
 }

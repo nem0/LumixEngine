@@ -142,58 +142,6 @@ struct LUMIX_ENGINE_API PropertyBase {
 };
 
 
-struct LUMIX_ENGINE_API DynamicProperties : PropertyBase {
-	enum Type {
-		I32,
-		FLOAT,
-		STRING,
-		ENTITY,
-		RESOURCE,
-		BOOLEAN,
-		COLOR,
-
-		NONE
-	};
-	union Value {
-		Value(){}
-		EntityPtr e;
-		i32 i;
-		float f;
-		const char* s;
-		bool b;
-		Vec3 v3;
-	};
-	DynamicProperties(IAllocator& allocator) : PropertyBase(allocator) {}
-
-	virtual u32 getCount(ComponentUID cmp, int array_idx) const = 0;
-	virtual Type getType(ComponentUID cmp, int array_idx, u32 idx) const = 0;
-	virtual const char* getName(ComponentUID cmp, int array_idx, u32 idx) const = 0;
-	virtual Value getValue(ComponentUID cmp, int array_idx, u32 idx) const = 0;
-	virtual ResourceAttribute getResourceAttribute(ComponentUID cmp, int array_idx, u32 idx) const = 0;
-	virtual void set(ComponentUID cmp, int array_idx, const char* name, Type type, Value value) const = 0;
-	virtual void set(ComponentUID cmp, int array_idx, u32 idx, Value value) const = 0;
-	
-	void visit(IPropertyVisitor& visitor) const override;
-};
-
-template <typename T> inline T get(DynamicProperties::Value);
-template <> inline float get(DynamicProperties::Value v) { return v.f; }
-template <> inline i32 get(DynamicProperties::Value v) { return v.i; }
-template <> inline const char* get(DynamicProperties::Value v) { return v.s; }
-template <> inline EntityPtr get(DynamicProperties::Value v) { return v.e; }
-template <> inline bool get(DynamicProperties::Value v) { return v.b; }
-template <> inline Vec3 get(DynamicProperties::Value v) { return v.v3; }
-
-template <typename T> inline void set(DynamicProperties::Value& v, T);
-template <> inline void set(DynamicProperties::Value& v, Path val) { v.s = val.c_str(); }
-template <> inline void set(DynamicProperties::Value& v, float val) { v.f = val; }
-template <> inline void set(DynamicProperties::Value& v, i32 val) { v.i = val; }
-template <> inline void set(DynamicProperties::Value& v, const char* val) { v.s = val; }
-template <> inline void set(DynamicProperties::Value& v, EntityPtr val) { v.e = val; }
-template <> inline void set(DynamicProperties::Value& v, bool val) { v.b = val; }
-template <> inline void set(DynamicProperties::Value& v, Vec3 val) { v.v3 = val; }
-
-
 template <typename T>
 struct Property : PropertyBase {
 	Property(IAllocator& allocator) : PropertyBase(allocator) {}
@@ -232,7 +180,6 @@ struct IPropertyVisitor {
 	virtual void visit(const Property<const char*>& prop) = 0;
 	virtual void visit(const struct ArrayProperty& prop) = 0;
 	virtual void visit(const struct BlobProperty& prop) = 0;
-	virtual void visit(const DynamicProperties& prop) {}
 };
 
 
@@ -257,7 +204,6 @@ struct IEmptyPropertyVisitor : IPropertyVisitor {
 	void visit(const Property<const char*>& prop) override {}
 	void visit(const ArrayProperty& prop) override {}
 	void visit(const BlobProperty& prop) override {}
-	void visit(const DynamicProperties& prop) override {}
 };
 
 struct LUMIX_ENGINE_API ArrayProperty : PropertyBase {
@@ -1052,7 +998,6 @@ template <typename F> void forEachProperty(ComponentType cmp_type, const F& f) {
 			parent = nullptr;
 		}
 		void visit(const struct BlobProperty& prop) override { f(prop, parent); }
-		void visit(const DynamicProperties& prop) override { f(prop, parent); }
 		const F& f;
 		const ArrayProperty* parent = nullptr;
 	};

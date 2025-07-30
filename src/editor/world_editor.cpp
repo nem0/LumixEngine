@@ -421,32 +421,6 @@ struct PropertyDeserializeVisitor : reflection::IPropertyVisitor {
 	void visit(const reflection::Property<Path>& prop) override { set(prop); }
 	void visit(const reflection::BlobProperty& prop) override { prop.setValue(cmp, idx, deserializer); }
 	
-	void visit(const reflection::DynamicProperties& prop) override {
-		u32 c;
-		deserializer.read(c);
-		for (u32 i = 0; i < c; ++i) {
-			const char* name = deserializer.readString();
-			reflection::DynamicProperties::Type type;
-			deserializer.read(type);
-			switch(type) {
-				case reflection::DynamicProperties::RESOURCE:	
-				case reflection::DynamicProperties::STRING: {
-					const char* tmp = deserializer.readString();
-					reflection::DynamicProperties::Value v;
-					v.s = tmp;
-					prop.set(cmp, idx, name, type, v);
-					break;
-				}
-				default: {
-					reflection::DynamicProperties::Value v;
-					deserializer.read(v);
-					prop.set(cmp, idx, name, type, v);
-					break;
-				}
-			}
-		}
-	}
-	
 	void visit(const reflection::Property<EntityPtr>& prop) override { 
 		if (!prop.setter) return;
 
@@ -506,27 +480,6 @@ struct PropertySerializeVisitor : reflection::IPropertyVisitor {
 	void visit(const reflection::BlobProperty& prop) override { prop.getValue(cmp, idx, serializer); }
 	void visit(const reflection::Property<Path>& prop) override { get(prop); }
 	void visit(const reflection::Property<const char*>& prop) override { get(prop); }
-	
-	void visit(const reflection::DynamicProperties& prop) override {
-		const u32 c = prop.getCount(cmp, idx);
-		serializer.write(c);
-		for (u32 i = 0; i < c; ++i) {
-			const char* name = prop.getName(cmp, idx, i);
-			serializer.writeString(name);
-			const reflection::DynamicProperties::Type type = prop.getType(cmp, idx, i);
-			serializer.write(type);
-			const reflection::DynamicProperties::Value v = prop.getValue(cmp, idx, i);
-			switch(type) {
-				case reflection::DynamicProperties::RESOURCE:	
-				case reflection::DynamicProperties::STRING: 
-					serializer.writeString(v.s);
-					break;
-				default:
-					serializer.write(v);
-					break;
-			}
-		}
-	}
 
 	void visit(const reflection::ArrayProperty& prop) override {
 		const int count = prop.getCount(cmp);
@@ -1242,18 +1195,6 @@ public:
 		}
 	}
 
-
-	template <typename T2> static void set(reflection::DynamicProperties::Value& v, T2) { ASSERT(false); }
-	static void set(reflection::DynamicProperties::Value& v, i32 val) { reflection::set(v, val); }
-	static void set(reflection::DynamicProperties::Value& v, float val) { reflection::set(v, val); }
-	static void set(reflection::DynamicProperties::Value& v, const Path& val) { reflection::set(v, val.c_str()); }
-	static void set(reflection::DynamicProperties::Value& v, const char* val) { reflection::set(v, val); }
-	static void set(reflection::DynamicProperties::Value& v, EntityPtr val) { reflection::set(v, val); }
-	static void set(reflection::DynamicProperties::Value& v, bool val) { reflection::set(v, val); }
-	static void set(reflection::DynamicProperties::Value& v, Vec3 val) { reflection::set(v, val); }
-	static void set(reflection::DynamicProperties::Value& v, const String& val) { reflection::set(v, val.c_str()); }
-
-
 	bool execute() override
 	{
 		struct : reflection::IEmptyPropertyVisitor {
@@ -1276,22 +1217,6 @@ public:
 				array = "";
 				prop.visitChildren(*this);
 				array = tmp;
-			}
-
-			void visit(const reflection::DynamicProperties& prop) override { 
-				World* world = cmd->m_editor.getWorld();
-				for (EntityPtr entity : cmd->m_entities) {
-					const ComponentUID cmp(*entity, cmd->m_component_type, world->getModule(cmd->m_component_type));
-					const u32 c = prop.getCount(cmp, cmd->m_index);
-					for (u32 i = 0; i < c; ++i) {
-						const char* name = prop.getName(cmp, cmd->m_index, i);
-						if (!equalStrings(prop_name, name)) continue;
-						found = true;
-						reflection::DynamicProperties::Value v;
-						set(v, cmd->m_new_value);
-						prop.set(cmp, cmd->m_index, i, v);
-					}
-				}
 			}
 
 			SetPropertyCommand<T>* cmd;
@@ -2720,25 +2645,6 @@ public:
 			}
 			index = -1;
 		}
-		
-		void visit(const reflection::DynamicProperties& prop) override { 
-			for (u32 i = 0, c = prop.getCount(src, index); i < c; ++i) {
-				const char* name = prop.getName(src, index, i);
-				reflection::DynamicProperties::Type type = prop.getType(src, index, i);
-				reflection::DynamicProperties::Value val = prop.getValue(src, index, i);
-				if (type == reflection::DynamicProperties::ENTITY) {
-					auto iter = map->find(val.e);
-					if (iter.isValid()) {
-						val.e = iter.value();
-					}
-					else {
-						val.e = INVALID_ENTITY;
-					}
-				}
-				prop.set(dst, index, name, type, val);
-			}
-		}
-		
 
 		void visit(const reflection::BlobProperty& prop) override { 
 			OutputMemoryStream tmp(*allocator);
