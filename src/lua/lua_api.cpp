@@ -1227,6 +1227,11 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 			setmetatable(r, self)
 			return r
 		end
+		function Lumix.Resource:newEmpty(type)
+			local r = { _handle = -1, _type = type }
+			setmetatable(r, self)
+			return r
+		end
 		function Lumix.Resource:getPath()
 			return LumixAPI.getResourcePath(self._handle)
 		end

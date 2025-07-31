@@ -18,14 +18,13 @@ local var = 123 -- this is not visible outside this script - not in property gri
 a = 123
 b = "foo"
 c = true
-d = Lumix.Entity.INVALID
+d = Lumix.Entity.INVALID -- d point to no entity, but we know the type of `d` is Entity
 ```
 
 ## Resource
 
 ```lua
--- first parameter, -1, means it's a null resource, same as nullptr in C++
--- second parameter defines the resource type, same as ResourceType in C++ API
-res = Lumix.Resource:new(-1, "clip")
+-- the parameter defines the resource type, same as ResourceType in C++ API
+res = Lumix.Resource:newEmpty("clip")
 ```
 

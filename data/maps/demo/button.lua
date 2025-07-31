@@ -3,7 +3,7 @@ local lumix_math = require "scripts/math"
 
 label = Lumix.Entity.INVALID
 player = Lumix.Entity.INVALID
-sound = Lumix.Resource:new(-1, "clip")
+sound = Lumix.Resource:newEmpty("clip")
 local interactive = false
 
 function playSound(sound)
