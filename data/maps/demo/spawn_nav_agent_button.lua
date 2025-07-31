@@ -1,15 +1,10 @@
 inherit "maps/demo/button"
 
-spawn_point = {}
-point0 = {}
-point1 = {}
-point2 = {}
-point3 = {}
-Editor.setPropertyType(this, "spawn_point", Editor.ENTITY_PROPERTY)
-Editor.setPropertyType(this, "point0", Editor.ENTITY_PROPERTY)
-Editor.setPropertyType(this, "point1", Editor.ENTITY_PROPERTY)
-Editor.setPropertyType(this, "point2", Editor.ENTITY_PROPERTY)
-Editor.setPropertyType(this, "point3", Editor.ENTITY_PROPERTY)
+spawn_point = Lumix.Entity.INVALID
+point0 = Lumix.Entity.INVALID
+point1 = Lumix.Entity.INVALID
+point2 = Lumix.Entity.INVALID
+point3 = Lumix.Entity.INVALID
 
 function buttonPressed()
 	local e : Entity = this.world:createEntityEx {

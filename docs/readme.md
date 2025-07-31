@@ -11,6 +11,7 @@
 # Lua
 * [Engine API](lua/engine_API.md)
 * [Type checking](lua/type_checking.md)
+* [Properties](lua/properties.md)
 * [Snippets](lua/snippets.md)
 
 # Animation
@@ -30,7 +31,8 @@
 
 # Editor
 
-* [Editor actions](editor_action.md)
+* [Editor actions](editor/action.md)
+* [Extending property_grid](editor/extending_property_grid.md)
 
 # Packaged game
 

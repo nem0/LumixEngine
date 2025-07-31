@@ -23,8 +23,7 @@ end
 
 ### Instantiate a prefab
 ```lua
-ext_prefab = -1
-Editor.setPropertyType(this, "ext_prefab", Editor.RESOURCE_PROPERTY, "prefab")
+ext_prefab = Lumix.Resource:new(-1, "prefab")
 local done = false
 
 function update(time_delta)

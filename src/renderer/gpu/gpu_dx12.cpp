@@ -360,6 +360,8 @@ struct ShaderCompiler {
 		, const char* name
 		, Program& program)
 	{
+		PROFILE_FUNCTION();
+		profiler::pushString(name);
 		program.attribute_count = decl.attributes_count;
 		for (u8 i = 0; i < decl.attributes_count; ++i) {
 			const Attribute& attr = decl.attributes[i];
@@ -426,6 +428,7 @@ struct ShaderCompiler {
 	}
 
 	ID3DBlob* compileStage(StableHash hash, const char* src, const char* target, const char* name, const char* entry_point) {
+		PROFILE_FUNCTION();
 		ID3DBlob* output = NULL;
 		ID3DBlob* errors = NULL;
 		HRESULT hr = D3DCompile(src,
@@ -536,8 +539,9 @@ struct ShaderCompiler {
 };
 
 struct PSOCache {
-	PSOCache(IAllocator& allocator)
-		: cache(allocator)
+	PSOCache(IAllocator& in_allocator)
+		: allocator(in_allocator, "pso cache")
+		, cache(allocator)
 	{}
 
 	ID3D12PipelineState* getPipelineStateCompute(ID3D12Device* device, ID3D12RootSignature* root_signature, ProgramHandle program) {
@@ -728,6 +732,7 @@ struct PSOCache {
 
 	// TODO separate compute and graphics cache
 	// TODO graphics cache should be [framebuffer][shader_hash] -> PSO, and [framebuffer] can be computed once in setFramebuffer
+	TagAllocator allocator;
 	HashMap<StableHash, ID3D12PipelineState*> cache;
 	ID3D12PipelineState* last = nullptr;
 };

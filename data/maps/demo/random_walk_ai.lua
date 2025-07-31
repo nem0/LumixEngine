@@ -1,11 +1,7 @@
-point0 = point0 or {}
-point1 = point1 or {}
-point2 = point2 or {}
-point3 = point3 or {}
-Editor.setPropertyType(this, "point0", Editor.ENTITY_PROPERTY)
-Editor.setPropertyType(this, "point1", Editor.ENTITY_PROPERTY)
-Editor.setPropertyType(this, "point2", Editor.ENTITY_PROPERTY)
-Editor.setPropertyType(this, "point3", Editor.ENTITY_PROPERTY)
+point0 = point0 or Lumix.Entity.INVALID
+point1 = point1 or Lumix.Entity.INVALID
+point2 = point2 or Lumix.Entity.INVALID
+point3 = point3 or Lumix.Entity.INVALID
 
 function goToRandomPoint()
 	local pidx = math.random(4) - 1

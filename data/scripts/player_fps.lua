@@ -8,8 +8,7 @@ local yaw = 0
 local sprint = 0
 local jump = 0
 local pitch = 0
-camera_pivot = -1
-Editor.setPropertyType(this, "camera_pivot", Editor.ENTITY_PROPERTY)
+camera_pivot = Lumix.Entity.INVALID
 
 function onInputEvent(event : InputEvent)
     if event.type == "axis" and event.device.type == "mouse" then

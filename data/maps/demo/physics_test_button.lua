@@ -1,19 +1,14 @@
 inherit "maps/demo/button"
 
-cubeA = cubeA or {}
-cubeB = cubeB or {}
-sphereA = sphereA or {}
-sphereB = sphereB or {}
+cubeA = cubeA or Lumix.Entity.INVALID
+cubeB = cubeB or Lumix.Entity.INVALID
+sphereA = sphereA or Lumix.Entity.INVALID
+sphereB = sphereB or Lumix.Entity.INVALID
 
 local cubeA_pos = {}
 local cubeB_pos = {}
 local sphereA_pos = {}
 local sphereB_pos = {}
-
-Editor.setPropertyType(this, "cubeA", Editor.ENTITY_PROPERTY)
-Editor.setPropertyType(this, "cubeB", Editor.ENTITY_PROPERTY)
-Editor.setPropertyType(this, "sphereA", Editor.ENTITY_PROPERTY)
-Editor.setPropertyType(this, "sphereB", Editor.ENTITY_PROPERTY)
 
 function buttonPressed()
 	-- reset objects' positions
