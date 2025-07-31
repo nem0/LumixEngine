@@ -82,8 +82,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		rm.setLoadHook(&m_load_hook);
 	}
 
-	~AssetCompilerImpl()
-	{
+	void saveResourceList() {
 		os::OutputFile file;
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (fs.open(".lumix/resources/_resources.txt_tmp", file)) {
@@ -109,6 +108,10 @@ struct AssetCompilerImpl : AssetCompiler {
 		else {
 			logError("Could not save .lumix/resources/_resources.txt");
 		}
+	}
+
+	~AssetCompilerImpl() {
+		saveResourceList();
 
 		ASSERT(m_plugins.empty());
 		ResourceManagerHub& rm = m_app.getEngine().getResourceManager();
@@ -472,6 +475,8 @@ struct AssetCompilerImpl : AssetCompiler {
 		end_tokenizing:
 			const u64 list_last_modified = os::getLastModified(list_path);
 			processDir("", list_last_modified);
+
+		saveResourceList();
 	}
 
 	void onInitFinished() override
