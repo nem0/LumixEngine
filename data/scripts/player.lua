@@ -14,8 +14,7 @@ local dir_input_idx = -1
 local stance_input_index = -1
 local crouched = false
 local aiming = false
-camera_pivot = -1
-Editor.setPropertyType(this, "camera_pivot", Editor.ENTITY_PROPERTY)
+camera_pivot = Lumix.Entity.INVALID
 handle_input = true
 
 function onInputEvent(event : InputEvent)

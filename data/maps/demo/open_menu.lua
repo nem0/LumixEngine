@@ -1,9 +1,7 @@
 inherit "maps/demo/button"
 
-gui = {}
-player = {}
-Editor.setPropertyType(this, "gui", Editor.ENTITY_PROPERTY)
-Editor.setPropertyType(this, "player", Editor.ENTITY_PROPERTY)
+gui = Lumix.Entity.INVALID
+player = Lumix.Entity.INVALID
 
 function buttonPressed()
 	gui.gui_rect.enabled = true

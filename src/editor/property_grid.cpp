@@ -220,99 +220,16 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 		if (prop.isReadonly()) ImGuiEx::PopReadOnly();
 	}
 
-
 	void visit(const reflection::Property<EntityPtr>& prop) override
 	{
 		if (!m_filter.pass(prop.name)) return;
 		if (prop.isReadonly()) ImGuiEx::PushReadOnly();
 		ComponentUID cmp = getComponent();
 		EntityPtr entity = prop.get(cmp, m_index);
-
-		char buf[128];
-		getEntityListDisplayName(m_app, *m_editor.getWorld(), Span(buf), entity);
-		ImGui::PushID(prop.name);
-		
 		ImGuiEx::Label(prop.name);
-		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, ImGui::GetStyle().ItemSpacing.y));
-		
-		if (!entity.isValid()) {
-			copyString(buf, "No entity (click to set)");
-			ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
+		if (m_grid.entityInput(prop.name, &entity)) {
+			m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, entity);
 		}
-		
-		const float icons_w = ImGui::CalcTextSize(ICON_FA_BULLSEYE ICON_FA_TRASH).x;
-		if (ImGui::Button(buf, ImVec2(entity.isValid() ? -icons_w : -1.f, 0))) {
-			ImGui::OpenPopup("popup");
-		}
-		if (!entity.isValid()) {
-			ImGui::PopStyleColor();
-		}
-
-		if (ImGui::BeginDragDropTarget()) {
-			if (auto* payload = ImGui::AcceptDragDropPayload("entity")) {
-				EntityRef dropped_entity = *(EntityRef*)payload->Data;
-				m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, dropped_entity);
-			}
-			ImGui::EndDragDropTarget();
-		}
-
-		if (entity.isValid()) {
-			ImGui::SameLine();
-			if (ImGuiEx::IconButton(ICON_FA_BULLSEYE, "Go to")) {
-				m_grid.m_deferred_select = entity;
-			}
-			ImGui::SameLine();
-			if (ImGuiEx::IconButton(ICON_FA_TRASH, "Clear")) {
-				m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, INVALID_ENTITY);
-			}
-		}
-		ImGui::PopStyleVar();
-
-		World& world = *m_editor.getWorld();
-		if (ImGuiEx::BeginResizablePopup("popup", ImVec2(200, 300), ImGuiWindowFlags_NoNavInputs)) {
-			static TextFilter entity_filter;
-			static i32 selected_idx = -1;
-			entity_filter.gui("Filter", -1, ImGui::IsWindowAppearing());
-			const bool insert_enter = ImGui::IsItemFocused() && ImGui::IsKeyPressed(ImGuiKey_Enter);
-			bool scroll = false;
-			if (ImGui::IsItemFocused()) {
-				if (ImGui::IsKeyPressed(ImGuiKey_UpArrow) && selected_idx > 0) {
-					--selected_idx;
-					scroll = true;
-				}
-				if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
-					++selected_idx;
-					scroll = true;
-				}
-			}
-			
-			if (ImGui::BeginChild("list", ImVec2(0, ImGui::GetContentRegionAvail().y))) {
-				i32 idx = -1;
-				// TODO imgui clipper
-				for (EntityPtr i = world.getFirstEntity(); i.isValid(); i = world.getNextEntity(*i)) {
-					getEntityListDisplayName(m_app, world, Span(buf), i);
-					const bool show = entity_filter.pass(buf);
-					if (!show) continue;
-
-					ImGui::PushID(i.index);
-					++idx;
-					const bool selected = selected_idx == idx;
-					if (show && (ImGui::Selectable(buf, selected) || (selected && insert_enter))) {
-						m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, i);
-						ImGui::CloseCurrentPopup();
-						ImGui::PopID();
-						break;
-					}
-					if (selected && scroll) {
-						ImGui::SetScrollHereY();
-					}
-					ImGui::PopID();
-				}
-			}
-			ImGui::EndChild();
-			ImGui::EndPopup();
-		}
-		ImGui::PopID();
 		if (prop.isReadonly()) ImGuiEx::PopReadOnly();
 	}
 
@@ -586,6 +503,100 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 	int m_index;
 	PropertyGrid& m_grid;
 };
+
+
+bool PropertyGrid::entityInput(const char* name, EntityPtr* entity) {
+	ASSERT(entity);
+	bool changed = false;
+	char buf[128];
+	World& world = *m_app.getWorldEditor().getWorld();
+	getEntityListDisplayName(m_app, world, Span(buf), *entity);
+	ImGui::PushID(name);
+	
+	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, ImGui::GetStyle().ItemSpacing.y));
+	
+	if (!entity->isValid()) {
+		copyString(buf, "No entity (click to set)");
+		ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
+	}
+	
+	const float icons_w = ImGui::CalcTextSize(ICON_FA_BULLSEYE ICON_FA_TRASH).x;
+	if (ImGui::Button(buf, ImVec2(entity->isValid() ? -icons_w : -1.f, 0))) {
+		ImGui::OpenPopup("popup");
+	}
+	if (!entity->isValid()) {
+		ImGui::PopStyleColor();
+	}
+
+	if (ImGui::BeginDragDropTarget()) {
+		if (auto* payload = ImGui::AcceptDragDropPayload("entity")) {
+			EntityRef dropped_entity = *(EntityRef*)payload->Data;
+			*entity = dropped_entity;
+			changed = true;
+		}
+		ImGui::EndDragDropTarget();
+	}
+
+	if (entity->isValid()) {
+		ImGui::SameLine();
+		if (ImGuiEx::IconButton(ICON_FA_BULLSEYE, "Go to")) {
+			m_deferred_select = *entity;
+		}
+		ImGui::SameLine();
+		if (ImGuiEx::IconButton(ICON_FA_TRASH, "Clear")) {
+			*entity = INVALID_ENTITY;
+			changed = true;
+		}
+	}
+	ImGui::PopStyleVar();
+
+	if (ImGuiEx::BeginResizablePopup("popup", ImVec2(200, 300), ImGuiWindowFlags_NoNavInputs)) {
+		static TextFilter entity_filter;
+		static i32 selected_idx = -1;
+		entity_filter.gui("Filter", -1, ImGui::IsWindowAppearing());
+		const bool insert_enter = ImGui::IsItemFocused() && ImGui::IsKeyPressed(ImGuiKey_Enter);
+		bool scroll = false;
+		if (ImGui::IsItemFocused()) {
+			if (ImGui::IsKeyPressed(ImGuiKey_UpArrow) && selected_idx > 0) {
+				--selected_idx;
+				scroll = true;
+			}
+			if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
+				++selected_idx;
+				scroll = true;
+			}
+		}
+		
+		if (ImGui::BeginChild("list", ImVec2(0, ImGui::GetContentRegionAvail().y))) {
+			i32 idx = -1;
+			// TODO imgui clipper
+			for (EntityPtr i = world.getFirstEntity(); i.isValid(); i = world.getNextEntity(*i)) {
+				getEntityListDisplayName(m_app, world, Span(buf), i);
+				const bool show = entity_filter.pass(buf);
+				if (!show) continue;
+
+				ImGui::PushID(i.index);
+				++idx;
+				const bool selected = selected_idx == idx;
+				if (show && (ImGui::Selectable(buf, selected) || (selected && insert_enter))) {
+					*entity = i;
+					changed = true;
+					ImGui::CloseCurrentPopup();
+					ImGui::PopID();
+					break;
+				}
+				if (selected && scroll) {
+					ImGui::SetScrollHereY();
+				}
+				ImGui::PopID();
+			}
+		}
+		ImGui::EndChild();
+		ImGui::EndPopup();
+	}
+	ImGui::PopID();
+	return changed;
+}
 
 
 static bool componentTreeNode(StudioApp& app, WorldEditor& editor, ComponentType cmp_type, const EntityRef* entities, int entities_count)

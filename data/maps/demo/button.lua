@@ -1,17 +1,13 @@
 local co = require "scripts/coroutine"
 local lumix_math = require "scripts/math"
 
-label = {}
-player = {}
-sound = -1
+label = Lumix.Entity.INVALID
+player = Lumix.Entity.INVALID
+sound = Lumix.Resource:new(-1, "clip")
 local interactive = false
 
-Editor.setPropertyType(this, "label", Editor.ENTITY_PROPERTY)
-Editor.setPropertyType(this, "player", Editor.ENTITY_PROPERTY)
-Editor.setPropertyType(this, "sound", Editor.RESOURCE_PROPERTY, "clip")
-
 function playSound(sound)
-	local path = this.world.lua_script:getResourcePath(sound)
+	local path = sound:getPath()
 	this.world:getModule("audio"):play(this, path, false)
 end
 

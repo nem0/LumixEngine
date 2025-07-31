@@ -1,5 +1,4 @@
-player = {}
-Editor.setPropertyType(this, "player", Editor.ENTITY_PROPERTY)
+player = Lumix.Entity.INVALID
 
 function onButtonClicked()
 	this.parent.gui_rect.enabled = false

@@ -15,13 +15,14 @@ struct LUMIX_EDITOR_API PropertyGrid : StudioApp::GUIPlugin {
 		virtual ~IPlugin() {}
 		virtual void update() {}
 		virtual void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, const TextFilter& filter, WorldEditor& editor) = 0;
-		virtual void blobGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type,  u32 idx, const TextFilter& filter, WorldEditor& editor) {}
+		virtual void blobGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, u32 array_index, const TextFilter& filter, WorldEditor& editor) {}
 	};
 
 	explicit PropertyGrid(StudioApp& app);
 
 	void addPlugin(IPlugin& plugin) { m_plugins.push(&plugin); }
 	void removePlugin(IPlugin& plugin) { m_plugins.eraseItem(&plugin); }
+	bool entityInput(const char* name, EntityPtr* entity);
 
 private:
 	void onGUI() override;
@@ -30,6 +31,7 @@ private:
 	void showCoreProperties(const Array<EntityRef>& entities, WorldEditor& editor) const;
 	void toggleUI() { m_is_open = !m_is_open; }
 	bool isOpen() const { return m_is_open; }
+
 
 	StudioApp& m_app;
 	Array<IPlugin*> m_plugins;

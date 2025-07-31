@@ -139,10 +139,6 @@ end
 declare class core_module
 end
 
-declare class lua_script_module
-	getResourcePath : (lua_script_module, number) -> any --[[char]]
-end
-
 declare class gui_module
 	getRectAt : (gui_module, Vec2) -> Entity?
 	isOver : (gui_module, Vec2, Entity?) -> boolean
