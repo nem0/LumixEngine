@@ -15,7 +15,6 @@ local stance_input_index = -1
 local crouched = false
 local aiming = false
 camera_pivot = Lumix.Entity.INVALID
-test = Lumix.Resource:newEmpty("model")
 handle_input = true
 
 function onInputEvent(event : InputEvent)
