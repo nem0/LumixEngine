@@ -118,7 +118,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		settings.registerOption("asset_browser_thumbnail_size", &m_thumbnail_size, "Asset browser", "Thumbnail size");
 	}
 
-	void onBasePathChanged() {
+	void onBasePathChanged() override {
 		const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
 		Path path(base_path, ".lumix");
 		bool success = os::makePath(path.c_str());

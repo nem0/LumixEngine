@@ -1424,6 +1424,7 @@ struct StudioAppImpl final : StudioApp {
 		extractBundled();
 		m_editor->loadProject();
 		m_asset_compiler->onBasePathChanged();
+		m_asset_browser->onBasePathChanged();
 		m_engine->getResourceManager().reloadAll();
 		initDefaultWorld();
 	}

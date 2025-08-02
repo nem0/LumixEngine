@@ -1296,7 +1296,7 @@ struct FBXImporter : ModelImporter {
 		}
 	}
 
-	static void extractEmbedded(const ofbx::IScene& m_scene, StringView src_dir, IAllocator& allocator)
+	void extractEmbedded(const ofbx::IScene& m_scene, StringView src_dir, IAllocator& allocator) const
 	{
 		PROFILE_FUNCTION();
 		for (int i = 0, c = m_scene.getEmbeddedDataCount(); i < c; ++i) {
@@ -1306,10 +1306,11 @@ struct FBXImporter : ModelImporter {
 			const PathInfo pi(filename);
 			const StaticString<MAX_PATH> fullpath(src_dir, pi.basename, ".", pi.extension);
 
-			if (os::fileExists(fullpath)) continue;
+			FileSystem& fs = m_app.getEngine().getFileSystem();
+			if (fs.fileExists(fullpath)) continue;
 
 			os::OutputFile file;
-			if (!file.open(fullpath)) {
+			if (!fs.open(fullpath, file)) {
 				logError("Failed to save ", fullpath);
 				return;
 			}

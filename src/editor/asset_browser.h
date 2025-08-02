@@ -29,6 +29,7 @@ struct LUMIX_EDITOR_API AssetBrowser : StudioApp::GUIPlugin {
 
 	virtual ~AssetBrowser() {}
 	virtual void onInitFinished() = 0;
+	virtual void onBasePathChanged() = 0;
 	virtual void openEditor(const Path& resource) = 0;
 	virtual bool resourceInput(const char* str_id, Path& buf, ResourceType type, float width = -1) = 0;
 	virtual void addPlugin(IPlugin& plugin, Span<const char*> extensions) = 0;
