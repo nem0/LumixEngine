@@ -382,6 +382,7 @@ struct AudioModuleImpl final : AudioModule
 	}
 
 	SoundHandle play(EntityRef entity, const Path& clip, bool is_3d) override {
+		if (clip.isEmpty()) return INVALID_SOUND_HANDLE;
 		Clip* res = m_system.getEngine().getResourceManager().load<Clip>(clip);
 		return play(entity, res, is_3d);
 	}

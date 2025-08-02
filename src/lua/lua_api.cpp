@@ -704,12 +704,18 @@ static int LUA_loadResource(LuaScriptSystem* system, const char* path, const cha
 	return system->addLuaResource(Path(path), ResourceType(type));
 }
 
+static int LUA_resourceTypeFromString(lua_State* L) {
+	const char* type_str = LuaWrapper::checkArg<const char*>(L, 1);
+	ResourceType type(type_str);
+	lua_pushlightuserdata(L, (void*)type.type.getHashValue());
+	return 1;
+}
 
 static const char* LUA_getResourcePath(lua_State* L, i32 handle) {
 	Engine* engine = LuaWrapper::getClosureObject<Engine>(L);
 	auto* system = (LuaScriptSystem*)engine->getSystemManager().getSystem("lua_script");
 	Resource* res = system->getLuaResource(handle);
-	return res->getPath().c_str();
+	return res ? res->getPath().c_str() : "";
 }
 
 
@@ -966,6 +972,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	LuaWrapper::createSystemFunction(L, "LumixReflection", "getStructMemberName", &LuaWrapper::wrap<LUA_getStructMemberName>);
 	LuaWrapper::createSystemFunction(L, "LumixReflection", "getStructMemberType", &LuaWrapper::wrap<LUA_getStructMemberType>);
 	
+	LuaWrapper::createSystemFunction(L, "LumixAPI", "resourceTypeFromString", &LUA_resourceTypeFromString);
 	LuaWrapper::createSystemFunction(L, "LumixAPI", "beginProfilerBlock", LuaWrapper::wrap<&profiler::endBlock>);
 	LuaWrapper::createSystemFunction(L, "LumixAPI", "endProfilerBlock", LuaWrapper::wrap<&profiler::beginBlock>);
 	LuaWrapper::createSystemFunction(L, "LumixAPI", "createProfilerCounter", LuaWrapper::wrap<&profiler::createCounter>);
@@ -980,6 +987,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "processFilesystemWork", LUA_processFilesystemWork);
 	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "pause", LUA_pause);
 	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "writeFile", LUA_writeFile);
+
 
 	#undef REGISTER_FUNCTION
 
@@ -1127,6 +1135,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 			end
 		end
 		Lumix.Entity.INVALID = Lumix.Entity:new(nil, -1)
+		Lumix.Entity.NULL = Lumix.Entity.INVALID
 
 		Lumix.Entity.__eq = function(a, b)
 			return a._entity == b._entity and a._world == b._world
@@ -1223,12 +1232,12 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 
 		Lumix.Resource = {}
 		function Lumix.Resource:new(handle, type)
-			local r = { _handle = handle, _type = type }
+			local r = { _handle = handle, _type = LumixAPI.resourceTypeFromString(type) }
 			setmetatable(r, self)
 			return r
 		end
 		function Lumix.Resource:newEmpty(type)
-			local r = { _handle = -1, _type = type }
+			local r = { _handle = -1, _type = LumixAPI.resourceTypeFromString(type) }
 			setmetatable(r, self)
 			return r
 		end
@@ -1240,7 +1249,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 				return Lumix.Resource[key]
 			end
 			if key == "path" then
-				return self:getPath()
+				return table:getPath()
 			end
 			return nil
 		end

@@ -1,7 +1,7 @@
 inherit "maps/demo/button"
 
-gui = Lumix.Entity.INVALID
-player = Lumix.Entity.INVALID
+gui = Lumix.Entity.NULL
+player = Lumix.Entity.NULL
 
 function buttonPressed()
 	gui.gui_rect.enabled = true

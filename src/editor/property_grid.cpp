@@ -634,15 +634,20 @@ void PropertyGrid::showComponentProperties(const Array<EntityRef>& entities, Com
 	const reflection::ComponentBase* component = reflection::getComponent(cmp_type);
 	bool filter_properties = false;
 	if (m_property_filter.isActive() && component) {
-
+		// if all properties are filtered out, don't show component at all
+		bool has_blob = false;
 		reflection::forEachProperty(cmp_type, [&](auto& prop, const reflection::ArrayProperty* parent) {
+			if constexpr (IsSame<decltype(prop), const reflection::BlobProperty&>::Value) {
+				// blob is opaque but can have properties passing filter, so let's show UI
+				has_blob = true;
+			}
 			if (m_property_filter.pass(prop.name)) {
 				filter_properties = true;
-				return;
 			}
 		});
 
-		if (m_property_filter.pass(component->label)) filter_properties = false;
+		if (has_blob) filter_properties = true;
+		else if (m_property_filter.pass(component->label)) filter_properties = false;
 		else if (!filter_properties) return;
 	}
 

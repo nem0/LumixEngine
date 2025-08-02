@@ -18,7 +18,7 @@ local var = 123 -- this is not visible outside this script - not in property gri
 a = 123
 b = "foo"
 c = true
-d = Lumix.Entity.INVALID -- d point to no entity, but we know the type of `d` is Entity
+d = Lumix.Entity.NULL -- d point to no entity, but we know the type of `d` is Entity
 ```
 
 ## Resource
@@ -28,3 +28,29 @@ d = Lumix.Entity.INVALID -- d point to no entity, but we know the type of `d` is
 res = Lumix.Resource:newEmpty("clip")
 ```
 
+## Arrays
+
+Arrays can be exposed using `Editor.setArrayPropertyType`. Using `Editor.setArrayPropertyType` is necessary because with it we don't know what type are array's elements. 
+
+```lua
+test = {}
+Editor.setArrayPropertyType(this, "test", Editor.FLOAT_PROPERTY)
+
+test2 = {}
+Editor.setArrayPropertyType(this, "test2", Editor.ENTITY_PROPERTY)
+
+test3 = {}
+Editor.setArrayPropertyType(this, "test3", Editor.INT_PROPERTY)
+
+test4 = {}
+Editor.setArrayPropertyType(this, "test4", Editor.BOOLEAN_PROPERTY)
+
+test5 = {}
+Editor.setArrayPropertyType(this, "test5", Editor.COLOR_PROPERTY)
+
+test6 = {}
+Editor.setArrayPropertyType(this, "test6", Editor.RESOURCE_PROPERTY, "model")
+
+unknown_array = {} -- without Editor.setArrayPropertyType, we have no idea what is supposed to be stored in this array
+
+```

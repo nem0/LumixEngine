@@ -100,6 +100,9 @@ declare class Entity
 %s
 end
 
+declare class Resource
+	getPath : () -> string
+end
 
 declare this:Entity
 
@@ -115,6 +118,7 @@ declare Editor: {
 	ENTITY_PROPERTY : number,
 	BOOLEAN_PROPERTY : number,
 	setPropertyType : (any, string, number, string?) -> (),
+	setArrayPropertyType : (any, string, number, string?) -> (),
 	getSelectedEntitiesCount : () -> number,
 	getSelectedEntity : (number) -> Entity,
 	addAction : (ActionDesc) -> (),

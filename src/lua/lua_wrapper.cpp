@@ -162,11 +162,6 @@ bool toEntity(lua_State* L, int idx, World*& world, EntityRef& entity) {
 }
 
 void pushEntity(lua_State* L, EntityPtr value, World* world) {
-	if (!value.isValid()) {
-		lua_newtable(L); // [env, {}]
-		return;
-	}
-
 	lua_getglobal(L, "Lumix");						// [Lumix]
 	lua_getfield(L, -1, "Entity");					// [Lumix, Lumix.Entity]
 	lua_remove(L, -2);								// [Lumix.Entity]

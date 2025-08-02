@@ -14,7 +14,7 @@ local dir_input_idx = -1
 local stance_input_index = -1
 local crouched = false
 local aiming = false
-camera_pivot = Lumix.Entity.INVALID
+camera_pivot = Lumix.Entity.NULL
 handle_input = true
 
 function onInputEvent(event : InputEvent)

@@ -8,7 +8,7 @@ local yaw = 0
 local sprint = 0
 local jump = 0
 local pitch = 0
-camera_pivot = Lumix.Entity.INVALID
+camera_pivot = Lumix.Entity.NULL
 
 function onInputEvent(event : InputEvent)
     if event.type == "axis" and event.device.type == "mouse" then

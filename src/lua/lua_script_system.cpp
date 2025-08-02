@@ -421,6 +421,7 @@ enum class LuaModuleVersion : i32
 {
 	HASH64,
 	INLINE_SCRIPT,
+	ARRAY_PROPERTIES,
 
 	LATEST
 };
@@ -1031,8 +1032,7 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 			lua_pop(L, 3);
 			if (!is_instance) return false;
 			lua_getfield(L, idx, "_type");
-			const char* type_str = lua_tostring(L, -1);
-			*resource_type = ResourceType(type_str);
+			resource_type->type = RuntimeHash::fromU64((u64)lua_tolightuserdata(L, -1));
 			lua_pop(L, 1);
 			return true;
 		}
@@ -1101,7 +1101,8 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 							default: existing_prop.type = Property::FLOAT;
 						}
 					}
-					m_module.applyProperty(inst, existing_prop, existing_prop.stored_value.c_str());
+					InputMemoryStream stream(existing_prop.stored_value);
+					m_module.applyProperty(inst, name, existing_prop, stream);
 				}
 				else {
 					const i32 size = inst.m_properties.size();
@@ -1292,18 +1293,9 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 		return getPropertyName(m_scripts[entity]->m_scripts[scr_index].m_properties[prop_index].name_hash);
 	}
 
-
-	ResourceType getPropertyResourceType(EntityRef entity, int scr_index, int prop_index) override
-	{
-		return m_scripts[entity]->m_scripts[scr_index].m_properties[prop_index].resource_type;
+	const Property& getProperty(EntityRef entity, int scr_index, int prop_index) override {
+		return m_scripts[entity]->m_scripts[scr_index].m_properties[prop_index];
 	}
-
-
-	Property::Type getPropertyType(EntityRef entity, int scr_index, int prop_index) override
-	{
-		return m_scripts[entity]->m_scripts[scr_index].m_properties[prop_index].type;
-	}
-
 
 	~LuaScriptModuleImpl() {
 		Path invalid_path;
@@ -1348,6 +1340,53 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 
 	World& getWorld() override { return m_world; }
 
+
+	static int setArrayPropertyType(lua_State* L) {
+		LuaWrapper::DebugGuard guard(L);
+		LuaWrapper::checkTableArg(L, 1);
+		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
+		int type = LuaWrapper::checkArg<int>(L, 3);
+		ResourceType resource_type;
+		if (type == Property::Type::RESOURCE) {
+			resource_type = ResourceType(LuaWrapper::checkArg<const char*>(L, 4));
+		}
+
+		lua_getfield(L, 1, "world");
+		if (!lua_istable(L, -1)) {
+			luaL_error(L, "%s", "Invalid `this.world`");
+		}
+
+		lua_getfield(L, -1, "value");
+		if (!lua_islightuserdata(L, -1)) {
+			luaL_error(L, "%s", "Invalid `this.world.value`");
+		}
+
+		auto* world = LuaWrapper::toType<World*>(L, -1);
+		auto* module = (LuaScriptModuleImpl*)world->getModule(LUA_SCRIPT_TYPE);
+
+		lua_pop(L, 2);
+		const StableHash prop_name_hash(prop_name);
+		const StableHash32 prop_name_hash32(prop_name);
+		for (auto& prop : module->m_current_script_instance->m_properties) {
+			if (prop.name_hash == prop_name_hash || prop.name_hash_legacy == prop_name_hash32) {
+				prop.type = (Property::Type)type;
+				prop.is_array = true;
+				prop.resource_type = resource_type;
+				return 0;
+			}
+		}
+
+		auto& prop = module->m_current_script_instance->m_properties.emplace(module->m_system.m_allocator);
+		prop.name_hash = prop_name_hash;
+		prop.type = (Property::Type)type;
+		prop.resource_type = resource_type;
+		prop.is_array = true;
+		if (!module->m_property_names.find(prop_name_hash).isValid())
+		{
+			module->m_property_names.insert(prop_name_hash, String(prop_name, module->m_system.m_allocator));
+		}
+		return 0;
+	}
 
 	static int setPropertyType(lua_State* L) {
 		LuaWrapper::DebugGuard guard(L);
@@ -1398,8 +1437,8 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 	void registerPropertyAPI()
 	{
 		lua_State* L = m_system.m_state;
-		auto f = &LuaWrapper::wrap<&setPropertyType>;
-		LuaWrapper::createSystemFunction(L, "Editor", "setPropertyType", f);
+		LuaWrapper::createSystemFunction(L, "Editor", "setPropertyType", &LuaWrapper::wrap<&setPropertyType>);
+		LuaWrapper::createSystemFunction(L, "Editor", "setArrayPropertyType", &LuaWrapper::wrap<&setArrayPropertyType>);
 		LuaWrapper::createSystemVariable(L, "Editor", "BOOLEAN_PROPERTY", Property::BOOLEAN);
 		LuaWrapper::createSystemVariable(L, "Editor", "FLOAT_PROPERTY", Property::FLOAT);
 		LuaWrapper::createSystemVariable(L, "Editor", "INT_PROPERTY", Property::INT);
@@ -1985,134 +2024,73 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 		return "N/A";
 	}
 
-	void applyEntityProperty(ScriptInstance& script, const char* name, Property& prop, const char* value)
-	{
-		LuaWrapper::DebugGuard guard(script.m_state);
-		lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment); // [env]
-		ASSERT(lua_type(script.m_state, -1));
-		const EntityPtr e = fromString<EntityPtr>(value);
+	void applyProperty(ScriptInstance& script, const char* name, Property& prop, InputMemoryStream& stream) {
+		if (stream.size() == 0) return;
 
-		if (!e.isValid()) {
-			lua_newtable(script.m_state); // [env, {}]
-			lua_setfield(script.m_state, -2, name); // [env]
-			lua_pop(script.m_state, 1);
-			return;
-		}
-
-		lua_getglobal(script.m_state, "Lumix"); // [env, Lumix]
-		lua_getfield(script.m_state, -1, "Entity"); // [env, Lumix, Lumix.Entity]
-		lua_remove(script.m_state, -2); // [env, Lumix.Entity]
-		lua_getfield(script.m_state, -1, "new"); // [env, Lumix.Entity, Entity.new]
-		lua_pushvalue(script.m_state, -2); // [env, Lumix.Entity, Entity.new, Lumix.Entity]
-		lua_remove(script.m_state, -3); // [env, Entity.new, Lumix.Entity]
-		LuaWrapper::push(script.m_state, &m_world); // [env, Entity.new, Lumix.Entity, world]
-		LuaWrapper::push(script.m_state, e.index); // [env, Entity.new, Lumix.Entity, world, entity_index]
-		const bool error = !LuaWrapper::pcall(script.m_state, 3, 1); // [env, entity]
-		ASSERT(!error);
-		lua_setfield(script.m_state, -2, name); // [env]
-		lua_pop(script.m_state, 1);
-	}
-
-	void applyResourceProperty(ScriptInstance& script, const char* name, Property& prop, const char* path) {
-		i32 new_res = path[0] ? m_system.addLuaResource(Path(path), prop.resource_type) : -1;
+		lua_State* L = script.m_state;
+		ASSERT(L);
 		
-		LuaWrapper::DebugGuard guard(script.m_state);
-		lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment); // [env]
-		ASSERT(lua_type(script.m_state, -1) == LUA_TTABLE);
+		LuaWrapper::DebugGuard guarD(L);
+		lua_rawgeti(L, LUA_REGISTRYINDEX, script.m_environment);
 		
-		lua_getfield(script.m_state, -1, name);
-		lua_getfield(script.m_state, -1, "_handle");
-		i32 prev_res = LuaWrapper::toType<int>(script.m_state, -1);
-		m_system.unloadLuaResource(prev_res);
+		auto pushValue = [&]() {
+			switch (prop.type) {
+				case Property::ANY:
+					ASSERT(false);
+					break;
+				case Property::RESOURCE: {
+					const char* path = stream.readString();
+					pushResource(L, path, prop.resource_type);
+					break;
+				}
+				case Property::ENTITY: {
+					EntityPtr e = stream.read<EntityPtr>();
+					LuaWrapper::pushEntity(L, e, &m_world);
+					break;
+				}
+				case Property::FLOAT: {
+					float val = stream.read<float>();
+					LuaWrapper::push(L, val);
+					break;
+				}
+				case Property::BOOLEAN: {
+					bool val = stream.read<u8>() != 0;
+					LuaWrapper::push(L, val);
+					break;
+				}
+				case Property::INT: {
+					i32 val = stream.read<i32>();
+					LuaWrapper::push(L, val);
+					break;
+				}
+				case Property::COLOR: {
+					Vec3 val = stream.read<Vec3>();
+					LuaWrapper::push(L, val);
+					break;
+				}
+				case Property::STRING: {
+					const char* val = stream.readString();
+					LuaWrapper::push(L, val);
+					break;
+				}
+			}
+		};
 
-		LuaWrapper::push(script.m_state, new_res);
-		lua_setfield(script.m_state, -3, "_handle");
-
-		lua_pop(script.m_state, 3);
-	}
-
-	template <typename T>
-	void applyProperty(ScriptInstance& script, Property& prop, T value) {
-		char tmp[64];
-		toCString(value, Span(tmp));
-		applyProperty(script, prop, tmp);
-	}
-
-	void applyProperty(ScriptInstance& script, Property& prop, float value) {
-		char tmp[64];
-		toCString(value, Span(tmp), 10);
-		applyProperty(script, prop, tmp);
-	}
-
-	void applyProperty(ScriptInstance& script, Property& prop, Vec3 value) {
-		const StaticString<512> tmp("{", value.x, ",", value.y, ",", value.z, "}");
-		applyProperty(script, prop, tmp.data);
-	}
-
-	void applyProperty(ScriptInstance& script, Property& prop, char* value) {
-		applyProperty(script, prop, (const char*)value);
-	}
-
-	void applyProperty(ScriptInstance& script, Property& prop, const char* value)
-	{
-		if (!value) return;
-
-		lua_State* state = script.m_state;
-		if (!state) return;
-
-		const char* name = getPropertyName(prop.name_hash);
-		if (!name) return;
-
-		if (prop.type == Property::RESOURCE)
-		{
-			applyResourceProperty(script, name, prop, value);
-			return;
+		if (prop.is_array) {
+			lua_newtable(L);
+			int array_idx = 1;
+			const u32 count = stream.read<u32>();
+			for (u32 i = 0; i < count; ++i) {
+				pushValue();
+				lua_rawseti(L, -2, array_idx++);
+			}
+			lua_setfield(L, -2, name);
 		}
-
-		if (prop.type != Property::STRING && prop.type != Property::RESOURCE && value[0] == '\0') return;
-
-		if (prop.type == Property::ENTITY)
-		{
-			applyEntityProperty(script, name, prop, value);
-			return;
+		else {
+			pushValue();
+			lua_setfield(L, -2, name);
 		}
-
-		StaticString<1024> tmp(name, " = ");
-		if (prop.type == Property::STRING) tmp.append("\"", value, "\"");
-		else tmp.append(value);
-
-		bool errors = LuaWrapper::luaL_loadbuffer(state, tmp, stringLength(tmp), nullptr) != 0;
-		if (errors)
-		{
-			logError(script.m_script->getPath(), ": ", lua_tostring(state, -1));
-			lua_pop(state, 1);
-			return;
-		}
-
-		lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment);
-		ASSERT(lua_type(script.m_state, -1) == LUA_TTABLE);
-		lua_setfenv(script.m_state, -2);
-
-		errors = lua_pcall(state, 0, 0, 0) != 0;
-
-		if (errors)
-		{
-			logError(script.m_script->getPath(), ": ", lua_tostring(state, -1));
-			lua_pop(state, 1);
-		}
-	}
-
-	template <typename T>
-	void setPropertyValue(EntityRef entity, int scr_index, const char* property_name, T value) {
-		auto* script_cmp = m_scripts[entity];
-		if (!script_cmp) return;
-		Property& prop = getScriptProperty(entity, scr_index, property_name);
-		if (!script_cmp->m_scripts[scr_index].m_state) {
-			toString(value, prop.stored_value);
-			return;
-		}
-
-		applyProperty(script_cmp->m_scripts[scr_index], prop, value);
+		lua_pop(L, 1);
 	}
 
 	const char* getPropertyName(EntityRef entity, int scr_index, int index) const
@@ -2329,77 +2307,75 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 	}
 
 	// TODO type-checking (does lua type match c++), check other places too
-	void serializePropertyValue(Property& prop, const char* prop_name, ScriptInstance& scr, OutputMemoryStream& stream) {
-		if (!scr.m_state) {
-			stream.writeString(prop.stored_value);
-			return;
-		}
+	void serializePropertyValue(Property& prop, const char* prop_name, ScriptInstance& inst, OutputMemoryStream& stream) {
+		lua_State* L = inst.m_state;
+		
+		LuaWrapper::DebugGuard guard(L);
+		lua_rawgeti(L, LUA_REGISTRYINDEX, inst.m_environment);
+		lua_getfield(L, -1, prop_name);
 
-		lua_rawgeti(scr.m_state, LUA_REGISTRYINDEX, scr.m_environment);
-		lua_getfield(scr.m_state, -1, prop_name);
-		const int type = lua_type(scr.m_state, -1);
-		if (type == LUA_TNIL) {
-			stream.writeString(prop.stored_value);
-			lua_pop(scr.m_state, 2);
-			return;
-		}
-
-		switch (prop.type) {
-			case Property::BOOLEAN: {
-				bool b = lua_toboolean(scr.m_state, -1) != 0;
-				stream.writeString(b ? "true" : "false");
-				break;
-			}
-			case Property::FLOAT: {
-				char tmp[64];
-				float val = (float)lua_tonumber(scr.m_state, -1);
-				toCString(val, tmp, 8);
-				stream.writeString(tmp);
-				break;
-			}
-			case Property::COLOR: {
-				const Vec3 val = LuaWrapper::toType<Vec3>(scr.m_state, -1);
-				const StaticString<512> tmp("{", val.x, ",", val.y, ",", val.z, "}");
-				stream.writeString(tmp);
-				break;
-			}
-			case Property::INT: {
-				int val = (int )lua_tointeger(scr.m_state, -1);
-				char tmp[64];
-				toCString(val, tmp);
-				stream.writeString(tmp);
-				break;
-			}
-			case Property::ENTITY: {
-				EntityPtr e = INVALID_ENTITY;
-				if (type != LUA_TTABLE) {
-					e = INVALID_ENTITY;
+		auto writeOne = [&]() {
+			switch (prop.type) {
+				case Property::ANY: ASSERT(false); break;
+				case Property::BOOLEAN: {
+					bool b = lua_toboolean(L, -1) != 0;
+					stream.write((u8)b);
+					break;
 				}
-				else {
-					if (LuaWrapper::getField(scr.m_state, -1, "_entity") == LUA_TNUMBER) {
-						e = EntityPtr{ (i32)lua_tointeger(scr.m_state, -1) };
+				case Property::FLOAT: {
+					float val = (float)lua_tonumber(L, -1);
+					stream.write(val);
+					break;
+				}
+				case Property::INT: {
+					i32 val = lua_tointeger(L, -1);
+					stream.write(val);
+					break;
+				}
+				case Property::ENTITY: {
+					EntityPtr e = INVALID_ENTITY;
+					if (lua_type(L, -1) == LUA_TTABLE) {
+						if (LuaWrapper::getField(L, -1, "_entity") == LUA_TNUMBER) {
+							e = EntityPtr{ (i32)lua_tointeger(L, -1) };
+						}
+						lua_pop(L, 1);
 					}
-					lua_pop(scr.m_state, 1);
+					stream.write(e.index);
+					break;
 				}
-				char tmp[64];
-				toCString(e.index, tmp);
-				stream.writeString(tmp);
-				break;
+				case Property::STRING:
+					stream.writeString(lua_tostring(L, -1));
+					break;
+				case Property::RESOURCE: {
+					lua_getfield(L, -1, "_handle");
+					int res_idx = LuaWrapper::toType<int>(L, -1);
+					lua_pop(L, 1);
+					Resource* res = m_system.getLuaResource(res_idx);
+					stream.writeString(res ? res->getPath().c_str() : "");
+					break;
+				}
+				case Property::COLOR: {
+					const Vec3 val = LuaWrapper::toType<Vec3>(L, -1);
+					stream.write(val);
+					break;
+				}
 			}
-			case Property::STRING:
-				stream.writeString(lua_tostring(scr.m_state, -1));
-				break;
-			case Property::RESOURCE: {
-				lua_getfield(scr.m_state, -1, "_handle");
-				int res_idx = LuaWrapper::toType<int>(scr.m_state, -1);
-				lua_pop(scr.m_state, 1);
-				Resource* res = m_system.getLuaResource(res_idx);
-				stream.writeString(res ? res->getPath() : Path());
-				break;
+		};
+
+		if (prop.is_array) {
+			const i32 num_elems = lua_objlen(inst.m_state, -1);
+			stream.write(num_elems);
+
+			for (i32 i = 0; i < num_elems; ++i) {
+				lua_rawgeti(inst.m_state, -1, i + 1);
+				writeOne();
+				lua_pop(inst.m_state, 1);
 			}
-			default: ASSERT(false); break;
 		}
-		lua_pop(scr.m_state, 2);
+		else {
+			writeOne();
+		}
+		lua_pop(inst.m_state, 2);
 	}
 
 
@@ -2414,29 +2390,27 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 		for (ScriptComponent* script_cmp : m_scripts) {
 			serializer.write(script_cmp->m_entity);
 			serializer.write(script_cmp->m_scripts.size());
+			
 			for (auto& scr : script_cmp->m_scripts) {
 				serializer.writeString(scr.m_script ? scr.m_script->getPath() : Path());
 				serializer.write(scr.m_flags);
 				serializer.write(scr.m_properties.size());
+				
 				for (Property& prop : scr.m_properties) {
 					serializer.write(prop.name_hash);
 					serializer.write(prop.type);
+					serializer.write(prop.is_array);
 					auto iter = m_property_names.find(prop.name_hash);
-					if (iter.isValid()) {
-						const char* name = iter.value().c_str();
-						serializePropertyValue(prop, name, scr, serializer);
-					}
-					else {
-						serializer.writeString("");
-					}
+					ASSERT(iter.isValid());
+
+					const char* name = iter.value().c_str();
+					serializePropertyValue(prop, name, scr, serializer);
 				}
 			}
 		}
 	}
 
-
-	void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map, i32 version) override
-	{
+	void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map, i32 version) override {
 		if (version > (i32)LuaModuleVersion::INLINE_SCRIPT) {
 			const i32 len = serializer.read<i32>();
 			m_inline_scripts.reserve(m_scripts.size() + len);
@@ -2453,8 +2427,7 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 
 		int len = serializer.read<int>();
 		m_scripts.reserve(len + m_scripts.size());
-		for (int i = 0; i < len; ++i)
-		{
+		for (int i = 0; i < len; ++i) {
 			auto& allocator = m_system.m_allocator;
 			EntityRef entity;
 			serializer.read(entity);
@@ -2464,8 +2437,7 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 			m_scripts.insert(script->m_entity, script);
 			int scr_count;
 			serializer.read(scr_count);
-			for (int scr_idx = 0; scr_idx < scr_count; ++scr_idx)
-			{
+			for (int scr_idx = 0; scr_idx < scr_count; ++scr_idx) {
 				auto& scr = script->m_scripts.emplace(*script, allocator);
 
 				const char* path = serializer.readString();
@@ -2473,8 +2445,7 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 				int prop_count;
 				serializer.read(prop_count);
 				scr.m_properties.reserve(prop_count);
-				for (int j = 0; j < prop_count; ++j)
-				{
+				for (int prop_idx = 0; prop_idx < prop_count; ++prop_idx) {
 					Property& prop = scr.m_properties.emplace(allocator);
 					prop.type = Property::ANY;
 					if (version <= (i32)LuaModuleVersion::HASH64) {
@@ -2485,16 +2456,67 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 					}
 					Property::Type type;
 					serializer.read(type);
-					const char* tmp = serializer.readString();
-					if (type == Property::ENTITY) {
-						EntityPtr prop_value;
-						fromCString(tmp, prop_value.index);
-						prop_value = entity_map.get(prop_value);
-						StaticString<64> buf(prop_value.index);
-						prop.stored_value = buf;
+					
+					if (version > (i32)LuaModuleVersion::ARRAY_PROPERTIES) {
+						prop.is_array = serializer.read<bool>();
+						u32 num_elements = 1;
+						if (prop.is_array) {
+							num_elements = serializer.read<u32>();
+							prop.stored_value.reserve(num_elements * 4 + sizeof(num_elements));
+							prop.stored_value.write(num_elements);	
+						}
+						// TODO small buffer optimization - most properties are <= 4B
+						switch (type) {
+							case Property::ANY: ASSERT(false); break;
+							case Property::ENTITY: prop.stored_value.write(serializer.skip(num_elements * sizeof(EntityPtr)), num_elements * sizeof(EntityPtr)); break;
+							case Property::FLOAT: prop.stored_value.write(serializer.skip(num_elements * sizeof(float)), num_elements * sizeof(float)); break;
+							case Property::BOOLEAN: prop.stored_value.write(serializer.skip(num_elements * sizeof(u8)), num_elements * sizeof(u8)); break;
+							case Property::INT: prop.stored_value.write(serializer.skip(num_elements * sizeof(i32)), num_elements * sizeof(i32)); break;
+							case Property::COLOR: prop.stored_value.write(serializer.skip(num_elements * sizeof(Vec3)), num_elements * sizeof(Vec3)); break;
+							case Property::STRING:
+							case Property::RESOURCE:
+								for(u32 j = 0; j < num_elements; ++j) {
+									prop.stored_value.writeString(serializer.readString());
+								}
+								break;
+						}
 					}
 					else {
-						prop.stored_value = tmp;
+						const char* tmp = serializer.readString();
+						switch (type) {
+							case Property::ANY: ASSERT(false); break;
+							case Property::ENTITY: {
+								EntityPtr prop_value;
+								fromCString(tmp, prop_value.index);
+								prop_value = entity_map.get(prop_value);
+								prop.stored_value.write(prop_value);
+								break;
+							}
+							case Property::FLOAT: {
+								float prop_value = fromString<float>(tmp);
+								prop.stored_value.write(prop_value);
+								break;
+							}
+							case Property::BOOLEAN: {
+								bool prop_value = fromString<bool>(tmp);
+								prop.stored_value.write(prop_value);
+								break;
+							}
+							case Property::INT: {
+								i32 prop_value = fromString<i32>(tmp);
+								prop.stored_value.write(prop_value);
+								break;
+							}
+							case Property::COLOR: {
+								Vec3 prop_value = fromString<Vec3>(tmp);
+								prop.stored_value.write(prop_value);
+								break;
+							}
+							case Property::STRING:
+							case Property::RESOURCE:
+								prop.stored_value.writeString(tmp);
+								break;
+						}
 					}
 				}
 				setPath(*script, scr, Path(path));
@@ -2797,159 +2819,111 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 		m_inline_scripts[entity].m_source = value;
 	}
 
-	template <typename T>
-	T getPropertyValue(ScriptInstance& scr, int scr_index, Property& prop, const char* property_name) {
-		if (!scr.m_state) return fromString<T>(prop.stored_value.c_str());
-
-		lua_rawgeti(scr.m_state, LUA_REGISTRYINDEX, scr.m_environment);
-		lua_getfield(scr.m_state, -1, property_name);	
-			
-		if (!LuaWrapper::isType<T>(scr.m_state, -1)) {
-			lua_pop(scr.m_state, 2);
-			return {};
-		}
-
-		const T res = LuaWrapper::toType<T>(scr.m_state, -1);
-		lua_pop(scr.m_state, 2);
-		return res;
-	}
-
 	void getScriptBlob(EntityRef e, u32 index, OutputMemoryStream& stream) {
 		ScriptInstance& inst = m_scripts[e]->m_scripts[index];
+		ASSERT(inst.m_state);
 		for (Property& prop : inst.m_properties) {
 			auto iter = m_property_names.find(prop.name_hash);
 			ASSERT(iter.isValid()); // TODO make sure this assert is never hit
 			const char* prop_name = iter.value().c_str();
 			stream.writeString(prop_name);
-			switch (prop.type) {
-				case Property::ANY: break;
-				case Property::BOOLEAN: {
-					const bool value = getPropertyValue<bool>(inst, index, prop, prop_name);
-					stream.write(value);
-					break;
-				}
-				case Property::FLOAT: {
-					const float value = getPropertyValue<float>(inst, index, prop, prop_name);
-					stream.write(value);
-					break;
-				}
-				case Property::INT: {
-					const i32 value = getPropertyValue<i32>(inst, index, prop, prop_name);
-					stream.write(value);
-					break;
-				}
-				case Property::ENTITY: {
-					const EntityPtr value = getPropertyValue<EntityPtr>(inst, index, prop, prop_name);
-					stream.write(value);
-					break;
-				}
-				case Property::COLOR: {
-					Vec3 value = getPropertyValue<Vec3>(inst, index, prop, prop_name);
-					stream.write(value);
-					break;
-				}
-				case Property::RESOURCE:
-					if (inst.m_state) {
-						lua_rawgeti(inst.m_state, LUA_REGISTRYINDEX, inst.m_environment);
-						lua_getfield(inst.m_state, -1, prop_name);
-						const int res_idx = LuaWrapper::toType<int>(inst.m_state, -1);
-						const Resource* res = m_system.getLuaResource(res_idx);
-						stream.writeString(res->getPath());
-						lua_pop(inst.m_state, 2);
-					}
-					else {
-						stream.writeString(prop.stored_value);
-					}
-					break;
-				case Property::STRING:
-					if (inst.m_state) {
-						lua_rawgeti(inst.m_state, LUA_REGISTRYINDEX, inst.m_environment);
-						lua_getfield(inst.m_state, -1, prop_name);
-						stream.writeString(lua_tostring(inst.m_state, -1));
-						lua_pop(inst.m_state, 2);
-					}
-					else {
-						stream.writeString(prop.stored_value);
-					}
-					break;
-			}
+
+			serializePropertyValue(prop, prop_name, inst, stream);
 		}
 	}
 
-	// TODO entity map - when copy/pasting script components, entity properties are not remaped to new entities
+	// TODO resource leaks all over the place
+	void pushResource(lua_State* L, const char* path, ResourceType resource_type) {
+		const i32 res_idx = path[0] ? m_system.addLuaResource(Path(path), resource_type) : -1;
+		
+		lua_newtable(L);
+		lua_getglobal(L, "Lumix");
+		lua_getfield(L, -1, "Resource");
+		lua_setmetatable(L, -3);
+		lua_pop(L, 1);
+
+		LuaWrapper::push(L, res_idx);
+		lua_setfield(L, -2, "_handle");
+
+		lua_pushlightuserdata(L, (void*)resource_type.type.getHashValue());
+		lua_setfield(L, -2, "_type");
+	}
+
 	void setScriptBlob(EntityRef entity, u32 index, InputMemoryStream& stream) {
 		// TODO make sure properties in set/get blobs match
 		ScriptInstance& inst = m_scripts[entity]->m_scripts[index];
+		ASSERT(inst.m_state);
+
+		lua_State* L = inst.m_state; 
+		LuaWrapper::DebugGuard guard(L);
+		lua_rawgeti(L, LUA_REGISTRYINDEX, inst.m_environment);
+		
 		for (u32 i = 0, n = inst.m_properties.size(); i < n; ++i) {
 			const char* prop_name = stream.readString();
 			Property& prop = getScriptProperty(entity, index, prop_name);
+			
+			const char* name = getPropertyName(prop.name_hash);
+			ASSERT(name);
 
-			switch (prop.type) {
-				case Property::ANY: break;
-				case Property::BOOLEAN: {
-					bool value;
-					stream.read(value);
-					if (!inst.m_state) {
-						prop.stored_value = value ? "true" : "false";
+			auto readProperty = [&](){
+				switch (prop.type) {
+					case Property::ANY: break;
+					case Property::BOOLEAN: {
+						bool value = stream.read<u8>() != 0;
+						LuaWrapper::push(L, value);
+						break;
 					}
-					else {
-						applyProperty(inst, prop, value);
+					case Property::FLOAT: {
+						float value = stream.read<float>();
+						LuaWrapper::push(L, value);
+						break;
 					}
-					break;
+					case Property::INT: {
+						i32 value = stream.read<i32>();
+						LuaWrapper::push(L, value);
+						break;
+					}
+					case Property::ENTITY: {
+						EntityPtr value;
+						stream.read(value);
+						// TODO entity map - when copy/pasting script components, entity properties are not remaped to new entities
+						LuaWrapper::pushEntity(L, value, &m_world);
+						break;
+					}
+					case Property::RESOURCE: {
+						const char* path = stream.readString();
+						pushResource(L, path, prop.resource_type);
+						break;
+					}
+					case Property::STRING: {
+						const char* value = stream.readString();
+						LuaWrapper::push(L, value);
+						break;
+					}
+					case Property::COLOR: {
+						Vec3 value = stream.read<Vec3>();
+						LuaWrapper::push(L, value);
+						break;
+					}
 				}
-				case Property::FLOAT: {
-					float value;
-					stream.read(value);
-					if (!inst.m_state) {
-						// TODO this is not lossless
-						toString(value, prop.stored_value);
-					} else {
-						applyProperty(inst, prop, value);
-					}
-					break;
+			};
+
+			if (prop.is_array) {
+				lua_newtable(L);
+				const i32 len = stream.read<i32>();
+				for (i32 j = 0; j < len; ++j) {
+					readProperty();
+					lua_rawseti(L, -2, j + 1);
 				}
-				case Property::INT: {
-					int value;
-					stream.read(value);
-					if (!inst.m_state) {
-						toString(value, prop.stored_value);
-					} else {
-						applyProperty(inst, prop, value);
-					}
-					break;
-				}
-				case Property::ENTITY: {
-					EntityPtr value;
-					stream.read(value);
-					if (!inst.m_state) {
-						toString(value, prop.stored_value);
-					} else {
-						applyProperty(inst, prop, value);
-					}
-					break;
-				}
-				case Property::RESOURCE:
-				case Property::STRING: {
-					const char* value = stream.readString();
-					if (!inst.m_state) {
-						prop.stored_value = value;
-					} else {
-						applyProperty(inst, prop, value);
-					}
-					break;
-				}
-				case Property::COLOR: {
-					Vec3 value;
-					stream.read(value);
-					if (!inst.m_state) {
-						toString(value, prop.stored_value);
-					} else {
-						applyProperty(inst, prop, value);
-					}
-					break;
-				}
+				lua_setfield(L, -2, name);
+			}
+			else {
+				readProperty();
+				lua_setfield(L, -2, name);
 			}
 		}
+
+		lua_pop(L, 1);
 	}
 
 	struct DeferredStart {

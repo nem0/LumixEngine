@@ -552,6 +552,10 @@ inline void push(lua_State* L, const char* value)
 {
 	lua_pushstring(L, value);
 }
+inline void push(lua_State* L, StringView value)
+{
+	lua_pushlstring(L, value.begin, value.size());
+}
 inline void push(lua_State* L, char* value)
 {
 	lua_pushstring(L, value);

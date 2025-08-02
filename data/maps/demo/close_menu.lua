@@ -1,4 +1,4 @@
-player = Lumix.Entity.INVALID
+player = Lumix.Entity.NULL
 
 function onButtonClicked()
 	this.parent.gui_rect.enabled = false

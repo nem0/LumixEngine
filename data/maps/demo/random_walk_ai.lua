@@ -1,7 +1,7 @@
-point0 = point0 or Lumix.Entity.INVALID
-point1 = point1 or Lumix.Entity.INVALID
-point2 = point2 or Lumix.Entity.INVALID
-point3 = point3 or Lumix.Entity.INVALID
+point0 = point0 or Lumix.Entity.NULL
+point1 = point1 or Lumix.Entity.NULL
+point2 = point2 or Lumix.Entity.NULL
+point3 = point3 or Lumix.Entity.NULL
 
 function goToRandomPoint()
 	local pidx = math.random(4) - 1

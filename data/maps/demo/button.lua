@@ -1,8 +1,8 @@
 local co = require "scripts/coroutine"
 local lumix_math = require "scripts/math"
 
-label = Lumix.Entity.INVALID
-player = Lumix.Entity.INVALID
+label = Lumix.Entity.NULL
+player = Lumix.Entity.NULL
 sound = Lumix.Resource:newEmpty("clip")
 local interactive = false
 

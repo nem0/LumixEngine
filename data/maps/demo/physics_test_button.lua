@@ -1,9 +1,9 @@
 inherit "maps/demo/button"
 
-cubeA = cubeA or Lumix.Entity.INVALID
-cubeB = cubeB or Lumix.Entity.INVALID
-sphereA = sphereA or Lumix.Entity.INVALID
-sphereB = sphereB or Lumix.Entity.INVALID
+cubeA = cubeA or Lumix.Entity.NULL
+cubeB = cubeB or Lumix.Entity.NULL
+sphereA = sphereA or Lumix.Entity.NULL
+sphereB = sphereB or Lumix.Entity.NULL
 
 local cubeA_pos = {}
 local cubeB_pos = {}

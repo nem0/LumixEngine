@@ -26,12 +26,9 @@ struct LuaScriptSystem : ISystem {
 	virtual void unloadLuaResource(LuaResourceHandle resource_idx) = 0;
 };
 
-struct LuaScriptModule : IModule
-{
-	struct Property
-	{
-		enum Type : int
-		{
+struct LuaScriptModule : IModule {
+	struct Property {
+		enum Type : int {
 			BOOLEAN,
 			FLOAT,
 			INT,
@@ -44,19 +41,17 @@ struct LuaScriptModule : IModule
 
 		explicit Property(IAllocator& allocator)
 			: stored_value(allocator)
-		{
-		}
+		{}
 
 		StableHash32 name_hash_legacy;
 		StableHash name_hash;
 		Type type;
 		ResourceType resource_type;
-		String stored_value;
+		OutputMemoryStream stored_value;
+		bool is_array = false;
 	};
 
-
-	struct IFunctionCall
-	{
+	struct IFunctionCall {
 		virtual ~IFunctionCall() {}
 		virtual void add(int parameter) = 0;
 		virtual void add(bool parameter) = 0;
@@ -65,9 +60,6 @@ struct LuaScriptModule : IModule
 		virtual void add(EntityPtr parameter) = 0;
 		virtual void addEnvironment(int env) = 0;
 	};
-
-
-	using lua_CFunction = int (*) (lua_State *L);
 
 	virtual Path getScriptPath(EntityRef entity, int scr_index) = 0;	
 	virtual void setScriptPath(EntityRef entity, int scr_index, const Path& path) = 0;
@@ -86,8 +78,7 @@ struct LuaScriptModule : IModule
 	virtual void moveScript(EntityRef entity, int scr_index, bool up) = 0;
 	virtual int getPropertyCount(EntityRef entity, int scr_index) = 0;
 	virtual const char* getPropertyName(EntityRef entity, int scr_index, int prop_index) = 0;
-	virtual Property::Type getPropertyType(EntityRef entity, int scr_index, int prop_index) = 0;
-	virtual ResourceType getPropertyResourceType(EntityRef entity, int scr_index, int prop_index) = 0;
+	virtual const Property& getProperty(EntityRef entity, int scr_index, int prop_index) = 0;
 	virtual const char* getInlineScriptCode(EntityRef entity) = 0;
 	virtual void setInlineScriptCode(EntityRef entity, const char* value) = 0;
 };
