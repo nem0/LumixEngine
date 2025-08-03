@@ -95,13 +95,6 @@ struct AudioDeviceImpl final : AudioDevice
 		PROFILE_FUNCTION();
 		m_engine = &engine;
 
-		auto coinitialize_result = CoInitialize(nullptr);
-		if (!SUCCEEDED(coinitialize_result)) {
-			logError("CoInitialize failed. Error code: ", (u32)coinitialize_result);
-			ASSERT(false);
-			return false;
-		}
-
 		m_library = LoadLibrary("dsound.dll");
 		if (!m_library) {
 			logError("Failed to load dsound.dll.");
