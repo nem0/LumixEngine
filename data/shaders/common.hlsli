@@ -532,7 +532,7 @@ struct AtlasTile {
 	float scale;
 };
 
-AtlasTile getShadowAtlasTile(int atlas_idx) {
+AtlasTile getShadowAtlasTile(uint atlas_idx) {
 	AtlasTile res;
 	if (atlas_idx < 1) {
 		res.offset = float2(0, 0);

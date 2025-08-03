@@ -759,7 +759,7 @@ struct SamplerHeap {
 		desc.MaxLOD = 1000;
 		desc.MinLOD = -1000;
 		desc.MaxAnisotropy = is_aniso ? 8 : 1;
-		desc.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+		desc.ComparisonFunc = D3D12_COMPARISON_FUNC_NONE;
 		D3D12_CPU_DESCRIPTOR_HANDLE cpu = cpu_begin;
 		cpu.ptr += increment * id;
 		device->CreateSampler(&desc, cpu);
