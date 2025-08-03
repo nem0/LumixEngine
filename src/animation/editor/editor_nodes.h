@@ -36,7 +36,7 @@ struct Node : NodeEditorNode {
 		if (parent) parent->m_nodes.push(this);
 	}
 
-	virtual ~Node() {}
+	virtual ~Node();
 	virtual Type type() const = 0;
 	virtual void serialize(OutputMemoryStream& stream) const;
 	virtual void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version);

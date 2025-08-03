@@ -994,6 +994,13 @@ void SwitchNode::serialize(OutputMemoryStream& stream) const {
 	stream.write(m_blend_length);
 }
 
+Node::~Node() {
+	for (Node* node : m_nodes) {
+		LUMIX_DELETE(m_allocator, node);
+	}
+} 
+
+
 void Node::serialize(OutputMemoryStream& stream) const {
 	stream.write(m_id);
 	stream.write(m_pos);

@@ -22,7 +22,7 @@ Controller::Controller(const Path& path, ResourceManager& resource_manager, IAll
 {}
 
 Controller::~Controller() {
-	LUMIX_DELETE(m_allocator, m_root);
+	unload();
 }
 
 void Controller::unload() {
@@ -102,6 +102,8 @@ void Controller::serialize(OutputMemoryStream& stream) {
 }
 
 bool Controller::deserialize(InputMemoryStream& stream) {
+	unload();
+
 	Header header;
 	stream.read(header);
 

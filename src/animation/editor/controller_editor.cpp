@@ -38,7 +38,9 @@ Controller::Controller(const Path& path, IAllocator& allocator)
 	m_root->m_name = "Root";
 }
 
-Controller::~Controller() { LUMIX_DELETE(m_allocator, m_root); }
+Controller::~Controller() {
+	LUMIX_DELETE(m_allocator, m_root);
+}
 
 void Controller::clear() {
 	m_animation_entries.clear();
@@ -98,6 +100,12 @@ bool Controller::compile(StudioApp& app, OutputMemoryStream& blob) {
 	controller.m_root = (anim::PoseNode*)m_root->compile(controller);
 	if (!controller.m_root) return false;
 	controller.serialize(blob);
+
+	for (auto& e : controller.m_animation_entries) {
+		if (e.animation) e.animation->decRefCount();
+	}
+	controller.m_animation_entries.clear();
+
 	return true;
 }
 
@@ -127,6 +135,8 @@ bool Controller::deserialize(InputMemoryStream& stream) {
 		stream.read(entry.set);
 		entry.animation = stream.readString();
 	}
+
+	LUMIX_DELETE(m_allocator, m_root);
 
 	m_root = LUMIX_NEW(m_allocator, TreeNode)(nullptr, *this, m_allocator);
 	m_root->m_name = "Root";
