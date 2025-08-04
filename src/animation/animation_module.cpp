@@ -386,7 +386,7 @@ struct AnimationModuleImpl final : AnimationModule {
 		return animator.resource ? animator.resource->getPath() : Path("");
 	}
 
-	bool isPropertyAnimatorLooped(EntityRef entity) {
+	bool isPropertyAnimatorLooped(EntityRef entity) override {
 		return isFlagSet(m_property_animators[entity].flags, PropertyAnimator::LOOPED);
 	}
 
@@ -406,7 +406,7 @@ struct AnimationModuleImpl final : AnimationModule {
 		}
 	}
 
-	void setPropertyAnimatorLooped(EntityRef entity, bool looped) {
+	void setPropertyAnimatorLooped(EntityRef entity, bool looped) override {
 		PropertyAnimator& animator = m_property_animators[entity];
 		setFlag(animator.flags, PropertyAnimator::LOOPED, looped);
 	}

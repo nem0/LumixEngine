@@ -892,7 +892,7 @@ struct RendererImpl final : Renderer {
 		return m_layers.size() - 1;
 	}
 
-	void enableBuiltinTAA(bool enable) {
+	void enableBuiltinTAA(bool enable) override {
 		m_taa.m_enabled = enable;
 		}
 
