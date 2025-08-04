@@ -2719,7 +2719,7 @@ struct ParticleEditorImpl : ParticleEditor {
 		, m_function_plugin(*this, app, m_allocator)
 		, m_particle_system_plugin(*this, app)
 		, m_functions(m_allocator)
-		, m_apply_action("Apply", "Particle editor apply", "particle_editor_apply", "")
+		, m_apply_action("Particle editor", "Apply", "Apply", "particle_editor_apply", "")
 	{
 		const char* particle_emitter_exts[] = {"par" };
 		m_app.getAssetCompiler().addPlugin(m_particle_system_plugin, Span(particle_emitter_exts));

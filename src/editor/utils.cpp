@@ -2023,12 +2023,12 @@ struct CodeEditorImpl final : CodeEditor {
 	static Action s_add_match_to_selection;
 };
 
-Action CodeEditorImpl::s_delete_left{"Delete left", "Code editor - delete left", "delete_left", ICON_FA_BACKSPACE};
-Action CodeEditorImpl::s_delete_word{"Delete word", "Code editor - delete word", "delete_word", ""};
-Action CodeEditorImpl::s_delete_word_left{"Delete word left", "Code editor - delete word left", "delete_word_left", ""};
-Action CodeEditorImpl::s_search{"Search", "Code editor - search", "code_editor_search", ICON_FA_SEARCH};
-Action CodeEditorImpl::s_cut{"Cut", "Code editor - cut", "code_editor_cut", ICON_FA_CUT};
-Action CodeEditorImpl::s_add_match_to_selection{"Add match to selection", "Code editor - add match to selection", "code_editor_add_match_to_selection", ""};
+Action CodeEditorImpl::s_delete_left{"Code editor", "Delete left", "Delete left", "delete_left", ICON_FA_BACKSPACE};
+Action CodeEditorImpl::s_delete_word{"Code editor", "Delete word", "Delete word", "delete_word", ""};
+Action CodeEditorImpl::s_delete_word_left{"Code editor", "Delete word left", "Delete word left", "delete_word_left", ""};
+Action CodeEditorImpl::s_search{"Code editor", "Search", "Search", "code_editor_search", ICON_FA_SEARCH};
+Action CodeEditorImpl::s_cut{"Code editor", "Cut", "Cut", "code_editor_cut", ICON_FA_CUT};
+Action CodeEditorImpl::s_add_match_to_selection{"Code editor", "Add match to selection", "Add match to selection", "code_editor_add_match_to_selection", ""};
 
 
 UniquePtr<CodeEditor> createCodeEditor(StudioApp& app) {
@@ -2099,13 +2099,14 @@ ResourceLocator::ResourceLocator(StringView path) {
 
 Action* Action::first_action = nullptr;
 
-Action::Action(const char* label_short, const char* label_long, const char* name, const char* font_icon, Type type)
+Action::Action(const char* group, const char* label_short, const char* label_long, const char* name, const char* font_icon, Type type)
 	: label_long(label_long)
 	, label_short(label_short)
 	, name(name)
 	, font_icon(font_icon)
 	, shortcut(os::Keycode::INVALID)
 	, type(type)
+	, group(group)
 {
 	if (type != TEMPORARY) {
 		if (first_action) {
@@ -2271,8 +2272,8 @@ bool inputStringMultiline(const char* label, String* value, const ImVec2& size) 
 	return ImGui::InputTextMultiline(label, (char*)value->c_str(), value->length() + 1, size, flags, inputTextCallback, value);
 }
 
-bool inputString(const char* label, String* value) {
-	ImGuiInputTextFlags flags = ImGuiInputTextFlags_CallbackResize;
+bool inputString(const char* label, String* value, ImGuiInputTextFlags flags) {
+	flags |= ImGuiInputTextFlags_CallbackResize;
 	return ImGui::InputText(label, (char*)value->c_str(), value->length() + 1, flags, inputTextCallback, value);
 }
 
@@ -2415,7 +2416,16 @@ void DirSelector::fillSubitems() {
 	FileSystem& fs = m_app.getEngine().getFileSystem();
 	const char* base_path = fs.getBasePath();
 	
-	const Path path(base_path, "/", m_current_dir);
+	Path path(base_path, "/", m_current_dir);
+	
+	TextFilter filter;
+	if (!os::dirExists(path)) {
+		StringView dir = Path::getDir(m_current_dir);
+		copyString(filter.filter, dir.end);
+		filter.build();
+		path = Path(base_path, "/", dir);
+	}
+
 	os::FileIterator* iter = os::createFileIterator(path, m_app.getAllocator());
 	os::FileInfo info;
 	while (os::getNextFile(iter, &info)) {
@@ -2423,39 +2433,11 @@ void DirSelector::fillSubitems() {
 		if (equalStrings(info.filename, "..")) continue;
 		if (equalStrings(info.filename, ".lumix") && m_current_dir.length() == 0) continue;
 
-		if (info.is_directory) {
+		if (info.is_directory && filter.pass(info.filename)) {
 			m_subdirs.emplace(info.filename, m_app.getAllocator());
 		}
 	}
 	os::destroyFileIterator(iter);
-}
-
-bool DirSelector::breadcrumb(StringView path) {
-	if (path.size() > 0 && path.back() == '/') path.removeSuffix(1);
-	if (path.empty()) {
-		if (ImGui::Button(".")) {
-			m_current_dir = "";
-			fillSubitems();
-			return true;
-		}
-		return false;
-	}
-	
-	StringView dir = Path::getDir(path);
-	StringView basename = Path::getBasename(path);
-	if (breadcrumb(dir)) return true;
-	ImGui::SameLine();
-	ImGui::TextUnformatted("/");
-	ImGui::SameLine();
-	
-	char tmp[MAX_PATH];
-	copyString(Span(tmp), basename);
-	if (ImGui::Button(tmp)) {
-		m_current_dir = String(path, m_app.getAllocator());
-		fillSubitems();
-		return true;
-	}
-	return false;
 }
 
 bool DirSelector::gui(const char* label, bool* open) {
@@ -2464,51 +2446,97 @@ bool DirSelector::gui(const char* label, bool* open) {
 		fillSubitems();
 	}
 
-	if (ImGui::BeginPopupModal(label, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-		bool recently_open_create_folder = false;
-		if (ImGui::Button(ICON_FA_PLUS " Create folder")) {
-			m_creating_folder = true;
-			m_new_folder_name[0] = '\0';
-			recently_open_create_folder = true;
-		}
-		breadcrumb(m_current_dir);
-		if (ImGui::BeginChild("list", ImVec2(300, 300), true, ImGuiWindowFlags_NoScrollbar)) {
-			if (m_current_dir.length() > 0) {
-				if (ImGui::Selectable(ICON_FA_LEVEL_UP_ALT "..", false, ImGuiSelectableFlags_DontClosePopups)) {
-					StringView dir = Path::getDir(m_current_dir);
-					if (!dir.empty()) dir.removeSuffix(1);
-					m_current_dir = String(dir, m_app.getAllocator());
-					fillSubitems();
-				}
-			}
-			
-			if (m_creating_folder) {
-				ImGui::SetNextItemWidth(-1);
-				if (recently_open_create_folder) ImGui::SetKeyboardFocusHere();
-				ImGui::InputTextWithHint("##nf", "New folder name", m_new_folder_name, sizeof(m_new_folder_name), ImGuiInputTextFlags_AutoSelectAll);
-				if (ImGui::IsItemDeactivated()) {
-					m_creating_folder = false;
-					if (ImGui::IsItemDeactivatedAfterEdit()) {
-						if (m_new_folder_name[0]) {
-							FileSystem& fs = m_app.getEngine().getFileSystem();
-							const Path fullpath(fs.getBasePath(), m_current_dir, "/", m_new_folder_name);
-							if (!os::makePath(fullpath.c_str())) {
-								logError("Failed to create ", fullpath);
-							}
-							else {
-								m_current_dir.append("/", m_new_folder_name); 
-								m_new_folder_name[0] = '\0';
-							}
-							fillSubitems();
-						}
-					}
-				}
-			}
+	const ImGuiViewport* vp = ImGui::GetMainViewport();
+	const ImGuiStyle& style = ImGui::GetStyle();
+	ImVec2 size(vp->Size.x * 0.4f, vp->Size.y * 0.4f);
+	ImVec2 pos = vp->GetCenter() - size * 0.5f;
+	ImGui::SetNextWindowPos(pos);
+	ImGui::SetNextWindowSize(size, ImGuiCond_Always);
+	FileSystem& fs = m_app.getEngine().getFileSystem();
+	const char* base_path = fs.getBasePath();
 
+	if (ImGui::BeginPopupModal(label, open, ImGuiWindowFlags_NoNavInputs)) {
+		bool res = false;
+		const Path fullpath(base_path, m_current_dir);
+		if (ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
+		if (ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+			if (os::dirExists(fullpath)) res = true;
+			else {
+				ImGui::OpenPopup("Confirm");
+			}
+		}
+
+		if (beginCenterStrip("Confirm")) {
+			ImGui::NewLine();
+			alignGUICenter([&](){ ImGui::Text("Create folder '%s'", m_current_dir.c_str()); });
+			alignGUICenter([&](){ 
+				if (ImGui::Button("Yes")) {
+					if (!os::makePath(fullpath.c_str())) {
+						logError("Failed to create ", fullpath);
+					}
+					fillSubitems();
+					ImGui::CloseCurrentPopup();
+					res = true;
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("No")) ImGui::CloseCurrentPopup();
+			});
+			endCenterStrip();
+		}
+
+		if (ImGui::Button(ICON_FA_PLUS " Create folder")) {
+			if (os::dirExists(fullpath)) {
+				logError(fullpath, " already exists");
+			}
+			else {
+				if (!os::makePath(fullpath.c_str())) {
+					logError("Failed to create ", fullpath);
+				}
+				fillSubitems();
+			}
+		}
+		ImGui::SameLine();
+		ImGui::SetNextItemWidth(-1);
+
+		auto cb = [](ImGuiInputTextCallbackData* data) -> int {
+			DirSelector* ds = (DirSelector*)data->UserData;
+			if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion) {
+				FileSystem& fs = ds->m_app.getEngine().getFileSystem();
+				const char* base_path = fs.getBasePath();
+				const Path fullpath(base_path, ds->m_current_dir);
+				if (!os::dirExists(ds->m_current_dir) && !ds->m_subdirs.empty()) {
+					const u32 dir_size = Path::getDir(ds->m_current_dir).size();
+					ds->m_current_dir.resize(dir_size);
+					ds->m_current_dir.append(ds->m_subdirs[0], "/");
+					ds->fillSubitems();
+				}
+				data->DeleteChars(0, data->BufTextLen);
+				data->InsertChars(0, ds->m_current_dir.c_str());
+			}
+			if (data->EventFlag == ImGuiInputTextFlags_CallbackResize) {
+				String* str = &ds->m_current_dir;
+				str->resize(data->BufTextLen);
+				data->Buf = (char*)str->c_str();
+			}
+			return 0;
+		};
+
+		if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
+		if (ImGui::InputText("##f", (char*)m_current_dir.c_str(), m_current_dir.length() + 1, ImGuiInputTextFlags_CallbackResize | ImGuiInputTextFlags_CallbackCompletion, cb, this)) {
+			fillSubitems();
+		}
+		if (ImGui::BeginChild("list", ImVec2(-1, -ImGui::GetTextLineHeightWithSpacing() - ImGui::GetStyle().WindowPadding.y), true, ImGuiWindowFlags_NoScrollbar)) {
 			for (const String& subdir : m_subdirs) {
 				ImGui::TextUnformatted(ICON_FA_FOLDER); ImGui::SameLine();
 				if (ImGui::Selectable(subdir.c_str(), false, ImGuiSelectableFlags_DontClosePopups)) {
-					m_current_dir.append("/", subdir.c_str());
+					if (os::dirExists(fullpath)) {
+						m_current_dir.append("/", subdir.c_str());
+					}
+					else {
+						const u32 dir_size = Path::getDir(m_current_dir).size();
+						m_current_dir.resize(dir_size);
+						m_current_dir.append(subdir.c_str());
+					}
 					fillSubitems();
 					break;
 				}
@@ -2516,7 +2544,7 @@ bool DirSelector::gui(const char* label, bool* open) {
 		}
 		ImGui::EndChild();
 	
-		bool res = ImGui::Button(ICON_FA_CHECK " Select");
+		res = ImGui::Button(ICON_FA_CHECK " Select") || res;
 		ImGui::SameLine();
 		if (ImGui::Button(ICON_FA_TIMES " Cancel")) ImGui::CloseCurrentPopup();
 	

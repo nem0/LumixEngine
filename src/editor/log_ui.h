@@ -72,7 +72,7 @@ struct LUMIX_EDITOR_API LogUI : StudioApp::GUIPlugin
 		bool m_show_warnings = true;
 		bool m_show_errors = true;
 
-		Action m_toggle_ui{"Log", "Toggle log UI", "log_toggle_ui", "", Action::WINDOW};
+		Action m_toggle_ui{"Log", "Log", "Log - Toggle UI", "log_toggle_ui", "", Action::WINDOW};
 		TextFilter m_filter;
 };
 

@@ -3486,8 +3486,8 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 		: m_app(app)
 		, m_probe_jobs(app.getAllocator())
 		, m_model_plugin(model_plugin)
-		, m_generate_action("Generate probes", "Tools - generate probes", "generate_probes", "", Action::TOOL)
-		, m_add_bounce_action("Add bounce", "Tools - add light bounce to probes", "probes_add_bounce", "", Action::TOOL)
+		, m_generate_action("Studio", "Generate probes", "Generate probes", "generate_probes", "", Action::TOOL)
+		, m_add_bounce_action("Studio", "Add bounce", "Add light bounce to probes", "probes_add_bounce", "", Action::TOOL)
 	{}
 
 	~EnvironmentProbePlugin() {
@@ -5316,7 +5316,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		IAllocator& allocator = m_app.getAllocator();
 
 		if (CommandLineParser::isOn("-renderdoc")) {
-			m_renderdoc_capture_action.create("Capture frame", "Tools - capture frame with RenderDoc", "capture_renderdoc", "", Action::TOOL);
+			m_renderdoc_capture_action.create("Studio", "Capture frame", "Capture frame with RenderDoc", "capture_renderdoc", "", Action::TOOL);
 		}
 
 		AddTerrainComponentPlugin* add_terrain_plugin = LUMIX_NEW(allocator, AddTerrainComponentPlugin)(m_app);

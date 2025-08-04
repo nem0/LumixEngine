@@ -38,7 +38,7 @@ static bool shortcutInput(char* button_label, Action& action, bool edit, StudioA
 	ImGuiStyle& style = ImGui::GetStyle();
 	ImVec2 prev = style.ButtonTextAlign;
 	style.ButtonTextAlign.x = 0;
-	static Action editing{"Temporary action", "Temporary action", "temporary_action", nullptr, Action::TEMPORARY };
+	static Action editing{"Temporary", "Temporary action", "Temporary action", "temporary_action", nullptr, Action::TEMPORARY };
 	if (ImGui::Button(button_label, ImVec2(-30, 0))) {
 		openCenterStrip("edit_shortcut_popup");
 		editing.shortcut = action.shortcut;
@@ -640,15 +640,12 @@ void Settings::save() {
 	m_last_save_time = os::Timer::getRawTimestamp();
 }
 
-static void HelpMarker(const char* desc) {
-	ImGui::TextDisabled("(?)");
-	if (ImGui::IsItemHovered()) {
-		ImGui::BeginTooltip();
-		ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
-		ImGui::TextUnformatted(desc);
-		ImGui::PopTextWrapPos();
-		ImGui::EndTooltip();
-	}
+static const char* GetTreeLinesFlagsName(ImGuiTreeNodeFlags flags)
+{
+	if (flags == ImGuiTreeNodeFlags_DrawLinesNone) return "DrawLinesNone";
+	if (flags == ImGuiTreeNodeFlags_DrawLinesFull) return "DrawLinesFull";
+	if (flags == ImGuiTreeNodeFlags_DrawLinesToNodes) return "DrawLinesToNodes";
+	return "";
 }
 
 // following two themes are from https://github.com/Raais/ImguiCandy/blob/main/ImCandy/candy.h
@@ -848,7 +845,7 @@ static void Theme_Lumix(ImGuiStyle* dst = NULL) {
 	style->DisplaySafeAreaPadding = {3.000000, 3.000000};
 }
 
-bool ShowStyleSelector() {
+bool styleSelectorGUI() {
 	static int style_idx = -1;
 	if (ImGui::Combo("##themes", &style_idx, "Classic\0Dark\0Light\0Blender\0Nord\0Lumix\0")) {
 		switch (style_idx) {
@@ -870,7 +867,9 @@ static void sortActions() {
 	for (;;) {
 		bool sorted = true;
 		for (Action* a = Action::first_action; a->next; a = a->next) {
-			if (compareString(a->label_long, a->next->label_long) <= 0) continue;
+			i32 group_cmp = compareString(a->group, a->next->group);
+			if (group_cmp < 0) continue;
+			if (group_cmp == 0 && compareString(a->label_long, a->next->label_long) <= 0) continue;
 
 			sorted = false;
 			if (a == Action::first_action) Action::first_action = a->next;
@@ -891,108 +890,216 @@ static void sortActions() {
 	}
 }
 
-void Settings::shortcutsGUI() {
+static void shortcutsGUI(const TextFilter& filter, Settings& settings) {
 	PROFILE_FUNCTION();
-	if (!ImGui::BeginTabItem("Shortcuts")) return;
+	sortActions();
 
-	static TextFilter filter;
-	if (m_app.checkShortcut(m_focus_search)) ImGui::SetKeyboardFocusHere();
-	filter.gui("Filter", -1, false, &m_focus_search);
-
-	if (ImGui::BeginChild("shortcuts_scrollarea")) {
-		if (ImGui::BeginTable("shortcuts", 2, ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable)) {
-			sortActions();
-			for (Action* a = Action::first_action; a; a = a->next) {
-				char button_label[64];
-				a->shortcutText(Span(button_label));
-				if (filter.pass(a->label_long) || filter.pass(button_label)) {
-					ImGui::TableNextRow();
-					ImGui::TableNextColumn();
-					ImGui::PushID(a);
-					ImGui::TextUnformatted(a->label_long);
-					ImGui::TableNextColumn();
-					if (shortcutInput(button_label, *a, a == m_edit_action, m_app)) {
-						m_edit_action = a;
-					}
-					ImGui::PopID();
+	if (filter.isActive()) {
+		for (Action* a = Action::first_action; a; a = a->next) {
+			char button_label[64];
+			a->shortcutText(Span(button_label));
+			if (filter.pass(a->label_long) || filter.pass(button_label) || filter.pass(a->group)) {
+				ImGui::TableNextRow();
+				ImGui::TableNextColumn();
+				ImGui::PushID(a);
+				ImGui::TextUnformatted("Shortcuts > ");
+				ImGui::SameLine();
+				ImGui::TextUnformatted(a->group);
+				ImGui::SameLine();
+				ImGui::TextUnformatted(" > ");
+				ImGui::SameLine();
+				ImGui::TextUnformatted(a->label_long);
+				ImGui::TableNextColumn();
+				if (shortcutInput(button_label, *a, a == settings.m_edit_action, settings.m_app)) {
+					settings.m_edit_action = a;
 				}
+				ImGui::PopID();
 			}
-			ImGui::EndTable();
 		}
+		return;
 	}
-	ImGui::EndChild();
 
-	ImGui::EndTabItem();
+	if (ImGui::BeginTable("shortcuts", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable)) {
+		for (Action* a = Action::first_action; a; a = a->next) {
+			char button_label[64];
+			a->shortcutText(Span(button_label));
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn();
+			ImGui::PushID(a);
+			ImGui::TextUnformatted(a->group);
+			ImGui::TableNextColumn();
+			ImGui::TextUnformatted(a->label_long);
+			ImGui::TableNextColumn();
+			if (shortcutInput(button_label, *a, a == settings.m_edit_action, settings.m_app)) {
+				settings.m_edit_action = a;
+			}
+			ImGui::PopID();
+		}
+		ImGui::EndTable();
+	}
 }
 
 // copy-pasted from imgui + minor changes
-static void styleGUI() {
+static void styleGUI(TextFilter& filter) {
 	ImGuiStyle& style = ImGui::GetStyle();
-	if (ImGui::BeginTabItem("Sizes")) {
-		ImGui::Text("Main");
-		ImGui::SliderFloat2("WindowPadding", (float*)&style.WindowPadding, 0.0f, 20.0f, "%.0f");
-		ImGui::SliderFloat2("FramePadding", (float*)&style.FramePadding, 0.0f, 20.0f, "%.0f");
-		ImGui::SliderFloat2("ItemSpacing", (float*)&style.ItemSpacing, 0.0f, 20.0f, "%.0f");
-		ImGui::SliderFloat2("ItemInnerSpacing", (float*)&style.ItemInnerSpacing, 0.0f, 20.0f, "%.0f");
-		ImGui::SliderFloat2("TouchExtraPadding", (float*)&style.TouchExtraPadding, 0.0f, 10.0f, "%.0f");
-		ImGui::SliderFloat("IndentSpacing", &style.IndentSpacing, 0.0f, 30.0f, "%.0f");
-		ImGui::SliderFloat("ScrollbarSize", &style.ScrollbarSize, 1.0f, 20.0f, "%.0f");
-		ImGui::SliderFloat("GrabMinSize", &style.GrabMinSize, 1.0f, 20.0f, "%.0f");
-		ImGui::Text("Borders");
-		ImGui::SliderFloat("WindowBorderSize", &style.WindowBorderSize, 0.0f, 1.0f, "%.0f");
-		ImGui::SliderFloat("ChildBorderSize", &style.ChildBorderSize, 0.0f, 1.0f, "%.0f");
-		ImGui::SliderFloat("PopupBorderSize", &style.PopupBorderSize, 0.0f, 1.0f, "%.0f");
-		ImGui::SliderFloat("FrameBorderSize", &style.FrameBorderSize, 0.0f, 1.0f, "%.0f");
-		ImGui::SliderFloat("TabBorderSize", &style.TabBorderSize, 0.0f, 1.0f, "%.0f");
-		ImGui::SliderFloat("TabBarOverlineSize", &style.TabBarOverlineSize, 0.0f, 2.0f, "%.0f");
-		ImGui::Text("Rounding");
-		ImGui::SliderFloat("WindowRounding", &style.WindowRounding, 0.0f, 12.0f, "%.0f");
-		ImGui::SliderFloat("ChildRounding", &style.ChildRounding, 0.0f, 12.0f, "%.0f");
-		ImGui::SliderFloat("FrameRounding", &style.FrameRounding, 0.0f, 12.0f, "%.0f");
-		ImGui::SliderFloat("PopupRounding", &style.PopupRounding, 0.0f, 12.0f, "%.0f");
-		ImGui::SliderFloat("ScrollbarRounding", &style.ScrollbarRounding, 0.0f, 12.0f, "%.0f");
-		ImGui::SliderFloat("GrabRounding", &style.GrabRounding, 0.0f, 12.0f, "%.0f");
-		ImGui::SliderFloat("LogSliderDeadzone", &style.LogSliderDeadzone, 0.0f, 12.0f, "%.0f");
-		ImGui::SliderFloat("TabRounding", &style.TabRounding, 0.0f, 12.0f, "%.0f");
-		ImGui::Text("Alignment");
-		ImGui::SliderFloat2("WindowTitleAlign", (float*)&style.WindowTitleAlign, 0.0f, 1.0f, "%.2f");
-		int window_menu_button_position = style.WindowMenuButtonPosition + 1;
-		if (ImGui::Combo("WindowMenuButtonPosition", (int*)&window_menu_button_position, "None\0Left\0Right\0"))
-			style.WindowMenuButtonPosition = ImGuiDir(window_menu_button_position - 1);
-		ImGui::Combo("ColorButtonPosition", (int*)&style.ColorButtonPosition, "Left\0Right\0");
-		ImGui::SliderFloat2("ButtonTextAlign", (float*)&style.ButtonTextAlign, 0.0f, 1.0f, "%.2f");
-		ImGui::SameLine(); HelpMarker("Alignment applies when a button is larger than its text content.");
-		ImGui::SliderFloat2("SelectableTextAlign", (float*)&style.SelectableTextAlign, 0.0f, 1.0f, "%.2f");
-		ImGui::SameLine(); HelpMarker("Alignment applies when a selectable is larger than its text content.");
-		ImGui::Text("Safe Area Padding");
-		ImGui::SameLine(); HelpMarker("Adjust if you cannot see the edges of your screen (e.g. on a TV where scaling has not been configured).");
-		ImGui::SliderFloat2("DisplaySafeAreaPadding", (float*)&style.DisplaySafeAreaPadding, 0.0f, 30.0f, "%.0f");
-		ImGui::EndTabItem();
-	}
-	
-	if (ImGui::BeginTabItem("Colors")) {
+
+	if (!filter.isActive()) {
 		ImGuiEx::Label("Themes");
-		ShowStyleSelector();
-
-		static TextFilter filter;
-		filter.gui("Filter");
-		ImGui::BeginChild("##colors", ImVec2(0, 0), true, ImGuiWindowFlags_AlwaysVerticalScrollbar | ImGuiWindowFlags_AlwaysHorizontalScrollbar | ImGuiWindowFlags_NavFlattened);
-		ImGui::PushItemWidth(-160);
-		for (int i = 0; i < ImGuiCol_COUNT; i++)
-		{
-			const char* name = ImGui::GetStyleColorName(i);
-			if (!filter.pass(name)) continue;
-			ImGui::PushID(i);
-			ImGui::ColorEdit4("##color", (float*)&style.Colors[i], ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreviewHalf);
-			ImGui::SameLine(0.0f, style.ItemInnerSpacing.x);
-			ImGui::TextUnformatted(name);
-			ImGui::PopID();
-		}
-		ImGui::PopItemWidth();
-		ImGui::EndChild();
-
-		ImGui::EndTabItem();
+		styleSelectorGUI();
 	}
+
+	if (!filter.isActive()) ImGui::SeparatorText("Colors");
+	for (int i = 0; i < ImGuiCol_COUNT; ++i) {
+		const char* name = ImGui::GetStyleColorName(i);
+		if (!filter.pass(name)) continue;
+		if (filter.isActive()) {
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn();
+			ImGui::TextUnformatted("Style");
+			ImGui::SameLine();
+			ImGui::TextUnformatted(" > ");
+			ImGui::SameLine();
+			ImGui::TextUnformatted(name);
+			ImGui::TableNextColumn();
+		}
+		else {
+			ImGuiEx::Label(name);
+		}
+		
+		ImGui::PushID(i);
+		ImGui::ColorEdit4("##color", (float*)&style.Colors[i], ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreviewHalf);
+		ImGui::PopID();
+	}
+
+	auto labelUI = [&](const char* label){
+		if (filter.pass(label)) {
+			if (filter.isActive()) {
+				ImGui::TableNextRow();
+				ImGui::TableNextColumn();
+				ImGui::TextUnformatted("Style");
+				ImGui::SameLine();
+				ImGui::TextUnformatted(" > ");
+				ImGui::SameLine();
+				ImGui::TextUnformatted(label);
+				ImGui::TableNextColumn();
+			} else {
+				ImGuiEx::Label(label);
+			}
+			return true;
+		}
+		return false;
+	};
+
+	#define dragFloat(label, ...) \
+		if (labelUI(label)) ImGui::DragFloat("##" label, __VA_ARGS__); 
+
+	#define combo(label, ...) \
+		if (labelUI(label)) ImGui::Combo("##" label, __VA_ARGS__);
+
+	#define sliderFloat2(label, ...) \
+		if (labelUI(label)) ImGui::SliderFloat2("##" label, __VA_ARGS__);
+
+	#define sliderFloat(label, ...) \
+		if (labelUI(label)) ImGui::SliderFloat("##" label, __VA_ARGS__);
+
+	if (!filter.isActive()) ImGui::SeparatorText("Main");
+	sliderFloat2("Window Padding", (float*)&style.WindowPadding, 0.0f, 20.0f, "%.0f");
+	sliderFloat2("Frame Padding", (float*)&style.FramePadding, 0.0f, 20.0f, "%.0f");
+	sliderFloat2("Item Spacing", (float*)&style.ItemSpacing, 0.0f, 20.0f, "%.0f");
+	sliderFloat2("Item Inner Spacing", (float*)&style.ItemInnerSpacing, 0.0f, 20.0f, "%.0f");
+	sliderFloat2("Touch Extra Padding", (float*)&style.TouchExtraPadding, 0.0f, 10.0f, "%.0f");
+	sliderFloat("Indent Spacing", &style.IndentSpacing, 0.0f, 30.0f, "%.0f");
+	sliderFloat("Scrollbar Size", &style.ScrollbarSize, 1.0f, 20.0f, "%.0f");
+	sliderFloat("Grab Min Size", &style.GrabMinSize, 1.0f, 20.0f, "%.0f");
+
+	if (!filter.isActive()) ImGui::SeparatorText("Borders");
+	sliderFloat("Window Border Size", &style.WindowBorderSize, 0.0f, 1.0f, "%.0f");
+	sliderFloat("Child Border Size", &style.ChildBorderSize, 0.0f, 1.0f, "%.0f");
+	sliderFloat("Popup Border Size", &style.PopupBorderSize, 0.0f, 1.0f, "%.0f");
+	sliderFloat("Frame Border Size", &style.FrameBorderSize, 0.0f, 1.0f, "%.0f");
+
+	if (!filter.isActive()) ImGui::SeparatorText("Rounding");
+	sliderFloat("Window Rounding", &style.WindowRounding, 0.0f, 12.0f, "%.0f");
+	sliderFloat("Child Rounding", &style.ChildRounding, 0.0f, 12.0f, "%.0f");
+	sliderFloat("Frame Rounding", &style.FrameRounding, 0.0f, 12.0f, "%.0f");
+	sliderFloat("Popup Rounding", &style.PopupRounding, 0.0f, 12.0f, "%.0f");
+	sliderFloat("Scrollbar Rounding", &style.ScrollbarRounding, 0.0f, 12.0f, "%.0f");
+	sliderFloat("Grab Rounding", &style.GrabRounding, 0.0f, 12.0f, "%.0f");
+
+	if (!filter.isActive()) ImGui::SeparatorText("Tabs");
+	sliderFloat("Tab Border Size", &style.TabBorderSize, 0.0f, 1.0f, "%.0f");
+	sliderFloat("TabBar Border Size", &style.TabBarBorderSize, 0.0f, 2.0f, "%.0f");
+	sliderFloat("TabBar Overline Size", &style.TabBarOverlineSize, 0.0f, 3.0f, "%.0f");
+	dragFloat("Tab Close Button Min Width Selected", &style.TabCloseButtonMinWidthSelected, 0.1f, -1.0f, 100.0f, (style.TabCloseButtonMinWidthSelected < 0.0f) ? "%.0f (Always)" : "%.0f");
+	dragFloat("Tab Close Button Min Width Unselected", &style.TabCloseButtonMinWidthUnselected, 0.1f, -1.0f, 100.0f, (style.TabCloseButtonMinWidthUnselected < 0.0f) ? "%.0f (Always)" : "%.0f");
+	sliderFloat("Tab Rounding", &style.TabRounding, 0.0f, 12.0f, "%.0f");
+
+	if (!filter.isActive()) ImGui::SeparatorText("Tables");
+	sliderFloat2("Cell Padding", (float*)&style.CellPadding, 0.0f, 20.0f, "%.0f");
+	if (labelUI("Table Angled Headers Angle")) {
+		ImGui::SliderAngle("##Table Angled Headers Angle", &style.TableAngledHeadersAngle, -50.0f, +50.0f);
+	}
+	sliderFloat2("Table Angled Headers Text Align", (float*)&style.TableAngledHeadersTextAlign, 0.0f, 1.0f, "%.2f");
+
+	if (!filter.isActive()) ImGui::SeparatorText("Trees");
+	if (labelUI("Tree Lines Flags")) {
+		bool combo_open = ImGui::BeginCombo("##TreeLinesFlags", GetTreeLinesFlagsName(style.TreeLinesFlags));
+		if (combo_open)
+		{
+			const ImGuiTreeNodeFlags options[] = { ImGuiTreeNodeFlags_DrawLinesNone, ImGuiTreeNodeFlags_DrawLinesFull, ImGuiTreeNodeFlags_DrawLinesToNodes };
+			for (ImGuiTreeNodeFlags option : options)
+				if (ImGui::Selectable(GetTreeLinesFlagsName(option), style.TreeLinesFlags == option))
+					style.TreeLinesFlags = option;
+			ImGui::EndCombo();
+		}
+	}
+	sliderFloat("Tree Lines Size", &style.TreeLinesSize, 0.0f, 2.0f, "%.0f");
+	sliderFloat("Tree Lines Rounding", &style.TreeLinesRounding, 0.0f, 12.0f, "%.0f");
+
+	if (!filter.isActive()) ImGui::SeparatorText("Windows");
+	sliderFloat2("Window Title Align", (float*)&style.WindowTitleAlign, 0.0f, 1.0f, "%.2f");
+	sliderFloat("Window Border Hover Padding", &style.WindowBorderHoverPadding, 1.0f, 20.0f, "%.0f");
+	int window_menu_button_position = style.WindowMenuButtonPosition + 1;
+	if (labelUI("Window Menu Button Position")) {
+		if (ImGui::Combo("##WindowMenuButtonPosition", (int*)&window_menu_button_position, "None\0Left\0Right\0"))
+			style.WindowMenuButtonPosition = (ImGuiDir)(window_menu_button_position - 1);
+	}
+
+	if (!filter.isActive()) ImGui::SeparatorText("Widgets");
+	if (labelUI("Color Button Position")) {
+		ImGui::Combo("##ColorButtonPosition", (int*)&style.ColorButtonPosition, "Left\0Right\0");
+	}
+	sliderFloat2("Button Text Align", (float*)&style.ButtonTextAlign, 0.0f, 1.0f, "%.2f");
+	sliderFloat2("Selectable Text Align", (float*)&style.SelectableTextAlign, 0.0f, 1.0f, "%.2f");
+	sliderFloat("Separator Text Border Size", &style.SeparatorTextBorderSize, 0.0f, 10.0f, "%.0f");
+	sliderFloat2("Separator Text Align", (float*)&style.SeparatorTextAlign, 0.0f, 1.0f, "%.2f");
+	sliderFloat2("Separator Text Padding", (float*)&style.SeparatorTextPadding, 0.0f, 40.0f, "%.0f");
+	sliderFloat("Log Slider Deadzone", &style.LogSliderDeadzone, 0.0f, 12.0f, "%.0f");
+	sliderFloat("Image Border Size", &style.ImageBorderSize, 0.0f, 1.0f, "%.0f");
+
+	if (!filter.isActive()) {
+		ImGui::SeparatorText("Tooltips");
+		for (int n = 0; n < 2; n++) {
+			if (ImGui::TreeNodeEx(n == 0 ? "HoverFlagsForTooltipMouse" : "HoverFlagsForTooltipNav")) {
+				ImGuiHoveredFlags* p = (n == 0) ? &style.HoverFlagsForTooltipMouse : &style.HoverFlagsForTooltipNav;
+				ImGui::CheckboxFlags("ImGuiHoveredFlags_DelayNone", p, ImGuiHoveredFlags_DelayNone);
+				ImGui::CheckboxFlags("ImGuiHoveredFlags_DelayShort", p, ImGuiHoveredFlags_DelayShort);
+				ImGui::CheckboxFlags("ImGuiHoveredFlags_DelayNormal", p, ImGuiHoveredFlags_DelayNormal);
+				ImGui::CheckboxFlags("ImGuiHoveredFlags_Stationary", p, ImGuiHoveredFlags_Stationary);
+				ImGui::CheckboxFlags("ImGuiHoveredFlags_NoSharedDelay", p, ImGuiHoveredFlags_NoSharedDelay);
+				ImGui::TreePop();
+			}
+		}
+	}
+
+	if (!filter.isActive()) ImGui::SeparatorText("Misc");
+	sliderFloat2("Display Window Padding", (float*)&style.DisplayWindowPadding, 0.0f, 30.0f, "%.0f"); 
+	sliderFloat2("Display Safe Area Padding", (float*)&style.DisplaySafeAreaPadding, 0.0f, 30.0f, "%.0f"); 
+	sliderFloat("Docking Separator Size", &style.DockingSeparatorSize, 0.0f, 12.0f, "%.0f");
+
+	#undef dragFloat
+	#undef sliderFloat
+	#undef sliderFloat2
 }
 
 static void generalGUI(Settings& settings) {
@@ -1030,55 +1137,101 @@ void Settings::gui() {
 	if (m_app.checkShortcut(m_toggle_ui_action, true)) m_is_open = !m_is_open;
 	if (!m_is_open) return;
 	if (ImGui::Begin(ICON_FA_COG "Settings##settings", &m_is_open)) {
-		if (ImGui::BeginTabBar("tabs")) {
-			shortcutsGUI();
-			styleGUI();
+		static u32 selected = 0;
+		
+		static TextFilter filter;
+		if (m_app.checkShortcut(m_focus_search)) ImGui::SetKeyboardFocusHere();
+		filter.gui("Filter", -1, false, &m_focus_search);
 
-			u32 cat_idx = -1;
-			for (Category& cat : m_categories) {
-				++cat_idx;
-				if (!ImGui::BeginTabItem(cat.name.c_str())) continue;
-
-				if (ImGui::BeginTable("settings_table", 2, ImGuiTableFlags_RowBg)) {
-					if (cat.name == "General") generalGUI(*this);
-					for (auto iter = m_variables.begin(), end = m_variables.end(); iter != end; ++iter) {
-						Variable& var = iter.value();
-						if (var.category != cat_idx) continue;
-						ImGui::TableNextRow();
-						ImGui::TableNextColumn();
-						ImGuiEx::Label(var.label);
-						ImGui::TableNextColumn();
-						ImGui::PushID(&var);
-						auto CB = [&](bool changed) { if (changed && var.set_callback.isValid()) var.set_callback.invoke(); };
-						switch (var.type) {
-							case Variable::BOOL: CB(ImGui::Checkbox("##var", &var.bool_value)); break;
-							case Variable::BOOL_PTR: CB(ImGui::Checkbox("##var", var.bool_ptr)); break;
-							case Variable::I32: CB(ImGui::InputInt("##var", &var.i32_value)); break;
-							case Variable::I32_PTR: CB(ImGui::InputInt("##var", var.i32_ptr)); break;
-							case Variable::FLOAT: CB(ImGui::DragFloat("##var", &var.float_value)); break;
-							case Variable::FLOAT_PTR: {
-								if (var.is_angle) {
-									float deg = radiansToDegrees(*var.float_ptr);
-									if (ImGui::DragFloat("##var", &deg)) {
-										*var.float_ptr = degreesToRadians(deg);
-										if (var.set_callback.isValid()) var.set_callback.invoke();
-									}
-								}
-								else {
-									CB(ImGui::DragFloat("##var", var.float_ptr));
-								}
-								break;
-							}
-							case Variable::STRING_PTR: CB(inputString("##var", var.string_ptr)); break;
-							case Variable::STRING: CB(inputString("##var", &var.string_value)); break;
-						}
-						ImGui::PopID();
-					}
-					ImGui::EndTable();
+		auto iterVars = [this](){
+			for (auto iter = m_variables.begin(), end = m_variables.end(); iter != end; ++iter) {
+				Variable& var = iter.value();
+				if (var.category == -1) continue;
+				if (!filter.isActive()) { if(var.category != selected - 2) continue; }
+				else if (!filter.pass(var.label)) continue;
+				
+				ImGui::TableNextRow();
+				ImGui::TableNextColumn();
+				if (filter.isActive()) {
+					const char* cat_name = m_categories[var.category].name.c_str();
+					ImGui::TextUnformatted(cat_name);
+					ImGui::SameLine();
+					ImGui::TextUnformatted(" > ");
+					ImGui::SameLine();
 				}
-				ImGui::EndTabItem();
+				ImGui::TextUnformatted(var.label);
+				ImGui::TableNextColumn();
+				ImGui::PushID(&var);
+				auto CB = [&](bool changed) { if (changed && var.set_callback.isValid()) var.set_callback.invoke(); };
+				switch (var.type) {
+					case Variable::BOOL: CB(ImGui::Checkbox("##var", &var.bool_value)); break;
+					case Variable::BOOL_PTR: CB(ImGui::Checkbox("##var", var.bool_ptr)); break;
+					case Variable::I32: CB(ImGui::InputInt("##var", &var.i32_value)); break;
+					case Variable::I32_PTR: CB(ImGui::InputInt("##var", var.i32_ptr)); break;
+					case Variable::FLOAT: CB(ImGui::DragFloat("##var", &var.float_value)); break;
+					case Variable::FLOAT_PTR: {
+						if (var.is_angle) {
+							float deg = radiansToDegrees(*var.float_ptr);
+							if (ImGui::DragFloat("##var", &deg)) {
+								*var.float_ptr = degreesToRadians(deg);
+								if (var.set_callback.isValid()) var.set_callback.invoke();
+							}
+						}
+						else {
+							CB(ImGui::DragFloat("##var", var.float_ptr));
+						}
+						break;
+					}
+					case Variable::STRING_PTR: CB(inputString("##var", var.string_ptr)); break;
+					case Variable::STRING: CB(inputString("##var", &var.string_value)); break;
+				}
+				ImGui::PopID();
+			}			
+		};
+
+		if (filter.isActive()) {
+			if (ImGui::BeginTable("settings_table", 2, ImGuiTableFlags_RowBg)) {
+				shortcutsGUI(filter, *this);
+				styleGUI(filter);
+				iterVars();
+				ImGui::EndTable();
 			}
-			ImGui::EndTabBar();
+		}
+		else if (ImGui::BeginTable("categories_table", 2, ImGuiTableFlags_Resizable)) {
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn();
+
+			auto vtab = [](const char* label, bool is_selected){
+				const ImGuiStyle& style = ImGui::GetStyle();
+				ImGui::PushStyleColor(ImGuiCol_Button, style.Colors[is_selected ? ImGuiCol_TabActive : ImGuiCol_Tab]);
+				bool res = false;
+				if (ImGui::Button(label, ImVec2(-1, 0))) {
+					res = true;
+				}
+				ImGui::PopStyleColor();
+				return res;
+			};
+			
+			if (vtab("Shortcuts", selected == 0)) selected = 0; 
+			if (vtab("Style", selected == 1)) selected = 1; 
+
+			for (Category& cat : m_categories) {
+				const u32 idx = u32(&cat - m_categories.begin());
+				bool is_selected = selected == idx + 2;
+				if (vtab(cat.name.c_str(), is_selected)) selected = idx + 2;
+			}
+
+			ImGui::TableNextColumn();
+			if (selected == 0) shortcutsGUI(filter, *this);
+			else if (selected == 1) {
+				styleGUI(filter);
+			}
+			else if (ImGui::BeginTable("settings_table", 2, ImGuiTableFlags_RowBg)) {
+				if (m_categories[selected - 2].name == "General") generalGUI(*this);
+				iterVars();
+				ImGui::EndTable();
+			}
+			ImGui::EndTable();
 		}
 	}
 	ImGui::End();

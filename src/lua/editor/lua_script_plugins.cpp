@@ -217,7 +217,7 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 		if (lua_getfield(L, -1, "windowMenuAction") == LUA_TFUNCTION) {
 			char tmp[64];
 			convertToLuaName(name, tmp);
-			plugin->m_action.create(name, name, tmp, "", Action::WINDOW);
+			plugin->m_action.create("Lua Studio plugin", name, name, tmp, "", Action::WINDOW);
 		}
 		lua_pop(L, 1);
 
@@ -1324,7 +1324,7 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 		lua_pushvalue(L, 1);
 		action->ref_action = LuaWrapper::createRef(L);
 		lua_pop(L, 2);
-		action->action.create(label, label, name, "");
+		action->action.create("Lua actions", label, label, name, "");
 		action->L = L;
 		return 0;
 	}

@@ -1097,16 +1097,16 @@ private:
 	EntityPtr m_canvas_entity = INVALID_ENTITY;
 	Vec3 m_clear_color = Vec3(0);
 
-	Action m_toggle_ui{"GUI Editor", "GUI editor - toggle UI", "gui_editor", "", Action::WINDOW};
-	Action m_align_top_action{"Top", "GUI editor - align top", "guied_align_top", ""};
-	Action m_align_right_action{"Right", "GUI editor - align right", "guied_align_right", ""};
-	Action m_align_bottom_action{"Bottom", "GUI editor - align bottom", "guied_align_bottom", ""};
-	Action m_align_left_action{"Left", "GUI editor - align left", "guied_align_left", ""};
-	Action m_hcenter_action{"Center horizontally", "GUI editor - center horizontally", "guied_hcenter", ""};
-	Action m_vcenter_action{"Center vertically", "GUI editor - center vertically", "guied_vcenter", ""};
-	Action m_hexpand_action{"Horizontally", "GUI editor - expand horizontally", "guied_hexpand", ""};
-	Action m_vexpand_action{"Vertically", "GUI editor - expand vertically", "guied_vexpand", ""};
-	Action m_make_rel_action{"Make relative", "GUI editor - make relative", "guied_makerel", ""};
+	Action m_toggle_ui{"GUI Editor", "GUI Editor", "Toggle UI", "gui_editor", "", Action::WINDOW};
+	Action m_align_top_action{"GUI Editor", "Top", "Align top", "guied_align_top", ""};
+	Action m_align_right_action{"GUI Editor", "Right", "Align right", "guied_align_right", ""};
+	Action m_align_bottom_action{"GUI Editor", "Bottom", "Align bottom", "guied_align_bottom", ""};
+	Action m_align_left_action{"GUI Editor", "Left", "Align left", "guied_align_left", ""};
+	Action m_hcenter_action{"GUI Editor", "Center horizontally", "Center horizontally", "guied_hcenter", ""};
+	Action m_vcenter_action{"GUI Editor", "Center vertically", "Center vertically", "guied_vcenter", ""};
+	Action m_hexpand_action{"GUI Editor", "Horizontally", "Expand horizontally", "guied_hexpand", ""};
+	Action m_vexpand_action{"GUI Editor", "Vertically", "Expand vertically", "guied_vexpand", ""};
+	Action m_make_rel_action{"GUI Editor", "Make relative", "Make relative", "guied_makerel", ""};
 };
 
 

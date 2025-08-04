@@ -1334,10 +1334,10 @@ struct AssetBrowserImpl : AssetBrowser {
 	bool m_show_subresources;
 	bool m_request_delete = false;
 	float m_thumbnail_size = 1.f;
-	Action m_focus_search{"Focus search", "Asset browser - focus search", "asset_browser_focus_search", ICON_FA_SEARCH};
-	Action m_back_action{"Back", "Asset browser - back in history", "asset_browser_back", ICON_FA_ARROW_LEFT};
-	Action m_forward_action{"Forward", "Asset browser - forward in history", "asset_browser_forward", ICON_FA_ARROW_RIGHT};
-	Action m_toggle_ui{"Asset browser", "Asset browser - toggle UI", "asset_browser_toggle_ui", "", Action::WINDOW};
+	Action m_focus_search{"Asset browser", "Focus search", "Focus search", "asset_browser_focus_search", ICON_FA_SEARCH};
+	Action m_back_action{"Asset browser", "Back", "Back in history", "asset_browser_back", ICON_FA_ARROW_LEFT};
+	Action m_forward_action{"Asset browser", "Forward", "Forward in history", "asset_browser_forward", ICON_FA_ARROW_RIGHT};
+	Action m_toggle_ui{"Asset browser", "Asset browser", "Toggle UI", "asset_browser_toggle_ui", "", Action::WINDOW};
 	WorldAssetPlugin m_world_asset_plugin;
 };
 

@@ -535,8 +535,8 @@ struct StudioAppImpl final : StudioApp {
 		StudioAppImpl& m_app;
 		bool m_is_open = true;
 		bool m_entity_selection_changed = false;
-		Action m_focus_filter_action{"Focus filter", "Hierarchy - focus filter", "hierarchy_focus_filter", ""};
-		Action m_toggle_ui_action{"Hierarchy", "Hierarchy - toggle UI", "hierarchy_toggle_ui", "", Action::WINDOW};
+		Action m_focus_filter_action{"Hierarchy", "Focus filter", "Focus filter", "hierarchy_focus_filter", ""};
+		Action m_toggle_ui_action{"Hierarchy", "Hierarchy", "Toggle UI", "hierarchy_toggle_ui", "", Action::WINDOW};
 		bool m_request_focus_filter = false;
 		EntityPtr m_renaming_entity = INVALID_ENTITY;
 		EntityFolders::FolderHandle m_renaming_folder = EntityFolders::INVALID_FOLDER;
@@ -1221,7 +1221,7 @@ struct StudioAppImpl final : StudioApp {
 				m_dockspace_id = ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
 			}
 			
-			if (checkShortcut(m_show_all_actions_action, true)) showAllActionsGUI();
+			if (checkShortcut(m_command_palette_action, true)) m_open_commands_palette = true;
 			else if (checkShortcut(m_start_standalone_app, true)) startStandaloneApp();
 			else if (checkShortcut(m_next_frame, true)) m_engine->nextFrame();
 			else if (checkShortcut(m_pause_game, true)) m_engine->pause(!m_engine->isPaused());
@@ -2207,8 +2207,8 @@ struct StudioAppImpl final : StudioApp {
 		
 			ImGui::LoadIniSettingsFromMemory(m_settings.m_imgui_state.c_str());
 
-			m_font = addFontFromFile("editor/fonts/notosans-regular.ttf", (float)m_font_size * font_scale, true);
-			m_bold_font = addFontFromFile("editor/fonts/notosans-bold.ttf", (float)m_font_size * font_scale, true);
+			m_font = addFontFromFile("editor/fonts/Roboto-Light.ttf", (float)m_font_size * font_scale, true);
+			m_bold_font = addFontFromFile("editor/fonts/Roboto-Bold.ttf", (float)m_font_size * font_scale, true);
 			m_monospace_font = addFontFromFile("editor/fonts/sourcecodepro-regular.ttf", (float)m_font_size * font_scale, false);
 
 			OutputMemoryStream data(m_allocator);
@@ -2230,7 +2230,7 @@ struct StudioAppImpl final : StudioApp {
 
 			if (!m_font || !m_bold_font) {
 				os::messageBox(
-					"Could not open editor/fonts/notosans-regular.ttf or editor/fonts/NotoSans-Bold.ttf\n"
+					"Could not open editor/fonts/Roboto-Light.ttf or editor/fonts/Roboto-Bold.ttf\n"
 					"It very likely means that data are not bundled with\n"
 					"the exe and the exe is not in the correct directory.\n"
 					"The program will eventually crash!"
@@ -2311,9 +2311,6 @@ struct StudioAppImpl final : StudioApp {
 			logError("Failed to run ", exe_path, " ", args);
 		}
 	}
-
-	void showAllActionsGUI() { m_show_all_actions_request = true; }
-
 
 	static bool copyPlugin(const char* src, int iteration, char (&out)[MAX_PATH])
 	{
@@ -2634,53 +2631,80 @@ struct StudioAppImpl final : StudioApp {
 	}
 
 	void guiAllActions() {
-		if (m_show_all_actions_request) ImGui::OpenPopup("Action palette");
+		if (m_open_commands_palette) ImGui::OpenPopup("Commands palette");
+		
+		const ImGuiViewport* viewport = ImGui::GetMainViewport();
+		ImVec2 size = viewport->Size;
+		size.x *= 0.4f;
+		size.y *= 0.8f;
+		ImVec2 pos = ImVec2(viewport->Pos.x + (viewport->Size.x - size.x) * 0.5f, viewport->Pos.y + (viewport->Size.y - size.y) * 0.5f);
+		if (pos.x < 300 && viewport->Size.x > 300) pos.x = 300;
+		ImGui::SetNextWindowPos(pos);
+		ImGui::SetNextWindowSize(size, ImGuiCond_Always);
 
-		if (ImGuiEx::BeginResizablePopup("Action palette", ImVec2(300, 200), ImGuiWindowFlags_NoNavInputs)) {
+		if (ImGui::BeginPopup("Commands palette", ImGuiWindowFlags_NoNavInputs)) {
 			if (ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
 
-			if(m_show_all_actions_request) m_all_actions_selected = 0;
-			if (m_all_actions_filter.gui(ICON_FA_SEARCH " Search", -1, m_show_all_actions_request)) {
+			if(m_open_commands_palette) m_all_actions_selected = 0;
+			ImGui::TextUnformatted(ICON_FA_SEARCH);
+			ImGui::SameLine();
+		
+			ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0, 0, 0, 0));
+			ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
+			if (m_all_actions_filter.gui("Search", -1, m_open_commands_palette)) {
 				m_all_actions_selected = 0;
 			}
+			ImGui::PopStyleColor(2);
 			const bool insert_enter = ImGui::IsItemFocused() && ImGui::IsKeyPressed(ImGuiKey_Enter);
+			bool moved = false;
 			if (ImGui::IsItemFocused()) {
 				if (ImGui::IsKeyPressed(ImGuiKey_UpArrow) && m_all_actions_selected > 0) {
 					--m_all_actions_selected;
+					moved = true;
 				}
 				if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
 					++m_all_actions_selected;
+					moved = true;
 				}
 			}
+			ImGui::Separator();
 			if (m_all_actions_filter.isActive()) {
-				if (ImGui::BeginChild("##list")) {
+				ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
+				if (ImGui::BeginChild("##list", ImVec2(0, 0))) {
 					u32 idx = 0;
 					for (Action* act = Action::first_action; act; act = act->next) {
-						if (!m_all_actions_filter.pass(act->label_long)) continue;
+						if (!m_all_actions_filter.pass(act->label_long) && !m_all_actions_filter.pass(act->group)) continue;
 
-						char buf[20] = " (";
-						getShortcut(*act, Span(buf + 2, sizeof(buf) - 2));
-						if (buf[2]) {
-							catString(buf, ")");
-						}
-						else { 
-							buf[0] = '\0';
-						}
 						bool selected = idx == m_all_actions_selected;
-						if (ImGui::Selectable(StaticString<128>(act->font_icon, act->label_long, buf), selected) || (selected && insert_enter)) {
+						if (moved && selected) ImGui::SetScrollHereY();
+						ImGui::Text("%s", act->group.data);
+						ImGui::SameLine(150); // Adjust the alignment value as needed
+						ImGui::Text("> ");
+						ImGui::SameLine();
+						if (ImGui::Selectable(act->label_long, selected, ImGuiSelectableFlags_SpanAvailWidth) || (selected && insert_enter)) {
 							ImGui::CloseCurrentPopup();
 							act->request = true;
 							break;
 						}
+						char buf[20];
+						getShortcut(*act, Span(buf, sizeof(buf)));
+						if (buf[0]) {
+							ImGui::SameLine();
+							alignGUIRight([&](){
+								ImGui::TextUnformatted(buf);
+							});
+						}
+						ImGui::Separator();
 						++idx;
 					}
 					m_all_actions_selected = m_all_actions_selected > 0 ? m_all_actions_selected % idx : 0;
 				}
+				ImGui::PopStyleColor();
 				ImGui::EndChild();
 			}
 			ImGui::EndPopup();
 		}
-		m_show_all_actions_request = false;
+		m_open_commands_palette = false;
 	}
 
 	static bool includeFileInExport(const char* filename) {
@@ -3034,14 +3058,15 @@ struct StudioAppImpl final : StudioApp {
 	jobs::Counter m_init_imgui_signal;
 
 	CommonActions m_common_actions;
-	Action m_show_all_actions_action{"Show all commands", "Show all commands", "show_all_commands", ""};
-	Action m_start_standalone_app{"Start standalone app", "Start standalone app", "start_standalone_app", "", Action::TOOL};
-	Action m_next_frame{"Next frame", "Game - next frame", "game_next_frame", ICON_FA_STEP_FORWARD};
-	Action m_pause_game{"Pause", "Game - pause", "game_pause", ICON_FA_PAUSE};
-	Action m_toggle_game_mode{"Run game", "Game - run", "game_run", ICON_FA_PLAY};
-	Action m_new_world_action{"New", "New world", "world_new", ICON_FA_PLUS};
-	Action m_exit_action{"Exit", "Exit Studio", "studio_exit", ICON_FA_SIGN_OUT_ALT};
-	Action m_show_export_action{"Package game", "Tools - package game", "package_game", ICON_FA_FILE_EXPORT};
+	Action m_command_palette_action{"Studio", "Commands palette", "Open commands palette lister", "show_all_commands", "", Action::WINDOW};
+	Action m_new_world_action{"Studio", "New", "New world", "world_new", ICON_FA_PLUS};
+	Action m_exit_action{"Studio", "Exit", "Exit Studio", "studio_exit", ICON_FA_SIGN_OUT_ALT};
+	Action m_show_export_action{"Studio", "Package game", "Package game", "package_game", ICON_FA_FILE_EXPORT};
+	
+	Action m_start_standalone_app{"Game", "Start standalone app", "Start standalone app", "start_standalone_app", "", Action::TOOL};
+	Action m_next_frame{"Game", "Next frame", "Next frame", "game_next_frame", ICON_FA_STEP_FORWARD};
+	Action m_pause_game{"Game", "Pause", "Pause", "game_pause", ICON_FA_PAUSE};
+	Action m_toggle_game_mode{"Game", "Run game", "Run", "game_run", ICON_FA_PLAY};
 
 	Array<GUIPlugin*> m_gui_plugins;
 	Array<MousePlugin*> m_mouse_plugins;
@@ -3129,7 +3154,7 @@ struct StudioAppImpl final : StudioApp {
 		bool reload_request = false;
 	} m_watched_plugin;
 
-	bool m_show_all_actions_request = false;
+	bool m_open_commands_palette = false;
 	i32 m_all_actions_selected = 0;
 	TextFilter m_all_actions_filter;
 	bool m_sleep_when_inactive = true;

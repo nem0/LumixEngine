@@ -42,7 +42,7 @@ struct LUMIX_EDITOR_API Action {
 		TEMPORARY
 	};
 
-	Action(const char* label_short, const char* label_long, const char* name, const char* font_icon, Type type = NORMAL);
+	Action(const char* group, const char* label_short, const char* label_long, const char* name, const char* font_icon, Type type = NORMAL);
 	~Action();
 	Action(const Action&) = delete;
 	void operator =(const Action&) = delete;
@@ -53,6 +53,7 @@ struct LUMIX_EDITOR_API Action {
 
 	StaticString<32> name;			// used for serialization
 	StaticString<32> label_short;	// used in menus
+	StaticString<32> group;			// used in shortcut editor
 	StaticString<64> label_long;	// used in shortcut editor
 	bool request = false;			// programatically request to invoke the action
 	Modifiers modifiers = Modifiers::NONE;
@@ -67,24 +68,26 @@ struct LUMIX_EDITOR_API Action {
 };
 
 struct CommonActions {
-	Action save{"Save", "Common - Save", "save", ICON_FA_SAVE};
-	Action undo{"Undo", "Common - Undo", "undo", ICON_FA_UNDO};
-	Action redo{"Redo", "Common - Redo", "redo", ICON_FA_REDO};
-	Action del{"Delete", "Common - Delete", "delete", ICON_FA_MINUS_SQUARE};
-	Action cam_orbit{"Orbit", "Camera - orbit with RMB", "orbit_rmb", ""};
-	Action cam_forward{"Move forward", "Camera - move forward", "camera_move_forward", ""};
-	Action cam_backward{"Move back", "Camera - move backward", "camera_move_back", ""};
-	Action cam_left{"Move left", "Camera - move left", "camera_move_left", ""};
-	Action cam_right{"Move right", "Camera - move right", "camera_move_right", ""};
-	Action cam_up{"Move up", "Camera - move up", "camera_move_up", ""};
-	Action cam_down{"Move down", "Camera - move down", "camera_move_down", ""};
-	Action select_all{"Select all", "Common - Select all", "select_all", ""};
-	Action rename{"Rename", "Common - Rename", "rename", ""};
-	Action copy{"Copy", "Common - Copy", "copy", ICON_FA_CLIPBOARD};
-	Action paste{"Paste", "Common - Paste", "paste", ICON_FA_PASTE};
-	Action close_window{"Close", "Close window", "close_window", ""};
-	Action open_externally{"Open externally", "Common - open externally", "open_externally", ICON_FA_EXTERNAL_LINK_ALT};
-	Action view_in_browser{"View in browser", "Common - view in asset browser", "view_in_asset_browser", ICON_FA_SEARCH};
+	Action save{"Common", "Save", "Save", "save", ICON_FA_SAVE};
+	Action undo{"Common", "Undo", "Undo", "undo", ICON_FA_UNDO};
+	Action redo{"Common", "Redo", "Redo", "redo", ICON_FA_REDO};
+	Action del{"Common", "Delete", "Delete", "delete", ICON_FA_MINUS_SQUARE};
+	
+	Action cam_orbit{"Camera", "Orbit", "Orbit with RMB", "orbit_rmb", ""};
+	Action cam_forward{"Camera", "Move forward", "Move forward", "camera_move_forward", ""};
+	Action cam_backward{"Camera", "Move back", "Move backward", "camera_move_back", ""};
+	Action cam_left{"Camera", "Move left", "Move left", "camera_move_left", ""};
+	Action cam_right{"Camera", "Move right", "Move right", "camera_move_right", ""};
+	Action cam_up{"Camera", "Move up", "Move up", "camera_move_up", ""};
+	Action cam_down{"Camera", "Move down", "Move down", "camera_move_down", ""};
+	
+	Action select_all{"Common", "Select all", "Select all", "select_all", ""};
+	Action rename{"Common", "Rename", "Rename", "rename", ""};
+	Action copy{"Common", "Copy", "Copy", "copy", ICON_FA_CLIPBOARD};
+	Action paste{"Common", "Paste", "Paste", "paste", ICON_FA_PASTE};
+	Action close_window{"Common", "Close", "Close window", "close_window", ""};
+	Action open_externally{"Common", "Open externally", "Open externally", "open_externally", ICON_FA_EXTERNAL_LINK_ALT};
+	Action view_in_browser{"Common", "View in browser", "View in asset browser", "view_in_asset_browser", ICON_FA_SEARCH};
 };
 
 inline Action::Modifiers operator |(Action::Modifiers a, Action::Modifiers b) { return Action::Modifiers((u8)a | (u8)b); }
@@ -94,7 +97,7 @@ LUMIX_EDITOR_API void getShortcut(const Action& action, Span<char> buf);
 LUMIX_EDITOR_API [[nodiscard]] bool menuItem(const Action& a, bool enabled);
 LUMIX_EDITOR_API void getEntityListDisplayName(StudioApp& app, struct World& editor, Span<char> buf, EntityPtr entity, bool force_display_index = false);
 LUMIX_EDITOR_API bool inputRotation(const char* label, struct Quat* value);
-LUMIX_EDITOR_API bool inputString(const char* label, String* value);
+LUMIX_EDITOR_API bool inputString(const char* label, String* value, ImGuiInputTextFlags flags = 0);
 LUMIX_EDITOR_API bool inputString(const char* str_id, const char* label, String* value);
 LUMIX_EDITOR_API bool inputStringMultiline(const char* label, String* value, const ImVec2& size = ImVec2(0, 0));
 LUMIX_EDITOR_API void openCenterStrip(const char* str_id);
@@ -158,13 +161,10 @@ struct DirSelector {
 
 private:
 	void fillSubitems();
-	bool breadcrumb(StringView path);
 
 	StudioApp& m_app;
 	String m_current_dir;
 	Array<String> m_subdirs;
-	bool m_creating_folder = false;
-	char m_new_folder_name[MAX_PATH] = "";
 };
 
 struct LUMIX_EDITOR_API FileSelector {

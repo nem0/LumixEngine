@@ -1709,9 +1709,9 @@ struct ProfilerUIImpl final : ProfilerUI {
 	Array<Counter> m_counters;
 	HashMap<i32, Block> m_blocks;
 
-	Action m_toggle_ui{"Profiler", "Profiler - toggle UI", "profiler_toggle_ui", "", Action::WINDOW};
-	Action m_snapshot{"Make snapshot", "Profiler - make snapshot", "profiler_play_pause", ICON_FA_DOWNLOAD};
-	Action m_focus_filter{"Focus filter", "Profiler - focus filter", "profiler_focus_filter", ""};
+	Action m_toggle_ui{"Profiler", "Profiler", "Toggle UI", "profiler_toggle_ui", "", Action::WINDOW};
+	Action m_snapshot{"Profiler", "Make snapshot", "Make snapshot", "profiler_play_pause", ICON_FA_DOWNLOAD};
+	Action m_focus_filter{"Profiler", "Focus filter", "Focus filter", "profiler_focus_filter", ""};
 
 	struct {
 		u32 frame = 0;

@@ -85,7 +85,7 @@ struct WorldViewImpl final : WorldView {
 		m_viewport.far = 1'000'000.f;
 
 		ResourceManagerHub& rm = m_editor.getEngine().getResourceManager();
-		Path font_path("editor/fonts/notosans-regular.ttf");
+		Path font_path("editor/fonts/Roboto-Light.ttf");
 		m_font_res = rm.load<FontResource>(font_path);
 		m_font = m_font_res->addRef(16);
 		onWorldCreated();
@@ -847,15 +847,15 @@ SceneView::SceneView(StudioApp& app)
 	m_camera_speed = 0.1f;
 	m_is_mouse_captured = false;
 
-	m_debug_show_actions[(u32)Pipeline::DebugShow::NONE].create("No debug", "Debug view - none", "debug_view_disable", "");
-	m_debug_show_actions[(u32)Pipeline::DebugShow::ALBEDO].create("Albedo", "Debug view - albedo", "debug_view_albedo", "");
-	m_debug_show_actions[(u32)Pipeline::DebugShow::NORMAL].create("Normal", "Debug view - normal", "debug_view_normal", "");
-	m_debug_show_actions[(u32)Pipeline::DebugShow::ROUGHNESS].create("Roughness", "Debug view - roughness", "debug_view_roughness", "");
-	m_debug_show_actions[(u32)Pipeline::DebugShow::METALLIC].create("Metallic", "Debug view - metallic", "debug_view_metalic", "");
-	m_debug_show_actions[(u32)Pipeline::DebugShow::AO].create("AO", "Debug view - AO", "debug_view_ao", "");
-	m_debug_show_actions[(u32)Pipeline::DebugShow::VELOCITY].create("Velocity", "Debug view - velocity", "debug_view_velocity", "");
-	m_debug_show_actions[(u32)Pipeline::DebugShow::LIGHT_CLUSTERS].create("Light clusters", "Debug view - light clusters", "debug_view_light_clusters", "");
-	m_debug_show_actions[(u32)Pipeline::DebugShow::PROBE_CLUSTERS].create("Probe clusters", "Debug view - probe clusters", "debug_view_probe_clusters", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::NONE].create("Debug view", "No debug", "None", "debug_view_disable", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::ALBEDO].create("Debug view", "Albedo", "Albedo", "debug_view_albedo", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::NORMAL].create("Debug view", "Normal", "Normal", "debug_view_normal", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::ROUGHNESS].create("Debug view", "Roughness", "Roughness", "debug_view_roughness", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::METALLIC].create("Debug view", "Metallic", "Metallic", "debug_view_metalic", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::AO].create("Debug view", "AO", "AO", "debug_view_ao", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::VELOCITY].create("Debug view", "Velocity", "Velocity", "debug_view_velocity", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::LIGHT_CLUSTERS].create("Debug view", "Light clusters", "Light clusters", "debug_view_light_clusters", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::PROBE_CLUSTERS].create("Debug view", "Probe clusters", "Probe clusters", "debug_view_probe_clusters", "");
 
 	m_app.getSettings().registerOption("quicksearch_preview", &m_search_preview, "Scene view", "Show previews in quick search");
 	m_app.getSettings().registerOption("show_camera_preview", &m_show_camera_preview, "Scene view", "Show camera preview");

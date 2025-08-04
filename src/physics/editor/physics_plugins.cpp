@@ -807,8 +807,8 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 
 	StudioApp& m_app;
 	bool m_is_window_open = false;
-	Action m_toggle_ui{"Physics", "Physics - toggle UI", "physics_toggle_ui", "", Action::WINDOW};
-	Action m_simulate_selected{"Simulate physics", "Physics - simulate physics for selected object", "simulate_physics_selected_obj", "", Action::TOOL};
+	Action m_toggle_ui{"Physics", "Physics", "Toggle UI", "physics_toggle_ui", "", Action::WINDOW};
+	Action m_simulate_selected{"Physics", "Simulate physics", "Simulate physics for selected object", "simulate_physics_selected_obj", "", Action::TOOL};
 	bool m_is_simulating_selected = false;
 	Array<SimulatedEntity> m_simulated_entities;
 	Array<EntityRef> m_reset_dynamic_entities;

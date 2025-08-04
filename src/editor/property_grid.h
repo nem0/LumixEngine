@@ -41,8 +41,8 @@ private:
 	bool m_focus_filter_request = false;
 	TextFilter m_component_filter;
 	TextFilter m_property_filter;
-	Action m_toggle_ui{"Inspector", "Inspector - toggle UI", "inspector_toggle_ui", "", Action::WINDOW};
-	Action m_focus_filter_action{"Focus filter", "Inspector - focus filter", "inspector_focus_filter", ""};
+	Action m_toggle_ui{"Inspector", "Inspector", "Toggle UI", "inspector_toggle_ui", "", Action::WINDOW};
+	Action m_focus_filter_action{"Inspector", "Focus filter", "Focus filter", "inspector_focus_filter", ""};
 };
 
 

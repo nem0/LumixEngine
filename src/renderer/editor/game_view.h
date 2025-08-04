@@ -61,8 +61,8 @@ private:
 		int width;
 		int height;
 	} m_forced_viewport;
-	Action m_toggle_ui{"Game View", "Game view - toggle UI", "game_view_toggle_ui", "", Action::WINDOW};
-	Action m_fullscreen_action{"Fullscreen", "Game view - fullscreen", "game_view_fullscreen", ""};
+	Action m_toggle_ui{"Game View", "Game View", "Toggle UI", "game_view_toggle_ui", "", Action::WINDOW};
+	Action m_fullscreen_action{"Game View", "Fullscreen", "Fullscreen", "game_view_fullscreen", ""};
 };
 
 
