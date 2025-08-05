@@ -56,6 +56,10 @@ namespace Lumix { struct Vec2; }
 //---- Implement STB libraries in a namespace to avoid conflicts
 //#define IMGUI_STB_NAMESPACE     ImGuiStb
 
+#define IMGUI_DISABLE_FILE_FUNCTIONS
+#define IMGUI_DISABLE_WIN32_DEFAULT_IME_FUNCTIONS
+#define IMGUI_DISABLE_WIN32_FUNCTIONS
+
 //---- Define constructor and implicit cast operators to convert back<>forth from your math types and ImVec2/ImVec4.
 
 #define IM_VEC2_CLASS_EXTRA                                                         \

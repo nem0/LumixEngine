@@ -6,7 +6,6 @@
 #include "editor/asset_compiler.h"
 #include "editor/settings.h"
 #include "editor/studio_app.h"
-#include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "engine/input_system.h"

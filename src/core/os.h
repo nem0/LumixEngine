@@ -197,6 +197,7 @@ LUMIX_CORE_API [[nodiscard]] bool getSaveFilename(Span<char> out, const char* fi
 LUMIX_CORE_API [[nodiscard]] bool getOpenDirectory(Span<char> out, const char* starting_dir);
 LUMIX_CORE_API ExecuteOpenResult shellExecuteOpen(StringView path, StringView args, StringView working_dir, bool show_console = true);
 LUMIX_CORE_API ExecuteOpenResult openExplorer(StringView path);
+LUMIX_CORE_API const char* getClipboardText(IAllocator& allocator);
 LUMIX_CORE_API void copyToClipboard(const char* text);
 
 LUMIX_CORE_API bool deleteFile(StringView path);

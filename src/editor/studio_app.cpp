@@ -2151,6 +2151,23 @@ struct StudioAppImpl final : StudioApp {
 			return os::getFocused() == vp->PlatformHandle;
 		};
 		pio.Platform_SetWindowFocus = nullptr;
+		pio.Platform_GetClipboardTextFn = [](ImGuiContext*){
+			struct : IAllocator {
+				void* allocate(size_t size, size_t align) override {
+					ctx->ClipboardHandlerData.resize((int)size);
+					return ctx->ClipboardHandlerData.begin();
+				}
+				void deallocate(void* ptr) override { ASSERT(false); }
+				void* reallocate(void* ptr, size_t new_size, size_t old_size, size_t align) override { ASSERT(false); return nullptr; }
+				
+				ImGuiContext* ctx;
+			} alloc;
+			alloc.ctx = ImGui::GetCurrentContext();
+			return os::getClipboardText(alloc);
+		};
+		pio.Platform_SetClipboardTextFn = [](ImGuiContext*, const char* text){
+			os::copyToClipboard(text);
+		};
 
 		ImGuiViewport* mvp = ImGui::GetMainViewport();
 		mvp->PlatformHandle = m_main_window;

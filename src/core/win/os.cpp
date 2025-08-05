@@ -9,10 +9,8 @@
 #pragma warning(push)
 #pragma warning(disable : 4091)
 #include <windowsx.h>
-#include <Shobjidl_core.h>
 #include <shlobj_core.h>
 #include <Psapi.h>
-#include <sysinfoapi.h>
 #pragma warning(pop)
 #pragma warning(disable : 4996)
 
@@ -27,7 +25,7 @@ extern "C" {
 // some winapi calls can fail but we don't have any known way to "fix" the issue
 // some of these calls are not fatal (e.g. if we fail to move a window), so we just assert -> DEBUG_CHECK
 #define DEBUG_CHECK(R) if (!(R)) ASSERT(false)
-// some may end up corrupting user data (e.g. not having enought space for path string and using such shorter path), so we better abort
+// some may end up corrupting user data (e.g. not having enough space for path string and using such shorter path), so we better abort
 #define FATAL_CHECK(R) do { if (!(R)) abort(); } while(false)
 
 
@@ -98,7 +96,7 @@ InputFile::InputFile()
 
 OutputFile::OutputFile()
 {
-    m_is_error = false;
+	m_is_error = false;
 	m_handle = (void*)INVALID_HANDLE_VALUE;
 	static_assert(sizeof(m_handle) >= sizeof(HANDLE), "");
 }
@@ -120,7 +118,7 @@ bool OutputFile::open(const char* path)
 {
 	m_handle = (HANDLE)::CreateFileA(path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
 	m_is_error = INVALID_HANDLE_VALUE == m_handle;
-    return !m_is_error;
+	return !m_is_error;
 }
 
 
@@ -164,7 +162,7 @@ bool OutputFile::write(const void* data, u64 size)
 	u64 written = 0;
 	::WriteFile((HANDLE)m_handle, data, (DWORD)size, (LPDWORD)&written, nullptr);
 	m_is_error = m_is_error || size != written;
-    return !m_is_error;
+	return !m_is_error;
 }
 
 bool InputFile::read(void* data, u64 size)
@@ -306,20 +304,20 @@ void finishDrag(const Event& event)
 
 static void UTF32ToUTF8(u32 utf32, char* utf8)
 {
-    if (utf32 <= 0x7F) {
-        utf8[0] = (char) utf32;
-    } else if (utf32 <= 0x7FF) {
-        utf8[0] = 0xC0 | (char) ((utf32 >> 6) & 0x1F);
-        utf8[1] = 0x80 | (char) (utf32 & 0x3F);
-    } else if (utf32 <= 0xFFFF) {
-        utf8[0] = 0xE0 | (char) ((utf32 >> 12) & 0x0F);
-        utf8[1] = 0x80 | (char) ((utf32 >> 6) & 0x3F);
-        utf8[2] = 0x80 | (char) (utf32 & 0x3F);
-    } else if (utf32 <= 0x10FFFF) {
-        utf8[0] = 0xF0 | (char) ((utf32 >> 18) & 0x0F);
-        utf8[1] = 0x80 | (char) ((utf32 >> 12) & 0x3F);
-        utf8[2] = 0x80 | (char) ((utf32 >> 6) & 0x3F);
-        utf8[3] = 0x80 | (char) (utf32 & 0x3F);
+	if (utf32 <= 0x7F) {
+		utf8[0] = (char) utf32;
+	} else if (utf32 <= 0x7FF) {
+		utf8[0] = 0xC0 | (char) ((utf32 >> 6) & 0x1F);
+		utf8[1] = 0x80 | (char) (utf32 & 0x3F);
+	} else if (utf32 <= 0xFFFF) {
+		utf8[0] = 0xE0 | (char) ((utf32 >> 12) & 0x0F);
+		utf8[1] = 0x80 | (char) ((utf32 >> 6) & 0x3F);
+		utf8[2] = 0x80 | (char) (utf32 & 0x3F);
+	} else if (utf32 <= 0x10FFFF) {
+		utf8[0] = 0xF0 | (char) ((utf32 >> 18) & 0x0F);
+		utf8[1] = 0x80 | (char) ((utf32 >> 12) & 0x3F);
+		utf8[2] = 0x80 | (char) ((utf32 >> 6) & 0x3F);
+		utf8[3] = 0x80 | (char) (utf32 & 0x3F);
 	}
 	else {
 		ASSERT(false);
@@ -991,7 +989,7 @@ bool isRelativeMouseMode()
 int getDPI()
 {
 	const HDC hdc = GetDC(NULL);
-    return GetDeviceCaps(hdc, LOGPIXELSX);
+	return GetDeviceCaps(hdc, LOGPIXELSX);
 }
 
 u32 getMemPageSize() {
@@ -1248,9 +1246,26 @@ bool getOpenDirectory(Span<char> output, const char* starting_dir)
 	return ret;
 }
 
+const char* getClipboardText(IAllocator& allocator) {
+	if (!OpenClipboard(nullptr)) return nullptr;
+	HANDLE wbuf_handle = GetClipboardData(CF_UNICODETEXT);
+	if (!wbuf_handle) {
+		CloseClipboard();
+		return nullptr;
+	}
+	
+	char* mem = nullptr;
+	if (const WCHAR* wbuf_global = (const WCHAR*)GlobalLock(wbuf_handle)) {
+		int buf_len = ::WideCharToMultiByte(CP_UTF8, 0, wbuf_global, -1, NULL, 0, NULL, NULL);
+		mem = (char*)allocator.allocate(buf_len, 1);
+		WideCharToMultiByte(CP_UTF8, 0, wbuf_global, -1, mem, buf_len, NULL, NULL);
+	}
+	GlobalUnlock(wbuf_handle);
+	CloseClipboard();
+	return mem;
+}
 
-void copyToClipboard(const char* text)
-{
+void copyToClipboard(const char* text) {
 	if (!OpenClipboard(NULL)) return;
 	int len = stringLength(text) + 1;
 	HGLOBAL mem_handle = GlobalAlloc(GMEM_MOVEABLE, len * sizeof(char));

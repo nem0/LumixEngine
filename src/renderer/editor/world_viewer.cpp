@@ -5,7 +5,6 @@
 #include "engine/resource_manager.h"
 #include "editor/studio_app.h"
 #include "editor/settings.h"
-#include "editor/utils.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
 #include "renderer/render_module.h"
