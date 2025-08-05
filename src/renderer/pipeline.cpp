@@ -1,7 +1,6 @@
 #include "core/arena_allocator.h"
 #include "core/associative_array.h"
 #include "core/atomic.h"
-#include "core/crt.h"
 #include "core/geometry.h"
 #include "core/hash.h"
 #include "core/job_system.h"
@@ -11,6 +10,7 @@
 #include "core/page_allocator.h"
 #include "core/path.h"
 #include "core/profiler.h"
+#include "core/sort.h"
 #include "core/stack_array.h"
 #include "core/sync.h"
 #include "culling_system.h"
@@ -3151,16 +3151,12 @@ struct PipelineImpl final : Pipeline {
 				probe.layer = refl_probe.texture_id;
 			}
 	
-			qsort(refl_probes, module_refl_probes.length(), sizeof(ClusterReflProbe), [](const void* a, const void* b){
-				const ClusterReflProbe* m = (const ClusterReflProbe*)a;
-				const ClusterReflProbe* n = (const ClusterReflProbe*)b;
-				const float m3 = m->half_extents.x * m->half_extents.y * m->half_extents.z;
-				const float n3 = n->half_extents.x * n->half_extents.y * n->half_extents.z;
-				if (m3 < n3) return -1;
-				return m3 > n3 ? 1 : 0;
+			sort(refl_probes, refl_probes + module_refl_probes.length(), [](const ClusterReflProbe& a, const ClusterReflProbe& b){
+				const float a3 = a.half_extents.x * a.half_extents.y * a.half_extents.z;
+				const float b3 = b.half_extents.x * b.half_extents.y * b.half_extents.z;
+				return a3 < b3;
 			});
-	
-	
+
 			const Span<EntityRef> env_probe_entities = m_module->getEnvironmentProbesEntities();
 			for (u32 probe_idx = 0, c = module_env_probes.length(); probe_idx < c; ++probe_idx) {
 				const EnvironmentProbe& env_probe = module_env_probes[probe_idx];
@@ -3177,13 +3173,10 @@ struct PipelineImpl final : Pipeline {
 				}
 			}
 	
-			qsort(env_probes, module_env_probes.length(), sizeof(ClusterEnvProbe), [](const void* a, const void* b){
-				const ClusterEnvProbe* m = (const ClusterEnvProbe*)a;
-				const ClusterEnvProbe* n = (const ClusterEnvProbe*)b;
-				const float m3 = m->outer_range.x * m->outer_range.y * m->outer_range.z;
-				const float n3 = n->outer_range.x * n->outer_range.y * n->outer_range.z;
-				if (m3 < n3) return -1;
-				return m3 > n3 ? 1 : 0;
+			sort(env_probes, env_probes + module_env_probes.length(), [](const ClusterEnvProbe& a, const ClusterEnvProbe& b){
+				const float a3 = a.outer_range.x * a.outer_range.y * a.outer_range.z;
+				const float b3 = b.outer_range.x * b.outer_range.y * b.outer_range.z;
+				return a3 < b3;
 			});
 	
 			auto range = [](const Vec3& p, float r, i32 size, const Vec4* planes){

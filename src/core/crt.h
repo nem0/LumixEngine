@@ -26,18 +26,25 @@
 		LUMIX_CRT_API void* __cdecl _aligned_malloc(size_t size, size_t align);
 		LUMIX_CRT_API void __cdecl _aligned_free(void* ptr);
 		LUMIX_CRT_API void* __cdecl _aligned_realloc(void* ptr, size_t size, size_t align);
-		LUMIX_CRT_API unsigned int __cdecl _control87(unsigned int value, unsigned int mask);
-		LUMIX_CRT_API int __cdecl _stricmp(const char* str1, const char* str2);
-		LUMIX_CRT_API int __cdecl _strncmp(const char* str1, const char* str2);
-		LUMIX_CRT_API int __cdecl _strnicmp(const char* str1, const char* str2, size_t max_count);
-
+		LUMIX_CRT_API void* __cdecl malloc(size_t size);
+		LUMIX_CRT_API void __cdecl free(void* ptr);
+		int __cdecl memcmp(const void* buf1, const void* buf2, size_t size);
+		void* __cdecl memcpy(void* dst, void const* src, size_t size); __pragma(intrinsic(memcpy))
+		void* __cdecl memmove(void* dst, const void* src, size_t size); __pragma(intrinsic(memmove))
+		void* __cdecl memset(void*  dst, int val, size_t size); __pragma(intrinsic(memset))
+		
 		LUMIX_CRT_API __declspec(noreturn) void __cdecl abort(void);
+		LUMIX_CRT_API unsigned int __cdecl _control87(unsigned int value, unsigned int mask);
+		
 		LUMIX_CRT_API float __cdecl acosf(float x);
-		LUMIX_CRT_API float __cdecl atan2f(float y, float x);
-		LUMIX_CRT_API double __cdecl atof(const char* str);
-		LUMIX_CRT_API int __cdecl atoi(const char* str);
-		LUMIX_CRT_API double __cdecl ceil(double x);
 		LUMIX_CRT_API float __cdecl cosf(float x);
+		LUMIX_CRT_API float __cdecl atan2f(float y, float x);
+		LUMIX_CRT_API float __cdecl tanf(float x);
+		LUMIX_CRT_API float __cdecl asinf(float x);
+		LUMIX_CRT_API float __cdecl sinf(float x);
+		
+		LUMIX_CRT_API double __cdecl atof(const char* str);
+		LUMIX_CRT_API double __cdecl ceil(double x);
 		double __cdecl fabs(double x);
 		LUMIX_CRT_API double __cdecl floor(double _X);
 		#ifndef _INC_MATH
@@ -47,36 +54,20 @@
 			LUMIX_CRT_API float __cdecl ceilf(float x);
 		#endif
 		LUMIX_CRT_API float fmodf(float x, float y);
-		double __cdecl fmod(double x, double y);
-		LUMIX_CRT_API void __cdecl free(void* ptr);
 		LUMIX_CRT_API int __cdecl _finite(double x);
 		inline int __cdecl isinf(double x) { return !_finite(x); }
-
-		double __cdecl log10(double x);
-		LUMIX_CRT_API void* __cdecl malloc(size_t size);
-		const void* __cdecl memchr(const void* buf, int val, size_t max_count);
-		int __cdecl memcmp(const void* buf1, const void* buf2, size_t size);
-		void* __cdecl memcpy(void* dst, void const* src, size_t size); __pragma(intrinsic(memcpy))
-		void* __cdecl memmove(void* dst, const void* src, size_t size); __pragma(intrinsic(memmove))
-		void* __cdecl memset(void*  dst, int val, size_t size); __pragma(intrinsic(memset))
-		LUMIX_CRT_API float __cdecl powf(float x, float y);
-		double __cdecl pow(double x, double y); __pragma(intrinsic(pow))
-		LUMIX_CRT_API void __cdecl qsort(void* ptr, size_t count, size_t size, int(*cmp)(const void *, const void *));
-		LUMIX_CRT_API void* __cdecl realloc(void* ptr, size_t size);
-		LUMIX_CRT_API float __cdecl sinf(float x);
-		double __cdecl asin(double _X);
+		
 		LUMIX_CRT_API float __cdecl sqrtf(float x);
 		double __cdecl sqrt(double _X);
-		const char* __cdecl strchr(const char* str, int val);
+		double __cdecl log10(double x);
+		LUMIX_CRT_API float __cdecl powf(float x, float y);
+		double __cdecl pow(double x, double y); __pragma(intrinsic(pow))
+
 		size_t __cdecl strlen(const char* str);
 		int __cdecl strcmp(const char* str, const char* str2);
 		char* strcpy(char* dest, const char* src);
 		LUMIX_CRT_API int __cdecl strncmp(const char* str1, const char* str2, size_t max_count);
-		LUMIX_CRT_API char* strncpy(char *dest, const char *src, size_t n);
 		const char* __cdecl strstr(const char* str, const char* substr);
-		LUMIX_CRT_API float __cdecl strtof(const char* str, char** end);
-		double __cdecl tan(double _X);
-		LUMIX_CRT_API float __cdecl tanf(float x);
 	}
 #elif defined(__linux__) || defined(__clang__)
 	#include <float.h>
@@ -85,7 +76,4 @@
 	#include <math.h>
 	#include <stdlib.h>
 	#include <string.h>
-	#ifndef __clang__
-		inline int stricmp(const char* a, const char* b) { return strcasecmp(a, b); }
-	#endif
 #endif

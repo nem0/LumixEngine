@@ -635,7 +635,7 @@ Vec3 Quat::toEuler() const
 		return Vec3(PI * 0.5f, 0.0f, atan2f(2.0f * (x * z - w * y), 1.0f - 2.0f * (y * y + z * z)));
 	}
 
-	return Vec3((float)asin(check),
+	return Vec3(asinf(check),
 		atan2f(2.0f * (x * z + w * y), 1.0f - 2.0f * (x * x + y * y)),
 		atan2f(2.0f * (x * y + w * z), 1.0f - 2.0f * (x * x + z * z)));
 }

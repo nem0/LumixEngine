@@ -3,6 +3,7 @@
 #include "core/hash.h"
 #include "core/log.h"
 #include "core/math.h"
+#include "core/sort.h"
 #include "engine/plugin.h"
 #include "engine/prefab.h"
 #include "engine/reflection.h"
@@ -56,9 +57,7 @@ struct World::ArchetypeManager {
 		RollingHasher hasher;
 
 		// we sort to get the same hash for different order
-		qsort(types.begin(), types.length(), sizeof(ComponentType), [](const void* a, const void* b) {
-			return ((const ComponentType*)a)->index - ((const ComponentType*)b)->index;
-		});
+		sort(types.begin(), types.end(), [](const ComponentType& a, const ComponentType& b) { return a.index < b.index; });
 
 		hasher.begin();
 		for (ComponentType type : types) {

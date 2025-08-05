@@ -451,7 +451,7 @@ void Frustum::computePerspective(const Vec3& position,
 	ASSERT(near_distance < far_distance);
 	ASSERT(fov > 0);
 	ASSERT(ratio > 0);
-	float scale = (float)tan(fov * 0.5f);
+	float scale = tanf(fov * 0.5f);
 	Vec3 right = cross(direction, up);
 	Vec3 up_near = up * near_distance * scale;
 	Vec3 right_near = right * (near_distance * scale * ratio);
@@ -482,7 +482,7 @@ void ShiftedFrustum::computePerspective(const DVec3& position,
 	ASSERT(near_distance < far_distance);
 	ASSERT(fov > 0);
 	ASSERT(ratio > 0);
-	const float scale = (float)tan(fov * 0.5f);
+	const float scale = tanf(fov * 0.5f);
 	const Vec3 right = cross(direction, up);
 	const Vec3 up_near = up * near_distance * scale;
 	const Vec3 right_near = right * (near_distance * scale * ratio);

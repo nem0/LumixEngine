@@ -358,10 +358,10 @@ namespace Lumix
 	LUMIX_FORCE_INLINE float4 f4Sqrt(float4 a)
 	{
 		return{
-			(float)sqrt(a.x),
-			(float)sqrt(a.y),
-			(float)sqrt(a.z),
-			(float)sqrt(a.w)
+			sqrtf(a.x),
+			sqrtf(a.y),
+			sqrtf(a.z),
+			sqrtf(a.w)
 		};
 	}
 
@@ -369,10 +369,10 @@ namespace Lumix
 	LUMIX_FORCE_INLINE float4 f4Rsqrt(float4 a)
 	{
 		return{
-			1 / (float)sqrt(a.x),
-			1 / (float)sqrt(a.y),
-			1 / (float)sqrt(a.z),
-			1 / (float)sqrt(a.w)
+			1 / sqrtf(a.x),
+			1 / sqrtf(a.y),
+			1 / sqrtf(a.z),
+			1 / sqrtf(a.w)
 		};
 	}
 

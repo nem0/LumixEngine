@@ -231,6 +231,26 @@ static char makeLowercase(char c) {
 	return c >= 'A' && c <= 'Z' ? c - ('A' - 'a') : c;
 }
 
+int compareStringInsensitive(StringView lhs, StringView rhs) {
+	const char* a = lhs.begin;
+	const char* b = rhs.begin;
+
+	while (a != lhs.end && b != rhs.end) {
+		char lower_a = makeLowercase(*a);
+		char lower_b = makeLowercase(*b);
+		if (lower_a != lower_b) {
+			return lower_a - lower_b;
+		}
+		++a;
+		++b;
+	}
+
+	i32 ac = a == lhs.end ? 0 : makeLowercase(*a);
+	i32 bc = b == rhs.end ? 0 : makeLowercase(*b);
+
+	return ac - bc;
+}
+
 int compareString(StringView lhs, StringView rhs) {
 	const char* a = lhs.begin;
 	const char* b = rhs.begin;

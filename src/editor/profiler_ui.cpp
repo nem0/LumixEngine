@@ -4,7 +4,6 @@
 #include "core/atomic.h"
 #include "core/color.h"
 #include "core/command_line_parser.h"
-#include "core/crt.h"
 #include "core/debug.h"
 #include "core/job_system.h"
 #include "core/log.h"
@@ -12,6 +11,7 @@
 #include "core/os.h"
 #include "core/page_allocator.h"
 #include "core/profiler.h"
+#include "core/sort.h"
 #include "core/stack_array.h"
 #include "core/stack_tree.h"
 #include "core/string.h"
@@ -230,7 +230,11 @@ struct AllocationTag {
 		debug::StackNode* stack_node;
 		size_t size;
 		u32 count = 1;
+
+		bool operator < (const Allocation& rhs) const { return size < rhs.size; }
 	};
+
+	bool operator < (const AllocationTag& rhs) const { return m_size < rhs.m_size; }
 
 	Array<AllocationTag> m_child_tags;
 	Array<Allocation> m_allocations;
@@ -361,24 +365,16 @@ struct MemoryProfilerUI {
 			tag.m_size += child.m_size;
 		}
 
-		qsort(tag.m_child_tags.begin(), tag.m_child_tags.size(), sizeof(tag.m_child_tags[0]), [](const void* a, const void* b){
-			size_t sa = ((AllocationTag*)a)->m_size;
-			size_t sb = ((AllocationTag*)b)->m_size;
-
-			if (sa > sb) return -1;
-			if (sa < sb) return 1;
-			return 0;
+		sort(tag.m_child_tags.begin(), tag.m_child_tags.end(), [](const AllocationTag& a, const AllocationTag& b) {
+			return b < a;
+		});
+		
+		// sort by stack_node, so we can collapse allocations with the same stack node
+		sort(tag.m_allocations.begin(), tag.m_allocations.end(), [](const AllocationTag::Allocation& a, const AllocationTag::Allocation& b) {
+			return a.stack_node < b.stack_node;
 		});
 
-		qsort(tag.m_allocations.begin(), tag.m_allocations.size(), sizeof(tag.m_allocations[0]), [](const void* a, const void* b){
-			const void* sa = ((AllocationTag::Allocation*)a)->stack_node;
-			const void* sb = ((AllocationTag::Allocation*)b)->stack_node;
-
-			if (sa > sb) return -1;
-			if (sa < sb) return 1;
-			return 0;
-		});
-
+		// collapse allocations with the same stack node, i.e., keep only one of them and sum their size and count
 		for (i32 i = tag.m_allocations.size() - 1; i > 0; --i) {
 			if (tag.m_allocations[i].stack_node != tag.m_allocations[i - 1].stack_node) continue;
 
@@ -387,13 +383,9 @@ struct MemoryProfilerUI {
 			tag.m_allocations.swapAndPop(i);
 		}
 
-		qsort(tag.m_allocations.begin(), tag.m_allocations.size(), sizeof(tag.m_allocations[0]), [](const void* a, const void* b){
-			const size_t sa = ((AllocationTag::Allocation*)a)->size;
-			const size_t sb = ((AllocationTag::Allocation*)b)->size;
-
-			if (sa > sb) return -1;
-			if (sa < sb) return 1;
-			return 0;
+		// sort by size
+		sort(tag.m_allocations.begin(), tag.m_allocations.end(), [](const AllocationTag::Allocation& a, const AllocationTag::Allocation& b) {
+			return b.size < a.size;
 		});
 	}
 

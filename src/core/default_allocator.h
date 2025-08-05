@@ -2,7 +2,6 @@
 
 #include "allocator.h"
 #include "atomic.h"
-#include "crt.h"
 #include "sync.h"
 
 namespace Lumix {

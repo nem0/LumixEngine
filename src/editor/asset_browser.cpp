@@ -1,12 +1,12 @@
 #include <imgui/imgui.h>
 
 #include "asset_browser.h"
-#include "core/crt.h"
 #include "core/hash.h"
 #include "core/log.h"
 #include "core/os.h"
 #include "core/path.h"
 #include "core/profiler.h"
+#include "core/sort.h"
 #include "core/string.h"
 #include "editor/asset_compiler.h"
 #include "editor/editor_asset.h"
@@ -328,19 +328,14 @@ struct AssetBrowserImpl : AssetBrowser {
 
 	void sortTiles() {
 		if (m_filter.isActive()) {
-			qsort(m_file_infos.begin(), m_file_infos.size(), sizeof(m_file_infos[0]), [](const void* a, const void* b){
-				const FileInfo* m = (FileInfo*)a;
-				const FileInfo* n = (FileInfo*)b;
-				if (n->score < m->score) return -1;
-				if (n->score > m->score) return 1;
-				return compareString(m->filepath, n->filepath);
+			sort(m_file_infos.begin(), m_file_infos.end(), [](const FileInfo& a, const FileInfo& b){
+				if (a.score < b.score) return true;
+				return compareStringInsensitive(a.filepath, b.filepath) < 0;
 			});
 		}
 		else {
-			qsort(m_file_infos.begin(), m_file_infos.size(), sizeof(m_file_infos[0]), [](const void* a, const void* b){
-				FileInfo* m = (FileInfo*)a;
-				FileInfo* n = (FileInfo*)b;
-				return compareString(m->filepath, n->filepath);
+			sort(m_file_infos.begin(), m_file_infos.end(), [](const FileInfo& a, const FileInfo& b){
+				return compareStringInsensitive(a.filepath, b.filepath) < 0;
 			});
 		}
 	}

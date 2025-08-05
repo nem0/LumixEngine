@@ -1,7 +1,6 @@
 #include "core/array.h"
 #include "core/associative_array.h"
 #include "core/command_line_parser.h"
-#include "core/crt.h"
 #include "core/delegate_list.h"
 #include "core/geometry.h"
 #include "core/hash.h"
@@ -11,6 +10,7 @@
 #include "core/os.h"
 #include "core/path.h"
 #include "core/profiler.h"
+#include "core/sort.h"
 #include "core/stream.h"
 #include "core/string.h"
 #include "editor/entity_folders.h"
@@ -2802,9 +2802,7 @@ public:
 	void setProperty(ComponentType cmp, const char* array, int idx, const char* prop, Span<const EntityRef> entities, const IVec3& val) override { set(cmp, array, idx, prop, entities, val); }
 
 	static void fastRemoveDuplicates(Array<EntityRef>& entities) {
-		qsort(entities.begin(), entities.size(), sizeof(entities[0]), [](const void* a, const void* b){
-			return memcmp(a, b, sizeof(EntityRef));
-		});
+		sort(entities.begin(), entities.end());
 		for (i32 i = entities.size() - 2; i >= 0; --i) {
 			if (entities[i] == entities[i + 1]) entities.swapAndPop(i);
 		}

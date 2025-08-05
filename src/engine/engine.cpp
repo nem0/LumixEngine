@@ -8,6 +8,7 @@
 #include "core/page_allocator.h"
 #include "core/path.h"
 #include "core/profiler.h"
+#include "core/sort.h"
 #include "core/stream.h"
 #include "core/string.h"
 #include "engine/core.h"
@@ -272,9 +273,7 @@ struct EngineImpl final : Engine {
 	void computeSmoothTimeDelta() {
 		float tmp[11];
 		memcpy(tmp, m_last_time_deltas, sizeof(tmp));
-		qsort(tmp, lengthOf(tmp), sizeof(tmp[0]), [](const void* a, const void* b) -> i32 {
-			return *(const float*)a < *(const float*)b ? -1 : *(const float*)a > *(const float*)b ? 1 : 0;
-		});
+		sort(tmp, tmp + lengthOf(tmp), [](float a, float b) { return a < b; });
 		float t = 0;
 		for (u32 i = 2; i < lengthOf(tmp) - 2; ++i) {
 			t += tmp[i];

@@ -1,6 +1,7 @@
-#define LUMIX_NO_CUSTOM_CRT
 #include <lua.h>
 #ifdef LUMIX_LUAU_ANALYSIS
+	// TODO is this necessary?
+	#define LUMIX_NO_CUSTOM_CRT
 	#include <Luau/AstQuery.h>
 	#include <Luau/Autocomplete.h>
 	#include <Luau/Frontend.h>
