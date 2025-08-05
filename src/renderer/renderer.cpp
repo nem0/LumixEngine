@@ -14,7 +14,6 @@
 #include "core/os.h"
 #include "core/profiler.h"
 #include "core/stack_array.h"
-#include "core/thread.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "core/string.h"

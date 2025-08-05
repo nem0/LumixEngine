@@ -1,6 +1,5 @@
 #include "asset_compiler.h"
 #include "core/atomic.h"
-#include "core/atomic.h"
 #include "core/hash.h"
 #include "core/job_system.h"
 #include "core/log.h"

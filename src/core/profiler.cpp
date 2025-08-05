@@ -13,7 +13,6 @@
 #include "core/crt.h"
 #include "core/debug.h"
 #include "core/hash_map.h"
-#include "core/atomic.h"
 #include "core/math.h"
 #include "core/string.h"
 #include "core/sync.h"

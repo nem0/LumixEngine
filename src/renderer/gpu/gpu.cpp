@@ -9,7 +9,6 @@
 #include "core/sync.h"
 #include "core/os.h"
 #include "core/profiler.h"
-#include "core/stream.h"
 #include "core/string.h"
 
 namespace Lumix {

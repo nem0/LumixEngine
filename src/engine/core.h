@@ -2,12 +2,17 @@
 
 #include "core/array.h"
 #include "core/hash_map.h"
-
 #include "engine/engine.h"
 #include "engine/plugin.h"
-#include "engine/reflection.h"
+
 
 namespace Lumix {
+
+namespace reflection {
+	struct Module;
+	struct EventBase;
+	struct FunctionBase;
+}
 
 struct Vec3;
 

@@ -1,10 +1,10 @@
 #include "core.h"
-#include "engine.h"
-#include "engine_hash_funcs.h"
 #include "core/hash_map.h"
 #include "core/log.h"
-#include "reflection.h"
 #include "core/stream.h"
+#include "engine.h"
+#include "engine_hash_funcs.h"
+#include "engine/reflection.h"
 #include "world.h"
 
 namespace Lumix {

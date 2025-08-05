@@ -29,13 +29,7 @@
 namespace Lumix
 {
 
-template <typename T> struct Array;
-template <typename T> struct Span;
 struct Path;
-struct IVec3;
-struct Vec2;
-struct Vec3;
-struct Vec4;
 struct InputMemoryStream;
 struct OutputMemoryStream;
 

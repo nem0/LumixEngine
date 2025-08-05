@@ -88,6 +88,14 @@ newoption {
 	description = "Build luau as dynamic library. Only valid if Luau source code is available."
 }
 
+-- Splitting in multiple project oversubsribes CPU threads when building with MSBuild.
+-- MSBuild does cl invocation per project, with lots of threads in every invocation.
+-- Splitting in projects also causes reporting by vcperf or Compile Score to be much less useful (timing includes preempted timeslices)
+newoption {
+	trigger = "split-projects",
+	description = "Split into project per plugin. Dynamic library plugins are always split."
+}
+
 newoption {
 	trigger = "gcc",
 	value = "GCC",
@@ -104,6 +112,7 @@ newoption {
 build_studio = not _OPTIONS["no-studio"]
 build_app = _OPTIONS["with-app"] or false
 local embed_resources = _OPTIONS["embed-resources"]
+local split_projects = _OPTIONS["split-projects"]
 local working_dir = _OPTIONS["working-dir"]
 local debug_args = _OPTIONS["debug-args"]
 local release_args = _OPTIONS["release-args"]
@@ -192,6 +201,18 @@ function defaultConfigurations()
 		flags { "FullSymbols" } -- VS can't set brekpoints from time to time, only rebuilding several times or using FullSymbols helps
 end
 
+function lib_project(name)
+	if not split_projects then
+		name = "engine_merged"
+	end
+	
+	project(name)
+end
+
+function exe_project(name)
+	project(name)
+end
+
 -- Use this in plugins (which can be static libs) to link other plugins (also possibly static libs).
 -- "Linking" static libs together just creates a dependency between them and hurts build parallelism. So we don't do that.
 function dynamic_link_plugin(plugin_name)
@@ -203,28 +224,38 @@ end
 -- To create new plugin use this:
 -- if  plugin "plugin_name" then 
 --     files { ...
+
+local first_plugin = true
 function plugin(plugin_name)
 	if not hasPlugin(plugin_name) then return false end
 
 	table.insert(plugin_creators, plugin_name)
-	if build_studio then
-		project "studio"
-			links(plugin_name)
+	if not split_projects then
+		plugin_name = "engine_merged"
 	end
 
-	if build_app then
-		project "app"
-			links {plugin_name}
-	end
-	
-	project(plugin_name)
-	libType()
+	if first_plugin or split_projects then
+		if build_studio then
+			exe_project "studio"
+				links(plugin_name)
+		end
 
-	if build_studio then
-		dynamic_link_plugin { "editor" }
+		if build_app then
+			exe_project "app"
+				links {plugin_name}
+		end
+
+		lib_project(plugin_name)
+		libType()
+
+		if build_studio then
+			dynamic_link_plugin { "editor" }
+		end
+
+		defaultConfigurations()
 	end
 
-	defaultConfigurations()
+	lib_project(plugin_name)
 	return true
 end
 
@@ -357,7 +388,7 @@ solution "LumixEngine"
 		linkoptions { "-g" }
 	end
 
-project "core"
+lib_project "core"
 	libType()
 	defaultConfigurations()
 	defines { "BUILDING_CORE" }
@@ -373,7 +404,7 @@ project "core"
 	configuration { "linux" }
 		buildoptions { "`pkg-config --cflags gtk+-3.0`" }
 
-project "engine"
+lib_project "engine"
 	libType()
 	defines { "BUILDING_ENGINE" }
 	dynamic_link_plugin { "core" }
@@ -570,11 +601,11 @@ if plugin "lua" then
 	end
 
 	if build_luau and build_studio then
-		project "studio"
+		exe_project "studio"
 			links {"Luau"}
 	end
 	if build_luau and build_app then
-		project "app"
+		exe_project "app"
 			links {"Luau"}
 	end
 end
@@ -603,7 +634,7 @@ function dbgHelp()
 end
 
 if build_app then
-	project "app"
+	exe_project "app"
 		kind "ConsoleApp"
 		defaultConfigurations()
 		includedirs { "../src", "../src/app" }
@@ -631,8 +662,6 @@ if build_app then
 			if hasPlugin "physics" then
 				linkPhysX()
 			end
-			links { "core", "engine" }
-
 			if use_basisu then
 				linkLib "basisu"
 			end
@@ -642,13 +671,13 @@ if build_app then
 				links { "psapi", "dxguid", "winmm" }
 
 			configuration {}
-		else
-			links { "core", "engine" }
 		end
+		links { "core", "engine" }
 		
-		if build_studio then
+		if build_studio and split_projects then
 			links { "editor" }
 		end
+		
 		if build_studio and use_basisu then
 			linkLib "basisu"
 		end
@@ -670,7 +699,7 @@ if build_app then
 end
 
 if build_studio then
-	project "editor"
+	lib_project "editor"
 		libType()
 		defaultConfigurations()
 		defines { "BUILDING_EDITOR" }
@@ -706,13 +735,15 @@ if build_studio then
 			configuration {}
 		end
 
-	project "studio"
+	exe_project "studio"
 		kind "WindowedApp"
 		files { "../src/studio/**.cpp" }
 		dbgHelp()
 		includedirs { "../src" }
 		defaultConfigurations()
-		links { "editor", "core", "engine", "renderer" }
+		if split_projects then
+			links { "editor", "core", "engine", "renderer" }
+		end
 
 		if embed_resources then
 			files { "../src/studio/**.rc" }
@@ -778,7 +809,7 @@ end
 
 if build_physx and hasPlugin("physics") then
 	printf("Using PhysX from external/_repos/physx (build from source code)")
-	project "PhysX"
+	lib_project "PhysX"
 		kind "StaticLib"
 		files { "../external/_repos/physx/physx/source/**.cpp", "../external/_repos/physx/physx/include/**.h", "../external/_repos/physx/pxshared/**.h" }
 		removefiles { "../**/unix/*", "../**/linux/*" }
@@ -853,7 +884,7 @@ end
 
 if os.isdir("../external/_repos/freetype") then
 	printf("Using FreeType from external/_repos/freetype (build from source code)")
-	project "freetype"
+	lib_project "freetype"
 		kind "StaticLib"
 		files {
 			"../external/_repos/freetype/src/autofit/autofit.c",
@@ -918,7 +949,7 @@ end
 
 if build_luau then
 	printf("Using Luau from external/_repos/luau (build from source code)")
-	project "Luau"
+	lib_project "Luau"
 		if luau_dynamic then
 			kind "SharedLib"
 		else
