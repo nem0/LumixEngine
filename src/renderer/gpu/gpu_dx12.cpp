@@ -759,7 +759,7 @@ struct SamplerHeap {
 		desc.MaxLOD = 1000;
 		desc.MinLOD = -1000;
 		desc.MaxAnisotropy = is_aniso ? 8 : 1;
-		desc.ComparisonFunc = D3D12_COMPARISON_FUNC_NONE;
+		desc.ComparisonFunc = (D3D12_COMPARISON_FUNC)0;
 		D3D12_CPU_DESCRIPTOR_HANDLE cpu = cpu_begin;
 		cpu.ptr += increment * id;
 		device->CreateSampler(&desc, cpu);
@@ -3181,3 +3181,5 @@ void createProgram(ProgramHandle program
 }
 
 } // namespace
+
+#include "renderer/fsr3.inl"

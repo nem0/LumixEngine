@@ -6,6 +6,8 @@
 #include "core/profiler.h"
 #include "core/tokenizer.h"
 #include "editor/studio_app.h"
+#include "editor/action.h"
+#include "editor/text_filter.h"
 #include "editor/utils.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"

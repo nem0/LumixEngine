@@ -3,6 +3,7 @@
 #include "editor/property_grid.h"
 #include "editor/world_editor.h"
 #include "signal_editor.h"
+#include <imgui/imgui.h>
 
 namespace Lumix {
 

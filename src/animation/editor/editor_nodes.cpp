@@ -5,6 +5,7 @@
 #include "animation/animation.h"
 #include "animation/controller.h"
 #include "editor_nodes.h"
+#include "editor/text_filter.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
 

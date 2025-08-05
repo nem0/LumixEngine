@@ -8,7 +8,7 @@
 #include "core/stack_array.h"
 #include "core/string.h"
 #include "core/tag_allocator.h"
-#include "editor/utils.h"
+#include "editor/action.h"
 #include "engine/lumix.h"
 
 namespace Lumix {

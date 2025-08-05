@@ -1,6 +1,7 @@
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
 
+#include "action.h"
 #include "core/command_line_parser.h"
 #include "core/log.h"
 #include "core/math.h"
@@ -14,6 +15,7 @@
 #include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/world.h"
+#include "text_filter.h"
 #include "utils.h"
 
 namespace Lumix {

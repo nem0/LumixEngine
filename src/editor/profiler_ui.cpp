@@ -20,7 +20,7 @@
 #include "editor/asset_compiler.h"
 #include "editor/settings.h"
 #include "editor/studio_app.h"
-#include "editor/utils.h"
+#include "editor/text_filter.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/resource_manager.h"

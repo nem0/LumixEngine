@@ -6,8 +6,9 @@
 #include "core/string.h"
 #include "core/tag_allocator.h"
 
+#include "editor/action.h"
 #include "editor/studio_app.h"
-#include "editor/utils.h"
+#include "editor/text_filter.h"
 
 
 namespace Lumix

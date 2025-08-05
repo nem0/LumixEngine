@@ -14,7 +14,6 @@
 #include "editor/entity_folders.h"
 #include "editor/prefab_system.h"
 #include "editor/studio_app.h"
-#include "editor/utils.h"
 #include "engine/component_uid.h"
 #include "engine/core.h"
 #include "engine/engine.h"

@@ -164,53 +164,6 @@ function hasPlugin(plugin)
   return false
 end
 
-function plugin(plugin_name)
-	if not hasPlugin(plugin_name) then return false end
-
-	if build_studio then
-		project "studio"
-			links(plugin_name)
-	end
-
-	if build_app then
-		project "app"
-			links {plugin_name}
-	end
-	linkPlugin(plugin_name)
-	
-	project(plugin_name)
-	libType()
-
-	if build_studio then
-		links { "editor" }
-	end
-
-	defaultConfigurations()
-	return true
-end
-
-function linkPlugin(plugin_name)
-	table.insert(plugin_creators, plugin_name)
-	if build_studio then
-		project "studio"
-			links(plugin_name)
-	end
-
-	if build_app then
-		project "app"
-			links {plugin_name}
-	end
-end
-
-function detect_plugins()
-	local plugins_dirs = os.matchdirs("../plugins/*")
-	for k, plugin_dir in ipairs(plugins_dirs) do
-		local dir = string.sub(plugin_dir, 12, -1)
-		table.insert(plugins, dir)
-	end
-end
-detect_plugins()
-
 function defaultConfigurations()
 	configuration "Debug"
 		targetdir(BINARY_DIR .. "Debug")
@@ -238,6 +191,51 @@ function defaultConfigurations()
 		defines { "_ITERATOR_DEBUG_LEVEL=0", "STBI_NO_STDIO" }
 		flags { "FullSymbols" } -- VS can't set brekpoints from time to time, only rebuilding several times or using FullSymbols helps
 end
+
+-- Use this in plugins (which can be static libs) to link other plugins (also possibly static libs).
+-- "Linking" static libs together just creates a dependency between them and hurts build parallelism. So we don't do that.
+function dynamic_link_plugin(plugin_name)
+	if dynamic_plugins then
+		links { plugin_name }
+	end
+end
+
+-- To create new plugin use this:
+-- if  plugin "plugin_name" then 
+--     files { ...
+function plugin(plugin_name)
+	if not hasPlugin(plugin_name) then return false end
+
+	table.insert(plugin_creators, plugin_name)
+	if build_studio then
+		project "studio"
+			links(plugin_name)
+	end
+
+	if build_app then
+		project "app"
+			links {plugin_name}
+	end
+	
+	project(plugin_name)
+	libType()
+
+	if build_studio then
+		dynamic_link_plugin { "editor" }
+	end
+
+	defaultConfigurations()
+	return true
+end
+
+function detect_plugins()
+	local plugins_dirs = os.matchdirs("../plugins/*")
+	for k, plugin_dir in ipairs(plugins_dirs) do
+		local dir = string.sub(plugin_dir, 12, -1)
+		table.insert(plugins, dir)
+	end
+end
+detect_plugins()
 
 function linkLib(lib)
 	links {lib}
@@ -378,7 +376,7 @@ project "core"
 project "engine"
 	libType()
 	defines { "BUILDING_ENGINE" }
-	links { "core" }
+	dynamic_link_plugin { "core" }
 	defaultConfigurations()
 	includedirs { "../src", "../external/freetype/include" }
 
@@ -414,7 +412,7 @@ if plugin "physics" then
 	files { "../src/physics/**.h", "../src/physics/**.cpp" }
 	includedirs { "../external/physx/include/" }
 	defines { "BUILDING_PHYSICS", "LUMIX_STATIC_PHYSX" }
-	links { "core", "engine", "renderer" }
+	dynamic_link_plugin { "core", "engine", "renderer" }
 	linkPhysX()
 end
 
@@ -456,7 +454,7 @@ if plugin "renderer" then
 	
 	defines { "BUILDING_RENDERER" }
 	libdirs { "../external/pix/bin/x64" }
-	links { "core", "engine" }
+	dynamic_link_plugin { "core", "engine" }
 
 	if build_studio and use_basisu then
 		linkLib "basisu"
@@ -475,7 +473,7 @@ if plugin "animation" then
 	files { "../src/animation/**.h", "../src/animation/**.cpp" }
 	includedirs { "../src" }
 	defines { "BUILDING_ANIMATION" }
-	links { "core", "engine", "renderer" }
+	dynamic_link_plugin { "core", "engine", "renderer" }
 end
 
 if plugin "audio" then
@@ -487,7 +485,7 @@ if plugin "audio" then
 
 	includedirs { "../src", "../src/audio" }
 	defines { "BUILDING_AUDIO" }
-	links { "core", "engine" }
+	dynamic_link_plugin { "core", "engine" }
 
 	configuration "windows"
 		links { "dxguid" }
@@ -531,13 +529,13 @@ if plugin "navigation" then
 	}
 
 	includedirs { "../src", "../src/navigation", "../external/recast/include" }
-	links { "core", "engine", "renderer" }
+	dynamic_link_plugin { "core", "engine", "renderer" }
 end
 
 if plugin "gui" then
 	files { "../src/gui/**.h", "../src/gui/**.cpp" }
 	includedirs { "../src", "../src/gui" }
-	links { "core", "engine", "renderer" }
+	dynamic_link_plugin { "core", "engine", "renderer" }
 	defines { "BUILDING_GUI" }
 	
 	configuration { "vs*" }
@@ -565,10 +563,10 @@ if plugin "lua" then
 		, "../src/lua"
 	}
 	defines { "BUILDING_LUA" }
-	links { "core", "engine" }
+	dynamic_link_plugin { "core", "engine" }
 
 	if hasPlugin "renderer" then
-		links { "renderer" }
+		dynamic_link_plugin { "renderer" }
 	end
 
 	if build_luau and build_studio then
@@ -676,7 +674,7 @@ if build_studio then
 		libType()
 		defaultConfigurations()
 		defines { "BUILDING_EDITOR" }
-		links { "core", "engine" }
+		dynamic_link_plugin { "core", "engine" }
 
 		files {
 			"../src/editor/**.h",

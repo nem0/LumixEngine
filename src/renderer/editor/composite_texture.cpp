@@ -11,6 +11,7 @@
 #include "editor/editor_asset.h"
 #include "editor/settings.h"
 #include "editor/studio_app.h"
+#include "editor/text_filter.h"
 #include "renderer/draw_stream.h"
 #include "renderer/texture.h"
 #include "renderer/renderer.h"

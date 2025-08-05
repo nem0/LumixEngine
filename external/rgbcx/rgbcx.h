@@ -58,9 +58,30 @@
 
 #include <stdlib.h>
 #include <stdint.h>
-#include <algorithm>
 #include <assert.h>
 #include <limits.h>
+#include <math.h>
+
+#define RGBCX_MAX(a, b) ((a) > (b) ? (a) : (b))
+#define RGBCX_MIN(a, b) ((a) < (b) ? (a) : (b))
+template <typename T>
+void rgbcx_swap(T& a, T& b) {
+	T temp(a);
+	a = b;
+	b = temp;
+}
+
+void rgbcx_sort(int* from, int* to) {
+	for (int* i = from + 1; i < to; ++i) {
+		int key = *i;
+		int* j = i - 1;
+		while (j >= from && *j > key) {
+			*(j + 1) = *j;
+			--j;
+		}
+		*(j + 1) = key;
+	}
+}
 
 // By default, the table used to accelerate cluster fit on 4 color blocks uses a 969x128 entry table. 
 // To reduce the executable size, set RGBCX_USE_SMALLER_TABLES to 1, which selects the smaller 969x32 entry table. 
@@ -1474,8 +1495,8 @@ namespace rgbcx
 
 		void set_rgb(const color32& other) { c[0] = static_cast<uint8_t>(other.c[0]); c[1] = static_cast<uint8_t>(other.c[1]); c[2] = static_cast<uint8_t>(other.c[2]); }
 
-		static color32 comp_min(const color32& a, const color32& b) { return color32(eNoClamp::cNoClamp, std::min(a[0], b[0]), std::min(a[1], b[1]), std::min(a[2], b[2]), std::min(a[3], b[3])); }
-		static color32 comp_max(const color32& a, const color32& b) { return color32(eNoClamp::cNoClamp, std::max(a[0], b[0]), std::max(a[1], b[1]), std::max(a[2], b[2]), std::max(a[3], b[3])); }
+		static color32 comp_min(const color32& a, const color32& b) { return color32(eNoClamp::cNoClamp, RGBCX_MIN(a[0], b[0]), RGBCX_MIN(a[1], b[1]), RGBCX_MIN(a[2], b[2]), RGBCX_MIN(a[3], b[3])); }
+		static color32 comp_max(const color32& a, const color32& b) { return color32(eNoClamp::cNoClamp, RGBCX_MAX(a[0], b[0]), RGBCX_MAX(a[1], b[1]), RGBCX_MAX(a[2], b[2]), RGBCX_MAX(a[3], b[3])); }
 	};
 	
 	enum dxt_constants
@@ -1921,7 +1942,7 @@ namespace rgbcx
 				min16 = (g_bc1_match5_half[fr].m_lo << 11) | (g_bc1_match6_half[fg].m_lo << 5) | g_bc1_match5_half[fb].m_lo;
 
 				if (max16 > min16)
-					std::swap(max16, min16);
+					rgbcx_swap(max16, min16);
 			}
 		}
 
@@ -1954,7 +1975,7 @@ namespace rgbcx
 
 			if (max16 < min16)
 			{
-				std::swap(max16, min16);
+				rgbcx_swap(max16, min16);
 				mask ^= 0x55;
 			}
 		}
@@ -2503,7 +2524,7 @@ namespace rgbcx
 			uint8_t invert_mask = 0;
 			if (lc16 < hc16)
 			{
-				std::swap(lc16, hc16);
+				rgbcx_swap(lc16, hc16);
 				invert_mask = 0x55;
 			}
 
@@ -2531,7 +2552,7 @@ namespace rgbcx
 		bool invert_flag = false;
 		if (lc16 > hc16)
 		{
-			std::swap(lc16, hc16);
+			rgbcx_swap(lc16, hc16);
 			invert_flag = true;
 		}
 
@@ -2581,8 +2602,8 @@ namespace rgbcx
 			if ((r | g | b) < 4)
 				continue;
 			
-			max_r = std::max(max_r, r); max_g = std::max(max_g, g); max_b = std::max(max_b, b);
-			min_r = std::min(min_r, r); min_g = std::min(min_g, g); min_b = std::min(min_b, b);
+			max_r = RGBCX_MAX(max_r, r); max_g = RGBCX_MAX(max_g, g); max_b = RGBCX_MAX(max_b, b);
+			min_r = RGBCX_MIN(min_r, r); min_g = RGBCX_MIN(min_g, g); min_b = RGBCX_MIN(min_b, b);
 			total_r += r; total_g += g; total_b += b;
 				
 			total_pixels++;
@@ -2818,7 +2839,7 @@ namespace rgbcx
 				dots[i] = (d << 4) + i;
 			}
 
-			std::sort(dots, dots + 16);
+			rgbcx_sort(dots, dots + 16);
 
 			uint32_t r_sum[17], g_sum[17], b_sum[17];
 			uint32_t r = 0, g = 0, b = 0;
@@ -2839,7 +2860,7 @@ namespace rgbcx
 			g_sum[16] = total_g;
 			b_sum[16] = total_b;
 						
-			const uint32_t q_total = (flags & cEncodeBC1Exhaustive) ? NUM_UNIQUE_TOTAL_ORDERINGS3 : std::min(total_orderings_to_try, MAX_TOTAL_ORDERINGS3);
+			const uint32_t q_total = (flags & cEncodeBC1Exhaustive) ? NUM_UNIQUE_TOTAL_ORDERINGS3 : RGBCX_MIN(total_orderings_to_try, MAX_TOTAL_ORDERINGS3);
 			for (uint32_t q = 0; q < q_total; q++)
 			{
 				const uint32_t s = (flags & cEncodeBC1Exhaustive) ? q : g_best_total_orderings3[orig_total_order_index][q];
@@ -3237,10 +3258,10 @@ namespace rgbcx
 			}
 						 
 			 if (icov_xz < 0)
-				  std::swap(l.c[0], h.c[0]);
+				  rgbcx_swap(l.c[0], h.c[0]);
 
 			 if (icov_yz < 0)
-				  std::swap(l.c[1], h.c[1]);
+				  rgbcx_swap(l.c[1], h.c[1]);
 
 			 precise_round_565(l, h, lr, lg, lb, hr, hg, hb);
 		}
@@ -3287,10 +3308,10 @@ namespace rgbcx
 			 int y1 = max_g;
 
 			 if (icov_xz < 0)
-				  std::swap(x0, x1);
+				  rgbcx_swap(x0, x1);
 
 			 if (icov_yz < 0)
-				  std::swap(y0, y1);
+				  rgbcx_swap(y0, y1);
 			 
 			 lr = to_5(x0);
 			 lg = to_6(y0);
@@ -3366,17 +3387,17 @@ namespace rgbcx
 				int dot2 = ((pSrc_pixels[i + 2].r * saxis_r + pSrc_pixels[i + 2].g * saxis_g + pSrc_pixels[i + 2].b * saxis_b) & ~0xF) + i + 2;
 				int dot3 = ((pSrc_pixels[i + 3].r * saxis_r + pSrc_pixels[i + 3].g * saxis_g + pSrc_pixels[i + 3].b * saxis_b) & ~0xF) + i + 3;
 
-				int min_d01 = std::min(dot0, dot1);
-				int max_d01 = std::max(dot0, dot1);
+				int min_d01 = RGBCX_MIN(dot0, dot1);
+				int max_d01 = RGBCX_MAX(dot0, dot1);
 
-				int min_d23 = std::min(dot2, dot3);
-				int max_d23 = std::max(dot2, dot3);
+				int min_d23 = RGBCX_MIN(dot2, dot3);
+				int max_d23 = RGBCX_MAX(dot2, dot3);
 
-				int min_d = std::min(min_d01, min_d23);
-				int max_d = std::max(max_d01, max_d23);
+				int min_d = RGBCX_MIN(min_d01, min_d23);
+				int max_d = RGBCX_MAX(max_d01, max_d23);
 
-				low_dot = std::min(low_dot, min_d);
-				high_dot = std::max(high_dot, max_d);
+				low_dot = RGBCX_MIN(low_dot, min_d);
+				high_dot = RGBCX_MAX(high_dot, max_d);
 			}
 			low_c = low_dot & 15;
 			high_c = high_dot & 15;
@@ -3514,8 +3535,8 @@ namespace rgbcx
 			grayscale_flag &= ((r == g) && (r == b));
 			any_black_pixels |= ((r | g | b) < 4);
 
-			max_r = std::max(max_r, r); max_g = std::max(max_g, g); max_b = std::max(max_b, b);
-			min_r = std::min(min_r, r); min_g = std::min(min_g, g); min_b = std::min(min_b, b);
+			max_r = RGBCX_MAX(max_r, r); max_g = RGBCX_MAX(max_g, g); max_b = RGBCX_MAX(max_b, b);
+			min_r = RGBCX_MIN(min_r, r); min_g = RGBCX_MIN(min_g, g); min_b = RGBCX_MIN(min_b, b);
 			total_r += r; total_g += g; total_b += b;
 		}
 
@@ -3717,7 +3738,7 @@ namespace rgbcx
 					dots[i] = (d << 4) + i;
 				}
 
-				std::sort(dots, dots + 16);
+				rgbcx_sort(dots, dots + 16);
 								
 				uint32_t r_sum[17], g_sum[17], b_sum[17];
 				uint32_t r = 0, g = 0, b = 0;
@@ -3895,24 +3916,24 @@ namespace rgbcx
 		}
 
 		{
-			uint32_t v0 = pPixels[4 * stride]; min0_v = std::min(min0_v, v0); max0_v = std::max(max0_v, v0);
-			uint32_t v1 = pPixels[5 * stride]; min1_v = std::min(min1_v, v1); max1_v = std::max(max1_v, v1);
-			uint32_t v2 = pPixels[6 * stride]; min2_v = std::min(min2_v, v2); max2_v = std::max(max2_v, v2);
-			uint32_t v3 = pPixels[7 * stride]; min3_v = std::min(min3_v, v3); max3_v = std::max(max3_v, v3);
+			uint32_t v0 = pPixels[4 * stride]; min0_v = RGBCX_MIN(min0_v, v0); max0_v = RGBCX_MAX(max0_v, v0);
+			uint32_t v1 = pPixels[5 * stride]; min1_v = RGBCX_MIN(min1_v, v1); max1_v = RGBCX_MAX(max1_v, v1);
+			uint32_t v2 = pPixels[6 * stride]; min2_v = RGBCX_MIN(min2_v, v2); max2_v = RGBCX_MAX(max2_v, v2);
+			uint32_t v3 = pPixels[7 * stride]; min3_v = RGBCX_MIN(min3_v, v3); max3_v = RGBCX_MAX(max3_v, v3);
 		}
 
 		{
-			uint32_t v0 = pPixels[8 * stride]; min0_v = std::min(min0_v, v0); max0_v = std::max(max0_v, v0);
-			uint32_t v1 = pPixels[9 * stride]; min1_v = std::min(min1_v, v1); max1_v = std::max(max1_v, v1);
-			uint32_t v2 = pPixels[10 * stride]; min2_v = std::min(min2_v, v2); max2_v = std::max(max2_v, v2);
-			uint32_t v3 = pPixels[11 * stride]; min3_v = std::min(min3_v, v3); max3_v = std::max(max3_v, v3);
+			uint32_t v0 = pPixels[8 * stride]; min0_v = RGBCX_MIN(min0_v, v0); max0_v = RGBCX_MAX(max0_v, v0);
+			uint32_t v1 = pPixels[9 * stride]; min1_v = RGBCX_MIN(min1_v, v1); max1_v = RGBCX_MAX(max1_v, v1);
+			uint32_t v2 = pPixels[10 * stride]; min2_v = RGBCX_MIN(min2_v, v2); max2_v = RGBCX_MAX(max2_v, v2);
+			uint32_t v3 = pPixels[11 * stride]; min3_v = RGBCX_MIN(min3_v, v3); max3_v = RGBCX_MAX(max3_v, v3);
 		}
 
 		{
-			uint32_t v0 = pPixels[12 * stride]; min0_v = std::min(min0_v, v0); max0_v = std::max(max0_v, v0);
-			uint32_t v1 = pPixels[13 * stride]; min1_v = std::min(min1_v, v1); max1_v = std::max(max1_v, v1);
-			uint32_t v2 = pPixels[14 * stride]; min2_v = std::min(min2_v, v2); max2_v = std::max(max2_v, v2);
-			uint32_t v3 = pPixels[15 * stride]; min3_v = std::min(min3_v, v3); max3_v = std::max(max3_v, v3);
+			uint32_t v0 = pPixels[12 * stride]; min0_v = RGBCX_MIN(min0_v, v0); max0_v = RGBCX_MAX(max0_v, v0);
+			uint32_t v1 = pPixels[13 * stride]; min1_v = RGBCX_MIN(min1_v, v1); max1_v = RGBCX_MAX(max1_v, v1);
+			uint32_t v2 = pPixels[14 * stride]; min2_v = RGBCX_MIN(min2_v, v2); max2_v = RGBCX_MAX(max2_v, v2);
+			uint32_t v3 = pPixels[15 * stride]; min3_v = RGBCX_MIN(min3_v, v3); max3_v = RGBCX_MAX(max3_v, v3);
 		}
 
 		const uint32_t min_v = minimum(min0_v, min1_v, min2_v, min3_v);
