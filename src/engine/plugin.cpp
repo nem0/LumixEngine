@@ -163,7 +163,7 @@ namespace Lumix
 				os::unloadLibrary(lib);
 			}
 			else {
-				logWarning("Failed to load system.");
+				logWarning("Failed to load system ", path_with_ext);
 			}
 			return nullptr;
 		}

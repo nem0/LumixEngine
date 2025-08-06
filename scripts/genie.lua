@@ -786,9 +786,14 @@ if build_studio then
 				libdirs { "../external/pix/bin/x64" }
 				files { "../external/pix/bin/x64/WinPixEventRuntime.dll" }
 				copy { "../external/pix/bin/x64/WinPixEventRuntime.dll" }
-			
-			configuration {}
 		end
+
+		configuration { "vs*" }
+			libdirs { "../external/pix/bin/x64" }
+			files { "../external/pix/bin/x64/WinPixEventRuntime.dll" }
+			copy { "../external/pix/bin/x64/WinPixEventRuntime.dll" }
+
+		configuration {}
 
 		for _, callback in ipairs(build_studio_callbacks) do
 			callback()
