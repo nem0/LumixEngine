@@ -2474,7 +2474,14 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 						// TODO small buffer optimization - most properties are <= 4B
 						switch (type) {
 							case Property::ANY: ASSERT(false); break;
-							case Property::ENTITY: prop.stored_value.write(serializer.skip(num_elements * sizeof(EntityPtr)), num_elements * sizeof(EntityPtr)); break;
+							case Property::ENTITY: {
+								for (u32 j = 0; j < num_elements; ++j) {
+									EntityPtr e = serializer.read<EntityPtr>();
+									e = entity_map.get(e);
+									prop.stored_value.write(e);
+								}
+								break;
+							}
 							case Property::FLOAT: prop.stored_value.write(serializer.skip(num_elements * sizeof(float)), num_elements * sizeof(float)); break;
 							case Property::BOOLEAN: prop.stored_value.write(serializer.skip(num_elements * sizeof(u8)), num_elements * sizeof(u8)); break;
 							case Property::INT: prop.stored_value.write(serializer.skip(num_elements * sizeof(i32)), num_elements * sizeof(i32)); break;
