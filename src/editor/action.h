@@ -5,6 +5,8 @@
 #include "engine/lumix.h"
 #include <imgui/IconsFontAwesome5.h>
 
+struct ImFont;
+
 namespace Lumix {
 
 struct LUMIX_EDITOR_API Action {
@@ -27,7 +29,7 @@ struct LUMIX_EDITOR_API Action {
 	~Action();
 	Action(const Action&) = delete;
 	void operator =(const Action&) = delete;
-	bool toolbarButton(struct ImFont* font, bool is_selected = false);
+	bool toolbarButton(ImFont* font, bool is_selected = false);
 	bool isActive() const;
 	bool iconButton(bool enabled = true, struct StudioApp* app = nullptr);
 	bool shortcutText(Span<char> out) const;
