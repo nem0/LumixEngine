@@ -208,6 +208,8 @@ struct Cloud {
 	float t_bottom;
 };
 
+// Compiler warns about a potentially unused variable because of the early return.
+#pragma warning(disable : 4000)
 Cloud cloud(float2 screen_uv) {
 	Cloud result;
 	result.color = float3(0, 0, 0);
