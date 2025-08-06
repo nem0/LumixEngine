@@ -14,6 +14,7 @@
 #include "core/os.h"
 #include "core/path.h"
 #include "core/stack_array.h"
+#include "engine/engine_hash_funcs.h"
 #include "engine/prefab.h"
 #include "core/profiler.h"
 #include "engine/resource_manager.h"

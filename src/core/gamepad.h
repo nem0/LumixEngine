@@ -24,6 +24,6 @@ struct IGamepadBackend {
 	virtual bool isControllerConnected(int index) = 0;
 };
 
-IGamepadBackend* createGamepadBackend(struct IAllocator& allocator);
+LUMIX_CORE_API IGamepadBackend* createGamepadBackend(struct IAllocator& allocator);
 
 } // namespace Lumix

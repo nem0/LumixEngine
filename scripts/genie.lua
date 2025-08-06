@@ -112,13 +112,13 @@ newoption {
 build_studio = not _OPTIONS["no-studio"]
 build_app = _OPTIONS["with-app"] or false
 local embed_resources = _OPTIONS["embed-resources"]
-local split_projects = _OPTIONS["split-projects"]
 local working_dir = _OPTIONS["working-dir"]
 local debug_args = _OPTIONS["debug-args"]
 local release_args = _OPTIONS["release-args"]
 local luau_dynamic = _OPTIONS["luau-dynamic"]
 local use_basisu =  _OPTIONS["with-basis-universal"]
 local dynamic_plugins = _OPTIONS["dynamic-plugins"]
+local split_projects = _OPTIONS["split-projects"] or dynamic_plugins
 local build_luau = os.isdir("../external/_repos/luau")
 local build_physx = os.isdir("../external/_repos/physx")
 

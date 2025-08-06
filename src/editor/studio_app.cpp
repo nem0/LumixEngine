@@ -36,9 +36,12 @@
 #include "log_ui.h"
 #include "profiler_ui.h"
 #include "property_grid.h"
-#include "renderer/gpu/gpu.h"
-#include "renderer/renderer.h"
-#include "renderer/shader.h"
+// with dynamic plaugins, editor can't depend on renderer (since renderer already depends on editor)
+#ifdef STATIC_PLUGINS
+	#include "renderer/gpu/gpu.h"
+	#include "renderer/renderer.h"
+	#include "renderer/shader.h"
+#endif
 #include "settings.h"
 #include "studio_app.h"
 #include "utils.h"
@@ -745,7 +748,9 @@ struct StudioAppImpl final : StudioApp {
 	}
 
 	void onShutdown() {
-		if (m_welcome_shader) m_welcome_shader->decRefCount();
+		#ifdef STATIC_PLUGINS
+			if (m_welcome_shader) m_welcome_shader->decRefCount();
+		#endif
 
 		while (m_engine->getFileSystem().hasWork()) {
 			m_engine->getFileSystem().processCallbacks();
@@ -1001,7 +1006,9 @@ struct StudioAppImpl final : StudioApp {
 			logInfo(os::getTimeSinceProcessStart(), " s since process started");
 		#endif
 
-		m_welcome_shader = m_engine->getResourceManager().load<Shader>(Path("shaders/welcome.hlsl"));
+		#ifdef STATIC_PLUGINS
+			m_welcome_shader = m_engine->getResourceManager().load<Shader>(Path("shaders/welcome.hlsl"));
+		#endif
 	}
 
 	void loadLogo() {
@@ -1429,55 +1436,7 @@ struct StudioAppImpl final : StudioApp {
 		initDefaultWorld();
 	}
 
-	static gpu::ProgramHandle createCustomImGuiShader(Engine& engine, const char* src) {
-		StackAllocator<4096, 1>  allocator(engine.getAllocator());
-		OutputMemoryStream blob(allocator);
-		blob << R"#(struct VSInput {
-			float2 pos : TEXCOORD0;
-			float2 uv : TEXCOORD1;
-			float4 color : TEXCOORD2;
-		};
-
-		cbuffer ImGuiState : register(b4) {
-			float2 c_scale;
-			float2 c_offset;
-			uint c_texture;
-			float c_time;
-		};
-
-		struct VSOutput {
-			float4 color : TEXCOORD0;
-			float2 uv : TEXCOORD1;
-			float4 position : SV_POSITION;
-		};
-
-		VSOutput mainVS(VSInput input) {
-			VSOutput output;
-			output.color = input.color;
-			output.uv = input.uv;
-			float2 p = input.pos * c_scale + c_offset;
-			output.position = float4(p.xy, 0, 1);
-			return output;
-		}
-
-		float4 mainPS(VSOutput input) : SV_Target {
-		)#";
-		blob << src;
-		blob << "}\n";
-		blob.write(0);
-		
-		gpu::ProgramHandle program = gpu::allocProgramHandle();
-		Renderer* renderer = (Renderer*)engine.getSystemManager().getSystem("renderer");
-		DrawStream& draw_stream = renderer->getDrawStream();
-		gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLES);
-		decl.addAttribute(0, 2, gpu::AttributeType::FLOAT, 0);
-		decl.addAttribute(8, 2, gpu::AttributeType::FLOAT, 0);
-		decl.addAttribute(16, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
-		const gpu::StateFlags state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
-		draw_stream.createProgram(program, state, decl, (const char*)blob.data(), gpu::ShaderType::SURFACE, nullptr, 0, "custom imgui");
-		return program;
-	}
-
+	#ifdef STATIC_PLUGINS
 	// draw imgui rect with custom shader
 	static void shaderRect(Engine& engine, gpu::ProgramHandle program, ImVec2 size) {
 		Renderer* renderer = (Renderer*)engine.getSystemManager().getSystem("renderer");
@@ -1510,6 +1469,7 @@ struct StudioAppImpl final : StudioApp {
 
 		dl->AddCallback(ImDrawCallback_ResetRenderState, nullptr);
 	}
+	#endif
 
 	void guiWelcomeScreen() {
 		const ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
@@ -1518,18 +1478,20 @@ struct StudioAppImpl final : StudioApp {
 		ImGui::SetNextWindowSize(viewport->WorkSize);
 		ImGui::SetNextWindowViewport(viewport->ID);
 		if (ImGui::Begin("Welcome", nullptr, flags)) {
-			// backgrounnd shader
-			if (m_welcome_shader->isReady() && m_welcome_screen_use_shader) {
-				ImGui::SetCursorPos(ImVec2(0, 0));
-				ImVec2 size = ImGui::GetContentRegionAvail();
-				gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLES);
-				decl.addAttribute(0, 2, gpu::AttributeType::FLOAT, 0);
-				decl.addAttribute(8, 2, gpu::AttributeType::FLOAT, 0);
-				decl.addAttribute(16, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
-				const gpu::StateFlags state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
-				gpu::ProgramHandle program = m_welcome_shader->getProgram(state, decl, 0, 0);
-				shaderRect(*m_engine, program, size);
-			}
+			// background shader
+			#ifdef STATIC_PLUGINS
+				if (m_welcome_shader->isReady() && m_welcome_screen_use_shader) {
+					ImGui::SetCursorPos(ImVec2(0, 0));
+					ImVec2 size = ImGui::GetContentRegionAvail();
+					gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLES);
+					decl.addAttribute(0, 2, gpu::AttributeType::FLOAT, 0);
+					decl.addAttribute(8, 2, gpu::AttributeType::FLOAT, 0);
+					decl.addAttribute(16, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
+					const gpu::StateFlags state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
+					gpu::ProgramHandle program = m_welcome_shader->getProgram(state, decl, 0, 0);
+					shaderRect(*m_engine, program, size);
+				}
+			#endif
 
 			#ifdef _WIN32
 				if (!m_use_native_titlebar) {
@@ -3160,7 +3122,9 @@ struct StudioAppImpl final : StudioApp {
 	ImFont* m_bold_font;
 	ImFont* m_monospace_font;
 	ImGuiID m_dockspace_id = 0;
-	Shader* m_welcome_shader = nullptr;
+	#ifdef STATIC_PLUGINS	
+		Shader* m_welcome_shader = nullptr;
+	#endif
 
 	struct WatchedPlugin {
 		UniquePtr<FileSystemWatcher> watcher;
