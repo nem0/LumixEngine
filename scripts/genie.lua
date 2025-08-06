@@ -672,7 +672,6 @@ if build_app then
 
 			configuration {}
 		end
-		links { "core", "engine" }
 		
 		if build_studio and split_projects then
 			links { "editor" }
@@ -741,9 +740,6 @@ if build_studio then
 		dbgHelp()
 		includedirs { "../src" }
 		defaultConfigurations()
-		if split_projects then
-			links { "editor", "core", "engine", "renderer" }
-		end
 
 		if embed_resources then
 			files { "../src/studio/**.rc" }
