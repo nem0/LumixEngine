@@ -674,7 +674,7 @@ if build_app then
 		end
 		
 		if build_studio and split_projects then
-			links { "editor" }
+			links { "core", "engine", "editor" }
 		end
 		
 		if build_studio and use_basisu then
@@ -713,7 +713,7 @@ if build_studio then
 			"../src/editor",
 			"../external"
 		}
-		
+
 		if #plugins > 0 and dynamic_plugins then
 			local def = ""
 			for idx, plugin in ipairs(plugins) do
@@ -743,6 +743,10 @@ if build_studio then
 
 		if embed_resources then
 			files { "../src/studio/**.rc" }
+		end
+
+		if split_projects then
+			links { "core", "engine", "editor" }
 		end
 
 		if debug_args then

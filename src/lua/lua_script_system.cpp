@@ -1928,6 +1928,12 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 		}
 
 		for (const reflection::RegisteredComponent& cmp : reflection::getComponents()) {
+			// there can be code that works with component in abstract way:
+			// ComponentType MESH_ACTOR_TYPE = reflection::getComponentType("rigid_actor");
+			// m_editor.setProperty(MESH_ACTOR_TYPE, "", -1, "Mesh", Span(&entity, 1), Path(path));
+			// but the plugin (physics in this case might not be linked)
+			// in that case cmp.cmp is nullptr
+			if (!cmp.cmp) continue;
 			const char* cmp_name = cmp.cmp->name;
 			const ComponentType cmp_type = cmp.cmp->component_type;
 

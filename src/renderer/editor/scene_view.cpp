@@ -20,7 +20,6 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
-#include "physics/physics_resources.h"
 #include "renderer/culling_system.h"
 #include "renderer/draw_stream.h"
 #include "renderer/draw2d.h"
@@ -1154,6 +1153,8 @@ void SceneView::handleDrop(const char* path, float x, float y)
 
 	const ResourceType type = m_app.getAssetCompiler().getResourceType(path);
 
+	ResourceType physics_geom_type("physics_geometry");
+
 	if (type == ParticleSystemResource::TYPE) {
 		const DVec3 pos = hit.origin + (hit.is_hit ? hit.t : 5) * hit.dir;
 		
@@ -1196,7 +1197,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 		m_editor.setProperty(MODEL_INSTANCE_TYPE, "", -1, "Source", Span(&entity, 1), Path(path));
 		m_editor.endCommandGroup();
 	}
-	else if (type == PhysicsGeometry::TYPE) {
+	else if (type == physics_geom_type) {
 		if (hit.is_hit && hit.entity.isValid())
 		{
 			m_editor.beginCommandGroup("insert_phy_component");
