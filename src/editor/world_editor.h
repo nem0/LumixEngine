@@ -29,14 +29,14 @@ struct IEditorCommand
 	virtual bool merge(IEditorCommand& command) = 0;
 };
 
-struct WorldView {
-	struct RayHit {
-		bool is_hit;
-		float t;
-		EntityPtr entity;
-		DVec3 pos;
-	};
+struct RayHit {
+	bool is_hit;
+	float t;
+	EntityPtr entity;
+	DVec3 pos;
+};
 
+struct WorldView {
 	struct Vertex {
 		Vec3 pos;
 		u32 abgr;

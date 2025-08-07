@@ -1,3 +1,4 @@
+#include "core/array.h"
 #include "core/log.h"
 #include "core/stream.h"
 #include "font.h"

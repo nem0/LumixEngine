@@ -38,7 +38,6 @@
 #include "lua_script_system.h"
 #include "lua_wrapper.h"
 #include "renderer/editor/game_view.h"
-#include "renderer/editor/scene_view.h"
 
 
 using namespace Lumix;

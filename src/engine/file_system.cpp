@@ -2,7 +2,6 @@
 #include "core/array.h"
 #include "core/delegate_list.h"
 #include "core/hash_map.h"
-#include "core/metaprogramming.h"
 #include "core/log.h"
 #include "core/sync.h"
 #include "core/thread.h"

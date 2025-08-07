@@ -1,12 +1,8 @@
 #include "core/array.h"
-#include "core/geometry.h"
 #include "core/hash.h"
-#include "core/hash_map.h"
 #include "core/log.h"
 #include "core/math.h"
 #include "core/string.h"
-
-#include "prefab_system.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
 #include "editor/entity_folders.h"
@@ -15,10 +11,10 @@
 #include "engine/engine.h"
 #include "engine/plugin.h"
 #include "engine/prefab.h"
-#include "engine/reflection.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
+#include "prefab_system.h"
 
 namespace Lumix
 {

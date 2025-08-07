@@ -79,7 +79,7 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 			}
 		}
 
-		WorldView::RayHit hit = view.getCameraRaycastHit(x, y, INVALID_ENTITY);
+		RayHit hit = view.getCameraRaycastHit(x, y, INVALID_ENTITY);
 		if (hit.is_hit) {
 			CoreModule* module = (CoreModule*)world->getModule(SPLINE_TYPE);
 			Spline& hit_spline = module->getSpline(e);

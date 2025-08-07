@@ -2,6 +2,7 @@
 
 #include "engine/lumix.h"
 
+#include "core/array.h"
 #include "core/core.h"
 #include "core/color.h"
 #include "core/delegate_list.h"

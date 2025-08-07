@@ -4797,7 +4797,7 @@ struct RenderInterfaceImpl final : RenderInterface
 	}
 
 
-	WorldView::RayHit castRay(World& world, const Ray& ray, EntityPtr ignored) override
+	RayHit castRay(World& world, const Ray& ray, EntityPtr ignored) override
 	{
 		RenderModule* module = (RenderModule*)world.getModule(ENVIRONMENT_PROBE_TYPE);
 		const RayCastModelHit hit = module->castRay(ray, ignored);

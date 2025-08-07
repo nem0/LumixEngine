@@ -1,22 +1,24 @@
 #include "asset_compiler.h"
+#include "core/array.h"
 #include "core/atomic.h"
 #include "core/hash.h"
 #include "core/job_system.h"
 #include "core/log.h"
+#include "core/math.h"
 #include "core/os.h"
 #include "core/path.h"
 #include "core/profiler.h"
 #include "core/sync.h"
+#include "core/tag_allocator.h"
 #include "core/thread.h"
 #include "core/tokenizer.h"
 #include "editor/file_system_watcher.h"
-#include "editor/log_ui.h"
 #include "editor/studio_app.h"
-#include "editor/utils.h"
-#include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "engine/resource_manager.h"
 #include "engine/resource.h"
+
+#include <imgui/imgui.h>
 
 namespace Lumix {
 

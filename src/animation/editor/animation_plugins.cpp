@@ -1,5 +1,6 @@
 #include <imgui/imgui.h>
 
+#include "core/array.h"
 #include "core/hash_map.h"
 #include "core/log.h"
 #include "core/profiler.h"

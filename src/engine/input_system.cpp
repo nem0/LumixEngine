@@ -1,4 +1,5 @@
 #include "engine/input_system.h"
+#include "core/array.h"
 #include "core/delegate.h"
 #include "core/delegate_list.h"
 #include "core/gamepad.h"

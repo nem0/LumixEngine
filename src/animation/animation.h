@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/array.h"
 #include "core/hash_map.h"
 #include "core/math.h"
 #include "core/tag_allocator.h"

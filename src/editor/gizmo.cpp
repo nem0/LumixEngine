@@ -5,6 +5,7 @@
 #include "core/string.h"
 
 #include "editor/gizmo.h"
+#include "editor/world_editor.h"
 #include "engine/world.h"
 #include "render_interface.h"
 

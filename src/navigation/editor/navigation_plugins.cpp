@@ -127,7 +127,7 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 		ImGui::SameLine();
 		if (ImGui::Button("Debug tile")) {
 			WorldView& view = editor.getView();
-			const WorldView::RayHit hit = view.getCameraRaycastHit(view.getViewport().w >> 1, view.getViewport().h >> 1, INVALID_ENTITY);
+			const RayHit hit = view.getCameraRaycastHit(view.getViewport().w >> 1, view.getViewport().h >> 1, INVALID_ENTITY);
 			module->generateTileAt(entities[0], hit.pos, true);
 		}
 
@@ -141,7 +141,7 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 			ImGui::Checkbox("Outer boundaries", &outer_boundaries);
 			ImGui::Checkbox("Portals", &portals);
 			WorldView& view = editor.getView();
-			const WorldView::RayHit hit = view.getCameraRaycastHit(view.getViewport().w >> 1, view.getViewport().h >> 1, INVALID_ENTITY);
+			const RayHit hit = view.getCameraRaycastHit(view.getViewport().w >> 1, view.getViewport().h >> 1, INVALID_ENTITY);
 			module->debugDrawNavmesh(entities[0], hit.pos, inner_boundaries, outer_boundaries, portals);
 		}
 

@@ -1,3 +1,4 @@
+#include "core/array.h"
 #include "controller.h"
 #include "nodes.h"
 #include "renderer/model.h"

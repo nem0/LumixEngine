@@ -1,3 +1,4 @@
+#include "core/array.h"
 #include "core/log.h"
 #include "engine/file_system.h"
 #include "engine/resource_manager.h"

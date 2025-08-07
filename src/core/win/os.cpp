@@ -5,6 +5,7 @@
 #include "core/os.h"
 #include "core/profiler.h"
 #include "core/string.h"
+#define NOCRYPT
 #define UNICODE
 #pragma warning(push)
 #pragma warning(disable : 4091)
