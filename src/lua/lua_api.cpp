@@ -602,6 +602,7 @@ static const char* LUA_getFunctionArgType(reflection::FunctionBase* fnc, u32 arg
 		case reflection::Variant::ENTITY: return "EntityPtr";
 		case reflection::Variant::VEC2: return "Vec2";
 		case reflection::Variant::VEC3: return "Vec3";
+		case reflection::Variant::VEC4: return "Vec4";
 		case reflection::Variant::DVEC3: return "DVec3";
 		case reflection::Variant::COLOR: return "Color";
 		case reflection::Variant::QUAT: return "Quat";

@@ -108,6 +108,7 @@ static void toVariant(reflection::Variant::Type type, lua_State* L, int idx, ref
 			break;
 		}
 		case reflection::Variant::VEC3: val = LuaWrapper::checkArg<Vec3>(L, idx); break;
+		case reflection::Variant::VEC4: val = LuaWrapper::checkArg<Vec4>(L, idx); break;
 		case reflection::Variant::DVEC3: val = LuaWrapper::checkArg<DVec3>(L, idx); break;
 		case reflection::Variant::QUAT: val = LuaWrapper::checkArg<Quat>(L, idx); break;
 		case reflection::Variant::CSTR: val = LuaWrapper::checkArg<const char*>(L, idx); break;

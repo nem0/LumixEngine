@@ -424,6 +424,12 @@ struct RendererImpl final : Renderer {
 	{
 		RenderModule::reflect();
 
+		LUMIX_GLOBAL_FUNC(Material::setUniformI32);
+		LUMIX_GLOBAL_FUNC(Material::setUniformFloat);
+		LUMIX_GLOBAL_FUNC(Material::setUniformVec2);
+		LUMIX_GLOBAL_FUNC(Material::setUniformVec3);
+		LUMIX_GLOBAL_FUNC(Material::setUniformVec4);
+
 		LUMIX_GLOBAL_FUNC(Model::getBoneCount);
 		LUMIX_GLOBAL_FUNC(Model::getBoneName);
 		LUMIX_GLOBAL_FUNC(Model::getBoneParent);

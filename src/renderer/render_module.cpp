@@ -2004,9 +2004,15 @@ struct RenderModuleImpl final : RenderModule {
 		}
 	}
 
+	Material* getModelInstanceMaterial(EntityRef entity) { 
+		ModelInstance& inst = m_model_instances[entity.index];
+		if (inst.custom_material) return inst.custom_material;
+		if (!inst.model) return nullptr;
+		if (inst.model->getMeshCount() == 0) return nullptr;
+		return inst.model->getMesh(0).material;
+	}
 
 	Model* getModelInstanceModel(EntityRef entity) override { return m_model_instances[entity.index].model; }
-
 
 	bool isModelInstanceEnabled(EntityRef entity) override
 	{
@@ -3480,6 +3486,7 @@ void RenderModule::reflect() {
 			.blob_property<&RenderModuleImpl::getInstancedModelBlob, &RenderModuleImpl::setInstancedModelBlob>("Blob")
 		.LUMIX_CMP(ModelInstance, "model_instance", "Render / Mesh")
 			.LUMIX_FUNC_EX(RenderModule::getModelInstanceModel, "getModel")
+			.LUMIX_FUNC_EX(RenderModuleImpl::getModelInstanceMaterial, "getMaterial")
 			.prop<&RenderModule::isModelInstanceEnabled, &RenderModule::enableModelInstance>("Enabled")
 			.prop<&RenderModule::getModelInstanceMaterialOverride,&RenderModule::setModelInstanceMaterialOverride>("Material").noUIAttribute()
 			.LUMIX_PROP(ModelInstancePath, "Source").resourceAttribute(Model::TYPE)

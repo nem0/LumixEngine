@@ -58,6 +58,11 @@ struct LUMIX_RENDERER_API Material final : Resource {
 	Uniform& getUniform(int index) { return m_uniforms[index]; }
 	const Uniform& getUniform(int index) const { return m_uniforms[index]; }
 	Uniform* findUniform(RuntimeHash name_hash);
+	void setUniformI32(u32 index, i32 value);
+	void setUniformFloat(u32 index, float value);
+	void setUniformVec2(u32 index, Vec2 value);
+	void setUniformVec3(u32 index, Vec3 value);
+	void setUniformVec4(u32 index, Vec4 value);
 
 	void setDefine(u8 define_idx, bool enabled);
 	bool isDefined(u8 define_idx) const;

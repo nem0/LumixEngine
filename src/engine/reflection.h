@@ -297,6 +297,7 @@ struct Variant {
 		ENTITY,
 		VEC2,
 		VEC3,
+		VEC4,
 		DVEC3,
 		COLOR,
 		QUAT
@@ -310,6 +311,7 @@ struct Variant {
 		EntityPtr e;
 		Vec2 v2;
 		Vec3 v3;
+		Vec4 v4;
 		DVec3 dv3;
 		void* ptr;
 		Color color;
@@ -325,6 +327,7 @@ struct Variant {
 	void operator =(EntityPtr v) { e = v; type = ENTITY; }
 	void operator =(Vec2 v) { v2 = v; type = VEC2; }
 	void operator =(Vec3 v) { v3 = v; type = VEC3; }
+	void operator =(Vec4 v) { v4 = v; type = VEC4; }
 	void operator =(const DVec3& v) { dv3 = v; type = DVEC3; }
 	void operator =(void* v) { ptr = v; type = PTR; }
 	void operator =(Color c) { color = c; type = COLOR; }
@@ -356,6 +359,7 @@ inline Variant::Type _getVariantType(VariantTag<EntityPtr>) { return Variant::EN
 inline Variant::Type _getVariantType(VariantTag<EntityRef>) { return Variant::ENTITY; }
 inline Variant::Type _getVariantType(VariantTag<Vec2>) { return Variant::VEC2; }
 inline Variant::Type _getVariantType(VariantTag<Vec3>) { return Variant::VEC3; }
+inline Variant::Type _getVariantType(VariantTag<Vec4>) { return Variant::VEC4; }
 inline Variant::Type _getVariantType(VariantTag<Path>) { return Variant::CSTR; }
 inline Variant::Type _getVariantType(VariantTag<Color>) { return Variant::COLOR; }
 inline Variant::Type _getVariantType(VariantTag<DVec3>) { return Variant::DVEC3; }
@@ -426,6 +430,7 @@ inline u32 fromVariant(int i, Span<const Variant> args, VariantTag<u32>) { retur
 inline Color fromVariant(int i, Span<const Variant> args, VariantTag<Color>) { return args[i].color; }
 inline Vec2 fromVariant(int i, Span<const Variant> args, VariantTag<Vec2>) { return args[i].v2; }
 inline Vec3 fromVariant(int i, Span<const Variant> args, VariantTag<Vec3>) { return args[i].v3; }
+inline Vec4 fromVariant(int i, Span<const Variant> args, VariantTag<Vec4>) { return args[i].v4; }
 inline Quat fromVariant(int i, Span<const Variant> args, VariantTag<Quat>) { return args[i].quat; }
 inline DVec3 fromVariant(int i, Span<const Variant> args, VariantTag<DVec3>) { return args[i].dv3; }
 inline EntityPtr fromVariant(int i, Span<const Variant> args, VariantTag<EntityPtr>) { return args[i].e; }

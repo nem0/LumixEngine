@@ -103,6 +103,26 @@ void Material::setDefine(u8 define_idx, bool enabled)
 	if (old_mask != m_define_mask) updateRenderData(false);
 }
 
+void Material::setUniformI32(u32 index, i32 value) {
+	m_uniforms[index].int_value = value;
+	updateRenderData(false);
+}
+void Material::setUniformFloat(u32 index, float value) {
+	m_uniforms[index].float_value = value; 
+	updateRenderData(false);
+}
+void Material::setUniformVec2(u32 index, Vec2 value) {
+	memcpy(m_uniforms[index].vec2, &value, sizeof(value)); 
+	updateRenderData(false);
+}
+void Material::setUniformVec3(u32 index, Vec3 value) {
+	memcpy(m_uniforms[index].vec3, &value, sizeof(value)); 
+	updateRenderData(false);
+}
+void Material::setUniformVec4(u32 index, Vec4 value) {
+	memcpy(m_uniforms[index].vec4, &value, sizeof(value)); 
+	updateRenderData(false);
+}
 
 Material::Uniform* Material::findUniform(RuntimeHash name_hash) {
 	for (Uniform& u : m_uniforms) {
