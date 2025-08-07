@@ -3148,7 +3148,7 @@ struct CodeEditorWindow : AssetEditorWindow {
 						m_disassembly_view->setReadOnly(true);
 					}
 					else {
-						m_disassembly_view->gui("disasm");
+						m_disassembly_view->gui("disasm", ImVec2(0, 0), m_app.getMonospaceFont(), m_app.getDefaultFont());
 					}
 				}
 			}
@@ -3172,9 +3172,7 @@ struct CodeEditorWindow : AssetEditorWindow {
 			ImGui::EndMenuBar();
 		}
 
-		ImGui::PushFont(m_app.getMonospaceFont());
-		if (m_editor->gui("codeeditor")) m_dirty = true;
-		ImGui::PopFont();
+		if (m_editor->gui("codeeditor", ImVec2(0, 0), m_app.getMonospaceFont(), m_app.getDefaultFont())) m_dirty = true;
 	}
 	
 	const Path& getPath() override { return m_path; }

@@ -1661,7 +1661,7 @@ struct CodeEditorImpl final : CodeEditor {
 		return nullptr;
 	}
 
-	bool gui(const char* str_id, const ImVec2& size, ImFont* ui_font) override {
+	bool gui(const char* str_id, const ImVec2& size, ImFont* code_font, ImFont* ui_font) override {
 		PROFILE_FUNCTION();
 		m_handle_input = false;
 		if (!ImGui::BeginChild(str_id, size, false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
@@ -1669,6 +1669,7 @@ struct CodeEditorImpl final : CodeEditor {
 			return false;
 		}
 		
+		ImGui::PushFont(code_font, maximum(1.f, (float)s_font_size));
 		u32 version = m_version;
 		ImGuiIO& io = ImGui::GetIO();
 		const ImGuiStyle& style = ImGui::GetStyle();
@@ -1893,7 +1894,7 @@ struct CodeEditorImpl final : CodeEditor {
 				io.InputQueueCharacters.resize(0);
 			}
 		}
-
+		ImGui::PopFont();
 		ImGui::EndChild();
 		return version != m_version;
 	}

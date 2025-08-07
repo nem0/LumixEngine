@@ -489,9 +489,7 @@ struct EditorWindow : AssetEditorWindow {
 		}
 
 		if (m_code_editor) {
-			ImGui::PushFont(m_app.getMonospaceFont());
-			
-			if (m_code_editor->gui("codeeditor", ImVec2(0, 0), m_app.getDefaultFont())) {
+			if (m_code_editor->gui("codeeditor", ImVec2(0, 0), m_app.getMonospaceFont(), m_app.getDefaultFont())) {
 				m_dirty = true;
 				m_analysis.markDirty(m_path);
 				underline();
@@ -577,7 +575,6 @@ struct EditorWindow : AssetEditorWindow {
 					ImGui::EndPopup();
 				}
 			#endif
-			ImGui::PopFont();
 		}
 	}
 	
