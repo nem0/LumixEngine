@@ -1,10 +1,6 @@
-#ifdef _WIN32
-	#define INITGUID
-	#define NOGDI
-	#define WIN32_LEAN_AND_MEAN
-	#include <Windows.h>
-	#include <evntcons.h>
-#endif
+#define INITGUID
+#include "core/win/simple_win.h"
+#include <string.h>
 
 #include "core/atomic.h"
 #include "core/array.h"
@@ -21,13 +17,9 @@
 #include "core/os.h"
 #include "profiler.h"
 
-namespace Lumix
-{
+namespace Lumix {
 
-
-namespace profiler
-{
-
+namespace profiler {
 
 struct GPUScope {
 	struct Pair {
@@ -193,8 +185,8 @@ struct Instance {
 				strcpy_s(props.name, KERNEL_LOGGER_NAME);
 
 				TraceProps tmp = props;
-				ControlTrace(NULL, KERNEL_LOGGER_NAME, &tmp.base, EVENT_TRACE_CONTROL_STOP);
-				ULONG res = StartTrace(&trace_handle, KERNEL_LOGGER_NAME, &props.base);
+				ControlTraceA(NULL, KERNEL_LOGGER_NAME, &tmp.base, EVENT_TRACE_CONTROL_STOP);
+				ULONG res = StartTraceA(&trace_handle, KERNEL_LOGGER_NAME, &props.base);
 				switch (res) {
 					case ERROR_ALREADY_EXISTS:
 					case ERROR_ACCESS_DENIED:
@@ -203,11 +195,11 @@ struct Instance {
 					case ERROR_SUCCESS: context_switches_enabled = true; break;
 				}
 
-				static EVENT_TRACE_LOGFILE trace = {};
+				static EVENT_TRACE_LOGFILEA trace = {};
 				trace.LoggerName = (decltype(trace.LoggerName))KERNEL_LOGGER_NAME;
 				trace.ProcessTraceMode = PROCESS_TRACE_MODE_RAW_TIMESTAMP | PROCESS_TRACE_MODE_REAL_TIME | PROCESS_TRACE_MODE_EVENT_RECORD;
 				trace.EventRecordCallback = TraceTask::callback;
-				trace_task.open_handle = OpenTrace(&trace);
+				trace_task.open_handle = OpenTraceA(&trace);
 				trace_task.create("profiler trace", true);
 			}
 		#endif
@@ -326,7 +318,7 @@ LUMIX_FORCE_INLINE static void write(ThreadContext& ctx, u64 timestamp, EventTyp
 
 	void TraceTask::callback(PEVENT_RECORD event) {
 		if (event->EventHeader.EventDescriptor.Opcode != SWITCH_CONTEXT_OPCODE) return;
-		if (sizeof(CSwitch) != event->UserDataLength) return;
+		if (sizeof(CSwitch) > event->UserDataLength) return;
 
 		const CSwitch* cs = reinterpret_cast<CSwitch*>(event->UserData);
 		ContextSwitchRecord rec;
@@ -732,6 +724,5 @@ void shutdown() {
 }
 
 } // namespace Lumix
-
 
 } //	namespace profiler

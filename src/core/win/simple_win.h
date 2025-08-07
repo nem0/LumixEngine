@@ -1,7 +1,7 @@
 #pragma once
 
 #define PASCAL __stdcall
-#ifndef _W64 
+#ifndef _W64
 	#define _W64 __w64
 #endif
 #define SymGetLineFromAddr SymGetLineFromAddr64
@@ -9,9 +9,9 @@
 #define IMAGEHLP_LINE IMAGEHLP_LINE64
 #define ERROR_SUCCESS 0L
 #define XUSER_MAX_COUNT 4
-#define MEM_COMMIT 0x00001000  
-#define MEM_RESERVE 0x00002000  
-#define MEM_RELEASE 0x00008000  
+#define MEM_COMMIT 0x00001000
+#define MEM_RESERVE 0x00002000
+#define MEM_RELEASE 0x00008000
 #define PAGE_READWRITE 0x04
 #define INVALID_SET_FILE_POINTER ((DWORD)-1)
 #define CF_TEXT 1
@@ -53,7 +53,7 @@
 #define WAIT_OBJECT_0 ((STATUS_WAIT_0) + 0)
 #define CREATE_SUSPENDED 0x00000004
 #define EXCEPTION_EXECUTE_HANDLER 1
-#define GetFileAttributes  GetFileAttributesA
+#define GetFileAttributes GetFileAttributesA
 #define CreateFile CreateFileA
 #define CreateSemaphore CreateSemaphoreA
 #define CreateMutex CreateMutexA
@@ -67,29 +67,29 @@
 #define DispatchMessage DispatchMessageA
 #define FindNextFile FindNextFileA
 #define OutputDebugString OutputDebugStringA
-#define CreateWindowA(lpClassName,  \
-					  lpWindowName, \
-					  dwStyle,      \
-					  x,            \
-					  y,            \
-					  nWidth,       \
-					  nHeight,      \
-					  hWndParent,   \
-					  hMenu,        \
-					  hInstance,    \
-					  lpParam)      \
+#define CreateWindowA(lpClassName, \
+					 lpWindowName, \
+					 dwStyle, \
+					 x, \
+					 y, \
+					 nWidth, \
+					 nHeight, \
+					 hWndParent, \
+					 hMenu, \
+					 hInstance, \
+					 lpParam) \
 	\
-CreateWindowExA(0L,                 \
-		lpClassName,                \
-		lpWindowName,               \
-		dwStyle,                    \
-		x,                          \
-		y,                          \
-		nWidth,                     \
-		nHeight,                    \
-		hWndParent,                 \
-		hMenu,                      \
-		hInstance,                  \
+CreateWindowExA(0L, \
+		lpClassName, \
+		lpWindowName, \
+		dwStyle, \
+		x, \
+		y, \
+		nWidth, \
+		nHeight, \
+		hWndParent, \
+		hMenu, \
+		hInstance, \
 		lpParam)
 
 #define INVALID_FILE_ATTRIBUTES ((DWORD)-1)
@@ -153,7 +153,7 @@ CreateWindowExA(0L,                 \
 #define WS_CLIPSIBLINGS 0x04000000L
 #define WS_CLIPCHILDREN 0x02000000L
 #define WS_MAXIMIZE 0x01000000L
-#define WS_CAPTION 0x00C00000L /* WS_BORDER | WS_DLGFRAME  */
+#define WS_CAPTION 0x00C00000L
 #define WS_BORDER 0x00800000L
 #define WS_DLGFRAME 0x00400000L
 #define WS_VSCROLL 0x00200000L
@@ -168,7 +168,7 @@ CreateWindowExA(0L,                 \
 #define WM_QUIT 0x0012
 
 #define UnlockResource(hResData) ((hResData), 0)
-#define HGLOBAL     HANDLE
+#define HGLOBAL HANDLE
 #define MAKEINTRESOURCEA(i) ((LPSTR)((ULONG_PTR)((WORD)(i))))
 #define MAKEINTRESOURCE MAKEINTRESOURCEA
 #define IDI_APPLICATION MAKEINTRESOURCE(32512)
@@ -319,19 +319,19 @@ typedef struct sockaddr_in SOCKADDR_IN;
 
 typedef struct _XINPUT_GAMEPAD
 {
-    WORD                                wButtons;
-    BYTE                                bLeftTrigger;
-    BYTE                                bRightTrigger;
-    SHORT                               sThumbLX;
-    SHORT                               sThumbLY;
-    SHORT                               sThumbRX;
-    SHORT                               sThumbRY;
+	WORD wButtons;
+	BYTE bLeftTrigger;
+	BYTE bRightTrigger;
+	SHORT sThumbLX;
+	SHORT sThumbLY;
+	SHORT sThumbRX;
+	SHORT sThumbRY;
 } XINPUT_GAMEPAD, *PXINPUT_GAMEPAD;
 
 typedef struct _XINPUT_STATE
 {
-    DWORD                               dwPacketNumber;
-    XINPUT_GAMEPAD                      Gamepad;
+	DWORD dwPacketNumber;
+	XINPUT_GAMEPAD Gamepad;
 } XINPUT_STATE, *PXINPUT_STATE;
 
 typedef struct _LIST_ENTRY {
@@ -340,15 +340,15 @@ typedef struct _LIST_ENTRY {
 } LIST_ENTRY, *PLIST_ENTRY;
 
 
-typedef struct _RTL_CONDITION_VARIABLE {                    
-        PVOID Ptr;                                       
-} RTL_CONDITION_VARIABLE, *PRTL_CONDITION_VARIABLE;      
+typedef struct _RTL_CONDITION_VARIABLE {
+ PVOID Ptr;
+} RTL_CONDITION_VARIABLE, *PRTL_CONDITION_VARIABLE;
 
 typedef RTL_CONDITION_VARIABLE CONDITION_VARIABLE, *PCONDITION_VARIABLE;
 
-typedef struct _RTL_SRWLOCK {                            
-        PVOID Ptr;                                       
-} RTL_SRWLOCK, *PRTL_SRWLOCK;                            
+typedef struct _RTL_SRWLOCK {
+ PVOID Ptr;
+} RTL_SRWLOCK, *PRTL_SRWLOCK;
 typedef RTL_SRWLOCK SRWLOCK, *PSRWLOCK;
 
 typedef struct _SECURITY_ATTRIBUTES
@@ -385,7 +385,6 @@ typedef void* HBRUSH;
 typedef struct tagWNDCLASSEXA
 {
 	UINT cbSize;
-	/* Win 3.x */
 	UINT style;
 	WNDPROC lpfnWndProc;
 	int cbClsExtra;
@@ -396,15 +395,14 @@ typedef struct tagWNDCLASSEXA
 	HBRUSH hbrBackground;
 	LPCSTR lpszMenuName;
 	LPCSTR lpszClassName;
-	/* Win 4.0 */
 	HICON hIconSm;
 } WNDCLASSEXA, *PWNDCLASSEXA, *NPWNDCLASSEXA, *LPWNDCLASSEXA;
 typedef WNDCLASSEXA WNDCLASSEX;
 typedef PWNDCLASSEXA PWNDCLASSEX;
 typedef enum PROCESS_DPI_AWARENESS {
-    PROCESS_DPI_UNAWARE = 0,
-    PROCESS_SYSTEM_DPI_AWARE = 1,
-    PROCESS_PER_MONITOR_DPI_AWARE = 2
+	PROCESS_DPI_UNAWARE = 0,
+	PROCESS_SYSTEM_DPI_AWARE = 1,
+	PROCESS_PER_MONITOR_DPI_AWARE = 2
 } PROCESS_DPI_AWARENESS;
 
 
@@ -473,7 +471,7 @@ typedef struct _FILE_NOTIFY_INFORMATION
 #if defined(MIDL_PASS)
 typedef struct _LARGE_INTEGER
 {
-#else // MIDL_PASS
+#else
 typedef union _LARGE_INTEGER {
 	struct
 	{
@@ -485,7 +483,7 @@ typedef union _LARGE_INTEGER {
 		DWORD LowPart;
 		LONG HighPart;
 	} u;
-#endif // MIDL_PASS
+#endif
 	LONGLONG QuadPart;
 } LARGE_INTEGER;
 
@@ -554,14 +552,14 @@ int PASCAL closesocket(SOCKET s);
 int PASCAL recv(SOCKET s, char* buf, int len, int flags);
 int PASCAL send(SOCKET s, const char* buf, int len, int flags);
 WINBASEAPI LPVOID WINAPI VirtualAlloc(
-    LPVOID lpAddress,
-    SIZE_T dwSize,
-    DWORD flAllocationType,
-    DWORD flProtect);
+	LPVOID lpAddress,
+	SIZE_T dwSize,
+	DWORD flAllocationType,
+	DWORD flProtect);
 WINBASEAPI BOOL WINAPI VirtualFree(
-    LPVOID lpAddress,
-    SIZE_T dwSize,
-    DWORD dwFreeType);
+	LPVOID lpAddress,
+	SIZE_T dwSize,
+	DWORD dwFreeType);
 WINBASEAPI HANDLE WINAPI CreateFileA(LPCSTR lpFileName,
 	DWORD dwDesiredAccess,
 	DWORD dwShareMode,
@@ -703,4 +701,396 @@ WINBASEAPI VOID WINAPI DeleteFiber(PVOID lpFiber);
 HRESULT WINAPI SetProcessDpiAwareness(PROCESS_DPI_AWARENESS value);
 DECLSPEC_IMPORT BOOL WINAPI SetProcessDPIAware(VOID);
 
-} // extern "C"
+
+
+#ifndef WMIAPI
+#ifndef MIDL_PASS
+#ifdef _WMI_SOURCE_
+#define WMIAPI __stdcall
+#else
+#define WMIAPI DECLSPEC_IMPORT __stdcall
+#endif
+#endif
+
+#endif
+
+
+#ifndef GUID_DEFINED
+#define GUID_DEFINED
+#if defined(__midl)
+typedef struct {
+	unsigned long Data1;
+	unsigned short Data2;
+	unsigned short Data3;
+	byte Data4[8];
+} GUID;
+#else
+typedef struct _GUID {
+	unsigned long Data1;
+	unsigned short Data2;
+	unsigned short Data3;
+	unsigned char Data4[8];
+} GUID;
+#endif
+#endif
+
+typedef struct _EVENT_DESCRIPTOR {
+
+	USHORT Id;
+	UCHAR Version;
+	UCHAR Channel;
+	UCHAR Level;
+	UCHAR Opcode;
+	USHORT Task;
+	ULONGLONG Keyword;
+} EVENT_DESCRIPTOR, * PEVENT_DESCRIPTOR;
+
+#ifndef EVENT_HEADER_DEF
+#define EVENT_HEADER_DEF
+typedef struct _EVENT_HEADER {
+
+	USHORT Size;
+	USHORT HeaderType;
+	USHORT Flags;
+	USHORT EventProperty;
+	ULONG ThreadId;
+	ULONG ProcessId;
+	LARGE_INTEGER TimeStamp;
+	GUID ProviderId;
+	EVENT_DESCRIPTOR EventDescriptor;
+	union {
+		struct {
+			ULONG KernelTime;
+			ULONG UserTime;
+		} DUMMYSTRUCTNAME;
+		ULONG64 ProcessorTime;
+		
+	} DUMMYUNIONNAME;
+	GUID ActivityId;
+
+} EVENT_HEADER, * PEVENT_HEADER;
+#endif
+
+#if _MSC_VER >= 1200
+#pragma warning(push)
+#endif
+#pragma warning (disable:4201)
+#ifndef ETW_BUFFER_CONTEXT_DEF
+#define ETW_BUFFER_CONTEXT_DEF
+typedef struct _ETW_BUFFER_CONTEXT {
+	union {
+		struct {
+			UCHAR ProcessorNumber;
+			UCHAR Alignment;
+		} DUMMYSTRUCTNAME;
+		USHORT ProcessorIndex;
+	} DUMMYUNIONNAME;
+	USHORT LoggerId;
+} ETW_BUFFER_CONTEXT, * PETW_BUFFER_CONTEXT;
+#endif
+#if _MSC_VER >= 1200
+#pragma warning(pop)
+#endif
+
+#ifndef _TRACEHANDLE_DEFINED
+#define _TRACEHANDLE_DEFINED
+
+typedef ULONG64 TRACEHANDLE, * PTRACEHANDLE;
+#endif
+
+
+#ifndef EVENT_HEADER_EXTENDED_DATA_ITEM_DEF
+#define EVENT_HEADER_EXTENDED_DATA_ITEM_DEF
+typedef struct _EVENT_HEADER_EXTENDED_DATA_ITEM {
+
+	USHORT Reserved1;
+	USHORT ExtType;
+	struct {
+		USHORT Linkage : 1;
+		
+		USHORT Reserved2 : 15;
+	};
+	USHORT DataSize;
+	ULONGLONG DataPtr;
+
+} EVENT_HEADER_EXTENDED_DATA_ITEM, * PEVENT_HEADER_EXTENDED_DATA_ITEM;
+#endif
+
+#ifndef EVENT_RECORD_DEF
+#define EVENT_RECORD_DEF
+typedef struct _EVENT_RECORD {
+
+	EVENT_HEADER EventHeader;
+	ETW_BUFFER_CONTEXT BufferContext;
+	USHORT ExtendedDataCount;
+	
+	USHORT UserDataLength;
+	PEVENT_HEADER_EXTENDED_DATA_ITEM
+		ExtendedData;
+	PVOID UserData;
+	PVOID UserContext;
+} EVENT_RECORD, * PEVENT_RECORD;
+
+typedef const EVENT_RECORD* PCEVENT_RECORD;
+#endif
+
+#define KERNEL_LOGGER_NAME "NT Kernel Logger"
+
+typedef struct _WNODE_HEADER
+{
+	ULONG BufferSize;
+	ULONG ProviderId;
+	union
+	{
+		ULONG64 HistoricalContext;
+		struct
+		{
+			ULONG Version;
+			ULONG Linkage;
+		} DUMMYSTRUCTNAME;
+	} DUMMYUNIONNAME;
+
+	union
+	{
+		ULONG CountLost;
+		HANDLE KernelHandle;
+		LARGE_INTEGER TimeStamp;
+		
+	} DUMMYUNIONNAME2;
+	GUID Guid;
+	ULONG ClientContext;
+	ULONG Flags;
+} WNODE_HEADER, * PWNODE_HEADER;
+
+typedef struct _EVENT_TRACE_PROPERTIES {
+	WNODE_HEADER Wnode;
+	
+	
+	ULONG BufferSize;
+	ULONG MinimumBuffers;
+	ULONG MaximumBuffers;
+	ULONG MaximumFileSize;
+	ULONG LogFileMode;
+	ULONG FlushTimer;
+	ULONG EnableFlags;
+	union {
+		LONG AgeLimit;
+		LONG FlushThreshold;
+	} DUMMYUNIONNAME;
+
+	
+	ULONG NumberOfBuffers;
+	ULONG FreeBuffers;
+	ULONG EventsLost;
+	ULONG BuffersWritten;
+	ULONG LogBuffersLost;
+	ULONG RealTimeBuffersLost;
+	HANDLE LoggerThreadId;
+	ULONG LogFileNameOffset;
+	ULONG LoggerNameOffset;
+} EVENT_TRACE_PROPERTIES, * PEVENT_TRACE_PROPERTIES;
+
+typedef ULONG64 PROCESSTRACE_HANDLE;
+typedef ULONG64 CONTROLTRACE_ID;
+
+#define WNODE_FLAG_TRACED_GUID 0x00020000
+#define EVENT_TRACE_FLAG_CSWITCH 0x00000010
+#define EVENT_TRACE_REAL_TIME_MODE 0x00000100
+#define EVENT_TRACE_CONTROL_STOP 1
+#define ERROR_ALREADY_EXISTS 183L
+#define ERROR_ACCESS_DENIED 5L
+#define ERROR_BAD_LENGTH 24L
+#define PROCESS_TRACE_MODE_REAL_TIME 0x00000100
+#define PROCESS_TRACE_MODE_RAW_TIMESTAMP 0x00001000
+#define PROCESS_TRACE_MODE_EVENT_RECORD 0x10000000
+
+typedef struct _EVENT_TRACE_HEADER {
+	USHORT Size;
+	union {
+		USHORT FieldTypeFlags;
+		struct {
+			UCHAR HeaderType;
+			UCHAR MarkerFlags;
+		} DUMMYSTRUCTNAME;
+	} DUMMYUNIONNAME;
+	union {
+		ULONG Version;
+		struct {
+			UCHAR Type;
+			UCHAR Level;
+			USHORT Version;
+		} Class;
+	} DUMMYUNIONNAME2;
+	ULONG ThreadId;
+	ULONG ProcessId;
+	LARGE_INTEGER TimeStamp;
+	union {
+		GUID Guid;
+		ULONGLONG GuidPtr;
+	} DUMMYUNIONNAME3;
+	union {
+		struct {
+			ULONG KernelTime;
+			ULONG UserTime;
+		} DUMMYSTRUCTNAME;
+		ULONG64 ProcessorTime;
+		struct {
+			ULONG ClientContext;
+			ULONG Flags;
+		} DUMMYSTRUCTNAME2;
+	} DUMMYUNIONNAME4;
+} EVENT_TRACE_HEADER, * PEVENT_TRACE_HEADER;
+
+typedef struct _EVENT_TRACE {
+	EVENT_TRACE_HEADER Header;
+	ULONG InstanceId;
+	ULONG ParentInstanceId;
+	GUID ParentGuid;
+	PVOID MofData;
+	ULONG MofLength;
+	union {
+		ULONG ClientContext;
+		ETW_BUFFER_CONTEXT BufferContext;
+	} DUMMYUNIONNAME;
+} EVENT_TRACE, * PEVENT_TRACE;
+
+typedef struct _SYSTEMTIME {
+	WORD wYear;
+	WORD wMonth;
+	WORD wDayOfWeek;
+	WORD wDay;
+	WORD wHour;
+	WORD wMinute;
+	WORD wSecond;
+	WORD wMilliseconds;
+} SYSTEMTIME, * PSYSTEMTIME, * LPSYSTEMTIME;
+
+typedef struct _TIME_ZONE_INFORMATION {
+	LONG Bias;
+	WCHAR StandardName[32];
+	SYSTEMTIME StandardDate;
+	LONG StandardBias;
+	WCHAR DaylightName[32];
+	SYSTEMTIME DaylightDate;
+	LONG DaylightBias;
+} TIME_ZONE_INFORMATION, * PTIME_ZONE_INFORMATION, * LPTIME_ZONE_INFORMATION;
+
+typedef struct _TRACE_LOGFILE_HEADER {
+	ULONG BufferSize;
+	union {
+		ULONG Version;
+		struct {
+			UCHAR MajorVersion;
+			UCHAR MinorVersion;
+			UCHAR SubVersion;
+			UCHAR SubMinorVersion;
+		} VersionDetail;
+	} DUMMYUNIONNAME;
+	ULONG ProviderVersion;
+	ULONG NumberOfProcessors;
+	LARGE_INTEGER EndTime;
+	ULONG TimerResolution;
+	ULONG MaximumFileSize;
+	ULONG LogFileMode;
+	ULONG BuffersWritten;
+	union {
+		GUID LogInstanceGuid;
+		struct {
+			ULONG StartBuffers;
+			ULONG PointerSize;
+			ULONG EventsLost;
+			ULONG CpuSpeedInMHz;
+		} DUMMYSTRUCTNAME;
+	} DUMMYUNIONNAME2;
+#if defined(_WMIKM_)
+	PWCHAR LoggerName;
+	PWCHAR LogFileName;
+	RTL_TIME_ZONE_INFORMATION TimeZone;
+#else
+	LPWSTR LoggerName;
+	LPWSTR LogFileName;
+	TIME_ZONE_INFORMATION TimeZone;
+#endif
+	LARGE_INTEGER BootTime;
+	LARGE_INTEGER PerfFreq;
+	LARGE_INTEGER StartTime;
+	ULONG ReservedFlags;
+	ULONG BuffersLost;
+} TRACE_LOGFILE_HEADER, * PTRACE_LOGFILE_HEADER;
+
+typedef ULONG(WINAPI* PEVENT_TRACE_BUFFER_CALLBACKA)
+(struct _EVENT_TRACE_LOGFILEA* Logfile);
+
+typedef VOID(WINAPI* PEVENT_CALLBACK)(PEVENT_TRACE pEvent);
+typedef VOID(WINAPI* PEVENT_RECORD_CALLBACK) (PEVENT_RECORD EventRecord);
+
+struct _EVENT_TRACE_LOGFILEA {
+	LPSTR LogFileName;
+	LPSTR LoggerName;
+	LONGLONG CurrentTime;
+	ULONG BuffersRead;
+	union {
+		ULONG LogFileMode;
+		ULONG ProcessTraceMode;
+	};
+	EVENT_TRACE CurrentEvent;
+	TRACE_LOGFILE_HEADER LogfileHeader;
+	PEVENT_TRACE_BUFFER_CALLBACKA
+		BufferCallback;
+
+	
+	
+	
+	ULONG BufferSize;
+	ULONG Filled;
+	ULONG EventsLost;
+	
+	
+	
+	union {
+		PEVENT_CALLBACK EventCallback;
+		PEVENT_RECORD_CALLBACK EventRecordCallback;
+	};
+
+
+	ULONG IsKernelTrace;
+
+	PVOID Context;
+};
+
+typedef struct _EVENT_TRACE_LOGFILEA
+EVENT_TRACE_LOGFILEA, * PEVENT_TRACE_LOGFILEA;
+
+ULONG WMIAPI CloseTrace(PROCESSTRACE_HANDLE TraceHandle);
+ULONG WMIAPI ControlTraceA(CONTROLTRACE_ID TraceId, LPCSTR InstanceName, PEVENT_TRACE_PROPERTIES Properties, ULONG ControlCode);
+ULONG WMIAPI StartTraceA(CONTROLTRACE_ID* TraceId, LPCSTR InstanceName, PEVENT_TRACE_PROPERTIES Properties);
+PROCESSTRACE_HANDLE WMIAPI OpenTraceA(PEVENT_TRACE_LOGFILEA Logfile);
+ULONG WMIAPI ProcessTrace(PROCESSTRACE_HANDLE* HandleArray, ULONG HandleCount, LPFILETIME StartTime, LPFILETIME EndTime);
+
+#ifndef DECLSPEC_SELECTANY
+#if (_MSC_VER >= 1100)
+#define DECLSPEC_SELECTANY __declspec(selectany)
+#else
+#define DECLSPEC_SELECTANY
+#endif
+#endif
+
+#ifdef INITGUID
+#define DEFINE_GUID(name, l, w1, w2, b1, b2, b3, b4, b5, b6, b7, b8) \
+ GUID DECLSPEC_SELECTANY name \
+ = { l, w1, w2, { b1, b2, b3, b4, b5, b6, b7, b8 } }
+#else
+#define DEFINE_GUID(name, l, w1, w2, b1, b2, b3, b4, b5, b6, b7, b8) \
+	const GUID name
+#endif
+
+
+DEFINE_GUID (
+	SystemTraceControlGuid,
+	0x9e814aad,
+	0x3204,
+	0x11d2,
+	0x9a, 0x82, 0x00, 0x60, 0x08, 0xa8, 0x69, 0x39
+ );
+
+}
