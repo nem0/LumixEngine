@@ -1124,6 +1124,8 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 				return LumixAPI.getEntityScale(table._world, table._entity)
 			elseif key == "world" then
 				return Lumix.World:new(table._world)
+			elseif key == "_world" or key == "_entity" then
+				return rawget(table, key)
 			elseif Lumix.Entity[key] ~= nil then
 				return Lumix.Entity[key]
 			else 
