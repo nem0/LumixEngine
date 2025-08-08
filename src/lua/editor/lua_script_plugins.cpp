@@ -704,82 +704,6 @@ struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	LuauAnalysis& m_analysis;
 };
 
-struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
-{
-	explicit AddComponentPlugin(StudioApp& app)
-		: app(app)
-		, file_selector("lua", app)
-	{
-	}
-
-	void onGUI(bool create_entity, bool, EntityPtr parent, WorldEditor& editor) override
-	{
-		if (!ImGui::BeginMenu("File")) return;
-		Path path;
-		AssetBrowser& asset_browser = app.getAssetBrowser();
-		bool new_created = false;
-		if (ImGui::BeginMenu("New")) {
-			file_selector.gui(false, "lua");
-			if (ImGui::Button("Create")) {
-				path = file_selector.getPath();
-				os::OutputFile file;
-				FileSystem& fs = app.getEngine().getFileSystem();
-				if (fs.open(file_selector.getPath(), file)) {
-					new_created = true;
-					file.close();
-				}
-				else {
-					logError("Failed to create ", path);
-				}
-			}
-			ImGui::EndMenu();
-		}
-		bool create_empty = ImGui::Selectable("Empty", false);
-
-		static FilePathHash selected_res_hash;
-		if (asset_browser.resourceList(path, selected_res_hash, LuaScript::TYPE, false) || create_empty || new_created)
-		{
-			editor.beginCommandGroup("createEntityWithComponent");
-			if (create_entity)
-			{
-				EntityRef entity = editor.addEntity();
-				editor.selectEntities(Span(&entity, 1), false);
-			}
-			if (editor.getSelectedEntities().empty()) return;
-			EntityRef entity = editor.getSelectedEntities()[0];
-
-			if (!editor.getWorld()->hasComponent(entity, LUA_SCRIPT_TYPE))
-			{
-				editor.addComponent(Span(&entity, 1), LUA_SCRIPT_TYPE);
-			}
-
-			const ComponentUID cmp(entity, LUA_SCRIPT_TYPE, editor.getWorld()->getModule(LUA_SCRIPT_TYPE));
-			editor.addArrayPropertyItem(cmp, "scripts");
-
-			if (!create_empty) {
-				auto* script_scene = static_cast<LuaScriptModule*>(editor.getWorld()->getModule(LUA_SCRIPT_TYPE));
-				int scr_count = script_scene->getScriptCount(entity);
-				editor.setProperty(cmp.type, "scripts", scr_count - 1, "Path", Span((const EntityRef*)&entity, 1), path);
-			}
-			if (parent.isValid()) editor.makeParent(parent, entity);
-			editor.endCommandGroup();
-			editor.lockGroupCommand();
-			ImGui::CloseCurrentPopup();
-		}
-		ImGui::EndMenu();
-	}
-
-
-	const char* getLabel() const override 
-	{
-		return "Lua Script / File";
-	}
-
-
-	StudioApp& app;
-	FileSelector file_selector;
-};
-
 template <typename T> struct StoredType { 
 	using Type = T; 
 	static T construct(T value, IAllocator& allocator) { return value; }
@@ -1072,6 +996,31 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 		: m_app(app)
 		, m_editor(app.getWorldEditor())
 	{}
+
+	bool onPathDropped(const PathInfo& path_info) override {
+		if (!equalIStrings(path_info.extension, "lua")) return false;
+		
+		const Path path(path_info.dir, path_info.basename, ".lua");
+
+		Span<const EntityRef> selected = m_editor.getSelectedEntities();
+		m_editor.beginCommandGroup("drop_script");
+		World& world = *m_editor.getWorld();
+		ComponentUID cmp;
+		cmp.type = LUA_SCRIPT_TYPE;
+		cmp.module = world.getModule("lua_script");
+		auto* prop = (reflection::ArrayProperty*)reflection::getProperty(LUA_SCRIPT_TYPE, "scripts");
+		for (EntityRef e : selected) {
+			if (!world.hasComponent(e, LUA_SCRIPT_TYPE)) {
+				m_editor.addComponent(Span(&e, 1), LUA_SCRIPT_TYPE);
+			}
+			cmp.entity = e;
+			const u32 index = prop->getCount(cmp);
+			m_editor.addArrayPropertyItem(cmp, "scripts");
+			m_editor.setProperty(LUA_SCRIPT_TYPE, "scripts", index, "Path", Span(&e, 1), path);
+		}
+		m_editor.endCommandGroup();
+		return true;
+	}
 
 	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, const TextFilter& filter, WorldEditor& editor) override {}
 	
@@ -1772,9 +1721,6 @@ struct SetPropertyVisitor : reflection::IPropertyVisitor {
 
 	void init() override
 	{
-		AddComponentPlugin* add_cmp_plugin = LUMIX_NEW(m_app.getAllocator(), AddComponentPlugin)(m_app);
-		m_app.registerComponent(ICON_FA_MOON, "lua_script", *add_cmp_plugin);
-
 		const char* exts[] = { "lua" };
 		m_app.getAssetCompiler().addPlugin(m_asset_plugin, Span(exts));
 		m_app.getAssetBrowser().addPlugin(m_asset_plugin, Span(exts));

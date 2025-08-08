@@ -2596,7 +2596,7 @@ public:
 	}
 
 
-	const Array<EntityRef>& getSelectedEntities() const override
+	Span<const EntityRef> getSelectedEntities() const override
 	{
 		return m_selected_entities;
 	}

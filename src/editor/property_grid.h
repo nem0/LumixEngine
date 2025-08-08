@@ -17,6 +17,7 @@ struct LUMIX_EDITOR_API PropertyGrid : StudioApp::GUIPlugin {
 		virtual void update() {}
 		virtual void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, const TextFilter& filter, WorldEditor& editor) = 0;
 		virtual void blobGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, u32 array_index, const TextFilter& filter, WorldEditor& editor) {}
+		virtual bool onPathDropped(const struct PathInfo&) { return false; }
 	};
 
 	explicit PropertyGrid(StudioApp& app);
@@ -28,11 +29,11 @@ struct LUMIX_EDITOR_API PropertyGrid : StudioApp::GUIPlugin {
 private:
 	void onGUI() override;
 	const char* getName() const override { return "property_grid"; }
-	void showComponentProperties(const Array<EntityRef>& entities, ComponentType cmp_type, WorldEditor& editor);
-	void showCoreProperties(const Array<EntityRef>& entities, WorldEditor& editor) const;
+	void showComponentProperties(Span<const EntityRef> entities, ComponentType cmp_type, WorldEditor& editor);
+	void showCoreProperties(Span<const EntityRef> entities, WorldEditor& editor) const;
 	void toggleUI() { m_is_open = !m_is_open; }
 	bool isOpen() const { return m_is_open; }
-
+	void onPathDropped(const char* path);
 
 	StudioApp& m_app;
 	Array<IPlugin*> m_plugins;

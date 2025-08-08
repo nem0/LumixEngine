@@ -4039,7 +4039,7 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 
 	Component getComponent() {
 		WorldEditor& editor = m_app.getWorldEditor();
-		const Array<EntityRef>& selected_entities = editor.getSelectedEntities();
+		Span<const EntityRef> selected_entities = editor.getSelectedEntities();
 		if (selected_entities.size() != 1) return { nullptr };
 
 		World& world = *editor.getWorld();
@@ -4452,7 +4452,7 @@ struct ProceduralGeomPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		if (!m_is_open) return false;
 
 		WorldEditor& editor = view.getEditor();
-		const Array<EntityRef>& selected = editor.getSelectedEntities();
+		Span<const EntityRef> selected = editor.getSelectedEntities();
 		if (selected.size() != 1) return false;
 
 		const EntityRef entity = selected[0];
@@ -5245,7 +5245,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin {
 				EntityRef entity = editor.addEntity();
 				editor.selectEntities(Span(&entity, 1), false);
 			}
-			if (editor.getSelectedEntities().empty()) return;
+			if (editor.getSelectedEntities().size() == 0) return;
 			EntityRef entity = editor.getSelectedEntities()[0];
 
 			if (!editor.getWorld()->hasComponent(entity, TERRAIN_TYPE))

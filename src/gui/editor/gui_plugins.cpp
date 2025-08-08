@@ -667,9 +667,9 @@ private:
 		}
 
 		if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(0) && ImGui::IsItemHovered() && ImGui::GetMouseDragDelta().x == 0 && ImGui::GetMouseDragDelta().x == 0) {
-			const Array<EntityRef>& selected = editor.getSelectedEntities();
+			Span<const EntityRef> selected = editor.getSelectedEntities();
 			bool parent_selected = false;
-			if (!selected.empty() && isInCanvas(selected[0], *m_canvas_entity)) {
+			if (selected.size() != 0 && isInCanvas(selected[0], *m_canvas_entity)) {
 				const EntityPtr parent = editor.getWorld()->getParent(selected[0]);
 				if (module->isOver(mouse_canvas_pos, selected[0]) && parent.isValid()) {
 					const GUIModule::Rect rect = module->getRect(*parent);
@@ -791,7 +791,7 @@ private:
 			ImGui::InputInt("Row height", &row_height);
 			ImGui::InputInt("Row spacing", &row_spacing);
 			ImGui::InputInt("Column spacing", &col_spacing);
-			if (editor.getSelectedEntities().empty()) {
+			if (editor.getSelectedEntities().size() == 0) {
 				ImGui::TextUnformatted("Please select an entity");
 			}
 			else {
@@ -804,8 +804,8 @@ private:
 	}
 
 	void layout(u32 cols, u32 row_height, u32 row_spacing, u32 col_spacing, WorldEditor& editor) {
-		const Array<EntityRef>& selected = editor.getSelectedEntities();
-		ASSERT(!selected.empty());
+		Span<const EntityRef> selected = editor.getSelectedEntities();
+		ASSERT(selected.size() != 0);
 		ASSERT(cols > 0);
 		const World& world = *editor.getWorld();
 		const EntityRef e = selected[0];

@@ -2836,6 +2836,7 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 	void getScriptBlob(EntityRef e, u32 index, OutputMemoryStream& stream) {
 		ScriptInstance& inst = m_scripts[e]->m_scripts[index];
 		ASSERT(inst.m_state);
+		stream.write(inst.m_properties.size());
 		for (Property& prop : inst.m_properties) {
 			auto iter = m_property_names.find(prop.name_hash);
 			ASSERT(iter.isValid()); // TODO make sure this assert is never hit
@@ -2872,7 +2873,8 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 		LuaWrapper::DebugGuard guard(L);
 		lua_rawgeti(L, LUA_REGISTRYINDEX, inst.m_environment);
 		
-		for (u32 i = 0, n = inst.m_properties.size(); i < n; ++i) {
+		u32 num_props = stream.read<u32>();
+		for (u32 i = 0; i < num_props; ++i) {
 			const char* prop_name = stream.readString();
 			Property& prop = getScriptProperty(entity, index, prop_name);
 			

@@ -135,7 +135,7 @@ void VoxelizerUI::draw() {
 	PROFILE_FUNCTION();
 	WorldEditor& editor = m_app.getWorldEditor();
 	WorldView& view = editor.getView();
-	const Array<EntityRef>& selected = editor.getSelectedEntities();
+	Span<const EntityRef> selected = editor.getSelectedEntities();
 	if (selected.size() != 1) return;
 	if (m_debug_triangles.empty()) return;
 

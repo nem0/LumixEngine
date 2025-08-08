@@ -174,8 +174,8 @@ struct WorldViewImpl final : WorldView {
 				const Ray ray = m_viewport.getRay(m_mouse_pos);
 				const RayCastModelHit hit = m_module->castRay(ray, INVALID_ENTITY);
 
-				const Array<EntityRef>& selected_entities = m_editor.getSelectedEntities();
-				if (m_snap_mode != SnapMode::NONE && !selected_entities.empty() && hit.is_hit)
+				Span<const EntityRef> selected_entities = m_editor.getSelectedEntities();
+				if (m_snap_mode != SnapMode::NONE && selected_entities.size() != 0 && hit.is_hit)
 				{
 					DVec3 snap_pos = ray.origin + ray.dir * hit.t;
 					if (m_snap_mode == SnapMode::VERTEX) snap_pos = getClosestVertex(hit);
@@ -222,8 +222,8 @@ struct WorldViewImpl final : WorldView {
 	
 	void setCustomPivot() override
 	{
-		const Array<EntityRef>& selected_entities = m_editor.getSelectedEntities();
-		if (selected_entities.empty()) return;
+		Span<const EntityRef> selected_entities = m_editor.getSelectedEntities();
+		if (selected_entities.size() == 0) return;
 
 		const Ray ray = m_viewport.getRay(m_mouse_pos);
 		const RayCastModelHit hit = m_module->castRay(ray, INVALID_ENTITY);
@@ -372,14 +372,14 @@ struct WorldViewImpl final : WorldView {
 
 
 	void copyTransform() override {
-		if (m_editor.getSelectedEntities().empty()) return;
+		if (m_editor.getSelectedEntities().size() == 0) return;
 
 		m_editor.setEntitiesPositionsAndRotations(m_editor.getSelectedEntities().begin(), &m_viewport.pos, &m_viewport.rot, 1);
 	}
 
 	void lookAtSelected() override {
 		const World* world = m_editor.getWorld();
-		if (m_editor.getSelectedEntities().empty()) return;
+		if (m_editor.getSelectedEntities().size() == 0) return;
 
 		m_go_to_parameters.m_is_active = true;
 		m_go_to_parameters.m_t = 0;
@@ -397,8 +397,8 @@ struct WorldViewImpl final : WorldView {
 		m_go_to_parameters.m_t = 0;
 		m_go_to_parameters.m_from = m_viewport.pos;
 		m_go_to_parameters.m_to = m_go_to_parameters.m_from;
-		const Array<EntityRef>& selected_entities = m_editor.getSelectedEntities();
-		if (!selected_entities.empty()) {
+		Span<const EntityRef> selected_entities = m_editor.getSelectedEntities();
+		if (selected_entities.size() != 0) {
 			auto* world = m_editor.getWorld();
 			m_go_to_parameters.m_to = world->getPosition(selected_entities[0]) + Vec3(0, 10, 0);
 		}
@@ -412,8 +412,8 @@ struct WorldViewImpl final : WorldView {
 		m_go_to_parameters.m_t = 0;
 		m_go_to_parameters.m_from = m_viewport.pos;
 		m_go_to_parameters.m_to = m_go_to_parameters.m_from;
-		const Array<EntityRef>& selected_entities = m_editor.getSelectedEntities();
-		if (!selected_entities.empty()) {
+		Span<const EntityRef> selected_entities = m_editor.getSelectedEntities();
+		if (selected_entities.size() != 0) {
 			auto* world = m_editor.getWorld();
 			m_go_to_parameters.m_to = world->getPosition(selected_entities[0]) + Vec3(0, 0, -10);
 		}
@@ -428,8 +428,8 @@ struct WorldViewImpl final : WorldView {
 		m_go_to_parameters.m_t = 0;
 		m_go_to_parameters.m_from = m_viewport.pos;
 		m_go_to_parameters.m_to = m_go_to_parameters.m_from;
-		const Array<EntityRef>& selected_entities = m_editor.getSelectedEntities();
-		if (!selected_entities.empty()) {
+		Span<const EntityRef> selected_entities = m_editor.getSelectedEntities();
+		if (selected_entities.size() != 0) {
 			auto* world = m_editor.getWorld();
 			m_go_to_parameters.m_to = world->getPosition(selected_entities[0]) + Vec3(-10, 0, 0);
 		}
@@ -461,7 +461,7 @@ struct WorldViewImpl final : WorldView {
 		const Quat pitch_rot(pitch_axis, pitch);
 		rot = normalize(pitch_rot * rot);
 
-		if (m_app.getCommonActions().cam_orbit.isActive() && !m_editor.getSelectedEntities().empty()) {
+		if (m_app.getCommonActions().cam_orbit.isActive() && m_editor.getSelectedEntities().size() != 0) {
 			const Vec3 dir = rot.rotate(Vec3(0, 0, 1));
 			const Transform tr = world->getTransform(m_editor.getSelectedEntities()[0]);
 			Vec3 offset = m_app.getGizmoConfig().offset;
@@ -634,7 +634,7 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 		Renderer& renderer = pipeline.getRenderer();
 
 		// selection
-		const Array<EntityRef>& entities = m_scene_view.m_editor.getSelectedEntities();
+		Span<const EntityRef> entities = m_scene_view.m_editor.getSelectedEntities();
 		const Viewport& vp = m_scene_view.m_view->getViewport();
 		if (entities.size() < 5000) {
 			const RenderBufferHandle selection_mask = renderer.createRenderbuffer({
@@ -645,7 +645,7 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 			renderer.setRenderTargets({}, selection_mask);
 			pipeline.clear(gpu::ClearFlags::ALL, 0, 0, 0, 0, 0);
 	
-			renderer.pushJob("selection", [&pipeline, &renderer, this, &entities](DrawStream& stream) {
+			renderer.pushJob("selection", [&pipeline, &renderer, this, entities](DrawStream& stream) {
 				RenderModule* module = pipeline.getModule();
 				const World& world = module->getWorld();
 				const u32 skinned_define = 1 << renderer.getShaderDefineIdx("SKINNED");
@@ -896,8 +896,8 @@ SceneView::~SceneView()
 
 void SceneView::toggleWireframe() {
 	WorldEditor& editor = m_app.getWorldEditor();
-	const Array<EntityRef>& selected = editor.getSelectedEntities();
-	if (selected.empty()) return;
+	Span<const EntityRef> selected = m_editor.getSelectedEntities();
+	if (selected.size() == 0) return;
 
 	World& world = *editor.getWorld();
 	RenderModule& module = *(RenderModule*)world.getModule(MODEL_INSTANCE_TYPE);
@@ -927,11 +927,10 @@ void SceneView::toggleWireframe() {
 }
 
 void SceneView::rotate90Degrees() {
-	const Array<EntityRef>& selected_entities = m_app.getWorldEditor().getSelectedEntities();
 	WorldEditor& editor = m_app.getWorldEditor();
 	World& world = *editor.getWorld();
 	editor.beginCommandGroup("rot90deg");
-	for (EntityRef e : selected_entities) {
+	for (EntityRef e : editor.getSelectedEntities()) {
 		Quat rot = world.getRotation(e);
 		float yaw = rot.toEuler().y;
 		yaw += PI * 0.5f; // next turn
@@ -945,7 +944,6 @@ void SceneView::rotate90Degrees() {
 }
 
 void SceneView::moveEntity(Vec2 v) {
-	const Array<EntityRef>& selected_entities = m_app.getWorldEditor().getSelectedEntities();
 	Vec3 V = m_view->m_viewport.rot * Vec3(0, 0, -1);  
 	if (fabsf(V.x) > fabsf(V.z)) {
 		V = {signum(V.x), 0, 0};
@@ -963,7 +961,7 @@ void SceneView::moveEntity(Vec2 v) {
 	WorldEditor& editor = m_app.getWorldEditor();
 	World& world = *editor.getWorld();
 	editor.beginCommandGroup("rot90deg");
-	for (EntityRef e : selected_entities) {
+	for (EntityRef e : editor.getSelectedEntities()) {
 		DVec3 pos = world.getPosition(e);
 		pos += V * v.y + S * v.x;
 		// round position to multiple of step
@@ -978,8 +976,8 @@ void SceneView::moveEntity(Vec2 v) {
 
 void SceneView::manipulate() {
 	PROFILE_FUNCTION();
-	const Array<EntityRef>* selected = &m_editor.getSelectedEntities();
-	if (selected->empty()) return;
+	Span<const EntityRef> selected = m_editor.getSelectedEntities();
+	if (selected.size() == 0) return;
 
 	const bool is_anisotropic_scale = m_anisotropic_scale_action.isActive();
 	Gizmo::Config& cfg = m_app.getGizmoConfig();
@@ -988,7 +986,7 @@ void SceneView::manipulate() {
 	const bool is_snap = m_toggle_gizmo_step_action.isActive();
 	cfg.enableStep(is_snap);
 		
-	Transform tr = m_editor.getWorld()->getTransform((*selected)[0]);
+	Transform tr = m_editor.getWorld()->getTransform(selected[0]);
 	tr.pos += tr.rot.rotate(cfg.getOffset());
 	const Transform old_pivot_tr = tr;
 			
@@ -998,20 +996,20 @@ void SceneView::manipulate() {
 	}
 
 	if (m_view->isMouseClick(os::MouseButton::LEFT)) cfg.ungrab();
-	if (!Gizmo::manipulate((*selected)[0].index, *m_view, tr, cfg)) return;
+	if (!Gizmo::manipulate(selected[0].index, *m_view, tr, cfg)) return;
 
 	if (copy_move && !m_copy_moved) {
 		m_editor.copyEntities();
 		m_editor.pasteEntities(&tr.pos);
-		selected = &m_editor.getSelectedEntities();
-		Gizmo::setDragged((*selected)[0].index);
+		selected = m_editor.getSelectedEntities();
+		Gizmo::setDragged(selected[0].index);
 		m_copy_moved = true;
 	}
 
 	// keep only topmost entities in selection
 	Array<EntityRef> filtered_selection(m_app.getAllocator());
 	World& world = *m_editor.getWorld();
-	for (EntityRef& e : *selected) {
+	for (EntityRef e : selected) {
 		bool is_topmost = true;
 		for (u32 i = 0; i < (u32)filtered_selection.size(); ++i) {
 			if (world.isDescendant(e, filtered_selection[i])) {
@@ -1485,7 +1483,7 @@ void SceneView::cameraPreviewGUI(Vec2 size) {
 	if (size.x <= 0) return;
 	if (size.y <= 0) return;
 
-	const Array<EntityRef>& selected = m_editor.getSelectedEntities();
+	Span<const EntityRef> selected = m_editor.getSelectedEntities();
 	if (selected.size() != 1) return;
 
 	World* world = m_editor.getWorld();
@@ -1514,8 +1512,8 @@ void SceneView::cameraPreviewGUI(Vec2 size) {
 
 void SceneView::snapDown() {
 	WorldEditor& editor = m_app.getWorldEditor();
-	const Array<EntityRef>& selected = editor.getSelectedEntities();
-	if (selected.empty()) return;
+	Span<const EntityRef> selected = editor.getSelectedEntities();
+	if (selected.size() == 0) return;
 
 	Array<DVec3> new_positions(m_app.getAllocator());
 	World* world = editor.getWorld();
@@ -1540,7 +1538,7 @@ void SceneView::snapDown() {
 }
 
 static void selectParent(WorldEditor& editor) {
-	const Array<EntityRef>& selected = editor.getSelectedEntities();
+	Span<const EntityRef> selected = editor.getSelectedEntities();
 	if (selected.size() != 1) return;
 
 	const EntityPtr parent = editor.getWorld()->getParent(selected[0]);
@@ -1551,7 +1549,7 @@ static void selectParent(WorldEditor& editor) {
 }
 
 static void selectFirstChild(WorldEditor& editor) {
-	const Array<EntityRef>& selected = editor.getSelectedEntities();
+	Span<const EntityRef> selected = editor.getSelectedEntities();
 	if (selected.size() != 1) return;
 
 	const EntityPtr child = editor.getWorld()->getFirstChild(selected[0]);
@@ -1562,7 +1560,7 @@ static void selectFirstChild(WorldEditor& editor) {
 }
 
 static void selectNextSibling(WorldEditor& editor) {
-	const Array<EntityRef>& selected = editor.getSelectedEntities();
+	Span<const EntityRef> selected = editor.getSelectedEntities();
 	if (selected.size() != 1) return;
 
 	const EntityPtr sibling = editor.getWorld()->getNextSibling(selected[0]);
@@ -1573,7 +1571,7 @@ static void selectNextSibling(WorldEditor& editor) {
 }
 
 static void selectPrevSibling(WorldEditor& editor) {
-	const Array<EntityRef>& selected = editor.getSelectedEntities();
+	Span<const EntityRef> selected = editor.getSelectedEntities();
 	if (selected.size() != 1) return;
 
 	const World& world = *editor.getWorld();

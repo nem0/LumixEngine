@@ -768,7 +768,7 @@ struct TerrainTextureChangeCommand : IEditorCommand {
 
 Terrain* TerrainEditor::getTerrain() const {
 	WorldEditor& editor = m_app.getWorldEditor();
-	const Array<EntityRef>& selected_entities = editor.getSelectedEntities();
+	Span<const EntityRef> selected_entities = editor.getSelectedEntities();
 	if (selected_entities.size() != 1) return nullptr;
 	
 	World& world = *editor.getWorld();
@@ -886,7 +886,7 @@ bool TerrainEditor::onMouseDown(WorldView& view, int x, int y)
 	if (!m_is_enabled) return false;
 
 	WorldEditor& editor = view.getEditor();
-	const Array<EntityRef>& selected_entities = editor.getSelectedEntities();
+	Span<const EntityRef> selected_entities = editor.getSelectedEntities();
 	if (selected_entities.size() != 1) return false;
 	
 	World& world = *editor.getWorld();
@@ -1152,7 +1152,7 @@ void TerrainEditor::onMouseMove(WorldView& view, int x, int y, int, int)
 	if (!m_is_enabled) return;
 
 	WorldEditor& editor = view.getEditor();
-	const Array<EntityRef>& selected_entities = editor.getSelectedEntities();
+	Span<const EntityRef> selected_entities = editor.getSelectedEntities();
 	if (selected_entities.size() != 1) return;
 
 	const EntityRef entity = selected_entities[0];

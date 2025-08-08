@@ -412,7 +412,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		}
 		else {
 			ASSERT(m_simulated_entities.empty());
-			const Array<EntityRef>& selected =  editor.getSelectedEntities();
+			Span<const EntityRef> selected = editor.getSelectedEntities();
 			for (EntityRef e : selected) {
 				if (!world->hasComponent(e, RIGID_ACTOR_TYPE)) continue;
 				SimulatedEntity& se = m_simulated_entities.emplace();
@@ -668,7 +668,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 	{
 		if (!ImGui::CollapsingHeader("Actors")) return;
 
-		if (editor.getSelectedEntities().empty()) {
+		if (editor.getSelectedEntities().size() == 0) {
 			ImGui::Text("No entities selected.");
 			return;
 		}

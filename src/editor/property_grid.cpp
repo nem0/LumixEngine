@@ -2,6 +2,7 @@
 
 #include "core/crt.h"
 #include "core/math.h"
+#include "core/path.h"
 #include "core/stream.h"
 #include "core/math.h"
 
@@ -38,7 +39,7 @@ PropertyGrid::PropertyGrid(StudioApp& app)
 
 struct GridUIVisitor final : reflection::IPropertyVisitor
 {
-	GridUIVisitor(StudioApp& app, int index, const Array<EntityRef>& entities, ComponentType cmp_type, const TextFilter& filter, WorldEditor& editor)
+	GridUIVisitor(StudioApp& app, int index, Span<const EntityRef> entities, ComponentType cmp_type, const TextFilter& filter, WorldEditor& editor)
 		: m_entities(entities)
 		, m_cmp_type(cmp_type)
 		, m_editor(editor)
@@ -499,7 +500,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 	StudioApp& m_app;
 	WorldEditor& m_editor;
 	ComponentType m_cmp_type;
-	const Array<EntityRef>& m_entities;
+	Span<const EntityRef> m_entities;
 	int m_index;
 	PropertyGrid& m_grid;
 };
@@ -630,7 +631,7 @@ static bool componentTreeNode(StudioApp& app, WorldEditor& editor, ComponentType
 }
 
 
-void PropertyGrid::showComponentProperties(const Array<EntityRef>& entities, ComponentType cmp_type, WorldEditor& editor) {
+void PropertyGrid::showComponentProperties(Span<const EntityRef> entities, ComponentType cmp_type, WorldEditor& editor) {
 	const reflection::ComponentBase* component = reflection::getComponent(cmp_type);
 	bool filter_properties = false;
 	if (m_property_filter.isActive() && component) {
@@ -683,7 +684,7 @@ void PropertyGrid::showComponentProperties(const Array<EntityRef>& entities, Com
 }
 
 
-void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities, WorldEditor& editor) const
+void PropertyGrid::showCoreProperties(Span<const EntityRef> entities, WorldEditor& editor) const
 {
 	ImGui::PushFont(m_app.getBoldFont());
 	if (!ImGui::TreeNodeEx("General", ImGuiTreeNodeFlags_DefaultOpen))
@@ -841,6 +842,13 @@ static void showAddComponentNode(const StudioApp::AddCmpTreeNode* node, const Te
 	showAddComponentNode(node->next, filter, parent, editor);
 }
 
+void PropertyGrid::onPathDropped(const char* path) {
+	PathInfo info(path);
+	for (IPlugin* i : m_plugins) {
+		i->onPathDropped(info);
+	}
+}
+
 void PropertyGrid::onGUI() {
 	for (IPlugin* i : m_plugins) {
 		i->update();
@@ -856,15 +864,28 @@ void PropertyGrid::onGUI() {
 	if (!m_is_open) return;
 
 	WorldEditor& editor = m_app.getWorldEditor();
-	const Array<EntityRef>& ents = editor.getSelectedEntities();
+	Span<const EntityRef> ents = editor.getSelectedEntities();
 	if (m_focus_filter_request) ImGui::SetNextWindowFocus();
 	if (ImGui::Begin(ICON_FA_INFO_CIRCLE "Inspector##inspector", &m_is_open)) {
+		ImVec2 window_pos = ImGui::GetWindowPos();
+		ImVec2 window_size = ImGui::GetWindowSize();
+		ImGui::SetCursorScreenPos(window_pos);
+		ImGui::Dummy(window_size);
+		if (ImGui::BeginDragDropTarget()) {
+			if (auto* payload = ImGui::AcceptDragDropPayload("path")) {
+				const char* dropped_path = (const char*)payload->Data;
+				onPathDropped(dropped_path);
+			}
+			ImGui::EndDragDropTarget();
+		}
+		ImGui::SetCursorScreenPos(window_pos); // reset cursor to top
+		
 		if (m_focus_filter_request) {
 			ImGui::SetKeyboardFocusHere();
 			m_focus_filter_request = false;
 		}
 
-		if (!ents.empty()) {
+		if (ents.size() != 0) {
 			showCoreProperties(ents, editor);
 			m_property_filter.gui("Filter", -1, ImGui::IsWindowAppearing(), &m_focus_filter_action);
 			World& world = *editor.getWorld();

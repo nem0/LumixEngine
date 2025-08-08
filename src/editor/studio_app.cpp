@@ -4,6 +4,7 @@
 
 #include "audio/audio_module.h"
 #include "core/associative_array.h"
+#include "core/allocator.h"
 #include "core/atomic.h"
 #include "core/color.h"
 #include "core/command_line_parser.h"
@@ -111,7 +112,7 @@ struct StudioAppImpl final : StudioApp {
 			ImGui::PopStyleColor();			
 		}
 
-		void showHierarchy(EntityRef entity, const Array<EntityRef>& selected_entities, Span<const EntityRef> selection_chain) {
+		void showHierarchy(EntityRef entity, Span<const EntityRef> selected_entities, Span<const EntityRef> selection_chain) {
 			WorldEditor& editor = m_app.getWorldEditor();
 			World* world = editor.getWorld();
 			bool is_selected = selected_entities.indexOf(entity) >= 0;
@@ -187,7 +188,7 @@ struct StudioAppImpl final : StudioApp {
 					}
 
 					if (auto* payload = ImGui::AcceptDragDropPayload("selected_entities")) {
-						const Array<EntityRef>& selected = editor.getSelectedEntities();
+						Span<const EntityRef> selected = editor.getSelectedEntities();
 						for (EntityRef e : selected) {
 							if (e != entity) {
 								editor.makeParent(entity, e);
@@ -207,7 +208,7 @@ struct StudioAppImpl final : StudioApp {
 					getEntityListDisplayName(m_app, *world, Span(buffer), entity);
 					ImGui::TextUnformatted(buffer);
 					
-					const Array<EntityRef>& selected = editor.getSelectedEntities();
+					Span<const EntityRef> selected = editor.getSelectedEntities();
 					if (selected.size() > 0 && selected.indexOf(entity) >= 0) {
 						ImGui::SetDragDropPayload("selected_entities", nullptr, 0);
 					}
@@ -289,8 +290,8 @@ struct StudioAppImpl final : StudioApp {
 				}
 
 				if (auto* payload = ImGui::AcceptDragDropPayload("selected_entities")) {
-					const Array<EntityRef>& selected = editor.getSelectedEntities();
-					if (!selected.empty()) {
+					Span<const EntityRef> selected = editor.getSelectedEntities();
+					if (selected.size() != 0) {
 						editor.beginCommandGroup("move_entities_to_folder_group");
 						for (EntityRef e : selected) {
 							editor.makeParent(INVALID_ENTITY, e);
@@ -443,15 +444,15 @@ struct StudioAppImpl final : StudioApp {
 				ImGui::EndPopup();
 			}
 
-			const Array<EntityRef>& entities = editor.getSelectedEntities();
+			Span<const EntityRef> entities = editor.getSelectedEntities();
 			static TextFilter filter;
 			if (!m_is_open) return;
 
 			if (m_request_focus_filter) ImGui::SetNextWindowFocus();
 			if (ImGui::Begin(ICON_FA_STREAM "Hierarchy##hierarchy", &m_is_open)) {
 				if (m_app.checkShortcut(m_app.m_common_actions.rename)) {
-					const Array<EntityRef>& selected_entities = editor.getSelectedEntities();
-					m_renaming_entity = selected_entities.empty() ? INVALID_ENTITY : selected_entities[0];
+					Span<const EntityRef> selected_entities = editor.getSelectedEntities();
+					m_renaming_entity = selected_entities.size() == 0 ? INVALID_ENTITY : selected_entities[0];
 					if (m_renaming_entity.isValid()) {
 						m_set_rename_focus = true;
 						const char* name = editor.getWorld()->getEntityName(selected_entities[0]);
@@ -514,7 +515,7 @@ struct StudioAppImpl final : StudioApp {
 					} else {
 						EntityFolders& folders = editor.getEntityFolders();
 						Array<EntityRef> selection_chain(m_app.getAllocator());
-						if (m_entity_selection_changed && !editor.getSelectedEntities().empty()) {
+						if (m_entity_selection_changed && editor.getSelectedEntities().size() != 0) {
 							getSelectionChain(selection_chain, editor.getSelectedEntities()[0]);
 							m_entity_selection_changed = false;
 						}
@@ -1132,7 +1133,7 @@ struct StudioAppImpl final : StudioApp {
 						editor.selectEntities(Span(&entity, 1), false);
 					}
 
-					const Array<EntityRef>& selected = editor.getSelectedEntities();
+					Span<const EntityRef> selected = editor.getSelectedEntities();
 					editor.addComponent(selected, type);
 					if (parent.isValid()) editor.makeParent(parent, selected[0]);
 					editor.endCommandGroup();
@@ -1266,8 +1267,8 @@ struct StudioAppImpl final : StudioApp {
 	}
 
 	void showGizmos() {
-		const Array<EntityRef>& ents = m_editor->getSelectedEntities();
-		if (ents.empty()) return;
+		Span<const EntityRef> ents = m_editor->getSelectedEntities();
+		if (ents.size() == 0) return;
 
 		World* world = m_editor->getWorld();
 
@@ -1293,7 +1294,7 @@ struct StudioAppImpl final : StudioApp {
 	}
 
 	void updateGizmoOffset() {
-		const Array<EntityRef>& ents = m_editor->getSelectedEntities();
+		Span<const EntityRef> ents = m_editor->getSelectedEntities();
 		if (ents.size() != 1) {
 			m_gizmo_config.offset = Vec3::ZERO;
 			return;
@@ -1657,8 +1658,8 @@ struct StudioAppImpl final : StudioApp {
 
 	void destroySelectedEntity()
 	{
-		auto& selected_entities = m_editor->getSelectedEntities();
-		if (selected_entities.empty()) return;
+		Span<const EntityRef> selected_entities = m_editor->getSelectedEntities();
+		if (selected_entities.size() == 0) return;
 		m_editor->destroyEntities(&selected_entities[0], selected_entities.size());
 	}
 
@@ -1723,7 +1724,7 @@ struct StudioAppImpl final : StudioApp {
 		if (!ImGui::BeginMenu("Entity")) return;
 
 		const auto& selected_entities = m_editor->getSelectedEntities();
-		bool is_any_entity_selected = !selected_entities.empty();
+		bool is_any_entity_selected = selected_entities.size() != 0;
 		if (ImGuiEx::BeginMenuEx("Create", ICON_FA_PLUS_SQUARE))
 		{
 			onCreateEntityWithComponentGUI(INVALID_ENTITY);
@@ -1763,7 +1764,7 @@ struct StudioAppImpl final : StudioApp {
 	{
 		if (!ImGui::BeginMenu("Edit")) return;
 
-		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
+		bool is_any_entity_selected = !m_editor->getSelectedEntities().size() == 0;
 		menuItem("undo", m_editor->canUndo());
 		menuItem("redo", m_editor->canRedo());
 		ImGui::Separator();
@@ -1838,7 +1839,7 @@ struct StudioAppImpl final : StudioApp {
 	void toolsMenu() {
 		if (!ImGui::BeginMenu("Tools")) return;
 
-		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
+		bool is_any_entity_selected = m_editor->getSelectedEntities().size() != 0;
 		menuItem("asset_browser_focus_search", true);
 		menuItem("entity_snap_down", is_any_entity_selected);
 		menuItem("autosnap_down", true);

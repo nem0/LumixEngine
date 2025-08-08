@@ -138,7 +138,7 @@ struct LUMIX_EDITOR_API WorldEditor
 	
 	virtual void addArrayPropertyItem(const struct ComponentUID& cmp, const char* property) = 0;
 	virtual void removeArrayPropertyItem(const ComponentUID& cmp, int index, const char* property) = 0;
-	virtual const Array<EntityRef>& getSelectedEntities() const = 0;
+	virtual Span<const EntityRef> getSelectedEntities() const = 0;
 	virtual bool isEntitySelected(EntityRef entity) const = 0;
 	virtual void makeParent(EntityPtr parent, EntityRef child) = 0;
 

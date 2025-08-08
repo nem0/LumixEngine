@@ -3340,7 +3340,7 @@ struct ParticleEditorWindow : AssetEditorWindow, NodeEditor {
 
 	const ParticleSystem* getSelectedParticleSystem() {
 		WorldEditor& editor = m_app.getWorldEditor();
-		const Array<EntityRef>& selected = editor.getSelectedEntities();
+		Span<const EntityRef> selected = editor.getSelectedEntities();
 		if (selected.size() != 1) return nullptr;
 
 		World* world = editor.getWorld();

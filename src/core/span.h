@@ -63,7 +63,15 @@ template <typename T> struct Span {
 		return -1;
 	}
 
+	i32 indexOf(const T& val) const {
+		for (u32 i = 0, c = length(); i < c; ++i) {
+			if (m_begin[i] == val) return i;
+		}
+		return -1;
+	}
+
 	u32 length() const { return u32(m_end - m_begin); }
+	u32 size() const { return u32(m_end - m_begin); }
 
 	T* begin() const { return m_begin; }
 	T* end() const { return m_end; }

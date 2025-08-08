@@ -475,9 +475,9 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		}
 
 		void debuggerUI() {
-			const Array<EntityRef>& selected = m_app.getWorldEditor().getSelectedEntities();
+			Span<const EntityRef> selected = m_app.getWorldEditor().getSelectedEntities();
 			World& world = *m_app.getWorldEditor().getWorld();
-			if (selected.empty()) {
+			if (selected.size() == 0) {
 				ImGui::TextUnformatted("No entity selected");
 				return;
 			}
