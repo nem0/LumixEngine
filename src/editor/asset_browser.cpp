@@ -500,6 +500,10 @@ struct AssetBrowserImpl : AssetBrowser {
 			}
 		}
 		ImVec2 text_size = ImGui::CalcTextSize(tile.clamped_filename);
+		if (text_size.x < int(TILE_SIZE * m_thumbnail_size * 0.75f)) {
+			tile.clamped_filename = Path::getBasename(tile.filepath);
+			text_size = ImGui::CalcTextSize(tile.clamped_filename);
+		}
 		if (text_size.x > int(TILE_SIZE * m_thumbnail_size)) {
 			clampText(tile.clamped_filename.data, int(TILE_SIZE * m_thumbnail_size));
 			text_size = ImGui::CalcTextSize(tile.clamped_filename);
