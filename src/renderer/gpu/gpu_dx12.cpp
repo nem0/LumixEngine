@@ -19,6 +19,9 @@
 #include "core/tag_allocator.h"
 #include "nvml.h"
 #include "renderer/gpu/gpu.h"
+
+#define WIN32_LEAN_AND_MEAN
+#define NOCRYPT
 #include <d3d12.h>
 #include <d3dcompiler.h>
 #include <d3dx12.h>

@@ -12,6 +12,15 @@ template <typename R, typename... Args> struct DelegateList<R(Args...)> {
 		: m_allocator(allocator)
 	{}
 
+	DelegateList(DelegateList&&) = delete;
+	DelegateList(const DelegateList&) = delete;
+	void operator =(const DelegateList&) = delete;
+	void operator =(DelegateList&&) = delete;
+
+	~DelegateList() {
+		if (m_delegates) m_allocator.deallocate(m_delegates);
+	}
+
 	template <auto Function, typename C> void bind(C* instance) {
 		Delegate<R(Args...)> cb;
 		cb.template bind<Function>(instance);

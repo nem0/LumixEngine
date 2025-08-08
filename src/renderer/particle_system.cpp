@@ -384,50 +384,9 @@ static float4* getStream(const ParticleSystem::Emitter& emitter
 	}
 }
 
-struct LiteralGetter {
-	LiteralGetter(DataStream stream) : stream(stream) {}
-
-	float4* get(const ParticleSystem::Emitter& emitter, i32, i32, float4**) {
-		value = f4Splat(stream.value);
-		return &value;
-	}
-
-	static void step(float4*&) {}
-	float4 value;
-	DataStream stream;
-};
-
-struct ChannelGetter {
-	ChannelGetter(DataStream stream) : stream(stream) {}
-	float4* get(const ParticleSystem::Emitter& emitter, i32 fromf4, i32, float4**) {
-		return ((float4*)emitter.channels[stream.index].data) + fromf4;
-	}
-	static void step(float4*& val) { ++val; }
-	DataStream stream;
-};
-
-struct ConstGetter {
-	ConstGetter(DataStream stream) : stream(stream) {}
-
-	float4* get(const ParticleSystem::Emitter& emitter, i32, i32, float4**) {
-		value = f4Splat(emitter.system.m_constants[stream.index]);
-		return &value;
-	}
-	static void step(float4*& val) {}
-
-	float4 value;
-	DataStream stream;
-};
-
-struct RegisterGetter {
-	RegisterGetter(DataStream stream) : stream(stream) {}
-
-	float4* get(const ParticleSystem::Emitter& emitter, i32, i32 stepf4, float4** reg_mem) {
-		return reg_mem[stream.index];
-	}
-
-	static void step(float4*& val) { ++val; }
-	DataStream stream;
+struct Stream {
+	float4* data;
+	u32 step;
 };
 
 struct ProcessHelper {
@@ -447,7 +406,7 @@ struct ProcessHelper {
 	}
 
 	template <auto F>
-	void runSingle(InputMemoryStream& ip) {
+	void run1(InputMemoryStream& ip) {
 		const DataStream dst = ip.read<DataStream>();
 		DataStream op0 = ip.read<DataStream>();
 		const float* arg0 = (float*)getStream(emitter, op0, fromf4, reg_mem);
@@ -493,54 +452,58 @@ struct ProcessHelper {
 		}
 	}
 
-	template <auto F>
-	void run(InputMemoryStream& ip) {
-		if constexpr (IsSame<typename ResultOf<decltype(F)>::Type, float>::Value) {
-			runSingle<F>(ip);
-		}
-		else if constexpr (ArgsCount<decltype(F)>::value == 2) {
-			const DataStream dst = ip.read<DataStream>();
-			run2<F>(dst, ip);
-		}
-		else if constexpr (ArgsCount<decltype(F)>::value == 3) {
-			const DataStream dst = ip.read<DataStream>();
-			run3<F>(dst, ip);
-		}
-		else {
-			// basically static_assert(false), but that does not compile on gcc and clang
-			// https://devblogs.microsoft.com/oldnewthing/20200311-00/?p=103553
-			static_assert(sizeof(F) == 0);
-		}
-	}
-
 	const ParticleSystem::Emitter& emitter;
 	const i32 fromf4;
 	const i32 stepf4;
 	float4** reg_mem;
 	float* out_mem = nullptr;
 
-private:
-	template <auto F, typename... T>
-	void run2(DataStream dst, InputMemoryStream& ip, T&... args) {
-		const DataStream stream = ip.read<DataStream>();
-		switch(stream.type) {
-			case DataStream::CHANNEL: { ChannelGetter tmp(stream); run2<F>(dst, ip, args..., tmp); break; }
-			case DataStream::LITERAL: { LiteralGetter tmp(stream); run2<F>(dst, ip, args..., tmp); break; }
-			case DataStream::CONST: { ConstGetter tmp(stream); run2<F>(dst, ip, args..., tmp); break; }
-			case DataStream::REGISTER: { RegisterGetter tmp(stream); run2<F>(dst, ip, args..., tmp); break; }
+	LUMIX_FORCE_INLINE void readArgs(InputMemoryStream& ip, Stream* s, float4* literals, u32 num_args) {
+		for (u32 i = 0; i < num_args; ++i) {
+			const DataStream stream = ip.read<DataStream>();;
+			switch (stream.type) {
+			case DataStream::CHANNEL: {
+				s[i].data = ((float4*)emitter.channels[stream.index].data) + fromf4;
+				s[i].step = 1;
+				break;
+			}
+			case DataStream::LITERAL: {
+				literals[i] = f4Splat(stream.value);
+				s[i].data = &literals[i];
+				s[i].step = 0;
+				break;
+			}
+			case DataStream::CONST: {
+				literals[i] = f4Splat(emitter.system.m_constants[stream.index]);
+				s[i].data = &literals[i];
+				s[i].step = 0;
+				break;
+			}
+			case DataStream::REGISTER: {
+				s[i].data = reg_mem[stream.index];
+				s[i].step = 1;
+				break;
+			}
 			default: ASSERT(false);
+			}
 		}
 	}
 
-	template <auto F, typename T0, typename T1>
-	void run2(DataStream dst, InputMemoryStream& ip, T0& t0, T1& t1) {
-		float4* arg0 = t0.get(emitter, fromf4, stepf4, reg_mem);
-		float4* arg1 = t1.get(emitter, fromf4, stepf4, reg_mem);
+	template <auto F>
+	void run2(InputMemoryStream& ip) {
+		const DataStream dst = ip.read<DataStream>();
+		Stream s[2];
+		float4 literals[2];
+
+		readArgs(ip, s, literals, 2);
+
+		float4* arg0 = s[0].data;
+		float4* arg1 = s[1].data;
 		
 		if (dst.type == DataStream::OUT) {
 			const u32 stride = emitter.resource_emitter.outputs_count;
 			u32 idx = dst.index + fromf4 * 4 * stride;
-			for (i32 i = 0; i < stepf4; ++i, T0::step(arg0), T1::step(arg1)) {
+			for (i32 i = 0; i < stepf4; ++i, arg0 += s[0].step, arg1 += s[1].step) {
 				float4 tmp = F(*arg0, *arg1);
 				out_mem[idx] = f4GetX(tmp);
 				idx += stride;
@@ -556,33 +519,27 @@ private:
 			float4* result = getStream(emitter, dst, fromf4, reg_mem);
 			const float4* const end = result + stepf4;
 
-			for (; result != end; ++result, T0::step(arg0), T1::step(arg1)) {
+			for (; result != end; ++result, arg0 += s[0].step, arg1 += s[1].step) {
 				*result = F(*arg0, *arg1);
 			}
 		}
 	}
 
-	template <auto F, typename... T>
-	void run3(DataStream dst, InputMemoryStream& ip, T&... args) {
-		const DataStream stream = ip.read<DataStream>();
-		switch(stream.type) {
-			case DataStream::CHANNEL: { ChannelGetter tmp(stream); run3<F>(dst, ip, args..., tmp); break; }
-			case DataStream::LITERAL: { LiteralGetter tmp(stream); run3<F>(dst, ip, args..., tmp); break; }
-			case DataStream::CONST: { ConstGetter tmp(stream); run3<F>(dst, ip, args..., tmp); break; }
-			case DataStream::REGISTER: { RegisterGetter tmp(stream); run3<F>(dst, ip, args..., tmp); break; }
-			default: ASSERT(false);
-		}
-	}
+	template <auto F>
+	void run3(InputMemoryStream& ip) {
+		const DataStream dst = ip.read<DataStream>();
+		Stream s[3];
+		float4 literals[3];
 
-	template <auto F, typename T0, typename T1, typename T2>
-	void run3(DataStream dst, InputMemoryStream& ip, T0& t0, T1& t1, T2& t2) {
-		float4* arg0 = t0.get(emitter, fromf4, stepf4, reg_mem);
-		float4* arg1 = t1.get(emitter, fromf4, stepf4, reg_mem);
-		float4* arg2 = t2.get(emitter, fromf4, stepf4, reg_mem);
+		readArgs(ip, s, literals, 3);
+
+		float4* arg0 = s[0].data;
+		float4* arg1 = s[1].data;
+		float4* arg2 = s[2].data;
 
 		if (dst.type == DataStream::OUT) {
 			const u32 stride = emitter.resource_emitter.outputs_count;
-			for (i32 i = 0; i < stepf4; ++i, T0::step(arg0), T1::step(arg1), T2::step(arg2)) {
+			for (i32 i = 0; i < stepf4; ++i, arg0 += s[0].step, arg1 += s[1].step, arg2 += s[2].step) {
 				float4 tmp = F(*arg0, *arg1, *arg2);
 				u32 idx = dst.index + (fromf4 + i) * 4 * stride;
 				out_mem[idx] = f4GetX(tmp);
@@ -598,7 +555,7 @@ private:
 			float4* result = getStream(emitter, dst, fromf4, reg_mem);
 			const float4* const end = result + stepf4;
 
-			for (; result != end; ++result, T0::step(arg0), T1::step(arg1), T2::step(arg2)) {
+			for (; result != end; ++result, arg0 += s[0].step, arg1 += s[1].step, arg2 += s[2].step) {
 				*result = F(*arg0, *arg1, *arg2);
 			}
 		}
@@ -995,22 +952,22 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 				}
 				break;
 			}
-			case InstructionType::BLEND: op_helper.run<f4Blend>(ip); break;
-			case InstructionType::LT: op_helper.run<f4CmpLT>(ip); break;
-			case InstructionType::GT: op_helper.run<f4CmpGT>(ip); break;
-			case InstructionType::MUL: op_helper.run<f4Mul>(ip); break; 
-			case InstructionType::MOD: op_helper.run<fmodf>(ip); break; 
-			case InstructionType::DIV: op_helper.run<f4Div>(ip); break; 
-			case InstructionType::SUB: op_helper.run<f4Sub>(ip); break; 
-			case InstructionType::AND: op_helper.run<f4And>(ip); break; 
-			case InstructionType::OR: op_helper.run<f4Or>(ip); break; 
-			case InstructionType::ADD: op_helper.run<f4Add>(ip); break; 
-			case InstructionType::MIX: op_helper.run<ProcessHelper::mix>(ip); break; 
-			case InstructionType::MULTIPLY_ADD: op_helper.run<ProcessHelper::madd>(ip); break; 
-			case InstructionType::SQRT: op_helper.run<sqrtf>(ip); break;
-			case InstructionType::COS: op_helper.run<cosf>(ip); break;
-			case InstructionType::NOISE: op_helper.run<gnoise>(ip); break;
-			case InstructionType::SIN: op_helper.run<sinf>(ip); break;
+			case InstructionType::BLEND: op_helper.run3<f4Blend>(ip); break;
+			case InstructionType::LT: op_helper.run2<f4CmpLT>(ip); break;
+			case InstructionType::GT: op_helper.run2<f4CmpGT>(ip); break;
+			case InstructionType::MUL: op_helper.run2<f4Mul>(ip); break; 
+			case InstructionType::DIV: op_helper.run2<f4Div>(ip); break; 
+			case InstructionType::SUB: op_helper.run2<f4Sub>(ip); break; 
+			case InstructionType::AND: op_helper.run2<f4And>(ip); break; 
+			case InstructionType::OR: op_helper.run2<f4Or>(ip); break; 
+			case InstructionType::ADD: op_helper.run2<f4Add>(ip); break; 
+			case InstructionType::MIX: op_helper.run3<ProcessHelper::mix>(ip); break; 
+			case InstructionType::MULTIPLY_ADD: op_helper.run3<ProcessHelper::madd>(ip); break; 
+			case InstructionType::MOD: op_helper.run1<fmodf>(ip); break; 
+			case InstructionType::SQRT: op_helper.run1<sqrtf>(ip); break;
+			case InstructionType::COS: op_helper.run1<cosf>(ip); break;
+			case InstructionType::NOISE: op_helper.run1<gnoise>(ip); break;
+			case InstructionType::SIN: op_helper.run1<sinf>(ip); break;
 			case InstructionType::MOV: {
 				const DataStream dst = ip.read<DataStream>();
 				const DataStream op0 = ip.read<DataStream>();

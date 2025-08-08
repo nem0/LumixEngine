@@ -1,4 +1,5 @@
 #define NOGDI 
+#define NOCRYPT
 #include <dsound.h>
 
 #include "core/allocator.h"
