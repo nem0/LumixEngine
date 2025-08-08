@@ -3,6 +3,7 @@
 
 #include "action.h"
 #include "core/command_line_parser.h"
+#include "core/defer.h"
 #include "core/log.h"
 #include "core/math.h"
 #include "core/os.h"
@@ -2902,16 +2903,25 @@ void TextFilter::build() {
 	}
 }
 
-bool TextFilter::gui(const char* hint, float width, bool set_keyboard_focus, Action* focus_action) {
+bool TextFilter::gui(const char* hint, float width, bool set_keyboard_focus, Action* focus_action, bool with_bg) {
+	if (!with_bg) {
+		ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0, 0, 0, 0));
+		ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
+	}
+	defer {
+		if (!with_bg) ImGui::PopStyleColor(2);
+	};
+
 	if (focus_action) {
 		StaticString<64> hint_shortcut(hint);
 		char shortcut[32];
 		if (focus_action->shortcutText(shortcut)) {
 			hint_shortcut.append(" (", shortcut, ")");
-			return gui(hint_shortcut, width, set_keyboard_focus);
+			return gui(hint_shortcut, width, set_keyboard_focus, nullptr, with_bg);
 		}
 	}
 
+	ImGui::TextUnformatted(ICON_FA_SEARCH); ImGui::SameLine();
 	if (ImGuiEx::Filter(hint, filter, sizeof(filter), width, set_keyboard_focus)) {
 		build();
 		return true;

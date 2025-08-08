@@ -188,7 +188,7 @@ void LogUI::onGUI()
 		}
 
 		ImGui::SameLine();
-		m_filter.gui(ICON_FA_SEARCH " Filter", -1, ImGui::IsWindowAppearing());
+		m_filter.gui("Filter", -1, ImGui::IsWindowAppearing(), nullptr, false);
 		int len = 0;
 
 		u8 level_filter = m_show_info ? (1 << (u8)LogLevel::INFO) : 0;

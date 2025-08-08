@@ -1,6 +1,7 @@
 #include <imgui/imgui.h>
 
 #include "asset_browser.h"
+#include "core/defer.h"
 #include "core/hash.h"
 #include "core/log.h"
 #include "core/os.h"
@@ -210,7 +211,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 
 		StringView dir = Path::getDir(path);
-		if (!Path::isSame(dir, m_dir)) return;
+		if (!Path::isSame(dir, m_dir) && m_dir != ".") return;
 
 		RenderInterface* ri = m_app.getRenderInterface();
 
@@ -664,54 +665,39 @@ struct AssetBrowserImpl : AssetBrowser {
 			}
 		}
 
+		bool open_rename_popup = false;
 		bool open_create_dir_popup = false;
 		bool open_delete_popup = false;
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		static char tmp[MAX_PATH] = "";
 		const char* base_path = fs.getBasePath();
+		IPlugin* create_resource_plugin = nullptr;
 		auto common_popup = [&](){
-			if (ImGui::Checkbox("Thumbnails", &m_show_thumbnails)) refreshLabels();
 			if (ImGui::Checkbox("Subresources", &m_show_subresources)) {
 				ImGui::CloseCurrentPopup();
 				changeDir(m_dir, false);
-			}
-			if (ImGui::SliderFloat("Icon size", &m_thumbnail_size, 0.3f, 3.f, "%.2f", ImGuiSliderFlags_AlwaysClamp)) {
-				refreshLabels();
 			}
 			
 			if (ImGui::MenuItem("View in explorer")) {
 				const Path dir_full_path(base_path, "/", m_dir);
 				os::openExplorer(dir_full_path);
 			}
-			if (ImGui::MenuItem("Create directory")) open_create_dir_popup = true; 
+			if (ImGui::MenuItem("Create directory")) {
+				tmp[0] = 0;
+				open_create_dir_popup = true;
+			}
 
 			if (canMultiEdit() && ImGui::MenuItem("Multiedit")) openMultiEdit();
 
 			if (ImGui::MenuItem("Recreate tiles")) {
 				recreateTiles();
 			}
-			ImGui::Separator();
-			static TextFilter filter;
-			filter.gui("Filter", -1, ImGui::IsWindowAppearing());
-			for (IPlugin* plugin : m_plugins) {
-				if (!plugin->canCreateResource()) continue;
-				if (!filter.pass(plugin->getLabel())) continue;
-				if (ImGui::BeginMenu(plugin->getLabel())) {
-					bool input_entered = ImGui::InputTextWithHint("##name", "Name", tmp, sizeof(tmp), ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
-					ImGui::SameLine();
-					if (ImGui::Button("Create") || input_entered) {
-						OutputMemoryStream blob(m_allocator);
-						plugin->createResource(blob);
-						Path path(m_dir, "/", tmp, ".", plugin->getDefaultExtension());
-						if (!fs.saveContentSync(path, blob)) {
-							logError("Failed to write ", path);
-						}
-						selectResource(path, false);
-						ImGui::CloseCurrentPopup();
-					}
-
-					ImGui::EndMenu();
+			if (ImGui::BeginMenu("Create")) {
+				for (IPlugin* plugin : m_plugins) {
+					if (!plugin->canCreateResource()) continue;
+					if (ImGui::MenuItem(plugin->getLabel())) create_resource_plugin = plugin;
 				}
+				ImGui::EndMenu();
 			}
 		};
 
@@ -729,17 +715,9 @@ struct AssetBrowserImpl : AssetBrowser {
 					if (*ResourcePath::getSubresource(m_selected_resources[0]).end == 0 && ImGui::MenuItem(ICON_FA_EXTERNAL_LINK_ALT "Open externally")) {
 						openInExternalEditor(m_selected_resources[0]);
 					}
-					if (ImGui::BeginMenu("Rename")) {
-						ImGui::InputTextWithHint("##New name", "New name", tmp, sizeof(tmp), ImGuiInputTextFlags_AutoSelectAll);
-						if (ImGui::Button("Rename", ImVec2(100, 0))) {
-							PathInfo fi(m_selected_resources[0]);
-							const Path new_path(fi.dir, tmp, ".", fi.extension);
-							if (!fs.moveFile(m_selected_resources[0], new_path)) {
-								logError("Failed to rename ", m_selected_resources[0], " to ", new_path);
-							}
-							ImGui::CloseCurrentPopup();
-						}
-						ImGui::EndMenu();
+					if (ImGui::MenuItem("Rename")) {
+						copyString(tmp, Path::getBasename(m_selected_resources[0]));
+						open_rename_popup = true;
 					}
 				}
 				open_delete_popup = ImGui::MenuItem("Delete");
@@ -753,8 +731,71 @@ struct AssetBrowserImpl : AssetBrowser {
 			ImGui::EndPopup();
 		}
 
+		static IPlugin* plugin;
+		if (create_resource_plugin) {
+			plugin = create_resource_plugin;
+			openCenterStrip("create_resource");
+			tmp[0] = 0;
+		}
+		if (beginCenterStrip("create_resource")) {
+			bool create = false;
+			ImGui::NewLine();
+			alignGUICenter([&](){
+				if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
+				create = ImGui::InputTextWithHint("##name", "Name", tmp, sizeof(tmp), ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+			});
+			alignGUICenter([&](){
+				if (ImGui::Button("Create")) create = true;
+				ImGui::SameLine();
+				if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+			});
+			if (create) {
+				OutputMemoryStream blob(m_allocator);
+				plugin->createResource(blob);
+				Path path(m_dir, "/", tmp, ".", plugin->getDefaultExtension());
+				if (!fs.saveContentSync(path, blob)) {
+					logError("Failed to write ", path);
+				}
+				selectResource(path, false);
+				ImGui::CloseCurrentPopup();
+			}
+			endCenterStrip();
+		}
+
+		// rename
+		if (open_rename_popup || m_request_rename) {
+			if (m_request_rename) copyString(tmp, Path::getBasename(m_selected_resources[0]));
+			openCenterStrip("rename");
+			m_request_rename = false;
+		}
+		if (beginCenterStrip("rename")) {
+			if (ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
+			ImGui::NewLine();
+			alignGUICenter([](){
+				if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
+				ImGui::InputTextWithHint("##name", "New name", tmp, sizeof(tmp), ImGuiInputTextFlags_AutoSelectAll);
+			});
+			bool rename_submit = ImGui::IsKeyPressed(ImGuiKey_Enter);
+			alignGUICenter([&](){
+				if (ImGui::Button("Rename")) rename_submit = true;
+				ImGui::SameLine();
+				if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+			});
+			if (rename_submit) {
+				PathInfo fi(m_selected_resources[0]);
+				const Path new_path(fi.dir, tmp, ".", fi.extension);
+				if (!fs.moveFile(m_selected_resources[0], new_path)) {
+					logError("Failed to rename ", m_selected_resources[0], " to ", new_path);
+				}
+				ImGui::CloseCurrentPopup();
+			}
+			endCenterStrip();
+		}
+		
+		// create dir
 		if (open_create_dir_popup) openCenterStrip("create_dir");
 		if (beginCenterStrip("create_dir")) {
+			if (ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
 			ImGui::NewLine();
 			bool input_entered = false;
 			alignGUICenter([&](){
@@ -777,6 +818,7 @@ struct AssetBrowserImpl : AssetBrowser {
 			endCenterStrip();
 		}
 
+		// delete
 		if (open_delete_popup || m_request_delete) {
 			openCenterStrip("Delete file");
 			m_request_delete = false;
@@ -903,15 +945,16 @@ struct AssetBrowserImpl : AssetBrowser {
 		checkExtendedMouseButtons();
 		CommonActions& common = m_app.getCommonActions();
 		if (m_app.checkShortcut(m_back_action)) goBackDir();
-		if (m_app.checkShortcut(m_forward_action)) goForwardDir();
-		if (m_app.checkShortcut(common.del) && !m_selected_resources.empty()) m_request_delete = true;
-		if (m_app.checkShortcut(common.select_all)) selectAll();
+		else if (m_app.checkShortcut(m_forward_action)) goForwardDir();
+		else if (m_app.checkShortcut(common.del) && !m_selected_resources.empty()) m_request_delete = true;
+		else if (m_app.checkShortcut(common.rename) && m_selected_resources.size() == 1) m_request_rename = true;
+		else if (m_app.checkShortcut(common.select_all)) selectAll();
 
 		if (request_focus_search) {
 			ImGui::SetKeyboardFocusHere();
 		}
 
-		if (m_filter.gui(ICON_FA_SEARCH " Search", 300, false, &m_focus_search)) {
+		if (m_filter.gui("Search", 300, false, &m_focus_search, true)) {
 			m_create_tile_cooldown = 0.2f;
 			changeDir(m_dir, false);
 		}
@@ -1076,29 +1119,38 @@ struct AssetBrowserImpl : AssetBrowser {
 
 	bool resourceInput(const char* str_id, Path& path, ResourceType type, float width)  override {
 		ImGui::PushID(str_id);
+		defer { ImGui::PopID(); };
 
 		const ResourceLocator rl(path);
 	
-		bool popup_opened = false;
-		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, ImGui::GetStyle().ItemSpacing.y));
+		ImVec2 pos = ImGui::GetCursorScreenPos();
+		bool combo_open = false;
 		if (path.isEmpty()) {
-			ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
-			if (ImGui::Button("No resource (click to set)", ImVec2(width, 0))) {
-				ImGui::OpenPopup("popup");
-				popup_opened = true;
+			ImGui::SetNextItemWidth(width);
+			if (ImGui::BeginCombo("##cb", "No resource (click to set)", ImGuiComboFlags_HeightLargest)) {
+				combo_open = true;
 			}
 		}
 		else {
 			float w = ImGui::CalcTextSize(ICON_FA_BULLSEYE ICON_FA_TRASH).x;
-			if (ImGui::Button(getImGuiLabelID(rl, false), ImVec2(width < 0 ? -w : width - w, 0))) {
-				ImGui::OpenPopup("popup");
-				popup_opened = true;
+			ImGui::SetNextItemWidth(width < 0 ? -w : width - w);
+			if (ImGui::BeginCombo("##cb", getImGuiLabelID(rl, false), ImGuiComboFlags_HeightLargest)) {
+				combo_open = true;
 			}
 		}
-		if (path.isEmpty()) {
-			ImGui::PopStyleColor();
+
+		if (combo_open) {
+			static FilePathHash selected_path_hash;
+			if (resourceList(path, selected_path_hash, type, true, true, ImGui::IsWindowAppearing(), -1)) {
+				ImGui::CloseCurrentPopup();
+				ImGui::EndCombo();
+				return true;
+			}
+			ImGui::EndCombo();
 		}
-		else if (ImGui::IsItemHovered()) {
+
+		ImVec2 button_size = ImGui::GetItemRectSize();
+		if (!path.isEmpty() && ImGui::IsItemHovered()) {
 			ImGui::SetTooltip("%s", path.c_str());
 		}
 	
@@ -1111,8 +1163,6 @@ struct AssetBrowserImpl : AssetBrowser {
 				if (compiler.acceptExtension(ext, type)) {
 					path = dropped_path;
 					ImGui::EndDragDropTarget();
-					ImGui::PopStyleVar();
-					ImGui::PopID();
 					return true;
 				}
 			}
@@ -1126,23 +1176,10 @@ struct AssetBrowserImpl : AssetBrowser {
 			ImGui::SameLine();
 			if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear")) {
 				path = Path();
-				ImGui::PopStyleVar();
-				ImGui::PopID();
 				return true;
 			}
 		}
-		ImGui::PopStyleVar();
 
-		if (ImGuiEx::BeginResizablePopup("popup", ImVec2(200, 300))) {
-			static FilePathHash selected_path_hash;
-			if (resourceList(path, selected_path_hash, type, true, true, popup_opened, -1)) {
-				ImGui::EndPopup();
-				ImGui::PopID();
-				return true;
-			}
-			ImGui::EndPopup();
-		}
-		ImGui::PopID();
 		return false;
 	}
 
@@ -1173,6 +1210,10 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 	}
 
+	u32 getThumbnailWidth() const override {
+		return u32(m_thumbnail_size * TILE_SIZE);
+	}
+
 	void tile(const Path& path, bool selected) override {
 		i32 idx = m_immediate_tiles.find([&path](const FileInfo& fi){
 			return fi.filepath == path;
@@ -1201,12 +1242,13 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 
 		m_immediate_tiles[idx].gc_counter = 2;
-		thumbnail(m_immediate_tiles[idx], 50.f, selected);
+		thumbnail(m_immediate_tiles[idx], m_thumbnail_size * TILE_SIZE, selected);
 	}
 
 	bool resourceList(Path& path, FilePathHash& selected_path_hash, ResourceType type, bool can_create_new, bool enter_submit, bool focus, float width) override {
 		static TextFilter filter;
 		filter.gui("Filter", width, focus);
+		ImGui::Separator();
 		
 		float h = maximum(200.f, ImGui::GetContentRegionAvail().y - ImGui::GetTextLineHeightWithSpacing() * 2);
 
@@ -1329,6 +1371,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	bool m_show_thumbnails;
 	bool m_show_subresources;
 	bool m_request_delete = false;
+	bool m_request_rename = false;
 	float m_thumbnail_size = 1.f;
 	Action m_focus_search{"Asset browser", "Focus search", "Focus search", "asset_browser_focus_search", ICON_FA_SEARCH};
 	Action m_back_action{"Asset browser", "Back", "Back in history", "asset_browser_back", ICON_FA_ARROW_LEFT};

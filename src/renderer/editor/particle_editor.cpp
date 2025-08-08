@@ -3024,7 +3024,8 @@ struct ParticleEditorWindow : AssetEditorWindow, NodeEditor {
 
 	void onContextMenu(ImVec2 pos) override {
 		Node* n = nullptr;
-		m_node_filter.gui("Filter", 150, ImGui::IsWindowAppearing());
+		m_node_filter.gui("Filter", 250, ImGui::IsWindowAppearing(), nullptr, false);
+		ImGui::Separator();
 		if (m_node_filter.isActive()) {
 			struct : ICategoryVisitor {
 				ICategoryVisitor& visitType(const char* label, const INodeCreator& creator, char shortcut) override {

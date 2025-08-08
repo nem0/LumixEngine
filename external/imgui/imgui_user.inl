@@ -540,6 +540,10 @@ namespace ImGuiEx {
 		}
 	}
 
+	void VSeparator(float thickness) {
+		ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical, thickness);
+	}
+
 	void SetSkipItems(bool skip) {
 		ImGui::GetCurrentWindow()->SkipItems = false;
 	}
@@ -1357,7 +1361,7 @@ namespace ImGuiEx {
 		g.Style.Colors[ImGuiCol_Button] = g.Style.Colors[ImGuiCol_FrameBg];
 		float backup_padding = g.Style.FramePadding.x;
 		g.Style.FramePadding.x = 2;
-		if (Button(ICON_FA_TIMES)) {
+		if (Button(ICON_FA_BRUSH)) {
 			buf[0] = '\0';
 			changed = true;
 		}

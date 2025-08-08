@@ -1226,18 +1226,26 @@ void SceneView::onToolbar()
 		&m_translate_gizmo_mode,
 		&m_rotate_gizmo_mode,
 		&m_scale_gizmo_mode,
+		nullptr,
 		&m_local_coord_gizmo,
 		&m_global_coord_gizmo,
-		&m_top_view_action,
-		&m_front_view_action,
-		&m_side_view_action,
+		nullptr,
+		// &m_top_view_action,
+		// &m_front_view_action,
+		// &m_side_view_action,
 	};
 
 	auto pos = ImGui::GetCursorScreenPos();
 	const float toolbar_height = ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().FramePadding.y * 2;
 	if (ImGuiEx::BeginToolbar("scene_view_toolbar", pos, ImVec2(0, toolbar_height))) {
 		for (Action* action : actions) {
-			action->toolbarButton(m_app.getBigIconFont());
+			if (action) {
+				action->toolbarButton(m_app.getBigIconFont());
+			}
+			else {
+				ImGui::SameLine();
+				ImGuiEx::VSeparator(3);
+			}
 		}
 	}
 
@@ -1268,24 +1276,20 @@ void SceneView::onToolbar()
 	}
 
 	ImGui::SameLine();
-	pos = ImGui::GetCursorPos();
-	ImGui::SetCursorPos(pos);
-	ImGui::TextUnformatted(mode_action->font_icon);
+	float step = m_app.getGizmoConfig().getStep();
+	if (ImGuiEx::ToolbarButton(m_app.getBigIconFont(), ICON_FA_EYE, bg_color, "View")) ImGui::OpenPopup("Debug");
 
 	ImGui::SameLine();
-	pos = ImGui::GetCursorPos();
-	pos.y += offset;
-	ImGui::SetCursorPos(pos);
-	float step = m_app.getGizmoConfig().getStep();
-	// TODO followin two widgets are not valigned
-	if (ImGui::DragFloat("##gizmoStep", &step, 1.0f, 0, 200))
-	{
+	ImGuiEx::VSeparator(3);
+
+	ImGui::SameLine();
+	ImGui::TextUnformatted(mode_action->font_icon);
+	ImGui::SameLine();
+	if (ImGui::DragFloat("##gizmoStep", &step, 1.0f, 0, 200)) {
 		m_app.getGizmoConfig().setStep(step);
 	}
-	if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Snap amount");
-
-	ImGui::SameLine();
-	if (ImGui::Button("Debug")) ImGui::OpenPopup("Debug");
+	ImGui::SetItemTooltip("%s", "Snap amount");
+	
 	if (ImGui::BeginPopup("Debug")) {
 		auto option = [&](const char* label, Pipeline::DebugShow value) {
 			StaticString<64> tmp(label);
@@ -1397,7 +1401,12 @@ void SceneView::handleEvents() {
 void SceneView::insertModelUI() {
 	if (m_insert_model_request) ImGui::OpenPopup("Insert model");
 
-	if (ImGuiEx::BeginResizablePopup("Insert model", ImVec2(300, 200), ImGuiWindowFlags_NoNavInputs)) {
+	ImVec2 pos = {(float)m_screen_x, (float)m_screen_y};
+	ImVec2 size = {(float)m_width, (float)m_height};
+	ImGui::SetNextWindowPos(pos + size * 0.2f);
+	ImGui::SetNextWindowSize(size * 0.6f, ImGuiCond_Always);
+
+	if (ImGui::BeginPopup("Insert model", ImGuiWindowFlags_NoNavInputs)) {
 		if (ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
 
 		ImGui::AlignTextToFramePadding();
@@ -1408,11 +1417,12 @@ void SceneView::insertModelUI() {
 		}
 		ImGui::SameLine();
 		if(m_insert_model_request) m_search_selected = 0;
-		if (m_filter.gui(ICON_FA_SEARCH " Search", -1, m_insert_model_request)) {
+		if (m_filter.gui("Search", -1, m_insert_model_request, nullptr, false)) {
 			m_search_selected = 0;
 		}
 		bool scroll = false;
 		const bool insert_enter = ImGui::IsItemFocused() && ImGui::IsKeyPressed(ImGuiKey_Enter);
+		ImGui::Separator();
 		if (ImGui::IsItemFocused()) {
 			if (ImGui::IsKeyPressed(ImGuiKey_UpArrow) && m_search_selected > 0) {
 				--m_search_selected;
@@ -1449,7 +1459,7 @@ void SceneView::insertModelUI() {
 					const bool selected = idx == m_search_selected;
 					if (m_search_preview) {
 						ImGui::SameLine();
-						if (idx == 0 || ImGui::GetContentRegionAvail().x < 50) ImGui::NewLine();
+						if (idx == 0 || ImGui::GetContentRegionAvail().x < ab.getThumbnailWidth()) ImGui::NewLine();
 						ab.tile(res.path, selected);
 						if (ImGui::IsItemClicked() || (insert_enter && selected)) {
 							insert(res.path);

@@ -887,7 +887,7 @@ void PropertyGrid::onGUI() {
 
 		if (ents.size() != 0) {
 			showCoreProperties(ents, editor);
-			m_property_filter.gui("Filter", -1, ImGui::IsWindowAppearing(), &m_focus_filter_action);
+			m_property_filter.gui("Filter", -1, ImGui::IsWindowAppearing(), &m_focus_filter_action, true);
 			World& world = *editor.getWorld();
 			for (ComponentType cmp_type : world.getComponents(ents[0])) {
 				showComponentProperties(ents, cmp_type, editor);

@@ -3206,7 +3206,8 @@ struct CompositeTextureEditorImpl : CompositeTextureEditor, NodeEditor {
 	void onLinkDoubleClicked(NodeEditorLink& link, ImVec2 pos) override {}
 	
 	void onContextMenu(ImVec2 pos) override {
-		m_node_filter.gui("Filter", 150, ImGui::IsWindowAppearing());
+		m_node_filter.gui("Filter", 250, ImGui::IsWindowAppearing());
+		ImGui::Separator();
 		
 		if (m_node_filter.isActive()) {
 			struct : INodeTypeVisitor {

@@ -467,10 +467,11 @@ struct StudioAppImpl final : StudioApp {
 				
 				bool select_first = false;
 				World* world = editor.getWorld();
-				filter.gui(ICON_FA_SEARCH "Filter", -1, false, &m_focus_filter_action);
+				filter.gui("Filter", -1, false, &m_focus_filter_action, false);
 				if (ImGui::IsItemDeactivatedAfterEdit() && ImGui::IsKeyPressed(ImGuiKey_Enter)) {
 					select_first = true;
 				}
+				ImGui::Separator();
 
 				if (ImGui::BeginChild("entities")) {
 					ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().FramePadding.x);
@@ -2627,15 +2628,10 @@ struct StudioAppImpl final : StudioApp {
 			if (ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
 
 			if(m_open_commands_palette) m_all_actions_selected = 0;
-			ImGui::TextUnformatted(ICON_FA_SEARCH);
-			ImGui::SameLine();
 		
-			ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0, 0, 0, 0));
-			ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
-			if (m_all_actions_filter.gui("Search", -1, m_open_commands_palette)) {
+			if (m_all_actions_filter.gui("Search", -1, m_open_commands_palette, nullptr, false)) {
 				m_all_actions_selected = 0;
 			}
-			ImGui::PopStyleColor(2);
 			const bool insert_enter = ImGui::IsItemFocused() && ImGui::IsKeyPressed(ImGuiKey_Enter);
 			bool moved = false;
 			if (ImGui::IsItemFocused()) {

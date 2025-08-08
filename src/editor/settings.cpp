@@ -1127,7 +1127,8 @@ void Settings::gui() {
 		
 		static TextFilter filter;
 		if (m_app.checkShortcut(m_focus_search)) ImGui::SetKeyboardFocusHere();
-		filter.gui("Filter", -1, false, &m_focus_search);
+		filter.gui("Filter", -1, false, &m_focus_search, false);
+		ImGui::Separator();
 
 		auto iterVars = [this](){
 			for (auto iter = m_variables.begin(), end = m_variables.end(); iter != end; ++iter) {

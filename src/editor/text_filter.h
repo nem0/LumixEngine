@@ -14,7 +14,7 @@ struct LUMIX_EDITOR_API TextFilter {
 	void build();
 	// show filter input, returns true if filter changed
 	// add `focus_action`'s shortcut to label
-	bool gui(const char* label, float width = -1, bool set_keyboard_focus = false, Action* focus_action = nullptr);
+	bool gui(const char* label, float width = -1, bool set_keyboard_focus = false, Action* focus_action = nullptr, bool with_bg = false);
 
 	char filter[128] = "";
 	StringView subfilters[8];
