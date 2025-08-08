@@ -590,7 +590,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		ImGui::BeginChild("main_col");
 
 		float w = ImGui::GetContentRegionAvail().x;
-		int columns = m_show_thumbnails ? (int)w / int(TILE_SIZE * m_thumbnail_size) : 1;
+		int columns = m_show_thumbnails ? (int)w / int(TILE_SIZE * m_thumbnail_size + ImGui::GetStyle().ItemSpacing.x) : 1;
 		columns = maximum(columns, 1);
 		int tile_count = m_file_infos.size();
 		int row_count = m_show_thumbnails ? (tile_count + columns - 1) / columns : tile_count;
