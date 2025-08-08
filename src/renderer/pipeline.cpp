@@ -2691,7 +2691,7 @@ struct PipelineImpl final : Pipeline {
 							if (mi->flags & ModelInstance::MOVED) {
 								const i32 start_i = i;
 								const u64 key = sort_keys[i];
-								while (i < keys_count && sort_keys[i] == key) {
+								while (i < to && sort_keys[i] == key) {
 									++i;
 								}
 
@@ -2737,7 +2737,7 @@ struct PipelineImpl final : Pipeline {
 							else {
 								int start_i = i;
 								const u64 key = sort_keys[i] & instance_key_mask;
-								while (i < keys_count && (sort_keys[i] & instance_key_mask) == key) {
+								while (i < to && (sort_keys[i] & instance_key_mask) == key) {
 									++i;
 								}
 								const u32 count = u32(i - start_i);
@@ -2837,7 +2837,7 @@ struct PipelineImpl final : Pipeline {
 
 						int start_i = i;
 						const u64 key = sort_keys[i];
-						while (i < keys_count && sort_keys[i] == key) {
+						while (i < to && sort_keys[i] == key) {
 							++i;
 						}
 						const u32 count = i - start_i;
@@ -2897,7 +2897,7 @@ struct PipelineImpl final : Pipeline {
 
 						int start_i = i;
 						const u64 key = sort_keys[i];
-						while (i < keys_count && sort_keys[i] == key) {
+						while (i < to && sort_keys[i] == key) {
 							++i;
 						}
 						const u32 count = i - start_i;
