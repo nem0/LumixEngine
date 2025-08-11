@@ -38,10 +38,12 @@ struct LUMIX_CORE_API GuardAllocator final : IAllocator {
 struct LUMIX_CORE_API AllocationInfo {
 	enum Flags : u16{
 		NONE = 0,
-		IS_VRAM = 0b01 << 1,
-		IS_PAGED = 0b10 << 1,
-		IS_ARENA = 0b11 << 1
+		IS_VRAM = 0b001 << 1,
+		IS_PAGED = 0b010 << 1,
+		IS_ARENA = 0b011 << 1,
+		IS_MISC = 0b100 << 1 
 	};
+	bool is(Flags type) const { return (flags & 0b1110) == type; }
 	AllocationInfo* previous = nullptr;
 	AllocationInfo* next = nullptr;
 	StackNode* stack_leaf = nullptr;

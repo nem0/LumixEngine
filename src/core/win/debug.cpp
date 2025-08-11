@@ -378,11 +378,11 @@ void checkLeaks() {
 			while (info) {
 				 // s_stack_tree uses arena and we can't deallocate it because we might need it to print leak's callstack
 				 // so we ignore it "leaking"
-				if (info != &s_stack_tree->getAllocator().getAllocationInfo()) {
+				if (info != &s_stack_tree->getAllocator().getAllocationInfo() && !info->is(AllocationInfo::IS_MISC)) {
 					if (first) OutputDebugString("Memory leaks detected!\n");
 					first = false;
 					StaticString<2048> tmp("\nAllocation size : ", info->size, " , memory ", (u64)(info + sizeof(info)), "\n");
-					if (info->flags & debug::AllocationInfo::IS_VRAM) tmp.append("VRAM\n");
+					if (info->is(AllocationInfo::IS_VRAM)) tmp.append("VRAM\n");
 					OutputDebugString(tmp);
 					s_stack_tree->printCallstack(info->stack_leaf);
 				}
@@ -404,10 +404,12 @@ void checkGuards() {
 		MutexGuard lock(s_allocation_debug.m_mutex);
 		auto* info = s_allocation_debug.m_root;
 		while (info) {
-			const bool is_vram = (info->flags & AllocationInfo::IS_VRAM) != 0;
-			const bool is_paged = (info->flags & AllocationInfo::IS_PAGED) != 0;
+			const bool is_vram = info->is(AllocationInfo::IS_VRAM);
+			const bool is_paged = info->is(AllocationInfo::IS_PAGED);
+			const bool is_misc = info->is(AllocationInfo::IS_MISC);
+			const bool is_arena = info->is(AllocationInfo::IS_ARENA);
 
-			if (!is_vram && !is_paged) {
+			if (!is_vram && !is_paged && !is_misc && !is_arena) {
 				auto user_ptr = getUserPtrFromAllocationInfo(info);
 				void* system_ptr = getSystemFromUser(user_ptr);
 				if (*(u32*)system_ptr != ALLOCATION_GUARD) {
@@ -459,7 +461,7 @@ void registerAlloc(AllocationInfo& info) {
 		s_allocation_debug.m_root->previous = &info;
 	}
 	s_allocation_debug.m_root = &info;
-	if ((info.flags & AllocationInfo::IS_VRAM) == 0) {
+	if (!info.is(AllocationInfo::IS_VRAM)) {
 		s_allocation_debug.m_total_size.add(info.size);
 	}
 }
@@ -471,7 +473,7 @@ void unregisterAlloc(const AllocationInfo& info) {
 	}
 	if (info.previous) info.previous->next = info.next;
 	if (info.next) info.next->previous = info.previous;
-	if ((info.flags & AllocationInfo::IS_VRAM) == 0) {
+	if (!info.is(AllocationInfo::IS_VRAM)) {
 		s_allocation_debug.m_total_size.subtract(info.size);
 	}
 }

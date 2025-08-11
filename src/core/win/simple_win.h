@@ -1093,4 +1093,6 @@ DEFINE_GUID (
 	0x9a, 0x82, 0x00, 0x60, 0x08, 0xa8, 0x69, 0x39
  );
 
+WINBASEAPI VOID WINAPI GetCurrentThreadStackLimits(PULONG_PTR LowLimit, PULONG_PTR HighLimit);
+
 }

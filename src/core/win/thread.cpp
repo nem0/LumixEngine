@@ -1,6 +1,8 @@
 #include "core/core.h"
 #include "core/allocator.h"
+#include "core/debug.h"
 #include "core/sync.h"
+#include "core/tag_allocator.h"
 #include "core/thread.h"
 #include "core/os.h"
 #include "core/string.h"
@@ -18,9 +20,9 @@ struct ThreadImpl
 {
 	explicit ThreadImpl(IAllocator& allocator)
 		: m_allocator(allocator)
-	{
-	}
+	{}
 
+	debug::AllocationInfo m_allocation_info;
 	IAllocator& m_allocator;
 	HANDLE m_handle;
 	DWORD m_thread_id;
@@ -64,12 +66,22 @@ static void setThreadName(os::ThreadID thread_id, const char* thread_name)
 
 static DWORD WINAPI threadFunction(LPVOID ptr)
 {
+	static TagAllocator tag_allocator(getGlobalAllocator(), "thread stack");
+
 	struct ThreadImpl* impl = reinterpret_cast<ThreadImpl*>(ptr);
+	impl->m_allocation_info.align = 16;
+	ULONG_PTR low, high;
+	GetCurrentThreadStackLimits(&low, &high);
+	impl->m_allocation_info.size = size_t(high - low);
+	impl->m_allocation_info.tag = &tag_allocator;
+	impl->m_allocation_info.flags = debug::AllocationInfo::IS_MISC;
+	debug::registerAlloc(impl->m_allocation_info);
 	setThreadName(impl->m_thread_id, impl->m_thread_name);
 	profiler::setThreadName(impl->m_thread_name);
 	const u32 ret = impl->m_owner->task();
 	impl->m_exited = true;
 	impl->m_is_running = false;
+	debug::unregisterAlloc(impl->m_allocation_info);
 	return ret;
 }
 
