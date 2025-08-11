@@ -27,6 +27,7 @@
 #include "renderer/pipeline.h"
 #include "renderer/pose.h"
 #include "renderer/renderer.h"
+#include "renderer/shader.h"
 #include "renderer/terrain.h"
 #include "renderer/texture.h"
 
@@ -57,6 +58,26 @@ struct BoneAttachment
 	int bone_index;
 	LocalRigidTransform relative_transform;
 };
+
+void MaterialOverride::destroy(Renderer& renderer) {
+	for (const Element& e : elements) {
+		if (e.material) e.material->decRefCount();
+		else {
+			renderer.destroyMaterialConstants(e.instance);
+		}
+	}
+	elements.clear();
+}
+
+MaterialOverride::~MaterialOverride() {
+	ASSERT(elements.empty());
+}
+
+u32 MaterialOverride::getInstance(u32 element) const {
+	const MaterialOverride::Element& e = elements[element];
+	if (e.material) return e.material->getIndex();
+	return e.instance;
+}
 
 u32 ProceduralGeometry::getVertexCount() const {
 	return vertex_decl.getStride() ? u32(vertex_data.size() / vertex_decl.getStride()) : 0;
@@ -210,8 +231,11 @@ struct RenderModuleImpl final : RenderModule {
 		{
 			if ((i.flags & ModelInstance::VALID) && i.model) {
 				i.model->decRefCount();
-				if (i.custom_material) i.custom_material->decRefCount();
-				i.custom_material = nullptr;
+				if (i.material_override) {
+					i.material_override->destroy(m_renderer);
+					LUMIX_DELETE(m_allocator, i.material_override);
+					i.material_override = nullptr;
+				}
 				LUMIX_DELETE(m_allocator, i.pose);
 			}
 		}
@@ -649,7 +673,16 @@ struct RenderModuleImpl final : RenderModule {
 			serializer.write(r.flags);
 			if(r.flags & ModelInstance::VALID) {
 				serializer.write(u32(r.model ? offsets[r.model] : 0xffFFffFF));
-				serializer.writeString(r.custom_material ? r.custom_material->getPath().c_str() : "");
+				if (r.material_override) {
+					const auto& elems = r.material_override->elements;
+					serializer.write(r.material_override->elements.size());
+					for (const auto& elem : elems) {
+						serializer.writeString(elem.material ? elem.material->getPath().c_str() : "");
+					}
+				}
+				else {
+					serializer.write(u32(0));
+				}
 			}
 		}
 	}
@@ -1036,14 +1069,14 @@ struct RenderModuleImpl final : RenderModule {
 
 				const char* mat_path = serializer.readString();
 				if (mat_path[0] != 0) {
-					setModelInstanceMaterialOverride(e, Path(mat_path));
+					setModelInstanceMaterialOverride(e, 0, Path(mat_path));
 				}
 
 				m_world.onComponentCreated(e, MODEL_INSTANCE_TYPE, this);
 			}
 		}
 	}
-	void deserializeModelInstances(InputMemoryStream& serializer, const EntityMap& entity_map)
+	void deserializeModelInstances(InputMemoryStream& serializer, const EntityMap& entity_map, RenderModuleVersion version)
 	{
 		PROFILE_FUNCTION();
 		u32 size = 0;
@@ -1079,9 +1112,18 @@ struct RenderModuleImpl final : RenderModule {
 					setModel(e, model);
 				}
 
-				const char* mat_path = serializer.readString();
-				if (mat_path[0] != 0) {
-					setModelInstanceMaterialOverride(e, Path(mat_path));
+				if (version > RenderModuleVersion::MATERIAL_OVERRIDE) {
+					u32 num_elems = serializer.read<u32>();
+					for (u32 mesh_idx = 0; mesh_idx < num_elems; ++mesh_idx) {
+						const char* path = serializer.readString();
+						setModelInstanceMaterialOverride(e, mesh_idx, Path(path));
+					}
+				}
+				else {
+					const char* mat_path = serializer.readString();
+					if (mat_path[0] != 0) {
+						setModelInstanceMaterialOverride(e, 0, Path(mat_path));
+					}
 				}
 
 				m_world.onComponentCreated(e, MODEL_INSTANCE_TYPE, this);
@@ -1219,7 +1261,7 @@ struct RenderModuleImpl final : RenderModule {
 	{
 		deserializeCameras(serializer, entity_map, version);
 		if (version > (i32)RenderModuleVersion::SMALLER_MODEL_INSTANCES) {
-			deserializeModelInstances(serializer, entity_map);
+			deserializeModelInstances(serializer, entity_map, (RenderModuleVersion)version);
 		}
 		else {
 			deserializeModelInstancesOld(serializer, entity_map);
@@ -1375,8 +1417,11 @@ struct RenderModuleImpl final : RenderModule {
 		LUMIX_DELETE(m_allocator, model_instance.pose);
 		model_instance.pose = nullptr;
 		model_instance.flags = ModelInstance::NONE;
-		if (model_instance.custom_material) model_instance.custom_material->decRefCount();
-		model_instance.custom_material = nullptr;
+		if (model_instance.material_override) {
+			model_instance.material_override->destroy(m_renderer);
+			LUMIX_DELETE(m_allocator, model_instance.material_override);
+			model_instance.material_override = nullptr;
+		}
 		m_world.onComponentDestroyed(entity, MODEL_INSTANCE_TYPE, this);
 	}
 
@@ -2004,12 +2049,48 @@ struct RenderModuleImpl final : RenderModule {
 		}
 	}
 
-	Material* getModelInstanceMaterial(EntityRef entity) { 
+	void overrideMaterialVec4(EntityRef entity, u32 mesh_index, const char* uniform_name, Vec4 value) {
 		ModelInstance& inst = m_model_instances[entity.index];
-		if (inst.custom_material) return inst.custom_material;
+		ASSERT(inst.model->isReady());
+		if (!inst.material_override) {
+			inst.material_override = LUMIX_NEW(m_allocator, MaterialOverride)(m_allocator);
+
+			if (m_culling_system->isAdded(entity)) {
+				m_culling_system->remove(entity);
+			}
+
+			const RenderableTypes type = getRenderableType(*inst.model, inst.material_override);
+			const DVec3 pos = m_world.getPosition(entity);
+			const Vec3& scale = m_world.getScale(entity);
+			const float radius = inst.model->getOriginBoundingRadius() * maximum(scale.x, scale.y, scale.z);
+			m_culling_system->add(entity, (u8)type, pos, radius);
+		}
+		if ((u32)inst.material_override->elements.size() <= mesh_index) {
+			inst.material_override->elements.resize(mesh_index + 1);
+		}
+		MaterialOverride::Element& element = inst.material_override->elements[mesh_index];
+		Material* mesh_material = inst.model->getMesh(mesh_index).material;
+		if (element.instance == 0) {
+			float tmp[Material::MAX_UNIFORMS_FLOATS];
+			mesh_material->getUniformData(Span(tmp));
+			element.instance = m_renderer.createMaterialInstance(tmp);
+		}
+		for (const auto& u : mesh_material->getShader()->m_uniforms) {
+			if (equalStrings(u.name, uniform_name)) {
+				m_renderer.updateMaterialConstants(element.instance, Span(&value.x, 4), u.offset);
+				break;
+			}
+		}
+	}
+
+	Material* getModelInstanceMaterial(EntityRef entity, u32 mesh_index) { 
+		ModelInstance& inst = m_model_instances[entity.index];
+		if (inst.material_override) {
+			return inst.material_override->elements[mesh_index].material;
+		}
 		if (!inst.model) return nullptr;
 		if (inst.model->getMeshCount() == 0) return nullptr;
-		return inst.model->getMesh(0).material;
+		return inst.model->getMesh(mesh_index).material;
 	}
 
 	Model* getModelInstanceModel(EntityRef entity) override { return m_model_instances[entity.index].model; }
@@ -2033,7 +2114,7 @@ struct RenderModuleImpl final : RenderModule {
 			const Vec3& scale = m_world.getScale(entity);
 			const float radius = model_instance.model->getOriginBoundingRadius() * maximum(scale.x, scale.y, scale.z);
 			if (!m_culling_system->isAdded(entity)) {
-				const RenderableTypes type = getRenderableType(*model_instance.model, model_instance.custom_material);
+				const RenderableTypes type = getRenderableType(*model_instance.model, model_instance.material_override);
 				m_culling_system->add(entity, (u8)type, pos, radius);
 			}
 		}
@@ -2043,20 +2124,21 @@ struct RenderModuleImpl final : RenderModule {
 		}
 	}
 
-	void setModelInstanceMaterialOverride(EntityRef entity, const Path& path) override {
+	void setModelInstanceMaterialOverride(EntityRef entity, u32 mesh_idx, const Path& path) override {
 		ModelInstance& mi = m_model_instances[entity.index];
-		if (mi.custom_material) {
-			if (mi.custom_material->getPath() == path) return;
-			
-			mi.custom_material->decRefCount();
-			mi.custom_material = nullptr;
-		}
-
 		if (mi.mesh_count > 0 && mi.meshes[0].material->getPath() == path) return;
 
 		if (!path.isEmpty()) {
+			if (!mi.material_override) {
+				mi.material_override = LUMIX_NEW(m_allocator, MaterialOverride)(m_allocator);
+			}
+
 			Material* material = m_engine.getResourceManager().load<Material>(path);
-			mi.custom_material = material;
+			
+			if ((u32)mi.material_override->elements.size() <= mesh_idx) {
+				mi.material_override->elements.resize(mesh_idx + 1);
+			}
+			mi.material_override->elements[mesh_idx].material = material;
 		}
 
 		if (!mi.model || !mi.model->isReady()) return;
@@ -2064,15 +2146,20 @@ struct RenderModuleImpl final : RenderModule {
 		if (m_culling_system->isAdded(entity)) {
 			m_culling_system->remove(entity);
 		}
-		const RenderableTypes type = getRenderableType(*mi.model, mi.custom_material);
+
+		const RenderableTypes type = getRenderableType(*mi.model, mi.material_override);
 		const DVec3 pos = m_world.getPosition(entity);
 		const Vec3& scale = m_world.getScale(entity);
 		const float radius = mi.model->getOriginBoundingRadius() * maximum(scale.x, scale.y, scale.z);
 		m_culling_system->add(entity, (u8)type, pos, radius);
 	}
 
-	Path getModelInstanceMaterialOverride(EntityRef entity) override {
-		return m_model_instances[entity.index].custom_material ? m_model_instances[entity.index].custom_material->getPath() : Path("");
+	Path getModelInstanceMaterialOverride(EntityRef entity, u32 mesh_idx) override {
+		ModelInstance& mi = m_model_instances[entity.index];
+		if (!mi.material_override) return Path("");
+		if (mesh_idx >= (u32)mi.material_override->elements.size()) return Path("");
+		if (mi.material_override->elements[mesh_idx].material) return mi.material_override->elements[mesh_idx].material->getPath();
+		return Path("");
 	}
 
 	Path getInstancedModelPath(EntityRef entity) override {
@@ -2911,7 +2998,7 @@ struct RenderModuleImpl final : RenderModule {
 		const DVec3 pos = m_world.getPosition(entity);
 		const float radius = bounding_radius * maximum(scale.x, scale.y, scale.z);
 		if(r.flags & ModelInstance::ENABLED) {
-			const RenderableTypes type = getRenderableType(*model, r.custom_material);
+			const RenderableTypes type = getRenderableType(*model, r.material_override);
 			m_culling_system->add(entity, (u8)type, pos, radius);
 		}
 		ASSERT(!r.pose);
@@ -3487,8 +3574,8 @@ void RenderModule::reflect() {
 		.LUMIX_CMP(ModelInstance, "model_instance", "Render / Mesh")
 			.LUMIX_FUNC_EX(RenderModule::getModelInstanceModel, "getModel")
 			.LUMIX_FUNC_EX(RenderModuleImpl::getModelInstanceMaterial, "getMaterial")
+			.LUMIX_FUNC_EX(RenderModuleImpl::overrideMaterialVec4, "overrideMaterialVec4")
 			.prop<&RenderModule::isModelInstanceEnabled, &RenderModule::enableModelInstance>("Enabled")
-			.prop<&RenderModule::getModelInstanceMaterialOverride,&RenderModule::setModelInstanceMaterialOverride>("Material").noUIAttribute()
 			.LUMIX_PROP(ModelInstancePath, "Source").resourceAttribute(Model::TYPE)
 		.LUMIX_CMP(Environment, "environment", "Render / Environment")
 			.icon(ICON_FA_GLOBE)

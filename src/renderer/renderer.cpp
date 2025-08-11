@@ -540,6 +540,7 @@ struct RendererImpl final : Renderer {
 			add(s, "#define INSTANCE3_ATTR ", first_empty + 3);
 			add(s, "#define INSTANCE4_ATTR ", first_empty + 4);
 			add(s, "#define INSTANCE5_ATTR ", first_empty + 5);
+			add(s, "#define INSTANCE6_ATTR ", first_empty + 6);
 
 			iter = m_semantic_defines.insert(hash, static_cast<String&&>(s));
 		}
@@ -622,7 +623,7 @@ struct RendererImpl final : Renderer {
 		}
 
 		MaterialBuffer& mb = m_material_buffer;
-		const u32 MAX_MATERIAL_CONSTS_COUNT = 400;
+		const u32 MAX_MATERIAL_CONSTS_COUNT = 10400;
 		mb.buffer = gpu::allocBufferHandle();
 		mb.map.insert(RuntimeHash(), 0);
 		mb.data.resize(MAX_MATERIAL_CONSTS_COUNT);
@@ -820,6 +821,34 @@ struct RendererImpl final : Renderer {
 		}
 	}
 
+	u32 createMaterialInstance(Span<const float> data) override {
+		if (m_material_buffer.first_free == -1) {
+			ASSERT(false);
+			++m_material_buffer.data[0].ref_count;
+			return 0;
+		}
+		u32 idx = m_material_buffer.first_free;
+		m_material_buffer.first_free = m_material_buffer.data[m_material_buffer.first_free].next_free;
+		m_material_buffer.data[idx].ref_count = 1;
+		m_material_buffer.data[idx].is_instance = true;
+		m_material_buffer.data[idx].hash = RuntimeHash(data.begin(), data.length() * sizeof(float));
+		
+		jobs::wait(&m_cpu_frame->can_setup);
+		const u32 size = u32(data.length() * sizeof(float));
+		const TransientSlice slice = m_cpu_frame->uniform_buffer.alloc(size);
+		memcpy(slice.ptr, data.begin(), size);
+		m_cpu_frame->draw_stream.copy(m_material_buffer.buffer, slice.buffer, idx * Material::MAX_UNIFORMS_BYTES, slice.offset, size);
+		return idx;
+	}
+
+	void updateMaterialConstants(u32 handle, Span<const float> data, u32 offset) override {
+		jobs::wait(&m_cpu_frame->can_setup);
+		const u32 size = u32(data.length() * sizeof(float));
+		const TransientSlice slice = m_cpu_frame->uniform_buffer.alloc(size);
+		memcpy(slice.ptr, data.begin(), size);
+		m_cpu_frame->draw_stream.copy(m_material_buffer.buffer, slice.buffer, handle * Material::MAX_UNIFORMS_BYTES, slice.offset, size);
+	}
+
 	u32 createMaterialConstants(Span<const float> data) override {
 		const RuntimeHash hash(data.begin(), data.length() * sizeof(float));
 		auto iter = m_material_buffer.map.find(hash);
@@ -836,6 +865,7 @@ struct RendererImpl final : Renderer {
 			idx = m_material_buffer.first_free;
 			m_material_buffer.first_free = m_material_buffer.data[m_material_buffer.first_free].next_free;
 			m_material_buffer.data[idx].ref_count = 0;
+			m_material_buffer.data[idx].is_instance = false;
 			m_material_buffer.data[idx].hash = RuntimeHash(data.begin(), data.length() * sizeof(float));
 			m_material_buffer.map.insert(hash, idx);
 			
@@ -1311,6 +1341,7 @@ struct RendererImpl final : Renderer {
 		struct Data {
 			Data() {}
 			u32 ref_count;
+			bool is_instance;
 			union {
 				RuntimeHash hash;
 				u32 next_free;

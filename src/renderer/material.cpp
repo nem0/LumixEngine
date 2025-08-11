@@ -332,6 +332,32 @@ void Material::onBeforeReady()
 	updateRenderData(true);
 }
 
+void Material::getUniformData(Span<float> data) const {
+	if (!m_shader) return;
+
+	// TODO check overflow
+	u8* cs = (u8*)data.begin();
+	u32 textures_offset = 0;
+	for (const Shader::Uniform& shader_uniform : m_shader->m_uniforms) {
+		const u32 size = shader_uniform.size();
+		textures_offset = maximum(textures_offset, shader_uniform.offset + size);
+		bool found = false;
+		for (Uniform& uniform : m_uniforms) {
+			if (shader_uniform.name_hash == uniform.name_hash) {
+				memcpy((u8*)cs + shader_uniform.offset, uniform.vec4, size);
+				found = true;
+				break;
+			}
+		}
+		if (!found) {
+			memcpy((u8*)cs + shader_uniform.offset, shader_uniform.default_value.vec4, size);
+		}
+	}
+	for (u32 i = 0; i < m_shader->m_texture_slot_count; ++i) {
+		const gpu::BindlessHandle bindless_handle = m_textures[i] ? gpu::getBindlessHandle(m_textures[i]->handle) : gpu::BindlessHandle();
+		memcpy((u8*)cs + textures_offset + i * sizeof(bindless_handle), &bindless_handle, sizeof(bindless_handle));
+	}
+}
 
 void Material::updateRenderData(bool on_before_ready)
 {
@@ -365,7 +391,6 @@ void Material::updateRenderData(bool on_before_ready)
 
 	m_material_constants = m_renderer.createMaterialConstants(Span(cs));
 }
-
 
 void Material::bind(DrawStream& stream) const
 {

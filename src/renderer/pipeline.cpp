@@ -539,6 +539,7 @@ struct PipelineImpl final : Pipeline {
 		m_decal_decl.addAttribute(12, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 		m_decal_decl.addAttribute(28, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 		m_decal_decl.addAttribute(40, 2, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+		m_decal_decl.addAttribute(48, 1, gpu::AttributeType::U32, gpu::Attribute::INSTANCED);
 
 		m_curve_decal_decl.addAttribute(0, 3, gpu::AttributeType::FLOAT, 0);
 		m_curve_decal_decl.addAttribute(0, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
@@ -2545,13 +2546,14 @@ struct PipelineImpl final : Pipeline {
 		dyn_instance_decl.addAttribute(32, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 		dyn_instance_decl.addAttribute(48, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 		dyn_instance_decl.addAttribute(64, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-		dyn_instance_decl.addAttribute(80, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+		dyn_instance_decl.addAttribute(80, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+		dyn_instance_decl.addAttribute(92, 1, gpu::AttributeType::U32, gpu::Attribute::INSTANCED);
 
 		gpu::VertexDecl instanced_decl(gpu::PrimitiveType::NONE);
 		instanced_decl.addAttribute(0, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 		instanced_decl.addAttribute(16, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-		instanced_decl.addAttribute(32, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-
+		instanced_decl.addAttribute(32, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+		instanced_decl.addAttribute(44, 1, gpu::AttributeType::U32, gpu::Attribute::INSTANCED);
 
 		const u32 num_batches = lengthOf(view.buckets[0].substreams);
 		jobs::forEach(num_batches, 1, [&](u32 batch_idx, u32){
@@ -2606,7 +2608,15 @@ struct PipelineImpl final : Pipeline {
 						const Renderer::TransientSlice slice = emitter.slice;
 						const Matrix mtx(lpos, tr.rot);
 
-						const Renderer::TransientSlice ub = m_renderer.allocUniform(&mtx, sizeof(Matrix));
+						struct {
+							Matrix mtx;
+							u32 material_index;
+						} ub_data = {
+							mtx,
+							material->getIndex()
+						};
+
+						const Renderer::TransientSlice ub = m_renderer.allocUniform(&ub_data, sizeof(ub_data));
 						stream->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 						material->bind(*stream);
 						stream->useProgram(program);
@@ -2619,25 +2629,43 @@ struct PipelineImpl final : Pipeline {
 					case RenderableTypes::MESH_MATERIAL_OVERRIDE: {
 						const u32 mesh_idx = u32(renderables[i] >> SORT_KEY_MESH_IDX_SHIFT);
 						const ModelInstance* LUMIX_RESTRICT mi = &model_instances[entity.index];
-						const Mesh& mesh = mi->meshes[mesh_idx];
+						Material* material;
+						u32 material_index;
+						if (mi->material_override && mesh_idx < (u32)mi->material_override->elements.size()) {
+							material = mi->material_override->elements[mesh_idx].material;
+							if (material) {
+								material_index = material->getIndex();
+							}
+							else {
+								material = mi->meshes[mesh_idx].material;
+								material_index = mi->material_override->elements[mesh_idx].instance;
+							}
+						}
+						else {
+							material = mi->model->getMesh(mesh_idx).material;
+							material_index = material->getIndex();
+						}
 
-						const Renderer::TransientSlice slice = m_renderer.allocTransient(sizeof(Vec4) * 3);
-						u8* instance_data = slice.ptr;
-						const Transform& tr = transforms[entity.index];
-						const float lod_d = model_instances[entity.index].lod - mesh.lod;
-						const Vec3 lpos = Vec3(tr.pos - camera_pos);
-						memcpy(instance_data, &tr.rot, sizeof(tr.rot));
-						instance_data += sizeof(tr.rot);
-						memcpy(instance_data, &lpos, sizeof(lpos));
-						instance_data += sizeof(lpos);
-						memcpy(instance_data, &lod_d, sizeof(lod_d));
-						instance_data += sizeof(lod_d);
-						memcpy(instance_data, &tr.scale, sizeof(tr.scale));
-						instance_data += sizeof(tr.scale) + sizeof(float)/*padding*/;
+						if (material->isReady()) {
+							const Mesh& mesh = mi->meshes[mesh_idx];
 
-						if (mi->custom_material->isReady()) {
-							Shader* shader = mi->custom_material->getShader();
-							const Material* material =  mi->custom_material;
+							const Renderer::TransientSlice slice = m_renderer.allocTransient(sizeof(Vec4) * 3);
+							u8* instance_data = slice.ptr;
+							const Transform& tr = transforms[entity.index];
+							const float lod_d = model_instances[entity.index].lod - mesh.lod;
+							const Vec3 lpos = Vec3(tr.pos - camera_pos);
+							memcpy(instance_data, &tr.rot, sizeof(tr.rot));
+							instance_data += sizeof(tr.rot);
+							memcpy(instance_data, &lpos, sizeof(lpos));
+							instance_data += sizeof(lpos);
+							memcpy(instance_data, &lod_d, sizeof(lod_d));
+							instance_data += sizeof(lod_d);
+							memcpy(instance_data, &tr.scale, sizeof(tr.scale));
+							instance_data += sizeof(tr.scale);
+							memcpy(instance_data, &material_index, sizeof(material_index));
+							instance_data += sizeof(material_index);
+
+							Shader* shader = material->getShader();
 
 							const gpu::StateFlags state = material->m_render_states | render_state;
 							const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_decl, autoinstanced_define_mask | material->getDefineMask(), mesh.semantics_defines);
@@ -2719,7 +2747,8 @@ struct PipelineImpl final : Pipeline {
 									WRITE(prev_pos_ws);
 									WRITE(lod_d);
 									WRITE(prev_tr.scale);
-									instance_data += sizeof(float); // padding
+									u32 material_index = material->getIndex();
+									WRITE(material_index);
 									#undef WRITE
 								}
 
@@ -2755,7 +2784,10 @@ struct PipelineImpl final : Pipeline {
 									memcpy(instance_data, &lod_d, sizeof(lod_d));
 									instance_data += sizeof(lod_d);
 									memcpy(instance_data, &tr.scale, sizeof(tr.scale));
-									instance_data += sizeof(tr.scale) + sizeof(float)/*padding*/;
+									instance_data += sizeof(tr.scale);
+									u32 material_index = mesh.material->getIndex();
+									memcpy(instance_data, &material_index, sizeof(material_index));
+									instance_data += sizeof(material_index);
 								}
 
 								const u32 defines = autoinstanced_define_mask | material->getDefineMask();
@@ -2787,7 +2819,7 @@ struct PipelineImpl final : Pipeline {
 							float fur_scale;
 							float gravity;
 							float layers;
-							float padding;
+							u32 material_index;
 							Matrix model_mtx;
 							Matrix prev_model_mtx;
 						};
@@ -2821,6 +2853,8 @@ struct PipelineImpl final : Pipeline {
 						}
 					
 						const Material* material = mesh.material;
+						prefix->material_index = material->getIndex();
+						
 						stream->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 						const gpu::StateFlags state = material->m_render_states | render_state;
 						const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, defines, mesh.semantics_defines);
@@ -2846,6 +2880,7 @@ struct PipelineImpl final : Pipeline {
 							Quat rot;
 							Vec3 half_extents;
 							Vec2 uv_scale;
+							u32 material_index;
 						};
 						const Renderer::TransientSlice slice = m_renderer.allocTransient(count * (sizeof(DecalData)));
 
@@ -2864,6 +2899,7 @@ struct PipelineImpl final : Pipeline {
 							iter->rot = tr.rot;
 							iter->half_extents = decal.half_extents;
 							iter->uv_scale = decal.uv_scale;
+							iter->material_index = material->getIndex();
 							intersecting ? --end : ++beg;
 						}
 
@@ -2907,6 +2943,7 @@ struct PipelineImpl final : Pipeline {
 							Vec3 half_extents;
 							Vec2 uv_scale;
 							Vec4 bezier;
+							u32 material_index;
 						};
 						const Renderer::TransientSlice slice = m_renderer.allocTransient(count * (sizeof(DecalData)));
 
@@ -2926,6 +2963,7 @@ struct PipelineImpl final : Pipeline {
 							iter->half_extents = decal.half_extents;
 							iter->uv_scale = decal.uv_scale;
 							iter->bezier = Vec4(decal.bezier_p0, decal.bezier_p2);
+							iter->material_index = material->getIndex();
 							intersecting ? --end : ++beg;
 						}
 
@@ -3318,7 +3356,8 @@ struct PipelineImpl final : Pipeline {
 				m_cluster_buffers.clusters.buffer,
 				m_cluster_buffers.maps.buffer,
 				m_cluster_buffers.env_probes.buffer,
-				m_cluster_buffers.refl_probes.buffer
+				m_cluster_buffers.refl_probes.buffer,
+				m_renderer.getMaterialUniformBuffer()
 			};
 			stream.bindShaderBuffers(sbs);
 		});
@@ -3413,10 +3452,12 @@ struct PipelineImpl final : Pipeline {
 							auto create_key = [&](const LODMeshIndices& lod){
 								for (int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx) {
 									const Mesh& mesh = mi.meshes[mesh_idx];
-									const u8 layer = mi.custom_material ? mi.custom_material->getLayer() : mesh.layer;
+									u8 layer = mesh.layer;
+									if (mi.material_override && mesh_idx < mi.material_override->elements.size() && mi.material_override->elements[mesh_idx].material) {
+										layer = mi.material_override->elements[mesh_idx].material->getLayer();
+									}
 									const u32 bucket = bucket_map[layer];
-									const u32 mesh_sort_key = mi.custom_material ? 0x00FFffFF : mesh.sort_key;
-									ASSERT(!mi.custom_material || mesh_idx == 0);
+									const u32 mesh_sort_key = mi.material_override ? 0x00FFffFF : mesh.sort_key;
 									const u64 subrenderable = e.index | type_mask | ((u64)mesh_idx << SORT_KEY_MESH_IDX_SHIFT);
 									if (bucket < 0xff) {
 										const u64 key = mesh_sort_key | ((u64)bucket << SORT_KEY_BUCKET_SHIFT);
@@ -3474,7 +3515,7 @@ struct PipelineImpl final : Pipeline {
 								for (int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx) {
 									const Mesh& mesh = mi.meshes[mesh_idx];
 									const u32 bucket = bucket_map[mesh.layer];
-									ASSERT(!mi.custom_material);
+									ASSERT(!mi.material_override);
 									const u64 subrenderable = e.index | type_mask | ((u64)mesh_idx << SORT_KEY_MESH_IDX_SHIFT);
 									if (mi.flags & ModelInstance::MOVED && !is_shadow) {
 										// moved and unmoved meshes can't be drawn in single drawcall as they need different instance data
@@ -3565,7 +3606,10 @@ struct PipelineImpl final : Pipeline {
 						memcpy(instance_data, &lod_d, sizeof(lod_d));
 						instance_data += sizeof(lod_d);
 						memcpy(instance_data, &tr.scale, sizeof(tr.scale));
-						instance_data += sizeof(tr.scale) + sizeof(float) /*padding to vec4*/;
+						instance_data += sizeof(tr.scale);
+						u32 material_index = mesh->material->getIndex();
+						memcpy(instance_data, &material_index, sizeof(material_index));
+						instance_data += sizeof(material_index);
 					}
 					group = group->next;
 				}

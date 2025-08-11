@@ -61,6 +61,7 @@ int getSize(AttributeType type)
 		case AttributeType::U8: return 1;
 		case AttributeType::I16: return 2;
 		case AttributeType::U16: return 2;
+		case AttributeType::U32: return 4;
 	}
 	ASSERT(false);
 	return 0;

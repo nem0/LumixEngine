@@ -114,6 +114,8 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 	virtual struct ResourceManager& getTextureManager() = 0;
 	
 	virtual u32 createMaterialConstants(Span<const float> data) = 0;
+	virtual u32 createMaterialInstance(Span<const float> data) = 0;
+	virtual void updateMaterialConstants(u32 handle, Span<const float> data, u32 offset) = 0;
 	virtual void destroyMaterialConstants(u32 id) = 0;
 	virtual gpu::BufferHandle getMaterialUniformBuffer() = 0;
 	

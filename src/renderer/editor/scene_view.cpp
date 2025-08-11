@@ -678,7 +678,14 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 			
 						Renderer::TransientSlice ub;
 						if (dq_pose.empty()) {
-							ub = renderer.allocUniform(&mtx, sizeof(mtx));
+							struct UBData {
+								Matrix mtx;
+								u32 material_index;
+							} ub_data = {
+								mtx,
+								material->getIndex()
+							};
+							ub = renderer.allocUniform(&ub_data, sizeof(ub_data));
 						}
 						else {
 							struct UBPrefix {
@@ -760,8 +767,6 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 					if (!model || !model->isReady()) continue;
 
 					const Matrix mtx = icon_manager->getIconMatrix(icon, camera_mtx, vp.pos, vp.is_ortho, vp.ortho_size);
-					const Renderer::TransientSlice ub = renderer.allocUniform(&mtx, sizeof(Matrix));
-					stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 
 					for (int i = 0; i <= model->getLODIndices()[0].to; ++i) {
 						const Mesh& mesh = model->getMesh(i);
@@ -769,6 +774,16 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 						material->bind(stream);
 						const gpu::StateFlags state = material->m_render_states | gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE;
 						gpu::ProgramHandle program = mesh.material->getShader()->getProgram(state, mesh.vertex_decl, material->getDefineMask(), mesh.semantics_defines);
+
+						struct UB {
+							Matrix mtx;
+							u32 material_index;
+						} ub_data = {
+							mtx,
+							material->getIndex()
+						};
+						const Renderer::TransientSlice ub = renderer.allocUniform(&ub_data, sizeof(ub_data));
+						stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 
 						stream.useProgram(program);
 						stream.bindIndexBuffer(mesh.index_buffer_handle);

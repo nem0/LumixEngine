@@ -248,21 +248,70 @@ void Shader::onBeforeReady() {
 	if (m_uniforms.empty() && m_texture_slot_count == 0) return;
 
 	String tmp(m_allocator);
-	tmp.append("cbuffer MaterialState : register(b2) {");
+	String tmp2(m_allocator);
 
+	#define STRINGIZE_DETAIL(x) #x
+	#define STRINGIZE(x) STRINGIZE_DETAIL(x)
+
+	tmp.append("#line 1 \"shader.cpp\"\n");
+	tmp.append("struct MaterialData {");
+
+	tmp2.append(
+		"MaterialData getMaterialData(uint index) {\n"
+		"	MaterialData res;\n"
+	);
+
+	u32 offset = 0;
 	for (const Uniform& u : m_uniforms) {
 		char var_name[64];
 		toUniformVarName(Span(var_name), u.name);
 		tmp.append(toString(u.type), " ", var_name, ";\n");
+		char offset_str[32];
+		toCString(offset, Span(offset_str));
+		// TODO pack
+		switch (u.type) {
+			case Uniform::INT:
+				tmp2.append("res.", var_name, " = b_material.Load(index * 256 + ", offset_str, ");\n");
+				offset += 4;
+				break;
+			case Uniform::NORMALIZED_FLOAT:
+			case Uniform::FLOAT:
+				tmp2.append("res.", var_name, " = asfloat(b_material.Load(index * 256 + ", offset_str, "));\n");
+				offset += 4;
+				break;
+			case Uniform::FLOAT2:
+				tmp2.append("res.", var_name, " = asfloat(b_material.Load2(index * 256 + ", offset_str, "));\n");
+				offset += 8;
+				break;
+			case Uniform::FLOAT3:
+				tmp2.append("res.", var_name, " = asfloat(b_material.Load3(index * 256 + ", offset_str, "));\n");
+				offset += 12;
+				break;
+			case Uniform::COLOR:
+			case Uniform::FLOAT4:
+				tmp2.append("res.", var_name, " = asfloat(b_material.Load4(index * 256 + ", offset_str, "));\n");
+				offset += 16;
+				break;
+		}
 	}
 
 	for (u32 i = 0; i < m_texture_slot_count; ++i) {
+		char offset_str[32];
+		toCString(offset, Span(offset_str));
 		char var_name[64];
 		toTextureVarName(Span(var_name), m_texture_slots[i].name);
 		tmp.append("uint ", var_name, ";\n");
+		tmp2.append("res.", var_name, " = b_material.Load(index * 256 + ", offset_str, ");\n");
+		offset += 4;
 	}
 
 	tmp.append("};\n");
+	tmp2.append(
+		"	return res;\n"
+		"}\n"
+	);
+	
+	m_code.insert(0, tmp2);
 	m_code.insert(0, tmp);
 }
 

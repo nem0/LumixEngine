@@ -184,6 +184,18 @@ struct EnvironmentProbe {
 	Vec3 sh_coefs[9];
 };
 
+struct MaterialOverride {
+	struct Element {
+		Material* material = nullptr;
+		u32 instance = 0;
+	};
+	MaterialOverride(IAllocator& allocator) : elements(allocator) {}
+	~MaterialOverride();
+	void destroy(Renderer& renderer);
+	u32 getInstance(u32 element) const;
+	Array<Element> elements;
+};
+
 struct ModelInstance {
 	enum Flags : u8 {
 		NONE = 0,
@@ -196,7 +208,7 @@ struct ModelInstance {
 	Model* model;
 	Mesh* meshes;
 	Pose* pose;
-	Material* custom_material = nullptr; 
+	MaterialOverride* material_override = nullptr; 
 	EntityPtr next_model = INVALID_ENTITY;
 	EntityPtr prev_model = INVALID_ENTITY;
 	float lod = 4;
@@ -309,6 +321,7 @@ enum class RenderModuleVersion : i32 {
 	POSTPROCESS,
 	FOG_DENSITY,
 	CLOUDS,
+	MATERIAL_OVERRIDE,
 
 	LATEST
 };
@@ -401,8 +414,8 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual Path getModelInstancePath(EntityRef entity) = 0;
 	virtual void setModelInstanceLOD(EntityRef entity, u32 lod) = 0;
 	virtual void setModelInstancePath(EntityRef entity, const Path& path) = 0;
-	virtual void setModelInstanceMaterialOverride(EntityRef entity, const Path& path) = 0;
-	virtual Path getModelInstanceMaterialOverride(EntityRef entity) = 0;
+	virtual void setModelInstanceMaterialOverride(EntityRef entity, u32 mesh_idx, const Path& path) = 0;
+	virtual Path getModelInstanceMaterialOverride(EntityRef entity, u32 mesh_idx) = 0;
 	virtual CullResult* getRenderables(const ShiftedFrustum& frustum, RenderableTypes type) const = 0;
 	virtual CullResult* getRenderables(const ShiftedFrustum& frustum) const = 0;
 	virtual EntityPtr getFirstModelInstance() = 0;

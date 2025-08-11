@@ -63,6 +63,7 @@ struct LUMIX_RENDERER_API Material final : Resource {
 	void setUniformVec2(u32 index, Vec2 value);
 	void setUniformVec3(u32 index, Vec3 value);
 	void setUniformVec4(u32 index, Vec4 value);
+	void getUniformData(Span<float> out) const;
 
 	void setDefine(u8 define_idx, bool enabled);
 	bool isDefined(u8 define_idx) const;
@@ -89,6 +90,7 @@ struct LUMIX_RENDERER_API Material final : Resource {
 	void serialize(struct OutputMemoryStream& blob);
 	void bind(struct DrawStream& stream) const;
 	u32 getBufferOffset() const { return m_material_constants * MAX_UNIFORMS_BYTES; }
+	u32 getIndex() const { return m_material_constants; }
 
 	gpu::StateFlags m_render_states;
 
