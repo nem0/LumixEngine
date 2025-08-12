@@ -92,7 +92,6 @@ struct LUMIX_RENDERER_API Mesh {
 	Array<Vec3> vertices;
 	Array<Skin> skin;
 	Flags flags = Flags::NONE;
-	u32 sort_key;
 	u8 layer;
 	String name;
 	Material* material;
@@ -101,6 +100,7 @@ struct LUMIX_RENDERER_API Mesh {
 	const char* semantics_defines = "";
 	Renderer& renderer;
 	float lod = 0;
+	u32 sort_key = 0;
 
 	gpu::BufferHandle vertex_buffer_handle;
 	u32 vb_stride;

@@ -211,7 +211,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 
 		StringView dir = Path::getDir(path);
-		if (!Path::isSame(dir, m_dir) && m_dir != ".") return;
+		if (!Path::isSame(dir, m_dir)) return;
 
 		RenderInterface* ri = m_app.getRenderInterface();
 

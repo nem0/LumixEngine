@@ -4,33 +4,6 @@
 	#define HAS_LOD
 #endif
 
-struct VSOutput {
-	float4 pos_ws : TEXCOORD0;
-	float3 normal : TEXCOORD1;
-	#ifdef UV0_ATTR
-		float2 uv : TEXCOORD2;
-	#endif
-	#ifdef TANGENT_ATTR
-		float3 tangent : TEXCOORD3;
-	#endif
-	#if defined DYNAMIC || defined SKINNED
-		float4 prev_ndcpos_no_jitter : TEXCOORD4;
-	#endif
-	#ifdef HAS_LOD
-		float lod : TEXCOORD5;
-	#endif
-	#ifdef AO_ATTR
-		float ao : TEXCOORD6;
-	#endif
-	#ifdef GRASS
-		#ifdef COLOR0_ATTR
-			//float4 color : TEXCOORD6;
-		#endif
-		float pos_y : TEXCOORD7;
-	#endif
-	float4 position : SV_POSITION;
-};
-
 #define ATTR(X) TEXCOORD##X
 struct VSInput {
 	float3 position : ATTR(0);
@@ -57,6 +30,8 @@ struct VSInput {
 		float4 i_rot : ATTR(INSTANCE0_ATTR);
 		float4 i_pos_lod : ATTR(INSTANCE1_ATTR);
 		float4 i_scale : ATTR(INSTANCE2_ATTR);
+		uint i_material_index : ATTR(INSTANCE3_ATTR);
+		#define HAS_MATERIAL_INDEX_ATTR
 	#elif defined INSTANCED
 		float4 i_rot_lod : ATTR(INSTANCE0_ATTR);
 		float4 i_pos_scale : ATTR(INSTANCE1_ATTR);
@@ -67,6 +42,8 @@ struct VSInput {
 		float4 i_prev_rot : ATTR(INSTANCE3_ATTR);
 		float4 i_prev_pos_lod : ATTR(INSTANCE4_ATTR);
 		float4 i_prev_scale : ATTR(INSTANCE5_ATTR);
+		uint i_material_index : ATTR(INSTANCE6_ATTR);
+		#define HAS_MATERIAL_INDEX_ATTR
 	#elif defined SKINNED
 	#elif defined GRASS
 		float4 i_pos_scale : ATTR(INSTANCE0_ATTR);
@@ -78,33 +55,72 @@ struct VSInput {
 	#endif
 };
 
+struct VSOutput {
+	float4 pos_ws : TEXCOORD0;
+	float3 normal : TEXCOORD1;
+	#ifdef UV0_ATTR
+		float2 uv : TEXCOORD2;
+	#endif
+	#ifdef TANGENT_ATTR
+		float3 tangent : TEXCOORD3;
+	#endif
+	#if defined DYNAMIC || defined SKINNED
+		float4 prev_ndcpos_no_jitter : TEXCOORD4;
+	#endif
+	#ifdef HAS_LOD
+		float lod : TEXCOORD5;
+	#endif
+	#ifdef AO_ATTR
+		float ao : TEXCOORD6;
+	#endif
+	#ifdef GRASS
+		#ifdef COLOR0_ATTR
+			//float4 color : TEXCOORD6;
+		#endif
+		float pos_y : TEXCOORD7;
+	#endif
+	float4 position : SV_POSITION;
+	#ifdef HAS_MATERIAL_INDEX_ATTR
+		uint i_material_index : TEXCOORD8;
+	#endif
+};
+
 #ifdef SKINNED
 	cbuffer ModelState : register(b4) {
 		float fur_scale;
 		float fur_gravity;
 		float layers;
-		float padding;
+		uint material_index;
 		row_major float4x4 mtx;
 		row_major float4x4 prev_matrix;
 		row_major float2x4 bones[255];
 	}
 #elif defined INSTANCED
+	cbuffer ModelState : register(b4) {
+		uint material_index;
+	};
 #elif defined AUTOINSTANCED
 #elif defined GRASS
 	cbuffer ModelState : register(b4) {
 		float3 u_grass_origin;
+		float u_distance;
+		uint material_index;
 	};
 #elif defined DYNAMIC
 #else
 	cbuffer ModelState : register(b4) {
 		row_major float4x4 model_mtx;
+		uint material_index;
 	};
 #endif
 
-Surface getSurface(VSOutput input);
+Surface getSurface(VSOutput input, uint material_index);
 
 VSOutput mainVS(VSInput input) {
 	VSOutput output;
+	#ifdef HAS_MATERIAL_INDEX_ATTR
+		output.i_material_index = input.i_material_index;
+	#endif
 	#ifdef HAS_LOD
 		output.lod = 0;
 	#endif
@@ -198,7 +214,11 @@ VSOutput mainVS(VSInput input) {
 }
 
 Surface getSurfaceEx(VSOutput input) {
-	Surface data = getSurface(input);
+	#ifdef HAS_MATERIAL_INDEX_ATTR
+		Surface data = getSurface(input, input.i_material_index);
+	#else
+		Surface data = getSurface(input, material_index);
+	#endif
 	float4 p = mul(input.pos_ws, Global_ws_to_ndc_no_jitter);
 	#if defined DYNAMIC || defined SKINNED
 		float2 prev_pos_projected = input.prev_ndcpos_no_jitter.xy / input.prev_ndcpos_no_jitter.w;

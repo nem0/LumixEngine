@@ -15,7 +15,7 @@
 namespace Lumix
 {
 	static constexpr u32 PAGE_SIZE = 4096;
-	static constexpr size_t MAX_PAGE_COUNT = 16384;
+	static constexpr size_t MAX_PAGE_COUNT = 32768;
 	static constexpr u32 SMALL_ALLOC_MAX_SIZE = 64;
 
 	struct DefaultAllocator::Page {
@@ -102,7 +102,10 @@ namespace Lumix
 		}
 		DefaultAllocator::Page* p = allocator.m_free_lists[bin];
 		if (!p) {
-			if (allocator.m_page_count == MAX_PAGE_COUNT) return nullptr;
+			if (allocator.m_page_count == MAX_PAGE_COUNT) {
+				ASSERT(false);
+				return nullptr;
+			}
 
 			p = (DefaultAllocator::Page*)(allocator.m_small_allocations + PAGE_SIZE * allocator.m_page_count);
 			initPage(8 << bin, p);

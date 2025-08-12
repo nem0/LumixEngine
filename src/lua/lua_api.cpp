@@ -748,6 +748,11 @@ static i32 LUA_getFirstChild(World* world, i32 entity)
 	return world->getFirstChild({entity}).index;
 }
 
+static i32 LUA_getNextSibling(World* world, i32 entity)
+{
+	return world->getNextSibling({entity}).index;
+}
+
 static i32 LUA_getParent(World* world, i32 entity)
 {
 	return world->getParent({entity}).index;
@@ -921,6 +926,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	REGISTER_FUNCTION(getEntityRotation);
 	REGISTER_FUNCTION(getEntityScale);
 	REGISTER_FUNCTION(getFirstChild);
+	REGISTER_FUNCTION(getNextSibling);
 	REGISTER_FUNCTION(getParent);
 	REGISTER_FUNCTION(setParent);
 	REGISTER_FUNCTION(getModule);
@@ -1115,6 +1121,10 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 				return Lumix.Entity:new(table._world, p)
 			elseif key == "first_child" then
 				local p = LumixAPI.getFirstChild(table._world, table._entity)
+				if p < 0 then return nil end
+				return Lumix.Entity:new(table._world, p)
+			elseif key == "next_sibling" then
+				local p = LumixAPI.getNextSibling(table._world, table._entity)
 				if p < 0 then return nil end
 				return Lumix.Entity:new(table._world, p)
 			elseif key == "rotation" then

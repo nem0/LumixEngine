@@ -867,9 +867,8 @@ void PropertyGrid::onGUI() {
 	Span<const EntityRef> ents = editor.getSelectedEntities();
 	if (m_focus_filter_request) ImGui::SetNextWindowFocus();
 	if (ImGui::Begin(ICON_FA_INFO_CIRCLE "Inspector##inspector", &m_is_open)) {
-		ImVec2 window_pos = ImGui::GetWindowPos();
+		ImVec2 cp_screen_pos = ImGui::GetCursorScreenPos();
 		ImVec2 window_size = ImGui::GetWindowSize();
-		ImGui::SetCursorScreenPos(window_pos);
 		ImGui::Dummy(window_size);
 		if (ImGui::BeginDragDropTarget()) {
 			if (auto* payload = ImGui::AcceptDragDropPayload("path")) {
@@ -878,7 +877,7 @@ void PropertyGrid::onGUI() {
 			}
 			ImGui::EndDragDropTarget();
 		}
-		ImGui::SetCursorScreenPos(window_pos); // reset cursor to top
+		ImGui::SetCursorScreenPos(cp_screen_pos);
 		
 		if (m_focus_filter_request) {
 			ImGui::SetKeyboardFocusHere();

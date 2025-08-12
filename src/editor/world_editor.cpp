@@ -2484,7 +2484,6 @@ public:
 	}
 	
 	void loadWorld(InputMemoryStream& blob, const char* basename, bool additive) override {
-		ASSERT(!m_is_game_mode);
 		logInfo("Loading world ", basename, "...");
 		
 		if (additive) {
@@ -2802,6 +2801,7 @@ public:
 	void setProperty(ComponentType cmp, const char* array, int idx, const char* prop, Span<const EntityRef> entities, const IVec3& val) override { set(cmp, array, idx, prop, entities, val); }
 
 	static void fastRemoveDuplicates(Array<EntityRef>& entities) {
+		// TODO stack overflow if selecting a lot of entities
 		sort(entities.begin(), entities.end());
 		for (i32 i = entities.size() - 2; i >= 0; --i) {
 			if (entities[i] == entities[i + 1]) entities.swapAndPop(i);

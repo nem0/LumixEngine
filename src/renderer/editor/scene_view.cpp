@@ -709,7 +709,6 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 						const gpu::StateFlags state = gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_FUNCTION;
 						gpu::ProgramHandle program = mesh.material->getShader()->getProgram(material->m_render_states | state, mesh.vertex_decl, define_mask, mesh.semantics_defines);
 						stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
-						material->bind(stream);
 						stream.useProgram(program);
 						stream.bindIndexBuffer(mesh.index_buffer_handle);
 						stream.bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
@@ -771,7 +770,6 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 					for (int i = 0; i <= model->getLODIndices()[0].to; ++i) {
 						const Mesh& mesh = model->getMesh(i);
 						const Material* material = mesh.material;
-						material->bind(stream);
 						const gpu::StateFlags state = material->m_render_states | gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE;
 						gpu::ProgramHandle program = mesh.material->getShader()->getProgram(state, mesh.vertex_decl, material->getDefineMask(), mesh.semantics_defines);
 

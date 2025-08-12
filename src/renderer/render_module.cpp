@@ -62,21 +62,14 @@ struct BoneAttachment
 void MaterialOverride::destroy(Renderer& renderer) {
 	for (const Element& e : elements) {
 		if (e.material) e.material->decRefCount();
-		else {
-			renderer.destroyMaterialConstants(e.instance);
-		}
+		if (e.own_material_index) renderer.destroyMaterialConstants(e.material_index);
+		if (e.own_sort_key) renderer.freeSortKey(e.sort_key);
 	}
 	elements.clear();
 }
 
 MaterialOverride::~MaterialOverride() {
 	ASSERT(elements.empty());
-}
-
-u32 MaterialOverride::getInstance(u32 element) const {
-	const MaterialOverride::Element& e = elements[element];
-	if (e.material) return e.material->getIndex();
-	return e.instance;
 }
 
 u32 ProceduralGeometry::getVertexCount() const {
@@ -87,12 +80,9 @@ u32 ProceduralGeometry::getIndexCount() const {
 	return u32(index_data.size() / (index_type == gpu::DataType::U16 ? 2 : 4));
 }
 
-static RenderableTypes getRenderableType(const Model& model, bool custom_material)
-{
+static RenderableTypes getRenderableType(const Model& model) {
 	ASSERT(model.isReady());
-	if (custom_material) return RenderableTypes::MESH_MATERIAL_OVERRIDE;
-	if (model.isSkinned()) return RenderableTypes::SKINNED;
-	return RenderableTypes::MESH;
+	return model.isSkinned() ? RenderableTypes::SKINNED : RenderableTypes::MESH;
 }
 
 struct ReflectionProbe::LoadJob {
@@ -229,12 +219,11 @@ struct RenderModuleImpl final : RenderModule {
 
 		for (ModelInstance& i : m_model_instances)
 		{
-			if ((i.flags & ModelInstance::VALID) && i.model) {
-				i.model->decRefCount();
+			if ((i.flags & ModelInstance::VALID)) {
+				if (i.model) i.model->decRefCount();
 				if (i.material_override) {
 					i.material_override->destroy(m_renderer);
 					LUMIX_DELETE(m_allocator, i.material_override);
-					i.material_override = nullptr;
 				}
 				LUMIX_DELETE(m_allocator, i.pose);
 			}
@@ -675,7 +664,7 @@ struct RenderModuleImpl final : RenderModule {
 				serializer.write(u32(r.model ? offsets[r.model] : 0xffFFffFF));
 				if (r.material_override) {
 					const auto& elems = r.material_override->elements;
-					serializer.write(r.material_override->elements.size());
+					serializer.write(elems.size());
 					for (const auto& elem : elems) {
 						serializer.writeString(elem.material ? elem.material->getPath().c_str() : "");
 					}
@@ -2051,46 +2040,29 @@ struct RenderModuleImpl final : RenderModule {
 
 	void overrideMaterialVec4(EntityRef entity, u32 mesh_index, const char* uniform_name, Vec4 value) {
 		ModelInstance& inst = m_model_instances[entity.index];
-		ASSERT(inst.model->isReady());
+		ASSERT(inst.model->isReady()); // TODO handle not ready 
 		if (!inst.material_override) {
 			inst.material_override = LUMIX_NEW(m_allocator, MaterialOverride)(m_allocator);
-
-			if (m_culling_system->isAdded(entity)) {
-				m_culling_system->remove(entity);
-			}
-
-			const RenderableTypes type = getRenderableType(*inst.model, inst.material_override);
-			const DVec3 pos = m_world.getPosition(entity);
-			const Vec3& scale = m_world.getScale(entity);
-			const float radius = inst.model->getOriginBoundingRadius() * maximum(scale.x, scale.y, scale.z);
-			m_culling_system->add(entity, (u8)type, pos, radius);
 		}
 		if ((u32)inst.material_override->elements.size() <= mesh_index) {
 			inst.material_override->elements.resize(mesh_index + 1);
 		}
 		MaterialOverride::Element& element = inst.material_override->elements[mesh_index];
 		Material* mesh_material = inst.model->getMesh(mesh_index).material;
-		if (element.instance == 0) {
+		if (element.material_index == 0) {
 			float tmp[Material::MAX_UNIFORMS_FLOATS];
 			mesh_material->getUniformData(Span(tmp));
-			element.instance = m_renderer.createMaterialInstance(tmp);
+			element.material_index = m_renderer.createMaterialInstance(tmp);
+			element.own_material_index = true;
 		}
-		for (const auto& u : mesh_material->getShader()->m_uniforms) {
+		Shader* shader = mesh_material->getShader();
+		for (const auto& u : shader->m_uniforms) {
 			if (equalStrings(u.name, uniform_name)) {
-				m_renderer.updateMaterialConstants(element.instance, Span(&value.x, 4), u.offset);
-				break;
+				m_renderer.updateMaterialConstants(element.material_index, Span(&value.x, 4), u.offset);
+				return;
 			}
 		}
-	}
-
-	Material* getModelInstanceMaterial(EntityRef entity, u32 mesh_index) { 
-		ModelInstance& inst = m_model_instances[entity.index];
-		if (inst.material_override) {
-			return inst.material_override->elements[mesh_index].material;
-		}
-		if (!inst.model) return nullptr;
-		if (inst.model->getMeshCount() == 0) return nullptr;
-		return inst.model->getMesh(mesh_index).material;
+		logWarning("Failed to override ", uniform_name, " in shader ", shader->getPath(), " on entity ", entity.index);
 	}
 
 	Model* getModelInstanceModel(EntityRef entity) override { return m_model_instances[entity.index].model; }
@@ -2114,7 +2086,7 @@ struct RenderModuleImpl final : RenderModule {
 			const Vec3& scale = m_world.getScale(entity);
 			const float radius = model_instance.model->getOriginBoundingRadius() * maximum(scale.x, scale.y, scale.z);
 			if (!m_culling_system->isAdded(entity)) {
-				const RenderableTypes type = getRenderableType(*model_instance.model, model_instance.material_override);
+				const RenderableTypes type = getRenderableType(*model_instance.model);
 				m_culling_system->add(entity, (u8)type, pos, radius);
 			}
 		}
@@ -2126,32 +2098,40 @@ struct RenderModuleImpl final : RenderModule {
 
 	void setModelInstanceMaterialOverride(EntityRef entity, u32 mesh_idx, const Path& path) override {
 		ModelInstance& mi = m_model_instances[entity.index];
-		if (mi.mesh_count > 0 && mi.meshes[0].material->getPath() == path) return;
 
-		if (!path.isEmpty()) {
+		if (path.isEmpty()) {
+			if (!mi.material_override) return;
+			if (mesh_idx >= (u32)mi.material_override->elements.size()) return;
+			
+			mi.material_override->elements[mesh_idx].material = nullptr;
+			bool all_null = true;
+			for (const MaterialOverride::Element& el : mi.material_override->elements) {
+				if (el.material || el.own_material_index) {
+					all_null = false;
+					break;
+				}
+			}
+
+			if (all_null) {
+				mi.material_override->destroy(m_renderer);
+				LUMIX_DELETE(m_allocator, mi.material_override);
+				mi.material_override = nullptr;
+				return;
+			}
+		}
+		else {
 			if (!mi.material_override) {
 				mi.material_override = LUMIX_NEW(m_allocator, MaterialOverride)(m_allocator);
 			}
-
-			Material* material = m_engine.getResourceManager().load<Material>(path);
-			
-			if ((u32)mi.material_override->elements.size() <= mesh_idx) {
+			if (mesh_idx >= (u32)mi.material_override->elements.size()) {
 				mi.material_override->elements.resize(mesh_idx + 1);
 			}
+			
+			Material* material = m_engine.getResourceManager().load<Material>(path);
 			mi.material_override->elements[mesh_idx].material = material;
 		}
 
-		if (!mi.model || !mi.model->isReady()) return;
-
-		if (m_culling_system->isAdded(entity)) {
-			m_culling_system->remove(entity);
-		}
-
-		const RenderableTypes type = getRenderableType(*mi.model, mi.material_override);
-		const DVec3 pos = m_world.getPosition(entity);
-		const Vec3& scale = m_world.getScale(entity);
-		const float radius = mi.model->getOriginBoundingRadius() * maximum(scale.x, scale.y, scale.z);
-		m_culling_system->add(entity, (u8)type, pos, radius);
+		mi.material_override->dirty = true;
 	}
 
 	Path getModelInstanceMaterialOverride(EntityRef entity, u32 mesh_idx) override {
@@ -2998,7 +2978,7 @@ struct RenderModuleImpl final : RenderModule {
 		const DVec3 pos = m_world.getPosition(entity);
 		const float radius = bounding_radius * maximum(scale.x, scale.y, scale.z);
 		if(r.flags & ModelInstance::ENABLED) {
-			const RenderableTypes type = getRenderableType(*model, r.material_override);
+			const RenderableTypes type = getRenderableType(*model);
 			m_culling_system->add(entity, (u8)type, pos, radius);
 		}
 		ASSERT(!r.pose);
@@ -3024,6 +3004,25 @@ struct RenderModuleImpl final : RenderModule {
 				break;
 			}
 		}
+
+		if (r.material_override) {
+			r.material_override->dirty = true;
+		}
+	}
+
+	u32 computeSortKey(const Material& material, const Mesh& mesh) const override {
+		ASSERT(material.isReady());
+		RollingHasher hasher;
+		const Shader* shader = material.getShader();
+		const u32 define_mask = material.getDefineMask();
+		hasher.begin();
+		const Mesh* mesh_ptr = &mesh;
+		hasher.update(&mesh_ptr, sizeof(mesh_ptr));
+		hasher.update(&shader, sizeof(shader));
+		hasher.update(&define_mask, sizeof(define_mask));
+		hasher.update(&material.m_render_states, sizeof(material.m_render_states));
+		const RuntimeHash32 hash = hasher.end();
+		return m_renderer.allocSortKey(hash.getHashValue());
 	}
 
 
@@ -3573,7 +3572,6 @@ void RenderModule::reflect() {
 			.blob_property<&RenderModuleImpl::getInstancedModelBlob, &RenderModuleImpl::setInstancedModelBlob>("Blob")
 		.LUMIX_CMP(ModelInstance, "model_instance", "Render / Mesh")
 			.LUMIX_FUNC_EX(RenderModule::getModelInstanceModel, "getModel")
-			.LUMIX_FUNC_EX(RenderModuleImpl::getModelInstanceMaterial, "getMaterial")
 			.LUMIX_FUNC_EX(RenderModuleImpl::overrideMaterialVec4, "overrideMaterialVec4")
 			.prop<&RenderModule::isModelInstanceEnabled, &RenderModule::enableModelInstance>("Enabled")
 			.LUMIX_PROP(ModelInstancePath, "Source").resourceAttribute(Model::TYPE)

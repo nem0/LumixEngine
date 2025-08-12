@@ -38,6 +38,7 @@ struct LUMIX_RENDERER_API Material final : Resource {
 	static const ResourceType TYPE;
 
 	Material(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& allocator);
+	~Material();
 
 	ResourceType getType() const override { return TYPE; }
 	Renderer& getRenderer() { return m_renderer; }
@@ -58,11 +59,6 @@ struct LUMIX_RENDERER_API Material final : Resource {
 	Uniform& getUniform(int index) { return m_uniforms[index]; }
 	const Uniform& getUniform(int index) const { return m_uniforms[index]; }
 	Uniform* findUniform(RuntimeHash name_hash);
-	void setUniformI32(u32 index, i32 value);
-	void setUniformFloat(u32 index, float value);
-	void setUniformVec2(u32 index, Vec2 value);
-	void setUniformVec3(u32 index, Vec3 value);
-	void setUniformVec4(u32 index, Vec4 value);
 	void getUniformData(Span<float> out) const;
 
 	void setDefine(u8 define_idx, bool enabled);
@@ -88,7 +84,6 @@ struct LUMIX_RENDERER_API Material final : Resource {
 
 	void deserialize(struct InputMemoryStream& blob);
 	void serialize(struct OutputMemoryStream& blob);
-	void bind(struct DrawStream& stream) const;
 	u32 getBufferOffset() const { return m_material_constants * MAX_UNIFORMS_BYTES; }
 	u32 getIndex() const { return m_material_constants; }
 
@@ -103,7 +98,7 @@ private:
 	Shader* m_shader;
 	Texture* m_textures[MAX_TEXTURE_COUNT];
 	u8 m_layer;
-	u32 m_sort_key;
+	u32 m_sort_key = 0;
 	u32 m_define_mask;
 	u32 m_material_constants = 0;
 	u32 m_texture_count;

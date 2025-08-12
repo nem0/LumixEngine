@@ -959,12 +959,6 @@ void TerrainEditor::removeEntities(const DVec3& hit_pos, WorldEditor& editor) co
 	const AABB brush_aabb(Vec3(-m_terrain_brush_size), Vec3(m_terrain_brush_size));
 
 	CullResult* meshes = module->getRenderables(frustum, RenderableTypes::MESH);
-	if(meshes) {
-		meshes->merge(module->getRenderables(frustum, RenderableTypes::MESH_MATERIAL_OVERRIDE));
-	}
-	else {
-		meshes = module->getRenderables(frustum, RenderableTypes::MESH_MATERIAL_OVERRIDE);
-	}
 	if(!meshes) return;
 
 	editor.beginCommandGroup("remove_entities");
@@ -1072,8 +1066,6 @@ void TerrainEditor::paintEntities(const DVec3& hit_pos, WorldEditor& editor, Ent
 			m_terrain_brush_size);
 		
 		CullResult* meshes = module->getRenderables(frustum, RenderableTypes::MESH);
-		if (meshes) meshes->merge(module->getRenderables(frustum, RenderableTypes::MESH_MATERIAL_OVERRIDE));
-		else meshes = module->getRenderables(frustum, RenderableTypes::MESH_MATERIAL_OVERRIDE);
 
 		const EntityFolders& folders = editor.getEntityFolders();
 		const EntityFolders::FolderHandle folder = folders.getSelectedFolder();

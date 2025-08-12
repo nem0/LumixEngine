@@ -29,6 +29,9 @@ static LocalRigidTransform invert(const LocalRigidTransform& tr)
 	return result;
 }
 
+Mesh::~Mesh() {
+	renderer.freeSortKey(sort_key);
+}
 
 Mesh::Mesh(Material* mat,
 	const gpu::VertexDecl& vertex_decl,
@@ -59,8 +62,6 @@ Mesh::Mesh(Material* mat,
 	}
 	
 	semantics_defines = renderer.getSemanticDefines(Span(attributes_semantic));
-
-	sort_key = renderer.allocSortKey(this);
 }
 
 Mesh::Mesh(Mesh&& rhs)
@@ -69,7 +70,6 @@ Mesh::Mesh(Mesh&& rhs)
 	, vertices(rhs.vertices.move())
 	, skin(rhs.skin.move())
 	, flags(rhs.flags)
-	, sort_key(rhs.sort_key)
 	, layer(rhs.layer)
 	, name(rhs.name)
 	, material(rhs.material)
@@ -78,10 +78,6 @@ Mesh::Mesh(Mesh&& rhs)
 	, renderer(rhs.renderer)
 {
 	ASSERT(false); // renderer keeps Mesh* pointer, so we should not move
-}
-
-Mesh::~Mesh() {
-	renderer.freeSortKey(sort_key);
 }
 
 static bool hasAttribute(Mesh& mesh, AttributeSemantic attribute)
@@ -346,6 +342,21 @@ void Model::onBeforeReady()
 		for (i32 j = m_lod_indices[i].from; j <= m_lod_indices[i].to; ++j) {
 			m_meshes[j].lod = float(i);
 		}
+	}
+
+	for (Mesh& mesh : m_meshes) {
+		RollingHasher hasher;
+		const Material* material = mesh.material;
+		const Shader* shader = material->getShader();
+		const u32 define_mask = material->getDefineMask();
+		hasher.begin();
+		Mesh* mesh_ptr = &mesh;
+		hasher.update(&mesh_ptr, sizeof(mesh_ptr));
+		hasher.update(&shader, sizeof(shader));
+		hasher.update(&define_mask, sizeof(define_mask));
+		hasher.update(&material->m_render_states, sizeof(material->m_render_states));
+		const RuntimeHash32 hash = hasher.end();
+		mesh.sort_key = m_renderer.allocSortKey(hash.getHashValue());
 	}
 }
 

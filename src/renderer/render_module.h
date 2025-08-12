@@ -187,13 +187,16 @@ struct EnvironmentProbe {
 struct MaterialOverride {
 	struct Element {
 		Material* material = nullptr;
-		u32 instance = 0;
+		u32 material_index = 0;
+		u32 sort_key = 0;
+		bool own_sort_key = false;
+		bool own_material_index = false;
 	};
 	MaterialOverride(IAllocator& allocator) : elements(allocator) {}
 	~MaterialOverride();
 	void destroy(Renderer& renderer);
-	u32 getInstance(u32 element) const;
 	Array<Element> elements;
+	bool dirty = true;
 };
 
 struct ModelInstance {
@@ -289,7 +292,6 @@ enum class RenderableTypes : u8 {
 	SKINNED,
 	DECAL,
 	LOCAL_LIGHT,
-	MESH_MATERIAL_OVERRIDE,
 	FUR,
 	CURVE_DECAL,
 	PARTICLES,
@@ -350,6 +352,7 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual ShiftedFrustum getCameraFrustum(EntityRef entity, const Vec2& a, const Vec2& b) const = 0;
 	virtual Engine& getEngine() const = 0;
 	virtual IAllocator& getAllocator() = 0;
+	virtual u32 computeSortKey(const Material& material, const Mesh& mesh) const = 0;
 
 	virtual Pose* lockPose(EntityRef entity) = 0;
 	virtual void unlockPose(EntityRef entity, bool changed) = 0;

@@ -22,13 +22,17 @@ struct VSOutput {
 	float4 position : SV_POSITION;
 };
 
-cbuffer Model : register(b4) { float4x4 u_model; }
+cbuffer Model : register(b4) {
+	float4x4 u_model;
+	uint u_material_index;
+}
 
 VSOutput mainVS(VSInput input) {
+	MaterialData material = getMaterialData(u_material_index);
 	float2 pos = float2(input.vertex_id & 1, (input.vertex_id & 2) * 0.5);
 	uint frame = uint(input.i_frame);
 	VSOutput output;
-	output.uv = (pos + float2(frame % u_frames_cols, frame / u_frames_cols)) / float2(u_frames_cols, u_frames_rows);
+	output.uv = (pos + float2(frame % material.u_frames_cols, frame / material.u_frames_cols)) / float2(material.u_frames_cols, material.u_frames_rows);
 
 	float3 dir = normalize(input.i_position);
 
@@ -46,8 +50,9 @@ VSOutput mainVS(VSInput input) {
 }
 
 float4 mainPS(VSOutput input) : SV_TARGET {
+	MaterialData material = getMaterialData(u_material_index);
 	Surface data;
-	float4 c = sampleBindless(LinearSampler, t_texture, input.uv) * saturate(input.color);
+	float4 c = sampleBindless(LinearSampler, material.t_texture, input.uv) * saturate(input.color);
 	data.N = 0;
 	data.V = 0;
 	data.pos_ws = 0;

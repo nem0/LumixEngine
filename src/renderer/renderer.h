@@ -102,10 +102,9 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 	virtual u8 getLayerIdx(const char* name) = 0;
 	virtual u8 getLayersCount() const = 0;
 	virtual const char* getLayerName(u8 layer) const = 0;
-	virtual u32 allocSortKey(struct Mesh* mesh) = 0;
+	virtual u32 allocSortKey(u32 hash) = 0;
 	virtual void freeSortKey(u32 key) = 0;
 	virtual u32 getMaxSortKey() const = 0;
-	virtual const Mesh** getSortKeyToMeshMap() const = 0;
 	virtual void enableBuiltinTAA(bool enable) = 0;
 	
 	virtual const char* getSemanticDefines(Span<const AttributeSemantic> attributes) = 0;

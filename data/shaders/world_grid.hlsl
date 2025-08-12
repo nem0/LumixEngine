@@ -3,7 +3,7 @@
 #include "shaders/surface_base.hlsli"
 
 // https://bgolus.medium.com/the-best-darn-grid-shader-yet-727f9278b9d8
-Surface getSurface(VSOutput input) {
+Surface getSurface(VSOutput input, uint dummy) {
 	float3 pos_gs = input.pos_ws.xyz + Global_camera_world_pos.xyz;
 	float3 line_width = 0.04;
 	line_width *= sqrt(saturate(1.0 - input.normal * input.normal));

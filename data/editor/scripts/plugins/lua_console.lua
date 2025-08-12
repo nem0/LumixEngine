@@ -32,11 +32,16 @@ function execute()
 			end
 			for i = 1, selected_count do
 				local entity = Editor.getSelectedEntity(i - 1)
-				if entity.lua_script == nil then continue end
+				if entity.lua_script == nil then 
+					LumixAPI.logError("Entity does not have lua script")
+					continue
+				end
 				local env = entity.lua_script[1]
 				if env ~= nil then
 					setfenv(f, env)
 					f()
+				else
+					LumixAPI.logError("Entity does not have lua script")
 				end
 			end
 		else

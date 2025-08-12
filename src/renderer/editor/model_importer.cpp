@@ -471,7 +471,9 @@ void ModelImporter::createImpostorTextures(Model* model, ImpostorTexturesContext
 					const gpu::StateFlags state = gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE | material->m_render_states;
 					const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, capture_define | material->getDefineMask(), mesh.semantics_defines);
 
-					material->bind(stream);
+					ASSERT(false);
+					// TODO
+					// material->bind(stream);
 					stream.useProgram(program);
 					stream.bindIndexBuffer(mesh.index_buffer_handle);
 					stream.bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);

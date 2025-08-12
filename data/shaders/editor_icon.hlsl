@@ -5,6 +5,7 @@
 
 cbuffer Drawcall : register(b4) {
 	float4x4 u_ls_to_ws;
+	uint u_material_index;
 };
 
 cbuffer Drawcall2 : register(b5) {
@@ -42,9 +43,10 @@ VSOutput mainVS(VSInput input) {
 }
 
 float4 mainPS(VSOutput input) : SV_TARGET {
+	MaterialData material = getMaterialData(u_material_index);
 	float2 screen_uv = input.position.xy * Global_rcp_framebuffer_size;
 	float3 pos_ws = getPositionWS(u_gbuffer_depth, screen_uv);
-	float4 albedo = bindless_textures[t_albedo].Sample(LinearSampler, input.uv);
+	float4 albedo = bindless_textures[material.t_albedo].Sample(LinearSampler, input.uv);
 	#ifdef ALPHA_CUTOUT
 		if (albedo.a < 0.5) discard;
 	#endif
