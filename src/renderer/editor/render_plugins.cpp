@@ -5235,7 +5235,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin {
 			static int size = 1024;
 			ImGuiEx::Label("Size");
 			ImGui::InputInt("##size", &size);
-			m_file_selector.gui(false, "mat");
+			m_file_selector.gui("mat");
 			if (m_file_selector.getPath()[0] &&  ImGui::Button("Create"))
 			{
 				new_created = createHeightmap(Path(m_file_selector.getPath()), size);

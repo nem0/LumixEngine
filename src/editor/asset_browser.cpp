@@ -747,6 +747,8 @@ struct AssetBrowserImpl : AssetBrowser {
 			alignGUICenter([&](){
 				if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
 				create = ImGui::InputTextWithHint("##name", "Name", tmp, sizeof(tmp), ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+				ImGui::SameLine();
+				ImGui::Text(".%s", plugin->getDefaultExtension());
 			});
 			alignGUICenter([&](){
 				if (ImGui::Button("Create")) create = true;

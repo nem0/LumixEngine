@@ -105,21 +105,18 @@ struct LUMIX_EDITOR_API FileSelector {
 	// popup
 	bool gui(const char* label, bool* open, const char* extension, bool save);
 	// inplace
-	bool gui(bool show_breadcrumbs, const char* extension);
+	bool gui(const char* extension);
 	const char* getPath();
-	String m_current_dir;
 
+	String m_path;
 private:
-	bool breadcrumb(StringView path);
 	void fillSubitems();
-
+	
 	StudioApp& m_app;
 	bool m_save;
-	String m_filename;
 	String m_accepted_extension;
 	Array<String> m_subdirs;
 	Array<String> m_subfiles;
-	String m_full_path;
 };
 
 struct LUMIX_EDITOR_API NodeEditor : SimpleUndoRedo {
