@@ -139,6 +139,9 @@ end
 declare class core_module
 end
 
+declare class lua_script_module
+end
+
 declare class gui_module
 	getRectAt : (gui_module, Vec2) -> Entity?
 	isOver : (gui_module, Vec2, Entity?) -> boolean
@@ -202,121 +205,11 @@ declare class spline_component
 	blob: any
 end
 
-declare class particle_emitter_component
-	autodestroy: boolean
-	source: string
-end
-
-declare class terrain_component
-	material: string
-	xz_scale: number
-	height_scale: number
-	tesselation: number
-	grid_resolution: number
-	grass: any
-	getTerrainNormalAt : (terrain_component, number, number) -> Vec3
-	getTerrainHeightAt : (terrain_component, number, number) -> number
-end
-
-declare class camera_component
-	fov: number
-	near: number
-	far: number
-	orthographic: boolean
-	orthographic_size: number
-	film_grain_intensity: number
-	dof_enabled: boolean
-	dof_distance: number
-	dof_range: number
-	dof_max_blur_size: number
-	dof_sharp_range: number
-	bloom_enabled: boolean
-	bloom_tonemap_enabled: boolean
-	bloom_accomodation_speed: number
-	bloom_avg_bloom_multiplier: number
-	bloom_exposure: number
-	getRay : (camera_component, Vec2) -> any --[[Ray]]
-end
-
-declare class decal_component
-	material: string
-	half_extents: Vec3
-	uv_scale: any
-end
-
-declare class curve_decal_component
-	material: string
-	half_extents: number
-	uv_scale: any
-end
-
-declare class point_light_component
-	cast_shadows: boolean
-	dynamic: boolean
-	intensity: number
-	fov: number
-	attenuation: number
-	color: Vec3
-	range: number
-end
-
-declare class environment_component
-	color: Vec3
-	intensity: number
-	indirect_intensity: number
-	shadow_cascades: any
-	cast_shadows: boolean
-	sky_texture: string
-	atmosphere_enabled: boolean
-	godrays_enabled: boolean
-	sky_intensity: number
-	scatter_rayleigh: Vec3
-	scatter_mie: Vec3
-	absorb_mie: Vec3
-	sunlight_color: Vec3
-	sunlight_strength: number
-	height_distribution_rayleigh: number
-	height_distribution_mie: number
-	ground_radius: number
-	atmosphere_radius: number
-	fog_density: number
-	fog_scattering: Vec3
-	fog_top: number
-end
-
-declare class instanced_model_component
-	model: string
-	blob: any
-end
-
 declare class model_instance_component
 	enabled: boolean
-	material: string
 	source: string
 	getModel : (model_instance_component) -> Model
-end
-
-declare class environment_probe_component
-	enabled: boolean
-	inner_range: Vec3
-	outer_range: Vec3
-end
-
-declare class reflection_probe_component
-	enabled: boolean
-	size: number
-	half_extents: Vec3
-end
-
-declare class fur_component
-	layers: number
-	scale: number
-	gravity: number
-	enabled: boolean
-end
-
-declare class procedural_geom_component
-	material: string
+	overrideMaterialVec4 : (model_instance_component, number, string, any --[[Vec4]]) -> boolean
 end
 
 declare class bone_attachment_component
@@ -324,30 +217,6 @@ declare class bone_attachment_component
 	relative_position: Vec3
 	relative_rotation: Vec3
 	bone: number
-end
-
-declare class rigid_actor_component
-	layer: number
-	dynamic: number
-	trigger: boolean
-	box_geometry: any
-	sphere_geometry: any
-	ccd: boolean
-	mesh: string
-	material: string
-	putToSleep : (rigid_actor_component) -> ()
-	getSpeed : (rigid_actor_component) -> number
-	getVelocity : (rigid_actor_component) -> Vec3
-	applyForce : (rigid_actor_component, Vec3) -> ()
-	applyImpulse : (rigid_actor_component, Vec3) -> ()
-	addForceAtPos : (rigid_actor_component, Vec3, Vec3) -> ()
-end
-
-declare class physical_heightfield_component
-	layer: number
-	heightmap: string
-	y_scale: number
-	xz_scale: number
 end
 
 declare class physical_controller_component
@@ -360,49 +229,6 @@ declare class physical_controller_component
 	move : (physical_controller_component, Vec3) -> ()
 	isCollisionDown : (physical_controller_component) -> boolean
 	getGravitySpeed : (physical_controller_component) -> number
-end
-
-declare class gui_image_component
-	enabled: boolean
-	color: any
-	sprite: string
-end
-
-declare class gui_text_component
-	text: string
-	font: string
-	font_size: number
-	horizontal_align: number
-	vertical_align: number
-	color: any
-end
-
-declare class gui_button_component
-	hovered_color: any
-	cursor: number
-end
-
-declare class gui_render_target_component
-end
-
-declare class animable_component
-	animation: string
-end
-
-declare class property_animator_component
-	animation: string
-	enabled: boolean
-	looped: boolean
-end
-
-declare class animator_component
-	source: string
-	default_set: number
-	use_root_motion: boolean
-	setFloatInput : (animator_component, number, number) -> ()
-	setBoolInput : (animator_component, number, boolean) -> ()
-	setVec3Input : (animator_component, number, Vec3) -> ()
-	getInputIndex : (animator_component, string) -> number
 end
 
 declare class distance_joint_component
@@ -448,6 +274,23 @@ declare class d6_joint_component
 	restitution: number
 end
 
+declare class rigid_actor_component
+	layer: number
+	dynamic: number
+	trigger: boolean
+	box_geometry: any
+	sphere_geometry: any
+	ccd: boolean
+	mesh: string
+	material: string
+	putToSleep : (rigid_actor_component) -> ()
+	getSpeed : (rigid_actor_component) -> number
+	getVelocity : (rigid_actor_component) -> Vec3
+	applyForce : (rigid_actor_component, Vec3) -> ()
+	applyImpulse : (rigid_actor_component, Vec3) -> ()
+	addForceAtPos : (rigid_actor_component, Vec3, Vec3) -> ()
+end
+
 declare class vehicle_component
 	speed: number
 	current_gear: number
@@ -474,6 +317,123 @@ declare class wheel_component
 	spring_damper_rate: number
 	slot: number
 	rpm: number
+end
+
+declare class particle_emitter_component
+	autodestroy: boolean
+	source: string
+end
+
+declare class terrain_component
+	material: string
+	xz_scale: number
+	height_scale: number
+	tesselation: number
+	grid_resolution: number
+	grass: any
+	getTerrainNormalAt : (terrain_component, number, number) -> Vec3
+	getTerrainHeightAt : (terrain_component, number, number) -> number
+end
+
+declare class camera_component
+	fov: number
+	near: number
+	far: number
+	orthographic: boolean
+	orthographic_size: number
+	film_grain_intensity: number
+	dof_enabled: boolean
+	dof_distance: number
+	dof_range: number
+	dof_max_blur_size: number
+	dof_sharp_range: number
+	bloom_enabled: boolean
+	bloom_tonemap_enabled: boolean
+	bloom_accomodation_speed: number
+	bloom_average_bloom_multiplier: number
+	bloom_exposure: number
+	getRay : (camera_component, Vec2) -> any --[[Ray]]
+end
+
+declare class decal_component
+	material: string
+	half_extents: Vec3
+	uv_scale: any
+end
+
+declare class curve_decal_component
+	material: string
+	half_extents: number
+	uv_scale: any
+end
+
+declare class point_light_component
+	cast_shadows: boolean
+	dynamic: boolean
+	intensity: number
+	fov: number
+	attenuation: number
+	color: Vec3
+	range: number
+end
+
+declare class environment_component
+	color: Vec3
+	intensity: number
+	indirect_intensity: number
+	shadow_cascades: any
+	cast_shadows: boolean
+	sky_texture: string
+	atmosphere_enabled: boolean
+	godrays_enabled: boolean
+	clouds_enabled: boolean
+	clouds_top: number
+	clouds_bottom: number
+	sky_intensity: number
+	scatter_rayleigh: Vec3
+	scatter_mie: Vec3
+	absorb_mie: Vec3
+	sunlight_color: Vec3
+	sunlight_strength: number
+	height_distribution_rayleigh: number
+	height_distribution_mie: number
+	ground_radius: number
+	atmosphere_radius: number
+	fog_density: number
+	fog_scattering: Vec3
+	fog_top: number
+end
+
+declare class instanced_model_component
+	model: string
+	blob: any
+end
+
+declare class environment_probe_component
+	enabled: boolean
+	inner_range: Vec3
+	outer_range: Vec3
+end
+
+declare class reflection_probe_component
+	enabled: boolean
+	size: number
+	half_extents: Vec3
+end
+
+declare class fur_component
+	layers: number
+	scale: number
+	gravity: number
+	enabled: boolean
+end
+
+declare class procedural_geom_component
+	material: string
+end
+
+declare class animable_component
+	animation: string
 end
 
 declare class navmesh_agent_component
@@ -505,12 +465,59 @@ declare class navmesh_zone_component
 	generateNavmesh : (navmesh_zone_component) -> any --[[NavmeshBuildJob]]
 end
 
+declare class gui_image_component
+	enabled: boolean
+	color: any
+	sprite: string
+end
+
+declare class gui_text_component
+	text: string
+	font: string
+	font_size: number
+	horizontal_align: number
+	vertical_align: number
+	color: any
+end
+
+declare class gui_button_component
+	hovered_color: any
+	cursor: number
+end
+
+declare class gui_render_target_component
+end
+
 declare class lua_script_component
 	scripts: any
 	getScriptPath : (lua_script_component, number) -> string
 end
 
-declare class gui_input_field_component
+declare class property_animator_component
+	animation: string
+	enabled: boolean
+	looped: boolean
+end
+
+declare class animator_component
+	source: string
+	default_set: number
+	use_root_motion: boolean
+	setFloatInput : (animator_component, number, number) -> ()
+	setBoolInput : (animator_component, number, boolean) -> ()
+	setVec3Input : (animator_component, number, Vec3) -> ()
+	getInputIndex : (animator_component, string) -> number
+end
+
+declare class physical_heightfield_component
+	layer: number
+	heightmap: string
+	y_scale: number
+	xz_scale: number
+end
+
+declare class lua_script_inline_component
+	code: string
 end
 
 declare class physical_instanced_cube_component
@@ -542,8 +549,7 @@ declare class chorus_zone_component
 	delay__ms_: number
 end
 
-declare class lua_script_inline_component
-	code: string
+declare class gui_input_field_component
 end
 
 
@@ -563,6 +569,16 @@ declare class Entity
 	gui_canvas: gui_canvas_component
 	signal: signal_component
 	spline: spline_component
+	model_instance: model_instance_component
+	bone_attachment: bone_attachment_component
+	physical_controller: physical_controller_component
+	distance_joint: distance_joint_component
+	hinge_joint: hinge_joint_component
+	spherical_joint: spherical_joint_component
+	d6_joint: d6_joint_component
+	rigid_actor: rigid_actor_component
+	vehicle: vehicle_component
+	wheel: wheel_component
 	particle_emitter: particle_emitter_component
 	terrain: terrain_component
 	camera: camera_component
@@ -571,42 +587,35 @@ declare class Entity
 	point_light: point_light_component
 	environment: environment_component
 	instanced_model: instanced_model_component
-	model_instance: model_instance_component
 	environment_probe: environment_probe_component
 	reflection_probe: reflection_probe_component
 	fur: fur_component
 	procedural_geom: procedural_geom_component
-	bone_attachment: bone_attachment_component
-	rigid_actor: rigid_actor_component
-	physical_heightfield: physical_heightfield_component
-	physical_controller: physical_controller_component
+	animable: animable_component
+	navmesh_agent: navmesh_agent_component
+	navmesh_zone: navmesh_zone_component
 	gui_image: gui_image_component
 	gui_text: gui_text_component
 	gui_button: gui_button_component
 	gui_render_target: gui_render_target_component
-	animable: animable_component
+	lua_script: lua_script_component
 	property_animator: property_animator_component
 	animator: animator_component
-	distance_joint: distance_joint_component
-	hinge_joint: hinge_joint_component
-	spherical_joint: spherical_joint_component
-	d6_joint: d6_joint_component
-	vehicle: vehicle_component
-	wheel: wheel_component
-	navmesh_agent: navmesh_agent_component
-	navmesh_zone: navmesh_zone_component
-	lua_script: lua_script_component
-	gui_input_field: gui_input_field_component
+	physical_heightfield: physical_heightfield_component
+	lua_script_inline: lua_script_inline_component
 	physical_instanced_cube: physical_instanced_cube_component
 	physical_instanced_mesh: physical_instanced_mesh_component
 	audio_listener: audio_listener_component
 	ambient_sound: ambient_sound_component
 	echo_zone: echo_zone_component
 	chorus_zone: chorus_zone_component
-	lua_script_inline: lua_script_inline_component
+	gui_input_field: gui_input_field_component
 
 end
 
+declare class Resource
+	getPath : () -> string
+end
 
 declare this:Entity
 
@@ -622,6 +631,7 @@ declare Editor: {
 	ENTITY_PROPERTY : number,
 	BOOLEAN_PROPERTY : number,
 	setPropertyType : (any, string, number, string?) -> (),
+	setArrayPropertyType : (any, string, number, string?) -> (),
 	getSelectedEntitiesCount : () -> number,
 	getSelectedEntity : (number) -> Entity,
 	addAction : (ActionDesc) -> (),
