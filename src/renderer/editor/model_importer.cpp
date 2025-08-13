@@ -465,9 +465,10 @@ void ModelImporter::createImpostorTextures(Model* model, ImpostorTexturesContext
 				stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 
 				for (u32 i = 0; i <= (u32)model->getLODIndices()[0].to; ++i) {
+					const MeshMaterial& mesh_mat = model->getMeshMaterial(i);
 					const Mesh& mesh = model->getMesh(i);
-					Shader* shader = mesh.material->getShader();
-					const Material* material = mesh.material;
+					const Material* material = mesh_mat.material;
+					Shader* shader = material->getShader();
 					const gpu::StateFlags state = gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE | material->m_render_states;
 					const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, capture_define | material->getDefineMask(), mesh.semantics_defines);
 

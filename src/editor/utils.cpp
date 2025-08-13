@@ -2619,7 +2619,7 @@ bool FileSelector::gui(const char* accepted_extension) {
 	float w = maximum(300.f, ImGui::GetContentRegionAvail().x);
 	float h = -ImGui::GetTextLineHeightWithSpacing() - ImGui::GetStyle().WindowPadding.y;
 	if (ImGui::GetContentRegionAvail().y < 200) h = 150;
-	if (ImGui::BeginChild("list", ImVec2(w, h), true, ImGuiWindowFlags_NoScrollbar)) {
+	if (ImGui::BeginChild("list", ImVec2(w, h), ImGuiChildFlags_Borders, ImGuiWindowFlags_NoScrollbar)) {
 		if (ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
 		
 		for (const String& subdir : m_subdirs) {

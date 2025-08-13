@@ -29,19 +29,13 @@ static LocalRigidTransform invert(const LocalRigidTransform& tr)
 	return result;
 }
 
-Mesh::~Mesh() {
-	renderer.freeSortKey(sort_key);
-}
-
-Mesh::Mesh(Material* mat,
-	const gpu::VertexDecl& vertex_decl,
+Mesh::Mesh(const gpu::VertexDecl& vertex_decl,
 	u8 vb_stride,
 	StringView name,
 	const AttributeSemantic* semantics,
 	Renderer& renderer,
 	IAllocator& allocator)
 	: name(name, allocator)
-	, material(mat)
 	, indices(allocator)
 	, vertices(allocator)
 	, skin(allocator)
@@ -70,9 +64,7 @@ Mesh::Mesh(Mesh&& rhs)
 	, vertices(rhs.vertices.move())
 	, skin(rhs.skin.move())
 	, flags(rhs.flags)
-	, layer(rhs.layer)
 	, name(rhs.name)
-	, material(rhs.material)
 	, vertex_decl(rhs.vertex_decl)
 	, lod(rhs.lod)
 	, renderer(rhs.renderer)
@@ -89,14 +81,6 @@ static bool hasAttribute(Mesh& mesh, AttributeSemantic attribute)
 }
 
 
-void Mesh::setMaterial(Material* new_material, Model& model, Renderer& renderer)
-{
-	if (material) material->decRefCount();
-	material = new_material;
-	type = model.getBoneCount() == 0 || skin.empty() ? Mesh::RIGID : Mesh::SKINNED;
-}
-
-
 const ResourceType Model::TYPE("model");
 
 
@@ -105,6 +89,7 @@ Model::Model(const Path& path, ResourceManager& resource_manager, Renderer& rend
 	, m_allocator(allocator, m_path.c_str())
 	, m_bone_map(m_allocator)
 	, m_meshes(m_allocator)
+	, m_mesh_material(m_allocator)
 	, m_bones(m_allocator)
 	, m_first_nonroot_bone_index(0)
 	, m_renderer(renderer)
@@ -331,9 +316,9 @@ static bool parseVertexDecl(IInputStream& file, gpu::VertexDecl* vertex_decl, At
 
 void Model::onBeforeReady()
 {
-	for (Mesh& mesh : m_meshes) {
+	for (u32 i = 0, n = m_meshes.size(); i < n; ++i) {
+		Mesh& mesh = m_meshes[i];
 		mesh.type = getBoneCount() == 0 || mesh.skin.empty() ? Mesh::RIGID : Mesh::SKINNED;
-		mesh.layer = mesh.material->getLayer();
 	}
 
 	for (u32 i = 0; i < 4; ++i) {
@@ -344,9 +329,12 @@ void Model::onBeforeReady()
 		}
 	}
 
-	for (Mesh& mesh : m_meshes) {
+	for (u32 i = 0, n = m_meshes.size(); i < n; ++i) {
+		Mesh& mesh = m_meshes[i];
+		MeshMaterial& mesh_mat = m_mesh_material[i];
+		
 		RollingHasher hasher;
-		const Material* material = mesh.material;
+		const Material* material = mesh_mat.material;
 		const Shader* shader = material->getShader();
 		const u32 define_mask = material->getDefineMask();
 		hasher.begin();
@@ -356,7 +344,8 @@ void Model::onBeforeReady()
 		hasher.update(&define_mask, sizeof(define_mask));
 		hasher.update(&material->m_render_states, sizeof(material->m_render_states));
 		const RuntimeHash32 hash = hasher.end();
-		mesh.sort_key = m_renderer.allocSortKey(hash.getHashValue());
+		mesh_mat.sort_key = m_renderer.allocSortKey(hash.getHashValue());
+		mesh_mat.material_index = mesh_mat.material->getIndex();
 	}
 }
 
@@ -475,7 +464,8 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 
 		StringView mesh_name((const char*)tmp, str_size);
 
-		m_meshes.emplace(material, vertex_decl, vb_stride, mesh_name, semantics, m_renderer, m_allocator);
+		m_meshes.emplace(vertex_decl, vb_stride, mesh_name, semantics, m_renderer, m_allocator);
+		m_mesh_material.emplace(material);
 		addDependency(*material);
 	}
 
@@ -609,9 +599,17 @@ bool Model::load(Span<const u8> mem)
 
 void Model::unload()
 {
-	for (int i = 0; i < m_meshes.size(); ++i) {
-		removeDependency(*m_meshes[i].material);
-		m_meshes[i].material->decRefCount();
+	for (int i = 0, n = m_mesh_material.size(); i < n; ++i) {
+		MeshMaterial& m = m_mesh_material[i];
+		removeDependency(*m.material);
+		m.material->decRefCount();
+		m_renderer.freeSortKey(m.sort_key);
+		m.sort_key = 0;
+		if (m.flags && MeshMaterial::OWN_MATERIAL_INDEX) {
+			m_renderer.destroyMaterialConstants(m.material_index);
+		}
+		m.flags = MeshMaterial::NONE;
+		m.material_index = 0;
 	}
 
 	for (Mesh& mesh : m_meshes) {
@@ -622,6 +620,7 @@ void Model::unload()
 		mesh.vertex_buffer_handle = gpu::INVALID_BUFFER;
 	}
 	m_meshes.clear();
+	m_mesh_material.clear();
 	m_bones.clear();
 }
 

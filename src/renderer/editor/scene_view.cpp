@@ -661,8 +661,9 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 					const Pose* pose = module->lockPose(e);
 					for (int i = 0; i <= model->getLODIndices()[0].to; ++i) {
 						const Mesh& mesh = model->getMesh(i);
+						const MeshMaterial& mesh_mat = model->getMeshMaterial(i);
 					
-						Material* material = mesh.material;
+						Material* material = mesh_mat.material;
 						u32 define_mask = material->getDefineMask() | depth_define;
 						const Matrix mtx = world.getRelativeMatrix(e, view_pos);
 						dq_pose.clear();
@@ -707,7 +708,7 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 						}
 		
 						const gpu::StateFlags state = gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_FUNCTION;
-						gpu::ProgramHandle program = mesh.material->getShader()->getProgram(material->m_render_states | state, mesh.vertex_decl, define_mask, mesh.semantics_defines);
+						gpu::ProgramHandle program = mesh_mat.material->getShader()->getProgram(material->m_render_states | state, mesh.vertex_decl, define_mask, mesh.semantics_defines);
 						stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 						stream.useProgram(program);
 						stream.bindIndexBuffer(mesh.index_buffer_handle);
@@ -769,9 +770,10 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 
 					for (int i = 0; i <= model->getLODIndices()[0].to; ++i) {
 						const Mesh& mesh = model->getMesh(i);
-						const Material* material = mesh.material;
+						const MeshMaterial& mesh_mat = model->getMeshMaterial(i);
+						const Material* material = mesh_mat.material;
 						const gpu::StateFlags state = material->m_render_states | gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE;
-						gpu::ProgramHandle program = mesh.material->getShader()->getProgram(state, mesh.vertex_decl, material->getDefineMask(), mesh.semantics_defines);
+						gpu::ProgramHandle program = material->getShader()->getProgram(state, mesh.vertex_decl, material->getDefineMask(), mesh.semantics_defines);
 
 						struct UB {
 							Matrix mtx;
@@ -922,7 +924,7 @@ void SceneView::toggleWireframe() {
 			if (!model->isReady()) continue;
 			
 			for (u32 i = 0; i < (u32)model->getMeshCount(); ++i) {
-				Mesh& mesh = model->getMesh(i);
+				const MeshMaterial& mesh = model->getMeshMaterial(i);
 				materials.push(mesh.material);
 			}
 		}

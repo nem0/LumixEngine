@@ -59,19 +59,6 @@ struct BoneAttachment
 	LocalRigidTransform relative_transform;
 };
 
-void MaterialOverride::destroy(Renderer& renderer) {
-	for (const Element& e : elements) {
-		if (e.material) e.material->decRefCount();
-		if (e.own_material_index) renderer.destroyMaterialConstants(e.material_index);
-		if (e.own_sort_key) renderer.freeSortKey(e.sort_key);
-	}
-	elements.clear();
-}
-
-MaterialOverride::~MaterialOverride() {
-	ASSERT(elements.empty());
-}
-
 u32 ProceduralGeometry::getVertexCount() const {
 	return vertex_decl.getStride() ? u32(vertex_data.size() / vertex_decl.getStride()) : 0;
 }
@@ -219,14 +206,7 @@ struct RenderModuleImpl final : RenderModule {
 
 		for (ModelInstance& i : m_model_instances)
 		{
-			if ((i.flags & ModelInstance::VALID)) {
-				if (i.model) i.model->decRefCount();
-				if (i.material_override) {
-					i.material_override->destroy(m_renderer);
-					LUMIX_DELETE(m_allocator, i.material_override);
-				}
-				LUMIX_DELETE(m_allocator, i.pose);
-			}
+			clear(i, false);
 		}
 		
 		for(auto iter : m_model_entity_map.iterated()) {
@@ -662,11 +642,10 @@ struct RenderModuleImpl final : RenderModule {
 			serializer.write(r.flags);
 			if(r.flags & ModelInstance::VALID) {
 				serializer.write(u32(r.model ? offsets[r.model] : 0xffFFffFF));
-				if (r.material_override) {
-					const auto& elems = r.material_override->elements;
-					serializer.write(elems.size());
-					for (const auto& elem : elems) {
-						serializer.writeString(elem.material ? elem.material->getPath().c_str() : "");
+				if (hasMaterialOverride(r)) {
+					serializer.write((u32)r.mesh_materials.size());
+					for (const MeshMaterial& m : r.mesh_materials) {
+						serializer.writeString(m.material ? m.material->getPath().c_str() : "");
 					}
 				}
 				else {
@@ -1038,17 +1017,12 @@ struct RenderModuleImpl final : RenderModule {
 
 				while (e.index >= m_model_instances.size()) {
 					auto& r = m_model_instances.emplace();
-					r.flags = ModelInstance::NONE;
-					r.model = nullptr;
-					r.pose = nullptr;
+					clear(r, false);
 				}
 
 				ModelInstance& r = m_model_instances[e.index];
+				clear(r, false);
 				r.flags = flags;
-				r.model = nullptr;
-				r.pose = nullptr;
-				r.meshes = nullptr;
-				r.mesh_count = 0;
 
 				const char* path = serializer.readString();
 				if (path[0] != 0) {
@@ -1089,11 +1063,8 @@ struct RenderModuleImpl final : RenderModule {
 				}
 
 				ModelInstance& r = m_model_instances[e.index];
+				clear(r, false);
 				r.flags = flags;
-				r.model = nullptr;
-				r.pose = nullptr;
-				r.meshes = nullptr;
-				r.mesh_count = 0;
 
 				const u32 path_offset = serializer.read<u32>();
 				if (path_offset != 0xffFFffFF) {
@@ -1399,18 +1370,9 @@ struct RenderModuleImpl final : RenderModule {
 		m_world.onComponentDestroyed(entity, INSTANCED_MODEL_TYPE, this);
 	}
 
-	void destroyModelInstance(EntityRef entity)
-	{
-		setModel(entity, nullptr);
+	void destroyModelInstance(EntityRef entity) {
 		auto& model_instance = m_model_instances[entity.index];
-		LUMIX_DELETE(m_allocator, model_instance.pose);
-		model_instance.pose = nullptr;
-		model_instance.flags = ModelInstance::NONE;
-		if (model_instance.material_override) {
-			model_instance.material_override->destroy(m_renderer);
-			LUMIX_DELETE(m_allocator, model_instance.material_override);
-			model_instance.material_override = nullptr;
-		}
+		clear(model_instance, false);
 		m_world.onComponentDestroyed(entity, MODEL_INSTANCE_TYPE, this);
 	}
 
@@ -2038,31 +2000,30 @@ struct RenderModuleImpl final : RenderModule {
 		}
 	}
 
-	void overrideMaterialVec4(EntityRef entity, u32 mesh_index, const char* uniform_name, Vec4 value) {
+	bool overrideMaterialVec4(EntityRef entity, u32 mesh_index, const char* uniform_name, Vec4 value) {
 		ModelInstance& inst = m_model_instances[entity.index];
-		ASSERT(inst.model->isReady()); // TODO handle not ready 
-		if (!inst.material_override) {
-			inst.material_override = LUMIX_NEW(m_allocator, MaterialOverride)(m_allocator);
-		}
-		if ((u32)inst.material_override->elements.size() <= mesh_index) {
-			inst.material_override->elements.resize(mesh_index + 1);
-		}
-		MaterialOverride::Element& element = inst.material_override->elements[mesh_index];
-		Material* mesh_material = inst.model->getMesh(mesh_index).material;
-		if (element.material_index == 0) {
+		if (!inst.model->isReady()) return false;
+
+		ensureMaterialDataSize(inst, mesh_index + 1);
+
+		MeshMaterial& mat = inst.mesh_materials[mesh_index];
+		if (!mat.material || !mat.material->isReady()) return false;
+		
+		if (mat.material_index == 0 || !isFlagSet(mat.flags, MeshMaterial::OWN_MATERIAL_INDEX)) {
 			float tmp[Material::MAX_UNIFORMS_FLOATS];
-			mesh_material->getUniformData(Span(tmp));
-			element.material_index = m_renderer.createMaterialInstance(tmp);
-			element.own_material_index = true;
+			mat.material->getUniformData(Span(tmp));
+			mat.material_index = m_renderer.createMaterialInstance(tmp);
+			mat.flags = MeshMaterial::OWN_MATERIAL_INDEX;
 		}
-		Shader* shader = mesh_material->getShader();
+
+		Shader* shader = mat.material->getShader();
 		for (const auto& u : shader->m_uniforms) {
 			if (equalStrings(u.name, uniform_name)) {
-				m_renderer.updateMaterialConstants(element.material_index, Span(&value.x, 4), u.offset);
-				return;
+				m_renderer.updateMaterialConstants(mat.material_index, Span(&value.x, 4), u.offset);
+				return true;
 			}
 		}
-		logWarning("Failed to override ", uniform_name, " in shader ", shader->getPath(), " on entity ", entity.index);
+		return false;
 	}
 
 	Model* getModelInstanceModel(EntityRef entity) override { return m_model_instances[entity.index].model; }
@@ -2096,50 +2057,59 @@ struct RenderModuleImpl final : RenderModule {
 		}
 	}
 
+	static bool hasMaterialOverride(const ModelInstance& m) {
+		if (!m.model->isReady()) return m.mesh_materials.size() > 0;
+		return &m.model->getMeshMaterial(0) != m.mesh_materials.begin();
+	}
+
+	void ensureMaterialDataSize(ModelInstance& m, u32 size) {
+		bool has = hasMaterialOverride(m);
+		const u32 num_existing = m.mesh_materials.size();
+		if (has && num_existing >= size) return;
+		
+		m.dirty = true;
+		MeshMaterial* new_data = (MeshMaterial*)m_allocator.allocate(sizeof(MeshMaterial) * size, alignof(MeshMaterial));
+		if (has) {
+			memcpy(new_data, m.mesh_materials.begin(), sizeof(new_data[0]) * num_existing);
+			memset(&new_data[num_existing], 0, sizeof(new_data[0]) * (size - num_existing));
+			m_allocator.deallocate(m.mesh_materials.begin());
+		}
+		else {
+			memset(new_data, 0, sizeof(new_data[0]) * size);
+			for (u32 i = 0; i < num_existing; ++i) {
+				new_data[i].material = m.mesh_materials[i].material;
+				new_data[i].material->incRefCount();
+			}
+		}
+		m.mesh_materials = Span(new_data, size);
+	}
+
 	void setModelInstanceMaterialOverride(EntityRef entity, u32 mesh_idx, const Path& path) override {
 		ModelInstance& mi = m_model_instances[entity.index];
 
-		if (path.isEmpty()) {
-			if (!mi.material_override) return;
-			if (mesh_idx >= (u32)mi.material_override->elements.size()) return;
-			
-			mi.material_override->elements[mesh_idx].material = nullptr;
-			bool all_null = true;
-			for (const MaterialOverride::Element& el : mi.material_override->elements) {
-				if (el.material || el.own_material_index) {
-					all_null = false;
-					break;
-				}
-			}
+		ensureMaterialDataSize(mi, mesh_idx + 1);
 
-			if (all_null) {
-				mi.material_override->destroy(m_renderer);
-				LUMIX_DELETE(m_allocator, mi.material_override);
-				mi.material_override = nullptr;
-				return;
-			}
-		}
-		else {
-			if (!mi.material_override) {
-				mi.material_override = LUMIX_NEW(m_allocator, MaterialOverride)(m_allocator);
-			}
-			if (mesh_idx >= (u32)mi.material_override->elements.size()) {
-				mi.material_override->elements.resize(mesh_idx + 1);
-			}
-			
-			Material* material = m_engine.getResourceManager().load<Material>(path);
-			mi.material_override->elements[mesh_idx].material = material;
-		}
-
-		mi.material_override->dirty = true;
+		MeshMaterial& mat = mi.mesh_materials[mesh_idx];
+		Material* prev_mat = mat.material;
+		if (mat.sort_key) m_renderer.freeSortKey(mat.sort_key);
+		if (mat.flags & MeshMaterial::OWN_MATERIAL_INDEX) m_renderer.destroyMaterialConstants(mat.material_index);
+		
+		mat.material = path.isEmpty() ? nullptr : m_engine.getResourceManager().load<Material>(path);
+		
+		if (prev_mat) prev_mat->decRefCount();
+		mat.sort_key = 0;
+		mat.material_index = 0;
+		mi.dirty = true;
 	}
 
 	Path getModelInstanceMaterialOverride(EntityRef entity, u32 mesh_idx) override {
 		ModelInstance& mi = m_model_instances[entity.index];
-		if (!mi.material_override) return Path("");
-		if (mesh_idx >= (u32)mi.material_override->elements.size()) return Path("");
-		if (mi.material_override->elements[mesh_idx].material) return mi.material_override->elements[mesh_idx].material->getPath();
-		return Path("");
+		if (mesh_idx >= mi.mesh_materials.size() || !mi.mesh_materials[mesh_idx].material) {
+			if (!mi.model->isReady()) return Path("");
+			return mi.model->getMeshMaterial(mesh_idx).material->getPath();
+		}
+
+		return mi.mesh_materials[mesh_idx].material->getPath();
 	}
 
 	Path getInstancedModelPath(EntityRef entity) override {
@@ -2955,10 +2925,29 @@ struct RenderModuleImpl final : RenderModule {
 		return m_environment_probes[entity].flags & EnvironmentProbe::ENABLED;
 	}
 
+	void clear(ModelInstance& r, bool keep_flags) {
+		if (r.model && r.model->isReady() && r.mesh_materials.begin() != &r.model->getMeshMaterial(0)) {
+			for (MeshMaterial& m : r.mesh_materials) {
+				m.material->decRefCount();
+				m_renderer.freeSortKey(m.sort_key);
+			}
+			m_allocator.deallocate(r.mesh_materials.begin());
+		}
+		r.mesh_materials = {};
+		
+		if (r.model) r.model->decRefCount();
+		r.model = nullptr;
+		
+		r.meshes = nullptr;
+		r.mesh_count = 0;
+		LUMIX_DELETE(m_allocator, r.pose);
+		r.pose = nullptr;
+		if (!keep_flags) r.flags = ModelInstance::NONE;
+		r.dirty = true;
+	}
 
-	void modelUnloaded(Model*, EntityRef entity)
-	{
-		auto& r = m_model_instances[entity.index];
+	void modelUnloaded(Model*, EntityRef entity) {
+		ModelInstance& r = m_model_instances[entity.index];
 		r.meshes = nullptr;
 		r.mesh_count = 0;
 		LUMIX_DELETE(m_allocator, r.pose);
@@ -2989,6 +2978,9 @@ struct RenderModuleImpl final : RenderModule {
 		}
 		r.mesh_count = r.model->getMeshCount();
 		r.meshes = r.mesh_count > 0 ? &r.model->getMesh(0) : nullptr;
+		if (r.mesh_materials.size() == 0) {
+			r.mesh_materials = Span(&r.model->getMeshMaterial(0), r.model->getMeshCount());
+		}
 
 		if (r.flags & ModelInstance::IS_BONE_ATTACHMENT_PARENT) {
 			for (auto& attachment : m_bone_attachments) {
@@ -3004,10 +2996,8 @@ struct RenderModuleImpl final : RenderModule {
 				break;
 			}
 		}
-
-		if (r.material_override) {
-			r.material_override->dirty = true;
-		}
+		
+		r.dirty = true;
 	}
 
 	u32 computeSortKey(const Material& material, const Mesh& mesh) const override {
@@ -3187,11 +3177,8 @@ struct RenderModuleImpl final : RenderModule {
 			}
 			old_model->decRefCount();
 		}
+		clear(model_instance, true);
 		model_instance.model = model;
-		model_instance.meshes = nullptr;
-		model_instance.mesh_count = 0;
-		LUMIX_DELETE(m_allocator, model_instance.pose);
-		model_instance.pose = nullptr;
 		if (model)
 		{
 			addToModelEntityMap(model, entity);
@@ -3344,19 +3331,13 @@ struct RenderModuleImpl final : RenderModule {
 
 	void createModelInstance(EntityRef entity)
 	{
-		while(entity.index >= m_model_instances.size())
-		{
+		while(entity.index >= m_model_instances.size()) {
 			auto& r = m_model_instances.emplace();
-			r.flags = ModelInstance::NONE;
-			r.model = nullptr;
-			r.pose = nullptr;
+			clear(r, false);
 		}
 		auto& r = m_model_instances[entity.index];
-		r.model = nullptr;
-		r.meshes = nullptr;
-		r.pose = nullptr;
+		clear(r, false);
 		r.flags = ModelInstance::VALID | ModelInstance::ENABLED;
-		r.mesh_count = 0;
 		m_world.onComponentCreated(entity, MODEL_INSTANCE_TYPE, this);
 	}
 

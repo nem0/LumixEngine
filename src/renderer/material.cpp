@@ -49,10 +49,6 @@ Material::Material(const Path& path, ResourceManager& resource_manager, Renderer
 	u64 hash = u64(this);
 }
 
-Material::~Material() {
-	m_renderer.freeSortKey(m_sort_key);
-}
-
 const char* Material::getCustomFlagName(int index)
 {
 	return s_custom_flags.flags[index];
@@ -310,6 +306,13 @@ void Material::onBeforeReady()
 	}
 	m_texture_count = minimum(m_texture_count, m_shader->m_texture_slot_count);
 
+	RollingHasher hasher;
+	hasher.begin();
+	hasher.update(&m_shader, sizeof(m_shader));
+	hasher.update(&m_define_mask, sizeof(m_define_mask));
+	hasher.update(&m_render_states, sizeof(m_render_states));
+	RuntimeHash32 hash = hasher.end();
+	m_sort_key = hash.getHashValue();
 	updateRenderData(true);
 }
 

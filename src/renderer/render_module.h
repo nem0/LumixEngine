@@ -24,6 +24,7 @@ struct Frustum;
 struct IAllocator;
 struct Material;
 struct Mesh;
+struct MeshMaterial;
 struct Model;
 struct Path;
 struct Pose;
@@ -184,21 +185,6 @@ struct EnvironmentProbe {
 	Vec3 sh_coefs[9];
 };
 
-struct MaterialOverride {
-	struct Element {
-		Material* material = nullptr;
-		u32 material_index = 0;
-		u32 sort_key = 0;
-		bool own_sort_key = false;
-		bool own_material_index = false;
-	};
-	MaterialOverride(IAllocator& allocator) : elements(allocator) {}
-	~MaterialOverride();
-	void destroy(Renderer& renderer);
-	Array<Element> elements;
-	bool dirty = true;
-};
-
 struct ModelInstance {
 	enum Flags : u8 {
 		NONE = 0,
@@ -210,14 +196,15 @@ struct ModelInstance {
 
 	Model* model;
 	Mesh* meshes;
+	Span<MeshMaterial> mesh_materials;
 	Pose* pose;
-	MaterialOverride* material_override = nullptr; 
 	EntityPtr next_model = INVALID_ENTITY;
 	EntityPtr prev_model = INVALID_ENTITY;
 	float lod = 4;
 	Transform prev_frame_transform;
 	Flags flags = Flags::NONE;
 	u16 mesh_count;
+	bool dirty = true;
 };
 
 struct InstancedModel {

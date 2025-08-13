@@ -245,11 +245,12 @@ struct NavigationModuleImpl final : NavigationModule
 
 		auto lod = model->getLODIndices()[0];
 		for (int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx) {
-			Mesh& mesh = model->getMesh(mesh_idx);
+			const Mesh& mesh = model->getMesh(mesh_idx);
+			const MeshMaterial& mesh_mat = model->getMeshMaterial(mesh_idx);
 			bool is16 = mesh.areIndices16();
 
-			if (mesh.material->isCustomFlag(no_navigation_flag)) continue;
-			bool is_walkable = !mesh.material->isCustomFlag(nonwalkable_flag);
+			if (mesh_mat.material->isCustomFlag(no_navigation_flag)) continue;
+			bool is_walkable = !mesh_mat.material->isCustomFlag(nonwalkable_flag);
 			auto* vertices = &mesh.vertices[0];
 			if (is16) {
 				const u16* indices16 = (const u16*)mesh.indices.data();
@@ -310,7 +311,7 @@ struct NavigationModuleImpl final : NavigationModule
 
 			bool all_meshes_no_nav = true;
 			for (i32 i = 0; i < im.model->getMeshCount(); ++i) {
-				if (!im.model->getMesh(i).material->isCustomFlag(no_navigation_flag)) {
+				if (!im.model->getMeshMaterial(i).material->isCustomFlag(no_navigation_flag)) {
 					all_meshes_no_nav = false;
 					break;
 				}

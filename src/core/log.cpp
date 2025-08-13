@@ -21,6 +21,7 @@ namespace detail {
 	};
 
 	struct Log {
+		// TODO globla allocator might be destroyed before log
 		Log() : message(getGlobalAllocator()) { message.reserve(4096); }
 		~Log() {
 			// this struct is only destroyed on shutdown,
