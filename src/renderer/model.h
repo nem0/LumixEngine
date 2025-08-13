@@ -54,6 +54,17 @@ struct LUMIX_RENDERER_API RayCastModelHit {
 };
 
 
+struct MeshMaterial {
+	enum Flags : u8 {
+		NONE = 0,
+		OWN_MATERIAL_INDEX = 1 << 0,
+	};
+	Material* material;
+	u32 sort_key;
+	u32 material_index;
+	Flags flags;
+};
+
 struct LUMIX_RENDERER_API Mesh {
 	struct Skin {
 		Vec4 weights;
@@ -72,19 +83,16 @@ struct LUMIX_RENDERER_API Mesh {
 		INDICES_16_BIT = 1 << 0
 	};
 
-	Mesh(Material* mat,
-		const gpu::VertexDecl& vertex_decl,
+	Mesh(const gpu::VertexDecl& vertex_decl,
 		u8 vb_stride,
 		StringView name,
 		const AttributeSemantic* semantics,
 		Renderer& renderer,
 		IAllocator& allocator);
 	Mesh(Mesh&& rhs);
-	~Mesh();
-
+	
 	void operator=(Mesh&&) = delete;
 
-	void setMaterial(Material* material, Model& model, Renderer& renderer);
 	bool areIndices16() const { return flags & Flags::INDICES_16_BIT; }
 
 	Type type;
@@ -92,10 +100,7 @@ struct LUMIX_RENDERER_API Mesh {
 	Array<Vec3> vertices;
 	Array<Skin> skin;
 	Flags flags = Flags::NONE;
-	u32 sort_key;
-	u8 layer;
 	String name;
-	Material* material;
 	gpu::VertexDecl vertex_decl;
 	AttributeSemantic attributes_semantic[gpu::VertexDecl::MAX_ATTRIBUTES];
 	const char* semantics_defines = "";
@@ -170,6 +175,8 @@ public:
 
 	Mesh& getMesh(u32 index) { return m_meshes[index]; }
 	const Mesh& getMesh(u32 index) const { return m_meshes[index]; }
+	MeshMaterial& getMeshMaterial(u32 index) { return m_mesh_material[index]; }
+	const MeshMaterial& getMeshMaterial(u32 index) const { return m_mesh_material[index]; }
 	int getMeshCount() const { return m_meshes.size(); }
 	int getBoneCount() const { return m_bones.size(); }
 	const char* getBoneName(u32 idx) { return m_bones[idx].name.c_str(); }
@@ -210,6 +217,7 @@ private:
 	TagAllocator m_allocator;
 	Renderer& m_renderer;
 	Array<Mesh> m_meshes;
+	Array<MeshMaterial> m_mesh_material;
 	Array<Bone> m_bones;
 	LODMeshIndices m_lod_indices[MAX_LOD_COUNT + 1];
 	float m_lod_distances[MAX_LOD_COUNT];

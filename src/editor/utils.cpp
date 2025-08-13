@@ -2346,15 +2346,23 @@ void FileSelector::fillSubitems() {
 	FileSystem& fs = m_app.getEngine().getFileSystem();
 	const char* base_path = fs.getBasePath();
 	
-	const Path path(base_path, "/", m_current_dir);
+	Path path(base_path, "/", m_path);
+	TextFilter filter;
+	if (!os::dirExists(path)) {
+		StringView dir = Path::getDir(m_path);
+		copyString(filter.filter, dir.end);
+		filter.build();
+		path = Path(base_path, "/", dir);
+	}
+	
 	os::FileIterator* iter = os::createFileIterator(path, m_app.getAllocator());
 	os::FileInfo info;
 	const char* ext = m_accepted_extension.c_str();
 	while (os::getNextFile(iter, &info)) {
 		if (equalStrings(info.filename, ".")) continue;
 		if (equalStrings(info.filename, "..")) continue;
-		if (equalStrings(info.filename, ".lumix") && m_current_dir.length() == 0) continue;
-
+		if (equalStrings(info.filename, ".lumix")) continue;
+		if (!filter.pass(info.filename)) continue;
 		if (info.is_directory) {
 			m_subdirs.emplace(info.filename, m_app.getAllocator());
 		}
@@ -2368,39 +2376,9 @@ void FileSelector::fillSubitems() {
 }
 
 
-bool FileSelector::breadcrumb(StringView path) {
-	if (path.size() > 0 && path.back() == '/') path.removeSuffix(1);
-	if (path.empty()) {
-		if (ImGui::Button(".")) {
-			m_current_dir = "";
-			fillSubitems();
-			return true;
-		}
-		return false;
-	}
-	
-	StringView dir = Path::getDir(path);
-	StringView basename = Path::getBasename(path);
-	if (breadcrumb(dir)) return true;
-	ImGui::SameLine();
-	ImGui::TextUnformatted("/");
-	ImGui::SameLine();
-	
-	char tmp[MAX_PATH];
-	copyString(Span(tmp), basename);
-	if (ImGui::Button(tmp)) {
-		m_current_dir = String(path, m_app.getAllocator());
-		fillSubitems();
-		return true;
-	}
-	return false;
-}
-
 FileSelector::FileSelector(const char* ext, StudioApp& app)
 	: m_app(app)
-	, m_filename(app.getAllocator())
-	, m_full_path(app.getAllocator())
-	, m_current_dir(app.getAllocator())
+	, m_path(app.getAllocator())
 	, m_subdirs(app.getAllocator())
 	, m_subfiles(app.getAllocator())
 	, m_accepted_extension(ext, app.getAllocator())
@@ -2421,7 +2399,6 @@ void DirSelector::fillSubitems() {
 	const char* base_path = fs.getBasePath();
 	
 	Path path(base_path, "/", m_current_dir);
-	
 	TextFilter filter;
 	if (!os::dirExists(path)) {
 		StringView dir = Path::getDir(m_current_dir);
@@ -2451,7 +2428,6 @@ bool DirSelector::gui(const char* label, bool* open) {
 	}
 
 	const ImGuiViewport* vp = ImGui::GetMainViewport();
-	const ImGuiStyle& style = ImGui::GetStyle();
 	ImVec2 size(vp->Size.x * 0.4f, vp->Size.y * 0.4f);
 	ImVec2 pos = vp->GetCenter() - size * 0.5f;
 	ImGui::SetNextWindowPos(pos);
@@ -2508,7 +2484,7 @@ bool DirSelector::gui(const char* label, bool* open) {
 				FileSystem& fs = ds->m_app.getEngine().getFileSystem();
 				const char* base_path = fs.getBasePath();
 				const Path fullpath(base_path, ds->m_current_dir);
-				if (!os::dirExists(ds->m_current_dir) && !ds->m_subdirs.empty()) {
+				if (!os::dirExists(fullpath) && !ds->m_subdirs.empty()) {
 					const u32 dir_size = Path::getDir(ds->m_current_dir).size();
 					ds->m_current_dir.resize(dir_size);
 					ds->m_current_dir.append(ds->m_subdirs[0], "/");
@@ -2562,59 +2538,116 @@ bool DirSelector::gui(const char* label, bool* open) {
 
 FileSelector::FileSelector(StudioApp& app)
 	: m_app(app)
-	, m_filename(app.getAllocator())
-	, m_full_path(app.getAllocator())
-	, m_current_dir(app.getAllocator())
+	, m_path(app.getAllocator())
 	, m_subdirs(app.getAllocator())
 	, m_subfiles(app.getAllocator())
 	, m_accepted_extension(app.getAllocator())
 {}
 
 const char* FileSelector::getPath() {
-	if (Path::getExtension(m_full_path).empty()) m_full_path.append(".", m_accepted_extension.c_str());
-	return m_full_path.c_str();
+	if (Path::getExtension(m_path).empty()) m_path.append(".", m_accepted_extension.c_str());
+	return m_path.c_str();
 }
 
-bool FileSelector::gui(bool show_breadcrumbs, const char* accepted_extension) {
+bool FileSelector::gui(const char* accepted_extension) {
 	if (m_accepted_extension != accepted_extension) {
 		m_accepted_extension = accepted_extension;
 		fillSubitems();
 	}
 
+	auto cb = [](ImGuiInputTextCallbackData* data) -> int {
+		FileSelector* selector = (FileSelector*)data->UserData;
+		if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion) {
+			FileSystem& fs = selector->m_app.getEngine().getFileSystem();
+			const char* base_path = fs.getBasePath();
+			const Path fullpath(base_path, selector->m_path);
+			if (!os::fileExists(fullpath)) {
+				u32 dir_size;
+				if (os::dirExists(fullpath)) {
+					if (!endsWith(selector->m_path, "/") && !endsWith(selector->m_path, "\\")) {
+						selector->m_path.append("/");
+					}
+					dir_size = selector->m_path.length();
+				}
+				else {
+					dir_size = Path::getDir(selector->m_path).size();
+				}
+				if (!selector->m_subdirs.empty()) {
+					selector->m_path.resize(dir_size);
+					selector->m_path.append(selector->m_subdirs[0], "/");
+					selector->fillSubitems();
+				}
+				else if (!selector->m_subfiles.empty()) {
+					selector->m_path.resize(dir_size);
+					selector->m_path.append(selector->m_subfiles[0]);
+					selector->fillSubitems();
+				}
+			}
+			data->DeleteChars(0, data->BufTextLen);
+			data->InsertChars(0, selector->m_path.c_str());
+		}
+		if (data->EventFlag == ImGuiInputTextFlags_CallbackResize) {
+			String* str = &selector->m_path;
+			str->resize(data->BufTextLen);
+			data->Buf = (char*)str->c_str();
+		}
+		return 0;
+	};
+
 	bool res = false;
-	ImGui::AlignTextToFramePadding();
-	ImGui::TextUnformatted("Filename"); ImGui::SameLine(); ImGui::SetNextItemWidth(-1);
-	bool changed = inputString("##fn", &m_filename);
+	FileSystem& fs = m_app.getEngine().getFileSystem();
+	const Path fullpath(fs.getBasePath(), "/", m_path);
+	if (ImGui::Button(ICON_FA_PLUS " Create folder")) {
+		if (os::dirExists(fullpath) || os::fileExists(fullpath)) {
+			logError(fullpath, " already exists");
+		}
+		else {
+			if (!os::makePath(fullpath.c_str())) {
+				logError("Failed to create ", fullpath);
+			}
+			fillSubitems();
+		}
+	}
+	ImGui::SameLine();
+	ImGui::SetNextItemWidth(-1);
+	if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
+	if (ImGui::InputText("##f", (char*)m_path.c_str(), m_path.length() + 1, ImGuiInputTextFlags_CallbackResize | ImGuiInputTextFlags_CallbackCompletion, cb, this)) {
+		fillSubitems();
+	}
 	if (ImGui::IsItemDeactivatedAfterEdit() && ImGui::IsKeyPressed(ImGuiKey_Enter)) res = true;
 
-	if (show_breadcrumbs) {
-		changed = breadcrumb(m_current_dir) || changed;
-	}
-	if (ImGui::BeginChild("list", ImVec2(300, 300), true, ImGuiWindowFlags_NoScrollbar)) {
-		if (m_current_dir.length() > 0) {
-			if (ImGui::Selectable(ICON_FA_LEVEL_UP_ALT "..", false, ImGuiSelectableFlags_DontClosePopups)) {
-				StringView dir = Path::getDir(m_current_dir);
-				if (!dir.empty()) dir.removeSuffix(1);
-				m_current_dir = String(dir, m_app.getAllocator());
-				fillSubitems();
-				changed = true;
-			}
-		}
+	float w = maximum(300.f, ImGui::GetContentRegionAvail().x);
+	float h = -ImGui::GetTextLineHeightWithSpacing() - ImGui::GetStyle().WindowPadding.y;
+	if (ImGui::GetContentRegionAvail().y < 200) h = 150;
+	if (ImGui::BeginChild("list", ImVec2(w, h), ImGuiChildFlags_Borders, ImGuiWindowFlags_NoScrollbar)) {
+		if (ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
 		
 		for (const String& subdir : m_subdirs) {
 			ImGui::TextUnformatted(ICON_FA_FOLDER); ImGui::SameLine();
 			if (ImGui::Selectable(subdir.c_str(), false, ImGuiSelectableFlags_DontClosePopups)) {
-				m_current_dir.append("/", subdir.c_str());
+				if (os::dirExists(fullpath)) {
+					m_path.append("/", subdir.c_str());
+				}
+				else {
+					const u32 dir_size = Path::getDir(m_path).size();
+					m_path.resize(dir_size);
+					m_path.append(subdir.c_str());
+				}
 				fillSubitems();
-				changed = true;
 				break;
 			}
 		}
 		
 		for (const String& subfile : m_subfiles) {
 			if (ImGui::Selectable(subfile.c_str(), false, ImGuiSelectableFlags_DontClosePopups | ImGuiSelectableFlags_AllowDoubleClick)) {
-				m_filename = subfile;
-				changed = true;
+				if (os::dirExists(fullpath)) {
+					m_path.append("/", subfile.c_str());
+				}
+				else {
+					const u32 dir_size = Path::getDir(m_path).size();
+					m_path.resize(dir_size);
+					m_path.append(subfile.c_str());
+				}
 				if (ImGui::IsMouseDoubleClicked(0)) {
 					res = true;
 				}
@@ -2622,9 +2655,22 @@ bool FileSelector::gui(bool show_breadcrumbs, const char* accepted_extension) {
 		}
 	}
 	ImGui::EndChild();
-	if (changed) {
-		m_full_path = m_current_dir;
-		m_full_path.append("/", m_filename.c_str());
+	if (res && m_save && os::fileExists(fullpath)) {
+		openCenterStrip("Confirm");
+		res = false;
+	}
+	if (beginCenterStrip("Confirm")) {
+		ImGui::NewLine();
+		alignGUICenter([&](){ ImGui::Text("Overwrite file '%s'", m_path.c_str()); });
+		alignGUICenter([&](){ 
+			if (ImGui::Button("Yes")) {
+				ImGui::CloseCurrentPopup();
+				res = true;
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("No")) ImGui::CloseCurrentPopup();
+		});
+		endCenterStrip();
 	}
 	return res;
 }
@@ -2634,39 +2680,41 @@ bool FileSelector::gui(const char* label, bool* open, const char* extension, boo
 		ImGui::OpenPopup(label);
 		m_save = save;
 		m_accepted_extension = extension;
-		m_filename = "";
-		m_full_path = "";
+		m_path = "";
 		fillSubitems();
 	}
 
+	const ImGuiViewport* vp = ImGui::GetMainViewport();
+	ImVec2 size(vp->Size.x * 0.4f, vp->Size.y * 0.4f);
+	ImVec2 pos = vp->GetCenter() - size * 0.5f;
+	ImGui::SetNextWindowPos(pos);
+	ImGui::SetNextWindowSize(size, ImGuiCond_Always);
 	bool res = false;
-	if (ImGui::BeginPopupModal(label, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-		res = gui(true, extension);
+	if (ImGui::BeginPopupModal(label, open, ImGuiWindowFlags_AlwaysAutoResize)) {
+		res = gui(extension);
 	
-		alignGUICenter([&](){
-			if (m_save) {
-				if (ImGui::Button(ICON_FA_SAVE " Save")) {
-					if (!Path::hasExtension(m_full_path, m_accepted_extension)) {
-						m_full_path.append(".", m_accepted_extension.c_str());
-					}
-					if (m_app.getEngine().getFileSystem().fileExists(m_full_path)) {
-						ImGui::OpenPopup("warn_overwrite");
-					}
-					else {
-						res = true;
-					}
+		if (m_save) {
+			if (ImGui::Button(ICON_FA_SAVE " Save")) {
+				if (Path::getExtension(m_path).empty()) {
+					m_path.append(".", m_accepted_extension.c_str());
+				}
+				if (m_app.getEngine().getFileSystem().fileExists(m_path)) {
+					ImGui::OpenPopup("warn_overwrite");
+				}
+				else {
+					res = true;
 				}
 			}
-			else {
-				if (ImGui::Button(ICON_FA_FOLDER_OPEN " Open")) {
-					if (m_app.getEngine().getFileSystem().fileExists(m_full_path)) {
-						res = true;
-					}
+		}
+		else {
+			if (ImGui::Button(ICON_FA_FOLDER_OPEN " Open")) {
+				if (m_app.getEngine().getFileSystem().fileExists(m_path)) {
+					res = true;
 				}
 			}
-			ImGui::SameLine();
-			if (ImGui::Button(ICON_FA_TIMES " Cancel")) ImGui::CloseCurrentPopup();
-		});
+		}
+		ImGui::SameLine();
+		if (ImGui::Button(ICON_FA_TIMES " Cancel")) ImGui::CloseCurrentPopup();
 	
 		if (ImGui::BeginPopup("warn_overwrite")) {
 			ImGui::TextUnformatted("File already exists, are you sure you want to overwrite it?");

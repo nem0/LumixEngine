@@ -39,8 +39,6 @@ Material::Material(const Path& path, ResourceManager& resource_manager, Renderer
 	, m_define_mask(0)
 	, m_custom_flags(0)
 {
-	static u32 last_sort_key = 0;
-	m_sort_key = ++last_sort_key;
 	m_layer = m_renderer.getLayerIdx("default");
 	for (int i = 0; i < MAX_TEXTURE_COUNT; ++i)
 	{
@@ -48,8 +46,8 @@ Material::Material(const Path& path, ResourceManager& resource_manager, Renderer
 	}
 
 	setShader(nullptr);
+	u64 hash = u64(this);
 }
-
 
 const char* Material::getCustomFlagName(int index)
 {
@@ -101,27 +99,6 @@ void Material::setDefine(u8 define_idx, bool enabled)
 		m_define_mask &= ~(1 << define_idx);
 	}
 	if (old_mask != m_define_mask) updateRenderData(false);
-}
-
-void Material::setUniformI32(u32 index, i32 value) {
-	m_uniforms[index].int_value = value;
-	updateRenderData(false);
-}
-void Material::setUniformFloat(u32 index, float value) {
-	m_uniforms[index].float_value = value; 
-	updateRenderData(false);
-}
-void Material::setUniformVec2(u32 index, Vec2 value) {
-	memcpy(m_uniforms[index].vec2, &value, sizeof(value)); 
-	updateRenderData(false);
-}
-void Material::setUniformVec3(u32 index, Vec3 value) {
-	memcpy(m_uniforms[index].vec3, &value, sizeof(value)); 
-	updateRenderData(false);
-}
-void Material::setUniformVec4(u32 index, Vec4 value) {
-	memcpy(m_uniforms[index].vec4, &value, sizeof(value)); 
-	updateRenderData(false);
 }
 
 Material::Uniform* Material::findUniform(RuntimeHash name_hash) {
@@ -329,9 +306,42 @@ void Material::onBeforeReady()
 	}
 	m_texture_count = minimum(m_texture_count, m_shader->m_texture_slot_count);
 
+	RollingHasher hasher;
+	hasher.begin();
+	hasher.update(&m_shader, sizeof(m_shader));
+	hasher.update(&m_define_mask, sizeof(m_define_mask));
+	hasher.update(&m_render_states, sizeof(m_render_states));
+	RuntimeHash32 hash = hasher.end();
+	m_sort_key = hash.getHashValue();
 	updateRenderData(true);
 }
 
+void Material::getUniformData(Span<float> data) const {
+	if (!m_shader) return;
+
+	// TODO check overflow
+	u8* cs = (u8*)data.begin();
+	u32 textures_offset = 0;
+	for (const Shader::Uniform& shader_uniform : m_shader->m_uniforms) {
+		const u32 size = shader_uniform.size();
+		textures_offset = maximum(textures_offset, shader_uniform.offset + size);
+		bool found = false;
+		for (Uniform& uniform : m_uniforms) {
+			if (shader_uniform.name_hash == uniform.name_hash) {
+				memcpy((u8*)cs + shader_uniform.offset, uniform.vec4, size);
+				found = true;
+				break;
+			}
+		}
+		if (!found) {
+			memcpy((u8*)cs + shader_uniform.offset, shader_uniform.default_value.vec4, size);
+		}
+	}
+	for (u32 i = 0; i < m_shader->m_texture_slot_count; ++i) {
+		const gpu::BindlessHandle bindless_handle = m_textures[i] ? gpu::getBindlessHandle(m_textures[i]->handle) : gpu::BindlessHandle();
+		memcpy((u8*)cs + textures_offset + i * sizeof(bindless_handle), &bindless_handle, sizeof(bindless_handle));
+	}
+}
 
 void Material::updateRenderData(bool on_before_ready)
 {
@@ -365,16 +375,6 @@ void Material::updateRenderData(bool on_before_ready)
 
 	m_material_constants = m_renderer.createMaterialConstants(Span(cs));
 }
-
-
-void Material::bind(DrawStream& stream) const
-{
-	stream.bindUniformBuffer(UniformBuffer::MATERIAL
-	, m_renderer.getMaterialUniformBuffer()
-	, m_material_constants * Material::MAX_UNIFORMS_BYTES
-	, Material::MAX_UNIFORMS_BYTES);
-}
-
 
 void Material::setShader(Shader* shader)
 {

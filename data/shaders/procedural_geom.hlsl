@@ -15,6 +15,7 @@
 
 cbuffer Drawcall : register(b4) {
 	float4x4 u_ls_to_ws;
+	uint u_material_index;
 };
 
 struct VSOutput {
@@ -44,8 +45,9 @@ VSOutput mainVS(VSInput input) {
 }
 
 Surface getSurface(VSOutput input) {
+	MaterialData material = getMaterialData(u_material_index);
 	Surface surface;
-	surface.albedo = sampleBindless(LinearSampler, t_albedo, input.uv).rgb;
+	surface.albedo = sampleBindless(LinearSampler, material.t_albedo, input.uv).rgb;
 
 	float3x3 tbn = float3x3(
 		input.tangent, 
@@ -53,24 +55,24 @@ Surface getSurface(VSOutput input) {
 		normalize(cross(input.normal, input.tangent))
 	);
 	
-	surface.N.xz = sampleBindless(LinearSampler, t_normal, input.uv).xy * 2 - 1;
+	surface.N.xz = sampleBindless(LinearSampler, material.t_normal, input.uv).xy * 2 - 1;
 	surface.N.y = sqrt(saturate(1 - dot(surface.N.xz, surface.N.xz))); 
 	surface.N = mul(surface.N, tbn);
+	surface.roughness = material.u_roughness * sampleBindless(LinearSampler, material.t_roughness, input.uv).r;
 
-	surface.roughness = u_roughness * sampleBindless(LinearSampler, t_roughness, input.uv).r;
-	surface.metallic = u_metallic;
+	surface.metallic = material.u_metallic;
 	#ifdef HAS_METALLICMAP
-		surface.metallic *= sampleBindless(LinearSampler, t_metallic, input.uv).r;
+		surface.metallic *= sampleBindless(LinearSampler, material.t_metallic, input.uv).r;
 	#endif
 	#ifdef HAS_AMBIENT_OCCLUSION_TEX
-		surface.ao = sampleBindless(LinearSampler, t_ambient_occlusion, input.uv).r;
+		surface.ao = sampleBindless(LinearSampler, material.t_ambient_occlusion, input.uv).r;
 	#else
 		surface.ao = 1;
 	#endif
 	surface.shadow = 1;
 	surface.alpha = 1;
-	surface.emission = u_emission;
-	surface.translucency = u_translucency;
+	surface.emission = material.u_emission;
+	surface.translucency = material.u_translucency;
 	surface.pos_ws = input.pos_ws;
 	surface.V = normalize(-surface.pos_ws);
 	surface.motion = computeStaticObjectMotionVector(input.pos_ws.xyz);

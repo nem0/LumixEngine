@@ -211,7 +211,7 @@ struct DeleteMemoryData {
 };
 
 struct BinderShaderBufferData {
-	gpu::BufferHandle buffers[5];
+	gpu::BufferHandle buffers[6];
 };
 
 struct CreateProgramData {
@@ -431,6 +431,7 @@ void DrawStream::createProgram(gpu::ProgramHandle prog
 		ByteAddressBuffer bindless_buffers[] : register(t0, space5);
 		RWTexture2D<float4> bindless_rw_textures[] : register(u0, space0);
 		RWByteAddressBuffer bindless_rw_buffers[] : register(u0, space1);
+		ByteAddressBuffer b_material : register(t5);
 
 		SamplerState LinearSamplerClamp : register(s0);
 		SamplerState LinearSampler : register(s1);

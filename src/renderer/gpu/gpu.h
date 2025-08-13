@@ -144,7 +144,8 @@ enum class AttributeType : u8 {
 	FLOAT,
 	I16,
 	I8,
-	U16
+	U16,
+	U32
 };
 
 

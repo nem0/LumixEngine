@@ -24,6 +24,7 @@ struct Frustum;
 struct IAllocator;
 struct Material;
 struct Mesh;
+struct MeshMaterial;
 struct Model;
 struct Path;
 struct Pose;
@@ -195,14 +196,15 @@ struct ModelInstance {
 
 	Model* model;
 	Mesh* meshes;
+	Span<MeshMaterial> mesh_materials;
 	Pose* pose;
-	Material* custom_material = nullptr; 
 	EntityPtr next_model = INVALID_ENTITY;
 	EntityPtr prev_model = INVALID_ENTITY;
 	float lod = 4;
 	Transform prev_frame_transform;
 	Flags flags = Flags::NONE;
 	u16 mesh_count;
+	bool dirty = true;
 };
 
 struct InstancedModel {
@@ -277,7 +279,6 @@ enum class RenderableTypes : u8 {
 	SKINNED,
 	DECAL,
 	LOCAL_LIGHT,
-	MESH_MATERIAL_OVERRIDE,
 	FUR,
 	CURVE_DECAL,
 	PARTICLES,
@@ -309,6 +310,7 @@ enum class RenderModuleVersion : i32 {
 	POSTPROCESS,
 	FOG_DENSITY,
 	CLOUDS,
+	MATERIAL_OVERRIDE,
 
 	LATEST
 };
@@ -337,6 +339,7 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual ShiftedFrustum getCameraFrustum(EntityRef entity, const Vec2& a, const Vec2& b) const = 0;
 	virtual Engine& getEngine() const = 0;
 	virtual IAllocator& getAllocator() = 0;
+	virtual u32 computeSortKey(const Material& material, const Mesh& mesh) const = 0;
 
 	virtual Pose* lockPose(EntityRef entity) = 0;
 	virtual void unlockPose(EntityRef entity, bool changed) = 0;
@@ -401,8 +404,8 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual Path getModelInstancePath(EntityRef entity) = 0;
 	virtual void setModelInstanceLOD(EntityRef entity, u32 lod) = 0;
 	virtual void setModelInstancePath(EntityRef entity, const Path& path) = 0;
-	virtual void setModelInstanceMaterialOverride(EntityRef entity, const Path& path) = 0;
-	virtual Path getModelInstanceMaterialOverride(EntityRef entity) = 0;
+	virtual void setModelInstanceMaterialOverride(EntityRef entity, u32 mesh_idx, const Path& path) = 0;
+	virtual Path getModelInstanceMaterialOverride(EntityRef entity, u32 mesh_idx) = 0;
 	virtual CullResult* getRenderables(const ShiftedFrustum& frustum, RenderableTypes type) const = 0;
 	virtual CullResult* getRenderables(const ShiftedFrustum& frustum) const = 0;
 	virtual EntityPtr getFirstModelInstance() = 0;

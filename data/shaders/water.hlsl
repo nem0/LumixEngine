@@ -33,6 +33,7 @@ struct VSInput {
 		float4 i_rot : ATTR(INSTANCE0_ATTR);
 		float4 i_pos_lod : ATTR(INSTANCE1_ATTR);
 		float4 i_scale : ATTR(INSTANCE2_ATTR);
+		uint i_material_index : ATTR(INSTANCE3_ATTR);
 	#endif
 };
 
@@ -41,6 +42,7 @@ struct VSOutput {
 	float3 normal : TEXCOORD1;
 	float3 tangent : TEXCOORD2;
 	float3 pos_ws : TEXCOORD3;
+	uint i_material_index : TEXCOORD4;
 	#ifdef _HAS_ATTR2 
 		//float2 masks : TEXCOORD4;
 	#endif
@@ -59,6 +61,7 @@ VSOutput mainVS(VSInput input) {
 
 	VSOutput output;
 	output.uv = input.uv;
+	output.i_material_index = input.i_material_index;
 	#if defined AUTOINSTANCED
 		output.normal = rotateByQuat(input.i_rot, normal);
 		output.tangent = rotateByQuat(input.i_rot, tangent);
@@ -176,24 +179,24 @@ float4 getRefraction(float3 pos_ws)
 	return sampleBindless(LinearSamplerClamp, u_bg, screen_pos.xy);
 }
 
-float getHeight(float2 uv) {
+float getHeight(float2 uv, MaterialData material) {
 	return 
-		(cos(sampleBindless(LinearSampler, t_normal, uv).x * 2 * M_PI + Global_time * 5) 
-		+ sin(sampleBindless(LinearSampler, t_normal, -uv.yx * 2 + 0.1).x * M_PI - Global_time * 3)) * 0.5 + 0.5
+		(cos(sampleBindless(LinearSampler, material.t_normal, uv).x * 2 * M_PI + Global_time * 5) 
+		+ sin(sampleBindless(LinearSampler, material.t_normal, -uv.yx * 2 + 0.1).x * M_PI - Global_time * 3)) * 0.5 + 0.5
 ;
 }
 
 // TODO try less texture fetches
-float3 getSurfaceNormal(float2 uv, float normal_strength, out float h00)
+float3 getSurfaceNormal(MaterialData material, float2 uv, float normal_strength, out float h00)
 {
 	float2 d = float2(0.01, 0);
-	uv *= u_uv_scale;
-	uv += u_flow_dir * Global_time;
+	uv *= material.u_uv_scale;
+	uv += material.u_flow_dir * Global_time;
 	// TODO optimize
-	h00 = getHeight(uv - d.xy) * normal_strength;
-	float h10 = getHeight(uv + d.xy) * normal_strength;
-	float h01 = getHeight(uv - d.yx) * normal_strength;
-	float h11 = getHeight(uv + d.yx) * normal_strength;
+	h00 = getHeight(uv - d.xy, material) * normal_strength;
+	float h10 = getHeight(uv + d.xy, material) * normal_strength;
+	float h01 = getHeight(uv - d.yx, material) * normal_strength;
+	float h11 = getHeight(uv + d.yx, material) * normal_strength;
 
 	float3 N;
 	N.x = h00 - h10;
@@ -204,6 +207,7 @@ float3 getSurfaceNormal(float2 uv, float normal_strength, out float h00)
 
 float4 mainPS(VSOutput input) : SV_TARGET
 {
+	MaterialData material = getMaterialData(input.i_material_index);
 	float3 V = normalize(-input.pos_ws);
 	float3 L = Global_light_dir.xyz;
 	
@@ -213,42 +217,40 @@ float4 mainPS(VSOutput input) : SV_TARGET
 		normalize(cross(input.normal, input.tangent))
 	);
 
-	float normal_strength = u_normal_strength;
+	float normal_strength = material.u_normal_strength;
 	#ifdef _HAS_ATTR2 
 		//normal_strength *= 1 - v_masks.g;
 	#endif
 
 	float h;
-	float3 wnormal = getSurfaceNormal(input.uv, normal_strength, h);
+	float3 wnormal = getSurfaceNormal(material, input.uv, normal_strength, h);
 	wnormal = normalize(mul(wnormal, tbn));
 
 	//float shadow = getShadow(u_shadowmap, input.pos_ws, wnormal);
 
 	float dist = length(input.pos_ws);
 	float3 view = -normalize(input.pos_ws);
-	float3 refl_color = getReflectionColor(view, wnormal, dist * normal_strength, input.pos_ws) * u_reflection_multiplier;
+	float3 refl_color = getReflectionColor(view, wnormal, dist * normal_strength, input.pos_ws) * material.u_reflection_multiplier;
 	float water_depth = getWaterDepth(input.pos_ws, view, wnormal)- saturate(h * 0.4);
 	
 
 	float3 halfvec = normalize(view + Global_light_dir.xyz);
-	float spec_strength = pow(saturate(dot(halfvec, wnormal)), u_specular_power);
+	float spec_strength = pow(saturate(dot(halfvec, wnormal)), material.u_specular_power);
 	
 	float3 R = reflect(-normalize(view), normalize(wnormal));
-	spec_strength = pow(saturate(dot(R, normalize(Global_light_dir.xyz))), u_specular_power);
+	spec_strength = pow(saturate(dot(R, normalize(Global_light_dir.xyz))), material.u_specular_power);
 
-	float3 spec_color = Global_light_color.rgb * spec_strength * u_specular_multiplier;
-	float fresnel = u_r0 + (1.0 - u_r0) * pow(saturate(1.0 - dot(normalize(view), wnormal)), 5);
+	float3 spec_color = Global_light_color.rgb * spec_strength * material.u_specular_multiplier;
+	float fresnel = material.u_r0 + (1.0 - material.u_r0) * pow(saturate(1.0 - dot(normalize(view), wnormal)), 5);
 
-	float3 water_color = pow(u_water_color.rgb, 2.2); // TODO do not do this in shader
-	float3 transmittance = saturate(exp(-water_depth * u_water_scattering * (1.0f - water_color)));
+	float3 water_color = pow(material.u_water_color.rgb, 2.2); // TODO do not do this in shader
+	float3 transmittance = saturate(exp(-water_depth * material.u_water_scattering * (1.0f - water_color)));
 
 	float t = saturate(water_depth * 5); // no hard edge
 
-	float refraction_distortion = u_refraction_distortion;
+	float3 refraction = getRefraction(input.pos_ws + float3(wnormal.xz, 0) * material.u_refraction_distortion * t).rgb;
 
-	float3 refraction = getRefraction(input.pos_ws + float3(wnormal.xz, 0) * u_refraction_distortion * t).rgb;
-
-	refraction *= lerp(1.0, u_ground_tint.rgb, t);
+	refraction *= lerp(1.0, material.u_ground_tint.rgb, t);
 	refraction *= transmittance;
 
 	float3 reflection = refl_color + spec_color;
@@ -257,7 +259,7 @@ float4 mainPS(VSOutput input) : SV_TARGET
 	o_color.rgb = lerp(refraction, reflection, fresnel);
 	o_color.rgb = lerp(refraction, o_color.rgb, t);
 	
-	float noise = sampleBindless(LinearSampler, t_noise, 1 - input.uv * 0.1 + u_flow_dir * Global_time * 0.3).x;
+	float noise = sampleBindless(LinearSampler, material.t_noise, 1 - input.uv * 0.1 + material.u_flow_dir * Global_time * 0.3).x;
 	/*#if defined HAS_FOAM && defined _HAS_ATTR2
 		float4 foam = sampleBindless(LinearSampler, t_foam, input.uv + u_flow_dir * Global_time * 3);
 		o_color.rgb = lerp(o_color.rgb, foam.rgb, saturate(v_masks.r - noise) * t);

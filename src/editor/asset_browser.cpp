@@ -211,7 +211,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 
 		StringView dir = Path::getDir(path);
-		if (!Path::isSame(dir, m_dir) && m_dir != ".") return;
+		if (!Path::isSame(dir, m_dir)) return;
 
 		RenderInterface* ri = m_app.getRenderInterface();
 
@@ -747,6 +747,8 @@ struct AssetBrowserImpl : AssetBrowser {
 			alignGUICenter([&](){
 				if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
 				create = ImGui::InputTextWithHint("##name", "Name", tmp, sizeof(tmp), ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+				ImGui::SameLine();
+				ImGui::Text(".%s", plugin->getDefaultExtension());
 			});
 			alignGUICenter([&](){
 				if (ImGui::Button("Create")) create = true;

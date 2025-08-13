@@ -43,7 +43,7 @@ namespace UniformBuffer {
 	enum Enum {
 		GLOBAL,
 		PASS,
-		MATERIAL,
+		UNUSED_,
 		SHADOW,
 		DRAWCALL,
 		DRAWCALL2,

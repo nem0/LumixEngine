@@ -948,7 +948,7 @@ struct StudioAppImpl final : StudioApp {
 		m_settings.registerOption("welcome_shader", &m_welcome_screen_use_shader, "General", "Animated background in welcome screen");
 		m_settings.registerOption("report_crashes", &m_crash_reporting, "General", "Report crashes");
 		m_settings.registerOption("sleep_when_inactive", &m_sleep_when_inactive, "General", "Sleep when inactive");
-		m_settings.registerOption("fileselector_dir", &m_file_selector.m_current_dir);
+		m_settings.registerOption("fileselector_dir", &m_file_selector.m_path);
 		m_settings.registerOption("font_size", &m_font_size, "General", "Font size");
 		m_settings.registerOption("code_editor_font_size", &CodeEditor::s_font_size, "General", "Code editor font size");
 		m_settings.registerOption("export_pack", &m_export.pack);
@@ -1729,12 +1729,12 @@ struct StudioAppImpl final : StudioApp {
 		if (ImGuiEx::BeginMenuEx("Create", ICON_FA_PLUS_SQUARE))
 		{
 			onCreateEntityWithComponentGUI(INVALID_ENTITY);
-			ImGui::EndMenu();
+		ImGui::EndMenu();
 		}
 		menuItem("delete", is_any_entity_selected);
 		
 		if (ImGui::BeginMenu("Save as prefab", selected_entities.size() == 1)) {
-			bool selected = m_file_selector.gui(false, "fab");
+			bool selected = m_file_selector.gui("fab");
 			selected = ImGui::Button(ICON_FA_SAVE " Save") || selected;
 			if (selected) {
 				char filename[MAX_PATH];

@@ -406,8 +406,8 @@ struct RendererImpl final : Renderer {
 		, m_layers(m_allocator)
 		, m_material_buffer(m_allocator)
 		, m_plugins(m_allocator)
-		, m_free_sort_keys(m_allocator)
-		, m_sort_key_to_mesh_map(m_allocator)
+		, m_sort_keys(m_allocator)
+		, m_sort_key_map(m_allocator)
 		, m_semantic_defines(m_allocator)
 		, m_free_frames(m_allocator)
 		, m_renderbuffers(m_allocator)
@@ -422,13 +422,10 @@ struct RendererImpl final : Renderer {
 		, m_ssao(*this)
 		, m_taa(*this)
 	{
-		RenderModule::reflect();
+		m_sort_keys.emplace().hash = 0; // we use sort_key 0 as "null" sort key
+		m_sort_key_map.insert(0, 0);
 
-		LUMIX_GLOBAL_FUNC(Material::setUniformI32);
-		LUMIX_GLOBAL_FUNC(Material::setUniformFloat);
-		LUMIX_GLOBAL_FUNC(Material::setUniformVec2);
-		LUMIX_GLOBAL_FUNC(Material::setUniformVec3);
-		LUMIX_GLOBAL_FUNC(Material::setUniformVec4);
+		RenderModule::reflect();
 
 		LUMIX_GLOBAL_FUNC(Model::getBoneCount);
 		LUMIX_GLOBAL_FUNC(Model::getBoneName);
@@ -464,7 +461,7 @@ struct RendererImpl final : Renderer {
 			stream.destroy(rb.handle);
 			rb.handle = gpu::INVALID_TEXTURE;
 		}
-
+		
 		m_particle_emitter_manager.destroy();
 		m_texture_manager.destroy();
 		m_model_manager.destroy();
@@ -472,16 +469,16 @@ struct RendererImpl final : Renderer {
 		m_shader_manager.destroy();
 		m_font_manager->destroy();
 		LUMIX_DELETE(m_allocator, m_font_manager);
-
+		
 		frame();
 		frame();
 		frame();
 		waitForRender();
-
+		
 		m_frame_thread.finished = true;
 		m_frame_thread.semaphore.signal();
 		m_frame_thread.destroy();
-
+		
 		jobs::Counter counter;
 		jobs::runLambda([this]() {
 			for (const Local<FrameData>& frame : m_frames) {
@@ -494,15 +491,12 @@ struct RendererImpl final : Renderer {
 			gpu::present();
 			gpu::present();
 			gpu::present();
-		}, &counter, 1);
-		jobs::wait(&counter);
-		// TODO can't we merge these two jobs?
-		jobs::runLambda([]() {
 			gpu::shutdown();
 		}, &counter, 1);
 		jobs::wait(&counter);
+		ASSERT(m_sort_key_map.size() == 1); // only null key left
 	}
-
+	
 	static void add(String& res, const char* a, u32 b) {
 		char tmp[32];
 		toCString(b, Span(tmp));
@@ -540,6 +534,7 @@ struct RendererImpl final : Renderer {
 			add(s, "#define INSTANCE3_ATTR ", first_empty + 3);
 			add(s, "#define INSTANCE4_ATTR ", first_empty + 4);
 			add(s, "#define INSTANCE5_ATTR ", first_empty + 5);
+			add(s, "#define INSTANCE6_ATTR ", first_empty + 6);
 
 			iter = m_semantic_defines.insert(hash, static_cast<String&&>(s));
 		}
@@ -622,7 +617,7 @@ struct RendererImpl final : Renderer {
 		}
 
 		MaterialBuffer& mb = m_material_buffer;
-		const u32 MAX_MATERIAL_CONSTS_COUNT = 400;
+		const u32 MAX_MATERIAL_CONSTS_COUNT = 5000;
 		mb.buffer = gpu::allocBufferHandle();
 		mb.map.insert(RuntimeHash(), 0);
 		mb.data.resize(MAX_MATERIAL_CONSTS_COUNT);
@@ -820,6 +815,34 @@ struct RendererImpl final : Renderer {
 		}
 	}
 
+	u32 createMaterialInstance(Span<const float> data) override {
+		if (m_material_buffer.first_free == -1) {
+			ASSERT(false);
+			++m_material_buffer.data[0].ref_count;
+			return 0;
+		}
+		u32 idx = m_material_buffer.first_free;
+		m_material_buffer.first_free = m_material_buffer.data[m_material_buffer.first_free].next_free;
+		m_material_buffer.data[idx].ref_count = 1;
+		m_material_buffer.data[idx].is_instance = true;
+		m_material_buffer.data[idx].hash = RuntimeHash(data.begin(), data.length() * sizeof(float));
+		
+		jobs::wait(&m_cpu_frame->can_setup);
+		const u32 size = u32(data.length() * sizeof(float));
+		const TransientSlice slice = m_cpu_frame->uniform_buffer.alloc(size);
+		memcpy(slice.ptr, data.begin(), size);
+		m_cpu_frame->draw_stream.copy(m_material_buffer.buffer, slice.buffer, idx * Material::MAX_UNIFORMS_BYTES, slice.offset, size);
+		return idx;
+	}
+
+	void updateMaterialConstants(u32 handle, Span<const float> data, u32 offset) override {
+		jobs::wait(&m_cpu_frame->can_setup);
+		const u32 size = u32(data.length() * sizeof(float));
+		const TransientSlice slice = m_cpu_frame->uniform_buffer.alloc(size);
+		memcpy(slice.ptr, data.begin(), size);
+		m_cpu_frame->draw_stream.copy(m_material_buffer.buffer, slice.buffer, handle * Material::MAX_UNIFORMS_BYTES, slice.offset, size);
+	}
+
 	u32 createMaterialConstants(Span<const float> data) override {
 		const RuntimeHash hash(data.begin(), data.length() * sizeof(float));
 		auto iter = m_material_buffer.map.find(hash);
@@ -836,6 +859,7 @@ struct RendererImpl final : Renderer {
 			idx = m_material_buffer.first_free;
 			m_material_buffer.first_free = m_material_buffer.data[m_material_buffer.first_free].next_free;
 			m_material_buffer.data[idx].ref_count = 0;
+			m_material_buffer.data[idx].is_instance = false;
 			m_material_buffer.data[idx].hash = RuntimeHash(data.begin(), data.length() * sizeof(float));
 			m_material_buffer.map.insert(hash, idx);
 			
@@ -899,39 +923,56 @@ struct RendererImpl final : Renderer {
 
 	void enableBuiltinTAA(bool enable) override {
 		m_taa.m_enabled = enable;
-		}
-
-	const Mesh** getSortKeyToMeshMap() const override {
-		return m_sort_key_to_mesh_map.begin();
 	}
 
-	u32 allocSortKey(Mesh* mesh) override {
-		if (!m_free_sort_keys.empty()) {
-			const u32 key = m_free_sort_keys.back();
-			m_free_sort_keys.pop();
-			ASSERT(key != 0);
-			if ((u32)m_sort_key_to_mesh_map.size() < key + 1)
-				m_sort_key_to_mesh_map.resize(key + 1);
-			m_sort_key_to_mesh_map[key] = mesh;
+	struct SortKey {
+		union {
+			u32 ref_count = 0;
+			i32 next;
+		};
+		u32 hash;
+	};
+
+	u32 allocSortKey(u32 hash) override {
+		auto iter = m_sort_key_map.find(hash);
+		if (iter.isValid()) {
+			++m_sort_keys[iter.value()].ref_count;
+			return iter.value();
+		}
+
+		if (m_first_free_sort_key >= 0) {
+			const i32 next_free = m_sort_keys[m_first_free_sort_key].next;
+			const u32 key = m_first_free_sort_key;
+			m_first_free_sort_key = next_free;
+			
+			m_sort_keys[key].hash = hash;
+			m_sort_keys[key].ref_count = 1;
+			m_sort_key_map.insert(hash, key);
+
 			return key;
 		}
-		++m_max_sort_key;
-		const u32 key = m_max_sort_key;
-		ASSERT(key != 0);
-		if ((u32)m_sort_key_to_mesh_map.size() < key + 1)
-			m_sort_key_to_mesh_map.resize(key + 1);
-		m_sort_key_to_mesh_map[key] = mesh;
+
+		SortKey& sort_key = m_sort_keys.emplace();
+		sort_key.ref_count = 1;
+		sort_key.hash = hash;
+		const u32 key = m_sort_keys.size() - 1;
+		m_sort_key_map.insert(hash, key);
+
 		return key;
 	}
 
 	void freeSortKey(u32 key) override {
-		if (key != 0) {
-			m_free_sort_keys.push(key);
-		}
+		SortKey& sort_key = m_sort_keys[key];
+		--sort_key.ref_count;
+		if (sort_key.ref_count > 0) return;
+
+		m_sort_key_map.erase(sort_key.hash);
+		sort_key.next = m_first_free_sort_key;
+		m_first_free_sort_key = key;
 	}
 	
 	u32 getMaxSortKey() const override {
-		return m_max_sort_key;
+		return m_sort_keys.empty() ? 0 : m_sort_keys.size() - 1;
 	}
 
 	gpu::TextureHandle createTexture(u32 w, u32 h, u32 depth, gpu::TextureFormat format, gpu::TextureFlags flags, const MemRef& memory, const char* debug_name) override
@@ -1281,9 +1322,6 @@ struct RendererImpl final : Renderer {
 	RenderResourceManager<Shader> m_shader_manager;
 	RenderResourceManager<Texture> m_texture_manager;
 	RenderResourceManager<Material> m_material_manager;
-	Array<u32> m_free_sort_keys;
-	Array<const Mesh*> m_sort_key_to_mesh_map;
-	u32 m_max_sort_key = 0;
 	u32 m_frame_number = 0;
 	float m_lod_multiplier = 1;
 	jobs::Counter m_init_signal;
@@ -1311,6 +1349,7 @@ struct RendererImpl final : Renderer {
 		struct Data {
 			Data() {}
 			u32 ref_count;
+			bool is_instance;
 			union {
 				RuntimeHash hash;
 				u32 next_free;
@@ -1322,6 +1361,10 @@ struct RendererImpl final : Renderer {
 		int first_free;
 		HashMap<RuntimeHash, u32> map;
 	} m_material_buffer;
+
+	Array<SortKey> m_sort_keys;
+	HashMap<u32, u32> m_sort_key_map;
+	i32 m_first_free_sort_key = -1;
 
 	Array<Renderbuffer> m_renderbuffers;
 	gpu::BufferHandle m_instanced_meshes_buffer = gpu::INVALID_BUFFER;

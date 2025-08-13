@@ -102,10 +102,9 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 	virtual u8 getLayerIdx(const char* name) = 0;
 	virtual u8 getLayersCount() const = 0;
 	virtual const char* getLayerName(u8 layer) const = 0;
-	virtual u32 allocSortKey(struct Mesh* mesh) = 0;
+	virtual u32 allocSortKey(u32 hash) = 0;
 	virtual void freeSortKey(u32 key) = 0;
 	virtual u32 getMaxSortKey() const = 0;
-	virtual const Mesh** getSortKeyToMeshMap() const = 0;
 	virtual void enableBuiltinTAA(bool enable) = 0;
 	
 	virtual const char* getSemanticDefines(Span<const AttributeSemantic> attributes) = 0;
@@ -114,6 +113,8 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 	virtual struct ResourceManager& getTextureManager() = 0;
 	
 	virtual u32 createMaterialConstants(Span<const float> data) = 0;
+	virtual u32 createMaterialInstance(Span<const float> data) = 0;
+	virtual void updateMaterialConstants(u32 handle, Span<const float> data, u32 offset) = 0;
 	virtual void destroyMaterialConstants(u32 id) = 0;
 	virtual gpu::BufferHandle getMaterialUniformBuffer() = 0;
 	

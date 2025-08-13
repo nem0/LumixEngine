@@ -1696,6 +1696,27 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 struct ModelPropertiesPlugin final : PropertyGrid::IPlugin {
 	ModelPropertiesPlugin(StudioApp& app) : m_app(app) {}
 	
+	struct OverrideMaterialCommand : IEditorCommand {
+		bool execute() override {
+			auto* module = (RenderModule*)editor->getWorld()->getModule("renderer");
+			old_path = module->getModelInstanceMaterialOverride(entity, mesh_idx);
+			module->setModelInstanceMaterialOverride(entity, mesh_idx, path);
+			return true;
+		}
+		void undo() override {
+			auto* module = (RenderModule*)editor->getWorld()->getModule("renderer");
+			module->setModelInstanceMaterialOverride(entity, mesh_idx, old_path);
+		}
+		const char* getType() override { return "override_material"; }
+		bool merge(IEditorCommand& command) override { return false; }
+		
+		EntityRef entity;
+		Path path;
+		Path old_path;
+		u32 mesh_idx;
+		WorldEditor* editor;
+	};
+
 	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, const TextFilter& filter, WorldEditor& editor) override {
 		if (!filter.pass("Material")) return;
 		
@@ -1707,48 +1728,40 @@ struct ModelPropertiesPlugin final : PropertyGrid::IPlugin {
 		Model* model = module->getModelInstanceModel(entity);
 		if (!model || !model->isReady()) return;
 
-		const i32 count = model->getMeshCount();
-		if (count == 1) {
-			ImGuiEx::Label("Material");
-			
-			Path path = module->getModelInstanceMaterialOverride(entity);
-			if (path.isEmpty()) {
-				path = model->getMesh(0).material->getPath();
-			}
-			if (m_app.getAssetBrowser().resourceInput("##mat", path, Material::TYPE)) {
-				editor.setProperty(MODEL_INSTANCE_TYPE, "", -1, "Material", Span(&entity, 1), path);
-			}
-			return;
-		}
+		const u32 num_meshes = (u32)model->getMeshCount();
 		
 
 		bool open = true;
-		if (count > 1) {
-			open = ImGui::TreeNodeEx("Materials", ImGuiTreeNodeFlags_DefaultOpen);
+		if (num_meshes > 1) {
+			open = ImGui::TreeNodeEx("Materials", num_meshes < 5 ? ImGuiTreeNodeFlags_DefaultOpen : 0);
 		}
 		if (open) {
 			const float go_to_w = ImGui::CalcTextSize(ICON_FA_BULLSEYE).x;
-			for (i32 i = 0; i < count; ++i) {
-				Material* material = model->getMesh(i).material;
-				bool duplicate = false;
-				for (i32 j = 0; j < i; ++j) {
-					if (model->getMesh(j).material == material) {
-						duplicate = true;
-					}
+			for (u32 i = 0; i < num_meshes; ++i) {
+
+				Path path = module->getModelInstanceMaterialOverride(entity, i);
+				const MeshMaterial& mesh_mat = model->getMeshMaterial(i);
+				if (path.isEmpty()) {
+					path = mesh_mat.material->getPath();
 				}
-				if (duplicate) continue;
+
+				Mesh& mesh = model->getMesh(i);
+				Material* material = mesh_mat.material;
 				ImGui::PushID(i);
-				
-				const float w = ImGui::GetContentRegionAvail().x - go_to_w;
-				ImGuiEx::TextClipped(material->getPath().c_str(), w);
-				ImGui::SameLine();
-				if (ImGuiEx::IconButton(ICON_FA_BULLSEYE, "Go to"))
-				{
-					m_app.getAssetBrowser().openEditor(material->getPath());
+
+				ImGuiEx::Label(mesh.name.c_str());
+				if (m_app.getAssetBrowser().resourceInput("##mat", path, Material::TYPE)) {
+					IAllocator& allocator = editor.getAllocator();
+					UniquePtr<OverrideMaterialCommand> cmd = UniquePtr<OverrideMaterialCommand>::create(allocator);
+					cmd->editor = &editor;
+					cmd->entity = entity;
+					cmd->mesh_idx = i;
+					cmd->path = path;
+					editor.executeCommand(cmd.move());
 				}
 				ImGui::PopID();
 			}
-			if(count > 1) ImGui::TreePop();
+			if(num_meshes > 1) ImGui::TreePop();
 		}
 	}
 
@@ -2382,15 +2395,16 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 						ImGui::TableNextRow();
 						ImGui::TableNextColumn();
 						const Mesh& mesh = m_resource->getMesh(i);
+						const MeshMaterial& mesh_mat = m_resource->getMeshMaterial(i);
 						ImGuiEx::TextUnformatted(mesh.name);
 						ImGui::TableNextColumn();
 						ImGui::Text("%d", ((i32)mesh.indices.size() >> (mesh.areIndices16() ? 1 : 2)) / 3);
 						ImGui::TableNextColumn();
 						const float w = ImGui::GetContentRegionAvail().x - go_to_w;
-						ImGuiEx::TextClipped(mesh.material->getPath().c_str(), w);
+						ImGuiEx::TextClipped(mesh_mat.material->getPath().c_str(), w);
 						ImGui::SameLine();
 						if (ImGuiEx::IconButton(ICON_FA_BULLSEYE, "Go to")) {
-							m_app.getAssetBrowser().openEditor(mesh.material->getPath());
+							m_app.getAssetBrowser().openEditor(mesh_mat.material->getPath());
 						}
 						ImGui::PopID();
 					}
@@ -2464,8 +2478,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		 
 		static void enableWireframe(Model& model, bool enable) {
 			for (u32 i = 0; i < (u32)model.getMeshCount(); ++i) {
-				Mesh& mesh = model.getMesh(i);
-				mesh.material->setWireframe(enable);
+				const MeshMaterial& mesh_mat = model.getMeshMaterial(i);
+				mesh_mat.material->setWireframe(enable);
 			}
 		}
 
@@ -5228,7 +5242,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin {
 			static int size = 1024;
 			ImGuiEx::Label("Size");
 			ImGui::InputInt("##size", &size);
-			m_file_selector.gui(false, "mat");
+			m_file_selector.gui("mat");
 			if (m_file_selector.getPath()[0] &&  ImGui::Button("Create"))
 			{
 				new_created = createHeightmap(Path(m_file_selector.getPath()), size);
