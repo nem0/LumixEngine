@@ -617,7 +617,7 @@ struct RendererImpl final : Renderer {
 		}
 
 		MaterialBuffer& mb = m_material_buffer;
-		const u32 MAX_MATERIAL_CONSTS_COUNT = 5000;
+		const u32 MAX_MATERIAL_CONSTS_COUNT = 10000;
 		mb.buffer = gpu::allocBufferHandle();
 		mb.map.insert(RuntimeHash(), 0);
 		mb.data.resize(MAX_MATERIAL_CONSTS_COUNT);

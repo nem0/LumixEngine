@@ -814,7 +814,7 @@ end
 
 if build_physx and hasPlugin("physics") then
 	printf("Using PhysX from external/_repos/physx (build from source code)")
-	lib_project "PhysX"
+	project "PhysX"
 		kind "StaticLib"
 		files { "../external/_repos/physx/physx/source/**.cpp", "../external/_repos/physx/physx/include/**.h", "../external/_repos/physx/pxshared/**.h" }
 		removefiles { "../**/unix/*", "../**/linux/*" }
