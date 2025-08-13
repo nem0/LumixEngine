@@ -204,9 +204,19 @@ struct RenderModuleImpl final : RenderModule {
 			if (im.gpu_data) m_renderer.getEndFrameDrawStream().destroy(im.gpu_data);
 		}
 
-		for (ModelInstance& i : m_model_instances)
-		{
-			clear(i, false);
+		for (ModelInstance& r : m_model_instances) {
+			if (!isFlagSet(r.flags, ModelInstance::VALID)) continue;
+			
+			if (!r.model || !r.model->isReady() || r.mesh_materials.begin() != &r.model->getMeshMaterial(0)) {
+				for (MeshMaterial& m : r.mesh_materials) {
+					m.material->decRefCount();
+					m_renderer.freeSortKey(m.sort_key);
+				}
+				m_allocator.deallocate(r.mesh_materials.begin());
+			}
+			
+			if (r.model) r.model->decRefCount();
+			LUMIX_DELETE(m_allocator, r.pose);
 		}
 		
 		for(auto iter : m_model_entity_map.iterated()) {
@@ -1016,12 +1026,10 @@ struct RenderModuleImpl final : RenderModule {
 				const EntityRef e = entity_map.get(EntityRef{(i32)i});
 
 				while (e.index >= m_model_instances.size()) {
-					auto& r = m_model_instances.emplace();
-					clear(r, false);
+					m_model_instances.emplace();
 				}
 
 				ModelInstance& r = m_model_instances[e.index];
-				clear(r, false);
 				r.flags = flags;
 
 				const char* path = serializer.readString();
@@ -1056,14 +1064,10 @@ struct RenderModuleImpl final : RenderModule {
 				const EntityRef e = entity_map.get(EntityRef{(i32)i});
 
 				while (e.index >= m_model_instances.size()) {
-					ModelInstance& r = m_model_instances.emplace();
-					r.flags = ModelInstance::NONE;
-					r.model = nullptr;
-					r.pose = nullptr;
+					m_model_instances.emplace();
 				}
 
 				ModelInstance& r = m_model_instances[e.index];
-				clear(r, false);
 				r.flags = flags;
 
 				const u32 path_offset = serializer.read<u32>();
@@ -1373,7 +1377,7 @@ struct RenderModuleImpl final : RenderModule {
 	void destroyModelInstance(EntityRef entity) {
 		auto& model_instance = m_model_instances[entity.index];
 		setModel(entity, nullptr);
-		model_instance.flags = ModelInstance::NONE;
+		model_instance = {};
 		m_world.onComponentDestroyed(entity, MODEL_INSTANCE_TYPE, this);
 	}
 
@@ -1531,12 +1535,9 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 
-	void onEntityDestroyed(EntityRef entity)
-	{
-		for (auto& i : m_bone_attachments)
-		{
-			if (i.parent_entity == entity)
-			{
+	void onEntityDestroyed(EntityRef entity) {
+		for (auto& i : m_bone_attachments) {
+			if (i.parent_entity == entity) {
 				i.parent_entity = INVALID_ENTITY;
 				break;
 			}
@@ -2926,27 +2927,6 @@ struct RenderModuleImpl final : RenderModule {
 		return m_environment_probes[entity].flags & EnvironmentProbe::ENABLED;
 	}
 
-	void clear(ModelInstance& r, bool keep_flags) {
-		if (r.model && r.model->isReady() && r.mesh_materials.begin() != &r.model->getMeshMaterial(0)) {
-			for (MeshMaterial& m : r.mesh_materials) {
-				m.material->decRefCount();
-				m_renderer.freeSortKey(m.sort_key);
-			}
-			m_allocator.deallocate(r.mesh_materials.begin());
-		}
-		r.mesh_materials = {};
-		
-		if (r.model) r.model->decRefCount();
-		r.model = nullptr;
-		
-		r.meshes = nullptr;
-		r.mesh_count = 0;
-		LUMIX_DELETE(m_allocator, r.pose);
-		r.pose = nullptr;
-		if (!keep_flags) r.flags = ModelInstance::NONE;
-		r.dirty = true;
-	}
-
 	void modelUnloaded(Model*, EntityRef entity) {
 		ModelInstance& r = m_model_instances[entity.index];
 		r.meshes = nullptr;
@@ -2958,8 +2938,7 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 
-	void modelLoaded(Model* model, EntityRef entity)
-	{
+	void modelLoaded(Model* model, EntityRef entity) {
 		ASSERT(model->isReady());
 		auto& r = m_model_instances[entity.index];
 
@@ -2998,7 +2977,7 @@ struct RenderModuleImpl final : RenderModule {
 			}
 		}
 		
-		r.dirty = true;
+		r.dirty = r.mesh_materials.begin() != &r.model->getMeshMaterial(0);
 	}
 
 	u32 computeSortKey(const Material& material, const Mesh& mesh) const override {
@@ -3340,14 +3319,12 @@ struct RenderModuleImpl final : RenderModule {
 		m_world.onComponentCreated(entity, INSTANCED_MODEL_TYPE, this);
 	}
 
-	void createModelInstance(EntityRef entity)
-	{
+	void createModelInstance(EntityRef entity) {
 		while(entity.index >= m_model_instances.size()) {
-			auto& r = m_model_instances.emplace();
-			clear(r, false);
+			m_model_instances.emplace();
 		}
 		auto& r = m_model_instances[entity.index];
-		clear(r, false);
+		ASSERT(!r.model);
 		r.flags = ModelInstance::VALID | ModelInstance::ENABLED;
 		m_world.onComponentCreated(entity, MODEL_INSTANCE_TYPE, this);
 	}

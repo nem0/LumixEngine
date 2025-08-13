@@ -194,16 +194,16 @@ struct ModelInstance {
 		MOVED = 1 << 3,
 	};
 
-	Model* model;
-	Mesh* meshes;
-	Span<MeshMaterial> mesh_materials;
-	Pose* pose;
+	Model* model = nullptr;
+	Mesh* meshes = nullptr;
+	Span<MeshMaterial> mesh_materials = {};
+	Pose* pose = nullptr;
 	EntityPtr next_model = INVALID_ENTITY;
 	EntityPtr prev_model = INVALID_ENTITY;
 	float lod = 4;
 	Transform prev_frame_transform;
 	Flags flags = Flags::NONE;
-	u16 mesh_count;
+	u16 mesh_count = 0;
 	bool dirty = true;
 };
 
