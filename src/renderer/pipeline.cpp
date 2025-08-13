@@ -1451,7 +1451,7 @@ struct PipelineImpl final : Pipeline {
 			.debug_name = "2D only"
 			});
 		m_renderer.setRenderTargets(Span(&rb, 1));
-		clear(gpu::ClearFlags::ALL, 0, 0, 0, 0, 0);
+		clear(gpu::ClearFlags::ALL, m_clear_color.r, m_clear_color.g, m_clear_color.b, 1, 0);
 		render2D(rb);
 		m_output = rb;
 	}
