@@ -1372,7 +1372,8 @@ struct RenderModuleImpl final : RenderModule {
 
 	void destroyModelInstance(EntityRef entity) {
 		auto& model_instance = m_model_instances[entity.index];
-		clear(model_instance, false);
+		setModel(entity, nullptr);
+		model_instance.flags = ModelInstance::NONE;
 		m_world.onComponentDestroyed(entity, MODEL_INSTANCE_TYPE, this);
 	}
 
@@ -3154,37 +3155,47 @@ struct RenderModuleImpl final : RenderModule {
 		}
 	}
 
-	void setModel(EntityRef entity, Model* model)
-	{
-		auto& model_instance = m_model_instances[entity.index];
-		model_instance.prev_frame_transform = m_world.getTransform(entity);
+	void setModel(EntityRef entity, Model* model) {
+		auto& r = m_model_instances[entity.index];
+		r.prev_frame_transform = m_world.getTransform(entity);
+		ASSERT(r.flags & ModelInstance::VALID);
 
-		ASSERT(model_instance.flags & ModelInstance::VALID);
-		Model* old_model = model_instance.model;
+		Model* old_model = r.model;
 		bool no_change = model == old_model && old_model;
-		if (no_change)
-		{
+		if (no_change) {
 			old_model->decRefCount();
 			return;
 		}
-		if (old_model)
-		{
+
+		if (!old_model || !old_model->isReady() || r.mesh_materials.begin() != &old_model->getMeshMaterial(0)) {
+			for (MeshMaterial& m : r.mesh_materials) {
+				m.material->decRefCount();
+				m_renderer.freeSortKey(m.sort_key);
+			}
+			m_allocator.deallocate(r.mesh_materials.begin());
+		}
+		r.mesh_materials = {};
+		
+		r.meshes = nullptr;
+		r.mesh_count = 0;
+		LUMIX_DELETE(m_allocator, r.pose);
+		r.pose = nullptr;
+		r.dirty = true;
+
+		if (old_model) {
 			removeFromModelEntityMap(old_model, entity);
 
-			if (old_model->isReady())
-			{
+			if (old_model->isReady()) {
 				m_culling_system->remove(entity);
 			}
 			old_model->decRefCount();
 		}
-		clear(model_instance, true);
-		model_instance.model = model;
-		if (model)
-		{
+
+		r.model = model;
+		if (model) {
 			addToModelEntityMap(model, entity);
 
-			if (model->isReady())
-			{
+			if (model->isReady()) {
 				modelLoaded(model, entity);
 			}
 		}

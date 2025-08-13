@@ -35,34 +35,12 @@ struct LUMIX_EDITOR_API Settings {
 
 	enum : u32 { INVALID_CATEGORY = 0xFFffFFff };
 
-	Settings(struct StudioApp& app);
-
-	void gui();
-	void load();
-	void save();
-
-	i32 getI32(const char* var_name, i32 default_value);
-	bool getBool(const char* var_name, bool default_value);
-	float getFloat(const char* var_name, float default_value);
-	const char* getString(const char* var_name, const char* default_value);
-
-	void setI32(const char* var_name, i32 value, Storage storage);
-	void setBool(const char* var_name, bool value, Storage storage);
-	void setFloat(const char* var_name, float value, Storage storage);
-	void setString(const char* var_name, const char* value, Storage storage);
-
-	// register variable with memory storage not in Settings
-	// if category is null, the variable is not visible in settings UI
-	// otherwise it's grouped in the category
-	void registerOption(const char* name, bool* value, const char* category = nullptr, const char* label = nullptr, const Delegate<void()>* set_callback = nullptr);
-	void registerOption(const char* name, String* value, const char* category = nullptr, const char* label = nullptr);
-	void registerOption(const char* name, i32* value, const char* category = nullptr, const char* label = nullptr);
-	void registerOption(const char* name, float* value, const char* category = nullptr, const char* label = nullptr, bool is_angle = false);
-
-	float getTimeSinceLastSave() const;
-
 	struct Variable {
-		Variable(IAllocator& allocator) : string_value(allocator) {}
+		Variable(IAllocator& allocator);
+		Variable& setMin(float v) { min = v; return *this; }
+		Variable& setMax(float v) { max = v; return *this; }
+		Variable& setIsAngle(bool v) { is_angle = v; return *this; }
+
 		Storage storage = WORKSPACE;
 		enum Type {
 			BOOL,
@@ -84,6 +62,7 @@ struct LUMIX_EDITOR_API Settings {
 			float* float_ptr;
 		};
 		String string_value;
+		float min, max;
 		Type type;
 		u32 category = INVALID_CATEGORY;
 		Delegate<void()> set_callback; // only called by settings
@@ -96,6 +75,32 @@ struct LUMIX_EDITOR_API Settings {
 		Category(IAllocator& allocator) : name(allocator) {}
 		String name;
 	};
+
+	Settings(struct StudioApp& app);
+
+	void gui();
+	void load();
+	void save();
+
+	i32 getI32(const char* var_name, i32 default_value);
+	bool getBool(const char* var_name, bool default_value);
+	float getFloat(const char* var_name, float default_value);
+	const char* getString(const char* var_name, const char* default_value);
+
+	void setI32(const char* var_name, i32 value, Storage storage);
+	void setBool(const char* var_name, bool value, Storage storage);
+	void setFloat(const char* var_name, float value, Storage storage);
+	void setString(const char* var_name, const char* value, Storage storage);
+
+	// register variable with memory storage not in Settings
+	// if category is null, the variable is not visible in settings UI
+	// otherwise it's grouped in the category
+	Variable& registerOption(const char* name, bool* value, const char* category = nullptr, const char* label = nullptr, const Delegate<void()>* set_callback = nullptr);
+	Variable& registerOption(const char* name, String* value, const char* category = nullptr, const char* label = nullptr);
+	Variable& registerOption(const char* name, i32* value, const char* category = nullptr, const char* label = nullptr);
+	Variable& registerOption(const char* name, float* value, const char* category = nullptr, const char* label = nullptr);
+
+	float getTimeSinceLastSave() const;
 
 	StudioApp& m_app;
 	TagAllocator m_allocator;

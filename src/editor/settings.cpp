@@ -110,6 +110,13 @@ static bool shortcutInput(char* button_label, Action& action, bool edit, StudioA
 	return res;
 }
 
+Settings::Variable::Variable(IAllocator& allocator)
+	: string_value(allocator)
+	, min(-FLT_MAX)
+	, max(FLT_MAX)
+{}
+
+
 MouseSensitivity::MouseSensitivity(IAllocator& allocator)
 	: values(allocator) {
 	values.push({0, 0.5f});
@@ -1119,6 +1126,10 @@ static void generalGUI(Settings& settings) {
 	settings.m_mouse_sensitivity_y.gui();
 }
 
+static i32 clampInt(i32 value, float min, float max) {
+	return (i32)clamp((float)value, min, max);
+}
+
 void Settings::gui() {
 	if (m_app.checkShortcut(m_toggle_ui_action, true)) m_is_open = !m_is_open;
 	if (!m_is_open) return;
@@ -1149,23 +1160,35 @@ void Settings::gui() {
 				ImGui::TextUnformatted(var.label);
 				ImGui::TableNextColumn();
 				ImGui::PushID(&var);
-				auto CB = [&](bool changed) { if (changed && var.set_callback.isValid()) var.set_callback.invoke(); };
+				auto CB = [&](bool changed) {
+					if (!changed) return changed;
+					if (var.set_callback.isValid()) var.set_callback.invoke();
+					return changed;
+				};
 				switch (var.type) {
 					case Variable::BOOL: CB(ImGui::Checkbox("##var", &var.bool_value)); break;
 					case Variable::BOOL_PTR: CB(ImGui::Checkbox("##var", var.bool_ptr)); break;
-					case Variable::I32: CB(ImGui::InputInt("##var", &var.i32_value)); break;
-					case Variable::I32_PTR: CB(ImGui::InputInt("##var", var.i32_ptr)); break;
-					case Variable::FLOAT: CB(ImGui::DragFloat("##var", &var.float_value)); break;
+					case Variable::I32: 
+						if (CB(ImGui::InputInt("##var", &var.i32_value))) {
+							var.i32_value = clampInt(var.i32_value, var.min, var.max);
+						}
+					break;
+					case Variable::I32_PTR: 
+						if (CB(ImGui::InputInt("##var", var.i32_ptr))) {
+							*var.i32_ptr = clampInt(*var.i32_ptr, var.min, var.max);
+						}
+						break;
+					case Variable::FLOAT: CB(ImGui::DragFloat("##var", &var.float_value, 1, var.min, var.max)); break;
 					case Variable::FLOAT_PTR: {
 						if (var.is_angle) {
 							float deg = radiansToDegrees(*var.float_ptr);
-							if (ImGui::DragFloat("##var", &deg)) {
+							if (ImGui::DragFloat("##var", &deg, 1, var.min, var.max)) {
 								*var.float_ptr = degreesToRadians(deg);
 								if (var.set_callback.isValid()) var.set_callback.invoke();
 							}
 						}
 						else {
-							CB(ImGui::DragFloat("##var", var.float_ptr));
+							CB(ImGui::DragFloat("##var", var.float_ptr, 1, var.min, var.max));
 						}
 						break;
 					}
@@ -1398,7 +1421,7 @@ static u32 getCategory(Settings& settings, const char* category) {
 	return settings.m_categories.size() - 1;
 }
 
-void Settings::registerOption(const char* name, String* value, const char* category, const char* label) {
+Settings::Variable& Settings::registerOption(const char* name, String* value, const char* category, const char* label) {
 	// if variable already exists
 	Variable* var = findVar(*this, name);
 	if (var) {
@@ -1406,12 +1429,12 @@ void Settings::registerOption(const char* name, String* value, const char* categ
 		var->category = getCategory(*this, category);
 		if (var->type != Variable::STRING) {
 			logError("Setting ", name, " already exists but is not a string");
-			return;
+			return *var;
 		}
 		*value = var->string_value;
 		var->string_ptr = value;
 		var->type = Variable::STRING_PTR;
-		return;
+		return *var;
 	}
 
 	// create variable
@@ -1421,9 +1444,10 @@ void Settings::registerOption(const char* name, String* value, const char* categ
 	new_var.type = Variable::STRING_PTR;
 	new_var.storage = WORKSPACE;
 	new_var.category = getCategory(*this, category);
+	return new_var;
 }
 
-void Settings::registerOption(const char* name, bool* value, const char* category, const char* label, const Delegate<void()>* callback) {
+Settings::Variable& Settings::registerOption(const char* name, bool* value, const char* category, const char* label, const Delegate<void()>* callback) {
 	// if variable already exists
 	Variable* var = findVar(*this, name);
 	if (var) {
@@ -1431,13 +1455,13 @@ void Settings::registerOption(const char* name, bool* value, const char* categor
 		var->category = getCategory(*this, category);
 		if (var->type != Variable::BOOL) {
 			logError("Setting ", name, " already exists but is not a bool");
-			return;
+			return *var;
 		}
 		*value = var->bool_value;
 		var->bool_ptr = value;
 		var->type = Variable::BOOL_PTR;
 		if (callback) var->set_callback = *callback;
-		return;
+		return *var;
 	}
 
 	// create variable
@@ -1447,10 +1471,11 @@ void Settings::registerOption(const char* name, bool* value, const char* categor
 	new_var.type = Variable::BOOL_PTR;
 	new_var.storage = WORKSPACE;
 	if (callback) new_var.set_callback = *callback;
-	new_var.category = getCategory(*this, category);
+	new_var.category = getCategory(*this, category);\
+	return new_var;
 }
 
-void Settings::registerOption(const char* name, i32* value, const char* category, const char* label) {
+Settings::Variable& Settings::registerOption(const char* name, i32* value, const char* category, const char* label) {
 	// if variable already exists
 	Variable* var = findVar(*this, name);
 	if (var) {
@@ -1458,12 +1483,12 @@ void Settings::registerOption(const char* name, i32* value, const char* category
 		var->category = getCategory(*this, category);
 		if (var->type != Variable::I32) {
 			logError("Setting ", name, " already exists but is not a bool");
-			return;
+			return *var;
 		}
 		*value = var->bool_value;
 		var->i32_ptr = value;
 		var->type = Variable::I32_PTR;
-		return;
+		return *var;
 	}
 
 	// create variable
@@ -1473,39 +1498,39 @@ void Settings::registerOption(const char* name, i32* value, const char* category
 	new_var.type = Variable::I32_PTR;
 	new_var.storage = WORKSPACE;
 	new_var.category = getCategory(*this, category);
+	return new_var;
 }
 
-void Settings::registerOption(const char* name, float* value, const char* category, const char* label, bool is_angle) {
+Settings::Variable& Settings::registerOption(const char* name, float* value, const char* category, const char* label) {
 	// if variable already exists
 	Variable* var = findVar(*this, name);
 	if (var) {
 		var->label = label;
-		var->is_angle = is_angle;
 		var->category = getCategory(*this, category);
 		if (var->type == Variable::I32) {
 			*value = (float)var->i32_value;
 			var->float_ptr = value;
 			var->type = Variable::FLOAT_PTR;
-			return;
+			return *var;
 		}
 		if (var->type != Variable::FLOAT) {
 			logError("Setting ", name, " already exists but is not float");
-			return;
+			return *var;
 		}
 		*value = var->float_value;
 		var->float_ptr = value;
 		var->type = Variable::FLOAT_PTR;
-		return;
+		return *var;
 	}
 
 	// create variable
 	Variable& new_var = m_variables.insert(String(name, m_allocator));
 	new_var.label = label;
-	new_var.is_angle = is_angle;
 	new_var.float_ptr = value;
 	new_var.type = Variable::FLOAT_PTR;
 	new_var.storage = WORKSPACE;
 	new_var.category = getCategory(*this, category);
+	return new_var;
 }
 
 } // namespace Lumix

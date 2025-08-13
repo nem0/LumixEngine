@@ -949,12 +949,12 @@ struct StudioAppImpl final : StudioApp {
 		m_settings.registerOption("report_crashes", &m_crash_reporting, "General", "Report crashes");
 		m_settings.registerOption("sleep_when_inactive", &m_sleep_when_inactive, "General", "Sleep when inactive");
 		m_settings.registerOption("fileselector_dir", &m_file_selector.m_path);
-		m_settings.registerOption("font_size", &m_font_size, "General", "Font size");
-		m_settings.registerOption("code_editor_font_size", &CodeEditor::s_font_size, "General", "Code editor font size");
+		m_settings.registerOption("font_size", &m_font_size, "General", "Font size").setMin(1);
+		m_settings.registerOption("code_editor_font_size", &CodeEditor::s_font_size, "General", "Code editor font size").setMin(1);
 		m_settings.registerOption("export_pack", &m_export.pack);
 		m_settings.registerOption("export_dir", &m_export.dest_dir);
-		m_settings.registerOption("gizmo_scale", &m_gizmo_config.scale, "General", "Gizmo scale");
-		m_settings.registerOption("fov", &m_fov, "General", "FOV", true);
+		m_settings.registerOption("gizmo_scale", &m_gizmo_config.scale, "General", "Gizmo scale").setMin(0.001f);
+		m_settings.registerOption("fov", &m_fov, "General", "FOV").setMin(1).setMax(179).setIsAngle(true);
 		static bool use_native_titlebar = false;
 		m_settings.registerOption("use_native_titlebar", &use_native_titlebar, "General", "Native titlebar (restart required)");
 		// we need some stuff (font_size) from settings at this point
@@ -2030,6 +2030,7 @@ struct StudioAppImpl final : StudioApp {
 
 	ImFont* addFontFromFile(const char* path, float size, bool merge_icons) {
 		PROFILE_FUNCTION();
+		size = maximum(size, 1.f);
 		FileSystem& fs = m_engine->getFileSystem();
 		OutputMemoryStream data(m_allocator);
 		if (!fs.getContentSync(Path(path), data)) return nullptr;
@@ -2195,7 +2196,7 @@ struct StudioAppImpl final : StudioApp {
 
 			OutputMemoryStream data(m_allocator);
 			if (fs.getContentSync(Path("editor/fonts/fa-solid-900.ttf"), data)) {
-				const float size = (float)m_font_size * font_scale * 1.25f;
+				const float size = maximum(1.f, (float)m_font_size * font_scale * 1.25f);
 				ImFontConfig cfg;
 				copyString(cfg.Name, "editor/fonts/fa-solid-900.ttf");
 				cfg.FontDataOwnedByAtlas = false;

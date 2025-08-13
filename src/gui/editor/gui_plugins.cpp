@@ -286,8 +286,8 @@ struct GUIEditor final : StudioApp::GUIPlugin {
 		Renderer& renderer = *static_cast<Renderer*>(engine.getSystemManager().getSystem("renderer"));
 		m_pipeline = Pipeline::create(renderer, PipelineType::GUI_EDITOR);
 		m_app.getSettings().registerOption("gui_editor_show_grid", &m_show_grid, "GUI editor", "Show grid");
-		m_app.getSettings().registerOption("gui_editor_grid_spacing", &m_grid_spacing, "GUI editor", "Grid spacing");
-		m_app.getSettings().registerOption("gui_editor_grid_opacity", &m_grid_opacity, "GUI editor", "Grid opacity");
+		m_app.getSettings().registerOption("gui_editor_grid_spacing", &m_grid_spacing, "GUI editor", "Grid spacing").setMin(2);
+		m_app.getSettings().registerOption("gui_editor_grid_opacity", &m_grid_opacity, "GUI editor", "Grid opacity").setMin(0).setMax(1);
 	}
 
 private:
