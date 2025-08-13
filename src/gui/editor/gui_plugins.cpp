@@ -262,10 +262,8 @@ struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 };
 
 
-struct GUIEditor final : StudioApp::GUIPlugin
-{
-	enum class EdgeMask
-	{
+struct GUIEditor final : StudioApp::GUIPlugin {
+	enum class EdgeMask {
 		LEFT = 1 << 0,
 		RIGHT = 1 << 1,
 		TOP = 1 << 2,
@@ -277,7 +275,6 @@ struct GUIEditor final : StudioApp::GUIPlugin
 		VERTICAL = TOP | BOTTOM
 	};
 
-public:
 	GUIEditor(StudioApp& app)
 		: m_app(app)
 	{
@@ -288,6 +285,9 @@ public:
 		Engine& engine = m_app.getEngine();
 		Renderer& renderer = *static_cast<Renderer*>(engine.getSystemManager().getSystem("renderer"));
 		m_pipeline = Pipeline::create(renderer, PipelineType::GUI_EDITOR);
+		m_app.getSettings().registerOption("gui_editor_show_grid", &m_show_grid, "GUI editor", "Show grid");
+		m_app.getSettings().registerOption("gui_editor_grid_spacing", &m_grid_spacing, "GUI editor", "Grid spacing");
+		m_app.getSettings().registerOption("gui_editor_grid_opacity", &m_grid_opacity, "GUI editor", "Grid opacity");
 	}
 
 private:
@@ -644,7 +644,7 @@ private:
 		vp.w = (int)size.x;
 		vp.h = (int)size.y;
 		m_pipeline->setViewport(vp);
-		m_pipeline->setClearColor(m_clear_color);	
+		m_pipeline->setClearColor(m_clear_color);
 
 		if (m_pipeline->render(true)) {
 			m_texture_handle = m_pipeline->getOutput();
@@ -655,6 +655,20 @@ private:
 				}
 				else {
 					ImGui::Image(m_texture_handle, size);
+				}
+			}
+
+			if (m_show_grid) {
+				ImDrawList* dl = ImGui::GetWindowDrawList();
+				const ImU32 grid_color = IM_COL32(200, 200, 200, u8(m_grid_opacity * 255.f));
+				const ImVec2 img_min = ImGui::GetItemRectMin();
+				const ImVec2 img_max = ImGui::GetItemRectMax();
+
+				for (float x = img_min.x; x < img_max.x; x += m_grid_spacing) {
+					dl->AddLine(ImVec2(x, img_min.y), ImVec2(x, img_max.y), grid_color);
+				}
+				for (float y = img_min.y; y < img_max.y; y += m_grid_spacing) {
+					dl->AddLine(ImVec2(img_min.x, y), ImVec2(img_max.x, y), grid_color);
 				}
 			}
 
@@ -1096,6 +1110,9 @@ private:
 	Vec2 m_canvas_size;
 	EntityPtr m_canvas_entity = INVALID_ENTITY;
 	Vec3 m_clear_color = Vec3(0);
+	bool m_show_grid = false;
+	float m_grid_spacing = 100.f;
+	float m_grid_opacity = 0.1f;
 
 	Action m_toggle_ui{"GUI Editor", "GUI Editor", "Toggle UI", "gui_editor", "", Action::WINDOW};
 	Action m_align_top_action{"GUI Editor", "Top", "Align top", "guied_align_top", ""};
