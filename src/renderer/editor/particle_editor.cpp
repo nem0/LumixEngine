@@ -2657,7 +2657,7 @@ struct ParticleEditorImpl : ParticleEditor {
 			compiler.registerExtension("par", ParticleSystemResource::TYPE);
 		}
 
-		void addSubresources(AssetCompiler& compiler, const Path& path) override {
+		void addSubresources(AssetCompiler& compiler, const Path& path, AtomicI32&) override {
 			compiler.addResource(ParticleSystemResource::TYPE, path);
 			ParticleEditor::registerDependencies(path, m_app);
 		}
@@ -2698,7 +2698,7 @@ struct ParticleEditorImpl : ParticleEditor {
 			, m_editor(editor)
 		{}
 
-		void addSubresources(AssetCompiler& compiler, const Path& path) override;
+		void addSubresources(AssetCompiler& compiler, const Path& path, AtomicI32&) override;
 		bool compile(const Path& src) override { return true; }
 		void listLoaded() override;
 		void openEditor(const Path& path) override { m_editor.open(path); }
@@ -3594,7 +3594,7 @@ void ParticleEditorImpl::open(const Path& path) {
 	m_app.getAssetBrowser().addWindow(win.move());
 }
 
-void ParticleEditorImpl::FunctionPlugin::addSubresources(AssetCompiler& compiler, const Path& path) {
+void ParticleEditorImpl::FunctionPlugin::addSubresources(AssetCompiler& compiler, const Path& path, AtomicI32&) {
 	compiler.addResource(ParticleSystemEditorResource::TYPE, path);
 	((ParticleEditorImpl&)m_editor).addFunction(path);
 }

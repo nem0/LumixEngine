@@ -13,7 +13,11 @@ struct LUMIX_EDITOR_API AssetCompiler {
 	struct LUMIX_EDITOR_API IPlugin {
 		virtual ~IPlugin() {}
 		virtual bool compile(const Path& src) = 0;
-		virtual void addSubresources(AssetCompiler& compiler, const Path& path);
+		
+		// Some plugins do async scan for subresources (e.g. ModelPlugin).
+		// They increment `signal` when they start the scan and decrement it when they finish.
+		// So when `signal` == 0, all scans, including async scans, are done and we can save the resource list.
+		virtual void addSubresources(AssetCompiler& compiler, const Path& path, struct AtomicI32& signal);
 		virtual void listLoaded() {}
 	};
 

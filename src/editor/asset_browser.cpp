@@ -58,7 +58,7 @@ struct WorldAssetPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		app.getAssetCompiler().registerExtension("unv", WORLD_TYPE);
 	}
 
-	void addSubresources(AssetCompiler& compiler, const Path& path) override {
+	void addSubresources(AssetCompiler& compiler, const Path& path, AtomicI32&) override {
 		compiler.addResource(WORLD_TYPE, path);
 	}
 	

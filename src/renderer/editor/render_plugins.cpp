@@ -2574,12 +2574,13 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		m_renderer = static_cast<Renderer*>(engine.getSystemManager().getSystem("renderer"));
 	}
 
-	void addSubresources(AssetCompiler& compiler, const Path& _path) override {
+	void addSubresources(AssetCompiler& compiler, const Path& _path, AtomicI32& scan_counter) override {
 		compiler.addResource(Model::TYPE, _path);
+		scan_counter.inc();
 
 		ModelMeta meta(m_app.getAllocator());
 		meta.load(_path, m_app);
-		jobs::runLambda([this, _path, meta = static_cast<ModelMeta&&>(meta)]() {
+		jobs::runLambda([this, &scan_counter, _path, meta = static_cast<ModelMeta&&>(meta)]() {
 			ModelImporter* importer = createFBXImporter(m_app, m_app.getAllocator());
 			AssetCompiler& compiler = m_app.getAssetCompiler();
 
@@ -2625,7 +2626,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				}
 			}
 			destroyFBXImporter(*importer);
-		}, &m_subres_signal, 2);			
+			scan_counter.dec();
+		}, &m_subres_signal, 2);
 	}
 
 	bool compile(const Path& src) override {
@@ -3255,7 +3257,7 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		}
 	}
 
-	void addSubresources(AssetCompiler& compiler, const Path& path) override {
+	void addSubresources(AssetCompiler& compiler, const Path& path, AtomicI32&) override {
 		compiler.addResource(Shader::TYPE, path);
 		findIncludes(path);
 	}
@@ -3482,7 +3484,7 @@ struct ShaderIncludePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		app.getAssetCompiler().registerExtension("hlsli", SHADER_INCLUDE_TYPE);
 	}
 
-	void addSubresources(AssetCompiler& compiler, const Path& path) override {
+	void addSubresources(AssetCompiler& compiler, const Path& path, AtomicI32&) override {
 		compiler.addResource(SHADER_INCLUDE_TYPE, path);
 	}
 	

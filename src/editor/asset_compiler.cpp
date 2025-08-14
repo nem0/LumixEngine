@@ -36,7 +36,7 @@ struct HashFunc<Path>
 };
 
 
-void AssetCompiler::IPlugin::addSubresources(AssetCompiler& compiler, const Path& path)
+void AssetCompiler::IPlugin::addSubresources(AssetCompiler& compiler, const Path& path, AtomicI32&)
 {
 	const ResourceType type = compiler.getResourceType(path);
 	if (!type.isValid()) return;
@@ -84,6 +84,9 @@ struct AssetCompilerImpl : AssetCompiler {
 	}
 
 	void saveResourceList() {
+		if (m_scan_counter > 0) return;
+
+		PROFILE_FUNCTION();
 		os::OutputFile file;
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (fs.open(".lumix/resources/_resources.txt_tmp", file)) {
@@ -247,7 +250,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		jobs::MutexGuard guard(m_resources_mutex);
 		auto iter = m_resources.find(path.getHash());
 		if (!iter.isValid()) {
-			// Resource scane is async, so it's not guaranteed that the resource is in the m_resources list at this point
+			// Resource scan is async, so it's not guaranteed that the resource is in the m_resources list at this point
 			// If it's not, we don't need to add it to the list
 			m_resources.insert(path.getHash(), {path, getResourceType(path), dirHash(path)});
 		}
@@ -286,7 +289,6 @@ struct AssetCompilerImpl : AssetCompiler {
 		return INVALID_RESOURCE_TYPE;
 	}
 
-
 	bool acceptExtension(StringView ext, ResourceType type) const override
 	{
 		alignas(u32) char tmp[6] = {};
@@ -316,29 +318,25 @@ struct AssetCompilerImpl : AssetCompiler {
 		auto iter = m_plugins.find(RuntimeHash(ext));
 		if (!iter.isValid()) return;
 
-		iter.value()->addSubresources(*this, fullpath);
+		iter.value()->addSubresources(*this, fullpath, m_scan_counter);
 	}
 
 	
-	void processDir(StringView dir, u64 list_last_modified)
-	{
+	void processDir(StringView dir, u64 list_last_modified) {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		auto* iter = fs.createFileIterator(dir);
 		os::FileInfo info;
-		while (getNextFile(iter, &info))
-		{
+		while (getNextFile(iter, &info)) {
 			if (info.filename[0] == '.') continue;
 
-			if (info.is_directory)
-			{
+			if (info.is_directory) {
 				char child_path[MAX_PATH];
 				copyString(child_path, dir);
 				if(!dir.empty()) catString(child_path, "/");
 				catString(child_path, info.filename);
 				processDir(child_path, list_last_modified);
 			}
-			else
-			{
+			else {
 				char fullpath[MAX_PATH];
 				copyString(fullpath, dir);
 				if(!dir.empty()) catString(fullpath, "/");
@@ -475,10 +473,13 @@ struct AssetCompilerImpl : AssetCompiler {
 		}
 
 		end_tokenizing:
+		{
+			m_scan_timer.tick();
+			PROFILE_BLOCK("asset scan")
 			const u64 list_last_modified = os::getLastModified(list_path);
 			processDir("", list_last_modified);
-
-		saveResourceList();
+		}
+		m_save_list_after_scan = true;
 	}
 
 	void onInitFinished() override
@@ -666,6 +667,12 @@ struct AssetCompilerImpl : AssetCompiler {
 	}
 
 	void update() override {
+		if (m_save_list_after_scan && m_scan_counter == 0) {
+			m_save_list_after_scan = false;
+			saveResourceList();
+			logInfo("Asset scan took ", m_scan_timer.getTimeSinceTick(), " seconds.");
+		}
+
 		for(;;) {
 			runOneJob();
 			CompileJob job = popCompiledResource();
@@ -835,6 +842,9 @@ struct AssetCompilerImpl : AssetCompiler {
 	DelegateList<void(Resource&, bool)> m_resource_compiled;
 	bool m_init_finished = false;
 	Array<Resource*> m_on_init_load;
+	AtomicI32 m_scan_counter = 0;
+	bool m_save_list_after_scan = false;
+	os::Timer m_scan_timer;
 
 	u32 m_compile_batch_count = 0;
 	u32 m_batch_remaining_count = 0;
