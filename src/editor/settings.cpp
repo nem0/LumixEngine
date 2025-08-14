@@ -1238,7 +1238,7 @@ void Settings::gui() {
 			ImGui::PopStyleColor();
 			ImGui::SameLine();
 
-			if (ImGui::BeginChild("right_page", ImVec2(0, 0))) {
+			if (ImGui::BeginChild("right_page", ImVec2(0, 0), ImGuiChildFlags_AlwaysUseWindowPadding)) {
 				if (selected == 0) shortcutsGUI(filter, *this);
 				else if (selected == 1) {
 					styleGUI(filter);

@@ -3339,7 +3339,7 @@ struct PipelineImpl final : Pipeline {
 			if (!mi.dirty) continue;
 			
 			ASSERT(mi.model->isReady());
-			const bool has_override = mi.mesh_materials.begin() != &mi.model->getMeshMaterial(0);
+			const bool has_override = mi.mesh_materials.begin() != mi.model->getMeshMaterials().begin();
 			if (!has_override) {
 				mi.dirty = false;
 				continue;

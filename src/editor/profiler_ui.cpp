@@ -856,7 +856,7 @@ struct ProfilerUIImpl final : ProfilerUI {
 			ImGui::EndChild();
 			ImGui::PopStyleColor();
 			ImGui::SameLine();
-			if (ImGui::BeginChild("right_pane", ImVec2(0, 0))) {
+			if (ImGui::BeginChild("right_pane", ImVec2(0, 0), ImGuiChildFlags_AlwaysUseWindowPadding)) {
 				switch (tab) {
 					case 0: flamegraphUI(); break;
 					case 1: GPUUI(); break;

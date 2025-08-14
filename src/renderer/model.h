@@ -176,6 +176,7 @@ public:
 
 	Mesh& getMesh(u32 index) { return m_meshes[index]; }
 	const Mesh& getMesh(u32 index) const { return m_meshes[index]; }
+	Span<MeshMaterial> getMeshMaterials() { return m_mesh_material; }
 	MeshMaterial& getMeshMaterial(u32 index) { return m_mesh_material[index]; }
 	const MeshMaterial& getMeshMaterial(u32 index) const { return m_mesh_material[index]; }
 	int getMeshCount() const { return m_meshes.size(); }

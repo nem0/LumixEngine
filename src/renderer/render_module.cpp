@@ -207,7 +207,7 @@ struct RenderModuleImpl final : RenderModule {
 		for (ModelInstance& r : m_model_instances) {
 			if (!isFlagSet(r.flags, ModelInstance::VALID)) continue;
 			
-			if (!r.model || !r.model->isReady() || r.mesh_materials.begin() != &r.model->getMeshMaterial(0)) {
+			if (!r.model || !r.model->isReady() || r.mesh_materials.begin() != r.model->getMeshMaterials().begin()) {
 				for (MeshMaterial& m : r.mesh_materials) {
 					m.material->decRefCount();
 					m_renderer.freeSortKey(m.sort_key);
@@ -2061,7 +2061,7 @@ struct RenderModuleImpl final : RenderModule {
 
 	static bool hasMaterialOverride(const ModelInstance& m) {
 		if (!m.model->isReady()) return m.mesh_materials.size() > 0;
-		return &m.model->getMeshMaterial(0) != m.mesh_materials.begin();
+		return m.model->getMeshMaterials().begin() != m.mesh_materials.begin();
 	}
 
 	void ensureMaterialDataSize(ModelInstance& m, u32 size) {
@@ -2959,7 +2959,7 @@ struct RenderModuleImpl final : RenderModule {
 		r.mesh_count = r.model->getMeshCount();
 		r.meshes = r.mesh_count > 0 ? &r.model->getMesh(0) : nullptr;
 		if (r.mesh_materials.size() == 0) {
-			r.mesh_materials = Span(&r.model->getMeshMaterial(0), r.model->getMeshCount());
+			r.mesh_materials = r.model->getMeshMaterials();
 		}
 
 		if (r.flags & ModelInstance::IS_BONE_ATTACHMENT_PARENT) {
@@ -2977,7 +2977,7 @@ struct RenderModuleImpl final : RenderModule {
 			}
 		}
 		
-		r.dirty = r.mesh_materials.begin() != &r.model->getMeshMaterial(0);
+		r.dirty = r.mesh_materials.begin() != r.model->getMeshMaterials().begin();
 	}
 
 	u32 computeSortKey(const Material& material, const Mesh& mesh) const override {
@@ -3146,7 +3146,7 @@ struct RenderModuleImpl final : RenderModule {
 			return;
 		}
 
-		if (!old_model || !old_model->isReady() || r.mesh_materials.begin() != &old_model->getMeshMaterial(0)) {
+		if (!old_model || !old_model->isReady() || r.mesh_materials.begin() != old_model->getMeshMaterials().begin()) {
 			for (MeshMaterial& m : r.mesh_materials) {
 				m.material->decRefCount();
 				m_renderer.freeSortKey(m.sort_key);

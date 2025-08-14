@@ -1424,13 +1424,6 @@ void SceneView::insertModelUI() {
 	if (ImGui::BeginPopup("Insert model", ImGuiWindowFlags_NoNavInputs)) {
 		if (ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
 
-		ImGui::AlignTextToFramePadding();
-		if (ImGuiEx::IconButton(ICON_FA_COG, "Settings")) ImGui::OpenPopup("settings_popup");
-		if (ImGui::BeginPopup("settings_popup")) {
-			ImGui::Checkbox("Preview", &m_search_preview);
-			ImGui::EndPopup();
-		}
-		ImGui::SameLine();
 		if(m_insert_model_request) m_search_selected = 0;
 		if (m_filter.gui("Search", -1, m_insert_model_request, nullptr, false)) {
 			m_search_selected = 0;
