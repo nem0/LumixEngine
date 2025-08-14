@@ -609,7 +609,7 @@ void Model::unload()
 			m_renderer.destroyMaterialConstants(m.material_index);
 		}
 		m.flags = MeshMaterial::NONE;
-		m.material_index = 0;
+		m.material_index = MaterialIndex{0};
 	}
 
 	for (Mesh& mesh : m_meshes) {

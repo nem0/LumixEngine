@@ -173,6 +173,7 @@ struct AssetBrowserPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin 
 		return m_app.getAssetCompiler().writeCompiledResource(src, Span(compiled.data(), (i32)compiled.size()));
 	}
 
+	const char* getIcon() const override { return ICON_FA_FILE_AUDIO; }
 	const char* getLabel() const override { return "Audio"; }
 	ResourceType getResourceType() const override { return Clip::TYPE; }
 	

@@ -17,6 +17,7 @@ struct LUMIX_EDITOR_API AssetBrowser : StudioApp::GUIPlugin {
 		virtual void createResource(struct OutputMemoryStream& content) {}
 		virtual const char* getDefaultExtension() const { return ""; }
 
+		virtual const char* getIcon() const { return nullptr; }
 		virtual const char* getLabel() const = 0;
 		virtual ResourceType getResourceType() const = 0;
 		virtual bool createTile(const char* in_path, const char* out_path, struct ResourceType type);

@@ -53,6 +53,7 @@ struct LUMIX_RENDERER_API RayCastModelHit {
 	using Filter = Delegate<bool (const RayCastModelHit&)>;
 };
 
+enum class MaterialIndex : u32 {}; // strong-typed handle
 
 struct MeshMaterial {
 	enum Flags : u8 {
@@ -61,7 +62,7 @@ struct MeshMaterial {
 	};
 	Material* material;
 	u32 sort_key;
-	u32 material_index;
+	MaterialIndex material_index;
 	Flags flags;
 };
 

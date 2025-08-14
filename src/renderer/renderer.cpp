@@ -815,11 +815,11 @@ struct RendererImpl final : Renderer {
 		}
 	}
 
-	u32 createMaterialInstance(Span<const float> data) override {
+	MaterialIndex createMaterialInstance(Span<const float> data) override {
 		if (m_material_buffer.first_free == -1) {
 			ASSERT(false);
 			++m_material_buffer.data[0].ref_count;
-			return 0;
+			return MaterialIndex{0};
 		}
 		u32 idx = m_material_buffer.first_free;
 		m_material_buffer.first_free = m_material_buffer.data[m_material_buffer.first_free].next_free;
@@ -832,18 +832,18 @@ struct RendererImpl final : Renderer {
 		const TransientSlice slice = m_cpu_frame->uniform_buffer.alloc(size);
 		memcpy(slice.ptr, data.begin(), size);
 		m_cpu_frame->draw_stream.copy(m_material_buffer.buffer, slice.buffer, idx * Material::MAX_UNIFORMS_BYTES, slice.offset, size);
-		return idx;
+		return MaterialIndex{idx};
 	}
 
-	void updateMaterialConstants(u32 handle, Span<const float> data, u32 offset) override {
+	void updateMaterialConstants(MaterialIndex handle, Span<const float> data, u32 offset) override {
 		jobs::wait(&m_cpu_frame->can_setup);
 		const u32 size = u32(data.length() * sizeof(float));
 		const TransientSlice slice = m_cpu_frame->uniform_buffer.alloc(size);
 		memcpy(slice.ptr, data.begin(), size);
-		m_cpu_frame->draw_stream.copy(m_material_buffer.buffer, slice.buffer, handle * Material::MAX_UNIFORMS_BYTES, slice.offset, size);
+		m_cpu_frame->draw_stream.copy(m_material_buffer.buffer, slice.buffer, u32(handle) * Material::MAX_UNIFORMS_BYTES, slice.offset, size);
 	}
 
-	u32 createMaterialConstants(Span<const float> data) override {
+	MaterialIndex createMaterialConstants(Span<const float> data) override {
 		const RuntimeHash hash(data.begin(), data.length() * sizeof(float));
 		auto iter = m_material_buffer.map.find(hash);
 		u32 idx;
@@ -854,7 +854,7 @@ struct RendererImpl final : Renderer {
 			if (m_material_buffer.first_free == -1) {
 				ASSERT(false);
 				++m_material_buffer.data[0].ref_count;
-				return 0;
+				return MaterialIndex{0};
 			}
 			idx = m_material_buffer.first_free;
 			m_material_buffer.first_free = m_material_buffer.data[m_material_buffer.first_free].next_free;
@@ -870,10 +870,13 @@ struct RendererImpl final : Renderer {
 			m_cpu_frame->draw_stream.copy(m_material_buffer.buffer, slice.buffer, idx * Material::MAX_UNIFORMS_BYTES, slice.offset, size);
 		}
 		++m_material_buffer.data[idx].ref_count;
-		return idx;
+		return MaterialIndex{idx};
 	}
 
-	void destroyMaterialConstants(u32 idx) override {
+	void destroyMaterialConstants(MaterialIndex handle) override {
+		const u32 idx = u32(handle);
+		if (idx == 0) return;
+
 		--m_material_buffer.data[idx].ref_count;
 		if (m_material_buffer.data[idx].ref_count > 0) return;
 			

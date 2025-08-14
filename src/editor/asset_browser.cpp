@@ -65,6 +65,7 @@ struct WorldAssetPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	void openEditor(const Path& path) override { m_app.tryLoadWorld(path, ImGui::GetIO().KeyCtrl); }
 
 	bool compile(const Path& src) override { return true; }
+	const char* getIcon() const override { return ICON_FA_GLOBE_AFRICA; }
 	const char* getLabel() const override { return "World"; }
 	ResourceType getResourceType() const override { return WORLD_TYPE; }
 
@@ -78,6 +79,10 @@ static volatile bool once = [](){
 
 
 struct AssetBrowserImpl : AssetBrowser {
+	struct Subdir {
+		StaticString<MAX_PATH> clamped_name;
+		Path dir;
+	};
 	struct FileInfo {
 		StaticString<MAX_PATH> clamped_filename;
 		Path filepath;
@@ -117,7 +122,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		Settings& settings = m_app.getSettings();
 		settings.registerOption("asset_browser_open", &m_is_open);
 		settings.registerOption("asset_browser_thumbnails", &m_show_thumbnails, "Asset browser", "Show thumbnails");
-		settings.registerOption("asset_browser_thumbnail_size", &m_thumbnail_size, "Asset browser", "Thumbnail size");
+		settings.registerOption("asset_browser_thumbnail_size", &m_thumbnail_scale, "Asset browser", "Thumbnail size").setMin(0.01f);
 	}
 
 	void onBasePathChanged() override {
@@ -300,14 +305,20 @@ struct AssetBrowserImpl : AssetBrowser {
 		if (push_history) pushDirHistory(m_dir);
 
 		FileSystem& fs = engine.getFileSystem();
-		os::FileIterator* iter = fs.createFileIterator(m_dir);
-		os::FileInfo info;
 		m_subdirs.clear();
-		while (os::getNextFile(iter, &info)) {
-			if (!info.is_directory) continue;
-			if (info.filename[0] != '.') m_subdirs.emplace(info.filename);
+		if (!m_filter.isActive()) {
+			os::FileIterator* iter = fs.createFileIterator(m_dir);
+			os::FileInfo info;
+			while (os::getNextFile(iter, &info)) {
+				if (!info.is_directory) continue;
+				if (info.filename[0] == '.') continue;
+
+				Subdir& dir = m_subdirs.emplace();
+				dir.dir = info.filename;
+				dir.clamped_name = info.filename;
+			}
+			os::destroyFileIterator(iter);
 		}
-		os::destroyFileIterator(iter);
 
 		AssetCompiler& compiler = m_app.getAssetCompiler();
 		const RuntimeHash dir_hash(equalStrings(".", m_dir) ? "" : m_dir.c_str());
@@ -377,34 +388,6 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 
-	void dirColumn() {
-		ImGui::BeginChild("left_col");
-		bool b = false;
-		if (m_dir != "." && ImGui::Selectable("..", &b)) {
-			changeDir(Path::getDir(m_dir), true);
-		}
-
-		for (const Path& subdir : m_subdirs) {
-			if (ImGui::Selectable(subdir.c_str(), &b)) {
-				Path new_dir(m_dir, "/", subdir);
-				changeDir(new_dir, true);
-			}
-		}
-
-		ImGui::EndChild();
-	}
-
-
-	int getThumbnailIndex(int i, int j, int columns) const
-	{
-		int idx = j * columns + i;
-		if (idx >= m_file_infos.size()) {
-			return -1;
-		}
-		return idx;
-	}
-
-
 	void createTile(FileInfo& tile, const char* out_path) {
 		if (m_create_tile_cooldown > 0) return;
 		if (tile.create_called) return;
@@ -449,42 +432,85 @@ struct AssetBrowserImpl : AssetBrowser {
 		return TileState::OK;
 	}
 
-	void thumbnail(FileInfo& tile, float size, bool selected)
-	{
-		ImGui::BeginGroup();
+	void tileLabel(StringView label, StaticString<MAX_PATH>& clamped_label, float size) {
+		ImVec2 text_size = ImGui::CalcTextSize(clamped_label);
+		if (text_size.x < int(size * 0.75f)) {
+			clamped_label = label;
+			text_size = ImGui::CalcTextSize(clamped_label);
+		}
+		if (text_size.x > int(size * 0.9f)) {
+			clampText(clamped_label.data, int(size * 0.9f));
+			text_size = ImGui::CalcTextSize(clamped_label);
+		}
+		
+		ImDrawList* dl = ImGui::GetWindowDrawList();
+		ImVec2 img_size(size, size);
+		const u32 text_color = ImGui::ColorConvertFloat4ToU32(ImGui::GetStyleColorVec4(ImGuiCol_Text));
+		const ImVec2 text_pos = ImGui::GetCursorScreenPos() + ImVec2((img_size.x - text_size.x) * 0.5f, 0);
+		dl->AddText(ImGui::GetFont(), ImGui::GetFontSize(), text_pos, text_color, clamped_label);		
+	}
+
+	const char* getIconByExtension(u64 extension) const {
+		auto iter = m_plugin_map.find(extension);
+		if (!iter.isValid()) return ICON_FA_FILE;
+
+		const char* icon = iter.value()->getIcon();
+		if (icon) return icon;
+		return ICON_FA_FILE;
+	}
+
+	void tileImage(void* tex, float size) {
 		ImVec2 img_size(size, size);
 		RenderInterface* ri = m_app.getRenderInterface();
-		if (tile.tex)
-		{
-			if(ri->isValid(tile.tex)) {
-				ImGui::Image(*(void**)tile.tex, img_size);
-			}
-			else {
-				ImGui::Dummy(img_size);
-			}
+		if(ri->isValid(tex)) {
+			ImGui::Image(*(void**)tex, img_size);
 		}
-		else
-		{
-			//ImGuiEx::Rect(img_size.x, img_size.y, 0xfff00FFF);
-
-			ImDrawList* dl = ImGui::GetWindowDrawList();
-			ImVec2 screen_pos = ImGui::GetCursorScreenPos();
-			ImVec2 end_pos = screen_pos + img_size;
-			dl->AddRectFilled(screen_pos, end_pos, 0xffFFffFF);
-			
-			auto iter = m_plugin_map.find(tile.extension);
-			if (iter.isValid()) {
-				const char* label = iter.value()->getLabel();
-				ImGui::PushFont(m_app.getBoldFont());
-				float wrap_width = img_size.x * 0.9f;
-				const ImVec2 text_size = ImGui::CalcTextSize(label, nullptr, false, wrap_width);
-				
-				dl->AddText(ImGui::GetFont(), ImGui::GetFontSize(), screen_pos + (img_size - text_size) * 0.5f, IM_COL32(0, 0, 0, 0xff), label, nullptr, wrap_width);
-				ImGui::PopFont();
-			}
-
+		else {
 			ImGui::Dummy(img_size);
+		}
+	}
 
+	void tileIcon(const char* icon, float size) {
+		ImVec2 img_size(size, size);
+		ImDrawList* dl = ImGui::GetWindowDrawList();
+		ImVec2 screen_pos = ImGui::GetCursorScreenPos();
+		
+		ImGui::PushFont(m_app.getBoldFont(), size * 0.8f);
+		const ImVec2 text_size = ImGui::CalcTextSize(icon);
+		const u32 text_color = ImGui::ColorConvertFloat4ToU32(ImGui::GetStyleColorVec4(ImGuiCol_Text));
+		dl->AddText(ImGui::GetFont(), ImGui::GetFontSize(), screen_pos + (img_size - text_size) * 0.5f, text_color, icon);
+		ImGui::PopFont();
+
+		ImGui::Dummy(img_size);
+	}
+
+	bool tileDir(StringView name, StaticString<MAX_PATH>& clamped_name, float size) {
+		ImGui::BeginGroup();
+		ImGui::PushID(name.begin, name.end);
+		
+		ImVec2 cp = ImGui::GetCursorScreenPos();
+		tileIcon(ICON_FA_FOLDER, size);
+		ImGui::SetCursorScreenPos(cp);
+		bool pressed = ImGui::InvisibleButton("thumbnail", ImVec2(size, size));
+
+		tileLabel(name, clamped_name, size);
+		
+		ImGui::PopID();
+		ImGui::EndGroup();
+		return pressed;
+	}
+
+	void tileFile(FileInfo& tile, float size, bool selected) {
+		ImGui::BeginGroup();
+		
+		if (tile.tex) {
+			tileImage(tile.tex, size);
+		}
+		else {
+			const char* icon = getIconByExtension(tile.extension);
+			tileIcon(icon, size);
+
+			RenderInterface* ri = m_app.getRenderInterface();
 			const Path path(".lumix/asset_tiles/", tile.filepath.getHash().getHashValue(), ".lbc");
 			FileSystem& fs = m_app.getEngine().getFileSystem();
 			switch (getState(tile, fs)) {
@@ -499,20 +525,11 @@ struct AssetBrowserImpl : AssetBrowser {
 					break;
 			}
 		}
-		ImVec2 text_size = ImGui::CalcTextSize(tile.clamped_filename);
-		if (text_size.x < int(TILE_SIZE * m_thumbnail_size * 0.75f)) {
-			tile.clamped_filename = Path::getBasename(tile.filepath);
-			text_size = ImGui::CalcTextSize(tile.clamped_filename);
-		}
-		if (text_size.x > int(TILE_SIZE * m_thumbnail_size)) {
-			clampText(tile.clamped_filename.data, int(TILE_SIZE * m_thumbnail_size));
-			text_size = ImGui::CalcTextSize(tile.clamped_filename);
-		}
-		ImVec2 pos = ImGui::GetCursorPos();
-		pos.x += (size - text_size.x) * 0.5f;
-		ImGui::SetCursorPos(pos);
-		ImGuiEx::TextUnformatted(tile.clamped_filename);
+
+		tileLabel(Path::getBasename(tile.filepath), tile.clamped_filename, size);
+
 		ImGui::EndGroup();
+		
 		if (selected) {
 			ImDrawList* dl = ImGui::GetWindowDrawList();
 			const u32 color = ImGui::ColorConvertFloat4ToU32(ImGui::GetStyle().Colors[ImGuiCol_ButtonActive]);
@@ -590,84 +607,122 @@ struct AssetBrowserImpl : AssetBrowser {
 		plugin->openMultiEditor(m_selected_resources);
 	}
 
-	void fileColumn() {
-		ImGui::BeginChild("main_col");
-
-		float w = ImGui::GetContentRegionAvail().x;
-		int columns = m_show_thumbnails ? (int)w / int(TILE_SIZE * m_thumbnail_size + ImGui::GetStyle().ItemSpacing.x) : 1;
-		columns = maximum(columns, 1);
-		int tile_count = m_file_infos.size();
-		int row_count = m_show_thumbnails ? (tile_count + columns - 1) / columns : tile_count;
-	
-		auto callbacks = [this](FileInfo& tile, int idx, bool is_selected) {
-			if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tile.filepath.c_str());
-			if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
-			{
-				if (m_selected_resources.size() > 1 && is_selected) {
-					ImGui::Text("%d files", m_selected_resources.size());
-					ImGui::SetDragDropPayload("asset_browser_selection", nullptr, 0, ImGuiCond_Once);
-					ImGui::EndDragDropSource();
+	void fileEvents(FileInfo& tile, bool is_selected) {
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tile.filepath.c_str());
+		
+		if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
+			if (m_selected_resources.size() > 1 && is_selected) {
+				ImGui::Text("%d files", m_selected_resources.size());
+				ImGui::SetDragDropPayload("asset_browser_selection", nullptr, 0, ImGuiCond_Once);
+				ImGui::EndDragDropSource();
+			}
+			else {
+				ImGuiEx::TextUnformatted(tile.filepath);
+				ImGui::SetDragDropPayload("path", tile.filepath.c_str(), tile.filepath.length() + 1, ImGuiCond_Once);
+				ImGui::EndDragDropSource();
+			}
+		}
+		else if (ImGui::IsItemHovered()){
+			if (ImGui::IsMouseDoubleClicked(0)) {
+				openEditor(tile.filepath);
+			}
+			else if (ImGui::IsMouseReleased(0)) {
+				if (os::isKeyDown(os::Keycode::SHIFT) && !m_selected_resources.empty()) {
+					selectRange(m_selected_resources.back(), tile.filepath);
 				}
 				else {
-					ImGuiEx::TextUnformatted(tile.filepath);
-					ImGui::SetDragDropPayload("path", tile.filepath.c_str(), tile.filepath.length() + 1, ImGuiCond_Once);
-					ImGui::EndDragDropSource();
+					const bool additive = os::isKeyDown(os::Keycode::CTRL);
+					selectResource(tile.filepath, additive);
 				}
 			}
-			else if (ImGui::IsItemHovered()){
-				if (ImGui::IsMouseDoubleClicked(0)) {
-					openEditor(tile.filepath);
-				}
-				else if (ImGui::IsMouseReleased(0)) {
-					if (os::isKeyDown(os::Keycode::SHIFT) && !m_selected_resources.empty()) {
-						selectRange(m_selected_resources.back(), tile.filepath);
-					}
-					else {
-						const bool additive = os::isKeyDown(os::Keycode::CTRL);
-						selectResource(tile.filepath, additive);
-					}
-				}
-				else if(ImGui::IsMouseReleased(1)) {
-					if (m_selected_resources.indexOf(tile.filepath) < 0) m_selected_resources.clear();
-					if (m_selected_resources.empty()) selectResource(tile.filepath, false);
-					ImGui::OpenPopup("item_ctx");
-				}
+			else if(ImGui::IsMouseReleased(1)) {
+				if (m_selected_resources.indexOf(tile.filepath) < 0) m_selected_resources.clear();
+				if (m_selected_resources.empty()) selectResource(tile.filepath, false);
+				ImGui::OpenPopup("item_ctx");
 			}
-		};
+		}
+	}
+
+	void listGUI() {
+		ImGui::BeginChild("list");
+
+		const float w = ImGui::GetContentRegionAvail().x;
+		const float thumbnail_size = TILE_SIZE * m_thumbnail_scale;
+		u32 num_columns = m_show_thumbnails ? u32(w / (thumbnail_size + 5)) : 1;
+		num_columns = maximum(num_columns, 1);
+		const float spacing = (w - num_columns * thumbnail_size) / (num_columns - 1);
+
+		const u32 num_tiles = m_file_infos.size() + m_subdirs.size();
+		const u32 num_rows = m_show_thumbnails ? (num_tiles + num_columns - 1) / num_columns : num_tiles;
 
 		ImGuiListClipper clipper;
-		clipper.Begin(row_count);
-		while (clipper.Step())
-		{
-			for (int j = clipper.DisplayStart; j < clipper.DisplayEnd; ++j)
-			{
-				if (m_show_thumbnails)
-				{
-					for (int i = 0; i < columns; ++i)
-					{
+		clipper.Begin(num_rows);
+		bool first = true;
+		if (m_show_thumbnails) ImGui::PushStyleVarX(ImGuiStyleVar_ItemSpacing, 0);
+		while (clipper.Step()) {
+			for (int j = clipper.DisplayStart; j < clipper.DisplayEnd; ++j) {
+				if (m_show_thumbnails) {
+					for (u32 i = 0; i < num_columns; ++i) {
 						if (i > 0) ImGui::SameLine();
-						int idx = getThumbnailIndex(i, j, columns);
-						if (idx < 0) {
-							ImGui::NewLine();
-							break;
+						else if (!first) ImGui::NewLine();
+						
+						first = false;
+						const u32 item_index = i + j * num_columns;
+						if (item_index < (u32)m_subdirs.size()) {
+							Subdir& subdir = m_subdirs[item_index];
+							if (tileDir(subdir.dir, subdir.clamped_name, thumbnail_size)) {
+								Path new_dir(m_dir, "/", subdir.dir);
+								changeDir(new_dir, true);
+								goto after_list;
+							}
 						}
-						FileInfo& tile = m_file_infos[idx];
-						bool selected = m_selected_resources.find([&](const Path& p){ return p == tile.filepath; }) >= 0;
-						thumbnail(tile, m_thumbnail_size * TILE_SIZE, selected);
-						callbacks(tile, idx, selected);
+						else {
+							const u32 file_index = item_index - m_subdirs.size();
+							if (file_index >= (u32)m_file_infos.size()) {
+								ImGui::NewLine();
+								break;
+							}
+							FileInfo& tile = m_file_infos[file_index];
+							bool selected = m_selected_resources.find([&](const Path& p){ return p == tile.filepath; }) >= 0;
+							tileFile(tile, thumbnail_size, selected);
+							fileEvents(tile, selected);
+						}
+						ImGui::SameLine();
+						ImGui::Dummy(ImVec2(spacing, thumbnail_size));
 					}
 				}
-				else
-				{
-					FileInfo& tile = m_file_infos[j];
-					bool b = m_selected_resources.find([&](const Path& p){ return p == tile.filepath; }) >= 0;
-					ImGui::PushID(&tile);
-					ImGui::Selectable(tile.clamped_filename, b);
-					callbacks(tile, j, b);
-					ImGui::PopID();
+				else {
+					if (j < m_subdirs.size()) {
+						ImGui::TextUnformatted(ICON_FA_FOLDER);
+						ImGui::SameLine();
+						if (ImGui::Selectable(m_subdirs[j].dir.c_str(), false)) {
+							Path new_dir(m_dir, "/", m_subdirs[j].dir);
+							changeDir(new_dir, true);
+							goto after_list;
+						}
+					}
+					else {
+						u32 file_idx = j - m_subdirs.size();
+						FileInfo& tile = m_file_infos[file_idx];
+						bool b = m_selected_resources.find([&](const Path& p){ return p == tile.filepath; }) >= 0;
+						ImGui::PushID(&tile);
+						auto iter = m_plugin_map.find(tile.extension);
+						const char* icon = ICON_FA_FILE;
+						if (iter.isValid()) {
+							icon = iter.value()->getIcon();
+						}
+						if (!icon) icon = ICON_FA_FILE;
+						ImGui::TextUnformatted(icon);
+						ImGui::SameLine();
+						ImGui::Selectable(tile.clamped_filename, b);
+						fileEvents(tile, b);
+						ImGui::PopID();
+					}
 				}
 			}
 		}
+		after_list:
+		if (m_show_thumbnails) ImGui::PopStyleVar();
 
 		bool open_rename_popup = false;
 		bool open_create_dir_popup = false;
@@ -856,7 +911,7 @@ struct AssetBrowserImpl : AssetBrowser {
 
 		ImGui::EndChild();
 		if (ImGui::IsItemHovered() && ImGui::GetIO().KeyCtrl) {
-			m_thumbnail_size = clamp(m_thumbnail_size + ImGui::GetIO().MouseWheel * 0.1f, 0.3f, 3.f);
+			m_thumbnail_scale = clamp(m_thumbnail_scale + ImGui::GetIO().MouseWheel * 0.1f, 0.3f, 3.f);
 		}
 
 		if (ImGui::BeginDragDropTarget()) {
@@ -889,27 +944,6 @@ struct AssetBrowserImpl : AssetBrowser {
 				m_dropped_entity = INVALID_ENTITY;
 			}
 			ImGui::EndPopup();
-		}
-	}
-
-	void refreshLabels() {
-		for (FileInfo& tile : m_file_infos) {
-			StaticString<MAX_PATH> filename;
-			StringView subres = ResourcePath::getSubresource(tile.filepath);
-			if (*subres.end) {
-				filename.append(subres, ":", Path::getBasename(tile.filepath));
-			} else {
-				filename = Path::getBasename(tile.filepath);
-			}
-			if (m_show_thumbnails) {
-				clampText(filename.data, int(TILE_SIZE * m_thumbnail_size));
-			}
-			else {
-				filename.append(".");
-				filename.append(Path::getExtension(tile.filepath));
-			}
-
-			tile.clamped_filename = filename;
 		}
 	}
 
@@ -972,14 +1006,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		breadcrumbs();
 		ImGui::Separator();
 
-		if (ImGui::BeginTable("cols", 2, ImGuiTableFlags_Resizable)) {
-			ImGui::TableNextRow();
-			ImGui::TableNextColumn();
-			dirColumn();
-			ImGui::TableNextColumn();
-			fileColumn();
-			ImGui::EndTable();
-		}
+		listGUI();
 
 		ImGui::End();
 	}
@@ -1217,7 +1244,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 	u32 getThumbnailWidth() const override {
-		return u32(m_thumbnail_size * TILE_SIZE);
+		return u32(m_thumbnail_scale * TILE_SIZE);
 	}
 
 	void tile(const Path& path, bool selected) override {
@@ -1248,7 +1275,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 
 		m_immediate_tiles[idx].gc_counter = 2;
-		thumbnail(m_immediate_tiles[idx], m_thumbnail_size * TILE_SIZE, selected);
+		tileFile(m_immediate_tiles[idx], m_thumbnail_scale * TILE_SIZE, selected);
 	}
 
 	bool resourceList(Path& path, FilePathHash& selected_path_hash, ResourceType type, bool can_create_new, bool enter_submit, bool focus, float width) override {
@@ -1359,7 +1386,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	bool m_is_open;
 	StudioApp& m_app;
 	Path m_dir;
-	Array<Path> m_subdirs;
+	Array<Subdir> m_subdirs;
 	Array<FileInfo> m_file_infos;
 	Array<ImmediateTile> m_immediate_tiles;
 	Array<UniquePtr<AssetEditorWindow>> m_windows;
@@ -1378,7 +1405,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	bool m_show_subresources;
 	bool m_request_delete = false;
 	bool m_request_rename = false;
-	float m_thumbnail_size = 1.f;
+	float m_thumbnail_scale = 1.f;
 	Action m_focus_search{"Asset browser", "Focus search", "Focus search", "asset_browser_focus_search", ICON_FA_SEARCH};
 	Action m_back_action{"Asset browser", "Back", "Back in history", "asset_browser_back", ICON_FA_ARROW_LEFT};
 	Action m_forward_action{"Asset browser", "Forward", "Forward in history", "asset_browser_forward", ICON_FA_ARROW_RIGHT};

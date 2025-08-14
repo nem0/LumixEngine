@@ -19,6 +19,7 @@ namespace Lumix {
 enum class AttributeSemantic : u8;
 struct RenderBufferHandle;
 struct GBuffer;
+enum class MaterialIndex : u32;
 
 struct RenderbufferDesc {
 	IVec2 size;
@@ -112,10 +113,10 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 	virtual struct FontManager& getFontManager() = 0;
 	virtual struct ResourceManager& getTextureManager() = 0;
 	
-	virtual u32 createMaterialConstants(Span<const float> data) = 0;
-	virtual u32 createMaterialInstance(Span<const float> data) = 0;
-	virtual void updateMaterialConstants(u32 handle, Span<const float> data, u32 offset) = 0;
-	virtual void destroyMaterialConstants(u32 id) = 0;
+	virtual MaterialIndex createMaterialConstants(Span<const float> data) = 0;
+	virtual MaterialIndex createMaterialInstance(Span<const float> data) = 0;
+	virtual void updateMaterialConstants(MaterialIndex handle, Span<const float> data, u32 offset) = 0;
+	virtual void destroyMaterialConstants(MaterialIndex id) = 0;
 	virtual gpu::BufferHandle getMaterialUniformBuffer() = 0;
 	
 	virtual TransientSlice allocTransient(u32 size) = 0;

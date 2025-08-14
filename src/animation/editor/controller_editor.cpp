@@ -1215,6 +1215,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 
 	bool canCreateResource() const override { return true; }
 	const char* getDefaultExtension() const override { return "act"; }
+	const char* getIcon() const override { return ICON_FA_MALE; }
 	const char* getLabel() const override { return "Animation Controller"; }
 	ResourceType getResourceType() const override { return anim::Controller::TYPE; }
 

@@ -932,6 +932,7 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 		return m_app.getAssetCompiler().writeCompiledResource(src, compiled);
 	}
+	const char* getIcon() const override { return ICON_FA_CHART_LINE; }
 	const char* getLabel() const override { return "Property animation"; }
 	ResourceType getResourceType() const override { return PropertyAnimation::TYPE; }
 	

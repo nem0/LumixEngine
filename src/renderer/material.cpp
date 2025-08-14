@@ -348,7 +348,7 @@ void Material::updateRenderData(bool on_before_ready)
 	if (!m_shader) return;
 	if (!on_before_ready && !isReady()) return;
 
-	if (m_material_constants) m_renderer.destroyMaterialConstants(m_material_constants);
+	m_renderer.destroyMaterialConstants(m_material_constants);
 
 	// TODO check overflow
 	float cs[Material::MAX_UNIFORMS_FLOATS] = {};

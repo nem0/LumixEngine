@@ -691,6 +691,7 @@ struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		return m_app.getAssetCompiler().writeCompiledResource(src, out);
 	}
 
+	const char* getIcon() const override { return ICON_FA_FILE_CODE; }
 	const char* getLabel() const override { return "Lua script"; }
 	ResourceType getResourceType() const override { return LuaScript::TYPE; }
 	bool canCreateResource() const override { return true; }

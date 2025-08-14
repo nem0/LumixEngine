@@ -681,7 +681,7 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 						if (dq_pose.empty()) {
 							struct UBData {
 								Matrix mtx;
-								u32 material_index;
+								MaterialIndex material_index;
 							} ub_data = {
 								mtx,
 								material->getIndex()
@@ -777,7 +777,7 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 
 						struct UB {
 							Matrix mtx;
-							u32 material_index;
+							MaterialIndex material_index;
 						} ub_data = {
 							mtx,
 							material->getIndex()

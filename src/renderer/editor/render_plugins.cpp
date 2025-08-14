@@ -630,6 +630,7 @@ struct FontPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	}
 
 	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
+	const char* getIcon() const override { return ICON_FA_FONT; }
 	const char* getLabel() const override { return "Font"; }
 	ResourceType getResourceType() const override { return FontResource::TYPE; }
 
@@ -897,6 +898,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	const char* getDefaultExtension() const override { return "mat"; }
 	void createResource(OutputMemoryStream& blob) override { blob << "shader \"/shaders/standard.hlsl\""; }
 	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
+	const char* getIcon() const override { return ICON_FA_IMAGES; }
 	const char* getLabel() const override { return "Material"; }
 	ResourceType getResourceType() const override { return Material::TYPE; }
 
@@ -1675,6 +1677,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		return m_app.getAssetCompiler().writeCompiledResource(src, Span(out.data(), (i32)out.size()));
 	}
 
+	const char* getIcon() const override { return ICON_FA_FILE_IMAGE; }
 	const char* getLabel() const override { return "Texture"; }
 	ResourceType getResourceType() const override { return Texture::TYPE; }
 
@@ -2662,6 +2665,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		m_tile.pipeline->setWorld(m_tile.world);
 	}
 
+	const char* getIcon() const override { return ICON_FA_CUBE; }
 	const char* getLabel() const override { return "Model"; }
 	ResourceType getResourceType() const override { return Model::TYPE; }
 
@@ -3462,6 +3466,7 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		return m_app.getAssetCompiler().writeCompiledResource(src, preamble);
 	}
 	
+	const char* getIcon() const override { return ICON_FA_FILE_ALT; }
 	const char* getLabel() const override { return "Shader"; }
 	ResourceType getResourceType() const override { return Shader::TYPE; }
 
@@ -3487,6 +3492,7 @@ struct ShaderIncludePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	}
 
 	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
+	const char* getIcon() const override { return ICON_FA_FILE_IMPORT; }
 	const char* getLabel() const override { return "Shader include"; }
 	ResourceType getResourceType() const override { return SHADER_INCLUDE_TYPE; }
 

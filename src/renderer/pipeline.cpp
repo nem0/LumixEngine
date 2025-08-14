@@ -1914,7 +1914,7 @@ struct PipelineImpl final : Pipeline {
 					Vec4 terrain_scale;
 					Vec2 hm_size;
 					float cell_size;
-					u32 material_index;
+					MaterialIndex material_index;
 				};
 
 				Quad quad;
@@ -2060,7 +2060,7 @@ struct PipelineImpl final : Pipeline {
 							struct {
 								Vec3 rel_pos;
 								float dist;
-								u32 material_index;
+								MaterialIndex material_index;
 							} drawcall_data = {
 								rel_pos,
 								distance,
@@ -2285,7 +2285,7 @@ struct PipelineImpl final : Pipeline {
 			const gpu::StateFlags render_state = bucket.state;
 			struct {
 				Matrix mtx;
-				u32 material_index;
+				MaterialIndex material_index;
 			} ub_data = {
 				world.getRelativeMatrix(iter.key(), camera_pos),
 				pg.material->getIndex()
@@ -2516,7 +2516,7 @@ struct PipelineImpl final : Pipeline {
 				const gpu::StateFlags state = material->m_render_states | bucket.state;
 				const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_decl, instanced_define_mask | material->getDefineMask(), mesh.semantics_defines);
 
-				u32 material_index = material->getIndex();
+				MaterialIndex material_index = material->getIndex();
 				Renderer::TransientSlice ub_slice = m_renderer.allocUniform(&material_index, sizeof(material_index));
 
 				bucket.stream.useProgram(program);
@@ -2630,7 +2630,7 @@ struct PipelineImpl final : Pipeline {
 
 						struct {
 							Matrix mtx;
-							u32 material_index;
+							MaterialIndex material_index;
 						} ub_data = {
 							mtx,
 							material->getIndex()
@@ -2720,7 +2720,7 @@ struct PipelineImpl final : Pipeline {
 									WRITE(prev_pos_ws);
 									WRITE(lod_d);
 									WRITE(prev_tr.scale);
-									const u32 material_index = mi2->mesh_materials[mesh_idx].material_index;
+									const MaterialIndex material_index = mi2->mesh_materials[mesh_idx].material_index;
 									WRITE(material_index);
 									#undef WRITE
 								}
@@ -2757,7 +2757,7 @@ struct PipelineImpl final : Pipeline {
 									instance_data += sizeof(lod_d);
 									memcpy(instance_data, &tr.scale, sizeof(tr.scale));
 									instance_data += sizeof(tr.scale);
-									u32 material_index = material->getIndex();
+									MaterialIndex material_index = material->getIndex();
 									memcpy(instance_data, &material_index, sizeof(material_index));
 									instance_data += sizeof(material_index);
 								}
@@ -2791,7 +2791,7 @@ struct PipelineImpl final : Pipeline {
 							float fur_scale;
 							float gravity;
 							float layers;
-							u32 material_index;
+							MaterialIndex material_index;
 							Matrix model_mtx;
 							Matrix prev_model_mtx;
 						};
@@ -2851,7 +2851,7 @@ struct PipelineImpl final : Pipeline {
 							Quat rot;
 							Vec3 half_extents;
 							Vec2 uv_scale;
-							u32 material_index;
+							MaterialIndex material_index;
 						};
 						const Renderer::TransientSlice slice = m_renderer.allocTransient(count * (sizeof(DecalData)));
 
@@ -2913,7 +2913,7 @@ struct PipelineImpl final : Pipeline {
 							Vec3 half_extents;
 							Vec2 uv_scale;
 							Vec4 bezier;
-							u32 material_index;
+							MaterialIndex material_index;
 						};
 						const Renderer::TransientSlice slice = m_renderer.allocTransient(count * (sizeof(DecalData)));
 
@@ -3360,7 +3360,7 @@ struct PipelineImpl final : Pipeline {
 				if (mat.sort_key == 0) {
 					mat.sort_key = m_module->computeSortKey(*mat.material, mi.meshes[i]);
 				}
-				if (mat.material_index == 0) {
+				if ((u32)mat.material_index == 0) {
 					mat.material_index = mat.material->getIndex();
 					mat.flags = mat.flags & ~MeshMaterial::OWN_MATERIAL_INDEX;
 				}
@@ -3632,7 +3632,7 @@ struct PipelineImpl final : Pipeline {
 						memcpy(instance_data, &tr.scale, sizeof(tr.scale));
 						instance_data += sizeof(tr.scale);
 
-						const u32 material_index = model_instances[e.index].mesh_materials[mesh_idx].material_index;
+						const MaterialIndex material_index = model_instances[e.index].mesh_materials[mesh_idx].material_index;
 						memcpy(instance_data, &material_index, sizeof(material_index));
 						instance_data += sizeof(material_index);
 					}

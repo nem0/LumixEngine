@@ -11,6 +11,8 @@
 
 namespace Lumix {
 
+
+enum class MaterialIndex : u32;
 struct Renderer;
 struct ResourceManagerHub;
 struct Shader;
@@ -83,8 +85,8 @@ struct LUMIX_RENDERER_API Material final : Resource {
 
 	void deserialize(struct InputMemoryStream& blob);
 	void serialize(struct OutputMemoryStream& blob);
-	u32 getBufferOffset() const { return m_material_constants * MAX_UNIFORMS_BYTES; }
-	u32 getIndex() const { return m_material_constants; }
+	u32 getBufferOffset() const { return u32(m_material_constants) * MAX_UNIFORMS_BYTES; }
+	MaterialIndex getIndex() const { return m_material_constants; }
 
 	gpu::StateFlags m_render_states;
 
@@ -99,7 +101,7 @@ private:
 	u8 m_layer;
 	u32 m_sort_key = 0;
 	u32 m_define_mask;
-	u32 m_material_constants = 0;
+	MaterialIndex m_material_constants = MaterialIndex{0};
 	u32 m_texture_count;
 
 	Array<Uniform> m_uniforms;

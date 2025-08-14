@@ -2011,7 +2011,7 @@ struct RenderModuleImpl final : RenderModule {
 		MeshMaterial& mat = inst.mesh_materials[mesh_index];
 		if (!mat.material || !mat.material->isReady()) return false;
 		
-		if (mat.material_index == 0 || !isFlagSet(mat.flags, MeshMaterial::OWN_MATERIAL_INDEX)) {
+		if (u32(mat.material_index) == 0 || !isFlagSet(mat.flags, MeshMaterial::OWN_MATERIAL_INDEX)) {
 			float tmp[Material::MAX_UNIFORMS_FLOATS];
 			mat.material->getUniformData(Span(tmp));
 			mat.material_index = m_renderer.createMaterialInstance(tmp);
@@ -2100,7 +2100,7 @@ struct RenderModuleImpl final : RenderModule {
 		
 		if (prev_mat) prev_mat->decRefCount();
 		mat.sort_key = 0;
-		mat.material_index = 0;
+		mat.material_index = MaterialIndex{0};
 		mi.dirty = true;
 	}
 
