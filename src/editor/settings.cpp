@@ -1207,41 +1207,49 @@ void Settings::gui() {
 				ImGui::EndTable();
 			}
 		}
-		else if (ImGui::BeginTable("categories_table", 2, ImGuiTableFlags_Resizable)) {
-			ImGui::TableNextRow();
-			ImGui::TableNextColumn();
+		else {
+			ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
+			if (ImGui::BeginChild("left_pane", ImVec2(150, 0), ImGuiChildFlags_AutoResizeX )) {
+				auto vtab = [](const char* label, bool is_selected){
+					if (is_selected) {
+						ImGui::Dummy(ImVec2(15, 1));
+						ImGui::SameLine();
+					}
+					const ImGuiStyle& style = ImGui::GetStyle();
+					ImGui::PushStyleColor(ImGuiCol_Button, style.Colors[is_selected ? ImGuiCol_TabActive : ImGuiCol_Tab]);
+					bool res = false;
+					if (ImGui::Button(label, ImVec2(-1, 0))) {
+						res = true;
+					}
+					ImGui::PopStyleColor();
+					return res;
+				};
+				
+				if (vtab("Shortcuts", selected == 0)) selected = 0; 
+				if (vtab("Style", selected == 1)) selected = 1; 
 
-			auto vtab = [](const char* label, bool is_selected){
-				const ImGuiStyle& style = ImGui::GetStyle();
-				ImGui::PushStyleColor(ImGuiCol_Button, style.Colors[is_selected ? ImGuiCol_TabActive : ImGuiCol_Tab]);
-				bool res = false;
-				if (ImGui::Button(label, ImVec2(-1, 0))) {
-					res = true;
+				for (Category& cat : m_categories) {
+					const u32 idx = u32(&cat - m_categories.begin());
+					bool is_selected = selected == idx + 2;
+					if (vtab(cat.name.c_str(), is_selected)) selected = idx + 2;
 				}
-				ImGui::PopStyleColor();
-				return res;
-			};
-			
-			if (vtab("Shortcuts", selected == 0)) selected = 0; 
-			if (vtab("Style", selected == 1)) selected = 1; 
+			}
+			ImGui::EndChild();
+			ImGui::PopStyleColor();
+			ImGui::SameLine();
 
-			for (Category& cat : m_categories) {
-				const u32 idx = u32(&cat - m_categories.begin());
-				bool is_selected = selected == idx + 2;
-				if (vtab(cat.name.c_str(), is_selected)) selected = idx + 2;
+			if (ImGui::BeginChild("right_page", ImVec2(0, 0))) {
+				if (selected == 0) shortcutsGUI(filter, *this);
+				else if (selected == 1) {
+					styleGUI(filter);
+				}
+				else if (ImGui::BeginTable("settings_table", 2, ImGuiTableFlags_RowBg)) {
+					if (m_categories[selected - 2].name == "General") generalGUI(*this);
+					iterVars();
+					ImGui::EndTable();
+				}
 			}
-
-			ImGui::TableNextColumn();
-			if (selected == 0) shortcutsGUI(filter, *this);
-			else if (selected == 1) {
-				styleGUI(filter);
-			}
-			else if (ImGui::BeginTable("settings_table", 2, ImGuiTableFlags_RowBg)) {
-				if (m_categories[selected - 2].name == "General") generalGUI(*this);
-				iterVars();
-				ImGui::EndTable();
-			}
-			ImGui::EndTable();
+			ImGui::EndChild();
 		}
 	}
 	ImGui::End();

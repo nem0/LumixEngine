@@ -828,27 +828,43 @@ struct ProfilerUIImpl final : ProfilerUI {
 		if (m_app.checkShortcut(m_toggle_ui, true)) m_is_open = !m_is_open;
 
 		if (!m_is_open) return;
-		if (ImGui::Begin(ICON_FA_CHART_AREA "Profiler##profiler", &m_is_open))
-		{
-			if (ImGui::BeginTabBar("tb")) {
-				if (ImGui::BeginTabItem("Flamegraph")) {
-					flamegraphUI();
-					ImGui::EndTabItem();
+		
+		if (ImGui::Begin(ICON_FA_CHART_AREA "Profiler##profiler", &m_is_open)) {
+			static u32 tab = 0;
+			auto vtab = [](const char* label, bool is_selected){
+				const ImGuiStyle& style = ImGui::GetStyle();
+				if (is_selected) {
+					ImGui::Dummy(ImVec2(10, 1));
+					ImGui::SameLine();
 				}
-				if (ImGui::BeginTabItem("GPU")) {
-					GPUUI();
-					ImGui::EndTabItem();
+				ImGui::PushStyleColor(ImGuiCol_Button, style.Colors[is_selected ? ImGuiCol_TabActive : ImGuiCol_Tab]);
+				bool res = false;
+				if (ImGui::Button(label, ImVec2(-1, 0))) {
+					res = true;
 				}
-				if (ImGui::BeginTabItem("Memory")) {
-					m_memory_ui.gui();
-					ImGui::EndTabItem();
-				}
-				if (ImGui::BeginTabItem("Resources")) {
-					resourcesUI();
-					ImGui::EndTabItem();
-				}
-				ImGui::EndTabBar();
+				ImGui::PopStyleColor();
+				return res;
+			};
+			
+			ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
+			if (ImGui::BeginChild("left_pane", ImVec2(150, 0), ImGuiChildFlags_AutoResizeX)) {
+				if (vtab("Flamegraph", tab == 0)) tab = 0;
+				if (vtab("GPU", tab == 1)) tab = 1;
+				if (vtab("Memory", tab == 2)) tab = 2;
+				if (vtab("Resources", tab == 3)) tab = 3;
 			}
+			ImGui::EndChild();
+			ImGui::PopStyleColor();
+			ImGui::SameLine();
+			if (ImGui::BeginChild("right_pane", ImVec2(0, 0))) {
+				switch (tab) {
+					case 0: flamegraphUI(); break;
+					case 1: GPUUI(); break;
+					case 2: m_memory_ui.gui(); break;
+					case 3: resourcesUI(); break;
+				}
+			}
+			ImGui::EndChild();
 			++m_frame_idx;
 		}
 		ImGui::End();
