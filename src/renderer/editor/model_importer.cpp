@@ -337,6 +337,7 @@ void ModelImporter::postprocessCommon(const ModelMeta& meta, StringView src_file
 				, u32(geom.vertex_buffer.size() / geom.vertex_size)
 				, geom.vertex_size
 				, size_t(geom.indices.size() * meta.autolod_coefs[i])
+				, 0.5f
 				);
 			geom.autolod_indices[i]->resize((u32)lod_index_count);
 		}
