@@ -60,7 +60,11 @@ namespace Lumix {
 
 	template <typename T>
 	int partition(T* from,  T* to) {
-		T* pivot = to - 1;
+		T* mid = from + (to - from) / 2;
+		if (*mid < *from) LUMIX_SWAP(*mid, *from);
+		if (*(to - 1) < *from) LUMIX_SWAP(*(to - 1), *from);
+		if (*(to - 1) < *mid) LUMIX_SWAP(*(to - 1), *mid);
+		T* pivot = mid;
 		T* i = from - 1;
 
 		for (T* j = from; j < pivot; ++j) {
@@ -75,30 +79,30 @@ namespace Lumix {
 	}
 
 	template <typename T, typename LessThan>
-	void sort(T* from, T* to, LessThan lessThan) {
+	void sort(T* from, T* to, LessThan lessThan, u32 depth = 0) {
 		if (from >= to) return;
-		if (to - from <= 32) {
+		if (to - from <= 32 || depth > 25) {
 			insertSort(from, to, lessThan);
 			return;
 		}
 		
 		int pivot_pos = partition(from, to, lessThan);
-		sort(from, from + pivot_pos, lessThan);
-		sort(from + pivot_pos + 1, to, lessThan);
+		sort(from, from + pivot_pos, lessThan, depth + 1);
+		sort(from + pivot_pos + 1, to, lessThan, depth + 1);
 	}
 
 	#undef LUMIX_SWAP
 
 	template <typename T>
-	void sort(T* from, T* to) {
+	void sort(T* from, T* to, u32 depth = 0) {
 		if (from >= to) return;
-		if (to - from <= 32) {
+		if (to - from <= 32 || depth > 25) {
 			insertSort(from, to);
 			return;
 		}
 		
 		int pivot_pos = partition(from, to);
-		sort(from, from + pivot_pos);
-		sort(from + pivot_pos + 1, to);
+		sort(from, from + pivot_pos, depth + 1);
+		sort(from + pivot_pos + 1, to, depth + 1);
 	}
 }
