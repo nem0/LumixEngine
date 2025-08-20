@@ -848,9 +848,9 @@ struct PipelineImpl final : Pipeline {
 		Matrix matrix = m_module->getWorld().getRelativeMatrix(e, m_viewport.pos);
 		Matrix normalize(
 			Vec4(1 / canvas_size.x, 0, 0, 0),
-			Vec4(0, -1 / canvas_size.x, 0, 0),
+			Vec4(0, -1 / canvas_size.y, 0, 0),
 			Vec4(0, 0, 1, 0),
-			Vec4(-0.5f, 0.5f * canvas_size.y / canvas_size.x, 0, 1)
+			Vec4(-0.5f, 0.5f, 0, 1)
 		);
 		if (orient_to_cam) {
 			const Transform tr = m_module->getWorld().getTransform(e);

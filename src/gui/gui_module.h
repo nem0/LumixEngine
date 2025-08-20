@@ -18,35 +18,35 @@ struct GUICanvas {
 	Vec2 virtual_size = Vec2(1000);
 };
 
-struct GUIModule : IModule
-{
-	enum class TextHAlign : int
-	{
+struct GUIRayHit {
+	EntityPtr entity = INVALID_ENTITY;
+	float t = -1;
+};
+
+struct GUIModule : IModule {
+	enum class TextHAlign : i32 {
 		LEFT,
 		CENTER,
 		RIGHT
 	};
 
-	enum class TextVAlign : int
-	{
+	enum class TextVAlign : i32 {
 		TOP,
 		MIDDLE,
 		BOTTOM
 	};
 
-	struct Rect
-	{
+	struct Rect {
 		float x, y, w, h;
 	};
 
-	static UniquePtr<GUIModule> createInstance(struct GUISystem& system,
-		World& world,
-		struct IAllocator& allocator);
+	static UniquePtr<GUIModule> createInstance(struct GUISystem& system, World& world, struct IAllocator& allocator);
 	static void reflect();
 
 	virtual void render(struct Pipeline& pipeline, const struct Vec2& canvas_size, bool is_main) = 0;
 	virtual void renderCanvas(Pipeline& pipeline, const struct Vec2& canvas_size, bool is_main, EntityRef canvas_entity) = 0;
 	virtual IVec2 getCursorPosition() = 0;
+	virtual GUIRayHit raycast(const struct Ray& ray) = 0;
 
 	virtual bool hasGUI(EntityRef entity) const = 0;
 	virtual Rect getRectEx(EntityPtr entity, const Vec2& canvas_size) const = 0;

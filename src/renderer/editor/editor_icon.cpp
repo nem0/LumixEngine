@@ -15,6 +15,7 @@ namespace Lumix
 {
 
 
+static const ComponentType GUI_RECT_TYPE = reflection::getComponentType("gui_rect");
 static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
 static const ComponentType PHYSICAL_CONTROLLER_TYPE = reflection::getComponentType("physical_controller");
 static const ComponentType CAMERA_TYPE = reflection::getComponentType("camera");
@@ -113,6 +114,7 @@ struct EditorIconsImpl final : EditorIcons
 		World& world = *m_editor.getWorld();
 		
 		if (world.hasComponent(entity, MODEL_INSTANCE_TYPE)) return;
+		if (world.hasComponent(entity, GUI_RECT_TYPE)) return;
 
 		auto& icon = m_icons.insert(entity);
 		icon.entity = entity;

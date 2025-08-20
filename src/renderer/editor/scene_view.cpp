@@ -20,6 +20,7 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
+#include "gui/gui_module.h"
 #include "renderer/culling_system.h"
 #include "renderer/draw_stream.h"
 #include "renderer/draw2d.h"
@@ -160,23 +161,19 @@ struct WorldViewImpl final : WorldView {
 		}
 	}
 
-	void onMouseUp(int x, int y, os::MouseButton button)
-	{
+	void onMouseUp(int x, int y, os::MouseButton button) {
 		m_mouse_pos = {(float)x, (float)y};
-		if (m_mouse_mode == MouseMode::SELECT)
-		{
-			if ((m_rect_selection_start.x != m_mouse_pos.x || m_rect_selection_start.y != m_mouse_pos.y) && m_rect_selection_timer > 0.1f)
-			{
+		if (m_mouse_mode == MouseMode::SELECT) {
+			if ((m_rect_selection_start.x != m_mouse_pos.x || m_rect_selection_start.y != m_mouse_pos.y) && m_rect_selection_timer > 0.1f) {
 				rectSelect();
 			}
-			else
-			{
+			else {
 				const Ray ray = m_viewport.getRay(m_mouse_pos);
 				const RayCastModelHit hit = m_module->castRay(ray, INVALID_ENTITY);
+				GUIModule* gui_module = (GUIModule*)m_module->getWorld().getModule("gui");
 
 				Span<const EntityRef> selected_entities = m_editor.getSelectedEntities();
-				if (m_snap_mode != SnapMode::NONE && selected_entities.size() != 0 && hit.is_hit)
-				{
+				if (m_snap_mode != SnapMode::NONE && selected_entities.size() != 0 && hit.is_hit) {
 					DVec3 snap_pos = ray.origin + ray.dir * hit.t;
 					if (m_snap_mode == SnapMode::VERTEX) snap_pos = getClosestVertex(hit);
 					const Quat rot = m_editor.getWorld()->getRotation(selected_entities[0]);
@@ -184,8 +181,7 @@ struct WorldViewImpl final : WorldView {
 					const Vec3 offset = rot.rotate(gizmo_cfg.getOffset());
 					m_editor.snapEntities(snap_pos - offset, gizmo_cfg.isTranslateMode());
 				}
-				else
-				{
+				else {
 					auto icon_hit = m_icons->raycast(ray.origin, ray.dir);
 					if (icon_hit.entity != INVALID_ENTITY) {
 						if(icon_hit.entity.isValid()) {
@@ -193,21 +189,30 @@ struct WorldViewImpl final : WorldView {
 							m_editor.selectEntities(Span(&e, 1), ImGui::GetIO().KeyCtrl);
 						}
 					}
-					else if (hit.is_hit) {
-						if (hit.entity.isValid()) {
-							EntityRef entity = (EntityRef)hit.entity;
-							m_editor.selectEntities(Span(&entity, 1), ImGui::GetIO().KeyCtrl);
+					else {
+						GUIRayHit gui_hit; 
+						if (gui_module) {
+							gui_hit = gui_module->raycast(ray);
 						}
-					} else {
-						m_editor.selectEntities(Span((const EntityRef*)nullptr, (u64)0), false);
+						if (hit.is_hit && (gui_hit.entity == INVALID_ENTITY || gui_hit.t > hit.t)) {
+							if (hit.entity.isValid()) {
+								EntityRef entity = (EntityRef)hit.entity;
+								m_editor.selectEntities(Span(&entity, 1), ImGui::GetIO().KeyCtrl);
+							}
+						}
+						else if (gui_hit.entity.isValid()) {
+							m_editor.selectEntities(Span((EntityRef*)&gui_hit.entity, 1), ImGui::GetIO().KeyCtrl);
+						}
+						else {
+							m_editor.selectEntities({}, false);
+						}
 					}
 				}
 			}
 		}
 
 		m_is_mouse_down[(int)button] = false;
-		if (m_mouse_handling_plugin)
-		{
+		if (m_mouse_handling_plugin) {
 			m_mouse_handling_plugin->onMouseUp(*this, x, y, button);
 			m_mouse_handling_plugin = nullptr;
 		}
