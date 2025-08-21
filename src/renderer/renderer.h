@@ -17,7 +17,6 @@
 namespace Lumix {
 
 enum class AttributeSemantic : u8;
-struct RenderBufferHandle;
 struct GBuffer;
 enum class MaterialIndex : u32;
 
@@ -28,15 +27,9 @@ struct RenderbufferDesc {
 	const char* debug_name;
 };
 
-struct RenderBufferHandle {
-	constexpr RenderBufferHandle() : value(0xffFFffFF) {}
-	explicit constexpr RenderBufferHandle(u32 value) : value(value) {}
-	operator u32() const { return value; }
-	bool operator ==(const RenderBufferHandle& rhs) const { return value == rhs.value; }
-	u32 value;
-};
+enum class RenderBufferHandle : u32 {};
 
-static constexpr RenderBufferHandle INVALID_RENDERBUFFER = RenderBufferHandle();
+static constexpr RenderBufferHandle INVALID_RENDERBUFFER = RenderBufferHandle{0xffFFffFF};
 
 struct LUMIX_RENDERER_API RenderPlugin {
 	virtual ~RenderPlugin() {}

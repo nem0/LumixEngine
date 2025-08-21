@@ -467,7 +467,7 @@ struct PipelineImpl final : Pipeline {
 		, m_type(type)
 		, m_module(nullptr)
 		, m_draw2d(m_allocator)
-		, m_output(-1)
+		, m_output(INVALID_RENDERBUFFER)
 		, m_shadow_atlas(m_allocator)
 		, m_textures(m_allocator)
 		, m_buffers(m_allocator)

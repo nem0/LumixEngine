@@ -1004,7 +1004,6 @@ struct AssetBrowserImpl : AssetBrowser {
 
 		ImGui::SameLine();
 		breadcrumbs();
-		ImGui::Separator();
 
 		listGUI();
 

@@ -765,14 +765,14 @@ struct RendererImpl final : Renderer {
 		return RenderBufferHandle(m_renderbuffers.size() - 1);
 	}
 
-	void releaseRenderbuffer(RenderBufferHandle idx) override {
-		if (idx == INVALID_RENDERBUFFER) return;
-		m_renderbuffers[idx].state = Renderbuffer::REUSABLE;
+	void releaseRenderbuffer(RenderBufferHandle handle) override {
+		if (handle == INVALID_RENDERBUFFER) return;
+		m_renderbuffers[u32(handle)].state = Renderbuffer::REUSABLE;
 	}
 
 	gpu::TextureHandle toTexture(RenderBufferHandle handle) override {
-		if (handle >= (u32)m_renderbuffers.size()) return gpu::INVALID_TEXTURE;
-		return m_renderbuffers[handle].handle;
+		if (u32(handle) >= (u32)m_renderbuffers.size()) return gpu::INVALID_TEXTURE;
+		return m_renderbuffers[u32(handle)].handle;
 	}
 
 	void setRenderTargets(Span<const RenderBufferHandle> renderbuffers, RenderBufferHandle ds = INVALID_RENDERBUFFER, gpu::FramebufferFlags flags = gpu::FramebufferFlags::NONE) override {
@@ -782,13 +782,13 @@ struct RendererImpl final : Renderer {
 			return;
 		}
 
-		const IVec2 viewport_size = m_renderbuffers[ds == INVALID_RENDERBUFFER ? renderbuffers[0] : ds].size;
+		const IVec2 viewport_size = m_renderbuffers[u32(ds == INVALID_RENDERBUFFER ? renderbuffers[0] : ds)].size;
 		gpu::TextureHandle attachments[16];
 		ASSERT(renderbuffers.length() <= lengthOf(attachments));
 		for (u32 i = 0; i < renderbuffers.length(); ++i) {
-			attachments[i] = m_renderbuffers[renderbuffers[i]].handle;
+			attachments[i] = m_renderbuffers[u32(renderbuffers[i])].handle;
 		}
-		stream.setFramebuffer(attachments, renderbuffers.length(), ds != INVALID_RENDERBUFFER ? m_renderbuffers[ds].handle : gpu::INVALID_TEXTURE, flags);
+		stream.setFramebuffer(attachments, renderbuffers.length(), ds != INVALID_RENDERBUFFER ? m_renderbuffers[u32(ds)].handle : gpu::INVALID_TEXTURE, flags);
 		stream.viewport(0, 0, viewport_size.x, viewport_size.y);
 	}
 
