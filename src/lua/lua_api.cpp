@@ -1210,7 +1210,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 			if Lumix.World[key] ~= nil then
 				return Lumix.World[key]
 			else
-				if Lumix[key] == nil then return nil end
+				if LumixModules[key] == nil then return nil end
 				local module = LumixAPI.getModule(table.value, key)
 				return LumixModules[key]:new(module)
 			end
