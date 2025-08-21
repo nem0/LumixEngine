@@ -812,6 +812,7 @@ struct SRVUAVHeap {
 		ASSERT(resources.length() == srv_descs.length());
 		ASSERT(transient_count + resources.length() <= max_transient_count);
 		D3D12_GPU_DESCRIPTOR_HANDLE gpu = heap->GetGPUDescriptorHandleForHeapStart();
+		ASSERT(gpu.ptr);
 		D3D12_CPU_DESCRIPTOR_HANDLE cpu = heap->GetCPUDescriptorHandleForHeapStart();
 		gpu.ptr += (frame * max_transient_count + transient_count) * handle_increment_size;
 		cpu.ptr += (frame * max_transient_count + transient_count) * handle_increment_size;
