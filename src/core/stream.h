@@ -82,6 +82,7 @@ struct LUMIX_CORE_API OutputMemoryStream final : IOutputStream {
 	bool write(const void* data, u64 size) override;
 
 	Span<u8> releaseOwnership();
+	void setAllocator(IAllocator* allocator) { ASSERT(!m_data); m_allocator = allocator; }
 	operator Span<const u8>() const { return Span(m_data, m_data + m_size); }
 	void resize(u64 size);
 	void reserve(u64 size);
