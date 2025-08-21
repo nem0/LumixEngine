@@ -375,7 +375,7 @@ struct GUIModuleImpl final : GUIModule {
 		}
 	}
 
-	void render(Pipeline& pipeline, const Vec2& canvas_size, bool is_main) override {
+	void render(Pipeline& pipeline, const Vec2& canvas_size, bool is_main, bool is_3d_only) override {
 		m_canvas_size = canvas_size;
 		if (is_main) {
 			m_cursor_type = os::CursorType::DEFAULT;
@@ -385,7 +385,7 @@ struct GUIModuleImpl final : GUIModule {
 			if (canvas.is_3d) {
 				draw3D(canvas, pipeline);
 			}
-			else {
+			else if (!is_3d_only) {
 				auto iter = m_rects.find(canvas.entity);
 				if (iter.isValid()) {
 					GUIRect* r = iter.value();

@@ -43,7 +43,7 @@ struct GUIModule : IModule {
 	static UniquePtr<GUIModule> createInstance(struct GUISystem& system, World& world, struct IAllocator& allocator);
 	static void reflect();
 
-	virtual void render(struct Pipeline& pipeline, const struct Vec2& canvas_size, bool is_main) = 0;
+	virtual void render(struct Pipeline& pipeline, const struct Vec2& canvas_size, bool is_main, bool is_3d_only) = 0;
 	virtual void renderCanvas(Pipeline& pipeline, const struct Vec2& canvas_size, bool is_main, EntityRef canvas_entity) = 0;
 	virtual IVec2 getCursorPosition() = 0;
 	virtual GUIRayHit raycast(const struct Ray& ray) = 0;
