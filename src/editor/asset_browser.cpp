@@ -688,7 +688,7 @@ struct AssetBrowserImpl : AssetBrowser {
 							fileEvents(tile, selected);
 						}
 						ImGui::SameLine();
-						ImGui::Dummy(ImVec2(spacing, thumbnail_size));
+						ImGui::Dummy(ImVec2(spacing, thumbnail_size + ImGui::GetTextLineHeightWithSpacing()));
 					}
 				}
 				else {
@@ -908,7 +908,6 @@ struct AssetBrowserImpl : AssetBrowser {
 			});
 			endCenterStrip();
 		}
-
 		ImGui::EndChild();
 		if (ImGui::IsItemHovered() && ImGui::GetIO().KeyCtrl) {
 			m_thumbnail_scale = clamp(m_thumbnail_scale + ImGui::GetIO().MouseWheel * 0.1f, 0.3f, 3.f);
