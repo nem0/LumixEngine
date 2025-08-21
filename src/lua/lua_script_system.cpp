@@ -2311,6 +2311,9 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 		LUMIX_DELETE(m_system.m_allocator, cmp);
 		m_scripts.erase(entity);
 		m_world.onComponentDestroyed(entity, LUA_SCRIPT_TYPE, this);
+		m_to_start.eraseItems([entity](DeferredStart& element){
+			return element.entity == entity;
+		});
 	}
 
 	// TODO type-checking (does lua type match c++), check other places too
