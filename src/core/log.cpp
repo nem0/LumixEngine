@@ -28,6 +28,8 @@ namespace detail {
 			// so to prevent crash, we release ownership
 			// because the allocator might have been already destroyed
 			message.releaseOwnership();
+			// for same reason, we have to set allocator to nullptr
+			message.setAllocator(nullptr);
 		}
 		OutputMemoryStream message;
 	};
