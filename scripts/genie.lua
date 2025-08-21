@@ -580,11 +580,11 @@ if plugin "lua" then
 
 	configuration { "vs20*" }
 		libdirs {  "../external/luau/lib/win" }
-		links "Luau"
+		linkLib "Luau"
 		
 	configuration { "linux" }
 		libdirs {  "../external/luau/lib/linux" }
-		links "Luau"
+		linkLib "Luau"
 
 	configuration {}
 
@@ -602,11 +602,11 @@ if plugin "lua" then
 
 	if build_luau and build_studio then
 		exe_project "studio"
-			links {"Luau"}
+			linkLib "Luau"
 	end
 	if build_luau and build_app then
 		exe_project "app"
-			links {"Luau"}
+			linkLib "Luau"
 	end
 end
 
@@ -954,7 +954,7 @@ end
 
 if build_luau then
 	printf("Using Luau from external/_repos/luau (build from source code)")
-	lib_project "Luau"
+	project "Luau"
 		if luau_dynamic then
 			kind "SharedLib"
 		else
