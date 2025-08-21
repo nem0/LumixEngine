@@ -9,6 +9,7 @@
 #include "core/color.h"
 #include "core/command_line_parser.h"
 #include "core/debug.h"
+#include "core/defer.h"
 #include "core/default_allocator.h"
 #include "core/geometry.h"
 #include "core/hash.h"
@@ -2652,6 +2653,9 @@ struct StudioAppImpl final : StudioApp {
 					u32 idx = 0;
 					for (Action* act = Action::first_action; act; act = act->next) {
 						if (!m_all_actions_filter.pass(act->label_long) && !m_all_actions_filter.pass(act->group)) continue;
+
+						ImGui::PushID(act);
+						defer { ImGui::PopID(); };
 
 						bool selected = idx == m_all_actions_selected;
 						if (moved && selected) ImGui::SetScrollHereY();
