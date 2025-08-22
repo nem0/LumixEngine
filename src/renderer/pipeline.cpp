@@ -2656,7 +2656,7 @@ struct PipelineImpl final : Pipeline {
 							const u32 mesh_idx = u32(renderable >> SORT_KEY_MESH_IDX_SHIFT);
 							const ModelInstance& mi = model_instances[entity_index];
 							const Mesh& mesh = mi.model->getMesh(mesh_idx);
-							const MeshMaterial& mesh_mat = mi.model->getMeshMaterial(mesh_idx);
+							const MeshMaterial& mesh_mat = mi.mesh_materials[mesh_idx];
 
 							const Material* material = mesh_mat.material;
 							Shader* shader = material->getShader();
@@ -2671,9 +2671,6 @@ struct PipelineImpl final : Pipeline {
 								.vertex_buffers = { mesh.vertex_buffer_handle, instances.slice.buffer },
 								.vertex_buffer_offsets = { 0, instances.slice.offset },
 								.vertex_buffer_sizes = { mesh.vb_stride, 48 },
-								.uniform_buffer2 = m_renderer.getMaterialUniformBuffer(),
-								.uniform_buffer2_offset = material->getBufferOffset(),
-								.uniform_buffer2_size = Material::MAX_UNIFORMS_BYTES,
 								.indices_count = mesh.indices_count,
 								.instances_count = total_count,
 								.index_type = mesh.index_type,

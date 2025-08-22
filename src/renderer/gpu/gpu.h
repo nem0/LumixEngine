@@ -257,9 +257,6 @@ struct Drawcall {
 	gpu::BufferHandle vertex_buffers[2];
 	u32 vertex_buffer_offsets[2];
 	u32 vertex_buffer_sizes[2];
-	gpu::BufferHandle uniform_buffer2;
-	u32 uniform_buffer2_offset;
-	u32 uniform_buffer2_size;
 	u32 indices_count;
 	u32 instances_count;
 	DataType index_type;
