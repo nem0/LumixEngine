@@ -11,7 +11,7 @@
 //    contributors may be used to endorse or promote products derived
 //    from this software without specific prior written permission.
 //
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ''AS IS'' AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 // IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
 // PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -23,7 +23,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-// Copyright (c) 2008-2019 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2021 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -51,6 +51,70 @@ class PxVehicleTireForceCalculator;
 class PxShape;
 class PxPhysics;
 class PxMaterial;
+
+/**
+\brief Flags to configure the vehicle wheel simulation.
+
+@see PxVehicleWheelsSimData::setFlags(), PxVehicleWheelsSimData::getFlags()
+*/
+struct PxVehicleWheelsSimFlag
+{
+	enum Enum
+	{
+		/**
+		\brief Limit the suspension expansion velocity.
+
+		For extreme damping ratios, large damping forces might result in the vehicle sticking to the ground where
+		one would rather expect to see the vehicle lift off. While it is highly recommended to use somewhat realistic 
+		damping ratios, this flag can be used to limit the velocity of the suspension. In more detail, the simulation 
+		will check whether the suspension can extend to the target length in the given simulation time step. If that 
+		is the case, the suspension force will be computed as usual, else the force will be set to zero. Enabling 
+		this feature gives a slightly more realisitic behavior at the potential cost of more easily losing control 
+		when steering the vehicle.
+		*/
+		eLIMIT_SUSPENSION_EXPANSION_VELOCITY = (1 << 0),
+
+		/**
+		\brief Disable internal cylinder-plane intersection test.
+
+		By default the internal code runs a post-process on sweep results, approximating the wheel shape with a
+		cylinder and tweaking the sweep hit results accordingly. This can produce artefacts in certain cases, in
+		particular when the swept shape is very different from a cylinder - e.g. with swept spheres. This flag
+		tells the system to disable this internal test, and reuse the direct user-provided sweep results.
+
+		The default code refines the sweep results in each substep. Enabling this flag makes the system partially
+		reuse the same sweep results over each substep, which could potentially create other artefacts.
+		*/
+		eDISABLE_INTERNAL_CYLINDER_PLANE_INTERSECTION_TEST = (1 << 1),
+
+		/**
+		\brief Disable suspension force projection.
+
+		By default the internal code modulates the suspension force with the contact normal, i.e. the more the contact
+		normal is aligned with the suspension direction, the bigger the force. This can create issues when using a
+		single blocking hit, whose unique contact normal sometimes does not accurately capture the reality of the
+		surrounding geometry. For example it can weaken the suspension force too much, which visually makes the wheel
+		move up and down against e.g. a kerb. Enabling this flag tells the system to disable the modulation of the
+		suspension force by the contact normal.
+		
+		The rationale is that a real tire has a deformed contact patch containing multiple normals, and even if some
+		of these normals are bent when colliding against a kerb, there would still be a large area of the contact patch
+		touching the ground, and getting normals aligned with the suspension. This is difficult to capture with simple
+		sweep results, especially with a single sweep hit whose normal is computed by a less than accurate algorithm
+		like GJK. Using this flag shortcuts these issues, which can improves the behavior when driving over kerbs or
+		small obstacles.
+		*/
+		eDISABLE_SUSPENSION_FORCE_PROJECTION = (1 << 2)
+	};
+};
+
+/**
+\brief Collection of set bits defined in #PxVehicleWheelsSimFlag.
+
+@see PxVehicleWheelsSimFlag
+*/
+typedef PxFlags<PxVehicleWheelsSimFlag::Enum, PxU32> PxVehicleWheelsSimFlags;
+PX_FLAGS_OPERATORS(PxVehicleWheelsSimFlag::Enum, PxU32)
 
 /**
 \brief Data structure describing configuration data of a vehicle with up to 20 wheels.
@@ -408,6 +472,26 @@ public:
 	*/
 	void setMinLongSlipDenominator(const PxReal minLongSlipDenominator);
 
+	/**
+	\brief Set the vehicle wheel simulation flags.
+
+	\param[in] flags The flags to set (see #PxVehicleWheelsSimFlags).
+
+	<b>Default:</b> no flag set
+
+	@see PxVehicleWheelsSimFlag
+	*/
+	void setFlags(PxVehicleWheelsSimFlags flags);
+
+	/**
+	\brief Return the vehicle wheel simulation flags.
+
+	\return The values of the flags.
+
+	@see PxVehicleWheelsSimFlag
+	*/
+	PxVehicleWheelsSimFlags getFlags() const;
+
 private:
 
 	/**
@@ -476,9 +560,14 @@ private:
 	*/
 	PxF32 mMinLongSlipDenominator;
 
+	/**
+	\brief The vehicle wheel simulation flags.
+
+	@see PxVehicleWheelsSimFlags
+	*/
+	PxU32 mFlags;
+
 #if PX_P64_FAMILY
-	PxU32 mPad[2];
-#else 
 	PxU32 mPad[1];
 #endif
 
@@ -666,6 +755,31 @@ public:
 	PxU32 getNbWheelRotationAngle() const {	return mNbActiveWheels; }	
 	PxVehicleWheels4DynData* getWheel4DynData() const { return mWheels4DynData; }
 //~serialization
+
+	/**
+	\brief Retrieve the number of PxConstraint objects associated with the vehicle.
+
+	You can use #getConstraints() to retrieve the constraint pointers.
+
+	\return Number of constraints associated with this vehicle.
+
+	@see PxConstraint getConstraints()
+	*/
+	PxU32 getNbConstraints() const { return mNbWheels4; }
+
+	/**
+	\brief Retrieve all the PxConstraint objects associated with the vehicle.
+
+	There is one PxConstraint per block of 4 wheels. The count can be extracted through #getNbConstraints()
+
+	\param[out] userBuffer The buffer to store the constraint pointers.
+	\param[in] bufferSize Size of provided user buffer.
+	\param[in] startIndex Index of first constraint pointer to be retrieved
+	\return Number of constraint pointers written to the buffer.
+
+	@see PxConstraint getNbConstraints()
+	*/
+	PxU32 getConstraints(PxConstraint** userBuffer, PxU32 bufferSize, PxU32 startIndex = 0) const;
 };
 PX_COMPILE_TIME_ASSERT(0==(sizeof(PxVehicleWheelsDynData) & 15));
 
@@ -748,6 +862,11 @@ protected:
 	@see PxVehicleDrive4W::free, PxVehicleDriveTank::free
 	*/
 	void free();
+
+	/*
+	\brief Deferred deletion.
+	*/
+	void onConstraintRelease();
 
 	/**
 	@see PxVehicleDrive4W::setup, PxVehicleDriveTank::setup

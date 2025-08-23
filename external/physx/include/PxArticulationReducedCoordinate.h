@@ -11,7 +11,7 @@
 //    contributors may be used to endorse or promote products derived
 //    from this software without specific prior written permission.
 //
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ''AS IS'' AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 // IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
 // PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -23,7 +23,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-// Copyright (c) 2008-2019 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2021 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -53,6 +53,16 @@ namespace physx
 	}
 	PX_ALIGN_SUFFIX(16);
 
+	PX_ALIGN_PREFIX(16)
+	struct PxSpatialVelocity
+	{
+		PxVec3 linear;
+		PxReal pad0;
+		PxVec3 angular;
+		PxReal pad1;
+	}
+	PX_ALIGN_SUFFIX(16);
+
 	class PxJoint;
 
 	struct PxArticulationRootLinkData
@@ -69,12 +79,14 @@ namespace physx
 	public:
 		enum Enum
 		{
-			eVELOCITY		= (1 << 0),		//!< The joint velocities this frame. Note, this is the accumulated joint velocities, not change in joint velocity.
-			eACCELERATION	= (1 << 1),		//!< The joint accelerations this frame. Delta velocity can be computed from acceleration * dt.
-			ePOSITION		= (1 << 2),		//!< The joint positions this frame. Note, this is the accumulated joint positions over frames, not change in joint position.
-			eFORCE			= (1 << 3),		//!< The joint forces this frame. Note, the application should provide these values for the forward dynamic. If the application is using inverse dynamic, this is the joint force returned.
-			eROOT			= (1 << 4),		//!< Root link transform, velocity and acceleration. Note, when the application call applyCache with eROOT flag, it won't apply root link's acceleration to the simulation
-			eALL			= (eVELOCITY | eACCELERATION | ePOSITION| eROOT)
+			eVELOCITY			= (1 << 0),		//!< The joint velocities this frame. Note, this is the accumulated joint velocities, not change in joint velocity.
+			eACCELERATION		= (1 << 1),		//!< The joint accelerations this frame. Delta velocity can be computed from acceleration * dt.
+			ePOSITION			= (1 << 2),		//!< The joint positions this frame. Note, this is the accumulated joint positions over frames, not change in joint position.
+			eFORCE				= (1 << 3),		//!< The joint forces this frame. Note, the application should provide these values for the forward dynamic. If the application is using inverse dynamic, this is the joint force returned.
+			eLINKVELOCITY		= (1 << 4),		//!< The link velocities this frame.
+			eLINKACCELERATION	= (1 << 5),		//!< The link accelerations this frame.
+			eROOT				= (1 << 6),		//!< Root link transform, velocity and acceleration. Note, when the application call applyCache with eROOT flag, it won't apply root link's acceleration to the simulation
+			eALL				= (eVELOCITY | eACCELERATION | ePOSITION| eLINKVELOCITY | eLINKACCELERATION | eROOT )
 		};
 		PxArticulationCache() :
 			externalForces		(NULL),
@@ -92,14 +104,16 @@ namespace physx
 			version				(0)
 		{}
 
-		PxSpatialForce*				externalForces;		// N = getNbLinks()
-		PxReal*						denseJacobian;		// N = 6*getDofs()*NumJoints, NumJoints = getNbLinks() - 1
-		PxReal*						massMatrix;			// N = getDofs()*getDofs()
-		PxReal*						jointVelocity;		// N = getDofs()
-		PxReal*						jointAcceleration;	// N = getDofs()
-		PxReal*						jointPosition;		// N = getDofs()
-		PxReal*						jointForce;			// N = getDofs()
-		PxArticulationRootLinkData*	rootLinkData;		// root link Data
+		PxSpatialForce*				externalForces;			// N = getNbLinks()
+		PxReal*						denseJacobian;			// N = 6*getDofs()*NumJoints, NumJoints = getNbLinks() - 1
+		PxReal*						massMatrix;				// N = getDofs()*getDofs()
+		PxReal*						jointVelocity;			// N = getDofs()
+		PxReal*						jointAcceleration;		// N = getDofs()
+		PxReal*						jointPosition;			// N = getDofs()
+		PxReal*						jointForce;				// N = getDofs()
+		PxSpatialVelocity*			linkVelocity;			// N = getNbLinks()
+		PxSpatialVelocity*			linkAcceleration;		// N = getNbLinks()
+		PxArticulationRootLinkData*	rootLinkData;			// root link Data
 
 		//application need to allocate those memory and assign them to the cache
 		PxReal*						coefficientMatrix; 
@@ -371,6 +385,24 @@ namespace physx
 		@see commonInit
 		*/
 		virtual		void					teleportRootLink(const PxTransform& pose, bool autowake) = 0;
+
+
+		/**
+		\brief return the link velocity in world space with the associated low-level link index(getLinkIndex()).
+		\param[in] linkId low-level link index
+
+		@see getLinkIndex() in PxArticulationLink
+		*/
+		virtual		PxSpatialVelocity		getLinkVelocity(const PxU32 linkId) = 0;
+
+
+		/**
+		\brief return the link acceleration in world space with the associated low-level link index(getLinkIndex())
+		\param[in] linkId low-level link index
+
+		@see getLinkIndex() in PxArticulationLink
+		*/
+		virtual		PxSpatialVelocity		getLinkAcceleration(const PxU32 linkId) = 0;
 
 	protected:
 		PX_INLINE							PxArticulationReducedCoordinate(PxType concreteType, PxBaseFlags baseFlags) : PxArticulationBase(concreteType, baseFlags) {}

@@ -11,7 +11,7 @@
 //    contributors may be used to endorse or promote products derived
 //    from this software without specific prior written permission.
 //
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ''AS IS'' AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 // IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
 // PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -23,7 +23,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-// Copyright (c) 2008-2019 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2021 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -58,7 +58,7 @@ public:
 	/**
 	\brief Default constructor, initializes to a capsule with zero height and radius.
 	*/
-	PX_INLINE PxCapsuleGeometry() :						PxGeometry(PxGeometryType::eCAPSULE), radius(0), halfHeight(0)		{}
+	PX_INLINE PxCapsuleGeometry() : PxGeometry(PxGeometryType::eCAPSULE), radius(0), halfHeight(0)		{}
 
 	/**
 	\brief Constructor, initializes to a capsule with passed radius and half height.
@@ -89,7 +89,6 @@ public:
 	PxReal halfHeight;
 };
 
-
 PX_INLINE bool PxCapsuleGeometry::isValid() const
 {
 	if (mType != PxGeometryType::eCAPSULE)
@@ -101,18 +100,6 @@ PX_INLINE bool PxCapsuleGeometry::isValid() const
 
 	return true;
 }
-
-
-/** \brief creates a transform from the endpoints of a segment, suitable for an actor transform for a PxCapsuleGeometry
-
-\param[in] p0 one end of major axis of the capsule
-\param[in] p1 the other end of the axis of the capsule
-\param[out] halfHeight the halfHeight of the capsule. This parameter is optional.
-\return A PxTransform which will transform the vector (1,0,0) to the capsule axis shrunk by the halfHeight
-*/
-
-PX_FOUNDATION_API PxTransform PxTransformFromSegment(const PxVec3& p0, const PxVec3& p1, PxReal* halfHeight = NULL);
-
 
 #if !PX_DOXYGEN
 } // namespace physx

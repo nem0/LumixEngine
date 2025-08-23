@@ -11,7 +11,7 @@
 //    contributors may be used to endorse or promote products derived
 //    from this software without specific prior written permission.
 //
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ''AS IS'' AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 // IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
 // PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -23,7 +23,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-// Copyright (c) 2008-2019 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2021 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.
 
@@ -88,6 +88,8 @@ Operating system defines, see http://sourceforge.net/p/predef/wiki/OperatingSyst
 */
 #if defined(_XBOX_ONE)
 #define PX_XBOXONE 1
+#elif defined(_GAMING_XBOX) || defined (_GAMING_XBOX_SCARLETT)
+#define PX_XBOX_SERIES_X 1
 #elif defined(WINAPI_FAMILY) && WINAPI_FAMILY == WINAPI_FAMILY_APP
 #define PX_UWP 1
 #elif defined(_WIN64) // note: _XBOX_ONE implies _WIN64
@@ -156,6 +158,9 @@ define anything not defined on this platform to 0
 #endif
 #ifndef PX_XBOXONE
 #define PX_XBOXONE 0
+#endif
+#ifndef PX_XBOX_SERIES_X
+#define PX_XBOX_SERIES_X 0
 #endif
 #ifndef PX_WIN64
 #define PX_WIN64 0
@@ -238,7 +243,7 @@ family shortcuts
 #define PX_GCC_FAMILY (PX_CLANG || PX_GCC)
 // os
 #define PX_WINDOWS_FAMILY (PX_WIN32 || PX_WIN64 || PX_UWP)
-#define PX_MICROSOFT_FAMILY (PX_XBOXONE || PX_WINDOWS_FAMILY)
+#define PX_MICROSOFT_FAMILY (PX_XBOXONE || PX_WINDOWS_FAMILY || PX_XBOX_SERIES_X)
 #define PX_LINUX_FAMILY (PX_LINUX || PX_ANDROID)
 #define PX_APPLE_FAMILY (PX_IOS || PX_OSX)                  // equivalent to #if __APPLE__
 #define PX_UNIX_FAMILY (PX_LINUX_FAMILY || PX_APPLE_FAMILY) // shortcut for unix/posix platforms
@@ -255,7 +260,7 @@ family shortcuts
 /**
 C++ standard library defines
 */
-#if defined(_LIBCPP_VERSION) || PX_WIN64 || PX_WIN32 || PX_PS4 || PX_XBOXONE || PX_UWP || PX_EMSCRIPTEN
+#if defined(_LIBCPP_VERSION) || PX_WIN64 || PX_WIN32 || PX_PS4 || PX_XBOXONE || PX_UWP || PX_EMSCRIPTEN || PX_XBOX_SERIES_X
 #define PX_LIBCPP 1
 #else
 #define PX_LIBCPP 0
@@ -292,7 +297,7 @@ DLL export macros
 #define PX_UNIX_EXPORT
 #endif
 
-#if PX_WINDOWS_FAMILY
+#if (PX_WINDOWS_FAMILY || PX_XBOXONE || PX_PS4 || PX_XBOX_SERIES_X)
 #define PX_DLL_EXPORT __declspec(dllexport)
 #define PX_DLL_IMPORT __declspec(dllimport)
 #else

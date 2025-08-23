@@ -11,7 +11,7 @@
 //    contributors may be used to endorse or promote products derived
 //    from this software without specific prior written permission.
 //
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ''AS IS'' AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 // IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
 // PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -23,7 +23,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-// Copyright (c) 2008-2019 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2021 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -478,7 +478,7 @@ public:
 	<b>Range:</b> force vector<br>
 	<b>Default:</b> Zero
 
-	@see PxScene.setGravity()
+	@see PxScene.setGravity() PxScene.getGravity()
 
 	When setting gravity, you should probably also set bounce threshold.
 	*/
@@ -623,7 +623,7 @@ public:
 	<b>Range:</b> [0, PX_MAX_F32)<br>
 	<b>Default:</b> 0.2 * PxTolerancesScale::speed
 
-	@see PxMaterial
+	@see PxMaterial PxScene.setBounceThresholdVelocity() PxScene.getBounceThresholdVelocity()
 	*/
 	PxReal bounceThresholdVelocity; 
 

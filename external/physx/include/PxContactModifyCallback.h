@@ -11,7 +11,7 @@
 //    contributors may be used to endorse or promote products derived
 //    from this software without specific prior written permission.
 //
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ''AS IS'' AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 // IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
 // PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -23,7 +23,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-// Copyright (c) 2008-2019 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2021 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -135,14 +135,14 @@ public:
 
 	@see PxModifiableContact.internalFaceIndex0
 	*/
-	PX_FORCE_INLINE		PxU32 getInternalFaceIndex0(PxU32 i)			{ PX_UNUSED(i); return PXC_CONTACT_NO_FACE_INDEX; }
+	PX_FORCE_INLINE		PxU32 getInternalFaceIndex0(PxU32 i)	const		{ PX_UNUSED(i); return PXC_CONTACT_NO_FACE_INDEX; }
 
 	/**
 	\brief Get the face index with respect to the second shape of the pair for a specific contact point in the set.
 
 	@see PxModifiableContact.internalFaceIndex1
 	*/
-	PX_FORCE_INLINE		PxU32 getInternalFaceIndex1(PxU32 i)
+	PX_FORCE_INLINE		PxU32 getInternalFaceIndex1(PxU32 i)	const
 	{
 		PxContactPatch* patch = getPatch();
 		if (patch->internalFlags & PxContactPatch::eHAS_FACE_INDICES)
@@ -237,7 +237,7 @@ public:
 
 	If a contact point is ignored then no force will get applied at this point. This can be used to disable collision in certain areas of a shape, for example.
 	*/
-	PX_FORCE_INLINE		void ignore(PxU32 i)							{ mContacts[i].maxImpulse = 0.f; }
+	PX_FORCE_INLINE		void ignore(PxU32 i)							{ setMaxImpulse(i, 0.0f);	}
 
 	/**
 	\brief The number of contact points in the set.

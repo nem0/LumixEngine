@@ -11,7 +11,7 @@
 //    contributors may be used to endorse or promote products derived
 //    from this software without specific prior written permission.
 //
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ''AS IS'' AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 // IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
 // PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -23,7 +23,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-// Copyright (c) 2008-2019 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2021 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -1090,9 +1090,12 @@ class PxScene
 
 	/**
 	\brief Set the friction model.
+
+	\deprecated The friction type cannot be changed after the first simulate call so this function is deprecated. Set the friction type at scene creation time in PxSceneDesc.
+
 	@see PxFrictionType, PxSceneDesc::frictionType
 	*/
-	virtual void setFrictionType(PxFrictionType::Enum frictionType) = 0;
+	PX_DEPRECATED	virtual void setFrictionType(PxFrictionType::Enum frictionType) = 0;
 
 	/**
 	\brief Return the friction model.
@@ -1322,7 +1325,7 @@ class PxScene
 	\param[in] distance		Length of the ray. Has to be in the [0, inf) range.
 	\param[out] hitCall		Raycast hit buffer or callback object used to report raycast hits.
 	\param[in] hitFlags		Specifies which properties per hit should be computed and returned via the hit callback.
-	\param[in] filterData	Filtering data passed to the filer shader. See #PxQueryFilterData #PxBatchQueryPreFilterShader, #PxBatchQueryPostFilterShader
+	\param[in] filterData	Filtering data passed to the filter shader. See #PxQueryFilterData #PxBatchQueryPreFilterShader, #PxBatchQueryPostFilterShader
 	\param[in] filterCall	Custom filtering logic (optional). Only used if the corresponding #PxQueryFlag flags are set. If NULL, all hits are assumed to be blocking.
 	\param[in] cache		Cached hit shape (optional). Ray is tested against cached shape first. If no hit is found the ray gets queried against the scene.
 							Note: Filtering is not executed for a cached shape if supplied; instead, if a hit is found, it is assumed to be a blocking hit.

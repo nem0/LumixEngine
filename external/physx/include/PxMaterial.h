@@ -11,7 +11,7 @@
 //    contributors may be used to endorse or promote products derived
 //    from this software without specific prior written permission.
 //
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ''AS IS'' AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 // IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
 // PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -23,7 +23,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-// Copyright (c) 2008-2019 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2021 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -240,24 +240,31 @@ public:
 	
 	See the list of flags #PxMaterialFlag
 
+	<b>Default:</b> no flags are set
+
 	<b>Sleeping:</b> Does <b>NOT</b> wake any actors which may be affected.
 
-	\param[in] flag The PxMaterial flag to raise(set) or clear.
+	\param[in]	flag	The PxMaterial flag to raise(set) or clear.
+	\param[in]	b		New state of the flag
 
-	@see getFlags() PxMaterialFlag
+	@see getFlags() setFlags() PxMaterialFlag
 	*/
-	virtual		void			setFlag(PxMaterialFlag::Enum flag, bool) = 0;
-
+	virtual		void			setFlag(PxMaterialFlag::Enum flag, bool b) = 0;
 
 	/**
 	\brief sets all the material flags.
 	
 	See the list of flags #PxMaterialFlag
 
+	<b>Default:</b> no flags are set
+
 	<b>Sleeping:</b> Does <b>NOT</b> wake any actors which may be affected.
 
+	\param[in]	flags	All PxMaterial flags
+
+	@see getFlags() setFlag() PxMaterialFlag
 	*/
-	virtual		void 			setFlags( PxMaterialFlags inFlags ) = 0;
+	virtual		void 			setFlags(PxMaterialFlags flags) = 0;
 
 	/**
 	\brief Retrieves the flags. See #PxMaterialFlag.
@@ -272,6 +279,8 @@ public:
 	\brief Sets the friction combine mode.
 	
 	See the enum ::PxCombineMode .
+
+	<b>Default:</b> PxCombineMode::eAVERAGE
 
 	<b>Sleeping:</b> Does <b>NOT</b> wake any actors which may be affected.
 
@@ -296,6 +305,8 @@ public:
 	\brief Sets the restitution combine mode.
 	
 	See the enum ::PxCombineMode .
+
+	<b>Default:</b> PxCombineMode::eAVERAGE
 
 	<b>Sleeping:</b> Does <b>NOT</b> wake any actors which may be affected.
 

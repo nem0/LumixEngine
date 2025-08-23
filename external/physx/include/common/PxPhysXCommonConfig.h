@@ -11,7 +11,7 @@
 //    contributors may be used to endorse or promote products derived
 //    from this software without specific prior written permission.
 //
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ''AS IS'' AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 // IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
 // PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -23,7 +23,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-// Copyright (c) 2008-2019 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2021 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -47,7 +47,7 @@ https://developercommunity.visualstudio.com/content/problem/66047/possible-compi
 #if defined PX_PHYSX_STATIC_LIB
 	#define PX_PHYSX_CORE_API
 #else
-	#if PX_WINDOWS_FAMILY
+	#if (PX_WINDOWS_FAMILY || PX_XBOXONE || PX_PS4 || PX_XBOX_SERIES_X)
 		#if defined PX_PHYSX_CORE_EXPORTS
 			#define PX_PHYSX_CORE_API __declspec(dllexport)
 		#else
@@ -85,7 +85,7 @@ https://developercommunity.visualstudio.com/content/problem/66047/possible-compi
 #if defined PX_PHYSX_STATIC_LIB
 	#define PX_PHYSX_COMMON_API
 #else
-	#if PX_WINDOWS_FAMILY && !defined(__CUDACC__)
+	#if (PX_WINDOWS_FAMILY || PX_XBOXONE || PX_PS4 || PX_XBOX_SERIES_X) && !defined(__CUDACC__)
 		#if defined PX_PHYSX_COMMON_EXPORTS
 			#define PX_PHYSX_COMMON_API __declspec(dllexport)
 		#else

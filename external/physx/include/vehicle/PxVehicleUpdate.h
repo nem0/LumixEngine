@@ -11,7 +11,7 @@
 //    contributors may be used to endorse or promote products derived
 //    from this software without specific prior written permission.
 //
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ''AS IS'' AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 // IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
 // PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -23,7 +23,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-// Copyright (c) 2008-2019 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2021 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -90,6 +90,8 @@ namespace physx
 		/**
 		\brief If suspension travel limits forbid the wheel from touching the drivable surface then isInAir is true.
 		\note If the wheel can be placed on the contact plane of the most recent suspension line raycast/sweep then isInAir is false.
+		\note If #PxVehicleWheelsSimFlag::eLIMIT_SUSPENSION_EXPANSION_VELOCITY is set, then isInAir will also be true if the suspension
+		force is not large enough to expand to the target length in the given simulation time step.
 		\note If no raycast/sweep for the corresponding suspension was performed immediately prior to PxVehicleUpdates then isInAir
 		is computed using the contact plane that was hit by the most recent suspension line raycast/sweep.
 		*/
@@ -238,10 +240,10 @@ namespace physx
 	};
 
 	/**
-	\brief Structure containing data that is computed for a wheel during concurrent calls to PxVehicleUpdates
-	but which cannot be safely concurrently applied. 
+	\brief Structure containing data that is computed for a wheel during concurrent calls to PxVehicleUpdates or 
+	PxVehicleUpdateSingleVehicleAndStoreTelemetryData but which cannot be safely concurrently applied. 
 
-	@see PxVehicleUpdates, PxVehiclePostUpdates, PxVehicleConcurrentUpdate
+	@see PxVehicleUpdates, PxVehicleUpdateSingleVehicleAndStoreTelemetryData, PxVehiclePostUpdates, PxVehicleConcurrentUpdate
 	*/
 	struct PxVehicleWheelConcurrentUpdateData
 	{
@@ -264,10 +266,10 @@ namespace physx
 	};
 
 	/**
-	\brief Structure containing data that is computed for a vehicle and its wheels during concurrent calls to PxVehicleUpdates
-	but which cannot be safely concurrently applied. 
+	\brief Structure containing data that is computed for a vehicle and its wheels during concurrent calls to PxVehicleUpdates or
+	PxVehicleUpdateSingleVehicleAndStoreTelemetryData but which cannot be safely concurrently applied. 
 
-	@see PxVehicleUpdates, PxVehiclePostUpdates, PxVehicleWheelConcurrentUpdateData
+	@see PxVehicleUpdates, PxVehicleUpdateSingleVehicleAndStoreTelemetryData, PxVehiclePostUpdates, PxVehicleWheelConcurrentUpdateData
 	*/
 
 	struct PxVehicleConcurrentUpdateData
@@ -374,6 +376,9 @@ namespace physx
 
 	\param[in] sweepRadiusScale scales the geometry of the wheel used in the sweep.  Values < 1 result in a larger swept wheel, while values > 1 result in a smaller swept wheel.
 
+	\param[in] sweepInflation	Inflation parameter for sweeps. This is the inflation parameter from PxScene::sweep(). It inflates the shape and makes it rounder,
+	which gives smoother and more reliable normals.
+
 	\note If vehiclesToSweep is NULL then sweeps are performed for all vehicles in the vehicles array.
 
 	\note If vehiclesToSweep[i] is false then the vehicle stored in vehicles[i] will automatically use the most recent sweep or raycast hit planes 
@@ -401,7 +406,7 @@ namespace physx
 
 	@see PxVehicleDrive4W::setToRestState, PxVehicleDriveNW::setToRestState, PxVehicleDriveTank::setToRestState, PxVehicleNoDrive::setToRestState
 
-	@see PxBatchQuery::sweep
+	@see PxBatchQuery::sweep PxScene::sweep()
 
 	@see PxVehicleSetSweepHitRejectionAngles
 	*/
@@ -410,7 +415,7 @@ namespace physx
 		 const PxU32 nbVehicles, PxVehicleWheels** vehicles, 
 		 const PxU32 nbSceneQueryResults, PxSweepQueryResult* sceneQueryResults,  const PxU16 nbHitsPerQuery, 
 		 const bool* vehiclesToSweep = NULL,
-		 const PxF32 sweepWidthScale = 1.0f, const PxF32 sweepRadiusScale = 1.0f);
+		 const PxF32 sweepWidthScale = 1.0f, const PxF32 sweepRadiusScale = 1.0f, const PxF32 sweepInflation = 0.0f);
 
 	/**
 	\brief A function called from PxContactModifyCallback::onContactModify.  The function determines if rigid body contact points
@@ -470,16 +475,16 @@ namespace physx
 	\param[out] vehicleWheelQueryResults is an array of length nbVehicles storing the wheel query results of each corresponding vehicle and wheel in the 
 	vehicles array.  A NULL pointer is permitted.  
 
-	\param[out] vehicleConcurrentUpdates is an array of length nbVehicles.  It is only necessary to specify vehicleConcurrentUpdates if PxVehicleUpdates is 
-	called concurrently.  The element vehicleWheelQueryResults[i] of the array stores data that is computed for vehicle[i] during PxVehicleUpdates but which 
-	cannot be safely written when concurrently called.  The data computed and stored in vehicleConcurrentUpdates must be passed to PxVehiclePostUpdates, where 
-	it is applied to all relevant actors in sequence.  A NULL pointer is permitted.  
+	\param[out] vehicleConcurrentUpdates is an array of length nbVehicles. It is only necessary to specify vehicleConcurrentUpdates if PxVehicleUpdates is 
+	called concurrently (also concurrently with PxVehicleUpdateSingleVehicleAndStoreTelemetryData). The element vehicleConcurrentUpdates[i] of the array 
+	stores data that is computed for vehicle[i] during PxVehicleUpdates but which cannot be safely written when concurrently called. The data computed and 
+	stored in vehicleConcurrentUpdates must be passed to PxVehiclePostUpdates, where it is applied to all relevant actors in sequence. A NULL pointer is permitted.
 	
 	\note The vehicleWheelQueryResults buffer must persist until the end of PxVehicleUpdates.
 	
 	\note The vehicleWheelQueryResults buffer is left unmodified for vehicles with sleeping rigid bodies whose control inputs indicate they should remain inert.
 
-	\note If PxVehicleUpdates is called concurrently then vehicleConcurrentUpdates must be specified.  Do not specify vehicleConcurrentUpdates is PxVehicleUpdates
+	\note If PxVehicleUpdates is called concurrently then vehicleConcurrentUpdates must be specified.  Do not specify vehicleConcurrentUpdates if PxVehicleUpdates
 	is not called concurrently.
 
 	\note The vehicleConcurrentUpdates buffer must persist until the end of PxVehiclePostUpdate.
@@ -488,8 +493,8 @@ namespace physx
 	with a PxShape (PxVehicleWheelsSimData::setWheelShapeMapping); the differential of the vehicle must be configured so that no drive torque 
 	is delivered to a disabled wheel; and the wheel must have zero rotation speed (PxVehicleWheelsDynData::setWheelRotationSpeed)
 
-	\note PxVehicleUpdates may be called concurrently provided all concurrent calls to PxVehicleUpdates involve only vehicles in the scene specified by PxVehicleUpdateSetScene.  
-	PxVehicleUpdates must never run concurrently with PxVehicleUpdateSingleVehicleAndStoreTelemetryData.
+	\note Concurrent calls to PxVehicleUpdates and PxVehicleUpdateSingleVehicleAndStoreTelemetryData are permitted if the parameter
+	vehicleConcurrentUpdates is used.
 
 	@see PxVehicleSetUpdateMode, PxVehicleWheelsSimData::disableWheel, PxVehicleWheelsSimData::setWheelShapeMapping, PxVehicleWheelsDynData::setWheelRotationSpeed,
 	PxVehiclePostUpdates
@@ -501,16 +506,18 @@ namespace physx
 
 
 	/**
-	\brief Apply actor changes that were computed in concurrent calls to PxVehicleUpdates but which could not be safely applied due to the concurrency.
+	\brief Apply actor changes that were computed in concurrent calls to PxVehicleUpdates or PxVehicleUpdateSingleVehicleAndStoreTelemetryData but 
+	which could not be safely applied due to the concurrency.
 
 	\param[in] vehicleConcurrentUpdates is an array of length nbVehicles where vehicleConcurrentUpdates[i] contains data describing actor changes that 
-	were computed for vehicles[i] during concurrent calls to PxVehicleUpdates.
+	were computed for vehicles[i] during concurrent calls to PxVehicleUpdates or PxVehicleUpdateSingleVehicleAndStoreTelemetryData.
 
 	\param[in] nbVehicles is the number of vehicles pointers in the vehicles array
 
-	\param[in,out] vehicles is an array of length nbVehicles containing all vehicles that were partially updated in concurrent calls to PxVehicleUpdates.
+	\param[in,out] vehicles is an array of length nbVehicles containing all vehicles that were partially updated in concurrent calls to PxVehicleUpdates or
+	PxVehicleUpdateSingleVehicleAndStoreTelemetryData.
 
-	@see PxVehicleUpdates
+	@see PxVehicleUpdates, PxVehicleUpdateSingleVehicleAndStoreTelemetryData
 	*/
 	void PxVehiclePostUpdates(
 		const PxVehicleConcurrentUpdateData* vehicleConcurrentUpdates, const PxU32 nbVehicles, PxVehicleWheels** vehicles);
@@ -556,19 +563,27 @@ namespace physx
 
 	\param[out] telemetryData is the data structure used to record telemetry data during the update for later query or visualization
 
-	\note The vehicleWheelQueryResults buffer must persist until the end of PxVehicleUpdates
+	\param[out] vehicleConcurrentUpdates is an array of length 1. It is only necessary to specify vehicleConcurrentUpdates if
+	PxVehicleUpdateSingleVehicleAndStoreTelemetryData is called concurrently (also concurrently with PxVehicleUpdates). The 
+	PxVehicleConcurrentUpdateData struct stores data that cannot be safely written when concurrently called. The data computed and 
+	stored in vehicleConcurrentUpdates must be passed to PxVehiclePostUpdates, where it is applied to the vehicle actor. A NULL 
+	pointer is permitted.
+
+	\note The vehicleWheelQueryResults buffer must persist until the end of PxVehicleUpdateSingleVehicleAndStoreTelemetryData
 
 	\note The vehicleWheelQueryResults buffer is left unmodified for vehicles with sleeping rigid bodies whose control inputs indicate they should remain inert.
 
-	\note PxVehicleUpdateSingleVehicleAndStoreTelemetryData is not thread-safe.  As a consequence, it must run sequentially and never concurrently with PxVehicleUpdates
+	\note Concurrent calls to PxVehicleUpdateSingleVehicleAndStoreTelemetryData and PxVehicleUpdates are permitted if the parameter
+	vehicleConcurrentUpdates is used.
 
-	@see PxVehicleSetUpdateMode, PxVehicleTelemetryData
+	@see PxVehiclePostUpdates, PxVehicleSetUpdateMode, PxVehicleTelemetryData
 	*/
 	void PxVehicleUpdateSingleVehicleAndStoreTelemetryData
 		(const PxReal timestep, const PxVec3& gravity, 
 		 const PxVehicleDrivableSurfaceToTireFrictionPairs& vehicleDrivableSurfaceToTireFrictionPairs, 
 		 PxVehicleWheels* focusVehicle, PxVehicleWheelQueryResult* vehicleWheelQueryResults, 
-		 PxVehicleTelemetryData& telemetryData);
+		 PxVehicleTelemetryData& telemetryData,
+		 PxVehicleConcurrentUpdateData* vehicleConcurrentUpdates = NULL);
 #endif
 
 #if !PX_DOXYGEN

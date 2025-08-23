@@ -11,7 +11,7 @@
 //    contributors may be used to endorse or promote products derived
 //    from this software without specific prior written permission.
 //
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ''AS IS'' AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 // IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
 // PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -23,7 +23,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-// Copyright (c) 2008-2019 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2021 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.
 
@@ -267,10 +267,10 @@ struct PxArticulationJointType
 {
 	enum Enum
 	{
-		ePRISMATIC = 0,
-		eREVOLUTE = 1,
-		eSPHERICAL = 2,
-		eFIX = 3,
+		eFIX = 0,
+		ePRISMATIC = 1,
+		eREVOLUTE = 2,
+		eSPHERICAL = 3,
 		eUNDEFINED = 4
 	};
 };
@@ -279,7 +279,8 @@ struct PxArticulationFlag
 {
 	enum Enum
 	{
-		eFIX_BASE = (1 << 0)
+		eFIX_BASE = (1 << 0),
+		eDRIVE_LIMITS_ARE_FORCES = (1<<1)
 	};
 };
 
@@ -291,7 +292,10 @@ struct PxArticulationDriveType
 	enum Enum
 	{
 		eFORCE = 0,
-		eACCELERATION = 1
+		eACCELERATION = 1,
+		eTARGET = 2,
+		eVELOCITY = 3,
+		eNONE = 4
 	};
 };
 

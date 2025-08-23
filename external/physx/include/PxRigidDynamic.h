@@ -11,7 +11,7 @@
 //    contributors may be used to endorse or promote products derived
 //    from this software without specific prior written permission.
 //
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ''AS IS'' AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 // IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
 // PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
@@ -23,7 +23,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-// Copyright (c) 2008-2019 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2021 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -60,8 +60,8 @@ struct PxRigidDynamicLockFlag
 	};
 };
 
-typedef PxFlags<PxRigidDynamicLockFlag::Enum, PxU16> PxRigidDynamicLockFlags;
-PX_FLAGS_OPERATORS(PxRigidDynamicLockFlag::Enum, PxU16)
+typedef PxFlags<PxRigidDynamicLockFlag::Enum, PxU8> PxRigidDynamicLockFlags;
+PX_FLAGS_OPERATORS(PxRigidDynamicLockFlag::Enum, PxU8)
 
 /**
 \brief PxRigidDynamic represents a dynamic rigid simulation object in the physics SDK.
@@ -325,7 +325,7 @@ public:
 	<b>Default:</b> 4 position iterations, 1 velocity iteration
 
 	\param[in] minPositionIters Number of position iterations the solver should perform for this body. <b>Range:</b> [1,255]
-	\param[in] minVelocityIters Number of velocity iterations the solver should perform for this body. <b>Range:</b> [1,255]
+	\param[in] minVelocityIters Number of velocity iterations the solver should perform for this body. <b>Range:</b> [0,255]
 
 	@see getSolverIterationCounts()
 	*/
