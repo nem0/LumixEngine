@@ -193,6 +193,9 @@ struct LuauAnalysis :Luau::FileResolver {
 	Array<OpenEditor> m_open_editors;
 	Luau::Frontend m_luau_frontend;
 	Luau::NullConfigResolver m_luau_config_resolver;
+	Action m_go_to_action{ "Luau", "Go To", "Go to", "luau_go_to", "" };
+	Action m_autocomplete_action{"Luau", "Autocomplete", "Autocomplete", "luau_autocomplete", "" };
+
 };
 #else
 	struct LuauAnalysis { 
@@ -506,10 +509,10 @@ struct EditorWindow : AssetEditorWindow {
 			}
 			#ifdef LUMIX_LUAU_ANALYSIS
 				if (m_code_editor->canHandleInput()) {
-					if (ImGui::IsKeyPressed(ImGuiKey_Space, false) && ImGui::GetIO().KeyCtrl && m_code_editor->getNumCursors() == 1) {
+					if (m_app.checkShortcut(m_analysis.m_autocomplete_action) && m_code_editor->getNumCursors() == 1) {
 						m_autocomplete_list.clear();
 						StringView prefix = m_code_editor->getPrefix();
-						if (equalStrings(prefix, ".") || equalStrings(prefix, ":")) prefix = {};
+						if (endsWith(prefix, ".") || endsWith(prefix, ":")) prefix = {};
 						m_analysis.autocomplete(m_path.c_str(), m_code_editor->getCursorLine(), m_code_editor->getCursorColumn(), [&](const char* v){
 							if (!startsWith(v, prefix)) return;
 							String tmp(v, m_app.getAllocator());
@@ -535,14 +538,14 @@ struct EditorWindow : AssetEditorWindow {
 							}
 						}
 					}
-					if (ImGui::IsKeyDown(ImGuiKey_F11)) {
+					if (m_app.checkShortcut(m_analysis.m_go_to_action)) {
 						std::optional<LuauAnalysis::Range> range = m_analysis.goTo(m_path.c_str(), m_code_editor->getCursorLine(), m_code_editor->getCursorColumn());
 						if (range.has_value()) {
 							m_code_editor->setSelection(range->from.line, range->from.col, range->to.line, range->to.col, true);
 						}
 					}
 				}
-				if (ImGui::BeginPopup("autocomplete")) {
+				if (ImGui::BeginPopup("autocomplete", ImGuiWindowFlags_NoNav)) {
 					u32 sel_idx = m_autocomplete_selection_idx;
 					if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) m_autocomplete_selection_idx += m_autocomplete_list.size() - 1;
 					if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) ++m_autocomplete_selection_idx;
