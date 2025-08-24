@@ -76,8 +76,19 @@ struct LuauAnalysis :Luau::FileResolver {
 		
 		if (m_app.getEngine().getFileSystem().getContentSync(Path("scripts/lumix.d.lua"), def_blob)) {
 			std::string_view def_src((const char*)def_blob.data(), def_blob.size());
-			m_luau_frontend.loadDefinitionFile(m_luau_frontend.globals, m_luau_frontend.globals.globalScope, def_src, "@lumix", false, false);
+			report(m_luau_frontend.loadDefinitionFile(m_luau_frontend.globals, m_luau_frontend.globals.globalScope, def_src, "@lumix", false, false));
 			m_luau_frontend.loadDefinitionFile(m_luau_frontend.globalsForAutocomplete, m_luau_frontend.globalsForAutocomplete.globalScope, def_src, "@lumix", false, true);
+		}
+	}
+
+	void report(const Luau::LoadDefinitionFileResult& result) {
+		for (const Luau::ParseError& e : result.parseResult.errors) {
+			const Luau::Location& loc = e.getLocation();
+			logError("scripts/lumix.d.lua:", loc.begin.line, ":", loc.begin.column, ": ", e.getMessage().c_str());
+		}
+		for (const Luau::ParseError& e : result.sourceModule.parseErrors) {
+			const Luau::Location& loc = e.getLocation();
+			logError("scripts/lumix.d.lua:", loc.begin.line, ":", loc.begin.column, ": ", e.getMessage().c_str());
 		}
 	}
 

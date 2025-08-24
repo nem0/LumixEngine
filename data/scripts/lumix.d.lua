@@ -76,9 +76,9 @@ declare class World
 	setActivePartition : (World, number) -> ()
 	createPartition : (World, string) -> number
 	load : (World, string, any) -> ()
-	getModule : (string) -> any,
-	createEntity : () -> Entity,
-	createEntityEx : (any) -> Entity,
+	getModule : (string) -> any
+	createEntity : () -> Entity
+	createEntityEx : (any) -> Entity
 	findEntityByName : (string) -> Entity?
 	core : core_module
 	lua_script : lua_script_module
