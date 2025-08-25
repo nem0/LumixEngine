@@ -1659,7 +1659,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 
-	void render() override {
+	void render() {
 		auto* render_module = static_cast<RenderModule*>(m_world.getModule("renderer"));
 		if (!render_module) return;
 

@@ -2060,6 +2060,7 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 	static bool hasMaterialOverride(const ModelInstance& m) {
+		if (!m.model) return false;
 		if (!m.model->isReady()) return m.mesh_materials.size() > 0;
 		return m.model->getMeshMaterials().begin() != m.mesh_materials.begin();
 	}
