@@ -344,7 +344,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 
 		ImGuiEx::Label(prop.name);
 		ImGui::PushID(prop.name);
-		if (ImGui::Checkbox("##v", &value))
+		if (ImGui::Checkbox("##v", &value) && !prop.isReadonly())
 		{
 			m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, value);
 		}
