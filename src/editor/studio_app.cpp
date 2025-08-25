@@ -2716,7 +2716,7 @@ struct StudioAppImpl final : StudioApp {
 					if (m_command_palette_search_settings) {
 						m_settings.commandPaletteUI(m_all_actions_filter);
 					}
-					m_all_actions_selected = m_all_actions_selected > 0 ? m_all_actions_selected % idx : 0;
+					if (idx != 0) m_all_actions_selected = m_all_actions_selected > 0 ? m_all_actions_selected % idx : 0;
 				}
 				ImGui::PopStyleColor();
 				ImGui::EndChild();
