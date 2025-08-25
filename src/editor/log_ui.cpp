@@ -171,23 +171,6 @@ void LogUI::onGUI()
 	}
 	if (!m_is_open) return;
 	if (ImGui::Begin(ICON_FA_COMMENT_ALT "Log##log", &m_is_open)) {
-		if (ImGuiEx::IconButton(ICON_FA_COG, "Settings")) ImGui::OpenPopup("Settings");
-		if (ImGui::BeginPopup("Settings")) {
-			char label[64];
-			fillLabel(Span(label), "Info ", m_new_message_count[0]);
-			if (ImGui::Checkbox(label, &m_show_info)) m_new_message_count[0] = 0;
-
-			fillLabel(Span(label), "Warnings ", m_new_message_count[1]);
-			if (ImGui::Checkbox(label, &m_show_warnings)) m_new_message_count[1] = 0;
-
-			fillLabel(Span(label), "Errors ", m_new_message_count[2]);
-			if (ImGui::Checkbox(label, &m_show_errors)) m_new_message_count[2] = 0;
-
-			ImGui::Checkbox("Autoscroll", &m_autoscroll);
-			ImGui::EndPopup();
-		}
-
-		ImGui::SameLine();
 		m_filter.gui("Filter", -1, ImGui::IsWindowAppearing(), nullptr, false);
 		int len = 0;
 
@@ -199,10 +182,13 @@ void LogUI::onGUI()
 			ImGui::PushFont(m_app.getMonospaceFont());
 			for (int i = 0; i < m_messages.size(); ++i)
 			{
-				if ((level_filter & (1 << (int)m_messages[i].level)) == 0) continue;
-				const char* msg = m_messages[i].text.c_str();
-				if (m_filter.pass(msg)) {
-					ImGui::TextUnformatted(msg);
+				Message& msg = m_messages[i];
+				if ((level_filter & (1 << (int)msg.level)) == 0) continue;
+				const char* msg_str = msg.text.c_str();
+				if (m_filter.pass(msg_str)) {
+					if (msg.level == LogLevel::ERROR) ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0xff, 0, 0, 0xff));
+					ImGui::TextUnformatted(msg_str);
+					if (msg.level == LogLevel::ERROR) ImGui::PopStyleColor();
 				}
 			}
 			if (m_scroll_to_bottom) {

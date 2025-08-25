@@ -1361,7 +1361,7 @@ namespace ImGuiEx {
 		g.Style.Colors[ImGuiCol_Button] = g.Style.Colors[ImGuiCol_FrameBg];
 		float backup_padding = g.Style.FramePadding.x;
 		g.Style.FramePadding.x = 2;
-		if (Button(ICON_FA_BRUSH)) {
+		if (Button(ICON_FA_ERASER)) {
 			buf[0] = '\0';
 			changed = true;
 		}

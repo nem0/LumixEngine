@@ -1847,41 +1847,6 @@ struct PipelineImpl final : Pipeline {
 
 	RenderModule* getModule() const override { return m_module; }
 
-	static gpu::TextureFormat getFormat(const char* name)
-	{
-		static const struct
-		{
-			const char* name;
-			gpu::TextureFormat value;
-		} FORMATS[] = {
-			{"depth32", gpu::TextureFormat::D32},
-			{"depth24stencil8", gpu::TextureFormat::D24S8},
-			{"rg8", gpu::TextureFormat::RG8},
-			{"rgba8", gpu::TextureFormat::RGBA8},
-			{"srgba", gpu::TextureFormat::SRGBA},
-			{"srgb", gpu::TextureFormat::SRGB},
-			{"rgba16", gpu::TextureFormat::RGBA16},
-			{"rgba16f", gpu::TextureFormat::RGBA16F},
-			{"rgba32f", gpu::TextureFormat::RGBA32F},
-			{"r16f", gpu::TextureFormat::R16F},
-			{"r16", gpu::TextureFormat::R16},
-			{"rg16", gpu::TextureFormat::RG16},
-			{"r8", gpu::TextureFormat::R8},
-			{"r32f", gpu::TextureFormat::R32F},
-			{"rg32f", gpu::TextureFormat::RG32F},
-			{"rg16f", gpu::TextureFormat::RG16F},
-			{"rgb32f", gpu::TextureFormat::RGB32F},
-			{"r11g11b10f", gpu::TextureFormat::R11G11B10F },
-		};
-
-		for (auto& i : FORMATS)
-		{
-			if (equalStrings(i.name, name)) return i.value;
-		}
-		logError("Unknown texture format ", name);
-		return gpu::TextureFormat::RGBA8;
-	}
-
 	void renderTerrains(const CameraParams& cp, gpu::StateFlags state, const char* define) {
 		const u32 define_mask = define ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
 		m_renderer.pushJob("terrain", [this, cp, state, define_mask](DrawStream& stream){

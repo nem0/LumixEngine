@@ -121,6 +121,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		m_app.getAssetCompiler().addPlugin(m_world_asset_plugin, Span(world_exts));
 		Settings& settings = m_app.getSettings();
 		settings.registerOption("asset_browser_open", &m_is_open);
+		settings.registerOption("asset_browser_subresources", &m_show_subresources, "Asset browser", "Show subresources");
 		settings.registerOption("asset_browser_thumbnails", &m_show_thumbnails, "Asset browser", "Show thumbnails");
 		settings.registerOption("asset_browser_thumbnail_size", &m_thumbnail_scale, "Asset browser", "Thumbnail size").setMin(0.01f);
 	}
@@ -732,11 +733,6 @@ struct AssetBrowserImpl : AssetBrowser {
 		const char* base_path = fs.getBasePath();
 		IPlugin* create_resource_plugin = nullptr;
 		auto common_popup = [&](){
-			if (ImGui::Checkbox("Subresources", &m_show_subresources)) {
-				ImGui::CloseCurrentPopup();
-				changeDir(m_dir, false);
-			}
-			
 			if (ImGui::MenuItem("View in explorer")) {
 				const Path dir_full_path(base_path, "/", m_dir);
 				os::openExplorer(dir_full_path);

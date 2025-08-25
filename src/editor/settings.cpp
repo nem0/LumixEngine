@@ -53,7 +53,7 @@ static bool shortcutInput(char* button_label, Action& action, bool edit, StudioA
 			}
 			if (num_collisions > 0) {
 				alignGUICenter([&](){ 
-					ImGui::Text("This shortcut is already used by %s and %d other(s)", first_collision->label_long.data, num_collisions - 1);
+					ImGui::Text("This shortcut is already used by %s > %s and %d other(s)", first_collision->group.data, first_collision->label_long.data, num_collisions - 1);
 				});
 			}
 		}
@@ -571,6 +571,7 @@ void Settings::load() {
 		}
 		file.close();
 	}
+	m_dirty = false;
 }
 
 static void saveShortcuts(Settings& settings, OutputMemoryStream& blob) {
@@ -631,6 +632,7 @@ void Settings::save() {
 	}
 
 	m_last_save_time = os::Timer::getRawTimestamp();
+	m_dirty = false;
 }
 
 static const char* GetTreeLinesFlagsName(ImGuiTreeNodeFlags flags)
@@ -905,6 +907,7 @@ static void shortcutsGUI(const TextFilter& filter, Settings& settings) {
 				ImGui::TableNextColumn();
 				if (shortcutInput(button_label, *a, a == settings.m_edit_action, settings.m_app)) {
 					settings.m_edit_action = a;
+					settings.m_dirty = true;
 				}
 				ImGui::PopID();
 			}
@@ -933,12 +936,15 @@ static void shortcutsGUI(const TextFilter& filter, Settings& settings) {
 }
 
 // copy-pasted from imgui + minor changes
-static void styleGUI(TextFilter& filter) {
+[[nodiscard]] static bool styleGUI(const TextFilter& filter) {
 	ImGuiStyle& style = ImGui::GetStyle();
+	bool changed = false;
 
 	if (!filter.isActive()) {
 		ImGuiEx::Label("Themes");
-		styleSelectorGUI();
+		if (styleSelectorGUI()) {
+			changed = true;
+		}
 	}
 
 	if (!filter.isActive()) ImGui::SeparatorText("Colors");
@@ -960,7 +966,9 @@ static void styleGUI(TextFilter& filter) {
 		}
 		
 		ImGui::PushID(i);
-		ImGui::ColorEdit4("##color", (float*)&style.Colors[i], ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreviewHalf);
+		if (ImGui::ColorEdit4("##color", (float*)&style.Colors[i], ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreviewHalf)) {
+			changed = true;
+		}
 		ImGui::PopID();
 	}
 
@@ -984,16 +992,16 @@ static void styleGUI(TextFilter& filter) {
 	};
 
 	#define dragFloat(label, ...) \
-		if (labelUI(label)) ImGui::DragFloat("##" label, __VA_ARGS__); 
+		if (labelUI(label) && ImGui::DragFloat("##" label, __VA_ARGS__)) changed = true; 
 
 	#define combo(label, ...) \
-		if (labelUI(label)) ImGui::Combo("##" label, __VA_ARGS__);
+		if (labelUI(label) && ImGui::Combo("##" label, __VA_ARGS__)) changed = true;
 
 	#define sliderFloat2(label, ...) \
-		if (labelUI(label)) ImGui::SliderFloat2("##" label, __VA_ARGS__);
+		if (labelUI(label) && ImGui::SliderFloat2("##" label, __VA_ARGS__)) changed = true;
 
 	#define sliderFloat(label, ...) \
-		if (labelUI(label)) ImGui::SliderFloat("##" label, __VA_ARGS__);
+		if (labelUI(label) && ImGui::SliderFloat("##" label, __VA_ARGS__)) changed = true;
 
 	if (!filter.isActive()) ImGui::SeparatorText("Main");
 	sliderFloat2("Window Padding", (float*)&style.WindowPadding, 0.0f, 20.0f, "%.0f");
@@ -1030,7 +1038,9 @@ static void styleGUI(TextFilter& filter) {
 	if (!filter.isActive()) ImGui::SeparatorText("Tables");
 	sliderFloat2("Cell Padding", (float*)&style.CellPadding, 0.0f, 20.0f, "%.0f");
 	if (labelUI("Table Angled Headers Angle")) {
-		ImGui::SliderAngle("##Table Angled Headers Angle", &style.TableAngledHeadersAngle, -50.0f, +50.0f);
+		if (ImGui::SliderAngle("##Table Angled Headers Angle", &style.TableAngledHeadersAngle, -50.0f, +50.0f)) {
+			changed = true;
+		}
 	}
 	sliderFloat2("Table Angled Headers Text Align", (float*)&style.TableAngledHeadersTextAlign, 0.0f, 1.0f, "%.2f");
 
@@ -1041,8 +1051,10 @@ static void styleGUI(TextFilter& filter) {
 		{
 			const ImGuiTreeNodeFlags options[] = { ImGuiTreeNodeFlags_DrawLinesNone, ImGuiTreeNodeFlags_DrawLinesFull, ImGuiTreeNodeFlags_DrawLinesToNodes };
 			for (ImGuiTreeNodeFlags option : options)
-				if (ImGui::Selectable(GetTreeLinesFlagsName(option), style.TreeLinesFlags == option))
+				if (ImGui::Selectable(GetTreeLinesFlagsName(option), style.TreeLinesFlags == option)) {
 					style.TreeLinesFlags = option;
+					changed = true;
+				}
 			ImGui::EndCombo();
 		}
 	}
@@ -1054,13 +1066,17 @@ static void styleGUI(TextFilter& filter) {
 	sliderFloat("Window Border Hover Padding", &style.WindowBorderHoverPadding, 1.0f, 20.0f, "%.0f");
 	int window_menu_button_position = style.WindowMenuButtonPosition + 1;
 	if (labelUI("Window Menu Button Position")) {
-		if (ImGui::Combo("##WindowMenuButtonPosition", (int*)&window_menu_button_position, "None\0Left\0Right\0"))
+		if (ImGui::Combo("##WindowMenuButtonPosition", (int*)&window_menu_button_position, "None\0Left\0Right\0")) {
 			style.WindowMenuButtonPosition = (ImGuiDir)(window_menu_button_position - 1);
+			changed = true;
+		}
 	}
 
 	if (!filter.isActive()) ImGui::SeparatorText("Widgets");
 	if (labelUI("Color Button Position")) {
-		ImGui::Combo("##ColorButtonPosition", (int*)&style.ColorButtonPosition, "Left\0Right\0");
+		if (ImGui::Combo("##ColorButtonPosition", (int*)&style.ColorButtonPosition, "Left\0Right\0")) {
+			changed = true;
+		}
 	}
 	sliderFloat2("Button Text Align", (float*)&style.ButtonTextAlign, 0.0f, 1.0f, "%.2f");
 	sliderFloat2("Selectable Text Align", (float*)&style.SelectableTextAlign, 0.0f, 1.0f, "%.2f");
@@ -1093,6 +1109,7 @@ static void styleGUI(TextFilter& filter) {
 	#undef dragFloat
 	#undef sliderFloat
 	#undef sliderFloat2
+	return changed;
 }
 
 static void generalGUI(Settings& settings) {
@@ -1130,10 +1147,81 @@ static i32 clampInt(i32 value, float min, float max) {
 	return (i32)clamp((float)value, min, max);
 }
 
+void Settings::commandPaletteUI(const TextFilter& filter) {
+	if (ImGui::BeginTable("settings_table", 2, ImGuiTableFlags_RowBg)) {
+		shortcutsGUI(filter, *this);
+		if (styleGUI(filter)) {
+			m_dirty = true;
+		}
+		iterVars(filter, 0);
+		ImGui::EndTable();
+	}
+}
+
+void Settings::iterVars(const TextFilter& filter, u32 selected_tab) {
+	for (auto iter = m_variables.begin(), end = m_variables.end(); iter != end; ++iter) {
+		Variable& var = iter.value();
+		if (var.category == -1) continue;
+		const char* cat_name = m_categories[var.category].name.c_str();
+		if (!filter.isActive()) { if(var.category != selected_tab - 2) continue; }
+		else if (!filter.pass(var.label) && !filter.pass(cat_name)) continue;
+		
+		ImGui::TableNextRow();
+		ImGui::TableNextColumn();
+		if (filter.isActive()) {
+			ImGui::TextUnformatted(cat_name);
+			ImGui::SameLine();
+			ImGui::TextUnformatted(" > ");
+			ImGui::SameLine();
+		}
+		ImGui::TextUnformatted(var.label);
+		ImGui::TableNextColumn();
+		ImGui::PushID(&var);
+		auto CB = [&](bool changed) {
+			if (!changed) return changed;
+			if (var.set_callback.isValid()) var.set_callback.invoke();
+			m_dirty = true;
+			return changed;
+		};
+		switch (var.type) {
+			case Variable::BOOL: CB(ImGui::Checkbox("##var", &var.bool_value)); break;
+			case Variable::BOOL_PTR: CB(ImGui::Checkbox("##var", var.bool_ptr)); break;
+			case Variable::I32: 
+				if (CB(ImGui::InputInt("##var", &var.i32_value))) {
+					var.i32_value = clampInt(var.i32_value, var.min, var.max);
+				}
+			break;
+			case Variable::I32_PTR: 
+				if (CB(ImGui::InputInt("##var", var.i32_ptr))) {
+					*var.i32_ptr = clampInt(*var.i32_ptr, var.min, var.max);
+				}
+				break;
+			case Variable::FLOAT: CB(ImGui::DragFloat("##var", &var.float_value, 1, var.min, var.max)); break;
+			case Variable::FLOAT_PTR: {
+				if (var.is_angle) {
+					float deg = radiansToDegrees(*var.float_ptr);
+					if (ImGui::DragFloat("##var", &deg, 1, var.min, var.max)) {
+						*var.float_ptr = degreesToRadians(deg);
+						if (var.set_callback.isValid()) var.set_callback.invoke();
+						m_dirty = true;
+					}
+				}
+				else {
+					CB(ImGui::DragFloat("##var", var.float_ptr, 1, var.min, var.max));
+				}
+				break;
+			}
+			case Variable::STRING_PTR: CB(inputString("##var", var.string_ptr)); break;
+			case Variable::STRING: CB(inputString("##var", &var.string_value)); break;
+		}
+		ImGui::PopID();
+	}			
+}
+
 void Settings::gui() {
 	if (m_app.checkShortcut(m_toggle_ui_action, true)) m_is_open = !m_is_open;
 	if (!m_is_open) return;
-	if (ImGui::Begin(ICON_FA_COG "Settings##settings", &m_is_open)) {
+	if (ImGui::Begin(ICON_FA_COG "Settings##settings", &m_is_open, m_dirty ? ImGuiWindowFlags_UnsavedDocument : 0)) {
 		static u32 selected = 0;
 		
 		static TextFilter filter;
@@ -1141,69 +1229,11 @@ void Settings::gui() {
 		filter.gui("Filter", -1, false, &m_focus_search, false);
 		ImGui::Separator();
 
-		auto iterVars = [this](){
-			for (auto iter = m_variables.begin(), end = m_variables.end(); iter != end; ++iter) {
-				Variable& var = iter.value();
-				if (var.category == -1) continue;
-				if (!filter.isActive()) { if(var.category != selected - 2) continue; }
-				else if (!filter.pass(var.label)) continue;
-				
-				ImGui::TableNextRow();
-				ImGui::TableNextColumn();
-				if (filter.isActive()) {
-					const char* cat_name = m_categories[var.category].name.c_str();
-					ImGui::TextUnformatted(cat_name);
-					ImGui::SameLine();
-					ImGui::TextUnformatted(" > ");
-					ImGui::SameLine();
-				}
-				ImGui::TextUnformatted(var.label);
-				ImGui::TableNextColumn();
-				ImGui::PushID(&var);
-				auto CB = [&](bool changed) {
-					if (!changed) return changed;
-					if (var.set_callback.isValid()) var.set_callback.invoke();
-					return changed;
-				};
-				switch (var.type) {
-					case Variable::BOOL: CB(ImGui::Checkbox("##var", &var.bool_value)); break;
-					case Variable::BOOL_PTR: CB(ImGui::Checkbox("##var", var.bool_ptr)); break;
-					case Variable::I32: 
-						if (CB(ImGui::InputInt("##var", &var.i32_value))) {
-							var.i32_value = clampInt(var.i32_value, var.min, var.max);
-						}
-					break;
-					case Variable::I32_PTR: 
-						if (CB(ImGui::InputInt("##var", var.i32_ptr))) {
-							*var.i32_ptr = clampInt(*var.i32_ptr, var.min, var.max);
-						}
-						break;
-					case Variable::FLOAT: CB(ImGui::DragFloat("##var", &var.float_value, 1, var.min, var.max)); break;
-					case Variable::FLOAT_PTR: {
-						if (var.is_angle) {
-							float deg = radiansToDegrees(*var.float_ptr);
-							if (ImGui::DragFloat("##var", &deg, 1, var.min, var.max)) {
-								*var.float_ptr = degreesToRadians(deg);
-								if (var.set_callback.isValid()) var.set_callback.invoke();
-							}
-						}
-						else {
-							CB(ImGui::DragFloat("##var", var.float_ptr, 1, var.min, var.max));
-						}
-						break;
-					}
-					case Variable::STRING_PTR: CB(inputString("##var", var.string_ptr)); break;
-					case Variable::STRING: CB(inputString("##var", &var.string_value)); break;
-				}
-				ImGui::PopID();
-			}			
-		};
-
 		if (filter.isActive()) {
 			if (ImGui::BeginTable("settings_table", 2, ImGuiTableFlags_RowBg)) {
 				shortcutsGUI(filter, *this);
-				styleGUI(filter);
-				iterVars();
+				if (styleGUI(filter)) m_dirty = true;
+				iterVars(filter, selected);
 				ImGui::EndTable();
 			}
 		}
@@ -1238,14 +1268,14 @@ void Settings::gui() {
 			ImGui::PopStyleColor();
 			ImGui::SameLine();
 
-			if (ImGui::BeginChild("right_page", ImVec2(0, 0), ImGuiChildFlags_AlwaysUseWindowPadding)) {
+			if (ImGui::BeginChild("right_pane", ImVec2(0, 0), ImGuiChildFlags_AlwaysUseWindowPadding)) {
 				if (selected == 0) shortcutsGUI(filter, *this);
 				else if (selected == 1) {
-					styleGUI(filter);
+					if (styleGUI(filter)) m_dirty = true;
 				}
 				else if (ImGui::BeginTable("settings_table", 2, ImGuiTableFlags_RowBg)) {
 					if (m_categories[selected - 2].name == "General") generalGUI(*this);
-					iterVars();
+					iterVars(filter, selected);
 					ImGui::EndTable();
 				}
 			}

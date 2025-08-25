@@ -51,6 +51,7 @@ GameView::GameView(StudioApp& app)
 {
 	m_app.getSettings().registerOption("game_view_open", &m_is_open);
 	m_app.getSettings().registerOption("game_view_focus_on_game_start", &m_focus_on_game_start, "Game view", "Focus on game start");
+	m_app.getSettings().registerOption("game_view_capture_mouse_on_game_start", &m_capture_mouse_on_game_start, "Game view", "Capture mouse on game start");
 }
 
 
@@ -240,6 +241,9 @@ void GameView::onGUI()
 	if (is_game_mode && !m_was_game_mode && m_focus_on_game_start) {
 		ImGui::SetNextWindowFocus();
 		m_is_open = true;
+		if (m_capture_mouse_on_game_start) {
+			captureMouse(true);
+		}
 	}
 	m_was_game_mode = is_game_mode;
 

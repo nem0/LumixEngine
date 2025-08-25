@@ -836,7 +836,10 @@ struct StudioAppImpl final : StudioApp {
 			plugin->update(time_delta);
 		}
 
-		if (m_settings.getTimeSinceLastSave() > 30.f) saveSettings();
+		const float since_last_settings_save = m_settings.getTimeSinceLastSave();
+		bool settings_dirty = m_settings.m_dirty;
+		settings_dirty = settings_dirty || ImGui::GetIO().WantSaveIniSettings;
+		if (since_last_settings_save > 30.f || (since_last_settings_save > 1.f && settings_dirty)) saveSettings();
 
 		guiEndFrame();
 
@@ -946,6 +949,8 @@ struct StudioAppImpl final : StudioApp {
 		};
 		init_data.plugins = Span(plugins, plugins + lengthOf(plugins) - 1);
 		m_engine = Engine::create(static_cast<Engine::InitArgs&&>(init_data), m_allocator);
+		
+		m_settings.registerOption("command_pallete_search_settings", &m_command_palette_search_settings, "General", "Command palette searches in settings");
 		m_settings.registerOption("welcome_shader", &m_welcome_screen_use_shader, "General", "Animated background in welcome screen");
 		m_settings.registerOption("report_crashes", &m_crash_reporting, "General", "Report crashes");
 		m_settings.registerOption("sleep_when_inactive", &m_sleep_when_inactive, "General", "Sleep when inactive");
@@ -1248,7 +1253,7 @@ struct StudioAppImpl final : StudioApp {
 			else if (checkShortcut(m_common_actions.del, true)) destroySelectedEntity();
 
 			m_asset_compiler->onGUI();
-			guiAllActions();
+			commandPaletteUI();
 			guiSaveAsDialog();
 			for (i32 i = m_gui_plugins.size() - 1; i >= 0; --i) {
 				GUIPlugin* win = m_gui_plugins[i];
@@ -2614,7 +2619,35 @@ struct StudioAppImpl final : StudioApp {
 		m_exit_code = exit_code;
 	}
 
-	void guiAllActions() {
+	u32 createComponentCommandPaletteUI(u32 start_idx, bool insert_enter) {
+		Span<const reflection::RegisteredComponent> cmps = reflection::getComponents();
+		u32 idx = start_idx;
+		for (const reflection::RegisteredComponent& cmp : cmps) {
+			if (!m_all_actions_filter.pass(cmp.cmp->label)) continue;
+
+			ImGui::PushID(&cmp);
+			defer { ImGui::PopID(); };
+
+			ImGui::TextUnformatted("Create"); 
+			ImGui::SameLine(150);
+			ImGui::Text("> ");
+			ImGui::SameLine();
+			bool is_selected = idx == m_all_actions_selected;
+			if (ImGui::Selectable(cmp.cmp->label, is_selected, ImGuiSelectableFlags_SpanAvailWidth) || (is_selected && insert_enter)) {
+				Span<const EntityRef> selected = m_editor->getSelectedEntities();
+				if (selected.size() > 0) {
+					m_editor->addComponent(selected, cmp.cmp->component_type);
+				}
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::Separator();
+			++idx;
+		}
+		return idx;
+	}
+
+	void commandPaletteUI() {
+		PROFILE_FUNCTION();
 		if (m_open_commands_palette) ImGui::OpenPopup("Commands palette");
 		
 		const ImGuiViewport* viewport = ImGui::GetMainViewport();
@@ -2622,7 +2655,6 @@ struct StudioAppImpl final : StudioApp {
 		size.x *= 0.4f;
 		size.y *= 0.8f;
 		ImVec2 pos = ImVec2(viewport->Pos.x + (viewport->Size.x - size.x) * 0.5f, viewport->Pos.y + (viewport->Size.y - size.y) * 0.5f);
-		if (pos.x < 300 && viewport->Size.x > 300) pos.x = 300;
 		ImGui::SetNextWindowPos(pos);
 		ImGui::SetNextWindowSize(size, ImGuiCond_Always);
 
@@ -2660,7 +2692,7 @@ struct StudioAppImpl final : StudioApp {
 						bool selected = idx == m_all_actions_selected;
 						if (moved && selected) ImGui::SetScrollHereY();
 						ImGui::Text("%s", act->group.data);
-						ImGui::SameLine(150); // Adjust the alignment value as needed
+						ImGui::SameLine(150);
 						ImGui::Text("> ");
 						ImGui::SameLine();
 						if (ImGui::Selectable(act->label_long, selected, ImGuiSelectableFlags_SpanAvailWidth) || (selected && insert_enter)) {
@@ -2678,6 +2710,10 @@ struct StudioAppImpl final : StudioApp {
 						}
 						ImGui::Separator();
 						++idx;
+					}
+					idx = createComponentCommandPaletteUI(idx, insert_enter);
+					if (m_command_palette_search_settings) {
+						m_settings.commandPaletteUI(m_all_actions_filter);
 					}
 					m_all_actions_selected = m_all_actions_selected > 0 ? m_all_actions_selected % idx : 0;
 				}
@@ -3144,6 +3180,7 @@ struct StudioAppImpl final : StudioApp {
 	bool m_sleep_when_inactive = true;
 	bool m_crash_reporting = true;
 	bool m_welcome_screen_use_shader = true;
+	bool m_command_palette_search_settings = true;
 	i32 m_font_size = 16;
 };
 

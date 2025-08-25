@@ -4,7 +4,6 @@
 #include "core/delegate.h"
 #include "core/hash_map.h"
 #include "core/math.h"
-#include "core/os.h"
 #include "core/stack_array.h"
 #include "core/string.h"
 #include "core/tag_allocator.h"
@@ -79,6 +78,7 @@ struct LUMIX_EDITOR_API Settings {
 	Settings(struct StudioApp& app);
 
 	void gui();
+	void commandPaletteUI(const struct TextFilter& filter);
 	void load();
 	void save();
 
@@ -112,9 +112,12 @@ struct LUMIX_EDITOR_API Settings {
 	MouseSensitivity m_mouse_sensitivity_y;
 	bool m_is_open = false;
 	u64 m_last_save_time = 0;
+	bool m_dirty = false;
 	Action* m_edit_action = nullptr;
 	Action m_toggle_ui_action{"Settings", "Settings", "Toggle UI", "settings_toggle_ui", "", Action::WINDOW};
 	Action m_focus_search{"Settings", "Focus search", "Focus shortcut search", "settings_focus_search", ""};
+
+	void iterVars(const TextFilter& filter, u32 selected_tab);
 };
 
 } // namespace Lumix

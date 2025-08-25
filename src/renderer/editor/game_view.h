@@ -54,6 +54,7 @@ private:
 	bool m_is_fullscreen;
 	bool m_was_game_mode = false;
 	bool m_focus_on_game_start = false;
+	bool m_capture_mouse_on_game_start = false;
 	os::CursorType m_cursor_type = os::CursorType::DEFAULT;
 	struct
 	{
