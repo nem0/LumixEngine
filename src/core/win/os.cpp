@@ -1280,6 +1280,123 @@ void copyToClipboard(const char* text) {
 	CloseClipboard();
 }
 
+struct Process {
+	IAllocator* allocator;
+	HANDLE handle;
+	HANDLE stdout_read;
+	HANDLE stdout_write;
+};
+
+Process* createProcess(IAllocator& allocator, StringView cmd, StringView working_dir) {
+	Process* p = LUMIX_NEW(allocator, Process);
+	p->allocator = &allocator;
+	
+	// Create pipe for stdout/err
+	SECURITY_ATTRIBUTES sa;
+	sa.nLength = sizeof(sa);
+	sa.lpSecurityDescriptor = nullptr;
+	sa.bInheritHandle = TRUE;
+	
+	if (!CreatePipe(&p->stdout_read, &p->stdout_write, &sa, 0)) {
+		LUMIX_DELETE(allocator, p);
+		return nullptr;
+	}
+	
+	// Ensure the read handle is not inherited
+	if (!SetHandleInformation(p->stdout_read, HANDLE_FLAG_INHERIT, 0)) {
+		CloseHandle(p->stdout_read);
+		CloseHandle(p->stdout_write);
+		LUMIX_DELETE(allocator, p);
+		return nullptr;
+	}
+	
+	STARTUPINFOW si = {};
+	si.cb = sizeof(si);
+	si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
+	si.hStdOutput = p->stdout_write;
+	si.hStdError = p->stdout_write;
+	si.wShowWindow = SW_HIDE;
+	
+	PROCESS_INFORMATION pi = {};
+	
+	ASSERT(cmd.size() < 1024); // TODO
+	WCharStr<1024> wcmd(cmd);
+	WCharStr<MAX_PATH> wdir(working_dir);
+	
+	BOOL success = CreateProcessW(
+		nullptr,
+		wcmd.data,
+		nullptr,
+		nullptr,
+		TRUE,
+		0,
+		nullptr,
+		working_dir.empty() ? nullptr : wdir.data,
+		&si,
+		&pi
+	);
+	
+	if (!success) {
+		CloseHandle(p->stdout_read);
+		CloseHandle(p->stdout_write);
+		LUMIX_DELETE(allocator, p);
+		return nullptr;
+	}
+	
+	// Close unnecessary handle
+	CloseHandle(pi.hThread);
+	
+	p->handle = pi.hProcess;
+	
+	return p;
+}
+
+i32 getReturnCode(Process& process) {
+	ASSERT(process.handle);
+	DWORD exit_code = STILL_ACTIVE;
+	if (!GetExitCodeProcess(process.handle, &exit_code)) {
+		ASSERT(false);
+		return -1;
+	}
+	ASSERT(exit_code != STILL_ACTIVE);
+	return (i32)exit_code;
+}
+
+bool isFinished(Process& process) {
+	if (!process.handle) return true;
+
+	DWORD exit_code = STILL_ACTIVE;
+	if (!GetExitCodeProcess(process.handle, &exit_code)) {
+		ASSERT(false);
+		return false;
+	}
+	return exit_code != STILL_ACTIVE;
+}
+
+void destroyProcess(Process& process) {
+	if (process.stdout_write) CloseHandle(process.stdout_write);
+	if (process.stdout_read) CloseHandle(process.stdout_read);
+	if (process.handle) CloseHandle(process.handle);
+	LUMIX_DELETE(*process.allocator, &process);
+}
+
+u32 readStdOutput(Process& process, Span<char> output) {
+	DWORD available = 0;
+	if (!PeekNamedPipe(process.stdout_read, nullptr, 0, nullptr, &available, nullptr) || available == 0) {
+		return 0;
+	}
+	
+	DWORD bytes_read = 0;
+	DWORD to_read = output.size();
+	to_read = available < to_read ? available : to_read;
+	if (ReadFile(process.stdout_read, output.m_begin, to_read, &bytes_read, nullptr)) {
+		return bytes_read;
+	}
+	
+	return 0;
+}
+
+
 
 ExecuteOpenResult shellExecuteOpen(StringView path, StringView args, StringView working_dir, bool show_console)
 {

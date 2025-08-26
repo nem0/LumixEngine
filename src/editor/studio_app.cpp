@@ -1443,6 +1443,7 @@ struct StudioAppImpl final : StudioApp {
 		m_asset_browser->onBasePathChanged();
 		m_engine->getResourceManager().reloadAll();
 		initDefaultWorld();
+		loadSettings();
 	}
 
 	#ifdef STATIC_PLUGINS
