@@ -2071,20 +2071,20 @@ struct RenderModuleImpl final : RenderModule {
 		if (has && num_existing >= size) return;
 		
 		m.dirty = true;
-		MeshMaterial* new_data = (MeshMaterial*)m_allocator.allocate(sizeof(MeshMaterial) * size, alignof(MeshMaterial));
+		MeshMaterial* new_data = (MeshMaterial*)m_allocator.allocate(sizeof(MeshMaterial) * maximum(size, num_existing), alignof(MeshMaterial));
 		if (has) {
 			memcpy(new_data, m.mesh_materials.begin(), sizeof(new_data[0]) * num_existing);
 			memset(&new_data[num_existing], 0, sizeof(new_data[0]) * (size - num_existing));
 			m_allocator.deallocate(m.mesh_materials.begin());
 		}
 		else {
-			memset(new_data, 0, sizeof(new_data[0]) * size);
+			memset(new_data, 0, sizeof(new_data[0]) * maximum(size, num_existing));
 			for (u32 i = 0; i < num_existing; ++i) {
 				new_data[i].material = m.mesh_materials[i].material;
 				new_data[i].material->incRefCount();
 			}
 		}
-		m.mesh_materials = Span(new_data, size);
+		m.mesh_materials = Span(new_data, maximum(size, num_existing));
 	}
 
 	void setModelInstanceMaterialOverride(EntityRef entity, u32 mesh_idx, const Path& path) override {
