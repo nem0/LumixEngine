@@ -235,6 +235,12 @@ struct StringView {
 	const char* value;
 	const char* end;
 
+	StringView(const char* v, const char* e)
+	{
+		value = v;
+		end = e;
+	}
+
 	bool operator ==(StringView rhs) const {
 		const size_t len = end - value;
 		if (len != (size_t)(rhs.end - rhs.value)) return false;
