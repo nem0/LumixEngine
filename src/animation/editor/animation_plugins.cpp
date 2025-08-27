@@ -142,7 +142,7 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 			m_viewer.m_world->createComponent(ANIMABLE_TYPE, *m_viewer.m_mesh);
 
 			auto* anim_module = static_cast<AnimationModule*>(m_viewer.m_world->getModule(ANIMABLE_TYPE));
-			anim_module->setAnimation(*m_viewer.m_mesh, path);
+			anim_module->setAnimableAnimation(*m_viewer.m_mesh, path);
 
 			Path parent_path(ResourcePath::getResource(path));
 			m_parent_meta.load(parent_path, m_app);
@@ -961,7 +961,7 @@ struct AnimablePropertyGridPlugin final : PropertyGrid::IPlugin {
 
 		const EntityRef entity = entities[0];
 		auto* module = (AnimationModule*)editor.getWorld()->getModule(cmp_type);
-		auto* animation = module->getAnimableAnimation(entity);
+		auto* animation = module->getAnimation(entity);
 		if (!animation) return;
 		if (!animation->isReady()) return;
 

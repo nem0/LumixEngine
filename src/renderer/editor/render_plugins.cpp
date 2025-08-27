@@ -2938,7 +2938,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			ComponentType ANIMABLE_TYPE = reflection::getComponentType("animable");
 			m_tile.world->createComponent(ANIMABLE_TYPE, mesh_entity);
 			AnimationModule* anim_module = (AnimationModule*)m_tile.world->getModule(ANIMABLE_TYPE);
-			anim_module->setAnimation(mesh_entity, animation->getPath());
+			anim_module->setAnimableAnimation(mesh_entity, animation->getPath());
 			if (anim_module) anim_module->updateAnimable(mesh_entity, animation->getLength().seconds() * 0.5f);
 		}
 

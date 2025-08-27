@@ -817,7 +817,7 @@ bool ModelImporter::writePrefab(const Path& src, const ModelMeta& meta) {
 	
 			if (with_physics) {
 				world.createComponent(RIGID_ACTOR_TYPE, e);
-				pmodule->setMeshGeomPath(e, Path(geom.name, ".phy:", src));
+				pmodule->setActorMesh(e, Path(geom.name, ".phy:", src));
 			}
 		}
 
@@ -836,7 +836,7 @@ bool ModelImporter::writePrefab(const Path& src, const ModelMeta& meta) {
 
 		ASSERT(with_physics);
 		world.createComponent(RIGID_ACTOR_TYPE, root);
-		pmodule->setMeshGeomPath(root, Path(".phy:", src));
+		pmodule->setActorMesh(root, Path(".phy:", src));
 	}
 
 	world.serialize(blob, WorldSerializeFlags::NONE);

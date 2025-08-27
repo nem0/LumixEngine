@@ -388,6 +388,11 @@ solution "LumixEngine"
 		linkoptions { "-g" }
 	end
 
+exe_project "meta"
+	kind "ConsoleApp"
+	defaultConfigurations()
+	files { "../src/meta/**.cpp", "../src/meta/**.h" }
+
 lib_project "core"
 	libType()
 	defaultConfigurations()

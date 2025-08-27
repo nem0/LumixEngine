@@ -8,9 +8,13 @@ namespace Lumix
 {
 
 namespace os { enum class CursorType : u32; }
+struct Path;
 
 template <typename T> struct DelegateList;
 
+//@ module GUIModuleImpl gui "GUI"
+
+// TODO reflection
 struct GUICanvas {
 	EntityRef entity;
 	bool is_3d = false;
@@ -56,6 +60,7 @@ struct GUIModule : IModule {
 	virtual EntityPtr getRectAt(const Vec2& pos) const = 0;
 	virtual bool isOver(const Vec2& pos, EntityRef e) = 0;
 
+	//@ component Rect gui_rect "Rect"
 	virtual void enableRect(EntityRef entity, bool enable) = 0;
 	virtual bool isRectEnabled(EntityRef entity) = 0;
 	virtual bool getRectClip(EntityRef entity) = 0;
@@ -79,34 +84,41 @@ struct GUIModule : IModule {
 	virtual void setRectBottomPoints(EntityRef entity, float value) = 0;
 	virtual float getRectBottomRelative(EntityRef entity) = 0;
 	virtual void setRectBottomRelative(EntityRef entity, float value) = 0;
+	//@ end
 
+	//@ component Button gui_button "Button"
 	virtual Vec4 getButtonHoveredColorRGBA(EntityRef entity) = 0;
 	virtual void setButtonHoveredColorRGBA(EntityRef entity, const Vec4& color) = 0;
+	//@ end
 	virtual os::CursorType getButtonHoveredCursor(EntityRef entity) = 0;
 	virtual void setButtonHoveredCursor(EntityRef entity, os::CursorType cursor) = 0;
 
+	//@ component Image gui_image "Image"
 	virtual void enableImage(EntityRef entity, bool enable) = 0;
 	virtual bool isImageEnabled(EntityRef entity) = 0;
 	virtual Vec4 getImageColorRGBA(EntityRef entity) = 0;
 	virtual void setImageColorRGBA(EntityRef entity, const Vec4& color) = 0;
-	virtual struct Path getImageSprite(EntityRef entity) = 0;
+	virtual Path getImageSprite(EntityRef entity) = 0;
 	virtual void setImageSprite(EntityRef entity, const Path& path) = 0;
+	//@ end
 
 	virtual GUICanvas& getCanvas(EntityRef entity) = 0;
 	virtual HashMap<EntityRef, GUICanvas>& getCanvases() = 0;
 
-	virtual void setText(EntityRef entity, const char* text) = 0;
-	virtual const char* getText(EntityRef entity) = 0;
-	virtual TextHAlign getTextHAlign(EntityRef entity) = 0;
-	virtual void setTextHAlign(EntityRef entity, TextHAlign align) = 0;
-	virtual TextVAlign getTextVAlign(EntityRef entity) = 0;
-	virtual void setTextVAlign(EntityRef entity, TextVAlign align) = 0;
+	//@ component Text gui_text "Text"
 	virtual void setTextFontSize(EntityRef entity, int value) = 0;
 	virtual int getTextFontSize(EntityRef entity) = 0;
 	virtual Vec4 getTextColorRGBA(EntityRef entity) = 0;
 	virtual void setTextColorRGBA(EntityRef entity, const Vec4& color) = 0;
 	virtual Path getTextFontPath(EntityRef entity) = 0;
 	virtual void setTextFontPath(EntityRef entity, const Path& path) = 0;
+	//@ end
+	virtual TextHAlign getTextHAlign(EntityRef entity) = 0;
+	virtual void setTextHAlign(EntityRef entity, TextHAlign align) = 0;
+	virtual TextVAlign getTextVAlign(EntityRef entity) = 0;
+	virtual void setTextVAlign(EntityRef entity, TextVAlign align) = 0;
+	virtual const char* getText(EntityRef entity) = 0;
+	virtual void setText(EntityRef entity, const char* text) = 0;
 
 	virtual void setRenderTarget(EntityRef entity, gpu::TextureHandle* texture_handle) = 0;
 

@@ -26,6 +26,7 @@ struct LuaScriptSystem : ISystem {
 	virtual void unloadLuaResource(LuaResourceHandle resource_idx) = 0;
 };
 
+//@ module LuaScriptModule lua_script "Lua"
 struct LuaScriptModule : IModule {
 	struct Property {
 		enum Type : int {
@@ -61,9 +62,16 @@ struct LuaScriptModule : IModule {
 		virtual void addEnvironment(int env) = 0;
 	};
 
+	//@ component Script lua_script "Lua script"
+	//@ array Script
+	virtual void enableScript(EntityRef entity, int scr_index, bool enable) = 0;
+	virtual bool isScriptEnabled(EntityRef entity, int scr_index) = 0;
 	virtual Path getScriptPath(EntityRef entity, int scr_index) = 0;	
 	virtual void setScriptPath(EntityRef entity, int scr_index, const Path& path) = 0;
+	//@ end
+	//@ end
 	virtual int getEnvironment(EntityRef entity, int scr_index) = 0;
+	
 	virtual IFunctionCall* beginFunctionCall(EntityRef entity, int scr_index, const char* function) = 0;
 	virtual IFunctionCall* beginFunctionCallInlineScript(EntityRef entity, const char* function) = 0;
 	virtual void endFunctionCall() = 0;
@@ -73,8 +81,6 @@ struct LuaScriptModule : IModule {
 	virtual void insertScript(EntityRef entity, int idx) = 0;
 	virtual int addScript(EntityRef entity, int scr_index) = 0;
 	virtual void removeScript(EntityRef entity, int scr_index) = 0;
-	virtual void enableScript(EntityRef entity, int scr_index, bool enable) = 0;
-	virtual bool isScriptEnabled(EntityRef entity, int scr_index) = 0;
 	virtual void moveScript(EntityRef entity, int scr_index, bool up) = 0;
 	virtual int getPropertyCount(EntityRef entity, int scr_index) = 0;
 	virtual const char* getPropertyName(EntityRef entity, int scr_index, int prop_index) = 0;

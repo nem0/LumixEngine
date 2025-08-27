@@ -2702,6 +2702,7 @@ struct StudioAppImpl final : StudioApp {
 						if (ImGui::Selectable(act->label_long, selected, ImGuiSelectableFlags_SpanAvailWidth) || (selected && insert_enter)) {
 							ImGui::CloseCurrentPopup();
 							act->request = true;
+							++idx;
 							break;
 						}
 						char buf[20];

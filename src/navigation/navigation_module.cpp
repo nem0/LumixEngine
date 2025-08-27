@@ -1078,7 +1078,7 @@ struct NavigationModuleImpl final : NavigationModule
 	}
 
 
-	void setActorActive(EntityRef entity, bool active) override
+	void setAgentActive(EntityRef entity, bool active) override
 	{
 		/*if (!m_crowd) return;
 
@@ -1673,7 +1673,7 @@ struct NavigationModuleImpl final : NavigationModule
 		return m_zones[entity].zone;
 	}
 
-	bool isZoneDetailed(EntityRef entity) override {
+	bool getZoneDetailed(EntityRef entity) override {
 		return m_zones[entity].zone.flags & NavmeshZone::DETAILED;
 	}
 
@@ -1682,7 +1682,7 @@ struct NavigationModuleImpl final : NavigationModule
 		else m_zones[entity].zone.flags &= ~NavmeshZone::DETAILED;
 	}
 
-	bool isZoneAutoload(EntityRef entity) override {
+	bool getZoneAutoload(EntityRef entity) override {
 		return m_zones[entity].zone.flags & NavmeshZone::AUTOLOAD;
 	}
 	
@@ -1731,11 +1731,11 @@ void NavigationModule::reflect() {
 			.var_prop<&NavigationModule::getZone, &NavmeshZone::cell_height>("Cell height")
 			.var_prop<&NavigationModule::getZone, &NavmeshZone::walkable_slope_angle>("Walkable slope angle")
 			.var_prop<&NavigationModule::getZone, &NavmeshZone::max_climb>("Max climb")
-			.prop<&NavigationModule::isZoneAutoload, &NavigationModule::setZoneAutoload>("Autoload")
-			.prop<&NavigationModule::isZoneDetailed, &NavigationModule::setZoneDetailed>("Detailed")
+			.prop<&NavigationModule::getZoneAutoload, &NavigationModule::setZoneAutoload>("Autoload")
+			.prop<&NavigationModule::getZoneDetailed, &NavigationModule::setZoneDetailed>("Detailed")
 		.LUMIX_CMP(Agent, "navmesh_agent", "Navigation / Agent")
 			.icon(ICON_FA_MAP_MARKED_ALT)
-			.LUMIX_FUNC_EX(NavigationModule::setActorActive, "setActive")
+			.LUMIX_FUNC_EX(NavigationModule::setAgentActive, "setActive")
 			.LUMIX_FUNC_EX(NavigationModule::navigate, "navigate")
 			.LUMIX_FUNC_EX(NavigationModule::cancelNavigation, "cancelNavigation")
 			.LUMIX_FUNC_EX(NavigationModule::debugDrawPath, "drawPath")

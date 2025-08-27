@@ -1351,8 +1351,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 	void destroyDistanceJoint(EntityRef entity) { destroyJointGeneric(entity, DISTANCE_JOINT_TYPE); }
 
 
-	void destroyRigidActor(EntityRef entity)
-	{
+	void destroyActor(EntityRef entity) {
 		RigidActor& actor = m_actors[entity];
 		actor.setPhysxActor(nullptr);
 		m_actors.erase(entity);
@@ -1555,7 +1554,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 
-	void createRigidActor(EntityRef entity)
+	void createActor(EntityRef entity)
 	{
 		if (m_actors.find(entity).isValid()) {
 			logError("Entity ", entity.index, " already has rigid actor");
@@ -1574,17 +1573,17 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 
-	Path getHeightmapSource(EntityRef entity) override
+	Path getHeightfieldSource(EntityRef entity) override
 	{
 		auto& terrain = m_terrains[entity];
 		return terrain.m_heightmap ? terrain.m_heightmap->getPath() : Path("");
 	}
 
 
-	float getHeightmapXZScale(EntityRef entity) override { return m_terrains[entity].m_xz_scale; }
+	float getHeightfieldXZScale(EntityRef entity) override { return m_terrains[entity].m_xz_scale; }
 
 
-	void setHeightmapXZScale(EntityRef entity, float scale) override
+	void setHeightfieldXZScale(EntityRef entity, float scale) override
 	{
 		if (scale == 0) return;
 		auto& terrain = m_terrains[entity];
@@ -1599,10 +1598,10 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 
-	float getHeightmapYScale(EntityRef entity) override { return m_terrains[entity].m_y_scale; }
+	float getHeightfieldYScale(EntityRef entity) override { return m_terrains[entity].m_y_scale; }
 
 
-	void setHeightmapYScale(EntityRef entity, float scale) override
+	void setHeightfieldYScale(EntityRef entity, float scale) override
 	{
 		if (scale == 0) return;
 		auto& terrain = m_terrains[entity];
@@ -1617,7 +1616,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 
-	void setHeightmapSource(EntityRef entity, const Path& str) override
+	void setHeightfieldSource(EntityRef entity, const Path& str) override
 	{
 		ResourceManagerHub& resource_manager = m_engine.getResourceManager();
 		Heightfield& terrain = m_terrains[entity];
@@ -2687,17 +2686,17 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 
-	bool getIsTrigger(EntityRef entity) override { return m_actors[entity].is_trigger; }
+	bool getActorIsTrigger(EntityRef entity) override { return m_actors[entity].is_trigger; }
 
 
-	void setIsTrigger(EntityRef entity, bool is_trigger) override
+	void setActorIsTrigger(EntityRef entity, bool is_trigger) override
 	{
 		RigidActor& actor = m_actors[entity];
 		actor.setIsTrigger(is_trigger);
 	}
 
 
-	DynamicType getDynamicType(EntityRef entity) override { return m_actors[entity].dynamic_type; }
+	DynamicType getActorDynamicType(EntityRef entity) override { return m_actors[entity].dynamic_type; }
 
 
 	void moveShapeIndices(EntityRef entity, int index, PxGeometryType::Enum type)
@@ -2712,9 +2711,9 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 
-	void addBoxGeometry(EntityRef entity, int index) override
+	void addBox(EntityRef entity, int index) override
 	{
-		if (index == -1) index = getBoxGeometryCount(entity);
+		if (index == -1) index = getBoxCount(entity);
 		moveShapeIndices(entity, index, PxGeometryType::eBOX);
 		PhysicsMaterial* mat = m_actors[entity].material;
 		PxRigidActor* actor = m_actors[entity].physx_actor;
@@ -2743,13 +2742,13 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 
-	void removeBoxGeometry(EntityRef entity, int index) override
+	void removeBox(EntityRef entity, int index) override
 	{
 		removeGeometry(entity, index, PxGeometryType::eBOX);
 	}
 
 
-	Vec3 getBoxGeomHalfExtents(EntityRef entity, int index) override
+	Vec3 getBoxHalfExtents(EntityRef entity, int index) override
 	{
 		PxShape* shape = getShape(entity, index, PxGeometryType::eBOX);
 		PxBoxGeometry box = shape->getGeometry().box();
@@ -2778,7 +2777,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 
-	void setBoxGeomHalfExtents(EntityRef entity, int index, const Vec3& size) override
+	void setBoxHalfExtents(EntityRef entity, int index, const Vec3& size) override
 	{
 		PxShape* shape = getShape(entity, index, PxGeometryType::eBOX);
 		PxBoxGeometry box = shape->getGeometry().box();
@@ -2802,17 +2801,17 @@ struct PhysicsModuleImpl final : PhysicsModule
 		return fromPhysx(tr.q);
 	}
 
-	Quat getBoxGeomOffsetRotationQuat(EntityRef entity, int index) override {
+	Quat getBoxOffsetRotationQuat(EntityRef entity, int index) override {
 		return getGeomOffsetRotation(entity, index, PxGeometryType::eBOX);
 	}
 
-	Vec3 getBoxGeomOffsetRotation(EntityRef entity, int index) override
+	Vec3 getBoxOffsetRotation(EntityRef entity, int index) override
 	{
 		return getGeomOffsetRotation(entity, index, PxGeometryType::eBOX).toEuler();
 	}
 
 
-	Vec3 getBoxGeomOffsetPosition(EntityRef entity, int index) override
+	Vec3 getBoxOffsetPosition(EntityRef entity, int index) override
 	{
 		return getGeomOffsetPosition(entity, index, PxGeometryType::eBOX);
 	}
@@ -2838,13 +2837,13 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 
-	void setBoxGeomOffsetPosition(EntityRef entity, int index, const Vec3& pos) override
+	void setBoxOffsetPosition(EntityRef entity, int index, const Vec3& pos) override
 	{
 		setGeomOffsetPosition(entity, index, pos, PxGeometryType::eBOX);
 	}
 
 
-	void setBoxGeomOffsetRotation(EntityRef entity, int index, const Vec3& rot) override
+	void setBoxOffsetRotation(EntityRef entity, int index, const Vec3& rot) override
 	{
 		setGeomOffsetRotation(entity, index, rot, PxGeometryType::eBOX);
 	}
@@ -2864,18 +2863,18 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 
-	int getBoxGeometryCount(EntityRef entity) override 
+	int getBoxCount(EntityRef entity) override 
 	{ 
 		PxRigidActor* actor = m_actors[entity].physx_actor;
 		return getGeometryCount(actor, PxGeometryType::eBOX);
 	}
 
-	bool getRigidActorCCD(EntityRef e) {
+	bool getActorCCD(EntityRef e) override {
 		RigidActor& actor = m_actors[e];
 		return actor.ccd;
 	}
 
-	void setRigidActorCCD(EntityRef e, bool enable) {
+	void setActorCCD(EntityRef e, bool enable) override {
 		RigidActor& actor = m_actors[e];
 		actor.ccd = enable;
 		if (actor.physx_actor) {
@@ -2884,18 +2883,18 @@ struct PhysicsModuleImpl final : PhysicsModule
 		}
 	}
 
-	Path getMeshGeomPath(EntityRef entity) override {
+	Path getActorMesh(EntityRef entity) override {
 		RigidActor& actor = m_actors[entity];
 		return actor.mesh ? actor.mesh->getPath() : Path();
 	}
 	
-	void setMeshGeomPath(EntityRef entity, const Path& path) override {
+	void setActorMesh(EntityRef entity, const Path& path) override {
 		ResourceManagerHub& manager = m_engine.getResourceManager();
 		PhysicsGeometry* geom_res = manager.load<PhysicsGeometry>(path);
 		m_actors[entity].setMesh(geom_res);
 	}
 	
-	void setRigidActorMaterial(EntityRef entity, const Path& path) override {
+	void setActorMaterial(EntityRef entity, const Path& path) override {
 		PxShape* shapes[64];
 		const u32 shapes_count = m_actors[entity].physx_actor->getShapes(shapes, lengthOf(shapes));
 
@@ -2916,14 +2915,14 @@ struct PhysicsModuleImpl final : PhysicsModule
 		}
 	}
 
-	Path getRigidActorMaterial(EntityRef entity) override {
+	Path getActorMaterial(EntityRef entity) override {
 		RigidActor& actor = m_actors[entity];
 		return actor.material ? actor.material->getPath() : Path();
 	}
 
-	void addSphereGeometry(EntityRef entity, int index) override
+	void addSphere(EntityRef entity, int index) override
 	{
-		if (index == -1) index = getSphereGeometryCount(entity);
+		if (index == -1) index = getSphereCount(entity);
 		moveShapeIndices(entity, index, PxGeometryType::eSPHERE);
 		PxRigidActor* actor = m_actors[entity].physx_actor;
 		PxSphereGeometry geom;
@@ -2933,50 +2932,37 @@ struct PhysicsModuleImpl final : PhysicsModule
 		shape->userData = (void*)(intptr_t)index;
 	}
 
-
-	void removeSphereGeometry(EntityRef entity, int index) override
-	{
+	void removeSphere(EntityRef entity, int index) override {
 		removeGeometry(entity, index, PxGeometryType::eSPHERE);
 	}
 
-
-	int getSphereGeometryCount(EntityRef entity) override 
-	{ 
+	i32 getSphereCount(EntityRef entity) override { 
 		PxRigidActor* actor = m_actors[entity].physx_actor;
 		return getGeometryCount(actor, PxGeometryType::eSPHERE);
 	}
 
-
-	float getSphereGeomRadius(EntityRef entity, int index) override
-	{
+	float getSphereRadius(EntityRef entity, int index) override {
 		PxShape* shape = getShape(entity, index, PxGeometryType::eSPHERE);
 		PxSphereGeometry geom = shape->getGeometry().sphere();
 		return geom.radius;
 	}
 
-
-	void setSphereGeomRadius(EntityRef entity, int index, float radius) override
-	{
+	void setSphereRadius(EntityRef entity, int index, float radius) override {
 		PxShape* shape = getShape(entity, index, PxGeometryType::eSPHERE);
 		PxSphereGeometry geom = shape->getGeometry().sphere();
 		geom.radius = radius;
 		shape->setGeometry(geom);
 	}
 
-
-	Vec3 getSphereGeomOffsetPosition(EntityRef entity, int index) override
-	{
+	Vec3 getSphereOffsetPosition(EntityRef entity, int index) override {
 		return getGeomOffsetPosition(entity, index, PxGeometryType::eSPHERE);
 	}
 
-
-	void setSphereGeomOffsetPosition(EntityRef entity, int index, const Vec3& pos) override
-	{
+	void setSphereOffsetPosition(EntityRef entity, int index, const Vec3& pos) override {
 		setGeomOffsetPosition(entity, index, pos, PxGeometryType::eSPHERE);
 	}
 
-
-	void setDynamicType(EntityRef entity, DynamicType new_value) override
+	void setActorDynamicType(EntityRef entity, DynamicType new_value) override
 	{
 		RigidActor& actor = m_actors[entity];
 		if (actor.dynamic_type == new_value) return;
@@ -3525,7 +3511,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 			serializer.read(terrain.m_layer);
 
 			m_terrains.insert(terrain.m_entity, terrain);
-			setHeightmapSource(terrain.m_entity, Path(tmp));
+			setHeightfieldSource(terrain.m_entity, Path(tmp));
 			m_world.onComponentCreated(terrain.m_entity, HEIGHTFIELD_TYPE, this);
 		}
 	}
@@ -4021,7 +4007,7 @@ void PhysicsModule::reflect() {
 			.LUMIX_PROP(ControllerUseRootMotion, "Use root motion")
 			.LUMIX_PROP(ControllerCustomGravity, "Use custom gravity")
 			.LUMIX_PROP(ControllerCustomGravityAcceleration, "Custom gravity acceleration")
-		.LUMIX_CMP(RigidActor, "rigid_actor", "Physics / Rigid actor")
+		.LUMIX_CMP(Actor, "rigid_actor", "Physics / Actor")
 			.icon(ICON_FA_VOLLEYBALL_BALL)
 			.LUMIX_FUNC_EX(PhysicsModule::putToSleep, "putToSleep")
 			.LUMIX_FUNC_EX(PhysicsModule::getActorSpeed, "getSpeed")
@@ -4030,20 +4016,20 @@ void PhysicsModule::reflect() {
 			.LUMIX_FUNC_EX(PhysicsModule::applyImpulseToActor, "applyImpulse")
 			.LUMIX_FUNC_EX(PhysicsModule::addForceAtPos, "addForceAtPos")
 			.LUMIX_ENUM_PROP(ActorLayer, "Layer").attribute<LayerEnum>()
-			.LUMIX_ENUM_PROP(DynamicType, "Dynamic").attribute<DynamicTypeEnum>()
-			.LUMIX_PROP(IsTrigger, "Trigger")
-			.begin_array<&PhysicsModule::getBoxGeometryCount, &PhysicsModule::addBoxGeometry, &PhysicsModule::removeBoxGeometry>("Box geometry")	
-				.LUMIX_PROP(BoxGeomHalfExtents, "Size")
-				.LUMIX_PROP(BoxGeomOffsetPosition, "Position offset")
-				.LUMIX_PROP(BoxGeomOffsetRotation, "Rotation offset").radiansAttribute()
+			.LUMIX_ENUM_PROP(ActorDynamicType, "Dynamic").attribute<DynamicTypeEnum>()
+			.LUMIX_PROP(ActorIsTrigger, "Trigger")
+			.begin_array<&PhysicsModule::getBoxCount, &PhysicsModule::addBox, &PhysicsModule::removeBox>("Box geometry")	
+				.LUMIX_PROP(BoxHalfExtents, "Size")
+				.LUMIX_PROP(BoxOffsetPosition, "Position offset")
+				.LUMIX_PROP(BoxOffsetRotation, "Rotation offset").radiansAttribute()
 			.end_array()
-			.begin_array<&PhysicsModule::getSphereGeometryCount, &PhysicsModule::addSphereGeometry, &PhysicsModule::removeSphereGeometry>("Sphere geometry")
-				.LUMIX_PROP(SphereGeomRadius, "Radius").minAttribute(0)
-				.LUMIX_PROP(SphereGeomOffsetPosition, "Position offset")
+			.begin_array<&PhysicsModule::getSphereCount, &PhysicsModule::addSphere, &PhysicsModule::removeSphere>("Sphere geometry")
+				.LUMIX_PROP(SphereRadius, "Radius").minAttribute(0)
+				.LUMIX_PROP(SphereOffsetPosition, "Position offset")
 			.end_array()
-			.LUMIX_PROP(RigidActorCCD, "CCD")
-			.LUMIX_PROP(MeshGeomPath, "Mesh").resourceAttribute(PhysicsGeometry::TYPE)
-			.LUMIX_PROP(RigidActorMaterial, "Material").resourceAttribute(PhysicsMaterial::TYPE)
+			.LUMIX_PROP(ActorCCD, "CCD")
+			.LUMIX_PROP(ActorMesh, "Mesh").resourceAttribute(PhysicsGeometry::TYPE)
+			.LUMIX_PROP(ActorMaterial, "Material").resourceAttribute(PhysicsMaterial::TYPE)
 		.LUMIX_CMP(Vehicle, "vehicle", "Physics / Vehicle")
 			.icon(ICON_FA_CAR_ALT)
 			.LUMIX_FUNC_EX(PhysicsModule::setVehicleAccel, "setAccel")
@@ -4071,9 +4057,9 @@ void PhysicsModule::reflect() {
 			.prop<&PhysicsModuleImpl::getWheelRPM>("RPM")
 		.LUMIX_CMP(Heightfield, "physical_heightfield", "Physics / Heightfield")
 			.LUMIX_ENUM_PROP(HeightfieldLayer, "Layer").attribute<LayerEnum>()
-			.LUMIX_PROP(HeightmapSource, "Heightmap").resourceAttribute(Texture::TYPE)
-			.LUMIX_PROP(HeightmapYScale, "Y scale").minAttribute(0)
-			.LUMIX_PROP(HeightmapXZScale, "XZ scale").minAttribute(0)
+			.LUMIX_PROP(HeightfieldSource, "Heightmap").resourceAttribute(Texture::TYPE)
+			.LUMIX_PROP(HeightfieldYScale, "Y scale").minAttribute(0)
+			.LUMIX_PROP(HeightfieldXZScale, "XZ scale").minAttribute(0)
 	;
 }
 

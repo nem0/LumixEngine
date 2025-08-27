@@ -13,6 +13,7 @@
 #include "gpu/gpu.h"
 
 
+//@ module RenderModule renderer "Render"
 namespace Lumix
 {
 
@@ -59,40 +60,46 @@ struct ProceduralGeometry {
 	u32 getIndexCount() const;
 };
 
+//@ component_struct camera "Camera"
 struct Camera {
 	EntityRef entity;
-	float fov;
-	float near;
-	float far;
-	float ortho_size;
+	float fov;									//@ property radians
+	float near;									//@ property min 0
+	float far;									//@ property min 0
+	bool is_ortho;								//@ property
+	float ortho_size;							//@ property min 0
+	
 	float screen_width;
 	float screen_height;
-	bool is_ortho;
-	float film_grain_intensity = 0;
 	
-	bool dof_enabled = false;
-	float dof_distance = 10;
-	float dof_range = 20;
-	float dof_max_blur_size = 10;
-	float dof_sharp_range = 0;
+	float film_grain_intensity = 0;				//@ property min 0
+	
+	bool dof_enabled = false;					//@ property
+	float dof_distance = 10;					//@ property min 0
+	float dof_range = 20;						//@ property min 0
+	float dof_max_blur_size = 10;				//@ property min 0
+	float dof_sharp_range = 0;					//@ property min 0
 
-	bool bloom_enabled = false;
-	bool bloom_tonemap_enabled = false;
-	float bloom_accomodation_speed = 1;
-	float bloom_avg_bloom_multiplier = 16.0f;
-	float bloom_exposure = 1;
+	bool bloom_enabled = false;					//@ property
+	bool bloom_tonemap_enabled = false;			//@ property
+	float bloom_accomodation_speed = 1;			//@ property
+	float bloom_avg_bloom_multiplier = 16.0f;	//@ property
+	float bloom_exposure = 1;					//@ property
 };
+//@ end
 
+//@ component_struct decal "Decal"
 struct Decal {
 	Material* material = nullptr;
 	Transform transform;
-	float radius;
 	EntityRef entity;
 	EntityPtr prev_decal = INVALID_ENTITY;
 	EntityPtr next_decal = INVALID_ENTITY;
+	float radius;
 	Vec3 half_extents;
-	Vec2 uv_scale;
+	Vec2 uv_scale;		//@ property
 };
+//@ end
 
 struct CurveDecal {
 	Material* material = nullptr;
@@ -107,39 +114,42 @@ struct CurveDecal {
 	Vec2 bezier_p2;
 };
 
+//@ component_struct environment "Environment'
 struct Environment {
 	enum Flags : u32 {
 		NONE = 0,
 		CAST_SHADOWS = 1 << 0
 	};
 
-	Vec3 light_color;
-	float direct_intensity;
-	float indirect_intensity;
+	Vec3 light_color;							//@ property color
+	float direct_intensity;						//@ property min 0
+	float indirect_intensity;					//@ property min 0
 	EntityRef entity;
 	Vec4 cascades;
 	Flags flags = Flags::NONE;
 	Texture* cubemap_sky = nullptr;
-	float sky_intensity = 1;
-	Vec3 scatter_rayleigh = {5.802f / 33.1f, 13.558f / 33.1f, 33.1f / 33.1f};
-	Vec3 scatter_mie = {1, 1, 1};
-	Vec3 absorb_mie = {1, 1, 1};
-	Vec3 sunlight_color = {1, 1, 1};
-	Vec3 fog_scattering = {1, 1, 1};
-	float fog_density = 1.f;
-	float sunlight_strength = 10;
-	float height_distribution_rayleigh = 8000;
-	float height_distribution_mie = 1200;
-	float ground_r = 6378;
-	float atmo_r = 6478;
-	float fog_top = 100;
-	bool godrays_enabled = false;
-	bool atmo_enabled = true;
-	bool clouds_enabled = false;
-	float clouds_top = 4000;
-	float clouds_bottom = 2000;
+	float sky_intensity = 1;					//@ property
+	Vec3 scatter_rayleigh = {5.802f / 33.1f, 13.558f / 33.1f, 33.1f / 33.1f};	//@ property
+	Vec3 scatter_mie = {1, 1, 1};				//@ property
+	Vec3 absorb_mie = {1, 1, 1};				//@ property
+	Vec3 sunlight_color = {1, 1, 1};			//@ property
+	Vec3 fog_scattering = {1, 1, 1};			//@ property
+	float fog_density = 1.f;					//@ property
+	float sunlight_strength = 10;				//@ property
+	float height_distribution_rayleigh = 8000;	//@ property
+	float height_distribution_mie = 1200;		//@ property
+	float ground_r = 6378;						//@ property min 0
+	float atmo_r = 6478;						//@ property
+	float fog_top = 100;						//@ property
+	bool godrays_enabled = false;				//@ property
+	bool atmo_enabled = true;					//@ property
+	bool clouds_enabled = false;				//@ property
+	float clouds_top = 4000;					//@ property
+	float clouds_bottom = 2000;					//@ property
 };
+//@ end
 
+//@ component_struct point_light
 struct PointLight {
 	enum Flags : u32 {
 		NONE = 0,
@@ -147,16 +157,18 @@ struct PointLight {
 		DYNAMIC = 1 << 1
 	};
 
-	Vec3 color;
-	float intensity;
+	Vec3 color;						//@ property color
+	float intensity;				//@ property
+	float fov;						//@ property
+	float attenuation_param;		//@ property
 	EntityRef entity;
-	float fov;
-	float attenuation_param;
 	float range;
 	Flags flags = Flags::NONE;
 	u64 guid;
 };
+//@ end
 
+//@ component_struct reflection_probe "Reflection probe"
 struct ReflectionProbe {
 	enum Flags {
 		NONE = 0,
@@ -165,25 +177,28 @@ struct ReflectionProbe {
 
 	u64 guid;
 	Flags flags = Flags::NONE;
-	u32 size = 128;
-	Vec3 half_extents = Vec3(100, 100, 100);
+	u32 size = 128;								//@ property
+	Vec3 half_extents = Vec3(100, 100, 100);	//@ property
 	u32 texture_id = 0xffFFffFF;
 
 	struct LoadJob;
 	LoadJob* load_job = nullptr;
 };
+//@ end
 
+//@ component_struct environment_probe "Environment probe"
 struct EnvironmentProbe {
 	enum Flags {
 		NONE = 0,
 		ENABLED = 1 << 2,
 	};
 
-	Vec3 inner_range;
-	Vec3 outer_range;
+	Vec3 inner_range;	//@ property
+	Vec3 outer_range;	//@ property
 	Flags flags = Flags::NONE;
 	Vec3 sh_coefs[9];
 };
+//@ end
 
 struct ModelInstance {
 	enum Flags : u8 {
@@ -287,12 +302,14 @@ enum class RenderableTypes : u8 {
 };
 
 
+//@ component_struct fur "Fur"
 struct FurComponent {
-	u32 layers = 16;
-	float scale = 0.01f;
-	float gravity = 1.f;
-	bool enabled = true;
+	u32 layers = 16;		//@ property
+	float scale = 0.01f;	//@ property
+	float gravity = 1.f;	//@ property
+	bool enabled = true;	//@ property
 };
+//@ end
 
 enum class RenderModuleVersion : i32 {
 	DECAL_UV_SCALE,
@@ -358,6 +375,7 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual void addDebugCube(const DVec3& from, const DVec3& max, Color color) = 0;
 	virtual void addDebugCubeSolid(const DVec3& from, const DVec3& max, Color color) = 0;
 
+	//@ component BoneAttachment bone_attachment "Bone attachment"
 	virtual EntityPtr getBoneAttachmentParent(EntityRef entity) = 0;
 	virtual void setBoneAttachmentParent(EntityRef entity, EntityPtr parent) = 0;
 	virtual void setBoneAttachmentBone(EntityRef entity, int value) = 0;
@@ -367,6 +385,7 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual Vec3 getBoneAttachmentRotation(EntityRef entity) = 0;
 	virtual void setBoneAttachmentRotation(EntityRef entity, const Vec3& rot) = 0;
 	virtual void setBoneAttachmentRotationQuat(EntityRef entity, const Quat& rot) = 0;
+	//@ end
 
 	virtual HashMap<EntityRef, FurComponent>& getFurs() = 0;
 	virtual FurComponent& getFur(EntityRef e) = 0;
@@ -383,36 +402,43 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual void setCameraScreenSize(EntityRef entity, int w, int h) = 0;
 	virtual Vec2 getCameraScreenSize(EntityRef entity) = 0;
 
+	//@ component ParticleSystem particle_emitter "Particle emitter"
 	virtual void setParticleSystemPath(EntityRef entity, const Path& path) = 0;
 	virtual Path getParticleSystemPath(EntityRef entity) = 0;
+	//@end
 	virtual void updateParticleSystem(EntityRef entity, float dt) = 0;
 	virtual const HashMap<EntityRef, struct ParticleSystem>& getParticleSystems() const = 0;
 	virtual ParticleSystem& getParticleSystem(EntityRef e) = 0;
 
+	//@ component InstancedModel instanced_model "Instanced Model"
 	virtual Path getInstancedModelPath(EntityRef entity) = 0;
 	virtual void setInstancedModelPath(EntityRef entity, const Path& path) = 0;
+	//@ end
 	virtual const HashMap<EntityRef, InstancedModel>& getInstancedModels() const = 0;
 	virtual InstancedModel& beginInstancedModelEditing(EntityRef entity) = 0;
 	virtual void endInstancedModelEditing(EntityRef entity) = 0;
 	virtual void initInstancedModelGPUData(EntityRef entity) = 0;
 
-	virtual void enableModelInstance(EntityRef entity, bool enable) = 0;
+	//@ component ModelInstance model_instance "Mesh"
 	virtual bool isModelInstanceEnabled(EntityRef entity) = 0;
+	virtual void enableModelInstance(EntityRef entity, bool enable) = 0;
+	virtual Path getModelInstancePath(EntityRef entity) = 0;
+	virtual void setModelInstancePath(EntityRef entity, const Path& path) = 0;
+	//@ end
+	virtual Model* getModelInstanceModel(EntityRef entity) = 0;
 	virtual ModelInstance* getModelInstance(EntityRef entity) = 0;
 	virtual Span<const ModelInstance> getModelInstances() const = 0;
 	virtual Span<ModelInstance> getModelInstances() = 0;
-	virtual Path getModelInstancePath(EntityRef entity) = 0;
 	virtual void setModelInstanceLOD(EntityRef entity, u32 lod) = 0;
-	virtual void setModelInstancePath(EntityRef entity, const Path& path) = 0;
 	virtual void setModelInstanceMaterialOverride(EntityRef entity, u32 mesh_idx, const Path& path) = 0;
 	virtual Path getModelInstanceMaterialOverride(EntityRef entity, u32 mesh_idx) = 0;
 	virtual CullResult* getRenderables(const ShiftedFrustum& frustum, RenderableTypes type) const = 0;
 	virtual CullResult* getRenderables(const ShiftedFrustum& frustum) const = 0;
 	virtual EntityPtr getFirstModelInstance() = 0;
 	virtual EntityPtr getNextModelInstance(EntityPtr entity) = 0;
-	virtual Model* getModelInstanceModel(EntityRef entity) = 0;
 
 	virtual CurveDecal& getCurveDecal(EntityRef entity) = 0;
+	//@ component CurveDecal curve_decal "Curve decal"
 	virtual void setCurveDecalMaterialPath(EntityRef entity, const Path& path) = 0;
 	virtual Path getCurveDecalMaterialPath(EntityRef entity) = 0;
 	virtual void setCurveDecalHalfExtents(EntityRef entity, float value) = 0;
@@ -423,20 +449,29 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual Vec2 getCurveDecalBezierP0(EntityRef entity) = 0;
 	virtual void setCurveDecalBezierP2(EntityRef entity, const Vec2& value) = 0;
 	virtual Vec2 getCurveDecalBezierP2(EntityRef entity) = 0;
+	//@ end
 
 	virtual Decal& getDecal(EntityRef entity) = 0;
+	//@ component Decal decal "Decal"
 	virtual void setDecalMaterialPath(EntityRef entity, const Path& path) = 0;
 	virtual Path getDecalMaterialPath(EntityRef entity) = 0;
 	virtual void setDecalHalfExtents(EntityRef entity, const Vec3& value) = 0;
 	virtual Vec3 getDecalHalfExtents(EntityRef entity) = 0;
+	//@ end
 
 	virtual Terrain* getTerrain(EntityRef entity) = 0;
 	virtual const HashMap<EntityRef, Terrain*>& getTerrains() = 0;
+	virtual Material* getTerrainMaterial(EntityRef entity) = 0;
+	virtual Vec2 getTerrainSize(EntityRef entity) = 0;
+	virtual AABB getTerrainAABB(EntityRef entity) = 0;
+	virtual IVec2 getTerrainResolution(EntityRef entity) = 0;
+	virtual EntityPtr getFirstTerrain() = 0;
+	virtual EntityPtr getNextTerrain(EntityRef entity) = 0;
 	virtual float getTerrainHeightAt(EntityRef entity, float x, float z) = 0;
 	virtual Vec3 getTerrainNormalAt(EntityRef entity, float x, float z) = 0;
+	//@ component Terrain terrain "Terrain"
 	virtual void setTerrainMaterialPath(EntityRef entity, const Path& path) = 0;
 	virtual Path getTerrainMaterialPath(EntityRef entity) = 0;
-	virtual Material* getTerrainMaterial(EntityRef entity) = 0;
 	virtual void setTerrainXZScale(EntityRef entity, float scale) = 0;
 	virtual float getTerrainXZScale(EntityRef entity) = 0;
 	virtual void setTerrainTesselation(EntityRef entity, u32 value) = 0;
@@ -445,12 +480,12 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual u32 getTerrainBaseGridResolution(EntityRef entity) = 0;
 	virtual void setTerrainYScale(EntityRef entity, float scale) = 0;
 	virtual float getTerrainYScale(EntityRef entity) = 0;
-	virtual Vec2 getTerrainSize(EntityRef entity) = 0;
-	virtual AABB getTerrainAABB(EntityRef entity) = 0;
-	virtual IVec2 getTerrainResolution(EntityRef entity) = 0;
-	virtual EntityPtr getFirstTerrain() = 0;
-	virtual EntityPtr getNextTerrain(EntityRef entity) = 0;
 
+	//@ array Grass
+	virtual int getGrassCount(EntityRef entity) = 0;
+	virtual void addGrass(EntityRef entity, int index) = 0;
+	virtual void removeGrass(EntityRef entity, int index) = 0;
+	
 	virtual int getGrassRotationMode(EntityRef entity, int index) = 0;
 	virtual void setGrassRotationMode(EntityRef entity, int index, int value) = 0;
 	virtual float getGrassDistance(EntityRef entity, int index) = 0;
@@ -459,9 +494,8 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual Path getGrassPath(EntityRef entity, int index) = 0;
 	virtual void setGrassSpacing(EntityRef entity, int index, float spacing) = 0;
 	virtual float getGrassSpacing(EntityRef entity, int index) = 0;
-	virtual int getGrassCount(EntityRef entity) = 0;
-	virtual void addGrass(EntityRef entity, int index) = 0;
-	virtual void removeGrass(EntityRef entity, int index) = 0;
+	//@ end
+	//@ end
 
 	virtual void setProceduralGeometry(EntityRef entity
 		, Span<const u8> vertex_data
@@ -473,30 +507,44 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual const HashMap<EntityRef, ProceduralGeometry>& getProceduralGeometries() = 0;
 	virtual ProceduralGeometry& getProceduralGeometry(EntityRef e) = 0;
 
+
+	virtual Environment& getEnvironment(EntityRef entity) = 0;
+
+	//@ component Environment environment "Environment"
 	virtual bool getEnvironmentCastShadows(EntityRef entity) = 0;
 	virtual void setEnvironmentCastShadows(EntityRef entity, bool enable) = 0;
-	virtual Environment& getEnvironment(EntityRef entity) = 0;
+	virtual Path getEnvironmentSkyTexture(EntityRef entity)	const = 0;
+	virtual void setEnvironmentSkyTexture(EntityRef entity, const Path& path) = 0;
+	//@ end
+
 	virtual const HashMap<EntityRef, PointLight>& getPointLights() = 0;
 	virtual PointLight& getPointLight(EntityRef entity) = 0;
 	virtual float getLightRange(EntityRef entity) = 0;
 	virtual void setLightRange(EntityRef entity, float value) = 0;
+	//@ component PointLight point_light "Point light"
 	virtual bool getPointLightCastShadows(EntityRef entity) = 0;
 	virtual void setPointLightCastShadows(EntityRef entity, bool value) = 0;
 	virtual bool getPointLightDynamic(EntityRef entity) = 0;
 	virtual void setPointLightDynamic(EntityRef entity, bool value) = 0;
+	//@ end
 
-	virtual Span<EntityRef> getReflectionProbesEntities() = 0;
-	virtual ReflectionProbe& getReflectionProbe(EntityRef entity) = 0;
+	//@ component ReflectionProbe reflection_probe "Reflection probe"
 	virtual void enableReflectionProbe(EntityRef entity, bool enable) = 0;
 	virtual bool isReflectionProbeEnabled(EntityRef entity) = 0;
+	//@ end
+	virtual Span<EntityRef> getReflectionProbesEntities() = 0;
+	virtual ReflectionProbe& getReflectionProbe(EntityRef entity) = 0;
 	virtual Span<const ReflectionProbe> getReflectionProbes() = 0;
 	virtual gpu::TextureHandle getReflectionProbesTexture() = 0;
 	virtual void reloadReflectionProbes() = 0;
 
-	virtual Span<EntityRef> getEnvironmentProbesEntities() = 0;
-	virtual EnvironmentProbe& getEnvironmentProbe(EntityRef entity) = 0;
+	//@ component EnvironmentProbe environment_probe "Environment probe"
 	virtual void enableEnvironmentProbe(EntityRef entity, bool enable) = 0;
 	virtual bool isEnvironmentProbeEnabled(EntityRef entity) = 0;
+	//@ end
+	virtual Span<EntityRef> getEnvironmentProbesEntities() = 0;
+	virtual EnvironmentProbe& getEnvironmentProbe(EntityRef entity) = 0;
+	
 	virtual Span<const EnvironmentProbe> getEnvironmentProbes() = 0;
 };
 

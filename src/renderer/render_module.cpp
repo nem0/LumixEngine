@@ -1482,11 +1482,11 @@ struct RenderModuleImpl final : RenderModule {
 		m_world.onComponentCreated(entity, PARTICLE_EMITTER_TYPE, this);
 	}
 
-	Path getSkyTexturePath(EntityRef entity)	const {
+	Path getEnvironmentSkyTexture(EntityRef entity)	const override {
 		return m_environments[entity].cubemap_sky ? m_environments[entity].cubemap_sky->getPath() : Path();
 	}
 
-	void setSkyTexturePath(EntityRef entity, const Path& path) {
+	void setEnvironmentSkyTexture(EntityRef entity, const Path& path) override {
 		auto& env = m_environments[entity];
 		if (env.cubemap_sky) env.cubemap_sky->decRefCount();
 		env.cubemap_sky = path.isEmpty() ? nullptr : m_engine.getResourceManager().load<Texture>(path);
@@ -3552,7 +3552,7 @@ void RenderModule::reflect() {
 			.var_prop<&RenderModule::getEnvironment, &Environment::indirect_intensity>("Indirect intensity").minAttribute(0)
 			.LUMIX_PROP(ShadowmapCascades, "Shadow cascades")
 			.LUMIX_PROP(EnvironmentCastShadows, "Cast shadows")
-			.LUMIX_PROP(SkyTexturePath, "Sky texture").resourceAttribute(Texture::TYPE)
+			.LUMIX_PROP(EnvironmentSkyTexture, "Sky texture").resourceAttribute(Texture::TYPE)
 			.var_prop<&RenderModule::getEnvironment, &Environment::atmo_enabled>("Atmosphere enabled")
 			.var_prop<&RenderModule::getEnvironment, &Environment::godrays_enabled>("Godrays enabled")
 			.var_prop<&RenderModule::getEnvironment, &Environment::clouds_enabled>("Clouds enabled")

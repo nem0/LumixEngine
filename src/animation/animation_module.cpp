@@ -165,7 +165,7 @@ struct AnimationModuleImpl final : AnimationModule {
 	}
 
 
-	Animation* getAnimableAnimation(EntityRef entity) override
+	Animation* getAnimation(EntityRef entity) override
 	{
 		return m_animables[entity].animation;
 	}
@@ -412,14 +412,14 @@ struct AnimationModuleImpl final : AnimationModule {
 	}
 
 
-	Path getPropertyAnimation(EntityRef entity) override
+	Path getPropertyAnimatorAnimation(EntityRef entity) override
 	{
 		const auto& animator = m_property_animators[entity];
 		return animator.animation ? animator.animation->getPath() : Path("");
 	}
 	
 	
-	void setPropertyAnimation(EntityRef entity, const Path& path) override
+	void setPropertyAnimatorAnimation(EntityRef entity, const Path& path) override
 	{
 		auto& animator = m_property_animators[entity];
 		animator.time = 0;
@@ -428,14 +428,14 @@ struct AnimationModuleImpl final : AnimationModule {
 	}
 
 
-	Path getAnimation(EntityRef entity) override
+	Path getAnimableAnimation(EntityRef entity) override
 	{
 		const auto& animable = m_animables[entity];
 		return animable.animation ? animable.animation->getPath() : Path("");
 	}
 
 
-	void setAnimation(EntityRef entity, const Path& path) override
+	void setAnimableAnimation(EntityRef entity, const Path& path) override
 	{
 		auto& animable = m_animables[entity];
 		unloadResource(animable.animation);
@@ -849,7 +849,7 @@ UniquePtr<AnimationModule> AnimationModule::create(Engine& engine, ISystem& syst
 void AnimationModule::reflect(Engine& engine) {
 	LUMIX_MODULE(AnimationModuleImpl, "animation")
 		.LUMIX_CMP(PropertyAnimator, "property_animator", "Animation / Property animator")
-			.LUMIX_PROP(PropertyAnimation, "Animation").resourceAttribute(PropertyAnimation::TYPE)
+			.LUMIX_PROP(PropertyAnimatorAnimation, "Animation").resourceAttribute(PropertyAnimation::TYPE)
 			.prop<&AnimationModule::isPropertyAnimatorEnabled, &AnimationModule::enablePropertyAnimator>("Enabled")
 			.prop<&AnimationModule::isPropertyAnimatorLooped, &AnimationModule::setPropertyAnimatorLooped>("Looped")
 		.LUMIX_CMP(Animator, "animator", "Animation / Animator")
@@ -861,7 +861,7 @@ void AnimationModule::reflect(Engine& engine) {
 			.LUMIX_PROP(AnimatorDefaultSet, "Default set")
 			.LUMIX_PROP(AnimatorUseRootMotion, "Use root motion")
 		.LUMIX_CMP(Animable, "animable", "Animation / Animable")
-			.LUMIX_PROP(Animation, "Animation").resourceAttribute(Animation::TYPE)
+			.LUMIX_PROP(AnimableAnimation, "Animation").resourceAttribute(Animation::TYPE)
 	;
 }
 

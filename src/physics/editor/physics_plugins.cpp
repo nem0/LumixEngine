@@ -200,11 +200,11 @@ void showRigidActorGizmo(WorldView& view, ComponentUID cmp)
 	World& world = module->getWorld();
 	const DVec3 pos = world.getPosition(e);
 	const Quat rot = world.getRotation(e);
-	const i32 box_count = module->getBoxGeometryCount(e);
+	const i32 box_count = module->getBoxCount(e);
 	for (i32 i = 0; i < box_count; ++i) {
-		const Vec3 half = module->getBoxGeomHalfExtents(e, i);
-		const Vec3 p = module->getBoxGeomOffsetPosition(e, i);
-		const Quat r = rot * module->getBoxGeomOffsetRotationQuat(e, i);
+		const Vec3 half = module->getBoxHalfExtents(e, i);
+		const Vec3 p = module->getBoxOffsetPosition(e, i);
+		const Quat r = rot * module->getBoxOffsetRotationQuat(e, i);
 
 		addCube(view
 			, pos + rot.rotate(p)
@@ -213,10 +213,10 @@ void showRigidActorGizmo(WorldView& view, ComponentUID cmp)
 			, r.rotate(Vec3(0, 0, half.z))
 			, Color::BLUE);
 	}
-	const i32 sphere_count = module->getSphereGeometryCount(e);
+	const i32 sphere_count = module->getSphereCount(e);
 	for (i32 i = 0; i < sphere_count; ++i) {
-		const float r = module->getSphereGeomRadius(e, i);
-		const Vec3 p = module->getSphereGeomOffsetPosition(e, i);
+		const float r = module->getSphereRadius(e, i);
+		const Vec3 p = module->getSphereOffsetPosition(e, i);
 		addSphere(view, pos + rot.rotate(p), r, Color::BLUE);
 	}
 }
@@ -380,7 +380,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 
 		if (!m_is_simulating_selected) return;
 		for (EntityRef e : m_reset_dynamic_entities) {
-			module->setDynamicType(e, PhysicsModule::DynamicType::DYNAMIC);
+			module->setActorDynamicType(e, PhysicsModule::DynamicType::DYNAMIC);
 		}
 
 		m_reset_dynamic_entities.clear();
@@ -404,7 +404,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 			editor.endCommandGroup();
 			editor.lockGroupCommand();
 			for (EntityRef e : m_reset_dynamic_entities) {
-				module->setDynamicType(e, PhysicsModule::DynamicType::DYNAMIC);
+				module->setActorDynamicType(e, PhysicsModule::DynamicType::DYNAMIC);
 			}
 
 			m_reset_dynamic_entities.clear();
@@ -421,7 +421,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 			}
 			for (EntityRef e : module->getDynamicActors()) {
 				if (selected.indexOf(e) < 0) {
-					module->setDynamicType(e, PhysicsModule::DynamicType::STATIC);
+					module->setActorDynamicType(e, PhysicsModule::DynamicType::STATIC);
 					m_reset_dynamic_entities.push(e);
 				}
 			}

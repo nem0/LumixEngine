@@ -149,7 +149,7 @@ struct AudioModuleImpl final : AudioModule
 	}
 
 
-	bool isAmbientSound3D(EntityRef entity) override
+	bool getAmbientSound3D(EntityRef entity) override
 	{
 		return m_ambient_sounds[entity].is_3d;
 	}
@@ -512,7 +512,7 @@ void AudioModule::reflect(Engine& engine) {
 		.LUMIX_CMP(AmbientSound, "ambient_sound", "Audio / Ambient sound")
 			.LUMIX_FUNC_EX(AudioModule::pauseAmbientSound, "pause")
 			.LUMIX_FUNC_EX(AudioModule::resumeAmbientSound, "resume")
-			.prop<&AudioModule::isAmbientSound3D, &AudioModule::setAmbientSound3D>("3D")
+			.prop<&AudioModule::getAmbientSound3D, &AudioModule::setAmbientSound3D>("3D")
 			.LUMIX_PROP(AmbientSoundClip, "Sound").resourceAttribute(Clip::TYPE)
 		.LUMIX_CMP(Listener, "audio_listener", "Audio / Listener").icon(ICON_FA_HEADPHONES)
 		.LUMIX_CMP(EchoZone, "echo_zone", "Audio / Echo zone")
