@@ -541,7 +541,7 @@ private:
 
 		m_pipeline->setWorld(&world);
 		GUIModule* module = (GUIModule*)world.getModule("gui");
-		HashMap<EntityRef, GUICanvas>& canvases = module->getCanvases();
+		HashMap<EntityRef, Canvas>& canvases = module->getCanvases();
 		if (!m_canvas_entity.isValid() && canvases.size() > 0) {
 			m_canvas_entity = canvases.begin().key();
 		}

@@ -231,8 +231,7 @@ struct AnimationModuleImpl final : AnimationModule {
 	}
 
 
-	void destroyPropertyAnimator(EntityRef entity)
-	{
+	void destroyPropertyAnimator(EntityRef entity) override {
 		int idx = m_property_animators.find(entity);
 		auto& animator = m_property_animators.at(idx);
 		unloadResource(animator.animation);
@@ -241,8 +240,7 @@ struct AnimationModuleImpl final : AnimationModule {
 	}
 
 
-	void destroyAnimable(EntityRef entity)
-	{
+	void destroyAnimable(EntityRef entity) override {
 		auto& animable = m_animables[entity];
 		unloadResource(animable.animation);
 		m_animables.erase(entity);
@@ -250,8 +248,7 @@ struct AnimationModuleImpl final : AnimationModule {
 	}
 
 
-	void destroyAnimator(EntityRef entity)
-	{
+	void destroyAnimator(EntityRef entity) override {
 		const u32 idx = m_animator_map[entity];
 		Animator& animator = m_animators[idx];
 		unloadResource(animator.resource);
@@ -386,7 +383,7 @@ struct AnimationModuleImpl final : AnimationModule {
 		return animator.resource ? animator.resource->getPath() : Path("");
 	}
 
-	bool isPropertyAnimatorLooped(EntityRef entity) override {
+	bool getPropertyAnimatorLooped(EntityRef entity) override {
 		return isFlagSet(m_property_animators[entity].flags, PropertyAnimator::LOOPED);
 	}
 
@@ -795,8 +792,7 @@ struct AnimationModuleImpl final : AnimationModule {
 	}
 
 
-	void createPropertyAnimator(EntityRef entity)
-	{
+	void createPropertyAnimator(EntityRef entity) override {
 		PropertyAnimator& animator = m_property_animators.emplace(entity, m_allocator);
 		animator.animation = nullptr;
 		animator.time = 0;
@@ -804,8 +800,7 @@ struct AnimationModuleImpl final : AnimationModule {
 	}
 
 
-	void createAnimable(EntityRef entity)
-	{
+	void createAnimable(EntityRef entity) override {
 		Animable& animable = m_animables.insert(entity);
 		animable.time = Time::fromSeconds(0);
 		animable.animation = nullptr;
@@ -815,8 +810,7 @@ struct AnimationModuleImpl final : AnimationModule {
 	}
 
 
-	void createAnimator(EntityRef entity)
-	{
+	void createAnimator(EntityRef entity) override {
 		m_animator_map.insert(entity, m_animators.size());
 		Animator& animator = m_animators.emplace();
 		animator.entity = entity;
@@ -847,22 +841,7 @@ UniquePtr<AnimationModule> AnimationModule::create(Engine& engine, ISystem& syst
 }
 
 void AnimationModule::reflect(Engine& engine) {
-	LUMIX_MODULE(AnimationModuleImpl, "animation")
-		.LUMIX_CMP(PropertyAnimator, "property_animator", "Animation / Property animator")
-			.LUMIX_PROP(PropertyAnimatorAnimation, "Animation").resourceAttribute(PropertyAnimation::TYPE)
-			.prop<&AnimationModule::isPropertyAnimatorEnabled, &AnimationModule::enablePropertyAnimator>("Enabled")
-			.prop<&AnimationModule::isPropertyAnimatorLooped, &AnimationModule::setPropertyAnimatorLooped>("Looped")
-		.LUMIX_CMP(Animator, "animator", "Animation / Animator")
-			.function<(void (AnimationModule::*)(EntityRef, u32, float))&AnimationModule::setAnimatorInput>("setFloatInput", "AnimationModule::setAnimatorInput")
-			.function<(void (AnimationModule::*)(EntityRef, u32, bool))&AnimationModule::setAnimatorInput>("setBoolInput", "AnimationModule::setAnimatorInput")
-			.function<(void (AnimationModule::*)(EntityRef, u32, Vec3))&AnimationModule::setAnimatorInput>("setVec3Input", "AnimationModule::setAnimatorInput")
-			.LUMIX_FUNC_EX(AnimationModule::getAnimatorInputIndex, "getInputIndex")
-			.LUMIX_PROP(AnimatorSource, "Source").resourceAttribute(anim::Controller::TYPE)
-			.LUMIX_PROP(AnimatorDefaultSet, "Default set")
-			.LUMIX_PROP(AnimatorUseRootMotion, "Use root motion")
-		.LUMIX_CMP(Animable, "animable", "Animation / Animable")
-			.LUMIX_PROP(AnimableAnimation, "Animation").resourceAttribute(Animation::TYPE)
-	;
+	#include "animation_module.gen.h"
 }
 
 } // namespace Lumix

@@ -2289,24 +2289,24 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 		m_timers.clear();
 	}
 
-	void createInlineScriptComponent(EntityRef entity) {
+	void createInlineScript(EntityRef entity) override {
 		m_inline_scripts.insert(entity, InlineScriptComponent(entity, *this, m_system.m_allocator));
 		m_world.onComponentCreated(entity, LUA_SCRIPT_INLINE_TYPE, this);
 	}
 
-	void destroyInlineScriptComponent(EntityRef entity) {
+	void destroyInlineScript(EntityRef entity) override {
 		m_inline_scripts.erase(entity);
 		m_world.onComponentDestroyed(entity, LUA_SCRIPT_INLINE_TYPE, this);
 	}
 
-	void createScriptComponent(EntityRef entity) {
+	void createScript(EntityRef entity) override {
 		auto& allocator = m_system.m_allocator;
 		ScriptComponent* script = LUMIX_NEW(allocator, ScriptComponent)(*this, entity, allocator);
 		m_scripts.insert(entity, script);
 		m_world.onComponentCreated(entity, LUA_SCRIPT_TYPE, this);
 	}
 
-	void destroyScriptComponent(EntityRef entity) {
+	void destroyScript(EntityRef entity) override {
 		ScriptComponent* cmp = m_scripts[entity];
 		LUMIX_DELETE(m_system.m_allocator, cmp);
 		m_scripts.erase(entity);
@@ -2836,7 +2836,7 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 		m_inline_scripts[entity].m_source = value;
 	}
 
-	void getScriptBlob(EntityRef e, u32 index, OutputMemoryStream& stream) {
+	void getScriptBlob(EntityRef e, u32 index, OutputMemoryStream& stream) override {
 		ScriptInstance& inst = m_scripts[e]->m_scripts[index];
 		ASSERT(inst.m_state);
 		stream.write(inst.m_properties.size());
@@ -2867,7 +2867,7 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 		lua_setfield(L, -2, "_type");
 	}
 
-	void setScriptBlob(EntityRef entity, u32 index, InputMemoryStream& stream) {
+	void setScriptBlob(EntityRef entity, u32 index, InputMemoryStream& stream) override {
 		// TODO make sure properties in set/get blobs match
 		ScriptInstance& inst = m_scripts[entity]->m_scripts[index];
 		ASSERT(inst.m_state);
@@ -3269,16 +3269,7 @@ LuaScriptSystemImpl::LuaScriptSystemImpl(Engine& engine)
 
 	m_script_manager.create(LuaScript::TYPE, engine.getResourceManager());
 
-	LUMIX_MODULE(LuaScriptModuleImpl, "lua_script")
-		.LUMIX_CMP(InlineScriptComponent, "lua_script_inline", "Lua Script / Inline") 
-			.LUMIX_PROP(InlineScriptCode, "Code").multilineAttribute()
-		.LUMIX_CMP(ScriptComponent, "lua_script", "Lua Script / File") 
-			.LUMIX_FUNC_EX(LuaScriptModule::getScriptPath, "getScriptPath")
-			.begin_array<&LuaScriptModule::getScriptCount, &LuaScriptModule::addScript, &LuaScriptModule::removeScript>("scripts")
-				.prop<&LuaScriptModule::isScriptEnabled, &LuaScriptModule::enableScript>("Enabled")
-				.LUMIX_PROP(ScriptPath, "Path").resourceAttribute(LuaScript::TYPE)
-				.blob_property<&LuaScriptModuleImpl::getScriptBlob, &LuaScriptModuleImpl::setScriptBlob>("script_blob")
-			.end_array();
+	#include "lua_script_system.gen.h"
 }
 
 

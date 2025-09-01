@@ -202,8 +202,7 @@ struct AudioModuleImpl final : AudioModule
 	}
 
 
-	void createListener(EntityRef entity)
-	{
+	void createListener(EntityRef entity) override {
 		m_listener.entity = entity;
 		m_world.onComponentCreated(entity, LISTENER_TYPE, this);
 	}
@@ -271,16 +270,14 @@ struct AudioModuleImpl final : AudioModule
 	}
 
 
-	void destroyChorusZone(EntityRef entity)
-	{
+	void destroyChorusZone(EntityRef entity) override {
 		int idx = m_chorus_zones.find(entity);
 		m_chorus_zones.eraseAt(idx);
 		m_world.onComponentDestroyed(entity, CHORUS_ZONE_TYPE, this);
 	}
 
 
-	void createAmbientSound(EntityRef entity)
-	{
+	void createAmbientSound(EntityRef entity) override {
 		AmbientSound& sound = m_ambient_sounds.insert(entity);
 		sound.entity = entity;
 		sound.clip = nullptr;
@@ -289,15 +286,13 @@ struct AudioModuleImpl final : AudioModule
 	}
 
 
-	void destroyListener(EntityRef entity)
-	{
+	void destroyListener(EntityRef entity) override {
 		m_listener.entity = INVALID_ENTITY;
 		m_world.onComponentDestroyed(entity, LISTENER_TYPE, this);
 	}
 
 
-	void destroyAmbientSound(EntityRef entity)
-	{
+	void destroyAmbientSound(EntityRef entity) override {
 		m_ambient_sounds.erase(entity);
 		m_world.onComponentDestroyed(entity, AMBIENT_SOUND_TYPE, this);
 	}
@@ -501,27 +496,7 @@ UniquePtr<AudioModule> AudioModule::createInstance(AudioSystem& system,
 }
 
 void AudioModule::reflect(Engine& engine) {
-	LUMIX_MODULE(AudioModuleImpl, "audio")
-		.LUMIX_FUNC(setMasterVolume)
-		.function<(SoundHandle (AudioModule::*)(EntityRef, const Path&, bool))&AudioModule::play>("play", "AudioModule::play")
-		.LUMIX_FUNC(stop)
-		.LUMIX_FUNC(isEnd)
-		.LUMIX_FUNC(setFrequency)
-		.LUMIX_FUNC(setVolume)
-		.LUMIX_FUNC(setEcho)
-		.LUMIX_CMP(AmbientSound, "ambient_sound", "Audio / Ambient sound")
-			.LUMIX_FUNC_EX(AudioModule::pauseAmbientSound, "pause")
-			.LUMIX_FUNC_EX(AudioModule::resumeAmbientSound, "resume")
-			.prop<&AudioModule::getAmbientSound3D, &AudioModule::setAmbientSound3D>("3D")
-			.LUMIX_PROP(AmbientSoundClip, "Sound").resourceAttribute(Clip::TYPE)
-		.LUMIX_CMP(Listener, "audio_listener", "Audio / Listener").icon(ICON_FA_HEADPHONES)
-		.LUMIX_CMP(EchoZone, "echo_zone", "Audio / Echo zone")
-			.var_prop<&AudioModule::getEchoZone, &EchoZone::radius>("Radius").minAttribute(0)
-			.var_prop<&AudioModule::getEchoZone, &EchoZone::delay>("Delay (ms)").minAttribute(0)
-		.LUMIX_CMP(ChorusZone, "chorus_zone", "Audio / Chorus zone")
-			.var_prop<&AudioModule::getChorusZone, &ChorusZone::radius>("Radius").minAttribute(0)
-			.var_prop<&AudioModule::getChorusZone, &ChorusZone::delay>("Delay (ms)").minAttribute(0)
-	;
+	#include "audio_module.gen.h"
 }
 
 

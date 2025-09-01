@@ -1129,8 +1129,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 
 
 	EntityPtr getJointConnectedBody(EntityRef entity) override { return m_joints[entity].connected_body; }
-
-
+	
 	void setJointConnectedBody(EntityRef joint_entity, EntityPtr connected_body) override
 	{
 		int idx = m_joints.find(joint_entity);
@@ -1139,14 +1138,12 @@ struct PhysicsModuleImpl final : PhysicsModule
 		if (m_is_game_running) initJoint(joint_entity, joint);
 	}
 
-
 	void setJointAxisPosition(EntityRef entity, const Vec3& value) override
 	{
 		auto& joint = m_joints[entity];
 		joint.local_frame0.p = toPhysx(value);
 		joint.physx->setLocalPose(PxJointActorIndex::eACTOR0, joint.local_frame0);
 	}
-
 
 	void setJointAxisDirection(EntityRef entity, const Vec3& value) override
 	{
@@ -1156,8 +1153,61 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 
-	Vec3 getJointAxisPosition(EntityRef entity) override { return fromPhysx(m_joints[entity].local_frame0.p); }
+	EntityPtr getHingeJointConnectedBody(EntityRef entity) override { return m_joints[entity].connected_body; }
+	void setHingeJointConnectedBody(EntityRef joint_entity, EntityPtr connected_body) override {
+		setJointConnectedBody(joint_entity, connected_body);
+	}
+	void setHingeJointAxisPosition(EntityRef entity, const Vec3& value) override {
+		setJointAxisPosition(entity, value);
+	}
+	void setHingeJointAxisDirection(EntityRef entity, const Vec3& value) override {
+		setJointAxisDirection(entity, value);
+	}
+	Vec3 getHingeJointAxisPosition(EntityRef entity) override { return fromPhysx(m_joints[entity].local_frame0.p); }
+	Vec3 getHingeJointAxisDirection(EntityRef entity) override {
+		return getJointAxisDirection(entity);
+	}
 
+	EntityPtr getSphericalJointConnectedBody(EntityRef entity) override { return m_joints[entity].connected_body; }
+	void setSphericalJointConnectedBody(EntityRef joint_entity, EntityPtr connected_body) override {
+		setJointConnectedBody(joint_entity, connected_body);
+	}
+	void setSphericalJointAxisPosition(EntityRef entity, const Vec3& value) override {
+		setJointAxisPosition(entity, value);
+	}
+	void setSphericalJointAxisDirection(EntityRef entity, const Vec3& value) override {
+		setJointAxisDirection(entity, value);
+	}
+	Vec3 getSphericalJointAxisPosition(EntityRef entity) override { return fromPhysx(m_joints[entity].local_frame0.p); }
+	Vec3 getSphericalJointAxisDirection(EntityRef entity) override {
+		return getJointAxisDirection(entity);
+	}
+
+	EntityPtr getD6JointConnectedBody(EntityRef entity) override { return m_joints[entity].connected_body; }
+	void setD6JointConnectedBody(EntityRef joint_entity, EntityPtr connected_body) override {
+		setJointConnectedBody(joint_entity, connected_body);
+	}
+	void setD6JointAxisPosition(EntityRef entity, const Vec3& value) override {
+		setJointAxisPosition(entity, value);
+	}
+	void setD6JointAxisDirection(EntityRef entity, const Vec3& value) override {
+		setJointAxisDirection(entity, value);
+	}
+	Vec3 getD6JointAxisPosition(EntityRef entity) override { return fromPhysx(m_joints[entity].local_frame0.p); }
+	Vec3 getD6JointAxisDirection(EntityRef entity) override {
+		return getJointAxisDirection(entity);
+	}
+
+	EntityPtr getDistanceJointConnectedBody(EntityRef entity) override { return m_joints[entity].connected_body; }
+	void setDistanceJointConnectedBody(EntityRef joint_entity, EntityPtr connected_body) override {
+		setJointConnectedBody(joint_entity, connected_body);
+	}
+	void setDistanceJointAxisPosition(EntityRef entity, const Vec3& value) override {
+		setJointAxisPosition(entity, value);
+	}
+	Vec3 getDistanceJointAxisPosition(EntityRef entity) override { return fromPhysx(m_joints[entity].local_frame0.p); }
+
+	Vec3 getJointAxisPosition(EntityRef entity) override { return fromPhysx(m_joints[entity].local_frame0.p); }
 
 	Vec3 getJointAxisDirection(EntityRef entity) override
 	{
@@ -3791,7 +3841,6 @@ struct PhysicsModuleImpl final : PhysicsModule
 	World& m_world;
 	HitReport m_hit_report;
 	PhysxContactCallback m_contact_callback;
-	BoneOrientation m_new_bone_orientation = BoneOrientation::X;
 	PxScene* m_scene;
 	LuaScriptModule* m_script_module;
 	PhysicsSystem* m_system;
@@ -3897,46 +3946,6 @@ void PhysicsModule::reflect() {
 			return system.getCollisionLayerName(idx);
 		}
 	};
-
-	struct DynamicTypeEnum : reflection::EnumAttribute {
-		u32 count(ComponentUID cmp) const override { return 3; }
-		const char* name(ComponentUID cmp, u32 idx) const override { 
-			switch ((PhysicsModule::DynamicType)idx) {
-				case PhysicsModule::DynamicType::DYNAMIC: return "Dynamic";
-				case PhysicsModule::DynamicType::STATIC: return "Static";
-				case PhysicsModule::DynamicType::KINEMATIC: return "Kinematic";
-			}
-			ASSERT(false);
-			return "N/A";
-		}
-	};
-
-	struct D6MotionEnum : reflection::EnumAttribute {
-		u32 count(ComponentUID cmp) const override { return 3; }
-		const char* name(ComponentUID cmp, u32 idx) const override { 
-			switch ((PhysicsModule::D6Motion)idx) {
-				case PhysicsModule::D6Motion::LOCKED: return "Locked";
-				case PhysicsModule::D6Motion::LIMITED: return "Limited";
-				case PhysicsModule::D6Motion::FREE: return "Free";
-			}
-			ASSERT(false);
-			return "N/A";
-		}
-	};
-
-	struct WheelSlotEnum : reflection::EnumAttribute {
-		u32 count(ComponentUID cmp) const override { return 4; }
-		const char* name(ComponentUID cmp, u32 idx) const override { 
-			switch ((PhysicsModule::WheelSlot)idx) {
-				case PhysicsModule::WheelSlot::FRONT_LEFT: return "Front left";
-				case PhysicsModule::WheelSlot::FRONT_RIGHT: return "Front right";
-				case PhysicsModule::WheelSlot::REAR_LEFT: return "Rear left";
-				case PhysicsModule::WheelSlot::REAR_RIGHT: return "Rear right";
-			}
-			ASSERT(false);
-			return "N/A";
-		}
-	};
 	
 	reflection::structure<RaycastHit>("RaycastHit")
 		.LUMIX_MEMBER(RaycastHit::position, "position")
@@ -3949,118 +3958,7 @@ void PhysicsModule::reflect() {
 		.LUMIX_MEMBER(SweepHit::distance, "distance")
 		.LUMIX_MEMBER(SweepHit::entity, "entity");
 
-	LUMIX_MODULE(PhysicsModuleImpl, "physics")
-		.LUMIX_FUNC(raycast)
-		.LUMIX_FUNC(raycastEx)
-		.LUMIX_FUNC(sweepSphere)
-		.LUMIX_FUNC(setGravity)
-		.LUMIX_CMP(D6Joint, "d6_joint", "Physics / Joint / D6")
-			.LUMIX_PROP(JointConnectedBody, "Connected body")
-			.LUMIX_PROP(JointAxisPosition, "Axis position")
-			.LUMIX_PROP(JointAxisDirection, "Axis direction")
-			.LUMIX_ENUM_PROP(D6JointXMotion, "X motion").attribute<D6MotionEnum>()
-			.LUMIX_ENUM_PROP(D6JointYMotion, "Y motion").attribute<D6MotionEnum>()
-			.LUMIX_ENUM_PROP(D6JointZMotion, "Z motion").attribute<D6MotionEnum>()
-			.LUMIX_ENUM_PROP(D6JointSwing1Motion, "Swing 1").attribute<D6MotionEnum>()
-			.LUMIX_ENUM_PROP(D6JointSwing2Motion, "Swing 2").attribute<D6MotionEnum>()
-			.LUMIX_ENUM_PROP(D6JointTwistMotion, "Twist").attribute<D6MotionEnum>()
-			.LUMIX_PROP(D6JointLinearLimit, "Linear limit").minAttribute(0)
-			.LUMIX_PROP(D6JointSwingLimit, "Swing limit").radiansAttribute()
-			.LUMIX_PROP(D6JointTwistLimit, "Twist limit").radiansAttribute()
-			.LUMIX_PROP(D6JointDamping, "Damping")
-			.LUMIX_PROP(D6JointStiffness, "Stiffness")
-			.LUMIX_PROP(D6JointRestitution, "Restitution")
-		.LUMIX_CMP(SphericalJoint, "spherical_joint", "Physics / Joint / Spherical")
-			.LUMIX_PROP(JointConnectedBody, "Connected body")
-			.LUMIX_PROP(JointAxisPosition, "Axis position")
-			.LUMIX_PROP(JointAxisDirection, "Axis direction")
-			.LUMIX_PROP(SphericalJointUseLimit, "Use limit")
-			.LUMIX_PROP(SphericalJointLimit, "Limit").radiansAttribute()
-		.LUMIX_CMP(DistanceJoint, "distance_joint", "Physics / Joint / Distance")
-			.LUMIX_PROP(JointConnectedBody, "Connected body")
-			.LUMIX_PROP(JointAxisPosition, "Axis position")
-			.LUMIX_PROP(DistanceJointDamping, "Damping").minAttribute(0)
-			.LUMIX_PROP(DistanceJointStiffness, "Stiffness").minAttribute(0)
-			.LUMIX_PROP(DistanceJointTolerance, "Tolerance").minAttribute(0)
-			.LUMIX_PROP(DistanceJointLimits, "Limits")
-		.LUMIX_CMP(HingeJoint, "hinge_joint", "Physics / Joint / Hinge")
-			.LUMIX_PROP(JointConnectedBody, "Connected body")
-			.LUMIX_PROP(JointAxisPosition, "Axis position")
-			.LUMIX_PROP(JointAxisDirection, "Axis direction")
-			.LUMIX_PROP(HingeJointDamping, "Damping").minAttribute(0)
-			.LUMIX_PROP(HingeJointStiffness, "Stiffness").minAttribute(0)
-			.LUMIX_PROP(HingeJointUseLimit, "Use limit")
-			.LUMIX_PROP(HingeJointLimit, "Limit").radiansAttribute()
-		.LUMIX_CMP(InstancedCube, "physical_instanced_cube", "Physics / Instanced cube")
-			.LUMIX_PROP(InstancedCubeHalfExtents, "Half extents")
-			.LUMIX_ENUM_PROP(InstancedCubeLayer, "Layer").attribute<LayerEnum>()
-		.LUMIX_CMP(InstancedMesh, "physical_instanced_mesh", "Physics / Instanced mesh")
-			.LUMIX_PROP(InstancedMeshGeomPath, "Mesh").resourceAttribute(PhysicsGeometry::TYPE)
-			.LUMIX_ENUM_PROP(InstancedMeshLayer, "Layer").attribute<LayerEnum>()
-		.LUMIX_CMP(Controller, "physical_controller", "Physics / Controller")
-			.LUMIX_FUNC_EX(PhysicsModule::moveController, "move")
-			.LUMIX_FUNC_EX(PhysicsModule::isControllerCollisionDown, "isCollisionDown")
-			.LUMIX_FUNC_EX(PhysicsModule::getGravitySpeed, "getGravitySpeed")
-			.LUMIX_PROP(ControllerRadius, "Radius")
-			.LUMIX_PROP(ControllerHeight, "Height")
-			.LUMIX_ENUM_PROP(ControllerLayer, "Layer").attribute<LayerEnum>()
-			.LUMIX_PROP(ControllerUseRootMotion, "Use root motion")
-			.LUMIX_PROP(ControllerCustomGravity, "Use custom gravity")
-			.LUMIX_PROP(ControllerCustomGravityAcceleration, "Custom gravity acceleration")
-		.LUMIX_CMP(Actor, "rigid_actor", "Physics / Actor")
-			.icon(ICON_FA_VOLLEYBALL_BALL)
-			.LUMIX_FUNC_EX(PhysicsModule::putToSleep, "putToSleep")
-			.LUMIX_FUNC_EX(PhysicsModule::getActorSpeed, "getSpeed")
-			.LUMIX_FUNC_EX(PhysicsModule::getActorVelocity, "getVelocity")
-			.LUMIX_FUNC_EX(PhysicsModule::applyForceToActor, "applyForce")
-			.LUMIX_FUNC_EX(PhysicsModule::applyImpulseToActor, "applyImpulse")
-			.LUMIX_FUNC_EX(PhysicsModule::addForceAtPos, "addForceAtPos")
-			.LUMIX_ENUM_PROP(ActorLayer, "Layer").attribute<LayerEnum>()
-			.LUMIX_ENUM_PROP(ActorDynamicType, "Dynamic").attribute<DynamicTypeEnum>()
-			.LUMIX_PROP(ActorIsTrigger, "Trigger")
-			.begin_array<&PhysicsModule::getBoxCount, &PhysicsModule::addBox, &PhysicsModule::removeBox>("Box geometry")	
-				.LUMIX_PROP(BoxHalfExtents, "Size")
-				.LUMIX_PROP(BoxOffsetPosition, "Position offset")
-				.LUMIX_PROP(BoxOffsetRotation, "Rotation offset").radiansAttribute()
-			.end_array()
-			.begin_array<&PhysicsModule::getSphereCount, &PhysicsModule::addSphere, &PhysicsModule::removeSphere>("Sphere geometry")
-				.LUMIX_PROP(SphereRadius, "Radius").minAttribute(0)
-				.LUMIX_PROP(SphereOffsetPosition, "Position offset")
-			.end_array()
-			.LUMIX_PROP(ActorCCD, "CCD")
-			.LUMIX_PROP(ActorMesh, "Mesh").resourceAttribute(PhysicsGeometry::TYPE)
-			.LUMIX_PROP(ActorMaterial, "Material").resourceAttribute(PhysicsMaterial::TYPE)
-		.LUMIX_CMP(Vehicle, "vehicle", "Physics / Vehicle")
-			.icon(ICON_FA_CAR_ALT)
-			.LUMIX_FUNC_EX(PhysicsModule::setVehicleAccel, "setAccel")
-			.LUMIX_FUNC_EX(PhysicsModule::setVehicleSteer, "setSteer")
-			.LUMIX_FUNC_EX(PhysicsModule::setVehicleBrake, "setBrake")
-			.prop<&PhysicsModuleImpl::getVehicleSpeed>("Speed")
-			.prop<&PhysicsModuleImpl::getVehicleCurrentGear>("Current gear")
-			.prop<&PhysicsModuleImpl::getVehicleRPM>("RPM")
-			.LUMIX_PROP(VehicleMass, "Mass").minAttribute(0)
-			.LUMIX_PROP(VehicleCenterOfMass, "Center of mass")
-			.LUMIX_PROP(VehicleMOIMultiplier, "MOI multiplier")
-			.LUMIX_PROP(VehicleChassis, "Chassis").resourceAttribute(PhysicsGeometry::TYPE)
-			.LUMIX_ENUM_PROP(VehicleChassisLayer, "Chassis layer").attribute<LayerEnum>()
-			.LUMIX_ENUM_PROP(VehicleWheelsLayer, "Wheels layer").attribute<LayerEnum>()
-		.LUMIX_CMP(Wheel, "wheel", "Physics / Wheel")
-			.LUMIX_PROP(WheelRadius, "Radius").minAttribute(0)
-			.LUMIX_PROP(WheelWidth, "Width").minAttribute(0)
-			.LUMIX_PROP(WheelMass, "Mass").minAttribute(0)
-			.LUMIX_PROP(WheelMOI, "MOI").minAttribute(0)
-			.LUMIX_PROP(WheelSpringMaxCompression, "Max compression").minAttribute(0)
-			.LUMIX_PROP(WheelSpringMaxDroop, "Max droop").minAttribute(0)
-			.LUMIX_PROP(WheelSpringStrength, "Spring strength").minAttribute(0)
-			.LUMIX_PROP(WheelSpringDamperRate, "Spring damper rate").minAttribute(0)
-			.LUMIX_ENUM_PROP(WheelSlot, "Slot").attribute<WheelSlotEnum>()
-			.prop<&PhysicsModuleImpl::getWheelRPM>("RPM")
-		.LUMIX_CMP(Heightfield, "physical_heightfield", "Physics / Heightfield")
-			.LUMIX_ENUM_PROP(HeightfieldLayer, "Layer").attribute<LayerEnum>()
-			.LUMIX_PROP(HeightfieldSource, "Heightmap").resourceAttribute(Texture::TYPE)
-			.LUMIX_PROP(HeightfieldYScale, "Y scale").minAttribute(0)
-			.LUMIX_PROP(HeightfieldXZScale, "XZ scale").minAttribute(0)
-	;
+	#include "physics_module.gen.h"
 }
 
 void PhysicsModuleImpl::RigidActor::setIsTrigger(bool is) {

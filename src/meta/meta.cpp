@@ -4,11 +4,24 @@
 
 using i32 = int;
 
+template <typename T, i32 CAPACITY>
+struct InplaceArray {
+	T& push() { ++size; return values[size - 1]; }
+	T values[CAPACITY];
+	i32 size = 0;
+
+	T* begin() { return values; }
+	T* end() { return values + size; }
+	const T* begin() const { return values; }
+	const T* end() const { return values + size; }
+	T& last() { return values[size - 1]; }
+};
+
 struct StringView {
 	const char* begin = nullptr;
 	const char* end = nullptr;
 
-	i32 size() { return i32(end - begin); }
+	i32 size() const { return i32(end - begin); }
 	char operator[] (i32 index) { return begin[index]; }
 };
 
@@ -181,7 +194,7 @@ static StringView skipWhitespaces(StringView v) {
 }
 
 bool isWordSeparator(char c) {
-	return isspace(c) || c == '(';
+	return isspace(c) || c == '(' || c == ',' || c == '{' || c == ';' || c == '}' || c == '<';
 }
 
 StringView consumeWord(StringView& str) {
@@ -212,8 +225,35 @@ StringView consumeString(StringView& str) {
 	return result;
 }
 
+char peekChar(StringView str) {
+	const char* c = str.begin;
+	while (c != str.end && isspace(*c)) ++c;
+	if (c != str.end) return *c;
+	return 0;
+}
+
 StringView consumeType(StringView& str) {
-	return consumeWord(str);
+	StringView word = consumeWord(str);
+	if (equal(word, "const")) {
+		StringView word2 = consumeWord(str);
+		word.end = word2.end;
+	}
+	if (peekChar(str) == '<') {
+		while (word.end != str.end && *word.end != '>') {
+			++word.end;
+		}
+		if (word.end != str.end) ++word.end;
+	}
+	str.begin = word.end;
+
+	if (word.end != str.end) {
+		char c = peekChar(str);
+		if (c == '&' || c == '*') {
+			++word.end;
+		}
+	}
+	str.begin = word.end;
+	return word;
 }
 
 StringView consumeIdentifier(StringView& str) {
@@ -250,6 +290,12 @@ struct OutputStream {
 		append(makeStringView(v));
 	}
 
+	void append(i32 value) {
+		char cstr[32] = "";
+		_itoa_s(value, cstr, 10);
+		append(makeStringView(cstr));
+	}
+
 	void append(StringView v) {
 		if (capacity < length + v.size()) {
 			capacity = (length + v.size()) * 2;
@@ -268,23 +314,37 @@ struct OutputStream {
 };
 
 struct Attributes {
+	StringView label;
 	StringView min;
-	StringView max;
+	StringView clamp_max;
+	StringView resource_type;
+	StringView property_name;
+	StringView dynamic_enum_name;
+	bool no_ui = false;
 	bool is_radians = false;
 	bool is_color = false;
+	bool force_function = false;
+	bool force_getter = false;
+	bool force_setter = false;
+	bool is_enum = false;
+	bool is_multiline = false;
+	bool is_blob = false;
 };
 
 struct IParseVisitor {
 	virtual void beginModule(StringView name, StringView id, StringView label) = 0;
 	virtual void endModule() = 0;
-	virtual void beginComponent(StringView name, StringView id, StringView label) = 0;
+	virtual void beginComponent(StringView name, StringView struct_name, StringView id, StringView label, StringView icon) = 0;
 	virtual void endComponent() = 0;
-	virtual void beginArray(StringView name) = 0;
+	virtual void beginArray(StringView name, StringView array_id) = 0;
 	virtual void endArray() = 0;
-	virtual void function(StringView name) = 0;
-	virtual void setter(StringView property_name, StringView args) = 0;
-	virtual void getter(StringView property_name, StringView args) = 0;
+	virtual void beginEnum(StringView name) = 0;
+	virtual void enumerator(StringView name, StringView value) = 0;
+	virtual void function(StringView name, StringView return_type, StringView args, const Attributes* attributes) = 0;
+	virtual void setter(StringView method_name, StringView property_name, StringView args, const Attributes* attributes) = 0;
+	virtual void getter(StringView return_type, StringView method_name, StringView property_name, StringView args, const Attributes* attributes) = 0;
 	virtual void variable(StringView type, StringView property_name, const Attributes& attributes) = 0;
+	virtual void event(StringView type, StringView name) = 0;
 };
 
 struct Parser {
@@ -316,23 +376,71 @@ struct Parser {
 		logInfo(filename, "(", line_str, "): ", args...); // TODO logInfo?
 	}
 
-	void parseSetter(StringView component_name, StringView name, StringView args) {
+	void parseGetter(StringView return_type, StringView method_name, StringView component_name, StringView name, StringView args, const Attributes* attributes) {
 		if (!startsWith(name, component_name)) {
 			logError("Expected ", component_name);
 			return;
 		}
 		name.begin += component_name.size();
-		
-		visitor->setter(name, args);
+		visitor->getter(return_type, method_name, name, args, attributes);
 	}
 
-	void parseGetter(StringView component_name, StringView name, StringView args) {
-		if (!startsWith(name, component_name)) {
-			logError("Expected ", component_name);
-			return;
+	bool parseAttributes(StringView def, Attributes& attributes) {
+		if (def.size() == 0) return false;
+
+		StringView word = consumeWord(def);
+		while (word.size() > 0) {
+			if (equal(word, "radians")) {
+				attributes.is_radians = true;
+			}
+			else if (equal(word, "resource_type")) {
+				attributes.resource_type = consumeWord(def);
+			}
+			else if (equal(word, "color")) {
+				attributes.is_color = true;
+			}
+			else if (equal(word, "enum")) {
+				attributes.is_enum = true;
+			}
+			else if (equal(word, "dynenum")) {
+				attributes.dynamic_enum_name = consumeWord(def);
+			}
+			else if (equal(word, "no_ui")) {
+				attributes.no_ui = true;
+			}
+			else if (equal(word, "min")) {
+				attributes.min = consumeWord(def);
+			}
+			else if (equal(word, "multiline")) {
+				attributes.is_multiline = true;
+			}
+			else if (equal(word, "blob")) {
+				attributes.is_blob = true;
+			}
+			else if (equal(word, "clamp")) {
+				attributes.min = consumeWord(def);
+				attributes.clamp_max = consumeWord(def);
+			}
+			else if (equal(word, "function")) {
+				attributes.force_function = true;
+			}
+			else if (equal(word, "label")) {
+				attributes.label = consumeString(def);
+			}
+			else if (equal(word, "getter")) {
+				attributes.property_name = consumeIdentifier(def);
+				attributes.force_getter = true;
+			}
+			else if (equal(word, "setter")) {
+				attributes.property_name = consumeIdentifier(def);
+				attributes.force_setter = true;
+			}
+			else {
+				logError("Unknown attribute ", word);
+			}
+			word = consumeWord(def);
 		}
-		name.begin += component_name.size();
-		visitor->getter(name, args);
+		return true;
 	}
 
 	void propertyVariable(StringView line, StringView def) {
@@ -341,38 +449,16 @@ struct Parser {
 		StringView name = consumeIdentifier(line);
 		if (name.end != name.begin && *(name.end - 1) == ';') --name.end; // trim ';'
 		
+		StringView label = name;
 		Attributes attributes;
-		StringView word = consumeWord(def);
-		while (word.size() > 0) {
-			if (equal(word, "radians")) {
-				attributes.is_radians = true;
-			}
-			else if (equal(word, "color")) {
-				attributes.is_color = true;
-			}
-			else if (equal(word, "min")) {
-				attributes.min = consumeWord(def);
-			}
-			else if (equal(word, "max")) {
-				attributes.max = consumeWord(def);
-			}
-			else {
-				logError("Unknown attribute ", word);
-			}
-			word = consumeWord(def);
-		}
+		parseAttributes(def, attributes);
 		
 		visitor->variable(type, name, attributes);
 	}
 
-	void parseComponentStruct(StringView id, StringView label) {
+	void parseComponentStruct(StringView name, StringView struct_name, StringView id, StringView label, StringView icon) {
 		StringView line;
-		// TODO errors
-		if (!readLine(content, line)) return;
-		if (!equal(consumeWord(line), "struct")) return;
-		StringView name = consumeWord(line);
-
-		visitor->beginComponent(name, id, label);
+		visitor->beginComponent(name, struct_name, id, label, icon);
 		defer { visitor->endComponent(); };
 
 		while (readLine(content, line)) {
@@ -392,12 +478,18 @@ struct Parser {
 				}
 			}
 		}		
-		logError("'//@ end' not found while parsing component ", name);
+		logError("'//@ end' not found while parsing component ", struct_name);
 	}
 
-	void parseArray(StringView component_name, StringView array_name) {
+	StringView withoutPrefix(StringView str, i32 prefix_len) {
+		StringView res = str;
+		res.begin += prefix_len;
+		return res;
+	}
+
+	void parseArray(StringView component_name, StringView array_name, StringView array_id) {
 		StringView line;
-		visitor->beginArray(array_name);
+		visitor->beginArray(array_name, array_id);
 		defer { visitor->endArray(); };
 		while (readLine(content, line)) {
 			StringView word = consumeWord(line);
@@ -415,27 +507,56 @@ struct Parser {
 				StringView type = consumeType(line);
 				StringView method_name = consumeIdentifier(line);
 				StringView args = consumeArgs(line);
+				StringView def = find(line, "//@");
 
+				Attributes attributes;
+				Attributes* attributes_ptr = nullptr;
+				if (def.size() > 0) {
+					def.begin += 3;
+					if (parseAttributes(def, attributes)) {
+						attributes_ptr = &attributes;
+					}
+				}
+
+				StringView property_name = method_name;
 				if (startsWith(method_name, "get")) {
-					method_name.begin += 3;
-					if (!startsWith(method_name, array_name)) {
+					property_name.begin += 3;
+					if (!startsWith(property_name, array_name)) {
 						logError("Expected ", array_name);
 					}
 					else {
-						method_name.begin += array_name.size();
-						if (!equal(method_name, "Count")) {
-							visitor->getter(method_name, args);
+						if (!equal(withoutPrefix(property_name, array_name.size()), "Count")) {
+							visitor->getter(type, method_name, property_name, args, attributes_ptr);
+						}
+					}
+				}
+				else if (startsWith(method_name, "is")) {
+					property_name.begin += 2;
+					if (!startsWith(property_name, array_name)) {
+						logError("Expected ", array_name);
+					}
+					else {
+						if (!equal(withoutPrefix(property_name, array_name.size()), "Count")) {
+							visitor->getter(type, method_name, property_name, args, attributes_ptr);
 						}
 					}
 				}
 				else if (startsWith(method_name, "set")) {
-					method_name.begin += 3;
-					if (!startsWith(method_name, array_name)) {
+					property_name.begin += 3;
+					if (!startsWith(property_name, array_name)) {
 						logError("Expected ", array_name);
 					}
 					else {
-						method_name.begin += array_name.size();
-						visitor->setter(method_name, args);
+						visitor->setter(method_name, property_name, args, attributes_ptr);
+					}
+				}
+				else if (startsWith(method_name, "enable")) {
+					property_name.begin += 6;
+					if (!startsWith(property_name, array_name)) {
+						logError("Expected ", array_name);
+					}
+					else {
+						visitor->setter(method_name, property_name, args, attributes_ptr);
 					}
 				}
 			}
@@ -443,8 +564,8 @@ struct Parser {
 		logError("'//@ end' not found while parsing ", component_name, ".", array_name);
 	}
 
-	void parseComponent(StringView component_name, StringView id, StringView label) {
-		visitor->beginComponent(component_name, id, label);
+	void parseComponent(StringView component_name, StringView id, StringView label, StringView icon) {
+		visitor->beginComponent(component_name, {}, id, label, icon);
 		defer { visitor->endComponent(); };
 
 		StringView line;
@@ -458,7 +579,8 @@ struct Parser {
 				}
 				else if (equal(word, "array")) {
 					StringView array_name = consumeIdentifier(line);
-					parseArray(component_name, array_name);
+					StringView array_id = consumeIdentifier(line);
+					parseArray(component_name, array_name, array_id);
 				}
 				else {
 					logError("Unexpected \"", word, "\"");
@@ -468,28 +590,122 @@ struct Parser {
 				StringView type = consumeType(line);
 				StringView method_name = consumeIdentifier(line);
 				StringView args = consumeArgs(line);
+				StringView def = find(line, "//@");
 
-				if (startsWith(method_name, "set")) {
-					method_name.begin += 3;
-					parseSetter(component_name, method_name, args);
+				Attributes attributes;
+				Attributes* attributes_ptr = nullptr;
+				if (def.size() > 0) {
+					def.begin += 3;
+					if (parseAttributes(def, attributes)) {
+						attributes_ptr = &attributes;
+					}
+				}
+
+				StringView property_name = method_name;
+				if (attributes.force_function) {
+					visitor->function(method_name, type, args, attributes_ptr);
+				}
+				else if (attributes.force_setter) {
+					visitor->setter(method_name, attributes.property_name, args, attributes_ptr);
+				}
+				else if (attributes.force_getter) {
+					visitor->getter(type, method_name, attributes.property_name, args, attributes_ptr);
+				}
+				else if (startsWith(method_name, "set")) {
+					property_name.begin += 3;
+					if (!startsWith(property_name, component_name)) {
+						logError("Expected ", component_name);
+						continue;
+					}
+					property_name.begin += component_name.size();
+					
+					visitor->setter(method_name, property_name, args, attributes_ptr);
 				}
 				else if (startsWith(method_name, "get")) {
-					method_name.begin += 3;
-					parseGetter(component_name, method_name, args);
+					property_name.begin += 3;
+					parseGetter(type, method_name, component_name, property_name, args, attributes_ptr);
 				}
 				else if (startsWith(method_name, "is")) {
-					method_name.begin += 2;
-					parseGetter(component_name, method_name, args);
+					property_name.begin += 2;
+					parseGetter(type, method_name, component_name, property_name, args, attributes_ptr);
 				}
 				else if (startsWith(method_name, "enable")) {
-					visitor->setter(makeStringView("Enabled"), args);
+					visitor->setter(method_name, makeStringView("Enabled"), args, attributes_ptr);
 				}
 				else {
-					visitor->function(method_name);
+					visitor->function(method_name, type, args, attributes_ptr);
 				}
 			}
 		}		
 		logError("'//@ end' not found while parsing component ", component_name);
+	}
+
+	void parseEvents() {
+		StringView line;
+		while (readLine(content, line)) {
+			StringView word = consumeWord(line);
+			if (equal(word, "virtual")) {
+				StringView type = consumeType(line);
+				StringView method_name = consumeIdentifier(line);
+				visitor->event(type, method_name);
+			}
+		}
+	}
+
+	void parseFunctions() {
+		StringView line;
+		while (readLine(content, line)) {
+			StringView word = consumeWord(line);
+			if (equal(word, "virtual")) {
+				StringView type = consumeType(line);
+				StringView method_name = consumeIdentifier(line);
+				StringView args = consumeArgs(line);
+				StringView def = find(line, "//@");
+				Attributes attributes;
+				bool has_attributes = false;
+				if (def.size() > 0) {
+					def.begin += 3;
+					has_attributes = parseAttributes(def, attributes);
+				}
+				visitor->function(method_name, type, args, has_attributes ? &attributes : nullptr);
+			}
+			else if (equal(word, "//@")) {
+				word = consumeWord(line);
+				if (equal(word, "end")) return;
+
+				logError("Unexpected ", word);
+			}
+		}
+	}
+	
+	void parseEnum() {
+		StringView line;
+		if (!readLine(content, line)) return;
+		StringView word0 = consumeWord(line);
+		if (!equal(word0, "enum")) {
+			logError("Expected enum");
+			return;
+		}
+		StringView enum_name = consumeWord(line);
+		if (equal(enum_name, "class")) enum_name = consumeWord(line);
+		visitor->beginEnum(enum_name);
+
+		for (;;) {
+			if (!readLine(content, line)) {
+				logError("End of enum not found");
+				return;
+			}
+			StringView enumerator_name = consumeWord(line);
+			if (equal(enumerator_name, "}")) break;
+			if (enumerator_name.size() == 0) continue;
+		
+			StringView enumerator_value = consumeWord(line);
+			if (equal(enumerator_value, "=")) {
+				enumerator_value = consumeWord(line);
+			}
+			else enumerator_value = {};
+			visitor->enumerator(enumerator_name, enumerator_value);
+		}
 	}
 
 	void parseModule(StringView module_name, StringView id, StringView label) {
@@ -501,16 +717,62 @@ struct Parser {
 			line.begin += 3;
 			line = skipWhitespaces(line);
 			StringView word = consumeWord(line);
-			if (equal(word, "component")) {
+			if (equal(word, "functions")) {
+				parseFunctions();
+			}
+			else if (equal(word, "enum")) {
+				parseEnum();
+			}
+			else if (equal(word, "events")) {
+				parseEvents();
+			}
+			else if (equal(word, "component")) {
 				StringView cmp_name = consumeWord(line);
 				StringView id = consumeWord(line);
 				StringView label = consumeString(line);
-				parseComponent(cmp_name, id, label);
+				StringView def = consumeWord(line);
+				StringView icon;
+
+				if (def.size() > 0) {
+					if (equal(def, "icon")) {
+						icon = consumeWord(line);
+					}
+					else {
+						logError("Unexpected ", def);
+					}
+				}
+				parseComponent(cmp_name, id, label, icon);
 			}
 			else if (equal(word, "component_struct")) {
 				StringView id = consumeWord(line);
 				StringView label = consumeString(line);
-				parseComponentStruct(id, label);
+				StringView icon;
+				StringView def = consumeWord(line);
+				StringView name;
+				if (def.size() > 0) {
+					if (equal(def, "icon")) {
+						icon = consumeWord(line);
+					}
+					else if (equal(def, "name")) {
+						name = consumeWord(line);
+					}
+					else {
+						logError("Unexpected ", def);
+					}
+				}
+				
+				if (!readLine(content, line) || !equal(consumeWord(line), "struct")) {
+					logError("Expected 'struct'");
+					return;
+				}
+				StringView struct_name = consumeWord(line);
+				if (struct_name.size() == 0) {
+					logError("Expected struct name");
+					return;
+				}
+				if (name.size() == 0) name = struct_name;
+				
+				parseComponentStruct(name, struct_name, id, label, icon);
 			}
 			else if (equal(word, "end")) {
 				return;
@@ -544,8 +806,10 @@ struct Parser {
 
 struct Property {
 	StringView name;
-	bool has_setter  = false;
-	bool has_getter  = false;
+	StringView type;
+	StringView getter_name;
+	StringView setter_name;
+	StringView array_id;
 	bool is_var = false;
 	bool is_array_begin = false;
 	bool is_array_end = false;
@@ -553,13 +817,18 @@ struct Property {
 };
 
 struct Function {
+	StringView return_type;
 	StringView name;
+	StringView args;
+	Attributes attributes;
 };
 
 struct Component {
 	StringView name;
+	StringView struct_name;
 	StringView id;
 	StringView label;
+	StringView icon;
 	Function functions[32];
 	i32 num_functions = 0;
 	Property properties[1024];
@@ -567,10 +836,22 @@ struct Component {
 	Component* next = nullptr;
 };
 
+struct Enumerator {
+	StringView name;
+	i32 value;
+};
+
+struct Enum {
+	StringView name;
+	InplaceArray<Enumerator, 64> values;
+};
+
 struct Reflector : IParseVisitor {
 	void beginModule(StringView name, StringView id, StringView label) override {
-		output.add("reflection::build_module(\"", id, "\")\n");
+		has_any_export = true;
+		num_module_functions = 0;
 		current_module = name;
+		current_module_id = id;
 		current_module_label = label;
 	}
 
@@ -610,21 +891,94 @@ struct Reflector : IParseVisitor {
 		}
 	}
 
+	void outputAttributes(const Attributes& attributes) {
+		if (attributes.is_radians) {
+			output.add("\t\t\t.radiansAttribute()\n");
+		}
+		if (attributes.is_multiline) {
+			output.add("\t\t\t.multilineAttribute()\n");
+		}
+		if (attributes.resource_type.size() > 0) {
+			output.add("\t\t\t.resourceAttribute(", attributes.resource_type, ")\n");
+		}
+		if (attributes.is_color) {
+			output.add("\t\t\t.colorAttribute()\n");
+		}
+		if (attributes.no_ui) {
+			output.add("\t\t\t.noUIAttribute()\n");
+		}
+		if (attributes.min.size() > 0) {
+			output.add("\t\t\t.minAttribute(", attributes.min, ")\n");
+		}
+		if (attributes.clamp_max.size() > 0) {
+			output.add("\t\t\t.clampAttribute(", attributes.min, ", ", attributes.clamp_max, ")\n");
+		}
+	}
+
+	bool isEnum(StringView name) {
+		for (const Enum& e : enums) {
+			if (equal(e.name, name)) return true;
+		}
+		return false;
+	}
+
+	StringView withoutNamespace(StringView ident) {
+		StringView res = ident;
+		res.begin = ident.end;
+		while (res.begin != ident.begin && *res.begin != ':') --res.begin;
+		if (*res.begin == ':') ++res.begin;
+		return res;
+	}
+
 	void endModule() override {
+		for (const Enum& e : enums) {
+			output.add("struct ", e.name, "Enum : reflection::EnumAttribute {\n");
+			output.add("\tu32 count(ComponentUID cmp) const override { return ",e.values.size,"; }\n");
+			output.add("\tconst char* name(ComponentUID cmp, u32 idx) const override {\n");
+			output.add("\t\tswitch((",e.name,")idx) {\n");
+			for (const Enumerator& v : e.values) {
+				output.add("\t\t\tcase ",e.name,"::",v.name,": return \"",v.name,"\";\n");
+			}
+			output.add("\t\t}\n");
+			output.add("\t\tASSERT(false);\n");
+			output.add("\t\treturn \"N/A\";\n");
+			output.add("\t}\n");
+			output.add("};\n\n");
+		}
+
+		output.add("reflection::build_module(\"", current_module_id, "\")\n");
+		
+		for (StringView e : events) {
+			output.add("\t.event<&",current_module,"::",e,">(\"",e,"\")\n");
+		}
+
+		for (i32 i = 0; i < num_module_functions; ++i) {
+			Function& fn = module_functions[i];
+			StringView label = fn.name;
+			if (fn.attributes.label.size() > 0) label = fn.attributes.label;
+			output.add("\t.function<(", fn.return_type, " (", current_module, "::*)", fn.args, ")&", current_module, "::", fn.name ,">(\"", label, "\", \"", current_module, "::", fn.name ,"\")\n");
+		}
+		
+
 		Component* cmp = components;
 		while (cmp) {
 			output.add("\t.cmp<&", current_module, "::create", cmp->name, ", &", current_module, "::destroy", cmp->name, ">(\"", cmp->id, "\", \"", current_module_label, " / ", cmp->label, "\")\n");
 			StringView array;
 			
+			if (cmp->icon.size() > 0) {
+				output.add("\t\t.icon(", cmp->icon, ")\n");
+			}
+
 			for (i32 i = 0; i < cmp->num_functions; ++i) {
 				Function& fn = cmp->functions[i];
-				output.add("\t\t.function<&", current_module, "::", fn.name, ">(\"", fn.name, "\", \"", fn.name, "\")\n");
+				StringView label = fn.attributes.label.size() > 0 ? fn.attributes.label : fn.name;
+				output.add("\t\t.function<(", fn.return_type, " (", current_module, "::*)", fn.args, ")&", current_module, "::", fn.name, ">(\"", label, "\", \"", current_module, "::", fn.name, "\")\n");
 			}
 
 			for (i32 i = 0; i < cmp->num_properties; ++i) {
 				Property& prop = cmp->properties[i];
 				if (prop.is_array_begin) {
-					output.add("\t\t.begin_array<&", current_module, "::get", prop.name, "Count, &", current_module, "::add", prop.name, ", &", current_module, "::remove", prop.name, ">(\"", prop.name ,"\")\n");
+					output.add("\t\t.begin_array<&", current_module, "::get", prop.name, "Count, &", current_module, "::add", prop.name, ", &", current_module, "::remove", prop.name, ">(\"", prop.array_id ,"\")\n");
 					array = prop.name;
 				}
 				else if (prop.is_array_end) {
@@ -633,43 +987,55 @@ struct Reflector : IParseVisitor {
 				}
 				else if (prop.is_var) {
 					char label[256];
-					toLabel(prop.name, Span(label, label + sizeof(label)));
-					output.add("\t\t.var_prop<&", current_module, "::get", cmp->name, ", &", cmp->name, "::", prop.name, ">(\"", label, "\")");
-					if (prop.attributes.is_radians) {
-						output.add(".radiansAttribute()");
+					if (prop.attributes.label.size() > 0) {
+						buildString(label, prop.attributes.label);
 					}
-					if (prop.attributes.is_color) {
-						output.add(".colorAttribute()");
+					else {
+						toLabel(prop.name, Span(label, label + sizeof(label)));
 					}
-					if (prop.attributes.min.size() > 0) {
-						output.add(".minAttribute(", prop.attributes.min, ")");
-					}
-					if (prop.attributes.max.size() > 0) {
-						output.add(".maxAttribute(", prop.attributes.max, ")");
-					}
+					output.add("\t\t.var_prop<&", current_module, "::get", cmp->name, ", &", cmp->struct_name, "::", prop.name, ">(\"", label, "\")");
 					output.add("\n");
+					outputAttributes(prop.attributes);
 				}
-				else if (prop.has_getter) {
-					StringView object_name = cmp->name;
-					if (array.size() > 0) object_name = array;
+				else if (prop.getter_name.size() > 0) {
+					bool is_enum = isEnum(prop.type) || prop.attributes.is_enum || prop.attributes.dynamic_enum_name.size() > 0;
 					if (equal(prop.name, "Enabled")) {
-						output.add("\t\t.prop<&", current_module, "::is", object_name, prop.name);
-						if (prop.has_getter && prop.has_setter) {
-							output.add(", &", current_module, "::enable", object_name);
+						output.add("\t\t.prop<&", current_module, "::", prop.getter_name);
+						if (prop.setter_name.size() > 0) {
+							output.add(", &", current_module, "::", prop.setter_name);
 						}
 					}
 					else {
-						output.add("\t\t.prop<&", current_module, "::get", object_name, prop.name);
-						if (prop.has_getter && prop.has_setter) {
-							output.add(", &", current_module, "::set", object_name, prop.name);
+						if (prop.attributes.is_blob) {
+							output.add("\t\t.blob_property<&", current_module, "::", prop.getter_name);
+						}
+						else if (is_enum) {
+							output.add("\t\t.enum_prop<&", current_module, "::", prop.getter_name);
+						}
+						else {
+							output.add("\t\t.prop<&", current_module, "::", prop.getter_name);
+						}
+						if (prop.setter_name.size() > 0) {
+							output.add(", &", current_module, "::", prop.setter_name);
 						}
 					}
 					char label[256];
-					toLabel(prop.name, Span(label, label + sizeof(label)));
+					if (prop.attributes.label.size() > 0) {
+						buildString(label, prop.attributes.label);
+					}
+					else {
+						toLabel(prop.name, Span(label, label + sizeof(label)));
+					}
 					output.add(">(\"", label, "\")\n");
+					outputAttributes(prop.attributes);
+					if (is_enum) {
+						// TODO withoutNamespace?
+						StringView enum_name = prop.attributes.dynamic_enum_name.size() > 0 ? prop.attributes.dynamic_enum_name : withoutNamespace(prop.type);
+						output.add("\t\t\t.attribute<",enum_name,"Enum>()\n");
+					}
 				}
-				else if (prop.has_setter) {
-					output.add("\t\t.function<&", current_module, "::set", cmp->name, prop.name, ">(\"set", prop.name, "\", \"set", cmp->name, prop.name, "\")\n");
+				else if (prop.setter_name.size() > 0) {
+					output.add("\t\t.function<&", current_module, "::",  prop.setter_name, ">(\"set", prop.name, "\", \"", current_module, "::", prop.setter_name, "\")\n");
 				}
 			}
 			Component* next = cmp->next;
@@ -679,12 +1045,34 @@ struct Reflector : IParseVisitor {
 		output.add(";\n\n");
 	}
 
-	void beginArray(StringView name) override {
+	void beginEnum(StringView name) override {
+		Enum& e = enums.push();
+		e.name = name;
+		last_enumerator_value = -1;
+	}
+
+	void enumerator(StringView name, StringView value) override {
+		Enumerator& e = enums.last().values.push();
+		e.name = name;
+		if (value.size() > 0) {
+			char tmp[64];
+			buildString(tmp, value);
+			e.value = atoi(tmp);
+			last_enumerator_value = e.value;
+		}
+		else {
+			++last_enumerator_value;
+			e.value = last_enumerator_value;
+		}
+	}
+
+	void beginArray(StringView name, StringView array_id) override {
 		Component* cmp = components;
 		while (cmp && !equal(cmp->id, current_component)) cmp = cmp->next;
 		cmp->properties[cmp->num_properties] = Property();
 		cmp->properties[cmp->num_properties].name = name;
 		cmp->properties[cmp->num_properties].is_array_begin = true;
+		cmp->properties[cmp->num_properties].array_id = array_id;
 		++cmp->num_properties;
 	}
 
@@ -696,9 +1084,9 @@ struct Reflector : IParseVisitor {
 		++cmp->num_properties;
 	}
 
-	void beginComponent(StringView name, StringView id, StringView label) override {
+	void beginComponent(StringView name, StringView struct_name, StringView id, StringView label, StringView icon) override {
 		current_component = id;
-		
+
 		Component* comp = components;
 		while (comp && !equal(comp->id, current_component)) {
 			comp = comp->next;
@@ -707,7 +1095,9 @@ struct Reflector : IParseVisitor {
 			comp = new Component;
 			comp->id = id;
 			comp->name = name;
+			comp->struct_name = struct_name;
 			comp->next = components;
+			comp->icon = icon;
 			comp->label = label;
 			components = comp;
 		}
@@ -718,25 +1108,46 @@ struct Reflector : IParseVisitor {
 		current_component = {};
 	}
 	
-	void function(StringView name) override {
+	void function(StringView name, StringView return_type, StringView args, const Attributes* attributes) override {
+		if (current_component.size() == 0) {
+			Function& fn = module_functions[num_module_functions];
+			fn.name = name;
+			fn.args = args;
+			fn.return_type = return_type;
+			if (attributes) fn.attributes = *attributes;
+			++num_module_functions;
+			return;
+		}
+
 		Component* cmp = components;
 		while (cmp && !equal(cmp->id, current_component)) cmp = cmp->next;
 
-		cmp->functions[cmp->num_functions] = Function();
-		cmp->functions[cmp->num_functions].name = name;
+		Function& fn = cmp->functions[cmp->num_functions];
+		fn = Function();
+		fn.name = name;
+		fn.return_type = return_type;
+		fn.args = args;
+		if (attributes) cmp->functions[cmp->num_functions].attributes = *attributes;
 		++cmp->num_functions;
 	}
 
-	void setter(StringView property_name, StringView args) override {
+	void setter(StringView method_name, StringView property_name, StringView args, const Attributes* attributes) override {
 		Property& prop = getProperty(property_name);
-		prop.has_setter = true;
+		if (attributes) prop.attributes = *attributes;
+		prop.setter_name = method_name;
 	}
 
-	void getter(StringView property_name, StringView args) override {
+	void getter(StringView return_type, StringView method_name, StringView property_name, StringView args, const Attributes* attributes) override {
 		Property& prop = getProperty(property_name);
-		prop.has_getter = true;
+		if (attributes) prop.attributes = *attributes;
+		prop.getter_name = method_name;
+		prop.type = return_type;
 	}
 	
+	void event(StringView type, StringView name) override {
+		events.push() = name;
+	}
+
 	void variable(StringView type, StringView property_name, const Attributes& attributes) override {
 		Property& prop = getProperty(property_name);
 		prop.is_var = true;
@@ -757,10 +1168,17 @@ struct Reflector : IParseVisitor {
 	}
 
 	OutputStream output;
+	InplaceArray<Enum, 64> enums;
+	InplaceArray<StringView, 64> events;
+	i32 last_enumerator_value = -1;
+	Function module_functions[64];
+	i32 num_module_functions = 0;
 	StringView current_component;
 	StringView current_module;
 	StringView current_module_label;
+	StringView current_module_id;
 	Component* components = nullptr;
+	bool has_any_export = false;
 };
 
 void parseFile(StringView path, StringView filename) {
@@ -782,6 +1200,7 @@ void parseFile(StringView path, StringView filename) {
 	}
 
 	Reflector visitor;
+	visitor.output.add("// generated by meta.cpp\n\n");
 	Parser parser;
 	parser.visitor = &visitor;
 	parser.filename = filename;
@@ -790,9 +1209,8 @@ void parseFile(StringView path, StringView filename) {
 	parser.parse();
 	
 	visitor.output.data[visitor.output.length] = 0;
-	if (visitor.output.length > 0) {
-		OutputDebugString(visitor.output.data);
-		// write reflection output beside source file as *.inl.h
+	if (visitor.has_any_export) {
+		// write reflection output beside source file as *.gen.h
 		char out_path[MAX_PATH];
 		{
 			const char* b = filename.begin;

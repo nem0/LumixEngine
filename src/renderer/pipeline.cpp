@@ -620,7 +620,7 @@ struct PipelineImpl final : Pipeline {
 
 			const World& world = m_module->getWorld();
 			const EntityPtr light = m_module->getActiveEnvironment();
-			const Vec4 cascades = light.isValid() ? m_module->getShadowmapCascades((EntityRef)light) : Vec4(3, 10, 60, 150);
+			const Vec4 cascades = light.isValid() ? m_module->getEnvironmentShadowmapCascades((EntityRef)light) : Vec4(3, 10, 60, 150);
 			const Matrix light_mtx = light.isValid() ? world.getRelativeMatrix((EntityRef)light, m_viewport.pos) : Matrix::IDENTITY;
 
 			const float camera_height = (float)m_viewport.h;
@@ -2198,7 +2198,7 @@ struct PipelineImpl final : Pipeline {
 	void setupFur(View& view) {
 		if (view.cp.is_shadow) return;
 
-		HashMap<EntityRef, FurComponent>& furs = m_module->getFurs();
+		HashMap<EntityRef, Fur>& furs = m_module->getFurs();
 		if (furs.empty()) return;
 
 		Span<const ModelInstance> mi = m_module->getModelInstances();
@@ -2763,7 +2763,7 @@ struct PipelineImpl final : Pipeline {
 						UBPrefix* prefix = (UBPrefix*)ub.ptr;
 						u32 layers = 1;
 						if (type == RenderableTypes::FUR) {
-							FurComponent& fur = m_module->getFur(entity);
+							Fur& fur = m_module->getFur(entity);
 							layers = fur.layers;
 							prefix->fur_scale = fur.scale;
 							prefix->gravity = fur.gravity;

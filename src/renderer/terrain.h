@@ -28,6 +28,12 @@ struct TerrainQuad;
 struct Texture;
 struct World;
 
+enum class GrassRotationMode : i32 {
+	Y_UP,
+	ALL_RANDOM,
+
+	COUNT,
+};
 
 struct LUMIX_RENDERER_API Terrain {
 	struct GrassQuad {
@@ -55,14 +61,7 @@ struct LUMIX_RENDERER_API Terrain {
 		float m_spacing;
 		float m_distance;
 		int m_idx;
-		enum class RotationMode : int
-		{
-			Y_UP,
-			ALL_RANDOM,
-
-			COUNT,
-		};
-		RotationMode m_rotation_mode = RotationMode::Y_UP;
+		GrassRotationMode m_rotation_mode = GrassRotationMode::Y_UP;
 	};
 
 	Terrain(Renderer& renderer, EntityPtr entity, RenderModule& module, IAllocator& allocator);
@@ -86,7 +85,7 @@ struct LUMIX_RENDERER_API Terrain {
 	int getHeight() const { return m_height; }
 	float getGrassTypeSpacing(int index) const;
 	float getGrassTypeDistance(int index) const;
-	GrassType::RotationMode getGrassTypeRotationMode(int index) const;
+	GrassRotationMode getGrassTypeRotationMode(int index) const;
 	int getGrassTypeCount() const { return m_grass_types.size(); }
 
 	float getHeight(int x, int z) const;
@@ -96,7 +95,7 @@ struct LUMIX_RENDERER_API Terrain {
 	void setGrassTypePath(int index, const Path& path);
 	void setGrassTypeSpacing(int index, float spacing);
 	void setGrassTypeDistance(int index, float value);
-	void setGrassTypeRotationMode(int index, GrassType::RotationMode mode);
+	void setGrassTypeRotationMode(int index, GrassRotationMode mode);
 	void setMaterial(Material* material);
 
 	RayCastModelHit castRay(const Ray& ray);

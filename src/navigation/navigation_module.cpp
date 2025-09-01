@@ -1077,23 +1077,6 @@ struct NavigationModuleImpl final : NavigationModule
 		}
 	}
 
-
-	void setAgentActive(EntityRef entity, bool active) override
-	{
-		/*if (!m_crowd) return;
-
-		auto iter = m_agents.find(entity);
-		if (iter == m_agents.end()) return;
-
-		Agent& agent = iter.value();
-		if (agent.agent < 0) return;
-
-		dtCrowdAgent* dt_agent = m_crowd->getEditableAgent(agent.agent);
-		if (dt_agent) dt_agent->paused = !active;*/
-		// TOOD
-	}
-
-
 	bool navigate(EntityRef entity, const DVec3& world_dest, float speed, float stop_distance) override
 	{
 		auto iter = m_agents.find(entity);
@@ -1157,10 +1140,10 @@ struct NavigationModuleImpl final : NavigationModule
 		config.cs = zone.zone.cell_size;
 		config.ch = zone.zone.cell_height;
 		config.walkableSlopeAngle = zone.zone.walkable_slope_angle;
-		config.walkableHeight = (int)(zone.zone.agent_height / config.ch + 0.99f);
-		config.walkableClimb = (int)(zone.zone.max_climb / config.ch);
-		config.walkableRadius = (int)(zone.zone.agent_radius / config.cs + 0.99f);
-		config.maxEdgeLen = (int)(12 / config.cs);
+		config.walkableHeight = int(zone.zone.agent_height / config.ch + 0.99f);
+		config.walkableClimb = int(zone.zone.max_climb / config.ch);
+		config.walkableRadius = int(zone.zone.agent_radius / config.cs + 0.99f);
+		config.maxEdgeLen = int(12 / config.cs);
 		config.maxSimplificationError = 1.3f;
 		config.minRegionArea = 8 * 8;
 		config.mergeRegionArea = 20 * 20;
@@ -1468,7 +1451,7 @@ struct NavigationModuleImpl final : NavigationModule
 		}
 	}
 
-	void createZone(EntityRef entity) {
+	void createZone(EntityRef entity) override {
 		RecastZone zone;
 		zone.zone.extents = Vec3(1);
 		zone.zone.guid = randGUID();
@@ -1478,7 +1461,7 @@ struct NavigationModuleImpl final : NavigationModule
 		m_world.onComponentCreated(entity, NAVMESH_ZONE_TYPE, this);
 	}
 
-	void destroyZone(EntityRef entity) {
+	void destroyZone(EntityRef entity) override {
 		for (Agent& agent : m_agents) {
 			if (agent.zone == entity) agent.zone = INVALID_ENTITY;
 		}
@@ -1515,7 +1498,7 @@ struct NavigationModuleImpl final : NavigationModule
 		}
 	}
 
-	void createAgent(EntityRef entity) {
+	void createAgent(EntityRef entity) override {
 		Agent agent;
 		agent.zone = INVALID_ENTITY;
 		agent.entity = entity;
@@ -1529,7 +1512,7 @@ struct NavigationModuleImpl final : NavigationModule
 		m_world.onComponentCreated(entity, NAVMESH_AGENT_TYPE, this);
 	}
 
-	void destroyAgent(EntityRef entity) {
+	void destroyAgent(EntityRef entity) override {
 		auto iter = m_agents.find(entity);
 		const Agent& agent = iter.value();
 		if (agent.zone.isValid()) {
@@ -1715,34 +1698,7 @@ UniquePtr<NavigationModule> NavigationModule::create(Engine& engine, ISystem& sy
 
 
 void NavigationModule::reflect() {
-	LUMIX_MODULE(NavigationModuleImpl, "navigation")
-		.LUMIX_CMP(Zone, "navmesh_zone", "Navigation / Zone")
-			.icon(ICON_FA_STREET_VIEW)
-			.LUMIX_FUNC_EX(NavigationModule::loadZone, "load")
-			.LUMIX_FUNC_EX(NavigationModule::debugDrawContours, "drawContours")
-			.LUMIX_FUNC_EX(NavigationModule::debugDrawNavmesh, "drawNavmesh")
-			.LUMIX_FUNC_EX(NavigationModule::debugDrawCompactHeightfield, "drawCompactHeightfield")
-			.LUMIX_FUNC_EX(NavigationModule::debugDrawHeightfield, "drawHeightfield")
-			.LUMIX_FUNC_EX(NavigationModule::generateNavmesh, "generateNavmesh")
-			.var_prop<&NavigationModule::getZone, &NavmeshZone::extents>("Extents")
-			.var_prop<&NavigationModule::getZone, &NavmeshZone::agent_height>("Agent height")
-			.var_prop<&NavigationModule::getZone, &NavmeshZone::agent_radius>("Agent radius")
-			.var_prop<&NavigationModule::getZone, &NavmeshZone::cell_size>("Cell size")
-			.var_prop<&NavigationModule::getZone, &NavmeshZone::cell_height>("Cell height")
-			.var_prop<&NavigationModule::getZone, &NavmeshZone::walkable_slope_angle>("Walkable slope angle")
-			.var_prop<&NavigationModule::getZone, &NavmeshZone::max_climb>("Max climb")
-			.prop<&NavigationModule::getZoneAutoload, &NavigationModule::setZoneAutoload>("Autoload")
-			.prop<&NavigationModule::getZoneDetailed, &NavigationModule::setZoneDetailed>("Detailed")
-		.LUMIX_CMP(Agent, "navmesh_agent", "Navigation / Agent")
-			.icon(ICON_FA_MAP_MARKED_ALT)
-			.LUMIX_FUNC_EX(NavigationModule::setAgentActive, "setActive")
-			.LUMIX_FUNC_EX(NavigationModule::navigate, "navigate")
-			.LUMIX_FUNC_EX(NavigationModule::cancelNavigation, "cancelNavigation")
-			.LUMIX_FUNC_EX(NavigationModule::debugDrawPath, "drawPath")
-			.LUMIX_PROP(AgentRadius, "Radius").minAttribute(0)
-			.LUMIX_PROP(AgentHeight, "Height").minAttribute(0)
-			.LUMIX_PROP(AgentMoveEntity, "Move entity")
-			.prop<&NavigationModuleImpl::getAgentSpeed>("Speed");
+	#include "navigation_module.gen.h"
 }
 
 } // namespace Lumix

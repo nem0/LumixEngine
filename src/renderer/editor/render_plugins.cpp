@@ -5444,7 +5444,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		RenderModule* module = static_cast<RenderModule*>(light.module);
 		World& world = module->getWorld();
 
-		const float range = module->getLightRange((EntityRef)light.entity);
+		const float range = module->getPointLightRange((EntityRef)light.entity);
 		const float fov = module->getPointLight((EntityRef)light.entity).fov;
 
 		const DVec3 pos = world.getPosition((EntityRef)light.entity);

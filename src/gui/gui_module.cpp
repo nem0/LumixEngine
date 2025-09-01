@@ -310,7 +310,7 @@ struct GUIModuleImpl final : GUIModule {
 	}
 
 	GUIRayHit raycast(const Ray& ray) override {
-		for (const GUICanvas& canvas : m_canvas) {
+		for (const Canvas& canvas : m_canvas) {
 			auto iter = m_rects.find(canvas.entity);
 			if (iter.isValid()) {
 				const Transform& transform = m_world.getTransform(canvas.entity);
@@ -348,7 +348,7 @@ struct GUIModuleImpl final : GUIModule {
 
 	IVec2 getCursorPosition() override { return m_cursor_pos; }
 
-	void draw3D(GUICanvas& canvas, Pipeline& pipeline) {
+	void draw3D(Canvas& canvas, Pipeline& pipeline) {
 		m_draw_2d.clear({2, 2});
 
 		auto canvas_rect_iter = m_rects.find(canvas.entity);
@@ -367,7 +367,7 @@ struct GUIModuleImpl final : GUIModule {
 
 	void renderCanvas(Pipeline& pipeline, const struct Vec2& canvas_size, bool is_main, EntityRef canvas_entity) override {
 		m_canvas_size = canvas_size;
-		GUICanvas& canvas = m_canvas[canvas_entity];
+		Canvas& canvas = m_canvas[canvas_entity];
 		auto iter = m_rects.find(canvas.entity);
 		if (iter.isValid()) {
 			GUIRect* r = iter.value();
@@ -381,7 +381,7 @@ struct GUIModuleImpl final : GUIModule {
 			m_cursor_type = os::CursorType::DEFAULT;
 			m_cursor_set = false;
 		}
-		for (GUICanvas& canvas : m_canvas) {
+		for (Canvas& canvas : m_canvas) {
 			if (canvas.is_3d) {
 				draw3D(canvas, pipeline);
 			}
@@ -453,11 +453,11 @@ struct GUIModuleImpl final : GUIModule {
 		return image->sprite ? image->sprite->getPath() : Path();
 	}
 	
-	HashMap<EntityRef, GUICanvas>& getCanvases() override {
+	HashMap<EntityRef, Canvas>& getCanvases() override {
 		return m_canvas;
 	}
 
-	GUICanvas& getCanvas(EntityRef entity) override {
+	Canvas& getCanvas(EntityRef entity) override {
 		return m_canvas[entity];
 	}
 
@@ -530,7 +530,7 @@ struct GUIModuleImpl final : GUIModule {
 	}
 
 	EntityPtr getRectAtEx(const Vec2& pos, const Vec2& canvas_size, EntityPtr limit, EntityRef canvas_entity) const override {
-		const GUICanvas& canvas = m_canvas[canvas_entity];
+		const Canvas& canvas = m_canvas[canvas_entity];
 		auto iter = m_rects.find(canvas.entity);
 		if (iter.isValid()) {
 			const GUIRect* r = iter.value();
@@ -542,7 +542,7 @@ struct GUIModuleImpl final : GUIModule {
 
 	EntityPtr getRectAtEx(const Vec2& pos, const Vec2& canvas_size, EntityPtr limit) const override
 	{
-		for (const GUICanvas& canvas : m_canvas) {
+		for (const Canvas& canvas : m_canvas) {
 			auto iter = m_rects.find(canvas.entity);
 			if (iter.isValid()) {
 				const GUIRect* r = iter.value();
@@ -888,7 +888,7 @@ struct GUIModuleImpl final : GUIModule {
 					if (event.device->type == InputSystem::Device::MOUSE) {
 						Vec2 pos(event.data.axis.x_abs, event.data.axis.y_abs);
 						m_cursor_pos = IVec2((i32)pos.x, (i32)pos.y);
-						for (const GUICanvas& canvas : m_canvas) {
+						for (const Canvas& canvas : m_canvas) {
 							auto iter = m_rects.find(canvas.entity);
 							if (iter.isValid()) {
 								GUIRect* r = iter.value();
@@ -906,7 +906,7 @@ struct GUIModuleImpl final : GUIModule {
 							m_mouse_down_pos.y = event.data.button.y;
 						}
 						bool handled = false;
-						for (const GUICanvas& canvas : m_canvas) {
+						for (const Canvas& canvas : m_canvas) {
 							auto iter = m_rects.find(canvas.entity);
 							if (iter.isValid()) {
 								GUIRect* r = iter.value();
@@ -949,8 +949,7 @@ struct GUIModuleImpl final : GUIModule {
 	}
 
 
-	void createRect(EntityRef entity)
-	{
+	void createRect(EntityRef entity) override {
 		auto iter = m_rects.find(entity);
 		GUIRect* rect;
 		if (iter.isValid()) {
@@ -970,8 +969,7 @@ struct GUIModuleImpl final : GUIModule {
 	}
 
 
-	void createText(EntityRef entity)
-	{
+	void createText(EntityRef entity) override {
 		auto iter = m_rects.find(entity);
 		if (!iter.isValid())
 		{
@@ -985,8 +983,7 @@ struct GUIModuleImpl final : GUIModule {
 	}
 
 
-	void createRenderTarget(EntityRef entity)
-	{
+	void createRenderTarget(EntityRef entity) override {
 		auto iter = m_rects.find(entity);
 		if (!iter.isValid())
 		{
@@ -998,8 +995,7 @@ struct GUIModuleImpl final : GUIModule {
 	}
 
 
-	void createButton(EntityRef entity)
-	{
+	void createButton(EntityRef entity) override {
 		auto iter = m_rects.find(entity);
 		if (!iter.isValid())
 		{
@@ -1015,15 +1011,13 @@ struct GUIModuleImpl final : GUIModule {
 	}
 	
 
-	void createCanvas(EntityRef entity)
-	{
-		GUICanvas& canvas = m_canvas.insert(entity);
+	void createCanvas(EntityRef entity) override {
+		Canvas& canvas = m_canvas.insert(entity);
 		canvas.entity = entity;
 		m_world.onComponentCreated(entity, GUI_CANVAS_TYPE, this);
 	}
 
-	void createInputField(EntityRef entity)
-	{
+	void createInputField(EntityRef entity) override {
 		auto iter = m_rects.find(entity);
 		if (!iter.isValid())
 		{
@@ -1037,8 +1031,7 @@ struct GUIModuleImpl final : GUIModule {
 	}
 
 
-	void createImage(EntityRef entity)
-	{
+	void createImage(EntityRef entity) override {
 		auto iter = m_rects.find(entity);
 		if (!iter.isValid())
 		{
@@ -1053,8 +1046,7 @@ struct GUIModuleImpl final : GUIModule {
 	}
 
 
-	void destroyRect(EntityRef entity)
-	{
+	void destroyRect(EntityRef entity) override {
 		GUIRect* rect = m_rects[entity];
 		rect->flags &= ~GUIRect::IS_VALID;
 		if (!rect->image && !rect->text && !rect->input_field && !rect->render_target)
@@ -1066,19 +1058,17 @@ struct GUIModuleImpl final : GUIModule {
 	}
 
 
-	void destroyButton(EntityRef entity)
-	{
+	void destroyButton(EntityRef entity) override {
 		m_buttons.erase(entity);
 		m_world.onComponentDestroyed(entity, GUI_BUTTON_TYPE, this);
 	}
 
-	void destroyCanvas(EntityRef entity) {
+	void destroyCanvas(EntityRef entity) override {
 		m_canvas.erase(entity);
 		m_world.onComponentDestroyed(entity, GUI_CANVAS_TYPE, this);
 	}
 
-	void destroyRenderTarget(EntityRef entity)
-	{
+	void destroyRenderTarget(EntityRef entity) override {
 		GUIRect* rect = m_rects[entity];
 		rect->render_target = nullptr;
 		m_world.onComponentDestroyed(entity, GUI_RENDER_TARGET_TYPE, this);
@@ -1086,8 +1076,7 @@ struct GUIModuleImpl final : GUIModule {
 	}
 
 
-	void destroyInputField(EntityRef entity)
-	{
+	void destroyInputField(EntityRef entity) override {
 		GUIRect* rect = m_rects[entity];
 		LUMIX_DELETE(m_allocator, rect->input_field);
 		rect->input_field = nullptr;
@@ -1109,8 +1098,7 @@ struct GUIModuleImpl final : GUIModule {
 	}
 
 
-	void destroyImage(EntityRef entity)
-	{
+	void destroyImage(EntityRef entity) override {
 		GUIRect* rect = m_rects[entity];
 		LUMIX_DELETE(m_allocator, rect->image);
 		rect->image = nullptr;
@@ -1119,8 +1107,7 @@ struct GUIModuleImpl final : GUIModule {
 	}
 
 
-	void destroyText(EntityRef entity)
-	{
+	void destroyText(EntityRef entity) override {
 		GUIRect* rect = m_rects[entity];
 		LUMIX_DELETE(m_allocator, rect->text);
 		rect->text = nullptr;
@@ -1175,7 +1162,7 @@ struct GUIModuleImpl final : GUIModule {
 
 		serializer.write(m_canvas.size());
 		
-		for (GUICanvas& c : m_canvas) {
+		for (Canvas& c : m_canvas) {
 			serializer.write(c.entity);
 			serializer.write(c.is_3d);
 			serializer.write(c.orient_to_camera);
@@ -1268,7 +1255,7 @@ struct GUIModuleImpl final : GUIModule {
 		
 		count = serializer.read<u32>();
 		for (u32 i = 0; i < count; ++i) {
-			GUICanvas canvas;
+			Canvas canvas;
 			serializer.read(canvas.entity);
 			serializer.read(canvas.is_3d);
 			if (version > (i32)Version::CANVAS_3D) {
@@ -1296,7 +1283,7 @@ struct GUIModuleImpl final : GUIModule {
 
 	World& getWorld() override { return m_world; }
 	ISystem& getSystem() const override { return m_system; }
-	GUISystem* getSystemPtr() const { return &m_system; }
+	GUISystem* getSystemPtr() const override { return &m_system; }
 
 	IAllocator& m_allocator;
 	World& m_world;
@@ -1304,7 +1291,7 @@ struct GUIModuleImpl final : GUIModule {
 	
 	HashMap<EntityRef, GUIRect*> m_rects;
 	HashMap<EntityRef, GUIButton> m_buttons;
-	HashMap<EntityRef, GUICanvas> m_canvas;
+	HashMap<EntityRef, Canvas> m_canvas;
 	EntityRef m_buttons_down[16];
 	u32 m_buttons_down_count;
 	EntityPtr m_focused_entity = INVALID_ENTITY;
@@ -1331,33 +1318,8 @@ UniquePtr<GUIModule> GUIModule::createInstance(GUISystem& system,
 }
 
 void GUIModule::reflect() {
-	struct TextHAlignEnum : reflection::EnumAttribute {
-		u32 count(ComponentUID cmp) const override { return 3; }
-		const char* name(ComponentUID cmp, u32 idx) const override {
-			switch((GUIModule::TextHAlign)idx) {
-				case GUIModule::TextHAlign::LEFT: return "Left";
-				case GUIModule::TextHAlign::RIGHT: return "Right";
-				case GUIModule::TextHAlign::CENTER: return "Center";
-			}
-			ASSERT(false);
-			return "N/A";
-		}
-	};
-
-	struct TextVAlignEnum : reflection::EnumAttribute {
-		u32 count(ComponentUID cmp) const override { return 3; }
-		const char* name(ComponentUID cmp, u32 idx) const override {
-			switch((GUIModule::TextVAlign)idx) {
-				case GUIModule::TextVAlign::TOP: return "Top";
-				case GUIModule::TextVAlign::MIDDLE: return "Middle";
-				case GUIModule::TextVAlign::BOTTOM: return "Bottom";
-			}
-			ASSERT(false);
-			return "N/A";
-		}
-	};
-		
-	struct CursorEnum : reflection::EnumAttribute {
+	// TODO handle in meta
+	struct CursorTypeEnum : reflection::EnumAttribute {
 		u32 count(ComponentUID cmp) const override { return 7; }
 		const char* name(ComponentUID cmp, u32 idx) const override {
 			switch((os::CursorType)idx) {
@@ -1375,49 +1337,7 @@ void GUIModule::reflect() {
 		}
 	};
 
-	LUMIX_MODULE(GUIModuleImpl, "gui")
-		.LUMIX_EVENT(GUIModule::buttonClicked)
-		.LUMIX_EVENT(GUIModule::rectHovered)
-		.LUMIX_EVENT(GUIModule::rectHoveredOut)
-		.LUMIX_EVENT(GUIModule::rectMouseDown)
-		.LUMIX_EVENT(GUIModule::mousedButtonUnhandled)
-		.LUMIX_FUNC_EX(GUIModule::getRectAt, "getRectAt")
-		.LUMIX_FUNC(isOver)
-		.function<&GUIModuleImpl::getSystemPtr>("getSystem", "GUIModule::getSystem")
-		.LUMIX_CMP(RenderTarget, "gui_render_target", "GUI / Render taget")
-		.LUMIX_CMP(Text, "gui_text", "GUI / Text")
-			.icon(ICON_FA_FONT)
-			.LUMIX_PROP(Text, "Text").multilineAttribute()
-			.LUMIX_PROP(TextFontPath, "Font").resourceAttribute(FontResource::TYPE)
-			.LUMIX_PROP(TextFontSize, "Font Size")
-			.LUMIX_ENUM_PROP(TextHAlign, "Horizontal align").attribute<TextHAlignEnum>()
-			.LUMIX_ENUM_PROP(TextVAlign, "Vertical align").attribute<TextVAlignEnum>()
-			.LUMIX_PROP(TextColorRGBA, "Color").colorAttribute()
-		.LUMIX_CMP(InputField, "gui_input_field", "GUI / Input field").icon(ICON_FA_KEYBOARD)
-		.LUMIX_CMP(Canvas, "gui_canvas", "GUI / Canvas")
-			.var_prop<&GUIModule::getCanvas, &GUICanvas::is_3d>("Is 3D")
-			.var_prop<&GUIModule::getCanvas, &GUICanvas::orient_to_camera>("Orient to camera")
-			.var_prop<&GUIModule::getCanvas, &GUICanvas::virtual_size>("Virtual size")
-		.LUMIX_CMP(Button, "gui_button", "GUI / Button")
-			.LUMIX_PROP(ButtonHoveredColorRGBA, "Hovered color").colorAttribute()
-			.LUMIX_ENUM_PROP(ButtonHoveredCursor, "Cursor").attribute<CursorEnum>()
-		.LUMIX_CMP(Image, "gui_image", "GUI / Image")
-			.icon(ICON_FA_IMAGE)
-			.prop<&GUIModule::isImageEnabled, &GUIModule::enableImage>("Enabled")
-			.LUMIX_PROP(ImageColorRGBA, "Color").colorAttribute()
-			.LUMIX_PROP(ImageSprite, "Sprite").resourceAttribute(Sprite::TYPE)
-		.LUMIX_CMP(Rect, "gui_rect", "GUI / Rect")
-			.prop<&GUIModule::isRectEnabled, &GUIModule::enableRect>("Enabled")
-			.LUMIX_PROP(RectClip, "Clip content")
-			.LUMIX_PROP(RectTopPoints, "Top Points")
-			.LUMIX_PROP(RectTopRelative, "Top Relative")
-			.LUMIX_PROP(RectRightPoints, "Right Points")
-			.LUMIX_PROP(RectRightRelative, "Right Relative")
-			.LUMIX_PROP(RectBottomPoints, "Bottom Points")
-			.LUMIX_PROP(RectBottomRelative, "Bottom Relative")
-			.LUMIX_PROP(RectLeftPoints, "Left Points")
-			.LUMIX_PROP(RectLeftRelative, "Left Relative")
-	;
+	#include "gui_module.gen.h"
 }
 
 } // namespace Lumix

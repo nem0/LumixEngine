@@ -95,13 +95,13 @@ struct RenderModuleImpl final : RenderModule {
 		World& world,
 		IAllocator& allocator);
 
-	void getInstancedModelBlob(EntityRef entity, OutputMemoryStream& value) {
+	void getInstancedModelBlob(EntityRef entity, OutputMemoryStream& value) override {
 		const Array<InstancedModel::InstanceData>& instances = m_instanced_models[entity].instances;
 		value.write(instances.size());
 		value.write(instances.begin(), instances.byte_size());
 	}
 
-	void setInstancedModelBlob(EntityRef entity, InputMemoryStream& value) {
+	void setInstancedModelBlob(EntityRef entity, InputMemoryStream& value) override {
 		const i32 size = value.read<i32>();
 		InstancedModel& im = beginInstancedModelEditing(entity);
 		im.instances.resize(size);
@@ -725,7 +725,7 @@ struct RenderModuleImpl final : RenderModule {
 			EntityRef e;
 			serializer.read(e);
 			e = entity_map.get(e);
-			FurComponent fur;
+			Fur fur;
 			serializer.read(fur);
 			m_furs.insert(e, fur);
 			m_world.onComponentCreated(e, FUR_TYPE, this);
@@ -1249,8 +1249,7 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 
-	void destroyBoneAttachment(EntityRef entity)
-	{
+	void destroyBoneAttachment(EntityRef entity) override {
 		const BoneAttachment& bone_attachment = m_bone_attachments[entity];
 		const EntityPtr parent_entity = bone_attachment.parent_entity;
 		if (parent_entity.isValid() && parent_entity.index < m_model_instances.size())
@@ -1262,16 +1261,14 @@ struct RenderModuleImpl final : RenderModule {
 		m_world.onComponentDestroyed(entity, BONE_ATTACHMENT_TYPE, this);
 	}
 	
-	void destroyReflectionProbe(EntityRef entity)
-	{
+	void destroyReflectionProbe(EntityRef entity) override {
 		ReflectionProbe& probe = m_reflection_probes[entity];
 		LUMIX_DELETE(m_allocator, probe.load_job);
 		m_reflection_probes.erase(entity);
 		m_world.onComponentDestroyed(entity, REFLECTION_PROBE_TYPE, this);
 	}
 
-	void destroyEnvironmentProbe(EntityRef entity)
-	{
+	void destroyEnvironmentProbe(EntityRef entity) override {
 		m_environment_probes.erase(entity);
 		m_world.onComponentDestroyed(entity, ENVIRONMENT_PROBE_TYPE, this);
 	}
@@ -1366,7 +1363,7 @@ struct RenderModuleImpl final : RenderModule {
 		im.dirty = false;
 	}
 
-	void destroyInstancedModel(EntityRef entity) {
+	void destroyInstancedModel(EntityRef entity) override {
 		Model* m = m_instanced_models[entity].model;
 		if (m) m->decRefCount();
 		if (m_instanced_models[entity].gpu_data) m_renderer.getEndFrameDrawStream().destroy(m_instanced_models[entity].gpu_data);
@@ -1374,14 +1371,14 @@ struct RenderModuleImpl final : RenderModule {
 		m_world.onComponentDestroyed(entity, INSTANCED_MODEL_TYPE, this);
 	}
 
-	void destroyModelInstance(EntityRef entity) {
+	void destroyModelInstance(EntityRef entity) override {
 		auto& model_instance = m_model_instances[entity.index];
 		setModel(entity, nullptr);
 		model_instance = {};
 		m_world.onComponentDestroyed(entity, MODEL_INSTANCE_TYPE, this);
 	}
 
-	void destroyEnvironment(EntityRef entity) {
+	void destroyEnvironment(EntityRef entity) override {
 		if ((EntityPtr)entity == m_active_global_light_entity) {
 			m_active_global_light_entity = INVALID_ENTITY;
 		}
@@ -1393,65 +1390,58 @@ struct RenderModuleImpl final : RenderModule {
 		m_world.onComponentDestroyed(entity, ENVIRONMENT_TYPE, this);
 	}
 
-	void destroyFur(EntityRef entity) {
+	void destroyFur(EntityRef entity) override {
 		m_furs.erase(entity);
 		m_world.onComponentDestroyed(entity, FUR_TYPE, this);
 	}
 
-	void destroyDecal(EntityRef entity)
-	{
+	void destroyDecal(EntityRef entity) override {
 		m_culling_system->remove(entity);
 		m_decals.erase(entity);
 		m_world.onComponentDestroyed(entity, DECAL_TYPE, this);
 	}
 
-	void destroyCurveDecal(EntityRef entity)
-	{
+	void destroyCurveDecal(EntityRef entity) override {
 		m_culling_system->remove(entity);
 		m_curve_decals.erase(entity);
 		m_world.onComponentDestroyed(entity, CURVE_DECAL_TYPE, this);
 	}
 
-	void destroyPointLight(EntityRef entity)
-	{
+	void destroyPointLight(EntityRef entity) override {
 		m_point_lights.erase(entity);
 		m_culling_system->remove(entity);
 		m_world.onComponentDestroyed(entity, POINT_LIGHT_TYPE, this);
 	}
 
 
-	void destroyCamera(EntityRef entity)
-	{
+	void destroyCamera(EntityRef entity) override {
 		m_cameras.erase(entity);
 		m_world.onComponentDestroyed(entity, CAMERA_TYPE, this);
 		if (m_active_camera == entity) m_active_camera = INVALID_ENTITY;
 	}
 
 
-	void destroyTerrain(EntityRef entity)
-	{
+	void destroyTerrain(EntityRef entity) override {
 		LUMIX_DELETE(m_allocator, m_terrains[entity]);
 		m_terrains.erase(entity);
 		m_world.onComponentDestroyed(entity, TERRAIN_TYPE, this);
 	}
 
 
-	void destroyParticleSystem(EntityRef entity)
-	{
+	void destroyParticleSystem(EntityRef entity) override {
 		const ParticleSystem& emitter = m_particle_emitters[entity];
 		m_world.onComponentDestroyed(*emitter.m_entity, PARTICLE_EMITTER_TYPE, this);
 		m_particle_emitters.erase(*emitter.m_entity);
 	}
 
 
-	void createFur(EntityRef entity) {
+	void createFur(EntityRef entity) override {
 		m_furs.insert(entity, {});
 		m_world.onComponentCreated(entity, FUR_TYPE, this);
 	}
 
 
-	void createCamera(EntityRef entity)
-	{
+	void createCamera(EntityRef entity) override {
 		Camera camera;
 		camera.is_ortho = false;
 		camera.ortho_size = 10;
@@ -1468,16 +1458,14 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 
-	void createTerrain(EntityRef entity)
-	{
+	void createTerrain(EntityRef entity) override {
 		Terrain* terrain = LUMIX_NEW(m_allocator, Terrain)(m_renderer, entity, *this, m_allocator);
 		m_terrains.insert(entity, terrain);
 		m_world.onComponentCreated(entity, TERRAIN_TYPE, this);
 	}
 
 
-	void createParticleSystem(EntityRef entity)
-	{
+	void createParticleSystem(EntityRef entity) override {
 		m_particle_emitters.insert(entity, ParticleSystem(entity, m_world, m_allocator));
 		m_world.onComponentCreated(entity, PARTICLE_EMITTER_TYPE, this);
 	}
@@ -2002,7 +1990,7 @@ struct RenderModuleImpl final : RenderModule {
 		}
 	}
 
-	bool overrideMaterialVec4(EntityRef entity, u32 mesh_index, const char* uniform_name, Vec4 value) {
+	bool overrideMaterialVec4(EntityRef entity, u32 mesh_index, const char* uniform_name, Vec4 value) override {
 		ModelInstance& inst = m_model_instances[entity.index];
 		if (!inst.model->isReady()) return false;
 
@@ -2158,15 +2146,15 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 
-	int getGrassRotationMode(EntityRef entity, int index) override
+	GrassRotationMode getGrassRotationMode(EntityRef entity, int index) override
 	{
-		return (int)m_terrains[entity]->getGrassTypeRotationMode(index);
+		return m_terrains[entity]->getGrassTypeRotationMode(index);
 	}
 
 
-	void setGrassRotationMode(EntityRef entity, int index, int value) override
+	void setGrassRotationMode(EntityRef entity, int index, GrassRotationMode value) override
 	{
-		m_terrains[entity]->setGrassTypeRotationMode(index, (Terrain::GrassType::RotationMode)value);
+		m_terrains[entity]->setGrassTypeRotationMode(index, value);
 	}
 
 
@@ -2312,11 +2300,11 @@ struct RenderModuleImpl final : RenderModule {
 		return Vec2(cam.screen_width, cam.screen_height);
 	}
 
-	FurComponent& getFur(EntityRef e) override {
+	Fur& getFur(EntityRef e) override {
 		return m_furs[e];
 	}
 
-	HashMap<EntityRef, FurComponent>& getFurs() override {
+	HashMap<EntityRef, Fur>& getFurs() override {
 		return m_furs;
 	}
 
@@ -2813,14 +2801,12 @@ struct RenderModuleImpl final : RenderModule {
 		return hit;
 	}
 	
-	Vec4 getShadowmapCascades(EntityRef entity) override
-	{
+	Vec4 getEnvironmentShadowmapCascades(EntityRef entity) override {
 		return m_environments[entity].cascades;
 	}
 
 
-	void setShadowmapCascades(EntityRef entity, const Vec4& value) override
-	{
+	void setEnvironmentShadowmapCascades(EntityRef entity, const Vec4& value) override {
 		Vec4 valid_value = value;
 		valid_value.x = maximum(valid_value.x, 0.02f);
 		valid_value.y = maximum(valid_value.x + 0.01f, valid_value.y);
@@ -2831,7 +2817,7 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 
-	float getLightRange(EntityRef entity) override
+	float getPointLightRange(EntityRef entity) override
 	{
 		return m_point_lights[entity].range;
 	}
@@ -2852,7 +2838,7 @@ struct RenderModuleImpl final : RenderModule {
 		setFlag(m_point_lights[entity].flags, PointLight::DYNAMIC, value);
 	}
 
-	void setLightRange(EntityRef entity, float value) override
+	void setPointLightRange(EntityRef entity, float value) override
 	{
 		m_point_lights[entity].range = value;
 		m_culling_system->setRadius(entity, value);
@@ -3183,8 +3169,7 @@ struct RenderModuleImpl final : RenderModule {
 
 	IAllocator& getAllocator() override { return m_allocator; }
 
-	void createEnvironment(EntityRef entity)
-	{
+	void createEnvironment(EntityRef entity) override {
 		Environment light;
 		light.flags = Environment::CAST_SHADOWS;
 		light.entity = entity;
@@ -3200,8 +3185,7 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 
-	void createPointLight(EntityRef entity)
-	{
+	void createPointLight(EntityRef entity) override {
 		PointLight light;
 		light.entity = entity;
 		light.color = Vec3(1, 1, 1);
@@ -3235,8 +3219,7 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 
-	void createDecal(EntityRef entity)
-	{
+	void createDecal(EntityRef entity) override {
 		Decal& decal = m_decals.insert(entity);
 		decal.material = nullptr;
 		decal.entity = entity;
@@ -3247,8 +3230,7 @@ struct RenderModuleImpl final : RenderModule {
 		m_world.onComponentCreated(entity, DECAL_TYPE, this);
 	}
 
-	void createCurveDecal(EntityRef entity)
-	{
+	void createCurveDecal(EntityRef entity) override {
 		CurveDecal& decal = m_curve_decals.insert(entity);
 		decal.material = nullptr;
 		decal.entity = entity;
@@ -3261,8 +3243,7 @@ struct RenderModuleImpl final : RenderModule {
 		m_world.onComponentCreated(entity, CURVE_DECAL_TYPE, this);
 	}
 
-	void createEnvironmentProbe(EntityRef entity)
-	{
+	void createEnvironmentProbe(EntityRef entity) override {
 		EnvironmentProbe& probe = m_environment_probes.insert(entity);
 
 		probe.outer_range = Vec3(9001.f);
@@ -3274,7 +3255,7 @@ struct RenderModuleImpl final : RenderModule {
 		m_world.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);
 	}
 	
-	void destroyProceduralGeometry(EntityRef entity) {
+	void destroyProceduralGeometry(EntityRef entity) override {
 		const ProceduralGeometry& pg = m_procedural_geometries[entity];
 		if (pg.material) pg.material->decRefCount();
 		if (pg.vertex_buffer) m_renderer.getEndFrameDrawStream().destroy(pg.vertex_buffer);
@@ -3283,14 +3264,13 @@ struct RenderModuleImpl final : RenderModule {
 		m_world.onComponentDestroyed(entity, PROCEDURAL_GEOM_TYPE, this);
 	}
 	
-	void createProceduralGeometry(EntityRef entity) {
+	void createProceduralGeometry(EntityRef entity) override {
 		ASSERT(!m_procedural_geometries.find(entity).isValid());
 		m_procedural_geometries.insert(entity, ProceduralGeometry(m_allocator));
 		m_world.onComponentCreated(entity, PROCEDURAL_GEOM_TYPE, this);
 	}
 
-	void createReflectionProbe(EntityRef entity)
-	{
+	void createReflectionProbe(EntityRef entity) override {
 		ReflectionProbe& probe = m_reflection_probes.insert(entity);
 		probe.guid = randGUID();
 		probe.flags |= ReflectionProbe::ENABLED;
@@ -3298,8 +3278,7 @@ struct RenderModuleImpl final : RenderModule {
 		m_world.onComponentCreated(entity, REFLECTION_PROBE_TYPE, this);
 	}
 
-	void createBoneAttachment(EntityRef entity)
-	{
+	void createBoneAttachment(EntityRef entity) override {
 		BoneAttachment& attachment = m_bone_attachments.emplace(entity);
 		attachment.entity = entity;
 		attachment.parent_entity = INVALID_ENTITY;
@@ -3312,7 +3291,7 @@ struct RenderModuleImpl final : RenderModule {
 		return m_instanced_models;
 	}
 
-	void createInstancedModel(EntityRef entity) {
+	void createInstancedModel(EntityRef entity) override {
 		InstancedModel im(m_allocator);
 		m_instanced_models.insert(entity, static_cast<InstancedModel&&>(im));
 
@@ -3320,7 +3299,7 @@ struct RenderModuleImpl final : RenderModule {
 		m_world.onComponentCreated(entity, INSTANCED_MODEL_TYPE, this);
 	}
 
-	void createModelInstance(EntityRef entity) {
+	void createModelInstance(EntityRef entity) override {
 		while(entity.index >= m_model_instances.size()) {
 			m_model_instances.emplace();
 		}
@@ -3332,6 +3311,14 @@ struct RenderModuleImpl final : RenderModule {
 
 	void updateParticleSystem(EntityRef entity, float dt) override { m_particle_emitters[entity].update(dt, m_engine.getPageAllocator()); }
 
+	void setParticleSystemAutodestroy(EntityRef entity, bool enable) override {
+		m_particle_emitters[entity].m_autodestroy = enable;
+	}
+
+	bool getParticleSystemAutodestroy(EntityRef entity) override {
+		return m_particle_emitters[entity].m_autodestroy;
+	}
+	
 	void setParticleSystemPath(EntityRef entity, const Path& path) override {
 		ParticleSystemResource* res = m_engine.getResourceManager().load<ParticleSystemResource>(path);
 		m_particle_emitters[entity].setResource(res);
@@ -3378,7 +3365,7 @@ struct RenderModuleImpl final : RenderModule {
 
 	Array<DebugTriangle> m_debug_triangles;
 	Array<DebugLine> m_debug_lines;
-	HashMap<EntityRef, FurComponent> m_furs;
+	HashMap<EntityRef, Fur> m_furs;
 
 	EntityPtr m_updating_attachment = INVALID_ENTITY;
 	bool m_is_game_running;
@@ -3432,13 +3419,13 @@ void ReflectionProbe::LoadJob::callback(Span<const u8> data, bool success) {
 void RenderModule::reflect() {
 	using namespace reflection;
 
-	struct RotationModeEnum : reflection::EnumAttribute {
+	struct GrassRotationModeEnum : reflection::EnumAttribute {
 		u32 count(ComponentUID cmp) const override { return 2; }
 		const char* name(ComponentUID cmp, u32 idx) const override {
-			switch((Terrain::GrassType::RotationMode)idx) {
-				case Terrain::GrassType::RotationMode::ALL_RANDOM: return "All random";
-				case Terrain::GrassType::RotationMode::Y_UP: return "Y up";
-				case Terrain::GrassType::RotationMode::COUNT: break;
+			switch((GrassRotationMode)idx) {
+				case GrassRotationMode::ALL_RANDOM: return "All random";
+				case GrassRotationMode::Y_UP: return "Y up";
+				case GrassRotationMode::COUNT: break;
 			}
 			ASSERT(false);
 			return "N/A";
@@ -3485,126 +3472,7 @@ void RenderModule::reflect() {
 		.LUMIX_MEMBER(RayCastModelHit::t, "t")
 		.LUMIX_MEMBER(RayCastModelHit::entity, "entity");
 
-	LUMIX_MODULE(RenderModuleImpl, "renderer")
-		.LUMIX_FUNC(addDebugCross)
-		.LUMIX_FUNC(addDebugLine)
-		.LUMIX_FUNC(addDebugTriangle)
-		.function<(RayCastModelHit (RenderModuleImpl::*)(const Ray&, EntityPtr))&RenderModuleImpl::castRay>("castRay", "RenderModuleImpl::castRay")
-		.LUMIX_FUNC(setActiveCamera)
-		.LUMIX_CMP(ProceduralGeometry, "procedural_geom", "Render / Procedural geometry")
-			.LUMIX_PROP(ProceduralGeometryMaterial, "Material").resourceAttribute(Material::TYPE)
-		.LUMIX_CMP(BoneAttachment, "bone_attachment", "Render / Bone attachment")
-			.icon(ICON_FA_BONE)
-			.LUMIX_PROP(BoneAttachmentParent, "Parent")
-			.LUMIX_PROP(BoneAttachmentPosition, "Relative position")
-			.LUMIX_PROP(BoneAttachmentRotation, "Relative rotation").radiansAttribute()
-			.LUMIX_PROP(BoneAttachmentBone, "Bone").attribute<BoneEnum>() 
-		.LUMIX_CMP(Fur, "fur", "Render / Fur")
-			.var_prop<&RenderModule::getFur, &FurComponent::layers>("Layers")
-			.var_prop<&RenderModule::getFur, &FurComponent::scale>("Scale")
-			.var_prop<&RenderModule::getFur, &FurComponent::gravity>("Gravity")
-			.var_prop<&RenderModule::getFur, &FurComponent::enabled>("Enabled")
-		.LUMIX_CMP(EnvironmentProbe, "environment_probe", "Render / Environment probe")
-			.prop<&RenderModule::isEnvironmentProbeEnabled, &RenderModule::enableEnvironmentProbe>("Enabled")
-			.var_prop<&RenderModule::getEnvironmentProbe, &EnvironmentProbe::inner_range>("Inner range")
-			.var_prop<&RenderModule::getEnvironmentProbe, &EnvironmentProbe::outer_range>("Outer range")
-		.LUMIX_CMP(ReflectionProbe, "reflection_probe", "Render / Reflection probe")
-			.prop<&RenderModule::isReflectionProbeEnabled, &RenderModule::enableReflectionProbe>("Enabled")
-			.var_prop<&RenderModule::getReflectionProbe, &ReflectionProbe::size>("size")
-			.var_prop<&RenderModule::getReflectionProbe, &ReflectionProbe::half_extents>("half_extents")
-		.LUMIX_CMP(ParticleSystem, "particle_emitter", "Render / Particle emitter")
-			.var_prop<&RenderModule::getParticleSystem, &ParticleSystem::m_autodestroy>("Autodestroy")
-			.LUMIX_PROP(ParticleSystemPath, "Source").resourceAttribute(ParticleSystemResource::TYPE)
-		.LUMIX_CMP(Camera, "camera", "Render / Camera")
-			.icon(ICON_FA_CAMERA)
-			.function<&RenderModule::getCameraRay>("getRay", "getCameraRay")
-			.var_prop<&RenderModule::getCamera, &Camera::fov>("FOV").radiansAttribute()
-			.var_prop<&RenderModule::getCamera, &Camera::near>("Near").minAttribute(0)
-			.var_prop<&RenderModule::getCamera, &Camera::far>("Far").minAttribute(0)
-			.var_prop<&RenderModule::getCamera, &Camera::is_ortho>("Orthographic")
-			.var_prop<&RenderModule::getCamera, &Camera::ortho_size>("Orthographic size").minAttribute(0)
-
-			.var_prop<&RenderModule::getCamera, &Camera::film_grain_intensity>("Film Grain intensity")
-			.var_prop<&RenderModule::getCamera, &Camera::dof_enabled>("DOF enabled")
-			.var_prop<&RenderModule::getCamera, &Camera::dof_distance>("DOF distance").minAttribute(0)
-			.var_prop<&RenderModule::getCamera, &Camera::dof_range>("DOF range").minAttribute(0)
-			.var_prop<&RenderModule::getCamera, &Camera::dof_max_blur_size>("DOF max blur size").minAttribute(0)
-			.var_prop<&RenderModule::getCamera, &Camera::dof_sharp_range>("DOF sharp range").minAttribute(0)
-
-			.var_prop<&RenderModule::getCamera, &Camera::bloom_enabled>("Bloom enabled")
-			.var_prop<&RenderModule::getCamera, &Camera::bloom_tonemap_enabled>("Bloom tonemap enabled")
-			.var_prop<&RenderModule::getCamera, &Camera::bloom_accomodation_speed>("Bloom accomodation speed")
-			.var_prop<&RenderModule::getCamera, &Camera::bloom_avg_bloom_multiplier>("Bloom average bloom multiplier")
-			.var_prop<&RenderModule::getCamera, &Camera::bloom_exposure>("Bloom exposure")
-
-		.LUMIX_CMP(InstancedModel, "instanced_model", "Render / Instanced model")
-			.LUMIX_PROP(InstancedModelPath, "Model").resourceAttribute(Model::TYPE)
-			.blob_property<&RenderModuleImpl::getInstancedModelBlob, &RenderModuleImpl::setInstancedModelBlob>("Blob")
-		.LUMIX_CMP(ModelInstance, "model_instance", "Render / Mesh")
-			.LUMIX_FUNC_EX(RenderModule::getModelInstanceModel, "getModel")
-			.LUMIX_FUNC_EX(RenderModuleImpl::overrideMaterialVec4, "overrideMaterialVec4")
-			.prop<&RenderModule::isModelInstanceEnabled, &RenderModule::enableModelInstance>("Enabled")
-			.LUMIX_PROP(ModelInstancePath, "Source").resourceAttribute(Model::TYPE)
-		.LUMIX_CMP(Environment, "environment", "Render / Environment")
-			.icon(ICON_FA_GLOBE)
-			.var_prop<&RenderModule::getEnvironment, &Environment::light_color>("Color").colorAttribute()
-			.var_prop<&RenderModule::getEnvironment, &Environment::direct_intensity>("Intensity").minAttribute(0)
-			.var_prop<&RenderModule::getEnvironment, &Environment::indirect_intensity>("Indirect intensity").minAttribute(0)
-			.LUMIX_PROP(ShadowmapCascades, "Shadow cascades")
-			.LUMIX_PROP(EnvironmentCastShadows, "Cast shadows")
-			.LUMIX_PROP(EnvironmentSkyTexture, "Sky texture").resourceAttribute(Texture::TYPE)
-			.var_prop<&RenderModule::getEnvironment, &Environment::atmo_enabled>("Atmosphere enabled")
-			.var_prop<&RenderModule::getEnvironment, &Environment::godrays_enabled>("Godrays enabled")
-			.var_prop<&RenderModule::getEnvironment, &Environment::clouds_enabled>("Clouds enabled")
-			.var_prop<&RenderModule::getEnvironment, &Environment::clouds_top>("Clouds top")
-			.var_prop<&RenderModule::getEnvironment, &Environment::clouds_bottom>("Clouds bottom")
-			.var_prop<&RenderModule::getEnvironment, &Environment::sky_intensity>("Sky intensity").minAttribute(0)
-			.var_prop<&RenderModule::getEnvironment, &Environment::scatter_rayleigh>("Scatter Rayleigh").colorAttribute()
-			.var_prop<&RenderModule::getEnvironment, &Environment::scatter_mie>("Scatter Mie").colorAttribute()
-			.var_prop<&RenderModule::getEnvironment, &Environment::absorb_mie>("Absorb Mie").colorAttribute()
-			.var_prop<&RenderModule::getEnvironment, &Environment::sunlight_color>("Sunlight color").colorAttribute()
-			.var_prop<&RenderModule::getEnvironment, &Environment::sunlight_strength>("Sunlight strength").minAttribute(0)
-			.var_prop<&RenderModule::getEnvironment, &Environment::height_distribution_rayleigh>("Height distribution Rayleigh")
-			.var_prop<&RenderModule::getEnvironment, &Environment::height_distribution_mie>("Height distribution Mie")
-			.var_prop<&RenderModule::getEnvironment, &Environment::ground_r>("Ground radius").minAttribute(0)
-			.var_prop<&RenderModule::getEnvironment, &Environment::atmo_r>("Atmosphere radius").minAttribute(0)
-			.var_prop<&RenderModule::getEnvironment, &Environment::fog_density>("Fog density").minAttribute(0)
-			.var_prop<&RenderModule::getEnvironment, &Environment::fog_scattering>("Fog scattering").colorAttribute()
-			.var_prop<&RenderModule::getEnvironment, &Environment::fog_top>("Fog top")
-		.LUMIX_CMP(PointLight, "point_light", "Render / Point light")
-			.icon(ICON_FA_LIGHTBULB)
-			.LUMIX_PROP(PointLightCastShadows, "Cast shadows")
-			.LUMIX_PROP(PointLightDynamic, "Dynamic")
-			.var_prop<&RenderModule::getPointLight, &PointLight::intensity>("Intensity").minAttribute(0)
-			.var_prop<&RenderModule::getPointLight, &PointLight::fov>("FOV").clampAttribute(0, 360).radiansAttribute()
-			.var_prop<&RenderModule::getPointLight, &PointLight::attenuation_param>("Attenuation").clampAttribute(0, 100)
-			.var_prop<&RenderModule::getPointLight, &PointLight::color>("Color").colorAttribute()
-			.LUMIX_PROP(LightRange, "Range").minAttribute(0)
-		.LUMIX_CMP(Decal, "decal", "Render / Decal")
-			.LUMIX_PROP(DecalMaterialPath, "Material").resourceAttribute(Material::TYPE)
-			.LUMIX_PROP(DecalHalfExtents, "Half extents").minAttribute(0)
-			.var_prop<&RenderModule::getDecal, &Decal::uv_scale>("UV scale").minAttribute(0)
-		.LUMIX_CMP(CurveDecal, "curve_decal", "Render / Curve decal")
-			.LUMIX_PROP(CurveDecalMaterialPath, "Material").resourceAttribute(Material::TYPE)
-			.LUMIX_PROP(CurveDecalHalfExtents, "Half extents").minAttribute(0)
-			.LUMIX_PROP(CurveDecalUVScale, "UV scale").minAttribute(0)
-			.LUMIX_PROP(CurveDecalBezierP0, "Bezier P0").noUIAttribute()
-			.LUMIX_PROP(CurveDecalBezierP2, "Bezier P2").noUIAttribute()
-		.LUMIX_CMP(Terrain, "terrain", "Render / Terrain")
-			.LUMIX_FUNC_EX(RenderModule::getTerrainNormalAt, "getTerrainNormalAt")
-			.LUMIX_FUNC_EX(RenderModule::getTerrainHeightAt, "getTerrainHeightAt")
-			.LUMIX_PROP(TerrainMaterialPath, "Material").resourceAttribute(Material::TYPE)
-			.LUMIX_PROP(TerrainXZScale, "XZ scale").minAttribute(0)
-			.LUMIX_PROP(TerrainYScale, "Height scale").minAttribute(0)
-			.LUMIX_PROP(TerrainTesselation, "Tesselation").minAttribute(1)
-			.LUMIX_PROP(TerrainBaseGridResolution, "Grid resolution").minAttribute(8)
-			.begin_array<&RenderModule::getGrassCount, &RenderModule::addGrass, &RenderModule::removeGrass>("grass")
-				.LUMIX_PROP(GrassPath, "Mesh").resourceAttribute(Model::TYPE)
-				.LUMIX_PROP(GrassDistance, "Distance").minAttribute(1)
-				.LUMIX_PROP(GrassSpacing, "Spacing")
-				.LUMIX_PROP(GrassRotationMode, "Mode").attribute<RotationModeEnum>()
-			.end_array()
-	;
+	#include "render_module.gen.h"
 }
 
 RenderModuleImpl::RenderModuleImpl(Renderer& renderer,
@@ -3619,7 +3487,7 @@ RenderModuleImpl::RenderModuleImpl(Renderer& renderer,
 	, m_model_instances(m_allocator)
 	, m_moved_instances(m_allocator)
 	, m_instanced_models(m_allocator)
-	, m_cameras(m_allocator)
+	, m_cameras(m_allocator) 
 	, m_terrains(m_allocator)
 	, m_point_lights(m_allocator)
 	, m_environments(m_allocator)
