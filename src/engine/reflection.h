@@ -14,15 +14,7 @@
 #include "engine/component_uid.h"
 #include "engine/resource.h"
 
-
-#define LUMIX_MODULE(Class, Label) using ReflModule = Class; reflection::build_module(Label)
-#define LUMIX_FUNC_EX(F, Name) function<&ReflModule::F>(Name, #F)
-#define LUMIX_FUNC(F) function<&ReflModule::F>(#F, #F)
-#define LUMIX_EVENT(F) event<&F>(#F)
-#define LUMIX_CMP(Cmp, Name, Label) cmp<&ReflModule::create##Cmp, &ReflModule::destroy##Cmp>(Name, Label)
-#define LUMIX_PROP(Property, Label) prop<&ReflModule::get##Property, &ReflModule::set##Property>(Label)
-#define LUMIX_ENUM_PROP(Property, Label) enum_prop<&ReflModule::get##Property, &ReflModule::set##Property>(Label)
-#define LUMIX_GLOBAL_FUNC(Func) reflection::function<&Func>(#Func, nullptr)
+#define LUMIX_GLOBAL_FUNC(Func) reflection::function<&Func>(#Func)
 
 // see member function for explanation
 #define LUMIX_MEMBER(V, Name) member<&V, __LINE__>(Name)
@@ -74,7 +66,6 @@ LUMIX_ENGINE_API StableHash getPropertyHash(ComponentType cmp, const char* prope
 LUMIX_ENGINE_API bool componentTypeExists(const char* id);
 LUMIX_ENGINE_API ComponentType getComponentType(StringView id);
 LUMIX_ENGINE_API ComponentType getComponentTypeFromHash(RuntimeHash hash);
-LUMIX_ENGINE_API const char* declCodeToName(const char* decl_code);
 
 struct ResourceAttribute : IAttribute
 {
@@ -402,7 +393,6 @@ struct FunctionBase {
 	// we can use this in Delegate::bindRaw, so there's less overhead
 	virtual DummyFnType getDelegateStub() = 0;
 
-	const char* decl_code;
 	const char* name;
 };
 
@@ -670,12 +660,11 @@ LUMIX_ENGINE_API Array<FunctionBase*>& allFunctions();
 LUMIX_ENGINE_API Array<StructBase*>& allStructs();
 
 template <auto func>
-auto& function(const char* decl_code, const char* name)
+auto& function(const char* name)
 {
 	static Function<func> ret;
 	allFunctions().push(&ret);
-	ret.decl_code = decl_code;
-	ret.name = name && name[0] ? name : declCodeToName(decl_code);
+	ret.name = name;
 	return ret;
 }
 
@@ -944,10 +933,9 @@ struct LUMIX_ENGINE_API builder {
 	}
 
 	template <auto F>
-	builder& function(const char* name, const char* decl_code) {
+	builder& function(const char* name) {
 		auto* f = LUMIX_NEW(allocator, Function<F>);
-		f->name = name && name[0] ? name : declCodeToName(decl_code);
-		f->decl_code = decl_code;
+		f->name = name;
 		if (module->cmps.empty()) {
 			module->functions.push(f);
 		}

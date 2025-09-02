@@ -326,7 +326,7 @@ struct LUMIX_PHYSICS_API PhysicsModule : IModule {
 	virtual void setVehicleChassis(EntityRef entity, const Path& path) = 0;
 	virtual float getVehicleMass(EntityRef entity) = 0;						//@ min 0
 	virtual void setVehicleMass(EntityRef entity, float mass) = 0;
-	virtual float getVehicleMOIMultiplier(EntityRef entity) = 0;
+	virtual float getVehicleMOIMultiplier(EntityRef entity) = 0;			//@ label "MOI multiplier"
 	virtual void setVehicleMOIMultiplier(EntityRef entity, float m) = 0;
 	virtual Vec3 getVehicleCenterOfMass(EntityRef entity) = 0;
 	virtual void setVehicleCenterOfMass(EntityRef entity, Vec3 center) = 0;

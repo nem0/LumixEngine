@@ -894,6 +894,7 @@ static int LUA_instantiatePrefab(lua_State* L) {
 	return 0;
 }
 
+void registerLuaComponents(lua_State* L);
 
 void registerEngineAPI(lua_State* L, Engine* engine)
 {
@@ -1273,7 +1274,72 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	if (!LuaWrapper::execute(L, entity_src, __FILE__ "(" TO_STR(__LINE__) ")", 0)) {
 		logError("Failed to init entity api");
 	}
+
 }
 
+struct {
+	IModule* module;
+	EntityRef entity;
+}
+checkComponent(lua_State* L) {
+	LuaWrapper::checkTableArg(L, 1); // self
+	if (LuaWrapper::getField(L, 1, "_module") != LUA_TLIGHTUSERDATA) {
+		ASSERT(false);
+		luaL_error(L, "Internal error");
+	}
+	auto* module = LuaWrapper::toType<IModule*>(L, -1);
+	lua_pop(L, 1);
+			
+	if (LuaWrapper::getField(L, 1, "_entity") != LUA_TNUMBER) {
+		ASSERT(false);
+		luaL_error(L, "Internal error");
+	}
+	EntityRef entity = {LuaWrapper::toType<int>(L, -1)};
+	lua_pop(L, 1);
+	return {module, entity};
+}
+
+static int lua_new_cmp(lua_State* L) {
+	LuaWrapper::DebugGuard guard(L, 1);
+	LuaWrapper::checkTableArg(L, 1); // self
+	const World* world = LuaWrapper::checkArg<World*>(L, 2);
+	const EntityRef e = {LuaWrapper::checkArg<i32>(L, 3)};
+		
+	LuaWrapper::getField(L, 1, "cmp_type");
+	const int cmp_type = LuaWrapper::toType<int>(L, -1);
+	lua_pop(L, 1);
+	IModule* module = world->getModule(ComponentType{cmp_type});
+
+	lua_newtable(L);
+	LuaWrapper::setField(L, -1, "_entity", e);
+	LuaWrapper::setField(L, -1, "_module", module);
+	lua_pushvalue(L, 1);
+	lua_setmetatable(L, -2);
+	return 1;
+}
+
+static void registerLuaComponent(lua_State* L, const char* cmp_name, lua_CFunction getter, lua_CFunction setter) {
+	const ComponentType cmp_type = reflection::getComponentType(cmp_name);
+	lua_newtable(L);
+	lua_getglobal(L, "Lumix");
+	lua_pushvalue(L, -2);
+	lua_setfield(L, -2, cmp_name);
+	lua_pop(L, 1);
+
+	lua_pushcfunction(L, lua_new_cmp, "new");
+	lua_setfield(L, -2, "new");
+
+	LuaWrapper::setField(L, -1, "cmp_type", cmp_type.index);
+
+	LuaWrapper::push(L, cmp_type);
+	lua_pushcclosure(L, getter, "getter", 1);
+	lua_setfield(L, -2, "__index");
+		
+	LuaWrapper::push(L, cmp_type);
+	lua_pushcclosure(L, setter, "setter", 1);
+	lua_setfield(L, -2, "__newindex");
+
+	lua_pop(L, 1);
+}
 
 } // namespace Lumix

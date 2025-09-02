@@ -174,13 +174,13 @@ struct CoreModuleImpl : CoreModule {
 	void update(float time_delta) override {}
 	World& getWorld() override { return m_world; }
 
-	void createSpline(EntityRef e) {
+	void createSpline(EntityRef e) override {
 		Spline spline(m_allocator);
 		m_splines.insert(e, static_cast<Spline&&>(spline));
 		m_world.onComponentCreated(e, SPLINE_TYPE, this);
 	}
 	
-	void destroySpline(EntityRef e) {
+	void destroySpline(EntityRef e) override {
 		m_splines.erase(e);
 		m_world.onComponentDestroyed(e, SPLINE_TYPE, this);
 	}
@@ -191,14 +191,14 @@ struct CoreModuleImpl : CoreModule {
 
 	const HashMap<EntityRef, Spline>& getSplines() override { return m_splines; }
 
-	void createSignal(EntityRef e) {
+	void createSignal(EntityRef e) override {
 		UniquePtr<Signal>& s = m_signals.insert(e);
 		s = UniquePtr<Signal>::create(m_allocator);
 		s->entity = e;
 		m_world.onComponentCreated(e, SIGNAL_TYPE, this);
 	}
 
-	void destroySignal(EntityRef e) {
+	void destroySignal(EntityRef e) override {
 		for (UniquePtr<SignalDispatcher>& dispatcher : m_signal_dispatchers) {
 			auto iter = dispatcher->map.find(e);
 			if (iter.isValid()) {
@@ -246,12 +246,7 @@ struct CoreModuleImpl : CoreModule {
 	}
 
 	static void reflect() {
-		LUMIX_MODULE(CoreModuleImpl, "core")
-			.LUMIX_CMP(Spline, "spline", "Core / Spline")
-				.blob_property<&CoreModuleImpl::getSplineBlob, &CoreModuleImpl::setSplineBlob>("Blob")
-			.LUMIX_CMP(Signal, "signal", "Core / Signal")
-				.blob_property<&CoreModuleImpl::getSignalBlob, &CoreModuleImpl::setSignalBlob>("Blob")
-		;
+		#include "core.gen.h"
 	}
 
 	IAllocator& m_allocator;

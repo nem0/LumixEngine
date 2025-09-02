@@ -8,6 +8,7 @@ namespace Lumix {
 struct AABB;
 struct Matrix;
 
+//@ struct name Ray
 struct LUMIX_CORE_API Ray {
 	DVec3 origin;
 	Vec3 dir;
