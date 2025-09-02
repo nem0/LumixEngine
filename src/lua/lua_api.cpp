@@ -1277,7 +1277,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 
 }
 
-struct {
+static struct {
 	IModule* module;
 	EntityRef entity;
 }
