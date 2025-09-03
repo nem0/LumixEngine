@@ -72,12 +72,6 @@ struct WorldAssetPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	StudioApp& m_app;
 };
 
-static volatile bool once = [](){
-	LUMIX_GLOBAL_FUNC(AssetBrowser::openEditor);
-	return true;
-}();
-
-
 struct AssetBrowserImpl : AssetBrowser {
 	struct Subdir {
 		StaticString<MAX_PATH> clamped_name;

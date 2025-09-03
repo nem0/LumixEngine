@@ -525,7 +525,7 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual void addGrass(EntityRef entity, int index) = 0;
 	virtual void removeGrass(EntityRef entity, int index) = 0;
 	
-	virtual GrassRotationMode getGrassRotationMode(EntityRef entity, int index) = 0; //@ enum
+	virtual GrassRotationMode getGrassRotationMode(EntityRef entity, int index) = 0;	//@ enum
 	virtual void setGrassRotationMode(EntityRef entity, int index, GrassRotationMode value) = 0;
 	virtual float getGrassDistance(EntityRef entity, int index) = 0;				//@ min 1
 	virtual void setGrassDistance(EntityRef entity, int index, float value) = 0;

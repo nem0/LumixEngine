@@ -14,11 +14,6 @@
 #include "engine/component_uid.h"
 #include "engine/resource.h"
 
-#define LUMIX_GLOBAL_FUNC(Func) reflection::function<&Func>(#Func)
-
-// see member function for explanation
-#define LUMIX_MEMBER(V, Name) member<&V, __LINE__>(Name)
-
 namespace Lumix
 {
 
@@ -633,31 +628,8 @@ struct StructVar : StructVarBase {
 	}
 };
 
-struct StructBase {
-	StructBase() : allocator(getGlobalAllocator()), members(getGlobalAllocator()) {}
-
-	virtual ~StructBase() {}
-	virtual void* createInstance(IAllocator& allocator) = 0;
-	virtual void destroyInstance(void* obj, IAllocator& allocator) = 0;
-
-	// clang (at least on windows) has an issue with multiple definitions with same mangled name
-	// so we need to add a dummy template parameter, see LUMIX_MEMBER macro
-	template <auto Getter, int V = 0> 
-	StructBase& member(const char* name) {
-		StructVar<Getter>* member = LUMIX_NEW(allocator, StructVar<Getter>);
-		member->name = name;
-		members.push(member);
-		return *this;
-	}
-
-	IAllocator& allocator;
-	const char* name;
-	Array<StructVarBase*> members;
-	u32 size = 0;
-};
 
 LUMIX_ENGINE_API Array<FunctionBase*>& allFunctions();
-LUMIX_ENGINE_API Array<StructBase*>& allStructs();
 
 template <auto func>
 auto& function(const char* name)
@@ -665,19 +637,6 @@ auto& function(const char* name)
 	static Function<func> ret;
 	allFunctions().push(&ret);
 	ret.name = name;
-	return ret;
-}
-
-template <typename S>
-auto& structure(const char* name)
-{
-	static struct : StructBase {
-		void* createInstance(IAllocator& allocator) override { return LUMIX_NEW(allocator, S); }
-		void destroyInstance(void* obj, IAllocator& allocator) override { LUMIX_DELETE(allocator, (S*)obj); }
-	} ret;
-	ret.name = name;
-	ret.size = sizeof(S);
-	allStructs().push(&ret);
 	return ret;
 }
 
@@ -752,27 +711,6 @@ struct LUMIX_ENGINE_API builder {
 		return *this;
 	}
 
-	template <auto Getter, auto PropGetter>
-	builder& var_enum_prop(const char* name) {
-		using T = typename ResultOf<decltype(PropGetter)>::Type;
-		auto* p = LUMIX_NEW(allocator, Property<i32>)(allocator);
-		p->setter = [](IModule* module, EntityRef e, u32, const i32& value) {
-			using C = typename ClassOf<decltype(Getter)>::Type;
-			auto& c = (static_cast<C*>(module)->*Getter)(e);
-			auto& v = c.*PropGetter;
-			v = static_cast<T>(value);
-		};
-		p->getter = [](IModule* module, EntityRef e, u32) -> i32 {
-			using C = typename ClassOf<decltype(Getter)>::Type;
-			auto& c = (static_cast<C*>(module)->*Getter)(e);
-			auto& v = c.*PropGetter;
-			return static_cast<i32>(v);
-		};
-		p->name = name;
-		addProp(p);
-		return *this;
-	}
-
 	template <auto Getter, auto Setter = nullptr>
 	builder& enum_prop(const char* name) {
 		auto* p = LUMIX_NEW(allocator, Property<i32>)(allocator);
@@ -803,13 +741,6 @@ struct LUMIX_ENGINE_API builder {
 			}
 		};
 		p->name = name;
-		addProp(p);
-		return *this;
-	}
-
-	template <typename T>
-	builder& property() {
-		auto* p = LUMIX_NEW(allocator, T)(allocator);
 		addProp(p);
 		return *this;
 	}

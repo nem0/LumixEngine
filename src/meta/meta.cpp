@@ -2,6 +2,8 @@
 #include <float.h>
 #include <Windows.h>
 
+#define L(...) out.add(__VA_ARGS__, "\n")
+
 using i32 = int;
 
 struct NewPlaceholder {};
@@ -356,6 +358,12 @@ StringView consumeIdentifier(StringView& str) {
 	return consumeWord(str);
 }
 
+StringView withoutPrefix(StringView str, i32 prefix_len) {
+	StringView res = str;
+	res.begin += prefix_len;
+	return res;
+}
+
 StringView consumeArgs(StringView& str) {
 	str = skipWhitespaces(str);
 	StringView args;
@@ -366,6 +374,12 @@ StringView consumeArgs(StringView& str) {
 	while (args.end != str.end && *args.end != ')') ++args.end;
 	if (args.end != str.end) ++args.end; // include ')'
 	str.begin = args.end;
+
+	// trim "()"
+	if (args.size() > 1) {
+		++args.begin;
+		--args.end;
+	}
 	return args;
 }
 
@@ -432,13 +446,10 @@ struct Property {
 	StringView type;
 	StringView getter_name;
 	StringView setter_name;
-	StringView array_id;
 	StringView getter_args;
 	StringView setter_args;
-	bool is_var = false;
-	bool is_array_begin = false;
-	bool is_array_end = false;
 	Attributes attributes;
+	bool is_var = false;
 };
 
 struct Function {
@@ -448,10 +459,18 @@ struct Function {
 	Attributes attributes;
 };
 
+struct ArrayProperty {
+	ArrayProperty(IAllocator& allocator) : children(allocator) {}
+	StringView id;
+	StringView name;
+	ExpArray<Property> children;
+};
+
 struct Component {
 	Component(IAllocator& allocator)
 		: functions(allocator)
 		, properties(allocator)
+		, arrays(allocator)
 	{}
 	StringView name;
 	StringView struct_name;
@@ -460,6 +479,7 @@ struct Component {
 	StringView icon;
 	ExpArray<Function> functions;
 	ExpArray<Property> properties;
+	ExpArray<ArrayProperty> arrays;
 };
 
 struct Enumerator {
@@ -470,12 +490,20 @@ struct Enumerator {
 struct Enum {
 	Enum(IAllocator& allocator) : values(allocator) {}
 	StringView name;
+	StringView full;
 	ExpArray<Enumerator> values;
 };
 
 struct StructVar {
 	StringView type;
 	StringView name;
+};
+
+struct Object {
+	Object(IAllocator& allocator) : functions(allocator) {}
+	StringView name;
+	char* filename;
+	ExpArray<Function> functions;
 };
 
 struct Struct {
@@ -507,6 +535,7 @@ struct Parser {
 		: allocator(allocator)
 		, modules(allocator)
 		, structs(allocator)
+		, objects(allocator)
 	{}
 
 	bool readLine(StringView& content, StringView& line) {
@@ -640,25 +669,13 @@ struct Parser {
 		logError("'//@ end' not found while parsing component ", struct_name);
 	}
 
-	StringView withoutPrefix(StringView str, i32 prefix_len) {
-		StringView res = str;
-		res.begin += prefix_len;
-		return res;
-	}
-
 	void parseArray(StringView component_name, StringView array_name, StringView array_id) {
 		StringView line;
 
-		Property& p = current_component->properties.emplace();
-		p.name = array_name;
-		p.is_array_begin = true;
-		p.array_id = array_id;
-
-		defer { 
-			Property& p = current_component->properties.emplace();
-			p.is_array_end = true;
-		};
-
+		ArrayProperty& a = current_component->arrays.emplace(allocator);
+		a.id = array_id;
+		a.name = array_name;
+		
 		while (readLine(content, line)) {
 			StringView word = consumeWord(line);
 			if (equal(word, "//@")) {
@@ -693,8 +710,13 @@ struct Parser {
 						logError("Expected ", array_name);
 					}
 					else {
-						if (!equal(withoutPrefix(property_name, array_name.size()), "Count")) {
-							getter(type, method_name, property_name, args, attributes_ptr);
+						property_name.begin += array_name.size();
+						if (!equal(property_name, "Count")) {
+							Property& prop = getChild(a, property_name);
+							if (attributes_ptr) prop.attributes = *attributes_ptr;
+							prop.getter_name = method_name;
+							prop.getter_args = args;
+							prop.type = type;
 						}
 					}
 				}
@@ -704,8 +726,13 @@ struct Parser {
 						logError("Expected ", array_name);
 					}
 					else {
-						if (!equal(withoutPrefix(property_name, array_name.size()), "Count")) {
-							getter(type, method_name, property_name, args, attributes_ptr);
+						property_name.begin += array_name.size();
+						if (!equal(property_name, "Count")) {
+							Property& prop = getChild(a, property_name);
+							if (attributes_ptr) prop.attributes = *attributes_ptr;
+							prop.getter_name = method_name;
+							prop.getter_args = args;
+							prop.type = type;
 						}
 					}
 				}
@@ -715,7 +742,11 @@ struct Parser {
 						logError("Expected ", array_name);
 					}
 					else {
-						setter(method_name, property_name, args, attributes_ptr);
+						property_name.begin += array_name.size();
+						Property& prop = getChild(a, property_name);
+						if (attributes_ptr) prop.attributes = *attributes_ptr;
+						prop.setter_name = method_name;
+						prop.setter_args = args;
 					}
 				}
 				else if (startsWith(method_name, "enable")) {
@@ -724,7 +755,10 @@ struct Parser {
 						logError("Expected ", array_name);
 					}
 					else {
-						setter(method_name, property_name, args, attributes_ptr);
+						Property& prop = getChild(a, makeStringView("Enabled"));
+						if (attributes_ptr) prop.attributes = *attributes_ptr;
+						prop.setter_name = method_name;
+						prop.setter_args = args;
 					}
 				}
 			}
@@ -846,7 +880,19 @@ struct Parser {
 		}
 	}
 	
-	void parseEnum() {
+	void parseEnum(StringView def) {
+		StringView word = consumeWord(def);
+		StringView full;
+		while (word.size() > 0) {
+			if (equal(word, "full")) {
+				full = consumeIdentifier(def);
+			}
+			else {
+				logError("Unknown ", word);
+			}
+			word = consumeWord(def);
+		}
+		
 		StringView line;
 		if (!readLine(content, line)) return;
 		StringView word0 = consumeWord(line);
@@ -858,6 +904,7 @@ struct Parser {
 		if (equal(enum_name, "class")) enum_name = consumeWord(line);
 
 		Enum& e = current_module->enums.emplace(allocator);
+		e.full = full.size() > 0 ? full : enum_name;
 		e.name = enum_name;
 		last_enumerator_value = -1;
 
@@ -898,7 +945,7 @@ struct Parser {
 				parseFunctions();
 			}
 			else if (equal(word, "enum")) {
-				parseEnum();
+				parseEnum(line);
 			}
 			else if (equal(word, "events")) {
 				parseEvents();
@@ -960,6 +1007,61 @@ struct Parser {
 		}
 	}
 
+	void parseObject(StringView def) {
+		StringView word = consumeWord(def);
+		StringView name;
+		while (word.size() > 0) {
+			if (equal(word, "name")) {
+				name = consumeIdentifier(def);
+			}
+			else {
+				logError("Unexpected ", word);
+			}
+			word = consumeWord(def);
+		}
+
+		StringView line;
+		if (!readLine(content, line)) {
+			logError("Expected struct");
+			return;
+		}
+		word = consumeWord(line);
+		if (!equal(word, "struct")) {
+			logError("Expected struct");
+			return;
+		}
+		if (name.size() == 0) name = consumeIdentifier(line);
+
+		Object& o = objects.emplace(allocator);
+		o.name = name;
+		o.filename = (char*)allocator.allocate(filename.size() + 1);
+		strncpy_s(o.filename, filename.size() + 1, filename.begin, filename.size());
+
+		while (readLine(content, line)) {
+			word = consumeWord(line);
+			if (equal(word, "//@")) {
+				word = consumeWord(line);
+				if (equal(word, "function")) {
+					if (!readLine(content, line)) {
+						logError("Expected new line with function");
+						continue;
+					}
+					Function& func = o.functions.emplace();
+					word = consumeWord(line);
+					if (!equal(word, "virtual")) {
+						logError("Expected virtual");
+					}
+					func.return_type = consumeType(line);
+					func.name = consumeIdentifier(line);
+					func.args = consumeArgs(line);
+				}
+				else {
+					logError("Unexpected ", word);
+				}
+			}
+		}
+	}
+
 	void parseStruct(StringView def) {
 		StringView word = consumeWord(def);
 		StringView name;
@@ -1013,6 +1115,9 @@ struct Parser {
 			}
 			else if (equal(word, "struct")) {
 				parseStruct(line);
+			}
+			else if (equal(word, "object")) {
+				parseObject(line);
 			}
 			else {
 				logError("Unexpected \"", word, "\"");
@@ -1099,6 +1204,16 @@ struct Parser {
 		return p;
 	}
 
+	Property& getChild(ArrayProperty& array, StringView name) {
+		for (Property& p : array.children) {
+			if (equal(p.name, name)) return p;
+		}
+
+		Property& p = array.children.emplace();
+		p.name = name;
+		return p;
+	}
+
 	IAllocator& allocator;
 	StringView filename;
 	i32 last_enumerator_value = -1;
@@ -1106,6 +1221,7 @@ struct Parser {
 	Module* current_module = nullptr;
 	ExpArray<Module> modules;
 	ExpArray<Struct> structs;
+	ExpArray<Object> objects;
 	StringView content;
 	i32 line_idx = 0;
 };
@@ -1155,28 +1271,14 @@ void scan(StringView path) {
 	destroyFileIterator(iter);
 }
 
-void write(OutputStream& output, const Attributes& attributes) {
-	if (attributes.is_radians) {
-		output.add("\t\t\t.radiansAttribute()\n");
-	}
-	if (attributes.is_multiline) {
-		output.add("\t\t\t.multilineAttribute()\n");
-	}
-	if (attributes.resource_type.size() > 0) {
-		output.add("\t\t\t.resourceAttribute(", attributes.resource_type, ")\n");
-	}
-	if (attributes.is_color) {
-		output.add("\t\t\t.colorAttribute()\n");
-	}
-	if (attributes.no_ui) {
-		output.add("\t\t\t.noUIAttribute()\n");
-	}
-	if (attributes.min.size() > 0) {
-		output.add("\t\t\t.minAttribute(", attributes.min, ")\n");
-	}
-	if (attributes.clamp_max.size() > 0) {
-		output.add("\t\t\t.clampAttribute(", attributes.min, ", ", attributes.clamp_max, ")\n");
-	}
+void serializeAttributes(OutputStream& out, const Attributes& attributes) {
+	if (attributes.is_radians)					L("\t\t\t.radiansAttribute()");
+	if (attributes.is_multiline)				L("\t\t\t.multilineAttribute()");
+	if (attributes.resource_type.size() > 0)	L("\t\t\t.resourceAttribute(", attributes.resource_type, ")");
+	if (attributes.is_color)					L("\t\t\t.colorAttribute()");
+	if (attributes.no_ui)						L("\t\t\t.noUIAttribute()");
+	if (attributes.min.size() > 0)				L("\t\t\t.minAttribute(", attributes.min, ")");
+	if (attributes.clamp_max.size() > 0)		L("\t\t\t.clampAttribute(", attributes.min, ", ", attributes.clamp_max, ")");
 }
 
 StringView withoutNamespace(StringView ident) {
@@ -1187,11 +1289,11 @@ StringView withoutNamespace(StringView ident) {
 	return res;
 }
 
-bool isEnum(Module& m, StringView name) {
-	for (const Enum& e : m.enums) {
-		if (equal(e.name, name)) return true;
+Enum* getEnum(Module& m, StringView name) {
+	for (Enum& e : m.enums) {
+		if (equal(e.name, name)) return &e;
 	}
-	return false;
+	return nullptr;
 }
 
 void toLabel(StringView in, Span<char> out) {
@@ -1251,18 +1353,6 @@ static bool endsWith(StringView str, const char* prefix) {
 	return true;
 }
 
-StringView withoutPrefix(StringView str, i32 prefix_len) {
-	StringView res = str;
-	res.begin += prefix_len;
-	return res;
-}
-
-StringView withoutSuffix(StringView str, i32 suffix_len) {
-	StringView res = str;
-	res.end -= suffix_len;
-	return res;
-}
-
 bool consumeArg(StringView& line, Arg& out) {
 	line = skipWhitespaces(line);
 	if (line.size() == 0) return false;
@@ -1275,7 +1365,7 @@ bool consumeArg(StringView& line, Arg& out) {
 	if (equal(word, "struct")) word = consumeWord(line);
 	if (endsWith(word, "&")) {
 		out.is_ref = true;
-		word = withoutSuffix(word, 1);
+		word.end -= 1;
 	}
 	out.type = word;
 	word = consumeWord(line);
@@ -1303,19 +1393,19 @@ Struct* findStruct(StringView struct_name) {
 void wrap(OutputStream& out, Module& m, Component& c, Function& f) {
 	StringView label = f.attributes.label;
 	if (label.size() == 0) label = f.name;
-	out.add("int ",c.name,"_",label,"(lua_State* L) {\n");
-	out.add("\tauto [imodule, entity] = checkComponent(L);\n");
-	out.add("\tauto* module = (",m.name,"*)imodule;\n");
+	L("int ",c.name,"_",label,"(lua_State* L) {");
+	L("\tauto [imodule, entity] = checkComponent(L);");
+	L("\tauto* module = (",m.name,"*)imodule;");
 	
 	i32 arg_idx = -1;
-	StringView args = withoutPrefix(withoutSuffix(f.args, 1), 1);
+	StringView args = f.args;
 	forEachArg(args, [&](const Arg& arg, bool is_first) {
 		++arg_idx;
 		if (is_first) return; // skip entity, we alredy have it
 		if (arg.is_const && equal(arg.type, "char*"))
-			out.add("\tauto ",arg.name," = LuaWrapper::checkArg<const char*>(L, ",(arg_idx + 1),");\n");
+			L("\tauto ",arg.name," = LuaWrapper::checkArg<const char*>(L, ",(arg_idx + 1),");");
 		else
-			out.add("\tauto ",arg.name," = LuaWrapper::checkArg<",arg.type,">(L, ",(arg_idx + 1),");\n");
+			L("\tauto ",arg.name," = LuaWrapper::checkArg<",arg.type,">(L, ",(arg_idx + 1),");");
 	});
 
 	Struct* st = findStruct(f.return_type);
@@ -1329,32 +1419,31 @@ void wrap(OutputStream& out, Module& m, Component& c, Function& f) {
 	});
 	out.add(")");
 	if (st) {
-		out.add(";\n");
-		out.add("\tlua_newtable(L);\n");
+		L(";");
+		L("\tlua_newtable(L);");
 		for (StructVar& v : st->vars) {
-			out.add("\tLuaWrapper::push(L, s.",v.name,");\n");
-			out.add("\tlua_setfield(L, -2, \"",v.name,"\");\n");
+			L("\tLuaWrapper::push(L, s.",v.name,");");
+			L("\tlua_setfield(L, -2, \"",v.name,"\");");
 		}
-		out.add("\n\treturn 1;\n");
+		L("\n\treturn 1;");
 	}
 	else if (has_return) {
-		out.add(");\n\treturn 1;\n");
+		L(");\n\treturn 1;");
 	}
 	else {
-		out.add(";\n\treturn 0;\n");
+		L(";\n\treturn 0;");
 	}
-	out.add("}\n\n");
+	L("}\n");
 }
 
 void wrap(OutputStream& out, StringView module, StringView component, StringView property_name, StringView method_name, StringView args, bool is_getter) {
-	out.add("int ", (is_getter ? "get" : "set"), component, property_name, "(lua_State* L) {\n");
-	i32 idx = 2;
-	out.add("\tauto [imodule, entity] = checkComponent(L);\n");
-	out.add("\tauto* module = (",module,"*)imodule;\n");
+	L("int ", (is_getter ? "get" : "set"), component, property_name, "(lua_State* L) {");
+	L("\tauto [imodule, entity] = checkComponent(L);");
+	L("\tauto* module = (",module,"*)imodule;");
 	
-	args = withoutPrefix(withoutSuffix(args, 1), 1);
+	i32 idx = 2;
 	forEachArg(args, [&](const Arg& arg, bool){
-		out.add("\tauto ", arg.name, " = LuaWrapper::checkArg<",arg.type,">(L, ",idx,");\n");
+		L("\tauto ", arg.name, " = LuaWrapper::checkArg<",arg.type,">(L, ",idx,");");
 		++idx;
 	});
 	if (is_getter) out.add("\tLuaWrapper::push(L, module->", method_name, "(");
@@ -1364,41 +1453,96 @@ void wrap(OutputStream& out, StringView module, StringView component, StringView
 		out.add(arg.name);
 	});
 	if (is_getter) out.add(")");
-	out.add(");\n");
-	if (is_getter) out.add("\treturn 1;\n");
-	else out.add("\treturn 0;\n");
-	out.add("}\n\n");
+	L(");");
+	if (is_getter) L("\treturn 1;");
+	else L("\treturn 0;");
+	L("}\n");
 }
 
-void serializeComponentRegister(OutputStream& out, Parser& parser) {
-	out.add("namespace Lumix {\n");
-	out.add("void registerLuaComponents(lua_State* L) {\n");
+void serializeMain(OutputStream& out, Parser& parser) {
+	L("namespace Lumix {");
+	L("void registerLuaAPI(lua_State* L) {");
+	for (Object& o : parser.objects) {
+		L("{");
+		L("lua_getglobal(L, \"LumixAPI\");");
+		L("lua_newtable(L);");
+		L("lua_pushvalue(L, -1);");
+		L("lua_setfield(L, -3, \"",o.name,"\");");
+		L("lua_pushvalue(L, -1);");
+		L("lua_setfield(L, -2, \"__index\");");
+
+		for (Function& f : o.functions) {
+			L("{");
+			L("auto proxy = [](lua_State* L) -> int {");
+				L("LuaWrapper::checkTableArg(L, 1); // self");
+				L(o.name, "* obj;");
+				L("if (!LuaWrapper::checkField(L, 1, \"_value\", &obj)) luaL_error(L, \"Invalid object\");");
+				
+				i32 idx = 0;
+				forEachArg(f.args, [&](const Arg& arg, bool){
+					++idx;
+					L("auto ",arg.name," = LuaWrapper::checkArg<",arg.type,">(L, ",(idx + 1),");");
+				});
+				
+				bool has_return = !equal(f.return_type, "void");
+				if (has_return) out.add("auto res = ");
+				
+				out.add("obj->",f.name,"(");
+				forEachArg(f.args, [&](const Arg& arg, bool first){
+					if (!first) out.add(", ");
+					out.add(arg.name);
+				});
+				L(");");
+				
+				if (has_return) {
+					L("LuaWrapper::push(L, res);");
+					L("return 1;");
+				}
+				else {
+					L("return 0;");
+				}
+				
+			L("};");
+
+			L("const char* name = \"", f.name, "\";");
+			L("lua_pushcfunction(L, proxy, name);");
+			L("lua_setfield(L, -2, name);");
+			L("}");
+		}
+		L("lua_pop(L, 2);");
+		L("}");
+	}
+	
 	for (Module& m : parser.modules) {
 		for (Component& c : m.components) {
-			out.add("\tregisterLuaComponent(L, \"",c.id,"\", ",c.name,"_getter, ",c.name,"_setter);\n");
+			L("\tregisterLuaComponent(L, \"",c.id,"\", ",c.name,"_getter, ",c.name,"_setter);");
 		}
 	}
-	out.add("}\n");
-	out.add("}\n\n");
+	L("}");
+	L("}\n");
 }
 
 
 void toID(StringView name, Span<char> out) {
 	char* dst = out.begin;
 	const char* src = name.begin;
+	bool prev_uppercase = false;
 	while (dst < out.end - 1 && src < name.end) {
 		if (*src == ' ') {
 			*dst = '_';
+			prev_uppercase = false;
 		}
 		else if (*src >= 'A' && *src <= 'Z') {
-			if (src != name.begin) {
+			if (src != name.begin && !prev_uppercase) {
 				*dst = '_';
 				++dst;
 			}
 			if (dst != out.end - 1) *dst = *src | 0x20;
+			prev_uppercase = true;
 		}
 		else {
 			*dst = *src;
+			prev_uppercase = false;
 		}
 		++dst;
 		++src;
@@ -1412,52 +1556,46 @@ StringView pickLabel(StringView base, StringView spec) {
 }
 
 void serializeLuaPropertySetter(OutputStream& out, Module& m, Component& c) {
-	out.add("int ",c.name,"_setter(lua_State* L) {\n");
-	out.add(R"#(
-	auto [imodule, entity] = checkComponent(L);
-	auto* module = ()#",m.name,R"#(*)imodule;
-	const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
-	if (false) {}
-)#");
+	L("int ",c.name,"_setter(lua_State* L) {");
+	L("auto [imodule, entity] = checkComponent(L);");
+	L("auto* module = (",m.name,"*)imodule;");
+	L("const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);");
+	L("if (false) {}");
 
-	// TODO
 	bool is_array = false;
 	for (Property& p : c.properties) {
-		if (p.is_array_begin) {
-			is_array = true;
-			continue;
-		}
-		if (p.is_array_end) {
-			is_array = false;
-			continue;
-		}
-		if (is_array) continue;
 		if (p.attributes.is_blob) continue;
-		if (p.attributes.is_enum) continue;
-		if (isEnum(m, p.type)) continue;
-		if (p.attributes.force_function) continue;
 		if (p.is_var) {
-			out.add("\telse if (equalStrings(prop_name, \"",p.name,"\")) module->get",c.name,"(entity).",p.name," = LuaWrapper::checkArg<",p.type,">(L, 3);\n");
+			L("\telse if (equalStrings(prop_name, \"",p.name,"\")) module->get",c.name,"(entity).",p.name," = LuaWrapper::checkArg<",p.type,">(L, 3);");
 			continue;
 		}
-
+		
 		if (p.getter_name.size() == 0) continue;
 		if (p.setter_name.size() == 0) continue;
-
+		
 		char tmp[256];
 		toID(pickLabel(p.name, p.attributes.label), Span(tmp, tmp + 255));
-		out.add("\telse if (equalStrings(prop_name, \"",tmp,"\")) module->",p.setter_name,"(entity, LuaWrapper::checkArg<",p.type,">(L, 3));\n");
-	}
-	out.add("\telse { ASSERT(false); luaL_error(L, \"Unknown property %s\", prop_name); }\n");
 
-	out.add("\treturn 0;\n");
-	out.add("}\n\n");
+		out.add("\telse if (equalStrings(prop_name, \"",tmp,"\")) ");
+		if (Enum* e = getEnum(m, p.type)) {
+			L("module->",p.setter_name,"(entity, (",e->full,")LuaWrapper::checkArg<i32>(L, 3));");
+		}
+		else if (p.attributes.is_enum) {
+			L("module->",p.setter_name,"(entity, (",p.type,")LuaWrapper::checkArg<i32>(L, 3));");
+		}
+		else {
+			L("module->",p.setter_name,"(entity, LuaWrapper::checkArg<",p.type,">(L, 3));");
+		}
+	}
+	L("\telse { ASSERT(false); luaL_error(L, \"Unknown property %s\", prop_name); }");
+
+	L("\treturn 0;");
+	L("}\n");
 }
 
-void serializeLuaArrayGetter(OutputStream& out, Module& m, Component& c, Property& p) {
-	out.add("using GetterModule = ",m.name,";\n");
-	out.add(
-	R"#(			auto getter = [](lua_State* L) ->int {
+void serializeLuaArrayGetter(OutputStream& out, Module& m, Component& c, ArrayProperty& a) {
+	L("using GetterModule = ",m.name,";");
+	out.add(R"#(auto getter = [](lua_State* L) ->int {
 		LuaWrapper::checkTableArg(L, 1); // self
 		auto* module = LuaWrapper::toType<GetterModule*>(L, lua_upvalueindex(1));
 		EntityRef entity{LuaWrapper::toType<i32>(L, lua_upvalueindex(2))};
@@ -1465,7 +1603,7 @@ void serializeLuaArrayGetter(OutputStream& out, Module& m, Component& c, Propert
 			auto adder = [](lua_State* L) -> int  {
 				auto* module = LuaWrapper::toType<GetterModule*>(L, lua_upvalueindex(1));
 				EntityRef entity{LuaWrapper::toType<i32>(L, lua_upvalueindex(2))};
-				module->add)#",p.name,R"#((entity, module->get)#",p.name,R"#(Count(entity));
+				module->add)#",a.name,R"#((entity, module->get)#",a.name,R"#(Count(entity));
 				return 0;
 			};
 
@@ -1489,168 +1627,147 @@ void serializeLuaArrayGetter(OutputStream& out, Module& m, Component& c, Propert
 			EntityRef entity = {LuaWrapper::toType<i32>(L, lua_upvalueindex(2))};
 			i32 index = LuaWrapper::toType<int>(L, lua_upvalueindex(3));
 			if (false) {}
-)#");	
-				bool is_sub = false;
-				for (Property& sub : c.properties) {
-					if (&sub == &p) {
-						is_sub = true;
-						continue;
-					}
-					else if (p.is_array_end) break;
-					if (sub.attributes.is_blob) continue;
-					if (sub.attributes.force_function) continue;
-					if (sub.attributes.is_enum) continue;
-					if (isEnum(m, sub.type)) continue;
-					if (sub.getter_name.size() == 0) continue;
-					if (is_sub) {
-						char tmp[256];
-						toID(pickLabel(sub.name, sub.attributes.label), Span(tmp, tmp + 256));
-						out.add("\t\t\t\t\telse if(equalStrings(prop_name, \"",tmp,"\")) {\n");
-						out.add("\t\t\t\t\t\tLuaWrapper::push(L, module->",sub.getter_name,"(entity, index));\n");
-						out.add("\t\t\t\t\t}\n");
-					}
-				}
-				out.add("\t\t\t\t\telse { ASSERT(false); luaL_error(L, \"Unknown property %s\", prop_name); }\n");
-out.add(R"#(
-					return 1;
-				};
+	)#");
 
-				auto setter = [](lua_State* L) -> int {
-					LuaWrapper::checkTableArg(L, 1);
-					const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
-					auto* module = LuaWrapper::toType<GetterModule*>(L, lua_upvalueindex(1));
-					EntityRef entity = {LuaWrapper::toType<i32>(L, lua_upvalueindex(2))};
-					i32 index = LuaWrapper::toType<int>(L, lua_upvalueindex(3));
-					if (false) {}
-)#");	
+	for (Property& child : a.children) {
+		if (child.attributes.is_blob) continue;
+		if (child.getter_name.size() == 0) continue;
+		
+		char tmp[256];
+		toID(pickLabel(child.name, child.attributes.label), Span(tmp, tmp + 256));
+
+		L("else if(equalStrings(prop_name, \"",tmp,"\")) {");
+		if (child.attributes.is_enum || getEnum(m, child.type)) {
+			L("LuaWrapper::push(L, (i32)module->",child.getter_name,"(entity, index));");
+		}
+		else {
+			L("LuaWrapper::push(L, module->",child.getter_name,"(entity, index));");
+		}
+		L("}");
+
+	}
+	L("else { ASSERT(false); luaL_error(L, \"Unknown property %s\", prop_name); }");
+
+	out.add(R"#(return 1;
+		};
+
+		auto setter = [](lua_State* L) -> int {
+			LuaWrapper::checkTableArg(L, 1);
+			const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
+			auto* module = LuaWrapper::toType<GetterModule*>(L, lua_upvalueindex(1));
+			EntityRef entity = {LuaWrapper::toType<i32>(L, lua_upvalueindex(2))};
+			i32 index = LuaWrapper::toType<int>(L, lua_upvalueindex(3));
+			if (false) {}
+	)#");	
 					
-				is_sub = false;
-				for (Property& sub : c.properties) {
-					if (&sub == &p) {
-						is_sub = true;
-						continue;
-					}
-					else if (p.is_array_end) break;
-					if (sub.attributes.is_blob) continue;
-					if (sub.attributes.force_function) continue;
-					if (sub.attributes.is_enum) continue;
-					if (isEnum(m, sub.type)) continue;
-					if (sub.setter_name.size() == 0) continue;
-					if (is_sub) {
-						char tmp[256];
-						toID(pickLabel(sub.name, sub.attributes.label), Span(tmp, tmp + 256));
-						out.add("\t\t\t\t\telse if(equalStrings(prop_name, \"",tmp,"\")) {\n");
-						out.add("\t\t\t\t\t\tmodule->",sub.setter_name,"(entity, index, LuaWrapper::checkArg<",sub.type,">(L, 3));\n");
-						out.add("\t\t\t\t\t}\n");
-					}
-				}
-				out.add("\t\t\t\t\telse { ASSERT(false); luaL_error(L, \"Unknown property %s\", prop_name); }\n");
-out.add(R"#(
-					return 0;
-				};
+	for (Property& child : a.children) {
+		if (child.attributes.is_blob) continue;
+		if (child.setter_name.size() == 0) continue;
+		
+		char tmp[256];
+		toID(pickLabel(child.name, child.attributes.label), Span(tmp, tmp + 256));
 
-				i32 index = LuaWrapper::checkArg<i32>(L, 2) - 1;
-				lua_newtable(L);
-				lua_newtable(L);
-
-				lua_pushlightuserdata(L, (void*)module);
-				LuaWrapper::push(L, entity.index);
-				LuaWrapper::push(L, index);
-				lua_pushcclosure(L, getter, "getter", 3);
-				lua_setfield(L, -2, "__index");
-
-				lua_pushlightuserdata(L, (void*)module);
-				LuaWrapper::push(L, entity.index);
-				LuaWrapper::push(L, index);
-				lua_pushcclosure(L, setter, "setter", 3);
-				lua_setfield(L, -2, "__newindex");
-
-				lua_setmetatable(L, -2);
-				return 1;
-			};
-)#");	
-}
-
-void serializeLuaPropertyGetter(OutputStream& out, Module& m, Component& c) {
-	out.add("int ",c.name,"_getter(lua_State* L) {\n");
-	out.add("\tauto [imodule, entity] = checkComponent(L);\n");
-	out.add("\tauto* module = (",m.name,"*)imodule;\n");
-
-	if (equal(c.id, "lua_script")) {
-		out.add(R"#(
-			if (lua_isnumber(L, 2)) {
-				const i32 scr_index = LuaWrapper::toType<i32>(L, 2) - 1;
-				int env = module->getEnvironment(entity, scr_index);
-				if (env < 0) {
-					lua_pushnil(L);
-				}
-				else {
-					lua_rawgeti(L, LUA_REGISTRYINDEX, env);
-					ASSERT(lua_type(L, -1) == LUA_TTABLE);
-				}
-				return 1;
-			}
-		)#");
+		L("else if(equalStrings(prop_name, \"",tmp,"\")) {");
+		if (child.attributes.is_enum || getEnum(m, child.type)) {
+			L("module->",child.setter_name,"(entity, index, (",child.type,")LuaWrapper::checkArg<i32>(L, 3));");
+		}
+		else {
+			L("module->",child.setter_name,"(entity, index, LuaWrapper::checkArg<",child.type,">(L, 3));");
+		}
+		L("}");
 	}
 
-	out.add(R"#(
-	const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
-	if (false) {}
-)#");
+	out.add(R"#(else { ASSERT(false); luaL_error(L, "Unknown property %ss", prop_name); }
+			return 0;
+			};
 
-	// TODO
-	bool is_array = false;
-	for (Property& p : c.properties) {
-		if (p.is_array_begin) {
-			out.add("\telse if (equalStrings(prop_name, \"",p.array_id,"\")) {\n");
-			serializeLuaArrayGetter(out, m, c, p);
-			out.add(R"#(
-			lua_newtable(L); // {}
-			lua_newtable(L); // {}, metatable
-			LuaWrapper::push(L, module);
-			LuaWrapper::push(L, entity.index);
-			lua_pushcclosure(L, getter, "getter", 2);
-			lua_setfield(L, -2, "__index"); // {}, mt
-			lua_setmetatable(L, -2); // {}
+			i32 index = LuaWrapper::checkArg<i32>(L, 2) - 1;
+			i32 num_elements = module->get)#",a.name,R"#(Count(entity);
+			if (index >= num_elements) {
+				lua_pushnil(L);
+				return 1;
 			}
-			)#");
-			is_array = true;
-			continue;
-		}
-		if (p.is_array_end) {
-			is_array = false;
-			continue;
-		}
-		if (is_array) continue;
+
+			lua_newtable(L);
+			lua_newtable(L);
+
+			lua_pushlightuserdata(L, (void*)module);
+			LuaWrapper::push(L, entity.index);
+			LuaWrapper::push(L, index);
+			lua_pushcclosure(L, getter, "getter", 3);
+			lua_setfield(L, -2, "__index");
+
+			lua_pushlightuserdata(L, (void*)module);
+			LuaWrapper::push(L, entity.index);
+			LuaWrapper::push(L, index);
+			lua_pushcclosure(L, setter, "setter", 3);
+			lua_setfield(L, -2, "__newindex");
+
+			lua_setmetatable(L, -2);
+			return 1;
+		};
+
+		lua_newtable(L); // {}
+		lua_newtable(L); // {}, metatable
+		LuaWrapper::push(L, module);
+		LuaWrapper::push(L, entity.index);
+		lua_pushcclosure(L, getter, "getter", 2);
+		lua_setfield(L, -2, "__index"); // {}, mt
+		lua_setmetatable(L, -2); // {}
+	)#");
+}
+
+// TODO move lua stuff into separate file
+void serializeLuaPropertyGetter(OutputStream& out, Module& m, Component& c) {
+	L("int ",c.name,"_getter(lua_State* L) {");
+	L("\tauto [imodule, entity] = checkComponent(L);");
+	L("\tauto* module = (",m.name,"*)imodule;");
+
+	if (equal(c.id, "lua_script")) {
+		L("if (lua_isnumber(L, 2)) return lua_push_script_env(L, entity, module);");
+	}
+
+	L("const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);");
+	L("if (false) {}");
+
+	for (ArrayProperty& a : c.arrays) {
+		L("\telse if (equalStrings(prop_name, \"",a.id,"\")) {");
+		serializeLuaArrayGetter(out, m, c, a);
+		L("}");
+	}
+
+	for (Property& p : c.properties) {
 		if (p.attributes.is_blob) continue;
-		if (p.attributes.is_enum) continue;
-		if (isEnum(m, p.type)) continue;
-		if (p.attributes.force_function) continue;
 		if (p.is_var) {
-			out.add("\telse if (equalStrings(prop_name, \"",p.name,"\")) LuaWrapper::push(L, module->get",c.name,"(entity).",p.name,");\n");
+			L("\telse if (equalStrings(prop_name, \"",p.name,"\")) LuaWrapper::push(L, module->get",c.name,"(entity).",p.name,");");
 			continue;
 		}
 		if (p.getter_name.size() == 0) continue;
 
 		char tmp[256];
 		toID(pickLabel(p.name, p.attributes.label), Span(tmp, tmp + 255));
-		out.add("\telse if (equalStrings(prop_name, \"",tmp,"\")) LuaWrapper::push(L, module->",p.getter_name,"(entity));\n");
+		if (p.attributes.is_enum || getEnum(m, p.type)) {
+			L("\telse if (equalStrings(prop_name, \"",tmp,"\")) LuaWrapper::push(L, (i32)module->",p.getter_name,"(entity));");
+		}
+		else {
+			L("\telse if (equalStrings(prop_name, \"",tmp,"\")) LuaWrapper::push(L, module->",p.getter_name,"(entity));");
+		}
 	}
 
 	for (Function& f : c.functions) {
 		StringView label = f.attributes.label;
 		if (label.size() == 0) label = f.name;
-		out.add("\telse if (equalStrings(prop_name, \"",label,"\")) {\n");
-		out.add("\t\tlua_pushcfunction(L, ",c.name,"_",label,", \"",c.name,"_",f.name,"\");\n");
-		out.add("\t}\n");
+		L("\telse if (equalStrings(prop_name, \"",label,"\")) {");
+		L("\t\tlua_pushcfunction(L, ",c.name,"_",label,", \"",c.name,"_",f.name,"\");");
+		L("\t}");
 	}
-	out.add("\telse { ASSERT(false); luaL_error(L, \"Unknown property %s\", prop_name); }\n");
-	out.add("\treturn 1;\n");
-	out.add("}\n\n");
+	L("\telse { ASSERT(false); luaL_error(L, \"Unknown property %s\", prop_name); }");
+	L("\treturn 1;");
+	L("}\n");
 }
 
 void serializeLuaCAPI(OutputStream& out, Module& m) {
-	out.add("namespace Lumix {\n");
+	L("namespace Lumix {");
 	for (Component& c : m.components) {
 		for (Function& f : c.functions) {
 			wrap(out, m, c, f);
@@ -1658,16 +1775,16 @@ void serializeLuaCAPI(OutputStream& out, Module& m) {
 		serializeLuaPropertyGetter(out, m, c);
 		serializeLuaPropertySetter(out, m, c);
 	}
-	out.add("}\n\n");
+	L("}\n");
 }
 
 void serializeReflection(OutputStream& out, Module& m) {
-	out.add("// Generated by meta.cpp\n\n");
+	L("// Generated by meta.cpp\n");
 	for (Enum& e : m.enums) {
-		out.add("struct ", e.name, "Enum : reflection::EnumAttribute {\n");
-		out.add("\tu32 count(ComponentUID cmp) const override { return ",e.values.size,"; }\n");
-		out.add("\tconst char* name(ComponentUID cmp, u32 idx) const override {\n");
-		out.add("\t\tswitch((",e.name,")idx) {\n");
+		L("struct ", e.name, "Enum : reflection::EnumAttribute {");
+		L("\tu32 count(ComponentUID cmp) const override { return ",e.values.size,"; }");
+		L("\tconst char* name(ComponentUID cmp, u32 idx) const override {");
+		L("\t\tswitch((",e.name,")idx) {");
 		for (Enumerator& v : e.values) {
 			char tmp[256];
 			buildString(tmp, v.name);
@@ -1678,48 +1795,28 @@ void serializeReflection(OutputStream& out, Module& m) {
 					c |= 0x20;
 				}
 			}
-			out.add("\t\t\tcase ",e.name,"::",v.name,": return \"",tmp,"\";\n");
+			L("\t\t\tcase ",e.name,"::",v.name,": return \"",tmp,"\";");
 		}
-		out.add("\t\t}\n");
-		out.add("\t\tASSERT(false);\n");
-		out.add("\t\treturn \"N/A\";\n");
-		out.add("\t}\n");
-		out.add("};\n\n");
+		L("\t\t}");
+		L("\t\tASSERT(false);");
+		L("\t\treturn \"N/A\";");
+		L("\t}");
+		L("};\n");
 	}
 
-	out.add("reflection::build_module(\"", m.id, "\")\n");
+	L("reflection::build_module(\"", m.id, "\")");
 	for (StringView e : m.events) {
-		out.add("\t.event<&",m.name,"::",e,">(\"",e,"\")\n");
+		L("\t.event<&",m.name,"::",e,">(\"",e,"\")");
 	}
 	for (Function& fn : m.functions) {
 		StringView label = fn.name;
 		if (fn.attributes.label.size() > 0) label = fn.attributes.label;
-		out.add("\t.function<(", fn.return_type, " (", m.name, "::*)", fn.args, ")&", m.name, "::", fn.name ,">(\"", label, "\")\n");
+		L("\t.function<(", fn.return_type, " (", m.name, "::*)(", fn.args, "))&", m.name, "::", fn.name ,">(\"", label, "\")");
 	}
 
 	for (Component& cmp : m.components) {
-		out.add("\t.cmp<&", m.name, "::create", cmp.name, ", &", m.name, "::destroy", cmp.name, ">(\"", cmp.id, "\", \"", m.label, " / ", cmp.label, "\")\n");
-		StringView array;
-		
-		if (cmp.icon.size() > 0) {
-			out.add("\t\t.icon(", cmp.icon, ")\n");
-		}
-
-		for (Function& fn : cmp.functions) {
-			StringView label = fn.attributes.label.size() > 0 ? fn.attributes.label : fn.name;
-			out.add("\t\t.function<(", fn.return_type, " (", m.name, "::*)", fn.args, ")&", m.name, "::", fn.name, ">(\"", label, "\")\n");
-		}
-
-		for (Property& prop : cmp.properties) {
-			if (prop.is_array_begin) {
-				out.add("\t\t.begin_array<&", m.name, "::get", prop.name, "Count, &", m.name, "::add", prop.name, ", &", m.name, "::remove", prop.name, ">(\"", prop.array_id ,"\")\n");
-				array = prop.name;
-			}
-			else if (prop.is_array_end) {
-				out.add("\t\t.end_array()\n");
-				array = {};
-			}
-			else if (prop.is_var) {
+		auto def_property = [&](const Property& prop) {
+			if (prop.is_var) {
 				char label[256];
 				if (prop.attributes.label.size() > 0) {
 					buildString(label, prop.attributes.label);
@@ -1727,12 +1824,13 @@ void serializeReflection(OutputStream& out, Module& m) {
 				else {
 					toLabel(prop.name, Span(label, label + sizeof(label)));
 				}
-				out.add("\t\t.var_prop<&", m.name, "::get", cmp.name, ", &", cmp.struct_name, "::", prop.name, ">(\"", label, "\")");
-				out.add("\n");
-				write(out, prop.attributes);
+				L("\t\t.var_prop<&", m.name, "::get", cmp.name, ", &", cmp.struct_name, "::", prop.name, ">(\"", label, "\")");
+				serializeAttributes(out, prop.attributes);
+				return;
 			}
-			else if (prop.getter_name.size() > 0) {
-				bool is_enum = isEnum(m, prop.type) || prop.attributes.is_enum || prop.attributes.dynamic_enum_name.size() > 0;
+
+			if (prop.getter_name.size() > 0) {
+				bool is_enum = getEnum(m, prop.type) || prop.attributes.is_enum || prop.attributes.dynamic_enum_name.size() > 0;
 				if (equal(prop.name, "Enabled")) {
 					out.add("\t\t.prop<&", m.name, "::", prop.getter_name);
 					if (prop.setter_name.size() > 0) {
@@ -1760,20 +1858,45 @@ void serializeReflection(OutputStream& out, Module& m) {
 				else {
 					toLabel(prop.name, Span(label, label + sizeof(label)));
 				}
-				out.add(">(\"", label, "\")\n");
-				write(out, prop.attributes);
+				L(">(\"", label, "\")");
+				serializeAttributes(out, prop.attributes);
 				if (is_enum) {
 					// TODO withoutNamespace?
 					StringView enum_name = prop.attributes.dynamic_enum_name.size() > 0 ? prop.attributes.dynamic_enum_name : withoutNamespace(prop.type);
-					out.add("\t\t\t.attribute<",enum_name,"Enum>()\n");
+					L("\t\t\t.attribute<",enum_name,"Enum>()");
 				}
+				return;
 			}
-			else if (prop.setter_name.size() > 0) {
-				out.add("\t\t.function<&", m.name, "::",  prop.setter_name, ">(\"set", prop.name, "\")\n");
+			
+			if (prop.setter_name.size() > 0) {
+				L("\t\t.function<&", m.name, "::",  prop.setter_name, ">(\"set", prop.name, "\")");
+			}	
+		};
+
+		L("\t.cmp<&", m.name, "::create", cmp.name, ", &", m.name, "::destroy", cmp.name, ">(\"", cmp.id, "\", \"", m.label, " / ", cmp.label, "\")");
+		
+		if (cmp.icon.size() > 0) {
+			L("\t\t.icon(", cmp.icon, ")");
+		}
+
+		for (Function& fn : cmp.functions) {
+			StringView label = fn.attributes.label.size() > 0 ? fn.attributes.label : fn.name;
+			L("\t\t.function<(", fn.return_type, " (", m.name, "::*)(", fn.args, "))&", m.name, "::", fn.name, ">(\"", label, "\")");
+		}
+
+		for (Property& prop : cmp.properties) {
+			def_property(prop);
+		}
+
+		for (ArrayProperty& array : cmp.arrays) {
+			L("\t\t.begin_array<&", m.name, "::get", array.name, "Count, &", m.name, "::add", array.name, ", &", m.name, "::remove", array.name, ">(\"", array.id ,"\")");
+			for (Property& prop : array.children) {
+				def_property(prop);
 			}
+			L("\t\t.end_array()");
 		}
 	}
-	out.add(";\n\n");
+	L(";\n");
 }
 
 void writeFile(const char* out_path, OutputStream& stream) {
@@ -1810,6 +1933,10 @@ int main() {
 	OutputStream stream;
 	OutputStream lua_capi_stream;
 	lua_capi_stream.add("// Generated by meta.cpp\n\n");
+	for (Object& o : parser.objects) {
+		StringView include_path = withoutPrefix(makeStringView(o.filename), 2); // skip "./"
+		lua_capi_stream.add("#include \"",include_path,"\"\n");
+	}
 	for (Module& m : parser.modules) {
 		StringView include_path = withoutPrefix(makeStringView(m.filename), 2); // skip "./"
 		lua_capi_stream.add("#include \"",include_path,"\"\n");
@@ -1839,7 +1966,7 @@ int main() {
 
 		serializeLuaCAPI(lua_capi_stream, m);
 	}
-	serializeComponentRegister(lua_capi_stream, parser);
+	serializeMain(lua_capi_stream, parser);
 
 	writeFile("lua/lua_capi.gen.h", lua_capi_stream);
 

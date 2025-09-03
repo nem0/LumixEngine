@@ -609,14 +609,6 @@ void SceneView::setViewportRotation(const Quat& rot) {
 	m_view->setViewport(vp);
 }
 
-static volatile bool once = [](){
-	LUMIX_GLOBAL_FUNC(SceneView::getViewportRotation);
-	LUMIX_GLOBAL_FUNC(SceneView::setViewportRotation);
-	LUMIX_GLOBAL_FUNC(SceneView::getViewportPosition);
-	LUMIX_GLOBAL_FUNC(SceneView::setViewportPosition);
-	return true;
-}();
-
 struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 	RenderPlugin(SceneView& view, Renderer& renderer)
 		: m_scene_view(view)

@@ -427,10 +427,6 @@ struct RendererImpl final : Renderer {
 
 		RenderModule::reflect();
 
-		LUMIX_GLOBAL_FUNC(Model::getBoneCount);
-		LUMIX_GLOBAL_FUNC(Model::getBoneName);
-		LUMIX_GLOBAL_FUNC(Model::getBoneParent);
-
 		m_shader_defines.reserve(32);
 
 		bool try_load_renderdoc = CommandLineParser::isOn("-renderdoc");

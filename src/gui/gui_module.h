@@ -29,14 +29,14 @@ struct GUIRayHit {
 };
 
 struct GUIModule : IModule {
-	//@ enum
+	//@ enum full GUIModule::TextHAlign
 	enum class TextHAlign : i32 {
 		LEFT,
 		CENTER,
 		RIGHT
 	};
 
-	//@ enum
+	//@ enum full GUIModule::TextVAlign
 	enum class TextVAlign : i32 {
 		TOP,
 		MIDDLE,
