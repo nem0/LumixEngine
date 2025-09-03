@@ -452,36 +452,8 @@ static i32 LUA_getNumFunctions() {
 	return reflection::allFunctions().size();
 }
 
-static i32 LUA_getNumStructs() {
-	return reflection::allStructs().size();
-}
-
 static reflection::FunctionBase* LUA_getFunction(i32 idx) {
 	return reflection::allFunctions()[idx];
-}
-
-static reflection::StructBase* LUA_getStruct(i32 idx) {
-	return reflection::allStructs()[idx];
-}
-
-static const char* LUA_getStructName(reflection::StructBase* str) {
-	return str->name;
-}
-
-static i32 LUA_getNumStructMembers(reflection::StructBase* str) {
-	return str->members.size();
-}
-
-static reflection::StructVarBase* LUA_getStructMember(reflection::StructBase* str, u32 idx) {
-	return str->members[idx];
-}
-
-static u32 LUA_getStructMemberType(reflection::StructVarBase* var) {
-	return (u32)var->getType().type;
-}
-
-static const char* LUA_getStructMemberName(reflection::StructVarBase* var) {
-	return var->name;
 }
 
 static i32 LUA_getNextModule(lua_State* L) {
@@ -894,7 +866,7 @@ static int LUA_instantiatePrefab(lua_State* L) {
 	return 0;
 }
 
-void registerLuaComponents(lua_State* L);
+void registerLuaAPI(lua_State* L);
 
 void registerEngineAPI(lua_State* L, Engine* engine)
 {
@@ -971,14 +943,6 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	
 	LuaWrapper::createSystemFunction(L, "LumixReflection", "getNumFunctions", &LuaWrapper::wrap<LUA_getNumFunctions>);
 	LuaWrapper::createSystemFunction(L, "LumixReflection", "getFunction", &LuaWrapper::wrap<LUA_getFunction>);
-	
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getNumStructs", &LuaWrapper::wrap<LUA_getNumStructs>);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getStruct", &LuaWrapper::wrap<LUA_getStruct>);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getStructName", &LuaWrapper::wrap<LUA_getStructName>);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getNumStructMembers", &LuaWrapper::wrap<LUA_getNumStructMembers>);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getStructMember", &LuaWrapper::wrap<LUA_getStructMember>);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getStructMemberName", &LuaWrapper::wrap<LUA_getStructMemberName>);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getStructMemberType", &LuaWrapper::wrap<LUA_getStructMemberType>);
 	
 	LuaWrapper::createSystemFunction(L, "LumixAPI", "resourceTypeFromString", &LUA_resourceTypeFromString);
 	LuaWrapper::createSystemFunction(L, "LumixAPI", "beginProfilerBlock", LuaWrapper::wrap<&profiler::endBlock>);
@@ -1275,6 +1239,17 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 		logError("Failed to init entity api");
 	}
 
+	lua_getglobal(L, "LumixAPI");
+	if (lua_type(L, -1) == LUA_TNIL) {
+		lua_pop(L, 1);
+		lua_newtable(L);
+		lua_setglobal(L, "LumixAPI");
+	}
+	else {
+		lua_pop(L, 1);
+	}
+
+	registerLuaAPI(L);
 }
 
 static struct {
@@ -1297,6 +1272,19 @@ checkComponent(lua_State* L) {
 	EntityRef entity = {LuaWrapper::toType<int>(L, -1)};
 	lua_pop(L, 1);
 	return {module, entity};
+}
+
+static int lua_push_script_env(lua_State* L, EntityRef entity, LuaScriptModule* module){
+	const i32 scr_index = LuaWrapper::toType<i32>(L, 2) - 1;
+	int env = module->getEnvironment(entity, scr_index);
+	if (env < 0) {
+		lua_pushnil(L);
+	}
+	else {
+		lua_rawgeti(L, LUA_REGISTRYINDEX, env);
+		ASSERT(lua_type(L, -1) == LUA_TTABLE);
+	}
+	return 1;
 }
 
 static int lua_new_cmp(lua_State* L) {
@@ -1343,3 +1331,5 @@ static void registerLuaComponent(lua_State* L, const char* cmp_name, lua_CFuncti
 }
 
 } // namespace Lumix
+
+#include "lua_capi.gen.h"

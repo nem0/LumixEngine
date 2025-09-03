@@ -46,11 +46,6 @@ Array<FunctionBase*>& allFunctions() {
 	return fncs;
 }
 
-Array<StructBase*>& allStructs() {
-	static Array<StructBase*> structs(getGlobalAllocator());
-	return structs;
-}
-
 ComponentBase::ComponentBase(IAllocator& allocator)
 	: props(allocator)
 	, functions(allocator)

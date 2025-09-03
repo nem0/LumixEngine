@@ -3463,15 +3463,6 @@ void RenderModule::reflect() {
 		}
 	};
 
-	reflection::structure<Ray>("Ray")
-		.LUMIX_MEMBER(Ray::origin, "origin")
-		.LUMIX_MEMBER(Ray::dir, "dir");
-
-	reflection::structure<RayCastModelHit>("RayCastModelHit")
-		.LUMIX_MEMBER(RayCastModelHit::is_hit, "is_hit")
-		.LUMIX_MEMBER(RayCastModelHit::t, "t")
-		.LUMIX_MEMBER(RayCastModelHit::entity, "entity");
-
 	#include "render_module.gen.h"
 }
 

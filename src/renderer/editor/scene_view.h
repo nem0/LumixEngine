@@ -4,6 +4,7 @@
 #include "editor/action.h"
 #include "editor/render_interface.h"
 #include "editor/studio_app.h"
+#include "editor/text_filter.h"
 #include "core/allocator.h"
 #include "renderer/gpu/gpu.h"
 #include "renderer/pipeline.h"
@@ -21,6 +22,7 @@ struct RayCastModelHit;
 struct Shader;
 struct World;
 
+//@ object
 struct SceneView : StudioApp::GUIPlugin
 {
 	friend struct WorldViewImpl;
