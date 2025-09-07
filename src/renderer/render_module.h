@@ -14,6 +14,8 @@
 
 
 //@ module RenderModule renderer "Render"
+//@ include "core/geometry.h"
+//@ include "renderer/model.h"
 namespace Lumix
 {
 
@@ -385,11 +387,11 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual void addDebugCross(const DVec3& center, float size, Color color) = 0;
 	virtual void addDebugBone(const DVec3& pos, const Vec3& dir, const Vec3& up, const Vec3& right, Color color) = 0;
 	virtual void addDebugCube(const DVec3& pos, const Vec3& dir, const Vec3& up, const Vec3& right, Color color) = 0;
-	virtual void addDebugCube(const DVec3& from, const DVec3& to, Color color) = 0;
 	virtual void addDebugCubeSolid(const DVec3& from, const DVec3& max, Color color) = 0;
 	virtual void setActiveCamera(EntityRef camera) = 0;
 	virtual void setActiveEnvironment(EntityRef entity) = 0;
 	//@ end
+	virtual void addDebugCube(const DVec3& from, const DVec3& to, Color color) = 0;
 	
 	//@ component Camera camera "Camera"
 	virtual Ray getCameraRay(EntityRef entity, const Vec2& screen_pos) = 0; //@ function label "getRay"
@@ -449,7 +451,7 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	//@ component InstancedModel instanced_model "Instanced Model"
 	virtual Path getInstancedModelPath(EntityRef entity) = 0;  //@ resource_type Model::TYPE label "Model"
 	virtual void setInstancedModelPath(EntityRef entity, const Path& path) = 0;
-	virtual void setInstancedModelBlob(EntityRef entity, InputMemoryStream& value) = 0;	//@ blob
+	virtual void setInstancedModelBlob(EntityRef entity, InputMemoryStream& value) = 0;
 	virtual void getInstancedModelBlob(EntityRef entity, OutputMemoryStream& value) = 0;
 	//@ end
 	virtual const HashMap<EntityRef, InstancedModel>& getInstancedModels() const = 0;
@@ -525,7 +527,7 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual void addGrass(EntityRef entity, int index) = 0;
 	virtual void removeGrass(EntityRef entity, int index) = 0;
 	
-	virtual GrassRotationMode getGrassRotationMode(EntityRef entity, int index) = 0;	//@ enum
+	virtual GrassRotationMode getGrassRotationMode(EntityRef entity, int index) = 0;
 	virtual void setGrassRotationMode(EntityRef entity, int index, GrassRotationMode value) = 0;
 	virtual float getGrassDistance(EntityRef entity, int index) = 0;				//@ min 1
 	virtual void setGrassDistance(EntityRef entity, int index, float value) = 0;

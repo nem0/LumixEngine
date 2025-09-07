@@ -2,6 +2,7 @@
 
 #include "animation/animation_module.h"
 #include "audio/audio_module.h"
+#include "core/geometry.h"
 #include "editor/asset_browser.h"
 #include "engine/core.h"
 #include "gui/gui_module.h"
@@ -10,6 +11,7 @@
 #include "navigation/navigation_module.h"
 #include "physics/physics_module.h"
 #include "renderer/editor/scene_view.h"
+#include "renderer/model.h"
 #include "renderer/render_module.h"
 
 namespace Lumix {
@@ -169,6 +171,77 @@ int Animable_setter(lua_State* L) {
 } // namespace Lumix
 
 namespace Lumix {
+int AudioModule_play(lua_State* L) {
+	LuaWrapper::checkTableArg(L, 1);
+	AudioModule* module;
+	if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+	auto entity = LuaWrapper::checkArg<EntityRef>(L, 2);
+	auto clip = LuaWrapper::checkArg<Path>(L, 3);
+	auto is_3d = LuaWrapper::checkArg<bool>(L, 4);
+	LuaWrapper::push(L, module->play(entity, clip, is_3d));
+	return 1;
+}
+
+int AudioModule_setMasterVolume(lua_State* L) {
+	LuaWrapper::checkTableArg(L, 1);
+	AudioModule* module;
+	if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+	auto volume = LuaWrapper::checkArg<float>(L, 2);
+	module->setMasterVolume(volume);
+	return 0;
+}
+
+int AudioModule_stop(lua_State* L) {
+	LuaWrapper::checkTableArg(L, 1);
+	AudioModule* module;
+	if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+	auto sound_id = LuaWrapper::checkArg<SoundHandle>(L, 2);
+	module->stop(sound_id);
+	return 0;
+}
+
+int AudioModule_isEnd(lua_State* L) {
+	LuaWrapper::checkTableArg(L, 1);
+	AudioModule* module;
+	if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+	auto sound_id = LuaWrapper::checkArg<SoundHandle>(L, 2);
+	LuaWrapper::push(L, module->isEnd(sound_id));
+	return 1;
+}
+
+int AudioModule_setFrequency(lua_State* L) {
+	LuaWrapper::checkTableArg(L, 1);
+	AudioModule* module;
+	if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+	auto sound_id = LuaWrapper::checkArg<SoundHandle>(L, 2);
+	auto frequency_hz = LuaWrapper::checkArg<u32>(L, 3);
+	module->setFrequency(sound_id, frequency_hz);
+	return 0;
+}
+
+int AudioModule_setVolume(lua_State* L) {
+	LuaWrapper::checkTableArg(L, 1);
+	AudioModule* module;
+	if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+	auto sound_id = LuaWrapper::checkArg<SoundHandle>(L, 2);
+	auto volume = LuaWrapper::checkArg<float>(L, 3);
+	module->setVolume(sound_id, volume);
+	return 0;
+}
+
+int AudioModule_setEcho(lua_State* L) {
+	LuaWrapper::checkTableArg(L, 1);
+	AudioModule* module;
+	if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+	auto sound_id = LuaWrapper::checkArg<SoundHandle>(L, 2);
+	auto wet_dry_mix = LuaWrapper::checkArg<float>(L, 3);
+	auto feedback = LuaWrapper::checkArg<float>(L, 4);
+	auto left_delay = LuaWrapper::checkArg<float>(L, 5);
+	auto right_delay = LuaWrapper::checkArg<float>(L, 6);
+	module->setEcho(sound_id, wet_dry_mix, feedback, left_delay, right_delay);
+	return 0;
+}
+
 int EchoZone_getter(lua_State* L) {
 	auto [imodule, entity] = checkComponent(L);
 	auto* module = (AudioModule*)imodule;
@@ -361,6 +434,33 @@ int Signal_setter(lua_State* L) {
 } // namespace Lumix
 
 namespace Lumix {
+int GUIModule_getRectAt(lua_State* L) {
+	LuaWrapper::checkTableArg(L, 1);
+	GUIModule* module;
+	if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+	auto pos = LuaWrapper::checkArg<Vec2>(L, 2);
+	LuaWrapper::push(L, module->getRectAt(pos));
+	return 1;
+}
+
+int GUIModule_isOver(lua_State* L) {
+	LuaWrapper::checkTableArg(L, 1);
+	GUIModule* module;
+	if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+	auto pos = LuaWrapper::checkArg<Vec2>(L, 2);
+	auto e = LuaWrapper::checkArg<EntityRef>(L, 3);
+	LuaWrapper::push(L, module->isOver(pos, e));
+	return 1;
+}
+
+int GUIModule_getSystemPtr(lua_State* L) {
+	LuaWrapper::checkTableArg(L, 1);
+	GUIModule* module;
+	if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+	LuaWrapper::pushObject(L, module->getSystemPtr(), "GUISystem");
+	return 1;
+}
+
 int Canvas_getter(lua_State* L) {
 	auto [imodule, entity] = checkComponent(L);
 	auto* module = (GUIModule*)imodule;
@@ -613,9 +713,9 @@ int Text_setter(lua_State* L) {
 	else if (equalStrings(prop_name, "font_path"))
 		module->setTextFontPath(entity, LuaWrapper::checkArg<Path>(L, 3));
 	else if (equalStrings(prop_name, "horizontal_align"))
-		module->setTextHAlign(entity, (GUIModule::TextHAlign)LuaWrapper::checkArg<i32>(L, 3));
+		module->setTextHAlign(entity, (TextHAlign)LuaWrapper::checkArg<i32>(L, 3));
 	else if (equalStrings(prop_name, "vertical_align"))
-		module->setTextVAlign(entity, (GUIModule::TextVAlign)LuaWrapper::checkArg<i32>(L, 3));
+		module->setTextVAlign(entity, (TextVAlign)LuaWrapper::checkArg<i32>(L, 3));
 	else if (equalStrings(prop_name, "text"))
 		module->setText(entity, LuaWrapper::checkArg<const char*>(L, 3));
 	else {
@@ -978,6 +1078,27 @@ int Agent_setter(lua_State* L) {
 } // namespace Lumix
 
 namespace Lumix {
+int PhysicsModule_raycast(lua_State* L) {
+	LuaWrapper::checkTableArg(L, 1);
+	PhysicsModule* module;
+	if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+	auto origin = LuaWrapper::checkArg<Vec3>(L, 2);
+	auto dir = LuaWrapper::checkArg<Vec3>(L, 3);
+	auto distance = LuaWrapper::checkArg<float>(L, 4);
+	auto ignore_entity = LuaWrapper::checkArg<EntityPtr>(L, 5);
+	LuaWrapper::push(L, module->raycast(origin, dir, distance, ignore_entity));
+	return 1;
+}
+
+int PhysicsModule_setGravity(lua_State* L) {
+	LuaWrapper::checkTableArg(L, 1);
+	PhysicsModule* module;
+	if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+	auto gravity = LuaWrapper::checkArg<Vec3>(L, 2);
+	module->setGravity(gravity);
+	return 0;
+}
+
 int Heightfield_getter(lua_State* L) {
 	auto [imodule, entity] = checkComponent(L);
 	auto* module = (PhysicsModule*)imodule;
@@ -1811,6 +1932,154 @@ int InstancedMesh_setter(lua_State* L) {
 } // namespace Lumix
 
 namespace Lumix {
+int RenderModule_castRay(lua_State* L) {
+	LuaWrapper::checkTableArg(L, 1);
+	RenderModule* module;
+	if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+	Ray ray;
+
+	if (!LuaWrapper::checkField(L, 2, "origin", &ray.origin)) luaL_error(L, "Invalid argument");
+	if (!LuaWrapper::checkField(L, 2, "dir", &ray.dir)) luaL_error(L, "Invalid argument");
+	auto ignore = LuaWrapper::checkArg<EntityPtr>(L, 3);
+	auto s = module->castRay(ray, ignore);
+	lua_newtable(L);
+	LuaWrapper::push(L, s.is_hit);
+	lua_setfield(L, -2, "is_hit");
+	LuaWrapper::push(L, s.t);
+	lua_setfield(L, -2, "t");
+	LuaWrapper::push(L, s.origin);
+	lua_setfield(L, -2, "origin");
+	LuaWrapper::push(L, s.dir);
+	lua_setfield(L, -2, "dir");
+	LuaWrapper::push(L, s.mesh);
+	lua_setfield(L, -2, "mesh");
+	LuaWrapper::push(L, s.entity);
+	lua_setfield(L, -2, "entity");
+	LuaWrapper::push(L, s.component_type);
+	lua_setfield(L, -2, "component_type");
+	LuaWrapper::push(L, s.subindex);
+	lua_setfield(L, -2, "subindex");
+	return 1;
+}
+
+int RenderModule_castRayTerrain(lua_State* L) {
+	LuaWrapper::checkTableArg(L, 1);
+	RenderModule* module;
+	if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+	Ray ray;
+
+	if (!LuaWrapper::checkField(L, 2, "origin", &ray.origin)) luaL_error(L, "Invalid argument");
+	if (!LuaWrapper::checkField(L, 2, "dir", &ray.dir)) luaL_error(L, "Invalid argument");
+	auto s = module->castRayTerrain(ray);
+	lua_newtable(L);
+	LuaWrapper::push(L, s.is_hit);
+	lua_setfield(L, -2, "is_hit");
+	LuaWrapper::push(L, s.t);
+	lua_setfield(L, -2, "t");
+	LuaWrapper::push(L, s.origin);
+	lua_setfield(L, -2, "origin");
+	LuaWrapper::push(L, s.dir);
+	lua_setfield(L, -2, "dir");
+	LuaWrapper::push(L, s.mesh);
+	lua_setfield(L, -2, "mesh");
+	LuaWrapper::push(L, s.entity);
+	lua_setfield(L, -2, "entity");
+	LuaWrapper::push(L, s.component_type);
+	lua_setfield(L, -2, "component_type");
+	LuaWrapper::push(L, s.subindex);
+	lua_setfield(L, -2, "subindex");
+	return 1;
+}
+
+int RenderModule_addDebugTriangle(lua_State* L) {
+	LuaWrapper::checkTableArg(L, 1);
+	RenderModule* module;
+	if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+	auto p0 = LuaWrapper::checkArg<DVec3>(L, 2);
+	auto p1 = LuaWrapper::checkArg<DVec3>(L, 3);
+	auto p2 = LuaWrapper::checkArg<DVec3>(L, 4);
+	auto color = LuaWrapper::checkArg<Color>(L, 5);
+	module->addDebugTriangle(p0, p1, p2, color);
+	return 0;
+}
+
+int RenderModule_addDebugLine(lua_State* L) {
+	LuaWrapper::checkTableArg(L, 1);
+	RenderModule* module;
+	if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+	auto from = LuaWrapper::checkArg<DVec3>(L, 2);
+	auto to = LuaWrapper::checkArg<DVec3>(L, 3);
+	auto color = LuaWrapper::checkArg<Color>(L, 4);
+	module->addDebugLine(from, to, color);
+	return 0;
+}
+
+int RenderModule_addDebugCross(lua_State* L) {
+	LuaWrapper::checkTableArg(L, 1);
+	RenderModule* module;
+	if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+	auto center = LuaWrapper::checkArg<DVec3>(L, 2);
+	auto size = LuaWrapper::checkArg<float>(L, 3);
+	auto color = LuaWrapper::checkArg<Color>(L, 4);
+	module->addDebugCross(center, size, color);
+	return 0;
+}
+
+int RenderModule_addDebugBone(lua_State* L) {
+	LuaWrapper::checkTableArg(L, 1);
+	RenderModule* module;
+	if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+	auto pos = LuaWrapper::checkArg<DVec3>(L, 2);
+	auto dir = LuaWrapper::checkArg<Vec3>(L, 3);
+	auto up = LuaWrapper::checkArg<Vec3>(L, 4);
+	auto right = LuaWrapper::checkArg<Vec3>(L, 5);
+	auto color = LuaWrapper::checkArg<Color>(L, 6);
+	module->addDebugBone(pos, dir, up, right, color);
+	return 0;
+}
+
+int RenderModule_addDebugCube(lua_State* L) {
+	LuaWrapper::checkTableArg(L, 1);
+	RenderModule* module;
+	if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+	auto pos = LuaWrapper::checkArg<DVec3>(L, 2);
+	auto dir = LuaWrapper::checkArg<Vec3>(L, 3);
+	auto up = LuaWrapper::checkArg<Vec3>(L, 4);
+	auto right = LuaWrapper::checkArg<Vec3>(L, 5);
+	auto color = LuaWrapper::checkArg<Color>(L, 6);
+	module->addDebugCube(pos, dir, up, right, color);
+	return 0;
+}
+
+int RenderModule_addDebugCubeSolid(lua_State* L) {
+	LuaWrapper::checkTableArg(L, 1);
+	RenderModule* module;
+	if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+	auto from = LuaWrapper::checkArg<DVec3>(L, 2);
+	auto max = LuaWrapper::checkArg<DVec3>(L, 3);
+	auto color = LuaWrapper::checkArg<Color>(L, 4);
+	module->addDebugCubeSolid(from, max, color);
+	return 0;
+}
+
+int RenderModule_setActiveCamera(lua_State* L) {
+	LuaWrapper::checkTableArg(L, 1);
+	RenderModule* module;
+	if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+	auto camera = LuaWrapper::checkArg<EntityRef>(L, 2);
+	module->setActiveCamera(camera);
+	return 0;
+}
+
+int RenderModule_setActiveEnvironment(lua_State* L) {
+	LuaWrapper::checkTableArg(L, 1);
+	RenderModule* module;
+	if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+	auto entity = LuaWrapper::checkArg<EntityRef>(L, 2);
+	module->setActiveEnvironment(entity);
+	return 0;
+}
+
 int Camera_getRay(lua_State* L) {
 	auto [imodule, entity] = checkComponent(L);
 	auto* module = (RenderModule*)imodule;
@@ -2644,7 +2913,102 @@ int ProceduralGeometry_setter(lua_State* L) {
 } // namespace Lumix
 
 namespace Lumix {
+
 void registerLuaAPI(lua_State* L) {
+	lua_newtable(L);
+	lua_setglobal(L, "LumixModules");
+	{
+		lua_newtable(L);
+		lua_getglobal(L, "LumixModules");
+		lua_pushvalue(L, -2);
+		lua_setfield(L, -2, "audio");
+		lua_pop(L, 1);
+		lua_pushvalue(L, -1);
+		lua_setfield(L, -2, "__index");
+		lua_pushcfunction(L, lua_new_module, "new");
+		lua_setfield(L, -2, "new");
+		lua_pushcfunction(L, AudioModule_play, "play");
+		lua_setfield(L, -2, "play");
+		lua_pushcfunction(L, AudioModule_setMasterVolume, "setMasterVolume");
+		lua_setfield(L, -2, "setMasterVolume");
+		lua_pushcfunction(L, AudioModule_stop, "stop");
+		lua_setfield(L, -2, "stop");
+		lua_pushcfunction(L, AudioModule_isEnd, "isEnd");
+		lua_setfield(L, -2, "isEnd");
+		lua_pushcfunction(L, AudioModule_setFrequency, "setFrequency");
+		lua_setfield(L, -2, "setFrequency");
+		lua_pushcfunction(L, AudioModule_setVolume, "setVolume");
+		lua_setfield(L, -2, "setVolume");
+		lua_pushcfunction(L, AudioModule_setEcho, "setEcho");
+		lua_setfield(L, -2, "setEcho");
+		lua_pop(L, 1);
+	}
+	{
+		lua_newtable(L);
+		lua_getglobal(L, "LumixModules");
+		lua_pushvalue(L, -2);
+		lua_setfield(L, -2, "gui");
+		lua_pop(L, 1);
+		lua_pushvalue(L, -1);
+		lua_setfield(L, -2, "__index");
+		lua_pushcfunction(L, lua_new_module, "new");
+		lua_setfield(L, -2, "new");
+		lua_pushcfunction(L, GUIModule_getRectAt, "getRectAt");
+		lua_setfield(L, -2, "getRectAt");
+		lua_pushcfunction(L, GUIModule_isOver, "isOver");
+		lua_setfield(L, -2, "isOver");
+		lua_pushcfunction(L, GUIModule_getSystemPtr, "getSystemPtr");
+		lua_setfield(L, -2, "getSystem");
+		lua_pop(L, 1);
+	}
+	{
+		lua_newtable(L);
+		lua_getglobal(L, "LumixModules");
+		lua_pushvalue(L, -2);
+		lua_setfield(L, -2, "physics");
+		lua_pop(L, 1);
+		lua_pushvalue(L, -1);
+		lua_setfield(L, -2, "__index");
+		lua_pushcfunction(L, lua_new_module, "new");
+		lua_setfield(L, -2, "new");
+		lua_pushcfunction(L, PhysicsModule_raycast, "raycast");
+		lua_setfield(L, -2, "raycast");
+		lua_pushcfunction(L, PhysicsModule_setGravity, "setGravity");
+		lua_setfield(L, -2, "setGravity");
+		lua_pop(L, 1);
+	}
+	{
+		lua_newtable(L);
+		lua_getglobal(L, "LumixModules");
+		lua_pushvalue(L, -2);
+		lua_setfield(L, -2, "renderer");
+		lua_pop(L, 1);
+		lua_pushvalue(L, -1);
+		lua_setfield(L, -2, "__index");
+		lua_pushcfunction(L, lua_new_module, "new");
+		lua_setfield(L, -2, "new");
+		lua_pushcfunction(L, RenderModule_castRay, "castRay");
+		lua_setfield(L, -2, "castRay");
+		lua_pushcfunction(L, RenderModule_castRayTerrain, "castRayTerrain");
+		lua_setfield(L, -2, "castRayTerrain");
+		lua_pushcfunction(L, RenderModule_addDebugTriangle, "addDebugTriangle");
+		lua_setfield(L, -2, "addDebugTriangle");
+		lua_pushcfunction(L, RenderModule_addDebugLine, "addDebugLine");
+		lua_setfield(L, -2, "addDebugLine");
+		lua_pushcfunction(L, RenderModule_addDebugCross, "addDebugCross");
+		lua_setfield(L, -2, "addDebugCross");
+		lua_pushcfunction(L, RenderModule_addDebugBone, "addDebugBone");
+		lua_setfield(L, -2, "addDebugBone");
+		lua_pushcfunction(L, RenderModule_addDebugCube, "addDebugCube");
+		lua_setfield(L, -2, "addDebugCube");
+		lua_pushcfunction(L, RenderModule_addDebugCubeSolid, "addDebugCubeSolid");
+		lua_setfield(L, -2, "addDebugCubeSolid");
+		lua_pushcfunction(L, RenderModule_setActiveCamera, "setActiveCamera");
+		lua_setfield(L, -2, "setActiveCamera");
+		lua_pushcfunction(L, RenderModule_setActiveEnvironment, "setActiveEnvironment");
+		lua_setfield(L, -2, "setActiveEnvironment");
+		lua_pop(L, 1);
+	}
 	{
 		lua_getglobal(L, "LumixAPI");
 		lua_newtable(L);

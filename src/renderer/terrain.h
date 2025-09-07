@@ -28,6 +28,7 @@ struct TerrainQuad;
 struct Texture;
 struct World;
 
+//@ enum
 enum class GrassRotationMode : i32 {
 	Y_UP,
 	ALL_RANDOM,

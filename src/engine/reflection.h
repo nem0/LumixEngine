@@ -711,16 +711,20 @@ struct LUMIX_ENGINE_API builder {
 		return *this;
 	}
 
+	template <bool pick_first, typename A, typename B> struct Pick { using Type = A; };
+	template <typename A, typename B> struct Pick<false, A, B> { using Type = B; };
+
 	template <auto Getter, auto Setter = nullptr>
-	builder& enum_prop(const char* name) {
-		auto* p = LUMIX_NEW(allocator, Property<i32>)(allocator);
+	builder& prop(const char* name) {
+		using T = typename ResultOf<decltype(Getter)>::Type;
+		using Backing = typename Pick<__is_enum(T), i32, T>::Type;
+		auto* p = LUMIX_NEW(allocator, Property<Backing>)(allocator);
 		
 		if constexpr (Setter == nullptr) {
 			p->setter = nullptr;
 		}
-		else {
+		else if constexpr (__is_enum(T)) {
 			p->setter = [](IModule* module, EntityRef e, u32 idx, const i32& value) {
-				using T = typename ResultOf<decltype(Getter)>::Type;
 				using C = typename ClassOf<decltype(Setter)>::Type;
 				if constexpr (ArgsCount<decltype(Setter)>::value == 2) {
 					(static_cast<C*>(module)->*Setter)(e, static_cast<T>(value));
@@ -729,29 +733,6 @@ struct LUMIX_ENGINE_API builder {
 					(static_cast<C*>(module)->*Setter)(e, idx, static_cast<T>(value));
 				}
 			};
-		}
-
-		p->getter = [](IModule* module, EntityRef e, u32 idx) -> i32 {
-			using C = typename ClassOf<decltype(Getter)>::Type;
-			if constexpr (ArgsCount<decltype(Getter)>::value == 1) {
-				return static_cast<i32>((static_cast<C*>(module)->*Getter)(e));
-			}
-			else {
-				return static_cast<i32>((static_cast<C*>(module)->*Getter)(e, idx));
-			}
-		};
-		p->name = name;
-		addProp(p);
-		return *this;
-	}
-
-	template <auto Getter, auto Setter = nullptr>
-	builder& prop(const char* name) {
-		using T = typename ResultOf<decltype(Getter)>::Type;
-		auto* p = LUMIX_NEW(allocator, Property<T>)(allocator);
-		
-		if constexpr (Setter == nullptr) {
-			p->setter = nullptr;
 		}
 		else {
 			p->setter = [](IModule* module, EntityRef e, u32 idx, const T& value) {
@@ -765,15 +746,28 @@ struct LUMIX_ENGINE_API builder {
 			};
 		}
 
-		p->getter = [](IModule* module, EntityRef e, u32 idx) -> T {
-			using C = typename ClassOf<decltype(Getter)>::Type;
-			if constexpr (ArgsCount<decltype(Getter)>::value == 1) {
-				return (static_cast<C*>(module)->*Getter)(e);
-			}
-			else {
-				return (static_cast<C*>(module)->*Getter)(e, idx);
-			}
-		};
+		if constexpr (__is_enum(T)) {
+			p->getter = [](IModule* module, EntityRef e, u32 idx) -> i32 {
+				using C = typename ClassOf<decltype(Getter)>::Type;
+				if constexpr (ArgsCount<decltype(Getter)>::value == 1) {
+					return static_cast<i32>((static_cast<C*>(module)->*Getter)(e));
+				}
+				else {
+					return static_cast<i32>((static_cast<C*>(module)->*Getter)(e, idx));
+				}
+			};
+		}
+		else {
+			p->getter = [](IModule* module, EntityRef e, u32 idx) -> T {
+				using C = typename ClassOf<decltype(Getter)>::Type;
+				if constexpr (ArgsCount<decltype(Getter)>::value == 1) {
+					return (static_cast<C*>(module)->*Getter)(e);
+				}
+				else {
+					return (static_cast<C*>(module)->*Getter)(e, idx);
+				}
+			};
+		}
 
 		p->name = name;
 		addProp(p);

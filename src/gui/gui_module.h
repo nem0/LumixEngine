@@ -28,20 +28,22 @@ struct GUIRayHit {
 	float t = -1;
 };
 
-struct GUIModule : IModule {
-	//@ enum full GUIModule::TextHAlign
-	enum class TextHAlign : i32 {
-		LEFT,
-		CENTER,
-		RIGHT
-	};
+//@ enum 
+enum class TextHAlign : i32 {
+	LEFT,
+	CENTER,
+	RIGHT
+};
 
-	//@ enum full GUIModule::TextVAlign
-	enum class TextVAlign : i32 {
-		TOP,
-		MIDDLE,
-		BOTTOM
-	};
+//@ enum
+enum class TextVAlign : i32 {
+	TOP,
+	MIDDLE,
+	BOTTOM
+};
+
+struct GUIModule : IModule {
+
 
 	struct Rect {
 		float x, y, w, h;
@@ -116,7 +118,7 @@ struct GUIModule : IModule {
 	//@ component Button gui_button "Button"
 	virtual Vec4 getButtonHoveredColorRGBA(EntityRef entity) = 0; //@ label "Hovered color" color
 	virtual void setButtonHoveredColorRGBA(EntityRef entity, const Vec4& color) = 0;
-	virtual os::CursorType getButtonHoveredCursor(EntityRef entity) = 0;				//@ enum
+	virtual os::CursorType getButtonHoveredCursor(EntityRef entity) = 0;
 	virtual void setButtonHoveredCursor(EntityRef entity, os::CursorType cursor) = 0;
 	//@ end
 

@@ -2,6 +2,7 @@
 
 #include "engine/lumix.h"
 
+#include "core/color.h"
 #include "core/math.h"
 #include "core/metaprogramming.h"
 #include "core/path.h"
@@ -12,8 +13,6 @@
 namespace Lumix {
 
 struct World;
-struct CameraParams;
-struct PipelineTexture;
 template <typename T> struct Array;
 
 namespace LuaWrapper {
@@ -124,6 +123,11 @@ template <> inline bool isType<Vec3>(lua_State* L, int index)
 {
 	return lua_istable(L, index) != 0 && lua_objlen(L, index) == 3;
 }
+template <> inline bool isType<Color>(lua_State* L, int index) {
+	if (lua_istable(L, index) == 0) return false;
+	const i32 len = lua_objlen(L, index);
+	return len == 3 || len == 4;
+}
 template <> inline bool isType<DVec3>(lua_State* L, int index)
 {
 	return lua_istable(L, index) != 0 && lua_objlen(L, index) == 3;
@@ -181,8 +185,6 @@ template <typename T> inline T toType(lua_State* L, int index)
 {
 	return (T)lua_touserdata(L, index);
 }
-
-template <> CameraParams toType(lua_State* L, int idx);
 
 template <> inline int toType(lua_State* L, int index) { return (int)lua_tointeger(L, index); }
 template <> inline u16 toType(lua_State* L, int index) { return (u16)lua_tointeger(L, index); }
@@ -319,6 +321,15 @@ template <> inline IVec2 toType(lua_State* L, int index) {
 	return v;
 }
 
+template <> inline Color toType(lua_State* L, int index) {
+	if (isType<Vec3>(L, index)) {
+		Vec3 v = toType<Vec3>(L, index);
+		return Color(u8(v.r * 255), u8(v.g * 255), u8(v.b * 255), 0xff);
+	}
+	Vec4 v = toType<Vec4>(L, index);
+	return Color(u8(v.r * 255), u8(v.g * 255), u8(v.b * 255), u8(v.a * 255));
+}
+
 template <> inline i64 toType(lua_State* L, int index) { return (i64)lua_tointeger(L, index); }
 template <> inline u32 toType(lua_State* L, int index) { return (u32)lua_tointeger(L, index); }
 template <> inline u64 toType(lua_State* L, int index) { return (u64)lua_tointeger(L, index); }
@@ -380,6 +391,10 @@ template <> inline const char* typeToString<Vec3>()
 {
 	return "Vec3";
 }
+template <> inline const char* typeToString<Color>()
+{
+	return "Color";
+}
 template <> inline const char* typeToString<DVec3>()
 {
 	return "DVec3";
@@ -426,9 +441,6 @@ template <typename T> inline void push(lua_State* L, T* value)
 {
 	lua_pushlightuserdata(L, value);
 }
-
-void push(lua_State* L, const CameraParams& value);
-void push(lua_State* L, const PipelineTexture& value);
 
 template <typename T> inline void push(lua_State* L, const T* value)
 {
@@ -611,10 +623,8 @@ template <typename T> void argError(lua_State* L, int index)
 
 template <typename T> struct Tag {};
 
-template <typename T> T checkArg(lua_State* L, int index, Tag<T>)
-{
-	if (!isType<T>(L, index))
-	{
+template <typename T> T checkArg(lua_State* L, int index, Tag<T>) {
+	if (!isType<T>(L, index)) {
 		argError<T>(L, index);
 	}
 	return toType<T>(L, index);
@@ -663,6 +673,13 @@ template <typename T, u32 C> Array<T, C> checkArg(lua_State* L, int index, Tag<A
 
 template <typename T> T checkArg(lua_State* L, int index)
 {
+	if constexpr (__is_enum(T)) {
+		if (!isType<i32>(L, index)) {
+			argError<i32>(L, index);
+		}
+		return (T)toType<i32>(L, index);
+	}
+
 	return checkArg(L, index, Tag<T>{});
 }
 

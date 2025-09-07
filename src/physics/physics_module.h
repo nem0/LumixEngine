@@ -49,13 +49,14 @@ struct SweepHit {
 };
 
 //@ module PhysicsModule physics "Physics"
-struct LUMIX_PHYSICS_API PhysicsModule : IModule {
+struct PhysicsModule : IModule {
 	//@ enum full PhysicsModule::D6Motion
 	enum class D6Motion : i32 {
 		LOCKED,
 		LIMITED,
 		FREE
 	};
+
 	//@ enum full PhysicsModule::WheelSlot
 	enum class WheelSlot : i32 {
 		FRONT_LEFT,
@@ -63,6 +64,7 @@ struct LUMIX_PHYSICS_API PhysicsModule : IModule {
 		REAR_LEFT,
 		REAR_RIGHT
 	};
+
 	//@ enum full PhysicsModule::DynamicType
 	enum class DynamicType : i32 {
 		STATIC,
@@ -88,7 +90,7 @@ struct LUMIX_PHYSICS_API PhysicsModule : IModule {
 	virtual EntityPtr raycast(const Vec3& origin, const Vec3& dir, float distance, EntityPtr ignore_entity) = 0;
 	virtual void setGravity(const Vec3& gravity) = 0;
 	//@ end
-	virtual bool raycastEx(const Vec3& origin, const Vec3& dir, float distance, RaycastHit& result, EntityPtr ignored, int layer) = 0;
+	virtual bool raycastEx(const Vec3& origin, const Vec3& dir, float distance, RaycastHit& result, EntityPtr ignored, i32 layer) = 0;
 	virtual bool sweepSphere(const DVec3& pos, float radius, const Vec3& dir, float distance, SweepHit& result, EntityPtr ignored, i32 layer) = 0;
 
 	virtual void createInstancedMesh(EntityRef entity) = 0;

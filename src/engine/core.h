@@ -36,14 +36,14 @@ struct CoreModule : IModule {
 	virtual const HashMap<EntityRef, Spline>& getSplines() = 0;
 
 	//@ component Spline spline "Spline"
-	virtual void getSplineBlob(EntityRef entity, OutputMemoryStream& value) = 0;	//@ blob
+	virtual void getSplineBlob(EntityRef entity, OutputMemoryStream& value) = 0;
 	virtual void setSplineBlob(EntityRef entity, InputMemoryStream& value) = 0;
 	//@ end
 	virtual void createSpline(EntityRef entity) = 0;
 	virtual void destroySpline(EntityRef entity) = 0;
 
 	//@ component Signal signal "Signal"
-	virtual void getSignalBlob(EntityRef entity, OutputMemoryStream& value) = 0;	//@ blob
+	virtual void getSignalBlob(EntityRef entity, OutputMemoryStream& value) = 0;
 	virtual void setSignalBlob(EntityRef entity, InputMemoryStream& value) = 0;
 	//@ end
 	virtual void createSignal(EntityRef entity) = 0;

@@ -64,11 +64,11 @@ struct LuaScriptModule : IModule {
 
 	//@ component Script lua_script "File"
 	//@ array Script scripts
-	virtual bool isScriptEnabled(EntityRef entity, int scr_index) = 0;					//@ getter Enabled
-	virtual void enableScript(EntityRef entity, int scr_index, bool enable) = 0;		//@ setter Enabled
+	virtual bool isScriptEnabled(EntityRef entity, int scr_index) = 0;
+	virtual void enableScript(EntityRef entity, int scr_index, bool enable) = 0;
 	virtual Path getScriptPath(EntityRef entity, int scr_index) = 0;					//@ label "Path" resource_type LuaScript::TYPE
 	virtual void setScriptPath(EntityRef entity, int scr_index, const Path& path) = 0;
-	virtual void getScriptBlob(EntityRef e, u32 index, OutputMemoryStream& stream) = 0;	//@ blob
+	virtual void getScriptBlob(EntityRef e, u32 index, OutputMemoryStream& stream) = 0;
 	virtual void setScriptBlob(EntityRef e, u32 index, InputMemoryStream& stream) = 0;
 	//@ end
 	//@ end

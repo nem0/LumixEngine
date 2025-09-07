@@ -49,222 +49,6 @@ static const char* toString(InputSystem::Event::Type type) {
 	return "N/A";
 }
 
-struct ArrayItemSetVisitor : reflection::IPropertyVisitor {
-	void visit(const reflection::Property<float>& prop) override { set(prop); }
-	void visit(const reflection::Property<int>& prop) override { set(prop); }
-	void visit(const reflection::Property<u32>& prop) override { set(prop); }
-	void visit(const reflection::Property<EntityPtr>& prop) override { set(prop); }
-	void visit(const reflection::Property<Vec2>& prop) override { set(prop); }
-	void visit(const reflection::Property<Vec3>& prop) override { set(prop); }
-	void visit(const reflection::Property<IVec3>& prop) override { set(prop); }
-	void visit(const reflection::Property<Vec4>& prop) override { set(prop); }
-	void visit(const reflection::Property<Path>& prop) override { set(prop); }
-	void visit(const reflection::Property<bool>& prop) override { set(prop); }
-	void visit(const reflection::Property<const char*>& prop) override { set(prop); }
-	void visit(const reflection::ArrayProperty& prop) override { ASSERT(false); }
-	void visit(const reflection::BlobProperty& prop) override { ASSERT(false); }
-
-	template <typename T>
-	void set(const reflection::Property<T>& prop) {
-		char tmp[50];
-		LuaWrapper::convertPropertyToLuaName(prop.name, Span(tmp));
-		i32 type = lua_getfield(L, -1, tmp);
-		if (type == LUA_TNIL) {
-			lua_pop(L, 1);
-			return;
-		}
-		if (!LuaWrapper::isType<T>(L, -1)) {
-			lua_pop(L, 1);
-			luaL_error(L, "%s has incorrect type", tmp);
-		}
-
-		T val = LuaWrapper::toType<T>(L, -1);
-		lua_pop(L, 1);
-		prop.set(cmp, idx, val);
-	}
-
-	ComponentUID cmp;
-	const char* prop_name;
-	u32 idx;
-	lua_State* L;
-};
-
-static void toVariant(reflection::Variant::Type type, lua_State* L, int idx, reflection::Variant& val) {
-	switch(type) {
-		case reflection::Variant::BOOL: val = LuaWrapper::checkArg<bool>(L, idx); break;
-		case reflection::Variant::U32: val = LuaWrapper::checkArg<u32>(L, idx); break;
-		case reflection::Variant::I32: val = LuaWrapper::checkArg<i32>(L, idx); break;
-		case reflection::Variant::FLOAT: val = LuaWrapper::checkArg<float>(L, idx); break;
-		case reflection::Variant::ENTITY: val = LuaWrapper::checkArg<EntityPtr>(L, idx); break;
-		case reflection::Variant::VEC2: val = LuaWrapper::checkArg<Vec2>(L, idx); break;
-		case reflection::Variant::COLOR: {
-			if (LuaWrapper::isType<Vec4>(L, idx)) {
-				Vec4 c = LuaWrapper::toType<Vec4>(L, idx);
-				val = Color(u8(c.r * 255), u8(c.g * 255), u8(c.b * 255), u8(c.a * 255));
-				break;
-			}
-			Vec3 c = LuaWrapper::checkArg<Vec3>(L, idx);
-			val = Color(u8(c.r * 255), u8(c.g * 255), u8(c.b * 255), 0xff);
-			break;
-		}
-		case reflection::Variant::VEC3: val = LuaWrapper::checkArg<Vec3>(L, idx); break;
-		case reflection::Variant::VEC4: val = LuaWrapper::checkArg<Vec4>(L, idx); break;
-		case reflection::Variant::DVEC3: val = LuaWrapper::checkArg<DVec3>(L, idx); break;
-		case reflection::Variant::QUAT: val = LuaWrapper::checkArg<Quat>(L, idx); break;
-		case reflection::Variant::CSTR: val = LuaWrapper::checkArg<const char*>(L, idx); break;
-		case reflection::Variant::PTR: {
-			void* ptr;
-			if (!LuaWrapper::checkField(L, idx, "_value", &ptr)) {
-				luaL_argerror(L, idx, "expected object");
-			}
-			val = ptr;
-			break;
-		}
-		case reflection::Variant::VOID: ASSERT(false); break;
-	}	
-}
-
-static bool isPath(const reflection::TypeDescriptor& type) {
-	if (type.type != reflection::Variant::CSTR) return false;
-	return equalStrings(type.type_name, "Path");
-}
-
-static int push(lua_State* L, Span<u8> val, const reflection::TypeDescriptor& type, World* world) {
-	#define RET(T) do { \
-		T v; \
-		ASSERT(sizeof(v) == val.length()); \
-		memcpy(&v, val.m_begin, sizeof(v)); \
-		LuaWrapper::push(L, v); \
-		return 1; \
-	} while(false) \
-	
-	switch (type.type) {
-		default:	
-		case reflection::Variant::ENTITY: ASSERT(false); return 0;
-		case reflection::Variant::VOID: return 0;
-		case reflection::Variant::BOOL: RET(bool);
-		case reflection::Variant::U32: RET(u32);
-		case reflection::Variant::I32: RET(i32);
-		case reflection::Variant::VEC2: RET(Vec2);
-		case reflection::Variant::COLOR:
-		case reflection::Variant::VEC3: RET(Vec3);
-		case reflection::Variant::DVEC3: RET(DVec3);
-		case reflection::Variant::QUAT: RET(Quat);
-		case reflection::Variant::PTR: {
-			if (type.is_pointer) {
-				void* ptr;
-				ASSERT(sizeof(ptr) == val.length());
-				memcpy(&ptr, val.m_begin, sizeof(ptr));
-				LuaWrapper::pushObject(L, ptr, type.type_name);
-				return 1;
-			}
-			
-			void* inst = type.create_copy(val.m_begin, getGlobalAllocator());
-			LuaWrapper::pushObject(L, inst, type.type_name);
-			return 1;
-		}
-		case reflection::Variant::FLOAT: RET(float);
-		case reflection::Variant::CSTR: {
-			if (isPath(type)) {
-				LuaWrapper::push(L, (const char*)val.m_begin);
-				return 1;
-			}
-			RET(const char*);
-		}
-	}
-	ASSERT(false);
-	return 0;
-	#undef RET
-}
-
-static int luaMethodClosure(lua_State* L) {
-	LuaWrapper::checkTableArg(L, 1); // self
-	void* obj;
-	if (!LuaWrapper::checkField(L, 1, "_value", &obj)) {
-		ASSERT(false);
-		return 0;
-	}
-
-	reflection::FunctionBase* f = LuaWrapper::toType<reflection::FunctionBase*>(L, lua_upvalueindex(1));
-		
-	LuaWrapper::DebugGuard guard(L, f->getReturnType().type == reflection::Variant::VOID ? 0 : 1);
-
-	reflection::Variant args[32];
-	ASSERT(f->getArgCount() <= lengthOf(args));
-	for (u32 i = 0; i < f->getArgCount(); ++i) {
-		reflection::Variant::Type type = f->getArgType(i).type;
-		toVariant(type, L, i + 2, args[i]);
-	}
-
-	u8 res_mem[sizeof(Path)];
-	reflection::TypeDescriptor ret_type = f->getReturnType();
-	ASSERT(ret_type.size <= sizeof(res_mem));
-	Span<u8> res(res_mem, ret_type.size);
-	f->invoke(obj, res, Span(args, f->getArgCount()));
-	return push(L, res, f->getReturnType(), nullptr);
-}
-
-static int luaModuleMethodClosure(lua_State* L) {
-	LuaWrapper::checkTableArg(L, 1); // self
-	IModule* module;
-	if (!LuaWrapper::checkField(L, 1, "_module", &module)) {
-		ASSERT(false);
-		return 0;
-	}
-
-	reflection::FunctionBase* f = LuaWrapper::toType<reflection::FunctionBase*>(L, lua_upvalueindex(1));
-	reflection::Variant args[32];
-	ASSERT(f->getArgCount() <= lengthOf(args));
-	for (u32 i = 0; i < f->getArgCount(); ++i) {
-		reflection::Variant::Type type = f->getArgType(i).type;
-		toVariant(type, L, i + 2, args[i]);
-	}
-
-	u8 res_mem[sizeof(Path)];
-	reflection::TypeDescriptor ret_type = f->getReturnType();
-	ASSERT(ret_type.size <= sizeof(res_mem));
-	Span<u8> res(res_mem, ret_type.size);
-	
-	f->invoke(module, res, Span(args, f->getArgCount()));
-	return push(L, res, f->getReturnType(), &module->getWorld());
-}
-
-static int luaCmpMethodClosure(lua_State* L) {
-	LuaWrapper::checkTableArg(L, 1); // self
-	if (LuaWrapper::getField(L, 1, "_module") != LUA_TLIGHTUSERDATA) {
-		ASSERT(false);
-		lua_pop(L, 1);
-		return 0;
-	}
-	IModule* module = LuaWrapper::toType<IModule*>(L, -1);
-	lua_pop(L, 1);
-			
-	if (LuaWrapper::getField(L, 1, "_entity") != LUA_TNUMBER) {
-		ASSERT(false);
-		lua_pop(L, 1);
-		return 0;
-	}
-	EntityRef entity = {LuaWrapper::toType<int>(L, -1)};
-	lua_pop(L, 1);
-
-	reflection::FunctionBase* f = LuaWrapper::toType<reflection::FunctionBase*>(L, lua_upvalueindex(1));
-	reflection::Variant args[32];
-	ASSERT(f->getArgCount() < lengthOf(args));
-	args[0] = entity;
-	for (u32 i = 1; i < f->getArgCount(); ++i) {
-		reflection::Variant::Type type = f->getArgType(i).type;
-		toVariant(type, L, i + 1, args[i]);
-	}
-
-	u8 res_mem[sizeof(Path)];
-	reflection::TypeDescriptor ret_type = f->getReturnType();
-	ASSERT(ret_type.size <= sizeof(res_mem));
-	Span<u8> res(res_mem, ret_type.size);
-	
-	f->invoke(module, res, Span(args, f->getArgCount()));
-	return push(L, res, f->getReturnType(), &module->getWorld());
-}
-
 static const ComponentType LUA_SCRIPT_TYPE = reflection::getComponentType("lua_script");
 static const ComponentType LUA_SCRIPT_INLINE_TYPE = reflection::getComponentType("lua_script_inline");
 
@@ -535,35 +319,6 @@ static int LUA_raycast(lua_State* L)
 	return 1;
 }
 
-
-static int LUA_castCameraRay(lua_State* L)
-{
-	LuaWrapper::checkTableArg(L, 1);
-	if (LuaWrapper::getField(L, 1, "_module") != LUA_TLIGHTUSERDATA) {
-		LuaWrapper::argError(L, 1, "module");
-	}
-	RenderModule* module = LuaWrapper::toType<RenderModule*>(L, -1);
-	lua_pop(L, 1);
-	EntityRef camera_entity = LuaWrapper::checkArg<EntityRef>(L, 2);
-	float x, y;
-	if (lua_gettop(L) > 3) {
-		x = LuaWrapper::checkArg<float>(L, 3);
-		y = LuaWrapper::checkArg<float>(L, 4);
-	}
-	else {
-		x = module->getCameraScreenWidth(camera_entity) * 0.5f;
-		y = module->getCameraScreenHeight(camera_entity) * 0.5f;
-	}
-
-	const Ray ray = module->getCameraRay(camera_entity, {x, y});
-
-	RayCastModelHit hit = module->castRay(ray, INVALID_ENTITY);
-	LuaWrapper::push(L, hit.is_hit);
-	LuaWrapper::push(L, hit.is_hit ? hit.origin + hit.dir * hit.t : DVec3(0));
-	LuaWrapper::pushEntity(L, hit.is_hit ? hit.entity : INVALID_ENTITY, &module->getWorld());
-
-	return 3;
-}
 
 struct LuaScriptSystemImpl final : LuaScriptSystem
 {
@@ -1283,20 +1038,6 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 		return 0;
 	}
 
-
-	void registerPropertyAPI()
-	{
-		lua_State* L = m_system.m_state;
-		LuaWrapper::createSystemFunction(L, "Editor", "setPropertyType", &LuaWrapper::wrap<&setPropertyType>);
-		LuaWrapper::createSystemFunction(L, "Editor", "setArrayPropertyType", &LuaWrapper::wrap<&setArrayPropertyType>);
-		LuaWrapper::createSystemVariable(L, "Editor", "BOOLEAN_PROPERTY", Property::BOOLEAN);
-		LuaWrapper::createSystemVariable(L, "Editor", "FLOAT_PROPERTY", Property::FLOAT);
-		LuaWrapper::createSystemVariable(L, "Editor", "INT_PROPERTY", Property::INT);
-		LuaWrapper::createSystemVariable(L, "Editor", "ENTITY_PROPERTY", Property::ENTITY);
-		LuaWrapper::createSystemVariable(L, "Editor", "RESOURCE_PROPERTY", Property::RESOURCE);
-		LuaWrapper::createSystemVariable(L, "Editor", "COLOR_PROPERTY", Property::COLOR);
-	}
-
 	static int rescan(lua_State* L) {
 		const auto* world = LuaWrapper::checkArg<World*>(L, 1);
 		const EntityRef entity = LuaWrapper::checkArg<EntityRef>(L, 2);
@@ -1390,12 +1131,6 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 		return 1;
 	}
 		
-	static bool isSameProperty(const char* name, const char* lua_name) {
-		char tmp[50];
-		LuaWrapper::convertPropertyToLuaName(name, Span(tmp));
-		return equalStrings(tmp, lua_name);
-	}
-
 	static int lua_new_module(lua_State* L) {
 		LuaWrapper::DebugGuard guard(L, 1);
 		LuaWrapper::checkTableArg(L, 1); // self
@@ -1406,39 +1141,6 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 		lua_pushvalue(L, 1);
 		lua_setmetatable(L, -2);
 		return 1;
-	}
-
-	void registerProperties()
-	{
-		lua_State* L = m_system.m_state;
-		LuaWrapper::DebugGuard guard(L);
-
-		reflection::Module* module = reflection::getFirstModule();
-		lua_newtable(L);
-		lua_setglobal(L, "LumixModules");
-		while (module) {
-			lua_newtable(L); // [ module ]
-			lua_getglobal(L, "LumixModules"); // [ module, Lumix ]
-			lua_pushvalue(L, -2); // [ module, Lumix, module]
-			lua_setfield(L, -2, module->name); // [ module, Lumix ]
-			lua_pop(L, 1); // [ module ]
-
-			lua_pushvalue(L, -1); // [ module, module ]
-			lua_setfield(L, -2, "__index"); // [ module ]
-
-			lua_pushcfunction(L, lua_new_module, "new"); // [ module, fn_new_module ]
-			lua_setfield(L, -2, "new"); // [ module ]
-
-			for (const reflection::FunctionBase* f :  module->functions) {
-				lua_pushlightuserdata(L, (void*)f); // [module, f]
-				ASSERT(f->name);
-				lua_pushcclosure(L, luaModuleMethodClosure, f->name, 1);
-				lua_setfield(L, -2, f->name); // [module]
-			}
-			lua_pop(L, 1); // []
-
-			module = module->next;
-		}
 	}
 
 	void cancelTimer(int timer_func)
@@ -1470,30 +1172,26 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 	}
 
 
-	void registerAPI()
-	{
+	void registerAPI() {
 		if (m_is_api_registered) return;
 
 		m_is_api_registered = true;
 
-		lua_State* engine_state = m_system.m_state;
+		lua_State* L = m_system.m_state;
 			
-		registerProperties();
-		registerPropertyAPI();
-		LuaWrapper::createSystemFunction(engine_state, "LuaScript", "getEnvironment", &LuaScriptModuleImpl::getEnvironment);
-		LuaWrapper::createSystemFunction(engine_state, "LuaScript", "rescan", &LuaScriptModuleImpl::rescan);
-			
-		#define REGISTER_FUNCTION(F) \
-			do { \
-				auto f = &LuaWrapper::wrapMethod<&LuaScriptModuleImpl::F>; \
-				LuaWrapper::createSystemFunction(engine_state, "LuaScript", #F, f); \
-			} while(false)
-
-		REGISTER_FUNCTION(cancelTimer);
-
-		#undef REGISTER_FUNCTION
-
-		LuaWrapper::createSystemFunction(engine_state, "LuaScript", "setTimer", &LuaScriptModuleImpl::setTimer);
+		LuaWrapper::createSystemFunction(L, "Editor", "setPropertyType", &LuaWrapper::wrap<&setPropertyType>);
+		LuaWrapper::createSystemFunction(L, "Editor", "setArrayPropertyType", &LuaWrapper::wrap<&setArrayPropertyType>);
+		LuaWrapper::createSystemVariable(L, "Editor", "BOOLEAN_PROPERTY", Property::BOOLEAN);
+		LuaWrapper::createSystemVariable(L, "Editor", "FLOAT_PROPERTY", Property::FLOAT);
+		LuaWrapper::createSystemVariable(L, "Editor", "INT_PROPERTY", Property::INT);
+		LuaWrapper::createSystemVariable(L, "Editor", "ENTITY_PROPERTY", Property::ENTITY);
+		LuaWrapper::createSystemVariable(L, "Editor", "RESOURCE_PROPERTY", Property::RESOURCE);
+		LuaWrapper::createSystemVariable(L, "Editor", "COLOR_PROPERTY", Property::COLOR);
+		
+		LuaWrapper::createSystemFunction(L, "LuaScript", "getEnvironment", &LuaScriptModuleImpl::getEnvironment);
+		LuaWrapper::createSystemFunction(L, "LuaScript", "rescan", &LuaScriptModuleImpl::rescan);
+		LuaWrapper::createSystemFunction(L, "LuaScript", "cancelTimer", &LuaWrapper::wrapMethod<&LuaScriptModuleImpl::cancelTimer>); 
+		LuaWrapper::createSystemFunction(L, "LuaScript", "setTimer", &LuaScriptModuleImpl::setTimer);
 	}
 
 

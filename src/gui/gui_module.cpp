@@ -83,8 +83,8 @@ struct GUIText
 
 
 	String text;
-	GUIModule::TextHAlign horizontal_align = GUIModule::TextHAlign::LEFT;
-	GUIModule::TextVAlign vertical_align = GUIModule::TextVAlign::TOP;
+	TextHAlign horizontal_align = TextHAlign::LEFT;
+	TextVAlign vertical_align = TextVAlign::TOP;
 	u32 color = 0xff000000;
 
 private:

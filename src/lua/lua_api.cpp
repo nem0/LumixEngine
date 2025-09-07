@@ -1182,6 +1182,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 		end
 		function Lumix.World:getModule(name)
 			local module = LumixAPI.getModule(self.value, name)	
+			if LumixModules[name] == nil then return nil end
 			return LumixModules[name]:new(module)
 		end
 		function Lumix.World:findEntityByName(parent, name)
@@ -1328,6 +1329,18 @@ static void registerLuaComponent(lua_State* L, const char* cmp_name, lua_CFuncti
 	lua_setfield(L, -2, "__newindex");
 
 	lua_pop(L, 1);
+}
+
+static int lua_new_module(lua_State* L) {
+	LuaWrapper::DebugGuard guard(L, 1);
+	LuaWrapper::checkTableArg(L, 1); // self
+	IModule* module = LuaWrapper::checkArg<IModule*>(L, 2);
+		
+	lua_newtable(L);
+	LuaWrapper::setField(L, -1, "_module", module);
+	lua_pushvalue(L, 1);
+	lua_setmetatable(L, -2);
+	return 1;
 }
 
 } // namespace Lumix

@@ -23,6 +23,7 @@ namespace os {
 
 enum class Keycode : u8;
 
+//@ enum full os::CursorType
 enum class CursorType : u32 {
 	DEFAULT,
 	SIZE_NS,

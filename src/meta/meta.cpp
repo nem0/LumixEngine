@@ -364,6 +364,12 @@ StringView withoutPrefix(StringView str, i32 prefix_len) {
 	return res;
 }
 
+StringView withoutSuffix(StringView str, i32 suffix_len) {
+	StringView res = str;
+	res.end -= suffix_len;
+	return res;
+}
+
 StringView consumeArgs(StringView& str) {
 	str = skipWhitespaces(str);
 	StringView args;
@@ -436,9 +442,7 @@ struct Attributes {
 	bool force_function = false;
 	bool force_getter = false;
 	bool force_setter = false;
-	bool is_enum = false;
 	bool is_multiline = false;
-	bool is_blob = false;
 };
 
 struct Property {
@@ -472,10 +476,12 @@ struct Component {
 		, properties(allocator)
 		, arrays(allocator)
 	{}
+	// name used to detect properties, e.g. if name =="Decal", function `void setDecalMaterialPath(...);` is
+	// considered setter for property `MaterialPath` on component `Decal`
 	StringView name;
-	StringView struct_name;
-	StringView id;
-	StringView label;
+	StringView struct_name;		// e.g., it's `NavmeshZone` in case of `struct NavmeshZone { ...`
+	StringView id;				// ComponentType
+	StringView label;			// how it's shown in UI
 	StringView icon;
 	ExpArray<Function> functions;
 	ExpArray<Property> properties;
@@ -519,7 +525,8 @@ struct Module {
 		, functions(allocator)
 		, events(allocator)
 		, enums(allocator)
-	{}
+		, includes(allocator)
+		{}
 	StringView name;
 	StringView id;
 	StringView label;
@@ -528,6 +535,7 @@ struct Module {
 	ExpArray<Function> functions;
 	ExpArray<StringView> events;
 	ExpArray<Enum> enums;
+	ExpArray<StringView> includes;
 };
 
 struct Parser {
@@ -536,9 +544,10 @@ struct Parser {
 		, modules(allocator)
 		, structs(allocator)
 		, objects(allocator)
+		, enums(allocator)
 	{}
 
-	bool readLine(StringView& content, StringView& line) {
+	bool readLine(StringView& line) {
 		if (content.size() == 0) return false;
 		++line_idx;
 
@@ -561,15 +570,6 @@ struct Parser {
 		logInfo(filename, "(", line_str, "): ", args...); // TODO logInfo?
 	}
 
-	void parseGetter(StringView return_type, StringView method_name, StringView component_name, StringView name, StringView args, const Attributes* attributes) {
-		if (!startsWith(name, component_name)) {
-			logError("Expected ", component_name);
-			return;
-		}
-		name.begin += component_name.size();
-		getter(return_type, method_name, name, args, attributes);
-	}
-
 	bool parseAttributes(StringView def, Attributes& attributes) {
 		if (def.size() == 0) return false;
 
@@ -584,9 +584,6 @@ struct Parser {
 			else if (equal(word, "color")) {
 				attributes.is_color = true;
 			}
-			else if (equal(word, "enum")) {
-				attributes.is_enum = true;
-			}
 			else if (equal(word, "dynenum")) {
 				attributes.dynamic_enum_name = consumeWord(def);
 			}
@@ -598,9 +595,6 @@ struct Parser {
 			}
 			else if (equal(word, "multiline")) {
 				attributes.is_multiline = true;
-			}
-			else if (equal(word, "blob")) {
-				attributes.is_blob = true;
 			}
 			else if (equal(word, "clamp")) {
 				attributes.min = consumeWord(def);
@@ -628,6 +622,19 @@ struct Parser {
 		return true;
 	}
 
+	Function consumeCPPFunction(StringView& str) {
+		Function res;
+		res.return_type = consumeType(str);
+		res.name = consumeIdentifier(str);
+		res.args = consumeArgs(str);
+		StringView def = find(str, "//@");
+		if (def.size() > 2) {
+			def.begin += 3;
+			parseAttributes(def, res.attributes);
+		}
+		return res;
+	}
+
 	void propertyVariable(StringView line, StringView def) {
 		line = skipWhitespaces(line);
 		StringView type = consumeType(line);
@@ -641,32 +648,55 @@ struct Parser {
 		Property& prop = getProperty(name);
 		prop.is_var = true;
 		prop.type = type;
-		prop.attributes = attributes;
+		merge(prop.attributes, attributes);
 	}
 
 	void parseComponentStruct(StringView name, StringView struct_name, StringView id, StringView label, StringView icon) {
-		StringView line;
 		beginComponent(name, struct_name, id, label, icon);
 		defer { current_component = nullptr; };
-
-		while (readLine(content, line)) {
+		
+		StringView line;
+		while (readLine(line)) {
 			StringView def = find(line, "//@");
-			if (def.size() > 0) {
-				def.begin += 3;
-				def = skipWhitespaces(def);
-				StringView word = consumeWord(def);
-				if (equal(word, "property")) {
-					propertyVariable(line, def);
-				}
-				else if (equal(word, "end")) {
-					return;
-				}
-				else {
-					logError("Unexpected \"", word, "\"");
-				}
+			if (def.size() == 0) continue;
+			
+			def.begin += 3;
+			StringView word = consumeWord(def);
+			if (equal(word, "property")) {
+				propertyVariable(line, def);
+			}
+			else if (equal(word, "end")) {
+				return;
+			}
+			else {
+				logError("Unexpected \"", word, "\"");
 			}
 		}		
 		logError("'//@ end' not found while parsing component ", struct_name);
+	}
+
+	bool consumePrefix(StringView& str, const char* prefix) {
+		const char* a = str.begin;
+		const char* b = prefix;
+		while (a < str.end && *b && *a == *b) {
+			++a;
+			++b;
+		}
+		if (*b) return false;
+		str.begin = a;
+		return true;
+	}
+
+	bool consumePrefix(StringView& str, StringView prefix) {
+		const char* a = str.begin;
+		const char* b = prefix.begin;
+		while (a < str.end && b < prefix.end && *a == *b) {
+			++a;
+			++b;
+		}
+		if (b < prefix.end) return false;
+		str.begin = a;
+		return true;
 	}
 
 	void parseArray(StringView component_name, StringView array_name, StringView array_id) {
@@ -676,7 +706,7 @@ struct Parser {
 		a.id = array_id;
 		a.name = array_name;
 		
-		while (readLine(content, line)) {
+		while (readLine(line)) {
 			StringView word = consumeWord(line);
 			if (equal(word, "//@")) {
 				line = skipWhitespaces(line);
@@ -689,77 +719,41 @@ struct Parser {
 				}
 			}
 			else if (equal(word, "virtual")) {
-				StringView type = consumeType(line);
-				StringView method_name = consumeIdentifier(line);
-				StringView args = consumeArgs(line);
-				StringView def = find(line, "//@");
+				Function fn = consumeCPPFunction(line);
 
-				Attributes attributes;
-				Attributes* attributes_ptr = nullptr;
-				if (def.size() > 0) {
-					def.begin += 3;
-					if (parseAttributes(def, attributes)) {
-						attributes_ptr = &attributes;
-					}
-				}
-
-				StringView property_name = method_name;
-				if (startsWith(method_name, "get")) {
-					property_name.begin += 3;
-					if (!startsWith(property_name, array_name)) {
+				StringView property_name = fn.name;
+				if (consumePrefix(property_name, "get") || consumePrefix(property_name, "is")) {
+					if (!consumePrefix(property_name, array_name)) {
 						logError("Expected ", array_name);
+						continue;
 					}
-					else {
-						property_name.begin += array_name.size();
-						if (!equal(property_name, "Count")) {
-							Property& prop = getChild(a, property_name);
-							if (attributes_ptr) prop.attributes = *attributes_ptr;
-							prop.getter_name = method_name;
-							prop.getter_args = args;
-							prop.type = type;
-						}
-					}
-				}
-				else if (startsWith(method_name, "is")) {
-					property_name.begin += 2;
-					if (!startsWith(property_name, array_name)) {
-						logError("Expected ", array_name);
-					}
-					else {
-						property_name.begin += array_name.size();
-						if (!equal(property_name, "Count")) {
-							Property& prop = getChild(a, property_name);
-							if (attributes_ptr) prop.attributes = *attributes_ptr;
-							prop.getter_name = method_name;
-							prop.getter_args = args;
-							prop.type = type;
-						}
-					}
-				}
-				else if (startsWith(method_name, "set")) {
-					property_name.begin += 3;
-					if (!startsWith(property_name, array_name)) {
-						logError("Expected ", array_name);
-					}
-					else {
-						property_name.begin += array_name.size();
+					if (!equal(property_name, "Count")) {
 						Property& prop = getChild(a, property_name);
-						if (attributes_ptr) prop.attributes = *attributes_ptr;
-						prop.setter_name = method_name;
-						prop.setter_args = args;
+						merge(prop.attributes, fn.attributes);
+						prop.getter_name = fn.name;
+						prop.getter_args = fn.args;
+						prop.type = fn.return_type;
 					}
 				}
-				else if (startsWith(method_name, "enable")) {
-					property_name.begin += 6;
+				else if (consumePrefix(property_name, "set")) {
+					if (!consumePrefix(property_name, array_name)) {
+						logError("Expected ", array_name);
+						continue;
+					}
+					Property& prop = getChild(a, property_name);
+					merge(prop.attributes, fn.attributes);
+					prop.setter_name = fn.name;
+					prop.setter_args = fn.args;
+				}
+				else if (consumePrefix(property_name, "enable")) {
 					if (!startsWith(property_name, array_name)) {
 						logError("Expected ", array_name);
+						continue;
 					}
-					else {
-						Property& prop = getChild(a, makeStringView("Enabled"));
-						if (attributes_ptr) prop.attributes = *attributes_ptr;
-						prop.setter_name = method_name;
-						prop.setter_args = args;
-					}
+					Property& prop = getChild(a, makeStringView("Enabled"));
+					merge(prop.attributes, fn.attributes);
+					prop.setter_name = fn.name;
+					prop.setter_args = fn.args;
 				}
 			}
 		}
@@ -771,7 +765,7 @@ struct Parser {
 		defer { current_component = nullptr; };
 
 		StringView line;
-		while (readLine(content, line)) {
+		while (readLine(line)) {
 			StringView word = consumeWord(line);
 			if (equal(word, "//@")) {
 				line = skipWhitespaces(line);
@@ -789,53 +783,37 @@ struct Parser {
 				}
 			}
 			else if (equal(word, "virtual")) {
-				StringView type = consumeType(line);
-				StringView method_name = consumeIdentifier(line);
-				StringView args = consumeArgs(line);
-				StringView def = find(line, "//@");
+				Function fn = consumeCPPFunction(line);
 
-				Attributes attributes;
-				Attributes* attributes_ptr = nullptr;
-				if (def.size() > 0) {
-					def.begin += 3;
-					if (parseAttributes(def, attributes)) {
-						attributes_ptr = &attributes;
-					}
+				StringView property_name = fn.name;
+				if (fn.attributes.force_function) {
+					current_component->functions.emplace(fn);
 				}
-
-				StringView property_name = method_name;
-				if (attributes.force_function) {
-					function(method_name, type, args, attributes_ptr);
+				else if (fn.attributes.force_setter) {
+					setter(fn.name, fn.attributes.property_name, fn.args, fn.attributes);
 				}
-				else if (attributes.force_setter) {
-					setter(method_name, attributes.property_name, args, attributes_ptr);
+				else if (fn.attributes.force_getter) {
+					getter(fn.return_type, fn.name, fn.attributes.property_name, fn.args, fn.attributes);
 				}
-				else if (attributes.force_getter) {
-					getter(type, method_name, attributes.property_name, args, attributes_ptr);
-				}
-				else if (startsWith(method_name, "set")) {
-					property_name.begin += 3;
-					if (!startsWith(property_name, component_name)) {
+				else if (consumePrefix(property_name, "set")) {
+					if (!consumePrefix(property_name, component_name)) {
 						logError("Expected ", component_name);
 						continue;
 					}
-					property_name.begin += component_name.size();
-					
-					setter(method_name, property_name, args, attributes_ptr);
+					setter(fn.name, property_name, fn.args, fn.attributes);
 				}
-				else if (startsWith(method_name, "get")) {
-					property_name.begin += 3;
-					parseGetter(type, method_name, component_name, property_name, args, attributes_ptr);
+				else if (consumePrefix(property_name, "get") || consumePrefix(property_name, "is")) {
+					if (!consumePrefix(property_name, component_name)) {
+						logError("Expected ", component_name);
+						return;
+					}
+					getter(fn.return_type, fn.name, property_name, fn.args, fn.attributes);
 				}
-				else if (startsWith(method_name, "is")) {
-					property_name.begin += 2;
-					parseGetter(type, method_name, component_name, property_name, args, attributes_ptr);
-				}
-				else if (startsWith(method_name, "enable")) {
-					setter(method_name, makeStringView("Enabled"), args, attributes_ptr);
+				else if (startsWith(property_name, "enable")) {
+					setter(fn.name, makeStringView("Enabled"), fn.args, fn.attributes);
 				}
 				else {
-					function(method_name, type, args, attributes_ptr);
+					current_component->functions.emplace(fn);
 				}
 			}
 		}		
@@ -844,7 +822,7 @@ struct Parser {
 
 	void parseEvents() {
 		StringView line;
-		while (readLine(content, line)) {
+		while (readLine(line)) {
 			StringView word = consumeWord(line);
 			if (equal(word, "virtual")) {
 				StringView type = consumeType(line);
@@ -856,20 +834,11 @@ struct Parser {
 
 	void parseFunctions() {
 		StringView line;
-		while (readLine(content, line)) {
+		while (readLine(line)) {
 			StringView word = consumeWord(line);
 			if (equal(word, "virtual")) {
-				StringView type = consumeType(line);
-				StringView method_name = consumeIdentifier(line);
-				StringView args = consumeArgs(line);
-				StringView def = find(line, "//@");
-				Attributes attributes;
-				bool has_attributes = false;
-				if (def.size() > 0) {
-					def.begin += 3;
-					has_attributes = parseAttributes(def, attributes);
-				}
-				function(method_name, type, args, has_attributes ? &attributes : nullptr);
+				Function fn = consumeCPPFunction(line);
+				current_module->functions.emplace(fn);
 			}
 			else if (equal(word, "//@")) {
 				word = consumeWord(line);
@@ -880,7 +849,7 @@ struct Parser {
 		}
 	}
 	
-	void parseEnum(StringView def) {
+	void parseEnum(StringView def, ExpArray<Enum>& enums) {
 		StringView word = consumeWord(def);
 		StringView full;
 		while (word.size() > 0) {
@@ -894,7 +863,7 @@ struct Parser {
 		}
 		
 		StringView line;
-		if (!readLine(content, line)) return;
+		if (!readLine(line)) return;
 		StringView word0 = consumeWord(line);
 		if (!equal(word0, "enum")) {
 			logError("Expected enum");
@@ -903,13 +872,13 @@ struct Parser {
 		StringView enum_name = consumeWord(line);
 		if (equal(enum_name, "class")) enum_name = consumeWord(line);
 
-		Enum& e = current_module->enums.emplace(allocator);
+		Enum& e = enums.emplace(allocator);
 		e.full = full.size() > 0 ? full : enum_name;
 		e.name = enum_name;
 		last_enumerator_value = -1;
 
 		for (;;) {
-			if (!readLine(content, line)) {
+			if (!readLine(line)) {
 				logError("End of enum not found");
 				return;
 			}
@@ -922,7 +891,20 @@ struct Parser {
 				enumerator_value = consumeWord(line);
 			}
 			else enumerator_value = {};
-			enumerator(enumerator_name, enumerator_value);
+
+			Enumerator& e = enums.last().values.emplace();
+			e.name = enumerator_name;
+			if (enumerator_value.size() > 0) {
+				char tmp[64];
+				buildString(tmp, enumerator_value);
+				e.value = atoi(tmp);
+				last_enumerator_value = e.value;
+			}
+			else {
+				++last_enumerator_value;
+				e.value = last_enumerator_value;
+			}
+
 		}
 	}
 
@@ -936,16 +918,20 @@ struct Parser {
 		m.name = module_name;
 
 		StringView line;
-		while (readLine(content, line)) {
-			if (!startsWith(line, "//@")) continue;
-			line.begin += 3;
+		while (readLine(line)) {
+			if (!consumePrefix(line, "//@")) continue;
+			
 			line = skipWhitespaces(line);
 			StringView word = consumeWord(line);
 			if (equal(word, "functions")) {
 				parseFunctions();
 			}
 			else if (equal(word, "enum")) {
-				parseEnum(line);
+				parseEnum(line, current_module->enums);
+			}
+			else if (equal(word, "include")) {
+				StringView path = consumeString(line);
+				m.includes.emplace(path);
 			}
 			else if (equal(word, "events")) {
 				parseEvents();
@@ -972,6 +958,7 @@ struct Parser {
 				StringView label = consumeString(line);
 				StringView icon;
 				StringView def = consumeWord(line);
+				StringView getter_name;
 				StringView name;
 				if (def.size() > 0) {
 					if (equal(def, "icon")) {
@@ -985,7 +972,7 @@ struct Parser {
 					}
 				}
 				
-				if (!readLine(content, line) || !equal(consumeWord(line), "struct")) {
+				if (!readLine(line) || !equal(consumeWord(line), "struct")) {
 					logError("Expected 'struct'");
 					return;
 				}
@@ -994,8 +981,8 @@ struct Parser {
 					logError("Expected struct name");
 					return;
 				}
-				if (name.size() == 0) name = struct_name;
 				
+				if (name.size() == 0) name = struct_name;
 				parseComponentStruct(name, struct_name, id, label, icon);
 			}
 			else if (equal(word, "end")) {
@@ -1021,7 +1008,7 @@ struct Parser {
 		}
 
 		StringView line;
-		if (!readLine(content, line)) {
+		if (!readLine(line)) {
 			logError("Expected struct");
 			return;
 		}
@@ -1037,12 +1024,12 @@ struct Parser {
 		o.filename = (char*)allocator.allocate(filename.size() + 1);
 		strncpy_s(o.filename, filename.size() + 1, filename.begin, filename.size());
 
-		while (readLine(content, line)) {
+		while (readLine(line)) {
 			word = consumeWord(line);
 			if (equal(word, "//@")) {
 				word = consumeWord(line);
 				if (equal(word, "function")) {
-					if (!readLine(content, line)) {
+					if (!readLine(line)) {
 						logError("Expected new line with function");
 						continue;
 					}
@@ -1076,7 +1063,7 @@ struct Parser {
 		}
 
 		StringView line;
-		if (!readLine(content, line)) {
+		if (!readLine(line)) {
 			logError("Expected struct");
 			return;
 		}
@@ -1089,20 +1076,24 @@ struct Parser {
 		Struct& s = structs.emplace(allocator);
 		s.name = name;
 
-		while (readLine(content, line)) {
+		while (readLine(line)) {
 			line = skipWhitespaces(line);
 			
 			if (peekChar(line) == '}') break;
 
+			StringView type = consumeType(line);
+			if (equal(type, "using")) {
+				continue;
+			}
 			StructVar& v = s.vars.emplace();
-			v.type = consumeType(line);
+			v.type = type;
 			v.name = consumeIdentifier(line);
 		}
 	}
 
 	void parse() {
 		StringView line;
-		while (readLine(content, line)) {
+		while (readLine(line)) {
 			if (!startsWith(line, "//@")) continue;
 			line.begin += 3;
 			line = skipWhitespaces(line);
@@ -1112,6 +1103,9 @@ struct Parser {
 				StringView id = consumeWord(line);
 				StringView label = consumeString(line);
 				parseModule(module_name, id, label);
+			}
+			else if (equal(word, "enum")) {
+				parseEnum(line, enums);
 			}
 			else if (equal(word, "struct")) {
 				parseStruct(line);
@@ -1127,21 +1121,6 @@ struct Parser {
 
 	void beginFile(StringView name) {
 		filename = name;
-	}
-
-	void enumerator(StringView name, StringView value) {
-		Enumerator& e = current_module->enums.last().values.emplace();
-		e.name = name;
-		if (value.size() > 0) {
-			char tmp[64];
-			buildString(tmp, value);
-			e.value = atoi(tmp);
-			last_enumerator_value = e.value;
-		}
-		else {
-			++last_enumerator_value;
-			e.value = last_enumerator_value;
-		}
 	}
 
 	void beginComponent(StringView name, StringView struct_name, StringView id, StringView label, StringView icon) {
@@ -1161,34 +1140,32 @@ struct Parser {
 		current_component = &c;
 	}
 
-	void function(StringView name, StringView return_type, StringView args, const Attributes* attributes) {
-		if (!current_component) {
-			Function& fn = current_module->functions.emplace();
-			fn.name = name;
-			fn.args = args;
-			fn.return_type = return_type;
-			if (attributes) fn.attributes = *attributes;
-			return;
-		}
-
-		Function& fn = current_component->functions.emplace();
-		fn = Function();
-		fn.name = name;
-		fn.return_type = return_type;
-		fn.args = args;
-		if (attributes) fn.attributes = *attributes;
+	void merge(Attributes& dst, const Attributes& src) {
+		if (src.label.size() > 0) dst.label = src.label;
+		if (src.min.size() > 0) dst.min = src.min;
+		if (src.clamp_max.size() > 0) dst.clamp_max = src.clamp_max;
+		if (src.resource_type.size() > 0) dst.resource_type = src.resource_type;
+		if (src.property_name.size() > 0) dst.property_name = src.property_name;
+		if (src.dynamic_enum_name.size() > 0) dst.dynamic_enum_name = src.dynamic_enum_name;
+		dst.no_ui = dst.no_ui || src.no_ui;
+		dst.is_radians = dst.is_radians || src.is_radians;
+		dst.is_color = dst.is_color || src.is_color;
+		dst.force_function = dst.force_function || src.force_function;
+		dst.force_getter = dst.force_getter || src.force_getter;
+		dst.force_setter = dst.force_setter || src.force_setter;
+		dst.is_multiline = dst.is_multiline || src.is_multiline;
 	}
 
-	void setter(StringView method_name, StringView property_name, StringView args, const Attributes* attributes) {
+	void setter(StringView method_name, StringView property_name, StringView args, const Attributes& attributes) {
 		Property& prop = getProperty(property_name);
-		if (attributes) prop.attributes = *attributes;
+		merge(prop.attributes, attributes);
 		prop.setter_name = method_name;
 		prop.setter_args = args;
 	}
 
-	void getter(StringView return_type, StringView method_name, StringView property_name, StringView args, const Attributes* attributes) {
+	void getter(StringView return_type, StringView method_name, StringView property_name, StringView args, const Attributes& attributes) {
 		Property& prop = getProperty(property_name);
-		if (attributes) prop.attributes = *attributes;
+		merge(prop.attributes, attributes);
 		prop.getter_name = method_name;
 		prop.getter_args = args;
 		prop.type = return_type;
@@ -1222,6 +1199,7 @@ struct Parser {
 	ExpArray<Module> modules;
 	ExpArray<Struct> structs;
 	ExpArray<Object> objects;
+	ExpArray<Enum> enums;
 	StringView content;
 	i32 line_idx = 0;
 };
@@ -1290,8 +1268,13 @@ StringView withoutNamespace(StringView ident) {
 }
 
 Enum* getEnum(Module& m, StringView name) {
+	for (Enum& e : parser.enums) {
+		if (equal(e.name, name)) return &e;
+		if (equal(e.full, name)) return &e;
+	}
 	for (Enum& e : m.enums) {
 		if (equal(e.name, name)) return &e;
+		if (equal(e.full, name)) return &e;
 	}
 	return nullptr;
 }
@@ -1390,6 +1373,78 @@ Struct* findStruct(StringView struct_name) {
 	return nullptr;
 }
 
+Object* findObject(StringView object_name) {
+	for (Object& o : parser.objects) {
+		if (equal(o.name, object_name)) return &o;
+	}
+	return nullptr;
+}
+
+void wrap(OutputStream& out, Module& m, Function& f) {
+	L("int ",m.name,"_",f.name,"(lua_State* L) {");
+	L("LuaWrapper::checkTableArg(L, 1);");
+	L(m.name,"* module;");
+	L("if (!LuaWrapper::checkField(L, 1, \"_module\", &module)) luaL_argerror(L, 1, \"Module expected\");");
+
+	i32 arg_idx = -1;
+	StringView args = f.args;
+	forEachArg(args, [&](const Arg& arg, bool is_first) {
+		++arg_idx;
+		Struct* st = findStruct(arg.type);
+		if (st) {
+			L("\t",arg.type," ",arg.name,";\n");
+			for (StructVar& v : st->vars) {
+				L("\tif(!LuaWrapper::checkField(L, ",(arg_idx + 2),", \"",v.name,"\", &",arg.name,".",v.name,")) luaL_error(L, \"Invalid argument\");");
+			}
+		}
+		else {
+			Object* obj = findObject(arg.type);
+			if (obj) {
+				L("\tif(!LuaWrapper::checkField(L, ",(arg_idx + 2),", \"_object\", &",arg.name,")) luaL_error(L, \"Invalid argument\");");
+			}
+			else if (arg.is_const && equal(arg.type, "char*")) {
+				L("\tauto ",arg.name," = LuaWrapper::checkArg<const char*>(L, ",(arg_idx + 2),");");
+			}
+			else {
+				L("\tauto ",arg.name," = LuaWrapper::checkArg<",arg.type,">(L, ",(arg_idx + 2),");");
+			}
+		}
+	});
+
+	Struct* st = findStruct(f.return_type);
+	Object* obj = findObject(withoutSuffix(f.return_type, 1)/*remove pointer '*`*/);
+	if (st) out.add("\tauto s = ");
+	bool has_return = !equal(f.return_type, "void") && st == nullptr;
+	if (obj) out.add("\tLuaWrapper::pushObject(L, ");
+	else if (has_return) out.add("\tLuaWrapper::push(L, ");
+	out.add("\tmodule->",f.name,"(");
+	forEachArg(args, [&](const Arg& arg, bool is_first){
+		if (!is_first) out.add(", ");
+		out.add(arg.name);
+	});
+	out.add(")");
+	if (obj) {
+		L(", \"",withoutSuffix(f.return_type, 1),"\");");
+		L("return 1;");
+	}
+	else if (st) {
+		L(";");
+		L("\tlua_newtable(L);");
+		for (StructVar& v : st->vars) {
+			L("\tLuaWrapper::push(L, s.",v.name,");");
+			L("\tlua_setfield(L, -2, \"",v.name,"\");");
+		}
+		L("\treturn 1;");
+	}
+	else if (has_return) {
+		L(");\n\treturn 1;");
+	}
+	else {
+		L(";\n\treturn 0;");
+	}
+	L("}\n");
+}
+
 void wrap(OutputStream& out, Module& m, Component& c, Function& f) {
 	StringView label = f.attributes.label;
 	if (label.size() == 0) label = f.name;
@@ -1459,9 +1514,37 @@ void wrap(OutputStream& out, StringView module, StringView component, StringView
 	L("}\n");
 }
 
+StringView pickLabel(StringView base, StringView spec) {
+	if (spec.size() > 0) return spec;
+	return base;
+}
+
 void serializeMain(OutputStream& out, Parser& parser) {
-	L("namespace Lumix {");
+	L("namespace Lumix {\n");
 	L("void registerLuaAPI(lua_State* L) {");
+	L("	lua_newtable(L);");
+	L("	lua_setglobal(L, \"LumixModules\");");
+
+	for (Module& m : parser.modules) {
+		if (m.functions.size == 0) continue;
+		L("	{");
+		L("		lua_newtable(L);");
+		L("		lua_getglobal(L, \"LumixModules\");");
+		L("		lua_pushvalue(L, -2);");
+		L("		lua_setfield(L, -2, \"",m.id,"\");");
+		L("		lua_pop(L, 1);");
+		L("		lua_pushvalue(L, -1);");
+		L("		lua_setfield(L, -2, \"__index\");");
+		L("		lua_pushcfunction(L, lua_new_module, \"new\");");
+		L("		lua_setfield(L, -2, \"new\");");
+		for (Function& f : m.functions) {
+			L("		lua_pushcfunction(L, ",m.name,"_",f.name,", \"",f.name,"\");");
+			L("		lua_setfield(L, -2, \"",pickLabel(f.name, f.attributes.label),"\");");
+		}
+		L("		lua_pop(L, 1);");
+		L("	}");
+	}
+
 	for (Object& o : parser.objects) {
 		L("{");
 		L("lua_getglobal(L, \"LumixAPI\");");
@@ -1550,9 +1633,8 @@ void toID(StringView name, Span<char> out) {
 	*dst = 0;
 }
 
-StringView pickLabel(StringView base, StringView spec) {
-	if (spec.size() > 0) return spec;
-	return base;
+bool isBlob(const Property& p) {
+	return equal(p.type, "void");
 }
 
 void serializeLuaPropertySetter(OutputStream& out, Module& m, Component& c) {
@@ -1564,7 +1646,7 @@ void serializeLuaPropertySetter(OutputStream& out, Module& m, Component& c) {
 
 	bool is_array = false;
 	for (Property& p : c.properties) {
-		if (p.attributes.is_blob) continue;
+		if (isBlob(p)) continue;
 		if (p.is_var) {
 			L("\telse if (equalStrings(prop_name, \"",p.name,"\")) module->get",c.name,"(entity).",p.name," = LuaWrapper::checkArg<",p.type,">(L, 3);");
 			continue;
@@ -1579,9 +1661,6 @@ void serializeLuaPropertySetter(OutputStream& out, Module& m, Component& c) {
 		out.add("\telse if (equalStrings(prop_name, \"",tmp,"\")) ");
 		if (Enum* e = getEnum(m, p.type)) {
 			L("module->",p.setter_name,"(entity, (",e->full,")LuaWrapper::checkArg<i32>(L, 3));");
-		}
-		else if (p.attributes.is_enum) {
-			L("module->",p.setter_name,"(entity, (",p.type,")LuaWrapper::checkArg<i32>(L, 3));");
 		}
 		else {
 			L("module->",p.setter_name,"(entity, LuaWrapper::checkArg<",p.type,">(L, 3));");
@@ -1630,14 +1709,14 @@ void serializeLuaArrayGetter(OutputStream& out, Module& m, Component& c, ArrayPr
 	)#");
 
 	for (Property& child : a.children) {
-		if (child.attributes.is_blob) continue;
+		if (isBlob(child)) continue;
 		if (child.getter_name.size() == 0) continue;
 		
 		char tmp[256];
 		toID(pickLabel(child.name, child.attributes.label), Span(tmp, tmp + 256));
 
 		L("else if(equalStrings(prop_name, \"",tmp,"\")) {");
-		if (child.attributes.is_enum || getEnum(m, child.type)) {
+		if (getEnum(m, child.type)) {
 			L("LuaWrapper::push(L, (i32)module->",child.getter_name,"(entity, index));");
 		}
 		else {
@@ -1661,15 +1740,15 @@ void serializeLuaArrayGetter(OutputStream& out, Module& m, Component& c, ArrayPr
 	)#");	
 					
 	for (Property& child : a.children) {
-		if (child.attributes.is_blob) continue;
+		if (isBlob(child)) continue;
 		if (child.setter_name.size() == 0) continue;
 		
 		char tmp[256];
 		toID(pickLabel(child.name, child.attributes.label), Span(tmp, tmp + 256));
 
 		L("else if(equalStrings(prop_name, \"",tmp,"\")) {");
-		if (child.attributes.is_enum || getEnum(m, child.type)) {
-			L("module->",child.setter_name,"(entity, index, (",child.type,")LuaWrapper::checkArg<i32>(L, 3));");
+		if (Enum* e = getEnum(m, child.type)) {
+			L("module->",child.setter_name,"(entity, index, (",e->full,")LuaWrapper::checkArg<i32>(L, 3));");
 		}
 		else {
 			L("module->",child.setter_name,"(entity, index, LuaWrapper::checkArg<",child.type,">(L, 3));");
@@ -1737,7 +1816,7 @@ void serializeLuaPropertyGetter(OutputStream& out, Module& m, Component& c) {
 	}
 
 	for (Property& p : c.properties) {
-		if (p.attributes.is_blob) continue;
+		if (isBlob(p)) continue;
 		if (p.is_var) {
 			L("\telse if (equalStrings(prop_name, \"",p.name,"\")) LuaWrapper::push(L, module->get",c.name,"(entity).",p.name,");");
 			continue;
@@ -1746,7 +1825,7 @@ void serializeLuaPropertyGetter(OutputStream& out, Module& m, Component& c) {
 
 		char tmp[256];
 		toID(pickLabel(p.name, p.attributes.label), Span(tmp, tmp + 255));
-		if (p.attributes.is_enum || getEnum(m, p.type)) {
+		if (getEnum(m, p.type)) {
 			L("\telse if (equalStrings(prop_name, \"",tmp,"\")) LuaWrapper::push(L, (i32)module->",p.getter_name,"(entity));");
 		}
 		else {
@@ -1768,6 +1847,9 @@ void serializeLuaPropertyGetter(OutputStream& out, Module& m, Component& c) {
 
 void serializeLuaCAPI(OutputStream& out, Module& m) {
 	L("namespace Lumix {");
+	for (Function& f : m.functions) {
+		wrap(out, m, f);
+	}
 	for (Component& c : m.components) {
 		for (Function& f : c.functions) {
 			wrap(out, m, c, f);
@@ -1830,36 +1912,28 @@ void serializeReflection(OutputStream& out, Module& m) {
 			}
 
 			if (prop.getter_name.size() > 0) {
-				bool is_enum = getEnum(m, prop.type) || prop.attributes.is_enum || prop.attributes.dynamic_enum_name.size() > 0;
-				if (equal(prop.name, "Enabled")) {
+				if (isBlob(prop)) {
+					out.add("\t\t.blob_property<&", m.name, "::", prop.getter_name);
+				}
+				else {
 					out.add("\t\t.prop<&", m.name, "::", prop.getter_name);
-					if (prop.setter_name.size() > 0) {
-						out.add(", &", m.name, "::", prop.setter_name);
-					}
 				}
-				else {
-					if (prop.attributes.is_blob) {
-						out.add("\t\t.blob_property<&", m.name, "::", prop.getter_name);
-					}
-					else if (is_enum) {
-						out.add("\t\t.enum_prop<&", m.name, "::", prop.getter_name);
-					}
-					else {
-						out.add("\t\t.prop<&", m.name, "::", prop.getter_name);
-					}
-					if (prop.setter_name.size() > 0) {
-						out.add(", &", m.name, "::", prop.setter_name);
-					}
+
+				if (prop.setter_name.size() > 0) {
+					out.add(", &", m.name, "::", prop.setter_name);
 				}
-				char label[256];
+
 				if (prop.attributes.label.size() > 0) {
-					buildString(label, prop.attributes.label);
+					L(">(\"", prop.attributes.label, "\")");
 				}
 				else {
+					char label[256];
 					toLabel(prop.name, Span(label, label + sizeof(label)));
+					L(">(\"", label, "\")");
 				}
-				L(">(\"", label, "\")");
+
 				serializeAttributes(out, prop.attributes);
+				bool is_enum = getEnum(m, prop.type) || prop.attributes.dynamic_enum_name.size() > 0;
 				if (is_enum) {
 					// TODO withoutNamespace?
 					StringView enum_name = prop.attributes.dynamic_enum_name.size() > 0 ? prop.attributes.dynamic_enum_name : withoutNamespace(prop.type);
@@ -1868,6 +1942,7 @@ void serializeReflection(OutputStream& out, Module& m) {
 				return;
 			}
 			
+			// if there's only a setter without a getter, we treat it as a function rather than a write-only property
 			if (prop.setter_name.size() > 0) {
 				L("\t\t.function<&", m.name, "::",  prop.setter_name, ">(\"set", prop.name, "\")");
 			}	
@@ -1875,9 +1950,7 @@ void serializeReflection(OutputStream& out, Module& m) {
 
 		L("\t.cmp<&", m.name, "::create", cmp.name, ", &", m.name, "::destroy", cmp.name, ">(\"", cmp.id, "\", \"", m.label, " / ", cmp.label, "\")");
 		
-		if (cmp.icon.size() > 0) {
-			L("\t\t.icon(", cmp.icon, ")");
-		}
+		if (cmp.icon.size() > 0) L("\t\t.icon(", cmp.icon, ")");
 
 		for (Function& fn : cmp.functions) {
 			StringView label = fn.attributes.label.size() > 0 ? fn.attributes.label : fn.name;
@@ -1938,6 +2011,9 @@ int main() {
 		lua_capi_stream.add("#include \"",include_path,"\"\n");
 	}
 	for (Module& m : parser.modules) {
+		for (StringView include_path : m.includes) {
+			lua_capi_stream.add("#include \"",include_path,"\"\n");
+		}
 		StringView include_path = withoutPrefix(makeStringView(m.filename), 2); // skip "./"
 		lua_capi_stream.add("#include \"",include_path,"\"\n");
 	}

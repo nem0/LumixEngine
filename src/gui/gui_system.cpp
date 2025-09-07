@@ -51,11 +51,11 @@ struct GUISystemImpl final : GUISystem
 {
 	static const char* getTextHAlignName(int index)
 	{
-		switch ((GUIModule::TextHAlign) index)
+		switch ((TextHAlign) index)
 		{
-			case GUIModule::TextHAlign::LEFT: return "left";
-			case GUIModule::TextHAlign::RIGHT: return "right";
-			case GUIModule::TextHAlign::CENTER: return "center";
+			case TextHAlign::LEFT: return "left";
+			case TextHAlign::RIGHT: return "right";
+			case TextHAlign::CENTER: return "center";
 		}
 		ASSERT(false);
 		return "Unknown";
