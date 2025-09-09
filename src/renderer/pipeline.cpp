@@ -2055,7 +2055,7 @@ struct PipelineImpl final : Pipeline {
 
 		if (view.cp.is_shadow) return;
 
-		const auto& particle_systems = m_module->getParticleSystems();
+		const auto& particle_systems = m_module->getParticleEmitters();
 		if (particle_systems.size() == 0) return;
 			
 		Sorter::Inserter inserter(view.sorter);
@@ -2580,7 +2580,7 @@ struct PipelineImpl final : Pipeline {
 				switch(type) {
 					case RenderableTypes::PARTICLES: {
 						const u32 emitter_idx = u32(renderables[i] >> SORT_KEY_EMITTER_SHIFT);
-						const ParticleSystem& particle_system = m_module->getParticleSystem(entity);
+						const ParticleSystem& particle_system = m_module->getParticleEmitter(entity);
 						const ParticleSystem::Emitter& emitter = particle_system.getEmitter(emitter_idx);
 						const Material* material = emitter.resource_emitter.material;
 						const u32 particles_count = emitter.particles_count;

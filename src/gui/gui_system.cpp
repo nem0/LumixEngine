@@ -69,7 +69,6 @@ struct GUISystemImpl final : GUISystem
 		, m_render_plugin(*this)
 	{
 		GUIModule::reflect();
-		reflection::function<&GUISystem::enableCursor>("enableCursor");
 		m_sprite_manager.create(Sprite::TYPE, m_engine.getResourceManager());
 	}
 

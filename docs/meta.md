@@ -19,7 +19,7 @@ It's not necessary for struct to follow immediately after `//@ module`
 ```cpp
 //@ module GUIModule gui "GUI"
 
-//@ component_struct gui_canvas "Canvas"
+//@ component_struct id gui_canvas
 struct Canvas {
 	EntityRef entity;
 	bool is_3d = false;				//@ property
@@ -114,18 +114,15 @@ Defines new component type and includes all virtual methods between `//@ compone
 
 Examples:
 ```cpp
-//@ component PropertyAnimator property_animator "Property animator"
+//@ component
 virtual bool isPropertyAnimatorEnabled(EntityRef entity) = 0;
 virtual void enablePropertyAnimator(EntityRef entity, bool enabled) = 0;
 ...
 //@ end
 ```
 
-`//@ component` has 3 parameters:
-
-1. Name - used to autodetect properties from method names.
-2. Component's identifier.
-3. Label used in UI.
+`//@ component` has 1 parameter - Name - used to autodetect properties from method names. 
+ID and label are generated from name and can be overriden with attributes `//@ component Listener id audio_listener`, `//@ component Script id lua_script label "File"`.
 
 ### Properties
 
@@ -174,11 +171,9 @@ Any method inside a component block (`//@ component` ... `//@ end`) that is not 
 
 `//@ component_struct` declares a POD-style component whose data is stored directly in a C++ struct rather than accessed through virtual interface methods.
 
-Parameters:
-1. Identifier. `//@ component` and `//@ component_struct` with the same identifier are merged together. So some properties can use direct field access and other properties can use virtual interface methods.
-3. UI label in quotes.
-
 Rules and behavior:
+* `//@ component` and `//@ component_struct` with the same id are merged together. So some properties can use direct field access and other properties can use virtual interface methods.
+* ID and label are generated from struct's name and can be overriden with attributes `//@ component_struct id gui_canvas`, `//@ component_struct label "Zone"`.
 * Must appear inside a module block.
 * The struct must immediately follow on the next line (without blank lines / comments).
 * Fields become properties only if marked with //@ property (unlike function-based components where properties are inferred from method names).
@@ -190,7 +185,7 @@ Rules and behavior:
 
 Examples:
 ```cpp
-//@ component_struct fur "Fur"
+//@ component_struct
 struct Fur {
 	u32 layers = 16;		//@ property
 	float scale = 0.01f;	//@ property
@@ -201,7 +196,7 @@ struct Fur {
 ```
 
 ```cpp
-//@ component_struct echo_zone "Echo zone"
+//@ component_struct
 struct EchoZone {
 	EntityRef entity;
 	float radius;		//@ property min 0

@@ -591,6 +591,67 @@ bool readLine(StringView& content, StringView& line) {
 	return true;
 }
 
+void toLabel(StringView in, Span<char> out) {
+	char* to = out.begin;
+	const char* from = in.begin;
+	while (from < in.end && to < out.end) {
+		if (*from >= 'A' && *from <= 'Z' && from != in.begin) {
+			*to = ' ';
+			++to;
+			if (to == out.end) break;
+		}
+		if (from == in.begin) {
+			if (*from < 'a' || *from > 'z') {
+				*to = *from;
+			}
+			else {
+				*to = *from + ('A' - 'a');
+			}
+		}
+		else {
+			if (*from == '_')
+				*to = ' ';
+			else if (*from >= 'A' && *from <= 'Z')
+				*to = *from + ('a' - 'A');
+			else
+				*to = *from;
+		}
+		++to;
+		++from;
+	}
+	if (to < out.end) {
+		*to = 0;
+	}
+	else {
+		*(to - 1) = 0;
+	}
+}
+
+void toID(StringView name, Span<char> out) {
+	char* dst = out.begin;
+	const char* src = name.begin;
+	bool prev_lowercase = false;
+	while (dst < out.end - 1 && src < name.end) {
+		if (*src == ' ') {
+			*dst = '_';
+		}
+		else if (*src >= 'A' && *src <= 'Z') {
+			if (src != name.begin && prev_lowercase) {
+				*dst = '_';
+				++dst;
+			}
+			if (dst != out.end - 1) *dst = *src | 0x20;
+		}
+		else {
+			prev_lowercase = *src >= 'a' && *src <= 'z';
+			*dst = *src;
+		}
+		++dst;
+		++src;
+	}
+	*dst = 0;
+}
+
 struct Parser {
 	Parser(IAllocator& allocator)
 		: allocator(allocator)
@@ -694,11 +755,58 @@ struct Parser {
 		merge(prop.attributes, attributes);
 	}
 
-	void parseComponentStruct(StringView name, StringView struct_name, StringView id, StringView label, StringView icon) {
-		beginComponent(name, struct_name, id, label, icon);
-		defer { current_component = nullptr; };
+	void parseComponentStruct(StringView def) {
+		StringView icon;
+		StringView name;
+		StringView word = consumeWord(def);
+		StringView label;
+		StringView id;
+		while (word.size() > 0) {
+			if (equal(word, "icon")) {
+				icon = consumeWord(def);
+			}
+			else if (equal(word, "name")) {
+				name = consumeWord(def);
+			}
+			else if (equal(word, "label")) {
+				label = consumeString(def);
+			}
+			else if (equal(word, "id")) {
+				id = consumeIdentifier(def);
+			}
+			else {
+				logError("Unexpected ", word);
+			}
+			word = consumeWord(def);
+		}
 		
 		StringView line;
+		if (!readLine(line) || !equal(consumeWord(line), "struct")) {
+			logError("Expected 'struct'");
+			return;
+		}
+		StringView struct_name = consumeWord(line);
+		if (struct_name.size() == 0) {
+			logError("Expected struct name");
+			return;
+		}
+		
+		if (name.size() == 0) name = struct_name;
+		
+		if (id.size() > 0) {
+			beginComponent(name, struct_name, id, label, icon);
+		}
+		else {
+			char tmp[256];
+			toID(struct_name, Span(tmp, tmp + 255));
+			const size_t id_strlen = strlen(tmp);
+			char* id_str = (char*)allocator.allocate(id_strlen + 1);
+			strcpy_s(id_str, id_strlen + 1, tmp);
+
+			beginComponent(name, struct_name, makeStringView(id_str), label, icon);
+		}
+		defer { current_component = nullptr; };
+		
 		while (readLine(line)) {
 			StringView def = find(line, "//@");
 			if (def.size() == 0) continue;
@@ -803,7 +911,45 @@ struct Parser {
 		logError("'//@ end' not found while parsing ", component_name, ".", array_name);
 	}
 
-	void parseComponent(StringView component_name, StringView id, StringView label, StringView icon) {
+	void parseComponent(StringView component_name, StringView def) {
+		StringView id;
+		StringView label;
+		StringView icon;
+
+		StringView word = consumeWord(def);
+		while (word.size() > 0) {
+			if (equal(word, "icon")) {
+				icon = consumeWord(def);
+			}
+			else if (equal(word, "id")) {
+				id = consumeIdentifier(def);
+			}
+			else if (equal(word, "label")) {
+				label = consumeString(def);
+			}
+			else {
+				logError("Unexpected ", word);
+			}
+			word = consumeWord(def);
+		}
+
+		char tmp[256];
+		if (label.size() == 0) {
+			toLabel(component_name, Span(tmp, tmp + sizeof(tmp)));
+			const size_t len = strlen(tmp) + 1;
+			char* l = (char*)allocator.allocate(len);
+			strcpy_s(l, len, tmp);
+			label = makeStringView(l);
+		}
+		if (id.size() == 0) {
+			toID(component_name, Span(tmp, tmp + sizeof(tmp)));
+
+			const size_t len = strlen(tmp) + 1;
+			char* l = (char*)allocator.allocate(len);
+			strcpy_s(l, len, tmp);
+			id = makeStringView(l);
+		}
+
 		beginComponent(component_name, {}, id, label, icon);
 		defer { current_component = nullptr; };
 
@@ -981,52 +1127,10 @@ struct Parser {
 			}
 			else if (equal(word, "component")) {
 				StringView cmp_name = consumeWord(line);
-				StringView id = consumeWord(line);
-				StringView label = consumeString(line);
-				StringView def = consumeWord(line);
-				StringView icon;
-
-				if (def.size() > 0) {
-					if (equal(def, "icon")) {
-						icon = consumeWord(line);
-					}
-					else {
-						logError("Unexpected ", def);
-					}
-				}
-				parseComponent(cmp_name, id, label, icon);
+				parseComponent(cmp_name, line);
 			}
 			else if (equal(word, "component_struct")) {
-				StringView id = consumeWord(line);
-				StringView label = consumeString(line);
-				StringView icon;
-				StringView def = consumeWord(line);
-				StringView getter_name;
-				StringView name;
-				if (def.size() > 0) {
-					if (equal(def, "icon")) {
-						icon = consumeWord(line);
-					}
-					else if (equal(def, "name")) {
-						name = consumeWord(line);
-					}
-					else {
-						logError("Unexpected ", def);
-					}
-				}
-				
-				if (!readLine(line) || !equal(consumeWord(line), "struct")) {
-					logError("Expected 'struct'");
-					return;
-				}
-				StringView struct_name = consumeWord(line);
-				if (struct_name.size() == 0) {
-					logError("Expected struct name");
-					return;
-				}
-				
-				if (name.size() == 0) name = struct_name;
-				parseComponentStruct(name, struct_name, id, label, icon);
+				parseComponentStruct(line);
 			}
 			else if (equal(word, "end")) {
 				return;
@@ -1339,42 +1443,6 @@ Enum* getEnum(Module& m, StringView name) {
 	return nullptr;
 }
 
-void toLabel(StringView in, Span<char> out) {
-	char* to = out.begin;
-	const char* from = in.begin;
-	while (from < in.end && to < out.end) {
-		if (*from >= 'A' && *from <= 'Z' && from != in.begin) {
-			*to = ' ';
-			++to;
-			if (to == out.end) break;
-		}
-		if (from == in.begin) {
-			if (*from < 'a' || *from > 'z') {
-				*to = *from;
-			}
-			else {
-				*to = *from + ('A' - 'a');
-			}
-		}
-		else {
-			if (*from == '_')
-				*to = ' ';
-			else if (*from >= 'A' && *from <= 'Z')
-				*to = *from + ('a' - 'A');
-			else
-				*to = *from;
-		}
-		++to;
-		++from;
-	}
-	if (to < out.end) {
-		*to = 0;
-	}
-	else {
-		*(to - 1) = 0;
-	}
-}
-
 struct Arg {
 	StringView type;
 	StringView name;
@@ -1684,32 +1752,6 @@ void serializeMain(OutputStream& out, Parser& parser) {
 	L("}" OUT_ENDL);
 
 	formatCPP(out);
-}
-
-
-void toID(StringView name, Span<char> out) {
-	char* dst = out.begin;
-	const char* src = name.begin;
-	bool prev_lowercase = false;
-	while (dst < out.end - 1 && src < name.end) {
-		if (*src == ' ') {
-			*dst = '_';
-		}
-		else if (*src >= 'A' && *src <= 'Z') {
-			if (src != name.begin && prev_lowercase) {
-				*dst = '_';
-				++dst;
-			}
-			if (dst != out.end - 1) *dst = *src | 0x20;
-		}
-		else {
-			prev_lowercase = *src >= 'a' && *src <= 'z';
-			*dst = *src;
-		}
-		++dst;
-		++src;
-	}
-	*dst = 0;
 }
 
 bool isBlob(const Property& p) {
@@ -2294,14 +2336,15 @@ void serializeReflection(OutputStream& out, Module& m) {
 	for (Component& cmp : m.components) {
 		auto def_property = [&](const Property& prop) {
 			if (prop.is_var) {
+				out.add("\t\t.var_prop<&", m.name, "::get", cmp.name, ", &", cmp.struct_name, "::", prop.name, ">(\"");
 				char label[256];
 				if (prop.attributes.label.size() > 0) {
-					buildString(label, prop.attributes.label);
+					L(prop.attributes.label, "\")");
 				}
 				else {
 					toLabel(prop.name, Span(label, label + sizeof(label)));
+					L(label, "\")");
 				}
-				L("\t\t.var_prop<&", m.name, "::get", cmp.name, ", &", cmp.struct_name, "::", prop.name, ">(\"", label, "\")");
 				serializeAttributes(out, prop.attributes);
 				return;
 			}
@@ -2343,7 +2386,15 @@ void serializeReflection(OutputStream& out, Module& m) {
 			}	
 		};
 
-		L("\t.cmp<&", m.name, "::create", cmp.name, ", &", m.name, "::destroy", cmp.name, ">(\"", cmp.id, "\", \"", m.label, " / ", cmp.label, "\")");
+		out.add("\t.cmp<&", m.name, "::create", cmp.name, ", &", m.name, "::destroy", cmp.name, ">(\"", cmp.id, "\", \"", m.label, " / ");
+		if (cmp.label.size() > 0) {
+			L(cmp.label, "\")");
+		}
+		else {
+			char tmp[256];
+			toLabel(cmp.name, Span(tmp, tmp + sizeof(tmp)));
+			L(tmp, "\")");
+		}
 		
 		if (cmp.icon.size() > 0) L("\t\t.icon(", cmp.icon, ")");
 

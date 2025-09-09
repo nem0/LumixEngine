@@ -2148,28 +2148,28 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int ParticleSystem_getter(lua_State* L) {
+	int ParticleEmitter_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
 		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
 		switch (name_hash) {
-			case /*source*/17609862876178282011: LuaWrapper::push(L, module->getParticleSystemPath(entity)); break;
-			case /*autodestroy*/13701391921693763709: LuaWrapper::push(L, module->getParticleSystemAutodestroy(entity)); break;
+			case /*source*/17609862876178282011: LuaWrapper::push(L, module->getParticleEmitterPath(entity)); break;
+			case /*autodestroy*/13701391921693763709: LuaWrapper::push(L, module->getParticleEmitterAutodestroy(entity)); break;
 			case 0:
 			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
 	
-	int ParticleSystem_setter(lua_State* L) {
+	int ParticleEmitter_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
 		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
 		switch (name_hash) {
-			case /*source*/17609862876178282011: module->setParticleSystemPath(entity, LuaWrapper::checkArg<Path>(L, 3)); break;
-			case /*autodestroy*/13701391921693763709: module->setParticleSystemAutodestroy(entity, LuaWrapper::checkArg<bool>(L, 3)); break;
+			case /*source*/17609862876178282011: module->setParticleEmitterPath(entity, LuaWrapper::checkArg<Path>(L, 3)); break;
+			case /*autodestroy*/13701391921693763709: module->setParticleEmitterAutodestroy(entity, LuaWrapper::checkArg<bool>(L, 3)); break;
 			case 0:
 			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
 		}
@@ -2653,7 +2653,7 @@ namespace Lumix {
 		registerLuaComponent(L, "environment_probe", EnvironmentProbe_getter, EnvironmentProbe_setter);
 		registerLuaComponent(L, "fur", Fur_getter, Fur_setter);
 		registerLuaComponent(L, "bone_attachment", BoneAttachment_getter, BoneAttachment_setter);
-		registerLuaComponent(L, "particle_emitter", ParticleSystem_getter, ParticleSystem_setter);
+		registerLuaComponent(L, "particle_emitter", ParticleEmitter_getter, ParticleEmitter_setter);
 		registerLuaComponent(L, "instanced_model", InstancedModel_getter, InstancedModel_setter);
 		registerLuaComponent(L, "model_instance", ModelInstance_getter, ModelInstance_setter);
 		registerLuaComponent(L, "curve_decal", CurveDecal_getter, CurveDecal_setter);

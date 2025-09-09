@@ -17,7 +17,7 @@ namespace Lumix
 struct IAllocator;
 
 
-//@ component_struct navmesh_zone "Zone" name Zone
+//@ component_struct label "Zone" name Zone
 struct NavmeshZone {
 	enum Flags {
 		AUTOLOAD = 1 << 0,
@@ -47,7 +47,7 @@ struct NavigationModule : IModule {
 	static void reflect();
 
 	virtual NavmeshZone& getZone(EntityRef entity) = 0;
-	//@ component Zone navmesh_zone "Zone"
+	//@ component Zone id navmesh_zone
 	virtual bool loadZone(EntityRef zone_entity) = 0;	//@ label "load"
 	virtual void debugDrawNavmesh(EntityRef zone, const DVec3& pos, bool inner_boundaries, bool outer_boundaries, bool portals) = 0; //@ label "drawNavmesh"
 	virtual void debugDrawCompactHeightfield(EntityRef zone) = 0;	//@ label "drawCompactHeightfield"
@@ -63,7 +63,7 @@ struct NavigationModule : IModule {
 	virtual void createZone(EntityRef entity) = 0;
 	virtual void destroyZone(EntityRef entity) = 0;
 
-	//@ component Agent navmesh_agent "Agent"
+	//@ component Agent id navmesh_agent
 	virtual void setAgentRadius(EntityRef entity, float radius) = 0;
 	virtual float getAgentRadius(EntityRef entity) = 0;
 	virtual void setAgentHeight(EntityRef entity, float height) = 0;

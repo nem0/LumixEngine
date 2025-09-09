@@ -14,7 +14,7 @@ template <typename T> struct DelegateList;
 
 //@ module GUIModule gui "GUI"
 
-//@ component_struct gui_canvas "Canvas"
+//@ component_struct id gui_canvas
 struct Canvas {
 	EntityRef entity;
 	bool is_3d = false;				//@ property
@@ -83,13 +83,13 @@ struct GUIModule : IModule {
 	virtual GUISystem* getSystemPtr() const = 0; //@ label "getSystem"
 	//@ end
 
-	//@ component RenderTarget gui_render_target "Render target"
+	//@ component RenderTarget id gui_render_target
 	//@ end
 
-	//@ component InputField gui_input_field "Input field" icon ICON_FA_KEYBOARD
+	//@ component InputField id gui_input_field icon ICON_FA_KEYBOARD
 	//@ end
 
-	//@ component Rect gui_rect "Rect"
+	//@ component Rect id gui_rect
 	virtual void enableRect(EntityRef entity, bool enable) = 0;
 	virtual bool isRectEnabled(EntityRef entity) = 0;
 	virtual bool getRectClip(EntityRef entity) = 0;					//@ label "Clip content"
@@ -115,14 +115,14 @@ struct GUIModule : IModule {
 	virtual void setRectBottomRelative(EntityRef entity, float value) = 0;
 	//@ end
 
-	//@ component Button gui_button "Button"
+	//@ component Button id gui_button
 	virtual Vec4 getButtonHoveredColorRGBA(EntityRef entity) = 0; //@ label "Hovered color" color
 	virtual void setButtonHoveredColorRGBA(EntityRef entity, const Vec4& color) = 0;
 	virtual os::CursorType getButtonHoveredCursor(EntityRef entity) = 0;
 	virtual void setButtonHoveredCursor(EntityRef entity, os::CursorType cursor) = 0;
 	//@ end
 
-	//@ component Image gui_image "Image" icon ICON_FA_IMAGE
+	//@ component Image id gui_image icon ICON_FA_IMAGE
 	virtual void enableImage(EntityRef entity, bool enable) = 0;
 	virtual bool isImageEnabled(EntityRef entity) = 0;
 	virtual Vec4 getImageColorRGBA(EntityRef entity) = 0;						//@ label "Color" color
@@ -134,7 +134,7 @@ struct GUIModule : IModule {
 	virtual Canvas& getCanvas(EntityRef entity) = 0;
 	virtual HashMap<EntityRef, Canvas>& getCanvases() = 0;
 
-	//@ component Text gui_text "Text" icon ICON_FA_FONT
+	//@ component Text id gui_text icon ICON_FA_FONT
 	virtual void setTextFontSize(EntityRef entity, int value) = 0;			//@ min 0
 	virtual int getTextFontSize(EntityRef entity) = 0;
 	virtual Vec4 getTextColorRGBA(EntityRef entity) = 0; 					//@ label "Color" color

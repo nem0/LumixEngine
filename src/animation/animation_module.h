@@ -32,7 +32,7 @@ struct AnimationModule : IModule {
 	virtual void destroyAnimator(EntityRef entity) = 0;
 	virtual void destroyPropertyAnimator(EntityRef entity) = 0;
 
-	//@ component PropertyAnimator property_animator "Property animator"
+	//@ component PropertyAnimator
 	virtual bool isPropertyAnimatorEnabled(EntityRef entity) = 0;
 	virtual void enablePropertyAnimator(EntityRef entity, bool enabled) = 0;
 	virtual bool getPropertyAnimatorLooped(EntityRef entity) = 0;
@@ -41,7 +41,7 @@ struct AnimationModule : IModule {
 	virtual void setPropertyAnimatorAnimation(EntityRef entity, const Path& path) = 0;
 	//@ end
 	
-	//@ component Animator animator "Animator"
+	//@ component Animator
 	virtual void setAnimatorSource(EntityRef entity, const Path& path) = 0;				//@ resource_type anim::Controller::TYPE
 	virtual Path getAnimatorSource(EntityRef entity) = 0;
 	virtual void setAnimatorUseRootMotion(EntityRef entity, bool value) = 0;
@@ -67,7 +67,7 @@ struct AnimationModule : IModule {
 	virtual OutputMemoryStream& beginBlendstackUpdate(EntityRef entity) = 0;
 	virtual void endBlendstackUpdate(EntityRef entity) = 0;
 
-	//@ component Animable animable "Animable"
+	//@ component Animable
 	virtual Path getAnimableAnimation(EntityRef entity) = 0;
 	virtual void setAnimableAnimation(EntityRef entity, const Path& path) = 0;
 	//@ end

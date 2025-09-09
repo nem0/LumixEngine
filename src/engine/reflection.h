@@ -322,14 +322,12 @@ struct Variant {
 };
 
 struct TypeDescriptor {
-	using Copier = void* (*)(const void* src, IAllocator& allocator);
 	Variant::Type type;
 	StringView type_name;
 	bool is_const;
 	bool is_reference;
 	bool is_pointer;
 	u32 size;
-	Copier create_copy;
 };
 
 template <typename T> struct VariantTag {};
@@ -355,12 +353,6 @@ template <typename T> inline Variant::Type getVariantType() { return _getVariant
 
 template <typename T> TypeDescriptor toTypeDescriptor() {
 	TypeDescriptor td;
-	td.create_copy = [](const void* src, IAllocator& allocator) -> void* {
-		if constexpr (__is_constructible(T)) {
-			return LUMIX_NEW(allocator, RemoveCVR<T>)(*(RemoveCVR<T>*)src);
-		}
-		return nullptr;
-	};
 	td.type_name = getTypeName<RemoveCVR<RemovePointer<T>>>();
 	td.type = getVariantType<T>();
 	td.is_const = !IsSame<T, typename RemoveConst<T>::Type>::Value;
@@ -382,7 +374,6 @@ struct FunctionBase {
 
 	virtual u32 getArgCount() const = 0;
 	virtual TypeDescriptor getReturnType() const = 0;
-	virtual TypeDescriptor getThisType() const = 0;
 	virtual TypeDescriptor getArgType(int i) const = 0;
 	virtual void invoke(void* obj, Span<u8> ret_mem, Span<const Variant> args) const = 0;
 	// we can use this in Delegate::bindRaw, so there's less overhead
@@ -399,7 +390,6 @@ struct EventBase {
 
 	virtual ~EventBase() {}
 	virtual u32 getArgCount() const = 0;
-	virtual StringView getThisTypeName() const = 0;
 	virtual TypeDescriptor getArgType(int i) const = 0;
 	virtual void bind(void* object, Callback* callback) const = 0;
 	[[nodiscard]] virtual bool bind(void* object, void* fn_object, FunctionBase* function) const = 0;
@@ -514,7 +504,6 @@ struct Function : FunctionBase {
 
 	u32 getArgCount() const override { return ArgsCount<F>::value; }
 	TypeDescriptor getReturnType() const override { return toTypeDescriptor<R>(); }
-	TypeDescriptor getThisType() const override { return toTypeDescriptor<C>(); }
 	
 	TypeDescriptor getArgType(int i) const override {
 		return ArgToTypeDescriptor<F>::get(i);
@@ -537,7 +526,6 @@ struct Event<DelegateList<void(Args...)>& (C::*)()> : EventBase
 	F function;
 
 	u32 getArgCount() const override { return sizeof...(Args); }
-	StringView getThisTypeName() const override { return getTypeName<C>(); }
 
 	TypeDescriptor getArgType(int i) const override
 	{
@@ -627,18 +615,6 @@ struct StructVar : StructVarBase {
 		return true;
 	}
 };
-
-
-LUMIX_ENGINE_API Array<FunctionBase*>& allFunctions();
-
-template <auto func>
-auto& function(const char* name)
-{
-	static Function<func> ret;
-	allFunctions().push(&ret);
-	ret.name = name;
-	return ret;
-}
 
 struct LUMIX_ENGINE_API ComponentBase {
 	ComponentBase(IAllocator& allocator);

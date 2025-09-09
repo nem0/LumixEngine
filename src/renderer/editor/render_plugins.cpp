@@ -648,7 +648,7 @@ struct ParticleSystemPropertyPlugin final : PropertyGrid::IPlugin
 		if (entities.length() != 1) return;
 		
 		RenderModule* module = (RenderModule*)editor.getWorld()->getModule(cmp_type);
-		ParticleSystem& system = module->getParticleSystem(entities[0]);
+		ParticleSystem& system = module->getParticleEmitter(entities[0]);
  
 		if (m_playing && ImGui::Button(ICON_FA_STOP " Stop")) m_playing = false;
 		else if (!m_playing && ImGui::Button(ICON_FA_PLAY " Play")) m_playing = true;
@@ -660,7 +660,7 @@ struct ParticleSystemPropertyPlugin final : PropertyGrid::IPlugin
 		ImGui::SliderFloat("##ts", &m_time_scale, 0, 1);
 		if (m_playing) {
 			float dt = m_app.getEngine().getLastTimeDelta() * m_time_scale;
-			module->updateParticleSystem(entities[0], dt);
+			module->updateParticleEmitter(entities[0], dt);
 		}
 			
 		ImGui::TextUnformatted("Particle count");

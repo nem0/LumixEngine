@@ -41,11 +41,6 @@ const char* declCodeToName(const char* decl_code) {
 	return c;
 }
 
-Array<FunctionBase*>& allFunctions() {
-	static Array<FunctionBase*> fncs(getGlobalAllocator());
-	return fncs;
-}
-
 ComponentBase::ComponentBase(IAllocator& allocator)
 	: props(allocator)
 	, functions(allocator)
