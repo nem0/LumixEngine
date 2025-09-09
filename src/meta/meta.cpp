@@ -1,8 +1,15 @@
 #include "core/defer.h"
 #include <float.h>
 #include <Windows.h>
+#include <assert.h>
 
-#define L(...) out.add(__VA_ARGS__, "\n")
+#define XXH_STATIC_LINKING_ONLY
+#define XXH_IMPLEMENTATION
+#include "xxhash/xxhash.h"
+
+// we use crlf in output to avoid unnecessary changes because git converts to crlf 
+#define OUT_ENDL "\r\n"
+#define L(...) out.add(__VA_ARGS__, OUT_ENDL)
 
 using i32 = int;
 
@@ -109,7 +116,7 @@ struct ArenaAllocator : IAllocator {
 	}
 
 	void deallocate(void* mem) override {}
-	
+
 	void* mem;
 	size_t allocated = 0;
 	size_t commited = 0;
@@ -307,6 +314,10 @@ StringView consumeWord(StringView& str) {
 	return word;
 }
 
+StringView peekWord(StringView str) {
+	return consumeWord(str);
+}
+
 StringView consumeString(StringView& str) {
 	str = skipWhitespaces(str);
 	if (str.size() < 2) return {};
@@ -397,6 +408,16 @@ struct OutputStream {
 		delete[] data;
 	}
 
+	void consume(OutputStream& rhs) {
+		delete[] data;
+		data = rhs.data;
+		capacity = rhs.capacity;
+		length = rhs.length;
+		rhs.data = nullptr;
+		rhs.capacity = 0;
+		rhs.length = 0;
+	}
+
 	template <typename... Args>
 	void add(Args... args) {
 		(append(args), ...);
@@ -406,10 +427,26 @@ struct OutputStream {
 		append(makeStringView(v));
 	}
 
+	void append(XXH64_hash_t hash) {
+		char cstr[32] = "";
+		_ui64toa_s(hash, cstr, sizeof(cstr), 10);
+		append(makeStringView(cstr));
+	}
+
 	void append(i32 value) {
 		char cstr[32] = "";
 		_itoa_s(value, cstr, 10);
 		append(makeStringView(cstr));
+	}
+
+	void reserve(i32 size) {
+		if (capacity >= size) return;
+
+		capacity = size;
+		char* new_data = new char[capacity];
+		memcpy(new_data, data, length);
+		delete[] data;
+		data = new_data;
 	}
 
 	void append(StringView v) {
@@ -538,6 +575,22 @@ struct Module {
 	ExpArray<StringView> includes;
 };
 
+bool readLine(StringView& content, StringView& line) {
+	if (content.size() == 0) return false;
+
+	line.begin = content.begin;
+	line.end = line.begin;
+	
+	while (line.end != content.end && *line.end != '\n') {
+		++line.end;
+	}
+	line = skipWhitespaces(line);
+	content.begin = line.end;
+	if (content.begin != content.end) ++content.begin; // skip \n
+	if (line.end > line.begin && *(line.end - 1) == '\r') --line.end;
+	return true;
+}
+
 struct Parser {
 	Parser(IAllocator& allocator)
 		: allocator(allocator)
@@ -548,18 +601,8 @@ struct Parser {
 	{}
 
 	bool readLine(StringView& line) {
-		if (content.size() == 0) return false;
+		if (!::readLine(content, line)) return false;
 		++line_idx;
-
-		line.begin = content.begin;
-		line.end = line.begin;
-		
-		while (line.end != content.end && *line.end != '\n') {
-			++line.end;
-		}
-		line = skipWhitespaces(line);
-		content.begin = line.end;
-		if (content.begin != content.end) ++content.begin; // skip \n
 		return true;
 	}
 
@@ -1409,7 +1452,7 @@ void wrap(OutputStream& out, Module& m, Function& f) {
 		++arg_idx;
 		Struct* st = findStruct(arg.type);
 		if (st) {
-			L("\t",arg.type," ",arg.name,";\n");
+			L("\t",arg.type," ",arg.name,";" OUT_ENDL);
 			for (StructVar& v : st->vars) {
 				L("\tif(!LuaWrapper::checkField(L, ",(arg_idx + 2),", \"",v.name,"\", &",arg.name,".",v.name,")) luaL_error(L, \"Invalid argument\");");
 			}
@@ -1454,12 +1497,12 @@ void wrap(OutputStream& out, Module& m, Function& f) {
 		L("\treturn 1;");
 	}
 	else if (has_return) {
-		L(");\n\treturn 1;");
+		L(");" OUT_ENDL "\treturn 1;");
 	}
 	else {
-		L(";\n\treturn 0;");
+		L(";" OUT_ENDL "\treturn 0;");
 	}
-	L("}\n");
+	L("}" OUT_ENDL);
 }
 
 void wrap(OutputStream& out, Module& m, Component& c, Function& f) {
@@ -1497,15 +1540,15 @@ void wrap(OutputStream& out, Module& m, Component& c, Function& f) {
 			L("\tLuaWrapper::push(L, s.",v.name,");");
 			L("\tlua_setfield(L, -2, \"",v.name,"\");");
 		}
-		L("\n\treturn 1;");
+		L("" OUT_ENDL "\treturn 1;");
 	}
 	else if (has_return) {
-		L(");\n\treturn 1;");
+		L(");" OUT_ENDL "\treturn 1;");
 	}
 	else {
-		L(";\n\treturn 0;");
+		L(";" OUT_ENDL "\treturn 0;");
 	}
-	L("}\n");
+	L("}", OUT_ENDL);
 }
 
 void wrap(OutputStream& out, StringView module, StringView component, StringView property_name, StringView method_name, StringView args, bool is_getter) {
@@ -1528,7 +1571,7 @@ void wrap(OutputStream& out, StringView module, StringView component, StringView
 	L(");");
 	if (is_getter) L("\treturn 1;");
 	else L("\treturn 0;");
-	L("}\n");
+	L("}" OUT_ENDL);
 }
 
 StringView pickLabel(StringView base, StringView spec) {
@@ -1536,30 +1579,49 @@ StringView pickLabel(StringView base, StringView spec) {
 	return base;
 }
 
+void formatCPP(OutputStream& out) {
+	OutputStream formatted;
+	StringView raw = { out.data, out.data + out.length };
+	StringView line;
+	const char* tabs = "\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t";
+	i32 indent = 0;
+	while (readLine(raw, line)) {
+		i32 prev_indent = indent;
+		for (const char* c = line.begin; c < line.end; ++c) {
+			if (*c == '{') ++indent;
+			else if (*c == '}') --indent;
+			assert(indent >= 0);
+		}
+		if (indent > 0) formatted.add(StringView(tabs, tabs + (indent < prev_indent ? indent : prev_indent)));
+		formatted.add(line, OUT_ENDL);
+	}
+	out.consume(formatted);
+}
+
 void serializeMain(OutputStream& out, Parser& parser) {
-	L("namespace Lumix {\n");
+	L("namespace Lumix {" OUT_ENDL);
 	L("void registerLuaAPI(lua_State* L) {");
 	L("	lua_newtable(L);");
 	L("	lua_setglobal(L, \"LumixModules\");");
 
 	for (Module& m : parser.modules) {
 		if (m.functions.size == 0) continue;
-		L("	{");
-		L("		lua_newtable(L);");
-		L("		lua_getglobal(L, \"LumixModules\");");
-		L("		lua_pushvalue(L, -2);");
-		L("		lua_setfield(L, -2, \"",m.id,"\");");
-		L("		lua_pop(L, 1);");
-		L("		lua_pushvalue(L, -1);");
-		L("		lua_setfield(L, -2, \"__index\");");
-		L("		lua_pushcfunction(L, lua_new_module, \"new\");");
-		L("		lua_setfield(L, -2, \"new\");");
+		L("{");
+		L("	lua_newtable(L);");
+		L("	lua_getglobal(L, \"LumixModules\");");
+		L("	lua_pushvalue(L, -2);");
+		L("	lua_setfield(L, -2, \"",m.id,"\");");
+		L("	lua_pop(L, 1);");
+		L("	lua_pushvalue(L, -1);");
+		L("	lua_setfield(L, -2, \"__index\");");
+		L("	lua_pushcfunction(L, lua_new_module, \"new\");");
+		L("	lua_setfield(L, -2, \"new\");");
 		for (Function& f : m.functions) {
-			L("		lua_pushcfunction(L, ",m.name,"_",f.name,", \"",f.name,"\");");
-			L("		lua_setfield(L, -2, \"",pickLabel(f.name, f.attributes.label),"\");");
+			L("lua_pushcfunction(L, ",m.name,"_",f.name,", \"",f.name,"\");");
+			L("lua_setfield(L, -2, \"",pickLabel(f.name, f.attributes.label),"\");");
 		}
-		L("		lua_pop(L, 1);");
-		L("	}");
+		L("	lua_pop(L, 1);");
+		L("}");
 	}
 
 	for (Object& o : parser.objects) {
@@ -1619,7 +1681,9 @@ void serializeMain(OutputStream& out, Parser& parser) {
 		}
 	}
 	L("}");
-	L("}\n");
+	L("}" OUT_ENDL);
+
+	formatCPP(out);
 }
 
 
@@ -1657,13 +1721,17 @@ void serializeLuaPropertySetter(OutputStream& out, Module& m, Component& c) {
 	L("auto [imodule, entity] = checkComponent(L);");
 	L("auto* module = (",m.name,"*)imodule;");
 	L("const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);");
-	L("if (false) {}");
-
+	L("XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));");
+	L("switch (name_hash) {");
+	
 	bool is_array = false;
 	for (Property& p : c.properties) {
 		if (isBlob(p)) continue;
+
+		// TODO check collisions
+		XXH64_hash_t hash = XXH3_64bits(p.name.begin, p.name.size());
 		if (p.is_var) {
-			L("\telse if (equalStrings(prop_name, \"",p.name,"\")) module->get",c.name,"(entity).",p.name," = LuaWrapper::checkArg<",p.type,">(L, 3);");
+			L("case /*",p.name,"*/",hash,": module->get",c.name,"(entity).",p.name," = LuaWrapper::checkArg<",p.type,">(L, 3); break;");
 			continue;
 		}
 		
@@ -1673,18 +1741,21 @@ void serializeLuaPropertySetter(OutputStream& out, Module& m, Component& c) {
 		char tmp[256];
 		toID(pickLabel(p.name, p.attributes.label), Span(tmp, tmp + 255));
 
-		out.add("\telse if (equalStrings(prop_name, \"",tmp,"\")) ");
+		hash = XXH3_64bits(tmp, strlen(tmp));
+		out.add("case /*",tmp,"*/",hash,": ");
 		if (Enum* e = getEnum(m, p.type)) {
-			L("module->",p.setter_name,"(entity, (",e->full,")LuaWrapper::checkArg<i32>(L, 3));");
+			L("module->",p.setter_name,"(entity, (",e->full,")LuaWrapper::checkArg<i32>(L, 3)); break;");
 		}
 		else {
-			L("module->",p.setter_name,"(entity, LuaWrapper::checkArg<",p.type,">(L, 3));");
+			L("module->",p.setter_name,"(entity, LuaWrapper::checkArg<",p.type,">(L, 3)); break;");
 		}
 	}
-	L("\telse { ASSERT(false); luaL_error(L, \"Unknown property %s\", prop_name); }");
+	L("case 0:"); // to avoid emtpy switch (compiler error) in case we have 0 properties
+	L("default: ASSERT(false); luaL_error(L, \"Unknown property %s\", prop_name); break;");
+	L("}");
 
-	L("\treturn 0;");
-	L("}\n");
+	L("return 0;");
+	L("}" OUT_ENDL);
 }
 
 void serializeLuaArrayGetter(OutputStream& out, Module& m, Component& c, ArrayProperty& a) {
@@ -1720,7 +1791,8 @@ void serializeLuaArrayGetter(OutputStream& out, Module& m, Component& c, ArrayPr
 			auto* module = LuaWrapper::toType<GetterModule*>(L, lua_upvalueindex(1));
 			EntityRef entity = {LuaWrapper::toType<i32>(L, lua_upvalueindex(2))};
 			i32 index = LuaWrapper::toType<int>(L, lua_upvalueindex(3));
-			if (false) {}
+			XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
+			switch (name_hash) {
 	)#");
 
 	for (Property& child : a.children) {
@@ -1729,18 +1801,17 @@ void serializeLuaArrayGetter(OutputStream& out, Module& m, Component& c, ArrayPr
 		
 		char tmp[256];
 		toID(pickLabel(child.name, child.attributes.label), Span(tmp, tmp + 256));
-
-		L("else if(equalStrings(prop_name, \"",tmp,"\")) {");
+		XXH64_hash_t hash = XXH3_64bits(tmp, strlen(tmp));
+		out.add("case /*",tmp,"*/",hash,": ");
 		if (getEnum(m, child.type)) {
-			L("LuaWrapper::push(L, (i32)module->",child.getter_name,"(entity, index));");
+			L("LuaWrapper::push(L, (i32)module->",child.getter_name,"(entity, index)); break;");
 		}
 		else {
-			L("LuaWrapper::push(L, module->",child.getter_name,"(entity, index));");
+			L("LuaWrapper::push(L, module->",child.getter_name,"(entity, index)); break;");
 		}
-		L("}");
-
 	}
-	L("else { ASSERT(false); luaL_error(L, \"Unknown property %s\", prop_name); }");
+	L("default: { ASSERT(false); luaL_error(L, \"Unknown property %s\", prop_name); break; }");
+	L("}");
 
 	out.add(R"#(return 1;
 		};
@@ -1748,12 +1819,13 @@ void serializeLuaArrayGetter(OutputStream& out, Module& m, Component& c, ArrayPr
 		auto setter = [](lua_State* L) -> int {
 			LuaWrapper::checkTableArg(L, 1);
 			const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
+			XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
 			auto* module = LuaWrapper::toType<GetterModule*>(L, lua_upvalueindex(1));
 			EntityRef entity = {LuaWrapper::toType<i32>(L, lua_upvalueindex(2))};
 			i32 index = LuaWrapper::toType<int>(L, lua_upvalueindex(3));
-			if (false) {}
+			switch (name_hash) {
 	)#");	
-					
+
 	for (Property& child : a.children) {
 		if (isBlob(child)) continue;
 		if (child.setter_name.size() == 0) continue;
@@ -1761,17 +1833,20 @@ void serializeLuaArrayGetter(OutputStream& out, Module& m, Component& c, ArrayPr
 		char tmp[256];
 		toID(pickLabel(child.name, child.attributes.label), Span(tmp, tmp + 256));
 
-		L("else if(equalStrings(prop_name, \"",tmp,"\")) {");
+		XXH64_hash_t hash = XXH3_64bits(tmp, strlen(tmp));
+		out.add("case /*",tmp,"*/",hash,": ");
 		if (Enum* e = getEnum(m, child.type)) {
-			L("module->",child.setter_name,"(entity, index, (",e->full,")LuaWrapper::checkArg<i32>(L, 3));");
+			L("module->",child.setter_name,"(entity, index, (",e->full,")LuaWrapper::checkArg<i32>(L, 3)); break;");
 		}
 		else {
-			L("module->",child.setter_name,"(entity, index, LuaWrapper::checkArg<",child.type,">(L, 3));");
+			L("module->",child.setter_name,"(entity, index, LuaWrapper::checkArg<",child.type,">(L, 3)); break;");
 		}
-		L("}");
 	}
 
-	out.add(R"#(else { ASSERT(false); luaL_error(L, "Unknown property %ss", prop_name); }
+	out.add(R"#(
+			case 0:	
+			default: { ASSERT(false); luaL_error(L, "Unknown property %ss", prop_name); break; }
+			}
 			return 0;
 			};
 
@@ -1822,42 +1897,52 @@ void serializeLuaPropertyGetter(OutputStream& out, Module& m, Component& c) {
 	}
 
 	L("const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);");
-	L("if (false) {}");
+	L("XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));");
+	L("switch (name_hash) {");
 
 	for (ArrayProperty& a : c.arrays) {
-		L("\telse if (equalStrings(prop_name, \"",a.id,"\")) {");
+		XXH64_hash_t hash = XXH3_64bits(a.id.begin, a.id.size());
+		L("case /*",a.id,"*/",hash, ": {");
 		serializeLuaArrayGetter(out, m, c, a);
+		L("break;");
 		L("}");
 	}
 
 	for (Property& p : c.properties) {
 		if (isBlob(p)) continue;
 		if (p.is_var) {
-			L("\telse if (equalStrings(prop_name, \"",p.name,"\")) LuaWrapper::push(L, module->get",c.name,"(entity).",p.name,");");
+			XXH64_hash_t hash = XXH3_64bits(p.name.begin, p.name.size());
+			out.add("case /*",p.name,"*/",hash, ": ");
+			L("LuaWrapper::push(L, module->get",c.name,"(entity).",p.name,"); break;");
 			continue;
 		}
 		if (p.getter_name.size() == 0) continue;
 
 		char tmp[256];
 		toID(pickLabel(p.name, p.attributes.label), Span(tmp, tmp + 255));
+		XXH64_hash_t hash = XXH3_64bits(tmp, strlen(tmp));
+		out.add("case /*",tmp,"*/",hash, ": ");
+		
 		if (getEnum(m, p.type)) {
-			L("\telse if (equalStrings(prop_name, \"",tmp,"\")) LuaWrapper::push(L, (i32)module->",p.getter_name,"(entity));");
+			L("LuaWrapper::push(L, (i32)module->",p.getter_name,"(entity)); break;");
 		}
 		else {
-			L("\telse if (equalStrings(prop_name, \"",tmp,"\")) LuaWrapper::push(L, module->",p.getter_name,"(entity));");
+			L("LuaWrapper::push(L, module->",p.getter_name,"(entity)); break;");
 		}
 	}
 
 	for (Function& f : c.functions) {
 		StringView label = f.attributes.label;
 		if (label.size() == 0) label = f.name;
-		L("\telse if (equalStrings(prop_name, \"",label,"\")) {");
-		L("\t\tlua_pushcfunction(L, ",c.name,"_",label,", \"",c.name,"_",f.name,"\");");
-		L("\t}");
+		XXH64_hash_t hash = XXH3_64bits(label.begin, label.size());
+		out.add("case /*",label,"*/",hash, ": ");
+		L("lua_pushcfunction(L, ",c.name,"_",label,", \"",c.name,"_",f.name,"\"); break;");
 	}
-	L("\telse { ASSERT(false); luaL_error(L, \"Unknown property %s\", prop_name); }");
+	L("case 0:"); // to avoid emtpy switch (compiler error) in case we have 0 properties
+	L("default: { ASSERT(false); luaL_error(L, \"Unknown property %s\", prop_name); break; }");
+	L("}");
 	L("\treturn 1;");
-	L("}\n");
+	L("}" OUT_ENDL);
 }
 
 void serializeLuaCAPI(OutputStream& out, Module& m) {
@@ -1872,7 +1957,7 @@ void serializeLuaCAPI(OutputStream& out, Module& m) {
 		serializeLuaPropertyGetter(out, m, c);
 		serializeLuaPropertySetter(out, m, c);
 	}
-	L("}\n");
+	L("}" OUT_ENDL);
 }
 
 StringView toLuaType(StringView ctype) {
@@ -1921,10 +2006,11 @@ void serializeLuaType(OutputStream& out, StringView self_type, const char* self_
 			out.add(toLuaType(arg.type));
 		}
 	});
-	out.add(") -> ",toLuaType(f.return_type),"\n");
+	out.add(") -> ",toLuaType(f.return_type),OUT_ENDL);
 }
 
-void serializeLuaTypes(OutputStream& out) {
+void serializeLuaTypes(OutputStream& out_formatted) {
+	OutputStream out;
 	out.add(R"#(
 	export type Vec2 = {number}
 	export type Vec3 = {number}
@@ -2011,17 +2097,17 @@ void serializeLuaTypes(OutputStream& out) {
 	)#");
 
 	for (Module& m : parser.modules) {
-		L("\t\t",m.id,": ",m.id,"_module");
+		L(m.id,": ",m.id,"_module");
 	}
 
-	L("end\n");
+	L("end" OUT_ENDL);
 
 	for (Struct& s : parser.structs) {
 		L("declare class ",s.name);
 		for (StructVar& v : s.vars) {
-			L("\t",v.name,": ",toLuaType(v.type));
+			L(v.name,": ",toLuaType(v.type));
 		}
-		L("end\n");
+		L("end" OUT_ENDL);
 	}
 
 	for (Object& o : parser.objects) {
@@ -2029,7 +2115,7 @@ void serializeLuaTypes(OutputStream& out) {
 		for (Function& f : o.functions) {
 			serializeLuaType(out, o.name, "", f, false);
 		}
-		L("end\n");
+		L("end" OUT_ENDL);
 	}
 
 	for (Module& m : parser.modules) {
@@ -2037,7 +2123,7 @@ void serializeLuaTypes(OutputStream& out) {
 		for (Function& f : m.functions) {
 			serializeLuaType(out, m.id, "_module", f, false);
 		}
-		L("end\n");
+		L("end" OUT_ENDL);
 		
 		for (Component& c : m.components) {
 			L("declare class ",c.id,"_component");
@@ -2050,7 +2136,7 @@ void serializeLuaTypes(OutputStream& out) {
 			for (Function& f : c.functions) {
 				serializeLuaType(out, c.id, "_component", f, true);
 			}
-			L("end\n");
+			L("end" OUT_ENDL);
 		}
 	}
 
@@ -2070,11 +2156,11 @@ void serializeLuaTypes(OutputStream& out) {
 
 	for (Module& m : parser.modules) {
 		for (Component& c : m.components) {
-			L("\t\t",c.id,": ",c.id,"_component");
+			L(c.id,": ",c.id,"_component");
 		}
 	}
 	
-	L("end\n");
+	L("end" OUT_ENDL);
 
 	out.add(R"#(
 	declare this:Entity
@@ -2142,10 +2228,35 @@ void serializeLuaTypes(OutputStream& out) {
 
 	export type InputEvent = ButtonInputEvent | AxisInputEvent
 	)#");
+
+	// format output
+	StringView raw(out.data, out.data + out.length);
+	StringView line;
+	i32 indent = 0;
+	const char* tabs = "\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t";
+	while (readLine(raw, line)) {
+		i32 prev_indent = indent;
+		StringView word = peekWord(line);
+		if (equal(word, "declare")) {
+			++indent;
+		}
+		else if (equal(word, "end")) {
+			--indent;
+		}
+		else {
+			for (const char* c = line.begin; c < line.end; ++c) {
+				if (*c == '{') ++indent;
+				else if (*c == '}') --indent;
+			}
+		}
+
+		if (indent > 0) out_formatted.add(StringView(tabs, tabs + (indent < prev_indent ? indent : prev_indent)));
+		out_formatted.add(line, OUT_ENDL);
+	}
 }
 
 void serializeReflection(OutputStream& out, Module& m) {
-	L("// Generated by meta.cpp\n");
+	L("// Generated by meta.cpp" OUT_ENDL);
 	for (Enum& e : m.enums) {
 		L("struct ", e.name, "Enum : reflection::EnumAttribute {");
 		L("\tu32 count(ComponentUID cmp) const override { return ",e.values.size,"; }");
@@ -2167,7 +2278,7 @@ void serializeReflection(OutputStream& out, Module& m) {
 		L("\t\tASSERT(false);");
 		L("\t\treturn \"N/A\";");
 		L("\t}");
-		L("};\n");
+		L("};" OUT_ENDL);
 	}
 
 	L("reflection::build_module(\"", m.id, "\")");
@@ -2253,7 +2364,7 @@ void serializeReflection(OutputStream& out, Module& m) {
 			L("\t\t.end_array()");
 		}
 	}
-	L(";\n");
+	L(";" OUT_ENDL);
 }
 
 void writeFile(const char* out_path, OutputStream& stream) {
@@ -2291,20 +2402,23 @@ int main() {
 	OutputStream lua_capi_stream;
 	OutputStream lua_d_stream;
 
-	lua_capi_stream.add("// Generated by meta.cpp\n\n");
-	lua_d_stream.add("-- Generated by meta.cpp\n\n");
+	lua_capi_stream.add("// Generated by meta.cpp" OUT_ENDL OUT_ENDL);
+	lua_d_stream.add("-- Generated by meta.cpp" OUT_ENDL OUT_ENDL);
 	for (Object& o : parser.objects) {
 		StringView include_path = withoutPrefix(makeStringView(o.filename), 2); // skip "./"
-		lua_capi_stream.add("#include \"",include_path,"\"\n");
+		lua_capi_stream.add("#include \"",include_path,"\"" OUT_ENDL);
 	}
 	for (Module& m : parser.modules) {
 		for (StringView include_path : m.includes) {
-			lua_capi_stream.add("#include \"",include_path,"\"\n");
+			lua_capi_stream.add("#include \"",include_path,"\"" OUT_ENDL);
 		}
 		StringView include_path = withoutPrefix(makeStringView(m.filename), 2); // skip "./"
-		lua_capi_stream.add("#include \"",include_path,"\"\n");
+		lua_capi_stream.add("#include \"",include_path,"\"" OUT_ENDL);
 	}
-	lua_capi_stream.add("\n");
+	lua_capi_stream.add("#define XXH_STATIC_LINKING_ONLY" OUT_ENDL);
+	lua_capi_stream.add("#include \"xxhash/xxhash.h\"" OUT_ENDL);
+
+	lua_capi_stream.add(OUT_ENDL);
 
 	for (Module& m : parser.modules) {
 		char out_path[MAX_PATH];
