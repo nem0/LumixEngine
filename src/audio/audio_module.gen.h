@@ -24,6 +24,6 @@ reflection::build_module("audio")
 		.function<(void (AudioModule::*)(EntityRef entity))&AudioModule::resumeAmbientSound>("resume")
 		.prop<&AudioModule::getAmbientSoundClip, &AudioModule::setAmbientSoundClip>("Clip")
 			.resourceAttribute(Clip::TYPE)
-		.prop<&AudioModule::getAmbientSound3D, &AudioModule::setAmbientSound3D>("3D")
+		.prop<&AudioModule::isAmbientSound3D, &AudioModule::setAmbientSound3D>("3D")
 ;
 

@@ -3940,7 +3940,8 @@ void PhysicsModule::reflect() {
 			PhysicsSystem& system = (PhysicsSystem&)module->getSystem();
 			return system.getCollisionsLayersCount();
 		}
-		const char* name(ComponentUID cmp, u32 idx) const override { 
+		
+		const char* name(ComponentUID cmp, u32 idx) const override {
 			PhysicsModule* module = (PhysicsModule*)cmp.module;
 			PhysicsSystem& system = (PhysicsSystem&)module->getSystem();
 			return system.getCollisionLayerName(idx);

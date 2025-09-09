@@ -351,8 +351,8 @@ int AmbientSound_getter(lua_State* L) {
 	if (false) {
 	} else if (equalStrings(prop_name, "clip"))
 		LuaWrapper::push(L, module->getAmbientSoundClip(entity));
-	else if (equalStrings(prop_name, "3_d"))
-		LuaWrapper::push(L, module->getAmbientSound3D(entity));
+	else if (equalStrings(prop_name, "3d"))
+		LuaWrapper::push(L, module->isAmbientSound3D(entity));
 	else if (equalStrings(prop_name, "pause")) {
 		lua_pushcfunction(L, AmbientSound_pause, "AmbientSound_pauseAmbientSound");
 	} else if (equalStrings(prop_name, "resume")) {
@@ -371,7 +371,7 @@ int AmbientSound_setter(lua_State* L) {
 	if (false) {
 	} else if (equalStrings(prop_name, "clip"))
 		module->setAmbientSoundClip(entity, LuaWrapper::checkArg<Path>(L, 3));
-	else if (equalStrings(prop_name, "3_d"))
+	else if (equalStrings(prop_name, "3d"))
 		module->setAmbientSound3D(entity, LuaWrapper::checkArg<bool>(L, 3));
 	else {
 		ASSERT(false);
@@ -686,7 +686,7 @@ int Text_getter(lua_State* L) {
 		LuaWrapper::push(L, module->getTextFontSize(entity));
 	else if (equalStrings(prop_name, "color"))
 		LuaWrapper::push(L, module->getTextColorRGBA(entity));
-	else if (equalStrings(prop_name, "font_path"))
+	else if (equalStrings(prop_name, "font"))
 		LuaWrapper::push(L, module->getTextFontPath(entity));
 	else if (equalStrings(prop_name, "horizontal_align"))
 		LuaWrapper::push(L, (i32)module->getTextHAlign(entity));
@@ -710,7 +710,7 @@ int Text_setter(lua_State* L) {
 		module->setTextFontSize(entity, LuaWrapper::checkArg<int>(L, 3));
 	else if (equalStrings(prop_name, "color"))
 		module->setTextColorRGBA(entity, LuaWrapper::checkArg<Vec4>(L, 3));
-	else if (equalStrings(prop_name, "font_path"))
+	else if (equalStrings(prop_name, "font"))
 		module->setTextFontPath(entity, LuaWrapper::checkArg<Path>(L, 3));
 	else if (equalStrings(prop_name, "horizontal_align"))
 		module->setTextHAlign(entity, (TextHAlign)LuaWrapper::checkArg<i32>(L, 3));
@@ -1810,7 +1810,7 @@ int Vehicle_getter(lua_State* L) {
 	if (false) {
 	} else if (equalStrings(prop_name, "peak_torque"))
 		LuaWrapper::push(L, module->getVehiclePeakTorque(entity));
-	else if (equalStrings(prop_name, "max__rpm"))
+	else if (equalStrings(prop_name, "max__r_p_m"))
 		LuaWrapper::push(L, module->getVehicleMaxRPM(entity));
 	else if (equalStrings(prop_name, "rpm"))
 		LuaWrapper::push(L, module->getVehicleRPM(entity));
@@ -1844,7 +1844,7 @@ int Vehicle_setter(lua_State* L) {
 	if (false) {
 	} else if (equalStrings(prop_name, "peak_torque"))
 		module->setVehiclePeakTorque(entity, LuaWrapper::checkArg<float>(L, 3));
-	else if (equalStrings(prop_name, "max__rpm"))
+	else if (equalStrings(prop_name, "max__r_p_m"))
 		module->setVehicleMaxRPM(entity, LuaWrapper::checkArg<float>(L, 3));
 	else if (equalStrings(prop_name, "chassis"))
 		module->setVehicleChassis(entity, LuaWrapper::checkArg<Path>(L, 3));

@@ -139,7 +139,7 @@ struct GUIModule : IModule {
 	virtual int getTextFontSize(EntityRef entity) = 0;
 	virtual Vec4 getTextColorRGBA(EntityRef entity) = 0; 					//@ label "Color" color
 	virtual void setTextColorRGBA(EntityRef entity, const Vec4& color) = 0;
-	virtual Path getTextFontPath(EntityRef entity) = 0;						//@ resource_type FontResource::TYPE
+	virtual Path getTextFontPath(EntityRef entity) = 0;						//@ label "Font" resource_type FontResource::TYPE
 	virtual void setTextFontPath(EntityRef entity, const Path& path) = 0;
 	virtual TextHAlign getTextHAlign(EntityRef entity) = 0;					//@ label "Horizontal align"
 	virtual void setTextHAlign(EntityRef entity, TextHAlign align) = 0;

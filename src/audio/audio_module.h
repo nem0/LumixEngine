@@ -81,8 +81,8 @@ struct AudioModule : IModule {
 	//@ component AmbientSound ambient_sound "Ambient sound"
 	virtual Path getAmbientSoundClip(EntityRef entity) = 0;					//@ resource_type Clip::TYPE
 	virtual void setAmbientSoundClip(EntityRef entity, const Path& clip) = 0;
-	virtual bool getAmbientSound3D(EntityRef entity) = 0;					//@ label "3D"
-	virtual void setAmbientSound3D(EntityRef entity, bool is_3d) = 0;
+	virtual bool isAmbientSound3D(EntityRef entity) = 0;					//@ getter Is3D label "3D"
+	virtual void setAmbientSound3D(EntityRef entity, bool is_3d) = 0;		//@ setter Is3D
 	virtual void pauseAmbientSound(EntityRef entity) = 0;					//@ label "pause"
 	virtual void resumeAmbientSound(EntityRef entity) = 0;					//@ label "resume"
 	//@ end

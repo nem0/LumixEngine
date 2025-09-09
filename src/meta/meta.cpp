@@ -1267,6 +1267,23 @@ StringView withoutNamespace(StringView ident) {
 	return res;
 }
 
+Struct* getStruct(StringView name) {
+	for (Struct& s : parser.structs) {
+		if (equal(s.name, name)) return &s;
+	}
+	return nullptr;
+}
+
+Object* getObject(StringView name) {
+	if (*(name.end - 1) == '*') {
+		--name.end;
+	}
+	for (Object& o : parser.objects) {
+		if (equal(o.name, name)) return &o;
+	}
+	return nullptr;
+}
+
 Enum* getEnum(Module& m, StringView name) {
 	for (Enum& e : parser.enums) {
 		if (equal(e.name, name)) return &e;
@@ -1609,23 +1626,21 @@ void serializeMain(OutputStream& out, Parser& parser) {
 void toID(StringView name, Span<char> out) {
 	char* dst = out.begin;
 	const char* src = name.begin;
-	bool prev_uppercase = false;
+	bool prev_lowercase = false;
 	while (dst < out.end - 1 && src < name.end) {
 		if (*src == ' ') {
 			*dst = '_';
-			prev_uppercase = false;
 		}
 		else if (*src >= 'A' && *src <= 'Z') {
-			if (src != name.begin && !prev_uppercase) {
+			if (src != name.begin && prev_lowercase) {
 				*dst = '_';
 				++dst;
 			}
 			if (dst != out.end - 1) *dst = *src | 0x20;
-			prev_uppercase = true;
 		}
 		else {
+			prev_lowercase = *src >= 'a' && *src <= 'z';
 			*dst = *src;
-			prev_uppercase = false;
 		}
 		++dst;
 		++src;
@@ -1860,6 +1875,275 @@ void serializeLuaCAPI(OutputStream& out, Module& m) {
 	L("}\n");
 }
 
+StringView toLuaType(StringView ctype) {
+	if (equal(ctype, "void")) return makeStringView("()");
+
+	#define C(CTYPE, LUATYPE) do { if (equal(ctype, #CTYPE)) return makeStringView(#LUATYPE); } while (false)
+		C(int, number);
+		C(const char *, string);
+		C(const char*, string);
+		C(char const *, string);
+		C(Vec3, Vec3);
+		C(Quat, Quat);
+		C(Vec2, Vec2);
+		C(Color, Color);
+		C(DVec3, DVec3);
+		C(EntityPtr, Entity?);
+		C(EntityRef, Entity);
+		C(Path, string);
+		C(i32, number);
+		C(u32, number);
+		C(float, number);
+		C(bool, boolean);
+	#undef C
+
+	// TODO structs	
+	Struct* s = getStruct(ctype);
+	if (s) return s->name;
+
+	Object* o = getObject(ctype);
+	if (o) return o->name;
+
+	return makeStringView("any");
+}
+
+void serializeLuaType(OutputStream& out, StringView self_type, const char* self_type_suffix, Function& f, bool skip_first_arg) {
+	out.add("\t",pickLabel(f.name, f.attributes.label),": (");
+	forEachArg(f.args, [&](const Arg& arg, bool first){
+		if (!first) out.add(", ");
+		if (first) {
+			out.add(self_type,self_type_suffix);
+			if (!skip_first_arg) {
+				out.add(", ", toLuaType(arg.type));
+			}
+		}
+		else {
+			out.add(toLuaType(arg.type));
+		}
+	});
+	out.add(") -> ",toLuaType(f.return_type),"\n");
+}
+
+void serializeLuaTypes(OutputStream& out) {
+	out.add(R"#(
+	export type Vec2 = {number}
+	export type Vec3 = {number}
+	export type Color = {number}
+	export type Quat = {number}
+	export type DVec3 = {number}
+	declare ImGui: {
+		AlignTextToFramePadding : () -> (),
+		Begin : (string, boolean?) -> (boolean, boolean?),
+		BeginChildFrame : (string, number, number) -> boolean,
+		BeginMenu : (string, boolean) -> boolean,
+		BeginPopup : (string) -> boolean,
+		Button : (string) -> boolean,
+		CalcTextSize : (string) -> (number, number),
+		Checkbox : (string, boolean) -> (boolean, boolean),
+		CloseCurrentPopup : () -> (),
+		CollapsingHeader : (string) -> boolean,
+		Columns : (number) -> (),
+		DragFloat : (string, number) -> (boolean, number),
+		DragInt : (string, number) -> (boolean, number),
+		Dummy : (number, number) -> (),
+		End : () -> (),
+		EndChildFrame : () -> (),
+		EndCombo : () -> (),
+		EndMenu : () -> (),
+		EndPopup : () -> (),
+		GetColumnWidth : (number) -> number,
+		GetDisplayWidth : () -> number,
+		GetDisplayHeight : () -> number,
+		GetOsImePosRequest : () -> (number, number),
+		GetWindowWidth : () -> (),
+		GetWindowHeight : () -> (),
+		GetWindowPos : () -> any,
+		Indent : (number) -> (),
+		InputTextMultiline : (string, string) -> (boolean, string?),
+		InputTextMultilineWithCallback : (string, string, (string, number, boolean) -> ()) -> (boolean, string?),
+		IsItemHovered : () -> boolean,
+		IsKeyPressed : (number, boolean) -> boolean,
+		IsMouseClicked : (number) -> boolean,
+		IsMouseDown : (number) -> boolean,
+		LabelText : (string, string) -> (),
+		NewLine : () -> (),
+		NextColumn : () -> (),
+		OpenPopup : (string) -> (),
+		PlotLines : (string, {number}, Vec2) -> (),
+		PopItemWidth : () -> (),
+		PopID : () -> (),
+		PopStyleColor : (number) -> (),
+		PopStyleVar : (number) -> (),
+		PopItemWidth : () -> (),
+		PushItemWidth : (number) -> (),
+		PushID : (number) -> (),
+		PushStyleColor : (number, any) -> (),
+		PushStyleVar : (number, number, number) -> () | (number, number) -> () ,
+		Rect : (number, number, number) -> (),
+		SameLine : () -> (),
+		Selectable : (string, boolean) -> boolean | (string) -> boolean,
+		Separator : () -> (),
+		SetCursorScreenPos : (number, number) -> (),
+		SetKeyboardFocusHere : (number) -> (),
+		SetNextWindowPos : (number, number) -> (),
+		SetNextWindowPosCenter : () -> (),
+		SetNextWindowSize : (number, number) -> (),
+		SetStyleColor : (number, any) -> (),
+		SliderFloat : (string, number, number, number) -> (boolean, number),
+		Text : (string) -> (),
+		Unindent : (number) -> (),
+
+		Key_DownArrow : number,
+		Key_Enter : number,
+		Key_Escape : number,
+		Key_UpArrow : number
+	}
+
+	declare class World
+		getActivePartition : (World) -> number
+		setActivePartition : (World, number) -> ()
+		createPartition : (World, string) -> number
+		load : (World, string, any) -> ()
+		getModule : (string) -> any
+		createEntity : () -> Entity
+		createEntityEx : (any) -> Entity
+		findEntityByName : (string) -> Entity
+	)#");
+
+	for (Module& m : parser.modules) {
+		L("\t\t",m.id,": ",m.id,"_module");
+	}
+
+	L("end\n");
+
+	for (Struct& s : parser.structs) {
+		L("declare class ",s.name);
+		for (StructVar& v : s.vars) {
+			L("\t",v.name,": ",toLuaType(v.type));
+		}
+		L("end\n");
+	}
+
+	for (Object& o : parser.objects) {
+		L("declare class ",o.name);
+		for (Function& f : o.functions) {
+			serializeLuaType(out, o.name, "", f, false);
+		}
+		L("end\n");
+	}
+
+	for (Module& m : parser.modules) {
+		L("declare class ",m.id,"_module");
+		for (Function& f : m.functions) {
+			serializeLuaType(out, m.id, "_module", f, false);
+		}
+		L("end\n");
+		
+		for (Component& c : m.components) {
+			L("declare class ",c.id,"_component");
+			for (Property& p : c.properties) {
+				
+				char tmp[256];
+				toID(p.name, Span(tmp, tmp + 256));
+				if (!isBlob(p) && p.type.size() > 0) L("	",tmp,": ", toLuaType(p.type));
+			}
+			for (Function& f : c.functions) {
+				serializeLuaType(out, c.id, "_component", f, true);
+			}
+			L("end\n");
+		}
+	}
+
+	out.add(R"#(
+	declare class Entity 
+		world : World
+		name : string
+		parent : Entity?
+		rotation : any
+		position : Vec3
+		scale : Vec3
+		hasComponent : (Entity, any) -> boolean
+		getComponent : (Entity, any) -> any
+		destroy : (Entity) -> ()
+		createComponent : (Entity, any) -> any
+	)#");
+
+	for (Module& m : parser.modules) {
+		for (Component& c : m.components) {
+			L("\t\t",c.id,": ",c.id,"_component");
+		}
+	}
+	
+	L("end\n");
+
+	out.add(R"#(
+	declare this:Entity
+
+	type ActionDesc = {
+		name : string,
+		label : string,
+		run : () -> ()
+	}
+
+	declare Editor: {
+		RESOURCE_PROPERTY : number,
+		COLOR_PROPERTY : number,
+		ENTITY_PROPERTY : number,
+		BOOLEAN_PROPERTY : number,
+		setPropertyType : (any, string, number, string?) -> (),
+		setArrayPropertyType : (any, string, number, string?) -> (),
+		getSelectedEntitiesCount : () -> number,
+		getSelectedEntity : (number) -> Entity,
+		addAction : (ActionDesc) -> (),
+		createEntityEx : (any) -> Entity,
+		scene_view : SceneView,
+		asset_browser : AssetBrowser
+	}
+
+	declare LumixAPI: {
+		RaycastHit : { create : () -> RaycastHit, destroy : (RaycastHit) -> () },
+		SweepHit : { create : () -> SweepHit, destroy : (SweepHit) -> () },
+		Ray : { create : () -> Ray, destroy : (Ray) -> () },
+		RayCastModelHit : { create : () -> RayCastModelHit, destroy : (RayCastModelHit) -> () },
+
+		INPUT_KEYCODE_SHIFT: number,
+		INPUT_KEYCODE_LEFT : number,
+		INPUT_KEYCODE_RIGHT : number,
+		engine : any,
+		logError : (string) -> (),
+		logInfo : (string) -> (),
+		loadResource : (any, path:string, restype:string) -> any,
+		writeFile : (string, string) -> boolean
+	}
+
+	type InputDevice = {
+		type : "mouse" | "keyboard",
+		index : number
+	}
+
+	type AxisInputEvent = {
+		type : "axis",
+		device : InputDevice,
+		x : number,
+		y : number,
+		x_abs : number,
+		y_abs : number
+	}
+
+	type ButtonInputEvent = {
+		type : "button",
+		device : InputDevice,
+		key_id : number,
+		down : boolean,
+		is_repeat : boolean,
+		x : number,
+		y : number
+	}
+
+	export type InputEvent = ButtonInputEvent | AxisInputEvent
+	)#");
+}
+
 void serializeReflection(OutputStream& out, Module& m) {
 	L("// Generated by meta.cpp\n");
 	for (Enum& e : m.enums) {
@@ -2005,7 +2289,10 @@ int main() {
 	scan(makeStringView("."));
 	OutputStream stream;
 	OutputStream lua_capi_stream;
+	OutputStream lua_d_stream;
+
 	lua_capi_stream.add("// Generated by meta.cpp\n\n");
+	lua_d_stream.add("-- Generated by meta.cpp\n\n");
 	for (Object& o : parser.objects) {
 		StringView include_path = withoutPrefix(makeStringView(o.filename), 2); // skip "./"
 		lua_capi_stream.add("#include \"",include_path,"\"\n");
@@ -2042,9 +2329,11 @@ int main() {
 
 		serializeLuaCAPI(lua_capi_stream, m);
 	}
+	serializeLuaTypes(lua_d_stream);
 	serializeMain(lua_capi_stream, parser);
 
 	writeFile("lua/lua_capi.gen.h", lua_capi_stream);
+	writeFile("../data/scripts/lumix.d.lua", lua_d_stream);
 
 	QueryPerformanceCounter(&stop);
 	QueryPerformanceFrequency(&freq);

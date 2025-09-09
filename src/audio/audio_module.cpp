@@ -149,7 +149,7 @@ struct AudioModuleImpl final : AudioModule
 	}
 
 
-	bool getAmbientSound3D(EntityRef entity) override
+	bool isAmbientSound3D(EntityRef entity) override
 	{
 		return m_ambient_sounds[entity].is_3d;
 	}
