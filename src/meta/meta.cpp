@@ -252,6 +252,20 @@ static FileIterator createFileIterator(StringView path) {
 	return iter;
 }
 
+static bool endsWith(StringView str, const char* suffix) {
+	i32 plen = (i32)strlen(suffix);
+	if (plen > str.size()) return false;
+
+	const char* a = str.end - plen;
+	const char* b = suffix;
+	while (*b) {
+		if (*a != *b) return false;
+		++a;
+		++b;
+	}
+	return true;
+}
+
 static bool startsWith(StringView str, const char* prefix) {
 	const char* c = prefix;
 	const char* d = str.begin;
@@ -1395,7 +1409,9 @@ void scan(StringView path) {
 			scan(full);
 		}
 		else {
-			parseFile(path, name);
+			if (endsWith(name, ".cpp") || endsWith(name, ".h")) {
+				parseFile(path, name);
+			}
 		}
 	}
 	destroyFileIterator(iter);
@@ -1455,19 +1471,6 @@ struct Arg {
 	bool is_ref = false;
 };
 
-static bool endsWith(StringView str, const char* prefix) {
-	i32 plen = (i32)strlen(prefix);
-	if (plen > str.size()) return false;
-
-	const char* a = str.end - plen;
-	const char* b = prefix;
-	while (*b) {
-		if (*a != *b) return false;
-		++a;
-		++b;
-	}
-	return true;
-}
 
 bool consumeArg(StringView& line, Arg& out) {
 	line = skipWhitespaces(line);
@@ -2452,7 +2455,8 @@ int main() {
 	LARGE_INTEGER start, stop, freq;
 	QueryPerformanceCounter(&start);
 	
-	scan(makeStringView("."));
+	scan(makeStringView("src/"));
+	scan(makeStringView("plugins/"));
 	OutputStream stream;
 	OutputStream lua_capi_stream;
 	OutputStream lua_d_stream;
