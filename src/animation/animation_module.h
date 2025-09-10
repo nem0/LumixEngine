@@ -32,7 +32,7 @@ struct AnimationModule : IModule {
 	virtual void destroyAnimator(EntityRef entity) = 0;
 	virtual void destroyPropertyAnimator(EntityRef entity) = 0;
 
-	//@ component PropertyAnimator property_animator "Property animator"
+	//@ component PropertyAnimator
 	virtual bool isPropertyAnimatorEnabled(EntityRef entity) = 0;
 	virtual void enablePropertyAnimator(EntityRef entity, bool enabled) = 0;
 	virtual bool getPropertyAnimatorLooped(EntityRef entity) = 0;
@@ -41,19 +41,19 @@ struct AnimationModule : IModule {
 	virtual void setPropertyAnimatorAnimation(EntityRef entity, const Path& path) = 0;
 	//@ end
 	
-	//@ component Animator animator "Animator"
+	//@ component Animator
 	virtual void setAnimatorSource(EntityRef entity, const Path& path) = 0;				//@ resource_type anim::Controller::TYPE
 	virtual Path getAnimatorSource(EntityRef entity) = 0;
 	virtual void setAnimatorUseRootMotion(EntityRef entity, bool value) = 0;
 	virtual bool getAnimatorUseRootMotion(EntityRef entity) = 0;
 	virtual void setAnimatorDefaultSet(EntityRef entity, u32 idx) = 0;
 	virtual u32 getAnimatorDefaultSet(EntityRef entity) = 0;
-	virtual void applyAnimatorSet(EntityRef entity, u32 idx) = 0;						//@ function label "applySet"
+	virtual void applyAnimatorSet(EntityRef entity, u32 idx) = 0;						//@ function alias applySet
 	
-	virtual void setAnimatorInput(EntityRef entity, u32 input_idx, bool value) = 0;		//@ function label "setBoolInput"
-	virtual void setAnimatorInput(EntityRef entity, u32 input_idx, float value) = 0;	//@ function label "setFloatInput"
-	virtual void setAnimatorInput(EntityRef entity, u32 input_idx, Vec3 value) = 0;		//@ function label "setVec3Input"
-	virtual int getAnimatorInputIndex(EntityRef entity, const char* name) const = 0;	//@ function label "getInputIndex"
+	virtual void setAnimatorInput(EntityRef entity, u32 input_idx, bool value) = 0;		//@ function alias setBoolInput
+	virtual void setAnimatorInput(EntityRef entity, u32 input_idx, float value) = 0;	//@ function alias setFloatInput
+	virtual void setAnimatorInput(EntityRef entity, u32 input_idx, Vec3 value) = 0;		//@ function alias setVec3Input
+	virtual int getAnimatorInputIndex(EntityRef entity, const char* name) const = 0;	//@ function alias getInputIndex
 	//@ end
 	virtual void updateAnimator(EntityRef entity, float time_delta) = 0;
 	virtual bool getAnimatorBoolInput(EntityRef entity, u32 input_idx) = 0;
@@ -67,7 +67,7 @@ struct AnimationModule : IModule {
 	virtual OutputMemoryStream& beginBlendstackUpdate(EntityRef entity) = 0;
 	virtual void endBlendstackUpdate(EntityRef entity) = 0;
 
-	//@ component Animable animable "Animable"
+	//@ component Animable
 	virtual Path getAnimableAnimation(EntityRef entity) = 0;
 	virtual void setAnimableAnimation(EntityRef entity, const Path& path) = 0;
 	//@ end

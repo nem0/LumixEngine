@@ -3940,24 +3940,14 @@ void PhysicsModule::reflect() {
 			PhysicsSystem& system = (PhysicsSystem&)module->getSystem();
 			return system.getCollisionsLayersCount();
 		}
-		const char* name(ComponentUID cmp, u32 idx) const override { 
+		
+		const char* name(ComponentUID cmp, u32 idx) const override {
 			PhysicsModule* module = (PhysicsModule*)cmp.module;
 			PhysicsSystem& system = (PhysicsSystem&)module->getSystem();
 			return system.getCollisionLayerName(idx);
 		}
 	};
 	
-	reflection::structure<RaycastHit>("RaycastHit")
-		.LUMIX_MEMBER(RaycastHit::position, "position")
-		.LUMIX_MEMBER(RaycastHit::normal, "normal")
-		.LUMIX_MEMBER(RaycastHit::entity, "entity");
-
-	reflection::structure<SweepHit>("SweepHit")
-		.LUMIX_MEMBER(SweepHit::position, "position")
-		.LUMIX_MEMBER(SweepHit::normal, "normal")
-		.LUMIX_MEMBER(SweepHit::distance, "distance")
-		.LUMIX_MEMBER(SweepHit::entity, "entity");
-
 	#include "physics_module.gen.h"
 }
 

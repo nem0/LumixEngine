@@ -49,21 +49,23 @@ struct SweepHit {
 };
 
 //@ module PhysicsModule physics "Physics"
-struct LUMIX_PHYSICS_API PhysicsModule : IModule {
-	//@ enum
+struct PhysicsModule : IModule {
+	//@ enum full PhysicsModule::D6Motion
 	enum class D6Motion : i32 {
 		LOCKED,
 		LIMITED,
 		FREE
 	};
-	//@ enum
+
+	//@ enum full PhysicsModule::WheelSlot
 	enum class WheelSlot : i32 {
 		FRONT_LEFT,
 		FRONT_RIGHT,
 		REAR_LEFT,
 		REAR_RIGHT
 	};
-	//@ enum
+
+	//@ enum full PhysicsModule::DynamicType
 	enum class DynamicType : i32 {
 		STATIC,
 		DYNAMIC,
@@ -86,10 +88,10 @@ struct LUMIX_PHYSICS_API PhysicsModule : IModule {
 	
 	//@ functions
 	virtual EntityPtr raycast(const Vec3& origin, const Vec3& dir, float distance, EntityPtr ignore_entity) = 0;
-	virtual bool raycastEx(const Vec3& origin, const Vec3& dir, float distance, RaycastHit& result, EntityPtr ignored, int layer) = 0;
-	virtual bool sweepSphere(const DVec3& pos, float radius, const Vec3& dir, float distance, SweepHit& result, EntityPtr ignored, i32 layer) = 0;
 	virtual void setGravity(const Vec3& gravity) = 0;
 	//@ end
+	virtual bool raycastEx(const Vec3& origin, const Vec3& dir, float distance, RaycastHit& result, EntityPtr ignored, i32 layer) = 0;
+	virtual bool sweepSphere(const DVec3& pos, float radius, const Vec3& dir, float distance, SweepHit& result, EntityPtr ignored, i32 layer) = 0;
 
 	virtual void createInstancedMesh(EntityRef entity) = 0;
 	virtual void createInstancedCube(EntityRef entity) = 0;
@@ -115,7 +117,7 @@ struct LUMIX_PHYSICS_API PhysicsModule : IModule {
 	virtual void destroyD6Joint(EntityRef entity) = 0;
 	virtual void destroyHeightfield(EntityRef entity) = 0;
 
-	//@ component Heightfield physical_heightfield "Heightfield"
+	//@ component Heightfield id physical_heightfield
 	virtual Path getHeightfieldSource(EntityRef entity) = 0;					//@ label "Heightmap" resource_type Texture::TYPE
 	virtual void setHeightfieldSource(EntityRef entity, const Path& path) = 0;
 	virtual float getHeightfieldXZScale(EntityRef entity) = 0;					//@ label "XZ scale" min 0
@@ -133,7 +135,7 @@ struct LUMIX_PHYSICS_API PhysicsModule : IModule {
 		const u8* data,
 		int bytes_per_pixel) = 0;
 
-	//@ component D6Joint d6_joint "D6 joint"
+	//@ component D6Joint id d6_joint label "D6 joint"
 	virtual D6Motion getD6JointXMotion(EntityRef entity) = 0;
 	virtual void setD6JointXMotion(EntityRef entity, D6Motion motion) = 0;
 	virtual D6Motion getD6JointYMotion(EntityRef entity) = 0;
@@ -166,7 +168,7 @@ struct LUMIX_PHYSICS_API PhysicsModule : IModule {
 	virtual void setD6JointAxisDirection(EntityRef entity, const Vec3& value) = 0;
 	//@ end
 
-	//@ component DistanceJoint distance_joint "Distance joint"
+	//@ component DistanceJoint
 	virtual EntityPtr getDistanceJointConnectedBody(EntityRef entity) = 0;
 	virtual void setDistanceJointConnectedBody(EntityRef entity, EntityPtr connected_body) = 0;
 	virtual Vec3 getDistanceJointAxisPosition(EntityRef entity) = 0;
@@ -185,7 +187,7 @@ struct LUMIX_PHYSICS_API PhysicsModule : IModule {
 	virtual int getJointCount() = 0;
 	virtual EntityRef getJointEntity(int index) = 0;
 
-	//@ component HingeJoint hinge_joint "Hinge joint"
+	//@ component HingeJoint
 	virtual EntityPtr getHingeJointConnectedBody(EntityRef entity) = 0;
 	virtual void setHingeJointConnectedBody(EntityRef entity, EntityPtr connected_body) = 0;
 	virtual Vec3 getHingeJointAxisPosition(EntityRef entity) = 0;
@@ -212,7 +214,7 @@ struct LUMIX_PHYSICS_API PhysicsModule : IModule {
 	virtual RigidTransform getJointConnectedBodyLocalFrame(EntityRef entity) = 0;
 	virtual physx::PxJoint* getJoint(EntityRef entity) = 0;
 
-	//@ component SphericalJoint spherical_joint "Spherical joint"
+	//@ component SphericalJoint
 	virtual EntityPtr getSphericalJointConnectedBody(EntityRef entity) = 0;
 	virtual void setSphericalJointConnectedBody(EntityRef entity, EntityPtr connected_body) = 0;
 	virtual Vec3 getSphericalJointAxisPosition(EntityRef entity) = 0;
@@ -225,11 +227,11 @@ struct LUMIX_PHYSICS_API PhysicsModule : IModule {
 	virtual void setSphericalJointLimit(EntityRef entity, const Vec2& limit) = 0;
 	//@ end
 
-	//@ component Controller physical_controller "Controller"
+	//@ component Controller id physical_controller
 	virtual float getGravitySpeed(EntityRef entity) const = 0;			//@ function
-	virtual void moveController(EntityRef entity, const Vec3& v) = 0;	//@ label "move"
-	virtual bool isControllerCollisionDown(EntityRef entity) const = 0; //@ function label "isCollisionDown"
-	virtual void resizeController(EntityRef entity, float height) = 0;	//@ label "resize"
+	virtual void moveController(EntityRef entity, const Vec3& v) = 0;	//@ alias move
+	virtual bool isControllerCollisionDown(EntityRef entity) const = 0; //@ function alias isCollisionDown
+	virtual void resizeController(EntityRef entity, float height) = 0;	//@ alias resize
 	virtual u32 getControllerLayer(EntityRef entity) = 0;				//@ dynenum Layer
 	virtual void setControllerLayer(EntityRef entity, u32 layer) = 0;
 	virtual float getControllerRadius(EntityRef entity) = 0;
@@ -244,11 +246,11 @@ struct LUMIX_PHYSICS_API PhysicsModule : IModule {
 	virtual void setControllerUseRootMotion(EntityRef entity, bool enable) = 0;
 	//@ end
 
-	//@ component Actor rigid_actor "Actor" icon ICON_FA_VOLLEYBALL_BALL
+	//@ component Actor id rigid_actor icon ICON_FA_VOLLEYBALL_BALL
 	virtual void putToSleep(EntityRef entity) = 0;
 	virtual void addForceAtPos(EntityRef entity, const Vec3& force, const Vec3& pos) = 0;
-	virtual void applyForceToActor(EntityRef entity, const Vec3& force) = 0;				//@ label "applyForce"
-	virtual void applyImpulseToActor(EntityRef entity, const Vec3& force) = 0;				//@ label "applyImpulse"
+	virtual void applyForceToActor(EntityRef entity, const Vec3& force) = 0;				//@ alias applyForce
+	virtual void applyImpulseToActor(EntityRef entity, const Vec3& force) = 0;				//@ alias applyImpulse
 	virtual Vec3 getActorVelocity(EntityRef entity) = 0;
 	virtual float getActorSpeed(EntityRef entity) = 0;
 	virtual u32 getActorLayer(EntityRef entity) = 0;				//@ dynenum Layer
@@ -289,7 +291,7 @@ struct LUMIX_PHYSICS_API PhysicsModule : IModule {
 
 	virtual Quat getBoxOffsetRotationQuat(EntityRef entity, int index) = 0;
 
-	//@ component Wheel wheel "Wheel"
+	//@ component Wheel
 	virtual float getWheelSpringStrength(EntityRef entity) = 0;					//@ min 0
 	virtual void setWheelSpringStrength(EntityRef entity, float str) = 0;
 	virtual float getWheelSpringMaxCompression(EntityRef entity) = 0;			//@ min 0
@@ -311,7 +313,7 @@ struct LUMIX_PHYSICS_API PhysicsModule : IModule {
 	virtual float getWheelRPM(EntityRef entity) = 0;							//@ label "RPM"
 	//@ end
 
-	//@ component Vehicle vehicle "Vehicle" icon ICON_FA_CAR_ALT
+	//@ component Vehicle icon ICON_FA_CAR_ALT
 	virtual float getVehiclePeakTorque(EntityRef entity) = 0;
 	virtual void setVehiclePeakTorque(EntityRef entity, float value) = 0;
 	virtual float getVehicleMaxRPM(EntityRef entity) = 0;					//@ label "Max RPM"
@@ -336,14 +338,14 @@ struct LUMIX_PHYSICS_API PhysicsModule : IModule {
 	virtual void setVehicleChassisLayer(EntityRef entity, u32 layer) = 0;
 	//@ end
 
-	//@ component InstancedCube physical_instanced_cube "Instanced cube"
+	//@ component InstancedCube id physical_instanced_cube
 	virtual Vec3 getInstancedCubeHalfExtents(EntityRef entity) = 0;
 	virtual void setInstancedCubeHalfExtents(EntityRef entity, const Vec3& half_extents) = 0;
 	virtual u32 getInstancedCubeLayer(EntityRef entity) = 0;				//@ dynenum Layer
 	virtual void setInstancedCubeLayer(EntityRef entity, u32 layer) = 0;
 	//@ end
 
-	//@ component InstancedMesh physical_instanced_mesh "Instanced mesh"
+	//@ component InstancedMesh id physical_instanced_mesh
 	virtual u32 getInstancedMeshLayer(EntityRef entity) = 0;				//@ dynenum Layer
 	virtual void setInstancedMeshLayer(EntityRef entity, u32 layer) = 0;
 	virtual Path getInstancedMeshGeomPath(EntityRef entity) = 0;			//@ label "Mesh" resource_type PhysicsGeometry::TYPE

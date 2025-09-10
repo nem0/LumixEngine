@@ -9,7 +9,6 @@
 #include "engine/input_system.h"
 #include "engine/plugin.h"
 #include "engine/prefab.h"
-#include "engine/reflection.h"
 #include "engine/world.h"
 #include "lua_script_system.h"
 #include "lua_wrapper.h"
@@ -432,189 +431,6 @@ static bool LUA_networkWrite(os::NetworkStream* stream, const char* data, u32 si
 	return os::write(*stream, data, size);
 }
 
-static reflection::ComponentBase* LUA_getComponent(u32 index) {
-	return reflection::getComponents()[index].cmp;
-}
-
-static const char* LUA_getComponentName(reflection::ComponentBase* cmp) {
-	return cmp->name;
-}
-
-static i32 LUA_getNumProperties(reflection::ComponentBase* cmp) {
-	return cmp->props.size();
-}
-
-static i32 LUA_getNumComponentFunctions(reflection::ComponentBase* cmp) {
-	return cmp->functions.size();
-}
-
-static i32 LUA_getNumFunctions() {
-	return reflection::allFunctions().size();
-}
-
-static i32 LUA_getNumStructs() {
-	return reflection::allStructs().size();
-}
-
-static reflection::FunctionBase* LUA_getFunction(i32 idx) {
-	return reflection::allFunctions()[idx];
-}
-
-static reflection::StructBase* LUA_getStruct(i32 idx) {
-	return reflection::allStructs()[idx];
-}
-
-static const char* LUA_getStructName(reflection::StructBase* str) {
-	return str->name;
-}
-
-static i32 LUA_getNumStructMembers(reflection::StructBase* str) {
-	return str->members.size();
-}
-
-static reflection::StructVarBase* LUA_getStructMember(reflection::StructBase* str, u32 idx) {
-	return str->members[idx];
-}
-
-static u32 LUA_getStructMemberType(reflection::StructVarBase* var) {
-	return (u32)var->getType().type;
-}
-
-static const char* LUA_getStructMemberName(reflection::StructVarBase* var) {
-	return var->name;
-}
-
-static i32 LUA_getNextModule(lua_State* L) {
-	reflection::Module* module = LuaWrapper::checkArg<reflection::Module*>(L, 1);
-	if (module->next) lua_pushlightuserdata(L, module->next);
-	else lua_pushnil(L);
-	return 1;
-}
-
-i32 LUA_getThisTypeName(lua_State* L) {
-	reflection::FunctionBase* fn = LuaWrapper::checkArg<reflection::FunctionBase*>(L, 1);
-	StringView sv = fn->getThisType().type_name;
-	lua_pushlstring(L, sv.begin, sv.size());
-	return 1;
-}
-
-i32 LUA_getReturnTypeName(lua_State* L) {
-	reflection::FunctionBase* fn = LuaWrapper::checkArg<reflection::FunctionBase*>(L, 1);
-	StringView sv = fn->getReturnType().type_name;
-	lua_pushlstring(L, sv.begin, sv.size());
-	return 1;
-}
-
-static i32 LUA_getNumModuleFunctions(reflection::Module* module) {
-	return module->functions.size();
-}
-
-static reflection::FunctionBase* LUA_getModuleFunction(reflection::Module* module, i32 idx) {
-	return module->functions[idx];
-}
-
-static const char* LUA_getModuleName(reflection::Module* module) {
-	return module->name;
-}
-
-static i32 LUA_getPropertyType(reflection::PropertyBase* property) {
-	enum class PropertyType {
-		FLOAT,
-		I32,
-		U32,
-		ENTITY,
-		VEC2,
-		VEC3,
-		IVEC3,
-		VEC4,
-		PATH,
-		BOOL,
-		STRING,
-		ARRAY,
-		BLOB,
-	};
-	
-	struct : reflection::IPropertyVisitor {
-		void visit(const reflection::Property<float>& prop) override { type = PropertyType::FLOAT; }
-		void visit(const reflection::Property<int>& prop) override { type = PropertyType::I32; }
-		void visit(const reflection::Property<u32>& prop) override { type = PropertyType::U32; }
-		void visit(const reflection::Property<EntityPtr>& prop) override { type = PropertyType::ENTITY; }
-		void visit(const reflection::Property<Vec2>& prop) override { type = PropertyType::VEC2; }
-		void visit(const reflection::Property<Vec3>& prop) override { type = PropertyType::VEC3; }
-		void visit(const reflection::Property<IVec3>& prop) override { type = PropertyType::IVEC3; }
-		void visit(const reflection::Property<Vec4>& prop) override { type = PropertyType::VEC4; }
-		void visit(const reflection::Property<Path>& prop) override { type = PropertyType::PATH; }
-		void visit(const reflection::Property<bool>& prop) override { type = PropertyType::BOOL; }
-		void visit(const reflection::Property<const char*>& prop) override { type = PropertyType::STRING; }
-		void visit(const struct reflection::ArrayProperty& prop) override { type = PropertyType::ARRAY; }
-		void visit(const struct reflection::BlobProperty& prop) override { type = PropertyType::BLOB; }
-		PropertyType type;
-	} visitor;
-	property->visit(visitor);
-	return (i32)visitor.type;
-}
-
-static i32 LUA_getNumComponents() {
-	return reflection::getComponents().length();
-}
-
-static const char* LUA_getComponentLabel(reflection::ComponentBase* cmp) {
-	return cmp->label;
-}
-
-static const char* LUA_getComponentIcon(reflection::ComponentBase* cmp) {
-	return cmp->icon;
-}
-
-static reflection::PropertyBase* LUA_getProperty(reflection::ComponentBase* cmp, u32 index) {
-	return cmp->props[index];
-}
-
-static reflection::FunctionBase* LUA_getComponentFunction(reflection::ComponentBase* cmp, u32 index) {
-	return cmp->functions[index];
-}
-
-static const char* LUA_getFunctionName(reflection::FunctionBase* fnc) {
-	return fnc->name;
-}
-
-static u32 LUA_getFunctionArgCount(reflection::FunctionBase* fnc) {
-	return fnc->getArgCount();
-}
-
-static i32 LUA_getFunctionReturnType(lua_State* L) {
-	auto* fnc = LuaWrapper::checkArg<reflection::FunctionBase*>(L, 1);
-	StringView name = fnc->getReturnType().type_name;
-	lua_pushlstring(L, name.begin, name.size());
-	return 1;
-}
-
-static const char* LUA_getFunctionArgType(reflection::FunctionBase* fnc, u32 arg_idx) {
-	const reflection::TypeDescriptor type = fnc->getArgType(arg_idx);
-	switch (type.type) {
-		case reflection::Variant::VOID: return "void";
-		case reflection::Variant::PTR: return "void*";
-		case reflection::Variant::BOOL: return "bool";
-		case reflection::Variant::I32: return "i32";
-		case reflection::Variant::U32: return "u32";
-		case reflection::Variant::FLOAT: return "float";
-		case reflection::Variant::CSTR: return "const char*";
-		case reflection::Variant::ENTITY: return "EntityPtr";
-		case reflection::Variant::VEC2: return "Vec2";
-		case reflection::Variant::VEC3: return "Vec3";
-		case reflection::Variant::VEC4: return "Vec4";
-		case reflection::Variant::DVEC3: return "DVec3";
-		case reflection::Variant::COLOR: return "Color";
-		case reflection::Variant::QUAT: return "Quat";
-	}
-	ASSERT(false);
-	return "";
-}
-
-static const char* LUA_getPropertyName(reflection::PropertyBase* prop) {
-	return prop->name;
-}
-
 static int LUA_networkRead(lua_State* L) {
 	char tmp[4096];
 	os::NetworkStream* stream = LuaWrapper::checkArg<os::NetworkStream*>(L, 1);
@@ -894,7 +710,7 @@ static int LUA_instantiatePrefab(lua_State* L) {
 	return 0;
 }
 
-void registerLuaComponents(lua_State* L);
+void registerLuaAPI(lua_State* L);
 
 void registerEngineAPI(lua_State* L, Engine* engine)
 {
@@ -945,41 +761,6 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	REGISTER_FUNCTION(unloadResource);
 	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "getResourcePath", &LuaWrapper::wrap<LUA_getResourcePath>);
 
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getComponent", &LuaWrapper::wrap<LUA_getComponent>);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getNumComponents", &LuaWrapper::wrap<LUA_getNumComponents>);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getNumProperties", &LuaWrapper::wrap<LUA_getNumProperties>);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getNumComponentFunctions", &LuaWrapper::wrap<LUA_getNumComponentFunctions>);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getComponentName", &LuaWrapper::wrap<LUA_getComponentName>);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getComponentLabel", &LuaWrapper::wrap<LUA_getComponentLabel>);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getComponentIcon", &LuaWrapper::wrap<LUA_getComponentIcon>);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getProperty", &LuaWrapper::wrap<LUA_getProperty>);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getComponentFunction", &LuaWrapper::wrap<LUA_getComponentFunction>);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getFunctionName", &LuaWrapper::wrap<LUA_getFunctionName>);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getFunctionArgCount", &LuaWrapper::wrap<LUA_getFunctionArgCount>);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getFunctionReturnType", &LUA_getFunctionReturnType);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getFunctionArgType", &LuaWrapper::wrap<LUA_getFunctionArgType>);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getPropertyType", &LuaWrapper::wrap<LUA_getPropertyType>);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getPropertyName", &LuaWrapper::wrap<LUA_getPropertyName>);
-	
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getFirstModule", &LuaWrapper::wrap<reflection::getFirstModule>);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getNextModule", &LUA_getNextModule);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getThisTypeName", &LUA_getThisTypeName);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getReturnTypeName", &LUA_getReturnTypeName);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getNumModuleFunctions", &LuaWrapper::wrap<LUA_getNumModuleFunctions>);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getModuleFunction", &LuaWrapper::wrap<LUA_getModuleFunction>);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getModuleName", &LuaWrapper::wrap<LUA_getModuleName>);
-	
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getNumFunctions", &LuaWrapper::wrap<LUA_getNumFunctions>);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getFunction", &LuaWrapper::wrap<LUA_getFunction>);
-	
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getNumStructs", &LuaWrapper::wrap<LUA_getNumStructs>);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getStruct", &LuaWrapper::wrap<LUA_getStruct>);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getStructName", &LuaWrapper::wrap<LUA_getStructName>);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getNumStructMembers", &LuaWrapper::wrap<LUA_getNumStructMembers>);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getStructMember", &LuaWrapper::wrap<LUA_getStructMember>);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getStructMemberName", &LuaWrapper::wrap<LUA_getStructMemberName>);
-	LuaWrapper::createSystemFunction(L, "LumixReflection", "getStructMemberType", &LuaWrapper::wrap<LUA_getStructMemberType>);
-	
 	LuaWrapper::createSystemFunction(L, "LumixAPI", "resourceTypeFromString", &LUA_resourceTypeFromString);
 	LuaWrapper::createSystemFunction(L, "LumixAPI", "beginProfilerBlock", LuaWrapper::wrap<&profiler::endBlock>);
 	LuaWrapper::createSystemFunction(L, "LumixAPI", "endProfilerBlock", LuaWrapper::wrap<&profiler::beginBlock>);
@@ -1218,6 +999,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 		end
 		function Lumix.World:getModule(name)
 			local module = LumixAPI.getModule(self.value, name)	
+			if LumixModules[name] == nil then return nil end
 			return LumixModules[name]:new(module)
 		end
 		function Lumix.World:findEntityByName(parent, name)
@@ -1275,6 +1057,17 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 		logError("Failed to init entity api");
 	}
 
+	lua_getglobal(L, "LumixAPI");
+	if (lua_type(L, -1) == LUA_TNIL) {
+		lua_pop(L, 1);
+		lua_newtable(L);
+		lua_setglobal(L, "LumixAPI");
+	}
+	else {
+		lua_pop(L, 1);
+	}
+
+	registerLuaAPI(L);
 }
 
 static struct {
@@ -1297,6 +1090,19 @@ checkComponent(lua_State* L) {
 	EntityRef entity = {LuaWrapper::toType<int>(L, -1)};
 	lua_pop(L, 1);
 	return {module, entity};
+}
+
+static int lua_push_script_env(lua_State* L, EntityRef entity, LuaScriptModule* module){
+	const i32 scr_index = LuaWrapper::toType<i32>(L, 2) - 1;
+	int env = module->getEnvironment(entity, scr_index);
+	if (env < 0) {
+		lua_pushnil(L);
+	}
+	else {
+		lua_rawgeti(L, LUA_REGISTRYINDEX, env);
+		ASSERT(lua_type(L, -1) == LUA_TTABLE);
+	}
+	return 1;
 }
 
 static int lua_new_cmp(lua_State* L) {
@@ -1342,4 +1148,18 @@ static void registerLuaComponent(lua_State* L, const char* cmp_name, lua_CFuncti
 	lua_pop(L, 1);
 }
 
+static int lua_new_module(lua_State* L) {
+	LuaWrapper::DebugGuard guard(L, 1);
+	LuaWrapper::checkTableArg(L, 1); // self
+	IModule* module = LuaWrapper::checkArg<IModule*>(L, 2);
+		
+	lua_newtable(L);
+	LuaWrapper::setField(L, -1, "_module", module);
+	lua_pushvalue(L, 1);
+	lua_setmetatable(L, -2);
+	return 1;
+}
+
 } // namespace Lumix
+
+#include "lua_capi.gen.h"

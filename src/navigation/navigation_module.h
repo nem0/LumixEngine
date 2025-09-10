@@ -17,7 +17,7 @@ namespace Lumix
 struct IAllocator;
 
 
-//@ component_struct navmesh_zone "Zone" name Zone
+//@ component_struct label "Zone" name Zone
 struct NavmeshZone {
 	enum Flags {
 		AUTOLOAD = 1 << 0,
@@ -47,12 +47,12 @@ struct NavigationModule : IModule {
 	static void reflect();
 
 	virtual NavmeshZone& getZone(EntityRef entity) = 0;
-	//@ component Zone navmesh_zone "Zone"
-	virtual bool loadZone(EntityRef zone_entity) = 0;	//@ label "load"
-	virtual void debugDrawNavmesh(EntityRef zone, const DVec3& pos, bool inner_boundaries, bool outer_boundaries, bool portals) = 0; //@ label "drawNavmesh"
-	virtual void debugDrawCompactHeightfield(EntityRef zone) = 0;	//@ label "drawCompactHeightfield"
-	virtual void debugDrawHeightfield(EntityRef zone) = 0;			//@ label "drawHeightfield"
-	virtual void debugDrawContours(EntityRef zone) = 0;				//@ label "drawContours"
+	//@ component Zone id navmesh_zone
+	virtual bool loadZone(EntityRef zone_entity) = 0;	//@ alias load
+	virtual void debugDrawNavmesh(EntityRef zone, const DVec3& pos, bool inner_boundaries, bool outer_boundaries, bool portals) = 0; //@ alias drawNavmesh
+	virtual void debugDrawCompactHeightfield(EntityRef zone) = 0;	//@ alias drawCompactHeightfield
+	virtual void debugDrawHeightfield(EntityRef zone) = 0;			//@ alias drawHeightfield
+	virtual void debugDrawContours(EntityRef zone) = 0;				//@ alias drawContours
 	virtual NavmeshBuildJob* generateNavmesh(EntityRef zone) = 0;
 	virtual bool getZoneAutoload(EntityRef entity) = 0;
 	virtual void setZoneAutoload(EntityRef entity, bool value) = 0;
@@ -63,7 +63,7 @@ struct NavigationModule : IModule {
 	virtual void createZone(EntityRef entity) = 0;
 	virtual void destroyZone(EntityRef entity) = 0;
 
-	//@ component Agent navmesh_agent "Agent"
+	//@ component Agent id navmesh_agent
 	virtual void setAgentRadius(EntityRef entity, float radius) = 0;
 	virtual float getAgentRadius(EntityRef entity) = 0;
 	virtual void setAgentHeight(EntityRef entity, float height) = 0;
@@ -72,7 +72,7 @@ struct NavigationModule : IModule {
 	virtual void setAgentMoveEntity(EntityRef entity, bool value) = 0;
 	virtual bool navigate(EntityRef entity, const struct DVec3& dest, float speed, float stop_distance) = 0;
 	virtual void cancelNavigation(EntityRef entity) = 0;
-	virtual void debugDrawPath(EntityRef agent_entity, bool include_polygons) = 0;	//@ label "drawPath"
+	virtual void debugDrawPath(EntityRef agent_entity, bool include_polygons) = 0;	//@ alias drawPath
 	virtual float getAgentSpeed(EntityRef entity) = 0;
 	//@ end
 	virtual void createAgent(EntityRef entity) = 0;

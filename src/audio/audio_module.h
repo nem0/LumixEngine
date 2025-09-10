@@ -21,7 +21,7 @@ struct SoundAnimationEvent
 };
 
 
-//@ component_struct echo_zone "Echo zone"
+//@ component_struct
 struct EchoZone {
 	EntityRef entity;
 	float radius;		//@ property min 0
@@ -30,7 +30,7 @@ struct EchoZone {
 //@ end
 
 
-//@ component_struct chorus_zone "Chorus zone"
+//@ component_struct
 struct ChorusZone {
 	EntityRef entity;
 	float radius;			//@ property min 0
@@ -43,8 +43,9 @@ struct ChorusZone {
 };
 //@ end
 
+using SoundHandle = i32;
+
 struct AudioModule : IModule {
-	using SoundHandle = i32;
 	static constexpr SoundHandle INVALID_SOUND_HANDLE = -1;
 
 	static UniquePtr<AudioModule> createInstance(AudioSystem& system,
@@ -74,16 +75,16 @@ struct AudioModule : IModule {
 	virtual void createAmbientSound(EntityRef entity) = 0;
 	virtual void destroyAmbientSound(EntityRef entity) = 0;
 
-	//@ component Listener audio_listener "Listener"
+	//@ component Listener id audio_listener
 	//@ end
 
-	//@ component AmbientSound ambient_sound "Ambient sound"
+	//@ component AmbientSound
 	virtual Path getAmbientSoundClip(EntityRef entity) = 0;					//@ resource_type Clip::TYPE
 	virtual void setAmbientSoundClip(EntityRef entity, const Path& clip) = 0;
-	virtual bool getAmbientSound3D(EntityRef entity) = 0;					//@ label "3D"
-	virtual void setAmbientSound3D(EntityRef entity, bool is_3d) = 0;
-	virtual void pauseAmbientSound(EntityRef entity) = 0;					//@ label "pause"
-	virtual void resumeAmbientSound(EntityRef entity) = 0;					//@ label "resume"
+	virtual bool isAmbientSound3D(EntityRef entity) = 0;					//@ getter Is_3D label "Is 3D"
+	virtual void setAmbientSound3D(EntityRef entity, bool is_3d) = 0;		//@ setter Is_3D
+	virtual void pauseAmbientSound(EntityRef entity) = 0;					//@ alias pause
+	virtual void resumeAmbientSound(EntityRef entity) = 0;					//@ alias resume
 	//@ end
 };
 

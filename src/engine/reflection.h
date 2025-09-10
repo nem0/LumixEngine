@@ -14,11 +14,6 @@
 #include "engine/component_uid.h"
 #include "engine/resource.h"
 
-#define LUMIX_GLOBAL_FUNC(Func) reflection::function<&Func>(#Func)
-
-// see member function for explanation
-#define LUMIX_MEMBER(V, Name) member<&V, __LINE__>(Name)
-
 namespace Lumix
 {
 
@@ -327,14 +322,12 @@ struct Variant {
 };
 
 struct TypeDescriptor {
-	using Copier = void* (*)(const void* src, IAllocator& allocator);
 	Variant::Type type;
 	StringView type_name;
 	bool is_const;
 	bool is_reference;
 	bool is_pointer;
 	u32 size;
-	Copier create_copy;
 };
 
 template <typename T> struct VariantTag {};
@@ -360,12 +353,6 @@ template <typename T> inline Variant::Type getVariantType() { return _getVariant
 
 template <typename T> TypeDescriptor toTypeDescriptor() {
 	TypeDescriptor td;
-	td.create_copy = [](const void* src, IAllocator& allocator) -> void* {
-		if constexpr (__is_constructible(T)) {
-			return LUMIX_NEW(allocator, RemoveCVR<T>)(*(RemoveCVR<T>*)src);
-		}
-		return nullptr;
-	};
 	td.type_name = getTypeName<RemoveCVR<RemovePointer<T>>>();
 	td.type = getVariantType<T>();
 	td.is_const = !IsSame<T, typename RemoveConst<T>::Type>::Value;
@@ -387,7 +374,6 @@ struct FunctionBase {
 
 	virtual u32 getArgCount() const = 0;
 	virtual TypeDescriptor getReturnType() const = 0;
-	virtual TypeDescriptor getThisType() const = 0;
 	virtual TypeDescriptor getArgType(int i) const = 0;
 	virtual void invoke(void* obj, Span<u8> ret_mem, Span<const Variant> args) const = 0;
 	// we can use this in Delegate::bindRaw, so there's less overhead
@@ -404,7 +390,6 @@ struct EventBase {
 
 	virtual ~EventBase() {}
 	virtual u32 getArgCount() const = 0;
-	virtual StringView getThisTypeName() const = 0;
 	virtual TypeDescriptor getArgType(int i) const = 0;
 	virtual void bind(void* object, Callback* callback) const = 0;
 	[[nodiscard]] virtual bool bind(void* object, void* fn_object, FunctionBase* function) const = 0;
@@ -519,7 +504,6 @@ struct Function : FunctionBase {
 
 	u32 getArgCount() const override { return ArgsCount<F>::value; }
 	TypeDescriptor getReturnType() const override { return toTypeDescriptor<R>(); }
-	TypeDescriptor getThisType() const override { return toTypeDescriptor<C>(); }
 	
 	TypeDescriptor getArgType(int i) const override {
 		return ArgToTypeDescriptor<F>::get(i);
@@ -542,7 +526,6 @@ struct Event<DelegateList<void(Args...)>& (C::*)()> : EventBase
 	F function;
 
 	u32 getArgCount() const override { return sizeof...(Args); }
-	StringView getThisTypeName() const override { return getTypeName<C>(); }
 
 	TypeDescriptor getArgType(int i) const override
 	{
@@ -633,54 +616,6 @@ struct StructVar : StructVarBase {
 	}
 };
 
-struct StructBase {
-	StructBase() : allocator(getGlobalAllocator()), members(getGlobalAllocator()) {}
-
-	virtual ~StructBase() {}
-	virtual void* createInstance(IAllocator& allocator) = 0;
-	virtual void destroyInstance(void* obj, IAllocator& allocator) = 0;
-
-	// clang (at least on windows) has an issue with multiple definitions with same mangled name
-	// so we need to add a dummy template parameter, see LUMIX_MEMBER macro
-	template <auto Getter, int V = 0> 
-	StructBase& member(const char* name) {
-		StructVar<Getter>* member = LUMIX_NEW(allocator, StructVar<Getter>);
-		member->name = name;
-		members.push(member);
-		return *this;
-	}
-
-	IAllocator& allocator;
-	const char* name;
-	Array<StructVarBase*> members;
-	u32 size = 0;
-};
-
-LUMIX_ENGINE_API Array<FunctionBase*>& allFunctions();
-LUMIX_ENGINE_API Array<StructBase*>& allStructs();
-
-template <auto func>
-auto& function(const char* name)
-{
-	static Function<func> ret;
-	allFunctions().push(&ret);
-	ret.name = name;
-	return ret;
-}
-
-template <typename S>
-auto& structure(const char* name)
-{
-	static struct : StructBase {
-		void* createInstance(IAllocator& allocator) override { return LUMIX_NEW(allocator, S); }
-		void destroyInstance(void* obj, IAllocator& allocator) override { LUMIX_DELETE(allocator, (S*)obj); }
-	} ret;
-	ret.name = name;
-	ret.size = sizeof(S);
-	allStructs().push(&ret);
-	return ret;
-}
-
 struct LUMIX_ENGINE_API ComponentBase {
 	ComponentBase(IAllocator& allocator);
 
@@ -752,37 +687,20 @@ struct LUMIX_ENGINE_API builder {
 		return *this;
 	}
 
-	template <auto Getter, auto PropGetter>
-	builder& var_enum_prop(const char* name) {
-		using T = typename ResultOf<decltype(PropGetter)>::Type;
-		auto* p = LUMIX_NEW(allocator, Property<i32>)(allocator);
-		p->setter = [](IModule* module, EntityRef e, u32, const i32& value) {
-			using C = typename ClassOf<decltype(Getter)>::Type;
-			auto& c = (static_cast<C*>(module)->*Getter)(e);
-			auto& v = c.*PropGetter;
-			v = static_cast<T>(value);
-		};
-		p->getter = [](IModule* module, EntityRef e, u32) -> i32 {
-			using C = typename ClassOf<decltype(Getter)>::Type;
-			auto& c = (static_cast<C*>(module)->*Getter)(e);
-			auto& v = c.*PropGetter;
-			return static_cast<i32>(v);
-		};
-		p->name = name;
-		addProp(p);
-		return *this;
-	}
+	template <bool pick_first, typename A, typename B> struct Pick { using Type = A; };
+	template <typename A, typename B> struct Pick<false, A, B> { using Type = B; };
 
 	template <auto Getter, auto Setter = nullptr>
-	builder& enum_prop(const char* name) {
-		auto* p = LUMIX_NEW(allocator, Property<i32>)(allocator);
+	builder& prop(const char* name) {
+		using T = typename ResultOf<decltype(Getter)>::Type;
+		using Backing = typename Pick<__is_enum(T), i32, T>::Type;
+		auto* p = LUMIX_NEW(allocator, Property<Backing>)(allocator);
 		
 		if constexpr (Setter == nullptr) {
 			p->setter = nullptr;
 		}
-		else {
+		else if constexpr (__is_enum(T)) {
 			p->setter = [](IModule* module, EntityRef e, u32 idx, const i32& value) {
-				using T = typename ResultOf<decltype(Getter)>::Type;
 				using C = typename ClassOf<decltype(Setter)>::Type;
 				if constexpr (ArgsCount<decltype(Setter)>::value == 2) {
 					(static_cast<C*>(module)->*Setter)(e, static_cast<T>(value));
@@ -791,36 +709,6 @@ struct LUMIX_ENGINE_API builder {
 					(static_cast<C*>(module)->*Setter)(e, idx, static_cast<T>(value));
 				}
 			};
-		}
-
-		p->getter = [](IModule* module, EntityRef e, u32 idx) -> i32 {
-			using C = typename ClassOf<decltype(Getter)>::Type;
-			if constexpr (ArgsCount<decltype(Getter)>::value == 1) {
-				return static_cast<i32>((static_cast<C*>(module)->*Getter)(e));
-			}
-			else {
-				return static_cast<i32>((static_cast<C*>(module)->*Getter)(e, idx));
-			}
-		};
-		p->name = name;
-		addProp(p);
-		return *this;
-	}
-
-	template <typename T>
-	builder& property() {
-		auto* p = LUMIX_NEW(allocator, T)(allocator);
-		addProp(p);
-		return *this;
-	}
-
-	template <auto Getter, auto Setter = nullptr>
-	builder& prop(const char* name) {
-		using T = typename ResultOf<decltype(Getter)>::Type;
-		auto* p = LUMIX_NEW(allocator, Property<T>)(allocator);
-		
-		if constexpr (Setter == nullptr) {
-			p->setter = nullptr;
 		}
 		else {
 			p->setter = [](IModule* module, EntityRef e, u32 idx, const T& value) {
@@ -834,15 +722,28 @@ struct LUMIX_ENGINE_API builder {
 			};
 		}
 
-		p->getter = [](IModule* module, EntityRef e, u32 idx) -> T {
-			using C = typename ClassOf<decltype(Getter)>::Type;
-			if constexpr (ArgsCount<decltype(Getter)>::value == 1) {
-				return (static_cast<C*>(module)->*Getter)(e);
-			}
-			else {
-				return (static_cast<C*>(module)->*Getter)(e, idx);
-			}
-		};
+		if constexpr (__is_enum(T)) {
+			p->getter = [](IModule* module, EntityRef e, u32 idx) -> i32 {
+				using C = typename ClassOf<decltype(Getter)>::Type;
+				if constexpr (ArgsCount<decltype(Getter)>::value == 1) {
+					return static_cast<i32>((static_cast<C*>(module)->*Getter)(e));
+				}
+				else {
+					return static_cast<i32>((static_cast<C*>(module)->*Getter)(e, idx));
+				}
+			};
+		}
+		else {
+			p->getter = [](IModule* module, EntityRef e, u32 idx) -> T {
+				using C = typename ClassOf<decltype(Getter)>::Type;
+				if constexpr (ArgsCount<decltype(Getter)>::value == 1) {
+					return (static_cast<C*>(module)->*Getter)(e);
+				}
+				else {
+					return (static_cast<C*>(module)->*Getter)(e, idx);
+				}
+			};
+		}
 
 		p->name = name;
 		addProp(p);

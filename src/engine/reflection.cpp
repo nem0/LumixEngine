@@ -33,24 +33,6 @@ static Context& getContext() {
 	return ctx;
 }
 
-const char* declCodeToName(const char* decl_code) {
-	const char* c = decl_code;
-	while (*c) ++c;
-	while (*c != ':' && c > decl_code) --c;
-	if (*c == ':') ++c;
-	return c;
-}
-
-Array<FunctionBase*>& allFunctions() {
-	static Array<FunctionBase*> fncs(getGlobalAllocator());
-	return fncs;
-}
-
-Array<StructBase*>& allStructs() {
-	static Array<StructBase*> structs(getGlobalAllocator());
-	return structs;
-}
-
 ComponentBase::ComponentBase(IAllocator& allocator)
 	: props(allocator)
 	, functions(allocator)

@@ -1428,7 +1428,7 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 
-	void destroyParticleSystem(EntityRef entity) override {
+	void destroyParticleEmitter(EntityRef entity) override {
 		const ParticleSystem& emitter = m_particle_emitters[entity];
 		m_world.onComponentDestroyed(*emitter.m_entity, PARTICLE_EMITTER_TYPE, this);
 		m_particle_emitters.erase(*emitter.m_entity);
@@ -1465,7 +1465,7 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 
-	void createParticleSystem(EntityRef entity) override {
+	void createParticleEmitter(EntityRef entity) override {
 		m_particle_emitters.insert(entity, ParticleSystem(entity, m_world, m_allocator));
 		m_world.onComponentCreated(entity, PARTICLE_EMITTER_TYPE, this);
 	}
@@ -3309,35 +3309,35 @@ struct RenderModuleImpl final : RenderModule {
 		m_world.onComponentCreated(entity, MODEL_INSTANCE_TYPE, this);
 	}
 
-	void updateParticleSystem(EntityRef entity, float dt) override { m_particle_emitters[entity].update(dt, m_engine.getPageAllocator()); }
+	void updateParticleEmitter(EntityRef entity, float dt) override { m_particle_emitters[entity].update(dt, m_engine.getPageAllocator()); }
 
-	void setParticleSystemAutodestroy(EntityRef entity, bool enable) override {
+	void setParticleEmitterAutodestroy(EntityRef entity, bool enable) override {
 		m_particle_emitters[entity].m_autodestroy = enable;
 	}
 
-	bool getParticleSystemAutodestroy(EntityRef entity) override {
+	bool getParticleEmitterAutodestroy(EntityRef entity) override {
 		return m_particle_emitters[entity].m_autodestroy;
 	}
 	
-	void setParticleSystemPath(EntityRef entity, const Path& path) override {
+	void setParticleEmitterPath(EntityRef entity, const Path& path) override {
 		ParticleSystemResource* res = m_engine.getResourceManager().load<ParticleSystemResource>(path);
 		m_particle_emitters[entity].setResource(res);
 	}
 
-	Path getParticleSystemPath(EntityRef entity) override {
+	Path getParticleEmitterPath(EntityRef entity) override {
 		const ParticleSystem& emitter = m_particle_emitters[entity];
 		if (!emitter.getResource()) return Path("");
 
 		return emitter.getResource()->getPath();
 	}
 
-	ParticleSystem& getParticleSystem(EntityRef e) override {
+	ParticleSystem& getParticleEmitter(EntityRef e) override {
 		auto iter = m_particle_emitters.find(e);
 		ASSERT(iter.isValid());
 		return iter.value();
 	}
 
-	const HashMap<EntityRef, ParticleSystem>& getParticleSystems() const override { return m_particle_emitters; }
+	const HashMap<EntityRef, ParticleSystem>& getParticleEmitters() const override { return m_particle_emitters; }
 
 	TagAllocator m_allocator;
 	World& m_world;
@@ -3462,15 +3462,6 @@ void RenderModule::reflect() {
 			return render_module->getWorld().hasComponent((EntityRef)parent_entity, MODEL_INSTANCE_TYPE) ? parent_entity : INVALID_ENTITY;
 		}
 	};
-
-	reflection::structure<Ray>("Ray")
-		.LUMIX_MEMBER(Ray::origin, "origin")
-		.LUMIX_MEMBER(Ray::dir, "dir");
-
-	reflection::structure<RayCastModelHit>("RayCastModelHit")
-		.LUMIX_MEMBER(RayCastModelHit::is_hit, "is_hit")
-		.LUMIX_MEMBER(RayCastModelHit::t, "t")
-		.LUMIX_MEMBER(RayCastModelHit::entity, "entity");
 
 	#include "render_module.gen.h"
 }

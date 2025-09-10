@@ -62,13 +62,13 @@ struct LuaScriptModule : IModule {
 		virtual void addEnvironment(int env) = 0;
 	};
 
-	//@ component Script lua_script "File"
+	//@ component Script id lua_script label "File"
 	//@ array Script scripts
-	virtual bool isScriptEnabled(EntityRef entity, int scr_index) = 0;					//@ label "Enabled"
+	virtual bool isScriptEnabled(EntityRef entity, int scr_index) = 0;
 	virtual void enableScript(EntityRef entity, int scr_index, bool enable) = 0;
 	virtual Path getScriptPath(EntityRef entity, int scr_index) = 0;					//@ label "Path" resource_type LuaScript::TYPE
 	virtual void setScriptPath(EntityRef entity, int scr_index, const Path& path) = 0;
-	virtual void getScriptBlob(EntityRef e, u32 index, OutputMemoryStream& stream) = 0;	//@ blob
+	virtual void getScriptBlob(EntityRef e, u32 index, OutputMemoryStream& stream) = 0;
 	virtual void setScriptBlob(EntityRef e, u32 index, InputMemoryStream& stream) = 0;
 	//@ end
 	//@ end
@@ -90,7 +90,7 @@ struct LuaScriptModule : IModule {
 	virtual const char* getPropertyName(EntityRef entity, int scr_index, int prop_index) = 0;
 	virtual const Property& getProperty(EntityRef entity, int scr_index, int prop_index) = 0;
 	
-	//@ component InlineScript lua_script_inline "Inline"
+	//@ component InlineScript id lua_script_inline label "Inline"
 	virtual const char* getInlineScriptCode(EntityRef entity) = 0;	//@ multiline
 	virtual void setInlineScriptCode(EntityRef entity, const char* value) = 0;
 	//@ end

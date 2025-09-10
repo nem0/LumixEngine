@@ -3348,7 +3348,7 @@ struct ParticleEditorWindow : AssetEditorWindow, NodeEditor {
 		ComponentType emitter_type = reflection::getComponentType("particle_emitter");
 		RenderModule* module = (RenderModule*)world->getModule(emitter_type);
 		const bool has = world->hasComponent(selected[0], emitter_type);
-		return has ? &module->getParticleSystem(selected[0]) : nullptr;
+		return has ? &module->getParticleEmitter(selected[0]) : nullptr;
 	}
 
 	void apply() {
