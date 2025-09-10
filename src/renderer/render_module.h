@@ -394,7 +394,7 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual void addDebugCube(const DVec3& from, const DVec3& to, Color color) = 0;
 	
 	//@ component Camera
-	virtual Ray getCameraRay(EntityRef entity, const Vec2& screen_pos) = 0; //@ function label "getRay"
+	virtual Ray getCameraRay(EntityRef entity, const Vec2& screen_pos) = 0; //@ function alias getRay
 	//@ end
 	
 	virtual EntityPtr getActiveCamera() const = 0;
@@ -420,7 +420,7 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual void setBoneAttachmentPosition(EntityRef entity, const Vec3& pos) = 0;
 	virtual Vec3 getBoneAttachmentRotation(EntityRef entity) = 0;						//@ label "Relative rotation" radians
 	virtual void setBoneAttachmentRotation(EntityRef entity, const Vec3& rot) = 0;
-	virtual void setBoneAttachmentRotationQuat(EntityRef entity, const Quat& rot) = 0;	//@ function label "setRotation"
+	virtual void setBoneAttachmentRotationQuat(EntityRef entity, const Quat& rot) = 0;	//@ function alias setRotation
 	//@ end
 
 	virtual HashMap<EntityRef, Fur>& getFurs() = 0;
@@ -465,7 +465,7 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual Path getModelInstancePath(EntityRef entity) = 0;  //@ resource_type Model::TYPE label "Source"
 	virtual void setModelInstancePath(EntityRef entity, const Path& path) = 0;
 	virtual bool overrideMaterialVec4(EntityRef entity, u32 mesh_index, const char* uniform_name, Vec4 value) = 0;
-	virtual Model* getModelInstanceModel(EntityRef entity) = 0; //@ function label "getModel"
+	virtual Model* getModelInstanceModel(EntityRef entity) = 0; //@ function alias getModel
 	//@ end
 	virtual ModelInstance* getModelInstance(EntityRef entity) = 0;
 	virtual Span<const ModelInstance> getModelInstances() const = 0;
@@ -509,8 +509,8 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual EntityPtr getNextTerrain(EntityRef entity) = 0;
 	//@ component Terrain
 	virtual Vec2 getTerrainSize(EntityRef entity) = 0;
-	virtual float getTerrainHeightAt(EntityRef entity, float x, float z) = 0;	//@ function label "getHeightAt"
-	virtual Vec3 getTerrainNormalAt(EntityRef entity, float x, float z) = 0;	//@ function label "getNormalAt"
+	virtual float getTerrainHeightAt(EntityRef entity, float x, float z) = 0;	//@ function alias getHeightAt
+	virtual Vec3 getTerrainNormalAt(EntityRef entity, float x, float z) = 0;	//@ function alias getNormalAt
 	virtual void setTerrainMaterialPath(EntityRef entity, const Path& path) = 0;  //@ label "Material" resource_type Material::TYPE
 	virtual Path getTerrainMaterialPath(EntityRef entity) = 0;
 	virtual void setTerrainXZScale(EntityRef entity, float scale) = 0;			//@ label "XZ scale" min 0

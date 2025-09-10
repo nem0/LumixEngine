@@ -467,6 +467,7 @@ struct OutputStream {
 };
 
 struct Attributes {
+	StringView alias;
 	StringView label;
 	StringView min;
 	StringView clamp_max;
@@ -709,6 +710,9 @@ struct Parser {
 			}
 			else if (equal(word, "label")) {
 				attributes.label = consumeString(def);
+			}
+			else if (equal(word, "alias")) {
+				attributes.alias = consumeIdentifier(def);
 			}
 			else if (equal(word, "getter")) {
 				attributes.property_name = consumeIdentifier(def);
@@ -1239,6 +1243,7 @@ struct Parser {
 	}
 
 	void parse() {
+		line_idx = 0;
 		StringView line;
 		while (readLine(line)) {
 			if (!startsWith(line, "//@")) continue;
@@ -1574,9 +1579,9 @@ void wrap(OutputStream& out, Module& m, Function& f) {
 }
 
 void wrap(OutputStream& out, Module& m, Component& c, Function& f) {
-	StringView label = f.attributes.label;
-	if (label.size() == 0) label = f.name;
-	L("int ",c.name,"_",label,"(lua_State* L) {");
+	StringView name = f.attributes.alias;
+	if (name.size() == 0) name = f.name;
+	L("int ",c.name,"_",name,"(lua_State* L) {");
 	L("\tauto [imodule, entity] = checkComponent(L);");
 	L("\tauto* module = (",m.name,"*)imodule;");
 	
@@ -1686,7 +1691,7 @@ void serializeMain(OutputStream& out, Parser& parser) {
 		L("	lua_setfield(L, -2, \"new\");");
 		for (Function& f : m.functions) {
 			L("lua_pushcfunction(L, ",m.name,"_",f.name,", \"",f.name,"\");");
-			L("lua_setfield(L, -2, \"",pickLabel(f.name, f.attributes.label),"\");");
+			L("lua_setfield(L, -2, \"",pickLabel(f.name, f.attributes.alias),"\");");
 		}
 		L("	lua_pop(L, 1);");
 		L("}");
@@ -1974,11 +1979,10 @@ void serializeLuaPropertyGetter(OutputStream& out, Module& m, Component& c) {
 	}
 
 	for (Function& f : c.functions) {
-		StringView label = f.attributes.label;
-		if (label.size() == 0) label = f.name;
-		XXH64_hash_t hash = XXH3_64bits(label.begin, label.size());
-		out.add("case /*",label,"*/",hash, ": ");
-		L("lua_pushcfunction(L, ",c.name,"_",label,", \"",c.name,"_",f.name,"\"); break;");
+		StringView name = pickLabel(f.name, f.attributes.alias);
+		XXH64_hash_t hash = XXH3_64bits(name.begin, name.size());
+		out.add("case /*",name,"*/",hash, ": ");
+		L("lua_pushcfunction(L, ",c.name,"_",name,", \"",c.name,"_",name,"\"); break;");
 	}
 	L("case 0:"); // to avoid emtpy switch (compiler error) in case we have 0 properties
 	L("default: { ASSERT(false); luaL_error(L, \"Unknown property %s\", prop_name); break; }");
@@ -2035,7 +2039,7 @@ StringView toLuaType(StringView ctype) {
 }
 
 void serializeLuaType(OutputStream& out, StringView self_type, const char* self_type_suffix, Function& f, bool skip_first_arg) {
-	out.add("\t",pickLabel(f.name, f.attributes.label),": (");
+	out.add("\t",pickLabel(f.name, f.attributes.alias),": (");
 	forEachArg(f.args, [&](const Arg& arg, bool first){
 		if (!first) out.add(", ");
 		if (first) {
@@ -2328,9 +2332,9 @@ void serializeReflection(OutputStream& out, Module& m) {
 		L("\t.event<&",m.name,"::",e,">(\"",e,"\")");
 	}
 	for (Function& fn : m.functions) {
-		StringView label = fn.name;
-		if (fn.attributes.label.size() > 0) label = fn.attributes.label;
-		L("\t.function<(", fn.return_type, " (", m.name, "::*)(", fn.args, "))&", m.name, "::", fn.name ,">(\"", label, "\")");
+		StringView name = fn.name;
+		if (fn.attributes.alias.size() > 0) name = fn.attributes.alias;
+		L("\t.function<(", fn.return_type, " (", m.name, "::*)(", fn.args, "))&", m.name, "::", fn.name ,">(\"", name, "\")");
 	}
 
 	for (Component& cmp : m.components) {
@@ -2399,8 +2403,8 @@ void serializeReflection(OutputStream& out, Module& m) {
 		if (cmp.icon.size() > 0) L("\t\t.icon(", cmp.icon, ")");
 
 		for (Function& fn : cmp.functions) {
-			StringView label = fn.attributes.label.size() > 0 ? fn.attributes.label : fn.name;
-			L("\t\t.function<(", fn.return_type, " (", m.name, "::*)(", fn.args, "))&", m.name, "::", fn.name, ">(\"", label, "\")");
+			StringView name = fn.attributes.alias.size() > 0 ? fn.attributes.alias : fn.name;
+			L("\t\t.function<(", fn.return_type, " (", m.name, "::*)(", fn.args, "))&", m.name, "::", fn.name, ">(\"", name, "\")");
 		}
 
 		for (Property& prop : cmp.properties) {

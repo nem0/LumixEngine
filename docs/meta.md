@@ -229,7 +229,7 @@ virtual Path getAmbientSoundClip(EntityRef entity) = 0;	//@ resource_type Clip::
 virtual void setAnimatorSource(EntityRef entity, const Path& path) = 0;	//@ resource_type anim::Controller::TYPE
 
 // for function
-virtual void pauseAmbientSound(EntityRef entity) = 0;					//@ label "pause"
+virtual void pauseAmbientSound(EntityRef entity) = 0;					//@ alias pause
 
 struct ChorusZone {
 	// for field
@@ -244,7 +244,7 @@ Forces Meta to treat the method strictly as a function rather than inferring it 
 
 ```cpp
 // this is not auto-detected as a getter for property `InputIndex`
-virtual int getAnimatorInputIndex(EntityRef entity, const char* name) const = 0;	//@ function label "getInputIndex"
+virtual int getAnimatorInputIndex(EntityRef entity, const char* name) const = 0;	//@ function alias getInputIndex
 ```
 
 ### `getter`, `setter` attributes
@@ -310,6 +310,9 @@ Specifies the minimum allowed value for a numeric property or return value.
 ```cpp
 virtual float getHingeJointDamping(EntityRef entity) = 0;	//@ min 0
 ```
+### `alias` attribute
+
+Specifies an alternate function name; the alias does not need to be globally unique within the module.
 
 ### `clamp` attribute
 

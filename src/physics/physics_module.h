@@ -229,9 +229,9 @@ struct PhysicsModule : IModule {
 
 	//@ component Controller id physical_controller
 	virtual float getGravitySpeed(EntityRef entity) const = 0;			//@ function
-	virtual void moveController(EntityRef entity, const Vec3& v) = 0;	//@ label "move"
-	virtual bool isControllerCollisionDown(EntityRef entity) const = 0; //@ function label "isCollisionDown"
-	virtual void resizeController(EntityRef entity, float height) = 0;	//@ label "resize"
+	virtual void moveController(EntityRef entity, const Vec3& v) = 0;	//@ alias move
+	virtual bool isControllerCollisionDown(EntityRef entity) const = 0; //@ function alias isCollisionDown
+	virtual void resizeController(EntityRef entity, float height) = 0;	//@ alias resize
 	virtual u32 getControllerLayer(EntityRef entity) = 0;				//@ dynenum Layer
 	virtual void setControllerLayer(EntityRef entity, u32 layer) = 0;
 	virtual float getControllerRadius(EntityRef entity) = 0;
@@ -249,8 +249,8 @@ struct PhysicsModule : IModule {
 	//@ component Actor id rigid_actor icon ICON_FA_VOLLEYBALL_BALL
 	virtual void putToSleep(EntityRef entity) = 0;
 	virtual void addForceAtPos(EntityRef entity, const Vec3& force, const Vec3& pos) = 0;
-	virtual void applyForceToActor(EntityRef entity, const Vec3& force) = 0;				//@ label "applyForce"
-	virtual void applyImpulseToActor(EntityRef entity, const Vec3& force) = 0;				//@ label "applyImpulse"
+	virtual void applyForceToActor(EntityRef entity, const Vec3& force) = 0;				//@ alias applyForce
+	virtual void applyImpulseToActor(EntityRef entity, const Vec3& force) = 0;				//@ alias applyImpulse
 	virtual Vec3 getActorVelocity(EntityRef entity) = 0;
 	virtual float getActorSpeed(EntityRef entity) = 0;
 	virtual u32 getActorLayer(EntityRef entity) = 0;				//@ dynenum Layer

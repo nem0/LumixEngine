@@ -99,11 +99,11 @@ namespace Lumix {
 			case /*source*/17609862876178282011: LuaWrapper::push(L, module->getAnimatorSource(entity)); break;
 			case /*use_root_motion*/7336167410229006784: LuaWrapper::push(L, module->getAnimatorUseRootMotion(entity)); break;
 			case /*default_set*/7320943736218812204: LuaWrapper::push(L, module->getAnimatorDefaultSet(entity)); break;
-			case /*applySet*/17017936901183810145: lua_pushcfunction(L, Animator_applySet, "Animator_applyAnimatorSet"); break;
-			case /*setBoolInput*/6477692741421575490: lua_pushcfunction(L, Animator_setBoolInput, "Animator_setAnimatorInput"); break;
-			case /*setFloatInput*/6071940261820792332: lua_pushcfunction(L, Animator_setFloatInput, "Animator_setAnimatorInput"); break;
-			case /*setVec3Input*/14320350081376399052: lua_pushcfunction(L, Animator_setVec3Input, "Animator_setAnimatorInput"); break;
-			case /*getInputIndex*/6182785171120527074: lua_pushcfunction(L, Animator_getInputIndex, "Animator_getAnimatorInputIndex"); break;
+			case /*applySet*/17017936901183810145: lua_pushcfunction(L, Animator_applySet, "Animator_applySet"); break;
+			case /*setBoolInput*/6477692741421575490: lua_pushcfunction(L, Animator_setBoolInput, "Animator_setBoolInput"); break;
+			case /*setFloatInput*/6071940261820792332: lua_pushcfunction(L, Animator_setFloatInput, "Animator_setFloatInput"); break;
+			case /*setVec3Input*/14320350081376399052: lua_pushcfunction(L, Animator_setVec3Input, "Animator_setVec3Input"); break;
+			case /*getInputIndex*/6182785171120527074: lua_pushcfunction(L, Animator_getInputIndex, "Animator_getInputIndex"); break;
 			case 0:
 			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
@@ -327,8 +327,8 @@ namespace Lumix {
 		switch (name_hash) {
 			case /*clip*/13569199342746918467: LuaWrapper::push(L, module->getAmbientSoundClip(entity)); break;
 			case /*is_3d*/7401995853317604073: LuaWrapper::push(L, module->isAmbientSound3D(entity)); break;
-			case /*pause*/3701802990388885733: lua_pushcfunction(L, AmbientSound_pause, "AmbientSound_pauseAmbientSound"); break;
-			case /*resume*/3192798007053220969: lua_pushcfunction(L, AmbientSound_resume, "AmbientSound_resumeAmbientSound"); break;
+			case /*pause*/3701802990388885733: lua_pushcfunction(L, AmbientSound_pause, "AmbientSound_pause"); break;
+			case /*resume*/3192798007053220969: lua_pushcfunction(L, AmbientSound_resume, "AmbientSound_resume"); break;
 			case 0:
 			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
@@ -865,11 +865,11 @@ namespace Lumix {
 			case /*max_climb*/18440467892564879558: LuaWrapper::push(L, module->getZone(entity).max_climb); break;
 			case /*autoload*/12820653450790247776: LuaWrapper::push(L, module->getZoneAutoload(entity)); break;
 			case /*detailed*/3305050883106733620: LuaWrapper::push(L, module->getZoneDetailed(entity)); break;
-			case /*load*/15165270708108832870: lua_pushcfunction(L, Zone_load, "Zone_loadZone"); break;
-			case /*drawNavmesh*/2652037676279031843: lua_pushcfunction(L, Zone_drawNavmesh, "Zone_debugDrawNavmesh"); break;
-			case /*drawCompactHeightfield*/13172685102570950854: lua_pushcfunction(L, Zone_drawCompactHeightfield, "Zone_debugDrawCompactHeightfield"); break;
-			case /*drawHeightfield*/16614662065599330693: lua_pushcfunction(L, Zone_drawHeightfield, "Zone_debugDrawHeightfield"); break;
-			case /*drawContours*/13346899911515510418: lua_pushcfunction(L, Zone_drawContours, "Zone_debugDrawContours"); break;
+			case /*load*/15165270708108832870: lua_pushcfunction(L, Zone_load, "Zone_load"); break;
+			case /*drawNavmesh*/2652037676279031843: lua_pushcfunction(L, Zone_drawNavmesh, "Zone_drawNavmesh"); break;
+			case /*drawCompactHeightfield*/13172685102570950854: lua_pushcfunction(L, Zone_drawCompactHeightfield, "Zone_drawCompactHeightfield"); break;
+			case /*drawHeightfield*/16614662065599330693: lua_pushcfunction(L, Zone_drawHeightfield, "Zone_drawHeightfield"); break;
+			case /*drawContours*/13346899911515510418: lua_pushcfunction(L, Zone_drawContours, "Zone_drawContours"); break;
 			case /*generateNavmesh*/17733766460475722627: lua_pushcfunction(L, Zone_generateNavmesh, "Zone_generateNavmesh"); break;
 			case /*saveZone*/7775591933563895126: lua_pushcfunction(L, Zone_saveZone, "Zone_saveZone"); break;
 			case 0:
@@ -936,7 +936,7 @@ namespace Lumix {
 			case /*speed*/5411191639289302350: LuaWrapper::push(L, module->getAgentSpeed(entity)); break;
 			case /*navigate*/10641905485202240135: lua_pushcfunction(L, Agent_navigate, "Agent_navigate"); break;
 			case /*cancelNavigation*/10369242840717673752: lua_pushcfunction(L, Agent_cancelNavigation, "Agent_cancelNavigation"); break;
-			case /*drawPath*/15681074705421253585: lua_pushcfunction(L, Agent_drawPath, "Agent_debugDrawPath"); break;
+			case /*drawPath*/15681074705421253585: lua_pushcfunction(L, Agent_drawPath, "Agent_drawPath"); break;
 			case 0:
 			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
@@ -1220,9 +1220,9 @@ namespace Lumix {
 			case /*custom_gravity_acceleration*/12693697298512190214: LuaWrapper::push(L, module->getControllerCustomGravityAcceleration(entity)); break;
 			case /*use_root_motion*/7336167410229006784: LuaWrapper::push(L, module->getControllerUseRootMotion(entity)); break;
 			case /*getGravitySpeed*/14023941067117348079: lua_pushcfunction(L, Controller_getGravitySpeed, "Controller_getGravitySpeed"); break;
-			case /*move*/4303913335132134325: lua_pushcfunction(L, Controller_move, "Controller_moveController"); break;
-			case /*isCollisionDown*/9137665887596174557: lua_pushcfunction(L, Controller_isCollisionDown, "Controller_isControllerCollisionDown"); break;
-			case /*resize*/14316244282687965501: lua_pushcfunction(L, Controller_resize, "Controller_resizeController"); break;
+			case /*move*/4303913335132134325: lua_pushcfunction(L, Controller_move, "Controller_move"); break;
+			case /*isCollisionDown*/9137665887596174557: lua_pushcfunction(L, Controller_isCollisionDown, "Controller_isCollisionDown"); break;
+			case /*resize*/14316244282687965501: lua_pushcfunction(L, Controller_resize, "Controller_resize"); break;
 			case 0:
 			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
@@ -1485,8 +1485,8 @@ namespace Lumix {
 			case /*ccd*/13088881172075296505: LuaWrapper::push(L, module->getActorCCD(entity)); break;
 			case /*putToSleep*/245310123528029111: lua_pushcfunction(L, Actor_putToSleep, "Actor_putToSleep"); break;
 			case /*addForceAtPos*/604890780200946858: lua_pushcfunction(L, Actor_addForceAtPos, "Actor_addForceAtPos"); break;
-			case /*applyForce*/11411330100860280528: lua_pushcfunction(L, Actor_applyForce, "Actor_applyForceToActor"); break;
-			case /*applyImpulse*/15938965961108614155: lua_pushcfunction(L, Actor_applyImpulse, "Actor_applyImpulseToActor"); break;
+			case /*applyForce*/11411330100860280528: lua_pushcfunction(L, Actor_applyForce, "Actor_applyForce"); break;
+			case /*applyImpulse*/15938965961108614155: lua_pushcfunction(L, Actor_applyImpulse, "Actor_applyImpulse"); break;
 			case 0:
 			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
@@ -1840,7 +1840,7 @@ namespace Lumix {
 			case /*bloom_accomodation_speed*/625785543228489392: LuaWrapper::push(L, module->getCamera(entity).bloom_accomodation_speed); break;
 			case /*bloom_avg_bloom_multiplier*/11648327012290020021: LuaWrapper::push(L, module->getCamera(entity).bloom_avg_bloom_multiplier); break;
 			case /*bloom_exposure*/13164642978374509665: LuaWrapper::push(L, module->getCamera(entity).bloom_exposure); break;
-			case /*getRay*/17827108223211535328: lua_pushcfunction(L, Camera_getRay, "Camera_getCameraRay"); break;
+			case /*getRay*/17827108223211535328: lua_pushcfunction(L, Camera_getRay, "Camera_getRay"); break;
 			case 0:
 			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
@@ -2125,7 +2125,7 @@ namespace Lumix {
 			case /*bone*/2783102482993102300: LuaWrapper::push(L, module->getBoneAttachmentBone(entity)); break;
 			case /*relative_position*/11618981167408611974: LuaWrapper::push(L, module->getBoneAttachmentPosition(entity)); break;
 			case /*relative_rotation*/17991945435353486994: LuaWrapper::push(L, module->getBoneAttachmentRotation(entity)); break;
-			case /*setRotation*/8660453606820818866: lua_pushcfunction(L, BoneAttachment_setRotation, "BoneAttachment_setBoneAttachmentRotationQuat"); break;
+			case /*setRotation*/8660453606820818866: lua_pushcfunction(L, BoneAttachment_setRotation, "BoneAttachment_setRotation"); break;
 			case 0:
 			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
@@ -2228,7 +2228,7 @@ namespace Lumix {
 			case /*enabled*/13840943435668507618: LuaWrapper::push(L, module->isModelInstanceEnabled(entity)); break;
 			case /*source*/17609862876178282011: LuaWrapper::push(L, module->getModelInstancePath(entity)); break;
 			case /*overrideMaterialVec4*/7886464768384394135: lua_pushcfunction(L, ModelInstance_overrideMaterialVec4, "ModelInstance_overrideMaterialVec4"); break;
-			case /*getModel*/6439928831641943397: lua_pushcfunction(L, ModelInstance_getModel, "ModelInstance_getModelInstanceModel"); break;
+			case /*getModel*/6439928831641943397: lua_pushcfunction(L, ModelInstance_getModel, "ModelInstance_getModel"); break;
 			case 0:
 			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
@@ -2411,8 +2411,8 @@ namespace Lumix {
 			case /*tesselation*/15900032269147374267: LuaWrapper::push(L, module->getTerrainTesselation(entity)); break;
 			case /*base_grid_resolution*/10993858714653204735: LuaWrapper::push(L, module->getTerrainBaseGridResolution(entity)); break;
 			case /*yscale*/9502059661590009697: LuaWrapper::push(L, module->getTerrainYScale(entity)); break;
-			case /*getHeightAt*/10334719470066961856: lua_pushcfunction(L, Terrain_getHeightAt, "Terrain_getTerrainHeightAt"); break;
-			case /*getNormalAt*/5262915926868391893: lua_pushcfunction(L, Terrain_getNormalAt, "Terrain_getTerrainNormalAt"); break;
+			case /*getHeightAt*/10334719470066961856: lua_pushcfunction(L, Terrain_getHeightAt, "Terrain_getHeightAt"); break;
+			case /*getNormalAt*/5262915926868391893: lua_pushcfunction(L, Terrain_getNormalAt, "Terrain_getNormalAt"); break;
 			case 0:
 			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
 		}

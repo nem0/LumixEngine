@@ -80,7 +80,7 @@ struct GUIModule : IModule {
 	//@ functions
 	virtual EntityPtr getRectAt(const Vec2& pos) const = 0;
 	virtual bool isOver(const Vec2& pos, EntityRef e) = 0;
-	virtual GUISystem* getSystemPtr() const = 0; //@ label "getSystem"
+	virtual GUISystem* getSystemPtr() const = 0; //@ alias getSystem
 	//@ end
 
 	//@ component RenderTarget id gui_render_target
