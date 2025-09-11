@@ -355,7 +355,7 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 
-	ShiftedFrustum getCameraFrustum(EntityRef entity, const Vec2& viewport_min_px, const Vec2& viewport_max_px) const override
+	ShiftedFrustum getCameraFrustum(EntityRef entity, Vec2 viewport_min_px, Vec2 viewport_max_px) const override
 	{
 		ShiftedFrustum ret;
 		const Camera& camera = m_cameras[entity];
@@ -452,7 +452,7 @@ struct RenderModuleImpl final : RenderModule {
 		return m_bone_attachments[entity].relative_transform.pos;
 	}
 
-	void setBoneAttachmentPosition(EntityRef entity, const Vec3& pos) override {
+	void setBoneAttachmentPosition(EntityRef entity, Vec3 pos) override {
 		BoneAttachment& attachment = m_bone_attachments[entity];
 		attachment.relative_transform.pos = pos;
 		EntityPtr backup = m_updating_attachment;
@@ -465,7 +465,7 @@ struct RenderModuleImpl final : RenderModule {
 		return m_bone_attachments[entity].relative_transform.rot.toEuler();
 	}
 
-	void setBoneAttachmentRotation(EntityRef entity, const Vec3& rot) override {
+	void setBoneAttachmentRotation(EntityRef entity, Vec3 rot) override {
 		BoneAttachment& attachment = m_bone_attachments[entity];
 		Vec3 euler = rot;
 		euler.x = clamp(euler.x, -PI * 0.5f, PI * 0.5f);
@@ -476,7 +476,7 @@ struct RenderModuleImpl final : RenderModule {
 		m_updating_attachment = backup;
 	}
 
-	void setBoneAttachmentRotationQuat(EntityRef entity, const Quat& rot) override {
+	void setBoneAttachmentRotationQuat(EntityRef entity, Quat rot) override {
 		BoneAttachment& attachment = m_bone_attachments[entity];
 		attachment.relative_transform.rot = rot;
 		EntityPtr backup = m_updating_attachment;
@@ -1679,7 +1679,7 @@ struct RenderModuleImpl final : RenderModule {
 	Material* getTerrainMaterial(EntityRef entity) override { return m_terrains[entity]->getMaterial(); }
 
 
-	void setDecalHalfExtents(EntityRef entity, const Vec3& value) override
+	void setDecalHalfExtents(EntityRef entity, Vec3 value) override
 	{
 		Decal& decal = m_decals[entity];
 		decal.half_extents = value;
@@ -1741,7 +1741,7 @@ struct RenderModuleImpl final : RenderModule {
 		}
 	}
 
-	void setCurveDecalBezierP0(EntityRef entity, const Vec2& value) override {
+	void setCurveDecalBezierP0(EntityRef entity, Vec2 value) override {
 		CurveDecal& decal = m_curve_decals[entity];
 		decal.bezier_p0 = value;
 		updateDecalInfo(decal);
@@ -1750,7 +1750,7 @@ struct RenderModuleImpl final : RenderModule {
 		}
 	}
 
-	void setCurveDecalUVScale(EntityRef entity, const Vec2& value) override {
+	void setCurveDecalUVScale(EntityRef entity, Vec2 value) override {
 		m_curve_decals[entity].uv_scale = value;
 		updateDecalInfo(m_curve_decals[entity]);
 	}
@@ -1759,7 +1759,7 @@ struct RenderModuleImpl final : RenderModule {
 		return m_curve_decals[entity].bezier_p0;
 	}
 
-	void setCurveDecalBezierP2(EntityRef entity, const Vec2& value) override {
+	void setCurveDecalBezierP2(EntityRef entity, Vec2 value) override {
 		CurveDecal& decal = m_curve_decals[entity];
 		decal.bezier_p2 = value;
 		updateDecalInfo(decal);
@@ -2418,10 +2418,10 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 
-	void addDebugBone(const DVec3& pos,
-		const Vec3& dir,
-		const Vec3& up,
-		const Vec3& right,
+	void addDebugBone(DVec3 pos,
+		Vec3 dir,
+		Vec3 up,
+		Vec3 right,
 		Color color) override
 	{
 		addDebugLine(pos + up + right, pos + up - right, color);
@@ -2435,10 +2435,10 @@ struct RenderModuleImpl final : RenderModule {
 		addDebugLine(pos - up - right, pos + dir, color);
 	}
 
-	void addDebugCube(const DVec3& pos,
-		const Vec3& dir,
-		const Vec3& up,
-		const Vec3& right,
+	void addDebugCube(DVec3 pos,
+		Vec3 dir,
+		Vec3 up,
+		Vec3 right,
 		Color color) override
 	{
 		addDebugLine(pos + dir + up + right, pos + dir + up - right, color);
@@ -2459,8 +2459,8 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 
-	void addDebugCubeSolid(const DVec3& min,
-		const DVec3& max,
+	void addDebugCubeSolid(DVec3 min,
+		DVec3 max,
 		Color color) override
 	{
 		DVec3 a = min;
@@ -2526,8 +2526,8 @@ struct RenderModuleImpl final : RenderModule {
 
 
 
-	void addDebugCube(const DVec3& min,
-		const DVec3& max,
+	void addDebugCube(DVec3 min,
+		DVec3 max,
 		Color color) override
 	{
 		DVec3 a = min;
@@ -2569,7 +2569,7 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 
-	void addDebugCross(const DVec3& center, float size, Color color) override
+	void addDebugCross(DVec3 center, float size, Color color) override
 	{
 		addDebugLine(center, DVec3(center.x - size, center.y, center.z), color);
 		addDebugLine(center, DVec3(center.x + size, center.y, center.z), color);
@@ -2579,7 +2579,7 @@ struct RenderModuleImpl final : RenderModule {
 		addDebugLine(center, DVec3(center.x, center.y, center.z + size), color);
 	}
 
-	void addDebugLine(const DVec3& from, const DVec3& to, Color color) override 
+	void addDebugLine(DVec3 from, DVec3 to, Color color) override 
 	{
 		DebugLine& line = m_debug_lines.emplace();
 		line.from = from;

@@ -184,6 +184,12 @@ struct StringBuilder {
 		add(makeStringView(v));
 	}
 
+	void add(i32 v) {
+		char tmp[32];
+		_itoa_s(v, tmp, 10);
+		add(tmp);
+	}
+
 	void add(StringView v) {
 		i32 len = v.size();
 		if (length + len > capacity) {
@@ -212,7 +218,9 @@ void logInfo(Args... args) {
 	StringBuilder builder(buffer, sizeof(buffer));
 	(builder.add(args), ...);
 	builder.add("\n");
-	OutputDebugString(buffer);
+	HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
+	DWORD written;
+	WriteFile(hStdout, buffer, (DWORD)strlen(buffer), &written, NULL);
 }
 
 struct FileIterator {
@@ -1377,6 +1385,8 @@ struct Parser {
 
 ArenaAllocator allocator;
 Parser parser(allocator);
+i32 num_parsed_files = 0;
+i32 num_parsed_bytes = 0;
 
 void parseFile(StringView path, StringView filename) {
 	char full[MAX_PATH];
@@ -1394,6 +1404,9 @@ void parseFile(StringView path, StringView filename) {
 	if (ReadFile(h, data, size, &read, nullptr)) {
 		data[read] = 0;
 	}
+
+	++num_parsed_files;
+	num_parsed_bytes += size;
 
 	parser.beginFile(makeStringView(full));
 	parser.content.begin = data;
@@ -2529,8 +2542,6 @@ int main() {
 	QueryPerformanceCounter(&stop);
 	QueryPerformanceFrequency(&freq);
 	i32 duration = i32(float((stop.QuadPart - start.QuadPart) / double(freq.QuadPart)) * 1000);
-	char tmp[32];
-	_itoa_s(duration, tmp, 10);
-	logInfo("Processed in ", tmp, " ms");
+	logInfo("Meta: Processed ",num_parsed_bytes/1024," KB in ",num_parsed_files," files in ", duration, " ms");
 	return 0;
 }

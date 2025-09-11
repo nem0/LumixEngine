@@ -87,11 +87,11 @@ struct PhysicsModule : IModule {
 	virtual DelegateList<void(const ContactData&)>& onContact() = 0;
 	
 	//@ functions
-	virtual EntityPtr raycast(const Vec3& origin, const Vec3& dir, float distance, EntityPtr ignore_entity) = 0;
-	virtual void setGravity(const Vec3& gravity) = 0;
+	virtual EntityPtr raycast(Vec3 origin, Vec3 dir, float distance, EntityPtr ignore_entity) = 0;
+	virtual void setGravity(Vec3 gravity) = 0;
 	//@ end
-	virtual bool raycastEx(const Vec3& origin, const Vec3& dir, float distance, RaycastHit& result, EntityPtr ignored, i32 layer) = 0;
-	virtual bool sweepSphere(const DVec3& pos, float radius, const Vec3& dir, float distance, SweepHit& result, EntityPtr ignored, i32 layer) = 0;
+	virtual bool raycastEx(Vec3 origin, Vec3 dir, float distance, RaycastHit& result, EntityPtr ignored, i32 layer) = 0;
+	virtual bool sweepSphere(DVec3 pos, float radius, Vec3 dir, float distance, SweepHit& result, EntityPtr ignored, i32 layer) = 0;
 
 	virtual void createInstancedMesh(EntityRef entity) = 0;
 	virtual void createInstancedCube(EntityRef entity) = 0;
@@ -151,9 +151,9 @@ struct PhysicsModule : IModule {
 	virtual float getD6JointLinearLimit(EntityRef entity) = 0;						//@ min 0
 	virtual void setD6JointLinearLimit(EntityRef entity, float limit) = 0;
 	virtual Vec2 getD6JointTwistLimit(EntityRef entity) = 0;						//@ radians
-	virtual void setD6JointTwistLimit(EntityRef entity, const Vec2& limit) = 0;
+	virtual void setD6JointTwistLimit(EntityRef entity, Vec2 limit) = 0;
 	virtual Vec2 getD6JointSwingLimit(EntityRef entity) = 0;						//@ radians
-	virtual void setD6JointSwingLimit(EntityRef entity, const Vec2& limit) = 0;
+	virtual void setD6JointSwingLimit(EntityRef entity, Vec2 limit) = 0;
 	virtual float getD6JointDamping(EntityRef entity) = 0;
 	virtual void setD6JointDamping(EntityRef entity, float value) = 0;
 	virtual float getD6JointStiffness(EntityRef entity) = 0;
@@ -163,16 +163,16 @@ struct PhysicsModule : IModule {
 	virtual EntityPtr getD6JointConnectedBody(EntityRef entity) = 0;
 	virtual void setD6JointConnectedBody(EntityRef entity, EntityPtr connected_body) = 0;
 	virtual Vec3 getD6JointAxisPosition(EntityRef entity) = 0;
-	virtual void setD6JointAxisPosition(EntityRef entity, const Vec3& value) = 0;
+	virtual void setD6JointAxisPosition(EntityRef entity, Vec3 value) = 0;
 	virtual Vec3 getD6JointAxisDirection(EntityRef entity) = 0;
-	virtual void setD6JointAxisDirection(EntityRef entity, const Vec3& value) = 0;
+	virtual void setD6JointAxisDirection(EntityRef entity, Vec3 value) = 0;
 	//@ end
 
 	//@ component DistanceJoint
 	virtual EntityPtr getDistanceJointConnectedBody(EntityRef entity) = 0;
 	virtual void setDistanceJointConnectedBody(EntityRef entity, EntityPtr connected_body) = 0;
 	virtual Vec3 getDistanceJointAxisPosition(EntityRef entity) = 0;
-	virtual void setDistanceJointAxisPosition(EntityRef entity, const Vec3& value) = 0;
+	virtual void setDistanceJointAxisPosition(EntityRef entity, Vec3 value) = 0;
 	virtual float getDistanceJointDamping(EntityRef entity) = 0;				//@ min 0
 	virtual void setDistanceJointDamping(EntityRef entity, float value) = 0;
 	virtual float getDistanceJointStiffness(EntityRef entity) = 0;				//@ min 0
@@ -180,7 +180,7 @@ struct PhysicsModule : IModule {
 	virtual float getDistanceJointTolerance(EntityRef entity) = 0;				//@ min 0
 	virtual void setDistanceJointTolerance(EntityRef entity, float value) = 0;
 	virtual Vec2 getDistanceJointLimits(EntityRef entity) = 0;
-	virtual void setDistanceJointLimits(EntityRef entity, const Vec2& value) = 0;
+	virtual void setDistanceJointLimits(EntityRef entity, Vec2 value) = 0;
 	virtual Vec3 getDistanceJointLinearForce(EntityRef entity) = 0;
 	//@ end
 
@@ -191,9 +191,9 @@ struct PhysicsModule : IModule {
 	virtual EntityPtr getHingeJointConnectedBody(EntityRef entity) = 0;
 	virtual void setHingeJointConnectedBody(EntityRef entity, EntityPtr connected_body) = 0;
 	virtual Vec3 getHingeJointAxisPosition(EntityRef entity) = 0;
-	virtual void setHingeJointAxisPosition(EntityRef entity, const Vec3& value) = 0;
+	virtual void setHingeJointAxisPosition(EntityRef entity, Vec3 value) = 0;
 	virtual Vec3 getHingeJointAxisDirection(EntityRef entity) = 0;
-	virtual void setHingeJointAxisDirection(EntityRef entity, const Vec3& value) = 0;
+	virtual void setHingeJointAxisDirection(EntityRef entity, Vec3 value) = 0;
 	virtual float getHingeJointDamping(EntityRef entity) = 0;					//@ min 0
 	virtual void setHingeJointDamping(EntityRef entity, float value) = 0;
 	virtual float getHingeJointStiffness(EntityRef entity) = 0;					//@ min 0
@@ -201,15 +201,15 @@ struct PhysicsModule : IModule {
 	virtual bool getHingeJointUseLimit(EntityRef entity) = 0;
 	virtual void setHingeJointUseLimit(EntityRef entity, bool use_limit) = 0;
 	virtual Vec2 getHingeJointLimit(EntityRef entity) = 0;						//@ radians
-	virtual void setHingeJointLimit(EntityRef entity, const Vec2& limit) = 0;
+	virtual void setHingeJointLimit(EntityRef entity, Vec2 limit) = 0;
 	//@ end
 
 	virtual EntityPtr getJointConnectedBody(EntityRef entity) = 0;
 	virtual void setJointConnectedBody(EntityRef entity, EntityPtr connected_body) = 0;
 	virtual Vec3 getJointAxisPosition(EntityRef entity) = 0;
-	virtual void setJointAxisPosition(EntityRef entity, const Vec3& value) = 0;
+	virtual void setJointAxisPosition(EntityRef entity, Vec3 value) = 0;
 	virtual Vec3 getJointAxisDirection(EntityRef entity) = 0;
-	virtual void setJointAxisDirection(EntityRef entity, const Vec3& value) = 0;
+	virtual void setJointAxisDirection(EntityRef entity, Vec3 value) = 0;
 	virtual RigidTransform getJointLocalFrame(EntityRef entity) = 0;
 	virtual RigidTransform getJointConnectedBodyLocalFrame(EntityRef entity) = 0;
 	virtual physx::PxJoint* getJoint(EntityRef entity) = 0;
@@ -218,18 +218,18 @@ struct PhysicsModule : IModule {
 	virtual EntityPtr getSphericalJointConnectedBody(EntityRef entity) = 0;
 	virtual void setSphericalJointConnectedBody(EntityRef entity, EntityPtr connected_body) = 0;
 	virtual Vec3 getSphericalJointAxisPosition(EntityRef entity) = 0;
-	virtual void setSphericalJointAxisPosition(EntityRef entity, const Vec3& value) = 0;
+	virtual void setSphericalJointAxisPosition(EntityRef entity, Vec3 value) = 0;
 	virtual Vec3 getSphericalJointAxisDirection(EntityRef entity) = 0;
-	virtual void setSphericalJointAxisDirection(EntityRef entity, const Vec3& value) = 0;
+	virtual void setSphericalJointAxisDirection(EntityRef entity, Vec3 value) = 0;
 	virtual bool getSphericalJointUseLimit(EntityRef entity) = 0;
 	virtual void setSphericalJointUseLimit(EntityRef entity, bool use_limit) = 0;
 	virtual Vec2 getSphericalJointLimit(EntityRef entity) = 0;						//@ radians
-	virtual void setSphericalJointLimit(EntityRef entity, const Vec2& limit) = 0;
+	virtual void setSphericalJointLimit(EntityRef entity, Vec2 limit) = 0;
 	//@ end
 
 	//@ component Controller id physical_controller
 	virtual float getGravitySpeed(EntityRef entity) const = 0;			//@ function
-	virtual void moveController(EntityRef entity, const Vec3& v) = 0;	//@ alias move
+	virtual void moveController(EntityRef entity, Vec3 v) = 0;	//@ alias move
 	virtual bool isControllerCollisionDown(EntityRef entity) const = 0; //@ function alias isCollisionDown
 	virtual void resizeController(EntityRef entity, float height) = 0;	//@ alias resize
 	virtual u32 getControllerLayer(EntityRef entity) = 0;				//@ dynenum Layer
@@ -248,9 +248,9 @@ struct PhysicsModule : IModule {
 
 	//@ component Actor id rigid_actor icon ICON_FA_VOLLEYBALL_BALL
 	virtual void putToSleep(EntityRef entity) = 0;
-	virtual void addForceAtPos(EntityRef entity, const Vec3& force, const Vec3& pos) = 0;
-	virtual void applyForceToActor(EntityRef entity, const Vec3& force) = 0;				//@ alias applyForce
-	virtual void applyImpulseToActor(EntityRef entity, const Vec3& force) = 0;				//@ alias applyImpulse
+	virtual void addForceAtPos(EntityRef entity, Vec3 force, Vec3 pos) = 0;
+	virtual void applyForceToActor(EntityRef entity, Vec3 force) = 0;				//@ alias applyForce
+	virtual void applyImpulseToActor(EntityRef entity, Vec3 force) = 0;				//@ alias applyImpulse
 	virtual Vec3 getActorVelocity(EntityRef entity) = 0;
 	virtual float getActorSpeed(EntityRef entity) = 0;
 	virtual u32 getActorLayer(EntityRef entity) = 0;				//@ dynenum Layer
@@ -271,11 +271,11 @@ struct PhysicsModule : IModule {
 	virtual void removeBox(EntityRef entity, int index) = 0;
 	virtual int getBoxCount(EntityRef entity) = 0;
 	virtual Vec3 getBoxHalfExtents(EntityRef entity, int index) = 0;
-	virtual void setBoxHalfExtents(EntityRef entity, int index, const Vec3& size) = 0;
+	virtual void setBoxHalfExtents(EntityRef entity, int index, Vec3 size) = 0;
 	virtual Vec3 getBoxOffsetPosition(EntityRef entity, int index) = 0;			//@ label "Position offset"
-	virtual void setBoxOffsetPosition(EntityRef entity, int index, const Vec3& pos) = 0;
+	virtual void setBoxOffsetPosition(EntityRef entity, int index, Vec3 pos) = 0;
 	virtual Vec3 getBoxOffsetRotation(EntityRef entity, int index) = 0;			//@ radians label "Rotation offset"
-	virtual void setBoxOffsetRotation(EntityRef entity, int index, const Vec3& euler_angles) = 0;
+	virtual void setBoxOffsetRotation(EntityRef entity, int index, Vec3 euler_angles) = 0;
 	//@ end
 	
 	//@ array Sphere spheres
@@ -285,7 +285,7 @@ struct PhysicsModule : IModule {
 	virtual float getSphereRadius(EntityRef entity, int index) = 0;					//@ min 0
 	virtual void setSphereRadius(EntityRef entity, int index, float size) = 0;
 	virtual Vec3 getSphereOffsetPosition(EntityRef entity, int index) = 0;			//@ label "Position offset"
-	virtual void setSphereOffsetPosition(EntityRef entity, int index, const Vec3& pos) = 0;
+	virtual void setSphereOffsetPosition(EntityRef entity, int index, Vec3 pos) = 0;
 	//@ end
 	//@ end
 
@@ -340,7 +340,7 @@ struct PhysicsModule : IModule {
 
 	//@ component InstancedCube id physical_instanced_cube
 	virtual Vec3 getInstancedCubeHalfExtents(EntityRef entity) = 0;
-	virtual void setInstancedCubeHalfExtents(EntityRef entity, const Vec3& half_extents) = 0;
+	virtual void setInstancedCubeHalfExtents(EntityRef entity, Vec3 half_extents) = 0;
 	virtual u32 getInstancedCubeLayer(EntityRef entity) = 0;				//@ dynenum Layer
 	virtual void setInstancedCubeLayer(EntityRef entity, u32 layer) = 0;
 	//@ end

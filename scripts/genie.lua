@@ -389,7 +389,7 @@ solution "LumixEngine"
 	end
 
 exe_project "meta"
-	kind "WindowedApp"
+	kind "ConsoleApp"
 	debugdir "../"
 	defaultConfigurations()
 	files { "../src/meta/**.cpp", "../src/meta/**.h" }

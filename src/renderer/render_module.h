@@ -383,15 +383,15 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual RayCastModelHit castRay(const Ray& ray, EntityPtr ignore) = 0;
 	virtual RayCastModelHit castRayTerrain(const Ray& ray) = 0;
 	virtual void addDebugTriangle(const DVec3& p0, const DVec3& p1, const DVec3& p2, Color color) = 0;
-	virtual void addDebugLine(const DVec3& from, const DVec3& to, Color color) = 0; 
-	virtual void addDebugCross(const DVec3& center, float size, Color color) = 0;
-	virtual void addDebugBone(const DVec3& pos, const Vec3& dir, const Vec3& up, const Vec3& right, Color color) = 0;
-	virtual void addDebugCube(const DVec3& pos, const Vec3& dir, const Vec3& up, const Vec3& right, Color color) = 0;
-	virtual void addDebugCubeSolid(const DVec3& from, const DVec3& max, Color color) = 0;
+	virtual void addDebugLine(DVec3 from, DVec3 to, Color color) = 0; 
+	virtual void addDebugCross(DVec3 center, float size, Color color) = 0;
+	virtual void addDebugBone(DVec3 pos, Vec3 dir, Vec3 up, Vec3 right, Color color) = 0;
+	virtual void addDebugCube(DVec3 pos, Vec3 dir, Vec3 up, Vec3 right, Color color) = 0;
+	virtual void addDebugCubeSolid(DVec3 from, DVec3 max, Color color) = 0;
 	virtual void setActiveCamera(EntityRef camera) = 0;
 	virtual void setActiveEnvironment(EntityRef entity) = 0;
 	//@ end
-	virtual void addDebugCube(const DVec3& from, const DVec3& to, Color color) = 0;
+	virtual void addDebugCube(DVec3 from, DVec3 to, Color color) = 0;
 	
 	//@ component Camera
 	virtual Ray getCameraRay(EntityRef entity, const Vec2& screen_pos) = 0; //@ function alias getRay
@@ -402,7 +402,7 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual float getCameraLODMultiplier(float fov, bool is_ortho) const = 0;
 	virtual float getCameraLODMultiplier(EntityRef entity) const = 0;
 	virtual ShiftedFrustum getCameraFrustum(EntityRef entity) const = 0;
-	virtual ShiftedFrustum getCameraFrustum(EntityRef entity, const Vec2& a, const Vec2& b) const = 0;
+	virtual ShiftedFrustum getCameraFrustum(EntityRef entity, Vec2 viewport_min_px, Vec2 viewport_max_px) const = 0;
 	virtual Engine& getEngine() const = 0;
 	virtual IAllocator& getAllocator() = 0;
 	virtual u32 computeSortKey(const Material& material, const Mesh& mesh) const = 0;
@@ -417,10 +417,10 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual void setBoneAttachmentBone(EntityRef entity, int value) = 0;				//@ dynenum Bone
 	virtual int getBoneAttachmentBone(EntityRef entity) = 0;
 	virtual Vec3 getBoneAttachmentPosition(EntityRef entity) = 0;						//@ label "Relative position"
-	virtual void setBoneAttachmentPosition(EntityRef entity, const Vec3& pos) = 0;
+	virtual void setBoneAttachmentPosition(EntityRef entity, Vec3 pos) = 0;
 	virtual Vec3 getBoneAttachmentRotation(EntityRef entity) = 0;						//@ label "Relative rotation" radians
-	virtual void setBoneAttachmentRotation(EntityRef entity, const Vec3& rot) = 0;
-	virtual void setBoneAttachmentRotationQuat(EntityRef entity, const Quat& rot) = 0;	//@ function alias setRotation
+	virtual void setBoneAttachmentRotation(EntityRef entity, Vec3 rot) = 0;
+	virtual void setBoneAttachmentRotationQuat(EntityRef entity, Quat rot) = 0;	//@ function alias setRotation
 	//@ end
 
 	virtual HashMap<EntityRef, Fur>& getFurs() = 0;
@@ -484,11 +484,11 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual Path getCurveDecalMaterialPath(EntityRef entity) = 0;
 	virtual void setCurveDecalHalfExtents(EntityRef entity, float value) = 0;	//@ min 0
 	virtual float getCurveDecalHalfExtents(EntityRef entity) = 0;
-	virtual void setCurveDecalUVScale(EntityRef entity, const Vec2& value) = 0; //@ label "UV scale" min 0
+	virtual void setCurveDecalUVScale(EntityRef entity, Vec2 value) = 0; //@ label "UV scale" min 0
 	virtual Vec2 getCurveDecalUVScale(EntityRef entity) = 0;
-	virtual void setCurveDecalBezierP0(EntityRef entity, const Vec2& value) = 0; //@ no_ui
+	virtual void setCurveDecalBezierP0(EntityRef entity, Vec2 value) = 0; //@ no_ui
 	virtual Vec2 getCurveDecalBezierP0(EntityRef entity) = 0;
-	virtual void setCurveDecalBezierP2(EntityRef entity, const Vec2& value) = 0; //@ no_ui
+	virtual void setCurveDecalBezierP2(EntityRef entity, Vec2 value) = 0; //@ no_ui
 	virtual Vec2 getCurveDecalBezierP2(EntityRef entity) = 0;
 	//@ end
 
@@ -496,7 +496,7 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	//@ component Decal
 	virtual void setDecalMaterialPath(EntityRef entity, const Path& path) = 0;  //@ label "Material" resource_type Material::TYPE
 	virtual Path getDecalMaterialPath(EntityRef entity) = 0;
-	virtual void setDecalHalfExtents(EntityRef entity, const Vec3& value) = 0;
+	virtual void setDecalHalfExtents(EntityRef entity, Vec3 value) = 0;
 	virtual Vec3 getDecalHalfExtents(EntityRef entity) = 0;						//@ min 0
 	//@ end
 

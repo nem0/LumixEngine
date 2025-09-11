@@ -160,23 +160,23 @@ struct InputStream final : PxInputStream
 };
 
 
-static Vec3 fromPhysx(const PxVec3& v)
+static Vec3 fromPhysx(PxVec3 v)
 {
 	return Vec3(v.x, v.y, v.z);
 }
-static PxVec3 toPhysx(const Vec3& v)
+static PxVec3 toPhysx(Vec3 v)
 {
 	return PxVec3(v.x, v.y, v.z);
 }
-static PxVec3 toPhysx(const DVec3& v)
+static PxVec3 toPhysx(DVec3 v)
 {
 	return PxVec3((float)v.x, (float)v.y, (float)v.z);
 }
-static Quat fromPhysx(const PxQuat& v)
+static Quat fromPhysx(PxQuat v)
 {
 	return Quat(v.x, v.y, v.z, v.w);
 }
-static PxQuat toPhysx(const Quat& v)
+static PxQuat toPhysx(Quat v)
 {
 	return PxQuat(v.x, v.y, v.z, v.w);
 }
@@ -961,7 +961,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 
-	void setDistanceJointLimits(EntityRef entity, const Vec2& value) override
+	void setDistanceJointLimits(EntityRef entity, Vec2 value) override
 	{
 		auto* joint = getDistanceJoint(entity);
 		joint->setMinDistance(value.x);
@@ -1017,7 +1017,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 
-	void setD6JointTwistLimit(EntityRef entity, const Vec2& limit) override
+	void setD6JointTwistLimit(EntityRef entity, Vec2 limit) override
 	{
 		auto* joint = getD6Joint(entity);
 		auto px_limit = joint->getTwistLimit();
@@ -1034,7 +1034,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 
-	void setD6JointSwingLimit(EntityRef entity, const Vec2& limit) override
+	void setD6JointSwingLimit(EntityRef entity, Vec2 limit) override
 	{
 		auto* joint = getD6Joint(entity);
 		auto px_limit = joint->getSwingLimit();
@@ -1138,14 +1138,14 @@ struct PhysicsModuleImpl final : PhysicsModule
 		if (m_is_game_running) initJoint(joint_entity, joint);
 	}
 
-	void setJointAxisPosition(EntityRef entity, const Vec3& value) override
+	void setJointAxisPosition(EntityRef entity, Vec3 value) override
 	{
 		auto& joint = m_joints[entity];
 		joint.local_frame0.p = toPhysx(value);
 		joint.physx->setLocalPose(PxJointActorIndex::eACTOR0, joint.local_frame0);
 	}
 
-	void setJointAxisDirection(EntityRef entity, const Vec3& value) override
+	void setJointAxisDirection(EntityRef entity, Vec3 value) override
 	{
 		auto& joint = m_joints[entity];
 		joint.local_frame0.q = toPhysx(Quat::vec3ToVec3(Vec3(1, 0, 0), value));
@@ -1157,10 +1157,10 @@ struct PhysicsModuleImpl final : PhysicsModule
 	void setHingeJointConnectedBody(EntityRef joint_entity, EntityPtr connected_body) override {
 		setJointConnectedBody(joint_entity, connected_body);
 	}
-	void setHingeJointAxisPosition(EntityRef entity, const Vec3& value) override {
+	void setHingeJointAxisPosition(EntityRef entity, Vec3 value) override {
 		setJointAxisPosition(entity, value);
 	}
-	void setHingeJointAxisDirection(EntityRef entity, const Vec3& value) override {
+	void setHingeJointAxisDirection(EntityRef entity, Vec3 value) override {
 		setJointAxisDirection(entity, value);
 	}
 	Vec3 getHingeJointAxisPosition(EntityRef entity) override { return fromPhysx(m_joints[entity].local_frame0.p); }
@@ -1172,10 +1172,10 @@ struct PhysicsModuleImpl final : PhysicsModule
 	void setSphericalJointConnectedBody(EntityRef joint_entity, EntityPtr connected_body) override {
 		setJointConnectedBody(joint_entity, connected_body);
 	}
-	void setSphericalJointAxisPosition(EntityRef entity, const Vec3& value) override {
+	void setSphericalJointAxisPosition(EntityRef entity, Vec3 value) override {
 		setJointAxisPosition(entity, value);
 	}
-	void setSphericalJointAxisDirection(EntityRef entity, const Vec3& value) override {
+	void setSphericalJointAxisDirection(EntityRef entity, Vec3 value) override {
 		setJointAxisDirection(entity, value);
 	}
 	Vec3 getSphericalJointAxisPosition(EntityRef entity) override { return fromPhysx(m_joints[entity].local_frame0.p); }
@@ -1187,10 +1187,10 @@ struct PhysicsModuleImpl final : PhysicsModule
 	void setD6JointConnectedBody(EntityRef joint_entity, EntityPtr connected_body) override {
 		setJointConnectedBody(joint_entity, connected_body);
 	}
-	void setD6JointAxisPosition(EntityRef entity, const Vec3& value) override {
+	void setD6JointAxisPosition(EntityRef entity, Vec3 value) override {
 		setJointAxisPosition(entity, value);
 	}
-	void setD6JointAxisDirection(EntityRef entity, const Vec3& value) override {
+	void setD6JointAxisDirection(EntityRef entity, Vec3 value) override {
 		setJointAxisDirection(entity, value);
 	}
 	Vec3 getD6JointAxisPosition(EntityRef entity) override { return fromPhysx(m_joints[entity].local_frame0.p); }
@@ -1202,7 +1202,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 	void setDistanceJointConnectedBody(EntityRef joint_entity, EntityPtr connected_body) override {
 		setJointConnectedBody(joint_entity, connected_body);
 	}
-	void setDistanceJointAxisPosition(EntityRef entity, const Vec3& value) override {
+	void setDistanceJointAxisPosition(EntityRef entity, Vec3 value) override {
 		setJointAxisPosition(entity, value);
 	}
 	Vec3 getDistanceJointAxisPosition(EntityRef entity) override { return fromPhysx(m_joints[entity].local_frame0.p); }
@@ -1237,7 +1237,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 
-	void setSphericalJointLimit(EntityRef entity, const Vec2& limit) override
+	void setSphericalJointLimit(EntityRef entity, Vec2 limit) override
 	{
 		auto* joint = static_cast<PxSphericalJoint*>(m_joints[entity].physx);
 		auto limit_cone = joint->getLimitCone();
@@ -1293,7 +1293,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 
-	void setHingeJointLimit(EntityRef entity, const Vec2& limit) override
+	void setHingeJointLimit(EntityRef entity, Vec2 limit) override
 	{
 		auto* joint = static_cast<PxRevoluteJoint*>(m_joints[entity].physx);
 		PxJointAngularLimitPair px_limit = joint->getLimit();
@@ -2385,7 +2385,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 
-	void addForceAtPos(EntityRef entity, const Vec3& force, const Vec3& pos) override
+	void addForceAtPos(EntityRef entity, Vec3 force, Vec3 pos) override
 	{
 		auto iter = m_actors.find(entity);
 		if (!iter.isValid()) return;
@@ -2400,13 +2400,13 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 
-	void moveController(EntityRef entity, const Vec3& v) override { m_controllers[entity].frame_change += v; }
+	void moveController(EntityRef entity, Vec3 v) override { m_controllers[entity].frame_change += v; }
 
-	void setGravity(const Vec3& gravity) override {
+	void setGravity(Vec3 gravity) override {
 		m_scene->setGravity(toPhysx(gravity));
 	}
 
-	EntityPtr raycast(const Vec3& origin, const Vec3& dir, float distance, EntityPtr ignore_entity) override {
+	EntityPtr raycast(Vec3 origin, Vec3 dir, float distance, EntityPtr ignore_entity) override {
 		RaycastHit hit;
 		if (raycastEx(origin, dir, distance, hit, ignore_entity, -1)) return hit.entity;
 		return INVALID_ENTITY;
@@ -2446,7 +2446,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		PhysicsModuleImpl* module;
 	};
 
-	bool sweepSphere(const DVec3& pos, float radius, const Vec3& dir, float distance, SweepHit& result, EntityPtr ignored, i32 layer) override {
+	bool sweepSphere(DVec3 pos, float radius, Vec3 dir, float distance, SweepHit& result, EntityPtr ignored, i32 layer) override {
 		PxSweepBuffer hit; 
 		physx::PxSphereGeometry sphere(radius);
 		physx::PxTransform transform(toPhysx(pos), physx::PxIdentity);
@@ -2465,8 +2465,8 @@ struct PhysicsModuleImpl final : PhysicsModule
 		return true;	
 	}
 
-	bool raycastEx(const Vec3& origin,
-		const Vec3& dir,
+	bool raycastEx(Vec3 origin,
+		Vec3 dir,
 		float distance,
 		RaycastHit& result,
 		EntityPtr ignored,
@@ -2827,7 +2827,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 
-	void setBoxHalfExtents(EntityRef entity, int index, const Vec3& size) override
+	void setBoxHalfExtents(EntityRef entity, int index, Vec3 size) override
 	{
 		PxShape* shape = getShape(entity, index, PxGeometryType::eBOX);
 		PxBoxGeometry box = shape->getGeometry().box();
@@ -2867,7 +2867,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 
-	void setGeomOffsetPosition(EntityRef entity, int index, const Vec3& pos, PxGeometryType::Enum type)
+	void setGeomOffsetPosition(EntityRef entity, int index, Vec3 pos, PxGeometryType::Enum type)
 	{
 		PxShape* shape = getShape(entity, index, type);
 		PxTransform tr = shape->getLocalPose();
@@ -2876,7 +2876,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 
-	void setGeomOffsetRotation(EntityRef entity, int index, const Vec3& rot, PxGeometryType::Enum type)
+	void setGeomOffsetRotation(EntityRef entity, int index, Vec3 rot, PxGeometryType::Enum type)
 	{
 		PxShape* shape = getShape(entity, index, type);
 		PxTransform tr = shape->getLocalPose();
@@ -2887,13 +2887,13 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 
-	void setBoxOffsetPosition(EntityRef entity, int index, const Vec3& pos) override
+	void setBoxOffsetPosition(EntityRef entity, int index, Vec3 pos) override
 	{
 		setGeomOffsetPosition(entity, index, pos, PxGeometryType::eBOX);
 	}
 
 
-	void setBoxOffsetRotation(EntityRef entity, int index, const Vec3& rot) override
+	void setBoxOffsetRotation(EntityRef entity, int index, Vec3 rot) override
 	{
 		setGeomOffsetRotation(entity, index, rot, PxGeometryType::eBOX);
 	}
@@ -3008,7 +3008,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		return getGeomOffsetPosition(entity, index, PxGeometryType::eSPHERE);
 	}
 
-	void setSphereOffsetPosition(EntityRef entity, int index, const Vec3& pos) override {
+	void setSphereOffsetPosition(EntityRef entity, int index, Vec3 pos) override {
 		setGeomOffsetPosition(entity, index, pos, PxGeometryType::eSPHERE);
 	}
 
@@ -3662,7 +3662,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 
-	void applyForceToActor(EntityRef entity, const Vec3& force) override
+	void applyForceToActor(EntityRef entity, Vec3 force) override
 	{
 		auto iter = m_actors.find(entity);
 		if (!iter.isValid()) return;
@@ -3676,7 +3676,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 
-	void applyImpulseToActor(EntityRef entity, const Vec3& impulse) override
+	void applyImpulseToActor(EntityRef entity, Vec3 impulse) override
 	{
 		auto iter = m_actors.find(entity);
 		if (!iter.isValid()) return;
@@ -3739,7 +3739,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		return m_instanced_cubes[entity].half_extents;
 	}
 
-	void setInstancedCubeHalfExtents(EntityRef entity, const Vec3& half_extents) override {
+	void setInstancedCubeHalfExtents(EntityRef entity, Vec3 half_extents) override {
 		m_instanced_cubes[entity].half_extents = half_extents;
 	}
 
