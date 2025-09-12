@@ -34,3 +34,18 @@ function update(time_delta)
 	end
 end
 ```
+
+
+### Load another world as a partition of current world
+
+```lua
+function start()
+	level_partition = this.world:createPartition("level")
+	this.world:setActivePartition(level_partition)
+	this.world:load("maps/level01.unv", onLevelLoaded)
+end
+
+function onLevelLoaded()
+	LumixAPI.logError("level01 loaded")
+end
+```
