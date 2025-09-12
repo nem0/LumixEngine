@@ -52,6 +52,7 @@ GameView::GameView(StudioApp& app)
 	m_app.getSettings().registerOption("game_view_open", &m_is_open);
 	m_app.getSettings().registerOption("game_view_focus_on_game_start", &m_focus_on_game_start, "Game view", "Focus on game start");
 	m_app.getSettings().registerOption("game_view_capture_mouse_on_game_start", &m_capture_mouse_on_game_start, "Game view", "Capture mouse on game start");
+	m_app.getSettings().registerOption("game_view_merged_with_scene_view", &m_game_view_merged_with_scene_view, "Game view", "Merge game and scene view");
 }
 
 
@@ -195,6 +196,8 @@ void GameView::processInputEvents() {
 }
 
 void GameView::controlsGUI(WorldEditor& editor) {
+	if (m_game_view_merged_with_scene_view) return;
+	
 	Engine& engine = m_app.getEngine();
 	ImGui::SetNextItemWidth(50);
 	if (ImGui::DragFloat("Time multiplier", &m_time_multiplier, 0.01f, 0.01f, 30.0f)) {
@@ -229,8 +232,18 @@ void GameView::controlsGUI(WorldEditor& editor) {
 }
 
 
-void GameView::onGUI()
-{
+void GameView::onGUI() {
+	if (m_game_view_merged_with_scene_view) return;
+
+	const char* window_name = ICON_FA_CAMERA "Game View###game_view";
+	if (m_is_mouse_captured) {
+		window_name = ICON_FA_CAMERA "Game View (mouse captured)###game_view";
+	}
+
+	windowUI(window_name);
+}
+
+void GameView::windowUI(const char* window_name) {
 	PROFILE_FUNCTION();
 	WorldEditor& editor = m_app.getWorldEditor();
 	m_pipeline->setWorld(editor.getWorld());
@@ -251,10 +264,8 @@ void GameView::onGUI()
 		captureMouse(false);
 	}
 
-	const char* window_name = ICON_FA_CAMERA "Game View###game_view";
 	if (m_is_mouse_captured) {
 		window_name = ICON_FA_CAMERA "Game View (mouse captured)###game_view";
-		os::setCursor(m_cursor_type);
 	}
 	
 	if (m_is_fullscreen) {

@@ -5313,6 +5313,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		, m_model_plugin(app)
 		, m_procedural_geom_plugin(app)
 	{
+		m_scene_view.setGameView(m_game_view);
 		m_fbx_importer = createFBXImporter(app, app.getAllocator());
 	}
 

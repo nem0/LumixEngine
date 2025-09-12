@@ -32,9 +32,13 @@ struct LUMIX_RENDERER_API GameView : StudioApp::GUIPlugin {
 	bool isOpen() const { return m_is_open; }
 	void onToggleOpen() { m_is_open = !m_is_open; }
 	void onGUI() override;
+	void windowUI(const char* window_name);
 	void init();
 
 	bool m_is_open;
+	bool m_game_view_merged_with_scene_view = false;
+	bool m_capture_mouse_on_game_start = false;
+	Action m_posses_game_camera{"Game View", "Posses", "Posses game camera", "game_view_posses", ICON_FA_MALE};
 
 private:
 	void toggleFullscreen();
@@ -54,7 +58,6 @@ private:
 	bool m_is_fullscreen;
 	bool m_was_game_mode = false;
 	bool m_focus_on_game_start = false;
-	bool m_capture_mouse_on_game_start = false;
 	os::CursorType m_cursor_type = os::CursorType::DEFAULT;
 	struct
 	{

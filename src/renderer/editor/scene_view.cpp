@@ -25,6 +25,7 @@
 #include "renderer/draw_stream.h"
 #include "renderer/draw2d.h"
 #include "renderer/editor/editor_icon.h"
+#include "renderer/editor/game_view.h"
 #include "renderer/font.h"
 #include "renderer/gpu/gpu.h"
 #include "renderer/material.h"
@@ -1261,10 +1262,10 @@ void SceneView::onToolbar()
 		}
 	}
 
-	ImGui::SameLine();
 	const ImVec4 bg_color = ImGui::GetStyle().Colors[ImGuiCol_Text];
 	const ImVec4 col_active = ImGui::GetStyle().Colors[ImGuiCol_ButtonActive];
-	
+
+	ImGui::SameLine();
 	bool open_camera_transform = false;
 	if(ImGuiEx::ToolbarButton(m_app.getBigIconFont(), ICON_FA_CAMERA, bg_color, "Camera details")) {
 		open_camera_transform = true;
@@ -1301,7 +1302,14 @@ void SceneView::onToolbar()
 		m_app.getGizmoConfig().setStep(step);
 	}
 	ImGui::SetItemTooltip("%s", "Snap amount");
-	
+
+	if (m_game_view->m_game_view_merged_with_scene_view && m_editor.isGameMode()) {
+		ImGui::SameLine();
+		if (m_game_view->m_posses_game_camera.toolbarButton(m_app.getBigIconFont()) || m_app.checkShortcut(m_game_view->m_posses_game_camera, true)) {
+			m_game_view->captureMouse(true);
+		}
+	}
+
 	if (ImGui::BeginPopup("Debug")) {
 		auto option = [&](const char* label, Pipeline::DebugShow value) {
 			StaticString<64> tmp(label);
@@ -1349,7 +1357,6 @@ void SceneView::onToolbar()
 		if (inputRotation("Rotation", &vp.rot)) {
 			m_view->setViewport(vp);
 		}
-		ImGui::Selectable(ICON_FA_TIMES " Close");
 		ImGui::EndPopup();
 	}
 }
@@ -1610,6 +1617,21 @@ static void selectPrevSibling(WorldEditor& editor) {
 }
 
 void SceneView::onGUI() {
+	const char* title = ICON_FA_GLOBE "Scene View###Scene View";
+	if (m_log_ui.getUnreadErrorCount() > 0) title = ICON_FA_GLOBE "Scene View | " ICON_FA_EXCLAMATION_TRIANGLE " errors in log###Scene View";
+
+	bool is_game_mode = m_editor.isGameMode();
+	if (m_game_view->m_game_view_merged_with_scene_view && is_game_mode) {
+		if (!m_was_game_mode) {
+			m_game_view->captureMouse(true);
+		}
+		m_was_game_mode = is_game_mode;
+		if (m_game_view->isMouseCaptured()) {
+			m_game_view->windowUI(title);
+			return;
+		}
+	}
+	m_was_game_mode = is_game_mode;
 	PROFILE_FUNCTION();
 	WorldEditor& editor = m_app.getWorldEditor();		
 	if (m_is_mouse_captured && !m_app.isMouseCursorClipped()) captureMouse(false);
@@ -1622,8 +1644,6 @@ void SceneView::onGUI() {
 	m_pipeline->setWorld(m_editor.getWorld());
 	bool is_open = false;
 	ImVec2 view_pos;
-	const char* title = ICON_FA_GLOBE "Scene View###Scene View";
-	if (m_log_ui.getUnreadErrorCount() > 0) title = ICON_FA_GLOBE "Scene View | " ICON_FA_EXCLAMATION_TRIANGLE " errors in log###Scene View";
 
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 	ImVec2 view_size;

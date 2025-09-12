@@ -40,6 +40,7 @@ struct SceneView : StudioApp::GUIPlugin
 	void setViewportPosition(const DVec3& pos);
 	Quat getViewportRotation();
 	void setViewportRotation(const Quat& rot);
+	void setGameView(struct GameView& game_view) { m_game_view = &game_view; }
 
 private:
 	void cameraPreviewGUI(Vec2 size);
@@ -117,9 +118,11 @@ private:
 	LogUI& m_log_ui;
 	bool m_show_camera_preview = true;
 	bool m_mouse_wheel_changes_speed = true;
+	bool m_was_game_mode = false;
 	
 	WorldEditor& m_editor;
 	struct WorldViewImpl* m_view;
+	GameView* m_game_view = nullptr;
 
 	bool m_is_measure_active = false;
 	bool m_is_measure_from_set = false;
