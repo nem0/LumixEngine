@@ -3023,6 +3023,8 @@ struct StudioAppImpl final : StudioApp {
 
 	void setCaptureInput(bool capture) override {
 		m_capture_input = capture;
+		ImGui::GetIO().ClearInputKeys();
+		ImGui::GetIO().ClearInputMouse();
 	}
 
 	bool checkShortcut(Action& action, bool global = false) override {
