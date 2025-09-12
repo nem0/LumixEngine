@@ -606,6 +606,10 @@ static u16 LUA_createPartition(World* world, const char* name) {
 	return (u16)world->createPartition(name);
 }
 
+static void LUA_destroyPartition(World* world, u16 partition) {
+	world->destroyPartition(partition);
+}
+
 static u16 LUA_getActivePartition(World* world) {
 	return (u16)world->getActivePartition();
 }
@@ -737,6 +741,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	REGISTER_FUNCTION(getActivePartition);
 	REGISTER_FUNCTION(setActivePartition);
 	REGISTER_FUNCTION(createPartition);
+	REGISTER_FUNCTION(destroyPartition);
 	REGISTER_FUNCTION(getEntityName);
 	REGISTER_FUNCTION(getEntityLocalPosition);
 	REGISTER_FUNCTION(getEntityPosition);
@@ -980,6 +985,9 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 		end
 		function Lumix.World:createPartition(name)
 			return LumixAPI.createPartition(self.value, name)
+		end
+		function Lumix.World:destroyPartition(partition)
+			return LumixAPI.destroyPartition(self.value, partition)
 		end
 		function Lumix.World:instantiatePrefab(position, prefab)
 			return LumixAPI.instantiatePrefab(self, position, prefab._handle)
