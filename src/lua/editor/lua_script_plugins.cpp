@@ -1306,15 +1306,28 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 
 			ImGui::Separator();
 			i32 idx = 0;
-			for (const auto& res : resources) {
-				if (res.type != LuaScript::TYPE) continue;
-				if (!m_list_filter.pass(res.path)) continue;
+			if (ImGui::BeginTable("lua_scripts", 2, ImGuiTableFlags_Resizable)) {
+				ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
+				ImGui::TableSetupColumn("Directory");
+				for (const auto& res : resources) {
+					if (res.type != LuaScript::TYPE) continue;
+					if (!m_list_filter.pass(res.path)) continue;
 
-				if (ImGui::Selectable(res.path.c_str(), idx == m_selected_script) || (insert_enter && idx == m_selected_script)) {
-					m_app.getAssetBrowser().openEditor(res.path);
-					ImGui::CloseCurrentPopup();
+					PathInfo info(res.path);
+					StaticString<256> tmp(info.basename);
+
+					ImGui::TableNextRow();
+					ImGui::TableNextColumn();
+					bool clicked = ImGui::Selectable(tmp.data, idx == m_selected_script, ImGuiSelectableFlags_SpanAllColumns) || (insert_enter && idx == m_selected_script);
+					ImGui::TableNextColumn();
+					ImGui::TextUnformatted(info.dir.begin, info.dir.end);
+					if (clicked) {
+						m_app.getAssetBrowser().openEditor(res.path);
+						ImGui::CloseCurrentPopup();
+					}
+					++idx;
 				}
-				++idx;
+				ImGui::EndTable();
 			}
 
 			if (idx) m_selected_script = m_selected_script % idx;
