@@ -216,6 +216,7 @@ Settings::Settings(StudioApp& app)
 	m_last_save_time = os::Timer::getRawTimestamp();
 	registerOption("imgui_state", &m_imgui_state);
 	registerOption("settings_open", &m_is_open);
+	registerOption("show_settings_as_popup", &m_show_settings_as_popup, "General", "Show settings as popup");
 }
 
 float Settings::getTimeSinceLastSave() const {
@@ -1219,14 +1220,36 @@ void Settings::iterVars(const TextFilter& filter, u32 selected_tab) {
 }
 
 void Settings::gui() {
-	if (m_app.checkShortcut(m_toggle_ui_action, true)) m_is_open = !m_is_open;
+	bool is_popup = m_show_settings_as_popup;
+	
+	if (m_app.checkShortcut(m_toggle_ui_action, true)) {
+		if (is_popup) ImGui::OpenPopup(ICON_FA_COG "Settings##settings");
+		else m_is_open = !m_is_open;
+	}
+	if (is_popup) m_is_open = ImGui::IsPopupOpen(ICON_FA_COG "Settings##settings");
 	if (!m_is_open) return;
-	if (ImGui::Begin(ICON_FA_COG "Settings##settings", &m_is_open, m_dirty ? ImGuiWindowFlags_UnsavedDocument : 0)) {
+	
+	bool open;
+	if (is_popup) {
+		const ImGuiViewport* viewport = ImGui::GetMainViewport();
+		ImVec2 size = viewport->Size;
+		size.x *= 0.4f;
+		size.y *= 0.8f;
+		ImVec2 pos = ImVec2(viewport->Pos.x + (viewport->Size.x - size.x) * 0.5f, viewport->Pos.y + (viewport->Size.y - size.y) * 0.5f);
+		ImGui::SetNextWindowPos(pos);
+		ImGui::SetNextWindowSize(size, ImGuiCond_Always);
+		open = ImGui::BeginPopup(ICON_FA_COG "Settings##settings", ImGuiWindowFlags_NoNavInputs | (m_dirty ? ImGuiWindowFlags_UnsavedDocument : 0));
+	}
+	else {
+		open = ImGui::Begin(ICON_FA_COG "Settings##settings", &m_is_open, m_dirty ? ImGuiWindowFlags_UnsavedDocument : 0);
+	}
+
+	if (open) {
 		static u32 selected = 0;
 		
 		static TextFilter filter;
 		if (m_app.checkShortcut(m_focus_search)) ImGui::SetKeyboardFocusHere();
-		filter.gui("Filter", -1, false, &m_focus_search, false);
+		filter.gui("Filter", -1, is_popup && ImGui::IsWindowAppearing(), &m_focus_search, false);
 		ImGui::Separator();
 
 		if (filter.isActive()) {
@@ -1281,8 +1304,9 @@ void Settings::gui() {
 			}
 			ImGui::EndChild();
 		}
+		if (is_popup) ImGui::EndPopup();
 	}
-	ImGui::End();
+	if (!is_popup) ImGui::End();
 }
 
 bool Settings::getBool(const char* var_name, bool default_value) {

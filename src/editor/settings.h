@@ -113,6 +113,7 @@ struct LUMIX_EDITOR_API Settings {
 	bool m_is_open = false;
 	u64 m_last_save_time = 0;
 	bool m_dirty = false;
+	bool m_show_settings_as_popup = true;
 	Action* m_edit_action = nullptr;
 	Action m_toggle_ui_action{"Settings", "Settings", "Toggle UI", "settings_toggle_ui", "", Action::WINDOW};
 	Action m_focus_search{"Settings", "Focus search", "Focus shortcut search", "settings_focus_search", ""};
