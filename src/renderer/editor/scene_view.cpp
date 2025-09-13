@@ -1621,6 +1621,9 @@ void SceneView::onGUI() {
 	if (m_log_ui.getUnreadErrorCount() > 0) title = ICON_FA_GLOBE "Scene View | " ICON_FA_EXCLAMATION_TRIANGLE " errors in log###Scene View";
 
 	bool is_game_mode = m_editor.isGameMode();
+	if (m_was_game_mode && !is_game_mode && m_game_view->m_game_view_merged_with_scene_view) {
+		m_game_view->captureMouse(false);
+	}
 	if (m_game_view->m_game_view_merged_with_scene_view && is_game_mode) {
 		if (!m_was_game_mode) {
 			m_game_view->captureMouse(true);
