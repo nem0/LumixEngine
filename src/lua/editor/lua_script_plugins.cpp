@@ -13,6 +13,7 @@
 #include "core/array.h"
 #include "core/command_line_parser.h"
 #include "core/crt.h"
+#include "core/defer.h"
 #include "core/hash.h"
 #include "core/log.h"
 #include "core/math.h"
@@ -476,6 +477,7 @@ struct EditorWindow : AssetEditorWindow {
 			underline();
 
 			m_analysis.registerOpenEditor(m_path, m_code_editor.get());
+			m_is_code_editor_appearing = true;
 		}
 	}
 
@@ -502,6 +504,8 @@ struct EditorWindow : AssetEditorWindow {
 		}
 
 		if (m_code_editor) {
+			if (m_is_code_editor_appearing) m_code_editor->focus();
+			m_is_code_editor_appearing = false;
 			if (m_code_editor->gui("codeeditor", ImVec2(0, 0), m_app.getMonospaceFont(), m_app.getDefaultFont())) {
 				m_dirty = true;
 				m_analysis.markDirty(m_path);
@@ -604,6 +608,7 @@ struct EditorWindow : AssetEditorWindow {
 		u32 m_autocomplete_selection_idx = 0;
 		TextFilter m_autocomplete_filter;
 	#endif
+	bool m_is_code_editor_appearing = false;
 };
 
 static bool gatherRequires(Span<const u8> src, Lumix::Array<Path>& dependencies, const Path& path) {
@@ -1260,7 +1265,66 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 		initPlugins();
 	}
 
+	void ui() {
+		bool focus = false;
+		if (m_app.checkShortcut(m_show_lua_script_list_action, true)) {
+			ImGui::OpenPopup("Lua Script list");
+			focus = true;
+		}
+		
+		const ImGuiViewport* viewport = ImGui::GetMainViewport();
+		ImVec2 size = viewport->Size;
+		size.x *= 0.4f;
+		size.y *= 0.8f;
+		ImVec2 pos = ImVec2(viewport->Pos.x + (viewport->Size.x - size.x) * 0.5f, viewport->Pos.y + (viewport->Size.y - size.y) * 0.5f);
+		ImGui::SetNextWindowPos(pos);
+		ImGui::SetNextWindowSize(size, ImGuiCond_Always);
+
+		if (ImGui::BeginPopup("Lua Script list", ImGuiWindowFlags_NoNavInputs)) {
+			if (ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
+			
+			if (m_list_filter.gui("Search", -1, focus, nullptr, false)) {
+				
+			}
+
+			AssetCompiler& compiler = m_app.getAssetCompiler();
+			auto& resources = compiler.lockResources();
+			defer { compiler.unlockResources(); };
+			
+			const bool insert_enter = ImGui::IsItemFocused() && ImGui::IsKeyPressed(ImGuiKey_Enter);
+			bool moved = false;
+			if (ImGui::IsItemFocused()) {
+				if (ImGui::IsKeyPressed(ImGuiKey_UpArrow) && m_selected_script > 0) {
+					--m_selected_script;
+					moved = true;
+				}
+				if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
+					++m_selected_script;
+					moved = true;
+				}
+			}
+
+			ImGui::Separator();
+			i32 idx = 0;
+			for (const auto& res : resources) {
+				if (res.type != LuaScript::TYPE) continue;
+				if (!m_list_filter.pass(res.path)) continue;
+
+				if (ImGui::Selectable(res.path.c_str(), idx == m_selected_script) || (insert_enter && idx == m_selected_script)) {
+					m_app.getAssetBrowser().openEditor(res.path);
+					ImGui::CloseCurrentPopup();
+				}
+				++idx;
+			}
+
+			if (idx) m_selected_script = m_selected_script % idx;
+
+			ImGui::EndPopup();
+		}
+	}
+
 	void update(float) override {
+		ui();
 		for (LuaAction* action : m_lua_actions) {
 			if (m_app.checkShortcut(*action->action, true)) action->run();
 		}
@@ -1852,6 +1916,9 @@ struct SetPropertyVisitor : reflection::IPropertyVisitor {
 	Array<LuaAction*> m_lua_actions;
 	Array<StudioLuaPlugin*> m_plugins;
 	bool m_lua_debug_enabled = true;
+	Action m_show_lua_script_list_action{"Lua", "List Lua scripts", "List Lua scripts", "list_lua_scripts", ""};
+	TextFilter m_list_filter;
+	i32 m_selected_script = 0;
 };
 
 
