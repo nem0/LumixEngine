@@ -504,7 +504,7 @@ struct EditorWindow : AssetEditorWindow {
 		}
 
 		if (m_code_editor) {
-			if (m_is_code_editor_appearing) m_code_editor->focus();
+			if (m_is_code_editor_appearing || ImGui::IsWindowAppearing()) m_code_editor->focus();
 			m_is_code_editor_appearing = false;
 			if (m_code_editor->gui("codeeditor", ImVec2(0, 0), m_app.getMonospaceFont(), m_app.getDefaultFont())) {
 				m_dirty = true;
