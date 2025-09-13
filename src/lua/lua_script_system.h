@@ -96,6 +96,8 @@ struct LuaScriptModule : IModule {
 	//@ end
 	virtual void createInlineScript(EntityRef entity) = 0;
 	virtual void destroyInlineScript(EntityRef entity) = 0;
+	virtual int getInlineEnvironment(EntityRef entity) = 0;
+
 };
 
 
