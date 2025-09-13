@@ -62,6 +62,9 @@ struct LuaScriptModule : IModule {
 		virtual void addEnvironment(int env) = 0;
 	};
 
+	virtual void deferEntityDestruction(EntityRef entity) = 0;
+	virtual void deferPartitionDestruction(u16 partition) = 0;
+
 	//@ component Script id lua_script label "File"
 	//@ array Script scripts
 	virtual bool isScriptEnabled(EntityRef entity, int scr_index) = 0;

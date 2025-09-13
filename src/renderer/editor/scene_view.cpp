@@ -1298,7 +1298,7 @@ void SceneView::onToolbar()
 	ImGui::SameLine();
 	ImGui::TextUnformatted(mode_action->font_icon);
 	ImGui::SameLine();
-	if (ImGui::DragFloat("##gizmoStep", &step, 1.0f, 0, 200)) {
+	if (ImGui::DragFloat("##gizmoStep", &step, 1.0f, 0, 200, "%.4f", ImGuiSliderFlags_NoRoundToFormat)) {
 		m_app.getGizmoConfig().setStep(step);
 	}
 	ImGui::SetItemTooltip("%s", "Snap amount");

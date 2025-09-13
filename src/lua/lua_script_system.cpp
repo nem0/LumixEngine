@@ -815,6 +815,8 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 	LuaScriptModuleImpl(LuaScriptSystemImpl& system, World& world)
 		: m_system(system)
 		, m_world(world)
+		, m_deferred_destructions(system.m_allocator)
+		, m_deferred_partition_destructions(system.m_allocator)
 		, m_scripts(system.m_allocator)
 		, m_inline_scripts(system.m_allocator)
 		, m_updates(system.m_allocator)
@@ -1938,6 +1940,16 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 			LuaWrapper::pcall(update_item.state, 1, 0);
 			lua_pop(update_item.state, 1);
 		}
+
+		for (EntityRef e : m_deferred_destructions) {
+			m_world.destroyEntity(e);
+		}
+		m_deferred_destructions.clear();
+
+		for (World::PartitionHandle p : m_deferred_partition_destructions) {
+			m_world.destroyPartition(p);
+		}
+		m_deferred_partition_destructions.clear();
 	}
 
 
@@ -2022,6 +2034,13 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 		if (beginFunctionCall(entity, scr_index, fn)) endFunctionCall();
 	}
 
+	void deferPartitionDestruction(u16 partition) override {
+		m_deferred_partition_destructions.push(partition);
+	}
+
+	void deferEntityDestruction(EntityRef entity) override {
+		m_deferred_destructions.push(entity);
+	}
 
 	void enableScript(EntityRef entity, int scr_index, bool enable) override
 	{
@@ -2181,6 +2200,8 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 	};
 
 	LuaScriptSystemImpl& m_system;
+	Array<EntityRef> m_deferred_destructions;
+	Array<World::PartitionHandle> m_deferred_partition_destructions;
 	HashMap<EntityRef, ScriptComponent*> m_scripts;
 	HashMap<EntityRef, InlineScriptComponent> m_inline_scripts;
 	HashMap<StableHash, String> m_property_names;

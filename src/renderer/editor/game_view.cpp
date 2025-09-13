@@ -235,12 +235,12 @@ void GameView::controlsGUI(WorldEditor& editor) {
 void GameView::onGUI() {
 	if (m_game_view_merged_with_scene_view) return;
 
-	const char* window_name = ICON_FA_CAMERA "Game View###game_view";
+	const char* window_label = ICON_FA_CAMERA "Game View###game_view";
 	if (m_is_mouse_captured) {
-		window_name = ICON_FA_CAMERA "Game View (mouse captured)###game_view";
+		window_label = ICON_FA_CAMERA "Game View (mouse captured)###game_view";
 	}
 
-	windowUI(window_name);
+	windowUI(window_label);
 }
 
 void GameView::windowUI(const char* window_name) {
@@ -264,10 +264,6 @@ void GameView::windowUI(const char* window_name) {
 		captureMouse(false);
 	}
 
-	if (m_is_mouse_captured) {
-		window_name = ICON_FA_CAMERA "Game View (mouse captured)###game_view";
-	}
-	
 	if (m_is_fullscreen) {
 		onFullscreenGUI(editor);
 		return;
