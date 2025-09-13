@@ -1241,7 +1241,7 @@ struct StudioAppImpl final : StudioApp {
 			else if (checkShortcut(m_start_standalone_app, true)) startStandaloneApp();
 			else if (checkShortcut(m_next_frame, true)) m_engine->nextFrame();
 			else if (checkShortcut(m_pause_game, true)) m_engine->pause(!m_engine->isPaused());
-			else if (checkShortcut(m_toggle_game_mode, true)) m_editor->toggleGameMode();
+			else if (checkShortcut(m_toggle_game_mode, true, true)) m_editor->toggleGameMode();
 			else if (checkShortcut(m_new_world_action, true)) newWorld();
 			else if (checkShortcut(m_exit_action, true)) exit();
 			else if (checkShortcut(m_show_export_action, true)) m_is_export_game_dialog_open = true;
@@ -3027,8 +3027,8 @@ struct StudioAppImpl final : StudioApp {
 		ImGui::GetIO().ClearInputMouse();
 	}
 
-	bool checkShortcut(Action& action, bool global = false) override {
-		if (m_capture_input) return false;
+	bool checkShortcut(Action& action, bool global = false, bool force = false) override {
+		if (m_capture_input && !force) return false;
 
 		if(action.request) {
 			action.request = false;
