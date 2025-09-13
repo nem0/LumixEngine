@@ -288,7 +288,7 @@ void GameView::windowUI(const char* window_name) {
 
 		const ImVec2 content_min = ImGui::GetCursorScreenPos();
 		view_size = ImGui::GetContentRegionAvail();
-		view_size.y -= ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().ItemSpacing.y * 3;
+		if (!m_game_view_merged_with_scene_view) view_size.y -= ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().ItemSpacing.y * 3;
 		ImVec2 content_max(content_min.x + view_size.x, content_min.y + view_size.y);
 		if (m_forced_viewport.enabled) view_size = { (float)m_forced_viewport.width, (float)m_forced_viewport.height };
 		if (view_size.x > 0 && view_size.y > 0) {
