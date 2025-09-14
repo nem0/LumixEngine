@@ -269,7 +269,7 @@ void GameView::windowUI(const char* window_name) {
 		return;
 	}
 
-	if (!m_is_open) {
+	if (!m_is_open && !m_game_view_merged_with_scene_view) {
 		captureMouse(false);
 		return;
 	}

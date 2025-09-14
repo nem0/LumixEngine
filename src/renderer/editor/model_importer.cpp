@@ -1290,16 +1290,13 @@ void ModelImporter::writeModelHeader()
 }
 
 bool ModelImporter::writePhysics(const Path& src, const ModelMeta& meta) {
+	PhysicsSystem* ps = (PhysicsSystem*)m_app.getEngine().getSystemManager().getSystem("physics");
+	if (!ps) return true;
+	
 	if (m_meshes.empty()) return true;
 	if (meta.physics == ModelMeta::Physics::NONE) return true;
 
 	Array<Vec3> verts(m_allocator);
-	PhysicsSystem* ps = (PhysicsSystem*)m_app.getEngine().getSystemManager().getSystem("physics");
-	if (!ps) {
-		logError(src, ": no physics system found while trying to cook physics data");
-		return false;
-	}
-
 	PhysicsGeometry::Header header;
 	header.m_magic = PhysicsGeometry::HEADER_MAGIC;
 	header.m_version = (u32)PhysicsGeometry::Versions::LAST;
