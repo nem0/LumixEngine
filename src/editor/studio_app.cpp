@@ -1215,7 +1215,8 @@ struct StudioAppImpl final : StudioApp {
 		}
 		ImGui::PushFont(m_font);
 
-		if (os::getFocused() != m_main_window && m_cursor_clipped) unclipMouseCursor();
+		os::WindowHandle focused = os::getFocused();
+		if ( m_windows.indexOf(focused) < 0 && focused != m_main_window && m_cursor_clipped) unclipMouseCursor();
 	}
 
 	u32 getDockspaceID() const override {
