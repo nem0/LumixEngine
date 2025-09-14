@@ -1579,7 +1579,7 @@ struct ProfilerUIImpl final : ProfilerUI {
 			snapshot();
 		}
 
-		if (ImGui::Button(ICON_FA_DOWNLOAD) || m_app.checkShortcut(m_snapshot)) {
+		if (ImGui::Button(ICON_FA_DOWNLOAD) || m_app.checkShortcut(m_snapshot, true, true)) {
 			snapshot();
 		}
 

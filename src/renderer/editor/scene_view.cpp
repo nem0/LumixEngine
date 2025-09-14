@@ -1249,8 +1249,7 @@ void SceneView::onToolbar()
 	};
 
 	auto pos = ImGui::GetCursorScreenPos();
-	const float toolbar_height = ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().FramePadding.y * 2;
-	if (ImGuiEx::BeginToolbar("scene_view_toolbar", pos, ImVec2(0, toolbar_height))) {
+	if (ImGuiEx::BeginToolbar("scene_view_toolbar", pos)) {
 		for (Action* action : actions) {
 			if (action) {
 				action->toolbarButton(m_app.getBigIconFont());
@@ -1272,7 +1271,6 @@ void SceneView::onToolbar()
 	}
 
 	ImGui::PushItemWidth(50);
-	float offset = (toolbar_height - ImGui::GetTextLineHeightWithSpacing()) / 2;
 	
 	Action* mode_action;
 	if (m_app.getGizmoConfig().isTranslateMode()) {
@@ -1296,7 +1294,9 @@ void SceneView::onToolbar()
 	ImGuiEx::VSeparator(3);
 
 	ImGui::SameLine();
+	ImGui::PushFont(m_app.getBigIconFont());
 	ImGui::TextUnformatted(mode_action->font_icon);
+	ImGui::PopFont();
 	ImGui::SameLine();
 	if (ImGui::DragFloat("##gizmoStep", &step, 1.0f, 0, 200, "%.4f", ImGuiSliderFlags_NoRoundToFormat)) {
 		m_app.getGizmoConfig().setStep(step);

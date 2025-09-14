@@ -435,7 +435,7 @@ namespace ImGuiEx {
 	}
 
 
-	bool BeginToolbar(const char* str_id, ImVec2 screen_pos, ImVec2 size)
+	bool BeginToolbar(const char* str_id, ImVec2 screen_pos)
 	{
 		bool is_global = GImGui->CurrentWindowStack.Size == 1;
 		SetNextWindowPos(screen_pos);
@@ -445,10 +445,8 @@ namespace ImGuiEx {
 		PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
 		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
 			ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings;
-		if (size.x == 0) size.x = GetContentRegionAvail().x;
-		SetNextWindowSize(size);
 
-		bool ret = is_global ? Begin(str_id, nullptr, flags) : BeginChild(str_id, size, false, flags);
+		bool ret = is_global ? Begin(str_id, nullptr, flags) : BeginChild(str_id, ImVec2(0, 0), ImGuiChildFlags_AutoResizeY, flags);
 		PopStyleVar(3);
 
 		return ret;

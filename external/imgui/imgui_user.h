@@ -16,7 +16,7 @@ IMGUI_API void VSeparator(float thickness = 1.f);
 
 IMGUI_API void BringToFront();
 
-IMGUI_API bool BeginToolbar(const char* str_id, ImVec2 screen_pos, ImVec2 size);
+IMGUI_API bool BeginToolbar(const char* str_id, ImVec2 screen_pos);
 IMGUI_API void EndToolbar();
 IMGUI_API bool ToolbarButton(ImFont* font, const char* font_icon, const ImVec4& bg_color, const char* tooltip);
 
