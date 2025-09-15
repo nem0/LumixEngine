@@ -81,6 +81,16 @@ struct LuauAnalysis :Luau::FileResolver {
 		}
 	}
 
+	std::optional<Luau::ModuleInfo> resolveModule(const Luau::ModuleInfo* context, Luau::AstExpr* node) override {
+		if (Luau::AstExprConstantString* expr = node->as<Luau::AstExprConstantString>()) {
+			Luau::ModuleName name = std::string(expr->value.data, expr->value.size) + ".lua";
+			return {{name}};
+		}
+
+		return std::nullopt;
+	}
+
+
 	void report(const Luau::LoadDefinitionFileResult& result) {
 		if (result.module) {
 			for (const Luau::TypeError& e : result.module->errors) {
@@ -154,18 +164,27 @@ struct LuauAnalysis :Luau::FileResolver {
 
 	void markDirty(const Path& path) {
 		m_luau_frontend.markDirty(path.c_str()); 
+		// TODO this takes a lot of time, move into a thread
 		m_luau_frontend.queueModuleCheck(path.c_str());
-		Luau::FrontendOptions options;
-		options.forAutocomplete = true;
-		// TODO don't do this on every change
-		m_luau_frontend.checkQueuedModules(options);
+	}
+
+	void update(float time_delta) {
+		static float timer = 1.0f;
+		timer -= time_delta;
+		if (timer < 0) {
+			Luau::FrontendOptions options;
+			options.forAutocomplete = true;
+			PROFILE_BLOCK("Luau check modules");
+			m_luau_frontend.checkQueuedModules(options);
+			timer = 1.0f;
+		}
 	}
 
 	std::optional<Luau::SourceCode> readSource(const Luau::ModuleName& name) override {
 		for (const LuauAnalysis::OpenEditor& editor : m_open_editors) {
 			if (editor.path == name.c_str()) {
 				Luau::SourceCode res;
-				res.type = Luau::SourceCode::Local;
+				res.type = Luau::SourceCode::Module;
 				OutputMemoryStream blob(m_app.getAllocator());
 				editor.editor->serializeText(blob);
 				res.source = std::string(blob.data(), blob.data() + blob.size());
@@ -176,7 +195,7 @@ struct LuauAnalysis :Luau::FileResolver {
 		OutputMemoryStream blob(m_app.getAllocator());
 		if (!m_app.getEngine().getFileSystem().getContentSync(Path(name.c_str()), blob)) return {};
 		Luau::SourceCode res;
-		res.type = Luau::SourceCode::Local;
+		res.type = Luau::SourceCode::Module;
 		res.source = std::string(blob.data(), blob.data() + blob.size());
 		return res;
 	}
@@ -201,7 +220,6 @@ struct LuauAnalysis :Luau::FileResolver {
 	Luau::NullConfigResolver m_luau_config_resolver;
 	Action m_go_to_action{ "Luau", "Go To", "Go to", "luau_go_to", "" };
 	Action m_autocomplete_action{"Luau", "Autocomplete", "Autocomplete", "luau_autocomplete", "" };
-
 };
 #else
 	struct LuauAnalysis { 
@@ -452,11 +470,14 @@ struct EditorWindow : AssetEditorWindow {
 
 	void underline() {
 		#ifdef LUMIX_LUAU_ANALYSIS
-			Luau::FrontendOptions options;
-			options.forAutocomplete = true;
-			Luau::CheckResult check_res = m_analysis.m_luau_frontend.check(m_path.c_str(), options);
+			PROFILE_BLOCK("Lua editor underline");
+			std::optional<Luau::CheckResult> check_res = m_analysis.m_luau_frontend.getCheckResult(m_path.c_str(), false, true);
 			
-			for (const Luau::TypeError& err : check_res.errors) {
+			if (!check_res.has_value()) return;
+			m_underline_dirty = false;
+
+			for (const Luau::TypeError& err : check_res.value().errors) {
+				if (strcmp(err.moduleName.c_str(), m_path.c_str()) != 0) continue;
 				const char* msg;
 				std::string msg_str;
 				if (const auto* syntax_error = Luau::get_if<Luau::SyntaxError>(&err.data))
@@ -479,7 +500,8 @@ struct EditorWindow : AssetEditorWindow {
 			v.end = (const char*)data.end();
 			m_code_editor = createLuaCodeEditor(m_app);
 			m_code_editor->setText(v);
-			underline();
+			m_analysis.markDirty(m_path);
+			m_underline_dirty = true;
 
 			m_analysis.registerOpenEditor(m_path, m_code_editor.get());
 			m_is_code_editor_appearing = true;
@@ -493,7 +515,14 @@ struct EditorWindow : AssetEditorWindow {
 		m_dirty = false;
 	}
 	
+	void markDirty() {
+		m_dirty = true;
+		m_analysis.markDirty(m_path);
+		m_underline_dirty = true;
+	}
+
 	void windowGUI() override {
+		PROFILE_BLOCK("lua editor gui");
 		CommonActions& actions = m_app.getCommonActions();
 
 		if (ImGui::BeginMenuBar()) {
@@ -511,10 +540,9 @@ struct EditorWindow : AssetEditorWindow {
 		if (m_code_editor) {
 			if (m_is_code_editor_appearing || ImGui::IsWindowAppearing()) m_code_editor->focus();
 			m_is_code_editor_appearing = false;
+			if (m_underline_dirty) underline();
 			if (m_code_editor->gui("codeeditor", ImVec2(0, 0), m_app.getMonospaceFont(), m_app.getDefaultFont())) {
-				m_dirty = true;
-				m_analysis.markDirty(m_path);
-				underline();
+				markDirty();
 			}
 			#ifdef LUMIX_LUAU_ANALYSIS
 				if (m_code_editor->canHandleInput()) {
@@ -536,8 +564,7 @@ struct EditorWindow : AssetEditorWindow {
 								m_code_editor->selectWord();
 								m_code_editor->insertText(m_autocomplete_list[0].c_str());
 								m_autocomplete_list.clear();
-								m_analysis.markDirty(m_path);
-								underline();
+								markDirty();
 							}
 							else {
 								ImGui::OpenPopup("autocomplete");
@@ -582,8 +609,7 @@ struct EditorWindow : AssetEditorWindow {
 						if (ImGui::Selectable(s.c_str(), is_selected) || is_enter && i == m_autocomplete_selection_idx) {
 							m_code_editor->selectWord();
 							m_code_editor->insertText(s.c_str());
-							m_analysis.markDirty(m_path);
-							underline();
+							markDirty();
 							ImGui::CloseCurrentPopup();
 							m_code_editor->focus();
 							m_autocomplete_list.clear();
@@ -614,6 +640,7 @@ struct EditorWindow : AssetEditorWindow {
 		TextFilter m_autocomplete_filter;
 	#endif
 	bool m_is_code_editor_appearing = false;
+	bool m_underline_dirty = true;
 };
 
 static bool gatherRequires(Span<const u8> src, Lumix::Array<Path>& dependencies, const Path& path) {
@@ -1253,8 +1280,6 @@ struct LuaAction {
 	int ref_action;
 };
 
-
-
 struct StudioAppPlugin : StudioApp::IPlugin {
 	StudioAppPlugin(StudioApp& app)
 		: m_app(app)
@@ -1270,7 +1295,9 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 		initPlugins();
 	}
 
-	void update(float) override {
+	void update(float time_delta) override {
+		m_luau_analysis.update(time_delta);
+
 		for (LuaAction* action : m_lua_actions) {
 			if (m_app.checkShortcut(*action->action, true)) action->run();
 		}

@@ -102,13 +102,13 @@ struct ArenaAllocator : IAllocator {
 	}
 	
 	void* allocate(size_t size) override {
-		if (allocated + size > commited) {
+		if (allocated + size > comitted) {
 			static constexpr size_t PAGE_SIZE = 4096;
 			size_t required = allocated + size;
 			size_t new_commited = (required + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
 			if (new_commited > CAPACITY) return nullptr;
-			if (!VirtualAlloc((char*)mem + commited, new_commited - commited, MEM_COMMIT, PAGE_READWRITE)) return nullptr;
-			commited = new_commited;
+			if (!VirtualAlloc((char*)mem + comitted, new_commited - comitted, MEM_COMMIT, PAGE_READWRITE)) return nullptr;
+			comitted = new_commited;
 		}
 
 		allocated += size;
@@ -119,7 +119,7 @@ struct ArenaAllocator : IAllocator {
 
 	void* mem;
 	size_t allocated = 0;
-	size_t commited = 0;
+	size_t comitted = 0;
 };
 
 struct StringView {
@@ -2146,7 +2146,7 @@ void serializeLuaTypes(OutputStream& out_formatted) {
 		Key_UpArrow : number
 	}
 
-	type Resource = {
+	export type Resource = {
 		newEmpty: (Resource, string) -> Resource,
 		getPath: (Resource) -> string,
 		path : string,
@@ -2157,7 +2157,7 @@ void serializeLuaTypes(OutputStream& out_formatted) {
 		Entity : Entity
 	}
 
-	type World = {
+	export type World = {
 		getActivePartition : (World) -> number,
 		setActivePartition : (World, number) -> (),
 		createPartition : (World, string) -> number,
@@ -2213,7 +2213,7 @@ void serializeLuaTypes(OutputStream& out_formatted) {
 	}
 
 	out.add(R"#(
-	type Entity = {
+	export type Entity = {
 		NULL : Entity,
 		world : World,
 		name : string,
