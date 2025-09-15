@@ -82,6 +82,12 @@ struct LuauAnalysis :Luau::FileResolver {
 	}
 
 	void report(const Luau::LoadDefinitionFileResult& result) {
+		if (!result.success) {
+			for (const Luau::TypeError& e : result.module->errors) {
+				std::string error = Luau::toString(e);
+				logError("scripts/lumix.d.lua:", e.location.begin.line, ": ", e.location.begin.column, ": ", error.c_str());
+			}
+		}
 		for (const Luau::ParseError& e : result.parseResult.errors) {
 			const Luau::Location& loc = e.getLocation();
 			logError("scripts/lumix.d.lua:", loc.begin.line, ":", loc.begin.column, ": ", e.getMessage().c_str());
