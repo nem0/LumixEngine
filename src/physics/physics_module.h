@@ -34,13 +34,14 @@ struct RigidTransform;
 struct World;
 template <typename T> struct DelegateList;
 
-
+//@ struct
 struct RaycastHit {
 	Vec3 position;
 	Vec3 normal;
 	EntityPtr entity;
 };
 
+//@ struct
 struct SweepHit {
 	Vec3 position;
 	Vec3 normal;

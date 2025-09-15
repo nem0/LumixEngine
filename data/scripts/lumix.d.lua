@@ -74,534 +74,560 @@ declare ImGui: {
 	Key_UpArrow : number
 }
 
-declare class World
-	getActivePartition : (World) -> number
-	setActivePartition : (World, number) -> ()
-	createPartition : (World, string) -> number
-	load : (World, string, any) -> ()
-	getModule : (string) -> any
-	createEntity : () -> Entity
-	createEntityEx : (any) -> Entity
-	findEntityByName : (string) -> Entity
-	animation: animation_module
-	audio: audio_module
-	core: core_module
-	gui: gui_module
-	lua_script: lua_script_module
-	navigation: navigation_module
-	physics: physics_module
-	renderer: renderer_module
-end
+type Resource = {
+	newEmpty: (Resource, string) -> Resource,
+	getPath: (Resource) -> string,
+	path : string,
+}
 
-declare class Ray
-	origin: DVec3
-	dir: Vec3
-end
+declare Lumix : {
+	Resource : Resource,
+	Entity : Entity
+}
 
-declare class RayCastModelHit
-	is_hit: boolean
-	t: number
-	origin: DVec3
-	dir: Vec3
-	mesh: any
-	entity: Entity?
-	component_type: any
-	subindex: number
-end
+type World = {
+	getActivePartition : (World) -> number,
+	setActivePartition : (World, number) -> (),
+	createPartition : (World, string) -> number,
+	destroyPartition : (World, number) -> (),
+	load : (World, string, any) -> (),
+	getModule : (World, string) -> any,
+	createEntity : (World) -> Entity,
+	createEntityEx : (World, any) -> Entity,
+	findEntityByName : (World, Entity, string) -> Entity,
+	animation: animation_module,
+	audio: audio_module,
+	core: core_module,
+	gui: gui_module,
+	lua_script: lua_script_module,
+	navigation: navigation_module,
+	physics: physics_module,
+	renderer: renderer_module,
+}
 
-declare class AssetBrowser
-	openEditor: (AssetBrowser, string) -> ()
-end
+type Ray = {
+	origin: DVec3,
+	dir: Vec3,
+}
 
-declare class GUISystem
-	enableCursor: (GUISystem, boolean) -> ()
-end
+type RaycastHit = {
+	position: Vec3,
+	normal: Vec3,
+	entity: Entity?,
+}
 
-declare class SceneView
-end
+type SweepHit = {
+	position: Vec3,
+	normal: Vec3,
+	entity: Entity?,
+	distance: number,
+}
 
-declare class animation_module
-end
+type RayCastModelHit = {
+	is_hit: boolean,
+	t: number,
+	origin: DVec3,
+	dir: Vec3,
+	mesh: any,
+	entity: Entity?,
+	component_type: any,
+	subindex: number,
+}
 
-declare class property_animator_component
-	enabled: boolean
-	looped: boolean
-	animation: string
-end
+type AssetBrowser = {
+	openEditor: (AssetBrowser, string) -> (),
+}
 
-declare class animator_component
-	source: string
-	use_root_motion: boolean
-	default_set: number
-	applySet: (animator_component, number) -> ()
-	setBoolInput: (animator_component, number, boolean) -> ()
-	setFloatInput: (animator_component, number, number) -> ()
-	setVec3Input: (animator_component, number, Vec3) -> ()
-	getInputIndex: (animator_component, any) -> number
-end
+type GUISystem = {
+	enableCursor: (GUISystem, boolean) -> (),
+}
 
-declare class animable_component
-	animation: string
-end
+type SceneView = {
+}
 
-declare class audio_module
-	play: (audio_module, Entity, string, boolean) -> any
-	setMasterVolume: (audio_module, number) -> ()
-	stop: (audio_module, any) -> ()
-	isEnd: (audio_module, any) -> boolean
-	setFrequency: (audio_module, any, number) -> ()
-	setVolume: (audio_module, any, number) -> ()
-	setEcho: (audio_module, any, number, number, number, number) -> ()
-end
+type animation_module = {
+}
 
-declare class echo_zone_component
-	radius: number
-	delay: number
-end
+type property_animator_component =  {
+	enabled: boolean,
+	looped: boolean,
+	animation: string,
+}
 
-declare class chorus_zone_component
-	radius: number
-	delay: number
-end
+type animator_component =  {
+	source: string,
+	use_root_motion: boolean,
+	default_set: number,
+	applySet: (animator_component, number) -> (),
+	setBoolInput: (animator_component, number, boolean) -> (),
+	setFloatInput: (animator_component, number, number) -> (),
+	setVec3Input: (animator_component, number, Vec3) -> (),
+	getInputIndex: (animator_component, any) -> number,
+}
 
-declare class audio_listener_component
-end
+type animable_component =  {
+	animation: string,
+}
 
-declare class ambient_sound_component
-	clip: string
-	is_3d: boolean
-	pause: (ambient_sound_component) -> ()
-	resume: (ambient_sound_component) -> ()
-end
+type audio_module = {
+	play: (audio_module, Entity, string, boolean) -> any,
+	setMasterVolume: (audio_module, number) -> (),
+	stop: (audio_module, any) -> (),
+	isEnd: (audio_module, any) -> boolean,
+	setFrequency: (audio_module, any, number) -> (),
+	setVolume: (audio_module, any, number) -> (),
+	setEcho: (audio_module, any, number, number, number, number) -> (),
+}
 
-declare class core_module
-end
+type echo_zone_component =  {
+	radius: number,
+	delay: number,
+}
 
-declare class spline_component
-end
+type chorus_zone_component =  {
+	radius: number,
+	delay: number,
+}
 
-declare class signal_component
-end
+type audio_listener_component =  {
+}
 
-declare class gui_module
-	getRectAt: (gui_module, Vec2) -> Entity?
-	isOver: (gui_module, Vec2, Entity) -> boolean
-	getSystem: () -> GUISystem
-end
+type ambient_sound_component =  {
+	clip: string,
+	is_3d: boolean,
+	pause: (ambient_sound_component) -> (),
+	resume: (ambient_sound_component) -> (),
+}
 
-declare class gui_canvas_component
-	is_3d: boolean
-	orient_to_camera: boolean
-	virtual_size: Vec2
-end
+type core_module = {
+}
 
-declare class gui_render_target_component
-end
+type spline_component =  {
+}
 
-declare class gui_input_field_component
-end
+type signal_component =  {
+}
 
-declare class gui_rect_component
-	enabled: boolean
-	clip: boolean
-	left_points: number
-	left_relative: number
-	right_points: number
-	right_relative: number
-	top_points: number
-	top_relative: number
-	bottom_points: number
-	bottom_relative: number
-end
+type gui_module = {
+	getRectAt: (gui_module, Vec2) -> Entity?,
+	isOver: (gui_module, Vec2, Entity) -> boolean,
+	getSystem: (gui_module) -> GUISystem,
+}
 
-declare class gui_button_component
-	hovered_color_r_g_b_a: any
-	hovered_cursor: any
-end
+type gui_canvas_component =  {
+	is_3d: boolean,
+	orient_to_camera: boolean,
+	virtual_size: Vec2,
+}
 
-declare class gui_image_component
-	enabled: boolean
-	color_r_g_b_a: any
-	sprite: string
-end
+type gui_render_target_component =  {
+}
 
-declare class gui_text_component
-	font_size: number
-	color_r_g_b_a: any
-	font_path: string
-	halign: any
-	valign: any
-	text: string
-end
+type gui_input_field_component =  {
+}
 
-declare class lua_script_module
-end
+type gui_rect_component =  {
+	enabled: boolean,
+	clip: boolean,
+	left_points: number,
+	left_relative: number,
+	right_points: number,
+	right_relative: number,
+	top_points: number,
+	top_relative: number,
+	bottom_points: number,
+	bottom_relative: number,
+}
 
-declare class lua_script_component
-end
+type gui_button_component =  {
+	hovered_color_r_g_b_a: any,
+	hovered_cursor: any,
+}
 
-declare class lua_script_inline_component
-	code: string
-end
+type gui_image_component =  {
+	enabled: boolean,
+	color_r_g_b_a: any,
+	sprite: string,
+}
 
-declare class navigation_module
-end
+type gui_text_component =  {
+	font_size: number,
+	color_r_g_b_a: any,
+	font_path: string,
+	halign: any,
+	valign: any,
+	text: string,
+}
 
-declare class navmesh_zone_component
-	extents: Vec3
-	cell_size: number
-	cell_height: number
-	walkable_slope_angle: number
-	agent_height: number
-	agent_radius: number
-	max_climb: number
-	autoload: boolean
-	detailed: boolean
-	load: (navmesh_zone_component) -> boolean
-	drawNavmesh: (navmesh_zone_component, DVec3, boolean, boolean, boolean) -> ()
-	drawCompactHeightfield: (navmesh_zone_component) -> ()
-	drawHeightfield: (navmesh_zone_component) -> ()
-	drawContours: (navmesh_zone_component) -> ()
-	generateNavmesh: (navmesh_zone_component) -> any
-	saveZone: (navmesh_zone_component) -> boolean
-end
+type lua_script_module = {
+}
 
-declare class navmesh_agent_component
-	radius: number
-	height: number
-	move_entity: boolean
-	speed: number
-	navigate: (navmesh_agent_component, DVec3, number, number) -> boolean
-	cancelNavigation: (navmesh_agent_component) -> ()
-	drawPath: (navmesh_agent_component, boolean) -> ()
-end
+type lua_script_component =  {
+}
 
-declare class physics_module
-	raycast: (physics_module, Vec3, Vec3, number, Entity?) -> Entity?
-	setGravity: (physics_module, Vec3) -> ()
-end
+type lua_script_inline_component =  {
+	code: string,
+}
 
-declare class physical_heightfield_component
-	source: string
-	xzscale: number
-	yscale: number
-	layer: number
-end
+type navigation_module = {
+}
 
-declare class d6_joint_component
-	xmotion: any
-	ymotion: any
-	zmotion: any
-	swing1motion: any
-	swing2motion: any
-	twist_motion: any
-	linear_limit: number
-	twist_limit: Vec2
-	swing_limit: Vec2
-	damping: number
-	stiffness: number
-	restitution: number
-	connected_body: Entity?
-	axis_position: Vec3
-	axis_direction: Vec3
-end
+type navmesh_zone_component =  {
+	extents: Vec3,
+	cell_size: number,
+	cell_height: number,
+	walkable_slope_angle: number,
+	agent_height: number,
+	agent_radius: number,
+	max_climb: number,
+	autoload: boolean,
+	detailed: boolean,
+	load: (navmesh_zone_component) -> boolean,
+	drawNavmesh: (navmesh_zone_component, DVec3, boolean, boolean, boolean) -> (),
+	drawCompactHeightfield: (navmesh_zone_component) -> (),
+	drawHeightfield: (navmesh_zone_component) -> (),
+	drawContours: (navmesh_zone_component) -> (),
+	generateNavmesh: (navmesh_zone_component) -> any,
+	saveZone: (navmesh_zone_component) -> boolean,
+}
 
-declare class distance_joint_component
-	connected_body: Entity?
-	axis_position: Vec3
-	damping: number
-	stiffness: number
-	tolerance: number
-	limits: Vec2
-	linear_force: Vec3
-end
+type navmesh_agent_component =  {
+	radius: number,
+	height: number,
+	move_entity: boolean,
+	speed: number,
+	navigate: (navmesh_agent_component, DVec3, number, number) -> boolean,
+	cancelNavigation: (navmesh_agent_component) -> (),
+	drawPath: (navmesh_agent_component, boolean) -> (),
+}
 
-declare class hinge_joint_component
-	connected_body: Entity?
-	axis_position: Vec3
-	axis_direction: Vec3
-	damping: number
-	stiffness: number
-	use_limit: boolean
-	limit: Vec2
-end
+type physics_module = {
+	raycast: (physics_module, Vec3, Vec3, number, Entity?) -> Entity?,
+	setGravity: (physics_module, Vec3) -> (),
+}
 
-declare class spherical_joint_component
-	connected_body: Entity?
-	axis_position: Vec3
-	axis_direction: Vec3
-	use_limit: boolean
-	limit: Vec2
-end
+type physical_heightfield_component =  {
+	source: string,
+	xzscale: number,
+	yscale: number,
+	layer: number,
+}
 
-declare class physical_controller_component
-	layer: number
-	radius: number
-	height: number
-	custom_gravity: boolean
-	custom_gravity_acceleration: number
-	use_root_motion: boolean
-	getGravitySpeed: (physical_controller_component) -> number
-	move: (physical_controller_component, Vec3) -> ()
-	isCollisionDown: (physical_controller_component) -> boolean
-	resize: (physical_controller_component, number) -> ()
-end
+type d6_joint_component =  {
+	xmotion: any,
+	ymotion: any,
+	zmotion: any,
+	swing1motion: any,
+	swing2motion: any,
+	twist_motion: any,
+	linear_limit: number,
+	twist_limit: Vec2,
+	swing_limit: Vec2,
+	damping: number,
+	stiffness: number,
+	restitution: number,
+	connected_body: Entity?,
+	axis_position: Vec3,
+	axis_direction: Vec3,
+}
 
-declare class rigid_actor_component
-	velocity: Vec3
-	speed: number
-	layer: number
-	dynamic_type: any
-	is_trigger: boolean
-	mesh: string
-	material: string
-	ccd: boolean
-	putToSleep: (rigid_actor_component) -> ()
-	addForceAtPos: (rigid_actor_component, Vec3, Vec3) -> ()
-	applyForce: (rigid_actor_component, Vec3) -> ()
-	applyImpulse: (rigid_actor_component, Vec3) -> ()
-end
+type distance_joint_component =  {
+	connected_body: Entity?,
+	axis_position: Vec3,
+	damping: number,
+	stiffness: number,
+	tolerance: number,
+	limits: Vec2,
+	linear_force: Vec3,
+}
 
-declare class wheel_component
-	spring_strength: number
-	spring_max_compression: number
-	spring_max_droop: number
-	spring_damper_rate: number
-	radius: number
-	width: number
-	mass: number
-	moi: number
-	slot: any
-	rpm: number
-end
+type hinge_joint_component =  {
+	connected_body: Entity?,
+	axis_position: Vec3,
+	axis_direction: Vec3,
+	damping: number,
+	stiffness: number,
+	use_limit: boolean,
+	limit: Vec2,
+}
 
-declare class vehicle_component
-	peak_torque: number
-	max_r_p_m: number
-	rpm: number
-	current_gear: number
-	speed: number
-	chassis: string
-	mass: number
-	moimultiplier: number
-	center_of_mass: Vec3
-	wheels_layer: number
-	chassis_layer: number
-end
+type spherical_joint_component =  {
+	connected_body: Entity?,
+	axis_position: Vec3,
+	axis_direction: Vec3,
+	use_limit: boolean,
+	limit: Vec2,
+}
 
-declare class physical_instanced_cube_component
-	half_extents: Vec3
-	layer: number
-end
+type physical_controller_component =  {
+	layer: number,
+	radius: number,
+	height: number,
+	custom_gravity: boolean,
+	custom_gravity_acceleration: number,
+	use_root_motion: boolean,
+	getGravitySpeed: (physical_controller_component) -> number,
+	move: (physical_controller_component, Vec3) -> (),
+	isCollisionDown: (physical_controller_component) -> boolean,
+	resize: (physical_controller_component, number) -> (),
+}
 
-declare class physical_instanced_mesh_component
-	layer: number
-	geom_path: string
-end
+type rigid_actor_component =  {
+	velocity: Vec3,
+	speed: number,
+	layer: number,
+	dynamic_type: any,
+	is_trigger: boolean,
+	mesh: string,
+	material: string,
+	ccd: boolean,
+	putToSleep: (rigid_actor_component) -> (),
+	addForceAtPos: (rigid_actor_component, Vec3, Vec3) -> (),
+	applyForce: (rigid_actor_component, Vec3) -> (),
+	applyImpulse: (rigid_actor_component, Vec3) -> (),
+}
 
-declare class renderer_module
-	castRay: (renderer_module, Ray, Entity?) -> RayCastModelHit
-	castRayTerrain: (renderer_module, Ray) -> RayCastModelHit
-	addDebugTriangle: (renderer_module, DVec3, DVec3, DVec3, Color) -> ()
-	addDebugLine: (renderer_module, DVec3, DVec3, Color) -> ()
-	addDebugCross: (renderer_module, DVec3, number, Color) -> ()
-	addDebugBone: (renderer_module, DVec3, Vec3, Vec3, Vec3, Color) -> ()
-	addDebugCube: (renderer_module, DVec3, Vec3, Vec3, Vec3, Color) -> ()
-	addDebugCubeSolid: (renderer_module, DVec3, DVec3, Color) -> ()
-	setActiveCamera: (renderer_module, Entity) -> ()
-	setActiveEnvironment: (renderer_module, Entity) -> ()
-end
+type wheel_component =  {
+	spring_strength: number,
+	spring_max_compression: number,
+	spring_max_droop: number,
+	spring_damper_rate: number,
+	radius: number,
+	width: number,
+	mass: number,
+	moi: number,
+	slot: any,
+	rpm: number,
+}
 
-declare class camera_component
-	fov: number
-	near: number
-	far: number
-	is_ortho: boolean
-	ortho_size: number
-	film_grain_intensity: number
-	dof_enabled: boolean
-	dof_distance: number
-	dof_range: number
-	dof_max_blur_size: number
-	dof_sharp_range: number
-	bloom_enabled: boolean
-	bloom_tonemap_enabled: boolean
-	bloom_accomodation_speed: number
-	bloom_avg_bloom_multiplier: number
-	bloom_exposure: number
-	getRay: (camera_component, Vec2) -> Ray
-end
+type vehicle_component =  {
+	peak_torque: number,
+	max_r_p_m: number,
+	rpm: number,
+	current_gear: number,
+	speed: number,
+	chassis: string,
+	mass: number,
+	moimultiplier: number,
+	center_of_mass: Vec3,
+	wheels_layer: number,
+	chassis_layer: number,
+}
 
-declare class decal_component
-	uv_scale: Vec2
-	material_path: string
-	half_extents: Vec3
-end
+type physical_instanced_cube_component =  {
+	half_extents: Vec3,
+	layer: number,
+}
 
-declare class environment_component
-	light_color: Vec3
-	direct_intensity: number
-	indirect_intensity: number
-	sky_intensity: number
-	scatter_rayleigh: Vec3
-	scatter_mie: Vec3
-	absorb_mie: Vec3
-	sunlight_color: Vec3
-	fog_scattering: Vec3
-	fog_density: number
-	sunlight_strength: number
-	height_distribution_rayleigh: number
-	height_distribution_mie: number
-	ground_r: number
-	atmo_r: number
-	fog_top: number
-	godrays_enabled: boolean
-	atmo_enabled: boolean
-	clouds_enabled: boolean
-	clouds_top: number
-	clouds_bottom: number
-	cast_shadows: boolean
-	sky_texture: string
-	shadowmap_cascades: any
-end
+type physical_instanced_mesh_component =  {
+	layer: number,
+	geom_path: string,
+}
 
-declare class point_light_component
-	color: Vec3
-	intensity: number
-	fov: number
-	attenuation_param: number
-	range: number
-	cast_shadows: boolean
-	dynamic: boolean
-end
+type renderer_module = {
+	castRay: (renderer_module, Ray, Entity?) -> RayCastModelHit,
+	castRayTerrain: (renderer_module, Ray) -> RayCastModelHit,
+	addDebugTriangle: (renderer_module, DVec3, DVec3, DVec3, Color) -> (),
+	addDebugLine: (renderer_module, DVec3, DVec3, Color) -> (),
+	addDebugCross: (renderer_module, DVec3, number, Color) -> (),
+	addDebugBone: (renderer_module, DVec3, Vec3, Vec3, Vec3, Color) -> (),
+	addDebugCube: (renderer_module, DVec3, Vec3, Vec3, Vec3, Color) -> (),
+	addDebugCubeSolid: (renderer_module, DVec3, DVec3, Color) -> (),
+	setActiveCamera: (renderer_module, Entity) -> (),
+	setActiveEnvironment: (renderer_module, Entity) -> (),
+}
 
-declare class reflection_probe_component
-	size: number
-	half_extents: Vec3
-	enabled: boolean
-end
+type camera_component =  {
+	fov: number,
+	near: number,
+	far: number,
+	is_ortho: boolean,
+	ortho_size: number,
+	film_grain_intensity: number,
+	dof_enabled: boolean,
+	dof_distance: number,
+	dof_range: number,
+	dof_max_blur_size: number,
+	dof_sharp_range: number,
+	bloom_enabled: boolean,
+	bloom_tonemap_enabled: boolean,
+	bloom_accomodation_speed: number,
+	bloom_avg_bloom_multiplier: number,
+	bloom_exposure: number,
+	getRay: (camera_component, Vec2) -> Ray,
+}
 
-declare class environment_probe_component
-	inner_range: Vec3
-	outer_range: Vec3
-	enabled: boolean
-end
+type decal_component =  {
+	uv_scale: Vec2,
+	material_path: string,
+	half_extents: Vec3,
+}
 
-declare class fur_component
-	layers: number
-	scale: number
-	gravity: number
-	enabled: boolean
-end
+type environment_component =  {
+	light_color: Vec3,
+	direct_intensity: number,
+	indirect_intensity: number,
+	sky_intensity: number,
+	scatter_rayleigh: Vec3,
+	scatter_mie: Vec3,
+	absorb_mie: Vec3,
+	sunlight_color: Vec3,
+	fog_scattering: Vec3,
+	fog_density: number,
+	sunlight_strength: number,
+	height_distribution_rayleigh: number,
+	height_distribution_mie: number,
+	ground_r: number,
+	atmo_r: number,
+	fog_top: number,
+	godrays_enabled: boolean,
+	atmo_enabled: boolean,
+	clouds_enabled: boolean,
+	clouds_top: number,
+	clouds_bottom: number,
+	cast_shadows: boolean,
+	sky_texture: string,
+	shadowmap_cascades: any,
+}
 
-declare class bone_attachment_component
-	parent: Entity?
-	bone: number
-	position: Vec3
-	rotation: Vec3
-	setRotation: (bone_attachment_component, Quat) -> ()
-end
+type point_light_component =  {
+	color: Vec3,
+	intensity: number,
+	fov: number,
+	attenuation_param: number,
+	range: number,
+	cast_shadows: boolean,
+	dynamic: boolean,
+}
 
-declare class particle_emitter_component
-	path: string
-	autodestroy: boolean
-end
+type reflection_probe_component =  {
+	size: number,
+	half_extents: Vec3,
+	enabled: boolean,
+}
 
-declare class instanced_model_component
-	path: string
-end
+type environment_probe_component =  {
+	inner_range: Vec3,
+	outer_range: Vec3,
+	enabled: boolean,
+}
 
-declare class model_instance_component
-	enabled: boolean
-	path: string
-	overrideMaterialVec4: (model_instance_component, number, any, any) -> boolean
-	getModel: (model_instance_component) -> any
-end
+type fur_component =  {
+	layers: number,
+	scale: number,
+	gravity: number,
+	enabled: boolean,
+}
 
-declare class curve_decal_component
-	material_path: string
-	half_extents: number
-	uvscale: Vec2
-	bezier_p0: Vec2
-	bezier_p2: Vec2
-end
+type bone_attachment_component =  {
+	parent: Entity?,
+	bone: number,
+	position: Vec3,
+	rotation: Vec3,
+	setRotation: (bone_attachment_component, Quat) -> (),
+}
 
-declare class terrain_component
-	size: Vec2
-	material_path: string
-	xzscale: number
-	tesselation: number
-	base_grid_resolution: number
-	yscale: number
-	getHeightAt: (terrain_component, number, number) -> number
-	getNormalAt: (terrain_component, number, number) -> Vec3
-end
+type particle_emitter_component =  {
+	path: string,
+	autodestroy: boolean,
+}
 
-declare class procedural_geom_component
-	material: string
-end
+type instanced_model_component =  {
+	path: string,
+}
 
+type model_instance_component =  {
+	enabled: boolean,
+	path: string,
+	overrideMaterialVec4: (model_instance_component, number, any, any) -> boolean,
+	getModel: (model_instance_component) -> any,
+}
 
-declare class Entity 
-	world : World
-	name : string
-	parent : Entity?
-	rotation : any
-	position : Vec3
-	scale : Vec3
-	hasComponent : (Entity, any) -> boolean
-	getComponent : (Entity, any) -> any
-	destroy : (Entity) -> ()
-	createComponent : (Entity, any) -> any
-	property_animator: property_animator_component
-	animator: animator_component
-	animable: animable_component
-	echo_zone: echo_zone_component
-	chorus_zone: chorus_zone_component
-	audio_listener: audio_listener_component
-	ambient_sound: ambient_sound_component
-	spline: spline_component
-	signal: signal_component
-	gui_canvas: gui_canvas_component
-	gui_render_target: gui_render_target_component
-	gui_input_field: gui_input_field_component
-	gui_rect: gui_rect_component
-	gui_button: gui_button_component
-	gui_image: gui_image_component
-	gui_text: gui_text_component
-	lua_script: lua_script_component
-	lua_script_inline: lua_script_inline_component
-	navmesh_zone: navmesh_zone_component
-	navmesh_agent: navmesh_agent_component
-	physical_heightfield: physical_heightfield_component
-	d6_joint: d6_joint_component
-	distance_joint: distance_joint_component
-	hinge_joint: hinge_joint_component
-	spherical_joint: spherical_joint_component
-	physical_controller: physical_controller_component
-	rigid_actor: rigid_actor_component
-	wheel: wheel_component
-	vehicle: vehicle_component
-	physical_instanced_cube: physical_instanced_cube_component
-	physical_instanced_mesh: physical_instanced_mesh_component
-	camera: camera_component
-	decal: decal_component
-	environment: environment_component
-	point_light: point_light_component
-	reflection_probe: reflection_probe_component
-	environment_probe: environment_probe_component
-	fur: fur_component
-	bone_attachment: bone_attachment_component
-	particle_emitter: particle_emitter_component
-	instanced_model: instanced_model_component
-	model_instance: model_instance_component
-	curve_decal: curve_decal_component
-	terrain: terrain_component
-	procedural_geom: procedural_geom_component
-end
+type curve_decal_component =  {
+	material_path: string,
+	half_extents: number,
+	uvscale: Vec2,
+	bezier_p0: Vec2,
+	bezier_p2: Vec2,
+}
+
+type terrain_component =  {
+	size: Vec2,
+	material_path: string,
+	xzscale: number,
+	tesselation: number,
+	base_grid_resolution: number,
+	yscale: number,
+	getHeightAt: (terrain_component, number, number) -> number,
+	getNormalAt: (terrain_component, number, number) -> Vec3,
+}
+
+type procedural_geom_component =  {
+	material: string,
+}
 
 
-declare this:Entity
+type Entity = {
+	NULL : Entity,
+	world : World,
+	name : string,
+	parent : Entity?,
+	rotation : any,
+	position : Vec3,
+	scale : Vec3,
+	hasComponent : (Entity, any) -> boolean,
+	getComponent : (Entity, any) -> any,
+	destroy : (Entity) -> (),
+	createComponent : (Entity, any) -> any,
+	property_animator: property_animator_component,
+	animator: animator_component,
+	animable: animable_component,
+	echo_zone: echo_zone_component,
+	chorus_zone: chorus_zone_component,
+	audio_listener: audio_listener_component,
+	ambient_sound: ambient_sound_component,
+	spline: spline_component,
+	signal: signal_component,
+	gui_canvas: gui_canvas_component,
+	gui_render_target: gui_render_target_component,
+	gui_input_field: gui_input_field_component,
+	gui_rect: gui_rect_component,
+	gui_button: gui_button_component,
+	gui_image: gui_image_component,
+	gui_text: gui_text_component,
+	lua_script: lua_script_component,
+	lua_script_inline: lua_script_inline_component,
+	navmesh_zone: navmesh_zone_component,
+	navmesh_agent: navmesh_agent_component,
+	physical_heightfield: physical_heightfield_component,
+	d6_joint: d6_joint_component,
+	distance_joint: distance_joint_component,
+	hinge_joint: hinge_joint_component,
+	spherical_joint: spherical_joint_component,
+	physical_controller: physical_controller_component,
+	rigid_actor: rigid_actor_component,
+	wheel: wheel_component,
+	vehicle: vehicle_component,
+	physical_instanced_cube: physical_instanced_cube_component,
+	physical_instanced_mesh: physical_instanced_mesh_component,
+	camera: camera_component,
+	decal: decal_component,
+	environment: environment_component,
+	point_light: point_light_component,
+	reflection_probe: reflection_probe_component,
+	environment_probe: environment_probe_component,
+	fur: fur_component,
+	bone_attachment: bone_attachment_component,
+	particle_emitter: particle_emitter_component,
+	instanced_model: instanced_model_component,
+	model_instance: model_instance_component,
+	curve_decal: curve_decal_component,
+	terrain: terrain_component,
+	procedural_geom: procedural_geom_component,
+}
+
+
+declare this : Entity
 	
 	type ActionDesc = {
 		name : string,
@@ -625,10 +651,7 @@ declare this:Entity
 	}
 	
 	declare LumixAPI: {
-		RaycastHit : { create : () -> RaycastHit, destroy : (RaycastHit) -> () },
-		SweepHit : { create : () -> SweepHit, destroy : (SweepHit) -> () },
-		Ray : { create : () -> Ray, destroy : (Ray) -> () },
-		RayCastModelHit : { create : () -> RayCastModelHit, destroy : (RayCastModelHit) -> () },
+		hasFilesystemWork : () -> boolean,
 		
 		INPUT_KEYCODE_SHIFT: number,
 		INPUT_KEYCODE_LEFT : number,

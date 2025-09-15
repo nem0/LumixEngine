@@ -2647,9 +2647,7 @@ struct StudioAppImpl final : StudioApp {
 		if (ImGui::BeginPopup("Open file", ImGuiWindowFlags_NoNavInputs)) {
 			if (ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
 			
-			if (m_open_file_filter.gui("Search", -1, focus, nullptr, false)) {
-				
-			}
+			m_open_file_filter.gui("Search", -1, focus, nullptr, false);
 
 			auto& resources = m_asset_compiler->lockResources();
 			defer { m_asset_compiler->unlockResources(); };
@@ -2685,7 +2683,9 @@ struct StudioAppImpl final : StudioApp {
 
 						ImGui::TableNextRow();
 						ImGui::TableNextColumn();
+						ImGui::PushID(&res);
 						bool clicked = ImGui::Selectable(tmp.data, idx == m_selected_file, ImGuiSelectableFlags_SpanAllColumns) || (insert_enter && idx == m_selected_file);
+						ImGui::PopID();
 						ImGui::TableNextColumn();
 						ImGui::TextUnformatted(info.dir.begin, info.dir.end);
 						if (clicked) {

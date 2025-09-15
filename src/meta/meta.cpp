@@ -2061,19 +2061,13 @@ StringView toLuaType(StringView ctype) {
 
 void serializeLuaType(OutputStream& out, StringView self_type, const char* self_type_suffix, Function& f, bool skip_first_arg) {
 	out.add("\t",pickLabel(f.name, f.attributes.alias),": (");
+	out.add(self_type,self_type_suffix);
 	forEachArg(f.args, [&](const Arg& arg, bool first){
-		if (!first) out.add(", ");
-		if (first) {
-			out.add(self_type,self_type_suffix);
-			if (!skip_first_arg) {
-				out.add(", ", toLuaType(arg.type));
-			}
-		}
-		else {
-			out.add(toLuaType(arg.type));
+		if (!first || !skip_first_arg) {
+			out.add(", ", toLuaType(arg.type));
 		}
 	});
-	out.add(") -> ",toLuaType(f.return_type),OUT_ENDL);
+	out.add(") -> ",toLuaType(f.return_type), "," OUT_ENDL);
 }
 
 void serializeLuaTypes(OutputStream& out_formatted) {
@@ -2152,85 +2146,97 @@ void serializeLuaTypes(OutputStream& out_formatted) {
 		Key_UpArrow : number
 	}
 
-	declare class World
-		getActivePartition : (World) -> number
-		setActivePartition : (World, number) -> ()
-		createPartition : (World, string) -> number
-		load : (World, string, any) -> ()
-		getModule : (string) -> any
-		createEntity : () -> Entity
-		createEntityEx : (any) -> Entity
-		findEntityByName : (string) -> Entity
+	type Resource = {
+		newEmpty: (Resource, string) -> Resource,
+		getPath: (Resource) -> string,
+		path : string,
+	}
+
+	declare Lumix : {
+		Resource : Resource,
+		Entity : Entity
+	}
+
+	type World = {
+		getActivePartition : (World) -> number,
+		setActivePartition : (World, number) -> (),
+		createPartition : (World, string) -> number,
+		destroyPartition : (World, number) -> (),
+		load : (World, string, any) -> (),
+		getModule : (World, string) -> any,
+		createEntity : (World) -> Entity,
+		createEntityEx : (World, any) -> Entity,
+		findEntityByName : (World, Entity, string) -> Entity,
 	)#");
 
 	for (Module& m : parser.modules) {
-		L(m.id,": ",m.id,"_module");
+		L(m.id,": ",m.id,"_module,");
 	}
 
-	L("end" OUT_ENDL);
+	L("}" OUT_ENDL);
 
 	for (Struct& s : parser.structs) {
-		L("declare class ",s.name);
+		L("type ",s.name, " = {");
 		for (StructVar& v : s.vars) {
-			L(v.name,": ",toLuaType(v.type));
+			L(v.name,": ",toLuaType(v.type), ",");
 		}
-		L("end" OUT_ENDL);
+		L("}" OUT_ENDL);
 	}
 
 	for (Object& o : parser.objects) {
-		L("declare class ",o.name);
+		L("type ",o.name, " = {");
 		for (Function& f : o.functions) {
 			serializeLuaType(out, o.name, "", f, false);
 		}
-		L("end" OUT_ENDL);
+		L("}" OUT_ENDL);
 	}
 
 	for (Module& m : parser.modules) {
-		L("declare class ",m.id,"_module");
+		L("type ",m.id,"_module = {");
 		for (Function& f : m.functions) {
 			serializeLuaType(out, m.id, "_module", f, false);
 		}
-		L("end" OUT_ENDL);
+		L("}" OUT_ENDL);
 		
 		for (Component& c : m.components) {
-			L("declare class ",c.id,"_component");
+			L("type ",c.id,"_component =  {");
 			for (Property& p : c.properties) {
-				
 				char tmp[256];
 				toID(p.name, Span(tmp, tmp + 256));
-				if (!isBlob(p) && p.type.size() > 0) L("	",tmp,": ", toLuaType(p.type));
+				if (!isBlob(p) && p.type.size() > 0) L("	",tmp,": ", toLuaType(p.type), ",");
 			}
 			for (Function& f : c.functions) {
 				serializeLuaType(out, c.id, "_component", f, true);
 			}
-			L("end" OUT_ENDL);
+			L("}" OUT_ENDL);
 		}
 	}
 
 	out.add(R"#(
-	declare class Entity 
-		world : World
-		name : string
-		parent : Entity?
-		rotation : any
-		position : Vec3
-		scale : Vec3
-		hasComponent : (Entity, any) -> boolean
-		getComponent : (Entity, any) -> any
-		destroy : (Entity) -> ()
-		createComponent : (Entity, any) -> any
+	type Entity = {
+		NULL : Entity,
+		world : World,
+		name : string,
+		parent : Entity?,
+		rotation : any,
+		position : Vec3,
+		scale : Vec3,
+		hasComponent : (Entity, any) -> boolean,
+		getComponent : (Entity, any) -> any,
+		destroy : (Entity) -> (),
+		createComponent : (Entity, any) -> any,
 	)#");
 
 	for (Module& m : parser.modules) {
 		for (Component& c : m.components) {
-			L(c.id,": ",c.id,"_component");
+			L(c.id,": ",c.id,"_component,");
 		}
 	}
 	
-	L("end" OUT_ENDL);
+	L("}" OUT_ENDL);
 
 	out.add(R"#(
-	declare this:Entity
+	declare this : Entity
 
 	type ActionDesc = {
 		name : string,
@@ -2254,10 +2260,7 @@ void serializeLuaTypes(OutputStream& out_formatted) {
 	}
 
 	declare LumixAPI: {
-		RaycastHit : { create : () -> RaycastHit, destroy : (RaycastHit) -> () },
-		SweepHit : { create : () -> SweepHit, destroy : (SweepHit) -> () },
-		Ray : { create : () -> Ray, destroy : (Ray) -> () },
-		RayCastModelHit : { create : () -> RayCastModelHit, destroy : (RayCastModelHit) -> () },
+		hasFilesystemWork : () -> boolean,
 
 		INPUT_KEYCODE_SHIFT: number,
 		INPUT_KEYCODE_LEFT : number,
