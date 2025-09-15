@@ -593,7 +593,14 @@ static void LUA_setEntityLocalPosition(World* univ, i32 entity, const DVec3& pos
 static void LUA_unloadResource(LuaScriptSystem* system, int resource_idx) { system->unloadLuaResource(resource_idx); }
 static World* LUA_createWorld(Engine* engine) { return &engine->createWorld(); }
 static void LUA_destroyWorld(Engine* engine, World* world) { engine->destroyWorld(*world); }
-static void LUA_destroyEntity(World* world, i32 entity) { world->destroyEntity({entity}); }
+
+static void LUA_destroyEntity(World* world, i32 entity) { 
+	// we defer destruction to avoid scripts destroying themselves while being used
+	// or destroying other components which are using them (e.g. destroying button from callback in the button)
+	auto* module = (LuaScriptModule*)world->getModule("lua_script");
+	module->deferEntityDestruction({entity});
+}
+
 static void LUA_logError(const char* text) { logError(text); }
 static void LUA_logInfo(const char* text) { logInfo(text); }
 static void LUA_setTimeMultiplier(Engine* engine, float multiplier) { engine->setTimeMultiplier(multiplier); }
@@ -607,7 +614,10 @@ static u16 LUA_createPartition(World* world, const char* name) {
 }
 
 static void LUA_destroyPartition(World* world, u16 partition) {
-	world->destroyPartition(partition);
+	// we defer destruction to avoid scripts destroying themselves while being used
+	// or destroying other components which are using them
+	auto* module = (LuaScriptModule*)world->getModule("lua_script");
+	module->deferPartitionDestruction(partition);
 }
 
 static u16 LUA_getActivePartition(World* world) {

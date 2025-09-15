@@ -483,6 +483,7 @@ struct EditorWindow : AssetEditorWindow {
 				if (const auto* syntax_error = Luau::get_if<Luau::SyntaxError>(&err.data))
 					msg = syntax_error->message.c_str();
 				else {
+					if (Luau::get_if<Luau::UnknownSymbol>(&err.data)) continue;
 					msg_str = Luau::toString(err, Luau::TypeErrorToStringOptions{&m_analysis});
 					msg = msg_str.c_str();
 				}

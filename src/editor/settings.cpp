@@ -19,7 +19,7 @@ namespace Lumix {
 static const char SETTINGS_PATH[] = "studio.ini";
 static const char DEFAULT_SETTINGS_PATH[] = "studio_default.ini";
 
-static bool shortcutInput(char* button_label, Action& action, bool edit, StudioApp& app) {
+static bool shortcutInput(char* button_label, Action& action, StudioApp& app) {
 	bool res = false;
 	ImGuiStyle& style = ImGui::GetStyle();
 	ImVec2 prev = style.ButtonTextAlign;
@@ -906,7 +906,7 @@ static void shortcutsGUI(const TextFilter& filter, Settings& settings) {
 				ImGui::SameLine();
 				ImGui::TextUnformatted(a->label_long);
 				ImGui::TableNextColumn();
-				if (shortcutInput(button_label, *a, a == settings.m_edit_action, settings.m_app)) {
+				if (shortcutInput(button_label, *a, settings.m_app)) {
 					settings.m_edit_action = a;
 					settings.m_dirty = true;
 				}
@@ -927,7 +927,7 @@ static void shortcutsGUI(const TextFilter& filter, Settings& settings) {
 			ImGui::TableNextColumn();
 			ImGui::TextUnformatted(a->label_long);
 			ImGui::TableNextColumn();
-			if (shortcutInput(button_label, *a, a == settings.m_edit_action, settings.m_app)) {
+			if (shortcutInput(button_label, *a, settings.m_app)) {
 				settings.m_edit_action = a;
 			}
 			ImGui::PopID();
@@ -1253,7 +1253,9 @@ void Settings::gui() {
 		ImGui::Separator();
 
 		if (filter.isActive()) {
-			if (ImGui::BeginTable("settings_table", 2, ImGuiTableFlags_RowBg)) {
+			if (ImGui::BeginTable("settings_table", 2, ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable)) {
+				ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
+				ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 				shortcutsGUI(filter, *this);
 				if (styleGUI(filter)) m_dirty = true;
 				iterVars(filter, selected);
