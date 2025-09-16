@@ -224,6 +224,7 @@ struct LuauAnalysis :Luau::FileResolver {
 #else
 	struct LuauAnalysis { 
 		LuauAnalysis(StudioApp& app) {} 
+		void update(float) {}
 		void markDirty(const Path& path) {}
 		void unregisterOpenEditor(const Path& path) {}
 		void registerOpenEditor(const Path& path, CodeEditor* editor) {}
