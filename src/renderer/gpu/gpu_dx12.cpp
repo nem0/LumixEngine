@@ -212,6 +212,20 @@ static DXGI_FORMAT getDXGIFormat(TextureFormat format, bool is_srgb) {
 	return is_srgb && fd.internal_srgb != DXGI_FORMAT_UNKNOWN ? fd.internal_srgb : fd.internal;
 }
 
+static void fromWChar(Span<char> out, const WCHAR* in)
+{
+	const WCHAR* c = in;
+	char* cout = out.begin();
+	const u32 size = out.length();
+	while (*c && c - in < size - 1)
+	{
+		*cout = (char)*c;
+		++cout;
+		++c;
+	}
+	*cout = 0;
+}
+
 
 template <int N> static void toWChar(WCHAR (&out)[N], const char* in) {
 	const char* c = in;
@@ -1924,12 +1938,68 @@ bool init(void* hwnd, InitFlags flags) {
 		//debug1->SetEnableGPUBasedValidation(true);
 	}
 
+	// Enumerate and select the best adapter
+	IDXGIFactory4* dxgi_factory = nullptr;
+	HRESULT hr = CreateDXGIFactory1(IID_PPV_ARGS(&dxgi_factory));
+	if (FAILED(hr)) {
+		logError("Failed to create DXGI factory");
+		return false;
+	}
+
+	IDXGIAdapter1* selected_adapter = nullptr;
+	SIZE_T max_dedicated_memory = 0;
+
+	for (UINT i = 0; ; ++i) {
+		IDXGIAdapter1* adapter = nullptr;
+		hr = dxgi_factory->EnumAdapters1(i, &adapter);
+		if (FAILED(hr)) break;
+
+		DXGI_ADAPTER_DESC1 desc;
+		adapter->GetDesc1(&desc);
+
+		char tmp[256];
+		fromWChar(Span(tmp, tmp + sizeof(tmp)), desc.Description);
+		logInfo("Adapter ", i, ": ", tmp, ", Dedicated Video Memory: ", desc.DedicatedVideoMemory / (1024 * 1024), " MB, Vendor ID: ", desc.VendorId);
+
+		// Choose the adapter with the most dedicated video memory (simple heuristic for "best")
+		if (desc.DedicatedVideoMemory > max_dedicated_memory) {
+			max_dedicated_memory = desc.DedicatedVideoMemory;
+			if (selected_adapter) selected_adapter->Release();
+			selected_adapter = adapter;
+		} else {
+			adapter->Release();
+		}
+	}
+
+	if (!selected_adapter) {
+		logError("No suitable adapter found");
+		dxgi_factory->Release();
+		return false;
+	}
+
+	DXGI_ADAPTER_DESC1 selected_desc;
+	selected_adapter->GetDesc1(&selected_desc);
+	char tmp[256];
+	fromWChar(Span(tmp, tmp + sizeof(tmp)), selected_desc.Description);
+	logInfo("Selected adapter: ", tmp);
+
+	// Now create the device with the selected adapter
 	D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_12_0;
-	HRESULT hr = api_D3D12CreateDevice(NULL, featureLevel, IID_PPV_ARGS(&d3d->device));
+	hr = api_D3D12CreateDevice(selected_adapter, featureLevel, IID_PPV_ARGS(&d3d->device));
+
+	selected_adapter->Release();
+	dxgi_factory->Release();
+
+	if (FAILED(hr)) {
+		logError("DX12 CreateDevice failed with selected adapter.");
+		return false;
+	}
+
+/*	HRESULT hr = api_D3D12CreateDevice(NULL, featureLevel, IID_PPV_ARGS(&d3d->device));
 	if (!SUCCEEDED(hr)) {
 		logError("DX12 CreateDevice failed.");
 		return false;
-	}
+	}*/
 
 	if (debug) {
 		ID3D12InfoQueue* info_queue;
