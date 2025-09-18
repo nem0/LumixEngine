@@ -179,7 +179,7 @@ struct WorldViewImpl final : WorldView {
 					if (m_snap_mode == SnapMode::VERTEX) snap_pos = getClosestVertex(hit);
 					const Quat rot = m_editor.getWorld()->getRotation(selected_entities[0]);
 					const Gizmo::Config& gizmo_cfg = m_app.getGizmoConfig();
-					const Vec3 offset = rot.rotate(gizmo_cfg.getOffset());
+					const Vec3 offset = rot.rotate(gizmo_cfg.offset);
 					m_editor.snapEntities(snap_pos - offset, gizmo_cfg.isTranslateMode());
 				}
 				else {
@@ -223,7 +223,7 @@ struct WorldViewImpl final : WorldView {
 	Vec2 getMousePos() const override { return m_mouse_pos; }
 	
 	void resetPivot() override {
-		m_app.getGizmoConfig().setOffset(Vec3::ZERO);
+		m_app.getGizmoConfig().offset = Vec3::ZERO;
 	}
 	
 	void setCustomPivot() override
@@ -238,7 +238,7 @@ struct WorldViewImpl final : WorldView {
 		const DVec3 snap_pos = getClosestVertex(hit);
 
 		const Transform tr = m_editor.getWorld()->getTransform(selected_entities[0]);
-		m_app.getGizmoConfig().setOffset(tr.rot.conjugated() * Vec3(snap_pos - tr.pos));
+		m_app.getGizmoConfig().offset = tr.rot.conjugated() * Vec3(snap_pos - tr.pos);
 	}
 
 
@@ -869,6 +869,10 @@ SceneView::SceneView(StudioApp& app)
 	m_debug_show_actions[(u32)Pipeline::DebugShow::LIGHT_CLUSTERS].create("Debug view", "Light clusters", "Light clusters", "debug_view_light_clusters", "");
 	m_debug_show_actions[(u32)Pipeline::DebugShow::PROBE_CLUSTERS].create("Debug view", "Probe clusters", "Probe clusters", "debug_view_probe_clusters", "");
 
+	Gizmo::Config& gizmo_cfg = m_app.getGizmoConfig();
+	m_app.getSettings().registerOption("gizmo_position_step", &gizmo_cfg.step_config.position, "Scene view", "Grid size when aligning on a grid");
+	m_app.getSettings().registerOption("gizmo_rotation_step", &gizmo_cfg.step_config.rotation, "Scene view", "Rotation step when rotating with gizmo");
+	m_app.getSettings().registerOption("gizmo_scale_step", &gizmo_cfg.step_config.scale, "Scene view", "Scale step when scaling with gizmo");
 	m_app.getSettings().registerOption("quicksearch_preview", &m_search_preview, "Scene view", "Show previews in quick search");
 	m_app.getSettings().registerOption("show_camera_preview", &m_show_camera_preview, "Scene view", "Show camera preview");
 	m_app.getSettings().registerOption("mouse_wheel_changes_speed", &m_mouse_wheel_changes_speed, "Scene view", "Mouse wheel changes speed");
@@ -965,9 +969,11 @@ void SceneView::moveEntity(Vec2 v) {
 		V = {0, 0, signum(V.z)};
 	}
 
-	float step = m_app.getGizmoConfig().getStep(Gizmo::Config::TRANSLATE);
-	if (step <= 0) step = 1;
-	V *= step;
+	Vec3 step = m_app.getGizmoConfig().step_config.position;
+	if (step.x <= 0) step.x = 1;
+	if (step.y <= 0) step.y = 1;
+	if (step.z <= 0) step.z = 1;
+	V = V * step;
 
 	Vec3 S(V.z, 0, -V.x);
 
@@ -979,9 +985,9 @@ void SceneView::moveEntity(Vec2 v) {
 		pos += V * v.y + S * v.x;
 		// round position to multiple of step
 		pos += Vec3(step * 0.5f);
-		pos.x = floor(pos.x / step) * step;
-		pos.y = floor(pos.y / step) * step;
-		pos.z = floor(pos.z / step) * step;
+		pos.x = floor(pos.x / step.x) * step.x;
+		pos.y = floor(pos.y / step.y) * step.y;
+		pos.z = floor(pos.z / step.z) * step.z;
 		editor.setEntitiesPositions(&e, &pos, 1);
 	}
 	editor.endCommandGroup();
@@ -996,11 +1002,10 @@ void SceneView::manipulate() {
 	Gizmo::Config& cfg = m_app.getGizmoConfig();
 	cfg.setAnisotropicScale(is_anisotropic_scale);
 
-	const bool is_snap = m_toggle_gizmo_step_action.isActive();
-	cfg.enableStep(is_snap);
-		
+	cfg.enableStep(m_use_grid_snapping);
+
 	Transform tr = m_editor.getWorld()->getTransform(selected[0]);
-	tr.pos += tr.rot.rotate(cfg.getOffset());
+	tr.pos += tr.rot.rotate(cfg.offset);
 	const Transform old_pivot_tr = tr;
 			
 	const bool copy_move = m_copy_move_action.isActive();
@@ -1038,7 +1043,7 @@ void SceneView::manipulate() {
 	}
 
 	const Transform new_pivot_tr = tr;
-	tr.pos -= tr.rot.rotate(cfg.getOffset());
+	tr.pos -= tr.rot.rotate(cfg.offset);
 	switch (cfg.mode) {
 		case Gizmo::Config::TRANSLATE: {
 			const DVec3 diff = new_pivot_tr.pos - old_pivot_tr.pos;
@@ -1077,7 +1082,7 @@ void SceneView::manipulate() {
 			break;
 		}
 	}
-	if (cfg.isAutosnapDown()) snapDown();
+	if (cfg.autosnap) snapDown();
 }
 
 void SceneView::update(float time_delta)
@@ -1235,14 +1240,19 @@ void SceneView::handleDrop(const char* path, float x, float y)
 
 void SceneView::onToolbar()
 {
-	Action* actions[] = {
-		&m_translate_gizmo_mode,
-		&m_rotate_gizmo_mode,
-		&m_scale_gizmo_mode,
-		nullptr,
-		&m_local_coord_gizmo,
-		&m_global_coord_gizmo,
-		nullptr,
+	struct {
+		Action* action;
+		bool selected;
+	} actions[] = {
+		{ &m_translate_gizmo_mode, false },
+		{ &m_rotate_gizmo_mode, false },
+		{ &m_scale_gizmo_mode, false },
+		{ nullptr, false },
+		{ &m_local_coord_gizmo, false },
+		{ &m_global_coord_gizmo, false },
+		{ nullptr, false },
+		{ &m_use_grid_snapping_action, m_use_grid_snapping },
+		{ nullptr, false },
 		// &m_top_view_action,
 		// &m_front_view_action,
 		// &m_side_view_action,
@@ -1250,9 +1260,9 @@ void SceneView::onToolbar()
 
 	auto pos = ImGui::GetCursorScreenPos();
 	if (ImGuiEx::BeginToolbar("scene_view_toolbar", pos)) {
-		for (Action* action : actions) {
-			if (action) {
-				action->toolbarButton(m_app.getBigIconFont());
+		for (auto& a : actions) {
+			if (a.action) {
+				a.action->toolbarButton(m_app.getBigIconFont(), a.selected);
 			}
 			else {
 				ImGui::SameLine();
@@ -1287,21 +1297,7 @@ void SceneView::onToolbar()
 	}
 
 	ImGui::SameLine();
-	float step = m_app.getGizmoConfig().getStep();
 	if (ImGuiEx::ToolbarButton(m_app.getBigIconFont(), ICON_FA_EYE, bg_color, "View")) ImGui::OpenPopup("Debug");
-
-	ImGui::SameLine();
-	ImGuiEx::VSeparator(3);
-
-	ImGui::SameLine();
-	ImGui::PushFont(m_app.getBigIconFont());
-	ImGui::TextUnformatted(mode_action->font_icon);
-	ImGui::PopFont();
-	ImGui::SameLine();
-	if (ImGui::DragFloat("##gizmoStep", &step, 1.0f, 0, 200, "%.4f", ImGuiSliderFlags_NoRoundToFormat)) {
-		m_app.getGizmoConfig().setStep(step);
-	}
-	ImGui::SetItemTooltip("%s", "Snap amount");
 
 	if (m_game_view->m_game_view_merged_with_scene_view && m_editor.isGameMode()) {
 		ImGui::SameLine();
@@ -1643,6 +1639,7 @@ void SceneView::onGUI() {
 	else if (m_app.checkShortcut(m_select_child, true)) selectFirstChild(editor);
 	else if (m_app.checkShortcut(m_select_next_sibling, true)) selectNextSibling(editor);
 	else if (m_app.checkShortcut(m_select_prev_sibling, true)) selectPrevSibling(editor);
+	else if (m_app.checkShortcut(m_use_grid_snapping_action)) m_use_grid_snapping = !m_use_grid_snapping;
 
 	m_pipeline->setWorld(m_editor.getWorld());
 	bool is_open = false;
@@ -1688,7 +1685,7 @@ void SceneView::onGUI() {
 		}
 		else if (m_app.checkShortcut(m_autosnap_down)) {
 			Gizmo::Config& cfg = m_app.getGizmoConfig();
-			cfg.setAutosnapDown(!cfg.isAutosnapDown());
+			cfg.autosnap = !cfg.autosnap;
 		}
 		else {
 			for (u32 i = 0; i < lengthOf(m_debug_show_actions); ++i) {

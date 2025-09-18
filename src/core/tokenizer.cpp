@@ -1,6 +1,7 @@
 #include "tokenizer.h"
 #include "core/log.h"
 #include "core/crt.h"
+#include "core/math.h"
 
 namespace Lumix {
 
@@ -188,6 +189,19 @@ bool Tokenizer::consume(bool& out) {
 	logError(filename, "(", getLine(), "): boolean expected.");
 	logErrorPosition(token.value.begin);
 	return false;
+}
+
+bool Tokenizer::consume(Vec3& out) {
+	float tmp[4];
+	u32 size;
+	if (!consumeVector(tmp, size)) return false;
+	if (size != 3) {
+		logError(filename, "(", getLine(), "): Vec3 expected.");
+		logErrorPosition(cursor);
+		return false;
+	}
+	memcpy(&out, tmp, sizeof(out));
+	return true;
 }
 
 bool Tokenizer::consume(i32& out) {

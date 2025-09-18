@@ -505,6 +505,14 @@ void Settings::load() {
 					case Variable::I32: if (!tokenizer.consume(var->i32_value)) return false; break;
 					case Variable::FLOAT_PTR: if (!tokenizer.consume(*var->float_ptr)) return false; break;
 					case Variable::FLOAT: if (!tokenizer.consume(var->float_value)) return false; break;
+					case Variable::VEC3: 
+						if (!tokenizer.consume("{")) return false;
+						if (!tokenizer.consume(var->vec3_value)) return false;
+						break;
+					case Variable::VEC3_PTR:
+						if (!tokenizer.consume("{")) return false;
+						if (!tokenizer.consume(*var->vec3_ptr)) return false;
+						break;
 					case Variable::STRING: {
 						StringView str;
 						if (!tokenizer.consume(str)) return false;
@@ -527,6 +535,15 @@ void Settings::load() {
 				switch (value.type) {
 					case Tokenizer::Token::NUMBER: fromCString(value.value, var->i32_value); var->type = Variable::I32; break;
 					case Tokenizer::Token::STRING: var->string_value = value.value; var->type = Variable::STRING; break;
+					case Tokenizer::Token::SYMBOL:
+						if (value != "{") {
+							logError(tokenizer.filename, "(", tokenizer.getLine(), "): Unexpected token in settings: ", value.value);
+							tokenizer.logErrorPosition(value.value.begin);
+							return false;
+						}
+						if (!tokenizer.consume(var->vec3_value)) return false;
+						var->type = Variable::VEC3;
+						break;
 					case Tokenizer::Token::IDENTIFIER:
 						if (value == "true") {
 							var->bool_value = true;
@@ -599,6 +616,8 @@ void Settings::save() {
 				case Variable::I32_PTR: blob << *var.i32_ptr; break;
 				case Variable::FLOAT: blob << var.float_value; break;
 				case Variable::FLOAT_PTR: blob << *var.float_ptr; break;
+				case Variable::VEC3: blob << "{" << var.vec3_value.x << "," << var.vec3_value.y << "," << var.vec3_value.z << "}"; break;
+				case Variable::VEC3_PTR: blob << "{" << var.vec3_ptr->x << "," << var.vec3_ptr->y << "," << var.vec3_ptr->z << "}"; break;
 				case Variable::STRING_PTR: blob << "`" << var.string_ptr->c_str() << "`"; break;
 				case Variable::STRING: blob << "`" << var.string_value.c_str() << "`"; break;
 			}
@@ -1214,6 +1233,8 @@ void Settings::iterVars(const TextFilter& filter, u32 selected_tab) {
 			}
 			case Variable::STRING_PTR: CB(inputString("##var", var.string_ptr)); break;
 			case Variable::STRING: CB(inputString("##var", &var.string_value)); break;
+			case Variable::VEC3: CB(ImGui::DragFloat3("##var", &var.vec3_value.x, 1, 0, 0, "%.4f", ImGuiSliderFlags_NoRoundToFormat)); break;
+			case Variable::VEC3_PTR: CB(ImGui::DragFloat3("##var", &var.vec3_ptr->x, 1, 0, 0, "%.4f", ImGuiSliderFlags_NoRoundToFormat)); break;
 		}
 		ImGui::PopID();
 	}			
@@ -1536,6 +1557,32 @@ Settings::Variable& Settings::registerOption(const char* name, bool* value, cons
 	new_var.storage = WORKSPACE;
 	if (callback) new_var.set_callback = *callback;
 	new_var.category = getCategory(*this, category);\
+	return new_var;
+}
+
+Settings::Variable& Settings::registerOption(const char* name, Vec3* value, const char* category, const char* label) {
+	// if variable already exists
+	Variable* var = findVar(*this, name);
+	if (var) {
+		var->label = label;
+		var->category = getCategory(*this, category);
+		if (var->type != Variable::VEC3) {
+			logError("Setting ", name, " already exists but is not Vec3");
+			return *var;
+		}
+		*value = var->vec3_value;
+		var->vec3_ptr = value;
+		var->type = Variable::VEC3_PTR;
+		return *var;
+	}
+
+	// create variable
+	Variable& new_var = m_variables.insert(String(name, m_allocator));
+	new_var.label = label;
+	new_var.vec3_ptr = value;
+	new_var.type = Variable::VEC3_PTR;
+	new_var.storage = WORKSPACE;
+	new_var.category = getCategory(*this, category);
 	return new_var;
 }
 

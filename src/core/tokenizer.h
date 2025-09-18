@@ -87,6 +87,10 @@ struct LUMIX_CORE_API Tokenizer {
 	// otherwise prints error and returns false
 	[[nodiscard]] bool consume(i32& out);
 
+	// if token is Vec3, put it in `out` and returns true
+	// otherwise prints error and returns false
+	[[nodiscard]] bool consume(struct Vec3& out);
+
 	// if token is a number, put it in `out` and returns true
 	// otherwise prints error and returns false
 	[[nodiscard]] bool consume(u32& out);

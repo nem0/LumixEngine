@@ -619,17 +619,17 @@ bool translate(u64 id, WorldView& view, Transform& tr, const Gizmo::Config& cfg)
 		view.addText2D(p.x + 30, p.y + 30, 0xffffFFFF, tmp);
 	};
 
-	if (!cfg.is_step || cfg.getStep() <= 0) {
+	if (!cfg.is_step || squaredLength(cfg.step_config.position) <= FLT_MIN) {
 		g_gizmo_state.prev_point = pos;
 		tr.pos = res;
 		print_delta();		
 		return squaredLength(delta_vec) > 0.f;
 	}
 
-	const float step = cfg.getStep();
-	res.x = double(i64((res.x + signum(res.x) * step * 0.5f) / step)) * step;
-	res.y = double(i64((res.y + signum(res.y) * step * 0.5f) / step)) * step;
-	res.z = double(i64((res.z + signum(res.z) * step * 0.5f) / step)) * step;
+	const Vec3 step = cfg.step_config.position;
+	res.x = double(i64((res.x + signum(res.x) * step.x * 0.5f) / step.x)) * step.x;
+	res.y = double(i64((res.y + signum(res.y) * step.y * 0.5f) / step.y)) * step.y;
+	res.z = double(i64((res.z + signum(res.z) * step.z * 0.5f) / step.z)) * step.z;
 	if (res.x != tr.pos.x || res.y != tr.pos.y || res.z != tr.pos.z) {
 		g_gizmo_state.prev_point = res;
 		tr.pos = res;
@@ -732,13 +732,13 @@ bool rotate(u64 id, WorldView& view, Transform& tr, const Gizmo::Config& cfg) {
 			default: ASSERT(false); break;
 		}
 
-		if (!cfg.is_step || cfg.getStep() <= 0) {
+		if (!cfg.is_step || cfg.step_config.rotation <= 0) {
 			tr.rot = normalize(Quat(normalize(normal), angle) * g_gizmo_state.start_rot);
 			return true;
 		}
 
-		if (cfg.is_step && fabs(angle) > degreesToRadians(cfg.getStep())) {
-			angle = angle - fmodf(angle, degreesToRadians(cfg.getStep()));
+		if (cfg.is_step && fabs(angle) > degreesToRadians(cfg.step_config.rotation)) {
+			angle = angle - fmodf(angle, degreesToRadians(cfg.step_config.rotation));
 			tr.rot = normalize(Quat(normalize(normal), angle) * g_gizmo_state.start_rot);
 			return true;
 		}

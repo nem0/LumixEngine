@@ -69,11 +69,11 @@ private:
 	Action m_toggle_projection_action{"Camera", "Ortho/perspective", "Toggle ortho/perspective projection", "toggle_projection", ""};
 	Action m_look_at_selected_action{"Camera", "Look at selected", "Look at selected entity", "look_at_selected", ""};
 	Action m_copy_view_action{"Camera", "Copy view transform", "Copy transform to entity", "copy_view_transform", ""};
-	
+
 	Action m_set_pivot_action{"Gizmo", "Set custom pivot", "Set custom pivot", "set_custom_pivot", ""};
 	Action m_reset_pivot_action{"Gizmo", "Reset pivot", "Reset pivot", "reset_pivot", ""};
 	Action m_anisotropic_scale_action{"Gizmo", "Enable/disable anisotropic scale", "Enable/disable anisotropic gizmo scale", "toggle_gizmo_anisotropic_scale", ""};
-	Action m_toggle_gizmo_step_action{"Gizmo", "Enable/disable gizmo step", "Enable/disable gizmo step", "toggle_gizmo_step", ""};
+	Action m_use_grid_snapping_action{"Gizmo", "Transform snapping", "Snap position, rotation or scale to configured multiples", "gizmo_snap_transform", ICON_FA_MAGNET};
 	Action m_copy_move_action{"Gizmo", "Duplicate move", "Duplicate entity when moving with gizmo", "duplicate_entity_move", ""};
 	Action m_translate_gizmo_mode{"Gizmo", "Translate", "Translate mode", "gizmo_translate_mode", ICON_FA_ARROWS_ALT};
 	Action m_rotate_gizmo_mode{"Gizmo", "Rotate", "Rotate mode", "gizmo_rotate_mode", ICON_FA_UNDO};
@@ -119,7 +119,8 @@ private:
 	bool m_show_camera_preview = true;
 	bool m_mouse_wheel_changes_speed = true;
 	bool m_was_game_mode = false;
-	
+	bool m_use_grid_snapping = false;
+
 	WorldEditor& m_editor;
 	struct WorldViewImpl* m_view;
 	GameView* m_game_view = nullptr;

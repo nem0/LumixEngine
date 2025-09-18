@@ -3618,11 +3618,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 	Vec3 getActorVelocity(EntityRef entity) override
 	{
 		const RigidActor& actor = m_actors[entity];
-		if (actor.dynamic_type != DynamicType::DYNAMIC)
-		{
-			logWarning("Trying to get speed of static object");
-			return Vec3::ZERO;
-		}
+		if (actor.dynamic_type != DynamicType::DYNAMIC) return Vec3::ZERO;
 
 		auto* physx_actor = static_cast<PxRigidDynamic*>(actor.physx_actor);
 		if (!physx_actor) return Vec3::ZERO;
@@ -3630,14 +3626,9 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 
-	float getActorSpeed(EntityRef entity) override
-	{
+	float getActorSpeed(EntityRef entity) override {
 		const RigidActor& actor = m_actors[entity];
-		if (actor.dynamic_type != DynamicType::DYNAMIC)
-		{
-			logWarning("Trying to get speed of static object");
-			return 0;
-		}
+		if (actor.dynamic_type != DynamicType::DYNAMIC) return 0;
 
 		auto* physx_actor = static_cast<PxRigidDynamic*>(actor.physx_actor);
 		if (!physx_actor) return 0;

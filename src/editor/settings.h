@@ -50,6 +50,8 @@ struct LUMIX_EDITOR_API Settings {
 			I32_PTR,
 			FLOAT,
 			FLOAT_PTR,
+			VEC3,
+			VEC3_PTR
 		};
 		union {
 			bool bool_value;
@@ -59,6 +61,8 @@ struct LUMIX_EDITOR_API Settings {
 			i32* i32_ptr;
 			float float_value;
 			float* float_ptr;
+			Vec3 vec3_value;
+			Vec3* vec3_ptr;
 		};
 		String string_value;
 		float min, max;
@@ -99,6 +103,7 @@ struct LUMIX_EDITOR_API Settings {
 	Variable& registerOption(const char* name, String* value, const char* category = nullptr, const char* label = nullptr);
 	Variable& registerOption(const char* name, i32* value, const char* category = nullptr, const char* label = nullptr);
 	Variable& registerOption(const char* name, float* value, const char* category = nullptr, const char* label = nullptr);
+	Variable& registerOption(const char* name, Vec3* value, const char* category = nullptr, const char* label = nullptr);
 
 	float getTimeSinceLastSave() const;
 
