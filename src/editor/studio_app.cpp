@@ -811,7 +811,6 @@ struct StudioAppImpl final : StudioApp {
 		if (m_watched_plugin.reload_request) tryReloadPlugin();
 
 		guiBeginFrame();
-		openFileUI(); 
 		m_asset_compiler->update();
 		m_editor->update();
 		showGizmos();
@@ -2629,81 +2628,6 @@ struct StudioAppImpl final : StudioApp {
 		m_exit_code = exit_code;
 	}
 
-	void openFileUI() {
-		bool focus = false;
-		if (checkShortcut(m_open_file_action, true)) {
-			ImGui::OpenPopup("Open file");
-			focus = true;
-		}
-		
-		const ImGuiViewport* viewport = ImGui::GetMainViewport();
-		ImVec2 size = viewport->Size;
-		size.x *= 0.4f;
-		size.y *= 0.8f;
-		ImVec2 pos = ImVec2(viewport->Pos.x + (viewport->Size.x - size.x) * 0.5f, viewport->Pos.y + (viewport->Size.y - size.y) * 0.5f);
-		ImGui::SetNextWindowPos(pos);
-		ImGui::SetNextWindowSize(size, ImGuiCond_Always);
-
-		if (ImGui::BeginPopup("Open file", ImGuiWindowFlags_NoNavInputs)) {
-			if (ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
-			
-			m_open_file_filter.gui("Search", -1, focus, nullptr, false);
-
-			auto& resources = m_asset_compiler->lockResources();
-			defer { m_asset_compiler->unlockResources(); };
-			
-			const bool insert_enter = ImGui::IsItemFocused() && ImGui::IsKeyPressed(ImGuiKey_Enter);
-			bool moved = false;
-			if (ImGui::IsItemFocused()) {
-				if (ImGui::IsKeyPressed(ImGuiKey_UpArrow) && m_selected_file > 0) {
-					--m_selected_file;
-					moved = true;
-				}
-				if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
-					++m_selected_file;
-					moved = true;
-				}
-			}
-
-			ImGui::Separator();
-			i32 idx = 0;
-			if (ImGui::BeginTable("files", 2, ImGuiTableFlags_Resizable)) {
-				ResourceType lua_script_type("lua_script");
-				ResourceType world_type("world");
-				
-				ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
-				ImGui::TableSetupColumn("Directory");
-				if (m_open_file_filter.isActive()) {
-					for (const auto& res : resources) {
-						if (res.type != lua_script_type && res.type != world_type) continue;
-						if (!m_open_file_filter.pass(res.path)) continue;
-
-						PathInfo info(res.path);
-						StaticString<256> tmp(info.basename, ".", info.extension);
-
-						ImGui::TableNextRow();
-						ImGui::TableNextColumn();
-						ImGui::PushID(&res);
-						bool clicked = ImGui::Selectable(tmp.data, idx == m_selected_file, ImGuiSelectableFlags_SpanAllColumns) || (insert_enter && idx == m_selected_file);
-						ImGui::PopID();
-						ImGui::TableNextColumn();
-						ImGui::TextUnformatted(info.dir.begin, info.dir.end);
-						if (clicked) {
-							m_asset_browser->openEditor(res.path);
-							ImGui::CloseCurrentPopup();
-						}
-						++idx;
-					}
-				}
-				ImGui::EndTable();
-			}
-
-			if (idx) m_selected_file = m_selected_file % idx;
-
-			ImGui::EndPopup();
-		}
-	}
-
 	u32 createComponentCommandPaletteUI(u32 start_idx, bool insert_enter) {
 		Span<const reflection::RegisteredComponent> cmps = reflection::getComponents();
 		u32 idx = start_idx;
@@ -3244,10 +3168,6 @@ struct StudioAppImpl final : StudioApp {
 
 	bool m_is_welcome_screen_open;
 	bool m_is_export_game_dialog_open;
-
-	Action m_open_file_action{"General", "Open file", "Open file", "open_file", ""};
-	TextFilter m_open_file_filter;
-	i32 m_selected_file = 0;
 
 	ImFont* m_font;
 	ImFont* m_big_icon_font;

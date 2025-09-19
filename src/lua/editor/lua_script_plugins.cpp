@@ -721,6 +721,8 @@ struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		app.getAssetCompiler().registerExtension("lua", LuaScript::TYPE);
 	}
 
+	bool showInOpenFileDialog() override { return true; }
+
 	void openEditor(const Path& path) override {
 		IAllocator& allocator = m_app.getAllocator();
 		UniquePtr<EditorWindow> win = UniquePtr<EditorWindow>::create(allocator, m_analysis, path, m_app);

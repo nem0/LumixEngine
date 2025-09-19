@@ -25,6 +25,7 @@ struct AssetBrowser : StudioApp::GUIPlugin {
 		virtual void update() {}
 		virtual void openEditor(const struct Path& path) {}
 		virtual void openMultiEditor(Span<const Path> paths) {}
+		virtual bool showInOpenFileDialog() { return false; }
 	};
 
 	static UniquePtr<AssetBrowser> create(struct StudioApp& app);
