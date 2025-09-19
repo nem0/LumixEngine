@@ -426,7 +426,7 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 
 	const char* getLabel() const override { return "Animation"; }
 	ResourceType getResourceType() const override { return Animation::TYPE; }
-
+	
 	void openEditor(const Path& path) override {
 		IAllocator& allocator = m_app.getAllocator();
 		UniquePtr<EditorWindow> win = UniquePtr<EditorWindow>::create(allocator, path, m_app);

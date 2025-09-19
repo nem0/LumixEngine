@@ -68,7 +68,6 @@ struct WorldAssetPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	const char* getIcon() const override { return ICON_FA_GLOBE_AFRICA; }
 	const char* getLabel() const override { return "World"; }
 	ResourceType getResourceType() const override { return WORLD_TYPE; }
-	bool showInOpenFileDialog() override { return true; }
 
 	StudioApp& m_app;
 };
@@ -106,7 +105,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		, m_subdirs(m_allocator)
 		, m_windows(m_allocator)
 		, m_world_asset_plugin(app)
-		, m_open_file_dialog_types(m_allocator)
+		, m_readonly_resource_types(m_allocator)
 	{
 		PROFILE_FUNCTION();
 
@@ -482,7 +481,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 	bool showInOpenFileDialog(ResourceType type) const {
-		return m_open_file_dialog_types.indexOf(type) >= 0;
+		return m_readonly_resource_types.indexOf(type) < 0;
 	}
 
 	void openFileUI() {
@@ -1102,7 +1101,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 	void removePlugin(IPlugin& plugin) override {
-		if (plugin.showInOpenFileDialog()) m_open_file_dialog_types.eraseItem(plugin.getResourceType());
+		if (plugin.isReadOnly()) m_readonly_resource_types.eraseItem(plugin.getResourceType());
 		m_plugins.eraseItem(&plugin);
 		m_plugin_map.eraseIf([&plugin](IPlugin* p){ return p == &plugin; });
 	}
@@ -1122,7 +1121,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 	void addPlugin(IPlugin& plugin, Span<const char*> extensions) override {
-		if (plugin.showInOpenFileDialog()) m_open_file_dialog_types.push(plugin.getResourceType());
+		if (plugin.isReadOnly()) m_readonly_resource_types.push(plugin.getResourceType());
 		m_plugins.push(&plugin);
 		for (const char* ext : extensions) {
 			u64 key = 0;
@@ -1489,7 +1488,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	TextFilter m_open_file_filter;
 	i32 m_selected_file = 0;
 	WorldAssetPlugin m_world_asset_plugin;
-	StackArray<ResourceType, 16> m_open_file_dialog_types;
+	StackArray<ResourceType, 16> m_readonly_resource_types;
 };
 
 UniquePtr<AssetBrowser> AssetBrowser::create(StudioApp& app) {

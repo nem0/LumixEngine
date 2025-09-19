@@ -23,9 +23,10 @@ struct AssetBrowser : StudioApp::GUIPlugin {
 		virtual ResourceType getResourceType() const = 0;
 		virtual bool createTile(const char* in_path, const char* out_path, struct ResourceType type);
 		virtual void update() {}
-		virtual void openEditor(const struct Path& path) {}
+		virtual void openEditor(const struct Path& path) = 0;
 		virtual void openMultiEditor(Span<const Path> paths) {}
-		virtual bool showInOpenFileDialog() { return false; }
+		// Return true if the resource type is read-only, i.e., no editor window opens when double-clicked in the asset browser.
+		virtual bool isReadOnly() { return false; }
 	};
 
 	static UniquePtr<AssetBrowser> create(struct StudioApp& app);

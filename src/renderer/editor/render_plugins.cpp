@@ -633,6 +633,8 @@ struct FontPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	const char* getIcon() const override { return ICON_FA_FONT; }
 	const char* getLabel() const override { return "Font"; }
 	ResourceType getResourceType() const override { return FontResource::TYPE; }
+	bool isReadOnly() override { return true; }
+	void openEditor(const struct Path& path) override {}
 
 	StudioApp& m_app;
 };
