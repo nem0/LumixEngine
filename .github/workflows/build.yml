@@ -23,6 +23,10 @@ jobs:
               working-directory: plugins
               run: |
                 git.exe clone --depth=1 https://github.com/nem0/lumixengine_net.git net
+            - name: fetch jolt plugin
+              working-directory: plugins
+              run: |
+                git.exe clone --depth=1 https://github.com/nem0/lumixengine_jolt.git jolt
             - name: fetch js plugin
               working-directory: plugins
               run: |
