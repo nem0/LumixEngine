@@ -825,6 +825,8 @@ struct PhysicsGeometryPlugin final : AssetBrowser::IPlugin
 
 	const char* getLabel() const override { return "Physics geometry"; }
 	ResourceType getResourceType() const override { return PhysicsGeometry::TYPE; }
+	void openEditor(const struct Path& path) override {}
+	bool isReadOnly() override { return true; }
 
 	StudioApp& m_app;
 };

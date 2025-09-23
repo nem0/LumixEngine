@@ -1559,7 +1559,7 @@ void serializeMain(OutputStream& out, Parser& parser) {
 	
 	for (Module& m : parser.modules) {
 		for (Component& c : m.components) {
-			L("\tregisterLuaComponent(L, \"",c.id,"\", ",c.name,"_getter, ",c.name,"_setter);");
+			L("\tregisterLuaComponent(L, \"",c.id,"\", ",c.id,"_getter, ",c.id,"_setter);");
 		}
 	}
 	L("}");
@@ -1573,7 +1573,7 @@ bool isBlob(const Property& p) {
 }
 
 void serializeLuaPropertySetter(OutputStream& out, Module& m, Component& c) {
-	L("int ",c.name,"_setter(lua_State* L) {");
+	L("int ",c.id,"_setter(lua_State* L) {");
 	L("auto [imodule, entity] = checkComponent(L);");
 	L("auto* module = (",m.name,"*)imodule;");
 	L("const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);");
@@ -1744,7 +1744,7 @@ void serializeLuaArrayGetter(OutputStream& out, Module& m, Component& c, ArrayPr
 
 // TODO move lua stuff into separate file
 void serializeLuaPropertyGetter(OutputStream& out, Module& m, Component& c) {
-	L("int ",c.name,"_getter(lua_State* L) {");
+	L("int ",c.id,"_getter(lua_State* L) {");
 	L("\tauto [imodule, entity] = checkComponent(L);");
 	L("\tauto* module = (",m.name,"*)imodule;");
 

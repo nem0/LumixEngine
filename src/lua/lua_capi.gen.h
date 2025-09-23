@@ -17,7 +17,7 @@
 #include "xxhash/xxhash.h"
 
 namespace Lumix {
-	int PropertyAnimator_getter(lua_State* L) {
+	int property_animator_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (AnimationModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -32,7 +32,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int PropertyAnimator_setter(lua_State* L) {
+	int property_animator_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (AnimationModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -90,7 +90,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int Animator_getter(lua_State* L) {
+	int animator_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (AnimationModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -110,7 +110,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int Animator_setter(lua_State* L) {
+	int animator_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (AnimationModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -125,7 +125,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int Animable_getter(lua_State* L) {
+	int animable_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (AnimationModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -138,7 +138,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int Animable_setter(lua_State* L) {
+	int animable_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (AnimationModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -225,7 +225,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int EchoZone_getter(lua_State* L) {
+	int echo_zone_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (AudioModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -239,7 +239,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int EchoZone_setter(lua_State* L) {
+	int echo_zone_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (AudioModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -253,7 +253,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int ChorusZone_getter(lua_State* L) {
+	int chorus_zone_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (AudioModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -267,7 +267,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int ChorusZone_setter(lua_State* L) {
+	int chorus_zone_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (AudioModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -281,7 +281,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int Listener_getter(lua_State* L) {
+	int audio_listener_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (AudioModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -293,7 +293,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int Listener_setter(lua_State* L) {
+	int audio_listener_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (AudioModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -319,7 +319,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int AmbientSound_getter(lua_State* L) {
+	int ambient_sound_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (AudioModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -335,7 +335,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int AmbientSound_setter(lua_State* L) {
+	int ambient_sound_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (AudioModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -352,7 +352,7 @@ namespace Lumix {
 }
 
 namespace Lumix {
-	int Spline_getter(lua_State* L) {
+	int spline_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (CoreModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -364,7 +364,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int Spline_setter(lua_State* L) {
+	int spline_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (CoreModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -376,7 +376,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int Signal_getter(lua_State* L) {
+	int signal_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (CoreModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -388,7 +388,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int Signal_setter(lua_State* L) {
+	int signal_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (CoreModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -430,7 +430,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int Canvas_getter(lua_State* L) {
+	int gui_canvas_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (GUIModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -445,7 +445,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int Canvas_setter(lua_State* L) {
+	int gui_canvas_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (GUIModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -460,7 +460,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int RenderTarget_getter(lua_State* L) {
+	int gui_render_target_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (GUIModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -472,7 +472,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int RenderTarget_setter(lua_State* L) {
+	int gui_render_target_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (GUIModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -484,7 +484,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int InputField_getter(lua_State* L) {
+	int gui_input_field_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (GUIModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -496,7 +496,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int InputField_setter(lua_State* L) {
+	int gui_input_field_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (GUIModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -508,7 +508,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int Rect_getter(lua_State* L) {
+	int gui_rect_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (GUIModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -530,7 +530,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int Rect_setter(lua_State* L) {
+	int gui_rect_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (GUIModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -552,7 +552,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int Button_getter(lua_State* L) {
+	int gui_button_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (GUIModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -566,7 +566,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int Button_setter(lua_State* L) {
+	int gui_button_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (GUIModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -580,7 +580,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int Image_getter(lua_State* L) {
+	int gui_image_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (GUIModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -595,7 +595,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int Image_setter(lua_State* L) {
+	int gui_image_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (GUIModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -610,7 +610,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int Text_getter(lua_State* L) {
+	int gui_text_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (GUIModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -628,7 +628,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int Text_setter(lua_State* L) {
+	int gui_text_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (GUIModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -649,7 +649,7 @@ namespace Lumix {
 }
 
 namespace Lumix {
-	int Script_getter(lua_State* L) {
+	int lua_script_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (LuaScriptModule*)imodule;
 		if (lua_isnumber(L, 2)) return lua_push_script_env(L, entity, module);
@@ -756,7 +756,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int Script_setter(lua_State* L) {
+	int lua_script_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (LuaScriptModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -768,7 +768,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int InlineScript_getter(lua_State* L) {
+	int lua_script_inline_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (LuaScriptModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -781,7 +781,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int InlineScript_setter(lua_State* L) {
+	int lua_script_inline_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (LuaScriptModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -850,7 +850,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int Zone_getter(lua_State* L) {
+	int navmesh_zone_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (NavigationModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -878,7 +878,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int Zone_setter(lua_State* L) {
+	int navmesh_zone_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (NavigationModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -924,7 +924,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int Agent_getter(lua_State* L) {
+	int navmesh_agent_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (NavigationModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -943,7 +943,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int Agent_setter(lua_State* L) {
+	int navmesh_agent_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (NavigationModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -982,7 +982,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int Heightfield_getter(lua_State* L) {
+	int physical_heightfield_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (PhysicsModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -998,7 +998,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int Heightfield_setter(lua_State* L) {
+	int physical_heightfield_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (PhysicsModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -1014,7 +1014,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int D6Joint_getter(lua_State* L) {
+	int d6_joint_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (PhysicsModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -1041,7 +1041,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int D6Joint_setter(lua_State* L) {
+	int d6_joint_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (PhysicsModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -1068,7 +1068,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int DistanceJoint_getter(lua_State* L) {
+	int distance_joint_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (PhysicsModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -1087,7 +1087,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int DistanceJoint_setter(lua_State* L) {
+	int distance_joint_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (PhysicsModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -1105,7 +1105,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int HingeJoint_getter(lua_State* L) {
+	int hinge_joint_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (PhysicsModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -1124,7 +1124,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int HingeJoint_setter(lua_State* L) {
+	int hinge_joint_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (PhysicsModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -1143,7 +1143,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int SphericalJoint_getter(lua_State* L) {
+	int spherical_joint_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (PhysicsModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -1160,7 +1160,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int SphericalJoint_setter(lua_State* L) {
+	int spherical_joint_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (PhysicsModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -1207,7 +1207,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int Controller_getter(lua_State* L) {
+	int physical_controller_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (PhysicsModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -1229,7 +1229,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int Controller_setter(lua_State* L) {
+	int physical_controller_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (PhysicsModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -1279,7 +1279,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int Actor_getter(lua_State* L) {
+	int rigid_actor_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (PhysicsModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -1493,7 +1493,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int Actor_setter(lua_State* L) {
+	int rigid_actor_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (PhysicsModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -1511,7 +1511,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int Wheel_getter(lua_State* L) {
+	int wheel_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (PhysicsModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -1533,7 +1533,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int Wheel_setter(lua_State* L) {
+	int wheel_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (PhysicsModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -1554,7 +1554,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int Vehicle_getter(lua_State* L) {
+	int vehicle_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (PhysicsModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -1577,7 +1577,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int Vehicle_setter(lua_State* L) {
+	int vehicle_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (PhysicsModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -1597,7 +1597,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int InstancedCube_getter(lua_State* L) {
+	int physical_instanced_cube_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (PhysicsModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -1611,7 +1611,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int InstancedCube_setter(lua_State* L) {
+	int physical_instanced_cube_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (PhysicsModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -1625,7 +1625,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int InstancedMesh_getter(lua_State* L) {
+	int physical_instanced_mesh_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (PhysicsModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -1639,7 +1639,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int InstancedMesh_setter(lua_State* L) {
+	int physical_instanced_mesh_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (PhysicsModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -1818,7 +1818,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int Camera_getter(lua_State* L) {
+	int camera_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -1847,7 +1847,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int Camera_setter(lua_State* L) {
+	int camera_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -1875,7 +1875,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int Decal_getter(lua_State* L) {
+	int decal_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -1890,7 +1890,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int Decal_setter(lua_State* L) {
+	int decal_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -1905,7 +1905,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int Environment_getter(lua_State* L) {
+	int environment_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -1941,7 +1941,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int Environment_setter(lua_State* L) {
+	int environment_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -1977,7 +1977,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int PointLight_getter(lua_State* L) {
+	int point_light_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -1996,7 +1996,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int PointLight_setter(lua_State* L) {
+	int point_light_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -2015,7 +2015,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int ReflectionProbe_getter(lua_State* L) {
+	int reflection_probe_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -2030,7 +2030,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int ReflectionProbe_setter(lua_State* L) {
+	int reflection_probe_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -2045,7 +2045,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int EnvironmentProbe_getter(lua_State* L) {
+	int environment_probe_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -2060,7 +2060,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int EnvironmentProbe_setter(lua_State* L) {
+	int environment_probe_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -2075,7 +2075,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int Fur_getter(lua_State* L) {
+	int fur_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -2091,7 +2091,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int Fur_setter(lua_State* L) {
+	int fur_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -2115,7 +2115,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int BoneAttachment_getter(lua_State* L) {
+	int bone_attachment_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -2132,7 +2132,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int BoneAttachment_setter(lua_State* L) {
+	int bone_attachment_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -2148,7 +2148,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int ParticleEmitter_getter(lua_State* L) {
+	int particle_emitter_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -2162,7 +2162,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int ParticleEmitter_setter(lua_State* L) {
+	int particle_emitter_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -2176,7 +2176,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int InstancedModel_getter(lua_State* L) {
+	int instanced_model_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -2189,7 +2189,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int InstancedModel_setter(lua_State* L) {
+	int instanced_model_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -2219,7 +2219,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int ModelInstance_getter(lua_State* L) {
+	int model_instance_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -2235,7 +2235,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int ModelInstance_setter(lua_State* L) {
+	int model_instance_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -2249,7 +2249,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int CurveDecal_getter(lua_State* L) {
+	int curve_decal_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -2266,7 +2266,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int CurveDecal_setter(lua_State* L) {
+	int curve_decal_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -2301,7 +2301,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int Terrain_getter(lua_State* L) {
+	int terrain_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -2419,7 +2419,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int Terrain_setter(lua_State* L) {
+	int terrain_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -2436,7 +2436,7 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int ProceduralGeometry_getter(lua_State* L) {
+	int procedural_geom_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -2449,7 +2449,7 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int ProceduralGeometry_setter(lua_State* L) {
+	int procedural_geom_setter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
@@ -2614,51 +2614,51 @@ namespace Lumix {
 			lua_setfield(L, -2, "__index");
 			lua_pop(L, 2);
 		}
-		registerLuaComponent(L, "property_animator", PropertyAnimator_getter, PropertyAnimator_setter);
-		registerLuaComponent(L, "animator", Animator_getter, Animator_setter);
-		registerLuaComponent(L, "animable", Animable_getter, Animable_setter);
-		registerLuaComponent(L, "echo_zone", EchoZone_getter, EchoZone_setter);
-		registerLuaComponent(L, "chorus_zone", ChorusZone_getter, ChorusZone_setter);
-		registerLuaComponent(L, "audio_listener", Listener_getter, Listener_setter);
-		registerLuaComponent(L, "ambient_sound", AmbientSound_getter, AmbientSound_setter);
-		registerLuaComponent(L, "spline", Spline_getter, Spline_setter);
-		registerLuaComponent(L, "signal", Signal_getter, Signal_setter);
-		registerLuaComponent(L, "gui_canvas", Canvas_getter, Canvas_setter);
-		registerLuaComponent(L, "gui_render_target", RenderTarget_getter, RenderTarget_setter);
-		registerLuaComponent(L, "gui_input_field", InputField_getter, InputField_setter);
-		registerLuaComponent(L, "gui_rect", Rect_getter, Rect_setter);
-		registerLuaComponent(L, "gui_button", Button_getter, Button_setter);
-		registerLuaComponent(L, "gui_image", Image_getter, Image_setter);
-		registerLuaComponent(L, "gui_text", Text_getter, Text_setter);
-		registerLuaComponent(L, "lua_script", Script_getter, Script_setter);
-		registerLuaComponent(L, "lua_script_inline", InlineScript_getter, InlineScript_setter);
-		registerLuaComponent(L, "navmesh_zone", Zone_getter, Zone_setter);
-		registerLuaComponent(L, "navmesh_agent", Agent_getter, Agent_setter);
-		registerLuaComponent(L, "physical_heightfield", Heightfield_getter, Heightfield_setter);
-		registerLuaComponent(L, "d6_joint", D6Joint_getter, D6Joint_setter);
-		registerLuaComponent(L, "distance_joint", DistanceJoint_getter, DistanceJoint_setter);
-		registerLuaComponent(L, "hinge_joint", HingeJoint_getter, HingeJoint_setter);
-		registerLuaComponent(L, "spherical_joint", SphericalJoint_getter, SphericalJoint_setter);
-		registerLuaComponent(L, "physical_controller", Controller_getter, Controller_setter);
-		registerLuaComponent(L, "rigid_actor", Actor_getter, Actor_setter);
-		registerLuaComponent(L, "wheel", Wheel_getter, Wheel_setter);
-		registerLuaComponent(L, "vehicle", Vehicle_getter, Vehicle_setter);
-		registerLuaComponent(L, "physical_instanced_cube", InstancedCube_getter, InstancedCube_setter);
-		registerLuaComponent(L, "physical_instanced_mesh", InstancedMesh_getter, InstancedMesh_setter);
-		registerLuaComponent(L, "camera", Camera_getter, Camera_setter);
-		registerLuaComponent(L, "decal", Decal_getter, Decal_setter);
-		registerLuaComponent(L, "environment", Environment_getter, Environment_setter);
-		registerLuaComponent(L, "point_light", PointLight_getter, PointLight_setter);
-		registerLuaComponent(L, "reflection_probe", ReflectionProbe_getter, ReflectionProbe_setter);
-		registerLuaComponent(L, "environment_probe", EnvironmentProbe_getter, EnvironmentProbe_setter);
-		registerLuaComponent(L, "fur", Fur_getter, Fur_setter);
-		registerLuaComponent(L, "bone_attachment", BoneAttachment_getter, BoneAttachment_setter);
-		registerLuaComponent(L, "particle_emitter", ParticleEmitter_getter, ParticleEmitter_setter);
-		registerLuaComponent(L, "instanced_model", InstancedModel_getter, InstancedModel_setter);
-		registerLuaComponent(L, "model_instance", ModelInstance_getter, ModelInstance_setter);
-		registerLuaComponent(L, "curve_decal", CurveDecal_getter, CurveDecal_setter);
-		registerLuaComponent(L, "terrain", Terrain_getter, Terrain_setter);
-		registerLuaComponent(L, "procedural_geom", ProceduralGeometry_getter, ProceduralGeometry_setter);
+		registerLuaComponent(L, "property_animator", property_animator_getter, property_animator_setter);
+		registerLuaComponent(L, "animator", animator_getter, animator_setter);
+		registerLuaComponent(L, "animable", animable_getter, animable_setter);
+		registerLuaComponent(L, "echo_zone", echo_zone_getter, echo_zone_setter);
+		registerLuaComponent(L, "chorus_zone", chorus_zone_getter, chorus_zone_setter);
+		registerLuaComponent(L, "audio_listener", audio_listener_getter, audio_listener_setter);
+		registerLuaComponent(L, "ambient_sound", ambient_sound_getter, ambient_sound_setter);
+		registerLuaComponent(L, "spline", spline_getter, spline_setter);
+		registerLuaComponent(L, "signal", signal_getter, signal_setter);
+		registerLuaComponent(L, "gui_canvas", gui_canvas_getter, gui_canvas_setter);
+		registerLuaComponent(L, "gui_render_target", gui_render_target_getter, gui_render_target_setter);
+		registerLuaComponent(L, "gui_input_field", gui_input_field_getter, gui_input_field_setter);
+		registerLuaComponent(L, "gui_rect", gui_rect_getter, gui_rect_setter);
+		registerLuaComponent(L, "gui_button", gui_button_getter, gui_button_setter);
+		registerLuaComponent(L, "gui_image", gui_image_getter, gui_image_setter);
+		registerLuaComponent(L, "gui_text", gui_text_getter, gui_text_setter);
+		registerLuaComponent(L, "lua_script", lua_script_getter, lua_script_setter);
+		registerLuaComponent(L, "lua_script_inline", lua_script_inline_getter, lua_script_inline_setter);
+		registerLuaComponent(L, "navmesh_zone", navmesh_zone_getter, navmesh_zone_setter);
+		registerLuaComponent(L, "navmesh_agent", navmesh_agent_getter, navmesh_agent_setter);
+		registerLuaComponent(L, "physical_heightfield", physical_heightfield_getter, physical_heightfield_setter);
+		registerLuaComponent(L, "d6_joint", d6_joint_getter, d6_joint_setter);
+		registerLuaComponent(L, "distance_joint", distance_joint_getter, distance_joint_setter);
+		registerLuaComponent(L, "hinge_joint", hinge_joint_getter, hinge_joint_setter);
+		registerLuaComponent(L, "spherical_joint", spherical_joint_getter, spherical_joint_setter);
+		registerLuaComponent(L, "physical_controller", physical_controller_getter, physical_controller_setter);
+		registerLuaComponent(L, "rigid_actor", rigid_actor_getter, rigid_actor_setter);
+		registerLuaComponent(L, "wheel", wheel_getter, wheel_setter);
+		registerLuaComponent(L, "vehicle", vehicle_getter, vehicle_setter);
+		registerLuaComponent(L, "physical_instanced_cube", physical_instanced_cube_getter, physical_instanced_cube_setter);
+		registerLuaComponent(L, "physical_instanced_mesh", physical_instanced_mesh_getter, physical_instanced_mesh_setter);
+		registerLuaComponent(L, "camera", camera_getter, camera_setter);
+		registerLuaComponent(L, "decal", decal_getter, decal_setter);
+		registerLuaComponent(L, "environment", environment_getter, environment_setter);
+		registerLuaComponent(L, "point_light", point_light_getter, point_light_setter);
+		registerLuaComponent(L, "reflection_probe", reflection_probe_getter, reflection_probe_setter);
+		registerLuaComponent(L, "environment_probe", environment_probe_getter, environment_probe_setter);
+		registerLuaComponent(L, "fur", fur_getter, fur_setter);
+		registerLuaComponent(L, "bone_attachment", bone_attachment_getter, bone_attachment_setter);
+		registerLuaComponent(L, "particle_emitter", particle_emitter_getter, particle_emitter_setter);
+		registerLuaComponent(L, "instanced_model", instanced_model_getter, instanced_model_setter);
+		registerLuaComponent(L, "model_instance", model_instance_getter, model_instance_setter);
+		registerLuaComponent(L, "curve_decal", curve_decal_getter, curve_decal_setter);
+		registerLuaComponent(L, "terrain", terrain_getter, terrain_setter);
+		registerLuaComponent(L, "procedural_geom", procedural_geom_getter, procedural_geom_setter);
 	}
 }
 

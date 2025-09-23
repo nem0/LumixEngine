@@ -74,7 +74,7 @@ declare ImGui: {
 	Key_UpArrow : number
 }
 
-type Resource = {
+export type Resource = {
 	newEmpty: (Resource, string) -> Resource,
 	getPath: (Resource) -> string,
 	path : string,
@@ -85,7 +85,7 @@ declare Lumix : {
 	Entity : Entity
 }
 
-type World = {
+export type World = {
 	getActivePartition : (World) -> number,
 	setActivePartition : (World, number) -> (),
 	createPartition : (World, string) -> number,
@@ -567,7 +567,7 @@ type procedural_geom_component =  {
 }
 
 
-type Entity = {
+export type Entity = {
 	NULL : Entity,
 	world : World,
 	name : string,
