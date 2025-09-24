@@ -538,6 +538,10 @@ namespace ImGuiEx {
 		}
 	}
 
+	void ScrollToItem() {
+		ImGui::ScrollToItem(ImGuiScrollFlags_KeepVisibleCenterY);
+	}
+
 	void VSeparator(float thickness) {
 		ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical, thickness);
 	}

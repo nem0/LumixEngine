@@ -956,7 +956,8 @@ struct StudioAppImpl final : StudioApp {
 		m_settings.registerOption("sleep_when_inactive", &m_sleep_when_inactive, "General", "Sleep when inactive");
 		m_settings.registerOption("fileselector_dir", &m_file_selector.m_path);
 		m_settings.registerOption("font_size", &m_font_size, "General", "Font size").setMin(1);
-		m_settings.registerOption("code_editor_font_size", &CodeEditor::s_font_size, "General", "Code editor font size").setMin(1);
+		m_settings.registerOption("code_editor_font_size", &CodeEditor::s_font_size, "Code editor", "Font size").setMin(1);
+		m_settings.registerOption("code_editor_show_line_nums", &CodeEditor::s_show_line_numbers, "Code editor", "Show line numbers");
 		m_settings.registerOption("export_pack", &m_export.pack);
 		m_settings.registerOption("export_dir", &m_export.dest_dir);
 		m_settings.registerOption("gizmo_scale", &m_gizmo_config.scale, "General", "Gizmo scale").setMin(0.001f);

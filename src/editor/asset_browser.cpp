@@ -542,6 +542,7 @@ struct AssetBrowserImpl : AssetBrowser {
 						ImGui::TableNextColumn();
 						ImGui::PushID(&res);
 						bool clicked = ImGui::Selectable(tmp.data, idx == m_selected_file, ImGuiSelectableFlags_SpanAllColumns) || (insert_enter && idx == m_selected_file);
+						if (moved && idx == m_selected_file) ImGuiEx::ScrollToItem();
 						ImGui::PopID();
 						ImGui::TableNextColumn();
 						ImGui::TextUnformatted(info.dir.begin, info.dir.end);

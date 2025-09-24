@@ -166,6 +166,7 @@ struct CodeEditor {
 	virtual bool gui(const char* str_id, const ImVec2& size, ImFont* code_font, ImFont* ui_font) = 0;
 
 	static inline i32 s_font_size = 20;
+	static inline bool s_show_line_numbers = true;
 };
 
 LUMIX_EDITOR_API UniquePtr<CodeEditor> createCodeEditor(StudioApp& app);
