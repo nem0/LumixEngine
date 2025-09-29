@@ -469,6 +469,10 @@ struct EditorWindow : AssetEditorWindow {
 		}
 	}
 
+	void fileChangedExternally() override {
+		m_show_external_modification_notification = true;
+	}
+
 	void underline() {
 		#ifdef LUMIX_LUAU_ANALYSIS
 			PROFILE_BLOCK("Lua editor underline");
@@ -523,6 +527,42 @@ struct EditorWindow : AssetEditorWindow {
 		m_underline_dirty = true;
 	}
 
+	void modificationNotificationUI() {
+		if (m_show_external_modification_notification) {
+			OutputMemoryStream tmp(m_app.getAllocator());
+			OutputMemoryStream tmp2(m_app.getAllocator());
+			m_code_editor->serializeText(tmp);
+			FileSystem& fs = m_app.getEngine().getFileSystem();
+			if (fs.getContentSync(m_path, tmp2)) {
+				if (tmp.size() != tmp2.size() || memcmp(tmp.data(), tmp2.data(), tmp.size()) != 0) {
+					openCenterStrip("modification_notif");
+				}
+			}
+			else {
+				logError("Unexpected error while reading file ", m_path);
+			}
+			m_show_external_modification_notification = false;
+		}
+
+		if (beginCenterStrip("modification_notif")) {
+			ImGui::NewLine();
+			alignGUICenter([&](){
+				ImGui::Text("File %s modified externally", m_path.c_str());
+			});
+			alignGUICenter([&](){
+				if (ImGui::Button("Ignore")) ImGui::CloseCurrentPopup();
+				ImGui::SameLine();
+				if (ImGui::Button("Reload")) {
+					FileSystem& fs = m_app.getEngine().getFileSystem();
+					m_file_async_handle = fs.getContent(m_path, makeDelegate<&EditorWindow::onFileLoaded>(this));
+					m_code_editor.reset();
+					ImGui::CloseCurrentPopup();
+				}
+			});
+			endCenterStrip();
+		}	
+	}
+
 	void windowGUI() override {
 		PROFILE_BLOCK("lua editor gui");
 		CommonActions& actions = m_app.getCommonActions();
@@ -538,6 +578,8 @@ struct EditorWindow : AssetEditorWindow {
 			ImGui::TextUnformatted("Loading...");
 			return;
 		}
+
+		modificationNotificationUI();
 
 		if (m_code_editor) {
 			if (m_is_code_editor_appearing || ImGui::IsWindowAppearing()) m_code_editor->focus();
@@ -643,6 +685,7 @@ struct EditorWindow : AssetEditorWindow {
 	#endif
 	bool m_is_code_editor_appearing = false;
 	bool m_underline_dirty = true;
+	bool m_show_external_modification_notification = false;
 };
 
 static bool gatherRequires(Span<const u8> src, Lumix::Array<Path>& dependencies, const Path& path) {

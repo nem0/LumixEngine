@@ -19,9 +19,11 @@ namespace Lumix {
 
 
 template <typename T> struct Array;
+template <typename T> struct DelegateList;
 template <typename T> struct UniquePtr;
 struct Action;
 struct ComponentUID;
+struct Path;
 namespace Gizmo { struct Config; }
 namespace os {
 	using WindowHandle = void*;
@@ -98,6 +100,7 @@ struct LUMIX_EDITOR_API StudioApp {
 	virtual struct Settings& getSettings() = 0;
 	virtual struct RenderInterface* getRenderInterface() = 0;
 	virtual void setRenderInterface(RenderInterface* ifc) = 0;
+	virtual DelegateList<void(const char*)>& fileChanged() = 0;
 	virtual void tryLoadWorld(const struct Path& path, bool additive) = 0;
 
 	virtual void addPlugin(IPlugin& plugin) = 0;

@@ -40,7 +40,7 @@ static ImVec2 CalcTextSize(const char* text, const char* text_end = nullptr, flo
 
 namespace LuaTokens {
 
-static inline const u32 token_colors[] = {
+static const u32 token_colors[] = {
 	IM_COL32(0xFF, 0x00, 0xFF, 0xff),
 	IM_COL32(0xe1, 0xe1, 0xe1, 0xff),
 	IM_COL32(0xf7, 0xc9, 0x5c, 0xff),
@@ -626,11 +626,11 @@ static bool tokenize(const char* str, u32& token_len, u8& token_type, u8 prev_to
 
 } // namespace
 
+// TODO page-up/down ignore virtual_x
 // TODO horizontal scroll
 // TODO utf8
 // TODO clipping selection 
 // TODO selection should render including "end of line char" in certain cases
-// TODO scrollbar
 // TODO mouse click - left/right half of character
 struct CodeEditorImpl final : CodeEditor {
 	struct TextPoint {
@@ -709,6 +709,7 @@ struct CodeEditorImpl final : CodeEditor {
 		Array<Cursor> cursors;
 
 		void execute(CodeEditorImpl& editor, bool is_redo) {
+			editor.m_blink_timer = 0;
 			++editor.m_version;
 			switch(type) {
 				case MOVE_LINE: {
@@ -868,16 +869,13 @@ struct CodeEditorImpl final : CodeEditor {
 		}
 	}
 
-	ImVec2 toScreenPosition(u32 line, u32 col) {
-		float y = line * ImGui::GetTextLineHeight();
-		const char* line_str = m_lines[line].value.c_str();
-		float x = CalcTextSize(line_str, line_str + col).x;
-		return m_text_area_screen_pos + ImVec2(x, y);
-	}
-
 	ImVec2 getCursorScreenPosition(u32 cursor_index) override {
 		const Cursor& cursor =  m_cursors[cursor_index];
-		return toScreenPosition(cursor.line, cursor.col);
+
+		float y = cursor.line * ImGui::GetTextLineHeight();
+		const char* line_str = m_lines[cursor.line].value.c_str();
+		float x = CalcTextSize(line_str, line_str + cursor.col).x;
+		return m_text_area_screen_pos + ImVec2(x, y);
 	}
 
 	u32 getCursorLine(u32 cursor_index) override { return m_cursors[cursor_index].line; };
@@ -1028,17 +1026,22 @@ struct CodeEditorImpl final : CodeEditor {
 		tryLockGroup();
 	}
 
-	void moveCursorUp(Cursor& cursor, u32 line_count = 1) {
+	void moveCursorUp(Cursor& cursor) {
 		tryLockGroup();
 		const char* line_str = m_lines[cursor.line].value.c_str();
-		cursor.line = maximum(0, cursor.line - line_count);
+		if (cursor.line == 0) {
+			cursor.col = 0;
+		}
+		else {
+			--cursor.line;
 
-		u32 num_chars_in_line = m_lines[cursor.line].length();
-		line_str = m_lines[cursor.line].value.c_str();
-		for (cursor.col = 0; cursor.col < (i32)num_chars_in_line; ++cursor.col) {
-			float x = CalcTextSize(line_str, line_str + cursor.col).x;
-			if (x >= cursor.virtual_x) {
-				break;
+			u32 num_chars_in_line = m_lines[cursor.line].length();
+			line_str = m_lines[cursor.line].value.c_str();
+			for (cursor.col = 0; cursor.col < (i32)num_chars_in_line; ++cursor.col) {
+				float x = CalcTextSize(line_str, line_str + cursor.col).x;
+				if (x >= cursor.virtual_x) {
+					break;
+				}
 			}
 		}
 
@@ -1046,18 +1049,23 @@ struct CodeEditorImpl final : CodeEditor {
 		if (&cursor == &m_cursors[0]) ensurePointVisible(cursor);
 	}
 
-	void moveCursorDown(Cursor& cursor, u32 line_count = 1) {
+	void moveCursorDown(Cursor& cursor) {
 		tryLockGroup();
 		const char* line_str = m_lines[cursor.line].value.c_str();
 		
-		cursor.line = minimum(m_lines.size() - 1, cursor.line + line_count);
+		if (cursor.line == m_lines.size() - 1) {
+			cursor.col = m_lines.last().length();
+		}
+		else {
+			++cursor.line;
 
-		u32 num_chars_in_line = m_lines[cursor.line].length();
-		line_str = m_lines[cursor.line].value.c_str();
-		for (cursor.col = 0; cursor.col < (i32)num_chars_in_line; ++cursor.col) {
-			float x = CalcTextSize(line_str, line_str + cursor.col).x;
-			if (x >= cursor.virtual_x) {
-				break;
+			u32 num_chars_in_line = m_lines[cursor.line].length();
+			line_str = m_lines[cursor.line].value.c_str();
+			for (cursor.col = 0; cursor.col < (i32)num_chars_in_line; ++cursor.col) {
+				float x = CalcTextSize(line_str, line_str + cursor.col).x;
+				if (x >= cursor.virtual_x) {
+					break;
+				}
 			}
 		}
 
@@ -1543,7 +1551,10 @@ struct CodeEditorImpl final : CodeEditor {
 		TextPoint p = point;
 		++p.col;
 		if (p.col <= (i32)m_lines[p.line].length()) return p;
-		if (p.line == m_lines.size() - 1) return p;
+		if (p.line == m_lines.size() - 1) {
+			--p.col;
+			return p;
+		}
 		++p.line;
 		p.col = 0;
 		return p;
@@ -1660,11 +1671,11 @@ struct CodeEditorImpl final : CodeEditor {
 		ImGuiInputTextFlags flags = ImGuiInputTextFlags_AutoSelectAll;
 		if (font) ImGui::PushFont(font);
 		
-		// InputTextWithHint clears the text on escape, se we don't let it
 		if (m_handle_search_input && ImGui::IsKeyPressed(ImGuiKey_Enter)) {
 			m_focus_editor = true;
 			m_search_visible = false;
 		}
+		// InputTextWithHint clears the text on escape, se we don't let it
 		else if ((m_handle_search_input || m_handle_input) && ImGui::IsKeyPressed(ImGuiKey_Escape)) {
 			m_focus_editor = true;
 			m_search_visible = false;
@@ -1685,44 +1696,6 @@ struct CodeEditorImpl final : CodeEditor {
 		if (font) ImGui::PopFont();
 		m_handle_search_input = ImGui::IsItemActive();
 		ImGui::End();
-/*
-
-		ImVec2 p = text_area_pos;
-		p.x += text_area_size.x - 350;
-		p.x = maximum(p.x, text_area_pos.x);
-		ImGui::SetNextWindowPos(p);
-		ImGui::SetNextWindowSize(ImVec2(350, ImGui::GetTextLineHeightWithSpacing()));
-		ImGui::BeginChild("search");
-		defer { ImGui::EndChild(); };
-
-		if (font) ImGui::PushFont(font);
-		if (m_handle_search_input && ImGui::IsKeyPressed(ImGuiKey_Enter)) {
-			find(m_cursors[0]);
-			m_focus_editor = true;
-			m_search_visible = false;
-		}
-		// InputTextWithHint clears the text on escape, se we don't let it
-		else if ((m_handle_search_input || m_handle_input) && ImGui::IsKeyPressed(ImGuiKey_Escape)) {
-			m_focus_editor = true;
-			m_search_visible = false;
-		}
-		else {
-			ImGui::BeginChild("search");
-			ImGui::TextUnformatted(ICON_FA_SEARCH); ImGui::SameLine();
-			ImGui::SetNextItemWidth(-1);
-			if (m_focus_search) ImGui::SetKeyboardFocusHere();
-			m_focus_search = false;
-			if (ImGui::InputTextWithHint("##findtext", "Find Text", m_search_text, sizeof(m_search_text), flags)) {
-				find(m_search_from);
-			}
-			m_handle_search_input = ImGui::IsItemActive();
-			ImGui::EndChild();
-		}
-
-		if ((m_handle_search_input || m_handle_input) && ImGui::IsKeyPressed(ImGuiKey_F3)) {
-			find(m_cursors[0]);
-		}
-		if (font) ImGui::PopFont();*/
 	}
 	
 	void focus() override { m_focus_editor = true; }

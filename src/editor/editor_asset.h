@@ -29,6 +29,7 @@ struct LUMIX_EDITOR_API AssetEditorWindow : StudioApp::GUIPlugin {
 
 	virtual void windowGUI() = 0;
 	virtual const Path& getPath() = 0;
+	virtual void fileChangedExternally() {}
 
 	void onGUI() override;
 

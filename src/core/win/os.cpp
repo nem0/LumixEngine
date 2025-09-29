@@ -242,6 +242,12 @@ struct WCharStr {
 
 void sleep(u32 milliseconds) { ::Sleep(milliseconds); }
 
+bool isAppForeground() {
+	DWORD ForegroundProcess;
+	GetWindowThreadProcessId(GetForegroundWindow(), &ForegroundProcess);
+	return ForegroundProcess == GetCurrentProcessId();
+}
+
 static_assert(sizeof(ThreadID) == sizeof(::GetCurrentThreadId()));
 ThreadID getCurrentThreadID() { return ::GetCurrentThreadId(); }
 

@@ -12,7 +12,6 @@
 #include "core/tag_allocator.h"
 #include "core/thread.h"
 #include "core/tokenizer.h"
-#include "editor/file_system_watcher.h"
 #include "editor/studio_app.h"
 #include "engine/engine.h"
 #include "engine/resource_manager.h"
@@ -81,6 +80,8 @@ struct AssetCompilerImpl : AssetCompiler {
 		Engine& engine = app.getEngine();
 		ResourceManagerHub& rm = engine.getResourceManager();
 		rm.setLoadHook(&m_load_hook);
+
+		app.fileChanged().bind<&AssetCompilerImpl::onFileChanged>(this);
 	}
 
 	void saveResourceList() {
@@ -115,6 +116,7 @@ struct AssetCompilerImpl : AssetCompiler {
 	}
 
 	~AssetCompilerImpl() {
+		m_app.fileChanged().unbind<&AssetCompilerImpl::onFileChanged>(this);
 		saveResourceList();
 
 		ASSERT(m_plugins.empty());
@@ -127,8 +129,6 @@ struct AssetCompilerImpl : AssetCompiler {
  		Engine& engine = m_app.getEngine();
 		FileSystem& fs = engine.getFileSystem();
 		const char* base_path = fs.getBasePath();
-		m_watcher = FileSystemWatcher::create(base_path, m_allocator);
-		m_watcher->getCallback().bind<&AssetCompilerImpl::onFileChanged>(this);
 
 		m_dependencies.clear();
 		m_resources.clear();
@@ -835,7 +835,6 @@ struct AssetCompilerImpl : AssetCompiler {
 	StudioApp& m_app;
 	LoadHook m_load_hook;
 	HashMap<RuntimeHash, IPlugin*> m_plugins;
-	UniquePtr<FileSystemWatcher> m_watcher;
 	HashMap<FilePathHash, ResourceItem> m_resources;
 	HashMap<u64, ResourceType> m_registered_extensions;
 	DelegateList<void(const Path&)> m_on_list_changed;

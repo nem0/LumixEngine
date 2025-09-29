@@ -119,6 +119,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		settings.registerOption("asset_browser_subresources", &m_show_subresources, "Asset browser", "Show subresources");
 		settings.registerOption("asset_browser_thumbnails", &m_show_thumbnails, "Asset browser", "Show thumbnails");
 		settings.registerOption("asset_browser_thumbnail_size", &m_thumbnail_scale, "Asset browser", "Thumbnail size").setMin(0.01f);
+		m_app.fileChanged().bind<&AssetBrowserImpl::onFileChanged>(this);
 	}
 
 	void onBasePathChanged() override {
@@ -148,6 +149,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 	~AssetBrowserImpl() override {
+		m_app.fileChanged().unbind<&AssetBrowserImpl::onFileChanged>(this);
 		removePlugin(m_world_asset_plugin);
 		m_app.getAssetCompiler().removePlugin(m_world_asset_plugin);
 		m_app.getAssetCompiler().listChanged().unbind<&AssetBrowserImpl::onResourceListChanged>(this);
@@ -200,6 +202,16 @@ struct AssetBrowserImpl : AssetBrowser {
 
 		addTile(resource.getPath());
 		sortTiles();
+	}
+
+	void onFileChanged(const char* path) {
+		Path p(path);
+		for (UniquePtr<AssetEditorWindow>& w : m_windows) {
+			if (w->getPath() == p) {
+				w->m_dirty = true;
+				w->fileChangedExternally();
+			}
+		}
 	}
 
 	void onResourceListChanged(const Path& path) {

@@ -249,6 +249,8 @@ LUMIX_CORE_API void restore(WindowHandle win);
 LUMIX_CORE_API bool isMaximized(WindowHandle win);
 LUMIX_CORE_API bool isMinimized(WindowHandle win);
 LUMIX_CORE_API WindowHandle getFocused();
+LUMIX_CORE_API bool isAppForeground();
+
 
 LUMIX_CORE_API bool isKeyDown(Keycode keycode);
 LUMIX_CORE_API void getKeyName(Keycode keycode, Span<char> out);
