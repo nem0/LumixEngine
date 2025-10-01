@@ -1446,6 +1446,9 @@ struct StudioAppImpl final : StudioApp {
 	}
 
 	void changeBasePath(const char* dir) {
+		m_file_watcher = FileSystemWatcher::create(dir, m_allocator);
+		m_file_watcher->getCallback().bind<&StudioAppImpl::onFileChanged>(this);
+
 		m_engine->getFileSystem().setBasePath(dir);
 		extractBundled();
 		m_editor->loadProject();
@@ -1455,9 +1458,6 @@ struct StudioAppImpl final : StudioApp {
 		initDefaultWorld();
 		loadSettings();
 		ImGui::LoadIniSettingsFromMemory(m_settings.m_imgui_state.c_str());
-
-		m_file_watcher = FileSystemWatcher::create(dir, m_allocator);
-		m_file_watcher->getCallback().bind<&StudioAppImpl::onFileChanged>(this);
 	}
 
 	void onFileChanged(const char* path) {

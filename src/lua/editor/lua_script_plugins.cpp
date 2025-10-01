@@ -511,6 +511,7 @@ struct EditorWindow : AssetEditorWindow {
 
 			m_analysis.registerOpenEditor(m_path, m_code_editor.get());
 			m_is_code_editor_appearing = true;
+			m_dirty = false;
 		}
 	}
 
