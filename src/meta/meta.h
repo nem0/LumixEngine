@@ -209,6 +209,13 @@ struct Struct {
 	ExpArray<StructVar> vars;
 };
 
+struct Arg {
+	StringView type;
+	StringView name;
+	bool is_const = false;
+	bool is_ref = false;
+};
+
 struct MetaData {
 	ExpArray<Module>& modules;
 	ExpArray<Struct>& structs;
@@ -263,5 +270,16 @@ StringView find(StringView haystack, const char* needle);
 bool isBlob(const Property& p);
 bool equal(StringView lhs, StringView rhs);
 bool equal(StringView lhs, const char* rhs);
+bool consumeArg(StringView& line, Arg& out);
+
+template <typename F>
+void forEachArg(StringView args, F f) {
+	Arg arg;
+	bool first_arg = true;
+	while (consumeArg(args, arg)) {
+		f(arg, first_arg);
+		first_arg = false;
+	}
+}
 
 #define META_PLUGIN(f) static MetaPluginRegister reg(f);

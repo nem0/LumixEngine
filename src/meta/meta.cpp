@@ -1270,14 +1270,6 @@ static Enum* getEnum(Module& m, StringView name) {
 	return nullptr;
 }
 
-struct Arg {
-	StringView type;
-	StringView name;
-	bool is_const = false;
-	bool is_ref = false;
-};
-
-
 bool consumeArg(StringView& line, Arg& out) {
 	line = skipWhitespaces(line);
 	if (line.size() == 0) return false;
@@ -1296,16 +1288,6 @@ bool consumeArg(StringView& line, Arg& out) {
 	word = consumeWord(line);
 	out.name = word;
 	return true;
-}
-
-template <typename F>
-void forEachArg(StringView args, F f) {
-	Arg arg;
-	bool first_arg = true;
-	while (consumeArg(args, arg)) {
-		f(arg, first_arg);
-		first_arg = false;
-	}
 }
 
 Struct* findStruct(StringView struct_name) {
