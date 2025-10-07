@@ -1,3 +1,3 @@
-shader "/shaders/world_grid.hlsl"
+shader "/engine/shaders/world_grid.hlsl"
 backface_culling true
 layer "default"

@@ -3522,7 +3522,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 		Renderer* renderer = static_cast<Renderer*>(system_manager.getSystem("renderer"));
 		ResourceManagerHub& rm = engine.getResourceManager();
 		m_pipeline = Pipeline::create(*renderer, PipelineType::PROBE);
-		m_ibl_filter_shader = rm.load<Shader>(Path("shaders/ibl_filter.hlsl"));
+		m_ibl_filter_shader = rm.load<Shader>(Path("engine/shaders/ibl_filter.hlsl"));
 	}
 
 	bool saveCubemap(u64 probe_guid, const Vec4* data, u32 texture_size, u32 num_src_mips, u32 num_saved_mips) {
@@ -5222,7 +5222,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin {
 		}
 
 		file << R"#(
-			shader "/shaders/terrain.hlsl"
+			shader "/engine/shaders/terrain.hlsl"
 			texture ")#";
 		file << info.basename;
 		file << R"#(.raw"

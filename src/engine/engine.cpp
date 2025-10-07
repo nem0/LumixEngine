@@ -70,22 +70,19 @@ struct EngineImpl final : Engine {
 		installUnhandledExceptionHandler();
 
 		logInfo("Creating engine...");
-		if (init_data.working_dir) logInfo("Working directory: ", init_data.working_dir);
 		char cmd_line[2048] = "";
 		os::getCommandLine(Span(cmd_line));
 		logInfo("Command line: ", cmd_line);
+		char current_dir[MAX_PATH];
+		os::getCurrentDirectory(Span(current_dir)); 
+		logInfo("Current dir: ", current_dir);
 
 		os::logInfo();
 
 		if (init_data.file_system.get()) {
 			m_file_system = static_cast<UniquePtr<FileSystem>&&>(init_data.file_system);
 		}
-		else if (init_data.working_dir) {
-			m_file_system = FileSystem::create(init_data.working_dir, m_allocator);
-		}
 		else {
-			char current_dir[MAX_PATH];
-			os::getCurrentDirectory(Span(current_dir)); 
 			m_file_system = FileSystem::create(current_dir, m_allocator);
 		}
 

@@ -374,7 +374,6 @@ struct AssetCompilerImpl : AssetCompiler {
 		if (m_plugins.empty()) return;
 
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		const Path list_path(fs.getBasePath(), ".lumix/resources/_resources.txt");
 		OutputMemoryStream content(m_allocator);
 		if (fs.getContentSync(Path(".lumix/resources/_resources.txt"), content)) {
 			Tokenizer tokenizer(StringView(content), ".lumix/resources/_resources.txt");
@@ -476,8 +475,9 @@ struct AssetCompilerImpl : AssetCompiler {
 		{
 			m_scan_timer.tick();
 			PROFILE_BLOCK("asset scan")
-			const u64 list_last_modified = os::getLastModified(list_path);
+			const u64 list_last_modified = fs.getLastModified(".lumix/resources/_resources.txt");
 			processDir("", list_last_modified);
+			processDir("engine/", list_last_modified);
 		}
 		m_save_list_after_scan = true;
 	}
@@ -499,10 +499,9 @@ struct AssetCompilerImpl : AssetCompiler {
 		if (startsWith(path, ".")) return;
 		if (equalIStrings(path, "lumix.log")) return;
 
-		const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
-		const Path full_path(base_path, "/", path);
+		FileSystem& fs = m_app.getEngine().getFileSystem();
 
-		if (os::dirExists(full_path)) {
+		if (fs.dirExists(path)) {
 			MutexGuard lock(m_changed_mutex);
 			m_changed_dirs.push(Path(path));
 		}
@@ -728,10 +727,8 @@ struct AssetCompilerImpl : AssetCompiler {
 
 			if (!path_obj.isEmpty()) {
 				FileSystem& fs = m_app.getEngine().getFileSystem();
-				const Path list_path(fs.getBasePath(), ".lumix/resources/_resources.txt");
-				const u64 list_last_modified = os::getLastModified(list_path);
-				const Path fullpath(fs.getBasePath(), path_obj);
-				if (os::dirExists(fullpath)) {
+				const u64 list_last_modified = fs.getLastModified(".lumix/resources/_resources.txt");
+				if (fs.dirExists(path_obj)) {
 					processDir(path_obj, list_last_modified);
 					m_on_list_changed.invoke(path_obj);
 				}
@@ -764,7 +761,8 @@ struct AssetCompilerImpl : AssetCompiler {
 			}
 
 			if (getResourceType(path_obj) != INVALID_RESOURCE_TYPE) {
-				if (!m_app.getEngine().getFileSystem().fileExists(path_obj)) {
+				FileSystem& fs = m_app.getEngine().getFileSystem();
+				if (!fs.fileExists(path_obj)) {
 					jobs::MutexGuard lock(m_resources_mutex);
 					m_resources.eraseIf([&](const ResourceItem& ri){
 						if (!endsWithInsensitive(ri.path, path_obj)) return false;

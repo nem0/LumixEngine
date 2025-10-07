@@ -1,5 +1,5 @@
 //@surface
-#include "shaders/common.hlsli"
+#include "engine/shaders/common.hlsli"
 
 //@uniform "Material color", "color", {1, 1, 1, 1}
 //@uniform "Roughness", "normalized_float", 1
@@ -7,9 +7,9 @@
 //@uniform "Emission", "float", 0
 //@uniform "Translucency", "normalized_float", 0
 
-//@texture_slot "Albedo", "textures/common/white.tga"
-//@texture_slot "Normal", "textures/common/default_normal.tga"
-//@texture_slot "Roughness", "textures/common/white.tga"
+//@texture_slot "Albedo", "engine/textures/common/white.tga"
+//@texture_slot "Normal", "engine/textures/common/default_normal.tga"
+//@texture_slot "Roughness", "engine/textures/common/white.tga"
 //@texture_slot "Metallic", "", "HAS_METALLICMAP"
 //@texture_slot "Ambient occlusion", "", "HAS_AMBIENT_OCCLUSION_TEX"
 

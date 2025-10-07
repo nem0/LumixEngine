@@ -1,5 +1,5 @@
 //@surface
-#include "shaders/common.hlsli"
+#include "engine/shaders/common.hlsli"
 
 cbuffer Drawcall : register(b4) {
 	float4 u_rcp_size;

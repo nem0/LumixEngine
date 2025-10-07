@@ -1,4 +1,4 @@
-shader "/shaders/decal.hlsl"
+shader "/engine/shaders/decal.hlsl"
 backface_culling true
 layer "decal"
 

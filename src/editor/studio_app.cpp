@@ -942,7 +942,6 @@ struct StudioAppImpl final : StudioApp {
 		checkDataDirCommandLine(data_dir, lengthOf(data_dir));
 
 		Engine::InitArgs init_data = {};
-		init_data.working_dir = data_dir[0] ? data_dir : current_dir;
 		const char* plugins[] = {
 			#define LUMIX_PLUGINS_STRINGS
 				#include "engine/plugins.inl"
@@ -950,10 +949,6 @@ struct StudioAppImpl final : StudioApp {
 		};
 		init_data.plugins = Span(plugins, plugins + lengthOf(plugins) - 1);
 		m_engine = Engine::create(static_cast<Engine::InitArgs&&>(init_data), m_allocator);
-		FileSystem& fs = m_engine->getFileSystem();
-		const char* base_path = fs.getBasePath();
-		m_file_watcher = FileSystemWatcher::create(base_path, m_allocator);
-		m_file_watcher->getCallback().bind<&StudioAppImpl::onFileChanged>(this);
 		
 		m_settings.registerOption("command_pallete_search_settings", &m_command_palette_search_settings, "General", "Command palette searches in settings");
 		m_settings.registerOption("welcome_shader", &m_welcome_screen_use_shader, "General", "Animated background in welcome screen");
@@ -970,7 +965,7 @@ struct StudioAppImpl final : StudioApp {
 		static bool use_native_titlebar = false;
 		m_settings.registerOption("use_native_titlebar", &use_native_titlebar, "General", "Native titlebar (restart required)");
 		// we need some stuff (font_size) from settings at this point
-		m_settings.load();
+		m_settings.load(true);
 		m_use_native_titlebar = use_native_titlebar;
 
 		os::InitWindowArgs init_window_args;
@@ -1022,13 +1017,13 @@ struct StudioAppImpl final : StudioApp {
 		#endif
 
 		#ifdef STATIC_PLUGINS
-			m_welcome_shader = m_engine->getResourceManager().load<Shader>(Path("shaders/welcome.hlsl"));
+			m_welcome_shader = m_engine->getResourceManager().load<Shader>(Path("engine/shaders/welcome.hlsl"));
 		#endif
 	}
 
 	void loadLogo() {
 		if (!m_render_interface) return;
-		m_logo = m_render_interface->loadTexture(Path("editor/logo.png"));
+		m_logo = m_render_interface->loadTexture(Path("engine/editor/logo.png"));
 	}
 
 	void destroyAddCmpTreeNode(AddCmpTreeNode* node)
@@ -1445,11 +1440,17 @@ struct StudioAppImpl final : StudioApp {
 		m_editor->loadWorld(blob, path.c_str(), additive);
 	}
 
-	void changeBasePath(const char* dir) {
-		m_file_watcher = FileSystemWatcher::create(dir, m_allocator);
+	void setBasePath(const char* dir) {
+		Path path(dir);
+		if (!endsWith(path, "\\") && !endsWith(path, "/")) {
+			path.append("/");
+		}
+		// TODO check for collisions in mounts vs dirs in base path
+		// TODO watch other mounts
+		m_file_watcher = FileSystemWatcher::create(path.c_str(), m_allocator);
 		m_file_watcher->getCallback().bind<&StudioAppImpl::onFileChanged>(this);
 
-		m_engine->getFileSystem().setBasePath(dir);
+		m_engine->getFileSystem().setBasePath(path.c_str());
 		extractBundled();
 		m_editor->loadProject();
 		m_asset_compiler->onBasePathChanged();
@@ -1557,7 +1558,7 @@ struct StudioAppImpl final : StudioApp {
 					StringView sv = dir;
 					sv.removeSuffix(1); // remove trailing slash
 
-					changeBasePath(dir);
+					setBasePath(dir);
 					
 					m_recent_folders.eraseItems([&](const String& s){ return s == sv; });
 					if (m_recent_folders.size() > 10) {
@@ -1570,7 +1571,7 @@ struct StudioAppImpl final : StudioApp {
 
 			for (String& path : m_recent_folders) {
 				if (ImGui::Selectable(path.c_str(), false, 0, ImVec2(ImGui::GetContentRegionAvail().x, 0))) {
-					changeBasePath(path.c_str());
+					setBasePath(path.c_str());
 					m_is_welcome_screen_open = false;
 				}
 			}
@@ -2067,19 +2068,19 @@ struct StudioAppImpl final : StudioApp {
 		auto font = io.Fonts->AddFontFromMemoryTTF((void*)data.data(), (i32)data.size(), size, &cfg);
 		if (merge_icons) {
 			ImFontConfig config;
-			copyString(config.Name, "editor/fonts/fa-regular-400.ttf");
+			copyString(config.Name, "engine/editor/fonts/fa-regular-400.ttf");
 			config.MergeMode = true;
 			config.FontDataOwnedByAtlas = false;
 			config.GlyphMinAdvanceX = size; // Use if you want to make the icon monospaced
 			static const ImWchar icon_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
 			OutputMemoryStream icons_data(m_allocator);
-			if (fs.getContentSync(Path("editor/fonts/fa-regular-400.ttf"), icons_data)) {
+			if (fs.getContentSync(Path("engine/editor/fonts/fa-regular-400.ttf"), icons_data)) {
 				ImFont* icons_font = io.Fonts->AddFontFromMemoryTTF((void*)icons_data.data(), (i32)icons_data.size(), size * 0.75f, &config, icon_ranges);
 				ASSERT(icons_font);
 			}
-			copyString(config.Name, "editor/fonts/fa-solid-900.ttf");
+			copyString(config.Name, "engine/editor/fonts/fa-solid-900.ttf");
 			icons_data.clear();
-			if (fs.getContentSync(Path("editor/fonts/fa-solid-900.ttf"), icons_data)) {
+			if (fs.getContentSync(Path("engine/editor/fonts/fa-solid-900.ttf"), icons_data)) {
 				ImFont* icons_font = io.Fonts->AddFontFromMemoryTTF((void*)icons_data.data(), (i32)icons_data.size(), size * 0.75f, &config, icon_ranges);
 				ASSERT(icons_font);
 			}
@@ -2216,22 +2217,22 @@ struct StudioAppImpl final : StudioApp {
 		
 			ImGui::LoadIniSettingsFromMemory(m_settings.m_imgui_state.c_str());
 
-			m_font = addFontFromFile("editor/fonts/Roboto-Light.ttf", (float)m_font_size * font_scale, true);
-			m_bold_font = addFontFromFile("editor/fonts/Roboto-Bold.ttf", (float)m_font_size * font_scale, true);
-			m_monospace_font = addFontFromFile("editor/fonts/JetBrainsMono-Regular.ttf", (float)m_font_size * font_scale, false);
+			m_font = addFontFromFile("engine/editor/fonts/Roboto-Light.ttf", (float)m_font_size * font_scale, true);
+			m_bold_font = addFontFromFile("engine/editor/fonts/Roboto-Bold.ttf", (float)m_font_size * font_scale, true);
+			m_monospace_font = addFontFromFile("engine/editor/fonts/JetBrainsMono-Regular.ttf", (float)m_font_size * font_scale, false);
 
 			OutputMemoryStream data(m_allocator);
-			if (fs.getContentSync(Path("editor/fonts/fa-solid-900.ttf"), data)) {
+			if (fs.getContentSync(Path("engine/editor/fonts/fa-solid-900.ttf"), data)) {
 				const float size = maximum(1.f, (float)m_font_size * font_scale * 1.25f);
 				ImFontConfig cfg;
-				copyString(cfg.Name, "editor/fonts/fa-solid-900.ttf");
+				copyString(cfg.Name, "engine/editor/fonts/fa-solid-900.ttf");
 				cfg.FontDataOwnedByAtlas = false;
 				cfg.GlyphMinAdvanceX = size; // to align font icons
 				static const ImWchar icon_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
 				m_big_icon_font = io.Fonts->AddFontFromMemoryTTF((void*)data.data(), (i32)data.size(), size, &cfg, icon_ranges);
 				cfg.MergeMode = true;
-				copyString(cfg.Name, "editor/fonts/fa-regular-400.ttf");
-				if (fs.getContentSync(Path("editor/fonts/fa-regular-400.ttf"), data)) {
+				copyString(cfg.Name, "engine/editor/fonts/fa-regular-400.ttf");
+				if (fs.getContentSync(Path("engine/editor/fonts/fa-regular-400.ttf"), data)) {
 					ImFont* icons_font = io.Fonts->AddFontFromMemoryTTF((void*)data.data(), (i32)data.size(), size, &cfg, icon_ranges);
 					ASSERT(icons_font);
 				}
@@ -2266,7 +2267,7 @@ struct StudioAppImpl final : StudioApp {
 		PROFILE_FUNCTION();
 		logInfo("Loading settings...");
 
-		m_settings.load();
+		m_settings.load(false);
 		if (CommandLineParser::isOn("-no_crash_report")) enableCrashReporting(false);
 		else enableCrashReporting(m_crash_reporting);
 

@@ -314,8 +314,14 @@ struct AssetBrowserImpl : AssetBrowser {
 
 		FileSystem& fs = engine.getFileSystem();
 		m_subdirs.clear();
+		if (path == ".") {
+			Subdir& dir = m_subdirs.emplace();
+			dir.dir = "engine";
+			dir.clamped_name = "engine";
+		}
 		if (!m_filter.isActive()) {
-			os::FileIterator* iter = fs.createFileIterator(m_dir);
+			Path tmp(m_dir, "/");
+			os::FileIterator* iter = fs.createFileIterator(tmp);
 			os::FileInfo info;
 			while (os::getNextFile(iter, &info)) {
 				if (!info.is_directory) continue;

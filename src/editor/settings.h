@@ -83,7 +83,7 @@ struct LUMIX_EDITOR_API Settings {
 
 	void gui();
 	void commandPaletteUI(const struct TextFilter& filter);
-	void load();
+	void load(bool user_data_only);
 	void save();
 
 	i32 getI32(const char* var_name, i32 default_value);

@@ -1,4 +1,4 @@
-shader "/shaders/standard.hlsl"
+shader "/engine/shaders/standard.hlsl"
 backface_culling true
 layer "transparent"
 texture ""

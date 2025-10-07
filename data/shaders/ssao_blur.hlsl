@@ -1,6 +1,6 @@
 // depth-aware blur using poisson disk sampling
 
-#include "shaders/common.hlsli"
+#include "engine/shaders/common.hlsli"
 
 cbuffer UB : register(b4) {
 	float2 u_rcp_size;

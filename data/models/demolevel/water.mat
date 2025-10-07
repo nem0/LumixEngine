@@ -1,4 +1,4 @@
-shader "/shaders/water.hlsl"
+shader "/engine/shaders/water.hlsl"
 backface_culling true
 layer "water"
 

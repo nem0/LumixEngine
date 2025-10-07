@@ -1,6 +1,6 @@
 //@surface
-#include "shaders/common.hlsli"
-#include "shaders/surface_base.hlsli"
+#include "engine/shaders/common.hlsli"
+#include "engine/shaders/surface_base.hlsli"
 
 // https://bgolus.medium.com/the-best-darn-grid-shader-yet-727f9278b9d8
 Surface getSurface(VSOutput input, uint dummy) {

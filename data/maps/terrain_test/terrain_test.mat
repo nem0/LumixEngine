@@ -1,5 +1,5 @@
 
-			shader "/shaders/terrain.hlsl"
+			shader "/engine/shaders/terrain.hlsl"
 			texture "terrain_test.raw"
 			texture "albedo_detail.ltc"
 			texture "normal_detail.ltc"

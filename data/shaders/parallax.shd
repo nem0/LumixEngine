@@ -1,4 +1,4 @@
-import "shaders/surface_base.inc"
+import "engine/shaders/surface_base.inc"
 
 uniform("Material color", "color", {1, 1, 1, 1})
 uniform("Roughness", "normalized_float", 1)
@@ -11,15 +11,15 @@ surface_shader_ex({
 	texture_slots = {
 		{
 			name = "Albedo",
-			default_texture = "textures/common/white.tga"
+			default_texture = "engine/textures/common/white.tga"
 		},
 		{
 			name = "Normal",
-			default_texture = "textures/common/default_normal.tga"
+			default_texture = "engine/textures/common/default_normal.tga"
 		},
 		{
 			name = "Roughness",
-			default_texture = "textures/common/white.tga"
+			default_texture = "engine/textures/common/white.tga"
 		},
 		{
 			name = "Metallic",
@@ -31,7 +31,7 @@ surface_shader_ex({
 		},
 		{
 			name = "Displacement",
-			default_texture = "textures/common/white.tga"
+			default_texture = "engine/textures/common/white.tga"
 		}
 	},
 

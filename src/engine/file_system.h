@@ -34,6 +34,7 @@ struct LUMIX_ENGINE_API FileSystem {
 	virtual bool moveFile(StringView from, StringView to) = 0;
 	virtual bool deleteFile(StringView path) = 0;
 	virtual bool fileExists(StringView path) = 0;
+	virtual bool dirExists(StringView path) = 0;
 	virtual os::FileIterator* createFileIterator(StringView dir) = 0;
 	virtual bool open(StringView path, os::InputFile& file) = 0;
 	virtual bool open(StringView path, os::OutputFile& file) = 0;

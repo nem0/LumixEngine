@@ -23,7 +23,7 @@ float4 mainPS() : SV_Target {
 If there's **no** `//@surface` directive, the HLSL file is considered as a compute shader. Compute shader entry point must be named `main`.
 
 ```hlsl
-#include "shaders/common.hlsli"
+#include "engine/shaders/common.hlsli"
 
 [numthreads(16, 16, 1)]
 void main(uint3 thread_id : SV_DispatchThreadID) {
@@ -36,7 +36,7 @@ void main(uint3 thread_id : SV_DispatchThreadID) {
 HLSL files can include other files with standard include directive. Included files must have `.hlsli` extension to be recognized by the editor - i.e. so they can be visible in asset browser and editable.
 
 ```hlsl
-#include "shaders/common.hlsli"
+#include "engine/shaders/common.hlsli"
 ```
 
 ## Directives
@@ -61,7 +61,7 @@ Texture slots can be defined using the `//@texture_slot` directive. Textures can
 * **define** - an optional argument. If provided, the define is activated when a texture is assigned to the slot.
 
 ```hlsl
-//@texture_slot "Albedo", "textures/common/white.tga"
+//@texture_slot "Albedo", "engine/textures/common/white.tga"
 //@texture_slot "Metallic", "", "HAS_METALLICMAP"
 
 float4 mainPS(VSOutput input) : SV_Target {

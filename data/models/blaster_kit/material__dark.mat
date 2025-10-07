@@ -1,4 +1,4 @@
-shader "/shaders/standard.hlsl"
+shader "/engine/shaders/standard.hlsl"
 texture ""
 texture ""
 texture ""

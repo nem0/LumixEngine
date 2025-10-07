@@ -462,11 +462,7 @@ static bool loadStyle(Tokenizer& tokenizer) {
 	return true;
 }
 
-void Settings::load() {
-	FileSystem& fs = m_app.getEngine().getFileSystem();
-	const bool has_settings = fs.fileExists(SETTINGS_PATH);
-	const char* path = has_settings ? SETTINGS_PATH : DEFAULT_SETTINGS_PATH;
-
+void Settings::load(bool user_data_only) {
 	auto parse = [&](OutputMemoryStream& buf, const char* path, Storage storage) -> bool {
 		Tokenizer tokenizer(StringView((const char*)buf.data(), (u32)buf.size()), path);
 		for (;;) {
@@ -570,14 +566,20 @@ void Settings::load() {
 	};
 
 	OutputMemoryStream buf(m_app.getAllocator());
-	if (fs.getContentSync(Path(path), buf)) {
-		parse(buf, path, WORKSPACE);
-	}
-	else {
-		logError("Failed to read ", path);
+	if (!user_data_only) {
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		const bool has_settings = fs.fileExists(SETTINGS_PATH);
+		const char* path = has_settings ? SETTINGS_PATH : DEFAULT_SETTINGS_PATH;
+
+		if (fs.getContentSync(Path(path), buf)) {
+			parse(buf, path, WORKSPACE);
+		}
+		else {
+			logError("Failed to read ", path);
+		}
+		buf.clear();
 	}
 
-	buf.clear();
 	os::InputFile file;
 	if (file.open(m_app_data_path.c_str())) {
 		buf.resize(file.size());

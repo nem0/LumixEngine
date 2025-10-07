@@ -53,16 +53,24 @@ private:
 	bool m_finish = false;
 };
 
+struct Mount {
+	Mount(IAllocator& allocator) : point(allocator), path(allocator) {}
+	String point;
+	String path;
+};
 
 struct FileSystemImpl : FileSystem {
-	explicit FileSystemImpl(const char* base_path, IAllocator& allocator)
+	explicit FileSystemImpl(const char* engine_data_dir, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_queue(allocator)	
 		, m_finished(allocator)	
 		, m_last_id(0)
 		, m_semaphore(0, 0xffFF)
+		, m_mounts(m_allocator)
 	{
-		setBasePath(base_path);
+		mount(engine_data_dir, "engine/");
+		mount(engine_data_dir, "");
+	
 		m_task.create(*this, m_allocator);
 		m_task->create("Filesystem", true);
 	}
@@ -73,25 +81,43 @@ struct FileSystemImpl : FileSystem {
 		m_task.destroy();
 	}
 
+	void mount(StringView path, StringView virtual_path) {
+		Mount& m = m_mounts.emplace(m_allocator);
+		m.path = path;
+		if (!endsWith(m.path, "/") && !endsWith(m.path, "\\")) {
+			m.path.append("/");
+		}
+		m.point = virtual_path;
+	}
 
 	bool hasWork() override
 	{
 		return m_work_counter != 0;
 	}
 
-	const char* getBasePath() const override { return m_base_path; }
+	const char* getBasePath() const override { return m_mounts.last().path.c_str(); }
 
-	void setBasePath(const char* dir) final
-	{ 
-		Path::normalize(dir, m_base_path.data);
-		if (!endsWith(m_base_path, "/") && !endsWith(m_base_path, "\\")) {
-			m_base_path.append('/');
+	void setBasePath(const char* dir) final {
+		m_mounts.pop();
+		Mount& m = m_mounts.emplace(m_allocator);
+		m.point = "";
+		m.path = dir;
+	}
+
+	Path getFullPath(StringView virtual_path) {
+		for (Mount& m : m_mounts) {
+			if (startsWith(virtual_path, m.point)) {
+				virtual_path.removePrefix(m.point.length());
+				return Path(m.path, "/", virtual_path);
+			}
 		}
+		ASSERT(false);
+		return {};
 	}
 
 	bool saveContentSync(const Path& path, Span<const u8> content) override {
 		os::OutputFile file;
-		const Path full_path(m_base_path, path);
+		const Path full_path = getFullPath(path);
 		if (!file.open(full_path.c_str())) return false;
 
 		bool res = file.write(content.begin(), content.length());
@@ -103,7 +129,7 @@ struct FileSystemImpl : FileSystem {
 	bool getContentSync(const Path& path, OutputMemoryStream& content) override {
 		PROFILE_FUNCTION();
 		os::InputFile file;
-		const Path full_path(m_base_path, path);
+		const Path full_path = getFullPath(path);
 
 		if (!file.open(full_path.c_str())) return false;
 
@@ -156,58 +182,61 @@ struct FileSystemImpl : FileSystem {
 
 	bool open(StringView path, os::InputFile& file) override
 	{
-		const Path full_path(m_base_path, path);
+		const Path full_path = getFullPath(path);
 		return file.open(full_path.c_str());
 	}
 
 
 	bool open(StringView path, os::OutputFile& file) override
 	{
-		const Path full_path(m_base_path, path);
+		const Path full_path = getFullPath(path);
 		return file.open(full_path.c_str());
 	}
 
 
 	bool deleteFile(StringView path) override
 	{
-		const Path full_path(m_base_path, path);
+		const Path full_path = getFullPath(path);
 		return os::deleteFile(full_path.c_str());
 	}
 
 
 	bool moveFile(StringView from, StringView to) override
 	{
-		const Path full_path_from(m_base_path, from);
-		const Path full_path_to(m_base_path, to);
+		const Path full_path_from = getFullPath(from);
+		const Path full_path_to = getFullPath(to);
 		return os::moveFile(full_path_from, full_path_to);
 	}
 
 
 	bool copyFile(StringView from, StringView to) override
 	{
-		const Path full_path_from(m_base_path, from);
-		const Path full_path_to(m_base_path, to);
+		const Path full_path_from = getFullPath(from);
+		const Path full_path_to = getFullPath(to);
 		return os::copyFile(full_path_from, full_path_to);
 	}
 
 
-	bool fileExists(StringView path) override
-	{
-		const Path full_path(m_base_path, path);
+	bool fileExists(StringView path) override {
+		const Path full_path = getFullPath(path);
 		return os::fileExists(full_path);
 	}
 
+	bool dirExists(StringView path) override {
+		const Path full_path = getFullPath(path);
+		return os::dirExists(full_path);
+	}
 
 	u64 getLastModified(StringView path) override
 	{
-		const Path full_path(m_base_path, path);
+		const Path full_path = getFullPath(path);
 		return os::getLastModified(full_path);
 	}
 
 
 	os::FileIterator* createFileIterator(StringView dir) override
 	{
-		const Path path(m_base_path, dir);
+		const Path path = getFullPath(dir);
 		return os::createFileIterator(path, m_allocator);
 	}
 
@@ -242,12 +271,12 @@ struct FileSystemImpl : FileSystem {
 
 	IAllocator& m_allocator;
 	Local<FSTask> m_task;
-	StaticString<MAX_PATH> m_base_path;
 	Array<AsyncItem> m_queue;
 	u32 m_work_counter = 0;
 	Array<AsyncItem> m_finished;
 	Mutex m_mutex;
 	Semaphore m_semaphore;
+	Array<Mount> m_mounts;
 
 	u32 m_last_id;
 };

@@ -1,6 +1,6 @@
 //@surface
 
-#include "shaders/common.hlsli"
+#include "engine/shaders/common.hlsli"
 
 cbuffer Drawcall : register(b4) {
 	float u_filter_roughness;

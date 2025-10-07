@@ -1,6 +1,6 @@
 //@surface
 
-#include "shaders/common.hlsli"
+#include "engine/shaders/common.hlsli"
 
 cbuffer Data : register(b4) {
 	TextureHandle u_input;
