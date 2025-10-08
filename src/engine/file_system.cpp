@@ -15,6 +15,12 @@
 
 namespace Lumix {
 
+struct FileIterator {
+	os::FileIterator* iter;
+	struct FileSystemImpl* fs;
+	i32 mount_idx = -1;
+};
+
 struct AsyncItem {
 	enum class Flags : u32 {
 		NONE = 0,
@@ -68,7 +74,7 @@ struct FileSystemImpl : FileSystem {
 		, m_semaphore(0, 0xffFF)
 		, m_mounts(m_allocator)
 	{
-		mount(engine_data_dir, "engine/");
+		mount(engine_data_dir, "engine");
 		mount(engine_data_dir, "");
 	
 		m_task.create(*this, m_allocator);
@@ -101,14 +107,28 @@ struct FileSystemImpl : FileSystem {
 		m_mounts.pop();
 		Mount& m = m_mounts.emplace(m_allocator);
 		m.point = "";
-		m.path = dir;
+		StringView sv = dir;
+		if (endsWith(sv, "/") || endsWith(sv, "/")) {
+			sv.removeSuffix(1);
+		}
+		m.path = sv;
 	}
 
-	Path getFullPath(StringView virtual_path) {
+	Path getFullPath(StringView virtual_path) const override {
+		if (startsWith(virtual_path, "/") || startsWith(virtual_path, "\\")) {
+			virtual_path.removePrefix(1);
+		}
 		for (Mount& m : m_mounts) {
 			if (startsWith(virtual_path, m.point)) {
-				virtual_path.removePrefix(m.point.length());
-				return Path(m.path, "/", virtual_path);
+				// exact match
+				if (virtual_path.size() == m.point.length()) {
+					return Path(m.path);
+				}
+				char next = virtual_path[m.point.length()];
+				if (m.point.length() == 0 || next == '\\' || next == '/') {
+					virtual_path.removePrefix(m.point.length());
+					return Path(m.path, "/", virtual_path);
+				}
 			}
 		}
 		ASSERT(false);
@@ -234,10 +254,17 @@ struct FileSystemImpl : FileSystem {
 	}
 
 
-	os::FileIterator* createFileIterator(StringView dir) override
+	FileIterator* createFileIterator(StringView dir) override
 	{
 		const Path path = getFullPath(dir);
-		return os::createFileIterator(path, m_allocator);
+		FileIterator* iter = LUMIX_NEW(m_allocator, FileIterator);
+		iter->iter = os::createFileIterator(path, m_allocator);
+		iter->fs = this;
+		iter->mount_idx = -1;
+		if (dir.size() == 0) iter->mount_idx = 0;
+		else if (equalStrings(dir, "/")) iter->mount_idx = 0;
+		else if (equalStrings(dir, "\\")) iter->mount_idx = 0;
+		return iter;
 	}
 
 	void processCallbacks() override
@@ -381,6 +408,23 @@ struct PackFileSystem : FileSystemImpl {
 	os::InputFile m_file;
 };
 
+void destroyFileIterator(FileIterator* iterator) {
+	LUMIX_DELETE(iterator->fs->m_allocator, iterator);
+}
+
+bool getNextFile(FileIterator* iterator, os::FileInfo* info) {
+	if (iterator->mount_idx >= 0) {
+		info->is_directory = true;
+		const Mount& m = iterator->fs->m_mounts[iterator->mount_idx];
+		copyString(info->filename, m.point);
+		++iterator->mount_idx;
+		if (iterator->mount_idx == iterator->fs->m_mounts.size() - 1) {
+			iterator->mount_idx = -1;
+		}
+		return true;
+	}
+	return os::getNextFile(iterator->iter, info);
+}
 
 UniquePtr<FileSystem> FileSystem::create(const char* base_path, IAllocator& allocator)
 {

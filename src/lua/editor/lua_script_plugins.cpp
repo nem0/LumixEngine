@@ -1375,9 +1375,9 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 
 	void initPlugins() {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		os::FileIterator* iter = fs.createFileIterator("editor/scripts/plugins");
+		FileIterator* iter = fs.createFileIterator("editor/scripts/plugins");
 		os::FileInfo info;
-		while (os::getNextFile(iter, &info)) {
+		while (getNextFile(iter, &info)) {
 			info.is_directory = info.is_directory;
 			if (info.is_directory) continue;
 			if (!Path::hasExtension(info.filename, "lua")) continue;
@@ -1392,7 +1392,7 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 			StudioLuaPlugin* plugin = StudioLuaPlugin::create(m_app, content, path);
 			if (plugin) m_plugins.push(plugin);
 		}
-		os::destroyFileIterator(iter);
+		destroyFileIterator(iter);
 	}
 
 	const char* getName() const override { return "lua_script"; }

@@ -1137,18 +1137,18 @@ static void shortcutsGUI(const TextFilter& filter, Settings& settings) {
 static void generalGUI(Settings& settings) {
 	ImGui::TableNextRow();
 	ImGui::TableNextColumn();
-	ImGuiEx::Label("Global settings path");
+	ImGuiEx::Label("Project settings path");
 	ImGui::TableNextColumn();
-	if (ImGui::Button(ICON_FA_FOLDER "##open global")) {
+	if (ImGui::Button(ICON_FA_FOLDER "##open_project")) {
 		os::openExplorer(settings.m_app.getEngine().getFileSystem().getBasePath());
 	}
 	ImGui::SameLine();
 	ImGui::TextUnformatted(SETTINGS_PATH);
 
 	ImGui::TableNextColumn();
-	ImGuiEx::Label("Local settings path");
+	ImGuiEx::Label("User settings path");
 	ImGui::TableNextColumn();
-	if (ImGui::Button(ICON_FA_FOLDER "##open_local")) {
+	if (ImGui::Button(ICON_FA_FOLDER "##open_user")) {
 		os::openExplorer(Path::getDir(settings.m_app_data_path.c_str()));
 	}
 	ImGui::SameLine();

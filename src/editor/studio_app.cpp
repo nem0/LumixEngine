@@ -2776,11 +2776,12 @@ struct StudioAppImpl final : StudioApp {
 	};
 
 	void scanCompiled(AssociativeArray<FilePathHash, ExportFileInfo>& infos) {
-		os::FileIterator* iter = m_engine->getFileSystem().createFileIterator(".lumix/resources");
-		const char* base_path = m_engine->getFileSystem().getBasePath();
+		FileSystem& fs = m_engine->getFileSystem();
+		FileIterator* iter = fs.createFileIterator(".lumix/resources");
+		const char* base_path = fs.getBasePath();
 		os::FileInfo info;
 		exportFile("lumix.prj", infos);
-		while (os::getNextFile(iter, &info)) {
+		while (getNextFile(iter, &info)) {
 			if (info.is_directory) continue;
 
 			StringView basename = Path::getBasename(info.filename);
@@ -2798,7 +2799,7 @@ struct StudioAppImpl final : StudioApp {
 		exportDataScan("shaders/", infos);
 		exportDataScan("maps/", infos);
 		
-		os::destroyFileIterator(iter);
+		destroyFileIterator(iter);
 	}
 
 
@@ -2815,10 +2816,10 @@ struct StudioAppImpl final : StudioApp {
 
 	void exportDataScan(const char* dir_path, AssociativeArray<FilePathHash, ExportFileInfo>& infos)
 	{
-		auto* iter = m_engine->getFileSystem().createFileIterator(dir_path);
+		FileIterator* iter = m_engine->getFileSystem().createFileIterator(dir_path);
 		const char* base_path = m_engine->getFileSystem().getBasePath();
 		os::FileInfo info;
-		while (os::getNextFile(iter, &info)) {
+		while (getNextFile(iter, &info)) {
 			char normalized_path[MAX_PATH];
 			Path::normalize(info.filename, Span(normalized_path));
 			if (info.is_directory)
@@ -2855,7 +2856,7 @@ struct StudioAppImpl final : StudioApp {
 			out_info.size = os::getFileSize(path);
 			out_info.offset = ~0UL;
 		}
-		os::destroyFileIterator(iter);
+		destroyFileIterator(iter);
 	}
 
 
