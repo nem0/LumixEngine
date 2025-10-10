@@ -158,6 +158,9 @@ struct Runner final
 		init_data.log_path = "lumix_app.log";
 
 		m_engine = Engine::create(static_cast<Engine::InitArgs&&>(init_data), m_allocator);
+		char current_dir[MAX_PATH];
+		os::getCurrentDirectory(Span(current_dir));
+		m_engine->getFileSystem().mount(current_dir, "");
 		m_imgui.m_engine = m_engine.get();
 
 		os::InitWindowArgs init_window_args;

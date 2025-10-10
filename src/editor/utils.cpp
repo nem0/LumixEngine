@@ -2583,7 +2583,7 @@ FileSelector::FileSelector(const char* ext, StudioApp& app)
 	, m_subfiles(app.getAllocator())
 	, m_accepted_extension(ext, app.getAllocator())
 {
-	fillSubitems();
+//	fillSubitems();
 }
 
 DirSelector::DirSelector(StudioApp& app)

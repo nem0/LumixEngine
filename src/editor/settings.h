@@ -39,6 +39,7 @@ struct LUMIX_EDITOR_API Settings {
 		Variable& setMin(float v) { min = v; return *this; }
 		Variable& setMax(float v) { max = v; return *this; }
 		Variable& setIsAngle(bool v) { is_angle = v; return *this; }
+		Variable& setStorage(Storage s) { storage = s; return *this; }
 
 		Storage storage = WORKSPACE;
 		enum Type {

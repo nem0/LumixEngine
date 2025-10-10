@@ -109,8 +109,6 @@ struct AssetBrowserImpl : AssetBrowser {
 	{
 		PROFILE_FUNCTION();
 
-		onBasePathChanged();
-
 		const char* world_exts[] = { "unv" };
 		addPlugin(m_world_asset_plugin, Span(world_exts));
 		m_app.getAssetCompiler().addPlugin(m_world_asset_plugin, Span(world_exts));
@@ -122,8 +120,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		m_app.fileChanged().bind<&AssetBrowserImpl::onFileChanged>(this);
 	}
 
-	void onBasePathChanged() override {
-		const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
+	void setProjectDir(StringView base_path) override {
 		Path path(base_path, ".lumix");
 		bool success = os::makePath(path.c_str());
 		path.append("/asset_tiles");

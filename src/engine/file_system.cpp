@@ -75,7 +75,6 @@ struct FileSystemImpl : FileSystem {
 		, m_mounts(m_allocator)
 	{
 		mount(engine_data_dir, "engine");
-		mount(engine_data_dir, "");
 	
 		m_task.create(*this, m_allocator);
 		m_task->create("Filesystem", true);
@@ -87,7 +86,7 @@ struct FileSystemImpl : FileSystem {
 		m_task.destroy();
 	}
 
-	void mount(StringView path, StringView virtual_path) {
+	void mount(StringView path, StringView virtual_path) override {
 		Mount& m = m_mounts.emplace(m_allocator);
 		m.path = path;
 		if (!endsWith(m.path, "/") && !endsWith(m.path, "\\")) {
@@ -99,19 +98,6 @@ struct FileSystemImpl : FileSystem {
 	bool hasWork() override
 	{
 		return m_work_counter != 0;
-	}
-
-	const char* getBasePath() const override { return m_mounts.last().path.c_str(); }
-
-	void setBasePath(const char* dir) final {
-		m_mounts.pop();
-		Mount& m = m_mounts.emplace(m_allocator);
-		m.point = "";
-		StringView sv = dir;
-		if (endsWith(sv, "/") || endsWith(sv, "/")) {
-			sv.removeSuffix(1);
-		}
-		m.path = sv;
 	}
 
 	Path getFullPath(StringView virtual_path) const override {
@@ -409,6 +395,7 @@ struct PackFileSystem : FileSystemImpl {
 };
 
 void destroyFileIterator(FileIterator* iterator) {
+	os::destroyFileIterator(iterator->iter);
 	LUMIX_DELETE(iterator->fs->m_allocator, iterator);
 }
 

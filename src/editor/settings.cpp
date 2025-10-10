@@ -17,7 +17,7 @@
 namespace Lumix {
 
 static const char SETTINGS_PATH[] = "studio.ini";
-static const char DEFAULT_SETTINGS_PATH[] = "studio_default.ini";
+static const char DEFAULT_SETTINGS_PATH[] = "engine/studio_default.ini";
 
 static bool shortcutInput(char* button_label, Action& action, StudioApp& app) {
 	bool res = false;
@@ -493,7 +493,7 @@ void Settings::load(bool user_data_only) {
 
 			Variable* var = findVar(*this, var_name.value);
 			if (var) {
-				var->storage = storage;
+				//var->storage = storage;
 				switch (var->type) {
 					case Variable::BOOL_PTR: if (!tokenizer.consume(*var->bool_ptr)) return false; break;
 					case Variable::BOOL: if (!tokenizer.consume(var->bool_value)) return false; break;
@@ -634,13 +634,13 @@ void Settings::save() {
 	};
 
 	OutputMemoryStream blob(m_allocator);
-	serialize(WORKSPACE, blob);
 	FileSystem& fs = m_app.getEngine().getFileSystem();
+	serialize(WORKSPACE, blob);
 	if (!fs.saveContentSync(Path(SETTINGS_PATH), blob)) {
 		logError("Failed to save workspace settings in ", SETTINGS_PATH);
 	}
-
 	blob.clear();
+
 	serialize(USER, blob);
 	os::OutputFile file;
 	if (file.open(m_app_data_path.c_str())) {
@@ -1140,7 +1140,7 @@ static void generalGUI(Settings& settings) {
 	ImGuiEx::Label("Project settings path");
 	ImGui::TableNextColumn();
 	if (ImGui::Button(ICON_FA_FOLDER "##open_project")) {
-		os::openExplorer(settings.m_app.getEngine().getFileSystem().getBasePath());
+		os::openExplorer(settings.m_app.getProjectDir());
 	}
 	ImGui::SameLine();
 	ImGui::TextUnformatted(SETTINGS_PATH);

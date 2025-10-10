@@ -75,9 +75,9 @@ struct AssetCompilerImpl : AssetCompiler {
 		, m_resource_compiled(m_allocator)
 		, m_on_init_load(m_allocator)
 	{
-		onBasePathChanged();
-
 		Engine& engine = app.getEngine();
+		FileSystem& fs = engine.getFileSystem();
+
 		ResourceManagerHub& rm = engine.getResourceManager();
 		rm.setLoadHook(&m_load_hook);
 
@@ -124,11 +124,9 @@ struct AssetCompilerImpl : AssetCompiler {
 		rm.setLoadHook(nullptr);
 	}
 	
-	void onBasePathChanged() override {
+	void setProjectDir(StringView base_path) override {
 		PROFILE_FUNCTION();
- 		Engine& engine = m_app.getEngine();
-		FileSystem& fs = engine.getFileSystem();
-		const char* base_path = fs.getBasePath();
+		Engine& engine = m_app.getEngine();
 
 		m_dependencies.clear();
 		m_resources.clear();
@@ -192,6 +190,13 @@ struct AssetCompilerImpl : AssetCompiler {
 			}
 		}
 
+		m_init_finished = true;
+		for (Resource* res : m_on_init_load) {
+			StringView filepath = ResourcePath::getResource(res->getPath());
+			pushToCompileQueue(Path(filepath));
+			res->decRefCount();
+		}
+		m_on_init_load.clear();
 		fillDB();
 	}
 
@@ -482,18 +487,6 @@ struct AssetCompilerImpl : AssetCompiler {
 		m_save_list_after_scan = true;
 	}
 
-	void onInitFinished() override
-	{
-		m_init_finished = true;
-		for (Resource* res : m_on_init_load) {
-			StringView filepath = ResourcePath::getResource(res->getPath());
-			pushToCompileQueue(Path(filepath));
-			res->decRefCount();
-		}
-		m_on_init_load.clear();
-		fillDB();
-	}
-
 	void onFileChanged(const char* path)
 	{
 		if (startsWith(path, ".")) return;
@@ -549,6 +542,12 @@ struct AssetCompilerImpl : AssetCompiler {
 	}
 	
 	ResourceManagerHub::LoadHook::Action onBeforeLoad(Resource& res) {
+		if (!m_init_finished) {
+			res.incRefCount();
+			m_on_init_load.push(&res);
+			return ResourceManagerHub::LoadHook::Action::DEFERRED;
+		}
+		
 		StringView filepath = ResourcePath::getResource(res.getPath());
 
 		FileSystem& fs = m_app.getEngine().getFileSystem();
@@ -565,11 +564,6 @@ struct AssetCompilerImpl : AssetCompiler {
 			|| fs.getLastModified(dst_path) < fs.getLastModified(meta_path)
 			)
 		{
-			if (!m_init_finished) {
-				res.incRefCount();
-				m_on_init_load.push(&res);
-				return ResourceManagerHub::LoadHook::Action::DEFERRED;
-			}
 			if (!getPlugin(res.getPath())) return ResourceManagerHub::LoadHook::Action::IMMEDIATE;
 
 			pushToCompileQueue(Path(filepath));
@@ -838,7 +832,7 @@ struct AssetCompilerImpl : AssetCompiler {
 	DelegateList<void(const Path&)> m_on_list_changed;
 	DelegateList<void(Resource&, bool)> m_resource_compiled;
 	bool m_init_finished = false;
-	Array<Resource*> m_on_init_load;
+	Array<Resource*> m_on_init_load; // defer loading resources until we have a project dir
 	AtomicI32 m_scan_counter = 0;
 	bool m_save_list_after_scan = false;
 	os::Timer m_scan_timer;

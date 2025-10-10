@@ -1051,8 +1051,9 @@ struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
 				if (actions.open_externally.iconButton(true, &m_app)) m_app.getAssetBrowser().openInExternalEditor(m_texture);
 				if (actions.view_in_browser.iconButton(true, &m_app)) m_app.getAssetBrowser().locate(*m_texture);
 				if (ImGuiEx::IconButton(ICON_FA_FOLDER_OPEN, "Open folder")) {
-					StaticString<MAX_PATH> dir(m_app.getEngine().getFileSystem().getBasePath(), Path::getDir(m_texture->getPath()));
-					os::openExplorer(dir);
+					FileSystem& fs = m_app.getEngine().getFileSystem();
+					Path full_path = fs.getFullPath(m_texture->getPath());
+					os::openExplorer(full_path);
 				}
 				if (actions.undo.iconButton(canUndo(), &m_app)) undo();
 				if (actions.redo.iconButton(canRedo(), &m_app)) redo();
@@ -3527,7 +3528,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 
 	bool saveCubemap(u64 probe_guid, const Vec4* data, u32 texture_size, u32 num_src_mips, u32 num_saved_mips) {
 		ASSERT(data);
-		const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
+		const char* base_path = m_app.getProjectDir();
 		Path path(base_path, "probes_tmp/");
 		if (!os::makePath(path.c_str()) && !os::dirExists(path)) {
 			logError("Failed to create ", path);
@@ -3816,9 +3817,10 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 		}
 
 		if (m_done_counter == m_probe_counter && !m_probe_jobs.empty()) {
-			const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
-			Path dir_path(base_path, "probes/");
-			if (!os::dirExists(dir_path) && !os::makePath(dir_path.c_str())) {
+			Engine& engine = m_app.getEngine();
+			FileSystem& fs = engine.getFileSystem();
+			Path dir_path = fs.getFullPath("probes/");
+			if (!fs.dirExists("probes/") && !os::makePath(dir_path.c_str())) {
 				logError("Failed to create ", dir_path);
 			}
 			RenderModule* module = nullptr;
@@ -3832,13 +3834,13 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 
 					const u64 guid = job.reflection_probe.guid;
 
-					const Path tmp_path(base_path, "/probes_tmp/", guid, ".lbc");
-					const Path path(base_path, "/probes/", guid, ".lbc");
-					if (!os::fileExists(tmp_path)) {
+					const Path tmp_path("/probes_tmp/", guid, ".lbc");
+					const Path path("/probes/", guid, ".lbc");
+					if (!fs.fileExists(tmp_path)) {
 						if (module) module->reloadReflectionProbes();
 						return;
 					}
-					if (!os::moveFile(tmp_path, path)) {
+					if (!fs.moveFile(tmp_path, path)) {
 						logError("Failed to move file ", tmp_path, " to ", path);
 					}
 				}
