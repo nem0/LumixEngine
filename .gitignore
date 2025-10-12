@@ -8,9 +8,9 @@ obj/
 *.nvuser
 *.orig
 .vscode
-data/.lumix
+.lumix
+studio.ini
 data/lumix.log
-data/studio.ini
 .lumixuser
 *.unv.bak
 scripts/3rdparty

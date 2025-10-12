@@ -1,7 +1,7 @@
 //@surface
 //@uniform "Frames cols", "int", 1
 //@uniform "Frames rows", "int", 1
-//@texture_slot "Texture", "engine/textures/common/white.tga"
+//@texture_slot "Texture", "engine/textures/white.tga"
 
 #include "engine/shaders/common.hlsli"
 

@@ -1,11 +1,11 @@
 //@surface
 #include "engine/shaders/common.hlsli"
-//@texture_slot "Heightmap", "engine/textures/common/white.tga"
-//@texture_slot "Detail albedo", "engine/textures/common/white.tga"
-//@texture_slot "Detail normal", "engine/textures/common/white.tga"
-//@texture_slot "Splatmap", "engine/textures/common/white.tga"
-//@texture_slot "Satellite", "engine/textures/common/white.tga"
-//@texture_slot "Noise", "engine/textures/common/blue_noise.tga"
+//@texture_slot "Heightmap", "engine/textures/white.tga"
+//@texture_slot "Detail albedo", "engine/textures/white.tga"
+//@texture_slot "Detail normal", "engine/textures/white.tga"
+//@texture_slot "Splatmap", "engine/textures/white.tga"
+//@texture_slot "Satellite", "engine/textures/white.tga"
+//@texture_slot "Noise", "engine/textures/blue_noise.tga"
 
 //@uniform "Roughness", "normalized_float", 1
 //@uniform "Metallic", "normalized_float", 0

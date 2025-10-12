@@ -1,5 +1,5 @@
 //@surface
-//@texture_slot "Albedo", "engine/textures/common/white.tga"
+//@texture_slot "Albedo", "engine/textures/white.tga"
 
 #include "engine/shaders/common.hlsli"
 

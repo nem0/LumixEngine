@@ -13,7 +13,7 @@ for i = 1, 7 do
 		for k = 1, 7 do
 			Editor.createEntityEx {
 				position = { i  * 3, j * 3, k * 3 },
-				model_instance = { source = "models/shapes/cube.fbx" },
+				model_instance = { source = "engine/models/cube.fbx" },
 				rigid_actor = { dynamic = 1, box_geometry = { {} } }
 			}
 		end

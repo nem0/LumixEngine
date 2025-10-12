@@ -7,9 +7,9 @@
 //@uniform "Emission", "float", 0
 //@uniform "Translucency", "normalized_float", 0
 
-//@texture_slot "Albedo", "engine/textures/common/white.tga"
-//@texture_slot "Normal", "engine/textures/common/default_normal.tga"
-//@texture_slot "Roughness", "engine/textures/common/white.tga"
+//@texture_slot "Albedo", "engine/textures/white.tga"
+//@texture_slot "Normal", "engine/textures/default_normal.tga"
+//@texture_slot "Roughness", "engine/textures/white.tga"
 //@texture_slot "Metallic", "", "HAS_METALLICMAP"
 //@texture_slot "Ambient occlusion", "", "HAS_AMBIENT_OCCLUSION_TEX"
 

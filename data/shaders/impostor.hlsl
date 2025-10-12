@@ -1,6 +1,6 @@
 //@surface
 
-//@texture_slot "Albedo", "engine/textures/common/white.tga"
+//@texture_slot "Albedo", "engine/textures/white.tga"
 //@texture_slot "Normal", "", "HAS_NORMAL"
 //@texture_slot "Self shadow", "", "HAS_SELFSHADOW"
 //@texture_slot "Depth", "", "HAS_DEPTHMAP"

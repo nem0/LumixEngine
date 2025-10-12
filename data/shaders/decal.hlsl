@@ -1,5 +1,5 @@
 //@surface
-//@texture_slot "Texture", "engine/textures/common/white.tga"
+//@texture_slot "Texture", "engine/textures/white.tga"
 //@uniform "Material color", "color", {1, 1, 1, 1}
 
 #include "engine/shaders/common.hlsli"

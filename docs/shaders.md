@@ -61,7 +61,7 @@ Texture slots can be defined using the `//@texture_slot` directive. Textures can
 * **define** - an optional argument. If provided, the define is activated when a texture is assigned to the slot.
 
 ```hlsl
-//@texture_slot "Albedo", "engine/textures/common/white.tga"
+//@texture_slot "Albedo", "engine/textures/white.tga"
 //@texture_slot "Metallic", "", "HAS_METALLICMAP"
 
 float4 mainPS(VSOutput input) : SV_Target {

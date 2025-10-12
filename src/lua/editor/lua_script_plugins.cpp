@@ -1305,7 +1305,7 @@ Editor.addAction {
 		for i = 1, 10 do
 			Editor.createEntityEx {
 				position = { 3 * i, 0, 0 },
-				model_instance = { Source = "models/shapes/cube.fbx" }
+				model_instance = { Source = "engine/models/cube.fbx" }
 			}
 		end
 	end

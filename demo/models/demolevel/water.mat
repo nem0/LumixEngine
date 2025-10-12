@@ -1,9 +1,8 @@
 shader "/engine/shaders/water.hlsl"
 backface_culling true
 layer "water"
-
 texture "/textures/water_h.ltc"
-texture "/textures/common/blue_noise.tga"
+texture "/engine/textures/blue_noise.tga"
 texture ""
 uniform "UV scale", 1.000000
 uniform "Specular power", 512.000000

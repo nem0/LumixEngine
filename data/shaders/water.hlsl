@@ -1,6 +1,6 @@
 //@surface
-//@texture_slot "Normal", "engine/textures/common/default_normal.tga"
-//@texture_slot "Noise", "engine/textures/common/white.tga"
+//@texture_slot "Normal", "engine/textures/default_normal.tga"
+//@texture_slot "Noise", "engine/textures/white.tga"
 //@texture_slot "Foam", "", "HAS_FOAM"
 //@texture_slot "Clutter", "", "HAS_CLUTTER"
 

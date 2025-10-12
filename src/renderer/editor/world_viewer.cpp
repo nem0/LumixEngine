@@ -52,7 +52,7 @@ WorldViewer::WorldViewer(StudioApp& app)
 	const EntityRef e = m_world->createEntity(DVec3(0, 0, 0), Quat::IDENTITY);
 	m_world->createComponent(MODEL_INSTANCE_TYPE, e);
 	m_world->setScale(e, Vec3(100));
-	render_module->setModelInstancePath(e, Path("models/shapes/plane.fbx"));
+	render_module->setModelInstancePath(e, Path("engine/models/plane.fbx"));
 
 	m_pipeline->setWorld(m_world);
 }

@@ -13,7 +13,7 @@ function buttonPressed()
 		navmesh_agent = {},
 		lua_script = {},
 		model_instance = {
-			source = "models/shapes/cylinder.fbx"
+			source = "engine/models/cylinder.fbx"
 		}
 	}
 	e.lua_script.scripts.add()
