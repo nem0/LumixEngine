@@ -1397,11 +1397,15 @@ struct StudioAppImpl final : StudioApp {
 		m_engine->getFileSystem().mount(path, "");
 		m_editor->loadProject();
 		m_asset_compiler->setProjectDir(path);
-		m_asset_browser->setProjectDir(path);
-		m_engine->getResourceManager().reloadAll();
+		
+		m_engine->getResourceManager().reloadAll(); // TODO is this reload necessary? loading resources should be deferred until here anyway
 		initDefaultWorld();
 		loadSettings(false);
 		ImGui::LoadIniSettingsFromMemory(m_settings.m_imgui_state.c_str());
+
+		for (GUIPlugin* p : m_gui_plugins) {
+			p->setProjectDir(path.c_str());
+		}
 	}
 
 	void onFileChanged(const char* path) {

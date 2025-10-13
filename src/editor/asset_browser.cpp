@@ -120,7 +120,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		m_app.fileChanged().bind<&AssetBrowserImpl::onFileChanged>(this);
 	}
 
-	void setProjectDir(StringView base_path) override {
+	void setProjectDir(const char* base_path) override {
 		Path path(base_path, ".lumix");
 		bool success = os::makePath(path.c_str());
 		path.append("/asset_tiles");

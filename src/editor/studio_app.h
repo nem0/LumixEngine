@@ -64,6 +64,8 @@ struct LUMIX_EDITOR_API StudioApp {
 		virtual void guiEndFrame() {}
 		virtual void onSettingsLoaded() {}
 		virtual void onBeforeSettingsSaved() {}
+		virtual void setProjectDir(const char* project_dir) {}
+
 	};
 
 	struct IAddComponentPlugin {
