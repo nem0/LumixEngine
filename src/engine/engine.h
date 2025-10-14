@@ -22,9 +22,10 @@ enum class DeserializeProjectResult {
 
 struct LUMIX_ENGINE_API Engine {
 	struct InitArgs {
-		const char* log_path = "lumix.log";
+		const char* log_path = "engine/lumix.log";
 		Span<const char*> plugins;
 		UniquePtr<struct FileSystem> file_system;
+		const char* engine_data_dir = nullptr;
 	};
 
 	virtual ~Engine() {}

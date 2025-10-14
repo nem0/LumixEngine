@@ -566,19 +566,17 @@ void Settings::load(bool user_data_only) {
 	};
 
 	OutputMemoryStream buf(m_app.getAllocator());
-	if (!user_data_only) {
-		FileSystem& fs = m_app.getEngine().getFileSystem();
-		const bool has_settings = fs.fileExists(SETTINGS_PATH);
-		const char* path = has_settings ? SETTINGS_PATH : DEFAULT_SETTINGS_PATH;
+	FileSystem& fs = m_app.getEngine().getFileSystem();
+	const bool has_settings = !user_data_only && fs.fileExists(SETTINGS_PATH);
+	const char* path = has_settings ? SETTINGS_PATH : DEFAULT_SETTINGS_PATH;
 
-		if (fs.getContentSync(Path(path), buf)) {
-			parse(buf, path, WORKSPACE);
-		}
-		else {
-			logError("Failed to read ", path);
-		}
-		buf.clear();
+	if (fs.getContentSync(Path(path), buf)) {
+		parse(buf, path, WORKSPACE);
 	}
+	else {
+		logError("Failed to read ", path);
+	}
+	buf.clear();
 
 	os::InputFile file;
 	if (file.open(m_app_data_path.c_str())) {

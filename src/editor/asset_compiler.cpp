@@ -490,7 +490,7 @@ struct AssetCompilerImpl : AssetCompiler {
 	void onFileChanged(const char* path)
 	{
 		if (startsWith(path, ".")) return;
-		if (equalIStrings(path, "lumix.log")) return;
+		if (equalIStrings(path, "engine/lumix.log")) return;
 
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 
@@ -543,6 +543,8 @@ struct AssetCompilerImpl : AssetCompiler {
 	
 	ResourceManagerHub::LoadHook::Action onBeforeLoad(Resource& res) {
 		if (!m_init_finished) {
+			// resource load can be requested before project dir is set,
+			// so we defer the load until we know where to actually look for the file
 			res.incRefCount();
 			m_on_init_load.push(&res);
 			return ResourceManagerHub::LoadHook::Action::DEFERRED;

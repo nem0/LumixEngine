@@ -86,6 +86,10 @@ struct FileSystemImpl : FileSystem {
 		m_task.destroy();
 	}
 
+	const char* getEngineDataDir() override {
+		return m_mounts[0].path.c_str();
+	}
+
 	void mount(StringView path, StringView virtual_path) override {
 		Mount& m = m_mounts.emplace(m_allocator);
 		m.path = path;

@@ -28,11 +28,12 @@ struct LUMIX_ENGINE_API FileSystem {
 		bool isValid() const { return value != 0xffFFffFF; }
 	};
 
-	static UniquePtr<FileSystem> create(const char* base_path, struct IAllocator& allocator);
+	static UniquePtr<FileSystem> create(const char* engine_data_dir, struct IAllocator& allocator);
 	static UniquePtr<FileSystem> createPacked(const char* pak_path, struct IAllocator& allocator);
 
 	virtual ~FileSystem() {}
 
+	virtual const char* getEngineDataDir() = 0;
 	virtual u64 getLastModified(struct StringView path) = 0;
 	virtual bool copyFile(StringView from, StringView to) = 0;
 	virtual bool moveFile(StringView from, StringView to) = 0;

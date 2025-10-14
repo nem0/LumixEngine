@@ -925,15 +925,59 @@ struct StudioAppImpl final : StudioApp {
 		return os::HitTestResult::NONE;
 	}
 
-	void onInit()
-	{
+	// Try to find engine data dir (by looking for shaders/surface_base.hlsli).
+	// Users should run the editor with working dir == repo/data, but they often don't.
+	Path findEngineDataDir() {
+		char current_dir[MAX_PATH];
+		os::getCurrentDirectory(Span(current_dir));
+		catString(current_dir, "/");
+
+		Path path;
+		if (findEngineDataDir(current_dir, path)) return path;
+
+		char exe_dir[MAX_PATH];
+		os::getExecutablePath(Span(exe_dir));
+		exe_dir[Path::getDir(exe_dir).size()] = 0;
+
+		if (findEngineDataDir(exe_dir, path)) return path;
+
+		return Path(current_dir);
+	}
+
+	static bool findEngineDataDir(const char* search_dir, Path& out) {
+		StaticString<MAX_PATH> tmp(search_dir, "shaders/surface_base.hlsli");
+		if (os::fileExists(tmp)) {
+			out = search_dir;
+			return true;
+		}
+		
+		// try to detect if we run from something like `scripts\tmp\vs2022\bin\Debug\`
+		StringView d = Path::getDir(Path::getDir(Path::getDir(Path::getDir(Path::getDir(search_dir)))));
+		if (d.size() > 0) {
+			tmp = "";
+			tmp.append(d, "data/shaders/surface_base.hlsli");
+			if (os::fileExists(tmp)) {
+				out = Path(d, "data/");
+				return true;
+			}
+		}
+
+		// try to detect if we run from engine's repo root
+		tmp = "";
+		tmp.append(search_dir, "data/shaders/surface_base.hlsli");
+		if (os::fileExists(tmp)) {
+			out = Path(search_dir, "data/");
+			return true;
+		}
+
+		return false;
+	}
+
+	void onInit() {
 		PROFILE_FUNCTION();
 
 		os::Timer init_timer;
 		m_add_cmp_root.label[0] = '\0';
-
-		char current_dir[MAX_PATH] = "";
-		os::getCurrentDirectory(Span(current_dir));
 
 		Engine::InitArgs init_data = {};
 		const char* plugins[] = {
@@ -942,6 +986,8 @@ struct StudioAppImpl final : StudioApp {
 			#undef LUMIX_PLUGINS_STRINGS
 		};
 		init_data.plugins = Span(plugins, plugins + lengthOf(plugins) - 1);
+		Path engine_data_dir = findEngineDataDir();
+		init_data.engine_data_dir = engine_data_dir.c_str();
 		m_engine = Engine::create(static_cast<Engine::InitArgs&&>(init_data), m_allocator);
 		
 		m_settings.registerOption("command_pallete_search_settings", &m_command_palette_search_settings, "General", "Command palette searches in settings");
@@ -982,7 +1028,11 @@ struct StudioAppImpl final : StudioApp {
 		m_engine->init();
 		jobs::wait(&m_init_imgui_signal);
 		
-		logInfo("Current directory: ", current_dir);
+		{
+			char current_dir[MAX_PATH] = "";
+			os::getCurrentDirectory(Span(current_dir));
+			logInfo("Current directory: ", current_dir);
+		}
 
 		m_editor = WorldEditor::create(*m_engine, m_allocator);
 		loadUserPlugins();
@@ -997,7 +1047,6 @@ struct StudioAppImpl final : StudioApp {
 		loadSettings(true); // we can load settings now, we have everything (i.e. actions, imgui context) available
 		m_asset_browser->onInitFinished();
 		
-		loadLogo();
 		loadWorldFromCommandLine();
 		logInfo("Init took ", init_timer.getTimeSinceStart(), " s");
 
@@ -1406,6 +1455,7 @@ struct StudioAppImpl final : StudioApp {
 		for (GUIPlugin* p : m_gui_plugins) {
 			p->setProjectDir(path.c_str());
 		}
+		loadLogo();
 	}
 
 	void onFileChanged(const char* path) {
@@ -1476,8 +1526,6 @@ struct StudioAppImpl final : StudioApp {
 			#endif
 
 			alignGUICenter([&](){
-				ImGui::Image(*(void**)m_logo, ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight()));
-				ImGui::SameLine();
 				ImGui::Text("Welcome to Lumix Studio");
 			});
 			ImGui::Separator();
@@ -2000,7 +2048,10 @@ struct StudioAppImpl final : StudioApp {
 		size = maximum(size, 1.f);
 		FileSystem& fs = m_engine->getFileSystem();
 		OutputMemoryStream data(m_allocator);
-		if (!fs.getContentSync(Path(path), data)) return nullptr;
+		if (!fs.getContentSync(Path(path), data)) {
+			logError("Failed to load ", path);
+			return nullptr;
+		}
 		ImGuiIO& io = ImGui::GetIO();
 		ImFontConfig cfg;
 		copyString(cfg.Name, path);
@@ -2178,16 +2229,6 @@ struct StudioAppImpl final : StudioApp {
 				}
 			}
 
-			if (!m_font || !m_bold_font) {
-				os::messageBox(
-					"!! If you run from Visual Studio, set your working directory to 'data/' !!\n"
-					"Could not open editor/fonts/Roboto-Light.ttf or editor/fonts/Roboto-Bold.ttf.\n"
-					"This most likely means the executable is not in the correct directory.\n"
-					"The program will probably crash later."
-				);
-			}
-			if (!m_monospace_font) logError("Failed to load monospace font");
-
 			ImGuiStyle& style = ImGui::GetStyle();
 			style.FramePadding.y = 0;
 			style.ItemSpacing.y = 2;
@@ -2217,12 +2258,11 @@ struct StudioAppImpl final : StudioApp {
 			if (os::dirExists(path)) m_recent_folders.emplace(path, m_allocator);
 		}
 		if (m_recent_folders.empty()) {
-			char current_dir[MAX_PATH] = "";
-			os::getCurrentDirectory(Span(current_dir));
-			StringView d = Path::getDir(current_dir);
-			current_dir[d.size()] = 0;
-			catString(current_dir, "demo");
-			m_recent_folders.emplace(current_dir, m_allocator);
+			FileSystem& fs = m_engine->getFileSystem();
+			const char* engine_data_dir = fs.getEngineDataDir();
+			StringView d = Path::getDir(engine_data_dir);
+			StaticString<MAX_PATH> demo_dir(d, "demo");
+			m_recent_folders.emplace(demo_dir, m_allocator);
 		}
 
 		for (auto* i : m_gui_plugins) {

@@ -10,14 +10,14 @@ obj/
 .vscode
 .lumix
 studio.ini
-data/lumix.log
+lumix.log
 .lumixuser
 *.unv.bak
 scripts/3rdparty
 !scripts/bin/
 plugins/
 src/engine/plugins.inl
-data/.shader_cache_dx11
+.shader_cache_dx11
 scripts/itch_io/
 !data/editor/scripts/plugins/
 *.dmp
