@@ -414,7 +414,7 @@ struct FBXImporter : ModelImporter {
 					});
 					import_geom.attributes.push({
 						.semantic = AttributeSemantic::WEIGHTS,
-						.type = gpu::AttributeType::FLOAT,
+						.type = gpu::AttributeType::U16,
 						.num_components = 4
 					});
 				}
