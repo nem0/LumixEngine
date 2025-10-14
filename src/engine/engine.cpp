@@ -65,29 +65,31 @@ struct EngineImpl final : Engine {
 		registerLogCallback<&EngineImpl::logToFile>(this);
 		registerLogCallback<logToDebugOutput>();
 
-		m_is_log_file_open = m_log_file.open(init_data.log_path);
-		
 		installUnhandledExceptionHandler();
-
-		logInfo("Creating engine...");
-		if (init_data.working_dir) logInfo("Working directory: ", init_data.working_dir);
-		char cmd_line[2048] = "";
-		os::getCommandLine(Span(cmd_line));
-		logInfo("Command line: ", cmd_line);
-
-		os::logInfo();
 
 		if (init_data.file_system.get()) {
 			m_file_system = static_cast<UniquePtr<FileSystem>&&>(init_data.file_system);
 		}
-		else if (init_data.working_dir) {
-			m_file_system = FileSystem::create(init_data.working_dir, m_allocator);
+		else if (init_data.engine_data_dir) {
+			m_file_system = FileSystem::create(init_data.engine_data_dir, m_allocator);
 		}
-		else {
+		else {			
 			char current_dir[MAX_PATH];
-			os::getCurrentDirectory(Span(current_dir)); 
+			os::getCurrentDirectory(Span(current_dir));
 			m_file_system = FileSystem::create(current_dir, m_allocator);
 		}
+
+		m_is_log_file_open = m_file_system->open(init_data.log_path, m_log_file);
+
+		logInfo("Creating engine...");
+		char cmd_line[2048] = "";
+		os::getCommandLine(Span(cmd_line));
+		logInfo("Command line: ", cmd_line);
+		if (init_data.engine_data_dir) {
+			logInfo("Engine data dir: ", init_data.engine_data_dir);
+		}
+
+		os::logInfo();
 
 		m_resource_manager.init(*m_file_system);
 		m_prefab_resource_manager.create(PrefabResource::TYPE, m_resource_manager);

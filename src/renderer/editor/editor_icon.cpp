@@ -58,7 +58,7 @@ struct EditorIconsImpl final : EditorIcons
 		ResourceManagerHub& rm = engine.getResourceManager();
 		for (u32 i = 0; i < lengthOf(ICONS); ++i)
 		{
-			const Path path_3d("editor/models/", ICONS[i], "_3d.fbx");
+			const Path path_3d("engine/editor/models/", ICONS[i], "_3d.fbx");
 			m_is_3d[i] = fs.fileExists(path_3d);
 			if (m_is_3d[i])
 			{
@@ -66,7 +66,7 @@ struct EditorIconsImpl final : EditorIcons
 			}
 			else
 			{
-				const Path path("editor/models/", ICONS[i], ".fbx");
+				const Path path("engine/editor/models/", ICONS[i], ".fbx");
 				m_models[i] = rm.load<Model>(path);
 			}
 		}

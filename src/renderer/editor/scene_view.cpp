@@ -86,7 +86,7 @@ struct WorldViewImpl final : WorldView {
 		m_viewport.far = 1'000'000.f;
 
 		ResourceManagerHub& rm = m_editor.getEngine().getResourceManager();
-		Path font_path("editor/fonts/Roboto-Light.ttf");
+		Path font_path("engine/editor/fonts/Roboto-Light.ttf");
 		m_font_res = rm.load<FontResource>(font_path);
 		m_font = m_font_res->addRef(16);
 		onWorldCreated();
@@ -615,9 +615,9 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 		: m_scene_view(view)
 	{
 		ResourceManagerHub& rm = renderer.getEngine().getResourceManager();
-		m_grid_shader = rm.load<Shader>(Path("shaders/grid.hlsl"));
-		m_debug_shape_shader = rm.load<Shader>(Path("shaders/debug_shape.hlsl"));
-		m_selection_outline_shader = rm.load<Shader>(Path("shaders/selection_outline.hlsl"));
+		m_grid_shader = rm.load<Shader>(Path("engine/shaders/grid.hlsl"));
+		m_debug_shape_shader = rm.load<Shader>(Path("engine/shaders/debug_shape.hlsl"));
+		m_selection_outline_shader = rm.load<Shader>(Path("engine/shaders/selection_outline.hlsl"));
 	}
 
 	~RenderPlugin() {

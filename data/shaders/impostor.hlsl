@@ -1,6 +1,6 @@
 //@surface
 
-//@texture_slot "Albedo", "textures/common/white.tga"
+//@texture_slot "Albedo", "engine/textures/white.tga"
 //@texture_slot "Normal", "", "HAS_NORMAL"
 //@texture_slot "Self shadow", "", "HAS_SELFSHADOW"
 //@texture_slot "Depth", "", "HAS_DEPTHMAP"
@@ -15,7 +15,7 @@
 //@uniform "Center", "float3", {0, 0, 0}
 //@uniform "Radius", "float", 1
 
-#include "shaders/common.hlsli"
+#include "engine/shaders/common.hlsli"
 
 struct VSOutput {
 	float2 uv : TEXCOORD0;

@@ -1,4 +1,4 @@
-#include "shaders/common.hlsli"
+#include "engine/shaders/common.hlsli"
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 

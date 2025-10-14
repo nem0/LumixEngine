@@ -75,9 +75,9 @@ struct AssetCompilerImpl : AssetCompiler {
 		, m_resource_compiled(m_allocator)
 		, m_on_init_load(m_allocator)
 	{
-		onBasePathChanged();
-
 		Engine& engine = app.getEngine();
+		FileSystem& fs = engine.getFileSystem();
+
 		ResourceManagerHub& rm = engine.getResourceManager();
 		rm.setLoadHook(&m_load_hook);
 
@@ -124,11 +124,9 @@ struct AssetCompilerImpl : AssetCompiler {
 		rm.setLoadHook(nullptr);
 	}
 	
-	void onBasePathChanged() override {
+	void setProjectDir(StringView base_path) override {
 		PROFILE_FUNCTION();
- 		Engine& engine = m_app.getEngine();
-		FileSystem& fs = engine.getFileSystem();
-		const char* base_path = fs.getBasePath();
+		Engine& engine = m_app.getEngine();
 
 		m_dependencies.clear();
 		m_resources.clear();
@@ -192,6 +190,13 @@ struct AssetCompilerImpl : AssetCompiler {
 			}
 		}
 
+		m_init_finished = true;
+		for (Resource* res : m_on_init_load) {
+			StringView filepath = ResourcePath::getResource(res->getPath());
+			pushToCompileQueue(Path(filepath));
+			res->decRefCount();
+		}
+		m_on_init_load.clear();
 		fillDB();
 	}
 
@@ -374,7 +379,6 @@ struct AssetCompilerImpl : AssetCompiler {
 		if (m_plugins.empty()) return;
 
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		const Path list_path(fs.getBasePath(), ".lumix/resources/_resources.txt");
 		OutputMemoryStream content(m_allocator);
 		if (fs.getContentSync(Path(".lumix/resources/_resources.txt"), content)) {
 			Tokenizer tokenizer(StringView(content), ".lumix/resources/_resources.txt");
@@ -476,33 +480,21 @@ struct AssetCompilerImpl : AssetCompiler {
 		{
 			m_scan_timer.tick();
 			PROFILE_BLOCK("asset scan")
-			const u64 list_last_modified = os::getLastModified(list_path);
+			const u64 list_last_modified = fs.getLastModified(".lumix/resources/_resources.txt");
 			processDir("", list_last_modified);
+			processDir("engine/", list_last_modified);
 		}
 		m_save_list_after_scan = true;
-	}
-
-	void onInitFinished() override
-	{
-		m_init_finished = true;
-		for (Resource* res : m_on_init_load) {
-			StringView filepath = ResourcePath::getResource(res->getPath());
-			pushToCompileQueue(Path(filepath));
-			res->decRefCount();
-		}
-		m_on_init_load.clear();
-		fillDB();
 	}
 
 	void onFileChanged(const char* path)
 	{
 		if (startsWith(path, ".")) return;
-		if (equalIStrings(path, "lumix.log")) return;
+		if (equalIStrings(path, "engine/lumix.log")) return;
 
-		const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
-		const Path full_path(base_path, "/", path);
+		FileSystem& fs = m_app.getEngine().getFileSystem();
 
-		if (os::dirExists(full_path)) {
+		if (fs.dirExists(path)) {
 			MutexGuard lock(m_changed_mutex);
 			m_changed_dirs.push(Path(path));
 		}
@@ -550,6 +542,14 @@ struct AssetCompilerImpl : AssetCompiler {
 	}
 	
 	ResourceManagerHub::LoadHook::Action onBeforeLoad(Resource& res) {
+		if (!m_init_finished) {
+			// resource load can be requested before project dir is set,
+			// so we defer the load until we know where to actually look for the file
+			res.incRefCount();
+			m_on_init_load.push(&res);
+			return ResourceManagerHub::LoadHook::Action::DEFERRED;
+		}
+		
 		StringView filepath = ResourcePath::getResource(res.getPath());
 
 		FileSystem& fs = m_app.getEngine().getFileSystem();
@@ -566,11 +566,6 @@ struct AssetCompilerImpl : AssetCompiler {
 			|| fs.getLastModified(dst_path) < fs.getLastModified(meta_path)
 			)
 		{
-			if (!m_init_finished) {
-				res.incRefCount();
-				m_on_init_load.push(&res);
-				return ResourceManagerHub::LoadHook::Action::DEFERRED;
-			}
 			if (!getPlugin(res.getPath())) return ResourceManagerHub::LoadHook::Action::IMMEDIATE;
 
 			pushToCompileQueue(Path(filepath));
@@ -728,10 +723,8 @@ struct AssetCompilerImpl : AssetCompiler {
 
 			if (!path_obj.isEmpty()) {
 				FileSystem& fs = m_app.getEngine().getFileSystem();
-				const Path list_path(fs.getBasePath(), ".lumix/resources/_resources.txt");
-				const u64 list_last_modified = os::getLastModified(list_path);
-				const Path fullpath(fs.getBasePath(), path_obj);
-				if (os::dirExists(fullpath)) {
+				const u64 list_last_modified = fs.getLastModified(".lumix/resources/_resources.txt");
+				if (fs.dirExists(path_obj)) {
 					processDir(path_obj, list_last_modified);
 					m_on_list_changed.invoke(path_obj);
 				}
@@ -764,7 +757,8 @@ struct AssetCompilerImpl : AssetCompiler {
 			}
 
 			if (getResourceType(path_obj) != INVALID_RESOURCE_TYPE) {
-				if (!m_app.getEngine().getFileSystem().fileExists(path_obj)) {
+				FileSystem& fs = m_app.getEngine().getFileSystem();
+				if (!fs.fileExists(path_obj)) {
 					jobs::MutexGuard lock(m_resources_mutex);
 					m_resources.eraseIf([&](const ResourceItem& ri){
 						if (!endsWithInsensitive(ri.path, path_obj)) return false;
@@ -840,7 +834,7 @@ struct AssetCompilerImpl : AssetCompiler {
 	DelegateList<void(const Path&)> m_on_list_changed;
 	DelegateList<void(Resource&, bool)> m_resource_compiled;
 	bool m_init_finished = false;
-	Array<Resource*> m_on_init_load;
+	Array<Resource*> m_on_init_load; // defer loading resources until we have a project dir
 	AtomicI32 m_scan_counter = 0;
 	bool m_save_list_after_scan = false;
 	os::Timer m_scan_timer;

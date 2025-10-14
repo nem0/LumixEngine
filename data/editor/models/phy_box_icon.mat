@@ -1,2 +1,2 @@
-shader "/shaders/editor_icon.hlsl"
-texture "/editor/models/phy_box_icon.tga"
+shader "/engine/shaders/editor_icon.hlsl"
+texture "/engine/editor/models/phy_box_icon.tga"

@@ -165,7 +165,7 @@ struct FBXImporter : ModelImporter {
 		static const int UV_SIZE = sizeof(float) * 2;
 		static const int COLOR_SIZE = sizeof(u8) * 4;
 		static const int AO_SIZE = sizeof(u8) * 4;
-		static const int BONE_INDICES_WEIGHTS_SIZE = sizeof(float) * 4 + sizeof(u16) * 4;
+		static const int BONE_INDICES_WEIGHTS_SIZE = sizeof(u16) * 4 + sizeof(u16) * 4;
 		int size = POSITION_SIZE + NORMAL_SIZE;
 
 		if (geom.getUVs().values) size += UV_SIZE;
@@ -414,7 +414,7 @@ struct FBXImporter : ModelImporter {
 					});
 					import_geom.attributes.push({
 						.semantic = AttributeSemantic::WEIGHTS,
-						.type = gpu::AttributeType::FLOAT,
+						.type = gpu::AttributeType::U16,
 						.num_components = 4
 					});
 				}
@@ -440,7 +440,7 @@ struct FBXImporter : ModelImporter {
 				if (colors.values && meta.import_vertex_colors) vertex_layout.size += sizeof(u32);
 				vertex_layout.tangent_offset = vertex_layout.size;
 				if (tangents.values || compute_tangents) vertex_layout.size += sizeof(u32);
-				if (import_geom.is_skinned) vertex_layout.size += sizeof(Vec4) + 4 * sizeof(u16);
+				if (import_geom.is_skinned) vertex_layout.size += 4 * sizeof(u16) + 4 * sizeof(u16);
 
 				if (import_geom.is_skinned) {
 					const FBXImportGeometry* g = (const FBXImportGeometry*)import_geom.user_data;
@@ -744,13 +744,17 @@ struct FBXImporter : ModelImporter {
 				if (tangents.values) write(getPackedVec3(tangents.get(tri_indices[i])));
 				else if (compute_tangents) write(u32(0));
 				if (skinning) {
+					const Skin* skin;
 					if (positions.indices) {
-						write((*skinning)[positions.indices[tri_indices[i]]].joints);
-						write((*skinning)[positions.indices[tri_indices[i]]].weights);
+						skin = &(*skinning)[positions.indices[tri_indices[i]]];
 					}
 					else {
-						write((*skinning)[tri_indices[i]].joints);
-						write((*skinning)[tri_indices[i]].weights);
+						skin = &(*skinning)[tri_indices[i]];
+					}
+					write(skin->joints);
+					for (float fw : skin->weights) {
+						u16 w = u16(clamp(fw * 0xffFF, 0.f, 65535.f));
+						write(w);
 					}
 				}
 			}

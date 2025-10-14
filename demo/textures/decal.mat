@@ -1,0 +1,7 @@
+shader "/engine/shaders/decal.hlsl"
+backface_culling true
+layer "decal"
+
+texture "/textures/decal.png"
+layer "decal"
+uniform "Material color", { 1.000000, 1.000000, 1.000000, 1.000000 }

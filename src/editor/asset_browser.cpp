@@ -109,8 +109,6 @@ struct AssetBrowserImpl : AssetBrowser {
 	{
 		PROFILE_FUNCTION();
 
-		onBasePathChanged();
-
 		const char* world_exts[] = { "unv" };
 		addPlugin(m_world_asset_plugin, Span(world_exts));
 		m_app.getAssetCompiler().addPlugin(m_world_asset_plugin, Span(world_exts));
@@ -122,8 +120,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		m_app.fileChanged().bind<&AssetBrowserImpl::onFileChanged>(this);
 	}
 
-	void onBasePathChanged() override {
-		const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
+	void setProjectDir(const char* base_path) override {
 		Path path(base_path, ".lumix");
 		bool success = os::makePath(path.c_str());
 		path.append("/asset_tiles");
@@ -217,8 +214,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	void onResourceListChanged(const Path& path) {
 		Engine& engine = m_app.getEngine();
 		FileSystem& fs = engine.getFileSystem();
-		const Path fullpath(fs.getBasePath(), path);
-		if (os::dirExists(fullpath)) {
+		if (fs.dirExists(path)) {
 			changeDir(m_dir, false);
 			return;
 		}
@@ -315,9 +311,10 @@ struct AssetBrowserImpl : AssetBrowser {
 		FileSystem& fs = engine.getFileSystem();
 		m_subdirs.clear();
 		if (!m_filter.isActive()) {
-			os::FileIterator* iter = fs.createFileIterator(m_dir);
+			Path tmp(m_dir, "/");
+			FileIterator* iter = fs.createFileIterator(tmp);
 			os::FileInfo info;
-			while (os::getNextFile(iter, &info)) {
+			while (getNextFile(iter, &info)) {
 				if (!info.is_directory) continue;
 				if (info.filename[0] == '.') continue;
 
@@ -325,7 +322,7 @@ struct AssetBrowserImpl : AssetBrowser {
 				dir.dir = info.filename;
 				dir.clamped_name = info.filename;
 			}
-			os::destroyFileIterator(iter);
+			destroyFileIterator(iter);
 		}
 
 		AssetCompiler& compiler = m_app.getAssetCompiler();
@@ -819,11 +816,10 @@ struct AssetBrowserImpl : AssetBrowser {
 		bool open_delete_popup = false;
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		static char tmp[MAX_PATH] = "";
-		const char* base_path = fs.getBasePath();
 		IPlugin* create_resource_plugin = nullptr;
 		auto common_popup = [&](){
 			if (ImGui::MenuItem("View in explorer")) {
-				const Path dir_full_path(base_path, "/", m_dir);
+				const Path dir_full_path = fs.getFullPath(m_dir);
 				os::openExplorer(dir_full_path);
 			}
 			if (ImGui::MenuItem("Create directory")) {
@@ -951,8 +947,9 @@ struct AssetBrowserImpl : AssetBrowser {
 			alignGUICenter([&](){
 				if (input_entered || ImGui::Button("Create")) {
 					input_entered = false;
-					StaticString<MAX_PATH> path(base_path, "/", m_dir, "/", tmp);
-					if (!os::makePath(path)) {
+					Path path = fs.getFullPath(m_dir);
+					path.append("/", tmp);
+					if (!os::makePath(path.c_str())) {
 						logError("Failed to create ", path);
 					}
 					changeDir(StaticString<MAX_PATH>(m_dir, "/", tmp), false);
@@ -1170,16 +1167,15 @@ struct AssetBrowserImpl : AssetBrowser {
 		os::destroyFileIterator(iter);
 	}
 
-	bool onDropFile(const char* path)  override
-	{
+	bool onDropFile(const char* path)  override {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
+		Path tmp = fs.getFullPath(m_dir);
 		if (os::dirExists(path)) {
-			const Path tmp(fs.getBasePath(), "/", m_dir, "/");
 			copyDir(path, tmp, m_allocator);
 		}
 		PathInfo fi(path);
-		const StaticString<MAX_PATH> dest(fs.getBasePath(), "/", m_dir, "/", fi.basename, ".", fi.extension);
-		return os::copyFile(path, dest);
+		tmp.append("/", fi.basename, ".", fi.extension);
+		return os::copyFile(path, tmp);
 	}
 
 	void openEditor(const Path& path) override {
@@ -1318,14 +1314,12 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 
 		Engine& engine = m_app.getEngine();
-		const char* base_path = engine.getFileSystem().getBasePath();
-		StaticString<MAX_PATH> src_full_path(base_path, tmp_path);
-		StaticString<MAX_PATH> dest_full_path(base_path, path);
-
+		const Path src_full_path = fs.getFullPath(tmp_path);
+		const Path dest_full_path = fs.getFullPath(path);
+		
 		os::deleteFile(dest_full_path);
 
-		if (!os::moveFile(src_full_path, dest_full_path))
-		{
+		if (!os::moveFile(src_full_path, dest_full_path)) {
 			logError("Could not save file ", path);
 		}
 	}
@@ -1426,8 +1420,8 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 	void openInExternalEditor(StringView path) const override {
-		const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
-		StaticString<MAX_PATH> full_path(base_path, path);
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		const Path full_path = fs.getFullPath(path);
 		const os::ExecuteOpenResult res = os::shellExecuteOpen(full_path, {}, {});
 		if (res == os::ExecuteOpenResult::NO_ASSOCIATION) {
 			logError(full_path, " is not associated with any app.");

@@ -387,7 +387,7 @@ bool ModelImporter::writeSubmodels(const Path& src, const ModelMeta& meta) {
 
 // TODO move this to the constructor?
 void ModelImporter::init() {
-	m_impostor_shadow_shader = m_app.getEngine().getResourceManager().load<Shader>(Path("shaders/impostor_shadow.hlsl"));
+	m_impostor_shadow_shader = m_app.getEngine().getResourceManager().load<Shader>(Path("engine/shaders/impostor_shadow.hlsl"));
 }
 
 void ModelImporter::createImpostorTextures(Model* model, ImpostorTexturesContext& ctx, bool bake_normals)

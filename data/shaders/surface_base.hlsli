@@ -124,9 +124,6 @@ VSOutput mainVS(VSInput input) {
 	#ifdef HAS_LOD
 		output.lod = 0;
 	#endif
-	#ifdef TANGENT_ATTR
-		output.tangent = input.tangent;
-	#endif
 	#ifdef AO_ATTR
 		output.ao = input.ao;
 	#endif
@@ -138,7 +135,11 @@ VSOutput mainVS(VSInput input) {
 		output.pos_ws = float4(input.i_pos_lod.xyz + rotateByQuat(input.i_rot, p), 1);
 		output.position = mul(output.pos_ws, Pass_ws_to_ndc);
 		output.normal = rotateByQuat(input.i_rot, input.normal);
-		#ifdef HAS_LOD
+		#ifdef TANGENT_ATTR
+			output.tangent = rotateByQuat(input.i_rot, input.tangent);
+		#endif
+		
+	#ifdef HAS_LOD
 			output.lod = input.i_pos_lod.w;
 		#endif
 	#elif defined INSTANCED

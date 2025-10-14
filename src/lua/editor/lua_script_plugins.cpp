@@ -74,7 +74,7 @@ struct LuauAnalysis :Luau::FileResolver {
 		Luau::registerBuiltinGlobals(m_luau_frontend, m_luau_frontend.globals, false);
 		Luau::registerBuiltinGlobals(m_luau_frontend, m_luau_frontend.globalsForAutocomplete, true);
 		
-		if (m_app.getEngine().getFileSystem().getContentSync(Path("scripts/lumix.d.lua"), def_blob)) {
+		if (m_app.getEngine().getFileSystem().getContentSync(Path("engine/scripts/lumix.d.lua"), def_blob)) {
 			std::string_view def_src((const char*)def_blob.data(), def_blob.size());
 			report(m_luau_frontend.loadDefinitionFile(m_luau_frontend.globals, m_luau_frontend.globals.globalScope, def_src, "@lumix", false, false));
 			m_luau_frontend.loadDefinitionFile(m_luau_frontend.globalsForAutocomplete, m_luau_frontend.globalsForAutocomplete.globalScope, def_src, "@lumix", false, true);
@@ -95,16 +95,16 @@ struct LuauAnalysis :Luau::FileResolver {
 		if (result.module) {
 			for (const Luau::TypeError& e : result.module->errors) {
 				std::string error = Luau::toString(e);
-				logError("scripts/lumix.d.lua:", e.location.begin.line, ": ", e.location.begin.column, ": ", error.c_str());
+				logError("engine/scripts/lumix.d.lua:", e.location.begin.line, ": ", e.location.begin.column, ": ", error.c_str());
 			}
 		}
 		for (const Luau::ParseError& e : result.parseResult.errors) {
 			const Luau::Location& loc = e.getLocation();
-			logError("scripts/lumix.d.lua:", loc.begin.line, ":", loc.begin.column, ": ", e.getMessage().c_str());
+			logError("engine/scripts/lumix.d.lua:", loc.begin.line, ":", loc.begin.column, ": ", e.getMessage().c_str());
 		}
 		for (const Luau::ParseError& e : result.sourceModule.parseErrors) {
 			const Luau::Location& loc = e.getLocation();
-			logError("scripts/lumix.d.lua:", loc.begin.line, ":", loc.begin.column, ": ", e.getMessage().c_str());
+			logError("engine/scripts/lumix.d.lua:", loc.begin.line, ":", loc.begin.column, ": ", e.getMessage().c_str());
 		}
 	}
 
@@ -1305,7 +1305,7 @@ Editor.addAction {
 		for i = 1, 10 do
 			Editor.createEntityEx {
 				position = { 3 * i, 0, 0 },
-				model_instance = { Source = "models/shapes/cube.fbx" }
+				model_instance = { Source = "engine/models/cube.fbx" }
 			}
 		end
 	end
@@ -1375,15 +1375,15 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 
 	void initPlugins() {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		os::FileIterator* iter = fs.createFileIterator("editor/scripts/plugins");
+		FileIterator* iter = fs.createFileIterator("engine/editor/scripts/plugins");
 		os::FileInfo info;
-		while (os::getNextFile(iter, &info)) {
+		while (getNextFile(iter, &info)) {
 			info.is_directory = info.is_directory;
 			if (info.is_directory) continue;
 			if (!Path::hasExtension(info.filename, "lua")) continue;
 
 			OutputMemoryStream blob(m_app.getAllocator());
-			const Path path("editor/scripts/plugins/", info.filename);
+			const Path path("engine/editor/scripts/plugins/", info.filename);
 			if (!fs.getContentSync(path, blob)) continue;
 
 			StringView content;
@@ -1392,7 +1392,7 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 			StudioLuaPlugin* plugin = StudioLuaPlugin::create(m_app, content, path);
 			if (plugin) m_plugins.push(plugin);
 		}
-		os::destroyFileIterator(iter);
+		destroyFileIterator(iter);
 	}
 
 	const char* getName() const override { return "lua_script"; }

@@ -1,8 +1,8 @@
 //@surface
-//@texture_slot "Texture", "textures/common/white.tga"
+//@texture_slot "Texture", "engine/textures/white.tga"
 //@uniform "Material color", "color", {1, 1, 1, 1}
 
-#include "shaders/common.hlsli"
+#include "engine/shaders/common.hlsli"
 
 struct VSInput {
 	float3 position : TEXCOORD0;

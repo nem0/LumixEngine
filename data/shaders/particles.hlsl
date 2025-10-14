@@ -1,9 +1,9 @@
 //@surface
 //@uniform "Frames cols", "int", 1
 //@uniform "Frames rows", "int", 1
-//@texture_slot "Texture", "textures/common/white.tga"
+//@texture_slot "Texture", "engine/textures/white.tga"
 
-#include "shaders/common.hlsli"
+#include "engine/shaders/common.hlsli"
 
 struct VSInput {
 	float3 i_position : TEXCOORD0;

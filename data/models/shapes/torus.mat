@@ -1,8 +1,0 @@
-shader "/shaders/standard.hlsl"
-backface_culling true
-layer "default"
-texture ""
-texture ""
-texture ""
-texture ""
-layer "default"

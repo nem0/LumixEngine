@@ -1,5 +1,5 @@
 //@surface
-#include "shaders/common.hlsli"
+#include "engine/shaders/common.hlsli"
 
 struct VSOutput {
 	float2 uv : TEXCOORD0;

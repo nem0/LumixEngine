@@ -2581,7 +2581,6 @@ public:
 		, m_engine(engine)
 		, m_game_mode_file(m_allocator)
 	{
-		loadProject();
 		logInfo("Initializing editor...");
 
 		m_prefab_system = PrefabSystem::create(*this);

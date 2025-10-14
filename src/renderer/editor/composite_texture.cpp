@@ -2902,8 +2902,8 @@ void CompositeTexture::initTerrainAlbedo() {
 	InputNode* inode1 = (InputNode*)addNode(NodeType::INPUT);
 	onode->m_layers_count = 2;
 	onode->m_output_type = OutputNode::OutputType::ARRAY;
-	inode0->m_texture = "textures/common/red.tga";
-	inode1->m_texture = "textures/common/green.tga";
+	inode0->m_texture = "engine/textures/red.tga";
+	inode1->m_texture = "engine/textures/green.tga";
 	link(inode0, 0, onode, 0);
 	link(inode1, 0, onode, 1);
 }
@@ -2920,8 +2920,8 @@ void CompositeTexture::initTerrainNormal() {
 	InputNode* inode1 = (InputNode*)addNode(NodeType::INPUT);
 	onode->m_layers_count = 2;
 	onode->m_output_type = OutputNode::OutputType::ARRAY;
-	inode0->m_texture = "textures/common/default_normal.tga";
-	inode1->m_texture = "textures/common/default_normal.tga";
+	inode0->m_texture = "engine/textures/default_normal.tga";
+	inode1->m_texture = "engine/textures/default_normal.tga";
 	link(inode0, 0, onode, 0);
 	link(inode1, 0, onode, 1);
 }

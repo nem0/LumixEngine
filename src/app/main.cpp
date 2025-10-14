@@ -155,9 +155,12 @@ struct Runner final
 		if (os::fileExists("main.pak")) {
 			init_data.file_system = FileSystem::createPacked("main.pak", m_allocator);
 		}
-		init_data.log_path = "lumix_app.log";
+		init_data.log_path = "engine/lumix_app.log";
 
 		m_engine = Engine::create(static_cast<Engine::InitArgs&&>(init_data), m_allocator);
+		char current_dir[MAX_PATH];
+		os::getCurrentDirectory(Span(current_dir));
+		m_engine->getFileSystem().mount(current_dir, "");
 		m_imgui.m_engine = m_engine.get();
 
 		os::InitWindowArgs init_window_args;

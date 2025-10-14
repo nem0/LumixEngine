@@ -39,6 +39,7 @@ struct LUMIX_EDITOR_API Settings {
 		Variable& setMin(float v) { min = v; return *this; }
 		Variable& setMax(float v) { max = v; return *this; }
 		Variable& setIsAngle(bool v) { is_angle = v; return *this; }
+		Variable& setStorage(Storage s) { storage = s; return *this; }
 
 		Storage storage = WORKSPACE;
 		enum Type {
@@ -83,7 +84,7 @@ struct LUMIX_EDITOR_API Settings {
 
 	void gui();
 	void commandPaletteUI(const struct TextFilter& filter);
-	void load();
+	void load(bool user_data_only);
 	void save();
 
 	i32 getI32(const char* var_name, i32 default_value);

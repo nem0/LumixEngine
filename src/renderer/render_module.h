@@ -162,9 +162,9 @@ struct PointLight {
 
 	Vec3 color;						//@ property color
 	float intensity;				//@ property min 0
+	EntityRef entity;
 	float fov;						//@ property radians clamp 0 360
 	float attenuation_param;		//@ property clamp 0 100
-	EntityRef entity;
 	float range;
 	Flags flags = Flags::NONE;
 	u64 guid;

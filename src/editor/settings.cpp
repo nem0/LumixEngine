@@ -17,7 +17,7 @@
 namespace Lumix {
 
 static const char SETTINGS_PATH[] = "studio.ini";
-static const char DEFAULT_SETTINGS_PATH[] = "studio_default.ini";
+static const char DEFAULT_SETTINGS_PATH[] = "engine/studio_default.ini";
 
 static bool shortcutInput(char* button_label, Action& action, StudioApp& app) {
 	bool res = false;
@@ -462,11 +462,7 @@ static bool loadStyle(Tokenizer& tokenizer) {
 	return true;
 }
 
-void Settings::load() {
-	FileSystem& fs = m_app.getEngine().getFileSystem();
-	const bool has_settings = fs.fileExists(SETTINGS_PATH);
-	const char* path = has_settings ? SETTINGS_PATH : DEFAULT_SETTINGS_PATH;
-
+void Settings::load(bool user_data_only) {
 	auto parse = [&](OutputMemoryStream& buf, const char* path, Storage storage) -> bool {
 		Tokenizer tokenizer(StringView((const char*)buf.data(), (u32)buf.size()), path);
 		for (;;) {
@@ -497,7 +493,7 @@ void Settings::load() {
 
 			Variable* var = findVar(*this, var_name.value);
 			if (var) {
-				var->storage = storage;
+				//var->storage = storage;
 				switch (var->type) {
 					case Variable::BOOL_PTR: if (!tokenizer.consume(*var->bool_ptr)) return false; break;
 					case Variable::BOOL: if (!tokenizer.consume(var->bool_value)) return false; break;
@@ -570,14 +566,18 @@ void Settings::load() {
 	};
 
 	OutputMemoryStream buf(m_app.getAllocator());
+	FileSystem& fs = m_app.getEngine().getFileSystem();
+	const bool has_settings = !user_data_only && fs.fileExists(SETTINGS_PATH);
+	const char* path = has_settings ? SETTINGS_PATH : DEFAULT_SETTINGS_PATH;
+
 	if (fs.getContentSync(Path(path), buf)) {
 		parse(buf, path, WORKSPACE);
 	}
 	else {
 		logError("Failed to read ", path);
 	}
-
 	buf.clear();
+
 	os::InputFile file;
 	if (file.open(m_app_data_path.c_str())) {
 		buf.resize(file.size());
@@ -632,13 +632,13 @@ void Settings::save() {
 	};
 
 	OutputMemoryStream blob(m_allocator);
-	serialize(WORKSPACE, blob);
 	FileSystem& fs = m_app.getEngine().getFileSystem();
+	serialize(WORKSPACE, blob);
 	if (!fs.saveContentSync(Path(SETTINGS_PATH), blob)) {
 		logError("Failed to save workspace settings in ", SETTINGS_PATH);
 	}
-
 	blob.clear();
+
 	serialize(USER, blob);
 	os::OutputFile file;
 	if (file.open(m_app_data_path.c_str())) {
@@ -1135,18 +1135,18 @@ static void shortcutsGUI(const TextFilter& filter, Settings& settings) {
 static void generalGUI(Settings& settings) {
 	ImGui::TableNextRow();
 	ImGui::TableNextColumn();
-	ImGuiEx::Label("Global settings path");
+	ImGuiEx::Label("Project settings path");
 	ImGui::TableNextColumn();
-	if (ImGui::Button(ICON_FA_FOLDER "##open global")) {
-		os::openExplorer(settings.m_app.getEngine().getFileSystem().getBasePath());
+	if (ImGui::Button(ICON_FA_FOLDER "##open_project")) {
+		os::openExplorer(settings.m_app.getProjectDir());
 	}
 	ImGui::SameLine();
 	ImGui::TextUnformatted(SETTINGS_PATH);
 
 	ImGui::TableNextColumn();
-	ImGuiEx::Label("Local settings path");
+	ImGuiEx::Label("User settings path");
 	ImGui::TableNextColumn();
-	if (ImGui::Button(ICON_FA_FOLDER "##open_local")) {
+	if (ImGui::Button(ICON_FA_FOLDER "##open_user")) {
 		os::openExplorer(Path::getDir(settings.m_app_data_path.c_str()));
 	}
 	ImGui::SameLine();

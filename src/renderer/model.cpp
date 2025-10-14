@@ -283,6 +283,13 @@ static bool parseVertexDecl(IInputStream& file, gpu::VertexDecl* vertex_decl, At
 
 		switch(semantics[i]) {
 			case AttributeSemantic::WEIGHTS:
+				if (type != gpu::AttributeType::FLOAT) {
+					vertex_decl->addAttribute(offset, cmp_count, type, gpu::Attribute::NORMALIZED);
+				}
+				else {
+					vertex_decl->addAttribute(offset, cmp_count, type, 0);
+				}
+				break;
 			case AttributeSemantic::POSITION:
 			case AttributeSemantic::TEXCOORD0:
 				vertex_decl->addAttribute(offset, cmp_count, type, 0);

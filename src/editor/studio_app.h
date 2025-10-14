@@ -64,6 +64,8 @@ struct LUMIX_EDITOR_API StudioApp {
 		virtual void guiEndFrame() {}
 		virtual void onSettingsLoaded() {}
 		virtual void onBeforeSettingsSaved() {}
+		virtual void setProjectDir(const char* project_dir) {}
+
 	};
 
 	struct IAddComponentPlugin {
@@ -89,6 +91,7 @@ struct LUMIX_EDITOR_API StudioApp {
 	virtual int getExitCode() const = 0;
 	virtual void exitWithCode(int exit_code) = 0;
 	virtual void exitGameMode() = 0;
+	virtual const char* getProjectDir() = 0;
 	
 	virtual struct PropertyGrid& getPropertyGrid() = 0;
 	virtual struct LogUI& getLogUI() = 0;

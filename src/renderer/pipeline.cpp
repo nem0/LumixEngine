@@ -483,16 +483,16 @@ struct PipelineImpl final : Pipeline {
 	{
 		m_viewport.w = m_viewport.h = 800;
 		ResourceManagerHub& rm = renderer.getEngine().getResourceManager();
-		m_tonemap_shader = rm.load<Shader>(Path("shaders/tonemap.hlsl"));
-		m_blit_shader = rm.load<Shader>(Path("shaders/blit.hlsl"));
-		m_lighting_shader = rm.load<Shader>(Path("shaders/lighting.hlsl"));
-		m_draw2d_shader = rm.load<Shader>(Path("shaders/draw2d.hlsl"));
-		m_downscale_depth_shader = rm.load<Shader>(Path("shaders/downscale_depth.hlsl"));
-		m_debug_shape_shader = rm.load<Shader>(Path("shaders/debug_shape.hlsl"));
-		m_debug_clusters_shader = rm.load<Shader>(Path("shaders/debug_clusters.hlsl"));
-		m_debug_velocity_shader = rm.load<Shader>(Path("shaders/debug_velocity.hlsl"));
-		m_instancing_shader = rm.load<Shader>(Path("shaders/instancing.hlsl"));
-		m_flatten_shader = rm.load<Shader>(Path("shaders/flatten_cube.hlsl"));
+		m_tonemap_shader = rm.load<Shader>(Path("engine/shaders/tonemap.hlsl"));
+		m_blit_shader = rm.load<Shader>(Path("engine/shaders/blit.hlsl"));
+		m_lighting_shader = rm.load<Shader>(Path("engine/shaders/lighting.hlsl"));
+		m_draw2d_shader = rm.load<Shader>(Path("engine/shaders/draw2d.hlsl"));
+		m_downscale_depth_shader = rm.load<Shader>(Path("engine/shaders/downscale_depth.hlsl"));
+		m_debug_shape_shader = rm.load<Shader>(Path("engine/shaders/debug_shape.hlsl"));
+		m_debug_clusters_shader = rm.load<Shader>(Path("engine/shaders/debug_clusters.hlsl"));
+		m_debug_velocity_shader = rm.load<Shader>(Path("engine/shaders/debug_velocity.hlsl"));
+		m_instancing_shader = rm.load<Shader>(Path("engine/shaders/instancing.hlsl"));
+		m_flatten_shader = rm.load<Shader>(Path("engine/shaders/flatten_cube.hlsl"));
 		
 		m_draw2d.clear({1, 1});
 

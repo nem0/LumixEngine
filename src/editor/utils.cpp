@@ -2543,21 +2543,22 @@ void FileSelector::fillSubitems() {
 	m_subdirs.clear();
 	m_subfiles.clear();
 	FileSystem& fs = m_app.getEngine().getFileSystem();
-	const char* base_path = fs.getBasePath();
 	
-	Path path(base_path, "/", m_path);
 	TextFilter filter;
-	if (!os::dirExists(path)) {
+	FileIterator* iter;
+	if (!fs.dirExists(m_path)) {
 		StringView dir = Path::getDir(m_path);
 		copyString(filter.filter, dir.end);
 		filter.build();
-		path = Path(base_path, "/", dir);
+		iter = fs.createFileIterator(dir);
+	}
+	else {
+		iter = fs.createFileIterator(m_path);
 	}
 	
-	os::FileIterator* iter = os::createFileIterator(path, m_app.getAllocator());
 	os::FileInfo info;
 	const char* ext = m_accepted_extension.c_str();
-	while (os::getNextFile(iter, &info)) {
+	while (getNextFile(iter, &info)) {
 		if (equalStrings(info.filename, ".")) continue;
 		if (equalStrings(info.filename, "..")) continue;
 		if (equalStrings(info.filename, ".lumix")) continue;
@@ -2571,7 +2572,7 @@ void FileSelector::fillSubitems() {
 			}
 		}
 	}
-	os::destroyFileIterator(iter);
+	destroyFileIterator(iter);
 }
 
 
@@ -2582,7 +2583,7 @@ FileSelector::FileSelector(const char* ext, StudioApp& app)
 	, m_subfiles(app.getAllocator())
 	, m_accepted_extension(ext, app.getAllocator())
 {
-	fillSubitems();
+//	fillSubitems();
 }
 
 DirSelector::DirSelector(StudioApp& app)
@@ -2595,29 +2596,30 @@ DirSelector::DirSelector(StudioApp& app)
 void DirSelector::fillSubitems() {
 	m_subdirs.clear();
 	FileSystem& fs = m_app.getEngine().getFileSystem();
-	const char* base_path = fs.getBasePath();
 	
-	Path path(base_path, "/", m_current_dir);
+	Path path = fs.getFullPath(m_current_dir);
 	TextFilter filter;
-	if (!os::dirExists(path)) {
+	FileIterator* iter;
+	if (fs.dirExists(m_current_dir)) {
+		iter = fs.createFileIterator(m_current_dir);
+	}
+	else {
 		StringView dir = Path::getDir(m_current_dir);
 		copyString(filter.filter, dir.end);
 		filter.build();
-		path = Path(base_path, "/", dir);
+		iter = fs.createFileIterator(dir);
 	}
-
-	os::FileIterator* iter = os::createFileIterator(path, m_app.getAllocator());
 	os::FileInfo info;
-	while (os::getNextFile(iter, &info)) {
+	while (getNextFile(iter, &info)) {
+		if (!info.is_directory) continue;
 		if (equalStrings(info.filename, ".")) continue;
 		if (equalStrings(info.filename, "..")) continue;
-		if (equalStrings(info.filename, ".lumix") && m_current_dir.length() == 0) continue;
+		if (equalStrings(info.filename, ".lumix")) continue;
+		if (!filter.pass(info.filename)) continue;
 
-		if (info.is_directory && filter.pass(info.filename)) {
-			m_subdirs.emplace(info.filename, m_app.getAllocator());
-		}
+		m_subdirs.emplace(info.filename, m_app.getAllocator());
 	}
-	os::destroyFileIterator(iter);
+	destroyFileIterator(iter);
 }
 
 bool DirSelector::gui(const char* label, bool* open) {
@@ -2632,11 +2634,10 @@ bool DirSelector::gui(const char* label, bool* open) {
 	ImGui::SetNextWindowPos(pos);
 	ImGui::SetNextWindowSize(size, ImGuiCond_Always);
 	FileSystem& fs = m_app.getEngine().getFileSystem();
-	const char* base_path = fs.getBasePath();
 
 	if (ImGui::BeginPopupModal(label, open, ImGuiWindowFlags_NoNavInputs)) {
 		bool res = false;
-		const Path fullpath(base_path, m_current_dir);
+		const Path fullpath = fs.getFullPath(m_current_dir);
 		if (ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
 		if (ImGui::IsKeyPressed(ImGuiKey_Enter)) {
 			if (os::dirExists(fullpath)) res = true;
@@ -2681,8 +2682,7 @@ bool DirSelector::gui(const char* label, bool* open) {
 			DirSelector* ds = (DirSelector*)data->UserData;
 			if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion) {
 				FileSystem& fs = ds->m_app.getEngine().getFileSystem();
-				const char* base_path = fs.getBasePath();
-				const Path fullpath(base_path, ds->m_current_dir);
+				const Path fullpath = fs.getFullPath(ds->m_current_dir);
 				if (!os::dirExists(fullpath) && !ds->m_subdirs.empty()) {
 					const u32 dir_size = Path::getDir(ds->m_current_dir).size();
 					ds->m_current_dir.resize(dir_size);
@@ -2758,8 +2758,7 @@ bool FileSelector::gui(const char* accepted_extension) {
 		FileSelector* selector = (FileSelector*)data->UserData;
 		if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion) {
 			FileSystem& fs = selector->m_app.getEngine().getFileSystem();
-			const char* base_path = fs.getBasePath();
-			const Path fullpath(base_path, selector->m_path);
+			const Path fullpath = fs.getFullPath(selector->m_path);
 			if (!os::fileExists(fullpath)) {
 				u32 dir_size;
 				if (os::dirExists(fullpath)) {
@@ -2795,12 +2794,12 @@ bool FileSelector::gui(const char* accepted_extension) {
 
 	bool res = false;
 	FileSystem& fs = m_app.getEngine().getFileSystem();
-	const Path fullpath(fs.getBasePath(), "/", m_path);
 	if (ImGui::Button(ICON_FA_PLUS " Create folder")) {
-		if (os::dirExists(fullpath) || os::fileExists(fullpath)) {
-			logError(fullpath, " already exists");
+		if (fs.dirExists(m_path) || fs.fileExists(m_path)) {
+			logError(m_path, " already exists");
 		}
 		else {
+			const Path fullpath = fs.getFullPath(m_path);
 			if (!os::makePath(fullpath.c_str())) {
 				logError("Failed to create ", fullpath);
 			}
@@ -2824,7 +2823,7 @@ bool FileSelector::gui(const char* accepted_extension) {
 		for (const String& subdir : m_subdirs) {
 			ImGui::TextUnformatted(ICON_FA_FOLDER); ImGui::SameLine();
 			if (ImGui::Selectable(subdir.c_str(), false, ImGuiSelectableFlags_DontClosePopups)) {
-				if (os::dirExists(fullpath)) {
+				if (fs.dirExists(m_path)) {
 					m_path.append("/", subdir.c_str());
 				}
 				else {
@@ -2839,7 +2838,7 @@ bool FileSelector::gui(const char* accepted_extension) {
 		
 		for (const String& subfile : m_subfiles) {
 			if (ImGui::Selectable(subfile.c_str(), false, ImGuiSelectableFlags_DontClosePopups | ImGuiSelectableFlags_AllowDoubleClick)) {
-				if (os::dirExists(fullpath)) {
+				if (fs.dirExists(m_path)) {
 					m_path.append("/", subfile.c_str());
 				}
 				else {
@@ -2854,7 +2853,7 @@ bool FileSelector::gui(const char* accepted_extension) {
 		}
 	}
 	ImGui::EndChild();
-	if (res && m_save && os::fileExists(fullpath)) {
+	if (res && m_save && fs.fileExists(m_path)) {
 		openCenterStrip("Confirm");
 		res = false;
 	}

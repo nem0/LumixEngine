@@ -33,7 +33,7 @@ struct AssetBrowser : StudioApp::GUIPlugin {
 
 	virtual ~AssetBrowser() {}
 	virtual void onInitFinished() = 0;
-	virtual void onBasePathChanged() = 0;
+	virtual void setProjectDir(const char* base_path) = 0;
 	//@ function
 	virtual void openEditor(const Path& resource) = 0;
 	virtual bool resourceInput(const char* str_id, Path& buf, ResourceType type, float width = -1) = 0;

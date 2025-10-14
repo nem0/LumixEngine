@@ -1,6 +1,6 @@
 //@surface
-//@texture_slot "Normal", "textures/common/default_normal.tga"
-//@texture_slot "Noise", "textures/common/white.tga"
+//@texture_slot "Normal", "engine/textures/default_normal.tga"
+//@texture_slot "Noise", "engine/textures/white.tga"
 //@texture_slot "Foam", "", "HAS_FOAM"
 //@texture_slot "Clutter", "", "HAS_CLUTTER"
 
@@ -17,7 +17,7 @@
 //@uniform "Refraction distortion", "float", 0.4
 //@define "SSR"
 
-#include "shaders/common.hlsli"
+#include "engine/shaders/common.hlsli"
 
 #define ATTR(X) TEXCOORD##X
 

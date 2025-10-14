@@ -1,4 +1,4 @@
-#include "shaders/common.hlsli"
+#include "engine/shaders/common.hlsli"
 
 cbuffer Data : register(b4) {
 	uint u_scale;

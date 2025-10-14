@@ -576,6 +576,7 @@ struct StudioAppImpl final : StudioApp {
 		, m_export(m_allocator)
 		, m_recent_folders(m_allocator)
 		, m_file_changed(m_allocator)
+		, m_project_dir(m_allocator)
 	{
 		PROFILE_FUNCTION();
 		u32 cpus_count = minimum(os::getCPUsCount(), 64);
@@ -752,10 +753,6 @@ struct StudioAppImpl final : StudioApp {
 	}
 
 	void onShutdown() {
-		#ifdef STATIC_PLUGINS
-			if (m_welcome_shader) m_welcome_shader->decRefCount();
-		#endif
-
 		while (m_engine->getFileSystem().hasWork()) {
 			m_engine->getFileSystem().processCallbacks();
 		}
@@ -928,39 +925,77 @@ struct StudioAppImpl final : StudioApp {
 		return os::HitTestResult::NONE;
 	}
 
-	void onInit()
-	{
+	// Try to find engine data dir (by looking for shaders/surface_base.hlsli).
+	// Users should run the editor with working dir == repo/data, but they often don't.
+	Path findEngineDataDir() {
+		char current_dir[MAX_PATH];
+		os::getCurrentDirectory(Span(current_dir));
+		catString(current_dir, "/");
+
+		Path path;
+		if (findEngineDataDir(current_dir, path)) return path;
+
+		char exe_dir[MAX_PATH];
+		os::getExecutablePath(Span(exe_dir));
+		exe_dir[Path::getDir(exe_dir).size()] = 0;
+
+		if (findEngineDataDir(exe_dir, path)) return path;
+
+		return Path(current_dir);
+	}
+
+	static bool findEngineDataDir(const char* search_dir, Path& out) {
+		StaticString<MAX_PATH> tmp(search_dir, "shaders/surface_base.hlsli");
+		if (os::fileExists(tmp)) {
+			out = search_dir;
+			return true;
+		}
+		
+		// try to detect if we run from something like `scripts\tmp\vs2022\bin\Debug\`
+		StringView d = Path::getDir(Path::getDir(Path::getDir(Path::getDir(Path::getDir(search_dir)))));
+		if (d.size() > 0) {
+			tmp = "";
+			tmp.append(d, "data/shaders/surface_base.hlsli");
+			if (os::fileExists(tmp)) {
+				out = Path(d, "data/");
+				return true;
+			}
+		}
+
+		// try to detect if we run from engine's repo root
+		tmp = "";
+		tmp.append(search_dir, "data/shaders/surface_base.hlsli");
+		if (os::fileExists(tmp)) {
+			out = Path(search_dir, "data/");
+			return true;
+		}
+
+		return false;
+	}
+
+	void onInit() {
 		PROFILE_FUNCTION();
 
 		os::Timer init_timer;
 		m_add_cmp_root.label[0] = '\0';
 
-		char current_dir[MAX_PATH] = "";
-		os::getCurrentDirectory(Span(current_dir));
-
-		char data_dir[MAX_PATH] = "";
-		checkDataDirCommandLine(data_dir, lengthOf(data_dir));
-
 		Engine::InitArgs init_data = {};
-		init_data.working_dir = data_dir[0] ? data_dir : current_dir;
 		const char* plugins[] = {
 			#define LUMIX_PLUGINS_STRINGS
 				#include "engine/plugins.inl"
 			#undef LUMIX_PLUGINS_STRINGS
 		};
 		init_data.plugins = Span(plugins, plugins + lengthOf(plugins) - 1);
+		Path engine_data_dir = findEngineDataDir();
+		init_data.engine_data_dir = engine_data_dir.c_str();
 		m_engine = Engine::create(static_cast<Engine::InitArgs&&>(init_data), m_allocator);
-		FileSystem& fs = m_engine->getFileSystem();
-		const char* base_path = fs.getBasePath();
-		m_file_watcher = FileSystemWatcher::create(base_path, m_allocator);
-		m_file_watcher->getCallback().bind<&StudioAppImpl::onFileChanged>(this);
 		
 		m_settings.registerOption("command_pallete_search_settings", &m_command_palette_search_settings, "General", "Command palette searches in settings");
-		m_settings.registerOption("welcome_shader", &m_welcome_screen_use_shader, "General", "Animated background in welcome screen");
+		m_settings.registerOption("welcome_shader", &m_welcome_screen_use_shader, "General", "Animated background in welcome screen").setStorage(Settings::USER);
 		m_settings.registerOption("report_crashes", &m_crash_reporting, "General", "Report crashes");
 		m_settings.registerOption("sleep_when_inactive", &m_sleep_when_inactive, "General", "Throttle FPS in background");
 		m_settings.registerOption("fileselector_dir", &m_file_selector.m_path);
-		m_settings.registerOption("font_size", &m_font_size, "General", "Font size").setMin(1);
+		m_settings.registerOption("font_size", &m_font_size, "General", "Font size").setMin(8).setStorage(Settings::USER);
 		m_settings.registerOption("code_editor_font_size", &CodeEditor::s_font_size, "Code editor", "Font size").setMin(1);
 		m_settings.registerOption("code_editor_show_line_nums", &CodeEditor::s_show_line_numbers, "Code editor", "Show line numbers");
 		m_settings.registerOption("export_pack", &m_export.pack);
@@ -968,9 +1003,9 @@ struct StudioAppImpl final : StudioApp {
 		m_settings.registerOption("gizmo_scale", &m_gizmo_config.scale, "General", "Gizmo scale").setMin(0.001f);
 		m_settings.registerOption("fov", &m_fov, "General", "FOV").setMin(1).setMax(179).setIsAngle(true);
 		static bool use_native_titlebar = false;
-		m_settings.registerOption("use_native_titlebar", &use_native_titlebar, "General", "Native titlebar (restart required)");
+		m_settings.registerOption("use_native_titlebar", &use_native_titlebar, "General", "Native titlebar (restart required)").setStorage(Settings::USER);
 		// we need some stuff (font_size) from settings at this point
-		m_settings.load();
+		m_settings.load(true);
 		m_use_native_titlebar = use_native_titlebar;
 
 		os::InitWindowArgs init_window_args;
@@ -993,9 +1028,11 @@ struct StudioAppImpl final : StudioApp {
 		m_engine->init();
 		jobs::wait(&m_init_imgui_signal);
 		
-		logInfo("Current directory: ", current_dir);
-
-		extractBundled();
+		{
+			char current_dir[MAX_PATH] = "";
+			os::getCurrentDirectory(Span(current_dir));
+			logInfo("Current directory: ", current_dir);
+		}
 
 		m_editor = WorldEditor::create(*m_engine, m_allocator);
 		loadUserPlugins();
@@ -1007,28 +1044,27 @@ struct StudioAppImpl final : StudioApp {
 		m_log_ui.create(*this, m_allocator);
 
 		initPlugins(); // needs initialized imgui
-		loadSettings(); // we can load settings now, we have everything (i.e. actions, imgui context) available
-
-		loadWorldFromCommandLine();
-
-		m_asset_compiler->onInitFinished();
+		loadSettings(true); // we can load settings now, we have everything (i.e. actions, imgui context) available
 		m_asset_browser->onInitFinished();
 		
-		loadLogo();
-
+		loadWorldFromCommandLine();
 		logInfo("Init took ", init_timer.getTimeSinceStart(), " s");
+
 		#ifdef _WIN32
 			logInfo(os::getTimeSinceProcessStart(), " s since process started");
 		#endif
 
-		#ifdef STATIC_PLUGINS
-			m_welcome_shader = m_engine->getResourceManager().load<Shader>(Path("shaders/welcome.hlsl"));
-		#endif
+		char data_dir[MAX_PATH] = "";
+		if (checkDataDirCommandLine(Span(data_dir))) {
+			logInfo("Data folder provided on command line: ", data_dir);
+			m_is_welcome_screen_open = false;
+			setProjectDir(data_dir);
+		}
 	}
 
 	void loadLogo() {
 		if (!m_render_interface) return;
-		m_logo = m_render_interface->loadTexture(Path("editor/logo.png"));
+		m_logo = m_render_interface->loadTexture(Path("engine/editor/logo.png"));
 	}
 
 	void destroyAddCmpTreeNode(AddCmpTreeNode* node)
@@ -1354,55 +1390,6 @@ struct StudioAppImpl final : StudioApp {
 		}
 	}
 
-	void extractBundled() {
-		#ifdef _WIN32
-			HRSRC hrsrc = FindResourceA(GetModuleHandle(NULL), MAKEINTRESOURCE(102), "TAR");
-			if (!hrsrc) return;
-			HGLOBAL hglobal = LoadResource(GetModuleHandle(NULL), hrsrc);
-			if (!hglobal) return;
-			const DWORD res_size = SizeofResource(GetModuleHandle(NULL), hrsrc);
-			if (res_size == 0) return;
-			const void* res_mem = LockResource(hglobal);
-			if (!res_mem) return;
-	
-			TCHAR exe_path[MAX_PATH];
-			GetModuleFileNameA(NULL, exe_path, MAX_PATH);
-
-			// TODO extract only nonexistent files
-			InputMemoryStream str(res_mem, res_size);
-
-			TarHeader header;
-			while (str.getPosition() < str.size()) {
-				const u8* ptr = (const u8*)str.getData() + str.getPosition();
-				str.read(&header, sizeof(header));
-				u32 size;
-				fromCStringOctal(StringView(header.size, sizeof(header.size)), size); 
-				if (header.name[0] && (header.typeflag == 0 || header.typeflag == '0')) {
-					const Path path(m_engine->getFileSystem().getBasePath(), "/", header.name);
-					char dir[MAX_PATH];
-					copyString(Span(dir), Path::getDir(path));
-					if (!os::makePath(dir)) logError("");
-					if (!os::fileExists(path)) {
-						os::OutputFile file;
-						if (file.open(path.c_str())) {
-							if (!file.write(ptr + 512, size)) {
-								logError("Failed to write ", path);
-							}
-							file.close();
-						}
-						else {
-							logError("Failed to extract ", path);
-						}
-					}
-				}
-
-				str.setPosition(str.getPosition() + (512 - str.getPosition() % 512) % 512);
-				str.setPosition(str.getPosition() + size + (512 - size % 512) % 512);
-			}
-		#endif
-	}
-
-
 	void initDefaultWorld() {
 		m_editor->beginCommandGroup("initWorld");
 		EntityRef env = m_editor->addEntity();
@@ -1445,19 +1432,30 @@ struct StudioAppImpl final : StudioApp {
 		m_editor->loadWorld(blob, path.c_str(), additive);
 	}
 
-	void changeBasePath(const char* dir) {
-		m_file_watcher = FileSystemWatcher::create(dir, m_allocator);
+	void setProjectDir(const char* dir) {
+		Path path(dir);
+		if (!endsWith(path, "\\") && !endsWith(path, "/")) {
+			path.append("/");
+		}
+		m_project_dir = path;
+		// TODO check for collisions in mounts vs dirs in base path
+		// TODO watch other mounts
+		m_file_watcher = FileSystemWatcher::create(path.c_str(), m_allocator);
 		m_file_watcher->getCallback().bind<&StudioAppImpl::onFileChanged>(this);
 
-		m_engine->getFileSystem().setBasePath(dir);
-		extractBundled();
+		m_engine->getFileSystem().mount(path, "");
 		m_editor->loadProject();
-		m_asset_compiler->onBasePathChanged();
-		m_asset_browser->onBasePathChanged();
-		m_engine->getResourceManager().reloadAll();
+		m_asset_compiler->setProjectDir(path);
+		
+		m_engine->getResourceManager().reloadAll(); // TODO is this reload necessary? loading resources should be deferred until here anyway
 		initDefaultWorld();
-		loadSettings();
+		loadSettings(false);
 		ImGui::LoadIniSettingsFromMemory(m_settings.m_imgui_state.c_str());
+
+		for (GUIPlugin* p : m_gui_plugins) {
+			p->setProjectDir(path.c_str());
+		}
+		loadLogo();
 	}
 
 	void onFileChanged(const char* path) {
@@ -1506,21 +1504,6 @@ struct StudioAppImpl final : StudioApp {
 		ImGui::SetNextWindowSize(viewport->WorkSize);
 		ImGui::SetNextWindowViewport(viewport->ID);
 		if (ImGui::Begin("Welcome", nullptr, flags)) {
-			// background shader
-			#ifdef STATIC_PLUGINS
-				if (m_welcome_shader->isReady() && m_welcome_screen_use_shader) {
-					ImGui::SetCursorPos(ImVec2(0, 0));
-					ImVec2 size = ImGui::GetContentRegionAvail();
-					gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLES);
-					decl.addAttribute(0, 2, gpu::AttributeType::FLOAT, 0);
-					decl.addAttribute(8, 2, gpu::AttributeType::FLOAT, 0);
-					decl.addAttribute(16, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
-					const gpu::StateFlags state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
-					gpu::ProgramHandle program = m_welcome_shader->getProgram(state, decl, 0, 0);
-					shaderRect(*m_engine, program, size);
-				}
-			#endif
-
 			#ifdef _WIN32
 				if (!m_use_native_titlebar) {
 					const ImVec2 cp = ImGui::GetCursorPos();
@@ -1543,8 +1526,6 @@ struct StudioAppImpl final : StudioApp {
 			#endif
 
 			alignGUICenter([&](){
-				ImGui::Image(*(void**)m_logo, ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight()));
-				ImGui::SameLine();
 				ImGui::Text("Welcome to Lumix Studio");
 			});
 			ImGui::Separator();
@@ -1552,12 +1533,12 @@ struct StudioAppImpl final : StudioApp {
 			ImGui::PushStyleVar(ImGuiStyleVar_SelectableTextAlign, ImVec2(0.5f, 0.5f));
 			if (ImGui::Selectable(ICON_FA_FOLDER_OPEN " Open / Create folder", false, 0, ImVec2(ImGui::GetContentRegionAvail().x, 0))) {
 				char dir[MAX_PATH];
-				if (os::getOpenDirectory(Span(dir), m_engine->getFileSystem().getBasePath())) {
+				if (os::getOpenDirectory(Span(dir), nullptr)) {
 					m_is_welcome_screen_open = false;
 					StringView sv = dir;
 					sv.removeSuffix(1); // remove trailing slash
 
-					changeBasePath(dir);
+					setProjectDir(dir);
 					
 					m_recent_folders.eraseItems([&](const String& s){ return s == sv; });
 					if (m_recent_folders.size() > 10) {
@@ -1570,7 +1551,7 @@ struct StudioAppImpl final : StudioApp {
 
 			for (String& path : m_recent_folders) {
 				if (ImGui::Selectable(path.c_str(), false, 0, ImVec2(ImGui::GetContentRegionAvail().x, 0))) {
-					changeBasePath(path.c_str());
+					setProjectDir(path.c_str());
 					m_is_welcome_screen_open = false;
 				}
 			}
@@ -1838,11 +1819,13 @@ struct StudioAppImpl final : StudioApp {
 				m_open_filter.gui("Filter", 150);
 	
 				forEachWorld([&](const Path& path){
+					ImGui::PushID(path.c_str());
 					StringView basename = Path::getBasename(path);
 					StaticString<MAX_PATH> tmp(basename);
 					if (m_open_filter.pass(path.c_str()) && ImGui::MenuItem(tmp)) {
 						tryLoadWorld(path, additive);
 					}
+					ImGui::PopID();
 				});
 				ImGui::EndMenu();
 			}
@@ -2025,7 +2008,13 @@ struct StudioAppImpl final : StudioApp {
 		}
 	}
 
+	const char* getProjectDir() override { 
+		return m_project_dir.c_str();
+	}
+
 	void saveSettings() override {
+		if (m_is_welcome_screen_open) return;
+		
 		ImGuiIO& io = ImGui::GetIO();
 		if (io.WantSaveIniSettings) {
 			const char* data = ImGui::SaveIniSettingsToMemory();
@@ -2038,13 +2027,13 @@ struct StudioAppImpl final : StudioApp {
 			m_settings.setString(StaticString<64>("recent_root_folder_", i), path.c_str(), Settings::USER);
 		}
 
-		m_settings.setBool("is_maximized", os::isMaximized(m_main_window), Settings::WORKSPACE);
+		m_settings.setBool("is_maximized", os::isMaximized(m_main_window), Settings::USER);
 		if (!os::isMinimized(m_main_window)) {
 			os::Rect win_rect = os::getWindowScreenRect(m_main_window);
-			m_settings.setI32("window_x", win_rect.left, Settings::WORKSPACE);
-			m_settings.setI32("window_y", win_rect.top, Settings::WORKSPACE);
-			m_settings.setI32("window_w", win_rect.width, Settings::WORKSPACE);
-			m_settings.setI32("window_h", win_rect.height, Settings::WORKSPACE);
+			m_settings.setI32("window_x", win_rect.left, Settings::USER);
+			m_settings.setI32("window_y", win_rect.top, Settings::USER);
+			m_settings.setI32("window_w", win_rect.width, Settings::USER);
+			m_settings.setI32("window_h", win_rect.height, Settings::USER);
 		}
 
 		for (auto* i : m_gui_plugins) {
@@ -2059,7 +2048,10 @@ struct StudioAppImpl final : StudioApp {
 		size = maximum(size, 1.f);
 		FileSystem& fs = m_engine->getFileSystem();
 		OutputMemoryStream data(m_allocator);
-		if (!fs.getContentSync(Path(path), data)) return nullptr;
+		if (!fs.getContentSync(Path(path), data)) {
+			logError("Failed to load ", path);
+			return nullptr;
+		}
 		ImGuiIO& io = ImGui::GetIO();
 		ImFontConfig cfg;
 		copyString(cfg.Name, path);
@@ -2067,19 +2059,19 @@ struct StudioAppImpl final : StudioApp {
 		auto font = io.Fonts->AddFontFromMemoryTTF((void*)data.data(), (i32)data.size(), size, &cfg);
 		if (merge_icons) {
 			ImFontConfig config;
-			copyString(config.Name, "editor/fonts/fa-regular-400.ttf");
+			copyString(config.Name, "engine/editor/fonts/fa-regular-400.ttf");
 			config.MergeMode = true;
 			config.FontDataOwnedByAtlas = false;
 			config.GlyphMinAdvanceX = size; // Use if you want to make the icon monospaced
 			static const ImWchar icon_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
 			OutputMemoryStream icons_data(m_allocator);
-			if (fs.getContentSync(Path("editor/fonts/fa-regular-400.ttf"), icons_data)) {
+			if (fs.getContentSync(Path("engine/editor/fonts/fa-regular-400.ttf"), icons_data)) {
 				ImFont* icons_font = io.Fonts->AddFontFromMemoryTTF((void*)icons_data.data(), (i32)icons_data.size(), size * 0.75f, &config, icon_ranges);
 				ASSERT(icons_font);
 			}
-			copyString(config.Name, "editor/fonts/fa-solid-900.ttf");
+			copyString(config.Name, "engine/editor/fonts/fa-solid-900.ttf");
 			icons_data.clear();
-			if (fs.getContentSync(Path("editor/fonts/fa-solid-900.ttf"), icons_data)) {
+			if (fs.getContentSync(Path("engine/editor/fonts/fa-solid-900.ttf"), icons_data)) {
 				ImFont* icons_font = io.Fonts->AddFontFromMemoryTTF((void*)icons_data.data(), (i32)icons_data.size(), size * 0.75f, &config, icon_ranges);
 				ASSERT(icons_font);
 			}
@@ -2216,37 +2208,26 @@ struct StudioAppImpl final : StudioApp {
 		
 			ImGui::LoadIniSettingsFromMemory(m_settings.m_imgui_state.c_str());
 
-			m_font = addFontFromFile("editor/fonts/Roboto-Light.ttf", (float)m_font_size * font_scale, true);
-			m_bold_font = addFontFromFile("editor/fonts/Roboto-Bold.ttf", (float)m_font_size * font_scale, true);
-			m_monospace_font = addFontFromFile("editor/fonts/JetBrainsMono-Regular.ttf", (float)m_font_size * font_scale, false);
+			m_font = addFontFromFile("engine/editor/fonts/Roboto-Light.ttf", (float)m_font_size * font_scale, true);
+			m_bold_font = addFontFromFile("engine/editor/fonts/Roboto-Bold.ttf", (float)m_font_size * font_scale, true);
+			m_monospace_font = addFontFromFile("engine/editor/fonts/JetBrainsMono-Regular.ttf", (float)m_font_size * font_scale, false);
 
 			OutputMemoryStream data(m_allocator);
-			if (fs.getContentSync(Path("editor/fonts/fa-solid-900.ttf"), data)) {
+			if (fs.getContentSync(Path("engine/editor/fonts/fa-solid-900.ttf"), data)) {
 				const float size = maximum(1.f, (float)m_font_size * font_scale * 1.25f);
 				ImFontConfig cfg;
-				copyString(cfg.Name, "editor/fonts/fa-solid-900.ttf");
+				copyString(cfg.Name, "engine/editor/fonts/fa-solid-900.ttf");
 				cfg.FontDataOwnedByAtlas = false;
 				cfg.GlyphMinAdvanceX = size; // to align font icons
 				static const ImWchar icon_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
 				m_big_icon_font = io.Fonts->AddFontFromMemoryTTF((void*)data.data(), (i32)data.size(), size, &cfg, icon_ranges);
 				cfg.MergeMode = true;
-				copyString(cfg.Name, "editor/fonts/fa-regular-400.ttf");
-				if (fs.getContentSync(Path("editor/fonts/fa-regular-400.ttf"), data)) {
+				copyString(cfg.Name, "engine/editor/fonts/fa-regular-400.ttf");
+				if (fs.getContentSync(Path("engine/editor/fonts/fa-regular-400.ttf"), data)) {
 					ImFont* icons_font = io.Fonts->AddFontFromMemoryTTF((void*)data.data(), (i32)data.size(), size, &cfg, icon_ranges);
 					ASSERT(icons_font);
 				}
 			}
-
-			if (!m_font || !m_bold_font) {
-				os::messageBox(
-					"!! If you run from Visual Studio, set your working directory to 'data/' !!\n"
-					"Could not open editor/fonts/Roboto-Light.ttf or editor/fonts/Roboto-Bold.ttf.\n"
-					"This most likely means the data are not bundled with the executable,\n"
-					"or the executable is not in the correct directory.\n"
-					"The program will probably crash later."
-				);
-			}
-			if (!m_monospace_font) logError("Failed to load monospace font");
 
 			ImGuiStyle& style = ImGui::GetStyle();
 			style.FramePadding.y = 0;
@@ -2262,11 +2243,11 @@ struct StudioAppImpl final : StudioApp {
 	void setFOV(float fov_radians) override { m_fov = fov_radians; }
 	Settings& getSettings() override { return m_settings; }
 
-	void loadSettings() {
+	void loadSettings(bool user_data_only) {
 		PROFILE_FUNCTION();
 		logInfo("Loading settings...");
 
-		m_settings.load();
+		m_settings.load(user_data_only);
 		if (CommandLineParser::isOn("-no_crash_report")) enableCrashReporting(false);
 		else enableCrashReporting(m_crash_reporting);
 
@@ -2277,7 +2258,11 @@ struct StudioAppImpl final : StudioApp {
 			if (os::dirExists(path)) m_recent_folders.emplace(path, m_allocator);
 		}
 		if (m_recent_folders.empty()) {
-			m_recent_folders.emplace(m_engine->getFileSystem().getBasePath(), m_allocator);
+			FileSystem& fs = m_engine->getFileSystem();
+			const char* engine_data_dir = fs.getEngineDataDir();
+			StringView d = Path::getDir(engine_data_dir);
+			StaticString<MAX_PATH> demo_dir(d, "demo");
+			m_recent_folders.emplace(demo_dir, m_allocator);
 		}
 
 		for (auto* i : m_gui_plugins) {
@@ -2315,7 +2300,7 @@ struct StudioAppImpl final : StudioApp {
 		#else
 			StaticString<MAX_PATH> exe_path(dir, "app");
 		#endif
-		const char* working_dir = m_engine->getFileSystem().getBasePath();
+		const char* working_dir = m_project_dir.c_str();
 		StaticString<MAX_PATH + 64> args("-window -world ", m_editor->getWorld()->getPartitions()[0].name);
 		if (os::shellExecuteOpen(exe_path, args, working_dir, false) != os::ExecuteOpenResult::SUCCESS) {
 			logError("Failed to run ", exe_path, " ", args);
@@ -2516,20 +2501,19 @@ struct StudioAppImpl final : StudioApp {
 		}
 	}
 
-	static void checkDataDirCommandLine(char* dir, int max_size)
-	{
+	static bool checkDataDirCommandLine(Span<char> dir) {
 		char cmd_line[2048];
 		os::getCommandLine(Span(cmd_line));
 
 		CommandLineParser parser(cmd_line);
-		while (parser.next())
-		{
+		while (parser.next()) {
 			if (!parser.currentEquals("-data_dir")) continue;
-			if (!parser.next()) break;
+			if (!parser.next()) return false;
 
-			parser.getCurrent(dir, max_size);
-			break;
+			parser.getCurrent(dir.m_begin, dir.length());
+			return true;
 		}
+		return false;
 	}
 	
 	Span<MousePlugin*> getMousePlugins() override { return m_mouse_plugins; }
@@ -2775,11 +2759,11 @@ struct StudioAppImpl final : StudioApp {
 	};
 
 	void scanCompiled(AssociativeArray<FilePathHash, ExportFileInfo>& infos) {
-		os::FileIterator* iter = m_engine->getFileSystem().createFileIterator(".lumix/resources");
-		const char* base_path = m_engine->getFileSystem().getBasePath();
+		FileSystem& fs = m_engine->getFileSystem();
+		FileIterator* iter = fs.createFileIterator(".lumix/resources");
 		os::FileInfo info;
 		exportFile("lumix.prj", infos);
-		while (os::getNextFile(iter, &info)) {
+		while (getNextFile(iter, &info)) {
 			if (info.is_directory) continue;
 
 			StringView basename = Path::getBasename(info.filename);
@@ -2788,7 +2772,7 @@ struct StudioAppImpl final : StudioApp {
 			fromCString(basename, tmp_hash);
 			rec.hash = FilePathHash::fromU64(tmp_hash);
 			rec.offset = 0;
-			const Path path(base_path, ".lumix/resources/", info.filename);
+			const Path path = fs.getFullPath(Path(".lumix/resources/", info.filename));
 			rec.size = os::getFileSize(path);
 			copyString(rec.path, ".lumix/resources/");
 			catString(rec.path, info.filename);
@@ -2797,27 +2781,27 @@ struct StudioAppImpl final : StudioApp {
 		exportDataScan("shaders/", infos);
 		exportDataScan("maps/", infos);
 		
-		os::destroyFileIterator(iter);
+		destroyFileIterator(iter);
 	}
 
 
 	void exportFile(const char* file_path, AssociativeArray<FilePathHash, ExportFileInfo>& infos) {
-		const char* base_path = m_engine->getFileSystem().getBasePath();
+		FileSystem& fs = m_engine->getFileSystem();
 		const FilePathHash hash(file_path);
 		ExportFileInfo& out_info = infos.emplace(hash);
 		copyString(out_info.path, file_path);
 		out_info.hash = hash;
-		const Path path(base_path, file_path);
+		const Path path = fs.getFullPath(file_path);
 		out_info.size = os::getFileSize(path);
 		out_info.offset = ~0UL;
 	}
 
 	void exportDataScan(const char* dir_path, AssociativeArray<FilePathHash, ExportFileInfo>& infos)
 	{
-		auto* iter = m_engine->getFileSystem().createFileIterator(dir_path);
-		const char* base_path = m_engine->getFileSystem().getBasePath();
+		FileSystem& fs = m_engine->getFileSystem();
+		FileIterator* iter = fs.createFileIterator(dir_path);
 		os::FileInfo info;
-		while (os::getNextFile(iter, &info)) {
+		while (getNextFile(iter, &info)) {
 			char normalized_path[MAX_PATH];
 			Path::normalize(info.filename, Span(normalized_path));
 			if (info.is_directory)
@@ -2850,11 +2834,11 @@ struct StudioAppImpl final : StudioApp {
 			auto& out_info = infos.emplace(hash);
 			copyString(out_info.path, out_path);
 			out_info.hash = hash;
-			const Path path(base_path, out_path);
+			const Path path = fs.getFullPath(out_path);
 			out_info.size = os::getFileSize(path);
 			out_info.offset = ~0UL;
 		}
-		os::destroyFileIterator(iter);
+		destroyFileIterator(iter);
 	}
 
 
@@ -2892,7 +2876,7 @@ struct StudioAppImpl final : StudioApp {
 			ImGuiEx::Label("Destination dir");
 			if (ImGui::Button(m_export.dest_dir.length() == 0 ? "..." : m_export.dest_dir.c_str())) {
 				char tmp[MAX_PATH];
-				if (os::getOpenDirectory(Span(tmp), m_engine->getFileSystem().getBasePath())) {
+				if (os::getOpenDirectory(Span(tmp), m_project_dir.c_str())) {
 					m_export.dest_dir = tmp;
 				}
 			}
@@ -2999,9 +2983,8 @@ struct StudioAppImpl final : StudioApp {
 			}
 		}
 		else {
-			const char* base_path = fs.getBasePath();
 			for (auto& info : infos) {
-				const Path src(base_path, info.path);
+				const Path src = fs.getFullPath(info.path);
 				StaticString<MAX_PATH> dst(m_export.dest_dir, info.path);
 				StaticString<MAX_PATH> dst_dir(m_export.dest_dir, Path::getDir(info.path));
 				if (!os::makePath(dst_dir) && !os::dirExists(dst_dir)) {
@@ -3190,9 +3173,6 @@ struct StudioAppImpl final : StudioApp {
 	ImFont* m_bold_font;
 	ImFont* m_monospace_font;
 	ImGuiID m_dockspace_id = 0;
-	#ifdef STATIC_PLUGINS	
-		Shader* m_welcome_shader = nullptr;
-	#endif
 
 	struct WatchedPlugin {
 		UniquePtr<FileSystemWatcher> watcher;
@@ -3213,6 +3193,7 @@ struct StudioAppImpl final : StudioApp {
 	i32 m_font_size = 16;
 	DelegateList<void(const char*)> m_file_changed;
 	UniquePtr<FileSystemWatcher> m_file_watcher;
+	String m_project_dir;
 };
 
 static Local<StudioAppImpl> g_studio;

@@ -1,7 +1,0 @@
-shader "/shaders/particles.hlsl"
-backface_culling true
-layer "transparent"
-
-texture "demo.png"
-int_uniform "Frames cols", 2
-int_uniform "Frames rows", 2

@@ -1,3 +1,3 @@
-shader "/shaders/editor_icon.hlsl"
-texture "/editor/models/icon.tga"
+shader "/engine/shaders/editor_icon.hlsl"
+texture "/engine/editor/models/icon.tga"
 

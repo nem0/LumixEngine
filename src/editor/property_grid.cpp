@@ -1,6 +1,7 @@
 #include <imgui/imgui.h>
 
 #include "core/crt.h"
+#include "core/defer.h"
 #include "core/math.h"
 #include "core/path.h"
 #include "core/stream.h"
@@ -632,6 +633,9 @@ static bool componentTreeNode(StudioApp& app, WorldEditor& editor, ComponentType
 
 
 void PropertyGrid::showComponentProperties(Span<const EntityRef> entities, ComponentType cmp_type, WorldEditor& editor) {
+	ImGui::PushID(cmp_type.index);
+	defer { ImGui::PopID(); };
+
 	const reflection::ComponentBase* component = reflection::getComponent(cmp_type);
 	bool filter_properties = false;
 	if (m_property_filter.isActive() && component) {
@@ -654,8 +658,7 @@ void PropertyGrid::showComponentProperties(Span<const EntityRef> entities, Compo
 
 	bool is_open = componentTreeNode(m_app, editor, cmp_type, &entities[0], entities.size());
 	ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - ImGui::CalcTextSize(ICON_FA_ELLIPSIS_V).x);
-	if (ImGuiEx::IconButton(ICON_FA_ELLIPSIS_V, "Context menu"))
-	{
+	if (ImGuiEx::IconButton(ICON_FA_ELLIPSIS_V, "Context menu")) {
 		ImGui::OpenPopup("ctx");
 	}
 	if (ImGui::BeginPopup("ctx")) {

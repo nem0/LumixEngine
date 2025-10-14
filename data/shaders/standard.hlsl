@@ -4,15 +4,15 @@
 //@uniform "Metallic", "normalized_float", 0
 //@uniform "Emission", "float", 0
 //@uniform "Translucency", "normalized_float", 0
-//@texture_slot "Albedo", "textures/common/white.tga"
-//@texture_slot "Normal", "textures/common/default_normal.tga"
-//@texture_slot "Roughness", "textures/common/white.tga"
+//@texture_slot "Albedo", "engine/textures/white.tga"
+//@texture_slot "Normal", "engine/textures/default_normal.tga"
+//@texture_slot "Roughness", "engine/textures/white.tga"
 //@texture_slot "Metallic", "", "HAS_METALLICMAP"
 //@texture_slot "Ambient occlusion", "", "HAS_AMBIENT_OCCLUSION_TEX"
 //@texture_slot "Emissive", "", "HAS_EMISSIVEMAP"
 //@define "ALPHA_CUTOUT"
-#include "shaders/common.hlsli"
-#include "shaders/surface_base.hlsli"
+#include "engine/shaders/common.hlsli"
+#include "engine/shaders/surface_base.hlsli"
 Surface getSurface(VSOutput input, uint material_index) {
 	MaterialData material = getMaterialData(material_index);
 	Surface data;

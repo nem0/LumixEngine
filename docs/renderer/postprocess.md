@@ -17,7 +17,7 @@
 
 		void init() {
 			ResourceManagerHub& rm = m_renderer.getEngine().getResourceManager();
-			m_shader = rm.load<Shader>(Path("shaders/film_grain.hlsl"));
+			m_shader = rm.load<Shader>(Path("engine/shaders/film_grain.hlsl"));
 		}
 
 		RenderBufferHandle renderAfterTonemap(const GBuffer& gbuffer, RenderBufferHandle input, Pipeline& pipeline) override {

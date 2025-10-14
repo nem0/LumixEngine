@@ -1,3 +1,0 @@
-shader "/shaders/world_grid.hlsl"
-backface_culling false
-layer "default"
