@@ -6,6 +6,24 @@
 
 namespace Lumix {
 
+struct alignas(8) LUMIX_CORE_API SRWLock {
+	SRWLock();
+	SRWLock(const SRWLock&) = delete;
+	~SRWLock();
+
+	void enterExclusive();
+	void exitExclusive();
+
+	void enterShared();
+	void exitShared();
+	
+	#ifdef _WIN32
+		u8 data[8];
+	#else
+		#error "Not implemented"
+	#endif
+};
+
 struct alignas(8) LUMIX_CORE_API Mutex {
 	friend struct ConditionVariable;
 	

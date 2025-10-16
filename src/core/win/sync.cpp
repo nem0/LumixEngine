@@ -54,6 +54,39 @@ ConditionVariable::ConditionVariable() {
 void ConditionVariable::sleep(Mutex& mutex) { SleepConditionVariableSRW((CONDITION_VARIABLE*)data, (SRWLOCK*)mutex.data, INFINITE, 0); }
 void ConditionVariable::wakeup() { WakeConditionVariable((CONDITION_VARIABLE*)data); }
 
+SRWLock::SRWLock() {
+	static_assert(sizeof(data) >= sizeof(SRWLOCK), "Size is not enough");
+	static_assert(alignof(SRWLock) == alignof(SRWLOCK), "Alignment does not match");
+	memset(data, 0, sizeof(data));
+	SRWLOCK* lock = new (NewPlaceholder(), data) SRWLOCK;
+	InitializeSRWLock(lock);
+}
+
+SRWLock::~SRWLock() {
+	SRWLOCK* lock = (SRWLOCK*)data;
+	lock->~SRWLOCK();
+}
+
+void SRWLock::enterExclusive() {
+	SRWLOCK* lock = (SRWLOCK*)data;
+	AcquireSRWLockExclusive(lock);
+}
+
+void SRWLock::exitExclusive() {
+	SRWLOCK* lock = (SRWLOCK*)data;
+	ReleaseSRWLockExclusive(lock);
+}
+
+void SRWLock::enterShared() {
+	SRWLOCK* lock = (SRWLOCK*)data;
+	AcquireSRWLockShared(lock);
+}
+
+void SRWLock::exitShared() {
+	SRWLOCK* lock = (SRWLOCK*)data;
+	ReleaseSRWLockShared(lock);
+}
+
 Mutex::Mutex()
 {
 	static_assert(sizeof(data) >= sizeof(SRWLOCK), "Size is not enough");

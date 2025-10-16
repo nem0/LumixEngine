@@ -72,6 +72,7 @@ static DWORD WINAPI threadFunction(LPVOID ptr)
 	impl->m_allocation_info.align = 16;
 	ULONG_PTR low, high;
 	GetCurrentThreadStackLimits(&low, &high);
+	// TODO GetCurrentThreadStackLimits is just the reserved amount, get the actual commited size
 	impl->m_allocation_info.size = size_t(high - low);
 	impl->m_allocation_info.tag = &tag_allocator;
 	impl->m_allocation_info.flags = debug::AllocationInfo::IS_MISC;
@@ -106,8 +107,7 @@ Thread::~Thread()
 
 bool Thread::create(const char* name, bool is_extended)
 {
-	HANDLE handle = CreateThread(
-		nullptr, STACK_SIZE, threadFunction, m_implementation, CREATE_SUSPENDED, &m_implementation->m_thread_id);
+	HANDLE handle = CreateThread(nullptr, STACK_SIZE, threadFunction, m_implementation, CREATE_SUSPENDED, &m_implementation->m_thread_id);
 	if (handle)
 	{
 		m_implementation->m_exited = false;

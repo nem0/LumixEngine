@@ -196,32 +196,21 @@ bool InputFile::seek(u64 pos)
 }
 
 
-static void fromWChar(Span<char> out, const WCHAR* in)
-{
-	const WCHAR* c = in;
-	char* cout = out.begin();
-	const u32 size = out.length();
-	while (*c && c - in < size - 1)
-	{
-		*cout = (char)*c;
-		++cout;
-		++c;
-	}
-	FATAL_CHECK(!*c);
-	*cout = 0;
+static void fromWChar(Span<char> out, const WCHAR* in) {
+	i32 written = WideCharToMultiByte(CP_UTF8, 0, in, -1, out.begin(), out.length(), nullptr, nullptr);
+	FATAL_CHECK(written > 0 && out[written - 1] == 0);
 }
 
+static void fromWChar(Span<char> out, Span<const WCHAR> in) {
+	i32 written = WideCharToMultiByte(CP_UTF8, 0, in.begin(), in.length(), out.begin(), out.length(), nullptr, nullptr);
+	FATAL_CHECK(written != out.length());
+	out[written] = 0;
+}
 
 template <int N> static void toWChar(WCHAR (&out)[N], StringView in) {
-	const char* c = in.begin;
-	WCHAR* cout = out;
-	while (c != in.end && c - in.begin < N - 1) {
-		*cout = *c;
-		++cout;
-		++c;
-	}
-	FATAL_CHECK(c == in.end);
-	*cout = 0;
+	i32 written = MultiByteToWideChar(CP_UTF8, 0, in.begin, in.size(), out, N);
+	FATAL_CHECK(written != N);
+	out[written] = 0;
 }
 
 
@@ -556,7 +545,7 @@ Point clientToScreen(WindowHandle win, int x, int y)
 
 WindowHandle createWindow(const InitWindowArgs& args) {
 	PROFILE_FUNCTION();
-	WCharStr<MAX_PATH> cls_name("lunex_window");
+	WCharStr<64> cls_name("lunex_window");
 	static WNDCLASS wndcls = [&]() -> WNDCLASS {
 		WNDCLASS wc = {};
 		auto WndProc = [](HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam) -> LRESULT {
@@ -1033,45 +1022,58 @@ void memRelease(void* ptr, size_t size) {
 	VirtualFree(ptr, 0, MEM_RELEASE);
 }
 
-struct FileIterator
-{
+struct FileIterator {
+	// members orderer by access pattern in getNextFile
+	u32 offset = 0;
+	bool is_first = true;
+	alignas(8) u8 buffer[4000];
 	HANDLE handle;
 	IAllocator* allocator;
-	WIN32_FIND_DATA ffd;
-	bool is_valid;
 };
 
 
-FileIterator* createFileIterator(StringView path, IAllocator& allocator)
-{
-	StaticString<MAX_PATH> tmp(path, "/*");
-	
-	WCharStr<MAX_PATH> wtmp(tmp);
+FileIterator* createFileIterator(StringView path, IAllocator& allocator) {
+	WCharStr<MAX_PATH> wpath(path);
+	HANDLE h = CreateFileW(wpath, FILE_LIST_DIRECTORY, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+	if (h == INVALID_HANDLE_VALUE) {
+		return nullptr;
+	}
+
 	auto* iter = LUMIX_NEW(allocator, FileIterator);
 	iter->allocator = &allocator;
-	iter->handle = FindFirstFile(wtmp, &iter->ffd);
-	iter->is_valid = iter->handle != INVALID_HANDLE_VALUE;
+	iter->offset = 0;
+	iter->is_first = true;
+	iter->handle = h;
 	return iter;
 }
 
 
-void destroyFileIterator(FileIterator* iterator)
-{
-	if (iterator->is_valid) {
-		DEBUG_CHECK(FindClose(iterator->handle));
-	}
+void destroyFileIterator(FileIterator* iterator) {
+	CloseHandle(iterator->handle);
 	LUMIX_DELETE(*iterator->allocator, iterator);
 }
 
 
-bool getNextFile(FileIterator* iterator, FileInfo* info)
-{
-	if (!iterator->is_valid) return false;
+bool getNextFile(FileIterator* iterator, FileInfo* info) {
+	if (iterator->offset == 0) {
+		FILE_INFO_BY_HANDLE_CLASS class_type = iterator->is_first ? FileIdBothDirectoryRestartInfo : FileIdBothDirectoryInfo;
+		iterator->is_first = false;
+		if (!GetFileInformationByHandleEx(iterator->handle, class_type, iterator->buffer, sizeof(iterator->buffer))) {
+			auto err = GetLastError();
+			return false;
+		}
+	}
 
-	info->is_directory = (iterator->ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
-	fromWChar(Span(info->filename), iterator->ffd.cFileName);
+	FILE_ID_BOTH_DIR_INFO* dir_info = (FILE_ID_BOTH_DIR_INFO*)(iterator->buffer + iterator->offset);
 
-	iterator->is_valid = FindNextFile(iterator->handle, &iterator->ffd) != FALSE;
+	if (dir_info->FileNameLength == 0) return false;
+
+	fromWChar(Span<char>(info->filename, MAX_PATH), Span(dir_info->FileName, dir_info->FileNameLength / sizeof(dir_info->FileName[0])));
+	info->is_directory = (dir_info->FileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+
+	iterator->offset += dir_info->NextEntryOffset;
+	if (dir_info->NextEntryOffset == 0) iterator->offset = 0;
+
 	return true;
 }
 

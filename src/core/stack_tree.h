@@ -23,10 +23,11 @@ struct LUMIX_CORE_API StackTree {
 
 private:
 	StackNode* insertChildren(StackNode* node, void** instruction, void** stack);
+	StackNode* find(void** stack, u32 num);
 
 	ArenaAllocator m_allocator;
 	StackNode* m_root;
-	Mutex m_mutex;
+	SRWLock m_srw_lock;
 	static AtomicI32 s_instances;
 };
 

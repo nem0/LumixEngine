@@ -12,6 +12,7 @@
 #include "core/atomic.h"
 #include "core/crt.h"
 #include "core/debug.h"
+#include "core/defer.h"
 #include "core/log.h"
 #include "core/os.h"
 #include "core/path.h"
@@ -203,21 +204,50 @@ StackNode* StackTree::insertChildren(StackNode* root_node, void** instruction, v
 	return node;
 }
 
+StackNode* StackTree::find(void** stack, u32 num) {
+	m_srw_lock.enterShared();
+	defer { m_srw_lock.exitShared(); };
+
+	void** ptr = stack + num - 1;
+	StackNode* node = m_root;
+
+	while (node) {
+		if (node->m_instruction != *ptr) {
+			node = node->m_next;
+			continue;
+		}
+
+		if (ptr != stack) {
+			--ptr;
+			node = node->m_first_child;
+			continue;
+		}
+		
+		return node;
+	}
+	
+	return nullptr;
+}
+
 StackNode* StackTree::record()
 {
-	static const int frames_to_capture = 256;
-	void* stack[frames_to_capture];
-	USHORT captured_frames_count = CaptureStackBackTrace(2, frames_to_capture, stack, 0);
-	void** ptr = stack + captured_frames_count - 1;
-
 	thread_local AtomicI32 is_recording = 0;
 	if (!is_recording.compareExchange(1, 0)) {
 		// Avoid recursive record(), since this function allocates and that in turn calls record() again.
 		return nullptr;
 	}
+	defer { is_recording = 0; };
 
-	// TODO use SRW lock, since the tree is rarely changed after a while
-	MutexGuard guard(m_mutex);
+	static const int frames_to_capture = 256;
+	void* stack[frames_to_capture];
+	USHORT captured_frames_count = CaptureStackBackTrace(2, frames_to_capture, stack, 0);
+	void** ptr = stack + captured_frames_count - 1;
+
+	StackNode* found = find(stack, captured_frames_count);
+	if (found) return found;
+
+	m_srw_lock.enterExclusive();
+	defer { m_srw_lock.exitExclusive(); };
 	if (!m_root) {
 		m_root = LUMIX_NEW(m_allocator, StackNode)();
 		m_root->m_instruction = *ptr;
@@ -226,19 +256,16 @@ StackNode* StackTree::record()
 		m_root->m_parent = nullptr;
 		--ptr;
 		StackNode* res = insertChildren(m_root, ptr, stack);
-		is_recording = 0;
 		return res;
 	}
 
 	StackNode* node = m_root;
-	while (ptr >= stack)
-	{
-		while (node->m_instruction != *ptr && node->m_next)
-		{
+	while (ptr >= stack) {
+		while (node->m_instruction != *ptr && node->m_next) {
 			node = node->m_next;
 		}
-		if (node->m_instruction != *ptr)
-		{
+
+		if (node->m_instruction != *ptr) {
 			node->m_next = LUMIX_NEW(m_allocator, StackNode);
 			node->m_next->m_parent = node->m_parent;
 			node->m_next->m_instruction = *ptr;
@@ -246,30 +273,24 @@ StackNode* StackTree::record()
 			node->m_next->m_first_child = nullptr;
 			--ptr;
 			StackNode* res = insertChildren(node->m_next, ptr, stack);
-			is_recording = 0;
 			return res;
 		}
 		
-		if (node->m_first_child)
-		{
+		if (node->m_first_child) {
 			--ptr;
 			node = node->m_first_child;
 		}
-		else if (ptr != stack)
-		{
+		else if (ptr != stack) {
 			--ptr;
 			StackNode* res = insertChildren(node, ptr, stack);
-			is_recording = 0;
 			return res;
 		}
 		else
 		{
-			is_recording = 0;
 			return node;
 		}
 	}
 
-	is_recording = 0;
 	return node;
 }
 
