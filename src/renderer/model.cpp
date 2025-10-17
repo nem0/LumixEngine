@@ -116,7 +116,7 @@ Vec3 Model::evalVertexPose(const Pose& pose, u32 mesh_idx, u32 index) const {
 		const i16 bone_idx = skin.indices[i];
 		const Bone& bone = m_bones[bone_idx];
 		LocalRigidTransform tmp = { pose.positions[bone_idx], pose.rotations[bone_idx] };
-		matrices[i] = (tmp * bone.inv_bind_transform).toMatrix();
+		matrices[i] = (tmp * getInverseBindTransform(bone_idx)).toMatrix();
 	}
 
 	const Matrix m = matrices[0] * skin.weights.x
@@ -128,13 +128,10 @@ Vec3 Model::evalVertexPose(const Pose& pose, u32 mesh_idx, u32 index) const {
 }
 
 
-static void computeSkinMatrices(const Pose& pose, const Model& model, Matrix* matrices)
-{
-	for (u32 i = 0; i < pose.count; ++i)
-	{
-		auto& bone = model.getBone(i);
+static void computeSkinMatrices(const Pose& pose, const Model& model, Matrix* matrices) {
+	for (u32 i = 0; i < pose.count; ++i) {
 		LocalRigidTransform tmp = { pose.positions[i], pose.rotations[i] };
-		matrices[i] = (tmp * bone.inv_bind_transform).toMatrix();
+		matrices[i] = (tmp * model.getInverseBindTransform(i)).toMatrix();
 	}
 }
 
@@ -399,24 +396,50 @@ bool Model::parseBones(InputMemoryStream& file)
 		}
 	}
 
-	for (int i = 0; i < m_bones.size(); ++i)
-	{
-			m_bones[i].inv_bind_transform = invert(m_bones[i].transform);
+	u32 num_soa = ((m_bones.size() + 3) / 4) * 4;
+	float* soa = (float*)m_allocator.allocate(sizeof(LocalRigidTransform) * num_soa, 16);
+	m_inverse_bind.px = soa; soa += num_soa;
+	m_inverse_bind.py = soa; soa += num_soa;
+	m_inverse_bind.pz = soa; soa += num_soa;
+	m_inverse_bind.rx = soa; soa += num_soa;
+	m_inverse_bind.ry = soa; soa += num_soa;
+	m_inverse_bind.rz = soa; soa += num_soa;
+	m_inverse_bind.rw = soa; soa += num_soa;
+	for (i32 i = 0, c = m_bones.size(); i < c; ++i) {
+		LocalRigidTransform inv_bind = invert(m_bones[i].transform);
+		m_inverse_bind.px[i] = inv_bind.pos.x;
+		m_inverse_bind.py[i] = inv_bind.pos.y;
+		m_inverse_bind.pz[i] = inv_bind.pos.z;
+		m_inverse_bind.rx[i] = inv_bind.rot.x;
+		m_inverse_bind.ry[i] = inv_bind.rot.y;
+		m_inverse_bind.rz[i] = inv_bind.rot.z;
+		m_inverse_bind.rw[i] = inv_bind.rot.w;
 	}
-	
-	for (int i = 0; i < m_bones.size(); ++i)
-	{
+
+	for (int i = 0; i < m_bones.size(); ++i) {
 		int p = m_bones[i].parent_idx;
-		if (p >= 0)
-		{
-			m_bones[i].relative_transform = m_bones[p].inv_bind_transform * m_bones[i].transform;
+		if (p >= 0) {
+			m_bones[i].relative_transform = getInverseBindTransform(p) * m_bones[i].transform;
 		}
 		else
 		{
 			m_bones[i].relative_transform = m_bones[i].transform;
 		}
 	}
+
 	return true;
+}
+
+LocalRigidTransform Model::getInverseBindTransform(i32 bone_idx) const {
+	LocalRigidTransform res;
+	res.pos.x = m_inverse_bind.px[bone_idx];
+	res.pos.y = m_inverse_bind.py[bone_idx];
+	res.pos.z = m_inverse_bind.pz[bone_idx];
+	res.rot.x = m_inverse_bind.rx[bone_idx];
+	res.rot.y = m_inverse_bind.ry[bone_idx];
+	res.rot.z = m_inverse_bind.rz[bone_idx];
+	res.rot.w = m_inverse_bind.rw[bone_idx];
+	return res;
 }
 
 int Model::getBoneIdx(const char* name)
@@ -629,6 +652,8 @@ void Model::unload()
 	m_meshes.clear();
 	m_mesh_material.clear();
 	m_bones.clear();
+	m_allocator.deallocate(m_inverse_bind.px);
+	m_inverse_bind = {};
 }
 
 

@@ -1047,7 +1047,6 @@ struct StudioAppImpl final : StudioApp {
 		loadSettings(true); // we can load settings now, we have everything (i.e. actions, imgui context) available
 		m_asset_browser->onInitFinished();
 		
-		loadWorldFromCommandLine();
 		logInfo("Init took ", init_timer.getTimeSinceStart(), " s");
 
 		#ifdef _WIN32
@@ -1059,6 +1058,7 @@ struct StudioAppImpl final : StudioApp {
 			logInfo("Data folder provided on command line: ", data_dir);
 			m_is_welcome_screen_open = false;
 			setProjectDir(data_dir);
+			loadWorldFromCommandLine();
 		}
 	}
 

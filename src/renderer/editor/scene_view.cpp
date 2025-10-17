@@ -669,9 +669,9 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 							define_mask |= skinned_define;
 							dq_pose.reserve(pose->count);
 							for (int j = 0, c = pose->count; j < c; ++j) {
-								const Model::Bone& bone = model->getBone(j);
+								const LocalRigidTransform& inv_bind = model->getInverseBindTransform(j);
 								const LocalRigidTransform tmp = {pose->positions[j], pose->rotations[j]};
-								dq_pose.push((tmp * bone.inv_bind_transform).toDualQuat());
+								dq_pose.push((tmp * inv_bind).toDualQuat());
 							}
 						}
 			

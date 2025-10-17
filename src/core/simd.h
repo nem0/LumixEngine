@@ -20,6 +20,10 @@ namespace Lumix
 	using float4 = __m128;
 
 
+	LUMIX_FORCE_INLINE float4 f4Init(float x, float y, float z, float w) {
+		return _mm_set_ps(w, z, y, x);
+	}
+	
 	LUMIX_FORCE_INLINE float4 f4LoadUnaligned(const void* src)
 	{
 		return _mm_loadu_ps((const float*)(src));
@@ -63,6 +67,16 @@ namespace Lumix
 	LUMIX_FORCE_INLINE void f4Store(void* dest, float4 src)
 	{
 		_mm_store_ps((float*)dest, src);
+	}
+
+	LUMIX_FORCE_INLINE void f4Stream(void* dest, float4 src)
+	{
+		_mm_stream_ps((float*)dest, src);
+	}
+
+	LUMIX_FORCE_INLINE void f4StoreUnaligned(void* dest, float4 src)
+	{
+		_mm_storeu_ps((float*)dest, src);
 	}
 
 	LUMIX_FORCE_INLINE float4 f4Blend(float4 false_val, float4 true_val, float4 mask)
@@ -157,8 +171,20 @@ namespace Lumix
 		return _mm_sub_ps(a, b);
 	}
 
+	LUMIX_FORCE_INLINE float4 operator -(float4 a) {
+		return _mm_sub_ps(_mm_setzero_ps(), a);
+	}
+
 	LUMIX_FORCE_INLINE float4 operator *(float4 a, float4 b) {
 		return _mm_mul_ps(a, b);
+	}
+
+	LUMIX_FORCE_INLINE float4 operator *(float4 a, float b) {
+		return _mm_mul_ps(a, _mm_set_ps1(b));
+	}
+
+	LUMIX_FORCE_INLINE void f4Transpose(float4& row0, float4& row1, float4& row2, float4& row3) { 
+		_MM_TRANSPOSE4_PS(row0, row1, row2, row3);
 	}
 
 #else 

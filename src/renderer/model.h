@@ -67,6 +67,16 @@ struct MeshMaterial {
 	Flags flags;
 };
 
+struct SOATransform {
+	float* px = nullptr;
+	float* py = nullptr;
+	float* pz = nullptr;
+	float* rx = nullptr;
+	float* ry = nullptr;
+	float* rz = nullptr;
+	float* rw = nullptr;
+};
+
 struct LUMIX_RENDERER_API Mesh {
 	struct Skin {
 		Vec4 weights;
@@ -122,10 +132,7 @@ struct LODMeshIndices
 	int to;
 };
 
-
-struct LUMIX_RENDERER_API Model final : Resource
-{
-public:
+struct LUMIX_RENDERER_API Model final : Resource {
 	using BoneMap = HashMap<BoneNameHash, int>;
 
 	enum class FileVersion : u32 {
@@ -143,8 +150,7 @@ public:
 	};
 #pragma pack()
 
-	struct Bone
-	{
+	struct Bone {
 		enum { MAX_COUNT = 196 };
 
 		explicit Bone(IAllocator& allocator)
@@ -156,13 +162,11 @@ public:
 		String name;
 		LocalRigidTransform transform;
 		LocalRigidTransform relative_transform;
-		LocalRigidTransform inv_bind_transform;
-		int parent_idx;
+		i32 parent_idx;
 	};
 
 	static const ResourceType TYPE;
 
-public:
 	Model(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& allocator);
 
 	ResourceType getType() const override { return TYPE; }
@@ -200,8 +204,9 @@ public:
 	const LODMeshIndices* getLODIndices() const { return m_lod_indices; }
 	Vec3 evalVertexPose(const Pose& pose, u32 mesh, u32 index) const;
 	BoneNameHash getRootMotionBone() const { return m_root_motion_bone; }
+	const SOATransform& getInverseBindPose() { return m_inverse_bind; }
+	LocalRigidTransform getInverseBindTransform(i32 bone_idx) const;
 
-public:
 	static constexpr u32 MAX_LOD_COUNT = 4;
 
 private:
@@ -216,12 +221,13 @@ private:
 	void unload() override;
 	bool load(Span<const u8> mem) override;
 
-private:
 	TagAllocator m_allocator;
 	Renderer& m_renderer;
 	Array<Mesh> m_meshes;
 	Array<MeshMaterial> m_mesh_material;
 	Array<Bone> m_bones;
+
+	SOATransform m_inverse_bind;
 	LODMeshIndices m_lod_indices[MAX_LOD_COUNT + 1];
 	float m_lod_distances[MAX_LOD_COUNT];
 	float m_origin_bounding_radius = 0;

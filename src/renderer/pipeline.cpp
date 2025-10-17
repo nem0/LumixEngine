@@ -10,6 +10,7 @@
 #include "core/page_allocator.h"
 #include "core/path.h"
 #include "core/profiler.h"
+#include "core/simd_math.h"
 #include "core/sort.h"
 #include "core/stack_array.h"
 #include "core/sync.h"
@@ -196,7 +197,7 @@ struct PipelineImpl final : Pipeline {
 		u32 define_mask = 0;
 		gpu::StateFlags state = gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_FN_GREATER;
 		DrawStream stream;
-		DrawStream* substreams[8];
+		DrawStream* substreams[32];
 	};
 
 	struct Sorter {
@@ -2509,6 +2510,72 @@ struct PipelineImpl final : Pipeline {
 		stream.memoryBarrier(m_indirect_buffer);
 	}
 
+	void computeSkeletonDualQuats(DualQuat* output, const ModelInstance* mi) {
+		ASSERT((uintptr)output % 16 == 0); // we store with f4Stream, which needs aligned memory
+
+		const Quat* rotations = mi->pose->rotations;
+		ASSERT((uintptr)rotations % 16 == 0); // we load with f4Load, which needs aligned memory
+		const Vec3* positions = mi->pose->positions;
+		Model& model = *mi->model;
+
+		#if 1 // SIMD
+			const u32 num_batches = (mi->pose->count - 3) / 4;
+		#else 
+			const u32 num_batches = 0;
+		#endif
+		SOATransform inv_bind = model.getInverseBindPose();
+		for (u32 batch = 0; batch < num_batches; ++batch) {
+			SIMDLocalRigidTransform tmp;
+
+			// load pose transforms
+			const u32 base = 4 * batch;
+			tmp.pos.x = f4Init(positions[base].x, positions[base + 1].x, positions[base + 2].x, positions[base + 3].x);
+			tmp.pos.y = f4Init(positions[base].y, positions[base + 1].y, positions[base + 2].y, positions[base + 3].y);
+			tmp.pos.z = f4Init(positions[base].z, positions[base + 1].z, positions[base + 2].z, positions[base + 3].z);
+			
+			tmp.rot.x = f4Load(&rotations[base + 0].x);
+			tmp.rot.y = f4Load(&rotations[base + 1].x);
+			tmp.rot.z = f4Load(&rotations[base + 2].x);
+			tmp.rot.w = f4Load(&rotations[base + 3].x);
+			f4Transpose(tmp.rot.x, tmp.rot.y, tmp.rot.z, tmp.rot.w);
+
+			// load inverse bind transform
+			SIMDLocalRigidTransform inv_bind_tr;
+			inv_bind_tr.pos.x =	f4Load(inv_bind.px + base);
+			inv_bind_tr.pos.y =	f4Load(inv_bind.py + base);
+			inv_bind_tr.pos.z =	f4Load(inv_bind.pz + base);
+
+			inv_bind_tr.rot.x =	f4Load(inv_bind.rx + base);
+			inv_bind_tr.rot.y =	f4Load(inv_bind.ry + base);
+			inv_bind_tr.rot.z =	f4Load(inv_bind.rz + base);
+			inv_bind_tr.rot.w =	f4Load(inv_bind.rw + base);
+
+			// convert
+			SIMDDualQuat out_dual = toDualQuat(tmp * inv_bind_tr);
+
+			// store output
+			f4Transpose(out_dual.r.x, out_dual.r.y, out_dual.r.z, out_dual.r.w);
+
+			f4Stream(&output[base].r.x, out_dual.r.x);
+			f4Stream(&output[base + 1].r.x, out_dual.r.y);
+			f4Stream(&output[base + 2].r.x, out_dual.r.z);
+			f4Stream(&output[base + 3].r.x, out_dual.r.w);
+
+			f4Transpose(out_dual.d.x, out_dual.d.y, out_dual.d.z, out_dual.d.w);
+
+			f4Stream(&output[base].d.x, out_dual.d.x);
+			f4Stream(&output[base + 1].d.x, out_dual.d.y);
+			f4Stream(&output[base + 2].d.x, out_dual.d.z);
+			f4Stream(&output[base + 3].d.x, out_dual.d.w);
+		}
+
+		for (int j = 4 * num_batches, c = mi->pose->count; j < c; ++j) {
+			const Model::Bone& bone = model.getBone(j);
+			const LocalRigidTransform tmp = {positions[j], rotations[j]};
+			output[j] = (tmp * model.getInverseBindTransform(j)).toDualQuat();
+		}
+	}
+
 	void createCommands(View& view)
 	{
 		PROFILE_FUNCTION();
@@ -2775,16 +2842,8 @@ struct PipelineImpl final : Pipeline {
 						const Vec3 prev_rel_pos = Vec3(mi->prev_frame_transform.pos - camera_pos);
 						prefix->prev_model_mtx = Matrix(prev_rel_pos, mi->prev_frame_transform.rot, mi->prev_frame_transform.scale);
 
-						const Quat* rotations = mi->pose->rotations;
-						const Vec3* positions = mi->pose->positions;
-						Model& model = *mi->model;
-
 						DualQuat* bones_ub_array = (DualQuat*)(ub.ptr + sizeof(UBPrefix));
-						for (int j = 0, c = mi->pose->count; j < c; ++j) {
-							const Model::Bone& bone = model.getBone(j);
-							const LocalRigidTransform tmp = {positions[j], rotations[j]};
-							bones_ub_array[j] = (tmp * bone.inv_bind_transform).toDualQuat();
-						}
+						computeSkeletonDualQuats(bones_ub_array, mi);
 
 						const Material* material = mesh_mat.material;
 						prefix->material_index = material->getIndex();

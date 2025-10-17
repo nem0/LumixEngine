@@ -10,7 +10,7 @@ obj/
 .vscode
 .lumix
 studio.ini
-lumix.log
+*.log
 .lumixuser
 *.unv.bak
 scripts/3rdparty
