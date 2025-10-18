@@ -43,7 +43,7 @@ struct LUMIX_CORE_API IVec3 {
 
 	i32 x;
 	i32 y;
-    i32 z;
+	i32 z;
 };
 
 struct LUMIX_CORE_API IVec4 {
@@ -241,13 +241,13 @@ struct LUMIX_CORE_API Quat
 	Quat conjugated() const;
 	Matrix toMatrix() const;
 
-	Vec3 rotate(const Vec3& v) const;
+	Vec3 rotate(Vec3 v) const;
 	DVec3 rotate(const DVec3& v) const;
-	Quat operator*(const Quat& q) const;
+	Quat operator*(Quat q) const;
 	Quat operator-() const;
-	Quat operator+(const Quat& q) const;
+	Quat operator+(Quat q) const;
 	Quat operator*(float m) const;
-	Vec3 operator*(const Vec3& q) const;
+	Vec3 operator*(Vec3 q) const;
 
 	static Quat vec3ToVec3(const Vec3& a, const Vec3& b);
 
@@ -541,7 +541,7 @@ LUMIX_CORE_API Vec3 lerp(const Vec3& op1, const Vec3& op2, float t);
 LUMIX_CORE_API DVec3 lerp(const DVec3& op1, const DVec3& op2, float t);
 LUMIX_CORE_API Vec2 lerp(const Vec2& op1, const Vec2& op2, float t);
 LUMIX_CORE_API Vec3 slerp(const Vec3& a, const Vec3& b, float t);
-LUMIX_CORE_API Quat nlerp(const Quat& q1, const Quat& q2, float t);
+LUMIX_CORE_API Quat nlerp(Quat q1, Quat q2, float t);
 
 LUMIX_CORE_API u32 nextPow2(u32 v);
 LUMIX_CORE_API u32 log2(u32 v);

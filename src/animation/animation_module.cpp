@@ -442,7 +442,6 @@ struct AnimationModuleImpl final : AnimationModule {
 
 
 	void updateAnimable(Animable& animable, float time_delta) const {
-		PROFILE_FUNCTION();
 		if (!animable.animation || !animable.animation->isReady()) return;
 		EntityRef entity = animable.entity;
 		if (!m_world.hasComponent(entity, MODEL_INSTANCE_TYPE)) return;
@@ -745,9 +744,12 @@ struct AnimationModuleImpl final : AnimationModule {
 		PROFILE_FUNCTION();
 		if (m_animables.size() == 0) return;
 
-		jobs::forEach(m_animables.size(), 1, [&](i32 idx, i32){
-			Animable& animable = m_animables.at(idx);
-			updateAnimable(animable, time_delta);
+		jobs::forEach(m_animables.size(), 32, [&](i32 idx, i32 to){
+			PROFILE_BLOCK("update animables");
+			for (i32 i = idx; i < to; ++i) {
+				Animable& animable = m_animables.at(i);
+				updateAnimable(animable, time_delta);
+			}
 		});
 	}
 

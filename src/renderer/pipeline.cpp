@@ -2519,7 +2519,7 @@ struct PipelineImpl final : Pipeline {
 		Model& model = *mi->model;
 
 		#if 1 // SIMD
-			const u32 num_batches = (mi->pose->count - 3) / 4;
+			const u32 num_batches = mi->pose->count / 4;
 		#else 
 			const u32 num_batches = 0;
 		#endif

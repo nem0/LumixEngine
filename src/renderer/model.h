@@ -155,14 +155,12 @@ struct LUMIX_RENDERER_API Model final : Resource {
 
 		explicit Bone(IAllocator& allocator)
 			: name(allocator)
-			, parent_idx(-1)
 		{
 		}
 
 		String name;
 		LocalRigidTransform transform;
 		LocalRigidTransform relative_transform;
-		i32 parent_idx;
 	};
 
 	static const ResourceType TYPE;
@@ -187,7 +185,7 @@ struct LUMIX_RENDERER_API Model final : Resource {
 	int getMeshCount() const { return m_meshes.size(); }
 	int getBoneCount() const { return m_bones.size(); }
 	const char* getBoneName(u32 idx) { return m_bones[idx].name.c_str(); }
-	i32 getBoneParent(u32 idx) { return m_bones[idx].parent_idx; }
+	i32 getBoneParent(u32 idx) const { return m_parents[idx]; }
 	const Bone& getBone(u32 i) const { return m_bones[i]; }
 	int getFirstNonrootBoneIndex() const { return m_first_nonroot_bone_index; }
 	BoneMap::ConstIterator getBoneIndex(BoneNameHash hash) const { return m_bone_map.find(hash); }
@@ -206,6 +204,7 @@ struct LUMIX_RENDERER_API Model final : Resource {
 	BoneNameHash getRootMotionBone() const { return m_root_motion_bone; }
 	const SOATransform& getInverseBindPose() { return m_inverse_bind; }
 	LocalRigidTransform getInverseBindTransform(i32 bone_idx) const;
+	Span<const i32> getParents() const { return m_parents; }
 
 	static constexpr u32 MAX_LOD_COUNT = 4;
 
@@ -228,6 +227,7 @@ private:
 	Array<Bone> m_bones;
 
 	SOATransform m_inverse_bind;
+	Array<i32> m_parents;
 	LODMeshIndices m_lod_indices[MAX_LOD_COUNT + 1];
 	float m_lod_distances[MAX_LOD_COUNT];
 	float m_origin_bounding_radius = 0;

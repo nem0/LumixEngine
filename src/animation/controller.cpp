@@ -156,15 +156,11 @@ static void getPose(const anim::RuntimeContext& ctx, Time time, float weight, u3
 	anim->getRelativePose(sample_ctx);
 }
 
-static LocalRigidTransform getAbsolutePosition(const Pose& pose, const Model& model, int bone_index)
-{
-	const Model::Bone& bone = model.getBone(bone_index);
+static LocalRigidTransform getAbsolutePosition(const Pose& pose, const Model& model, int bone_index) {
+	i32 parent_idx = model.getBoneParent(bone_index);
 	LocalRigidTransform bone_transform{pose.positions[bone_index], pose.rotations[bone_index]};
-	if (bone.parent_idx < 0)
-	{
-		return bone_transform;
-	}
-	return getAbsolutePosition(pose, model, bone.parent_idx) * bone_transform;
+	if (parent_idx < 0) return bone_transform;
+	return getAbsolutePosition(pose, model, parent_idx) * bone_transform;
 }
 
 void evalIK(float alpha, Vec3 target, u32 leaf_bone, u32 bones_count, Model& model, Pose& pose) {
@@ -186,10 +182,10 @@ void evalIK(float alpha, Vec3 target, u32 leaf_bone, u32 bones_count, Model& mod
 	}
 
 	// convert from bone space to object space
-	const Model::Bone& first_bone = model.getBone(indices[0]);
+	const i32 first_bone_parent = model.getBoneParent(indices[0]);
 	LocalRigidTransform roots_parent;
-	if (first_bone.parent_idx >= 0) {
-		roots_parent = getAbsolutePosition(pose, model, first_bone.parent_idx);
+	if (first_bone_parent >= 0) {
+		roots_parent = getAbsolutePosition(pose, model, first_bone_parent);
 	}
 	else {
 		roots_parent.pos = Vec3::ZERO;
@@ -248,7 +244,7 @@ void evalIK(float alpha, Vec3 target, u32 leaf_bone, u32 bones_count, Model& mod
 	}
 	ik_out[bones_count - 1].rot = pose.rotations[indices[bones_count - 1]];
 
-	if (first_bone.parent_idx >= 0) {
+	if (first_bone_parent >= 0) {
 		ik_out[0].rot = roots_parent.rot.conjugated() * transforms[0].rot;
 	}
 	else {

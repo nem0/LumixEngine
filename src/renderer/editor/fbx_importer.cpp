@@ -1,22 +1,23 @@
 #include "fbx_importer.h"
 #include "animation/animation.h"
-#include "editor/asset_compiler.h"
-#include "editor/studio_app.h"
-#include "editor/world_editor.h"
 #include "core/atomic.h"
 #include "core/crt.h"
-#include "engine/engine.h"
-#include "engine/file_system.h"
+#include "core/sort.h"
 #include "core/hash.h"
 #include "core/job_system.h"
 #include "core/log.h"
 #include "core/math.h"
 #include "core/os.h"
 #include "core/path.h"
+#include "core/profiler.h"
 #include "core/stack_array.h"
+#include "editor/asset_compiler.h"
+#include "editor/studio_app.h"
+#include "editor/world_editor.h"
+#include "engine/engine.h"
+#include "engine/file_system.h"
 #include "engine/engine_hash_funcs.h"
 #include "engine/prefab.h"
-#include "core/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
 #include "meshoptimizer/meshoptimizer.h"
@@ -762,26 +763,64 @@ struct FBXImporter : ModelImporter {
 		ASSERT(dst - unindexed_triangles.data() == unindexed_triangles.size());
 	}
 
+	// sort bones so parents are before their children
+	// so when doing relative -> absolute conversion, we can process bones linearly
+	// and be sure parents have up to date data
 	void sortBones() {
-		const int count = m_bones.size();
-		u32 first_nonroot = 0;
-		for (i32 i = 0; i < count; ++i) {
-			if (m_bones[i].parent_id == 0) {
-				swap(m_bones[i], m_bones[first_nonroot]);
-				++first_nonroot;
-			}
+		if (m_bones.size() <= 1) return;
+		
+		struct BoneDepth {
+			u32 depth;
+			Bone* bone;
+			i32 idx;
+		};
+		
+		HashMap<u64, BoneDepth> bone_map(m_allocator);
+		bone_map.reserve(m_bones.size());
+
+		for (Bone& b : m_bones) {
+			bone_map.insert(b.id, {0, &b, -1});
 		}
 
-		for (i32 i = 0; i < count; ++i) {
-			for (int j = i + 1; j < count; ++j) {
-				if (m_bones[i].parent_id == m_bones[j].id) {
-					Bone bone = static_cast<Bone&&>(m_bones[j]);
-					m_bones.swapAndPop(j);
-					m_bones.insert(i, static_cast<Bone&&>(bone));
-					--i;
+		for (BoneDepth& b : bone_map) {
+			u32 depth = 0;
+			u64 current_id = b.bone->parent_id;
+			while (current_id != 0) {
+				auto iter = bone_map.find(current_id);
+				if (!iter.isValid()) {
+					ASSERT(false);
 					break;
 				}
+				++depth;
+				current_id = iter.value().bone->parent_id;
 			}
+			b.depth = depth;
+		}
+
+		sort(&m_bones[0], &m_bones.last(), [&](const Bone& a, const Bone& b){
+			return bone_map[a.id].depth < bone_map[b.id].depth;
+		});
+
+		// try to maximize minimal distance between child and its parent, so we can process more bones with simd
+		i32 slice_begin = 0;
+		for (;;) {
+			u32 depth = bone_map[m_bones[slice_begin].id].depth;
+			i32 slice_end = slice_begin;
+			while (slice_end < m_bones.size() && bone_map[m_bones[slice_end].id].depth == depth) {
+				++slice_end;
+			}
+			if (depth > 0 && slice_end - slice_begin > 1) {
+				sort(&m_bones[slice_begin], &m_bones[slice_end], [&](const Bone& a, const Bone& b){
+					return bone_map[a.parent_id].idx < bone_map[b.parent_id].idx;
+				});
+			}
+
+			for (i32 i = slice_begin; i < slice_end; ++i) {
+				bone_map[m_bones[i].id].idx = i;
+			}
+
+			if (slice_end == m_bones.size()) break;
+			slice_begin = slice_end;
 		}
 	}
 

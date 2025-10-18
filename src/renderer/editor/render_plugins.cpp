@@ -2432,6 +2432,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 						ImGui::TableNextRow();
 						ImGui::TableNextColumn();
 						const Model::Bone& bone = m_resource->getBone(i);
+						const i32 parent_idx = m_resource->getBoneParent(i);
 						ImGuiEx::TextUnformatted(bone.name);
 						ImGui::TableNextColumn();
 						Vec3 pos = bone.transform.pos;
@@ -2440,8 +2441,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 						Quat rot = bone.transform.rot;
 						ImGui::Text("%f; %f; %f; %f", rot.x, rot.y, rot.z, rot.w);
 						ImGui::TableNextColumn();
-						if (bone.parent_idx >= 0) {
-							ImGuiEx::TextUnformatted(m_resource->getBone(bone.parent_idx).name);
+						if (parent_idx >= 0) {
+							ImGuiEx::TextUnformatted(m_resource->getBone(parent_idx).name);
 						}
 					}
 					ImGui::EndTable();

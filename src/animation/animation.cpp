@@ -3,6 +3,7 @@
 #include "core/profiler.h"
 #include "core/stream.h"
 #include "core/math.h"
+#include "core/simd_math.h"
 #include "animation/animation.h"
 #include "engine/resource_manager.h"
 #include "renderer/model.h"
@@ -109,7 +110,7 @@ struct AnimationSampler {
 			}
 
 			if constexpr (use_weight) {
-				rot[track.bone_index] = nlerp(rot[track.bone_index], track.value, weight);
+				rot[track.bone_index] = simd_nlerp(rot[track.bone_index], track.value, weight);
 			}
 			else {
 				rot[track.bone_index] = track.value;
@@ -123,10 +124,10 @@ struct AnimationSampler {
 				//if (mask->bones.find(track.) == mask->bones.end()) continue;
 			}
 
-			Quat anim_rot = nlerp(anim.getRotation(sample_idx, track), anim.getRotation(sample_idx + 1, track), t);
+			Quat anim_rot = anim.getRotation(sample_idx, track, t);
 
 			if constexpr (use_weight) {
-				rot[track.bone_index] = nlerp(rot[track.bone_index], anim_rot, weight);
+				rot[track.bone_index] = simd_nlerp(rot[track.bone_index], anim_rot, weight);
 			}
 			else {
 				rot[track.bone_index] = anim_rot;
@@ -242,7 +243,6 @@ void Animation::getRelativePose(const SampleContext& ctx) {
 }
 
 static float unpackChannel(u64 val, float min, float to_float_range, u32 bitsize) {
-	if (bitsize == 0) return min;
 	const u64 mask = (u64(1) << bitsize) - 1;
 	return float(min + to_float_range * double(val & mask));
 }
@@ -263,6 +263,70 @@ Vec3 Animation::getTranslation(u32 frame, const TranslationTrack& track) const {
 	tmp >>= track.bitsizes[1];
 	res.z = unpackChannel(tmp, track.min.z, track.to_range.z, track.bitsizes[2]);
 	return res;
+}
+
+Quat Animation::getRotation(u32 frame, const RotationTrack& track, float t) const {
+	ASSERT(&track >= m_rotations.begin() && &track < m_rotations.end());
+	if (&track - m_rotations.begin() == m_root_motion.rotation_track_idx) {
+		return simd_nlerp(m_root_motion.pose_rotations[frame], m_root_motion.pose_rotations[frame + 1], t);
+	}
+
+	// read packed data
+	const u32 offset1 = m_rotations_frame_size_bits * frame + track.offset_bits;
+	const u32 offset2 = offset1 + m_rotations_frame_size_bits;
+
+	u64 packed1;
+	memcpy(&packed1, &m_rotation_stream[offset1 / 8], sizeof(packed1));
+	packed1 >>= offset1 & 7;
+
+	u64 packed2;
+	memcpy(&packed2, &m_rotation_stream[offset2 / 8], sizeof(packed2));
+	packed2 >>= offset2 & 7;
+
+	bool is_negative1 = packed1 & 1;
+	packed1 >>= 1;
+
+	bool is_negative2 = packed2 & 1;
+	packed2 >>= 1;
+
+	Vec3 v3_1;
+	Vec3 v3_2;
+
+	// unpack
+	u64 mask_x = (u64(1) << track.bitsizes[0]) - 1;
+	u64 mask_y = (u64(1) << track.bitsizes[1]) - 1;
+	u64 mask_z = (u64(1) << track.bitsizes[2]) - 1;
+
+	u64 packed1_y = packed1 >> track.bitsizes[0];
+	u64 packed1_z = packed1_y >> track.bitsizes[1];
+	
+	u64 packed2_y = packed2 >> track.bitsizes[0];
+	u64 packed2_z = packed2_y >> track.bitsizes[1];
+
+	v3_1.x = track.min.x + track.to_range.x * float(packed1 & mask_x);
+	v3_1.y = track.min.y + track.to_range.y * float(packed1_y & mask_y);
+	v3_1.z = track.min.z + track.to_range.z * float(packed1_z & mask_z);
+	
+	v3_2.x = track.min.x + track.to_range.x * float(packed2 & mask_x);
+	v3_2.y = track.min.y + track.to_range.y * float(packed2_y & mask_y);
+	v3_2.z = track.min.z + track.to_range.z * float(packed2_z & mask_z);
+
+	float skipped1 = sqrtf(maximum(0.f, 1 - dot(v3_1, v3_1))) * (is_negative1 ? -1 : 1);
+	float skipped2 = sqrtf(maximum(0.f, 1 - dot(v3_2, v3_2))) * (is_negative2 ? -1 : 1);
+
+	float4 q1;
+	float4 q2;
+	
+	switch (track.skipped_channel) {
+		case 0: q1 = f4Init(skipped1, v3_1.x, v3_1.y, v3_1.z); q2 = f4Init(skipped2, v3_2.x, v3_2.y, v3_2.z); break;
+		case 1: q1 = f4Init(v3_1.x, skipped1, v3_1.y, v3_1.z); q2 = f4Init(v3_2.x, skipped2, v3_2.y, v3_2.z); break;
+		case 2: q1 = f4Init(v3_1.x, v3_1.y, skipped1, v3_1.z); q2 = f4Init(v3_2.x, v3_2.y, skipped2, v3_2.z); break;
+		case 3: q1 = f4Init(v3_1.x, v3_1.y, v3_1.z, skipped1); q2 = f4Init(v3_2.x, v3_2.y, v3_2.z, skipped2); break;
+		default: ASSERT(false); break;
+	}
+	
+	// interpolate
+	return simd_nlerp(q1, q2, t);
 }
 
 Quat Animation::getRotation(u32 frame, const RotationTrack& track) const {

@@ -143,7 +143,7 @@ IVec3::IVec3(const Vec3& rhs)
 
 DVec3 IVec3::operator *(double i) const
 {
-    return {i * x, i * y, i * z};
+	return {i * x, i * y, i * z};
 }
 
 Vec4 lerp(const Vec4& op1, const Vec4& op2, float t) {
@@ -156,7 +156,7 @@ Vec4 lerp(const Vec4& op1, const Vec4& op2, float t) {
 	};
 }
 
-Vec3 Quat::rotate(const Vec3& v) const
+Vec3 Quat::rotate(Vec3 v) const
 {
 	// nVidia SDK implementation
 
@@ -580,24 +580,24 @@ Quat Quat::vec3ToVec3(const Vec3& v0, const Vec3& v1)
 	const Vec3 to = normalize(v1);
 	
 	float cos_angle = dot(from, to);
-    Vec3 half;
+	Vec3 half;
 	
-    if(cos_angle > -1.0005f && cos_angle < -0.9995f) {
+	if(cos_angle > -1.0005f && cos_angle < -0.9995f) {
 		Vec3 n = Vec3(0, from.z, -from.y);
 		if (squaredLength(n) < 0.01) {
 			n = Vec3(from.y, -from.x, 0);
 		}
 		n = normalize(n);
 		return Quat(n, PI);
-    }
-    else
-        half = normalize(from + to);
+	}
+	else
+		half = normalize(from + to);
 
-    // http://physicsforgames.blogspot.sk/2010/03/quaternion-tricks.html
-    return Quat(
-        from.y * half.z - from.z * half.y,
-        from.z * half.x - from.x * half.z,
-        from.x * half.y - from.y * half.x,
+	// http://physicsforgames.blogspot.sk/2010/03/quaternion-tricks.html
+	return Quat(
+		from.y * half.z - from.z * half.y,
+		from.z * half.x - from.x * half.z,
+		from.x * half.y - from.y * half.x,
 		dot(from, half));
 }
 
@@ -663,36 +663,31 @@ Quat Quat::conjugated() const
 }
 
 Vec3 slerp(const Vec3& a, const Vec3& b, float t) {
-     float d = dot(a, b);
-     d = clamp(d, -1.f, 1.f);
-     const float s = acosf(d) * t;
-     const Vec3 r = normalize(b - a * d);
-     return a * cosf(s) + r * sinf(s);
+	 float d = dot(a, b);
+	 d = clamp(d, -1.f, 1.f);
+	 const float s = acosf(d) * t;
+	 const Vec3 r = normalize(b - a * d);
+	 return a * cosf(s) + r * sinf(s);
 }
 
-Quat nlerp(const Quat& q1, const Quat& q2, float t)
-{
+Quat nlerp(Quat q1, Quat q2, float t) {
 	Quat res;
 	float inv = 1.0f - t;
 	if (q1.x * q2.x + q1.y * q2.y + q1.z * q2.z + q1.w * q2.w < 0) t = -t;
-	float ox = q1.x * inv + q2.x * t;
-	float oy = q1.y * inv + q2.y * t;
-	float oz = q1.z * inv + q2.z * t;
-	float ow = q1.w * inv + q2.w * t;
-	float l = 1 / sqrtf(ox * ox + oy * oy + oz * oz + ow * ow);
-	ox *= l;
-	oy *= l;
-	oz *= l;
-	ow *= l;
-	res.x = ox;
-	res.y = oy;
-	res.z = oz;
-	res.w = ow;
+	res.x = q1.x * inv + q2.x * t;
+	res.y = q1.y * inv + q2.y * t;
+	res.z = q1.z * inv + q2.z * t;
+	res.w = q1.w * inv + q2.w * t;
+	float l = 1 / sqrtf(res.x * res.x + res.y * res.y + res.z * res.z + res.w * res.w);
+	res.x *= l;
+	res.y *= l;
+	res.z *= l;
+	res.w *= l;
 	return res;
 }
 
 
-Quat Quat::operator*(const Quat& rhs) const
+Quat Quat::operator*(Quat rhs) const
 {
 	return Quat(w * rhs.x + rhs.w * x + y * rhs.z - rhs.y * z,
 		w * rhs.y + rhs.w * y + z * rhs.x - rhs.z * x,
@@ -707,7 +702,7 @@ Quat Quat::operator-() const
 }
 
 
-Quat Quat::operator+(const Quat& q) const
+Quat Quat::operator+(Quat q) const
 {
 	return Quat(x + q.x, y + q.y, z + q.z, w + q.w);
 }
@@ -719,7 +714,7 @@ Quat Quat::operator*(float m) const
 }
 
 
-Vec3 Quat::operator*(const Vec3& q) const
+Vec3 Quat::operator*(Vec3 q) const
 {
 	return rotate(q);
 }
@@ -1351,7 +1346,7 @@ u32 rand(u32 from_incl, u32 to_incl) {
 
 float randFloat() {
 	u32 i = rand();
-    return float(i * 2.328306435996595e-10);
+	return float(i * 2.328306435996595e-10);
 }
 
 float RandomGenerator::randFloat(float from, float to) {

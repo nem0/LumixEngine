@@ -87,8 +87,7 @@ void WorldViewer::drawSkeleton(i32 selected_bone) {
 		Transform tr = m_world->getTransform(*m_mesh);
 		ASSERT(pose->is_absolute);
 		for (u32 i = 0, c = model->getBoneCount(); i < c; ++i) {
-			const Model::Bone& bone = model->getBone(i);
-			const i32 parent_idx = bone.parent_idx;
+			const i32 parent_idx = model->getBoneParent(i);
 			if (parent_idx < 0) continue;
 
 			Color color = Color::BLUE;

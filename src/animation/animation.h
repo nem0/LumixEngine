@@ -90,26 +90,26 @@ struct Animation final : Resource {
 	};
 
 	struct TranslationTrack {
-		BoneNameHash bone_name;
 		u16 bone_index;
 		Vec3 min;
 		Vec3 to_range; //  * to_normalized * (max - min)
 		u16 offset_bits = 0;
 		u8 bitsizes[3] = {};
+		BoneNameHash bone_name;
 	};
 
 	struct ConstRotationTrack {
-		BoneNameHash bone_name;
-		u16 bone_index;
 		Quat value;
+		u16 bone_index;
+		BoneNameHash bone_name;
 	};
 
 	struct RotationTrack {
 		BoneNameHash bone_name;
-		u16 bone_index;
 		Vec3 min;
 		Vec3 to_range; //  * to_normalized * (max - min)
 		u16 offset_bits;
+		u16 bone_index;
 		u8 bitsizes[3];
 		u8 skipped_channel;
 	};
@@ -129,6 +129,7 @@ struct Animation final : Resource {
 
 	Vec3 getTranslation(u32 frame, const TranslationTrack& track) const;
 	Quat getRotation(u32 sample, const RotationTrack& track) const;
+	Quat getRotation(u32 sample, const RotationTrack& track, float t) const;
 	
 	const Array<TranslationTrack>& getTranslations() const { return m_translations; }
 	const Array<ConstTranslationTrack>& getConstTranslations() const { return m_const_translations; }

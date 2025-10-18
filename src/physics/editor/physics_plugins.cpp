@@ -716,11 +716,12 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		Array<EntityRef> entities(m_app.getAllocator());
 		for (int i = 0; i < model->getBoneCount(); ++i) {
 			const Model::Bone& bone = model->getBone(i);
+			const i32 parent_idx = model->getBoneParent(i);
 
 			const Transform tr = root_tr.compose(bone.transform);
 
-			if (bone.parent_idx >= 0) {
-				const Model::Bone& parent_bone = model->getBone(bone.parent_idx);
+			if (parent_idx >= 0) {
+				const Model::Bone& parent_bone = model->getBone(parent_idx);
 				const Vec3 parent_pos = parent_bone.transform.pos;
 				const DVec3 pos = (root_tr.compose(parent_bone.transform)).pos;
 
@@ -744,19 +745,19 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 					editor.addArrayPropertyItem(cmp, "Box geometry");
 					editor.addComponent(Span(&bone_e, 1), BONE_ATTACHMENT_TYPE);
 					editor.setProperty(BONE_ATTACHMENT_TYPE, "", 0, "Parent", Span(&bone_e, 1), entity);
-					editor.setProperty(BONE_ATTACHMENT_TYPE, "", 0, "Bone", Span(&bone_e, 1), bone.parent_idx);
+					editor.setProperty(BONE_ATTACHMENT_TYPE, "", 0, "Bone", Span(&bone_e, 1), parent_idx);
 					editor.setProperty(RIGID_ACTOR_TYPE, "Box geometry", 0, "Size", Span(&bone_e, 1), size);
 					editor.setProperty(RIGID_ACTOR_TYPE, "Box geometry", 0, "Position offset", Span(&bone_e, 1), Vec3(0, -size.y, 0));
 					editor.setProperty(RIGID_ACTOR_TYPE, "", 0, "Dynamic", Span(&bone_e, 1), (i32)PhysicsModule::DynamicType::KINEMATIC);
 
 					editor.addComponent(Span(&bone_e, 1), SPHERICAL_JOINT_TYPE);
-					editor.setProperty(SPHERICAL_JOINT_TYPE, "", 0, "Connected body", Span(&bone_e, 1), entities[bone.parent_idx]);
+					editor.setProperty(SPHERICAL_JOINT_TYPE, "", 0, "Connected body", Span(&bone_e, 1), entities[parent_idx]);
 					editor.setProperty(SPHERICAL_JOINT_TYPE, "", 0, "Axis direction", Span(&bone_e, 1), Vec3(0, -1, 0));
 					editor.setProperty(SPHERICAL_JOINT_TYPE, "", 0, "Use limit", Span(&bone_e, 1), true);
 					editor.setProperty(SPHERICAL_JOINT_TYPE, "", 0, "Limit", Span(&bone_e, 1), Vec2(degreesToRadians(45.f)));
 				}
 				
-				editor.makeParent(entities[bone.parent_idx], bone_e);
+				editor.makeParent(entities[parent_idx], bone_e);
 			}
 			else {
 				const EntityRef bone_e = editor.addEntityAt(tr.pos);

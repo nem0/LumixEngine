@@ -93,6 +93,7 @@ Model::Model(const Path& path, ResourceManager& resource_manager, Renderer& rend
 	, m_bones(m_allocator)
 	, m_first_nonroot_bone_index(0)
 	, m_renderer(renderer)
+	, m_parents(m_allocator)
 {
 	for (LODMeshIndices& i : m_lod_indices) i = {0, -1};
 	for (float & i : m_lod_distances) i = FLT_MAX;
@@ -372,7 +373,9 @@ bool Model::parseBones(InputMemoryStream& file)
 		const void* name = file.skip(len);
 		b.name = StringView((const char*)name, (const char*)name + len);
 		m_bone_map.insert(BoneNameHash(b.name.c_str()), m_bones.size() - 1);
-		file.read(b.parent_idx);
+		i32 parent_idx;
+		file.read(parent_idx);
+		m_parents.emplace(parent_idx);
 		file.read(b.transform.pos);
 		file.read(b.transform.rot);
 	}
@@ -380,15 +383,16 @@ bool Model::parseBones(InputMemoryStream& file)
 	m_first_nonroot_bone_index = -1;
 	for (int i = 0; i < bone_count; ++i) {
 		Model::Bone& b = m_bones[i];
-		if (b.parent_idx < 0) {
+		i32 parent_idx = m_parents[i];
+		if (parent_idx < 0) {
 			if (m_first_nonroot_bone_index != -1) {
 				logError("Invalid skeleton in ", getPath());
 				return false;
 			}
-			b.parent_idx = -1;
+			m_parents[i] = -1;
 		}
 		else {
-			if (b.parent_idx > i) {
+			if (parent_idx > i) {
 				logError("Invalid skeleton in ", getPath());
 				return false;
 			}
@@ -417,7 +421,7 @@ bool Model::parseBones(InputMemoryStream& file)
 	}
 
 	for (int i = 0; i < m_bones.size(); ++i) {
-		int p = m_bones[i].parent_idx;
+		int p = m_parents[i];
 		if (p >= 0) {
 			m_bones[i].relative_transform = getInverseBindTransform(p) * m_bones[i].transform;
 		}
