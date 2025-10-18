@@ -203,10 +203,10 @@ struct ImGuiIntegration {
 	};
 
 	void encode(const ImDrawList* cmd_list, const ImGuiViewport* vp, Renderer* renderer, DrawStream& stream, gpu::ProgramHandle program, Vec2 scale, Vec2 offset) {
-		const Renderer::TransientSlice ib = renderer->allocTransient(cmd_list->IdxBuffer.size_in_bytes());
+		const TransientSlice ib = stream.allocTransient(cmd_list->IdxBuffer.size_in_bytes());
 		memcpy(ib.ptr, &cmd_list->IdxBuffer[0], cmd_list->IdxBuffer.size_in_bytes());
 
-		const Renderer::TransientSlice vb  = renderer->allocTransient(cmd_list->VtxBuffer.size_in_bytes());
+		const TransientSlice vb  = stream.allocTransient(cmd_list->VtxBuffer.size_in_bytes());
 		memcpy(vb.ptr, &cmd_list->VtxBuffer[0], cmd_list->VtxBuffer.size_in_bytes());
 
 		stream.useProgram(program);
@@ -232,7 +232,7 @@ struct ImGuiIntegration {
 
 			gpu::TextureHandle tex = (gpu::TextureHandle)(intptr_t)pcmd->GetTexID();
 			if (tex) {
-				const Renderer::TransientSlice ub = renderer->allocUniform(sizeof(ImGuiUniformBuffer));
+				const TransientSlice ub = stream->allocUniform(sizeof(ImGuiUniformBuffer));
 				ImGuiUniformBuffer* uniform_data = (ImGuiUniformBuffer*)ub.ptr;
 				uniform_data->scale = scale;
 				uniform_data->offset = offset;

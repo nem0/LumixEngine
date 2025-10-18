@@ -27,6 +27,72 @@ Animation::Animation(const Path& path, ResourceManager& resource_manager, IAlloc
 
 
 struct AnimationSampler {
+	static float4 getRotation(const Animation& anim, u32 frame, const Animation::RotationTrack& track, float t) {
+		const auto& rotations = anim.m_rotations;
+		ASSERT(&track >= rotations.begin() && &track < rotations.end());
+		if (&track - rotations.begin() == anim.m_root_motion.rotation_track_idx) {
+			float4 a = f4LoadUnaligned(&anim.m_root_motion.pose_rotations[frame]);
+			float4 b = f4LoadUnaligned(&anim.m_root_motion.pose_rotations[frame + 1]);
+			return simd_nlerp(a, b, t);
+		}
+
+		// read packed data
+		const u32 offset1 = anim.m_rotations_frame_size_bits * frame + track.offset_bits;
+		const u32 offset2 = offset1 + anim.m_rotations_frame_size_bits;
+
+		u64 packed1;
+		memcpy(&packed1, &anim.m_rotation_stream[offset1 / 8], sizeof(packed1));
+		packed1 >>= offset1 & 7;
+
+		u64 packed2;
+		memcpy(&packed2, &anim.m_rotation_stream[offset2 / 8], sizeof(packed2));
+		packed2 >>= offset2 & 7;
+
+		bool is_negative1 = packed1 & 1;
+		packed1 >>= 1;
+
+		bool is_negative2 = packed2 & 1;
+		packed2 >>= 1;
+
+		Vec3 v3_1;
+		Vec3 v3_2;
+
+		// unpack
+		u64 mask_x = (u64(1) << track.bitsizes[0]) - 1;
+		u64 mask_y = (u64(1) << track.bitsizes[1]) - 1;
+		u64 mask_z = (u64(1) << track.bitsizes[2]) - 1;
+
+		u64 packed1_y = packed1 >> track.bitsizes[0];
+		u64 packed1_z = packed1_y >> track.bitsizes[1];
+		
+		u64 packed2_y = packed2 >> track.bitsizes[0];
+		u64 packed2_z = packed2_y >> track.bitsizes[1];
+
+		v3_1.x = track.min.x + track.to_range.x * float(packed1 & mask_x);
+		v3_1.y = track.min.y + track.to_range.y * float(packed1_y & mask_y);
+		v3_1.z = track.min.z + track.to_range.z * float(packed1_z & mask_z);
+		
+		v3_2.x = track.min.x + track.to_range.x * float(packed2 & mask_x);
+		v3_2.y = track.min.y + track.to_range.y * float(packed2_y & mask_y);
+		v3_2.z = track.min.z + track.to_range.z * float(packed2_z & mask_z);
+
+		float skipped1 = sqrtf(maximum(0.f, 1 - dot(v3_1, v3_1))) * (is_negative1 ? -1 : 1);
+		float skipped2 = sqrtf(maximum(0.f, 1 - dot(v3_2, v3_2))) * (is_negative2 ? -1 : 1);
+
+		float4 q1;
+		float4 q2;
+		
+		switch (track.skipped_channel) {
+			case 0: q1 = f4Init(skipped1, v3_1.x, v3_1.y, v3_1.z); q2 = f4Init(skipped2, v3_2.x, v3_2.y, v3_2.z); break;
+			case 1: q1 = f4Init(v3_1.x, skipped1, v3_1.y, v3_1.z); q2 = f4Init(v3_2.x, skipped2, v3_2.y, v3_2.z); break;
+			case 2: q1 = f4Init(v3_1.x, v3_1.y, skipped1, v3_1.z); q2 = f4Init(v3_2.x, v3_2.y, skipped2, v3_2.z); break;
+			case 3: q1 = f4Init(v3_1.x, v3_1.y, v3_1.z, skipped1); q2 = f4Init(v3_2.x, v3_2.y, v3_2.z, skipped2); break;
+			default: ASSERT(false); break;
+		}
+		
+		// interpolate
+		return simd_nlerp(q1, q2, t);
+	}
 
 	static LUMIX_FORCE_INLINE LocalRigidTransform maskRootMotion(Animation::Flags flags, const LocalRigidTransform& transform) {
 		LocalRigidTransform root_motion;
@@ -124,13 +190,15 @@ struct AnimationSampler {
 				//if (mask->bones.find(track.) == mask->bones.end()) continue;
 			}
 
-			Quat anim_rot = anim.getRotation(sample_idx, track, t);
+			float4 anim_rot = getRotation(anim, sample_idx, track, t);
 
 			if constexpr (use_weight) {
-				rot[track.bone_index] = simd_nlerp(rot[track.bone_index], anim_rot, weight);
+				float4 rotf4 = f4LoadUnaligned(&rot[track.bone_index]);
+				rotf4 = simd_nlerp(rotf4, anim_rot, weight);
+				f4StoreUnaligned(&rot[track.bone_index], rotf4);
 			}
 			else {
-				rot[track.bone_index] = anim_rot;
+				f4StoreUnaligned(&rot[track.bone_index], anim_rot);
 			}
 		}
 	}
@@ -263,70 +331,6 @@ Vec3 Animation::getTranslation(u32 frame, const TranslationTrack& track) const {
 	tmp >>= track.bitsizes[1];
 	res.z = unpackChannel(tmp, track.min.z, track.to_range.z, track.bitsizes[2]);
 	return res;
-}
-
-Quat Animation::getRotation(u32 frame, const RotationTrack& track, float t) const {
-	ASSERT(&track >= m_rotations.begin() && &track < m_rotations.end());
-	if (&track - m_rotations.begin() == m_root_motion.rotation_track_idx) {
-		return simd_nlerp(m_root_motion.pose_rotations[frame], m_root_motion.pose_rotations[frame + 1], t);
-	}
-
-	// read packed data
-	const u32 offset1 = m_rotations_frame_size_bits * frame + track.offset_bits;
-	const u32 offset2 = offset1 + m_rotations_frame_size_bits;
-
-	u64 packed1;
-	memcpy(&packed1, &m_rotation_stream[offset1 / 8], sizeof(packed1));
-	packed1 >>= offset1 & 7;
-
-	u64 packed2;
-	memcpy(&packed2, &m_rotation_stream[offset2 / 8], sizeof(packed2));
-	packed2 >>= offset2 & 7;
-
-	bool is_negative1 = packed1 & 1;
-	packed1 >>= 1;
-
-	bool is_negative2 = packed2 & 1;
-	packed2 >>= 1;
-
-	Vec3 v3_1;
-	Vec3 v3_2;
-
-	// unpack
-	u64 mask_x = (u64(1) << track.bitsizes[0]) - 1;
-	u64 mask_y = (u64(1) << track.bitsizes[1]) - 1;
-	u64 mask_z = (u64(1) << track.bitsizes[2]) - 1;
-
-	u64 packed1_y = packed1 >> track.bitsizes[0];
-	u64 packed1_z = packed1_y >> track.bitsizes[1];
-	
-	u64 packed2_y = packed2 >> track.bitsizes[0];
-	u64 packed2_z = packed2_y >> track.bitsizes[1];
-
-	v3_1.x = track.min.x + track.to_range.x * float(packed1 & mask_x);
-	v3_1.y = track.min.y + track.to_range.y * float(packed1_y & mask_y);
-	v3_1.z = track.min.z + track.to_range.z * float(packed1_z & mask_z);
-	
-	v3_2.x = track.min.x + track.to_range.x * float(packed2 & mask_x);
-	v3_2.y = track.min.y + track.to_range.y * float(packed2_y & mask_y);
-	v3_2.z = track.min.z + track.to_range.z * float(packed2_z & mask_z);
-
-	float skipped1 = sqrtf(maximum(0.f, 1 - dot(v3_1, v3_1))) * (is_negative1 ? -1 : 1);
-	float skipped2 = sqrtf(maximum(0.f, 1 - dot(v3_2, v3_2))) * (is_negative2 ? -1 : 1);
-
-	float4 q1;
-	float4 q2;
-	
-	switch (track.skipped_channel) {
-		case 0: q1 = f4Init(skipped1, v3_1.x, v3_1.y, v3_1.z); q2 = f4Init(skipped2, v3_2.x, v3_2.y, v3_2.z); break;
-		case 1: q1 = f4Init(v3_1.x, skipped1, v3_1.y, v3_1.z); q2 = f4Init(v3_2.x, skipped2, v3_2.y, v3_2.z); break;
-		case 2: q1 = f4Init(v3_1.x, v3_1.y, skipped1, v3_1.z); q2 = f4Init(v3_2.x, v3_2.y, skipped2, v3_2.z); break;
-		case 3: q1 = f4Init(v3_1.x, v3_1.y, v3_1.z, skipped1); q2 = f4Init(v3_2.x, v3_2.y, v3_2.z, skipped2); break;
-		default: ASSERT(false); break;
-	}
-	
-	// interpolate
-	return simd_nlerp(q1, q2, t);
 }
 
 Quat Animation::getRotation(u32 frame, const RotationTrack& track) const {

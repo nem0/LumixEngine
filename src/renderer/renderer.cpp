@@ -80,8 +80,8 @@ struct TransientBuffer {
 		memset(m_ptr, 0, INIT_SIZE);
 	}
 
-	Renderer::TransientSlice alloc(u32 size) {
-		Renderer::TransientSlice slice;
+	LUMIX_FORCE_INLINE TransientSlice alloc(u32 size) {
+		TransientSlice slice;
 		size = (size + (ALIGN - 1)) & ~(ALIGN - 1);
 		slice.offset = m_offset.add(size);
 		slice.size = size;
@@ -694,22 +694,19 @@ struct RendererImpl final : Renderer {
 		gpu::popDebugGroup();
 	}
 
-	TransientSlice allocTransient(u32 size) override
+	TransientSlice allocTransientSlice(u32 size) override
 	{
-		jobs::wait(&m_cpu_frame->can_setup);
 		return m_cpu_frame->transient_buffer.alloc(size);
 	}
 
-	TransientSlice allocUniform(const void* data, u32 size) override {
-		jobs::wait(&m_cpu_frame->can_setup);
+	TransientSlice allocUniformSlice(const void* data, u32 size) override {
 		const TransientSlice slice = m_cpu_frame->uniform_buffer.alloc(size);
 		memcpy(slice.ptr, data, size);
 		return slice;
 	}
 
-	TransientSlice allocUniform(u32 size) override
+	TransientSlice allocUniformSlice(u32 size) override
 	{
-		jobs::wait(&m_cpu_frame->can_setup);
 		return m_cpu_frame->uniform_buffer.alloc(size);
 	}
 	

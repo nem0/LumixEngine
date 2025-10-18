@@ -100,46 +100,32 @@ LUMIX_FORCE_INLINE SIMDDualQuat toDualQuat(const SIMDLocalRigidTransform& t) {
 	return res;		
 }
 
-LUMIX_FORCE_INLINE Quat simd_nlerp(const Quat& a, const Quat& b, float t) {
+
+LUMIX_FORCE_INLINE float4 simd_nlerp(float4 q1, float4 q2, float t) {
 	Quat res;
 	float inv = 1.0f - t;
+	float4 q = q1 * q2;
+	q = _mm_hadd_ps(q, q);
+	q = _mm_hadd_ps(q, q);
+	float d = f4GetX(q);
+	if (d < 0) t = -t;
+	q = q1 * inv + q2 * t;
+	
+	float4 qtmp = q * q;
+	qtmp = _mm_hadd_ps(qtmp, qtmp);
+	qtmp = _mm_hadd_ps(qtmp, qtmp);
+	float l = 1 / f4GetX(f4Sqrt(qtmp));
+	q = q * l;
+	return q;
+}
+
+LUMIX_FORCE_INLINE Quat simd_nlerp(const Quat& a, const Quat& b, float t) {
 	float4 q1 = f4LoadUnaligned(&a);
 	float4 q2 = f4LoadUnaligned(&b);
-	float4 q = q1 * q2;
-	q = _mm_hadd_ps(q, q);
-	q = _mm_hadd_ps(q, q);
-	float d = f4GetX(q);
-	if (d < 0) t = -t;
-	q = q1 * inv + q2 * t;
-	
-	float4 qtmp = q * q;
-	qtmp = _mm_hadd_ps(qtmp, qtmp);
-	qtmp = _mm_hadd_ps(qtmp, qtmp);
-	// error with rsqrt is too big
-	float l = 1 / f4GetX(f4Sqrt(qtmp));
-	q = q * l;
-	f4StoreUnaligned(&res, q);
-	return res;
-}
-
-LUMIX_FORCE_INLINE Quat simd_nlerp(float4 q1, float4 q2, float t) {
+	float4 q = simd_nlerp(q1, q2, t);
 	Quat res;
-	float inv = 1.0f - t;
-	float4 q = q1 * q2;
-	q = _mm_hadd_ps(q, q);
-	q = _mm_hadd_ps(q, q);
-	float d = f4GetX(q);
-	if (d < 0) t = -t;
-	q = q1 * inv + q2 * t;
-	
-	float4 qtmp = q * q;
-	qtmp = _mm_hadd_ps(qtmp, qtmp);
-	qtmp = _mm_hadd_ps(qtmp, qtmp);
-	float l = 1 / f4GetX(f4Sqrt(qtmp));
-	q = q * l;
 	f4StoreUnaligned(&res, q);
 	return res;
 }
-
 
 }

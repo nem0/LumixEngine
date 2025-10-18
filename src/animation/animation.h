@@ -129,7 +129,6 @@ struct Animation final : Resource {
 
 	Vec3 getTranslation(u32 frame, const TranslationTrack& track) const;
 	Quat getRotation(u32 sample, const RotationTrack& track) const;
-	Quat getRotation(u32 sample, const RotationTrack& track, float t) const;
 	
 	const Array<TranslationTrack>& getTranslations() const { return m_translations; }
 	const Array<ConstTranslationTrack>& getConstTranslations() const { return m_const_translations; }

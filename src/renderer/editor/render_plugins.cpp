@@ -2897,7 +2897,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			.src = gpu::getBindlessHandle(src),
 			.dst = gpu::getRWBindlessHandle(dst),
 		};
-		const Renderer::TransientSlice ub_slice = m_renderer->allocUniform(&ubdata, sizeof(ubdata));
+		const TransientSlice ub_slice = stream.allocUniform(&ubdata, sizeof(ubdata));
 		stream.bindUniformBuffer(4, ub_slice.buffer, ub_slice.offset, ub_slice.size);
 		stream.useProgram(m_downscale_program);
 		stream.dispatch((dst_size.x + 15) / 16, (dst_size.y + 15) / 16, 1);
@@ -4924,10 +4924,10 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 	}
 
 	void encode(const ImDrawList* cmd_list, const ImGuiViewport* vp, Renderer* renderer, DrawStream& stream, gpu::ProgramHandle program, Vec2 scale, Vec2 offset) {
-		const Renderer::TransientSlice ib = renderer->allocTransient(cmd_list->IdxBuffer.size_in_bytes());
+		const TransientSlice ib = stream.allocTransient(cmd_list->IdxBuffer.size_in_bytes());
 		memcpy(ib.ptr, &cmd_list->IdxBuffer[0], cmd_list->IdxBuffer.size_in_bytes());
 
-		const Renderer::TransientSlice vb  = renderer->allocTransient(cmd_list->VtxBuffer.size_in_bytes());
+		const TransientSlice vb  = stream.allocTransient(cmd_list->VtxBuffer.size_in_bytes());
 		memcpy(vb.ptr, &cmd_list->VtxBuffer[0], cmd_list->VtxBuffer.size_in_bytes());
 
 		stream.useProgram(program);
@@ -4953,7 +4953,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 
 			gpu::TextureHandle tex = (gpu::TextureHandle)(intptr_t)pcmd->GetTexID();
 			if (tex) {
-				const Renderer::TransientSlice ub = renderer->allocUniform(sizeof(ImGuiUniformBuffer));
+				const TransientSlice ub = stream.allocUniform(sizeof(ImGuiUniformBuffer));
 				ImGuiUniformBuffer* uniform_data = (ImGuiUniformBuffer*)ub.ptr;
 				uniform_data->scale = scale;
 				uniform_data->offset = offset;

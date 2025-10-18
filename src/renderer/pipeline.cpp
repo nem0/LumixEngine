@@ -420,7 +420,7 @@ struct PipelineImpl final : Pipeline {
 		struct Instances {
 			Page::Group* begin;
 			Page::Group* end;
-			Renderer::TransientSlice slice;
+			TransientSlice slice;
 		};
 
 		Array<Instances> instances;
@@ -793,7 +793,7 @@ struct PipelineImpl final : Pipeline {
 					.dst = gpu::getRWBindlessHandle(dst)
 				};
 				
-				const Renderer::TransientSlice ub_mem = m_renderer.allocUniform(&ub, sizeof(ub));
+				const TransientSlice ub_mem = stream.allocUniform(&ub, sizeof(ub));
 				stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub_mem.buffer, ub_mem.offset, ub_mem.size);
 
 				ASSERT(m_viewport.w % 16 == 0);
@@ -915,7 +915,7 @@ struct PipelineImpl final : Pipeline {
 		jobs::turnRed(&view->ready);
 		m_renderer.pushJob("prepare view", [this, view_ptr](DrawStream& stream) {
 			setupFur(*view_ptr);
-			setupParticles(*view_ptr);
+			setupParticles(stream, *view_ptr);
 			encodeInstancedModels(stream, *view_ptr);
 			encodeProceduralGeometry(*view_ptr);
 
@@ -962,8 +962,8 @@ struct PipelineImpl final : Pipeline {
 			pass_state.shadow_to_camera = Vec4(Vec3(m_viewport.pos - cp.pos), 1);
 		}
 
-		const Renderer::TransientSlice ub = m_renderer.allocUniform(&pass_state, sizeof(PassState));
 		DrawStream& stream = m_renderer.getDrawStream();
+		const TransientSlice ub = stream.allocUniform(&pass_state, sizeof(PassState));
 		stream.bindUniformBuffer(UniformBuffer::PASS, ub.buffer, ub.offset, ub.size);
 	}
 
@@ -1007,9 +1007,10 @@ struct PipelineImpl final : Pipeline {
 	}
 
 	void setUniformRaw(Span<const u8> mem, UniformBuffer::Enum bind_point = UniformBuffer::DRAWCALL) override {
-		Renderer::TransientSlice ub = m_renderer.allocUniform(mem.length());
+		DrawStream& stream = m_renderer.getDrawStream();
+		TransientSlice ub = stream.allocUniform(mem.length());
 		memcpy(ub.ptr, mem.begin(), mem.length());
-		m_renderer.getDrawStream().bindUniformBuffer(bind_point, ub.buffer, ub.offset, ub.size);
+		stream.bindUniformBuffer(bind_point, ub.buffer, ub.offset, ub.size);
 	}
 
 	InstanceData getData(u32 idx, u32 size, u32 align) override {
@@ -1465,7 +1466,7 @@ struct PipelineImpl final : Pipeline {
 		
 		m_downscaled_depth = INVALID_RENDERBUFFER;
 		m_global_state.shadowmap_bindless = toBindless(shadowmap, stream);
-	 	Renderer::TransientSlice gsb = m_renderer.allocUniform(&m_global_state, sizeof(GlobalState));
+	 	TransientSlice gsb = stream.allocUniform(&m_global_state, sizeof(GlobalState));
 		stream.bindUniformBuffer(UniformBuffer::GLOBAL, gsb.buffer, gsb.offset, sizeof(GlobalState));
 		
 		u32 view_idx;
@@ -1572,7 +1573,7 @@ struct PipelineImpl final : Pipeline {
 
 		gpu::BindlessHandle texture = gpu::getBindlessHandle(m_renderer.toTexture(m_output));
 		
-		const Renderer::TransientSlice ub = m_renderer.allocUniform(&texture, sizeof(texture));
+		const TransientSlice ub = stream.allocUniform(&texture, sizeof(texture));
 		stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 		stream.drawArrays(0, 4);
 		stream.endProfileBlock();
@@ -1664,7 +1665,7 @@ struct PipelineImpl final : Pipeline {
 		}
 
 		DrawStream& stream = m_renderer.getDrawStream();
-		const Renderer::TransientSlice global_state_buffer = m_renderer.allocUniform(&global_state, sizeof(GlobalState));
+		const TransientSlice global_state_buffer = stream.allocUniform(&global_state, sizeof(GlobalState));
 
 		stream.bindUniformBuffer(UniformBuffer::GLOBAL, global_state_buffer.buffer, global_state_buffer.offset, sizeof(GlobalState));
 		stream.bindUniformBuffer(UniformBuffer::PASS, gpu::INVALID_BUFFER, 0, 0);
@@ -1705,8 +1706,8 @@ struct PipelineImpl final : Pipeline {
 			const Array<DebugTriangle>& tris = m_module->getDebugTriangles();
 			const gpu::StateFlags state = gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::CULL_BACK;
 			const gpu::ProgramHandle program = m_debug_shape_shader->getProgram(state, m_base_vertex_decl, 0, "");
-			const Renderer::TransientSlice vb = m_renderer.allocTransient(sizeof(BaseVertex) * tris.size() * 3);
-			const Renderer::TransientSlice ub = m_renderer.allocUniform(&Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
+			const TransientSlice vb = stream.allocTransient(sizeof(BaseVertex) * tris.size() * 3);
+			const TransientSlice ub = stream.allocUniform(&Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
 			BaseVertex* vertices = (BaseVertex*)vb.ptr;
 			for (u32 i = 0, c = tris.size(); i < c; ++i) {
 				vertices[3 * i + 0].color = tris[i].color.abgr();
@@ -1739,8 +1740,8 @@ struct PipelineImpl final : Pipeline {
 			const Array<DebugLine>& lines = m_module->getDebugLines();
 			const gpu::StateFlags state = gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE;
 			const gpu::ProgramHandle program = m_debug_shape_shader->getProgram(state, m_base_line_vertex_decl, 0, "");
-			const Renderer::TransientSlice vb = m_renderer.allocTransient(sizeof(BaseVertex) * lines.size() * 2);
-			const Renderer::TransientSlice ub = m_renderer.allocUniform(&Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
+			const TransientSlice vb = stream.allocTransient(sizeof(BaseVertex) * lines.size() * 2);
+			const TransientSlice ub = stream.allocUniform(&Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
 			BaseVertex* vertices = (BaseVertex*)vb.ptr;
 			for (u32 i = 0, c = lines.size(); i < c; ++i) {
 				vertices[2 * i + 0].color = lines[i].color.abgr();
@@ -1781,8 +1782,8 @@ struct PipelineImpl final : Pipeline {
 
 		DrawStream& stream = m_renderer.getDrawStream();
 		
-		const Renderer::TransientSlice idx_buffer_mem = m_renderer.allocTransient(data.getIndices().byte_size());
-		const Renderer::TransientSlice vtx_buffer_mem = m_renderer.allocTransient(data.getVertices().byte_size());
+		const TransientSlice idx_buffer_mem = stream.allocTransient(data.getIndices().byte_size());
+		const TransientSlice vtx_buffer_mem = stream.allocTransient(data.getVertices().byte_size());
 		memcpy(idx_buffer_mem.ptr, data.getIndices().begin(), data.getIndices().byte_size());
 		memcpy(vtx_buffer_mem.ptr, data.getVertices().begin(), data.getVertices().byte_size());
 
@@ -1920,7 +1921,7 @@ struct PipelineImpl final : Pipeline {
 						quad.terrain_scale = Vec4(scale, 0);
 						quad.cell_size = s;
 					
-						const Renderer::TransientSlice ub = m_renderer.allocUniform(&quad, sizeof(quad));
+						const TransientSlice ub = stream.allocUniform(&quad, sizeof(quad));
 
 						stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 						stream.drawArraysInstanced((subto.x - subfrom.x) * 2 + 2, subto.y - subfrom.y);
@@ -2032,7 +2033,7 @@ struct PipelineImpl final : Pipeline {
 								distance,
 								material->getIndex()
 							};
-							const Renderer::TransientSlice drawcall_ub = m_renderer.allocUniform(&drawcall_data, sizeof(drawcall_data));
+							const TransientSlice drawcall_ub = stream.allocUniform(&drawcall_data, sizeof(drawcall_data));
 							stream.bindUniformBuffer(UniformBuffer::DRAWCALL, drawcall_ub.buffer, drawcall_ub.offset, drawcall_ub.size);
 							stream.bindVertexBuffer(1, quad.instances, 0, sizeof(Vec4) * 2);
 							stream.drawIndexedInstanced(mesh.indices_count, instance_count, mesh.index_type);
@@ -2051,7 +2052,7 @@ struct PipelineImpl final : Pipeline {
 		});
 	}
 
-	void setupParticles(View& view) {
+	void setupParticles(DrawStream& stream, View& view) {
 		PROFILE_FUNCTION();
 
 		if (view.cp.is_shadow) return;
@@ -2077,7 +2078,7 @@ struct PipelineImpl final : Pipeline {
 				const u32 size = emitter.getParticlesDataSizeBytes();
 				if (size == 0) continue;
 
-				emitter.slice = m_renderer.allocTransient(size);
+				emitter.slice = stream.allocTransient(size);
 				emitter.fillInstanceData((float*)emitter.slice.ptr, m_renderer.getEngine().getPageAllocator());
 			}
 		});
@@ -2256,7 +2257,7 @@ struct PipelineImpl final : Pipeline {
 				world.getRelativeMatrix(iter.key(), camera_pos),
 				pg.material->getIndex()
 			};
-			const Renderer::TransientSlice ub = m_renderer.allocUniform(&ub_data, sizeof(ub_data));
+			const TransientSlice ub = bucket.stream.allocUniform(&ub_data, sizeof(ub_data));
 
 			bucket.stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 			const gpu::StateFlags state = pg.material->m_render_states | render_state;
@@ -2343,7 +2344,7 @@ struct PipelineImpl final : Pipeline {
 				u32 offset;
 				u32 count;
 				bool visible;
-				Renderer::TransientSlice ub;
+				TransientSlice ub;
 			} cells[16];
 			u32 cell_count = 0;
 
@@ -2366,7 +2367,7 @@ struct PipelineImpl final : Pipeline {
 							cells[cell_count].visible = visible;
 							cells[cell_count].count = cell.instance_count;
 							cells[cell_count].offset = cell.from_instance;
-							const Renderer::TransientSlice ub = m_renderer.allocUniform(sizeof(u32) * 2);
+							const TransientSlice ub = stream.allocUniform(sizeof(u32) * 2);
 							u32* tmp =(u32*)ub.ptr;
 							tmp[0] = cell.from_instance;
 							tmp[1] = cell.instance_count;
@@ -2412,7 +2413,7 @@ struct PipelineImpl final : Pipeline {
 			instanced_decl.addAttribute(0, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 			instanced_decl.addAttribute(16, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 
-			const Renderer::TransientSlice drawcall_ub = m_renderer.allocUniform(&ub_values, sizeof(ub_values));
+			const TransientSlice drawcall_ub = stream.allocUniform(&ub_values, sizeof(ub_values));
 
 			stream.bindUniformBuffer(UniformBuffer::DRAWCALL, drawcall_ub.buffer, drawcall_ub.offset, sizeof(UBValues));
 
@@ -2483,7 +2484,7 @@ struct PipelineImpl final : Pipeline {
 				const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_decl, instanced_define_mask | material->getDefineMask(), mesh.semantics_defines);
 
 				MaterialIndex material_index = material->getIndex();
-				Renderer::TransientSlice ub_slice = m_renderer.allocUniform(&material_index, sizeof(material_index));
+				TransientSlice ub_slice = stream.allocUniform(&material_index, sizeof(material_index));
 
 				bucket.stream.useProgram(program);
 				bucket.stream.bindIndexBuffer(mesh.index_buffer_handle);
@@ -2657,7 +2658,7 @@ struct PipelineImpl final : Pipeline {
 						const gpu::VertexDecl& decl = emitter.resource_emitter.vertex_decl;
 						const gpu::StateFlags state = material->m_render_states | render_state;
 						gpu::ProgramHandle program = material->getShader()->getProgram(state, decl, define_mask | material->getDefineMask(), "");
-						const Renderer::TransientSlice slice = emitter.slice;
+						const TransientSlice slice = emitter.slice;
 						const Matrix mtx(lpos, tr.rot);
 
 						struct {
@@ -2668,7 +2669,7 @@ struct PipelineImpl final : Pipeline {
 							material->getIndex()
 						};
 
-						const Renderer::TransientSlice ub = m_renderer.allocUniform(&ub_data, sizeof(ub_data));
+						const TransientSlice ub = stream->allocUniform(&ub_data, sizeof(ub_data));
 						stream->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 						stream->useProgram(program);
 						stream->bindIndexBuffer(gpu::INVALID_BUFFER);
@@ -2726,7 +2727,7 @@ struct PipelineImpl final : Pipeline {
 								}
 
 								const u32 count = u32(i - start_i);
-								const Renderer::TransientSlice slice = m_renderer.allocTransient(count * (sizeof(Vec4) * 6));
+								const TransientSlice slice = stream->allocTransient(count * (sizeof(Vec4) * 6));
 								u8* instance_data = slice.ptr;
 
 								for (i32 j = start_i; j < start_i + (i32)count; ++j) {
@@ -2771,7 +2772,7 @@ struct PipelineImpl final : Pipeline {
 									++i;
 								}
 								const u32 count = u32(i - start_i);
-								const Renderer::TransientSlice slice = m_renderer.allocTransient(count * (sizeof(Vec4) * 3));
+								const TransientSlice slice = stream->allocTransient(count * (sizeof(Vec4) * 3));
 								u8* instance_data = slice.ptr;
 								for (int j = start_i; j < start_i + (i32)count; ++j) {
 									const EntityRef e = { i32(renderables[j] & 0xFFffFFff) };
@@ -2825,7 +2826,7 @@ struct PipelineImpl final : Pipeline {
 							Matrix prev_model_mtx;
 						};
 
-						const Renderer::TransientSlice ub = m_renderer.allocUniform(sizeof(DualQuat) * mi->pose->count + sizeof(UBPrefix));
+						const TransientSlice ub = stream->allocUniform(sizeof(DualQuat) * mi->pose->count + sizeof(UBPrefix));
 					
 						UBPrefix* prefix = (UBPrefix*)ub.ptr;
 						u32 layers = 1;
@@ -2874,7 +2875,7 @@ struct PipelineImpl final : Pipeline {
 							Vec2 uv_scale;
 							MaterialIndex material_index;
 						};
-						const Renderer::TransientSlice slice = m_renderer.allocTransient(count * (sizeof(DecalData)));
+						const TransientSlice slice = stream->allocTransient(count * (sizeof(DecalData)));
 
 						DecalData* beg = (DecalData*)slice.ptr;
 						DecalData* end = (DecalData*)(slice.ptr + (count - 1) * sizeof(DecalData));
@@ -2936,7 +2937,7 @@ struct PipelineImpl final : Pipeline {
 							Vec4 bezier;
 							MaterialIndex material_index;
 						};
-						const Renderer::TransientSlice slice = m_renderer.allocTransient(count * (sizeof(DecalData)));
+						const TransientSlice slice = stream->allocTransient(count * (sizeof(DecalData)));
 
 						DecalData* beg = (DecalData*)slice.ptr;
 						DecalData* end = (DecalData*)(slice.ptr + (count - 1) * sizeof(DecalData));
@@ -3108,7 +3109,7 @@ struct PipelineImpl final : Pipeline {
 			}
 			shadow_atlas_matrices[light.atlas_idx] = getShadowMatrix(pl, light.atlas_idx);
 		}
-		const Renderer::TransientSlice shadow_matrices_ub = m_renderer.allocUniform(&shadow_atlas_matrices, sizeof(shadow_atlas_matrices));
+		const TransientSlice shadow_matrices_ub = stream.allocUniform(&shadow_atlas_matrices, sizeof(shadow_atlas_matrices));
 		stream.bindUniformBuffer(UniformBuffer::SHADOW, shadow_matrices_ub.buffer, shadow_matrices_ub.offset, shadow_matrices_ub.size);
 
 		m_renderer.pushJob("fill clusters", [clusters_count, clusters, lights, lights_count, cam_pos, &world, size, cp, this, &frame_allocator](DrawStream& stream){
@@ -3620,13 +3621,14 @@ struct PipelineImpl final : Pipeline {
 			PROFILE_BLOCK("fill instance data");
 			u32 num_instances = 0;
 			u32 num_meshes = 0;
+			DrawStream& stream = m_renderer.getDrawStream();
 			for (AutoInstancer::Instances& instances : instancer.instances) {
 				const AutoInstancer::Page::Group* group = instances.begin;
 				if (!group) continue;
 
 				++num_meshes;
 				const u32 count = instances.end->offset + instances.end->count;
-				instances.slice = m_renderer.allocTransient(count * (3 * sizeof(Vec4)));
+				instances.slice = stream.allocTransient(count * (3 * sizeof(Vec4)));
 				u8* instance_data = instances.slice.ptr;
 				const u32 sort_key = u32(&instances - instancer.instances.begin());
 				const u64 renderable = instances.begin->renderables[0];

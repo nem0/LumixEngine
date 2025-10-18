@@ -55,18 +55,18 @@ struct LUMIX_RENDERER_API RenderPlugin {
 
 struct DrawStream;
 
+struct TransientSlice {
+	gpu::BufferHandle buffer;
+	u32 offset;
+	u32 size;
+	u8* ptr;
+};
+
 struct LUMIX_RENDERER_API Renderer : ISystem {
 	struct MemRef {
 		u32 size = 0;
 		void* data = nullptr;
 		bool own = false;
-	};
-
-	struct TransientSlice {
-		gpu::BufferHandle buffer;
-		u32 offset;
-		u32 size;
-		u8* ptr;
 	};
 
 	enum { MAX_SHADER_DEFINES = 32 };
@@ -112,9 +112,9 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 	virtual void destroyMaterialConstants(MaterialIndex id) = 0;
 	virtual gpu::BufferHandle getMaterialUniformBuffer() = 0;
 	
-	virtual TransientSlice allocTransient(u32 size) = 0;
-	virtual TransientSlice allocUniform(u32 size) = 0;
-	virtual TransientSlice allocUniform(const void* data, u32 size) = 0;
+	virtual TransientSlice allocTransientSlice(u32 size) = 0;
+	virtual TransientSlice allocUniformSlice(u32 size) = 0;
+	virtual TransientSlice allocUniformSlice(const void* data, u32 size) = 0;
 	
 	virtual gpu::BufferHandle getInstancedMeshesBuffer() = 0;
 	virtual gpu::BufferHandle createBuffer(const MemRef& memory, gpu::BufferFlags flags, const char* debug_name) = 0;

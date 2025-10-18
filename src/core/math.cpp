@@ -24,11 +24,11 @@ const Transform Transform::IDENTITY = Transform({0, 0, 0}, {0, 0, 0, 1}, {1, 1, 
 const Quat Quat::IDENTITY = Quat(0, 0, 0, 1);
 
 	
-Vec2::Vec2(const IVec2& rhs)
+Vec2::Vec2(IVec2 rhs)
 	: x(float(rhs.x))
 	, y(float(rhs.y)) {}
 
-Vec2::Vec2(const DVec2& rhs)
+Vec2::Vec2(DVec2 rhs)
 	: x(float(rhs.x))
 	, y(float(rhs.y)) {}
 
@@ -50,11 +50,11 @@ float Vec2::operator[](u32 i) const {
 	return (&x)[i];
 }
 
-bool Vec2::operator==(const Vec2& rhs) const {
+bool Vec2::operator==(Vec2 rhs) const {
 	return x == rhs.x && y == rhs.y;
 }
 
-bool Vec2::operator!=(const Vec2& rhs) const {
+bool Vec2::operator!=(Vec2 rhs) const {
 	return x != rhs.x || y != rhs.y;
 }
 
@@ -67,26 +67,26 @@ void Vec2::operator*=(float f) {
 	y *= f;
 }
 
-Vec4 operator*(float f, const Vec4& v) {
+Vec4 operator*(float f, Vec4 v) {
 	return Vec4(f * v.x, f * v.y, f * v.z, f * v.w);
 }
 
-Vec4 operator*(const Vec4& v, float s) {
+Vec4 operator*(Vec4 v, float s) {
 	return Vec4(v.x * s, v.y * s, v.z * s, v.w * s);
 }
 
-Vec4 operator/(const Vec4& v, float s) {
+Vec4 operator/(Vec4 v, float s) {
 	return Vec4(v.x / s, v.y / s, v.z / s, v.w / s);
 }
 
-Vec3 operator*(float f, const Vec3& v) {
+Vec3 operator*(float f, Vec3 v) {
 	return Vec3(f * v.x, f * v.y, f * v.z);
 }
 
-Vec2 Vec2::operator*(const Vec2& v) const {
+Vec2 Vec2::operator*(Vec2 v) const {
 	return Vec2(x * v.x, y * v.y);
 }
-Vec2 Vec2::operator/(const Vec2& v) const {
+Vec2 Vec2::operator/(Vec2 v) const {
 	return Vec2(x / v.x, y / v.y);
 }
 Vec2 Vec2::operator*(float f) const {
@@ -95,17 +95,17 @@ Vec2 Vec2::operator*(float f) const {
 Vec2 Vec2::operator/(float f) const {
 	return Vec2(x / f, y / f);
 }
-Vec2 Vec2::operator+(const Vec2& v) const {
+Vec2 Vec2::operator+(Vec2 v) const {
 	return Vec2(x + v.x, y + v.y);
 }
 Vec2 Vec2::operator+(float v) const {
 	return Vec2(x + v, y + v);
 }
-void Vec2::operator+=(const Vec2& v) {
+void Vec2::operator+=(Vec2 v) {
 	x += v.x;
 	y += v.y;
 }
-Vec2 Vec2::operator-(const Vec2& v) const {
+Vec2 Vec2::operator-(Vec2 v) const {
 	return Vec2(x - v.x, y - v.y);
 }
 Vec2 Vec2::operator-(float f) const {
@@ -115,14 +115,14 @@ Vec2 Vec2::operator-() const {
 	return Vec2(-x, -y);
 }
 
-IVec2::IVec2(const Vec2& rhs)
+IVec2::IVec2(Vec2 rhs)
 	: x(int(rhs.x))
 	, y(int(rhs.y))
 {
 }
 
 
-Vec2 IVec2::operator/(const Vec2& rhs) const { return {x / rhs.x, y / rhs.y}; }
+Vec2 IVec2::operator/(Vec2 rhs) const { return {x / rhs.x, y / rhs.y}; }
 
 
 IVec3::IVec3(const DVec3& rhs)
@@ -133,7 +133,7 @@ IVec3::IVec3(const DVec3& rhs)
 }
 
 
-IVec3::IVec3(const Vec3& rhs)
+IVec3::IVec3(Vec3 rhs)
 	: x(int(rhs.x))
 	, y(int(rhs.y))
 	, z(int(rhs.z))
@@ -146,7 +146,7 @@ DVec3 IVec3::operator *(double i) const
 	return {i * x, i * y, i * z};
 }
 
-Vec4 lerp(const Vec4& op1, const Vec4& op2, float t) {
+Vec4 lerp(Vec4 op1, Vec4 op2, float t) {
 	const float invt = 1.0f - t;
 	return {
 		op1.x * invt + op2.x * t,
@@ -186,7 +186,7 @@ float lerp(float a, float b, float t) {
 	return a * (1 - t) + b * t;
 }
 
-Vec3 lerp(const Vec3& op1, const Vec3& op2, float t) {
+Vec3 lerp(Vec3 op1, Vec3 op2, float t) {
 	Vec3 res;
 	const float invt = 1.0f - t;
 	res.x = op1.x * invt + op2.x * t;
@@ -206,7 +206,7 @@ DVec3 lerp(const DVec3& op1, const DVec3& op2, float t) {
 }
 
 
-Vec2 lerp(const Vec2& op1, const Vec2& op2, float t) {
+Vec2 lerp(Vec2 op1, Vec2 op2, float t) {
 	Vec2 res;
 	const float invt = 1.0f - t;
 	res.x = op1.x * invt + op2.x * t;
@@ -231,7 +231,7 @@ Vec4::Vec4(float a, float b, float c, float d)
 {
 }
 
-Vec4::Vec4(const Vec2& v1, const Vec2& v2)
+Vec4::Vec4(Vec2 v1, Vec2 v2)
 	: x(v1.x)
 	, y(v1.y)
 	, z(v2.x)
@@ -239,7 +239,7 @@ Vec4::Vec4(const Vec2& v1, const Vec2& v2)
 {
 }
 
-Vec4::Vec4(const Vec3& v, float d)
+Vec4::Vec4(Vec3 v, float d)
 	: x(v.x)
 	, y(v.y)
 	, z(v.z)
@@ -264,15 +264,15 @@ float Vec4::operator[](u32 i) const {
 	return (&x)[i];
 }
 
-bool Vec4::operator==(const Vec4& rhs) const {
+bool Vec4::operator==(Vec4 rhs) const {
 	return x == rhs.x && y == rhs.y && z == rhs.z && w == rhs.w;
 }
 
-bool Vec4::operator!=(const Vec4& rhs) const {
+bool Vec4::operator!=(Vec4 rhs) const {
 	return x != rhs.x || y != rhs.y || z != rhs.z || w != rhs.w;
 }
 
-Vec4 Vec4::operator+(const Vec4& rhs) const {
+Vec4 Vec4::operator+(Vec4 rhs) const {
 	return Vec4(x + rhs.x, y + rhs.y, z + rhs.z, w + rhs.w);
 }
 
@@ -280,11 +280,11 @@ Vec4 Vec4::operator-() const {
 	return Vec4(-x, -y, -z, -w);
 }
 
-Vec4 Vec4::operator-(const Vec4& rhs) const {
+Vec4 Vec4::operator-(Vec4 rhs) const {
 	return Vec4(x - rhs.x, y - rhs.y, z - rhs.z, w - rhs.w);
 }
 
-void Vec4::operator+=(const Vec4& rhs)
+void Vec4::operator+=(Vec4 rhs)
 {
 	float x = this->x;
 	float y = this->y;
@@ -300,7 +300,7 @@ void Vec4::operator+=(const Vec4& rhs)
 	this->w = w;
 }
 
-void Vec4::operator-=(const Vec4& rhs)
+void Vec4::operator-=(Vec4 rhs)
 {
 	float x = this->x;
 	float y = this->y;
@@ -321,9 +321,8 @@ void Vec4::operator/=(float rhs)
 	*this *= 1.0f / rhs;
 }
 
-Vec4 Vec4::operator*(const Vec4& v) { return Vec4(x * v.x, y * v.y, z * v.z, w * v.w); }
-Vec4 Vec4::operator*(float s) { return Vec4(x * s, y * s, z * s, w * s); }
-Vec4 Vec4::operator/(const Vec4& v) { return Vec4(x / v.x, y / v.y, z / v.z, w / v.w); }
+Vec4 Vec4::operator*(Vec4 v) { return Vec4(x * v.x, y * v.y, z * v.z, w * v.w); }
+Vec4 Vec4::operator/(Vec4 v) { return Vec4(x / v.x, y / v.y, z / v.z, w / v.w); }
 Vec4 Vec4::operator/(float s) { return Vec4(x / s, y / s, z / s, w / s); }
 
 void Vec4::operator*=(float rhs)
@@ -342,7 +341,7 @@ void Vec4::operator*=(float rhs)
 	this->w = w;
 }
 
-Vec2 normalize(const Vec2& value) {
+Vec2 normalize(Vec2 value) {
 	float x = value.x;
 	float y = value.y;
 	const float inv_len = 1 / sqrtf(x * x + y * y);
@@ -360,7 +359,7 @@ DVec2 normalize(const DVec2& value) {
 	return DVec2(x, y);
 }
 
-Vec3 normalize(const Vec3& value) {
+Vec3 normalize(Vec3 value) {
 	float x = value.x;
 	float y = value.y;
 	float z = value.z;
@@ -371,7 +370,7 @@ Vec3 normalize(const Vec3& value) {
 	return Vec3(x, y, z);
 }
 
-Quat normalize(const Quat& value) {
+Quat normalize(Quat value) {
 	float x = value.x;
 	float y = value.y;
 	float z = value.z;
@@ -384,11 +383,11 @@ Quat normalize(const Quat& value) {
 	return Quat(x, y, z, w);
 }
 
-float length(const Vec2& value) { return sqrtf(value.x * value.x + value.y * value.y); }
-float length(const Vec3& value) { return sqrtf(value.x * value.x + value.y * value.y + value.z * value.z); }
+float length(Vec2 value) { return sqrtf(value.x * value.x + value.y * value.y); }
+float length(Vec3 value) { return sqrtf(value.x * value.x + value.y * value.y + value.z * value.z); }
 double length(const DVec3& value) { return sqrt(value.x * value.x + value.y * value.y + value.z * value.z); }
-float squaredLength(const Vec2& value) { return value.x * value.x + value.y * value.y; }
-float squaredLength(const Vec3& value) { return value.x * value.x + value.y * value.y + value.z * value.z; }
+float squaredLength(Vec2 value) { return value.x * value.x + value.y * value.y; }
+float squaredLength(Vec3 value) { return value.x * value.x + value.y * value.y + value.z * value.z; }
 double squaredLength(const DVec2& value) { return value.x * value.x + value.y * value.y; }
 double squaredLength(const DVec3& value) { return value.x * value.x + value.y * value.y + value.z * value.z; }
 
@@ -404,7 +403,7 @@ float halton(u32 index, i32 base) {
 	return r;
 }
 
-Vec3::Vec3(const Vec2& v, float c)
+Vec3::Vec3(Vec2 v, float c)
 	: x(v.x)
 	, y(v.y)
 	, z(c) {}
@@ -429,15 +428,15 @@ float Vec3::operator[](u32 i) const {
 	return (&x)[i];
 }
 
-bool Vec3::operator==(const Vec3& rhs) const {
+bool Vec3::operator==(Vec3 rhs) const {
 	return x == rhs.x && y == rhs.y && z == rhs.z;
 }
 
-bool Vec3::operator!=(const Vec3& rhs) const {
+bool Vec3::operator!=(Vec3 rhs) const {
 	return x != rhs.x || y != rhs.y || z != rhs.z;
 }
 
-Vec3 Vec3::operator+(const Vec3& rhs) const {
+Vec3 Vec3::operator+(Vec3 rhs) const {
 	return Vec3(x + rhs.x, y + rhs.y, z + rhs.z);
 }
 
@@ -445,23 +444,23 @@ Vec3 Vec3::operator-() const {
 	return Vec3(-x, -y, -z);
 }
 
-Vec3 Vec3::operator-(const Vec3& rhs) const {
+Vec3 Vec3::operator-(Vec3 rhs) const {
 	return Vec3(x - rhs.x, y - rhs.y, z - rhs.z);
 }
 
 Vec3 Vec3::operator*(float s) const {
 	return Vec3(x * s, y * s, z * s);
 }
-Vec3 Vec3::operator*(const Vec3& rhs) const {
+Vec3 Vec3::operator*(Vec3 rhs) const {
 	return Vec3(x * rhs.x, y * rhs.y, z * rhs.z);
 }
-Vec3 Vec3::operator*(const IVec3& rhs) const {
+Vec3 Vec3::operator*(IVec3 rhs) const {
 	return Vec3(x * rhs.x, y * rhs.y, z * rhs.z);
 }
-Vec3 Vec3::operator/(const IVec3& rhs) const {
+Vec3 Vec3::operator/(IVec3 rhs) const {
 	return Vec3(x / rhs.x, y / rhs.y, z / rhs.z);
 }
-Vec3 Vec3::operator/(const Vec3& rhs) const {
+Vec3 Vec3::operator/(Vec3 rhs) const {
 	return Vec3(x / rhs.x, y / rhs.y, z / rhs.z);
 }
 Vec3 Vec3::operator/(float s) const {
@@ -485,17 +484,17 @@ DVec3::DVec3(double a) : x(a), y(a), z(a) {}
 
 DVec3::DVec3(double x, double y, double z) : x(x), y(y), z(z) {}
 
-DVec3::DVec3(const Vec3& rhs) : x(rhs.x), y(rhs.y), z(rhs.z) {}
+DVec3::DVec3(Vec3 rhs) : x(rhs.x), y(rhs.y), z(rhs.z) {}
 
 DVec3 DVec3::operator-() const { return {-x, -y, -z}; }
 
 DVec3 DVec3::operator*(float rhs) const { return {x * rhs, y * rhs, z * rhs}; }
 
-DVec3 DVec3::operator*(const Vec3& rhs) const { return {x * rhs.x, y * rhs.y, z * rhs.z}; }
+DVec3 DVec3::operator*(Vec3 rhs) const { return {x * rhs.x, y * rhs.y, z * rhs.z}; }
 
 DVec3 DVec3::operator/(float rhs) const { return {x / rhs, y / rhs, z / rhs}; }
 
-DVec3 DVec3::operator/(const Vec3& rhs) const { return {x / rhs.x, y / rhs.y, z / rhs.z}; }
+DVec3 DVec3::operator/(Vec3 rhs) const { return {x / rhs.x, y / rhs.y, z / rhs.z}; }
 
 DVec3 DVec3::operator/(const DVec3& rhs) const { return {x / rhs.x, y / rhs.y, z / rhs.z}; }
 
@@ -503,19 +502,19 @@ DVec3 DVec3::operator-(const DVec3& rhs) const { return {x - rhs.x, y - rhs.y, z
 
 DVec3 DVec3::operator+(const DVec3& rhs) const { return {x + rhs.x, y + rhs.y, z + rhs.z }; }
 
-DVec3 DVec3::operator-(const Vec3& rhs) const { return {x - rhs.x, y - rhs.y, z - rhs.z }; }
+DVec3 DVec3::operator-(Vec3 rhs) const { return {x - rhs.x, y - rhs.y, z - rhs.z }; }
 
-DVec3 DVec3::operator+(const Vec3& rhs) const { return {x + rhs.x, y + rhs.y, z + rhs.z }; }
+DVec3 DVec3::operator+(Vec3 rhs) const { return {x + rhs.x, y + rhs.y, z + rhs.z }; }
 
-void DVec3::operator*=(const double& rhs) { x *= rhs; y *= rhs; z *= rhs; }
+void DVec3::operator*=(double rhs) { x *= rhs; y *= rhs; z *= rhs; }
 
-void DVec3::operator/=(const double& rhs) { x /= rhs; y /= rhs; z /= rhs; }
+void DVec3::operator/=(double rhs) { x /= rhs; y /= rhs; z /= rhs; }
 
 void DVec3::operator+=(const DVec3& rhs) { x += rhs.x; y += rhs.y; z += rhs.z; }
 
-void DVec3::operator+=(const Vec3& rhs) { x += rhs.x; y += rhs.y; z += rhs.z; }
+void DVec3::operator+=(Vec3 rhs) { x += rhs.x; y += rhs.y; z += rhs.z; }
 
-void DVec3::operator-=(const Vec3& rhs) { x -= rhs.x; y -= rhs.y; z -= rhs.z; }
+void DVec3::operator-=(Vec3 rhs) { x -= rhs.x; y -= rhs.y; z -= rhs.z; }
 
 DVec2 DVec3::xz() const { return DVec2(x, z); }
 
@@ -525,7 +524,7 @@ Vec3::Vec3(const DVec3& rhs)
 	, z((float)rhs.z)
 {}
 
-Vec3::Vec3(const IVec3& rhs)
+Vec3::Vec3(IVec3 rhs)
 	: x((float)rhs.x)
 	, y((float)rhs.y)
 	, z((float)rhs.z)
@@ -537,13 +536,13 @@ void Vec3::operator*=(float rhs) {
 	z *= rhs;
 }
 
-void Vec3::operator+=(const Vec3& rhs) {
+void Vec3::operator+=(Vec3 rhs) {
 	x += rhs.x;
 	y += rhs.y;
 	z += rhs.z;
 }
 
-void Vec3::operator-=(const Vec3& rhs) {
+void Vec3::operator-=(Vec3 rhs) {
 	float x = this->x;
 	float y = this->y;
 	float z = this->z;
@@ -555,7 +554,7 @@ void Vec3::operator-=(const Vec3& rhs) {
 	this->z = z;
 }
 
-void IVec4::operator += (const IVec4& rhs) {
+void IVec4::operator += (IVec4 rhs) {
 	x += rhs.x;
 	y += rhs.y;
 	z += rhs.z;
@@ -563,7 +562,7 @@ void IVec4::operator += (const IVec4& rhs) {
 }
 
 
-Quat::Quat(const Vec3& axis, float angle)
+Quat::Quat(Vec3 axis, float angle)
 {
 	float half_angle = angle * 0.5f;
 	float s = sinf(half_angle);
@@ -574,7 +573,7 @@ Quat::Quat(const Vec3& axis, float angle)
 }
 
 
-Quat Quat::vec3ToVec3(const Vec3& v0, const Vec3& v1)
+Quat Quat::vec3ToVec3(Vec3 v0, Vec3 v1)
 {
 	const Vec3 from = normalize(v0);
 	const Vec3 to = normalize(v1);
@@ -602,7 +601,7 @@ Quat Quat::vec3ToVec3(const Vec3& v0, const Vec3& v1)
 }
 
 
-void Quat::fromEuler(const Vec3& euler)
+void Quat::fromEuler(Vec3 euler)
 {
 	ASSERT(euler.x >= -HALF_PI && euler.x <= HALF_PI);
 	float ex = euler.x * 0.5f;
@@ -662,7 +661,7 @@ Quat Quat::conjugated() const
 	return Quat(x, y, z, -w);
 }
 
-Vec3 slerp(const Vec3& a, const Vec3& b, float t) {
+Vec3 slerp(Vec3 a, Vec3 b, float t) {
 	 float d = dot(a, b);
 	 d = clamp(d, -1.f, 1.f);
 	 const float s = acosf(d) * t;
@@ -751,28 +750,28 @@ Matrix Quat::toMatrix() const
 	return mtx;
 }
 
-Transform::Transform(const DVec3& pos, const Quat& rot, Vec3 scale)
+Transform::Transform(const DVec3& pos, Quat rot, Vec3 scale)
 	: pos(pos)
 	, rot(rot)
 	, scale(scale) {}
 
 Transform Transform::compose(const LocalRigidTransform& rhs) const { return {pos + rot.rotate(rhs.pos * scale), rot * rhs.rot, scale}; }
 
-DVec3 Transform::transform(const Vec3& value) const { return pos + rot.rotate(value * scale); }
+DVec3 Transform::transform(Vec3 value) const { return pos + rot.rotate(value * scale); }
 
 DVec3 Transform::invTransform(const DVec3& value) const {
 	return rot.conjugated().rotate(value - pos) / scale;
 }
 
-DVec3 Transform::invTransform(const Vec3& value) const {
+DVec3 Transform::invTransform(Vec3 value) const {
 	return rot.conjugated().rotate(DVec3(value) - pos) / scale;
 }
 
 DVec3 Transform::transform(const DVec3& value) const { return pos + rot.rotate(value * scale); }
 
-Vec3 Transform::transformVector(const Vec3& value) const { return rot.rotate(value * scale); }
+Vec3 Transform::transformVector(Vec3 value) const { return rot.rotate(value * scale); }
 
-Vec3 Transform::invTransformVector(const Vec3& value) const {
+Vec3 Transform::invTransformVector(Vec3 value) const {
 	return rot.conjugated().rotate(value) / scale;
 }
 
@@ -795,7 +794,7 @@ Transform Transform::computeLocal(const Transform& parent, const Transform& chil
 	};
 }
 
-LocalTransform::LocalTransform(const Vec3& pos, const Quat& rot, float scale)
+LocalTransform::LocalTransform(Vec3 pos, Quat rot, float scale)
 	: pos(pos)
 	, rot(rot)
 	, scale(scale)
@@ -854,7 +853,7 @@ RigidTransform RigidTransform::inverted() const {
 	return result;
 }
 
-RigidTransform::RigidTransform(const DVec3& pos, const Quat& rot)
+RigidTransform::RigidTransform(const DVec3& pos, Quat rot)
 	: pos(pos)
 	, rot(rot) {}
 
@@ -864,18 +863,18 @@ RigidTransform RigidTransform::operator*(const LocalRigidTransform& rhs) const {
 
 const Matrix Matrix::IDENTITY(Vec4(1, 0, 0, 0), Vec4(0, 1, 0, 0), Vec4(0, 0, 1, 0), Vec4(0, 0, 0, 1));
 
-Matrix::Matrix(const Vec3& pos, const Quat& rot) {
+Matrix::Matrix(Vec3 pos, Quat rot) {
 	*this = rot.toMatrix();
 	setTranslation(pos);
 }
 
-Matrix::Matrix(const Vec3& pos, const Quat& rot, const Vec3& scale) {
+Matrix::Matrix(Vec3 pos, Quat rot, Vec3 scale) {
 	*this = rot.toMatrix();
 	setTranslation(pos);
 	multiply3x3(scale);
 }
 
-void Matrix::lookAt(const Vec3& eye, const Vec3& at, const Vec3& up) {
+void Matrix::lookAt(Vec3 eye, Vec3 at, Vec3 up) {
 	*this = Matrix::IDENTITY;
 	Vec3 f = normalize((eye - at));
 	Vec3 r = normalize(cross(up, f));
@@ -1184,7 +1183,7 @@ void Matrix::transpose() {
 	columns[2].w = tmp;
 }
 
-void Matrix::multiply3x3(const Vec3& scale) {
+void Matrix::multiply3x3(Vec3 scale) {
 	columns[0].x *= scale.x;
 	columns[0].y *= scale.x;
 	columns[0].z *= scale.x;
@@ -1208,13 +1207,13 @@ void Matrix::multiply3x3(float scale) {
 	columns[2].z *= scale;
 }
 
-Vec3 Matrix::transformPoint(const Vec3& rhs) const {
+Vec3 Matrix::transformPoint(Vec3 rhs) const {
 	return Vec3(columns[0].x * rhs.x + columns[1].x * rhs.y + columns[2].x * rhs.z + columns[3].x,
 		columns[0].y * rhs.x + columns[1].y * rhs.y + columns[2].y * rhs.z + columns[3].y,
 		columns[0].z * rhs.x + columns[1].z * rhs.y + columns[2].z * rhs.z + columns[3].z);
 }
 
-Vec3 Matrix::transformVector(const Vec3& rhs) const {
+Vec3 Matrix::transformVector(Vec3 rhs) const {
 	return Vec3(columns[0].x * rhs.x + columns[1].x * rhs.y + columns[2].x * rhs.z,
 		columns[0].y * rhs.x + columns[1].y * rhs.y + columns[2].y * rhs.z,
 		columns[0].z * rhs.x + columns[1].z * rhs.y + columns[2].z * rhs.z);
@@ -1239,19 +1238,19 @@ void Matrix::setIdentity() {
 	columns[3].w = 1;
 }
 
-float dot(const Vec4& op1, const Vec4& op2) {
+float dot(Vec4 op1, Vec4 op2) {
 	return op1.x * op2.x + op1.y * op2.y + op1.z * op2.z + op1.w * op2.w;
 }
 
-float dot(const Vec3& op1, const Vec3& op2) {
+float dot(Vec3 op1, Vec3 op2) {
 	return op1.x * op2.x + op1.y * op2.y + op1.z * op2.z;
 }
 
-float dot(const Vec2& op1, const Vec2& op2) {
+float dot(Vec2 op1, Vec2 op2) {
 	return op1.x * op2.x + op1.y * op2.y;
 }
 
-Vec3 cross(const Vec3& op1, const Vec3& op2) {
+Vec3 cross(Vec3 op1, Vec3 op2) {
 	return Vec3(op1.y * op2.z - op1.z * op2.y, op1.z * op2.x - op1.x * op2.z, op1.x * op2.y - op1.y * op2.x);
 }
 
@@ -1284,19 +1283,19 @@ float radiansToDegrees(float angle) {
 	return angle / PI * 180.0f;
 }
 
-Vec2 degreesToRadians(const Vec2& v) {
+Vec2 degreesToRadians(Vec2 v) {
 	return Vec2(degreesToRadians(v.x), degreesToRadians(v.y));
 }
 
-Vec2 radiansToDegrees(const Vec2& v) {
+Vec2 radiansToDegrees(Vec2 v) {
 	return Vec2(radiansToDegrees(v.x), radiansToDegrees(v.y));
 }
 
-Vec3 degreesToRadians(const Vec3& v) {
+Vec3 degreesToRadians(Vec3 v) {
 	return Vec3(degreesToRadians(v.x), degreesToRadians(v.y), degreesToRadians(v.z));
 }
 
-Vec3 radiansToDegrees(const Vec3& v) {
+Vec3 radiansToDegrees(Vec3 v) {
 	return Vec3(radiansToDegrees(v.x), radiansToDegrees(v.y), radiansToDegrees(v.z));
 }
 
@@ -1406,26 +1405,26 @@ Matrix3x4::Matrix3x4(const Matrix& rhs) {
 	columns[2] = rhs.columns[2];
 }
 
-Matrix::Matrix(const Vec4& col0, const Vec4& col1, const Vec4& col2, const Vec4& col3) {
+Matrix::Matrix(Vec4 col0, Vec4 col1, Vec4 col2, Vec4 col3) {
 	columns[0] = col0;
 	columns[1] = col1;
 	columns[2] = col2;
 	columns[3] = col3;
 }
 
-void Matrix::setXVector(const Vec3& v) {
+void Matrix::setXVector(Vec3 v) {
 	columns[0].x = v.x;
 	columns[0].y = v.y;
 	columns[0].z = v.z;
 }
 
-void Matrix::setYVector(const Vec3& v) {
+void Matrix::setYVector(Vec3 v) {
 	columns[1].x = v.x;
 	columns[1].y = v.y;
 	columns[1].z = v.z;
 }
 
-void Matrix::setZVector(const Vec3& v) {
+void Matrix::setZVector(Vec3 v) {
 	columns[2].x = v.x;
 	columns[2].y = v.y;
 	columns[2].z = v.z;
@@ -1529,7 +1528,7 @@ void Matrix::copy3x3(const Matrix& mtx) {
 	columns[2].z = mtx.columns[2].z;
 }
 
-void Matrix::translate(const Vec3& t) {
+void Matrix::translate(Vec3 t) {
 	columns[3].x += t.x;
 	columns[3].y += t.y;
 	columns[3].z += t.z;
@@ -1541,7 +1540,7 @@ void Matrix::translate(float x, float y, float z) {
 	columns[3].z += z;
 }
 
-void Matrix::setTranslation(const Vec3& t) {
+void Matrix::setTranslation(Vec3 t) {
 	columns[3].x = t.x;
 	columns[3].y = t.y;
 	columns[3].z = t.z;

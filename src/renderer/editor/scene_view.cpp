@@ -675,7 +675,7 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 							}
 						}
 			
-						Renderer::TransientSlice ub;
+						TransientSlice ub;
 						if (dq_pose.empty()) {
 							struct UBData {
 								Matrix mtx;
@@ -684,7 +684,7 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 								mtx,
 								material->getIndex()
 							};
-							ub = renderer.allocUniform(&ub_data, sizeof(ub_data));
+							ub = stream.allocUniform(&ub_data, sizeof(ub_data));
 						}
 						else {
 							struct UBPrefix {
@@ -696,7 +696,7 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 								// DualQuat bones[];
 							};
 
-							ub = renderer.allocUniform(sizeof(UBPrefix) + dq_pose.byte_size());
+							ub = stream.allocUniform(sizeof(UBPrefix) + dq_pose.byte_size());
 							UBPrefix* dc = (UBPrefix*)ub.ptr;
 							dc->layer = 0;
 							dc->fur_scale = 0;
@@ -753,7 +753,7 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 			DrawStream& stream = pipeline.getRenderer().getDrawStream();
 			pipeline.setUniform(pipeline.toBindless(gbuffer.DS, stream), UniformBuffer::DRAWCALL2);
 
-			renderer.pushJob("icons", [this, &renderer](DrawStream& stream) {
+			renderer.pushJob("icons", [this](DrawStream& stream) {
 				const Viewport& vp = m_scene_view.m_view->getViewport();
 				const Matrix camera_mtx({ 0, 0, 0 }, vp.rot);
 
@@ -780,7 +780,7 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 							mtx,
 							material->getIndex()
 						};
-						const Renderer::TransientSlice ub = renderer.allocUniform(&ub_data, sizeof(ub_data));
+						const TransientSlice ub = stream.allocUniform(&ub_data, sizeof(ub_data));
 						stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 
 						stream.useProgram(program);
@@ -799,10 +799,10 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 			renderer.setRenderTargets(Span(&input, 1), icons_ds);
 			pipeline.clear(gpu::ClearFlags::DEPTH, 0, 0, 0, 0, 0);
 
-			renderer.pushJob("gizmos", [&renderer, &vertices, this](DrawStream& stream) {
-				Renderer::TransientSlice vb = renderer.allocTransient(vertices.byte_size());
+			renderer.pushJob("gizmos", [&vertices, this](DrawStream& stream) {
+				TransientSlice vb = stream.allocTransient(vertices.byte_size());
 				memcpy(vb.ptr, vertices.begin(), vertices.byte_size());
-				const Renderer::TransientSlice ub = renderer.allocUniform(&Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
+				const TransientSlice ub = stream.allocUniform(&Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
 
 				gpu::VertexDecl lines_decl(gpu::PrimitiveType::LINES);
 				lines_decl.addAttribute(0, 3, gpu::AttributeType::FLOAT, 0);

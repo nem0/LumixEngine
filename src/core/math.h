@@ -16,16 +16,16 @@ struct Matrix;
 struct LUMIX_CORE_API IVec2 {
 	IVec2() {}
 	explicit IVec2(i32 i) : x(i), y(i) {}
-	explicit IVec2(const Vec2& rhs);
+	explicit IVec2(Vec2 rhs);
 	IVec2(i32 x, i32 y) : x(x), y(y) {}
-	IVec2 operator +(const IVec2& v) const { return IVec2(x + v.x, y + v.y); }
-	IVec2 operator -(const IVec2& v) const { return IVec2(x - v.x, y - v.y); }
+	IVec2 operator +(IVec2 v) const { return IVec2(x + v.x, y + v.y); }
+	IVec2 operator -(IVec2 v) const { return IVec2(x - v.x, y - v.y); }
 	IVec2 operator *(i32 i) const { return IVec2(x * i, y * i); }
 	IVec2 operator / (i32 rhs) const { return IVec2(x / rhs, y / rhs); }
-	IVec2 operator / (const IVec2& rhs) const { return IVec2(x / rhs.x, y / rhs.y); }
-	inline Vec2 operator / (const Vec2& rhs) const;
-	bool operator !=(const IVec2& rhs) const { return rhs.x != x || rhs.y != y; }
-	bool operator ==(const IVec2& rhs) const { return rhs.x == x && rhs.y == y; }
+	IVec2 operator / (IVec2 rhs) const { return IVec2(x / rhs.x, y / rhs.y); }
+	inline Vec2 operator / (Vec2 rhs) const;
+	bool operator !=(IVec2 rhs) const { return rhs.x != x || rhs.y != y; }
+	bool operator ==(IVec2 rhs) const { return rhs.x == x && rhs.y == y; }
 
 	i32 x;
 	i32 y;
@@ -34,10 +34,10 @@ struct LUMIX_CORE_API IVec2 {
 struct LUMIX_CORE_API IVec3 {
 	IVec3() {}
 	IVec3(i32 x, i32 y, i32 z) : x(x), y(y), z(z) {}
-	IVec3 operator +(const IVec3& v) const { return IVec3(x + v.x, y + v.y, z + v.z); }
+	IVec3 operator +(IVec3 v) const { return IVec3(x + v.x, y + v.y, z + v.z); }
 	explicit IVec3(const DVec3& rhs);
-	explicit IVec3(const Vec3& rhs);
-	bool operator==(const IVec3& rhs) const { return x == rhs.x && y == rhs.y && z == rhs.z; }
+	explicit IVec3(Vec3 rhs);
+	bool operator==(IVec3 rhs) const { return x == rhs.x && y == rhs.y && z == rhs.z; }
 	DVec3 operator *(double i) const;
 	IVec2 xy() const { return {x, y}; }
 
@@ -50,8 +50,8 @@ struct LUMIX_CORE_API IVec4 {
 	IVec4() {}
 	IVec4(i32 x, i32 y, i32 z, i32 w) : x(x), y(y), z(z), w(w) {}
 	IVec4(i32 v) : x(v), y(v), z(v), w(v) {}
-	IVec4(const IVec2& a, const IVec2& b) : x(a.x), y(a.y), z(b.x), w(b.y) {}
-	void operator += (const IVec4& rhs);
+	IVec4(IVec2 a, IVec2 b) : x(a.x), y(a.y), z(b.x), w(b.y) {}
+	void operator += (IVec4 rhs);
 	IVec2 xy() const { return {x,y}; }
 	IVec2 zw() const { return {z,w}; }
 
@@ -61,8 +61,8 @@ struct LUMIX_CORE_API IVec4 {
 struct LUMIX_CORE_API DVec2 { 
 	DVec2() {}
 	DVec2(double x, double y) : x(x), y(y) {}
-	DVec2 operator -(const DVec2& rhs) const { return {x - rhs.x, y - rhs.y}; }
-	DVec2 operator +(const DVec2& rhs) const { return {x + rhs.x, y + rhs.y}; }
+	DVec2 operator -(DVec2 rhs) const { return {x - rhs.x, y - rhs.y}; }
+	DVec2 operator +(DVec2 rhs) const { return {x + rhs.x, y + rhs.y}; }
 	DVec2 operator *(double rhs) const { return {x * rhs, y * rhs}; }
 	double x, y;
 };
@@ -70,26 +70,26 @@ struct LUMIX_CORE_API DVec2 {
 struct LUMIX_CORE_API Vec2 {
 	Vec2() {}
 	
-	explicit Vec2(const IVec2& rhs);
-	explicit Vec2(const DVec2& rhs);
+	explicit Vec2(IVec2 rhs);
+	explicit Vec2(DVec2 rhs);
 	explicit Vec2(float a);
 	Vec2(float a, float b);
 
 	float& operator[](u32 i);
 	float operator[](u32 i) const;
-	bool operator==(const Vec2& rhs) const;
-	bool operator!=(const Vec2& rhs) const;
+	bool operator==(Vec2 rhs) const;
+	bool operator!=(Vec2 rhs) const;
 	void operator/=(float rhs);
 	void operator*=(float f);
 
-	Vec2 operator *(const Vec2& v) const;
-	Vec2 operator /(const Vec2& v) const;
+	Vec2 operator *(Vec2 v) const;
+	Vec2 operator /(Vec2 v) const;
 	Vec2 operator *(float f) const;
 	Vec2 operator /(float f) const;
-	Vec2 operator +(const Vec2& v) const;
+	Vec2 operator +(Vec2 v) const;
 	Vec2 operator +(float v) const;
-	void operator +=(const Vec2& v);
-	Vec2 operator -(const Vec2& v) const;
+	void operator +=(Vec2 v);
+	Vec2 operator -(Vec2 v) const;
 	Vec2 operator -(float f) const;
 	Vec2 operator -() const;
 	Vec2 ortho() const { return {y, -x}; }
@@ -103,26 +103,26 @@ struct LUMIX_CORE_API Vec2 {
 
 struct LUMIX_CORE_API Vec3 {
 	Vec3() {}
-	Vec3(const Vec2& v, float c);
+	Vec3(Vec2 v, float c);
 	Vec3(float a, float b, float c);
 	explicit Vec3(float a);
 	explicit Vec3(const DVec3& rhs);
-	explicit Vec3(const IVec3& rhs);
+	explicit Vec3(IVec3 rhs);
 
 	float& operator[](u32 i);
 	float operator[](u32 i) const;
-	bool operator==(const Vec3& rhs) const;
-	bool operator!=(const Vec3& rhs) const;
-	Vec3 operator+(const Vec3& rhs) const;
+	bool operator==(Vec3 rhs) const;
+	bool operator!=(Vec3 rhs) const;
+	Vec3 operator+(Vec3 rhs) const;
 	Vec3 operator-() const;
-	Vec3 operator-(const Vec3& rhs) const;
-	void operator+=(const Vec3& rhs);
-	void operator-=(const Vec3& rhs);
+	Vec3 operator-(Vec3 rhs) const;
+	void operator+=(Vec3 rhs);
+	void operator-=(Vec3 rhs);
 	Vec3 operator*(float s) const;
-	Vec3 operator*(const Vec3& rhs) const;
-	Vec3 operator*(const IVec3& rhs) const;
-	Vec3 operator/(const Vec3& rhs) const;
-	Vec3 operator/(const IVec3& rhs) const;
+	Vec3 operator*(Vec3 rhs) const;
+	Vec3 operator*(IVec3 rhs) const;
+	Vec3 operator/(Vec3 rhs) const;
+	Vec3 operator/(IVec3 rhs) const;
 	Vec3 operator-(float s) const;
 	Vec3 operator/(float s) const;
 	void operator/=(float rhs);
@@ -152,23 +152,23 @@ struct LUMIX_CORE_API DVec3
 	DVec3(double a);
 	DVec3(double x, double y, double z);
 	DVec3(const DVec3& rhs) = default;
-	explicit DVec3(const Vec3& rhs);
+	explicit DVec3(Vec3 rhs);
 
 	DVec3 operator-() const;
 	DVec3 operator*(float rhs) const;
-	DVec3 operator*(const Vec3& rhs) const;
+	DVec3 operator*(Vec3 rhs) const;
 	DVec3 operator/(float rhs) const;
-	DVec3 operator/(const Vec3& rhs) const;
+	DVec3 operator/(Vec3 rhs) const;
 	DVec3 operator/(const DVec3& rhs) const;
 	DVec3 operator-(const DVec3& rhs) const;
 	DVec3 operator+(const DVec3& rhs) const;
-	DVec3 operator-(const Vec3& rhs) const;
-	DVec3 operator+(const Vec3& rhs) const;
-	void operator*=(const double& rhs);
-	void operator/=(const double& rhs);
+	DVec3 operator-(Vec3 rhs) const;
+	DVec3 operator+(Vec3 rhs) const;
+	void operator*=(double rhs);
+	void operator/=(double rhs);
 	void operator+=(const DVec3& rhs);
-	void operator+=(const Vec3& rhs);
-	void operator-=(const Vec3& rhs);
+	void operator+=(Vec3 rhs);
+	void operator-=(Vec3 rhs);
 	DVec2 xz() const;
 
 	double x, y, z;
@@ -180,8 +180,8 @@ struct LUMIX_CORE_API Vec4 {
 	explicit Vec4(float a);
 
 	Vec4(float a, float b, float c, float d);
-	Vec4(const Vec2& v1, const Vec2& v2);
-	Vec4(const Vec3& v, float d);
+	Vec4(Vec2 v1, Vec2 v2);
+	Vec4(Vec3 v, float d);
 
 	Vec2 xz() const;
 	Vec2 xy() const;
@@ -192,19 +192,18 @@ struct LUMIX_CORE_API Vec4 {
 
 	float& operator[](u32 i);
 	float operator[](u32 i) const;
-	bool operator==(const Vec4& rhs) const;
-	bool operator!=(const Vec4& rhs) const;
-	Vec4 operator+(const Vec4& rhs) const;
+	bool operator==(Vec4 rhs) const;
+	bool operator!=(Vec4 rhs) const;
+	Vec4 operator+(Vec4 rhs) const;
 	Vec4 operator-() const;
-	Vec4 operator-(const Vec4& rhs) const;
+	Vec4 operator-(Vec4 rhs) const;
 
-	void operator+=(const Vec4& rhs);
-	void operator-=(const Vec4& rhs);
+	void operator+=(Vec4 rhs);
+	void operator-=(Vec4 rhs);
 	void operator/=(float rhs);
 	Vec4 operator/(float s);
-	Vec4 operator/(const Vec4& v);
-	Vec4 operator*(float s);
-	Vec4 operator*(const Vec4& v);
+	Vec4 operator/(Vec4 v);
+	Vec4 operator*(Vec4 v);
 	void operator*=(float rhs);
 
 	union {
@@ -221,19 +220,18 @@ struct LUMIX_CORE_API Vec4 {
 	static const Vec4 ZERO;
 };
 
-
-LUMIX_CORE_API Vec3 operator *(float f, const Vec3& v);
-LUMIX_CORE_API Vec4 operator *(float f, const Vec4& v);
-LUMIX_CORE_API Vec4 operator*(const Vec4& v, float s);
-LUMIX_CORE_API Vec4 operator/(const Vec4& v, float s);
+LUMIX_CORE_API Vec3 operator *(float f, Vec3 v);
+LUMIX_CORE_API Vec4 operator *(float f, Vec4 v);
+LUMIX_CORE_API Vec4 operator *(Vec4 v, float s);
+LUMIX_CORE_API Vec4 operator /(Vec4 v, float s);
 
 struct LUMIX_CORE_API Quat
 {
 	Quat() {}
-	Quat(const Vec3& axis, float angle);
+	Quat(Vec3 axis, float angle);
 	Quat(float _x, float _y, float _z, float _w) { x = _x; y = _y; z = _z; w = _w; } 
 
-	void fromEuler(const Vec3& euler);
+	void fromEuler(Vec3 euler);
 	Vec3 toEuler() const;
 	float toYaw() const;
 	void set(float _x, float _y, float _z, float _w) { x = _x; y = _y; z = _z; w = _w; } 
@@ -249,7 +247,7 @@ struct LUMIX_CORE_API Quat
 	Quat operator*(float m) const;
 	Vec3 operator*(Vec3 q) const;
 
-	static Quat vec3ToVec3(const Vec3& a, const Vec3& b);
+	static Quat vec3ToVec3(Vec3 a, Vec3 b);
 
 	float x, y, z, w;
 	
@@ -273,7 +271,7 @@ struct LUMIX_CORE_API LocalRigidTransform {
 
 struct LUMIX_CORE_API RigidTransform {
 	RigidTransform() {}
-	RigidTransform(const DVec3& pos, const Quat& rot);
+	RigidTransform(const DVec3& pos, Quat rot);
 
 	RigidTransform inverted() const;
 	RigidTransform operator*(const RigidTransform& rhs) const;
@@ -287,7 +285,7 @@ struct LUMIX_CORE_API RigidTransform {
 // single precision position, uniform scale
 struct LUMIX_CORE_API LocalTransform {
 	LocalTransform() {}
-	LocalTransform(const Vec3& pos, const Quat& rot, float scale);
+	LocalTransform(Vec3 pos, Quat rot, float scale);
 
 	LocalTransform inverted() const;
 
@@ -307,18 +305,18 @@ struct LUMIX_CORE_API LocalTransform {
 // 	* scale is lossy, i.e. when composing multiple transforms, "direction" of the original scale is lost
 struct LUMIX_CORE_API Transform {
 	Transform() {}
-	Transform(const DVec3& pos, const Quat& rot, Vec3 scale);
+	Transform(const DVec3& pos, Quat rot, Vec3 scale);
 	
 	static Transform computeLocal(const Transform& parent, const Transform& child);
 
 	Transform compose(const Transform& rhs) const;
 	Transform compose(const LocalRigidTransform& rhs) const;
 	DVec3 transform(const DVec3& value) const;
-	DVec3 transform(const Vec3& value) const;
+	DVec3 transform(Vec3 value) const;
 	DVec3 invTransform(const DVec3& value) const;
-	DVec3 invTransform(const Vec3& value) const;
-	Vec3 transformVector(const Vec3& value) const;
-	Vec3 invTransformVector(const Vec3& value) const;
+	DVec3 invTransform(Vec3 value) const;
+	Vec3 transformVector(Vec3 value) const;
+	Vec3 invTransformVector(Vec3 value) const;
 	RigidTransform getRigidPart() const;
 
 	DVec3 pos;
@@ -335,9 +333,9 @@ struct alignas(16) LUMIX_CORE_API Matrix {
 
 	Matrix() {}
 
-	Matrix(const Vec4& col0, const Vec4& col1, const Vec4& col2, const Vec4& col3);
-	Matrix(const Vec3& pos, const Quat& rot);
-	Matrix(const Vec3& pos, const Quat& rot, const Vec3& scale);
+	Matrix(Vec4 col0, Vec4 col1, Vec4 col2, Vec4 col3);
+	Matrix(Vec3 pos, Quat rot);
+	Matrix(Vec3 pos, Quat rot, Vec3 scale);
 
 	void decompose(Vec3& position, Quat& rotation, float& scale) const;
 	void decompose(Vec3& position, Quat& rotation, Vec3& scale) const;
@@ -348,39 +346,39 @@ struct alignas(16) LUMIX_CORE_API Matrix {
 	Matrix operator*(const Matrix& rhs) const;
 	Matrix operator+(const Matrix& rhs) const;
 	Matrix operator*(float rhs) const;
-	Vec4 operator*(const Vec4& rhs) const { return columns[0] * rhs.x + columns[1] * rhs.y + columns[2] * rhs.z + columns[3] * rhs.w; }
+	Vec4 operator*(Vec4 rhs) const { return columns[0] * rhs.x + columns[1] * rhs.y + columns[2] * rhs.z + columns[3] * rhs.w; }
 
 	Vec3 getZVector() const { return columns[2].xyz(); }
 	Vec3 getYVector() const { return columns[1].xyz(); }
 	Vec3 getXVector() const { return columns[0].xyz(); }
 
-	void setXVector(const Vec3& v);
-	void setYVector(const Vec3& v);
-	void setZVector(const Vec3& v);
+	void setXVector(Vec3 v);
+	void setYVector(Vec3 v);
+	void setZVector(Vec3 v);
 
 	float determinant() const;
 	Matrix inverted() const;
 	// orthonormal
 	Matrix fastInverted() const;
 	void copy3x3(const Matrix& mtx);
-	void translate(const Vec3& t);
+	void translate(Vec3 t);
 	void translate(float x, float y, float z);
-	void setTranslation(const Vec3& t);
+	void setTranslation(Vec3 t);
 
 	void setOrtho(float left, float right, float bottom, float top, float z_near, float z_far, bool reversed_z);
 	// reversed z, infinite far plane
 	void setPerspective(float vertical_fov, float xy_ratio, float near_plane);
 	void fromEuler(float yaw, float pitch, float roll);
-	void lookAt(const Vec3& eye, const Vec3& at, const Vec3& up);
+	void lookAt(Vec3 eye, Vec3 at, Vec3 up);
 	void normalizeScale();
 
 	Vec3 getTranslation() const { return columns[3].xyz(); }
 	Quat getRotation() const;
 	void transpose();
-	Vec3 transformPoint(const Vec3& pos) const;
-	Vec3 transformVector(const Vec3& pos) const;
+	Vec3 transformPoint(Vec3 pos) const;
+	Vec3 transformVector(Vec3 pos) const;
 	void multiply3x3(float scale);
-	void multiply3x3(const Vec3& scale);
+	void multiply3x3(Vec3 scale);
 	void setIdentity();
 
 	Vec4 columns[4];
@@ -423,14 +421,14 @@ template <typename T> LUMIX_FORCE_INLINE T minimum(T a, T b) {
 	return a < b ? a : b;
 }
 
-LUMIX_FORCE_INLINE Vec2 minimum(const Vec2& a, const Vec2& b) {
+LUMIX_FORCE_INLINE Vec2 minimum(Vec2 a, Vec2 b) {
 	return {
 		minimum(a.x, b.x),
 		minimum(a.y, b.y),
 	};
 }
 
-LUMIX_FORCE_INLINE IVec2 minimum(const IVec2& a, const IVec2& b) {
+LUMIX_FORCE_INLINE IVec2 minimum(IVec2 a, IVec2 b) {
 	return {
 		minimum(a.x, b.x),
 		minimum(a.y, b.y),
@@ -445,7 +443,7 @@ LUMIX_FORCE_INLINE DVec3 minimum(const DVec3& a, const DVec3& b) {
 	};
 }
 
-LUMIX_FORCE_INLINE Vec3 minimum(const Vec3& a, const Vec3& b) {
+LUMIX_FORCE_INLINE Vec3 minimum(Vec3 a, Vec3 b) {
 	return {
 		minimum(a.x, b.x),
 		minimum(a.y, b.y),
@@ -453,7 +451,7 @@ LUMIX_FORCE_INLINE Vec3 minimum(const Vec3& a, const Vec3& b) {
 	};
 }
 
-LUMIX_FORCE_INLINE Vec4 minimum(const Vec4& a, const Vec4& b) {
+LUMIX_FORCE_INLINE Vec4 minimum(Vec4 a, Vec4 b) {
 	return {
 		minimum(a.x, b.x),
 		minimum(a.y, b.y),
@@ -476,14 +474,14 @@ template <typename T1, typename... T2> LUMIX_FORCE_INLINE T1 maximum(T1 a, T2...
 	return a > min_b ? a : min_b;
 }
 
-LUMIX_FORCE_INLINE Vec2 maximum(const Vec2& a, const Vec2& b) {
+LUMIX_FORCE_INLINE Vec2 maximum(Vec2 a, Vec2 b) {
 	return {
 		maximum(a.x, b.x),
 		maximum(a.y, b.y),
 	};
 }
 
-LUMIX_FORCE_INLINE IVec2 maximum(const IVec2& a, const IVec2& b) {
+LUMIX_FORCE_INLINE IVec2 maximum(IVec2 a, IVec2 b) {
 	return {
 		maximum(a.x, b.x),
 		maximum(a.y, b.y),
@@ -498,7 +496,7 @@ LUMIX_FORCE_INLINE DVec3 maximum(const DVec3& a, const DVec3& b) {
 	};
 }
 
-LUMIX_FORCE_INLINE Vec3 maximum(const Vec3& a, const Vec3& b) {
+LUMIX_FORCE_INLINE Vec3 maximum(Vec3 a, Vec3 b) {
 	return {
 		maximum(a.x, b.x),
 		maximum(a.y, b.y),
@@ -506,7 +504,7 @@ LUMIX_FORCE_INLINE Vec3 maximum(const Vec3& a, const Vec3& b) {
 	};
 }
 
-LUMIX_FORCE_INLINE Vec4 maximum(const Vec4& a, const Vec4& b) {
+LUMIX_FORCE_INLINE Vec4 maximum(Vec4 a, Vec4 b) {
 	return {
 		maximum(a.x, b.x),
 		maximum(a.y, b.y),
@@ -529,18 +527,18 @@ template <typename T> bool isPowOfTwo(T n)
 	return (n) && !(n & (n - 1));
 }
 
-LUMIX_CORE_API float dot(const Vec4& op1, const Vec4& op2);
-LUMIX_CORE_API float dot(const Vec3& op1, const Vec3& op2);
-LUMIX_CORE_API float dot(const Vec2& op1, const Vec2& op2);
-LUMIX_CORE_API Vec3 cross(const Vec3& op1, const Vec3& op2);
+LUMIX_CORE_API float dot(Vec4 op1, Vec4 op2);
+LUMIX_CORE_API float dot(Vec3 op1, Vec3 op2);
+LUMIX_CORE_API float dot(Vec2 op1, Vec2 op2);
+LUMIX_CORE_API Vec3 cross(Vec3 op1, Vec3 op2);
 LUMIX_CORE_API DVec3 cross(const DVec3& op1, const DVec3& op2);
 
-LUMIX_CORE_API Vec4 lerp(const Vec4& op1, const Vec4& op2, float t);
+LUMIX_CORE_API Vec4 lerp(Vec4 op1, Vec4 op2, float t);
 LUMIX_CORE_API float lerp(float a, float b, float t);
-LUMIX_CORE_API Vec3 lerp(const Vec3& op1, const Vec3& op2, float t);
+LUMIX_CORE_API Vec3 lerp(Vec3 op1, Vec3 op2, float t);
 LUMIX_CORE_API DVec3 lerp(const DVec3& op1, const DVec3& op2, float t);
-LUMIX_CORE_API Vec2 lerp(const Vec2& op1, const Vec2& op2, float t);
-LUMIX_CORE_API Vec3 slerp(const Vec3& a, const Vec3& b, float t);
+LUMIX_CORE_API Vec2 lerp(Vec2 op1, Vec2 op2, float t);
+LUMIX_CORE_API Vec3 slerp(Vec3 a, Vec3 b, float t);
 LUMIX_CORE_API Quat nlerp(Quat q1, Quat q2, float t);
 
 LUMIX_CORE_API u32 nextPow2(u32 v);
@@ -549,10 +547,10 @@ LUMIX_CORE_API float degreesToRadians(float angle);
 LUMIX_CORE_API double degreesToRadians(double angle);
 LUMIX_CORE_API float degreesToRadians(int angle);
 LUMIX_CORE_API float radiansToDegrees(float angle);
-LUMIX_CORE_API Vec2 radiansToDegrees(const Vec2& v);
-LUMIX_CORE_API Vec3 radiansToDegrees(const Vec3& v);
-LUMIX_CORE_API Vec2 degreesToRadians(const Vec2& v);
-LUMIX_CORE_API Vec3 degreesToRadians(const Vec3& v);
+LUMIX_CORE_API Vec2 radiansToDegrees(Vec2 v);
+LUMIX_CORE_API Vec3 radiansToDegrees(Vec3 v);
+LUMIX_CORE_API Vec2 degreesToRadians(Vec2 v);
+LUMIX_CORE_API Vec3 degreesToRadians(Vec3 v);
 LUMIX_CORE_API float easeInOut(float t);
 LUMIX_CORE_API float angleDiff(float a, float b);
 LUMIX_CORE_API u64 randGUID();
@@ -560,16 +558,16 @@ LUMIX_CORE_API u32 rand();
 LUMIX_CORE_API u32 rand(u32 from, u32 to);
 LUMIX_CORE_API float randFloat();
 LUMIX_CORE_API float randFloat(float from, float to);
-LUMIX_CORE_API DVec2 normalize(const DVec2& value);
-LUMIX_CORE_API Vec2 normalize(const Vec2& value);
-LUMIX_CORE_API Vec3 normalize(const Vec3& value);
-LUMIX_CORE_API Quat normalize(const Quat& value);
-LUMIX_CORE_API float length(const Vec2& value);
-LUMIX_CORE_API float length(const Vec3& value);
+LUMIX_CORE_API DVec2 normalize(DVec2 value);
+LUMIX_CORE_API Vec2 normalize(Vec2 value);
+LUMIX_CORE_API Vec3 normalize(Vec3 value);
+LUMIX_CORE_API Quat normalize(Quat value);
+LUMIX_CORE_API float length(Vec2 value);
+LUMIX_CORE_API float length(Vec3 value);
 LUMIX_CORE_API double length(const DVec3& value);
-LUMIX_CORE_API float squaredLength(const Vec2& value);
-LUMIX_CORE_API float squaredLength(const Vec3& value);
-LUMIX_CORE_API double squaredLength(const DVec2& value);
+LUMIX_CORE_API float squaredLength(Vec2 value);
+LUMIX_CORE_API float squaredLength(Vec3 value);
+LUMIX_CORE_API double squaredLength(DVec2 value);
 LUMIX_CORE_API double squaredLength(const DVec3& value);
 LUMIX_CORE_API float halton(u32 index, i32 base);
 
