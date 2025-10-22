@@ -375,4 +375,11 @@ inline StateFlags getStencilStateBits(u8 write_mask, StencilFuncs func, u8 ref, 
 
 } // namespace gpu
 
+struct TransientSlice {
+	gpu::BufferHandle buffer;
+	u32 offset;
+	u32 size;
+	u8* ptr;
+};
+
 } // namespace Lumix

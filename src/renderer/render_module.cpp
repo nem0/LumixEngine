@@ -47,7 +47,6 @@ static const ComponentType TERRAIN_TYPE = reflection::getComponentType("terrain"
 static const ComponentType BONE_ATTACHMENT_TYPE = reflection::getComponentType("bone_attachment");
 static const ComponentType ENVIRONMENT_PROBE_TYPE = reflection::getComponentType("environment_probe");
 static const ComponentType REFLECTION_PROBE_TYPE = reflection::getComponentType("reflection_probe");
-static const ComponentType FUR_TYPE = reflection::getComponentType("fur");
 static const ComponentType PROCEDURAL_GEOM_TYPE = reflection::getComponentType("procedural_geom");
 
 
@@ -709,27 +708,11 @@ struct RenderModuleImpl final : RenderModule {
 		}
 	}
 
-	void serializeFurs(OutputMemoryStream& serializer) {
-		serializer.write(m_furs.size());
-		for (auto iter : m_furs.iterated()) {
-			serializer.write(iter.key());
-			serializer.write(iter.value());
-		}
-	}
-
-	void deserializeFurs(InputMemoryStream& serializer, const EntityMap& entity_map) {
-		u32 count;
-		serializer.read(count);
-		m_furs.reserve(count + m_furs.size());
-		for (u32 i = 0; i < count; ++i) {
-			EntityRef e;
-			serializer.read(e);
-			e = entity_map.get(e);
-			Fur fur;
-			serializer.read(fur);
-			m_furs.insert(e, fur);
-			m_world.onComponentCreated(e, FUR_TYPE, this);
-		}
+	void deserializeFurs(InputMemoryStream& serializer, const EntityMap& entity_map, i32 version) {
+		if (version > (i32)RenderModuleVersion::REMOVED_FUR) return;
+		
+		u32 count = serializer.read<u32>();
+		ASSERT(count == 0);
 	}
 
 	void deserializeDecals(InputMemoryStream& serializer, const EntityMap& entity_map, i32 version)
@@ -969,7 +952,6 @@ struct RenderModuleImpl final : RenderModule {
 		serializeReflectionProbes(serializer);
 		serializeDecals(serializer);
 		serializeCurveDecals(serializer);
-		serializeFurs(serializer);
 		serializeInstancedModels(serializer);
 		serializeProceduralGeometries(serializer);
 	}
@@ -1238,7 +1220,7 @@ struct RenderModuleImpl final : RenderModule {
 		deserializeReflectionProbes(serializer, entity_map);
 		deserializeDecals(serializer, entity_map, version);
 		deserializeCurveDecals(serializer, entity_map, version);
-		deserializeFurs(serializer, entity_map);
+		deserializeFurs(serializer, entity_map, version);
 		deserializeInstancedModels(serializer, entity_map, version);
 		if (version <= (i32)RenderModuleVersion::REMOVED_SPLINE_GEOMETRY && version > (i32)RenderModuleVersion::SPLINES) {
 			u32 count;
@@ -1390,11 +1372,6 @@ struct RenderModuleImpl final : RenderModule {
 		m_world.onComponentDestroyed(entity, ENVIRONMENT_TYPE, this);
 	}
 
-	void destroyFur(EntityRef entity) override {
-		m_furs.erase(entity);
-		m_world.onComponentDestroyed(entity, FUR_TYPE, this);
-	}
-
 	void destroyDecal(EntityRef entity) override {
 		m_culling_system->remove(entity);
 		m_decals.erase(entity);
@@ -1432,12 +1409,6 @@ struct RenderModuleImpl final : RenderModule {
 		const ParticleSystem& emitter = m_particle_emitters[entity];
 		m_world.onComponentDestroyed(*emitter.m_entity, PARTICLE_EMITTER_TYPE, this);
 		m_particle_emitters.erase(*emitter.m_entity);
-	}
-
-
-	void createFur(EntityRef entity) override {
-		m_furs.insert(entity, {});
-		m_world.onComponentCreated(entity, FUR_TYPE, this);
 	}
 
 
@@ -2298,14 +2269,6 @@ struct RenderModuleImpl final : RenderModule {
 	{
 		auto& cam = m_cameras[{camera.index}];
 		return Vec2(cam.screen_width, cam.screen_height);
-	}
-
-	Fur& getFur(EntityRef e) override {
-		return m_furs[e];
-	}
-
-	HashMap<EntityRef, Fur>& getFurs() override {
-		return m_furs;
 	}
 
 	void clearDebugLines() override { m_debug_lines.clear(); }
@@ -3365,7 +3328,6 @@ struct RenderModuleImpl final : RenderModule {
 
 	Array<DebugTriangle> m_debug_triangles;
 	Array<DebugLine> m_debug_lines;
-	HashMap<EntityRef, Fur> m_furs;
 
 	EntityPtr m_updating_attachment = INVALID_ENTITY;
 	bool m_is_game_running;
@@ -3496,7 +3458,6 @@ RenderModuleImpl::RenderModuleImpl(Renderer& renderer,
 	, m_procedural_geometries(m_allocator)
 	, m_material_decal_map(m_allocator)
 	, m_material_curve_decal_map(m_allocator)
-	, m_furs(m_allocator)
 {
 	m_world.componentTransformed(MODEL_INSTANCE_TYPE).bind<&RenderModuleImpl::onModelInstanceMoved>(this);
 	m_world.componentTransformed(DECAL_TYPE).bind<&RenderModuleImpl::onDecalMoved>(this);

@@ -9,8 +9,6 @@
 
 namespace Lumix {
 
-struct TransientSlice;
-
 struct DrawStream {
 	DrawStream(struct Renderer& renderer);
 	DrawStream(DrawStream&& rhs);
@@ -20,10 +18,6 @@ struct DrawStream {
 	void createBuffer(gpu::BufferHandle buffer, gpu::BufferFlags flags, size_t size, const void* data, const char* debug_name);
 	void createTexture(gpu::TextureHandle handle, u32 w, u32 h, u32 depth, gpu::TextureFormat format, gpu::TextureFlags flags, const char* debug_name);
 	void createTextureView(gpu::TextureHandle view, gpu::TextureHandle texture, u32 layer, u32 mip);
-
-	TransientSlice allocTransient(u32 size);
-	TransientSlice allocUniform(u32 size);
-	TransientSlice allocUniform(const void* data, u32 size);
 
 	void destroy(gpu::TextureHandle texture);
 	void destroy(gpu::BufferHandle buffer);

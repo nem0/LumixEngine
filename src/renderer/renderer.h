@@ -54,13 +54,8 @@ struct LUMIX_RENDERER_API RenderPlugin {
 };
 
 struct DrawStream;
-
-struct TransientSlice {
-	gpu::BufferHandle buffer;
-	u32 offset;
-	u32 size;
-	u8* ptr;
-};
+struct UniformPool;
+struct TransientPool;
 
 struct LUMIX_RENDERER_API Renderer : ISystem {
 	struct MemRef {
@@ -112,9 +107,8 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 	virtual void destroyMaterialConstants(MaterialIndex id) = 0;
 	virtual gpu::BufferHandle getMaterialUniformBuffer() = 0;
 	
-	virtual TransientSlice allocTransientSlice(u32 size) = 0;
-	virtual TransientSlice allocUniformSlice(u32 size) = 0;
-	virtual TransientSlice allocUniformSlice(const void* data, u32 size) = 0;
+	virtual TransientPool& getTransientPool() = 0;
+	virtual UniformPool& getUniformPool() = 0;
 	
 	virtual gpu::BufferHandle getInstancedMeshesBuffer() = 0;
 	virtual gpu::BufferHandle createBuffer(const MemRef& memory, gpu::BufferFlags flags, const char* debug_name) = 0;
@@ -138,6 +132,12 @@ protected:
 	virtual void setupJob(void* user_ptr, void(*task)(void*)) = 0;
 }; 
 
+struct UniformPool;
+struct TransientPool;
+
+LUMIX_RENDERER_API TransientSlice alloc(UniformPool& pool, u32 size);
+LUMIX_RENDERER_API TransientSlice alloc(UniformPool& pool, const void* data, u32 size);
+LUMIX_RENDERER_API TransientSlice alloc(TransientPool& pool, u32 size);
 
 template <typename T>
 void Renderer::pushJob(const char* name, const T& func) {

@@ -153,6 +153,22 @@ struct TransientBuffer {
 	} m_overflow;
 };
 
+struct UniformPool : TransientBuffer<256> {};
+struct TransientPool : TransientBuffer<16> {};
+
+LUMIX_RENDERER_API TransientSlice alloc(UniformPool& pool, u32 size) {
+	return pool.alloc(size);
+}
+
+LUMIX_RENDERER_API TransientSlice alloc(TransientPool& pool, u32 size) {
+	return pool.alloc(size);
+}
+
+LUMIX_RENDERER_API TransientSlice alloc(UniformPool& pool, const void* data, u32 size) {
+	TransientSlice slice = pool.alloc(size);
+	memcpy(slice.ptr, data, size);
+	return slice;
+}
 
 struct FrameData {
 	FrameData(struct RendererImpl& renderer, IAllocator& allocator, PageAllocator& page_allocator);
@@ -165,8 +181,8 @@ struct FrameData {
 		ShaderKey key;
 	};
 
-	TransientBuffer<16> transient_buffer;
-	TransientBuffer<256> uniform_buffer;
+	TransientPool transient_pool;
+	UniformPool uniform_pool;
 	u32 gpu_frame = 0xffFFffFF;
 
 	ArenaAllocator arena_allocator;
@@ -478,8 +494,8 @@ struct RendererImpl final : Renderer {
 		jobs::Counter counter;
 		jobs::runLambda([this]() {
 			for (const Local<FrameData>& frame : m_frames) {
-				gpu::destroy(frame->transient_buffer.m_buffer);
-				gpu::destroy(frame->uniform_buffer.m_buffer);
+				gpu::destroy(frame->transient_pool.m_buffer);
+				gpu::destroy(frame->uniform_pool.m_buffer);
 			}
 			gpu::destroy(m_material_buffer.buffer);
 			gpu::destroy(m_instanced_meshes_buffer);
@@ -599,8 +615,8 @@ struct RendererImpl final : Renderer {
 			}
 
 			for (const Local<FrameData>& frame : m_frames) {
-				frame->transient_buffer.init();
-				frame->uniform_buffer.init();
+				frame->transient_pool.init();
+				frame->uniform_pool.init();
 				jobs::turnGreen(&frame->can_setup);
 			}
 			gpu::createBuffer(m_instanced_meshes_buffer, gpu::BufferFlags::SHADER_BUFFER, 64 * 1024 * 1024, nullptr, "instanced_meshes");
@@ -694,22 +710,16 @@ struct RendererImpl final : Renderer {
 		gpu::popDebugGroup();
 	}
 
-	TransientSlice allocTransientSlice(u32 size) override
-	{
-		return m_cpu_frame->transient_buffer.alloc(size);
+	TransientPool& getTransientPool() override {
+		jobs::wait(&m_cpu_frame->can_setup);	
+		return m_cpu_frame->transient_pool;
 	}
 
-	TransientSlice allocUniformSlice(const void* data, u32 size) override {
-		const TransientSlice slice = m_cpu_frame->uniform_buffer.alloc(size);
-		memcpy(slice.ptr, data, size);
-		return slice;
-	}
+	UniformPool& getUniformPool() override {
+		jobs::wait(&m_cpu_frame->can_setup);
+		return m_cpu_frame->uniform_pool;
+	}	
 
-	TransientSlice allocUniformSlice(u32 size) override
-	{
-		return m_cpu_frame->uniform_buffer.alloc(size);
-	}
-	
 	gpu::BufferHandle getMaterialUniformBuffer() override {
 		return m_material_buffer.buffer;
 	}
@@ -822,7 +832,7 @@ struct RendererImpl final : Renderer {
 		
 		jobs::wait(&m_cpu_frame->can_setup);
 		const u32 size = u32(data.length() * sizeof(float));
-		const TransientSlice slice = m_cpu_frame->uniform_buffer.alloc(size);
+		const TransientSlice slice = m_cpu_frame->uniform_pool.alloc(size);
 		memcpy(slice.ptr, data.begin(), size);
 		m_cpu_frame->draw_stream.copy(m_material_buffer.buffer, slice.buffer, idx * Material::MAX_UNIFORMS_BYTES, slice.offset, size);
 		return MaterialIndex{idx};
@@ -831,7 +841,7 @@ struct RendererImpl final : Renderer {
 	void updateMaterialConstants(MaterialIndex handle, Span<const float> data, u32 offset) override {
 		jobs::wait(&m_cpu_frame->can_setup);
 		const u32 size = u32(data.length() * sizeof(float));
-		const TransientSlice slice = m_cpu_frame->uniform_buffer.alloc(size);
+		const TransientSlice slice = m_cpu_frame->uniform_pool.alloc(size);
 		memcpy(slice.ptr, data.begin(), size);
 		m_cpu_frame->draw_stream.copy(m_material_buffer.buffer, slice.buffer, u32(handle) * Material::MAX_UNIFORMS_BYTES, slice.offset, size);
 	}
@@ -858,7 +868,7 @@ struct RendererImpl final : Renderer {
 			
 			jobs::wait(&m_cpu_frame->can_setup);
 			const u32 size = u32(data.length() * sizeof(float));
-			const TransientSlice slice = m_cpu_frame->uniform_buffer.alloc(size);
+			const TransientSlice slice = m_cpu_frame->uniform_pool.alloc(size);
 			memcpy(slice.ptr, data.begin(), size);
 			m_cpu_frame->draw_stream.copy(m_material_buffer.buffer, slice.buffer, idx * Material::MAX_UNIFORMS_BYTES, slice.offset, size);
 		}
@@ -1070,8 +1080,8 @@ struct RendererImpl final : Renderer {
 
 		FrameData& frame = popGPUQueue();
 		profiler::pushInt("Frame", frame.frame_number);
-		frame.transient_buffer.prepareToRender();
-		frame.uniform_buffer.prepareToRender();
+		frame.transient_pool.prepareToRender();
+		frame.uniform_pool.prepareToRender();
 		
 		gpu::MemoryStats mem_stats;
 		if (gpu::getMemoryStats(mem_stats)) {
@@ -1120,8 +1130,8 @@ struct RendererImpl final : Renderer {
 
 		if (gpu::frameFinished(frame.gpu_frame)) {
 			frame.gpu_frame = 0xFFffFFff;
-			frame.transient_buffer.renderDone();
-			frame.uniform_buffer.renderDone();
+			frame.transient_pool.renderDone();
+			frame.uniform_pool.renderDone();
 			jobs::turnGreen(&frame.can_setup);
 			pushFreeFrame(frame);
 		}
@@ -1277,7 +1287,7 @@ struct RendererImpl final : Renderer {
 				
 				// If overflowed buffers exist, we must reuse the frame in the render thread
 				// because TransientBuffer::renderDone calls gpu::destroy
-				const bool can_run_on_any_worker = !f->transient_buffer.m_overflow.buffer && !f->uniform_buffer.m_overflow.buffer;
+				const bool can_run_on_any_worker = !f->transient_pool.m_overflow.buffer && !f->uniform_pool.m_overflow.buffer;
 
 				// running this on render thread might wait till other jobs are done on render thread, causing delay
 				// therefore we try to run on any worker if we can
@@ -1285,8 +1295,8 @@ struct RendererImpl final : Renderer {
 					PROFILE_BLOCK("reuse frame");
 					profiler::pushInt("Frame", f->frame_number);
 					f->gpu_frame = 0xFFffFFff;
-					f->transient_buffer.renderDone();
-					f->uniform_buffer.renderDone();
+					f->transient_pool.renderDone();
+					f->uniform_pool.renderDone();
 					jobs::turnGreen(&f->can_setup);
 					f->renderer.pushFreeFrame(*f);
 				}, nullptr, can_run_on_any_worker ? jobs::ANY_WORKER : 1);

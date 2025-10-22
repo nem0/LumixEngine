@@ -90,9 +90,12 @@ static DXGI_FORMAT getDXGIFormat(const Attribute& attr) {
 				case 4: return as_int ? DXGI_FORMAT_R16G16B16A16_UINT : DXGI_FORMAT_R16G16B16A16_UNORM;
 			}
 			break;
-		case AttributeType::U32: 
+		case AttributeType::U32:
 			switch(attr.components_count) {
-				case 1: ASSERT(!as_int); return DXGI_FORMAT_R32_UINT;
+				case 1: return DXGI_FORMAT_R32_UINT;
+				case 2: return DXGI_FORMAT_R32G32_UINT;
+				case 3: return DXGI_FORMAT_R32G32B32_UINT;
+				case 4: return DXGI_FORMAT_R32G32B32A32_UINT;
 			}
 			break;
 	}

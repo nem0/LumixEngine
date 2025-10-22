@@ -181,6 +181,37 @@ static const float SHADOW_CAM_FAR = 500.0f;
 
 } // anonymous namespace
 
+// use to wait for all jobs in the group to finish
+struct JobsGroup {
+	AtomicI32 counter = 0;
+	jobs::Signal signal;
+
+	// beginJob can only be called between begin()/end() pair
+	void begin() {
+		counter = 1;
+		jobs::turnRed(&signal);
+	}
+
+	void end() {
+		endJob();
+	}
+
+	void beginJob() {
+		counter.inc();
+	}
+
+	void endJob() {
+		if (counter.dec() == 1) {
+			jobs::turnGreen(&signal);
+		} 
+	}
+
+	// wait until all endJobs are called
+	void wait() {
+		jobs::wait(&signal);
+	}
+};
+
 struct PipelineImpl final : Pipeline {
 	struct Bucket {
 		Bucket(Renderer& renderer) 
@@ -721,6 +752,7 @@ struct PipelineImpl final : Pipeline {
 		if (!m_flatten_shader->isReady()) return false;
 
 		m_renderer.releaseRenderbuffer(m_output);
+		UniformPool& uniform_pool = m_renderer.getUniformPool();
 		m_output = INVALID_RENDERBUFFER;
 		const World& world = m_module->getWorld();
 		const Viewport backup_viewport = m_viewport;
@@ -793,7 +825,7 @@ struct PipelineImpl final : Pipeline {
 					.dst = gpu::getRWBindlessHandle(dst)
 				};
 				
-				const TransientSlice ub_mem = stream.allocUniform(&ub, sizeof(ub));
+				const TransientSlice ub_mem = alloc(uniform_pool, &ub, sizeof(ub));
 				stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub_mem.buffer, ub_mem.offset, ub_mem.size);
 
 				ASSERT(m_viewport.w % 16 == 0);
@@ -913,25 +945,32 @@ struct PipelineImpl final : Pipeline {
 
 		View* view_ptr = view.get();
 		jobs::turnRed(&view->ready);
+
+		m_sort_key_jobs_group.beginJob();
 		m_renderer.pushJob("prepare view", [this, view_ptr](DrawStream& stream) {
-			setupFur(*view_ptr);
 			setupParticles(stream, *view_ptr);
 			encodeInstancedModels(stream, *view_ptr);
 			encodeProceduralGeometry(*view_ptr);
 
 			view_ptr->renderables = m_module->getRenderables(view_ptr->cp.frustum);
 
-			if (view_ptr->renderables) {
+			if (view_ptr->renderables && (view_ptr->renderables->header.count != 0 || view_ptr->renderables->header.next)) {
 				createSortKeys(*view_ptr);
 				view_ptr->renderables->free(m_renderer.getEngine().getPageAllocator());
 			}
+			m_sort_key_jobs_group.endJob();
 			view_ptr->sorter.pack();
-
+				
 			if (!view_ptr->sorter.keys.empty()) {
 				radixSort(view_ptr->sorter.keys.begin(), view_ptr->sorter.values.begin(), view_ptr->sorter.keys.size());
+
+				// createSortKeys fills Pose::slice and createCommands uses it
+				// but the Pose can be used across views, so we have to wait for 
+				// all createSortKeys to finish before we can do any createCommands
+				m_sort_key_jobs_group.wait();
 				createCommands(*view_ptr);
 			}
-
+			
 			jobs::turnGreen(&view_ptr->ready);
 		});
 
@@ -962,8 +1001,9 @@ struct PipelineImpl final : Pipeline {
 			pass_state.shadow_to_camera = Vec4(Vec3(m_viewport.pos - cp.pos), 1);
 		}
 
+		UniformPool& uniform_pool = m_renderer.getUniformPool();
 		DrawStream& stream = m_renderer.getDrawStream();
-		const TransientSlice ub = stream.allocUniform(&pass_state, sizeof(PassState));
+		const TransientSlice ub = alloc(uniform_pool, &pass_state, sizeof(PassState));
 		stream.bindUniformBuffer(UniformBuffer::PASS, ub.buffer, ub.offset, ub.size);
 	}
 
@@ -1008,8 +1048,8 @@ struct PipelineImpl final : Pipeline {
 
 	void setUniformRaw(Span<const u8> mem, UniformBuffer::Enum bind_point = UniformBuffer::DRAWCALL) override {
 		DrawStream& stream = m_renderer.getDrawStream();
-		TransientSlice ub = stream.allocUniform(mem.length());
-		memcpy(ub.ptr, mem.begin(), mem.length());
+		UniformPool& pool = m_renderer.getUniformPool();
+		TransientSlice ub = alloc(pool, mem.begin(), mem.length());
 		stream.bindUniformBuffer(bind_point, ub.buffer, ub.offset, ub.size);
 	}
 
@@ -1459,14 +1499,17 @@ struct PipelineImpl final : Pipeline {
 	}
 
 	void renderMain() {
+		m_sort_key_jobs_group.begin();
+
 		m_renderer.releaseRenderbuffer(m_output);
+		UniformPool& uniform_pool = m_renderer.getUniformPool();
 
 		DrawStream& stream = m_renderer.getDrawStream();
 		const RenderBufferHandle shadowmap = shadowPass();
 		
 		m_downscaled_depth = INVALID_RENDERBUFFER;
 		m_global_state.shadowmap_bindless = toBindless(shadowmap, stream);
-	 	TransientSlice gsb = stream.allocUniform(&m_global_state, sizeof(GlobalState));
+	 	TransientSlice gsb = alloc(uniform_pool, &m_global_state, sizeof(GlobalState));
 		stream.bindUniformBuffer(UniformBuffer::GLOBAL, gsb.buffer, gsb.offset, sizeof(GlobalState));
 		
 		u32 view_idx;
@@ -1511,6 +1554,8 @@ struct PipelineImpl final : Pipeline {
 		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
 			result = plugin->renderAfterTonemap(gbuffer, result, *this);
 		}
+
+		m_sort_key_jobs_group.end();
 
 		m_renderer.releaseRenderbuffer(gbuffer.A);
 		m_renderer.releaseRenderbuffer(gbuffer.B);
@@ -1572,8 +1617,9 @@ struct PipelineImpl final : Pipeline {
 		stream.useProgram(m_blit_screen_program);
 
 		gpu::BindlessHandle texture = gpu::getBindlessHandle(m_renderer.toTexture(m_output));
-		
-		const TransientSlice ub = stream.allocUniform(&texture, sizeof(texture));
+		UniformPool& uniform_pool = m_renderer.getUniformPool();
+
+		const TransientSlice ub = alloc(uniform_pool, &texture, sizeof(texture));
 		stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 		stream.drawArrays(0, 4);
 		stream.endProfileBlock();
@@ -1665,7 +1711,8 @@ struct PipelineImpl final : Pipeline {
 		}
 
 		DrawStream& stream = m_renderer.getDrawStream();
-		const TransientSlice global_state_buffer = stream.allocUniform(&global_state, sizeof(GlobalState));
+		UniformPool& uniform_pool = m_renderer.getUniformPool();
+		const TransientSlice global_state_buffer = alloc(uniform_pool, &global_state, sizeof(GlobalState));
 
 		stream.bindUniformBuffer(UniformBuffer::GLOBAL, global_state_buffer.buffer, global_state_buffer.offset, sizeof(GlobalState));
 		stream.bindUniformBuffer(UniformBuffer::PASS, gpu::INVALID_BUFFER, 0, 0);
@@ -1706,8 +1753,10 @@ struct PipelineImpl final : Pipeline {
 			const Array<DebugTriangle>& tris = m_module->getDebugTriangles();
 			const gpu::StateFlags state = gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::CULL_BACK;
 			const gpu::ProgramHandle program = m_debug_shape_shader->getProgram(state, m_base_vertex_decl, 0, "");
-			const TransientSlice vb = stream.allocTransient(sizeof(BaseVertex) * tris.size() * 3);
-			const TransientSlice ub = stream.allocUniform(&Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
+			UniformPool& uniform_pool = m_renderer.getUniformPool();
+			TransientPool& transient_pool = m_renderer.getTransientPool();
+			const TransientSlice vb = alloc(transient_pool, sizeof(BaseVertex) * tris.size() * 3);
+			const TransientSlice ub = alloc(uniform_pool, &Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
 			BaseVertex* vertices = (BaseVertex*)vb.ptr;
 			for (u32 i = 0, c = tris.size(); i < c; ++i) {
 				vertices[3 * i + 0].color = tris[i].color.abgr();
@@ -1740,8 +1789,10 @@ struct PipelineImpl final : Pipeline {
 			const Array<DebugLine>& lines = m_module->getDebugLines();
 			const gpu::StateFlags state = gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE;
 			const gpu::ProgramHandle program = m_debug_shape_shader->getProgram(state, m_base_line_vertex_decl, 0, "");
-			const TransientSlice vb = stream.allocTransient(sizeof(BaseVertex) * lines.size() * 2);
-			const TransientSlice ub = stream.allocUniform(&Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
+			UniformPool& uniform_pool = m_renderer.getUniformPool();
+			TransientPool& transient_pool = m_renderer.getTransientPool();
+			const TransientSlice vb = alloc(transient_pool, sizeof(BaseVertex) * lines.size() * 2);
+			const TransientSlice ub = alloc(uniform_pool, &Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
 			BaseVertex* vertices = (BaseVertex*)vb.ptr;
 			for (u32 i = 0, c = lines.size(); i < c; ++i) {
 				vertices[2 * i + 0].color = lines[i].color.abgr();
@@ -1781,9 +1832,11 @@ struct PipelineImpl final : Pipeline {
 		const Texture* atlas_texture = m_renderer.getFontManager().getAtlasTexture();
 
 		DrawStream& stream = m_renderer.getDrawStream();
+		UniformPool& uniform_pool = m_renderer.getUniformPool();
+		TransientPool& transient_pool = m_renderer.getTransientPool();
 		
-		const TransientSlice idx_buffer_mem = stream.allocTransient(data.getIndices().byte_size());
-		const TransientSlice vtx_buffer_mem = stream.allocTransient(data.getVertices().byte_size());
+		const TransientSlice idx_buffer_mem = alloc(transient_pool, data.getIndices().byte_size());
+		const TransientSlice vtx_buffer_mem = alloc(transient_pool, data.getVertices().byte_size());
 		memcpy(idx_buffer_mem.ptr, data.getIndices().begin(), data.getIndices().byte_size());
 		memcpy(vtx_buffer_mem.ptr, data.getVertices().begin(), data.getVertices().byte_size());
 
@@ -1852,6 +1905,8 @@ struct PipelineImpl final : Pipeline {
 	void renderTerrains(const CameraParams& cp, gpu::StateFlags state, const char* define) {
 		const u32 define_mask = define ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
 		m_renderer.pushJob("terrain", [this, cp, state, define_mask](DrawStream& stream){
+			UniformPool& uniform_pool = m_renderer.getUniformPool();
+			TransientPool& transient_pool = m_renderer.getTransientPool();
 			const HashMap<EntityRef, Terrain*>& terrains = m_module->getTerrains();
 			if(terrains.empty()) return;
 
@@ -1921,7 +1976,7 @@ struct PipelineImpl final : Pipeline {
 						quad.terrain_scale = Vec4(scale, 0);
 						quad.cell_size = s;
 					
-						const TransientSlice ub = stream.allocUniform(&quad, sizeof(quad));
+						const TransientSlice ub = alloc(uniform_pool, &quad, sizeof(quad));
 
 						stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 						stream.drawArraysInstanced((subto.x - subfrom.x) * 2 + 2, subto.y - subfrom.y);
@@ -2033,7 +2088,9 @@ struct PipelineImpl final : Pipeline {
 								distance,
 								material->getIndex()
 							};
-							const TransientSlice drawcall_ub = stream.allocUniform(&drawcall_data, sizeof(drawcall_data));
+							UniformPool& uniform_pool = m_renderer.getUniformPool();
+
+							const TransientSlice drawcall_ub = alloc(uniform_pool, &drawcall_data, sizeof(drawcall_data));
 							stream.bindUniformBuffer(UniformBuffer::DRAWCALL, drawcall_ub.buffer, drawcall_ub.offset, drawcall_ub.size);
 							stream.bindVertexBuffer(1, quad.instances, 0, sizeof(Vec4) * 2);
 							stream.drawIndexedInstanced(mesh.indices_count, instance_count, mesh.index_type);
@@ -2063,6 +2120,7 @@ struct PipelineImpl final : Pipeline {
 		Sorter::Inserter inserter(view.sorter);
 		// TODO culling
 
+		TransientPool& transient_pool = m_renderer.getTransientPool();
 		jobs::forEach(particle_systems.capacity(), 1, [&](i32 idx, i32){
 			const ParticleSystem* system = particle_systems.getFromIndex(idx);
 			if (!system) return;
@@ -2078,7 +2136,7 @@ struct PipelineImpl final : Pipeline {
 				const u32 size = emitter.getParticlesDataSizeBytes();
 				if (size == 0) continue;
 
-				emitter.slice = stream.allocTransient(size);
+				emitter.slice = alloc(transient_pool, size);
 				emitter.fillInstanceData((float*)emitter.slice.ptr, m_renderer.getEngine().getPageAllocator());
 			}
 		});
@@ -2197,49 +2255,11 @@ struct PipelineImpl final : Pipeline {
 		Light lights[64];
 	};
 
-	void setupFur(View& view) {
-		if (view.cp.is_shadow) return;
-
-		HashMap<EntityRef, Fur>& furs = m_module->getFurs();
-		if (furs.empty()) return;
-
-		Span<const ModelInstance> mi = m_module->getModelInstances();
-		Sorter::Inserter inserter(view.sorter);
-		
-		const u64 type_mask = (u64)RenderableTypes::FUR << 32;
-		
-		// TODO frustum culling
-		// TODO render correct LOD
-		for (auto iter : furs.iterated()) {
-			const EntityRef e = iter.key();
-			if (e.index >= (i32)mi.length()) continue;
-			if ((mi[e.index].flags & ModelInstance::VALID) == 0) continue;
-			if (!iter.value().enabled) continue;
-
-			Model* model = mi[e.index].model;
-			if (!model) continue;
-			if (!model->isReady()) continue;
-
-			for (i32 i = 0; i < model->getMeshCount(); ++i) {
-				const Mesh& mesh = model->getMesh(i);
-				if (mesh.type != Mesh::SKINNED) continue;
-				
-				const MeshMaterial& mesh_mat = model->getMeshMaterial(i);
-				const u8 bucket_id = view.layer_to_bucket[mesh_mat.material->getLayer()];
-				if (bucket_id != 0xff) {
-					const u64 key = mesh_mat.sort_key | ((u64)bucket_id << SORT_KEY_BUCKET_SHIFT);
-					const u64 subrenderable = e.index | type_mask | ((u64)i << SORT_KEY_MESH_IDX_SHIFT);
-				
-					inserter.push(key, subrenderable);
-				}
-			}
-		}
-	}
-
 	void encodeProceduralGeometry(View& view) {
 		const World& world = m_module->getWorld();
 		const HashMap<EntityRef, ProceduralGeometry>& geometries = m_module->getProceduralGeometries();
 		const DVec3 camera_pos = view.cp.pos;
+		UniformPool& uniform_pool = m_renderer.getUniformPool();
 		for (auto iter = geometries.begin(), end = geometries.end(); iter != end; ++iter) {
 			const ProceduralGeometry& pg = iter.value();
 			if (!pg.vertex_buffer) continue;
@@ -2257,7 +2277,7 @@ struct PipelineImpl final : Pipeline {
 				world.getRelativeMatrix(iter.key(), camera_pos),
 				pg.material->getIndex()
 			};
-			const TransientSlice ub = bucket.stream.allocUniform(&ub_data, sizeof(ub_data));
+			const TransientSlice ub = alloc(uniform_pool, &ub_data, sizeof(ub_data));
 
 			bucket.stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 			const gpu::StateFlags state = pg.material->m_render_states | render_state;
@@ -2317,6 +2337,7 @@ struct PipelineImpl final : Pipeline {
 		const gpu::ProgramHandle cull_shader = m_instancing_shader->getProgram(cull_shader_defines);
 		const gpu::ProgramHandle init_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS0"));
 		const gpu::ProgramHandle update_lods_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("UPDATE_LODS"));
+		UniformPool& uniform_pool = m_renderer.getUniformPool();
 
 		for (auto iter = ims.begin(), end = ims.end(); iter != end; ++iter) {
 			const InstancedModel& im = iter.value();
@@ -2367,7 +2388,7 @@ struct PipelineImpl final : Pipeline {
 							cells[cell_count].visible = visible;
 							cells[cell_count].count = cell.instance_count;
 							cells[cell_count].offset = cell.from_instance;
-							const TransientSlice ub = stream.allocUniform(sizeof(u32) * 2);
+							const TransientSlice ub = alloc(uniform_pool, sizeof(u32) * 2);
 							u32* tmp =(u32*)ub.ptr;
 							tmp[0] = cell.from_instance;
 							tmp[1] = cell.instance_count;
@@ -2413,7 +2434,7 @@ struct PipelineImpl final : Pipeline {
 			instanced_decl.addAttribute(0, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 			instanced_decl.addAttribute(16, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 
-			const TransientSlice drawcall_ub = stream.allocUniform(&ub_values, sizeof(ub_values));
+			const TransientSlice drawcall_ub = alloc(uniform_pool, &ub_values, sizeof(ub_values));
 
 			stream.bindUniformBuffer(UniformBuffer::DRAWCALL, drawcall_ub.buffer, drawcall_ub.offset, sizeof(UBValues));
 
@@ -2484,7 +2505,7 @@ struct PipelineImpl final : Pipeline {
 				const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_decl, instanced_define_mask | material->getDefineMask(), mesh.semantics_defines);
 
 				MaterialIndex material_index = material->getIndex();
-				TransientSlice ub_slice = stream.allocUniform(&material_index, sizeof(material_index));
+				TransientSlice ub_slice = alloc(uniform_pool, &material_index, sizeof(material_index));
 
 				bucket.stream.useProgram(program);
 				bucket.stream.bindIndexBuffer(mesh.index_buffer_handle);
@@ -2593,6 +2614,16 @@ struct PipelineImpl final : Pipeline {
 		const Transform* LUMIX_RESTRICT transforms = world.getTransforms(); 
 		const DVec3 camera_pos = view.cp.pos;
 		
+		gpu::VertexDecl skinned_instanced_decl(gpu::PrimitiveType::NONE);
+		skinned_instanced_decl.addAttribute(0, 3, gpu::AttributeType::U32, gpu::Attribute::INSTANCED); // material index, bones_buffer, bones_buffer_offset
+		skinned_instanced_decl.addAttribute(12, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // pos
+		skinned_instanced_decl.addAttribute(24, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // rot
+		skinned_instanced_decl.addAttribute(40, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // scale
+		skinned_instanced_decl.addAttribute(52, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // prev_pos
+		skinned_instanced_decl.addAttribute(64, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // prev_rot
+		skinned_instanced_decl.addAttribute(80, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // prev_scale
+		const u32 skinned_instance_stride = skinned_instanced_decl.getStride();
+		
 		gpu::VertexDecl dyn_instance_decl(gpu::PrimitiveType::NONE);
 		dyn_instance_decl.addAttribute(0, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 		dyn_instance_decl.addAttribute(16, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
@@ -2608,6 +2639,9 @@ struct PipelineImpl final : Pipeline {
 		instanced_decl.addAttribute(32, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 		instanced_decl.addAttribute(44, 1, gpu::AttributeType::U32, gpu::Attribute::INSTANCED);
 
+		UniformPool& uniform_pool = m_renderer.getUniformPool();
+		TransientPool& transient_pool = m_renderer.getTransientPool();
+
 		const u32 num_batches = lengthOf(view.buckets[0].substreams);
 		jobs::forEach(num_batches, 1, [&](u32 batch_idx, u32){
 			PROFILE_BLOCK("create commands");
@@ -2622,7 +2656,6 @@ struct PipelineImpl final : Pipeline {
 			u32 autoinstanced_define_mask;
 			u32 dynamic_define_mask;
 			u32 skinned_define_mask;
-			u32 fur_define_mask;
 			gpu::StateFlags render_state;
 			DrawStream* stream = nullptr;
 			u8 prev_bucket = (sort_keys[from] >> SORT_KEY_BUCKET_SHIFT) + 1; // make sure it's different from the first bucket, so first iteration is properly initialized
@@ -2639,7 +2672,6 @@ struct PipelineImpl final : Pipeline {
 					autoinstanced_define_mask = define_mask | (1 << m_renderer.getShaderDefineIdx("AUTOINSTANCED"));
 					dynamic_define_mask = define_mask | (1 << m_renderer.getShaderDefineIdx("DYNAMIC"));
 					skinned_define_mask = define_mask | (1 << m_renderer.getShaderDefineIdx("SKINNED"));
-					fur_define_mask = define_mask | (1 << m_renderer.getShaderDefineIdx("FUR"));
 					const bool sort_depth = view.buckets[bucket].sort == BucketDesc::DEPTH;
 					instance_key_mask = sort_depth ? 0xff00'0000'00ff'ffff : 0xffff'ffff'0000'0000;
 					render_state = view.buckets[bucket].state;
@@ -2669,7 +2701,7 @@ struct PipelineImpl final : Pipeline {
 							material->getIndex()
 						};
 
-						const TransientSlice ub = stream->allocUniform(&ub_data, sizeof(ub_data));
+						const TransientSlice ub = alloc(uniform_pool, &ub_data, sizeof(ub_data));
 						stream->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 						stream->useProgram(program);
 						stream->bindIndexBuffer(gpu::INVALID_BUFFER);
@@ -2727,7 +2759,7 @@ struct PipelineImpl final : Pipeline {
 								}
 
 								const u32 count = u32(i - start_i);
-								const TransientSlice slice = stream->allocTransient(count * (sizeof(Vec4) * 6));
+								const TransientSlice slice = alloc(transient_pool, count * (sizeof(Vec4) * 6));
 								u8* instance_data = slice.ptr;
 
 								for (i32 j = start_i; j < start_i + (i32)count; ++j) {
@@ -2772,7 +2804,7 @@ struct PipelineImpl final : Pipeline {
 									++i;
 								}
 								const u32 count = u32(i - start_i);
-								const TransientSlice slice = stream->allocTransient(count * (sizeof(Vec4) * 3));
+								const TransientSlice slice = alloc(transient_pool, count * (sizeof(Vec4) * 3));
 								u8* instance_data = slice.ptr;
 								for (int j = start_i; j < start_i + (i32)count; ++j) {
 									const EntityRef e = { i32(renderables[j] & 0xFFffFFff) };
@@ -2805,58 +2837,66 @@ struct PipelineImpl final : Pipeline {
 						}
 						break;
 					}
-					case RenderableTypes::FUR:
 					case RenderableTypes::SKINNED: {
 						const u32 mesh_idx = u32(renderables[i] >> SORT_KEY_MESH_IDX_SHIFT);
 						ModelInstance* LUMIX_RESTRICT mi = &model_instances[entity.index];
-						const Transform& tr = transforms[entity.index];
-						const Vec3 rel_pos = Vec3(tr.pos - camera_pos);
-						const Mesh& mesh = mi->meshes[mesh_idx];
 						const MeshMaterial& mesh_mat = mi->mesh_materials[mesh_idx];
-						Shader* shader = mesh_mat.material->getShader();
 						u32 defines = skinned_define_mask | mesh_mat.material->getDefineMask();
-						if (type == RenderableTypes::FUR) defines |= fur_define_mask;
+						const gpu::StateFlags state = mesh_mat.material->m_render_states | render_state;
 
-						struct UBPrefix {
-							float fur_scale;
-							float gravity;
-							float layers;
-							MaterialIndex material_index;
-							Matrix model_mtx;
-							Matrix prev_model_mtx;
+						const u32 start_i = i;
+						const u64 key = sort_keys[i];
+						while (i < to && sort_keys[i] == key) {
+							++i;
+						}
+						const u32 num_instances = i - start_i;
+						--i;
+						
+						struct SkinnedInstanceData {
+							IVec3 idata;
+							Vec3 pos;
+							Quat rot;
+							Vec3 scale;
+							Vec3 prev_pos;
+							Quat prev_rot;
+							Vec3 prev_scale;
 						};
 
-						const TransientSlice ub = stream->allocUniform(sizeof(DualQuat) * mi->pose->count + sizeof(UBPrefix));
-					
-						UBPrefix* prefix = (UBPrefix*)ub.ptr;
-						u32 layers = 1;
-						if (type == RenderableTypes::FUR) {
-							Fur& fur = m_module->getFur(entity);
-							layers = fur.layers;
-							prefix->fur_scale = fur.scale;
-							prefix->gravity = fur.gravity;
+						const TransientSlice instance_buffer = alloc(transient_pool, sizeof(SkinnedInstanceData) * num_instances);
+						for (u32 j = start_i; j <= i; ++j) {
+							SkinnedInstanceData* skin_draw_data = (SkinnedInstanceData*)instance_buffer.ptr + j - start_i;
+
+							const EntityRef e = {int(renderables[j] & 0xFFffFFff)};
+							ModelInstance* mi2 = &model_instances[e.index];
+							const Transform& tr = transforms[e.index];
+							
+							const Vec3 rel_pos = Vec3(tr.pos - camera_pos);
+							const Material& material = *mi2->mesh_materials[mesh_idx].material;
+
+							skin_draw_data->pos = rel_pos;
+							skin_draw_data->rot = tr.rot;
+							skin_draw_data->scale = tr.scale;
+
+							const Vec3 prev_rel_pos = Vec3(mi2->prev_frame_transform.pos - camera_pos);
+							skin_draw_data->prev_pos = prev_rel_pos;
+							skin_draw_data->prev_rot = mi2->prev_frame_transform.rot;
+							skin_draw_data->prev_scale = mi2->prev_frame_transform.scale;
+
+							const TransientSlice bones_slice = mi2->pose->slice;
+
+							skin_draw_data->idata.x = (i32)material.getIndex();
+							skin_draw_data->idata.y = gpu::getBindlessHandle(bones_slice.buffer).value;
+							skin_draw_data->idata.z = bones_slice.offset;
 						}
-						prefix->layers = float(layers);
 
-						prefix->model_mtx = Matrix(rel_pos, tr.rot, tr.scale);
-
-						const Vec3 prev_rel_pos = Vec3(mi->prev_frame_transform.pos - camera_pos);
-						prefix->prev_model_mtx = Matrix(prev_rel_pos, mi->prev_frame_transform.rot, mi->prev_frame_transform.scale);
-
-						DualQuat* bones_ub_array = (DualQuat*)(ub.ptr + sizeof(UBPrefix));
-						computeSkeletonDualQuats(bones_ub_array, mi);
-
-						const Material* material = mesh_mat.material;
-						prefix->material_index = material->getIndex();
-
-						stream->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
-						const gpu::StateFlags state = material->m_render_states | render_state;
-						const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, defines, mesh.semantics_defines);
+						Shader* shader = mesh_mat.material->getShader();
+						const Mesh& mesh = mi->meshes[mesh_idx];
+						const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, skinned_instanced_decl, defines, mesh.semantics_defines);
 						stream->useProgram(program);
 						stream->bindIndexBuffer(mesh.index_buffer_handle);
 						stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
-						stream->bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-						stream->drawIndexedInstanced(mesh.indices_count, layers, mesh.index_type);
+						stream->bindVertexBuffer(1, instance_buffer.buffer, instance_buffer.offset, skinned_instance_stride);
+						stream->drawIndexedInstanced(mesh.indices_count, num_instances, mesh.index_type);
 						break;
 					}
 					case RenderableTypes::DECAL: {
@@ -2875,7 +2915,7 @@ struct PipelineImpl final : Pipeline {
 							Vec2 uv_scale;
 							MaterialIndex material_index;
 						};
-						const TransientSlice slice = stream->allocTransient(count * (sizeof(DecalData)));
+						const TransientSlice slice = alloc(transient_pool, count * (sizeof(DecalData)));
 
 						DecalData* beg = (DecalData*)slice.ptr;
 						DecalData* end = (DecalData*)(slice.ptr + (count - 1) * sizeof(DecalData));
@@ -2937,7 +2977,7 @@ struct PipelineImpl final : Pipeline {
 							Vec4 bezier;
 							MaterialIndex material_index;
 						};
-						const TransientSlice slice = stream->allocTransient(count * (sizeof(DecalData)));
+						const TransientSlice slice = alloc(transient_pool, count * (sizeof(DecalData)));
 
 						DecalData* beg = (DecalData*)slice.ptr;
 						DecalData* end = (DecalData*)(slice.ptr + (count - 1) * sizeof(DecalData));
@@ -3109,7 +3149,9 @@ struct PipelineImpl final : Pipeline {
 			}
 			shadow_atlas_matrices[light.atlas_idx] = getShadowMatrix(pl, light.atlas_idx);
 		}
-		const TransientSlice shadow_matrices_ub = stream.allocUniform(&shadow_atlas_matrices, sizeof(shadow_atlas_matrices));
+		UniformPool& uniform_pool = m_renderer.getUniformPool();
+
+		const TransientSlice shadow_matrices_ub = alloc(uniform_pool, &shadow_atlas_matrices, sizeof(shadow_atlas_matrices));
 		stream.bindUniformBuffer(UniformBuffer::SHADOW, shadow_matrices_ub.buffer, shadow_matrices_ub.offset, shadow_matrices_ub.size);
 
 		m_renderer.pushJob("fill clusters", [clusters_count, clusters, lights, lights_count, cam_pos, &world, size, cp, this, &frame_allocator](DrawStream& stream){
@@ -3399,7 +3441,6 @@ struct PipelineImpl final : Pipeline {
 	}
 
 	void createSortKeys(PipelineImpl::View& view) {
-		if (view.renderables->header.count == 0 && !view.renderables->header.next) return;
 		PagedListIterator<const CullResult> iterator(view.renderables);
 
 		view.instancers.reserve(jobs::getWorkersCount());
@@ -3423,6 +3464,9 @@ struct PipelineImpl final : Pipeline {
 				bucket_map[i] |= 0x100;
 			}
 		}
+		TransientPool& transient_pool = m_renderer.getTransientPool();
+		u32 frame_number = m_renderer.frameNumber() % 0xffFFffFF; // we keep 0xffFFffFF to mark invalid data
+
 		jobs::runOnWorkers([&](){
 			PROFILE_BLOCK("create keys");
 			int total = 0;
@@ -3484,6 +3528,16 @@ struct PipelineImpl final : Pipeline {
 							if (mi.dirty) {
 								queueMaterialOverrideRefresh(e);
 								continue;
+							}
+
+							for (;;) {
+								u32 frame = (u32)mi.pose->frame;
+								if (frame == frame_number) break;
+								if (mi.pose->frame.compareExchange(frame_number, frame)) {
+									mi.pose->slice = alloc(transient_pool, mi.pose->count * sizeof(DualQuat));
+									computeSkeletonDualQuats((DualQuat*)mi.pose->slice.ptr, &mi);
+									break;
+								}
 							}
 
 							auto create_key = [&](const LODMeshIndices& lod){
@@ -3599,7 +3653,6 @@ struct PipelineImpl final : Pipeline {
 						break;
 					}
 					case RenderableTypes::PARTICLES:
-					case RenderableTypes::FUR:
 					case RenderableTypes::COUNT:
 						ASSERT(false);
 						break;
@@ -3621,14 +3674,14 @@ struct PipelineImpl final : Pipeline {
 			PROFILE_BLOCK("fill instance data");
 			u32 num_instances = 0;
 			u32 num_meshes = 0;
-			DrawStream& stream = m_renderer.getDrawStream();
+			TransientPool& transient_pool = m_renderer.getTransientPool();
 			for (AutoInstancer::Instances& instances : instancer.instances) {
 				const AutoInstancer::Page::Group* group = instances.begin;
 				if (!group) continue;
 
 				++num_meshes;
 				const u32 count = instances.end->offset + instances.end->count;
-				instances.slice = stream.allocTransient(count * (3 * sizeof(Vec4)));
+				instances.slice = alloc(transient_pool, count * (3 * sizeof(Vec4)));
 				u8* instance_data = instances.slice.ptr;
 				const u32 sort_key = u32(&instances - instancer.instances.begin());
 				const u64 renderable = instances.begin->renderables[0];
@@ -3861,6 +3914,7 @@ struct PipelineImpl final : Pipeline {
 	ShadowAtlas m_shadow_atlas;
 	CameraParams m_custom_camera_params;
 	HashMap<u32, void*> m_instance_data;
+	JobsGroup m_sort_key_jobs_group;
 
 	struct {
 		struct Buffer {

@@ -354,18 +354,6 @@ void DrawStream::createBuffer(gpu::BufferHandle buffer, gpu::BufferFlags flags, 
 	WRITE_ARRAY(debug_name, len);
 }
 
-TransientSlice DrawStream::allocTransient(u32 size) {
-	return renderer.allocTransientSlice(size);
-}
-
-TransientSlice DrawStream::allocUniform(u32 size) {
-	return renderer.allocUniformSlice(size);
-}
-
-TransientSlice DrawStream::allocUniform(const void* data, u32 size) {
-	return renderer.allocUniformSlice(data, size);
-}
-
 void DrawStream::createTexture(gpu::TextureHandle handle, u32 w, u32 h, u32 depth, gpu::TextureFormat format, gpu::TextureFlags flags, const char* debug_name) {
 	ASSERT(debug_name);
 	CreateTextureData desc = {handle, w, h, depth, format, flags};

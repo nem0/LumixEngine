@@ -1,12 +1,10 @@
 #pragma once
 
-
+#include "core/atomic.h"
 #include "engine/lumix.h"
+#include "gpu/gpu.h"
 
-
-namespace Lumix
-{
-
+namespace Lumix {
 
 struct IAllocator;
 struct Matrix;
@@ -14,9 +12,7 @@ struct Model;
 struct Quat;
 struct Vec3;
 
-
-struct LUMIX_RENDERER_API Pose
-{
+struct LUMIX_RENDERER_API Pose {
 	explicit Pose(IAllocator& allocator);
 	~Pose();
 
@@ -30,6 +26,8 @@ struct LUMIX_RENDERER_API Pose
 	u32 count = 0;
 	Vec3* positions = nullptr;
 	Quat* rotations = nullptr;
+	AtomicI32 frame = 0xffFFffFF;
+	TransientSlice slice = {};
 	
 	private:
 		Pose(const Pose&);

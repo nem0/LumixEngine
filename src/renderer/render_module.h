@@ -297,22 +297,12 @@ enum class RenderableTypes : u8 {
 	SKINNED,
 	DECAL,
 	LOCAL_LIGHT,
-	FUR,
 	CURVE_DECAL,
 	PARTICLES,
 
 	COUNT
 };
 
-
-//@ component_struct
-struct Fur {
-	u32 layers = 16;		//@ property
-	float scale = 0.01f;	//@ property
-	float gravity = 1.f;	//@ property
-	bool enabled = true;	//@ property
-};
-//@ end
 
 enum class RenderModuleVersion : i32 {
 	DECAL_UV_SCALE,
@@ -331,6 +321,7 @@ enum class RenderModuleVersion : i32 {
 	FOG_DENSITY,
 	CLOUDS,
 	MATERIAL_OVERRIDE,
+	REMOVED_FUR,
 
 	LATEST
 };
@@ -354,7 +345,6 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual void createModelInstance(EntityRef entity) = 0;
 	virtual void createInstancedModel(EntityRef entity) = 0;
 	virtual void createPointLight(EntityRef entity) = 0;
-	virtual void createFur(EntityRef entity) = 0;
 	virtual void createParticleEmitter(EntityRef entity) = 0;
 	virtual void createBoneAttachment(EntityRef entity) = 0;
 	virtual void createProceduralGeometry(EntityRef entity) = 0;
@@ -369,7 +359,6 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual void destroyModelInstance(EntityRef entity) = 0;
 	virtual void destroyInstancedModel(EntityRef entity) = 0;
 	virtual void destroyPointLight(EntityRef entity) = 0;
-	virtual void destroyFur(EntityRef entity) = 0;
 	virtual void destroyParticleEmitter(EntityRef entity) = 0;
 	virtual void destroyBoneAttachment(EntityRef entity) = 0;
 	virtual void destroyProceduralGeometry(EntityRef entity) = 0;
@@ -422,9 +411,6 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual void setBoneAttachmentRotation(EntityRef entity, Vec3 rot) = 0;
 	virtual void setBoneAttachmentRotationQuat(EntityRef entity, Quat rot) = 0;	//@ function alias setRotation
 	//@ end
-
-	virtual HashMap<EntityRef, Fur>& getFurs() = 0;
-	virtual Fur& getFur(EntityRef e) = 0;
 
 	virtual void clearDebugLines() = 0;
 	virtual void clearDebugTriangles() = 0;

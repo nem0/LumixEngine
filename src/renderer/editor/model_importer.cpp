@@ -446,7 +446,8 @@ void ModelImporter::createImpostorTextures(Model* model, ImpostorTexturesContext
 		pass_state.inv_view_projection = pass_state.view_projection.inverted();
 		pass_state.view_dir = Vec4(pass_state.view.inverted().transformVector(Vec3(0, 0, -1)), 0);
 		pass_state.camera_up = Vec4(pass_state.view.inverted().transformVector(Vec3(0, 1, 0)), 0);
-		const TransientSlice pass_buf = stream.allocUniform(&pass_state, sizeof(pass_state));
+		UniformPool& uniform_pool = renderer->getUniformPool();
+		const TransientSlice pass_buf = alloc(uniform_pool, &pass_state, sizeof(pass_state));
 		stream.bindUniformBuffer(UniformBuffer::PASS, pass_buf.buffer, pass_buf.offset, pass_buf.size);
 
 		for (u32 j = 0; j < IMPOSTOR_COLS; ++j) {
@@ -462,7 +463,7 @@ void ModelImporter::createImpostorTextures(Model* model, ImpostorTexturesContext
 				Vec3 up = Vec3(0, 1, 0);
 				if (col == IMPOSTOR_COLS >> 1 && j == IMPOSTOR_COLS >> 1) up = Vec3(1, 0, 0);
 				model_mtx.lookAt(center - v * 1.01f * radius, center, up);
-				const TransientSlice ub = stream.allocUniform(&model_mtx, sizeof(model_mtx));
+				const TransientSlice ub = alloc(uniform_pool, &model_mtx, sizeof(model_mtx));
 				stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 
 				for (u32 i = 0; i <= (u32)model->getLODIndices()[0].to; ++i) {
@@ -527,7 +528,7 @@ void ModelImporter::createImpostorTextures(Model* model, ImpostorTexturesContext
 					.normalmap = gpu::getBindlessHandle(gbs[1]),
 					.output = gpu::getRWBindlessHandle(shadow),
 				};
-				const TransientSlice ub = stream.allocUniform(&data, sizeof(data));
+				const TransientSlice ub = alloc(uniform_pool, &data, sizeof(data));
 				stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 				stream.dispatch((tile_size.x + 15) / 16, (tile_size.y + 15) / 16, 1);
 			}
