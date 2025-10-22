@@ -2075,38 +2075,6 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int fur_getter(lua_State* L) {
-		auto [imodule, entity] = checkComponent(L);
-		auto* module = (RenderModule*)imodule;
-		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
-		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
-		switch (name_hash) {
-			case /*layers*/5478302996980294400: LuaWrapper::push(L, module->getFur(entity).layers); break;
-			case /*scale*/13323000532348084840: LuaWrapper::push(L, module->getFur(entity).scale); break;
-			case /*gravity*/653079012433669534: LuaWrapper::push(L, module->getFur(entity).gravity); break;
-			case /*enabled*/13840943435668507618: LuaWrapper::push(L, module->getFur(entity).enabled); break;
-			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
-		}
-		return 1;
-	}
-	
-	int fur_setter(lua_State* L) {
-		auto [imodule, entity] = checkComponent(L);
-		auto* module = (RenderModule*)imodule;
-		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
-		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
-		switch (name_hash) {
-			case /*layers*/5478302996980294400: module->getFur(entity).layers = LuaWrapper::checkArg<u32>(L, 3); break;
-			case /*scale*/13323000532348084840: module->getFur(entity).scale = LuaWrapper::checkArg<float>(L, 3); break;
-			case /*gravity*/653079012433669534: module->getFur(entity).gravity = LuaWrapper::checkArg<float>(L, 3); break;
-			case /*enabled*/13840943435668507618: module->getFur(entity).enabled = LuaWrapper::checkArg<bool>(L, 3); break;
-			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
-		}
-		return 0;
-	}
-	
 	int BoneAttachment_setRotation(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
@@ -2651,7 +2619,6 @@ namespace Lumix {
 		registerLuaComponent(L, "point_light", point_light_getter, point_light_setter);
 		registerLuaComponent(L, "reflection_probe", reflection_probe_getter, reflection_probe_setter);
 		registerLuaComponent(L, "environment_probe", environment_probe_getter, environment_probe_setter);
-		registerLuaComponent(L, "fur", fur_getter, fur_setter);
 		registerLuaComponent(L, "bone_attachment", bone_attachment_getter, bone_attachment_setter);
 		registerLuaComponent(L, "particle_emitter", particle_emitter_getter, particle_emitter_setter);
 		registerLuaComponent(L, "instanced_model", instanced_model_getter, instanced_model_setter);

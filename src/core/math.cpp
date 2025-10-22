@@ -350,7 +350,7 @@ Vec2 normalize(Vec2 value) {
 	return Vec2(x, y);
 }
 
-DVec2 normalize(const DVec2& value) {
+DVec2 normalize(DVec2 value) {
 	double x = value.x;
 	double y = value.y;
 	const double inv_len = 1 / sqrt(x * x + y * y);
