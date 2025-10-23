@@ -40,6 +40,7 @@ LUMIX_FORCE_INLINE void loadTranspose(SOAQuat& quat, const void* ptr) {
 	f4Transpose(quat.x, quat.y, quat.z, quat.w);
 }
 
+// 9 instructions
 LUMIX_FORCE_INLINE SOAVec3 cross(SOAVec3 op1, SOAVec3 op2) {
 	return SOAVec3(op1.y * op2.z - op1.z * op2.y, op1.z * op2.x - op1.x * op2.z, op1.x * op2.y - op1.y * op2.x);
 }
@@ -64,16 +65,18 @@ LUMIX_FORCE_INLINE SOAVec3 operator +(SOAVec3 a, SOAVec3 b) {
 	return { a.x + b.x, a.y + b.y, a.z + b.z };
 }
 
+// 32 instructions
 LUMIX_FORCE_INLINE SOAVec3 rotate(SOAQuat rot, SOAVec3 pos) {
 	SOAVec3 qvec(rot.x, rot.y, rot.z);
-	SOAVec3 uv = cross(qvec, pos);
-	SOAVec3 uuv = cross(qvec, uv);
-	uv = uv * (rot.w * 2.f);
-	uuv = uuv * 2.0f;
+	SOAVec3 uv = cross(qvec, pos); // 9 inst
+	SOAVec3 uuv = cross(qvec, uv); // 9 inst
+	uv = uv * (rot.w * 2.f); // 5 inst
+	uuv = uuv * 2.0f; // 3 inst
 
-	return pos + uv + uuv;
+	return pos + uv + uuv; // 6 inst
 }
 
+// 28 instructions
 LUMIX_FORCE_INLINE SOAQuat operator *(SOAQuat a, SOAQuat b) {
 	return {
 		a.w * b.x + b.w * a.x + a.y * b.z - b.y * a.z,

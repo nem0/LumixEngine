@@ -3725,44 +3725,69 @@ struct PipelineImpl final : Pipeline {
 		static constexpr u32 BITS = 11;
 		static constexpr u32 SIZE = 1 << BITS;
 		static constexpr u32 BIT_MASK = SIZE - 1;
-		static constexpr i32 STEP = 4096;
+		static constexpr i32 STEP = 512;
+		static constexpr i32 NUM_PASSES = 6;
+		static constexpr u32 SHIFTS[NUM_PASSES] = {
+			0, BITS, BITS * 2, BITS * 3, BITS * 4, BITS * 5
+		};
 
-		u32 m_histogram[SIZE];
-		bool m_sorted;
-		jobs::Mutex m_cs;
+		alignas(16) u32 m_histogram[NUM_PASSES][SIZE];
+		jobs::Mutex m_mutex[NUM_PASSES];
+		Local<AtomicI32> m_merge_idx[NUM_PASSES];
 
-		void compute(const u64* keys, const u64* values, int size, u16 shift) {
-			memset(m_histogram, 0, sizeof(m_histogram));
-			m_sorted = true;
-
+		void compute(const u64* keys, const u64* values, i32 size) {
 			AtomicI32 counter = 0;
+			for (u32 i = 0; i < lengthOf(m_merge_idx); ++i) {
+				m_merge_idx[i].create(0);
+			}
+
+			AtomicI32 worker_idx_counter = 0;
 			auto work = [&](){
-				PROFILE_BLOCK("compute histogram");
-				u32 histogram[SIZE];
-				bool sorted = true;
-				memset(histogram, 0, sizeof(histogram));
-
+				i32 worker_idx = worker_idx_counter.inc();
 				i32 begin = counter.add(STEP);
-
-				while (begin < size) {
+				if (begin >= size) return; // other jobs were faster than us
+				
+				alignas(16) u32 histogram[NUM_PASSES][SIZE];
+				PROFILE_BLOCK("compute histogram");
+				memset(histogram, 0, sizeof(histogram));
+				do {
 					const i32 end = minimum(size, begin + STEP);
 
-					u64 key = begin > 0 ? keys[begin - 1] : keys[0];
-					u64 prev_key = key;
 					for (i32 i = begin; i < end; ++i) {
-						key = keys[i];
-						const u16 index = (key >> shift) & BIT_MASK;
-						++histogram[index];
-						sorted &= prev_key <= key;
-						prev_key = key;
+						u64 key = keys[i];
+						
+						const u16 index0 = (key /*>> SHIFTS[0]*/) & BIT_MASK;
+						const u16 index1 = (key >> SHIFTS[1]) & BIT_MASK;
+						const u16 index2 = (key >> SHIFTS[2]) & BIT_MASK;
+						const u16 index3 = (key >> SHIFTS[3]) & BIT_MASK;
+						const u16 index4 = (key >> SHIFTS[4]) & BIT_MASK;
+						 // we don't need the & BIT_MASK here, since we shift 64bit number by 55 bits
+						const u16 index5 = u16(key >> SHIFTS[5]) /*& BIT_MASK*/;
+						++histogram[0][index0];
+						++histogram[1][index1];
+						++histogram[2][index2];
+						++histogram[3][index3];
+						++histogram[4][index4];
+						++histogram[5][index5];
 					}
 					begin = counter.add(STEP);
-				}
-
-				jobs::MutexGuard lock(m_cs);
-				m_sorted &= sorted;
-				for (u32 i = 0; i < lengthOf(m_histogram); ++i) {
-					m_histogram[i] += histogram[i]; 
+				} while (begin < size);
+				
+				// each worker starts at different index to limit contention on the mutex
+				for (i32 j = worker_idx; j < worker_idx + NUM_PASSES; ++j) {
+					i32 pass = j % NUM_PASSES;
+					jobs::MutexGuard lock(m_mutex[pass]);
+					if (m_merge_idx[pass]->inc() == 0) { 
+						memcpy(m_histogram[pass], histogram[pass], sizeof(m_histogram[pass]));
+					}
+					else {
+						for (u32 i = 0; i < SIZE; i += 4) {
+							int4 a = i4Load(&m_histogram[pass][i]);
+							int4 b = i4Load(&histogram[pass][i]);
+							int4 c = i4Add(a, b);
+							i4Store(&m_histogram[pass][i], c);
+						}
+					}
 				}
 			};
 
@@ -3782,51 +3807,43 @@ struct PipelineImpl final : Pipeline {
 		if (size == 0) return;
 
 		Array<u64> tmp_mem(m_allocator);
+		tmp_mem.resize(size * 2);
 
 		u64* keys = _keys;
 		u64* values = _values;
-		u64* tmp_keys = nullptr;
-		u64* tmp_values = nullptr;
+		u64* tmp_keys = tmp_mem.begin();
+		u64* tmp_values = &tmp_mem[size];
 
 		Histogram histogram;
 		u16 shift = 0;
+		histogram.compute(keys, values, size);
 
 		for (int pass = 0; pass < 6; ++pass) {
-			histogram.compute(keys, values, size, shift);
-
-			if (histogram.m_sorted) {
-				if (pass & 1) {
-					memcpy(_keys, tmp_mem.begin(), tmp_mem.byte_size() / 2);
-					memcpy(_values, &tmp_mem[size], tmp_mem.byte_size() / 2);
-				}
-				return;
-			}
-
-			if (!tmp_keys) {
-				tmp_mem.resize(size * 2);
-				tmp_keys = tmp_mem.begin();
-				tmp_values = &tmp_mem[size];
-			}
-
 			u32 offset = 0;
 			for (int i = 0; i < Histogram::SIZE; ++i) {
-				const u32 count = histogram.m_histogram[i];
-				histogram.m_histogram[i] = offset;
+				const u32 count = histogram.m_histogram[pass][i];
+				histogram.m_histogram[pass][i] = offset;
 				offset += count;
 			}
 
-			for (int i = 0; i < size; ++i) {
-				const u64 key = keys[i];
-				const u16 index = (key >> shift) & Histogram::BIT_MASK;
-				const u32 dest = histogram.m_histogram[index]++;
-				tmp_keys[dest] = key;
-				tmp_values[dest] = values[i];
+			if (histogram.m_histogram[pass][1] != size) {
+				for (int i = 0; i < size; ++i) {
+					const u64 key = keys[i];
+					const u16 index = (key >> shift) & Histogram::BIT_MASK;
+					const u32 dest = histogram.m_histogram[pass][index]++;
+					tmp_keys[dest] = key;
+					tmp_values[dest] = values[i];
+				}
+				swap(tmp_keys, keys);
+				swap(tmp_values, values);
 			}
 
-			swap(tmp_keys, keys);
-			swap(tmp_values, values);
-
 			shift += Histogram::BITS;
+		}
+
+		if (keys == _keys) {
+			memcpy(_keys, keys, size * sizeof(u64));
+			memcpy(_values, values, size * sizeof(u64));
 		}
 	}
 

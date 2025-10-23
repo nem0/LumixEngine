@@ -18,7 +18,19 @@ namespace Lumix
 
 #if defined _WIN32 && !defined __clang__
 	using float4 = __m128;
+	using int4 = __m128i;
 
+	LUMIX_FORCE_INLINE int4 i4Load(const void* src) {
+		return _mm_load_si128((const __m128i*)src);
+	}
+
+	LUMIX_FORCE_INLINE int4 i4Add(int4 a, int4 b) {
+		return _mm_add_epi32(a, b);
+	}
+
+	LUMIX_FORCE_INLINE void i4Store(void* dest, int4 src) {
+		_mm_store_si128((__m128i*)dest, src);
+	}
 
 	LUMIX_FORCE_INLINE float4 f4Init(float x, float y, float z, float w) {
 		return _mm_set_ps(w, z, y, x);

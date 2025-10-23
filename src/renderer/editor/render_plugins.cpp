@@ -5333,7 +5333,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 				renderer->getDrawStream().captureFrame();
 			}
 		}
-		//Local<Action> m_renderdoc_capture_action{"Capture frame", "Tools - capture frame with RenderDoc", "capture_renderdoc", "", Action::TOOL};
 	}
 
 	const char* getName() const override { return "renderer"; }

@@ -763,65 +763,94 @@ struct FBXImporter : ModelImporter {
 		ASSERT(dst - unindexed_triangles.data() == unindexed_triangles.size());
 	}
 
-	// sort bones so parents are before their children
-	// so when doing relative -> absolute conversion, we can process bones linearly
-	// and be sure parents have up to date data
+	struct BoneNode {
+		Bone* bone;
+		u32 bone_index;
+		BoneNode* parent;
+		BoneNode* first_child;
+		BoneNode* next_sibling;
+		u32 num_children;
+	};
+
+	static i32 findBestCandidate(Span<BoneNode*> queue, Span<BoneNode*> sorted) {
+		i32 batch_start = sorted.size() & ~3;
+		for (u32 i = 0; i < queue.size(); ++i) {
+			bool pass = true;
+			for (u32 j = batch_start; j < sorted.size(); ++j) {
+				if (queue[i]->bone->parent_id == sorted[j]->bone->id) {
+					pass = false;
+					break;
+				}
+			}
+			if (pass) return i;
+		}
+
+		return 0;
+	}
+
+	// sort bones for optimal simd processing (4 bones in a row must have parents in the previous bones) 
 	void sortBones() {
 		if (m_bones.size() <= 1) return;
 		
-		struct BoneDepth {
-			u32 depth;
-			Bone* bone;
-			i32 idx;
-		};
-		
-		HashMap<u64, BoneDepth> bone_map(m_allocator);
-		bone_map.reserve(m_bones.size());
-
-		for (Bone& b : m_bones) {
-			bone_map.insert(b.id, {0, &b, -1});
+		HashMap<u64, i32> id_to_index(m_allocator);
+		for (i32 i = 0; i < m_bones.size(); ++i) {
+			const Bone& b = m_bones[i];
+			id_to_index.insert(b.id, i);
 		}
 
-		for (BoneDepth& b : bone_map) {
-			u32 depth = 0;
-			u64 current_id = b.bone->parent_id;
-			while (current_id != 0) {
-				auto iter = bone_map.find(current_id);
-				if (!iter.isValid()) {
-					ASSERT(false);
-					break;
+		Array<BoneNode> nodes(m_allocator);
+		nodes.resize(m_bones.size());
+		for (i32 i = 0; i < m_bones.size(); ++i) {
+			nodes[i].bone = &m_bones[i];
+			nodes[i].bone_index = i;
+			nodes[i].parent = nullptr;
+			nodes[i].first_child = nullptr;
+			nodes[i].next_sibling = nullptr;
+			nodes[i].num_children = 0;
+		}
+
+		for (i32 i = 0; i < m_bones.size(); ++i) {
+			if (m_bones[i].parent_id == 0) continue;
+
+			i32 parent_index = id_to_index[m_bones[i].parent_id];
+			nodes[i].parent = &nodes[parent_index];
+			nodes[i].next_sibling = nodes[parent_index].first_child;
+			nodes[parent_index].first_child = &nodes[i];
+			++nodes[parent_index].num_children;
+		}
+
+		Array<BoneNode*> queue(m_allocator);
+		for (BoneNode& node : nodes) {
+			if (!node.parent) queue.push(&node);
+		}
+		Array<BoneNode*> sorted(m_allocator);
+		while (!queue.empty()) {
+			i32 idx = findBestCandidate(queue, sorted);
+			BoneNode& node = *queue[idx];
+			queue.erase(idx);
+			sorted.push(&node);
+			
+			u32 bone_idx = u32(&node - nodes.begin());
+			Array<Bone*> children(m_allocator);
+			for (BoneNode* child = node.first_child; child; child = child->next_sibling) {
+				u32 child_idx = u32(child - nodes.begin());
+				u32 num = child->num_children;
+				i32 insert_pos = 0;
+				for (; insert_pos < queue.size(); ++insert_pos) {
+					u32 q_idx = u32(queue[insert_pos] - nodes.begin());
+					if (num > nodes[q_idx].num_children) break;
 				}
-				++depth;
-				current_id = iter.value().bone->parent_id;
+				queue.insert(insert_pos, child);
 			}
-			b.depth = depth;
 		}
 
-		sort(&m_bones[0], &m_bones.last(), [&](const Bone& a, const Bone& b){
-			return bone_map[a.id].depth < bone_map[b.id].depth;
-		});
-
-		// try to maximize minimal distance between child and its parent, so we can process more bones with simd
-		i32 slice_begin = 0;
-		for (;;) {
-			u32 depth = bone_map[m_bones[slice_begin].id].depth;
-			i32 slice_end = slice_begin;
-			while (slice_end < m_bones.size() && bone_map[m_bones[slice_end].id].depth == depth) {
-				++slice_end;
-			}
-			if (depth > 0 && slice_end - slice_begin > 1) {
-				sort(&m_bones[slice_begin], &m_bones[slice_end], [&](const Bone& a, const Bone& b){
-					return bone_map[a.parent_id].idx < bone_map[b.parent_id].idx;
-				});
-			}
-
-			for (i32 i = slice_begin; i < slice_end; ++i) {
-				bone_map[m_bones[i].id].idx = i;
-			}
-
-			if (slice_end == m_bones.size()) break;
-			slice_begin = slice_end;
+		Array<Bone> new_bones(m_allocator);
+		new_bones.reserve(m_bones.size());
+		for (BoneNode* b : sorted) {
+			new_bones.push(*b->bone);
 		}
+		m_bones = static_cast<Array<Bone>&&>(new_bones);
+
 	}
 
 	const ofbx::Mesh* getAnyMeshFromBone(const ofbx::Object* node, i32 bone_idx) const {
