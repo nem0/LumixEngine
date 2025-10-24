@@ -512,7 +512,11 @@ LUMIX_FORCE_INLINE static void decCounter(Counter* counter) {
 		
 		// decrement the counter if nobody changed the state in the meantime
 		if (counter->signal.state.compareExchange(new_state, state)) {
-			if (fiber) scheduleFiber(fiber->fiber);
+			while (fiber) {
+				WaitingFiber* next = fiber->next;
+				scheduleFiber(fiber->fiber);
+				fiber = next;
+			}
 			return;
 		}
 	}
@@ -686,7 +690,6 @@ void waitAndTurnRed(Signal* signal) {
 		// fastest path
 		if (signal->state.bitTestAndSet(0)) {
 			signal->generation = g_generation.inc();
-			ASSERT(signal->state & 1);
 			return;
 		}
 
@@ -700,7 +703,6 @@ void waitAndTurnRed(Signal* signal) {
 		// check once again before parking the fiber
 		if (signal->state.bitTestAndSet(0)) {
 			signal->generation = g_generation.inc();
-			ASSERT(signal->state & 1);
 			return;
 		}
 
