@@ -626,7 +626,7 @@ bool ModelImporter::writeMaterials(const Path& src, const ModelMeta& meta, bool 
 		}
 		blob.clear();
 
-		blob << "shader \"/shaders/standard.hlsl\"\n";
+		blob << "shader \"/engine/shaders/standard.hlsl\"\n";
 		if (!material.textures[2].src.empty()) blob << "uniform \"Metallic\", 1.000000\n";
 
 		auto writeTexture = [&](const ImportTexture& texture, u32 idx) {

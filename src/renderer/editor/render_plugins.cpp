@@ -898,7 +898,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 	bool canCreateResource() const override { return true; }
 	const char* getDefaultExtension() const override { return "mat"; }
-	void createResource(OutputMemoryStream& blob) override { blob << "shader \"/shaders/standard.hlsl\""; }
+	void createResource(OutputMemoryStream& blob) override { blob << "shader \"/engine/shaders/standard.hlsl\""; }
 	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
 	const char* getIcon() const override { return ICON_FA_IMAGES; }
 	const char* getLabel() const override { return "Material"; }
@@ -2353,11 +2353,12 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				ImGui::SeparatorText("LODs");
 				const LODMeshIndices* lods = m_resource->getLODIndices();
 				float* distances = m_resource->getLODDistances();
-				if (lods[0].to >= 0 && !m_resource->isFailure() && ImGui::BeginTable("lodtbl", 4, ImGuiTableFlags_Resizable)) {
+				if (lods[0].to >= 0 && !m_resource->isFailure() && ImGui::BeginTable("lodtbl", 5, ImGuiTableFlags_Resizable)) {
 					ImGui::TableSetupColumn("LOD");
 					ImGui::TableSetupColumn("Distance");
 					ImGui::TableSetupColumn("# of meshes");
 					ImGui::TableSetupColumn("# of triangles");
+					ImGui::TableSetupColumn("# of vertices");
 					ImGui::TableHeadersRow();
 
 					for (i32 i = 0; i < Model::MAX_LOD_COUNT && lods[i].to >= 0; ++i) {
@@ -2374,14 +2375,20 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 						ImGui::Text("%d", lods[i].to - lods[i].from + 1);
 						ImGui::TableNextColumn();
 						int tri_count = 0;
+						i32 num_vertices = 0;
 						for (i32 j = lods[i].from; j <= lods[i].to; ++j) {
-							i32 indices_count = (i32)m_resource->getMesh(j).indices.size() >> 1;
+							const Mesh& mesh = m_resource->getMesh(j);
+							i32 indices_count = (i32)mesh.indices.size() >> 1;
 							if (!isFlagSet(m_resource->getMesh(j).flags, Mesh::Flags::INDICES_16_BIT)) {
 								indices_count >>= 1;
 							}
 							tri_count += indices_count / 3;
+							num_vertices += mesh.vertices.size();
 						}
 						ImGui::Text("%d", tri_count);
+						ImGui::TableNextColumn();
+						
+						ImGui::Text("%d", num_vertices);
 						ImGui::PopID();
 					}
 
@@ -2467,8 +2474,11 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			ImGui::TableNextRow();
 			ImGui::TableNextColumn();
 
-			importGUI();
-			if (ImGui::CollapsingHeader("Info")) infoGUI();
+			if (ImGui::BeginChild("leftpane")) {
+				importGUI();
+				if (ImGui::CollapsingHeader("Info")) infoGUI();
+			}
+			ImGui::EndChild();
 
 			ImGui::TableNextColumn();
 			previewGUI();
