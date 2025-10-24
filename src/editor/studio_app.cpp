@@ -1441,9 +1441,14 @@ struct StudioAppImpl final : StudioApp {
 		// TODO check for collisions in mounts vs dirs in base path
 		// TODO watch other mounts
 		m_file_watcher = FileSystemWatcher::create(path.c_str(), m_allocator);
-		m_file_watcher->getCallback().bind<&StudioAppImpl::onFileChanged>(this);
+		m_file_watcher->getCallback().bind<&StudioAppImpl::onProjectFileChanged>(this);
+		
+		FileSystem& fs = m_engine->getFileSystem();
+		const char* engine_data_dir = m_engine->getFileSystem().getEngineDataDir();
+		m_engine_data_watcher = FileSystemWatcher::create(engine_data_dir, m_allocator);
+		m_engine_data_watcher->getCallback().bind<&StudioAppImpl::onEngineFileChanged>(this);
 
-		m_engine->getFileSystem().mount(path, "");
+		fs.mount(path, "");
 		m_editor->loadProject();
 		m_asset_compiler->setProjectDir(path);
 		
@@ -1458,8 +1463,12 @@ struct StudioAppImpl final : StudioApp {
 		loadLogo();
 	}
 
-	void onFileChanged(const char* path) {
+	void onProjectFileChanged(const char* path) {
 		m_file_changed.invoke(path);
+	}
+
+	void onEngineFileChanged(const char* path) {
+		m_file_changed.invoke(Path("engine/", path).c_str());
 	}
 
 	#ifdef STATIC_PLUGINS
@@ -3193,6 +3202,7 @@ struct StudioAppImpl final : StudioApp {
 	i32 m_font_size = 16;
 	DelegateList<void(const char*)> m_file_changed;
 	UniquePtr<FileSystemWatcher> m_file_watcher;
+	UniquePtr<FileSystemWatcher> m_engine_data_watcher;
 	String m_project_dir;
 };
 

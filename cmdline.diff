@@ -1,0 +1,785 @@
+diff --git a/src/app/main.cpp b/src/app/main.cpp
+index 7dd636262..0a7b0fd19 100644
+--- a/src/app/main.cpp
++++ b/src/app/main.cpp
+@@ -1,7 +1,7 @@
+ #if 1 // set to 0 to build minimal lunex example
+ 
+ #include "core/atomic.h"
+-#include "core/command_line_parser.h"
++#include "core/command_line.h"
+ #include "core/debug.h"
+ #include "core/default_allocator.h"
+ #include "engine/file_system.h"
+@@ -31,6 +31,9 @@
+ 
+ using namespace Lumix;
+ 
++static BoolCommandLineOption window_cmdline("window");
++static StringCommandLineOption world_cmdline("world");
++
+ static const ComponentType ENVIRONMENT_TYPE = reflection::getComponentType("environment");
+ 
+ struct GUIInterface : GUISystem::Interface {
+@@ -51,6 +54,7 @@ struct Runner final
+ 		: m_allocator(m_main_allocator)
+ 		, m_imgui(m_allocator)
+ 	{
++		CommandLineOption::parseAll();
+ 		debug::init(m_allocator);
+ 		profiler::init(m_allocator);
+ 		if (!jobs::init(os::getCPUsCount(), m_allocator)) {
+@@ -134,18 +138,8 @@ struct Runner final
+ 			logError("Failed to deserialize project file");
+ 		}
+ 
+-		char cmd_line[4096];
+-		if (os::getCommandLine(cmd_line)) {
+-			CommandLineParser parser(cmd_line);
+-			while (parser.next()) {
+-				if (!parser.currentEquals("-world")) continue;
+-				if (!parser.next()) break;
+-
+-				char src[MAX_PATH];
+-				parser.getCurrent(src, lengthOf(src));
+-				m_startup_world = src;
+-				break;
+-			}
++		if (world_cmdline.provided) {
++			m_startup_world = world_cmdline.string;
+ 		}
+ 	}
+ 
+@@ -170,7 +164,7 @@ struct Runner final
+ 
+ 		m_engine->init();
+ 		
+-		if (!CommandLineParser::isOn("-window")) {
++		if (!window_cmdline.get()) {
+ 			os::setFullscreen(m_engine->getMainWindow());
+ 			captureMouse(true);
+ 		}
+@@ -354,6 +348,7 @@ int main(int args, char* argv[]) {
+ 	registerLogCallback<logToDebugOutput>();
+ 	os::init();
+ 	DefaultAllocator allocator;
++	CommandLineOption::parseAll();
+ 	debug::init(allocator);
+ 	profiler::init(allocator);
+ 	jobs::init(os::getCPUsCount(), allocator);
+diff --git a/src/audio/win/audio_device.cpp b/src/audio/win/audio_device.cpp
+index bf4505b76..2752329ee 100644
+--- a/src/audio/win/audio_device.cpp
++++ b/src/audio/win/audio_device.cpp
+@@ -3,7 +3,7 @@
+ #include <dsound.h>
+ 
+ #include "core/allocator.h"
+-#include "core/command_line_parser.h"
++#include "core/command_line.h"
+ #include "core/crt.h"
+ #include "core/log.h"
+ #include "core/math.h"
+@@ -577,9 +577,11 @@ struct NullAudioDevice final : AudioDevice
+ };
+ 
+ 
++static BoolCommandLineOption nullaudio_cmdline("nullaudio");
++
+ UniquePtr<AudioDevice> AudioDevice::create(Engine& engine, IAllocator& allocator)
+ {
+-	if (CommandLineParser::isOn("-nullaudio")) {
++	if (nullaudio_cmdline.get()) {
+ 		logInfo("Using null audio device because it was requested on command line");
+ 		return UniquePtr<NullAudioDevice>::create(engine.getAllocator());
+ 	}
+diff --git a/src/core/command_line_parser.h b/src/core/command_line_parser.h
+deleted file mode 100644
+index 631882267..000000000
+--- a/src/core/command_line_parser.h
++++ /dev/null
+@@ -1,135 +0,0 @@
+-#pragma once
+-
+-
+-#include "core.h"
+-#include "span.h"
+-#include "string.h"
+-
+-
+-namespace Lumix {
+-
+-namespace os {
+-	LUMIX_CORE_API bool getCommandLine(Span<char> output);
+-}
+-
+-struct CommandLineParser {
+-	static bool isOn(const char* option) {
+-		char tmp[4096];
+-		if (!os::getCommandLine(Span(tmp))) return false;
+-
+-		CommandLineParser parser(tmp);
+-		while (parser.next()) {
+-			if (parser.currentEquals(option)) return true;
+-		}
+-
+-		return false;
+-	}
+-
+-
+-	explicit CommandLineParser(const char* cmd_line)
+-		: m_cmd_line(cmd_line)
+-		, m_current(nullptr)
+-	{
+-		ASSERT(m_cmd_line != nullptr);
+-	}
+-
+-
+-	bool next()
+-	{
+-		if (!m_current)
+-		{
+-			m_current = m_cmd_line;
+-			skipWhitespaces();
+-			return *m_current != 0;
+-		}
+-
+-		while (*m_current && !isWhitespace(*m_current))
+-		{
+-			if (*m_current == '"')
+-			{
+-				skipString();
+-			}
+-			else
+-			{
+-				++m_current;
+-			}
+-		}
+-		skipWhitespaces();
+-		return *m_current != 0;
+-	}
+-
+-
+-	void getCurrent(char* output, int max_size)
+-	{
+-		ASSERT(*m_current);
+-		ASSERT(max_size > 0);
+-		const char* rhs = m_current;
+-		char* end = output + max_size - 1;
+-		char* lhs = output;
+-		if (*m_current == '"')
+-		{
+-			++rhs;
+-			while (*rhs && *rhs != '"' && lhs != end)
+-			{
+-				*lhs = *rhs;
+-				++lhs;
+-				++rhs;
+-			}
+-			*lhs = 0;
+-			return;
+-		}
+-		
+-		while (*rhs && !isWhitespace(*rhs) && lhs != end)
+-		{
+-			*lhs = *rhs;
+-			++lhs;
+-			++rhs;
+-		}
+-		*lhs = 0;
+-	}
+-
+-
+-	bool currentEquals(const char* value) 
+-	{
+-		ASSERT(*m_current);
+-
+-		const char* lhs = m_current;
+-		const char* rhs = value;
+-		while (*lhs && *rhs && *lhs == *rhs)
+-		{
+-			++lhs;
+-			++rhs;
+-		}
+-
+-		return *rhs == 0 && (*lhs == 0 || isWhitespace(*lhs));
+-	}
+-
+-private:
+-	void skipWhitespaces()
+-	{
+-		while (*m_current && isWhitespace(*m_current))
+-		{
+-			++m_current;
+-		}
+-	}
+-
+-
+-	void skipString()
+-	{
+-		ASSERT(*m_current == '"');
+-		++m_current;
+-		while (*m_current && *m_current != '"')
+-		{
+-			++m_current;
+-		}
+-		if (*m_current) ++m_current;
+-	}
+-
+-
+-private:
+-	const char* m_current;
+-	const char* m_cmd_line;
+-};
+-
+-
+-} // namespace Lumix
+diff --git a/src/core/profiler.cpp b/src/core/profiler.cpp
+index 6b0c5a736..9d8c408e5 100644
+--- a/src/core/profiler.cpp
++++ b/src/core/profiler.cpp
+@@ -4,7 +4,7 @@
+ 
+ #include "core/atomic.h"
+ #include "core/array.h"
+-#include "core/command_line_parser.h"
++#include "core/command_line.h"
+ #include "core/color.h"
+ #include "core/crt.h"
+ #include "core/debug.h"
+@@ -21,6 +21,8 @@ namespace Lumix {
+ 
+ namespace profiler {
+ 
++static BoolCommandLineOption profile_start_cmdline("profile_start");
++
+ struct GPUScope {
+ 	struct Pair {
+ 		u64 begin;
+@@ -145,6 +147,8 @@ struct ThreadContext {
+ 	void CloseTrace(int) {}
+ #endif
+ 
++static BoolCommandLineOption profile_cswitch_cmdline("profile_cswitch");
++
+ struct Instance {
+ 	Instance(IAllocator& allocator)
+ 		: tag_allocator(allocator, "profiler")
+@@ -172,36 +176,36 @@ struct Instance {
+ 	void startTrace()
+ 	{
+ 		#ifdef _WIN32
+-			if (CommandLineParser::isOn("-profile_cswitch")) {
+-				static TRACEHANDLE trace_handle;
+-				static TraceProps props = {};
+-				props.base.Wnode.BufferSize = sizeof(props);
+-				props.base.Wnode.Flags = WNODE_FLAG_TRACED_GUID;
+-				props.base.Wnode.ClientContext = 1;
+-				props.base.Wnode.Guid = SystemTraceControlGuid;
+-				props.base.LoggerNameOffset = sizeof(props.base);
+-				props.base.EnableFlags = EVENT_TRACE_FLAG_CSWITCH;
+-				props.base.LogFileMode = EVENT_TRACE_REAL_TIME_MODE;
+-				strcpy_s(props.name, KERNEL_LOGGER_NAME);
+-
+-				TraceProps tmp = props;
+-				ControlTraceA(NULL, KERNEL_LOGGER_NAME, &tmp.base, EVENT_TRACE_CONTROL_STOP);
+-				ULONG res = StartTraceA(&trace_handle, KERNEL_LOGGER_NAME, &props.base);
+-				switch (res) {
+-					case ERROR_ALREADY_EXISTS:
+-					case ERROR_ACCESS_DENIED:
+-					case ERROR_BAD_LENGTH:
+-					default: context_switches_enabled = false; break;
+-					case ERROR_SUCCESS: context_switches_enabled = true; break;
+-				}
+-
+-				static EVENT_TRACE_LOGFILEA trace = {};
+-				trace.LoggerName = (decltype(trace.LoggerName))KERNEL_LOGGER_NAME;
+-				trace.ProcessTraceMode = PROCESS_TRACE_MODE_RAW_TIMESTAMP | PROCESS_TRACE_MODE_REAL_TIME | PROCESS_TRACE_MODE_EVENT_RECORD;
+-				trace.EventRecordCallback = TraceTask::callback;
+-				trace_task.open_handle = OpenTraceA(&trace);
+-				trace_task.create("profiler trace", true);
++			if (!profile_cswitch_cmdline.get()) return;
++
++			static TRACEHANDLE trace_handle;
++			static TraceProps props = {};
++			props.base.Wnode.BufferSize = sizeof(props);
++			props.base.Wnode.Flags = WNODE_FLAG_TRACED_GUID;
++			props.base.Wnode.ClientContext = 1;
++			props.base.Wnode.Guid = SystemTraceControlGuid;
++			props.base.LoggerNameOffset = sizeof(props.base);
++			props.base.EnableFlags = EVENT_TRACE_FLAG_CSWITCH;
++			props.base.LogFileMode = EVENT_TRACE_REAL_TIME_MODE;
++			strcpy_s(props.name, KERNEL_LOGGER_NAME);
++
++			TraceProps tmp = props;
++			ControlTraceA(NULL, KERNEL_LOGGER_NAME, &tmp.base, EVENT_TRACE_CONTROL_STOP);
++			ULONG res = StartTraceA(&trace_handle, KERNEL_LOGGER_NAME, &props.base);
++			switch (res) {
++				case ERROR_ALREADY_EXISTS:
++				case ERROR_ACCESS_DENIED:
++				case ERROR_BAD_LENGTH:
++				default: context_switches_enabled = false; break;
++				case ERROR_SUCCESS: context_switches_enabled = true; break;
+ 			}
++
++			static EVENT_TRACE_LOGFILEA trace = {};
++			trace.LoggerName = (decltype(trace.LoggerName))KERNEL_LOGGER_NAME;
++			trace.ProcessTraceMode = PROCESS_TRACE_MODE_RAW_TIMESTAMP | PROCESS_TRACE_MODE_REAL_TIME | PROCESS_TRACE_MODE_EVENT_RECORD;
++			trace.EventRecordCallback = TraceTask::callback;
++			trace_task.open_handle = OpenTraceA(&trace);
++			trace_task.create("profiler trace", true);
+ 		#endif
+ 	}
+ 
+@@ -612,6 +616,10 @@ void pushMutexEvent(u64 mutex_id, u64 begin_enter_time, u64 end_enter_time, u64
+ 	write<false>(*ctx, os::Timer::getRawTimestamp(), EventType::MUTEX_EVENT, r);
+ }
+ 
++bool isProfileStart() {
++	return profile_start_cmdline.get();
++}
++
+ void showInProfiler(bool show)
+ {
+ 	ThreadContext* ctx = g_instance->getThreadContext();
+diff --git a/src/core/profiler.h b/src/core/profiler.h
+index 58da5ce4a..188e233a1 100644
+--- a/src/core/profiler.h
++++ b/src/core/profiler.h
+@@ -16,6 +16,7 @@ LUMIX_CORE_API void shutdown();
+ 
+ LUMIX_CORE_API void setThreadName(const char* name);
+ LUMIX_CORE_API void showInProfiler(bool show);
++LUMIX_CORE_API bool isProfileStart();
+ 
+ LUMIX_CORE_API void beginBlock(const char* name_literal);
+ LUMIX_CORE_API void beginJob(i32 signal_on_finish);
+diff --git a/src/editor/profiler_ui.cpp b/src/editor/profiler_ui.cpp
+index e2f049282..029127688 100644
+--- a/src/editor/profiler_ui.cpp
++++ b/src/editor/profiler_ui.cpp
+@@ -3,7 +3,7 @@
+ #include "core/arena_allocator.h"
+ #include "core/atomic.h"
+ #include "core/color.h"
+-#include "core/command_line_parser.h"
++#include "core/command_line.h"
+ #include "core/debug.h"
+ #include "core/job_system.h"
+ #include "core/log.h"
+@@ -957,7 +957,7 @@ struct ProfilerUIImpl final : ProfilerUI {
+ 		if (done) return;
+ 		done = true;
+ 
+-		if (CommandLineParser::isOn("-profile_start")) {
++		if (profiler::isProfileStart()) {
+ 			snapshot();
+ 		}
+ 	}
+diff --git a/src/editor/studio_app.cpp b/src/editor/studio_app.cpp
+index 419d75cf4..738a3f8dc 100644
+--- a/src/editor/studio_app.cpp
++++ b/src/editor/studio_app.cpp
+@@ -7,7 +7,7 @@
+ #include "core/allocator.h"
+ #include "core/atomic.h"
+ #include "core/color.h"
+-#include "core/command_line_parser.h"
++#include "core/command_line.h"
+ #include "core/debug.h"
+ #include "core/defer.h"
+ #include "core/default_allocator.h"
+@@ -55,6 +55,12 @@
+ namespace Lumix
+ {
+ 
++static StringCommandLineOption data_dir_cmdline("data_dir");
++static StringCommandLineOption open_cmdline("open");
++static StringCommandLineOption plugin_cmdline("plugin");
++static BoolCommandLineOption no_crash_report_cmdline("no_crash_report");
++static I32CommandLineOption workers_cmdline("workers");
++
+ #define LUMIX_EDITOR_PLUGINS_DECLS
+ #include "engine/plugins.inl"
+ #undef LUMIX_EDITOR_PLUGINS_DECLS
+@@ -580,9 +586,8 @@ struct StudioAppImpl final : StudioApp {
+ 	{
+ 		PROFILE_FUNCTION();
+ 		u32 cpus_count = minimum(os::getCPUsCount(), 64);
+-		u32 workers;
+-		if (workersCountOption(workers)) {
+-			cpus_count = workers;
++		if (workers_cmdline.isSpecified()) {
++			cpus_count = workers_cmdline.get();
+ 		}
+ 		if (!jobs::init(cpus_count, m_allocator)) {
+ 			logError("Failed to initialize job system.");
+@@ -876,7 +881,7 @@ struct StudioAppImpl final : StudioApp {
+ 		} data = {this, &semaphore};
+ 		jobs::runLambda([&data]() {
+ 			data.that->onInit();
+-			if (CommandLineParser::isOn("-profile_start")) {
++			if (profiler::isProfileStart()) {
+ 				data.that->m_profiler_ui->snapshot();
+ 			}
+ 			while (!data.that->m_finished) {
+@@ -1053,12 +1058,15 @@ struct StudioAppImpl final : StudioApp {
+ 			logInfo(os::getTimeSinceProcessStart(), " s since process started");
+ 		#endif
+ 
+-		char data_dir[MAX_PATH] = "";
+-		if (checkDataDirCommandLine(Span(data_dir))) {
+-			logInfo("Data folder provided on command line: ", data_dir);
++		if (data_dir_cmdline.isSpecified()) {
++			logInfo("Data folder provided on command line: ", data_dir_cmdline.get());
+ 			m_is_welcome_screen_open = false;
+-			setProjectDir(data_dir);
+-			loadWorldFromCommandLine();
++			setProjectDir(data_dir_cmdline.get());
++			
++			if (open_cmdline.isSpecified()) {
++				loadWorld(Path(open_cmdline.get()), false);
++				m_is_welcome_screen_open = false;
++			}
+ 		}
+ 	}
+ 
+@@ -1432,7 +1440,7 @@ struct StudioAppImpl final : StudioApp {
+ 		m_editor->loadWorld(blob, path.c_str(), additive);
+ 	}
+ 
+-	void setProjectDir(const char* dir) {
++	void setProjectDir(StringView dir) {
+ 		Path path(dir);
+ 		if (!endsWith(path, "\\") && !endsWith(path, "/")) {
+ 			path.append("/");
+@@ -2248,7 +2256,7 @@ struct StudioAppImpl final : StudioApp {
+ 		logInfo("Loading settings...");
+ 
+ 		m_settings.load(user_data_only);
+-		if (CommandLineParser::isOn("-no_crash_report")) enableCrashReporting(false);
++		if (no_crash_report_cmdline.get()) enableCrashReporting(false);
+ 		else enableCrashReporting(m_crash_reporting);
+ 
+ 		m_recent_folders.clear();
+@@ -2307,7 +2315,7 @@ struct StudioAppImpl final : StudioApp {
+ 		}
+ 	}
+ 
+-	static bool copyPlugin(const char* src, int iteration, char (&out)[MAX_PATH])
++	static bool copyPlugin(StringView src, int iteration, char (&out)[MAX_PATH])
+ 	{
+ 		char tmp_path[MAX_PATH];
+ 		os::getExecutablePath(Span(tmp_path));
+@@ -2345,16 +2353,9 @@ struct StudioAppImpl final : StudioApp {
+ 		char cmd_line[2048];
+ 		os::getCommandLine(Span(cmd_line));
+ 
+-		CommandLineParser parser(cmd_line);
+-		SystemManager& system_manager = m_engine->getSystemManager();
+-		while (parser.next())
+-		{
+-			if (!parser.currentEquals("-plugin")) continue;
+-			if (!parser.next()) break;
+-
+-			char src[MAX_PATH];
+-			parser.getCurrent(src, lengthOf(src));
+-
++		if (plugin_cmdline.isSpecified()) {
++			SystemManager& system_manager = m_engine->getSystemManager();
++			StringView src = plugin_cmdline.get();
+ 			bool is_full_path = contains(src, '.');
+ 			Lumix::ISystem* loaded_plugin;
+ 			if (is_full_path)
+@@ -2460,62 +2461,6 @@ struct StudioAppImpl final : StudioApp {
+ 		logInfo("Finished reloading plugin.");
+ 	}
+ 
+-	bool workersCountOption(u32& workers_count) {
+-		char cmd_line[2048];
+-		os::getCommandLine(Span(cmd_line));
+-
+-		CommandLineParser parser(cmd_line);
+-		while (parser.next())
+-		{
+-			if (parser.currentEquals("-workers")) {
+-				if(!parser.next()) {
+-					logError("command line option '-workers` without value");
+-					return false;
+-				}
+-				char tmp[64];
+-				parser.getCurrent(tmp, sizeof(tmp));
+-				fromCString(tmp, workers_count);
+-				return true;
+-			}
+-		}
+-		return false;
+-
+-	}
+-
+-	void loadWorldFromCommandLine()
+-	{
+-		char cmd_line[2048];
+-		char path[MAX_PATH];
+-		os::getCommandLine(Span(cmd_line));
+-
+-		CommandLineParser parser(cmd_line);
+-		while (parser.next())
+-		{
+-			if (!parser.currentEquals("-open")) continue;
+-			if (!parser.next()) break;
+-
+-			parser.getCurrent(path, lengthOf(path));
+-			loadWorld(Path(path), false);
+-			m_is_welcome_screen_open = false;
+-			break;
+-		}
+-	}
+-
+-	static bool checkDataDirCommandLine(Span<char> dir) {
+-		char cmd_line[2048];
+-		os::getCommandLine(Span(cmd_line));
+-
+-		CommandLineParser parser(cmd_line);
+-		while (parser.next()) {
+-			if (!parser.currentEquals("-data_dir")) continue;
+-			if (!parser.next()) return false;
+-
+-			parser.getCurrent(dir.m_begin, dir.length());
+-			return true;
+-		}
+-		return false;
+-	}
+-	
+ 	Span<MousePlugin*> getMousePlugins() override { return m_mouse_plugins; }
+ 
+ 	MousePlugin* getMousePlugin(const char* name) override {
+@@ -3200,6 +3145,7 @@ static Local<StudioAppImpl> g_studio;
+ 
+ StudioApp* StudioApp::create(IAllocator& allocator)
+ {
++	CommandLineOption::parseAll();
+ 	debug::init(allocator);
+ 	profiler::init(allocator);
+ 	g_studio.create(allocator);
+diff --git a/src/editor/utils.cpp b/src/editor/utils.cpp
+index 3db45600b..2a7d8739f 100644
+--- a/src/editor/utils.cpp
++++ b/src/editor/utils.cpp
+@@ -2,7 +2,6 @@
+ #include <imgui/imgui_internal.h>
+ 
+ #include "action.h"
+-#include "core/command_line_parser.h"
+ #include "core/defer.h"
+ #include "core/log.h"
+ #include "core/math.h"
+diff --git a/src/editor/world_editor.cpp b/src/editor/world_editor.cpp
+index 9f9c65116..d0d4dc9c6 100644
+--- a/src/editor/world_editor.cpp
++++ b/src/editor/world_editor.cpp
+@@ -1,6 +1,5 @@
+ #include "core/array.h"
+ #include "core/associative_array.h"
+-#include "core/command_line_parser.h"
+ #include "core/delegate_list.h"
+ #include "core/geometry.h"
+ #include "core/hash.h"
+diff --git a/src/engine/engine.cpp b/src/engine/engine.cpp
+index 2e0fd6ef7..a5a6f11f6 100644
+--- a/src/engine/engine.cpp
++++ b/src/engine/engine.cpp
+@@ -1,4 +1,5 @@
+ #include "core/atomic.h"
++#include "core/command_line.h"
+ #include "core/debug.h"
+ #include "core/hash.h"
+ #include "core/job_system.h"
+diff --git a/src/engine/plugin.cpp b/src/engine/plugin.cpp
+index a669ef9d0..282b8e7b7 100644
+--- a/src/engine/plugin.cpp
++++ b/src/engine/plugin.cpp
+@@ -119,7 +119,7 @@ namespace Lumix
+ 		}
+ 
+ 
+-		ISystem* load(const char* path) override
++		ISystem* load(StringView path) override
+ 		{
+ 			char path_with_ext[MAX_PATH];
+ 			copyString(path_with_ext, path);
+diff --git a/src/engine/plugin.h b/src/engine/plugin.h
+index da3196181..abd0b7fdb 100644
+--- a/src/engine/plugin.h
++++ b/src/engine/plugin.h
+@@ -21,7 +21,7 @@ struct LUMIX_ENGINE_API SystemManager
+ 	
+ 	virtual void initSystems() = 0;
+ 	virtual void unload(struct ISystem* system) = 0;
+-	virtual ISystem* load(const char* path) = 0;
++	virtual ISystem* load(StringView path) = 0;
+ 	virtual void addSystem(ISystem* system, void* library) = 0;
+ 	virtual void update(float dt) = 0;
+ 	virtual ISystem* getSystem(const char* name) = 0;
+diff --git a/src/lua/editor/lua_script_plugins.cpp b/src/lua/editor/lua_script_plugins.cpp
+index d04d0e6c8..fdc2ed899 100644
+--- a/src/lua/editor/lua_script_plugins.cpp
++++ b/src/lua/editor/lua_script_plugins.cpp
+@@ -11,7 +11,7 @@
+ 
+ #include "core/allocator.h"
+ #include "core/array.h"
+-#include "core/command_line_parser.h"
++#include "core/command_line.h"
+ #include "core/crt.h"
+ #include "core/hash.h"
+ #include "core/log.h"
+@@ -48,6 +48,8 @@ static const ComponentType LUA_SCRIPT_TYPE = reflection::getComponentType("lua_s
+ 
+ namespace {
+ 
++static StringCommandLineOption run_script_cmdline("run_script");
++
+ #ifdef LUMIX_LUAU_ANALYSIS
+ struct LuauAnalysis :Luau::FileResolver {
+ 	struct Location {
+@@ -1637,26 +1639,17 @@ struct SetPropertyVisitor : reflection::IPropertyVisitor {
+ 	}
+ 	
+ 	void checkScriptCommandLine() {
+-		char command_line[1024];
+-		os::getCommandLine(Span(command_line));
+-		CommandLineParser parser(command_line);
+-		while (parser.next()) {
+-			if (parser.currentEquals("-run_script")) {
+-				if (!parser.next()) break;
+-
+-				char tmp[MAX_PATH];
+-				parser.getCurrent(tmp, lengthOf(tmp));
+-				OutputMemoryStream content(m_app.getAllocator());
+-				
+-				if (m_app.getEngine().getFileSystem().getContentSync(Path(tmp), content)) {
+-					content.write('\0');
+-					runScript((const char*)content.data(), tmp);
+-				}
+-				else {
+-					logError("Could not read ", tmp);
+-				}
+-				break;
+-			}
++		if (!run_script_cmdline.isSpecified()) return;
++		
++		Path path(run_script_cmdline.get());
++		OutputMemoryStream content(m_app.getAllocator());
++		
++		if (m_app.getEngine().getFileSystem().getContentSync(path, content)) {
++			content.write('\0');
++			runScript((const char*)content.data(), path.c_str());
++		}
++		else {
++			logError("Could not read ", path);
+ 		}
+ 	}
+ 
+diff --git a/src/renderer/editor/render_plugins.cpp b/src/renderer/editor/render_plugins.cpp
+index bfa049888..435d8aaea 100644
+--- a/src/renderer/editor/render_plugins.cpp
++++ b/src/renderer/editor/render_plugins.cpp
+@@ -10,7 +10,7 @@
+ #include "animation/animation_module.h"
+ #include "core/associative_array.h"
+ #include "core/atomic.h"
+-#include "core/command_line_parser.h"
++#include "core/command_line.h"
+ #include "core/crt.h"
+ #include "core/geometry.h"
+ #include "core/hash.h"
+@@ -5341,7 +5341,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
+ 
+ 		IAllocator& allocator = m_app.getAllocator();
+ 
+-		if (CommandLineParser::isOn("-renderdoc")) {
++		auto* renderer = (Renderer*)m_app.getEngine().getSystemManager().getSystem("renderer");
++		if (renderer->isRenderDoc()) {
+ 			m_renderdoc_capture_action.create("Studio", "Capture frame", "Capture frame with RenderDoc", "capture_renderdoc", "", Action::TOOL);
+ 		}
+ 
+diff --git a/src/renderer/renderer.cpp b/src/renderer/renderer.cpp
+index 858151daa..47be430ff 100644
+--- a/src/renderer/renderer.cpp
++++ b/src/renderer/renderer.cpp
+@@ -3,7 +3,7 @@
+ #include "core/arena_allocator.h"
+ #include "core/array.h"
+ #include "core/atomic.h"
+-#include "core/command_line_parser.h"
++#include "core/command_line.h"
+ #include "engine/engine.h"
+ #include "core/hash.h"
+ #include "core/log.h"
+@@ -32,6 +32,11 @@
+ 
+ namespace Lumix {
+ 
++static BoolCommandLineOption debug_gpu_cmdline("debug_gpu");
++static BoolCommandLineOption gpu_stable_power_state_cmdline("gpu_stable_power_state");
++static BoolCommandLineOption renderdoc_cmdline("renderdoc");
++
++
+ static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
+ 
+ RenderBufferHandle RenderPlugin::renderBeforeTonemap(const GBuffer& gbuffer, RenderBufferHandle input, Pipeline& pipeline) { return input; }
+@@ -429,7 +434,7 @@ struct RendererImpl final : Renderer {
+ 
+ 		m_shader_defines.reserve(32);
+ 
+-		bool try_load_renderdoc = CommandLineParser::isOn("-renderdoc");
++		bool try_load_renderdoc = renderdoc_cmdline.get();
+ 		gpu::preinit(m_allocator, try_load_renderdoc);
+ 		for (Local<FrameData>& f : m_frames) f.create(*this, m_allocator, m_engine.getPageAllocator());
+ 
+@@ -445,6 +450,10 @@ struct RendererImpl final : Renderer {
+ 		addPlugin(m_taa);
+ 	}
+ 
++	bool isRenderDoc() override {
++		return renderdoc_cmdline.get();
++	}
++
+ 	float getLODMultiplier() const override { return m_lod_multiplier; }
+ 	void setLODMultiplier(float value) override { m_lod_multiplier = maximum(0.f, value); }
+ 
+@@ -565,16 +574,11 @@ struct RendererImpl final : Renderer {
+ 		PROFILE_FUNCTION();
+ 		gpu::InitFlags flags = gpu::InitFlags::NONE;
+ 		
+-		char cmd_line[4096];
+-		os::getCommandLine(Span(cmd_line));
+-		CommandLineParser cmd_line_parser(cmd_line);
+-		while (cmd_line_parser.next()) {
+-			if (cmd_line_parser.currentEquals("-debug_gpu")) {
+-				flags = flags | gpu::InitFlags::DEBUG;
+-			}
+-			else if (cmd_line_parser.currentEquals("-gpu_stable_power_state")) {
+-				flags = flags | gpu::InitFlags::STABLE_POWER_STATE;
+-			}
++		if (debug_gpu_cmdline.get()) {
++			flags = flags | gpu::InitFlags::DEBUG;
++		}
++		if (gpu_stable_power_state_cmdline.get()) {
++			flags = flags | gpu::InitFlags::STABLE_POWER_STATE;			
+ 		}
+ 
+ 		m_instanced_meshes_buffer = gpu::allocBufferHandle();
+diff --git a/src/renderer/renderer.h b/src/renderer/renderer.h
+index afa42d402..cbfb1d91c 100644
+--- a/src/renderer/renderer.h
++++ b/src/renderer/renderer.h
+@@ -79,6 +79,7 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
+ 	virtual struct Engine& getEngine() = 0;
+ 	virtual float getLODMultiplier() const = 0;
+ 	virtual void setLODMultiplier(float value) = 0;
++	virtual bool isRenderDoc() = 0;
+ 	
+ 	virtual struct ArenaAllocator& getCurrentFrameAllocator() = 0;
+ 	virtual IAllocator& getAllocator() = 0;

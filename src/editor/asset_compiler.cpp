@@ -192,9 +192,14 @@ struct AssetCompilerImpl : AssetCompiler {
 
 		m_init_finished = true;
 		for (Resource* res : m_on_init_load) {
-			StringView filepath = ResourcePath::getResource(res->getPath());
-			pushToCompileQueue(Path(filepath));
-			res->decRefCount();
+			LoadHook::Action action = onBeforeLoad(*res);
+			if (action == LoadHook::Action::IMMEDIATE) {
+				m_load_hook.continueLoad(*res, true);
+				res->decRefCount();
+			}
+			else {
+				pushToCompileQueue(Path(res->getPath()));
+			}
 		}
 		m_on_init_load.clear();
 		fillDB();
