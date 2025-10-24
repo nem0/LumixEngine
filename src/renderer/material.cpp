@@ -147,13 +147,10 @@ void Material::serialize(OutputMemoryStream& blob) {
 	blob << "backface_culling " << (isBackfaceCulling() ? "true" : "false") << "\n";
 	blob << "layer \"" << m_renderer.getLayerName(m_layer) << "\"\n";
 
-	bool first_define = true;
 	for (int i = 0; i < sizeof(m_define_mask) * 8; ++i) {
 		if ((m_define_mask & (1 << i)) == 0) continue;
 		const char* def = m_renderer.getShaderDefine(i);
-		if (!first_define) blob << ", ";
-		first_define = false;
-		blob << "define \"" << def << "\"";
+		blob << "define \"" << def << "\"\n";
 	}
 
 	for (u32 i = 0; i < m_texture_count; ++i) {
