@@ -946,9 +946,9 @@ struct PipelineImpl final : Pipeline {
 		View* view_ptr = view.get();
 		jobs::turnRed(&view->ready);
 
-		m_sort_key_jobs_group.beginJob();
+		m_sort_keys_group.beginJob();
 		m_renderer.pushJob("prepare view", [this, view_ptr](DrawStream& stream) {
-			setupParticles(stream, *view_ptr);
+			setupParticles(*view_ptr);
 			encodeInstancedModels(stream, *view_ptr);
 			encodeProceduralGeometry(*view_ptr);
 
@@ -958,16 +958,15 @@ struct PipelineImpl final : Pipeline {
 				createSortKeys(*view_ptr);
 				view_ptr->renderables->free(m_renderer.getEngine().getPageAllocator());
 			}
-			m_sort_key_jobs_group.endJob();
+			m_sort_keys_group.endJob();
 			view_ptr->sorter.pack();
 				
 			if (!view_ptr->sorter.keys.empty()) {
 				radixSort(view_ptr->sorter.keys.begin(), view_ptr->sorter.values.begin(), view_ptr->sorter.keys.size());
-
-				// createSortKeys fills Pose::slice and createCommands uses it
-				// but the Pose can be used across views, so we have to wait for 
-				// all createSortKeys to finish before we can do any createCommands
-				m_sort_key_jobs_group.wait();
+				// Wait for all createSortKeys jobs to finish, ensuring no more pose processing jobs will be created.
+				m_sort_keys_group.wait(); 
+				// Wait for all pose processing jobs to finish, because we use the pose transient slices in createCommands.
+				jobs::wait(&m_poses_done);
 				createCommands(*view_ptr);
 			}
 			
@@ -1499,7 +1498,7 @@ struct PipelineImpl final : Pipeline {
 	}
 
 	void renderMain() {
-		m_sort_key_jobs_group.begin();
+		m_sort_keys_group.begin();
 
 		m_renderer.releaseRenderbuffer(m_output);
 		UniformPool& uniform_pool = m_renderer.getUniformPool();
@@ -1555,7 +1554,8 @@ struct PipelineImpl final : Pipeline {
 			result = plugin->renderAfterTonemap(gbuffer, result, *this);
 		}
 
-		m_sort_key_jobs_group.end();
+		m_sort_keys_group.end();
+		m_sort_keys_group.wait();
 
 		m_renderer.releaseRenderbuffer(gbuffer.A);
 		m_renderer.releaseRenderbuffer(gbuffer.B);
@@ -2109,7 +2109,7 @@ struct PipelineImpl final : Pipeline {
 		});
 	}
 
-	void setupParticles(DrawStream& stream, View& view) {
+	void setupParticles(View& view) {
 		PROFILE_FUNCTION();
 
 		if (view.cp.is_shadow) return;
@@ -2532,7 +2532,8 @@ struct PipelineImpl final : Pipeline {
 		stream.memoryBarrier(m_indirect_buffer);
 	}
 
-	void computeSkeletonDualQuats(DualQuat* output, const ModelInstance* mi) {
+	void computeSkeletonDualQuats(const ModelInstance* mi) {
+		DualQuat* output = (DualQuat*)mi->pose->slice.ptr;
 		ASSERT((uintptr)output % 16 == 0); // we store with f4Stream, which needs aligned memory
 
 		const Quat* rotations = mi->pose->rotations;
@@ -3440,6 +3441,65 @@ struct PipelineImpl final : Pipeline {
 		m_material_override_refresh_queue.push(e);
 	}
 
+	struct PoseProcessor {
+		struct Batch {
+			u32 count = 0;
+			ModelInstance* elements[128];
+			PipelineImpl* pipeline;
+		};
+
+		PipelineImpl& pipeline;
+		ArenaAllocator& allocator;
+		Batch* batch = nullptr;
+
+		PoseProcessor(PipelineImpl& pipeline, ArenaAllocator& allocator)
+			: allocator(allocator)
+			, pipeline(pipeline)
+		{}
+
+		~PoseProcessor() {
+			if (batch) processBatch();
+		}
+
+		void push(ModelInstance* mi) {
+			if (!batch) {
+				batch = LUMIX_NEW(allocator, Batch);
+				batch->pipeline = &pipeline;
+			}
+
+			batch->elements[batch->count] = mi;
+			++batch->count;
+			if (batch->count == lengthOf(batch->elements)) {
+				processBatch();
+			}
+		}
+
+		void processBatch() {
+			jobs::run(batch, [](void* ptr){
+				PROFILE_BLOCK("compute gpu pose");
+				Batch* batch = (Batch*)ptr;
+				u32 num_bones = 0;
+				for (u32 i = 0; i < batch->count; ++i) {
+					num_bones += batch->elements[i]->pose->count;
+				}
+
+				profiler::pushInt("bones", num_bones);
+				TransientPool& pool = batch->pipeline->m_renderer.getTransientPool();
+				TransientSlice slice = alloc(pool, num_bones * sizeof(DualQuat)); 
+				u32 offset = 0;
+				for (u32 i = 0; i < batch->count; ++i) {
+					ModelInstance& mi = *batch->elements[i];
+					mi.pose->slice = slice;
+					mi.pose->slice.ptr += offset;
+					mi.pose->slice.offset += offset;
+					batch->pipeline->computeSkeletonDualQuats(&mi);
+					offset += mi.pose->count * sizeof(DualQuat);
+				}
+			}, &pipeline.m_poses_done);
+			batch = nullptr;
+		}
+	};
+
 	void createSortKeys(PipelineImpl::View& view) {
 		PagedListIterator<const CullResult> iterator(view.renderables);
 
@@ -3469,6 +3529,9 @@ struct PipelineImpl final : Pipeline {
 
 		jobs::runOnWorkers([&](){
 			PROFILE_BLOCK("create keys");
+			
+			PoseProcessor pose_processor(*this, m_renderer.getCurrentFrameAllocator());
+
 			int total = 0;
 			ModelInstance* LUMIX_RESTRICT model_instances = m_module->getModelInstances().begin();
 			const Transform* LUMIX_RESTRICT transforms = m_module->getWorld().getTransforms();
@@ -3534,8 +3597,7 @@ struct PipelineImpl final : Pipeline {
 								u32 frame = (u32)mi.pose->frame;
 								if (frame == frame_number) break;
 								if (mi.pose->frame.compareExchange(frame_number, frame)) {
-									mi.pose->slice = alloc(transient_pool, mi.pose->count * sizeof(DualQuat));
-									computeSkeletonDualQuats((DualQuat*)mi.pose->slice.ptr, &mi);
+									pose_processor.push(&mi);
 									break;
 								}
 							}
@@ -3931,7 +3993,8 @@ struct PipelineImpl final : Pipeline {
 	ShadowAtlas m_shadow_atlas;
 	CameraParams m_custom_camera_params;
 	HashMap<u32, void*> m_instance_data;
-	JobsGroup m_sort_key_jobs_group;
+	JobsGroup m_sort_keys_group;
+	jobs::Counter m_poses_done;
 
 	struct {
 		struct Buffer {
