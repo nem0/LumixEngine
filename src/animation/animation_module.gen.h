@@ -18,5 +18,6 @@ reflection::build_module("animation")
 		.prop<&AnimationModule::getAnimatorDefaultSet, &AnimationModule::setAnimatorDefaultSet>("Default set")
 	.cmp<&AnimationModule::createAnimable, &AnimationModule::destroyAnimable>("animable", "Animation / Animable")
 		.prop<&AnimationModule::getAnimableAnimation, &AnimationModule::setAnimableAnimation>("Animation")
+			.resourceAttribute(Animation::TYPE)
 ;
 

@@ -68,7 +68,7 @@ struct AnimationModule : IModule {
 	virtual void endBlendstackUpdate(EntityRef entity) = 0;
 
 	//@ component Animable
-	virtual Path getAnimableAnimation(EntityRef entity) = 0;
+	virtual Path getAnimableAnimation(EntityRef entity) = 0;						//@ resource_type Animation::TYPE
 	virtual void setAnimableAnimation(EntityRef entity, const Path& path) = 0;
 	//@ end
 	virtual void updateAnimable(EntityRef entity, float time_delta) = 0;
