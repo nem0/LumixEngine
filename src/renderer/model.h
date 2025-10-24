@@ -196,7 +196,6 @@ struct LUMIX_RENDERER_API Model final : Resource {
 	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Pose* pose, EntityPtr entity, const RayCastModelHit::Filter* filter);
 	const AABB& getAABB() const { return m_aabb; }
 	void onBeforeReady() override;
-	bool isSkinned() const;
 	const float* getLODDistances() const { return m_lod_distances; }
 	float* getLODDistances() { return m_lod_distances; }
 	const LODMeshIndices* getLODIndices() const { return m_lod_indices; }

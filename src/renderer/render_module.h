@@ -284,17 +284,14 @@ struct DebugTriangle
 };
 
 
-struct DebugLine
-{
+struct DebugLine {
 	DVec3 from;
 	DVec3 to;
 	Color color;
 };
 
-
 enum class RenderableTypes : u8 {
 	MESH,
-	SKINNED,
 	DECAL,
 	LOCAL_LIGHT,
 	CURVE_DECAL,
@@ -302,7 +299,6 @@ enum class RenderableTypes : u8 {
 
 	COUNT
 };
-
 
 enum class RenderModuleVersion : i32 {
 	DECAL_UV_SCALE,

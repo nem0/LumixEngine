@@ -66,11 +66,6 @@ u32 ProceduralGeometry::getIndexCount() const {
 	return u32(index_data.size() / (index_type == gpu::DataType::U16 ? 2 : 4));
 }
 
-static RenderableTypes getRenderableType(const Model& model) {
-	ASSERT(model.isReady());
-	return model.isSkinned() ? RenderableTypes::SKINNED : RenderableTypes::MESH;
-}
-
 struct ReflectionProbe::LoadJob {
 	LoadJob(struct RenderModuleImpl& module, EntityRef probe, IAllocator& allocator)
 		: m_module(module)
@@ -2008,8 +2003,7 @@ struct RenderModuleImpl final : RenderModule {
 			const Vec3& scale = m_world.getScale(entity);
 			const float radius = model_instance.model->getOriginBoundingRadius() * maximum(scale.x, scale.y, scale.z);
 			if (!m_culling_system->isAdded(entity)) {
-				const RenderableTypes type = getRenderableType(*model_instance.model);
-				m_culling_system->add(entity, (u8)type, pos, radius);
+				m_culling_system->add(entity, (u8)RenderableTypes::MESH, pos, radius);
 			}
 		}
 		else
@@ -2897,8 +2891,7 @@ struct RenderModuleImpl final : RenderModule {
 		const DVec3 pos = m_world.getPosition(entity);
 		const float radius = bounding_radius * maximum(scale.x, scale.y, scale.z);
 		if(r.flags & ModelInstance::ENABLED) {
-			const RenderableTypes type = getRenderableType(*model);
-			m_culling_system->add(entity, (u8)type, pos, radius);
+			m_culling_system->add(entity, (u8)RenderableTypes::MESH, pos, radius);
 		}
 		ASSERT(!r.pose);
 		if (model->getBoneCount() > 0) {

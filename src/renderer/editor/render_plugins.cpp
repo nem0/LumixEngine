@@ -83,7 +83,6 @@ static const ComponentType INSTANCED_MODEL_TYPE = reflection::getComponentType("
 static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
 static const ComponentType ENVIRONMENT_PROBE_TYPE = reflection::getComponentType("environment_probe");
 static const ComponentType REFLECTION_PROBE_TYPE = reflection::getComponentType("reflection_probe");
-static const ComponentType FUR_TYPE = reflection::getComponentType("fur");
 static const ComponentType PROCEDURAL_GEOM_TYPE = reflection::getComponentType("procedural_geom");
 
 namespace TextureCompressor {

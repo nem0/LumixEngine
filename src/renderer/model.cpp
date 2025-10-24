@@ -136,17 +136,6 @@ static void computeSkinMatrices(const Pose& pose, const Model& model, Matrix* ma
 	}
 }
 
-
-bool Model::isSkinned() const
-{
-	ASSERT(isReady());
-	for (const Mesh& m : m_meshes) {
-		if(m.type == Mesh::SKINNED) return true;
-	}
-	return false;
-}
-
-
 RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Pose* pose, EntityPtr entity, const RayCastModelHit::Filter* filter)
 {
 	static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");

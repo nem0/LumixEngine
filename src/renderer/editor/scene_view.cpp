@@ -643,8 +643,9 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 			renderer.setRenderTargets({}, selection_mask);
 			pipeline.clear(gpu::ClearFlags::ALL, 0, 0, 0, 0, 0);
 			UniformPool& uniform_pool = renderer.getUniformPool();
+			TransientPool& transient_pool = renderer.getTransientPool();
 	
-			renderer.pushJob("selection", [&pipeline, &renderer, this, entities, &uniform_pool](DrawStream& stream) {
+			renderer.pushJob("selection", [&pipeline, &renderer, this, entities, &uniform_pool, &transient_pool](DrawStream& stream) {
 				RenderModule* module = pipeline.getModule();
 				const World& world = module->getWorld();
 				const u32 skinned_define = 1 << renderer.getShaderDefineIdx("SKINNED");
@@ -676,7 +677,7 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 							}
 						}
 			
-						TransientSlice ub;
+						const gpu::StateFlags state = gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_FUNCTION;
 						if (dq_pose.empty()) {
 							struct UBData {
 								Matrix mtx;
@@ -685,34 +686,55 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 								mtx,
 								material->getIndex()
 							};
-							ub = alloc(uniform_pool, &ub_data, sizeof(ub_data));
+							TransientSlice ub = alloc(uniform_pool, &ub_data, sizeof(ub_data));
+							stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+							stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+							gpu::ProgramHandle program = mesh_mat.material->getShader()->getProgram(material->m_render_states | state, mesh.vertex_decl, define_mask, mesh.semantics_defines);
+							stream.useProgram(program);
 						}
 						else {
-							struct UBPrefix {
-								float layer;
-								float fur_scale;
-								float gravity;
-								float padding;
-								Matrix model_mtx;
-								// DualQuat bones[];
+							struct SkinnedInstanceData {
+								IVec3 idata;
+								Vec3 pos;
+								Quat rot;
+								Vec3 scale;
+								Vec3 prev_pos;
+								Quat prev_rot;
+								Vec3 prev_scale;
 							};
 
-							ub = alloc(uniform_pool, sizeof(UBPrefix) + dq_pose.byte_size());
-							UBPrefix* dc = (UBPrefix*)ub.ptr;
-							dc->layer = 0;
-							dc->fur_scale = 0;
-							dc->gravity = 0;
-							dc->model_mtx = mtx;
-							memcpy(ub.ptr + sizeof(UBPrefix), dq_pose.begin(), dq_pose.byte_size());
+							TransientSlice inst_buf = alloc(transient_pool, sizeof(SkinnedInstanceData));
+							TransientSlice bones = alloc(transient_pool, dq_pose.byte_size());
+							SkinnedInstanceData* idata = (SkinnedInstanceData*)inst_buf.ptr;
+							
+							Transform tr = world.getTransform(e);
+							idata->pos = Vec3(tr.pos - view_pos);
+							idata->prev_pos = idata->pos;
+							idata->rot = tr.rot;
+							idata->prev_rot = idata->rot;
+							idata->scale = tr.scale;
+							idata->prev_scale = idata->scale;
+							idata->idata.x = (i32)material->getIndex();
+							idata->idata.y = gpu::getBindlessHandle(bones.buffer).value;
+							idata->idata.z = bones.offset;
+
+							memcpy(bones.ptr, dq_pose.begin(), dq_pose.byte_size());
+							gpu::VertexDecl skinned_instanced_decl(gpu::PrimitiveType::NONE);
+							skinned_instanced_decl.addAttribute(0, 3, gpu::AttributeType::U32, gpu::Attribute::INSTANCED); // material index, bones_buffer, bones_buffer_offset
+							skinned_instanced_decl.addAttribute(12, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // pos
+							skinned_instanced_decl.addAttribute(24, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // rot
+							skinned_instanced_decl.addAttribute(40, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // scale
+							skinned_instanced_decl.addAttribute(52, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // prev_pos
+							skinned_instanced_decl.addAttribute(64, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // prev_rot
+							skinned_instanced_decl.addAttribute(80, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // prev_scale
+							const u32 skinned_instance_stride = skinned_instanced_decl.getStride();
+							stream.bindVertexBuffer(1, inst_buf.buffer, inst_buf.offset, inst_buf.size);
+							gpu::ProgramHandle program = mesh_mat.material->getShader()->getProgram(material->m_render_states | state, mesh.vertex_decl, skinned_instanced_decl, define_mask, mesh.semantics_defines);
+							stream.useProgram(program);
 						}
 		
-						const gpu::StateFlags state = gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_FUNCTION;
-						gpu::ProgramHandle program = mesh_mat.material->getShader()->getProgram(material->m_render_states | state, mesh.vertex_decl, define_mask, mesh.semantics_defines);
-						stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
-						stream.useProgram(program);
 						stream.bindIndexBuffer(mesh.index_buffer_handle);
 						stream.bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
-						stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 						stream.drawIndexed(0, mesh.indices_count, mesh.index_type);
 					}
 					module->unlockPose(e, false);

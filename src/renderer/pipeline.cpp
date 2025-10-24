@@ -36,6 +36,26 @@
 
 namespace Lumix {
 
+namespace {
+
+enum class DrawCommandTypes : u8 {
+	MESH,
+	AUTOINSTANCED,
+	SKINNED,
+	DECAL,
+	CURVE_DECAL,
+	PARTICLES,
+};
+
+// converts float to u32 so it can be used in radix sort
+// float float_value = 0;
+// u32 sort_key = floatFlip(*(u32*)&float_value);
+// http://stereopsis.com/radix.html
+static LUMIX_FORCE_INLINE u32 floatFlip(u32 float_bits_value) {
+	u32 mask = -i32(float_bits_value >> 31) | 0x80000000;
+	return float_bits_value ^ mask;
+}
+
 // sort key:
 // bucket 64-56
 // instanced_flag 55
@@ -44,14 +64,66 @@ namespace Lumix {
 // instancer 31 - 16; if instanced
 // instance group 15 - 0; if instanced
 
-static constexpr u32 SORT_VALUE_TYPE_MASK = (1 << 5) - 1;
 static constexpr u64 SORT_KEY_BUCKET_SHIFT = 56;
 static constexpr u64 SORT_KEY_INSTANCED_FLAG = (u64)1 << 55;
-static constexpr u64 SORT_KEY_INSTANCER_SHIFT = 16;
-static constexpr u64 SORT_KEY_MESH_IDX_SHIFT = 40;
-static constexpr u64 SORT_KEY_EMITTER_SHIFT = 40;
 
-namespace {
+static constexpr u64 SORT_VALUE_INSTANCER_SHIFT = 16;
+static constexpr u64 SORT_VALUE_EMITTER_SHIFT = 40;
+static constexpr u32 SORT_VALUE_TYPE_MASK = (1 << 5) - 1;
+static constexpr u64 SORT_VALUE_MESH_IDX_SHIFT = 40;
+static constexpr u64 SORT_VALUE_TYPE_SHIFT = 32;
+
+enum class SortKey : u64;
+enum class SortValue : u64;
+
+// sort key makers
+LUMIX_FORCE_INLINE SortKey makeDecalSortKey(const Material* material, u8 bucket) {
+	return SortKey(material->getSortKey() | ((u64)bucket << SORT_KEY_BUCKET_SHIFT));
+}
+
+LUMIX_FORCE_INLINE SortKey makeParticleSortKey(const Material* material, u8 bucket) {
+	return SortKey(material->getSortKey() | ((u64)bucket << SORT_KEY_BUCKET_SHIFT));
+}
+
+LUMIX_FORCE_INLINE SortKey makeMeshSortKey(const MeshMaterial& mesh_math, u8 bucket) {
+ 	return SortKey(mesh_math.sort_key | ((u64)bucket << SORT_KEY_BUCKET_SHIFT));
+}
+
+LUMIX_FORCE_INLINE SortKey makeDepthSortKey(float depth_squared, u8 bucket) {
+	const u32 depth_bits = floatFlip(*(u32*)&depth_squared);
+	return SortKey(depth_bits | ((u64)bucket << SORT_KEY_BUCKET_SHIFT));
+}
+
+LUMIX_FORCE_INLINE SortKey makeAutoInstancedSortKey(i32 instancer_index, u8 bucket) {
+	return SortKey(instancer_index | SORT_KEY_INSTANCED_FLAG | ((u64)bucket << SORT_KEY_BUCKET_SHIFT));
+}
+
+// sort value makers
+LUMIX_FORCE_INLINE SortValue makeParticleSortValue(EntityPtr entity, u32 emitter_idx) {
+	const u64 type_mask = (u64)DrawCommandTypes::PARTICLES << SORT_VALUE_TYPE_SHIFT;
+	return SortValue(entity.index | type_mask | ((u64)emitter_idx << SORT_VALUE_EMITTER_SHIFT));
+}
+
+LUMIX_FORCE_INLINE SortValue makeDecalSortValue(EntityPtr entity) {
+	return SortValue(entity.index | (u64(DrawCommandTypes::DECAL) << SORT_VALUE_TYPE_SHIFT));
+}
+
+LUMIX_FORCE_INLINE SortValue makeCurveDecalSortValue(EntityPtr entity) {
+	return SortValue(entity.index | (u64(DrawCommandTypes::CURVE_DECAL) << SORT_VALUE_TYPE_SHIFT));
+}
+
+LUMIX_FORCE_INLINE SortValue makeSkinnedSortValue(EntityPtr entity, u32 mesh_idx) {
+	return SortValue(entity.index | (u64(DrawCommandTypes::SKINNED) << SORT_VALUE_TYPE_SHIFT) | ((u64)mesh_idx << SORT_VALUE_MESH_IDX_SHIFT));
+}
+
+LUMIX_FORCE_INLINE SortValue makeMeshSortValue(EntityPtr entity, u32 mesh_idx) {
+	return SortValue(entity.index | (u64(DrawCommandTypes::MESH) << SORT_VALUE_TYPE_SHIFT) | ((u64)mesh_idx << SORT_VALUE_MESH_IDX_SHIFT));
+}
+
+LUMIX_FORCE_INLINE SortValue makeAutoInstancedSortValue(u32 batch_idx, u32 instancer_idx) {
+	return SortValue(batch_idx | (instancer_idx << SORT_VALUE_INSTANCER_SHIFT) | (u64(DrawCommandTypes::AUTOINSTANCED) << SORT_VALUE_TYPE_SHIFT));
+}
+
 
 struct Indirect {
 	u32 vertex_count;
@@ -239,8 +311,8 @@ struct PipelineImpl final : Pipeline {
 			} header;
 
 			static constexpr u32 MAX_COUNT = (PageAllocator::PAGE_SIZE - sizeof(Header)) / sizeof(u64) / 2;
-			u64 keys[MAX_COUNT];
-			u64 values[MAX_COUNT];
+			SortKey keys[MAX_COUNT];
+			SortValue values[MAX_COUNT];
 		};
 
 		static_assert(sizeof(Page) == PageAllocator::PAGE_SIZE);
@@ -257,7 +329,7 @@ struct PipelineImpl final : Pipeline {
 				return new (NewPlaceholder(), mem) Page;
 			}
 
-			void push(u64 key, u64 value) {
+			void push(SortKey key, SortValue value) {
 				if (last_page->header.count == lengthOf(last_page->keys)) {
 					Page* p = getNewPage();
 					last_page->header.next = p;
@@ -482,16 +554,6 @@ struct PipelineImpl final : Pipeline {
 		u8 layer_to_bucket[255];
 		jobs::Signal ready;
 	};
-
-	// converts float to u32 so it can be used in radix sort
-	// float float_value = 0;
-	// u32 sort_key = floatFlip(*(u32*)&float_value);
-	// http://stereopsis.com/radix.html
-	static LUMIX_FORCE_INLINE u32 floatFlip(u32 float_bits_value) {
-		u32 mask = -i32(float_bits_value >> 31) | 0x80000000;
-		return float_bits_value ^ mask;
-	}
-
 
 	PipelineImpl(Renderer& renderer, PipelineType type, IAllocator& allocator)
 		: m_allocator(allocator)
@@ -2154,10 +2216,11 @@ struct PipelineImpl final : Pipeline {
 				
 				ASSERT(emitter.particles_count > 0);
 
-				const u64 type_mask = (u64)RenderableTypes::PARTICLES << 32;
 				const u32 emitter_idx = u32(&emitter - system.getEmitters().begin());
-				const u64 subrenderable = system.m_entity.index | type_mask | ((u64)emitter_idx << SORT_KEY_EMITTER_SHIFT);
-				inserter.push(material->getSortKey() | ((u64)bucket_idx << SORT_KEY_BUCKET_SHIFT), subrenderable);
+				
+				SortValue value = makeParticleSortValue(system.m_entity, emitter_idx);
+				SortKey key = makeParticleSortKey(material, bucket_idx);
+				inserter.push(key, value);
 			}
 		}
 	}
@@ -2663,7 +2726,7 @@ struct PipelineImpl final : Pipeline {
 
 			for (u32 i = from; i < to; ++i) {
 				const EntityRef entity = {int(renderables[i] & 0xFFffFFff)};
-				const RenderableTypes type = RenderableTypes((renderables[i] >> 32) & SORT_VALUE_TYPE_MASK);
+				const DrawCommandTypes type = DrawCommandTypes((renderables[i] >> SORT_VALUE_TYPE_SHIFT) & SORT_VALUE_TYPE_MASK);
 				const u8 bucket = sort_keys[i] >> SORT_KEY_BUCKET_SHIFT;
 
 				if (bucket != prev_bucket) {
@@ -2679,8 +2742,8 @@ struct PipelineImpl final : Pipeline {
 				}
 
 				switch(type) {
-					case RenderableTypes::PARTICLES: {
-						const u32 emitter_idx = u32(renderables[i] >> SORT_KEY_EMITTER_SHIFT);
+					case DrawCommandTypes::PARTICLES: {
+						const u32 emitter_idx = u32(renderables[i] >> SORT_VALUE_EMITTER_SHIFT);
 						const ParticleSystem& particle_system = m_module->getParticleEmitter(entity);
 						const ParticleSystem::Emitter& emitter = particle_system.getEmitter(emitter_idx);
 						const Material* material = emitter.resource_emitter.material;
@@ -2711,135 +2774,134 @@ struct PipelineImpl final : Pipeline {
 						stream->drawArraysInstanced(4, particles_count);
 						break;
 					}
-					case RenderableTypes::MESH: {
-						if (sort_keys[i] & SORT_KEY_INSTANCED_FLAG) {
-							const u32 group_idx = renderables[i] & 0xffFF;
-							const u32 instancer_idx = (renderables[i] >> SORT_KEY_INSTANCER_SHIFT) & 0xffFF;
-							const AutoInstancer::Instances& instances = view.instancers[instancer_idx].instances[group_idx];
-							const u32 total_count = instances.end->offset + instances.end->count;
-							const u64 renderable = instances.begin->renderables[0];
-							const u32 entity_index = u32(renderable & 0xffFFffFF);
-							const u32 mesh_idx = u32(renderable >> SORT_KEY_MESH_IDX_SHIFT);
-							const ModelInstance& mi = model_instances[entity_index];
-							const Mesh& mesh = mi.model->getMesh(mesh_idx);
-							const MeshMaterial& mesh_mat = mi.mesh_materials[mesh_idx];
+					case DrawCommandTypes::AUTOINSTANCED: {
+						const u32 group_idx = renderables[i] & 0xffFF;
+						const u32 instancer_idx = (renderables[i] >> SORT_VALUE_INSTANCER_SHIFT) & 0xffFF;
+						const AutoInstancer::Instances& instances = view.instancers[instancer_idx].instances[group_idx];
+						const u32 total_count = instances.end->offset + instances.end->count;
+						const u64 renderable = instances.begin->renderables[0];
+						const u32 entity_index = u32(renderable & 0xffFFffFF);
+						const u32 mesh_idx = u32(renderable >> SORT_VALUE_MESH_IDX_SHIFT);
+						const ModelInstance& mi = model_instances[entity_index];
+						const Mesh& mesh = mi.model->getMesh(mesh_idx);
+						const MeshMaterial& mesh_mat = mi.mesh_materials[mesh_idx];
 
-							const Material* material = mesh_mat.material;
-							Shader* shader = material->getShader();
-							const gpu::StateFlags state = material->m_render_states | render_state;
-							const u32 defines = autoinstanced_define_mask | material->getDefineMask();
-							const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_decl, defines, mesh.semantics_defines);
-						
-							gpu::Drawcall& dc = stream->draw();
-							dc = {
-								.program = program,
-								.index_buffer = mesh.index_buffer_handle,
-								.vertex_buffers = { mesh.vertex_buffer_handle, instances.slice.buffer },
-								.vertex_buffer_offsets = { 0, instances.slice.offset },
-								.vertex_buffer_sizes = { mesh.vb_stride, 48 },
-								.indices_count = mesh.indices_count,
-								.instances_count = total_count,
-								.index_type = mesh.index_type,
-							};
+						const Material* material = mesh_mat.material;
+						Shader* shader = material->getShader();
+						const gpu::StateFlags state = material->m_render_states | render_state;
+						const u32 defines = autoinstanced_define_mask | material->getDefineMask();
+						const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_decl, defines, mesh.semantics_defines);
+					
+						gpu::Drawcall& dc = stream->draw();
+						dc = {
+							.program = program,
+							.index_buffer = mesh.index_buffer_handle,
+							.vertex_buffers = { mesh.vertex_buffer_handle, instances.slice.buffer },
+							.vertex_buffer_offsets = { 0, instances.slice.offset },
+							.vertex_buffer_sizes = { mesh.vb_stride, 48 },
+							.indices_count = mesh.indices_count,
+							.instances_count = total_count,
+							.index_type = mesh.index_type,
+						};
+						break;
+					}
+					case DrawCommandTypes::MESH: {
+						const u32 mesh_idx = u32(renderables[i] >> SORT_VALUE_MESH_IDX_SHIFT);
+						ModelInstance* LUMIX_RESTRICT mi = &model_instances[entity.index];
+						const Mesh& mesh = mi->meshes[mesh_idx];
+						const MeshMaterial& mesh_mat = mi->mesh_materials[mesh_idx];
+						const float mesh_lod = mesh.lod;
+						const Material* material = mesh_mat.material;
+						Shader* shader = material->getShader();
+						const gpu::StateFlags state = material->m_render_states | render_state;
+
+						if (mi->flags & ModelInstance::MOVED) {
+							const i32 start_i = i;
+							const u64 key = sort_keys[i];
+							while (i < to && sort_keys[i] == key) {
+								++i;
+							}
+
+							const u32 count = u32(i - start_i);
+							const TransientSlice slice = alloc(transient_pool, count * (sizeof(Vec4) * 6));
+							u8* instance_data = slice.ptr;
+
+							for (i32 j = start_i; j < start_i + (i32)count; ++j) {
+								const EntityRef e = { i32(renderables[j] & 0xFFffFFff) };
+								const Transform& tr = transforms[e.index];
+								const Vec3 pos_ws = Vec3(tr.pos - camera_pos);
+								const float lod_d = model_instances[e.index].lod - mesh_lod;
+								ModelInstance* mi2 = &model_instances[e.index];
+								const Transform prev_tr = mi2->prev_frame_transform;
+								const Vec3 prev_pos_ws = Vec3(prev_tr.pos - camera_pos);
+							
+								#define WRITE(X) memcpy(instance_data, &X, sizeof(X)); instance_data += sizeof(X)
+								WRITE(tr.rot);
+								WRITE(pos_ws);
+								WRITE(lod_d);
+								WRITE(tr.scale);
+								instance_data += sizeof(float); // padding
+							
+								WRITE(prev_tr.rot);
+								WRITE(prev_pos_ws);
+								WRITE(lod_d);
+								WRITE(prev_tr.scale);
+								const MaterialIndex material_index = mi2->mesh_materials[mesh_idx].material_index;
+								WRITE(material_index);
+								#undef WRITE
+							}
+
+							const u32 defines = dynamic_define_mask | material->getDefineMask();
+							const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, dyn_instance_decl, defines, mesh.semantics_defines);
+					
+							stream->useProgram(program);
+							stream->bindIndexBuffer(mesh.index_buffer_handle);
+							stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
+							stream->bindVertexBuffer(1, slice.buffer, slice.offset, sizeof(Vec4) * 6);
+							stream->drawIndexedInstanced(mesh.indices_count, count, mesh.index_type);
+							--i;
 						}
 						else {
-							const u32 mesh_idx = u32(renderables[i] >> SORT_KEY_MESH_IDX_SHIFT);
-							ModelInstance* LUMIX_RESTRICT mi = &model_instances[entity.index];
-							const Mesh& mesh = mi->meshes[mesh_idx];
-							const MeshMaterial& mesh_mat = mi->mesh_materials[mesh_idx];
-							const float mesh_lod = mesh.lod;
-							const Material* material = mesh_mat.material;
-							Shader* shader = material->getShader();
-							const gpu::StateFlags state = material->m_render_states | render_state;
-
-							if (mi->flags & ModelInstance::MOVED) {
-								const i32 start_i = i;
-								const u64 key = sort_keys[i];
-								while (i < to && sort_keys[i] == key) {
-									++i;
-								}
-
-								const u32 count = u32(i - start_i);
-								const TransientSlice slice = alloc(transient_pool, count * (sizeof(Vec4) * 6));
-								u8* instance_data = slice.ptr;
-
-								for (i32 j = start_i; j < start_i + (i32)count; ++j) {
-									const EntityRef e = { i32(renderables[j] & 0xFFffFFff) };
-									const Transform& tr = transforms[e.index];
-									const Vec3 pos_ws = Vec3(tr.pos - camera_pos);
-									const float lod_d = model_instances[e.index].lod - mesh_lod;
-									ModelInstance* mi2 = &model_instances[e.index];
-									const Transform prev_tr = mi2->prev_frame_transform;
-									const Vec3 prev_pos_ws = Vec3(prev_tr.pos - camera_pos);
-								
-									#define WRITE(X) memcpy(instance_data, &X, sizeof(X)); instance_data += sizeof(X)
-									WRITE(tr.rot);
-									WRITE(pos_ws);
-									WRITE(lod_d);
-									WRITE(tr.scale);
-									instance_data += sizeof(float); // padding
-								
-									WRITE(prev_tr.rot);
-									WRITE(prev_pos_ws);
-									WRITE(lod_d);
-									WRITE(prev_tr.scale);
-									const MaterialIndex material_index = mi2->mesh_materials[mesh_idx].material_index;
-									WRITE(material_index);
-									#undef WRITE
-								}
-
-								const u32 defines = dynamic_define_mask | material->getDefineMask();
-								const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, dyn_instance_decl, defines, mesh.semantics_defines);
-						
-								stream->useProgram(program);
-								stream->bindIndexBuffer(mesh.index_buffer_handle);
-								stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
-								stream->bindVertexBuffer(1, slice.buffer, slice.offset, sizeof(Vec4) * 6);
-								stream->drawIndexedInstanced(mesh.indices_count, count, mesh.index_type);
-								--i;
+							int start_i = i;
+							const u64 key = sort_keys[i] & instance_key_mask;
+							while (i < to && (sort_keys[i] & instance_key_mask) == key) {
+								++i;
 							}
-							else {
-								int start_i = i;
-								const u64 key = sort_keys[i] & instance_key_mask;
-								while (i < to && (sort_keys[i] & instance_key_mask) == key) {
-									++i;
-								}
-								const u32 count = u32(i - start_i);
-								const TransientSlice slice = alloc(transient_pool, count * (sizeof(Vec4) * 3));
-								u8* instance_data = slice.ptr;
-								for (int j = start_i; j < start_i + (i32)count; ++j) {
-									const EntityRef e = { i32(renderables[j] & 0xFFffFFff) };
-									const Transform& tr = transforms[e.index];
-									const Vec3 lpos = Vec3(tr.pos - camera_pos);
-									const float lod_d = model_instances[e.index].lod - mesh_lod;
-									memcpy(instance_data, &tr.rot, sizeof(tr.rot));
-									instance_data += sizeof(tr.rot);
-									memcpy(instance_data, &lpos, sizeof(lpos));
-									instance_data += sizeof(lpos);
-									memcpy(instance_data, &lod_d, sizeof(lod_d));
-									instance_data += sizeof(lod_d);
-									memcpy(instance_data, &tr.scale, sizeof(tr.scale));
-									instance_data += sizeof(tr.scale);
-									MaterialIndex material_index = material->getIndex();
-									memcpy(instance_data, &material_index, sizeof(material_index));
-									instance_data += sizeof(material_index);
-								}
-
-								const u32 defines = autoinstanced_define_mask | material->getDefineMask();
-								const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_decl, defines, mesh.semantics_defines);
-
-								stream->useProgram(program);
-								stream->bindIndexBuffer(mesh.index_buffer_handle);
-								stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
-								stream->bindVertexBuffer(1, slice.buffer, slice.offset, sizeof(Vec3) * 3);
-								stream->drawIndexedInstanced(mesh.indices_count, count, mesh.index_type);
-								--i;
+							const u32 count = u32(i - start_i);
+							const TransientSlice slice = alloc(transient_pool, count * (sizeof(Vec4) * 3));
+							u8* instance_data = slice.ptr;
+							for (int j = start_i; j < start_i + (i32)count; ++j) {
+								const EntityRef e = { i32(renderables[j] & 0xFFffFFff) };
+								const Transform& tr = transforms[e.index];
+								const Vec3 lpos = Vec3(tr.pos - camera_pos);
+								const float lod_d = model_instances[e.index].lod - mesh_lod;
+								memcpy(instance_data, &tr.rot, sizeof(tr.rot));
+								instance_data += sizeof(tr.rot);
+								memcpy(instance_data, &lpos, sizeof(lpos));
+								instance_data += sizeof(lpos);
+								memcpy(instance_data, &lod_d, sizeof(lod_d));
+								instance_data += sizeof(lod_d);
+								memcpy(instance_data, &tr.scale, sizeof(tr.scale));
+								instance_data += sizeof(tr.scale);
+								MaterialIndex material_index = material->getIndex();
+								memcpy(instance_data, &material_index, sizeof(material_index));
+								instance_data += sizeof(material_index);
 							}
+
+							const u32 defines = autoinstanced_define_mask | material->getDefineMask();
+							const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_decl, defines, mesh.semantics_defines);
+
+							stream->useProgram(program);
+							stream->bindIndexBuffer(mesh.index_buffer_handle);
+							stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
+							stream->bindVertexBuffer(1, slice.buffer, slice.offset, sizeof(Vec3) * 3);
+							stream->drawIndexedInstanced(mesh.indices_count, count, mesh.index_type);
+							--i;
 						}
 						break;
 					}
-					case RenderableTypes::SKINNED: {
-						const u32 mesh_idx = u32(renderables[i] >> SORT_KEY_MESH_IDX_SHIFT);
+					case DrawCommandTypes::SKINNED: {
+						const u32 mesh_idx = u32(renderables[i] >> SORT_VALUE_MESH_IDX_SHIFT);
 						ModelInstance* LUMIX_RESTRICT mi = &model_instances[entity.index];
 						const MeshMaterial& mesh_mat = mi->mesh_materials[mesh_idx];
 						u32 defines = skinned_define_mask | mesh_mat.material->getDefineMask();
@@ -2900,7 +2962,7 @@ struct PipelineImpl final : Pipeline {
 						stream->drawIndexedInstanced(mesh.indices_count, num_instances, mesh.index_type);
 						break;
 					}
-					case RenderableTypes::DECAL: {
+					case DrawCommandTypes::DECAL: {
 						const Material* material = m_module->getDecal(entity).material;
 
 						int start_i = i;
@@ -2961,7 +3023,7 @@ struct PipelineImpl final : Pipeline {
 						--i;
 						break;
 					}
-					case RenderableTypes::CURVE_DECAL: {
+					case DrawCommandTypes::CURVE_DECAL: {
 						const Material* material = m_module->getCurveDecal(entity).material;
 
 						int start_i = i;
@@ -3024,10 +3086,6 @@ struct PipelineImpl final : Pipeline {
 						--i;
 						break;
 					}
-					case RenderableTypes::COUNT:
-					case RenderableTypes::LOCAL_LIGHT:
-						ASSERT(false);
-						break;
 				}
 			}
 		});
@@ -3549,7 +3607,6 @@ struct PipelineImpl final : Pipeline {
 				total += page->header.count;
 				const EntityRef* LUMIX_RESTRICT renderables = page->entities;
 				const RenderableTypes type = (RenderableTypes)page->header.type;
-				const u64 type_mask = (u64)type << 32;
 				
 				switch(type) {
 					case RenderableTypes::LOCAL_LIGHT: break;
@@ -3560,8 +3617,9 @@ struct PipelineImpl final : Pipeline {
 							const int layer = material->getLayer();
 							const u8 bucket = bucket_map[layer];
 							if (bucket < 0xff) {
-								const u64 subrenderable = e.index | type_mask;
-								inserter.push(material->getSortKey() | ((u64)bucket << SORT_KEY_BUCKET_SHIFT), subrenderable);
+								SortKey key = makeDecalSortKey(material, bucket);
+								SortValue value = makeDecalSortValue(e);
+								inserter.push(key, value);
 							}
 						}
 						break;
@@ -3573,80 +3631,9 @@ struct PipelineImpl final : Pipeline {
 							const int layer = material->getLayer();
 							const u8 bucket = bucket_map[layer];
 							if (bucket < 0xff) {
-								const u64 subrenderable = e.index | type_mask;
-								inserter.push(material->getSortKey() | ((u64)bucket << SORT_KEY_BUCKET_SHIFT), subrenderable);
-							}
-						}
-						break;
-					}
-					case RenderableTypes::SKINNED: {
-						for (int i = 0, c = page->header.count; i < c; ++i) {
-							const EntityRef e = renderables[i];
-							const DVec3 pos = transforms[e.index].pos;
-							ModelInstance& mi = model_instances[e.index];
-							
-							const float squared_length = float(squaredLength(pos - lod_ref_point));
-							const u32 lod_idx = mi.model->getLODMeshIndices(squared_length * global_lod_multiplier_rcp);
-
-							if (mi.dirty) {
-								queueMaterialOverrideRefresh(e);
-								continue;
-							}
-
-							for (;;) {
-								u32 frame = (u32)mi.pose->frame;
-								if (frame == frame_number) break;
-								if (mi.pose->frame.compareExchange(frame_number, frame)) {
-									pose_processor.push(&mi);
-									break;
-								}
-							}
-
-							auto create_key = [&](const LODMeshIndices& lod){
-								for (int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx) {
-									const MeshMaterial& mesh_mat = mi.mesh_materials[mesh_idx];
-									const u8 layer = mesh_mat.material->getLayer();
-									const u32 mesh_sort_key = mesh_mat.sort_key;
-									const u32 bucket = bucket_map[layer];
-									const u64 subrenderable = e.index | type_mask | ((u64)mesh_idx << SORT_KEY_MESH_IDX_SHIFT);
-									if (bucket < 0xff) {
-										const u64 key = mesh_sort_key | ((u64)bucket << SORT_KEY_BUCKET_SHIFT);
-										inserter.push(key, subrenderable);
-									} else if (bucket < 0xffFF) {
-										const DVec3 pos = transforms[e.index].pos;
-										const DVec3 rel_pos = pos - camera_pos;
-										const float squared_length = float(rel_pos.x * rel_pos.x + rel_pos.y * rel_pos.y + rel_pos.z * rel_pos.z);
-										const u32 depth_bits = floatFlip(*(u32*)&squared_length);
-										const u64 key = ((u64)bucket << SORT_KEY_BUCKET_SHIFT) | depth_bits;
-										inserter.push(key, subrenderable);
-									}
-								}
-							};
-
-							if (mi.lod != lod_idx) {
-								if (view.cp.is_shadow) {
-									const u32 shadow_lod_idx = maximum((u32)mi.lod, lod_idx);
-									create_key(mi.model->getLODIndices()[shadow_lod_idx]);
-								}
-								else {
-									const float d = lod_idx - mi.lod;
-									const float ad = fabsf(d);
-									
-									if (ad <= time_delta) {
-										mi.lod = float(lod_idx);
-										create_key(mi.model->getLODIndices()[lod_idx]);
-									}
-									else {
-										mi.lod += d / ad * time_delta;
-										const u32 cur_lod_idx = u32(mi.lod);
-										create_key(mi.model->getLODIndices()[cur_lod_idx]);
-										if (cur_lod_idx < 3) create_key(mi.model->getLODIndices()[cur_lod_idx + 1]);
-									}
-								}
-							}
-							else {
-								const LODMeshIndices& lod = mi.model->getLODIndices()[lod_idx];
-								create_key(lod);
+								SortKey key = makeDecalSortKey(material, bucket);
+								SortValue value = makeCurveDecalSortValue(e);
+								inserter.push(key, value);
 							}
 						}
 						break;
@@ -3671,23 +3658,40 @@ struct PipelineImpl final : Pipeline {
 									const MeshMaterial& mesh_mat = mi.mesh_materials[mesh_idx];
 									const u32 bucket = bucket_map[mesh_mat.material->getLayer()];
 									const u32 mesh_sort_key = mesh_mat.sort_key;
-									const u64 subrenderable = e.index | type_mask | ((u64)mesh_idx << SORT_KEY_MESH_IDX_SHIFT);
-									if (mi.flags & ModelInstance::MOVED && !is_shadow) {
+									if (mi.meshes[mesh_idx].type == Mesh::SKINNED) {
+										// TODO do this only once per model, not for each mesh
+										for (;;) {
+											u32 frame = (u32)mi.pose->frame;
+											if (frame == frame_number) break;
+											if (mi.pose->frame.compareExchange(frame_number, frame)) {
+												pose_processor.push(&mi);
+												break;
+											}
+										}
+										
+										SortValue value = makeSkinnedSortValue(e, mesh_idx);
+										SortKey key = makeMeshSortKey(mesh_mat, bucket);
+										inserter.push(key, value);
+									}
+									else if (mi.flags & ModelInstance::MOVED && !is_shadow) {
 										// moved and unmoved meshes can't be drawn in single drawcall as they need different instance data
 										// but autoinstancer groups all instances of a mesh in single drawcall
 										// so we don't autoinstance moved meshes, only unmoved
-										const u64 key = ((u64)bucket << SORT_KEY_BUCKET_SHIFT) | mesh_sort_key;
-										inserter.push(key, subrenderable);
+										SortValue value = makeMeshSortValue(e, mesh_idx);
+										SortKey key = makeMeshSortKey(mesh_mat, bucket);
+										inserter.push(key, value);
 									}
 									else if (bucket < 0xff) {
-										instancer.add(mesh_sort_key, subrenderable);
+										const u64 value = e.index | ((u64)mesh_idx << SORT_VALUE_MESH_IDX_SHIFT);
+										instancer.add(mesh_sort_key, value);
 									} else if (bucket < 0xffFF) {
+										// depth sorted
 										const DVec3 pos = transforms[e.index].pos;
 										const DVec3 rel_pos = pos - camera_pos;
 										const float squared_length = float(rel_pos.x * rel_pos.x + rel_pos.y * rel_pos.y + rel_pos.z * rel_pos.z);
-										const u32 depth_bits = floatFlip(*(u32*)&squared_length);
-										const u64 key = ((u64)bucket << SORT_KEY_BUCKET_SHIFT) | depth_bits;
-										inserter.push(key, subrenderable);
+										SortValue value = makeMeshSortValue(e, mesh_idx);
+										SortKey key = makeDepthSortKey(squared_length, bucket);
+										inserter.push(key, value);
 									}
 								}
 							};
@@ -3727,10 +3731,12 @@ struct PipelineImpl final : Pipeline {
 
 				const u64 renderable = instancer.instances[i].begin->renderables[0];
 				const u32 entity_index = renderable & 0xffFFff;
-				const u32 mesh_idx = u32(renderable >> SORT_KEY_MESH_IDX_SHIFT);
+				const u32 mesh_idx = u32(renderable >> SORT_VALUE_MESH_IDX_SHIFT);
 				const u8 layer = model_instances[entity_index].mesh_materials[mesh_idx].material->getLayer();
 				const u8 bucket = view.layer_to_bucket[layer];
-				inserter.push(SORT_KEY_INSTANCED_FLAG | i | ((u64)bucket << SORT_KEY_BUCKET_SHIFT), i | (instancer_idx << SORT_KEY_INSTANCER_SHIFT));
+				SortValue value = makeAutoInstancedSortValue(i, instancer_idx);
+				SortKey key = makeAutoInstancedSortKey(i, bucket);
+				inserter.push(key, value);
 			}
 
 			PROFILE_BLOCK("fill instance data");
@@ -3748,7 +3754,7 @@ struct PipelineImpl final : Pipeline {
 				const u32 sort_key = u32(&instances - instancer.instances.begin());
 				const u64 renderable = instances.begin->renderables[0];
 				const u32 entity_index = renderable & 0xffFFff;
-				const u32 mesh_idx = u32(renderable >> SORT_KEY_MESH_IDX_SHIFT);
+				const u32 mesh_idx = u32(renderable >> SORT_VALUE_MESH_IDX_SHIFT);
 				const ModelInstance& mi = model_instances[entity_index];
 				const Mesh& mesh = mi.model->getMesh(mesh_idx);
 				const MeshMaterial& mesh_mat = mi.model->getMeshMaterial(mesh_idx);
