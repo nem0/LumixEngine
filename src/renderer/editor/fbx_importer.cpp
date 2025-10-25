@@ -278,22 +278,35 @@ struct FBXImporter : ModelImporter {
 		}
 	}
 
-	static void computeTangentsSimple(OutputMemoryStream& unindexed_triangles, const VertexLayout& layout) {
+	static void resetTangents(OutputMemoryStream& unindexed_triangles, const VertexLayout& layout) {
+		const u32 vertex_size = layout.size;
+		const u32 num_vertices = u32(unindexed_triangles.size() / vertex_size);
+		u8* tangents = unindexed_triangles.getMutableData() + layout.tangent_offset;
+		for (u32 i = 0; i < num_vertices; ++i) {
+			memset(tangents + i * vertex_size, 0, 4);
+		}
+	}
+
+	static void computeTangentsSimple(ImportGeometry& geom, const VertexLayout& layout, IAllocator& allocator) {
 		PROFILE_FUNCTION();
 		const u32 vertex_size = layout.size;
-		const int vertex_count = int(unindexed_triangles.size() / vertex_size);
+		const u32 num_vertices = u32(geom.vertex_buffer.size() / vertex_size);
+		const u32* indices = geom.indices.data();
+		const u8* positions = geom.vertex_buffer.data();
+		const u8* uvs = positions + layout.uv_offset;
+		const u32 num_indices = geom.indices.size();
 
-		const u8* positions = unindexed_triangles.data();
-		const u8* uvs = unindexed_triangles.data() + layout.uv_offset;
-		u8* tangents = unindexed_triangles.getMutableData() + layout.tangent_offset;
+		Array<Vec3> tangents(allocator);
+		tangents.resize(num_vertices);
+		memset(tangents.begin(), 0, tangents.byte_size());
 
-		for (int i = 0; i < vertex_count; i += 3) {
-			Vec3 v0; memcpy(&v0, positions + i * vertex_size, sizeof(v0));
-			Vec3 v1; memcpy(&v1, positions + (i + 1) * vertex_size, sizeof(v1));
-			Vec3 v2; memcpy(&v2, positions + (i + 2) * vertex_size, sizeof(v2));
-			Vec2 uv0; memcpy(&uv0, uvs + i * vertex_size, sizeof(uv0));
-			Vec2 uv1; memcpy(&uv1, uvs + (i + 1) * vertex_size, sizeof(uv1));
-			Vec2 uv2; memcpy(&uv2, uvs + (i + 2) * vertex_size, sizeof(uv2));
+		for (u32 i = 0; i < num_indices; i += 3) {
+			Vec3 v0; memcpy(&v0, positions + indices[i] * vertex_size, sizeof(v0));
+			Vec3 v1; memcpy(&v1, positions + indices[i + 1] * vertex_size, sizeof(v1));
+			Vec3 v2; memcpy(&v2, positions + indices[i + 2] * vertex_size, sizeof(v2));
+			Vec2 uv0; memcpy(&uv0, uvs + indices[i] * vertex_size, sizeof(uv0));
+			Vec2 uv1; memcpy(&uv1, uvs + indices[i + 1] * vertex_size, sizeof(uv1));
+			Vec2 uv2; memcpy(&uv2, uvs + indices[i + 2] * vertex_size, sizeof(uv2));
 
 			const Vec3 dv10 = v1 - v0;
 			const Vec3 dv20 = v2 - v0;
@@ -310,11 +323,15 @@ struct FBXImporter : ModelImporter {
 			tangent.y *= l;
 			tangent.z *= l;
 			
-			u32 tangent_packed = packF4u(tangent);
+			tangents[indices[i]] += tangent;
+			tangents[indices[i + 1]] += tangent;
+			tangents[indices[i + 2]] += tangent;
+		}
 
-			memcpy(tangents + i * vertex_size, &tangent_packed, sizeof(tangent_packed));
-			memcpy(tangents + (i + 1) * vertex_size, &tangent_packed, sizeof(tangent_packed));
-			memcpy(tangents + (i + 2) * vertex_size, &tangent_packed, sizeof(tangent_packed));
+		u8* packed_tangents = geom.vertex_buffer.getMutableData() + layout.tangent_offset;
+		for (u32 i = 0; i < num_vertices; ++i) {
+			u32 tangent_packed = packF4u(normalize(tangents[i]));
+			memcpy(packed_tangents + i * vertex_size, &tangent_packed, sizeof(tangent_packed));
 		}
 	}
 
@@ -459,11 +476,14 @@ struct FBXImporter : ModelImporter {
 						computeTangents(unindexed_triangles, vertex_layout, path);
 					}
 					else {
-						computeTangentsSimple(unindexed_triangles, vertex_layout);
+						resetTangents(unindexed_triangles, vertex_layout);
 					}
 				}
-
+				
 				remap(unindexed_triangles, import_geom);
+				if (compute_tangents && !meta.use_mikktspace) {
+					computeTangentsSimple(import_geom, vertex_layout, m_allocator);
+				}
 				import_geom.index_size = areIndices16Bit(import_geom) ? 2 : 4;
 				
 				if (import_geom.flip_handness) {
