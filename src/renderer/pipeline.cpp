@@ -2013,6 +2013,7 @@ struct PipelineImpl final : Pipeline {
 				bool first = true;
 				
 				stream.useProgram(program);
+				// TODO indexed rendering 
 				stream.bindIndexBuffer(gpu::INVALID_BUFFER);
 				stream.bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
 				stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);

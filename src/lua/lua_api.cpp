@@ -458,20 +458,17 @@ static int LUA_unpackU32(lua_State* L) {
 	return 1;
 }
 
-static bool LUA_createComponent(World* world, i32 entity, const char* type)
+static void LUA_createComponent(lua_State* L, World* world, i32 entity, const char* type)
 {
-	if (!world) return false;
+	if (!world) luaL_argerror(L, 1, "World can not be null");
 	ComponentType cmp_type = reflection::getComponentType(type);
 	IModule* module = world->getModule(cmp_type);
-	if (!module) return false;
-	if (world->hasComponent({entity}, cmp_type))
-	{
-		logError("Component ", type, " already exists in entity ", entity);
-		return false;
+	if (!module) luaL_error(L, "unknown component type %s", type);
+	if (world->hasComponent({entity}, cmp_type)) {
+		luaL_error(L, "Component %s already exists in entity %d", type, entity);
 	}
 
 	world->createComponent(cmp_type, {entity});
-	return true;
 }
 
 
@@ -898,6 +895,9 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 		end
 		function Lumix.Entity:createComponent(cmp)
 			LumixAPI.createComponent(self._world, self._entity, cmp)
+			if Lumix[cmp] == nil then
+				error("Lua does not know component " .. cmp)
+			end
 			return Lumix[cmp]:new(self._world, self._entity)
 		end
 		function Lumix.Entity:getComponent(cmp)

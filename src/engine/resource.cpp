@@ -255,7 +255,7 @@ u32 Resource::decRefCount() {
 }
 
 
-void Resource::onStateChanged(State old_state, State new_state, Resource&)
+void Resource::onStateChanged(State old_state, State new_state, Resource& dependency)
 {
 	ASSERT(old_state != new_state);
 	ASSERT(m_current_state != State::EMPTY || m_desired_state != State::EMPTY);
@@ -269,6 +269,10 @@ void Resource::onStateChanged(State old_state, State new_state, Resource&)
 	{
 		ASSERT(m_failed_dep_count > 0);
 		--m_failed_dep_count;
+	}
+
+	if (new_state == State::FAILURE && old_state != State::FAILURE) {
+		logError("Dependency failed for resource ", getPath(), " dependency: ", dependency.getPath());
 	}
 
 	if (new_state == State::EMPTY) ++m_empty_dep_count;

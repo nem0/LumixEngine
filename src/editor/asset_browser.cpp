@@ -537,7 +537,7 @@ struct AssetBrowserImpl : AssetBrowser {
 				ResourceType world_type("world");
 				
 				ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
-				ImGui::TableSetupColumn("Directory");
+				ImGui::TableSetupColumn("Directory", ImGuiTableColumnFlags_WidthStretch);
 	
 				if (m_open_file_filter.isActive()) {
 					for (const auto& res : resources) {
