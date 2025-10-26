@@ -797,9 +797,10 @@ bool ModelImporter::writePrefab(const Path& src, const ModelMeta& meta) {
 	OutputMemoryStream blob(m_allocator);
 	static const ComponentType RIGID_ACTOR_TYPE = reflection::getComponentType("rigid_actor");
 	static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
-	const bool with_physics = meta.physics != ModelMeta::Physics::NONE;
+	bool with_physics = meta.physics != ModelMeta::Physics::NONE;
 	RenderModule* rmodule = (RenderModule*)world.getModule(MODEL_INSTANCE_TYPE);
-	PhysicsModule* pmodule = (PhysicsModule*)world.getModule(RIGID_ACTOR_TYPE);
+	PhysicsModule* pmodule = (PhysicsModule*)world.getModule("physics");
+	if (!pmodule) with_physics = false;
 	
 	const EntityRef root = world.createEntity({0, 0, 0}, Quat::IDENTITY);
 	if (meta.split) {

@@ -1129,7 +1129,9 @@ void SceneView::update(float time_delta)
 		addLine(*m_view, m_measure_from, m_measure_to, Color::BLUE);
 	}
 
-	manipulate();
+	if (!m_game_view->m_game_view_merged_with_scene_view || !m_editor.isGameMode() || !m_game_view->isMouseCaptured()) {
+		manipulate();
+	}
 
 	if (ImGui::IsAnyItemActive()) return;
 	if (!m_is_mouse_captured) return;
@@ -1651,6 +1653,8 @@ void SceneView::onGUI() {
 		}
 		m_was_game_mode = is_game_mode;
 		if (m_game_view->isMouseCaptured()) {
+			m_view->m_draw_vertices.clear();
+			m_view->m_draw_cmds.clear();
 			m_game_view->windowUI(title);
 			return;
 		}

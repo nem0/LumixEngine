@@ -538,6 +538,9 @@ struct EditorWindow : AssetEditorWindow {
 				if (tmp.size() != tmp2.size() || memcmp(tmp.data(), tmp2.data(), tmp.size()) != 0) {
 					openCenterStrip("modification_notif");
 				}
+				else {
+					m_dirty = false;
+				}
 			}
 			else {
 				logError("Unexpected error while reading file ", m_path);
