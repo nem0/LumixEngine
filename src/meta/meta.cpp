@@ -832,6 +832,12 @@ struct Parser {
 				StringView method_name = consumeIdentifier(line);
 				current_module->events.emplace() = method_name;
 			}
+			else if (equal(word, "//@")) {
+				word = consumeWord(line);
+				if (equal(word, "end")) return;
+
+				logError("Unexpected ", word);
+			}
 		}
 	}
 
