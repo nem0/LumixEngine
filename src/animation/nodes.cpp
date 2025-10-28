@@ -1,4 +1,5 @@
 #include "core/array.h"
+#include "core/log.h"
 #include "controller.h"
 #include "nodes.h"
 #include "renderer/model.h"
@@ -385,7 +386,13 @@ void IKNode::serialize(OutputMemoryStream& stream) const {
 
 void IKNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) {
 	stream.read(m_bones_count);
-	stream.read(m_leaf_bone);
+	if (version <= (u32)ControllerVersion::BONE_NAME_HASH) {
+		stream.read<u32>();
+		logWarning("IKNode in ", ctrl.getPath(), " is outdated, please recompile the asset");
+	}
+	else {
+		stream.read(m_leaf_bone);
+	}
 	m_alpha = (ValueNode*)deserializeNode(stream, ctrl, version);
 	m_effector_position = (ValueNode*)deserializeNode(stream, ctrl, version);
 	m_input = (PoseNode*)deserializeNode(stream, ctrl, version);

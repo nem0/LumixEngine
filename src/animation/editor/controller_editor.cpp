@@ -579,7 +579,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 						ImGui::Text("Alpha: %f", alpha);
 						Vec3 pos = blob.read<Vec3>();
 						ImGui::Text("Position: %f %f %F", pos.x, pos.y, pos.z);
-						blob.read<u32>(); // leaf
+						blob.read<BoneNameHash>(); // leaf
 						blob.read<u32>(); // bone count
 						break;
 					}
@@ -775,8 +775,9 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				
 				ImGuiEx::Label("Name");
 				saveUndo(inputString("##name", &mask.name));
-				for (u32 i = 0, c = m_skeleton->getBoneCount(); i < c; ++i) {
-					const char* bone_name = m_skeleton->getBone(i).name.c_str();
+				Span<const Model::Bone> bones = m_skeleton->getBones();
+				for (const Model::Bone& bone : bones) {
+					const char* bone_name = bone.name.c_str();
 					const BoneNameHash bone_name_hash(bone_name);
 					const bool is_masked = mask.bones.find(bone_name_hash).isValid();
 					bool b = is_masked;

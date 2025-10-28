@@ -86,7 +86,8 @@ void WorldViewer::drawSkeleton(i32 selected_bone) {
 	if (pose && model->isReady()) {
 		Transform tr = m_world->getTransform(*m_mesh);
 		ASSERT(pose->is_absolute);
-		for (u32 i = 0, c = model->getBoneCount(); i < c; ++i) {
+		Span<const Model::Bone> bones = model->getBones();
+		for (u32 i = 0, c = bones.size(); i < c; ++i) {
 			const i32 parent_idx = model->getBoneParent(i);
 			if (parent_idx < 0) continue;
 

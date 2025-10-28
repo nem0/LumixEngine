@@ -63,6 +63,7 @@ enum BlendStackInstructions : u8 {
 
 enum class ControllerVersion : u32 {
 	FIRST,
+	BONE_NAME_HASH,
 
 	LATEST
 };

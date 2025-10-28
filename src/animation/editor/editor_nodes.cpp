@@ -723,18 +723,35 @@ void IKNode::serialize(OutputMemoryStream& stream) const {
 
 void IKNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) {
 	Node::deserialize(stream, ctrl, version);
-	stream.read(m_leaf_bone);
+	if (version <= (u32)ControllerVersion::LEAF_BONE_HASH) {
+		stream.read<u32>();
+		logError("IKNode in ", ctrl.m_path, " has old version, please set the IK leaf bone again.");
+	}
+	else {
+		stream.read(m_leaf_bone);
+	}
 	stream.read(m_bones_count);
 }
 
 bool IKNode::propertiesGUI(Model& skeleton) {
 	ImGuiEx::Label("Leaf");
 	bool changed = false;
-	if (ImGui::BeginCombo("##leaf", skeleton.getBoneName(m_leaf_bone))) {
-		for (u32 j = 0, cj = skeleton.getBoneCount(); j < cj; ++j) {
-			const char* bone_name = skeleton.getBoneName(j);
+
+	Span<const Model::Bone> bones = skeleton.getBones();
+	const Model::Bone* leaf_bone = nullptr;
+	for (const Model::Bone& bone : bones) {
+		if (BoneNameHash(bone.name.c_str()) == m_leaf_bone) {
+			leaf_bone = &bone;
+			break;
+		}
+	}
+
+	if (ImGui::BeginCombo("##leaf", leaf_bone ? leaf_bone->name.c_str() : "Not set")) {
+		for (const Model::Bone& bone : bones) {
+			const char* bone_name = bone.name.c_str();
 			if (ImGui::Selectable(bone_name)) {
-				m_leaf_bone = j;
+				m_leaf_bone = BoneNameHash(bone_name);
+				leaf_bone = &bone;
 				m_bones_count = 1;
 				changed = true;
 			}
@@ -742,23 +759,24 @@ bool IKNode::propertiesGUI(Model& skeleton) {
 		ImGui::EndCombo();
 	}
 
-	i32 iter = skeleton.getBoneParent(m_leaf_bone);
-	for (u32 i = 0; i < m_bones_count - 1; ++i) {
-		if (iter == -1) {
-			break;
+	if (leaf_bone) {
+		u32 leaf_bone_index = u32(leaf_bone - bones.begin());
+		i16 iter = skeleton.getBoneParent(leaf_bone_index);
+		for (u32 i = 0; i < m_bones_count - 1; ++i) {
+			if (iter == -1) break;
+			ImGuiEx::TextUnformatted(bones[iter].name.c_str());
+			iter = skeleton.getBoneParent(iter);
 		}
-		ImGuiEx::TextUnformatted(skeleton.getBoneName(iter));
-		iter = skeleton.getBoneParent(iter);
-	}
 
-	if (iter >= 0) {
-		i32 parent = skeleton.getBoneParent(iter);
-		if (parent >= 0) {
-			const char* bone_name = skeleton.getBoneName(parent);
-			const StaticString<64> add_label("Add ", bone_name);
-			if (ImGui::Button(add_label)) {
-				++m_bones_count;
-				changed = true;
+		if (iter >= 0) {
+			i32 parent = skeleton.getBoneParent(iter);
+			if (parent >= 0) {
+				const char* bone_name = bones[parent].name.c_str();
+				const StaticString<64> add_label("Add ", bone_name);
+				if (ImGui::Button(add_label)) {
+					++m_bones_count;
+					changed = true;
+				}
 			}
 		}
 	}

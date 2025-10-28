@@ -12,6 +12,7 @@ struct Node;
 
 enum class ControllerVersion : u32 {
 	FIRST_SUPPORTED = 4,
+	LEAF_BONE_HASH = 5,
 
 	LATEST
 };

@@ -714,8 +714,9 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		Model* model = render_module->getModelInstanceModel(entity);
 		ASSERT(model && model->isReady());
 		Array<EntityRef> entities(m_app.getAllocator());
-		for (int i = 0; i < model->getBoneCount(); ++i) {
-			const Model::Bone& bone = model->getBone(i);
+		Span<const Model::Bone> bones = model->getBones();
+		for (u32 i = 0; i < bones.size(); ++i) {
+			const Model::Bone& bone = bones[i];
 			const i32 parent_idx = model->getBoneParent(i);
 
 			const Transform tr = root_tr.compose(bone.transform);

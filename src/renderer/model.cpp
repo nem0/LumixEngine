@@ -228,10 +228,10 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Pose* 
 
 void Model::getRelativePose(Pose& pose)
 {
-	ASSERT(pose.count == getBoneCount());
+	ASSERT(pose.count == m_bones.size());
 	Vec3* pos = pose.positions;
 	Quat* rot = pose.rotations;
-	for (int i = 0, c = getBoneCount(); i < c; ++i)
+	for (int i = 0, c = m_bones.size(); i < c; ++i)
 	{
 		pos[i] = m_bones[i].relative_transform.pos;
 		rot[i] = m_bones[i].relative_transform.rot;
@@ -242,10 +242,10 @@ void Model::getRelativePose(Pose& pose)
 
 void Model::getPose(Pose& pose)
 {
-	ASSERT(pose.count == getBoneCount());
+	ASSERT(pose.count == m_bones.size());
 	Vec3* pos = pose.positions;
 	Quat* rot = pose.rotations;
-	for (int i = 0, c = getBoneCount(); i < c; ++i)
+	for (int i = 0, c = m_bones.size(); i < c; ++i)
 	{
 		pos[i] = m_bones[i].transform.pos;
 		rot[i] = m_bones[i].transform.rot;
@@ -312,7 +312,7 @@ void Model::onBeforeReady()
 {
 	for (u32 i = 0, n = m_meshes.size(); i < n; ++i) {
 		Mesh& mesh = m_meshes[i];
-		mesh.type = getBoneCount() == 0 || mesh.skin.empty() ? Mesh::RIGID : Mesh::SKINNED;
+		mesh.type = m_bones.empty() || mesh.skin.empty() ? Mesh::RIGID : Mesh::SKINNED;
 	}
 
 	for (u32 i = 0; i < 4; ++i) {

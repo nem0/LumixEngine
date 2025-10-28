@@ -318,6 +318,7 @@ enum class RenderModuleVersion : i32 {
 	CLOUDS,
 	MATERIAL_OVERRIDE,
 	REMOVED_FUR,
+	BONE_NAME_HASH,
 
 	LATEST
 };

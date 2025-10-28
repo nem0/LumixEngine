@@ -183,10 +183,9 @@ struct LUMIX_RENDERER_API Model final : Resource {
 	MeshMaterial& getMeshMaterial(u32 index) { return m_mesh_material[index]; }
 	const MeshMaterial& getMeshMaterial(u32 index) const { return m_mesh_material[index]; }
 	int getMeshCount() const { return m_meshes.size(); }
-	int getBoneCount() const { return m_bones.size(); }
-	const char* getBoneName(u32 idx) { return m_bones[idx].name.c_str(); }
 	i16 getBoneParent(u32 idx) const { return m_parents[idx]; }
 	const Bone& getBone(u32 i) const { return m_bones[i]; }
+	Span<const Bone> getBones() const { return m_bones; }
 	int getFirstNonrootBoneIndex() const { return m_first_nonroot_bone_index; }
 	BoneMap::ConstIterator getBoneIndex(BoneNameHash hash) const { return m_bone_map.find(hash); }
 	void getPose(Pose& pose);

@@ -3,6 +3,7 @@
 #include "core/array.h"
 #include "core/associative_array.h"
 #include "core/crt.h"
+#include "core/defer.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
 #include "core/geometry.h"
@@ -54,7 +55,7 @@ struct BoneAttachment
 {
 	EntityRef entity;
 	EntityPtr parent_entity;
-	int bone_index;
+	BoneNameHash bone_name_hash;
 	LocalRigidTransform relative_transform;
 };
 
@@ -383,63 +384,70 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 
-	void updateBoneAttachment(const BoneAttachment& bone_attachment)
-	{
+	void updateBoneAttachment(const BoneAttachment& bone_attachment) {
 		if (!bone_attachment.parent_entity.isValid()) return;
-		const EntityPtr model_instance_ptr = bone_attachment.parent_entity;
-		if (!model_instance_ptr.isValid()) return;
 
-		const EntityRef model_instance = (EntityRef)model_instance_ptr;
-		if (!m_world.hasComponent(model_instance, MODEL_INSTANCE_TYPE)) return;
-		const Pose* parent_pose = lockPose(model_instance);
+		const EntityRef parent_entity = *bone_attachment.parent_entity;
+		if (!m_world.hasComponent(parent_entity, MODEL_INSTANCE_TYPE)) return;
+		
+		const Pose* parent_pose = lockPose(parent_entity);
 		if (!parent_pose) return;
+		defer { unlockPose(parent_entity, false); };
 
-		Transform parent_entity_transform = m_world.getTransform((EntityRef)bone_attachment.parent_entity);
-		int idx = bone_attachment.bone_index;
-		if (idx < 0 || idx >= (int)parent_pose->count) {
-			unlockPose(model_instance, false);
-			return;
-		}
+		Transform parent_entity_transform = m_world.getTransform(parent_entity);
+
+		Model* model = m_model_instances[parent_entity.index].model;
+		if (!model) return;
+
+		auto bone_iter = model->getBoneIndex(bone_attachment.bone_name_hash);
+		if (!bone_iter.isValid()) return;
+
+		int idx = bone_iter.value();
+		if (idx < 0 || idx >= (int)parent_pose->count) return;
+
 		Vec3 original_scale = m_world.getScale(bone_attachment.entity);
 		const LocalRigidTransform bone_transform = {parent_pose->positions[idx], parent_pose->rotations[idx] };
 		const LocalRigidTransform relative_transform = { bone_attachment.relative_transform.pos, bone_attachment.relative_transform.rot };
 		Transform result = parent_entity_transform.compose(bone_transform * relative_transform);
 		result.scale = original_scale;
 		m_world.setTransform(bone_attachment.entity, result);
-		unlockPose(model_instance, false);
 	}
 
-
-	EntityPtr getBoneAttachmentParent(EntityRef entity) override
-	{
+	EntityPtr getBoneAttachmentParent(EntityRef entity) override {
 		return m_bone_attachments[entity].parent_entity;
 	}
 
-
-	void updateRelativeMatrix(BoneAttachment& attachment)
-	{
+	void updateRelativeMatrix(BoneAttachment& attachment) {
 		if (!attachment.parent_entity.isValid()) return;
-		if (attachment.bone_index < 0) return;
+		if (attachment.bone_name_hash.getHashValue() == 0) return;
+
 		const EntityPtr model_instance_ptr = attachment.parent_entity;
 		if (!model_instance_ptr.isValid()) return;
+
 		const EntityRef model_instance = (EntityRef)model_instance_ptr;
 		if (!m_world.hasComponent(model_instance, MODEL_INSTANCE_TYPE)) return;
+
 		const Pose* pose = lockPose(model_instance);
 		if (!pose) return;
-
+		
+		defer { unlockPose(model_instance, false); };
 		ASSERT(pose->is_absolute);
-		if (attachment.bone_index >= (int)pose->count) {
-			unlockPose(model_instance, false);
-			return;
-		}
-		const LocalRigidTransform bone_transform = {pose->positions[attachment.bone_index], pose->rotations[attachment.bone_index]};
+		
+		Model* model = m_model_instances[model_instance.index].model;
+		if (!model) return;
+		
+		auto bone_iter = model->getBoneIndex(attachment.bone_name_hash);
+		if (!bone_iter.isValid()) return;
 
+		i32 bone_index = bone_iter.value();
+		if (bone_index >= (int)pose->count) return;
+
+		const LocalRigidTransform bone_transform = {pose->positions[bone_index], pose->rotations[bone_index]};
 		const EntityRef parent = (EntityRef)attachment.parent_entity;
 		Transform parent_transform = m_world.getTransform(parent).compose(bone_transform);
 		const Transform child_transform = m_world.getTransform(attachment.entity);
 		const Transform res = Transform::computeLocal(parent_transform, child_transform);
 		attachment.relative_transform = {Vec3(res.pos), res.rot};
-		unlockPose(model_instance, false);
 	}
 
 	Vec3 getBoneAttachmentPosition(EntityRef entity) override {
@@ -480,14 +488,32 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 	int getBoneAttachmentBone(EntityRef entity) override {
-		return m_bone_attachments[entity].bone_index;
+		BoneAttachment& ba = m_bone_attachments[entity];
+		if (!ba.parent_entity.isValid()) return -1;
+
+		Model* model = m_model_instances[ba.parent_entity.index].model;
+		if (!model) return -1;
+
+		auto iter = model->getBoneIndex(ba.bone_name_hash);
+		if (!iter.isValid()) return -1;
+
+		return iter.value();
 	}
 
 
-	void setBoneAttachmentBone(EntityRef entity, int value) override
-	{
+	void setBoneAttachmentBone(EntityRef entity, i32 value) override {
 		BoneAttachment& ba = m_bone_attachments[entity];
-		ba.bone_index = value;
+		if (!ba.parent_entity.isValid()) return;
+
+		Model* model = m_model_instances[ba.parent_entity.index].model;
+		if (!model) return;
+
+		Span<const Model::Bone> bones = model->getBones();
+		if (value >= (i32)bones.size()) return;
+		
+		const char* bone_name = bones[value].name.c_str();
+		
+		ba.bone_name_hash = BoneNameHash(bone_name);
 		updateRelativeMatrix(ba);
 	}
 
@@ -558,12 +584,10 @@ struct RenderModuleImpl final : RenderModule {
 
 	const char* getName() const override { return "renderer"; }
 
-	void serializeBoneAttachments(OutputMemoryStream& serializer)
-	{
+	void serializeBoneAttachments(OutputMemoryStream& serializer) {
 		serializer.write((i32)m_bone_attachments.size());
-		for (auto& attachment : m_bone_attachments)
-		{
-			serializer.write(attachment.bone_index);
+		for (auto& attachment : m_bone_attachments) {
+			serializer.write(attachment.bone_name_hash);
 			serializer.write(attachment.entity);
 			serializer.write(attachment.parent_entity);
 			serializer.write(attachment.relative_transform);
@@ -873,14 +897,19 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 
-	void deserializeBoneAttachments(InputMemoryStream& serializer, const EntityMap& entity_map)
-	{
+	void deserializeBoneAttachments(InputMemoryStream& serializer, const EntityMap& entity_map, i32 version) {
 		u32 count;
 		serializer.read(count);
 		m_bone_attachments.reserve(count + m_bone_attachments.size());
 		for (u32 i = 0; i < count; ++i) {
 			BoneAttachment bone_attachment;
-			serializer.read(bone_attachment.bone_index);
+			if (version <= (i32)RenderModuleVersion::BONE_NAME_HASH) {
+				serializer.read<i32>();
+				logError("Bone attachment uses outdated version. Please reset bone attachment's bone and save the scene.");
+			}
+			else {
+				serializer.read(bone_attachment.bone_name_hash);
+			}
 			serializer.read(bone_attachment.entity);
 			bone_attachment.entity = entity_map.get(bone_attachment.entity);
 			serializer.read(bone_attachment.parent_entity);
@@ -1210,7 +1239,7 @@ struct RenderModuleImpl final : RenderModule {
 		deserializeLights(serializer, entity_map, version);
 		deserializeTerrains(serializer, entity_map, version);
 		deserializeParticleSystems(serializer, entity_map, version);
-		deserializeBoneAttachments(serializer, entity_map);
+		deserializeBoneAttachments(serializer, entity_map, version);
 		deserializeEnvironmentProbes(serializer, entity_map);
 		deserializeReflectionProbes(serializer, entity_map);
 		deserializeDecals(serializer, entity_map, version);
@@ -2894,9 +2923,10 @@ struct RenderModuleImpl final : RenderModule {
 			m_culling_system->add(entity, (u8)RenderableTypes::MESH, pos, radius);
 		}
 		ASSERT(!r.pose);
-		if (model->getBoneCount() > 0) {
+		u32 num_bones = model->getBones().size();
+		if (num_bones > 0) {
 			r.pose = LUMIX_NEW(m_allocator, Pose)(m_allocator);
-			r.pose->resize(model->getBoneCount());
+			r.pose->resize(num_bones);
 			model->getPose(*r.pose);
 		}
 		r.mesh_count = r.model->getMeshCount();
@@ -3238,8 +3268,7 @@ struct RenderModuleImpl final : RenderModule {
 		BoneAttachment& attachment = m_bone_attachments.emplace(entity);
 		attachment.entity = entity;
 		attachment.parent_entity = INVALID_ENTITY;
-		attachment.bone_index = -1;
-
+		
 		m_world.onComponentCreated(entity, BONE_ATTACHMENT_TYPE, this);
 	}
 
@@ -3396,7 +3425,7 @@ void RenderModule::reflect() {
 			auto* model = render_module->getModelInstanceModel((EntityRef)model_instance);
 			if (!model || !model->isReady()) return 0;
 
-			return model->getBoneCount();
+			return model->getBones().size();
 		}
 
 		const char* name(ComponentUID cmp, u32 idx) const override {
@@ -3407,7 +3436,8 @@ void RenderModule::reflect() {
 			auto* model = render_module->getModelInstanceModel((EntityRef)model_instance);
 			if (!model) return "";
 
-			return idx < (u32)model->getBoneCount() ? model->getBone(idx).name.c_str() : "N/A";
+			Span<const Model::Bone> bones = model->getBones();
+			return idx < bones.size() ? bones[idx].name.c_str() : "N/A";
 		}
 
 

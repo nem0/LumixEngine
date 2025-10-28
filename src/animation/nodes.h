@@ -265,7 +265,7 @@ struct IKNode final : PoseNode {
 	ValueNode* m_alpha = nullptr;
 	ValueNode* m_effector_position = nullptr;
 	PoseNode* m_input = nullptr;
-	u32 m_leaf_bone;
+	BoneNameHash m_leaf_bone;
 	u32 m_bones_count;
 };
 

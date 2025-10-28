@@ -133,7 +133,7 @@ struct IKNode final : PoseNode {
 	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
 	anim::Node* compile(anim::Controller& controller) override;
 
-	i32 m_leaf_bone = 0;
+	BoneNameHash m_leaf_bone;
 	u32 m_bones_count = 0;
 };
 

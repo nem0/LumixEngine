@@ -163,7 +163,7 @@ static LocalRigidTransform getAbsolutePosition(const Pose& pose, const Model& mo
 	return getAbsolutePosition(pose, model, parent_idx) * bone_transform;
 }
 
-void evalIK(float alpha, Vec3 target, u32 leaf_bone, u32 bones_count, Model& model, Pose& pose) {
+void evalIK(float alpha, Vec3 target, BoneNameHash leaf_bone, u32 bones_count, Model& model, Pose& pose, const Path& controller_path) {
 	if (alpha < 0.001f) return;
 	
 	// TODO user defined
@@ -176,7 +176,12 @@ void evalIK(float alpha, Vec3 target, u32 leaf_bone, u32 bones_count, Model& mod
 	Vec3 old_pos[MAX_BONES_COUNT];
 	float len[MAX_BONES_COUNT - 1];
 	float len_sum = 0;
-	indices[bones_count - 1] = leaf_bone;
+	auto leaf_iter = model.getBoneIndex(leaf_bone);
+	if (!leaf_iter.isValid()) {
+		logError(controller_path, ": IK leaf bone not found in ", model.getPath());
+		return;
+	}
+	indices[bones_count - 1] = leaf_iter.value();
 	for (u32 i = 1; i < bones_count; ++i) {
 		indices[bones_count - 1 - i] = model.getBoneParent(indices[bones_count - i]);
 	}
@@ -270,9 +275,9 @@ void evalBlendStack(const anim::RuntimeContext& ctx, Pose& pose) {
 			case anim::BlendStackInstructions::IK: {
 				float alpha = bs.read<float>();
 				Vec3 pos = bs.read<Vec3>();
-				u32 leaf_bone = bs.read<u32>();
+				BoneNameHash leaf_bone = bs.read<BoneNameHash>();
 				u32 bone_count = bs.read<u32>();
-				evalIK(alpha * ctx.weight, pos, leaf_bone, bone_count, *ctx.model, pose);
+				evalIK(alpha * ctx.weight, pos, leaf_bone, bone_count, *ctx.model, pose, ctx.controller.getPath());
 				break;
 			}
 			case anim::BlendStackInstructions::SAMPLE: {

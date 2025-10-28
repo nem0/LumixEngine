@@ -2424,20 +2424,21 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				}
 			}
 
-			if (m_resource->isReady() && m_resource->getBoneCount() > 0) {
+			Span<const Model::Bone> bones = m_resource->getBones();
+			if (m_resource->isReady() && bones.size() > 0) {
 				ImGui::SeparatorText("Bones");
 				ImGuiEx::Label("Count");
-				ImGui::Text("%d", m_resource->getBoneCount());
+				ImGui::Text("%d", bones.size());
 				if (ImGui::BeginTable("bnstbl", 4, ImGuiTableFlags_Resizable)) {
 					ImGui::TableSetupColumn("Name");
 					ImGui::TableSetupColumn("Position");
 					ImGui::TableSetupColumn("Rotation");
 					ImGui::TableSetupColumn("Parent");
 					ImGui::TableHeadersRow();
-					for (i32 i = 0; i < m_resource->getBoneCount(); ++i) {
+					for (u32 i = 0; i < bones.size(); ++i) {
 						ImGui::TableNextRow();
 						ImGui::TableNextColumn();
-						const Model::Bone& bone = m_resource->getBone(i);
+						const Model::Bone& bone = bones[i];
 						const i32 parent_idx = m_resource->getBoneParent(i);
 						ImGuiEx::TextUnformatted(bone.name);
 						ImGui::TableNextColumn();
