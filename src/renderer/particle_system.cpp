@@ -615,7 +615,7 @@ void ParticleSystem::run(RunningContext& ctx) {
 				}
 
 				const u32 idx = u32(getConstValue(index) + 0.5f);
-				if (model->getBoneCount() > 0) {
+				if (model->getBones().size() > 0) {
 					ModelInstance* mi = render_module->getModelInstance(*m_entity);
 					if (!mi->pose) return;
 
