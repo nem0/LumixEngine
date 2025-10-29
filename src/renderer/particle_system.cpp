@@ -939,16 +939,28 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 					ms[i] = (values[i] - values[i - 1]) / (keys[i] - keys[i - 1]);
 				}
 
-				ASSERT(dst.type == DataStream::OUT);
-				const u8 output_idx = dst.index;
-				const u32 stride = emitter.resource_emitter.outputs_count;
-				const float* arg = (float*)getStream(emitter, op0, fromf4, ctx.registers);
-				float* out = ctx.output_memory + output_idx + fromf4 * 4 * stride;
-				for (i32 i = 0, j = 0; i < stepf4 * 4; ++i, j += stride) {
-					const float v = clamp(arg[i], keys[0], keys[count - 1]);
-					u32 k = 1;
-					while (v > keys[k]) ++k;
-					out[j] = values[k] - (keys[k] - v) * ms[k];
+				if (dst.type == DataStream::OUT) {
+					const u8 output_idx = dst.index;
+					const u32 stride = emitter.resource_emitter.outputs_count;
+					const float* arg = (float*)getStream(emitter, op0, fromf4, ctx.registers);
+					float* out = ctx.output_memory + output_idx + fromf4 * 4 * stride;
+					for (i32 i = 0, j = 0; i < stepf4 * 4; ++i, j += stride) {
+						const float v = clamp(arg[i], keys[0], keys[count - 1]);
+						u32 k = 1;
+						while (v > keys[k]) ++k;
+						out[j] = values[k] - (keys[k] - v) * ms[k];
+					}
+				}
+				else if (dst.type == DataStream::REGISTER) {
+					const u8 output_idx = dst.index;
+					const float* arg = (float*)getStream(emitter, op0, fromf4, ctx.registers);
+					float* result = (float*)getStream(emitter, dst, fromf4, ctx.registers);
+					for (i32 i = 0; i < stepf4 * 4; ++i) {
+						const float v = clamp(arg[i], keys[0], keys[count - 1]);
+						u32 k = 1;
+						while (v > keys[k]) ++k;
+						result[i] = values[k] - (keys[k] - v) * ms[k];
+					}
 				}
 				break;
 			}
