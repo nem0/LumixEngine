@@ -31,6 +31,7 @@
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
+#include "engine/component_types.h"
 #include "engine/component_uid.h"
 #include "engine/core.h"
 #include "engine/engine.h"
@@ -67,23 +68,9 @@
 #include "stb/stb_image.h"
 #include <stb/stb_image_resize2.h>
 
-
 using namespace Lumix;
 
 namespace {
-
-static const ComponentType PARTICLE_EMITTER_TYPE = reflection::getComponentType("particle_emitter");
-static const ComponentType TERRAIN_TYPE = reflection::getComponentType("terrain");
-static const ComponentType CAMERA_TYPE = reflection::getComponentType("camera");
-static const ComponentType DECAL_TYPE = reflection::getComponentType("decal");
-static const ComponentType CURVE_DECAL_TYPE = reflection::getComponentType("curve_decal");
-static const ComponentType POINT_LIGHT_TYPE = reflection::getComponentType("point_light");
-static const ComponentType ENVIRONMENT_TYPE = reflection::getComponentType("environment");
-static const ComponentType INSTANCED_MODEL_TYPE = reflection::getComponentType("instanced_model");
-static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
-static const ComponentType ENVIRONMENT_PROBE_TYPE = reflection::getComponentType("environment_probe");
-static const ComponentType REFLECTION_PROBE_TYPE = reflection::getComponentType("reflection_probe");
-static const ComponentType PROCEDURAL_GEOM_TYPE = reflection::getComponentType("procedural_geom");
 
 namespace TextureCompressor {
 
@@ -645,7 +632,7 @@ struct ParticleSystemPropertyPlugin final : PropertyGrid::IPlugin
 
 	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, const TextFilter& filter, WorldEditor& editor) override {
 		if (filter.isActive()) return;
-		if (cmp_type != PARTICLE_EMITTER_TYPE) return;
+		if (cmp_type != types::particle_emitter) return;
 		if (entities.length() != 1) return;
 		
 		RenderModule* module = (RenderModule*)editor.getWorld()->getModule(cmp_type);
@@ -1725,7 +1712,7 @@ struct ModelPropertiesPlugin final : PropertyGrid::IPlugin {
 	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, const TextFilter& filter, WorldEditor& editor) override {
 		if (!filter.pass("Material")) return;
 		
-		if (cmp_type != MODEL_INSTANCE_TYPE) return;
+		if (cmp_type != types::model_instance) return;
 		if (entities.length() != 1) return;
 
 		RenderModule* module = (RenderModule*)editor.getWorld()->getModule(cmp_type);
@@ -2021,7 +2008,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 			m_renderer = static_cast<Renderer*>(engine.getSystemManager().getSystem("renderer"));
 
-			auto* render_module = static_cast<RenderModule*>(m_viewer.m_world->getModule(MODEL_INSTANCE_TYPE));
+			auto* render_module = static_cast<RenderModule*>(m_viewer.m_world->getModule(types::model_instance));
 			render_module->setModelInstancePath(*m_viewer.m_mesh, m_resource->getPath());
 
 			if (Path::hasExtension(path, "fbx")) {
@@ -2520,7 +2507,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			if (ImGui::Button("Reset camera")) m_viewer.resetCamera(*m_resource);
 			// TODO this does not work, two lods are rendered
 			/*
-			auto* render_module = static_cast<RenderModule*>(m_viewer.m_world->getModule(MODEL_INSTANCE_TYPE));
+			auto* render_module = static_cast<RenderModule*>(m_viewer.m_world->getModule(types::model_instance));
 			ASSERT(render_module);
 			ImGui::SameLine();
 			ImGui::InputInt("LOD", &m_preview_lod);
@@ -2665,16 +2652,16 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		m_tile.world = &engine.createWorld();
 		m_tile.pipeline = Pipeline::create(*m_renderer, PipelineType::PREVIEW);
 
-		RenderModule* render_module = (RenderModule*)m_tile.world->getModule(MODEL_INSTANCE_TYPE);
+		RenderModule* render_module = (RenderModule*)m_tile.world->getModule(types::model_instance);
 		const EntityRef env_probe = m_tile.world->createEntity({0, 0, 0}, Quat::IDENTITY);
-		m_tile.world->createComponent(ENVIRONMENT_PROBE_TYPE, env_probe);
+		m_tile.world->createComponent(types::environment_probe, env_probe);
 		render_module->getEnvironmentProbe(env_probe).outer_range = Vec3(1e3);
 		render_module->getEnvironmentProbe(env_probe).inner_range = Vec3(1e3);
 
 		Matrix mtx;
 		mtx.lookAt({0, 0, 0}, {-10, -10, -10}, {0, 1, 0});
 		const EntityRef light_entity = m_tile.world->createEntity({0, 0, 0}, mtx.getRotation());
-		m_tile.world->createComponent(ENVIRONMENT_TYPE, light_entity);
+		m_tile.world->createComponent(types::environment, light_entity);
 		render_module->getEnvironment(light_entity).direct_intensity = 5;
 		render_module->getEnvironment(light_entity).indirect_intensity = 1;
 		
@@ -2816,8 +2803,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			EntityRef ent = (EntityRef)e;
 			const DVec3 pos = world.getPosition(ent);
 			aabb.addPoint(Vec3(pos));
-			if (world.hasComponent(ent, MODEL_INSTANCE_TYPE)) {
-				RenderModule* module = (RenderModule*)world.getModule(MODEL_INSTANCE_TYPE);
+			if (world.hasComponent(ent, types::model_instance)) {
+				RenderModule* module = (RenderModule*)world.getModule(types::model_instance);
 				Model* model = module->getModelInstanceModel(ent);
 				module->setModelInstanceLOD(ent, 0);
 				if (model->isReady()) {
@@ -2936,13 +2923,13 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	void renderTile(Model* model, Animation* animation, const Viewport* in_viewport)
 	{
 		if (!m_tile.world) createTileWorld();
-		RenderModule* render_module = (RenderModule*)m_tile.world->getModule(MODEL_INSTANCE_TYPE);
+		RenderModule* render_module = (RenderModule*)m_tile.world->getModule(types::model_instance);
 		if (!render_module || !model->isReady() || model->getMeshCount() == 0) {
 			return;
 		}
 
 		EntityRef mesh_entity = m_tile.world->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
-		m_tile.world->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
+		m_tile.world->createComponent(types::model_instance, mesh_entity);
 
 		render_module->setModelInstancePath(mesh_entity, model->getPath());
 		render_module->setModelInstanceLOD(mesh_entity, 0);
@@ -2950,9 +2937,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		const float radius = model->getCenterBoundingRadius();
 
 		if (animation) {
-			ComponentType ANIMABLE_TYPE = reflection::getComponentType("animable");
-			m_tile.world->createComponent(ANIMABLE_TYPE, mesh_entity);
-			AnimationModule* anim_module = (AnimationModule*)m_tile.world->getModule(ANIMABLE_TYPE);
+			m_tile.world->createComponent(types::animable, mesh_entity);
+			AnimationModule* anim_module = (AnimationModule*)m_tile.world->getModule(types::animable);
 			anim_module->setAnimableAnimation(mesh_entity, animation->getPath());
 			if (anim_module) anim_module->updateAnimable(mesh_entity, animation->getLength().seconds() * 0.5f);
 		}
@@ -3588,7 +3574,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 
 		m_pipeline->setIndirectLightMultiplier(bounce ? 1.f : 0.f);
 
-		RenderModule* module = (RenderModule*)world.getModule(ENVIRONMENT_PROBE_TYPE);
+		RenderModule* module = (RenderModule*)world.getModule(types::environment_probe);
 		const Span<EntityRef> env_probes = module->getEnvironmentProbesEntities();
 		const Span<EntityRef> reflection_probes = module->getReflectionProbesEntities();
 		m_probe_jobs.reserve(env_probes.length() + reflection_probes.length());
@@ -3857,8 +3843,8 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 					}
 				}
 
-				if (job.world.hasComponent(job.entity, ENVIRONMENT_PROBE_TYPE)) {
-					module = (RenderModule*)job.world.getModule(ENVIRONMENT_PROBE_TYPE);
+				if (job.world.hasComponent(job.entity, types::environment_probe)) {
+					module = (RenderModule*)job.world.getModule(types::environment_probe);
 					EnvironmentProbe& p = module->getEnvironmentProbe(job.entity);
 					static_assert(sizeof(p.sh_coefs) == sizeof(job.sh.coefs));
 					memcpy(p.sh_coefs, job.sh.coefs, sizeof(p.sh_coefs));
@@ -3890,7 +3876,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 		World& world = *editor.getWorld();
 		const EntityRef e = entities[0];
 		auto* module = static_cast<RenderModule*>(world.getModule(cmp_type));
-		if (cmp_type == REFLECTION_PROBE_TYPE) {
+		if (cmp_type == types::reflection_probe) {
 			const ReflectionProbe& probe = module->getReflectionProbe(e);
 			if (probe.flags & ReflectionProbe::ENABLED) {
 				ImGuiEx::Label("GUID");
@@ -3925,7 +3911,7 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		}
 
 		bool execute() override {
-			RenderModule* module = (RenderModule*)editor.getWorld()->getModule(INSTANCED_MODEL_TYPE);
+			RenderModule* module = (RenderModule*)editor.getWorld()->getModule(types::instanced_model);
 			InstancedModel& im = module->beginInstancedModelEditing(entity);
 
 			for (auto& i : im.instances) {
@@ -3941,7 +3927,7 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		}
 
 		void undo() override {
-			RenderModule* module = (RenderModule*)editor.getWorld()->getModule(INSTANCED_MODEL_TYPE);
+			RenderModule* module = (RenderModule*)editor.getWorld()->getModule(types::instanced_model);
 			InstancedModel& im = module->beginInstancedModelEditing(entity);
 
 			for (auto& i : im.instances) {
@@ -3983,7 +3969,7 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		bool execute() override {
 			instances.clear();
 			
-			RenderModule* module = (RenderModule*)editor.getWorld()->getModule(INSTANCED_MODEL_TYPE);
+			RenderModule* module = (RenderModule*)editor.getWorld()->getModule(types::instanced_model);
 			InstancedModel& im = module->beginInstancedModelEditing(entity);
 			for (i32 i = im.instances.size() - 1; i >= 0; --i) {
 				const InstancedModel::InstanceData& id = im.instances[i];
@@ -3998,7 +3984,7 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		}
 		
 		void undo() override {
-			RenderModule* module = (RenderModule*)editor.getWorld()->getModule(INSTANCED_MODEL_TYPE);
+			RenderModule* module = (RenderModule*)editor.getWorld()->getModule(types::instanced_model);
 			InstancedModel& im = module->beginInstancedModelEditing(entity);
 			
 			for (const InstancedModel::InstanceData& id : instances) {
@@ -4026,7 +4012,7 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		{}
 
 		bool execute() override {
-			RenderModule* module = (RenderModule*)editor.getWorld()->getModule(INSTANCED_MODEL_TYPE);
+			RenderModule* module = (RenderModule*)editor.getWorld()->getModule(types::instanced_model);
 			InstancedModel& im = module->beginInstancedModelEditing(entity);
 			for (const InstancedModel::InstanceData& i : instances) {
 				im.instances.push(i);
@@ -4036,7 +4022,7 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		}
 		
 		void undo() override {
-			RenderModule* module = (RenderModule*)editor.getWorld()->getModule(INSTANCED_MODEL_TYPE);
+			RenderModule* module = (RenderModule*)editor.getWorld()->getModule(types::instanced_model);
 			InstancedModel& im = module->beginInstancedModelEditing(entity);
 			for (u32 j = 0, cj = (u32)instances.size(); j < cj; ++j) {
 				for (u32 i = 0, ci = (u32)im.instances.size(); i < ci; ++i) {
@@ -4081,7 +4067,7 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		if (selected_entities.size() != 1) return { nullptr };
 
 		World& world = *editor.getWorld();
-		RenderModule* module = (RenderModule*)world.getModule(INSTANCED_MODEL_TYPE);
+		RenderModule* module = (RenderModule*)world.getModule(types::instanced_model);
 		auto iter = module->getInstancedModels().find(selected_entities[0]);
 		if (!iter.isValid()) return { nullptr };
 		return { &iter.value(), selected_entities[0], module };
@@ -4279,7 +4265,7 @@ struct InstancedModelPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 
 	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, const TextFilter& filter, WorldEditor& editor) override {
 		if (filter.isActive()) return;
-		if (cmp_type != INSTANCED_MODEL_TYPE) return;
+		if (cmp_type != types::instanced_model) return;
 		if (entities.length() != 1) return;
 
 		RenderModule* render_module = (RenderModule*)editor.getWorld()->getModule(cmp_type);
@@ -4496,7 +4482,7 @@ struct ProceduralGeomPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 		const EntityRef entity = selected[0];
 		const World& world = *editor.getWorld();
 		RenderModule* module = (RenderModule*)world.getModule("renderer");
-		if (!world.hasComponent(entity, PROCEDURAL_GEOM_TYPE)) return false;
+		if (!world.hasComponent(entity, types::procedural_geom)) return false;
 
 		const Ray ray = view.getViewport().getRay({(float)x, (float)y});
 		const RayCastModelHit hit = module->castRay(ray, [entity](const RayCastModelHit& hit) {
@@ -4657,10 +4643,10 @@ struct ProceduralGeomPlugin final : PropertyGrid::IPlugin, StudioApp::MousePlugi
 
 	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, const TextFilter& filter, WorldEditor& editor) override {
 		if (filter.isActive()) return;
-		if (cmp_type != PROCEDURAL_GEOM_TYPE) return;
+		if (cmp_type != types::procedural_geom) return;
 		if (entities.length() != 1) return;
 
-		RenderModule* module = (RenderModule*)editor.getWorld()->getModule(PROCEDURAL_GEOM_TYPE);
+		RenderModule* module = (RenderModule*)editor.getWorld()->getModule(types::procedural_geom);
 		ProceduralGeometry& pg = module->getProceduralGeometry(entities[0]);
 		ImGuiEx::Label("Vertex count");
 		const u32 stride = pg.vertex_decl.getStride();
@@ -4730,7 +4716,7 @@ struct TerrainPlugin final : PropertyGrid::IPlugin
 
 	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, const TextFilter& filter, WorldEditor& editor) override {
 		if (filter.isActive()) return;
-		if (cmp_type != TERRAIN_TYPE) return;
+		if (cmp_type != types::terrain) return;
 		if (entities.length() != 1) return;
 
 		ComponentUID cmp;
@@ -4837,7 +4823,7 @@ struct RenderInterfaceImpl final : RenderInterface
 
 	RayHit castRay(World& world, const Ray& ray, EntityPtr ignored) override
 	{
-		RenderModule* module = (RenderModule*)world.getModule(ENVIRONMENT_PROBE_TYPE);
+		RenderModule* module = (RenderModule*)world.getModule(types::environment_probe);
 		const RayCastModelHit hit = module->castRay(ray, ignored);
 
 		return {hit.is_hit, hit.t, hit.entity, hit.origin + hit.dir * hit.t};
@@ -4848,8 +4834,8 @@ struct RenderInterfaceImpl final : RenderInterface
 	{
 		AABB aabb;
 
-		if (world.hasComponent(entity, MODEL_INSTANCE_TYPE)) {
-			RenderModule* module = (RenderModule*)world.getModule(ENVIRONMENT_PROBE_TYPE);
+		if (world.hasComponent(entity, types::model_instance)) {
+			RenderModule* module = (RenderModule*)world.getModule(types::environment_probe);
 			Model* model = module->getModelInstanceModel(entity);
 			if (!model) return aabb;
 
@@ -4867,7 +4853,7 @@ struct RenderInterfaceImpl final : RenderInterface
 
 
 	Path getModelInstancePath(World& world, EntityRef entity) override {
-		RenderModule* module = (RenderModule*)world.getModule(ENVIRONMENT_PROBE_TYPE);
+		RenderModule* module = (RenderModule*)world.getModule(types::environment_probe);
 		return module->getModelInstancePath(entity); 
 	}
 
@@ -5289,14 +5275,14 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin {
 			if (editor.getSelectedEntities().size() == 0) return;
 			EntityRef entity = editor.getSelectedEntities()[0];
 
-			if (!editor.getWorld()->hasComponent(entity, TERRAIN_TYPE))
+			if (!editor.getWorld()->hasComponent(entity, types::terrain))
 			{
-				editor.addComponent(Span(&entity, 1), TERRAIN_TYPE);
+				editor.addComponent(Span(&entity, 1), types::terrain);
 			}
 
 			if (!create_empty)
 			{
-				editor.setProperty(TERRAIN_TYPE, "", -1, "Material", Span(&entity, 1), path);
+				editor.setProperty(types::terrain, "", -1, "Material", Span(&entity, 1), path);
 			}
 			if (parent.isValid()) editor.makeParent(parent, entity);
 			ImGui::CloseCurrentPopup();
@@ -5429,13 +5415,13 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		WorldEditor& editor = view.getEditor();
 		if (Gizmo::box(u64(cmp.entity.index) | (u64(1) << 33), view, tr, p.inner_range, cfg, true)) {
 			editor.beginCommandGroup("env_probe_inner_range");
-			editor.setProperty(ENVIRONMENT_PROBE_TYPE, "", -1, "Inner range", Span(&e, 1), p.inner_range);
+			editor.setProperty(types::environment_probe, "", -1, "Inner range", Span(&e, 1), p.inner_range);
 			editor.setEntitiesPositions(&e, &tr.pos, 1);
 			editor.endCommandGroup();
 		}
 		if (Gizmo::box(u64(cmp.entity.index) | (u64(1) << 32), view, tr, p.outer_range, cfg, false)) {
 			editor.beginCommandGroup("env_probe_outer_range");
-			editor.setProperty(ENVIRONMENT_PROBE_TYPE, "", -1, "Outer range", Span(&e, 1), p.outer_range);
+			editor.setProperty(types::environment_probe, "", -1, "Outer range", Span(&e, 1), p.outer_range);
 			editor.setEntitiesPositions(&e, &tr.pos, 1);
 			editor.endCommandGroup();
 		}
@@ -5452,7 +5438,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		WorldEditor& editor = view.getEditor();
 		if (Gizmo::box(u64(cmp.entity.index) | (u64(1) << 32), view, tr, p.half_extents, cfg, false)) {
 			editor.beginCommandGroup("refl_probe_half_ext");
-			editor.setProperty(ENVIRONMENT_PROBE_TYPE, "", -1, "Half extents", Span(&e, 1), p.half_extents);
+			editor.setProperty(types::environment_probe, "", -1, "Half extents", Span(&e, 1), p.half_extents);
 			editor.setEntitiesPositions(&e, &tr.pos, 1);
 			editor.endCommandGroup();
 		}
@@ -5542,14 +5528,14 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		WorldEditor& editor = view.getEditor();
 		if (Gizmo::manipulate((u64(1) << 32) | cmp.entity.index, view, p0_tr, cfg)) {
 			const Vec2 p0 = Vec2(tr.invTransform(p0_tr.pos).xz());
-			editor.setProperty(CURVE_DECAL_TYPE, "", 0, "Bezier P0", Span(&e, 1), p0);
+			editor.setProperty(types::curve_decal, "", 0, "Bezier P0", Span(&e, 1), p0);
 		}
 
 		const DVec3 pos2 = tr.transform(DVec3(decal.bezier_p2.x, 0, decal.bezier_p2.y));
 		Transform p2_tr = { pos2, Quat::IDENTITY, Vec3(1) };
 		if (Gizmo::manipulate((u64(2) << 32) | cmp.entity.index, view, p2_tr, cfg)) {
 			const Vec2 p2 = Vec2(tr.invTransform(p2_tr.pos).xz());
-			editor.setProperty(CURVE_DECAL_TYPE, "", 0, "Bezier P2", Span(&e, 1), p2);
+			editor.setProperty(types::curve_decal, "", 0, "Bezier P2", Span(&e, 1), p2);
 		}
 
 		addLine(view, tr.pos, p0_tr.pos, Color::BLUE);
@@ -5565,36 +5551,36 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	bool showGizmo(WorldView& view, ComponentUID cmp) override
 	{
-		if (cmp.type == CAMERA_TYPE)
+		if (cmp.type == types::camera)
 		{
 			showCameraGizmo(view, cmp);
 			return true;
 		}
-		if (cmp.type == DECAL_TYPE)
+		if (cmp.type == types::decal)
 		{
 			showDecalGizmo(view, cmp);
 			return true;
 		}
-		if (cmp.type == CURVE_DECAL_TYPE)
+		if (cmp.type == types::curve_decal)
 		{
 			showCurveDecalGizmo(view, cmp);
 			return true;
 		}
-		if (cmp.type == POINT_LIGHT_TYPE)
+		if (cmp.type == types::point_light)
 		{
 			showPointLightGizmo(view, cmp);
 			return true;
 		}
-		if (cmp.type == ENVIRONMENT_TYPE)
+		if (cmp.type == types::environment)
 		{
 			showGlobalLightGizmo(view, cmp);
 			return true;
 		}
-		if (cmp.type == ENVIRONMENT_PROBE_TYPE) {
+		if (cmp.type == types::environment_probe) {
 			showEnvironmentProbeGizmo(view, cmp);
 			return true;
 		}
-		if (cmp.type == REFLECTION_PROBE_TYPE) {
+		if (cmp.type == types::reflection_probe) {
 			showReflectionProbeGizmo(view, cmp);
 			return true;
 		}

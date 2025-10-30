@@ -13,10 +13,12 @@
 #include "editor/text_filter.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
+#include "engine/component_types.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/world.h"
 #include "particle_script_compiler.h"
+#include "renderer/editor/world_viewer.h"
 #include "renderer/material.h"
 #include "renderer/particle_system.h"
 #include "renderer/render_module.h"
@@ -3400,9 +3402,8 @@ struct ParticleEditorWindow : AssetEditorWindow, NodeEditor {
 		if (selected.size() != 1) return nullptr;
 
 		World* world = editor.getWorld();
-		ComponentType emitter_type = reflection::getComponentType("particle_emitter");
-		RenderModule* module = (RenderModule*)world->getModule(emitter_type);
-		const bool has = world->hasComponent(selected[0], emitter_type);
+		RenderModule* module = (RenderModule*)world->getModule(types::particle_emitter);
+		const bool has = world->hasComponent(selected[0], types::particle_emitter);
 		return has ? &module->getParticleEmitter(selected[0]) : nullptr;
 	}
 

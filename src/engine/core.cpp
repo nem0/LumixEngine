@@ -4,13 +4,11 @@
 #include "core/stream.h"
 #include "engine.h"
 #include "engine_hash_funcs.h"
+#include "engine/component_types.h"
 #include "engine/reflection.h"
 #include "world.h"
 
 namespace Lumix {
-
-static const ComponentType SPLINE_TYPE = reflection::getComponentType("spline");
-static const ComponentType SIGNAL_TYPE = reflection::getComponentType("signal");
 
 enum class CoreModuleVersion : i32 {
 	SIGNALS,
@@ -101,7 +99,7 @@ struct CoreModuleImpl : CoreModule {
 				signal->function = findReflectionFunction(signal->function_module, function_name);
 			
 				m_signals.insert(e, signal.move());
-				m_world.onComponentCreated(e, SIGNAL_TYPE, this);
+				m_world.onComponentCreated(e, types::signal, this);
 			}
 		}
 
@@ -115,7 +113,7 @@ struct CoreModuleImpl : CoreModule {
 			serializer.readArray(&spline.points);
 			
 			m_splines.insert(e, static_cast<Spline&&>(spline));
-			m_world.onComponentCreated(e, SPLINE_TYPE, this);
+			m_world.onComponentCreated(e, types::spline, this);
 		}
 	}
 
@@ -177,12 +175,12 @@ struct CoreModuleImpl : CoreModule {
 	void createSpline(EntityRef e) override {
 		Spline spline(m_allocator);
 		m_splines.insert(e, static_cast<Spline&&>(spline));
-		m_world.onComponentCreated(e, SPLINE_TYPE, this);
+		m_world.onComponentCreated(e, types::spline, this);
 	}
 	
 	void destroySpline(EntityRef e) override {
 		m_splines.erase(e);
-		m_world.onComponentDestroyed(e, SPLINE_TYPE, this);
+		m_world.onComponentDestroyed(e, types::spline, this);
 	}
 	
 	Spline& getSpline(EntityRef e) override {
@@ -195,7 +193,7 @@ struct CoreModuleImpl : CoreModule {
 		UniquePtr<Signal>& s = m_signals.insert(e);
 		s = UniquePtr<Signal>::create(m_allocator);
 		s->entity = e;
-		m_world.onComponentCreated(e, SIGNAL_TYPE, this);
+		m_world.onComponentCreated(e, types::signal, this);
 	}
 
 	void destroySignal(EntityRef e) override {
@@ -206,7 +204,7 @@ struct CoreModuleImpl : CoreModule {
 			}
 		}
 		m_signals.erase(e);
-		m_world.onComponentDestroyed(e, SIGNAL_TYPE, this);
+		m_world.onComponentDestroyed(e, types::signal, this);
 	}
 
 	Signal& getSignal(EntityRef e) override {

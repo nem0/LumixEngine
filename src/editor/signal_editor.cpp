@@ -1,3 +1,4 @@
+#include "engine/component_types.h"
 #include "engine/core.h"
 #include "engine/reflection.h"
 #include "editor/property_grid.h"
@@ -6,8 +7,6 @@
 #include <imgui/imgui.h>
 
 namespace Lumix {
-
-static const ComponentType SIGNAL_TYPE = reflection::getComponentType("signal");
 
 struct SignalEditorImpl : SignalEditor {
 	SignalEditorImpl(StudioApp& app) : m_app(app) {}
@@ -25,7 +24,7 @@ struct SignalEditorImpl : SignalEditor {
 	bool showGizmo(struct WorldView& view, struct ComponentUID cmp) override { return false; }
 
 	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, const TextFilter& filter, WorldEditor& editor) override {
-		if (cmp_type != SIGNAL_TYPE) return;
+		if (cmp_type != types::signal) return;
 		if (filter.isActive()) return;
 		if (entities.length() != 1) return;
 

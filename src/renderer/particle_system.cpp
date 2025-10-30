@@ -1,19 +1,20 @@
 #include "particle_system.h"
 #include "core/crt.h"
 #include "core/atomic.h"
-#include "engine/core.h"
 #include "core/job_system.h"
 #include "core/log.h"
 #include "core/math.h"
 #include "core/metaprogramming.h"
 #include "core/page_allocator.h"
 #include "core/profiler.h"
-#include "engine/resource_manager.h"
 #include "core/simd.h"
 #include "core/stack_array.h"
 #include "core/stream.h"
 #include "editor/gizmo.h"
 #include "editor/world_editor.h"
+#include "engine/component_types.h"
+#include "engine/core.h"
+#include "engine/resource_manager.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/render_module.h"
@@ -26,8 +27,6 @@ using DataStream = ParticleSystemResource::DataStream;
 using InstructionType = ParticleSystemResource::InstructionType;
 
 const ResourceType ParticleSystemResource::TYPE = ResourceType("particle_emitter");
-static const ComponentType SPLINE_TYPE = reflection::getComponentType("spline");
-static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
 
 ParticleSystemResource::Emitter::~Emitter() {
 	if (material) material->decRefCount();
@@ -600,8 +599,8 @@ void ParticleSystem::run(RunningContext& ctx) {
 				DataStream index = ip.read<DataStream>();
 				const u8 subindex = ip.read<u8>();
 
-				RenderModule* render_module = (RenderModule*)m_world.getModule(MODEL_INSTANCE_TYPE);
-				if (!m_world.hasComponent(*m_entity, MODEL_INSTANCE_TYPE)) return; // TODO error message
+				RenderModule* render_module = (RenderModule*)m_world.getModule(types::model_instance);
+				if (!m_world.hasComponent(*m_entity, types::model_instance)) return; // TODO error message
 				
 				Model* model = render_module->getModelInstanceModel(*m_entity);
 				if (!model || !model->isReady()) return;
@@ -633,8 +632,8 @@ void ParticleSystem::run(RunningContext& ctx) {
 				DataStream op0 = ip.read<DataStream>();
 				const u8 subindex = ip.read<u8>();
 
-				CoreModule* core_module = (CoreModule*)m_world.getModule(SPLINE_TYPE);
-				if (!m_world.hasComponent(*m_entity, SPLINE_TYPE)) return; // TODO error message
+				CoreModule* core_module = (CoreModule*)m_world.getModule(types::spline);
+				if (!m_world.hasComponent(*m_entity, types::spline)) return; // TODO error message
 				Spline& spline = core_module->getSpline(*m_entity);
 
 				float t = getConstValue(op0);
@@ -899,8 +898,8 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 				const u8 subindex = ip.read<u8>();
 				ASSERT(dst.type == DataStream::OUT);
 
-				CoreModule* core_module = (CoreModule*)m_world.getModule(SPLINE_TYPE);
-				if (!m_world.hasComponent(*m_entity, SPLINE_TYPE)) {
+				CoreModule* core_module = (CoreModule*)m_world.getModule(types::spline);
+				if (!m_world.hasComponent(*m_entity, types::spline)) {
 					return; // TODO error message
 				}
 				Spline& spline = core_module->getSpline(*m_entity);

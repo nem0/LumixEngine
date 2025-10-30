@@ -31,8 +31,6 @@
 
 using namespace Lumix;
 
-static const ComponentType ENVIRONMENT_TYPE = reflection::getComponentType("environment");
-
 struct GUIInterface : GUISystem::Interface {
 	Pipeline* getPipeline() override { return pipeline; }
 	Vec2 getPos() const override { return Vec2(0); }

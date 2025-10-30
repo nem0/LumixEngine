@@ -18,6 +18,7 @@
 #include "editor/studio_app.h"
 #include "editor/text_filter.h"
 #include "editor/world_editor.h"
+#include "engine/component_types.h"
 #include "engine/engine.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
@@ -1001,11 +1002,10 @@ struct AssetBrowserImpl : AssetBrowser {
 				m_dropped_entity = e;
 				ImGui::OpenPopup("Save as prefab");
 				World* world = m_app.getWorldEditor().getWorld();
-				const ComponentType model_inst_type = reflection::getComponentType("model_instance");
-				IModule* module = world->getModule(model_inst_type);
-				if (module && world->hasComponent(e, model_inst_type)) {
+				IModule* module = world->getModule(types::model_instance);
+				if (module && world->hasComponent(e, types::model_instance)) {
 					Path source;
-					if (reflection::getPropertyValue(*module, e, model_inst_type, "Source", source)) {
+					if (reflection::getPropertyValue(*module, e, types::model_instance, "Source", source)) {
 						copyString(Span(m_prefab_name), Path::getBasename(source));
 					}
 				}
