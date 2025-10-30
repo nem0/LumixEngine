@@ -6,6 +6,7 @@
 #include "core/os.h"
 #include "core/profiler.h"
 #include "core/sync.h"
+#include "engine/component_types.h"
 #include "engine/engine.h"
 #include "engine/lumix.h"
 #include "engine/reflection.h"
@@ -24,10 +25,7 @@
 #include <DetourNavMeshQuery.h>
 #include <Recast.h>
 
-
-namespace Lumix
-{
-
+namespace Lumix {
 
 enum class NavigationModuleVersion : i32 {
 	ZONE_GUID,
@@ -46,11 +44,7 @@ struct NavmeshHeader {
 	Version version = LATEST;
 };
 
-static const ComponentType LUA_SCRIPT_TYPE = reflection::getComponentType("lua_script");
-static const ComponentType NAVMESH_ZONE_TYPE = reflection::getComponentType("navmesh_zone");
-static const ComponentType NAVMESH_AGENT_TYPE = reflection::getComponentType("navmesh_agent");
 static const int CELLS_PER_TILE_SIDE = 256;
-
 
 struct RecastZone {
 	EntityRef entity;
@@ -101,7 +95,7 @@ struct NavigationModuleImpl final : NavigationModule
 		, m_zones(m_allocator)
 		, m_script_module(nullptr)
 	{
-		m_world.componentTransformed(NAVMESH_AGENT_TYPE).bind<&NavigationModuleImpl::onAgentMoved>(this);
+		m_world.componentTransformed(types::navmesh_agent).bind<&NavigationModuleImpl::onAgentMoved>(this);
 	}
 
 
@@ -109,7 +103,7 @@ struct NavigationModuleImpl final : NavigationModule
 		for(RecastZone& zone : m_zones) {
 			clearNavmesh(zone);
 		}
-		m_world.componentTransformed(NAVMESH_AGENT_TYPE).unbind<&NavigationModuleImpl::onAgentMoved>(this);
+		m_world.componentTransformed(types::navmesh_agent).unbind<&NavigationModuleImpl::onAgentMoved>(this);
 	}
 
 
@@ -339,7 +333,7 @@ struct NavigationModuleImpl final : NavigationModule
 	{
 		if (!m_script_module) return;
 		
-		if (!m_world.hasComponent(agent.entity, LUA_SCRIPT_TYPE)) return;
+		if (!m_world.hasComponent(agent.entity, types::lua_script)) return;
 
 		for (int i = 0, c = m_script_module->getScriptCount(agent.entity); i < c; ++i)
 		{
@@ -1458,7 +1452,7 @@ struct NavigationModuleImpl final : NavigationModule
 		zone.zone.flags = NavmeshZone::AUTOLOAD | NavmeshZone::DETAILED;
 		zone.entity = entity;
 		m_zones.insert(entity, zone);
-		m_world.onComponentCreated(entity, NAVMESH_ZONE_TYPE, this);
+		m_world.onComponentCreated(entity, types::navmesh_zone, this);
 	}
 
 	void destroyZone(EntityRef entity) override {
@@ -1478,7 +1472,7 @@ struct NavigationModuleImpl final : NavigationModule
 		}
 
 		m_zones.erase(iter);
-		m_world.onComponentDestroyed(entity, NAVMESH_ZONE_TYPE, this);
+		m_world.onComponentDestroyed(entity, types::navmesh_zone, this);
 	}
 
 	void assignZone(Agent& agent) {
@@ -1509,7 +1503,7 @@ struct NavigationModuleImpl final : NavigationModule
 		agent.is_finished = true;
 		assignZone(agent);
 		m_agents.insert(entity, agent);
-		m_world.onComponentCreated(entity, NAVMESH_AGENT_TYPE, this);
+		m_world.onComponentCreated(entity, types::navmesh_agent, this);
 	}
 
 	void destroyAgent(EntityRef entity) override {
@@ -1520,7 +1514,7 @@ struct NavigationModuleImpl final : NavigationModule
 			if (zone.crowd && agent.agent >= 0) zone.crowd->removeAgent(agent.agent);
 		}
 		m_agents.erase(iter);
-		m_world.onComponentDestroyed(entity, NAVMESH_AGENT_TYPE, this);
+		m_world.onComponentDestroyed(entity, types::navmesh_agent, this);
 	}
 
 	i32 getVersion() const override { return (i32)NavigationModuleVersion::LATEST; }
@@ -1590,7 +1584,7 @@ struct NavigationModuleImpl final : NavigationModule
 			}
 
 			m_zones.insert(e, zone);
-			m_world.onComponentCreated(e, NAVMESH_ZONE_TYPE, this);
+			m_world.onComponentCreated(e, types::navmesh_zone, this);
 			if (version > (i32)NavigationModuleVersion::ZONE_GUID && (zone.zone.flags & NavmeshZone::AUTOLOAD) != 0) {
 				loadZone(e);
 			}
@@ -1609,7 +1603,7 @@ struct NavigationModuleImpl final : NavigationModule
 			agent.agent = -1;
 			assignZone(agent);
 			m_agents.insert(agent.entity, agent);
-			m_world.onComponentCreated(agent.entity, NAVMESH_AGENT_TYPE, this);
+			m_world.onComponentCreated(agent.entity, types::navmesh_agent, this);
 		}
 	}
 

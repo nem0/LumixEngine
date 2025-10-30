@@ -1,10 +1,11 @@
 #include <imgui/imgui.h>
 
 #include "animation/animation_module.h"
-#include "engine/plugin.h"
-#include "engine/resource_manager.h"
 #include "editor/studio_app.h"
 #include "editor/settings.h"
+#include "engine/component_types.h"
+#include "engine/plugin.h"
+#include "engine/resource_manager.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
 #include "renderer/render_module.h"
@@ -12,10 +13,6 @@
 #include "world_viewer.h"
 
 namespace Lumix {
-
-static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
-static const ComponentType ENVIRONMENT_PROBE_TYPE = reflection::getComponentType("environment_probe");
-static const ComponentType ENVIRONMENT_TYPE = reflection::getComponentType("environment");
 
 WorldViewer::WorldViewer(StudioApp& app)
 	: m_app(app)
@@ -33,26 +30,26 @@ WorldViewer::WorldViewer(StudioApp& app)
 	m_pipeline = Pipeline::create(*renderer, PipelineType::PREVIEW);
 
 	const EntityRef mesh_entity = m_world->createEntity({0, 0, 0}, {0, 0, 0, 1});
-	auto* render_module = static_cast<RenderModule*>(m_world->getModule(MODEL_INSTANCE_TYPE));
+	auto* render_module = static_cast<RenderModule*>(m_world->getModule(types::model_instance));
 	m_mesh = mesh_entity;
-	m_world->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
+	m_world->createComponent(types::model_instance, mesh_entity);
 
 	const EntityRef env_probe = m_world->createEntity({0, 0, 0}, Quat::IDENTITY);
-	m_world->createComponent(ENVIRONMENT_PROBE_TYPE, env_probe);
+	m_world->createComponent(types::environment_probe, env_probe);
 	render_module->getEnvironmentProbe(env_probe).inner_range = Vec3(1e3);
 	render_module->getEnvironmentProbe(env_probe).outer_range = Vec3(1e3);
 
 	Matrix light_mtx;
 	light_mtx.lookAt({10, 10, 10}, Vec3::ZERO, {0, 1, 0});
 	const EntityRef light_entity = m_world->createEntity({0, 0, 0}, light_mtx.getRotation());
-	m_world->createComponent(ENVIRONMENT_TYPE, light_entity);
+	m_world->createComponent(types::environment, light_entity);
 	render_module->getEnvironment(light_entity).direct_intensity = 3;
 	render_module->getEnvironment(light_entity).indirect_intensity = 1;
 	
-	const EntityRef e = m_world->createEntity(DVec3(0, 0, 0), Quat::IDENTITY);
-	m_world->createComponent(MODEL_INSTANCE_TYPE, e);
-	m_world->setScale(e, Vec3(100));
-	render_module->setModelInstancePath(e, Path("engine/models/plane.fbx"));
+	m_ground = m_world->createEntity(DVec3(0, 0, 0), Quat::IDENTITY);
+	m_world->createComponent(types::model_instance, m_ground);
+	m_world->setScale(m_ground, Vec3(100));
+	render_module->setModelInstancePath(m_ground, Path("engine/models/plane.fbx"));
 
 	m_pipeline->setWorld(m_world);
 }
@@ -64,9 +61,8 @@ void WorldViewer::setModelPath(const Path& path) {
 
 void WorldViewer::setAnimatorPath(const Path& path) {
 	AnimationModule* module = (AnimationModule*)m_world->getModule("animation");
-	ComponentType ANIMATOR_TYPE = reflection::getComponentType("animator");
-	if (!m_world->hasComponent(*m_mesh, ANIMATOR_TYPE)) {
-		m_world->createComponent(ANIMATOR_TYPE, *m_mesh);
+	if (!m_world->hasComponent(*m_mesh, types::animator)) {
+		m_world->createComponent(types::animator, *m_mesh);
 	}
 	module->setAnimatorSource(*m_mesh, path);
 }
@@ -138,7 +134,7 @@ void WorldViewer::resetCamera(const Model& model) {
 }
 
 void WorldViewer::gui() {
-	auto* render_module = static_cast<RenderModule*>(m_world->getModule(MODEL_INSTANCE_TYPE));
+	auto* render_module = static_cast<RenderModule*>(m_world->getModule(types::model_instance));
 	ASSERT(render_module);
 
 	ImVec2 image_size = ImGui::GetContentRegionAvail();

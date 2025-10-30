@@ -8,6 +8,7 @@
 #include "core/profiler.h"
 #include "core/stream.h"
 #include "core/string.h"
+#include "engine/component_types.h"
 #include "engine/engine.h"
 #include "engine/input_system.h"
 #include "engine/plugin.h"
@@ -49,11 +50,7 @@ static const char* toString(InputSystem::Event::Type type) {
 	return "N/A";
 }
 
-static const ComponentType LUA_SCRIPT_TYPE = reflection::getComponentType("lua_script");
-static const ComponentType LUA_SCRIPT_INLINE_TYPE = reflection::getComponentType("lua_script_inline");
-
-enum class LuaModuleVersion : i32
-{
+enum class LuaModuleVersion : i32 {
 	HASH64,
 	INLINE_SCRIPT,
 	ARRAY_PROPERTIES,
@@ -969,7 +966,7 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 		}
 
 		auto* world = LuaWrapper::toType<World*>(L, -1);
-		auto* module = (LuaScriptModuleImpl*)world->getModule(LUA_SCRIPT_TYPE);
+		auto* module = (LuaScriptModuleImpl*)world->getModule(types::lua_script);
 
 		lua_pop(L, 2);
 		const StableHash prop_name_hash(prop_name);
@@ -1016,7 +1013,7 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 		}
 
 		auto* world = LuaWrapper::toType<World*>(L, -1);
-		auto* module = (LuaScriptModuleImpl*)world->getModule(LUA_SCRIPT_TYPE);
+		auto* module = (LuaScriptModuleImpl*)world->getModule(types::lua_script);
 
 		lua_pop(L, 2);
 		const StableHash prop_name_hash(prop_name);
@@ -1045,11 +1042,11 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 		const EntityRef entity = LuaWrapper::checkArg<EntityRef>(L, 2);
 		const int scr_index = LuaWrapper::checkArg<int>(L, 3);
 
-		if (!world->hasComponent(entity, LUA_SCRIPT_TYPE)) {
+		if (!world->hasComponent(entity, types::lua_script)) {
 			return 0;
 		}
 			
-		LuaScriptModuleImpl* module = (LuaScriptModuleImpl*)world->getModule(LUA_SCRIPT_TYPE);
+		LuaScriptModuleImpl* module = (LuaScriptModuleImpl*)world->getModule(types::lua_script);
 
 		const int count = module->getScriptCount(entity);
 		if (scr_index >= count) {
@@ -1104,12 +1101,12 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 		World* world = LuaWrapper::toType<World*>(L, -1);
 		lua_pop(L, 1);
 
-		if (!world->hasComponent(entity, LUA_SCRIPT_INLINE_TYPE)) {
+		if (!world->hasComponent(entity, types::lua_script_inline)) {
 			lua_pushnil(L);
 			return 1;
 		}
 			
-		LuaScriptModule* module = (LuaScriptModule*)world->getModule(LUA_SCRIPT_TYPE);
+		LuaScriptModule* module = (LuaScriptModule*)world->getModule(types::lua_script);
 
 		int env = module->getInlineEnvironment(entity);
 		if (env < 0) {
@@ -1144,13 +1141,13 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 
 		const i32 scr_index = LuaWrapper::checkArg<i32>(L, 2);
 
-		if (!world->hasComponent(entity, LUA_SCRIPT_TYPE))
+		if (!world->hasComponent(entity, types::lua_script))
 		{
 			lua_pushnil(L);
 			return 1;
 		}
 			
-		LuaScriptModule* module = (LuaScriptModule*)world->getModule(LUA_SCRIPT_TYPE);
+		LuaScriptModule* module = (LuaScriptModule*)world->getModule(types::lua_script);
 
 		int count = module->getScriptCount(entity);
 		if (scr_index >= count)
@@ -1453,7 +1450,7 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 			endFunctionCall();
 		}
 
-		if (!m_world.hasComponent(e, LUA_SCRIPT_TYPE)) return;
+		if (!m_world.hasComponent(e, types::lua_script)) return;
 
 		for (int i = 0, c = getScriptCount(e); i < c; ++i)
 		{
@@ -1473,7 +1470,7 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 			endFunctionCall();
 		}
 
-		if (!m_world.hasComponent(e, LUA_SCRIPT_TYPE)) return;
+		if (!m_world.hasComponent(e, types::lua_script)) return;
 
 		for (int i = 0, c = getScriptCount(e); i < c; ++i)
 		{
@@ -1516,26 +1513,26 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 
 	void createInlineScript(EntityRef entity) override {
 		m_inline_scripts.insert(entity, InlineScriptComponent(entity, *this, m_system.m_allocator));
-		m_world.onComponentCreated(entity, LUA_SCRIPT_INLINE_TYPE, this);
+		m_world.onComponentCreated(entity, types::lua_script_inline, this);
 	}
 
 	void destroyInlineScript(EntityRef entity) override {
 		m_inline_scripts.erase(entity);
-		m_world.onComponentDestroyed(entity, LUA_SCRIPT_INLINE_TYPE, this);
+		m_world.onComponentDestroyed(entity, types::lua_script_inline, this);
 	}
 
 	void createScript(EntityRef entity) override {
 		auto& allocator = m_system.m_allocator;
 		ScriptComponent* script = LUMIX_NEW(allocator, ScriptComponent)(*this, entity, allocator);
 		m_scripts.insert(entity, script);
-		m_world.onComponentCreated(entity, LUA_SCRIPT_TYPE, this);
+		m_world.onComponentCreated(entity, types::lua_script, this);
 	}
 
 	void destroyScript(EntityRef entity) override {
 		ScriptComponent* cmp = m_scripts[entity];
 		LUMIX_DELETE(m_system.m_allocator, cmp);
 		m_scripts.erase(entity);
-		m_world.onComponentDestroyed(entity, LUA_SCRIPT_TYPE, this);
+		m_world.onComponentDestroyed(entity, types::lua_script, this);
 		m_to_start.eraseItems([entity](DeferredStart& element){
 			return element.entity == entity;
 		});
@@ -1655,7 +1652,7 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 				entity = entity_map.get(entity);
 				auto iter = m_inline_scripts.insert(entity, InlineScriptComponent(entity, *this, m_system.m_allocator));
 				serializer.read(iter.value().m_source);
-				m_world.onComponentCreated(entity, LUA_SCRIPT_INLINE_TYPE, this);
+				m_world.onComponentCreated(entity, types::lua_script_inline, this);
 				m_to_start.push({entity, (u32)i, true, false});
 			}
 		}
@@ -1764,7 +1761,7 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 				setPath(*script, scr, Path(path));
 				m_to_start.push({entity, (u32)scr_idx, false, false});
 			}
-			m_world.onComponentCreated(script->m_entity, LUA_SCRIPT_TYPE, this);
+			m_world.onComponentCreated(script->m_entity, types::lua_script, this);
 		}
 	}
 

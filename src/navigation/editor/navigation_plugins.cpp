@@ -5,6 +5,7 @@
 #include "editor/render_interface.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
+#include "engine/component_types.h"
 #include "engine/component_uid.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
@@ -16,17 +17,9 @@
 #include "engine/world.h"
 #include "navigation/navigation_module.h"
 
-
 using namespace Lumix;
 
-
-namespace
-{
-
-
-static const ComponentType NAVMESH_AGENT_TYPE = reflection::getComponentType("navmesh_agent");
-static const ComponentType NAVMESH_ZONE_TYPE = reflection::getComponentType("navmesh_zone");
-
+namespace {
 
 struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 	PropertyGridPlugin(StudioApp& app) : m_app(app) {}
@@ -63,7 +56,7 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 
 	void update() override {
 		if (!m_job) return;
-		auto* module = static_cast<NavigationModule*>(m_app.getWorldEditor().getWorld()->getModule(NAVMESH_AGENT_TYPE));
+		auto* module = static_cast<NavigationModule*>(m_app.getWorldEditor().getWorld()->getModule(types::navmesh_agent));
 		if (m_job->isFinished()) {
 			module->free(m_job);
 			m_job = nullptr;
@@ -94,12 +87,12 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 		if (filter.isActive()) return;
 		if (entities.length() != 1) return;
 
-		if(cmp_type == NAVMESH_AGENT_TYPE) { 
+		if(cmp_type == types::navmesh_agent) { 
 			onAgentGUI(entities[0], editor);
 			return;
 		}
 
-		if (cmp_type != NAVMESH_ZONE_TYPE) return;
+		if (cmp_type != types::navmesh_zone) return;
 		
 		auto* module = static_cast<NavigationModule*>(editor.getWorld()->getModule(cmp_type));
 		if (m_job) {
@@ -190,7 +183,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	}
 
 	bool showGizmo(WorldView& view, ComponentUID cmp) override {
-		if(cmp.type != NAVMESH_ZONE_TYPE) return false;
+		if(cmp.type != types::navmesh_zone) return false;
 
 		auto* module = static_cast<NavigationModule*>(cmp.module);
 		World& world = module->getWorld();

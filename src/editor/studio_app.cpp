@@ -28,6 +28,7 @@
 #include "editor/signal_editor.h"
 #include "editor/spline_editor.h"
 #include "editor/world_editor.h"
+#include "engine/component_types.h"
 #include "engine/engine_hash_funcs.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
@@ -1394,9 +1395,8 @@ struct StudioAppImpl final : StudioApp {
 		m_editor->beginCommandGroup("initWorld");
 		EntityRef env = m_editor->addEntity();
 		m_editor->setEntityName(env, "environment");
-		ComponentType env_cmp_type = reflection::getComponentType("environment");
 		Span<EntityRef> entities(&env, 1);
-		m_editor->addComponent(entities, env_cmp_type);
+		m_editor->addComponent(entities, types::environment);
 		Quat rot;
 		rot.fromEuler(Vec3(degreesToRadians(45.f), 0, 0));
 		m_editor->setEntitiesRotations(&env, &rot, 1);

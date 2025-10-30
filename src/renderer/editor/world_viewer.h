@@ -14,7 +14,7 @@ struct LUMIX_RENDERER_API WorldViewer {
 
 	void gui();
 	void resetCamera();
-	void resetCamera(const Model& model);
+	void resetCamera(const struct Model& model);
 	void drawSkeleton(i32 selected_bone);
 	void drawMeshTransform();
 	void setModelPath(const Path& path);

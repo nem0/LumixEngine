@@ -4,8 +4,6 @@
 #include "core/associative_array.h"
 #include "core/crt.h"
 #include "core/defer.h"
-#include "engine/engine.h"
-#include "engine/file_system.h"
 #include "core/geometry.h"
 #include "core/hash.h"
 #include "core/job_system.h"
@@ -13,10 +11,13 @@
 #include "core/math.h"
 #include "core/page_allocator.h"
 #include "core/profiler.h"
-#include "engine/reflection.h"
-#include "engine/resource_manager.h"
 #include "core/stack_array.h"
 #include "core/stream.h"
+#include "engine/component_types.h"
+#include "engine/engine.h"
+#include "engine/file_system.h"
+#include "engine/reflection.h"
+#include "engine/resource_manager.h"
 #include "engine/world.h"
 #include "imgui/IconsFontAwesome5.h"
 #include "renderer/culling_system.h"
@@ -32,27 +33,9 @@
 #include "renderer/terrain.h"
 #include "renderer/texture.h"
 
+namespace Lumix {
 
-namespace Lumix
-{
-
-static const ComponentType INSTANCED_MODEL_TYPE = reflection::getComponentType("instanced_model");
-static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
-static const ComponentType DECAL_TYPE = reflection::getComponentType("decal");
-static const ComponentType CURVE_DECAL_TYPE = reflection::getComponentType("curve_decal");
-static const ComponentType POINT_LIGHT_TYPE = reflection::getComponentType("point_light");
-static const ComponentType PARTICLE_EMITTER_TYPE = reflection::getComponentType("particle_emitter");
-static const ComponentType ENVIRONMENT_TYPE = reflection::getComponentType("environment");
-static const ComponentType CAMERA_TYPE = reflection::getComponentType("camera");
-static const ComponentType TERRAIN_TYPE = reflection::getComponentType("terrain");
-static const ComponentType BONE_ATTACHMENT_TYPE = reflection::getComponentType("bone_attachment");
-static const ComponentType ENVIRONMENT_PROBE_TYPE = reflection::getComponentType("environment_probe");
-static const ComponentType REFLECTION_PROBE_TYPE = reflection::getComponentType("reflection_probe");
-static const ComponentType PROCEDURAL_GEOM_TYPE = reflection::getComponentType("procedural_geom");
-
-
-struct BoneAttachment
-{
+struct BoneAttachment {
 	EntityRef entity;
 	EntityPtr parent_entity;
 	BoneNameHash bone_name_hash;
@@ -173,12 +156,12 @@ struct RenderModuleImpl final : RenderModule {
 
 
 	~RenderModuleImpl() {
-		m_world.componentTransformed(MODEL_INSTANCE_TYPE).unbind<&RenderModuleImpl::onModelInstanceMoved>(this);
-		m_world.componentTransformed(DECAL_TYPE).unbind<&RenderModuleImpl::onDecalMoved>(this);
-		m_world.componentTransformed(CURVE_DECAL_TYPE).unbind<&RenderModuleImpl::onCurveDecalMoved>(this);
-		m_world.componentTransformed(PARTICLE_EMITTER_TYPE).unbind<&RenderModuleImpl::onParticleEmitterMoved>(this);
-		m_world.componentTransformed(POINT_LIGHT_TYPE).unbind<&RenderModuleImpl::onPointLightMoved>(this);
-		m_world.componentTransformed(BONE_ATTACHMENT_TYPE).unbind<&RenderModuleImpl::onBoneAttachmentMoved>(this);
+		m_world.componentTransformed(types::model_instance).unbind<&RenderModuleImpl::onModelInstanceMoved>(this);
+		m_world.componentTransformed(types::decal).unbind<&RenderModuleImpl::onDecalMoved>(this);
+		m_world.componentTransformed(types::curve_decal).unbind<&RenderModuleImpl::onCurveDecalMoved>(this);
+		m_world.componentTransformed(types::particle_emitter).unbind<&RenderModuleImpl::onParticleEmitterMoved>(this);
+		m_world.componentTransformed(types::point_light).unbind<&RenderModuleImpl::onPointLightMoved>(this);
+		m_world.componentTransformed(types::bone_attachment).unbind<&RenderModuleImpl::onBoneAttachmentMoved>(this);
 
 		for (Decal& decal : m_decals) {
 			if (decal.material) decal.material->decRefCount();
@@ -388,7 +371,7 @@ struct RenderModuleImpl final : RenderModule {
 		if (!bone_attachment.parent_entity.isValid()) return;
 
 		const EntityRef parent_entity = *bone_attachment.parent_entity;
-		if (!m_world.hasComponent(parent_entity, MODEL_INSTANCE_TYPE)) return;
+		if (!m_world.hasComponent(parent_entity, types::model_instance)) return;
 		
 		const Pose* parent_pose = lockPose(parent_entity);
 		if (!parent_pose) return;
@@ -425,7 +408,7 @@ struct RenderModuleImpl final : RenderModule {
 		if (!model_instance_ptr.isValid()) return;
 
 		const EntityRef model_instance = (EntityRef)model_instance_ptr;
-		if (!m_world.hasComponent(model_instance, MODEL_INSTANCE_TYPE)) return;
+		if (!m_world.hasComponent(model_instance, types::model_instance)) return;
 
 		const Pose* pose = lockPose(model_instance);
 		if (!pose) return;
@@ -723,7 +706,7 @@ struct RenderModuleImpl final : RenderModule {
 			serializer.read(im.instances.begin(), im.instances.byte_size());
 			m_instanced_models.insert(e, static_cast<InstancedModel&&>(im));
 			initInstancedModelGPUData(e);
-			m_world.onComponentCreated(e, INSTANCED_MODEL_TYPE, this);
+			m_world.onComponentCreated(e, types::instanced_model, this);
 		}
 	}
 
@@ -752,7 +735,7 @@ struct RenderModuleImpl final : RenderModule {
 			updateDecalInfo(decal);
 			m_decals.insert(decal.entity, decal);
 			setDecalMaterialPath(decal.entity, Path(tmp));
-			m_world.onComponentCreated(decal.entity, DECAL_TYPE, this);
+			m_world.onComponentCreated(decal.entity, types::decal, this);
 		}
 	}
 	
@@ -775,7 +758,7 @@ struct RenderModuleImpl final : RenderModule {
 			updateDecalInfo(decal);
 			m_curve_decals.insert(decal.entity, decal);
 			setCurveDecalMaterialPath(decal.entity, Path(tmp));
-			m_world.onComponentCreated(decal.entity, CURVE_DECAL_TYPE, this);
+			m_world.onComponentCreated(decal.entity, types::curve_decal, this);
 		}
 	}
 
@@ -847,7 +830,7 @@ struct RenderModuleImpl final : RenderModule {
 			serializer.read(probe.half_extents);
 			load(probe, entity);
 
-			m_world.onComponentCreated(entity, REFLECTION_PROBE_TYPE, this);
+			m_world.onComponentCreated(entity, types::reflection_probe, this);
 		}
 	}
 
@@ -892,7 +875,7 @@ struct RenderModuleImpl final : RenderModule {
 			EnvironmentProbe& probe = m_environment_probes.insert(entity);
 			serializer.read(probe);
 
-			m_world.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);
+			m_world.onComponentCreated(entity, types::environment_probe, this);
 		}
 	}
 
@@ -916,7 +899,7 @@ struct RenderModuleImpl final : RenderModule {
 			bone_attachment.parent_entity = entity_map.get(bone_attachment.parent_entity);
 			serializer.read(bone_attachment.relative_transform);
 			m_bone_attachments.insert(bone_attachment.entity, bone_attachment);
-			m_world.onComponentCreated(bone_attachment.entity, BONE_ATTACHMENT_TYPE, this);
+			m_world.onComponentCreated(bone_attachment.entity, types::bone_attachment, this);
 		}
 	}
 
@@ -933,7 +916,7 @@ struct RenderModuleImpl final : RenderModule {
 			if (emitter.m_entity.isValid()) {
 				EntityRef e = *emitter.m_entity;
 				m_particle_emitters.insert(e, static_cast<ParticleSystem&&>(emitter));
-				m_world.onComponentCreated(e, PARTICLE_EMITTER_TYPE, this);
+				m_world.onComponentCreated(e, types::particle_emitter, this);
 			}
 		}
 	}
@@ -1013,7 +996,7 @@ struct RenderModuleImpl final : RenderModule {
 			camera.entity = entity_map.get(camera.entity);
 
 			m_cameras.insert(camera.entity, camera);
-			m_world.onComponentCreated(camera.entity, CAMERA_TYPE, this);
+			m_world.onComponentCreated(camera.entity, types::camera, this);
 			if (!m_active_camera.isValid()) m_active_camera = camera.entity;
 		}
 	}
@@ -1049,7 +1032,7 @@ struct RenderModuleImpl final : RenderModule {
 					setModelInstanceMaterialOverride(e, 0, Path(mat_path));
 				}
 
-				m_world.onComponentCreated(e, MODEL_INSTANCE_TYPE, this);
+				m_world.onComponentCreated(e, types::model_instance, this);
 			}
 		}
 	}
@@ -1096,7 +1079,7 @@ struct RenderModuleImpl final : RenderModule {
 					}
 				}
 
-				m_world.onComponentCreated(e, MODEL_INSTANCE_TYPE, this);
+				m_world.onComponentCreated(e, types::model_instance, this);
 			}
 		}
 	}
@@ -1112,7 +1095,7 @@ struct RenderModuleImpl final : RenderModule {
 			m_point_lights.insert(light.entity, light);
 			const DVec3 pos = m_world.getPosition(light.entity);
 			m_culling_system->add(light.entity, (u8)RenderableTypes::LOCAL_LIGHT, pos, light.range);
-			m_world.onComponentCreated(light.entity, POINT_LIGHT_TYPE, this);
+			m_world.onComponentCreated(light.entity, types::point_light, this);
 		}
 
 		serializer.read(size);
@@ -1160,7 +1143,7 @@ struct RenderModuleImpl final : RenderModule {
 
 			env.entity = entity_map.get(env.entity);
 			m_environments.insert(env.entity, env);
-			m_world.onComponentCreated(env.entity, ENVIRONMENT_TYPE, this);
+			m_world.onComponentCreated(env.entity, types::environment, this);
 		}
 		
 		EntityPtr tmp;
@@ -1208,7 +1191,7 @@ struct RenderModuleImpl final : RenderModule {
 			}
 			computeAABB(pg);
 			m_procedural_geometries.insert(e, static_cast<ProceduralGeometry&&>(pg));
-			m_world.onComponentCreated(e, PROCEDURAL_GEOM_TYPE, this);
+			m_world.onComponentCreated(e, types::procedural_geom, this);
 		}
 	}
 
@@ -1264,19 +1247,19 @@ struct RenderModuleImpl final : RenderModule {
 			mi.flags &= ~ModelInstance::IS_BONE_ATTACHMENT_PARENT;
 		}
 		m_bone_attachments.erase(entity);
-		m_world.onComponentDestroyed(entity, BONE_ATTACHMENT_TYPE, this);
+		m_world.onComponentDestroyed(entity, types::bone_attachment, this);
 	}
 	
 	void destroyReflectionProbe(EntityRef entity) override {
 		ReflectionProbe& probe = m_reflection_probes[entity];
 		LUMIX_DELETE(m_allocator, probe.load_job);
 		m_reflection_probes.erase(entity);
-		m_world.onComponentDestroyed(entity, REFLECTION_PROBE_TYPE, this);
+		m_world.onComponentDestroyed(entity, types::reflection_probe, this);
 	}
 
 	void destroyEnvironmentProbe(EntityRef entity) override {
 		m_environment_probes.erase(entity);
-		m_world.onComponentDestroyed(entity, ENVIRONMENT_PROBE_TYPE, this);
+		m_world.onComponentDestroyed(entity, types::environment_probe, this);
 	}
 
 	InstancedModel& beginInstancedModelEditing(EntityRef entity) override {
@@ -1374,14 +1357,14 @@ struct RenderModuleImpl final : RenderModule {
 		if (m) m->decRefCount();
 		if (m_instanced_models[entity].gpu_data) m_renderer.getEndFrameDrawStream().destroy(m_instanced_models[entity].gpu_data);
 		m_instanced_models.erase(entity);
-		m_world.onComponentDestroyed(entity, INSTANCED_MODEL_TYPE, this);
+		m_world.onComponentDestroyed(entity, types::instanced_model, this);
 	}
 
 	void destroyModelInstance(EntityRef entity) override {
 		auto& model_instance = m_model_instances[entity.index];
 		setModel(entity, nullptr);
 		model_instance = {};
-		m_world.onComponentDestroyed(entity, MODEL_INSTANCE_TYPE, this);
+		m_world.onComponentDestroyed(entity, types::model_instance, this);
 	}
 
 	void destroyEnvironment(EntityRef entity) override {
@@ -1393,31 +1376,31 @@ struct RenderModuleImpl final : RenderModule {
 		if (env.cubemap_sky) env.cubemap_sky->decRefCount();
 		m_environments.erase(entity);
 
-		m_world.onComponentDestroyed(entity, ENVIRONMENT_TYPE, this);
+		m_world.onComponentDestroyed(entity, types::environment, this);
 	}
 
 	void destroyDecal(EntityRef entity) override {
 		m_culling_system->remove(entity);
 		m_decals.erase(entity);
-		m_world.onComponentDestroyed(entity, DECAL_TYPE, this);
+		m_world.onComponentDestroyed(entity, types::decal, this);
 	}
 
 	void destroyCurveDecal(EntityRef entity) override {
 		m_culling_system->remove(entity);
 		m_curve_decals.erase(entity);
-		m_world.onComponentDestroyed(entity, CURVE_DECAL_TYPE, this);
+		m_world.onComponentDestroyed(entity, types::curve_decal, this);
 	}
 
 	void destroyPointLight(EntityRef entity) override {
 		m_point_lights.erase(entity);
 		m_culling_system->remove(entity);
-		m_world.onComponentDestroyed(entity, POINT_LIGHT_TYPE, this);
+		m_world.onComponentDestroyed(entity, types::point_light, this);
 	}
 
 
 	void destroyCamera(EntityRef entity) override {
 		m_cameras.erase(entity);
-		m_world.onComponentDestroyed(entity, CAMERA_TYPE, this);
+		m_world.onComponentDestroyed(entity, types::camera, this);
 		if (m_active_camera == entity) m_active_camera = INVALID_ENTITY;
 	}
 
@@ -1425,13 +1408,13 @@ struct RenderModuleImpl final : RenderModule {
 	void destroyTerrain(EntityRef entity) override {
 		LUMIX_DELETE(m_allocator, m_terrains[entity]);
 		m_terrains.erase(entity);
-		m_world.onComponentDestroyed(entity, TERRAIN_TYPE, this);
+		m_world.onComponentDestroyed(entity, types::terrain, this);
 	}
 
 
 	void destroyParticleEmitter(EntityRef entity) override {
 		const ParticleSystem& emitter = m_particle_emitters[entity];
-		m_world.onComponentDestroyed(*emitter.m_entity, PARTICLE_EMITTER_TYPE, this);
+		m_world.onComponentDestroyed(*emitter.m_entity, types::particle_emitter, this);
 		m_particle_emitters.erase(*emitter.m_entity);
 	}
 
@@ -1447,7 +1430,7 @@ struct RenderModuleImpl final : RenderModule {
 		camera.near = 0.1f;
 		camera.far = 10000.0f;
 		m_cameras.insert(entity, camera);
-		m_world.onComponentCreated(entity, CAMERA_TYPE, this);
+		m_world.onComponentCreated(entity, types::camera, this);
 
 		if (!m_active_camera.isValid()) m_active_camera = entity;
 	}
@@ -1456,13 +1439,13 @@ struct RenderModuleImpl final : RenderModule {
 	void createTerrain(EntityRef entity) override {
 		Terrain* terrain = LUMIX_NEW(m_allocator, Terrain)(m_renderer, entity, *this, m_allocator);
 		m_terrains.insert(entity, terrain);
-		m_world.onComponentCreated(entity, TERRAIN_TYPE, this);
+		m_world.onComponentCreated(entity, types::terrain, this);
 	}
 
 
 	void createParticleEmitter(EntityRef entity) override {
 		m_particle_emitters.insert(entity, ParticleSystem(entity, m_world, m_allocator));
-		m_world.onComponentCreated(entity, PARTICLE_EMITTER_TYPE, this);
+		m_world.onComponentCreated(entity, types::particle_emitter, this);
 	}
 
 	Path getEnvironmentSkyTexture(EntityRef entity)	const override {
@@ -1533,7 +1516,7 @@ struct RenderModuleImpl final : RenderModule {
 #if 0
 		if (m_is_updating_attachments || m_is_game_running) return;
 		
-		if(m_world.hasComponent(entity, BONE_ATTACHMENT_TYPE)) {
+		if(m_world.hasComponent(entity, types::bone_attachment)) {
 			for (auto& attachment : m_bone_attachments)
 			{
 				if (attachment.entity == entity)
@@ -2601,7 +2584,7 @@ struct RenderModuleImpl final : RenderModule {
 		hit.is_hit = false;
 		for (Terrain* terrain : m_terrains) {
 			hit = terrain->castRay(ray);
-			hit.component_type = TERRAIN_TYPE;
+			hit.component_type = types::terrain;
 			hit.entity = terrain->getEntity();
 			if (hit.is_hit) break;
 		}
@@ -2643,7 +2626,7 @@ struct RenderModuleImpl final : RenderModule {
 					RayCastModelHit new_hit = im.model->castRay(rel_pos, rel_dir, nullptr, e, &filter);
 					if (new_hit.is_hit && (!hit.is_hit || new_hit.t * id.scale < hit.t)) {
 						new_hit.entity = e;
-						new_hit.component_type = INSTANCED_MODEL_TYPE;
+						new_hit.component_type = types::instanced_model;
 						hit = new_hit;
 						hit.t *= id.scale;
 						hit.is_hit = true;
@@ -2753,7 +2736,7 @@ struct RenderModuleImpl final : RenderModule {
 						const float new_t = (float)length(ray.origin - new_hit_pos);
 						if (!hit.is_hit || new_t < hit.t) {
 							new_hit.entity = entity;
-							new_hit.component_type = MODEL_INSTANCE_TYPE;
+							new_hit.component_type = types::model_instance;
 							hit = new_hit;
 							hit.origin = ray.origin;
 							hit.dir = ray.dir;
@@ -2769,13 +2752,13 @@ struct RenderModuleImpl final : RenderModule {
 		const RayCastModelHit pg_hit = castRayProceduralGeometry(ray, filter);
 		if (pg_hit.is_hit && (pg_hit.t < hit.t || !hit.is_hit)) {
 			hit = pg_hit;
-			hit.component_type = PROCEDURAL_GEOM_TYPE;
+			hit.component_type = types::procedural_geom;
 		}
 
 		for (auto* terrain : m_terrains) {
 			RayCastModelHit terrain_hit = terrain->castRay(ray);
 			if (terrain_hit.is_hit && (!hit.is_hit || terrain_hit.t < hit.t)) {
-				terrain_hit.component_type = TERRAIN_TYPE;
+				terrain_hit.component_type = types::terrain;
 				terrain_hit.entity = terrain->getEntity();
 				terrain_hit.mesh = nullptr;
 				if (filter.invoke(terrain_hit)) hit = terrain_hit;
@@ -3167,7 +3150,7 @@ struct RenderModuleImpl final : RenderModule {
 		if (m_environments.empty()) m_active_global_light_entity = entity;
 
 		m_environments.insert(entity, light);
-		m_world.onComponentCreated(entity, ENVIRONMENT_TYPE, this);
+		m_world.onComponentCreated(entity, types::environment, this);
 	}
 
 
@@ -3185,7 +3168,7 @@ struct RenderModuleImpl final : RenderModule {
 		m_point_lights.insert(entity, light);
 		m_culling_system->add(entity, (u8)RenderableTypes::LOCAL_LIGHT, pos, light.range);
 
-		m_world.onComponentCreated(entity, POINT_LIGHT_TYPE, this);
+		m_world.onComponentCreated(entity, types::point_light, this);
 	}
 
 
@@ -3213,7 +3196,7 @@ struct RenderModuleImpl final : RenderModule {
 		decal.uv_scale = Vec2(1);
 		updateDecalInfo(decal);
 
-		m_world.onComponentCreated(entity, DECAL_TYPE, this);
+		m_world.onComponentCreated(entity, types::decal, this);
 	}
 
 	void createCurveDecal(EntityRef entity) override {
@@ -3226,7 +3209,7 @@ struct RenderModuleImpl final : RenderModule {
 		decal.bezier_p2 = Vec2(1, 0);
 		updateDecalInfo(decal);
 
-		m_world.onComponentCreated(entity, CURVE_DECAL_TYPE, this);
+		m_world.onComponentCreated(entity, types::curve_decal, this);
 	}
 
 	void createEnvironmentProbe(EntityRef entity) override {
@@ -3238,7 +3221,7 @@ struct RenderModuleImpl final : RenderModule {
 		memset(probe.sh_coefs, 0, sizeof(probe.sh_coefs));
 		probe.sh_coefs[0] = Vec3(0.5f, 0.5f, 0.5f);
 
-		m_world.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);
+		m_world.onComponentCreated(entity, types::environment_probe, this);
 	}
 	
 	void destroyProceduralGeometry(EntityRef entity) override {
@@ -3247,13 +3230,13 @@ struct RenderModuleImpl final : RenderModule {
 		if (pg.vertex_buffer) m_renderer.getEndFrameDrawStream().destroy(pg.vertex_buffer);
 		if (pg.index_buffer) m_renderer.getEndFrameDrawStream().destroy(pg.index_buffer);
 		m_procedural_geometries.erase(entity);
-		m_world.onComponentDestroyed(entity, PROCEDURAL_GEOM_TYPE, this);
+		m_world.onComponentDestroyed(entity, types::procedural_geom, this);
 	}
 	
 	void createProceduralGeometry(EntityRef entity) override {
 		ASSERT(!m_procedural_geometries.find(entity).isValid());
 		m_procedural_geometries.insert(entity, ProceduralGeometry(m_allocator));
-		m_world.onComponentCreated(entity, PROCEDURAL_GEOM_TYPE, this);
+		m_world.onComponentCreated(entity, types::procedural_geom, this);
 	}
 
 	void createReflectionProbe(EntityRef entity) override {
@@ -3261,7 +3244,7 @@ struct RenderModuleImpl final : RenderModule {
 		probe.guid = randGUID();
 		probe.flags |= ReflectionProbe::ENABLED;
 
-		m_world.onComponentCreated(entity, REFLECTION_PROBE_TYPE, this);
+		m_world.onComponentCreated(entity, types::reflection_probe, this);
 	}
 
 	void createBoneAttachment(EntityRef entity) override {
@@ -3269,7 +3252,7 @@ struct RenderModuleImpl final : RenderModule {
 		attachment.entity = entity;
 		attachment.parent_entity = INVALID_ENTITY;
 		
-		m_world.onComponentCreated(entity, BONE_ATTACHMENT_TYPE, this);
+		m_world.onComponentCreated(entity, types::bone_attachment, this);
 	}
 
 	const HashMap<EntityRef, InstancedModel>& getInstancedModels() const override {
@@ -3281,7 +3264,7 @@ struct RenderModuleImpl final : RenderModule {
 		m_instanced_models.insert(entity, static_cast<InstancedModel&&>(im));
 
 		initInstancedModelGPUData(entity);
-		m_world.onComponentCreated(entity, INSTANCED_MODEL_TYPE, this);
+		m_world.onComponentCreated(entity, types::instanced_model, this);
 	}
 
 	void createModelInstance(EntityRef entity) override {
@@ -3291,7 +3274,7 @@ struct RenderModuleImpl final : RenderModule {
 		auto& r = m_model_instances[entity.index];
 		ASSERT(!r.model);
 		r.flags = ModelInstance::VALID | ModelInstance::ENABLED;
-		m_world.onComponentCreated(entity, MODEL_INSTANCE_TYPE, this);
+		m_world.onComponentCreated(entity, types::model_instance, this);
 	}
 
 	void updateParticleEmitter(EntityRef entity, float dt) override { m_particle_emitters[entity].update(dt, m_engine.getPageAllocator()); }
@@ -3444,7 +3427,7 @@ void RenderModule::reflect() {
 		EntityPtr getModelInstance(RenderModule* render_module, EntityRef bone_attachment) const {
 			EntityPtr parent_entity = render_module->getBoneAttachmentParent(bone_attachment);
 			if (!parent_entity.isValid()) return INVALID_ENTITY;
-			return render_module->getWorld().hasComponent((EntityRef)parent_entity, MODEL_INSTANCE_TYPE) ? parent_entity : INVALID_ENTITY;
+			return render_module->getWorld().hasComponent((EntityRef)parent_entity, types::model_instance) ? parent_entity : INVALID_ENTITY;
 		}
 	};
 
@@ -3482,12 +3465,12 @@ RenderModuleImpl::RenderModuleImpl(Renderer& renderer,
 	, m_material_decal_map(m_allocator)
 	, m_material_curve_decal_map(m_allocator)
 {
-	m_world.componentTransformed(MODEL_INSTANCE_TYPE).bind<&RenderModuleImpl::onModelInstanceMoved>(this);
-	m_world.componentTransformed(DECAL_TYPE).bind<&RenderModuleImpl::onDecalMoved>(this);
-	m_world.componentTransformed(CURVE_DECAL_TYPE).bind<&RenderModuleImpl::onCurveDecalMoved>(this);
-	m_world.componentTransformed(PARTICLE_EMITTER_TYPE).bind<&RenderModuleImpl::onParticleEmitterMoved>(this);
-	m_world.componentTransformed(POINT_LIGHT_TYPE).bind<&RenderModuleImpl::onPointLightMoved>(this);
-	m_world.componentTransformed(BONE_ATTACHMENT_TYPE).bind<&RenderModuleImpl::onBoneAttachmentMoved>(this);
+	m_world.componentTransformed(types::model_instance).bind<&RenderModuleImpl::onModelInstanceMoved>(this);
+	m_world.componentTransformed(types::decal).bind<&RenderModuleImpl::onDecalMoved>(this);
+	m_world.componentTransformed(types::curve_decal).bind<&RenderModuleImpl::onCurveDecalMoved>(this);
+	m_world.componentTransformed(types::particle_emitter).bind<&RenderModuleImpl::onParticleEmitterMoved>(this);
+	m_world.componentTransformed(types::point_light).bind<&RenderModuleImpl::onPointLightMoved>(this);
+	m_world.componentTransformed(types::bone_attachment).bind<&RenderModuleImpl::onBoneAttachmentMoved>(this);
 
 	m_world.entityDestroyed().bind<&RenderModuleImpl::onEntityDestroyed>(this);
 	m_culling_system = CullingSystem::create(m_allocator, engine.getPageAllocator());

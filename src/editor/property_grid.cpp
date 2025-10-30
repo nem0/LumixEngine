@@ -13,6 +13,7 @@
 #include "editor/settings.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
+#include "engine/component_types.h"
 #include "engine/plugin.h"
 #include "engine/prefab.h"
 #include "engine/reflection.h"
@@ -20,13 +21,7 @@
 #include "engine/world.h"
 #include "utils.h"
 
-
-namespace Lumix
-{
-
-static const ComponentType GUI_RECT_TYPE = reflection::getComponentType("gui_rect");
-static const ComponentType GUI_CANVAS_TYPE = reflection::getComponentType("gui_canvas");
-
+namespace Lumix {
 
 PropertyGrid::PropertyGrid(StudioApp& app)
 	: m_app(app)
@@ -731,7 +726,7 @@ void PropertyGrid::showCoreProperties(Span<const EntityRef> entities, WorldEdito
 			ImGuiEx::Label("Parent");
 			ImGui::TextUnformatted(name);
 
-			if (!world.hasComponent(entities[0], GUI_RECT_TYPE) || world.hasComponent(entities[0], GUI_CANVAS_TYPE)) {
+			if (!world.hasComponent(entities[0], types::gui_rect) || world.hasComponent(entities[0], types::gui_canvas)) {
 				Transform tr = world.getLocalTransform(entities[0]);
 				DVec3 old_pos = tr.pos;
 				ImGuiEx::Label("Local position");
@@ -774,7 +769,7 @@ void PropertyGrid::showCoreProperties(Span<const EntityRef> entities, WorldEdito
 	}
 
 
-	if (!world.hasComponent(entities[0], GUI_RECT_TYPE) || world.hasComponent(entities[0], GUI_CANVAS_TYPE)) {
+	if (!world.hasComponent(entities[0], types::gui_rect) || world.hasComponent(entities[0], types::gui_canvas)) {
 		DVec3 pos = world.getPosition(entities[0]);
 		DVec3 old_pos = pos;
 		ImGuiEx::Label("Position");

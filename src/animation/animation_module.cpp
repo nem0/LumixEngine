@@ -11,6 +11,7 @@
 #include "animation/animation.h"
 #include "animation/controller.h"
 #include "animation/property_animation.h"
+#include "engine/component_types.h"
 #include "engine/engine.h"
 #include "engine/engine_hash_funcs.h"
 #include "engine/reflection.h"
@@ -34,12 +35,6 @@ enum class AnimationModuleVersion {
 
 	LATEST
 };
-
-
-static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
-static const ComponentType ANIMABLE_TYPE = reflection::getComponentType("animable");
-static const ComponentType PROPERTY_ANIMATOR_TYPE = reflection::getComponentType("property_animator");
-static const ComponentType ANIMATOR_TYPE = reflection::getComponentType("animator");
 
 
 struct AnimationModuleImpl final : AnimationModule {
@@ -236,7 +231,7 @@ struct AnimationModuleImpl final : AnimationModule {
 		auto& animator = m_property_animators.at(idx);
 		unloadResource(animator.animation);
 		m_property_animators.erase(entity);
-		m_world.onComponentDestroyed(entity, PROPERTY_ANIMATOR_TYPE, this);
+		m_world.onComponentDestroyed(entity, types::property_animator, this);
 	}
 
 
@@ -244,7 +239,7 @@ struct AnimationModuleImpl final : AnimationModule {
 		auto& animable = m_animables[entity];
 		unloadResource(animable.animation);
 		m_animables.erase(entity);
-		m_world.onComponentDestroyed(entity, ANIMABLE_TYPE, this);
+		m_world.onComponentDestroyed(entity, types::animable, this);
 	}
 
 
@@ -257,7 +252,7 @@ struct AnimationModuleImpl final : AnimationModule {
 		m_animator_map[last.entity] = idx;
 		m_animator_map.erase(entity);
 		m_animators.swapAndPop(idx);
-		m_world.onComponentDestroyed(entity, ANIMATOR_TYPE, this);
+		m_world.onComponentDestroyed(entity, types::animator, this);
 	}
 
 
@@ -306,7 +301,7 @@ struct AnimationModuleImpl final : AnimationModule {
 			const char* path = serializer.readString();
 			animable.animation = path[0] == '\0' ? nullptr : loadAnimation(Path(path));
 			m_animables.insert(animable.entity, animable);
-			m_world.onComponentCreated(animable.entity, ANIMABLE_TYPE, this);
+			m_world.onComponentCreated(animable.entity, types::animable, this);
 		}
 
 		serializer.read(count);
@@ -322,7 +317,7 @@ struct AnimationModuleImpl final : AnimationModule {
 			serializer.read(animator.flags);
 			animator.time = 0;
 			animator.animation = loadPropertyAnimation(Path(path));
-			m_world.onComponentCreated(entity, PROPERTY_ANIMATOR_TYPE, this);
+			m_world.onComponentCreated(entity, types::property_animator, this);
 		}
 
 
@@ -342,7 +337,7 @@ struct AnimationModuleImpl final : AnimationModule {
 			setSource(animator, tmp[0] ? loadController(Path(tmp)) : nullptr);
 			m_animator_map.insert(animator.entity, m_animators.size());
 			m_animators.push(animator);
-			m_world.onComponentCreated(animator.entity, ANIMATOR_TYPE, this);
+			m_world.onComponentCreated(animator.entity, types::animator, this);
 		}
 	}
 
@@ -444,7 +439,7 @@ struct AnimationModuleImpl final : AnimationModule {
 	void updateAnimable(Animable& animable, float time_delta) const {
 		if (!animable.animation || !animable.animation->isReady()) return;
 		EntityRef entity = animable.entity;
-		if (!m_world.hasComponent(entity, MODEL_INSTANCE_TYPE)) return;
+		if (!m_world.hasComponent(entity, types::model_instance)) return;
 
 		Model* model = m_render_module->getModelInstanceModel(entity);
 		if (!model || !model->isReady()) return;
@@ -612,7 +607,7 @@ struct AnimationModuleImpl final : AnimationModule {
 		}
 
 		const EntityRef entity = animator.entity;
-		if (!m_world.hasComponent(entity, MODEL_INSTANCE_TYPE)) return;
+		if (!m_world.hasComponent(entity, types::model_instance)) return;
 
 		Model* model = m_render_module->getModelInstanceModel(entity);
 		if (!model || !model->isReady()) return;
@@ -798,7 +793,7 @@ struct AnimationModuleImpl final : AnimationModule {
 		PropertyAnimator& animator = m_property_animators.emplace(entity, m_allocator);
 		animator.animation = nullptr;
 		animator.time = 0;
-		m_world.onComponentCreated(entity, PROPERTY_ANIMATOR_TYPE, this);
+		m_world.onComponentCreated(entity, types::property_animator, this);
 	}
 
 
@@ -808,7 +803,7 @@ struct AnimationModuleImpl final : AnimationModule {
 		animable.animation = nullptr;
 		animable.entity = entity;
 
-		m_world.onComponentCreated(entity, ANIMABLE_TYPE, this);
+		m_world.onComponentCreated(entity, types::animable, this);
 	}
 
 
@@ -817,7 +812,7 @@ struct AnimationModuleImpl final : AnimationModule {
 		Animator& animator = m_animators.emplace();
 		animator.entity = entity;
 
-		m_world.onComponentCreated(entity, ANIMATOR_TYPE, this);
+		m_world.onComponentCreated(entity, types::animator, this);
 	}
 
 

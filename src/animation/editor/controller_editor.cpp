@@ -13,6 +13,7 @@
 #include "editor/settings.h"
 #include "editor/text_filter.h"
 #include "editor/world_editor.h"
+#include "engine/component_types.h"
 #include "engine/engine.h"
 #include "engine/input_system.h"
 #include "engine/resource_manager.h"
@@ -263,8 +264,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				logError("Failed to read ", path);
 			}
 
-			const ComponentType animator_type = reflection::getComponentType("animator");
-			m_viewer.m_world->createComponent(animator_type, *m_viewer.m_mesh);
+			m_viewer.m_world->createComponent(types::animator, *m_viewer.m_mesh);
 			auto* anim_module = (AnimationModule*)m_viewer.m_world->getModule("animation");
 			anim_module->setAnimatorSource(*m_viewer.m_mesh, path);
 			anim_module->setAnimatorUseRootMotion(*m_viewer.m_mesh, true);
@@ -483,8 +483,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				return;
 			}
 			const EntityRef entity = selected[0];
-			const ComponentType animator_type = reflection::getComponentType("animator");
-			if (!world.hasComponent(entity, animator_type)) {
+			if (!world.hasComponent(entity, types::animator)) {
 				ImGui::TextUnformatted("Entity does not have an animator component");
 				return;
 			}
@@ -497,8 +496,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			if (m_visualize_position_inputs.empty()) return;
 
 			Transform entity_transform = world.getTransform(entity);
-			const ComponentType animator_type = reflection::getComponentType("animator");
-			AnimationModule* anim_module = (AnimationModule*)world.getModule(animator_type);
+			AnimationModule* anim_module = (AnimationModule*)world.getModule(types::animator);
 			RenderModule* render_module = (RenderModule*)world.getModule("renderer");
 			
 			for (u32 input_idx : m_visualize_position_inputs) {
@@ -511,8 +509,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 		void processControllerMapping(World& world, EntityRef entity) {
 			if (m_controller_debug_mapping.axis_x < 0 && m_controller_debug_mapping.axis_y < 0) return;
 
-			const ComponentType animator_type = reflection::getComponentType("animator");
-			AnimationModule* module = (AnimationModule*)world.getModule(animator_type);
+			AnimationModule* module = (AnimationModule*)world.getModule(types::animator);
 			const InputSystem& input_system = m_app.getEngine().getInputSystem();
 			Span<const InputSystem::Event> events = input_system.getEvents();
 			for (const InputSystem::Event& e : events) {
@@ -553,8 +550,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				}
 			}
 
-			const ComponentType animator_type = reflection::getComponentType("animator");
-			AnimationModule* module = (AnimationModule*)world.getModule(animator_type);
+			AnimationModule* module = (AnimationModule*)world.getModule(types::animator);
 			if (m_recording.is_recording) {
 				const anim::RuntimeContext* ctx = module->getAnimatorRuntimeContext(entity);
 				m_recording.buffer.write(ctx->blendstack.data(), ctx->blendstack.size());
@@ -634,8 +630,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			processControllerMapping(world, entity);
 			processPositionVisualizations(world, entity);
 
-			const ComponentType animator_type = reflection::getComponentType("animator");
-			AnimationModule* module = (AnimationModule*)world.getModule(animator_type);
+			AnimationModule* module = (AnimationModule*)world.getModule(types::animator);
 			anim::Controller* ctrl = module->getAnimatorController(entity);
 			if (!ctrl) {
 				ImGui::TextUnformatted("Selected entity does not have resource assigned in animator component");

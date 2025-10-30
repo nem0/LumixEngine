@@ -10,6 +10,7 @@
 #include "animation/animation_module.h"
 #include "animation/controller.h"
 #include "animation/property_animation.h"
+#include "controller_editor.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
 #include "editor/editor_asset.h"
@@ -18,9 +19,9 @@
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
+#include "engine/component_types.h"
 #include "engine/engine.h"
 #include "engine/resource_manager.h"
-#include "controller_editor.h"
 #include "engine/reflection.h"
 #include "engine/world.h"
 #include "renderer/editor/model_meta.h"
@@ -35,11 +36,6 @@
 
 using namespace Lumix;
 
-
-static const ComponentType ANIMABLE_TYPE = reflection::getComponentType("animable");
-static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
-static const ComponentType ENVIRONMENT_PROBE_TYPE = reflection::getComponentType("environment_probe");
-static const ComponentType ENVIRONMENT_TYPE = reflection::getComponentType("environment");
 
 namespace {
 
@@ -139,15 +135,15 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 		{
 			m_resource = app.getEngine().getResourceManager().load<Animation>(path);
 
-			m_viewer.m_world->createComponent(ANIMABLE_TYPE, *m_viewer.m_mesh);
+			m_viewer.m_world->createComponent(types::animable, *m_viewer.m_mesh);
 
-			auto* anim_module = static_cast<AnimationModule*>(m_viewer.m_world->getModule(ANIMABLE_TYPE));
+			auto* anim_module = static_cast<AnimationModule*>(m_viewer.m_world->getModule(types::animable));
 			anim_module->setAnimableAnimation(*m_viewer.m_mesh, path);
 
 			Path parent_path(ResourcePath::getResource(path));
 			m_parent_meta.load(parent_path, m_app);
 
-			auto* render_module = static_cast<RenderModule*>(m_viewer.m_world->getModule(MODEL_INSTANCE_TYPE));
+			auto* render_module = static_cast<RenderModule*>(m_viewer.m_world->getModule(types::model_instance));
 			if (m_parent_meta.skeleton.isEmpty()) {
 				m_model = m_app.getEngine().getResourceManager().load<Model>(parent_path);
 				render_module->setModelInstancePath(*m_viewer.m_mesh, parent_path);
@@ -343,8 +339,8 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 		}
 		
 		void previewGUI() {
-			auto* render_module = static_cast<RenderModule*>(m_viewer.m_world->getModule(MODEL_INSTANCE_TYPE));
-			auto* anim_module = static_cast<AnimationModule*>(m_viewer.m_world->getModule(ANIMABLE_TYPE));
+			auto* render_module = static_cast<RenderModule*>(m_viewer.m_world->getModule(types::model_instance));
+			auto* anim_module = static_cast<AnimationModule*>(m_viewer.m_world->getModule(types::animable));
 			if (ImGuiEx::IconButton(ICON_FA_COG, "Settings")) ImGui::OpenPopup("Settings");
 			ImGui::SameLine();
 			if (ImGui::BeginPopup("Settings")) {
@@ -956,7 +952,7 @@ struct AnimablePropertyGridPlugin final : PropertyGrid::IPlugin {
 	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, const TextFilter& filter, WorldEditor& editor) override
 	{
 		if (filter.isActive()) return;
-		if (cmp_type != ANIMABLE_TYPE) return;
+		if (cmp_type != types::animable) return;
 		if (entities.length() != 1) return;
 
 		const EntityRef entity = entities[0];
@@ -981,8 +977,8 @@ struct AnimablePropertyGridPlugin final : PropertyGrid::IPlugin {
 
 		if (ImGui::CollapsingHeader("Transformation"))
 		{
-			auto* render_module = (RenderModule*)module->getWorld().getModule(MODEL_INSTANCE_TYPE);
-			if (module->getWorld().hasComponent(entity, MODEL_INSTANCE_TYPE))
+			auto* render_module = (RenderModule*)module->getWorld().getModule(types::model_instance);
+			if (module->getWorld().hasComponent(entity, types::model_instance))
 			{
 				const Pose* pose = render_module->lockPose(entity);
 				Model* model = render_module->getModelInstanceModel(entity);

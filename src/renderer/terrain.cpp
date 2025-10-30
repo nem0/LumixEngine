@@ -5,6 +5,7 @@
 #include "core/log.h"
 #include "core/math.h"
 #include "core/profiler.h"
+#include "engine/component_types.h"
 #include "engine/resource_manager.h"
 #include "core/stream.h"
 #include "renderer/draw_stream.h"
@@ -15,14 +16,9 @@
 #include "renderer/texture.h"
 #include "engine/world.h"
 
+namespace Lumix {
 
-namespace Lumix
-{
-
-static const ComponentType TERRAIN_HASH = reflection::getComponentType("terrain");
-
-struct Sample
-{
+struct Sample {
 	Vec3 pos;
 	float u, v;
 };
@@ -357,7 +353,7 @@ void Terrain::deserialize(EntityRef entity, InputMemoryStream& serializer, World
 		serializer.read(m_grass_types[i].m_rotation_mode);
 		setGrassTypePath(i, Path(path));
 	}
-	world.onComponentCreated(m_entity, TERRAIN_HASH, &module);
+	world.onComponentCreated(m_entity, types::terrain, &module);
 }
 
 	

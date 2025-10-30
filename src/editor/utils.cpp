@@ -13,6 +13,7 @@
 #include "editor/settings.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
+#include "engine/component_types.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/world.h"
@@ -2512,23 +2513,18 @@ bool menuItem(const Action& a, bool enabled) {
 	return ImGuiEx::MenuItemEx(a.label_short, a.font_icon, buf, false, enabled);
 }
 
-void getEntityListDisplayName(StudioApp& app, World& world, Span<char> buf, EntityPtr entity, bool force_display_index)
-{
-	if (!entity.isValid())
-	{
+void getEntityListDisplayName(StudioApp& app, World& world, Span<char> buf, EntityPtr entity, bool force_display_index) {
+	if (!entity.isValid()) {
 		buf[0] = '\0';
 		return;
 	}
 
 	EntityRef e = (EntityRef)entity;
 	const char* name = world.getEntityName(e);
-	static const auto MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
-	if (world.hasComponent(e, MODEL_INSTANCE_TYPE))
-	{
+	if (world.hasComponent(e, types::model_instance)) {
 		RenderInterface* render_interface = app.getRenderInterface();
 		const Path path = render_interface->getModelInstancePath(world, e);
-		if (!path.isEmpty())
-		{
+		if (!path.isEmpty()) {
 			const char* c = path.c_str();
 			while (*c && *c != ':') ++c;
 			if (*c == ':') {
@@ -2549,8 +2545,7 @@ void getEntityListDisplayName(StudioApp& app, World& world, Span<char> buf, Enti
 		}
 	}
 
-	if (name && name[0] != '\0')
-	{
+	if (name && name[0] != '\0') {
 		copyString(buf, name);
 		if (force_display_index) {
 			catString(buf, " ");
@@ -2558,8 +2553,7 @@ void getEntityListDisplayName(StudioApp& app, World& world, Span<char> buf, Enti
 			toCString(entity.index, buf);
 		}
 	}
-	else
-	{
+	else {
 		toCString(entity.index, buf);
 	}
 }
