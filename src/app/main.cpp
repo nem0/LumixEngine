@@ -12,6 +12,7 @@
 #include "core/path.h"
 #include "core/profiler.h"
 #include "core/thread.h"
+#include "engine/component_types.h"
 #include "engine/engine.h"
 #include "engine/input_system.h"
 #include "engine/plugin.h"
@@ -94,7 +95,7 @@ struct Runner final
 
 	void initDemoScene() {
 		const EntityRef env = m_world->createEntity({0, 0, 0}, Quat::IDENTITY);
-		m_world->createComponent(ENVIRONMENT_TYPE, env);
+		m_world->createComponent(types::environment, env);
 		
 		RenderModule* render_module = (RenderModule*)m_world->getModule("renderer");
 		Environment& environment = render_module->getEnvironment(env);
