@@ -19,6 +19,7 @@ namespace Lumix
 
 struct DVec3;
 struct Material;
+struct Model;
 struct Renderer;
 
 
@@ -30,6 +31,7 @@ struct ParticleSystemResource final : Resource {
 		EMIT,
 		FLAGS,
 		NEW_VERTEX_DECL,
+		MODEL,
 
 		LAST
 	};
@@ -43,6 +45,7 @@ struct ParticleSystemResource final : Resource {
 		Emitter(ParticleSystemResource& resource);
 		~Emitter();
 		void setMaterial(const Path& path);
+		void setModel(const Path& path);
 		
 		ParticleSystemResource& resource;
 		OutputMemoryStream instructions;
@@ -53,6 +56,7 @@ struct ParticleSystemResource final : Resource {
 		u32 emit_inputs_count;
 		u32 outputs_count;
 		Material* material = nullptr;
+		Model* model = nullptr;
 		u32 init_emit_count = 0;
 		float emit_per_second = 100;
 		gpu::VertexDecl vertex_decl;

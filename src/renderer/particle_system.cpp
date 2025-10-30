@@ -30,12 +30,12 @@ const ResourceType ParticleSystemResource::TYPE = ResourceType("particle_emitter
 
 ParticleSystemResource::Emitter::~Emitter() {
 	if (material) material->decRefCount();
+	if (model) model->decRefCount();
 }
 
 ParticleSystemResource::Emitter::Emitter(ParticleSystemResource& resource)
 	: resource(resource)
 	, instructions(resource.m_allocator)
-	, material(nullptr)
 	, vertex_decl(gpu::PrimitiveType::TRIANGLE_STRIP)
 {
 }
@@ -55,6 +55,12 @@ ParticleSystemResource::ParticleSystemResource(const Path& path
 void ParticleSystemResource::unload()
 {
 	for (Emitter& emitter : m_emitters) {
+		if (emitter.model) {
+			Model* tmp = emitter.model;
+			emitter.model = nullptr;
+			removeDependency(*tmp);
+			tmp->decRefCount();
+		}
 		if (emitter.material) {
 			Material* tmp = emitter.material;
 			emitter.material = nullptr;
@@ -100,8 +106,7 @@ void ParticleSystemResource::overrideData(u32 emitter_idx
 	checkState();
 }
 
-void ParticleSystemResource::Emitter::setMaterial(const Path& path)
-{
+void ParticleSystemResource::Emitter::setMaterial(const Path& path) {
 	Material* new_material = resource.m_resource_manager.getOwner().load<Material>(path);
 	if (material) {
 		Material* tmp = material;
@@ -112,6 +117,22 @@ void ParticleSystemResource::Emitter::setMaterial(const Path& path)
 	material = new_material;
 	if (material) {
 		resource.addDependency(*material);
+		setModel(Path());
+	}
+}
+
+void ParticleSystemResource::Emitter::setModel(const Path& path) {
+	Model* new_model = resource.m_resource_manager.getOwner().load<Model>(path);
+	if (model) {
+		Model* tmp = model;
+		model = nullptr;
+		resource.removeDependency(*tmp);
+		tmp->decRefCount();
+	}
+	model = new_model;
+	if (model) {
+		resource.addDependency(*model);
+		setMaterial(Path());
 	}
 }
 
@@ -163,6 +184,9 @@ bool ParticleSystemResource::load(Span<const u8> mem) {
 		}
 
 		emitter.setMaterial(Path(blob.readString()));
+		if (header.version > Version::MODEL) {
+			emitter.setModel(Path(blob.readString()));
+		}
 		const u32 isize = blob.read<u32>();
 		emitter.instructions.resize(isize);
 		blob.read(emitter.instructions.getMutableData(), emitter.instructions.size());
@@ -859,24 +883,24 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 				RunningContext emit_ctx(emitter, m_allocator);
 				for (const float4* beg = cond; cond != end; ++cond) {
 					const int m = f4MoveMask(*cond);
-					if (m) {
-						for (int i = 0; i < 4; ++i) {
-							const u32 particle_index = u32(from + (cond - beg) * 4 + i);
-							if ((m & (1 << i)) && particle_index < emitter.particles_count) {
-								InputMemoryStream tmp_instr((const u8*)ip.getData() + ip.getPosition(), ip.remaining());
-								u32 emitter_idx = tmp_instr.read<u32>();
-								emit_ctx.instructions.set((const u8*)tmp_instr.getData() + tmp_instr.getPosition(), tmp_instr.remaining());
-								emit_ctx.particle_idx = particle_index;
-								emit_ctx.registers.resize(res_emitter.registers_count);
-								emit_ctx.outputs.resize(m_resource->getEmitters()[emitter_idx].emit_inputs_count);
-								run(emit_ctx);
-								
-								jobs::enter(ctx.emit_mutex);
-								ctx.emit_stream->write(emitter_idx);
-								ctx.emit_stream->write(emit_ctx.outputs.size());
-								ctx.emit_stream->write(emit_ctx.outputs.begin(), emit_ctx.outputs.byte_size());
-								jobs::exit(ctx.emit_mutex);
-							}
+					if (!m) continue;
+					
+					for (int i = 0; i < 4; ++i) {
+						const u32 particle_index = u32(from + (cond - beg) * 4 + i);
+						if ((m & (1 << i)) && particle_index < emitter.particles_count) {
+							InputMemoryStream tmp_instr((const u8*)ip.getData() + ip.getPosition(), ip.remaining());
+							u32 emitter_idx = tmp_instr.read<u32>();
+							emit_ctx.instructions.set((const u8*)tmp_instr.getData() + tmp_instr.getPosition(), tmp_instr.remaining());
+							emit_ctx.particle_idx = particle_index;
+							emit_ctx.registers.resize(res_emitter.registers_count);
+							emit_ctx.outputs.resize(m_resource->getEmitters()[emitter_idx].emit_inputs_count);
+							run(emit_ctx);
+							
+							jobs::enter(ctx.emit_mutex);
+							ctx.emit_stream->write(emitter_idx);
+							ctx.emit_stream->write(emit_ctx.outputs.size());
+							ctx.emit_stream->write(emit_ctx.outputs.begin(), emit_ctx.outputs.byte_size());
+							jobs::exit(ctx.emit_mutex);
 						}
 					}
 				}

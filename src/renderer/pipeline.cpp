@@ -45,6 +45,7 @@ enum class DrawCommandTypes : u8 {
 	DECAL,
 	CURVE_DECAL,
 	PARTICLES,
+	MESH_PARTICLES,
 };
 
 // converts float to u32 so it can be used in radix sort
@@ -101,6 +102,11 @@ LUMIX_FORCE_INLINE SortKey makeAutoInstancedSortKey(i32 instancer_index, u8 buck
 // sort value makers
 LUMIX_FORCE_INLINE SortValue makeParticleSortValue(EntityPtr entity, u32 emitter_idx) {
 	const u64 type_mask = (u64)DrawCommandTypes::PARTICLES << SORT_VALUE_TYPE_SHIFT;
+	return SortValue(entity.index | type_mask | ((u64)emitter_idx << SORT_VALUE_EMITTER_SHIFT));
+}
+
+LUMIX_FORCE_INLINE SortValue makeMeshParticleSortValue(EntityPtr entity, u32 emitter_idx) {
+	const u64 type_mask = (u64)DrawCommandTypes::MESH_PARTICLES << SORT_VALUE_TYPE_SHIFT;
 	return SortValue(entity.index | type_mask | ((u64)emitter_idx << SORT_VALUE_EMITTER_SHIFT));
 }
 
@@ -2191,10 +2197,21 @@ struct PipelineImpl final : Pipeline {
 			PROFILE_BLOCK("setup particles");
 			for (ParticleSystem::Emitter& emitter : system->getEmitters()) {
 				const Material* material = emitter.resource_emitter.material;
-				if (!material) continue;
+				const Model* model = emitter.resource_emitter.model; 
 
-				const u8 bucket_idx = view.layer_to_bucket[material->getLayer()];
-				if (bucket_idx == 0xff) continue;
+				if (material) {
+					const u8 bucket_idx = view.layer_to_bucket[material->getLayer()];
+					if (bucket_idx == 0xff) continue;
+				}
+				else if (model) {
+					if (model->getMeshCount() < 1) continue;
+					const u8 layer = model->getMeshMaterial(0).material->getLayer();
+					const u8 bucket_idx = view.layer_to_bucket[layer];
+					if (bucket_idx == 0xff) continue;
+				}
+				else {
+					continue;
+				}
 
 				const u32 size = emitter.getParticlesDataSizeBytes();
 				if (size == 0) continue;
@@ -2207,9 +2224,20 @@ struct PipelineImpl final : Pipeline {
 		for (const ParticleSystem& system : particle_systems) {
 			for (ParticleSystem::Emitter& emitter : system.getEmitters()) {
 				const Material* material = emitter.resource_emitter.material;
-				if (!material) continue;
+				const Model* model = emitter.resource_emitter.model; 
 
-				const u8 bucket_idx = view.layer_to_bucket[material->getLayer()];
+				u8 bucket_idx;
+				if (material) {
+					bucket_idx = view.layer_to_bucket[material->getLayer()];
+				}
+				else if (model) {
+					if (model->getMeshCount() < 1) continue;
+					const u8 layer = model->getMeshMaterial(0).material->getLayer();
+					bucket_idx = view.layer_to_bucket[layer];
+				}
+				else {
+					continue;
+				}
 				if (bucket_idx == 0xff) continue;
 
 				const u32 size = emitter.getParticlesDataSizeBytes();
@@ -2219,9 +2247,17 @@ struct PipelineImpl final : Pipeline {
 
 				const u32 emitter_idx = u32(&emitter - system.getEmitters().begin());
 				
-				SortValue value = makeParticleSortValue(system.m_entity, emitter_idx);
-				SortKey key = makeParticleSortKey(material, bucket_idx);
-				inserter.push(key, value);
+				if (material) {
+					SortValue value = makeParticleSortValue(system.m_entity, emitter_idx);
+					SortKey key = makeParticleSortKey(material, bucket_idx);
+					inserter.push(key, value);
+				}
+				else {
+					Material* mesh_mat = model->getMeshMaterial(0).material;
+					SortValue value = makeMeshParticleSortValue(system.m_entity, emitter_idx);
+					SortKey key = makeParticleSortKey(mesh_mat, bucket_idx);
+					inserter.push(key, value);
+				}
 			}
 		}
 	}
@@ -2719,6 +2755,7 @@ struct PipelineImpl final : Pipeline {
 			u64 instance_key_mask;
 			u32 define_mask;
 			u32 autoinstanced_define_mask;
+			u32 mesh_particle_define_mask;
 			u32 dynamic_define_mask;
 			u32 skinned_define_mask;
 			gpu::StateFlags render_state;
@@ -2737,12 +2774,50 @@ struct PipelineImpl final : Pipeline {
 					autoinstanced_define_mask = define_mask | (1 << m_renderer.getShaderDefineIdx("AUTOINSTANCED"));
 					dynamic_define_mask = define_mask | (1 << m_renderer.getShaderDefineIdx("DYNAMIC"));
 					skinned_define_mask = define_mask | (1 << m_renderer.getShaderDefineIdx("SKINNED"));
+					mesh_particle_define_mask = define_mask | (1 << m_renderer.getShaderDefineIdx("MESH_PARTICLE"));
+					
 					const bool sort_depth = view.buckets[bucket].sort == BucketDesc::DEPTH;
 					instance_key_mask = sort_depth ? 0xff00'0000'00ff'ffff : 0xffff'ffff'0000'0000;
 					render_state = view.buckets[bucket].state;
 				}
 
 				switch(type) {
+					case DrawCommandTypes::MESH_PARTICLES: {
+						const u32 emitter_idx = u32(renderables[i] >> SORT_VALUE_EMITTER_SHIFT);
+						const ParticleSystem& particle_system = m_module->getParticleEmitter(entity);
+						const ParticleSystem::Emitter& emitter = particle_system.getEmitter(emitter_idx);
+						const Model* model = emitter.resource_emitter.model;
+						const u32 particles_count = emitter.particles_count;
+						const MeshMaterial& mesh_mat = model->getMeshMaterial(0);
+						const Material* material = mesh_mat.material;
+						const Mesh& mesh = model->getMesh(0);
+
+						const Transform tr = world.getTransform(*particle_system.m_entity);
+						const Vec3 lpos = Vec3(tr.pos - camera_pos);
+						const gpu::VertexDecl& inst_decl = emitter.resource_emitter.vertex_decl;
+						const gpu::StateFlags state = material->m_render_states | render_state;
+						const u32 defines = mesh_particle_define_mask | material->getDefineMask();
+						Shader* shader = material->getShader();
+						gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, inst_decl, defines, mesh.semantics_defines);
+
+						struct UBData {
+							Vec3 pos;
+							MaterialIndex material_index;
+						} ub_data = {
+							lpos,
+							material->getIndex()
+						};
+
+						TransientSlice ub = alloc(uniform_pool, &ub_data, sizeof(ub_data));
+
+						stream->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+						stream->useProgram(program);
+						stream->bindIndexBuffer(mesh.index_buffer_handle);
+						stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
+						stream->bindVertexBuffer(1, emitter.slice.buffer, emitter.slice.offset, inst_decl.getStride());
+						stream->drawIndexedInstanced(mesh.indices_count, particles_count, mesh.index_type);
+						break;
+					}
 					case DrawCommandTypes::PARTICLES: {
 						const u32 emitter_idx = u32(renderables[i] >> SORT_VALUE_EMITTER_SHIFT);
 						const ParticleSystem& particle_system = m_module->getParticleEmitter(entity);
