@@ -32,7 +32,7 @@ struct VSInput {
 		float4 i_scale : ATTR(INSTANCE2_ATTR);
 		uint i_material_index : ATTR(INSTANCE3_ATTR);
 		#define HAS_MATERIAL_INDEX_ATTR
-	#elif defined INSTANCED
+	#elif defined INSTANCED || defined MESH_PARTICLE
 		float4 i_rot_lod : ATTR(INSTANCE0_ATTR);
 		float4 i_pos_scale : ATTR(INSTANCE1_ATTR);
 	#elif defined DYNAMIC
@@ -94,6 +94,11 @@ struct VSOutput {
 };
 
 #ifdef SKINNED
+#elif defined MESH_PARTICLE
+	cbuffer ModelState : register(b4) {
+		float3 position;
+		uint material_index;
+	};
 #elif defined INSTANCED
 	cbuffer ModelState : register(b4) {
 		uint material_index;
@@ -152,7 +157,7 @@ VSOutput mainVS(VSInput input) {
 	#ifdef HAS_LOD
 			output.lod = input.i_pos_lod.w;
 		#endif
-	#elif defined INSTANCED
+	#elif defined INSTANCED || defined MESH_PARTICLE
 		float4 rot_quat = float4(input.i_rot_lod.xyz, 0);
 		rot_quat.w = sqrt(saturate(1 - dot(rot_quat.xyz, rot_quat.xyz)));
 		output.normal = rotateByQuat(rot_quat, input.normal);
@@ -160,7 +165,11 @@ VSOutput mainVS(VSInput input) {
 			output.tangent = rotateByQuat(rot_quat, input.tangent);
 		#endif
 		float3 p = input.position * input.i_pos_scale.w;
-		output.pos_ws = input.i_pos_scale.xyz + rotateByQuat(rot_quat, p);
+		#ifdef MESH_PARTICLE
+			output.pos_ws = position + input.i_pos_scale.xyz + rotateByQuat(rot_quat, p);
+		#else
+			output.pos_ws = input.i_pos_scale.xyz + rotateByQuat(rot_quat, p);
+		#endif
 		output.position = mul(float4(output.pos_ws, 1), Pass_ws_to_ndc);
 	#elif defined GRASS
 		output.normal = rotateByQuat(input.i_rot, input.normal);

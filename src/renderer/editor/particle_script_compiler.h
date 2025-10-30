@@ -37,15 +37,33 @@ struct ParticleScriptCompiler {
             return offset;
         }
 	};
+
+	struct Emitter {
+		Emitter(IAllocator& allocator)
+			: m_outputs(allocator)
+			, m_update(allocator)
+			, m_emit(allocator)
+			, m_output(allocator)
+			, m_vars(allocator)
+		{}
+
+		StringView m_name;
+		Path m_material;
+		Path m_mesh;
+		OutputMemoryStream m_update;
+		OutputMemoryStream m_emit;
+		OutputMemoryStream m_output;
+		Array<Variable> m_vars;
+		Array<Variable> m_outputs;
+		i32 m_register_allocator = 0;
+		u32 m_init_emit_count = 0;
+		float m_emit_per_second = 0;
+	};
 	
 	ParticleScriptCompiler(StringView content, const Path& path, IAllocator& allocator)
 		: m_allocator(allocator)
-		, m_vars(allocator)
-		, m_outputs(allocator)
 		, m_content(content)
-		, m_update(allocator)
-		, m_emit(allocator)
-		, m_output(allocator)
+		, m_emitters(allocator)
 		, m_constants(allocator)
 		, m_path(path)
         , m_text_begin(content.begin)
@@ -152,9 +170,9 @@ struct ParticleScriptCompiler {
         return nullptr;
     }
 
-	i32 getVariableIndex(StringView name) {
-		for (const Variable& var : m_vars) {
-			if (equalStrings(var.name, name)) return i32(&var - m_vars.begin());
+	i32 getVariableIndex(const Emitter& emitter, StringView name) {
+		for (const Variable& var : emitter.m_vars) {
+			if (equalStrings(var.name, name)) return i32(&var - emitter.m_vars.begin());
 		}
 		return -1;
 	}
@@ -172,9 +190,9 @@ struct ParticleScriptCompiler {
 		return SystemValue::NONE;
 	}
 
-	i32 getOutputIndex(StringView name) {
-		for (const Variable& var : m_outputs) {
-			if (equalStrings(var.name, name)) return i32(&var - m_outputs.begin());
+	i32 getOutputIndex(const Emitter& emitter, StringView name) {
+		for (const Variable& var : emitter.m_outputs) {
+			if (equalStrings(var.name, name)) return i32(&var - emitter.m_outputs.begin());
 		}
 		return -1;
 	}
@@ -291,15 +309,15 @@ struct ParticleScriptCompiler {
 		return res;
 	}
 
-	DataStream allocRegister() {
+	DataStream allocRegister(Emitter& emitter) {
 		DataStream res;
 		res.type = DataStream::REGISTER;
-		res.index = m_register_allocator;
-		++m_register_allocator;
+		res.index = emitter.m_register_allocator;
+		++emitter.m_register_allocator;
 		return res;
 	}
 
-	DataStream compileExpression(OutputMemoryStream& compiled, bool is_function_arg, u32 sub) {
+	DataStream compileExpression(Emitter& emitter, OutputMemoryStream& compiled, bool is_function_arg, u32 sub) {
 		expectNotEOF();
 
 		DataStream op1;
@@ -355,11 +373,24 @@ struct ParticleScriptCompiler {
                     op1.index = (u8)system_value;
                 } 
                 else {
-                    i32 var_index = getVariableIndex(ident);
+                    i32 var_index = getVariableIndex(emitter, ident);
                     if (var_index >= 0) {
-                        const Variable& var = m_vars[var_index];
+                        const Variable& var = emitter.m_vars[var_index];
                         op1.type = DataStream::CHANNEL;
-                        op1.index = var.getOffsetSub(sub);
+                        if (peekChar() != '.') {
+							op1.index = var.getOffsetSub(sub);
+						}
+						else {
+							++m_content.begin;
+							switch(peekChar()) {
+								case 'r': case 'x': op1.index = var.getOffsetSub(0); break;
+								case 'g': case 'y': op1.index = var.getOffsetSub(1); break;
+								case 'b': case 'z': op1.index = var.getOffsetSub(2); break;
+								case 'a': case 'w': op1.index = var.getOffsetSub(3); break;
+								default: error(m_content, "Invalid subscript"); --m_content.begin; break;
+							}
+							++m_content.begin;
+						}
                     }
                     else {
                         Function fn = getFunction(ident);
@@ -367,7 +398,7 @@ struct ParticleScriptCompiler {
                             if (!fn.returns_value) error(ident, "Function does not return a value");
                             expect("(");
                             if (fn.instruction == InstructionType::RAND) {
-                                op1 = allocRegister();
+                                op1 = allocRegister(emitter);
                                 compiled.write(fn.instruction);
                                 compiled.write(op1);
                                 compiled.write(readNumber());
@@ -375,8 +406,8 @@ struct ParticleScriptCompiler {
                                 compiled.write(readNumber());
                             }
                             else if (fn.instruction == InstructionType::GRADIENT) {
-                                DataStream arg0 = compileExpression(compiled, true, sub);
-                                op1 = allocRegister();
+                                DataStream arg0 = compileExpression(emitter, compiled, true, sub);
+                                op1 = allocRegister(emitter);
                                 compiled.write(fn.instruction);
                                 compiled.write(op1);
                                 compiled.write(arg0);
@@ -411,8 +442,8 @@ struct ParticleScriptCompiler {
                                 // TODO collapse if all values are the same
                             }
                             else {
-                                DataStream arg_val = compileExpression(compiled, true, sub);
-                                op1 = allocRegister();
+                                DataStream arg_val = compileExpression(emitter, compiled, true, sub);
+                                op1 = allocRegister(emitter);
                                 compiled.write(fn.instruction);
                                 compiled.write(op1);
                                 compiled.write(arg_val);
@@ -437,7 +468,7 @@ struct ParticleScriptCompiler {
 		StringView oper = readOperator();
 		if (oper.size() == 0) return op1;
 
-		DataStream op2 = compileExpression(compiled, is_function_arg, sub);
+		DataStream op2 = compileExpression(emitter, compiled, is_function_arg, sub);
 
 		switch (*oper.begin) {
 			case '>': compiled.write(InstructionType::GT); break;
@@ -449,19 +480,19 @@ struct ParticleScriptCompiler {
 			case '%': compiled.write(InstructionType::MOD); break;
 		}
 
-		DataStream res = allocRegister();
+		DataStream res = allocRegister(emitter);
 		compiled.write(res);
 		compiled.write(op1);
 		compiled.write(op2);
 		return res;
 	}
 
-	void compileAssignment(OutputMemoryStream& compiled, Array<Variable>& vars, u32 var_index, DataStream::Type stream_type) {
+	void compileAssignment(Emitter& emitter, OutputMemoryStream& compiled, Array<Variable>& vars, u32 var_index, DataStream::Type stream_type) {
 		i32 offset = vars[var_index].offset;
 		switch (vars[var_index].type) {
 			case Type::FLOAT: {
 				expect("=");
-				DataStream expr_result = compileExpression(compiled, false, 0);
+				DataStream expr_result = compileExpression(emitter, compiled, false, 0);
 				DataStream dst;
 				dst.type = stream_type;
 				dst.index = offset;
@@ -486,7 +517,7 @@ struct ParticleScriptCompiler {
 					} 
 
 					expect("=");
-					DataStream expr_result = compileExpression(compiled, false, 0);
+					DataStream expr_result = compileExpression(emitter, compiled, false, 0);
 					DataStream dst;
 					dst.type = stream_type;
 					dst.index = offset;
@@ -498,7 +529,7 @@ struct ParticleScriptCompiler {
 					expect("=");
 					for (i32 i = 0; i < (is_float4 ? 4 : 3); ++i) {
 						StringView content = m_content;
-						DataStream expr_result = compileExpression(compiled, false, i);
+						DataStream expr_result = compileExpression(emitter, compiled, false, i);
 						DataStream dst;
 						dst.type = stream_type;
 						dst.index = offset + i;
@@ -513,39 +544,39 @@ struct ParticleScriptCompiler {
 		}	
 	}
 
-	void compileFunction() {
+	void compileFunction(Emitter& emitter) {
 		StringView fn_name = readIdentifier();
 		expect("{");
 		
 		OutputMemoryStream& compiled = [&]() -> OutputMemoryStream& {
-			if (equalStrings(fn_name, "update")) return m_update;
-			if (equalStrings(fn_name, "emit")) return m_emit;
-			if (equalStrings(fn_name, "output")) return m_output;
+			if (equalStrings(fn_name, "update")) return emitter.m_update;
+			if (equalStrings(fn_name, "emit")) return emitter.m_emit;
+			if (equalStrings(fn_name, "output")) return emitter.m_output;
 			error(m_content, "Unknown function");
-			return m_output;
+			return emitter.m_output;
 		}();
 
 		for (;;) {
 			StringView word = readWord();
 			if (equalStrings(word, "}")) break;
-			i32 var_index = getVariableIndex(word);
+			i32 var_index = getVariableIndex(emitter, word);
 			if (var_index >= 0) {
-				compileAssignment(compiled, m_vars, var_index, DataStream::CHANNEL);
+				compileAssignment(emitter, compiled, emitter.m_vars, var_index, DataStream::CHANNEL);
 			}
 			else {
-				i32 out_index = getOutputIndex(word);
+				i32 out_index = getOutputIndex(emitter, word);
 				if (out_index >= 0) {
-					compileAssignment(compiled, m_outputs, out_index, DataStream::OUT);
+					compileAssignment(emitter, compiled, emitter.m_outputs, out_index, DataStream::OUT);
 				}
 				else {
 					Function fn = getFunction(word);
 					if (fn.instruction != InstructionType::END) {
 						if (fn.returns_value) error(word, "Unexpected function call");
                         expect("(");
-						DataStream arg_val = compileExpression(compiled, true, 0);
+						DataStream arg_val = compileExpression(emitter, compiled, true, 0);
 						expect(")");
 						expect(";");
-						DataStream dst = allocRegister();
+						DataStream dst = allocRegister(emitter);
 						compiled.write(fn.instruction);
 						compiled.write(arg_val);
 					}
@@ -569,10 +600,10 @@ struct ParticleScriptCompiler {
 		return res;
 	}
 
-	void parseVar() {
+	void compileVar(Emitter& emitter) {
 		u32 offset = 0;
-		if (!m_vars.empty()) {
-			const Variable& var = m_vars.last();
+		if (!emitter.m_vars.empty()) {
+			const Variable& var = emitter.m_vars.last();
 			offset = var.offset;
 			switch (var.type) {
 				case Type::FLOAT: ++offset; break;
@@ -580,11 +611,32 @@ struct ParticleScriptCompiler {
 				case Type::FLOAT4: offset += 4; break;
 			}
 		}
-		Variable& var = m_vars.emplace();
+		Variable& var = emitter.m_vars.emplace();
 		var.name = readIdentifier();
 		expect(":");
 		var.type = readType();
 		var.offset = offset;
+	}
+
+	void compileEmitter() {
+		StringView ident = readIdentifier();
+		Emitter& emitter = m_emitters.emplace(m_allocator);
+		emitter.m_name = ident;
+		expect("{");
+
+		for (;;) {
+			StringView word = readWord();
+			if (equalStrings(word, "}")) break;
+			else if (equalStrings(word, "material")) compileMaterial(emitter);
+			else if (equalStrings(word, "mesh")) compileMesh(emitter);
+			else if (equalStrings(word, "var")) compileVar(emitter);
+			else if (equalStrings(word, "out")) compileOutput(emitter);
+			else if (equalStrings(word, "fn")) compileFunction(emitter);
+			else if (equalStrings(word, "emit_per_second")) emitter.m_emit_per_second = readNumber();
+			else if (equalStrings(word, "init_emit_count")) emitter.m_init_emit_count = (u32)readNumber();
+			else error(word, "Unknown identifier");
+		}
+		
 	}
 
 	void parseConst() {
@@ -608,10 +660,10 @@ struct ParticleScriptCompiler {
         expect(";");
 	}
 
-	void parseOutput() {
+	void compileOutput(Emitter& emitter) {
 		u32 offset = 0;
-		if (!m_outputs.empty()) {
-			const Variable& var = m_outputs.last();
+		if (!emitter.m_outputs.empty()) {
+			const Variable& var = emitter.m_outputs.last();
 			offset = var.offset;
 			switch (var.type) {
 				case Type::FLOAT: ++offset; break;
@@ -619,14 +671,14 @@ struct ParticleScriptCompiler {
 				case Type::FLOAT4: offset += 4; break;
 			}
 		}
-		Variable& var = m_outputs.emplace();
+		Variable& var = emitter.m_outputs.emplace();
 		var.name = readIdentifier();
 		expect(":");
 		var.type = readType();
 		var.offset = offset;
 	}
 
-	void parseMaterial() {
+	void compileMaterial(Emitter& emitter) {
 		expectNotEOF();
 		expect("\"");
 		StringView path = m_content;
@@ -634,20 +686,27 @@ struct ParticleScriptCompiler {
 		while (path.end != m_content.end && *path.end != '"') ++path.end;
 		m_content.begin = path.end;
 		expect("\"");
-		m_material = path;
+		emitter.m_material = path;
+	}
+
+	void compileMesh(Emitter& emitter) {
+		expectNotEOF();
+		expect("\"");
+		StringView path = m_content;
+		path.end = path.begin;
+		while (path.end != m_content.end && *path.end != '"') ++path.end;
+		m_content.begin = path.end;
+		expect("\"");
+		emitter.m_mesh = path;
 	}
 
 	bool compile(OutputMemoryStream& output) {
 		for (;;) {
 			StringView word = tryReadWord();
 			if (word.size() == 0) break;
-			if (equalStrings(word, "emit_per_second")) m_emit_per_second = readNumber();
-			else if (equalStrings(word, "init_emit_count")) m_init_emit_count = (u32)readNumber();
-			else if (equalStrings(word, "material")) parseMaterial();
-			else if (equalStrings(word, "var")) parseVar();
-			else if (equalStrings(word, "const")) parseConst();
-			else if (equalStrings(word, "out")) parseOutput();
-			else if (equalStrings(word, "fn")) compileFunction();
+			if (equalStrings(word, "const")) parseConst();
+			else if (equalStrings(word, "emitter")) compileEmitter();
+			else if (!equalStrings(word, "\n")) error(word, "Syntax error");
 		}
 
 		ParticleSystemResource::Header header;
@@ -656,45 +715,48 @@ struct ParticleScriptCompiler {
 		ParticleSystemResource::Flags flags = ParticleSystemResource::Flags::NONE;
 		output.write(flags);
 		
-		output.write(1);
+		output.write(m_emitters.size());
 
-		gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLE_STRIP);
-		fillVertexDecl(decl);
-		output.write(decl);
-		output.writeString(m_material);
-		const u32 count = u32(m_update.size() + m_emit.size() + m_output.size());
-		output.write(count);
-		output.write(m_update.data(), m_update.size());
-		output.write(m_emit.data(), m_emit.size());
-		output.write(m_output.data(), m_output.size());
-		output.write((u32)m_update.size());
-		output.write(u32(m_update.size() + m_emit.size()));
+		for (const Emitter& emitter : m_emitters) {
+			gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLE_STRIP);
+			fillVertexDecl(emitter, decl);
+			output.write(decl);
+			output.writeString(emitter.m_material);
+			output.writeString(emitter.m_mesh);
+			const u32 count = u32(emitter.m_update.size() + emitter.m_emit.size() + emitter.m_output.size());
+			output.write(count);
+			output.write(emitter.m_update.data(), emitter.m_update.size());
+			output.write(emitter.m_emit.data(), emitter.m_emit.size());
+			output.write(emitter.m_output.data(), emitter.m_output.size());
+			output.write((u32)emitter.m_update.size());
+			output.write(u32(emitter.m_update.size() + emitter.m_emit.size()));
 
-		auto getCount = [&](const auto& x){
-			u32 c = 0;
-			for (const auto& i : x) {
-				switch (i.type) {
-					case Type::FLOAT4: c+= 4; break;
-					case Type::FLOAT3: c+= 3; break;
-					case Type::FLOAT: c+= 1; break;
+			auto getCount = [&](const auto& x){
+				u32 c = 0;
+				for (const auto& i : x) {
+					switch (i.type) {
+						case Type::FLOAT4: c+= 4; break;
+						case Type::FLOAT3: c+= 3; break;
+						case Type::FLOAT: c+= 1; break;
+					}
 				}
-			}
-			return c;
-		};
+				return c;
+			};
 
-		output.write(getCount(m_vars));
-		output.write(m_register_allocator);
-		output.write(getCount(m_outputs));
-		output.write(m_init_emit_count);
-		output.write(m_emit_per_second);
-		output.write(/*getCount(emitter->m_emit_inputs)*/u32(0));
+			output.write(getCount(emitter.m_vars));
+			output.write(emitter.m_register_allocator);
+			output.write(getCount(emitter.m_outputs));
+			output.write(emitter.m_init_emit_count);
+			output.write(emitter.m_emit_per_second);
+			output.write(/*getCount(emitter->m_emit_inputs)*/u32(0));
+		}
 		
 		return !m_is_error;
 	}
 
-	void fillVertexDecl(gpu::VertexDecl& decl) {
+	void fillVertexDecl(const Emitter& emitter, gpu::VertexDecl& decl) {
 		u32 offset = 0;
-		for (const Variable& o : m_outputs) {
+		for (const Variable& o : emitter.m_outputs) {
 			switch (o.type) {
 				case Type::FLOAT: 
 					decl.addAttribute(offset, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
@@ -714,18 +776,11 @@ struct ParticleScriptCompiler {
 
 	IAllocator& m_allocator;
 	Path m_path;
-	Path m_material;
-	OutputMemoryStream m_update;
-	OutputMemoryStream m_emit;
-	OutputMemoryStream m_output;
-	Array<Variable> m_vars;
-    Array<Constant> m_constants;
-	Array<Variable> m_outputs;
+	Array<Emitter> m_emitters;
+	Array<Constant> m_constants;
+	
 	StringView m_content;
     const char* m_text_begin;
-	u32 m_init_emit_count = 0;
-	float m_emit_per_second = 0;
-	i32 m_register_allocator = 0;
 	bool m_is_error = false;
 };
 
