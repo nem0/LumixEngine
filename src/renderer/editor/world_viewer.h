@@ -22,6 +22,7 @@ struct LUMIX_RENDERER_API WorldViewer {
 
 	StudioApp& m_app;
 	World* m_world;
+	EntityRef m_ground;
 	UniquePtr<Pipeline> m_pipeline;
 	EntityPtr m_mesh;
 	float m_camera_speed = 1;
