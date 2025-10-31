@@ -45,9 +45,4 @@ LUMIX_ENGINE_API extern const ComponentType model_instance;
 LUMIX_ENGINE_API extern const ComponentType curve_decal;
 LUMIX_ENGINE_API extern const ComponentType terrain;
 LUMIX_ENGINE_API extern const ComponentType procedural_geom;
-LUMIX_ENGINE_API extern const ComponentType jolt_mesh;
-LUMIX_ENGINE_API extern const ComponentType jolt_sphere;
-LUMIX_ENGINE_API extern const ComponentType jolt_box;
-LUMIX_ENGINE_API extern const ComponentType jolt_body;
-LUMIX_ENGINE_API extern const ComponentType js_script;
 }
