@@ -1,0 +1,6 @@
+shader "/engine/shaders/particles.hlsl"
+backface_culling true
+layer "transparent"
+texture "explosion.ltc"
+int_uniform "Frames cols", 1
+int_uniform "Frames rows", 1
