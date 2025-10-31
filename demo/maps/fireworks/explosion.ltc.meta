@@ -1,0 +1,7 @@
+srgb = false
+compress = true
+stochastic_mip = false
+mip_scale_coverage = -0.500000
+mips = true
+normalmap = false
+invert_green = false

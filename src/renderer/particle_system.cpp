@@ -908,12 +908,12 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 				}
 
 				// skip emit subroutine
-				ip.read<u32>(); // emitter idx
+				u32 emitter_idx = ip.read<u32>();
 				RunningContext ctx(emitter, m_allocator);
 				ctx.instructions.set((const u8*)ip.getData() + ip.getPosition(), ip.remaining());
 				ctx.particle_idx = 0;
 				ctx.registers.resize(res_emitter.registers_count);
-				ctx.outputs.resize(res_emitter.outputs_count);
+				ctx.outputs.resize(m_resource->getEmitters()[emitter_idx].emit_inputs_count);
 				run(ctx);
 				ip.setPosition(ip.size() - ctx.instructions.remaining());
 				break;

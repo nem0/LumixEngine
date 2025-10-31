@@ -46,6 +46,7 @@ struct ParticleScriptCompiler {
     enum class SystemValue {
         TIME_DELTA,
         TOTAL_TIME,
+		EMIT_INDEX,
         
         NONE,
     };
@@ -66,7 +67,8 @@ struct ParticleScriptCompiler {
 			OPERATOR,
 			FUNCTION,
 			VARIABLE,
-			SYSTEM_VALUE
+			SYSTEM_VALUE,
+			REGISTER,
 		};
 
 		Type type;
@@ -74,6 +76,7 @@ struct ParticleScriptCompiler {
 		Operators operator_char;
 		InstructionType function;
 		i32 variable_index;
+		i32 register_offset;
 		SystemValue system_value;
 		i32 sub;
 		u32 parenthesis_depth = 0xffFFffFF;
@@ -85,6 +88,7 @@ struct ParticleScriptCompiler {
 			, m_update(allocator)
 			, m_emit(allocator)
 			, m_output(allocator)
+			, m_inputs(allocator)
 			, m_vars(allocator)
 		{}
 
@@ -96,6 +100,7 @@ struct ParticleScriptCompiler {
 		OutputMemoryStream m_output;
 		Array<Variable> m_vars;
 		Array<Variable> m_outputs;
+		Array<Variable> m_inputs;
 		u32 m_num_used_registers = 0;
 		u32 m_register_allocator = 0;
 		u32 m_init_emit_count = 0;
@@ -197,12 +202,20 @@ struct ParticleScriptCompiler {
 		return res;
 	}
 
+	i32 getEmitterIndex(StringView name) {
+		for (const Emitter& emitter : m_emitters) {
+			if (equalStrings(emitter.m_name, name)) return i32(&emitter - m_emitters.begin());
+		}
+		return -1;
+	}
+
 	Function getFunction(StringView name) {
 		if (equalStrings(name, "cos")) return { InstructionType::COS, true };
 		else if (equalStrings(name, "sin")) return { InstructionType::SIN, true };
 		else if (equalStrings(name, "kill")) return { InstructionType::KILL, false };
 		else if (equalStrings(name, "random")) return { InstructionType::RAND, true };
 		else if (equalStrings(name, "curve")) return { InstructionType::GRADIENT, true };
+		else if (equalStrings(name, "emit")) return { InstructionType::EMIT, false};
 		else return { InstructionType::END };
 	}
 
@@ -223,12 +236,21 @@ struct ParticleScriptCompiler {
 	SystemValue getSystemValue(StringView name) {
 		if (equalStrings(name, "time_delta")) return SystemValue::TIME_DELTA;
 		if (equalStrings(name, "total_time")) return SystemValue::TOTAL_TIME;
+		// TODO error if emit_index is used outside emit
+		if (equalStrings(name, "emit_index")) return SystemValue::EMIT_INDEX;
 		return SystemValue::NONE;
 	}
 
 	i32 getOutputIndex(const Emitter& emitter, StringView name) {
 		for (const Variable& var : emitter.m_outputs) {
 			if (equalStrings(var.name, name)) return i32(&var - emitter.m_outputs.begin());
+		}
+		return -1;
+	}
+
+	i32 getInputIndex(const Emitter& emitter, StringView name) {
+		for (const Variable& var : emitter.m_inputs) {
+			if (equalStrings(var.name, name)) return i32(&var - emitter.m_inputs.begin());
 		}
 		return -1;
 	}
@@ -369,6 +391,13 @@ struct ParticleScriptCompiler {
 			return res;
 		}
 
+		if (el.type == ExpressionStackElement::REGISTER) {
+			DataStream res;
+			res.type = DataStream::REGISTER;
+			res.index = el.register_offset;
+			return res;
+		}
+
 		if (el.type == ExpressionStackElement::OPERATOR) {
 			if (m_postfix.size() < 2) {
 				// TODO error location
@@ -497,7 +526,7 @@ struct ParticleScriptCompiler {
 		m_stack.push(el);
 	}
 
-	DataStream compileExpression(Emitter& emitter, OutputMemoryStream& compiled, u32 sub) {
+	DataStream compileExpression(Emitter& emitter, OutputMemoryStream& compiled, u32 sub, char expression_end = ';') {
 		m_stack.clear();
 		m_postfix.clear();
 
@@ -509,7 +538,7 @@ struct ParticleScriptCompiler {
 			expectNotEOF();
 
 			const char peeked = peekChar();
-			if (peeked == ';') {
+			if (peeked == expression_end) {
 				++m_content.begin;
 				while (!m_stack.empty()) {
 					m_postfix.push(m_stack.last());
@@ -627,6 +656,16 @@ struct ParticleScriptCompiler {
 				continue;
 			}
 
+			i32 input_index = getInputIndex(emitter, ident);
+			if (input_index >= 0) {
+				ExpressionStackElement& el = m_postfix.emplace();
+				el.type = ExpressionStackElement::REGISTER;
+				el.register_offset = emitter.m_inputs[input_index].getOffsetSub(sub);
+				el.parenthesis_depth = parenthesis_depth;
+				can_be_unary = false;
+				continue;
+			}
+
 			i32 var_index = getVariableIndex(emitter, ident);
 			if (var_index >= 0) {
 				ExpressionStackElement& el = m_postfix.emplace();
@@ -726,6 +765,24 @@ struct ParticleScriptCompiler {
 		emitter.m_register_allocator = 0;
 	}
 
+	bool compileEmitBlock(Emitter& emitter, OutputMemoryStream& compiled, Emitter& emitted) {
+		for (;;) {
+			StringView word = readWord();
+			if (equalStrings(word, "}")) break;
+
+			i32 out_index = getInputIndex(emitted, word);
+			if (out_index >= 0) {
+				compileAssignment(emitter, compiled, emitted.m_inputs, out_index, DataStream::OUT);
+				continue;
+			}
+
+			error(word, "Syntax error");
+			return false;
+		}
+		compiled.write(InstructionType::END);
+		return true;
+	}
+
 	void compileFunction(Emitter& emitter) {
 		StringView fn_name = readIdentifier();
 		expect("{");
@@ -744,25 +801,57 @@ struct ParticleScriptCompiler {
 			i32 var_index = getVariableIndex(emitter, word);
 			if (var_index >= 0) {
 				compileAssignment(emitter, compiled, emitter.m_vars, var_index, DataStream::CHANNEL);
+				continue;
 			}
-			else {
-				i32 out_index = getOutputIndex(emitter, word);
-				if (out_index >= 0) {
-					compileAssignment(emitter, compiled, emitter.m_outputs, out_index, DataStream::OUT);
-				}
-				else {
-					Function fn = getFunction(word);
-					if (fn.instruction != InstructionType::END) {
-						if (fn.returns_value) error(word, "Unexpected function call");
-						DataStream arg_val = compileExpression(emitter, compiled, 0);
-						compiled.write(fn.instruction);
-						compiled.write(arg_val);
-					}
-					else {
-						error(word, "Syntax error");
-					}
-				}
+
+			i32 out_index = getOutputIndex(emitter, word);
+			if (out_index >= 0) {
+				compileAssignment(emitter, compiled, emitter.m_outputs, out_index, DataStream::OUT);
+				continue;
 			}
+
+			Function fn = getFunction(word);
+			if (fn.instruction != InstructionType::END) {
+				if (fn.returns_value) error(word, "Unexpected function call");
+						
+				if (fn.instruction == InstructionType::EMIT) {
+					expect("(");
+					StringView ident = readIdentifier();
+					i32 emitter_index = getEmitterIndex(ident);
+					if (emitter_index < 0) {
+						error(ident, "Unknown emitter");
+						return;
+					}
+					expect(",");
+					
+					DataStream arg_val = compileExpression(emitter, compiled, 0, ')');
+					compiled.write(fn.instruction);
+					compiled.write(arg_val);
+					compiled.write(emitter_index);
+					
+					expectNotEOF();
+					if (peekChar() == ';') {
+						compiled.write(InstructionType::END);
+						++m_content.begin;
+						continue;
+					}
+					if (peekChar() != '{') {
+						error(m_content, "Expected ; or {");
+						return;
+					}
+					++m_content.begin;
+					if (!compileEmitBlock(emitter, compiled, m_emitters[emitter_index])) return;
+					continue;
+				}
+
+				DataStream arg_val = compileExpression(emitter, compiled, 0);
+				compiled.write(fn.instruction);
+				compiled.write(arg_val);
+				continue;
+			}
+
+			error(word, "Syntax error");
+			return;
 		}
 		compiled.write(InstructionType::END);
 		// TODO optimize the bytecode
@@ -810,6 +899,7 @@ struct ParticleScriptCompiler {
 			else if (equalStrings(word, "mesh")) compileMesh(emitter);
 			else if (equalStrings(word, "var")) compileVar(emitter);
 			else if (equalStrings(word, "out")) compileOutput(emitter);
+			else if (equalStrings(word, "in")) compileInput(emitter);
 			else if (equalStrings(word, "fn")) compileFunction(emitter);
 			else if (equalStrings(word, "emit_per_second")) emitter.m_emit_per_second = readNumber();
 			else if (equalStrings(word, "init_emit_count")) emitter.m_init_emit_count = (u32)readNumber();
@@ -851,6 +941,24 @@ struct ParticleScriptCompiler {
 			}
 		}
 		Variable& var = emitter.m_outputs.emplace();
+		var.name = readIdentifier();
+		expect(":");
+		var.type = readType();
+		var.offset = offset;
+	}
+
+	void compileInput(Emitter& emitter) {
+		u32 offset = 0;
+		if (!emitter.m_inputs.empty()) {
+			const Variable& var = emitter.m_inputs.last();
+			offset = var.offset;
+			switch (var.type) {
+				case Type::FLOAT: ++offset; break;
+				case Type::FLOAT3: offset += 3; break;
+				case Type::FLOAT4: offset += 4; break;
+			}
+		}
+		Variable& var = emitter.m_inputs.emplace();
 		var.name = readIdentifier();
 		expect(":");
 		var.type = readType();
@@ -927,7 +1035,7 @@ struct ParticleScriptCompiler {
 			output.write(getCount(emitter.m_outputs));
 			output.write(emitter.m_init_emit_count);
 			output.write(emitter.m_emit_per_second);
-			output.write(/*getCount(emitter->m_emit_inputs)*/u32(0));
+			output.write(getCount(emitter.m_inputs));
 		}
 		
 		return !m_is_error;

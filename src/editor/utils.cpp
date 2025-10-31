@@ -459,6 +459,7 @@ static bool isWordChar(char c) {
 static bool tokenize(const char* str, u32& token_len, u8& token_type, u8 prev_token_type) {
 	static const char* keywords[] = {
 		"var",
+		"in",
 		"out",
 		"fn",
 		"float",
@@ -2656,6 +2657,7 @@ void FileSelector::fillSubitems() {
 	else {
 		iter = fs.createFileIterator(m_path);
 	}
+	if (!iter) return;
 	
 	os::FileInfo info;
 	const char* ext = m_accepted_extension.c_str();
