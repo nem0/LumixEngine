@@ -187,6 +187,8 @@ void WorldViewer::gui() {
 			m_is_mouse_captured = true;
 			m_app.clipMouseCursor();
 			os::showCursor(false);
+			ImGui::SetWindowFocus();
+			ImGuiEx::ResetActiveID(); // code editor is active without this
 			m_captured_mouse_pos = os::getMouseScreenPos();
 		}
 

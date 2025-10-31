@@ -275,6 +275,8 @@ void ParticleSystem::onResourceChanged(Resource::State old_state, Resource::Stat
 			m_emitters.emplace(*this, m_resource->getEmitters()[i]);
 		}
 	}
+
+	m_total_time = 0;
 	for (Emitter& emitter : m_emitters) {
 		emitter.emit_timer = 0;
 		emitter.particles_count = 0;

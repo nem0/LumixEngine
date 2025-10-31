@@ -464,6 +464,9 @@ static bool tokenize(const char* str, u32& token_len, u8& token_type, u8 prev_to
 		"float",
 		"float3",
 		"float4",
+		"kill",
+		"const",
+		"emitter"
 	};
 	
 	const char* c = str;
@@ -1884,7 +1887,7 @@ struct CodeEditorImpl final : CodeEditor {
 			ImGui::EndChild();
 			return false;
 		}
-		
+
 		ImVec2 child_pos = ImGui::GetCursorScreenPos();
 		ImGui::PushFont(code_font, maximum(1.f, (float)s_font_size));
 		u32 version = m_version;
