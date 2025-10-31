@@ -15,6 +15,7 @@
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
+#include "engine/component_types.h"
 #include "engine/engine.h"
 #include "engine/prefab.h"
 #include "engine/reflection.h"
@@ -40,13 +41,6 @@
 
 namespace Lumix
 {
-
-static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
-static const ComponentType PARTICLE_EMITTER_TYPE = reflection::getComponentType("particle_emitter");
-static const ComponentType MESH_ACTOR_TYPE = reflection::getComponentType("rigid_actor");
-static const ComponentType CAMERA_TYPE = reflection::getComponentType("camera");
-static const ComponentType TERRAIN_TYPE = reflection::getComponentType("terrain");
-static const ComponentType PROCEDURAL_GEOM_TYPE = reflection::getComponentType("procedural_geom");
 
 struct WorldViewImpl final : WorldView {
 	enum class MouseMode
@@ -249,7 +243,7 @@ struct WorldViewImpl final : WorldView {
 		World& world = m_module->getWorld();
 		const Transform tr = world.getTransform(entity);
 		const Vec3 lpos = tr.rot.conjugated() * Vec3(wpos - tr.pos);
-		if (!world.hasComponent(entity, MODEL_INSTANCE_TYPE)) return wpos;
+		if (!world.hasComponent(entity, types::model_instance)) return wpos;
 
 		Model* model = m_module->getModelInstanceModel(entity);
 
@@ -653,7 +647,7 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 				const DVec3 view_pos = m_scene_view.m_view->getViewport().pos;
 				Array<DualQuat> dq_pose(renderer.getAllocator());
 				for (EntityRef e : entities) {
-					if (!module->getWorld().hasComponent(e, MODEL_INSTANCE_TYPE)) continue;
+					if (!module->getWorld().hasComponent(e, types::model_instance)) continue;
 
 					const Model* model = module->getModelInstanceModel(e);
 					if (!model || !model->isReady()) continue;
@@ -942,11 +936,11 @@ void SceneView::toggleWireframe() {
 	if (selected.size() == 0) return;
 
 	World& world = *editor.getWorld();
-	RenderModule& module = *(RenderModule*)world.getModule(MODEL_INSTANCE_TYPE);
+	RenderModule& module = *(RenderModule*)world.getModule(types::model_instance);
 
 	Array<Material*> materials(m_app.getAllocator());
 	for (EntityRef e : selected) {
-		if (world.hasComponent(e, MODEL_INSTANCE_TYPE)) {
+		if (world.hasComponent(e, types::model_instance)) {
 			Model* model = module.getModelInstanceModel(e);
 			if (!model->isReady()) continue;
 			
@@ -955,10 +949,10 @@ void SceneView::toggleWireframe() {
 				materials.push(mesh.material);
 			}
 		}
-		if (world.hasComponent(e, TERRAIN_TYPE)) {
+		if (world.hasComponent(e, types::terrain)) {
 			materials.push(module.getTerrainMaterial(e));
 		}
-		if (world.hasComponent(e, PROCEDURAL_GEOM_TYPE)) {
+		if (world.hasComponent(e, types::procedural_geom)) {
 			materials.push(module.getProceduralGeometry(e).material);
 		}
 	}
@@ -1204,8 +1198,8 @@ void SceneView::handleDrop(const char* path, float x, float y)
 		m_editor.beginCommandGroup("insert_particle");
 		EntityRef entity = m_editor.addEntity();
 		m_editor.setEntitiesPositions(&entity, &pos, 1);
-		m_editor.addComponent(Span(&entity, 1), PARTICLE_EMITTER_TYPE);
-		m_editor.setProperty(PARTICLE_EMITTER_TYPE, "", -1, "Source", Span(&entity, 1), Path(path));
+		m_editor.addComponent(Span(&entity, 1), types::particle_emitter);
+		m_editor.setProperty(types::particle_emitter, "", -1, "Source", Span(&entity, 1), Path(path));
 		m_editor.endCommandGroup();
 		m_editor.selectEntities(Span(&entity, 1), false);
 	}
@@ -1236,8 +1230,8 @@ void SceneView::handleDrop(const char* path, float x, float y)
 		EntityRef entity = m_editor.addEntity();
 		m_editor.selectEntities(Span(&entity, 1), false);
 		m_editor.setEntitiesPositions(&entity, &pos, 1);
-		m_editor.addComponent(Span(&entity, 1), MODEL_INSTANCE_TYPE);
-		m_editor.setProperty(MODEL_INSTANCE_TYPE, "", -1, "Source", Span(&entity, 1), Path(path));
+		m_editor.addComponent(Span(&entity, 1), types::model_instance);
+		m_editor.setProperty(types::model_instance, "", -1, "Source", Span(&entity, 1), Path(path));
 		m_editor.endCommandGroup();
 	}
 	else if (type == physics_geom_type) {
@@ -1246,8 +1240,8 @@ void SceneView::handleDrop(const char* path, float x, float y)
 			m_editor.beginCommandGroup("insert_phy_component");
 			const EntityRef e = (EntityRef)hit.entity;
 			m_editor.selectEntities(Span(&e, 1), false);
-			m_editor.addComponent(Span(&e, 1), MESH_ACTOR_TYPE);
-			m_editor.setProperty(MESH_ACTOR_TYPE, "", -1, "Mesh", Span(&e, 1), Path(path));
+			m_editor.addComponent(Span(&e, 1), types::rigid_actor);
+			m_editor.setProperty(types::rigid_actor, "", -1, "Mesh", Span(&e, 1), Path(path));
 			m_editor.endCommandGroup();
 		}
 		else
@@ -1257,8 +1251,8 @@ void SceneView::handleDrop(const char* path, float x, float y)
 			EntityRef entity = m_editor.addEntity();
 			m_editor.setEntitiesPositions(&entity, &pos, 1);
 			m_editor.selectEntities(Span(&entity, 1), false);
-			m_editor.addComponent(Span(&entity, 1), MESH_ACTOR_TYPE);
-			m_editor.setProperty(MESH_ACTOR_TYPE, "", -1, "Mesh", Span(&entity, 1), Path(path));
+			m_editor.addComponent(Span(&entity, 1), types::rigid_actor);
+			m_editor.setProperty(types::rigid_actor, "", -1, "Mesh", Span(&entity, 1), Path(path));
 			m_editor.endCommandGroup();
 		}
 	}
@@ -1477,8 +1471,8 @@ void SceneView::insertModelUI() {
 					m_editor.beginCommandGroup("insert_mesh");
 					EntityRef entity = m_editor.addEntity();
 					m_editor.setEntitiesPositions(&entity, &pos, 1);
-					m_editor.addComponent(Span(&entity, 1), MODEL_INSTANCE_TYPE);
-					m_editor.setProperty(MODEL_INSTANCE_TYPE, "", -1, "Source", Span(&entity, 1), path);
+					m_editor.addComponent(Span(&entity, 1), types::model_instance);
+					m_editor.setProperty(types::model_instance, "", -1, "Source", Span(&entity, 1), path);
 					m_editor.endCommandGroup();
 					m_editor.selectEntities(Span(&entity, 1), false);
 
@@ -1532,7 +1526,7 @@ void SceneView::cameraPreviewGUI(Vec2 size) {
 	if (selected.size() != 1) return;
 
 	World* world = m_editor.getWorld();
-	if (!world->hasComponent(selected[0], CAMERA_TYPE)) return;
+	if (!world->hasComponent(selected[0], types::camera)) return;
 
 	RenderModule* module = (RenderModule*)m_editor.getWorld()->getModule("renderer");
 	Viewport vp = module->getCameraViewport(selected[0]);

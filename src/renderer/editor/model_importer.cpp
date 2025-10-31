@@ -5,6 +5,7 @@
 #include "core/profiler.h"
 #include "editor/asset_compiler.h"
 #include "editor/studio_app.h"
+#include "engine/component_types.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/plugin.h"
@@ -795,10 +796,8 @@ bool ModelImporter::writePrefab(const Path& src, const ModelMeta& meta) {
 	}
 
 	OutputMemoryStream blob(m_allocator);
-	static const ComponentType RIGID_ACTOR_TYPE = reflection::getComponentType("rigid_actor");
-	static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
 	bool with_physics = meta.physics != ModelMeta::Physics::NONE;
-	RenderModule* rmodule = (RenderModule*)world.getModule(MODEL_INSTANCE_TYPE);
+	RenderModule* rmodule = (RenderModule*)world.getModule(types::model_instance);
 	PhysicsModule* pmodule = (PhysicsModule*)world.getModule("physics");
 	if (!pmodule) with_physics = false;
 	
@@ -811,33 +810,32 @@ bool ModelImporter::writePrefab(const Path& src, const ModelMeta& meta) {
 			m_meshes[i].matrix.decompose(pos, rot, scale);
 			const EntityRef e = world.createEntity(DVec3(pos), rot);
 			world.setScale(e, scale);
-			world.createComponent(MODEL_INSTANCE_TYPE, e);
+			world.createComponent(types::model_instance, e);
 			world.setParent(root, e);
 			const ImportGeometry& geom = m_geometries[m_meshes[i].geometry_idx];
 			Path mesh_path(geom.name, ".fbx:", src);
 			rmodule->setModelInstancePath(e, mesh_path);
 	
 			if (with_physics) {
-				world.createComponent(RIGID_ACTOR_TYPE, e);
+				world.createComponent(types::rigid_actor, e);
 				pmodule->setActorMesh(e, Path(geom.name, ".phy:", src));
 			}
 		}
 
-		static const ComponentType POINT_LIGHT_TYPE = reflection::getComponentType("point_light");
 		for (i32 i = 0, c = (i32)m_lights.size(); i < c; ++i) {
 			const DVec3 pos = m_lights[i];
 			const EntityRef e = world.createEntity(pos, Quat::IDENTITY);
-			world.createComponent(POINT_LIGHT_TYPE, e);
+			world.createComponent(types::point_light, e);
 			world.setParent(root, e);
 			world.setEntityName(e, "light");
 		}
 	}
 	else {
-		world.createComponent(MODEL_INSTANCE_TYPE, root);
+		world.createComponent(types::model_instance, root);
 		rmodule->setModelInstancePath(root, src);
 
 		ASSERT(with_physics);
-		world.createComponent(RIGID_ACTOR_TYPE, root);
+		world.createComponent(types::rigid_actor, root);
 		pmodule->setActorMesh(root, Path(".phy:", src));
 	}
 

@@ -2,14 +2,14 @@
 
 #include "core/array.h"
 #include "core/crt.h"
-#include "engine/file_system.h"
 #include "core/hash.h"
 #include "core/log.h"
 #include "core/math.h"
 #include "core/path.h"
 #include "core/profiler.h"
 #include "core/stream.h"
-
+#include "engine/component_types.h"
+#include "engine/file_system.h"
 #include "engine/resource_manager.h"
 #include "renderer/draw_stream.h"
 #include "renderer/material.h"
@@ -136,10 +136,7 @@ static void computeSkinMatrices(const Pose& pose, const Model& model, Matrix* ma
 	}
 }
 
-RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Pose* pose, EntityPtr entity, const RayCastModelHit::Filter* filter)
-{
-	static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
-
+RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Pose* pose, EntityPtr entity, const RayCastModelHit::Filter* filter) {
 	RayCastModelHit hit;
 	hit.is_hit = false;
 	if (!isReady()) return hit;
@@ -215,7 +212,7 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Pose* 
 				hit.t = t;
 				hit.entity = entity;
 				hit.mesh = &m_meshes[mesh_index];
-				hit.component_type = MODEL_INSTANCE_TYPE;
+				hit.component_type = types::model_instance;
 				if (filter && !filter->invoke(hit)) hit = prev;
 			}
 		}

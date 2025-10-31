@@ -10,20 +10,14 @@
 #include "audio_device.h"
 #include "audio_system.h"
 #include "clip.h"
+#include "engine/component_types.h"
 #include "engine/engine.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
 #include "imgui/IconsFontAwesome5.h"
 
-namespace Lumix
-{
-
-
-static const ComponentType LISTENER_TYPE = reflection::getComponentType("audio_listener");
-static const ComponentType AMBIENT_SOUND_TYPE = reflection::getComponentType("ambient_sound");
-static const ComponentType ECHO_ZONE_TYPE = reflection::getComponentType("echo_zone");
-static const ComponentType CHORUS_ZONE_TYPE = reflection::getComponentType("chorus_zone");
+namespace Lumix {
 
 struct Listener
 {
@@ -204,7 +198,7 @@ struct AudioModuleImpl final : AudioModule
 
 	void createListener(EntityRef entity) override {
 		m_listener.entity = entity;
-		m_world.onComponentCreated(entity, LISTENER_TYPE, this);
+		m_world.onComponentCreated(entity, types::audio_listener, this);
 	}
 
 
@@ -231,7 +225,7 @@ struct AudioModuleImpl final : AudioModule
 		zone.entity = entity;
 		zone.delay = 500.0f;
 		zone.radius = 10;
-		m_world.onComponentCreated(entity, ECHO_ZONE_TYPE, this);
+		m_world.onComponentCreated(entity, types::echo_zone, this);
 	}
 
 
@@ -239,7 +233,7 @@ struct AudioModuleImpl final : AudioModule
 	{
 		int idx = m_echo_zones.find(entity);
 		m_echo_zones.eraseAt(idx);
-		m_world.onComponentDestroyed(entity, ECHO_ZONE_TYPE, this);
+		m_world.onComponentDestroyed(entity, types::echo_zone, this);
 	}
 
 	
@@ -260,7 +254,7 @@ struct AudioModuleImpl final : AudioModule
 		zone.frequency = 1;
 		zone.phase = 0;
 		zone.wet_dry_mix = 0.5f;
-		m_world.onComponentCreated(entity, CHORUS_ZONE_TYPE, this);
+		m_world.onComponentCreated(entity, types::chorus_zone, this);
 	}
 
 
@@ -273,7 +267,7 @@ struct AudioModuleImpl final : AudioModule
 	void destroyChorusZone(EntityRef entity) override {
 		int idx = m_chorus_zones.find(entity);
 		m_chorus_zones.eraseAt(idx);
-		m_world.onComponentDestroyed(entity, CHORUS_ZONE_TYPE, this);
+		m_world.onComponentDestroyed(entity, types::chorus_zone, this);
 	}
 
 
@@ -282,19 +276,19 @@ struct AudioModuleImpl final : AudioModule
 		sound.entity = entity;
 		sound.clip = nullptr;
 		sound.playing_sound = -1;
-		m_world.onComponentCreated(entity, AMBIENT_SOUND_TYPE, this);
+		m_world.onComponentCreated(entity, types::ambient_sound, this);
 	}
 
 
 	void destroyListener(EntityRef entity) override {
 		m_listener.entity = INVALID_ENTITY;
-		m_world.onComponentDestroyed(entity, LISTENER_TYPE, this);
+		m_world.onComponentDestroyed(entity, types::audio_listener, this);
 	}
 
 
 	void destroyAmbientSound(EntityRef entity) override {
 		m_ambient_sounds.erase(entity);
-		m_world.onComponentDestroyed(entity, AMBIENT_SOUND_TYPE, this);
+		m_world.onComponentDestroyed(entity, types::ambient_sound, this);
 	}
 
 
@@ -329,7 +323,7 @@ struct AudioModuleImpl final : AudioModule
 		serializer.read(m_listener.entity);
 		m_listener.entity = entity_map.get(m_listener.entity);
 		if (m_listener.entity.isValid()) {
-			m_world.onComponentCreated((EntityRef)m_listener.entity, LISTENER_TYPE, this);
+			m_world.onComponentCreated((EntityRef)m_listener.entity, types::audio_listener, this);
 		}
 
 		if (version < (i32)Version::CLIPS_REWORKED) {
@@ -351,7 +345,7 @@ struct AudioModuleImpl final : AudioModule
 			serializer.read(sound.is_3d);
 
 			m_ambient_sounds.insert(sound.entity, sound);
-			m_world.onComponentCreated(sound.entity, AMBIENT_SOUND_TYPE, this);
+			m_world.onComponentCreated(sound.entity, types::ambient_sound, this);
 		}
 
 		serializer.read(count);
@@ -361,7 +355,7 @@ struct AudioModuleImpl final : AudioModule
 			serializer.read(zone);
 			zone.entity = entity_map.get(zone.entity);
 			m_echo_zones.insert(zone.entity, zone);
-			m_world.onComponentCreated(zone.entity, ECHO_ZONE_TYPE, this);
+			m_world.onComponentCreated(zone.entity, types::echo_zone, this);
 		}
 
 		serializer.read(count);
@@ -372,7 +366,7 @@ struct AudioModuleImpl final : AudioModule
 			zone.entity = entity_map.get(zone.entity);
 
 			m_chorus_zones.insert(zone.entity, zone);
-			m_world.onComponentCreated(zone.entity, CHORUS_ZONE_TYPE, this);
+			m_world.onComponentCreated(zone.entity, types::chorus_zone, this);
 		}
 	}
 

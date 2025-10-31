@@ -15,6 +15,7 @@
 #include "editor/studio_app.h"
 #include "editor/text_filter.h"
 #include "editor/world_editor.h"
+#include "engine/component_types.h"
 #include "engine/component_uid.h"
 #include "engine/engine.h"
 #include "engine/resource_manager.h"
@@ -199,13 +200,9 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	}
 
 
-	bool showGizmo(WorldView& view, ComponentUID cmp) override
-	{
-		static const ComponentType ECHO_ZONE_TYPE = reflection::getComponentType("echo_zone");
-		static const ComponentType CHORUS_ZONE_TYPE = reflection::getComponentType("chorus_zone");
-
+	bool showGizmo(WorldView& view, ComponentUID cmp) override {
 		const EntityRef entity = (EntityRef)cmp.entity;
-		if (cmp.type == ECHO_ZONE_TYPE)
+		if (cmp.type == types::echo_zone)
 		{
 			auto* audio_module = static_cast<AudioModule*>(cmp.module);
 			float radius = audio_module->getEchoZone(entity).radius;
@@ -215,7 +212,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 			addSphere(view, pos, radius, Color::BLUE);
 			return true;
 		}
-		else if (cmp.type == CHORUS_ZONE_TYPE)
+		else if (cmp.type == types::chorus_zone)
 		{
 			auto* audio_module = static_cast<AudioModule*>(cmp.module);
 			float radius = audio_module->getChorusZone(entity).radius;

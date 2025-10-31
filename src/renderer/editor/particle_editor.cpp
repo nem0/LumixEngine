@@ -1,5 +1,6 @@
 #include "particle_editor.h"
 #include "core/associative_array.h"
+#include "core/array.h"
 #include "core/log.h"
 #include "core/math.h"
 #include "core/os.h"
@@ -12,9 +13,12 @@
 #include "editor/text_filter.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
+#include "engine/component_types.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/world.h"
+#include "particle_script_compiler.h"
+#include "renderer/editor/world_viewer.h"
 #include "renderer/material.h"
 #include "renderer/particle_system.h"
 #include "renderer/render_module.h"
@@ -25,15 +29,15 @@ namespace Lumix {
 
 namespace {
 
+bool operator !=(const ParticleSystemResource::DataStream& a, const ParticleSystemResource::DataStream& b) {
+	if (a.type != b.type) return true;
+	if (a.type == ParticleSystemResource::DataStream::LITERAL) return a.value != b.value;
+	return a.index != b.index;
+}
+
 static constexpr u32 OUTPUT_FLAG = 1 << 31;
 using DataStream = ParticleSystemResource::DataStream;
 using InstructionType = ParticleSystemResource::InstructionType;
-
-bool operator !=(const DataStream& a, const DataStream& b) {
-	if (a.type != b.type) return true;
-	if (a.type == DataStream::LITERAL) return a.value != b.value;
-	return a.index != b.index;
-}
 
 enum class Version {
 	LINK_ID_REMOVED,
@@ -491,6 +495,7 @@ struct ParticleEmitterEditorResource {
 		blob.write(m_last_id);
 		blob.writeString(m_name);
 		blob.writeString(m_mat_path);
+		blob.writeString(m_model_path);
 		blob.write(m_init_emit_count);
 		blob.write(m_emit_per_second);
 		
@@ -646,6 +651,7 @@ struct ParticleEmitterEditorResource {
 	IAllocator& m_allocator;
 	String m_name;
 	Path m_mat_path;
+	Path m_model_path;
 	Array<EmitInput> m_emit_inputs;
 	Array<Stream> m_streams;
 	Array<Output> m_outputs;
@@ -2655,11 +2661,12 @@ struct ParticleEditorImpl : ParticleEditor {
 		{
 			AssetCompiler& compiler = app.getAssetCompiler();
 			compiler.registerExtension("par", ParticleSystemResource::TYPE);
+			compiler.registerExtension("pat", ParticleSystemResource::TYPE);
 		}
 
 		void addSubresources(AssetCompiler& compiler, const Path& path, AtomicI32&) override {
 			compiler.addResource(ParticleSystemResource::TYPE, path);
-			ParticleEditor::registerDependencies(path, m_app);
+			if (Path::hasExtension(path, "par")) ParticleEditor::registerDependencies(path, m_app);
 		}
 
 		bool compile(const Path& src) override {
@@ -2722,7 +2729,7 @@ struct ParticleEditorImpl : ParticleEditor {
 		, m_functions(m_allocator)
 		, m_apply_action("Particle editor", "Apply", "Apply", "particle_editor_apply", "")
 	{
-		const char* particle_emitter_exts[] = {"par" };
+		const char* particle_emitter_exts[] = {"par", "pat" };
 		m_app.getAssetCompiler().addPlugin(m_particle_system_plugin, Span(particle_emitter_exts));
 		m_app.getAssetBrowser().addPlugin(m_particle_system_plugin, Span(particle_emitter_exts));
 	}
@@ -2740,7 +2747,15 @@ struct ParticleEditorImpl : ParticleEditor {
 		func.name = Path::getBasename(path);
 	}
 
+	bool compileText(InputMemoryStream& input, OutputMemoryStream& output, const Path& path) {
+		StringView content = { (const char*)input.getData(), (const char*)input.getData() + input.size() };
+		ParticleScriptCompiler compiler(content, path, m_allocator);
+		return compiler.compile(output);
+	}
+
 	bool compile(InputMemoryStream& input, OutputMemoryStream& output, const char* path) override {
+		if (Path::hasExtension(path, "pat")) return compileText(input, output, Path(path));
+
 		ParticleSystemEditorResource res(Path(path), m_app, m_allocator);
 		if (!res.deserialize(input)) return false;
 
@@ -2759,6 +2774,7 @@ struct ParticleEditorImpl : ParticleEditor {
 			emitter->fillVertexDecl(decl, nullptr, m_allocator);
 			output.write(decl);
 			output.writeString(emitter->m_mat_path);
+			output.writeString(emitter->m_model_path);
 			const u32 count = u32(emitter->m_update.size() + emitter->m_emit.size() + emitter->m_output.size());
 			output.write(count);
 			output.write(emitter->m_update.data(), emitter->m_update.size());
@@ -2795,6 +2811,125 @@ struct ParticleEditorImpl : ParticleEditor {
 	ParticleSystemPlugin m_particle_system_plugin;
 	FunctionPlugin m_function_plugin;
 	Action m_apply_action;
+};
+
+struct ParticleScriptEditorWindow : AssetEditorWindow {
+	ParticleScriptEditorWindow(const Path& path, StudioApp& app)
+		: AssetEditorWindow(app)
+		, m_app(app)
+		, m_path(path)
+		, m_viewer(app)
+	{
+		m_editor = createParticleScriptEditor(m_app);
+		m_editor->focus();
+			
+		OutputMemoryStream blob(app.getAllocator());
+		if (app.getEngine().getFileSystem().getContentSync(path, blob)) {
+			StringView v((const char*)blob.data(), (u32)blob.size());
+			m_editor->setText(v);
+		}
+
+		World* world = m_viewer.m_world;
+		m_preview_entity = world->createEntity({0, 0, 0}, Quat::IDENTITY);
+		world->createComponent(types::particle_emitter, m_preview_entity);
+		RenderModule* module = (RenderModule*)world->getModule(types::particle_emitter);
+		module->setParticleEmitterPath(m_preview_entity, m_path);
+
+		m_viewer.m_viewport.pos = {0, 2, 5};
+		m_viewer.m_viewport.rot = {0, 0, 1, 0};
+	}
+
+	void save() {
+		OutputMemoryStream blob(m_app.getAllocator());
+		m_editor->serializeText(blob);
+		m_app.getAssetBrowser().saveResource(m_path, blob);
+		m_dirty = false;
+	}
+
+	void fileChangedExternally() override {
+		OutputMemoryStream tmp(m_app.getAllocator());
+		OutputMemoryStream tmp2(m_app.getAllocator());
+		m_editor->serializeText(tmp);
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		if (!fs.getContentSync(m_path, tmp2)) return;
+
+		if (tmp.size() == tmp2.size() && memcmp(tmp.data(), tmp2.data(), tmp.size()) == 0) {
+			m_dirty = false;
+		}
+	}
+
+	void windowGUI() override {
+		CommonActions& actions = m_app.getCommonActions();
+
+		if (ImGui::BeginMenuBar()) {
+			if (actions.save.iconButton(m_dirty, &m_app)) save();
+			if (actions.open_externally.iconButton(true, &m_app)) m_app.getAssetBrowser().openInExternalEditor(m_path);
+			if (actions.view_in_browser.iconButton(true, &m_app)) m_app.getAssetBrowser().locate(m_path);
+			if (ImGuiEx::IconButton(ICON_FA_ANGLE_DOUBLE_RIGHT, "Toggle preview")) m_show_preview = !m_show_preview;
+			if (ImGuiEx::IconButton(ICON_FA_BUG, "Debug")) { ASSERT(false); /*TODO*/ };
+			ImGui::EndMenuBar();
+		}
+
+		float w = ImGui::GetContentRegionAvail().x / 2;
+		// TODO hide preview pane -> code_page does not stretch
+		if (ImGui::BeginChild("code_pane", ImVec2(m_show_preview ? w : 0, 0), ImGuiChildFlags_ResizeX)) {
+			if (m_editor->gui("codeeditor", ImVec2(0, 0), m_app.getMonospaceFont(), m_app.getDefaultFont())) m_dirty = true;
+		}
+		ImGui::EndChild();
+		if (m_show_preview) {
+			ImGui::SameLine();
+			if (ImGui::BeginChild("preview_pane")) {
+				auto* module = (RenderModule*)m_viewer.m_world->getModule(types::particle_emitter);
+				if (m_play) {
+					if (ImGuiEx::IconButton(ICON_FA_PAUSE, "Pause")) m_play = false;
+					float td = m_app.getEngine().getLastTimeDelta();
+					module->updateParticleEmitter(m_preview_entity, td);
+				}
+				else {
+					if (ImGuiEx::IconButton(ICON_FA_PLAY, "Play")) m_play = true;
+				}
+				ImGui::SameLine();
+				if (ImGuiEx::IconButton(ICON_FA_STEP_FORWARD, "Next frame")) {
+					if (m_play) logError("Particle simulation must be paused.");
+					else {
+						float td = m_app.getEngine().getLastTimeDelta();
+						module->updateParticleEmitter(m_preview_entity, td);
+					}
+				}
+				
+				ParticleSystem& system = module->getParticleEmitter(m_preview_entity);
+				ImGui::SameLine();
+				if (ImGuiEx::IconButton(ICON_FA_EYE, "Toggle ground")) {
+					m_show_ground = !m_show_ground;
+					module->enableModelInstance(m_viewer.m_ground, m_show_ground);
+				};
+
+				ImGui::SameLine();
+				if (ImGui::Button(ICON_FA_UNDO_ALT " Reset")) system.reset();
+				u32 num_particles = 0;
+				for (ParticleSystem::Emitter& emitter : system.getEmitters()) {
+					num_particles += emitter.particles_count;
+				}
+				
+				ImGui::SameLine();
+				ImGui::Text("Particles: %d", num_particles);
+				m_viewer.gui();
+			}
+			ImGui::EndChild();
+		}
+	}
+	
+	const Path& getPath() override { return m_path; }
+	const char* getName() const override { return "particle script editor"; }
+
+	StudioApp& m_app;
+	UniquePtr<CodeEditor> m_editor;
+	WorldViewer m_viewer;
+	Path m_path;
+	EntityRef m_preview_entity;
+	bool m_play = true;
+	bool m_show_preview = true;
+	bool m_show_ground = true;
 };
 
 struct ParticleEditorWindow : AssetEditorWindow, NodeEditor {
@@ -3345,9 +3480,8 @@ struct ParticleEditorWindow : AssetEditorWindow, NodeEditor {
 		if (selected.size() != 1) return nullptr;
 
 		World* world = editor.getWorld();
-		ComponentType emitter_type = reflection::getComponentType("particle_emitter");
-		RenderModule* module = (RenderModule*)world->getModule(emitter_type);
-		const bool has = world->hasComponent(selected[0], emitter_type);
+		RenderModule* module = (RenderModule*)world->getModule(types::particle_emitter);
+		const bool has = world->hasComponent(selected[0], types::particle_emitter);
 		return has ? &module->getParticleEmitter(selected[0]) : nullptr;
 	}
 
@@ -3589,9 +3723,15 @@ struct ParticleEditorWindow : AssetEditorWindow, NodeEditor {
 
 
 void ParticleEditorImpl::open(const Path& path) {
-	UniquePtr<ParticleEditorWindow> win = UniquePtr<ParticleEditorWindow>::create(m_allocator, path, *this, m_app, m_allocator);
-	win->loadResource();
-	m_app.getAssetBrowser().addWindow(win.move());
+	if (Path::hasExtension(path, "pat")) {
+		UniquePtr<ParticleScriptEditorWindow> win = UniquePtr<ParticleScriptEditorWindow>::create(m_allocator, path, m_app);
+		m_app.getAssetBrowser().addWindow(win.move());
+	}
+	else {
+		UniquePtr<ParticleEditorWindow> win = UniquePtr<ParticleEditorWindow>::create(m_allocator, path, *this, m_app, m_allocator);
+		win->loadResource();
+		m_app.getAssetBrowser().addWindow(win.move());
+	}
 }
 
 void ParticleEditorImpl::FunctionPlugin::addSubresources(AssetCompiler& compiler, const Path& path, AtomicI32&) {

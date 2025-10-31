@@ -7,6 +7,7 @@
 #include "editor/spline_editor.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
+#include "engine/component_types.h"
 #include "engine/component_uid.h"
 #include "engine/core.h"
 #include "engine/engine.h"
@@ -16,8 +17,6 @@
 #include <imgui/imgui.h>
 
 namespace Lumix {
-
-static const ComponentType SPLINE_TYPE = reflection::getComponentType("spline");
 
 struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::IPlugin {
 	SplineEditorPlugin(StudioApp& app)
@@ -54,7 +53,7 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 		Span<const EntityRef> selected = editor.getSelectedEntities();
 		if (selected.size() != 1) return INVALID_ENTITY;
 		
-		if (editor.getWorld()->hasComponent(selected[0], SPLINE_TYPE)) return selected[0];
+		if (editor.getWorld()->hasComponent(selected[0], types::spline)) return selected[0];
 		return INVALID_ENTITY;
 	}
 
@@ -81,7 +80,7 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 
 		RayHit hit = view.getCameraRaycastHit(x, y, INVALID_ENTITY);
 		if (hit.is_hit) {
-			CoreModule* module = (CoreModule*)world->getModule(SPLINE_TYPE);
+			CoreModule* module = (CoreModule*)world->getModule(types::spline);
 			Spline& hit_spline = module->getSpline(e);
 			m_selected = (i32)hit_spline.points.size();
 			recordUndo(-1, hit_spline, e, [&](){
@@ -94,9 +93,9 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 		WorldEditor& editor = m_app.getWorldEditor();
 		World* world = editor.getWorld();
 
-		ASSERT(world->hasComponent(entity, SPLINE_TYPE));
+		ASSERT(world->hasComponent(entity, types::spline));
 
-		CoreModule* module = (CoreModule*)world->getModule(SPLINE_TYPE);
+		CoreModule* module = (CoreModule*)world->getModule(types::spline);
 		Spline& spline = module->getSpline(entity);
 		
 		recordUndo(-1, spline, entity, [&](){
@@ -112,15 +111,15 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 
 		World* world = editor.getWorld();
 
-		if (!world->hasComponent(selected[0], SPLINE_TYPE)) return nullptr;
+		if (!world->hasComponent(selected[0], types::spline)) return nullptr;
 
-		CoreModule* module = (CoreModule*)world->getModule(SPLINE_TYPE);
+		CoreModule* module = (CoreModule*)world->getModule(types::spline);
 		return &module->getSpline(selected[0]);
 	}
 
 	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, const TextFilter& filter, WorldEditor& editor) override {
 		if (filter.isActive()) return;
-		if (cmp_type != SPLINE_TYPE) return;
+		if (cmp_type != types::spline) return;
 		if (entities.length() != 1) return;
 
 		const EntityRef entity = entities[0];
@@ -151,14 +150,14 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 		{}
 
 		bool execute() override { 
-			CoreModule* module = (CoreModule*)editor.getWorld()->getModule(SPLINE_TYPE);
+			CoreModule* module = (CoreModule*)editor.getWorld()->getModule(types::spline);
 			Spline& spline = module->getSpline(e);
 			new_points.copyTo(spline.points);
 			return true;
 		}
 
 		void undo() override {
-			CoreModule* module = (CoreModule*)editor.getWorld()->getModule(SPLINE_TYPE);
+			CoreModule* module = (CoreModule*)editor.getWorld()->getModule(types::spline);
 			Spline& spline = module->getSpline(e);
 			old_points.copyTo(spline.points);
 		}
@@ -198,11 +197,11 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 
 	bool showGizmo(WorldView& view, ComponentUID cmp) override {
 		m_hovered_gizmo = false;
-		if (cmp.type != SPLINE_TYPE) return false;
+		if (cmp.type != types::spline) return false;
 		
 		const EntityRef e = (EntityRef)cmp.entity;
 		World& world = cmp.module->getWorld();
-		if (!world.hasComponent(e, SPLINE_TYPE)) return false;
+		if (!world.hasComponent(e, types::spline)) return false;
 
 		CoreModule* module = (CoreModule*)cmp.module;
 		Spline& spline = module->getSpline(e);
