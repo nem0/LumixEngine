@@ -38,6 +38,47 @@ struct ParticleScriptCompiler {
         }
 	};
 
+	struct Function {
+        InstructionType instruction;
+        bool returns_value;
+    };
+
+    enum class SystemValue {
+        TIME_DELTA,
+        TOTAL_TIME,
+        
+        NONE,
+    };
+
+	enum class Operators : char {
+		ADD = '+',
+		SUB = '-',
+		DIV = '/',
+		MUL = '*',
+		LT = '<',
+		GT = '>',
+	};
+
+	struct ExpressionStackElement {
+		enum Type {
+			NONE,
+			LITERAL,
+			OPERATOR,
+			FUNCTION,
+			VARIABLE,
+			SYSTEM_VALUE
+		};
+
+		Type type;
+		float literal_value;
+		Operators operator_char;
+		InstructionType function;
+		i32 variable_index;
+		SystemValue system_value;
+		i32 sub;
+		u32 parenthesis_depth = 0xffFFffFF;
+	};
+
 	struct Emitter {
 		Emitter(IAllocator& allocator)
 			: m_outputs(allocator)
@@ -55,7 +96,8 @@ struct ParticleScriptCompiler {
 		OutputMemoryStream m_output;
 		Array<Variable> m_vars;
 		Array<Variable> m_outputs;
-		i32 m_register_allocator = 0;
+		u32 m_num_used_registers = 0;
+		u32 m_register_allocator = 0;
 		u32 m_init_emit_count = 0;
 		float m_emit_per_second = 0;
 	};
@@ -65,6 +107,8 @@ struct ParticleScriptCompiler {
 		, m_content(content)
 		, m_emitters(allocator)
 		, m_constants(allocator)
+		, m_stack(allocator)
+		, m_postfix(allocator)
 		, m_path(path)
         , m_text_begin(content.begin)
 	{}
@@ -83,9 +127,13 @@ struct ParticleScriptCompiler {
 		}
 	}
 
-	void expectNotEOF() {
+	bool expectNotEOF() {
 		skipWhitespaces();
-		if (m_content.size() == 0) error(m_content, "Unexpected end of file");
+		if (m_content.size() == 0) {
+			error(m_content, "Unexpected end of file");
+			return false;
+		}
+		return true;
 	}
 
 	StringView tryReadWord() {
@@ -149,11 +197,6 @@ struct ParticleScriptCompiler {
 		return res;
 	}
 
-    struct Function {
-        InstructionType instruction;
-        bool returns_value;
-    };
-
 	Function getFunction(StringView name) {
 		if (equalStrings(name, "cos")) return { InstructionType::COS, true };
 		else if (equalStrings(name, "sin")) return { InstructionType::SIN, true };
@@ -176,13 +219,6 @@ struct ParticleScriptCompiler {
 		}
 		return -1;
 	}
-
-    enum class SystemValue {
-        TIME_DELTA,
-        TOTAL_TIME,
-        
-        NONE,
-    };
 
 	SystemValue getSystemValue(StringView name) {
 		if (equalStrings(name, "time_delta")) return SystemValue::TIME_DELTA;
@@ -277,214 +313,359 @@ struct ParticleScriptCompiler {
 		return *m_content.begin;
 	}
 
-	bool tryReadSemicolon() {
-		skipWhitespaces();
-		if (m_content.size() == 0) return false;
-		if (*m_content.begin != ';') return false;
-
-		++m_content.begin;
-		return true;
-	}
-
-	StringView readOperator() {
-		expectNotEOF();
-		switch (*m_content.begin) {
-			case '(':
-			case '<':
-			case '>':
-			case '+':
-			case '-':
-			case '*':
-			case '//':
-			case '%': break;
-			default: 
-				error(m_content, "Expected an operator");
-				return {};
+	static void deallocRegister(Emitter& emitter, const DataStream& stream) {
+		if (stream.type == DataStream::REGISTER) {
+			emitter.m_register_allocator = emitter.m_register_allocator & ~(1 << stream.index);
 		}
-		
-		StringView res;
-		res.begin = m_content.begin;
-		res.end = res.begin + 1;
-		++m_content.begin;
-		return res;
 	}
 
 	DataStream allocRegister(Emitter& emitter) {
 		DataStream res;
 		res.type = DataStream::REGISTER;
-		res.index = emitter.m_register_allocator;
-		++emitter.m_register_allocator;
+		for (u32 i = 0; i < 32; ++i) {
+			if ((emitter.m_register_allocator & (1 << i)) == 0) {
+				res.index = i;
+				emitter.m_num_used_registers = maximum(emitter.m_num_used_registers, i + 1);
+				emitter.m_register_allocator |= 1 << i;
+				return res;
+			}
+		}
+		error(m_content, "Run out of allocators");
 		return res;
 	}
+	
+	bool isOperator(char c) { 
+		switch ((Operators)c) {
+			case Operators::ADD: case Operators::SUB:
+			case Operators::MUL: case Operators::DIV:
+			case Operators::LT: case Operators::GT:
+				return true;
+		}
+		return false;
+	}
 
-	DataStream compileExpression(Emitter& emitter, OutputMemoryStream& compiled, bool is_function_arg, u32 sub) {
-		expectNotEOF();
-
-		DataStream op1;
+	DataStream compilePostfix(Emitter& emitter, OutputMemoryStream& compiled) {
+		ExpressionStackElement el = m_postfix.last();
+		m_postfix.pop();
 		
-		if (peekChar() == '{') {
-			++m_content.begin;
-			op1.type = DataStream::LITERAL;
-			op1.value = readNumber();
-			for (u32 i = 1; i <= sub; ++i) {
-				expect(",");
-				op1.value = readNumber();
+		if (el.type == ExpressionStackElement::LITERAL) {
+			DataStream res;
+			res.type = DataStream::LITERAL;
+			res.value = el.literal_value;
+			return res;
+		}
+
+		if (el.type == ExpressionStackElement::SYSTEM_VALUE) {
+			DataStream res;
+			res.type = DataStream::CONST;
+			res.index = (u8)el.system_value;
+			return res;
+		}
+
+		if (el.type == ExpressionStackElement::VARIABLE) {
+			DataStream res;
+			res.type = DataStream::CHANNEL;
+			res.index = emitter.m_vars[el.variable_index].getOffsetSub(el.sub);
+			return res;
+		}
+
+		if (el.type == ExpressionStackElement::OPERATOR) {
+			if (m_postfix.size() < 2) {
+				// TODO error location
+				error(m_content, "Operator must have left and right side");
+				return {};
 			}
-			for (;;) {
-				StringView w = readWord();
-				if (w.size() == 0) {
-					error(w, "Unexpected end of file");
-					break;
+			DataStream op2 = compilePostfix(emitter, compiled);
+			DataStream op1 = compilePostfix(emitter, compiled);
+			switch (el.operator_char) {
+				case Operators::ADD: compiled.write(InstructionType::ADD); break;
+				case Operators::SUB: compiled.write(InstructionType::SUB); break;
+				case Operators::MUL: compiled.write(InstructionType::MUL); break;
+				case Operators::DIV: compiled.write(InstructionType::DIV); break;
+				case Operators::LT: compiled.write(InstructionType::LT); break;
+				case Operators::GT: compiled.write(InstructionType::GT); break;
+			}
+
+			DataStream res = allocRegister(emitter);
+			compiled.write(res);
+			compiled.write(op1);
+			compiled.write(op2);
+
+			deallocRegister(emitter, op1);
+			deallocRegister(emitter, op2);
+			return res;
+		}
+
+		if (el.type == ExpressionStackElement::FUNCTION) {
+			if (el.function == InstructionType::RAND) {
+				DataStream res = allocRegister(emitter);
+				compiled.write(el.function);
+				compiled.write(res);
+				if (m_postfix.size() < 2) {
+					// TODO error location
+					error(m_content, "rand expects 2 arguments");
+					return {};
 				}
-				if (equalStrings(w, "}")) break;
-				if (!equalStrings(w, ",")) error(w, "Expected ,");
-				readNumber();
+				ExpressionStackElement arg1 = m_postfix.last();
+				m_postfix.pop();
+				ExpressionStackElement arg0 = m_postfix.last();
+				m_postfix.pop();
+				if (arg0.type != ExpressionStackElement::LITERAL || arg0.type != ExpressionStackElement::LITERAL) {
+					// TODO error location
+					error(m_content, "rand expects 2 lietrals");
+					return {};
+				}
+
+				compiled.write(arg0.literal_value);
+				compiled.write(arg1.literal_value);
+				return res;
 			}
-		}
-		else if (isNumeric(*m_content.begin)) {
-			op1.type = DataStream::LITERAL;
-			op1.value = readNumber(); 
-		}
-		else if (*m_content.begin == '-') {
-			op1.type = DataStream::LITERAL;
-			if (m_content.begin < m_content.end - 1 && isNumeric(m_content.begin[1])) {
-                op1.value = readNumber(); 
-            }
-            else {
-                StringView cname = readIdentifier();
-                Constant* c = getConstant(cname);
-                if (!c) error (cname, "Unknown constant");
-                else {
-                    op1.value = -c->value[sub];
-                }
-            }
-		}
-        else {
-            StringView ident = readIdentifier();
-            Constant* c = getConstant(ident);
-            if (c) {
-    			op1.type = DataStream::LITERAL;
-                op1.value = c->value[sub];
-            }
-            else {
-                SystemValue system_value = getSystemValue(ident);
-                if (system_value != SystemValue::NONE) {
-                    op1.type = DataStream::CONST;
-                    op1.index = (u8)system_value;
-                } 
-                else {
-                    i32 var_index = getVariableIndex(emitter, ident);
-                    if (var_index >= 0) {
-                        const Variable& var = emitter.m_vars[var_index];
-                        op1.type = DataStream::CHANNEL;
-                        if (peekChar() != '.') {
-							op1.index = var.getOffsetSub(sub);
-						}
-						else {
-							++m_content.begin;
-							switch(peekChar()) {
-								case 'r': case 'x': op1.index = var.getOffsetSub(0); break;
-								case 'g': case 'y': op1.index = var.getOffsetSub(1); break;
-								case 'b': case 'z': op1.index = var.getOffsetSub(2); break;
-								case 'a': case 'w': op1.index = var.getOffsetSub(3); break;
-								default: error(m_content, "Invalid subscript"); --m_content.begin; break;
-							}
-							++m_content.begin;
-						}
-                    }
-                    else {
-                        Function fn = getFunction(ident);
-                        if (fn.instruction != InstructionType::END) {
-                            if (!fn.returns_value) error(ident, "Function does not return a value");
-                            expect("(");
-                            if (fn.instruction == InstructionType::RAND) {
-                                op1 = allocRegister(emitter);
-                                compiled.write(fn.instruction);
-                                compiled.write(op1);
-                                compiled.write(readNumber());
-                                expect(",");
-                                compiled.write(readNumber());
-                            }
-                            else if (fn.instruction == InstructionType::GRADIENT) {
-                                DataStream arg0 = compileExpression(emitter, compiled, true, sub);
-                                op1 = allocRegister(emitter);
-                                compiled.write(fn.instruction);
-                                compiled.write(op1);
-                                compiled.write(arg0);
-                                u32 num_keyframes = 2;
-                                expect(",");
-                                float keys[8];
-                                float values[8];
-                                keys[0] = readNumber();
-                                expect(",");
-                                values[0] = readNumberOrSub(sub);
 
-                                expect(",");
-                                keys[1] = readNumber();
-                                expect(",");
-                                values[1] = readNumberOrSub(sub);
+			if (el.function == InstructionType::GRADIENT) {
+				DataStream res = allocRegister(emitter);
+				compiled.write(el.function);
+				compiled.write(res);
 
-                                for (;;) {
-                                    if (peekChar() != ',') break;
-                                    if (num_keyframes == lengthOf(keys)) {
-                                        error(m_content, "Too many arguments");
-                                        break;
-                                    } 
-                                    expect(",");
-                                    keys[num_keyframes] = readNumberOrSub(sub);
-                                    expect(",");
-                                    values[num_keyframes] = readNumberOrSub(sub);
-                                    ++num_keyframes;
-                                }
-                                compiled.write(num_keyframes);
-                                compiled.write(keys, sizeof(keys[0]) * num_keyframes);
-                                compiled.write(values, sizeof(values[0]) * num_keyframes);
-                                // TODO collapse if all values are the same
-                            }
-                            else {
-                                DataStream arg_val = compileExpression(emitter, compiled, true, sub);
-                                op1 = allocRegister(emitter);
-                                compiled.write(fn.instruction);
-                                compiled.write(op1);
-                                compiled.write(arg_val);
-                            }
-                            expect(")");
-                        }
-                        else {
-                            error(ident, "Unknown identifier");
-                        }
-                    }
-                }
-            }
-		}
-		skipWhitespaces();
-		if (tryReadSemicolon()) {
-			return op1;
-		}
-		if (is_function_arg && (peekChar() == ')' || peekChar() == ',')) {
-			return op1;
+				float keys[8];
+				float values[8];
+				u32 num_frames = 0;
+				DataStream t;
+				for (;;) {
+					DataStream stream = compilePostfix(emitter, compiled);
+					if (stream.type != DataStream::LITERAL) {
+						t = stream;
+						break;
+					}
+					keys[num_frames] = stream.value;
+
+					stream = compilePostfix(emitter, compiled);
+					if (stream.type != DataStream::LITERAL) {
+						// TODO error location
+						error(m_content, "Literal expected");
+						return {};
+					}
+					values[num_frames] = stream.value;
+					++num_frames;
+				}
+
+				compiled.write(t);
+				deallocRegister(emitter, t);
+				compiled.write(num_frames);
+				compiled.write(keys, sizeof(keys[0]) * num_frames);
+				compiled.write(values, sizeof(values[0]) * num_frames);
+				return res;
+			}
+
+			DataStream op1 = compilePostfix(emitter, compiled);
+			DataStream res = allocRegister(emitter);
+			compiled.write(el.function);
+			compiled.write(res);
+			compiled.write(op1);
+			deallocRegister(emitter, op1);
+
+			return res;
 		}
 
-		StringView oper = readOperator();
-		if (oper.size() == 0) return op1;
+		ASSERT(false);
+		return {};
+	}
 
-		DataStream op2 = compileExpression(emitter, compiled, is_function_arg, sub);
-
-		switch (*oper.begin) {
-			case '>': compiled.write(InstructionType::GT); break;
-			case '<': compiled.write(InstructionType::LT); break;
-			case '+': compiled.write(InstructionType::ADD); break;
-			case '-': compiled.write(InstructionType::SUB); break;
-			case '*': compiled.write(InstructionType::MUL); break;
-			case '/': compiled.write(InstructionType::DIV); break;
-			case '%': compiled.write(InstructionType::MOD); break;
+	u32 getPriority(const ExpressionStackElement& el) {
+		u32 prio = el.parenthesis_depth * 10;
+		switch (el.type) {
+			case ExpressionStackElement::FUNCTION: prio += 9; break;
+			case ExpressionStackElement::OPERATOR: 
+				switch(el.operator_char) {
+					case Operators::GT: case Operators::LT: prio += 0; break;
+					case Operators::ADD: case Operators::SUB: prio += 1; break;
+					case Operators::MUL: case Operators::DIV: prio += 2; break;
+				}
+				break;
+			default: ASSERT(false);
 		}
+		return prio;
+	}
 
-		DataStream res = allocRegister(emitter);
-		compiled.write(res);
-		compiled.write(op1);
-		compiled.write(op2);
-		return res;
+	void pushStack(const ExpressionStackElement& el) {
+		u32 priority = getPriority(el);
+		while (!m_stack.empty()) {
+			if (getPriority(m_stack.last()) < priority) break;
+
+			m_postfix.push(m_stack.last());
+			m_stack.pop();
+		}
+		m_stack.push(el);
+	}
+
+	DataStream compileExpression(Emitter& emitter, OutputMemoryStream& compiled, u32 sub) {
+		m_stack.clear();
+		m_postfix.clear();
+
+		const char* expression_start = m_content.begin;
+		bool can_be_unary = true;
+		// convert tokens to postfix notation and then compile
+		u32 parenthesis_depth = 0;
+		for (;;) {
+			expectNotEOF();
+
+			const char peeked = peekChar();
+			if (peeked == ';') {
+				++m_content.begin;
+				while (!m_stack.empty()) {
+					m_postfix.push(m_stack.last());
+					m_stack.pop();
+				}
+				if (m_postfix.empty()) {
+					error(expression_start, "Empty expression");
+					return {};
+				}
+				return compilePostfix(emitter, compiled);
+			}
+
+			if (peeked == ')') {
+				if (parenthesis_depth == 0) {
+					error(m_content, "Unexpected )");
+					return {};
+				}
+				++m_content.begin;
+				--parenthesis_depth;
+				can_be_unary = false;
+				continue;
+			}
+
+			if (peeked == '(') {
+				can_be_unary = true;
+				++parenthesis_depth;
+				++m_content.begin;
+				continue;
+			}
+
+			if (peeked == ',') {
+				if (parenthesis_depth == 0) {
+					error(m_content, "Unexpected ,");
+					return {};
+				}
+				can_be_unary = true;
+				++m_content.begin;
+				continue;
+			}
+
+			if (peeked == '{') {
+				ExpressionStackElement& el = m_postfix.emplace();
+				el.type = ExpressionStackElement::LITERAL;
+				el.literal_value = readNumberOrSub(sub);
+				el.parenthesis_depth = parenthesis_depth;
+				can_be_unary = true;
+				continue;
+			}			
+
+			if (isNumeric(peeked)) {
+				ExpressionStackElement& el = m_postfix.emplace();
+				el.type = ExpressionStackElement::LITERAL;
+				el.literal_value = readNumber();
+				el.parenthesis_depth = parenthesis_depth;
+				can_be_unary = false;
+				continue;
+			}
+
+			if (isOperator(peeked)) {
+				if (can_be_unary && peeked == '-') {
+					can_be_unary = false;
+					++m_content.begin;
+					if (!expectNotEOF()) return {};
+					if (isNumeric(peekChar())) {
+						float v = -readNumber();
+					
+						ExpressionStackElement& el = m_postfix.emplace();
+						el.type = ExpressionStackElement::LITERAL;
+						el.literal_value = v;
+						continue;
+					}
+
+					StringView iden = readIdentifier();
+					Constant* c = getConstant(iden);
+					if (c) {
+						ExpressionStackElement& el = m_postfix.emplace();
+						el.type = ExpressionStackElement::LITERAL;
+						el.literal_value = -c->value[sub];
+						continue;
+					}
+
+					error(iden, "Only literal or const is supported after unary -");
+					return {};
+				}
+				++m_content.begin;
+				ExpressionStackElement el;
+				el.type = ExpressionStackElement::OPERATOR;
+				el.operator_char = (Operators)peeked;
+				el.parenthesis_depth = parenthesis_depth;
+				pushStack(el);
+				can_be_unary = true;
+				continue;
+			}
+			
+			StringView ident = readIdentifier();
+			if (Constant* c = getConstant(ident)) {
+				ExpressionStackElement& el = m_postfix.emplace();
+				el.type = ExpressionStackElement::LITERAL;
+				el.literal_value = c->value[sub];
+				el.parenthesis_depth = parenthesis_depth;
+				can_be_unary = false;
+				continue;
+			}
+
+			Function fn = getFunction(ident);
+			if (fn.instruction != InstructionType::END) {
+				ExpressionStackElement el;
+				el.type = ExpressionStackElement::FUNCTION;
+				el.function = fn.instruction;
+				el.parenthesis_depth = parenthesis_depth;
+				pushStack(el);
+				expect("(");
+				++parenthesis_depth;
+				can_be_unary = true;
+				continue;
+			}
+
+			i32 var_index = getVariableIndex(emitter, ident);
+			if (var_index >= 0) {
+				ExpressionStackElement& el = m_postfix.emplace();
+				el.type = ExpressionStackElement::VARIABLE;
+				el.variable_index = var_index;
+				el.parenthesis_depth = parenthesis_depth;
+				can_be_unary = false;
+			
+				if (peekChar() != '.') {
+					el.sub = sub;
+					continue;
+				}
+
+				++m_content.begin;
+				switch(peekChar()) {
+					case 'x': case 'r': el.sub = 0; break;
+					case 'y': case 'g': el.sub = 1; break;
+					case 'z': case 'b': el.sub = 2; break;
+					case 'w': case 'a': el.sub = 3; break;
+					default: error(m_content, "Unknown subscript"); --m_content.begin; break;
+				}
+				++m_content.begin;
+				continue;
+			}
+				
+            SystemValue system_value = getSystemValue(ident);
+            if (system_value != SystemValue::NONE) {
+				ExpressionStackElement& el = m_postfix.emplace();
+				el.type = ExpressionStackElement::SYSTEM_VALUE;
+				el.system_value = system_value;
+				el.parenthesis_depth = parenthesis_depth;
+				can_be_unary = false;
+				continue;
+			}
+
+			error(ident, "Unknown identifier");
+			return {};
+		}
+		return {};
 	}
 
 	void compileAssignment(Emitter& emitter, OutputMemoryStream& compiled, Array<Variable>& vars, u32 var_index, DataStream::Type stream_type) {
@@ -492,7 +673,7 @@ struct ParticleScriptCompiler {
 		switch (vars[var_index].type) {
 			case Type::FLOAT: {
 				expect("=");
-				DataStream expr_result = compileExpression(emitter, compiled, false, 0);
+				DataStream expr_result = compileExpression(emitter, compiled, 0);
 				DataStream dst;
 				dst.type = stream_type;
 				dst.index = offset;
@@ -517,7 +698,7 @@ struct ParticleScriptCompiler {
 					} 
 
 					expect("=");
-					DataStream expr_result = compileExpression(emitter, compiled, false, 0);
+					DataStream expr_result = compileExpression(emitter, compiled, 0);
 					DataStream dst;
 					dst.type = stream_type;
 					dst.index = offset;
@@ -529,7 +710,7 @@ struct ParticleScriptCompiler {
 					expect("=");
 					for (i32 i = 0; i < (is_float4 ? 4 : 3); ++i) {
 						StringView content = m_content;
-						DataStream expr_result = compileExpression(emitter, compiled, false, i);
+						DataStream expr_result = compileExpression(emitter, compiled, i);
 						DataStream dst;
 						dst.type = stream_type;
 						dst.index = offset + i;
@@ -541,7 +722,8 @@ struct ParticleScriptCompiler {
 				}
 				break;
 			}
-		}	
+		}
+		emitter.m_register_allocator = 0;
 	}
 
 	void compileFunction(Emitter& emitter) {
@@ -572,11 +754,7 @@ struct ParticleScriptCompiler {
 					Function fn = getFunction(word);
 					if (fn.instruction != InstructionType::END) {
 						if (fn.returns_value) error(word, "Unexpected function call");
-                        expect("(");
-						DataStream arg_val = compileExpression(emitter, compiled, true, 0);
-						expect(")");
-						expect(";");
-						DataStream dst = allocRegister(emitter);
+						DataStream arg_val = compileExpression(emitter, compiled, 0);
 						compiled.write(fn.instruction);
 						compiled.write(arg_val);
 					}
@@ -587,7 +765,8 @@ struct ParticleScriptCompiler {
 			}
 		}
 		compiled.write(InstructionType::END);
-		
+		// TODO optimize the bytecode
+		// e.g. there are unnecessary movs
 	}
 
 	Type readType() {
@@ -639,7 +818,7 @@ struct ParticleScriptCompiler {
 		
 	}
 
-	void parseConst() {
+	void compileConst() {
 		StringView name = readIdentifier();
         expect("=");
         Constant& c = m_constants.emplace();
@@ -704,9 +883,9 @@ struct ParticleScriptCompiler {
 		for (;;) {
 			StringView word = tryReadWord();
 			if (word.size() == 0) break;
-			if (equalStrings(word, "const")) parseConst();
+			if (equalStrings(word, "const")) compileConst();
 			else if (equalStrings(word, "emitter")) compileEmitter();
-			else if (!equalStrings(word, "\n")) error(word, "Syntax error");
+			else if (word.size() != 1 || !isWhitespace(word[0])) error(word, "Syntax error");
 		}
 
 		ParticleSystemResource::Header header;
@@ -744,7 +923,7 @@ struct ParticleScriptCompiler {
 			};
 
 			output.write(getCount(emitter.m_vars));
-			output.write(emitter.m_register_allocator);
+			output.write(emitter.m_num_used_registers);
 			output.write(getCount(emitter.m_outputs));
 			output.write(emitter.m_init_emit_count);
 			output.write(emitter.m_emit_per_second);
@@ -778,6 +957,8 @@ struct ParticleScriptCompiler {
 	Path m_path;
 	Array<Emitter> m_emitters;
 	Array<Constant> m_constants;
+	StackArray<ExpressionStackElement, 16> m_stack;
+	StackArray<ExpressionStackElement, 16> m_postfix;
 	
 	StringView m_content;
     const char* m_text_begin;

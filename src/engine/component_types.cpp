@@ -46,9 +46,4 @@ extern const ComponentType model_instance = reflection::getComponentType("model_
 extern const ComponentType curve_decal = reflection::getComponentType("curve_decal");
 extern const ComponentType terrain = reflection::getComponentType("terrain");
 extern const ComponentType procedural_geom = reflection::getComponentType("procedural_geom");
-extern const ComponentType jolt_mesh = reflection::getComponentType("jolt_mesh");
-extern const ComponentType jolt_sphere = reflection::getComponentType("jolt_sphere");
-extern const ComponentType jolt_box = reflection::getComponentType("jolt_box");
-extern const ComponentType jolt_body = reflection::getComponentType("jolt_body");
-extern const ComponentType js_script = reflection::getComponentType("js_script");
 }
