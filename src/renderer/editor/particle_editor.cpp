@@ -2795,6 +2795,8 @@ struct ParticleEditorImpl : ParticleEditor {
 			output.write(emitter->m_init_emit_count);
 			output.write(emitter->m_emit_per_second);
 			output.write(getCount(emitter->m_emit_inputs));
+			output.write(u32(0)); // max ribbons
+			output.write(u32(0)); // max ribbon length
 		}
 		return true;
 	}
@@ -2908,7 +2910,12 @@ struct ParticleScriptEditorWindow : AssetEditorWindow {
 				if (ImGui::Button(ICON_FA_UNDO_ALT " Reset")) system.reset();
 				u32 num_particles = 0;
 				for (ParticleSystem::Emitter& emitter : system.getEmitters()) {
-					num_particles += emitter.particles_count;
+					if (emitter.resource_emitter.max_ribbons > 0) {
+						for (u32 n : emitter.ribbon_length) num_particles += n;
+					}
+					else {
+						num_particles += emitter.particles_count;
+					}
 				}
 				
 				ImGui::SameLine();

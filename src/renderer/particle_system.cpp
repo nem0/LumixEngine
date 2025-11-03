@@ -23,6 +23,12 @@
 namespace Lumix
 {
 
+enum class ParticleSystemValues : u8 {
+	TIME_DELTA = 0,
+	TOTAL_TIME = 1,
+	EMIT_INDEX = 2
+};
+
 using DataStream = ParticleSystemResource::DataStream;
 using InstructionType = ParticleSystemResource::InstructionType;
 
@@ -202,6 +208,13 @@ bool ParticleSystemResource::load(Span<const u8> mem) {
 		if (header.version > Version::EMIT) {
 			blob.read(emitter.emit_inputs_count);
 		}
+
+		if (header.version > Version::RIBBONS) {
+			blob.read(emitter.max_ribbons);
+			blob.read(emitter.max_ribbon_length);
+			emitter.max_ribbon_length = (emitter.max_ribbon_length + 3) & ~3;
+			blob.read(emitter.init_ribbons_count);
+		}
 	}
 	return true;
 }
@@ -217,6 +230,7 @@ ParticleSystem::ParticleSystem(EntityPtr entity, World& world, IAllocator& alloc
 ParticleSystem::Emitter::Emitter(ParticleSystem::Emitter&& rhs)
 	: system(rhs.system)
 	, resource_emitter(rhs.resource_emitter)
+	, ribbon_length(static_cast<Array<u32>&&>(rhs.ribbon_length))
 {
 	memcpy(channels, rhs.channels, sizeof(channels));
 	memset(rhs.channels, 0, sizeof(rhs.channels));
@@ -348,6 +362,32 @@ void ParticleSystem::ensureCapacity(Emitter& emitter, u32 num_new_particles) {
 }
 
 
+void ParticleSystem::emitRibbonPoints(u32 emitter_idx, u32 ribbon_idx, Span<const float> emit_data, u32 count, float time_step) {
+	Emitter& emitter = m_emitters[emitter_idx];
+	const ParticleSystemResource::Emitter& res_emitter = m_resource->getEmitters()[emitter_idx];
+
+	RunningContext ctx(emitter, m_allocator);
+	ctx.registers.resize(res_emitter.registers_count + emit_data.length());
+	
+	const float c1 = m_constants[(u8)ParticleSystemValues::TOTAL_TIME];
+	for (u32 i = 0; i < count; ++i) {
+		m_constants[(u8)ParticleSystemValues::EMIT_INDEX] = (float)emitter.emit_index; // TODO
+		if (emit_data.length() > 0) {
+			memcpy(ctx.registers.begin(), emit_data.begin(), emit_data.length() * sizeof(emit_data[0]));
+		}
+		ctx.particle_idx = emitter.ribbon_length[ribbon_idx] + ribbon_idx * emitter.resource_emitter.max_ribbon_length;
+		ctx.instructions.set(res_emitter.instructions.data() + res_emitter.emit_offset, res_emitter.instructions.size() - res_emitter.emit_offset);
+		run(ctx);
+		
+		++emitter.particles_count;
+		++emitter.ribbon_length[ribbon_idx];
+		++emitter.emit_index;
+		m_constants[(u8)ParticleSystemValues::TOTAL_TIME] += time_step;
+	}
+	m_last_update_stats.emitted.add(count);
+	m_constants[(u8)ParticleSystemValues::TOTAL_TIME] = c1;
+}
+
 void ParticleSystem::emit(u32 emitter_idx, Span<const float> emit_data, u32 count, float time_step) {
 	Emitter& emitter = m_emitters[emitter_idx];
 	const ParticleSystemResource::Emitter& res_emitter = m_resource->getEmitters()[emitter_idx];
@@ -356,9 +396,9 @@ void ParticleSystem::emit(u32 emitter_idx, Span<const float> emit_data, u32 coun
 	RunningContext ctx(emitter, m_allocator);
 	ctx.registers.resize(res_emitter.registers_count + emit_data.length());
 
-	const float c1 = m_constants[1];
+	const float c1 = m_constants[(u8)ParticleSystemValues::TOTAL_TIME];
 	for (u32 i = 0; i < count; ++i) {
-		m_constants[2] = (float)emitter.emit_index; // TODO
+		m_constants[(u8)ParticleSystemValues::EMIT_INDEX] = (float)emitter.emit_index; // TODO
 		if (emit_data.length() > 0) {
 			memcpy(ctx.registers.begin(), emit_data.begin(), emit_data.length() * sizeof(emit_data[0]));
 		}
@@ -368,10 +408,10 @@ void ParticleSystem::emit(u32 emitter_idx, Span<const float> emit_data, u32 coun
 		
 		++emitter.particles_count;
 		++emitter.emit_index;
-		m_constants[1] += time_step;
+		m_constants[(u8)ParticleSystemValues::TOTAL_TIME] += time_step;
 	}
 	m_last_update_stats.emitted.add(count);
-	m_constants[1] = c1;
+	m_constants[(u8)ParticleSystemValues::TOTAL_TIME] = c1;
 }
 
 
@@ -823,6 +863,7 @@ struct ParticleSystem::ChunkProcessorContext {
 	const Emitter& emitter;
 	PageAllocator& page_allocator;
 	i32 from;
+	i32 to;
 	float4* registers[16] = {};
 
 	u32 instructions_offset = 0;
@@ -839,7 +880,7 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 
 	ParticleSystemResource::Emitter& res_emitter = emitter.resource_emitter;
 	const i32 fromf4 = from / 4;
-	const i32 stepf4 = minimum(1024, emitter.particles_count - from + 3) / 4;
+	const i32 stepf4 = ((ctx.to - from) + 3) / 4;
 	InputMemoryStream ip = InputMemoryStream(res_emitter.instructions);
 	ip.skip(ctx.instructions_offset);
 	InstructionType itype = ip.read<InstructionType>();
@@ -854,15 +895,15 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 				const float4* start = getStream(emitter, condition_stream, fromf4, ctx.registers);
 				const float4* const end = start + stepf4;
 				u32 kill_count = 0;
-				u32 last = minimum(from + stepf4 * 4, emitter.particles_count) - 1;
+				u32 last = ctx.to - 1;
 				const i32 channels_count = res_emitter.channels_count;
 				for (const float4* cond = end - 1; cond >= start; --cond) {
 					const int m = f4MoveMask(*cond);
 					if (m) {
 						for (int i = 3; i >= 0; --i) {
 							const u32 index_in_chunk = u32((cond - start) * 4 + i);
-							const u32 particle_index = u32(from + index_in_chunk);
-							if ((m & (1 << i)) && particle_index < emitter.particles_count) {
+							const i32 particle_index = from + index_in_chunk;
+							if ((m & (1 << i)) && particle_index < ctx.to) {
 								for (i32 ch = 0; ch < channels_count; ++ch) {
 									float* data = emitter.channels[ch].data;
 									data[particle_index] = data[last];
@@ -888,8 +929,8 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 					if (!m) continue;
 					
 					for (int i = 0; i < 4; ++i) {
-						const u32 particle_index = u32(from + (cond - beg) * 4 + i);
-						if ((m & (1 << i)) && particle_index < emitter.particles_count) {
+						const i32 particle_index = from + i32(cond - beg) * 4 + i;
+						if ((m & (1 << i)) && particle_index < ctx.to) {
 							InputMemoryStream tmp_instr((const u8*)ip.getData() + ip.getPosition(), ip.remaining());
 							u32 emitter_idx = tmp_instr.read<u32>();
 							emit_ctx.instructions.set((const u8*)tmp_instr.getData() + tmp_instr.getPosition(), tmp_instr.remaining());
@@ -1085,10 +1126,36 @@ void ParticleSystem::applyTransform(const Transform& new_tr) {
 	m_prev_frame_transform = new_tr;
 }
 
+void ParticleSystem::updateRibbons(float dt, u32 emitter_idx, PageAllocator& page_allocator) {
+	Emitter& emitter = m_emitters[emitter_idx];
+	ParticleSystemResource::Emitter& res_emitter = emitter.resource_emitter;
+
+	ChunkProcessorContext ctx(emitter, page_allocator);
+	ctx.kill_counter = nullptr;
+	ctx.emit_mutex = nullptr;
+	ctx.emit_stream = nullptr;
+	ctx.time_delta = dt;
+
+	// for each ribbon
+	for (u32 ribbon_idx = 0, c = emitter.ribbon_length.size(); ribbon_idx < c; ++ribbon_idx) {
+		u32 ribbon_length = emitter.ribbon_length[ribbon_idx];
+		for (u32 i = 0; i < ribbon_length; i+= 1024) {
+			ctx.from = ribbon_idx * res_emitter.max_ribbon_length + i;
+			ctx.to = ctx.from + ribbon_length;
+			processChunk(ctx);
+		}
+	}
+}
+
 void ParticleSystem::update(float dt, u32 emitter_idx, PageAllocator& page_allocator) {
 	PROFILE_FUNCTION();
 
 	Emitter& emitter = m_emitters[emitter_idx];
+	if (emitter.resource_emitter.max_ribbons > 0) {
+		updateRibbons(dt, emitter_idx, page_allocator);
+		return;
+	}
+
 	ParticleSystemResource::Emitter& res_emitter = m_resource->getEmitters()[emitter_idx];
 
 	if (res_emitter.emit_per_second > 0) {
@@ -1096,7 +1163,7 @@ void ParticleSystem::update(float dt, u32 emitter_idx, PageAllocator& page_alloc
 		if (emitter.emit_timer > 0) {
 			PROFILE_BLOCK("emit");
 			const float d = 1.f / res_emitter.emit_per_second;
-			m_constants[1] = m_total_time;
+			m_constants[(u8)ParticleSystemValues::TOTAL_TIME] = m_total_time;
 			const u32 count = u32(floorf(emitter.emit_timer / d));
 			emit(emitter_idx, {}, count, d);
 			emitter.emit_timer -= d * count;
@@ -1106,7 +1173,8 @@ void ParticleSystem::update(float dt, u32 emitter_idx, PageAllocator& page_alloc
 
 	if (emitter.particles_count == 0) return;
 
-	m_constants[1] = m_total_time;
+	m_constants[(u8)ParticleSystemValues::TOTAL_TIME] = m_total_time;
+
 	profiler::pushInt("particle count", emitter.particles_count);
 	u32* kill_counter = (u32*)page_allocator.allocate();
 	const u32 chunks_count = (emitter.particles_count + 1023) / 1024;
@@ -1130,8 +1198,9 @@ void ParticleSystem::update(float dt, u32 emitter_idx, PageAllocator& page_alloc
 			ctx.from = counter.add(1024);
 			if (ctx.from >= (i32)emitter.particles_count) return;
 
+			ctx.to = minimum(ctx.from + 1024, emitter.particles_count);
 			processChunk(ctx);
-			processed += minimum(1024, emitter.particles_count - ctx.from);
+			processed += ctx.to - ctx.from;
 		}
 		profiler::pushInt("Total count", processed);
 	};
@@ -1179,7 +1248,7 @@ void ParticleSystem::update(float dt, u32 emitter_idx, PageAllocator& page_alloc
 		profiler::pushInt("kill count", total_killed);
 		page_allocator.deallocate(kill_counter);
 	}
-
+	
 	InputPagedStream blob(emit_stream);
 	while (!blob.isEnd()) {
 		u32 emitter_idx = blob.read<u32>();
@@ -1187,12 +1256,29 @@ void ParticleSystem::update(float dt, u32 emitter_idx, PageAllocator& page_alloc
 		float outputs[64];
 		ASSERT(outputs_count < lengthOf(outputs));
 		blob.read(outputs, outputs_count * sizeof(float));
-	
+		
 		Emitter& dst_emitter = m_emitters[emitter_idx];
-			
+		
 		PROFILE_BLOCK("emit from graph");
 		profiler::pushInt("count", dst_emitter.resource_emitter.init_emit_count);
 		emit(emitter_idx, Span(outputs, outputs_count), dst_emitter.resource_emitter.init_emit_count, 0);
+	}
+}
+
+void ParticleSystem::initRibbonEmitter(i32 emitter_idx) {
+	Emitter& emitter = m_emitters[emitter_idx];
+	
+	const u32 num_channels = emitter.resource_emitter.channels_count;
+	const u32 num_floats_in_channel = emitter.resource_emitter.max_ribbons * emitter.resource_emitter.max_ribbon_length;
+	for (u32 i = 0; i < num_channels; ++i) {
+		emitter.channels[i].data = (float*)m_allocator.allocate(num_floats_in_channel * sizeof(float), alignof(float4));
+	}
+
+	emitter.ribbon_length.reserve(emitter.resource_emitter.max_ribbons);
+	emitter.ribbon_length.resize(emitter.resource_emitter.init_ribbons_count);
+	for (u32 i = 0; i < emitter.resource_emitter.init_ribbons_count; ++i) {
+		emitter.ribbon_length[i] = 0;
+		emitRibbonPoints(emitter_idx, i, {}, emitter.resource_emitter.init_emit_count, 0);
 	}
 }
 
@@ -1202,13 +1288,16 @@ bool ParticleSystem::update(float dt, PageAllocator& page_allocator)
 	m_last_update_stats = {};
 	if (!m_resource || !m_resource->isReady()) return false;
 	
-	m_constants[0] = dt;
-	m_constants[1] = m_total_time;
+	m_constants[(u8)ParticleSystemValues::TIME_DELTA] = dt;
+	m_constants[(u8)ParticleSystemValues::TOTAL_TIME] = m_total_time;
 	
 	if (m_total_time == 0) {
 		for (i32 emitter_idx = 0; emitter_idx < m_emitters.size(); ++emitter_idx) {
 			const ParticleSystemResource::Emitter& emitter = m_resource->getEmitters()[emitter_idx];
-			if (emitter.emit_inputs_count == 0) {
+			if (emitter.max_ribbons > 0) {
+				initRibbonEmitter(emitter_idx);
+			}
+			else if (emitter.emit_inputs_count == 0) {
 				emit(emitter_idx, {}, emitter.init_emit_count, 0);
 			}
 		}
@@ -1248,6 +1337,7 @@ void ParticleSystem::Emitter::fillInstanceData(float* data, PageAllocator& page_
 			ctx.from = counter.add(1024);
 			if (ctx.from >= (i32)particles_count) return;
 			
+			ctx.to = minimum(ctx.from + 1024, particles_count);
 			system.processChunk(ctx);
 		}
 	};
