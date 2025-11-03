@@ -32,6 +32,7 @@ struct ParticleSystemResource final : Resource {
 		FLAGS,
 		NEW_VERTEX_DECL,
 		MODEL,
+		RIBBONS,
 
 		LAST
 	};
@@ -55,6 +56,9 @@ struct ParticleSystemResource final : Resource {
 		u32 registers_count;
 		u32 emit_inputs_count;
 		u32 outputs_count;
+		u32 max_ribbons;
+		u32 max_ribbon_length;
+		u32 init_ribbons_count;
 		Material* material = nullptr;
 		Model* model = nullptr;
 		u32 init_emit_count = 0;
@@ -148,7 +152,7 @@ struct ResourceManagerHub;
 
 struct LUMIX_RENDERER_API ParticleSystem {
 	struct Channel {
-		alignas(16) float* data = nullptr;
+		float* data = nullptr;
 		u32 name = 0;
 	};
 
@@ -163,6 +167,7 @@ struct LUMIX_RENDERER_API ParticleSystem {
 		Emitter(ParticleSystem& system, ParticleSystemResource::Emitter& resource_emitter) 
 			: system(system)
 			, resource_emitter(resource_emitter)
+			, ribbon_length(system.m_allocator)
 		{}
 		u32 getParticlesDataSizeBytes() const;
 		void fillInstanceData(float* data, PageAllocator& page_allocator) const;
@@ -171,6 +176,7 @@ struct LUMIX_RENDERER_API ParticleSystem {
 		ParticleSystemResource::Emitter& resource_emitter;
 		Channel channels[16];
 		u32 particles_count = 0;
+		Array<u32> ribbon_length;
 		u32 capacity = 0;
 		float emit_timer = 0;
 		u32 emit_index = 0;
@@ -205,10 +211,13 @@ private:
 	void operator =(ParticleSystem&& rhs) = delete;
 	void onResourceChanged(Resource::State old_state, Resource::State new_state, Resource&);
 	void update(float dt, u32 emitter_idx, PageAllocator& page_allocator);
+	void updateRibbons(float dt, u32 emitter_idx, PageAllocator& page_allocator);
+	void emitRibbonPoints(u32 emitter_idx, u32 ribbon_idx, Span<const float> emit_data, u32 count, float time_step);
 	void emit(u32 emitter_idx, Span<const float> emit_data, u32 count, float time_step);
 	void ensureCapacity(Emitter& emitter, u32 num_new_particles);
 	void run(RunningContext& ctx);
 	void processChunk(ChunkProcessorContext& ctx);
+	void initRibbonEmitter(i32 emiter);
 
 	IAllocator& m_allocator;
 	Array<Emitter> m_emitters;

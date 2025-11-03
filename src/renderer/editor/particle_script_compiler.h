@@ -78,7 +78,7 @@ struct ParticleScriptCompiler {
 		i32 variable_index;
 		i32 register_offset;
 		SystemValue system_value;
-		i32 sub;
+		u8 sub;
 		u32 parenthesis_depth = 0xffFFffFF;
 	};
 
@@ -105,6 +105,9 @@ struct ParticleScriptCompiler {
 		u32 m_register_allocator = 0;
 		u32 m_init_emit_count = 0;
 		float m_emit_per_second = 0;
+		u32 m_max_ribbons = 0;
+		u32 m_max_ribbon_length = 0;
+		u32 m_init_ribbons_count = 0;
 	};
 	
 	ParticleScriptCompiler(StringView content, const Path& path, IAllocator& allocator)
@@ -215,7 +218,9 @@ struct ParticleScriptCompiler {
 		else if (equalStrings(name, "kill")) return { InstructionType::KILL, false };
 		else if (equalStrings(name, "random")) return { InstructionType::RAND, true };
 		else if (equalStrings(name, "curve")) return { InstructionType::GRADIENT, true };
-		else if (equalStrings(name, "emit")) return { InstructionType::EMIT, false};
+		else if (equalStrings(name, "emit")) return { InstructionType::EMIT, false };
+		else if (equalStrings(name, "mesh")) return { InstructionType::MESH, true };
+		else if (equalStrings(name, "noise")) return { InstructionType::NOISE, true };
 		else return { InstructionType::END };
 	}
 
@@ -441,7 +446,7 @@ struct ParticleScriptCompiler {
 				m_postfix.pop();
 				if (arg0.type != ExpressionStackElement::LITERAL || arg0.type != ExpressionStackElement::LITERAL) {
 					// TODO error location
-					error(m_content, "rand expects 2 lietrals");
+					error(m_content, "rand expects 2 literals");
 					return {};
 				}
 
@@ -450,6 +455,18 @@ struct ParticleScriptCompiler {
 				return res;
 			}
 
+			if (el.function == InstructionType::MESH) {
+				DataStream res = allocRegister(emitter);
+				if (m_mesh_stream.type == DataStream::NONE) {
+					m_mesh_stream = allocRegister(emitter);
+				}
+				compiled.write(el.function);
+				compiled.write(res);
+				compiled.write(m_mesh_stream);
+				compiled.write(el.sub);
+				return res;
+			}
+			
 			if (el.function == InstructionType::GRADIENT) {
 				DataStream res = allocRegister(emitter);
 				compiled.write(el.function);
@@ -649,6 +666,7 @@ struct ParticleScriptCompiler {
 				el.type = ExpressionStackElement::FUNCTION;
 				el.function = fn.instruction;
 				el.parenthesis_depth = parenthesis_depth;
+				el.sub = sub;
 				pushStack(el);
 				expect("(");
 				++parenthesis_depth;
@@ -707,9 +725,9 @@ struct ParticleScriptCompiler {
 		return {};
 	}
 
-	void compileAssignment(Emitter& emitter, OutputMemoryStream& compiled, Array<Variable>& vars, u32 var_index, DataStream::Type stream_type) {
-		i32 offset = vars[var_index].offset;
-		switch (vars[var_index].type) {
+	void compileAssignment(Emitter& emitter, OutputMemoryStream& compiled, Variable& variable, DataStream::Type stream_type) {
+		i32 offset = variable.offset;
+		switch (variable.type) {
 			case Type::FLOAT: {
 				expect("=");
 				DataStream expr_result = compileExpression(emitter, compiled, 0);
@@ -723,7 +741,7 @@ struct ParticleScriptCompiler {
 			}
 			case Type::FLOAT4:
 			case Type::FLOAT3: {
-				const bool is_float4 = vars[var_index].type == Type::FLOAT4;
+				const bool is_float4 = variable.type == Type::FLOAT4;
 				if (peekChar() == '.') {
 					++m_content.begin;
 					StringView sub = readWord();
@@ -756,6 +774,7 @@ struct ParticleScriptCompiler {
 						compiled.write(InstructionType::MOV);
 						compiled.write(dst);
 						compiled.write(expr_result);
+						deallocRegister(emitter, expr_result);
 						if (i < (is_float4 ? 3 : 2)) m_content = content;
 					}
 				}
@@ -772,7 +791,7 @@ struct ParticleScriptCompiler {
 
 			i32 out_index = getInputIndex(emitted, word);
 			if (out_index >= 0) {
-				compileAssignment(emitter, compiled, emitted.m_inputs, out_index, DataStream::OUT);
+				compileAssignment(emitter, compiled, emitted.m_inputs[out_index], DataStream::OUT);
 				continue;
 			}
 
@@ -800,13 +819,13 @@ struct ParticleScriptCompiler {
 			if (equalStrings(word, "}")) break;
 			i32 var_index = getVariableIndex(emitter, word);
 			if (var_index >= 0) {
-				compileAssignment(emitter, compiled, emitter.m_vars, var_index, DataStream::CHANNEL);
+				compileAssignment(emitter, compiled, emitter.m_vars[var_index], DataStream::CHANNEL);
 				continue;
 			}
 
 			i32 out_index = getOutputIndex(emitter, word);
 			if (out_index >= 0) {
-				compileAssignment(emitter, compiled, emitter.m_outputs, out_index, DataStream::OUT);
+				compileAssignment(emitter, compiled, emitter.m_outputs[out_index], DataStream::OUT);
 				continue;
 			}
 
@@ -903,6 +922,9 @@ struct ParticleScriptCompiler {
 			else if (equalStrings(word, "fn")) compileFunction(emitter);
 			else if (equalStrings(word, "emit_per_second")) emitter.m_emit_per_second = readNumber();
 			else if (equalStrings(word, "init_emit_count")) emitter.m_init_emit_count = (u32)readNumber();
+			else if (equalStrings(word, "max_ribbons")) emitter.m_max_ribbons = (u32)readNumber();
+			else if (equalStrings(word, "max_ribbon_length")) emitter.m_max_ribbon_length = (u32)readNumber();
+			else if (equalStrings(word, "init_ribbons_count")) emitter.m_init_ribbons_count = (u32)readNumber();
 			else error(word, "Unknown identifier");
 		}
 		
@@ -993,13 +1015,14 @@ struct ParticleScriptCompiler {
 			if (word.size() == 0) break;
 			if (equalStrings(word, "const")) compileConst();
 			else if (equalStrings(word, "emitter")) compileEmitter();
+			else if (equalStrings(word, "world_space")) m_is_world_space = true;
 			else if (word.size() != 1 || !isWhitespace(word[0])) error(word, "Syntax error");
 		}
 
 		ParticleSystemResource::Header header;
 		output.write(header);
 
-		ParticleSystemResource::Flags flags = ParticleSystemResource::Flags::NONE;
+		ParticleSystemResource::Flags flags = m_is_world_space ? ParticleSystemResource::Flags::WORLD_SPACE : ParticleSystemResource::Flags::NONE;
 		output.write(flags);
 		
 		output.write(m_emitters.size());
@@ -1036,6 +1059,9 @@ struct ParticleScriptCompiler {
 			output.write(emitter.m_init_emit_count);
 			output.write(emitter.m_emit_per_second);
 			output.write(getCount(emitter.m_inputs));
+			output.write(emitter.m_max_ribbons);
+			output.write(emitter.m_max_ribbon_length);
+			output.write(emitter.m_init_ribbons_count);
 		}
 		
 		return !m_is_error;
@@ -1067,10 +1093,12 @@ struct ParticleScriptCompiler {
 	Array<Constant> m_constants;
 	StackArray<ExpressionStackElement, 16> m_stack;
 	StackArray<ExpressionStackElement, 16> m_postfix;
+	DataStream m_mesh_stream;
 	
 	StringView m_content;
     const char* m_text_begin;
 	bool m_is_error = false;
+	bool m_is_world_space = false;
 };
 
 }
