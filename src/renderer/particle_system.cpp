@@ -377,9 +377,9 @@ void ParticleSystem::emitRibbonPoints(u32 emitter_idx, u32 ribbon_idx, Span<cons
 			memcpy(ctx.registers.begin(), emit_data.begin(), emit_data.length() * sizeof(emit_data[0]));
 		}
 		
-		++emitter.particles_count;
 		if (ribbon.length < max_len) {
-			++emitter.ribbons[ribbon_idx].length;
+			++ribbon.length;
+			++emitter.particles_count;
 		}
 		else {
 			++ribbon.offset;
@@ -1211,7 +1211,7 @@ void ParticleSystem::updateRibbons(float dt, u32 emitter_idx, PageAllocator& pag
 		
 		Emitter& dst_emitter = m_emitters[emitter_idx];
 		
-		emitRibbonPoints(emitter_idx, ribbon_index, Span(outputs, outputs_count), 0, 0);
+		emitRibbonPoints(emitter_idx, ribbon_index, Span(outputs, outputs_count), 1, 0);
 	}
 }
 
