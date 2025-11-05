@@ -467,7 +467,15 @@ static bool tokenize(const char* str, u32& token_len, u8& token_type, u8 prev_to
 		"float4",
 		"kill",
 		"const",
-		"emitter"
+		"emitter",
+		"init_emit_count",
+		"emit_per_second",
+		"max_ribbons",
+		"max_ribbon_length",
+		"init_ribbons_count",
+		"mesh",
+		"material",
+		"world_space",
 	};
 	
 	const char* c = str;
