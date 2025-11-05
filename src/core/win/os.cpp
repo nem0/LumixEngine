@@ -1485,21 +1485,14 @@ bool dirExists(StringView path)
 }
 
 
-u64 getLastModified(StringView path)
-{
+u64 getLastModified(StringView path) {
 	const WCharStr<MAX_PATH> wpath(path);
-	FILETIME ft;
-	HANDLE handle = CreateFile(wpath, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (handle == INVALID_HANDLE_VALUE) return 0;
-	if (GetFileTime(handle, NULL, NULL, &ft) == FALSE) {
-		CloseHandle(handle);
-		return 0;
-	}
-	CloseHandle(handle);
+	WIN32_FILE_ATTRIBUTE_DATA fad;
+	if (!GetFileAttributesEx(wpath, GetFileExInfoStandard, &fad)) return 0;
 
 	ULARGE_INTEGER i;
-	i.LowPart = ft.dwLowDateTime;
-	i.HighPart = ft.dwHighDateTime;
+	i.LowPart = fad.ftLastWriteTime.dwLowDateTime;
+	i.HighPart = fad.ftLastWriteTime.dwHighDateTime;
 	return i.QuadPart;
 }
 
