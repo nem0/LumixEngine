@@ -2828,15 +2828,17 @@ struct PipelineImpl final : Pipeline {
 						u32 points_offset = 0;
 						u32 offset = 0;
 						const gpu::VertexDecl& decl = emitter.resource_emitter.vertex_decl;
-						TransientSlice slice = alloc(transient_pool, sizeof(u32) * 4 * emitter.ribbon_length.size());
-						for (u32 len : emitter.ribbon_length) {
+						TransientSlice slice = alloc(transient_pool, sizeof(u32) * 4 * emitter.ribbons.size());
+						for (const auto& ribbon : emitter.ribbons) {
 							u32* inst_data = (u32*)slice.ptr;
 							inst_data[0] = gpu::getBindlessHandle(point_slice.buffer).value;
 							inst_data[1] = point_slice.offset + points_offset * decl.getStride();
+							inst_data[2] = ribbon.offset;
+							inst_data[3] = emitter.resource_emitter.max_ribbon_length;
 							stream->bindVertexBuffer(1, slice.buffer, slice.offset + offset, stride);
-							stream->drawArraysInstanced(2 * len, 1);
+							stream->drawArraysInstanced(2 * ribbon.length, 1);
 							offset += 4 * sizeof(u32);
-							points_offset += len;
+							points_offset += ribbon.length;
 						}
 						break;
 					}

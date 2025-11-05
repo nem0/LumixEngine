@@ -230,7 +230,7 @@ ParticleSystem::ParticleSystem(EntityPtr entity, World& world, IAllocator& alloc
 ParticleSystem::Emitter::Emitter(ParticleSystem::Emitter&& rhs)
 	: system(rhs.system)
 	, resource_emitter(rhs.resource_emitter)
-	, ribbon_length(static_cast<Array<u32>&&>(rhs.ribbon_length))
+	, ribbons(static_cast<Array<Ribbon>&&>(rhs.ribbons))
 {
 	memcpy(channels, rhs.channels, sizeof(channels));
 	memset(rhs.channels, 0, sizeof(rhs.channels));
@@ -361,7 +361,6 @@ void ParticleSystem::ensureCapacity(Emitter& emitter, u32 num_new_particles) {
 	}
 }
 
-
 void ParticleSystem::emitRibbonPoints(u32 emitter_idx, u32 ribbon_idx, Span<const float> emit_data, u32 count, float time_step) {
 	Emitter& emitter = m_emitters[emitter_idx];
 	const ParticleSystemResource::Emitter& res_emitter = m_resource->getEmitters()[emitter_idx];
@@ -370,17 +369,26 @@ void ParticleSystem::emitRibbonPoints(u32 emitter_idx, u32 ribbon_idx, Span<cons
 	ctx.registers.resize(res_emitter.registers_count + emit_data.length());
 	
 	const float c1 = m_constants[(u8)ParticleSystemValues::TOTAL_TIME];
+	Ribbon& ribbon = emitter.ribbons[ribbon_idx];
+	const u32 max_len = emitter.resource_emitter.max_ribbon_length;
 	for (u32 i = 0; i < count; ++i) {
 		m_constants[(u8)ParticleSystemValues::EMIT_INDEX] = (float)emitter.emit_index; // TODO
 		if (emit_data.length() > 0) {
 			memcpy(ctx.registers.begin(), emit_data.begin(), emit_data.length() * sizeof(emit_data[0]));
 		}
-		ctx.particle_idx = emitter.ribbon_length[ribbon_idx] + ribbon_idx * emitter.resource_emitter.max_ribbon_length;
-		ctx.instructions.set(res_emitter.instructions.data() + res_emitter.emit_offset, res_emitter.instructions.size() - res_emitter.emit_offset);
-		run(ctx);
 		
 		++emitter.particles_count;
-		++emitter.ribbon_length[ribbon_idx];
+		if (ribbon.length < max_len) {
+			++emitter.ribbons[ribbon_idx].length;
+		}
+		else {
+			++ribbon.offset;
+		}
+
+		ctx.particle_idx = ((ribbon.offset + ribbon.length - 1) % max_len) + ribbon_idx * max_len;
+		ctx.instructions.set(res_emitter.instructions.data() + res_emitter.emit_offset, res_emitter.instructions.size() - res_emitter.emit_offset);
+		run(ctx);
+
 		++emitter.emit_index;
 		m_constants[(u8)ParticleSystemValues::TOTAL_TIME] += time_step;
 	}
@@ -872,6 +880,7 @@ struct ParticleSystem::ChunkProcessorContext {
 	OutputPagedStream* emit_stream = nullptr;
 	float time_delta = 0;
 	float* output_memory = nullptr;
+	u32 ribbon_index = 0;
 };
 
 void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
@@ -924,26 +933,55 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 				const float4* cond = getStream(emitter, condition_stream, fromf4, ctx.registers);
 				const float4* const end = cond + stepf4;
 				RunningContext emit_ctx(emitter, m_allocator);
-				for (const float4* beg = cond; cond != end; ++cond) {
-					const int m = f4MoveMask(*cond);
-					if (!m) continue;
+				bool is_ribbon = emitter.resource_emitter.max_ribbons > 0;
+				if (is_ribbon) {
+					for (const float4* beg = cond; cond != end; ++cond) {
+						const int m = f4MoveMask(*cond);
+						if (!m) continue;
 					
-					for (int i = 0; i < 4; ++i) {
-						const i32 particle_index = from + i32(cond - beg) * 4 + i;
-						if ((m & (1 << i)) && particle_index < ctx.to) {
-							InputMemoryStream tmp_instr((const u8*)ip.getData() + ip.getPosition(), ip.remaining());
-							u32 emitter_idx = tmp_instr.read<u32>();
-							emit_ctx.instructions.set((const u8*)tmp_instr.getData() + tmp_instr.getPosition(), tmp_instr.remaining());
-							emit_ctx.particle_idx = particle_index;
-							emit_ctx.registers.resize(res_emitter.registers_count);
-							emit_ctx.outputs.resize(m_resource->getEmitters()[emitter_idx].emit_inputs_count);
-							run(emit_ctx);
+						for (int i = 0; i < 4; ++i) {
+							const i32 particle_index = from + i32(cond - beg) * 4 + i;
+							if ((m & (1 << i)) && particle_index < ctx.to) {
+								InputMemoryStream tmp_instr((const u8*)ip.getData() + ip.getPosition(), ip.remaining());
+								u32 emitter_idx = tmp_instr.read<u32>();
+								emit_ctx.instructions.set((const u8*)tmp_instr.getData() + tmp_instr.getPosition(), tmp_instr.remaining());
+								emit_ctx.particle_idx = particle_index;
+								emit_ctx.registers.resize(res_emitter.registers_count);
+								emit_ctx.outputs.resize(m_resource->getEmitters()[emitter_idx].emit_inputs_count);
+								run(emit_ctx);
 							
-							jobs::enter(ctx.emit_mutex);
-							ctx.emit_stream->write(emitter_idx);
-							ctx.emit_stream->write(emit_ctx.outputs.size());
-							ctx.emit_stream->write(emit_ctx.outputs.begin(), emit_ctx.outputs.byte_size());
-							jobs::exit(ctx.emit_mutex);
+								jobs::enter(ctx.emit_mutex);
+								ctx.emit_stream->write(emitter_idx);
+								ctx.emit_stream->write(emit_ctx.outputs.size());
+								ctx.emit_stream->write(emit_ctx.outputs.begin(), emit_ctx.outputs.byte_size());
+								ctx.emit_stream->write(ctx.ribbon_index);
+								jobs::exit(ctx.emit_mutex);
+							}
+						}
+					}
+				}
+				else {
+					for (const float4* beg = cond; cond != end; ++cond) {
+						const int m = f4MoveMask(*cond);
+						if (!m) continue;
+					
+						for (int i = 0; i < 4; ++i) {
+							const i32 particle_index = from + i32(cond - beg) * 4 + i;
+							if ((m & (1 << i)) && particle_index < ctx.to) {
+								InputMemoryStream tmp_instr((const u8*)ip.getData() + ip.getPosition(), ip.remaining());
+								u32 emitter_idx = tmp_instr.read<u32>();
+								emit_ctx.instructions.set((const u8*)tmp_instr.getData() + tmp_instr.getPosition(), tmp_instr.remaining());
+								emit_ctx.particle_idx = particle_index;
+								emit_ctx.registers.resize(res_emitter.registers_count);
+								emit_ctx.outputs.resize(m_resource->getEmitters()[emitter_idx].emit_inputs_count);
+								run(emit_ctx);
+							
+								jobs::enter(ctx.emit_mutex);
+								ctx.emit_stream->write(emitter_idx);
+								ctx.emit_stream->write(emit_ctx.outputs.size());
+								ctx.emit_stream->write(emit_ctx.outputs.begin(), emit_ctx.outputs.byte_size());
+								jobs::exit(ctx.emit_mutex);
+							}
 						}
 					}
 				}
@@ -1130,20 +1168,50 @@ void ParticleSystem::updateRibbons(float dt, u32 emitter_idx, PageAllocator& pag
 	Emitter& emitter = m_emitters[emitter_idx];
 	ParticleSystemResource::Emitter& res_emitter = emitter.resource_emitter;
 
+	if (res_emitter.emit_per_second > 0) {
+		emitter.emit_timer += dt;
+		if (emitter.emit_timer > 0) {
+			PROFILE_BLOCK("emit");
+			const float d = 1.f / res_emitter.emit_per_second;
+			m_constants[(u8)ParticleSystemValues::TOTAL_TIME] = m_total_time;
+			const u32 count = u32(floorf(emitter.emit_timer / d));
+			for(i32 ribbon_index = 0; ribbon_index < emitter.ribbons.size(); ++ribbon_index) {
+				emitRibbonPoints(emitter_idx, ribbon_index, {}, count, d);
+			}
+			emitter.emit_timer -= d * count;
+		}
+	}
+
+	OutputPagedStream emit_stream(page_allocator);
+	jobs::Mutex emit_mutex;
 	ChunkProcessorContext ctx(emitter, page_allocator);
 	ctx.kill_counter = nullptr;
-	ctx.emit_mutex = nullptr;
-	ctx.emit_stream = nullptr;
+	ctx.emit_mutex = &emit_mutex;
+	ctx.emit_stream = &emit_stream;
 	ctx.time_delta = dt;
 
-	// for each ribbon
-	for (u32 ribbon_idx = 0, c = emitter.ribbon_length.size(); ribbon_idx < c; ++ribbon_idx) {
-		u32 ribbon_length = emitter.ribbon_length[ribbon_idx];
+	for (u32 ribbon_idx = 0, c = emitter.ribbons.size(); ribbon_idx < c; ++ribbon_idx) {
+		u32 ribbon_length = emitter.ribbons[ribbon_idx].length;
 		for (u32 i = 0; i < ribbon_length; i+= 1024) {
 			ctx.from = ribbon_idx * res_emitter.max_ribbon_length + i;
 			ctx.to = ctx.from + ribbon_length;
+			ctx.ribbon_index = ribbon_idx;
 			processChunk(ctx);
 		}
+	}
+
+	InputPagedStream blob(emit_stream);
+	while (!blob.isEnd()) {
+		u32 emitter_idx = blob.read<u32>();
+		u32 outputs_count = blob.read<u32>();
+		u32 ribbon_index = blob.read<u32>();
+		float outputs[64];
+		ASSERT(outputs_count < lengthOf(outputs));
+		blob.read(outputs, outputs_count * sizeof(float));
+		
+		Emitter& dst_emitter = m_emitters[emitter_idx];
+		
+		emitRibbonPoints(emitter_idx, ribbon_index, Span(outputs, outputs_count), 0, 0);
 	}
 }
 
@@ -1274,10 +1342,11 @@ void ParticleSystem::initRibbonEmitter(i32 emitter_idx) {
 		emitter.channels[i].data = (float*)m_allocator.allocate(num_floats_in_channel * sizeof(float), alignof(float4));
 	}
 
-	emitter.ribbon_length.reserve(emitter.resource_emitter.max_ribbons);
-	emitter.ribbon_length.resize(emitter.resource_emitter.init_ribbons_count);
+	emitter.ribbons.reserve(emitter.resource_emitter.max_ribbons);
+	emitter.ribbons.resize(emitter.resource_emitter.init_ribbons_count);
 	for (u32 i = 0; i < emitter.resource_emitter.init_ribbons_count; ++i) {
-		emitter.ribbon_length[i] = 0;
+		emitter.ribbons[i].length = 0;
+		emitter.ribbons[i].offset = 0;
 		emitRibbonPoints(emitter_idx, i, {}, emitter.resource_emitter.init_emit_count, 0);
 	}
 }

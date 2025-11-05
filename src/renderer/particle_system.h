@@ -162,12 +162,17 @@ struct LUMIX_RENDERER_API ParticleSystem {
 		AtomicI32 processed = 0;
 	};
 
+	struct Ribbon {
+		u32 offset;
+		u32 length;
+	};
+
 	struct Emitter {
 		Emitter(Emitter&& rhs);
 		Emitter(ParticleSystem& system, ParticleSystemResource::Emitter& resource_emitter) 
 			: system(system)
 			, resource_emitter(resource_emitter)
-			, ribbon_length(system.m_allocator)
+			, ribbons(system.m_allocator)
 		{}
 		u32 getParticlesDataSizeBytes() const;
 		void fillInstanceData(float* data, PageAllocator& page_allocator) const;
@@ -176,7 +181,7 @@ struct LUMIX_RENDERER_API ParticleSystem {
 		ParticleSystemResource::Emitter& resource_emitter;
 		Channel channels[16];
 		u32 particles_count = 0;
-		Array<u32> ribbon_length;
+		Array<Ribbon> ribbons;
 		u32 capacity = 0;
 		float emit_timer = 0;
 		u32 emit_index = 0;
