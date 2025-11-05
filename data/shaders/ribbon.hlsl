@@ -45,11 +45,13 @@ VSOutput mainVS(VSInput input) {
 	uint ribbon_offset = input.i_data.z;
 	uint ribbon_max_length = input.i_data.w;
 	uint pidx = ribbon_offset + (input.vertex_id >> 1);
+	uint prev_pidx = pidx > 0 ? pidx - 1 : 0;
+	PointData prev_pd = getPointData(buffer_idx, buffer_offset, prev_pidx % ribbon_max_length);
 	PointData pd = getPointData(buffer_idx, buffer_offset, pidx % ribbon_max_length);
 	PointData next_pd = getPointData(buffer_idx, buffer_offset, (pidx + 1) % ribbon_max_length);
 	
 	VSOutput output;
-	float3 dir = next_pd.position - pd.position;
+	float3 dir = next_pd.position - prev_pd.position;
 	if (dot(dir, dir) < 0.01) {
 		dir = float3(0, 0, 1);
 	}
