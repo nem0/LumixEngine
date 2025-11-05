@@ -2911,7 +2911,7 @@ struct ParticleScriptEditorWindow : AssetEditorWindow {
 				u32 num_particles = 0;
 				for (ParticleSystem::Emitter& emitter : system.getEmitters()) {
 					if (emitter.resource_emitter.max_ribbons > 0) {
-						for (u32 n : emitter.ribbon_length) num_particles += n;
+						for (const auto& ribbon : emitter.ribbons) num_particles += ribbon.length;
 					}
 					else {
 						num_particles += emitter.particles_count;
