@@ -928,6 +928,9 @@ struct ParticleScriptCompiler {
 			else error(word, "Unknown identifier");
 		}
 		
+		if (emitter.m_max_ribbons > 0 && emitter.m_max_ribbon_length == 0) {
+			error(m_content, "max_ribbon_length must be > 0 if max_ribbons is > 0");
+		}
 	}
 
 	void compileConst() {
