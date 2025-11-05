@@ -40,28 +40,35 @@ PointData getPointData(uint buffer_index, uint buffer_offset, uint point_idx) {
 }
 
 VSOutput mainVS(VSInput input) {
-	//MaterialData material = getMaterialData(u_material_index);
-	float2 pos = float2((input.vertex_id & 1) * 2.0 - 1.0, 0);
 	uint buffer_idx = input.i_data.x;
 	uint buffer_offset = input.i_data.y;
 	uint ribbon_offset = input.i_data.z;
 	uint ribbon_max_length = input.i_data.w;
-	uint point_index = (ribbon_offset + (input.vertex_id >> 1)) % ribbon_max_length;
-	PointData pd = getPointData(buffer_idx, buffer_offset, point_index);
+	uint pidx = ribbon_offset + (input.vertex_id >> 1);
+	PointData pd = getPointData(buffer_idx, buffer_offset, pidx % ribbon_max_length);
+	PointData next_pd = getPointData(buffer_idx, buffer_offset, (pidx + 1) % ribbon_max_length);
 	
 	VSOutput output;
-
-	pos *= pd.scale;
+	float3 dir = next_pd.position - pd.position;
+	if (dot(dir, dir) < 0.01) {
+		dir = float3(0, 0, 1);
+	}
+	else {
+		dir = normalize(dir);
+	}
+	dir = mul(float4(dir, 0), u_model);
 	
+	float3 right = normalize(cross(Global_view_dir.xyz, dir));
+	float3 offset = right * pd.scale * (input.vertex_id & 1);
+
 	output.color = pd.color;
 	output.emission = pd.emission;
-	float4 pos_vs = transformPosition(pd.position, u_model, Pass_ws_to_vs) + float4(pos, 0, 0);
+	float4 pos_vs = transformPosition(transformPosition(pd.position, u_model) + offset, Pass_ws_to_vs);
 	output.position = transformPosition(pos_vs, Pass_vs_to_ndc);
 	return output;
 }
 
 float4 mainPS(VSOutput input) : SV_TARGET {
-	//MaterialData material = getMaterialData(u_material_index);
 	Surface data;
 	data.N = 0;
 	data.V = 0;
@@ -75,14 +82,11 @@ float4 mainPS(VSOutput input) : SV_TARGET {
 	data.metallic = 0;
 	data.translucency = 0;
 
+// TODO DEFERRED
 	float linear_depth = dot(data.pos_ws.xyz, Pass_view_dir.xyz);
 	Cluster cluster = getClusterLinearDepth(linear_depth, input.position.xy);
 	float4 o_color;
 	o_color.rgb = computeLighting(cluster, data, Global_light_dir.xyz, Global_light_color.rgb * Global_light_intensity, Global_shadowmap, Global_shadow_atlas, Global_reflection_probes, input.position.xy);
-
-	#if defined ALPHA_CUTOUT
-		if(data.alpha < 0.5) discard;
-	#endif
 	o_color.a = data.alpha;
 	return o_color;
 }	
