@@ -1259,18 +1259,21 @@ void SceneView::handleDrop(const char* path, float x, float y)
 }
 
 
-void SceneView::onToolbar()
-{
+void SceneView::onToolbar() {
+	const Gizmo::Config& gizmo_cfg = m_app.getGizmoConfig();
+	Gizmo::Config::Mode gizmo_mode = gizmo_cfg.mode;
+	Gizmo::Config::CoordSystem gizmo_coord_system = gizmo_cfg.coord_system;
+
 	struct {
 		Action* action;
 		bool selected;
 	} actions[] = {
-		{ &m_translate_gizmo_mode, false },
-		{ &m_rotate_gizmo_mode, false },
-		{ &m_scale_gizmo_mode, false },
+		{ &m_translate_gizmo_mode, gizmo_mode == Gizmo::Config::TRANSLATE },
+		{ &m_rotate_gizmo_mode, gizmo_mode == Gizmo::Config::ROTATE },
+		{ &m_scale_gizmo_mode, gizmo_mode == Gizmo::Config::SCALE },
 		{ nullptr, false },
-		{ &m_local_coord_gizmo, false },
-		{ &m_global_coord_gizmo, false },
+		{ &m_local_coord_gizmo, gizmo_coord_system == Gizmo::Config::LOCAL },
+		{ &m_global_coord_gizmo, gizmo_coord_system == Gizmo::Config::GLOBAL },
 		{ nullptr, false },
 		{ &m_use_grid_snapping_action, m_use_grid_snapping },
 		{ nullptr, false },
