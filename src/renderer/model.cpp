@@ -536,12 +536,15 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 		mesh.vertices.resize(mesh_vertex_count);
 		if (keep_skin) mesh.skin.resize(mesh_vertex_count);
 		const u8* vertices = (const u8*)vertices_mem.data;
-		for (int j = 0; j < mesh_vertex_count; ++j)
-		{
+		for (int j = 0; j < mesh_vertex_count; ++j) {
 			int offset = j * vertex_size;
-			if (keep_skin)
-			{
-				mesh.skin[j].weights = *(const Vec4*)&vertices[offset + weights_attribute_offset];
+			if (keep_skin) {
+				u16 weights[4];
+				memcpy(weights, &vertices[offset + weights_attribute_offset], sizeof(weights));
+				mesh.skin[j].weights.x = weights[0] / 65535.f;
+				mesh.skin[j].weights.y = weights[1] / 65535.f;
+				mesh.skin[j].weights.z = weights[2] / 65535.f;
+				mesh.skin[j].weights.w = weights[3] / 65535.f;
 				memcpy(mesh.skin[j].indices,
 					&vertices[offset + bone_indices_attribute_offset],
 					sizeof(mesh.skin[j].indices));
