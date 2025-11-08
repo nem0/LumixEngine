@@ -3292,6 +3292,62 @@ struct RenderModuleImpl final : RenderModule {
 		m_particle_emitters[entity].setResource(res);
 	}
 
+	i32 getParticleEmitterParameterID(EntityRef entity, const char* name) override {
+		ParticleSystemResource* res = m_particle_emitters[entity].getResource();
+		if (!res) return -1;
+
+		const auto& params = res->getParameters();
+		StringView n = name;
+		for (i32 i = 0, c = params.size(); i < c; ++i) {
+			if (equalStrings(params[i].name, n)) return i;
+		}
+		return -1;
+	}
+	
+	void setParticleEmitterParameter(EntityRef entity, i32 id, float value) override {
+		ASSERT(id >= 0);
+		ParticleSystem& ps = m_particle_emitters[entity];
+		ParticleSystemResource* res = m_particle_emitters[entity].getResource();
+
+		u32 offset = res->getParameters()[id].offset;
+		if (offset >= (u32)ps.m_params.size()) {
+			ps.m_params.resize(offset + 1);
+		}
+		ps.m_params[offset] = value;
+	}
+	
+	void setParticleEmitterParameter(EntityRef entity, i32 id, Vec3 value) override {
+		ASSERT(id >= 0);
+		ParticleSystem& ps = m_particle_emitters[entity];
+		ParticleSystemResource* res = m_particle_emitters[entity].getResource();
+
+		u32 offset = res->getParameters()[id].offset;
+		u32 needed_size = offset + 3;
+		if (needed_size > (u32)ps.m_params.size()) {
+			ps.m_params.resize(needed_size);
+		}
+		ps.m_params[offset] = value.x;
+		ps.m_params[offset + 1] = value.y;
+		ps.m_params[offset + 2] = value.z;
+	}
+	
+	void setParticleEmitterParameter(EntityRef entity, i32 id, Vec4 value) override {
+		ASSERT(id >= 0);
+		ParticleSystem& ps = m_particle_emitters[entity];
+		ParticleSystemResource* res = m_particle_emitters[entity].getResource();
+
+		u32 offset = res->getParameters()[id].offset;
+		u32 needed_size = offset + 4;
+		if (needed_size > (u32)ps.m_params.size()) {
+			ps.m_params.resize(needed_size);
+		}
+		ps.m_params[offset] = value.x;
+		ps.m_params[offset + 1] = value.y;
+		ps.m_params[offset + 2] = value.z;
+		ps.m_params[offset + 3] = value.w;
+	}
+
+
 	Path getParticleEmitterPath(EntityRef entity) override {
 		const ParticleSystem& emitter = m_particle_emitters[entity];
 		if (!emitter.getResource()) return Path("");

@@ -2490,12 +2490,6 @@ struct BinaryOpNode : Node {
 };
 
 struct ConstNode : Node {
-	enum class Const : u8 {
-		TIME_DELTA,
-		TOTAL_TIME,
-		EMIT_INDEX
-	};
-
 	ConstNode(ParticleEmitterEditorResource& res) : Node(res) {}
 
 	Type getType() const override { return Type::CONST; }
@@ -2507,10 +2501,10 @@ struct ConstNode : Node {
 	bool hasOutputPins() const override { return true; }
 
 	DataStream generateInternal(GenerateContext& ctx, DataStream, u8 subindex) override {
-		if (ctx.context != GenerateContext::INIT && constant == Const::EMIT_INDEX) return error("Invalid context");
+		if (ctx.context != GenerateContext::INIT && constant == ParticleSystemValues::EMIT_INDEX) return error("Invalid context");
 		
 		DataStream r;
-		r.type = DataStream::CONST;
+		r.type = DataStream::SYSTEM_VALUE;
 		r.index = (u8)constant;
 		return r;
 	}
@@ -2518,14 +2512,17 @@ struct ConstNode : Node {
 	bool onGUI() override {
 		outputSlot(); 
 		switch (constant) {
-			case Const::TIME_DELTA:
+			case ParticleSystemValues::TIME_DELTA:
 				ImGui::TextUnformatted("Time delta");
 				break;
-			case Const::TOTAL_TIME:
+			case ParticleSystemValues::TOTAL_TIME:
 				ImGui::TextUnformatted("Total time");
 				break;
-			case Const::EMIT_INDEX:
+			case ParticleSystemValues::EMIT_INDEX:
 				ImGui::TextUnformatted("Emit index");
+				break;
+			case ParticleSystemValues::RIBBON_INDEX:
+				ImGui::TextUnformatted("Ribbon index");
 				break;
 			default:
 				ImGui::TextUnformatted(ICON_FA_EXCLAMATION_TRIANGLE " INVALID CONSTANT");
@@ -2534,7 +2531,7 @@ struct ConstNode : Node {
 		return false;
 	}
 
-	Const constant;
+	ParticleSystemValues constant;
 };
 
 struct EmitNode : Node {
@@ -2798,6 +2795,7 @@ struct ParticleEditorImpl : ParticleEditor {
 			output.write(u32(0)); // max ribbons
 			output.write(u32(0)); // max ribbon length
 		}
+		output.write(u32(0)); // num params
 		return true;
 	}
 
@@ -2918,6 +2916,28 @@ struct ParticleScriptEditorWindow : AssetEditorWindow {
 					}
 				}
 				
+				if (!system.m_params.empty()) {
+					ImGui::SameLine();
+					if (ImGui::Button("Parameters")) ImGui::OpenPopup("Parameters");
+					if (ImGui::BeginPopup("Parameters")) {
+						u32 offset = 0;
+						for (const auto& p : system.getResource()->getParameters()) {
+							ImGui::PushID(&p);
+							ImGuiEx::Label(p.name.c_str());
+							ImGui::SetNextItemWidth(150);
+							float* f = system.m_params.begin() + offset;
+							switch (p.num_floats) {
+								case 1: ImGui::InputFloat("##v", f); break;
+								case 2: ImGui::InputFloat2("##v", f); break;
+								case 3: ImGui::InputFloat3("##v", f); break;
+								case 4: ImGui::InputFloat4("##v", f); break;
+							}
+							offset += p.num_floats;
+							ImGui::PopID();
+						}
+						ImGui::EndPopup();
+					}
+				}
 				ImGui::SameLine();
 				ImGui::Text("Particles: %d", num_particles);
 				m_viewer.gui();
@@ -2980,16 +3000,18 @@ struct ParticleEditorWindow : AssetEditorWindow, NodeEditor {
 			struct : ICategoryVisitor::INodeCreator {
 				Node* create(ParticleEmitterEditorResource& res) const override {
 					auto* n = (ConstNode*)res.addNode(Node::CONST);
-					n->constant = (ConstNode::Const)i;
+					n->constant = (ParticleSystemValues)i;
 					return n;
 				}
 				u8 i;
 			} creator;
-			creator.i = (u8)ConstNode::Const::TIME_DELTA;
+			creator.i = (u8)ParticleSystemValues::TIME_DELTA;
 			visitor.visitType("Time delta", creator);
-			creator.i = (u8)ConstNode::Const::TOTAL_TIME;
+			creator.i = (u8)ParticleSystemValues::RIBBON_INDEX;
+			visitor.visitType("Ribbon index", creator);
+			creator.i = (u8)ParticleSystemValues::TOTAL_TIME;
 			visitor.visitType("Total time", creator);
-			creator.i = (u8)ConstNode::Const::EMIT_INDEX;
+			creator.i = (u8)ParticleSystemValues::EMIT_INDEX;
 			visitor.visitType("Emit index", creator);
 			visitor.endCategory();
 		}
