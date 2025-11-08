@@ -33,6 +33,7 @@ struct ParticleSystemResource final : Resource {
 		NEW_VERTEX_DECL,
 		MODEL,
 		RIBBONS,
+		PARAMS,
 
 		LAST
 	};
@@ -40,6 +41,13 @@ struct ParticleSystemResource final : Resource {
 		static constexpr u32 MAGIC = '_LPA';
 		const u32 magic = MAGIC;
 		Version version = Version::LAST;
+	};
+
+	struct Parameter {
+		Parameter(IAllocator& allocator) : name(allocator) {}
+		String name;
+		u32 num_floats = 0;
+		u32 offset = 0;
 	};
 
 	struct Emitter {
@@ -70,10 +78,12 @@ struct ParticleSystemResource final : Resource {
 		enum Type : u8 {
 			NONE,
 			CHANNEL,
-			CONST,
+			SYSTEM_VALUE,
 			OUT,
 			REGISTER,
 			LITERAL,
+			PARAM,
+
 			ERROR
 		};
 
@@ -114,7 +124,9 @@ struct ParticleSystemResource final : Resource {
 		MOD,
 		OR,
 		AND,
-		BLEND
+		BLEND,
+		MAX,
+		MIN
 	};
 
 	static const ResourceType TYPE;
@@ -139,9 +151,11 @@ struct ParticleSystemResource final : Resource {
 
 	Array<Emitter>& getEmitters() { return m_emitters; }
 	Flags getFlags() const { return m_flags; }
+	Span<const Parameter> getParameters() const { return m_parameters; }
 
 private:
 	Array<Emitter> m_emitters;
+	Array<Parameter> m_parameters;
 	IAllocator& m_allocator;
 	Flags m_flags = Flags::NONE;
 };
@@ -149,6 +163,15 @@ private:
 
 struct ResourceManagerHub;
 
+enum class ParticleSystemValues : u8 {
+	TIME_DELTA = 0,
+	TOTAL_TIME = 1,
+	EMIT_INDEX = 2,
+	RIBBON_INDEX = 3,
+	COUNT,
+
+	NONE = 0xff
+};
 
 struct LUMIX_RENDERER_API ParticleSystem {
 	struct Channel {
@@ -165,6 +188,7 @@ struct LUMIX_RENDERER_API ParticleSystem {
 	struct Ribbon {
 		u32 offset;
 		u32 length;
+		u32 emit_index;
 	};
 
 	struct Emitter {
@@ -205,9 +229,10 @@ struct LUMIX_RENDERER_API ParticleSystem {
 	World& m_world;
 	EntityPtr m_entity;
 	bool m_autodestroy = false;
-	float m_constants[16];
+	float m_system_values[16];
 	float m_total_time = 0;
 	Stats m_last_update_stats;
+	Array<float> m_params;
 
 private:
 	struct RunningContext;

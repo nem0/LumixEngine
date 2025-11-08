@@ -2116,6 +2116,41 @@ namespace Lumix {
 		return 0;
 	}
 	
+	int ParticleEmitter_getParameterID(lua_State* L) {
+		auto [imodule, entity] = checkComponent(L);
+		auto* module = (RenderModule*)imodule;
+		auto name = LuaWrapper::checkArg<const char*>(L, 2);
+		LuaWrapper::push(L, 	module->getParticleEmitterParameterID(entity, name));
+		return 1;
+	}
+	
+	int ParticleEmitter_setFloatParameter(lua_State* L) {
+		auto [imodule, entity] = checkComponent(L);
+		auto* module = (RenderModule*)imodule;
+		auto id = LuaWrapper::checkArg<i32>(L, 2);
+		auto value = LuaWrapper::checkArg<float>(L, 3);
+		module->setParticleEmitterParameter(entity, id, value);
+		return 0;
+	}
+	
+	int ParticleEmitter_setVec3Parameter(lua_State* L) {
+		auto [imodule, entity] = checkComponent(L);
+		auto* module = (RenderModule*)imodule;
+		auto id = LuaWrapper::checkArg<i32>(L, 2);
+		auto value = LuaWrapper::checkArg<Vec3>(L, 3);
+		module->setParticleEmitterParameter(entity, id, value);
+		return 0;
+	}
+	
+	int ParticleEmitter_setVec4Parameter(lua_State* L) {
+		auto [imodule, entity] = checkComponent(L);
+		auto* module = (RenderModule*)imodule;
+		auto id = LuaWrapper::checkArg<i32>(L, 2);
+		auto value = LuaWrapper::checkArg<Vec4>(L, 3);
+		module->setParticleEmitterParameter(entity, id, value);
+		return 0;
+	}
+	
 	int particle_emitter_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
@@ -2124,6 +2159,10 @@ namespace Lumix {
 		switch (name_hash) {
 			case /*source*/17609862876178282011: LuaWrapper::push(L, module->getParticleEmitterPath(entity)); break;
 			case /*autodestroy*/13701391921693763709: LuaWrapper::push(L, module->getParticleEmitterAutodestroy(entity)); break;
+			case /*getParameterID*/12478678714176540554: lua_pushcfunction(L, ParticleEmitter_getParameterID, "ParticleEmitter_getParameterID"); break;
+			case /*setFloatParameter*/8609433045288617923: lua_pushcfunction(L, ParticleEmitter_setFloatParameter, "ParticleEmitter_setFloatParameter"); break;
+			case /*setVec3Parameter*/7340607900902100417: lua_pushcfunction(L, ParticleEmitter_setVec3Parameter, "ParticleEmitter_setVec3Parameter"); break;
+			case /*setVec4Parameter*/3457141589455107174: lua_pushcfunction(L, ParticleEmitter_setVec4Parameter, "ParticleEmitter_setVec4Parameter"); break;
 			case 0:
 			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
