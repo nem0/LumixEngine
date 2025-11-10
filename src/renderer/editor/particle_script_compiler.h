@@ -229,7 +229,7 @@ struct ParticleScriptCompiler {
 		Operators operator_char;
 		BuiltinFunction function_desc;
 		union {
-			i32 variable_index;
+			i32 variable_offset;
 			i32 param_index;
 			i32 arg_index;
 			i32 register_offset;
@@ -507,48 +507,55 @@ struct ParticleScriptCompiler {
 		INPUT
 	};
 
+	// b.xy = a.y;
 	bool compileVariable(const CompileContext& ctx, i32 var_index, VariableFamily type, u32& parenthesis_depth, u32 sub, bool can_assign) {
 		ExpressionStackElement el;
 		el.parenthesis_depth = parenthesis_depth;
 
-		bool has_subscript = false;
-
+		u8 swizzle[4] = {0, 1, 2, 3};
+		u32 swizzle_len = 0;
+		StringView swizzle_str;
+		// if swizzle
 		if (peekToken().type == Token::DOT) {
-			consume(Token::DOT);
-			StringView subtoken;
-			if (!consume(Token::IDENTIFIER, subtoken)) return false;
-			if (subtoken.size() != 1) {
-				error(subtoken, "Unknown subscript.");
+			if (!consume(Token::DOT)) return false;
+			if (!consume(Token::IDENTIFIER, swizzle_str)) return false;
+			if (swizzle_str.size() > 4) {
+				error(swizzle_str, "Invalid swizzle.");
 				return false;
 			}
-			switch (subtoken[0]) {
-				case 'x': case 'r': sub = 0; break;
-				case 'y': case 'g': sub = 1; break;
-				case 'z': case 'b': sub = 2; break;
-				case 'w': case 'a': sub = 3; break;
-				default: error(subtoken, "Unknown subscript"); return false;
+			swizzle_len = swizzle_str.size();
+			for (u32 i = 0; i < swizzle_len; ++i) {
+				switch (swizzle_str[i]) {
+					case 'x': case 'r': swizzle[i] = 0; break;
+					case 'y': case 'g': swizzle[i] = 1; break;
+					case 'z': case 'b': swizzle[i] = 2; break;
+					case 'w': case 'a': swizzle[i] = 3; break;
+					default: error(swizzle_str, "Invalid swizzle"); return false;
+				}
 			}
-			has_subscript = true;
-			el.sub = sub;
+			// a.xy = b.y; means a.x = b.y; a.y = b.y;
+			for (u32 i = swizzle_len; i < 4; ++i) {
+				swizzle[i] = swizzle[swizzle_len - 1];
+			}
 		}
+		el.sub = swizzle[sub];
 
 		switch (type) {
 			case VariableFamily::OUTPUT:
-				el.output_offset = ctx.emitter->m_outputs[var_index].getOffsetSub(sub);
+				el.output_offset = ctx.emitter->m_outputs[var_index].getOffsetSub(el.sub);
 				el.type = ExpressionStackElement::OUTPUT;
 				break;
 			case VariableFamily::CHANNEL:
-				el.variable_index = var_index;
+				el.variable_offset = ctx.emitter->m_vars[var_index].getOffsetSub(el.sub);
 				el.type = ExpressionStackElement::VARIABLE;
 				break;
 			case VariableFamily::INPUT:
-				el.register_offset = ctx.emitted->m_inputs[var_index].getOffsetSub(sub);
+				el.register_offset = ctx.emitted->m_inputs[var_index].getOffsetSub(el.sub);
 				el.type = ExpressionStackElement::OUTPUT;
 				break;
 		}
 
 		if (peekToken().type != Token::EQUAL) {
-			el.sub = sub;
 			m_postfix.push(el);
 			return true;
 		}
@@ -559,54 +566,50 @@ struct ParticleScriptCompiler {
 			return false;
 		}
 
-		if (has_subscript) {
-			compileExpression(ctx, sub, parenthesis_depth);
-			ASSERT(m_stack.empty());
-			m_postfix.push(el);
-			m_postfix.emplace().type = ExpressionStackElement::ASSIGN;
-			return true;
-		}
-
 		Type var_type;
-		
 		switch (type) {
 			case VariableFamily::OUTPUT: var_type = ctx.emitter->m_outputs[var_index].type; break;
 			case VariableFamily::CHANNEL: var_type = ctx.emitter->m_vars[var_index].type; break;
 			case VariableFamily::INPUT: var_type = ctx.emitted->m_inputs[var_index].type; break;
 		}
 
-		u32 num = 0;
+		u32 var_len = 0;
 		switch (var_type) {
-			case Type::FLOAT: num = 1; break;
-			case Type::FLOAT3: num = 3; break;
-			case Type::FLOAT4: num = 4; break;
+			case Type::FLOAT: var_len = 1; break;
+			case Type::FLOAT3: var_len = 3; break;
+			case Type::FLOAT4: var_len = 4; break;
 		}
 
-		for (u32 i = 0; i < num; ++i) {
+		if (swizzle_len == 0) swizzle_len = var_len;
+		for (u32 i = 0; i < swizzle_len; ++i) {
+			if (swizzle[i] >= var_len) {
+				error(swizzle_str, "Out of bounds swizzle.");
+				return false;
+			} 
 			ParticleScriptTokenizer tokenizer = m_tokenizer;
 			compileExpression(ctx, i, parenthesis_depth);
-			if (i != num - 1) m_tokenizer = tokenizer;
+			if (i != var_len - 1) m_tokenizer = tokenizer;
 			ASSERT(m_stack.empty());
 			
+			el.sub = swizzle[i];
 			switch (type) {
-				case VariableFamily::OUTPUT: el.output_offset = ctx.emitter->m_outputs[var_index].getOffsetSub(i); break;
-				case VariableFamily::CHANNEL: el.variable_index = var_index; break;
-				case VariableFamily::INPUT: el.register_offset = ctx.emitted->m_inputs[var_index].getOffsetSub(i); break;
+				case VariableFamily::OUTPUT: el.output_offset = ctx.emitter->m_outputs[var_index].getOffsetSub(el.sub); break;
+				case VariableFamily::CHANNEL: el.variable_offset = ctx.emitter->m_vars[var_index].getOffsetSub(el.sub); break;
+				case VariableFamily::INPUT: el.register_offset = ctx.emitted->m_inputs[var_index].getOffsetSub(el.sub); break;
 			}
 			
-			el.sub = i;
 			m_postfix.push(el);
 			m_postfix.emplace().type = ExpressionStackElement::ASSIGN;
 		}
 		return true;
 	}
 
-	float compileCompoundLiteral(u32 sub) {
+	float compileCompound(u32 sub) {
 		float res = 0;
 		for (u32 i = 0;; ++i) {
 			Token t = peekToken();
 			if (t.type == Token::RIGHT_BRACE) {
-				if (i <= sub) error(t.value, "Compound literal is too small.");
+				if (i <= sub) error(t.value, "Out of bounds access.");
 				return res;
 			}
 			if (i > 0 && !consume(Token::COMMA)) return 0;
@@ -736,7 +739,7 @@ struct ParticleScriptCompiler {
 					consumeToken();
 					ExpressionStackElement& el = m_postfix.emplace();
 					el.type = ExpressionStackElement::LITERAL;
-					el.literal_value = compileCompoundLiteral(sub);
+					el.literal_value = compileCompound(sub);
 					el.parenthesis_depth = parenthesis_depth;
 					consume(Token::RIGHT_BRACE);
 					break;
@@ -1062,7 +1065,7 @@ struct ParticleScriptCompiler {
 						break;
 					case ExpressionStackElement::VARIABLE:
 						dst.type = DataStream::CHANNEL;
-						dst.index = ctx.emitter->m_vars[dst_el.variable_index].getOffsetSub(dst_el.sub);
+						dst.index = dst_el.variable_offset;
 						break;
 					case ExpressionStackElement::REGISTER:
 						dst.type = DataStream::REGISTER;
@@ -1072,6 +1075,7 @@ struct ParticleScriptCompiler {
 				}
 				compiled.write(dst);
 				compiled.write(src);
+				deallocRegister(*ctx.emitter, src);
 				return {};
 			}
 
@@ -1106,7 +1110,7 @@ struct ParticleScriptCompiler {
 			case ExpressionStackElement::VARIABLE: {
 				DataStream res;
 				res.type = DataStream::CHANNEL;
-				res.index = ctx.emitter->m_vars[el.variable_index].getOffsetSub(el.sub);
+				res.index = el.variable_offset;
 				return res;
 			}
 
@@ -1186,6 +1190,7 @@ struct ParticleScriptCompiler {
 					compiled.write(el.function_desc.instruction);
 					ASSERT(emitter_index.type == DataStream::LITERAL);
 					compiled.write(cond_stream);
+					deallocRegister(*ctx.emitter, cond_stream);
 					compiled.write(u32(emitter_index.index));
 					return {};
 				}
@@ -1549,5 +1554,35 @@ struct ParticleScriptCompiler {
 	bool m_is_error = false;
 	bool m_is_world_space = false;
 };
+
+#if 0
+static bool ParticleScriptTest = [](){
+	ParticleScriptCompiler compiler("t.xzy = r.zxy;", Path(), getGlobalAllocator());
+	u32 depth = 0;
+	auto& emitter = compiler.m_emitters.emplace(getGlobalAllocator());
+	auto& var = emitter.m_vars.emplace();
+	var.name = "t";
+	var.type = ParticleScriptCompiler::Type::FLOAT3;
+	var.offset = 0;
+	auto& var2 = emitter.m_vars.emplace();
+	var2.name = "r";
+	var2.type = ParticleScriptCompiler::Type::FLOAT3;
+	var2.offset = 3;
+	compiler.compileExpression({.emitter = &emitter}, 0, depth);
+	ASSERT(compiler.m_postfix.size() == 9);
+	ASSERT(compiler.m_postfix[0].type == ParticleScriptCompiler::ExpressionStackElement::VARIABLE);
+	ASSERT(compiler.m_postfix[1].type == ParticleScriptCompiler::ExpressionStackElement::VARIABLE);
+	ASSERT(compiler.m_postfix[2].type == ParticleScriptCompiler::ExpressionStackElement::ASSIGN);
+	ASSERT(compiler.m_postfix[3].type == ParticleScriptCompiler::ExpressionStackElement::VARIABLE);
+	ASSERT(compiler.m_postfix[4].type == ParticleScriptCompiler::ExpressionStackElement::VARIABLE);
+	ASSERT(compiler.m_postfix[5].type == ParticleScriptCompiler::ExpressionStackElement::ASSIGN);
+	ASSERT(compiler.m_postfix[6].type == ParticleScriptCompiler::ExpressionStackElement::VARIABLE);
+	ASSERT(compiler.m_postfix[7].type == ParticleScriptCompiler::ExpressionStackElement::VARIABLE);
+	ASSERT(compiler.m_postfix[7].variable_offset == 1);
+	ASSERT(compiler.m_postfix[8].type == ParticleScriptCompiler::ExpressionStackElement::ASSIGN);
+	return true;
+}();
+#endif
+
 
 }
