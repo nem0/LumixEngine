@@ -28,7 +28,7 @@ emitter explosion {
 		i_color.a = 1;
 		i_rot = 0;
 		i_frame = 0;
-		i_emission = 10;
+		i_emission = 100 * t;
 	}
 
 	fn emit {
@@ -59,7 +59,6 @@ emitter fireworks {
 	out i_frame : float
 	out i_emission : float
 
-
 	var vel : float3
 	var t : float
 	
@@ -87,7 +86,7 @@ emitter fireworks {
 			in_col.x = random(0, 1);
 			in_col.y = random(0, 1);
 			in_col.z = random(0, 1);
-		}
+		};
 		kill(t > 1.5);
 	}
 }
