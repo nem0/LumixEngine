@@ -6,9 +6,159 @@
 
 namespace Lumix {
 
+struct ParticleScriptToken {
+	enum Type {
+		EOF, ERROR, SEMICOLON, COMMA, COLON, DOT,
+		LEFT_PAREN, RIGHT_PAREN, LEFT_BRACE, RIGHT_BRACE,
+		STAR, SLASH, MINUS, PLUS, EQUAL, PERCENT, GT, LT,
+		NUMBER, STRING, IDENTIFIER,
+
+		// keywords
+		CONST, PARAM, EMITTER, FN, WORLD_SPACE, VAR, OUT, IN
+	};
+
+	Type type;
+	StringView value;
+};
+
+struct ParticleScriptTokenizer {
+	using Token = ParticleScriptToken;
+
+	StringView m_document;
+	const char* m_start_token;
+	const char* m_current;
+	Token m_current_token;
+
+	void skipWhitespaces() {
+		while (m_current != m_document.end && isWhitespace(*m_current)) ++m_current;
+		if (m_current < m_document.end - 1
+			&& m_current[0] == '/'
+			&& m_current[1] == '/') 
+		{
+			m_current += 2;
+			while (m_current != m_document.end && *m_current != '\n') {
+				++m_current;
+			}
+			skipWhitespaces();
+		}
+	}
+
+	Token makeToken(Token::Type type) {
+		Token res;
+		res.type = type;
+		res.value.begin = m_start_token;
+		res.value.end = m_current;
+		if (type == Token::STRING) {
+			++res.value.begin;
+			--res.value.end;
+		}
+		return res;
+	}
+
+	char advance() {
+		ASSERT(m_current < m_document.end);
+		char c = m_current[0];
+		++m_current;
+		return c;
+	}
+
+	static bool isDigit(char c) { return c >= '0' && c <= '9'; }
+
+	char peekChar() {
+		if (m_current == m_document.end) return 0;
+		return m_current[0];
+	}
+
+	char peekNextChar() {
+		if (m_current + 1 >= m_document.end) return 0;
+		return m_current[1];
+	}
+
+	Token numberToken() {
+		while (isDigit(peekChar())) advance();
+		if (peekChar() == '.') {
+			advance();
+			if (!isDigit(peekChar())) return makeToken(Token::ERROR);
+			advance();
+			while (isDigit(peekChar())) advance();
+		}
+		return makeToken(Token::NUMBER);
+	}
+
+	Token stringToken() {
+		while (m_current != m_document.end && m_current[0] != '"') {
+			++m_current;
+		}
+		if (m_current == m_document.end) return makeToken(Token::ERROR);
+		advance();
+		return makeToken(Token::STRING);
+	}
+
+	Token checkKeyword(const char* remaining, i32 start, i32 len, Token::Type type) {
+		if (m_current - m_start_token != start + len) return makeToken(Token::IDENTIFIER);
+		if (memcmp(m_start_token + start, remaining, len) != 0) return makeToken(Token::IDENTIFIER);
+		return makeToken(type);
+	}
+
+	static bool isIdentifierChar(char c) {
+		return isLetter(c) || isDigit(c) || c == '_';
+	}
+
+	Token identifierOrKeywordToken() {
+		while (isIdentifierChar(peekChar())) advance();
+
+		switch (m_start_token[0]) {
+			case 'c': return checkKeyword("onst", 1, 4, Token::CONST);
+			case 'e': return checkKeyword("mitter", 1, 6, Token::EMITTER);
+			case 'f': return checkKeyword("n", 1, 1, Token::FN);
+			case 'i': return checkKeyword("n", 1, 1, Token::IN);
+			case 'o': return checkKeyword("ut", 1, 2, Token::OUT);
+			case 'p': return checkKeyword("aram", 1, 4, Token::PARAM);
+			case 'v': return checkKeyword("ar", 1, 2, Token::VAR);
+			case 'w': return checkKeyword("orld_space", 1, 10, Token::WORLD_SPACE);
+		}
+		return makeToken(Token::IDENTIFIER);
+	}
+
+	Token nextToken() {
+		skipWhitespaces();
+		Token res;
+		m_start_token = m_current;
+		if (m_current == m_document.end) return makeToken(Token::EOF);
+
+		char c = advance();
+		if (isDigit(c)) return numberToken();
+		if (isLetter(c) || c == '_') return identifierOrKeywordToken();
+		
+		switch (c) {
+			case '"': return stringToken();
+			case '.': return makeToken(Token::DOT);
+			case ';': return makeToken(Token::SEMICOLON);
+			case ':': return makeToken(Token::COLON);
+			case '{': return makeToken(Token::LEFT_BRACE);
+			case '}': return makeToken(Token::RIGHT_BRACE);
+			case '(': return makeToken(Token::LEFT_PAREN);
+			case ')': return makeToken(Token::RIGHT_PAREN);
+			case '-': return makeToken(Token::MINUS);
+			case '+': return makeToken(Token::PLUS);
+			case '*': return makeToken(Token::STAR);
+			case '/': return makeToken(Token::SLASH);
+			case '%': return makeToken(Token::PERCENT);
+			case '=': return makeToken(Token::EQUAL);
+			case ',': return makeToken(Token::COMMA);
+			case '>': return makeToken(Token::GT);
+			case '<': return makeToken(Token::LT);
+		}
+		
+		return makeToken(Token::ERROR);
+	}
+};
+
 struct ParticleScriptCompiler {
 	using InstructionType = ParticleSystemResource::InstructionType;
 	using DataStream = ParticleSystemResource::DataStream;
+	using Token = ParticleScriptToken;
+
 
     enum class Type {
         FLOAT,
@@ -70,7 +220,8 @@ struct ParticleScriptCompiler {
 			RETURN,
 			OUTPUT,
 			EMITTER_INDEX,
-			BLOCK_END
+			BLOCK_END,
+			NEGATIVE
 		};
 
 		Type type;
@@ -129,12 +280,12 @@ struct ParticleScriptCompiler {
 	struct CompileContext {
 		const Function* function = nullptr;
 		Emitter* emitter = nullptr;
+		Emitter* emitted = nullptr;
 		Span<DataStream> args = {};
 	};
 
 	ParticleScriptCompiler(StringView content, const Path& path, IAllocator& allocator)
 		: m_allocator(allocator)
-		, m_content(content)
 		, m_emitters(allocator)
 		, m_constants(allocator)
 		, m_params(allocator)
@@ -143,56 +294,15 @@ struct ParticleScriptCompiler {
 		, m_functions(allocator)
 		, m_path(path)
         , m_text_begin(content.begin)
-	{}
-
-	void skipWhitespaces() {
-		while (m_content.begin != m_content.end && isWhitespace(*m_content.begin)) ++m_content.begin;
-		if (m_content.begin < m_content.end - 1
-			&& m_content.begin[0] == '/'
-			&& m_content.begin[1] == '/') 
-		{
-			m_content.begin += 2;
-			while (m_content.begin != m_content.end && *m_content.begin != '\n') {
-				++m_content.begin;
-			}
-			skipWhitespaces();
-		}
-	}
-
-	bool expectNotEOF() {
-		skipWhitespaces();
-		if (m_content.size() == 0) {
-			error(m_content, "Unexpected end of file");
-			return false;
-		}
-		return true;
-	}
-
-	StringView tryReadWord() {
-		StringView res = m_content;
-		res.end = res.begin;
-		if (res.end != m_content.end) {
-			++res.end;
-			if (!isNumeric(*res.begin) && !isLetter(*res.begin) && *res.begin != '_') {
-				m_content.begin = res.end;
-				return res;
-			}
-		}
-		while (res.end != m_content.end && (isNumeric(*res.end) || isLetter(*res.end) || *res.end == '_')) ++res.end;
-		m_content.begin = res.end;
-		return res;
-	}
-
-	StringView readWord() {
-		expectNotEOF();
-		StringView w = tryReadWord();
-		if (w.size() == 0) error(w, "Expected a word"); 
-		return w;
+	{
+		m_tokenizer.m_current = content.begin;
+		m_tokenizer.m_document = content;
+		m_tokenizer.m_current_token = m_tokenizer.nextToken();
 	}
 
     i32 getLine(StringView location) {
-        ASSERT(location.begin <= m_content.end);
-        const char* c = m_text_begin;
+        ASSERT(location.begin <= m_tokenizer.m_document.end);
+        const char* c = m_tokenizer.m_document.begin;
         i32 line = 1;
         while(c < location.begin) {
             if (*c == '\n') ++line;
@@ -211,43 +321,141 @@ struct ParticleScriptCompiler {
 		m_is_error = true;
 	}
 
-	void expect(const char* v) {
-		StringView w = readWord();
-		if (!equalStrings(w, v)) error(w, "Expected ", v);
+	Token peekToken() { return m_tokenizer.m_current_token; }
+
+	Token consumeToken() {
+		Token t = m_tokenizer.m_current_token;
+		m_tokenizer.m_current_token = m_tokenizer.nextToken();
+		return t;
 	}
 
-	StringView readIdentifier() {
-		expectNotEOF();
-		StringView res = m_content;
-		res.end = res.begin;
-		if (!isLetter(*res.begin) && *res.begin != '_') error(res, "Identifier must start with a letter or _"); 
-		++res.end;
-		while (res.end != m_content.end && (isNumeric(*res.end) || isLetter(*res.end) || *res.end == '_')) {
-			 ++res.end;
+	bool consume(Token::Type type) {
+		Token t = consumeToken();
+		if (t.type != type) {
+			error(t.value, "Unexpected token.");
+			return false;
 		}
-		m_content.begin = res.end;
-		return res;
+		return true;
 	}
 
-	i32 getEmitterIndex(StringView name) {
-		for (const Emitter& emitter : m_emitters) {
-			if (equalStrings(emitter.m_name, name)) return i32(&emitter - m_emitters.begin());
+	[[nodiscard]] bool consume(Token::Type type, StringView& value) {
+		Token t = consumeToken();
+		if (t.type != type) {
+			error(t.value, "Unexpected token.");
+			return false;
 		}
-		return -1;
+		value = t.value;
+		return true;
 	}
 
-	static i32 getArgumentIndex(const Function& fn, StringView ident) {
-		for (i32 i = 0, c = fn.args.size(); i < c; ++i) {
-			if (equalStrings(fn.args[i], ident)) return i;
-		}
-		return -1;
+	float asFloat(Token token) {
+		ASSERT(token.type == Token::NUMBER);
+		float v;
+		fromCString(token.value, v);
+		return v;
 	}
 
-	i32 getFunctionIndex(StringView ident) {
-		for (Function& fn : m_functions) {
-			if (equalStrings(fn.name, ident)) return i32(&fn - m_functions.begin());
+	void compileConst() {
+        Constant& c = m_constants.emplace();
+		if (!consume(Token::IDENTIFIER, c.name)) return;
+        if (!consume(Token::EQUAL)) return;
+        
+		Token value = consumeToken();
+		if (value.type != Token::NUMBER) {
+			// TODO floatN constants
+			error(value.value, "Expected a number.");
+			return;
 		}
-		return -1;
+
+        float f = asFloat(value);
+        c.value[0] = f;
+        c.value[1] = f;
+        c.value[2] = f;
+        c.value[3] = f;
+        c.type = Type::FLOAT;
+
+		consume(Token::SEMICOLON);
+	}
+
+	void fillVertexDecl(const Emitter& emitter, gpu::VertexDecl& decl) {
+		u32 offset = 0;
+		for (const Variable& o : emitter.m_outputs) {
+			switch (o.type) {
+				case Type::FLOAT: 
+					decl.addAttribute(offset, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+					offset += sizeof(float);
+					break;
+				case Type::FLOAT3: 
+					decl.addAttribute(offset, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+					offset += sizeof(Vec3);
+					break;
+				case Type::FLOAT4: 
+					decl.addAttribute(offset, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+					offset += sizeof(Vec4);
+					break;
+			}
+		}
+	}
+
+	void parseArgs(Function& fn) {
+		consume(Token::LEFT_PAREN);
+		bool comma = false;
+		for (;;) {
+			Token t = consumeToken();
+			switch (t.type) {
+				case Token::ERROR: return;
+				case Token::EOF: error(t.value, "Unexpected end of file.");
+				case Token::RIGHT_PAREN:
+					if (!comma) return;
+					error(t.value, "Unexpected ).'");
+					return;
+				case Token::COMMA: 
+					if (fn.args.empty() || comma) {
+						error(t.value, "Unexpected ,.");
+						return;
+					}
+					comma = true;
+					break;
+				case Token::IDENTIFIER: {
+					StringView& arg = fn.args.emplace();
+					arg = t.value;
+					comma = false;
+					break;
+				}
+				default:
+					error(t.value, "Unexpected token.");
+					return;
+			}
+		}
+	}
+
+	static u32 getPriority(const ExpressionStackElement& el) {
+		u32 prio = el.parenthesis_depth * 10;
+		switch (el.type) {
+			case ExpressionStackElement::FUNCTION_CALL: prio += 9; break;
+			case ExpressionStackElement::NEGATIVE: prio += 9; break;
+			case ExpressionStackElement::FUNCTION: prio += 8; break;
+			case ExpressionStackElement::OPERATOR: 
+				switch(el.operator_char) {
+					case Operators::GT: case Operators::LT: prio += 0; break;
+					case Operators::ADD: case Operators::SUB: prio += 1; break;
+					case Operators::MOD: case Operators::MUL: case Operators::DIV: prio += 2; break;
+				}
+				break;
+			default: ASSERT(false);
+		}
+		return prio;
+	}
+
+	void pushStack(const ExpressionStackElement& el) {
+		u32 priority = getPriority(el);
+		while (!m_stack.empty()) {
+			if (getPriority(m_stack.last()) < priority) break;
+
+			m_postfix.push(m_stack.last());
+			m_stack.pop();
+		}
+		m_stack.push(el);
 	}
 
 	BuiltinFunction getBuiltinFunction(StringView name) {
@@ -265,23 +473,160 @@ struct ParticleScriptCompiler {
 		else return { InstructionType::END };
 	}
 
-	i32 getParamIndex(StringView name) {
-		for (const Variable& var : m_params) {
-			if (equalStrings(var.name, name)) return i32(&var - m_params.begin());
+	static i32 getArgumentIndex(const Function& fn, StringView ident) {
+		for (i32 i = 0, c = fn.args.size(); i < c; ++i) {
+			if (equalStrings(fn.args[i], ident)) return i;
 		}
 		return -1;
 	}
 
-    Constant* getConstant(StringView name) {
-        for (Constant& c : m_constants) {
-            if (equalStrings(c.name, name)) return &c;
-        }
-        return nullptr;
-    }
+	static i32 getInputIndex(const Emitter& emitter, StringView name) {
+		for (const Variable& var : emitter.m_inputs) {
+			if (equalStrings(var.name, name)) return i32(&var - emitter.m_inputs.begin());
+		}
+		return -1;
+	}
 
-	i32 getVariableIndex(const Emitter& emitter, StringView name) {
+	static i32 getOutputIndex(const Emitter& emitter, StringView name) {
+		for (const Variable& var : emitter.m_outputs) {
+			if (equalStrings(var.name, name)) return i32(&var - emitter.m_outputs.begin());
+		}
+		return -1;
+	}
+
+	static i32 getVariableIndex(const Emitter& emitter, StringView name) {
 		for (const Variable& var : emitter.m_vars) {
 			if (equalStrings(var.name, name)) return i32(&var - emitter.m_vars.begin());
+		}
+		return -1;
+	}
+
+	enum class VariableFamily {
+		OUTPUT,
+		CHANNEL,
+		INPUT
+	};
+
+	bool compileVariable(const CompileContext& ctx, i32 var_index, VariableFamily type, u32& parenthesis_depth, u32 sub, bool can_assign) {
+		ExpressionStackElement el;
+		el.parenthesis_depth = parenthesis_depth;
+
+		bool has_subscript = false;
+
+		if (peekToken().type == Token::DOT) {
+			consume(Token::DOT);
+			StringView subtoken;
+			if (!consume(Token::IDENTIFIER, subtoken)) return false;
+			if (subtoken.size() != 1) {
+				error(subtoken, "Unknown subscript.");
+				return false;
+			}
+			switch (subtoken[0]) {
+				case 'x': case 'r': sub = 0; break;
+				case 'y': case 'g': sub = 1; break;
+				case 'z': case 'b': sub = 2; break;
+				case 'w': case 'a': sub = 3; break;
+				default: error(subtoken, "Unknown subscript"); return false;
+			}
+			has_subscript = true;
+			el.sub = sub;
+		}
+
+		switch (type) {
+			case VariableFamily::OUTPUT:
+				el.output_offset = ctx.emitter->m_outputs[var_index].getOffsetSub(sub);
+				el.type = ExpressionStackElement::OUTPUT;
+				break;
+			case VariableFamily::CHANNEL:
+				el.variable_index = var_index;
+				el.type = ExpressionStackElement::VARIABLE;
+				break;
+			case VariableFamily::INPUT:
+				el.register_offset = ctx.emitted->m_inputs[var_index].getOffsetSub(sub);
+				el.type = ExpressionStackElement::OUTPUT;
+				break;
+		}
+
+		if (peekToken().type != Token::EQUAL) {
+			el.sub = sub;
+			m_postfix.push(el);
+			return true;
+		}
+			
+		consumeToken();
+		if (!can_assign) {
+			error(m_tokenizer.m_current_token.value, "Unexpected =.");
+			return false;
+		}
+
+		if (has_subscript) {
+			compileExpression(ctx, sub, parenthesis_depth);
+			ASSERT(m_stack.empty());
+			m_postfix.push(el);
+			m_postfix.emplace().type = ExpressionStackElement::ASSIGN;
+			return true;
+		}
+
+		Type var_type;
+		
+		switch (type) {
+			case VariableFamily::OUTPUT: var_type = ctx.emitter->m_outputs[var_index].type; break;
+			case VariableFamily::CHANNEL: var_type = ctx.emitter->m_vars[var_index].type; break;
+			case VariableFamily::INPUT: var_type = ctx.emitted->m_inputs[var_index].type; break;
+		}
+
+		u32 num = 0;
+		switch (var_type) {
+			case Type::FLOAT: num = 1; break;
+			case Type::FLOAT3: num = 3; break;
+			case Type::FLOAT4: num = 4; break;
+		}
+
+		for (u32 i = 0; i < num; ++i) {
+			ParticleScriptTokenizer tokenizer = m_tokenizer;
+			compileExpression(ctx, i, parenthesis_depth);
+			if (i != num - 1) m_tokenizer = tokenizer;
+			ASSERT(m_stack.empty());
+			
+			switch (type) {
+				case VariableFamily::OUTPUT: el.output_offset = ctx.emitter->m_outputs[var_index].getOffsetSub(i); break;
+				case VariableFamily::CHANNEL: el.variable_index = var_index; break;
+				case VariableFamily::INPUT: el.register_offset = ctx.emitted->m_inputs[var_index].getOffsetSub(i); break;
+			}
+			
+			el.sub = i;
+			m_postfix.push(el);
+			m_postfix.emplace().type = ExpressionStackElement::ASSIGN;
+		}
+		return true;
+	}
+
+	float compileCompoundLiteral(u32 sub) {
+		float res = 0;
+		for (u32 i = 0;; ++i) {
+			Token t = peekToken();
+			if (t.type == Token::RIGHT_BRACE) {
+				if (i <= sub) error(t.value, "Compound literal is too small.");
+				return res;
+			}
+			if (i > 0 && !consume(Token::COMMA)) return 0;
+			StringView val;
+			bool neg = false;
+			if (peekToken().type == Token::MINUS) {
+				neg = true;
+				consumeToken();
+			}
+			if (!consume(Token::NUMBER, val)) return 0;
+			if (i == sub) {
+				fromCString(val, res);
+				if (neg) res = -res;
+			}
+		}
+	}
+
+	i32 getFunctionIndex(StringView ident) const {
+		for (Function& fn : m_functions) {
+			if (equalStrings(fn.name, ident)) return i32(&fn - m_functions.begin());
 		}
 		return -1;
 	}
@@ -294,100 +639,358 @@ struct ParticleScriptCompiler {
 		if (equalStrings(name, "ribbon_index")) return ParticleSystemValues::RIBBON_INDEX;
 		return ParticleSystemValues::NONE;
 	}
-
-	i32 getOutputIndex(const Emitter& emitter, StringView name) {
-		for (const Variable& var : emitter.m_outputs) {
-			if (equalStrings(var.name, name)) return i32(&var - emitter.m_outputs.begin());
-		}
-		return -1;
-	}
-
-	i32 getInputIndex(const Emitter& emitter, StringView name) {
-		for (const Variable& var : emitter.m_inputs) {
-			if (equalStrings(var.name, name)) return i32(&var - emitter.m_inputs.begin());
-		}
-		return -1;
-	}
-
-	float readNumberOrSub(u32 sub) {
-		expectNotEOF();
-        if (peekChar() != '{') return readNumber();
-        ++m_content.begin;
-        skipWhitespaces();
-        float vals[4] = {};
-        vals[0] = readNumber();
-        expect(",");
-        vals[1] = readNumber();
-		expectNotEOF();
-        if (peekChar() == '}') {
-            if (sub > 1) error (m_content, "Expected ,");
+	
+	Constant* getConstant(StringView name) const {
+        for (Constant& c : m_constants) {
+            if (equalStrings(c.name, name)) return &c;
         }
-        else {
-            expect(",");
-            vals[2] = readNumber();
-            if (peekChar() == '}') {
-                if (sub > 2) error (m_content, "Expected ,");
-            }
-            else {
-                expect(",");
-                vals[3] = readNumber();
-            }
-        }
-        expect("}");
-
-        return vals[sub];
+        return nullptr;
     }
 
-	float readNumber() {
-		expectNotEOF();
-		
-        bool is_negative = false;
-		if (*m_content.begin == '-') {
-            is_negative = true;
-            ++m_content.begin;
-            if (m_content.size() == 0) {
-                error(m_content, "Expected a number");
-                return 0;
-            }
-        }
-        if (!isNumeric(*m_content.begin)) {
-            StringView ident = readIdentifier();
-            Constant* c = getConstant(ident);
-            if (c) {
-                return c->value[0] * (is_negative ? -1 : 1);
-            }
-            else {
-                error(ident, "Expected a number");
-            }
-            return 0;
-        }
-		
-		StringView s;
-		s.begin = m_content.begin;
-		s.end = s.begin + 1;
-		while (s.end != m_content.end && isNumeric(*s.end)) ++s.end;
-		if (s.end == m_content.end || *s.end != '.') {
-			m_content.begin = s.end;
-			float v;
-			fromCString(s, v);
-            if (is_negative) v = -v;
-	 		return v;
+	i32 getParamIndex(StringView name) const {
+		for (const Variable& var : m_params) {
+			if (equalStrings(var.name, name)) return i32(&var - m_params.begin());
 		}
-		++s.end;
-		while (s.end != m_content.end && isNumeric(*s.end)) ++s.end;
-		m_content.begin = s.end;
-		float v;
-		fromCString(s, v);
-        if (is_negative) v = -v;
-		return v;
+		return -1;
 	}
 
-	char peekChar() {
-		if (m_content.size() == 0) {
-			error(m_content, "Unexpected end of file");
-			return 0;
+	i32 getEmitterIndex(StringView name) const {
+		for (const Emitter& emitter : m_emitters) {
+			if (equalStrings(emitter.m_name, name)) return i32(&emitter - m_emitters.begin());
 		}
-		return *m_content.begin;
+		return -1;
+	}
+
+	bool compileEmitBlock(const CompileContext& ctx, Emitter& emitted) {
+		for (;;) {
+			Token token = peekToken();
+			switch (token.type) {
+				case Token::ERROR: return false;
+				case Token::EOF:
+					error(token.value, "Unexpected end of file.");
+					return false;
+				case Token::RIGHT_BRACE:
+					return true;
+				default: {
+					u32 depth = 0;
+					CompileContext ctx2 = ctx;
+					ctx2.emitted = &emitted;
+					compileExpression(ctx2, 0, depth);
+					if (!consume(Token::SEMICOLON)) return false;
+					break;
+				}
+			}
+		}
+		return true;
+	}
+
+
+	void compileExpression(const CompileContext& ctx, u32 sub, u32& parenthesis_depth) {
+		bool can_be_unary = true;
+		bool can_assign = true;
+
+		const i32 start_postfix_size = m_postfix.size();
+		const i32 start_stack_size = m_stack.size();
+		u32 start_depth = parenthesis_depth;
+		for (;;) {
+			Token token = peekToken();
+			switch (token.type) {
+				case Token::ERROR: return;
+				case Token::EOF:
+					consumeToken();
+					error(token.value, "Unexpected end of file");
+					return;
+				case Token::COMMA:
+				case Token::SEMICOLON:
+					while (m_stack.size() > start_stack_size) {
+						m_postfix.push(m_stack.last());
+						m_stack.pop();
+					}
+					if (m_postfix.size() == start_postfix_size) {
+						error(token.value, "Empty expression");
+						return;
+					}
+					return;
+				case Token::RIGHT_PAREN:
+					if (parenthesis_depth == start_depth) {
+						while (m_stack.size() > start_stack_size) {
+							m_postfix.push(m_stack.last());
+							m_stack.pop();
+						}
+						if (m_postfix.size() == start_postfix_size) {
+							error(token.value, "Empty expression");
+							return;
+						}
+						return;
+					}
+					consumeToken();
+					--parenthesis_depth;
+					can_be_unary = false;
+					break;
+				case Token::LEFT_PAREN:
+					consumeToken();
+					can_be_unary = true;
+					++parenthesis_depth;
+					break;
+				case Token::LEFT_BRACE: {
+					consumeToken();
+					ExpressionStackElement& el = m_postfix.emplace();
+					el.type = ExpressionStackElement::LITERAL;
+					el.literal_value = compileCompoundLiteral(sub);
+					el.parenthesis_depth = parenthesis_depth;
+					consume(Token::RIGHT_BRACE);
+					break;
+				}
+				case Token::NUMBER: {
+					consumeToken();
+					ExpressionStackElement& el = m_postfix.emplace();
+					el.type = ExpressionStackElement::LITERAL;
+					el.literal_value = asFloat(token);
+					el.parenthesis_depth = parenthesis_depth;
+					can_be_unary = false;
+					break;
+				}
+				case Token::MINUS: {
+					consumeToken();
+					if (can_be_unary) {
+						if (peekToken().type == Token::NUMBER) {
+							consumeToken();
+							ExpressionStackElement& el = m_postfix.emplace();
+							el.type = ExpressionStackElement::LITERAL;
+							el.literal_value = -asFloat(token);
+							el.parenthesis_depth = parenthesis_depth;
+							can_be_unary = false;
+							break;
+						}
+						// TODO this does not work with abs(-a + b);
+						compileExpression(ctx, sub, parenthesis_depth);
+						ExpressionStackElement& el = m_postfix.emplace();
+						el.type = ExpressionStackElement::NEGATIVE;
+						break;
+					}
+					ExpressionStackElement el;
+					el.type = ExpressionStackElement::OPERATOR;
+					el.operator_char = (Operators)token.value[0];
+					el.parenthesis_depth = parenthesis_depth;
+					pushStack(el);
+					can_be_unary = true;
+					break;
+				}
+				case Token::GT:
+				case Token::LT:
+				case Token::PERCENT:
+				case Token::PLUS:
+				case Token::STAR:
+				case Token::SLASH: {
+					consumeToken();
+					ExpressionStackElement el;
+					el.type = ExpressionStackElement::OPERATOR;
+					el.operator_char = (Operators)token.value[0];
+					el.parenthesis_depth = parenthesis_depth;
+					pushStack(el);
+					can_be_unary = true;
+					break;
+				}
+				case Token::IDENTIFIER: {
+					consumeToken();
+					BuiltinFunction bfn = getBuiltinFunction(token.value);
+					if (bfn.instruction != InstructionType::END) {
+						++parenthesis_depth;
+						if (!consume(Token::LEFT_PAREN)) return;
+
+						if (bfn.instruction == InstructionType::EMIT) {
+							StringView emitter_name;
+							if (!consume(Token::IDENTIFIER, emitter_name)) return;
+							i32 emitter_index = getEmitterIndex(emitter_name);
+							if (emitter_index < 0) {
+								error(emitter_name, "Unknown emitter");
+								return;
+							}
+							consume(Token::COMMA);
+					
+							const i32 condition_postfix_offset = m_postfix.size();
+							compileExpression(ctx, 0, parenthesis_depth);
+							StackArray<ExpressionStackElement, 16> cond_exprs(m_allocator);
+							while (m_postfix.size() > condition_postfix_offset) {
+								cond_exprs.push(m_postfix.last());
+								m_postfix.pop();
+							}
+
+							consume(Token::RIGHT_PAREN);
+							--parenthesis_depth;
+
+							ExpressionStackElement& end_el = m_postfix.emplace();
+							end_el.type = ExpressionStackElement::BLOCK_END;
+							if (peekToken().type == Token::LEFT_BRACE) {
+								consumeToken();
+								if (!compileEmitBlock(ctx, m_emitters[emitter_index])) return;
+								consume(Token::RIGHT_BRACE);
+							}
+							else {
+								consume(Token::SEMICOLON);
+							}
+
+							ExpressionStackElement& emit_el = m_postfix.emplace();
+							emit_el.type = ExpressionStackElement::EMITTER_INDEX;
+							emit_el.emitter_index = emitter_index;
+
+							while (!cond_exprs.empty()) {
+								m_postfix.push(cond_exprs.last());
+								cond_exprs.pop();
+							}
+
+							ExpressionStackElement& dst = m_postfix.emplace();
+							dst.type = ExpressionStackElement::FUNCTION;
+							dst.function_desc = bfn;
+
+							//flushCompile(ctx, compiled);
+							return;
+						}
+						
+						ExpressionStackElement el;
+						el.type = ExpressionStackElement::FUNCTION;
+						el.function_desc = bfn;
+						el.parenthesis_depth = parenthesis_depth - 1;
+						el.sub = sub;
+						pushStack(el);
+						for (u32 i = 0; i < bfn.num_args; ++i) {
+							if (i > 0 && !consume(Token::COMMA)) return;
+							compileExpression(ctx, sub, parenthesis_depth);
+						}
+						if (!consume(Token::RIGHT_PAREN)) return;
+						--parenthesis_depth;
+						can_be_unary = true;
+						break;
+					}
+
+					ParticleSystemValues system_value = getSystemValue(token.value);
+					if (system_value != ParticleSystemValues::NONE) {
+						ExpressionStackElement& el = m_postfix.emplace();
+						el.type = ExpressionStackElement::SYSTEM_VALUE;
+						el.system_value = system_value;
+						el.parenthesis_depth = parenthesis_depth;
+						can_be_unary = false;
+						break;
+					}
+
+					i32 fn_index = getFunctionIndex(token.value);
+					if (fn_index >= 0) {
+						ExpressionStackElement el;
+						el.type = ExpressionStackElement::FUNCTION_CALL;
+						el.function_index = fn_index;
+						el.parenthesis_depth = parenthesis_depth;
+						el.sub = sub;
+						pushStack(el);
+						++parenthesis_depth;
+						consume(Token::LEFT_PAREN);
+						for (u32 i = 0, c = m_functions[fn_index].args.size(); i < c; ++i) {
+							compileExpression(ctx, sub, parenthesis_depth);
+						}
+						consume(Token::RIGHT_PAREN);
+						--parenthesis_depth;
+						can_be_unary = true;
+						break;;
+					}
+
+					if (ctx.emitted) {
+						i32 index = getInputIndex(*ctx.emitted, token.value);
+						if (index >= 0) {
+							if (!compileVariable(ctx, index, VariableFamily::INPUT, parenthesis_depth, sub, can_assign)) return;
+							can_be_unary = false;
+							break;
+						}
+					}
+
+					if (ctx.emitter) {
+						i32 input_index = getInputIndex(*ctx.emitter, token.value);
+						if (input_index >= 0) {
+							ExpressionStackElement& el = m_postfix.emplace();
+							el.type = ExpressionStackElement::REGISTER;
+							el.register_offset = ctx.emitter->m_inputs[input_index].getOffsetSub(sub);
+							el.parenthesis_depth = parenthesis_depth;
+							can_be_unary = false;
+							break;
+						}
+
+						i32 out_index = getOutputIndex(*ctx.emitter, token.value);
+						if (out_index >= 0) {
+							if (!compileVariable(ctx, out_index, VariableFamily::OUTPUT, parenthesis_depth, sub, can_assign)) return;
+							can_be_unary = false;
+							break;
+						}
+
+						i32 var_index = getVariableIndex(*ctx.emitter, token.value);
+						if (var_index >= 0) {
+							if (!compileVariable(ctx, var_index, VariableFamily::CHANNEL, parenthesis_depth, sub, can_assign)) return;
+							can_be_unary = false;
+							break;
+						}
+					}
+
+					if (Constant* c = getConstant(token.value)) {
+						ExpressionStackElement& el = m_postfix.emplace();
+						el.type = ExpressionStackElement::LITERAL;
+						el.literal_value = c->value[sub];
+						el.parenthesis_depth = parenthesis_depth;
+						can_be_unary = false;
+						break;
+					}
+
+					i32 param_index = getParamIndex(token.value);
+					if (param_index >= 0) {
+						ExpressionStackElement& el = m_postfix.emplace();
+						el.type = ExpressionStackElement::PARAM;
+						el.param_index = param_index;
+						el.parenthesis_depth = parenthesis_depth;
+						can_be_unary = false;
+
+						if (peekToken().type != Token::DOT) {
+							el.sub = sub;
+							continue;
+						}
+
+						consumeToken();
+						StringView subtoken;
+						if (!consume(Token::IDENTIFIER, subtoken)) return;
+						if (subtoken.size() != 1) {
+							error(subtoken, "Unknown subscript.");
+							return;
+						}
+
+						switch(subtoken[0]) {
+							case 'x': case 'r': el.sub = 0; break;
+							case 'y': case 'g': el.sub = 1; break;
+							case 'z': case 'b': el.sub = 2; break;
+							case 'w': case 'a': el.sub = 3; break;
+							default: error(subtoken, "Unknown subscript"); break;
+						}
+						break;
+					}
+
+					if (ctx.function) {
+						if (equalStrings(token.value, "return")) {
+							ExpressionStackElement& el = m_postfix.emplace();
+							el.type = ExpressionStackElement::RETURN;
+							can_be_unary = true;
+							break;
+						}
+
+						i32 arg_index = getArgumentIndex(*ctx.function, token.value);
+						if (arg_index >= 0) {
+							ExpressionStackElement& el = m_postfix.emplace();
+							el.type = ExpressionStackElement::FUNCTION_ARGUMENT;
+							el.arg_index = arg_index;
+							can_be_unary = false;
+							break;
+						}					
+					}
+					ASSERT(false);
+					break;
+				}
+				default: ASSERT(false); break;
+			}
+			can_assign = false;
+		}
 	}
 
 	static void deallocRegister(Emitter& emitter, const DataStream& stream) {
@@ -407,19 +1010,8 @@ struct ParticleScriptCompiler {
 				return res;
 			}
 		}
-		error(m_content, "Run out of allocators");
+		error(StringView(m_tokenizer.m_current, m_tokenizer.m_document.end), "Run out of allocators");
 		return res;
-	}
-	
-	bool isOperator(char c) { 
-		switch ((Operators)c) {
-			case Operators::ADD: case Operators::SUB:
-			case Operators::MUL: case Operators::DIV:
-			case Operators::LT: case Operators::GT:
-			case Operators::MOD:
-				return true;
-		}
-		return false;
 	}
 
 	DataStream compilePostfix(const CompileContext& ctx, OutputMemoryStream& compiled, Span<ExpressionStackElement>& postfix) {
@@ -471,6 +1063,10 @@ struct ParticleScriptCompiler {
 					case ExpressionStackElement::VARIABLE:
 						dst.type = DataStream::CHANNEL;
 						dst.index = ctx.emitter->m_vars[dst_el.variable_index].getOffsetSub(dst_el.sub);
+						break;
+					case ExpressionStackElement::REGISTER:
+						dst.type = DataStream::REGISTER;
+						dst.index = dst_el.register_offset;
 						break;
 					default: ASSERT(false); break;
 				}
@@ -524,11 +1120,28 @@ struct ParticleScriptCompiler {
 			case ExpressionStackElement::OPERATOR: {
 				if (postfix.size() < 2) {
 					// TODO error location
-					error(m_content, "Operator must have left and right side");
+					error(m_tokenizer.m_document, "Operator must have left and right side");
 					return {};
 				}
 				DataStream op2 = compilePostfix(ctx, compiled, postfix);
 				DataStream op1 = compilePostfix(ctx, compiled, postfix);
+
+				if (op1.type == DataStream::LITERAL && op2.type == DataStream::LITERAL) {
+					DataStream res;
+					res.type = DataStream::LITERAL;
+					switch (el.operator_char) {
+						case Operators::MOD: res.value = fmodf(op1.value, op2.value); break;
+						case Operators::ADD: res.value = op1.value + op2.value; break;
+						case Operators::SUB: res.value = op1.value - op2.value; break;
+						case Operators::MUL: res.value = op1.value * op2.value; break;
+						case Operators::DIV: res.value = op1.value / op2.value; break;
+						case Operators::GT:
+						case Operators::LT: goto nonliteral;
+					}
+					return res;
+				}
+
+				nonliteral:
 				switch (el.operator_char) {
 					case Operators::MOD: compiled.write(InstructionType::MOD); break;
 					case Operators::ADD: compiled.write(InstructionType::ADD); break;
@@ -549,6 +1162,23 @@ struct ParticleScriptCompiler {
 				return res;
 			}
 
+			case ExpressionStackElement::NEGATIVE: {
+				DataStream cont = compilePostfix(ctx, compiled, postfix);
+				if (cont.type == DataStream::LITERAL) {
+					cont.value = -cont.value;
+					return cont;
+				}
+				DataStream res = allocRegister(*ctx.emitter);
+				compiled.write(InstructionType::MUL);
+				compiled.write(res);
+				compiled.write(cont);
+				DataStream neg;
+				neg.type = DataStream::LITERAL;
+				neg.value = -1;
+				compiled.write(neg);
+				return res;
+			}
+
 			case ExpressionStackElement::FUNCTION: {
 				if (el.function_desc.instruction == InstructionType::EMIT) {
 					DataStream cond_stream = compilePostfix(ctx, compiled, postfix);
@@ -566,21 +1196,19 @@ struct ParticleScriptCompiler {
 					compiled.write(res);
 					if (postfix.size() < 2) {
 						// TODO error location
-						error(m_content, "rand expects 2 arguments");
+						error(m_tokenizer.m_document, "rand expects 2 arguments");
 						return {};
 					}
-					ExpressionStackElement arg1 = postfix.last();
-					postfix.removeSuffix(1);
-					ExpressionStackElement arg0 = postfix.last();
-					postfix.removeSuffix(1);
-					if (arg0.type != ExpressionStackElement::LITERAL || arg0.type != ExpressionStackElement::LITERAL) {
+					DataStream arg1 = compilePostfix(ctx, compiled, postfix);
+					DataStream arg0 = compilePostfix(ctx, compiled, postfix);
+					if (arg0.type != DataStream::LITERAL || arg0.type != DataStream::LITERAL) {
 						// TODO error location
-						error(m_content, "rand expects 2 literals");
+						error(m_tokenizer.m_document, "rand expects 2 literals");
 						return {};
 					}
 
-					compiled.write(arg0.literal_value);
-					compiled.write(arg1.literal_value);
+					compiled.write(arg0.value);
+					compiled.write(arg1.value);
 					return res;
 				}
 
@@ -616,7 +1244,7 @@ struct ParticleScriptCompiler {
 						stream = compilePostfix(ctx, compiled, postfix);
 						if (stream.type != DataStream::LITERAL) {
 							// TODO error location
-							error(m_content, "Literal expected");
+							error(m_tokenizer.m_document, "Literal expected");
 							return {};
 						}
 						values[num_frames] = stream.value;
@@ -654,278 +1282,389 @@ struct ParticleScriptCompiler {
 		return {};
 	}
 
-	u32 getPriority(const ExpressionStackElement& el) {
-		u32 prio = el.parenthesis_depth * 10;
-		switch (el.type) {
-			case ExpressionStackElement::FUNCTION_CALL: prio += 9; break;
-			case ExpressionStackElement::FUNCTION: prio += 9; break;
-			case ExpressionStackElement::OPERATOR: 
-				switch(el.operator_char) {
-					case Operators::GT: case Operators::LT: prio += 0; break;
-					case Operators::ADD: case Operators::SUB: prio += 1; break;
-					case Operators::MOD: case Operators::MUL: case Operators::DIV: prio += 2; break;
-				}
-				break;
-			default: ASSERT(false);
+	void flushCompile(const CompileContext& ctx, OutputMemoryStream& compiled) {
+		Span<ExpressionStackElement> exprs = m_postfix; 
+		while (exprs.size() > 0) {
+			compilePostfix(ctx, compiled, exprs);
 		}
-		return prio;
+		m_postfix.clear();
 	}
 
-	void pushStack(const ExpressionStackElement& el) {
-		u32 priority = getPriority(el);
-		while (!m_stack.empty()) {
-			if (getPriority(m_stack.last()) < priority) break;
+	void compileFunction(Emitter& emitter) {
+		StringView fn_name;
+		if (!consume(Token::IDENTIFIER, fn_name)) return;
+		if (!consume(Token::LEFT_BRACE)) return;
+		
+		OutputMemoryStream& compiled = [&]() -> OutputMemoryStream& {
+			if (equalStrings(fn_name, "update")) return emitter.m_update;
+			if (equalStrings(fn_name, "emit")) return emitter.m_emit;
+			if (equalStrings(fn_name, "output")) return emitter.m_output;
+			error(fn_name, "Unknown function");
+			return emitter.m_output;
+		}();
 
-			m_postfix.push(m_stack.last());
-			m_stack.pop();
-		}
-		m_stack.push(el);
-	}
+		ASSERT(m_postfix.empty());
 
-	void compileExpression(const CompileContext& ctx, u32 sub, u32& parenthesis_depth) {
-		const char* expression_start = m_content.begin;
-		bool can_be_unary = true;
-
-		const i32 start_postfix_size = m_postfix.size();
-		const i32 start_stack_size = m_stack.size();
-		u32 start_depth = parenthesis_depth;
+		CompileContext ctx;
+		ctx.emitter = &emitter;
 		for (;;) {
-			expectNotEOF();
-
-			const char peeked = peekChar();
-			if (peeked == ';' || peeked == ',') {
-				++m_content.begin;
-				while (m_stack.size() > start_stack_size) {
-					m_postfix.push(m_stack.last());
-					m_stack.pop();
-				}
-				if (m_postfix.size() == start_postfix_size) {
-					error(expression_start, "Empty expression");
+			Token token = peekToken();
+			switch (token.type) {
+				case Token::ERROR: return;
+				case Token::EOF:
+					error(token.value, "Unexpected end of file.");
 					return;
+				case Token::RIGHT_BRACE:
+					consumeToken();
+					compiled.write(InstructionType::END);
+					return;
+				default: {
+					u32 depth = 0;
+					compileExpression({.emitter = &emitter}, 0, depth);
+					if (!consume(Token::SEMICOLON)) return;
+					flushCompile(ctx, compiled);
+					break;
 				}
-				return;
 			}
+		}
+	}
 
-			if (peeked == ')') {
-				if (parenthesis_depth == start_depth) {
-					while (m_stack.size() > start_stack_size) {
-						m_postfix.push(m_stack.last());
-						m_stack.pop();
+	void compileFunction() {
+		ASSERT(m_stack.empty());
+		ASSERT(m_postfix.empty());
+
+		Function& fn = m_functions.emplace(m_allocator);
+		if (!consume(Token::IDENTIFIER, fn.name)) return;
+		parseArgs(fn);
+		consume(Token::LEFT_BRACE);
+
+		for (;;) {
+			Token t = consumeToken();
+			switch (t.type) {
+				case Token::ERROR: return;
+				case Token::EOF: error(t.value, "Unexpected end of file."); return;
+				case Token::RIGHT_BRACE:
+					m_postfix.copyTo(fn.expressions);
+					m_postfix.clear();
+					return;
+				default:
+					u32 parenthesis_depth = 0;
+					compileExpression({.function = &fn}, 0, parenthesis_depth);
+					if (!consume(Token::SEMICOLON)) return;
+					break;
+			}
+		
+		}
+
+	}
+	
+	void compileMesh(Emitter& emitter) {
+		StringView value;
+		if (!consume(Token::STRING, value)) return;
+		emitter.m_mesh = value;
+	}
+
+	void compileMaterial(Emitter& emitter) {
+		StringView value;
+		if (!consume(Token::STRING, value)) return;
+		emitter.m_material = value;
+	}
+
+	float consumeFloat() {
+		return asFloat(consumeToken());
+	}
+
+	u32 consumeU32() {
+		Token t = consumeToken();
+		if (t.type != Token::NUMBER) {
+			error(t.value, "Expected number.");
+			return 0;
+		}
+		u32 res;
+		const char* end = fromCString(t.value, res);
+		if (end != t.value.end) {
+			error(t.value, "Expected u32.");
+			return res;
+		}
+		return res;
+	}
+
+	Type parseType() {
+		StringView type;
+		if (!consume(Token::IDENTIFIER, type)) return Type::FLOAT;
+		if (equalStrings(type, "float")) return Type::FLOAT;
+		if (equalStrings(type, "float3")) return Type::FLOAT3;
+		if (equalStrings(type, "float4")) return Type::FLOAT4;
+		error(type, "Unknown type");
+		return Type::FLOAT;
+	}
+
+
+	void parseVariableDeclaration(Array<Variable>& vars) {
+		u32 offset = 0;
+		if (!vars.empty()) {
+			const Variable& var = vars.last();
+			offset = var.offset;
+			switch (var.type) {
+				case Type::FLOAT: ++offset; break;
+				case Type::FLOAT3: offset += 3; break;
+				case Type::FLOAT4: offset += 4; break;
+			}
+		}
+		Variable& var = vars.emplace();
+		if (!consume(Token::IDENTIFIER, var.name)) return;
+		consume(Token::COLON);
+		var.type = parseType();
+		var.offset = offset;
+	}
+
+	void compileEmitter() {
+		Emitter& emitter = m_emitters.emplace(m_allocator);
+		if (!consume(Token::IDENTIFIER, emitter.m_name)) return;
+		if (!consume(Token::LEFT_BRACE)) return;
+
+		for (;;) {
+			Token token = consumeToken();
+			switch (token.type) {
+				case Token::ERROR: return;
+				case Token::FN: compileFunction(emitter); break;
+				case Token::VAR: parseVariableDeclaration(emitter.m_vars); break;
+				case Token::OUT: parseVariableDeclaration(emitter.m_outputs); break;
+				case Token::IN: parseVariableDeclaration(emitter.m_inputs); break;
+				case Token::EOF:
+					error(token.value, "Unexpected end of file.");
+					return;
+				case Token::RIGHT_BRACE:
+					if (emitter.m_max_ribbons > 0 && emitter.m_max_ribbon_length == 0) {
+						error(token.value, "max_ribbon_length must be > 0 if max_ribbons is > 0");
 					}
-					if (m_postfix.size() == start_postfix_size) {
-						error(expression_start, "Empty expression");
+					return;
+				case Token::IDENTIFIER:
+					if (equalStrings(token.value, "material")) compileMaterial(emitter);
+					else if (equalStrings(token.value, "mesh")) compileMesh(emitter);
+					else if (equalStrings(token.value, "init_emit_count")) emitter.m_init_emit_count = consumeU32();
+					else if (equalStrings(token.value, "emit_per_second")) emitter.m_emit_per_second = consumeFloat();
+					else if (equalStrings(token.value, "max_ribbons")) emitter.m_max_ribbons = consumeU32();
+					else if (equalStrings(token.value, "max_ribbon_length")) emitter.m_max_ribbon_length = consumeU32();
+					else if (equalStrings(token.value, "init_ribbons_count")) emitter.m_init_ribbons_count = consumeU32();
+					else {
+						error(token.value, "Unknown identifier");
 						return;
 					}
+					break;
+				default:
+					error(token.value, "Unexpected token.");
 					return;
-				}
-				++m_content.begin;
-				--parenthesis_depth;
-				can_be_unary = false;
-				continue;
 			}
-
-			if (peeked == '(') {
-				can_be_unary = true;
-				++parenthesis_depth;
-				++m_content.begin;
-				continue;
-			}
-
-			if (peeked == '{') {
-				ExpressionStackElement& el = m_postfix.emplace();
-				el.type = ExpressionStackElement::LITERAL;
-				el.literal_value = readNumberOrSub(sub);
-				el.parenthesis_depth = parenthesis_depth;
-				can_be_unary = true;
-				continue;
-			}			
-
-			if (isNumeric(peeked)) {
-				ExpressionStackElement& el = m_postfix.emplace();
-				el.type = ExpressionStackElement::LITERAL;
-				el.literal_value = readNumber();
-				el.parenthesis_depth = parenthesis_depth;
-				can_be_unary = false;
-				continue;
-			}
-
-			if (isOperator(peeked)) {
-				if (can_be_unary && peeked == '-') {
-					can_be_unary = false;
-					++m_content.begin;
-					if (!expectNotEOF()) return;
-					if (isNumeric(peekChar())) {
-						float v = -readNumber();
-					
-						ExpressionStackElement& el = m_postfix.emplace();
-						el.type = ExpressionStackElement::LITERAL;
-						el.literal_value = v;
-						continue;
-					}
-
-					StringView iden = readIdentifier();
-					Constant* c = getConstant(iden);
-					if (c) {
-						ExpressionStackElement& el = m_postfix.emplace();
-						el.type = ExpressionStackElement::LITERAL;
-						el.literal_value = -c->value[sub];
-						continue;
-					}
-
-					error(iden, "Only literal or const is supported after unary -");
-					return;
-				}
-				++m_content.begin;
-				ExpressionStackElement el;
-				el.type = ExpressionStackElement::OPERATOR;
-				el.operator_char = (Operators)peeked;
-				el.parenthesis_depth = parenthesis_depth;
-				pushStack(el);
-				can_be_unary = true;
-				continue;
-			}
-			
-			StringView ident = readIdentifier();
-
-			if (ctx.function) {
-				if (equalStrings(ident, "return")) {
-					ExpressionStackElement& el = m_postfix.emplace();
-					el.type = ExpressionStackElement::RETURN;
-					can_be_unary = true;
-					continue;
-				}
-
-				i32 arg_index = getArgumentIndex(*ctx.function, ident);
-				if (arg_index >= 0) {
-					ExpressionStackElement& el = m_postfix.emplace();
-					el.type = ExpressionStackElement::FUNCTION_ARGUMENT;
-					el.arg_index = arg_index;
-					can_be_unary = false;
-					continue;
-				}
-			}
-
-			if (Constant* c = getConstant(ident)) {
-				ExpressionStackElement& el = m_postfix.emplace();
-				el.type = ExpressionStackElement::LITERAL;
-				el.literal_value = c->value[sub];
-				el.parenthesis_depth = parenthesis_depth;
-				can_be_unary = false;
-				continue;
-			}
-
-			if (ctx.emitter) {
-				i32 input_index = getInputIndex(*ctx.emitter, ident);
-				if (input_index >= 0) {
-					ExpressionStackElement& el = m_postfix.emplace();
-					el.type = ExpressionStackElement::REGISTER;
-					el.register_offset = ctx.emitter->m_inputs[input_index].getOffsetSub(sub);
-					el.parenthesis_depth = parenthesis_depth;
-					can_be_unary = false;
-					continue;
-				}
-
-				i32 var_index = getVariableIndex(*ctx.emitter, ident);
-				if (var_index >= 0) {
-					ExpressionStackElement& el = m_postfix.emplace();
-					el.type = ExpressionStackElement::VARIABLE;
-					el.variable_index = var_index;
-					el.parenthesis_depth = parenthesis_depth;
-					can_be_unary = false;
-			
-					expectNotEOF();
-					if (peekChar() != '.') {
-						el.sub = sub;
-						continue;
-					}
-
-					++m_content.begin;
-					switch(peekChar()) {
-						case 'x': case 'r': el.sub = 0; break;
-						case 'y': case 'g': el.sub = 1; break;
-						case 'z': case 'b': el.sub = 2; break;
-						case 'w': case 'a': el.sub = 3; break;
-						default: error(m_content, "Unknown subscript"); --m_content.begin; break;
-					}
-					++m_content.begin;
-					continue;
-				}
-			}
-
-			i32 param_index = getParamIndex(ident);
-			if (param_index >= 0) {
-				ExpressionStackElement& el = m_postfix.emplace();
-				el.type = ExpressionStackElement::PARAM;
-				el.param_index = param_index;
-				el.parenthesis_depth = parenthesis_depth;
-				can_be_unary = false;
-			
-				expectNotEOF();
-				if (peekChar() != '.') {
-					el.sub = sub;
-					continue;
-				}
-
-				++m_content.begin;
-				switch(peekChar()) {
-					case 'x': case 'r': el.sub = 0; break;
-					case 'y': case 'g': el.sub = 1; break;
-					case 'z': case 'b': el.sub = 2; break;
-					case 'w': case 'a': el.sub = 3; break;
-					default: error(m_content, "Unknown subscript"); --m_content.begin; break;
-				}
-				++m_content.begin;
-				continue;
-			}
-
-            ParticleSystemValues system_value = getSystemValue(ident);
-            if (system_value != ParticleSystemValues::NONE) {
-				ExpressionStackElement& el = m_postfix.emplace();
-				el.type = ExpressionStackElement::SYSTEM_VALUE;
-				el.system_value = system_value;
-				el.parenthesis_depth = parenthesis_depth;
-				can_be_unary = false;
-				continue;
-			}
-
-			if (ctx.emitter) {
-				i32 fn_index = getFunctionIndex(ident);
-				if (fn_index >= 0) {
-					ExpressionStackElement el;
-					el.type = ExpressionStackElement::FUNCTION_CALL;
-					el.function_index = fn_index ;
-					el.parenthesis_depth = parenthesis_depth;
-					el.sub = sub;
-					pushStack(el);
-					expect("(");
-					++parenthesis_depth;
-					can_be_unary = true;
-					continue;
-				}
-			}
-
-			BuiltinFunction bfn = getBuiltinFunction(ident);
-			if (bfn.instruction != InstructionType::END) {
-				ExpressionStackElement el;
-				el.type = ExpressionStackElement::FUNCTION;
-				el.function_desc = bfn;
-				el.parenthesis_depth = parenthesis_depth;
-				el.sub = sub;
-				pushStack(el);
-				++parenthesis_depth;
-				expect("(");
-				for (u32 i = 0; i < bfn.num_args; ++i) {
-					compileExpression(ctx, sub, parenthesis_depth);
-				}
-				expect(")");
-				--parenthesis_depth;
-				can_be_unary = true;
-				continue;
-			}
-
-			error(ident, "Unknown identifier");
-			return;
 		}
+		
+	}
+
+	bool compile(OutputMemoryStream& output) {
+		// TODO error reporting
+		for (;;) {
+			Token token = consumeToken();
+			switch (token.type) {
+				case Token::EOF: goto write_label;
+				case Token::ERROR: return false;
+				case Token::CONST: compileConst(); break;
+				case Token::FN: compileFunction(); break;
+				case Token::PARAM: parseVariableDeclaration(m_params); break;
+				case Token::EMITTER: compileEmitter(); break;
+				case Token::WORLD_SPACE: m_is_world_space = true; break;
+				default: error(token.value, "Unexpected token."); return false;
+			}
+		}
+
+		write_label:
+
+		ParticleSystemResource::Header header;
+		output.write(header);
+
+		ParticleSystemResource::Flags flags = m_is_world_space ? ParticleSystemResource::Flags::WORLD_SPACE : ParticleSystemResource::Flags::NONE;
+		output.write(flags);
+		
+		output.write(m_emitters.size());
+		auto getCount = [](const auto& x){
+			u32 c = 0;
+			for (const auto& i : x) {
+				switch (i.type) {
+					case Type::FLOAT4: c+= 4; break;
+					case Type::FLOAT3: c+= 3; break;
+					case Type::FLOAT: c+= 1; break;
+				}
+			}
+			return c;
+		};
+
+		for (const Emitter& emitter : m_emitters) {
+			gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLE_STRIP);
+			fillVertexDecl(emitter, decl);
+			output.write(decl);
+			output.writeString(emitter.m_material);
+			output.writeString(emitter.m_mesh);
+			const u32 count = u32(emitter.m_update.size() + emitter.m_emit.size() + emitter.m_output.size());
+			output.write(count);
+			output.write(emitter.m_update.data(), emitter.m_update.size());
+			output.write(emitter.m_emit.data(), emitter.m_emit.size());
+			output.write(emitter.m_output.data(), emitter.m_output.size());
+			output.write((u32)emitter.m_update.size());
+			output.write(u32(emitter.m_update.size() + emitter.m_emit.size()));
+
+			output.write(getCount(emitter.m_vars));
+			output.write(emitter.m_num_used_registers);
+			output.write(getCount(emitter.m_outputs));
+			output.write(emitter.m_init_emit_count);
+			output.write(emitter.m_emit_per_second);
+			output.write(getCount(emitter.m_inputs));
+			output.write(emitter.m_max_ribbons);
+			output.write(emitter.m_max_ribbon_length);
+			output.write(emitter.m_init_ribbons_count);
+		}
+		output.write(m_params.size());
+		for (const Variable& p : m_params) {
+			output.writeString(p.name);
+			switch (p.type) {
+				case Type::FLOAT: output.write(u32(1)); break;
+				case Type::FLOAT3: output.write(u32(3)); break;
+				case Type::FLOAT4: output.write(u32(4)); break;
+			}
+		}
+		
+		return !m_is_error;
+	}
+#if 0
+	bool expectNotEOF() {
+		skipWhitespaces();
+		if (m_content.size() == 0) {
+			error(m_content, "Unexpected end of file");
+			return false;
+		}
+		return true;
+	}
+
+	StringView tryReadWord() {
+		StringView res = m_content;
+		res.end = res.begin;
+		if (res.end != m_content.end) {
+			++res.end;
+			if (!isDigit(*res.begin) && !isLetter(*res.begin) && *res.begin != '_') {
+				m_content.begin = res.end;
+				return res;
+			}
+		}
+		while (res.end != m_content.end && (isDigit(*res.end) || isLetter(*res.end) || *res.end == '_')) ++res.end;
+		m_content.begin = res.end;
+		return res;
+	}
+
+	StringView readWord() {
+		expectNotEOF();
+		StringView w = tryReadWord();
+		if (w.size() == 0) error(w, "Expected a word"); 
+		return w;
+	}
+
+	void expect(const char* v) {
+		StringView w = readWord();
+		if (!equalStrings(w, v)) error(w, "Expected ", v);
+	}
+
+	StringView readIdentifier() {
+		expectNotEOF();
+		StringView res = m_content;
+		res.end = res.begin;
+		if (!isLetter(*res.begin) && *res.begin != '_') error(res, "Identifier must start with a letter or _"); 
+		++res.end;
+		while (res.end != m_content.end && (isDigit(*res.end) || isLetter(*res.end) || *res.end == '_')) {
+			 ++res.end;
+		}
+		m_content.begin = res.end;
+		return res;
+	}
+
+	float readNumberOrSub(u32 sub) {
+		expectNotEOF();
+        if (peekChar() != '{') return readNumber();
+        ++m_content.begin;
+        skipWhitespaces();
+        float vals[4] = {};
+        vals[0] = readNumber();
+        expect(",");
+        vals[1] = readNumber();
+		expectNotEOF();
+        if (peekChar() == '}') {
+            if (sub > 1) error (m_content, "Expected ,");
+        }
+        else {
+            expect(",");
+            vals[2] = readNumber();
+            if (peekChar() == '}') {
+                if (sub > 2) error (m_content, "Expected ,");
+            }
+            else {
+                expect(",");
+                vals[3] = readNumber();
+            }
+        }
+        expect("}");
+
+        return vals[sub];
+    }
+
+	float readNumber() {
+		expectNotEOF();
+		
+        bool is_negative = false;
+		if (*m_content.begin == '-') {
+            is_negative = true;
+            ++m_content.begin;
+            if (m_content.size() == 0) {
+                error(m_content, "Expected a number");
+                return 0;
+            }
+        }
+        if (!isDigit(*m_content.begin)) {
+            StringView ident = readIdentifier();
+            Constant* c = getConstant(ident);
+            if (c) {
+                return c->value[0] * (is_negative ? -1 : 1);
+            }
+            else {
+                error(ident, "Expected a number");
+            }
+            return 0;
+        }
+		
+		StringView s;
+		s.begin = m_content.begin;
+		s.end = s.begin + 1;
+		while (s.end != m_content.end && isDigit(*s.end)) ++s.end;
+		if (s.end == m_content.end || *s.end != '.') {
+			m_content.begin = s.end;
+			float v;
+			fromCString(s, v);
+            if (is_negative) v = -v;
+	 		return v;
+		}
+		++s.end;
+		while (s.end != m_content.end && isDigit(*s.end)) ++s.end;
+		m_content.begin = s.end;
+		float v;
+		fromCString(s, v);
+        if (is_negative) v = -v;
+		return v;
+	}
+
+	bool isOperator(char c) { 
+		switch ((Operators)c) {
+			case Operators::ADD: case Operators::SUB:
+			case Operators::MUL: case Operators::DIV:
+			case Operators::LT: case Operators::GT:
+			case Operators::MOD:
+				return true;
+		}
+		return false;
 	}
 
 	void compileAssignment(Emitter& emitter, Variable& variable, DataStream::Type stream_type, i32 index) {
@@ -1052,361 +1791,7 @@ struct ParticleScriptCompiler {
 		return true;
 	}
 
-	void parseArgs(Function& fn) {
-		expect("(");
-		bool comma = false;
-		for (;;) {
-			StringView word = readWord();
-			if (word.size() == 0) break;
-			if (equalStrings(word, ")")) {
-				if (comma) error(word, "Unexpected )");
-				break;
-			}
-			if (equalStrings(word, ",")) {
-				if (fn.args.empty() || comma) {
-					error(word, "Unexpected ,");
-					return;
-				}
-				comma = true;
-				continue;
-			}
-
-			StringView& arg = fn.args.emplace();
-			arg = word;
-			comma = false;
-		}
-	}
-
-	void compileFunction() {
-		ASSERT(m_stack.empty());
-		ASSERT(m_postfix.empty());
-
-		Function& fn = m_functions.emplace(m_allocator);
-		fn.name = readIdentifier();
-		parseArgs(fn);
-		expect("{");
-
-		for (;;) {
-			if (!expectNotEOF()) break;
-			if (peekChar() == '}') {
-				++m_content.begin;
-				break;
-			}
-			
-			u32 parenthesis_depth = 0;
-			compileExpression({.function = &fn}, 0, parenthesis_depth);
-		}
-
-		m_postfix.copyTo(fn.expressions);
-		m_postfix.clear();
-	}
-
-	void flushCompile(const CompileContext& ctx, OutputMemoryStream& compiled) {
-		Span<ExpressionStackElement> exprs = m_postfix; 
-		while (exprs.size() > 0) {
-			compilePostfix(ctx, compiled, exprs);
-		}
-		m_postfix.clear();
-	}
-
-	void compileFunction(Emitter& emitter) {
-		StringView fn_name = readIdentifier();
-		expect("{");
-		
-		OutputMemoryStream& compiled = [&]() -> OutputMemoryStream& {
-			if (equalStrings(fn_name, "update")) return emitter.m_update;
-			if (equalStrings(fn_name, "emit")) return emitter.m_emit;
-			if (equalStrings(fn_name, "output")) return emitter.m_output;
-			error(m_content, "Unknown function");
-			return emitter.m_output;
-		}();
-
-		ASSERT(m_postfix.empty());
-
-		CompileContext ctx;
-		ctx.emitter = &emitter;
-		for (;;) {
-			StringView word = readWord();
-			if (word.size() == 0) break;
-			if (equalStrings(word, "}")) break;
-
-			i32 var_index = getVariableIndex(emitter, word);
-			if (var_index >= 0) {
-				compileAssignment(emitter, emitter.m_vars[var_index], DataStream::CHANNEL, var_index);
-
-				flushCompile(ctx, compiled);
-				continue;
-			}
-
-			i32 out_index = getOutputIndex(emitter, word);
-			if (out_index >= 0) {
-				compileAssignment(emitter, emitter.m_outputs[out_index], DataStream::OUT, out_index);
-				flushCompile(ctx, compiled);
-				continue;
-			}
-
-			BuiltinFunction fn = getBuiltinFunction(word);
-			if (fn.instruction != InstructionType::END) {
-				if (fn.returns_value) error(word, "Unexpected function call");
-				expect("(");
-						
-				if (fn.instruction == InstructionType::EMIT) {
-					StringView ident = readIdentifier();
-					i32 emitter_index = getEmitterIndex(ident);
-					if (emitter_index < 0) {
-						error(ident, "Unknown emitter");
-						return;
-					}
-					expect(",");
-					
-					const i32 condition_postfix_offset = m_postfix.size();
-					u32 parethesis_depth = 0;
-					compileExpression({.emitter = &emitter}, 0, parethesis_depth);
-					StackArray<ExpressionStackElement, 16> cond_exprs(m_allocator);
-					while (m_postfix.size() > condition_postfix_offset) {
-						cond_exprs.push(m_postfix.last());
-						m_postfix.pop();
-					}
-
-					expect(")");
-
-					expectNotEOF();
-					ExpressionStackElement& end_el = m_postfix.emplace();
-					end_el.type = ExpressionStackElement::BLOCK_END;
-					if (peekChar() == '{') {
-						++m_content.begin;
-						if (!compileEmitBlock(emitter, m_emitters[emitter_index])) return;
-					}
-					else {
-						expect(";");
-					}
-
-					ExpressionStackElement& emit_el = m_postfix.emplace();
-					emit_el.type = ExpressionStackElement::EMITTER_INDEX;
-					emit_el.emitter_index = emitter_index;
-
-					while (!cond_exprs.empty()) {
-						m_postfix.push(cond_exprs.last());
-						cond_exprs.pop();
-					}
-
-					ExpressionStackElement& dst = m_postfix.emplace();
-					dst.type = ExpressionStackElement::FUNCTION;
-					dst.function_desc = fn;
-
-					flushCompile(ctx, compiled);
-					continue;
-				}
-
-				u32 parenthesis_depth = 0;
-				compileExpression({.emitter = &emitter }, 0, parenthesis_depth);
-				ExpressionStackElement& dst = m_postfix.emplace();
-				dst.type = ExpressionStackElement::FUNCTION;
-				dst.function_desc = fn;
-				expect(")");
-				expect(";");
-				flushCompile(ctx, compiled);
-				continue;
-			}
-
-			error(word, "Syntax error");
-			return;
-		}
-		compiled.write(InstructionType::END);
-		// TODO optimize the bytecode
-		// e.g. there are unnecessary movs
-	}
-
-	Type readType() {
-		StringView type = readIdentifier();
-        Type res = Type::FLOAT;
-		if (equalStrings(type, "float")) res = Type::FLOAT;
-		else if (equalStrings(type, "float3")) res = Type::FLOAT3;
-		else if (equalStrings(type, "float4")) res = Type::FLOAT4;
-		else error(type, "Unknown type");
-		return res;
-	}
-
-	void compileEmitter() {
-		StringView ident = readIdentifier();
-		Emitter& emitter = m_emitters.emplace(m_allocator);
-		emitter.m_name = ident;
-		expect("{");
-
-		for (;;) {
-			StringView word = readWord();
-			if (equalStrings(word, "}")) break;
-			else if (equalStrings(word, "material")) compileMaterial(emitter);
-			else if (equalStrings(word, "mesh")) compileMesh(emitter);
-			else if (equalStrings(word, "var")) compileVariable(emitter.m_vars);
-			else if (equalStrings(word, "out")) compileVariable(emitter.m_outputs);
-			else if (equalStrings(word, "in")) compileVariable(emitter.m_inputs);
-			else if (equalStrings(word, "fn")) compileFunction(emitter);
-			else if (equalStrings(word, "emit_per_second")) emitter.m_emit_per_second = readNumber();
-			else if (equalStrings(word, "init_emit_count")) emitter.m_init_emit_count = (u32)readNumber();
-			else if (equalStrings(word, "max_ribbons")) emitter.m_max_ribbons = (u32)readNumber();
-			else if (equalStrings(word, "max_ribbon_length")) emitter.m_max_ribbon_length = (u32)readNumber();
-			else if (equalStrings(word, "init_ribbons_count")) emitter.m_init_ribbons_count = (u32)readNumber();
-			else error(word, "Unknown identifier");
-		}
-		
-		if (emitter.m_max_ribbons > 0 && emitter.m_max_ribbon_length == 0) {
-			error(m_content, "max_ribbon_length must be > 0 if max_ribbons is > 0");
-		}
-	}
-
-	void compileConst() {
-		StringView name = readIdentifier();
-        expect("=");
-        Constant& c = m_constants.emplace();
-        c.name = name;
-        
-		expectNotEOF();
-        if (peekChar() != '{') {
-            float value = readNumber();
-            c.value[0] = value;
-            c.value[1] = value;
-            c.value[2] = value;
-            c.value[3] = value;
-            c.type = Type::FLOAT;
-        }
-        else {
-            ASSERT(false);
-            // TODO
-        }
-        expect(";");
-	}
-
-	void compileVariable(Array<Variable>& vars) {
-		u32 offset = 0;
-		if (!vars.empty()) {
-			const Variable& var = vars.last();
-			offset = var.offset;
-			switch (var.type) {
-				case Type::FLOAT: ++offset; break;
-				case Type::FLOAT3: offset += 3; break;
-				case Type::FLOAT4: offset += 4; break;
-			}
-		}
-		Variable& var = vars.emplace();
-		var.name = readIdentifier();
-		expect(":");
-		var.type = readType();
-		var.offset = offset;
-	}
-
-	void compileMaterial(Emitter& emitter) {
-		expectNotEOF();
-		expect("\"");
-		StringView path = m_content;
-		path.end = path.begin;
-		while (path.end != m_content.end && *path.end != '"') ++path.end;
-		m_content.begin = path.end;
-		expect("\"");
-		emitter.m_material = path;
-	}
-
-	void compileMesh(Emitter& emitter) {
-		expectNotEOF();
-		expect("\"");
-		StringView path = m_content;
-		path.end = path.begin;
-		while (path.end != m_content.end && *path.end != '"') ++path.end;
-		m_content.begin = path.end;
-		expect("\"");
-		emitter.m_mesh = path;
-	}
-
-	bool compile(OutputMemoryStream& output) {
-		for (;;) {
-			StringView word = tryReadWord();
-			if (word.size() == 0) break;
-			if (equalStrings(word, "const")) compileConst();
-			else if (equalStrings(word, "param")) compileVariable(m_params);
-			else if (equalStrings(word, "emitter")) compileEmitter();
-			else if (equalStrings(word, "fn")) compileFunction();
-			else if (equalStrings(word, "world_space")) m_is_world_space = true;
-			else if (word.size() != 1 || !isWhitespace(word[0])) error(word, "Syntax error");
-
-			if (m_is_error) return false;
-		}
-
-		ParticleSystemResource::Header header;
-		output.write(header);
-
-		ParticleSystemResource::Flags flags = m_is_world_space ? ParticleSystemResource::Flags::WORLD_SPACE : ParticleSystemResource::Flags::NONE;
-		output.write(flags);
-		
-		output.write(m_emitters.size());
-		auto getCount = [](const auto& x){
-			u32 c = 0;
-			for (const auto& i : x) {
-				switch (i.type) {
-					case Type::FLOAT4: c+= 4; break;
-					case Type::FLOAT3: c+= 3; break;
-					case Type::FLOAT: c+= 1; break;
-				}
-			}
-			return c;
-		};
-
-		for (const Emitter& emitter : m_emitters) {
-			gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLE_STRIP);
-			fillVertexDecl(emitter, decl);
-			output.write(decl);
-			output.writeString(emitter.m_material);
-			output.writeString(emitter.m_mesh);
-			const u32 count = u32(emitter.m_update.size() + emitter.m_emit.size() + emitter.m_output.size());
-			output.write(count);
-			output.write(emitter.m_update.data(), emitter.m_update.size());
-			output.write(emitter.m_emit.data(), emitter.m_emit.size());
-			output.write(emitter.m_output.data(), emitter.m_output.size());
-			output.write((u32)emitter.m_update.size());
-			output.write(u32(emitter.m_update.size() + emitter.m_emit.size()));
-
-			output.write(getCount(emitter.m_vars));
-			output.write(emitter.m_num_used_registers);
-			output.write(getCount(emitter.m_outputs));
-			output.write(emitter.m_init_emit_count);
-			output.write(emitter.m_emit_per_second);
-			output.write(getCount(emitter.m_inputs));
-			output.write(emitter.m_max_ribbons);
-			output.write(emitter.m_max_ribbon_length);
-			output.write(emitter.m_init_ribbons_count);
-		}
-		output.write(m_params.size());
-		for (const Variable& p : m_params) {
-			output.writeString(p.name);
-			switch (p.type) {
-				case Type::FLOAT: output.write(u32(1)); break;
-				case Type::FLOAT3: output.write(u32(3)); break;
-				case Type::FLOAT4: output.write(u32(4)); break;
-			}
-		}
-		
-		return !m_is_error;
-	}
-
-	void fillVertexDecl(const Emitter& emitter, gpu::VertexDecl& decl) {
-		u32 offset = 0;
-		for (const Variable& o : emitter.m_outputs) {
-			switch (o.type) {
-				case Type::FLOAT: 
-					decl.addAttribute(offset, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-					offset += sizeof(float);
-					break;
-				case Type::FLOAT3: 
-					decl.addAttribute(offset, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-					offset += sizeof(Vec3);
-					break;
-				case Type::FLOAT4: 
-					decl.addAttribute(offset, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-					offset += sizeof(Vec4);
-					break;
-			}
-		}
-	}
-
+#endif
 	IAllocator& m_allocator;
 	Path m_path;
 	Array<Emitter> m_emitters;
@@ -1417,7 +1802,7 @@ struct ParticleScriptCompiler {
 	StackArray<ExpressionStackElement, 16> m_postfix;
 	DataStream m_mesh_stream;
 	
-	StringView m_content;
+	ParticleScriptTokenizer m_tokenizer;
     const char* m_text_begin;
 	bool m_is_error = false;
 	bool m_is_world_space = false;
