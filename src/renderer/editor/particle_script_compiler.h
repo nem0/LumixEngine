@@ -14,7 +14,7 @@ struct ParticleScriptToken {
 		NUMBER, STRING, IDENTIFIER,
 
 		// keywords
-		CONST, PARAM, EMITTER, FN, WORLD_SPACE, VAR, OUT, IN
+		CONST, PARAM, EMITTER, FN, WORLD_SPACE, VAR, OUT, IN, LET
 	};
 
 	Type type;
@@ -112,6 +112,7 @@ struct ParticleScriptTokenizer {
 			case 'e': return checkKeyword("mitter", 1, 6, Token::EMITTER);
 			case 'f': return checkKeyword("n", 1, 1, Token::FN);
 			case 'i': return checkKeyword("n", 1, 1, Token::IN);
+			case 'l': return checkKeyword("et", 1, 2, Token::LET);
 			case 'o': return checkKeyword("ut", 1, 2, Token::OUT);
 			case 'p': return checkKeyword("aram", 1, 4, Token::PARAM);
 			case 'v': return checkKeyword("ar", 1, 2, Token::VAR);
@@ -171,6 +172,12 @@ struct ParticleScriptCompiler {
         Type type;
         float value[4];
     };
+
+	struct Local {
+		StringView name;
+		Type type;
+		i32 registers[4];
+	};
 
 	struct Variable {
 		StringView name;
@@ -270,6 +277,7 @@ struct ParticleScriptCompiler {
 		Array<Variable> m_inputs;
 		u32 m_num_used_registers = 0;
 		u32 m_register_allocator = 0;
+		u32 m_local_allocator = 0;
 		u32 m_init_emit_count = 0;
 		float m_emit_per_second = 0;
 		u32 m_max_ribbons = 0;
@@ -292,6 +300,7 @@ struct ParticleScriptCompiler {
 		, m_stack(allocator)
 		, m_postfix(allocator)
 		, m_functions(allocator)
+		, m_locals(allocator)
 		, m_path(path)
         , m_text_begin(content.begin)
 	{
@@ -504,7 +513,8 @@ struct ParticleScriptCompiler {
 	enum class VariableFamily {
 		OUTPUT,
 		CHANNEL,
-		INPUT
+		INPUT,
+		LOCAL
 	};
 
 	// b.xy = a.y;
@@ -553,6 +563,10 @@ struct ParticleScriptCompiler {
 				el.register_offset = ctx.emitted->m_inputs[var_index].getOffsetSub(el.sub);
 				el.type = ExpressionStackElement::OUTPUT;
 				break;
+			case VariableFamily::LOCAL:
+				el.register_offset = m_locals[var_index].registers[el.sub];
+				el.type = ExpressionStackElement::REGISTER;
+				break;
 		}
 
 		if (peekToken().type != Token::EQUAL) {
@@ -571,6 +585,7 @@ struct ParticleScriptCompiler {
 			case VariableFamily::OUTPUT: var_type = ctx.emitter->m_outputs[var_index].type; break;
 			case VariableFamily::CHANNEL: var_type = ctx.emitter->m_vars[var_index].type; break;
 			case VariableFamily::INPUT: var_type = ctx.emitted->m_inputs[var_index].type; break;
+			case VariableFamily::LOCAL: var_type = m_locals[var_index].type; break;
 		}
 
 		u32 var_len = 0;
@@ -596,6 +611,7 @@ struct ParticleScriptCompiler {
 				case VariableFamily::OUTPUT: el.output_offset = ctx.emitter->m_outputs[var_index].getOffsetSub(el.sub); break;
 				case VariableFamily::CHANNEL: el.variable_offset = ctx.emitter->m_vars[var_index].getOffsetSub(el.sub); break;
 				case VariableFamily::INPUT: el.register_offset = ctx.emitted->m_inputs[var_index].getOffsetSub(el.sub); break;
+				case VariableFamily::LOCAL: el.register_offset = m_locals[var_index].registers[el.sub]; break;
 			}
 			
 			m_postfix.push(el);
@@ -630,6 +646,13 @@ struct ParticleScriptCompiler {
 	i32 getFunctionIndex(StringView ident) const {
 		for (Function& fn : m_functions) {
 			if (equalStrings(fn.name, ident)) return i32(&fn - m_functions.begin());
+		}
+		return -1;
+	}
+
+	i32 getLocalIndex(StringView ident) const {
+		for (Local& v : m_locals) {
+			if (equalStrings(v.name, ident)) return i32(&v - m_locals.begin());
 		}
 		return -1;
 	}
@@ -876,6 +899,13 @@ struct ParticleScriptCompiler {
 						break;
 					}
 
+					i32 local_index = getLocalIndex(token.value);
+					if (local_index >= 0) {
+						if (!compileVariable(ctx, local_index, VariableFamily::LOCAL, parenthesis_depth, sub, can_assign)) return;
+						can_be_unary = false;
+						break;
+					}
+
 					i32 fn_index = getFunctionIndex(token.value);
 					if (fn_index >= 0) {
 						ExpressionStackElement el;
@@ -987,17 +1017,19 @@ struct ParticleScriptCompiler {
 							break;
 						}					
 					}
-					ASSERT(false);
-					break;
+					error(token.value, "Unexpected token.");
+					return;
 				}
-				default: ASSERT(false); break;
+				default:
+					error(token.value, "Unexpected token.");
+					return;
 			}
 			can_assign = false;
 		}
 	}
 
 	static void deallocRegister(Emitter& emitter, const DataStream& stream) {
-		if (stream.type == DataStream::REGISTER) {
+		if (stream.type == DataStream::REGISTER && (emitter.m_local_allocator & (1 << stream.index)) == 0) {
 			emitter.m_register_allocator = emitter.m_register_allocator & ~(1 << stream.index);
 		}
 	}
@@ -1013,7 +1045,7 @@ struct ParticleScriptCompiler {
 				return res;
 			}
 		}
-		error(StringView(m_tokenizer.m_current, m_tokenizer.m_document.end), "Run out of allocators");
+		error(StringView(m_tokenizer.m_current, m_tokenizer.m_document.end), "Run out of registers");
 		return res;
 	}
 
@@ -1322,7 +1354,13 @@ struct ParticleScriptCompiler {
 				case Token::RIGHT_BRACE:
 					consumeToken();
 					compiled.write(InstructionType::END);
+					emitter.m_register_allocator = emitter.m_register_allocator & ~emitter.m_local_allocator;
+					emitter.m_local_allocator = 0;
+					m_locals.clear();
 					return;
+				case Token::LET:
+					declareLocal(emitter);
+					break;
 				default: {
 					u32 depth = 0;
 					compileExpression({.emitter = &emitter}, 0, depth);
@@ -1330,6 +1368,39 @@ struct ParticleScriptCompiler {
 					flushCompile(ctx, compiled);
 					break;
 				}
+			}
+		}
+	}
+
+	void declareLocal(Emitter& emitter) {
+		if (!consume(Token::LET)) return;
+		Local& local = m_locals.emplace();
+		if (!consume(Token::IDENTIFIER, local.name)) return;
+		if (!consume(Token::COLON)) return;
+		local.type = parseType();
+		if (!consume(Token::SEMICOLON)) return;
+
+		switch (local.type) {
+			case Type::FLOAT4: {
+				DataStream reg3 = allocRegister(emitter);
+				emitter.m_local_allocator |= 1 << reg3.index;
+				local.registers[3] = reg3.index;
+				// fallthrough
+			}
+			case Type::FLOAT3: {
+				DataStream reg2 = allocRegister(emitter);
+				DataStream reg1 = allocRegister(emitter);
+				emitter.m_local_allocator |= 1 << reg2.index;
+				emitter.m_local_allocator |= 1 << reg1.index;
+				local.registers[2] = reg2.index;
+				local.registers[1] = reg1.index;
+				// fallthrough
+			}
+			case Type::FLOAT: {
+				DataStream reg0 = allocRegister(emitter);
+				emitter.m_local_allocator |= 1 << reg0.index;
+				local.registers[0] = reg0.index;
+				break;
 			}
 		}
 	}
@@ -1545,6 +1616,7 @@ struct ParticleScriptCompiler {
 	Array<Constant> m_constants;
 	Array<Variable> m_params;
 	Array<Function> m_functions;
+	Array<Local> m_locals;
 	StackArray<ExpressionStackElement, 16> m_stack;
 	StackArray<ExpressionStackElement, 16> m_postfix;
 	DataStream m_mesh_stream;
