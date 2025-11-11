@@ -2746,8 +2746,8 @@ struct ParticleEditorImpl : ParticleEditor {
 
 	bool compileText(InputMemoryStream& input, OutputMemoryStream& output, const Path& path) {
 		StringView content = { (const char*)input.getData(), (const char*)input.getData() + input.size() };
-		ParticleScriptCompiler compiler(content, path, m_allocator);
-		return compiler.compile(output);
+		ParticleScriptCompiler compiler(m_allocator);
+		return compiler.compile(path, content, output);
 	}
 
 	bool compile(InputMemoryStream& input, OutputMemoryStream& output, const char* path) override {
