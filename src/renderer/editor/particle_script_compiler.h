@@ -1,7 +1,8 @@
 #pragma once
 
-#include "core/log.h"
 #include "core/arena_allocator.h"
+#include "core/defer.h"
+#include "core/log.h"
 #include "core/string.h"
 #include "renderer/particle_system.h"
 
@@ -191,6 +192,25 @@ struct ParticleScriptCompiler {
         float value[4];
     };
 
+	enum class VariableFamily {
+		OUTPUT,
+		CHANNEL,
+		INPUT,
+		LOCAL
+	};
+
+	struct CompileResult {
+		DataStream streams[4];
+		u32 num_streams = 0;
+		bool success = true;
+	};
+
+	struct Local {
+		StringView name;
+		Type type;
+		i32 registers[4];
+	};
+
 	struct Node {
 		enum Type {
 			UNARY_OPERATOR,
@@ -200,9 +220,8 @@ struct ParticleScriptCompiler {
 			PARAM,
 			FUNCTION_ARG,
 			ASSIGN,
-			OUTPUT_VAR,
-			INPUT_VAR,
-			VAR,
+			VARIABLE,
+			LOCAL_VARIABLE,
 			SWIZZLE,
 			SYSCALL,
 			SYSTEM_VALUE,
@@ -229,8 +248,10 @@ struct ParticleScriptCompiler {
 	};
 
 	struct BlockNode : Node {
-		BlockNode(Token token, IAllocator& allocator) : Node(Node::BLOCK, token), statements(allocator) {}
+		BlockNode(Token token, IAllocator& allocator) : Node(Node::BLOCK, token), statements(allocator), locals(allocator) {}
 		Array<Node*> statements;
+		Array<Local> locals;
+		BlockNode* parent = nullptr;
 	};
 
 	struct SysCallNode : Node {
@@ -255,19 +276,16 @@ struct ParticleScriptCompiler {
 		i32 index;
 	};
 
-	struct OutputVarNode : Node {
-		OutputVarNode(Token token) : Node(Node::OUTPUT_VAR, token) {}
+	struct VariableNode : Node {
+		VariableNode(Token token) : Node(Node::VARIABLE, token) {}
 		i32 index;
+		VariableFamily family;
 	};
 
-	struct InputVarNode : Node {
-		InputVarNode(Token token) : Node(Node::INPUT_VAR, token) {}
-		i32 index;
-	};
-
-	struct VarNode : Node {
-		VarNode(Token token) : Node(Node::VAR, token) {}
-		i32 index;
+	struct LocalVariableNode : Node {
+		LocalVariableNode(Token token) : Node(Node::LOCAL_VARIABLE, token) {}
+		DataStream values[4];
+		u32 num_values = 0;
 	};
 
 	struct SwizzleNode : Node {
@@ -305,10 +323,10 @@ struct ParticleScriptCompiler {
 	};
 
 	struct Function {
-		Function(IAllocator& allocator) : args(allocator), statements(allocator) {}
+		Function(IAllocator& allocator) : args(allocator) {}
 		StringView name;
 		Array<StringView> args;
-		Array<Node*> statements;
+		Node* block = nullptr;
 	};
 
 	struct Variable {
@@ -359,8 +377,10 @@ struct ParticleScriptCompiler {
 		Emitter* emitter = nullptr;
 		Emitter* emitted = nullptr;
 		Span<DataStream> args = {};
+		BlockNode* block = nullptr;
 
 		u32 register_allocator = 0;
+		u32 local_allocator = 0;
 	};
 
 	ParticleScriptCompiler(IAllocator& allocator)
@@ -574,18 +594,50 @@ const char* toString(Token::Type type) {
 			}
 			case Node::SYSCALL: {
 				auto* n = (SysCallNode*)node;
+				bool all_args_const = true;
 				for (Node*& arg : n->args) {
 					arg = collapseConstants(arg);
+					if (arg->type != Node::LITERAL) all_args_const = false;
 				}
-				// TODO collapse the function itself if all args are literals
+				if (all_args_const) {
+					auto* arg0 = ((LiteralNode*)n->args[0]);
+					auto* arg1 = n->args.size() > 1 ? ((LiteralNode*)n->args[1]) : nullptr;
+					switch (n->function.instruction) {
+						case InstructionType::COS: {
+							auto* res = LUMIX_NEW(m_arena_allocator, LiteralNode)(n->token);
+							res->value = cosf(arg0->value);
+							return res;
+						}
+						case InstructionType::SIN: {
+							auto* res = LUMIX_NEW(m_arena_allocator, LiteralNode)(n->token);
+							res->value = sinf(arg0->value);
+							return res;
+						}
+						case InstructionType::SQRT: {
+							auto* res = LUMIX_NEW(m_arena_allocator, LiteralNode)(n->token);
+							res->value = sqrtf(arg0->value);
+							return res;
+						}
+						case InstructionType::MIN: {
+							auto* res = LUMIX_NEW(m_arena_allocator, LiteralNode)(n->token);
+							res->value = minimum(arg0->value, arg1->value);
+							return res;
+						}
+						case InstructionType::MAX: {
+							auto* res = LUMIX_NEW(m_arena_allocator, LiteralNode)(n->token);
+							res->value = maximum(arg0->value, arg1->value);
+							return res;
+						}
+						default: return node;
+					}
+				}
 				return node;
 			}
 			case Node::FUNCTION_ARG: return node;
-			case Node::OUTPUT_VAR: return node;
 			case Node::EMITTER_REF: return node;
-			case Node::INPUT_VAR: return node;
 			case Node::SYSTEM_VALUE: return node;
-			case Node::VAR: return node;
+			case Node::LOCAL_VARIABLE: return node;
+			case Node::VARIABLE: return node;
 			case Node::PARAM: return node;
 			case Node::LITERAL: return node;
 			case Node::BINARY_OPERATOR: {
@@ -686,8 +738,11 @@ const char* toString(Token::Type type) {
 		return { InstructionType::END };
 	}
 
-	Node* block(const CompileContext& ctx) {
+	BlockNode* block(CompileContext& ctx) {
 		auto* node = LUMIX_NEW(m_arena_allocator, BlockNode)(peekToken(), m_arena_allocator);
+		node->parent = ctx.block;
+		ctx.block = node;
+		defer { ctx.block = node->parent; };
 		if (!consume(Token::LEFT_BRACE)) return nullptr;
 		node->statements.reserve(8);
 		for (;;) {
@@ -697,6 +752,9 @@ const char* toString(Token::Type type) {
 				case Token::EOF:
 					errorAtCurrent("Unexpected end of file.");
 					return nullptr;
+				case Token::LET:
+					declareLocal(ctx);
+					break;
 				case Token::RIGHT_BRACE:
 					consumeToken();
 					return node;
@@ -705,6 +763,7 @@ const char* toString(Token::Type type) {
 					if (!s) return nullptr;
 					if (!consume(Token::SEMICOLON)) return nullptr;
 					node->statements.push(s);
+					break;
 				}
 			}
 		}
@@ -802,7 +861,8 @@ const char* toString(Token::Type type) {
 				if (ctx.emitted) {
 					i32 input_index = find(ctx.emitted->m_inputs, token.value);
 					if (input_index >= 0) {
-						auto* node = LUMIX_NEW(m_arena_allocator, InputVarNode)(token);
+						auto* node = LUMIX_NEW(m_arena_allocator, VariableNode)(token);
+						node->family = VariableFamily::INPUT;
 						node->index = input_index;
 						return node;
 					}
@@ -811,21 +871,24 @@ const char* toString(Token::Type type) {
 				if (ctx.emitter) {
 					i32 output_index = find(ctx.emitter->m_outputs, token.value);
 					if (output_index >= 0) {
-						auto* node = LUMIX_NEW(m_arena_allocator, OutputVarNode)(token);
+						auto* node = LUMIX_NEW(m_arena_allocator, VariableNode)(token);
+						node->family = VariableFamily::OUTPUT;
 						node->index = output_index;
 						return node;
 					}
 
 					i32 input_index = find(ctx.emitter->m_inputs, token.value);
 					if (input_index >= 0) {
-						auto* node = LUMIX_NEW(m_arena_allocator, InputVarNode)(token);
+						auto* node = LUMIX_NEW(m_arena_allocator, VariableNode)(token);
+						node->family = VariableFamily::INPUT;
 						node->index = input_index;
 						return node;
 					}
 
 					i32 var_index = find(ctx.emitter->m_vars, token.value);
 					if (var_index >= 0) {
-						auto* node = LUMIX_NEW(m_arena_allocator, VarNode)(token);
+						auto* node = LUMIX_NEW(m_arena_allocator, VariableNode)(token);
+						node->family = VariableFamily::CHANNEL;
 						node->index = var_index;
 						return node;
 					}
@@ -848,6 +911,23 @@ const char* toString(Token::Type type) {
 					return node;
 				}
 				
+				for (const Local& local : ctx.block->locals) {
+					if (equalStrings(local.name, token.value)) {
+						auto* node = LUMIX_NEW(m_arena_allocator, LocalVariableNode)(token);
+						switch (local.type) {
+							case Type::FLOAT: node->num_values = 1; break;
+							case Type::FLOAT3: node->num_values = 3; break;
+							case Type::FLOAT4: node->num_values = 4; break;
+						}
+						for (u32 i = 0; i < node->num_values; ++i) {
+							node->values[i].index = local.registers[i];
+							node->values[i].type = DataStream::REGISTER;
+						}
+						return node;
+					}
+				}
+
+
 				error(token.value, "Unexpected token ", token.value);
 				return nullptr;
 			}
@@ -871,7 +951,84 @@ const char* toString(Token::Type type) {
 		return nullptr;
 	} 
 
-	Node* statement(const CompileContext& ctx) {
+	// let a = ...;
+	// let a : type;
+	// let a : type = ...;
+	void declareLocal(CompileContext& ctx) {
+		if (!consume(Token::LET)) return;
+		BlockNode* block = ctx.block;
+		Local& local = block->locals.emplace();
+		if (!consume(Token::IDENTIFIER, local.name)) return;
+
+		if (peekToken().type == Token::COLON) {
+			// let a : type ...
+			if (!consume(Token::COLON)) return;
+			local.type = parseType();
+		}
+		else if (peekToken().type == Token::EQUAL) {
+			// let a = ...; 
+			local.type = Type::FLOAT;
+		}
+		else {
+			error(peekToken().value, "Unexpected token.");
+			return;
+		}
+
+		switch (local.type) {
+			case Type::FLOAT4: {
+				DataStream reg3 = allocRegister(ctx);
+				ctx.local_allocator |= 1 << reg3.index;
+				local.registers[3] = reg3.index;
+				// fallthrough
+			}
+			case Type::FLOAT3: {
+				DataStream reg2 = allocRegister(ctx);
+				DataStream reg1 = allocRegister(ctx);
+				ctx.local_allocator |= 1 << reg2.index;
+				ctx.local_allocator |= 1 << reg1.index;
+				local.registers[2] = reg2.index;
+				local.registers[1] = reg1.index;
+				// fallthrough
+			}
+			case Type::FLOAT: {
+				DataStream reg0 = allocRegister(ctx);
+				ctx.local_allocator |= 1 << reg0.index;
+				local.registers[0] = reg0.index;
+				break;
+			}
+		}
+
+		if (peekToken().type == Token::SEMICOLON) {
+			// let a : type;
+			consumeToken();
+			return;
+		}
+		Token equal_token = peekToken();
+		if (!consume(Token::EQUAL)) return;
+
+		// let a : type = ...
+		// let a = ...
+		u32 var_len;
+		switch (local.type) {
+			case Type::FLOAT4: var_len = 4; break;
+			case Type::FLOAT3: var_len = 3; break;
+			case Type::FLOAT: var_len = 1; break;
+		}
+
+		Node* value = expression(ctx, 0);
+		if (!value) return;
+
+		auto* assign = LUMIX_NEW(m_arena_allocator, AssignNode)(equal_token);
+		assign->right = value;
+		auto* var_node = LUMIX_NEW(m_arena_allocator, VariableNode)(equal_token);
+		var_node->family = VariableFamily::LOCAL;
+		var_node->index = ctx.block->locals.size() - 1;
+		assign->left = var_node;
+
+		consume(Token::SEMICOLON);
+	}
+
+	Node* statement(CompileContext& ctx) {
 		Token token = peekToken();
 		switch (token.type) {
 			case Token::IDENTIFIER: {
@@ -999,8 +1156,11 @@ const char* toString(Token::Type type) {
 	void compileFunction(Emitter& emitter) {
 		StringView fn_name;
 		if (!consume(Token::IDENTIFIER, fn_name)) return;
-		if (!consume(Token::LEFT_BRACE)) return;
-		
+	
+		CompileContext ctx = {.emitter = &emitter};
+		BlockNode* b = block(ctx);
+		if (!b) return;
+
 		OutputMemoryStream& compiled = [&]() -> OutputMemoryStream& {
 			if (equalStrings(fn_name, "update")) return emitter.m_update;
 			if (equalStrings(fn_name, "emit")) return emitter.m_emit;
@@ -1008,41 +1168,9 @@ const char* toString(Token::Type type) {
 			error(fn_name, "Unknown function");
 			return emitter.m_output;
 		}();
-
-		CompileContext ctx;
-		ctx.emitter = &emitter;
-		for (;;) {
-			Token token = peekToken();
-			switch (token.type) {
-				case Token::ERROR: return;
-				case Token::EOF:
-					error(token.value, "Unexpected end of file.");
-					return;
-				case Token::RIGHT_BRACE:
-					consumeToken();
-					compiled.write(InstructionType::END);
-					return;
-				case Token::LET:
-					ASSERT(false);
-					//declareLocal(ctx);
-					break;
-				default: {
-					Node* s = statement({.emitter = &emitter});
-					if (!s) return;
-					if (!consume(Token::SEMICOLON)) return;
-					if (!compile(ctx, s, compiled).success) return;
-					// TODO compile
-					break;
-				}
-			}
-		}
+		compile(ctx, b, compiled);
+		compiled.write(InstructionType::END);
 	}
-
-	struct CompileResult {
-		DataStream streams[4];
-		u32 num_streams = 0;
-		bool success = true;
-	};
 
 	CompileResult toCompileResult(const Variable& var, DataStream::Type type) {
 		CompileResult res;
@@ -1135,15 +1263,50 @@ const char* toString(Token::Type type) {
 				}
 				return res;
 			}
-			case Node::OUTPUT_VAR: {
-				u32 index = ((OutputVarNode*)node)->index;
-				res = toCompileResult(ctx.emitter->m_outputs[index], DataStream::OUT);
+			case Node::LOCAL_VARIABLE: {
+				auto* n = (LocalVariableNode*)node;
+				res.num_streams = n->num_values;
+				ASSERT(n->num_values < lengthOf(n->values));
+				ASSERT(n->num_values < lengthOf(res.streams));
+				memcpy(res.streams, n->values, n->num_values * sizeof(n->values[0]));
 				return res;
 			}
-			case Node::VAR: {
-				u32 index = ((VarNode*)node)->index;
-				res = toCompileResult(ctx.emitter->m_vars[index], DataStream::CHANNEL);
-				return res;
+			case Node::VARIABLE: {
+				auto* n = (VariableNode*)node;
+				switch (n->family) {
+					case VariableFamily::LOCAL: {
+						const Local& local = ctx.block->locals[n->index];
+						// fallthroughs intentional
+						switch (local.type) {
+							case Type::FLOAT4:
+								res.streams[3].type = DataStream::REGISTER;
+								res.streams[3].index = local.registers[3];
+								++res.num_streams;
+							case Type::FLOAT3:
+								res.streams[2].type = DataStream::REGISTER;
+								res.streams[2].index = local.registers[2];
+								res.streams[1].type = DataStream::REGISTER;
+								res.streams[1].index = local.registers[1];
+								res.num_streams += 2;
+							case Type::FLOAT:
+								res.streams[0].type = DataStream::REGISTER;
+								res.streams[0].index = local.registers[0];
+								++res.num_streams;
+								return res;
+						}
+					}
+					case VariableFamily::CHANNEL:
+						return toCompileResult(ctx.emitter->m_vars[n->index], DataStream::CHANNEL);
+					case VariableFamily::OUTPUT:
+						return toCompileResult(ctx.emitter->m_outputs[n->index], DataStream::OUT);
+					case VariableFamily::INPUT:
+						if (ctx.emitted) {
+							return toCompileResult(ctx.emitted->m_inputs[n->index], DataStream::OUT);
+						}
+						return toCompileResult(ctx.emitter->m_inputs[n->index], DataStream::REGISTER);
+				}
+				ASSERT(false);
+				return {.success = false};
 			}
 			case Node::SWIZZLE: {
 				auto* n = (SwizzleNode*)node;
@@ -1200,16 +1363,50 @@ const char* toString(Token::Type type) {
 					}
 				}
 				compiled.write(n->function.instruction);
-				DataStream dst = allocRegister(ctx);
-				compiled.write(dst); res.streams[0] = dst;
-				res.num_streams = 1;
-				for (i32 i = 0; i < n->args.size(); ++i) {
-					compiled.write(args[i].streams[0]);
+				if (n->function.instruction == InstructionType::EMIT) {
+					compiled.write(args[1].streams[0]);
+					compiled.write(u32(args[0].streams[0].value));
+					if (n->after_block) {
+						CompileContext inner_ctx = ctx;
+						if (n->function.instruction == InstructionType::EMIT) {
+							inner_ctx.emitted = &m_emitters[u32(args[0].streams[0].value)];
+						}
+						if (!compile(inner_ctx, n->after_block, compiled).success) return {.success = false};
+						compiled.write(InstructionType::END);
+					}
 				}
-				// TODO n->after_block
+				else {
+					if (n->function.returns_value) {
+						DataStream dst = allocRegister(ctx);
+						compiled.write(dst);
+						res.streams[0] = dst;
+						res.num_streams = 1;
+					}
+					for (i32 i = 0; i < n->args.size(); ++i) {
+						if (n->function.instruction == InstructionType::RAND) { 
+							compiled.write(args[i].streams[0].value);
+						}
+						else {
+							compiled.write(args[i].streams[0]);
+						}
+					}
+				}
 				return res;
 			}
-			case Node::LITERAL: 
+			case Node::BLOCK: {
+				auto* n = (BlockNode*)node;
+				ctx.block = n;
+				for (Node* statement : n->statements) {
+					if (!compile(ctx, statement, compiled).success) return {.success=false};
+				}
+				ctx.block = n->parent;
+			}
+			case Node::EMITTER_REF:
+				res.streams[0].type = DataStream::LITERAL;
+				res.streams[0].value = float(((EmitterRefNode*)node)->index);
+				res.num_streams = 1;
+				return res;
+			case Node::LITERAL:
 				res.streams[0].type = DataStream::LITERAL;
 				res.streams[0].value = ((LiteralNode*)node)->value;
 				res.num_streams = 1;
@@ -1243,29 +1440,10 @@ const char* toString(Token::Type type) {
 		Function& fn = m_functions.emplace(m_allocator);
 		if (!consume(Token::IDENTIFIER, fn.name)) return;
 		parseArgs(fn);
-		consume(Token::LEFT_BRACE);
-
-		for (;;) {
-			Token t = peekToken();
-			switch (t.type) {
-				case Token::ERROR: return;
-				case Token::EOF: error(t.value, "Unexpected end of file."); return;
-				case Token::RIGHT_BRACE:
-					consumeToken();	
-					return;
-				case Token::LET:
-					ASSERT(false);
-					//declareLocal({.function = &fn});
-					break;
-				default:
-					Node* s = statement({.function = &fn});
-					if (!s) return;
-					fn.statements.push(s);
-					if (!consume(Token::SEMICOLON)) return;
-					break;
-			}
 		
-		}
+		CompileContext ctx;
+		ctx.function = &fn;
+		fn.block = block(ctx);
 	}
 
 	void compileMesh(Emitter& emitter) {
@@ -1441,12 +1619,6 @@ const char* toString(Token::Type type) {
 
 #if 0
 
-	struct Local {
-		StringView name;
-		Type type;
-		i32 registers[4];
-	};
-
 	struct ExpressionStackElement {
 		enum Type {
 			NONE,
@@ -1483,13 +1655,6 @@ const char* toString(Token::Type type) {
 		ParticleSystemValues system_value;
 		u8 sub;
 		u32 parenthesis_depth = 0xffFFffFF;
-	};
-
-	enum class VariableFamily {
-		OUTPUT,
-		CHANNEL,
-		INPUT,
-		LOCAL
 	};
 
 	static u32 getPriority(const ExpressionStackElement& el) {
@@ -2306,83 +2471,6 @@ const char* toString(Token::Type type) {
 			compilePostfix(ctx, compiled, exprs);
 		}
 		m_postfix.clear();
-	}
-
-	// let a = ...;
-	// let a : type;
-	// let a : type = ...;
-	void declareLocal(const CompileContext& ctx) {
-		if (!consume(Token::LET)) return;
-		Local& local = m_locals.emplace();
-		if (!consume(Token::IDENTIFIER, local.name)) return;
-		
-		if (peekToken().type == Token::COLON) { 
-			// let a : type ...
-			if (!consume(Token::COLON)) return;
-			local.type = parseType();
-		}
-		else if(peekToken().type == Token::EQUAL) {
-			// let a = ...; 
-			local.type = Type::FLOAT;
-		}
-		else {
-			error(peekToken().value, "Unexpected token.");
-			return;
-		}
-
-		switch (local.type) {
-			case Type::FLOAT4: {
-				DataStream reg3 = allocRegister();
-				m_local_allocator |= 1 << reg3.index;
-				local.registers[3] = reg3.index;
-				// fallthrough
-			}
-			case Type::FLOAT3: {
-				DataStream reg2 = allocRegister();
-				DataStream reg1 = allocRegister();
-				m_local_allocator |= 1 << reg2.index;
-				m_local_allocator |= 1 << reg1.index;
-				local.registers[2] = reg2.index;
-				local.registers[1] = reg1.index;
-				// fallthrough
-			}
-			case Type::FLOAT: {
-				DataStream reg0 = allocRegister();
-				m_local_allocator |= 1 << reg0.index;
-				local.registers[0] = reg0.index;
-				break;
-			}
-		}
-
-		if (peekToken().type == Token::SEMICOLON) {
-			// let a : type;
-			consumeToken();
-			return;
-		}
-		if (!consume(Token::EQUAL)) return;
-
-		// let a : type = ...
-		// let a = ...
-		u32 var_len;
-		switch (local.type) {
-			case Type::FLOAT4: var_len = 4; break;
-			case Type::FLOAT3: var_len = 3; break;
-			case Type::FLOAT: var_len = 1; break;
-		}
-
-		for (u32 i = 0; i < var_len; ++i) {
-			ParticleScriptTokenizer tokenizer = m_tokenizer;
-			u32 depth = 0;
-			compileExpression(ctx, i, depth);
-			if (i != var_len - 1) m_tokenizer = tokenizer;
-			ExpressionStackElement el;
-			el.type = ExpressionStackElement::REGISTER;
-			el.register_offset = local.registers[i];
-			m_postfix.push(el);
-			m_postfix.emplace().type = ExpressionStackElement::ASSIGN;
-		}
-
-		consume(Token::SEMICOLON);
 	}
 
 	Array<Local> m_locals;
