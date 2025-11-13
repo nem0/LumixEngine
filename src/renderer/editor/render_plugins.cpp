@@ -2468,6 +2468,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			ImGui::EndChild();
 
 			ImGui::TableNextColumn();
+			if (!m_resource->isReady()) {
+				ImGui::TextUnformatted("Failed to load. See log for more info.");
+			}
 			previewGUI();
 
 			ImGui::EndTable();
