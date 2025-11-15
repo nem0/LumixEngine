@@ -1096,7 +1096,7 @@ const char* toString(Token::Type type) {
 				case Token::SLASH: case Token::STAR:
 				case Token::MINUS: case Token::PLUS: {
 					u32 prio = getPriority(op);
-					if (prio < min_priority) return lhs;
+					if (prio <= min_priority) return lhs;
 					consumeToken();
 					Node* rhs = expression(ctx, prio);
 					BinaryOperatorNode* opnode = LUMIX_NEW(m_arena_allocator, BinaryOperatorNode)(op);
