@@ -46,6 +46,7 @@ enum class Version {
 	EMIT_NODE,
 	WORLD_SPACE,
 	STREAM_NODE_CHANNELS,
+	MODEL,
 
 	LAST
 };
@@ -434,6 +435,9 @@ struct ParticleEmitterEditorResource {
 		blob.read(m_last_id);
 		if (version > Version::MULTIEMITTER) m_name = blob.readString();
 		m_mat_path = blob.readString();
+		if (version > Version::MODEL) {
+			m_model_path = blob.readString();
+		}
 
 		if (version > Version::EMIT_RATE) {
 			blob.read(m_init_emit_count);
@@ -2787,6 +2791,8 @@ struct ParticleEditorImpl : ParticleEditor {
 			};
 
 			output.write(getCount(emitter->m_streams));
+			output.write((u32)emitter->m_registers_count);
+			output.write((u32)emitter->m_registers_count);
 			output.write((u32)emitter->m_registers_count);
 			output.write(getCount(emitter->m_outputs));
 			output.write(emitter->m_init_emit_count);
