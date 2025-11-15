@@ -1169,37 +1169,38 @@ const char* toString(Token::Type type) {
 	}
 	
 	void forEachDataStreamInBytecode(InputMemoryStream& ip, auto f) {
-		auto forNumStreams = [&](u32 num){
+		auto forNumStreams = [&](u32 num, InstructionType itype, i32 ioffset) {
 			for (u32 i = 0; i < num; ++i) {
 				i32 pos = (i32)ip.getPosition();
 				DataStream dst = ip.read<DataStream>();
-				f(dst, pos, i == 0);
+				f(dst, pos, i == 0, itype, ioffset);
 			}
 		};
 		for(;;) {
+			i32 ioffset = (i32)ip.getPosition();
 			InstructionType itype = ip.read<InstructionType>();
 			switch (itype) {
 				case InstructionType::END: return;
-				case InstructionType::NOISE: forNumStreams(2); break;
-				case InstructionType::MOV: forNumStreams(2); break;
-				case InstructionType::SIN: forNumStreams(2); break;
-				case InstructionType::COS: forNumStreams(2); break;
-				case InstructionType::SQRT: forNumStreams(2); break;
-				case InstructionType::GT: forNumStreams(3); break;
-				case InstructionType::LT: forNumStreams(3); break;
-				case InstructionType::SUB: forNumStreams(3); break;
-				case InstructionType::ADD: forNumStreams(3); break;
-				case InstructionType::MUL: forNumStreams(3); break;
-				case InstructionType::DIV: forNumStreams(3); break;
-				case InstructionType::MOD: forNumStreams(3); break;
-				case InstructionType::AND: forNumStreams(3); break;
-				case InstructionType::OR: forNumStreams(3); break;
-				case InstructionType::MIN: forNumStreams(3); break;
-				case InstructionType::MAX: forNumStreams(3); break;
-				case InstructionType::KILL: forNumStreams(1); break;
-				case InstructionType::RAND: forNumStreams(1); ip.skip(sizeof(float) * 2); break;
+				case InstructionType::NOISE: forNumStreams(2, itype, ioffset); break;
+				case InstructionType::MOV: forNumStreams(2, itype, ioffset); break;
+				case InstructionType::SIN: forNumStreams(2, itype, ioffset); break;
+				case InstructionType::COS: forNumStreams(2, itype, ioffset); break;
+				case InstructionType::SQRT: forNumStreams(2, itype, ioffset); break;
+				case InstructionType::GT: forNumStreams(3, itype, ioffset); break;
+				case InstructionType::LT: forNumStreams(3, itype, ioffset); break;
+				case InstructionType::SUB: forNumStreams(3, itype, ioffset); break;
+				case InstructionType::ADD: forNumStreams(3, itype, ioffset); break;
+				case InstructionType::MUL: forNumStreams(3, itype, ioffset); break;
+				case InstructionType::DIV: forNumStreams(3, itype, ioffset); break;
+				case InstructionType::MOD: forNumStreams(3, itype, ioffset); break;
+				case InstructionType::AND: forNumStreams(3, itype, ioffset); break;
+				case InstructionType::OR: forNumStreams(3, itype, ioffset); break;
+				case InstructionType::MIN: forNumStreams(3, itype, ioffset); break;
+				case InstructionType::MAX: forNumStreams(3, itype, ioffset); break;
+				case InstructionType::KILL: forNumStreams(1, itype, ioffset); break;
+				case InstructionType::RAND: forNumStreams(1, itype, ioffset); ip.skip(sizeof(float) * 2); break;
 				case InstructionType::EMIT:
-						forNumStreams(1);
+						forNumStreams(1, itype, ioffset);
 						ip.skip(sizeof(u32)); // emitter index
 						forEachDataStreamInBytecode(ip, f); // emit subroutine
 						break;
@@ -1211,40 +1212,86 @@ const char* toString(Token::Type type) {
 	}
 
 	u32 optimizeBytecode(OutputMemoryStream& bytecode, u32 num_immutables) {
-		// collapse moves
+		// register allocation
 		struct Lifetime {
-			i32 register_index;
-			i32 from;
-			i32 to;
-			i32 remapped;
+			i32 register_index = -1;
+			i32 from = -1;
+			i32 to = -1;
+			i32 remapped = -1;
+			bool is_dst = false;
+			i32 num_reads = 0;
 		};
-		StackArray<Lifetime, 16> lifetimes(m_arena_allocator);
 		InputMemoryStream ip(bytecode.data(), bytecode.size());
-		forEachDataStreamInBytecode(ip, [&](const DataStream& s, i32 position, bool is_dst){
-			if (s.type != DataStream::REGISTER) return;
-			if (s.index < num_immutables) return;
+		StackArray<Lifetime, 16> lifetimes(m_arena_allocator);
+		auto computeLifetimes = [&](){
+			lifetimes.clear();
+			ip.setPosition(0);
+			forEachDataStreamInBytecode(ip, [&](const DataStream& s, i32 position, bool is_dst, InstructionType itype, i32 ioffset){
+				if (s.type != DataStream::REGISTER) return;
+				if (s.index < num_immutables) return;
 			
-			if (is_dst) {
+				if (is_dst) {
+					Lifetime& lt = lifetimes.emplace();
+					lt.register_index = s.index;
+					lt.from = position;
+					lt.to = position;
+					lt.is_dst = true; 
+					lt.num_reads = 0;
+					return;
+				}
+
+				for (i32 i = lifetimes.size() - 1; i >= 0; --i) {
+					if (lifetimes[i].register_index == s.index) {
+						lifetimes[i].to = position;
+						++lifetimes[i].num_reads;
+						return;
+					}
+				}
+
 				Lifetime& lt = lifetimes.emplace();
 				lt.register_index = s.index;
 				lt.from = position;
 				lt.to = position;
-				return;
-			}
+				lt.is_dst = false;
+				lt.num_reads = 1;
+			});
+		};
+		computeLifetimes();
 
-			for (i32 i = lifetimes.size() - 1; i >= 0; --i) {
-				if (lifetimes[i].register_index == s.index) {
-					lifetimes[i].to = position;
-					return;
+		// collapse unnecessary MOVs
+		StackArray<i32, 16> movs_to_remove(m_arena_allocator);
+		ip.setPosition(0);
+		forEachDataStreamInBytecode(ip, [&](const DataStream& s, i32 position, bool is_dst, InstructionType itype, i32 ioffset){
+			if (s.type != DataStream::REGISTER) return;
+			if (s.index < num_immutables) return;
+			if (itype != InstructionType::MOV) return;
+			if (is_dst) return;
+
+			// we are mov-ing from register, it's also the only read from that value
+			// collapse the mov instruction with the instruction which produced the value
+			// e.g. `out = t * 5;` is collapsed into just a single instruction `mul out, t, 5`
+			for (const Lifetime& lt : lifetimes) {
+				if (lt.register_index == s.index && position == lt.to && lt.num_reads == 1 && lt.is_dst) {
+					movs_to_remove.push(ioffset);
+					DataStream mov_dst;
+					memcpy(&mov_dst, bytecode.data() + ioffset + sizeof(InstructionType), sizeof(mov_dst));
+					memcpy(bytecode.getMutableData() + lt.from, &mov_dst, sizeof(mov_dst));
+					break;
 				}
 			}
-
-			Lifetime& lt = lifetimes.emplace();
-			lt.register_index = s.index;
-			lt.from = position;
-			lt.to = position;
 		});
-		
+
+		for (i32 i = movs_to_remove.size() - 1; i >= 0; --i) {
+			u8* data = bytecode.getMutableData();
+			i32 offset = movs_to_remove[i];
+			static constexpr u32 SIZE = sizeof(DataStream) * 2 + sizeof(InstructionType);
+			memmove(data + offset, data + offset + SIZE, bytecode.size() - offset - SIZE);
+			bytecode.resize(bytecode.size() - SIZE);
+		}
+		ip = InputMemoryStream(bytecode.data(), bytecode.size());
+		computeLifetimes();
+
+		// allocate registers
 		if (!lifetimes.empty()) lifetimes[0].remapped = num_immutables;
 		for (i32 i = 1, c = lifetimes.size(); i < c; ++i) {
 			Lifetime& lt = lifetimes[i];
@@ -1260,7 +1307,7 @@ const char* toString(Token::Type type) {
 		}
 
 		ip.setPosition(0);
-		forEachDataStreamInBytecode(ip, [&](const DataStream& s, i32 position, bool is_dst){
+		forEachDataStreamInBytecode(ip, [&](const DataStream& s, i32 position, bool is_dst, InstructionType itype, i32 ioffset){
 			if (s.type != DataStream::REGISTER) return;
 			if (s.index < num_immutables) return;
 
