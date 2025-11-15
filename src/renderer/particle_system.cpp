@@ -97,7 +97,9 @@ void ParticleSystemResource::overrideData(u32 emitter_idx
 	emitter.emit_offset = emit_offset;
 	emitter.output_offset = output_offset;
 	emitter.channels_count = channels_count;
-	emitter.registers_count = registers_count;
+	emitter.emit_registers_count = registers_count;
+	emitter.update_registers_count = registers_count;
+	emitter.output_registers_count = registers_count;
 	emitter.outputs_count = outputs_count;
 	emitter.init_emit_count = init_emit_count;
 	emitter.emit_per_second = emit_rate;
@@ -195,7 +197,16 @@ bool ParticleSystemResource::load(Span<const u8> mem) {
 		blob.read(emitter.emit_offset);
 		blob.read(emitter.output_offset);
 		blob.read(emitter.channels_count);
-		blob.read(emitter.registers_count);
+		if (header.version > Version::NUM_REGISTERS_SPLIT) {
+			blob.read(emitter.update_registers_count); 
+			blob.read(emitter.emit_registers_count);
+			blob.read(emitter.output_registers_count);
+		}
+		else {
+			blob.read(emitter.update_registers_count);
+			emitter.emit_registers_count = emitter.update_registers_count;
+			emitter.output_registers_count = emitter.update_registers_count;
+		}
 		blob.read(emitter.outputs_count);
 		if (header.version > Version::EMIT_RATE) {
 			blob.read(emitter.init_emit_count);
@@ -389,7 +400,7 @@ void ParticleSystem::emitRibbonPoints(u32 emitter_idx, u32 ribbon_idx, Span<cons
 	Ribbon& ribbon = emitter.ribbons[ribbon_idx];
 
 	RunningContext ctx(emitter, m_allocator);
-	ctx.registers.resize(res_emitter.registers_count + emit_data.length());
+	ctx.registers.resize(res_emitter.emit_registers_count + emit_data.length());
 
 	const u32 max_len = emitter.resource_emitter.max_ribbon_length;
 	m_system_values[(u8)ParticleSystemValues::RIBBON_INDEX] = (float)ribbon_idx;
@@ -424,7 +435,7 @@ void ParticleSystem::emit(u32 emitter_idx, Span<const float> emit_data, u32 coun
 	ensureCapacity(emitter, count);
 
 	RunningContext ctx(emitter, m_allocator);
-	ctx.registers.resize(res_emitter.registers_count + emit_data.length());
+	ctx.registers.resize(res_emitter.emit_registers_count + emit_data.length());
 
 	const float c1 = m_system_values[(u8)ParticleSystemValues::TOTAL_TIME];
 	m_system_values[(u8)ParticleSystemValues::RIBBON_INDEX] = 0;
@@ -920,24 +931,28 @@ void ParticleSystem::run(RunningContext& ctx) {
 }
 
 struct ParticleSystem::ChunkProcessorContext {
-	ChunkProcessorContext(const Emitter& emitter, PageAllocator& page_allocator)
+	ChunkProcessorContext(const Emitter& emitter, bool is_update, PageAllocator& page_allocator)
 		: emitter(emitter)
 		, page_allocator(page_allocator)
+		, is_update(is_update)
 	{
-		ASSERT(emitter.resource_emitter.registers_count <= lengthOf(registers));
-		for (u32 i = 0; i < emitter.resource_emitter.registers_count; ++i) {
+		u32 num_registers = is_update ? emitter.resource_emitter.update_registers_count : emitter.resource_emitter.output_registers_count;
+		ASSERT(num_registers <= lengthOf(registers));
+		for (u32 i = 0; i < num_registers; ++i) {
 			registers[i] = (float4*)page_allocator.allocate();
 		}
 	}
 
 	~ChunkProcessorContext() {
-		for (u32 i = 0; i < emitter.resource_emitter.registers_count; ++i) {
+		u32 num_registers = is_update ? emitter.resource_emitter.update_registers_count : emitter.resource_emitter.output_registers_count;
+		for (u32 i = 0; i < num_registers; ++i) {
 			page_allocator.deallocate(registers[i]);
 		}
 	}
 
 	const Emitter& emitter;
 	PageAllocator& page_allocator;
+	bool is_update;
 	i32 from;
 	i32 to;
 	float4* registers[16] = {};
@@ -1014,7 +1029,7 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 								InputMemoryStream tmp_instr((const u8*)ip.getData() + ip.getPosition(), ip.remaining());
 								emit_ctx.instructions.set((const u8*)tmp_instr.getData() + tmp_instr.getPosition(), tmp_instr.remaining());
 								emit_ctx.particle_idx = particle_index;
-								emit_ctx.registers.resize(res_emitter.registers_count);
+								emit_ctx.registers.resize(res_emitter.update_registers_count);
 								emit_ctx.outputs.resize(m_resource->getEmitters()[emitter_idx].emit_inputs_count);
 								run(emit_ctx);
 							
@@ -1039,7 +1054,7 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 								InputMemoryStream tmp_instr((const u8*)ip.getData() + ip.getPosition(), ip.remaining());
 								emit_ctx.instructions.set((const u8*)tmp_instr.getData() + tmp_instr.getPosition(), tmp_instr.remaining());
 								emit_ctx.particle_idx = particle_index;
-								emit_ctx.registers.resize(res_emitter.registers_count);
+								emit_ctx.registers.resize(res_emitter.update_registers_count);
 								emit_ctx.outputs.resize(m_resource->getEmitters()[emitter_idx].emit_inputs_count);
 								run(emit_ctx);
 							
@@ -1057,7 +1072,7 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 				RunningContext ctx(emitter, m_allocator);
 				ctx.instructions.set((const u8*)ip.getData() + ip.getPosition(), ip.remaining());
 				ctx.particle_idx = 0;
-				ctx.registers.resize(res_emitter.registers_count);
+				ctx.registers.resize(res_emitter.update_registers_count);
 				ctx.outputs.resize(m_resource->getEmitters()[emitter_idx].emit_inputs_count);
 				run(ctx);
 				ip.setPosition(ip.size() - ctx.instructions.remaining());
@@ -1260,7 +1275,7 @@ void ParticleSystem::updateRibbons(float dt, u32 emitter_idx, PageAllocator& pag
 
 	OutputPagedStream emit_stream(page_allocator);
 	jobs::Mutex emit_mutex;
-	ChunkProcessorContext ctx(emitter, page_allocator);
+	ChunkProcessorContext ctx(emitter, true, page_allocator);
 	ctx.kill_counter = nullptr;
 	ctx.emit_mutex = &emit_mutex;
 	ctx.emit_stream = &emit_stream;
@@ -1331,7 +1346,7 @@ void ParticleSystem::update(float dt, u32 emitter_idx, PageAllocator& page_alloc
 	auto update = [&](){
 		PROFILE_BLOCK("update particles");
 		
-		ChunkProcessorContext ctx(emitter, page_allocator);
+		ChunkProcessorContext ctx(emitter, true, page_allocator);
 		ctx.kill_counter = kill_counter;
 		ctx.emit_mutex = &emit_mutex;
 		ctx.emit_stream = &emit_stream;
@@ -1475,7 +1490,7 @@ void ParticleSystem::Emitter::fillInstanceData(float* data, PageAllocator& page_
 	auto fill = [&](){
 		PROFILE_BLOCK("fill particle gpu data");
 
-		ChunkProcessorContext ctx(*this, page_allocator);
+		ChunkProcessorContext ctx(*this, false, page_allocator);
 		ctx.instructions_offset = resource_emitter.output_offset;
 		ctx.output_memory = data;
 
