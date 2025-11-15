@@ -2880,6 +2880,23 @@ struct ParticleScriptEditorWindow : AssetEditorWindow {
 			ImGui::SameLine();
 			if (ImGui::BeginChild("preview_pane")) {
 				auto* module = (RenderModule*)m_viewer.m_world->getModule(types::particle_emitter);
+				ParticleSystem& system = module->getParticleEmitter(m_preview_entity);
+				
+				if (ImGuiEx::IconButton(ICON_FA_INFO_CIRCLE, "Info")) ImGui::OpenPopup("info");
+				if (ImGui::BeginPopup("info")) {
+					Span<ParticleSystemResource::Emitter> emitters = system.getResource()->getEmitters();
+					for (u32 i = 0, c = emitters.size(); i < c; ++i) {
+						const auto& emitter = emitters[i];
+						ImGui::Text("Emitter %d", i + 1);
+						ImGui::Indent();
+						ImGui::LabelText("Emit registers", "%d", emitter.emit_registers_count);
+						ImGui::LabelText("Update registers", "%d", emitter.update_registers_count);
+						ImGui::LabelText("Output registers", "%d", emitter.output_registers_count);
+						ImGui::Unindent();
+					}
+					ImGui::EndPopup();
+				}
+				ImGui::SameLine();
 				if (m_play) {
 					if (ImGuiEx::IconButton(ICON_FA_PAUSE, "Pause")) m_play = false;
 					float td = m_app.getEngine().getLastTimeDelta();
@@ -2897,7 +2914,6 @@ struct ParticleScriptEditorWindow : AssetEditorWindow {
 					}
 				}
 				
-				ParticleSystem& system = module->getParticleEmitter(m_preview_entity);
 				ImGui::SameLine();
 				if (ImGuiEx::IconButton(ICON_FA_EYE, "Toggle ground")) {
 					m_show_ground = !m_show_ground;
