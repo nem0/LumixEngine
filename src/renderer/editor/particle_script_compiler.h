@@ -280,8 +280,7 @@ struct ParticleScriptCompiler {
 		Span<CompileResult> args = {};
 		BlockNode* block = nullptr;
 
-		u32 stack_size = 0;
-		u32 max_stack_size = 0;
+		u32 value_counter = 0;
 	};
 
 	struct Node {
@@ -875,7 +874,6 @@ const char* toString(Token::Type type) {
 							inner_ctx.emitted = &m_emitters[emitter_index];
 						}
 						node->after_block = block(inner_ctx);
-						ctx.max_stack_size = inner_ctx.max_stack_size;
 						if (!node->after_block) return nullptr;
 					}
 
@@ -1169,14 +1167,13 @@ const char* toString(Token::Type type) {
 			}
 		}
 	}
-
 	
 	void forEachDataStreamInBytecode(InputMemoryStream& ip, auto f) {
 		auto forNumStreams = [&](u32 num){
 			for (u32 i = 0; i < num; ++i) {
-				u64 pos = ip.getPosition();
+				i32 pos = (i32)ip.getPosition();
 				DataStream dst = ip.read<DataStream>();
-				f(dst, pos);
+				f(dst, pos, i == 0);
 			}
 		};
 		for(;;) {
@@ -1213,46 +1210,73 @@ const char* toString(Token::Type type) {
 		}
 	}
 
-	u32 optimizeBytecode(OutputMemoryStream& bytecode) {
-		// remove unused register space
-		u64 register_mask = 0;
+	u32 optimizeBytecode(OutputMemoryStream& bytecode, u32 num_immutables) {
+		// collapse moves
+		struct Lifetime {
+			i32 register_index;
+			i32 from;
+			i32 to;
+			i32 remapped;
+		};
+		StackArray<Lifetime, 16> lifetimes(m_arena_allocator);
 		InputMemoryStream ip(bytecode.data(), bytecode.size());
-		// find out which registers are used
-		forEachDataStreamInBytecode(ip, [&](const DataStream& s, u64 position){
-			if (s.type == DataStream::REGISTER) {
-				ASSERT(s.index < 64);
-				register_mask |= u64(1) << s.index;
+		forEachDataStreamInBytecode(ip, [&](const DataStream& s, i32 position, bool is_dst){
+			if (s.type != DataStream::REGISTER) return;
+			if (s.index < num_immutables) return;
+			
+			if (is_dst) {
+				Lifetime& lt = lifetimes.emplace();
+				lt.register_index = s.index;
+				lt.from = position;
+				lt.to = position;
+				return;
 			}
+
+			for (i32 i = lifetimes.size() - 1; i >= 0; --i) {
+				if (lifetimes[i].register_index == s.index) {
+					lifetimes[i].to = position;
+					return;
+				}
+			}
+
+			Lifetime& lt = lifetimes.emplace();
+			lt.register_index = s.index;
+			lt.from = position;
+			lt.to = position;
 		});
-		ASSERT(ip.remaining() == 0);
-		u32 offsets[64] = {};
-		u32 unused = 0;
-		// prefix sum
-		for (u32 i = 0; i < 64; ++i) {
-			offsets[i] = unused;
-			bool is_used = register_mask & (u64(1) << i);
-			if (!is_used) ++unused;
+		
+		if (!lifetimes.empty()) lifetimes[0].remapped = num_immutables;
+		for (i32 i = 1, c = lifetimes.size(); i < c; ++i) {
+			Lifetime& lt = lifetimes[i];
+			// assign .remapped values so lifetimes with the same remapped value do no overlap
+			lt.remapped = num_immutables;
+			for (i32 j = 0; j < i; ++j) {
+				const Lifetime& prev = lifetimes[j];
+				if (prev.remapped == lt.remapped && !(lt.to < prev.from || prev.to < lt.from)) {
+					++lt.remapped;
+					j = -1; // restart check
+				}
+			}
 		}
 
-		register_mask = 0;
 		ip.setPosition(0);
-		// offset used registers so they are tightly packed
-		forEachDataStreamInBytecode(ip, [&](const DataStream& s, u64 position){
-			if (s.type == DataStream::REGISTER) {
-				DataStream shifted = s;
-				shifted.index -= offsets[s.index];
-				u8* dst = bytecode.getMutableData() + position;
-				memcpy(dst, &shifted, sizeof(shifted));
-				register_mask |= u64(1) << shifted.index;
+		forEachDataStreamInBytecode(ip, [&](const DataStream& s, i32 position, bool is_dst){
+			if (s.type != DataStream::REGISTER) return;
+			if (s.index < num_immutables) return;
+
+			DataStream* ds = const_cast<DataStream*>((const DataStream*)(bytecode.data() + position));
+			for (const Lifetime& lt : lifetimes) {
+				if (lt.register_index == s.index && position >= lt.from && position <= lt.to) {
+					ds->index = lt.remapped;
+				}
 			}
 		});
-		// return number of used registers
-		#ifdef _WIN32
-			const u32 count = (u32)__popcnt64(register_mask);
-		#else
-			const u32 count = __builtin_popcountll(register_mask);
-		#endif
-		return count;
+
+		i32 max_used_register = (i32)num_immutables - 1;
+		for (const Lifetime& lt : lifetimes) {
+			max_used_register = maximum(max_used_register, lt.remapped);
+		}
+		return max_used_register + 1;
 	}
 
 
@@ -1269,24 +1293,24 @@ const char* toString(Token::Type type) {
 				for (const Variable& v : emitter.m_inputs) {
 					switch (v.type) {
 						case ValueType::VOID: ASSERT(false); break;
-						case ValueType::FLOAT: ++ctx.stack_size; break;
-						case ValueType::FLOAT3: ctx.stack_size += 3; break;
-						case ValueType::FLOAT4: ctx.stack_size += 4; break;
+						case ValueType::FLOAT: ++ctx.value_counter; break;
+						case ValueType::FLOAT3: ctx.value_counter += 3; break;
+						case ValueType::FLOAT4: ctx.value_counter += 4; break;
 					}
 				}
-				ctx.max_stack_size = ctx.stack_size;
 				return emitter.m_emit;
 			}
 			if (equalStrings(fn_name, "output")) return emitter.m_output;
 			error(fn_name, "Unknown function");
 			return emitter.m_output;
 		}();
+		u32 stack_offset = ctx.value_counter;
 
 		BlockNode* b = block(ctx);
 		if (!b) return;
 		compile(ctx, b, compiled);
 		compiled.write(InstructionType::END);
-		u32 num_used_registers = optimizeBytecode(compiled);
+		u32 num_used_registers = optimizeBytecode(compiled, stack_offset);
 
 		if (equalStrings(fn_name, "update")) emitter.m_num_update_registers = num_used_registers;
 		else if (equalStrings(fn_name, "emit")) emitter.m_num_emit_registers = num_used_registers;
@@ -1322,14 +1346,9 @@ const char* toString(Token::Type type) {
 	DataStream pushStack(CompileContext& ctx) {
 		DataStream res;
 		res.type = DataStream::REGISTER;
-		res.index = ctx.stack_size;
-		if (ctx.stack_size == 255) {
-			errorAtCurrent("Run out of registers");
-			res.type = DataStream::NONE;
-			return res;
-		}
-		++ctx.stack_size;
-		ctx.max_stack_size = maximum(ctx.stack_size, ctx.max_stack_size);
+		res.index = ctx.value_counter;
+		++ctx.value_counter;
+		ASSERT(ctx.value_counter < 255);
 		return res;
 	}
 
@@ -1358,8 +1377,6 @@ const char* toString(Token::Type type) {
 			}
 			case Node::BINARY_OPERATOR: {
 				auto* n = (BinaryOperatorNode*)node;
-				u32 stack_size = ctx.stack_size;
-				// TODO proper size
 				res.streams[0] = pushStack(ctx);
 				res.streams[1] = pushStack(ctx);
 				res.streams[2] = pushStack(ctx);
@@ -1388,7 +1405,6 @@ const char* toString(Token::Type type) {
 					compiled.write(left.streams[i < left.num_streams ? i : 0]);
 					compiled.write(right.streams[i < right.num_streams ? i : 0]);
 				}
-				ctx.stack_size = stack_size + res.num_streams;
 				return res;
 			}
 			case Node::COMPOUND: {
@@ -1542,7 +1558,6 @@ const char* toString(Token::Type type) {
 							inner_ctx.emitted = &m_emitters[u32(args[0].streams[0].value)];
 						}
 						if (!compile(inner_ctx, n->after_block, compiled).success) return {.success = false};
-						ctx.max_stack_size = inner_ctx.max_stack_size;
 						compiled.write(InstructionType::END);
 					}
 				}
@@ -1567,7 +1582,6 @@ const char* toString(Token::Type type) {
 			case Node::BLOCK: {
 				auto* n = (BlockNode*)node;
 				ctx.block = n;
-				u32 block_start_stack_size = ctx.stack_size;
 				res.streams[0] = pushStack(ctx);
 				res.streams[1] = pushStack(ctx);
 				res.streams[2] = pushStack(ctx);
@@ -1590,27 +1604,15 @@ const char* toString(Token::Type type) {
 				// execute statements
 				for (Node* statement : n->statements) {
 					if (statement->type == Node::RETURN) {
-						CompileResult returned = compile(ctx, statement, compiled);
-						for (u32 i = 0; i < returned.num_streams; ++i) {
-							ASSERT(block_start_stack_size + i < 255); // TODO runtime error
-							DataStream r {.type = DataStream::REGISTER, .index = u8(block_start_stack_size + i) };
-							compiled.write(InstructionType::MOV);
-							compiled.write(res.streams[i]);
-							compiled.write(returned.streams[i]);
-						}
-						res.num_streams = returned.num_streams;
+						res = compile(ctx, statement, compiled);
 						ctx.block = n->parent;
-						ctx.stack_size = block_start_stack_size + res.num_streams;
 						return res;
 					}
 					else {
-						u32 stack_size = ctx.stack_size;
 						if (!compile(ctx, statement, compiled).success) return {.success=false};
-						ctx.stack_size = stack_size;
 					}
 				}
 				ctx.block = n->parent;
-				ctx.stack_size = block_start_stack_size;
 				return res;
 			}
 			case Node::EMITTER_REF:
