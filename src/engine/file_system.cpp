@@ -254,6 +254,10 @@ struct FileSystemImpl : FileSystem {
 		if (dir.size() == 0) iter->mount_idx = 0;
 		else if (equalStrings(dir, "/")) iter->mount_idx = 0;
 		else if (equalStrings(dir, "\\")) iter->mount_idx = 0;
+		if (!iter->iter && iter->mount_idx < 0) {
+			LUMIX_DELETE(m_allocator, iter);
+			return nullptr;
+		}
 		return iter;
 	}
 

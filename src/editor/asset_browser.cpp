@@ -18,6 +18,7 @@
 #include "editor/studio_app.h"
 #include "editor/text_filter.h"
 #include "editor/world_editor.h"
+#include "engine/component_types.h"
 #include "engine/engine.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
@@ -532,6 +533,7 @@ struct AssetBrowserImpl : AssetBrowser {
 
 			ImGui::Separator();
 			i32 idx = 0;
+			ImGui::BeginChild("list");
 			if (ImGui::BeginTable("files", 2, ImGuiTableFlags_Resizable)) {
 				ResourceType lua_script_type("lua_script");
 				ResourceType world_type("world");
@@ -543,9 +545,13 @@ struct AssetBrowserImpl : AssetBrowser {
 					for (const auto& res : resources) {
 						if (!showInOpenFileDialog(res.type)) continue;
 						if (!m_open_file_filter.pass(res.path)) continue;
-
-						PathInfo info(res.path);
-						StaticString<256> tmp(info.basename, ".", info.extension);
+						
+						ResourceLocator locator(res.path);
+						StaticString<256> tmp;
+						if (locator.subresource.size() > 0) {
+							tmp.append(locator.subresource, ":");
+						}
+						tmp.append(locator.basename, ".", locator.ext);
 
 						ImGui::TableNextRow();
 						ImGui::TableNextColumn();
@@ -554,7 +560,7 @@ struct AssetBrowserImpl : AssetBrowser {
 						if (moved && idx == m_selected_file) ImGuiEx::ScrollToItem();
 						ImGui::PopID();
 						ImGui::TableNextColumn();
-						ImGui::TextUnformatted(info.dir.begin, info.dir.end);
+						ImGui::TextUnformatted(locator.dir.begin, locator.dir.end);
 						if (clicked) {
 							openEditor(res.path);
 							ImGui::CloseCurrentPopup();
@@ -564,6 +570,7 @@ struct AssetBrowserImpl : AssetBrowser {
 				}
 				ImGui::EndTable();
 			}
+			ImGui::EndChild();
 
 			if (idx) m_selected_file = m_selected_file % idx;
 
@@ -1001,11 +1008,10 @@ struct AssetBrowserImpl : AssetBrowser {
 				m_dropped_entity = e;
 				ImGui::OpenPopup("Save as prefab");
 				World* world = m_app.getWorldEditor().getWorld();
-				const ComponentType model_inst_type = reflection::getComponentType("model_instance");
-				IModule* module = world->getModule(model_inst_type);
-				if (module && world->hasComponent(e, model_inst_type)) {
+				IModule* module = world->getModule(types::model_instance);
+				if (module && world->hasComponent(e, types::model_instance)) {
 					Path source;
-					if (reflection::getPropertyValue(*module, e, model_inst_type, "Source", source)) {
+					if (reflection::getPropertyValue(*module, e, types::model_instance, "Source", source)) {
 						copyString(Span(m_prefab_name), Path::getBasename(source));
 					}
 				}

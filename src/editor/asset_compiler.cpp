@@ -566,11 +566,14 @@ struct AssetCompilerImpl : AssetCompiler {
 		const Path dst_path(".lumix/resources/", hash, ".res");
 		const Path meta_path(filepath, ".meta");
 
-		if (!fs.fileExists(dst_path)
-			|| fs.getLastModified(dst_path) < fs.getLastModified(filepath)
-			|| fs.getLastModified(dst_path) < fs.getLastModified(meta_path)
-			)
-		{
+		bool do_compile = true;
+		// TODO merge fileExists + getLastModified so only one winapi function is called
+		if (fs.fileExists(dst_path)) {
+			u64 compiled_time = fs.getLastModified(dst_path);
+			do_compile = compiled_time < fs.getLastModified(filepath) || compiled_time < fs.getLastModified(meta_path);
+		}
+
+		if (do_compile) {
 			if (!getPlugin(res.getPath())) return ResourceManagerHub::LoadHook::Action::IMMEDIATE;
 
 			pushToCompileQueue(Path(filepath));

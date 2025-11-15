@@ -122,6 +122,7 @@ struct InputSystemImpl final : InputSystem {
 			m_devices.eraseItem(device);
 			LUMIX_DELETE(m_allocator, device);
 		}
+		m_to_remove.clear();
 
 		m_events.clear();
 

@@ -15,6 +15,7 @@
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
+#include "engine/component_types.h"
 #include "engine/engine.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
@@ -31,13 +32,6 @@ using namespace Lumix;
 
 
 namespace {
-
-static const ComponentType GUI_CANVAS_TYPE = reflection::getComponentType("gui_canvas");
-static const ComponentType GUI_RECT_TYPE = reflection::getComponentType("gui_rect");
-static const ComponentType GUI_IMAGE_TYPE = reflection::getComponentType("gui_image");
-static const ComponentType GUI_TEXT_TYPE = reflection::getComponentType("gui_text");
-static const ComponentType GUI_BUTTON_TYPE = reflection::getComponentType("gui_button");
-static const ComponentType GUI_RENDER_TARGET_TYPE = reflection::getComponentType("gui_render_target");
 
 struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	struct EditorWindow : AssetEditorWindow {
@@ -329,27 +323,27 @@ private:
 		EntityRef child = editor.addEntity();
 		editor.makeParent(entity, child);
 		editor.selectEntities(Span(&child, 1), false);
-		editor.addComponent(Span(&child, 1), GUI_RECT_TYPE);
-		editor.addComponent(Span(&child, 1), GUI_IMAGE_TYPE);
-		editor.setProperty(GUI_IMAGE_TYPE, "", 0, "Sprite", Span(&child, 1), Path(path));
+		editor.addComponent(Span(&child, 1), types::gui_rect);
+		editor.addComponent(Span(&child, 1), types::gui_image);
+		editor.setProperty(types::gui_image, "", 0, "Sprite", Span(&child, 1), Path(path));
 		
 		Sprite* sprite = m_app.getEngine().getResourceManager().load<Sprite>(Path(path));
 		Texture* texture = sprite->getTexture();
 		if (sprite->isReady() && texture) {
-			editor.setProperty(GUI_RECT_TYPE, "", 0, "Top Relative", Span(&child, 1), 0.f);
-			editor.setProperty(GUI_RECT_TYPE, "", 0, "Bottom Relative", Span(&child, 1), 0.f);
-			editor.setProperty(GUI_RECT_TYPE, "", 0, "Left Relative", Span(&child, 1), 0.f);
-			editor.setProperty(GUI_RECT_TYPE, "", 0, "Right Relative", Span(&child, 1), 0.f);
+			editor.setProperty(types::gui_rect, "", 0, "Top Relative", Span(&child, 1), 0.f);
+			editor.setProperty(types::gui_rect, "", 0, "Bottom Relative", Span(&child, 1), 0.f);
+			editor.setProperty(types::gui_rect, "", 0, "Left Relative", Span(&child, 1), 0.f);
+			editor.setProperty(types::gui_rect, "", 0, "Right Relative", Span(&child, 1), 0.f);
 
 			float w = (float)texture->width;
 			float h = (float)texture->height;
 			float x = drop_pos.x - rect.x - w / 2;
 			float y = drop_pos.y - rect.y - h / 2;
 
-			editor.setProperty(GUI_RECT_TYPE, "", 0, "Top Points", Span(&child, 1), y);
-			editor.setProperty(GUI_RECT_TYPE, "", 0, "Bottom Points", Span(&child, 1), y + h);
-			editor.setProperty(GUI_RECT_TYPE, "", 0, "Left Points", Span(&child, 1), x);
-			editor.setProperty(GUI_RECT_TYPE, "", 0, "Right Points", Span(&child, 1), x + w);
+			editor.setProperty(types::gui_rect, "", 0, "Top Points", Span(&child, 1), y);
+			editor.setProperty(types::gui_rect, "", 0, "Bottom Points", Span(&child, 1), y + h);
+			editor.setProperty(types::gui_rect, "", 0, "Left Points", Span(&child, 1), x);
+			editor.setProperty(types::gui_rect, "", 0, "Right Points", Span(&child, 1), x + w);
 		}
 		sprite->decRefCount();
 
@@ -448,7 +442,7 @@ private:
 
 		void set(GUIModule* module, EntityRef e, const char* prop_name)
 		{
-			const bool found = reflection::getPropertyValue(*module, e, GUI_RECT_TYPE, prop_name, value);
+			const bool found = reflection::getPropertyValue(*module, e, types::gui_rect, prop_name, value);
 			ASSERT(found);
 			prop = prop_name;
 		}
@@ -497,7 +491,7 @@ private:
 		for (int i = 0; i < m_copy_position_buffer_count; ++i)
 		{
 			CopyPositionBufferItem& item = m_copy_position_buffer[i];
-			editor.setProperty(GUI_RECT_TYPE, "", -1, item.prop, Span(&e, 1), item.value);
+			editor.setProperty(types::gui_rect, "", -1, item.prop, Span(&e, 1), item.value);
 		}
 		editor.endCommandGroup();
 	}
@@ -534,7 +528,7 @@ private:
 		}
 
 		World& world = *editor.getWorld();
-		if (m_canvas_entity.isValid() && (!world.hasEntity(*m_canvas_entity) || !world.hasComponent(*m_canvas_entity, GUI_CANVAS_TYPE))) {
+		if (m_canvas_entity.isValid() && (!world.hasEntity(*m_canvas_entity) || !world.hasComponent(*m_canvas_entity, types::gui_canvas))) {
 			// new world or entity deleted or component deleted
 			m_canvas_entity = INVALID_ENTITY;
 		}
@@ -570,8 +564,8 @@ private:
 					editor.beginCommandGroup("create_gui_canvas");
 					EntityRef e = editor.addEntity();
 					editor.setEntityName(e, "GUI canvas");
-					editor.addComponent(Span(&e, 1), GUI_CANVAS_TYPE);
-					editor.addComponent(Span(&e, 1), GUI_RECT_TYPE);
+					editor.addComponent(Span(&e, 1), types::gui_canvas);
+					editor.addComponent(Span(&e, 1), types::gui_rect);
 					editor.endCommandGroup();
 				}
 			}
@@ -714,7 +708,7 @@ private:
 
 		bool has_rect = false;
 		if (editor.getSelectedEntities().size() == 1) {
-			has_rect = editor.getWorld()->hasComponent(editor.getSelectedEntities()[0], GUI_RECT_TYPE);
+			has_rect = editor.getWorld()->hasComponent(editor.getSelectedEntities()[0], types::gui_rect);
 		}
 		
 		if (has_rect && ImGui::BeginPopupContextItem("context")) {
@@ -728,12 +722,12 @@ private:
 	void entityContextMenu(EntityRef e, Vec2 canvas_size) {
 		WorldEditor& editor = m_app.getWorldEditor();
 		if (ImGui::BeginMenu("Create child")) {
-			if (ImGui::MenuItem("Button + Image + Text")) createChildren(e, editor, GUI_BUTTON_TYPE, GUI_IMAGE_TYPE, GUI_TEXT_TYPE);
-			if (ImGui::MenuItem("Button")) createChild(e, GUI_BUTTON_TYPE, editor);
-			if (ImGui::MenuItem("Image")) createChild(e, GUI_IMAGE_TYPE, editor);
-			if (ImGui::MenuItem("Rect")) createChild(e, GUI_RECT_TYPE, editor);
-			if (ImGui::MenuItem("Text")) createChild(e, GUI_TEXT_TYPE, editor);
-			if (ImGui::MenuItem("Render target")) createChild(e, GUI_RENDER_TARGET_TYPE, editor);
+			if (ImGui::MenuItem("Button + Image + Text")) createChildren(e, editor, types::gui_button, types::gui_image, types::gui_text);
+			if (ImGui::MenuItem("Button")) createChild(e, types::gui_button, editor);
+			if (ImGui::MenuItem("Image")) createChild(e, types::gui_image, editor);
+			if (ImGui::MenuItem("Rect")) createChild(e, types::gui_rect, editor);
+			if (ImGui::MenuItem("Text")) createChild(e, types::gui_text, editor);
+			if (ImGui::MenuItem("Render target")) createChild(e, types::gui_render_target, editor);
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Align")) {
@@ -829,7 +823,7 @@ private:
 		u32 y = 0;
 		u32 col = 0;
 		for (EntityRef ch : world.childrenOf(e)) {
-			if (!world.hasComponent(ch, GUI_RECT_TYPE)) continue;
+			if (!world.hasComponent(ch, types::gui_rect)) continue;
 
 			setRectProperty(ch, "Top Points", (float)y, editor);
 			setRectProperty(ch, "Bottom Points", (float)y + row_height, editor);
@@ -857,10 +851,10 @@ private:
 		EntityRef child = editor.addEntity();
 		editor.makeParent(entity, child);
 		editor.selectEntities(Span(&child, 1), false);
-		editor.addComponent(Span(&child, 1), GUI_RECT_TYPE);
-		ASSERT(child_type0 != GUI_RECT_TYPE);
-		ASSERT(child_type1 != GUI_RECT_TYPE);
-		ASSERT(child_type2 != GUI_RECT_TYPE);
+		editor.addComponent(Span(&child, 1), types::gui_rect);
+		ASSERT(child_type0 != types::gui_rect);
+		ASSERT(child_type1 != types::gui_rect);
+		ASSERT(child_type2 != types::gui_rect);
 		editor.addComponent(Span(&child, 1), child_type0);
 		editor.addComponent(Span(&child, 1), child_type1);
 		editor.addComponent(Span(&child, 1), child_type2);
@@ -874,8 +868,8 @@ private:
 		EntityRef child = editor.addEntity();
 		editor.makeParent(entity, child);
 		editor.selectEntities(Span(&child, 1), false);
-		editor.addComponent(Span(&child, 1), GUI_RECT_TYPE);
-		if (child_type != GUI_RECT_TYPE) {
+		editor.addComponent(Span(&child, 1), types::gui_rect);
+		if (child_type != types::gui_rect) {
 			editor.addComponent(Span(&child, 1), child_type);
 		}
 		editor.endCommandGroup();
@@ -884,7 +878,7 @@ private:
 
 	void setRectProperty(EntityRef e, const char* prop_name, float value, WorldEditor& editor)
 	{
-		editor.setProperty(GUI_RECT_TYPE, "", -1, prop_name, Span(&e, 1), value);
+		editor.setProperty(types::gui_rect, "", -1, prop_name, Span(&e, 1), value);
 	}
 
 

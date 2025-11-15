@@ -13,6 +13,7 @@
 #include "editor/settings.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
+#include "engine/component_types.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/world.h"
@@ -428,6 +429,115 @@ namespace CPPTokens {
 	}
 
 } // namespace CPPTokens
+
+namespace ParticleScriptTokens {
+
+static inline const u32 token_colors[] = {
+	IM_COL32(0xFF, 0x00, 0xFF, 0xff),
+	IM_COL32(0xe1, 0xe1, 0xe1, 0xff),
+	IM_COL32(0xf7, 0xc9, 0x5c, 0xff),
+	IM_COL32(0xFF, 0xA9, 0x4D, 0xff),
+	IM_COL32(0xE5, 0x8A, 0xC9, 0xff),
+	IM_COL32(0x93, 0xDD, 0xFA, 0xff),
+	IM_COL32(0x67, 0x6b, 0x6f, 0xff),
+};
+
+enum class TokenType : u8 {
+	EMPTY,
+	IDENTIFIER,
+	NUMBER,
+	STRING,
+	KEYWORD,
+	OPERATOR,
+	COMMENT,
+};
+
+static bool isWordChar(char c) {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
+}
+
+static bool tokenize(const char* str, u32& token_len, u8& token_type, u8 prev_token_type) {
+	static const char* keywords[] = {
+		"var",
+		"in",
+		"out",
+		"fn",
+		"float",
+		"float3",
+		"float4",
+		"kill",
+		"const",
+		"emitter",
+		"init_emit_count",
+		"emit_per_second",
+		"max_ribbons",
+		"max_ribbon_length",
+		"init_ribbons_count",
+		"mesh",
+		"material",
+		"world_space",
+	};
+	
+	const char* c = str;
+	if (!*c) return false;
+	
+	if (c[0] == '/' && c[1] == '/') {
+		token_type = (u8)TokenType::COMMENT;
+		while (*c) ++c;
+		token_len = u32(c - str);
+		return *c;
+	}
+
+	if (*c == '"') {
+		token_type = (u8)TokenType::STRING;
+		++c;
+		while (*c && *c != '"') ++c;
+		if (*c == '"') ++c;
+		token_len = u32(c - str);
+		return *c;
+	}
+
+	const char operators[] = "*/+-%.<>;=(),:[]{}&|^";
+	for (char op : operators) {
+		if (*c == op) {
+			token_type = (u8)TokenType::OPERATOR;
+			token_len = 1;
+			return *c;
+		}
+	}
+		
+	if (*c >= '0' && *c <= '9') {
+		token_type = (u8)TokenType::NUMBER;
+		while (*c >= '0' && *c <= '9') ++c;
+		if (*c == '.') {
+			++c;
+			while (*c >= '0' && *c <= '9') ++c;
+		}
+		token_len = u32(c - str);
+		return *c;
+	}
+
+	if ((*c >= 'a' && *c <= 'z') || (*c >= 'A' && *c <= 'Z') || *c == '_') {
+		token_type = (u8)TokenType::IDENTIFIER;
+		while (isWordChar(*c)) ++c;
+		token_len = u32(c - str);
+		StringView token_view(str, str + token_len);
+		for (const char* kw : keywords) {
+			if (equalStrings(kw, token_view)) {
+				token_type = (u8)TokenType::KEYWORD;
+				break;
+			}
+		}
+		return *c;
+	}
+
+	token_type = (u8)TokenType::IDENTIFIER;
+	token_len = 1;
+	++c;
+	return *c;
+}
+
+}
 
 namespace HLSLTokens {
 
@@ -1786,7 +1896,7 @@ struct CodeEditorImpl final : CodeEditor {
 			ImGui::EndChild();
 			return false;
 		}
-		
+
 		ImVec2 child_pos = ImGui::GetCursorScreenPos();
 		ImGui::PushFont(code_font, maximum(1.f, (float)s_font_size));
 		u32 version = m_version;
@@ -2253,6 +2363,13 @@ UniquePtr<CodeEditor> createCppCodeEditor(StudioApp& app) {
 	return editor.move();
 }
 
+UniquePtr<CodeEditor> createParticleScriptEditor(StudioApp& app) {
+	UniquePtr<CodeEditorImpl> editor = UniquePtr<CodeEditorImpl>::create(app.getAllocator(), app);
+	editor->setTokenColors(ParticleScriptTokens::token_colors);
+	editor->setTokenizer(&ParticleScriptTokens::tokenize);
+	return editor.move();
+}
+
 UniquePtr<CodeEditor> createHLSLCodeEditor(StudioApp& app) {
 	UniquePtr<CodeEditorImpl> editor = UniquePtr<CodeEditorImpl>::create(app.getAllocator(), app);
 	editor->setTokenColors(HLSLTokens::token_colors);
@@ -2408,23 +2525,18 @@ bool menuItem(const Action& a, bool enabled) {
 	return ImGuiEx::MenuItemEx(a.label_short, a.font_icon, buf, false, enabled);
 }
 
-void getEntityListDisplayName(StudioApp& app, World& world, Span<char> buf, EntityPtr entity, bool force_display_index)
-{
-	if (!entity.isValid())
-	{
+void getEntityListDisplayName(StudioApp& app, World& world, Span<char> buf, EntityPtr entity, bool force_display_index) {
+	if (!entity.isValid()) {
 		buf[0] = '\0';
 		return;
 	}
 
 	EntityRef e = (EntityRef)entity;
 	const char* name = world.getEntityName(e);
-	static const auto MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
-	if (world.hasComponent(e, MODEL_INSTANCE_TYPE))
-	{
+	if (world.hasComponent(e, types::model_instance)) {
 		RenderInterface* render_interface = app.getRenderInterface();
 		const Path path = render_interface->getModelInstancePath(world, e);
-		if (!path.isEmpty())
-		{
+		if (!path.isEmpty()) {
 			const char* c = path.c_str();
 			while (*c && *c != ':') ++c;
 			if (*c == ':') {
@@ -2445,8 +2557,7 @@ void getEntityListDisplayName(StudioApp& app, World& world, Span<char> buf, Enti
 		}
 	}
 
-	if (name && name[0] != '\0')
-	{
+	if (name && name[0] != '\0') {
 		copyString(buf, name);
 		if (force_display_index) {
 			catString(buf, " ");
@@ -2454,8 +2565,7 @@ void getEntityListDisplayName(StudioApp& app, World& world, Span<char> buf, Enti
 			toCString(entity.index, buf);
 		}
 	}
-	else
-	{
+	else {
 		toCString(entity.index, buf);
 	}
 }
@@ -2555,6 +2665,7 @@ void FileSelector::fillSubitems() {
 	else {
 		iter = fs.createFileIterator(m_path);
 	}
+	if (!iter) return;
 	
 	os::FileInfo info;
 	const char* ext = m_accepted_extension.c_str();

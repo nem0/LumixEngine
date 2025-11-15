@@ -14,6 +14,7 @@
 #include "editor/entity_folders.h"
 #include "editor/prefab_system.h"
 #include "editor/studio_app.h"
+#include "engine/component_types.h"
 #include "engine/component_uid.h"
 #include "engine/core.h"
 #include "engine/engine.h"
@@ -32,16 +33,8 @@
 #include "renderer/texture.h"
 #include "stb/stb_image.h"
 
+namespace Lumix {
 
-namespace Lumix
-{
-
-
-static const ComponentType INSTANCED_MODEL_TYPE = reflection::getComponentType("instanced_model");
-static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
-static const ComponentType TERRAIN_TYPE = reflection::getComponentType("terrain");
-static const ComponentType SPLINE_TYPE = reflection::getComponentType("spline");
-static const ComponentType HEIGHTFIELD_TYPE = reflection::getComponentType("physical_heightfield");
 static const char* HEIGHTMAP_SLOT_NAME = "Heightmap";
 static const char* SPLATMAP_SLOT_NAME = "Splatmap";
 static const char* DETAIL_ALBEDO_SLOT_NAME = "Detail albedo";
@@ -59,7 +52,7 @@ struct FillClearGrassCommand final : IEditorCommand {
 
 	Texture* getDestinationTexture() const
 	{
-		RenderModule* module = (RenderModule*)m_world_editor.getWorld()->getModule(TERRAIN_TYPE);
+		RenderModule* module = (RenderModule*)m_world_editor.getWorld()->getModule(types::terrain);
 		return module->getTerrainMaterial(m_terrain)->getTextureByName(SPLATMAP_SLOT_NAME);
 	}
 
@@ -92,7 +85,7 @@ struct FillClearGrassCommand final : IEditorCommand {
 		}
 		texture->onDataUpdated(0, 0, texture->width, texture->height);
 
-		RenderModule* module = (RenderModule*)m_world_editor.getWorld()->getModule(TERRAIN_TYPE);
+		RenderModule* module = (RenderModule*)m_world_editor.getWorld()->getModule(types::terrain);
 		module->getTerrain(m_terrain)->setGrassDirty();
 
 		return true;
@@ -112,7 +105,7 @@ struct FillClearGrassCommand final : IEditorCommand {
 		memcpy(data, m_old_data.begin(), m_old_data.byte_size());
 		texture->onDataUpdated(0, 0, texture->width, texture->height);
 
-		RenderModule* module = (RenderModule*)m_world_editor.getWorld()->getModule(TERRAIN_TYPE);
+		RenderModule* module = (RenderModule*)m_world_editor.getWorld()->getModule(types::terrain);
 		module->getTerrain(m_terrain)->setGrassDirty();
 	}
 	const char* getType() override { return "fill_clear_grass"; }
@@ -172,7 +165,7 @@ struct PaintTerrainCommand final : IEditorCommand
 		m_width = m_height = m_x = m_y = -1;
 		World& world = *editor.getWorld();
 		const Transform terrain_tr = world.getTransform(terrain);
-		RenderModule* module = (RenderModule*)world.getModule(TERRAIN_TYPE);
+		RenderModule* module = (RenderModule*)world.getModule(types::terrain);
 		DVec3 local_pos = hit_pos - terrain_tr.pos;
 		float terrain_size = module->getTerrainSize(terrain).x;
 		local_pos = local_pos / terrain_size;
@@ -259,7 +252,7 @@ private:
 				break;
 		}
 
-		RenderModule* module = (RenderModule*)m_world_editor.getWorld()->getModule(TERRAIN_TYPE);
+		RenderModule* module = (RenderModule*)m_world_editor.getWorld()->getModule(types::terrain);
 		return module->getTerrainMaterial(m_terrain)->getTextureByName(uniform_name);
 	}
 
@@ -567,12 +560,12 @@ private:
 			if (!module) return;
 
 			auto* phy_module = static_cast<PhysicsModule*>(module);
-			if (!module->getWorld().hasComponent(m_terrain, HEIGHTFIELD_TYPE)) return;
+			if (!module->getWorld().hasComponent(m_terrain, types::physical_heightfield)) return;
 
 			phy_module->updateHeighfieldData(m_terrain, m_x, m_y, m_width, m_height, &data[0], bpp);
 		}
 		else {
-			RenderModule* module = (RenderModule*)m_world_editor.getWorld()->getModule(TERRAIN_TYPE);
+			RenderModule* module = (RenderModule*)m_world_editor.getWorld()->getModule(types::terrain);
 			return module->getTerrain(m_terrain)->setGrassDirty();
 		}
 	}
@@ -734,7 +727,7 @@ struct TerrainTextureChangeCommand : IEditorCommand {
 	}
 
 	bool apply(OutputMemoryStream& blob) {
-		RenderModule* render_module = (RenderModule*)editor.getWorld()->getModule(TERRAIN_TYPE);
+		RenderModule* render_module = (RenderModule*)editor.getWorld()->getModule(types::terrain);
 		Terrain* terrain = render_module->getTerrain(entity);
 		if (!terrain) return false;
 		Texture* texture = splatmap ? terrain->m_splatmap : terrain->m_heightmap;
@@ -772,10 +765,10 @@ Terrain* TerrainEditor::getTerrain() const {
 	if (selected_entities.size() != 1) return nullptr;
 	
 	World& world = *editor.getWorld();
-	bool is_terrain = world.hasComponent(selected_entities[0], TERRAIN_TYPE);
+	bool is_terrain = world.hasComponent(selected_entities[0], types::terrain);
 	if (!is_terrain) return nullptr;
 
-	RenderModule* module = (RenderModule*)world.getModule(TERRAIN_TYPE);
+	RenderModule* module = (RenderModule*)world.getModule(types::terrain);
 	return module->getTerrain(selected_entities[0]);
 }
 
@@ -868,7 +861,7 @@ u16 TerrainEditor::getHeight(const DVec3& world_pos, RenderModule* module, Entit
 	ComponentUID cmp;
 	cmp.entity = terrain;
 	cmp.module = module;
-	cmp.type = TERRAIN_TYPE;
+	cmp.type = types::terrain;
 	Texture* heightmap = getMaterial(cmp)->getTextureByName(HEIGHTMAP_SLOT_NAME);
 	if (!heightmap) return 0;
 
@@ -890,10 +883,10 @@ bool TerrainEditor::onMouseDown(WorldView& view, int x, int y)
 	if (selected_entities.size() != 1) return false;
 	
 	World& world = *editor.getWorld();
-	bool is_terrain = world.hasComponent(selected_entities[0], TERRAIN_TYPE);
+	bool is_terrain = world.hasComponent(selected_entities[0], types::terrain);
 	if (!is_terrain) return false;
 
-	RenderModule* module = (RenderModule*)world.getModule(TERRAIN_TYPE);
+	RenderModule* module = (RenderModule*)world.getModule(types::terrain);
 	const Ray ray = view.getViewport().getRay({(float)x, (float)y});
 	const RayCastModelHit hit = module->castRayTerrain(ray);
 	if (!hit.is_hit) return false;
@@ -947,7 +940,7 @@ void TerrainEditor::removeEntities(const DVec3& hit_pos, WorldEditor& editor) co
 	PROFILE_FUNCTION();
 
 	World& world = *editor.getWorld();
-	RenderModule* module = static_cast<RenderModule*>(world.getModule(TERRAIN_TYPE));
+	RenderModule* module = static_cast<RenderModule*>(world.getModule(types::terrain));
 	ShiftedFrustum frustum;
 	frustum.computeOrtho(hit_pos,
 		Vec3(0, 0, 1),
@@ -1053,7 +1046,7 @@ void TerrainEditor::paintEntities(const DVec3& hit_pos, WorldEditor& editor, Ent
 	editor.beginCommandGroup("paint_entities");
 	{
 		World& world = *editor.getWorld();
-		RenderModule* module = static_cast<RenderModule*>(world.getModule(TERRAIN_TYPE));
+		RenderModule* module = static_cast<RenderModule*>(world.getModule(types::terrain));
 		const DVec3 terrain_pos = world.getPosition(terrain);
 
 		ShiftedFrustum frustum;
@@ -1123,7 +1116,7 @@ void TerrainEditor::paintEntities(const DVec3& hit_pos, WorldEditor& editor, Ent
 				if (!m_selected_prefabs[random_idx]) continue;
 				const EntityPtr entity = prefab_system.instantiatePrefab(*m_selected_prefabs[random_idx], pos, rot, Vec3(size));
 				if (entity.isValid()) {
-					if (world.hasComponent((EntityRef)entity, MODEL_INSTANCE_TYPE)) {
+					if (world.hasComponent((EntityRef)entity, types::model_instance)) {
 						Model* model = module->getModelInstanceModel((EntityRef)entity);
 						const Transform tr = { pos, rot, Vec3(size * scale) };
 						if (isOBBCollision(*module, meshes, tr, model, m_ignore_entities_not_in_folder, folders, folder)) {
@@ -1149,8 +1142,8 @@ void TerrainEditor::onMouseMove(WorldView& view, int x, int y, int, int)
 
 	const EntityRef entity = selected_entities[0];
 	World& world = *editor.getWorld();
-	if (!world.hasComponent(entity, TERRAIN_TYPE)) return;
-	RenderModule* module = (RenderModule*)world.getModule(TERRAIN_TYPE);
+	if (!world.hasComponent(entity, types::terrain)) return;
+	RenderModule* module = (RenderModule*)world.getModule(types::terrain);
 	const Ray ray = view.getViewport().getRay({(float)x, (float)y});
 
 	const RayCastModelHit hit = module->castRayTerrain(ray);
@@ -1220,7 +1213,7 @@ static Array<u8> getFileContent(const char* path, IAllocator& allocator) {
 
 void TerrainEditor::exportGrass(u32 idx, EntityRef terrain, WorldEditor& editor) {
 	OutputMemoryStream blob(editor.getAllocator());
-	RenderModule* module = (RenderModule*)editor.getWorld()->getModule(TERRAIN_TYPE);
+	RenderModule* module = (RenderModule*)editor.getWorld()->getModule(types::terrain);
 	Texture* texture = module->getTerrainMaterial(terrain)->getTextureByName(SPLATMAP_SLOT_NAME);
 	if (!texture) return;
 	
@@ -1262,7 +1255,7 @@ void TerrainEditor::exportGrass(u32 idx, EntityRef terrain, WorldEditor& editor)
 }
 
 void TerrainEditor::importGrass(u32 idx, EntityRef terrain, WorldEditor& editor) {
-	RenderModule* module = (RenderModule*)editor.getWorld()->getModule(TERRAIN_TYPE);
+	RenderModule* module = (RenderModule*)editor.getWorld()->getModule(types::terrain);
 	Texture* texture = module->getTerrainMaterial(terrain)->getTextureByName(SPLATMAP_SLOT_NAME);
 	if (!texture) return;
 
@@ -1825,7 +1818,7 @@ struct TextureEditCommand final : IEditorCommand {
 
 	bool set(OutputMemoryStream& data) {
 		World* world = m_editor.getWorld();
-		RenderModule* module = (RenderModule*)world->getModule(TERRAIN_TYPE);
+		RenderModule* module = (RenderModule*)world->getModule(types::terrain);
 		Terrain* terrain = module->getTerrain(m_entity);
 		Texture* texture = m_is_splatmap ? terrain->getSplatmap() : terrain->getHeightmap();
 		if (!texture || !texture->isReady()) return false;
@@ -1905,7 +1898,7 @@ void TerrainEditor::updateSplatmap(Terrain* terrain, OutputMemoryStream&& new_da
 }
 
 void TerrainEditor::onGUI(ComponentUID cmp, WorldEditor& editor) {
-	ASSERT(cmp.type == TERRAIN_TYPE);
+	ASSERT(cmp.type == types::terrain);
 	
 	RenderModule* module = static_cast<RenderModule*>(cmp.module);
 	ImGui::Unindent();
@@ -2001,7 +1994,7 @@ void TerrainEditor::onGUI(ComponentUID cmp, WorldEditor& editor) {
 
 	World& world = *editor.getWorld();
 	for(auto entity : editor.getSelectedEntities()) {
-		if (!world.hasComponent(entity, TERRAIN_TYPE)) continue;
+		if (!world.hasComponent(entity, types::terrain)) continue;
 		
 		const Ray ray = editor.getView().getViewport().getRay(mp);
 		const RayCastModelHit hit = module->castRayTerrain(ray);

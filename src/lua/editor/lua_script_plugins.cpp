@@ -28,6 +28,7 @@
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
+#include "engine/component_types.h"
 #include "engine/component_uid.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
@@ -39,12 +40,7 @@
 #include "lua_wrapper.h"
 #include "renderer/editor/game_view.h"
 
-
 using namespace Lumix;
-
-
-static const ComponentType LUA_SCRIPT_TYPE = reflection::getComponentType("lua_script");
-
 
 namespace {
 
@@ -877,7 +873,7 @@ struct RemoveLuaArrayElementCommand : IEditorCommand {
 	{}
 
 	bool execute() override {
-		LuaScriptModule* module = (LuaScriptModule*)m_editor.getWorld()->getModule(LUA_SCRIPT_TYPE);
+		LuaScriptModule* module = (LuaScriptModule*)m_editor.getWorld()->getModule(types::lua_script);
 		lua_State* L = module->getState(m_entity, m_script_index);
 		if (!L) return false;
 
@@ -905,7 +901,7 @@ struct RemoveLuaArrayElementCommand : IEditorCommand {
 	}
 
 	void undo() override {
-		LuaScriptModule* module = (LuaScriptModule*)m_editor.getWorld()->getModule(LUA_SCRIPT_TYPE);
+		LuaScriptModule* module = (LuaScriptModule*)m_editor.getWorld()->getModule(types::lua_script);
 		lua_State* L = module->getState(m_entity, m_script_index);
 		if (!L) return;
 
@@ -953,7 +949,7 @@ struct SetLuaPropertyCommand : IEditorCommand {
 		, m_array_index(array_index)
 		, m_resource_type(resource_type)
 	{
-		LuaScriptModule* module = (LuaScriptModule*)m_editor.getWorld()->getModule(LUA_SCRIPT_TYPE);
+		LuaScriptModule* module = (LuaScriptModule*)m_editor.getWorld()->getModule(types::lua_script);
 		lua_State* L = module->getState(m_entity, m_script_index);
 		ASSERT(L);
 		
@@ -986,7 +982,7 @@ struct SetLuaPropertyCommand : IEditorCommand {
 
 	void undo() override {
 		if (m_new_element) {
-			LuaScriptModule* module = (LuaScriptModule*)m_editor.getWorld()->getModule(LUA_SCRIPT_TYPE);
+			LuaScriptModule* module = (LuaScriptModule*)m_editor.getWorld()->getModule(types::lua_script);
 			lua_State* L = module->getState(m_entity, m_script_index);
 			ASSERT(L);
 
@@ -1005,7 +1001,7 @@ struct SetLuaPropertyCommand : IEditorCommand {
 	}
 
 	bool setValue(T value) {
-		LuaScriptModule* module = (LuaScriptModule*)m_editor.getWorld()->getModule(LUA_SCRIPT_TYPE);
+		LuaScriptModule* module = (LuaScriptModule*)m_editor.getWorld()->getModule(types::lua_script);
 		lua_State* L = module->getState(m_entity, m_script_index);
 		ASSERT(L);
 		
@@ -1107,17 +1103,17 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 		m_editor.beginCommandGroup("drop_script");
 		World& world = *m_editor.getWorld();
 		ComponentUID cmp;
-		cmp.type = LUA_SCRIPT_TYPE;
+		cmp.type = types::lua_script;
 		cmp.module = world.getModule("lua_script");
-		auto* prop = (reflection::ArrayProperty*)reflection::getProperty(LUA_SCRIPT_TYPE, "scripts");
+		auto* prop = (reflection::ArrayProperty*)reflection::getProperty(types::lua_script, "scripts");
 		for (EntityRef e : selected) {
-			if (!world.hasComponent(e, LUA_SCRIPT_TYPE)) {
-				m_editor.addComponent(Span(&e, 1), LUA_SCRIPT_TYPE);
+			if (!world.hasComponent(e, types::lua_script)) {
+				m_editor.addComponent(Span(&e, 1), types::lua_script);
 			}
 			cmp.entity = e;
 			const u32 index = prop->getCount(cmp);
 			m_editor.addArrayPropertyItem(cmp, "scripts");
-			m_editor.setProperty(LUA_SCRIPT_TYPE, "scripts", index, "Path", Span(&e, 1), path);
+			m_editor.setProperty(types::lua_script, "scripts", index, "Path", Span(&e, 1), path);
 		}
 		m_editor.endCommandGroup();
 		return true;
@@ -1228,7 +1224,7 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 	};
 
 	void blobGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, u32 script_idx, const TextFilter& filter, WorldEditor& editor) override {
-		if (cmp_type != LUA_SCRIPT_TYPE) return;
+		if (cmp_type != types::lua_script) return;
 		if (entities.length() != 1) return;
 
 		LuaScriptModule* module = (LuaScriptModule*)editor.getWorld()->getModule(cmp_type); 
@@ -1915,7 +1911,7 @@ struct SetPropertyVisitor : reflection::IPropertyVisitor {
 
 	bool showGizmo(WorldView& view, ComponentUID cmp) override
 	{
-		if (cmp.type == LUA_SCRIPT_TYPE)
+		if (cmp.type == types::lua_script)
 		{
 			auto* module = static_cast<LuaScriptModule*>(cmp.module);
 			int count = module->getScriptCount((EntityRef)cmp.entity);

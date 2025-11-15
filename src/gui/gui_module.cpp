@@ -2,12 +2,13 @@
 #include "core/allocator.h"
 #include "core/associative_array.h"
 #include "core/crt.h"
-#include "engine/input_system.h"
 #include "core/log.h"
 #include "core/os.h"
+#include "core/string.h"
+#include "engine/component_types.h"
+#include "engine/input_system.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "core/string.h"
 #include "engine/world.h"
 #include "gui_module.h"
 #include "gui_system.h"
@@ -18,18 +19,8 @@
 #include "sprite.h"
 #include "imgui/IconsFontAwesome5.h"
 
+namespace Lumix {
 
-namespace Lumix
-{
-
-
-static const ComponentType GUI_CANVAS_TYPE = reflection::getComponentType("gui_canvas");
-static const ComponentType GUI_BUTTON_TYPE = reflection::getComponentType("gui_button");
-static const ComponentType GUI_RECT_TYPE = reflection::getComponentType("gui_rect");
-static const ComponentType GUI_RENDER_TARGET_TYPE = reflection::getComponentType("gui_render_target");
-static const ComponentType GUI_IMAGE_TYPE = reflection::getComponentType("gui_image");
-static const ComponentType GUI_TEXT_TYPE = reflection::getComponentType("gui_text");
-static const ComponentType GUI_INPUT_FIELD_TYPE = reflection::getComponentType("gui_input_field");
 static const float CURSOR_BLINK_PERIOD = 1.0f;
 static gpu::TextureHandle EMPTY_RENDER_TARGET = gpu::INVALID_TEXTURE;
 
@@ -965,7 +956,7 @@ struct GUIModuleImpl final : GUIModule {
 		rect->left = {0, 0};
 		rect->entity = entity;
 		rect->flags |= GUIRect::IS_VALID | GUIRect::IS_ENABLED;
-		m_world.onComponentCreated(entity, GUI_RECT_TYPE, this);
+		m_world.onComponentCreated(entity, types::gui_rect, this);
 	}
 
 
@@ -979,7 +970,7 @@ struct GUIModuleImpl final : GUIModule {
 		GUIRect& rect = *iter.value();
 		rect.text = LUMIX_NEW(m_allocator, GUIText)(m_allocator);
 
-		m_world.onComponentCreated(entity, GUI_TEXT_TYPE, this);
+		m_world.onComponentCreated(entity, types::gui_text, this);
 	}
 
 
@@ -991,7 +982,7 @@ struct GUIModuleImpl final : GUIModule {
 			iter = m_rects.find(entity);
 		}
 		iter.value()->render_target = &EMPTY_RENDER_TARGET;
-		m_world.onComponentCreated(entity, GUI_RENDER_TARGET_TYPE, this);
+		m_world.onComponentCreated(entity, types::gui_render_target, this);
 	}
 
 
@@ -1007,14 +998,14 @@ struct GUIModuleImpl final : GUIModule {
 		if (image) {
 			button.hovered_color = image->color;
 		}
-		m_world.onComponentCreated(entity, GUI_BUTTON_TYPE, this);
+		m_world.onComponentCreated(entity, types::gui_button, this);
 	}
 	
 
 	void createCanvas(EntityRef entity) override {
 		Canvas& canvas = m_canvas.insert(entity);
 		canvas.entity = entity;
-		m_world.onComponentCreated(entity, GUI_CANVAS_TYPE, this);
+		m_world.onComponentCreated(entity, types::gui_canvas, this);
 	}
 
 	void createInputField(EntityRef entity) override {
@@ -1027,7 +1018,7 @@ struct GUIModuleImpl final : GUIModule {
 		GUIRect& rect = *iter.value();
 		rect.input_field = LUMIX_NEW(m_allocator, GUIInputField);
 
-		m_world.onComponentCreated(entity, GUI_INPUT_FIELD_TYPE, this);
+		m_world.onComponentCreated(entity, types::gui_input_field, this);
 	}
 
 
@@ -1042,7 +1033,7 @@ struct GUIModuleImpl final : GUIModule {
 		rect.image = LUMIX_NEW(m_allocator, GUIImage);
 		rect.image->flags |= GUIImage::IS_ENABLED;
 
-		m_world.onComponentCreated(entity, GUI_IMAGE_TYPE, this);
+		m_world.onComponentCreated(entity, types::gui_image, this);
 	}
 
 
@@ -1054,24 +1045,24 @@ struct GUIModuleImpl final : GUIModule {
 			LUMIX_DELETE(m_allocator, rect);
 			m_rects.erase(entity);
 		}
-		m_world.onComponentDestroyed(entity, GUI_RECT_TYPE, this);
+		m_world.onComponentDestroyed(entity, types::gui_rect, this);
 	}
 
 
 	void destroyButton(EntityRef entity) override {
 		m_buttons.erase(entity);
-		m_world.onComponentDestroyed(entity, GUI_BUTTON_TYPE, this);
+		m_world.onComponentDestroyed(entity, types::gui_button, this);
 	}
 
 	void destroyCanvas(EntityRef entity) override {
 		m_canvas.erase(entity);
-		m_world.onComponentDestroyed(entity, GUI_CANVAS_TYPE, this);
+		m_world.onComponentDestroyed(entity, types::gui_canvas, this);
 	}
 
 	void destroyRenderTarget(EntityRef entity) override {
 		GUIRect* rect = m_rects[entity];
 		rect->render_target = nullptr;
-		m_world.onComponentDestroyed(entity, GUI_RENDER_TARGET_TYPE, this);
+		m_world.onComponentDestroyed(entity, types::gui_render_target, this);
 		checkGarbage(*rect);
 	}
 
@@ -1080,7 +1071,7 @@ struct GUIModuleImpl final : GUIModule {
 		GUIRect* rect = m_rects[entity];
 		LUMIX_DELETE(m_allocator, rect->input_field);
 		rect->input_field = nullptr;
-		m_world.onComponentDestroyed(entity, GUI_INPUT_FIELD_TYPE, this);
+		m_world.onComponentDestroyed(entity, types::gui_input_field, this);
 		checkGarbage(*rect);
 	}
 
@@ -1102,7 +1093,7 @@ struct GUIModuleImpl final : GUIModule {
 		GUIRect* rect = m_rects[entity];
 		LUMIX_DELETE(m_allocator, rect->image);
 		rect->image = nullptr;
-		m_world.onComponentDestroyed(entity, GUI_IMAGE_TYPE, this);
+		m_world.onComponentDestroyed(entity, types::gui_image, this);
 		checkGarbage(*rect);
 	}
 
@@ -1111,7 +1102,7 @@ struct GUIModuleImpl final : GUIModule {
 		GUIRect* rect = m_rects[entity];
 		LUMIX_DELETE(m_allocator, rect->text);
 		rect->text = nullptr;
-		m_world.onComponentDestroyed(entity, GUI_TEXT_TYPE, this);
+		m_world.onComponentDestroyed(entity, types::gui_text, this);
 		checkGarbage(*rect);
 	}
 
@@ -1195,7 +1186,7 @@ struct GUIModuleImpl final : GUIModule {
 			serializer.read(rect->bottom);
 			serializer.read(rect->left);
 			if (rect->flags & GUIRect::IS_VALID) {
-				m_world.onComponentCreated(rect->entity, GUI_RECT_TYPE, this);
+				m_world.onComponentCreated(rect->entity, types::gui_rect, this);
 			}
 
 			bool has_image = serializer.read<bool>();
@@ -1214,14 +1205,14 @@ struct GUIModuleImpl final : GUIModule {
 				}
 				serializer.read(rect->image->color);
 				serializer.read(rect->image->flags);
-				m_world.onComponentCreated(rect->entity, GUI_IMAGE_TYPE, this);
+				m_world.onComponentCreated(rect->entity, types::gui_image, this);
 
 			}
 			bool has_input_field = serializer.read<bool>();
 			if (has_input_field)
 			{
 				rect->input_field = LUMIX_NEW(m_allocator, GUIInputField);
-				m_world.onComponentCreated(rect->entity, GUI_INPUT_FIELD_TYPE, this);
+				m_world.onComponentCreated(rect->entity, types::gui_input_field, this);
 			}
 			bool has_text = serializer.read<bool>();
 			if (has_text)
@@ -1238,7 +1229,7 @@ struct GUIModuleImpl final : GUIModule {
 				serializer.read(text.text);
 				FontResource* res = tmp[0] == 0 ? nullptr : m_font_manager->getOwner().load<FontResource>(Path(tmp));
 				text.setFontResource(res);
-				m_world.onComponentCreated(rect->entity, GUI_TEXT_TYPE, this);
+				m_world.onComponentCreated(rect->entity, types::gui_text, this);
 			}
 		}
 		
@@ -1250,7 +1241,7 @@ struct GUIModuleImpl final : GUIModule {
 			GUIButton& button = m_buttons.insert(e);
 			serializer.read(button.hovered_color);
 			serializer.read(button.hovered_cursor);
-			m_world.onComponentCreated(e, GUI_BUTTON_TYPE, this);
+			m_world.onComponentCreated(e, types::gui_button, this);
 		}
 		
 		count = serializer.read<u32>();
@@ -1266,7 +1257,7 @@ struct GUIModuleImpl final : GUIModule {
 			canvas.entity = entity_map.get(canvas.entity);
 			m_canvas.insert(canvas.entity, canvas);
 			
-			m_world.onComponentCreated(canvas.entity, GUI_CANVAS_TYPE, this);
+			m_world.onComponentCreated(canvas.entity, types::gui_canvas, this);
 		}
 	}
 	

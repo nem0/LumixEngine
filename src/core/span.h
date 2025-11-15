@@ -46,6 +46,9 @@ template <typename T> struct Span {
 		ASSERT(length() > 0);
 		return *(m_end - 1);
 	}
+	const T& last() const {
+		return back();
+	}
 	bool equals(const Span<T>& rhs) {
 		bool res = true;
 		if (length() != rhs.length()) return false;

@@ -2,14 +2,14 @@
 
 #include "core/array.h"
 #include "core/crt.h"
-#include "engine/file_system.h"
 #include "core/hash.h"
 #include "core/log.h"
 #include "core/math.h"
 #include "core/path.h"
 #include "core/profiler.h"
 #include "core/stream.h"
-
+#include "engine/component_types.h"
+#include "engine/file_system.h"
 #include "engine/resource_manager.h"
 #include "renderer/draw_stream.h"
 #include "renderer/material.h"
@@ -136,10 +136,7 @@ static void computeSkinMatrices(const Pose& pose, const Model& model, Matrix* ma
 	}
 }
 
-RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Pose* pose, EntityPtr entity, const RayCastModelHit::Filter* filter)
-{
-	static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
-
+RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Pose* pose, EntityPtr entity, const RayCastModelHit::Filter* filter) {
 	RayCastModelHit hit;
 	hit.is_hit = false;
 	if (!isReady()) return hit;
@@ -215,7 +212,7 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Pose* 
 				hit.t = t;
 				hit.entity = entity;
 				hit.mesh = &m_meshes[mesh_index];
-				hit.component_type = MODEL_INSTANCE_TYPE;
+				hit.component_type = types::model_instance;
 				if (filter && !filter->invoke(hit)) hit = prev;
 			}
 		}
@@ -539,12 +536,15 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 		mesh.vertices.resize(mesh_vertex_count);
 		if (keep_skin) mesh.skin.resize(mesh_vertex_count);
 		const u8* vertices = (const u8*)vertices_mem.data;
-		for (int j = 0; j < mesh_vertex_count; ++j)
-		{
+		for (int j = 0; j < mesh_vertex_count; ++j) {
 			int offset = j * vertex_size;
-			if (keep_skin)
-			{
-				mesh.skin[j].weights = *(const Vec4*)&vertices[offset + weights_attribute_offset];
+			if (keep_skin) {
+				u16 weights[4];
+				memcpy(weights, &vertices[offset + weights_attribute_offset], sizeof(weights));
+				mesh.skin[j].weights.x = weights[0] / 65535.f;
+				mesh.skin[j].weights.y = weights[1] / 65535.f;
+				mesh.skin[j].weights.z = weights[2] / 65535.f;
+				mesh.skin[j].weights.w = weights[3] / 65535.f;
 				memcpy(mesh.skin[j].indices,
 					&vertices[offset + bone_indices_attribute_offset],
 					sizeof(mesh.skin[j].indices));

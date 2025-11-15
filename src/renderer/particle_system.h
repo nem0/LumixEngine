@@ -19,6 +19,7 @@ namespace Lumix
 
 struct DVec3;
 struct Material;
+struct Model;
 struct Renderer;
 
 
@@ -30,6 +31,10 @@ struct ParticleSystemResource final : Resource {
 		EMIT,
 		FLAGS,
 		NEW_VERTEX_DECL,
+		MODEL,
+		RIBBONS,
+		PARAMS,
+		NUM_REGISTERS_SPLIT,
 
 		LAST
 	};
@@ -39,20 +44,34 @@ struct ParticleSystemResource final : Resource {
 		Version version = Version::LAST;
 	};
 
+	struct Parameter {
+		Parameter(IAllocator& allocator) : name(allocator) {}
+		String name;
+		u32 num_floats = 0;
+		u32 offset = 0;
+	};
+
 	struct Emitter {
 		Emitter(ParticleSystemResource& resource);
 		~Emitter();
 		void setMaterial(const Path& path);
+		void setModel(const Path& path);
 		
 		ParticleSystemResource& resource;
 		OutputMemoryStream instructions;
 		u32 emit_offset;
 		u32 output_offset;
 		u32 channels_count;
-		u32 registers_count;
+		u32 emit_registers_count;
+		u32 update_registers_count;
+		u32 output_registers_count;
 		u32 emit_inputs_count;
 		u32 outputs_count;
+		u32 max_ribbons;
+		u32 max_ribbon_length;
+		u32 init_ribbons_count;
 		Material* material = nullptr;
+		Model* model = nullptr;
 		u32 init_emit_count = 0;
 		float emit_per_second = 100;
 		gpu::VertexDecl vertex_decl;
@@ -62,10 +81,12 @@ struct ParticleSystemResource final : Resource {
 		enum Type : u8 {
 			NONE,
 			CHANNEL,
-			CONST,
+			SYSTEM_VALUE,
 			OUT,
 			REGISTER,
 			LITERAL,
+			PARAM,
+
 			ERROR
 		};
 
@@ -106,7 +127,9 @@ struct ParticleSystemResource final : Resource {
 		MOD,
 		OR,
 		AND,
-		BLEND
+		BLEND,
+		MAX,
+		MIN
 	};
 
 	static const ResourceType TYPE;
@@ -131,9 +154,11 @@ struct ParticleSystemResource final : Resource {
 
 	Array<Emitter>& getEmitters() { return m_emitters; }
 	Flags getFlags() const { return m_flags; }
+	Span<const Parameter> getParameters() const { return m_parameters; }
 
 private:
 	Array<Emitter> m_emitters;
+	Array<Parameter> m_parameters;
 	IAllocator& m_allocator;
 	Flags m_flags = Flags::NONE;
 };
@@ -141,10 +166,19 @@ private:
 
 struct ResourceManagerHub;
 
+enum class ParticleSystemValues : u8 {
+	TIME_DELTA = 0,
+	TOTAL_TIME = 1,
+	EMIT_INDEX = 2,
+	RIBBON_INDEX = 3,
+	COUNT,
+
+	NONE = 0xff
+};
 
 struct LUMIX_RENDERER_API ParticleSystem {
 	struct Channel {
-		alignas(16) float* data = nullptr;
+		float* data = nullptr;
 		u32 name = 0;
 	};
 
@@ -154,11 +188,18 @@ struct LUMIX_RENDERER_API ParticleSystem {
 		AtomicI32 processed = 0;
 	};
 
+	struct Ribbon {
+		u32 offset;
+		u32 length;
+		u32 emit_index;
+	};
+
 	struct Emitter {
 		Emitter(Emitter&& rhs);
 		Emitter(ParticleSystem& system, ParticleSystemResource::Emitter& resource_emitter) 
 			: system(system)
 			, resource_emitter(resource_emitter)
+			, ribbons(system.m_allocator)
 		{}
 		u32 getParticlesDataSizeBytes() const;
 		void fillInstanceData(float* data, PageAllocator& page_allocator) const;
@@ -167,6 +208,7 @@ struct LUMIX_RENDERER_API ParticleSystem {
 		ParticleSystemResource::Emitter& resource_emitter;
 		Channel channels[16];
 		u32 particles_count = 0;
+		Array<Ribbon> ribbons;
 		u32 capacity = 0;
 		float emit_timer = 0;
 		u32 emit_index = 0;
@@ -190,9 +232,10 @@ struct LUMIX_RENDERER_API ParticleSystem {
 	World& m_world;
 	EntityPtr m_entity;
 	bool m_autodestroy = false;
-	float m_constants[16];
+	float m_system_values[16];
 	float m_total_time = 0;
 	Stats m_last_update_stats;
+	Array<float> m_params;
 
 private:
 	struct RunningContext;
@@ -201,10 +244,13 @@ private:
 	void operator =(ParticleSystem&& rhs) = delete;
 	void onResourceChanged(Resource::State old_state, Resource::State new_state, Resource&);
 	void update(float dt, u32 emitter_idx, PageAllocator& page_allocator);
+	void updateRibbons(float dt, u32 emitter_idx, PageAllocator& page_allocator);
+	void emitRibbonPoints(u32 emitter_idx, u32 ribbon_idx, Span<const float> emit_data, u32 count, float time_step);
 	void emit(u32 emitter_idx, Span<const float> emit_data, u32 count, float time_step);
 	void ensureCapacity(Emitter& emitter, u32 num_new_particles);
 	void run(RunningContext& ctx);
 	void processChunk(ChunkProcessorContext& ctx);
+	void initRibbonEmitter(i32 emiter);
 
 	IAllocator& m_allocator;
 	Array<Emitter> m_emitters;

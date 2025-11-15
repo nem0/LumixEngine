@@ -21,6 +21,7 @@
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
+#include "engine/component_types.h"
 #include "engine/component_uid.h"
 #include "engine/engine.h"
 #include "engine/world.h"
@@ -30,25 +31,9 @@
 #include "renderer/model.h"
 #include "renderer/render_module.h"
 
-
 using namespace Lumix;
 
-
-namespace
-{
-
-
-const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
-const ComponentType BONE_ATTACHMENT_TYPE = reflection::getComponentType("bone_attachment");
-const ComponentType CONTROLLER_TYPE = reflection::getComponentType("physical_controller");
-const ComponentType DISTANCE_JOINT_TYPE = reflection::getComponentType("distance_joint");
-const ComponentType HINGE_JOINT_TYPE = reflection::getComponentType("hinge_joint");
-const ComponentType SPHERICAL_JOINT_TYPE = reflection::getComponentType("spherical_joint");
-const ComponentType D6_JOINT_TYPE = reflection::getComponentType("d6_joint");
-const ComponentType RIGID_ACTOR_TYPE = reflection::getComponentType("rigid_actor");
-const ComponentType VEHICLE_TYPE = reflection::getComponentType("vehicle");
-const ComponentType WHEEL_TYPE = reflection::getComponentType("wheel");
-
+namespace {
 
 Vec3 fromPhysx(const physx::PxVec3& v) { return Vec3(v.x, v.y, v.z); }
 Quat fromPhysx(const physx::PxQuat& v) { return Quat(v.x, v.y, v.z, v.w); }
@@ -239,12 +224,12 @@ void showVehicleGizmo(WorldView& view, ComponentUID cmp) {
 	World& world = cmp.module->getWorld();
 	const Transform vehicle_tr = world.getTransform(e);
 	for (EntityRef ch : world.childrenOf(e)) {
-		if (!world.hasComponent(ch, WHEEL_TYPE)) continue;
+		if (!world.hasComponent(ch, types::wheel)) continue;
 			
 		ComponentUID wheel_cmp;
 		wheel_cmp.entity = ch;
 		wheel_cmp.module = module;
-		wheel_cmp.type = WHEEL_TYPE;
+		wheel_cmp.type = types::wheel;
 		showWheelGizmo(view, wheel_cmp);
 
 		const Transform wheel_tr = world.getTransform(ch);
@@ -376,7 +361,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 	void resetSimulation() {
 		WorldEditor& editor = m_app.getWorldEditor();
 		World* world = editor.getWorld();
-		PhysicsModule* module = (PhysicsModule*)world->getModule(RIGID_ACTOR_TYPE);
+		PhysicsModule* module = (PhysicsModule*)world->getModule(types::rigid_actor);
 
 		if (!m_is_simulating_selected) return;
 		for (EntityRef e : m_reset_dynamic_entities) {
@@ -393,7 +378,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		if (editor.isGameMode()) return;
 
 		World* world = editor.getWorld();
-		PhysicsModule* module = (PhysicsModule*)world->getModule(RIGID_ACTOR_TYPE);
+		PhysicsModule* module = (PhysicsModule*)world->getModule(types::rigid_actor);
 		if (m_is_simulating_selected) {
 			editor.beginCommandGroup("phys_sim_end");
 			for (SimulatedEntity e : m_simulated_entities) {
@@ -414,7 +399,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 			ASSERT(m_simulated_entities.empty());
 			Span<const EntityRef> selected = editor.getSelectedEntities();
 			for (EntityRef e : selected) {
-				if (!world->hasComponent(e, RIGID_ACTOR_TYPE)) continue;
+				if (!world->hasComponent(e, types::rigid_actor)) continue;
 				SimulatedEntity& se = m_simulated_entities.emplace();
 				se.entity = e;
 				se.start_transform = world->getTransform(e);
@@ -437,7 +422,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 			return;
 		}
 
-		PhysicsModule* module = (PhysicsModule*)m_app.getWorldEditor().getWorld()->getModule(RIGID_ACTOR_TYPE);
+		PhysicsModule* module = (PhysicsModule*)m_app.getWorldEditor().getWorld()->getModule(types::rigid_actor);
 		module->forceUpdateDynamicActors(time_delta);
 	}
 
@@ -562,8 +547,8 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 
 	void onJointGUI(WorldEditor& editor) {
 		World& world = *editor.getWorld();
-		auto* phy_module = static_cast<PhysicsModule*>(world.getModule(RIGID_ACTOR_TYPE));
-		auto* render_module = static_cast<RenderModule*>(world.getModule(MODEL_INSTANCE_TYPE));
+		auto* phy_module = static_cast<PhysicsModule*>(world.getModule(types::rigid_actor));
+		auto* render_module = static_cast<RenderModule*>(world.getModule(types::model_instance));
 		if (!render_module) return;
 
 		int count = phy_module->getJointCount();
@@ -583,19 +568,19 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 				//physx::PxJoint* joint = phy_module->getJoint(entity);
 				switch ((physx::PxJointConcreteType::Enum)phy_module->getJoint(entity)->getConcreteType()) {
 					case physx::PxJointConcreteType::eDISTANCE:
-						cmp.type = DISTANCE_JOINT_TYPE;
+						cmp.type = types::distance_joint;
 						// showDistanceJointGizmo(cmp);
 						break;
 					case physx::PxJointConcreteType::eREVOLUTE:
-						cmp.type = HINGE_JOINT_TYPE;
+						cmp.type = types::hinge_joint;
 						// showHingeJointGizmo(cmp);
 						break;
 					case physx::PxJointConcreteType::eSPHERICAL:
-						cmp.type = SPHERICAL_JOINT_TYPE;
+						cmp.type = types::spherical_joint;
 						// showSphericalJointGizmo(view, cmp); // TODO
 						break;
 					case physx::PxJointConcreteType::eD6:
-						cmp.type = D6_JOINT_TYPE;
+						cmp.type = types::d6_joint;
 						/*showD6JointGizmo(world.getTransform(entity).getRigidPart(),
 							*render_module,
 							static_cast<physx::PxD6Joint*>(joint));*/
@@ -678,7 +663,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		World& world = *editor.getWorld();
 		auto* module = static_cast<PhysicsModule*>(world.getModule("physics"));
 
-		if(!module->getWorld().hasComponent(e, RIGID_ACTOR_TYPE)) {
+		if(!module->getWorld().hasComponent(e, types::rigid_actor)) {
 			ImGui::Text("Entity does not have rigid actor component.");
 			return;
 		};
@@ -707,8 +692,8 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 	void autogeneratePhySkeleton(EntityRef entity, WorldEditor& editor) {
 		editor.beginCommandGroup("ragdoll");
 		World& world = *editor.getWorld();
-		auto* phy_module = static_cast<PhysicsModule*>(world.getModule(RIGID_ACTOR_TYPE));
-		auto* render_module = static_cast<RenderModule*>(world.getModule(MODEL_INSTANCE_TYPE));
+		auto* phy_module = static_cast<PhysicsModule*>(world.getModule(types::rigid_actor));
+		auto* render_module = static_cast<RenderModule*>(world.getModule(types::model_instance));
 		const Transform root_tr = world.getTransform(entity);
 		ASSERT(render_module);
 		Model* model = render_module->getModelInstanceModel(entity);
@@ -738,24 +723,24 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 				size.z *= 0.2f;
 
 				if (size.y > 0) {
-					editor.addComponent(Span(&bone_e, 1), RIGID_ACTOR_TYPE);
+					editor.addComponent(Span(&bone_e, 1), types::rigid_actor);
 					ComponentUID cmp;
 					cmp.entity = bone_e;
 					cmp.module = phy_module;
-					cmp.type = RIGID_ACTOR_TYPE;
+					cmp.type = types::rigid_actor;
 					editor.addArrayPropertyItem(cmp, "Box geometry");
-					editor.addComponent(Span(&bone_e, 1), BONE_ATTACHMENT_TYPE);
-					editor.setProperty(BONE_ATTACHMENT_TYPE, "", 0, "Parent", Span(&bone_e, 1), entity);
-					editor.setProperty(BONE_ATTACHMENT_TYPE, "", 0, "Bone", Span(&bone_e, 1), parent_idx);
-					editor.setProperty(RIGID_ACTOR_TYPE, "Box geometry", 0, "Size", Span(&bone_e, 1), size);
-					editor.setProperty(RIGID_ACTOR_TYPE, "Box geometry", 0, "Position offset", Span(&bone_e, 1), Vec3(0, -size.y, 0));
-					editor.setProperty(RIGID_ACTOR_TYPE, "", 0, "Dynamic", Span(&bone_e, 1), (i32)PhysicsModule::DynamicType::KINEMATIC);
+					editor.addComponent(Span(&bone_e, 1), types::bone_attachment);
+					editor.setProperty(types::bone_attachment, "", 0, "Parent", Span(&bone_e, 1), entity);
+					editor.setProperty(types::bone_attachment, "", 0, "Bone", Span(&bone_e, 1), parent_idx);
+					editor.setProperty(types::rigid_actor, "Box geometry", 0, "Size", Span(&bone_e, 1), size);
+					editor.setProperty(types::rigid_actor, "Box geometry", 0, "Position offset", Span(&bone_e, 1), Vec3(0, -size.y, 0));
+					editor.setProperty(types::rigid_actor, "", 0, "Dynamic", Span(&bone_e, 1), (i32)PhysicsModule::DynamicType::KINEMATIC);
 
-					editor.addComponent(Span(&bone_e, 1), SPHERICAL_JOINT_TYPE);
-					editor.setProperty(SPHERICAL_JOINT_TYPE, "", 0, "Connected body", Span(&bone_e, 1), entities[parent_idx]);
-					editor.setProperty(SPHERICAL_JOINT_TYPE, "", 0, "Axis direction", Span(&bone_e, 1), Vec3(0, -1, 0));
-					editor.setProperty(SPHERICAL_JOINT_TYPE, "", 0, "Use limit", Span(&bone_e, 1), true);
-					editor.setProperty(SPHERICAL_JOINT_TYPE, "", 0, "Limit", Span(&bone_e, 1), Vec2(degreesToRadians(45.f)));
+					editor.addComponent(Span(&bone_e, 1), types::spherical_joint);
+					editor.setProperty(types::spherical_joint, "", 0, "Connected body", Span(&bone_e, 1), entities[parent_idx]);
+					editor.setProperty(types::spherical_joint, "", 0, "Axis direction", Span(&bone_e, 1), Vec3(0, -1, 0));
+					editor.setProperty(types::spherical_joint, "", 0, "Use limit", Span(&bone_e, 1), true);
+					editor.setProperty(types::spherical_joint, "", 0, "Limit", Span(&bone_e, 1), Vec2(degreesToRadians(45.f)));
 				}
 				
 				editor.makeParent(entities[parent_idx], bone_e);
@@ -978,22 +963,22 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		
 		const EntityRef entity = (EntityRef)cmp.entity;
 		
-		if (cmp.type == RIGID_ACTOR_TYPE) {
+		if (cmp.type == types::rigid_actor) {
 			showRigidActorGizmo(view, cmp);
 			return true;
 		}
 		
-		if (cmp.type == VEHICLE_TYPE) {
+		if (cmp.type == types::vehicle) {
 			showVehicleGizmo(view, cmp);
 			return true;
 		}
 		
-		if (cmp.type == WHEEL_TYPE) {
+		if (cmp.type == types::wheel) {
 			showWheelGizmo(view, cmp);
 			return true;
 		}
 
-		if (cmp.type == CONTROLLER_TYPE)
+		if (cmp.type == types::physical_controller)
 		{
 			float height = phy_module->getControllerHeight(entity);
 			float radius = phy_module->getControllerRadius(entity);
@@ -1003,25 +988,25 @@ struct StudioAppPlugin : StudioApp::IPlugin
 			return true;
 		}
 
-		if (cmp.type == DISTANCE_JOINT_TYPE)
+		if (cmp.type == types::distance_joint)
 		{
 			showDistanceJointGizmo(view, cmp);
 			return true;
 		}
 
-		if (cmp.type == HINGE_JOINT_TYPE)
+		if (cmp.type == types::hinge_joint)
 		{
 			showHingeJointGizmo(view, cmp);
 			return true;
 		}
 
-		if (cmp.type == SPHERICAL_JOINT_TYPE)
+		if (cmp.type == types::spherical_joint)
 		{
 			showSphericalJointGizmo(view, cmp);
 			return true;
 		}
 
-		if (cmp.type == D6_JOINT_TYPE)
+		if (cmp.type == types::d6_joint)
 		{
 			physx::PxD6Joint* joint = static_cast<physx::PxD6Joint*>(phy_module->getJoint(entity));
 			showD6JointGizmo(view, world.getTransform(entity).getRigidPart(), joint);

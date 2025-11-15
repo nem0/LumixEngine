@@ -32,8 +32,6 @@
 
 namespace Lumix {
 
-static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
-
 RenderBufferHandle RenderPlugin::renderBeforeTonemap(const GBuffer& gbuffer, RenderBufferHandle input, Pipeline& pipeline) { return input; }
 RenderBufferHandle RenderPlugin::renderBeforeTransparent(const GBuffer& gbuffer, RenderBufferHandle input, Pipeline& pipeline) { return input; }
 RenderBufferHandle RenderPlugin::renderAfterTonemap(const GBuffer& gbuffer, RenderBufferHandle input, Pipeline& pipeline) { return input; }

@@ -3,6 +3,7 @@
 #include "core/geometry.h"
 #include "core/math.h"
 #include "editor/world_editor.h"
+#include "engine/component_types.h"
 #include "engine/component_uid.h"
 #include "engine/engine.h"
 #include "engine/resource_manager.h"
@@ -10,23 +11,9 @@
 #include "renderer/model.h"
 #include "renderer/render_module.h"
 
+namespace Lumix {
 
-namespace Lumix
-{
-
-
-static const ComponentType GUI_RECT_TYPE = reflection::getComponentType("gui_rect");
-static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
-static const ComponentType PHYSICAL_CONTROLLER_TYPE = reflection::getComponentType("physical_controller");
-static const ComponentType CAMERA_TYPE = reflection::getComponentType("camera");
-static const ComponentType ENVIRONMENT_TYPE = reflection::getComponentType("environment");
-static const ComponentType POINT_LIGHT_TYPE = reflection::getComponentType("point_light");
-static const ComponentType TERRAIN_TYPE = reflection::getComponentType("terrain");
-static const ComponentType CURVE_DECAL_TYPE = reflection::getComponentType("curve_decal");
-
-
-const char* ICONS[(int)EditorIcons::IconType::COUNT] =
-{
+const char* ICONS[(int)EditorIcons::IconType::COUNT] = {
 	"phy_controller_icon",
 	"camera_icon",
 	"directional_light_icon",
@@ -35,12 +22,9 @@ const char* ICONS[(int)EditorIcons::IconType::COUNT] =
 	"curve_decal"
 };
 
-
 static const float ORTHO_SIZE_SCALE = 1 / 20.0f;
 
-
-struct EditorIconsImpl final : EditorIcons
-{
+struct EditorIconsImpl final : EditorIcons {
 	explicit EditorIconsImpl(WorldEditor& editor, RenderModule& module)
 		: m_editor(editor)
 		, m_icons(editor.getAllocator())
@@ -113,30 +97,30 @@ struct EditorIconsImpl final : EditorIcons
 	{
 		World& world = *m_editor.getWorld();
 		
-		if (world.hasComponent(entity, MODEL_INSTANCE_TYPE)) return;
-		if (world.hasComponent(entity, GUI_RECT_TYPE)) return;
+		if (world.hasComponent(entity, types::model_instance)) return;
+		if (world.hasComponent(entity, types::gui_rect)) return;
 
 		auto& icon = m_icons.insert(entity);
 		icon.entity = entity;
 		icon.type = IconType::ENTITY;
 		for (ComponentType cmp_type : world.getComponents(entity)) {
-			if(cmp_type == PHYSICAL_CONTROLLER_TYPE) {
+			if(cmp_type == types::physical_controller) {
 				icon.type = IconType::PHYSICAL_CONTROLLER;
 				break;
 			}
-			if(cmp_type == CAMERA_TYPE) {
+			if(cmp_type == types::camera) {
 				icon.type = IconType::CAMERA;
 				break;
 			}
-			if(cmp_type == ENVIRONMENT_TYPE || cmp_type == POINT_LIGHT_TYPE) {
+			if(cmp_type == types::environment || cmp_type == types::point_light) {
 				icon.type = IconType::LIGHT;
 				break;
 			}
-			if(cmp_type == TERRAIN_TYPE) {
+			if(cmp_type == types::terrain) {
 				icon.type = IconType::TERRAIN;
 				break;
 			}
-			if(cmp_type == CURVE_DECAL_TYPE) {
+			if(cmp_type == types::curve_decal) {
 				icon.type = IconType::CURVE_DECAL;
 				break;
 			}
