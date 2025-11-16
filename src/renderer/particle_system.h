@@ -35,6 +35,7 @@ struct ParticleSystemResource final : Resource {
 		RIBBONS,
 		PARAMS,
 		NUM_REGISTERS_SPLIT,
+		NUM_INSTRUCTIONS,
 
 		LAST
 	};
@@ -62,6 +63,9 @@ struct ParticleSystemResource final : Resource {
 		u32 emit_offset;
 		u32 output_offset;
 		u32 channels_count;
+		u32 emit_instructions_count;
+		u32 update_instructions_count;
+		u32 output_instructions_count;
 		u32 emit_registers_count;
 		u32 update_registers_count;
 		u32 output_registers_count;

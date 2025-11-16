@@ -2794,6 +2794,9 @@ struct ParticleEditorImpl : ParticleEditor {
 			output.write((u32)emitter->m_registers_count);
 			output.write((u32)emitter->m_registers_count);
 			output.write((u32)emitter->m_registers_count);
+			output.write((u32)emitter->m_update_instructions_count);
+			output.write((u32)emitter->m_init_instructions_count);
+			output.write((u32)emitter->m_output_instructions_count);
 			output.write(getCount(emitter->m_outputs));
 			output.write(emitter->m_init_emit_count);
 			output.write(emitter->m_emit_per_second);
@@ -2896,8 +2899,11 @@ struct ParticleScriptEditorWindow : AssetEditorWindow {
 						ImGui::Text("Emitter %d", i + 1);
 						ImGui::Indent();
 						ImGui::LabelText("Emit registers", "%d", emitter.emit_registers_count);
+						ImGui::LabelText("Emit instructions", "%d", emitter.emit_instructions_count);
 						ImGui::LabelText("Update registers", "%d", emitter.update_registers_count);
+						ImGui::LabelText("Update instructions", "%d", emitter.update_instructions_count);
 						ImGui::LabelText("Output registers", "%d", emitter.output_registers_count);
+						ImGui::LabelText("Output instructions", "%d", emitter.output_instructions_count);
 						ImGui::Unindent();
 					}
 					ImGui::EndPopup();

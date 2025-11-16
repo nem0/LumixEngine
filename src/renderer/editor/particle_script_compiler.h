@@ -259,6 +259,9 @@ struct ParticleScriptCompiler {
 		u32 m_num_update_registers = 0;
 		u32 m_num_emit_registers = 0;
 		u32 m_num_output_registers = 0;
+		u32 m_num_update_instructions = 0;
+		u32 m_num_emit_instructions = 0;
+		u32 m_num_output_instructions = 0;
 		Array<Variable> m_vars;
 		Array<Variable> m_outputs;
 		Array<Variable> m_inputs;
@@ -1167,20 +1170,22 @@ const char* toString(Token::Type type) {
 			}
 		}
 	}
-	
-	void forEachDataStreamInBytecode(InputMemoryStream& ip, auto f) {
+
+	u32 forEachDataStreamInBytecode(InputMemoryStream& ip, auto f, u32 instruction_index_offset = 0) {
+		u32 instruction_index = instruction_index_offset;
 		auto forNumStreams = [&](u32 num, InstructionType itype, i32 ioffset) {
 			for (u32 i = 0; i < num; ++i) {
 				i32 pos = (i32)ip.getPosition();
 				DataStream dst = ip.read<DataStream>();
-				f(dst, pos, i, itype, ioffset);
+				f(dst, pos, i, itype, ioffset, instruction_index);
 			}
+			++instruction_index;
 		};
 		for(;;) {
 			i32 ioffset = (i32)ip.getPosition();
 			InstructionType itype = ip.read<InstructionType>();
 			switch (itype) {
-				case InstructionType::END: return;
+				case InstructionType::END: return instruction_index;
 				case InstructionType::NOISE: forNumStreams(2, itype, ioffset); break;
 				case InstructionType::MOV: forNumStreams(2, itype, ioffset); break;
 				case InstructionType::SIN: forNumStreams(2, itype, ioffset); break;
@@ -1202,7 +1207,7 @@ const char* toString(Token::Type type) {
 				case InstructionType::EMIT:
 						forNumStreams(1, itype, ioffset);
 						ip.skip(sizeof(u32)); // emitter index
-						forEachDataStreamInBytecode(ip, f); // emit subroutine
+						instruction_index = forEachDataStreamInBytecode(ip, f, instruction_index); // emit subroutine
 						break;
 				default:
 					ASSERT(false);
@@ -1226,7 +1231,7 @@ const char* toString(Token::Type type) {
 		auto computeLifetimes = [&](){
 			lifetimes.clear();
 			ip.setPosition(0);
-			forEachDataStreamInBytecode(ip, [&](const DataStream& s, i32 position, i32 arg_index, InstructionType itype, i32 ioffset){
+			forEachDataStreamInBytecode(ip, [&](const DataStream& s, i32 position, i32 arg_index, InstructionType itype, i32 ioffset, i32){
 				if (s.type != DataStream::REGISTER) return;
 				if (s.index < num_immutables) return;
 			
@@ -1261,7 +1266,7 @@ const char* toString(Token::Type type) {
 		// collapse unnecessary MOVs
 		StackArray<i32, 16> movs_to_remove(m_arena_allocator);
 		ip.setPosition(0);
-		forEachDataStreamInBytecode(ip, [&](const DataStream& src, i32 position, i32 arg_index, InstructionType itype, i32 ioffset){
+		forEachDataStreamInBytecode(ip, [&](const DataStream& src, i32 position, i32 arg_index, InstructionType itype, i32 ioffset, i32){
 			if (src.type != DataStream::REGISTER) return;
 			if (src.index < num_immutables) return;
 			if (itype != InstructionType::MOV) return;
@@ -1322,7 +1327,7 @@ const char* toString(Token::Type type) {
 		}
 
 		ip.setPosition(0);
-		forEachDataStreamInBytecode(ip, [&](const DataStream& s, i32 position, i32 arg_index, InstructionType itype, i32 ioffset){
+		forEachDataStreamInBytecode(ip, [&](const DataStream& s, i32 position, i32 arg_index, InstructionType itype, i32 ioffset, i32){
 			if (s.type != DataStream::REGISTER) return;
 			if (s.index < num_immutables) return;
 
@@ -1375,10 +1380,24 @@ const char* toString(Token::Type type) {
 		compile(ctx, b, compiled);
 		compiled.write(InstructionType::END);
 		u32 num_used_registers = optimizeBytecode(compiled, stack_offset);
+		InputMemoryStream ip(compiled.data(), compiled.size());
+		u32 max_instruction_index = 0;
+		forEachDataStreamInBytecode(ip, [&](const DataStream&, i32, i32, InstructionType, i32, i32 instruction_index){
+			max_instruction_index = instruction_index;
+		});
 
-		if (equalStrings(fn_name, "update")) emitter.m_num_update_registers = num_used_registers;
-		else if (equalStrings(fn_name, "emit")) emitter.m_num_emit_registers = num_used_registers;
-		else if (equalStrings(fn_name, "output")) emitter.m_num_output_registers = num_used_registers;
+		if (equalStrings(fn_name, "update")) {
+			emitter.m_num_update_registers = num_used_registers;
+			emitter.m_num_update_instructions = max_instruction_index + 1;
+		}
+		else if (equalStrings(fn_name, "emit")) {
+			emitter.m_num_emit_registers = num_used_registers;
+			emitter.m_num_emit_instructions = max_instruction_index + 1;
+		}
+		else if (equalStrings(fn_name, "output")) {
+			emitter.m_num_output_registers = num_used_registers;
+			emitter.m_num_output_instructions = max_instruction_index + 1;
+		}
 	}
 
 	CompileResult toCompileResult(const Variable& var, DataStream::Type type) {
@@ -1877,6 +1896,9 @@ const char* toString(Token::Type type) {
 			output.write(emitter.m_num_update_registers);
 			output.write(emitter.m_num_emit_registers);
 			output.write(emitter.m_num_output_registers);
+			output.write(emitter.m_num_update_instructions);
+			output.write(emitter.m_num_emit_instructions);
+			output.write(emitter.m_num_output_instructions);
 			output.write(getCount(emitter.m_outputs));
 			output.write(emitter.m_init_emit_count);
 			output.write(emitter.m_emit_per_second);
