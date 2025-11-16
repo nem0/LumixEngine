@@ -207,6 +207,16 @@ bool ParticleSystemResource::load(Span<const u8> mem) {
 			emitter.emit_registers_count = emitter.update_registers_count;
 			emitter.output_registers_count = emitter.update_registers_count;
 		}
+		if (header.version > Version::NUM_INSTRUCTIONS) {
+			blob.read(emitter.update_instructions_count); 
+			blob.read(emitter.emit_instructions_count);
+			blob.read(emitter.output_instructions_count);
+		}
+		else {
+			emitter.update_instructions_count = 0; 
+			emitter.emit_instructions_count = 0;
+			emitter.output_instructions_count = 0;
+		}
 		blob.read(emitter.outputs_count);
 		if (header.version > Version::EMIT_RATE) {
 			blob.read(emitter.init_emit_count);
