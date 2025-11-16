@@ -1201,7 +1201,13 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 					float4* result = getStream(emitter, dst, fromf4, ctx.registers);
 					const float4* const end = result + stepf4;
 				
-					if (op0.type == DataStream::SYSTEM_VALUE) {
+					if (op0.type == DataStream::LITERAL) {
+						const float4 src = f4Splat(op0.value);
+						for (; result != end; ++result) {
+							*result = src;
+						}
+					}
+					else if (op0.type == DataStream::SYSTEM_VALUE) {
 						const float4 src = f4Splat(m_system_values[op0.index]);
 						for (; result != end; ++result) {
 							*result = src;
