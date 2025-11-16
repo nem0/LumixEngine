@@ -1173,7 +1173,7 @@ const char* toString(Token::Type type) {
 			for (u32 i = 0; i < num; ++i) {
 				i32 pos = (i32)ip.getPosition();
 				DataStream dst = ip.read<DataStream>();
-				f(dst, pos, i == 0, itype, ioffset);
+				f(dst, pos, i, itype, ioffset);
 			}
 		};
 		for(;;) {
@@ -1226,11 +1226,11 @@ const char* toString(Token::Type type) {
 		auto computeLifetimes = [&](){
 			lifetimes.clear();
 			ip.setPosition(0);
-			forEachDataStreamInBytecode(ip, [&](const DataStream& s, i32 position, bool is_dst, InstructionType itype, i32 ioffset){
+			forEachDataStreamInBytecode(ip, [&](const DataStream& s, i32 position, i32 arg_index, InstructionType itype, i32 ioffset){
 				if (s.type != DataStream::REGISTER) return;
 				if (s.index < num_immutables) return;
 			
-				if (is_dst) {
+				if (arg_index == 0 && itype != InstructionType::EMIT && itype != InstructionType::KILL) {
 					Lifetime& lt = lifetimes.emplace();
 					lt.register_index = s.index;
 					lt.from = position;
@@ -1259,13 +1259,14 @@ const char* toString(Token::Type type) {
 		computeLifetimes();
 
 		// collapse unnecessary MOVs
+
 		StackArray<i32, 16> movs_to_remove(m_arena_allocator);
 		ip.setPosition(0);
-		forEachDataStreamInBytecode(ip, [&](const DataStream& s, i32 position, bool is_dst, InstructionType itype, i32 ioffset){
+		forEachDataStreamInBytecode(ip, [&](const DataStream& s, i32 position, i32 arg_index, InstructionType itype, i32 ioffset){
 			if (s.type != DataStream::REGISTER) return;
 			if (s.index < num_immutables) return;
 			if (itype != InstructionType::MOV) return;
-			if (is_dst) return;
+			if (arg_index != 0) return;
 
 			// we are mov-ing from register, it's also the only read from that value
 			// collapse the mov instruction with the instruction which produced the value
@@ -1307,7 +1308,7 @@ const char* toString(Token::Type type) {
 		}
 
 		ip.setPosition(0);
-		forEachDataStreamInBytecode(ip, [&](const DataStream& s, i32 position, bool is_dst, InstructionType itype, i32 ioffset){
+		forEachDataStreamInBytecode(ip, [&](const DataStream& s, i32 position, i32 arg_index, InstructionType itype, i32 ioffset){
 			if (s.type != DataStream::REGISTER) return;
 			if (s.index < num_immutables) return;
 
@@ -1330,6 +1331,8 @@ const char* toString(Token::Type type) {
 	void compileFunction(Emitter& emitter) {
 		StringView fn_name;
 		if (!consume(Token::IDENTIFIER, fn_name)) return;
+		if (!consume(Token::LEFT_PAREN)) return;
+		if (!consume(Token::RIGHT_PAREN)) return;
 	
 		CompileContext ctx(*this);
 		ctx.emitter = &emitter;
