@@ -1259,24 +1259,38 @@ const char* toString(Token::Type type) {
 		computeLifetimes();
 
 		// collapse unnecessary MOVs
-
 		StackArray<i32, 16> movs_to_remove(m_arena_allocator);
 		ip.setPosition(0);
-		forEachDataStreamInBytecode(ip, [&](const DataStream& s, i32 position, i32 arg_index, InstructionType itype, i32 ioffset){
-			if (s.type != DataStream::REGISTER) return;
-			if (s.index < num_immutables) return;
+		forEachDataStreamInBytecode(ip, [&](const DataStream& src, i32 position, i32 arg_index, InstructionType itype, i32 ioffset){
+			if (src.type != DataStream::REGISTER) return;
+			if (src.index < num_immutables) return;
 			if (itype != InstructionType::MOV) return;
-			if (arg_index != 0) return;
+			if (arg_index == 0) return;
 
 			// we are mov-ing from register, it's also the only read from that value
 			// collapse the mov instruction with the instruction which produced the value
 			// e.g. `out = t * 5;` is collapsed into just a single instruction `mul out, t, 5`
 			for (const Lifetime& lt : lifetimes) {
-				if (lt.register_index == s.index && position == lt.to && lt.num_reads == 1 && lt.is_dst) {
+				if (lt.register_index == src.index && position == lt.to && lt.num_reads == 1 && lt.is_dst) {
 					movs_to_remove.push(ioffset);
 					DataStream mov_dst;
-					memcpy(&mov_dst, bytecode.data() + ioffset + sizeof(InstructionType), sizeof(mov_dst));
+					i32 offset = ioffset + sizeof(InstructionType);
+					memcpy(&mov_dst, bytecode.data() + offset, sizeof(mov_dst));
 					memcpy(bytecode.getMutableData() + lt.from, &mov_dst, sizeof(mov_dst));
+					
+					// dst register starts to exist when the orignal src started
+					if (mov_dst.type == DataStream::REGISTER) {
+						for (Lifetime& dst_lifetime : lifetimes) {
+							if (dst_lifetime.register_index == mov_dst.index) {
+								ASSERT(lt.from < dst_lifetime.from);
+								dst_lifetime.from = lt.from;
+								break;
+							}
+						}
+					}
+					
+					// original src register does not exist anymore
+					lifetimes.eraseItems([&src](const Lifetime& l){ return l.register_index == src.index; });
 					break;
 				}
 			}
