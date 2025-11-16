@@ -1,10 +1,5 @@
 const hspread = 10.5;
 
-
-fn asb(x) {
-	return max(x, -x);
-}
-
 fn sphere(r) {
 	let lat = random(0, 2 * 3.14159);
 	let lon = random(0, 2 * 3.14159);
@@ -38,9 +33,7 @@ emitter explosion {
 	fn output() {
 		i_position = pos;
 		i_scale = (1 - t) * 0.2;
-		i_color.r = col.r;
-		i_color.g = col.g;
-		i_color.b = col.b;
+		i_color.rgb = col.rgb;
 		i_color.a = 1;
 		i_rot = 0;
 		i_frame = 0;
