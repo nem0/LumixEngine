@@ -1,5 +1,21 @@
 const hspread = 10.5;
 
+
+fn asb(x) {
+	return max(x, -x);
+}
+
+fn sphere(r) {
+	let lat = random(0, 2 * 3.14159);
+	let lon = random(0, 2 * 3.14159);
+	let res : float3;
+	let tmp = sin(lon) * r;
+	res.x = cos(lat) * tmp;
+	res.y = sin(lat) * tmp;
+	res.z = cos(lon) * r;
+	return res;
+}
+
 emitter explosion {
 	material "/maps/fireworks/explosion.mat"
 	init_emit_count 100
@@ -19,7 +35,7 @@ emitter explosion {
 	in in_pos : float3
 	in in_col : float3
 
-	fn output {
+	fn output() {
 		i_position = pos;
 		i_scale = (1 - t) * 0.2;
 		i_color.r = col.r;
@@ -31,16 +47,14 @@ emitter explosion {
 		i_emission = 100 * t;
 	}
 
-	fn emit {
+	fn emit() {
 		t = 0;
 		pos = in_pos;
 		col = in_col;
-		vel.x = random(-hspread, hspread);
-		vel.y = random(-hspread, hspread);
-		vel.z = random(-hspread, hspread);
+		vel = sphere(10);
 	}
 
-	fn update {
+	fn update() {
 		t = t + time_delta;
 		vel.y = vel.y - time_delta * 0.3;
 		pos = pos + vel * time_delta;
@@ -62,7 +76,7 @@ emitter fireworks {
 	var vel : float3
 	var t : float
 	
-	fn output {
+	fn output() {
 		i_position = vel * t;
 		i_scale = 0.1;
 		i_color = {1, 0, 1, 1};
@@ -71,14 +85,14 @@ emitter fireworks {
 		i_emission = 10;
 	}
 
-	fn emit {
+	fn emit() {
 		t = 0;
 		vel.x = random(-hspread, hspread);
 		vel.y = 30;
 		vel.z = random(-hspread, hspread);
 	}
 
-	fn update {
+	fn update() {
 		t = t + time_delta;
 		vel.y = vel.y - time_delta * 9.8;
 		emit(explosion, t > 1.5) {
