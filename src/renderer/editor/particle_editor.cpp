@@ -2803,6 +2803,7 @@ struct ParticleEditorImpl : ParticleEditor {
 			output.write(getCount(emitter->m_emit_inputs));
 			output.write(u32(0)); // max ribbons
 			output.write(u32(0)); // max ribbon length
+			output.write(false); // emit on move
 		}
 		output.write(u32(0)); // num params
 		return true;
@@ -2944,16 +2945,16 @@ struct ParticleScriptEditorWindow : AssetEditorWindow {
 					}
 				}
 				
-				if (!system.m_params.empty()) {
+				if (!system.m_globals.empty()) {
 					ImGui::SameLine();
-					if (ImGui::Button("Parameters")) ImGui::OpenPopup("Parameters");
-					if (ImGui::BeginPopup("Parameters")) {
+					if (ImGui::Button("Globals")) ImGui::OpenPopup("Globals");
+					if (ImGui::BeginPopup("Globals")) {
 						u32 offset = 0;
-						for (const auto& p : system.getResource()->getParameters()) {
+						for (const auto& p : system.getResource()->getGlobals()) {
 							ImGui::PushID(&p);
 							ImGuiEx::Label(p.name.c_str());
 							ImGui::SetNextItemWidth(150);
-							float* f = system.m_params.begin() + offset;
+							float* f = system.m_globals.begin() + offset;
 							switch (p.num_floats) {
 								case 1: ImGui::InputFloat("##v", f); break;
 								case 2: ImGui::InputFloat2("##v", f); break;

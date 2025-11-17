@@ -199,7 +199,7 @@ struct ParticleScriptCompiler {
 		CHANNEL,
 		INPUT,
 		LOCAL,
-		PARAM
+		GLOBAL
 	};
 
 	struct CompileResult {
@@ -266,6 +266,7 @@ struct ParticleScriptCompiler {
 		Array<Variable> m_outputs;
 		Array<Variable> m_inputs;
 		u32 m_init_emit_count = 0;
+		bool m_emit_on_move = false;
 		float m_emit_per_second = 0;
 		u32 m_max_ribbons = 0;
 		u32 m_max_ribbon_length = 0;
@@ -833,7 +834,7 @@ const char* toString(Token::Type type) {
 				i32 param_index = getParamIndex(token.value);
 				if (param_index >= 0) {
 					auto* node = LUMIX_NEW(m_arena_allocator, VariableNode)(token);
-					node->family = VariableFamily::PARAM;
+					node->family = VariableFamily::GLOBAL;
 					node->index = param_index;
 					return node;
 				}
@@ -1512,8 +1513,8 @@ const char* toString(Token::Type type) {
 			case Node::VARIABLE: {
 				auto* n = (VariableNode*)node;
 				switch (n->family) {
-					case VariableFamily::PARAM:
-						return toCompileResult(m_params[n->index], DataStream::PARAM);
+					case VariableFamily::GLOBAL:
+						return toCompileResult(m_params[n->index], DataStream::GLOBAL);
 					case VariableFamily::LOCAL: {
 						const Local& local = ctx.block->locals[n->index];
 						// fallthroughs intentional
@@ -1799,6 +1800,7 @@ const char* toString(Token::Type type) {
 				case Token::IDENTIFIER:
 					if (equalStrings(token.value, "material")) compileMaterial(emitter);
 					else if (equalStrings(token.value, "mesh")) compileMesh(emitter);
+					else if (equalStrings(token.value, "emit_on_move")) emitter.m_emit_on_move = true;
 					else if (equalStrings(token.value, "init_emit_count")) emitter.m_init_emit_count = consumeU32();
 					else if (equalStrings(token.value, "emit_per_second")) emitter.m_emit_per_second = consumeFloat();
 					else if (equalStrings(token.value, "max_ribbons")) emitter.m_max_ribbons = consumeU32();
@@ -1907,6 +1909,7 @@ const char* toString(Token::Type type) {
 			output.write(emitter.m_max_ribbons);
 			output.write(emitter.m_max_ribbon_length);
 			output.write(emitter.m_init_ribbons_count);
+			output.write(emitter.m_emit_on_move);
 		}
 		output.write(m_params.size());
 		for (const Variable& p : m_params) {
