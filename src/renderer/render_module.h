@@ -426,9 +426,9 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual bool getParticleEmitterAutodestroy(EntityRef entity) = 0;
 	virtual void setParticleEmitterAutodestroy(EntityRef entity, bool enable) = 0;
 	virtual i32 getParticleEmitterParameterID(EntityRef entity, const char* name) = 0;			//@ function alias getParameterID
-	virtual void setParticleEmitterParameter(EntityRef entity, i32 id, float value) = 0;		//@ function alias setFloatParameter
-	virtual void setParticleEmitterParameter(EntityRef entity, i32 id, Vec3 value) = 0;			//@ function alias setVec3Parameter
-	virtual void setParticleEmitterParameter(EntityRef entity, i32 id, Vec4 value) = 0;			//@ function alias setVec4Parameter
+	virtual void setParticleEmitterGlobal(EntityRef entity, i32 id, float value) = 0;			//@ function alias setFloatGlobal
+	virtual void setParticleEmitterGlobal(EntityRef entity, i32 id, Vec3 value) = 0;			//@ function alias setVec3Global
+	virtual void setParticleEmitterGlobal(EntityRef entity, i32 id, Vec4 value) = 0;			//@ function alias setVec4Global
 	//@ end
 	virtual void updateParticleEmitter(EntityRef entity, float dt) = 0;
 	virtual const HashMap<EntityRef, struct ParticleSystem>& getParticleEmitters() const = 0;

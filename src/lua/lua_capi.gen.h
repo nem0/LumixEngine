@@ -2124,30 +2124,30 @@ namespace Lumix {
 		return 1;
 	}
 	
-	int ParticleEmitter_setFloatParameter(lua_State* L) {
+	int ParticleEmitter_setFloatGlobal(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		auto id = LuaWrapper::checkArg<i32>(L, 2);
 		auto value = LuaWrapper::checkArg<float>(L, 3);
-		module->setParticleEmitterParameter(entity, id, value);
+		module->setParticleEmitterGlobal(entity, id, value);
 		return 0;
 	}
 	
-	int ParticleEmitter_setVec3Parameter(lua_State* L) {
+	int ParticleEmitter_setVec3Global(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		auto id = LuaWrapper::checkArg<i32>(L, 2);
 		auto value = LuaWrapper::checkArg<Vec3>(L, 3);
-		module->setParticleEmitterParameter(entity, id, value);
+		module->setParticleEmitterGlobal(entity, id, value);
 		return 0;
 	}
 	
-	int ParticleEmitter_setVec4Parameter(lua_State* L) {
+	int ParticleEmitter_setVec4Global(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		auto id = LuaWrapper::checkArg<i32>(L, 2);
 		auto value = LuaWrapper::checkArg<Vec4>(L, 3);
-		module->setParticleEmitterParameter(entity, id, value);
+		module->setParticleEmitterGlobal(entity, id, value);
 		return 0;
 	}
 	
@@ -2160,9 +2160,9 @@ namespace Lumix {
 			case /*source*/17609862876178282011: LuaWrapper::push(L, module->getParticleEmitterPath(entity)); break;
 			case /*autodestroy*/13701391921693763709: LuaWrapper::push(L, module->getParticleEmitterAutodestroy(entity)); break;
 			case /*getParameterID*/12478678714176540554: lua_pushcfunction(L, ParticleEmitter_getParameterID, "ParticleEmitter_getParameterID"); break;
-			case /*setFloatParameter*/8609433045288617923: lua_pushcfunction(L, ParticleEmitter_setFloatParameter, "ParticleEmitter_setFloatParameter"); break;
-			case /*setVec3Parameter*/7340607900902100417: lua_pushcfunction(L, ParticleEmitter_setVec3Parameter, "ParticleEmitter_setVec3Parameter"); break;
-			case /*setVec4Parameter*/3457141589455107174: lua_pushcfunction(L, ParticleEmitter_setVec4Parameter, "ParticleEmitter_setVec4Parameter"); break;
+			case /*setFloatGlobal*/3973545480916277798: lua_pushcfunction(L, ParticleEmitter_setFloatGlobal, "ParticleEmitter_setFloatGlobal"); break;
+			case /*setVec3Global*/6886268473822891416: lua_pushcfunction(L, ParticleEmitter_setVec3Global, "ParticleEmitter_setVec3Global"); break;
+			case /*setVec4Global*/7790184538809416461: lua_pushcfunction(L, ParticleEmitter_setVec4Global, "ParticleEmitter_setVec4Global"); break;
 			case 0:
 			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
 		}

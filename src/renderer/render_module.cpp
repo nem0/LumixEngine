@@ -3296,55 +3296,55 @@ struct RenderModuleImpl final : RenderModule {
 		ParticleSystemResource* res = m_particle_emitters[entity].getResource();
 		if (!res) return -1;
 
-		const auto& params = res->getParameters();
+		const auto& globals = res->getGlobals();
 		StringView n = name;
-		for (i32 i = 0, c = params.size(); i < c; ++i) {
-			if (equalStrings(params[i].name, n)) return i;
+		for (i32 i = 0, c = globals.size(); i < c; ++i) {
+			if (equalStrings(globals[i].name, n)) return i;
 		}
 		return -1;
 	}
 	
-	void setParticleEmitterParameter(EntityRef entity, i32 id, float value) override {
+	void setParticleEmitterGlobal(EntityRef entity, i32 id, float value) override {
 		ASSERT(id >= 0);
 		ParticleSystem& ps = m_particle_emitters[entity];
 		ParticleSystemResource* res = m_particle_emitters[entity].getResource();
 
-		u32 offset = res->getParameters()[id].offset;
-		if (offset >= (u32)ps.m_params.size()) {
-			ps.m_params.resize(offset + 1);
+		u32 offset = res->getGlobals()[id].offset;
+		if (offset >= (u32)ps.m_globals.size()) {
+			ps.m_globals.resize(offset + 1);
 		}
-		ps.m_params[offset] = value;
+		ps.m_globals[offset] = value;
 	}
 	
-	void setParticleEmitterParameter(EntityRef entity, i32 id, Vec3 value) override {
+	void setParticleEmitterGlobal(EntityRef entity, i32 id, Vec3 value) override {
 		ASSERT(id >= 0);
 		ParticleSystem& ps = m_particle_emitters[entity];
 		ParticleSystemResource* res = m_particle_emitters[entity].getResource();
 
-		u32 offset = res->getParameters()[id].offset;
+		u32 offset = res->getGlobals()[id].offset;
 		u32 needed_size = offset + 3;
-		if (needed_size > (u32)ps.m_params.size()) {
-			ps.m_params.resize(needed_size);
+		if (needed_size > (u32)ps.m_globals.size()) {
+			ps.m_globals.resize(needed_size);
 		}
-		ps.m_params[offset] = value.x;
-		ps.m_params[offset + 1] = value.y;
-		ps.m_params[offset + 2] = value.z;
+		ps.m_globals[offset] = value.x;
+		ps.m_globals[offset + 1] = value.y;
+		ps.m_globals[offset + 2] = value.z;
 	}
 	
-	void setParticleEmitterParameter(EntityRef entity, i32 id, Vec4 value) override {
+	void setParticleEmitterGlobal(EntityRef entity, i32 id, Vec4 value) override {
 		ASSERT(id >= 0);
 		ParticleSystem& ps = m_particle_emitters[entity];
 		ParticleSystemResource* res = m_particle_emitters[entity].getResource();
 
-		u32 offset = res->getParameters()[id].offset;
+		u32 offset = res->getGlobals()[id].offset;
 		u32 needed_size = offset + 4;
-		if (needed_size > (u32)ps.m_params.size()) {
-			ps.m_params.resize(needed_size);
+		if (needed_size > (u32)ps.m_globals.size()) {
+			ps.m_globals.resize(needed_size);
 		}
-		ps.m_params[offset] = value.x;
-		ps.m_params[offset + 1] = value.y;
-		ps.m_params[offset + 2] = value.z;
-		ps.m_params[offset + 3] = value.w;
+		ps.m_globals[offset] = value.x;
+		ps.m_globals[offset + 1] = value.y;
+		ps.m_globals[offset + 2] = value.z;
+		ps.m_globals[offset + 3] = value.w;
 	}
 
 

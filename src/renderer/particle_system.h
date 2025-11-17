@@ -33,9 +33,10 @@ struct ParticleSystemResource final : Resource {
 		NEW_VERTEX_DECL,
 		MODEL,
 		RIBBONS,
-		PARAMS,
+		GLOBALS,
 		NUM_REGISTERS_SPLIT,
 		NUM_INSTRUCTIONS,
+		EMIT_ON_MOVE,
 
 		LAST
 	};
@@ -45,8 +46,8 @@ struct ParticleSystemResource final : Resource {
 		Version version = Version::LAST;
 	};
 
-	struct Parameter {
-		Parameter(IAllocator& allocator) : name(allocator) {}
+	struct Global {
+		Global(IAllocator& allocator) : name(allocator) {}
 		String name;
 		u32 num_floats = 0;
 		u32 offset = 0;
@@ -74,6 +75,7 @@ struct ParticleSystemResource final : Resource {
 		u32 max_ribbons;
 		u32 max_ribbon_length;
 		u32 init_ribbons_count;
+		bool emit_on_move = false;
 		Material* material = nullptr;
 		Model* model = nullptr;
 		u32 init_emit_count = 0;
@@ -89,7 +91,7 @@ struct ParticleSystemResource final : Resource {
 			OUT,
 			REGISTER,
 			LITERAL,
-			PARAM,
+			GLOBAL,
 
 			ERROR
 		};
@@ -158,11 +160,11 @@ struct ParticleSystemResource final : Resource {
 
 	Array<Emitter>& getEmitters() { return m_emitters; }
 	Flags getFlags() const { return m_flags; }
-	Span<const Parameter> getParameters() const { return m_parameters; }
+	Span<const Global> getGlobals() const { return m_globals; }
 
 private:
 	Array<Emitter> m_emitters;
-	Array<Parameter> m_parameters;
+	Array<Global> m_globals;
 	IAllocator& m_allocator;
 	Flags m_flags = Flags::NONE;
 };
@@ -216,6 +218,7 @@ struct LUMIX_RENDERER_API ParticleSystem {
 		u32 capacity = 0;
 		float emit_timer = 0;
 		u32 emit_index = 0;
+		DVec3 last_emit_point;
 		TransientSlice slice;
 	};
 
@@ -239,7 +242,7 @@ struct LUMIX_RENDERER_API ParticleSystem {
 	float m_system_values[16];
 	float m_total_time = 0;
 	Stats m_last_update_stats;
-	Array<float> m_params;
+	Array<float> m_globals;
 
 private:
 	struct RunningContext;

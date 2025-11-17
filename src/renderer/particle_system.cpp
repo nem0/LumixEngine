@@ -48,7 +48,7 @@ ParticleSystemResource::ParticleSystemResource(const Path& path
 	: Resource(path, manager, allocator)
 	, m_allocator(allocator)
 	, m_emitters(allocator)
-	, m_parameters(allocator)
+	, m_globals(allocator)
 {
 }
 
@@ -71,7 +71,7 @@ void ParticleSystemResource::unload()
 		emitter.instructions.clear();
 	}
 	m_emitters.clear();
-	m_parameters.clear();
+	m_globals.clear();
 }
 
 
@@ -232,13 +232,16 @@ bool ParticleSystemResource::load(Span<const u8> mem) {
 			emitter.max_ribbon_length = (emitter.max_ribbon_length + 3) & ~3;
 			blob.read(emitter.init_ribbons_count);
 		}
+		if (header.version > Version::EMIT_ON_MOVE) {
+			emitter.emit_on_move = blob.read<bool>();
+		}
 	}
-	if (header.version > Version::PARAMS) {
-		u32 num_params = blob.read<u32>();
-		m_parameters.reserve(num_params);
+	if (header.version > Version::GLOBALS) {
+		u32 num_globals = blob.read<u32>();
+		m_globals.reserve(num_globals);
 		u32 offset = 0;
-		for (u32 i = 0; i < num_params; ++i) {
-			Parameter& p = m_parameters.emplace(m_allocator);
+		for (u32 i = 0; i < num_globals; ++i) {
+			Global& p = m_globals.emplace(m_allocator);
 			p.name = blob.readString();
 			p.num_floats = blob.read<u32>();
 			p.offset = offset;
@@ -253,7 +256,7 @@ ParticleSystem::ParticleSystem(EntityPtr entity, World& world, IAllocator& alloc
 	, m_world(world)
 	, m_entity(entity)
 	, m_emitters(allocator)
-	, m_params(allocator)
+	, m_globals(allocator)
 {}
 
 ParticleSystem::Emitter::Emitter(ParticleSystem::Emitter&& rhs)
@@ -275,7 +278,7 @@ ParticleSystem::ParticleSystem(ParticleSystem&& rhs)
 	, m_total_time(rhs.m_total_time)
 	, m_prev_frame_transform(rhs.m_prev_frame_transform)
 	, m_last_update_stats(rhs.m_last_update_stats)
-	, m_params(rhs.m_params.move())
+	, m_globals(rhs.m_globals.move())
 {
 	memcpy(m_system_values, rhs.m_system_values, sizeof(m_system_values));
 	
@@ -314,13 +317,13 @@ void ParticleSystem::onResourceChanged(Resource::State old_state, Resource::Stat
 				m_allocator.deallocate(c.data);
 			}
 		}
-		u32 num_floats_params = 0;
-		for (const auto& p : m_resource->getParameters()) {
-			num_floats_params += p.num_floats;
+		u32 nun_float_globals = 0;
+		for (const auto& p : m_resource->getGlobals()) {
+			nun_float_globals += p.num_floats;
 		}
-		m_params.resize(num_floats_params);
-		if (num_floats_params > 0) {
-			memset(m_params.begin(), 0, m_params.byte_size());
+		m_globals.resize(nun_float_globals);
+		if (nun_float_globals > 0) {
+			memset(m_globals.begin(), 0, m_globals.byte_size());
 		}
 		m_emitters.clear();
 		for (u32 i = 0, c = m_resource->getEmitters().size(); i < c; ++i) {
@@ -604,8 +607,8 @@ struct ProcessHelper {
 					s[i].step = 0;
 					break;
 				}
-				case DataStream::PARAM: {
-					literals[i] = f4Splat(emitter.system.m_params[stream.index]);
+				case DataStream::GLOBAL: {
+					literals[i] = f4Splat(emitter.system.m_globals[stream.index]);
 					s[i].data = &literals[i];
 					s[i].step = 0;
 					break;
@@ -710,7 +713,7 @@ void ParticleSystem::run(RunningContext& ctx) {
 			case DataStream::OUT: return outputs[str.index];
 			case DataStream::REGISTER: return registers[str.index];
 			case DataStream::CHANNEL: return emitter.channels[str.index].data[particle_idx];
-			case DataStream::PARAM: return m_params[str.index];
+			case DataStream::GLOBAL: return m_globals[str.index];
 			case DataStream::ERROR:
 			case DataStream::NONE: break;
 		}
@@ -724,7 +727,7 @@ void ParticleSystem::run(RunningContext& ctx) {
 			case DataStream::REGISTER: registers[str.index] = value; return;
 			case DataStream::CHANNEL: emitter.channels[str.index].data[particle_idx] = value; return;
 			case DataStream::SYSTEM_VALUE:
-			case DataStream::PARAM:
+			case DataStream::GLOBAL:
 			case DataStream::LITERAL:
 			case DataStream::ERROR:
 			case DataStream::NONE: break;
@@ -1163,10 +1166,10 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 			case InstructionType::LT: op_helper.run2<f4CmpLT>(ip); break;
 			case InstructionType::GT: op_helper.run2<f4CmpGT>(ip); break;
 			case InstructionType::MUL: op_helper.run2<f4Mul>(ip); break; 
-			case InstructionType::DIV: op_helper.run2<f4Div>(ip); break; 
-			case InstructionType::SUB: op_helper.run2<f4Sub>(ip); break; 
-			case InstructionType::AND: op_helper.run2<f4And>(ip); break; 
-			case InstructionType::OR: op_helper.run2<f4Or>(ip); break; 
+			case InstructionType::DIV: op_helper.run2<f4Div>(ip); break;
+			case InstructionType::SUB: op_helper.run2<f4Sub>(ip); break;
+			case InstructionType::AND: op_helper.run2<f4And>(ip); break;
+			case InstructionType::OR: op_helper.run2<f4Or>(ip); break;
 			case InstructionType::ADD: op_helper.run2<f4Add>(ip); break; 
 			case InstructionType::MIX: op_helper.run3<ProcessHelper::mix>(ip); break; 
 			case InstructionType::MULTIPLY_ADD: op_helper.run3<ProcessHelper::madd>(ip); break; 
@@ -1182,8 +1185,8 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 				const DataStream op0 = ip.read<DataStream>();
 				if (dst.type == DataStream::OUT) {
 					const u32 stride = emitter.resource_emitter.outputs_count;
-					if (op0.type == DataStream::PARAM) {
-						const float arg = m_params[op0.index];
+					if (op0.type == DataStream::GLOBAL) {
+						const float arg = m_globals[op0.index];
 						u8 output_idx = dst.index;
 						float* res = ctx.output_memory + output_idx + fromf4 * 4 * stride;
 						for (i32 i = 0; i < stepf4 * 4; ++i) {
@@ -1251,6 +1254,21 @@ void ParticleSystem::applyTransform(const Transform& new_tr) {
 	const Transform delta_tr = Transform::computeLocal(new_tr, m_prev_frame_transform);
 	for (i32 emitter_idx = 0; emitter_idx < m_emitters.size(); ++emitter_idx) {
 		Emitter& emitter = m_emitters[emitter_idx];
+		if (emitter.resource_emitter.emit_on_move) {
+			const bool moved = squaredLength(new_tr.pos - emitter.last_emit_point) > 0.0025f;
+			if (moved) {
+				emitter.last_emit_point = new_tr.pos;
+				m_system_values[(u8)ParticleSystemValues::TOTAL_TIME] = m_total_time;
+				if (emitter.resource_emitter.max_ribbons > 0) {
+					for (u32 i = 0, c =emitter.ribbons.size(); i < c; ++i) {
+						emitRibbonPoints(emitter_idx, i, {}, 1, 0);
+					}
+				}
+				else {
+					emit(emitter_idx, {}, 1, 0);
+				}
+			}
+		}
 		if ((u32)m_resource->getFlags() & (u32)ParticleSystemResource::Flags::WORLD_SPACE) {
 			jobs::forEach(emitter.particles_count, 4096, [&](u32 from, u32 to){
 				PROFILE_BLOCK("to world space");
