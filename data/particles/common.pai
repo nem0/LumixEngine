@@ -1,0 +1,21 @@
+const PI = 3.14159265;
+
+fn abs(x) {
+	return max(x, -x);
+}
+
+fn saturate(x) {
+	return max(0, min(1, x));
+}
+
+fn sphere(r) {
+	let lat = random(0, 2 * PI);
+	let lon = random(0, 2 * PI);
+	let res : float3;
+	let tmp = sin(lon) * r;
+	res.x = cos(lat) * tmp;
+	res.y = sin(lat) * tmp;
+	res.z = cos(lon) * r;
+	return res;
+}
+

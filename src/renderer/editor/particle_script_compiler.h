@@ -4,7 +4,9 @@
 #include "core/defer.h"
 #include "core/log.h"
 #include "core/string.h"
+#include "renderer/editor/world_viewer.h"
 #include "renderer/particle_system.h"
+#include "renderer/render_module.h"
 
 namespace Lumix {
 
@@ -16,11 +18,176 @@ struct ParticleScriptToken {
 		NUMBER, STRING, IDENTIFIER,
 
 		// keywords
-		CONST, PARAM, EMITTER, FN, WORLD_SPACE, VAR, OUT, IN, LET, RETURN,
+		CONST, GLOBAL, EMITTER, FN, WORLD_SPACE, VAR, OUT, IN, LET, RETURN, IMPORT
 	};
 
 	Type type;
 	StringView value;
+};
+
+struct ParticleScriptEditorWindow : AssetEditorWindow {
+	ParticleScriptEditorWindow(const Path& path, StudioApp& app)
+		: AssetEditorWindow(app)
+		, m_app(app)
+		, m_path(path)
+		, m_viewer(app)
+	{
+		m_editor = createParticleScriptEditor(m_app);
+		m_editor->focus();
+			
+		OutputMemoryStream blob(app.getAllocator());
+		if (app.getEngine().getFileSystem().getContentSync(path, blob)) {
+			StringView v((const char*)blob.data(), (u32)blob.size());
+			m_editor->setText(v);
+		}
+
+		World* world = m_viewer.m_world;
+		m_preview_entity = world->createEntity({0, 0, 0}, Quat::IDENTITY);
+		world->createComponent(types::particle_emitter, m_preview_entity);
+		RenderModule* module = (RenderModule*)world->getModule(types::particle_emitter);
+		module->setParticleEmitterPath(m_preview_entity, m_path);
+
+		m_viewer.m_viewport.pos = {0, 2, 5};
+		m_viewer.m_viewport.rot = {0, 0, 1, 0};
+	}
+
+	void save() {
+		OutputMemoryStream blob(m_app.getAllocator());
+		m_editor->serializeText(blob);
+		m_app.getAssetBrowser().saveResource(m_path, blob);
+		m_dirty = false;
+	}
+
+	void fileChangedExternally() override {
+		OutputMemoryStream tmp(m_app.getAllocator());
+		OutputMemoryStream tmp2(m_app.getAllocator());
+		m_editor->serializeText(tmp);
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		if (!fs.getContentSync(m_path, tmp2)) return;
+
+		if (tmp.size() == tmp2.size() && memcmp(tmp.data(), tmp2.data(), tmp.size()) == 0) {
+			m_dirty = false;
+		}
+	}
+
+	void windowGUI() override {
+		CommonActions& actions = m_app.getCommonActions();
+
+		if (ImGui::BeginMenuBar()) {
+			if (actions.save.iconButton(m_dirty, &m_app)) save();
+			if (actions.open_externally.iconButton(true, &m_app)) m_app.getAssetBrowser().openInExternalEditor(m_path);
+			if (actions.view_in_browser.iconButton(true, &m_app)) m_app.getAssetBrowser().locate(m_path);
+			if (ImGuiEx::IconButton(ICON_FA_ANGLE_DOUBLE_RIGHT, "Toggle preview")) m_show_preview = !m_show_preview;
+			if (ImGuiEx::IconButton(ICON_FA_BUG, "Debug")) { ASSERT(false); /*TODO*/ };
+			ImGui::EndMenuBar();
+		}
+
+		float w = ImGui::GetContentRegionAvail().x / 2;
+		// TODO hide preview pane -> code_page does not stretch
+		if (ImGui::BeginChild("code_pane", ImVec2(m_show_preview ? w : 0, 0), ImGuiChildFlags_ResizeX)) {
+			if (m_editor->gui("codeeditor", ImVec2(0, 0), m_app.getMonospaceFont(), m_app.getDefaultFont())) m_dirty = true;
+		}
+		ImGui::EndChild();
+		if (m_show_preview) {
+			ImGui::SameLine();
+			if (ImGui::BeginChild("preview_pane")) {
+				auto* module = (RenderModule*)m_viewer.m_world->getModule(types::particle_emitter);
+				ParticleSystem& system = module->getParticleEmitter(m_preview_entity);
+				
+				if (ImGuiEx::IconButton(ICON_FA_INFO_CIRCLE, "Info")) ImGui::OpenPopup("info");
+				if (ImGui::BeginPopup("info")) {
+					Span<ParticleSystemResource::Emitter> emitters = system.getResource()->getEmitters();
+					for (u32 i = 0, c = emitters.size(); i < c; ++i) {
+						const auto& emitter = emitters[i];
+						ImGui::Text("Emitter %d", i + 1);
+						ImGui::Indent();
+						ImGui::LabelText("Emit registers", "%d", emitter.emit_registers_count);
+						ImGui::LabelText("Emit instructions", "%d", emitter.emit_instructions_count);
+						ImGui::LabelText("Update registers", "%d", emitter.update_registers_count);
+						ImGui::LabelText("Update instructions", "%d", emitter.update_instructions_count);
+						ImGui::LabelText("Output registers", "%d", emitter.output_registers_count);
+						ImGui::LabelText("Output instructions", "%d", emitter.output_instructions_count);
+						ImGui::Unindent();
+					}
+					ImGui::EndPopup();
+				}
+				ImGui::SameLine();
+				if (m_play) {
+					if (ImGuiEx::IconButton(ICON_FA_PAUSE, "Pause")) m_play = false;
+					float td = m_app.getEngine().getLastTimeDelta();
+					module->updateParticleEmitter(m_preview_entity, td);
+				}
+				else {
+					if (ImGuiEx::IconButton(ICON_FA_PLAY, "Play")) m_play = true;
+				}
+				ImGui::SameLine();
+				if (ImGuiEx::IconButton(ICON_FA_STEP_FORWARD, "Next frame")) {
+					if (m_play) logError("Particle simulation must be paused.");
+					else {
+						float td = m_app.getEngine().getLastTimeDelta();
+						module->updateParticleEmitter(m_preview_entity, td);
+					}
+				}
+				
+				ImGui::SameLine();
+				if (ImGuiEx::IconButton(ICON_FA_EYE, "Toggle ground")) {
+					m_show_ground = !m_show_ground;
+					module->enableModelInstance(m_viewer.m_ground, m_show_ground);
+				};
+
+				ImGui::SameLine();
+				if (ImGui::Button(ICON_FA_UNDO_ALT " Reset")) system.reset();
+				u32 num_particles = 0;
+				for (ParticleSystem::Emitter& emitter : system.getEmitters()) {
+					if (emitter.resource_emitter.max_ribbons > 0) {
+						for (const auto& ribbon : emitter.ribbons) num_particles += ribbon.length;
+					}
+					else {
+						num_particles += emitter.particles_count;
+					}
+				}
+				
+				if (!system.m_globals.empty()) {
+					ImGui::SameLine();
+					if (ImGui::Button("Globals")) ImGui::OpenPopup("Globals");
+					if (ImGui::BeginPopup("Globals")) {
+						u32 offset = 0;
+						for (const auto& p : system.getResource()->getGlobals()) {
+							ImGui::PushID(&p);
+							ImGuiEx::Label(p.name.c_str());
+							ImGui::SetNextItemWidth(150);
+							float* f = system.m_globals.begin() + offset;
+							switch (p.num_floats) {
+								case 1: ImGui::InputFloat("##v", f); break;
+								case 2: ImGui::InputFloat2("##v", f); break;
+								case 3: ImGui::InputFloat3("##v", f); break;
+								case 4: ImGui::InputFloat4("##v", f); break;
+							}
+							offset += p.num_floats;
+							ImGui::PopID();
+						}
+						ImGui::EndPopup();
+					}
+				}
+				ImGui::SameLine();
+				ImGui::Text("Particles: %d", num_particles);
+				m_viewer.gui();
+			}
+			ImGui::EndChild();
+		}
+	}
+	
+	const Path& getPath() override { return m_path; }
+	const char* getName() const override { return "particle script editor"; }
+
+	StudioApp& m_app;
+	UniquePtr<CodeEditor> m_editor;
+	WorldViewer m_viewer;
+	Path m_path;
+	EntityRef m_preview_entity;
+	bool m_play = true;
+	bool m_show_preview = true;
+	bool m_show_ground = true;
 };
 
 struct ParticleScriptTokenizer {
@@ -123,10 +290,17 @@ struct ParticleScriptTokenizer {
 			case 'c': return checkKeyword("onst", 1, 4, Token::CONST);
 			case 'e': return checkKeyword("mitter", 1, 6, Token::EMITTER);
 			case 'f': return checkKeyword("n", 1, 1, Token::FN);
-			case 'i': return checkKeyword("n", 1, 1, Token::IN);
+			case 'g': return checkKeyword("lobal", 1, 5, Token::GLOBAL);
+			case 'i': {
+				if (m_current - m_start_token < 2) return makeToken(Token::IDENTIFIER);
+				switch (m_start_token[1]) {
+					case 'n': return checkKeyword("", 2, 0, Token::IN);
+					case 'm': return checkKeyword("port", 2, 4, Token::IMPORT);
+				}
+				return makeToken(Token::IDENTIFIER);
+			}
 			case 'l': return checkKeyword("et", 1, 2, Token::LET);
 			case 'o': return checkKeyword("ut", 1, 2, Token::OUT);
-			case 'p': return checkKeyword("aram", 1, 4, Token::PARAM);
 			case 'r': return checkKeyword("eturn", 1, 5, Token::RETURN);
 			case 'v': return checkKeyword("ar", 1, 2, Token::VAR);
 			case 'w': return checkKeyword("orld_space", 1, 10, Token::WORLD_SPACE);
@@ -393,13 +567,15 @@ struct ParticleScriptCompiler {
 		Operators op;
 	};
 	
-	ParticleScriptCompiler(IAllocator& allocator)
-		: m_allocator(allocator)
+	ParticleScriptCompiler(StudioApp& app, IAllocator& allocator)
+		: m_app(app)
+		, m_allocator(allocator)
 		, m_emitters(allocator)
 		, m_constants(allocator)
-		, m_params(allocator)
+		, m_globals(allocator)
 		, m_functions(allocator)
 		, m_arena_allocator(1024 * 1024 * 256, m_allocator, "particle_script_compiler")
+		, m_imports(allocator)
 	{
 	}
 
@@ -451,8 +627,8 @@ struct ParticleScriptCompiler {
 	}
 
 	i32 getParamIndex(StringView name) const {
-		for (const Variable& var : m_params) {
-			if (equalStrings(var.name, name)) return i32(&var - m_params.begin());
+		for (const Variable& var : m_globals) {
+			if (equalStrings(var.name, name)) return i32(&var - m_globals.begin());
 		}
 		return -1;
 	}
@@ -527,7 +703,7 @@ const char* toString(Token::Type type) {
 			case Token::Type::NUMBER: return "number";
 			case Token::Type::STRING: return "string";
 			case Token::Type::IDENTIFIER: return "identifier";
-			case Token::Type::PARAM: return "param";
+			case Token::Type::GLOBAL: return "global";
 			case Token::Type::FN: return "fn";
 			case Token::Type::WORLD_SPACE: return "world_space";
 			case Token::Type::VAR: return "var";
@@ -535,6 +711,7 @@ const char* toString(Token::Type type) {
 			case Token::Type::IN: return "in";
 			case Token::Type::LET: return "let";
 			case Token::Type::RETURN: return "return";
+			case Token::Type::IMPORT: return "import";
 		}
 		ASSERT(false);
 		return "N//A";
@@ -1009,7 +1186,7 @@ const char* toString(Token::Type type) {
 			local.type = ValueType::FLOAT;
 		}
 		else {
-			error(peekToken().value, "Unexpected token.");
+			error(peekToken().value, "Unexpected token ", peekToken().value);
 			return;
 		}
 
@@ -1114,6 +1291,42 @@ const char* toString(Token::Type type) {
 		}
 	}
 
+	Array<OutputMemoryStream> m_imports;
+
+	void compileImport() {
+		StringView path;
+		if (!consume(Token::STRING, path)) return;
+		
+		OutputMemoryStream& import_content = m_imports.emplace(m_allocator);
+		if (!m_app.getEngine().getFileSystem().getContentSync(Path(path), import_content)) {
+			error(path, "Failed to load import ", path);
+			return;
+		}
+		
+		ParticleScriptTokenizer tokenizer = m_tokenizer;
+		m_tokenizer.m_current = (const char*)import_content.data();
+		m_tokenizer.m_document = StringView((const char*)import_content.data(), (u32)import_content.size());
+		m_tokenizer.m_current_token = m_tokenizer.nextToken();
+		
+		for (;;) {
+			Token token = consumeToken();
+			switch (token.type) {
+				case Token::EOF: goto end_import;
+				case Token::ERROR: return;
+				case Token::IMPORT: compileImport(); break;
+				case Token::CONST: compileConst(); break;
+				case Token::FN: compileFunction(); break;
+				case Token::GLOBAL: variableDeclaration(m_globals); break;
+				case Token::EMITTER: compileEmitter(); break;
+				case Token::WORLD_SPACE: m_is_world_space = true; break;
+				default: error(token.value, "Unexpected token ", token.value); return;
+			}
+		}
+		end_import:
+		
+		m_tokenizer = tokenizer;
+	}
+
 	void compileConst() {
         Constant& c = m_constants.emplace();
 		if (!consume(Token::IDENTIFIER, c.name)) return;
@@ -1166,7 +1379,7 @@ const char* toString(Token::Type type) {
 					break;
 				}
 				default:
-					error(t.value, "Unexpected token.");
+					error(t.value, "Unexpected token ", t.value);
 					return;
 			}
 		}
@@ -1514,7 +1727,7 @@ const char* toString(Token::Type type) {
 				auto* n = (VariableNode*)node;
 				switch (n->family) {
 					case VariableFamily::GLOBAL:
-						return toCompileResult(m_params[n->index], DataStream::GLOBAL);
+						return toCompileResult(m_globals[n->index], DataStream::GLOBAL);
 					case VariableFamily::LOCAL: {
 						const Local& local = ctx.block->locals[n->index];
 						// fallthroughs intentional
@@ -1851,12 +2064,13 @@ const char* toString(Token::Type type) {
 			switch (token.type) {
 				case Token::EOF: goto write_label;
 				case Token::ERROR: return false;
+				case Token::IMPORT: compileImport(); break;
 				case Token::CONST: compileConst(); break;
 				case Token::FN: compileFunction(); break;
-				case Token::PARAM: variableDeclaration(m_params); break;
+				case Token::GLOBAL: variableDeclaration(m_globals); break;
 				case Token::EMITTER: compileEmitter(); break;
 				case Token::WORLD_SPACE: m_is_world_space = true; break;
-				default: error(token.value, "Unexpected token."); return false;
+				default: error(token.value, "Unexpected token ", token.value); return false;
 			}
 		}
 
@@ -1911,8 +2125,8 @@ const char* toString(Token::Type type) {
 			output.write(emitter.m_init_ribbons_count);
 			output.write(emitter.m_emit_on_move);
 		}
-		output.write(m_params.size());
-		for (const Variable& p : m_params) {
+		output.write(m_globals.size());
+		for (const Variable& p : m_globals) {
 			output.writeString(p.name);
 			switch (p.type) {
 				case ValueType::VOID: ASSERT(false); break;
@@ -1925,6 +2139,7 @@ const char* toString(Token::Type type) {
 		return !m_is_error;
 	}
 
+	StudioApp& m_app;
 	IAllocator& m_allocator;
 	ArenaAllocator m_arena_allocator;
 	Path m_path;
@@ -1933,9 +2148,163 @@ const char* toString(Token::Type type) {
 	bool m_is_world_space = false;
 	Array<Constant> m_constants;
 	Array<Function> m_functions;
-	Array<Variable> m_params;
+	Array<Variable> m_globals;
 	Array<Emitter> m_emitters;
 };
 
+
+struct ParticleScriptImportEditorWindow : AssetEditorWindow {
+	ParticleScriptImportEditorWindow(const Path& path, StudioApp& app)
+		: AssetEditorWindow(app)
+		, m_app(app)
+		, m_path(path)
+	{
+		m_editor = createParticleScriptEditor(m_app);
+		m_editor->focus();
+			
+		OutputMemoryStream blob(app.getAllocator());
+		if (app.getEngine().getFileSystem().getContentSync(path, blob)) {
+			StringView v((const char*)blob.data(), (u32)blob.size());
+			m_editor->setText(v);
+		}
+	}
+
+	void save() {
+		OutputMemoryStream blob(m_app.getAllocator());
+		m_editor->serializeText(blob);
+		m_app.getAssetBrowser().saveResource(m_path, blob);
+		m_dirty = false;
+	}
+
+	void fileChangedExternally() override {
+		OutputMemoryStream tmp(m_app.getAllocator());
+		OutputMemoryStream tmp2(m_app.getAllocator());
+		m_editor->serializeText(tmp);
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		if (!fs.getContentSync(m_path, tmp2)) return;
+
+		if (tmp.size() == tmp2.size() && memcmp(tmp.data(), tmp2.data(), tmp.size()) == 0) {
+			m_dirty = false;
+		}
+	}
+
+	void windowGUI() override {
+		CommonActions& actions = m_app.getCommonActions();
+
+		if (ImGui::BeginMenuBar()) {
+			if (actions.save.iconButton(m_dirty, &m_app)) save();
+			if (actions.open_externally.iconButton(true, &m_app)) m_app.getAssetBrowser().openInExternalEditor(m_path);
+			if (actions.view_in_browser.iconButton(true, &m_app)) m_app.getAssetBrowser().locate(m_path);
+			ImGui::EndMenuBar();
+		}
+
+		if (m_editor->gui("codeeditor", ImVec2(0, 0), m_app.getMonospaceFont(), m_app.getDefaultFont())) m_dirty = true;
+	}
+	
+	const Path& getPath() override { return m_path; }
+	const char* getName() const override { return "particle script import editor"; }
+
+	StudioApp& m_app;
+	UniquePtr<CodeEditor> m_editor;
+	Path m_path;
+};
+
+struct ParticleScriptImportPlugin : EditorAssetPlugin {
+	ParticleScriptImportPlugin(StudioApp& app, IAllocator& allocator)
+		: EditorAssetPlugin("Particle script import", "pai", TYPE, app, allocator)
+		, m_app(app)
+	{}
+
+	bool compile(const Path& src) override { return true; }
+	void openEditor(const Path& path) override {
+		UniquePtr<ParticleScriptImportEditorWindow> win = UniquePtr<ParticleScriptImportEditorWindow>::create(m_app.getAllocator(), path, m_app);
+		m_app.getAssetBrowser().addWindow(win.move());
+	}
+	void createResource(OutputMemoryStream& blob) override {}
+
+	StudioApp& m_app;
+	static inline ResourceType TYPE = ResourceType("particle_script_import");
+};
+
+struct ParticleScriptPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
+	ParticleScriptPlugin(StudioApp& app, IAllocator& allocator)
+		: m_app(app)
+		, m_allocator(allocator)
+	{
+		AssetCompiler& compiler = app.getAssetCompiler();
+		compiler.registerExtension("pat", ParticleSystemResource::TYPE);
+		const char* particle_emitter_exts[] = { "pat" };
+		compiler.addPlugin(*this, Span(particle_emitter_exts));
+		m_app.getAssetBrowser().addPlugin(*this, Span(particle_emitter_exts));
+	}
+
+	bool compile(const Path& src) override {
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		OutputMemoryStream src_data(m_app.getAllocator());
+		if (!fs.getContentSync(src, src_data)) return false;
+
+		StringView content = { (const char*)src_data.data(), (const char*)src_data.data() + src_data.size() };
+		ParticleScriptCompiler compiler(m_app, m_allocator);
+		OutputMemoryStream output(m_app.getAllocator());
+		if (!compiler.compile(src, content, output)) return false;
+
+		return m_app.getAssetCompiler().writeCompiledResource(src, Span(output.data(), (i32)output.size()));
+	}
+
+	const char* getIcon() const override { return ICON_FA_FIRE; }
+
+	bool canCreateResource() const override { return true; }
+	bool canMultiEdit() override { return false; }
+	void createResource(struct OutputMemoryStream& content) override {
+		content << R"#(
+emitter Emitter0 {
+	material "/engine/materials/particle.mat"
+	init_emit_count 0
+	emit_per_second 10
+	
+	out i_position : float3
+	out i_scale : float
+	out i_color : float4
+	out i_rot : float
+	out i_frame : float
+	out i_emission : float
+
+	var pos : float3
+	var t : float
+
+	fn update() {
+		t = t + time_delta;
+		kill(t > 1);
+	}
+	fn emit() {
+		pos.x = random(-1, 1);
+		pos.y = random(0, 2);
+		pos.z = random(-1, 1);
+		t = 0;
+	}
+	fn output() {
+		i_position = pos;
+		i_scale = 0.1;
+		i_color = {1, 0, 0, 1};
+		i_rot = 0;
+		i_frame = 0;
+		i_emission = 10;
+	}
+}
+		)#";
+	}
+	const char* getDefaultExtension() const override { return "pat"; }
+
+	const char* getLabel() const override { return "Particle script"; }
+	ResourceType getResourceType() const override { return ParticleSystemResource::TYPE; }
+	
+	void openEditor(const struct Path& path) override {
+		UniquePtr<ParticleScriptEditorWindow> win = UniquePtr<ParticleScriptEditorWindow>::create(m_allocator, path, m_app);
+		m_app.getAssetBrowser().addWindow(win.move());
+	}
+
+	IAllocator& m_allocator;
+	StudioApp& m_app;
+};
 
 }

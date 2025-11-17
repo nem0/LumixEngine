@@ -2662,7 +2662,6 @@ struct ParticleEditorImpl : ParticleEditor {
 		{
 			AssetCompiler& compiler = app.getAssetCompiler();
 			compiler.registerExtension("par", ParticleSystemResource::TYPE);
-			compiler.registerExtension("pat", ParticleSystemResource::TYPE);
 		}
 
 		void addSubresources(AssetCompiler& compiler, const Path& path, AtomicI32&) override {
@@ -2725,12 +2724,14 @@ struct ParticleEditorImpl : ParticleEditor {
 	ParticleEditorImpl(StudioApp& app)
 		: m_app(app)
 		, m_allocator(app.getAllocator(), "particle editor")
+		, m_particle_script_plugin(app, m_allocator)
+		, m_particle_script_import_plugin(app, m_allocator)
 		, m_function_plugin(*this, app, m_allocator)
 		, m_particle_system_plugin(*this, app)
 		, m_functions(m_allocator)
 		, m_apply_action("Particle editor", "Apply", "Apply", "particle_editor_apply", "")
 	{
-		const char* particle_emitter_exts[] = {"par", "pat" };
+		const char* particle_emitter_exts[] = {"par"};
 		m_app.getAssetCompiler().addPlugin(m_particle_system_plugin, Span(particle_emitter_exts));
 		m_app.getAssetBrowser().addPlugin(m_particle_system_plugin, Span(particle_emitter_exts));
 	}
@@ -2748,15 +2749,7 @@ struct ParticleEditorImpl : ParticleEditor {
 		func.name = Path::getBasename(path);
 	}
 
-	bool compileText(InputMemoryStream& input, OutputMemoryStream& output, const Path& path) {
-		StringView content = { (const char*)input.getData(), (const char*)input.getData() + input.size() };
-		ParticleScriptCompiler compiler(m_allocator);
-		return compiler.compile(path, content, output);
-	}
-
 	bool compile(InputMemoryStream& input, OutputMemoryStream& output, const char* path) override {
-		if (Path::hasExtension(path, "pat")) return compileText(input, output, Path(path));
-
 		ParticleSystemEditorResource res(Path(path), m_app, m_allocator);
 		if (!res.deserialize(input)) return false;
 
@@ -2820,172 +2813,9 @@ struct ParticleEditorImpl : ParticleEditor {
 	Array<Function> m_functions;
 	ParticleSystemPlugin m_particle_system_plugin;
 	FunctionPlugin m_function_plugin;
+	ParticleScriptPlugin m_particle_script_plugin;
+	ParticleScriptImportPlugin m_particle_script_import_plugin;
 	Action m_apply_action;
-};
-
-struct ParticleScriptEditorWindow : AssetEditorWindow {
-	ParticleScriptEditorWindow(const Path& path, StudioApp& app)
-		: AssetEditorWindow(app)
-		, m_app(app)
-		, m_path(path)
-		, m_viewer(app)
-	{
-		m_editor = createParticleScriptEditor(m_app);
-		m_editor->focus();
-			
-		OutputMemoryStream blob(app.getAllocator());
-		if (app.getEngine().getFileSystem().getContentSync(path, blob)) {
-			StringView v((const char*)blob.data(), (u32)blob.size());
-			m_editor->setText(v);
-		}
-
-		World* world = m_viewer.m_world;
-		m_preview_entity = world->createEntity({0, 0, 0}, Quat::IDENTITY);
-		world->createComponent(types::particle_emitter, m_preview_entity);
-		RenderModule* module = (RenderModule*)world->getModule(types::particle_emitter);
-		module->setParticleEmitterPath(m_preview_entity, m_path);
-
-		m_viewer.m_viewport.pos = {0, 2, 5};
-		m_viewer.m_viewport.rot = {0, 0, 1, 0};
-	}
-
-	void save() {
-		OutputMemoryStream blob(m_app.getAllocator());
-		m_editor->serializeText(blob);
-		m_app.getAssetBrowser().saveResource(m_path, blob);
-		m_dirty = false;
-	}
-
-	void fileChangedExternally() override {
-		OutputMemoryStream tmp(m_app.getAllocator());
-		OutputMemoryStream tmp2(m_app.getAllocator());
-		m_editor->serializeText(tmp);
-		FileSystem& fs = m_app.getEngine().getFileSystem();
-		if (!fs.getContentSync(m_path, tmp2)) return;
-
-		if (tmp.size() == tmp2.size() && memcmp(tmp.data(), tmp2.data(), tmp.size()) == 0) {
-			m_dirty = false;
-		}
-	}
-
-	void windowGUI() override {
-		CommonActions& actions = m_app.getCommonActions();
-
-		if (ImGui::BeginMenuBar()) {
-			if (actions.save.iconButton(m_dirty, &m_app)) save();
-			if (actions.open_externally.iconButton(true, &m_app)) m_app.getAssetBrowser().openInExternalEditor(m_path);
-			if (actions.view_in_browser.iconButton(true, &m_app)) m_app.getAssetBrowser().locate(m_path);
-			if (ImGuiEx::IconButton(ICON_FA_ANGLE_DOUBLE_RIGHT, "Toggle preview")) m_show_preview = !m_show_preview;
-			if (ImGuiEx::IconButton(ICON_FA_BUG, "Debug")) { ASSERT(false); /*TODO*/ };
-			ImGui::EndMenuBar();
-		}
-
-		float w = ImGui::GetContentRegionAvail().x / 2;
-		// TODO hide preview pane -> code_page does not stretch
-		if (ImGui::BeginChild("code_pane", ImVec2(m_show_preview ? w : 0, 0), ImGuiChildFlags_ResizeX)) {
-			if (m_editor->gui("codeeditor", ImVec2(0, 0), m_app.getMonospaceFont(), m_app.getDefaultFont())) m_dirty = true;
-		}
-		ImGui::EndChild();
-		if (m_show_preview) {
-			ImGui::SameLine();
-			if (ImGui::BeginChild("preview_pane")) {
-				auto* module = (RenderModule*)m_viewer.m_world->getModule(types::particle_emitter);
-				ParticleSystem& system = module->getParticleEmitter(m_preview_entity);
-				
-				if (ImGuiEx::IconButton(ICON_FA_INFO_CIRCLE, "Info")) ImGui::OpenPopup("info");
-				if (ImGui::BeginPopup("info")) {
-					Span<ParticleSystemResource::Emitter> emitters = system.getResource()->getEmitters();
-					for (u32 i = 0, c = emitters.size(); i < c; ++i) {
-						const auto& emitter = emitters[i];
-						ImGui::Text("Emitter %d", i + 1);
-						ImGui::Indent();
-						ImGui::LabelText("Emit registers", "%d", emitter.emit_registers_count);
-						ImGui::LabelText("Emit instructions", "%d", emitter.emit_instructions_count);
-						ImGui::LabelText("Update registers", "%d", emitter.update_registers_count);
-						ImGui::LabelText("Update instructions", "%d", emitter.update_instructions_count);
-						ImGui::LabelText("Output registers", "%d", emitter.output_registers_count);
-						ImGui::LabelText("Output instructions", "%d", emitter.output_instructions_count);
-						ImGui::Unindent();
-					}
-					ImGui::EndPopup();
-				}
-				ImGui::SameLine();
-				if (m_play) {
-					if (ImGuiEx::IconButton(ICON_FA_PAUSE, "Pause")) m_play = false;
-					float td = m_app.getEngine().getLastTimeDelta();
-					module->updateParticleEmitter(m_preview_entity, td);
-				}
-				else {
-					if (ImGuiEx::IconButton(ICON_FA_PLAY, "Play")) m_play = true;
-				}
-				ImGui::SameLine();
-				if (ImGuiEx::IconButton(ICON_FA_STEP_FORWARD, "Next frame")) {
-					if (m_play) logError("Particle simulation must be paused.");
-					else {
-						float td = m_app.getEngine().getLastTimeDelta();
-						module->updateParticleEmitter(m_preview_entity, td);
-					}
-				}
-				
-				ImGui::SameLine();
-				if (ImGuiEx::IconButton(ICON_FA_EYE, "Toggle ground")) {
-					m_show_ground = !m_show_ground;
-					module->enableModelInstance(m_viewer.m_ground, m_show_ground);
-				};
-
-				ImGui::SameLine();
-				if (ImGui::Button(ICON_FA_UNDO_ALT " Reset")) system.reset();
-				u32 num_particles = 0;
-				for (ParticleSystem::Emitter& emitter : system.getEmitters()) {
-					if (emitter.resource_emitter.max_ribbons > 0) {
-						for (const auto& ribbon : emitter.ribbons) num_particles += ribbon.length;
-					}
-					else {
-						num_particles += emitter.particles_count;
-					}
-				}
-				
-				if (!system.m_globals.empty()) {
-					ImGui::SameLine();
-					if (ImGui::Button("Globals")) ImGui::OpenPopup("Globals");
-					if (ImGui::BeginPopup("Globals")) {
-						u32 offset = 0;
-						for (const auto& p : system.getResource()->getGlobals()) {
-							ImGui::PushID(&p);
-							ImGuiEx::Label(p.name.c_str());
-							ImGui::SetNextItemWidth(150);
-							float* f = system.m_globals.begin() + offset;
-							switch (p.num_floats) {
-								case 1: ImGui::InputFloat("##v", f); break;
-								case 2: ImGui::InputFloat2("##v", f); break;
-								case 3: ImGui::InputFloat3("##v", f); break;
-								case 4: ImGui::InputFloat4("##v", f); break;
-							}
-							offset += p.num_floats;
-							ImGui::PopID();
-						}
-						ImGui::EndPopup();
-					}
-				}
-				ImGui::SameLine();
-				ImGui::Text("Particles: %d", num_particles);
-				m_viewer.gui();
-			}
-			ImGui::EndChild();
-		}
-	}
-	
-	const Path& getPath() override { return m_path; }
-	const char* getName() const override { return "particle script editor"; }
-
-	StudioApp& m_app;
-	UniquePtr<CodeEditor> m_editor;
-	WorldViewer m_viewer;
-	Path m_path;
-	EntityRef m_preview_entity;
-	bool m_play = true;
-	bool m_show_preview = true;
-	bool m_show_ground = true;
 };
 
 struct ParticleEditorWindow : AssetEditorWindow, NodeEditor {
@@ -3781,15 +3611,9 @@ struct ParticleEditorWindow : AssetEditorWindow, NodeEditor {
 
 
 void ParticleEditorImpl::open(const Path& path) {
-	if (Path::hasExtension(path, "pat")) {
-		UniquePtr<ParticleScriptEditorWindow> win = UniquePtr<ParticleScriptEditorWindow>::create(m_allocator, path, m_app);
-		m_app.getAssetBrowser().addWindow(win.move());
-	}
-	else {
-		UniquePtr<ParticleEditorWindow> win = UniquePtr<ParticleEditorWindow>::create(m_allocator, path, *this, m_app, m_allocator);
-		win->loadResource();
-		m_app.getAssetBrowser().addWindow(win.move());
-	}
+	UniquePtr<ParticleEditorWindow> win = UniquePtr<ParticleEditorWindow>::create(m_allocator, path, *this, m_app, m_allocator);
+	win->loadResource();
+	m_app.getAssetBrowser().addWindow(win.move());
 }
 
 void ParticleEditorImpl::FunctionPlugin::addSubresources(AssetCompiler& compiler, const Path& path, AtomicI32&) {
