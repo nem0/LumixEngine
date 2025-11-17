@@ -1663,6 +1663,7 @@ const char* toString(Token::Type type) {
 				return res;
 			}
 			case Node::BLOCK: {
+				BlockNode* prev_block = ctx.block;
 				auto* n = (BlockNode*)node;
 				ctx.block = n;
 				res.streams[0] = pushStack(ctx);
@@ -1688,14 +1689,14 @@ const char* toString(Token::Type type) {
 				for (Node* statement : n->statements) {
 					if (statement->type == Node::RETURN) {
 						res = compile(ctx, statement, compiled);
-						ctx.block = n->parent;
+						ctx.block = prev_block;
 						return res;
 					}
 					else {
 						if (!compile(ctx, statement, compiled).success) return {.success=false};
 					}
 				}
-				ctx.block = n->parent;
+				ctx.block = prev_block;
 				return res;
 			}
 			case Node::EMITTER_REF:
