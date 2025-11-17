@@ -25,6 +25,8 @@
 #include "renderer/renderer.h"
 #include <imgui/imgui.h>
 
+//#define LUMIX_PARTICLE_SCRIPT
+
 namespace Lumix {
 
 namespace {
@@ -2724,8 +2726,10 @@ struct ParticleEditorImpl : ParticleEditor {
 	ParticleEditorImpl(StudioApp& app)
 		: m_app(app)
 		, m_allocator(app.getAllocator(), "particle editor")
-		, m_particle_script_plugin(app, m_allocator)
-		, m_particle_script_import_plugin(app, m_allocator)
+		#ifdef LUMIX_PARTICLE_SCRIPT		
+			, m_particle_script_plugin(app, m_allocator)
+			, m_particle_script_import_plugin(app, m_allocator)
+		#endif
 		, m_function_plugin(*this, app, m_allocator)
 		, m_particle_system_plugin(*this, app)
 		, m_functions(m_allocator)
@@ -2813,8 +2817,10 @@ struct ParticleEditorImpl : ParticleEditor {
 	Array<Function> m_functions;
 	ParticleSystemPlugin m_particle_system_plugin;
 	FunctionPlugin m_function_plugin;
-	ParticleScriptPlugin m_particle_script_plugin;
-	ParticleScriptImportPlugin m_particle_script_import_plugin;
+	#ifdef LUMIX_PARTICLE_SCRIPT
+		ParticleScriptPlugin m_particle_script_plugin;
+		ParticleScriptImportPlugin m_particle_script_import_plugin;
+	#endif
 	Action m_apply_action;
 };
 
