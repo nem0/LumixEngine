@@ -1,18 +1,10 @@
 const hspread = 10.5;
+const G = 9.8;
 
-fn sphere(r) {
-	let lat = random(0, 2 * 3.14159);
-	let lon = random(0, 2 * 3.14159);
-	let res : float3;
-	let tmp = sin(lon) * r;
-	res.x = cos(lat) * tmp;
-	res.y = sin(lat) * tmp;
-	res.z = cos(lon) * r;
-	return res;
-}
+import "/engine/particles/common.pai"
 
 emitter explosion {
-	material "/maps/fireworks/explosion.mat"
+	material "/maps/particles/explosion.mat"
 	init_emit_count 100
 
 	out i_position : float3
@@ -49,14 +41,14 @@ emitter explosion {
 
 	fn update() {
 		t = t + time_delta;
-		vel.y = vel.y - time_delta * 0.3;
+		vel.y = vel.y - time_delta * G;
 		pos = pos + vel * time_delta;
 		kill(t > 1);
 	}
 }
 
 emitter fireworks {
-	material "/maps/fireworks/explosion.mat"
+	material "/maps/particles/explosion.mat"
 	emit_per_second 5
 
 	out i_position : float3
@@ -87,7 +79,7 @@ emitter fireworks {
 
 	fn update() {
 		t = t + time_delta;
-		vel.y = vel.y - time_delta * 9.8;
+		vel.y = vel.y - time_delta * G;
 		emit(explosion, t > 1.5) {
 			in_pos = vel * t;
 			in_col.x = random(0, 1);
