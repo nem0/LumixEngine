@@ -2253,6 +2253,41 @@ struct ParticleScriptPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugi
 
 	const char* getIcon() const override { return ICON_FA_FIRE; }
 
+	void addSubresources(AssetCompiler& compiler, const Path& path, AtomicI32&) override {
+		compiler.addResource(ParticleSystemResource::TYPE, path);
+		
+		OutputMemoryStream content(m_allocator);
+		if (!m_app.getEngine().getFileSystem().getContentSync(path, content)) {
+			logError("Failed to read ", path);
+			return;
+		}
+
+		ParticleScriptTokenizer tokenizer;
+		tokenizer.m_document.begin = (const char*)content.data();
+		tokenizer.m_document.end = tokenizer.m_document.begin + content.size();
+		tokenizer.m_current = tokenizer.m_document.begin;
+		tokenizer.m_current_token = tokenizer.nextToken();
+		
+		for (;;) {
+			ParticleScriptTokenizer::Token token = tokenizer.m_current_token;
+			tokenizer.m_current_token = tokenizer.nextToken();
+			
+			switch (token.type) {
+				case ParticleScriptTokenizer::Token::EOF: return;
+				case ParticleScriptTokenizer::Token::ERROR: return;
+				case ParticleScriptTokenizer::Token::IMPORT: {
+					ParticleScriptTokenizer::Token t = tokenizer.m_current_token;
+					tokenizer.m_current_token = tokenizer.nextToken();
+					if (t.type == ParticleScriptTokenizer::Token::STRING) {
+						m_app.getAssetCompiler().registerDependency(path, Path(t.value));
+					}
+					break;
+				}
+				default: break;
+			}
+		}	
+	}
+
 	bool canCreateResource() const override { return true; }
 	bool canMultiEdit() override { return false; }
 	void createResource(struct OutputMemoryStream& content) override {
