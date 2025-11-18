@@ -363,10 +363,22 @@ struct ParticleScriptCompiler {
 		VOID
     };
 
+	enum class EntryPoint {
+		EMIT,
+		UPDATE,
+		OUTPUT,
+		GLOBAL
+	};
+
 	struct SysCall {
         InstructionType instruction;
         bool returns_value;
 		u32 num_args;
+		u32 valid_entry_points =
+			  (1 << u32(EntryPoint::EMIT)) 
+			| (1 << u32(EntryPoint::UPDATE))
+			| (1 << u32(EntryPoint::OUTPUT))
+			;
     };
 
     struct Constant {
@@ -462,6 +474,7 @@ struct ParticleScriptCompiler {
 		Emitter* emitted = nullptr;
 		Span<CompileResult> args = {};
 		BlockNode* block = nullptr;
+		EntryPoint entry_point;
 
 		u32 value_counter = 0;
 	};
@@ -933,8 +946,8 @@ const char* toString(Token::Type type) {
 				}
 				return { InstructionType::END };
 				
-			case 'e': return checkBuiltinFunction(name, "mit", 1, 3, { InstructionType::EMIT, false, 1 });
-			case 'k': return checkBuiltinFunction(name, "ill", 1, 3, { InstructionType::KILL, false, 0 });
+			case 'e': return checkBuiltinFunction(name, "mit", 1, 3, { InstructionType::EMIT, false, 1, 1 << u32(EntryPoint::UPDATE) });
+			case 'k': return checkBuiltinFunction(name, "ill", 1, 3, { InstructionType::KILL, false, 0, 1 << u32(EntryPoint::UPDATE) });
 			case 'm':
 				if (name.size() < 2) return {InstructionType::END};
 				switch (name[1]) {
@@ -1377,6 +1390,7 @@ const char* toString(Token::Type type) {
         if (!consume(Token::EQUAL)) return;
         
 		CompileContext ctx(*this);
+		ctx.entry_point = EntryPoint::GLOBAL;
 		Node* n = expression(ctx, 0);
 		if (!n) return;
 		n = collapseConstants(n);
@@ -1623,8 +1637,12 @@ const char* toString(Token::Type type) {
 		ctx.emitter = &emitter;
 
 		OutputMemoryStream& compiled = [&]() -> OutputMemoryStream& {
-			if (equalStrings(fn_name, "update")) return emitter.m_update;
+			if (equalStrings(fn_name, "update")) {
+				ctx.entry_point = EntryPoint::UPDATE;
+				return emitter.m_update;
+			}
 			if (equalStrings(fn_name, "emit")) {
+				ctx.entry_point = EntryPoint::EMIT;
 				for (const Variable& v : emitter.m_inputs) {
 					switch (v.type) {
 						case ValueType::VOID: ASSERT(false); break;
@@ -1635,7 +1653,10 @@ const char* toString(Token::Type type) {
 				}
 				return emitter.m_emit;
 			}
-			if (equalStrings(fn_name, "output")) return emitter.m_output;
+			if (equalStrings(fn_name, "output")) {
+				ctx.entry_point = EntryPoint::OUTPUT;
+				return emitter.m_output;
+			}
 			error(fn_name, "Unknown function");
 			return emitter.m_output;
 		}();
@@ -1881,6 +1902,10 @@ const char* toString(Token::Type type) {
 			}
 			case Node::SYSCALL: {
 				auto* n = (SysCallNode*)node;
+				if ((n->function.valid_entry_points & (1 << u32(ctx.entry_point))) == 0) {
+					error(n->token.value, "Syscall ", n->token.value, " can not be called here.");
+					return {.success = false};
+				}
 				CompileResult args[8];
 				DataStream dst = n->function.returns_value ? pushStack(ctx) : DataStream{};
 				if ((u32)n->args.size() > lengthOf(args)) {
@@ -2055,6 +2080,7 @@ const char* toString(Token::Type type) {
 		parseArgs(fn);
 		
 		CompileContext ctx(*this);
+		ctx.entry_point = EntryPoint::GLOBAL;
 		ctx.function = &fn;
 		fn.block = block(ctx);
 	}

@@ -24,6 +24,7 @@
 * [Shaders](shaders.md)
 * [FSR3](fsr3.md)
 * [Custom postprocess](renderer/postprocess.md)
+* [Particle script](renderer/particle_script.md)
 
 # Physics
 
