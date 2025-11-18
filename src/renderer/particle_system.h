@@ -25,18 +25,7 @@ struct Renderer;
 
 struct ParticleSystemResource final : Resource {
 	enum class Version : u32{
-		VERTEX_DECL,
-		EMIT_RATE,
-		MULTIEMITTER,
-		EMIT,
-		FLAGS,
-		NEW_VERTEX_DECL,
-		MODEL,
-		RIBBONS,
-		GLOBALS,
-		NUM_REGISTERS_SPLIT,
-		NUM_INSTRUCTIONS,
-		EMIT_ON_MOVE,
+		NOT_SUPPORTED_BEFORE = 12,
 
 		LAST
 	};
@@ -135,7 +124,9 @@ struct ParticleSystemResource final : Resource {
 		AND,
 		BLEND,
 		MAX,
-		MIN
+		MIN,
+		CMP,
+		CMP_ELSE
 	};
 
 	static const ResourceType TYPE;
@@ -248,6 +239,11 @@ private:
 	struct RunningContext;
 	struct ChunkProcessorContext;
 
+	enum class RunResult {
+		SURVIVED,
+		KILLED
+	};
+
 	void operator =(ParticleSystem&& rhs) = delete;
 	void onResourceChanged(Resource::State old_state, Resource::State new_state, Resource&);
 	void update(float dt, u32 emitter_idx, PageAllocator& page_allocator);
@@ -255,7 +251,8 @@ private:
 	void emitRibbonPoints(u32 emitter_idx, u32 ribbon_idx, Span<const float> emit_data, u32 count, float time_step);
 	void emit(u32 emitter_idx, Span<const float> emit_data, u32 count, float time_step);
 	void ensureCapacity(Emitter& emitter, u32 num_new_particles);
-	void run(RunningContext& ctx);
+	RunResult run(RunningContext& ctx);
+	void skipBlock(ParticleSystem::RunningContext& ctx, const InputMemoryStream& ip, InputMemoryStream& head, InputMemoryStream& tail);
 	void processChunk(ChunkProcessorContext& ctx);
 	void initRibbonEmitter(i32 emiter);
 

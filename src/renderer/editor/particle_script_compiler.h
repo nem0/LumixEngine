@@ -18,7 +18,7 @@ struct ParticleScriptToken {
 		NUMBER, STRING, IDENTIFIER,
 
 		// keywords
-		CONST, GLOBAL, EMITTER, FN, WORLD_SPACE, VAR, OUT, IN, LET, RETURN, IMPORT
+		CONST, GLOBAL, EMITTER, FN, WORLD_SPACE, VAR, OUT, IN, LET, RETURN, IMPORT, IF, ELSE
 	};
 
 	Type type;
@@ -288,12 +288,19 @@ struct ParticleScriptTokenizer {
 
 		switch (m_start_token[0]) {
 			case 'c': return checkKeyword("onst", 1, 4, Token::CONST);
-			case 'e': return checkKeyword("mitter", 1, 6, Token::EMITTER);
+			case 'e': {
+				if (m_current - m_start_token < 2) return makeToken(Token::IDENTIFIER);
+				switch (m_start_token[1]) {
+					case 'm': return checkKeyword("itter", 2, 5, Token::EMITTER);
+					case 'l': return checkKeyword("se", 2, 2, Token::ELSE);
+				}
+			}
 			case 'f': return checkKeyword("n", 1, 1, Token::FN);
 			case 'g': return checkKeyword("lobal", 1, 5, Token::GLOBAL);
 			case 'i': {
 				if (m_current - m_start_token < 2) return makeToken(Token::IDENTIFIER);
 				switch (m_start_token[1]) {
+					case 'f': return checkKeyword("", 2, 0, Token::IF);
 					case 'n': return checkKeyword("", 2, 0, Token::IN);
 					case 'm': return checkKeyword("port", 2, 4, Token::IMPORT);
 				}
@@ -356,7 +363,7 @@ struct ParticleScriptCompiler {
 		VOID
     };
 
-	struct BuiltinFunction {
+	struct SysCall {
         InstructionType instruction;
         bool returns_value;
 		u32 num_args;
@@ -447,8 +454,6 @@ struct ParticleScriptCompiler {
 		u32 m_init_ribbons_count = 0;
 	};
 
-	struct BlockNode;
-
 	struct CompileContext {
 		CompileContext(ParticleScriptCompiler& compiler) : compiler(compiler) {} 
 		ParticleScriptCompiler& compiler; 
@@ -477,7 +482,8 @@ struct ParticleScriptCompiler {
 			COMPOUND,
 			EMITTER_REF,
 			BLOCK,
-			FUNCTION_CALL
+			FUNCTION_CALL,
+			IF
 		};
 
 		Node(Type type, Token token) : type(type), token(token) {}
@@ -504,9 +510,16 @@ struct ParticleScriptCompiler {
 		BlockNode* parent = nullptr;
 	};
 
+	struct IfNode : Node {
+		IfNode(Token token) : Node(Node::IF, token) {}
+		Node* condition = nullptr;
+		BlockNode* true_block = nullptr;
+		BlockNode* false_block = nullptr;
+	};\
+
 	struct SysCallNode : Node {
 		SysCallNode(Token token, IAllocator& allocator) : Node(Node::SYSCALL, token), args(allocator) {}
-		BuiltinFunction function;
+		SysCall function;
 		Array<Node*> args;
 		Node* after_block = nullptr;
 	};
@@ -712,6 +725,8 @@ const char* toString(Token::Type type) {
 			case Token::Type::LET: return "let";
 			case Token::Type::RETURN: return "return";
 			case Token::Type::IMPORT: return "import";
+			case Token::Type::IF: return "if";
+			case Token::Type::ELSE: return "else";
 		}
 		ASSERT(false);
 		return "N//A";
@@ -788,7 +803,7 @@ const char* toString(Token::Type type) {
 			}
 			case Node::SYSCALL: {
 				auto* n = (SysCallNode*)node;
-				bool all_args_const = true;
+				bool all_args_const = n->args.size() > 0;
 				for (Node*& arg : n->args) {
 					arg = collapseConstants(arg);
 					if (arg->type != Node::LITERAL) all_args_const = false;
@@ -825,6 +840,13 @@ const char* toString(Token::Type type) {
 						default: return node;
 					}
 				}
+				return node;
+			}
+			case Node::IF: {
+				auto* n = (IfNode*)node;
+				n->condition = collapseConstants(n->condition);
+				collapseConstants(n->true_block);
+				if (n->false_block) collapseConstants(n->false_block);
 				return node;
 			}
 			case Node::FUNCTION_CALL: {
@@ -894,14 +916,14 @@ const char* toString(Token::Type type) {
 		return ParticleSystemValues::NONE;
 	}
 
-	BuiltinFunction checkBuiltinFunction(StringView name, const char* remaining, i32 start, i32 len, BuiltinFunction if_matching) {
+	SysCall checkBuiltinFunction(StringView name, const char* remaining, i32 start, i32 len, SysCall if_matching) {
 		if (name.size() != start + len) return {InstructionType::END};
 		name.removePrefix(start);
 		if (memcmp(name.begin, remaining, len) == 0) return if_matching;
 		return {InstructionType::END};
 	}
 
-	BuiltinFunction getBuiltinFunction(StringView name) {
+	SysCall getSysCall(StringView name) {
 		switch (name[0]) {
 			case 'c': 
 				if (name.size() < 2) return {InstructionType::END};
@@ -911,8 +933,8 @@ const char* toString(Token::Type type) {
 				}
 				return { InstructionType::END };
 				
-			case 'e': return checkBuiltinFunction(name, "mit", 1, 3, { InstructionType::EMIT, false, 2 });
-			case 'k': return checkBuiltinFunction(name, "ill", 1, 3, { InstructionType::KILL, false, 1 });
+			case 'e': return checkBuiltinFunction(name, "mit", 1, 3, { InstructionType::EMIT, false, 1 });
+			case 'k': return checkBuiltinFunction(name, "ill", 1, 3, { InstructionType::KILL, false, 0 });
 			case 'm':
 				if (name.size() < 2) return {InstructionType::END};
 				switch (name[1]) {
@@ -964,7 +986,6 @@ const char* toString(Token::Type type) {
 				default: {
 					Node* s = statement(ctx);
 					if (!s) return nullptr;
-					if (!consume(Token::SEMICOLON)) return nullptr;
 					node->statements.push(s);
 					break;
 				}
@@ -1031,12 +1052,12 @@ const char* toString(Token::Type type) {
 					return node;
 				}
 
-				BuiltinFunction bfn = getBuiltinFunction(token.value);
-				if (bfn.instruction != InstructionType::END) {
+				SysCall syscall = getSysCall(token.value);
+				if (syscall.instruction != InstructionType::END) {
 					auto* node = LUMIX_NEW(m_arena_allocator, SysCallNode)(token, m_arena_allocator);
 					if (!consume(Token::LEFT_PAREN)) return nullptr;
-					node->args.reserve(bfn.num_args);
-					for (u32 i = 0; i < bfn.num_args; ++i) {
+					node->args.reserve(syscall.num_args);
+					for (u32 i = 0; i < syscall.num_args; ++i) {
 						if (i > 0 && !consume(Token::COMMA)) return nullptr;
 						Node* arg = expression(ctx, 0);
 						if (!arg) return nullptr;
@@ -1046,7 +1067,7 @@ const char* toString(Token::Type type) {
 		
 					if (peekToken().type == Token::LEFT_BRACE) {
 						CompileContext inner_ctx = ctx;
-						if (bfn.instruction == InstructionType::EMIT) {
+						if (syscall.instruction == InstructionType::EMIT) {
 							if (node->args[0]->type != Node::EMITTER_REF) {
 								error(node->args[0]->token.value, "First parameter must an emitter.");
 								return nullptr;
@@ -1058,7 +1079,7 @@ const char* toString(Token::Type type) {
 						if (!node->after_block) return nullptr;
 					}
 
-					node->function = bfn;
+					node->function = syscall;
 					return node;
 				}
 
@@ -1222,16 +1243,37 @@ const char* toString(Token::Type type) {
 		consume(Token::SEMICOLON);
 	}
 
+	Node* ifStatement(CompileContext& ctx) {
+		IfNode* result = LUMIX_NEW(m_arena_allocator, IfNode)(peekToken());
+		result->condition = expression(ctx, 0);
+		if (!result->condition) return nullptr;
+
+		result->true_block = block(ctx);
+		if (!result->true_block) return nullptr;
+
+		if (peekToken().type == Token::ELSE) {
+			consumeToken();
+			result->false_block = block(ctx);
+			if (!result->false_block) return nullptr;
+		}
+		return result;
+	}
+
 	Node* statement(CompileContext& ctx) {
 		Token token = peekToken();
 		switch (token.type) {
+			case Token::IF: 
+				consumeToken();
+				return ifStatement(ctx);
 			case Token::IDENTIFIER: {
 				Node* lhs = atom(ctx);
 				if (!lhs) return nullptr;
 
 				Token op = peekToken();
 				switch (op.type) {
-					case Token::SEMICOLON: return lhs;
+					case Token::SEMICOLON: 
+						consumeToken();
+						return lhs;
 					case Token::EQUAL: {
 						consumeToken();
 						Node* value = expression(ctx, 0);
@@ -1239,6 +1281,7 @@ const char* toString(Token::Type type) {
 						auto* node = LUMIX_NEW(m_arena_allocator, AssignNode)(op);
 						node->left = lhs;
 						node->right = value;
+						if (!consume(Token::SEMICOLON)) return nullptr;
 						return node;
 					}
 					default:
@@ -1251,6 +1294,7 @@ const char* toString(Token::Type type) {
 				auto* node = LUMIX_NEW(m_arena_allocator, ReturnNode)(token);
 				node->value = expression(ctx, 0);
 				if (!node->value) return nullptr;
+				if (!consume(Token::SEMICOLON)) return nullptr;
 				return node;
 			}
 			default:
@@ -1400,6 +1444,15 @@ const char* toString(Token::Type type) {
 			InstructionType itype = ip.read<InstructionType>();
 			switch (itype) {
 				case InstructionType::END: return instruction_index;
+				case InstructionType::CMP_ELSE: 
+					forNumStreams(1, itype, ioffset);
+					instruction_index = forEachDataStreamInBytecode(ip, f, instruction_index); // if subblock
+					instruction_index = forEachDataStreamInBytecode(ip, f, instruction_index); // else subblock
+					break;
+				case InstructionType::CMP: 
+					forNumStreams(1, itype, ioffset);
+					instruction_index = forEachDataStreamInBytecode(ip, f, instruction_index); // if subblock
+					break;
 				case InstructionType::NOISE: forNumStreams(2, itype, ioffset); break;
 				case InstructionType::MOV: forNumStreams(2, itype, ioffset); break;
 				case InstructionType::SIN: forNumStreams(2, itype, ioffset); break;
@@ -1416,10 +1469,9 @@ const char* toString(Token::Type type) {
 				case InstructionType::OR: forNumStreams(3, itype, ioffset); break;
 				case InstructionType::MIN: forNumStreams(3, itype, ioffset); break;
 				case InstructionType::MAX: forNumStreams(3, itype, ioffset); break;
-				case InstructionType::KILL: forNumStreams(1, itype, ioffset); break;
+				case InstructionType::KILL: break;
 				case InstructionType::RAND: forNumStreams(1, itype, ioffset); ip.skip(sizeof(float) * 2); break;
 				case InstructionType::EMIT:
-						forNumStreams(1, itype, ioffset);
 						ip.skip(sizeof(u32)); // emitter index
 						instruction_index = forEachDataStreamInBytecode(ip, f, instruction_index); // emit subroutine
 						break;
@@ -1449,7 +1501,7 @@ const char* toString(Token::Type type) {
 				if (s.type != DataStream::REGISTER) return;
 				if (s.index < num_immutables) return;
 			
-				if (arg_index == 0 && itype != InstructionType::EMIT && itype != InstructionType::KILL) {
+				if (arg_index == 0 && itype != InstructionType::CMP && itype != InstructionType::CMP_ELSE) {
 					Lifetime& lt = lifetimes.emplace();
 					lt.register_index = s.index;
 					lt.from = position;
@@ -1846,7 +1898,6 @@ const char* toString(Token::Type type) {
 				}
 				compiled.write(n->function.instruction);
 				if (n->function.instruction == InstructionType::EMIT) {
-					compiled.write(args[1].streams[0]);
 					compiled.write(u32(args[0].streams[0].value));
 					//popStack(args[0].streams[0]);
 					if (n->after_block) {
@@ -1909,6 +1960,56 @@ const char* toString(Token::Type type) {
 					else {
 						if (!compile(ctx, statement, compiled).success) return {.success=false};
 					}
+				}
+				ctx.block = prev_block;
+				return res;
+			}
+			case Node::IF: {
+				BlockNode* prev_block = ctx.block;
+				auto* n = (IfNode*)node;
+				CompileResult cond = compile(ctx, n->condition, compiled);
+				if (!cond.success) return cond;
+				if (cond.num_streams != 1) {
+					error(node->token.value, "Condition in if statement must be scalar.");
+					return {.success = false};
+				}
+				compiled.write(n->false_block ? InstructionType::CMP_ELSE : InstructionType::CMP);
+				compiled.write(cond.streams[0]);
+
+				ctx.block = n->true_block;
+				// alloc space for locals
+				for (Local& l : n->true_block->locals) {
+					// fallthrough intentional
+					switch (l.type) {
+						case ValueType::VOID: ASSERT(false);
+						case ValueType::FLOAT4:
+							l.registers[3] = pushStack(ctx).index;
+						case ValueType::FLOAT3:
+							l.registers[2] = pushStack(ctx).index;
+							l.registers[1] = pushStack(ctx).index;
+						case ValueType::FLOAT:
+							l.registers[0] = pushStack(ctx).index;
+							break;
+					}
+				}
+				// execute statements
+				for (Node* statement : n->true_block->statements) {
+					if (statement->type == Node::RETURN) {
+						error(statement->token.value, "return in if statement is not supported");
+						return {.success = false};
+					}
+					if (!compile(ctx, statement, compiled).success) return {.success=false};
+				}
+				compiled.write(InstructionType::END);
+				if (n->false_block) {
+					for (Node* statement : n->false_block->statements) {
+						if (statement->type == Node::RETURN) {
+							error(statement->token.value, "return in if statement is not supported");
+							return {.success = false};
+						}
+						if (!compile(ctx, statement, compiled).success) return {.success=false};
+					}
+					compiled.write(InstructionType::END);
 				}
 				ctx.block = prev_block;
 				return res;
@@ -2309,7 +2410,9 @@ emitter Emitter0 {
 
 	fn update() {
 		t = t + time_delta;
-		kill(t > 1);
+		if t > 1 {
+			kill();
+		}
 	}
 	fn emit() {
 		pos.x = random(-1, 1);

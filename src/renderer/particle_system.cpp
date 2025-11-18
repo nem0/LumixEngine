@@ -149,104 +149,58 @@ bool ParticleSystemResource::load(Span<const u8> mem) {
 		return false;
 	}
 
+	if (header.version <= Version::NOT_SUPPORTED_BEFORE) {
+		logError("Version too old, please rebuild ", getPath());
+		return false;		
+	}
+
 	if (header.version > Version::LAST) {
 		logError("Unsupported version ", getPath());
 		return false;
 	}
 
-	if (header.version > Version::FLAGS) blob.read(m_flags);
+	blob.read(m_flags);
 
-	u32 emitter_count = 1;
-	if (header.version > Version::MULTIEMITTER) {
-		emitter_count = blob.read<u32>();
-	}
+	u32 emitter_count = emitter_count = blob.read<u32>();
 
 	for (u32 i = 0; i < emitter_count; ++i) {
 		Emitter& emitter = m_emitters.emplace(*this);
-		if (header.version > Version::VERTEX_DECL) {
-			if (header.version > Version::NEW_VERTEX_DECL) {
-				blob.read(emitter.vertex_decl);
-			}
-			else {
-				blob.read(emitter.vertex_decl.attributes_count);
-				blob.skip(3);
-				blob.read(emitter.vertex_decl.hash);
-				for (u32 j = 0; j < gpu::VertexDecl::MAX_ATTRIBUTES; ++j) {
-					blob.skip(1);
-					blob.read(emitter.vertex_decl.attributes[j]);
-				}
-				blob.read(emitter.vertex_decl.primitive_type);
-				blob.skip(3);
-			}
-		}
-		else {
-			emitter.vertex_decl.addAttribute(0, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// pos
-			emitter.vertex_decl.addAttribute(12, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// scale
-			emitter.vertex_decl.addAttribute(16, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// color
-			emitter.vertex_decl.addAttribute(32, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// rot
-			emitter.vertex_decl.addAttribute(36, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// frame
-		}
+		blob.read(emitter.vertex_decl);
 
 		emitter.setMaterial(Path(blob.readString()));
-		if (header.version > Version::MODEL) {
-			emitter.setModel(Path(blob.readString()));
-		}
+		emitter.setModel(Path(blob.readString()));
 		const u32 isize = blob.read<u32>();
 		emitter.instructions.resize(isize);
 		blob.read(emitter.instructions.getMutableData(), emitter.instructions.size());
 		blob.read(emitter.emit_offset);
 		blob.read(emitter.output_offset);
 		blob.read(emitter.channels_count);
-		if (header.version > Version::NUM_REGISTERS_SPLIT) {
-			blob.read(emitter.update_registers_count); 
-			blob.read(emitter.emit_registers_count);
-			blob.read(emitter.output_registers_count);
-		}
-		else {
-			blob.read(emitter.update_registers_count);
-			emitter.emit_registers_count = emitter.update_registers_count;
-			emitter.output_registers_count = emitter.update_registers_count;
-		}
-		if (header.version > Version::NUM_INSTRUCTIONS) {
-			blob.read(emitter.update_instructions_count); 
-			blob.read(emitter.emit_instructions_count);
-			blob.read(emitter.output_instructions_count);
-		}
-		else {
-			emitter.update_instructions_count = 0; 
-			emitter.emit_instructions_count = 0;
-			emitter.output_instructions_count = 0;
-		}
+		blob.read(emitter.update_registers_count); 
+		blob.read(emitter.emit_registers_count);
+		blob.read(emitter.output_registers_count);
+		blob.read(emitter.update_instructions_count); 
+		blob.read(emitter.emit_instructions_count);
+		blob.read(emitter.output_instructions_count);
 		blob.read(emitter.outputs_count);
-		if (header.version > Version::EMIT_RATE) {
-			blob.read(emitter.init_emit_count);
-			blob.read(emitter.emit_per_second);
-		}
-		if (header.version > Version::EMIT) {
-			blob.read(emitter.emit_inputs_count);
-		}
+		blob.read(emitter.init_emit_count);
+		blob.read(emitter.emit_per_second);
+		blob.read(emitter.emit_inputs_count);
 
-		if (header.version > Version::RIBBONS) {
-			blob.read(emitter.max_ribbons);
-			blob.read(emitter.max_ribbon_length);
-			emitter.max_ribbon_length = (emitter.max_ribbon_length + 3) & ~3;
-			blob.read(emitter.init_ribbons_count);
-		}
-		if (header.version > Version::EMIT_ON_MOVE) {
-			emitter.emit_on_move = blob.read<bool>();
-		}
+		blob.read(emitter.max_ribbons);
+		blob.read(emitter.max_ribbon_length);
+		emitter.max_ribbon_length = (emitter.max_ribbon_length + 3) & ~3;
+		blob.read(emitter.init_ribbons_count);
+		emitter.emit_on_move = blob.read<bool>();
 	}
-	if (header.version > Version::GLOBALS) {
-		u32 num_globals = blob.read<u32>();
-		m_globals.reserve(num_globals);
-		u32 offset = 0;
-		for (u32 i = 0; i < num_globals; ++i) {
-			Global& p = m_globals.emplace(m_allocator);
-			p.name = blob.readString();
-			p.num_floats = blob.read<u32>();
-			p.offset = offset;
-			offset += p.num_floats;
-		}
+	u32 num_globals = blob.read<u32>();
+	m_globals.reserve(num_globals);
+	u32 offset = 0;
+	for (u32 i = 0; i < num_globals; ++i) {
+		Global& p = m_globals.emplace(m_allocator);
+		p.name = blob.readString();
+		p.num_floats = blob.read<u32>();
+		p.offset = offset;
+		offset += p.num_floats;
 	}
 	return true;
 }
@@ -377,14 +331,16 @@ namespace {
 struct ParticleSystem::RunningContext {
 	RunningContext(const Emitter& emitter, IAllocator& allocator)
 		: registers(allocator)
-		, outputs(allocator)
 		, emitter(emitter)
 		, instructions(nullptr, 0)
 	{}
 	StackArray<float, 16> registers;
-	StackArray<float, 16> outputs;
+	float* output_memory;
 	InputMemoryStream instructions;
 	const Emitter& emitter;
+	jobs::Mutex* emit_mutex = nullptr;
+	OutputPagedStream* emit_stream = nullptr;
+	u32 ribbon_index;
 	u32 particle_idx;
 };
 
@@ -699,9 +655,9 @@ struct ProcessHelper {
 };
 
 
-void ParticleSystem::run(RunningContext& ctx) {
+ParticleSystem::RunResult ParticleSystem::run(RunningContext& ctx) {
 	StackArray<float, 16>& registers = ctx.registers;
-	StackArray<float, 16>& outputs = ctx.outputs;
+	float* outputs = ctx.output_memory;
 	const Emitter& emitter = ctx.emitter;
 	InputMemoryStream& ip = ctx.instructions;
 	const u32 particle_idx = ctx.particle_idx;
@@ -735,24 +691,26 @@ void ParticleSystem::run(RunningContext& ctx) {
 		ASSERT(false); 
 	};
 
+	RunResult result = RunResult::SURVIVED;
 	for (;;) {
 		const InstructionType it = ip.read<InstructionType>();
 		switch (it) {
 			case InstructionType::END:
-				return;
+				return result;
+			case InstructionType::KILL: result = RunResult::KILLED; break;
 			case InstructionType::MESH: {
 				DataStream dst = ip.read<DataStream>();
 				DataStream index = ip.read<DataStream>();
 				const u8 subindex = ip.read<u8>();
 
 				RenderModule* render_module = (RenderModule*)m_world.getModule(types::model_instance);
-				if (!m_world.hasComponent(*m_entity, types::model_instance)) return; // TODO error message
+				if (!m_world.hasComponent(*m_entity, types::model_instance)) return result; // TODO error message
 				
 				Model* model = render_module->getModelInstanceModel(*m_entity);
-				if (!model || !model->isReady()) return;
+				if (!model || !model->isReady()) return result;
 
 				u32 mesh_idx = 0; // TODO random mesh
-				if (mesh_idx >= (u32)model->getMeshCount()) return;
+				if (mesh_idx >= (u32)model->getMeshCount()) return result;
 				
 				const Mesh& mesh = model->getMesh(mesh_idx);
 				if (getConstValue(index) < 0) {
@@ -762,7 +720,7 @@ void ParticleSystem::run(RunningContext& ctx) {
 				const u32 idx = u32(getConstValue(index) + 0.5f);
 				if (model->getBones().size() > 0) {
 					ModelInstance* mi = render_module->getModelInstance(*m_entity);
-					if (!mi->pose) return;
+					if (!mi->pose) return result;
 
 					const float v = mi->model->evalVertexPose(*mi->pose, mesh_idx, idx)[subindex];
 					setValue(dst, v);
@@ -779,7 +737,7 @@ void ParticleSystem::run(RunningContext& ctx) {
 				const u8 subindex = ip.read<u8>();
 
 				CoreModule* core_module = (CoreModule*)m_world.getModule(types::spline);
-				if (!m_world.hasComponent(*m_entity, types::spline)) return; // TODO error message
+				if (!m_world.hasComponent(*m_entity, types::spline)) return result; // TODO error message
 				Spline& spline = core_module->getSpline(*m_entity);
 
 				float t = getConstValue(op0);
@@ -931,12 +889,54 @@ void ParticleSystem::run(RunningContext& ctx) {
 				setValue(dst, minimum(getConstValue(op0), getConstValue(op1)));
 				break;
 			}
+			case InstructionType::LT: {
+				DataStream dst = ip.read<DataStream>();
+				DataStream op0 = ip.read<DataStream>();
+				DataStream op1 = ip.read<DataStream>();
+
+				setValue(dst, getConstValue(op0) < getConstValue(op1));
+				break;
+			}
+			case InstructionType::GT: {
+				DataStream dst = ip.read<DataStream>();
+				DataStream op0 = ip.read<DataStream>();
+				DataStream op1 = ip.read<DataStream>();
+
+				setValue(dst, getConstValue(op0) > getConstValue(op1));
+				break;
+			}
+			case InstructionType::EMIT: {
+				u32 emitter_idx = ip.read<u32>();
+				bool is_ribbon = emitter.resource_emitter.max_ribbons > 0;
+
+				StackArray<float, 16> emit_outputs(m_allocator);
+				emit_outputs.resize(m_resource->getEmitters()[emitter_idx].emit_inputs_count);
+				float* output_tmp = ctx.output_memory;
+				ctx.output_memory = emit_outputs.begin();
+				run(ctx);
+				ctx.output_memory = output_tmp;
+
+				if (ctx.emit_mutex) { // if we are just skipping, emit_mutex is null
+					jobs::enter(ctx.emit_mutex);
+					if (is_ribbon) {
+						ctx.emit_stream->write(emitter_idx);
+						ctx.emit_stream->write(emit_outputs.size());
+						ctx.emit_stream->write(emit_outputs.begin(), emit_outputs.byte_size());
+						ctx.emit_stream->write(ctx.ribbon_index);
+					}
+					else {
+						ctx.emit_stream->write(emitter_idx);
+						ctx.emit_stream->write(emit_outputs.size());
+						ctx.emit_stream->write(emit_outputs.begin(), emit_outputs.byte_size());
+					}
+					jobs::exit(ctx.emit_mutex);
+				}
+				break;
+			}
 			case InstructionType::GRADIENT:
-			case InstructionType::EMIT:
-			case InstructionType::KILL:
 			case InstructionType::BLEND:
-			case InstructionType::LT:
-			case InstructionType::GT:
+			case InstructionType::CMP: // TODO nested ifs
+			case InstructionType::CMP_ELSE:
 				ASSERT(false);
 				break;
 		}
@@ -949,7 +949,7 @@ struct ParticleSystem::ChunkProcessorContext {
 		, page_allocator(page_allocator)
 		, is_update(is_update)
 	{
-		u32 num_registers = is_update ? emitter.resource_emitter.update_registers_count : emitter.resource_emitter.output_registers_count;
+		num_registers = is_update ? emitter.resource_emitter.update_registers_count : emitter.resource_emitter.output_registers_count;
 		ASSERT(num_registers <= lengthOf(registers));
 		for (u32 i = 0; i < num_registers; ++i) {
 			registers[i] = (float4*)page_allocator.allocate();
@@ -957,7 +957,7 @@ struct ParticleSystem::ChunkProcessorContext {
 	}
 
 	~ChunkProcessorContext() {
-		u32 num_registers = is_update ? emitter.resource_emitter.update_registers_count : emitter.resource_emitter.output_registers_count;
+		num_registers = is_update ? emitter.resource_emitter.update_registers_count : emitter.resource_emitter.output_registers_count;
 		for (u32 i = 0; i < num_registers; ++i) {
 			page_allocator.deallocate(registers[i]);
 		}
@@ -969,6 +969,7 @@ struct ParticleSystem::ChunkProcessorContext {
 	i32 from;
 	i32 to;
 	float4* registers[16] = {};
+	u32 num_registers = 0;
 
 	u32 instructions_offset = 0;
 	u32* kill_counter = nullptr;
@@ -978,6 +979,19 @@ struct ParticleSystem::ChunkProcessorContext {
 	float* output_memory = nullptr;
 	u32 ribbon_index = 0;
 };
+
+void ParticleSystem::skipBlock(ParticleSystem::RunningContext& ctx, const InputMemoryStream& ip, InputMemoryStream& head, InputMemoryStream& tail) {
+	ctx.instructions.set((const u8*)ip.getData() + ip.getPosition(), ip.remaining());
+	ctx.particle_idx = 0;
+	jobs::Mutex* mtx = ctx.emit_mutex;
+	ctx.emit_mutex = nullptr;
+	run(ctx);
+	ctx.emit_mutex = mtx;
+
+	u32 remaining = u32(ctx.instructions.remaining());
+	head.set(ctx.instructions.getData(), ctx.instructions.size() - remaining);
+	tail.set((const u8*)head.getData() + head.size(), remaining);
+}
 
 void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 	const Emitter& emitter = ctx.emitter;
@@ -989,27 +1003,90 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 	InputMemoryStream ip = InputMemoryStream(res_emitter.instructions);
 	ip.skip(ctx.instructions_offset);
 	InstructionType itype = ip.read<InstructionType>();
+	const u32 num_registers = ctx.num_registers;
 
 	ProcessHelper op_helper(emitter, fromf4, stepf4, ctx.registers);
 	op_helper.out_mem = ctx.output_memory;
+	const u32 num_channels = res_emitter.channels_count;
 
 	while (itype != InstructionType::END) {
 		switch (itype) {
-			case InstructionType::KILL: {
+			case InstructionType::CMP_ELSE: {
 				DataStream condition_stream = ip.read<DataStream>();
-				const float4* start = getStream(emitter, condition_stream, fromf4, ctx.registers);
-				const float4* const end = start + stepf4;
+				const float4* cond = getStream(emitter, condition_stream, fromf4, ctx.registers);
+				const float4* const end = cond + stepf4;
+				StackArray<float, 16> tmp_outputs(m_allocator);
+				tmp_outputs.resize(emitter.resource_emitter.outputs_count);
+				RunningContext single_ctx(emitter, m_allocator);
+				single_ctx.instructions = ip;
+				single_ctx.output_memory = tmp_outputs.begin();
+				single_ctx.registers.resize(num_registers);
+				single_ctx.emit_mutex = ctx.emit_mutex;
+				single_ctx.emit_stream = ctx.emit_stream;
+				
+				// TODO serialize block length so we can avoid this
+				InputMemoryStream true_block_ip(nullptr, 0), false_block_ip(nullptr, 0);
+				skipBlock(single_ctx, ip, true_block_ip, false_block_ip);
+				skipBlock(single_ctx, false_block_ip, false_block_ip, ip);
 				u32 kill_count = 0;
 				u32 last = ctx.to - 1;
-				const i32 channels_count = res_emitter.channels_count;
-				for (const float4* cond = end - 1; cond >= start; --cond) {
+
+				for (const float4* beg = cond; cond != end; ++cond) {
 					const int m = f4MoveMask(*cond);
-					if (m) {
-						for (int i = 3; i >= 0; --i) {
-							const u32 index_in_chunk = u32((cond - start) * 4 + i);
-							const i32 particle_index = from + index_in_chunk;
-							if ((m & (1 << i)) && particle_index < ctx.to) {
-								for (i32 ch = 0; ch < channels_count; ++ch) {
+					
+					i32 particle_index = from + i32(cond - beg) * 4;
+					for (i32 i = 0; i < 4; ++i) {
+						single_ctx.particle_idx = particle_index;
+						const bool is_true = (m & (1 << i)) && particle_index < ctx.to;
+						single_ctx.instructions = is_true ? true_block_ip : false_block_ip;
+						single_ctx.output_memory = ctx.output_memory + particle_index * emitter.resource_emitter.outputs_count;
+						if (run(single_ctx) == RunResult::KILLED) {
+							for (u32 ch = 0; ch < num_channels; ++ch) {
+								float* data = emitter.channels[ch].data;
+								data[particle_index] = data[last];
+							}
+							--last;
+							++kill_count;
+						}
+						++particle_index;
+					}
+					if (kill_count > 0) {
+						const u32 chunk_idx = from / 1024;
+						ctx.kill_counter[chunk_idx] = kill_count;
+					}
+				}
+				break;
+			}
+			case InstructionType::CMP: {
+				DataStream condition_stream = ip.read<DataStream>();
+				const float4* cond = getStream(emitter, condition_stream, fromf4, ctx.registers);
+				const float4* const end = cond + stepf4;
+				StackArray<float, 16> tmp_outputs(m_allocator);
+				tmp_outputs.resize(emitter.resource_emitter.outputs_count);
+				RunningContext single_ctx(emitter, m_allocator);
+				single_ctx.instructions = ip;
+				single_ctx.output_memory = tmp_outputs.begin();
+				single_ctx.registers.resize(num_registers);
+				single_ctx.emit_mutex = ctx.emit_mutex;
+				single_ctx.emit_stream = ctx.emit_stream;
+				
+				InputMemoryStream true_block_ip(nullptr, 0);
+				skipBlock(single_ctx, ip, true_block_ip, ip);
+				u32 kill_count = 0;
+				u32 last = ctx.to - 1;
+
+				for (const float4* beg = cond; cond != end; ++cond) {
+					const int m = f4MoveMask(*cond);
+					if (!m) continue;
+					
+					i32 particle_index = from + i32(cond - beg) * 4;
+					for (i32 i = 0; i < 4; ++i) {
+						if ((m & (1 << i)) && particle_index < ctx.to) {
+							single_ctx.instructions = true_block_ip;
+							single_ctx.particle_idx = particle_index;
+							single_ctx.output_memory = ctx.output_memory + particle_index * emitter.resource_emitter.outputs_count;
+							if (run(single_ctx) == RunResult::KILLED) {
+								for (u32 ch = 0; ch < num_channels; ++ch) {
 									float* data = emitter.channels[ch].data;
 									data[particle_index] = data[last];
 								}
@@ -1017,67 +1094,58 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 								++kill_count;
 							}
 						}
+						++particle_index;
+					}
+					if (kill_count > 0) {
+						const u32 chunk_idx = from / 1024;
+						ctx.kill_counter[chunk_idx] = kill_count;
 					}
 				}
-				const u32 chunk_idx = from / 1024;
-				ctx.kill_counter[chunk_idx] = kill_count;
-				// TODO update stepf4 and maybe some other vars
+				break;
+			}
+			case InstructionType::KILL: {
+				ASSERT(false); // kill outside if condition would alway kill all particles
+				// TODO catch this in the compiler
 				break;
 			}
 			case InstructionType::EMIT: {
-				DataStream condition_stream = ip.read<DataStream>();
 				const u32 emitter_idx = ip.read<u32>();
-				const float4* cond = getStream(emitter, condition_stream, fromf4, ctx.registers);
-				const float4* const end = cond + stepf4;
 				RunningContext emit_ctx(emitter, m_allocator);
 				bool is_ribbon = emitter.resource_emitter.max_ribbons > 0;
+				StackArray<float, 16> outputs(m_allocator);
+				outputs.resize(m_resource->getEmitters()[emitter_idx].emit_inputs_count);
+
 				if (is_ribbon) {
-					for (const float4* beg = cond; cond != end; ++cond) {
-						const int m = f4MoveMask(*cond);
-						if (!m) continue;
-					
-						for (int i = 0; i < 4; ++i) {
-							const i32 particle_index = from + i32(cond - beg) * 4 + i;
-							if ((m & (1 << i)) && particle_index < ctx.to) {
-								InputMemoryStream tmp_instr((const u8*)ip.getData() + ip.getPosition(), ip.remaining());
-								emit_ctx.instructions.set((const u8*)tmp_instr.getData() + tmp_instr.getPosition(), tmp_instr.remaining());
-								emit_ctx.particle_idx = particle_index;
-								emit_ctx.registers.resize(res_emitter.update_registers_count);
-								emit_ctx.outputs.resize(m_resource->getEmitters()[emitter_idx].emit_inputs_count);
-								run(emit_ctx);
+					for (i32 i = 0; i < stepf4 * 4; ++i) {					
+						const i32 particle_index = from + i;
+						emit_ctx.instructions.set((const u8*)ip.getData() + ip.getPosition(), ip.remaining());
+						emit_ctx.particle_idx = particle_index;
+						emit_ctx.registers.resize(res_emitter.update_registers_count);
+						emit_ctx.output_memory = outputs.begin();
+						run(emit_ctx);
 							
-								jobs::enter(ctx.emit_mutex);
-								ctx.emit_stream->write(emitter_idx);
-								ctx.emit_stream->write(emit_ctx.outputs.size());
-								ctx.emit_stream->write(emit_ctx.outputs.begin(), emit_ctx.outputs.byte_size());
-								ctx.emit_stream->write(ctx.ribbon_index);
-								jobs::exit(ctx.emit_mutex);
-							}
-						}
+						jobs::enter(ctx.emit_mutex);
+						ctx.emit_stream->write(emitter_idx);
+						ctx.emit_stream->write(outputs.size());
+						ctx.emit_stream->write(outputs.begin(), outputs.byte_size());
+						ctx.emit_stream->write(ctx.ribbon_index);
+						jobs::exit(ctx.emit_mutex);
 					}
 				}
 				else {
-					for (const float4* beg = cond; cond != end; ++cond) {
-						const int m = f4MoveMask(*cond);
-						if (!m) continue;
-					
-						for (int i = 0; i < 4; ++i) {
-							const i32 particle_index = from + i32(cond - beg) * 4 + i;
-							if ((m & (1 << i)) && particle_index < ctx.to) {
-								InputMemoryStream tmp_instr((const u8*)ip.getData() + ip.getPosition(), ip.remaining());
-								emit_ctx.instructions.set((const u8*)tmp_instr.getData() + tmp_instr.getPosition(), tmp_instr.remaining());
-								emit_ctx.particle_idx = particle_index;
-								emit_ctx.registers.resize(res_emitter.update_registers_count);
-								emit_ctx.outputs.resize(m_resource->getEmitters()[emitter_idx].emit_inputs_count);
-								run(emit_ctx);
+					for (i32 i = 0; i < stepf4 * 4; ++i) {					
+						const i32 particle_index = from + i;
+						emit_ctx.instructions.set((const u8*)ip.getData() + ip.getPosition(), ip.remaining());
+						emit_ctx.particle_idx = particle_index;
+						emit_ctx.registers.resize(res_emitter.update_registers_count);
+						emit_ctx.output_memory = outputs.begin();
+						run(emit_ctx);
 							
-								jobs::enter(ctx.emit_mutex);
-								ctx.emit_stream->write(emitter_idx);
-								ctx.emit_stream->write(emit_ctx.outputs.size());
-								ctx.emit_stream->write(emit_ctx.outputs.begin(), emit_ctx.outputs.byte_size());
-								jobs::exit(ctx.emit_mutex);
-							}
-						}
+						jobs::enter(ctx.emit_mutex);
+						ctx.emit_stream->write(emitter_idx);
+						ctx.emit_stream->write(outputs.size());
+						ctx.emit_stream->write(outputs.begin(), outputs.byte_size());
+						jobs::exit(ctx.emit_mutex);
 					}
 				}
 
@@ -1086,7 +1154,7 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 				ctx.instructions.set((const u8*)ip.getData() + ip.getPosition(), ip.remaining());
 				ctx.particle_idx = 0;
 				ctx.registers.resize(res_emitter.update_registers_count);
-				ctx.outputs.resize(m_resource->getEmitters()[emitter_idx].emit_inputs_count);
+				ctx.output_memory = outputs.begin();
 				run(ctx);
 				ip.setPosition(ip.size() - ctx.instructions.remaining());
 				break;

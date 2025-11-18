@@ -480,7 +480,8 @@ static bool tokenize(const char* str, u32& token_len, u8& token_type, u8 prev_to
 		"let",
 		"return",
 		"import",
-		"global"
+		"global",
+		"if",
 	};
 	
 	const char* c = str;
