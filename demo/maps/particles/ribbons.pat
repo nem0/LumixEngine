@@ -28,7 +28,7 @@ emitter ribbon {
 			- (min(1, (pos.x - attractor.x) * 0.1)) * pos.y * pos.y * 0.4
 			;
 		i_position.y = pos.y;
-		i_scale = 0.07;//(1 - pos.y * 0.05) * 0.1;
+		i_scale = 0.04;//(1 - pos.y * 0.05) * 0.1;
 		i_color = {1, 0, 0, 1};
 		i_emission = 10;
 	}

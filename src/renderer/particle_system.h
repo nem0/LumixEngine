@@ -25,7 +25,7 @@ struct Renderer;
 
 struct ParticleSystemResource final : Resource {
 	enum class Version : u32{
-		NOT_SUPPORTED_BEFORE = 12,
+		NOT_SUPPORTED_BEFORE = 13,
 
 		LAST
 	};
@@ -92,12 +92,6 @@ struct ParticleSystemResource final : Resource {
 		float value;
 	};
 
-	enum class Flags : u32 {
-		WORLD_SPACE = 1 << 0,
-
-		NONE = 0
-	};
-
 	enum class InstructionType : u8{
 		END,
 		ADD,
@@ -150,14 +144,12 @@ struct ParticleSystemResource final : Resource {
 	);
 
 	Array<Emitter>& getEmitters() { return m_emitters; }
-	Flags getFlags() const { return m_flags; }
 	Span<const Global> getGlobals() const { return m_globals; }
 
 private:
 	Array<Emitter> m_emitters;
 	Array<Global> m_globals;
 	IAllocator& m_allocator;
-	Flags m_flags = Flags::NONE;
 };
 
 
@@ -168,6 +160,9 @@ enum class ParticleSystemValues : u8 {
 	TOTAL_TIME = 1,
 	EMIT_INDEX = 2,
 	RIBBON_INDEX = 3,
+	ENTITY_POSITION_X = 4,
+	ENTITY_POSITION_Y = 5,
+	ENTITY_POSITION_Z = 6,
 	COUNT,
 
 	NONE = 0xff

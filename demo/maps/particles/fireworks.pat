@@ -43,7 +43,9 @@ emitter explosion {
 		t = t + time_delta;
 		vel.y = vel.y - time_delta * G;
 		pos = pos + vel * time_delta;
-		kill(t > 1);
+		if t > 1 {
+			kill();
+		}
 	}
 }
 
@@ -80,13 +82,15 @@ emitter fireworks {
 	fn update() {
 		t = t + time_delta;
 		vel.y = vel.y - time_delta * G;
-		emit(explosion, t > 1.5) {
-			in_pos = vel * t;
-			in_col.x = random(0, 1);
-			in_col.y = random(0, 1);
-			in_col.z = random(0, 1);
-		};
-		kill(t > 1.5);
+		if t > 1.5 {
+			emit(explosion) {
+				in_pos = vel * t;
+				in_col.x = random(0, 1);
+				in_col.y = random(0, 1);
+				in_col.z = random(0, 1);
+			};
+			kill();
+		}
 	}
 }
 

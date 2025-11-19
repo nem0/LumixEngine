@@ -18,7 +18,7 @@ struct ParticleScriptToken {
 		NUMBER, STRING, IDENTIFIER,
 
 		// keywords
-		CONST, GLOBAL, EMITTER, FN, WORLD_SPACE, VAR, OUT, IN, LET, RETURN, IMPORT, IF, ELSE
+		CONST, GLOBAL, EMITTER, FN, VAR, OUT, IN, LET, RETURN, IMPORT, IF, ELSE
 	};
 
 	Type type;
@@ -310,7 +310,6 @@ struct ParticleScriptTokenizer {
 			case 'o': return checkKeyword("ut", 1, 2, Token::OUT);
 			case 'r': return checkKeyword("eturn", 1, 5, Token::RETURN);
 			case 'v': return checkKeyword("ar", 1, 2, Token::VAR);
-			case 'w': return checkKeyword("orld_space", 1, 10, Token::WORLD_SPACE);
 		}
 		return makeToken(Token::IDENTIFIER);
 	}
@@ -731,7 +730,6 @@ const char* toString(Token::Type type) {
 			case Token::Type::IDENTIFIER: return "identifier";
 			case Token::Type::GLOBAL: return "global";
 			case Token::Type::FN: return "fn";
-			case Token::Type::WORLD_SPACE: return "world_space";
 			case Token::Type::VAR: return "var";
 			case Token::Type::OUT: return "out";
 			case Token::Type::IN: return "in";
@@ -921,11 +919,32 @@ const char* toString(Token::Type type) {
 		return node;
 	}
 	
+	static bool tokenMatchRemaining(StringView name, const char* remaining, i32 start, i32 len) {
+		if (name.size() != start + len) return false;
+		if (memcmp(name.begin + start, remaining, len) == 0) return true;
+		return false;
+	}
+
 	ParticleSystemValues getSystemValue(StringView name) {
-		if (equalStrings(name, "time_delta")) return ParticleSystemValues::TIME_DELTA;
-		if (equalStrings(name, "total_time")) return ParticleSystemValues::TOTAL_TIME;
-		if (equalStrings(name, "emit_index")) return ParticleSystemValues::EMIT_INDEX;
-		if (equalStrings(name, "ribbon_index")) return ParticleSystemValues::RIBBON_INDEX;
+		switch (name[0]) {
+			case 'e':
+				if (tokenMatchRemaining(name, "mit_index", 1, 9)) return ParticleSystemValues::EMIT_INDEX;
+				break; 
+			case 'r':
+				if (tokenMatchRemaining(name, "ibbon_index", 1, 11)) return ParticleSystemValues::RIBBON_INDEX;
+				break; 
+			case 't': 
+				if (name.size() < 2) return ParticleSystemValues::NONE;
+				switch (name[1]) {
+					case 'i':
+						if (tokenMatchRemaining(name, "me_delta", 2, 8)) return ParticleSystemValues::TIME_DELTA;
+						break; 
+					case 'o':
+						if (tokenMatchRemaining(name, "tal_time", 2, 8)) return ParticleSystemValues::TOTAL_TIME;
+						break; 
+				}
+				break;
+		}
 		return ParticleSystemValues::NONE;
 	}
 
@@ -1056,6 +1075,23 @@ const char* toString(Token::Type type) {
 						node->index = i32(&e - m_emitters.begin());
 						return node;
 					}
+				}
+
+				if (equalStrings(token.value, "entity_position")) {
+					auto* node = LUMIX_NEW(m_arena_allocator, CompoundNode)(token, m_arena_allocator);
+					node->elements.reserve(3);
+					auto* x = LUMIX_NEW(m_arena_allocator, SystemValueNode)(token);
+					x->value = ParticleSystemValues::ENTITY_POSITION_X;
+					node->elements.push(x);
+					
+					auto* y = LUMIX_NEW(m_arena_allocator, SystemValueNode)(token);
+					y->value = ParticleSystemValues::ENTITY_POSITION_Y;
+					node->elements.push(y);
+					
+					auto* z = LUMIX_NEW(m_arena_allocator, SystemValueNode)(token);
+					z->value = ParticleSystemValues::ENTITY_POSITION_Z;
+					node->elements.push(z);
+					return node;
 				}
 
 				ParticleSystemValues system_value = getSystemValue(token.value);
@@ -1375,7 +1411,6 @@ const char* toString(Token::Type type) {
 				case Token::FN: compileFunction(); break;
 				case Token::GLOBAL: variableDeclaration(m_globals); break;
 				case Token::EMITTER: compileEmitter(); break;
-				case Token::WORLD_SPACE: m_is_world_space = true; break;
 				default: error(token.value, "Unexpected token ", token.value); return;
 			}
 		}
@@ -2196,7 +2231,6 @@ const char* toString(Token::Type type) {
 				case Token::FN: compileFunction(); break;
 				case Token::GLOBAL: variableDeclaration(m_globals); break;
 				case Token::EMITTER: compileEmitter(); break;
-				case Token::WORLD_SPACE: m_is_world_space = true; break;
 				default: error(token.value, "Unexpected token ", token.value); return false;
 			}
 		}
@@ -2205,9 +2239,6 @@ const char* toString(Token::Type type) {
 		ParticleSystemResource::Header header;
 		output.write(header);
 
-		ParticleSystemResource::Flags flags = m_is_world_space ? ParticleSystemResource::Flags::WORLD_SPACE : ParticleSystemResource::Flags::NONE;
-		output.write(flags);
-		
 		output.write(m_emitters.size());
 		auto getCount = [](const auto& x){
 			u32 c = 0;
@@ -2272,7 +2303,6 @@ const char* toString(Token::Type type) {
 	Path m_path;
 	bool m_is_error = false;
 	ParticleScriptTokenizer m_tokenizer;
-	bool m_is_world_space = false;
 	Array<Constant> m_constants;
 	Array<Function> m_functions;
 	Array<Variable> m_globals;

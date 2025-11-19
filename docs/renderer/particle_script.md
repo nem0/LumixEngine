@@ -64,7 +64,6 @@ emitter EmitterName {
 
 ### Other
 - `import` - Import other scripts
-- `world_space` - Transform coordinates to world space
 
 ## Control Flow
 
@@ -212,6 +211,7 @@ fn sphere(r) {
 - `total_time` - Total elapsed time
 - `emit_index` - Index of current particle being emitted
 - `ribbon_index` - Index for ribbon particles
+- `entity_position` - World space position of emitting entity - useful to make world space particles
 
 ## Operators
 

@@ -2,6 +2,7 @@
 //@uniform "Frames cols", "int", 1
 //@uniform "Frames rows", "int", 1
 //@texture_slot "Texture", "engine/textures/white.tga"
+//@define "WORLD_SPACE"
 
 #include "engine/shaders/common.hlsli"
 
@@ -44,7 +45,12 @@ VSOutput mainVS(VSInput input) {
 	
 	output.color = input.i_color;
 	output.emission = input.i_emission;
-	float4 pos_vs = transformPosition(input.i_position, u_model, Pass_ws_to_vs) + float4(pos.xy, 0, 0);
+	#ifdef WORLD_SPACE
+		float4 pos_vs = transformPosition(input.i_position - Global_camera_world_pos.xyz, Pass_ws_to_vs);
+	#else
+		float4 pos_vs = transformPosition(input.i_position, u_model, Pass_ws_to_vs);
+	#endif
+	pos_vs +=  + float4(pos.xy, 0, 0);
 	output.position = transformPosition(pos_vs, Pass_vs_to_ndc);
 	return output;
 }

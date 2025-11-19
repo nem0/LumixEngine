@@ -1,4 +1,5 @@
 //@surface
+//@define "WORLD_SPACE"
 ////@texture_slot "Texture", "engine/textures/white.tga"
 
 #include "engine/shaders/common.hlsli"
@@ -61,11 +62,15 @@ VSOutput mainVS(VSInput input) {
 	dir = mul(float4(dir, 0), u_model);
 	
 	float3 right = normalize(cross(Global_view_dir.xyz, dir));
-	float3 offset = right * pd.scale * (input.vertex_id & 1);
+	float3 offset = right * pd.scale * (input.vertex_id & 1 ? 1 : -1);
 
 	output.color = pd.color;
 	output.emission = pd.emission;
-	float4 pos_vs = transformPosition(transformPosition(pd.position, u_model) + offset, Pass_ws_to_vs);
+	#ifdef WORLD_SPACE
+		float4 pos_vs = transformPosition(pd.position - Global_camera_world_pos.xyz + offset, Pass_ws_to_vs);
+	#else
+		float4 pos_vs = transformPosition(transformPosition(pd.position, u_model) + offset, Pass_ws_to_vs);
+	#endif
 	output.position = transformPosition(pos_vs, Pass_vs_to_ndc);
 	return output;
 }

@@ -49,6 +49,7 @@ enum class Version {
 	WORLD_SPACE,
 	STREAM_NODE_CHANNELS,
 	MODEL,
+	REMOVED_WORLD_SPACE,
 
 	LAST
 };
@@ -754,7 +755,6 @@ struct ParticleSystemEditorResource {
 	void serialize(OutputMemoryStream& blob) {
 		Header header;
 		blob.write(header);
-		blob.write(m_world_space);
 		blob.write(m_emitters.size());
 		for (const UniquePtr<ParticleEmitterEditorResource>& e : m_emitters) {
 			e->serialize(blob);
@@ -773,7 +773,7 @@ struct ParticleSystemEditorResource {
 			return false;
 		}
 
-		if (header.version > Version::WORLD_SPACE) blob.read(m_world_space);
+		if (header.version > Version::WORLD_SPACE && header.version <= Version::REMOVED_WORLD_SPACE) blob.read<bool>();
 
 		m_emitters.clear();
 		u32 count = 1;
@@ -841,7 +841,6 @@ struct ParticleSystemEditorResource {
 	Array<UniquePtr<ParticleEmitterEditorResource>> m_emitters;
 	Path m_path;
 	String m_name;
-	bool m_world_space = false;
 };
 
 ResourceType ParticleSystemEditorResource::TYPE = ResourceType("editor_particle");
@@ -2759,11 +2758,7 @@ struct ParticleEditorImpl : ParticleEditor {
 
 		ParticleSystemResource::Header header;
 		output.write(header);
-		
-		ParticleSystemResource::Flags flags = ParticleSystemResource::Flags::NONE;
-		if (res.m_world_space) flags = ParticleSystemResource::Flags::WORLD_SPACE;
-		output.write(flags);
-		
+	
 		output.write(res.m_emitters.size());
 		for (const UniquePtr<ParticleEmitterEditorResource>& emitter : res.m_emitters) {
 			if (!emitter->generate()) return false;
@@ -3477,7 +3472,6 @@ struct ParticleEditorWindow : AssetEditorWindow, NodeEditor {
 				ImGui::EndMenu();
 			}
 			if (ImGui::BeginMenu("Edit")) {
-				ImGui::MenuItem("World space", 0, &m_resource.m_world_space);
 				if (menuItem(actions.undo, canUndo())) undo();
 				if (menuItem(actions.redo, canRedo())) redo();
 				if (ImGui::MenuItem(ICON_FA_BRUSH "Clear")) deleteUnreachable();

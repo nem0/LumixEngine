@@ -475,7 +475,6 @@ static bool tokenize(const char* str, u32& token_len, u8& token_type, u8 prev_to
 		"init_ribbons_count",
 		"mesh",
 		"material",
-		"world_space",
 		"emit_on_move",
 		"let",
 		"return",

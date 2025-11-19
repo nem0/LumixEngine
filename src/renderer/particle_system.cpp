@@ -159,8 +159,6 @@ bool ParticleSystemResource::load(Span<const u8> mem) {
 		return false;
 	}
 
-	blob.read(m_flags);
-
 	u32 emitter_count = emitter_count = blob.read<u32>();
 
 	for (u32 i = 0; i < emitter_count; ++i) {
@@ -372,6 +370,10 @@ void ParticleSystem::emitRibbonPoints(u32 emitter_idx, u32 ribbon_idx, Span<cons
 	ctx.registers.resize(res_emitter.emit_registers_count + emit_data.length());
 
 	const u32 max_len = emitter.resource_emitter.max_ribbon_length;
+	DVec3 pos = m_world.getPosition(*m_entity);
+	m_system_values[(u8)ParticleSystemValues::ENTITY_POSITION_X] = (float)pos.x;
+	m_system_values[(u8)ParticleSystemValues::ENTITY_POSITION_Y] = (float)pos.y;
+	m_system_values[(u8)ParticleSystemValues::ENTITY_POSITION_Z] = (float)pos.z;
 	m_system_values[(u8)ParticleSystemValues::RIBBON_INDEX] = (float)ribbon_idx;
 	for (u32 i = 0; i < count; ++i) {
 		m_system_values[(u8)ParticleSystemValues::EMIT_INDEX] = (float)ribbon.emit_index;
@@ -407,6 +409,10 @@ void ParticleSystem::emit(u32 emitter_idx, Span<const float> emit_data, u32 coun
 	ctx.registers.resize(res_emitter.emit_registers_count + emit_data.length());
 
 	const float c1 = m_system_values[(u8)ParticleSystemValues::TOTAL_TIME];
+	DVec3 pos = m_world.getPosition(*m_entity);
+	m_system_values[(u8)ParticleSystemValues::ENTITY_POSITION_X] = (float)pos.x;
+	m_system_values[(u8)ParticleSystemValues::ENTITY_POSITION_Y] = (float)pos.y;
+	m_system_values[(u8)ParticleSystemValues::ENTITY_POSITION_Z] = (float)pos.z;
 	m_system_values[(u8)ParticleSystemValues::RIBBON_INDEX] = 0;
 	for (u32 i = 0; i < count; ++i) {
 		m_system_values[(u8)ParticleSystemValues::EMIT_INDEX] = (float)emitter.emit_index; // TODO
@@ -1337,22 +1343,6 @@ void ParticleSystem::applyTransform(const Transform& new_tr) {
 				}
 			}
 		}
-		if ((u32)m_resource->getFlags() & (u32)ParticleSystemResource::Flags::WORLD_SPACE) {
-			jobs::forEach(emitter.particles_count, 4096, [&](u32 from, u32 to){
-				PROFILE_BLOCK("to world space");
-				// TODO make sure first 3 channels are position
-				float* LUMIX_RESTRICT x = emitter.channels[0].data;
-				float* LUMIX_RESTRICT y = emitter.channels[1].data;
-				float* LUMIX_RESTRICT z = emitter.channels[2].data;
-				for (u32 i = from; i < to; ++i) {
-					Vec3 p{x[i], y[i], z[i]};
-					p = Vec3(delta_tr.transform(p));
-					x[i] = p.x;
-					y[i] = p.y;
-					z[i] = p.z;
-				}
-			});
-		}
 	}
 	m_prev_frame_transform = new_tr;
 }
@@ -1551,6 +1541,10 @@ bool ParticleSystem::update(float dt, PageAllocator& page_allocator)
 	m_last_update_stats = {};
 	if (!m_resource || !m_resource->isReady()) return false;
 	
+	DVec3 pos = m_world.getPosition(*m_entity);
+	m_system_values[(u8)ParticleSystemValues::ENTITY_POSITION_X] = (float)pos.x;
+	m_system_values[(u8)ParticleSystemValues::ENTITY_POSITION_Y] = (float)pos.y;
+	m_system_values[(u8)ParticleSystemValues::ENTITY_POSITION_Z] = (float)pos.z;
 	m_system_values[(u8)ParticleSystemValues::TIME_DELTA] = dt;
 	m_system_values[(u8)ParticleSystemValues::TOTAL_TIME] = m_total_time;
 	

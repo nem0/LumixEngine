@@ -19,7 +19,9 @@ emitter Emitter0 {
 		t = t + time_delta;
 		pos = pos + vel * time_delta;
 		vel.y = vel.y - G * time_delta;
-		kill(pos.y < -0.01);
+		if pos.y < -0.01 {
+			kill();
+		}
 	}
 
 	fn emit() {
