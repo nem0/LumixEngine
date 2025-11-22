@@ -646,6 +646,7 @@ const char* toString(Token::Type type) {
 				for (Node*& statement : n->statements) {
 					statement = collapseConstants(statement);
 				}
+				n->statements.eraseItems([](Node* n){ return n == nullptr; });
 				return node;
 			}
 			case Node::SYSCALL: {
@@ -694,6 +695,10 @@ const char* toString(Token::Type type) {
 				n->condition = collapseConstants(n->condition);
 				collapseConstants(n->true_block);
 				if (n->false_block) collapseConstants(n->false_block);
+				if (n->condition->type == Node::LITERAL) {
+					float v = ((LiteralNode*)n->condition)->value;
+					return v == 0 ? n->false_block : n->true_block;
+				}
 				return node;
 			}
 			case Node::FUNCTION_CALL: {
@@ -745,6 +750,9 @@ const char* toString(Token::Type type) {
 					case Operators::SUB: l->value = l->value - r->value; return l;
 					case Operators::MUL: l->value = l->value * r->value; return l;
 					case Operators::DIV: l->value = l->value / r->value; return l;
+					case Operators::MOD: l->value = fmodf(l->value, r->value); return l;
+					case Operators::LT: l->value = l->value < r->value ? 1.f : 0.f; return l;
+					case Operators::GT: l->value = l->value > r->value ? 1.f : 0.f; return l;
 					default: return node;
 				}
 			}
@@ -1570,7 +1578,7 @@ const char* toString(Token::Type type) {
 		u32 stack_offset = ctx.value_counter;
 
 		BlockNode* b = block(ctx);
-		if (!b) return;
+		if (!b || m_is_error) return;
 		compile(ctx, b, compiled);
 		compiled.write(InstructionType::END);
 		u32 num_used_registers = optimizeBytecode(compiled, stack_offset);
@@ -1597,7 +1605,7 @@ const char* toString(Token::Type type) {
 	CompileResult toCompileResult(const Variable& var, DataStream::Type type) {
 		CompileResult res;
 		switch (var.type) {
-			case ValueType::FLOAT4: 
+			case ValueType::FLOAT4:
 				res.streams[3].type = type;
 				res.streams[3].index = var.offset + 3;
 				++res.num_streams;
