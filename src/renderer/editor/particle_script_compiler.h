@@ -1509,13 +1509,15 @@ const char* toString(Token::Type type) {
 			InstructionType itype = ip.read<InstructionType>();
 			switch (itype) {
 				case InstructionType::END: return instruction_index;
-				case InstructionType::CMP_ELSE: 
+				case InstructionType::CMP_ELSE:
 					forNumStreams(1, itype, ioffset);
+					ip.skip(sizeof(u16) * 2); // blocks' sizes
 					instruction_index = forEachDataStreamInBytecode(ip, f, instruction_index); // if subblock
 					instruction_index = forEachDataStreamInBytecode(ip, f, instruction_index); // else subblock
 					break;
 				case InstructionType::CMP: 
 					forNumStreams(1, itype, ioffset);
+					ip.skip(sizeof(u16)); // block size
 					instruction_index = forEachDataStreamInBytecode(ip, f, instruction_index); // if subblock
 					break;
 				case InstructionType::NOISE: forNumStreams(2, itype, ioffset); break;
@@ -1545,6 +1547,40 @@ const char* toString(Token::Type type) {
 					break;
 			}
 		}
+	}
+
+	// some instructions do jumps relative to them, let's compute the jump size after all optimizations are done
+	void patchBlockSizes(OutputMemoryStream& bytecode) {
+		InputMemoryStream ip(bytecode);
+		forEachDataStreamInBytecode(ip, [&](const DataStream& s, i32 position, i32 arg_index, InstructionType itype, i32 ioffset, i32){
+			if (arg_index != 0) return;
+			switch (itype) {
+				case InstructionType::CMP_ELSE: {
+					u64 offset = position + sizeof(DataStream);
+					
+					InputMemoryStream inner((const u8*)ip.getData() + offset + sizeof(u16) * 2, ip.size() - offset - sizeof(u16) * 2);
+					forEachDataStreamInBytecode(inner, [](const DataStream& s, i32 position, i32 arg_index, InstructionType itype, i32 ioffset, i32){});
+					u64 true_size = inner.getPosition();
+					forEachDataStreamInBytecode(inner, [](const DataStream& s, i32 position, i32 arg_index, InstructionType itype, i32 ioffset, i32){});
+					u64 false_size = inner.getPosition() - true_size;
+					*(u16*)(bytecode.getMutableData() + offset) = u16(true_size);
+					*(u16*)(bytecode.getMutableData() + offset + 2) = u16(false_size);
+
+					break;
+				}
+				case InstructionType::CMP: {
+					u64 offset = position + sizeof(DataStream);
+					
+					InputMemoryStream inner((const u8*)ip.getData() + offset + sizeof(u16), ip.size() - offset - sizeof(u16));
+					forEachDataStreamInBytecode(inner, [](const DataStream& s, i32 position, i32 arg_index, InstructionType itype, i32 ioffset, i32){});
+					u64 size = inner.getPosition();
+					*(u16*)(bytecode.getMutableData() + offset) = u16(size);
+
+					break;
+				}
+				default: break;
+			}
+		});
 	}
 
 	u32 optimizeBytecode(OutputMemoryStream& bytecode, u32 num_immutables) {
@@ -1728,6 +1764,7 @@ const char* toString(Token::Type type) {
 		compile(ctx, collapsed, compiled);
 		compiled.write(InstructionType::END);
 		u32 num_used_registers = optimizeBytecode(compiled, stack_offset);
+		patchBlockSizes(compiled);
 		InputMemoryStream ip(compiled.data(), compiled.size());
 		u32 max_instruction_index = 0;
 		forEachDataStreamInBytecode(ip, [&](const DataStream&, i32, i32, InstructionType, i32, i32 instruction_index){
@@ -1984,15 +2021,12 @@ const char* toString(Token::Type type) {
 				compiled.write(n->function.instruction);
 				if (n->function.instruction == InstructionType::EMIT) {
 					compiled.write(u32(args[0].streams[0].value));
-					//popStack(args[0].streams[0]);
 					if (n->after_block) {
 						CompileContext inner_ctx = ctx;
-						if (n->function.instruction == InstructionType::EMIT) {
-							inner_ctx.emitted = &m_emitters[u32(args[0].streams[0].value)];
-						}
+						inner_ctx.emitted = &m_emitters[u32(args[0].streams[0].value)];
 						if (!compile(inner_ctx, n->after_block, compiled).success) return {.success = false};
-						compiled.write(InstructionType::END);
 					}
+					compiled.write(InstructionType::END);
 				}
 				else {
 					if (n->function.returns_value) {
@@ -2060,6 +2094,8 @@ const char* toString(Token::Type type) {
 				}
 				compiled.write(n->false_block ? InstructionType::CMP_ELSE : InstructionType::CMP);
 				compiled.write(cond.streams[0]);
+				compiled.write(u16(0));
+				if (n->false_block) compiled.write(u16(0));
 
 				ctx.block = n->true_block;
 				// alloc space for locals

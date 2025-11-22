@@ -1610,8 +1610,11 @@ struct UpdateNode : Node {
 		if (kill_input.node) {
 			DataStream res = kill_input.generate(ctx, {}, 0);
 			if (res.isError()) return res;
-			ctx.write(InstructionType::KILL);
+			ctx.write(InstructionType::CMP);
 			ctx.write(res);
+			ctx.write(u16(2));
+			ctx.write(InstructionType::KILL);
+			ctx.write(InstructionType::END);
 		}
 
 		ctx.m_register_mask = ctx.m_persistent_register_mask;
@@ -2559,8 +2562,11 @@ struct EmitNode : Node {
 		DataStream res = cond_input.generate(ctx, {}, 0);
 		if (res.isError()) return res;
 
-		ctx.write(InstructionType::EMIT);
+		ctx.write(InstructionType::CMP);
 		ctx.write(res);
+		const u64 block_size_offset = ctx.ip.size();
+		ctx.write(u16(0));
+		ctx.write(InstructionType::EMIT);
 		ctx.write(emitter_idx);
 		
 		ParticleEmitterEditorResource& emitter = *m_resource.m_system.m_emitters[emitter_idx].get();
@@ -2584,6 +2590,9 @@ struct EmitNode : Node {
 			}
 		}
 		ctx.write(InstructionType::END);
+		const u64 block_end = ctx.ip.size();
+		*(u16*)(ctx.ip.getMutableData() + block_size_offset) = u16(block_end - block_size_offset - 2);
+
 		return {};
 	}
 

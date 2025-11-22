@@ -933,21 +933,19 @@ ParticleSystem::RunResult ParticleSystem::run(RunningContext& ctx) {
 				run(ctx);
 				ctx.output_memory = output_tmp;
 
-				if (ctx.emit_mutex) { // if we are just skipping, emit_mutex is null
-					jobs::enter(ctx.emit_mutex);
-					if (is_ribbon) {
-						ctx.emit_stream->write(emitter_idx);
-						ctx.emit_stream->write(emit_outputs.size());
-						ctx.emit_stream->write(emit_outputs.begin(), emit_outputs.byte_size());
-						ctx.emit_stream->write(ctx.ribbon_index);
-					}
-					else {
-						ctx.emit_stream->write(emitter_idx);
-						ctx.emit_stream->write(emit_outputs.size());
-						ctx.emit_stream->write(emit_outputs.begin(), emit_outputs.byte_size());
-					}
-					jobs::exit(ctx.emit_mutex);
+				jobs::enter(ctx.emit_mutex);
+				if (is_ribbon) {
+					ctx.emit_stream->write(emitter_idx);
+					ctx.emit_stream->write(emit_outputs.size());
+					ctx.emit_stream->write(emit_outputs.begin(), emit_outputs.byte_size());
+					ctx.emit_stream->write(ctx.ribbon_index);
 				}
+				else {
+					ctx.emit_stream->write(emitter_idx);
+					ctx.emit_stream->write(emit_outputs.size());
+					ctx.emit_stream->write(emit_outputs.begin(), emit_outputs.byte_size());
+				}
+				jobs::exit(ctx.emit_mutex);
 				break;
 			}
 			case InstructionType::GRADIENT:
@@ -997,20 +995,6 @@ struct ParticleSystem::ChunkProcessorContext {
 	u32 ribbon_index = 0;
 };
 
-void ParticleSystem::skipBlock(ParticleSystem::RunningContext& ctx, const InputMemoryStream& ip, InputMemoryStream& head, InputMemoryStream& tail) {
-	ctx.instructions.set((const u8*)ip.getData() + ip.getPosition(), ip.remaining());
-	ctx.particle_idx = 0;
-	ctx.register_access_idx = 0;
-	jobs::Mutex* mtx = ctx.emit_mutex;
-	ctx.emit_mutex = nullptr;
-	run(ctx);
-	ctx.emit_mutex = mtx;
-
-	u32 remaining = u32(ctx.instructions.remaining());
-	head.set(ctx.instructions.getData(), ctx.instructions.size() - remaining);
-	tail.set((const u8*)head.getData() + head.size(), remaining);
-}
-
 void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 	const Emitter& emitter = ctx.emitter;
 	const i32 from = ctx.from;
@@ -1031,6 +1015,8 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 		switch (itype) {
 			case InstructionType::CMP_ELSE: {
 				DataStream condition_stream = ip.read<DataStream>();
+				const u16 true_block_size = ip.read<u16>();
+				const u16 false_block_size = ip.read<u16>();
 				const float4* cond = getStream(emitter, condition_stream, fromf4, ctx.registers);
 				const float4* const end = cond + stepf4;
 				StackArray<float, 16> tmp_outputs(m_allocator);
@@ -1043,9 +1029,9 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 				single_ctx.emit_stream = ctx.emit_stream;
 				
 				// TODO serialize block length so we can avoid this
-				InputMemoryStream true_block_ip(nullptr, 0), false_block_ip(nullptr, 0);
-				skipBlock(single_ctx, ip, true_block_ip, false_block_ip);
-				skipBlock(single_ctx, false_block_ip, false_block_ip, ip);
+				InputMemoryStream true_block_ip((const u8*)ip.getData() + ip.getPosition(), true_block_size);
+				InputMemoryStream false_block_ip((const u8*)true_block_ip.getData() + true_block_size, false_block_size);
+				ip.setPosition(ip.getPosition() + true_block_size + false_block_size);
 				u32 kill_count = 0;
 				u32 last = ctx.to - 1;
 
@@ -1078,6 +1064,7 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 			}
 			case InstructionType::CMP: {
 				DataStream condition_stream = ip.read<DataStream>();
+				const u16 block_size = ip.read<u16>();
 				const float4* cond = getStream(emitter, condition_stream, fromf4, ctx.registers);
 				const float4* const end = cond + stepf4;
 				StackArray<float, 16> tmp_outputs(m_allocator);
@@ -1089,8 +1076,8 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 				single_ctx.emit_mutex = ctx.emit_mutex;
 				single_ctx.emit_stream = ctx.emit_stream;
 				
-				InputMemoryStream true_block_ip(nullptr, 0);
-				skipBlock(single_ctx, ip, true_block_ip, ip);
+				InputMemoryStream true_block_ip = ip;
+				ip.setPosition(ip.getPosition() + block_size);
 				u32 kill_count = 0;
 				u32 last = ctx.to - 1;
 
@@ -1129,61 +1116,7 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 				break;
 			}
 			case InstructionType::EMIT: {
-				const u32 emitter_idx = ip.read<u32>();
-				RunningContext emit_ctx(emitter, m_allocator);
-				bool is_ribbon = emitter.resource_emitter.max_ribbons > 0;
-				StackArray<float, 16> outputs(m_allocator);
-				outputs.resize(m_resource->getEmitters()[emitter_idx].emit_inputs_count);
-				emit_ctx.register_access_idx = 0;
-				for (u32 i = 0, c = num_registers; i < c; ++i) {
-					emit_ctx.registers[i] = (float*)ctx.registers[i];
-				}
-				emit_ctx.output_memory = outputs.begin();
-				if (is_ribbon) {
-					for (i32 i = 0; i < stepf4 * 4; ++i) {					
-						const i32 particle_index = from + i;
-						emit_ctx.instructions.set((const u8*)ip.getData() + ip.getPosition(), ip.remaining());
-						emit_ctx.particle_idx = particle_index;
-						run(emit_ctx);
-							
-						jobs::enter(ctx.emit_mutex);
-						ctx.emit_stream->write(emitter_idx);
-						ctx.emit_stream->write(outputs.size());
-						ctx.emit_stream->write(outputs.begin(), outputs.byte_size());
-						ctx.emit_stream->write(ctx.ribbon_index);
-						jobs::exit(ctx.emit_mutex);
-					}
-				}
-				else {
-					for (i32 i = 0; i < stepf4 * 4; ++i) {					
-						const i32 particle_index = from + i;
-						emit_ctx.instructions.set((const u8*)ip.getData() + ip.getPosition(), ip.remaining());
-						emit_ctx.particle_idx = particle_index;
-						run(emit_ctx);
-							
-						jobs::enter(ctx.emit_mutex);
-						ctx.emit_stream->write(emitter_idx);
-						ctx.emit_stream->write(outputs.size());
-						ctx.emit_stream->write(outputs.begin(), outputs.byte_size());
-						jobs::exit(ctx.emit_mutex);
-					}
-				}
-
-				// skip emit subroutine
-				// TODO just a jmp 
-				// TODO this actually exectues for the first particle, i.e., it can change 1st particle's channels
-				RunningContext ctx(emitter, m_allocator);
-				ctx.instructions.set((const u8*)ip.getData() + ip.getPosition(), ip.remaining());
-				ctx.particle_idx = 0;
-				ctx.register_access_idx = 0;
-				StackArray<float, 16> registers(m_allocator);
-				registers.resize(num_registers);
-				for (u32 i = 0, c = num_registers; i < c; ++i) {
-					ctx.registers[i] = &registers[i];
-				}
-				ctx.output_memory = outputs.begin();
-				run(ctx);
-				ip.setPosition(ip.size() - ctx.instructions.remaining());
+				ASSERT(false);
 				break;
 			}
 			case InstructionType::SPLINE: {
