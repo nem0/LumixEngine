@@ -239,6 +239,8 @@ struct ParticleScriptCompiler {
 		StringView name;
 		ValueType type;
 		i32 registers[4] = {-1, -1, -1, -1};
+		bool is_const[4] = {true, true, true, true};
+		float values[4] = {};
 	};
 
 	struct BlockNode;
@@ -310,6 +312,7 @@ struct ParticleScriptCompiler {
 		BlockNode* block = nullptr;
 		EntryPoint entry_point;
 
+
 		u32 value_counter = 0;
 	};
 
@@ -322,7 +325,6 @@ struct ParticleScriptCompiler {
 			FUNCTION_ARG,
 			ASSIGN,
 			VARIABLE,
-			LOCAL_VARIABLE,
 			SWIZZLE,
 			SYSCALL,
 			SYSTEM_VALUE,
@@ -615,36 +617,146 @@ const char* toString(Token::Type type) {
 		return 0;
 	}
 
+	i32 toCount(ValueType type) {
+		switch (type) {
+			case ValueType::VOID: return 0;
+			case ValueType::FLOAT: return 1;
+			case ValueType::FLOAT3: return 3;
+			case ValueType::FLOAT4: return 4;
+		}
+		ASSERT(false);
+		return -1;
+	}
+
+	template <typename F>
+	void forEachSwizzleToIndex(StringView swizzle, F&& f) {
+		for (u32 i = 0, c = swizzle.size(); i < c; ++i) {	
+			switch (swizzle[i]) {
+				case 'x': case 'r': f(0); break;
+				case 'y': case 'g': f(1); break;
+				case 'z': case 'b': f(2); break;
+				case 'w': case 'a': f(3); break;
+			}
+		}
+	}
+
 	// original nodes are left in undefined state
-	Node* collapseConstants(Node* node) {
+	Node* collapseConstants(Node* node, BlockNode* block, bool is_conditional_block = false) {
 		switch (node->type) {
 			case Node::RETURN: {
 				auto* r = (ReturnNode*)node;
-				r->value = collapseConstants(r->value);
+				r->value = collapseConstants(r->value, block, is_conditional_block);
 				return r;
 			}
 			case Node::ASSIGN: {
 				auto* n = (AssignNode*)node;
-				n->right = collapseConstants(n->right);
+				n->right = collapseConstants(n->right, block, is_conditional_block);
+				
+				// n->left is either variable of swizzle node
+				// if n->right is not const, we set the local's is_const to false
+				// if n->right is const, we set the local's is_const to true and set local's values
+				
+				if (n->left->type != Node::VARIABLE && n->left->type != Node::SWIZZLE) return node;
+
+				VariableNode* lhs_var;
+				StringView swizzle;
+				if (n->left->type == Node::SWIZZLE) {
+					auto* swizzle_node = (SwizzleNode*)n->left;
+					if (swizzle_node->left->type != Node::VARIABLE) return node;
+
+					swizzle = swizzle_node->token.value;
+					lhs_var = (VariableNode*)swizzle_node->left;
+					// only locals can be collapsed to constant
+					if (lhs_var->family != VariableFamily::LOCAL) return node;
+				}
+				else {
+					lhs_var = (VariableNode*)n->left;
+					if (lhs_var->family != VariableFamily::LOCAL) return node;
+
+					switch (lhs_var->block->locals[lhs_var->index].type) {
+						case ValueType::FLOAT: swizzle = "x"; break;
+						case ValueType::FLOAT3: swizzle = "xyz"; break;
+						case ValueType::FLOAT4: swizzle = "xyzw"; break;
+						case ValueType::VOID: ASSERT(false); swizzle = ""; break;
+					}
+				}
+
+				Local& local = lhs_var->block->locals[lhs_var->index];
+				// we assign to outer scope local inside if/else
+				// so make the local non-const
+				if (lhs_var->block != block && is_conditional_block) {
+					forEachSwizzleToIndex(swizzle, [&](i32 idx) {
+						local.is_const[idx] = false;
+					});
+					return node;
+				}
+
+				if (n->right->type == Node::LITERAL) {
+					forEachSwizzleToIndex(swizzle, [&](i32 idx) {
+						local.is_const[idx] = true;
+						local.values[idx] = ((LiteralNode*)n->right)->value;
+					});
+					return node;
+				}
+				
+				if (n->right->type == Node::COMPOUND) {
+					auto* cn = (CompoundNode*)n->right;
+					ASSERT(cn->elements.size() <= 4);
+					forEachSwizzleToIndex(swizzle, [&](i32 idx) {
+						if (cn->elements[idx]->type == Node::LITERAL) {
+							local.is_const[idx] = true;
+							local.values[idx] = ((LiteralNode*)cn->elements[idx])->value;
+						}
+						else {
+							local.is_const[idx] = false;
+						}
+					});
+					return node;
+				}
+
+				forEachSwizzleToIndex(swizzle, [&](i32 idx) {
+					local.is_const[idx] = false;
+				});
 				return node;
 			}
 			case Node::SWIZZLE: {
 				auto* n = (SwizzleNode*)node;
-				n->left = collapseConstants(n->left);
-				// TODO compound literal
-				return node;
+				n->left = collapseConstants(n->left, block, is_conditional_block);
+				switch (n->left->type) {
+					case Node::LITERAL: return n->left;
+					case Node::COMPOUND: {
+						auto* compound = (CompoundNode*)n->left;
+						if (n->token.value.size() == 1) {
+							switch (n->token.value[0]) {
+								case 'x': case 'r': return compound->elements[0];
+								case 'y': case 'g': return compound->elements[1];
+								case 'z': case 'b': return compound->elements[2];
+								case 'w': case 'a': return compound->elements[3];
+								default: ASSERT(false); return node;
+							}
+						}
+
+						auto* swizzled = LUMIX_NEW(m_arena_allocator, CompoundNode)(n->token, m_arena_allocator);
+						swizzled->elements.reserve(n->token.value.size());
+						forEachSwizzleToIndex(n->token.value, [&](i32 idx){
+							swizzled->elements.push(compound->elements[idx]);
+						});
+						return swizzled;
+					}
+					default: return node;
+				}
 			}
 			case Node::COMPOUND: {
 				auto* n = (CompoundNode*)node;
 				for (Node*& element : n->elements) {
-					element = collapseConstants(element);
+					element = collapseConstants(element, block, is_conditional_block);
 				}
 				return node;
 			}
 			case Node::BLOCK: {
 				auto* n = (BlockNode*)node;
 				for (Node*& statement : n->statements) {
-					statement = collapseConstants(statement);
+					statement = collapseConstants(statement, n);
 				}
 				n->statements.eraseItems([](Node* n){ return n == nullptr; });
 				return node;
@@ -653,7 +765,7 @@ const char* toString(Token::Type type) {
 				auto* n = (SysCallNode*)node;
 				bool all_args_const = n->args.size() > 0;
 				for (Node*& arg : n->args) {
-					arg = collapseConstants(arg);
+					arg = collapseConstants(arg, block, is_conditional_block);
 					if (arg->type != Node::LITERAL) all_args_const = false;
 				}
 				if (all_args_const) {
@@ -692,30 +804,60 @@ const char* toString(Token::Type type) {
 			}
 			case Node::IF: {
 				auto* n = (IfNode*)node;
-				n->condition = collapseConstants(n->condition);
-				collapseConstants(n->true_block);
-				if (n->false_block) collapseConstants(n->false_block);
+				n->condition = collapseConstants(n->condition, block, is_conditional_block);
 				if (n->condition->type == Node::LITERAL) {
 					float v = ((LiteralNode*)n->condition)->value;
-					return v == 0 ? n->false_block : n->true_block;
+					if (v == 0) {
+						if (n->false_block) collapseConstants(n->false_block, block, false);
+						return n->false_block;
+					}
+					collapseConstants(n->true_block, block, false);
+					return n->true_block;
 				}
+				
+				collapseConstants(n->true_block, block, is_conditional_block);
+				if (n->false_block) collapseConstants(n->false_block, block, is_conditional_block);
 				return node;
 			}
 			case Node::FUNCTION_CALL: {
 				auto* n = (FunctionCallNode*)node;
-				for (Node*& arg : n->args) arg = collapseConstants(arg);
+				for (Node*& arg : n->args) arg = collapseConstants(arg, block, is_conditional_block);
 				return node;
 			}
 			case Node::FUNCTION_ARG: return node;
 			case Node::EMITTER_REF: return node;
 			case Node::SYSTEM_VALUE: return node;
-			case Node::LOCAL_VARIABLE: return node;
-			case Node::VARIABLE: return node;
+			case Node::VARIABLE: {
+				auto* n = (VariableNode*)node;
+				if (n->family != VariableFamily::LOCAL) return node;
+
+				const Local& local = n->block->locals[n->index];
+				if (local.type == ValueType::FLOAT) {
+					if (local.is_const) {
+						LiteralNode* ln = LUMIX_NEW(m_arena_allocator, LiteralNode)(node->token);
+						ln->value = local.values[0];
+						return ln;
+					}
+				}
+
+				u32 num = toCount(local.type);
+				for (u32 i = 0; i < num; ++i) {
+					if (!local.is_const[i]) return node;
+				}
+				CompoundNode* cn = LUMIX_NEW(m_arena_allocator, CompoundNode)(node->token, m_arena_allocator);
+				cn->elements.reserve(num);
+				for (u32 i = 0; i < num; ++i) {
+					LiteralNode* ln = LUMIX_NEW(m_arena_allocator, LiteralNode)(node->token);
+					ln->value = local.values[i];
+					cn->elements.push(ln);
+				}
+				return cn;
+			}
 			case Node::LITERAL: return node;
 			case Node::BINARY_OPERATOR: {
 				auto* n = (BinaryOperatorNode*)node;
-				n->left = collapseConstants(n->left); 
-				n->right = collapseConstants(n->right);
+				n->left = collapseConstants(n->left, block, is_conditional_block); 
+				n->right = collapseConstants(n->right, block, is_conditional_block);
 
 				if (n->left->type == Node::LITERAL) {
 					auto* l = (LiteralNode*)n->left;
@@ -760,7 +902,7 @@ const char* toString(Token::Type type) {
 				auto* n = (UnaryOperatorNode*)node;
 				if (n->op != Operators::SUB) return node;
 				
-				Node* r = collapseConstants(n->right);
+				Node* r = collapseConstants(n->right, block, is_conditional_block);
 				if (r->type == Node::LITERAL) {
 					auto* literal = (LiteralNode*)r;
 					literal->value = -literal->value;
@@ -1116,13 +1258,15 @@ const char* toString(Token::Type type) {
 		Local& local = block->locals.emplace();
 		if (!consume(Token::IDENTIFIER, local.name)) return;
 
+		bool infer_type = false;
 		if (peekToken().type == Token::COLON) {
 			// let a : type ...
 			if (!consume(Token::COLON)) return;
 			local.type = parseType();
 		}
 		else if (peekToken().type == Token::EQUAL) {
-			// let a = ...; 
+			// let a = ...;
+			infer_type = true;
 			local.type = ValueType::FLOAT;
 		}
 		else {
@@ -1140,16 +1284,17 @@ const char* toString(Token::Type type) {
 
 		// let a : type = ...
 		// let a = ...
-		u32 var_len;
-		switch (local.type) {
-			case ValueType::FLOAT4: var_len = 4; break;
-			case ValueType::FLOAT3: var_len = 3; break;
-			case ValueType::FLOAT: var_len = 1; break;
-			case ValueType::VOID: ASSERT(false); break;
-		}
-
 		Node* value = expression(ctx, 0);
 		if (!value) return;
+
+		if (value->type == Node::COMPOUND && infer_type) {
+			switch (((CompoundNode*)value)->elements.size()) {
+				case 1: local.type = ValueType::FLOAT; break;
+				case 3: local.type = ValueType::FLOAT3; break;
+				case 4: local.type = ValueType::FLOAT4; break;
+				default: ASSERT(false); break;
+			}
+		}
 
 		auto* assign = LUMIX_NEW(m_arena_allocator, AssignNode)(equal_token);
 		assign->right = value;
@@ -1299,7 +1444,7 @@ const char* toString(Token::Type type) {
 		ctx.entry_point = EntryPoint::GLOBAL;
 		Node* n = expression(ctx, 0);
 		if (!n) return;
-		n = collapseConstants(n);
+		n = collapseConstants(n, nullptr);
 
 		if (n->type != Node::LITERAL) {
 			// TODO floatN constants
@@ -1579,7 +1724,8 @@ const char* toString(Token::Type type) {
 
 		BlockNode* b = block(ctx);
 		if (!b || m_is_error) return;
-		compile(ctx, b, compiled);
+		Node* collapsed = collapseConstants(b, nullptr);
+		compile(ctx, collapsed, compiled);
 		compiled.write(InstructionType::END);
 		u32 num_used_registers = optimizeBytecode(compiled, stack_offset);
 		InputMemoryStream ip(compiled.data(), compiled.size());
@@ -1639,7 +1785,6 @@ const char* toString(Token::Type type) {
 
 	CompileResult compile(CompileContext& ctx, Node* node, OutputMemoryStream& compiled) {
 		CompileResult res;
-		node = collapseConstants(node);
 		switch (node->type) {
 			case Node::UNARY_OPERATOR: {
 				auto* n = (UnaryOperatorNode*)node;
