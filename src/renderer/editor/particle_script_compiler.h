@@ -641,7 +641,7 @@ const char* toString(Token::Type type) {
 	}
 
 	// original nodes are left in undefined state
-	Node* collapseConstants(Node* node, BlockNode* block, bool is_conditional_block = false) {
+	Node* collapseConstants(Node* node, BlockNode* block, bool is_conditional_block) {
 		switch (node->type) {
 			case Node::RETURN: {
 				auto* r = (ReturnNode*)node;
@@ -756,7 +756,7 @@ const char* toString(Token::Type type) {
 			case Node::BLOCK: {
 				auto* n = (BlockNode*)node;
 				for (Node*& statement : n->statements) {
-					statement = collapseConstants(statement, n);
+					statement = collapseConstants(statement, n, is_conditional_block);
 				}
 				n->statements.eraseItems([](Node* n){ return n == nullptr; });
 				return node;
@@ -815,8 +815,8 @@ const char* toString(Token::Type type) {
 					return n->true_block;
 				}
 				
-				collapseConstants(n->true_block, block, is_conditional_block);
-				if (n->false_block) collapseConstants(n->false_block, block, is_conditional_block);
+				collapseConstants(n->true_block, block, true);
+				if (n->false_block) collapseConstants(n->false_block, block, true);
 				return node;
 			}
 			case Node::FUNCTION_CALL: {
@@ -833,7 +833,7 @@ const char* toString(Token::Type type) {
 
 				const Local& local = n->block->locals[n->index];
 				if (local.type == ValueType::FLOAT) {
-					if (local.is_const) {
+					if (local.is_const[0]) {
 						LiteralNode* ln = LUMIX_NEW(m_arena_allocator, LiteralNode)(node->token);
 						ln->value = local.values[0];
 						return ln;
@@ -1444,7 +1444,7 @@ const char* toString(Token::Type type) {
 		ctx.entry_point = EntryPoint::GLOBAL;
 		Node* n = expression(ctx, 0);
 		if (!n) return;
-		n = collapseConstants(n, nullptr);
+		n = collapseConstants(n, nullptr, false);
 
 		if (n->type != Node::LITERAL) {
 			// TODO floatN constants
@@ -1724,7 +1724,7 @@ const char* toString(Token::Type type) {
 
 		BlockNode* b = block(ctx);
 		if (!b || m_is_error) return;
-		Node* collapsed = collapseConstants(b, nullptr);
+		Node* collapsed = collapseConstants(b, nullptr, false);
 		compile(ctx, collapsed, compiled);
 		compiled.write(InstructionType::END);
 		u32 num_used_registers = optimizeBytecode(compiled, stack_offset);
