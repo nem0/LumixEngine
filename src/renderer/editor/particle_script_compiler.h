@@ -2057,6 +2057,16 @@ const char* toString(Token::Type type) {
 						}
 						return num;
 					}
+					case VariableFamily::GLOBAL: {
+						const Variable& var = m_globals[n->index];
+						u32 num = toCount(var.type);
+						for (u32 i = 0; i < num; ++i) {
+							IRValue& val = ctx.stack.emplace();
+							val.type = DataStream::GLOBAL;
+							val.index = var.getOffsetSub(i);
+						}
+						return num;
+					}
 					case VariableFamily::OUTPUT: {
 						Variable& v = ctx.emitter.m_outputs[n->index];
 						u32 num = toCount(v.type);
