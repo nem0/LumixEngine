@@ -1573,9 +1573,9 @@ const char* toString(Token::Type type) {
 					
 					InputMemoryStream inner((const u8*)ip.getData() + offset + sizeof(u16), ip.size() - offset - sizeof(u16));
 					forEachDataStreamInBytecode(inner, [](const DataStream& s, i32 position, i32 arg_index, InstructionType itype, i32 ioffset, i32){});
-					u64 size = inner.getPosition();
-					*(u16*)(bytecode.getMutableData() + offset) = u16(size);
-
+					u16 size = (u16)inner.getPosition();
+					
+					memcpy(bytecode.getMutableData() + offset, &size, sizeof(size));
 					break;
 				}
 				default: break;
@@ -1722,6 +1722,472 @@ const char* toString(Token::Type type) {
 		return max_used_register + 1;
 	}
 
+	struct IRNode {
+		enum Type {
+			MOV,
+			BINARY,
+			SYSCALL,
+			IF,
+			END
+		};
+
+		IRNode(Type type) : type(type) {}
+
+		Type type;
+		IRNode* next = nullptr;
+	};
+
+	struct IRValue {
+		DataStream::Type type;
+		u32 index;
+		float value;
+	};
+
+	struct IRBinary : IRNode {
+		IRBinary() : IRNode(IRNode::BINARY) {}
+		InstructionType instruction;
+		IRValue dst;
+		IRValue left;
+		IRValue right;
+	};
+
+	struct IRMov : IRNode {
+		IRMov() : IRNode(IRNode::MOV) {}
+		IRValue dst;
+		IRValue src;
+	};
+
+	struct IREnd : IRNode {
+		IREnd() : IRNode(IRNode::END) {}
+	};
+
+	struct IRIf : IRNode {
+		IRIf() : IRNode(IRNode::IF) {}
+		IRValue condition;
+		IREnd* true_end = nullptr;
+		IREnd* false_end = nullptr;
+	};
+
+	struct IRSyscall : IRNode {
+		IRSyscall(IAllocator& allocator) : IRNode(IRNode::SYSCALL), args(allocator) {}
+		SysCall syscall;
+		IRValue dst;
+		StackArray<IRValue, 8> args;
+	};
+
+	struct IRContext {
+		IRContext(Emitter& emitter, IAllocator& allocator)
+			: stack(allocator)
+			, emitter(emitter)
+		{}
+
+		StackArray<IRValue, 16> stack;
+		i32 emitted_index = -1;
+		IRNode* tail = nullptr;
+		IRNode* head = nullptr;
+		Emitter& emitter;
+		struct Arg {
+			i32 num;
+			i32 offset;
+		};
+		Span<Arg> args;
+		
+		IRValue& stackValue(i32 idx) {
+			return stack[stack.size() + idx];
+		}
+
+		void push(IRNode* node) {
+			if (tail) tail->next = node;
+			if (!head) head = node;
+			tail = node;
+		}
+
+		void popStack(u32 num) {
+			for (u32 i = 0; i < num; ++i) stack.pop();
+		}
+	};
+	
+	IRNode* compileBytecode(CompileContext& ctx, IRNode* ir, OutputMemoryStream& compiled) {
+		IRNode* node = ir;
+		auto writeValue = [&](IRValue& val) {
+			DataStream tmp;
+			tmp.type = val.type;
+			tmp.index = val.index; // TODO remap registers
+			tmp.value = val.value;
+			compiled.write(tmp);
+		};
+		while (node) {
+			switch (node->type) {
+				case IRNode::IF: {
+					auto* n = (IRIf*)node;
+					compiled.write(n->false_end ? InstructionType::CMP_ELSE : InstructionType::CMP);
+					writeValue(n->condition);
+					compiled.write(u16(0));
+					if (n->false_end) compiled.write(u16(0));
+
+					compileBytecode(ctx, n->next, compiled);
+					node = n->true_end;
+					if (n->false_end) {
+						compileBytecode(ctx, node->next, compiled);
+						node = n->false_end;
+					}
+					break;
+				}
+				case IRNode::END: {
+					compiled.write(InstructionType::END);
+					return node;
+				}
+				case IRNode::SYSCALL: {
+					auto* n = (IRSyscall*)node;
+					compiled.write(n->syscall.instruction);
+					if (n->syscall.returns_value) {					
+						writeValue(n->dst);
+					}
+					if (n->syscall.instruction == InstructionType::RAND) { // TODO make this not special case
+						for (IRValue& arg : n->args) {
+							compiled.write(arg.value);
+						}
+					}
+					else if (n->syscall.instruction == InstructionType::EMIT) { // TODO make this not special case
+						compiled.write(u32(n->args[0].index));
+						node = compileBytecode(ctx, n->next, compiled);
+					}
+					else {
+						for (IRValue& arg : n->args) {
+							writeValue(arg);
+						}
+					}
+					break;
+				}
+				case IRNode::BINARY: {
+					auto* n = (IRBinary*)node;
+					compiled.write(n->instruction);
+					writeValue(n->dst);
+					writeValue(n->left);
+					writeValue(n->right);
+					break;
+				}
+				case IRNode::MOV: {
+					auto* n = (IRMov*)node;
+					compiled.write(InstructionType::MOV);
+					writeValue(n->dst);
+					writeValue(n->src);
+					break;
+				}
+
+			}
+			node = node->next;
+		}
+		return nullptr;
+	}
+
+	i32 compileIR(IRContext& ctx, Node* node) {
+		switch (node->type) {
+			case Node::EMITTER_REF: {
+				auto* n = (EmitterRefNode*)node;
+				ctx.stack.emplace().index = n->index;
+				return 1;
+			}
+			case Node::COMPOUND: {
+				auto* n = (CompoundNode*)node;
+				i32 num = 0;
+				for (u32 i = 0, c = n->elements.size(); i < c; ++i) {
+					i32 r = compileIR(ctx, n->elements[i]);
+					if (r < 0) return -1;
+					ASSERT(r != 0); // TODO can this happen?
+					num += r;
+				}
+				ASSERT(num <= 4); // TODO make sure this is handled in parser 
+				return num;
+			}
+			case Node::SYSCALL: {
+				auto* n = (SysCallNode*)node;
+				auto* res = LUMIX_NEW(m_arena_allocator, IRSyscall)(m_arena_allocator);
+				res->syscall = n->function;
+				res->args.reserve(n->args.size());
+				for (Node* arg : n->args) {
+					i32 a = compileIR(ctx, arg);
+					switch (a) {
+						case -1: return -1;
+						case 1: break;
+						default:
+							error(node->token.value, "Arguments must be scalars.");
+							return -1;
+					}
+					res->args.push(ctx.stack.last());
+					ctx.stack.pop();
+				}
+				if (n->function.returns_value) {
+					res->dst.type = DataStream::REGISTER;
+					res->dst.index = ctx.stack.size();
+					ctx.stack.push(res->dst);
+				}
+				ctx.push(res);
+				if (n->after_block) {
+					ASSERT(n->function.instruction == InstructionType::EMIT);
+					ctx.emitted_index = res->args[0].index;
+					i32 a = compileIR(ctx, n->after_block);
+					if (a < 0) return -1;
+					// TODO a > 0
+
+					ctx.emitted_index = -1;
+					auto* end = LUMIX_NEW(m_arena_allocator, IREnd);
+					ctx.push(end);
+				}
+				else if (n->function.instruction == InstructionType::EMIT) {
+					auto* end = LUMIX_NEW(m_arena_allocator, IREnd);
+					ctx.push(end);
+				}
+				return n->function.returns_value ? 1 : 0;
+			}
+			case Node::SWIZZLE: {
+				auto* n = (SwizzleNode*)node;
+				i32 left = compileIR(ctx, n->left);
+				if (left < 0) return -1;
+
+				StringView swizzle = n->token.value;
+				IRValue swizzled[4];
+				for (u32 i = 0; i < swizzle.size(); ++i) {
+					i32 idx = -1;
+					switch (swizzle[i]) {
+						case 'x': case 'r': idx = 0; break;
+						case 'y': case 'g': idx = 1; break;
+						case 'z': case 'b': idx = 2; break;
+						case 'w': case 'a': idx = 3; break;
+						default: ASSERT(false); return -1;
+					}
+					if (idx >= left) {
+						error(n->token.value, "Invalid swizzle component.");
+						return -1;
+					}
+					swizzled[i] = ctx.stackValue(-left + idx);
+				}
+				ctx.popStack(left);
+				for (u32 i = 0; i < swizzle.size(); ++i) ctx.stack.push(swizzled[i]);
+				return swizzle.size();
+			}
+			case Node::SYSTEM_VALUE: {
+				auto* n = (SystemValueNode*)node;
+				IRValue& val = ctx.stack.emplace();
+				val.type = DataStream::SYSTEM_VALUE;
+				val.index = (u8)n->value;
+				return 1;
+			}
+			case Node::FUNCTION_ARG: {
+				auto* n = (FunctionArgNode*)node;
+				IRContext::Arg arg = ctx.args[n->index];
+				for (i32 i = 0; i < arg.num; ++i) {
+					IRValue val = ctx.stack[ctx.args[n->index].offset + i];
+					ctx.stack.push(val);
+				}
+				return arg.num;
+			}
+			case Node::FUNCTION_CALL: {
+				auto* n = (FunctionCallNode*)node;
+				const Function& fn = m_functions[n->function_index];
+				IRContext::Arg args[8];
+				if ((u32)n->args.size() > lengthOf(args)) {
+					error(n->token.value, "Too many arguments.");
+					return -1;
+				}
+				u32 arg_offset = ctx.stack.size();
+				u32 args_size = 0;
+				for (i32 i = 0; i < n->args.size(); ++i) {
+					args[i].offset = arg_offset;
+					args[i].num = compileIR(ctx, n->args[i]);
+					args_size += args[i].num;
+					if (args[i].num < 0) return -1;
+					arg_offset = ctx.stack.size();
+				}
+				ctx.args = { args, &args[n->args.size()] };
+				i32 ret = compileIR(ctx, fn.block);
+				IRValue ret_vals[4];
+				for (i32 i = 0; i < ret; ++i) {
+					ret_vals[i] = ctx.stack.last();
+					ctx.stack.pop();
+				}
+				ctx.popStack(args_size);
+				for (i32 i = 0; i < ret; ++i) {
+					ctx.stack.push(ret_vals[ret - i - 1]);
+				}
+				return ret;
+			}
+			case Node::VARIABLE: {
+				auto* n = (VariableNode*)node;
+				switch (n->family) {
+					case VariableFamily::LOCAL: {
+						Local& l = n->block->locals[n->index];
+						u32 num = toCount(l.type);
+						for (u32 i = 0; i < num; ++i) {
+							IRValue& val = ctx.stack.emplace();
+							val.type = DataStream::REGISTER;
+							val.index = l.registers[i];
+						}
+						return num;
+					}
+					case VariableFamily::INPUT: {
+						u32 num;
+						if (ctx.emitted_index >= 0) {
+							Variable& v = m_emitters[ctx.emitted_index].m_inputs[n->index];
+							num = toCount(v.type);
+							for (u32 i = 0; i < num; ++i) {
+								IRValue& val = ctx.stack.emplace();
+								val.type = DataStream::OUT;
+								val.index = v.getOffsetSub(i);
+							}
+						}
+						else {
+							Variable& v = ctx.emitter.m_inputs[n->index];
+							num = toCount(v.type);
+							for (u32 i = 0; i < num; ++i) {
+								IRValue& val = ctx.stack.emplace();
+								val.type = DataStream::REGISTER;
+								val.index = v.getOffsetSub(i);
+							}
+						}
+						return num;
+					}
+					case VariableFamily::CHANNEL: {
+						Variable& v = ctx.emitter.m_vars[n->index];
+						u32 num = toCount(v.type);
+						for (u32 i = 0; i < num; ++i) {
+							IRValue& val = ctx.stack.emplace();
+							val.type = DataStream::CHANNEL;
+							val.index = v.getOffsetSub(i);
+						}
+						return num;
+					}
+					case VariableFamily::OUTPUT: {
+						Variable& v = ctx.emitter.m_outputs[n->index];
+						u32 num = toCount(v.type);
+						for (u32 i = 0; i < num; ++i) {
+							IRValue& val = ctx.stack.emplace();
+							val.type = DataStream::OUT;
+							val.index = v.getOffsetSub(i);
+						}
+						return num;
+					}
+					default: break;
+				}
+				ASSERT(false);
+				return -1;
+			}
+			case Node::BINARY_OPERATOR: {
+				auto* n = (BinaryOperatorNode*)node;
+				i32 left = compileIR(ctx, n->left);
+				i32 right = compileIR(ctx, n->right);
+				if (left < 0 || right < 0) return -1;
+				if (right != left && right != 1 && left != 1) {
+					error(node->token.value, "Type mismatch.");
+					return -1;
+				}
+				i32 num = maximum(left, right);
+				IRBinary* ir_ops[4];
+				for (i32 i = 0; i < num; ++i) {
+					auto* res = LUMIX_NEW(m_arena_allocator, IRBinary);
+					res->instruction = toInstruction(n->op);
+					res->dst.type = DataStream::REGISTER;
+					res->left = ctx.stackValue(-right - left + (left == 1 ? 0 : i));
+					res->right = ctx.stackValue(-right + (right == 1 ? 0 : i));
+					ir_ops[i] = res;
+				}
+				ctx.popStack(left + right);
+				for (i32 i = 0; i < left; ++i) {
+					ir_ops[i]->dst.index = ctx.stack.size();
+					ctx.stack.push(ir_ops[i]->dst);
+					ctx.push(ir_ops[i]);
+				}
+				return num;
+			}
+			case Node::IF: {
+				auto* n = (IfNode*)node;
+				i32 cond = compileIR(ctx, n->condition);
+				auto* res = LUMIX_NEW(m_arena_allocator, IRIf);
+				ctx.push(res);
+				if (cond < 0) return -1;
+				if (cond > 1) {
+					error(n->token.value, "Condition must be scalar.");
+					return -1;
+				}
+				res->condition = ctx.stack.last();
+				ctx.stack.pop();
+				
+				i32 t = compileIR(ctx, n->true_block);
+				if (t < 0) return -1; // TODO t > 0
+
+				res->true_end = LUMIX_NEW(m_arena_allocator, IREnd);
+				ctx.push(res->true_end);
+
+				if (n->false_block) {
+					i32 f = compileIR(ctx, n->false_block);
+					if (f < 0) return -1; // TODO f > 0
+
+					res->false_end = LUMIX_NEW(m_arena_allocator, IREnd);
+					ctx.push(res->false_end);
+				}
+				return 0;
+			}
+
+			case Node::RETURN: {
+				auto* n = (ReturnNode*)node;
+				return compileIR(ctx, n->value);
+			}
+			case Node::LITERAL: {
+				IRValue& val = ctx.stack.emplace();
+				val.type = DataStream::LITERAL;
+				val.value = ((LiteralNode*)node)->value;
+				return 1;
+			}
+			case Node::BLOCK: {
+				auto* n = (BlockNode*)node;
+				u32 size_locals = 0;
+				for (Local& l : n->locals) {
+					u32 num = toCount(l.type);
+					for (u32 i = 0; i < num; ++i) {
+						IRValue& v = ctx.stack.emplace();
+						v.type = DataStream::REGISTER;
+						v.index = ctx.stack.size();
+						l.registers[i] = v.index;
+					}
+					size_locals += num;
+				}
+				for (Node* statement : n->statements) {
+					i32 s = compileIR(ctx, statement);
+					if (s < 0) return -1;
+					if (s > 0) {
+						ctx.popStack(size_locals);
+						return s; // TODO make sure this is from "return ...;"
+					}
+				}
+				ctx.popStack(size_locals);
+				return 0;
+			}
+			case Node::ASSIGN: {
+				auto* n = (AssignNode*)node;
+				i32 left = compileIR(ctx, n->left);
+				i32 right = compileIR(ctx, n->right);
+				if (left < 0 || right < 0) return -1;
+				if ((right < left && right != 1) || right > left) {
+					error(node->token.value, "Type mismatch.");
+					return -1;
+				}
+
+				IRMov* movs[4];
+				for (i32 i = 0; i < left; ++i) {
+					auto* res = LUMIX_NEW(m_arena_allocator, IRMov);
+					res->dst = ctx.stackValue(-left - right + i);
+					res->src = ctx.stackValue(-right + (right == 1 ? 0 : i));
+					movs[i] = res;
+				}
+				ctx.popStack(left + right);
+				for (i32 i = 0; i < left; ++i) ctx.push(movs[i]);
+				return 0;
+			}
+			default: break;
+		}
+		ASSERT(false);
+		return -1;
+	}
 
 	void compileFunction(Emitter& emitter) {
 		StringView fn_name;
@@ -1761,7 +2227,10 @@ const char* toString(Token::Type type) {
 		BlockNode* b = block(ctx);
 		if (!b || m_is_error) return;
 		Node* collapsed = collapseConstants(b, nullptr, false);
-		compile(ctx, collapsed, compiled);
+		IRContext irctx(emitter, m_arena_allocator);
+		compileIR(irctx, collapsed);
+		compileBytecode(ctx, irctx.head, compiled);
+		//compile(ctx, collapsed, compiled);
 		compiled.write(InstructionType::END);
 		u32 num_used_registers = optimizeBytecode(compiled, stack_offset);
 		patchBlockSizes(compiled);
@@ -1820,6 +2289,20 @@ const char* toString(Token::Type type) {
 		return res;
 	}
 
+	InstructionType toInstruction(Operators op) {
+		switch (op) {
+			case Operators::MOD: return InstructionType::MOD;
+			case Operators::ADD: return InstructionType::ADD;
+			case Operators::SUB: return InstructionType::SUB;
+			case Operators::MUL: return InstructionType::MUL;
+			case Operators::DIV: return InstructionType::DIV;
+			case Operators::LT: return InstructionType::LT;
+			case Operators::GT: return InstructionType::GT;
+		}
+		ASSERT(false);
+		return InstructionType::END;
+	}
+
 	CompileResult compile(CompileContext& ctx, Node* node, OutputMemoryStream& compiled) {
 		CompileResult res;
 		switch (node->type) {
@@ -1859,15 +2342,7 @@ const char* toString(Token::Type type) {
 				}
 				res.num_streams = maximum(left.num_streams, right.num_streams);
 				for (u32 i = 0; i < res.num_streams; ++i) {
-					switch (n->op) {
-						case Operators::MOD: compiled.write(InstructionType::MOD); break;
-						case Operators::ADD: compiled.write(InstructionType::ADD); break;
-						case Operators::SUB: compiled.write(InstructionType::SUB); break;
-						case Operators::MUL: compiled.write(InstructionType::MUL); break;
-						case Operators::DIV: compiled.write(InstructionType::DIV); break;
-						case Operators::LT: compiled.write(InstructionType::LT); break;
-						case Operators::GT: compiled.write(InstructionType::GT); break;
-					}
+					compiled.write(toInstruction(n->op));
 					compiled.write(res.streams[i]);
 					compiled.write(left.streams[i < left.num_streams ? i : 0]);
 					compiled.write(right.streams[i < right.num_streams ? i : 0]);
@@ -2179,6 +2654,7 @@ const char* toString(Token::Type type) {
 		ctx.entry_point = EntryPoint::GLOBAL;
 		ctx.function = &fn;
 		fn.block = block(ctx);
+		collapseConstants(fn.block, nullptr, false);
 	}
 
 	void compileMesh(Emitter& emitter) {
@@ -2462,6 +2938,7 @@ struct ParticleScriptPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugi
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		OutputMemoryStream src_data(m_app.getAllocator());
 		if (!fs.getContentSync(src, src_data)) return false;
+		if (src_data.empty()) return false;
 
 		StringView content = { (const char*)src_data.data(), (const char*)src_data.data() + src_data.size() };
 		ParticleScriptCompiler compiler(m_app, m_allocator);
@@ -2479,6 +2956,11 @@ struct ParticleScriptPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugi
 		OutputMemoryStream content(m_allocator);
 		if (!m_app.getEngine().getFileSystem().getContentSync(path, content)) {
 			logError("Failed to read ", path);
+			return;
+		}
+
+		if (content.empty()) {
+			logError(path, " is empty.");
 			return;
 		}
 
