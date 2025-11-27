@@ -1723,6 +1723,10 @@ const char* toString(Token::Type type) {
 	}
 
 	struct IRNode {
+		#ifdef LUMIX_DEBUG
+			// so VS debugger can show use actual type
+			virtual ~IRNode() {}
+		#endif
 		enum Type {
 			MOV,
 			BINARY,
@@ -1731,20 +1735,23 @@ const char* toString(Token::Type type) {
 			END
 		};
 
-		IRNode(Type type) : type(type) {}
+		IRNode(Type type, Node* ast) : type(type), ast(ast) {}
 
 		Type type;
 		IRNode* next = nullptr;
+		bool is_dead = false;
+		Node* ast = nullptr; 
 	};
 
 	struct IRValue {
 		DataStream::Type type;
 		u32 index;
 		float value;
+		IRNode* creator = nullptr;
 	};
 
 	struct IRBinary : IRNode {
-		IRBinary() : IRNode(IRNode::BINARY) {}
+		IRBinary(Node* ast) : IRNode(IRNode::BINARY, ast) {}
 		InstructionType instruction;
 		IRValue dst;
 		IRValue left;
@@ -1752,24 +1759,24 @@ const char* toString(Token::Type type) {
 	};
 
 	struct IRMov : IRNode {
-		IRMov() : IRNode(IRNode::MOV) {}
+		IRMov(Node* ast) : IRNode(IRNode::MOV, ast) {}
 		IRValue dst;
 		IRValue src;
 	};
 
 	struct IREnd : IRNode {
-		IREnd() : IRNode(IRNode::END) {}
+		IREnd(Node* ast) : IRNode(IRNode::END, ast) {}
 	};
 
 	struct IRIf : IRNode {
-		IRIf() : IRNode(IRNode::IF) {}
+		IRIf(Node* ast) : IRNode(IRNode::IF, ast) {}
 		IRValue condition;
 		IREnd* true_end = nullptr;
 		IREnd* false_end = nullptr;
 	};
 
 	struct IRSyscall : IRNode {
-		IRSyscall(IAllocator& allocator) : IRNode(IRNode::SYSCALL), args(allocator) {}
+		IRSyscall(Node* ast, IAllocator& allocator) : IRNode(IRNode::SYSCALL, ast), args(allocator) {}
 		SysCall syscall;
 		IRValue dst;
 		StackArray<IRValue, 8> args;
@@ -1791,6 +1798,7 @@ const char* toString(Token::Type type) {
 			i32 offset;
 		};
 		Span<Arg> args;
+		u32 register_allocator = 0;
 		
 		IRValue& stackValue(i32 idx) {
 			return stack[stack.size() + idx];
@@ -1817,6 +1825,10 @@ const char* toString(Token::Type type) {
 			compiled.write(tmp);
 		};
 		while (node) {
+			if (node->is_dead) {
+				node = node->next;
+				continue;
+			}
 			switch (node->type) {
 				case IRNode::IF: {
 					auto* n = (IRIf*)node;
@@ -1881,6 +1893,117 @@ const char* toString(Token::Type type) {
 		return nullptr;
 	}
 
+	void optimizeIR(IRNode* node) {
+		collapseMovsIR(node);
+		reuseTemporaryIR(node);
+	}
+
+	template <typename F>
+	void forEachValue(IRNode* node, const F& fn) {
+		while (node) {
+			if (!node->is_dead) {
+				switch (node->type) {
+					case IRNode::SYSCALL: {
+						auto* n = (IRSyscall*)node;
+						fn(n->dst, true);
+						for (const IRValue& arg : n->args) {
+							fn(arg, false);
+						}
+						break;
+					}
+					case IRNode::BINARY: {
+						auto* n = (IRBinary*)node;
+						fn(n->dst, true);
+						fn(n->left, false);
+						fn(n->right, false);
+						break;
+					}
+					case IRNode::MOV: {
+						auto* n = (IRMov*)node;
+						fn(n->dst, true);
+						fn(n->src, false);
+						break;
+					}
+					case IRNode::END: break;
+					case IRNode::IF: {
+						auto* n = (IRIf*)node;
+						fn(n->condition, false);
+						break;
+					}
+				}
+			}
+			node = node->next;
+		}
+	}
+
+	void reuseTemporaryIR(IRNode* node) {
+		struct RegisterOp {
+			IRNode* node;
+			bool is_write;
+			RegisterOp* next = nullptr;
+		};
+		struct Register {
+			u32 num_reads = 0;
+			u32 num_writes = 0;
+			RegisterOp* head_op = nullptr;
+			RegisterOp* tail_op = nullptr;
+		};
+		StackArray<Register, 16> registers(m_arena_allocator);
+
+		forEachValue(node, [&](const IRValue& value, bool is_write) {
+			if (value.type != DataStream::REGISTER) return;
+
+			RegisterOp* op = LUMIX_NEW(m_arena_allocator, RegisterOp);
+			op->is_write = is_write;
+			op->node = value.creator;
+			if (registers.size() <= (i32)value.index) {
+				registers.resize(value.index + 1);
+			}
+			if (registers[value.index].tail_op) {
+				registers[value.index].tail_op->next = op;
+				registers[value.index].tail_op = op;
+			}
+			else {
+				registers[value.index].head_op = op;
+				registers[value.index].tail_op = op;
+			}
+
+			if (is_write) {
+				++registers[value.index].num_writes;
+			}
+			else {
+				++registers[value.index].num_reads;
+			}
+		});
+
+	}
+
+	void collapseMovsIR(IRNode* node) {
+		while (node) {
+			if (node->type == IRNode::MOV) {
+				auto* n = (IRMov*)node;
+				if (n->src.creator) {
+					switch (n->src.creator->type) {
+						case IRNode::SYSCALL: {
+							auto* src = (IRSyscall*)n->src.creator;
+							src->dst = n->dst;
+							n->is_dead = true;
+							break;
+						}
+						case IRNode::BINARY: {
+							auto* src = (IRBinary*)n->src.creator;
+							src->dst = n->dst;
+							n->is_dead = true;
+							break;
+						}
+						default: break;
+					}
+				}
+			}
+			node = node->next;
+		}
+	}
+
 	i32 compileIR(IRContext& ctx, Node* node) {
 		switch (node->type) {
 			case Node::EMITTER_REF: {
@@ -1902,7 +2025,7 @@ const char* toString(Token::Type type) {
 			}
 			case Node::SYSCALL: {
 				auto* n = (SysCallNode*)node;
-				auto* res = LUMIX_NEW(m_arena_allocator, IRSyscall)(m_arena_allocator);
+				auto* res = LUMIX_NEW(m_arena_allocator, IRSyscall)(node, m_arena_allocator);
 				res->syscall = n->function;
 				res->args.reserve(n->args.size());
 				for (Node* arg : n->args) {
@@ -1919,7 +2042,8 @@ const char* toString(Token::Type type) {
 				}
 				if (n->function.returns_value) {
 					res->dst.type = DataStream::REGISTER;
-					res->dst.index = ctx.stack.size();
+					res->dst.index = ++ctx.register_allocator;
+					res->dst.creator = res;
 					ctx.stack.push(res->dst);
 				}
 				ctx.push(res);
@@ -1931,11 +2055,11 @@ const char* toString(Token::Type type) {
 					// TODO a > 0
 
 					ctx.emitted_index = -1;
-					auto* end = LUMIX_NEW(m_arena_allocator, IREnd);
+					auto* end = LUMIX_NEW(m_arena_allocator, IREnd)(n->after_block);
 					ctx.push(end);
 				}
 				else if (n->function.instruction == InstructionType::EMIT) {
-					auto* end = LUMIX_NEW(m_arena_allocator, IREnd);
+					auto* end = LUMIX_NEW(m_arena_allocator, IREnd)(n);
 					ctx.push(end);
 				}
 				return n->function.returns_value ? 1 : 0;
@@ -1971,6 +2095,7 @@ const char* toString(Token::Type type) {
 				IRValue& val = ctx.stack.emplace();
 				val.type = DataStream::SYSTEM_VALUE;
 				val.index = (u8)n->value;
+				val.creator = nullptr;
 				return 1;
 			}
 			case Node::FUNCTION_ARG: {
@@ -2021,7 +2146,11 @@ const char* toString(Token::Type type) {
 						for (u32 i = 0; i < num; ++i) {
 							IRValue& val = ctx.stack.emplace();
 							val.type = DataStream::REGISTER;
+							if (l.registers[i] < 0) {
+								l.registers[i] = ++ctx.register_allocator;
+							}
 							val.index = l.registers[i];
+							val.creator = nullptr;
 						}
 						return num;
 					}
@@ -2034,6 +2163,7 @@ const char* toString(Token::Type type) {
 								IRValue& val = ctx.stack.emplace();
 								val.type = DataStream::OUT;
 								val.index = v.getOffsetSub(i);
+								val.creator = nullptr;
 							}
 						}
 						else {
@@ -2043,6 +2173,7 @@ const char* toString(Token::Type type) {
 								IRValue& val = ctx.stack.emplace();
 								val.type = DataStream::REGISTER;
 								val.index = v.getOffsetSub(i);
+								val.creator = nullptr;
 							}
 						}
 						return num;
@@ -2054,6 +2185,7 @@ const char* toString(Token::Type type) {
 							IRValue& val = ctx.stack.emplace();
 							val.type = DataStream::CHANNEL;
 							val.index = v.getOffsetSub(i);
+							val.creator = nullptr;
 						}
 						return num;
 					}
@@ -2074,6 +2206,7 @@ const char* toString(Token::Type type) {
 							IRValue& val = ctx.stack.emplace();
 							val.type = DataStream::OUT;
 							val.index = v.getOffsetSub(i);
+							val.creator = nullptr;
 						}
 						return num;
 					}
@@ -2094,16 +2227,17 @@ const char* toString(Token::Type type) {
 				i32 num = maximum(left, right);
 				IRBinary* ir_ops[4];
 				for (i32 i = 0; i < num; ++i) {
-					auto* res = LUMIX_NEW(m_arena_allocator, IRBinary);
+					auto* res = LUMIX_NEW(m_arena_allocator, IRBinary)(n);
 					res->instruction = toInstruction(n->op);
 					res->dst.type = DataStream::REGISTER;
 					res->left = ctx.stackValue(-right - left + (left == 1 ? 0 : i));
 					res->right = ctx.stackValue(-right + (right == 1 ? 0 : i));
+					res->dst.creator = res;
 					ir_ops[i] = res;
 				}
 				ctx.popStack(left + right);
 				for (i32 i = 0; i < left; ++i) {
-					ir_ops[i]->dst.index = ctx.stack.size();
+					ir_ops[i]->dst.index = ++ctx.register_allocator;
 					ctx.stack.push(ir_ops[i]->dst);
 					ctx.push(ir_ops[i]);
 				}
@@ -2112,7 +2246,7 @@ const char* toString(Token::Type type) {
 			case Node::IF: {
 				auto* n = (IfNode*)node;
 				i32 cond = compileIR(ctx, n->condition);
-				auto* res = LUMIX_NEW(m_arena_allocator, IRIf);
+				auto* res = LUMIX_NEW(m_arena_allocator, IRIf)(n);
 				ctx.push(res);
 				if (cond < 0) return -1;
 				if (cond > 1) {
@@ -2125,14 +2259,14 @@ const char* toString(Token::Type type) {
 				i32 t = compileIR(ctx, n->true_block);
 				if (t < 0) return -1; // TODO t > 0
 
-				res->true_end = LUMIX_NEW(m_arena_allocator, IREnd);
+				res->true_end = LUMIX_NEW(m_arena_allocator, IREnd)(n->true_block);
 				ctx.push(res->true_end);
 
 				if (n->false_block) {
 					i32 f = compileIR(ctx, n->false_block);
 					if (f < 0) return -1; // TODO f > 0
 
-					res->false_end = LUMIX_NEW(m_arena_allocator, IREnd);
+					res->false_end = LUMIX_NEW(m_arena_allocator, IREnd)(n->false_block);
 					ctx.push(res->false_end);
 				}
 				return 0;
@@ -2146,21 +2280,12 @@ const char* toString(Token::Type type) {
 				IRValue& val = ctx.stack.emplace();
 				val.type = DataStream::LITERAL;
 				val.value = ((LiteralNode*)node)->value;
+				val.creator = nullptr;
 				return 1;
 			}
 			case Node::BLOCK: {
 				auto* n = (BlockNode*)node;
 				u32 size_locals = 0;
-				for (Local& l : n->locals) {
-					u32 num = toCount(l.type);
-					for (u32 i = 0; i < num; ++i) {
-						IRValue& v = ctx.stack.emplace();
-						v.type = DataStream::REGISTER;
-						v.index = ctx.stack.size();
-						l.registers[i] = v.index;
-					}
-					size_locals += num;
-				}
 				for (Node* statement : n->statements) {
 					i32 s = compileIR(ctx, statement);
 					if (s < 0) return -1;
@@ -2169,7 +2294,6 @@ const char* toString(Token::Type type) {
 						return s; // TODO make sure this is from "return ...;"
 					}
 				}
-				ctx.popStack(size_locals);
 				return 0;
 			}
 			case Node::ASSIGN: {
@@ -2184,7 +2308,7 @@ const char* toString(Token::Type type) {
 
 				IRMov* movs[4];
 				for (i32 i = 0; i < left; ++i) {
-					auto* res = LUMIX_NEW(m_arena_allocator, IRMov);
+					auto* res = LUMIX_NEW(m_arena_allocator, IRMov)(n);
 					res->dst = ctx.stackValue(-left - right + i);
 					res->src = ctx.stackValue(-right + (right == 1 ? 0 : i));
 					movs[i] = res;
@@ -2239,6 +2363,7 @@ const char* toString(Token::Type type) {
 		Node* collapsed = collapseConstants(b, nullptr, false);
 		IRContext irctx(emitter, m_arena_allocator);
 		compileIR(irctx, collapsed);
+		optimizeIR(irctx.head);
 		compileBytecode(ctx, irctx.head, compiled);
 		//compile(ctx, collapsed, compiled);
 		compiled.write(InstructionType::END);
