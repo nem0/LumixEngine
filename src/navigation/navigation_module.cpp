@@ -408,7 +408,10 @@ struct NavigationModuleImpl final : NavigationModule
 		
 		const Transform zone_tr = m_world.getTransform(zone.entity);
 
-		zone.crowd->doMove(time_delta);
+		{
+			PROFILE_BLOCK("detour crowd move");
+			zone.crowd->doMove(time_delta);
+		}
 
 		for (auto& agent : m_agents) {
 			if (agent.agent < 0) continue;
@@ -743,16 +746,22 @@ struct NavigationModuleImpl final : NavigationModule
 		for (u32 j = 0; j < zone.m_num_tiles_z; ++j) {
 			for (u32 i = 0; i < zone.m_num_tiles_x; ++i) {
 				const auto* tile = zone.navmesh->getTileAt(i, j, 0);
-				blob.write(tile->dataSize);
-
-				compressed.clear();
-				if (!m_engine.compress(Span<const u8>((const u8*)tile->data, tile->dataSize), compressed)) {
-					logError("Could not compress navmesh, entity", zone_entity.index);
-					return false;
-				}
+				if (tile) {
+					blob.write(tile->dataSize);
+					compressed.clear();
+					if (!m_engine.compress(Span<const u8>((const u8*)tile->data, tile->dataSize), compressed)) {
+						logError("Could not compress navmesh, entity", zone_entity.index);
+						return false;
+					}
 				
-				blob.write((u32)compressed.size());
-				blob.write(compressed.data(), compressed.size());
+					blob.write((u32)compressed.size());
+					blob.write(compressed.data(), compressed.size());
+				}
+				else {
+					blob.write(i32(0));
+					blob.write(u32(0));
+				}
+
 			}
 		}
 

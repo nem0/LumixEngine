@@ -512,10 +512,22 @@ static IModule* LUA_getModule(World* world, const char* name)
 	return world->getModule(name);
 }
 
+static i32 LUA_unloadResource(lua_State* L) {
+	i32 resource_idx = LuaWrapper::checkArg<i32>(L, 1);
+	Engine* engine = LuaWrapper::getClosureObject<Engine>(L);
+	auto* system = (LuaScriptSystem*)engine->getSystemManager().getSystem("lua_script");
+	system->unloadLuaResource(resource_idx);
+	return 0;
+}
 
-static int LUA_loadResource(LuaScriptSystem* system, const char* path, const char* type)
-{
-	return system->addLuaResource(Path(path), ResourceType(type));
+static int LUA_loadResource(lua_State* L) {
+	const char* path = LuaWrapper::checkArg<const char*>(L, 1);
+	const char* type = LuaWrapper::checkArg<const char*>(L, 2);
+	Engine* engine = LuaWrapper::getClosureObject<Engine>(L);
+	auto* system = (LuaScriptSystem*)engine->getSystemManager().getSystem("lua_script");
+	i32 res = system->addLuaResource(Path(path), ResourceType(type));
+	LuaWrapper::push(L, res);
+	return 1;
 }
 
 static int LUA_resourceTypeFromString(lua_State* L) {
@@ -587,7 +599,6 @@ static void LUA_setEntityName(World* univ, i32 entity, const char* name) { univ-
 static void LUA_setEntityScale(World* univ, i32 entity, const Vec3& scale) { univ->setScale({entity}, scale); }
 static void LUA_setEntityPosition(World* univ, i32 entity, const DVec3& pos) { univ->setPosition({entity}, pos); }
 static void LUA_setEntityLocalPosition(World* univ, i32 entity, const DVec3& pos) { univ->setLocalPosition({entity}, pos); }
-static void LUA_unloadResource(LuaScriptSystem* system, int resource_idx) { system->unloadLuaResource(resource_idx); }
 static World* LUA_createWorld(Engine* engine) { return &engine->createWorld(); }
 static void LUA_destroyWorld(Engine* engine, World* world) { engine->destroyWorld(*world); }
 
@@ -759,7 +770,6 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	REGISTER_FUNCTION(getParent);
 	REGISTER_FUNCTION(setParent);
 	REGISTER_FUNCTION(getModule);
-	REGISTER_FUNCTION(loadResource);
 	REGISTER_FUNCTION(getResourcePath);
 	REGISTER_FUNCTION(logError);
 	REGISTER_FUNCTION(logInfo);
@@ -770,7 +780,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	REGISTER_FUNCTION(setEntityScale);
 	REGISTER_FUNCTION(setTimeMultiplier);
 	REGISTER_FUNCTION(startGame);
-	REGISTER_FUNCTION(unloadResource);
+	
 	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "getResourcePath", &LuaWrapper::wrap<LUA_getResourcePath>);
 
 	LuaWrapper::createSystemFunction(L, "LumixAPI", "resourceTypeFromString", &LUA_resourceTypeFromString);
@@ -788,8 +798,9 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "processFilesystemWork", LUA_processFilesystemWork);
 	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "pause", LUA_pause);
 	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "writeFile", LUA_writeFile);
-
-
+	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "loadResource", LUA_loadResource);
+	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "unloadResource", LUA_unloadResource);
+	
 	#undef REGISTER_FUNCTION
 
 	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "instantiatePrefab", &LUA_instantiatePrefab);

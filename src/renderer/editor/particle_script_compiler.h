@@ -3249,23 +3249,7 @@ struct ParticleScriptEditorWindow : AssetEditorWindow {
 				auto* module = (RenderModule*)m_viewer.m_world->getModule(types::particle_emitter);
 				ParticleSystem& system = module->getParticleEmitter(m_preview_entity);
 
-				if (ImGuiEx::IconButton(ICON_FA_INFO_CIRCLE, "Info")) ImGui::OpenPopup("info");
-				if (ImGui::BeginPopup("info")) {
-					Span<ParticleSystemResource::Emitter> emitters = system.getResource()->getEmitters();
-					for (u32 i = 0, c = emitters.size(); i < c; ++i) {
-						const auto& emitter = emitters[i];
-						ImGui::Text("Emitter %d", i + 1);
-						ImGui::Indent();
-						ImGui::LabelText("Emit registers", "%d", emitter.emit_registers_count);
-						ImGui::LabelText("Emit instructions", "%d", emitter.emit_instructions_count);
-						ImGui::LabelText("Update registers", "%d", emitter.update_registers_count);
-						ImGui::LabelText("Update instructions", "%d", emitter.update_instructions_count);
-						ImGui::LabelText("Output registers", "%d", emitter.output_registers_count);
-						ImGui::LabelText("Output instructions", "%d", emitter.output_instructions_count);
-						ImGui::Unindent();
-					}
-					ImGui::EndPopup();
-				}
+				if (ImGuiEx::IconButton(ICON_FA_INFO_CIRCLE, "Info")) m_show_info = !m_show_info;
 				ImGui::SameLine();
 				if (m_play) {
 					if (ImGuiEx::IconButton(ICON_FA_PAUSE, "Pause")) m_play = false;
@@ -3326,7 +3310,31 @@ struct ParticleScriptEditorWindow : AssetEditorWindow {
 				}
 				ImGui::SameLine();
 				ImGui::Text("Particles: %d", num_particles);
+				
+				ImVec2 viewer_pos = ImGui::GetCursorScreenPos();
 				m_viewer.gui();
+				
+				if (m_show_info) {
+					ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove |
+							 ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing;					
+					ImGui::SetNextWindowPos(ImVec2(viewer_pos.x + 10, viewer_pos.y + 10), ImGuiCond_Always);
+					if (ImGui::Begin("Emitter Info##overlay", &m_show_info, flags)) {
+						Span<ParticleSystemResource::Emitter> emitters = system.getResource()->getEmitters();
+						for (u32 i = 0, c = emitters.size(); i < c; ++i) {
+							const auto& emitter = emitters[i];
+							ImGui::Text("Emitter %d", i + 1);
+							ImGui::Indent();
+							ImGui::LabelText("Emit registers", "%d", emitter.emit_registers_count);
+							ImGui::LabelText("Emit instructions", "%d", emitter.emit_instructions_count);
+							ImGui::LabelText("Update registers", "%d", emitter.update_registers_count);
+							ImGui::LabelText("Update instructions", "%d", emitter.update_instructions_count);
+							ImGui::LabelText("Output registers", "%d", emitter.output_registers_count);
+							ImGui::LabelText("Output instructions", "%d", emitter.output_instructions_count);
+							ImGui::Unindent();
+						}
+						ImGui::End();
+					}
+				}
 			}
 			ImGui::EndChild();
 		}
@@ -3346,6 +3354,7 @@ struct ParticleScriptEditorWindow : AssetEditorWindow {
 	EntityRef m_preview_entity;
 	bool m_play = true;
 	bool m_show_ground = true;
+	bool m_show_info = false;
 };
 
 void ParticleScriptPlugin::openEditor(const struct Path& path) {

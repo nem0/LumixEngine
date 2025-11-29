@@ -191,7 +191,8 @@ World::PartitionHandle World::getPartition(EntityRef entity) {
 }
 
 IModule* World::getModule(ComponentType type) const {
-	return m_component_type_map[type.index]->module;
+	ComponentTypeEntry* entry = m_component_type_map[type.index].get();
+	return entry ? entry->module : nullptr;
 }
 
 
