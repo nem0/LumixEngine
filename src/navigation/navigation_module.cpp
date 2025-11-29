@@ -690,7 +690,13 @@ struct NavigationModuleImpl final : NavigationModule
 						file.read(compressed_size);
 						const u8* tmp = (const u8*)file.skip(compressed_size);
 
-						if (!module.m_engine.decompress(Span<const u8>(tmp, compressed_size), Span<u8>(data, data_size))) {
+						if (data_size != 0 && compressed_size == 0) {
+							LUMIX_DELETE(module.m_allocator, this);
+							logError("Invalid navmesh");
+							return;
+						}
+
+						if (data_size > 0 && !module.m_engine.decompress(Span<const u8>(tmp, compressed_size), Span<u8>(data, data_size))) {
 							LUMIX_DELETE(module.m_allocator, this);
 							logError("Failed to decompress navmesh");
 							return;
