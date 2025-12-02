@@ -6,6 +6,11 @@
 namespace Lumix
 {
 
+static inline float safeInverseScale(float value)
+{
+	return value == 0.0f ? 0.0f : 1.0f / value;
+}
+
 
 const Vec2 Vec2::MAX = Vec2(FLT_MAX);
 const Vec2 Vec2::MIN = Vec2(-FLT_MAX);
@@ -760,11 +765,21 @@ Transform Transform::compose(const LocalRigidTransform& rhs) const { return {pos
 DVec3 Transform::transform(Vec3 value) const { return pos + rot.rotate(value * scale); }
 
 DVec3 Transform::invTransform(const DVec3& value) const {
-	return rot.conjugated().rotate(value - pos) / scale;
+	const DVec3 rotated = rot.conjugated().rotate(value - pos);
+	return {
+		rotated.x * safeInverseScale(scale.x),
+		rotated.y * safeInverseScale(scale.y),
+		rotated.z * safeInverseScale(scale.z)
+	};
 }
 
 DVec3 Transform::invTransform(Vec3 value) const {
-	return rot.conjugated().rotate(DVec3(value) - pos) / scale;
+	const DVec3 rotated = rot.conjugated().rotate(DVec3(value) - pos);
+	return {
+		rotated.x * safeInverseScale(scale.x),
+		rotated.y * safeInverseScale(scale.y),
+		rotated.z * safeInverseScale(scale.z)
+	};
 }
 
 DVec3 Transform::transform(const DVec3& value) const { return pos + rot.rotate(value * scale); }
@@ -772,7 +787,13 @@ DVec3 Transform::transform(const DVec3& value) const { return pos + rot.rotate(v
 Vec3 Transform::transformVector(Vec3 value) const { return rot.rotate(value * scale); }
 
 Vec3 Transform::invTransformVector(Vec3 value) const {
-	return rot.conjugated().rotate(value) / scale;
+	const Vec3 rotated = rot.conjugated().rotate(value);
+	const Vec3 inv_scale = {
+		safeInverseScale(scale.x),
+		safeInverseScale(scale.y),
+		safeInverseScale(scale.z)
+	};
+	return rotated * inv_scale;
 }
 
 RigidTransform Transform::getRigidPart() const { return {pos, rot}; }
