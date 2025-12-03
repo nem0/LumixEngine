@@ -8,22 +8,26 @@
 #include "renderer/particle_system.h"
 #include "renderer/render_module.h"
 
+// TODO bugs
+// errors in imports in compileIR results in crash
+
 // TODO
-// * unary in IR
+// * optimize functions with compounds literals as args
 // * nested ifs
 // * function call inside a function
-// * spline, mesh, terrain
 // * and, or, not
-// * multiply-add
-// * emit_ribbon()
-// * autocomplete
-// * kill in ribbons?
-// * debugger
-// * preview for world space moving ribbons
-// * flow control (if, while, for)
-// * saturate, floor, round
+// * unary in IR
 
-// TODO maybe
+// TODO maybe / low prio
+// * spline, mesh, terrain
+// * saturate, floor, round
+// * preview for world space moving ribbons
+// * emit_ribbon()
+// * kill in ribbons
+// * multiply-add
+// * while, for cycles
+// * autocomplete
+// * debugger
 // * global update - runs once per frame on the whole emitter, can prepare some global data
 // * create mesh from script?
 
@@ -2633,6 +2637,7 @@ const char* toString(Token::Type type) {
 		ctx.entry_point = EntryPoint::GLOBAL;
 		ctx.function = &fn;
 		fn.block = block(ctx);
+		if (!fn.block) return;
 		collapseConstants(fn.block, nullptr, false);
 	}
 
