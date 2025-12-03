@@ -8,6 +8,25 @@
 #include "renderer/particle_system.h"
 #include "renderer/render_module.h"
 
+// TODO
+// * unary in IR
+// * nested ifs
+// * function call inside a function
+// * spline, mesh, terrain
+// * and, or, not
+// * multiply-add
+// * emit_ribbon()
+// * autocomplete
+// * kill in ribbons?
+// * debugger
+// * preview for world space moving ribbons
+// * flow control (if, while, for)
+// * saturate, floor, round
+
+// TODO maybe
+// * global update - runs once per frame on the whole emitter, can prepare some global data
+// * create mesh from script?
+
 namespace Lumix {
 
 struct ParticleScriptToken {
@@ -229,12 +248,6 @@ struct ParticleScriptCompiler {
 		GLOBAL
 	};
 
-	struct CompileResult {
-		DataStream streams[4];
-		u32 num_streams = 0;
-		bool success = true;
-	};
-
 	struct Local {
 		StringView name;
 		ValueType type;
@@ -308,7 +321,6 @@ struct ParticleScriptCompiler {
 		const Function* function = nullptr;
 		Emitter* emitter = nullptr;
 		Emitter* emitted = nullptr;
-		Span<CompileResult> args = {};
 		BlockNode* block = nullptr;
 		EntryPoint entry_point;
 
@@ -1402,7 +1414,7 @@ const char* toString(Token::Type type) {
 
 	Array<OutputMemoryStream> m_imports;
 
-	void compileImport() {
+	void parseImport() {
 		StringView path;
 		if (!consume(Token::STRING, path)) return;
 		
@@ -1422,9 +1434,9 @@ const char* toString(Token::Type type) {
 			switch (token.type) {
 				case Token::EOF: goto end_import;
 				case Token::ERROR: return;
-				case Token::IMPORT: compileImport(); break;
-				case Token::CONST: compileConst(); break;
-				case Token::FN: compileFunction(); break;
+				case Token::IMPORT: parseImport(); break;
+				case Token::CONST: parseConst(); break;
+				case Token::FN: parseFunction(); break;
 				case Token::GLOBAL: variableDeclaration(m_globals); break;
 				case Token::EMITTER: compileEmitter(); break;
 				default: error(token.value, "Unexpected token ", token.value); return;
@@ -1435,7 +1447,7 @@ const char* toString(Token::Type type) {
 		m_tokenizer = tokenizer;
 	}
 
-	void compileConst() {
+	void parseConst() {
         Constant& c = m_constants.emplace();
 		if (!consume(Token::IDENTIFIER, c.name)) return;
         if (!consume(Token::EQUAL)) return;
@@ -1583,145 +1595,6 @@ const char* toString(Token::Type type) {
 		});
 	}
 
-	u32 optimizeBytecode(OutputMemoryStream& bytecode, u32 num_immutables) {
-		// register allocation
-		struct Lifetime {
-			i32 register_index = -1;
-			i32 from = -1;
-			i32 to = -1;
-			i32 remapped = -1;
-			i32 num_reads = 0;
-			i32 num_writes = 0;
-		};
-		InputMemoryStream ip(bytecode.data(), bytecode.size());
-		StackArray<Lifetime, 16> lifetimes(m_arena_allocator);
-		auto computeLifetimes = [&](){
-			lifetimes.clear();
-			ip.setPosition(0);
-			forEachDataStreamInBytecode(ip, [&](const DataStream& s, i32 position, i32 arg_index, InstructionType itype, i32 ioffset, i32){
-				if (s.type != DataStream::REGISTER) return;
-				if (s.index < num_immutables) return;
-			
-				if (arg_index == 0 && itype != InstructionType::CMP && itype != InstructionType::CMP_ELSE) {
-					for (i32 i = lifetimes.size() - 1; i >= 0; --i) {
-						if (lifetimes[i].register_index == s.index) {
-							// writing to the same register more than once can happen 
-							// if the the local variable is stored in the register
-							lifetimes[i].to = position;
-							++lifetimes[i].num_writes;
-							return;
-						}
-					}
-					Lifetime& lt = lifetimes.emplace();
-					lt.register_index = s.index;
-					lt.from = position;
-					lt.to = position;
-					lt.num_writes = 1; 
-					lt.num_reads = 0;
-					return;
-				}
-
-				for (i32 i = lifetimes.size() - 1; i >= 0; --i) {
-					if (lifetimes[i].register_index == s.index) {
-						lifetimes[i].to = position;
-						++lifetimes[i].num_reads;
-						return;
-					}
-				}
-
-				Lifetime& lt = lifetimes.emplace();
-				lt.register_index = s.index;
-				lt.from = position;
-				lt.to = position;
-				lt.num_writes = 0;
-				lt.num_reads = 1;
-			});
-		};
-		computeLifetimes();
-
-		// collapse unnecessary MOVs
-		StackArray<i32, 16> movs_to_remove(m_arena_allocator);
-		ip.setPosition(0);
-		forEachDataStreamInBytecode(ip, [&](const DataStream& src, i32 position, i32 arg_index, InstructionType itype, i32 ioffset, i32){
-			if (src.type != DataStream::REGISTER) return;
-			if (src.index < num_immutables) return;
-			if (itype != InstructionType::MOV) return;
-			if (arg_index == 0) return;
-
-			// we are mov-ing from register, it's also the only read from that value
-			// collapse the mov instruction with the instruction which produced the value
-			// e.g. `out = t * 5;` is collapsed into just a single instruction `mul out, t, 5`
-			for (const Lifetime& lt : lifetimes) {
-				if (lt.register_index == src.index && position == lt.to && lt.num_reads == 1 && lt.num_writes == 1) {
-					movs_to_remove.push(ioffset);
-					DataStream mov_dst;
-					i32 offset = ioffset + sizeof(InstructionType);
-					if (offset == lt.from) break; // we assign a variable to itself, e.g. let x : float; x = x;
-					memcpy(&mov_dst, bytecode.data() + offset, sizeof(mov_dst));
-					memcpy(bytecode.getMutableData() + lt.from, &mov_dst, sizeof(mov_dst));
-					
-					// dst register starts to exist when the orignal src started
-					if (mov_dst.type == DataStream::REGISTER) {
-						for (Lifetime& dst_lifetime : lifetimes) {
-							if (dst_lifetime.register_index == mov_dst.index) {
-								dst_lifetime.from = minimum(lt.from, dst_lifetime.from);
-								break;
-							}
-						}
-					}
-					
-					// original src register does not exist anymore
-					lifetimes.eraseItems([&src](const Lifetime& l){ return l.register_index == src.index; });
-					break;
-				}
-			}
-		});
-
-		for (i32 i = movs_to_remove.size() - 1; i >= 0; --i) {
-			u8* data = bytecode.getMutableData();
-			i32 offset = movs_to_remove[i];
-			static constexpr u32 SIZE = sizeof(DataStream) * 2 + sizeof(InstructionType);
-			memmove(data + offset, data + offset + SIZE, bytecode.size() - offset - SIZE);
-			bytecode.resize(bytecode.size() - SIZE);
-		}
-		ip = InputMemoryStream(bytecode.data(), bytecode.size());
-		computeLifetimes();
-
-		// allocate registers
-		if (!lifetimes.empty()) lifetimes[0].remapped = num_immutables;
-		for (i32 i = 1, c = lifetimes.size(); i < c; ++i) {
-			Lifetime& lt = lifetimes[i];
-			// assign .remapped values so lifetimes with the same remapped value do no overlap
-			lt.remapped = num_immutables;
-			for (i32 j = 0; j < i; ++j) {
-				const Lifetime& prev = lifetimes[j];
-				if (prev.remapped == lt.remapped && !(lt.to < prev.from || prev.to < lt.from)) {
-					++lt.remapped;
-					j = -1; // restart check
-				}
-			}
-		}
-
-		ip.setPosition(0);
-		forEachDataStreamInBytecode(ip, [&](const DataStream& s, i32 position, i32 arg_index, InstructionType itype, i32 ioffset, i32){
-			if (s.type != DataStream::REGISTER) return;
-			if (s.index < num_immutables) return;
-
-			DataStream* ds = const_cast<DataStream*>((const DataStream*)(bytecode.data() + position));
-			for (const Lifetime& lt : lifetimes) {
-				if (lt.register_index == s.index && position >= lt.from && position <= lt.to) {
-					ds->index = lt.remapped;
-				}
-			}
-		});
-
-		i32 max_used_register = (i32)num_immutables - 1;
-		for (const Lifetime& lt : lifetimes) {
-			max_used_register = maximum(max_used_register, lt.remapped);
-		}
-		return max_used_register + 1;
-	}
-
 	struct IRNode {
 		#ifdef LUMIX_DEBUG
 			// so VS debugger can show use actual type
@@ -1739,7 +1612,7 @@ const char* toString(Token::Type type) {
 
 		Type type;
 		IRNode* next = nullptr;
-		bool is_dead = false;
+		IRNode* prev = nullptr;
 		Node* ast = nullptr; 
 	};
 
@@ -1747,7 +1620,12 @@ const char* toString(Token::Type type) {
 		DataStream::Type type;
 		u32 index;
 		float value;
-		IRNode* creator = nullptr;
+
+		bool operator==(const IRValue& rhs) const {
+			if (type != rhs.type) return false;
+			if (type == DataStream::LITERAL) return value == rhs.value;
+			return index == rhs.index;
+		}
 	};
 
 	struct IRBinary : IRNode {
@@ -1799,6 +1677,7 @@ const char* toString(Token::Type type) {
 		};
 		Span<Arg> args;
 		u32 register_allocator = 0;
+		u32 num_immutables = 0;
 		
 		IRValue& stackValue(i32 idx) {
 			return stack[stack.size() + idx];
@@ -1806,6 +1685,7 @@ const char* toString(Token::Type type) {
 
 		void push(IRNode* node) {
 			if (tail) tail->next = node;
+			node->prev = tail;
 			if (!head) head = node;
 			tail = node;
 		}
@@ -1820,15 +1700,11 @@ const char* toString(Token::Type type) {
 		auto writeValue = [&](IRValue& val) {
 			DataStream tmp;
 			tmp.type = val.type;
-			tmp.index = val.index; // TODO remap registers
+			tmp.index = val.index;
 			tmp.value = val.value;
 			compiled.write(tmp);
 		};
 		while (node) {
-			if (node->is_dead) {
-				node = node->next;
-				continue;
-			}
 			switch (node->type) {
 				case IRNode::IF: {
 					auto* n = (IRIf*)node;
@@ -1893,112 +1769,453 @@ const char* toString(Token::Type type) {
 		return nullptr;
 	}
 
-	void optimizeIR(IRNode* node) {
-		collapseMovsIR(node);
-		reuseTemporaryIR(node);
+	void optimizeIR(IRContext& ctx) {
+		reorderIR(ctx);
+		removeRedundantMOVs(ctx);
+	}
+
+	void printIR(StringView path, IRContext& ctx) {
+		StaticString<4096> tmp;
+		auto append = [&](const IRValue& val) {
+			switch (val.type) {
+				case DataStream::NONE:
+				case DataStream::ERROR: tmp.append("##ERROR##"); break;
+				case DataStream::LITERAL: tmp.append(val.value); break;
+				case DataStream::CHANNEL: tmp.append("CH", val.index); break;
+				case DataStream::GLOBAL: tmp.append("GLOB", val.index); break;
+				case DataStream::OUT: tmp.append("OUT", val.index); break;
+				case DataStream::REGISTER: tmp.append("R", val.index); break;
+				case DataStream::SYSTEM_VALUE: tmp.append("SYS", val.index); break;
+			}
+			};
+		IRNode* node = ctx.head;
+		while (node) {
+			switch (node->type) {
+				case IRNode::BINARY: {
+					auto* n = (IRBinary*)node;
+					append(n->dst);
+					tmp.append(" = ");
+					append(n->left);
+					switch (n->instruction) {
+						case InstructionType::MUL: tmp.append(" * "); break;
+						case InstructionType::ADD: tmp.append(" + "); break;
+						case InstructionType::SUB: tmp.append(" - "); break;
+						case InstructionType::DIV: tmp.append(" / "); break;
+						case InstructionType::LT: tmp.append(" < "); break;
+						case InstructionType::GT: tmp.append(" > "); break;
+						case InstructionType::MOD: tmp.append(" % "); break;
+						default: ASSERT(false); break;
+					}
+					append(n->right);
+					break;
+				}
+				case IRNode::MOV: {
+					auto* n = (IRMov*)node;
+					append(n->dst);
+					tmp.append(" = ");
+					append(n->src);
+					break;
+				}
+				case IRNode::END:
+					tmp.append("END");
+					break;
+				case IRNode::SYSCALL: {
+					auto* n = (IRSyscall*)node;
+					if (n->syscall.returns_value) {
+						append(n->dst);
+						tmp.append(" = ");
+					}
+					switch (n->syscall.instruction) {
+						case InstructionType::COS: tmp.append("cos("); break;
+						case InstructionType::SIN: tmp.append("sin("); break;
+						case InstructionType::KILL: tmp.append("kill("); break;
+						case InstructionType::EMIT: tmp.append("emit("); break;
+						case InstructionType::RAND: tmp.append("random("); break;
+						case InstructionType::MIN: tmp.append("min("); break;
+						case InstructionType::MAX: tmp.append("max("); break;
+						case InstructionType::NOISE: tmp.append("noise("); break;
+						default: ASSERT(false); break;
+					}
+					for (const IRValue& arg : n->args) {
+						if (&arg != n->args.begin()) {
+							tmp.append(", ");
+						}
+						append(arg);
+					}
+					tmp.append(")");
+					break;
+				}
+				case IRNode::IF: {
+					auto* n = (IRIf*)node;
+					tmp.append("CMP ");
+					append(n->condition);
+					break;
+				}
+			}
+			tmp.append("\n");
+			node = node->next;
+		}	
+		logError(path, "\n\n");
+		logError(tmp.data);
 	}
 
 	template <typename F>
 	void forEachValue(IRNode* node, const F& fn) {
+		u32 instruction_index = 0;
 		while (node) {
-			if (!node->is_dead) {
-				switch (node->type) {
-					case IRNode::SYSCALL: {
-						auto* n = (IRSyscall*)node;
-						fn(n->dst, true);
-						for (const IRValue& arg : n->args) {
-							fn(arg, false);
+			switch (node->type) {
+				case IRNode::SYSCALL: {
+					auto* n = (IRSyscall*)node;
+					fn(n->dst, true, instruction_index);
+					for (IRValue& arg : n->args) {
+						fn(arg, false, instruction_index);
+					}
+					break;
+				}
+				case IRNode::BINARY: {
+					auto* n = (IRBinary*)node;
+					fn(n->dst, true, instruction_index);
+					fn(n->left, false, instruction_index);
+					fn(n->right, false, instruction_index);
+					break;
+				}
+				case IRNode::MOV: {
+					auto* n = (IRMov*)node;
+					fn(n->dst, true, instruction_index);
+					fn(n->src, false, instruction_index);
+					break;
+				}
+				case IRNode::END: break;
+				case IRNode::IF: {
+					auto* n = (IRIf*)node;
+					fn(n->condition, false, instruction_index);
+					break;
+				}
+			}
+			node = node->next;
+			++instruction_index;
+		}
+	}
+
+	// Optimizes register allocation by reusing registers whose lifetimes don't overlap.
+	// Before this pass, each operation creates a unique register index. This pass remaps
+	// those indices to minimize the total number of registers needed at runtime.
+	u32 allocateRegisters(IRContext& ctx) {
+		struct IRLifetime {
+			u32 original_index;
+			i32 from = -1;
+			i32 to = -1;
+			i32 remapped = -1;
+		};
+
+		StackArray<IRLifetime, 16> lifetimes(m_arena_allocator);
+		HashMap<u32, i32> register_to_lifetime(m_allocator);
+
+		// gather reads/writes
+		forEachValue(ctx.head, [&](const IRValue& val, bool is_write, i32 instruction_index) {
+			if (val.type == DataStream::REGISTER) {
+				if (val.index < ctx.num_immutables) return;
+				auto iter = register_to_lifetime.find(val.index);
+				if (iter == register_to_lifetime.end()) {
+					IRLifetime& lt = lifetimes.emplace();
+					lt.original_index = val.index;
+					lt.from = instruction_index;
+					lt.to = instruction_index;
+					register_to_lifetime.insert(val.index, lifetimes.size() - 1);
+				} else {
+					IRLifetime& lt = lifetimes[iter.value()];
+					lt.to = maximum(lt.to, instruction_index);
+				}
+			}
+		});
+
+		u32 num_used_registers = 0;
+		// assign remapped
+		if (!lifetimes.empty()) {
+			lifetimes[0].remapped = ctx.num_immutables;
+			num_used_registers = 1;
+		}
+		for (i32 i = 1; i < lifetimes.size(); ++i) {
+			IRLifetime& lt = lifetimes[i];
+			lt.remapped = ctx.num_immutables;
+			for (i32 j = 0; j < i; ++j) {
+				const IRLifetime& prev = lifetimes[j];
+				if (prev.remapped == lt.remapped && !(lt.to <= prev.from || prev.to <= lt.from)) {
+					++lt.remapped;
+					if (lt.remapped > 0xfe) {
+						logError(m_path, ": Too many registers.");
+						m_is_error = true;
+						return 0;
+					}
+					j = -1; // restart check
+					num_used_registers = maximum(num_used_registers, lt.remapped + 1);
+				}
+			}
+		}
+
+		// update indices
+		forEachValue(ctx.head, [&](IRValue& val, bool, i32) {
+			if (val.type != DataStream::REGISTER) return;
+			if (val.index < ctx.num_immutables) return;
+			auto iter = register_to_lifetime.find(val.index);
+			val.index = lifetimes[iter.value()].remapped;
+		});
+		return num_used_registers;
+	}
+
+	static u32 getValues(IRNode& node, Span<IRValue> srcs, IRValue*& dst) {
+		dst = nullptr;
+		switch (node.type) {
+			case IRNode::BINARY: {
+				auto& n = (IRBinary&)node;
+				dst = &n.dst;
+				srcs[0] = n.left;
+				srcs[1] = n.right;
+				return 2;
+			}
+			case IRNode::MOV: {
+				auto& n = (IRMov&)node;
+				dst = &n.dst;
+				srcs[0] = n.src;
+				return 1;
+			}
+			case IRNode::SYSCALL: {
+				auto& n = (IRSyscall&)node;
+				dst = &n.dst;
+				u32 i = 0;
+				for (const IRValue& arg : n.args) {
+					srcs[i] = arg;
+					++i;
+				}
+				return i;
+			}
+			case IRNode::IF: {
+				auto& n = (IRIf&)node;
+				srcs[0] = n.condition;
+				return 1;
+			}
+			case IRNode::END: return 0;
+		}
+		ASSERT(false);
+		return 0;
+	}
+
+	enum class IRSwapResult {
+		POSSIBLE,
+		BLOCK,
+		COLLISION
+	};
+
+	static IRSwapResult canSwap(IRNode& node, IRNode& node_dst) {
+		switch (node_dst.type) {
+			case IRNode::END: return IRSwapResult::BLOCK;
+			case IRNode::IF: return IRSwapResult::BLOCK;
+			case IRNode::SYSCALL: {
+				auto& n = (IRSyscall&)node_dst;
+				if (n.syscall.instruction == InstructionType::EMIT) 
+					return IRSwapResult::BLOCK;
+				break;
+			}
+			default: break;
+		}
+
+		switch (node.type) {
+			case IRNode::END: return IRSwapResult::BLOCK;
+			case IRNode::IF: return IRSwapResult::BLOCK;
+			case IRNode::SYSCALL: {
+				auto& n = (IRSyscall&)node;
+				if (n.syscall.instruction == InstructionType::EMIT) 
+					return IRSwapResult::BLOCK;
+				break;
+			}
+			default: break;
+		}
+
+		IRValue values[9];
+		IRValue* dst;
+		IRValue prev_values[9];
+		IRValue* prev_dst;
+		u32 num_values = getValues(node, values, dst);
+		u32 num_prev_values = getValues(node_dst, prev_values, prev_dst);
+
+		if (dst) {
+			for (u32 i = 0; i < num_prev_values; ++i) {
+				if (*dst == prev_values[i]) return IRSwapResult::COLLISION;
+			}
+		}
+		if (prev_dst) {
+			for (u32 i = 0; i < num_values; ++i) {
+				if (*prev_dst == values[i]) return IRSwapResult::COLLISION;
+			}
+		}
+		return IRSwapResult::POSSIBLE;
+	}
+
+	// Reorders IR instructions to improve execution efficiency by moving instructions
+	// earlier in the sequence when possible. This optimization reduces register pressure
+	// and can enable better instruction scheduling by placing instructions closer to
+	// where their results are first used.
+	void reorderIR(IRContext& ctx) {
+		if (!ctx.head) return;
+
+		// we try to move nodes forward, otherwise conditions are moved far from ::CMP
+		IRNode* node = ctx.tail;
+		while (node) {
+			IRNode* prev = node->prev;
+			IRNode* dst = node->next;
+			// to keep instructions roughly in the same order, we don't swap unless there's collision
+			// this helps if we need to debug the compiler
+			while (dst) {
+				switch (canSwap(*node, *dst)) {
+					case IRSwapResult::BLOCK: goto next;
+					case IRSwapResult::POSSIBLE: break;
+					case IRSwapResult::COLLISION: {
+						if (dst->prev != node) {
+							// Move node before dst (which is where it should stay)
+							// Unlink node from its current position
+							node->next->prev = node->prev;
+							if (node->prev) node->prev->next = node->next;
+							else ctx.head = node->next;
+
+							// Insert node before dst
+							node->next = dst;
+							node->prev = dst->prev;
+							
+							dst->prev->next = node;
+							dst->prev = node;
 						}
-						break;
+						goto next;
 					}
-					case IRNode::BINARY: {
-						auto* n = (IRBinary*)node;
-						fn(n->dst, true);
-						fn(n->left, false);
-						fn(n->right, false);
-						break;
-					}
-					case IRNode::MOV: {
-						auto* n = (IRMov*)node;
-						fn(n->dst, true);
-						fn(n->src, false);
-						break;
-					}
-					case IRNode::END: break;
-					case IRNode::IF: {
-						auto* n = (IRIf*)node;
-						fn(n->condition, false);
-						break;
-					}
+				}
+				dst = dst->next;
+			}
+			next:
+			node = prev;
+		}
+	}
+
+	// Optimizes IR by removing redundant MOV instructions. This includes:
+	// 1. Eliminating duplicate consecutive MOVs to the same destination
+	// 2. removes a temporary register when an operation writes to it and then 
+	//		immediately a MOV copies that result to the final destination.
+	// 		If the temporary is written exactly once and read exactly once
+	//		(by the MOV), the operation can write directly to the final 
+	//		destination, eliminating the MOV entirely.
+	void removeRedundantMOVs(IRContext& ctx) {
+		if (!ctx.head) return;
+
+		IRNode* node = ctx.head;
+		// keep only one mov from several movs in a row into the same destination
+		while (node) {
+			if (node->prev && node->type == IRNode::MOV && node->prev->type == IRNode::MOV) {
+				auto* n_prev = (IRMov*)node->prev;
+				auto* n = (IRMov*)node;
+				if (n_prev->dst.type == n->dst.type && n_prev->dst.index == n->dst.index) {
+					if (n_prev == ctx.head) ctx.head = n_prev->next;
+					if (n_prev->prev) n_prev->prev->next = n_prev->next;
+					if (n_prev->next) n_prev->next->prev = n_prev->prev;
+					if (ctx.head == n_prev) ctx.head = n;
 				}
 			}
 			node = node->next;
 		}
-	}
-
-	void reuseTemporaryIR(IRNode* node) {
-		struct RegisterOp {
-			IRNode* node;
-			bool is_write;
-			RegisterOp* next = nullptr;
+		
+		struct RegisterAccess {
+			u32 reads = 0;
+			u32 writes = 0;
+			IRNode* prev_writer = nullptr;
 		};
-		struct Register {
-			u32 num_reads = 0;
-			u32 num_writes = 0;
-			RegisterOp* head_op = nullptr;
-			RegisterOp* tail_op = nullptr;
-		};
-		StackArray<Register, 16> registers(m_arena_allocator);
-
-		forEachValue(node, [&](const IRValue& value, bool is_write) {
-			if (value.type != DataStream::REGISTER) return;
-
-			RegisterOp* op = LUMIX_NEW(m_arena_allocator, RegisterOp);
-			op->is_write = is_write;
-			op->node = value.creator;
-			if (registers.size() <= (i32)value.index) {
-				registers.resize(value.index + 1);
-			}
-			if (registers[value.index].tail_op) {
-				registers[value.index].tail_op->next = op;
-				registers[value.index].tail_op = op;
-			}
-			else {
-				registers[value.index].head_op = op;
-				registers[value.index].tail_op = op;
-			}
-
+		StackArray<RegisterAccess, 16> register_access(m_arena_allocator);
+		register_access.reserve(ctx.register_allocator);
+		
+		auto set = [&register_access](bool is_write, const IRValue& val) {
+			if (val.type != DataStream::REGISTER) return;
+			if (val.index >= (u32)register_access.size()) register_access.resize(val.index + 1);
 			if (is_write) {
-				++registers[value.index].num_writes;
+				++register_access[val.index].writes;
 			}
 			else {
-				++registers[value.index].num_reads;
+				++register_access[val.index].reads;
 			}
-		});
+		};
 
-	}
-
-	void collapseMovsIR(IRNode* node) {
+		node = ctx.head;
 		while (node) {
-			if (node->type == IRNode::MOV) {
-				auto* n = (IRMov*)node;
-				if (n->src.creator) {
-					switch (n->src.creator->type) {
-						case IRNode::SYSCALL: {
-							auto* src = (IRSyscall*)n->src.creator;
-							src->dst = n->dst;
-							n->is_dead = true;
-							break;
+			IRValue reads[9];
+			IRValue* dst;
+			u32 num_reads = getValues(*node, reads, dst); 
+			if (dst) {
+				set(true, *dst);
+			}
+			for (u32 i = 0; i < num_reads; ++i) {
+				set(false, reads[i]);
+			}
+			node = node->next;
+		}
+
+		// collapse
+		// op op_dst op_a op_b
+		// mov mov_dst op_dst
+		// into 
+		// op mov_dst op_a op_b
+		node = ctx.head;
+		while (node) {
+			switch (node->type) {
+				case IRNode::MOV: {
+					auto* n = (IRMov*)node;
+
+					if (n->src.type == DataStream::REGISTER 
+						&& register_access[n->src.index].reads == 1
+						&& register_access[n->src.index].writes == 1
+						&& register_access[n->src.index].prev_writer
+					) {
+						IRNode* prev_writer = register_access[n->src.index].prev_writer;
+						switch (prev_writer->type) {
+							case IRNode::MOV: {
+								auto* src = (IRMov*)prev_writer;
+								src->dst = n->dst;
+								if (n->dst.type == DataStream::REGISTER) register_access[n->dst.index].prev_writer = prev_writer;
+								if (n->prev) n->prev->next = n->next;
+								if (n->next) n->next->prev = n->prev;
+								if (ctx.tail == n) ctx.tail = n->prev;
+								break;
+							}
+							case IRNode::SYSCALL: {
+								auto* src = (IRSyscall*)prev_writer;
+								src->dst = n->dst;
+								if (n->dst.type == DataStream::REGISTER) register_access[n->dst.index].prev_writer = prev_writer;
+								if (n->prev) n->prev->next = n->next;
+								if (n->next) n->next->prev = n->prev;
+								if (ctx.tail == n) ctx.tail = n->prev;
+								break;
+							}
+							case IRNode::BINARY: {
+								auto* src = (IRBinary*)prev_writer;
+								src->dst = n->dst;
+								if (n->dst.type == DataStream::REGISTER) register_access[n->dst.index].prev_writer = prev_writer;
+								if (n->prev) n->prev->next = n->next;
+								if (n->next) n->next->prev = n->prev;
+								if (ctx.tail == n) ctx.tail = n->prev;
+								break;
+							}
+							default: break;
 						}
-						case IRNode::BINARY: {
-							auto* src = (IRBinary*)n->src.creator;
-							src->dst = n->dst;
-							n->is_dead = true;
-							break;
-						}
-						default: break;
 					}
+					else if (n->dst.type == DataStream::REGISTER) register_access[n->dst.index].prev_writer = n;
+					break;
 				}
+				case IRNode::BINARY: {
+					auto* n = (IRBinary*)node;
+					if (n->dst.type == DataStream::REGISTER) register_access[n->dst.index].prev_writer = n;
+					break;
+				}
+				case IRNode::SYSCALL: {
+					auto* n = (IRSyscall*)node;
+					if (n->dst.type == DataStream::REGISTER) register_access[n->dst.index].prev_writer = n;
+					break;
+				}
+				case IRNode::IF: break;
+				case IRNode::END: break;
 			}
 			node = node->next;
 		}
@@ -2043,7 +2260,6 @@ const char* toString(Token::Type type) {
 				if (n->function.returns_value) {
 					res->dst.type = DataStream::REGISTER;
 					res->dst.index = ++ctx.register_allocator;
-					res->dst.creator = res;
 					ctx.stack.push(res->dst);
 				}
 				ctx.push(res);
@@ -2095,7 +2311,6 @@ const char* toString(Token::Type type) {
 				IRValue& val = ctx.stack.emplace();
 				val.type = DataStream::SYSTEM_VALUE;
 				val.index = (u8)n->value;
-				val.creator = nullptr;
 				return 1;
 			}
 			case Node::FUNCTION_ARG: {
@@ -2150,7 +2365,6 @@ const char* toString(Token::Type type) {
 								l.registers[i] = ++ctx.register_allocator;
 							}
 							val.index = l.registers[i];
-							val.creator = nullptr;
 						}
 						return num;
 					}
@@ -2163,7 +2377,6 @@ const char* toString(Token::Type type) {
 								IRValue& val = ctx.stack.emplace();
 								val.type = DataStream::OUT;
 								val.index = v.getOffsetSub(i);
-								val.creator = nullptr;
 							}
 						}
 						else {
@@ -2173,7 +2386,6 @@ const char* toString(Token::Type type) {
 								IRValue& val = ctx.stack.emplace();
 								val.type = DataStream::REGISTER;
 								val.index = v.getOffsetSub(i);
-								val.creator = nullptr;
 							}
 						}
 						return num;
@@ -2185,7 +2397,6 @@ const char* toString(Token::Type type) {
 							IRValue& val = ctx.stack.emplace();
 							val.type = DataStream::CHANNEL;
 							val.index = v.getOffsetSub(i);
-							val.creator = nullptr;
 						}
 						return num;
 					}
@@ -2206,7 +2417,6 @@ const char* toString(Token::Type type) {
 							IRValue& val = ctx.stack.emplace();
 							val.type = DataStream::OUT;
 							val.index = v.getOffsetSub(i);
-							val.creator = nullptr;
 						}
 						return num;
 					}
@@ -2232,7 +2442,6 @@ const char* toString(Token::Type type) {
 					res->dst.type = DataStream::REGISTER;
 					res->left = ctx.stackValue(-right - left + (left == 1 ? 0 : i));
 					res->right = ctx.stackValue(-right + (right == 1 ? 0 : i));
-					res->dst.creator = res;
 					ir_ops[i] = res;
 				}
 				ctx.popStack(left + right);
@@ -2280,7 +2489,6 @@ const char* toString(Token::Type type) {
 				IRValue& val = ctx.stack.emplace();
 				val.type = DataStream::LITERAL;
 				val.value = ((LiteralNode*)node)->value;
-				val.creator = nullptr;
 				return 1;
 			}
 			case Node::BLOCK: {
@@ -2331,7 +2539,9 @@ const char* toString(Token::Type type) {
 	
 		CompileContext ctx(*this);
 		ctx.emitter = &emitter;
+		IRContext irctx(emitter, m_arena_allocator);
 
+		u32 num_immutables = 0;
 		OutputMemoryStream& compiled = [&]() -> OutputMemoryStream& {
 			if (equalStrings(fn_name, "update")) {
 				ctx.entry_point = EntryPoint::UPDATE;
@@ -2342,9 +2552,9 @@ const char* toString(Token::Type type) {
 				for (const Variable& v : emitter.m_inputs) {
 					switch (v.type) {
 						case ValueType::VOID: ASSERT(false); break;
-						case ValueType::FLOAT: ++ctx.value_counter; break;
-						case ValueType::FLOAT3: ctx.value_counter += 3; break;
-						case ValueType::FLOAT4: ctx.value_counter += 4; break;
+						case ValueType::FLOAT: ++num_immutables; break;
+						case ValueType::FLOAT3: num_immutables += 3; break;
+						case ValueType::FLOAT4: num_immutables += 4; break;
 					}
 				}
 				return emitter.m_emit;
@@ -2356,18 +2566,20 @@ const char* toString(Token::Type type) {
 			error(fn_name, "Unknown function");
 			return emitter.m_output;
 		}();
-		u32 stack_offset = ctx.value_counter;
+		if (m_is_error) return;
+
+		irctx.register_allocator = num_immutables;
+		irctx.num_immutables = num_immutables;
 
 		BlockNode* b = block(ctx);
 		if (!b || m_is_error) return;
 		Node* collapsed = collapseConstants(b, nullptr, false);
-		IRContext irctx(emitter, m_arena_allocator);
 		compileIR(irctx, collapsed);
-		optimizeIR(irctx.head);
+		optimizeIR(irctx);
+		u32 num_used_registers = allocateRegisters(irctx);
+		//printIR(fn_name, irctx);
 		compileBytecode(ctx, irctx.head, compiled);
-		//compile(ctx, collapsed, compiled);
 		compiled.write(InstructionType::END);
-		u32 num_used_registers = optimizeBytecode(compiled, stack_offset);
 		patchBlockSizes(compiled);
 		InputMemoryStream ip(compiled.data(), compiled.size());
 		u32 max_instruction_index = 0;
@@ -2383,36 +2595,10 @@ const char* toString(Token::Type type) {
 			emitter.m_num_emit_registers = num_used_registers;
 			emitter.m_num_emit_instructions = max_instruction_index + 1;
 		}
-		else if (equalStrings(fn_name, "output")) {
+		else {
 			emitter.m_num_output_registers = num_used_registers;
 			emitter.m_num_output_instructions = max_instruction_index + 1;
 		}
-	}
-
-	CompileResult toCompileResult(const Variable& var, DataStream::Type type) {
-		CompileResult res;
-		switch (var.type) {
-			case ValueType::FLOAT4:
-				res.streams[3].type = type;
-				res.streams[3].index = var.offset + 3;
-				++res.num_streams;
-				// fallthrough
-			case ValueType::FLOAT3: 
-				res.streams[2].type = type;
-				res.streams[2].index = var.offset + 2;
-				res.streams[1].type = type;
-				res.streams[1].index = var.offset + 1;
-				res.num_streams += 2;
-				// fallthrough
-			case ValueType::FLOAT:
-				res.streams[0].type = type;
-				res.streams[0].index = var.offset;
-				++res.num_streams;
-				return res;
-			case ValueType::VOID: return res;
-		}
-		ASSERT(false);
-		return res;
 	}
 
 	DataStream pushStack(CompileContext& ctx) {
@@ -2438,349 +2624,7 @@ const char* toString(Token::Type type) {
 		return InstructionType::END;
 	}
 
-	CompileResult compile(CompileContext& ctx, Node* node, OutputMemoryStream& compiled) {
-		CompileResult res;
-		switch (node->type) {
-			case Node::UNARY_OPERATOR: {
-				auto* n = (UnaryOperatorNode*)node;
-				DataStream dst = pushStack(ctx);
-				CompileResult right = compile(ctx, n->right, compiled);
-				if (!right.success) return right;
-				if (right.num_streams != 1) {
-					error(n->right->token.value, "Only scalar is supported");
-					return {.success = false};
-				}
-				//popStack(right.streams[0]);
-				compiled.write(InstructionType::MUL);
-				DataStream neg = {.type = DataStream::LITERAL, .value = -1};
-				compiled.write(dst);
-				compiled.write(neg);
-				compiled.write(right.streams[0]);
-				res.num_streams = 1;
-				res.streams[0] = dst;
-				return res;
-			}
-			case Node::BINARY_OPERATOR: {
-				auto* n = (BinaryOperatorNode*)node;
-				res.streams[0] = pushStack(ctx);
-				res.streams[1] = pushStack(ctx);
-				res.streams[2] = pushStack(ctx);
-				res.streams[3] = pushStack(ctx);
-				CompileResult left = compile(ctx, n->left, compiled);
-				CompileResult right = compile(ctx, n->right, compiled);
-				
-				if (!left.success) return left;
-				if (!right.success) return right;
-				if (left.num_streams != right.num_streams && left.num_streams != 1 && right.num_streams != 1) {
-					error(n->token.value, "Mismatched operands in binary operation.");
-					return {.success = false };
-				}
-				res.num_streams = maximum(left.num_streams, right.num_streams);
-				for (u32 i = 0; i < res.num_streams; ++i) {
-					compiled.write(toInstruction(n->op));
-					compiled.write(res.streams[i]);
-					compiled.write(left.streams[i < left.num_streams ? i : 0]);
-					compiled.write(right.streams[i < right.num_streams ? i : 0]);
-				}
-				return res;
-			}
-			case Node::COMPOUND: {
-				auto* n = (CompoundNode*)node;
-				if ((u32)n->elements.size() > lengthOf(res.streams)) {
-					error(n->token.value, "Too many elements.");
-					return {.success = false};
-				}
-
-				for (u32 i = 0; i < (u32)n->elements.size(); ++i) {
-					CompileResult el = compile(ctx, n->elements[i], compiled);
-					if (!el.success) return el;
-					if (el.num_streams != 1) {
-						error(n->elements[i]->token.value, "Compound elements must be scalars.");
-						return {.success = false};
-					}
-					res.streams[i] = el.streams[0];
-					res.num_streams = i + 1;
-				}
-				return res;
-			}
-			case Node::VARIABLE: {
-				auto* n = (VariableNode*)node;
-				switch (n->family) {
-					case VariableFamily::GLOBAL:
-						return toCompileResult(m_globals[n->index], DataStream::GLOBAL);
-					case VariableFamily::LOCAL: {
-						const Local& local = n->block->locals[n->index];
-						// fallthroughs intentional
-						switch (local.type) {
-							case ValueType::VOID: ASSERT(false); return {.success=false};
-							case ValueType::FLOAT4:
-								res.streams[3].type = DataStream::REGISTER;
-								res.streams[3].index = local.registers[3];
-								++res.num_streams;
-							case ValueType::FLOAT3:
-								res.streams[2].type = DataStream::REGISTER;
-								res.streams[2].index = local.registers[2];
-								res.streams[1].type = DataStream::REGISTER;
-								res.streams[1].index = local.registers[1];
-								res.num_streams += 2;
-							case ValueType::FLOAT:
-								res.streams[0].type = DataStream::REGISTER;
-								res.streams[0].index = local.registers[0];
-								++res.num_streams;
-								return res;
-						}
-					}
-					case VariableFamily::CHANNEL:
-						return toCompileResult(ctx.emitter->m_vars[n->index], DataStream::CHANNEL);
-					case VariableFamily::OUTPUT:
-						return toCompileResult(ctx.emitter->m_outputs[n->index], DataStream::OUT);
-					case VariableFamily::INPUT:
-						if (ctx.emitted) {
-							return toCompileResult(ctx.emitted->m_inputs[n->index], DataStream::OUT);
-						}
-						return toCompileResult(ctx.emitter->m_inputs[n->index], DataStream::REGISTER);
-				}
-				ASSERT(false);
-				return {.success = false};
-			}
-			case Node::SWIZZLE: {
-				auto* n = (SwizzleNode*)node;
-				CompileResult left = compile(ctx, n->left, compiled);
-				if (!left.success) return left;
-				StringView swizzle = n->token.value;
-				res.num_streams = 0;
-				if (swizzle.size() > lengthOf(res.streams)) {
-					error(swizzle, "Invalid swizzle ", swizzle);
-					return {.success = false};
-				}
-				for (const char* c = swizzle.begin; c != swizzle.end; ++c) {
-					#define SET(i) do {\
-						if (left.num_streams <= i) { \
-							error(swizzle, "Accessing invalid element ", i); \
-							return {.success = false}; \
-						} \
-						res.streams[res.num_streams] = left.streams[i]; \
-					} while(false) \
-
-					switch (*c) {
-						case 'x': case 'r': SET(0); break;
-						case 'y': case 'g': SET(1); break;
-						case 'z': case 'b': SET(2); break;
-						case 'w': case 'a': SET(3); break;
-					}
-
-					#undef SET
-					++res.num_streams;
-				}
-				return res;
-			}
-			case Node::SYSTEM_VALUE: {
-				auto* n = (SystemValueNode*)node;
-				res.streams[0].type = DataStream::SYSTEM_VALUE;
-				res.streams[0].index = (u8)n->value;
-				res.num_streams = 1;
-				return res;
-			}
-			case Node::RETURN: {
-				auto* n = (ReturnNode*)node;
-				return compile(ctx, n->value, compiled);
-			}
-			case Node::FUNCTION_ARG: {
-				auto* n = (FunctionArgNode*)node;
-				ASSERT((u32)n->index < ctx.args.size());
-				res = ctx.args[n->index];
-				return res;
-			}
-			case Node::FUNCTION_CALL: {
-				auto* n = (FunctionCallNode*)node;
-				CompileResult return_val;
-				const Function& fn = m_functions[n->function_index];
-				CompileResult args[8];
-				if ((u32)n->args.size() > lengthOf(args)) {
-					error(n->token.value, "Too many arguments.");
-					return { .success = false };
-				}
-				for (i32 i = 0; i < n->args.size(); ++i) {
-					args[i] = compile(ctx, n->args[i], compiled);
-					if (!args[i].success) return args[i];
-				}
-				ctx.args = {args, &args[n->args.size()]};
-				return compile(ctx, fn.block, compiled);
-			}
-			case Node::SYSCALL: {
-				auto* n = (SysCallNode*)node;
-				if ((n->function.valid_entry_points & (1 << u32(ctx.entry_point))) == 0) {
-					error(n->token.value, "Syscall ", n->token.value, " can not be called here.");
-					return {.success = false};
-				}
-				CompileResult args[8];
-				DataStream dst = n->function.returns_value ? pushStack(ctx) : DataStream{};
-				if ((u32)n->args.size() > lengthOf(args)) {
-					error(n->token.value, "Too many arguments.");
-					return {.success = false};
-				}
-				for (i32 i = 0; i < n->args.size(); ++i) {
-					args[i] = compile(ctx, n->args[i], compiled);
-					if (!args[i].success) return args[i];
-					if (args[i].num_streams != 1) {
-						error(n->args[i]->token.value, "Only scalar arguments are supported.");
-						return {.success = false};
-						// TODO vector args
-					}
-				}
-				compiled.write(n->function.instruction);
-				if (n->function.instruction == InstructionType::EMIT) {
-					compiled.write(u32(args[0].streams[0].value));
-					if (n->after_block) {
-						CompileContext inner_ctx = ctx;
-						inner_ctx.emitted = &m_emitters[u32(args[0].streams[0].value)];
-						if (!compile(inner_ctx, n->after_block, compiled).success) return {.success = false};
-					}
-					compiled.write(InstructionType::END);
-				}
-				else {
-					if (n->function.returns_value) {
-						compiled.write(dst);
-						res.streams[0] = dst;
-						res.num_streams = 1;
-					}
-					for (i32 i = 0; i < n->args.size(); ++i) {
-						if (n->function.instruction == InstructionType::RAND) { 
-							compiled.write(args[i].streams[0].value);
-						}
-						else {
-							compiled.write(args[i].streams[0]);
-						}
-						//popStack(args[i].streams[0]);
-					}
-				}
-				return res;
-			}
-			case Node::BLOCK: {
-				BlockNode* prev_block = ctx.block;
-				auto* n = (BlockNode*)node;
-				ctx.block = n;
-				res.streams[0] = pushStack(ctx);
-				res.streams[1] = pushStack(ctx);
-				res.streams[2] = pushStack(ctx);
-				res.streams[3] = pushStack(ctx);
-				// alloc space for locals
-				for (Local& l : n->locals) {
-					// fallthrough intentional
-					switch (l.type) {
-						case ValueType::VOID: ASSERT(false);
-						case ValueType::FLOAT4:
-							l.registers[3] = pushStack(ctx).index;
-						case ValueType::FLOAT3:
-							l.registers[2] = pushStack(ctx).index;
-							l.registers[1] = pushStack(ctx).index;
-						case ValueType::FLOAT:
-							l.registers[0] = pushStack(ctx).index;
-							break;
-					}
-				}
-				// execute statements
-				for (Node* statement : n->statements) {
-					if (statement->type == Node::RETURN) {
-						res = compile(ctx, statement, compiled);
-						ctx.block = prev_block;
-						return res;
-					}
-					else {
-						if (!compile(ctx, statement, compiled).success) return {.success=false};
-					}
-				}
-				ctx.block = prev_block;
-				return res;
-			}
-			case Node::IF: {
-				BlockNode* prev_block = ctx.block;
-				auto* n = (IfNode*)node;
-				CompileResult cond = compile(ctx, n->condition, compiled);
-				if (!cond.success) return cond;
-				if (cond.num_streams != 1) {
-					error(node->token.value, "Condition in if statement must be scalar.");
-					return {.success = false};
-				}
-				compiled.write(n->false_block ? InstructionType::CMP_ELSE : InstructionType::CMP);
-				compiled.write(cond.streams[0]);
-				compiled.write(u16(0));
-				if (n->false_block) compiled.write(u16(0));
-
-				ctx.block = n->true_block;
-				// alloc space for locals
-				for (Local& l : n->true_block->locals) {
-					// fallthrough intentional
-					switch (l.type) {
-						case ValueType::VOID: ASSERT(false);
-						case ValueType::FLOAT4:
-							l.registers[3] = pushStack(ctx).index;
-						case ValueType::FLOAT3:
-							l.registers[2] = pushStack(ctx).index;
-							l.registers[1] = pushStack(ctx).index;
-						case ValueType::FLOAT:
-							l.registers[0] = pushStack(ctx).index;
-							break;
-					}
-				}
-				// execute statements
-				for (Node* statement : n->true_block->statements) {
-					if (statement->type == Node::RETURN) {
-						error(statement->token.value, "return in if statement is not supported");
-						return {.success = false};
-					}
-					if (!compile(ctx, statement, compiled).success) return {.success=false};
-				}
-				compiled.write(InstructionType::END);
-				if (n->false_block) {
-					for (Node* statement : n->false_block->statements) {
-						if (statement->type == Node::RETURN) {
-							error(statement->token.value, "return in if statement is not supported");
-							return {.success = false};
-						}
-						if (!compile(ctx, statement, compiled).success) return {.success=false};
-					}
-					compiled.write(InstructionType::END);
-				}
-				ctx.block = prev_block;
-				return res;
-			}
-			case Node::EMITTER_REF:
-				res.streams[0].type = DataStream::LITERAL;
-				res.streams[0].value = float(((EmitterRefNode*)node)->index);
-				res.num_streams = 1;
-				return res;
-			case Node::LITERAL:
-				res.streams[0].type = DataStream::LITERAL;
-				res.streams[0].value = ((LiteralNode*)node)->value;
-				res.num_streams = 1;
-				return res;
-			case Node::ASSIGN: {
-				auto* n = (AssignNode*)node;
-				CompileResult left = compile(ctx, n->left, compiled);
-				CompileResult right = compile(ctx, n->right, compiled);
-				if (!right.success) return right;
-				if (!left.success) return left;
-				if (left.num_streams > right.num_streams && right.num_streams != 1) {
-					error(node->token.value, "Trying to assign ", right.num_streams, " values into ", left.num_streams);
-					return {.success = false};
-				}
-				for (u32 i = 0; i < left.num_streams; ++i) {
-					compiled.write(InstructionType::MOV);
-					compiled.write(left.streams[i]);
-					compiled.write(right.streams[right.num_streams == 1 ? 0 : i]);
-				}
-				return {.success = true };
-			}
-			default: break;
-		}
-		
-		error(node->token.value, "Unknown error compiling ", node->token.value);
-		return {.success = false};
-	}
-
-
-	void compileFunction() {
+	void parseFunction() {
 		Function& fn = m_functions.emplace(m_allocator);
 		if (!consume(Token::IDENTIFIER, fn.name)) return;
 		parseArgs(fn);
@@ -2898,9 +2742,9 @@ const char* toString(Token::Type type) {
 			switch (token.type) {
 				case Token::EOF: goto write_label;
 				case Token::ERROR: return false;
-				case Token::IMPORT: compileImport(); break;
-				case Token::CONST: compileConst(); break;
-				case Token::FN: compileFunction(); break;
+				case Token::IMPORT: parseImport(); break;
+				case Token::CONST: parseConst(); break;
+				case Token::FN: parseFunction(); break;
 				case Token::GLOBAL: variableDeclaration(m_globals); break;
 				case Token::EMITTER: compileEmitter(); break;
 				default: error(token.value, "Unexpected token ", token.value); return false;

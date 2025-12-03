@@ -1,29 +1,12 @@
 const hspread = 10.5;
 
 emitter ribbon {
-	material "/maps/fireworks/ribbon.mat"
+	material "/maps/particles/ribbon.mat"
 	init_emit_count 40
 	emit_per_second 0
 	max_ribbons 1
 	max_ribbon_length 40
 	init_ribbons_count 1
-
-	// TODO
-		// emit on move / do not emit with the same position
-		// docs
-		// emit_ribbon()
-		// autocomplete
-		// kill in ribbons?
-		// include
-		// mesh, splines, terrains, ...
-		// demo
-		// fix show/hide preview
-		// debugger
-		// preview for world space moving ribbons
-		// flow control (if, while, for)
-		// create mesh from script?
-		// saturate, floor, round
-		// user function calling another function
 
 	out i_position : float3
 	out i_scale : float
