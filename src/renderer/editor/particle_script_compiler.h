@@ -12,9 +12,6 @@
 // errors in imports in compileIR results in crash
 
 // TODO
-// * optimize functions with compounds literals as args
-// * nested ifs
-// * function call inside a function
 // * and, or, not
 // * unary in IR
 
@@ -1193,22 +1190,22 @@ const char* toString(Token::Type type) {
 						node->index = var_index;
 						return node;
 					}
+				}
 
-					i32 fn_index = getFunctionIndex(token.value);
-					if (fn_index >= 0) {
-						auto* node = LUMIX_NEW(m_arena_allocator, FunctionCallNode)(token, m_arena_allocator);
-						if (!consume(Token::LEFT_PAREN)) return nullptr;
-						node->function_index = fn_index;
-						const Function& fn = m_functions[fn_index];
-						for (u32 i = 0, c = fn.args.size(); i < c; ++i) {
-							if (i > 0 && !consume(Token::COMMA)) return nullptr;
-							Node* arg = expression(ctx, 0);
-							if (!arg) return nullptr;
-							node->args.push(arg);
-						}
-						if (!consume(Token::RIGHT_PAREN)) return nullptr;
-						return node;
+				i32 fn_index = getFunctionIndex(token.value);
+				if (fn_index >= 0) {
+					auto* node = LUMIX_NEW(m_arena_allocator, FunctionCallNode)(token, m_arena_allocator);
+					if (!consume(Token::LEFT_PAREN)) return nullptr;
+					node->function_index = fn_index;
+					const Function& fn = m_functions[fn_index];
+					for (u32 i = 0, c = fn.args.size(); i < c; ++i) {
+						if (i > 0 && !consume(Token::COMMA)) return nullptr;
+						Node* arg = expression(ctx, 0);
+						if (!arg) return nullptr;
+						node->args.push(arg);
 					}
+					if (!consume(Token::RIGHT_PAREN)) return nullptr;
+					return node;
 				}
 
 				if (ctx.function) {
@@ -1605,9 +1602,7 @@ const char* toString(Token::Type type) {
 			virtual ~IRNode() {}
 		#endif
 		enum Type {
-			MOV,
-			BINARY,
-			SYSCALL,
+			OP, // mov, binary op or syscall
 			IF,
 			END
 		};
@@ -1632,18 +1627,11 @@ const char* toString(Token::Type type) {
 		}
 	};
 
-	struct IRBinary : IRNode {
-		IRBinary(Node* ast) : IRNode(IRNode::BINARY, ast) {}
+	struct IROp : IRNode {
+		IROp(Node* ast, IAllocator& allocator) : IRNode(IRNode::OP, ast), args(allocator) {}
 		InstructionType instruction;
 		IRValue dst;
-		IRValue left;
-		IRValue right;
-	};
-
-	struct IRMov : IRNode {
-		IRMov(Node* ast) : IRNode(IRNode::MOV, ast) {}
-		IRValue dst;
-		IRValue src;
+		StackArray<IRValue, 2> args;
 	};
 
 	struct IREnd : IRNode {
@@ -1655,13 +1643,6 @@ const char* toString(Token::Type type) {
 		IRValue condition;
 		IREnd* true_end = nullptr;
 		IREnd* false_end = nullptr;
-	};
-
-	struct IRSyscall : IRNode {
-		IRSyscall(Node* ast, IAllocator& allocator) : IRNode(IRNode::SYSCALL, ast), args(allocator) {}
-		SysCall syscall;
-		IRValue dst;
-		StackArray<IRValue, 8> args;
 	};
 
 	struct IRContext {
@@ -1729,18 +1710,16 @@ const char* toString(Token::Type type) {
 					compiled.write(InstructionType::END);
 					return node;
 				}
-				case IRNode::SYSCALL: {
-					auto* n = (IRSyscall*)node;
-					compiled.write(n->syscall.instruction);
-					if (n->syscall.returns_value) {					
-						writeValue(n->dst);
-					}
-					if (n->syscall.instruction == InstructionType::RAND) { // TODO make this not special case
+				case IRNode::OP: {
+					auto* n = (IROp*)node;
+					compiled.write(n->instruction);
+					if (n->dst.type != DataStream::NONE) writeValue(n->dst);
+					if (n->instruction == InstructionType::RAND) { // TODO make this not special case
 						for (IRValue& arg : n->args) {
 							compiled.write(arg.value);
 						}
 					}
-					else if (n->syscall.instruction == InstructionType::EMIT) { // TODO make this not special case
+					else if (n->instruction == InstructionType::EMIT) { // TODO make this not special case
 						compiled.write(u32(n->args[0].index));
 						node = compileBytecode(ctx, n->next, compiled);
 					}
@@ -1751,22 +1730,6 @@ const char* toString(Token::Type type) {
 					}
 					break;
 				}
-				case IRNode::BINARY: {
-					auto* n = (IRBinary*)node;
-					compiled.write(n->instruction);
-					writeValue(n->dst);
-					writeValue(n->left);
-					writeValue(n->right);
-					break;
-				}
-				case IRNode::MOV: {
-					auto* n = (IRMov*)node;
-					compiled.write(InstructionType::MOV);
-					writeValue(n->dst);
-					writeValue(n->src);
-					break;
-				}
-
 			}
 			node = node->next;
 		}
@@ -1775,7 +1738,7 @@ const char* toString(Token::Type type) {
 
 	void optimizeIR(IRContext& ctx) {
 		reorderIR(ctx);
-		removeRedundantMOVs(ctx);
+		removeRedundancy(ctx);
 	}
 
 	void printIR(StringView path, IRContext& ctx) {
@@ -1795,60 +1758,46 @@ const char* toString(Token::Type type) {
 		IRNode* node = ctx.head;
 		while (node) {
 			switch (node->type) {
-				case IRNode::BINARY: {
-					auto* n = (IRBinary*)node;
-					append(n->dst);
-					tmp.append(" = ");
-					append(n->left);
+				case IRNode::OP: {
+					auto* n = (IROp*)node;
+					if (n->dst.type != DataStream::NONE) {
+						append(n->dst);
+						tmp.append(" = ");
+					}
+
+					auto appendArgs = [&](){
+						for (IRValue& arg : n->args) {
+							if (&arg != n->args.begin()) tmp.append(",");
+							append(arg);
+						}
+						tmp.append(")");
+					};
+					
 					switch (n->instruction) {
-						case InstructionType::MUL: tmp.append(" * "); break;
-						case InstructionType::ADD: tmp.append(" + "); break;
-						case InstructionType::SUB: tmp.append(" - "); break;
-						case InstructionType::DIV: tmp.append(" / "); break;
-						case InstructionType::LT: tmp.append(" < "); break;
-						case InstructionType::GT: tmp.append(" > "); break;
-						case InstructionType::MOD: tmp.append(" % "); break;
+						case InstructionType::MUL: append(n->args[0]); tmp.append(" * "); append(n->args[1]); break;
+						case InstructionType::ADD: append(n->args[0]); tmp.append(" + "); append(n->args[1]); break;
+						case InstructionType::SUB: append(n->args[0]); tmp.append(" - "); append(n->args[1]); break;
+						case InstructionType::DIV: append(n->args[0]); tmp.append(" / "); append(n->args[1]); break;
+						case InstructionType::LT: append(n->args[0]); tmp.append(" < "); append(n->args[1]); break;
+						case InstructionType::GT: append(n->args[0]); tmp.append(" > "); append(n->args[1]); break;
+						case InstructionType::MOD: append(n->args[0]); tmp.append(" % "); append(n->args[1]); break;
+						case InstructionType::COS: tmp.append("cos("); appendArgs(); break;
+						case InstructionType::SIN: tmp.append("sin("); appendArgs(); break;
+						case InstructionType::KILL: tmp.append("kill("); appendArgs(); break;
+						case InstructionType::EMIT: tmp.append("emit(", n->args[0].index, ")"); break;
+						case InstructionType::RAND: tmp.append("random("); appendArgs(); break;
+						case InstructionType::MIN: tmp.append("min("); appendArgs(); break;
+						case InstructionType::MAX: tmp.append("max("); appendArgs(); break;
+						case InstructionType::NOISE: tmp.append("noise("); appendArgs(); break;
+						case InstructionType::SQRT: tmp.append("sqrt("); appendArgs(); break;
+						case InstructionType::MOV: append(n->args[0]); break;
 						default: ASSERT(false); break;
 					}
-					append(n->right);
-					break;
-				}
-				case IRNode::MOV: {
-					auto* n = (IRMov*)node;
-					append(n->dst);
-					tmp.append(" = ");
-					append(n->src);
 					break;
 				}
 				case IRNode::END:
 					tmp.append("END");
 					break;
-				case IRNode::SYSCALL: {
-					auto* n = (IRSyscall*)node;
-					if (n->syscall.returns_value) {
-						append(n->dst);
-						tmp.append(" = ");
-					}
-					switch (n->syscall.instruction) {
-						case InstructionType::COS: tmp.append("cos("); break;
-						case InstructionType::SIN: tmp.append("sin("); break;
-						case InstructionType::KILL: tmp.append("kill("); break;
-						case InstructionType::EMIT: tmp.append("emit("); break;
-						case InstructionType::RAND: tmp.append("random("); break;
-						case InstructionType::MIN: tmp.append("min("); break;
-						case InstructionType::MAX: tmp.append("max("); break;
-						case InstructionType::NOISE: tmp.append("noise("); break;
-						default: ASSERT(false); break;
-					}
-					for (const IRValue& arg : n->args) {
-						if (&arg != n->args.begin()) {
-							tmp.append(", ");
-						}
-						append(arg);
-					}
-					tmp.append(")");
-					break;
-				}
 				case IRNode::IF: {
 					auto* n = (IRIf*)node;
 					tmp.append("CMP ");
@@ -1868,25 +1817,12 @@ const char* toString(Token::Type type) {
 		u32 instruction_index = 0;
 		while (node) {
 			switch (node->type) {
-				case IRNode::SYSCALL: {
-					auto* n = (IRSyscall*)node;
-					fn(n->dst, true, instruction_index);
+				case IRNode::OP: {
+					auto* n = (IROp*)node;
+					if (n->dst.type != DataStream::NONE) fn(n->dst, true, instruction_index);
 					for (IRValue& arg : n->args) {
 						fn(arg, false, instruction_index);
 					}
-					break;
-				}
-				case IRNode::BINARY: {
-					auto* n = (IRBinary*)node;
-					fn(n->dst, true, instruction_index);
-					fn(n->left, false, instruction_index);
-					fn(n->right, false, instruction_index);
-					break;
-				}
-				case IRNode::MOV: {
-					auto* n = (IRMov*)node;
-					fn(n->dst, true, instruction_index);
-					fn(n->src, false, instruction_index);
 					break;
 				}
 				case IRNode::END: break;
@@ -1970,21 +1906,8 @@ const char* toString(Token::Type type) {
 	static u32 getValues(IRNode& node, Span<IRValue> srcs, IRValue*& dst) {
 		dst = nullptr;
 		switch (node.type) {
-			case IRNode::BINARY: {
-				auto& n = (IRBinary&)node;
-				dst = &n.dst;
-				srcs[0] = n.left;
-				srcs[1] = n.right;
-				return 2;
-			}
-			case IRNode::MOV: {
-				auto& n = (IRMov&)node;
-				dst = &n.dst;
-				srcs[0] = n.src;
-				return 1;
-			}
-			case IRNode::SYSCALL: {
-				auto& n = (IRSyscall&)node;
+			case IRNode::OP: {
+				auto& n = (IROp&)node;
 				dst = &n.dst;
 				u32 i = 0;
 				for (const IRValue& arg : n.args) {
@@ -2014,9 +1937,9 @@ const char* toString(Token::Type type) {
 		switch (node_dst.type) {
 			case IRNode::END: return IRSwapResult::BLOCK;
 			case IRNode::IF: return IRSwapResult::BLOCK;
-			case IRNode::SYSCALL: {
-				auto& n = (IRSyscall&)node_dst;
-				if (n.syscall.instruction == InstructionType::EMIT) 
+			case IRNode::OP: {
+				auto& n = (IROp&)node_dst;
+				if (n.instruction == InstructionType::EMIT) 
 					return IRSwapResult::BLOCK;
 				break;
 			}
@@ -2026,9 +1949,9 @@ const char* toString(Token::Type type) {
 		switch (node.type) {
 			case IRNode::END: return IRSwapResult::BLOCK;
 			case IRNode::IF: return IRSwapResult::BLOCK;
-			case IRNode::SYSCALL: {
-				auto& n = (IRSyscall&)node;
-				if (n.syscall.instruction == InstructionType::EMIT) 
+			case IRNode::OP: {
+				auto& n = (IROp&)node;
+				if (n.instruction == InstructionType::EMIT) 
 					return IRSwapResult::BLOCK;
 				break;
 			}
@@ -2105,16 +2028,16 @@ const char* toString(Token::Type type) {
 	// 		If the temporary is written exactly once and read exactly once
 	//		(by the MOV), the operation can write directly to the final 
 	//		destination, eliminating the MOV entirely.
-	void removeRedundantMOVs(IRContext& ctx) {
+	void removeRedundancy(IRContext& ctx) {
 		if (!ctx.head) return;
 
 		IRNode* node = ctx.head;
 		// keep only one mov from several movs in a row into the same destination
 		while (node) {
-			if (node->prev && node->type == IRNode::MOV && node->prev->type == IRNode::MOV) {
-				auto* n_prev = (IRMov*)node->prev;
-				auto* n = (IRMov*)node;
-				if (n_prev->dst.type == n->dst.type && n_prev->dst.index == n->dst.index) {
+			if (node->prev && node->type == IRNode::OP && node->prev->type == IRNode::OP) {
+				auto* n_prev = (IROp*)node->prev;
+				auto* n = (IROp*)node;
+				if (n_prev->dst.type == n->dst.type && n_prev->dst.index == n->dst.index && n->instruction == InstructionType::MOV && n_prev->instruction == InstructionType::MOV) {
 					if (n_prev == ctx.head) ctx.head = n_prev->next;
 					if (n_prev->prev) n_prev->prev->next = n_prev->next;
 					if (n_prev->next) n_prev->next->prev = n_prev->prev;
@@ -2128,6 +2051,8 @@ const char* toString(Token::Type type) {
 			u32 reads = 0;
 			u32 writes = 0;
 			IRNode* prev_writer = nullptr;
+			IRValue alias;
+			bool is_aliased = false;
 		};
 		StackArray<RegisterAccess, 16> register_access(m_arena_allocator);
 		register_access.reserve(ctx.register_allocator);
@@ -2145,19 +2070,48 @@ const char* toString(Token::Type type) {
 
 		node = ctx.head;
 		while (node) {
-			IRValue reads[9];
+			IRValue srcs[9];
 			IRValue* dst;
-			u32 num_reads = getValues(*node, reads, dst); 
+			u32 num_srcs = getValues(*node, srcs, dst); 
 			if (dst) {
 				set(true, *dst);
 			}
-			for (u32 i = 0; i < num_reads; ++i) {
-				set(false, reads[i]);
+			for (u32 i = 0; i < num_srcs; ++i) {
+				set(false, srcs[i]);
 			}
 			node = node->next;
 		}
 
-		// collapse
+		auto foldNode = [&](IRNode* node, const IRValue& dst, const IRValue& src) {
+			if (dst.type == DataStream::REGISTER 
+				&& register_access[dst.index].writes == 1 
+				&& register_access[dst.index].reads == 1
+			) {
+				// alias
+				register_access[dst.index].alias = src;
+				register_access[dst.index].is_aliased = true;
+
+				if (ctx.head == node) ctx.head = node->next;
+				if (ctx.tail == node) ctx.tail = node->prev;
+				if (node->prev) node->prev->next = node->next;
+				if (node->next) node->next->prev = node->prev;
+				return;
+			}
+
+			// replace with mov
+			auto* mov = LUMIX_NEW(m_arena_allocator, IROp)(node->ast, m_arena_allocator);
+			mov->instruction = InstructionType::MOV;
+			mov->dst = dst;
+			mov->args.push(src);
+			mov->prev = node->prev;
+			mov->next = node->next;
+			if (ctx.head == node) ctx.head = mov;
+			if (ctx.tail == node) ctx.tail = mov;
+			if (node->prev) node->prev->next = mov;
+			if (node->next) node->next->prev = mov;
+		};
+
+		// fold constants and collapse
 		// op op_dst op_a op_b
 		// mov mov_dst op_dst
 		// into 
@@ -2165,56 +2119,139 @@ const char* toString(Token::Type type) {
 		node = ctx.head;
 		while (node) {
 			switch (node->type) {
-				case IRNode::MOV: {
-					auto* n = (IRMov*)node;
+				case IRNode::OP: {
+					auto* n = (IROp*)node;
 
-					if (n->src.type == DataStream::REGISTER 
-						&& register_access[n->src.index].reads == 1
-						&& register_access[n->src.index].writes == 1
-						&& register_access[n->src.index].prev_writer
-					) {
-						IRNode* prev_writer = register_access[n->src.index].prev_writer;
-						switch (prev_writer->type) {
-							case IRNode::MOV: {
-								auto* src = (IRMov*)prev_writer;
-								src->dst = n->dst;
-								if (n->dst.type == DataStream::REGISTER) register_access[n->dst.index].prev_writer = prev_writer;
-								if (n->prev) n->prev->next = n->next;
-								if (n->next) n->next->prev = n->prev;
-								if (ctx.tail == n) ctx.tail = n->prev;
+					// fold all arguments first
+					bool all_args_literals = true;
+					for (IRValue& arg : n->args) {
+						if (arg.type == DataStream::REGISTER && register_access[arg.index].is_aliased) {
+							arg = register_access[arg.index].alias;
+						}
+						if (arg.type != DataStream::LITERAL) all_args_literals = false;
+					}
+
+					// fold operations like
+					// a = b * 1
+					// a = b * 0
+					// a = b - 0
+					if (n->args.size() == 2) {
+						if (n->args[0].type == DataStream::LITERAL) {
+							if ((n->instruction == InstructionType::ADD && n->args[0].value == 0)
+								|| (n->instruction == InstructionType::MUL && n->args[0].value == 1)
+								)
+							{
+								foldNode(n, n->dst, n->args[1]);
 								break;
 							}
-							case IRNode::SYSCALL: {
-								auto* src = (IRSyscall*)prev_writer;
-								src->dst = n->dst;
-								if (n->dst.type == DataStream::REGISTER) register_access[n->dst.index].prev_writer = prev_writer;
-								if (n->prev) n->prev->next = n->next;
-								if (n->next) n->next->prev = n->prev;
-								if (ctx.tail == n) ctx.tail = n->prev;
+							if (n->instruction == InstructionType::MUL && n->args[0].value == 0) {
+								foldNode(n, n->dst, n->args[0]);
 								break;
 							}
-							case IRNode::BINARY: {
-								auto* src = (IRBinary*)prev_writer;
-								src->dst = n->dst;
-								if (n->dst.type == DataStream::REGISTER) register_access[n->dst.index].prev_writer = prev_writer;
-								if (n->prev) n->prev->next = n->next;
-								if (n->next) n->next->prev = n->prev;
-								if (ctx.tail == n) ctx.tail = n->prev;
+						}
+
+						if (n->args[1].type == DataStream::LITERAL) {
+							if ((n->instruction == InstructionType::ADD && n->args[1].value == 0)
+								|| (n->instruction == InstructionType::SUB && n->args[1].value == 0)
+								|| (n->instruction == InstructionType::MUL && n->args[1].value == 1)
+								|| (n->instruction == InstructionType::DIV && n->args[1].value == 1)
+								)
+							{
+								foldNode(n, n->dst, n->args[0]);
 								break;
 							}
-							default: break;
+							if (n->instruction == InstructionType::MUL && n->args[1].value == 0) {
+								foldNode(n, n->dst, n->args[1]);
+								break;
+							}
 						}
 					}
-					else if (n->dst.type == DataStream::REGISTER) register_access[n->dst.index].prev_writer = n;
-					break;
-				}
-				case IRNode::BINARY: {
-					auto* n = (IRBinary*)node;
-					if (n->dst.type == DataStream::REGISTER) register_access[n->dst.index].prev_writer = n;
-					break;
-				}
-				case IRNode::SYSCALL: {
-					auto* n = (IRSyscall*)node;
+
+					// fold 
+					// op regN a b
+					// mov dst regN
+					// into
+					// op dst a b
+					// if it's safe to do
+					if (n->instruction == InstructionType::MOV
+						&& n->args[0].type == DataStream::REGISTER 
+						&& register_access[n->args[0].index].reads == 1
+						&& register_access[n->args[0].index].writes == 1
+						&& register_access[n->args[0].index].prev_writer
+					) {
+						IRNode* prev_writer = register_access[n->args[0].index].prev_writer;
+						if (prev_writer->type == IRNode::OP) {
+							auto* src = (IROp*)prev_writer;
+							src->dst = n->dst;
+							if (n->dst.type == DataStream::REGISTER) register_access[n->dst.index].prev_writer = prev_writer;
+							if (n->prev) n->prev->next = n->next;
+							if (n->next) n->next->prev = n->prev;
+							if (ctx.tail == n) ctx.tail = n->prev;
+							break;
+						}
+					}
+
+					// fold the operation if all arguments are runtime constant
+					// some operations can not be fold like this, e.g. random(...)
+					if (n->dst.type != DataStream::NONE
+						&& n->args.size() > 0
+						&& all_args_literals
+						&& n->dst.type == DataStream::REGISTER
+						&& register_access[n->dst.index].writes == 1
+					) {
+						float first = n->args[0].value;
+						switch (n->instruction) {
+							case InstructionType::SQRT:
+								register_access[n->dst.index].is_aliased = true;
+								register_access[n->dst.index].alias.value = sqrtf(n->args[0].value);
+								break;
+							case InstructionType::COS:
+								register_access[n->dst.index].is_aliased = true;
+								register_access[n->dst.index].alias.value = cosf(n->args[0].value);
+								break;
+							case InstructionType::SIN:
+								register_access[n->dst.index].is_aliased = true;
+								register_access[n->dst.index].alias.value = sinf(n->args[0].value);
+								break;
+							case InstructionType::ADD:
+								register_access[n->dst.index].is_aliased = true;
+								register_access[n->dst.index].alias.value = first + n->args[1].value;
+								break;
+							case InstructionType::MUL:
+								register_access[n->dst.index].is_aliased = true;
+								register_access[n->dst.index].alias.value = first * n->args[1].value;
+								break;
+							case InstructionType::DIV:
+								register_access[n->dst.index].is_aliased = true;
+								register_access[n->dst.index].alias.value = first / n->args[1].value;
+								break;
+							case InstructionType::SUB:
+								register_access[n->dst.index].is_aliased = true;
+								register_access[n->dst.index].alias.value = first - n->args[1].value;
+								break;
+							case InstructionType::MOD:
+								register_access[n->dst.index].is_aliased = true;
+								register_access[n->dst.index].alias.value = fmodf(first, n->args[1].value);
+								break;
+							case InstructionType::LT:
+								register_access[n->dst.index].is_aliased = true;
+								register_access[n->dst.index].alias.value = first < n->args[1].value ? 1.f : 0.f;
+								break;
+							case InstructionType::GT:
+								register_access[n->dst.index].is_aliased = true;
+								register_access[n->dst.index].alias.value = first > n->args[1].value ? 1.f : 0.f;
+								break;
+							default: break;
+						}
+
+						if (register_access[n->dst.index].is_aliased) {
+							register_access[n->dst.index].alias.type = DataStream::LITERAL;
+							if (n->prev) n->prev->next = n->next;
+							if (n->next) n->next->prev = n->prev;
+							if (ctx.tail == n) ctx.tail = n->prev;
+							break;
+						}
+					}
 					if (n->dst.type == DataStream::REGISTER) register_access[n->dst.index].prev_writer = n;
 					break;
 				}
@@ -2246,8 +2283,8 @@ const char* toString(Token::Type type) {
 			}
 			case Node::SYSCALL: {
 				auto* n = (SysCallNode*)node;
-				auto* res = LUMIX_NEW(m_arena_allocator, IRSyscall)(node, m_arena_allocator);
-				res->syscall = n->function;
+				auto* res = LUMIX_NEW(m_arena_allocator, IROp)(node, m_arena_allocator);
+				res->instruction = n->function.instruction;
 				res->args.reserve(n->args.size());
 				for (Node* arg : n->args) {
 					i32 a = compileIR(ctx, arg);
@@ -2343,8 +2380,10 @@ const char* toString(Token::Type type) {
 					if (args[i].num < 0) return -1;
 					arg_offset = ctx.stack.size();
 				}
+				Span<IRContext::Arg> prev_args = ctx.args;
 				ctx.args = { args, &args[n->args.size()] };
 				i32 ret = compileIR(ctx, fn.block);
+				ctx.args = prev_args;
 				IRValue ret_vals[4];
 				for (i32 i = 0; i < ret; ++i) {
 					ret_vals[i] = ctx.stack.last();
@@ -2439,13 +2478,13 @@ const char* toString(Token::Type type) {
 					return -1;
 				}
 				i32 num = maximum(left, right);
-				IRBinary* ir_ops[4];
+				IROp* ir_ops[4];
 				for (i32 i = 0; i < num; ++i) {
-					auto* res = LUMIX_NEW(m_arena_allocator, IRBinary)(n);
+					auto* res = LUMIX_NEW(m_arena_allocator, IROp)(n, m_arena_allocator);
 					res->instruction = toInstruction(n->op);
 					res->dst.type = DataStream::REGISTER;
-					res->left = ctx.stackValue(-right - left + (left == 1 ? 0 : i));
-					res->right = ctx.stackValue(-right + (right == 1 ? 0 : i));
+					res->args.push(ctx.stackValue(-right - left + (left == 1 ? 0 : i)));
+					res->args.push(ctx.stackValue(-right + (right == 1 ? 0 : i)));
 					ir_ops[i] = res;
 				}
 				ctx.popStack(left + right);
@@ -2518,11 +2557,12 @@ const char* toString(Token::Type type) {
 					return -1;
 				}
 
-				IRMov* movs[4];
+				IROp* movs[4];
 				for (i32 i = 0; i < left; ++i) {
-					auto* res = LUMIX_NEW(m_arena_allocator, IRMov)(n);
+					auto* res = LUMIX_NEW(m_arena_allocator, IROp)(n, m_arena_allocator);
+					res->instruction = InstructionType::MOV;
 					res->dst = ctx.stackValue(-left - right + i);
-					res->src = ctx.stackValue(-right + (right == 1 ? 0 : i));
+					res->args.push(ctx.stackValue(-right + (right == 1 ? 0 : i)));
 					movs[i] = res;
 				}
 				ctx.popStack(left + right);

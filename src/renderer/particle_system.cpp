@@ -708,11 +708,14 @@ ParticleSystem::RunResult ParticleSystem::run(RunningContext& ctx) {
 		ASSERT(false); 
 	};
 
+	u32 end_counter = 1;
 	RunResult result = RunResult::SURVIVED;
 	for (;;) {
 		const InstructionType it = ip.read<InstructionType>();
 		switch (it) {
 			case InstructionType::END:
+				--end_counter;
+				if (end_counter > 0) break;
 				return result;
 			case InstructionType::KILL: result = RunResult::KILLED; break;
 			case InstructionType::MESH: {
@@ -948,9 +951,20 @@ ParticleSystem::RunResult ParticleSystem::run(RunningContext& ctx) {
 				jobs::exit(ctx.emit_mutex);
 				break;
 			}
+			case InstructionType::CMP: {
+				DataStream condition_stream = ip.read<DataStream>();
+				const u16 true_block_size = ip.read<u16>();
+				float cond = getConstValue(condition_stream);
+				if (cond) {
+					++end_counter;
+				}
+				else {
+					ip.skip(true_block_size);
+				}
+				break;
+			}
 			case InstructionType::GRADIENT:
 			case InstructionType::BLEND:
-			case InstructionType::CMP: // TODO nested ifs
 			case InstructionType::CMP_ELSE:
 				ASSERT(false);
 				break;
