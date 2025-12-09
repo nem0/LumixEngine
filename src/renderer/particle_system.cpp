@@ -188,6 +188,7 @@ bool ParticleSystemResource::load(Span<const u8> mem) {
 		blob.read(emitter.max_ribbon_length);
 		emitter.max_ribbon_length = (emitter.max_ribbon_length + 3) & ~3;
 		blob.read(emitter.init_ribbons_count);
+		blob.read(emitter.tube_segments);
 		emitter.emit_on_move = blob.read<bool>();
 	}
 	u32 num_globals = blob.read<u32>();

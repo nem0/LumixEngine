@@ -64,6 +64,7 @@ struct ParticleSystemResource final : Resource {
 		u32 max_ribbons;
 		u32 max_ribbon_length;
 		u32 init_ribbons_count;
+		u32 tube_segments = 0; // 0 = flat ribbon, >0 = tube with this many segments
 		bool emit_on_move = false;
 		Material* material = nullptr;
 		Model* model = nullptr;

@@ -1,3 +1,5 @@
+#pragma once 
+
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
 

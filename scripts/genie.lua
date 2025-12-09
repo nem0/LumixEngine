@@ -108,9 +108,15 @@ newoption {
 	}
 }
 
+newoption {
+	trigger = "with-tests",
+	description = "Build test projects."
+}
+
 -- process _OPTIONS
 build_studio = not _OPTIONS["no-studio"]
 build_app = _OPTIONS["with-app"] or false
+build_tests = _OPTIONS["with-tests"] or false
 local embed_resources = _OPTIONS["embed-resources"]
 local working_dir = _OPTIONS["working-dir"]
 local debug_args = _OPTIONS["debug-args"]
@@ -238,6 +244,11 @@ function plugin(plugin_name)
 		if build_studio then
 			exe_project "studio"
 				links(plugin_name)
+		end
+
+		if build_tests then
+			exe_project "tests"
+				links {plugin_name}
 		end
 
 		if build_app then
@@ -1066,3 +1077,32 @@ io.write "#else\n"
 	end
 io.write "#endif\n"
 io.close(file)
+
+-- tests project
+if build_tests then
+	exe_project "tests"
+		kind "ConsoleApp"
+		defaultConfigurations()
+		includedirs { "../src", "../src/tests" }
+		files { "../src/tests/**.cpp", "../src/tests/**.h" }
+		
+		if split_projects then
+			links { "core", "engine" }
+			if hasPlugin "renderer" then
+				links { "renderer" }
+			end
+		else
+			links { "engine_merged" }
+		end
+		libdirs { "../external/pix/bin/x64" }
+		
+		debugdir "../data"
+		
+		configuration { "windows" }
+			links { "psapi", "dxguid", "winmm" }
+		
+		configuration { "linux" }
+			links { "GL", "X11", "dl", "rt", "Xi" }
+		
+		configuration {}
+end

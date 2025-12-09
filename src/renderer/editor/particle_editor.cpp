@@ -17,7 +17,7 @@
 #include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/world.h"
-#include "particle_script_compiler.h"
+#include "particle_script_ui.h"
 #include "renderer/editor/world_viewer.h"
 #include "renderer/material.h"
 #include "renderer/particle_system.h"

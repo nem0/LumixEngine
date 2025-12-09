@@ -47,6 +47,7 @@ enum class DrawCommandTypes : u8 {
 	PARTICLES,
 	MESH_PARTICLES,
 	RIBBONS,
+	RIBBON_TUBES,
 };
 
 // converts float to u32 so it can be used in radix sort
@@ -113,6 +114,11 @@ LUMIX_FORCE_INLINE SortValue makeMeshParticleSortValue(EntityPtr entity, u32 emi
 
 LUMIX_FORCE_INLINE SortValue makeRibbonsSortValue(EntityPtr entity, u32 emitter_idx) {
 	const u64 type_mask = (u64)DrawCommandTypes::RIBBONS << SORT_VALUE_TYPE_SHIFT;
+	return SortValue(entity.index | type_mask | ((u64)emitter_idx << SORT_VALUE_EMITTER_SHIFT));
+}
+
+LUMIX_FORCE_INLINE SortValue makeRibbonTubesSortValue(EntityPtr entity, u32 emitter_idx) {
+	const u64 type_mask = (u64)DrawCommandTypes::RIBBON_TUBES << SORT_VALUE_TYPE_SHIFT;
 	return SortValue(entity.index | type_mask | ((u64)emitter_idx << SORT_VALUE_EMITTER_SHIFT));
 }
 
@@ -2255,9 +2261,16 @@ struct PipelineImpl final : Pipeline {
 				
 				if (material) {
 					if (emitter.resource_emitter.max_ribbons) {
-						SortValue value = makeRibbonsSortValue(system.m_entity, emitter_idx);
-						SortKey key = makeParticleSortKey(material, bucket_idx);
-						inserter.push(key, value);
+						if (emitter.resource_emitter.tube_segments > 0) {
+							SortValue value = makeRibbonTubesSortValue(system.m_entity, emitter_idx);
+							SortKey key = makeParticleSortKey(material, bucket_idx);
+							inserter.push(key, value);
+						}
+						else {
+							SortValue value = makeRibbonsSortValue(system.m_entity, emitter_idx);
+							SortKey key = makeParticleSortKey(material, bucket_idx);
+							inserter.push(key, value);
+						}
 					}
 					else {
 						SortValue value = makeParticleSortValue(system.m_entity, emitter_idx);
@@ -2839,6 +2852,62 @@ struct PipelineImpl final : Pipeline {
 							// TODO instanced draw / indirect instanced
 							if(ribbon.length > 1) {
 								stream->drawArraysInstanced(2 * ribbon.length - 2, 1);
+							}
+							offset += 4 * sizeof(u32);
+							points_offset += ribbon.length * decl.getStride();
+							inst_data += 4;
+						}
+						break;
+					}
+					case DrawCommandTypes::RIBBON_TUBES: {
+						const u32 emitter_idx = u32(renderables[i] >> SORT_VALUE_EMITTER_SHIFT);
+						const ParticleSystem& particle_system = m_module->getParticleEmitter(entity);
+						const ParticleSystem::Emitter& emitter = particle_system.getEmitter(emitter_idx);
+						const Material* material = emitter.resource_emitter.material;
+						const u32 tube_segments = emitter.resource_emitter.tube_segments;
+
+						const Transform tr = world.getTransform(*particle_system.m_entity);
+						const Vec3 lpos = Vec3(tr.pos - camera_pos);
+						const gpu::StateFlags state = material->m_render_states | render_state;
+						gpu::VertexDecl inst_decl(gpu::PrimitiveType::TRIANGLE_STRIP);
+						inst_decl.addAttribute(0, 4, gpu::AttributeType::U32, gpu::Attribute::INSTANCED);
+						u32 stride = inst_decl.getStride();
+
+						gpu::ProgramHandle program = material->getShader()->getProgram(state, inst_decl, define_mask | material->getDefineMask(), "");
+						const TransientSlice point_slice = emitter.slice;
+						const Matrix mtx(lpos, tr.rot);
+
+						struct {
+							Matrix mtx;
+							MaterialIndex material_index;
+							u32 tube_segments;
+						} ub_data = {
+							mtx,
+							material->getIndex(),
+							tube_segments
+						};
+						const TransientSlice ub = alloc(uniform_pool, &ub_data, sizeof(ub_data));
+						stream->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+						stream->useProgram(program);
+						stream->bindIndexBuffer(gpu::INVALID_BUFFER);
+						stream->bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
+
+						u32 points_offset = 0;
+						u32 offset = 0;
+						const gpu::VertexDecl& decl = emitter.resource_emitter.vertex_decl;
+						TransientSlice slice = alloc(transient_pool, sizeof(u32) * 4 * emitter.ribbons.size());
+						u32* inst_data = (u32*)slice.ptr;
+						for (const auto& ribbon : emitter.ribbons) {
+							inst_data[0] = gpu::getBindlessHandle(point_slice.buffer).value;
+							inst_data[1] = point_slice.offset + points_offset;
+							inst_data[2] = ribbon.offset;
+							inst_data[3] = emitter.resource_emitter.max_ribbon_length;
+							stream->bindVertexBuffer(1, slice.buffer, slice.offset + offset, stride);
+							if(ribbon.length > 1) {
+								// For tube: each ring transition needs (tube_segments + 1) * 2 vertices
+								const u32 ring_transitions = ribbon.length - 1;
+								const u32 vertex_count = ring_transitions * (tube_segments + 1) * 2;
+								stream->drawArraysInstanced(vertex_count, 1);
 							}
 							offset += 4 * sizeof(u32);
 							points_offset += ribbon.length * decl.getStride();
