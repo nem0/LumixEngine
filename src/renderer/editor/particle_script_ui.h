@@ -210,12 +210,21 @@ emitter Emitter0 {
 
 
 struct ParticleScriptEditorWindow : AssetEditorWindow {
+	static inline const char* s_autocomplete_words[] = {
+		"const", "curve", "else", "emit", "emit_index", "emitter", "entity_position_x", "entity_position_y", "entity_position_z",
+		"float", "float3", "float4", "fn", "global", "if", "import", "in", "kill", "let", "max", "mesh", "min", "noise",
+		"out", "random", "return", "ribbon_index", "sin", "sqrt", "time_delta", "total_time", "var",
+		nullptr
+	};
+
 	ParticleScriptEditorWindow(const Path& path, ParticleScriptPlugin& plugin)
 		: AssetEditorWindow(plugin.m_app)
 		, m_app(plugin.m_app)
 		, m_path(path)
 		, m_viewer(plugin.m_app)
 		, m_plugin(plugin)
+		, m_autocomplete_list(plugin.m_allocator)
+		, m_autocomplete_action("Particle script", "Autocomplete", "Autocomplete", "particle_script_autocomplete", "", Action::NORMAL)
 	{
 		m_editor = createParticleScriptEditor(m_app);
 		m_editor->focus();
@@ -370,6 +379,110 @@ struct ParticleScriptEditorWindow : AssetEditorWindow {
 		else {
 			if (m_editor->gui("codeeditor", ImVec2(0, 0), m_app.getMonospaceFont(), m_app.getDefaultFont())) m_dirty = true;
 		}
+
+		handleAutocomplete();
+		autocompletePopupGUI();
+	}
+
+	void handleAutocomplete() {
+		if (!m_editor->canHandleInput()) return;
+		if (m_editor->getNumCursors() != 1) return;
+		if (!m_app.checkShortcut(m_autocomplete_action)) return;
+
+		StringView prefix = m_editor->getPrefix();
+		
+		const char* quote_pos = find(prefix, '"');
+		m_autocomplete_list.clear();
+		
+		if (quote_pos) {
+			// import autocomplete
+			// Extract the path part after the quote
+			prefix = StringView(quote_pos + 1, prefix.end);
+
+			AssetCompiler& compiler = m_app.getAssetCompiler();
+			const auto& resources = compiler.lockResources();
+			for (auto iter : resources) {
+				if (iter.type != ParticleScriptImportPlugin::TYPE) continue;
+				const char* path = iter.path.c_str();
+				if (prefix.size() > 0 && !startsWith(path, prefix)) continue;
+				String tmp(path, m_plugin.m_allocator);
+				i32 idx = 0;
+				for (; idx < m_autocomplete_list.size(); ++idx) {
+					if (compareString(tmp, m_autocomplete_list[idx]) < 0) break;
+				}
+				m_autocomplete_list.insert(idx, static_cast<String&&>(tmp));
+			}
+			compiler.unlockResources();
+		} else {
+			// keyword autocomplete
+			for (const char** kw = s_autocomplete_words; *kw; ++kw) {
+				if (prefix.size() > 0 && !startsWith(*kw, prefix)) continue;
+				String tmp(*kw, m_plugin.m_allocator);
+				i32 idx = 0;
+				for (; idx < m_autocomplete_list.size(); ++idx) {
+					if (compareString(tmp, m_autocomplete_list[idx]) < 0) break;
+				}
+				m_autocomplete_list.insert(idx, static_cast<String&&>(tmp));
+			}
+		}
+
+		if (m_autocomplete_list.empty()) return;
+
+		if (m_autocomplete_list.size() == 1) {
+			m_editor->selectWord();
+			m_editor->insertText(m_autocomplete_list[0].c_str());
+			m_autocomplete_list.clear();
+			m_dirty = true;
+		} else {
+			ImGui::OpenPopup("import_autocomplete");
+			m_autocomplete_filter.clear();
+			m_autocomplete_selection_idx = 0;
+			ImGui::SetNextWindowPos(m_editor->getCursorScreenPosition());
+		}
+	}
+
+	void autocompletePopupGUI() {
+		if (!ImGui::BeginPopup("import_autocomplete", ImGuiWindowFlags_NoNav)) return;
+
+		u32 sel_idx = m_autocomplete_selection_idx;
+		if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) m_autocomplete_selection_idx += m_autocomplete_list.size() - 1;
+		if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) ++m_autocomplete_selection_idx;
+		m_autocomplete_selection_idx = m_autocomplete_selection_idx % m_autocomplete_list.size();
+		if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+			ImGui::CloseCurrentPopup();
+			m_editor->focus();
+		}
+
+		bool is_child = false;
+		if (m_autocomplete_list.size() > 12) {
+			ImGui::PushFont(m_app.getDefaultFont());
+			m_autocomplete_filter.gui("Filter", 250, ImGui::IsWindowAppearing());
+			ImGui::PopFont();
+			ImGui::BeginChild("asl", ImVec2(0, ImGui::GetTextLineHeight() * 12));
+			is_child = true;
+		}
+
+		bool is_enter = ImGui::IsKeyPressed(ImGuiKey_Enter);
+		u32 i = 0;
+		for (const String& s : m_autocomplete_list) {
+			if (!m_autocomplete_filter.pass(s.c_str())) continue;
+			if (i - 1 == m_autocomplete_selection_idx) ImGui::SetScrollHereY(0.5f);
+			const bool is_selected = i == sel_idx;
+			if (ImGui::Selectable(s.c_str(), is_selected) || (is_enter && i == m_autocomplete_selection_idx)) {
+				m_editor->selectWord();
+				m_editor->insertText(s.c_str());
+				m_dirty = true;
+				ImGui::CloseCurrentPopup();
+				m_editor->focus();
+				m_autocomplete_list.clear();
+				break;
+			}
+			++i;
+		}
+		m_autocomplete_selection_idx = minimum(m_autocomplete_selection_idx, i > 0 ? i - 1 : 0);
+		if (is_child) ImGui::EndChild();
+
+		ImGui::EndPopup();
 	}
 
 	const Path& getPath() override { return m_path; }
@@ -384,6 +497,10 @@ struct ParticleScriptEditorWindow : AssetEditorWindow {
 	bool m_play = true;
 	bool m_show_ground = true;
 	bool m_show_info = false;
+	Array<String> m_autocomplete_list;
+	u32 m_autocomplete_selection_idx = 0;
+	TextFilter m_autocomplete_filter;
+	Action m_autocomplete_action;
 };
 
 void ParticleScriptPlugin::openEditor(const struct Path& path) {

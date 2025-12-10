@@ -13,9 +13,9 @@
 #include "renderer/renderer.h"
 
 
-namespace Lumix
-{
+namespace Lumix {
 
+namespace jobs { struct Mutex; }
 
 struct DVec3;
 struct Material;
@@ -25,7 +25,7 @@ struct Renderer;
 
 struct ParticleSystemResource final : Resource {
 	enum class Version : u32{
-		NOT_SUPPORTED_BEFORE = 14,
+		NOT_SUPPORTED_BEFORE = 15,
 
 		LAST
 	};
@@ -209,6 +209,11 @@ struct LUMIX_RENDERER_API ParticleSystem {
 		TransientSlice slice;
 	};
 
+	enum class RunResult {
+		SURVIVED,
+		KILLED
+	};
+
 	ParticleSystem(EntityPtr entity, struct World& world, IAllocator& allocator);
 	ParticleSystem(ParticleSystem&& rhs);
 	~ParticleSystem();
@@ -223,6 +228,25 @@ struct LUMIX_RENDERER_API ParticleSystem {
 	const Array<Emitter>& getEmitters() const { return m_emitters; }
 	void reset();
 
+	struct RunningContext {
+		bool is_ribbon = false;
+		const Channel* channels = nullptr;
+		const float* system_values = nullptr;
+		const float* globals = nullptr;
+		float* registers[16] = {};
+		float* output_memory = nullptr;
+		InputMemoryStream instructions = InputMemoryStream(nullptr, 0);
+		u32 ribbon_index = 0;
+		u32 particle_idx = 0;
+		u32 register_access_idx = 0;
+		World* world = nullptr;
+		EntityPtr entity;
+		Span<ParticleSystemResource::Emitter> emitters;
+		struct OutputPagedStream* emit_stream = nullptr;
+		jobs::Mutex* emit_mutex = nullptr;
+	};
+	static RunResult run(RunningContext& ctx, IAllocator& tmp_allocator);
+
 	World& m_world;
 	EntityPtr m_entity;
 	bool m_autodestroy = false;
@@ -232,13 +256,7 @@ struct LUMIX_RENDERER_API ParticleSystem {
 	Array<float> m_globals;
 
 private:
-	struct RunningContext;
 	struct ChunkProcessorContext;
-
-	enum class RunResult {
-		SURVIVED,
-		KILLED
-	};
 
 	void operator =(ParticleSystem&& rhs) = delete;
 	void onResourceChanged(Resource::State old_state, Resource::State new_state, Resource&);
@@ -247,7 +265,6 @@ private:
 	void emitRibbonPoints(u32 emitter_idx, u32 ribbon_idx, Span<const float> emit_data, u32 count, float time_step);
 	void emit(u32 emitter_idx, Span<const float> emit_data, u32 count, float time_step);
 	void ensureCapacity(Emitter& emitter, u32 num_new_particles);
-	RunResult run(RunningContext& ctx);
 	void skipBlock(ParticleSystem::RunningContext& ctx, const InputMemoryStream& ip, InputMemoryStream& head, InputMemoryStream& tail);
 	void processChunk(ChunkProcessorContext& ctx);
 	void initRibbonEmitter(i32 emiter);

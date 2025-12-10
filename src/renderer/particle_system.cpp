@@ -327,21 +327,6 @@ namespace {
 		return 2.4f * lerp(g0 * (f - 0.f), g1 * (f - 1.f), u);
 	}
 }
-struct ParticleSystem::RunningContext {
-	RunningContext(const Emitter& emitter, IAllocator& allocator)
-		: emitter(emitter)
-		, instructions(nullptr, 0)
-	{}
-	float* registers[16] = {};
-	float* output_memory;
-	InputMemoryStream instructions;
-	const Emitter& emitter;
-	jobs::Mutex* emit_mutex = nullptr;
-	OutputPagedStream* emit_stream = nullptr;
-	u32 ribbon_index;
-	u32 particle_idx;
-	u32 register_access_idx;
-};
 
 void ParticleSystem::ensureCapacity(Emitter& emitter, u32 num_new_particles) {
 	u32 new_capacity = num_new_particles + emitter.particles_count;
@@ -367,7 +352,8 @@ void ParticleSystem::emitRibbonPoints(u32 emitter_idx, u32 ribbon_idx, Span<cons
 	const float c1 = m_system_values[(u8)ParticleSystemValues::TOTAL_TIME];
 	Ribbon& ribbon = emitter.ribbons[ribbon_idx];
 
-	RunningContext ctx(emitter, m_allocator);
+	RunningContext ctx;
+	ctx.channels = emitter.channels;
 	StackArray<float, 16> registers(m_allocator);
 	registers.resize(res_emitter.emit_registers_count + emit_data.length());
 	ctx.register_access_idx = 0;
@@ -381,6 +367,12 @@ void ParticleSystem::emitRibbonPoints(u32 emitter_idx, u32 ribbon_idx, Span<cons
 	m_system_values[(u8)ParticleSystemValues::ENTITY_POSITION_Y] = (float)pos.y;
 	m_system_values[(u8)ParticleSystemValues::ENTITY_POSITION_Z] = (float)pos.z;
 	m_system_values[(u8)ParticleSystemValues::RIBBON_INDEX] = (float)ribbon_idx;
+	ctx.system_values = m_system_values;
+	ctx.globals = m_globals.begin();
+	ctx.world = &m_world;
+	ctx.entity = m_entity;
+	ctx.emitters = m_resource->getEmitters();
+	ctx.is_ribbon = emitter.resource_emitter.max_ribbons > 0;
 	for (u32 i = 0; i < count; ++i) {
 		m_system_values[(u8)ParticleSystemValues::EMIT_INDEX] = (float)ribbon.emit_index;
 		if (emit_data.length() > 0) {
@@ -397,7 +389,7 @@ void ParticleSystem::emitRibbonPoints(u32 emitter_idx, u32 ribbon_idx, Span<cons
 
 		ctx.particle_idx = ((ribbon.offset + ribbon.length - 1) % max_len) + ribbon_idx * max_len;
 		ctx.instructions.set(res_emitter.instructions.data() + res_emitter.emit_offset, res_emitter.instructions.size() - res_emitter.emit_offset);
-		run(ctx);
+		run(ctx, m_allocator);
 
 		++ribbon.emit_index;
 		m_system_values[(u8)ParticleSystemValues::TOTAL_TIME] += time_step;
@@ -411,7 +403,8 @@ void ParticleSystem::emit(u32 emitter_idx, Span<const float> emit_data, u32 coun
 	const ParticleSystemResource::Emitter& res_emitter = m_resource->getEmitters()[emitter_idx];
 	ensureCapacity(emitter, count);
 
-	RunningContext ctx(emitter, m_allocator);
+	RunningContext ctx;
+	ctx.channels = emitter.channels;
 	StackArray<float, 16> registers(m_allocator);
 	ctx.register_access_idx = 0;
 	registers.resize(res_emitter.emit_registers_count + emit_data.length());
@@ -425,6 +418,12 @@ void ParticleSystem::emit(u32 emitter_idx, Span<const float> emit_data, u32 coun
 	m_system_values[(u8)ParticleSystemValues::ENTITY_POSITION_Y] = (float)pos.y;
 	m_system_values[(u8)ParticleSystemValues::ENTITY_POSITION_Z] = (float)pos.z;
 	m_system_values[(u8)ParticleSystemValues::RIBBON_INDEX] = 0;
+	ctx.system_values = m_system_values;
+	ctx.globals = m_globals.begin();
+	ctx.world = &m_world;
+	ctx.entity = m_entity;
+	ctx.emitters = m_resource->getEmitters();
+	ctx.is_ribbon = emitter.resource_emitter.max_ribbons > 0;
 	for (u32 i = 0; i < count; ++i) {
 		m_system_values[(u8)ParticleSystemValues::EMIT_INDEX] = (float)emitter.emit_index; // TODO
 		if (emit_data.length() > 0) {
@@ -432,7 +431,7 @@ void ParticleSystem::emit(u32 emitter_idx, Span<const float> emit_data, u32 coun
 		}
 		ctx.particle_idx = emitter.particles_count;
 		ctx.instructions.set(res_emitter.instructions.data() + res_emitter.emit_offset, res_emitter.instructions.size() - res_emitter.emit_offset);
-		run(ctx);
+		run(ctx, m_allocator);
 		
 		++emitter.particles_count;
 		++emitter.emit_index;
@@ -672,22 +671,26 @@ struct ProcessHelper {
 };
 
 
-ParticleSystem::RunResult ParticleSystem::run(RunningContext& ctx) {
+ParticleSystem::RunResult ParticleSystem::run(RunningContext& ctx, IAllocator& tmp_allocator) {
 	float** registers = ctx.registers;
 	float* outputs = ctx.output_memory;
-	const Emitter& emitter = ctx.emitter;
+	const float* system_values = ctx.system_values;
+	const float* globals = ctx.globals;
+	const Channel* channels = ctx.channels;
 	InputMemoryStream& ip = ctx.instructions;
 	const u32 particle_idx = ctx.particle_idx;
 	const u32 register_access_idx = ctx.register_access_idx;
+	World* world = ctx.world;
+	EntityPtr entity = ctx.entity;
 
 	auto getConstValue = [&](const DataStream& str) -> float {
 		switch (str.type) {
 			case DataStream::LITERAL: return str.value;
-			case DataStream::SYSTEM_VALUE: return m_system_values[str.index];
+			case DataStream::SYSTEM_VALUE: return system_values[str.index];
 			case DataStream::OUT: return outputs[str.index];
 			case DataStream::REGISTER: return registers[str.index][register_access_idx];
-			case DataStream::CHANNEL: return emitter.channels[str.index].data[particle_idx];
-			case DataStream::GLOBAL: return m_globals[str.index];
+			case DataStream::CHANNEL: return channels[str.index].data[particle_idx];
+			case DataStream::GLOBAL: return globals[str.index];
 			case DataStream::ERROR:
 			case DataStream::NONE: break;
 		}
@@ -699,7 +702,7 @@ ParticleSystem::RunResult ParticleSystem::run(RunningContext& ctx) {
 		switch (str.type) {
 			case DataStream::OUT: outputs[str.index] = value; return;
 			case DataStream::REGISTER: registers[str.index][register_access_idx] = value; return;
-			case DataStream::CHANNEL: emitter.channels[str.index].data[particle_idx] = value; return;
+			case DataStream::CHANNEL: channels[str.index].data[particle_idx] = value; return;
 			case DataStream::SYSTEM_VALUE:
 			case DataStream::GLOBAL:
 			case DataStream::LITERAL:
@@ -724,10 +727,11 @@ ParticleSystem::RunResult ParticleSystem::run(RunningContext& ctx) {
 				DataStream index = ip.read<DataStream>();
 				const u8 subindex = ip.read<u8>();
 
-				RenderModule* render_module = (RenderModule*)m_world.getModule(types::model_instance);
-				if (!m_world.hasComponent(*m_entity, types::model_instance)) return result; // TODO error message
+				if (!world) return result;
+				if (!world->hasComponent(*entity, types::model_instance)) return result; // TODO error message
+				RenderModule* render_module = (RenderModule*)world->getModule(types::model_instance);
 				
-				Model* model = render_module->getModelInstanceModel(*m_entity);
+				Model* model = render_module->getModelInstanceModel(*entity);
 				if (!model || !model->isReady()) return result;
 
 				u32 mesh_idx = 0; // TODO random mesh
@@ -740,7 +744,7 @@ ParticleSystem::RunResult ParticleSystem::run(RunningContext& ctx) {
 
 				const u32 idx = u32(getConstValue(index) + 0.5f);
 				if (model->getBones().size() > 0) {
-					ModelInstance* mi = render_module->getModelInstance(*m_entity);
+					ModelInstance* mi = render_module->getModelInstance(*entity);
 					if (!mi->pose) return result;
 
 					const float v = mi->model->evalVertexPose(*mi->pose, mesh_idx, idx)[subindex];
@@ -757,9 +761,10 @@ ParticleSystem::RunResult ParticleSystem::run(RunningContext& ctx) {
 				DataStream op0 = ip.read<DataStream>();
 				const u8 subindex = ip.read<u8>();
 
-				CoreModule* core_module = (CoreModule*)m_world.getModule(types::spline);
-				if (!m_world.hasComponent(*m_entity, types::spline)) return result; // TODO error message
-				Spline& spline = core_module->getSpline(*m_entity);
+				if (!world) return result;
+				if (!world->hasComponent(*entity, types::spline)) return result; // TODO error message
+				CoreModule* core_module = (CoreModule*)world->getModule(types::spline);
+				Spline& spline = core_module->getSpline(*entity);
 
 				float t = getConstValue(op0);
 
@@ -928,13 +933,13 @@ ParticleSystem::RunResult ParticleSystem::run(RunningContext& ctx) {
 			}
 			case InstructionType::EMIT: {
 				u32 emitter_idx = ip.read<u32>();
-				bool is_ribbon = emitter.resource_emitter.max_ribbons > 0;
+				bool is_ribbon = ctx.is_ribbon;
 
-				StackArray<float, 16> emit_outputs(m_allocator);
-				emit_outputs.resize(m_resource->getEmitters()[emitter_idx].emit_inputs_count);
+				StackArray<float, 16> emit_outputs(tmp_allocator);
+				emit_outputs.resize(ctx.emitters[emitter_idx].emit_inputs_count);
 				float* output_tmp = ctx.output_memory;
 				ctx.output_memory = emit_outputs.begin();
-				run(ctx);
+				run(ctx, tmp_allocator);
 				ctx.output_memory = output_tmp;
 
 				jobs::enter(ctx.emit_mutex);
@@ -1036,13 +1041,20 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 				const float4* const end = cond + stepf4;
 				StackArray<float, 16> tmp_outputs(m_allocator);
 				tmp_outputs.resize(emitter.resource_emitter.outputs_count);
-				RunningContext single_ctx(emitter, m_allocator);
+				RunningContext single_ctx;
+				single_ctx.channels = emitter.channels;
 				single_ctx.instructions = ip;
 				single_ctx.output_memory = tmp_outputs.begin();
 				memcpy(single_ctx.registers, ctx.registers, sizeof(ctx.registers[0]) * num_registers);
 				single_ctx.emit_mutex = ctx.emit_mutex;
 				single_ctx.emit_stream = ctx.emit_stream;
-				
+				single_ctx.system_values = m_system_values;
+				single_ctx.globals = m_globals.begin();
+				single_ctx.world = &m_world;
+				single_ctx.entity = m_entity;
+				single_ctx.emitters = m_resource->getEmitters();
+				single_ctx.is_ribbon = emitter.resource_emitter.max_ribbons > 0;
+
 				// TODO serialize block length so we can avoid this
 				InputMemoryStream true_block_ip((const u8*)ip.getData() + ip.getPosition(), true_block_size);
 				InputMemoryStream false_block_ip((const u8*)true_block_ip.getData() + true_block_size, false_block_size);
@@ -1060,7 +1072,7 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 						const bool is_true = (m & (1 << i)) && particle_index < ctx.to;
 						single_ctx.instructions = is_true ? true_block_ip : false_block_ip;
 						single_ctx.output_memory = ctx.output_memory + particle_index * emitter.resource_emitter.outputs_count;
-						if (run(single_ctx) == RunResult::KILLED) {
+						if (run(single_ctx, m_allocator) == RunResult::KILLED) {
 							for (u32 ch = 0; ch < num_channels; ++ch) {
 								float* data = emitter.channels[ch].data;
 								data[particle_index] = data[last];
@@ -1084,13 +1096,20 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 				const float4* const end = cond + stepf4;
 				StackArray<float, 16> tmp_outputs(m_allocator);
 				tmp_outputs.resize(emitter.resource_emitter.outputs_count);
-				RunningContext single_ctx(emitter, m_allocator);
+				RunningContext single_ctx;
+				single_ctx.channels = emitter.channels;
 				single_ctx.instructions = ip;
 				single_ctx.output_memory = tmp_outputs.begin();
 				memcpy(single_ctx.registers, ctx.registers, sizeof(ctx.registers[0]) * num_registers);
 				single_ctx.emit_mutex = ctx.emit_mutex;
 				single_ctx.emit_stream = ctx.emit_stream;
-				
+				single_ctx.system_values = m_system_values;
+				single_ctx.globals = m_globals.begin();
+				single_ctx.world = &m_world;
+				single_ctx.entity = m_entity;
+				single_ctx.emitters = m_resource->getEmitters();
+				single_ctx.is_ribbon = emitter.resource_emitter.max_ribbons > 0;
+
 				InputMemoryStream true_block_ip = ip;
 				ip.setPosition(ip.getPosition() + block_size);
 				u32 kill_count = 0;
@@ -1107,7 +1126,7 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 							single_ctx.particle_idx = particle_index;
 							single_ctx.register_access_idx = particle_index;
 							single_ctx.output_memory = ctx.output_memory + particle_index * emitter.resource_emitter.outputs_count;
-							if (run(single_ctx) == RunResult::KILLED) {
+							if (run(single_ctx, m_allocator) == RunResult::KILLED) {
 								for (u32 ch = 0; ch < num_channels; ++ch) {
 									float* data = emitter.channels[ch].data;
 									data[particle_index] = data[last];

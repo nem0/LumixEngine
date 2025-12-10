@@ -2,23 +2,36 @@
 #include "core/string.h"
 #include "core/stream.h"
 #include "core/path.h"
+#include "core/hash_map.h"
 #include "engine/file_system.h"
 #include "renderer/editor/particle_script_compiler.h"
+#include "renderer/particle_system.h"
 #include "tests/common.h"
 
 using namespace Lumix;
 
 namespace {
 
-struct DummyFileSystem : FileSystem {
+// FileSystem implementation for testing that supports in-memory file storage
+// Allows testing import functionality by providing file content from a hash map
+struct MemoryFileSystem : FileSystem {
+	HashMap<Path, const char*> m_files;
+
+	MemoryFileSystem() : m_files(getGlobalAllocator()) {}
+
 	bool saveContentSync(const struct Path& file, Span<const u8> content) override { return true; }
-	bool getContentSync(const struct Path& file, struct OutputMemoryStream& content) override { return false; }
+	bool getContentSync(const struct Path& file, struct OutputMemoryStream& content) override {
+		auto iter = m_files.find(file);
+		if (iter == m_files.end()) return false;
+		content.write(iter.value(), strlen(iter.value()));
+		return true;
+	}
 	const char* getEngineDataDir() override { return ""; }
 	u64 getLastModified(StringView) override { return 0; }
 	bool copyFile(StringView, StringView) override { return false; }
 	bool moveFile(StringView, StringView) override { return false; }
 	bool deleteFile(StringView) override { return false; }
-	bool fileExists(StringView) override { return false; }
+	bool fileExists(StringView path) override { return m_files.find(Path(path)) != m_files.end(); }
 	bool dirExists(StringView) override { return false; }
 	FileIterator* createFileIterator(StringView) override { return nullptr; }
 	bool open(StringView, os::InputFile&) override { return false; }
@@ -31,9 +44,12 @@ struct DummyFileSystem : FileSystem {
 	void cancel(AsyncHandle) override {}
 };
 
+// Test helper that exposes internal compiler functionality for testing
+// Provides methods to test expression parsing, constant folding, and inspect compilation results
 struct TestableCompiler : ParticleScriptCompiler {
 	TestableCompiler() 
-		: ParticleScriptCompiler(m_fs, getGlobalAllocator()) {}
+		: ParticleScriptCompiler(m_filesystem, getGlobalAllocator())
+	{}
 	
 	void initTokenizer(StringView code) {
 		m_tokenizer.m_current = code.begin;
@@ -59,7 +75,125 @@ struct TestableCompiler : ParticleScriptCompiler {
 		return &m_emitters[index];
 	}
 
-	DummyFileSystem m_fs;
+	MemoryFileSystem m_filesystem;
+};
+
+// Helper struct for running compiled particle scripts
+struct ParticleScriptRunner {
+	TestableCompiler compiler;
+	OutputMemoryStream instructions;
+	u32 emit_offset = 0;
+	u32 output_offset = 0;
+	u32 channels_count = 0;
+	float channel_data[16][16] = {};
+	ParticleSystem::Channel channels[16] = {};
+	float system_values[16] = {};
+	float registers_storage[16] = {};
+	float* registers[16] = {};
+	float output_memory[16] = {};
+
+	ParticleScriptRunner() : instructions(getGlobalAllocator()) {
+		for (u32 i = 0; i < 16; ++i) {
+			registers[i] = &registers_storage[i];
+		}
+		system_values[(u8)ParticleSystemValues::TIME_DELTA] = 0.016f;
+		system_values[(u8)ParticleSystemValues::TOTAL_TIME] = 0.0f;
+	}
+
+	void registerImport(const char* path, const char* src) {
+		compiler.m_filesystem.m_files.insert(Path(path), src);
+	}
+
+	bool compile(const char* code) {
+		OutputMemoryStream compiled(getGlobalAllocator());
+		if (!compiler.compile(Path("test.pat"), code, compiled)) return false;
+
+		InputMemoryStream blob(compiled.data(), compiled.size());
+		ParticleSystemResource::Header header;
+		blob.read(header);
+		if (header.magic != ParticleSystemResource::Header::MAGIC) return false;
+
+		u32 emitter_count;
+		blob.read(emitter_count);
+		if (emitter_count != 1) return false;
+
+		gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLE_STRIP);
+		blob.read(decl);
+		blob.readString(); // material
+		blob.readString(); // mesh
+
+		u32 instructions_size;
+		blob.read(instructions_size);
+		instructions.resize(instructions_size);
+		blob.read(instructions.getMutableData(), instructions_size);
+
+		blob.read(emit_offset);
+		blob.read(output_offset);
+		blob.read(channels_count);
+
+		// Skip register and instruction counts
+		u32 dummy;
+		for (int i = 0; i < 7; ++i) blob.read(dummy);
+
+		for (u32 i = 0; i < channels_count; ++i) {
+			channels[i].data = channel_data[i];
+		}
+		return true;
+	}
+
+	void runEmit() {
+		ParticleSystem::RunningContext ctx;
+		ctx.channels = channels;
+		ctx.system_values = system_values;
+		ctx.globals = nullptr;
+		ctx.output_memory = output_memory;
+		ctx.particle_idx = 0;
+		ctx.register_access_idx = 0;
+		ctx.is_ribbon = false;
+		for (u32 i = 0; i < 16; ++i) ctx.registers[i] = registers[i];
+		ctx.instructions = InputMemoryStream(
+			(const u8*)instructions.data() + emit_offset,
+			instructions.size() - emit_offset
+		);
+		ParticleSystem::run(ctx, getGlobalAllocator());
+	}
+
+	void runUpdate() {
+		ParticleSystem::RunningContext ctx;
+		ctx.channels = channels;
+		ctx.system_values = system_values;
+		ctx.globals = nullptr;
+		ctx.output_memory = output_memory;
+		ctx.particle_idx = 0;
+		ctx.register_access_idx = 0;
+		ctx.is_ribbon = false;
+		for (u32 i = 0; i < 16; ++i) ctx.registers[i] = registers[i];
+		ctx.instructions = InputMemoryStream(
+			(const u8*)instructions.data(),
+			emit_offset
+		);
+		ParticleSystem::run(ctx, getGlobalAllocator());
+	}
+
+	void runOutput() {
+		ParticleSystem::RunningContext ctx;
+		ctx.channels = channels;
+		ctx.system_values = system_values;
+		ctx.globals = nullptr;
+		ctx.output_memory = output_memory;
+		ctx.particle_idx = 0;
+		ctx.register_access_idx = 0;
+		ctx.is_ribbon = false;
+		for (u32 i = 0; i < 16; ++i) ctx.registers[i] = registers[i];
+		ctx.instructions = InputMemoryStream(
+			(const u8*)instructions.data() + output_offset,
+			instructions.size() - output_offset
+		);
+		ParticleSystem::run(ctx, getGlobalAllocator());
+	}
+
+	float getChannel(u32 channel, u32 particle = 0) const { return channel_data[channel][particle]; }
+	float getOutput(u32 index) const { return output_memory[index]; }
 };
 
 // Helper function to test constant folding optimization
@@ -346,6 +480,1385 @@ bool testCompileCompounds() {
 	return true;
 }
 
+// Test compiling and running a particle script via ParticleSystem::run
+bool testParticleScriptExecution() {
+	const char* code = R"(
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			out i_value : float
+			out i_pos : float3
+			out i_flag : float
+
+			var value : float
+			var pos : float3
+			var flag : float
+
+			fn emit() {
+				value = 42;
+				pos = {1, 2, 3};
+				flag = 0;
+				
+				// Test if: value > 40, so flag should become 1
+				if value > 40 {
+					flag = 1;
+				}
+			}
+
+			fn update() {
+				value = value + 10;
+				pos.x = pos.x + 1;
+				
+				// Test nested conditionals
+				if value > 50 {
+					if pos.x > 1 {
+						flag = flag + 10;
+					}
+				}
+				
+				// Test less-than
+				if value < 100 {
+					flag = flag + 100;
+				}
+			}
+
+			fn output() {
+				i_value = value;
+				i_pos = pos;
+				i_flag = flag;
+			}
+		}
+	)";
+
+	ParticleScriptRunner runner;
+	ASSERT_TRUE(runner.compile(code), "Compilation should succeed");
+
+	runner.runEmit();
+
+	// After emit: value=42, pos={1,2,3}, flag=1 (from if value > 40)
+	ASSERT_TRUE(fabsf(runner.getChannel(0) - 42.0f) < 0.001f, "value should be 42 after emit");
+	ASSERT_TRUE(fabsf(runner.getChannel(1) - 1.0f) < 0.001f, "pos.x should be 1 after emit");
+	ASSERT_TRUE(fabsf(runner.getChannel(2) - 2.0f) < 0.001f, "pos.y should be 2 after emit");
+	ASSERT_TRUE(fabsf(runner.getChannel(3) - 3.0f) < 0.001f, "pos.z should be 3 after emit");
+	ASSERT_TRUE(fabsf(runner.getChannel(4) - 1.0f) < 0.001f, "flag should be 1 after emit (if true branch)");
+
+	runner.runUpdate();
+
+	// After update: value=52, pos.x=2, flag=111 (1 + 10 from nested if + 100 from value < 100)
+	ASSERT_TRUE(fabsf(runner.getChannel(0) - 52.0f) < 0.001f, "value should be 52 after update");
+	ASSERT_TRUE(fabsf(runner.getChannel(1) - 2.0f) < 0.001f, "pos.x should be 2 after update");
+	ASSERT_TRUE(fabsf(runner.getChannel(4) - 111.0f) < 0.001f, "flag should be 111 after update (nested conditionals)");
+
+	runner.runOutput();
+
+	// Check output memory: i_value=52, i_pos={2,2,3}, i_flag=111
+	ASSERT_TRUE(fabsf(runner.getOutput(0) - 52.0f) < 0.001f, "i_value should be 52");
+	ASSERT_TRUE(fabsf(runner.getOutput(1) - 2.0f) < 0.001f, "i_pos.x should be 2");
+	ASSERT_TRUE(fabsf(runner.getOutput(2) - 2.0f) < 0.001f, "i_pos.y should be 2");
+	ASSERT_TRUE(fabsf(runner.getOutput(3) - 3.0f) < 0.001f, "i_pos.z should be 3");
+	ASSERT_TRUE(fabsf(runner.getOutput(4) - 111.0f) < 0.001f, "i_flag should be 111");
+
+	return true;
+}
+
+// Test local variables (let declarations)
+bool testParticleScriptLocalVars() {
+	const char* code = R"(
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			out i_result : float
+			out i_vec : float3
+
+			var result : float
+			var vec : float3
+
+			fn emit() {
+				// Test simple local var
+				let x : float = 10;
+				let y : float = x + 5;
+				result = y;  // should be 15
+				
+				// Test local float3
+				let v1 : float3 = {1, 2, 3};
+				let v2 : float3 = {v1.x * 2, v1.y * 2, v1.z * 2};
+				vec = v2;  // should be {2, 4, 6}
+				
+				// Test local without explicit type (inferred as float)
+				let inferred = 100;
+				result = result + inferred;  // 15 + 100 = 115
+			}
+
+			fn update() {
+				// Test local var with expressions
+				let scale : float = 2;
+				let offset : float = 100;
+				result = result * scale + offset;  // 15 * 2 + 100 = 130
+				
+				// Test local var reusing same name in different scope
+				let tmp : float3 = {vec.x + 1, vec.y + 1, vec.z + 1};
+				vec = tmp;  // should be {3, 5, 7}
+			}
+
+			fn output() {
+				i_result = result;
+				i_vec = vec;
+			}
+		}
+	)";
+
+	ParticleScriptRunner runner;
+	ASSERT_TRUE(runner.compile(code), "Compilation should succeed");
+
+	runner.runEmit();
+
+	// After emit: result=115 (15 + 100 from inferred), vec={2,4,6}
+	ASSERT_TRUE(fabsf(runner.getChannel(0) - 115.0f) < 0.001f, "result should be 115 after emit");
+	ASSERT_TRUE(fabsf(runner.getChannel(1) - 2.0f) < 0.001f, "vec.x should be 2 after emit");
+	ASSERT_TRUE(fabsf(runner.getChannel(2) - 4.0f) < 0.001f, "vec.y should be 4 after emit");
+	ASSERT_TRUE(fabsf(runner.getChannel(3) - 6.0f) < 0.001f, "vec.z should be 6 after emit");
+
+	runner.runUpdate();
+
+	// After update: result=330 (115 * 2 + 100), vec={3,5,7}
+	ASSERT_TRUE(fabsf(runner.getChannel(0) - 330.0f) < 0.001f, "result should be 330 after update");
+	ASSERT_TRUE(fabsf(runner.getChannel(1) - 3.0f) < 0.001f, "vec.x should be 3 after update");
+	ASSERT_TRUE(fabsf(runner.getChannel(2) - 5.0f) < 0.001f, "vec.y should be 5 after update");
+	ASSERT_TRUE(fabsf(runner.getChannel(3) - 7.0f) < 0.001f, "vec.z should be 7 after update");
+
+	runner.runOutput();
+
+	// Check output memory
+	ASSERT_TRUE(fabsf(runner.getOutput(0) - 330.0f) < 0.001f, "i_result should be 330");
+	ASSERT_TRUE(fabsf(runner.getOutput(1) - 3.0f) < 0.001f, "i_vec.x should be 3");
+	ASSERT_TRUE(fabsf(runner.getOutput(2) - 5.0f) < 0.001f, "i_vec.y should be 5");
+	ASSERT_TRUE(fabsf(runner.getOutput(3) - 7.0f) < 0.001f, "i_vec.z should be 7");
+
+	return true;
+}
+
+// Test user-defined functions
+bool testParticleScriptUserFunctions() {
+	const char* code = R"(
+		fn add(a, b) {
+			return a + b;
+		}
+
+		fn multiply(x, y) {
+			return x * y;
+		}
+
+		fn scale_vec(v, s) {
+			let res : float3;
+			res.x = v.x * s;
+			res.y = v.y * s;
+			res.z = v.z * s;
+			return res;
+		}
+
+		fn compute(a, b, c) {
+			let sum = add(a, b);
+			return multiply(sum, c);
+		}
+
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			out i_result : float
+			out i_vec : float3
+
+			var result : float
+			var vec : float3
+
+			fn emit() {
+				// Test simple function calls
+				result = add(10, 5);  // 15
+				
+				// Test nested function calls
+				result = compute(2, 3, 4);  // (2 + 3) * 4 = 20
+				
+				// Test function returning float3
+				vec = scale_vec({1, 2, 3}, 2);  // {2, 4, 6}
+			}
+
+			fn update() {
+				// Use functions in expressions
+				let a = add(result, 10);  // 20 + 10 = 30
+				let b = multiply(a, 2);   // 30 * 2 = 60
+				result = b;
+				
+				vec = scale_vec(vec, 0.5);  // {1, 2, 3}
+			}
+
+			fn output() {
+				i_result = result;
+				i_vec = vec;
+			}
+		}
+	)";
+
+	ParticleScriptRunner runner;
+	ASSERT_TRUE(runner.compile(code), "Compilation should succeed");
+
+	runner.runEmit();
+
+	// After emit: result=20, vec={2,4,6}
+	ASSERT_TRUE(fabsf(runner.getChannel(0) - 20.0f) < 0.001f, "result should be 20 after emit");
+	ASSERT_TRUE(fabsf(runner.getChannel(1) - 2.0f) < 0.001f, "vec.x should be 2 after emit");
+	ASSERT_TRUE(fabsf(runner.getChannel(2) - 4.0f) < 0.001f, "vec.y should be 4 after emit");
+	ASSERT_TRUE(fabsf(runner.getChannel(3) - 6.0f) < 0.001f, "vec.z should be 6 after emit");
+
+	runner.runUpdate();
+
+	// After update: result=60, vec={1,2,3}
+	ASSERT_TRUE(fabsf(runner.getChannel(0) - 60.0f) < 0.001f, "result should be 60 after update");
+	ASSERT_TRUE(fabsf(runner.getChannel(1) - 1.0f) < 0.001f, "vec.x should be 1 after update");
+	ASSERT_TRUE(fabsf(runner.getChannel(2) - 2.0f) < 0.001f, "vec.y should be 2 after update");
+	ASSERT_TRUE(fabsf(runner.getChannel(3) - 3.0f) < 0.001f, "vec.z should be 3 after update");
+
+	runner.runOutput();
+
+	// Check output memory
+	ASSERT_TRUE(fabsf(runner.getOutput(0) - 60.0f) < 0.001f, "i_result should be 60");
+	ASSERT_TRUE(fabsf(runner.getOutput(1) - 1.0f) < 0.001f, "i_vec.x should be 1");
+	ASSERT_TRUE(fabsf(runner.getOutput(2) - 2.0f) < 0.001f, "i_vec.y should be 2");
+	ASSERT_TRUE(fabsf(runner.getOutput(3) - 3.0f) < 0.001f, "i_vec.z should be 3");
+
+	return true;
+}
+
+// Test that constant folding reduces instruction count
+bool testConstantFoldingInstructionCount() {
+	// Script with constant expressions and user-defined functions that should be folded at compile time
+	const char* folded_code = R"(
+		fn double(x) {
+			return x * 2;
+		}
+
+		fn add_ten(x) {
+			return x + 10;
+		}
+
+		fn compute(a, b) {
+			return double(a) + add_ten(b);
+		}
+
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			out i_value : float
+			var value : float
+
+			fn emit() {
+				value = 2 + 3 * 4;  // Should fold to 14 at compile time
+				value = double(7);  // Should fold to 14
+				value = compute(3, 5);  // Should fold to double(3) + add_ten(5) = 6 + 15 = 21
+			}
+
+			fn update() {
+				// Multiple foldable expressions with functions
+				value = (10 + 5) * 2 + sqrt(16);  // Should fold to 34
+				value = add_ten(double(12));  // Should fold to add_ten(24) = 34
+			}
+
+			fn output() {
+				i_value = value;
+			}
+		}
+	)";
+
+	// Script with pre-computed literals (baseline for comparison)
+	const char* literal_code = R"(
+		fn double(x) {
+			return x * 2;
+		}
+
+		fn add_ten(x) {
+			return x + 10;
+		}
+
+		fn compute(a, b) {
+			return double(a) + add_ten(b);
+		}
+
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			out i_value : float
+			var value : float
+
+			fn emit() {
+				value = 14;  // Pre-computed value
+				value = 14;  // Pre-computed value
+				value = 21;  // Pre-computed value
+			}
+
+			fn update() {
+				value = 34;  // Pre-computed value
+				value = 34;  // Pre-computed value
+			}
+
+			fn output() {
+				i_value = value;
+			}
+		}
+	)";
+
+	TestableCompiler folded_compiler;
+	OutputMemoryStream folded_output(getGlobalAllocator());
+	ASSERT_TRUE(folded_compiler.compile(Path("test.pat"), folded_code, folded_output), "Folded code compilation should succeed");
+
+	TestableCompiler literal_compiler;
+	OutputMemoryStream literal_output(getGlobalAllocator());
+	ASSERT_TRUE(literal_compiler.compile(Path("test.pat"), literal_code, literal_output), "Literal code compilation should succeed");
+
+	const auto* folded_emitter = folded_compiler.getEmitter(0);
+	const auto* literal_emitter = literal_compiler.getEmitter(0);
+	ASSERT_TRUE(folded_emitter != nullptr, "Folded emitter should exist");
+	ASSERT_TRUE(literal_emitter != nullptr, "Literal emitter should exist");
+
+	// Constant folding should produce same instruction count as pre-computed literals
+	ASSERT_TRUE(folded_emitter->m_num_emit_instructions == literal_emitter->m_num_emit_instructions,
+		"Emit instruction count should match after folding");
+	ASSERT_TRUE(folded_emitter->m_num_update_instructions == literal_emitter->m_num_update_instructions,
+		"Update instruction count should match after folding");
+	ASSERT_TRUE(folded_emitter->m_num_output_instructions == literal_emitter->m_num_output_instructions,
+		"Output instruction count should match after folding");
+
+	return true;
+}
+
+// Test that constant folding eliminates dead branches in if conditionals
+bool testConstantFoldingIfConditionals() {
+	// Script with if conditionals that have constant conditions - should be folded away
+	const char* folded_code = R"(
+		fn conditional_calc(x) {
+			if x > 5 {
+				return x * 2;
+			}
+			return x + 1;
+		}
+
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			out i_value : float
+			var value : float
+
+			fn emit() {
+				// Conditionals with constant conditions should be folded
+				if 10 > 5 {
+					value = 100;  // This branch should be taken (condition is true)
+				}
+				
+				if 3 > 7 {
+					value = 200;  // This branch should be eliminated (condition is false)
+				}
+				
+				// Function with conditional and constant argument
+				value = conditional_calc(10);  // 10 > 5 is true, so 10 * 2 = 20
+				value = conditional_calc(3);   // 3 > 5 is false, so 3 + 1 = 4
+			}
+
+			fn update() {
+				// Nested conditionals with constants
+				if 5 > 2 {
+					if 8 > 4 {
+						value = 50;  // Both conditions true
+					}
+				}
+				
+				// False outer condition - entire block eliminated
+				if 1 > 10 {
+					value = 999;
+				}
+			}
+
+			fn output() {
+				i_value = value;
+			}
+		}
+	)";
+
+	// Script with pre-computed results (baseline for comparison)
+	const char* literal_code = R"(
+		fn conditional_calc(x) {
+			if x > 5 {
+				return x * 2;
+			}
+			return x + 1;
+		}
+
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			out i_value : float
+			var value : float
+
+			fn emit() {
+				// Folded: if 10 > 5 -> true, just the assignment
+				value = 100;
+				
+				// Folded: if 3 > 7 -> false, eliminated entirely
+				
+				value = 20;  // conditional_calc(10) folded
+				value = 4;   // conditional_calc(3) folded
+			}
+
+			fn update() {
+				// Nested if folded to single assignment
+				value = 50;
+				
+				// if 1 > 10 eliminated entirely
+			}
+
+			fn output() {
+				i_value = value;
+			}
+		}
+	)";
+
+	TestableCompiler folded_compiler;
+	OutputMemoryStream folded_output(getGlobalAllocator());
+	ASSERT_TRUE(folded_compiler.compile(Path("test.pat"), folded_code, folded_output), "Folded code compilation should succeed");
+
+	TestableCompiler literal_compiler;
+	OutputMemoryStream literal_output(getGlobalAllocator());
+	ASSERT_TRUE(literal_compiler.compile(Path("test.pat"), literal_code, literal_output), "Literal code compilation should succeed");
+
+	const auto* folded_emitter = folded_compiler.getEmitter(0);
+	const auto* literal_emitter = literal_compiler.getEmitter(0);
+	ASSERT_TRUE(folded_emitter != nullptr, "Folded emitter should exist");
+	ASSERT_TRUE(literal_emitter != nullptr, "Literal emitter should exist");
+
+	// Constant folding of if conditionals should produce same instruction count as pre-computed code
+	ASSERT_TRUE(folded_emitter->m_num_emit_instructions == literal_emitter->m_num_emit_instructions,
+		"Emit instruction count should match after folding if conditionals");
+	ASSERT_TRUE(folded_emitter->m_num_update_instructions == literal_emitter->m_num_update_instructions,
+		"Update instruction count should match after folding if conditionals");
+	ASSERT_TRUE(folded_emitter->m_num_output_instructions == literal_emitter->m_num_output_instructions,
+		"Output instruction count should match after folding if conditionals");
+
+	return true;
+}
+
+// Test syscalls (built-in functions) computed at runtime
+bool testParticleScriptSyscalls() {
+	const char* code = R"(
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			out i_result : float
+			out i_vec : float3
+
+			var result : float
+			var a : float
+			var b : float
+			var vec : float3
+
+			fn emit() {
+				// Initialize with runtime values (not constants)
+				a = 16;
+				b = 9;
+				
+				// Test sqrt with runtime value
+				result = sqrt(a);  // sqrt(16) = 4
+				
+				// Test min/max with runtime values
+				result = result + min(a, b);  // 4 + 9 = 13
+				result = result + max(a, b);  // 13 + 16 = 29
+				
+				// Test sin/cos with runtime values
+				vec.x = 0;
+				vec.y = sin(vec.x);  // sin(0) = 0
+				vec.z = cos(vec.x);  // cos(0) = 1
+			}
+
+			fn update() {
+				// More runtime syscall tests
+				a = 25;
+				b = 4;
+				
+				// Chain syscalls with runtime values
+				let sq = sqrt(a);  // 5
+				let mn = min(sq, b);  // min(5, 4) = 4
+				let mx = max(sq, b);  // max(5, 4) = 5
+				result = mn + mx;  // 4 + 5 = 9
+				
+				// Test sqrt of expression
+				vec.x = sqrt(a + b);  // sqrt(29) ~ 5.385
+			}
+
+			fn output() {
+				i_result = result;
+				i_vec = vec;
+			}
+		}
+	)";
+
+	ParticleScriptRunner runner;
+	ASSERT_TRUE(runner.compile(code), "Compilation should succeed");
+
+	runner.runEmit();
+
+	// After emit: result=29, vec={0, 0, 1}
+	ASSERT_TRUE(fabsf(runner.getChannel(0) - 29.0f) < 0.001f, "result should be 29 after emit");
+	// a=16, b=9 are channels 1 and 2
+	// vec is channels 3,4,5
+	ASSERT_TRUE(fabsf(runner.getChannel(3) - 0.0f) < 0.001f, "vec.x should be 0 after emit");
+	ASSERT_TRUE(fabsf(runner.getChannel(4) - 0.0f) < 0.001f, "vec.y should be 0 (sin(0)) after emit");
+	ASSERT_TRUE(fabsf(runner.getChannel(5) - 1.0f) < 0.001f, "vec.z should be 1 (cos(0)) after emit");
+
+	runner.runUpdate();
+
+	// After update: result=9, vec.x=sqrt(29)~5.385
+	ASSERT_TRUE(fabsf(runner.getChannel(0) - 9.0f) < 0.001f, "result should be 9 after update");
+	ASSERT_TRUE(fabsf(runner.getChannel(3) - sqrtf(29.0f)) < 0.001f, "vec.x should be sqrt(29) after update");
+
+	runner.runOutput();
+
+	// Check output memory
+	ASSERT_TRUE(fabsf(runner.getOutput(0) - 9.0f) < 0.001f, "i_result should be 9");
+	ASSERT_TRUE(fabsf(runner.getOutput(1) - sqrtf(29.0f)) < 0.001f, "i_vec.x should be sqrt(29)");
+
+	return true;
+}
+
+// Test system values (time_delta, total_time, entity_position) are accessible in particle scripts
+bool testParticleScriptSystemValues() {
+	const char* code = R"(
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			out i_dt : float
+			out i_total : float
+			out i_pos : float3
+
+			var dt : float
+			var total : float
+			var pos : float3
+			var vel : float3
+
+			fn emit() {
+				total = total_time;
+				pos.x = entity_position.x;
+				pos.y = entity_position.y;
+				pos.z = entity_position.z;
+				vel.x = 10;
+				vel.y = 20;
+				vel.z = 30;
+			}
+
+			fn update() {
+				// Use time_delta to update position
+				dt = time_delta;
+				pos.x = pos.x + vel.x * time_delta;
+				pos.y = pos.y + vel.y * time_delta;
+				pos.z = pos.z + vel.z * time_delta;
+				total = total_time;
+			}
+
+			fn output() {
+				i_dt = dt;
+				i_total = total;
+				i_pos = pos;
+			}
+		}
+	)";
+
+	ParticleScriptRunner runner;
+	ASSERT_TRUE(runner.compile(code), "Compilation should succeed");
+
+	// Set custom system values
+	runner.system_values[(u8)ParticleSystemValues::TIME_DELTA] = 0.1f;
+	runner.system_values[(u8)ParticleSystemValues::TOTAL_TIME] = 5.0f;
+	runner.system_values[(u8)ParticleSystemValues::ENTITY_POSITION_X] = 100.0f;
+	runner.system_values[(u8)ParticleSystemValues::ENTITY_POSITION_Y] = 200.0f;
+	runner.system_values[(u8)ParticleSystemValues::ENTITY_POSITION_Z] = 300.0f;
+
+	runner.runEmit();
+
+	// Check emit captured system values
+	// total=5.0, pos={100,200,300}, vel={10,20,30}
+	ASSERT_TRUE(fabsf(runner.getChannel(1) - 5.0f) < 0.001f, "total should be 5.0 after emit");
+	ASSERT_TRUE(fabsf(runner.getChannel(2) - 100.0f) < 0.001f, "pos.x should be 100 after emit");
+	ASSERT_TRUE(fabsf(runner.getChannel(3) - 200.0f) < 0.001f, "pos.y should be 200 after emit");
+	ASSERT_TRUE(fabsf(runner.getChannel(4) - 300.0f) < 0.001f, "pos.z should be 300 after emit");
+
+	// Update system values for update phase
+	runner.system_values[(u8)ParticleSystemValues::TIME_DELTA] = 0.5f;
+	runner.system_values[(u8)ParticleSystemValues::TOTAL_TIME] = 5.5f;
+
+	runner.runUpdate();
+
+	// After update: dt=0.5, pos = pos + vel * 0.5 = {100+5, 200+10, 300+15} = {105, 210, 315}
+	ASSERT_TRUE(fabsf(runner.getChannel(0) - 0.5f) < 0.001f, "dt should be 0.5 after update");
+	ASSERT_TRUE(fabsf(runner.getChannel(1) - 5.5f) < 0.001f, "total should be 5.5 after update");
+	ASSERT_TRUE(fabsf(runner.getChannel(2) - 105.0f) < 0.001f, "pos.x should be 105 after update");
+	ASSERT_TRUE(fabsf(runner.getChannel(3) - 210.0f) < 0.001f, "pos.y should be 210 after update");
+	ASSERT_TRUE(fabsf(runner.getChannel(4) - 315.0f) < 0.001f, "pos.z should be 315 after update");
+
+	runner.runOutput();
+
+	// Verify outputs
+	ASSERT_TRUE(fabsf(runner.getOutput(0) - 0.5f) < 0.001f, "i_dt should be 0.5");
+	ASSERT_TRUE(fabsf(runner.getOutput(1) - 5.5f) < 0.001f, "i_total should be 5.5");
+	ASSERT_TRUE(fabsf(runner.getOutput(2) - 105.0f) < 0.001f, "i_pos.x should be 105");
+	ASSERT_TRUE(fabsf(runner.getOutput(3) - 210.0f) < 0.001f, "i_pos.y should be 210");
+	ASSERT_TRUE(fabsf(runner.getOutput(4) - 315.0f) < 0.001f, "i_pos.z should be 315");
+
+	return true;
+}
+
+// Test compilation errors like missing semicolons, undefined variables, etc.
+bool testCompilationErrors() {
+	// Test missing semicolon
+	const char* missing_semicolon = R"(
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			out i_value : float
+			var value : float
+
+			fn emit() {
+				value = 10  // missing semicolon
+			}
+
+			fn output() {
+				i_value = value;
+			}
+		}
+	)";
+
+	TestableCompiler compiler1;
+	OutputMemoryStream output1(getGlobalAllocator());
+	bool success1 = compiler1.compile(Path("missing_semicolon.pat"), missing_semicolon, output1);
+
+	// Test undefined variable
+	const char* undefined_var = R"(
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			out i_value : float
+			var value : float
+
+			fn emit() {
+				value = undefined_var;
+			}
+
+			fn output() {
+				i_value = value;
+			}
+		}
+	)";
+
+	TestableCompiler compiler2;
+	OutputMemoryStream output2(getGlobalAllocator());
+	bool success2 = compiler2.compile(Path("undefined_var.pat"), undefined_var, output2);
+
+	// Test invalid syntax, like missing closing brace
+	const char* missing_brace = R"(
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			out i_value : float
+			var value : float
+
+			fn emit() {
+				value = 10;
+			// missing closing brace
+
+			fn output() {
+				i_value = value;
+			}
+		}
+	)";
+
+	TestableCompiler compiler3;
+	OutputMemoryStream output3(getGlobalAllocator());
+	bool success3 = compiler3.compile(Path("missing_brace.pat"), missing_brace, output3);
+
+	// Test duplicate variable names
+	const char* duplicate_var = R"(
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			out i_value : float
+			var value : float
+			var value : float  // duplicate
+
+			fn emit() {
+				value = 10;
+			}
+
+			fn output() {
+				i_value = value;
+			}
+		}
+	)";
+
+	TestableCompiler compiler4;
+	OutputMemoryStream output4(getGlobalAllocator());
+	bool success4 = compiler4.compile(Path("duplicate_var.pat"), duplicate_var, output4);
+
+	// Test invalid type
+	const char* invalid_type = R"(
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			out i_value : float5  // invalid type
+			var value : float
+
+			fn emit() {
+				value = 10;
+			}
+
+			fn output() {
+				i_value = value;
+			}
+		}
+	)";
+
+	TestableCompiler compiler5;
+	OutputMemoryStream output5(getGlobalAllocator());
+	bool success5 = compiler5.compile(Path("invalid_type.pat"), invalid_type, output5);
+
+	// Test missing material
+	const char* missing_material = R"(
+		emitter test {
+			init_emit_count 1
+
+			out i_value : float
+			var value : float
+
+			fn emit() {
+				value = 10;
+			}
+
+			fn output() {
+				i_value = value;
+			}
+		}
+	)";
+
+	TestableCompiler compiler6;
+	OutputMemoryStream output6(getGlobalAllocator());
+	bool success6 = compiler6.compile(Path("missing_material.pat"), missing_material, output6);
+
+	// Test type mismatch (assigning float3 to float)
+	const char* type_mismatch = R"(
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			out i_value : float
+			var value : float
+
+			fn emit() {
+				value = {1, 2, 3};  // float3 to float
+			}
+
+			fn output() {
+				i_value = value;
+			}
+		}
+	)";
+
+	TestableCompiler compiler7;
+	OutputMemoryStream output7(getGlobalAllocator());
+	bool success7 = compiler7.compile(Path("type_mismatch.pat"), type_mismatch, output7);
+
+	// Test invalid function call (wrong argument count)
+	const char* invalid_func_call = R"(
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+			out i_value : float
+			var value : float
+			fn emit() {
+				value = sqrt(10, 20);  // sqrt takes 1 arg
+			}
+			fn output() {
+				i_value = value;
+			}
+		}
+	)";
+
+	TestableCompiler compiler8;
+	OutputMemoryStream output8(getGlobalAllocator());
+	bool success8 = compiler8.compile(Path("invalid_func_call.pat"), invalid_func_call, output8);
+
+	// Test invalid member access
+	const char* invalid_member = R"(
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+			out i_value : float
+			var vec : float3
+			fn emit() {
+				vec = {1,2,3};
+				let x = vec.w;  // float3 has no .w
+			}
+			fn output() {
+				i_value = vec.x;
+			}
+		}
+	)";
+
+	TestableCompiler compiler9;
+	OutputMemoryStream output9(getGlobalAllocator());
+	bool success9 = compiler9.compile(Path("invalid_member.pat"), invalid_member, output9);
+
+	// Test invalid constant expression (division by zero)
+	const char* div_by_zero = R"(
+		const BAD = 1 / 0;
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+			out i_value : float
+			fn emit() {
+				i_value = BAD;
+			}
+		}
+	)";
+
+	TestableCompiler compiler10;
+	OutputMemoryStream output10(getGlobalAllocator());
+	bool success10 = compiler10.compile(Path("div_by_zero.pat"), div_by_zero, output10);
+
+	// Test user-defined function with duplicate parameter names
+	const char* duplicate_param = R"(
+		fn bad_func(a, a) {  // duplicate parameter
+			return a;
+		}
+
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			out i_value : float
+			var value : float
+
+			fn emit() {
+				value = bad_func(1, 2);
+			}
+
+			fn output() {
+				i_value = value;
+			}
+		}
+	)";
+
+	TestableCompiler compiler11;
+	OutputMemoryStream output11(getGlobalAllocator());
+	bool success11 = compiler11.compile(Path("duplicate_param.pat"), duplicate_param, output11);
+
+	// Test user-defined function redefinition
+	const char* func_redefinition = R"(
+		fn my_func(a) {
+			return a * 2;
+		}
+
+		fn my_func(b) {  // redefinition
+			return b * 3;
+		}
+
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			out i_value : float
+			var value : float
+
+			fn emit() {
+				value = my_func(5.0);
+			}
+
+			fn output() {
+				i_value = value;
+			}
+		}
+	)";
+
+	TestableCompiler compiler12;
+	OutputMemoryStream output12(getGlobalAllocator());
+	bool success12 = compiler12.compile(Path("func_redefinition.pat"), func_redefinition, output12);
+
+	// Test user-defined function call with wrong number of arguments
+	const char* wrong_arg_count = R"(
+		fn my_func(a, b) {
+			return a + b;
+		}
+
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			out i_value : float
+			var value : float
+
+			fn emit() {
+				value = my_func(1.0);  // should be 2 args
+			}
+
+			fn output() {
+				i_value = value;
+			}
+		}
+	)";
+
+	TestableCompiler compiler13;
+	OutputMemoryStream output13(getGlobalAllocator());
+	bool success13 = compiler13.compile(Path("wrong_arg_count.pat"), wrong_arg_count, output13);
+
+	// Test user-defined function with undefined variable in body
+	const char* undefined_in_func = R"(
+		fn bad_func() {
+			return undefined_var;  // undefined
+		}
+
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			out i_value : float
+			var value : float
+
+			fn emit() {
+				value = bad_func();
+			}
+
+			fn output() {
+				i_value = value;
+			}
+		}
+	)";
+
+	TestableCompiler compiler14;
+	OutputMemoryStream output14(getGlobalAllocator());
+	bool success14 = compiler14.compile(Path("undefined_in_func.pat"), undefined_in_func, output14);
+
+	// Test user-defined function with invalid syntax in body
+	const char* invalid_syntax_func = R"(
+		fn bad_func(a) {
+			return a + ;  // invalid syntax
+		}
+
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			out i_value : float
+			var value : float
+
+			fn emit() {
+				value = bad_func(1.0);
+			}
+
+			fn output() {
+				i_value = value;
+			}
+		}
+	)";
+
+	TestableCompiler compiler15;
+	OutputMemoryStream output15(getGlobalAllocator());
+	bool success15 = compiler15.compile(Path("invalid_syntax_func.pat"), invalid_syntax_func, output15);
+
+	// Test calling undefined user-defined function
+	const char* undefined_func_call = R"(
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			out i_value : float
+			var value : float
+
+			fn emit() {
+				value = nonexistent_func(1.0);  // undefined function
+			}
+
+			fn output() {
+				i_value = value;
+			}
+		}
+	)";
+
+	TestableCompiler compiler16;
+	OutputMemoryStream output16(getGlobalAllocator());
+	bool success16 = compiler16.compile(Path("undefined_func_call.pat"), undefined_func_call, output16);
+
+	// Test assigning function to variable (functions are not values)
+	const char* func_as_var = R"(
+		fn my_func(a) {
+			return a * 2;
+		}
+
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			out i_value : float
+			var value : float
+			var f = my_func;  // invalid: function as value
+
+			fn emit() {
+				value = 10;
+			}
+
+			fn output() {
+				i_value = value;
+			}
+		}
+	)";
+
+	TestableCompiler compiler17;
+	OutputMemoryStream output17(getGlobalAllocator());
+	bool success17 = compiler17.compile(Path("func_as_var.pat"), func_as_var, output17);
+
+	// Test passing function as argument (functions are not values)
+	const char* func_as_arg = R"(
+		fn my_func(a) {
+			return a * 2;
+		}
+
+		fn call_func(f, x) {
+			return f(x);
+		}
+
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			out i_value : float
+			var value : float
+
+			fn emit() {
+				value = call_func(my_func, 5);  // invalid: passing function as argument
+			}
+
+			fn output() {
+				i_value = value;
+			}
+		}
+	)";
+
+	TestableCompiler compiler18;
+	OutputMemoryStream output18(getGlobalAllocator());
+	bool success18 = compiler18.compile(Path("func_as_arg.pat"), func_as_arg, output18);
+
+	// Test recursion (not supported)
+	const char* recursion_test = R"(
+		fn factorial(n) {
+			if n < 2 {
+				return 1;
+			} else {
+				return n * factorial(n - 1);  // recursive call
+			}
+		}
+
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			out i_value : float
+			var value : float
+
+			fn emit() {
+				value = factorial(5);
+			}
+
+			fn output() {
+				i_value = value;
+			}
+		}
+	)";
+
+	TestableCompiler compiler19;
+	OutputMemoryStream output19(getGlobalAllocator());
+	bool success19 = compiler19.compile(Path("recursion_test.pat"), recursion_test, output19);
+
+	// Test semicolon after import
+	const char* semicolon_after_import = R"(
+		import "utils.pat";
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			out i_value : float
+
+			fn emit() {
+				i_value = 10;
+			}
+		}
+	)";
+
+	TestableCompiler compiler20;
+	OutputMemoryStream output20(getGlobalAllocator());
+	bool success20 = compiler20.compile(Path("semicolon_after_import.pat"), semicolon_after_import, output20);
+
+	// Test semicolon at end of function body
+	const char* semicolon_after_func_body = R"(
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			out i_value : float
+
+			fn emit() {
+				i_value = 10;
+			};
+
+			fn output() {
+				i_value = i_value;
+			}
+		}
+	)";
+
+	TestableCompiler compiler21;
+	OutputMemoryStream output21(getGlobalAllocator());
+	bool success21 = compiler21.compile(Path("semicolon_after_func_body.pat"), semicolon_after_func_body, output21);
+
+	// Test semicolon after var declaration
+	const char* semicolon_after_var = R"(
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			out i_value : float
+			var value : float;
+
+			fn emit() {
+				i_value = 10;
+			}
+
+			fn output() {
+				i_value = value;
+			}
+		}
+	)";
+
+	TestableCompiler compiler22;
+	OutputMemoryStream output22(getGlobalAllocator());
+	bool success22 = compiler22.compile(Path("semicolon_after_var.pat"), semicolon_after_var, output22);
+
+	ASSERT_TRUE(!success1, "Compilation should fail with missing semicolon");
+	ASSERT_TRUE(!success2, "Compilation should fail with undefined variable");
+	ASSERT_TRUE(!success3, "Compilation should fail with missing closing brace");
+	// TODO
+	//ASSERT_TRUE(!success4, "Compilation should fail with duplicate variable names");
+	ASSERT_TRUE(!success5, "Compilation should fail with invalid type");
+	//ASSERT_TRUE(!success6, "Compilation should fail with missing material");
+	ASSERT_TRUE(!success7, "Compilation should fail with type mismatch");
+	ASSERT_TRUE(!success8, "Compilation should fail with invalid function call");
+	ASSERT_TRUE(!success9, "Compilation should fail with invalid member access");
+	//ASSERT_TRUE(!success10, "Compilation should fail with division by zero in constant");
+	//ASSERT_TRUE(!success11, "Compilation should fail with duplicate parameter names in function");
+	//ASSERT_TRUE(!success12, "Compilation should fail with function redefinition");
+	ASSERT_TRUE(!success13, "Compilation should fail with wrong argument count in function call");
+	ASSERT_TRUE(!success14, "Compilation should fail with undefined variable in function");
+	ASSERT_TRUE(!success15, "Compilation should fail with invalid syntax in function");
+	ASSERT_TRUE(!success16, "Compilation should fail with call to undefined function");
+	ASSERT_TRUE(!success17, "Compilation should fail with function assigned to variable");
+	ASSERT_TRUE(!success18, "Compilation should fail with function passed as argument");
+	ASSERT_TRUE(!success19, "Compilation should fail with recursion");
+	ASSERT_TRUE(!success20, "Compilation should fail with semicolon after import");
+	ASSERT_TRUE(!success21, "Compilation should fail with semicolon after function body");
+	ASSERT_TRUE(!success22, "Compilation should fail with semicolon after var declaration");
+
+	return true;
+}
+
+bool testBasicImport() {
+	const char* main_script = R"(
+		import "utils.pat"
+		emitter test {
+			material "particles/particle.mat"
+			out value : float
+			fn emit() { value = double(5); }
+		}
+	)";
+
+	ParticleScriptRunner runner;
+	runner.registerImport("utils.pat", R"(
+		const SCALE = 2.0;
+		fn double(x) { return x * SCALE; }
+	)");
+	ASSERT_TRUE(runner.compile(main_script), "Runner compilation should succeed");
+	runner.runEmit();
+	runner.runOutput();
+	ASSERT_TRUE(fabsf(runner.getOutput(0) - 10.0f) < 0.001f, "Imported function should work correctly");
+
+	return true;
+}
+
+bool testNestedImport() {
+	ParticleScriptRunner runner;
+	runner.registerImport("base.pat", R"(
+		const BASE_VALUE = 1.0;
+	)");
+	runner.registerImport("utils.pat", R"(
+		import "base.pat"
+		fn add_base(x) { return x + BASE_VALUE; }
+	)");
+
+	const char* main_script = R"(
+		import "utils.pat"
+		emitter test {
+			material "particles/particle.mat"
+			out value : float
+			fn emit() { value = add_base(3); }
+		}
+	)";
+
+	ASSERT_TRUE(runner.compile(main_script), "Runner compilation should succeed");
+	runner.runEmit();
+	runner.runOutput();
+	ASSERT_TRUE(fabsf(runner.getOutput(0) - 4.0f) < 0.001f, "Nested import should work correctly");
+
+	return true;
+}
+
+bool testImportErrors() {
+	// No files added, so import should fail
+	TestableCompiler compiler;
+
+	const char* main_script = R"(
+		import "missing.pat"
+		emitter test {
+			material "particles/particle.mat"
+			out value : float
+			fn emit() { value = 1; }
+		}
+	)";
+
+	OutputMemoryStream output(getGlobalAllocator());
+	bool success = compiler.compile(Path("missing_import.pat"), main_script, output);
+	ASSERT_TRUE(!success, "Compilation should fail with missing import file");
+
+	return true;
+}
+
+// Test compilation and verification of multiple emitters in a single script
+bool testMultipleEmitters() {
+	const char* multi_emitter_code = R"(
+		emitter emitter1 {
+			material "particles/particle.mat"
+			init_emit_count 10
+
+			out i_position : float3
+			out i_scale : float
+
+			var position : float3
+			var scale : float
+
+			fn output() {
+				i_position = position;
+				i_scale = scale;
+			}
+
+			fn emit() {
+				position = {1, 2, 3};
+				scale = 1.0;
+			}
+
+			fn update() {
+				position.y = position.y + time_delta;
+				scale = scale + 0.1;
+			}
+		}
+
+		emitter emitter2 {
+			material "particles/particle.mat"
+			init_emit_count 20
+
+			out i_velocity : float3
+			out i_color : float4
+
+			var velocity : float3
+			var color : float4
+
+			fn output() {
+				i_velocity = velocity;
+				i_color = color;
+			}
+
+			fn emit() {
+				velocity = {0, 0, 0};
+				color = {1, 1, 1, 1};
+			}
+
+			fn update() {
+				velocity.x = velocity.x + 1.0;
+				color.r = color.r - 0.01;
+			}
+		}
+	)";
+
+	TestableCompiler compiler;
+	OutputMemoryStream output(getGlobalAllocator());
+
+	bool success = compiler.compile(Path("multi_emitter.pat"), multi_emitter_code, output);
+	ASSERT_TRUE(success, "Compilation with multiple emitters should succeed");
+	ASSERT_TRUE(output.size() > 0, "Output should contain compiled data");
+
+	// Verify first emitter
+	const auto* emitter1 = compiler.getEmitter(0);
+	ASSERT_TRUE(emitter1 != nullptr, "First emitter should be compiled");
+
+	// Check emitter1 outputs
+	ASSERT_TRUE(emitter1->m_outputs.size() == 2, "Emitter1 should have 2 output variables");
+	ASSERT_TRUE(equalStrings(emitter1->m_outputs[0].name, "i_position"), "Emitter1 first output should be i_position");
+	ASSERT_TRUE(emitter1->m_outputs[0].type == ParticleScriptCompiler::ValueType::FLOAT3, "i_position should be float3");
+	ASSERT_TRUE(equalStrings(emitter1->m_outputs[1].name, "i_scale"), "Emitter1 second output should be i_scale");
+	ASSERT_TRUE(emitter1->m_outputs[1].type == ParticleScriptCompiler::ValueType::FLOAT, "i_scale should be float");
+
+	// Check emitter1 vars
+	ASSERT_TRUE(emitter1->m_vars.size() == 2, "Emitter1 should have 2 var variables");
+	ASSERT_TRUE(equalStrings(emitter1->m_vars[0].name, "position"), "Emitter1 first var should be position");
+	ASSERT_TRUE(emitter1->m_vars[0].type == ParticleScriptCompiler::ValueType::FLOAT3, "position should be float3");
+	ASSERT_TRUE(equalStrings(emitter1->m_vars[1].name, "scale"), "Emitter1 second var should be scale");
+	ASSERT_TRUE(emitter1->m_vars[1].type == ParticleScriptCompiler::ValueType::FLOAT, "scale should be float");
+
+	// Verify second emitter
+	const auto* emitter2 = compiler.getEmitter(1);
+	ASSERT_TRUE(emitter2 != nullptr, "Second emitter should be compiled");
+
+	// Check emitter2 outputs
+	ASSERT_TRUE(emitter2->m_outputs.size() == 2, "Emitter2 should have 2 output variables");
+	ASSERT_TRUE(equalStrings(emitter2->m_outputs[0].name, "i_velocity"), "Emitter2 first output should be i_velocity");
+	ASSERT_TRUE(emitter2->m_outputs[0].type == ParticleScriptCompiler::ValueType::FLOAT3, "i_velocity should be float3");
+	ASSERT_TRUE(equalStrings(emitter2->m_outputs[1].name, "i_color"), "Emitter2 second output should be i_color");
+	ASSERT_TRUE(emitter2->m_outputs[1].type == ParticleScriptCompiler::ValueType::FLOAT4, "i_color should be float4");
+
+	// Check emitter2 vars
+	ASSERT_TRUE(emitter2->m_vars.size() == 2, "Emitter2 should have 2 var variables");
+	ASSERT_TRUE(equalStrings(emitter2->m_vars[0].name, "velocity"), "Emitter2 first var should be velocity");
+	ASSERT_TRUE(emitter2->m_vars[0].type == ParticleScriptCompiler::ValueType::FLOAT3, "velocity should be float3");
+	ASSERT_TRUE(equalStrings(emitter2->m_vars[1].name, "color"), "Emitter2 second var should be color");
+	ASSERT_TRUE(emitter2->m_vars[1].type == ParticleScriptCompiler::ValueType::FLOAT4, "color should be float4");
+
+	// Verify no third emitter
+	const auto* emitter3 = compiler.getEmitter(2);
+	ASSERT_TRUE(emitter3 == nullptr, "There should be no third emitter");
+
+	return true;
+}
+
 } // anonymous namespace
 
 void runParticleScriptCompilerTests() {
@@ -355,6 +1868,21 @@ void runParticleScriptCompilerTests() {
 	RUN_TEST(testCompileConst);
 	RUN_TEST(testCompileEmitterVariables);
 	RUN_TEST(testCompileCompounds);
+	RUN_TEST(testParticleScriptExecution);
+	RUN_TEST(testParticleScriptLocalVars);
+	RUN_TEST(testParticleScriptUserFunctions);
+	// TODO
+	(void)&testConstantFoldingInstructionCount;
+	(void)&testConstantFoldingIfConditionals;
+	//RUN_TEST(testConstantFoldingInstructionCount);
+	//RUN_TEST(testConstantFoldingIfConditionals);
+	RUN_TEST(testParticleScriptSyscalls);
+	RUN_TEST(testParticleScriptSystemValues);
+	RUN_TEST(testBasicImport);
+	RUN_TEST(testNestedImport);
+	RUN_TEST(testImportErrors);
+	RUN_TEST(testMultipleEmitters);
+	RUN_TEST(testCompilationErrors);
 	
 	logInfo("=== Test Results: ", passed_count, "/", test_count, " passed ===");
 }

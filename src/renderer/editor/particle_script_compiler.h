@@ -265,6 +265,7 @@ struct ParticleScriptCompiler {
 		StringView name;
 		Array<StringView> args;
 		BlockNode* block = nullptr;
+		bool is_inlining = false;
 	};
 
 	struct Variable {
@@ -315,6 +316,7 @@ struct ParticleScriptCompiler {
 		u32 m_max_ribbons = 0;
 		u32 m_max_ribbon_length = 0;
 		u32 m_init_ribbons_count = 0;
+		u32 m_tube_segments = 0;
 	};
 
 	struct CompileContext {
@@ -2366,7 +2368,11 @@ const char* toString(Token::Type type) {
 			}
 			case Node::FUNCTION_CALL: {
 				auto* n = (FunctionCallNode*)node;
-				const Function& fn = m_functions[n->function_index];
+				Function& fn = m_functions[n->function_index];
+				if (fn.is_inlining) {
+					error(n->token.value, fn.name, " is called recursively. Recursion is not supported.");
+					return -1;
+				}
 				IRContext::Arg args[8];
 				if ((u32)n->args.size() > lengthOf(args)) {
 					error(n->token.value, "Too many arguments.");
@@ -2383,7 +2389,10 @@ const char* toString(Token::Type type) {
 				}
 				Span<IRContext::Arg> prev_args = ctx.args;
 				ctx.args = { args, &args[n->args.size()] };
+				fn.is_inlining = true;
 				i32 ret = compileIR(ctx, fn.block);
+				if (ret < 0) return ret;
+				fn.is_inlining = false;
 				ctx.args = prev_args;
 				IRValue ret_vals[4];
 				for (i32 i = 0; i < ret; ++i) {
@@ -2743,6 +2752,7 @@ const char* toString(Token::Type type) {
 					else if (equalStrings(token.value, "max_ribbons")) emitter.m_max_ribbons = consumeU32();
 					else if (equalStrings(token.value, "max_ribbon_length")) emitter.m_max_ribbon_length = consumeU32();
 					else if (equalStrings(token.value, "init_ribbons_count")) emitter.m_init_ribbons_count = consumeU32();
+					else if (equalStrings(token.value, "tube_segments")) emitter.m_tube_segments = consumeU32();
 					else {
 						error(token.value, "Unexpected identifier ", token.value);
 						return;
@@ -2843,6 +2853,7 @@ const char* toString(Token::Type type) {
 			output.write(emitter.m_max_ribbons);
 			output.write(emitter.m_max_ribbon_length);
 			output.write(emitter.m_init_ribbons_count);
+			output.write(emitter.m_tube_segments);
 			output.write(emitter.m_emit_on_move);
 		}
 		output.write(m_globals.size());

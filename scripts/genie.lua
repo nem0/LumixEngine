@@ -1085,7 +1085,7 @@ if build_tests then
 		defaultConfigurations()
 		includedirs { "../src", "../src/tests" }
 		files { "../src/tests/**.cpp", "../src/tests/**.h" }
-		
+	
 		if split_projects then
 			links { "core", "engine" }
 			if hasPlugin "renderer" then
@@ -1094,6 +1094,12 @@ if build_tests then
 		else
 			links { "engine_merged" }
 		end
+
+		linkLib "freetype"
+		if use_basisu then linkLib "basisu" end
+		if hasPlugin "physics" then linkPhysX() end
+		if hasPlugin "lua" then linkLib "Luau" end
+
 		libdirs { "../external/pix/bin/x64" }
 		
 		debugdir "../data"
