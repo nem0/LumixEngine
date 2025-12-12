@@ -85,6 +85,13 @@ struct ParticleScriptRunner {
 	u32 emit_offset = 0;
 	u32 output_offset = 0;
 	u32 channels_count = 0;
+	u32 num_vars = 0;
+	u32 num_update_registers = 0;
+	u32 num_emit_registers = 0;
+	u32 num_output_registers = 0;
+	u32 num_update_instructions = 0;
+	u32 num_emit_instructions = 0;
+	u32 num_output_instructions = 0;
 	float channel_data[16][16] = {};
 	ParticleSystem::Channel channels[16] = {};
 	float system_values[16] = {};
@@ -131,9 +138,13 @@ struct ParticleScriptRunner {
 		blob.read(output_offset);
 		blob.read(channels_count);
 
-		// Skip register and instruction counts
-		u32 dummy;
-		for (int i = 0; i < 7; ++i) blob.read(dummy);
+		blob.read(num_vars);
+		blob.read(num_update_registers);
+		blob.read(num_emit_registers);
+		blob.read(num_output_registers);
+		blob.read(num_update_instructions);
+		blob.read(num_emit_instructions);
+		blob.read(num_output_instructions);
 
 		for (u32 i = 0; i < channels_count; ++i) {
 			channels[i].data = channel_data[i];
@@ -839,11 +850,18 @@ bool testConstantFoldingIfConditionals() {
 	const char* folded_code = R"(
 		fn conditional_calc(x) {
 			let res : float;
+			let tmp : float;
 			if x > 5 {
-				res = x * 2;
+				tmp = x * 2;
 			}
 			else {
-				res = x + 1;
+				tmp = x + 1;
+			}
+			if tmp > 10 {
+				res = tmp + 7;
+			}
+			else {
+				res = tmp * 3;
 			}
 			return res;
 		}
@@ -894,11 +912,18 @@ bool testConstantFoldingIfConditionals() {
 	const char* literal_code = R"(
 		fn conditional_calc(x) {
 			let res : float;
+			let tmp : float;
 			if x > 5 {
-				res = x * 2;
+				tmp = x * 2;
 			}
 			else {
-				res = x + 1;
+				tmp = x + 1;
+			}
+			if tmp > 10 {
+				res = tmp + 7;
+			}
+			else {
+				res = tmp * 3;
 			}
 			return res;
 		}
@@ -933,18 +958,24 @@ bool testConstantFoldingIfConditionals() {
 		}
 	)";
 
-	TestableCompiler folded_compiler;
-	OutputMemoryStream folded_output(getGlobalAllocator());
-	ASSERT_TRUE(folded_compiler.compile(Path("test.pat"), folded_code, folded_output), "Folded code compilation should succeed");
+	ParticleScriptRunner folded_runner;
+	ASSERT_TRUE(folded_runner.compile(folded_code), "Folded runner compilation should succeed");
+	folded_runner.runEmit();
+	folded_runner.runUpdate();
+	folded_runner.runOutput();
 
-	TestableCompiler literal_compiler;
-	OutputMemoryStream literal_output(getGlobalAllocator());
-	ASSERT_TRUE(literal_compiler.compile(Path("test.pat"), literal_code, literal_output), "Literal code compilation should succeed");
+	ParticleScriptRunner literal_runner;
+	ASSERT_TRUE(literal_runner.compile(literal_code), "Literal runner compilation should succeed");
+	literal_runner.runEmit();
+	literal_runner.runUpdate();
+	literal_runner.runOutput();
 
-	const auto* folded_emitter = folded_compiler.getEmitter(0);
-	const auto* literal_emitter = literal_compiler.getEmitter(0);
-	ASSERT_TRUE(folded_emitter != nullptr, "Folded emitter should exist");
-	ASSERT_TRUE(literal_emitter != nullptr, "Literal emitter should exist");
+	// Check that the output value is the same
+	ASSERT_TRUE(fabsf(folded_runner.getChannel(0) - literal_runner.getChannel(0)) < 0.001f,
+		"Runtime output value should match after constant folding");
+
+	const auto* folded_emitter = folded_runner.compiler.getEmitter(0);
+	const auto* literal_emitter = literal_runner.compiler.getEmitter(0);
 
 	// Constant folding of if conditionals should produce same instruction count as pre-computed code
 	ASSERT_TRUE(folded_emitter->m_num_emit_instructions == literal_emitter->m_num_emit_instructions,
@@ -953,7 +984,6 @@ bool testConstantFoldingIfConditionals() {
 		"Update instruction count should match after folding if conditionals");
 	ASSERT_TRUE(folded_emitter->m_num_output_instructions == literal_emitter->m_num_output_instructions,
 		"Output instruction count should match after folding if conditionals");
-
 	return true;
 }
 
@@ -1129,565 +1159,302 @@ bool testParticleScriptSystemValues() {
 
 // Test compilation errors like missing semicolons, undefined variables, etc.
 bool testCompilationErrors() {
-	// Test missing semicolon
-	const char* missing_semicolon = R"(
-		emitter test {
-			material "particles/particle.mat"
-			init_emit_count 1
-
-			out i_value : float
-			var value : float
-
-			fn emit() {
-				value = 10  // missing semicolon
-			}
-
-			fn output() {
-				i_value = value;
-			}
+	bool all_tests_passed = true;
+	OutputMemoryStream output(getGlobalAllocator());
+	auto expectCompilationFailure = [&output, &all_tests_passed](const char* error_msg, const char* src) {
+		TestableCompiler compiler;
+		compiler.m_suppress_logging = true;
+		if (compiler.compile(Path("test.pat"), src, output)) {
+			logError("TEST FAILED: Compilation should fail with ", error_msg);
+			all_tests_passed = false;
 		}
-	)";
+	};
 
-	TestableCompiler compiler1;
-	OutputMemoryStream output1(getGlobalAllocator());
-	bool success1 = compiler1.compile(Path("missing_semicolon.pat"), missing_semicolon, output1);
+	expectCompilationFailure(
+		"missing semicolon",
+		R"(
+			emitter test {
+				material "particles/particle.mat"
+				var value : float
 
-	// Test undefined variable
-	const char* undefined_var = R"(
-		emitter test {
-			material "particles/particle.mat"
-			init_emit_count 1
+				fn emit() {
+					value = 10  // missing semicolon
+				}
+			}
+		)"
+	);
 
-			out i_value : float
-			var value : float
+	expectCompilationFailure(
+		"undefined variable",
+		R"(
+			emitter test {
+				material "particles/particle.mat"
+				var value : float
 
-			fn emit() {
-				value = undefined_var;
+				fn emit() {
+					value = undefined_var;
+				}
+			}
+		)"
+	);
+
+	expectCompilationFailure(
+		"missing closing brace",
+		R"(
+			emitter test {
+				material "particles/particle.mat"
+				init_emit_count 1
+
+				out i_value : float
+				var value : float
+
+				fn emit() {
+					value = 10;
+				// missing closing brace
+
+				fn output() {
+					i_value = value;
+				}
+			}
+		)"
+	);
+
+	expectCompilationFailure(
+		"duplicate variable names",
+		R"(
+			emitter test {
+				material "particles/particle.mat"
+				init_emit_count 1
+
+				var value : float
+				var value : float  // duplicate
+			}
+		)"
+	);
+
+	expectCompilationFailure("invalid type",
+		R"(
+			emitter test {
+				material "particles/particle.mat"
+				out i_value : float5  // invalid type
+			}
+		)"
+	);
+
+	expectCompilationFailure("missing material",
+		R"(
+			emitter test {
+				init_emit_count 1
+
+				out i_value : float
+				var value : float
+
+				fn emit() {
+					value = 10;
+				}
+
+				fn output() {
+					i_value = value;
+				}
+			}
+		)"
+	);
+
+	expectCompilationFailure("type mismatch",
+		R"(
+			emitter test {
+				material "particles/particle.mat"
+				var value : float
+
+				fn emit() {
+					value = {1, 2, 3};  // float3 to float
+				}
+			}
+		)"
+	);
+
+	expectCompilationFailure("invalid_func_call.pat", 
+		R"(
+			emitter test {
+				material "particles/particle.mat"
+				var value : float
+				fn emit() {
+					value = sqrt(10, 20);  // sqrt takes 1 arg
+				}
+			}
+		)"
+	);
+
+	expectCompilationFailure("invalid member access",
+		R"(
+			emitter test {
+				material "particles/particle.mat"
+				var vec : float3
+				fn emit() {
+					vec = {1,2,3};
+					let x = vec.w;  // float3 has no .w
+				}
+			}
+		)"
+	);
+
+	expectCompilationFailure("division by zero in constant", "const BAD = 1 / 0;");
+
+	expectCompilationFailure("duplicate parameter names in function",
+		R"(
+			fn bad_func(a, a) {  // duplicate parameter
+				return a;
+			}
+		)"
+	);
+
+	expectCompilationFailure("function redefinition",
+		R"(
+			fn my_func(a) {
+				return a * 2;
 			}
 
-			fn output() {
-				i_value = value;
+			fn my_func(b) {  // redefinition
+				return b * 3;
 			}
-		}
-	)";
+		)"
+	);
 
-	TestableCompiler compiler2;
-	OutputMemoryStream output2(getGlobalAllocator());
-	bool success2 = compiler2.compile(Path("undefined_var.pat"), undefined_var, output2);
-
-	// Test invalid syntax, like missing closing brace
-	const char* missing_brace = R"(
-		emitter test {
-			material "particles/particle.mat"
-			init_emit_count 1
-
-			out i_value : float
-			var value : float
-
-			fn emit() {
-				value = 10;
-			// missing closing brace
-
-			fn output() {
-				i_value = value;
-			}
-		}
-	)";
-
-	TestableCompiler compiler3;
-	OutputMemoryStream output3(getGlobalAllocator());
-	bool success3 = compiler3.compile(Path("missing_brace.pat"), missing_brace, output3);
-
-	// Test duplicate variable names
-	const char* duplicate_var = R"(
-		emitter test {
-			material "particles/particle.mat"
-			init_emit_count 1
-
-			out i_value : float
-			var value : float
-			var value : float  // duplicate
-
-			fn emit() {
-				value = 10;
+	expectCompilationFailure("wrong argument count in function call",
+		R"(
+			fn my_func(a, b) {
+				return a + b;
 			}
 
-			fn output() {
-				i_value = value;
+			emitter test {
+				material "particles/particle.mat"
+				var value : float
+
+				fn emit() {
+					value = my_func(1.0);  // should be 2 args
+				}
 			}
-		}
-	)";
+		)"
+	);
 
-	TestableCompiler compiler4;
-	OutputMemoryStream output4(getGlobalAllocator());
-	bool success4 = compiler4.compile(Path("duplicate_var.pat"), duplicate_var, output4);
-
-	// Test invalid type
-	const char* invalid_type = R"(
-		emitter test {
-			material "particles/particle.mat"
-			init_emit_count 1
-
-			out i_value : float5  // invalid type
-			var value : float
-
-			fn emit() {
-				value = 10;
+	expectCompilationFailure("undefined variable in function",
+		R"(
+			fn bad_func() {
+				return undefined_var;  // undefined
 			}
+		)"
+	);
 
-			fn output() {
-				i_value = value;
+	expectCompilationFailure("invalid syntax in function",
+		R"(
+			fn bad_func(a) {
+				return a + ;  // invalid syntax
 			}
-		}
-	)";
+		)"
+	);
 
-	TestableCompiler compiler5;
-	OutputMemoryStream output5(getGlobalAllocator());
-	bool success5 = compiler5.compile(Path("invalid_type.pat"), invalid_type, output5);
+	expectCompilationFailure("call to undefined function",
+		R"(
+			emitter test {
+				material "particles/particle.mat"
+				var value : float
 
-	// Test missing material
-	const char* missing_material = R"(
-		emitter test {
-			init_emit_count 1
-
-			out i_value : float
-			var value : float
-
-			fn emit() {
-				value = 10;
+				fn emit() {
+					value = nonexistent_func(1.0);  // undefined function
+				}
 			}
+		)"
+	);
 
-			fn output() {
-				i_value = value;
-			}
-		}
-	)";
-
-	TestableCompiler compiler6;
-	OutputMemoryStream output6(getGlobalAllocator());
-	bool success6 = compiler6.compile(Path("missing_material.pat"), missing_material, output6);
-
-	// Test type mismatch (assigning float3 to float)
-	const char* type_mismatch = R"(
-		emitter test {
-			material "particles/particle.mat"
-			init_emit_count 1
-
-			out i_value : float
-			var value : float
-
-			fn emit() {
-				value = {1, 2, 3};  // float3 to float
+	expectCompilationFailure("function assigned to variable",
+		R"(
+			fn my_func(a) {
+				return a * 2;
 			}
 
-			fn output() {
-				i_value = value;
+			emitter test {
+				material "particles/particle.mat"
+				var value : float
+
+				fn emit() {
+					let f = my_func;
+					value = 10;
+				}
 			}
-		}
-	)";
+		)"
+	);
 
-	TestableCompiler compiler7;
-	OutputMemoryStream output7(getGlobalAllocator());
-	bool success7 = compiler7.compile(Path("type_mismatch.pat"), type_mismatch, output7);
-
-	// Test invalid function call (wrong argument count)
-	const char* invalid_func_call = R"(
-		emitter test {
-			material "particles/particle.mat"
-			init_emit_count 1
-			out i_value : float
-			var value : float
-			fn emit() {
-				value = sqrt(10, 20);  // sqrt takes 1 arg
-			}
-			fn output() {
-				i_value = value;
-			}
-		}
-	)";
-
-	TestableCompiler compiler8;
-	OutputMemoryStream output8(getGlobalAllocator());
-	bool success8 = compiler8.compile(Path("invalid_func_call.pat"), invalid_func_call, output8);
-
-	// Test invalid member access
-	const char* invalid_member = R"(
-		emitter test {
-			material "particles/particle.mat"
-			init_emit_count 1
-			out i_value : float
-			var vec : float3
-			fn emit() {
-				vec = {1,2,3};
-				let x = vec.w;  // float3 has no .w
-			}
-			fn output() {
-				i_value = vec.x;
-			}
-		}
-	)";
-
-	TestableCompiler compiler9;
-	OutputMemoryStream output9(getGlobalAllocator());
-	bool success9 = compiler9.compile(Path("invalid_member.pat"), invalid_member, output9);
-
-	// Test invalid constant expression (division by zero)
-	const char* div_by_zero = R"(
-		const BAD = 1 / 0;
-		emitter test {
-			material "particles/particle.mat"
-			init_emit_count 1
-			out i_value : float
-			fn emit() {
-				i_value = BAD;
-			}
-		}
-	)";
-
-	TestableCompiler compiler10;
-	OutputMemoryStream output10(getGlobalAllocator());
-	bool success10 = compiler10.compile(Path("div_by_zero.pat"), div_by_zero, output10);
-
-	// Test user-defined function with duplicate parameter names
-	const char* duplicate_param = R"(
-		fn bad_func(a, a) {  // duplicate parameter
-			return a;
-		}
-
-		emitter test {
-			material "particles/particle.mat"
-			init_emit_count 1
-
-			out i_value : float
-			var value : float
-
-			fn emit() {
-				value = bad_func(1, 2);
+	expectCompilationFailure("function passed as argument",
+		R"(
+			fn my_func(a) {
+				return a * 2;
 			}
 
-			fn output() {
-				i_value = value;
-			}
-		}
-	)";
-
-	TestableCompiler compiler11;
-	OutputMemoryStream output11(getGlobalAllocator());
-	bool success11 = compiler11.compile(Path("duplicate_param.pat"), duplicate_param, output11);
-
-	// Test user-defined function redefinition
-	const char* func_redefinition = R"(
-		fn my_func(a) {
-			return a * 2;
-		}
-
-		fn my_func(b) {  // redefinition
-			return b * 3;
-		}
-
-		emitter test {
-			material "particles/particle.mat"
-			init_emit_count 1
-
-			out i_value : float
-			var value : float
-
-			fn emit() {
-				value = my_func(5.0);
+			fn call_func(f, x) {
+				return f(x);
 			}
 
-			fn output() {
-				i_value = value;
+			emitter test {
+				material "particles/particle.mat"
+				var value : float
+
+				fn emit() {
+					value = call_func(my_func, 5);  // invalid: passing function as argument
+				}
 			}
-		}
-	)";
+		)"
+	);
 
-	TestableCompiler compiler12;
-	OutputMemoryStream output12(getGlobalAllocator());
-	bool success12 = compiler12.compile(Path("func_redefinition.pat"), func_redefinition, output12);
-
-	// Test user-defined function call with wrong number of arguments
-	const char* wrong_arg_count = R"(
-		fn my_func(a, b) {
-			return a + b;
-		}
-
-		emitter test {
-			material "particles/particle.mat"
-			init_emit_count 1
-
-			out i_value : float
-			var value : float
-
-			fn emit() {
-				value = my_func(1.0);  // should be 2 args
+	expectCompilationFailure("recursion",
+		R"(
+			fn factorial(n) {
+				if n < 2 {
+					return 1;
+				} else {
+					return n * factorial(n - 1);  // recursive call
+				}
 			}
 
-			fn output() {
-				i_value = value;
+			emitter test {
+				material "particles/particle.mat"
+				var value : float
+
+				fn emit() {
+					value = factorial(5);
+				}
 			}
-		}
-	)";
+		)"
+	);
 
-	TestableCompiler compiler13;
-	OutputMemoryStream output13(getGlobalAllocator());
-	bool success13 = compiler13.compile(Path("wrong_arg_count.pat"), wrong_arg_count, output13);
-
-	// Test user-defined function with undefined variable in body
-	const char* undefined_in_func = R"(
-		fn bad_func() {
-			return undefined_var;  // undefined
-		}
-
-		emitter test {
-			material "particles/particle.mat"
-			init_emit_count 1
-
-			out i_value : float
-			var value : float
-
-			fn emit() {
-				value = bad_func();
+	expectCompilationFailure("semicolon after import",
+		R"(
+			import "utils.pat";
+			emitter test {
+				material "particles/particle.mat"
 			}
+		)"
+	);
 
-			fn output() {
-				i_value = value;
+	expectCompilationFailure("semicolon after function body",
+		R"(
+			emitter test {
+				material "particles/particle.mat"
+				fn emit() {};
 			}
-		}
-	)";
+		)"
+	);
 
-	TestableCompiler compiler14;
-	OutputMemoryStream output14(getGlobalAllocator());
-	bool success14 = compiler14.compile(Path("undefined_in_func.pat"), undefined_in_func, output14);
+	expectCompilationFailure("semicolon after var declaration",
+		R"(
+			emitter test {
+				material "particles/particle.mat"
 
-	// Test user-defined function with invalid syntax in body
-	const char* invalid_syntax_func = R"(
-		fn bad_func(a) {
-			return a + ;  // invalid syntax
-		}
-
-		emitter test {
-			material "particles/particle.mat"
-			init_emit_count 1
-
-			out i_value : float
-			var value : float
-
-			fn emit() {
-				value = bad_func(1.0);
+				var value : float;
 			}
+		)"
+	);
 
-			fn output() {
-				i_value = value;
-			}
-		}
-	)";
-
-	TestableCompiler compiler15;
-	OutputMemoryStream output15(getGlobalAllocator());
-	bool success15 = compiler15.compile(Path("invalid_syntax_func.pat"), invalid_syntax_func, output15);
-
-	// Test calling undefined user-defined function
-	const char* undefined_func_call = R"(
-		emitter test {
-			material "particles/particle.mat"
-			init_emit_count 1
-
-			out i_value : float
-			var value : float
-
-			fn emit() {
-				value = nonexistent_func(1.0);  // undefined function
-			}
-
-			fn output() {
-				i_value = value;
-			}
-		}
-	)";
-
-	TestableCompiler compiler16;
-	OutputMemoryStream output16(getGlobalAllocator());
-	bool success16 = compiler16.compile(Path("undefined_func_call.pat"), undefined_func_call, output16);
-
-	// Test assigning function to variable (functions are not values)
-	const char* func_as_var = R"(
-		fn my_func(a) {
-			return a * 2;
-		}
-
-		emitter test {
-			material "particles/particle.mat"
-			init_emit_count 1
-
-			out i_value : float
-			var value : float
-			var f = my_func;  // invalid: function as value
-
-			fn emit() {
-				value = 10;
-			}
-
-			fn output() {
-				i_value = value;
-			}
-		}
-	)";
-
-	TestableCompiler compiler17;
-	OutputMemoryStream output17(getGlobalAllocator());
-	bool success17 = compiler17.compile(Path("func_as_var.pat"), func_as_var, output17);
-
-	// Test passing function as argument (functions are not values)
-	const char* func_as_arg = R"(
-		fn my_func(a) {
-			return a * 2;
-		}
-
-		fn call_func(f, x) {
-			return f(x);
-		}
-
-		emitter test {
-			material "particles/particle.mat"
-			init_emit_count 1
-
-			out i_value : float
-			var value : float
-
-			fn emit() {
-				value = call_func(my_func, 5);  // invalid: passing function as argument
-			}
-
-			fn output() {
-				i_value = value;
-			}
-		}
-	)";
-
-	TestableCompiler compiler18;
-	OutputMemoryStream output18(getGlobalAllocator());
-	bool success18 = compiler18.compile(Path("func_as_arg.pat"), func_as_arg, output18);
-
-	// Test recursion (not supported)
-	const char* recursion_test = R"(
-		fn factorial(n) {
-			if n < 2 {
-				return 1;
-			} else {
-				return n * factorial(n - 1);  // recursive call
-			}
-		}
-
-		emitter test {
-			material "particles/particle.mat"
-			init_emit_count 1
-
-			out i_value : float
-			var value : float
-
-			fn emit() {
-				value = factorial(5);
-			}
-
-			fn output() {
-				i_value = value;
-			}
-		}
-	)";
-
-	TestableCompiler compiler19;
-	OutputMemoryStream output19(getGlobalAllocator());
-	bool success19 = compiler19.compile(Path("recursion_test.pat"), recursion_test, output19);
-
-	// Test semicolon after import
-	const char* semicolon_after_import = R"(
-		import "utils.pat";
-		emitter test {
-			material "particles/particle.mat"
-			init_emit_count 1
-
-			out i_value : float
-
-			fn emit() {
-				i_value = 10;
-			}
-		}
-	)";
-
-	TestableCompiler compiler20;
-	OutputMemoryStream output20(getGlobalAllocator());
-	bool success20 = compiler20.compile(Path("semicolon_after_import.pat"), semicolon_after_import, output20);
-
-	// Test semicolon at end of function body
-	const char* semicolon_after_func_body = R"(
-		emitter test {
-			material "particles/particle.mat"
-			init_emit_count 1
-
-			out i_value : float
-
-			fn emit() {
-				i_value = 10;
-			};
-
-			fn output() {
-				i_value = i_value;
-			}
-		}
-	)";
-
-	TestableCompiler compiler21;
-	OutputMemoryStream output21(getGlobalAllocator());
-	bool success21 = compiler21.compile(Path("semicolon_after_func_body.pat"), semicolon_after_func_body, output21);
-
-	// Test semicolon after var declaration
-	const char* semicolon_after_var = R"(
-		emitter test {
-			material "particles/particle.mat"
-			init_emit_count 1
-
-			out i_value : float
-			var value : float;
-
-			fn emit() {
-				i_value = 10;
-			}
-
-			fn output() {
-				i_value = value;
-			}
-		}
-	)";
-
-	TestableCompiler compiler22;
-	OutputMemoryStream output22(getGlobalAllocator());
-	bool success22 = compiler22.compile(Path("semicolon_after_var.pat"), semicolon_after_var, output22);
-
-	ASSERT_TRUE(!success1, "Compilation should fail with missing semicolon");
-	ASSERT_TRUE(!success2, "Compilation should fail with undefined variable");
-	ASSERT_TRUE(!success3, "Compilation should fail with missing closing brace");
-	ASSERT_TRUE(!success4, "Compilation should fail with duplicate variable names");
-	ASSERT_TRUE(!success5, "Compilation should fail with invalid type");
-	//ASSERT_TRUE(!success6, "Compilation should fail with missing material");
-	ASSERT_TRUE(!success7, "Compilation should fail with type mismatch");
-	ASSERT_TRUE(!success8, "Compilation should fail with invalid function call");
-	ASSERT_TRUE(!success9, "Compilation should fail with invalid member access");
-	ASSERT_TRUE(!success10, "Compilation should fail with division by zero in constant");
-	ASSERT_TRUE(!success11, "Compilation should fail with duplicate parameter names in function");
-	ASSERT_TRUE(!success12, "Compilation should fail with function redefinition");
-	ASSERT_TRUE(!success13, "Compilation should fail with wrong argument count in function call");
-	ASSERT_TRUE(!success14, "Compilation should fail with undefined variable in function");
-	ASSERT_TRUE(!success15, "Compilation should fail with invalid syntax in function");
-	ASSERT_TRUE(!success16, "Compilation should fail with call to undefined function");
-	ASSERT_TRUE(!success17, "Compilation should fail with function assigned to variable");
-	ASSERT_TRUE(!success18, "Compilation should fail with function passed as argument");
-	ASSERT_TRUE(!success19, "Compilation should fail with recursion");
-	ASSERT_TRUE(!success20, "Compilation should fail with semicolon after import");
-	ASSERT_TRUE(!success21, "Compilation should fail with semicolon after function body");
-	ASSERT_TRUE(!success22, "Compilation should fail with semicolon after var declaration");
-
-	return true;
+	return all_tests_passed;
 }
 
 bool testBasicImport() {
@@ -1743,13 +1510,12 @@ bool testNestedImport() {
 bool testImportErrors() {
 	// No files added, so import should fail
 	TestableCompiler compiler;
+	compiler.m_suppress_logging = true;
 
 	const char* main_script = R"(
 		import "missing.pat"
 		emitter test {
 			material "particles/particle.mat"
-			out value : float
-			fn emit() { value = 1; }
 		}
 	)";
 
@@ -1866,6 +1632,42 @@ bool testMultipleEmitters() {
 	return true;
 }
 
+// Test that unused local variables are optimized out
+bool testUnusedLocalOptimization() {
+	const char* code_with_unused = R"(
+		emitter test {
+			material "particles/particle.mat"
+			var result : float
+
+			fn emit() {
+				let unused = 1;
+				result = 2;
+			}
+		}
+	)";
+
+	const char* code_without_unused = R"(
+		emitter test {
+			material "particles/particle.mat"
+			var result : float
+
+			fn emit() {
+				result = 2;
+			}
+		}
+	)";
+
+	ParticleScriptRunner runner_with;
+	ASSERT_TRUE(runner_with.compile(code_with_unused), "Compilation with unused local should succeed");
+
+	ParticleScriptRunner runner_without;
+	ASSERT_TRUE(runner_without.compile(code_without_unused), "Compilation without unused local should succeed");
+
+	ASSERT_TRUE(runner_with.num_emit_registers == runner_without.num_emit_registers, "Unused local should not increase register count");
+
+	return true;
+}
+
 } // anonymous namespace
 
 void runParticleScriptCompilerTests() {
@@ -1887,6 +1689,7 @@ void runParticleScriptCompilerTests() {
 	RUN_TEST(testImportErrors);
 	RUN_TEST(testMultipleEmitters);
 	RUN_TEST(testCompilationErrors);
+	RUN_TEST(testUnusedLocalOptimization);
 	
 	logInfo("=== Test Results: ", passed_count, "/", test_count, " passed ===");
 }

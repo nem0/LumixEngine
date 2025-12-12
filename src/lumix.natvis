@@ -97,6 +97,8 @@
 		<DisplayString>{begin,[end - begin]}</DisplayString>
 	</Type>
 
+
+
 	<Type Name="Lumix::HashMap&lt;*,*&gt;">
 		<DisplayString>{{ size={m_size} }}</DisplayString>
 		<Expand>
@@ -112,6 +114,85 @@
 					<Exec>++i</Exec>
 				</Loop>
 			</CustomListItems>
+		</Expand>
+	</Type>
+
+	<Type Name="Lumix::ParticleScriptCompiler::IRContext">
+		<DisplayString>IRContext: head={head}</DisplayString>
+		<Expand>
+			<Item Name="head">head</Item>
+			<Item Name="tail">tail</Item>
+			<Item Name="stack">stack</Item>
+			<Item Name="emitted_index">emitted_index</Item>
+			<Item Name="register_allocator">register_allocator</Item>
+			<Item Name="num_immutables">num_immutables</Item>
+			<Item Name="args">args</Item>
+			<CustomListItems MaxItemsPerView="100">
+				<Variable Name="node" InitialValue="head" />
+				<Loop>
+					<Break Condition="node == nullptr" />
+					<Item>node</Item>
+					<Exec>node = node->next</Exec>
+				</Loop>
+			</CustomListItems>
+		</Expand>
+	</Type>
+
+	<!-- ParticleScriptCompiler -->
+	<Type Name="Lumix::ParticleScriptCompiler::IRNode">
+		<DisplayString Condition="type == 0">OP</DisplayString>
+		<DisplayString Condition="type == 1">IF</DisplayString>
+		<DisplayString Condition="type == 2">END</DisplayString>
+		<Expand>
+			<Item Name="type">type</Item>
+			<Item Name="next">next</Item>
+			<Item Name="prev">prev</Item>
+			<Item Name="ast">ast</Item>
+			<ExpandedItem Condition="type == 0">*(Lumix::ParticleScriptCompiler::IROp*)this</ExpandedItem>
+			<ExpandedItem Condition="type == 1">*(Lumix::ParticleScriptCompiler::IRIf*)this</ExpandedItem>
+			<ExpandedItem Condition="type == 2">*(Lumix::ParticleScriptCompiler::IREnd*)this</ExpandedItem>
+		</Expand>
+	</Type>
+
+	<Type Name="Lumix::ParticleScriptCompiler::IROp">
+		<DisplayString Condition="instruction == 10">{dst} = {args[0]}</DisplayString>
+		<DisplayString Condition="instruction == 7">{dst} = {args[0]} * {args[1]}</DisplayString>
+		<DisplayString Condition="instruction == 14">{dst} = {args[0]} > {args[1]}</DisplayString>
+		<DisplayString Condition="instruction == 1">{dst} = {args[0]} + {args[1]}</DisplayString>
+		<DisplayString>IROp: {instruction}</DisplayString>
+		<Expand>
+			<Item Name="instruction">instruction</Item>
+			<Item Name="dst">dst</Item>
+			<Item Name="args">args</Item>
+		</Expand>
+	</Type>
+
+	<Type Name="Lumix::ParticleScriptCompiler::IRIf">
+		<DisplayString>If {condition}</DisplayString>
+		<Expand>
+			<Item Name="condition">condition</Item>
+			<Item Name="true_end">true_end</Item>
+			<Item Name="false_end">false_end</Item>
+		</Expand>
+	</Type>
+
+	<Type Name="Lumix::ParticleScriptCompiler::IREnd">
+		<DisplayString>IREnd</DisplayString>
+	</Type>
+
+	<Type Name="Lumix::ParticleScriptCompiler::IRValue">
+		<DisplayString Condition="type == 0">##ERROR##</DisplayString>
+		<DisplayString Condition="type == 1">CH{index}</DisplayString>
+		<DisplayString Condition="type == 2">SYS{index}</DisplayString>
+		<DisplayString Condition="type == 3">OUT{index}</DisplayString>
+		<DisplayString Condition="type == 4">R{index}</DisplayString>
+		<DisplayString Condition="type == 5">{value}</DisplayString>
+		<DisplayString Condition="type == 6">GLOB{index}</DisplayString>
+		<DisplayString Condition="type == 7">##ERROR##</DisplayString>
+		<Expand>
+			<Item Name="type">type</Item>
+			<Item Name="index">index</Item>
+			<Item Name="value">value</Item>
 		</Expand>
 	</Type>
 </AutoVisualizer>

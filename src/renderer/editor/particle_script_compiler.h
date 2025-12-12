@@ -548,13 +548,13 @@ struct ParticleScriptCompiler {
 
 	template <typename... Args>
 	void error(StringView location, Args&&... args) {
-		if(!m_is_error) logError(m_path, "(", getLine(location), "): ", args...);
+		if(!m_is_error && !m_suppress_logging) logError(m_path, "(", getLine(location), "): ", args...);
 		m_is_error = true;
 	}
 
 	template <typename... Args>
 	void errorAtCurrent(Args&&... args) {
-		if(!m_is_error) logError(m_path, "(", getLine(m_tokenizer.m_current_token.value), "): ", args...);
+		if(!m_is_error && !m_suppress_logging) logError(m_path, "(", getLine(m_tokenizer.m_current_token.value), "): ", args...);
 		m_is_error = true;
 	}
 
@@ -566,7 +566,7 @@ struct ParticleScriptCompiler {
 		return t;
 	}
 
-const char* toString(Token::Type type) {
+	const char* toString(Token::Type type) {
 		switch (type) {
 			case Token::Type::COLON: return ";";
 			case Token::Type::COMMA: return ",";
@@ -1660,6 +1660,7 @@ const char* toString(Token::Type type) {
 
 	struct IREnd : IRNode {
 		IREnd(Node* ast) : IRNode(IRNode::END, ast) {}
+		bool is_conditional = false;
 	};
 
 	struct IRIf : IRNode {
@@ -1762,7 +1763,8 @@ const char* toString(Token::Type type) {
 
 	void optimizeIR(IRContext& ctx) {
 		reorderIR(ctx);
-		removeRedundancy(ctx);
+		fold(ctx);
+		fold(ctx); // It's possible more passes would fold even more, but we do only 2 passes.
 	}
 
 	void printIR(StringView path, IRContext& ctx) {
@@ -2052,16 +2054,18 @@ const char* toString(Token::Type type) {
 		if (node.next) node.next->prev = node.prev;
 	}
 
-	void removeRedundancy(IRContext& ctx) {
+	struct RegisterAccess {
+		u32 reads = 0;
+		u32 writes = 0;
+		IRNode* prev_writer = nullptr;
+		IRValue alias;
+		bool is_aliased = false;
+		IREnd* alias_branch = nullptr;
+	};
+
+	void fold(IRContext& ctx) {
 		if (!ctx.head) return;
 
-		struct RegisterAccess {
-			u32 reads = 0;
-			u32 writes = 0;
-			IRNode* prev_writer = nullptr;
-			IRValue alias;
-			bool is_aliased = false;
-		};
 		StackArray<RegisterAccess, 16> register_access(m_arena_allocator);
 		register_access.reserve(ctx.register_allocator);
 		
@@ -2095,14 +2099,10 @@ const char* toString(Token::Type type) {
 				&& register_access[dst.index].writes == 1 
 				&& register_access[dst.index].reads == 1
 			) {
-				// alias
 				register_access[dst.index].alias = src;
 				register_access[dst.index].is_aliased = true;
 
-				if (ctx.head == node) ctx.head = node->next;
-				if (ctx.tail == node) ctx.tail = node->prev;
-				if (node->prev) node->prev->next = node->next;
-				if (node->next) node->next->prev = node->prev;
+				unlinkNode(ctx, *node);
 				return;
 			}
 
@@ -2113,18 +2113,11 @@ const char* toString(Token::Type type) {
 			mov->args.push(src);
 			mov->prev = node->prev;
 			mov->next = node->next;
-			if (ctx.head == node) ctx.head = mov;
-			if (ctx.tail == node) ctx.tail = mov;
-			if (node->prev) node->prev->next = mov;
-			if (node->next) node->next->prev = mov;
+			unlinkNode(ctx, *node);
 		};
 
-		// fold constants and collapse
-		// op op_dst op_a op_b
-		// mov mov_dst op_dst
-		// into 
-		// op mov_dst op_a op_b
 		node = ctx.head;
+		StackArray<IREnd*, 4> branch_stack(m_arena_allocator);
 		while (node) {
 			switch (node->type) {
 				case IRNode::OP: {
@@ -2175,6 +2168,12 @@ const char* toString(Token::Type type) {
 						}
 					}
 
+					// we write into a register thah is never read, remove the operation
+					if (n->dst.type == DataStream::REGISTER && register_access[n->dst.index].reads == 0) {
+						unlinkNode(ctx, *n);
+						break;
+					}
+
 					// fold 
 					// op regN a b
 					// mov dst regN
@@ -2205,7 +2204,6 @@ const char* toString(Token::Type type) {
 						&& n->args.size() > 0
 						&& all_args_literals
 						&& n->dst.type == DataStream::REGISTER
-						&& register_access[n->dst.index].writes == 1
 					) {
 						float first = n->args[0].value;
 						switch (n->instruction) {
@@ -2249,14 +2247,20 @@ const char* toString(Token::Type type) {
 								register_access[n->dst.index].is_aliased = true;
 								register_access[n->dst.index].alias.value = first > n->args[1].value ? 1.f : 0.f;
 								break;
+							case InstructionType::MOV:
+								register_access[n->dst.index].is_aliased = true;
+								register_access[n->dst.index].alias.value = first;
+								break;
 							default: break;
 						}
 
 						if (register_access[n->dst.index].is_aliased) {
 							register_access[n->dst.index].alias.type = DataStream::LITERAL;
-							if (n->prev) n->prev->next = n->next;
-							if (n->next) n->next->prev = n->prev;
-							if (ctx.tail == n) ctx.tail = n->prev;
+							register_access[n->dst.index].alias_branch = branch_stack.empty() ? nullptr : branch_stack.last();
+							register_access[n->dst.index].prev_writer = n;
+							if (register_access[n->dst.index].writes == 1) {
+								unlinkNode(ctx, *n);
+							}
 							break;
 						}
 					}
@@ -2264,6 +2268,7 @@ const char* toString(Token::Type type) {
 					if (n->instruction == InstructionType::MOV && n->prev && n->prev->type == IRNode::OP) {
 						IROp* prev_op = (IROp*)n->prev;
 						if (prev_op->instruction == InstructionType::MOV && n->dst == prev_op->dst) {
+							// consecutive movs to the same destination, remove the previous mov
 							unlinkNode(ctx, *prev_op);
 						}
 					}
@@ -2271,8 +2276,51 @@ const char* toString(Token::Type type) {
 					if (n->dst.type == DataStream::REGISTER) register_access[n->dst.index].prev_writer = n;
 					break;
 				}
-				case IRNode::IF: break;
-				case IRNode::END: break;
+				case IRNode::END: {
+					auto* n = (IREnd*)node;
+					if (n->is_conditional) {
+						for (auto& r : register_access) {
+							if (r.alias_branch == n) {
+								r.is_aliased = false;
+							}
+						}
+						ASSERT(branch_stack.last() == n);
+						branch_stack.pop();
+					}
+					break;
+				}
+				case IRNode::IF: {
+					auto* n = (IRIf*)node;
+					if (n->condition.type == DataStream::REGISTER && register_access[n->condition.index].is_aliased) {
+						n->condition = register_access[n->condition.index].alias;
+					}
+					if (n->condition.type == DataStream::LITERAL) {
+						if (n->condition.value == 0.f) {
+							// take false branch
+							n->next = n->true_end->next;
+							if (n->next) n->next->prev = n;
+							unlinkNode(ctx, *n);
+							if (n->false_end) unlinkNode(ctx, *n->false_end);
+							node = n->true_end;
+						}
+						else {
+							// take true branch
+							unlinkNode(ctx, *n);
+							if (n->false_end) {
+								if (ctx.tail == n->false_end) ctx.tail = n->true_end;
+								n->true_end->next = n->false_end->next;
+								if (n->true_end->next) n->true_end->next->prev = n->true_end;
+							}
+							unlinkNode(ctx, *n->true_end);
+						}
+					}
+					else {
+						if (n->false_end) branch_stack.push(n->false_end);
+						branch_stack.push(n->true_end);
+					}
+
+					break;
+				}
 			}
 			node = node->next;
 		}
@@ -2535,6 +2583,7 @@ const char* toString(Token::Type type) {
 				if (t < 0) return -1; // TODO t > 0
 
 				res->true_end = LUMIX_NEW(m_arena_allocator, IREnd)(n->true_block);
+				res->true_end->is_conditional = true;
 				ctx.push(res->true_end);
 
 				if (n->false_block) {
@@ -2542,6 +2591,7 @@ const char* toString(Token::Type type) {
 					if (f < 0) return -1; // TODO f > 0
 
 					res->false_end = LUMIX_NEW(m_arena_allocator, IREnd)(n->false_block);
+					res->false_end->is_conditional = true;
 					ctx.push(res->false_end);
 				}
 				return 0;
@@ -2565,6 +2615,12 @@ const char* toString(Token::Type type) {
 					if (s < 0) return -1;
 					if (s > 0) {
 						ctx.popStack(size_locals);
+						for (auto& local : n->locals) {
+							local.registers[0] = -1;
+							local.registers[1] = -1;
+							local.registers[2] = -1;
+							local.registers[3] = -1;
+						}
 						return s; // TODO make sure this is from "return ...;"
 					}
 				}
@@ -2763,6 +2819,9 @@ const char* toString(Token::Type type) {
 					if (emitter.m_max_ribbons > 0 && emitter.m_max_ribbon_length == 0) {
 						error(token.value, "max_ribbon_length must be > 0 if max_ribbons is > 0");
 					}
+					if (emitter.m_material.isEmpty()) {
+						error(emitter.m_name, "Missing material.");
+					}
 					return;
 				case Token::IDENTIFIER:
 					if (equalStrings(token.value, "material")) compileMaterial(emitter);
@@ -2896,6 +2955,7 @@ const char* toString(Token::Type type) {
 	ArenaAllocator m_arena_allocator;
 	Path m_path;
 	bool m_is_error = false;
+	bool m_suppress_logging = false;
 	ParticleScriptTokenizer m_tokenizer;
 	Array<Constant> m_constants;
 	Array<Function> m_functions;
