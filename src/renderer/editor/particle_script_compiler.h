@@ -11,6 +11,7 @@
 
 // TODO bugs
 // errors in imports in compileIR results in crash
+// hotreload of common.hlsli does not work
 
 // TODO
 // * and, or, not
@@ -473,6 +474,14 @@ struct ParticleScriptCompiler {
 	}
 
 	void variableDeclaration(Array<Variable>& vars) {
+		StringView name;
+		if (!consume(Token::IDENTIFIER, name)) return;
+		for (const Variable& existing : vars) {
+			if (equalStrings(existing.name, name)) {
+				error(name, "Variable '", name, "' already exists.");
+				return;
+			}
+		}
 		u32 offset = 0;
 		if (!vars.empty()) {
 			const Variable& var = vars.last();
@@ -485,7 +494,7 @@ struct ParticleScriptCompiler {
 			}
 		}
 		Variable& var = vars.emplace();
-		if (!consume(Token::IDENTIFIER, var.name)) return;
+		var.name = name;
 		consume(Token::COLON);
 		var.type = parseType();
 		var.offset = offset;
@@ -890,6 +899,12 @@ const char* toString(Token::Type type) {
 				if (n->right->type == Node::LITERAL) {
 					auto* r = (LiteralNode*)n->right;
 					switch (n->op) {
+						case Operators::DIV:
+							if (r->value == 0) {
+								error(r->token.value, "Division by zero.");
+								return r;
+							}
+							break;
 						case Operators::ADD: if (r->value == 0) return n->left; break;
 						case Operators::MUL:
 							if (r->value == 1) return n->left;
@@ -1498,6 +1513,12 @@ const char* toString(Token::Type type) {
 					comma = true;
 					break;
 				case Token::IDENTIFIER: {
+					for (StringView a : fn.args) {
+						if (a == t.value) {
+							error(t.value, "Argument '", t.value, "' already exists.");
+							break;
+						}
+					}
 					StringView& arg = fn.args.emplace();
 					arg = t.value;
 					comma = false;
@@ -2024,32 +2045,16 @@ const char* toString(Token::Type type) {
 		}
 	}
 
-	// Optimizes IR by removing redundant MOV instructions. This includes:
-	// 1. Eliminating duplicate consecutive MOVs to the same destination
-	// 2. removes a temporary register when an operation writes to it and then 
-	//		immediately a MOV copies that result to the final destination.
-	// 		If the temporary is written exactly once and read exactly once
-	//		(by the MOV), the operation can write directly to the final 
-	//		destination, eliminating the MOV entirely.
+	static void unlinkNode(IRContext& ctx, IRNode& node) {
+		if (ctx.head == &node) ctx.head = ctx.head->next;
+		if (ctx.tail == &node) ctx.tail = ctx.tail->prev;
+		if (node.prev) node.prev->next = node.next;
+		if (node.next) node.next->prev = node.prev;
+	}
+
 	void removeRedundancy(IRContext& ctx) {
 		if (!ctx.head) return;
 
-		IRNode* node = ctx.head;
-		// keep only one mov from several movs in a row into the same destination
-		while (node) {
-			if (node->prev && node->type == IRNode::OP && node->prev->type == IRNode::OP) {
-				auto* n_prev = (IROp*)node->prev;
-				auto* n = (IROp*)node;
-				if (n_prev->dst.type == n->dst.type && n_prev->dst.index == n->dst.index && n->instruction == InstructionType::MOV && n_prev->instruction == InstructionType::MOV) {
-					if (n_prev == ctx.head) ctx.head = n_prev->next;
-					if (n_prev->prev) n_prev->prev->next = n_prev->next;
-					if (n_prev->next) n_prev->next->prev = n_prev->prev;
-					if (ctx.head == n_prev) ctx.head = n;
-				}
-			}
-			node = node->next;
-		}
-		
 		struct RegisterAccess {
 			u32 reads = 0;
 			u32 writes = 0;
@@ -2071,7 +2076,7 @@ const char* toString(Token::Type type) {
 			}
 		};
 
-		node = ctx.head;
+		IRNode* node = ctx.head;
 		while (node) {
 			IRValue srcs[9];
 			IRValue* dst;
@@ -2255,6 +2260,14 @@ const char* toString(Token::Type type) {
 							break;
 						}
 					}
+
+					if (n->instruction == InstructionType::MOV && n->prev && n->prev->type == IRNode::OP) {
+						IROp* prev_op = (IROp*)n->prev;
+						if (prev_op->instruction == InstructionType::MOV && n->dst == prev_op->dst) {
+							unlinkNode(ctx, *prev_op);
+						}
+					}
+
 					if (n->dst.type == DataStream::REGISTER) register_access[n->dst.index].prev_writer = n;
 					break;
 				}
@@ -2689,6 +2702,14 @@ const char* toString(Token::Type type) {
 		fn.block = block(ctx);
 		if (!fn.block) return;
 		collapseConstants(fn.block, nullptr, false);
+
+		u32 count = 0;
+		for (const Function& f : m_functions) {
+			if (f.name == fn.name) ++count;
+		}
+		if (count > 1) {
+			error(fn.name, "Function '", fn.name, "' already exists.");
+		}
 	}
 
 	void compileMesh(Emitter& emitter) {

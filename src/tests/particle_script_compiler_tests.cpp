@@ -838,10 +838,14 @@ bool testConstantFoldingIfConditionals() {
 	// Script with if conditionals that have constant conditions - should be folded away
 	const char* folded_code = R"(
 		fn conditional_calc(x) {
+			let res : float;
 			if x > 5 {
-				return x * 2;
+				res = x * 2;
 			}
-			return x + 1;
+			else {
+				res = x + 1;
+			}
+			return res;
 		}
 
 		emitter test {
@@ -889,10 +893,14 @@ bool testConstantFoldingIfConditionals() {
 	// Script with pre-computed results (baseline for comparison)
 	const char* literal_code = R"(
 		fn conditional_calc(x) {
+			let res : float;
 			if x > 5 {
-				return x * 2;
+				res = x * 2;
 			}
-			return x + 1;
+			else {
+				res = x + 1;
+			}
+			return res;
 		}
 
 		emitter test {
@@ -1659,16 +1667,15 @@ bool testCompilationErrors() {
 	ASSERT_TRUE(!success1, "Compilation should fail with missing semicolon");
 	ASSERT_TRUE(!success2, "Compilation should fail with undefined variable");
 	ASSERT_TRUE(!success3, "Compilation should fail with missing closing brace");
-	// TODO
-	//ASSERT_TRUE(!success4, "Compilation should fail with duplicate variable names");
+	ASSERT_TRUE(!success4, "Compilation should fail with duplicate variable names");
 	ASSERT_TRUE(!success5, "Compilation should fail with invalid type");
 	//ASSERT_TRUE(!success6, "Compilation should fail with missing material");
 	ASSERT_TRUE(!success7, "Compilation should fail with type mismatch");
 	ASSERT_TRUE(!success8, "Compilation should fail with invalid function call");
 	ASSERT_TRUE(!success9, "Compilation should fail with invalid member access");
-	//ASSERT_TRUE(!success10, "Compilation should fail with division by zero in constant");
-	//ASSERT_TRUE(!success11, "Compilation should fail with duplicate parameter names in function");
-	//ASSERT_TRUE(!success12, "Compilation should fail with function redefinition");
+	ASSERT_TRUE(!success10, "Compilation should fail with division by zero in constant");
+	ASSERT_TRUE(!success11, "Compilation should fail with duplicate parameter names in function");
+	ASSERT_TRUE(!success12, "Compilation should fail with function redefinition");
 	ASSERT_TRUE(!success13, "Compilation should fail with wrong argument count in function call");
 	ASSERT_TRUE(!success14, "Compilation should fail with undefined variable in function");
 	ASSERT_TRUE(!success15, "Compilation should fail with invalid syntax in function");
@@ -1871,11 +1878,8 @@ void runParticleScriptCompilerTests() {
 	RUN_TEST(testParticleScriptExecution);
 	RUN_TEST(testParticleScriptLocalVars);
 	RUN_TEST(testParticleScriptUserFunctions);
-	// TODO
-	(void)&testConstantFoldingInstructionCount;
-	(void)&testConstantFoldingIfConditionals;
-	//RUN_TEST(testConstantFoldingInstructionCount);
-	//RUN_TEST(testConstantFoldingIfConditionals);
+	RUN_TEST(testConstantFoldingInstructionCount);
+	RUN_TEST(testConstantFoldingIfConditionals);
 	RUN_TEST(testParticleScriptSyscalls);
 	RUN_TEST(testParticleScriptSystemValues);
 	RUN_TEST(testBasicImport);
