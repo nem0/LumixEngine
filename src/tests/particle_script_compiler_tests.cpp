@@ -1668,6 +1668,36 @@ bool testUnusedLocalOptimization() {
 	return true;
 }
 
+// Test unary minus operator in particle scripts
+bool testUnaryMinus() {
+	const char* code = R"(
+		emitter test {
+			material "particles/particle.mat"
+
+			var tmp: float
+
+			fn emit() {
+				let l = -1;
+				l = -l * 5;
+				tmp = l * 2;
+			}
+
+			fn update() {
+				tmp = -tmp * 5;
+			}
+		}
+	)";
+
+	ParticleScriptRunner runner;
+	ASSERT_TRUE(runner.compile(code), "Compilation with unary minus should succeed");
+
+	runner.runEmit();
+	runner.runUpdate();
+	ASSERT_TRUE(fabsf(runner.getChannel(0) - (-50.0f)) < 0.001f, "result should be -5 after emit");
+
+	return true;
+}
+
 } // anonymous namespace
 
 void runParticleScriptCompilerTests() {
@@ -1690,6 +1720,7 @@ void runParticleScriptCompilerTests() {
 	RUN_TEST(testMultipleEmitters);
 	RUN_TEST(testCompilationErrors);
 	RUN_TEST(testUnusedLocalOptimization);
+	RUN_TEST(testUnaryMinus);
 	
 	logInfo("=== Test Results: ", passed_count, "/", test_count, " passed ===");
 }

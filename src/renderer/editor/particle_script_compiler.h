@@ -15,9 +15,9 @@
 
 // TODO
 // * and, or, not
-// * unary in IR
 
 // TODO maybe / low prio
+// * autocomplete
 // * spline, mesh, terrain
 // * saturate, floor, round
 // * preview for world space moving ribbons
@@ -25,10 +25,9 @@
 // * kill in ribbons
 // * multiply-add
 // * while, for cycles
-// * autocomplete
 // * debugger
 // * global update - runs once per frame on the whole emitter, can prepare some global data
-// * create mesh from script?
+// * create mesh from script
 
 namespace Lumix {
 
@@ -1628,7 +1627,7 @@ struct ParticleScriptCompiler {
 		enum Type {
 			OP, // mov, binary op or syscall
 			IF,
-			END
+			END,
 		};
 
 		IRNode(Type type, Node* ast) : type(type), ast(ast) {}
@@ -2538,6 +2537,31 @@ struct ParticleScriptCompiler {
 				}
 				ASSERT(false);
 				return -1;
+			}
+			case Node::UNARY_OPERATOR: {
+				auto* n = (UnaryOperatorNode*)node;
+				ASSERT(n->op == Operators::SUB);
+				i32 right = compileIR(ctx, n->right);
+				if (right < 0) return -1;
+				i32 num = right;
+				IROp* ir_ops[4];
+				for (i32 i = 0; i < num; ++i) {
+					auto* res = LUMIX_NEW(m_arena_allocator, IROp)(node, m_arena_allocator);
+					res->instruction = InstructionType::MUL;
+					res->dst.type = DataStream::REGISTER;
+					res->dst.index = ++ctx.register_allocator;
+					res->args.push(ctx.stackValue(-num + i));
+					IRValue minus_one;
+					minus_one.type = DataStream::LITERAL;
+					minus_one.value = -1.0f;
+					res->args.push(minus_one);
+					ir_ops[i] = res;
+					ctx.push(res);
+				}
+				for (i32 i = 0; i < num; ++i) {
+					ctx.stackValue(-num + i) = ir_ops[i]->dst;
+				}
+				return num;
 			}
 			case Node::BINARY_OPERATOR: {
 				auto* n = (BinaryOperatorNode*)node;
