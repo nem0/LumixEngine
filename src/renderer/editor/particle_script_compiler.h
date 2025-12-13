@@ -2902,8 +2902,8 @@ struct ParticleScriptCompiler {
 					if (emitter.m_max_ribbons > 0 && emitter.m_max_ribbon_length == 0) {
 						error(token.value, "max_ribbon_length must be > 0 if max_ribbons is > 0");
 					}
-					if (emitter.m_material.isEmpty()) {
-						error(emitter.m_name, "Missing material.");
+					if (emitter.m_material.isEmpty() && emitter.m_mesh.isEmpty()) {
+						error(emitter.m_name, "Either material or mesh must be provided.");
 					}
 					return;
 				case Token::IDENTIFIER:
