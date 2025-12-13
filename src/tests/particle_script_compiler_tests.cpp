@@ -1698,6 +1698,60 @@ bool testUnaryMinus() {
 	return true;
 }
 
+bool testLogicOperators() {
+	const char* code = R"(
+		emitter test {
+			material "particles/particle.mat"
+
+			var tmp: float
+			var	tmp2 : float
+
+			fn emit() {
+				let a = 1.0;
+				let b = 0.0;
+				let c = 5.0;
+				let d = 3.0;
+				
+				// Test 'and'
+				if a > 0.0 and c > d {
+					tmp = 1.0;
+				} else {
+					tmp = 0.0;
+				}
+				
+				// Test 'or'
+				if b > 0.0 or c > d {
+					tmp = tmp + 2.0;
+				}
+				
+				// Test 'not'
+				if not (b > 0.0) {
+					tmp = tmp + 4.0;
+				}
+
+				tmp2 = 0;
+			}
+
+			fn update() {
+				// Additional test
+				if not tmp2 {
+					tmp = tmp * 2.0;
+				}
+			}
+		}
+	)";
+
+	ParticleScriptRunner runner;
+	ASSERT_TRUE(runner.compile(code), "Compilation with logic operators should succeed");
+
+	runner.runEmit();
+	runner.runUpdate();
+	// Expected: 1 (and true) + 2 (or true) + 4 (not true) = 7, then *2 = 14
+	ASSERT_TRUE(fabsf(runner.getChannel(0) - 14.0f) < 0.001f, "result should be 14 after logic operations");
+
+	return true;
+}
+
 } // anonymous namespace
 
 void runParticleScriptCompilerTests() {
@@ -1721,6 +1775,7 @@ void runParticleScriptCompilerTests() {
 	RUN_TEST(testCompilationErrors);
 	RUN_TEST(testUnusedLocalOptimization);
 	RUN_TEST(testUnaryMinus);
+	RUN_TEST(testLogicOperators);
 	
 	logInfo("=== Test Results: ", passed_count, "/", test_count, " passed ===");
 }

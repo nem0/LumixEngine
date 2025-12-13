@@ -860,6 +860,16 @@ ParticleSystem::RunResult ParticleSystem::run(RunningContext& ctx, IAllocator& t
 				setValue(dst, v);
 				break;
 			}
+			case InstructionType::NOT: {
+				const DataStream dst = ip.read<DataStream>();
+				const DataStream op0 = ip.read<DataStream>();
+
+				const bool res = getConstValue(op0) == 0;
+				float v;
+				memset(&v, res ? 0xffFFffFF : 0, sizeof(float));
+				setValue(dst, v);
+				break;
+			}
 			case InstructionType::MOV: {
 				const DataStream dst = ip.read<DataStream>();
 				const DataStream op0 = ip.read<DataStream>();
@@ -1298,6 +1308,7 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 				}
 				break;
 			}
+			case InstructionType::NOT:
 			case InstructionType::END:
 			case InstructionType::RAND:
 			case InstructionType::MESH:

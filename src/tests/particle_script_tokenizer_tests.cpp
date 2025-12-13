@@ -179,7 +179,7 @@ bool testIdentifiers() {
 }
 
 bool testKeywords() {
-	const char* source = "const global emitter fn var out in let return import if else";
+	const char* source = "const global emitter fn var out in let return import if else and or not";
 	ParticleScriptTokenizer tokenizer;
 	tokenizer.m_document = StringView(source);
 	tokenizer.m_current = tokenizer.m_document.begin;
@@ -221,12 +221,21 @@ bool testKeywords() {
 	
 	tok = tokenizer.nextToken();
 	ASSERT_EQ(Token::ELSE, tok.type, "else keyword");
-	
+
+	tok = tokenizer.nextToken();
+	ASSERT_EQ(Token::AND, tok.type, "and keyword");
+
+	tok = tokenizer.nextToken();
+	ASSERT_EQ(Token::OR, tok.type, "or keyword");
+
+	tok = tokenizer.nextToken();
+	ASSERT_EQ(Token::NOT, tok.type, "not keyword");
+
 	return true;
 }
 
 bool testKeywordPrefixes() {
-	const char* source = "cons constants emi emitters fnn global2 vary output input lets returns importing iff elses";
+	const char* source = "cons constants emi emitters fnn global2 vary output input lets returns importing iff elses an andd orr nott";
 	ParticleScriptTokenizer tokenizer;
 	tokenizer.m_document = StringView(source);
 	tokenizer.m_current = tokenizer.m_document.begin;
@@ -274,6 +283,18 @@ bool testKeywordPrefixes() {
 	
 	tok = tokenizer.nextToken();
 	ASSERT_EQ(Token::IDENTIFIER, tok.type, "elses should be identifier");
+	
+	tok = tokenizer.nextToken();
+	ASSERT_EQ(Token::IDENTIFIER, tok.type, "an should be identifier");
+	
+	tok = tokenizer.nextToken();
+	ASSERT_EQ(Token::IDENTIFIER, tok.type, "andd should be identifier");
+	
+	tok = tokenizer.nextToken();
+	ASSERT_EQ(Token::IDENTIFIER, tok.type, "orr should be identifier");
+	
+	tok = tokenizer.nextToken();
+	ASSERT_EQ(Token::IDENTIFIER, tok.type, "nott should be identifier");
 	
 	return true;
 }

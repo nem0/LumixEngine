@@ -25,7 +25,7 @@ struct Renderer;
 
 struct ParticleSystemResource final : Resource {
 	enum class Version : u32{
-		NOT_SUPPORTED_BEFORE = 15,
+		NOT_SUPPORTED_BEFORE = 16,
 
 		LAST
 	};
@@ -117,6 +117,7 @@ struct ParticleSystemResource final : Resource {
 		MOD,
 		OR,
 		AND,
+		NOT,
 		BLEND,
 		MAX,
 		MIN,

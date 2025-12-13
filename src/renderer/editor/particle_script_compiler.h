@@ -13,9 +13,6 @@
 // errors in imports in compileIR results in crash
 // hotreload of common.hlsli does not work
 
-// TODO
-// * and, or, not
-
 // TODO maybe / low prio
 // * autocomplete
 // * spline, mesh, terrain
@@ -39,7 +36,7 @@ struct ParticleScriptToken {
 		NUMBER, STRING, IDENTIFIER,
 
 		// keywords
-		CONST, GLOBAL, EMITTER, FN, VAR, OUT, IN, LET, RETURN, IMPORT, IF, ELSE
+		CONST, GLOBAL, EMITTER, FN, VAR, OUT, IN, LET, RETURN, IMPORT, IF, ELSE, AND, OR, NOT
 	};
 
 	Type type;
@@ -49,7 +46,7 @@ struct ParticleScriptToken {
 struct ParticleScriptTokenizer {
 	using Token = ParticleScriptToken;
 	
-	enum class Operators : char {
+	enum class Operators {
 		ADD = '+',
 		SUB = '-',
 		DIV = '/',
@@ -57,6 +54,9 @@ struct ParticleScriptTokenizer {
 		MOD = '%',
 		LT = '<',
 		GT = '>',
+		AND,
+		OR,
+		NOT
 	};
 	
 	StringView m_document;
@@ -143,6 +143,7 @@ struct ParticleScriptTokenizer {
 		while (isIdentifierChar(peekChar())) advance();
 
 		switch (m_start_token[0]) {
+			case 'a': return checkKeyword("nd", 1, 2, Token::AND);
 			case 'c': return checkKeyword("onst", 1, 4, Token::CONST);
 			case 'e': {
 				if (m_current - m_start_token < 2) return makeToken(Token::IDENTIFIER);
@@ -163,7 +164,15 @@ struct ParticleScriptTokenizer {
 				return makeToken(Token::IDENTIFIER);
 			}
 			case 'l': return checkKeyword("et", 1, 2, Token::LET);
-			case 'o': return checkKeyword("ut", 1, 2, Token::OUT);
+			case 'n': return checkKeyword("ot", 1, 2, Token::NOT);
+			case 'o': {
+				if (m_current - m_start_token < 2) return makeToken(Token::IDENTIFIER);
+				switch (m_start_token[1]) {
+					case 'r': return checkKeyword("", 2, 0, Token::OR);
+					case 'u': return checkKeyword("t", 2, 1, Token::OUT);
+				}
+				return makeToken(Token::IDENTIFIER);
+			}
 			case 'r': return checkKeyword("eturn", 1, 5, Token::RETURN);
 			case 'v': return checkKeyword("ar", 1, 2, Token::VAR);
 		}
@@ -567,6 +576,9 @@ struct ParticleScriptCompiler {
 
 	const char* toString(Token::Type type) {
 		switch (type) {
+			case Token::Type::AND: return "and";
+			case Token::Type::OR: return "or";
+			case Token::Type::NOT: return "not";
 			case Token::Type::COLON: return ";";
 			case Token::Type::COMMA: return ",";
 			case Token::Type::CONST: return "const";
@@ -633,9 +645,10 @@ struct ParticleScriptCompiler {
 
 	static u32 getPriority(const Token& token) {
 		switch (token.type) {
-			case Token::GT: case Token::LT: return 1;
-			case Token::PLUS: case Token::MINUS: return 2;
-			case Token::PERCENT: case Token::STAR: case Token::SLASH: return 3;
+			case Token::OR: case Token::AND: return 1;
+			case Token::GT: case Token::LT: return 2;
+			case Token::PLUS: case Token::MINUS: return 3;
+			case Token::PERCENT: case Token::STAR: case Token::SLASH: return 4;
 			default: ASSERT(false);
 		}
 		return 0;
@@ -891,6 +904,8 @@ struct ParticleScriptCompiler {
 							if (l->value == 1) return n->right;
 							if (l->value == 0) return l;
 							break;
+						case Operators::AND: if (l->value == 0) return l; break;
+						case Operators::OR: if (l->value != 0) return l; break;
 						default: break;
 					}
 				}
@@ -909,6 +924,8 @@ struct ParticleScriptCompiler {
 							if (r->value == 1) return n->left;
 							if (r->value == 0) return r;
 							break;
+						case Operators::AND: if (r->value == 0) return r; break;
+						case Operators::OR: if (r->value != 0) return r; break;
 						default: break;
 					}
 				}
@@ -925,17 +942,23 @@ struct ParticleScriptCompiler {
 					case Operators::MOD: l->value = fmodf(l->value, r->value); return l;
 					case Operators::LT: l->value = l->value < r->value ? 1.f : 0.f; return l;
 					case Operators::GT: l->value = l->value > r->value ? 1.f : 0.f; return l;
+					case Operators::AND: l->value = (l->value != 0 && r->value != 0) ? 1.f : 0.f; return l;
+					case Operators::OR: l->value = (l->value != 0 || r->value != 0) ? 1.f : 0.f; return l;
 					default: return node;
 				}
 			}
 			case Node::UNARY_OPERATOR: {
 				auto* n = (UnaryOperatorNode*)node;
-				if (n->op != Operators::SUB) return node;
+				if (n->op != Operators::SUB && n->op != Operators::NOT) return node;
 				
 				Node* r = collapseConstants(n->right, block, is_conditional_block);
 				if (r->type == Node::LITERAL) {
 					auto* literal = (LiteralNode*)r;
-					literal->value = -literal->value;
+					if (n->op == Operators::SUB) {
+						literal->value = -literal->value;
+					} else {
+						literal->value = (literal->value == 0) ? 1.f : 0.f;
+					}
 					return literal;
 				}
 				return node;
@@ -1259,10 +1282,16 @@ struct ParticleScriptCompiler {
 				error(token.value, "Unexpected token ", token.value);
 				return nullptr;
 			}
-
 			case Token::MINUS: {
 				UnaryOperatorNode* node = LUMIX_NEW(m_arena_allocator, UnaryOperatorNode)(token);
 				node->op = (Operators)token.value[0];
+				node->right = atom(ctx);
+				if (!node->right) return nullptr;
+				return node;
+			}
+			case Token::NOT: {
+				UnaryOperatorNode* node = LUMIX_NEW(m_arena_allocator, UnaryOperatorNode)(token);
+				node->op = Operators::NOT;
 				node->right = atom(ctx);
 				if (!node->right) return nullptr;
 				return node;
@@ -1410,6 +1439,7 @@ struct ParticleScriptCompiler {
 				case Token::ERROR: return nullptr;
 
 				case Token::PERCENT:
+				case Token::AND: case Token::OR:
 				case Token::LT: case Token::GT:
 				case Token::SLASH: case Token::STAR:
 				case Token::MINUS: case Token::PLUS: {
@@ -1418,7 +1448,9 @@ struct ParticleScriptCompiler {
 					consumeToken();
 					Node* rhs = expression(ctx, prio);
 					BinaryOperatorNode* opnode = LUMIX_NEW(m_arena_allocator, BinaryOperatorNode)(op);
-					opnode->op = (Operators)op.value[0];
+					if (op.type == Token::AND) opnode->op = Operators::AND;
+					else if (op.type == Token::OR) opnode->op = Operators::OR;
+					else opnode->op = (Operators)op.value[0];
 					opnode->left = lhs;
 					opnode->right = rhs;
 					lhs = opnode;
@@ -1561,6 +1593,7 @@ struct ParticleScriptCompiler {
 				case InstructionType::SIN: forNumStreams(2, itype, ioffset); break;
 				case InstructionType::COS: forNumStreams(2, itype, ioffset); break;
 				case InstructionType::SQRT: forNumStreams(2, itype, ioffset); break;
+				case InstructionType::NOT: forNumStreams(2, itype, ioffset); break;
 				case InstructionType::GT: forNumStreams(3, itype, ioffset); break;
 				case InstructionType::LT: forNumStreams(3, itype, ioffset); break;
 				case InstructionType::SUB: forNumStreams(3, itype, ioffset); break;
@@ -2540,28 +2573,50 @@ struct ParticleScriptCompiler {
 			}
 			case Node::UNARY_OPERATOR: {
 				auto* n = (UnaryOperatorNode*)node;
-				ASSERT(n->op == Operators::SUB);
-				i32 right = compileIR(ctx, n->right);
-				if (right < 0) return -1;
-				i32 num = right;
-				IROp* ir_ops[4];
-				for (i32 i = 0; i < num; ++i) {
-					auto* res = LUMIX_NEW(m_arena_allocator, IROp)(node, m_arena_allocator);
-					res->instruction = InstructionType::MUL;
-					res->dst.type = DataStream::REGISTER;
-					res->dst.index = ++ctx.register_allocator;
-					res->args.push(ctx.stackValue(-num + i));
-					IRValue minus_one;
-					minus_one.type = DataStream::LITERAL;
-					minus_one.value = -1.0f;
-					res->args.push(minus_one);
-					ir_ops[i] = res;
-					ctx.push(res);
+				if (n->op == Operators::SUB) {
+					i32 right = compileIR(ctx, n->right);
+					if (right < 0) return -1;
+					i32 num = right;
+					IROp* ir_ops[4];
+					for (i32 i = 0; i < num; ++i) {
+						auto* res = LUMIX_NEW(m_arena_allocator, IROp)(node, m_arena_allocator);
+						res->instruction = InstructionType::MUL;
+						res->dst.type = DataStream::REGISTER;
+						res->dst.index = ++ctx.register_allocator;
+						res->args.push(ctx.stackValue(-num + i));
+						IRValue minus_one;
+						minus_one.type = DataStream::LITERAL;
+						minus_one.value = -1.0f;
+						res->args.push(minus_one);
+						ir_ops[i] = res;
+						ctx.push(res);
+					}
+					for (i32 i = 0; i < num; ++i) {
+						ctx.stackValue(-num + i) = ir_ops[i]->dst;
+					}
+					return num;
+				} else if (n->op == Operators::NOT) {
+					i32 right = compileIR(ctx, n->right);
+					if (right < 0) return -1;
+					i32 num = right;
+					IROp* ir_ops[4];
+					for (i32 i = 0; i < num; ++i) {
+						auto* res = LUMIX_NEW(m_arena_allocator, IROp)(node, m_arena_allocator);
+						res->instruction = InstructionType::NOT;
+						res->dst.type = DataStream::REGISTER;
+						res->dst.index = ++ctx.register_allocator;
+						res->args.push(ctx.stackValue(-num + i));
+						ir_ops[i] = res;
+						ctx.push(res);
+					}
+					for (i32 i = 0; i < num; ++i) {
+						ctx.stackValue(-num + i) = ir_ops[i]->dst;
+					}
+					return num;
+				} else {
+					ASSERT(false);
+					return -1;
 				}
-				for (i32 i = 0; i < num; ++i) {
-					ctx.stackValue(-num + i) = ir_ops[i]->dst;
-				}
-				return num;
 			}
 			case Node::BINARY_OPERATOR: {
 				auto* n = (BinaryOperatorNode*)node;
@@ -2593,6 +2648,7 @@ struct ParticleScriptCompiler {
 			case Node::IF: {
 				auto* n = (IfNode*)node;
 				i32 cond = compileIR(ctx, n->condition);
+				if (cond < 0) return -1;
 				auto* res = LUMIX_NEW(m_arena_allocator, IRIf)(n);
 				ctx.push(res);
 				if (cond < 0) return -1;
@@ -2766,6 +2822,9 @@ struct ParticleScriptCompiler {
 			case Operators::DIV: return InstructionType::DIV;
 			case Operators::LT: return InstructionType::LT;
 			case Operators::GT: return InstructionType::GT;
+			case Operators::AND: return InstructionType::AND;
+			case Operators::OR: return InstructionType::OR;
+			case Operators::NOT: return InstructionType::NOT;
 		}
 		ASSERT(false);
 		return InstructionType::END;
