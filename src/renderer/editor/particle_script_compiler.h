@@ -677,295 +677,118 @@ struct ParticleScriptCompiler {
 		}
 	}
 
-	// original nodes are left in undefined state
-	Node* collapseConstants(Node* node, BlockNode* block, bool is_conditional_block) {
-		switch (node->type) {
-			case Node::RETURN: {
-				auto* r = (ReturnNode*)node;
-				r->value = collapseConstants(r->value, block, is_conditional_block);
-				return r;
-			}
-			case Node::ASSIGN: {
-				auto* n = (AssignNode*)node;
-				n->right = collapseConstants(n->right, block, is_conditional_block);
-				
-				// n->left is either variable of swizzle node
-				// if n->right is not const, we set the local's is_const to false
-				// if n->right is const, we set the local's is_const to true and set local's values
-				
-				if (n->left->type != Node::VARIABLE && n->left->type != Node::SWIZZLE) return node;
+	// Can evaluate AST tree. It's used to get the value of compile-time constants.
+	struct ASTEvaluator {
+		ASTEvaluator(ParticleScriptCompiler& compiler, IAllocator& allocator)
+			: stack(allocator)
+			, compiler(compiler)
+		{}
 
-				VariableNode* lhs_var;
-				StringView swizzle;
-				if (n->left->type == Node::SWIZZLE) {
-					auto* swizzle_node = (SwizzleNode*)n->left;
-					if (swizzle_node->left->type != Node::VARIABLE) return node;
+		StackArray<float, 16> stack;
+		ParticleScriptCompiler& compiler;
 
-					swizzle = swizzle_node->token.value;
-					lhs_var = (VariableNode*)swizzle_node->left;
-					// only locals can be collapsed to constant
-					if (lhs_var->family != VariableFamily::LOCAL) return node;
-				}
-				else {
-					lhs_var = (VariableNode*)n->left;
-					if (lhs_var->family != VariableFamily::LOCAL) return node;
-
-					switch (lhs_var->block->locals[lhs_var->index].type) {
-						case ValueType::FLOAT: swizzle = "x"; break;
-						case ValueType::FLOAT3: swizzle = "xyz"; break;
-						case ValueType::FLOAT4: swizzle = "xyzw"; break;
-						case ValueType::VOID: ASSERT(false); swizzle = ""; break;
+		void eval(Node* node) {
+			switch (node->type) {
+				case Node::UNARY_OPERATOR: {
+					auto* n = (UnaryOperatorNode*)node;
+					eval(n->right);
+					float value = stack.back();
+					stack.pop();
+					switch (n->op) {
+						case Operators::SUB: stack.push(-value); break;
+						case Operators::NOT: stack.push(value == 0.0f ? 1.0f : 0.0f); break;
+						default: ASSERT(false); break;
 					}
+					break;
 				}
-
-				Local& local = lhs_var->block->locals[lhs_var->index];
-				// we assign to outer scope local inside if/else
-				// so make the local non-const
-				if (lhs_var->block != block && is_conditional_block) {
-					forEachSwizzleToIndex(swizzle, [&](i32 idx) {
-						local.is_const[idx] = false;
-					});
-					return node;
-				}
-
-				if (n->right->type == Node::LITERAL) {
-					forEachSwizzleToIndex(swizzle, [&](i32 idx) {
-						local.is_const[idx] = true;
-						local.values[idx] = ((LiteralNode*)n->right)->value;
-					});
-					return node;
-				}
-				
-				if (n->right->type == Node::COMPOUND) {
-					auto* cn = (CompoundNode*)n->right;
-					ASSERT(cn->elements.size() <= 4);
-					forEachSwizzleToIndex(swizzle, [&](i32 idx) {
-						if (cn->elements[idx]->type == Node::LITERAL) {
-							local.is_const[idx] = true;
-							local.values[idx] = ((LiteralNode*)cn->elements[idx])->value;
-						}
-						else {
-							local.is_const[idx] = false;
-						}
-					});
-					return node;
-				}
-
-				forEachSwizzleToIndex(swizzle, [&](i32 idx) {
-					local.is_const[idx] = false;
-				});
-				return node;
-			}
-			case Node::SWIZZLE: {
-				auto* n = (SwizzleNode*)node;
-				n->left = collapseConstants(n->left, block, is_conditional_block);
-				switch (n->left->type) {
-					case Node::LITERAL: return n->left;
-					case Node::COMPOUND: {
-						auto* compound = (CompoundNode*)n->left;
-						if (n->token.value.size() == 1) {
-							switch (n->token.value[0]) {
-								case 'x': case 'r': return compound->elements[0];
-								case 'y': case 'g': return compound->elements[1];
-								case 'z': case 'b': return compound->elements[2];
-								case 'w': case 'a': return compound->elements[3];
-								default: ASSERT(false); return node;
-							}
-						}
-
-						auto* swizzled = LUMIX_NEW(m_arena_allocator, CompoundNode)(n->token, m_arena_allocator);
-						swizzled->elements.reserve(n->token.value.size());
-						forEachSwizzleToIndex(n->token.value, [&](i32 idx){
-							swizzled->elements.push(compound->elements[idx]);
-						});
-						return swizzled;
+				case Node::SYSCALL: {
+					auto* n = (SysCallNode*)node;
+					for (Node* arg : n->args) {
+						eval(arg);
 					}
-					default: return node;
-				}
-			}
-			case Node::COMPOUND: {
-				auto* n = (CompoundNode*)node;
-				for (Node*& element : n->elements) {
-					element = collapseConstants(element, block, is_conditional_block);
-				}
-				return node;
-			}
-			case Node::BLOCK: {
-				auto* n = (BlockNode*)node;
-				for (Node*& statement : n->statements) {
-					statement = collapseConstants(statement, n, is_conditional_block);
-				}
-				n->statements.eraseItems([](Node* n){ return n == nullptr; });
-				return node;
-			}
-			case Node::SYSCALL: {
-				auto* n = (SysCallNode*)node;
-				bool all_args_const = n->args.size() > 0;
-				for (Node*& arg : n->args) {
-					arg = collapseConstants(arg, block, is_conditional_block);
-					if (arg->type != Node::LITERAL) all_args_const = false;
-				}
-				if (all_args_const) {
-					auto* arg0 = ((LiteralNode*)n->args[0]);
-					auto* arg1 = n->args.size() > 1 ? ((LiteralNode*)n->args[1]) : nullptr;
 					switch (n->function.instruction) {
 						case InstructionType::COS: {
-							auto* res = LUMIX_NEW(m_arena_allocator, LiteralNode)(n->token);
-							res->value = cosf(arg0->value);
-							return res;
+							ASSERT(n->args.size() == 1);
+							float& v = stack.back();
+							v = cosf(v);
+							break;
 						}
 						case InstructionType::SIN: {
-							auto* res = LUMIX_NEW(m_arena_allocator, LiteralNode)(n->token);
-							res->value = sinf(arg0->value);
-							return res;
+							ASSERT(n->args.size() == 1);
+							float& v = stack.back();
+							v = sinf(v);
+							break;
 						}
 						case InstructionType::SQRT: {
-							auto* res = LUMIX_NEW(m_arena_allocator, LiteralNode)(n->token);
-							res->value = sqrtf(arg0->value);
-							return res;
+							ASSERT(n->args.size() == 1);
+							float& v = stack.back();
+							v = sqrtf(v);
+							break;
 						}
 						case InstructionType::MIN: {
-							auto* res = LUMIX_NEW(m_arena_allocator, LiteralNode)(n->token);
-							res->value = minimum(arg0->value, arg1->value);
-							return res;
+							ASSERT(n->args.size() == 2);
+							float v1 = stack.back(); stack.pop();
+							float& v0 = stack.back();
+							v0 = minimum(v0, v1);
+							break;
 						}
 						case InstructionType::MAX: {
-							auto* res = LUMIX_NEW(m_arena_allocator, LiteralNode)(n->token);
-							res->value = maximum(arg0->value, arg1->value);
-							return res;
+							ASSERT(n->args.size() == 2);
+							float v1 = stack.back(); stack.pop();
+							float& v0 = stack.back();
+							v0 = maximum(v0, v1);
+							break;
 						}
-						default: return node;
+						default: ASSERT(false); break;
 					}
+					break;
 				}
-				return node;
-			}
-			case Node::IF: {
-				auto* n = (IfNode*)node;
-				n->condition = collapseConstants(n->condition, block, is_conditional_block);
-				if (n->condition->type == Node::LITERAL) {
-					float v = ((LiteralNode*)n->condition)->value;
-					if (v == 0) {
-						if (n->false_block) collapseConstants(n->false_block, block, false);
-						return n->false_block;
-					}
-					collapseConstants(n->true_block, block, false);
-					return n->true_block;
-				}
-				
-				collapseConstants(n->true_block, block, true);
-				if (n->false_block) collapseConstants(n->false_block, block, true);
-				return node;
-			}
-			case Node::FUNCTION_CALL: {
-				auto* n = (FunctionCallNode*)node;
-				for (Node*& arg : n->args) arg = collapseConstants(arg, block, is_conditional_block);
-				return node;
-			}
-			case Node::FUNCTION_ARG: return node;
-			case Node::EMITTER_REF: return node;
-			case Node::SYSTEM_VALUE: return node;
-			case Node::VARIABLE: {
-				auto* n = (VariableNode*)node;
-				if (n->family != VariableFamily::LOCAL) return node;
+				case Node::BINARY_OPERATOR: {
+					auto* n = (BinaryOperatorNode*)node;
+					i32 l = stack.size();
+					eval(n->left);
+					i32 r = stack.size();
+					eval(n->right);
+					ASSERT(r - l == 1);
+					ASSERT(stack.size() - r == 1);
 
-				const Local& local = n->block->locals[n->index];
-				if (local.type == ValueType::FLOAT) {
-					if (local.is_const[0]) {
-						LiteralNode* ln = LUMIX_NEW(m_arena_allocator, LiteralNode)(node->token);
-						ln->value = local.values[0];
-						return ln;
-					}
-				}
+					float right = stack.back();
+					stack.pop();
+					float left = stack.back();
+					stack.pop();
 
-				u32 num = toCount(local.type);
-				for (u32 i = 0; i < num; ++i) {
-					if (!local.is_const[i]) return node;
-				}
-				CompoundNode* cn = LUMIX_NEW(m_arena_allocator, CompoundNode)(node->token, m_arena_allocator);
-				cn->elements.reserve(num);
-				for (u32 i = 0; i < num; ++i) {
-					LiteralNode* ln = LUMIX_NEW(m_arena_allocator, LiteralNode)(node->token);
-					ln->value = local.values[i];
-					cn->elements.push(ln);
-				}
-				return cn;
-			}
-			case Node::LITERAL: return node;
-			case Node::BINARY_OPERATOR: {
-				auto* n = (BinaryOperatorNode*)node;
-				n->left = collapseConstants(n->left, block, is_conditional_block); 
-				n->right = collapseConstants(n->right, block, is_conditional_block);
-
-				if (n->left->type == Node::LITERAL) {
-					auto* l = (LiteralNode*)n->left;
 					switch (n->op) {
-						case Operators::ADD: if (l->value == 0) return n->right; break;
-						case Operators::MUL:
-							if (l->value == 1) return n->right;
-							if (l->value == 0) return l;
-							break;
-						case Operators::AND: if (l->value == 0) return l; break;
-						case Operators::OR: if (l->value != 0) return l; break;
-						default: break;
-					}
-				}
-
-				if (n->right->type == Node::LITERAL) {
-					auto* r = (LiteralNode*)n->right;
-					switch (n->op) {
+						case Operators::ADD: stack.push(left + right); break;
+						case Operators::SUB: stack.push(left - right); break;
+						case Operators::MUL: stack.push(left * right); break;
 						case Operators::DIV:
-							if (r->value == 0) {
-								error(r->token.value, "Division by zero.");
-								return r;
+							if (right == 0) {
+								compiler.errorAtCurrent("Division by zero.");
+								return;
 							}
+							stack.push(left / right);
 							break;
-						case Operators::ADD: if (r->value == 0) return n->left; break;
-						case Operators::MUL:
-							if (r->value == 1) return n->left;
-							if (r->value == 0) return r;
-							break;
-						case Operators::AND: if (r->value == 0) return r; break;
-						case Operators::OR: if (r->value != 0) return r; break;
-						default: break;
+						case Operators::MOD: stack.push(fmodf(left, right)); break;
+						case Operators::LT: stack.push(left < right ? 1.0f : 0.0f); break;
+						case Operators::GT: stack.push(left > right ? 1.0f : 0.0f); break;
+						case Operators::AND: stack.push((left != 0.0f && right != 0.0f) ? 1.0f : 0.0f); break;
+						case Operators::OR: stack.push((left != 0.0f || right != 0.0f) ? 1.0f : 0.0f); break;
+						default: ASSERT(false); break;
 					}
-				}
 
-				if (n->left->type != Node::LITERAL || n->right->type != Node::LITERAL) return node;
-
-				auto* r = (LiteralNode*)n->right;
-				auto* l = (LiteralNode*)n->left;
-				switch (n->op) {
-					case Operators::ADD: l->value = l->value + r->value; return l;
-					case Operators::SUB: l->value = l->value - r->value; return l;
-					case Operators::MUL: l->value = l->value * r->value; return l;
-					case Operators::DIV: l->value = l->value / r->value; return l;
-					case Operators::MOD: l->value = fmodf(l->value, r->value); return l;
-					case Operators::LT: l->value = l->value < r->value ? 1.f : 0.f; return l;
-					case Operators::GT: l->value = l->value > r->value ? 1.f : 0.f; return l;
-					case Operators::AND: l->value = (l->value != 0 && r->value != 0) ? 1.f : 0.f; return l;
-					case Operators::OR: l->value = (l->value != 0 || r->value != 0) ? 1.f : 0.f; return l;
-					default: return node;
+					break;
 				}
-			}
-			case Node::UNARY_OPERATOR: {
-				auto* n = (UnaryOperatorNode*)node;
-				if (n->op != Operators::SUB && n->op != Operators::NOT) return node;
-				
-				Node* r = collapseConstants(n->right, block, is_conditional_block);
-				if (r->type == Node::LITERAL) {
-					auto* literal = (LiteralNode*)r;
-					if (n->op == Operators::SUB) {
-						literal->value = -literal->value;
-					} else {
-						literal->value = (literal->value == 0) ? 1.f : 0.f;
-					}
-					return literal;
+				case Node::LITERAL: {
+					auto* n = (LiteralNode*)node;
+					stack.push(n->value);
+					break;
 				}
-				return node;
+				default:
+					ASSERT(false);
+					break;
 			}
 		}
-		return node;
-	}
+	};
 
 	Node* atom(CompileContext& ctx) {
 		Node* left = atomInternal(ctx);
@@ -1447,6 +1270,7 @@ struct ParticleScriptCompiler {
 					if (prio <= min_priority) return lhs;
 					consumeToken();
 					Node* rhs = expression(ctx, prio);
+					if (!rhs) return nullptr;
 					BinaryOperatorNode* opnode = LUMIX_NEW(m_arena_allocator, BinaryOperatorNode)(op);
 					if (op.type == Token::AND) opnode->op = Operators::AND;
 					else if (op.type == Token::OR) opnode->op = Operators::OR;
@@ -1506,20 +1330,44 @@ struct ParticleScriptCompiler {
 		ctx.entry_point = EntryPoint::GLOBAL;
 		Node* n = expression(ctx, 0);
 		if (!n) return;
-		n = collapseConstants(n, nullptr, false);
+		
+		ASTEvaluator evaluator(*this, m_arena_allocator);
+		evaluator.eval(n);
 
-		if (n->type != Node::LITERAL) {
-			// TODO floatN constants
+		if (evaluator.stack.empty()) {
 			errorAtCurrent("Expected a constant.");
 			return;
 		}
 
-        float f = ((LiteralNode*)n)->value;
-        c.value[0] = f;
-        c.value[1] = f;
-        c.value[2] = f;
-        c.value[3] = f;
-        c.type = ValueType::FLOAT;
+		switch (evaluator.stack.size()) {
+			case 0: 
+				errorAtCurrent("Expected a constant.");
+				return;
+			case 4:
+				c.value[0] = evaluator.stack[0];
+				c.value[1] = evaluator.stack[1];
+				c.value[2] = evaluator.stack[2];
+				c.value[3] = evaluator.stack[3];
+				c.type = ValueType::FLOAT4;
+				break;
+			case 3:
+				c.value[0] = evaluator.stack[0];
+				c.value[1] = evaluator.stack[1];
+				c.value[2] = evaluator.stack[2];
+				c.value[3] = evaluator.stack[2];
+				c.type = ValueType::FLOAT3;
+				break;
+			case 1:
+				c.value[0] = evaluator.stack[0];
+				c.value[1] = evaluator.stack[0];
+				c.value[2] = evaluator.stack[0];
+				c.value[3] = evaluator.stack[0];
+				c.type = ValueType::FLOAT;
+				break;
+			default:
+				errorAtCurrent("Expected a constant.");
+				return;
+		}
 
 		consume(Token::SEMICOLON);
 	}
@@ -2776,8 +2624,7 @@ struct ParticleScriptCompiler {
 
 		BlockNode* b = block(ctx);
 		if (!b || m_is_error) return;
-		Node* collapsed = collapseConstants(b, nullptr, false);
-		compileIR(irctx, collapsed);
+		compileIR(irctx, b);
 		optimizeIR(irctx);
 		u32 num_used_registers = allocateRegisters(irctx);
 		//printIR(fn_name, irctx);
@@ -2840,7 +2687,6 @@ struct ParticleScriptCompiler {
 		ctx.function = &fn;
 		fn.block = block(ctx);
 		if (!fn.block) return;
-		collapseConstants(fn.block, nullptr, false);
 
 		u32 count = 0;
 		for (const Function& f : m_functions) {

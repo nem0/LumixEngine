@@ -57,12 +57,6 @@ struct TestableCompiler : ParticleScriptCompiler {
 		m_tokenizer.m_current_token = m_tokenizer.nextToken();
 	}
 	
-	Node* testExpression(CompileContext& ctx) {
-		Node* result = expression(ctx, 0);
-		if (result) result = collapseConstants(result, nullptr, false);
-		return result;
-	}
-	
 	const Constant* findConstant(StringView name) const {
 		for (const Constant& c : m_constants) {
 			if (equalStrings(c.name, name)) return &c;
@@ -207,125 +201,81 @@ struct ParticleScriptRunner {
 	float getOutput(u32 index) const { return output_memory[index]; }
 };
 
-// Helper function to test constant folding optimization
-bool testConstantFolding(const char* expr, float expected_value) {
-	TestableCompiler compiler;
-	compiler.initTokenizer(StringView(expr));
-	
-	ParticleScriptCompiler::CompileContext ctx(compiler);
-	ParticleScriptCompiler::Node* result = compiler.testExpression(ctx);
-	
-	if (!result) return false;
-	if (result->type != ParticleScriptCompiler::Node::LITERAL) return false;
-	
-	auto* literal = (ParticleScriptCompiler::LiteralNode*)result;
-	const float epsilon = 0.0001f;
-	return fabsf(literal->value - expected_value) < epsilon;
-}
+bool testCompileTimeEval(const char* src, float value) {
+	StaticString<256> code(R"(
+		const C = )", src,  R"(;
+		emitter test {
+			material "particles/particle.mat"
+		}
+	)");
 
-// Test constant folding for arithmetic operations and math functions
-bool testConstantFoldingOperations() {
-	ASSERT_TRUE(testConstantFolding("2 + 3", 5.0f), "2 + 3 should be folded to 5");
-	ASSERT_TRUE(testConstantFolding("10 - 3", 7.0f), "10 - 3 should be folded to 7");
-	ASSERT_TRUE(testConstantFolding("4 * 5", 20.0f), "4 * 5 should be folded to 20");
-	ASSERT_TRUE(testConstantFolding("20 / 4", 5.0f), "20 / 4 should be folded to 5");
-	ASSERT_TRUE(testConstantFolding("10 % 3", 1.0f), "10 % 3 should be folded to 1");
-	ASSERT_TRUE(testConstantFolding("2 + 3 * 4", 14.0f), "2 + 3 * 4 should be folded to 14");
-	ASSERT_TRUE(testConstantFolding("(2 + 3) * 4", 20.0f), "(2 + 3) * 4 should be folded to 20");
-	ASSERT_TRUE(testConstantFolding("10 - 2 - 3", 5.0f), "10 - 2 - 3 should be folded to 5");
-	ASSERT_TRUE(testConstantFolding("100 / 5 / 2", 10.0f), "100 / 5 / 2 should be folded to 10");
-	ASSERT_TRUE(testConstantFolding("-5 + 3", -2.0f), "-5 + 3 should be folded to -2");
-	ASSERT_TRUE(testConstantFolding("-(2 + 3)", -5.0f), "-(2 + 3) should be folded to -5");
-	ASSERT_TRUE(testConstantFolding("2 * 3 + 4 * 5", 26.0f), "2 * 3 + 4 * 5 should be folded to 26");
-	ASSERT_TRUE(testConstantFolding("sqrt(16)", 4.0f), "sqrt(16) should be folded to 4");
-	ASSERT_TRUE(testConstantFolding("sqrt(25)", 5.0f), "sqrt(25) should be folded to 5");
-	ASSERT_TRUE(testConstantFolding("sqrt(4) + sqrt(9)", 5.0f), "sqrt(4) + sqrt(9) should be folded to 5");
-	ASSERT_TRUE(testConstantFolding("sin(0)", 0.0f), "sin(0) should be folded to 0");
-	ASSERT_TRUE(testConstantFolding("cos(0)", 1.0f), "cos(0) should be folded to 1");
-	ASSERT_TRUE(testConstantFolding("min(3, 7)", 3.0f), "min(3, 7) should be folded to 3");
-	ASSERT_TRUE(testConstantFolding("max(3, 7)", 7.0f), "max(3, 7) should be folded to 7");
-	ASSERT_TRUE(testConstantFolding("min(5, 2) + max(1, 4)", 6.0f), "min(5, 2) + max(1, 4) should be folded to 6");
-	ASSERT_TRUE(testConstantFolding("2.5 + 3.5", 6.0f), "2.5 + 3.5 should be folded to 6");
-	ASSERT_TRUE(testConstantFolding("10.5 - 3.2", 7.3f), "10.5 - 3.2 should be folded to 7.3");
-	ASSERT_TRUE(testConstantFolding("2.5 * 4.0", 10.0f), "2.5 * 4.0 should be folded to 10");
-	ASSERT_TRUE(testConstantFolding("7.5 / 2.5", 3.0f), "7.5 / 2.5 should be folded to 3");
-	ASSERT_TRUE(testConstantFolding("0.5 + 0.25 * 4.0", 1.5f), "0.5 + 0.25 * 4.0 should be folded to 1.5");
-	ASSERT_TRUE(testConstantFolding("-3.14 + 1.14", -2.0f), "-3.14 + 1.14 should be folded to -2");
-	ASSERT_TRUE(testConstantFolding("sqrt(max(16, 9))", 4.0f), "sqrt(max(16, 9)) should be folded to 4");
-	ASSERT_TRUE(testConstantFolding("2 * sqrt(4) + 3", 7.0f), "2 * sqrt(4) + 3 should be folded to 7");
-	ASSERT_TRUE(testConstantFolding("sin(cos(0))", 0.8414709848f), "sin(cos(0)) should be folded to sin(1)");
-	ASSERT_TRUE(testConstantFolding("max(min(5, 3), 2)", 3.0f), "max(min(5, 3), 2) should be folded to 3");
-	ASSERT_TRUE(testConstantFolding("sqrt(9) * sqrt(4)", 6.0f), "sqrt(9) * sqrt(4) should be folded to 6");
-	return true;
+	TestableCompiler compiler;
+	OutputMemoryStream compiled(getGlobalAllocator());
+	if (!compiler.compile(Path("const_eval.pat"), code, compiled)) return false;
+
+	const ParticleScriptCompiler::Constant* C = compiler.findConstant("C");
+	if (!C) return false;
+	if (C->type != ParticleScriptCompiler::ValueType::FLOAT) return false;
+
+	return fabsf(C->value[0] - value) < 0.001f;
 }
 
 // Test constant declarations with literal values and expressions
-bool testCompileConst() {
-	const char* emitter_code = R"(
-		const PI = 3.14159265;
-		const GRAVITY = 9.8;
-		const TWO_PI = PI * 2;
-		const HALF_PI = PI / 2;
-		const SQRT_TWO = sqrt(2);
-		const COMBINED = (PI + 1) * 2;
+bool testCompileTimeEval() {
+	ASSERT_TRUE(testCompileTimeEval("2 + 3", 5.0f), "2 + 3 should be folded to 5");
+	ASSERT_TRUE(testCompileTimeEval("10 - 3", 7.0f), "10 - 3 should be folded to 7");
+	ASSERT_TRUE(testCompileTimeEval("4 * 5", 20.0f), "4 * 5 should be folded to 20");
+	ASSERT_TRUE(testCompileTimeEval("20 / 4", 5.0f), "20 / 4 should be folded to 5");
+	ASSERT_TRUE(testCompileTimeEval("10 % 3", 1.0f), "10 % 3 should be folded to 1");
+	ASSERT_TRUE(testCompileTimeEval("2 + 3 * 4", 14.0f), "2 + 3 * 4 should be folded to 14");
+	ASSERT_TRUE(testCompileTimeEval("(2 + 3) * 4", 20.0f), "(2 + 3) * 4 should be folded to 20");
+	ASSERT_TRUE(testCompileTimeEval("10 - 2 - 3", 5.0f), "10 - 2 - 3 should be folded to 5");
+	ASSERT_TRUE(testCompileTimeEval("100 / 5 / 2", 10.0f), "100 / 5 / 2 should be folded to 10");
+	ASSERT_TRUE(testCompileTimeEval("-5 + 3", -2.0f), "-5 + 3 should be folded to -2");
+	ASSERT_TRUE(testCompileTimeEval("-(2 + 3)", -5.0f), "-(2 + 3) should be folded to -5");
+	ASSERT_TRUE(testCompileTimeEval("2 * 3 + 4 * 5", 26.0f), "2 * 3 + 4 * 5 should be folded to 26");
+	ASSERT_TRUE(testCompileTimeEval("sqrt(16)", 4.0f), "sqrt(16) should be folded to 4");
+	ASSERT_TRUE(testCompileTimeEval("sqrt(25)", 5.0f), "sqrt(25) should be folded to 5");
+	ASSERT_TRUE(testCompileTimeEval("sqrt(4) + sqrt(9)", 5.0f), "sqrt(4) + sqrt(9) should be folded to 5");
+	ASSERT_TRUE(testCompileTimeEval("sin(0)", 0.0f), "sin(0) should be folded to 0");
+	ASSERT_TRUE(testCompileTimeEval("cos(0)", 1.0f), "cos(0) should be folded to 1");
+	ASSERT_TRUE(testCompileTimeEval("min(3, 7)", 3.0f), "min(3, 7) should be folded to 3");
+	ASSERT_TRUE(testCompileTimeEval("max(3, 7)", 7.0f), "max(3, 7) should be folded to 7");
+	ASSERT_TRUE(testCompileTimeEval("min(5, 2) + max(1, 4)", 6.0f), "min(5, 2) + max(1, 4) should be folded to 6");
+	ASSERT_TRUE(testCompileTimeEval("2.5 + 3.5", 6.0f), "2.5 + 3.5 should be folded to 6");
+	ASSERT_TRUE(testCompileTimeEval("10.5 - 3.2", 7.3f), "10.5 - 3.2 should be folded to 7.3");
+	ASSERT_TRUE(testCompileTimeEval("2.5 * 4.0", 10.0f), "2.5 * 4.0 should be folded to 10");
+	ASSERT_TRUE(testCompileTimeEval("7.5 / 2.5", 3.0f), "7.5 / 2.5 should be folded to 3");
+	ASSERT_TRUE(testCompileTimeEval("0.5 + 0.25 * 4.0", 1.5f), "0.5 + 0.25 * 4.0 should be folded to 1.5");
+	ASSERT_TRUE(testCompileTimeEval("-3.14 + 1.14", -2.0f), "-3.14 + 1.14 should be folded to -2");
+	ASSERT_TRUE(testCompileTimeEval("sqrt(max(16, 9))", 4.0f), "sqrt(max(16, 9)) should be folded to 4");
+	ASSERT_TRUE(testCompileTimeEval("2 * sqrt(4) + 3", 7.0f), "2 * sqrt(4) + 3 should be folded to 7");
+	ASSERT_TRUE(testCompileTimeEval("sin(cos(0))", 0.8414709848f), "sin(cos(0)) should be folded to sin(1)");
+	ASSERT_TRUE(testCompileTimeEval("max(min(5, 3), 2)", 3.0f), "max(min(5, 3), 2) should be folded to 3");
+	ASSERT_TRUE(testCompileTimeEval("sqrt(9) * sqrt(4)", 6.0f), "sqrt(9) * sqrt(4) should be folded to 6");
+	return true;
+}
 
+// Test constant declarations using other constants
+bool testCompileTimeConstUsingConst() {
+	const char* code = R"(
+		const C = 2;
+		const A = 5;
+		const B = max(A, C) + 3;
 		emitter test {
 			material "particles/particle.mat"
-			init_emit_count 10
-
-			out i_position : float3
-			out i_scale : float
-
-			var position : float3
-	
-			fn output() {
-				i_position = position;
-				i_scale = TWO_PI;
-			}
-	
-			fn emit() {
-				position = {0, 0, 0};
-			}
-	
-			fn update() {
-				position.y = position.y - GRAVITY * time_delta;
-				position.x = HALF_PI + SQRT_TWO + COMBINED;
-			}
 		}
 	)";
-	
+
 	TestableCompiler compiler;
-	OutputMemoryStream output(getGlobalAllocator());
-	
-	bool success = compiler.compile(Path("test.pat"), emitter_code, output);
-	ASSERT_TRUE(success, "Compilation with constants should succeed");
-	ASSERT_TRUE(output.size() > 0, "Output should contain compiled data");
-	
-	const auto* pi = compiler.findConstant("PI");
-	ASSERT_TRUE(pi != nullptr, "PI constant should be defined");
-	ASSERT_TRUE(fabsf(pi->value[0] - 3.14159265f) < 0.0001f, "PI should have correct value");
-	
-	const auto* gravity = compiler.findConstant("GRAVITY");
-	ASSERT_TRUE(gravity != nullptr, "GRAVITY constant should be defined");
-	ASSERT_TRUE(fabsf(gravity->value[0] - 9.8f) < 0.0001f, "GRAVITY should have correct value");
-	
-	const auto* two_pi = compiler.findConstant("TWO_PI");
-	ASSERT_TRUE(two_pi != nullptr, "TWO_PI constant should be defined");
-	ASSERT_TRUE(fabsf(two_pi->value[0] - (3.14159265f * 2)) < 0.0001f, "TWO_PI should be PI * 2");
-	
-	const auto* half_pi = compiler.findConstant("HALF_PI");
-	ASSERT_TRUE(half_pi != nullptr, "HALF_PI constant should be defined");
-	ASSERT_TRUE(fabsf(half_pi->value[0] - (3.14159265f / 2)) < 0.0001f, "HALF_PI should be PI / 2");
-	
-	const auto* sqrt_two = compiler.findConstant("SQRT_TWO");
-	ASSERT_TRUE(sqrt_two != nullptr, "SQRT_TWO constant should be defined");
-	ASSERT_TRUE(fabsf(sqrt_two->value[0] - sqrtf(2)) < 0.0001f, "SQRT_TWO should be sqrt(2)");
-	
-	const auto* combined = compiler.findConstant("COMBINED");
-	ASSERT_TRUE(combined != nullptr, "COMBINED constant should be defined");
-	ASSERT_TRUE(fabsf(combined->value[0] - ((3.14159265f + 1) * 2)) < 0.0001f, "COMBINED should be (PI + 1) * 2");
-	
-	return true;
+	OutputMemoryStream compiled(getGlobalAllocator());
+	if (!compiler.compile(Path("const_eval_multi.pat"), code, compiled)) return false;
+
+	const ParticleScriptCompiler::Constant* B = compiler.findConstant("B");
+	if (!B) return false;
+	if (B->type != ParticleScriptCompiler::ValueType::FLOAT) return false;
+
+	return fabsf(B->value[0] - 8.f) < 0.001f;
 }
 
 // Test emitter with input, output, and var variables
@@ -742,7 +692,7 @@ bool testParticleScriptUserFunctions() {
 }
 
 // Test that constant folding reduces instruction count
-bool testConstantFoldingInstructionCount() {
+bool testFolding() {
 	// Script with constant expressions and user-defined functions that should be folded at compile time
 	const char* folded_code = R"(
 		fn double(x) {
@@ -845,7 +795,7 @@ bool testConstantFoldingInstructionCount() {
 }
 
 // Test that constant folding eliminates dead branches in if conditionals
-bool testConstantFoldingIfConditionals() {
+bool testIfConditionalsFolding() {
 	// Script with if conditionals that have constant conditions - should be folded away
 	const char* folded_code = R"(
 		fn conditional_calc(x) {
@@ -1752,20 +1702,50 @@ bool testLogicOperators() {
 	return true;
 }
 
+bool testParticleScriptIfElse() {
+	const char* code = R"(
+		emitter test {
+			material "particles/particle.mat"
+			var v : float
+
+			fn emit() { v = 1; }
+
+			fn update() {
+				if v > 0 {
+					v = 2;
+				}
+				else {
+					v = 3;
+				}
+			}
+		}
+	)";
+
+	ParticleScriptRunner runner;
+	ASSERT_TRUE(runner.compile(code), "Compilation should succeed");
+
+	runner.runEmit();
+	runner.runUpdate();
+
+	ASSERT_TRUE(fabsf(runner.getChannel(0) - 2.0f) < 0.001f, "flag should be 2 (true branch)");
+
+	return true;
+}
+
 } // anonymous namespace
 
 void runParticleScriptCompilerTests() {
 	logInfo("=== Running Particle Script Compiler Tests ===");
 	
-	RUN_TEST(testConstantFoldingOperations);
-	RUN_TEST(testCompileConst);
+	RUN_TEST(testCompileTimeEval);
+	RUN_TEST(testCompileTimeConstUsingConst);
 	RUN_TEST(testCompileEmitterVariables);
 	RUN_TEST(testCompileCompounds);
 	RUN_TEST(testParticleScriptExecution);
 	RUN_TEST(testParticleScriptLocalVars);
 	RUN_TEST(testParticleScriptUserFunctions);
-	RUN_TEST(testConstantFoldingInstructionCount);
-	RUN_TEST(testConstantFoldingIfConditionals);
+	RUN_TEST(testFolding);
+	RUN_TEST(testIfConditionalsFolding);
 	RUN_TEST(testParticleScriptSyscalls);
 	RUN_TEST(testParticleScriptSystemValues);
 	RUN_TEST(testBasicImport);
@@ -1776,6 +1756,7 @@ void runParticleScriptCompilerTests() {
 	RUN_TEST(testUnusedLocalOptimization);
 	RUN_TEST(testUnaryMinus);
 	RUN_TEST(testLogicOperators);
+	RUN_TEST(testParticleScriptIfElse);
 	
 	logInfo("=== Test Results: ", passed_count, "/", test_count, " passed ===");
 }

@@ -682,6 +682,7 @@ ParticleSystem::RunResult ParticleSystem::run(RunningContext& ctx, IAllocator& t
 	const u32 register_access_idx = ctx.register_access_idx;
 	World* world = ctx.world;
 	EntityPtr entity = ctx.entity;
+	StackArray<u32, 4> skip_stack(tmp_allocator);
 
 	auto getConstValue = [&](const DataStream& str) -> float {
 		switch (str.type) {
@@ -718,6 +719,11 @@ ParticleSystem::RunResult ParticleSystem::run(RunningContext& ctx, IAllocator& t
 		const InstructionType it = ip.read<InstructionType>();
 		switch (it) {
 			case InstructionType::END:
+				if (!skip_stack.empty()) {
+					ip.skip(skip_stack.last());
+					skip_stack.pop();
+					break;
+				}
 				--end_counter;
 				if (end_counter > 0) break;
 				return result;
@@ -844,8 +850,7 @@ ParticleSystem::RunResult ParticleSystem::run(RunningContext& ctx, IAllocator& t
 				const DataStream op1 = ip.read<DataStream>();
 
 				const bool res = getConstValue(op0) != 0 && getConstValue(op1) != 0;
-				float v;
-				memset(&v, res ? 0xffFFffFF : 0, sizeof(float));
+				float v = res ? 1.f : 0.f;
 				setValue(dst, v);
 				break;
 			}
@@ -855,8 +860,7 @@ ParticleSystem::RunResult ParticleSystem::run(RunningContext& ctx, IAllocator& t
 				const DataStream op1 = ip.read<DataStream>();
 
 				const bool res = getConstValue(op0) != 0 || getConstValue(op1) != 0;
-				float v;
-				memset(&v, res ? 0xffFFffFF : 0, sizeof(float));
+				float v = res ? 1.f : 0.f;
 				setValue(dst, v);
 				break;
 			}
@@ -981,9 +985,19 @@ ParticleSystem::RunResult ParticleSystem::run(RunningContext& ctx, IAllocator& t
 			}
 			case InstructionType::GRADIENT:
 			case InstructionType::BLEND:
-			case InstructionType::CMP_ELSE:
-				ASSERT(false);
+			case InstructionType::CMP_ELSE: {
+				DataStream condition_stream = ip.read<DataStream>();
+				const u16 true_block_size = ip.read<u16>();
+				const u16 false_block_size = ip.read<u16>();
+				float cond = getConstValue(condition_stream);
+				if (cond) {
+					skip_stack.push(false_block_size);
+				} else {
+					ip.skip(true_block_size);
+					++end_counter;
+				}
 				break;
+			}
 		}
 	}
 }
@@ -1065,7 +1079,6 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 				single_ctx.emitters = m_resource->getEmitters();
 				single_ctx.is_ribbon = emitter.resource_emitter.max_ribbons > 0;
 
-				// TODO serialize block length so we can avoid this
 				InputMemoryStream true_block_ip((const u8*)ip.getData() + ip.getPosition(), true_block_size);
 				InputMemoryStream false_block_ip((const u8*)true_block_ip.getData() + true_block_size, false_block_size);
 				ip.setPosition(ip.getPosition() + true_block_size + false_block_size);
