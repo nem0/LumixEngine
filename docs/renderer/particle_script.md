@@ -58,6 +58,42 @@ emitter EmitterName {
 - `global` - Declares global variables. This can be set from outside the particle system, e.g., by a lua script.
 - `fn` - Defines a function.
 
+## Global Constants
+
+Global constants are compile-time evaluated values that are accessible throughout the particle script. They are declared using the `const` keyword and must be initialized with a constant expression.
+
+### Declaration
+
+```hlsl
+const PI = 3.14159;
+const GRAVITY = 9.8;
+const MAX_SPEED = 100.0;
+```
+
+Constants can use expressions, including function calls, as long as they can be evaluated at compile time:
+
+```hlsl
+const HALF_PI = PI / 2;
+const GRAVITY_SQUARED = GRAVITY * GRAVITY;
+const MAX_DISTANCE = sqrt(MAX_SPEED * MAX_SPEED + GRAVITY_SQUARED);
+```
+
+### Usage
+
+Constants can be used anywhere in the script where a literal value is expected:
+
+```hlsl
+fn update() {
+    velocity.y = velocity.y - GRAVITY * dt;
+    if speed > MAX_SPEED {
+        // clamp speed
+        speed = MAX_SPEED;
+    }
+}
+```
+
+Constants are evaluated once during compilation and cannot be modified at runtime.
+
 ### Control Flow
 - `if` / `else` - Conditional statements
 - `return` - Return from function

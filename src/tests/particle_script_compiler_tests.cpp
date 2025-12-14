@@ -278,6 +278,39 @@ bool testCompileTimeConstUsingConst() {
 	return fabsf(B->value[0] - 8.f) < 0.001f;
 }
 
+// Test constants that call user-defined functions
+bool testCompileTimeConstUsingUserFunction() {
+	const char* code = R"(
+		fn add(a, b) {
+			return a + b;
+		}
+
+		fn multiply(x, y) {
+			return x * y;
+		}
+
+		const C = add(3, 4);
+		const D = multiply(C, 2);
+		emitter test {
+			material "particles/particle.mat"
+		}
+	)";
+
+	TestableCompiler compiler;
+	OutputMemoryStream compiled(getGlobalAllocator());
+	if (!compiler.compile(Path("const_eval_user_func.pat"), code, compiled)) return false;
+
+	const ParticleScriptCompiler::Constant* C = compiler.findConstant("C");
+	if (!C) return false;
+	if (C->type != ParticleScriptCompiler::ValueType::FLOAT) return false;
+	if (fabsf(C->value[0] - 7.f) >= 0.001f) return false;
+
+	const ParticleScriptCompiler::Constant* D = compiler.findConstant("D");
+	if (!D) return false;
+	if (D->type != ParticleScriptCompiler::ValueType::FLOAT) return false;
+	return fabsf(D->value[0] - 14.f) < 0.001f;
+}
+
 // Test emitter with input, output, and var variables
 bool testCompileEmitterVariables() {
 	const char* emitter_code = R"(
@@ -1739,6 +1772,7 @@ void runParticleScriptCompilerTests() {
 	
 	RUN_TEST(testCompileTimeEval);
 	RUN_TEST(testCompileTimeConstUsingConst);
+	RUN_TEST(testCompileTimeConstUsingUserFunction);
 	RUN_TEST(testCompileEmitterVariables);
 	RUN_TEST(testCompileCompounds);
 	RUN_TEST(testParticleScriptExecution);

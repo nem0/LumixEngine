@@ -686,9 +686,49 @@ struct ParticleScriptCompiler {
 
 		StackArray<float, 16> stack;
 		ParticleScriptCompiler& compiler;
+		i32 arg_offset = -9000;
 
 		void eval(Node* node) {
 			switch (node->type) {
+				case Node::FUNCTION_ARG: {
+					auto* n = (FunctionArgNode*)node;
+					stack.push(stack[arg_offset + n->index]);
+					// TODO read from stack
+					break;
+				}
+				case Node::RETURN: {
+					auto* n = (ReturnNode*)node;
+					eval(n->value);
+					return;
+				}
+				case Node::BLOCK: {
+					auto* n = (BlockNode*)node;
+					for (Node* statement : n->statements) {
+						eval(statement);
+					}
+					break;
+				}
+				case Node::FUNCTION_CALL: {
+					// TODO we assume all args and result is float
+					auto* n = (FunctionCallNode*)node;
+					const Function& fn = compiler.m_functions[n->function_index];
+					u32 prev_arg_offset = arg_offset;
+					arg_offset = stack.size();
+					for (Node* arg : n->args) {
+						eval(arg);
+					}
+					u32 args_end = stack.size();
+					eval(fn.block);
+					ASSERT(stack.size() == args_end + 1); // TODO
+					float result = stack.back();
+					stack.pop();
+					for (u32 i = 0; i < (u32)n->args.size(); ++i) {
+						stack.pop();
+					}
+					stack.push(result);
+					arg_offset = prev_arg_offset;
+					break;
+				}
 				case Node::UNARY_OPERATOR: {
 					auto* n = (UnaryOperatorNode*)node;
 					eval(n->right);
@@ -731,6 +771,10 @@ struct ParticleScriptCompiler {
 							float& v0 = stack.back();
 							v0 = minimum(v0, v1);
 							break;
+						}
+						case InstructionType::RAND: {
+							compiler.errorAtCurrent("Random called when trying to evaluate a compile-time constant.");
+							return;
 						}
 						case InstructionType::MAX: {
 							ASSERT(n->args.size() == 2);
