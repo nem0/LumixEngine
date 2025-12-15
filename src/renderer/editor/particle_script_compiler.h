@@ -708,6 +708,18 @@ struct ParticleScriptCompiler {
 					}
 					break;
 				}
+				case Node::IF: {
+					auto* n = (IfNode*)node;
+					eval(n->condition);
+					float cond = stack.back();
+					stack.pop();
+					if (cond != 0.0f) {
+						eval(n->true_block);
+					} else if (n->false_block) {
+						eval(n->false_block);
+					}
+					break;
+				}
 				case Node::FUNCTION_CALL: {
 					// TODO we assume all args and result is float
 					auto* n = (FunctionCallNode*)node;

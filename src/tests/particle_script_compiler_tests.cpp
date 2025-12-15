@@ -311,6 +311,39 @@ bool testCompileTimeConstUsingUserFunction() {
 	return fabsf(D->value[0] - 14.f) < 0.001f;
 }
 
+// Test compile-time constant initialized with user-defined function containing if conditional
+bool testCompileTimeConstWithUserFunctionIf() {
+	const char* code = R"(
+		fn func_with_if(x) {
+			if x > 5 {
+				return x * 2;
+			} else {
+				return x + 1;
+			}
+		}
+
+		const C = func_with_if(10);  // 10 > 5, so 10 * 2 = 20
+		const D = func_with_if(3);   // 3 > 5 is false, so 3 + 1 = 4
+		emitter test {
+			material "particles/particle.mat"
+		}
+	)";
+
+	TestableCompiler compiler;
+	OutputMemoryStream compiled(getGlobalAllocator());
+	if (!compiler.compile(Path("const_eval_user_func_if.pat"), code, compiled)) return false;
+
+	const ParticleScriptCompiler::Constant* C = compiler.findConstant("C");
+	if (!C) return false;
+	if (C->type != ParticleScriptCompiler::ValueType::FLOAT) return false;
+	if (fabsf(C->value[0] - 20.f) >= 0.001f) return false;
+
+	const ParticleScriptCompiler::Constant* D = compiler.findConstant("D");
+	if (!D) return false;
+	if (D->type != ParticleScriptCompiler::ValueType::FLOAT) return false;
+	return fabsf(D->value[0] - 4.f) < 0.001f;
+}
+
 // Test emitter with input, output, and var variables
 bool testCompileEmitterVariables() {
 	const char* emitter_code = R"(
@@ -1437,6 +1470,24 @@ bool testCompilationErrors() {
 		)"
 	);
 
+	expectCompilationFailure("conditional expression in constant initialization",
+		R"(
+			const A = if true then 1 else 2;
+			emitter test {
+				material "particles/particle.mat"
+			}
+		)"
+	);
+
+	expectCompilationFailure("ternary conditional in constant initialization",
+		R"(
+			const A = true ? 1 : 2;
+			emitter test {
+				material "particles/particle.mat"
+			}
+		)"
+	);
+
 	return all_tests_passed;
 }
 
@@ -1773,6 +1824,7 @@ void runParticleScriptCompilerTests() {
 	RUN_TEST(testCompileTimeEval);
 	RUN_TEST(testCompileTimeConstUsingConst);
 	RUN_TEST(testCompileTimeConstUsingUserFunction);
+	RUN_TEST(testCompileTimeConstWithUserFunctionIf);
 	RUN_TEST(testCompileEmitterVariables);
 	RUN_TEST(testCompileCompounds);
 	RUN_TEST(testParticleScriptExecution);
