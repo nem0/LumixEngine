@@ -297,9 +297,12 @@ static void registerInputAPI(lua_State* state) {
 
 	#undef REGISTER_KEYCODE
 }
-static int LUA_raycast(lua_State* L)
+
+static int LUA_raycastEx(lua_State* L)
 {
-	auto* module = LuaWrapper::checkArg<PhysicsModule*>(L, 1);
+	LuaWrapper::checkTableArg(L, 1);
+	PhysicsModule* module;
+	if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
 	Vec3 origin = LuaWrapper::checkArg<Vec3>(L, 2);
 	Vec3 dir = LuaWrapper::checkArg<Vec3>(L, 3);
 	const int layer = lua_gettop(L) > 3 ? LuaWrapper::checkArg<int>(L, 4) : -1;
@@ -327,7 +330,13 @@ struct LuaScriptSystemImpl final : LuaScriptSystem
 		registerEngineAPI(m_state, &m_engine);
 		registerInputAPI(m_state);
 		registerRendererAPI(m_state, m_engine);
-		LuaWrapper::createSystemFunction(m_state, "Physics", "raycast", &LUA_raycast);
+
+		LuaWrapper::DebugGuard guard(m_state);
+		lua_getglobal(m_state, "LumixModules");
+		lua_getfield(m_state, -1, "physics");
+		lua_pushcfunction(m_state, LUA_raycastEx, "raycastEx");
+		lua_setfield(m_state, -2, "raycastEx");
+		lua_pop(m_state, 2);
 	}
 
 	void createModules(World& world) override;

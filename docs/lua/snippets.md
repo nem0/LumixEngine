@@ -21,6 +21,12 @@ for i = 1, 7 do
 end
 ```
 
+### raycastEx
+```lua
+local hit, entity, hitpos, hitnormal = this.world.physics:raycastEx(this.position, {1, -1, 0})
+```
+
+
 ### Instantiate a prefab
 ```lua
 ext_prefab = Lumix.Resource:newEmpty("prefab")
