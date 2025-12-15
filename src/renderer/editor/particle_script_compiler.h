@@ -30,7 +30,7 @@ namespace Lumix {
 
 struct ParticleScriptToken {
 	enum Type {
-		EOF, ERROR, SEMICOLON, COMMA, COLON, DOT,
+		EOF, ERROR, SEMICOLON, COMMA, COLON, DOT, 
 		LEFT_PAREN, RIGHT_PAREN, LEFT_BRACE, RIGHT_BRACE,
 		STAR, SLASH, MINUS, PLUS, EQUAL, PERCENT, GT, LT,
 		NUMBER, STRING, IDENTIFIER,
@@ -688,37 +688,38 @@ struct ParticleScriptCompiler {
 		ParticleScriptCompiler& compiler;
 		i32 arg_offset = -9000;
 
-		void eval(Node* node) {
+		// returns false on failure
+		bool eval(Node* node) {
+			if (compiler.m_is_error) return false;
+
 			switch (node->type) {
 				case Node::FUNCTION_ARG: {
 					auto* n = (FunctionArgNode*)node;
 					stack.push(stack[arg_offset + n->index]);
-					// TODO read from stack
-					break;
+					return true;
 				}
 				case Node::RETURN: {
 					auto* n = (ReturnNode*)node;
-					eval(n->value);
-					return;
+					return eval(n->value);
 				}
 				case Node::BLOCK: {
 					auto* n = (BlockNode*)node;
 					for (Node* statement : n->statements) {
-						eval(statement);
+						if (!eval(statement)) return false;
 					}
-					break;
+					return true;
 				}
 				case Node::IF: {
 					auto* n = (IfNode*)node;
-					eval(n->condition);
+					if (!eval(n->condition)) return false;
 					float cond = stack.back();
 					stack.pop();
 					if (cond != 0.0f) {
-						eval(n->true_block);
+						return eval(n->true_block);
 					} else if (n->false_block) {
-						eval(n->false_block);
+						return eval(n->false_block);
 					}
-					break;
+					return true;
 				}
 				case Node::FUNCTION_CALL: {
 					// TODO we assume all args and result is float
@@ -727,10 +728,10 @@ struct ParticleScriptCompiler {
 					u32 prev_arg_offset = arg_offset;
 					arg_offset = stack.size();
 					for (Node* arg : n->args) {
-						eval(arg);
+						if (!eval(arg)) return false;
 					}
 					u32 args_end = stack.size();
-					eval(fn.block);
+					if (!eval(fn.block)) return false;
 					ASSERT(stack.size() == args_end + 1); // TODO
 					float result = stack.back();
 					stack.pop();
@@ -739,11 +740,11 @@ struct ParticleScriptCompiler {
 					}
 					stack.push(result);
 					arg_offset = prev_arg_offset;
-					break;
+					return true;
 				}
 				case Node::UNARY_OPERATOR: {
 					auto* n = (UnaryOperatorNode*)node;
-					eval(n->right);
+					if (!eval(n->right)) return false;
 					float value = stack.back();
 					stack.pop();
 					switch (n->op) {
@@ -751,60 +752,61 @@ struct ParticleScriptCompiler {
 						case Operators::NOT: stack.push(value == 0.0f ? 1.0f : 0.0f); break;
 						default: ASSERT(false); break;
 					}
-					break;
+					return true;
 				}
 				case Node::SYSCALL: {
 					auto* n = (SysCallNode*)node;
 					for (Node* arg : n->args) {
-						eval(arg);
+						if (!eval(arg)) return false;
 					}
 					switch (n->function.instruction) {
 						case InstructionType::COS: {
 							ASSERT(n->args.size() == 1);
 							float& v = stack.back();
 							v = cosf(v);
-							break;
+							return true;
 						}
 						case InstructionType::SIN: {
 							ASSERT(n->args.size() == 1);
 							float& v = stack.back();
 							v = sinf(v);
-							break;
+							return true;
 						}
 						case InstructionType::SQRT: {
 							ASSERT(n->args.size() == 1);
 							float& v = stack.back();
 							v = sqrtf(v);
-							break;
+							return true;
 						}
 						case InstructionType::MIN: {
 							ASSERT(n->args.size() == 2);
 							float v1 = stack.back(); stack.pop();
 							float& v0 = stack.back();
 							v0 = minimum(v0, v1);
-							break;
+							return true;
 						}
 						case InstructionType::RAND: {
 							compiler.errorAtCurrent("Random called when trying to evaluate a compile-time constant.");
-							return;
+							return true;
 						}
 						case InstructionType::MAX: {
 							ASSERT(n->args.size() == 2);
 							float v1 = stack.back(); stack.pop();
 							float& v0 = stack.back();
 							v0 = maximum(v0, v1);
-							break;
+							return true;
 						}
-						default: ASSERT(false); break;
+						default: break;
 					}
-					break;
+					ASSERT(false); 
+					return false;
 				}
 				case Node::BINARY_OPERATOR: {
 					auto* n = (BinaryOperatorNode*)node;
 					i32 l = stack.size();
-					eval(n->left);
+					if (!eval(n->left)) return false;
 					i32 r = stack.size();
-					eval(n->right);
+					if (!eval(n->right)) return false;
 					ASSERT(r - l == 1);
 					ASSERT(stack.size() - r == 1);
 
@@ -814,22 +816,22 @@ struct ParticleScriptCompiler {
 					stack.pop();
 
 					switch (n->op) {
-						case Operators::ADD: stack.push(left + right); break;
-						case Operators::SUB: stack.push(left - right); break;
-						case Operators::MUL: stack.push(left * right); break;
+						case Operators::ADD: stack.push(left + right); return true;
+						case Operators::SUB: stack.push(left - right); return true;
+						case Operators::MUL: stack.push(left * right); return true;
 						case Operators::DIV:
 							if (right == 0) {
 								compiler.errorAtCurrent("Division by zero.");
-								return;
+								return false;
 							}
 							stack.push(left / right);
-							break;
-						case Operators::MOD: stack.push(fmodf(left, right)); break;
-						case Operators::LT: stack.push(left < right ? 1.0f : 0.0f); break;
-						case Operators::GT: stack.push(left > right ? 1.0f : 0.0f); break;
-						case Operators::AND: stack.push((left != 0.0f && right != 0.0f) ? 1.0f : 0.0f); break;
-						case Operators::OR: stack.push((left != 0.0f || right != 0.0f) ? 1.0f : 0.0f); break;
-						default: ASSERT(false); break;
+							return true;
+						case Operators::MOD: stack.push(fmodf(left, right)); return true;
+						case Operators::LT: stack.push(left < right ? 1.0f : 0.0f); return true;
+						case Operators::GT: stack.push(left > right ? 1.0f : 0.0f); return true;
+						case Operators::AND: stack.push((left != 0.0f && right != 0.0f) ? 1.0f : 0.0f); return true;
+						case Operators::OR: stack.push((left != 0.0f || right != 0.0f) ? 1.0f : 0.0f); return true;
+						default: ASSERT(false); return false;
 					}
 
 					break;
@@ -837,12 +839,13 @@ struct ParticleScriptCompiler {
 				case Node::LITERAL: {
 					auto* n = (LiteralNode*)node;
 					stack.push(n->value);
-					break;
+					return true;
 				}
-				default:
-					ASSERT(false);
-					break;
-			}
+				default: break;
+			} // switch
+
+			compiler.errorAtCurrent("Operation not supported at compile-time.");
+			return false;
 		}
 	};
 

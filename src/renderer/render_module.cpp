@@ -3292,7 +3292,7 @@ struct RenderModuleImpl final : RenderModule {
 		m_particle_emitters[entity].setResource(res);
 	}
 
-	i32 getParticleEmitterParameterID(EntityRef entity, const char* name) override {
+	i32 getParticleEmitterGlobalID(EntityRef entity, const char* name) override {
 		ParticleSystemResource* res = m_particle_emitters[entity].getResource();
 		if (!res) return -1;
 

@@ -2116,11 +2116,11 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int ParticleEmitter_getParameterID(lua_State* L) {
+	int ParticleEmitter_getGlobalID(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		auto name = LuaWrapper::checkArg<const char*>(L, 2);
-		LuaWrapper::push(L, 	module->getParticleEmitterParameterID(entity, name));
+		LuaWrapper::push(L, 	module->getParticleEmitterGlobalID(entity, name));
 		return 1;
 	}
 	
@@ -2159,7 +2159,7 @@ namespace Lumix {
 		switch (name_hash) {
 			case /*source*/17609862876178282011: LuaWrapper::push(L, module->getParticleEmitterPath(entity)); break;
 			case /*autodestroy*/13701391921693763709: LuaWrapper::push(L, module->getParticleEmitterAutodestroy(entity)); break;
-			case /*getParameterID*/12478678714176540554: lua_pushcfunction(L, ParticleEmitter_getParameterID, "ParticleEmitter_getParameterID"); break;
+			case /*getGlobalID*/2927779265954934174: lua_pushcfunction(L, ParticleEmitter_getGlobalID, "ParticleEmitter_getGlobalID"); break;
 			case /*setFloatGlobal*/3973545480916277798: lua_pushcfunction(L, ParticleEmitter_setFloatGlobal, "ParticleEmitter_setFloatGlobal"); break;
 			case /*setVec3Global*/6886268473822891416: lua_pushcfunction(L, ParticleEmitter_setVec3Global, "ParticleEmitter_setVec3Global"); break;
 			case /*setVec4Global*/7790184538809416461: lua_pushcfunction(L, ParticleEmitter_setVec4Global, "ParticleEmitter_setVec4Global"); break;

@@ -320,8 +320,8 @@ emitter Emitter0 {
 
 The particle script editor provides:
 - Syntax highlighting
+- Autocomplete
 - Real-time preview
-- Debug information showing register usage
+- Debug information showing register usage and instruction count
 - Play/pause/step controls
 - Global variable editing
-- Performance statistics

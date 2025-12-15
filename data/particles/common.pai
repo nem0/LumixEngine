@@ -1,5 +1,15 @@
 const PI = 3.14159265;
 
+fn dot(a, b) {
+	return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+fn distance(a, b) {
+	let d : float3;
+	d = a - b;
+	return sqrt(dot(d, d));
+}
+
 fn abs(x) {
 	return max(x, -x);
 }

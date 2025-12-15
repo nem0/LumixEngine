@@ -1488,6 +1488,29 @@ bool testCompilationErrors() {
 		)"
 	);
 
+	expectCompilationFailure("random called in constant initialization",
+		R"(
+			const A = random(0, 10);
+			emitter test {
+				material "particles/particle.mat"
+			}
+		)"
+	);
+
+	// TODO implement local vars in constant initialization
+	expectCompilationFailure("local variables during constant initialization",
+		R"(
+			fn test() {
+				let x = 0;
+				return x;
+			}
+			const A = test();
+			emitter test {
+				material "particles/particle.mat"
+			}
+		)"
+	);
+
 	return all_tests_passed;
 }
 
