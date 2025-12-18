@@ -1606,6 +1606,14 @@ struct PipelineImpl final : Pipeline {
 		transparentPass(gbuffer, shadowmap, result, view_idx);
 
 		if (m_type == PipelineType::PROBE) {
+			m_sort_keys_group.end();
+			m_sort_keys_group.wait();
+			m_renderer.releaseRenderbuffer(gbuffer.A);
+			m_renderer.releaseRenderbuffer(gbuffer.B);
+			m_renderer.releaseRenderbuffer(gbuffer.C);
+			m_renderer.releaseRenderbuffer(gbuffer.D);
+			m_renderer.releaseRenderbuffer(gbuffer.DS);
+			m_renderer.releaseRenderbuffer(shadowmap);
 			m_output = result;
 			return;
 		}
