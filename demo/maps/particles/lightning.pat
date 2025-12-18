@@ -62,7 +62,7 @@ emitter ribbon {
 emitter spark_up {
 	material "/maps/particles/world_space_particle.mat"
 	init_emit_count 0
-	emit_per_second 0
+	emit_per_second 10
 	
 	out i_position : float3
 	out i_scale : float
@@ -77,6 +77,7 @@ emitter spark_up {
 
 	fn update() {
 		t = t + time_delta;
+		vel.y = vel.y + time_delta * 1.5;
 		pos = pos + vel * time_delta;
 		if t > 1 {
 			kill();
@@ -85,7 +86,7 @@ emitter spark_up {
 	fn emit() {
 		pos = entity_position;
 		vel = sphere(0.5);
-		vel.y = 1;
+		vel.y = 0;
 		t = 0;
 	}
 
@@ -102,7 +103,7 @@ emitter spark_up {
 emitter sparks {
 	material "/maps/particles/world_space_particle.mat"
 	init_emit_count 0
-	emit_per_second 0
+	emit_per_second 100
 	
 	out i_position : float3
 	out i_scale : float
