@@ -1,0 +1,4 @@
+shader "/engine/shaders/ribbon.hlsl"
+backface_culling false
+layer "transparent"
+define "WORLD_SPACE"

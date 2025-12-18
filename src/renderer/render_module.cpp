@@ -3317,11 +3317,15 @@ struct RenderModuleImpl final : RenderModule {
 	}
 	
 	void setParticleEmitterGlobal(EntityRef entity, i32 id, Vec3 value) override {
-		ASSERT(id >= 0);
 		ParticleSystem& ps = m_particle_emitters[entity];
 		ParticleSystemResource* res = m_particle_emitters[entity].getResource();
 
-		u32 offset = res->getGlobals()[id].offset;
+		Span<const ParticleSystemResource::Global> globals = res->getGlobals();
+		if (id < 0 || id >= (i32)globals.size()) {
+			logError("Trying to access invalid particle system value on entity ", entity.index, ", emitter ", id);
+			return; 
+		}
+		u32 offset = globals[id].offset;
 		u32 needed_size = offset + 3;
 		if (needed_size > (u32)ps.m_globals.size()) {
 			ps.m_globals.resize(needed_size);
@@ -3331,6 +3335,25 @@ struct RenderModuleImpl final : RenderModule {
 		ps.m_globals[offset + 2] = value.z;
 	}
 	
+	void killRibbon(EntityRef entity, u32 emitter_index, u32 ribbon_index) override {
+		ParticleSystem& ps = m_particle_emitters[entity];
+		if (emitter_index >= (u32)ps.getEmitters().size()) {
+			logError("Trying to access invalid emitter on entity ", entity.index);
+			return;
+		}
+		ps.killRibbon(emitter_index, ribbon_index);
+	}
+
+
+	void emitRibbons(EntityRef entity, u32 emitter_index, u32 num_ribbons) override {
+		ParticleSystem& ps = m_particle_emitters[entity];
+		if (emitter_index >= (u32)ps.getEmitters().size()) {
+			logError("Trying to access invalid emitter on entity ", entity.index);
+			return;
+		}
+		ps.emitRibbons(emitter_index, num_ribbons);
+	}
+
 	void setParticleEmitterGlobal(EntityRef entity, i32 id, Vec4 value) override {
 		ASSERT(id >= 0);
 		ParticleSystem& ps = m_particle_emitters[entity];

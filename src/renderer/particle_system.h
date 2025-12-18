@@ -227,6 +227,8 @@ struct LUMIX_RENDERER_API ParticleSystem {
 	void setResource(ParticleSystemResource* res);
 	const Emitter& getEmitter(u32 emitter_idx) const { return m_emitters[emitter_idx]; }
 	const Array<Emitter>& getEmitters() const { return m_emitters; }
+	void emitRibbons(u32 emitter_index, u32 num_ribbons);
+	void killRibbon(u32 emitter_index, u32 ribbon_index);
 	void reset();
 
 	struct RunningContext {
@@ -268,7 +270,6 @@ private:
 	void ensureCapacity(Emitter& emitter, u32 num_new_particles);
 	void skipBlock(ParticleSystem::RunningContext& ctx, const InputMemoryStream& ip, InputMemoryStream& head, InputMemoryStream& tail);
 	void processChunk(ChunkProcessorContext& ctx);
-	void initRibbonEmitter(i32 emiter);
 
 	IAllocator& m_allocator;
 	Array<Emitter> m_emitters;

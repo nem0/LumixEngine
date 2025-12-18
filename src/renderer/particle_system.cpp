@@ -264,7 +264,15 @@ void ParticleSystem::reset() {
 }
 
 void ParticleSystem::onResourceChanged(Resource::State old_state, Resource::State new_state, Resource&) {
-	if (new_state == Resource::State::READY) {
+	if (new_state == Resource::State::EMPTY) {
+		for (Emitter& emitter : m_emitters) {
+			for (Channel& c : emitter.channels) {
+				m_allocator.deallocate(c.data);
+			}
+		}
+		m_emitters.clear();
+	}
+	else if (new_state == Resource::State::READY) {
 		for (Emitter& emitter : m_emitters) {
 			for (Channel& c : emitter.channels) {
 				m_allocator.deallocate(c.data);
@@ -316,15 +324,17 @@ namespace {
 		return float(n & u32(0x0ffFFffFU)) / float(0x0ffFFffF);
 	}
 
-	// https://www.shadertoy.com/view/3sd3Rs
+	// https://www.shadertoy.com/view/3sd3Rs (modified for value noise)
 	float gnoise(float p) {
 		u32 i = u32(floor(p));
 		float f = p - i;
-		float u = f * f * (3.f - 2.f * f);
+		// Quintic interpolation for smoother curve
+		float u = f * f * f * (f * (f * 6.f - 15.f) + 10.f);
 
-		float g0 = hash(i + 0u) * 2.f - 1.f;
-		float g1 = hash(i + 1u) * 2.f - 1.f;
-		return 2.4f * lerp(g0 * (f - 0.f), g1 * (f - 1.f), u);
+		float v0 = hash(i + 0u);
+		float v1 = hash(i + 1u);
+		// Center around 0 and scale to match original range (~ -2.4 to 2.4)
+		return (lerp(v0, v1, u) - 0.5f) * 4.8f;
 	}
 }
 
@@ -1528,18 +1538,45 @@ void ParticleSystem::update(float dt, u32 emitter_idx, PageAllocator& page_alloc
 	}
 }
 
-void ParticleSystem::initRibbonEmitter(i32 emitter_idx) {
+void ParticleSystem::killRibbon(u32 emitter_idx, u32 ribbon_index) {
 	Emitter& emitter = m_emitters[emitter_idx];
+	if (ribbon_index >= (u32)emitter.ribbons.size()) return;
+
+	const u32 max_len = emitter.resource_emitter.max_ribbon_length;
+	const u32 num_channels = emitter.resource_emitter.channels_count;
+	const u32 length = emitter.ribbons[ribbon_index].length;
+
+	// Shift data for all channels
+	for (u32 ch = 0; ch < num_channels; ++ch) {
+		if (!emitter.channels[ch].data) continue;
+		float* data = emitter.channels[ch].data;
+		const u32 start_shift = (ribbon_index + 1) * max_len;
+		const u32 num_to_shift = (emitter.ribbons.size() - ribbon_index - 1) * max_len;
+		if (num_to_shift > 0) {
+			memmove(&data[ribbon_index * max_len], &data[start_shift], num_to_shift * sizeof(float));
+		}
+	}
+
+	emitter.ribbons.erase(ribbon_index);
+	emitter.particles_count -= length;
+}
+
+void ParticleSystem::emitRibbons(u32 emitter_idx, u32 num_ribbons) {
+	Emitter& emitter = m_emitters[emitter_idx];
+	i32 prev_num_ribbons = emitter.ribbons.size();
 	
 	const u32 num_channels = emitter.resource_emitter.channels_count;
 	const u32 num_floats_in_channel = emitter.resource_emitter.max_ribbons * emitter.resource_emitter.max_ribbon_length;
 	for (u32 i = 0; i < num_channels; ++i) {
-		emitter.channels[i].data = (float*)m_allocator.allocate(num_floats_in_channel * sizeof(float), alignof(float4));
+		if (!emitter.channels[i].data) emitter.channels[i].data = (float*)m_allocator.allocate(num_floats_in_channel * sizeof(float), alignof(float4));
 	}
 
 	emitter.ribbons.reserve(emitter.resource_emitter.max_ribbons);
-	emitter.ribbons.resize(emitter.resource_emitter.init_ribbons_count);
-	for (u32 i = 0; i < emitter.resource_emitter.init_ribbons_count; ++i) {
+	num_ribbons = minimum(num_ribbons, emitter.resource_emitter.max_ribbons - prev_num_ribbons);
+	if (num_ribbons == 0) return;
+
+	emitter.ribbons.resize(prev_num_ribbons + num_ribbons);
+	for (u32 i = prev_num_ribbons; i < prev_num_ribbons + num_ribbons; ++i) {
 		emitter.ribbons[i].length = 0;
 		emitter.ribbons[i].offset = 0;
 		emitter.ribbons[i].emit_index = 0;
@@ -1564,7 +1601,7 @@ bool ParticleSystem::update(float dt, PageAllocator& page_allocator)
 		for (i32 emitter_idx = 0; emitter_idx < m_emitters.size(); ++emitter_idx) {
 			const ParticleSystemResource::Emitter& emitter = m_resource->getEmitters()[emitter_idx];
 			if (emitter.max_ribbons > 0) {
-				initRibbonEmitter(emitter_idx);
+				emitRibbons(emitter_idx, emitter.init_ribbons_count);
 			}
 			else if (emitter.emit_inputs_count == 0) {
 				emit(emitter_idx, {}, emitter.init_emit_count, 0);

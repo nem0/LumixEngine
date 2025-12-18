@@ -126,6 +126,7 @@ struct LuaScriptManager final : ResourceManager
 void registerEngineAPI(lua_State* L, Engine* engine);
 
 
+// TODO generate with meta
 static void registerRendererAPI(lua_State* L, Engine& engine) {
 	auto renderer = (Renderer*)engine.getSystemManager().getSystem("renderer");
 	LuaWrapper::createSystemClosure(L, "Renderer", renderer, "setLODMultiplier", &LuaWrapper::wrapMethodClosure<&Renderer::setLODMultiplier>);
@@ -305,6 +306,7 @@ static int LUA_raycastEx(lua_State* L)
 	if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
 	Vec3 origin = LuaWrapper::checkArg<Vec3>(L, 2);
 	Vec3 dir = LuaWrapper::checkArg<Vec3>(L, 3);
+	dir = normalize(dir);
 	const int layer = lua_gettop(L) > 3 ? LuaWrapper::checkArg<int>(L, 4) : -1;
 	RaycastHit hit;
 	if (module->raycastEx(origin, dir, FLT_MAX, hit, INVALID_ENTITY, layer))

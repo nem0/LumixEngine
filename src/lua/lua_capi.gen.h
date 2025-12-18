@@ -2151,6 +2151,24 @@ namespace Lumix {
 		return 0;
 	}
 	
+	int ParticleEmitter_emitRibbons(lua_State* L) {
+		auto [imodule, entity] = checkComponent(L);
+		auto* module = (RenderModule*)imodule;
+		auto emitter_index = LuaWrapper::checkArg<u32>(L, 2);
+		auto num_ribbons = LuaWrapper::checkArg<u32>(L, 3);
+		module->emitRibbons(entity, emitter_index, num_ribbons);
+		return 0;
+	}
+	
+	int ParticleEmitter_killRibbon(lua_State* L) {
+		auto [imodule, entity] = checkComponent(L);
+		auto* module = (RenderModule*)imodule;
+		auto emitter_index = LuaWrapper::checkArg<u32>(L, 2);
+		auto ribbon_index = LuaWrapper::checkArg<u32>(L, 3);
+		module->killRibbon(entity, emitter_index, ribbon_index);
+		return 0;
+	}
+	
 	int particle_emitter_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
@@ -2163,6 +2181,8 @@ namespace Lumix {
 			case /*setFloatGlobal*/3973545480916277798: lua_pushcfunction(L, ParticleEmitter_setFloatGlobal, "ParticleEmitter_setFloatGlobal"); break;
 			case /*setVec3Global*/6886268473822891416: lua_pushcfunction(L, ParticleEmitter_setVec3Global, "ParticleEmitter_setVec3Global"); break;
 			case /*setVec4Global*/7790184538809416461: lua_pushcfunction(L, ParticleEmitter_setVec4Global, "ParticleEmitter_setVec4Global"); break;
+			case /*emitRibbons*/12146662316880256423: lua_pushcfunction(L, ParticleEmitter_emitRibbons, "ParticleEmitter_emitRibbons"); break;
+			case /*killRibbon*/4358175860873073349: lua_pushcfunction(L, ParticleEmitter_killRibbon, "ParticleEmitter_killRibbon"); break;
 			case 0:
 			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
 		}

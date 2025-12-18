@@ -429,6 +429,8 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual void setParticleEmitterGlobal(EntityRef entity, i32 id, float value) = 0;			//@ function alias setFloatGlobal
 	virtual void setParticleEmitterGlobal(EntityRef entity, i32 id, Vec3 value) = 0;			//@ function alias setVec3Global
 	virtual void setParticleEmitterGlobal(EntityRef entity, i32 id, Vec4 value) = 0;			//@ function alias setVec4Global
+	virtual void emitRibbons(EntityRef entity, u32 emitter_index, u32 num_ribbons) = 0;			//@ function alias emitRibbons
+	virtual void killRibbon(EntityRef entity, u32 emitter_index, u32 ribbon_index) = 0;			//@ function alias killRibbon
 	//@ end
 	virtual void updateParticleEmitter(EntityRef entity, float dt) = 0;
 	virtual const HashMap<EntityRef, struct ParticleSystem>& getParticleEmitters() const = 0;
