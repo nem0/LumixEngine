@@ -2855,11 +2855,11 @@ struct PipelineImpl final : Pipeline {
 							inst_data[0] = gpu::getBindlessHandle(point_slice.buffer).value;
 							inst_data[1] = point_slice.offset + points_offset;
 							inst_data[2] = ribbon.offset;
-							inst_data[3] = emitter.resource_emitter.max_ribbon_length;
+							inst_data[3] = ribbon.length;
 							stream->bindVertexBuffer(1, slice.buffer, slice.offset + offset, stride);
 							// TODO instanced draw / indirect instanced
 							if(ribbon.length > 1) {
-								stream->drawArraysInstanced(2 * ribbon.length - 2, 1);
+								stream->drawArraysInstanced(2 * ribbon.length, 1);
 							}
 							offset += 4 * sizeof(u32);
 							points_offset += ribbon.length * decl.getStride();

@@ -252,6 +252,7 @@ struct EngineImpl final : Engine {
 	}
 
 	bool decompress(Span<const u8> src, Span<u8> output) override {
+		PROFILE_FUNCTION();
 		const i32 result = LZ4_decompress_safe((const char*)src.begin(), (char*)output.begin(), src.length(), output.length());
 		return result == output.length();
 	}

@@ -1,5 +1,5 @@
 const JITTER_SPEED = 30;
-const JITTER_SIZE = 0.05;
+const JITTER_SIZE = 0.10;
 
 import "engine/particles/common.pai"
 global g_target : float3
@@ -21,34 +21,48 @@ emitter ribbon {
 	out i_color : float4
 	out i_emission : float
 
-	var t : float
+	var offset : float
 	var r : float
+	var t : float
+	var noise_w : float
 
 	fn output() {
 		let pos : float3 = mix(entity_position, g_target, r);
 
-		i_position.z = pos.z + noise(t + 123.456) * JITTER_SIZE - JITTER_SIZE * 0.5;
-		i_position.y = pos.y + noise(t) * JITTER_SIZE - JITTER_SIZE * 0.5;
-		i_position.x = pos.x + noise(t + 456.789) * JITTER_SIZE - JITTER_SIZE * 0.5;
+		i_position.z = pos.z
+			+ (noise(offset + 123.456) * JITTER_SIZE - JITTER_SIZE * 0.5) * noise_w
+		;
+		i_position.y = pos.y
+			+ (noise(offset) * JITTER_SIZE - JITTER_SIZE * 0.5) * noise_w 
+			+ noise_w * t * 2
+		; 
+		i_position.x = pos.x
+			+ (noise(offset + 456.789) * JITTER_SIZE - JITTER_SIZE * 0.5) * noise_w
+		;
 		i_scale = 0.02;//(1 - pos.y * 0.05) * 0.1;
 		i_color = {0.3, 0.3, 1, 1};
 		i_emission = 5;
 	}
 
 	fn emit() {
-		r = emit_index / 10.0;
-		t = random(0, 9000);
+		r = emit_index / (10.0 - 1);
+		t = 0;
+		offset = random(0, 9000);
+		noise_w = abs(0.5 - r) * 2;
+		noise_w = noise_w * noise_w;
+		noise_w = 1 - noise_w;
 	}
 
 	fn update() {
-		t = t + time_delta * JITTER_SPEED;
+		t = t + time_delta;
+		offset = offset + time_delta * JITTER_SPEED;
 	}
 }
 
 emitter spark_up {
 	material "/maps/particles/world_space_particle.mat"
 	init_emit_count 0
-	emit_per_second 10
+	emit_per_second 0
 	
 	out i_position : float3
 	out i_scale : float
@@ -88,7 +102,7 @@ emitter spark_up {
 emitter sparks {
 	material "/maps/particles/world_space_particle.mat"
 	init_emit_count 0
-	emit_per_second 100
+	emit_per_second 0
 	
 	out i_position : float3
 	out i_scale : float

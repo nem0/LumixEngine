@@ -3116,8 +3116,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	UniquePtr<MultiEditor<Asset>> m_multi_editor;
 };
 
-struct CodeEditorWindow : AssetEditorWindow {
-	CodeEditorWindow(const Path& path, StudioApp& app)
+struct ShaderCodeEditorWindow : AssetEditorWindow {
+	ShaderCodeEditorWindow(const Path& path, StudioApp& app)
 		: AssetEditorWindow(app)
 		, m_app(app)
 		, m_path(path)
@@ -3133,8 +3133,20 @@ struct CodeEditorWindow : AssetEditorWindow {
 		}
 	}
 
-	~CodeEditorWindow() {
+	~ShaderCodeEditorWindow() {
 		if (m_shader) m_shader->decRefCount();
+	}
+
+	void fileChangedExternally() override {
+		OutputMemoryStream tmp(m_app.getAllocator());
+		OutputMemoryStream tmp2(m_app.getAllocator());
+		m_editor->serializeText(tmp);
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		if (!fs.getContentSync(m_path, tmp2)) return;
+
+		if (tmp.size() == tmp2.size() && memcmp(tmp.data(), tmp2.data(), tmp.size()) == 0) {
+			m_dirty = false;
+		}
 	}
 
 	void save() {
@@ -3267,7 +3279,7 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	}
 	
 	void openEditor(const Path& path) override {
-		UniquePtr<CodeEditorWindow> win = UniquePtr<CodeEditorWindow>::create(m_app.getAllocator(), path, m_app);
+		UniquePtr<ShaderCodeEditorWindow> win = UniquePtr<ShaderCodeEditorWindow>::create(m_app.getAllocator(), path, m_app);
 		m_app.getAssetBrowser().addWindow(win.move());
 	}
 
@@ -3493,7 +3505,7 @@ struct ShaderIncludePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	}
 	
 	void openEditor(const Path& path) override {
-		UniquePtr<CodeEditorWindow> win = UniquePtr<CodeEditorWindow>::create(m_app.getAllocator(), path, m_app);
+		UniquePtr<ShaderCodeEditorWindow> win = UniquePtr<ShaderCodeEditorWindow>::create(m_app.getAllocator(), path, m_app);
 		m_app.getAssetBrowser().addWindow(win.move());
 	}
 

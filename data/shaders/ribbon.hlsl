@@ -49,10 +49,17 @@ VSOutput mainVS(VSInput input) {
 	uint prev_pidx = pidx > 0 ? pidx - 1 : 0;
 	PointData prev_pd = getPointData(buffer_idx, buffer_offset, prev_pidx % ribbon_max_length);
 	PointData pd = getPointData(buffer_idx, buffer_offset, pidx % ribbon_max_length);
-	PointData next_pd = getPointData(buffer_idx, buffer_offset, (pidx + 1) % ribbon_max_length);
+	
+	float3 dir;
+	if (pidx == ribbon_max_length - 1) {
+		dir = pd.position - prev_pd.position;
+	}
+	else {
+		PointData next_pd = getPointData(buffer_idx, buffer_offset, (pidx + 1) % ribbon_max_length);
+		dir = next_pd.position - prev_pd.position;
+	}
 	
 	VSOutput output;
-	float3 dir = next_pd.position - prev_pd.position;
 	if (dot(dir, dir) < 0.01) {
 		dir = float3(0, 0, 1);
 	}
