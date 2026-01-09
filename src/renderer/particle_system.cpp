@@ -189,7 +189,7 @@ bool ParticleSystemResource::load(Span<const u8> mem) {
 		emitter.max_ribbon_length = (emitter.max_ribbon_length + 3) & ~3;
 		blob.read(emitter.init_ribbons_count);
 		blob.read(emitter.tube_segments);
-		emitter.emit_on_move = blob.read<bool>();
+		emitter.emit_move_distance = blob.read<float>();
 	}
 	u32 num_globals = blob.read<u32>();
 	m_globals.reserve(num_globals);
@@ -1350,8 +1350,9 @@ void ParticleSystem::applyTransform(const Transform& new_tr) {
 	const Transform delta_tr = Transform::computeLocal(new_tr, m_prev_frame_transform);
 	for (i32 emitter_idx = 0; emitter_idx < m_emitters.size(); ++emitter_idx) {
 		Emitter& emitter = m_emitters[emitter_idx];
-		if (emitter.resource_emitter.emit_on_move) {
-			const bool moved = squaredLength(new_tr.pos - emitter.last_emit_point) > 0.0025f;
+		float emit_move_dist = emitter.resource_emitter.emit_move_distance;
+		if (emit_move_dist > 0) {
+			const bool moved = squaredLength(new_tr.pos - emitter.last_emit_point) > emit_move_dist;
 			if (moved) {
 				emitter.last_emit_point = new_tr.pos;
 				m_system_values[(u8)ParticleSystemValues::TOTAL_TIME] = m_total_time;

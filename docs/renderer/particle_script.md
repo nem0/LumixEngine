@@ -136,7 +136,7 @@ Note: If/else statements are not SIMD-friendly, as branching is not vectorized i
 - `mesh` - Path to the mesh file (for mesh particles)
 - `init_emit_count` - Initial number of particles to emit
 - `emit_per_second` - Particles emitted per second
-- `emit_on_move` - Emit particles when emitter moves
+- `emit_move_distance` - Emit particles when emitter moves by this distance (negative value disables)
 - `max_ribbons` - Maximum number of ribbons
 - `max_ribbon_length` - Maximum ribbon length
 - `init_ribbons_count` - Initial ribbon count

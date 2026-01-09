@@ -2804,7 +2804,7 @@ struct ParticleEditorImpl : ParticleEditor {
 			output.write(getCount(emitter->m_emit_inputs));
 			output.write(u32(0)); // max ribbons
 			output.write(u32(0)); // max ribbon length
-			output.write(false); // emit on move
+			output.write(-1.f); // emit move distance
 		}
 		output.write(u32(0)); // num params
 		return true;

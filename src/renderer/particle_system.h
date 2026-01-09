@@ -1,17 +1,13 @@
 #pragma once
 
-#include "engine/lumix.h"
-
 #include "core/array.h"
 #include "core/atomic.h"
 #include "core/math.h"
 #include "core/stream.h"
-
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
 #include "renderer/gpu/gpu.h"
 #include "renderer/renderer.h"
-
 
 namespace Lumix {
 
@@ -22,13 +18,13 @@ struct Material;
 struct Model;
 struct Renderer;
 
-
 struct ParticleSystemResource final : Resource {
-	enum class Version : u32{
-		NOT_SUPPORTED_BEFORE = 16,
+	enum class Version : u32 {
+		NOT_SUPPORTED_BEFORE = 17,
 
 		LAST
 	};
+
 	struct Header {
 		static constexpr u32 MAGIC = '_LPA';
 		const u32 magic = MAGIC;
@@ -65,7 +61,7 @@ struct ParticleSystemResource final : Resource {
 		u32 max_ribbon_length;
 		u32 init_ribbons_count;
 		u32 tube_segments = 0; // 0 = flat ribbon, >0 = tube with this many segments
-		bool emit_on_move = false;
+		float emit_move_distance = -1;
 		Material* material = nullptr;
 		Model* model = nullptr;
 		u32 init_emit_count = 0;

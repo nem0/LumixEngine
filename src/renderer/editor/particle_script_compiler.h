@@ -25,6 +25,7 @@
 // * debugger
 // * global update - runs once per frame on the whole emitter, can prepare some global data
 // * create mesh from script
+// * JIT https://github.com/asmjit/asmjit
 
 namespace Lumix {
 
@@ -320,7 +321,7 @@ struct ParticleScriptCompiler {
 		Array<Variable> m_outputs;
 		Array<Variable> m_inputs;
 		u32 m_init_emit_count = 0;
-		bool m_emit_on_move = false;
+		float m_emit_move_distance = -1;
 		float m_emit_per_second = 0;
 		u32 m_max_ribbons = 0;
 		u32 m_max_ribbon_length = 0;
@@ -2814,7 +2815,7 @@ struct ParticleScriptCompiler {
 				case Token::IDENTIFIER:
 					if (equalStrings(token.value, "material")) compileMaterial(emitter);
 					else if (equalStrings(token.value, "mesh")) compileMesh(emitter);
-					else if (equalStrings(token.value, "emit_on_move")) emitter.m_emit_on_move = true;
+					else if (equalStrings(token.value, "emit_move_distance")) emitter.m_emit_move_distance = consumeFloat();
 					else if (equalStrings(token.value, "init_emit_count")) emitter.m_init_emit_count = consumeU32();
 					else if (equalStrings(token.value, "emit_per_second")) emitter.m_emit_per_second = consumeFloat();
 					else if (equalStrings(token.value, "max_ribbons")) emitter.m_max_ribbons = consumeU32();
@@ -2922,7 +2923,7 @@ struct ParticleScriptCompiler {
 			output.write(emitter.m_max_ribbon_length);
 			output.write(emitter.m_init_ribbons_count);
 			output.write(emitter.m_tube_segments);
-			output.write(emitter.m_emit_on_move);
+			output.write(emitter.m_emit_move_distance);
 		}
 		output.write(m_globals.size());
 		for (const Variable& p : m_globals) {
