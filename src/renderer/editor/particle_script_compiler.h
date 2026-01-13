@@ -1260,8 +1260,18 @@ struct ParticleScriptCompiler {
 
 		if (peekToken().type == Token::ELSE) {
 			consumeToken();
-			result->false_block = block(ctx);
-			if (!result->false_block) return nullptr;
+			if (peekToken().type == Token::IF) {
+				consumeToken();
+				Node* nested_if = ifStatement(ctx);
+				if (!nested_if) return nullptr;
+				auto* false_blk = LUMIX_NEW(m_arena_allocator, BlockNode)(peekToken(), m_arena_allocator);
+				false_blk->statements.push(nested_if);
+				result->false_block = false_blk;
+			}
+			else {
+				result->false_block = block(ctx);
+				if (!result->false_block) return nullptr;
+			}
 		}
 		return result;
 	}

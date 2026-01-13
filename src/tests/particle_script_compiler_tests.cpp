@@ -508,7 +508,7 @@ bool testCompileCompounds() {
 }
 
 // Test compiling and running a particle script via ParticleSystem::run
-bool testParticleScriptExecution() {
+bool testExecution() {
 	const char* code = R"(
 		emitter test {
 			material "particles/particle.mat"
@@ -590,7 +590,7 @@ bool testParticleScriptExecution() {
 }
 
 // Test local variables (let declarations)
-bool testParticleScriptLocalVars() {
+bool testLocalVars() {
 	const char* code = R"(
 		emitter test {
 			material "particles/particle.mat"
@@ -667,7 +667,7 @@ bool testParticleScriptLocalVars() {
 }
 
 // Test user-defined functions
-bool testParticleScriptUserFunctions() {
+bool testUserFunctions() {
 	const char* code = R"(
 		fn add(a, b) {
 			return a + b;
@@ -1004,7 +1004,7 @@ bool testIfConditionalsFolding() {
 }
 
 // Test syscalls (built-in functions) computed at runtime
-bool testParticleScriptSyscalls() {
+bool testSyscalls() {
 	const char* code = R"(
 		emitter test {
 			material "particles/particle.mat"
@@ -1087,7 +1087,7 @@ bool testParticleScriptSyscalls() {
 }
 
 // Test system values (time_delta, total_time, entity_position) are accessible in particle scripts
-bool testParticleScriptSystemValues() {
+bool testSystemValues() {
 	const char* code = R"(
 		emitter test {
 			material "particles/particle.mat"
@@ -1809,7 +1809,7 @@ bool testLogicOperators() {
 	return true;
 }
 
-bool testParticleScriptIfElse() {
+bool testIfElse() {
 	const char* code = R"(
 		emitter test {
 			material "particles/particle.mat"
@@ -1839,6 +1839,37 @@ bool testParticleScriptIfElse() {
 	return true;
 }
 
+bool testElseIf() {
+	const char* code = R"(
+		emitter test {
+			material "particles/particle.mat"
+			var v : float
+
+			fn emit() { v = 0; }
+
+			fn update() {
+				if v > 1 {
+					v = 10;
+				} else if v > -1 {
+					v = 5;
+				} else {
+					v = 3;
+				}
+			}
+		}
+	)";
+
+	ParticleScriptRunner runner;
+	ASSERT_TRUE(runner.compile(code), "Compilation should succeed");
+
+	runner.runEmit();
+	runner.runUpdate();
+
+	ASSERT_TRUE(fabsf(runner.getChannel(0) - 5.0f) < 0.001f, "v should be 5 (else-if branch)");
+
+	return true;
+}
+
 } // anonymous namespace
 
 void runParticleScriptCompilerTests() {
@@ -1850,13 +1881,13 @@ void runParticleScriptCompilerTests() {
 	RUN_TEST(testCompileTimeConstWithUserFunctionIf);
 	RUN_TEST(testCompileEmitterVariables);
 	RUN_TEST(testCompileCompounds);
-	RUN_TEST(testParticleScriptExecution);
-	RUN_TEST(testParticleScriptLocalVars);
-	RUN_TEST(testParticleScriptUserFunctions);
+	RUN_TEST(testExecution);
+	RUN_TEST(testLocalVars);
+	RUN_TEST(testUserFunctions);
 	RUN_TEST(testFolding);
 	RUN_TEST(testIfConditionalsFolding);
-	RUN_TEST(testParticleScriptSyscalls);
-	RUN_TEST(testParticleScriptSystemValues);
+	RUN_TEST(testSyscalls);
+	RUN_TEST(testSystemValues);
 	RUN_TEST(testBasicImport);
 	RUN_TEST(testNestedImport);
 	RUN_TEST(testImportErrors);
@@ -1865,7 +1896,8 @@ void runParticleScriptCompilerTests() {
 	RUN_TEST(testUnusedLocalOptimization);
 	RUN_TEST(testUnaryMinus);
 	RUN_TEST(testLogicOperators);
-	RUN_TEST(testParticleScriptIfElse);
+	RUN_TEST(testIfElse);
+	RUN_TEST(testElseIf);
 	
 	logInfo("=== Test Results: ", passed_count, "/", test_count, " passed ===");
 }
