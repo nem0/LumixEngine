@@ -146,7 +146,10 @@ struct ParticleScriptRunner {
 		return true;
 	}
 
-	void runEmit() {
+	void runEmit(Span<const float> emit_inputs = {}) {
+		for (u32 i = 0; i < emit_inputs.length() && i < 16; ++i) {
+			registers_storage[i] = emit_inputs[i];
+		}
 		ParticleSystem::RunningContext ctx;
 		ctx.channels = channels;
 		ctx.system_values = system_values;
@@ -344,6 +347,60 @@ bool testCompileTimeConstWithUserFunctionIf() {
 	return fabsf(D->value[0] - 4.f) < 0.001f;
 }
 
+// Test compile-time constant with floatN types
+bool testCompileTimeConstFloatN() {
+	const char* code = R"(
+		const A = 2;
+		const B = {1, A, A + 1};
+		const C = {2, 2, 2 * 3, 7} + {2, 3, 0, 0};
+		const NEG_VEC = -{1, 2, 3};
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			var v : float4
+
+			fn emit() {
+				v = C;
+			}
+		}
+	)";
+
+	ParticleScriptRunner runner;
+	ASSERT_TRUE(runner.compile(code), "Compilation should succeed");
+	
+	const ParticleScriptCompiler::Constant* B = runner.compiler.findConstant("B");
+	ASSERT_TRUE(B != nullptr, "B should be present");
+	ASSERT_TRUE(B->type == ParticleScriptCompiler::ValueType::FLOAT3, "B should be float3");
+	ASSERT_TRUE(fabsf(B->value[0] - 1.f) < 0.001f, "B.x should be 1");
+	ASSERT_TRUE(fabsf(B->value[1] - 2.f) < 0.001f, "B.y should be 2");
+	ASSERT_TRUE(fabsf(B->value[2] - 3.f) < 0.001f, "B.z should be 3");
+
+	const ParticleScriptCompiler::Constant* C = runner.compiler.findConstant("C");
+	ASSERT_TRUE(C != nullptr, "C should be present");
+	ASSERT_TRUE(C->type == ParticleScriptCompiler::ValueType::FLOAT4, "C should be float4");
+	ASSERT_TRUE(fabsf(C->value[0] - 4.f) < 0.001f, "C.x should be 4");
+	ASSERT_TRUE(fabsf(C->value[1] - 5.f) < 0.001f, "C.y should be 5");
+	ASSERT_TRUE(fabsf(C->value[2] - 6.f) < 0.001f, "C.z should be 6");
+	ASSERT_TRUE(fabsf(C->value[3] - 7.f) < 0.001f, "C.w should be 7");
+
+	const ParticleScriptCompiler::Constant* NEG_VEC = runner.compiler.findConstant("NEG_VEC");
+	ASSERT_TRUE(NEG_VEC != nullptr, "NEG_VEC should be present");
+	ASSERT_TRUE(NEG_VEC->type == ParticleScriptCompiler::ValueType::FLOAT3, "NEG_VEC should be float3");
+	ASSERT_TRUE(fabsf(NEG_VEC->value[0] - (-1.f)) < 0.001f, "NEG_VEC.x should be -1");
+	ASSERT_TRUE(fabsf(NEG_VEC->value[1] - (-2.f)) < 0.001f, "NEG_VEC.y should be -2");
+	ASSERT_TRUE(fabsf(NEG_VEC->value[2] - (-3.f)) < 0.001f, "NEG_VEC.z should be -3");
+
+	runner.runEmit();
+
+	ASSERT_TRUE(fabsf(runner.getChannel(0) - 4.0f) < 0.001f, "v should be 4 after emit");
+	ASSERT_TRUE(fabsf(runner.getChannel(1) - 5.0f) < 0.001f, "v should be 5 after emit");
+	ASSERT_TRUE(fabsf(runner.getChannel(2) - 6.0f) < 0.001f, "v should be 6 after emit");
+	ASSERT_TRUE(fabsf(runner.getChannel(3) - 7.0f) < 0.001f, "v should be 7 after emit");
+
+	return true;
+}
+
 // Test emitter with input, output, and var variables
 bool testCompileEmitterVariables() {
 	const char* emitter_code = R"(
@@ -364,11 +421,12 @@ bool testCompileEmitterVariables() {
 			var velocity : float3
 			var lifetime : float
 			var age : float
+			var color : float3
 	
 			fn output() {
 				i_position = position;
 				i_scale = 0.5 * (1 - age / lifetime);
-				i_color.rgb = in_color;
+				i_color.rgb = color.rgb;
 				i_color.a = 1 - age / lifetime;
 				i_rotation = age * 2;
 			}
@@ -376,6 +434,7 @@ bool testCompileEmitterVariables() {
 			fn emit() {
 				position = in_position;
 				velocity = in_velocity;
+				color = in_color;
 				lifetime = 2;
 				age = 0;
 			}
@@ -421,7 +480,7 @@ bool testCompileEmitterVariables() {
 	ASSERT_TRUE(emitter->m_outputs[3].type == ParticleScriptCompiler::ValueType::FLOAT, "i_rotation should be float");
 	
 	// Verify var variables
-	ASSERT_TRUE(emitter->m_vars.size() == 4, "Should have 4 var variables");
+	ASSERT_TRUE(emitter->m_vars.size() == 5, "Should have 5 var variables");
 	ASSERT_TRUE(equalStrings(emitter->m_vars[0].name, "position"), "First var should be position");
 	ASSERT_TRUE(emitter->m_vars[0].type == ParticleScriptCompiler::ValueType::FLOAT3, "position should be float3");
 	ASSERT_TRUE(equalStrings(emitter->m_vars[1].name, "velocity"), "Second var should be velocity");
@@ -753,6 +812,55 @@ bool testUserFunctions() {
 	ASSERT_TRUE(fabsf(runner.getOutput(1) - 1.0f) < 0.001f, "i_vec.x should be 1");
 	ASSERT_TRUE(fabsf(runner.getOutput(2) - 2.0f) < 0.001f, "i_vec.y should be 2");
 	ASSERT_TRUE(fabsf(runner.getOutput(3) - 3.0f) < 0.001f, "i_vec.z should be 3");
+
+	return true;
+}
+
+// Test duck typing for user-defined functions - functions accessing .xyz should accept both float3 and float4
+bool testUserFunctionDuckTyping() {
+	const char* code = R"(
+		fn get_xyz_sum(v) {
+			return v.x + v.y + v.z;
+		}
+
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			out i_sum3 : float
+			out i_sum4 : float
+
+			var vec3 : float3
+			var vec4 : float4
+
+			fn emit() {
+				vec3 = {1, 2, 3};
+				vec4 = {4, 5, 6, 7};
+			}
+
+			fn update() {
+				// Both float3 and float4 should work with function accessing .xyz
+				let sum3 = get_xyz_sum(vec3);  // 1 + 2 + 3 = 6
+				let sum4 = get_xyz_sum(vec4);  // 4 + 5 + 6 = 15
+			}
+
+			fn output() {
+				i_sum3 = get_xyz_sum(vec3);
+				i_sum4 = get_xyz_sum(vec4);
+			}
+		}
+	)";
+
+	ParticleScriptRunner runner;
+	ASSERT_TRUE(runner.compile(code), "Compilation should succeed");
+
+	runner.runEmit();
+	runner.runUpdate();
+	runner.runOutput();
+
+	// Check that duck typing works - function accepts both float3 and float4
+	ASSERT_TRUE(fabsf(runner.getOutput(0) - 6.0f) < 0.001f, "i_sum3 should be 6 (1+2+3)");
+	ASSERT_TRUE(fabsf(runner.getOutput(1) - 15.0f) < 0.001f, "i_sum4 should be 15 (4+5+6)");
 
 	return true;
 }
@@ -1186,6 +1294,18 @@ bool testCompilationErrors() {
 		}
 	};
 
+	expectCompilationFailure("material's path is not a string", "emitter test { material 0 }");
+
+	expectCompilationFailure("invalid assignment to constant",
+		R"(
+            const C = 5;
+            emitter test {
+                material "particles/particle.mat"
+                fn emit() { C = 10; }  // cannot assign to const
+            }
+        )"
+	);
+
 	expectCompilationFailure(
 		"missing semicolon",
 		R"(
@@ -1195,6 +1315,22 @@ bool testCompilationErrors() {
 
 				fn emit() {
 					value = 10  // missing semicolon
+				}
+			}
+		)"
+	);
+
+	expectCompilationFailure(
+		"condition must be scalar",
+		R"(
+			emitter test {
+				material "particles/particle.mat"
+				var value : float
+
+				fn emit() {
+					if {1, 2, 3} < 0 {
+						value = 10;
+					}
 				}
 			}
 		)"
@@ -1511,6 +1647,107 @@ bool testCompilationErrors() {
 		)"
 	);
 
+	expectCompilationFailure("== not supported",
+		R"(
+			emitter test {
+				material "particles/particle.mat"
+				var flag : float
+				fn emit() {
+					if 1 == 1 {
+						flag = 1;
+					}
+				}
+			}
+		)"
+	);
+
+	expectCompilationFailure("cannot assign to input variable",
+		R"(
+			emitter test {
+				material "particles/particle.mat"
+				in in_var : float
+
+				fn emit() {
+					in_var = 10.0;
+				}
+			}
+		)"
+	);
+
+	expectCompilationFailure("cannot call kill() outside of update()",
+		R"(
+			emitter test {
+				material "particles/particle.mat"
+				in in_var : float
+				var v : float
+
+				fn emit() {
+					kill();
+				}
+			}
+		)"
+	);
+
+	expectCompilationFailure("cannot call kill() outside of update()",
+		R"(
+			fn f() {
+				kill();
+			}
+
+			emitter test {
+				material "particles/particle.mat"
+				in in_var : float
+				var v : float
+
+				fn emit() {
+					f();
+				}
+			}
+		)"
+	);
+
+	expectCompilationFailure("cannot call kill() outside of update",
+		R"(
+			emitter test {
+				material "particles/particle.mat"
+				in in_var : float
+				var v : float
+
+				fn output() {
+					kill();
+				}
+			}
+		)"
+	);
+
+	expectCompilationFailure("cannot access input variables outside of emit",
+		R"(
+			emitter test {
+				material "particles/particle.mat"
+				in in_var : float
+				var v : float
+
+				fn update() {
+					v = in_var;
+				}
+			}
+		)"
+	);
+
+	expectCompilationFailure("cannot access out variables outside of output",
+		R"(
+			emitter test {
+				material "particles/particle.mat"
+				out i_var : float
+				var v : float
+
+				fn emit() {
+					i_var = v;
+				}
+			}
+		)"
+	);
+
 	return all_tests_passed;
 }
 
@@ -1520,7 +1757,7 @@ bool testBasicImport() {
 		emitter test {
 			material "particles/particle.mat"
 			out value : float
-			fn emit() { value = double(5); }
+			fn output() { value = double(5); }
 		}
 	)";
 
@@ -1552,7 +1789,7 @@ bool testNestedImport() {
 		emitter test {
 			material "particles/particle.mat"
 			out value : float
-			fn emit() { value = add_base(3); }
+			fn output() { value = add_base(3); }
 		}
 	)";
 
@@ -1755,6 +1992,119 @@ bool testUnaryMinus() {
 	return true;
 }
 
+bool testSwizzling() {
+	const char* code = R"(
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			out i_vec2 : float2
+			out i_vec3 : float3
+			out i_vec4 : float4
+
+			var vec4 : float4
+			var vec3 : float3
+			var vec2 : float2
+
+			fn emit() {
+				vec4 = {1, 2, 3, 4};
+				vec3 = {5, 6, 7};
+				vec2 = {8, 9};
+
+				// Test reading single components
+				let x = vec4.x;  // 1
+				let y = vec4.y;  // 2
+				let z = vec4.z;  // 3
+				let w = vec4.w;  // 4
+
+				// Test reading multiple components
+				let xy : float2 = vec4.xy;   // {1, 2}
+				let xyz : float3 = vec4.xyz; // {1, 2, 3}
+				let rgb : float3 = vec4.rgb; // {1, 2, 3} (same as xyz)
+
+				// Test reading with repeated components
+				let xx : float2 = vec4.xx;   // {1, 1}
+				let yyy : float3 = vec3.yyy; // {6, 6, 6}
+				let zz : float2 = vec4.zz;   // {3, 3}
+				let www : float4 = vec4.wwww; // {4, 4, 4, 4}
+
+				// Test reading with mixed repeated components
+				let xyx : float3 = vec4.xyx; // {1, 2, 1}
+				let zwz : float3 = vec4.zwz; // {3, 4, 3}
+
+				// Test writing to swizzles
+				vec4.xy = {10, 20};         // vec4 becomes {10, 20, 3, 4}
+				vec3.z = 30;                // vec3 becomes {5, 6, 30}
+				vec2.y = 40;                // vec2 becomes {8, 40}
+
+				// Test swizzle assignment with expressions
+				vec4.zw = vec2;             // vec4 becomes {10, 20, 8, 40}
+				vec3.xy = vec4.zw;          // vec3 becomes {8, 40, 30}
+			}
+
+			fn output() {
+				i_vec2 = vec2;
+				i_vec3 = vec3;
+				i_vec4 = vec4;
+			}
+		}
+	)";
+
+	ParticleScriptRunner runner;
+	ASSERT_TRUE(runner.compile(code), "Compilation with swizzling should succeed");
+
+	runner.runEmit();
+	runner.runOutput();
+
+	// Check vec2: should be {8, 40}
+	ASSERT_TRUE(fabsf(runner.getOutput(0) - 8.0f) < 0.001f, "i_vec2.x should be 8");
+	ASSERT_TRUE(fabsf(runner.getOutput(1) - 40.0f) < 0.001f, "i_vec2.y should be 40");
+
+	// Check vec3: should be {8, 40, 30}
+	ASSERT_TRUE(fabsf(runner.getOutput(2) - 8.0f) < 0.001f, "i_vec3.x should be 8");
+	ASSERT_TRUE(fabsf(runner.getOutput(3) - 40.0f) < 0.001f, "i_vec3.y should be 40");
+	ASSERT_TRUE(fabsf(runner.getOutput(4) - 30.0f) < 0.001f, "i_vec3.z should be 30");
+
+	// Check vec4: should be {10, 20, 8, 40}
+	ASSERT_TRUE(fabsf(runner.getOutput(5) - 10.0f) < 0.001f, "i_vec4.x should be 10");
+	ASSERT_TRUE(fabsf(runner.getOutput(6) - 20.0f) < 0.001f, "i_vec4.y should be 20");
+	ASSERT_TRUE(fabsf(runner.getOutput(7) - 8.0f) < 0.001f, "i_vec4.z should be 8");
+	ASSERT_TRUE(fabsf(runner.getOutput(8) - 40.0f) < 0.001f, "i_vec4.w should be 40");
+
+	return true;
+}
+
+// Regression test for optimizer reorder/fold affecting swizzle -> channel writes
+bool testOptimizerRegression() {
+	const char* code = R"(
+		emitter test {
+			material "particles/particle.mat"
+
+			var a : float
+			var b : float
+
+			fn emit() {
+				b = 3;
+				a = 8;
+				a = 40;
+
+				// These assignments exercised the optimizer bug previously
+				b = a;
+			}
+		}
+	)";
+
+	ParticleScriptRunner runner;
+	ASSERT_TRUE(runner.compile(code), "Compilation should succeed");
+
+	runner.runEmit();
+
+	ASSERT_TRUE(fabsf(runner.getChannel(0, 0) - 40.0f) < 0.001f, "a should be 40");
+	ASSERT_TRUE(fabsf(runner.getChannel(1, 0) - 40.0f) < 0.001f, "b should be 40");
+
+	return true;
+}
+
 bool testLogicOperators() {
 	const char* code = R"(
 		emitter test {
@@ -1870,6 +2220,82 @@ bool testElseIf() {
 	return true;
 }
 
+bool testInputs() {
+	const char* code = R"(
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			in in_pos : float3
+			in in_vel : float3
+			in in_scale : float
+
+			out i_position : float3
+			out i_velocity : float3
+			out i_scale : float
+
+			var position : float3
+			var velocity : float3
+			var scale : float
+
+			fn emit() {
+				position = in_pos + {1, 0, 0};
+				velocity = in_vel * 2;
+				scale = in_scale + 0.5;
+			}
+
+			fn update() {
+				position = position + velocity * time_delta;
+			}
+
+			fn output() {
+				i_position = position;
+				i_velocity = velocity;
+				i_scale = scale;
+			}
+		}
+	)";
+
+	ParticleScriptRunner runner;
+	ASSERT_TRUE(runner.compile(code), "Compilation with inputs should succeed");
+
+	// Set input values: in_pos = {10, 20, 30}, in_vel = {1, 2, 3}, in_scale = 2.0
+	float inputs[] = {10, 20, 30, 1, 2, 3, 2.0f};
+	runner.runEmit(Span(inputs, sizeof(inputs) / sizeof(inputs[0])));
+
+	// After emit: position = {11, 20, 30}, velocity = {2, 4, 6}, scale = 2.5
+	ASSERT_TRUE(fabsf(runner.getChannel(0) - 11.0f) < 0.001f, "position.x should be 11");
+	ASSERT_TRUE(fabsf(runner.getChannel(1) - 20.0f) < 0.001f, "position.y should be 20");
+	ASSERT_TRUE(fabsf(runner.getChannel(2) - 30.0f) < 0.001f, "position.z should be 30");
+	ASSERT_TRUE(fabsf(runner.getChannel(3) - 2.0f) < 0.001f, "velocity.x should be 2");
+	ASSERT_TRUE(fabsf(runner.getChannel(4) - 4.0f) < 0.001f, "velocity.y should be 4");
+	ASSERT_TRUE(fabsf(runner.getChannel(5) - 6.0f) < 0.001f, "velocity.z should be 6");
+	ASSERT_TRUE(fabsf(runner.getChannel(6) - 2.5f) < 0.001f, "scale should be 2.5");
+
+	runner.runUpdate();
+
+	// After update: position = {11, 20, 30} + {2, 4, 6} * 0.016 Γëê {11.032, 20.064, 30.096}
+	float expected_x = 11.0f + 2.0f * 0.016f;
+	float expected_y = 20.0f + 4.0f * 0.016f;
+	float expected_z = 30.0f + 6.0f * 0.016f;
+	ASSERT_TRUE(fabsf(runner.getChannel(0) - expected_x) < 0.001f, "position.x after update");
+	ASSERT_TRUE(fabsf(runner.getChannel(1) - expected_y) < 0.001f, "position.y after update");
+	ASSERT_TRUE(fabsf(runner.getChannel(2) - expected_z) < 0.001f, "position.z after update");
+
+	runner.runOutput();
+
+	// Check output memory
+	ASSERT_TRUE(fabsf(runner.getOutput(0) - expected_x) < 0.001f, "i_position.x");
+	ASSERT_TRUE(fabsf(runner.getOutput(1) - expected_y) < 0.001f, "i_position.y");
+	ASSERT_TRUE(fabsf(runner.getOutput(2) - expected_z) < 0.001f, "i_position.z");
+	ASSERT_TRUE(fabsf(runner.getOutput(3) - 2.0f) < 0.001f, "i_velocity.x");
+	ASSERT_TRUE(fabsf(runner.getOutput(4) - 4.0f) < 0.001f, "i_velocity.y");
+	ASSERT_TRUE(fabsf(runner.getOutput(5) - 6.0f) < 0.001f, "i_velocity.z");
+	ASSERT_TRUE(fabsf(runner.getOutput(6) - 2.5f) < 0.001f, "i_scale");
+
+	return true;
+}
+
 } // anonymous namespace
 
 void runParticleScriptCompilerTests() {
@@ -1879,11 +2305,13 @@ void runParticleScriptCompilerTests() {
 	RUN_TEST(testCompileTimeConstUsingConst);
 	RUN_TEST(testCompileTimeConstUsingUserFunction);
 	RUN_TEST(testCompileTimeConstWithUserFunctionIf);
+	RUN_TEST(testCompileTimeConstFloatN);
 	RUN_TEST(testCompileEmitterVariables);
 	RUN_TEST(testCompileCompounds);
 	RUN_TEST(testExecution);
 	RUN_TEST(testLocalVars);
 	RUN_TEST(testUserFunctions);
+	RUN_TEST(testUserFunctionDuckTyping);
 	RUN_TEST(testFolding);
 	RUN_TEST(testIfConditionalsFolding);
 	RUN_TEST(testSyscalls);
@@ -1895,9 +2323,12 @@ void runParticleScriptCompilerTests() {
 	RUN_TEST(testCompilationErrors);
 	RUN_TEST(testUnusedLocalOptimization);
 	RUN_TEST(testUnaryMinus);
+	RUN_TEST(testSwizzling);
+	RUN_TEST(testOptimizerRegression);
 	RUN_TEST(testLogicOperators);
 	RUN_TEST(testIfElse);
 	RUN_TEST(testElseIf);
+	RUN_TEST(testInputs);
 	
 	logInfo("=== Test Results: ", passed_count, "/", test_count, " passed ===");
 }

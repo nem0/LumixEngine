@@ -222,6 +222,7 @@ struct ParticleScriptCompiler {
 
     enum class ValueType {
         FLOAT,
+		FLOAT2,
         FLOAT3,
         FLOAT4,
 
@@ -287,7 +288,8 @@ struct ParticleScriptCompiler {
             switch (type) {
                 case ValueType::VOID: ASSERT(false); return offset;
                 case ValueType::FLOAT: return offset;
-                case ValueType::FLOAT3: return offset + minimum(sub, 2);
+				case ValueType::FLOAT2: return offset + minimum(sub, 1);
+				case ValueType::FLOAT3: return offset + minimum(sub, 2);
                 case ValueType::FLOAT4: return offset + minimum(sub, 3);
             }
             ASSERT(false);
@@ -476,6 +478,7 @@ struct ParticleScriptCompiler {
 		StringView type;
 		if (!consume(Token::IDENTIFIER, type)) return ValueType::FLOAT;
 		if (equalStrings(type, "float")) return ValueType::FLOAT;
+		if (equalStrings(type, "float2")) return ValueType::FLOAT2;
 		if (equalStrings(type, "float3")) return ValueType::FLOAT3;
 		if (equalStrings(type, "float4")) return ValueType::FLOAT4;
 		error(type, "Unknown type");
@@ -498,6 +501,7 @@ struct ParticleScriptCompiler {
 			switch (var.type) {
 				case ValueType::VOID: ASSERT(false); break;
 				case ValueType::FLOAT: ++offset; break;
+				case ValueType::FLOAT2: offset += 2; break;
 				case ValueType::FLOAT3: offset += 3; break;
 				case ValueType::FLOAT4: offset += 4; break;
 			}
@@ -659,6 +663,7 @@ struct ParticleScriptCompiler {
 		switch (type) {
 			case ValueType::VOID: return 0;
 			case ValueType::FLOAT: return 1;
+			case ValueType::FLOAT2: return 2;
 			case ValueType::FLOAT3: return 3;
 			case ValueType::FLOAT4: return 4;
 		}
@@ -745,13 +750,26 @@ struct ParticleScriptCompiler {
 				}
 				case Node::UNARY_OPERATOR: {
 					auto* n = (UnaryOperatorNode*)node;
+					i32 prev = stack.size();
 					if (!eval(n->right)) return false;
-					float value = stack.back();
-					stack.pop();
-					switch (n->op) {
-						case Operators::SUB: stack.push(-value); break;
-						case Operators::NOT: stack.push(value == 0.0f ? 1.0f : 0.0f); break;
-						default: ASSERT(false); break;
+					i32 count = stack.size() - prev;
+					if (count == 0) {
+						compiler.errorAtCurrent("Invalid unary operation.");
+						return false;
+					}
+					float vals[4];
+					for (i32 i = count - 1; i >= 0; --i) {
+						vals[i] = stack.back();
+						stack.pop();
+					}
+					for (i32 i = 0; i < count; ++i) {
+						float res;
+						switch (n->op) {
+							case Operators::SUB: res = -vals[i]; break;
+							case Operators::NOT: res = vals[i] == 0.0f ? 1.0f : 0.0f; break;
+							default: ASSERT(false); return false;
+						}
+						stack.push(res);
 					}
 					return true;
 				}
@@ -808,38 +826,63 @@ struct ParticleScriptCompiler {
 					if (!eval(n->left)) return false;
 					i32 r = stack.size();
 					if (!eval(n->right)) return false;
-					ASSERT(r - l == 1);
-					ASSERT(stack.size() - r == 1);
-
-					float right = stack.back();
-					stack.pop();
-					float left = stack.back();
-					stack.pop();
-
-					switch (n->op) {
-						case Operators::ADD: stack.push(left + right); return true;
-						case Operators::SUB: stack.push(left - right); return true;
-						case Operators::MUL: stack.push(left * right); return true;
-						case Operators::DIV:
-							if (right == 0) {
-								compiler.errorAtCurrent("Division by zero.");
-								return false;
-							}
-							stack.push(left / right);
-							return true;
-						case Operators::MOD: stack.push(fmodf(left, right)); return true;
-						case Operators::LT: stack.push(left < right ? 1.0f : 0.0f); return true;
-						case Operators::GT: stack.push(left > right ? 1.0f : 0.0f); return true;
-						case Operators::AND: stack.push((left != 0.0f && right != 0.0f) ? 1.0f : 0.0f); return true;
-						case Operators::OR: stack.push((left != 0.0f || right != 0.0f) ? 1.0f : 0.0f); return true;
-						default: ASSERT(false); return false;
+					i32 left_count = r - l;
+					i32 right_count = stack.size() - r;
+					if (left_count != right_count) {
+						compiler.errorAtCurrent("Vector sizes don't match in binary operation.");
+						return false;
 					}
-
-					break;
+					i32 count = left_count;
+					if (count == 0) {
+						compiler.errorAtCurrent("Invalid binary operation.");
+						return false;
+					}
+					float left_vals[4];
+					float right_vals[4];
+					for (i32 i = count - 1; i >= 0; --i) {
+						right_vals[i] = stack.back();
+						stack.pop();
+					}
+					for (i32 i = count - 1; i >= 0; --i) {
+						left_vals[i] = stack.back();
+						stack.pop();
+					}
+					for (i32 i = 0; i < count; ++i) {
+						float lv = left_vals[i];
+						float rv = right_vals[i];
+						float res;
+						switch (n->op) {
+							case Operators::ADD: res = lv + rv; break;
+							case Operators::SUB: res = lv - rv; break;
+							case Operators::MUL: res = lv * rv; break;
+							case Operators::DIV:
+								if (rv == 0) {
+									compiler.errorAtCurrent("Division by zero.");
+									return false;
+								}
+								res = lv / rv;
+								break;
+							case Operators::MOD: res = fmodf(lv, rv); break;
+							case Operators::LT: res = lv < rv ? 1.0f : 0.0f; break;
+							case Operators::GT: res = lv > rv ? 1.0f : 0.0f; break;
+							case Operators::AND: res = (lv != 0.0f && rv != 0.0f) ? 1.0f : 0.0f; break;
+							case Operators::OR: res = (lv != 0.0f || rv != 0.0f) ? 1.0f : 0.0f; break;
+							default: ASSERT(false); return false;
+						}
+						stack.push(res);
+					}
+					return true;
 				}
 				case Node::LITERAL: {
 					auto* n = (LiteralNode*)node;
 					stack.push(n->value);
+					return true;
+				}
+				case Node::COMPOUND: {
+					auto* n = (CompoundNode*)node;
+					for (Node* elem : n->elements) {
+						if (!eval(elem)) return false;
+					}
 					return true;
 				}
 				default: break;
@@ -955,6 +998,7 @@ struct ParticleScriptCompiler {
 					Node* s = block(ctx);
 					if (!s) return nullptr;
 					node->statements.push(s);
+					break;
 				}
 				case Token::LET:
 					declareLocal(ctx);
@@ -1142,10 +1186,61 @@ struct ParticleScriptCompiler {
 
 				Constant* c = getConstant(token.value);
 				if (c) {
-					auto* node = LUMIX_NEW(m_arena_allocator, LiteralNode)(token);
-					// TODO floatN
-					node->value = c->value[0];
-					return node;
+					switch (c->type) {
+						case ValueType::VOID: {
+							ASSERT(false);
+							return nullptr;
+						}
+						case ValueType::FLOAT: {
+							auto* node = LUMIX_NEW(m_arena_allocator, LiteralNode)(token);
+							node->value = c->value[0];
+							return node;
+						}
+						case ValueType::FLOAT2: {
+							auto* node = LUMIX_NEW(m_arena_allocator, CompoundNode)(token, m_arena_allocator);
+							auto* x = LUMIX_NEW(m_arena_allocator, LiteralNode)(token);
+							x->value = c->value[0];
+							auto* y = LUMIX_NEW(m_arena_allocator, LiteralNode)(token);
+							y->value = c->value[1];
+							node->elements.reserve(2);
+							node->elements.push(x);
+							node->elements.push(y);
+							return node;
+						}
+						case ValueType::FLOAT3: {
+							auto* node = LUMIX_NEW(m_arena_allocator, CompoundNode)(token, m_arena_allocator);
+							auto* x = LUMIX_NEW(m_arena_allocator, LiteralNode)(token);
+							x->value = c->value[0];
+							auto* y = LUMIX_NEW(m_arena_allocator, LiteralNode)(token);
+							y->value = c->value[1];
+							auto* z = LUMIX_NEW(m_arena_allocator, LiteralNode)(token);
+							z->value = c->value[2];
+							node->elements.reserve(3);
+							node->elements.push(x);
+							node->elements.push(y);
+							node->elements.push(z);
+							return node;
+						}
+						case ValueType::FLOAT4: {
+							auto* node = LUMIX_NEW(m_arena_allocator, CompoundNode)(token, m_arena_allocator);
+							auto* x = LUMIX_NEW(m_arena_allocator, LiteralNode)(token);
+							x->value = c->value[0];
+							auto* y = LUMIX_NEW(m_arena_allocator, LiteralNode)(token);
+							y->value = c->value[1];
+							auto* z = LUMIX_NEW(m_arena_allocator, LiteralNode)(token);
+							z->value = c->value[2];
+							auto* w = LUMIX_NEW(m_arena_allocator, LiteralNode)(token);
+							w->value = c->value[3];
+							node->elements.reserve(4);
+							node->elements.push(x);
+							node->elements.push(y);
+							node->elements.push(z);
+							node->elements.push(w);
+							return node;
+						}
+					}
+					ASSERT(false);
+					return nullptr;
 				}
 				
 				BlockNode* block = ctx.block;
@@ -1232,6 +1327,7 @@ struct ParticleScriptCompiler {
 		if (value->type == Node::COMPOUND && infer_type) {
 			switch (((CompoundNode*)value)->elements.size()) {
 				case 1: local.type = ValueType::FLOAT; break;
+				case 2: local.type = ValueType::FLOAT2; break;
 				case 3: local.type = ValueType::FLOAT3; break;
 				case 4: local.type = ValueType::FLOAT4; break;
 				default: ASSERT(false); break;
@@ -1276,6 +1372,17 @@ struct ParticleScriptCompiler {
 		return result;
 	}
 
+	static bool canMutate(Node* node) {
+		if (node->type == Node::SWIZZLE) return canMutate(((SwizzleNode*)node)->left);
+		if (node->type != Node::VARIABLE) return false;
+
+		VariableNode* var_node = static_cast<VariableNode*>(node);
+		if (var_node->family != VariableFamily::LOCAL && var_node->family != VariableFamily::OUTPUT && var_node->family != VariableFamily::CHANNEL) {
+			return false;
+		}
+		return true;
+	}
+
 	Node* statement(CompileContext& ctx) {
 		Token token = peekToken();
 		switch (token.type) {
@@ -1292,6 +1399,10 @@ struct ParticleScriptCompiler {
 						consumeToken();
 						return lhs;
 					case Token::EQUAL: {
+						if (!canMutate(lhs)) {
+							error(lhs->token.value, "Cannot assign to this expression.");
+							return nullptr;
+						}
 						consumeToken();
 						Node* value = expression(ctx, 0);
 						if (!value) return nullptr;
@@ -1426,6 +1537,13 @@ struct ParticleScriptCompiler {
 				c.value[2] = evaluator.stack[2];
 				c.value[3] = evaluator.stack[2];
 				c.type = ValueType::FLOAT3;
+				break;
+			case 2:
+				c.value[0] = evaluator.stack[0];
+				c.value[1] = evaluator.stack[1];
+				c.value[2] = evaluator.stack[1];
+				c.value[3] = evaluator.stack[1];
+				c.type = ValueType::FLOAT2;
 				break;
 			case 1:
 				c.value[0] = evaluator.stack[0];
@@ -1638,6 +1756,7 @@ struct ParticleScriptCompiler {
 		Span<Arg> args;
 		u32 register_allocator = 0;
 		u32 num_immutables = 0;
+		EntryPoint entry_point;
 		
 		IRValue& stackValue(i32 idx) {
 			return stack[stack.size() + idx];
@@ -1910,6 +2029,7 @@ struct ParticleScriptCompiler {
 	};
 
 	static IRSwapResult canSwap(IRNode& node, IRNode& node_dst) {
+		// we can't reorder across blocks (e.g. from inside an if statement)
 		switch (node_dst.type) {
 			case IRNode::END: return IRSwapResult::BLOCK;
 			case IRNode::IF: return IRSwapResult::BLOCK;
@@ -1941,6 +2061,14 @@ struct ParticleScriptCompiler {
 		u32 num_values = getValues(node, values, dst);
 		u32 num_prev_values = getValues(node_dst, prev_values, prev_dst);
 
+		// we can't reorder
+		// a = x
+		// a = y
+		if (*dst == *prev_dst) return IRSwapResult::COLLISION;
+
+		// we can't reorder
+		// a = x
+		// b = a
 		if (dst) {
 			for (u32 i = 0; i < num_prev_values; ++i) {
 				if (*dst == prev_values[i]) return IRSwapResult::COLLISION;
@@ -2132,6 +2260,7 @@ struct ParticleScriptCompiler {
 					// if it's safe to do
 					if (n->instruction == InstructionType::MOV
 						&& n->args[0].type == DataStream::REGISTER 
+						&& n->dst.type == DataStream::REGISTER
 						&& register_access[n->args[0].index].reads == 1
 						&& register_access[n->args[0].index].writes == 1
 						&& register_access[n->args[0].index].prev_writer
@@ -2276,6 +2405,17 @@ struct ParticleScriptCompiler {
 		}
 	}
 
+	static const char* toString(EntryPoint ep) {
+		switch (ep) {
+			case EntryPoint::EMIT: return "emit";
+			case EntryPoint::OUTPUT: return "output";
+			case EntryPoint::UPDATE: return "update";
+			case EntryPoint::GLOBAL: return "global";
+		}
+		ASSERT(false);
+		return "unknown";
+	}
+
 	i32 compileIR(IRContext& ctx, Node* node) {
 		switch (node->type) {
 			case Node::EMITTER_REF: {
@@ -2297,6 +2437,10 @@ struct ParticleScriptCompiler {
 			}
 			case Node::SYSCALL: {
 				auto* n = (SysCallNode*)node;
+				if ((n->function.valid_entry_points & (1 << (u32)ctx.entry_point)) == 0) {
+					error(node->token.value, n->token.value, " can not be called in context of ", toString(ctx.entry_point));
+					return -1;
+				}
 				auto* res = LUMIX_NEW(m_arena_allocator, IROp)(node, m_arena_allocator);
 				res->instruction = n->function.instruction;
 				res->args.reserve(n->args.size());
@@ -2433,6 +2577,10 @@ struct ParticleScriptCompiler {
 						return num;
 					}
 					case VariableFamily::INPUT: {
+						if (ctx.entry_point != EntryPoint::EMIT) {
+							error(node->token.value, "Can not access input variables outside of emit()");
+							return -1;
+						}
 						u32 num;
 						if (ctx.emitted_index >= 0) {
 							Variable& v = m_emitters[ctx.emitted_index].m_inputs[n->index];
@@ -2475,6 +2623,10 @@ struct ParticleScriptCompiler {
 						return num;
 					}
 					case VariableFamily::OUTPUT: {
+						if (ctx.entry_point != EntryPoint::OUTPUT) {
+							error(node->token.value, "Can not access output variables outside of output()");
+							return -1;
+						}
 						Variable& v = ctx.emitter.m_outputs[n->index];
 						u32 num = toCount(v.type);
 						for (u32 i = 0; i < num; ++i) {
@@ -2674,6 +2826,7 @@ struct ParticleScriptCompiler {
 					switch (v.type) {
 						case ValueType::VOID: ASSERT(false); break;
 						case ValueType::FLOAT: ++num_immutables; break;
+						case ValueType::FLOAT2: num_immutables += 2; break;
 						case ValueType::FLOAT3: num_immutables += 3; break;
 						case ValueType::FLOAT4: num_immutables += 4; break;
 					}
@@ -2689,12 +2842,14 @@ struct ParticleScriptCompiler {
 		}();
 		if (m_is_error) return;
 
+		irctx.entry_point = ctx.entry_point;
 		irctx.register_allocator = num_immutables;
 		irctx.num_immutables = num_immutables;
 
 		BlockNode* b = block(ctx);
 		if (!b || m_is_error) return;
 		compileIR(irctx, b);
+		if (m_is_error) return;
 		optimizeIR(irctx);
 		u32 num_used_registers = allocateRegisters(irctx);
 		//printIR(fn_name, irctx);
@@ -2853,6 +3008,10 @@ struct ParticleScriptCompiler {
 					decl.addAttribute(offset, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 					offset += sizeof(float);
 					break;
+				case ValueType::FLOAT2: 
+					decl.addAttribute(offset, 2, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+					offset += sizeof(Vec2);
+					break;
 				case ValueType::FLOAT3: 
 					decl.addAttribute(offset, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 					offset += sizeof(Vec3);
@@ -2897,6 +3056,7 @@ struct ParticleScriptCompiler {
 				switch (i.type) {
 					case ValueType::FLOAT4: c+= 4; break;
 					case ValueType::FLOAT3: c+= 3; break;
+					case ValueType::FLOAT2: c+= 2; break;
 					case ValueType::FLOAT: c+= 1; break;
 					case ValueType::VOID: ASSERT(false); break;
 				}
@@ -2941,6 +3101,7 @@ struct ParticleScriptCompiler {
 			switch (p.type) {
 				case ValueType::VOID: ASSERT(false); break;
 				case ValueType::FLOAT: output.write(u32(1)); break;
+				case ValueType::FLOAT2: output.write(u32(2)); break;
 				case ValueType::FLOAT3: output.write(u32(3)); break;
 				case ValueType::FLOAT4: output.write(u32(4)); break;
 			}

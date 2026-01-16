@@ -43,6 +43,7 @@ emitter EmitterName {
 ## Data Types
 
 - `float` - Single floating-point value
+- `float2` - 2-component vector (x, y)
 - `float3` - 3-component vector (x, y, z)
 - `float4` - 4-component vector (x, y, z, w)
 
@@ -145,6 +146,8 @@ Note: If/else statements are not SIMD-friendly, as branching is not vectorized i
 
 Input variables (`in`) declare parameters that can be passed when instantiating particles from another emitter. They allow emitters to communicate data between each other.
 
+Input variables are **only accessible in the `emit()` function** and are used to initialize particle state when spawned from another emitter.
+
 ```hlsl
 emitter ChildEmitter {
     // Input parameters
@@ -175,18 +178,37 @@ emitter ParentEmitter {
 }
 ```
 
-Input variables are only accessible in the `emit()` function and are used to initialize particle state when spawned from another emitter.
+## Entry Points and Context Restrictions
 
-## Entry points
+Particle scripts have three main entry points, each with specific restrictions on what can be accessed:
 
 ### emit()
 Called when emitting new particles. Initialize particle state here.
+- Can access `in` variables
+- Cannot access `out` variables
+- Can call `emit()` to spawn particles from other emitters
 
 ### update()
 Called every frame for each particle. Update particle state, check lifetime, etc.
+- Can access `var` variables
+- Cannot access `in` or `out` variables
+- Can call `kill()` to remove particles
+- Can call `emit()` to spawn new particles
 
 ### output()
 Called before rendering. Set output channels for rendering.
+- Can access `out` variables
+- Can access `var` variables
+- Cannot access `in` variables
+- Cannot call `kill()` or `emit()`
+
+## Variable Scope and Accessibility
+
+- `in` variables: Only accessible in `emit()` function
+- `out` variables: Only accessible in `output()` function  
+- `var` variables: Accessible in `emit()`, `update()`, and `output()` functions
+- `global` variables: Accessible everywhere
+- `const` variables: Accessible everywhere (compile-time constants)
 
 ## User-Defined Functions
 
@@ -238,7 +260,8 @@ fn sphere(r) {
 - `noise(float)` - Perlin noise
 
 ### Particle Functions
-- `emit(emitter)` - Emit new particle in specified `emitter` (update function only)
+- `emit()` - Emit new particle from current emitter (update function only)
+- `emit(emitter)` - Emit new particle from specified emitter with input parameters (update function only)
 - `kill()` - Kill current particle (update function only)
 
 ## System Values
@@ -257,14 +280,55 @@ fn sphere(r) {
 
 ## Vector Operations
 
-Vectors support swizzling and component-wise operations:
+Vectors support swizzling for reading and writing individual components or combinations of components:
+
+### Reading Components
 
 ```hlsl
-pos = {1, 2, 3};
-x = pos.x;
-xy = pos.xy;
-pos.yz = {4, 5};
+let pos = {1, 2, 3, 4};
+let x = pos.x;        // 1
+let y = pos.y;        // 2
+let z = pos.z;        // 3
+let w = pos.w;        // 4
+
+// Read multiple components
+let xy = pos.xy;      // {1, 2}
+let xyz = pos.xyz;    // {1, 2, 3}
+let rgb = pos.rgb;    // {1, 2, 3} (same as xyz)
+
+// Read with repetition
+let xx = pos.xx;      // {1, 1}
+let yyy = pos.yyy;    // {2, 2, 2}
+let zz = pos.zz;      // {3, 3}
+
+// Read mixed components
+let xyx = pos.xyx;    // {1, 2, 1}
+let zwz = pos.zwz;    // {3, 4, 3}
 ```
+
+### Writing Components
+
+```hlsl
+let mut pos = {1, 2, 3, 4};
+
+// Write single component
+pos.x = 10;           // pos = {10, 2, 3, 4}
+
+// Write multiple components
+pos.xy = {20, 30};    // pos = {20, 30, 3, 4}
+pos.xyz = {1, 2, 3};  // pos = {1, 2, 3, 4}
+
+// Write with swizzle
+pos.yz = {40, 50};    // pos = {1, 40, 50, 4}
+```
+
+### Component Names
+
+Vectors use the following component names:
+- `x`, `y`, `z`, `w` for general use
+- `r`, `g`, `b`, `a` for color operations (equivalent to x, y, z, w)
+
+All component names can be mixed and matched in swizzles.
 
 ## Example
 
@@ -279,7 +343,7 @@ emitter Emitter0 {
 	init_emit_count 0
 	emit_per_second 300
 	
-	// par-particle output data, read in shaders
+	// per-particle output data, read in shaders
     out i_rot_lod : float4
 	out i_pos_scale : float4
 
@@ -287,12 +351,18 @@ emitter Emitter0 {
     var pos : float3
 	var vel : float3
 	var t : float
+	var uv_offset : float2  // Example of float2 usage
 
 	// called every frame
     fn update() {
 		t = t + time_delta;
 		pos = pos + vel * time_delta;
 		vel.y = vel.y - G * time_delta;
+		
+		// Update UV animation
+		uv_offset.x = uv_offset.x + time_delta * 0.1;
+		uv_offset.y = uv_offset.y + time_delta * 0.05;
+		
 		kill(pos.y < -0.01);
 	}
 
@@ -305,6 +375,7 @@ emitter Emitter0 {
 		vel.y = start_vertical_velocity;
 		vel.z = sin(angle) * h;
 		t = 0;
+		uv_offset = {0, 0};
 	}
 
 	// called before rendering to output data to rendering system
@@ -312,6 +383,9 @@ emitter Emitter0 {
 		i_pos_scale.xyz = pos;
 		i_pos_scale.w = min(pos.y * 0.1, 0.1);
 		i_rot_lod = {0.707, 0, 0.707, 0};
+		
+		// Output UV offset as part of rotation/lod data
+		i_rot_lod.zw = uv_offset;
 	}
 }
 ```
