@@ -97,14 +97,13 @@ Constants are evaluated once during compilation and cannot be modified at runtim
 
 ### Control Flow
 - `if` / `else` - Conditional statements
-- `return` - Return from function
 
 ### Other
 - `import` - Import other scripts
 
 ## Control Flow
 
-Particle scripts support conditional execution using `if`/`else` statements. `else`
+Particle scripts support conditional execution using `if`/`else` statements.
 ### If/Else Statements
 
 ```hlsl
@@ -219,7 +218,36 @@ Particle scripts support user-defined functions to organize and reuse code. Func
 ```hlsl
 fn function_name(param1, param2, ...) {
     // function body
-    return value;
+	result = value;
+}
+```
+
+Functions do not use the `return` keyword. Instead, assign the function output to the implicit `result` local. The name `result` is reserved and cannot be used with `let`.
+
+The type of `result` is inferred from assignments in the function body: assigning a scalar makes it `float`, and assigning a compound literal like `{1, 2, 3}` makes it `float3` (similarly 2/4 elements infer `float2`/`float4`). Once inferred, subsequent assignments to `result` must match the inferred vector width, and accessing components like `result.z` is only valid if `result` has been inferred wide enough.
+
+If `result` is assigned in `if`/`else` blocks, the compiler still infers a single type for the whole function: all assignments to `result` across all branches must agree on the same vector width. If different branches assign different widths (e.g. `float3` in the `if` branch and `float` in the `else` branch), compilation fails with a type mismatch. If only some branches assign to `result`, the function still has the inferred type, but on the paths where `result` is not assigned it will keep its default value.
+
+Valid example (infers `float3`):
+
+```hlsl
+fn make_vec3() {
+    result = {1, 2, 3};
+    result.z = 4;
+}
+```
+
+Invalid examples:
+
+```hlsl
+fn bad_component() {
+    result = {1, 2};
+    result.z = 3; // error: result inferred as float2
+}
+
+fn bad_mismatch() {
+    result = 1;
+    result = {1, 2}; // error: type mismatch (float vs float2)
 }
 ```
 
@@ -227,11 +255,11 @@ Examples:
 
 ```hlsl
 fn abs(x) {
-	return max(x, -x);
+	result = max(x, -x);
 }
 
 fn saturate(x) {
-	return max(0, min(1, x));
+	result = max(0, min(1, x));
 }
 
 fn sphere(r) {
@@ -239,12 +267,47 @@ fn sphere(r) {
 	let lon = random(0, 2 * PI);
 	let res : float3;
 	let tmp = sin(lon) * r;
-	res.x = cos(lat) * tmp;
-	res.y = sin(lat) * tmp;
-	res.z = cos(lon) * r;
-	return res;
+    res.x = cos(lat) * tmp;
+    res.y = sin(lat) * tmp;
+    res.z = cos(lon) * r;
+    result = res;
 }
 ```
+
+### Generic Functions
+
+Functions in particle scripts can be used generically: a single user-defined function may accept and return different concrete vector widths depending on how it's called. The compiler infers parameter and `result` types from call sites and assignments, allowing one function body to be specialized for `float`, `float2`, `float3`, or `float4` as needed.
+
+Example (from tests):
+
+```hlsl
+fn identity(v) {
+    result = v;
+}
+
+emitter test {
+    out o3 : float3
+    out o4 : float4
+
+    var v3 : float3
+    var v4 : float4
+
+    fn emit() {
+        v3 = {1, 2, 3};
+        v4 = {4, 5, 6, 7};
+    }
+
+    fn output() {
+        o3 = identity(v3); // identity used as float3 -> returns float3
+        o4 = identity(v4); // identity used as float4 -> returns float4
+    }
+}
+```
+
+Notes:
+- The compiler creates an appropriate specialization based on argument types: `identity(float3)` and `identity(float4)` are both valid uses of the same function body.
+- Within a single specialization (a given call signature), all assignments to `result` must be compatible (same vector width). Mismatched widths across branches still produce a compile error.
+- Generic usage relies on type inference from call sites; if the compiler cannot determine types, make usages explicit so the intended types are clear.
 
 ## Built-in Functions
 

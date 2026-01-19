@@ -285,11 +285,13 @@ bool testCompileTimeConstUsingConst() {
 bool testCompileTimeConstUsingUserFunction() {
 	const char* code = R"(
 		fn add(a, b) {
-			return a + b;
+			result = a + b;
 		}
 
 		fn multiply(x, y) {
-			return x * y;
+			let tmp = x;
+			let tmp2 = tmp;
+			result = tmp2 * y;
 		}
 
 		const C = add(3, 4);
@@ -319,9 +321,9 @@ bool testCompileTimeConstWithUserFunctionIf() {
 	const char* code = R"(
 		fn func_with_if(x) {
 			if x > 5 {
-				return x * 2;
+				result = x * 2;
 			} else {
-				return x + 1;
+				result = x + 1;
 			}
 		}
 
@@ -729,24 +731,24 @@ bool testLocalVars() {
 bool testUserFunctions() {
 	const char* code = R"(
 		fn add(a, b) {
-			return a + b;
+			result = a + b;
 		}
 
 		fn multiply(x, y) {
-			return x * y;
+			result = x * y;
 		}
 
 		fn scale_vec(v, s) {
-			let res : float3;
-			res.x = v.x * s;
-			res.y = v.y * s;
-			res.z = v.z * s;
-			return res;
+			result = { 
+				v.x * s,
+				v.y * s,
+				v.z * s
+			};
 		}
 
 		fn compute(a, b, c) {
 			let sum = add(a, b);
-			return multiply(sum, c);
+			result = multiply(sum, c);
 		}
 
 		emitter test {
@@ -816,11 +818,44 @@ bool testUserFunctions() {
 	return true;
 }
 
+// Test that function result type is inferred when only `result` is assigned
+bool testInferResultType() {
+	const char* code = R"(
+		fn make_vec() {
+			result = {1, 2, 3};
+			result.z = 4;
+		}
+
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			out o : float3
+
+			fn output() {
+				o = make_vec();
+			}
+		}
+	)";
+
+	ParticleScriptRunner runner;
+	ASSERT_TRUE(runner.compile(code), "Compilation should succeed and infer result as float3");
+
+	runner.runEmit();
+	runner.runOutput();
+
+	ASSERT_TRUE(fabsf(runner.getOutput(0) - 1.0f) < 0.001f, "o1.x should be 1");
+	ASSERT_TRUE(fabsf(runner.getOutput(1) - 2.0f) < 0.001f, "o1.y should be 2");
+	ASSERT_TRUE(fabsf(runner.getOutput(2) - 4.0f) < 0.001f, "o1.z should be 4");
+
+	return true;
+}
+
 // Test duck typing for user-defined functions - functions accessing .xyz should accept both float3 and float4
 bool testUserFunctionDuckTyping() {
 	const char* code = R"(
 		fn get_xyz_sum(v) {
-			return v.x + v.y + v.z;
+			result = v.x + v.y + v.z;
 		}
 
 		emitter test {
@@ -865,20 +900,67 @@ bool testUserFunctionDuckTyping() {
 	return true;
 }
 
+// Test that a single user-defined function can return different types depending on argument type
+bool testFunctionGeneric() {
+	const char* code = R"(
+		fn identity(v) {
+			result = v;
+		}
+
+		emitter test {
+			material "particles/particle.mat"
+			init_emit_count 1
+
+			out o3 : float3
+			out o4 : float4
+
+			var v3 : float3
+			var v4 : float4
+
+			fn emit() {
+				v3 = {1, 2, 3};
+				v4 = {4, 5, 6, 7};
+			}
+
+			fn output() {
+				o3 = identity(v3);
+				o4 = identity(v4);
+			}
+		}
+	)";
+
+	ParticleScriptRunner runner;
+	ASSERT_TRUE(runner.compile(code), "Compilation should succeed");
+
+	runner.runEmit();
+	runner.runOutput();
+
+	ASSERT_TRUE(fabsf(runner.getOutput(0) - 1.0f) < 0.001f, "o3.x should be 1");
+	ASSERT_TRUE(fabsf(runner.getOutput(1) - 2.0f) < 0.001f, "o3.y should be 2");
+	ASSERT_TRUE(fabsf(runner.getOutput(2) - 3.0f) < 0.001f, "o3.z should be 3");
+
+	ASSERT_TRUE(fabsf(runner.getOutput(3) - 4.0f) < 0.001f, "o4.x should be 4");
+	ASSERT_TRUE(fabsf(runner.getOutput(4) - 5.0f) < 0.001f, "o4.y should be 5");
+	ASSERT_TRUE(fabsf(runner.getOutput(5) - 6.0f) < 0.001f, "o4.z should be 6");
+	ASSERT_TRUE(fabsf(runner.getOutput(6) - 7.0f) < 0.001f, "o4.w should be 7");
+
+	return true;
+}
+
 // Test that constant folding reduces instruction count
 bool testFolding() {
 	// Script with constant expressions and user-defined functions that should be folded at compile time
 	const char* folded_code = R"(
 		fn double(x) {
-			return x * 2;
+			result = x * 2;
 		}
 
 		fn add_ten(x) {
-			return x + 10;
+			result = x + 10;
 		}
 
 		fn compute(a, b) {
-			return double(a) + add_ten(b);
+			result = double(a) + add_ten(b);
 		}
 
 		emitter test {
@@ -909,15 +991,15 @@ bool testFolding() {
 	// Script with pre-computed literals (baseline for comparison)
 	const char* literal_code = R"(
 		fn double(x) {
-			return x * 2;
+			result = x * 2;
 		}
 
 		fn add_ten(x) {
-			return x + 10;
+			result = x + 10;
 		}
 
 		fn compute(a, b) {
-			return double(a) + add_ten(b);
+			result = double(a) + add_ten(b);
 		}
 
 		emitter test {
@@ -973,7 +1055,6 @@ bool testIfConditionalsFolding() {
 	// Script with if conditionals that have constant conditions - should be folded away
 	const char* folded_code = R"(
 		fn conditional_calc(x) {
-			let res : float;
 			let tmp : float;
 			if x > 5 {
 				tmp = x * 2;
@@ -982,12 +1063,11 @@ bool testIfConditionalsFolding() {
 				tmp = x + 1;
 			}
 			if tmp > 10 {
-				res = tmp + 7;
+				result = tmp + 7;
 			}
 			else {
-				res = tmp * 3;
+				result = tmp * 3;
 			}
-			return res;
 		}
 
 		emitter test {
@@ -1035,7 +1115,6 @@ bool testIfConditionalsFolding() {
 	// Script with pre-computed results (baseline for comparison)
 	const char* literal_code = R"(
 		fn conditional_calc(x) {
-			let res : float;
 			let tmp : float;
 			if x > 5 {
 				tmp = x * 2;
@@ -1044,12 +1123,11 @@ bool testIfConditionalsFolding() {
 				tmp = x + 1;
 			}
 			if tmp > 10 {
-				res = tmp + 7;
+				result = tmp + 7;
 			}
 			else {
-				res = tmp * 3;
+				result = tmp * 3;
 			}
-			return res;
 		}
 
 		emitter test {
@@ -1306,6 +1384,59 @@ bool testCompilationErrors() {
         )"
 	);
 
+	expectCompilationFailure("invalid assignment to global",
+		R"(
+	        global G : float
+
+			fn f() {
+				G = 5;
+			}
+
+            emitter test {
+                material "particles/particle.mat"
+            }
+        )"
+	);
+
+	expectCompilationFailure("access to invalid component",
+		R"(
+			fn f() {
+				let v = {1, 2}; // inferred to float2
+				v.z = 123; // .z is not in float2
+				result = v;
+			} 
+
+            emitter test {
+				var a : float2
+
+				fn update() {
+					a = f();
+				}
+	
+                material "particles/particle.mat"
+            }
+        )"
+	);
+
+	expectCompilationFailure("type mismatch",
+		R"(
+			fn f() {
+				result = {1, 2};
+			} 
+
+            emitter test {
+				var a : float3
+
+				fn update() {
+					a = f(); // error: assign float2 to float3
+				}
+	
+                material "particles/particle.mat"
+            }
+        )"
+	);
+
+
 	expectCompilationFailure(
 		"missing semicolon",
 		R"(
@@ -1450,12 +1581,25 @@ bool testCompilationErrors() {
 		)"
 	);
 
+	expectCompilationFailure("multiple swizzles",
+		R"(
+			emitter test {
+				material "particles/particle.mat"
+				var vec : float3
+				fn emit() {
+					vec = {1,2,3};
+					let x = vec.xy.x;
+				}
+			}
+		)"
+	);
+
 	expectCompilationFailure("division by zero in constant", "const BAD = 1 / 0;");
 
 	expectCompilationFailure("duplicate parameter names in function",
 		R"(
 			fn bad_func(a, a) {  // duplicate parameter
-				return a;
+				result = a;
 			}
 		)"
 	);
@@ -1463,11 +1607,11 @@ bool testCompilationErrors() {
 	expectCompilationFailure("function redefinition",
 		R"(
 			fn my_func(a) {
-				return a * 2;
+				result = a * 2;
 			}
 
 			fn my_func(b) {  // redefinition
-				return b * 3;
+				result = b * 3;
 			}
 		)"
 	);
@@ -1475,7 +1619,7 @@ bool testCompilationErrors() {
 	expectCompilationFailure("wrong argument count in function call",
 		R"(
 			fn my_func(a, b) {
-				return a + b;
+				result = a + b;
 			}
 
 			emitter test {
@@ -1492,7 +1636,7 @@ bool testCompilationErrors() {
 	expectCompilationFailure("undefined variable in function",
 		R"(
 			fn bad_func() {
-				return undefined_var;  // undefined
+				result = undefined_var;  // undefined
 			}
 		)"
 	);
@@ -1500,7 +1644,7 @@ bool testCompilationErrors() {
 	expectCompilationFailure("invalid syntax in function",
 		R"(
 			fn bad_func(a) {
-				return a + ;  // invalid syntax
+				result = a + ;  // invalid syntax
 			}
 		)"
 	);
@@ -1521,7 +1665,7 @@ bool testCompilationErrors() {
 	expectCompilationFailure("function assigned to variable",
 		R"(
 			fn my_func(a) {
-				return a * 2;
+				result = a * 2;
 			}
 
 			emitter test {
@@ -1539,11 +1683,11 @@ bool testCompilationErrors() {
 	expectCompilationFailure("function passed as argument",
 		R"(
 			fn my_func(a) {
-				return a * 2;
+				result = a * 2;
 			}
 
 			fn call_func(f, x) {
-				return f(x);
+				result = f(x);
 			}
 
 			emitter test {
@@ -1561,9 +1705,9 @@ bool testCompilationErrors() {
 		R"(
 			fn factorial(n) {
 				if n < 2 {
-					return 1;
+					result = 1;
 				} else {
-					return n * factorial(n - 1);  // recursive call
+					result = n * factorial(n - 1);  // recursive call
 				}
 			}
 
@@ -1627,20 +1771,6 @@ bool testCompilationErrors() {
 	expectCompilationFailure("random called in constant initialization",
 		R"(
 			const A = random(0, 10);
-			emitter test {
-				material "particles/particle.mat"
-			}
-		)"
-	);
-
-	// TODO implement local vars in constant initialization
-	expectCompilationFailure("local variables during constant initialization",
-		R"(
-			fn test() {
-				let x = 0;
-				return x;
-			}
-			const A = test();
 			emitter test {
 				material "particles/particle.mat"
 			}
@@ -1748,6 +1878,119 @@ bool testCompilationErrors() {
 		)"
 	);
 
+	expectCompilationFailure("return is not supported",
+		R"(
+			emitter test {
+				material "particles/particle.mat"
+				fn f() { return 42; }
+				fn emit() {	}
+			}
+		)"
+	);
+
+	expectCompilationFailure("missung = after result",
+		R"(
+			emitter test {
+				material "particles/particle.mat"
+				fn f() { result 42; }
+				fn emit() {	}
+			}
+		)"
+	);
+
+	expectCompilationFailure("type mismatch",
+		R"(
+			fn bad() {
+				if 1 > 0 {
+					result = {1, 2, 3}; // inferred as float3
+				} else {
+					result = {4, 5}; // can not assign float2 to float3
+				}
+			}
+
+			emitter test {
+				material "particles/particle.mat"
+				init_emit_count 1
+
+				var v : float3
+
+				fn update() { v = bad(); }
+			}
+		)"
+	);
+
+	expectCompilationFailure("invalid subscript",
+		R"(
+			fn bad() {
+				result = {1, 2, 3}; // inferred as float3
+				result.w = 4; // invalid subscript .w
+			}
+
+			emitter test {
+				material "particles/particle.mat"
+				init_emit_count 1
+
+				var v : float3
+
+				fn update() { v = bad(); }
+			}
+		)"
+	);
+
+	expectCompilationFailure("invalid variable name",
+		R"(
+			fn bad() {
+				let result : float = 12; // local variable can not be named `result`
+				result = 42;
+			}
+
+			emitter test {
+				material "particles/particle.mat"
+				init_emit_count 1
+
+				var v : float
+
+				fn update() { v = bad(); }
+			}
+		)"
+	);
+
+	expectCompilationFailure("type mismatch",
+		R"(
+			fn bad() {
+				result = {1, 2, 3}; // inferred as float3
+				result = {4, 5};	// can not assign float2 to float3
+			}
+
+			emitter test {
+				material "particles/particle.mat"
+				init_emit_count 1
+
+				var v : float3
+
+				fn update() { v = bad(); }
+			}
+		)"
+	);
+
+	expectCompilationFailure("invalid subscript",
+		R"(
+			fn bad() {
+				result.z = 4; // can not infer type of the result
+			}
+
+			emitter test {
+				material "particles/particle.mat"
+				init_emit_count 1
+
+				var v : float3
+
+				fn update() { v = bad(); }
+			}
+		)"
+	);
+
+
 	return all_tests_passed;
 }
 
@@ -1764,7 +2007,7 @@ bool testBasicImport() {
 	ParticleScriptRunner runner;
 	runner.registerImport("utils.pat", R"(
 		const SCALE = 2.0;
-		fn double(x) { return x * SCALE; }
+		fn double(x) { result = x * SCALE; }
 	)");
 	ASSERT_TRUE(runner.compile(main_script), "Runner compilation should succeed");
 	runner.runEmit();
@@ -1781,7 +2024,7 @@ bool testNestedImport() {
 	)");
 	runner.registerImport("utils.pat", R"(
 		import "base.pat"
-		fn add_base(x) { return x + BASE_VALUE; }
+		fn add_base(x) { result = x + BASE_VALUE; }
 	)");
 
 	const char* main_script = R"(
@@ -2074,6 +2317,35 @@ bool testSwizzling() {
 	return true;
 }
 
+bool testEmitAfterBlock() {
+	const char* code = R"(
+		emitter explosion {
+			material "/maps/particles/explosion.mat"
+			init_emit_count 1
+
+			in in_col : float3
+		}
+
+		emitter fireworks {
+			material "/maps/particles/explosion.mat"
+			emit_per_second 1
+
+			fn update() {
+				emit(explosion) {
+					in_col.x = random(0, 1);
+					in_col.y = random(0, 1);
+					in_col.z = random(0, 1);
+				};
+			}
+		}
+	)";
+
+	TestableCompiler compiler;
+	OutputMemoryStream compiled(getGlobalAllocator());
+	if (!compiler.compile(Path("emit_after_block.pat"), code, compiled)) return false;
+	return true;
+}
+
 // Regression test for optimizer reorder/fold affecting swizzle -> channel writes
 bool testOptimizerRegression() {
 	const char* code = R"(
@@ -2311,6 +2583,7 @@ void runParticleScriptCompilerTests() {
 	RUN_TEST(testExecution);
 	RUN_TEST(testLocalVars);
 	RUN_TEST(testUserFunctions);
+	RUN_TEST(testInferResultType);
 	RUN_TEST(testUserFunctionDuckTyping);
 	RUN_TEST(testFolding);
 	RUN_TEST(testIfConditionalsFolding);
@@ -2329,6 +2602,8 @@ void runParticleScriptCompilerTests() {
 	RUN_TEST(testIfElse);
 	RUN_TEST(testElseIf);
 	RUN_TEST(testInputs);
+	RUN_TEST(testEmitAfterBlock);
+	RUN_TEST(testFunctionGeneric);
 	
 	logInfo("=== Test Results: ", passed_count, "/", test_count, " passed ===");
 }

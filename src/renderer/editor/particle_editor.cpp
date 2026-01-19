@@ -25,7 +25,7 @@
 #include "renderer/renderer.h"
 #include <imgui/imgui.h>
 
-//#define LUMIX_PARTICLE_SCRIPT
+#define LUMIX_PARTICLE_SCRIPT
 
 namespace Lumix {
 

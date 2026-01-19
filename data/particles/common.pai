@@ -1,21 +1,21 @@
 const PI = 3.14159265;
 
 fn dot(a, b) {
-	return a.x * b.x + a.y * b.y + a.z * b.z;
+	result = a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
 fn distance(a, b) {
 	let d : float3;
 	d = a - b;
-	return sqrt(dot(d, d));
+	result = sqrt(dot(d, d));
 }
 
 fn abs(x) {
-	return max(x, -x);
+	result = max(x, -x);
 }
 
 fn saturate(x) {
-	return max(0, min(1, x));
+	result = max(0, min(1, x));
 }
 
 fn sphere(r) {
@@ -26,6 +26,6 @@ fn sphere(r) {
 	res.x = cos(lat) * tmp;
 	res.y = sin(lat) * tmp;
 	res.z = cos(lon) * r;
-	return res;
+	result = res;
 }
 

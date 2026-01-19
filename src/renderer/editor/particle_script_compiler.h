@@ -37,7 +37,7 @@ struct ParticleScriptToken {
 		NUMBER, STRING, IDENTIFIER,
 
 		// keywords
-		CONST, GLOBAL, EMITTER, FN, VAR, OUT, IN, LET, RETURN, IMPORT, IF, ELSE, AND, OR, NOT
+		CONST, GLOBAL, EMITTER, FN, VAR, OUT, IN, LET, IMPORT, IF, ELSE, AND, OR, NOT
 	};
 
 	Type type;
@@ -174,7 +174,6 @@ struct ParticleScriptTokenizer {
 				}
 				return makeToken(Token::IDENTIFIER);
 			}
-			case 'r': return checkKeyword("eturn", 1, 5, Token::RETURN);
 			case 'v': return checkKeyword("ar", 1, 2, Token::VAR);
 		}
 		return makeToken(Token::IDENTIFIER);
@@ -340,7 +339,6 @@ struct ParticleScriptCompiler {
 		BlockNode* block = nullptr;
 		EntryPoint entry_point;
 
-
 		u32 value_counter = 0;
 	};
 
@@ -385,6 +383,7 @@ struct ParticleScriptCompiler {
 		Array<Node*> statements;
 		Array<Local> locals;
 		BlockNode* parent = nullptr;
+		bool is_user_function_block = false;
 	};
 
 	struct IfNode : Node {
@@ -613,7 +612,6 @@ struct ParticleScriptCompiler {
 			case Token::Type::OUT: return "out";
 			case Token::Type::IN: return "in";
 			case Token::Type::LET: return "let";
-			case Token::Type::RETURN: return "return";
 			case Token::Type::IMPORT: return "import";
 			case Token::Type::IF: return "if";
 			case Token::Type::ELSE: return "else";
@@ -659,7 +657,7 @@ struct ParticleScriptCompiler {
 		return 0;
 	}
 
-	i32 toCount(ValueType type) {
+	static i32 toCount(ValueType type) {
 		switch (type) {
 			case ValueType::VOID: return 0;
 			case ValueType::FLOAT: return 1;
@@ -693,6 +691,7 @@ struct ParticleScriptCompiler {
 		StackArray<float, 16> stack;
 		ParticleScriptCompiler& compiler;
 		i32 arg_offset = -9000;
+		BlockNode* current_block = nullptr;
 
 		// returns false on failure
 		bool eval(Node* node) {
@@ -710,9 +709,12 @@ struct ParticleScriptCompiler {
 				}
 				case Node::BLOCK: {
 					auto* n = (BlockNode*)node;
+					ASSERT(n->parent == current_block);
+					current_block = n;
 					for (Node* statement : n->statements) {
 						if (!eval(statement)) return false;
 					}
+					current_block = n->parent;
 					return true;
 				}
 				case Node::IF: {
@@ -727,6 +729,78 @@ struct ParticleScriptCompiler {
 					}
 					return true;
 				}
+				case Node::VARIABLE: {
+					auto* n = (VariableNode*)node;
+					if (n->family != VariableFamily::LOCAL) {
+						compiler.errorAtCurrent("Operation not access the variable at compile-time.");
+						return false;
+					}
+					const Local& l = n->block->locals[n->index];
+					switch (l.type) {
+						case ValueType::VOID: 
+							compiler.errorAtCurrent("Cannot evaluate void variable at compile-time.");
+							return false;
+						case ValueType::FLOAT:
+							stack.push(l.values[0]);
+							break;
+						case ValueType::FLOAT2:
+							stack.push(l.values[0]);
+							stack.push(l.values[1]);
+							break;
+						case ValueType::FLOAT3:
+							stack.push(l.values[0]);
+							stack.push(l.values[1]);
+							stack.push(l.values[2]);
+							break;
+						case ValueType::FLOAT4:
+							stack.push(l.values[0]);
+							stack.push(l.values[1]);
+							stack.push(l.values[2]);
+							stack.push(l.values[3]);
+							break;
+					}
+					return true;
+				}
+				case Node::ASSIGN: {
+					auto* n = (AssignNode*)node;
+					const i32 rhs_stack_start = stack.size();
+					if (!eval(n->right)) return false;
+					const i32 num_rhs = stack.size() - rhs_stack_start;
+					
+					if (n->left->type != Node::VARIABLE) {
+						compiler.errorAtCurrent("Operation not supported at compile-time.");
+						return false;
+					}
+
+					auto* var_node = (VariableNode*)n->left;
+					if (var_node->family == VariableFamily::LOCAL) {
+						Local& local = var_node->block->locals[var_node->index];
+						u32 num_components = toCount(local.type);
+						if (local.type == ValueType::VOID) {
+							// infer result's type 
+							switch (num_rhs) {
+								case 1: break;
+								case 2: local.type = ValueType::FLOAT2; break;
+								case 3: local.type = ValueType::FLOAT3; break;
+								case 4: local.type = ValueType::FLOAT4; break;
+								default: 
+									compiler.error(node->token.value, "Not implemented");
+									return false;
+							}
+							num_components = num_rhs;
+						}
+						if (num_rhs != (i32)num_components) {
+							compiler.errorAtCurrent("Type mismatch in assignment.");
+							return false;
+						}
+						// TODO when recursion is supported, recursive call of the function overwrites value of the local
+						for (u32 i = 0; i < num_components; ++i) {
+							local.values[num_components - 1 - i] = stack.back();
+							stack.pop();
+						}
+						return true;
+					}
+				}
 				case Node::FUNCTION_CALL: {
 					// TODO we assume all args and result is float
 					auto* n = (FunctionCallNode*)node;
@@ -738,9 +812,7 @@ struct ParticleScriptCompiler {
 					}
 					u32 args_end = stack.size();
 					if (!eval(fn.block)) return false;
-					ASSERT(stack.size() == args_end + 1); // TODO
-					float result = stack.back();
-					stack.pop();
+					float result = fn.block->locals[0].values[0];
 					for (u32 i = 0; i < (u32)n->args.size(); ++i) {
 						stack.pop();
 					}
@@ -980,9 +1052,15 @@ struct ParticleScriptCompiler {
 		return { InstructionType::END };
 	}
 
-	BlockNode* block(CompileContext& ctx) {
+	BlockNode* block(CompileContext& ctx, bool is_user_function_block) {
 		auto* node = LUMIX_NEW(m_arena_allocator, BlockNode)(peekToken(), m_arena_allocator);
 		node->parent = ctx.block;
+		node->is_user_function_block = is_user_function_block;
+		if (is_user_function_block) {
+			Local& local = node->locals.emplace();
+			local.name = "result";
+			local.type = ValueType::VOID;
+		}
 		ctx.block = node;
 		defer { ctx.block = node->parent; };
 		if (!consume(Token::LEFT_BRACE)) return nullptr;
@@ -995,13 +1073,13 @@ struct ParticleScriptCompiler {
 					errorAtCurrent("Unexpected end of file.");
 					return nullptr;
 				case Token::LEFT_BRACE: {
-					Node* s = block(ctx);
+					Node* s = block(ctx, false);
 					if (!s) return nullptr;
 					node->statements.push(s);
 					break;
 				}
 				case Token::LET:
-					declareLocal(ctx);
+					if (!declareLocal(ctx)) return nullptr;
 					break;
 				case Token::RIGHT_BRACE:
 					consumeToken();
@@ -1115,7 +1193,7 @@ struct ParticleScriptCompiler {
 							u32 emitter_index = ((EmitterRefNode*)node->args[0])->index;
 							inner_ctx.emitted = &m_emitters[emitter_index];
 						}
-						node->after_block = block(inner_ctx);
+						node->after_block = block(inner_ctx, false);
 						if (!node->after_block) return nullptr;
 					}
 
@@ -1289,16 +1367,20 @@ struct ParticleScriptCompiler {
 	// let a = ...;
 	// let a : type;
 	// let a : type = ...;
-	void declareLocal(CompileContext& ctx) {
-		if (!consume(Token::LET)) return;
+	bool declareLocal(CompileContext& ctx) {
+		if (!consume(Token::LET)) return false;
 		BlockNode* block = ctx.block;
 		Local& local = block->locals.emplace();
-		if (!consume(Token::IDENTIFIER, local.name)) return;
+		if (!consume(Token::IDENTIFIER, local.name)) return false;
+		if (equalStrings(local.name, "result")) {
+			errorAtCurrent("Local variable can not be named `result`");
+			return false;
+		}
 
 		bool infer_type = false;
 		if (peekToken().type == Token::COLON) {
 			// let a : type ...
-			if (!consume(Token::COLON)) return;
+			if (!consume(Token::COLON)) return false;
 			local.type = parseType();
 		}
 		else if (peekToken().type == Token::EQUAL) {
@@ -1308,21 +1390,21 @@ struct ParticleScriptCompiler {
 		}
 		else {
 			error(peekToken().value, "Unexpected token ", peekToken().value);
-			return;
+			return false;
 		}
 
 		if (peekToken().type == Token::SEMICOLON) {
 			// let a : type;
 			consumeToken();
-			return;
+			return true;
 		}
 		Token equal_token = peekToken();
-		if (!consume(Token::EQUAL)) return;
+		if (!consume(Token::EQUAL)) return false;
 
 		// let a : type = ...
 		// let a = ...
 		Node* value = expression(ctx, 0);
-		if (!value) return;
+		if (!value) return false;
 
 		if (value->type == Node::COMPOUND && infer_type) {
 			switch (((CompoundNode*)value)->elements.size()) {
@@ -1330,7 +1412,7 @@ struct ParticleScriptCompiler {
 				case 2: local.type = ValueType::FLOAT2; break;
 				case 3: local.type = ValueType::FLOAT3; break;
 				case 4: local.type = ValueType::FLOAT4; break;
-				default: ASSERT(false); break;
+				default: ASSERT(false); return false;
 			}
 		}
 
@@ -1343,7 +1425,7 @@ struct ParticleScriptCompiler {
 		assign->left = var_node;
 		ctx.block->statements.push(assign);
 
-		consume(Token::SEMICOLON);
+		return consume(Token::SEMICOLON);
 	}
 
 	Node* ifStatement(CompileContext& ctx) {
@@ -1351,7 +1433,7 @@ struct ParticleScriptCompiler {
 		result->condition = expression(ctx, 0);
 		if (!result->condition) return nullptr;
 
-		result->true_block = block(ctx);
+		result->true_block = block(ctx, false);
 		if (!result->true_block) return nullptr;
 
 		if (peekToken().type == Token::ELSE) {
@@ -1365,7 +1447,7 @@ struct ParticleScriptCompiler {
 				result->false_block = false_blk;
 			}
 			else {
-				result->false_block = block(ctx);
+				result->false_block = block(ctx, false);
 				if (!result->false_block) return nullptr;
 			}
 		}
@@ -1377,10 +1459,7 @@ struct ParticleScriptCompiler {
 		if (node->type != Node::VARIABLE) return false;
 
 		VariableNode* var_node = static_cast<VariableNode*>(node);
-		if (var_node->family != VariableFamily::LOCAL && var_node->family != VariableFamily::OUTPUT && var_node->family != VariableFamily::CHANNEL) {
-			return false;
-		}
-		return true;
+		return var_node->family != VariableFamily::GLOBAL;
 	}
 
 	Node* statement(CompileContext& ctx) {
@@ -1416,14 +1495,6 @@ struct ParticleScriptCompiler {
 						error(op.value, "Unexpected token ", op.value);
 						return nullptr;
 				}
-			}
-			case Token::RETURN: {
-				consumeToken();
-				auto* node = LUMIX_NEW(m_arena_allocator, ReturnNode)(token);
-				node->value = expression(ctx, 0);
-				if (!node->value) return nullptr;
-				if (!consume(Token::SEMICOLON)) return nullptr;
-				return node;
 			}
 			default:
 				errorAtCurrent("Unexpected token ", token.value);
@@ -2545,20 +2616,25 @@ struct ParticleScriptCompiler {
 				Span<IRContext::Arg> prev_args = ctx.args;
 				ctx.args = { args, &args[n->args.size()] };
 				fn.is_inlining = true;
+				fn.block->locals[0].type = ValueType::VOID;
 				i32 ret = compileIR(ctx, fn.block);
 				if (ret < 0) return ret;
+				if (ret > 0) {
+					errorAtCurrent("Unknown error");
+					return -1;
+				}
+
 				fn.is_inlining = false;
 				ctx.args = prev_args;
-				IRValue ret_vals[4];
-				for (i32 i = 0; i < ret; ++i) {
-					ret_vals[i] = ctx.stack.last();
-					ctx.stack.pop();
-				}
 				ctx.popStack(args_size);
-				for (i32 i = 0; i < ret; ++i) {
-					ctx.stack.push(ret_vals[ret - i - 1]);
+				const Local& result = fn.block->locals[0];
+				const i32 result_type_size = toCount(result.type);
+				for (i32 i = 0; i < result_type_size; ++i) {
+					IRValue& r = ctx.stack.emplace();
+					r.type = DataStream::REGISTER;
+					r.index = result.registers[i];
 				}
-				return ret;
+				return result_type_size;
 			}
 			case Node::VARIABLE: {
 				auto* n = (VariableNode*)node;
@@ -2577,7 +2653,7 @@ struct ParticleScriptCompiler {
 						return num;
 					}
 					case VariableFamily::INPUT: {
-						if (ctx.entry_point != EntryPoint::EMIT) {
+						if (ctx.entry_point != EntryPoint::EMIT && ctx.emitted_index < 0) {
 							error(node->token.value, "Can not access input variables outside of emit()");
 							return -1;
 						}
@@ -2747,10 +2823,6 @@ struct ParticleScriptCompiler {
 				return 0;
 			}
 
-			case Node::RETURN: {
-				auto* n = (ReturnNode*)node;
-				return compileIR(ctx, n->value);
-			}
 			case Node::LITERAL: {
 				IRValue& val = ctx.stack.emplace();
 				val.type = DataStream::LITERAL;
@@ -2778,8 +2850,21 @@ struct ParticleScriptCompiler {
 			}
 			case Node::ASSIGN: {
 				auto* n = (AssignNode*)node;
-				i32 left = compileIR(ctx, n->left);
+
+				// Check for assignment to input variable (only allowed inside emit(other) block)
+				Node* lhs = n->left;
+				if (lhs->type == Node::SWIZZLE) lhs = ((SwizzleNode*)lhs)->left;
+				if (lhs->type == Node::VARIABLE) {
+					auto* var = (VariableNode*)lhs;
+					if (var->family == VariableFamily::INPUT && ctx.emitted_index < 0) {
+						error(node->token.value, "cannot assign to input variable");
+						return -1;
+					}
+				}	
+
 				i32 right = compileIR(ctx, n->right);
+				inferResultType(right, *n->left);
+				i32 left = compileIR(ctx, n->left);
 				if (left < 0 || right < 0) return -1;
 				if ((right < left && right != 1) || right > left) {
 					error(node->token.value, "Type mismatch.");
@@ -2790,8 +2875,8 @@ struct ParticleScriptCompiler {
 				for (i32 i = 0; i < left; ++i) {
 					auto* res = LUMIX_NEW(m_arena_allocator, IROp)(n, m_arena_allocator);
 					res->instruction = InstructionType::MOV;
-					res->dst = ctx.stackValue(-left - right + i);
-					res->args.push(ctx.stackValue(-right + (right == 1 ? 0 : i)));
+					res->dst = ctx.stackValue(-left + i);
+					res->args.push(ctx.stackValue(- left - right + (right == 1 ? 0 : i)));
 					movs[i] = res;
 				}
 				ctx.popStack(left + right);
@@ -2804,6 +2889,27 @@ struct ParticleScriptCompiler {
 		return -1;
 	}
 
+	static bool isResult(VariableNode& n) {
+		return n.family == VariableFamily::LOCAL && n.block && n.index == 0 && n.block->is_user_function_block;
+	}
+
+	static void inferResultType(i32 num, Node& node) {
+		if (node.type == Node::VARIABLE) {
+			auto& n = (VariableNode&)node;
+			if (isResult(n)) {
+				Local& l = n.block->locals[n.index];
+				if (l.type != ValueType::VOID) return;
+				num = maximum(num, toCount(l.type));
+				switch (num) {
+					case 1: l.type = ValueType::FLOAT; break;
+					case 2: l.type = ValueType::FLOAT2; break;
+					case 3: l.type = ValueType::FLOAT3; break;
+					case 4: l.type = ValueType::FLOAT4; break;
+				}
+			}
+		}
+	}
+	
 	void compileFunction(Emitter& emitter) {
 		StringView fn_name;
 		if (!consume(Token::IDENTIFIER, fn_name)) return;
@@ -2846,7 +2952,7 @@ struct ParticleScriptCompiler {
 		irctx.register_allocator = num_immutables;
 		irctx.num_immutables = num_immutables;
 
-		BlockNode* b = block(ctx);
+		BlockNode* b = block(ctx, false);
 		if (!b || m_is_error) return;
 		compileIR(irctx, b);
 		if (m_is_error) return;
@@ -2910,7 +3016,7 @@ struct ParticleScriptCompiler {
 		CompileContext ctx(*this);
 		ctx.entry_point = EntryPoint::GLOBAL;
 		ctx.function = &fn;
-		fn.block = block(ctx);
+		fn.block = block(ctx, true);
 		if (!fn.block) return;
 
 		u32 count = 0;

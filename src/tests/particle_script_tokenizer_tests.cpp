@@ -179,7 +179,7 @@ bool testIdentifiers() {
 }
 
 bool testKeywords() {
-	const char* source = "const global emitter fn var out in let return import if else and or not";
+	const char* source = "const global emitter fn var out in let import if else and or not";
 	ParticleScriptTokenizer tokenizer;
 	tokenizer.m_document = StringView(source);
 	tokenizer.m_current = tokenizer.m_document.begin;
@@ -209,9 +209,6 @@ bool testKeywords() {
 	
 	tok = tokenizer.nextToken();
 	ASSERT_EQ(Token::LET, tok.type, "let keyword");
-	
-	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::RETURN, tok.type, "return keyword");
 	
 	tok = tokenizer.nextToken();
 	ASSERT_EQ(Token::IMPORT, tok.type, "import keyword");
