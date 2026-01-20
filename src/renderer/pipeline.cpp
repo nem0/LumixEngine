@@ -278,6 +278,7 @@ struct JobsGroup {
 
 	// beginJob can only be called between begin()/end() pair
 	void begin() {
+		ASSERT(counter == 0);
 		counter = 1;
 		jobs::turnRed(&signal);
 	}
@@ -1578,12 +1579,13 @@ struct PipelineImpl final : Pipeline {
 	}
 
 	void renderMain() {
+		DrawStream& stream = m_renderer.getDrawStream();
 		m_sort_keys_group.begin();
+		fillClusters(stream, getMainCamera());
 
 		m_renderer.releaseRenderbuffer(m_output);
 		UniformPool& uniform_pool = m_renderer.getUniformPool();
 
-		DrawStream& stream = m_renderer.getDrawStream();
 		const RenderBufferHandle shadowmap = shadowPass();
 		
 		m_downscaled_depth = INVALID_RENDERBUFFER;
@@ -1815,7 +1817,6 @@ struct PipelineImpl final : Pipeline {
 			render2DOnly();
 		}
 		else {
-			fillClusters(stream, getMainCamera());
 			renderMain();
 		}
 
