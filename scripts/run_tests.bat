@@ -7,11 +7,18 @@ REM parenthesized blocks (we capture the tests.exe exit code with !ERRORLEVEL!).
 setlocal enabledelayedexpansion
 
 REM detect msbuild
-set msbuild_cmd=msbuild.exe
+set msbuild_cmd=
 where /q msbuild.exe
-if not %errorlevel%==0 (
-  set msbuild_cmd="C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe"
+if %errorlevel%==0 (
+  for /f "usebackq delims=" %%A in (`where msbuild.exe`) do set msbuild_cmd=%%A & goto :msbuild_found
 )
+if exist "%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" (
+  for /f "usebackq delims=" %%A in ('"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\MSBuild.exe') do set msbuild_cmd=%%A
+)
+if "%msbuild_cmd%"=="" (
+  set msbuild_cmd=C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\MSBuild.exe
+)
+:msbuild_found
 
 REM Ensure solution exists
 if not exist "tmp\vs2022\LumixEngine.sln" (
@@ -35,7 +42,8 @@ if exist "%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" (
   echo vswhere not found
 )
 echo Invoking msbuild with diagnostic verbosity to capture detailed errors...
-%msbuild_cmd% "tmp\vs2022\LumixEngine.sln" /p:Configuration=Debug /p:Platform=x64 /verbosity:diag > build_log.txt 2>&1
+echo Using MSBuild: %msbuild_cmd%
+"%msbuild_cmd%" "tmp\vs2022\LumixEngine.sln" /p:Configuration=Debug /p:Platform=x64 /verbosity:diag > build_log.txt 2>&1
 type build_log.txt
 if not %errorlevel%==0 (
   echo Build failed.
