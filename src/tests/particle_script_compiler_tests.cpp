@@ -2697,7 +2697,7 @@ bool testInputs() {
 	ASSERT_TRUE(fabsf(runner.getOutput(4) - 4.0f) < 0.001f, "i_velocity.y");
 	ASSERT_TRUE(fabsf(runner.getOutput(5) - 6.0f) < 0.001f, "i_velocity.z");
 	ASSERT_TRUE(fabsf(runner.getOutput(6) - 2.5f) < 0.001f, "i_scale");
-	ASSERT_TRUE(false , "test");
+	ASSERT_TRUE(false, "test");
 	return true;
 }
 
