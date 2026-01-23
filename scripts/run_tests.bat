@@ -13,7 +13,7 @@ if %errorlevel%==0 (
   for /f "usebackq delims=" %%A in (`where msbuild.exe`) do set msbuild_cmd=%%A & goto :msbuild_found
 )
 if exist "%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" (
-  for /f "usebackq delims=" %%A in ('"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\MSBuild.exe') do set msbuild_cmd=%%A
+  for /f "usebackq delims=" %%A in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\MSBuild.exe`) do set msbuild_cmd=%%A
 )
 if "%msbuild_cmd%"=="" (
   set msbuild_cmd=C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\MSBuild.exe
