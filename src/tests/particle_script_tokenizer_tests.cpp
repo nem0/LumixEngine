@@ -525,6 +525,4 @@ void runParticleScriptTokenizerTests() {
 	RUN_TEST(testOnlyWhitespace);
 	RUN_TEST(testInvalidCharacter);
 	RUN_TEST(testDotAfterIdentifier);
-	
-	logInfo("=== Test Results: ", passed_count, "/", test_count, " passed ===");
 }

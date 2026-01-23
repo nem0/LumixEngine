@@ -8,6 +8,7 @@
 #include "renderer/editor/world_viewer.h"
 #include "renderer/particle_system.h"
 #include "renderer/render_module.h"
+#include "core/array.h"
 
 // TODO bugs
 // errors in imports in compileIR results in crash
@@ -214,6 +215,51 @@ struct ParticleScriptTokenizer {
 };
 
 struct ParticleScriptCompiler {
+	enum class SymbolKind {
+		Function,
+		Var,
+		Global,
+		Constant,
+		EmitterField,
+	};
+
+	enum class ScopeKind { TopLevel, Function, Emitter, Block };
+
+	struct Symbol {
+		StringView name;
+		SymbolKind kind = SymbolKind::Function;
+		i32 start_offset = 0;
+		i32 end_offset = 0;
+		i32 scope_id = -1;
+	};
+
+	struct Scope {
+		ScopeKind kind = ScopeKind::TopLevel;
+		i32 id = -1;
+		i32 parent_id = -1;
+		i32 start_offset = 0;
+		i32 end_offset = 0;
+	};
+
+	struct CollectorOptions {
+		bool include_imported_symbols = false;
+		bool stop_at_cursor_only = true;
+		i32 max_symbols = 1000;
+	};
+
+	struct CollectorResult {
+		CollectorResult(IAllocator& allocator)
+			: symbols(allocator)
+			, scopes(allocator)
+		{}
+
+		Array<Symbol> symbols;
+		Array<Scope> scopes;
+		int cursor_scope_id = -1;
+		bool truncated = false;
+	};
+
+
 	using InstructionType = ParticleSystemResource::InstructionType;
 	using DataStream = ParticleSystemResource::DataStream;
 	using Token = ParticleScriptToken;
@@ -391,7 +437,7 @@ struct ParticleScriptCompiler {
 		Node* condition = nullptr;
 		BlockNode* true_block = nullptr;
 		BlockNode* false_block = nullptr;
-	};\
+	};
 
 	struct SysCallNode : Node {
 		SysCallNode(Token token, IAllocator& allocator) : Node(Node::SYSCALL, token), args(allocator) {}
@@ -779,7 +825,7 @@ struct ParticleScriptCompiler {
 						if (local.type == ValueType::VOID) {
 							// infer result's type 
 							switch (num_rhs) {
-								case 1: break;
+								case 1: local.type = ValueType::FLOAT; break;
 								case 2: local.type = ValueType::FLOAT2; break;
 								case 3: local.type = ValueType::FLOAT3; break;
 								case 4: local.type = ValueType::FLOAT4; break;
@@ -802,21 +848,24 @@ struct ParticleScriptCompiler {
 					}
 				}
 				case Node::FUNCTION_CALL: {
-					// TODO we assume all args and result is float
 					auto* n = (FunctionCallNode*)node;
 					const Function& fn = compiler.m_functions[n->function_index];
 					u32 prev_arg_offset = arg_offset;
-					arg_offset = stack.size();
+					i32 args_start = stack.size();
+					arg_offset = args_start;
 					for (Node* arg : n->args) {
 						if (!eval(arg)) return false;
 					}
-					u32 args_end = stack.size();
+					i32 args_count = stack.size() - args_start;
 					if (!eval(fn.block)) return false;
-					float result = fn.block->locals[0].values[0];
-					for (u32 i = 0; i < (u32)n->args.size(); ++i) {
-						stack.pop();
+					const Local& ret_local = fn.block->locals[0];
+					
+					ASSERT(ret_local.type != ValueType::VOID);
+					u32 ret_components = toCount(ret_local.type);
+					for (i32 i = 0; i < args_count; ++i) stack.pop();
+					if (ret_components > 0) {
+						for (u32 i = 0; i < ret_components; ++i) stack.push(ret_local.values[i]);
 					}
-					stack.push(result);
 					arg_offset = prev_arg_offset;
 					return true;
 				}
@@ -1113,6 +1162,10 @@ struct ParticleScriptCompiler {
 							return nullptr;
 						case Token::RIGHT_BRACE:
 							consumeToken();
+							if (node->elements.size() > 4) {
+								error(token.value, "Too many components");
+								return nullptr;
+							}
 							return node;
 						default: {
 							if (!node->elements.empty() && !consume(Token::COMMA)) return nullptr;
@@ -2490,9 +2543,8 @@ struct ParticleScriptCompiler {
 	i32 compileIR(IRContext& ctx, Node* node) {
 		switch (node->type) {
 			case Node::EMITTER_REF: {
-				auto* n = (EmitterRefNode*)node;
-				ctx.stack.emplace().index = n->index;
-				return 1;
+				error(node->token.value, "Emitter not expected");
+				return -1;
 			}
 			case Node::COMPOUND: {
 				auto* n = (CompoundNode*)node;
@@ -2500,7 +2552,10 @@ struct ParticleScriptCompiler {
 				for (u32 i = 0, c = n->elements.size(); i < c; ++i) {
 					i32 r = compileIR(ctx, n->elements[i]);
 					if (r < 0) return -1;
-					ASSERT(r != 0); // TODO can this happen?
+					if (r == 0) {
+						error(n->elements[i]->token.value, "Expected an expression");
+						return -1;
+					}
 					num += r;
 				}
 				ASSERT(num <= 4); // TODO make sure this is handled in parser 
@@ -2516,16 +2571,28 @@ struct ParticleScriptCompiler {
 				res->instruction = n->function.instruction;
 				res->args.reserve(n->args.size());
 				for (Node* arg : n->args) {
-					i32 a = compileIR(ctx, arg);
-					switch (a) {
-						case -1: return -1;
-						case 1: break;
-						default:
-							error(node->token.value, "Arguments must be scalars.");
+					if (n->function.instruction == InstructionType::EMIT && arg == n->args[0]) {
+						if (arg->type != Node::EMITTER_REF) {
+							error(arg->token.value, "First parameter must be an emitter.");
 							return -1;
+						}
+						IRValue ev;
+						ev.type = DataStream::LITERAL;
+						ev.index = (u32)((EmitterRefNode*)arg)->index;
+						res->args.push(ev);
 					}
-					res->args.push(ctx.stack.last());
-					ctx.stack.pop();
+					else {
+						i32 a = compileIR(ctx, arg);
+						switch (a) {
+							case -1: return -1;
+							case 1: break;
+							default:
+								error(node->token.value, "Arguments must be scalars.");
+								return -1;
+						}
+						res->args.push(ctx.stack.last());
+						ctx.stack.pop();
+					}
 				}
 				if (n->function.returns_value) {
 					res->dst.type = DataStream::REGISTER;
@@ -2836,14 +2903,8 @@ struct ParticleScriptCompiler {
 					i32 s = compileIR(ctx, statement);
 					if (s < 0) return -1;
 					if (s > 0) {
-						ctx.popStack(size_locals);
-						for (auto& local : n->locals) {
-							local.registers[0] = -1;
-							local.registers[1] = -1;
-							local.registers[2] = -1;
-							local.registers[3] = -1;
-						}
-						return s; // TODO make sure this is from "return ...;"
+						error(statement->token.value, "Expected a statement");
+						return -1;
 					}
 				}
 				return 0;
@@ -3214,6 +3275,143 @@ struct ParticleScriptCompiler {
 		}
 		
 		return !m_is_error;
+	}
+
+	static CollectorResult collectSymbolsFromBuffer(IAllocator& allocator, StringView doc, i32 cursor_offset, const CollectorOptions& opts) {
+		CollectorResult res(allocator);
+		if (doc.size() == 0) return res;
+
+		ParticleScriptTokenizer tokenizer;
+		tokenizer.m_document = doc;
+		tokenizer.m_current = doc.begin;
+		tokenizer.m_start_token = doc.begin;
+
+		Array<i32> scope_stack(allocator);
+		i32 next_scope_id = 0;
+
+		// create top-level scope
+		Scope top;
+		top.id = next_scope_id++;
+		top.parent_id = -1;
+		top.start_offset = 0;
+		top.end_offset = doc.size();
+		top.kind = ScopeKind::TopLevel;
+		res.scopes.push(top);
+		scope_stack.push(top.id);
+
+		ScopeKind pending_scope_kind = ScopeKind::TopLevel;
+		for (;;) {
+			const ParticleScriptToken tok = tokenizer.nextToken();
+			if (tok.type == ParticleScriptToken::EOF) break;
+			
+			const char* tok_begin = tok.value.begin ? tok.value.begin : tokenizer.m_current;
+			const char* tok_end = tok.value.end ? tok.value.end : tokenizer.m_current;
+			int tok_start_off = int(tok_begin - doc.begin);
+			int tok_end_off = int(tok_end - doc.begin);
+
+			if (opts.stop_at_cursor_only && tok_start_off > cursor_offset) break;
+
+			switch (tok.type) {
+				case ParticleScriptToken::LEFT_BRACE: {
+					Scope s;
+					s.id = next_scope_id++;
+					s.parent_id = scope_stack.empty() ? -1 : scope_stack.back();
+					s.start_offset = tok_start_off;
+					s.end_offset = doc.size();
+					s.kind = pending_scope_kind;
+					res.scopes.push(s);
+					scope_stack.push(s.id);
+					// after creating a scope, default subsequent nested braces to Block
+					pending_scope_kind = ScopeKind::Block;
+					break;
+				}
+				case ParticleScriptToken::RIGHT_BRACE: {
+					if (scope_stack.empty()) break;
+
+					i32 id = scope_stack.back();
+					scope_stack.pop();
+					for (int i = 0; i < res.scopes.size(); ++i) {
+						if (res.scopes[i].id == id) { res.scopes[i].end_offset = tok_end_off; break; }
+					}
+					break;
+				}
+				case ParticleScriptToken::EMITTER: {
+					ParticleScriptToken name_tok = tokenizer.nextToken();
+					if (name_tok.type == ParticleScriptToken::IDENTIFIER) {
+						Symbol s;
+						s.name = StringView(name_tok.value.begin, name_tok.value.end);
+						s.kind = SymbolKind::EmitterField;
+						s.start_offset = int(name_tok.value.begin - doc.begin);
+						s.end_offset = int(name_tok.value.end - doc.begin);
+						s.scope_id = scope_stack.empty() ? 0 : scope_stack.back();
+						res.symbols.push(s);
+						// mark next scope as emitter when brace comes
+						pending_scope_kind = ScopeKind::Emitter;
+						if (res.symbols.size() >= opts.max_symbols) { res.truncated = true; break; }
+					}
+					break;
+				}
+
+				case ParticleScriptToken::FN:
+				case ParticleScriptToken::GLOBAL:
+				case ParticleScriptToken::CONST:
+				case ParticleScriptToken::VAR:
+				case ParticleScriptToken::OUT:
+				case ParticleScriptToken::IN: {
+					ParticleScriptToken name_tok = tokenizer.nextToken();
+					if (name_tok.type == ParticleScriptToken::IDENTIFIER) {
+						Symbol s;
+						s.name = StringView(name_tok.value.begin, name_tok.value.end);
+						switch (tok.type) {
+							case ParticleScriptToken::FN:
+								pending_scope_kind = ScopeKind::Function;
+								s.kind = SymbolKind::Function;
+								break;
+							case ParticleScriptToken::GLOBAL:
+								s.kind = SymbolKind::Global;
+								break;
+							case ParticleScriptToken::CONST:
+								s.kind = SymbolKind::Constant;
+								break;
+							case ParticleScriptToken::VAR:
+								s.kind = SymbolKind::Var;
+								{
+									int current_scope = scope_stack.back();
+									for (int i = 0; i < res.scopes.size(); ++i) {
+										if (res.scopes[i].id == current_scope) {
+											if (res.scopes[i].kind == ScopeKind::Emitter) s.kind = SymbolKind::EmitterField;
+											break;
+										}
+									}
+								}
+								break;
+							case ParticleScriptToken::OUT:
+							case ParticleScriptToken::IN:
+								s.kind = SymbolKind::EmitterField;
+								break;
+							default: break;
+						}
+						s.start_offset = int(name_tok.value.begin - doc.begin);
+						s.end_offset = int(name_tok.value.end - doc.begin);
+						s.scope_id = scope_stack.empty() ? 0 : scope_stack.back();
+						res.symbols.push(s);
+						if (res.symbols.size() >= opts.max_symbols) { res.truncated = true; break; }
+					}
+					break;
+				}
+				default: break;
+			}
+			if (res.truncated) break;
+		}
+
+		// compute cursor scope id
+		res.cursor_scope_id = -1;
+		for (int i = 0; i < res.scopes.size(); ++i) {
+			const Scope& sc = res.scopes[i];
+			if (sc.start_offset <= cursor_offset && cursor_offset <= sc.end_offset) res.cursor_scope_id = sc.id;
+		}
+
+		return res;
 	}
 
 	FileSystem& m_filesystem;

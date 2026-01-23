@@ -1,10 +1,12 @@
 #include "tests/common.h"
 #include "core/debug.h"
 #include "core/log_callback.h"
+#include "core/string.h"
 #include <stdio.h>
 
 void runParticleScriptTokenizerTests();
 void runParticleScriptCompilerTests();
+void runParticleScriptCollectorTests();
 
 namespace Lumix {
 	int test_count = 0;
@@ -28,7 +30,9 @@ int main(int argc, char* argv[]) {
 	
 	runParticleScriptTokenizerTests();
 	runParticleScriptCompilerTests();
-	
+	runParticleScriptCollectorTests();
+	Lumix::logInfo("=== Test Results: ", Lumix::passed_count, "/", Lumix::test_count, " passed ===");
+
 	Lumix::unregisterLogCallback<&consoleLog>();
 	return 0;
 }

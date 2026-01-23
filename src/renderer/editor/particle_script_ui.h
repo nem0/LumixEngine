@@ -424,6 +424,35 @@ struct ParticleScriptEditorWindow : AssetEditorWindow {
 				}
 				m_autocomplete_list.insert(idx, static_cast<String&&>(tmp));
 			}
+
+			// collect symbols from current buffer (locals, functions, globals, etc.)
+			OutputMemoryStream buf_stream(m_app.getAllocator());
+			m_editor->serializeText(buf_stream);
+			const char* buf = (const char*)buf_stream.data();
+			int buf_len = (int)buf_stream.size();
+			int cursor_line = (int)m_editor->getCursorLine();
+			int cursor_col = (int)m_editor->getCursorColumn();
+			int cursor_offset = 0;
+			int cur_line = 0;
+			for (int i = 0; i < buf_len && cur_line < cursor_line; ++i) {
+				if (buf[i] == '\n') ++cur_line;
+				++cursor_offset;
+			}
+			cursor_offset += cursor_col;
+
+			ParticleScriptCompiler::CollectorOptions opts;
+			opts.stop_at_cursor_only = true;
+			opts.include_imported_symbols = false;
+			ParticleScriptCompiler::CollectorResult cres = ParticleScriptCompiler::collectSymbolsFromBuffer(m_plugin.m_allocator, StringView(buf, buf_len), cursor_offset, opts);
+			for (const auto& s : cres.symbols) {
+				if (prefix.size() > 0 && !startsWith(s.name, prefix)) continue;
+				String tmp(s.name, m_plugin.m_allocator);
+				i32 idx = 0;
+				for (; idx < m_autocomplete_list.size(); ++idx) {
+					if (compareString(tmp, m_autocomplete_list[idx]) < 0) break;
+				}
+				m_autocomplete_list.insert(idx, static_cast<String&&>(tmp));
+			}
 		}
 
 		if (m_autocomplete_list.empty()) return;

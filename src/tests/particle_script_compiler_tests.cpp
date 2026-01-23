@@ -294,8 +294,13 @@ bool testCompileTimeConstUsingUserFunction() {
 			result = tmp2 * y;
 		}
 
+		fn make_vec(x, y, z) {
+			result = {x, y, z};
+		}
+
 		const C = add(3, 4);
 		const D = multiply(C, 2);
+		const V = make_vec(1, 2, 3);
 		emitter test {
 			material "particles/particle.mat"
 		}
@@ -303,17 +308,26 @@ bool testCompileTimeConstUsingUserFunction() {
 
 	TestableCompiler compiler;
 	OutputMemoryStream compiled(getGlobalAllocator());
-	if (!compiler.compile(Path("const_eval_user_func.pat"), code, compiled)) return false;
+	ASSERT_TRUE(compiler.compile(Path("const_eval_user_func.pat"), code, compiled), "Compilation should succeed");
 
 	const ParticleScriptCompiler::Constant* C = compiler.findConstant("C");
-	if (!C) return false;
-	if (C->type != ParticleScriptCompiler::ValueType::FLOAT) return false;
-	if (fabsf(C->value[0] - 7.f) >= 0.001f) return false;
+	ASSERT_TRUE(C != nullptr, "C should be present");
+	ASSERT_TRUE(C->type == ParticleScriptCompiler::ValueType::FLOAT, "C should be float");
+	ASSERT_TRUE(fabsf(C->value[0] - 7.f) < 0.001f, "C should be 7");
 
 	const ParticleScriptCompiler::Constant* D = compiler.findConstant("D");
-	if (!D) return false;
-	if (D->type != ParticleScriptCompiler::ValueType::FLOAT) return false;
-	return fabsf(D->value[0] - 14.f) < 0.001f;
+	ASSERT_TRUE(D != nullptr, "D should be present");
+	ASSERT_TRUE(D->type == ParticleScriptCompiler::ValueType::FLOAT, "D should be float");
+	ASSERT_TRUE(fabsf(D->value[0] - 14.f) < 0.001f, "D should be 14");
+
+	const ParticleScriptCompiler::Constant* V = compiler.findConstant("V");
+	ASSERT_TRUE(V != nullptr, "V should be present");
+	ASSERT_TRUE(V->type == ParticleScriptCompiler::ValueType::FLOAT3, "V should be float3");
+	ASSERT_TRUE(fabsf(V->value[0] - 1.f) < 0.001f, "V.x should be 1");
+	ASSERT_TRUE(fabsf(V->value[1] - 2.f) < 0.001f, "V.y should be 2");
+	ASSERT_TRUE(fabsf(V->value[2] - 3.f) < 0.001f, "V.z should be 3");
+
+	return true;
 }
 
 // Test compile-time constant initialized with user-defined function containing if conditional
@@ -1380,6 +1394,125 @@ bool testCompilationErrors() {
             emitter test {
                 material "particles/particle.mat"
                 fn emit() { C = 10; }  // cannot assign to const
+            }
+        )"
+	);
+
+	expectCompilationFailure("expected a statement",
+		R"(
+            emitter test {
+                material "particles/particle.mat"
+                fn emit() { 10; }
+            }
+        )"
+	);
+
+	expectCompilationFailure("expected a statement",
+		R"(
+            emitter test {
+				const C = 5;
+                material "particles/particle.mat"
+                fn emit() { C; }
+            }
+        )"
+	);
+
+	expectCompilationFailure("expected a statement",
+		R"(
+            emitter test {
+                material "particles/particle.mat"
+                fn emit() { ; }
+            }
+        )"
+	);
+
+	expectCompilationFailure("expected a statement",
+		R"(
+            emitter test {
+                material "particles/particle.mat"
+                fn emit() { {1, 2, 3}; }
+            }
+        )"
+	);
+
+	expectCompilationFailure("expected a statement",
+		R"(
+			emitter explosion {
+				material "particles/particle.mat"
+			}
+
+			emitter test {
+				material "particles/particle.mat"
+
+				fn update() {
+					let v = { emit(explosion), 1 };
+				}
+			}
+		)"
+	);
+
+	expectCompilationFailure("too many components in a compound",
+		R"(
+			emitter test {
+				material "particles/particle.mat"
+
+				fn update() {
+					let v = { 1, 2, 3, 4, 5 };
+				}
+			}
+		)"
+	);
+
+	expectCompilationFailure("unexpected ,",
+		R"(
+			emitter test {
+				material "particles/particle.mat"
+
+				fn update() {
+					let v = { 1, 2, 3, 4, };
+				}
+			}
+		)"
+	);
+
+	expectCompilationFailure("expected a value, not an emitter",
+		R"(
+			emitter explosion {
+				material "particles/particle.mat"
+			}
+
+			emitter test {
+				material "particles/particle.mat"
+
+				fn update() {
+					let v = { explosion, 1 };
+				}
+			}
+		)"
+	);
+
+	expectCompilationFailure("expected a value, not an emitter",
+		R"(
+			emitter explosion {
+				material "particles/particle.mat"
+			}
+
+			emitter test {
+				material "particles/particle.mat"
+
+				fn update() {
+					let v = explosion;
+				}
+			}
+		)"
+	);
+
+	expectCompilationFailure("expected a statement",
+		R"(
+            emitter test {
+                material "particles/particle.mat"
+				var v : float
+                fn emit() { v; }
             }
         )"
 	);
@@ -2604,6 +2737,4 @@ void runParticleScriptCompilerTests() {
 	RUN_TEST(testInputs);
 	RUN_TEST(testEmitAfterBlock);
 	RUN_TEST(testFunctionGeneric);
-	
-	logInfo("=== Test Results: ", passed_count, "/", test_count, " passed ===");
 }
