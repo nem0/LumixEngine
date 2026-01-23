@@ -34,5 +34,5 @@ int main(int argc, char* argv[]) {
 	Lumix::logInfo("=== Test Results: ", Lumix::passed_count, "/", Lumix::test_count, " passed ===");
 
 	Lumix::unregisterLogCallback<&consoleLog>();
-	return 0;
+	return (Lumix::passed_count == Lumix::test_count) ? 0 : 1;
 }

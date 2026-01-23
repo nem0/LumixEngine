@@ -1,0 +1,19 @@
+name: particle-tests
+on:
+  push:
+    paths:
+      - '**/particle_script*'
+  pull_request:
+    paths:
+      - '**/particle_script*'
+
+jobs:
+  run-particle-tests:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v2
+      - name: Run particle script tests
+        shell: cmd
+        run: |
+          echo Running particle tests because particle_script* changed
+          scripts\run_tests.bat
