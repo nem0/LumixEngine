@@ -12,6 +12,23 @@ jobs:
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v2
+      - name: CI diagnostics
+        shell: cmd
+        run: |
+          echo == CI diagnostics ==
+          echo CWD: %cd%
+          echo PATH:
+          echo %PATH%
+          where msbuild.exe || echo msbuild.exe not found
+          where genie.exe || echo genie.exe not found
+          if exist "scripts\tmp\vs2022\LumixEngine.sln" (
+            echo Solution exists: scripts\tmp\vs2022\LumixEngine.sln
+          ) else (
+            echo Solution missing; listing scripts\tmp
+            dir scripts\tmp /s
+          )
+          echo Listing workspace root:
+          dir /b
       - name: Run particle script tests
         shell: cmd
         run: |

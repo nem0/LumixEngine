@@ -26,7 +26,17 @@ if not exist "tmp\vs2022\LumixEngine.sln" (
 
 REM Build solution
 echo Building solution...
-%msbuild_cmd% "tmp\vs2022\LumixEngine.sln" /p:Configuration=Debug /p:Platform=x64
+echo Current directory: %cd%
+echo msbuild command: %msbuild_cmd%
+where msbuild.exe || echo msbuild.exe not found on PATH
+if exist "%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" (
+  "%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -all -products * -prerelease -format text
+) else (
+  echo vswhere not found
+)
+echo Invoking msbuild with diagnostic verbosity to capture detailed errors...
+%msbuild_cmd% "tmp\vs2022\LumixEngine.sln" /p:Configuration=Debug /p:Platform=x64 /verbosity:diag > build_log.txt 2>&1
+type build_log.txt
 if not %errorlevel%==0 (
   echo Build failed.
   popd
