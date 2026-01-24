@@ -303,6 +303,9 @@ struct WorkerTask : Thread {
 	Signal* m_signal_to_check = nullptr;
 	WaitingFiber* m_waiting_fiber_to_push = nullptr;
 	i32 m_deferred_push_to_worker = -1;
+	// fiber to push to m_free_fibers after switch; we can't push before switch
+	// because another worker could pop and reuse the fiber while we're still in it
+	FiberJobPair* m_fiber_to_free = nullptr;
 	
 	Fiber::Handle m_primary_fiber;
 	System& m_system;
@@ -413,6 +416,12 @@ LUMIX_FORCE_INLINE static bool popWork(Work& work, WorkerTask* worker) {
 static void afterSwitch() {
 	WorkerTask* worker = getWorker();
 	
+	// the previous fiber requested to be freed, do it now that we've switched away from it
+	if (worker->m_fiber_to_free) {
+		g_system->m_free_fibers.push(worker->m_fiber_to_free);
+		worker->m_fiber_to_free = nullptr;
+	}
+
 	if (worker->m_deferred_push_to_worker >= 0) {
 		if (worker->m_deferred_push_to_worker != ANY_WORKER) {
 			WorkerTask* dst_worker = g_system->m_workers[worker->m_deferred_push_to_worker % g_system->m_workers.size()];
@@ -563,7 +572,9 @@ LUMIX_FORCE_INLINE static void executeJob(const Job& job) {
 		if (work.type == Work::FIBER) {
 			worker->m_current_fiber = work.fiber;
 
-			g_system->m_free_fibers.push(this_fiber);
+			// defer push to free list until after switch to avoid race condition
+			// otherwise other workers could pop the fiber before we manage to switch
+			worker->m_fiber_to_free = this_fiber;
 			Fiber::switchTo(&this_fiber->fiber, work.fiber->fiber);
 			afterSwitch();
 
