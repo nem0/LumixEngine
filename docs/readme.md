@@ -1,5 +1,6 @@
 * [Getting started](getting_started.md)
 * [Plugins](plugins.md)
+* [Custom plugin](custom_plugin.md)
 * [3rd party libraries](3rdparty.md)
 
 # Engine
