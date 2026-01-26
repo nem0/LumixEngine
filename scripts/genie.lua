@@ -1,116 +1,43 @@
-newoption {
-	trigger = "plugins",
-	description = "Add plugins to project, can be a comma-separated list, e.g. --plugins=pluginA,pluginB"
+-- simple options
+local simple_options = {
+	{ "plugins", "Add plugins to project, can be a comma-separated list, e.g. --plugins=pluginA,pluginB" },
+	{ "dynamic-plugins", "Plugins are dynamic libraries." },
+	{ "embed-resources", "Embed resources (shaders, ...) in executable" },
+	{ "no-physics", "Do not build physics plugin." },
+	{ "no-navigation", "Do not build navigation plugin." },
+	{ "no-animation", "Do not build animation plugin." },
+	{ "no-renderer", "Do not build renderer plugin." },
+	{ "no-audio", "Do not build audio plugin." },
+	{ "no-lua", "Do not build lua plugin." },
+	{ "no-gui", "Do not build ingame GUI plugin." },
+	{ "with-app", "Do build app." },
+	{ "with-basis-universal", "Use basis universal compression." },
+	{ "with-game", "Build game plugin." },
+	{ "working-dir", "Working directory." },
+	{ "debug-args", "Arguments passed to Studio in debug mode." },
+	{ "release-args", "Arguments passed to Studio in release mode." },
+	{ "no-studio", "Do not build Studio." },
+	{ "luau-dynamic", "Build luau as dynamic library. Only valid if Luau source code is available." },
+	-- Splitting in multiple project oversubsribes CPU threads when building with MSBuild.
+	-- MSBuild does cl invocation per project, with lots of threads in every invocation.
+	-- Splitting in projects also causes reporting by vcperf or Compile Score to be much less useful
+	{ "split-projects", "Split into project per plugin. Dynamic library plugins are always split." },
+	{ "with-tests", "Build test projects." },
 }
-
-newoption {
-	trigger = "dynamic-plugins",
-	description = "Plugins are dynamic libraries."
-}
-
-newoption {
-	trigger = "embed-resources",
-	description = "Embed resources (shaders, ...) in executable"
-}
-
-newoption {
-	trigger = "no-physics",
-	description = "Do not build physics plugin."
-}
-
-newoption {
-	trigger = "no-navigation",
-	description = "Do not build navigation plugin."
-}
-
-newoption {
-	trigger = "no-animation",
-	description = "Do not build animation plugin."
-}
-
-newoption {
-	trigger = "no-renderer",
-	description = "Do not build renderer plugin."
-}
-
-newoption {
-	trigger = "no-audio",
-	description = "Do not build audio plugin."
-}
-
-newoption {
-	trigger = "no-lua",
-	description = "Do not build lua plugin."
-}
-
-newoption {
-	trigger = "no-gui",
-	description = "Do not build ingame GUI plugin."
-}
-
-newoption {
-	trigger = "with-app",
-	description = "Do build app."
-}
-
-newoption {
-	trigger = "with-basis-universal",
-	description = "Use basis universal compression."
-}
-
-newoption {
-	trigger = "with-game",
-	description = "Build game plugin."
-}
-
-newoption {
-	trigger = "working-dir",
-	description = "Working directory."
-}
-
-newoption {
-	trigger = "debug-args",
-	description = "Arguments passed to Studio in debug mode."
-}
-
-newoption {
-	trigger = "release-args",
-	description = "Arguments passed to Studio in release mode."
-}
-
-newoption {
-	trigger = "no-studio",
-	description = "Do not build Studio."
-}
-
-newoption {
-	trigger = "luau-dynamic",
-	description = "Build luau as dynamic library. Only valid if Luau source code is available."
-}
-
--- Splitting in multiple project oversubsribes CPU threads when building with MSBuild.
--- MSBuild does cl invocation per project, with lots of threads in every invocation.
--- Splitting in projects also causes reporting by vcperf or Compile Score to be much less useful (timing includes preempted timeslices)
-newoption {
-	trigger = "split-projects",
-	description = "Split into project per plugin. Dynamic library plugins are always split."
-}
+for _, opt in ipairs(simple_options) do
+	newoption { trigger = opt[1], description = opt[2] }
+end
 
 newoption {
 	trigger = "gcc",
 	value = "GCC",
 	description = "Choose GCC flavor",
 	allowed = {
-		{ "linux-gcc", 			"Linux (GCC compiler)" 				},
-		{ "linux-gcc-5", 		"Linux (GCC-5 compiler)"			},
-		{ "linux-clang", 		"Linux (Clang compiler)"			},
-		{ "windows-clang", 		"Windows (Clang compiler)"			},
+		{ "linux-gcc", "Linux (GCC compiler)" },
+		{ "linux-gcc-5", "Linux (GCC-5 compiler)" },
+		{ "linux-clang", "Linux (Clang compiler)" },
+		{ "windows-clang", "Windows (Clang compiler)" },
 	}
-}
-
-newoption {
-	trigger = "with-tests",
-	description = "Build test projects."
 }
 
 -- process _OPTIONS
@@ -172,11 +99,40 @@ build_app_callbacks = {}
 
 function hasPlugin(plugin)
 	for _, v in ipairs(plugins) do
-	if v == plugin then
-	  return true
+		if v == plugin then
+			return true
+		end
 	end
-  end
-  return false
+	return false
+end
+
+-- common platform link helpers
+function linkWindowsLibs()
+	configuration { "windows" }
+		links { "psapi", "dxguid", "winmm" }
+	configuration {}
+end
+
+function linkLinuxLibs()
+	configuration { "linux" }
+		links { "GL", "X11", "dl", "rt", "Xi" }
+	configuration {}
+end
+
+function linkPlatformLibs()
+	linkWindowsLibs()
+	linkLinuxLibs()
+end
+
+function buildPluginDefines()
+	if #plugins > 0 and dynamic_plugins then
+		local def = ""
+		for idx, plugin in ipairs(plugins) do
+			if idx > 1 then def = def .. "," end
+			def = def .. "\"" .. plugin .. "\""
+		end
+		defines { "LUMIXENGINE_PLUGINS=" .. def }
+	end
 end
 
 function defaultConfigurations()
@@ -663,31 +619,14 @@ if build_app then
 			debugdir "../data"
 		end
 		
-		if #plugins > 0 and dynamic_plugins then
-			local def = ""
-			for idx, plugin in ipairs(plugins) do
-				if idx > 1 then 
-					def = def .. ",";
-				end
-				def = def .. "\"" .. plugin .. "\""
-			end
-			defines { "LUMIXENGINE_PLUGINS=" .. def }
-		end
+		buildPluginDefines()
 
 		if not dynamic_plugins then	
 			if hasPlugin "lua" then linkLib "Luau" end
-			if hasPlugin "physics" then
-				linkPhysX()
-			end
-			if use_basisu then
-				linkLib "basisu"
-			end
+			if hasPlugin "physics" then linkPhysX() end
+			if use_basisu then linkLib "basisu" end
 			linkLib "freetype"
-			
-			configuration { "vs*" }
-				links { "psapi", "dxguid", "winmm" }
-
-			configuration {}
+			linkWindowsLibs()
 		end
 		
 		if build_studio and split_projects then
@@ -702,8 +641,7 @@ if build_app then
 			kind "WindowedApp"
 			libdirs { "../external/pix/bin/x64" }
 
-		configuration { "linux" }
-			links { "GL", "X11", "dl", "rt", "Xi" }
+		linkLinuxLibs()
 		
 		configuration {"vs*"}
 			links { "winmm", "imm32", "version" }
@@ -731,16 +669,7 @@ if build_studio then
 			"../external"
 		}
 
-		if #plugins > 0 and dynamic_plugins then
-			local def = ""
-			for idx, plugin in ipairs(plugins) do
-				if idx > 1 then 
-					def = def .. ",";
-				end
-				def = def .. "\"" .. plugin .. "\""
-			end
-			defines { "LUMIXENGINE_PLUGINS=" .. def }
-		end
+		buildPluginDefines()
 
 		configuration { "windows" }
 			links { "winmm" }
@@ -796,8 +725,7 @@ if build_studio then
 					linkoptions { "-Wl,-rpath '-Wl,$$ORIGIN'" }
 				end
 
-			configuration { "windows" }
-				links { "psapi", "dxguid", "winmm" }
+			linkWindowsLibs()
 
 			configuration { "vs*" }
 				libdirs { "../external/pix/bin/x64" }
@@ -1104,11 +1032,5 @@ if build_tests then
 		
 		debugdir "../data"
 		
-		configuration { "windows" }
-			links { "psapi", "dxguid", "winmm" }
-		
-		configuration { "linux" }
-			links { "GL", "X11", "dl", "rt", "Xi" }
-		
-		configuration {}
+		linkPlatformLibs()
 end
