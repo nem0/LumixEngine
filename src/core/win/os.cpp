@@ -1740,12 +1740,15 @@ NetworkStream* connect(const char* ip, u16 port, IAllocator& allocator) {
 	return stream;
 }
 
-bool read(NetworkStream& stream, void* mem, u32 size) {
+NetworkReadResult read(NetworkStream& stream, void* mem, u32 size) {
 	i32 to_receive = size;
 	char* ptr = (char*)mem;
 
 	do {
 		i32 received = ::recv(stream.socket, ptr, to_receive, 0);
+		if (received == 0) { // connection closed on the other side
+			return NetworkReadResult::CLOSED;
+		}
 		ptr += received;
 		to_receive -= received;
 		if (received == SOCKET_ERROR) {
@@ -1754,11 +1757,11 @@ bool read(NetworkStream& stream, void* mem, u32 size) {
 				ptr -= received;
 				to_receive += received;
 			} else {
-				return false;
+				return NetworkReadResult::FAILED;
 			}
 		}
 	} while (to_receive > 0);
-	return true;
+	return NetworkReadResult::SUCCESS;
 }
 
 bool write(NetworkStream& stream, const void* data, u32 size) {

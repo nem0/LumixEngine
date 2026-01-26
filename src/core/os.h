@@ -267,11 +267,17 @@ LUMIX_CORE_API void unloadLibrary(void* handle);
 LUMIX_CORE_API void* getLibrarySymbol(void* handle, const char* name);
 LUMIX_CORE_API float getTimeSinceProcessStart();
 
+enum class NetworkReadResult {
+	SUCCESS,
+	CLOSED,
+	FAILED
+};
+
 LUMIX_CORE_API bool initNetwork();
 LUMIX_CORE_API void shutdownNetwork();
 LUMIX_CORE_API struct NetworkStream* listen(const char* ip, u16 port, IAllocator& allocator);
 LUMIX_CORE_API NetworkStream* connect(const char* ip, u16 port, IAllocator& allocator);
-LUMIX_CORE_API bool read(NetworkStream& stream, void* mem, u32 size);
+LUMIX_CORE_API NetworkReadResult read(NetworkStream& stream, void* mem, u32 size);
 LUMIX_CORE_API bool write(NetworkStream& stream, const void* data, u32 size);
 LUMIX_CORE_API void close(NetworkStream& stream);
 

@@ -436,7 +436,7 @@ static int LUA_networkRead(lua_State* L) {
 	os::NetworkStream* stream = LuaWrapper::checkArg<os::NetworkStream*>(L, 1);
 	u32 size = LuaWrapper::checkArg<u32>(L, 2);
 	if (size > sizeof(tmp)) luaL_error(L, "size too big, max %d allowed", (int)sizeof(tmp));
-	if (!os::read(*stream, tmp, size)) return 0;
+	if (os::read(*stream, tmp, size) != os::NetworkReadResult::SUCCESS) return 0;
 	lua_pushlstring(L, tmp, size);
 	return 1;
 }
