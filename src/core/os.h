@@ -300,6 +300,7 @@ struct LUMIX_CORE_API Timer {
 	u64 first_tick;
 };
 
+//@ enum full os::Keycode
 enum class Keycode : u8 {
 	LBUTTON = 0x01,
 	RBUTTON = 0x02,

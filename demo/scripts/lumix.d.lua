@@ -653,9 +653,6 @@ declare this : Entity
 	declare LumixAPI: {
 		hasFilesystemWork : () -> boolean,
 		
-		INPUT_KEYCODE_SHIFT: number,
-		INPUT_KEYCODE_LEFT : number,
-		INPUT_KEYCODE_RIGHT : number,
 		engine : any,
 		logError : (string) -> (),
 		logInfo : (string) -> (),

@@ -911,8 +911,39 @@ struct Parser {
 			if (enumerator_value.size() > 0) {
 				char tmp[64];
 				buildString(tmp, enumerator_value);
-				e.value = atoi(tmp);
-				last_enumerator_value = e.value;
+				// Handle character literals like 'A' and escape sequences, otherwise parse numeric (dec/hex)
+				if (tmp[0] == '\'' ) {
+					int val = 0;
+					if (tmp[1] == '\\') {
+						// escaped sequence
+						char esc = tmp[2];
+						switch (esc) {
+							case 'n': val = '\n'; break;
+							case 'r': val = '\r'; break;
+							case 't': val = '\t'; break;
+							case '\\': val = '\\'; break;
+							case '\'': val = '\''; break;
+							case '"': val = '"'; break;
+							case '0': val = '\0'; break;
+							case 'x': {
+								// parse hex after \x
+								char* endptr = nullptr;
+								val = (int)strtol(tmp + 3, &endptr, 16);
+								break;
+							}
+							default: val = (int)esc; break;
+						}
+					}
+					else {
+						val = (int)tmp[1];
+					}
+					e.value = val;
+					last_enumerator_value = e.value;
+				}
+				else {
+					e.value = (i32)strtol(tmp, nullptr, 0);
+					last_enumerator_value = e.value;
+				}
 			}
 			else {
 				++last_enumerator_value;
@@ -1545,7 +1576,32 @@ void serializeMain(OutputStream& out, Parser& parser) {
 		L("}");
 	}
 	
+	// Emit enums into LumixAPI as tables so Lua can access them as LumixAPI.<EnumName>.<Member>
+	for (Enum& e : parser.enums) {
+		L("{");
+		L("lua_getglobal(L, \"LumixAPI\");");
+		L("lua_newtable(L);");
+		for (Enumerator& en : e.values) {
+			L("LuaWrapper::push(L, ", en.value, ");");
+			L("lua_setfield(L, -2, \"", en.name, "\");");
+		}
+		L("lua_setfield(L, -2, \"", e.name, "\");");
+		L("}");
+	}
+
 	for (Module& m : parser.modules) {
+		for (Enum& e : m.enums) {
+			L("{");
+			L("lua_getglobal(L, \"LumixAPI\");");
+			L("lua_newtable(L);");
+			for (Enumerator& en : e.values) {
+				L("LuaWrapper::push(L, ", en.value, ");");
+				L("lua_setfield(L, -2, \"", en.name, "\");");
+			}
+			L("lua_setfield(L, -2, \"", e.name, "\");");
+			L("}");
+		}
+		
 		for (Component& c : m.components) {
 			L("\tregisterLuaComponent(L, \"",c.id,"\", ",c.id,"_getter, ",c.id,"_setter);");
 		}
@@ -2066,16 +2122,35 @@ void serializeLuaTypes(OutputStream& out_formatted) {
 	declare LumixAPI: {
 		hasFilesystemWork : () -> boolean,
 
-		INPUT_KEYCODE_SHIFT: number,
-		INPUT_KEYCODE_LEFT : number,
-		INPUT_KEYCODE_RIGHT : number,
 		engine : any,
 		logError : (string) -> (),
 		logInfo : (string) -> (),
 		loadResource : (any, path:string, restype:string) -> any,
 		writeFile : (string, string) -> boolean
+	)#");
+
+	// Emit enum typings into LumixAPI so editors see LumixAPI.<EnumName>.<Member>
+	for (Enum& e : parser.enums) {
+		L("\t", e.name, " : {");
+		for (Enumerator& en : e.values) {
+			L("\t\t", en.name, " : number,");
+		}
+		L("\t},");
 	}
 
+	for (Module& m : parser.modules) {
+		for (Enum& e : m.enums) {
+			L("\t", e.name, " : {");
+			for (Enumerator& en : e.values) {
+				L("\t\t", en.name, " : number,");
+			}
+			L("\t},");
+		}
+	}
+
+	L("}" OUT_ENDL);
+
+	out.add(R"#(
 	type InputDevice = {
 		type : "mouse" | "keyboard",
 		index : number

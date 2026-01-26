@@ -11,7 +11,7 @@ By default, ImGui is not enabled in packaged game. To enable ImGui integration, 
 	function onInputEvent(event : InputEvent)
 		if event.type == "button" then
 			if event.device.type == "keyboard" then
-				if event.key_id == LumixAPI.INPUT_KEYCODE_F11 and event.down then
+				if event.key_id == LumixAPI.Keycode.F11 and event.down then
 					show_imgui = not show_imgui
 				end
 			end

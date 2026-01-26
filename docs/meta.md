@@ -2,6 +2,25 @@
 
 Meta scans the source code for lines containing `//@` and generates artifacts such as reflection data and the Lua C API. It's used to mark modules, components, properties, functions, etc. To keep Meta simple and fast, it works using basic string operations. Meta does not preprocess C++ nor does it parse C++. This means valid C++ code can break Meta, if it's not exactly as Meta expects it.
 
+## Running Meta
+
+To build and run Meta, use the batch file in the scripts directory:
+
+```batch
+scripts\run_meta.bat
+```
+
+This script will:
+1. Initialize the Visual Studio developer environment
+2. Generate the solution if it doesn't exist (using genie.exe)
+3. Build the meta project
+4. Run meta.exe from the project root directory
+
+Meta scans `src/` and `plugins/` directories and generates:
+- Reflection headers (`*.gen.h`) alongside module source files
+- `src/lua/lua_capi.gen.h` - Lua C API bindings
+- `data/scripts/lumix.d.lua` - Lua type definitions
+
 # Modules
 
 To mark a class to be processed as a module by Meta, `//@ module` is used. It has 3 parameters:
@@ -42,6 +61,17 @@ Enum can have one attribute named `full`, which makes Meta emit fully qualified 
 nested in other structs or namespaces.
 
 Values inside enums are automatically parsed by Meta.
+
+### Lua exposure
+
+Enums marked with `//@ enum` are automatically exposed to Lua under the `LumixAPI` namespace. Each enum becomes a table with its enumerator names as keys and their integer values as values.
+
+```lua
+-- Access enum values in Lua
+local align = LumixAPI.TextVAlign.MIDDLE    -- 1
+local motion = LumixAPI.D6Motion.FREE       -- 2
+local cursor = LumixAPI.CursorType.HAND     -- 6
+```
 
 Examples:
 ```cpp
