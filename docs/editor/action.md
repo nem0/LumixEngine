@@ -1,6 +1,6 @@
 # Editor action
 
-In this context, an action refers to any command in the editor that can be triggered by a shortcut. In the code, it is represented by `struct Action` in [utils.h](../src/editor/utils.h). Every instance of `Action` is automatically saved in the settings and is available in the shortcut editor. Some `Action`s are available in the **Tools** or **View** menu. To check if the user actually pressed the assigned shorcut or triggered the action from the menu, use `StudioApp::checkShortcut`.
+In this context, an action refers to any command in the editor that can be triggered by a shortcut. In the code, it is represented by `struct Action` in [src/editor/action.h](../src/editor/action.h). Every instance of `Action` is automatically saved in the settings and is available in the shortcut editor. Some `Action`s are available in the **Tools** or **View** menu. To check if the user actually pressed the assigned shortcut or triggered the action from the menu, use `StudioApp::checkShortcut`.
 
 ## Shortcuts
 
@@ -12,12 +12,12 @@ Shorcuts can be changed in editor in **Settings** window under **Shortcuts** tab
 
 ### Window action
 
-A window action is an action that's supposed to open or close a window. It's automatically visible in **Main Menu** -> **View** -> `Action::short_label`.
+A window action is an action that's supposed to open or close a window. It's automatically visible in **Main Menu** -> **View** -> `Action::label_short`.
 
 ```cpp
 struct Plugin ... {
     ...
-    Action m_toggle_ui{"My plugin", "My plugin - toggle UI", "myplugin_toggle_ui", "", Action::WINDOW}; // Action::WINDOW -> the action is visibile in Main Menu -> View -> Action::short_label
+    Action m_toggle_ui{"My plugin", "Toggle UI", "Toggle UI", "myplugin_toggle_ui", "", Action::WINDOW}; // Action::WINDOW -> the action is visible in Main Menu -> View -> Action::label_short
     bool m_is_window_open = false;
     StudioApp& m_app;
     ...
@@ -48,7 +48,7 @@ A tool action is an action that's visible in **Main Menu** -> **Tools**
 ```cpp
 struct Plugin ... {
     ...
-    Action m_wireframe{"Wireframe", "My plugin - toggle wireframe", "myplugin_toggle_wireframe", "", Action::TOOL}; // Action::TOOL -> the action is visibile in Main Menu -> Tools -> Action::short_label
+    Action m_wireframe{"View", "Wireframe", "Toggle wireframe", "Toggle wireframe", "view_toggle_wireframe", "", Action::TOOL}; // Action::TOOL -> the action is visible in Main Menu -> Tools -> Action::label_short
     StudioApp& m_app;
     ...
 
@@ -67,7 +67,7 @@ An action, which is not a tool or window action, is just a normal action. It mea
 ```cpp
 struct Plugin ... {
     ...
-    Action m_create_action{"Create object", "My plugin - create object", "myplugin_create_object", ""}; // Action::NORMAL (default) -> the action is not automaticall visibile in any menu
+    Action m_create_action{"My plugin", "Create object", "Create object with some stuff", "myplugin_create_object", ""}; // Action::NORMAL (default) -> the action is not automatically visible in any menu
     StudioApp& m_app;
     ...
 
@@ -102,7 +102,7 @@ This is useful for stuff like camera movement:
 ```cpp
 struct CameraController ... {
     ...
-    Action m_forward_action{"Forward", "Camera - move forward", "camera_move_forward", ""}; 
+    Action m_forward_action{"Forward", "Forward", "Camera - move forward", "camera_move_forward", ""}; 
     ...
 
     void update(float time_delta) {

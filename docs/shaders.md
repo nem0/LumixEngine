@@ -1,6 +1,8 @@
 # Shaders
 
-Shaders can be found in the [data/shaders](../data/shaders) directory and are written in [HLSL](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl). We support pixel, vertex and compute shaders. Shaders are compiled with **FXC compiler** distributed with OS. Shaders are compiled with **Shader model 5.1.**. Shader files must have `.hlsl` extension. Shaders can be edited by integrated shader editor or any text editor.
+Shaders can be found in the [data/shaders](../data/shaders) directory and are written in [HLSL](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl). We support pixel, vertex and compute shaders. Shaders are compiled with **FXC compiler** distributed with OS. Shaders are compiled with **Shader model 5.1.**.
+
+Primary engine shaders use the `.hlsl` extension. Include files intended for shader source inclusion use the `.hlsli` extension (these are recognized by the editor and asset browser). Shaders can be edited by the integrated shader editor or any text editor.
 
 ## Vertex and pixel shader
 
@@ -117,3 +119,8 @@ float4 mainPS() : SV_Target {
 * `DrawStream::createProgram` - Adds some preamble to shaders.
 * `ShaderPlugin::compile` - Handles includes and directives. Outputs HLSL source code.
 * `ShaderCompiler::compileStage` - Invokes **FXC** to compile HLSL to bytecode.
+
+## Notes / Clarifications
+
+- **Automatic `u_`/`t_` injection:** The engine generates `MaterialData` and `getMaterialData()` and injects `u_` (uniform) and `t_` (texture) declarations into the shader code at load time based on `//@uniform` and `//@texture_slot` directives. Avoid declaring the same `u_` or `t_` variables manually when using these directives to prevent duplicate declarations.
+- **Include files:** Use `.hlsli` for files intended to be `#include`d into `.hlsl` shaders; the editor treats `.hlsli` as shader includes and exposes them in the asset browser.

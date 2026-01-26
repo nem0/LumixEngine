@@ -29,7 +29,7 @@ local hit, entity, hitpos, hitnormal = this.world.physics:raycastEx(this.positio
 
 ### Instantiate a prefab
 ```lua
-ext_prefab = Lumix.Resource:newEmpty("prefab")
+ext_prefab = Lumix.Resource:newEmpty("prefab") -- this is exposed in property grid
 local done = false
 
 function update(time_delta)

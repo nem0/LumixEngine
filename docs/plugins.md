@@ -6,9 +6,9 @@
 
 Plugins downloaded this way are placed in the `plugins` directory. *GENie* automatically detects all plugins in this directory and includes them in the solution.
 
-# Up to date plugins
+# Up-to-date plugins
 
-Note: plugins in this section are compilable/runnable, but some of them are only in prototype stage 
+Note: Plugins in this section are compilable and runnable; some are still in the prototype stage.
 
 * [Node-based shader editor](https://github.com/nem0/lumixengine_shader_editor)
 * [Real-world terrains, roads and buildings](https://github.com/nem0/LumixEngine_maps)
@@ -24,9 +24,9 @@ Note: plugins in this section are compilable/runnable, but some of them are only
 
 # Deprecated
 
-Note: not supported, most likely won't build with latest engine, but can be resurrected 
+Note: These plugins are not supported and most likely won't build with the latest engine, but can be resurrected.
 
-* [DX11 & DX12](https://github.com/nem0/lumixengine_dx11) - DX12 is now integrated in Engine, old APIs (DX11) are not supported.
+* [DX11 & DX12](https://github.com/nem0/lumixengine_dx11) - DX12 is now integrated into the engine; older APIs (DX11) are not supported.
 * [FBX importer using Autodesk's SDK](https://github.com/nem0/LumixEngine_fbx)
 * [HTML/CSS rendering](https://github.com/nem0/lumixengine_html)
 * [Turbo Badger](https://github.com/nem0/lumixengine_turbobadger)

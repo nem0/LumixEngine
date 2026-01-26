@@ -10,7 +10,7 @@ The **Recorder** is embedded within the engine and is responsible for capturing 
 
 The **Viewer** is integrated into the editor and enables developers to visualize and analyze the captured performance data. You can find its source code in [src/editor/profiler_ui.cpp](../src/editor/profiler_ui.cpp).
 
-To access the Viewer user interface, navigate to **Main Menu -> View -> Profiler** in the editor. The Viewer UI consists of three tabs: **Flamegraph, GPU, Memory and Resources**.
+To access the Viewer user interface, navigate to **Main Menu -> View -> Profiler** in the editor. The Viewer UI consists of four tabs: **Flamegraph, GPU, Memory and Resources**.
 
 ## Flamegraph
 
@@ -33,8 +33,8 @@ Blocks are defined using `profiler::beginBlock` and `profiler::endBlock`. These 
             // the block ends at the end of scope
             PROFILE_BLOCK("block #0");
             
-            // assign color to the current block (block #0)
-            profiler::blockColor(0x60, 0x60, 0x60); 
+            // assign color to the current block (block #0) in ABGR format (0xAABBGGRR)
+            profiler::blockColor(0xFF606060);
         }
 
         ...

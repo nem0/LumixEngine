@@ -2,6 +2,7 @@
 * [Plugins](plugins.md)
 * [Custom plugin](custom_plugin.md)
 * [3rd party libraries](3rdparty.md)
+* [Meta](meta.md)
 
 # Engine
 * [File paths](file_paths.md)

@@ -36,7 +36,7 @@ jobs::run(&data, sum, nullptr);
 * `jobs::wait` - Waits until the signal turns green. If the signal is already green, it continues. While waiting, the job system runs other jobs.
 * `jobs::waitAndTurnRed` - Waits until the signal turns green and then atomically turns it red. If the signal is already green, it is equivalent to `jobs::turnRed`. If multiple fibers are `waitAndTurnRed`-ing on the same signal and it turns green, only one fiber proceeds with execution.
 
-While **waiting** on a signal, a **worker thread** will attempt to **execute another job** from the queue. If no jobs are available, the thread will go to sleep to conserve resources. Signals are not copyable. It means the following code is invalid:
+While **waiting** on a signal, a **worker thread** will attempt to **execute another job** from the queue. If no jobs are available, the thread will go to sleep to conserve resources. Signals are not copyable. This means the following code is invalid:
 
 ```cpp
 jobs::Signal other_signal = signal;
@@ -44,22 +44,22 @@ jobs::Signal other_signal = signal;
 
 ### Counters
 
-Counters are a specialized type of signal that maintain a numeric value. They are considered green when this value is zero and red when it is non-zero. Counters are used to wait until one or more jobs are finished. There are two operations on counters:
+Counters are a specialized type of signal that maintain a numeric value. They are considered green when this value is zero and red when it is non-zero. Counters are used to wait until one or more jobs are finished. The main operations involving counters are:
 
-* `jobs::run` - can increment value of a provided counter. 
-* `jobs::wait` - waits until the signal turns green. 
+- `jobs::run` - can increment the value of a provided counter (pass the counter as the third parameter).
+- `jobs::wait` - waits until the counter reaches zero / signal turns green.
 
 ```cpp
 jobs::Counter counter;
 // run some job
-jobs::run(data, function, &counter);
+jobs::run(&data, function, &counter);
 
 // wait till the job is finished
 jobs::wait(&counter);
 // no need to cleanup `counter`
 ```
 
-The Job System retains pointers to counters until the associated jobs are completed. It is the **user's responsibility** to ensure that the **counter remains valid** until the job is finished. Consequently, counters **cannot be assigned** to other counter, making the following code invalid:
+The Job System retains pointers to counters until the associated jobs are completed. It is the **user's responsibility** to ensure that the **counter remains valid** until the job is finished. Consequently, counters **cannot be assigned** to another counter, making the following code invalid:
 
 ```cpp
 jobs::Counter other_counter = counter; // invalid
@@ -84,7 +84,7 @@ jobs::wait(&counter);
 
 ## Mutex
 
-The Job System provides a mutex to protect shared resources from concurrent access by multiple jobs.
+The Job System provides a mutex to protect shared resources from concurrent access by multiple jobs. Use the provided free functions `jobs::enter` / `jobs::exit` or the RAII `jobs::MutexGuard` to lock a `jobs::Mutex`.
 
 ```cpp
 struct {
@@ -92,10 +92,9 @@ struct {
     Array<T> m_array;
 
     T pop() {
-        m_mutex.enter();
+        jobs::MutexGuard guard(m_mutex);
         T result = m_array.back();
         m_array.pop();
-        m_mutex.exit();
         return result;
     }
     ...
@@ -112,7 +111,7 @@ A common pattern is to parallelize a standard single-threaded `for` loop across 
     ...
     jobs::forEach(particles_count, 4096, [&](u32 from, u32 to){
         for (u32 i = from; i < to; ++i) {
-            positons[i] = mtx * positions;
+            positions[i] = mtx * positions[i];
         }
     });
 ```
