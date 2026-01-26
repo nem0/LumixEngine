@@ -33,8 +33,9 @@ setlocal
 	echo  D. Basis Universal
 	echo  E. Jolt
 	echo  F. Bolt script
+	echo  G. Remote control
 	echo ===============================
-	choice /C 123456789ABCDEF /N /M "Your choice:"
+	choice /C 123456789ABCDEFG /N /M "Your choice:"
 	echo.
 	if %errorlevel%==1 exit /B 0
 	if %errorlevel%==2 call :empty_plugin
@@ -51,6 +52,7 @@ setlocal
 	if %errorlevel%==13 call :basisu
 	if %errorlevel%==14 call :jolt_plugin
 	if %errorlevel%==15 call :bolt_plugin
+	if %errorlevel%==16 call :remote_control
 goto :begin
 
 :glft_import_plugin
@@ -228,6 +230,21 @@ exit /B 0
 		popd
 	) else (
 		cd bolt
+		git pull
+	)
+	popd
+exit /B 0
+
+:remote_control
+	if not exist ..\plugins mkdir ..\plugins
+	pushd ..\plugins
+	if not exist bolt (
+		git.exe clone https://github.com/nem0/remote_control_lumix.git remote_control
+		pushd remote_control
+		git remote add origin2 git@github.com:nem0/remote_control_lumix.git
+		popd
+	) else (
+		cd remote_control
 		git pull
 	)
 	popd
