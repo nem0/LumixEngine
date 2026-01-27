@@ -476,6 +476,7 @@ static void LUA_createComponent(lua_State* L, World* world, i32 entity, const ch
 
 static bool LUA_hasComponent(World* world, i32 entity, const char* type)
 {
+	if (entity < 0) return false;
 	if (!world) return false;
 	ComponentType cmp_type = reflection::getComponentType(type);
 	return world->hasComponent({entity}, cmp_type);
