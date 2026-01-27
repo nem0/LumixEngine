@@ -1154,10 +1154,11 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 	}
 
 	void propertyInput(lua_State* L, LuaScriptSystem& system, EntityRef e, u32 script_idx, const char* name, const LuaScriptModule::Property& property, i32 array_index) {
+		if (!name[0]) return;
 		UniquePtr<IEditorCommand> cmd;
 		IAllocator& allocator = m_editor.getAllocator();
 		switch (property.type) {
-			case LuaScriptModule::Property::ANY: ASSERT(false); break;
+			case LuaScriptModule::Property::ANY: break;
 			case LuaScriptModule::Property::RESOURCE: {
 				lua_getfield(L, -1, "_handle");
 				i32 res_idx = lua_tointeger(L, -1);
@@ -1245,6 +1246,7 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 		for (i32 prop_idx = 0; prop_idx < num_props; ++prop_idx) {
 			const char* name = module->getPropertyName(e, script_idx, prop_idx);
 			if (!filter.pass(name)) continue;
+			if (!name[0]) continue;
 
 			const LuaScriptModule::Property& property = module->getProperty(e, script_idx, prop_idx);
 			LuaScriptSystem& system = ((LuaScriptSystem&)module->getSystem());

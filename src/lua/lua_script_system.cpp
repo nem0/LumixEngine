@@ -961,7 +961,7 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 	{
 		auto iter = m_property_names.find(name_hash);
 		if (iter.isValid()) return iter.value().c_str();
-		return "N/A";
+		return "";
 	}
 
 	void applyProperty(ScriptInstance& script, const char* name, Property& prop, InputMemoryStream& stream) {
@@ -1789,14 +1789,23 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 	void getScriptBlob(EntityRef e, u32 index, OutputMemoryStream& stream) override {
 		ScriptInstance& inst = m_scripts[e]->m_scripts[index];
 		ASSERT(inst.m_state);
-		stream.write(inst.m_properties.size());
+		u32 num_known_properties = 0;
 		for (Property& prop : inst.m_properties) {
 			auto iter = m_property_names.find(prop.name_hash);
-			ASSERT(iter.isValid()); // TODO make sure this assert is never hit
-			const char* prop_name = iter.value().c_str();
-			stream.writeString(prop_name);
+			if (iter.isValid()) ++num_known_properties;
+		}
 
-			serializePropertyValue(prop, prop_name, inst, stream);
+		stream.write(num_known_properties);
+
+		for (Property& prop : inst.m_properties) {
+			auto iter = m_property_names.find(prop.name_hash);
+			// iter can be invalid if the referenced script is not accessible (removed, moved)
+			// since m_property_names is fill from actual lua source code
+			if (iter.isValid()) {
+				const char* prop_name = iter.value().c_str();
+				stream.writeString(prop_name);
+				serializePropertyValue(prop, prop_name, inst, stream);
+			}
 		}
 	}
 
