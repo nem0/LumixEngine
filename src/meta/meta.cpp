@@ -997,38 +997,45 @@ struct Parser {
 		}
 	}
 
-	void parseObject(StringView def) {
-		StringView word = consumeWord(def);
-		StringView name;
-		while (word.size() > 0) {
-			if (equal(word, "name")) {
-				name = consumeIdentifier(def);
+	static StringView parseStructName(StringView line) {
+    	StringView word = consumeWord(line);
+    	if (!equal(word, "struct")) return {};
+		
+		StringView last_ident;
+		for (;;) {
+			StringView w = consumeWord(line);
+			if (w.size() == 0) return last_ident;
+			if (equal(w, "final")) return last_ident;
+			
+			// stop on inheritance or block start
+			char c = peekChar(line);
+			if (c == ':' || c == '{' || c == ';') {
+				return w;
 			}
-			else {
-				logError("Unexpected ", word);
-			}
-			word = consumeWord(def);
-		}
 
+			last_ident = w;
+		}
+	}
+
+	void parseObject(StringView def) {
 		StringView line;
 		if (!readLine(line)) {
 			logError("Expected struct");
 			return;
 		}
-		word = consumeWord(line);
-		if (!equal(word, "struct")) {
+		StringView struct_name = parseStructName(line);
+		if (struct_name.size() == 0) {
 			logError("Expected struct");
 			return;
 		}
-		if (name.size() == 0) name = consumeIdentifier(line);
 
 		Object& o = objects.emplace(allocator);
-		o.name = name;
+		o.name = struct_name;
 		o.filename = (char*)allocator.allocate(filename.size() + 1);
 		strncpy_s(o.filename, filename.size() + 1, filename.begin, filename.size());
 
 		while (readLine(line)) {
-			word = consumeWord(line);
+			StringView word = consumeWord(line);
 			if (equal(word, "//@")) {
 				word = consumeWord(line);
 				if (equal(word, "function")) {
@@ -1037,9 +1044,9 @@ struct Parser {
 						continue;
 					}
 					Function& func = o.functions.emplace();
-					word = consumeWord(line);
-					if (!equal(word, "virtual")) {
-						logError("Expected virtual");
+					word = peekWord(line);
+					if (equal(word, "virtual")) {
+						consumeWord(line);
 					}
 					func.return_type = consumeType(line);
 					func.name = consumeIdentifier(line);

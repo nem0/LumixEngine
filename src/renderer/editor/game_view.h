@@ -17,6 +17,7 @@ struct PlatformData;
 struct RenderModule;
 struct StudioApp;
 
+//@ object
 struct LUMIX_RENDERER_API GameView : StudioApp::GUIPlugin {
 	friend struct GUIInterface;
 
@@ -27,6 +28,7 @@ struct LUMIX_RENDERER_API GameView : StudioApp::GUIPlugin {
 	void captureMouse(bool capture);
 	void enableIngameCursor(bool enable);
 	void setCursor(os::CursorType type);
+	//@ function
 	void forceViewport(bool enable, int w, int h);
 	const char* getName() const override { return "game_view"; }
 	bool isOpen() const { return m_is_open; }

@@ -1830,37 +1830,25 @@ struct SetPropertyVisitor : reflection::IPropertyVisitor {
 		LuaScriptSystem* system = (LuaScriptSystem*)m_app.getEngine().getSystemManager().getSystem("lua_script");
 		lua_State* L = system->getState();
 
-		{
-			StudioApp::GUIPlugin* game_view = m_app.getGUIPlugin("game_view");
-			auto f = &LuaWrapper::wrapMethodClosure<&GameView::forceViewport>;
-			LuaWrapper::createSystemClosure(L, "GameView", game_view, "forceViewport", f);
-		}
-		
 		lua_getglobal(L, "Editor");
+		
 		StudioApp::GUIPlugin* scene_view = m_app.getGUIPlugin("scene_view");
 		LuaWrapper::pushObject(L, scene_view, "SceneView");
 		lua_setfield(L, -2, "scene_view");
 
+		StudioApp::GUIPlugin* game_view = m_app.getGUIPlugin("game_view");
+		LuaWrapper::pushObject(L, game_view, "GameView");
+		lua_setfield(L, -2, "game_view");
+
 		LuaWrapper::pushObject(L, &m_app.getAssetBrowser(), "AssetBrowser");
 		lua_setfield(L, -2, "asset_browser");
+
+		LuaWrapper::pushObject(L, &m_app, "StudioApp");
+		lua_setfield(L, -2, "app");
 		lua_pop(L, 1);
 
-		LuaWrapper::createSystemVariable(L, "Editor", "editor", &m_app);
-		
 		lua_pushcfunction(L, &LUA_debugCallback, "LumixDebugCallback");
 		lua_setglobal(L, "LumixDebugCallback");
-
-		#define REGISTER_FUNCTION(F)                                    \
-		do {                                                            \
-			auto f = &LuaWrapper::wrapMethodClosure<&StudioApp::F>; \
-			LuaWrapper::createSystemClosure(L, "Editor", this, #F, f);  \
-		} while (false)
-
-		REGISTER_FUNCTION(exitGameMode);
-		REGISTER_FUNCTION(exitWithCode);
-		REGISTER_FUNCTION(newWorld);
-
-		#undef REGISTER_FUNCTION
 
 		#define REGISTER_FUNCTION(F)                                    \
 		do {                                                            \

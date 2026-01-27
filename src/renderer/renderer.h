@@ -57,6 +57,7 @@ struct DrawStream;
 struct UniformPool;
 struct TransientPool;
 
+//@ object
 struct LUMIX_RENDERER_API Renderer : ISystem {
 	struct MemRef {
 		u32 size = 0;
@@ -72,7 +73,9 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 	virtual void waitForCommandSetup() = 0;
 	virtual void waitCanSetup() = 0;
 	virtual struct Engine& getEngine() = 0;
+	//@ function
 	virtual float getLODMultiplier() const = 0;
+	//@ function
 	virtual void setLODMultiplier(float value) = 0;
 	
 	virtual struct ArenaAllocator& getCurrentFrameAllocator() = 0;

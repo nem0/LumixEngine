@@ -19,10 +19,6 @@
 #include "lua_script.h"
 #include "lua_script_system.h"
 #include "lua_wrapper.h"
-#include "physics/physics_module.h"
-#include "renderer/model.h"
-#include "renderer/render_module.h"
-#include "renderer/renderer.h"
 #include <luacode.h>
 
 
@@ -126,38 +122,6 @@ struct LuaScriptManager final : ResourceManager
 void registerEngineAPI(lua_State* L, Engine* engine);
 
 
-// TODO generate with meta
-static void registerRendererAPI(lua_State* L, Engine& engine) {
-	auto renderer = (Renderer*)engine.getSystemManager().getSystem("renderer");
-	LuaWrapper::createSystemClosure(L, "Renderer", renderer, "setLODMultiplier", &LuaWrapper::wrapMethodClosure<&Renderer::setLODMultiplier>);
-	LuaWrapper::createSystemClosure(L, "Renderer", renderer, "getLODMultiplier", &LuaWrapper::wrapMethodClosure<&Renderer::getLODMultiplier>);
-}
-
-
-
-static int LUA_raycastEx(lua_State* L)
-{
-	LuaWrapper::checkTableArg(L, 1);
-	PhysicsModule* module;
-	if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
-	Vec3 origin = LuaWrapper::checkArg<Vec3>(L, 2);
-	Vec3 dir = LuaWrapper::checkArg<Vec3>(L, 3);
-	dir = normalize(dir);
-	const int layer = lua_gettop(L) > 3 ? LuaWrapper::checkArg<int>(L, 4) : -1;
-	RaycastHit hit;
-	if (module->raycastEx(origin, dir, FLT_MAX, hit, INVALID_ENTITY, layer))
-	{
-		LuaWrapper::push(L, hit.entity != INVALID_ENTITY);
-		LuaWrapper::pushEntity(L, hit.entity, &module->getWorld());
-		LuaWrapper::push(L, hit.position);
-		LuaWrapper::push(L, hit.normal);
-		return 4;
-	}
-	LuaWrapper::push(L, false);
-	return 1;
-}
-
-
 struct LuaScriptSystemImpl final : LuaScriptSystem
 {
 	explicit LuaScriptSystemImpl(Engine& engine);
@@ -166,14 +130,6 @@ struct LuaScriptSystemImpl final : LuaScriptSystem
 	void initEnd() override {
 		PROFILE_FUNCTION();
 		registerEngineAPI(m_state, &m_engine);
-		registerRendererAPI(m_state, m_engine);
-
-		LuaWrapper::DebugGuard guard(m_state);
-		lua_getglobal(m_state, "LumixModules");
-		lua_getfield(m_state, -1, "physics");
-		lua_pushcfunction(m_state, LUA_raycastEx, "raycastEx");
-		lua_setfield(m_state, -2, "raycastEx");
-		lua_pop(m_state, 2);
 	}
 
 	void createModules(World& world) override;
@@ -925,95 +881,6 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 
 		return 0;
 	}
-
-	static int getInlineEnvironment(lua_State* L) {
-		if (!lua_istable(L, 1)) {
-			LuaWrapper::argError(L, 1, "entity");
-		}
-
-		if (LuaWrapper::getField(L, 1, "_entity") != LUA_TNUMBER) { 
-			lua_pop(L, 1);
-			LuaWrapper::argError(L, 1, "entity");
-		}
-
-		const EntityRef entity = {LuaWrapper::toType<i32>(L, -1)};
-		lua_pop(L, 1);
-
-		if (LuaWrapper::getField(L, 1, "_world") != LUA_TLIGHTUSERDATA) {
-			lua_pop(L, 1);
-			LuaWrapper::argError(L, 1, "entity");
-		}
-		
-		World* world = LuaWrapper::toType<World*>(L, -1);
-		lua_pop(L, 1);
-
-		if (!world->hasComponent(entity, types::lua_script_inline)) {
-			lua_pushnil(L);
-			return 1;
-		}
-			
-		LuaScriptModule* module = (LuaScriptModule*)world->getModule(types::lua_script);
-
-		int env = module->getInlineEnvironment(entity);
-		if (env < 0) {
-			lua_pushnil(L);
-		}
-		else {
-			lua_rawgeti(L, LUA_REGISTRYINDEX, env);
-			ASSERT(lua_type(L, -1) == LUA_TTABLE);
-		}
-		return 1;
-	}
-		
-	static int getEnvironment(lua_State* L)
-	{
-		if (!lua_istable(L, 1)) {
-			LuaWrapper::argError(L, 1, "entity");
-		}
-
-		if (LuaWrapper::getField(L, 1, "_entity") != LUA_TNUMBER) {
-			lua_pop(L, 1);
-			LuaWrapper::argError(L, 1, "entity");
-		}
-		const EntityRef entity = {LuaWrapper::toType<i32>(L, -1)};
-		lua_pop(L, 1);
-
-		if (LuaWrapper::getField(L, 1, "_world") != LUA_TLIGHTUSERDATA) {
-			lua_pop(L, 1);
-			LuaWrapper::argError(L, 1, "entity");
-		}
-		World* world = LuaWrapper::toType<World*>(L, -1);
-		lua_pop(L, 1);
-
-		const i32 scr_index = LuaWrapper::checkArg<i32>(L, 2);
-
-		if (!world->hasComponent(entity, types::lua_script))
-		{
-			lua_pushnil(L);
-			return 1;
-		}
-			
-		LuaScriptModule* module = (LuaScriptModule*)world->getModule(types::lua_script);
-
-		int count = module->getScriptCount(entity);
-		if (scr_index >= count)
-		{
-			lua_pushnil(L);
-			return 1;
-		}
-
-		int env = module->getEnvironment(entity, scr_index);
-		if (env < 0)
-		{
-			lua_pushnil(L);
-		}
-		else
-		{
-			lua_rawgeti(L, LUA_REGISTRYINDEX, env);
-			ASSERT(lua_type(L, -1) == LUA_TTABLE);
-		}
-		return 1;
-	}
 		
 	static int lua_new_module(lua_State* L) {
 		LuaWrapper::DebugGuard guard(L, 1);
@@ -1072,8 +939,6 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 		LuaWrapper::createSystemVariable(L, "Editor", "RESOURCE_PROPERTY", Property::RESOURCE);
 		LuaWrapper::createSystemVariable(L, "Editor", "COLOR_PROPERTY", Property::COLOR);
 		
-		LuaWrapper::createSystemFunction(L, "LuaScript", "getEnvironment", &LuaScriptModuleImpl::getEnvironment);
-		LuaWrapper::createSystemFunction(L, "LuaScript", "getInlineEnvironment", &LuaScriptModuleImpl::getInlineEnvironment);
 		LuaWrapper::createSystemFunction(L, "LuaScript", "rescan", &LuaScriptModuleImpl::rescan);
 		LuaWrapper::createSystemFunction(L, "LuaScript", "cancelTimer", &LuaWrapper::wrapMethod<&LuaScriptModuleImpl::cancelTimer>); 
 		LuaWrapper::createSystemFunction(L, "LuaScript", "setTimer", &LuaScriptModuleImpl::setTimer);

@@ -32,6 +32,7 @@ namespace os {
 	struct Rect;
 }
 
+//@ object
 struct LUMIX_EDITOR_API StudioApp {
 	struct IPlugin {
 		virtual ~IPlugin() {}
@@ -89,7 +90,9 @@ struct LUMIX_EDITOR_API StudioApp {
 	virtual WorldEditor& getWorldEditor() = 0;
 	virtual void run() = 0;
 	virtual int getExitCode() const = 0;
+	//@ function
 	virtual void exitWithCode(int exit_code) = 0;
+	//@ function
 	virtual void exitGameMode() = 0;
 	virtual const char* getProjectDir() = 0;
 	
@@ -123,6 +126,7 @@ struct LUMIX_EDITOR_API StudioApp {
 
 	virtual Action* getAction(const char* name) = 0;
 	
+	//@ function
 	virtual void newWorld() = 0;
 	virtual void setFullscreen(bool fullscreen) = 0;
 	virtual float getFOV() const = 0;

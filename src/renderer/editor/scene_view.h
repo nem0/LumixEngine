@@ -36,9 +36,13 @@ struct SceneView : StudioApp::GUIPlugin
 	const char* getName() const override { return "scene_view"; }
 	void init();
 
+	//@ function
 	DVec3 getViewportPosition();
+	//@ function
 	void setViewportPosition(const DVec3& pos);
+	//@ function
 	Quat getViewportRotation();
+	//@ function
 	void setViewportRotation(const Quat& rot);
 	void setGameView(struct GameView& game_view) { m_game_view = &game_view; }
 
