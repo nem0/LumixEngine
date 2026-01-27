@@ -1593,6 +1593,7 @@ void serializeMain(OutputStream& out, Parser& parser) {
 			L("lua_setfield(L, -2, \"", en.name, "\");");
 		}
 		L("lua_setfield(L, -2, \"", e.name, "\");");
+		L("lua_pop(L, 1);");
 		L("}");
 	}
 
@@ -1606,6 +1607,7 @@ void serializeMain(OutputStream& out, Parser& parser) {
 				L("lua_setfield(L, -2, \"", en.name, "\");");
 			}
 			L("lua_setfield(L, -2, \"", e.name, "\");");
+			L("lua_pop(L, 1);");
 			L("}");
 		}
 		

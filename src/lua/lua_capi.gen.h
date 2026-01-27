@@ -2821,6 +2821,7 @@ namespace Lumix {
 			LuaWrapper::push(L, 7);
 			lua_setfield(L, -2, "UNDEFINED");
 			lua_setfield(L, -2, "CursorType");
+			lua_pop(L, 1);
 		}
 		{
 			lua_getglobal(L, "LumixAPI");
@@ -3174,6 +3175,7 @@ namespace Lumix {
 			LuaWrapper::push(L, 255);
 			lua_setfield(L, -2, "MAX");
 			lua_setfield(L, -2, "Keycode");
+			lua_pop(L, 1);
 		}
 		{
 			lua_getglobal(L, "LumixAPI");
@@ -3185,6 +3187,7 @@ namespace Lumix {
 			LuaWrapper::push(L, 2);
 			lua_setfield(L, -2, "COUNT");
 			lua_setfield(L, -2, "GrassRotationMode");
+			lua_pop(L, 1);
 		}
 		registerLuaComponent(L, "property_animator", property_animator_getter, property_animator_setter);
 		registerLuaComponent(L, "animator", animator_getter, animator_setter);
@@ -3205,6 +3208,7 @@ namespace Lumix {
 			LuaWrapper::push(L, 2);
 			lua_setfield(L, -2, "RIGHT");
 			lua_setfield(L, -2, "TextHAlign");
+			lua_pop(L, 1);
 		}
 		{
 			lua_getglobal(L, "LumixAPI");
@@ -3216,6 +3220,7 @@ namespace Lumix {
 			LuaWrapper::push(L, 2);
 			lua_setfield(L, -2, "BOTTOM");
 			lua_setfield(L, -2, "TextVAlign");
+			lua_pop(L, 1);
 		}
 		registerLuaComponent(L, "gui_canvas", gui_canvas_getter, gui_canvas_setter);
 		registerLuaComponent(L, "gui_render_target", gui_render_target_getter, gui_render_target_setter);
@@ -3238,6 +3243,7 @@ namespace Lumix {
 			LuaWrapper::push(L, 2);
 			lua_setfield(L, -2, "FREE");
 			lua_setfield(L, -2, "D6Motion");
+			lua_pop(L, 1);
 		}
 		{
 			lua_getglobal(L, "LumixAPI");
@@ -3251,6 +3257,7 @@ namespace Lumix {
 			LuaWrapper::push(L, 3);
 			lua_setfield(L, -2, "REAR_RIGHT");
 			lua_setfield(L, -2, "WheelSlot");
+			lua_pop(L, 1);
 		}
 		{
 			lua_getglobal(L, "LumixAPI");
@@ -3262,6 +3269,7 @@ namespace Lumix {
 			LuaWrapper::push(L, 2);
 			lua_setfield(L, -2, "KINEMATIC");
 			lua_setfield(L, -2, "DynamicType");
+			lua_pop(L, 1);
 		}
 		registerLuaComponent(L, "physical_heightfield", physical_heightfield_getter, physical_heightfield_setter);
 		registerLuaComponent(L, "d6_joint", d6_joint_getter, d6_joint_setter);

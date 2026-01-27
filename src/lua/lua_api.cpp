@@ -851,9 +851,6 @@ void registerLuaAPI(lua_State* L);
 
 void registerEngineAPI(lua_State* L, Engine* engine) {
 	LuaWrapper::DebugGuard guard(L);
-
-	lua_pushlightuserdata(L, engine);
-
 	lua_pushcfunction(L, &LUA_loadstring, "loadstring");
 	lua_setglobal(L, "loadstring");
 
@@ -897,6 +894,8 @@ void registerEngineAPI(lua_State* L, Engine* engine) {
 	REGISTER_FUNCTION(setTimeMultiplier);
 	REGISTER_FUNCTION(startGame);
 	
+	#undef REGISTER_FUNCTION
+	
 	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "getResourcePath", &LuaWrapper::wrap<LUA_getResourcePath>);
 
 	LuaWrapper::createSystemFunction(L, "LumixAPI", "resourceTypeFromString", &LUA_resourceTypeFromString);
@@ -920,8 +919,6 @@ void registerEngineAPI(lua_State* L, Engine* engine) {
 	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "writeFile", LUA_writeFile);
 	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "loadResource", LUA_loadResource);
 	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "unloadResource", LUA_unloadResource);
-	
-	#undef REGISTER_FUNCTION
 
 	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "instantiatePrefab", &LUA_instantiatePrefab);
 
@@ -1206,16 +1203,6 @@ void registerEngineAPI(lua_State* L, Engine* engine) {
 		logError("Failed to init entity api");
 	}
 
-	lua_getglobal(L, "LumixAPI");
-	if (lua_type(L, -1) == LUA_TNIL) {
-		lua_pop(L, 1);
-		lua_newtable(L);
-		lua_setglobal(L, "LumixAPI");
-	}
-	else {
-		lua_pop(L, 1);
-	}
-
 	registerLuaAPI(L);
 
 	lua_getglobal(L, "LumixModules");
@@ -1223,7 +1210,6 @@ void registerEngineAPI(lua_State* L, Engine* engine) {
 	lua_pushcfunction(L, LUA_raycastEx, "raycastEx");
 	lua_setfield(L, -2, "raycastEx");
 	lua_pop(L, 2);
-
 }
 
 static struct {
