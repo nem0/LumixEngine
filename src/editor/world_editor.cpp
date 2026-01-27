@@ -2064,7 +2064,7 @@ public:
 	}
 
 
-	void setEntitiesScale(const EntityRef* entities, int count, const Vec3& scale) override
+	void setEntitiesScale(const EntityRef* entities, const Vec3& scale, int count) override
 	{
 		if (count <= 0) return;
 

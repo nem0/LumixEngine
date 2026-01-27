@@ -1592,6 +1592,11 @@ struct SetPropertyVisitor : reflection::IPropertyVisitor {
 				const DVec3 pos = LuaWrapper::toType<DVec3>(L, -1);
 				editor.setEntitiesPositions(&e, &pos, 1);
 			}
+			else if (equalStrings(parameter_name, "scale"))
+			{
+				const Vec3 scale = LuaWrapper::toType<Vec3>(L, -1);
+				editor.setEntitiesScale(&e, scale, 1);
+			}
 			else if (equalStrings(parameter_name, "rotation"))
 			{
 				const Quat rot = LuaWrapper::toType<Quat>(L, -1);

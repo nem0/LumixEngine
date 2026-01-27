@@ -807,7 +807,7 @@ void PropertyGrid::showCoreProperties(Span<const EntityRef> entities, WorldEdito
 		ImGuiEx::Label("Scale");
 		if (ImGui::DragFloat3("##scale", &scale.x, 0.1f, 0, FLT_MAX))
 		{
-			editor.setEntitiesScale(&entities[0], entities.size(), scale);
+			editor.setEntitiesScale(&entities[0], scale, entities.size());
 		}
 	}
 	ImGui::TreePop();
