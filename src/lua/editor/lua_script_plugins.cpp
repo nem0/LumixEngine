@@ -1605,13 +1605,18 @@ struct SetPropertyVisitor : reflection::IPropertyVisitor {
 			else
 			{
 				ComponentType cmp_type = reflection::getComponentType(parameter_name);
+				const reflection::ComponentBase* cmp_des = reflection::getComponent(cmp_type);
+				if (!cmp_des) {
+					logError("Unknown component type: ", parameter_name);
+					lua_pop(L, 1);
+					continue;
+				}
 				editor.addComponent(Span(&e, 1), cmp_type);
 
 				IModule* module = editor.getWorld()->getModule(cmp_type);
 				if (module)
 				{
 					ComponentUID cmp(e, cmp_type, module);
-					const reflection::ComponentBase* cmp_des = reflection::getComponent(cmp_type);
 					if (cmp.isValid())
 					{
 						lua_pushvalue(L, -1);
