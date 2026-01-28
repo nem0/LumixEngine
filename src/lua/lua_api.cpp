@@ -1160,7 +1160,7 @@ void registerEngineAPI(lua_State* L, Engine* engine) {
 				if k == "position" then
 					ent.position = v
 				elseif k == "rotation" then
-					ent.position = v
+					ent.rotation = v
 				elseif k == "scale" then
 					ent.scale = v
 				else
