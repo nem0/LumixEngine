@@ -1660,7 +1660,7 @@ void serializeLuaPropertySetter(OutputStream& out, Module& m, Component& c) {
 		}
 	}
 	L("case 0:"); // to avoid emtpy switch (compiler error) in case we have 0 properties
-	L("default: ASSERT(false); luaL_error(L, \"Unknown property %s\", prop_name); break;");
+	L("default: luaL_error(L, \"Unknown property %s\", prop_name); break;");
 	L("}");
 
 	L("return 0;");
@@ -1719,7 +1719,7 @@ void serializeLuaArrayGetter(OutputStream& out, Module& m, Component& c, ArrayPr
 			L("LuaWrapper::push(L, module->",child.getter_name,"(entity, index)); break;");
 		}
 	}
-	L("default: { ASSERT(false); luaL_error(L, \"Unknown property %s\", prop_name); break; }");
+	L("default: { luaL_error(L, \"Unknown property %s\", prop_name); break; }");
 	L("}");
 
 	out.add(R"#(return 1;
@@ -1754,7 +1754,7 @@ void serializeLuaArrayGetter(OutputStream& out, Module& m, Component& c, ArrayPr
 
 	out.add(R"#(
 			case 0:	
-			default: { ASSERT(false); luaL_error(L, "Unknown property %ss", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %ss", prop_name); break; }
 			}
 			return 0;
 			};
@@ -1847,7 +1847,7 @@ void serializeLuaPropertyGetter(OutputStream& out, Module& m, Component& c) {
 		L("lua_pushcfunction(L, ",c.name,"_",name,", \"",c.name,"_",name,"\"); break;");
 	}
 	L("case 0:"); // to avoid emtpy switch (compiler error) in case we have 0 properties
-	L("default: { ASSERT(false); luaL_error(L, \"Unknown property %s\", prop_name); break; }");
+	L("default: { luaL_error(L, \"Unknown property %s\", prop_name); break; }");
 	L("}");
 	L("\treturn 1;");
 	L("}" OUT_ENDL);

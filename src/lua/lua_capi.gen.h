@@ -30,7 +30,7 @@ namespace Lumix {
 			case /*looped*/6405259518291244478: LuaWrapper::push(L, module->getPropertyAnimatorLooped(entity)); break;
 			case /*animation*/9955584850897845776: LuaWrapper::push(L, module->getPropertyAnimatorAnimation(entity)); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -45,7 +45,7 @@ namespace Lumix {
 			case /*looped*/6405259518291244478: module->setPropertyAnimatorLooped(entity, LuaWrapper::checkArg<bool>(L, 3)); break;
 			case /*animation*/9955584850897845776: module->setPropertyAnimatorAnimation(entity, LuaWrapper::checkArg<Path>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -108,7 +108,7 @@ namespace Lumix {
 			case /*setVec3Input*/14320350081376399052: lua_pushcfunction(L, Animator_setVec3Input, "Animator_setVec3Input"); break;
 			case /*getInputIndex*/6182785171120527074: lua_pushcfunction(L, Animator_getInputIndex, "Animator_getInputIndex"); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -123,7 +123,7 @@ namespace Lumix {
 			case /*use_root_motion*/7336167410229006784: module->setAnimatorUseRootMotion(entity, LuaWrapper::checkArg<bool>(L, 3)); break;
 			case /*default_set*/7320943736218812204: module->setAnimatorDefaultSet(entity, LuaWrapper::checkArg<u32>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -136,7 +136,7 @@ namespace Lumix {
 		switch (name_hash) {
 			case /*animation*/9955584850897845776: LuaWrapper::push(L, module->getAnimableAnimation(entity)); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -149,7 +149,7 @@ namespace Lumix {
 		switch (name_hash) {
 			case /*animation*/9955584850897845776: module->setAnimableAnimation(entity, LuaWrapper::checkArg<Path>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -237,7 +237,7 @@ namespace Lumix {
 			case /*radius*/3015162214864260720: LuaWrapper::push(L, module->getEchoZone(entity).radius); break;
 			case /*delay*/13078273434447554266: LuaWrapper::push(L, module->getEchoZone(entity).delay); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -251,7 +251,7 @@ namespace Lumix {
 			case /*radius*/3015162214864260720: module->getEchoZone(entity).radius = LuaWrapper::checkArg<float>(L, 3); break;
 			case /*delay*/13078273434447554266: module->getEchoZone(entity).delay = LuaWrapper::checkArg<float>(L, 3); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -265,7 +265,7 @@ namespace Lumix {
 			case /*radius*/3015162214864260720: LuaWrapper::push(L, module->getChorusZone(entity).radius); break;
 			case /*delay*/13078273434447554266: LuaWrapper::push(L, module->getChorusZone(entity).delay); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -279,7 +279,7 @@ namespace Lumix {
 			case /*radius*/3015162214864260720: module->getChorusZone(entity).radius = LuaWrapper::checkArg<float>(L, 3); break;
 			case /*delay*/13078273434447554266: module->getChorusZone(entity).delay = LuaWrapper::checkArg<float>(L, 3); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -291,7 +291,7 @@ namespace Lumix {
 		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
 		switch (name_hash) {
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -303,7 +303,7 @@ namespace Lumix {
 		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
 		switch (name_hash) {
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -333,7 +333,7 @@ namespace Lumix {
 			case /*pause*/3701802990388885733: lua_pushcfunction(L, AmbientSound_pause, "AmbientSound_pause"); break;
 			case /*resume*/3192798007053220969: lua_pushcfunction(L, AmbientSound_resume, "AmbientSound_resume"); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -347,7 +347,7 @@ namespace Lumix {
 			case /*clip*/13569199342746918467: module->setAmbientSoundClip(entity, LuaWrapper::checkArg<Path>(L, 3)); break;
 			case /*is_3d*/7401995853317604073: module->setAmbientSound3D(entity, LuaWrapper::checkArg<bool>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -362,7 +362,7 @@ namespace Lumix {
 		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
 		switch (name_hash) {
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -374,7 +374,7 @@ namespace Lumix {
 		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
 		switch (name_hash) {
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -386,7 +386,7 @@ namespace Lumix {
 		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
 		switch (name_hash) {
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -398,7 +398,7 @@ namespace Lumix {
 		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
 		switch (name_hash) {
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -443,7 +443,7 @@ namespace Lumix {
 			case /*orient_to_camera*/8367939065059955720: LuaWrapper::push(L, module->getCanvas(entity).orient_to_camera); break;
 			case /*virtual_size*/10008642934015139818: LuaWrapper::push(L, module->getCanvas(entity).virtual_size); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -458,7 +458,7 @@ namespace Lumix {
 			case /*orient_to_camera*/8367939065059955720: module->getCanvas(entity).orient_to_camera = LuaWrapper::checkArg<bool>(L, 3); break;
 			case /*virtual_size*/10008642934015139818: module->getCanvas(entity).virtual_size = LuaWrapper::checkArg<Vec2>(L, 3); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -470,7 +470,7 @@ namespace Lumix {
 		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
 		switch (name_hash) {
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -482,7 +482,7 @@ namespace Lumix {
 		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
 		switch (name_hash) {
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -494,7 +494,7 @@ namespace Lumix {
 		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
 		switch (name_hash) {
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -506,7 +506,7 @@ namespace Lumix {
 		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
 		switch (name_hash) {
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -528,7 +528,7 @@ namespace Lumix {
 			case /*bottom_points*/3712023579548425612: LuaWrapper::push(L, module->getRectBottomPoints(entity)); break;
 			case /*bottom_relative*/7595909218576582928: LuaWrapper::push(L, module->getRectBottomRelative(entity)); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -550,7 +550,7 @@ namespace Lumix {
 			case /*bottom_points*/3712023579548425612: module->setRectBottomPoints(entity, LuaWrapper::checkArg<float>(L, 3)); break;
 			case /*bottom_relative*/7595909218576582928: module->setRectBottomRelative(entity, LuaWrapper::checkArg<float>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -564,7 +564,7 @@ namespace Lumix {
 			case /*hovered_color*/1007138839029607122: LuaWrapper::push(L, module->getButtonHoveredColorRGBA(entity)); break;
 			case /*hovered_cursor*/18068079505236550740: LuaWrapper::push(L, (i32)module->getButtonHoveredCursor(entity)); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -578,7 +578,7 @@ namespace Lumix {
 			case /*hovered_color*/1007138839029607122: module->setButtonHoveredColorRGBA(entity, LuaWrapper::checkArg<Vec4>(L, 3)); break;
 			case /*hovered_cursor*/18068079505236550740: module->setButtonHoveredCursor(entity, (os::CursorType)LuaWrapper::checkArg<i32>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -593,7 +593,7 @@ namespace Lumix {
 			case /*color*/880366885425937065: LuaWrapper::push(L, module->getImageColorRGBA(entity)); break;
 			case /*sprite*/11899351776270312423: LuaWrapper::push(L, module->getImageSprite(entity)); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -608,7 +608,7 @@ namespace Lumix {
 			case /*color*/880366885425937065: module->setImageColorRGBA(entity, LuaWrapper::checkArg<Vec4>(L, 3)); break;
 			case /*sprite*/11899351776270312423: module->setImageSprite(entity, LuaWrapper::checkArg<Path>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -626,7 +626,7 @@ namespace Lumix {
 			case /*vertical_align*/6391177055909864478: LuaWrapper::push(L, (i32)module->getTextVAlign(entity)); break;
 			case /*text*/5145922347574273553: LuaWrapper::push(L, module->getText(entity)); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -644,7 +644,7 @@ namespace Lumix {
 			case /*vertical_align*/6391177055909864478: module->setTextVAlign(entity, (TextVAlign)LuaWrapper::checkArg<i32>(L, 3)); break;
 			case /*text*/5145922347574273553: module->setText(entity, LuaWrapper::checkArg<const char*>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -696,7 +696,7 @@ namespace Lumix {
 						switch (name_hash) {
 							case /*enabled*/13840943435668507618: LuaWrapper::push(L, module->isScriptEnabled(entity, index)); break;
 							case /*path*/8756705481922369689: LuaWrapper::push(L, module->getScriptPath(entity, index)); break;
-							default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+							default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 						}
 						return 1;
 					};
@@ -713,7 +713,7 @@ namespace Lumix {
 							case /*path*/8756705481922369689: module->setScriptPath(entity, index, LuaWrapper::checkArg<Path>(L, 3)); break;
 							
 							case 0:	
-							default: { ASSERT(false); luaL_error(L, "Unknown property %ss", prop_name); break; }
+							default: { luaL_error(L, "Unknown property %ss", prop_name); break; }
 						}
 						return 0;
 					};
@@ -754,7 +754,7 @@ namespace Lumix {
 				break;
 			}
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -766,7 +766,7 @@ namespace Lumix {
 		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
 		switch (name_hash) {
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -779,7 +779,7 @@ namespace Lumix {
 		switch (name_hash) {
 			case /*code*/329780482934683790: LuaWrapper::push(L, module->getInlineScriptCode(entity)); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -792,7 +792,7 @@ namespace Lumix {
 		switch (name_hash) {
 			case /*code*/329780482934683790: module->setInlineScriptCode(entity, LuaWrapper::checkArg<const char*>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -876,7 +876,7 @@ namespace Lumix {
 			case /*generateNavmesh*/17733766460475722627: lua_pushcfunction(L, Zone_generateNavmesh, "Zone_generateNavmesh"); break;
 			case /*saveZone*/7775591933563895126: lua_pushcfunction(L, Zone_saveZone, "Zone_saveZone"); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -897,7 +897,7 @@ namespace Lumix {
 			case /*autoload*/12820653450790247776: module->setZoneAutoload(entity, LuaWrapper::checkArg<bool>(L, 3)); break;
 			case /*detailed*/3305050883106733620: module->setZoneDetailed(entity, LuaWrapper::checkArg<bool>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -941,7 +941,7 @@ namespace Lumix {
 			case /*cancelNavigation*/10369242840717673752: lua_pushcfunction(L, Agent_cancelNavigation, "Agent_cancelNavigation"); break;
 			case /*drawPath*/15681074705421253585: lua_pushcfunction(L, Agent_drawPath, "Agent_drawPath"); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -956,7 +956,7 @@ namespace Lumix {
 			case /*height*/3439375685700528633: module->setAgentHeight(entity, LuaWrapper::checkArg<float>(L, 3)); break;
 			case /*move_entity*/3203804519501376147: module->setAgentMoveEntity(entity, LuaWrapper::checkArg<bool>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -996,7 +996,7 @@ namespace Lumix {
 			case /*yscale*/9502059661590009697: LuaWrapper::push(L, module->getHeightfieldYScale(entity)); break;
 			case /*layer*/12438280802495919435: LuaWrapper::push(L, module->getHeightfieldLayer(entity)); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -1012,7 +1012,7 @@ namespace Lumix {
 			case /*yscale*/9502059661590009697: module->setHeightfieldYScale(entity, LuaWrapper::checkArg<float>(L, 3)); break;
 			case /*layer*/12438280802495919435: module->setHeightfieldLayer(entity, LuaWrapper::checkArg<u32>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -1039,7 +1039,7 @@ namespace Lumix {
 			case /*axis_position*/2173619491007772698: LuaWrapper::push(L, module->getD6JointAxisPosition(entity)); break;
 			case /*axis_direction*/16325623039774346822: LuaWrapper::push(L, module->getD6JointAxisDirection(entity)); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -1066,7 +1066,7 @@ namespace Lumix {
 			case /*axis_position*/2173619491007772698: module->setD6JointAxisPosition(entity, LuaWrapper::checkArg<Vec3>(L, 3)); break;
 			case /*axis_direction*/16325623039774346822: module->setD6JointAxisDirection(entity, LuaWrapper::checkArg<Vec3>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -1085,7 +1085,7 @@ namespace Lumix {
 			case /*limits*/7840594216495710123: LuaWrapper::push(L, module->getDistanceJointLimits(entity)); break;
 			case /*linear_force*/16820564449043595678: LuaWrapper::push(L, module->getDistanceJointLinearForce(entity)); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -1103,7 +1103,7 @@ namespace Lumix {
 			case /*tolerance*/14660365190981525385: module->setDistanceJointTolerance(entity, LuaWrapper::checkArg<float>(L, 3)); break;
 			case /*limits*/7840594216495710123: module->setDistanceJointLimits(entity, LuaWrapper::checkArg<Vec2>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -1122,7 +1122,7 @@ namespace Lumix {
 			case /*use_limit*/5067557280613061028: LuaWrapper::push(L, module->getHingeJointUseLimit(entity)); break;
 			case /*limit*/6512589393810093616: LuaWrapper::push(L, module->getHingeJointLimit(entity)); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -1141,7 +1141,7 @@ namespace Lumix {
 			case /*use_limit*/5067557280613061028: module->setHingeJointUseLimit(entity, LuaWrapper::checkArg<bool>(L, 3)); break;
 			case /*limit*/6512589393810093616: module->setHingeJointLimit(entity, LuaWrapper::checkArg<Vec2>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -1158,7 +1158,7 @@ namespace Lumix {
 			case /*use_limit*/5067557280613061028: LuaWrapper::push(L, module->getSphericalJointUseLimit(entity)); break;
 			case /*limit*/6512589393810093616: LuaWrapper::push(L, module->getSphericalJointLimit(entity)); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -1175,7 +1175,7 @@ namespace Lumix {
 			case /*use_limit*/5067557280613061028: module->setSphericalJointUseLimit(entity, LuaWrapper::checkArg<bool>(L, 3)); break;
 			case /*limit*/6512589393810093616: module->setSphericalJointLimit(entity, LuaWrapper::checkArg<Vec2>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -1227,7 +1227,7 @@ namespace Lumix {
 			case /*isCollisionDown*/9137665887596174557: lua_pushcfunction(L, Controller_isCollisionDown, "Controller_isCollisionDown"); break;
 			case /*resize*/14316244282687965501: lua_pushcfunction(L, Controller_resize, "Controller_resize"); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -1245,7 +1245,7 @@ namespace Lumix {
 			case /*custom_gravity_acceleration*/12693697298512190214: module->setControllerCustomGravityAcceleration(entity, LuaWrapper::checkArg<float>(L, 3)); break;
 			case /*use_root_motion*/7336167410229006784: module->setControllerUseRootMotion(entity, LuaWrapper::checkArg<bool>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -1326,7 +1326,7 @@ namespace Lumix {
 							case /*half_extents*/854520953009164070: LuaWrapper::push(L, module->getBoxHalfExtents(entity, index)); break;
 							case /*position_offset*/15220513277102850184: LuaWrapper::push(L, module->getBoxOffsetPosition(entity, index)); break;
 							case /*rotation_offset*/6621896392170407801: LuaWrapper::push(L, module->getBoxOffsetRotation(entity, index)); break;
-							default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+							default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 						}
 						return 1;
 					};
@@ -1344,7 +1344,7 @@ namespace Lumix {
 							case /*rotation_offset*/6621896392170407801: module->setBoxOffsetRotation(entity, index, LuaWrapper::checkArg<Vec3>(L, 3)); break;
 							
 							case 0:	
-							default: { ASSERT(false); luaL_error(L, "Unknown property %ss", prop_name); break; }
+							default: { luaL_error(L, "Unknown property %ss", prop_name); break; }
 						}
 						return 0;
 					};
@@ -1421,7 +1421,7 @@ namespace Lumix {
 						switch (name_hash) {
 							case /*radius*/3015162214864260720: LuaWrapper::push(L, module->getSphereRadius(entity, index)); break;
 							case /*position_offset*/15220513277102850184: LuaWrapper::push(L, module->getSphereOffsetPosition(entity, index)); break;
-							default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+							default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 						}
 						return 1;
 					};
@@ -1438,7 +1438,7 @@ namespace Lumix {
 							case /*position_offset*/15220513277102850184: module->setSphereOffsetPosition(entity, index, LuaWrapper::checkArg<Vec3>(L, 3)); break;
 							
 							case 0:	
-							default: { ASSERT(false); luaL_error(L, "Unknown property %ss", prop_name); break; }
+							default: { luaL_error(L, "Unknown property %ss", prop_name); break; }
 						}
 						return 0;
 					};
@@ -1491,7 +1491,7 @@ namespace Lumix {
 			case /*applyForce*/11411330100860280528: lua_pushcfunction(L, Actor_applyForce, "Actor_applyForce"); break;
 			case /*applyImpulse*/15938965961108614155: lua_pushcfunction(L, Actor_applyImpulse, "Actor_applyImpulse"); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -1509,7 +1509,7 @@ namespace Lumix {
 			case /*material*/13073839037530523491: module->setActorMaterial(entity, LuaWrapper::checkArg<Path>(L, 3)); break;
 			case /*ccd*/13088881172075296505: module->setActorCCD(entity, LuaWrapper::checkArg<bool>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -1531,7 +1531,7 @@ namespace Lumix {
 			case /*slot*/686993539073000551: LuaWrapper::push(L, (i32)module->getWheelSlot(entity)); break;
 			case /*rpm*/17640912311330498303: LuaWrapper::push(L, module->getWheelRPM(entity)); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -1552,7 +1552,7 @@ namespace Lumix {
 			case /*moi*/3012507977500415911: module->setWheelMOI(entity, LuaWrapper::checkArg<float>(L, 3)); break;
 			case /*slot*/686993539073000551: module->setWheelSlot(entity, (PhysicsModule::WheelSlot)LuaWrapper::checkArg<i32>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -1575,7 +1575,7 @@ namespace Lumix {
 			case /*wheels_layer*/13903571279515726310: LuaWrapper::push(L, module->getVehicleWheelsLayer(entity)); break;
 			case /*chassis_layer*/15986641726988781619: LuaWrapper::push(L, module->getVehicleChassisLayer(entity)); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -1595,7 +1595,7 @@ namespace Lumix {
 			case /*wheels_layer*/13903571279515726310: module->setVehicleWheelsLayer(entity, LuaWrapper::checkArg<u32>(L, 3)); break;
 			case /*chassis_layer*/15986641726988781619: module->setVehicleChassisLayer(entity, LuaWrapper::checkArg<u32>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -1609,7 +1609,7 @@ namespace Lumix {
 			case /*half_extents*/854520953009164070: LuaWrapper::push(L, module->getInstancedCubeHalfExtents(entity)); break;
 			case /*layer*/12438280802495919435: LuaWrapper::push(L, module->getInstancedCubeLayer(entity)); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -1623,7 +1623,7 @@ namespace Lumix {
 			case /*half_extents*/854520953009164070: module->setInstancedCubeHalfExtents(entity, LuaWrapper::checkArg<Vec3>(L, 3)); break;
 			case /*layer*/12438280802495919435: module->setInstancedCubeLayer(entity, LuaWrapper::checkArg<u32>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -1637,7 +1637,7 @@ namespace Lumix {
 			case /*layer*/12438280802495919435: LuaWrapper::push(L, module->getInstancedMeshLayer(entity)); break;
 			case /*mesh*/6218765765714358715: LuaWrapper::push(L, module->getInstancedMeshGeomPath(entity)); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -1651,7 +1651,7 @@ namespace Lumix {
 			case /*layer*/12438280802495919435: module->setInstancedMeshLayer(entity, LuaWrapper::checkArg<u32>(L, 3)); break;
 			case /*mesh*/6218765765714358715: module->setInstancedMeshGeomPath(entity, LuaWrapper::checkArg<Path>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -1845,7 +1845,7 @@ namespace Lumix {
 			case /*bloom_exposure*/13164642978374509665: LuaWrapper::push(L, module->getCamera(entity).bloom_exposure); break;
 			case /*getRay*/17827108223211535328: lua_pushcfunction(L, Camera_getRay, "Camera_getRay"); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -1873,7 +1873,7 @@ namespace Lumix {
 			case /*bloom_avg_bloom_multiplier*/11648327012290020021: module->getCamera(entity).bloom_avg_bloom_multiplier = LuaWrapper::checkArg<float>(L, 3); break;
 			case /*bloom_exposure*/13164642978374509665: module->getCamera(entity).bloom_exposure = LuaWrapper::checkArg<float>(L, 3); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -1888,7 +1888,7 @@ namespace Lumix {
 			case /*material*/13073839037530523491: LuaWrapper::push(L, module->getDecalMaterialPath(entity)); break;
 			case /*half_extents*/854520953009164070: LuaWrapper::push(L, module->getDecalHalfExtents(entity)); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -1903,7 +1903,7 @@ namespace Lumix {
 			case /*material*/13073839037530523491: module->setDecalMaterialPath(entity, LuaWrapper::checkArg<Path>(L, 3)); break;
 			case /*half_extents*/854520953009164070: module->setDecalHalfExtents(entity, LuaWrapper::checkArg<Vec3>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -1939,7 +1939,7 @@ namespace Lumix {
 			case /*sky_texture*/17256734141889372778: LuaWrapper::push(L, module->getEnvironmentSkyTexture(entity)); break;
 			case /*shadowmap_cascades*/5777342048330698579: LuaWrapper::push(L, module->getEnvironmentShadowmapCascades(entity)); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -1975,7 +1975,7 @@ namespace Lumix {
 			case /*sky_texture*/17256734141889372778: module->setEnvironmentSkyTexture(entity, LuaWrapper::checkArg<Path>(L, 3)); break;
 			case /*shadowmap_cascades*/5777342048330698579: module->setEnvironmentShadowmapCascades(entity, LuaWrapper::checkArg<Vec4>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -1994,7 +1994,7 @@ namespace Lumix {
 			case /*cast_shadows*/10697859520051395372: LuaWrapper::push(L, module->getPointLightCastShadows(entity)); break;
 			case /*dynamic*/9000946549947402400: LuaWrapper::push(L, module->getPointLightDynamic(entity)); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -2013,7 +2013,7 @@ namespace Lumix {
 			case /*cast_shadows*/10697859520051395372: module->setPointLightCastShadows(entity, LuaWrapper::checkArg<bool>(L, 3)); break;
 			case /*dynamic*/9000946549947402400: module->setPointLightDynamic(entity, LuaWrapper::checkArg<bool>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -2028,7 +2028,7 @@ namespace Lumix {
 			case /*half_extents*/854520953009164070: LuaWrapper::push(L, module->getReflectionProbe(entity).half_extents); break;
 			case /*enabled*/13840943435668507618: LuaWrapper::push(L, module->isReflectionProbeEnabled(entity)); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -2043,7 +2043,7 @@ namespace Lumix {
 			case /*half_extents*/854520953009164070: module->getReflectionProbe(entity).half_extents = LuaWrapper::checkArg<Vec3>(L, 3); break;
 			case /*enabled*/13840943435668507618: module->enableReflectionProbe(entity, LuaWrapper::checkArg<bool>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -2058,7 +2058,7 @@ namespace Lumix {
 			case /*outer_range*/7392264662239472827: LuaWrapper::push(L, module->getEnvironmentProbe(entity).outer_range); break;
 			case /*enabled*/13840943435668507618: LuaWrapper::push(L, module->isEnvironmentProbeEnabled(entity)); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -2073,7 +2073,7 @@ namespace Lumix {
 			case /*outer_range*/7392264662239472827: module->getEnvironmentProbe(entity).outer_range = LuaWrapper::checkArg<Vec3>(L, 3); break;
 			case /*enabled*/13840943435668507618: module->enableEnvironmentProbe(entity, LuaWrapper::checkArg<bool>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -2098,7 +2098,7 @@ namespace Lumix {
 			case /*relative_rotation*/17991945435353486994: LuaWrapper::push(L, module->getBoneAttachmentRotation(entity)); break;
 			case /*setRotation*/8660453606820818866: lua_pushcfunction(L, BoneAttachment_setRotation, "BoneAttachment_setRotation"); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -2114,7 +2114,7 @@ namespace Lumix {
 			case /*relative_position*/11618981167408611974: module->setBoneAttachmentPosition(entity, LuaWrapper::checkArg<Vec3>(L, 3)); break;
 			case /*relative_rotation*/17991945435353486994: module->setBoneAttachmentRotation(entity, LuaWrapper::checkArg<Vec3>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -2187,7 +2187,7 @@ namespace Lumix {
 			case /*emitRibbons*/12146662316880256423: lua_pushcfunction(L, ParticleEmitter_emitRibbons, "ParticleEmitter_emitRibbons"); break;
 			case /*killRibbon*/4358175860873073349: lua_pushcfunction(L, ParticleEmitter_killRibbon, "ParticleEmitter_killRibbon"); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -2201,7 +2201,7 @@ namespace Lumix {
 			case /*source*/17609862876178282011: module->setParticleEmitterPath(entity, LuaWrapper::checkArg<Path>(L, 3)); break;
 			case /*autodestroy*/13701391921693763709: module->setParticleEmitterAutodestroy(entity, LuaWrapper::checkArg<bool>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -2214,7 +2214,7 @@ namespace Lumix {
 		switch (name_hash) {
 			case /*model*/8229337662361542422: LuaWrapper::push(L, module->getInstancedModelPath(entity)); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -2227,7 +2227,7 @@ namespace Lumix {
 		switch (name_hash) {
 			case /*model*/8229337662361542422: module->setInstancedModelPath(entity, LuaWrapper::checkArg<Path>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -2260,7 +2260,7 @@ namespace Lumix {
 			case /*overrideMaterialVec4*/7886464768384394135: lua_pushcfunction(L, ModelInstance_overrideMaterialVec4, "ModelInstance_overrideMaterialVec4"); break;
 			case /*getModel*/6439928831641943397: lua_pushcfunction(L, ModelInstance_getModel, "ModelInstance_getModel"); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -2274,7 +2274,7 @@ namespace Lumix {
 			case /*enabled*/13840943435668507618: module->enableModelInstance(entity, LuaWrapper::checkArg<bool>(L, 3)); break;
 			case /*source*/17609862876178282011: module->setModelInstancePath(entity, LuaWrapper::checkArg<Path>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -2291,7 +2291,7 @@ namespace Lumix {
 			case /*bezier_p0*/1063905269850860960: LuaWrapper::push(L, module->getCurveDecalBezierP0(entity)); break;
 			case /*bezier_p2*/17410494145398136508: LuaWrapper::push(L, module->getCurveDecalBezierP2(entity)); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -2308,7 +2308,7 @@ namespace Lumix {
 			case /*bezier_p0*/1063905269850860960: module->setCurveDecalBezierP0(entity, LuaWrapper::checkArg<Vec2>(L, 3)); break;
 			case /*bezier_p2*/17410494145398136508: module->setCurveDecalBezierP2(entity, LuaWrapper::checkArg<Vec2>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -2376,7 +2376,7 @@ namespace Lumix {
 							case /*distance*/17615932892140262544: LuaWrapper::push(L, module->getGrassDistance(entity, index)); break;
 							case /*mesh*/6218765765714358715: LuaWrapper::push(L, module->getGrassPath(entity, index)); break;
 							case /*spacing*/2859594769824822931: LuaWrapper::push(L, module->getGrassSpacing(entity, index)); break;
-							default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+							default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 						}
 						return 1;
 					};
@@ -2395,7 +2395,7 @@ namespace Lumix {
 							case /*spacing*/2859594769824822931: module->setGrassSpacing(entity, index, LuaWrapper::checkArg<float>(L, 3)); break;
 							
 							case 0:	
-							default: { ASSERT(false); luaL_error(L, "Unknown property %ss", prop_name); break; }
+							default: { luaL_error(L, "Unknown property %ss", prop_name); break; }
 						}
 						return 0;
 					};
@@ -2444,7 +2444,7 @@ namespace Lumix {
 			case /*getHeightAt*/10334719470066961856: lua_pushcfunction(L, Terrain_getHeightAt, "Terrain_getHeightAt"); break;
 			case /*getNormalAt*/5262915926868391893: lua_pushcfunction(L, Terrain_getNormalAt, "Terrain_getNormalAt"); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -2461,7 +2461,7 @@ namespace Lumix {
 			case /*base_grid_resolution*/10993858714653204735: module->setTerrainBaseGridResolution(entity, LuaWrapper::checkArg<u32>(L, 3)); break;
 			case /*yscale*/9502059661590009697: module->setTerrainYScale(entity, LuaWrapper::checkArg<float>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
@@ -2474,7 +2474,7 @@ namespace Lumix {
 		switch (name_hash) {
 			case /*material*/13073839037530523491: LuaWrapper::push(L, module->getProceduralGeometryMaterial(entity)); break;
 			case 0:
-			default: { ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
 		return 1;
 	}
@@ -2487,7 +2487,7 @@ namespace Lumix {
 		switch (name_hash) {
 			case /*material*/13073839037530523491: module->setProceduralGeometryMaterial(entity, LuaWrapper::checkArg<Path>(L, 3)); break;
 			case 0:
-			default: ASSERT(false); luaL_error(L, "Unknown property %s", prop_name); break;
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
 		return 0;
 	}
