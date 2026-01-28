@@ -668,6 +668,11 @@ struct PipelineImpl final : Pipeline {
 		m_2D_decl.addAttribute(16, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
 
 		if (m_type == PipelineType::PREVIEW) m_clear_color = { 0.2f, 0.2f, 0.2f };
+
+		m_autoinstanced_define_idx = m_renderer.getShaderDefineIdx("AUTOINSTANCED");
+		m_dynamic_define_idx = m_renderer.getShaderDefineIdx("DYNAMIC");
+		m_skinned_define_idx = m_renderer.getShaderDefineIdx("SKINNED");
+		m_mesh_particle_define_idx = m_renderer.getShaderDefineIdx("MESH_PARTICLE");
 	}
 
 	~PipelineImpl()
@@ -2806,10 +2811,10 @@ struct PipelineImpl final : Pipeline {
 					prev_bucket = bucket;
 					stream = view.buckets[bucket].substreams[batch_idx];
 					define_mask = view.buckets[bucket].define_mask;
-					autoinstanced_define_mask = define_mask | (1 << m_renderer.getShaderDefineIdx("AUTOINSTANCED"));
-					dynamic_define_mask = define_mask | (1 << m_renderer.getShaderDefineIdx("DYNAMIC"));
-					skinned_define_mask = define_mask | (1 << m_renderer.getShaderDefineIdx("SKINNED"));
-					mesh_particle_define_mask = define_mask | (1 << m_renderer.getShaderDefineIdx("MESH_PARTICLE"));
+					autoinstanced_define_mask = define_mask | (1 << m_autoinstanced_define_idx);
+					dynamic_define_mask = define_mask | (1 << m_dynamic_define_idx);
+					skinned_define_mask = define_mask | (1 << m_skinned_define_idx);
+					mesh_particle_define_mask = define_mask | (1 << m_mesh_particle_define_idx);
 					
 					const bool sort_depth = view.buckets[bucket].sort == BucketDesc::DEPTH;
 					instance_key_mask = sort_depth ? 0xff00'0000'00ff'ffff : 0xffff'ffff'0000'0000;
@@ -4219,6 +4224,10 @@ struct PipelineImpl final : Pipeline {
 	HashMap<u32, void*> m_instance_data;
 	JobsGroup m_sort_keys_group;
 	jobs::Counter m_poses_done;
+	u8 m_autoinstanced_define_idx;
+	u8 m_dynamic_define_idx;
+	u8 m_skinned_define_idx;
+	u8 m_mesh_particle_define_idx;
 
 	struct {
 		struct Buffer {
