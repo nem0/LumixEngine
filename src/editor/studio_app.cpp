@@ -2787,7 +2787,7 @@ struct StudioAppImpl final : StudioApp {
 			catString(rec.path, info.filename);
 			infos.insert(rec.hash, rec);
 		}
-		exportDataScan("shaders/", infos);
+		exportDataScan("engine/shaders/", infos);
 		exportDataScan("maps/", infos);
 		
 		destroyFileIterator(iter);
@@ -2809,6 +2809,10 @@ struct StudioAppImpl final : StudioApp {
 	{
 		FileSystem& fs = m_engine->getFileSystem();
 		FileIterator* iter = fs.createFileIterator(dir_path);
+		if (!iter) {
+			logWarning(dir_path, " not found when trying to scan files to package the game.");
+			return;
+		}
 		os::FileInfo info;
 		while (getNextFile(iter, &info)) {
 			char normalized_path[MAX_PATH];
@@ -2870,8 +2874,8 @@ struct StudioAppImpl final : StudioApp {
 				}
 			}
 		}
-		exportDataScan("shaders/", infos);
-		exportDataScan("universes/", infos);
+		exportDataScan("engine/shaders/", infos);
+		exportDataScan("maps/", infos);
 	}
 
 	void guiExportData() {
