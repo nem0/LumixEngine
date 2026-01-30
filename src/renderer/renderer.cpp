@@ -442,6 +442,7 @@ struct RendererImpl final : Renderer {
 		RenderModule::reflect();
 
 		m_shader_defines.reserve(32);
+		m_num_shader_defines = 0;
 
 		bool try_load_renderdoc = CommandLineParser::isOn("-renderdoc");
 		gpu::preinit(m_allocator, try_load_renderdoc);
@@ -1051,15 +1052,17 @@ struct RendererImpl final : Renderer {
 	}
 
 
-	u8 getShaderDefineIdx(const char* define) override
-	{
+	u8 getShaderDefineIdx(const char* define) override {
+		// Fast path: check existing entries without locking
+		i32 count = (i32)m_num_shader_defines;
+		for (i32 i = 0; i < count; ++i) {
+			if (m_shader_defines[i] == define) return u8(i);
+		}
+
+		// Not found, take lock and insert if still missing
 		jobs::MutexGuard lock(m_shader_defines_mutex);
-		for (int i = 0; i < m_shader_defines.size(); ++i)
-		{
-			if (m_shader_defines[i] == define)
-			{
-				return i;
-			}
+		for (i32 i = 0; i < (i32)m_shader_defines.size(); ++i) {
+			if (m_shader_defines[i] == define) return u8(i);
 		}
 
 		if (m_shader_defines.size() >= MAX_SHADER_DEFINES) {
@@ -1068,7 +1071,8 @@ struct RendererImpl final : Renderer {
 		}
 
 		m_shader_defines.emplace(define);
-		ASSERT(m_shader_defines.size() <= 32); // m_shader_defines are reserved in renderer constructor, so getShaderDefine() is MT safe
+		ASSERT(m_shader_defines.size() <= 32); // reserved in constructor
+		m_num_shader_defines = (i32)m_shader_defines.size();
 		return u8(m_shader_defines.size() - 1);
 	}
 
@@ -1317,6 +1321,7 @@ struct RendererImpl final : Renderer {
 	Engine& m_engine;
 	TagAllocator m_allocator;
 	Array<StaticString<32>> m_shader_defines;
+	AtomicI32 m_num_shader_defines = 0; // used for fast path without locking
 	jobs::Mutex m_render_mutex;
 	jobs::Mutex m_shader_defines_mutex;
 	Array<StaticString<32>> m_layers;
