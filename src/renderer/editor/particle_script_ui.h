@@ -98,6 +98,11 @@ struct ParticleScriptPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugi
 		m_app.getSettings().registerOption("particle_script_preview", &m_show_preview, "Particle script", "Show preview");
 	}
 
+	~ParticleScriptPlugin() {
+		m_app.getAssetCompiler().removePlugin(*this);
+		m_app.getAssetBrowser().removePlugin(*this);
+	}
+
 	bool compile(const Path& src) override {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		OutputMemoryStream src_data(m_app.getAllocator());
