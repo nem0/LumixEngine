@@ -63,7 +63,7 @@ int InputTextMultiline(lua_State* L) {
 	auto* name = LuaWrapper::checkArg<const char*>(L, 1);
 	auto* value = LuaWrapper::checkArg<const char*>(L, 2);
 	copyString(buf, value);
-	bool changed = ImGui::InputTextMultiline(name, buf, sizeof(buf), ImVec2(-1, -1));
+	bool changed = ImGui::InputTextMultiline(name, buf, sizeof(buf), ImVec2(-1, 1));
 	lua_pushboolean(L, changed);
 	if (changed) {
 		lua_pushstring(L, buf);
@@ -72,6 +72,19 @@ int InputTextMultiline(lua_State* L) {
 	return 1;
 }
 
+int InputText(lua_State* L) {
+	char buf[8 * 4096];
+	auto* name = LuaWrapper::checkArg<const char*>(L, 1);
+	auto* value = LuaWrapper::checkArg<const char*>(L, 2);
+	copyString(buf, value);
+	bool changed = ImGui::InputText(name, buf, sizeof(buf));
+	lua_pushboolean(L, changed);
+	if (changed) {
+		lua_pushstring(L, buf);
+		return 2;
+	}
+	return 1;
+}
 
 int DragFloat(lua_State* L)
 {
@@ -987,6 +1000,7 @@ void registerEngineAPI(lua_State* L, Engine* engine) {
 	LuaImGui::registerCFunction(L, "GetOsImePosRequest", &LuaImGui::GetOsImePosRequest);
 	LuaImGui::registerCFunction(L, "InputTextMultilineWithCallback", &LuaImGui::InputTextMultilineWithCallback);
 	LuaImGui::registerCFunction(L, "InputTextMultiline", &LuaImGui::InputTextMultiline);
+	LuaImGui::registerCFunction(L, "InputText", &LuaImGui::InputText);
 	LuaImGui::registerCFunction(L, "IsItemHovered", &LuaWrapper::wrap<&LuaImGui::IsItemHovered>);
 	LuaImGui::registerCFunction(L, "IsKeyPressed", &LuaWrapper::wrap<&LuaImGui::IsKeyPressed>);
 	LuaImGui::registerCFunction(L, "IsMouseClicked", &LuaWrapper::wrap<&LuaImGui::IsMouseClicked>);

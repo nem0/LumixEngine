@@ -2246,7 +2246,7 @@ namespace Lumix {
 	int ModelInstance_getModel(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
-		LuaWrapper::push(L, 	module->getModelInstanceModel(entity));
+		LuaWrapper::pushObject(L, 	module->getModelInstanceModel(entity), "Model");
 		return 1;
 	}
 	

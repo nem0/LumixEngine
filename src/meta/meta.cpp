@@ -1425,23 +1425,42 @@ void wrap(OutputStream& out, Module& m, Component& c, Function& f) {
 	forEachArg(args, [&](const Arg& arg, bool is_first) {
 		++arg_idx;
 		if (is_first) return; // skip entity, we alredy have it
-		if (arg.is_const && equal(arg.type, "char*"))
+		Struct* st_arg = findStruct(arg.type);
+		Object* obj_arg = findObject(arg.type);
+		if (st_arg) {
+			L("\t",arg.type," ",arg.name,";" OUT_ENDL);
+			for (StructVar& v : st_arg->vars) {
+				L("\tif(!LuaWrapper::checkField(L, ",(arg_idx + 1),", \"",v.name,"\", &",arg.name,".",v.name,")) luaL_error(L, \"Invalid argument\");");
+			}
+		}
+		else if (obj_arg) {
+			L("\tif(!LuaWrapper::checkField(L, ",(arg_idx + 1),", \"_object\", &",arg.name,")) luaL_error(L, \"Invalid argument\");");
+		}
+		else if (arg.is_const && equal(arg.type, "char*")) {
 			L("\tauto ",arg.name," = LuaWrapper::checkArg<const char*>(L, ",(arg_idx + 1),");");
-		else
+		}
+		else {
 			L("\tauto ",arg.name," = LuaWrapper::checkArg<",arg.type,">(L, ",(arg_idx + 1),");");
+		}
 	});
 
 	Struct* st = findStruct(f.return_type);
+	Object* obj = findObject(withoutSuffix(f.return_type, 1)/*remove pointer '*`*/);
 	if (st) out.add("\tauto s = ");
-	bool has_return = !equal(f.return_type, "void") && st == nullptr;
-	if (has_return) out.add("\tLuaWrapper::push(L, ");
+	bool has_return = !equal(f.return_type, "void") && st == nullptr && obj == nullptr;
+	if (obj) out.add("\tLuaWrapper::pushObject(L, ");
+	else if (has_return) out.add("\tLuaWrapper::push(L, ");
 	out.add("\tmodule->",f.name,"(entity");
 	forEachArg(args, [&](const Arg& arg, bool is_first){
 		if (is_first) return;
 		out.add(", ", arg.name);
 	});
 	out.add(")");
-	if (st) {
+	if (obj) {
+		L(", \"",withoutSuffix(f.return_type, 1),"\");");
+		L("\treturn 1;");
+	}
+	else if (st) {
 		L(";");
 		L("\tlua_newtable(L);");
 		for (StructVar& v : st->vars) {
@@ -1977,6 +1996,7 @@ void serializeLuaTypes(OutputStream& out_formatted) {
 		Indent : (number) -> (),
 		InputTextMultiline : (string, string) -> (boolean, string?),
 		InputTextMultilineWithCallback : (string, string, (string, number, boolean) -> ()) -> (boolean, string?),
+		InputText : (string, string) -> (boolean, string?),
 		IsItemHovered : () -> boolean,
 		IsKeyPressed : (number, boolean) -> boolean,
 		IsMouseClicked : (number) -> boolean,

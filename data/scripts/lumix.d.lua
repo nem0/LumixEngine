@@ -36,6 +36,7 @@ declare ImGui: {
 	Indent : (number) -> (),
 	InputTextMultiline : (string, string) -> (boolean, string?),
 	InputTextMultilineWithCallback : (string, string, (string, number, boolean) -> ()) -> (boolean, string?),
+	InputText : (string, string) -> (boolean, string?),
 	IsItemHovered : () -> boolean,
 	IsKeyPressed : (number, boolean) -> boolean,
 	IsMouseClicked : (number) -> boolean,
