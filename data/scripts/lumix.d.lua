@@ -95,6 +95,7 @@ export type World = {
 	getModule : (World, string) -> any,
 	createEntity : (World) -> Entity,
 	createEntityEx : (World, any) -> Entity,
+	destroyEntity : (Entity) -> (),
 	findEntityByName : (World, Entity, string) -> Entity,
 	animation: animation_module,
 	audio: audio_module,

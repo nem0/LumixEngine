@@ -84,6 +84,7 @@ declare class World
 	getModule : (string) -> any,
 	createEntity : () -> Entity,
 	createEntityEx : (any) -> Entity,
+	destroyEntity : (Entity) -> (),
 	findEntityByName : (string) -> Entity?
 
 	... all modules

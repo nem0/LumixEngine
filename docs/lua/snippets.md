@@ -51,6 +51,19 @@ for i = 1, 7 do
 end
 ```
 
+### Destroy entities in editor and ingame
+```lua
+-- In editor (undoable)
+local entity = Editor.createEntity()
+-- ... do something with entity
+Editor.destroyEntity(entity)
+
+-- Ingame (not undoable)
+local entity = this.world:createEntity()
+-- ... do something with entity
+entity:destroy()
+```
+
 ### raycastEx
 ```lua
 local hit, entity, hitpos, hitnormal = this.world.physics:raycastEx(this.position, {1, -1, 0})

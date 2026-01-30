@@ -2055,6 +2055,7 @@ void serializeLuaTypes(OutputStream& out_formatted) {
 		getModule : (World, string) -> any,
 		createEntity : (World) -> Entity,
 		createEntityEx : (World, any) -> Entity,
+		destroyEntity : (Entity) -> (),
 		findEntityByName : (World, Entity, string) -> Entity,
 	)#");
 

@@ -1827,6 +1827,7 @@ struct SetPropertyVisitor : reflection::IPropertyVisitor {
 	i32 getSelectedEntitiesCount() { return m_app.getWorldEditor().getSelectedEntities().size(); }
 	EntityRef getSelectedEntity(u32 idx) { return m_app.getWorldEditor().getSelectedEntities()[idx]; }
 	EntityRef createEntity() { return m_app.getWorldEditor().addEntity(); }
+	void destroyEntity(EntityRef entity) { m_app.getWorldEditor().destroyEntities(&entity, 1); }
 	void createComponent(EntityRef e, const char* type) {
 		const ComponentType cmp_type = reflection::getComponentType(type);
 		m_app.getWorldEditor().addComponent(Span(&e, 1), cmp_type);
@@ -1870,6 +1871,7 @@ struct SetPropertyVisitor : reflection::IPropertyVisitor {
 			LuaWrapper::createSystemClosure(L, "Editor", this, #F, f);  \
 		} while (false)
 		REGISTER_FUNCTION(createEntity);
+		REGISTER_FUNCTION(destroyEntity);
 		REGISTER_FUNCTION(createComponent);
 		REGISTER_FUNCTION(getSelectedEntitiesCount);
 		REGISTER_FUNCTION(getSelectedEntity);
