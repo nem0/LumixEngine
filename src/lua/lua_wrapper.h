@@ -683,6 +683,15 @@ template <typename T> T checkArg(lua_State* L, int index)
 	return checkArg(L, index, Tag<T>{});
 }
 
+template <> inline EntityRef checkArg<EntityRef>(lua_State* L, int index)
+{
+	EntityRef e = checkArg(L, index, Tag<EntityRef>{});
+	if (!((EntityPtr)e).isValid()) {
+		luaL_argerror(L, index, "invalid entity");
+	}
+	return e;
+}
+
 template <typename T>
 bool getOptionalField(lua_State* L, int idx, const char* field_name, T* out)
 {
