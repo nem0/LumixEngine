@@ -123,3 +123,32 @@ local entity = Editor.createEntityEx { -- use only in editor, not accessible ing
 entity.rigid_actor.spheres:add()
 entity.rigid_actor.spheres[1].radius = 1
 ```
+
+### GUI button click handler
+```lua
+	 for i = 1, #tower_types do
+        local idx = i
+        local button = this.world:createEntityEx({
+            gui_button = {},
+            gui_rect = {
+                left_points = 800,
+                top_points = 10 + (idx-1)*70,
+                right_points = 950,
+                bottom_points = 10 + (idx-1)*70 + 60,
+                bottom_relative = 0,
+                right_relative = 0,
+            },
+            gui_text = {
+                text = "Tower " .. idx,
+                font_size = 30,
+                font = "/engine/editor/fonts/notosans-bold.ttf"
+            },
+            lua_script = {}
+        })
+        button.parent = canvas
+        button.lua_script.scripts:add()
+        button.lua_script[1].onButtonClicked = function()
+            LumixAPI.logError("clicked " .. tostring(idx))
+        end
+    end
+```
