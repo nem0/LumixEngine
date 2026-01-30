@@ -118,12 +118,30 @@ OS-level mutexes are visualized as red lines beneath a block. Only mutexes recor
 
 ## GPU
 
+The GPU tab displays performance statistics for GPU operations. It shows a table of GPU scopes with their minimum, maximum, and average execution times in milliseconds. GPU scopes are defined using `profiler::beginGPUScope` and `profiler::endGPUScope`, similar to CPU blocks but for GPU commands.
+
+The tab also displays the current GPU clock speed in MHz if available. You can filter the scopes by name using the filter input.
+
+GPU blocks are also visualized in the Flamegraph tab, allowing you to see the timing and hierarchy of GPU operations alongside CPU activities.
 
 ## Memory
 
-TODO
+The Memory tab provides a snapshot of the current memory allocations in the engine. It organizes allocations by allocator tags, displaying the total memory used by each tag in megabytes. For each tag, you can expand to see individual allocations, including the function name and line number from the callstack, the size of the allocation in kilobytes, and the count of allocations with the same callstack.
+
+To capture the current allocations, click the "Capture" button. You can filter the allocations using the filter input. The "Check memory" button can be used to verify memory integrity by checking for guard corruption.
+
+This tool helps identify memory leaks and understand memory usage patterns by examining where allocations originate.
 
 ## Resources
 
-TODO
+The Resources tab displays information about all resources currently managed by the engine, organized by resource type (e.g., textures, models, scripts). For each resource type, it shows a table with the following columns:
+
+- **Path**: The resource's path, with a button to navigate to it in the asset browser.
+- **Compiled file size**: The size of the compiled resource file in kilobytes.
+- **State**: The current state of the resource (e.g., unloaded, loading, loaded, failure).
+- **References**: The number of references to the resource.
+
+You can filter resources by name using the filter input and by minimum size using the "Filter size (KB)" slider. At the bottom of each resource type's table, a summary row shows the total compiled file size for all resources of that type.
+
+This tab helps monitor resource loading, identify large resources, and check reference counts to detect potential leaks.
 
