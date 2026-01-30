@@ -613,12 +613,14 @@ void SceneView::makeScreenshot(StringView path) {
 
 	struct Callback {
 		StaticString<MAX_PATH> path;
+		StudioApp* app;
 		IVec2 size;
 		IAllocator* allocator;
 
 		void callback(Span<const u8> data) {
+			FileSystem& fs = app->getEngine().getFileSystem();
 			os::OutputFile file;
-			if (!file.open(path)) {
+			if (!fs.open(path, file)) {
 				logError("Could not save ", path);
 				LUMIX_DELETE(*allocator, this);
 				return;
@@ -638,6 +640,7 @@ void SceneView::makeScreenshot(StringView path) {
 	cb->allocator = &m_app.getAllocator();
 	cb->path = path;
 	cb->size = size;
+	cb->app = &m_app;
 
 	auto delegate = makeDelegate<&Callback::callback>(cb);
 	m_pipeline->getRenderer().getDrawStream().readTexture(texture, delegate);
