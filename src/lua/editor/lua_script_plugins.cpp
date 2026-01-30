@@ -246,6 +246,7 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 		const char* name = LuaWrapper::toType<const char*>(L, -1);
 
 		StudioLuaPlugin* plugin = LUMIX_NEW(app.getAllocator(), StudioLuaPlugin)(app, name);
+		plugin->m_path = path;
 		lua_pop(L, 1);
 
 
@@ -354,7 +355,8 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 				return;
 			} 
 			const char* setting_name = lua_tostring(L, -2);
-			switch (lua_type(L, -1)) {
+			i32 type = lua_type(L, -1);
+			switch (type) {
 				case LUA_TBOOLEAN: {
 					bool val = lua_toboolean(L, -1) != 0;
 					val = m_app.getSettings().getBool(setting_name, val);
@@ -377,7 +379,7 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 					break;
 				}
 				default:
-					logError(m_path, ": ", setting_name, " has unsupported type");
+					logError(m_path, ": setting ", setting_name, " has unsupported type");
 					break;
 			}
 			lua_pop(L, 1);
@@ -427,7 +429,7 @@ struct StudioLuaPlugin : StudioApp::GUIPlugin {
 					break;
 				}
 				default:
-					logError(m_path, ": ", setting_name, " has unsupported type");
+					logError(m_path, ": setting ", setting_name, " has unsupported type");
 					break;
 			}
 			lua_pop(L, 1);
