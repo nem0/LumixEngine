@@ -472,7 +472,7 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 				}
 				
 				const char* name = lua_tostring(L, -2);
-				if(name[0] == '_' || equalStrings(name, "enabled")) {
+				if(!name || name[0] == '_' || equalStrings(name, "enabled")) {
 					lua_pop(L, 1); // [env, key]
 					continue;
 				}
