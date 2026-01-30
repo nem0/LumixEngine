@@ -601,10 +601,7 @@ Quat SceneView::getViewportRotation() {
 	return m_view->getViewport().rot;
 }
 
-void SceneView::makeScreenshot() {
-	char path[MAX_PATH];
-	if (!os::getSaveFilename(Span(path), "TGA Image\0*.tga\0", "tga")) return;
-
+void SceneView::makeScreenshot(StringView path) {
 	const gpu::TextureHandle texture = m_pipeline->getOutput();
 	if (!texture) {
 		logError("Failed to get the pipeline output when trying to make a screenshot.");

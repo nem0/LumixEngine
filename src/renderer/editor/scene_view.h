@@ -45,7 +45,7 @@ struct SceneView : StudioApp::GUIPlugin
 	//@ function
 	void setViewportRotation(const Quat& rot);
 	//@ function
-	void makeScreenshot();
+	void makeScreenshot(StringView path);
 	void setGameView(struct GameView& game_view) { m_game_view = &game_view; }
 
 private:

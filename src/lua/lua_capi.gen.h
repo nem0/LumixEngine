@@ -2769,7 +2769,8 @@ namespace Lumix {
 					LuaWrapper::checkTableArg(L, 1); // self
 					SceneView* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
-					obj->makeScreenshot();
+					auto path = LuaWrapper::checkArg<StringView>(L, 2);
+					obj->makeScreenshot(path);
 					return 0;
 				};
 				const char* name = "makeScreenshot";

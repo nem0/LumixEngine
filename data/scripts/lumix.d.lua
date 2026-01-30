@@ -157,7 +157,7 @@ type SceneView = {
 	setViewportPosition: (SceneView, DVec3) -> (),
 	getViewportRotation: (SceneView) -> Quat,
 	setViewportRotation: (SceneView, Quat) -> (),
-	makeScreenshot: (SceneView) -> (),
+	makeScreenshot: (SceneView, any) -> (),
 }
 
 type Renderer = {

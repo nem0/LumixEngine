@@ -176,6 +176,10 @@ template <> inline bool isType<const char*>(lua_State* L, int index)
 {
 	return lua_isstring(L, index) != 0;
 }
+template <> inline bool isType<StringView>(lua_State* L, int index)
+{
+	return lua_isstring(L, index) != 0;
+}
 template <> inline bool isType<void*>(lua_State* L, int index)
 {
 	return lua_islightuserdata(L, index) != 0;
@@ -337,6 +341,10 @@ template <> inline bool toType(lua_State* L, int index) { return lua_toboolean(L
 template <> inline float toType(lua_State* L, int index) { return (float)lua_tonumber(L, index); }
 template <> inline void* toType(lua_State* L, int index) { return lua_touserdata(L, index); }
 template <> inline const char* toType(lua_State* L, int index) {
+	const char* res = lua_tostring(L, index);
+	return res ? res : "";
+}
+template <> inline StringView toType(lua_State* L, int index) {
 	const char* res = lua_tostring(L, index);
 	return res ? res : "";
 }
