@@ -5,6 +5,7 @@
 #include "gui/gui_system.h"
 #include "renderer/editor/game_view.h"
 #include "renderer/editor/scene_view.h"
+#include "renderer/model.h"
 #include "renderer/renderer.h"
 #include "animation/animation_module.h"
 #include "audio/audio_module.h"
@@ -2774,6 +2775,41 @@ namespace Lumix {
 					return 0;
 				};
 				const char* name = "makeScreenshot";
+				lua_pushcfunction(L, proxy, name);
+				lua_setfield(L, -2, name);
+			}
+			lua_pop(L, 2);
+		}
+		{
+			lua_getglobal(L, "LumixAPI");
+			lua_newtable(L);
+			lua_pushvalue(L, -1);
+			lua_setfield(L, -3, "Model");
+			lua_pushvalue(L, -1);
+			lua_setfield(L, -2, "__index");
+			{
+				auto proxy = [](lua_State* L) -> int {
+					LuaWrapper::checkTableArg(L, 1); // self
+					Model* obj;
+					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					auto res = obj->getOriginBoundingRadius();
+					LuaWrapper::push(L, res);
+					return 1;
+				};
+				const char* name = "getOriginBoundingRadius";
+				lua_pushcfunction(L, proxy, name);
+				lua_setfield(L, -2, name);
+			}
+			{
+				auto proxy = [](lua_State* L) -> int {
+					LuaWrapper::checkTableArg(L, 1); // self
+					Model* obj;
+					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					auto res = obj->getCenterBoundingRadius();
+					LuaWrapper::push(L, res);
+					return 1;
+				};
+				const char* name = "getCenterBoundingRadius";
 				lua_pushcfunction(L, proxy, name);
 				lua_setfield(L, -2, name);
 			}

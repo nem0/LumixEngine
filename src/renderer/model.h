@@ -132,6 +132,7 @@ struct LODMeshIndices
 	int to;
 };
 
+//@ object
 struct LUMIX_RENDERER_API Model final : Resource {
 	using BoneMap = HashMap<BoneNameHash, int>;
 
@@ -190,7 +191,9 @@ struct LUMIX_RENDERER_API Model final : Resource {
 	BoneMap::ConstIterator getBoneIndex(BoneNameHash hash) const { return m_bone_map.find(hash); }
 	void getPose(Pose& pose);
 	void getRelativePose(Pose& pose);
+	//@ function
 	float getOriginBoundingRadius() const { return m_origin_bounding_radius; }
+	//@ function
 	float getCenterBoundingRadius() const { return m_center_bounding_radius; }
 	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Pose* pose, EntityPtr entity, const RayCastModelHit::Filter* filter);
 	const AABB& getAABB() const { return m_aabb; }

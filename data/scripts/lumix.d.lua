@@ -160,6 +160,11 @@ type SceneView = {
 	makeScreenshot: (SceneView, any) -> (),
 }
 
+type Model = {
+	getOriginBoundingRadius: (Model) -> number,
+	getCenterBoundingRadius: (Model) -> number,
+}
+
 type Renderer = {
 	getLODMultiplier: (Renderer) -> number,
 	setLODMultiplier: (Renderer, number) -> (),
@@ -559,7 +564,7 @@ type model_instance_component =  {
 	enabled: boolean,
 	path: string,
 	overrideMaterialVec4: (model_instance_component, number, any, any) -> boolean,
-	getModel: (model_instance_component) -> any,
+	getModel: (model_instance_component) -> Model,
 }
 
 type curve_decal_component =  {
