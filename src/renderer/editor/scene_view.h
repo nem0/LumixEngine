@@ -44,6 +44,8 @@ struct SceneView : StudioApp::GUIPlugin
 	Quat getViewportRotation();
 	//@ function
 	void setViewportRotation(const Quat& rot);
+	//@ function
+	void makeScreenshot();
 	void setGameView(struct GameView& game_view) { m_game_view = &game_view; }
 
 private:

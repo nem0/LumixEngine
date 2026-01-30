@@ -1,5 +1,6 @@
 #include <imgui/imgui.h>
 
+#include "core/delegate.h"
 #include "core/delegate_list.h"
 #include "core/geometry.h"
 #include "core/path.h"
@@ -32,6 +33,8 @@
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/particle_system.h"
+#include "renderer/texture.h"
+#include "core/os.h"
 #include "renderer/pipeline.h"
 #include "renderer/pose.h"
 #include "renderer/render_module.h"
@@ -596,6 +599,51 @@ void SceneView::setViewportPosition(const DVec3& pos) {
 
 Quat SceneView::getViewportRotation() {
 	return m_view->getViewport().rot;
+}
+
+void SceneView::makeScreenshot() {
+	char path[MAX_PATH];
+	if (!os::getSaveFilename(Span(path), "TGA Image\0*.tga\0", "tga")) return;
+
+	const gpu::TextureHandle texture = m_pipeline->getOutput();
+	if (!texture) {
+		logError("Failed to get the pipeline output when trying to make a screenshot.");
+		return;
+	}
+
+	const IVec2 size = m_pipeline->getDisplaySize();
+	if (size.x <= 0 || size.y <= 0) return;
+
+	struct Callback {
+		StaticString<MAX_PATH> path;
+		IVec2 size;
+		IAllocator* allocator;
+
+		void callback(Span<const u8> data) {
+			os::OutputFile file;
+			if (!file.open(path)) {
+				logError("Could not save ", path);
+				LUMIX_DELETE(*allocator, this);
+				return;
+			}
+
+			bool res = Texture::saveTGA(&file, size.x, size.y, gpu::TextureFormat::RGBA8, data.begin(), true, Path(path), *allocator);
+			file.close();
+
+			if (!res) {
+				logError("Could not save ", path);
+			}
+			LUMIX_DELETE(*allocator, this);
+		}
+	};
+
+	Callback* cb = LUMIX_NEW(m_app.getAllocator(), Callback);
+	cb->allocator = &m_app.getAllocator();
+	cb->path = path;
+	cb->size = size;
+
+	auto delegate = makeDelegate<&Callback::callback>(cb);
+	m_pipeline->getRenderer().getDrawStream().readTexture(texture, delegate);
 }
 
 void SceneView::setViewportRotation(const Quat& rot) {

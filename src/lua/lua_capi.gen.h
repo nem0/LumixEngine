@@ -2764,6 +2764,18 @@ namespace Lumix {
 				lua_pushcfunction(L, proxy, name);
 				lua_setfield(L, -2, name);
 			}
+			{
+				auto proxy = [](lua_State* L) -> int {
+					LuaWrapper::checkTableArg(L, 1); // self
+					SceneView* obj;
+					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					obj->makeScreenshot();
+					return 0;
+				};
+				const char* name = "makeScreenshot";
+				lua_pushcfunction(L, proxy, name);
+				lua_setfield(L, -2, name);
+			}
 			lua_pop(L, 2);
 		}
 		{
