@@ -50,6 +50,7 @@ enum class LuaModuleVersion : i32 {
 	HASH64,
 	INLINE_SCRIPT,
 	ARRAY_PROPERTIES,
+	STRING_NAMES,
 
 	LATEST
 };
@@ -428,8 +429,9 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 		}
 
 		bool isResource(lua_State* L, i32 idx, ResourceType* resource_type) {
+			LuaWrapper::DebugGuard guard(L);
 			ASSERT(resource_type);
-			lua_getmetatable(L, idx); // mt
+			if (!lua_getmetatable(L, idx)) return false; // mt
 			lua_getglobal(L, "Lumix");  // mt, Lumix
 			lua_getfield(L, -1, "Resource"); // mt, Lumix, Resource
 			bool is_instance = lua_equal(L, -1, -3);
@@ -442,11 +444,17 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 		}
 
 		bool isLumixClass(lua_State* L, i32 idx, const char* class_name) {
-			lua_getmetatable(L, idx); // mt
+			LuaWrapper::DebugGuard guard(L);
+			if (!lua_getmetatable(L, idx)) return false; // mt
+			auto ll = lua_gettop(L);
 			lua_getglobal(L, "Lumix");  // mt, Lumix
+			auto ll2 = lua_gettop(L);
 			lua_getfield(L, -1, class_name); // mt, Lumix, class
+			auto ll3 = lua_gettop(L);
 			bool is_instance = lua_equal(L, -1, -3);
+			auto ll4 = lua_gettop(L);
 			lua_pop(L, 3);
+			auto ll5 = lua_gettop(L);
 			return is_instance;
 		}
 
@@ -466,6 +474,7 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 			ASSERT(lua_type(L, -1) == LUA_TTABLE);
 			lua_pushnil(L); // [env, nil]
 			while (lua_next(L, -2)) { // [env, key, value] | [env]
+				LuaWrapper::DebugGuard guard(L, -1);
 				if (lua_type(L, -1) == LUA_TFUNCTION) {
 					lua_pop(L, 1); // [env, key]
 					continue;
@@ -509,6 +518,7 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 					m_module.applyProperty(inst, name, existing_prop, stream);
 				}
 				else {
+					LuaWrapper::DebugGuard guard2(L);
 					const i32 size = inst.m_properties.size();
 					if (inst.m_properties.size() < sizeof(valid_properties) * 8) {
 						auto& prop = inst.m_properties.emplace(allocator);
@@ -1323,6 +1333,12 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 
 
 	void serialize(OutputMemoryStream& serializer) override {
+		serializer.write(m_property_names.size());
+		for (auto iter : m_property_names.iterated()) {
+			serializer.write(iter.key());
+			serializer.write(iter.value());
+		}
+
 		serializer.write(m_inline_scripts.size());
 		for (auto iter : m_inline_scripts.iterated()) {
 			serializer.write(iter.key());
@@ -1354,6 +1370,18 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 	}
 
 	void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map, i32 version) override {
+		if (version > (i32)LuaModuleVersion::STRING_NAMES) {
+			const i32 count = serializer.read<i32>();
+			m_property_names.reserve(count);
+			for (int i = 0; i < count; ++i) {
+				StableHash key;
+				serializer.read(key);
+				String name(m_system.m_allocator);
+				serializer.read(name);
+				m_property_names.insert(key, static_cast<String&&>(name));
+			}
+		}
+
 		if (version > (i32)LuaModuleVersion::INLINE_SCRIPT) {
 			const i32 len = serializer.read<i32>();
 			m_inline_scripts.reserve(m_scripts.size() + len);
