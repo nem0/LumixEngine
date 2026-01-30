@@ -37,13 +37,9 @@ struct SceneView : StudioApp::GUIPlugin
 	void init();
 
 	//@ function
-	DVec3 getViewportPosition();
+	const Viewport& getViewport();
 	//@ function
-	void setViewportPosition(const DVec3& pos);
-	//@ function
-	Quat getViewportRotation();
-	//@ function
-	void setViewportRotation(const Quat& rot);
+	void setViewport(const Viewport& vp);
 	//@ function
 	void makeScreenshot(StringView path);
 	void setGameView(struct GameView& game_view) { m_game_view = &game_view; }

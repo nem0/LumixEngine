@@ -2718,11 +2718,41 @@ namespace Lumix {
 					LuaWrapper::checkTableArg(L, 1); // self
 					SceneView* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
-					auto res = obj->getViewportPosition();
-					LuaWrapper::push(L, res);
+					auto res = obj->getViewport();
+					lua_newtable(L);
+					LuaWrapper::push(L, "is_ortho");
+					LuaWrapper::push(L, res.is_ortho);
+					lua_settable(L, -3);
+					LuaWrapper::push(L, "fov");
+					LuaWrapper::push(L, res.fov);
+					lua_settable(L, -3);
+					LuaWrapper::push(L, "ortho_size");
+					LuaWrapper::push(L, res.ortho_size);
+					lua_settable(L, -3);
+					LuaWrapper::push(L, "w");
+					LuaWrapper::push(L, res.w);
+					lua_settable(L, -3);
+					LuaWrapper::push(L, "h");
+					LuaWrapper::push(L, res.h);
+					lua_settable(L, -3);
+					LuaWrapper::push(L, "pos");
+					LuaWrapper::push(L, res.pos);
+					lua_settable(L, -3);
+					LuaWrapper::push(L, "rot");
+					LuaWrapper::push(L, res.rot);
+					lua_settable(L, -3);
+					LuaWrapper::push(L, "near");
+					LuaWrapper::push(L, res.near);
+					lua_settable(L, -3);
+					LuaWrapper::push(L, "far");
+					LuaWrapper::push(L, res.far);
+					lua_settable(L, -3);
+					LuaWrapper::push(L, "pixel_offset");
+					LuaWrapper::push(L, res.pixel_offset);
+					lua_settable(L, -3);
 					return 1;
 				};
-				const char* name = "getViewportPosition";
+				const char* name = "getViewport";
 				lua_pushcfunction(L, proxy, name);
 				lua_setfield(L, -2, name);
 			}
@@ -2731,37 +2761,21 @@ namespace Lumix {
 					LuaWrapper::checkTableArg(L, 1); // self
 					SceneView* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
-					auto pos = LuaWrapper::checkArg<DVec3>(L, 2);
-					obj->setViewportPosition(pos);
+					Viewport vp;
+					if(!LuaWrapper::checkField(L, 2, "is_ortho", &vp.is_ortho)) luaL_error(L, "Invalid argument");
+					if(!LuaWrapper::checkField(L, 2, "fov", &vp.fov)) luaL_error(L, "Invalid argument");
+					if(!LuaWrapper::checkField(L, 2, "ortho_size", &vp.ortho_size)) luaL_error(L, "Invalid argument");
+					if(!LuaWrapper::checkField(L, 2, "w", &vp.w)) luaL_error(L, "Invalid argument");
+					if(!LuaWrapper::checkField(L, 2, "h", &vp.h)) luaL_error(L, "Invalid argument");
+					if(!LuaWrapper::checkField(L, 2, "pos", &vp.pos)) luaL_error(L, "Invalid argument");
+					if(!LuaWrapper::checkField(L, 2, "rot", &vp.rot)) luaL_error(L, "Invalid argument");
+					if(!LuaWrapper::checkField(L, 2, "near", &vp.near)) luaL_error(L, "Invalid argument");
+					if(!LuaWrapper::checkField(L, 2, "far", &vp.far)) luaL_error(L, "Invalid argument");
+					if(!LuaWrapper::checkField(L, 2, "pixel_offset", &vp.pixel_offset)) luaL_error(L, "Invalid argument");
+					obj->setViewport(vp);
 					return 0;
 				};
-				const char* name = "setViewportPosition";
-				lua_pushcfunction(L, proxy, name);
-				lua_setfield(L, -2, name);
-			}
-			{
-				auto proxy = [](lua_State* L) -> int {
-					LuaWrapper::checkTableArg(L, 1); // self
-					SceneView* obj;
-					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
-					auto res = obj->getViewportRotation();
-					LuaWrapper::push(L, res);
-					return 1;
-				};
-				const char* name = "getViewportRotation";
-				lua_pushcfunction(L, proxy, name);
-				lua_setfield(L, -2, name);
-			}
-			{
-				auto proxy = [](lua_State* L) -> int {
-					LuaWrapper::checkTableArg(L, 1); // self
-					SceneView* obj;
-					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
-					auto rot = LuaWrapper::checkArg<Quat>(L, 2);
-					obj->setViewportRotation(rot);
-					return 0;
-				};
-				const char* name = "setViewportRotation";
+				const char* name = "setViewport";
 				lua_pushcfunction(L, proxy, name);
 				lua_setfield(L, -2, name);
 			}

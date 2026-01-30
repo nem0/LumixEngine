@@ -41,7 +41,7 @@ enum class AttributeSemantic : u8 {
 	NONE = 0xff
 };
 
-//@ struct name RayCastModelHit
+//@ struct
 struct LUMIX_RENDERER_API RayCastModelHit {
 	bool is_hit;
 	float t;

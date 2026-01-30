@@ -8,7 +8,7 @@ namespace Lumix {
 struct AABB;
 struct Matrix;
 
-//@ struct name Ray
+//@ struct
 struct LUMIX_CORE_API Ray {
 	DVec3 origin;
 	Vec3 dir;
@@ -174,7 +174,7 @@ struct LUMIX_CORE_API AABB {
 	Vec3 max;
 };
 
-
+//@ struct
 struct LUMIX_CORE_API Viewport {
 	Matrix getProjectionNoJitter() const;
 	Matrix getProjectionWithJitter() const;

@@ -447,7 +447,7 @@ This binds `scene_view` and `asset_browser` as fields on the global `Editor` tab
 
 The struct must immediately follow on the next line. All fields are automatically parsed until the closing `}`. Each field must be on its own line with the format `Type name;`. Lines starting with `using` are skipped. No explicit `//@ property` marker is needed—all fields are exposed.
 
-**Difference from `//@ object`:** Use `//@ struct` for plain data containers (POD-like types with public fields, passed by value or as results). Use `//@ object` for service/interface types with methods that need to be called from Lua. Structs expose fields; objects expose functions.
+**Difference from `//@ object`:** Use `//@ struct` for plain data containers (POD-like types with public fields, passed by value or as results). Use `//@ object` for service/interface types with methods that need to be called from Lua. Structs expose fields; objects expose functions. Structs are passed by value, objects are passed by reference.
 
 Usage in Lua:
 ```lua
@@ -460,12 +460,9 @@ if hit.is_hit then
 end
 ```
 
-Attributes:
-* `name` - overrides the Lua type name (useful when the C++ name differs from the desired Lua name)
-
 Examples:
 ```cpp
-//@ struct name Ray
+//@ struct
 struct LUMIX_CORE_API Ray {
 	DVec3 origin;
 	Vec3 dir;
@@ -474,15 +471,6 @@ struct LUMIX_CORE_API Ray {
 
 ```cpp
 //@ struct
-struct RaycastHit {
-	Vec3 position;
-	Vec3 normal;
-	EntityPtr entity;
-};
-```
-
-```cpp
-//@ struct name RayCastModelHit
 struct LUMIX_RENDERER_API RayCastModelHit {
 	bool is_hit;
 	float t;
@@ -495,35 +483,35 @@ struct LUMIX_RENDERER_API RayCastModelHit {
 };
 ```
 
-	### Note on fields and pointers
+### Note on fields and pointers
 
-	Pointer and handle fields (e.g., `Mesh*`) are represented in Lua as tables containing lightuserdata (not raw userdata). A pointer field may be `nil` in Lua if it represents a null pointer in C++. When using pointer fields from Lua, check for `nil` before accessing or calling methods on them.
+Pointer and handle fields (e.g., `Mesh*`) are represented in Lua as tables containing lightuserdata (not raw userdata). A pointer field may be `nil` in Lua if it represents a null pointer in C++. When using pointer fields from Lua, check for `nil` before accessing or calling methods on them.
 
-	Example:
-	```lua
-	local ray = camera.camera:getRay(screen_pos)
-	local hit = this.world.renderer:castRay(ray, nil)
-	if hit.is_hit then
-		if hit.mesh ~= nil then
-			-- mesh is an opaque handle; use it only with API functions that accept Mesh
-		end
+Example:
+```lua
+local ray = camera.camera:getRay(screen_pos)
+local hit = this.world.renderer:castRay(ray, nil)
+if hit.is_hit then
+	if hit.mesh ~= nil then
+		-- mesh is an opaque handle; use it only with API functions that accept Mesh
 	end
-	```
+end
+```
 
-	### Lifetime and ownership
+### Lifetime and ownership
 
-	Objects pushed to Lua with `LuaWrapper::pushObject` are raw pointers; C++ must guarantee their lifetime while Lua may hold references. Do not let Lua retain pointers to objects that may be destroyed by C++ without proper synchronization.
+Objects pushed to Lua with `LuaWrapper::pushObject` are raw pointers; C++ must guarantee their lifetime while Lua may hold references. Do not let Lua retain pointers to objects that may be destroyed by C++ without proper synchronization.
 
-	### Caveats & Troubleshooting
+### Caveats & Troubleshooting
 
-	Common issues:
-	- Missing `//@ end` will cause Meta to continue scanning and produce incorrect metadata.
-	- `//@ struct` or `//@ component_struct` must be immediately followed by the `struct` declaration on the next line.
-	- Combined declarations (e.g., `float a, b;`) are not supported; keep one field per line.
-	- Templates, macros that alter declaration shape, conditional compilation, or non-trivial field declarations may confuse the simple string-based parser.
-	- When binding objects, ensure the type name passed to `LuaWrapper::pushObject` matches the `//@ object` name used in headers.
+Common issues:
+- Missing `//@ end` will cause Meta to continue scanning and produce incorrect metadata.
+- `//@ struct` or `//@ component_struct` must be immediately followed by the `struct` declaration on the next line.
+- Combined declarations (e.g., `float a, b;`) are not supported; keep one field per line.
+- Templates, macros that alter declaration shape, conditional compilation, or non-trivial field declarations may confuse the simple string-based parser.
+- When binding objects, ensure the type name passed to `LuaWrapper::pushObject` matches the `//@ object` name used in headers.
 
-	# Comparison Table
+# Comparison Table
 
 | Feature | `//@ struct` | `//@ object` | `//@ component` / `//@ component_struct` |
 |---------|--------------|--------------|------------------------------------------|

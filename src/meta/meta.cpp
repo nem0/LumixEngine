@@ -1059,35 +1059,24 @@ struct Parser {
 		}
 	}
 
-	void parseStruct(StringView def) {
-		StringView word = consumeWord(def);
-		StringView name;
-		while (word.size() > 0) {
-			if (equal(word, "name")) {
-				name = consumeIdentifier(def);
-			}
-			else {
-				logError("Unexpected ", word);
-			}
-			word = consumeWord(def);
-		}
-
+	
+	void parseStruct() {
 		StringView line;
 		if (!readLine(line)) {
 			logError("Expected struct");
 			return;
 		}
-		word = consumeWord(line);
-		if (!equal(word, "struct")) {
-			logError("Expected struct");
+		StringView name = parseStructName(line);
+		if (name.size() == 0) {
+			logError("Failed to parse struct name");
 			return;
 		}
-		if (name.size() == 0) name = consumeIdentifier(line);
 		Struct& s = structs.emplace(allocator);
 		s.name = name;
 
 		while (readLine(line)) {
 			line = skipWhitespaces(line);
+			if (line.size() == 0) continue;
 			
 			if (peekChar(line) == '}') break;
 
@@ -1095,9 +1084,17 @@ struct Parser {
 			if (equal(type, "using")) {
 				continue;
 			}
+
+			StringView var_name = consumeIdentifier(line);
+			StringView after_name = consumeWord(line);
+
+			if (equal(after_name, "(")) {
+				continue; // this is a function, ignore
+			}
+
 			StructVar& v = s.vars.emplace();
 			v.type = type;
-			v.name = consumeIdentifier(line);
+			v.name = var_name;
 		}
 	}
 
@@ -1119,7 +1116,7 @@ struct Parser {
 				parseEnum(line, enums);
 			}
 			else if (equal(word, "struct")) {
-				parseStruct(line);
+				parseStruct();
 			}
 			else if (equal(word, "object")) {
 				parseObject(line);
@@ -1335,6 +1332,11 @@ bool consumeArg(StringView& line, Arg& out) {
 }
 
 Struct* findStruct(StringView struct_name) {
+	if (struct_name.size() == 0) return nullptr;
+	// TODO proper type support
+	if (startsWith(struct_name, "const")) struct_name.begin += 6;
+	if (*(struct_name.end - 1) == '&') --struct_name.end;
+
 	for (Struct& s : parser.structs) {
 		if (equal(s.name, struct_name)) return &s;
 	}
@@ -1570,7 +1572,16 @@ void serializeMain(OutputStream& out, Parser& parser) {
 				i32 idx = 0;
 				forEachArg(f.args, [&](const Arg& arg, bool){
 					++idx;
-					L("auto ",arg.name," = LuaWrapper::checkArg<",arg.type,">(L, ",(idx + 1),");");
+					Struct* arg_st = findStruct(arg.type);
+					if (arg_st) {
+						L("\t", arg.type, " ", arg.name, ";");
+						for (StructVar& v : arg_st->vars) {
+							L("\tif(!LuaWrapper::checkField(L, ", (idx + 1), ", \"", v.name, "\", &", arg.name, ".", v.name, ")) luaL_error(L, \"Invalid argument\");");
+						}
+					}
+					else {
+						L("auto ",arg.name," = LuaWrapper::checkArg<",arg.type,">(L, ",(idx + 1),");");
+					}
 				});
 				
 				bool has_return = !equal(f.return_type, "void");
@@ -1584,7 +1595,18 @@ void serializeMain(OutputStream& out, Parser& parser) {
 				L(");");
 				
 				if (has_return) {
-					L("LuaWrapper::push(L, res);");
+					Struct* ret_struct = findStruct(f.return_type);
+					if (ret_struct) {
+						// Push struct as Lua table
+						L("lua_newtable(L);");
+						for (StructVar& var : ret_struct->vars) {
+							L("LuaWrapper::push(L, \"", var.name, "\");");
+							L("LuaWrapper::push(L, res.", var.name, ");");
+							L("lua_settable(L, -3);");
+						}
+					} else {
+						L("LuaWrapper::push(L, res);");
+					}
 					L("return 1;");
 				}
 				else {

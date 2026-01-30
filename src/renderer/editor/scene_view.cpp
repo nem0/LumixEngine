@@ -587,18 +587,12 @@ struct WorldViewImpl final : WorldView {
 	Array<DrawCmd> m_draw_cmds;
 };
 
-DVec3 SceneView::getViewportPosition() {
-	return m_view->getViewport().pos;
+const Viewport& SceneView::getViewport() {
+	return m_view->getViewport();
 }
 
-void SceneView::setViewportPosition(const DVec3& pos) {
-	Viewport vp = m_view->getViewport();
-	vp.pos = pos;
+void SceneView::setViewport(const Viewport& vp) {
 	m_view->setViewport(vp);
-}
-
-Quat SceneView::getViewportRotation() {
-	return m_view->getViewport().rot;
 }
 
 void SceneView::makeScreenshot(StringView path) {
@@ -644,12 +638,6 @@ void SceneView::makeScreenshot(StringView path) {
 
 	auto delegate = makeDelegate<&Callback::callback>(cb);
 	m_pipeline->getRenderer().getDrawStream().readTexture(texture, delegate);
-}
-
-void SceneView::setViewportRotation(const Quat& rot) {
-	Viewport vp = m_view->getViewport();
-	vp.rot = rot;
-	m_view->setViewport(vp);
 }
 
 struct SceneView::RenderPlugin : Lumix::RenderPlugin {

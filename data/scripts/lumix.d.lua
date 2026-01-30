@@ -112,6 +112,19 @@ type Ray = {
 	dir: Vec3,
 }
 
+type Viewport = {
+	is_ortho: boolean,
+	fov: number,
+	ortho_size: number,
+	w: number,
+	h: number,
+	pos: DVec3,
+	rot: Quat,
+	near: number,
+	far: number,
+	pixel_offset: Vec2,
+}
+
 type RaycastHit = {
 	position: Vec3,
 	normal: Vec3,
@@ -155,10 +168,8 @@ type GameView = {
 }
 
 type SceneView = {
-	getViewportPosition: (SceneView) -> DVec3,
-	setViewportPosition: (SceneView, DVec3) -> (),
-	getViewportRotation: (SceneView) -> Quat,
-	setViewportRotation: (SceneView, Quat) -> (),
+	getViewport: (SceneView) -> any,
+	setViewport: (SceneView, Viewport) -> (),
 	makeScreenshot: (SceneView, any) -> (),
 }
 
