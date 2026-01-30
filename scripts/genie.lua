@@ -366,7 +366,7 @@ lib_project "core"
 	defaultConfigurations()
 	defines { "BUILDING_CORE" }
 	-- Run meta tool before any compilation to generate reflection headers and Lua bindings
-	prebuildcommands { "msbuild $(SolutionDir)meta.vcxproj /p:Configuration=$(Configuration) /verbosity:minimal", "cd $(ProjectDir)../../../ && $(SolutionDir)bin\\$(Configuration)\\meta.exe" }
+	prebuildcommands { "msbuild $(SolutionDir)meta.vcxproj /p:Configuration=$(Configuration) /p:Platform=$(Platform) /verbosity:minimal", "cd $(ProjectDir)../../../ && $(SolutionDir)bin\\$(Configuration)\\meta.exe" }
 
 	files { "../src/core/**.h",
 			"../src/core/**.c",
