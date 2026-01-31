@@ -201,7 +201,7 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 
 			if (!m_resource->isReady()) {
 				ImGuiEx::Label("Skeleton");
-				saveUndo(m_app.getAssetBrowser().resourceInput("##ske", m_parent_meta.skeleton, Model::TYPE));
+				saveUndo(m_app.getAssetBrowser().resourceInput("##ske", m_parent_meta.skeleton, Model::TYPE, -1));
 				return;
 			}
 
@@ -216,7 +216,7 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 			const Array<Animation::ConstTranslationTrack>& const_translations = m_resource->getConstTranslations();
 
 			ImGuiEx::Label("Skeleton");
-			saveUndo(m_app.getAssetBrowser().resourceInput("##ske", m_parent_meta.skeleton, Model::TYPE));
+			saveUndo(m_app.getAssetBrowser().resourceInput("##ske", m_parent_meta.skeleton, Model::TYPE, -1));
 			ImGuiEx::Label("Root rotation");
 			saveUndo(ImGui::CheckboxFlags("##rmr", (i32*)&m_parent_meta.root_motion_flags, (i32)Animation::Flags::ROOT_ROTATION));
 			ImGuiEx::Label("XZ root translation");
@@ -345,7 +345,7 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin {
 			ImGui::SameLine();
 			if (ImGui::BeginPopup("Settings")) {
 				Path model_path = m_model ? m_model->getPath() : Path();
-				if (m_app.getAssetBrowser().resourceInput("Preview model", model_path, ResourceType("model"))) {
+				if (m_app.getAssetBrowser().resourceInput("Preview model", model_path, ResourceType("model"), -1)) {
 					if (m_model) m_model->decRefCount();
 					m_model = m_app.getEngine().getResourceManager().load<Model>(model_path);
 					render_module->setModelInstancePath(*m_viewer.m_mesh, m_model ? m_model->getPath() : Path());

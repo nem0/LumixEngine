@@ -1535,9 +1535,9 @@ void TerrainEditor::layerGUI(ComponentUID cmp) {
 	ImGui::SetNextWindowSizeConstraints(ImVec2(200, 100), ImVec2(FLT_MAX, FLT_MAX));
 	if (ImGui::BeginPopupModal("Add surface")) {
 		ImGuiEx::Label("Albedo");
-		m_app.getAssetBrowser().resourceInput("albedo", m_add_layer_popup.albedo, Texture::TYPE);
+		m_app.getAssetBrowser().resourceInput("albedo", m_add_layer_popup.albedo, Texture::TYPE, -1);
 		ImGuiEx::Label("Normal");
-		m_app.getAssetBrowser().resourceInput("normal", m_add_layer_popup.normal, Texture::TYPE);
+		m_app.getAssetBrowser().resourceInput("normal", m_add_layer_popup.normal, Texture::TYPE, -1);
 		if (ImGui::Button(ICON_FA_PLUS "Add")) {
 			saveCompositeTexture(albedo->getPath(), m_add_layer_popup.albedo);
 			saveCompositeTexture(normal->getPath(), m_add_layer_popup.normal);

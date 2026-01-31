@@ -721,7 +721,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			Shader* shader = m_resource->getShader();
 			Path shader_path = shader ? shader->getPath() : Path();
 			
-			if (m_app.getAssetBrowser().resourceInput("shader", shader_path, Shader::TYPE)) {
+			if (m_app.getAssetBrowser().resourceInput("shader", shader_path, Shader::TYPE, -1)) {
 				m_resource->setShader(shader_path);
 				shader = m_resource->getShader();
 				saveUndo(true);
@@ -768,7 +768,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 				ImGuiEx::Label(slot.name);
 				ImGui::PushID(&slot);
-				if (m_app.getAssetBrowser().resourceInput("##res", path, Texture::TYPE)) { 
+				if (m_app.getAssetBrowser().resourceInput("##res", path, Texture::TYPE, -1)) { 
 					m_resource->setTexturePath(i, path);
 					saveUndo(true);
 				}
@@ -1236,7 +1236,7 @@ struct MultiEditor {
 		ImGui::Combo(label, (int*)value, "None\0Convex\0Triangle mesh\0");
 	}
 	LUMIX_FORCE_INLINE void ui(const char* label, Path* value, auto v) {
-		m_app.getAssetBrowser().resourceInput(label, *value, v.resource_type);
+		m_app.getAssetBrowser().resourceInput(label, *value, v.resource_type, -1);
 	}
 
 	void gui() {
@@ -1742,7 +1742,7 @@ struct ModelPropertiesPlugin final : PropertyGrid::IPlugin {
 				ImGui::PushID(i);
 
 				ImGuiEx::Label(mesh.name.c_str());
-				if (m_app.getAssetBrowser().resourceInput("##mat", path, Material::TYPE)) {
+				if (m_app.getAssetBrowser().resourceInput("##mat", path, Material::TYPE, -1)) {
 					IAllocator& allocator = editor.getAllocator();
 					UniquePtr<OverrideMaterialCommand> cmd = UniquePtr<OverrideMaterialCommand>::create(allocator);
 					cmd->editor = &editor;
@@ -2179,7 +2179,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				}
 
 				ImGuiEx::Label("Skeleton");
-				saveUndo(m_app.getAssetBrowser().resourceInput("##ske", m_meta.skeleton, Model::TYPE));
+				saveUndo(m_app.getAssetBrowser().resourceInput("##ske", m_meta.skeleton, Model::TYPE, -1));
 				if (m_meta.skeleton.isEmpty()) {
 					ImGuiEx::Label("Root motion bone");
 					saveUndo(inputString("##rmb", &m_meta.root_motion_bone));
@@ -2265,7 +2265,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			else {
 				ImGui::TextUnformatted("No mesh data");
 				ImGuiEx::Label("Skeleton");
-				saveUndo(m_app.getAssetBrowser().resourceInput("##ske", m_meta.skeleton, Model::TYPE));
+				saveUndo(m_app.getAssetBrowser().resourceInput("##ske", m_meta.skeleton, Model::TYPE, -1));
 				ImGuiEx::Label("Root rotation");
 				saveUndo(ImGui::CheckboxFlags("##rmr", (i32*)&m_meta.root_motion_flags, (i32)Animation::Flags::ROOT_ROTATION));
 				ImGuiEx::Label("XZ root translation");

@@ -6,6 +6,7 @@
 #include "core/math.h"
 #include "core/metaprogramming.h"
 #include "core/path.h"
+#include "engine/resource.h"
 
 #include <lua.h>
 #include <lualib.h>
@@ -180,6 +181,10 @@ template <> inline bool isType<StringView>(lua_State* L, int index)
 {
 	return lua_isstring(L, index) != 0;
 }
+template <> inline bool isType<ResourceType>(lua_State* L, int index)
+{
+	return lua_isstring(L, index) != 0;
+}
 template <> inline bool isType<void*>(lua_State* L, int index)
 {
 	return lua_islightuserdata(L, index) != 0;
@@ -347,6 +352,10 @@ template <> inline const char* toType(lua_State* L, int index) {
 template <> inline StringView toType(lua_State* L, int index) {
 	const char* res = lua_tostring(L, index);
 	return res ? res : "";
+}
+template <> inline ResourceType toType(lua_State* L, int index) {
+	const char* res = lua_tostring(L, index);
+	return res ? ResourceType(res) : ResourceType();
 }
 
 template <typename T> inline bool checkField(lua_State* L, int idx, const char* k, T* out)

@@ -1587,6 +1587,9 @@ void serializeMain(OutputStream& out, Parser& parser) {
 							L("\tif(!LuaWrapper::checkField(L, ", (idx + 1), ", \"", v.name, "\", &", arg.name, ".", v.name, ")) luaL_error(L, \"Invalid argument\");");
 						}
 					}
+					else if (arg.is_const && equal(arg.type, "char*")) {
+						L("\tauto ",arg.name," = LuaWrapper::checkArg<const char*>(L, ",(idx + 1),");");
+					}
 					else {
 						L("auto ",arg.name," = LuaWrapper::checkArg<",arg.type,">(L, ",(idx + 1),");");
 					}

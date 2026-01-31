@@ -361,7 +361,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 		ImGuiEx::Label(prop.name);
 		ImGui::PushID(prop.name);
 		if (attrs.resource_type.isValid()) {
-			if (m_app.getAssetBrowser().resourceInput(prop.name, path, attrs.resource_type)) {
+			if (m_app.getAssetBrowser().resourceInput(prop.name, path, attrs.resource_type, -1)) {
 				m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, path);
 			}
 		}

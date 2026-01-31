@@ -448,7 +448,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 				if (ImGuiEx::IconButton(ICON_FA_COG, "Settings")) ImGui::OpenPopup("Settings");
 				if (ImGui::BeginPopup("Settings")) {
 					Path model_path = render_module->getModelInstancePath(*m_viewer.m_mesh);
-					if (m_app.getAssetBrowser().resourceInput("Preview model", model_path, Model::TYPE)) {
+					if (m_app.getAssetBrowser().resourceInput("Preview model", model_path, Model::TYPE, -1)) {
 						render_module->setModelInstancePath(*m_viewer.m_mesh, model_path);
 						anim_module->setAnimatorSource(*m_viewer.m_mesh, m_controller.m_path);
 					}
@@ -895,7 +895,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 						saveUndo(editSlot(m_controller, "##slot", &entry.slot));
 						ImGui::NextColumn();
 						ImGui::PushItemWidth(-1);
-						if (m_app.getAssetBrowser().resourceInput("anim", entry.animation, Animation::TYPE)) {
+						if (m_app.getAssetBrowser().resourceInput("anim", entry.animation, Animation::TYPE, -1)) {
 							saveUndo(true);
 						}
 						ImGui::PopItemWidth();
@@ -1064,7 +1064,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 
 			if (m_controller.m_skeleton.isEmpty()) {
 				ImGuiEx::Label("Skeleton");
-				if(m_app.getAssetBrowser().resourceInput("skel", m_controller.m_skeleton, Model::TYPE)) {
+				if(m_app.getAssetBrowser().resourceInput("skel", m_controller.m_skeleton, Model::TYPE, -1)) {
 					onSkeletonChanged();
 					saveUndo(true);
 				}
@@ -1085,7 +1085,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 						}
 						if (ImGui::CollapsingHeader("Controller")) {
 							ImGuiEx::Label("Skeleton");
-							if (m_app.getAssetBrowser().resourceInput("skel", m_controller.m_skeleton, Model::TYPE)) {
+							if (m_app.getAssetBrowser().resourceInput("skel", m_controller.m_skeleton, Model::TYPE, -1)) {
 								onSkeletonChanged();
 								saveUndo(true);
 							}

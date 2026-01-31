@@ -3283,7 +3283,7 @@ struct ParticleEditorWindow : AssetEditorWindow, NodeEditor {
 	void leftColumnGUI() {
 		bool changed = inputString("##name", "Emitter name", &m_active_emitter->m_name);
 		ImGuiEx::Label("Material");
-		changed = m_app.getAssetBrowser().resourceInput("material", m_active_emitter->m_mat_path, Material::TYPE) || changed;
+		changed = m_app.getAssetBrowser().resourceInput("material", m_active_emitter->m_mat_path, Material::TYPE, -1) || changed;
 		ImGuiEx::Label("Emit per second");
 		changed = ImGui::DragFloat("##eps", &m_active_emitter->m_emit_per_second) || changed;
 		ImGuiEx::Label("Emit at start");

@@ -535,9 +535,6 @@ struct AssetBrowserImpl : AssetBrowser {
 			i32 idx = 0;
 			ImGui::BeginChild("list");
 			if (ImGui::BeginTable("files", 2, ImGuiTableFlags_Resizable)) {
-				ResourceType lua_script_type("lua_script");
-				ResourceType world_type("world");
-				
 				ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
 				ImGui::TableSetupColumn("Directory", ImGuiTableColumnFlags_WidthStretch);
 	

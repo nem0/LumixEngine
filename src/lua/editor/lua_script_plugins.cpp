@@ -1167,7 +1167,7 @@ struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 				lua_pop(L, 1);
 				Resource* res = system.getLuaResource(res_idx);
 				Path path = res ? res->getPath() : Path();
-				if (m_app.getAssetBrowser().resourceInput("##v", path, property.resource_type)) {
+				if (m_app.getAssetBrowser().resourceInput("##v", path, property.resource_type, -1)) {
 					const i32 prev_res_idx = res_idx;
 					cmd = UniquePtr<SetLuaPropertyCommand<Path>>::create(allocator, system, m_editor, e, script_idx, name, path, array_index, property.resource_type);
 					system.unloadLuaResource(prev_res_idx);
@@ -1570,6 +1570,24 @@ struct SetPropertyVisitor : reflection::IPropertyVisitor {
 		WorldEditor* editor;
 	};
 
+	static int LUA_resourceInput(lua_State* L) {
+		AssetBrowser* asset_browser;
+		if (!LuaWrapper::checkField<AssetBrowser*>(L, 1, "_value", &asset_browser)) luaL_argerror(L, 1, "Expected asset browser");
+		const char* label = LuaWrapper::checkArg<const char*>(L, 2);
+		const char* path_str = LuaWrapper::checkArg<const char*>(L, 3);
+		const char* type_str = LuaWrapper::checkArg<const char*>(L, 4);
+		float width = LuaWrapper::checkArg<float>(L, 5);
+
+		Path path(path_str);
+		ResourceType res_type(type_str);
+
+		bool changed = asset_browser->resourceInput(label, path, res_type, width);
+		lua_pushboolean(L, changed);
+		if (changed) LuaWrapper::push(L, path.c_str());
+		else lua_pushnil(L);
+		return 2;
+	}
+
 	static int LUA_createEntityEx(lua_State* L) {
 		StudioApp* studio = LuaWrapper::getClosureObject<StudioApp>(L);
 		LuaWrapper::checkTableArg(L, 1);
@@ -1856,6 +1874,10 @@ struct SetPropertyVisitor : reflection::IPropertyVisitor {
 		lua_setfield(L, -2, "game_view");
 
 		LuaWrapper::pushObject(L, &m_app.getAssetBrowser(), "AssetBrowser");
+		// TODO expose resourceInput with meta
+		// meta needs to support output arguments for that
+		lua_pushcfunction(L, &LUA_resourceInput, "resourceInput");
+		lua_setfield(L, -2, "resourceInput");
 		lua_setfield(L, -2, "asset_browser");
 
 		LuaWrapper::pushObject(L, &m_app, "StudioApp");

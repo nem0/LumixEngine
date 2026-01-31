@@ -158,7 +158,7 @@ struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			Texture* tex = m_resource->getTexture();
 			Path tmp = tex ? tex->getPath() : Path();
 			ImGuiEx::Label("Texture");
-			if (m_app.getAssetBrowser().resourceInput("texture", tmp, Texture::TYPE)) {
+			if (m_app.getAssetBrowser().resourceInput("texture", tmp, Texture::TYPE, -1)) {
 				m_resource->setTexture(tmp);
 				m_dirty = true;
 			}
