@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/lumix.h"
+#include "engine/black.h.h"
 
 #include "core/color.h"
 #include "core/math.h"
@@ -11,7 +11,7 @@
 #include <lua.h>
 #include <lualib.h>
 
-namespace Lumix {
+namespace black {
 
 struct World;
 template <typename T> struct Array;
@@ -19,7 +19,7 @@ template <typename T> struct Array;
 namespace LuaWrapper {
 
 
-#ifdef LUMIX_DEBUG
+#ifdef BLACK_DEBUG
 	struct DebugGuard {
 		DebugGuard(lua_State* L);
 		DebugGuard(lua_State* L, int offset);
@@ -912,4 +912,4 @@ template <auto t> int wrapMethodClosure(lua_State* L)
 
 
 } // namespace LuaWrapper
-} // namespace Lumix
+} // namespace black

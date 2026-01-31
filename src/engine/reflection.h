@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/lumix.h"
+#include "engine/black.h.h"
 
 #include "core/array.h"
 #include "core/core.h"
@@ -14,7 +14,7 @@
 #include "engine/component_uid.h"
 #include "engine/resource.h"
 
-namespace Lumix
+namespace black
 {
 
 struct Path;
@@ -52,15 +52,15 @@ struct RegisteredComponent {
 	struct ComponentBase* cmp = nullptr;
 };
 
-LUMIX_ENGINE_API const ComponentBase* getComponent(ComponentType cmp_type);
-LUMIX_ENGINE_API const struct PropertyBase* getProperty(ComponentType cmp_type, StringView prop);
-LUMIX_ENGINE_API Span<const RegisteredComponent> getComponents();
+BLACK_ENGINE_API const ComponentBase* getComponent(ComponentType cmp_type);
+BLACK_ENGINE_API const struct PropertyBase* getProperty(ComponentType cmp_type, StringView prop);
+BLACK_ENGINE_API Span<const RegisteredComponent> getComponents();
 
-LUMIX_ENGINE_API const PropertyBase* getPropertyFromHash(StableHash hash);
-LUMIX_ENGINE_API StableHash getPropertyHash(ComponentType cmp, const char* property_name);
-LUMIX_ENGINE_API bool componentTypeExists(const char* id);
-LUMIX_ENGINE_API ComponentType getComponentType(StringView id);
-LUMIX_ENGINE_API ComponentType getComponentTypeFromHash(RuntimeHash hash);
+BLACK_ENGINE_API const PropertyBase* getPropertyFromHash(StableHash hash);
+BLACK_ENGINE_API StableHash getPropertyHash(ComponentType cmp, const char* property_name);
+BLACK_ENGINE_API bool componentTypeExists(const char* id);
+BLACK_ENGINE_API ComponentType getComponentType(StringView id);
+BLACK_ENGINE_API ComponentType getComponentTypeFromHash(RuntimeHash hash);
 
 struct ResourceAttribute : IAttribute
 {
@@ -112,7 +112,7 @@ struct StringEnumAttribute : IAttribute {
 };
 
 
-struct LUMIX_ENGINE_API PropertyBase {
+struct BLACK_ENGINE_API PropertyBase {
 	PropertyBase(IAllocator& allocator) : attributes(allocator) {}
 	virtual ~PropertyBase() {}
 	Array<IAttribute*> attributes;
@@ -187,7 +187,7 @@ struct IEmptyPropertyVisitor : IPropertyVisitor {
 	void visit(const BlobProperty& prop) override {}
 };
 
-struct LUMIX_ENGINE_API ArrayProperty : PropertyBase {
+struct BLACK_ENGINE_API ArrayProperty : PropertyBase {
 	typedef u32 (*Counter)(IModule*, EntityRef);
 	typedef void (*Adder)(IModule*, EntityRef, u32);
 	typedef void (*Remover)(IModule*, EntityRef, u32);
@@ -207,7 +207,7 @@ struct LUMIX_ENGINE_API ArrayProperty : PropertyBase {
 	Remover remover;
 };
 
-struct LUMIX_ENGINE_API BlobProperty : PropertyBase {
+struct BLACK_ENGINE_API BlobProperty : PropertyBase {
 	BlobProperty(IAllocator& allocator);
 
 	void visit(struct IPropertyVisitor& visitor) const override;
@@ -227,9 +227,9 @@ inline Icon icon(const char* name) { return {name}; }
 namespace detail {
 
 #if defined __clang__ && defined _WIN32
-	static const u32 FRONT_SIZE = (u32)sizeof("static StringView Lumix::reflection::detail::GetTypeNameHelper<") - 1u;
+	static const u32 FRONT_SIZE = (u32)sizeof("static StringView black.h::reflection::detail::GetTypeNameHelper<") - 1u;
 #else
-	static const u32 FRONT_SIZE = sizeof("Lumix::reflection::detail::GetTypeNameHelper<") - 1u;
+	static const u32 FRONT_SIZE = sizeof("black.h::reflection::detail::GetTypeNameHelper<") - 1u;
 	static const u32 BACK_SIZE = sizeof(">::GetTypeName") - 1u;
 #endif
 
@@ -252,7 +252,7 @@ struct GetTypeNameHelper
 	}
 };
 
-LUMIX_ENGINE_API StringView normalizeTypeName(StringView type_name);
+BLACK_ENGINE_API StringView normalizeTypeName(StringView type_name);
 
 } // namespace detail
 
@@ -616,7 +616,7 @@ struct StructVar : StructVarBase {
 	}
 };
 
-struct LUMIX_ENGINE_API ComponentBase {
+struct BLACK_ENGINE_API ComponentBase {
 	ComponentBase(IAllocator& allocator);
 
 	void visit(IPropertyVisitor& visitor) const;
@@ -666,9 +666,9 @@ struct Module {
 	Module* next = nullptr;
 };
 
-LUMIX_ENGINE_API Module* getFirstModule();
+BLACK_ENGINE_API Module* getFirstModule();
 
-struct LUMIX_ENGINE_API builder {
+struct BLACK_ENGINE_API builder {
 	builder(IAllocator& allocator);
 
 	template <auto Creator, auto Destroyer>
@@ -676,7 +676,7 @@ struct LUMIX_ENGINE_API builder {
 		auto creator = [](IModule* module, EntityRef e){ (module->*static_cast<void (IModule::*)(EntityRef)>(Creator))(e); };
 		auto destroyer = [](IModule* module, EntityRef e){ (module->*static_cast<void (IModule::*)(EntityRef)>(Destroyer))(e); };
 	
-		ComponentBase* cmp = LUMIX_NEW(allocator, ComponentBase)(allocator);
+		ComponentBase* cmp = BLACK_NEW(allocator, ComponentBase)(allocator);
 		cmp->name = name;
 		cmp->label = label;
 		cmp->component_type = getComponentType(name);
@@ -694,7 +694,7 @@ struct LUMIX_ENGINE_API builder {
 	builder& prop(const char* name) {
 		using T = typename ResultOf<decltype(Getter)>::Type;
 		using Backing = typename Pick<__is_enum(T), i32, T>::Type;
-		auto* p = LUMIX_NEW(allocator, Property<Backing>)(allocator);
+		auto* p = BLACK_NEW(allocator, Property<Backing>)(allocator);
 		
 		if constexpr (Setter == nullptr) {
 			p->setter = nullptr;
@@ -752,7 +752,7 @@ struct LUMIX_ENGINE_API builder {
 
 	template <auto Getter, auto Setter>
 	builder& blob_property(const char* name) {
-		auto* p = LUMIX_NEW(allocator, BlobProperty)(allocator);
+		auto* p = BLACK_NEW(allocator, BlobProperty)(allocator);
 		p->name = name;
 		p->setter = [](IModule* module, EntityRef e, u32 idx, InputMemoryStream& value) {
 			using C = typename ClassOf<decltype(Setter)>::Type;
@@ -779,7 +779,7 @@ struct LUMIX_ENGINE_API builder {
 	template <auto Getter, auto PropGetter>
 	builder& var_prop(const char* name) {
 		using T = typename ResultOf<decltype(PropGetter)>::Type;
-		auto* p = LUMIX_NEW(allocator, Property<T>)(allocator);
+		auto* p = BLACK_NEW(allocator, Property<T>)(allocator);
 		p->setter = [](IModule* module, EntityRef e, u32, const T& value) {
 			using C = typename ClassOf<decltype(Getter)>::Type;
 			auto& c = (static_cast<C*>(module)->*Getter)(e);
@@ -799,7 +799,7 @@ struct LUMIX_ENGINE_API builder {
 
 	template <auto Counter, auto Adder, auto Remover>
 	builder& begin_array(const char* name) {
-		ArrayProperty* prop = LUMIX_NEW(allocator, ArrayProperty)(allocator);
+		ArrayProperty* prop = BLACK_NEW(allocator, ArrayProperty)(allocator);
 		using C = typename ClassOf<decltype(Counter)>::Type;
 		prop->counter = [](IModule* module, EntityRef e) -> u32 {
 			return (static_cast<C*>(module)->*Counter)(e);
@@ -819,14 +819,14 @@ struct LUMIX_ENGINE_API builder {
 
 	template <typename T>
 	builder& attribute() {
-		auto* a = LUMIX_NEW(allocator, T);
+		auto* a = BLACK_NEW(allocator, T);
 		last_prop->attributes.push(a);
 		return *this;
 	}
 
 	template <auto F>
 	builder& event(const char* name) {
-		auto* f = LUMIX_NEW(allocator, Event<decltype(F)>);
+		auto* f = BLACK_NEW(allocator, Event<decltype(F)>);
 		f->function = F;
 		f->name = name;
 		module->events.push(f);
@@ -835,7 +835,7 @@ struct LUMIX_ENGINE_API builder {
 
 	template <auto F>
 	builder& function(const char* name) {
-		auto* f = LUMIX_NEW(allocator, Function<F>);
+		auto* f = BLACK_NEW(allocator, Function<F>);
 		f->name = name;
 		if (module->cmps.empty()) {
 			module->functions.push(f);
@@ -896,8 +896,8 @@ template <typename F> void forEachProperty(ComponentType cmp_type, const F& f) {
 	if (cmp) cmp->visit(h);
 }
 
-LUMIX_ENGINE_API builder build_module(const char* name);
+BLACK_ENGINE_API builder build_module(const char* name);
 
 } // namespace reflection
 
-} // namespace Lumix
+} // namespace black

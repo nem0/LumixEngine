@@ -2,10 +2,10 @@
 
 #include "allocator.h"
 
-namespace Lumix {
+namespace black {
 
 // set active_allocator before calling its parent allocator, parent allocator can use the tag to e.g. group allocations
-struct LUMIX_CORE_API TagAllocator final : IAllocator {
+struct BLACK_CORE_API TagAllocator final : IAllocator {
 	TagAllocator(IAllocator& allocator, const char* tag_name);
 
 	void* allocate(size_t size, size_t align) override;
@@ -23,4 +23,4 @@ struct LUMIX_CORE_API TagAllocator final : IAllocator {
 	const char* m_tag;
 };
 
-} // namespace Lumix
+} // namespace black

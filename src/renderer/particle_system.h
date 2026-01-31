@@ -9,7 +9,7 @@
 #include "renderer/gpu/gpu.h"
 #include "renderer/renderer.h"
 
-namespace Lumix {
+namespace black {
 
 namespace jobs { struct Mutex; }
 
@@ -166,7 +166,7 @@ enum class ParticleSystemValues : u8 {
 	NONE = 0xff
 };
 
-struct LUMIX_RENDERER_API ParticleSystem {
+struct BLACK_RENDERER_API ParticleSystem {
 	struct Channel {
 		float* data = nullptr;
 		u32 name = 0;
@@ -274,4 +274,4 @@ private:
 };
 
 
-} // namespace Lumix
+} // namespace black

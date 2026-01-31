@@ -8,7 +8,7 @@
 #include "core/sync.h"
 #include "engine/component_types.h"
 #include "engine/engine.h"
-#include "engine/lumix.h"
+#include "engine/black.h.h"
 #include "engine/reflection.h"
 #include "engine/world.h"
 #include "imgui/IconsFontAwesome5.h"
@@ -25,7 +25,7 @@
 #include <DetourNavMeshQuery.h>
 #include <Recast.h>
 
-namespace Lumix {
+namespace black {
 
 enum class NavigationModuleVersion : i32 {
 	ZONE_GUID,
@@ -217,7 +217,7 @@ struct NavigationModuleImpl final : NavigationModule
 		}
 	}
 
-	LUMIX_FORCE_INLINE void rasterizeModel(Model* model
+	BLACK_FORCE_INLINE void rasterizeModel(Model* model
 		, const Transform& tr
 		, const AABB& zone_aabb
 		, const Transform& zone_tr
@@ -643,19 +643,19 @@ struct NavigationModuleImpl final : NavigationModule
 		void fileLoaded(Span<const u8> mem, bool success) {	
 			auto iter = module.m_zones.find(entity);
 			if (!iter.isValid()) {
-				LUMIX_DELETE(module.m_allocator, this);
+				BLACK_DELETE(module.m_allocator, this);
 				return;
 			}
 
 			if (!success) {
 				logError("Could not load navmesh, GUID ", iter.value().zone.guid);
-				LUMIX_DELETE(module.m_allocator, this);
+				BLACK_DELETE(module.m_allocator, this);
 				return;
 			}
 
 			RecastZone& zone = iter.value();
 			if (!module.initNavmesh(zone)) {
-				LUMIX_DELETE(module.m_allocator, this);
+				BLACK_DELETE(module.m_allocator, this);
 				return;
 			}
 
@@ -676,7 +676,7 @@ struct NavigationModuleImpl final : NavigationModule
 			file.read(&params, sizeof(params));
 			if (dtStatusFailed(zone.navmesh->init(&params))) {
 				logError("Could not init Detour navmesh");
-				LUMIX_DELETE(module.m_allocator, this);
+				BLACK_DELETE(module.m_allocator, this);
 				return;
 			}
 			for (u32 j = 0; j < zone.m_num_tiles_z; ++j) {
@@ -691,13 +691,13 @@ struct NavigationModuleImpl final : NavigationModule
 						const u8* tmp = (const u8*)file.skip(compressed_size);
 
 						if (data_size != 0 && compressed_size == 0) {
-							LUMIX_DELETE(module.m_allocator, this);
+							BLACK_DELETE(module.m_allocator, this);
 							logError("Invalid navmesh");
 							return;
 						}
 
 						if (data_size > 0 && !module.m_engine.decompress(Span<const u8>(tmp, compressed_size), Span<u8>(data, data_size))) {
-							LUMIX_DELETE(module.m_allocator, this);
+							BLACK_DELETE(module.m_allocator, this);
 							logError("Failed to decompress navmesh");
 							return;
 						}
@@ -708,7 +708,7 @@ struct NavigationModuleImpl final : NavigationModule
 
 					if (dtStatusFailed(zone.navmesh->addTile(data, data_size, DT_TILE_FREE_DATA, 0, 0))) {
 						dtFree(data);
-						LUMIX_DELETE(module.m_allocator, this);
+						BLACK_DELETE(module.m_allocator, this);
 						return; // TODO error message
 					}
 				}
@@ -716,7 +716,7 @@ struct NavigationModuleImpl final : NavigationModule
 
 			if (!zone.crowd) module.initCrowd(zone);
 
-			LUMIX_DELETE(module.m_allocator, this);
+			BLACK_DELETE(module.m_allocator, this);
 		}
 
 		NavigationModuleImpl& module;
@@ -727,7 +727,7 @@ struct NavigationModuleImpl final : NavigationModule
 		RecastZone& zone = m_zones[zone_entity];
 		clearNavmesh(zone);
 
-		LoadCallback* lcb = LUMIX_NEW(m_allocator, LoadCallback)(*this, zone_entity);
+		LoadCallback* lcb = BLACK_NEW(m_allocator, LoadCallback)(*this, zone_entity);
 
 		const Path path("navzones/", zone.zone.guid, ".nav");
 		FileSystem& fs = m_engine.getFileSystem();
@@ -1346,7 +1346,7 @@ struct NavigationModuleImpl final : NavigationModule
 	}
 
 	void free(NavmeshBuildJob* job) override{
-		LUMIX_DELETE(m_allocator, job);
+		BLACK_DELETE(m_allocator, job);
 	}
 
 	struct NavmeshBuildJobImpl : NavmeshBuildJob {
@@ -1432,7 +1432,7 @@ struct NavigationModuleImpl final : NavigationModule
 			}
 		}
 
-		NavmeshBuildJobImpl* job = LUMIX_NEW(m_allocator, NavmeshBuildJobImpl);
+		NavmeshBuildJobImpl* job = BLACK_NEW(m_allocator, NavmeshBuildJobImpl);
 		job->zone = &zone;
 		job->zone_entity = zone_entity;
 		job->module = this;
@@ -1710,4 +1710,4 @@ void NavigationModule::reflect() {
 	#include "navigation_module.gen.h"
 }
 
-} // namespace Lumix
+} // namespace black

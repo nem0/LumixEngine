@@ -11,7 +11,7 @@
 
 
 // this file is disabled in genie.lua, because this is only a helper class to develop voxelization
-namespace Lumix {
+namespace black {
 
 
 VoxelizerUI::~VoxelizerUI() {
@@ -202,4 +202,4 @@ void VoxelizerUI::onWindowGUI() {
 }
 
 
-} // namespace Lumix
+} // namespace black

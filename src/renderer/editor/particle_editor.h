@@ -2,13 +2,13 @@
 
 #include "editor/studio_app.h"
 
-namespace Lumix {
+namespace black {
 
 namespace gpu { struct VertexDecl; }
 
 template <typename T> struct UniquePtr;
 
-struct LUMIX_RENDERER_API ParticleEditor {
+struct BLACK_RENDERER_API ParticleEditor {
 	virtual ~ParticleEditor() {}
 
 	static UniquePtr<ParticleEditor> create(StudioApp& app);

@@ -3,7 +3,7 @@
 #include "core/allocator.h"
 #include "core/delegate.h"
 
-namespace Lumix {
+namespace black {
 
 template <typename T> struct DelegateList;
 
@@ -104,4 +104,4 @@ private:
 	u32 m_capacity = 0;
 };
 
-} // namespace Lumix
+} // namespace black

@@ -1,11 +1,11 @@
 #pragma once
 
-#include "engine/lumix.h"
+#include "engine/black.h.h.h"
 
 #include "core/allocator.h"
 #include "core/span.h"
 
-namespace Lumix {
+namespace black{
 
 struct Path;
 
@@ -20,9 +20,9 @@ enum class DeserializeProjectResult {
 	PLUGIN_VERSION_NOT_SUPPORTED
 };
 
-struct LUMIX_ENGINE_API Engine {
+struct BLACK_ENGINE_API Engine {
 	struct InitArgs {
-		const char* log_path = "engine/lumix.log";
+		const char* log_path = "engine/black.h.h.log";
 		Span<const char*> plugins;
 		UniquePtr<struct FileSystem> file_system;
 		const char* engine_data_dir = nullptr;
@@ -70,4 +70,4 @@ protected:
 	Engine(const Engine&) = delete;
 };
 
-} // namespace Lumix
+} // namespace black

@@ -11,7 +11,7 @@
 #include "stb/stb_vorbis.cpp"
 
 
-namespace Lumix
+namespace black
 {
 
 
@@ -88,4 +88,4 @@ bool Clip::load(Span<const u8> mem) {
 }
 
 
-} // namespace Lumix
+} // namespace black

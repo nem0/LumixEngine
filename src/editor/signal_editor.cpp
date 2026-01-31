@@ -6,7 +6,7 @@
 #include "signal_editor.h"
 #include <imgui/imgui.h>
 
-namespace Lumix {
+namespace black {
 
 struct SignalEditorImpl : SignalEditor {
 	SignalEditorImpl(StudioApp& app) : m_app(app) {}
@@ -68,7 +68,7 @@ struct SignalEditorImpl : SignalEditor {
 };
 
 SignalEditor* createSignalEditor(StudioApp& app) {
-	return LUMIX_NEW(app.getAllocator(), SignalEditorImpl)(app);
+	return BLACK_NEW(app.getAllocator(), SignalEditorImpl)(app);
 }
 
 }

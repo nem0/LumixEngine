@@ -1,4 +1,4 @@
-#include "engine/lumix.h"
+#include "engine/black.h.h"
 
 #include "core/array.h"
 #include "core/crt.h"
@@ -18,7 +18,7 @@
 #include "renderer/renderer.h"
 
 
-namespace Lumix
+namespace black
 {
 
 static LocalRigidTransform invert(const LocalRigidTransform& tr)
@@ -650,4 +650,4 @@ void Model::unload()
 }
 
 
-} // namespace Lumix
+} // namespace black

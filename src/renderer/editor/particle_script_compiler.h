@@ -28,7 +28,7 @@
 // * create mesh from script
 // * JIT https://github.com/asmjit/asmjit
 
-namespace Lumix {
+namespace black {
 
 struct ParticleScriptToken {
 	enum Type {
@@ -1025,7 +1025,7 @@ struct ParticleScriptCompiler {
 			error(swizzle.value, "Invalid swizzle ", swizzle.value);
 			return nullptr;
 		}
-		auto* node = LUMIX_NEW(m_arena_allocator, SwizzleNode)(swizzle);
+		auto* node = BLACK_NEW(m_arena_allocator, SwizzleNode)(swizzle);
 		node->left = left;
 		return node;
 	}
@@ -1102,7 +1102,7 @@ struct ParticleScriptCompiler {
 	}
 
 	BlockNode* block(CompileContext& ctx, bool is_user_function_block) {
-		auto* node = LUMIX_NEW(m_arena_allocator, BlockNode)(peekToken(), m_arena_allocator);
+		auto* node = BLACK_NEW(m_arena_allocator, BlockNode)(peekToken(), m_arena_allocator);
 		node->parent = ctx.block;
 		node->is_user_function_block = is_user_function_block;
 		if (is_user_function_block) {
@@ -1151,7 +1151,7 @@ struct ParticleScriptCompiler {
 				return nullptr;
 			case Token::ERROR: return nullptr;
 			case Token::LEFT_BRACE: {
-				auto* node = LUMIX_NEW(m_arena_allocator, CompoundNode)(token, m_arena_allocator);
+				auto* node = BLACK_NEW(m_arena_allocator, CompoundNode)(token, m_arena_allocator);
 				node->elements.reserve(4);
 				for (;;) {
 					Token t = peekToken();
@@ -1185,7 +1185,7 @@ struct ParticleScriptCompiler {
 			case Token::IDENTIFIER: {
 				i32 param_index = getParamIndex(token.value);
 				if (param_index >= 0) {
-					auto* node = LUMIX_NEW(m_arena_allocator, VariableNode)(token);
+					auto* node = BLACK_NEW(m_arena_allocator, VariableNode)(token);
 					node->family = VariableFamily::GLOBAL;
 					node->index = param_index;
 					return node;
@@ -1193,24 +1193,24 @@ struct ParticleScriptCompiler {
 
 				for (Emitter& e : m_emitters) {
 					if (equalStrings(e.m_name, token.value)) {
-						auto* node = LUMIX_NEW(m_arena_allocator, EmitterRefNode)(token);
+						auto* node = BLACK_NEW(m_arena_allocator, EmitterRefNode)(token);
 						node->index = i32(&e - m_emitters.begin());
 						return node;
 					}
 				}
 
 				if (equalStrings(token.value, "entity_position")) {
-					auto* node = LUMIX_NEW(m_arena_allocator, CompoundNode)(token, m_arena_allocator);
+					auto* node = BLACK_NEW(m_arena_allocator, CompoundNode)(token, m_arena_allocator);
 					node->elements.reserve(3);
-					auto* x = LUMIX_NEW(m_arena_allocator, SystemValueNode)(token);
+					auto* x = BLACK_NEW(m_arena_allocator, SystemValueNode)(token);
 					x->value = ParticleSystemValues::ENTITY_POSITION_X;
 					node->elements.push(x);
 					
-					auto* y = LUMIX_NEW(m_arena_allocator, SystemValueNode)(token);
+					auto* y = BLACK_NEW(m_arena_allocator, SystemValueNode)(token);
 					y->value = ParticleSystemValues::ENTITY_POSITION_Y;
 					node->elements.push(y);
 					
-					auto* z = LUMIX_NEW(m_arena_allocator, SystemValueNode)(token);
+					auto* z = BLACK_NEW(m_arena_allocator, SystemValueNode)(token);
 					z->value = ParticleSystemValues::ENTITY_POSITION_Z;
 					node->elements.push(z);
 					return node;
@@ -1218,14 +1218,14 @@ struct ParticleScriptCompiler {
 
 				ParticleSystemValues system_value = getSystemValue(token.value);
 				if (system_value != ParticleSystemValues::NONE) {
-					auto* node = LUMIX_NEW(m_arena_allocator, SystemValueNode)(token);
+					auto* node = BLACK_NEW(m_arena_allocator, SystemValueNode)(token);
 					node->value = system_value;
 					return node;
 				}
 
 				SysCall syscall = getSysCall(token.value);
 				if (syscall.instruction != InstructionType::END) {
-					auto* node = LUMIX_NEW(m_arena_allocator, SysCallNode)(token, m_arena_allocator);
+					auto* node = BLACK_NEW(m_arena_allocator, SysCallNode)(token, m_arena_allocator);
 					if (!consume(Token::LEFT_PAREN)) return nullptr;
 					node->args.reserve(syscall.num_args);
 					for (u32 i = 0; i < syscall.num_args; ++i) {
@@ -1257,7 +1257,7 @@ struct ParticleScriptCompiler {
 				if (ctx.emitted) {
 					i32 input_index = find(ctx.emitted->m_inputs, token.value);
 					if (input_index >= 0) {
-						auto* node = LUMIX_NEW(m_arena_allocator, VariableNode)(token);
+						auto* node = BLACK_NEW(m_arena_allocator, VariableNode)(token);
 						node->family = VariableFamily::INPUT;
 						node->index = input_index;
 						return node;
@@ -1267,7 +1267,7 @@ struct ParticleScriptCompiler {
 				if (ctx.emitter) {
 					i32 output_index = find(ctx.emitter->m_outputs, token.value);
 					if (output_index >= 0) {
-						auto* node = LUMIX_NEW(m_arena_allocator, VariableNode)(token);
+						auto* node = BLACK_NEW(m_arena_allocator, VariableNode)(token);
 						node->family = VariableFamily::OUTPUT;
 						node->index = output_index;
 						return node;
@@ -1275,7 +1275,7 @@ struct ParticleScriptCompiler {
 
 					i32 input_index = find(ctx.emitter->m_inputs, token.value);
 					if (input_index >= 0) {
-						auto* node = LUMIX_NEW(m_arena_allocator, VariableNode)(token);
+						auto* node = BLACK_NEW(m_arena_allocator, VariableNode)(token);
 						node->family = VariableFamily::INPUT;
 						node->index = input_index;
 						return node;
@@ -1283,7 +1283,7 @@ struct ParticleScriptCompiler {
 
 					i32 var_index = find(ctx.emitter->m_vars, token.value);
 					if (var_index >= 0) {
-						auto* node = LUMIX_NEW(m_arena_allocator, VariableNode)(token);
+						auto* node = BLACK_NEW(m_arena_allocator, VariableNode)(token);
 						node->family = VariableFamily::CHANNEL;
 						node->index = var_index;
 						return node;
@@ -1292,7 +1292,7 @@ struct ParticleScriptCompiler {
 
 				i32 fn_index = getFunctionIndex(token.value);
 				if (fn_index >= 0) {
-					auto* node = LUMIX_NEW(m_arena_allocator, FunctionCallNode)(token, m_arena_allocator);
+					auto* node = BLACK_NEW(m_arena_allocator, FunctionCallNode)(token, m_arena_allocator);
 					if (!consume(Token::LEFT_PAREN)) return nullptr;
 					node->function_index = fn_index;
 					const Function& fn = m_functions[fn_index];
@@ -1309,7 +1309,7 @@ struct ParticleScriptCompiler {
 				if (ctx.function) {
 					i32 arg_index = getArgumentIndex(*ctx.function, token.value);
 					if (arg_index >= 0) {
-						auto* node = LUMIX_NEW(m_arena_allocator, FunctionArgNode)(token);
+						auto* node = BLACK_NEW(m_arena_allocator, FunctionArgNode)(token);
 						node->index = arg_index;
 						return node;
 					}
@@ -1323,15 +1323,15 @@ struct ParticleScriptCompiler {
 							return nullptr;
 						}
 						case ValueType::FLOAT: {
-							auto* node = LUMIX_NEW(m_arena_allocator, LiteralNode)(token);
+							auto* node = BLACK_NEW(m_arena_allocator, LiteralNode)(token);
 							node->value = c->value[0];
 							return node;
 						}
 						case ValueType::FLOAT2: {
-							auto* node = LUMIX_NEW(m_arena_allocator, CompoundNode)(token, m_arena_allocator);
-							auto* x = LUMIX_NEW(m_arena_allocator, LiteralNode)(token);
+							auto* node = BLACK_NEW(m_arena_allocator, CompoundNode)(token, m_arena_allocator);
+							auto* x = BLACK_NEW(m_arena_allocator, LiteralNode)(token);
 							x->value = c->value[0];
-							auto* y = LUMIX_NEW(m_arena_allocator, LiteralNode)(token);
+							auto* y = BLACK_NEW(m_arena_allocator, LiteralNode)(token);
 							y->value = c->value[1];
 							node->elements.reserve(2);
 							node->elements.push(x);
@@ -1339,12 +1339,12 @@ struct ParticleScriptCompiler {
 							return node;
 						}
 						case ValueType::FLOAT3: {
-							auto* node = LUMIX_NEW(m_arena_allocator, CompoundNode)(token, m_arena_allocator);
-							auto* x = LUMIX_NEW(m_arena_allocator, LiteralNode)(token);
+							auto* node = BLACK_NEW(m_arena_allocator, CompoundNode)(token, m_arena_allocator);
+							auto* x = BLACK_NEW(m_arena_allocator, LiteralNode)(token);
 							x->value = c->value[0];
-							auto* y = LUMIX_NEW(m_arena_allocator, LiteralNode)(token);
+							auto* y = BLACK_NEW(m_arena_allocator, LiteralNode)(token);
 							y->value = c->value[1];
-							auto* z = LUMIX_NEW(m_arena_allocator, LiteralNode)(token);
+							auto* z = BLACK_NEW(m_arena_allocator, LiteralNode)(token);
 							z->value = c->value[2];
 							node->elements.reserve(3);
 							node->elements.push(x);
@@ -1353,14 +1353,14 @@ struct ParticleScriptCompiler {
 							return node;
 						}
 						case ValueType::FLOAT4: {
-							auto* node = LUMIX_NEW(m_arena_allocator, CompoundNode)(token, m_arena_allocator);
-							auto* x = LUMIX_NEW(m_arena_allocator, LiteralNode)(token);
+							auto* node = BLACK_NEW(m_arena_allocator, CompoundNode)(token, m_arena_allocator);
+							auto* x = BLACK_NEW(m_arena_allocator, LiteralNode)(token);
 							x->value = c->value[0];
-							auto* y = LUMIX_NEW(m_arena_allocator, LiteralNode)(token);
+							auto* y = BLACK_NEW(m_arena_allocator, LiteralNode)(token);
 							y->value = c->value[1];
-							auto* z = LUMIX_NEW(m_arena_allocator, LiteralNode)(token);
+							auto* z = BLACK_NEW(m_arena_allocator, LiteralNode)(token);
 							z->value = c->value[2];
-							auto* w = LUMIX_NEW(m_arena_allocator, LiteralNode)(token);
+							auto* w = BLACK_NEW(m_arena_allocator, LiteralNode)(token);
 							w->value = c->value[3];
 							node->elements.reserve(4);
 							node->elements.push(x);
@@ -1378,7 +1378,7 @@ struct ParticleScriptCompiler {
 				while (block) {
 					for (const Local& local : block->locals) {
 						if (equalStrings(local.name, token.value)) {
-							auto* node = LUMIX_NEW(m_arena_allocator, VariableNode)(token);
+							auto* node = BLACK_NEW(m_arena_allocator, VariableNode)(token);
 							node->family = VariableFamily::LOCAL;
 							node->block = block;
 							node->index = i32(&local - block->locals.begin());
@@ -1392,21 +1392,21 @@ struct ParticleScriptCompiler {
 				return nullptr;
 			}
 			case Token::MINUS: {
-				UnaryOperatorNode* node = LUMIX_NEW(m_arena_allocator, UnaryOperatorNode)(token);
+				UnaryOperatorNode* node = BLACK_NEW(m_arena_allocator, UnaryOperatorNode)(token);
 				node->op = (Operators)token.value[0];
 				node->right = atom(ctx);
 				if (!node->right) return nullptr;
 				return node;
 			}
 			case Token::NOT: {
-				UnaryOperatorNode* node = LUMIX_NEW(m_arena_allocator, UnaryOperatorNode)(token);
+				UnaryOperatorNode* node = BLACK_NEW(m_arena_allocator, UnaryOperatorNode)(token);
 				node->op = Operators::NOT;
 				node->right = atom(ctx);
 				if (!node->right) return nullptr;
 				return node;
 			}
 			case Token::NUMBER: {
-				LiteralNode* node = LUMIX_NEW(m_arena_allocator, LiteralNode)(token);
+				LiteralNode* node = BLACK_NEW(m_arena_allocator, LiteralNode)(token);
 				node->value = asFloat(token);
 				return node;
 			}
@@ -1469,9 +1469,9 @@ struct ParticleScriptCompiler {
 			}
 		}
 
-		auto* assign = LUMIX_NEW(m_arena_allocator, AssignNode)(equal_token);
+		auto* assign = BLACK_NEW(m_arena_allocator, AssignNode)(equal_token);
 		assign->right = value;
-		auto* var_node = LUMIX_NEW(m_arena_allocator, VariableNode)(equal_token);
+		auto* var_node = BLACK_NEW(m_arena_allocator, VariableNode)(equal_token);
 		var_node->family = VariableFamily::LOCAL;
 		var_node->block = ctx.block;
 		var_node->index = ctx.block->locals.size() - 1;
@@ -1482,7 +1482,7 @@ struct ParticleScriptCompiler {
 	}
 
 	Node* ifStatement(CompileContext& ctx) {
-		IfNode* result = LUMIX_NEW(m_arena_allocator, IfNode)(peekToken());
+		IfNode* result = BLACK_NEW(m_arena_allocator, IfNode)(peekToken());
 		result->condition = expression(ctx, 0);
 		if (!result->condition) return nullptr;
 
@@ -1495,7 +1495,7 @@ struct ParticleScriptCompiler {
 				consumeToken();
 				Node* nested_if = ifStatement(ctx);
 				if (!nested_if) return nullptr;
-				auto* false_blk = LUMIX_NEW(m_arena_allocator, BlockNode)(peekToken(), m_arena_allocator);
+				auto* false_blk = BLACK_NEW(m_arena_allocator, BlockNode)(peekToken(), m_arena_allocator);
 				false_blk->statements.push(nested_if);
 				result->false_block = false_blk;
 			}
@@ -1538,7 +1538,7 @@ struct ParticleScriptCompiler {
 						consumeToken();
 						Node* value = expression(ctx, 0);
 						if (!value) return nullptr;
-						auto* node = LUMIX_NEW(m_arena_allocator, AssignNode)(op);
+						auto* node = BLACK_NEW(m_arena_allocator, AssignNode)(op);
 						node->left = lhs;
 						node->right = value;
 						if (!consume(Token::SEMICOLON)) return nullptr;
@@ -1576,7 +1576,7 @@ struct ParticleScriptCompiler {
 					consumeToken();
 					Node* rhs = expression(ctx, prio);
 					if (!rhs) return nullptr;
-					BinaryOperatorNode* opnode = LUMIX_NEW(m_arena_allocator, BinaryOperatorNode)(op);
+					BinaryOperatorNode* opnode = BLACK_NEW(m_arena_allocator, BinaryOperatorNode)(op);
 					if (op.type == Token::AND) opnode->op = Operators::AND;
 					else if (op.type == Token::OR) opnode->op = Operators::OR;
 					else opnode->op = (Operators)op.value[0];
@@ -1813,7 +1813,7 @@ struct ParticleScriptCompiler {
 	}
 
 	struct IRNode {
-		#ifdef LUMIX_DEBUG
+		#ifdef BLACK_DEBUG
 			// so VS debugger can show use actual type
 			virtual ~IRNode() {}
 		#endif
@@ -2309,7 +2309,7 @@ struct ParticleScriptCompiler {
 			}
 
 			// replace with mov
-			auto* mov = LUMIX_NEW(m_arena_allocator, IROp)(node->ast, m_arena_allocator);
+			auto* mov = BLACK_NEW(m_arena_allocator, IROp)(node->ast, m_arena_allocator);
 			mov->instruction = InstructionType::MOV;
 			mov->dst = dst;
 			mov->args.push(src);
@@ -2567,7 +2567,7 @@ struct ParticleScriptCompiler {
 					error(node->token.value, n->token.value, " can not be called in context of ", toString(ctx.entry_point));
 					return -1;
 				}
-				auto* res = LUMIX_NEW(m_arena_allocator, IROp)(node, m_arena_allocator);
+				auto* res = BLACK_NEW(m_arena_allocator, IROp)(node, m_arena_allocator);
 				res->instruction = n->function.instruction;
 				res->args.reserve(n->args.size());
 				for (Node* arg : n->args) {
@@ -2608,11 +2608,11 @@ struct ParticleScriptCompiler {
 					// TODO a > 0
 
 					ctx.emitted_index = -1;
-					auto* end = LUMIX_NEW(m_arena_allocator, IREnd)(n->after_block);
+					auto* end = BLACK_NEW(m_arena_allocator, IREnd)(n->after_block);
 					ctx.push(end);
 				}
 				else if (n->function.instruction == InstructionType::EMIT) {
-					auto* end = LUMIX_NEW(m_arena_allocator, IREnd)(n);
+					auto* end = BLACK_NEW(m_arena_allocator, IREnd)(n);
 					ctx.push(end);
 				}
 				return n->function.returns_value ? 1 : 0;
@@ -2792,7 +2792,7 @@ struct ParticleScriptCompiler {
 					i32 num = right;
 					IROp* ir_ops[4];
 					for (i32 i = 0; i < num; ++i) {
-						auto* res = LUMIX_NEW(m_arena_allocator, IROp)(node, m_arena_allocator);
+						auto* res = BLACK_NEW(m_arena_allocator, IROp)(node, m_arena_allocator);
 						res->instruction = InstructionType::MUL;
 						res->dst.type = DataStream::REGISTER;
 						res->dst.index = ++ctx.register_allocator;
@@ -2814,7 +2814,7 @@ struct ParticleScriptCompiler {
 					i32 num = right;
 					IROp* ir_ops[4];
 					for (i32 i = 0; i < num; ++i) {
-						auto* res = LUMIX_NEW(m_arena_allocator, IROp)(node, m_arena_allocator);
+						auto* res = BLACK_NEW(m_arena_allocator, IROp)(node, m_arena_allocator);
 						res->instruction = InstructionType::NOT;
 						res->dst.type = DataStream::REGISTER;
 						res->dst.index = ++ctx.register_allocator;
@@ -2843,7 +2843,7 @@ struct ParticleScriptCompiler {
 				i32 num = maximum(left, right);
 				IROp* ir_ops[4];
 				for (i32 i = 0; i < num; ++i) {
-					auto* res = LUMIX_NEW(m_arena_allocator, IROp)(n, m_arena_allocator);
+					auto* res = BLACK_NEW(m_arena_allocator, IROp)(n, m_arena_allocator);
 					res->instruction = toInstruction(n->op);
 					res->dst.type = DataStream::REGISTER;
 					res->args.push(ctx.stackValue(-right - left + (left == 1 ? 0 : i)));
@@ -2862,7 +2862,7 @@ struct ParticleScriptCompiler {
 				auto* n = (IfNode*)node;
 				i32 cond = compileIR(ctx, n->condition);
 				if (cond < 0) return -1;
-				auto* res = LUMIX_NEW(m_arena_allocator, IRIf)(n);
+				auto* res = BLACK_NEW(m_arena_allocator, IRIf)(n);
 				ctx.push(res);
 				if (cond < 0) return -1;
 				if (cond > 1) {
@@ -2875,7 +2875,7 @@ struct ParticleScriptCompiler {
 				i32 t = compileIR(ctx, n->true_block);
 				if (t < 0) return -1; // TODO t > 0
 
-				res->true_end = LUMIX_NEW(m_arena_allocator, IREnd)(n->true_block);
+				res->true_end = BLACK_NEW(m_arena_allocator, IREnd)(n->true_block);
 				res->true_end->is_conditional = true;
 				ctx.push(res->true_end);
 
@@ -2883,7 +2883,7 @@ struct ParticleScriptCompiler {
 					i32 f = compileIR(ctx, n->false_block);
 					if (f < 0) return -1; // TODO f > 0
 
-					res->false_end = LUMIX_NEW(m_arena_allocator, IREnd)(n->false_block);
+					res->false_end = BLACK_NEW(m_arena_allocator, IREnd)(n->false_block);
 					res->false_end->is_conditional = true;
 					ctx.push(res->false_end);
 				}
@@ -2934,7 +2934,7 @@ struct ParticleScriptCompiler {
 
 				IROp* movs[4];
 				for (i32 i = 0; i < left; ++i) {
-					auto* res = LUMIX_NEW(m_arena_allocator, IROp)(n, m_arena_allocator);
+					auto* res = BLACK_NEW(m_arena_allocator, IROp)(n, m_arena_allocator);
 					res->instruction = InstructionType::MOV;
 					res->dst = ctx.stackValue(-left + i);
 					res->args.push(ctx.stackValue(- left - right + (right == 1 ? 0 : i)));

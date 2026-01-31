@@ -5,7 +5,7 @@
 #include "renderer/texture.h"
 #include "sprite.h"
 
-namespace Lumix {
+namespace black {
 
 const ResourceType Sprite::TYPE("sprite");
 
@@ -66,4 +66,4 @@ bool Sprite::load(Span<const u8> mem) {
 }
 
 
-} // namespace Lumix
+} // namespace black

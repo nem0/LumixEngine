@@ -14,7 +14,7 @@
 #include "engine/file_system.h"
 #include "settings.h"
 
-namespace Lumix {
+namespace black {
 
 static const char SETTINGS_PATH[] = "studio.ini";
 static const char DEFAULT_SETTINGS_PATH[] = "engine/studio_default.ini";
@@ -206,7 +206,7 @@ Settings::Settings(StudioApp& app)
 	}
 	else {
 		m_app_data_path = tmp;
-		m_app_data_path.append("\\lumixengine\\studio\\");
+		m_app_data_path.append("\\blackengine\\studio\\");
 		if (!os::makePath(m_app_data_path.c_str())) {
 			logError("Could not create ", m_app_data_path);
 		}
@@ -771,7 +771,7 @@ static void Theme_Nord(ImGuiStyle* dst = NULL) {
 	style->FrameBorderSize = 1.00f;
 }
 
-static void Theme_Lumix(ImGuiStyle* dst = NULL) {
+static void Theme_black.h(ImGuiStyle* dst = NULL) {
 	ImGuiStyle* style = dst ? dst : &ImGui::GetStyle();
 	ImVec4* colors = style->Colors;
 	ImGui::StyleColorsDark(style); // Reset to base/dark theme
@@ -862,14 +862,14 @@ static void Theme_Lumix(ImGuiStyle* dst = NULL) {
 
 bool styleSelectorGUI() {
 	static int style_idx = -1;
-	if (ImGui::Combo("##themes", &style_idx, "Classic\0Dark\0Light\0Blender\0Nord\0Lumix\0")) {
+	if (ImGui::Combo("##themes", &style_idx, "Classic\0Dark\0Light\0Blender\0Nord\0black.h\0")) {
 		switch (style_idx) {
 			case 0: ImGui::StyleColorsClassic(); break;
 			case 1: ImGui::StyleColorsDark(); break;
 			case 2: ImGui::StyleColorsLight(); break;
 			case 3: Theme_Blender(); break;
 			case 4: Theme_Nord(); break;
-			case 5: Theme_Lumix(); break;
+			case 5: Theme_black.h(); break;
 		}
 		return true;
 	}
@@ -1646,4 +1646,4 @@ Settings::Variable& Settings::registerOption(const char* name, float* value, con
 	return new_var;
 }
 
-} // namespace Lumix
+} // namespace black

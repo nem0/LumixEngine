@@ -6,7 +6,7 @@
 #include "core/tag_allocator.h"
 #include "engine/resource.h"
 
-namespace Lumix
+namespace black
 {
 
 struct Model;
@@ -182,4 +182,4 @@ inline Time lerp(Time op1, Time op2, float t) {
 	return Time(u32(d));
 }
 
-} // namespace Lumix
+} // namespace black

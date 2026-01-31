@@ -16,7 +16,7 @@
 #include <math.h>
 #include <imgui/imgui.h>
 
-namespace Lumix {
+namespace black {
 
 struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::IPlugin {
 	SplineEditorPlugin(StudioApp& app)
@@ -273,7 +273,7 @@ struct SplineEditorPlugin : SplineEditor, StudioApp::MousePlugin, PropertyGrid::
 };
 
 SplineEditor* createSplineEditor(StudioApp& app) {
-	return LUMIX_NEW(app.getAllocator(), SplineEditorPlugin)(app);
+	return BLACK_NEW(app.getAllocator(), SplineEditorPlugin)(app);
 }
 
 

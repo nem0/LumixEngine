@@ -6,7 +6,7 @@
 #include "core/string.h"
 
 
-namespace Lumix {
+namespace black {
 
 OutputMemoryStream::OutputMemoryStream(IAllocator& allocator)
 	: m_allocator(&allocator)
@@ -436,4 +436,4 @@ const char* InputMemoryStream::readString()
 }
 
 
-} // namespace Lumix
+} // namespace black

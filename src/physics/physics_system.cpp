@@ -23,7 +23,7 @@
 #include "renderer/texture.h"
 
 
-namespace Lumix
+namespace black
 {
 
 	struct OutputStream final : physx::PxOutputStream {
@@ -75,11 +75,11 @@ namespace Lumix
 		{}
 
 		Resource* createResource(const Path& path) override {
-			return LUMIX_NEW(m_allocator, PhysicsGeometry)(path, *this, m_system, m_allocator);
+			return BLACK_NEW(m_allocator, PhysicsGeometry)(path, *this, m_system, m_allocator);
 		}
 
 		void destroyResource(Resource& resource) override {
-			LUMIX_DELETE(m_allocator, static_cast<PhysicsGeometry*>(&resource));
+			BLACK_DELETE(m_allocator, static_cast<PhysicsGeometry*>(&resource));
 		}
 
 		IAllocator& m_allocator;
@@ -112,7 +112,7 @@ namespace Lumix
 
 			m_foundation = PxCreateFoundation(PX_PHYSICS_VERSION, m_physx_allocator, m_error_callback);
 
-			#ifdef LUMIX_DEBUG
+			#ifdef BLACK_DEBUG
 				if (connect2VisualDebugger()) {
 					logInfo("PhysX debugger connected");
 				}
@@ -247,13 +247,13 @@ namespace Lumix
 		physx::PxPvdTransport* m_pvd_transport = nullptr;
 	};
 
-	LUMIX_PLUGIN_ENTRY(physics) {
+	BLACK_PLUGIN_ENTRY(physics) {
 		PROFILE_FUNCTION();
-		return LUMIX_NEW(engine.getAllocator(), PhysicsSystemImpl)(engine);
+		return BLACK_NEW(engine.getAllocator(), PhysicsSystemImpl)(engine);
 	}
 
 
-} // namespace Lumix
+} // namespace black
 
 
 

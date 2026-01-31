@@ -6,7 +6,7 @@ In this context, an action refers to any command in the editor that can be trigg
 
 Every action can be assigned a shortcut. A shortcut consist of a set of modifiers (Alt, Ctrl, Shift) and a key, so for example `Ctrl A`, `F11` or `Alt` (modifier only shortcuts are valid). It's valid for different actions to have the same shortcut assigned as long as they are in different Windows/parts of UI, since focus can be taken into account. 
 
-Shorcuts can be changed in editor in **Settings** window under **Shortcuts** tab. Shortcuts are saved **studio.ini** in user settings. You can see the location of **studio.ini** in editor in **Settings** under **General** tab. On Windows it should be in `%APPDATA%/lumixengine/studio/studio.ini`
+Shorcuts can be changed in editor in **Settings** window under **Shortcuts** tab. Shortcuts are saved **studio.ini** in user settings. You can see the location of **studio.ini** in editor in **Settings** under **General** tab. On Windows it should be in `%APPDATA%/blackengine/studio/studio.ini`
 
 ## `Action` Usage
 

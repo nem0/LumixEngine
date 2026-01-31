@@ -17,7 +17,7 @@
 #include "engine/world.h"
 #include "navigation/navigation_module.h"
 
-using namespace Lumix;
+using namespace black;
 
 namespace {
 
@@ -208,9 +208,9 @@ struct StudioAppPlugin : StudioApp::IPlugin
 } // anonymous
 
 
-LUMIX_STUDIO_ENTRY(navigation) {
+BLACK_STUDIO_ENTRY(navigation) {
 	PROFILE_FUNCTION();
 	IAllocator& allocator = app.getAllocator();
-	return LUMIX_NEW(allocator, StudioAppPlugin)(app);
+	return BLACK_NEW(allocator, StudioAppPlugin)(app);
 }
 

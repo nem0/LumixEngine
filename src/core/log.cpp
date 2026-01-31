@@ -8,7 +8,7 @@
 #include "core/sync.h"
 
 
-namespace Lumix
+namespace black
 {
 
 
@@ -60,4 +60,4 @@ namespace detail {
 } // namespace detail
 
 
-} // namespace Lumix
+} // namespace black

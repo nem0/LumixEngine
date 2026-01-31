@@ -34,7 +34,7 @@
 #include "terrain.h"
 #include "texture.h"
 
-namespace Lumix {
+namespace black {
 
 namespace {
 
@@ -54,7 +54,7 @@ enum class DrawCommandTypes : u8 {
 // float float_value = 0;
 // u32 sort_key = floatFlip(*(u32*)&float_value);
 // http://stereopsis.com/radix.html
-static LUMIX_FORCE_INLINE u32 floatFlip(u32 float_bits_value) {
+static BLACK_FORCE_INLINE u32 floatFlip(u32 float_bits_value) {
 	u32 mask = -i32(float_bits_value >> 31) | 0x80000000;
 	return float_bits_value ^ mask;
 }
@@ -80,65 +80,65 @@ enum class SortKey : u64;
 enum class SortValue : u64;
 
 // sort key makers
-LUMIX_FORCE_INLINE SortKey makeDecalSortKey(const Material* material, u8 bucket) {
+BLACK_FORCE_INLINE SortKey makeDecalSortKey(const Material* material, u8 bucket) {
 	return SortKey(material->getSortKey() | ((u64)bucket << SORT_KEY_BUCKET_SHIFT));
 }
 
-LUMIX_FORCE_INLINE SortKey makeParticleSortKey(const Material* material, u8 bucket) {
+BLACK_FORCE_INLINE SortKey makeParticleSortKey(const Material* material, u8 bucket) {
 	return SortKey(material->getSortKey() | ((u64)bucket << SORT_KEY_BUCKET_SHIFT));
 }
 
-LUMIX_FORCE_INLINE SortKey makeMeshSortKey(const MeshMaterial& mesh_math, u8 bucket) {
+BLACK_FORCE_INLINE SortKey makeMeshSortKey(const MeshMaterial& mesh_math, u8 bucket) {
  	return SortKey(mesh_math.sort_key | ((u64)bucket << SORT_KEY_BUCKET_SHIFT));
 }
 
-LUMIX_FORCE_INLINE SortKey makeDepthSortKey(float depth_squared, u8 bucket) {
+BLACK_FORCE_INLINE SortKey makeDepthSortKey(float depth_squared, u8 bucket) {
 	const u32 depth_bits = floatFlip(*(u32*)&depth_squared);
 	return SortKey(depth_bits | ((u64)bucket << SORT_KEY_BUCKET_SHIFT));
 }
 
-LUMIX_FORCE_INLINE SortKey makeAutoInstancedSortKey(i32 instancer_index, u8 bucket) {
+BLACK_FORCE_INLINE SortKey makeAutoInstancedSortKey(i32 instancer_index, u8 bucket) {
 	return SortKey(instancer_index | SORT_KEY_INSTANCED_FLAG | ((u64)bucket << SORT_KEY_BUCKET_SHIFT));
 }
 
 // sort value makers
-LUMIX_FORCE_INLINE SortValue makeParticleSortValue(EntityPtr entity, u32 emitter_idx) {
+BLACK_FORCE_INLINE SortValue makeParticleSortValue(EntityPtr entity, u32 emitter_idx) {
 	const u64 type_mask = (u64)DrawCommandTypes::PARTICLES << SORT_VALUE_TYPE_SHIFT;
 	return SortValue(entity.index | type_mask | ((u64)emitter_idx << SORT_VALUE_EMITTER_SHIFT));
 }
 
-LUMIX_FORCE_INLINE SortValue makeMeshParticleSortValue(EntityPtr entity, u32 emitter_idx) {
+BLACK_FORCE_INLINE SortValue makeMeshParticleSortValue(EntityPtr entity, u32 emitter_idx) {
 	const u64 type_mask = (u64)DrawCommandTypes::MESH_PARTICLES << SORT_VALUE_TYPE_SHIFT;
 	return SortValue(entity.index | type_mask | ((u64)emitter_idx << SORT_VALUE_EMITTER_SHIFT));
 }
 
-LUMIX_FORCE_INLINE SortValue makeRibbonsSortValue(EntityPtr entity, u32 emitter_idx) {
+BLACK_FORCE_INLINE SortValue makeRibbonsSortValue(EntityPtr entity, u32 emitter_idx) {
 	const u64 type_mask = (u64)DrawCommandTypes::RIBBONS << SORT_VALUE_TYPE_SHIFT;
 	return SortValue(entity.index | type_mask | ((u64)emitter_idx << SORT_VALUE_EMITTER_SHIFT));
 }
 
-LUMIX_FORCE_INLINE SortValue makeRibbonTubesSortValue(EntityPtr entity, u32 emitter_idx) {
+BLACK_FORCE_INLINE SortValue makeRibbonTubesSortValue(EntityPtr entity, u32 emitter_idx) {
 	const u64 type_mask = (u64)DrawCommandTypes::RIBBON_TUBES << SORT_VALUE_TYPE_SHIFT;
 	return SortValue(entity.index | type_mask | ((u64)emitter_idx << SORT_VALUE_EMITTER_SHIFT));
 }
 
-LUMIX_FORCE_INLINE SortValue makeDecalSortValue(EntityPtr entity) {
+BLACK_FORCE_INLINE SortValue makeDecalSortValue(EntityPtr entity) {
 	return SortValue(entity.index | (u64(DrawCommandTypes::DECAL) << SORT_VALUE_TYPE_SHIFT));
 }
 
-LUMIX_FORCE_INLINE SortValue makeCurveDecalSortValue(EntityPtr entity) {
+BLACK_FORCE_INLINE SortValue makeCurveDecalSortValue(EntityPtr entity) {
 	return SortValue(entity.index | (u64(DrawCommandTypes::CURVE_DECAL) << SORT_VALUE_TYPE_SHIFT));
 }
 
-LUMIX_FORCE_INLINE SortValue makeSkinnedSortValue(EntityPtr entity, u32 mesh_idx) {
+BLACK_FORCE_INLINE SortValue makeSkinnedSortValue(EntityPtr entity, u32 mesh_idx) {
 	return SortValue(entity.index | (u64(DrawCommandTypes::SKINNED) << SORT_VALUE_TYPE_SHIFT) | ((u64)mesh_idx << SORT_VALUE_MESH_IDX_SHIFT));
 }
 
-LUMIX_FORCE_INLINE SortValue makeMeshSortValue(EntityPtr entity, u32 mesh_idx) {
+BLACK_FORCE_INLINE SortValue makeMeshSortValue(EntityPtr entity, u32 mesh_idx) {
 	return SortValue(entity.index | (u64(DrawCommandTypes::MESH) << SORT_VALUE_TYPE_SHIFT) | ((u64)mesh_idx << SORT_VALUE_MESH_IDX_SHIFT));
 }
 
-LUMIX_FORCE_INLINE SortValue makeAutoInstancedSortValue(u32 batch_idx, u32 instancer_idx) {
+BLACK_FORCE_INLINE SortValue makeAutoInstancedSortValue(u32 batch_idx, u32 instancer_idx) {
 	return SortValue(batch_idx | (instancer_idx << SORT_VALUE_INSTANCER_SHIFT) | (u64(DrawCommandTypes::AUTOINSTANCED) << SORT_VALUE_TYPE_SHIFT));
 }
 
@@ -2746,13 +2746,13 @@ struct PipelineImpl final : Pipeline {
 		profiler::pushInt("Count", keys_count);
 		if (keys_count == 0) return;
 		
-		const u64* LUMIX_RESTRICT renderables = view.sorter.values.begin();
-		const u64* LUMIX_RESTRICT sort_keys = view.sorter.keys.begin();
+		const u64* BLACK_RESTRICT renderables = view.sorter.values.begin();
+		const u64* BLACK_RESTRICT sort_keys = view.sorter.keys.begin();
 
 		const World& world = m_module->getWorld();
 		const ShiftedFrustum frustum = view.cp.frustum;
-		ModelInstance* LUMIX_RESTRICT model_instances = m_module->getModelInstances().begin();
-		const Transform* LUMIX_RESTRICT transforms = world.getTransforms(); 
+		ModelInstance* BLACK_RESTRICT model_instances = m_module->getModelInstances().begin();
+		const Transform* BLACK_RESTRICT transforms = world.getTransforms(); 
 		const DVec3 camera_pos = view.cp.pos;
 		
 		gpu::VertexDecl skinned_instanced_decl(gpu::PrimitiveType::NONE);
@@ -3030,7 +3030,7 @@ struct PipelineImpl final : Pipeline {
 					}
 					case DrawCommandTypes::MESH: {
 						const u32 mesh_idx = u32(renderables[i] >> SORT_VALUE_MESH_IDX_SHIFT);
-						ModelInstance* LUMIX_RESTRICT mi = &model_instances[entity.index];
+						ModelInstance* BLACK_RESTRICT mi = &model_instances[entity.index];
 						const Mesh& mesh = mi->meshes[mesh_idx];
 						const MeshMaterial& mesh_mat = mi->mesh_materials[mesh_idx];
 						const float mesh_lod = mesh.lod;
@@ -3125,7 +3125,7 @@ struct PipelineImpl final : Pipeline {
 					}
 					case DrawCommandTypes::SKINNED: {
 						const u32 mesh_idx = u32(renderables[i] >> SORT_VALUE_MESH_IDX_SHIFT);
-						ModelInstance* LUMIX_RESTRICT mi = &model_instances[entity.index];
+						ModelInstance* BLACK_RESTRICT mi = &model_instances[entity.index];
 						const MeshMaterial& mesh_mat = mi->mesh_materials[mesh_idx];
 						u32 defines = skinned_define_mask | mesh_mat.material->getDefineMask();
 						const gpu::StateFlags state = mesh_mat.material->m_render_states | render_state;
@@ -3744,7 +3744,7 @@ struct PipelineImpl final : Pipeline {
 
 		void push(ModelInstance* mi) {
 			if (!batch) {
-				batch = LUMIX_NEW(allocator, Batch);
+				batch = BLACK_NEW(allocator, Batch);
 				batch->pipeline = &pipeline;
 			}
 
@@ -3814,8 +3814,8 @@ struct PipelineImpl final : Pipeline {
 			PoseProcessor pose_processor(*this, m_renderer.getCurrentFrameAllocator());
 
 			int total = 0;
-			ModelInstance* LUMIX_RESTRICT model_instances = m_module->getModelInstances().begin();
-			const Transform* LUMIX_RESTRICT transforms = m_module->getWorld().getTransforms();
+			ModelInstance* BLACK_RESTRICT model_instances = m_module->getModelInstances().begin();
+			const Transform* BLACK_RESTRICT transforms = m_module->getWorld().getTransforms();
 			const DVec3 camera_pos = view.cp.pos;
 			const DVec3 lod_ref_point = m_viewport.pos;
 			Sorter::Inserter inserter(view.sorter);
@@ -3828,7 +3828,7 @@ struct PipelineImpl final : Pipeline {
 				const CullResult* page = iterator.next();
 				if(!page) break;
 				total += page->header.count;
-				const EntityRef* LUMIX_RESTRICT renderables = page->entities;
+				const EntityRef* BLACK_RESTRICT renderables = page->entities;
 				const RenderableTypes type = (RenderableTypes)page->header.type;
 				
 				switch(type) {
@@ -4253,5 +4253,5 @@ UniquePtr<Pipeline> Pipeline::create(Renderer& renderer, PipelineType type)
 }
 
 
-} // namespace Lumix
+} // namespace black
 

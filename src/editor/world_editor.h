@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/lumix.h"
+#include "engine/black.h.h"
 
 #include "core/color.h"
 #include "editor/entity_folders.h"
@@ -10,7 +10,7 @@
 #include "engine/world.h"
 
 
-namespace Lumix
+namespace black
 {
 
 namespace os { enum class MouseButton; }
@@ -65,17 +65,17 @@ struct WorldView {
 	virtual struct WorldEditor& getEditor() = 0;
 };
 
-LUMIX_EDITOR_API void addCircle(WorldView& view, const DVec3& center, float radius, const Vec3& up, Color color);
-LUMIX_EDITOR_API void addSphere(WorldView& view, const DVec3& center, float radius, Color color);
-LUMIX_EDITOR_API void addCube(WorldView& view, const DVec3& center, const Vec3& x, const Vec3& y, const Vec3& z, Color color);
-LUMIX_EDITOR_API void addCube(WorldView& view, const DVec3& min, const DVec3& max, Color color);
-LUMIX_EDITOR_API void addLine(WorldView& view, const DVec3& a, const DVec3& b, Color color);
-LUMIX_EDITOR_API void addCylinder(WorldView& view, const DVec3& pos, const Vec3& up, float radius, float height, Color color);
-LUMIX_EDITOR_API void addCone(WorldView& view, const DVec3& vertex, const Vec3& dir, const Vec3& axis0, const Vec3& axis1, Color color);
-LUMIX_EDITOR_API void addFrustum(WorldView& view, const struct ShiftedFrustum& frustum, Color color);
-LUMIX_EDITOR_API void addCapsule(WorldView& view, const DVec3& position, float height, float radius, Color color);
+BLACK_EDITOR_API void addCircle(WorldView& view, const DVec3& center, float radius, const Vec3& up, Color color);
+BLACK_EDITOR_API void addSphere(WorldView& view, const DVec3& center, float radius, Color color);
+BLACK_EDITOR_API void addCube(WorldView& view, const DVec3& center, const Vec3& x, const Vec3& y, const Vec3& z, Color color);
+BLACK_EDITOR_API void addCube(WorldView& view, const DVec3& min, const DVec3& max, Color color);
+BLACK_EDITOR_API void addLine(WorldView& view, const DVec3& a, const DVec3& b, Color color);
+BLACK_EDITOR_API void addCylinder(WorldView& view, const DVec3& pos, const Vec3& up, float radius, float height, Color color);
+BLACK_EDITOR_API void addCone(WorldView& view, const DVec3& vertex, const Vec3& dir, const Vec3& axis0, const Vec3& axis1, Color color);
+BLACK_EDITOR_API void addFrustum(WorldView& view, const struct ShiftedFrustum& frustum, Color color);
+BLACK_EDITOR_API void addCapsule(WorldView& view, const DVec3& position, float height, float radius, Color color);
 
-struct LUMIX_EDITOR_API WorldEditor
+struct BLACK_EDITOR_API WorldEditor
 {
 	enum class Coordinate : i32	{
 		X,

@@ -11,7 +11,7 @@ namespace physx
 	class PxTriangleMesh;
 }
 
-namespace Lumix
+namespace black
 {
 
 
@@ -89,4 +89,4 @@ struct PhysicsGeometry final : Resource
 };
 
 
-} // namespace Lumix
+} // namespace black

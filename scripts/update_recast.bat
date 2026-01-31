@@ -14,7 +14,7 @@ pushd %~dp0
 	if not exist %dir_3rdparty_src% mkdir %dir_3rdparty_src%
 	pushd %dir_3rdparty_src%
 		if not exist recast (
-			git.exe clone --depth=1  https://github.com/nem0/recastnavigation.git recast
+			git.exe clone --depth=1  https://github.com/abdulrhmandeveloper2/recastnavigation.git recast
 			cd recast
 		) else (
 			cd recast

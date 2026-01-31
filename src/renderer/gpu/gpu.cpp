@@ -11,7 +11,7 @@
 #include "core/profiler.h"
 #include "core/string.h"
 
-namespace Lumix {
+namespace black {
 
 namespace gpu {
 
@@ -95,4 +95,4 @@ u32 getBytesPerPixel(gpu::TextureFormat format) {
 
 } // namespace gpu
 
-} // namespace Lumix
+} // namespace black

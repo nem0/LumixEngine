@@ -3,7 +3,7 @@
 #include "property_grid.h"
 #include "studio_app.h"
 
-namespace Lumix {
+namespace black {
 
 struct SignalEditor : StudioApp::IPlugin, PropertyGrid::IPlugin {
 };

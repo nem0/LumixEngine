@@ -9,7 +9,7 @@
 #include <sys/eventfd.h>
 #include <unistd.h>
 
-namespace Lumix
+namespace black
 {
 
 ConditionVariable::ConditionVariable() {
@@ -104,4 +104,4 @@ void Mutex::exit()
 }
 
 
-} // namespace Lumix
+} // namespace black

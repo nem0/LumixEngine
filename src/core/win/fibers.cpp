@@ -2,7 +2,7 @@
 #include "core/profiler.h"
 #include "core/win/simple_win.h"
 
-namespace Lumix
+namespace black
 {
 
 
@@ -45,4 +45,4 @@ bool isValid(Handle handle)
 } // namespace Fibers
 
 
-} // namespace Lumix
+} // namespace black

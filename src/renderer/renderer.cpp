@@ -30,7 +30,7 @@
 #include "renderer/terrain.h"
 #include "renderer/texture.h"
 
-namespace Lumix {
+namespace black {
 
 RenderBufferHandle RenderPlugin::renderBeforeTonemap(const GBuffer& gbuffer, RenderBufferHandle input, Pipeline& pipeline) { return input; }
 RenderBufferHandle RenderPlugin::renderBeforeTransparent(const GBuffer& gbuffer, RenderBufferHandle input, Pipeline& pipeline) { return input; }
@@ -54,7 +54,7 @@ struct Renderbuffer {
 		TO_REMOVE
 	};
 	
-	#ifdef LUMIX_DEBUG
+	#ifdef BLACK_DEBUG
 		StaticString<32> debug_name;
 	#endif
 	gpu::TextureHandle handle;
@@ -78,7 +78,7 @@ struct TransientBuffer {
 		memset(m_ptr, 0, INIT_SIZE);
 	}
 
-	LUMIX_FORCE_INLINE TransientSlice alloc(u32 size) {
+	BLACK_FORCE_INLINE TransientSlice alloc(u32 size) {
 		TransientSlice slice;
 		size = (size + (ALIGN - 1)) & ~(ALIGN - 1);
 		slice.offset = m_offset.add(size);
@@ -154,15 +154,15 @@ struct TransientBuffer {
 struct UniformPool : TransientBuffer<256> {};
 struct TransientPool : TransientBuffer<16> {};
 
-LUMIX_RENDERER_API TransientSlice alloc(UniformPool& pool, u32 size) {
+BLACK_RENDERER_API TransientSlice alloc(UniformPool& pool, u32 size) {
 	return pool.alloc(size);
 }
 
-LUMIX_RENDERER_API TransientSlice alloc(TransientPool& pool, u32 size) {
+BLACK_RENDERER_API TransientSlice alloc(TransientPool& pool, u32 size) {
 	return pool.alloc(size);
 }
 
-LUMIX_RENDERER_API TransientSlice alloc(UniformPool& pool, const void* data, u32 size) {
+BLACK_RENDERER_API TransientSlice alloc(UniformPool& pool, const void* data, u32 size) {
 	TransientSlice slice = pool.alloc(size);
 	memcpy(slice.ptr, data, size);
 	return slice;
@@ -208,13 +208,13 @@ struct RenderResourceManager : ResourceManager
 
 	Resource* createResource(const Path& path) override
 	{
-		return LUMIX_NEW(m_allocator, T)(path, *this, m_renderer, m_allocator);
+		return BLACK_NEW(m_allocator, T)(path, *this, m_renderer, m_allocator);
 	}
 
 
 	void destroyResource(Resource& resource) override
 	{
-		LUMIX_DELETE(m_allocator, &resource);
+		BLACK_DELETE(m_allocator, &resource);
 	}
 
 	Renderer& m_renderer;
@@ -479,7 +479,7 @@ struct RendererImpl final : Renderer {
 		m_material_manager.destroy();
 		m_shader_manager.destroy();
 		m_font_manager->destroy();
-		LUMIX_DELETE(m_allocator, m_font_manager);
+		BLACK_DELETE(m_allocator, m_font_manager);
 		
 		frame();
 		frame();
@@ -658,7 +658,7 @@ struct RendererImpl final : Renderer {
 		m_material_manager.create(Material::TYPE, manager);
 		m_particle_emitter_manager.create(ParticleSystemResource::TYPE, manager);
 		m_shader_manager.create(Shader::TYPE, manager);
-		m_font_manager = LUMIX_NEW(m_allocator, FontManager)(*this, m_allocator);
+		m_font_manager = BLACK_NEW(m_allocator, FontManager)(*this, m_allocator);
 		m_font_manager->create(FontResource::TYPE, manager);
 		m_layers.emplace("default");
 
@@ -733,7 +733,7 @@ struct RendererImpl final : Renderer {
 			if (rb.flags != desc.flags) continue;
 
 			rb.state = Renderbuffer::ACTIVE;
-			#ifdef LUMIX_DEBUG
+			#ifdef BLACK_DEBUG
 				rb.debug_name = desc.debug_name;
 			#endif
 			StaticString<128> name(desc.debug_name, " ", u32(&rb - m_renderbuffers.begin()));
@@ -749,7 +749,7 @@ struct RendererImpl final : Renderer {
 			rb.flags = desc.flags;
 			rb.format = desc.format;
 			rb.size = desc.size;
-			#ifdef LUMIX_DEBUG
+			#ifdef BLACK_DEBUG
 				rb.debug_name = desc.debug_name;
 			#endif
 			return RenderBufferHandle(u32(&rb - m_renderbuffers.begin()));
@@ -761,7 +761,7 @@ struct RendererImpl final : Renderer {
 		rb.flags = desc.flags;
 		rb.format = desc.format;
 		rb.size = desc.size;
-		#ifdef LUMIX_DEBUG		
+		#ifdef BLACK_DEBUG		
 			rb.debug_name = desc.debug_name;
 		#endif
 		return RenderBufferHandle(m_renderbuffers.size() - 1);
@@ -1403,13 +1403,13 @@ FrameData::FrameData(struct RendererImpl& renderer, IAllocator& allocator, PageA
 	jobs::turnRed(&can_setup);
 }
 
-LUMIX_PLUGIN_ENTRY(renderer) {
+BLACK_PLUGIN_ENTRY(renderer) {
 	PROFILE_FUNCTION();
-	return LUMIX_NEW(engine.getAllocator(), RendererImpl)(engine);
+	return BLACK_NEW(engine.getAllocator(), RendererImpl)(engine);
 }
 
 
-} // namespace Lumix
+} // namespace black
 
 
 

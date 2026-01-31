@@ -25,7 +25,7 @@
 #include <d3d12.h>
 #include <d3dcompiler.h>
 #include <d3dx12.h>
-#ifdef LUMIX_DEBUG
+#ifdef BLACK_DEBUG
 	#include <dxgidebug.h>
 #endif
 #include <dxgi1_6.h>
@@ -35,14 +35,14 @@
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "dxgi.lib")
 
-#if defined LUMIX_DEBUG && !defined __clang__
+#if defined BLACK_DEBUG && !defined __clang__
 	#define USE_PIX
 	#pragma comment(lib, "WinPixEventRuntime.lib")
 	#include "pix3.h"
 #endif
 
 
-namespace Lumix::gpu {
+namespace black::gpu {
 
 static constexpr u32 NUM_BACKBUFFERS = 2;
 static constexpr u32 SCRATCH_BUFFER_SIZE = 8 * 1024 * 1024;
@@ -462,7 +462,7 @@ struct ShaderCompiler {
 			NULL,
 			entry_point,
 			target,
-			#ifdef LUMIX_DEBUG
+			#ifdef BLACK_DEBUG
 				D3DCOMPILE_PACK_MATRIX_ROW_MAJOR | D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES | D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,
 			#else
 				D3DCOMPILE_PACK_MATRIX_ROW_MAJOR | D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES,
@@ -1376,7 +1376,7 @@ QueryHandle createQuery(QueryType type) {
 	switch(type) {
 		case QueryType::STATS: {
 			ASSERT(d3d->stats_query_count < STATS_QUERY_COUNT);
-			Query* q = LUMIX_NEW(d3d->allocator, Query);
+			Query* q = BLACK_NEW(d3d->allocator, Query);
 			q->idx = d3d->stats_query_count;
 			q->type = type;
 			++d3d->stats_query_count;
@@ -1384,7 +1384,7 @@ QueryHandle createQuery(QueryType type) {
 		}
 		case QueryType::TIMESTAMP: {
 			ASSERT(d3d->timestamp_query_count < TIMESTAMP_QUERY_COUNT);
-			Query* q = LUMIX_NEW(d3d->allocator, Query);
+			Query* q = BLACK_NEW(d3d->allocator, Query);
 			q->type = type;
 			q->idx = d3d->timestamp_query_count;
 			++d3d->timestamp_query_count;
@@ -1402,7 +1402,7 @@ void destroy(ProgramHandle program) {
 	checkThread();
 
 	ASSERT(program);
-	LUMIX_DELETE(d3d->allocator, program);
+	BLACK_DELETE(d3d->allocator, program);
 }
 
 void destroy(TextureHandle texture) {
@@ -1412,12 +1412,12 @@ void destroy(TextureHandle texture) {
 	debug::unregisterAlloc(t.allocation_info);
 	if (t.resource && !t.is_view) d3d->frame->to_release.push(t.resource);
 	if (t.heap_id != INVALID_HEAP_ID) d3d->frame->to_heap_release.push(t.heap_id);
-	LUMIX_DELETE(d3d->allocator, texture);
+	BLACK_DELETE(d3d->allocator, texture);
 }
 
 void destroy(QueryHandle query) {
 	checkThread();
-	LUMIX_DELETE(d3d->allocator, query);
+	BLACK_DELETE(d3d->allocator, query);
 }
 
 void update(TextureHandle texture, u32 mip, u32 x, u32 y, u32 z, u32 w, u32 h, TextureFormat format, const void* buf, u32 buf_size) {
@@ -1749,7 +1749,7 @@ void preinit(IAllocator& allocator, bool load_renderdoc) {
 }
 
 void shutdown() {
-	d3d->shader_compiler.saveCache(".lumix/shader_cache_dx");
+	d3d->shader_compiler.saveCache(".black.h/shader_cache_dx");
 
 	if (d3d->nvml_lib) {
 		nvmlShutdown();
@@ -1775,7 +1775,7 @@ void shutdown() {
 	if(d3d->debug) d3d->debug->Release();
 	d3d->device->Release();
 
-	#ifdef LUMIX_DEBUG
+	#ifdef BLACK_DEBUG
 		auto api_DXGIGetDebugInterface1 = (decltype(DXGIGetDebugInterface1)*)GetProcAddress(d3d->dxgi_dll, "DXGIGetDebugInterface1");
 		IDXGIDebug1* dxgi_debug;
 		if (DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgi_debug)) == S_OK) {
@@ -1900,7 +1900,7 @@ ID3D12RootSignature* createRootSignature() {
 bool init(void* hwnd, InitFlags flags) {
 	PROFILE_FUNCTION();
 	bool debug = u32(flags & InitFlags::DEBUG);
-	#ifdef LUMIX_DEBUG
+	#ifdef BLACK_DEBUG
 		debug = true;
 	#endif
 
@@ -2063,7 +2063,7 @@ bool init(void* hwnd, InitFlags flags) {
 
 	for (TextureHandle& h : d3d->current_framebuffer.attachments) h = INVALID_TEXTURE;
 
-	d3d->shader_compiler.loadCache(".lumix/shader_cache_dx");
+	d3d->shader_compiler.loadCache(".black.h/shader_cache_dx");
 
 	{
 		D3D12_QUERY_HEAP_DESC queryHeapDesc = {};
@@ -2523,18 +2523,18 @@ void createBuffer(BufferHandle buffer, BufferFlags flags, size_t size, const voi
 }
 
 ProgramHandle allocProgramHandle() {
-	Program* p = LUMIX_NEW(d3d->allocator, Program)(d3d->allocator);
+	Program* p = BLACK_NEW(d3d->allocator, Program)(d3d->allocator);
 	return p;
 }
 
 BufferHandle allocBufferHandle() {
-	BufferHandle b = LUMIX_NEW(d3d->allocator, Buffer);
+	BufferHandle b = BLACK_NEW(d3d->allocator, Buffer);
 	b->heap_id = d3d->srv_heap.reserveID();
 	return b;
 }
 
 TextureHandle allocTextureHandle() {
-	TextureHandle t = LUMIX_NEW(d3d->allocator, Texture);
+	TextureHandle t = BLACK_NEW(d3d->allocator, Texture);
 	t->heap_id = d3d->srv_heap.reserveID();
 	return t;
 }
@@ -2967,7 +2967,7 @@ void destroy(BufferHandle buffer) {
 
 	debug::unregisterAlloc(buffer->allocation_info);
 
-	LUMIX_DELETE(d3d->allocator, buffer);
+	BLACK_DELETE(d3d->allocator, buffer);
 }
 
 

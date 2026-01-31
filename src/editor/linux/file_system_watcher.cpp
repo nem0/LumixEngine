@@ -10,7 +10,7 @@
 #include <unistd.h>
 
 
-namespace Lumix
+namespace black
 {
 
 
@@ -18,19 +18,19 @@ struct FileSystemWatcherImpl;
 
 
 
-struct FileSystemWatcherTask : Lumix::Thread
+struct FileSystemWatcherTask : black.h::Thread
 {
 	FileSystemWatcherTask(const char* path,
         FileSystemWatcherImpl& _watcher,
-		Lumix::IAllocator& _allocator)
+		black.h::IAllocator& _allocator)
 		: Thread(_allocator)
 		, watcher(_watcher)
 		, watched(_allocator)
 		, allocator(_allocator)
 	{
-		Lumix::copyString(this->path, path);
-		int len = Lumix::stringLength(path);
-		if(len > 0 && path[len - 1] != '/') Lumix::catString(this->path, "/");
+		black.h::copyString(this->path, path);
+		int len = black.h::stringLength(path);
+		if(len > 0 && path[len - 1] != '/') black.h::catString(this->path, "/");
 	}
 
 
@@ -41,18 +41,18 @@ struct FileSystemWatcherTask : Lumix::Thread
         close(fd);
     }
 
-    Lumix::IAllocator& allocator;
+    black.h::IAllocator& allocator;
     FileSystemWatcherImpl& watcher;
 	volatile bool finished = false;
 	char path[MAX_PATH];
-	Lumix::HashMap<int, Lumix::StaticString<MAX_PATH> > watched;
+	black.h::HashMap<int, black.h::StaticString<MAX_PATH> > watched;
 	int fd;
 };
 
 
 struct FileSystemWatcherImpl : FileSystemWatcher
 {
-	explicit FileSystemWatcherImpl(Lumix::IAllocator& _allocator)
+	explicit FileSystemWatcherImpl(black.h::IAllocator& _allocator)
 		: allocator(_allocator)
 		, task(nullptr)
 	{
@@ -65,17 +65,17 @@ struct FileSystemWatcherImpl : FileSystemWatcher
         {
             task->cancel();
             task->destroy();
-            LUMIX_DELETE(allocator, task);
+            BLACK_DELETE(allocator, task);
         }
     }
 
 
     bool start(const char* path)
     {
-        task = LUMIX_NEW(allocator, FileSystemWatcherTask)(path, *this, allocator);
+        task = BLACK_NEW(allocator, FileSystemWatcherTask)(path, *this, allocator);
         if (!task->create("FileSystemWatcherTask", true))
         {
-            LUMIX_DELETE(allocator, task);
+            BLACK_DELETE(allocator, task);
             task = nullptr;
             return false;
         }
@@ -83,16 +83,16 @@ struct FileSystemWatcherImpl : FileSystemWatcher
     }
 
 
-	virtual Lumix::Delegate<void(const char*)>& getCallback() { return callback; }
+	virtual black.h::Delegate<void(const char*)>& getCallback() { return callback; }
 
 
     FileSystemWatcherTask* task;
-	Lumix::Delegate<void(const char*)> callback;
-	Lumix::IAllocator& allocator;
+	black.h::Delegate<void(const char*)> callback;
+	black.h::IAllocator& allocator;
 };
 
 
-UniquePtr<FileSystemWatcher> FileSystemWatcher::create(const char* path, Lumix::IAllocator& allocator)
+UniquePtr<FileSystemWatcher> FileSystemWatcher::create(const char* path, black.h::IAllocator& allocator)
 {
 	UniquePtr<FileSystemWatcherImpl> watcher = UniquePtr<FileSystemWatcherImpl>::create(allocator, allocator);
 	if(!watcher->start(path))
@@ -115,10 +115,10 @@ static void addWatch(FileSystemWatcherTask& task, const char* path, int root_len
     while (os::getNextFile(iter, &info))
     {
         if (!info.is_directory) continue;
-		if (Lumix::equalStrings(info.filename, ".")) continue;
-		if (Lumix::equalStrings(info.filename, "..")) continue;
+		if (black.h::equalStrings(info.filename, ".")) continue;
+		if (black.h::equalStrings(info.filename, "..")) continue;
 
-        Lumix::StaticString<MAX_PATH> tmp(path, info.filename, "/");
+        black.h::StaticString<MAX_PATH> tmp(path, info.filename, "/");
         addWatch(task, tmp, root_length);
     }
     os::destroyFileIterator(iter);
@@ -131,12 +131,12 @@ static void getName(FileSystemWatcherTask& task, inotify_event* event, char* out
 
     if (iter == task.watched.end())
     {
-        Lumix::copyString(Span(out, max_size), event->name);
+        black.h::copyString(Span(out, max_size), event->name);
         return;
     }
 
-    Lumix::copyString(Span(out, max_size), iter.value());
-    Lumix::catString(Span(out, max_size), event->name);
+    black.h::copyString(Span(out, max_size), iter.value());
+    black.h::catString(Span(out, max_size), event->name);
 }
 
 
@@ -145,7 +145,7 @@ int FileSystemWatcherTask::task()
     fd = inotify_init();
     if (fd == -1) return false;
 
-	int root_length = Lumix::stringLength(path);
+	int root_length = black.h::stringLength(path);
     addWatch(*this, path, root_length);
 
     char buf[4096];
@@ -168,7 +168,7 @@ int FileSystemWatcherTask::task()
             while ((char*)event < buf + r)
             {
                 char tmp[MAX_PATH];
-                getName(*this, event, tmp, Lumix::lengthOf(tmp));
+                getName(*this, event, tmp, black.h::lengthOf(tmp));
                 if (event->mask & IN_CREATE) addWatch(*this, tmp, root_length);
                 watcher.callback.invoke(tmp);
 
@@ -181,4 +181,4 @@ int FileSystemWatcherTask::task()
 }
 
 
-} // namespace Lumix
+} // namespace black

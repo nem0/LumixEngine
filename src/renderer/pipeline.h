@@ -9,7 +9,7 @@
 #include "renderer/renderer.h"
 
 
-namespace Lumix {
+namespace black {
 
 struct Path;
 struct Renderer;
@@ -80,7 +80,7 @@ struct GBuffer {
 	RenderBufferHandle DS;
 };
 
-struct LUMIX_RENDERER_API Pipeline {
+struct BLACK_RENDERER_API Pipeline {
 	static UniquePtr<Pipeline> create(Renderer& renderer, PipelineType type);
 	
 	virtual ~Pipeline() {}
@@ -167,4 +167,4 @@ protected:
 	virtual InstanceData getData(u32 idx, u32 size, u32 align) = 0;
 };
 
-} // namespace Lumix
+} // namespace black

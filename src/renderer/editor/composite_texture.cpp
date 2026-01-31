@@ -19,7 +19,7 @@
 #include <math.h>
 #include <stb/stb_image_resize2.h>
 
-namespace Lumix {
+namespace black {
 
 enum class CompositeTexture::NodeType : u32 {
 	OUTPUT,
@@ -277,7 +277,7 @@ void CompositeTexture::deleteUnreachable() {
 				}
 			}
 
-			LUMIX_DELETE(m_allocator, node);
+			BLACK_DELETE(m_allocator, node);
 			m_nodes.swapAndPop(i);
 		}
 	}	
@@ -294,7 +294,7 @@ void CompositeTexture::deleteSelectedNodes() {
 				}
 			}
 
-			LUMIX_DELETE(m_allocator, node);
+			BLACK_DELETE(m_allocator, node);
 			m_nodes.swapAndPop(i);
 		}
 	}
@@ -2767,54 +2767,54 @@ struct OutputNode final : CompositeTexture::Node {
 CompositeTexture::Node* createNode(CompositeTexture::NodeType type, CompositeTexture& resource, IAllocator& allocator) {
 	CompositeTexture::Node* node = nullptr;
 	switch (type) {
-		case CompositeTexture::NodeType::OUTPUT: node = LUMIX_NEW(allocator, OutputNode)(allocator); break;
-		case CompositeTexture::NodeType::INPUT: node = LUMIX_NEW(allocator, InputNode)(allocator); break;
-		case CompositeTexture::NodeType::FLIP: node = LUMIX_NEW(allocator, FlipNode)(allocator); break;
-		case CompositeTexture::NodeType::INVERT: node = LUMIX_NEW(allocator, InvertNode)(allocator); break;
-		case CompositeTexture::NodeType::COLOR: node = LUMIX_NEW(allocator, ColorNode)(allocator); break;
-		case CompositeTexture::NodeType::SPLIT: node = LUMIX_NEW(allocator, SplitNode)(allocator); break;
-		case CompositeTexture::NodeType::MERGE: node = LUMIX_NEW(allocator, MergeNode)(allocator); break;
-		case CompositeTexture::NodeType::GAMMA: node = LUMIX_NEW(allocator, GammaNode)(allocator); break;
-		case CompositeTexture::NodeType::CROP: node = LUMIX_NEW(allocator, CropNode)(allocator); break;
-		case CompositeTexture::NodeType::CONTRAST: node = LUMIX_NEW(allocator, ContrastNode)(allocator); break;
-		case CompositeTexture::NodeType::BRIGHTNESS: node = LUMIX_NEW(allocator, BrightnessNode)(allocator); break;
-		case CompositeTexture::NodeType::RESIZE: node = LUMIX_NEW(allocator, ResizeNode)(allocator); break;
-		case CompositeTexture::NodeType::SPLAT: node = LUMIX_NEW(allocator, SplatNode)(allocator); break;
-		case CompositeTexture::NodeType::CELLULAR_NOISE: node = LUMIX_NEW(allocator, CellularNoiseNode)(allocator); break;
-		case CompositeTexture::NodeType::GRADIENT_NOISE: node = LUMIX_NEW(allocator, GradientNoiseNode)(allocator); break;
-		case CompositeTexture::NodeType::WAVE_NOISE: node = LUMIX_NEW(allocator, WaveNoiseNode)(allocator); break;
-		case CompositeTexture::NodeType::BLUR: node = LUMIX_NEW(allocator, BlurNode)(allocator); break;
-		case CompositeTexture::NodeType::NORMALMAP: node = LUMIX_NEW(allocator, NormalmapNode)(allocator); break;
-		case CompositeTexture::NodeType::TWIRL: node = LUMIX_NEW(allocator, TwirlNode)(allocator); break;
-		case CompositeTexture::NodeType::WARP: node = LUMIX_NEW(allocator, WarpNode)(allocator); break;
-		case CompositeTexture::NodeType::CHECKERBOARD: node = LUMIX_NEW(allocator, CheckerboardNode)(allocator); break;
-		case CompositeTexture::NodeType::TRIANGLE: node = LUMIX_NEW(allocator, TriangleNode)(allocator); break;
-		case CompositeTexture::NodeType::SQUARE: node = LUMIX_NEW(allocator, SquareNode)(allocator); break;
-		case CompositeTexture::NodeType::CIRCLE: node = LUMIX_NEW(allocator, CircleNode)(allocator); break;
-		case CompositeTexture::NodeType::SET_ALPHA: node = LUMIX_NEW(allocator, SetAlphaNode)(allocator); break;
-		case CompositeTexture::NodeType::CURVE: node = LUMIX_NEW(allocator, CurveNode)(allocator); break;
-		case CompositeTexture::NodeType::GRAYSCALE: node = LUMIX_NEW(allocator, GrayscaleNode)(allocator); break;
-		case CompositeTexture::NodeType::CONSTANT: node = LUMIX_NEW(allocator, ConstantNode)(allocator); break;
-		case CompositeTexture::NodeType::MULTIPLY: node = LUMIX_NEW(allocator, MultiplyNode)(allocator); break;
-		case CompositeTexture::NodeType::MIX: node = LUMIX_NEW(allocator, MixNode)(allocator); break;
-		case CompositeTexture::NodeType::GRADIENT: node = LUMIX_NEW(allocator, GradientNode)(allocator); break;
-		case CompositeTexture::NodeType::VALUE_NOISE: node = LUMIX_NEW(allocator, RandomPixelsNode)(allocator); break;
-		case CompositeTexture::NodeType::SHARPEN: node = LUMIX_NEW(allocator, SharpenNode)(allocator); break;
-		case CompositeTexture::NodeType::GRADIENT_MAP: node = LUMIX_NEW(allocator, GradientMapNode)(allocator); break;
-		case CompositeTexture::NodeType::CIRCULAR_SPLATTER: node = LUMIX_NEW(allocator, CircularSplatterNode)(allocator); break;
-		case CompositeTexture::NodeType::PIXEL_PROCESSOR: node = LUMIX_NEW(allocator, PixelProcessorNode)(allocator); break;
-		case CompositeTexture::NodeType::SPLATTER: node = LUMIX_NEW(allocator, SplatterNode)(allocator); break;
-		case CompositeTexture::NodeType::TRANSLATE: node = LUMIX_NEW(allocator, TranslateNode)(allocator); break;
-		case CompositeTexture::NodeType::STATIC_SWITCH: node = LUMIX_NEW(allocator, StaticSwitchNode)(allocator); break;
-		case CompositeTexture::NodeType::STEP: node = LUMIX_NEW(allocator, StepNode)(allocator); break;
-		case CompositeTexture::NodeType::PIXEL_COLOR: node = LUMIX_NEW(allocator, PixelNode<CompositeTexture::NodeType::PIXEL_COLOR>)(allocator); break;
-		case CompositeTexture::NodeType::PIXEL_X: node = LUMIX_NEW(allocator, PixelNode<CompositeTexture::NodeType::PIXEL_X>)(allocator); break;
-		case CompositeTexture::NodeType::PIXEL_Y: node = LUMIX_NEW(allocator, PixelNode<CompositeTexture::NodeType::PIXEL_Y>)(allocator); break;
-		case CompositeTexture::NodeType::PIXEL_CTX_W: node = LUMIX_NEW(allocator, PixelNode<CompositeTexture::NodeType::PIXEL_CTX_W>)(allocator); break;
-		case CompositeTexture::NodeType::PIXEL_CTX_H: node = LUMIX_NEW(allocator, PixelNode<CompositeTexture::NodeType::PIXEL_CTX_H>)(allocator); break;
-		case CompositeTexture::NodeType::DIVIDE: node = LUMIX_NEW(allocator, MathNode<CompositeTexture::NodeType::DIVIDE>)(allocator); break;
-		case CompositeTexture::NodeType::MAX: node = LUMIX_NEW(allocator, MathNode<CompositeTexture::NodeType::MAX>)(allocator); break;
-		case CompositeTexture::NodeType::MIN: node = LUMIX_NEW(allocator, MathNode<CompositeTexture::NodeType::MIN>)(allocator); break;
+		case CompositeTexture::NodeType::OUTPUT: node = BLACK_NEW(allocator, OutputNode)(allocator); break;
+		case CompositeTexture::NodeType::INPUT: node = BLACK_NEW(allocator, InputNode)(allocator); break;
+		case CompositeTexture::NodeType::FLIP: node = BLACK_NEW(allocator, FlipNode)(allocator); break;
+		case CompositeTexture::NodeType::INVERT: node = BLACK_NEW(allocator, InvertNode)(allocator); break;
+		case CompositeTexture::NodeType::COLOR: node = BLACK_NEW(allocator, ColorNode)(allocator); break;
+		case CompositeTexture::NodeType::SPLIT: node = BLACK_NEW(allocator, SplitNode)(allocator); break;
+		case CompositeTexture::NodeType::MERGE: node = BLACK_NEW(allocator, MergeNode)(allocator); break;
+		case CompositeTexture::NodeType::GAMMA: node = BLACK_NEW(allocator, GammaNode)(allocator); break;
+		case CompositeTexture::NodeType::CROP: node = BLACK_NEW(allocator, CropNode)(allocator); break;
+		case CompositeTexture::NodeType::CONTRAST: node = BLACK_NEW(allocator, ContrastNode)(allocator); break;
+		case CompositeTexture::NodeType::BRIGHTNESS: node = BLACK_NEW(allocator, BrightnessNode)(allocator); break;
+		case CompositeTexture::NodeType::RESIZE: node = BLACK_NEW(allocator, ResizeNode)(allocator); break;
+		case CompositeTexture::NodeType::SPLAT: node = BLACK_NEW(allocator, SplatNode)(allocator); break;
+		case CompositeTexture::NodeType::CELLULAR_NOISE: node = BLACK_NEW(allocator, CellularNoiseNode)(allocator); break;
+		case CompositeTexture::NodeType::GRADIENT_NOISE: node = BLACK_NEW(allocator, GradientNoiseNode)(allocator); break;
+		case CompositeTexture::NodeType::WAVE_NOISE: node = BLACK_NEW(allocator, WaveNoiseNode)(allocator); break;
+		case CompositeTexture::NodeType::BLUR: node = BLACK_NEW(allocator, BlurNode)(allocator); break;
+		case CompositeTexture::NodeType::NORMALMAP: node = BLACK_NEW(allocator, NormalmapNode)(allocator); break;
+		case CompositeTexture::NodeType::TWIRL: node = BLACK_NEW(allocator, TwirlNode)(allocator); break;
+		case CompositeTexture::NodeType::WARP: node = BLACK_NEW(allocator, WarpNode)(allocator); break;
+		case CompositeTexture::NodeType::CHECKERBOARD: node = BLACK_NEW(allocator, CheckerboardNode)(allocator); break;
+		case CompositeTexture::NodeType::TRIANGLE: node = BLACK_NEW(allocator, TriangleNode)(allocator); break;
+		case CompositeTexture::NodeType::SQUARE: node = BLACK_NEW(allocator, SquareNode)(allocator); break;
+		case CompositeTexture::NodeType::CIRCLE: node = BLACK_NEW(allocator, CircleNode)(allocator); break;
+		case CompositeTexture::NodeType::SET_ALPHA: node = BLACK_NEW(allocator, SetAlphaNode)(allocator); break;
+		case CompositeTexture::NodeType::CURVE: node = BLACK_NEW(allocator, CurveNode)(allocator); break;
+		case CompositeTexture::NodeType::GRAYSCALE: node = BLACK_NEW(allocator, GrayscaleNode)(allocator); break;
+		case CompositeTexture::NodeType::CONSTANT: node = BLACK_NEW(allocator, ConstantNode)(allocator); break;
+		case CompositeTexture::NodeType::MULTIPLY: node = BLACK_NEW(allocator, MultiplyNode)(allocator); break;
+		case CompositeTexture::NodeType::MIX: node = BLACK_NEW(allocator, MixNode)(allocator); break;
+		case CompositeTexture::NodeType::GRADIENT: node = BLACK_NEW(allocator, GradientNode)(allocator); break;
+		case CompositeTexture::NodeType::VALUE_NOISE: node = BLACK_NEW(allocator, RandomPixelsNode)(allocator); break;
+		case CompositeTexture::NodeType::SHARPEN: node = BLACK_NEW(allocator, SharpenNode)(allocator); break;
+		case CompositeTexture::NodeType::GRADIENT_MAP: node = BLACK_NEW(allocator, GradientMapNode)(allocator); break;
+		case CompositeTexture::NodeType::CIRCULAR_SPLATTER: node = BLACK_NEW(allocator, CircularSplatterNode)(allocator); break;
+		case CompositeTexture::NodeType::PIXEL_PROCESSOR: node = BLACK_NEW(allocator, PixelProcessorNode)(allocator); break;
+		case CompositeTexture::NodeType::SPLATTER: node = BLACK_NEW(allocator, SplatterNode)(allocator); break;
+		case CompositeTexture::NodeType::TRANSLATE: node = BLACK_NEW(allocator, TranslateNode)(allocator); break;
+		case CompositeTexture::NodeType::STATIC_SWITCH: node = BLACK_NEW(allocator, StaticSwitchNode)(allocator); break;
+		case CompositeTexture::NodeType::STEP: node = BLACK_NEW(allocator, StepNode)(allocator); break;
+		case CompositeTexture::NodeType::PIXEL_COLOR: node = BLACK_NEW(allocator, PixelNode<CompositeTexture::NodeType::PIXEL_COLOR>)(allocator); break;
+		case CompositeTexture::NodeType::PIXEL_X: node = BLACK_NEW(allocator, PixelNode<CompositeTexture::NodeType::PIXEL_X>)(allocator); break;
+		case CompositeTexture::NodeType::PIXEL_Y: node = BLACK_NEW(allocator, PixelNode<CompositeTexture::NodeType::PIXEL_Y>)(allocator); break;
+		case CompositeTexture::NodeType::PIXEL_CTX_W: node = BLACK_NEW(allocator, PixelNode<CompositeTexture::NodeType::PIXEL_CTX_W>)(allocator); break;
+		case CompositeTexture::NodeType::PIXEL_CTX_H: node = BLACK_NEW(allocator, PixelNode<CompositeTexture::NodeType::PIXEL_CTX_H>)(allocator); break;
+		case CompositeTexture::NodeType::DIVIDE: node = BLACK_NEW(allocator, MathNode<CompositeTexture::NodeType::DIVIDE>)(allocator); break;
+		case CompositeTexture::NodeType::MAX: node = BLACK_NEW(allocator, MathNode<CompositeTexture::NodeType::MAX>)(allocator); break;
+		case CompositeTexture::NodeType::MIN: node = BLACK_NEW(allocator, MathNode<CompositeTexture::NodeType::MIN>)(allocator); break;
 	}
 	if (!node) return nullptr;
 	node->m_resource = &resource;
@@ -2849,7 +2849,7 @@ void CompositeTexture::clear() {
 	Renderer* renderer = (Renderer*)m_app.getEngine().getSystemManager().getSystem("renderer");
 	for (Node* n : m_nodes) {
 		if (n->m_preview) renderer->getEndFrameDrawStream().destroy(n->m_preview);
-		LUMIX_DELETE(m_allocator, n);
+		BLACK_DELETE(m_allocator, n);
 	}
 	m_nodes.clear();
 	m_node_id_generator = 1;
@@ -2931,7 +2931,7 @@ void CompositeTexture::removeArrayLayer(u32 idx) {
 	const Node::Input input = node->getInput(idx);
 	if (!input) return;
 	m_links.eraseItems([&](const Link& link){ return link.getFromNode() == input.node->m_id; });
-	LUMIX_DELETE(m_allocator, input.node);
+	BLACK_DELETE(m_allocator, input.node);
 	m_nodes.eraseItem(input.node);
 	--node->m_layers_count;
 	for (Link& link : m_links) {
@@ -3448,4 +3448,4 @@ UniquePtr<CompositeTextureEditor> CompositeTextureEditor::open(const Path& path,
 	return UniquePtr<CompositeTextureEditorImpl>::create(allocator, Path(path), app, allocator);
 }
 
-} // namespace Lumix
+} // namespace black

@@ -20,7 +20,7 @@
 #include "renderer/texture.h"
 
 
-namespace Lumix
+namespace black
 {
 
 
@@ -36,11 +36,11 @@ struct SpriteManager final : ResourceManager
 	}
 
 	Resource* createResource(const Path& path) override {
-		return LUMIX_NEW(m_allocator, Sprite)(path, *this, m_allocator);
+		return BLACK_NEW(m_allocator, Sprite)(path, *this, m_allocator);
 	}
 
 	void destroyResource(Resource& resource) override {
-		LUMIX_DELETE(m_allocator, static_cast<Sprite*>(&resource));
+		BLACK_DELETE(m_allocator, static_cast<Sprite*>(&resource));
 	}
 
 	IAllocator& m_allocator;
@@ -72,7 +72,7 @@ struct GUISystemImpl final : GUISystem
 		m_sprite_manager.create(Sprite::TYPE, m_engine.getResourceManager());
 	}
 
-	struct RenderPlugin : Lumix::RenderPlugin {
+	struct RenderPlugin : black.h::RenderPlugin {
 		RenderPlugin(GUISystemImpl& system)
 			: m_system(system)
 		{
@@ -147,10 +147,10 @@ struct GUISystemImpl final : GUISystem
 };
 
 
-LUMIX_PLUGIN_ENTRY(gui) {
+BLACK_PLUGIN_ENTRY(gui) {
 	PROFILE_FUNCTION();
-	return LUMIX_NEW(engine.getAllocator(), GUISystemImpl)(engine);
+	return BLACK_NEW(engine.getAllocator(), GUISystemImpl)(engine);
 }
 
 
-} // namespace Lumix
+} // namespace black

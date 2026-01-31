@@ -53,12 +53,12 @@
 	#include "core/win/simple_win.h"
 #endif
 
-namespace Lumix
+namespace black
 {
 
-#define LUMIX_EDITOR_PLUGINS_DECLS
+#define BLACK_EDITOR_PLUGINS_DECLS
 #include "engine/plugins.inl"
-#undef LUMIX_EDITOR_PLUGINS_DECLS
+#undef BLACK_EDITOR_PLUGINS_DECLS
 
 struct TarHeader {
 	char name[100];
@@ -772,7 +772,7 @@ struct StudioAppImpl final : StudioApp {
 		destroyAddCmpTreeNode(m_add_cmp_root.child);
 
 		for (auto* i : m_plugins) {
-			LUMIX_DELETE(m_allocator, i);
+			BLACK_DELETE(m_allocator, i);
 		}
 		m_plugins.clear();
 
@@ -784,7 +784,7 @@ struct StudioAppImpl final : StudioApp {
 
 		for (auto* i : m_add_cmp_plugins)
 		{
-			LUMIX_DELETE(m_allocator, i);
+			BLACK_DELETE(m_allocator, i);
 		}
 		m_add_cmp_plugins.clear();
 
@@ -982,9 +982,9 @@ struct StudioAppImpl final : StudioApp {
 
 		Engine::InitArgs init_data = {};
 		const char* plugins[] = {
-			#define LUMIX_PLUGINS_STRINGS
+			#define BLACK_PLUGINS_STRINGS
 				#include "engine/plugins.inl"
-			#undef LUMIX_PLUGINS_STRINGS
+			#undef BLACK_PLUGINS_STRINGS
 		};
 		init_data.plugins = Span(plugins, plugins + lengthOf(plugins) - 1);
 		Path engine_data_dir = findEngineDataDir();
@@ -1015,7 +1015,7 @@ struct StudioAppImpl final : StudioApp {
 		init_window_args.hit_test_callback = &StudioAppImpl::hitTestCallback;
 		init_window_args.flags = m_use_native_titlebar ? 0 : os::InitWindowArgs::NO_DECORATION;
 		init_window_args.handle_file_drops = true;
-		init_window_args.name = "Lumix Studio";
+		init_window_args.name = "black.h Studio";
 		init_window_args.is_hidden = true;
 
 		m_main_window = os::createWindow(init_window_args);
@@ -1073,7 +1073,7 @@ struct StudioAppImpl final : StudioApp {
 		if (!node) return;
 		destroyAddCmpTreeNode(node->child);
 		destroyAddCmpTreeNode(node->next);
-		LUMIX_DELETE(m_allocator, node);
+		BLACK_DELETE(m_allocator, node);
 	}
 
 	const char* getComponentIcon(ComponentType cmp_type) const override
@@ -1103,7 +1103,7 @@ struct StudioAppImpl final : StudioApp {
 		}
 		m_add_cmp_plugins.insert(i, &plugin);
 
-		auto* node = LUMIX_NEW(m_allocator, AddCmpTreeNode);
+		auto* node = BLACK_NEW(m_allocator, AddCmpTreeNode);
 		copyString(node->label, plugin.getLabel());
 		node->plugin = &plugin;
 		insertAddCmpNode(m_add_cmp_root, node);
@@ -1151,7 +1151,7 @@ struct StudioAppImpl final : StudioApp {
 			insertAddCmpNodeOrdered(parent, node);
 			return;
 		}
-		auto* new_group = LUMIX_NEW(m_allocator, AddCmpTreeNode);
+		auto* new_group = BLACK_NEW(m_allocator, AddCmpTreeNode);
 		copyString(Span(new_group->label), StringView(node->label, u32(slash - node->label)));
 		insertAddCmpNodeOrdered(parent, new_group);
 		insertAddCmpNode(*new_group, node);
@@ -1198,7 +1198,7 @@ struct StudioAppImpl final : StudioApp {
 			char label[64];
 		};
 
-		Plugin* plugin = LUMIX_NEW(m_allocator, Plugin);
+		Plugin* plugin = BLACK_NEW(m_allocator, Plugin);
 		plugin->property_grid = m_property_grid.get();
 		plugin->type = type;
 		copyString(plugin->label, label);
@@ -1535,7 +1535,7 @@ struct StudioAppImpl final : StudioApp {
 			#endif
 
 			alignGUICenter([&](){
-				ImGui::Text("Welcome to Lumix Studio");
+				ImGui::Text("");
 			});
 			ImGui::Separator();
 
@@ -1774,7 +1774,7 @@ struct StudioAppImpl final : StudioApp {
 			ASSERT(false);
 			return;
 		}
-		if (Lumix::menuItem(*action, enabled)) action->request = true;
+		if (black.h::menuItem(*action, enabled)) action->request = true;
 	}
 
 	void editMenu()
@@ -1865,7 +1865,7 @@ struct StudioAppImpl final : StudioApp {
 		menuItem("package_game", true);
 		for (Action* action = Action::first_action; action; action = action->next) {
 			if (action->type != Action::Type::TOOL) continue;
-			if (Lumix::menuItem(*action, true)) action->request = true;
+			if (black.h::menuItem(*action, true)) action->request = true;
 		}
 		ImGui::EndMenu();
 	}
@@ -1874,7 +1874,7 @@ struct StudioAppImpl final : StudioApp {
 		if (!ImGui::BeginMenu("View")) return;
 		for (Action* action = Action::first_action; action; action = action->next) {
 			if (action->type != Action::WINDOW) continue;
-			if (Lumix::menuItem(*action, true)) action->request = true;
+			if (black.h::menuItem(*action, true)) action->request = true;
 		}
 		ImGui::EndMenu();
 	}
@@ -2365,7 +2365,7 @@ struct StudioAppImpl final : StudioApp {
 			parser.getCurrent(src, lengthOf(src));
 
 			bool is_full_path = contains(src, '.');
-			Lumix::ISystem* loaded_plugin;
+			black.h::ISystem* loaded_plugin;
 			if (is_full_path)
 			{
 				char copy_path[MAX_PATH];
@@ -2552,9 +2552,9 @@ struct StudioAppImpl final : StudioApp {
 	void initPlugins() {
 		PROFILE_FUNCTION();
 		#ifdef STATIC_PLUGINS
-			#define LUMIX_EDITOR_PLUGINS
+			#define BLACK_EDITOR_PLUGINS
 			#include "engine/plugins.inl"
-			#undef LUMIX_EDITOR_PLUGINS
+			#undef BLACK_EDITOR_PLUGINS
 		#else
 			auto& plugin_manager = m_engine->getSystemManager();
 			for (auto* lib : plugin_manager.getLibraries())
@@ -2769,9 +2769,9 @@ struct StudioAppImpl final : StudioApp {
 
 	void scanCompiled(AssociativeArray<FilePathHash, ExportFileInfo>& infos) {
 		FileSystem& fs = m_engine->getFileSystem();
-		FileIterator* iter = fs.createFileIterator(".lumix/resources");
+		FileIterator* iter = fs.createFileIterator(".black.h/resources");
 		os::FileInfo info;
-		exportFile("lumix.prj", infos);
+		exportFile("black.h.prj", infos);
 		while (getNextFile(iter, &info)) {
 			if (info.is_directory) continue;
 
@@ -2781,9 +2781,9 @@ struct StudioAppImpl final : StudioApp {
 			fromCString(basename, tmp_hash);
 			rec.hash = FilePathHash::fromU64(tmp_hash);
 			rec.offset = 0;
-			const Path path = fs.getFullPath(Path(".lumix/resources/", info.filename));
+			const Path path = fs.getFullPath(Path(".black.h/resources/", info.filename));
 			rec.size = os::getFileSize(path);
-			copyString(rec.path, ".lumix/resources/");
+			copyString(rec.path, ".black.h/resources/");
 			catString(rec.path, info.filename);
 			infos.insert(rec.hash, rec);
 		}
@@ -2858,12 +2858,12 @@ struct StudioAppImpl final : StudioApp {
 	void exportDataScanResources(AssociativeArray<FilePathHash, ExportFileInfo>& infos)
 	{
 		ResourceManagerHub& rm = m_engine->getResourceManager();
-		exportFile("lumix.prj", infos);
+		exportFile("black.h.prj", infos);
 		for (auto iter = rm.getAll().begin(), end = rm.getAll().end(); iter != end; ++iter) {
 			const auto& resources = iter.value()->getResourceTable();
 			for (Resource* res : resources) {
 				const FilePathHash hash = res->getPath().getHash();
-				const Path baked_path(".lumix/resources/", hash, ".res");
+				const Path baked_path(".black.h/resources/", hash, ".res");
 
 				if (infos.find(hash) < 0) {
 					auto& out_info = infos.emplace(hash);
@@ -2936,7 +2936,7 @@ struct StudioAppImpl final : StudioApp {
 			OutputMemoryStream prj_blob(m_allocator);
 			m_engine->serializeProject(prj_blob, m_export.startup_world);
 
-			const Path prj_file("lumix.prj");
+			const Path prj_file("black.h.prj");
 			if (!fs.saveContentSync(prj_file, prj_blob)) {
 				logError("Could not save ", prj_file);
 				return false;
@@ -3191,7 +3191,7 @@ struct StudioAppImpl final : StudioApp {
 		UniquePtr<FileSystemWatcher> watcher;
 		StaticString<MAX_PATH> dir;
 		StaticString<MAX_PATH> basename;
-		Lumix::ISystem* system = nullptr;
+		black.h::ISystem* system = nullptr;
 		int iteration = 0;
 		bool reload_request = false;
 	} m_watched_plugin;
@@ -3231,4 +3231,4 @@ void StudioApp::destroy(StudioApp& app)
 }
 
 
-} // namespace Lumix
+} // namespace black

@@ -12,7 +12,7 @@
 #endif
 
 
-namespace Lumix
+namespace black
 {
 	static constexpr u32 PAGE_SIZE = 4096;
 	static constexpr size_t MAX_PAGE_COUNT = 32768;
@@ -215,4 +215,4 @@ namespace Lumix
 	}
 #endif
 
-} // namespace Lumix
+} // namespace black

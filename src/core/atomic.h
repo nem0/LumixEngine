@@ -2,10 +2,10 @@
 
 #include "core.h"
 
-namespace Lumix
+namespace black
 {
 
-struct LUMIX_CORE_API AtomicI32 {
+struct BLACK_CORE_API AtomicI32 {
 	AtomicI32(i32 v) : value(v) {}
 	
 	void operator =(i32 v);
@@ -25,7 +25,7 @@ private:
 	volatile i32 value;
 };
 
-struct LUMIX_CORE_API AtomicI64 {
+struct BLACK_CORE_API AtomicI64 {
 	AtomicI64(i64 v) : value(v) {}
 	
 	void operator =(i64 v);
@@ -45,11 +45,11 @@ struct LUMIX_CORE_API AtomicI64 {
 	volatile i64 value;
 };
 
-LUMIX_CORE_API void* exchangePtr(void* volatile* value, void* exchange);
-LUMIX_CORE_API bool compareExchangePtr(void*volatile* value, void* exchange, void* comperand);
-LUMIX_CORE_API void memoryBarrier();
-LUMIX_CORE_API void readBarrier();
-LUMIX_CORE_API void writeBarrier();
-LUMIX_CORE_API void cpuRelax(); // rep nop, can be used in busy wait to conserve resources
+BLACK_CORE_API void* exchangePtr(void* volatile* value, void* exchange);
+BLACK_CORE_API bool compareExchangePtr(void*volatile* value, void* exchange, void* comperand);
+BLACK_CORE_API void memoryBarrier();
+BLACK_CORE_API void readBarrier();
+BLACK_CORE_API void writeBarrier();
+BLACK_CORE_API void cpuRelax(); // rep nop, can be used in busy wait to conserve resources
 
-} // namespace Lumix
+} // namespace black

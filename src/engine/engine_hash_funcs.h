@@ -1,10 +1,10 @@
 #pragma once
 
-#include "lumix.h"
+#include "black.h.h"
 #include "core/hash_map.h"
 #include "core/string.h"
 
-namespace Lumix {
+namespace black {
 
 template <> struct HashFunc<ComponentType> {
 	static u32 get(const ComponentType& key) {
@@ -14,7 +14,7 @@ template <> struct HashFunc<ComponentType> {
 };
 
 template <> struct HashFunc<EntityRef> {
-	LUMIX_ENGINE_API static u32 get(const EntityRef& key) {
+	BLACK_ENGINE_API static u32 get(const EntityRef& key) {
 		static_assert(sizeof(i32) == sizeof(key.index), "Check this");
 		return HashFunc<i32>::get(key.index);
 	}
@@ -44,4 +44,4 @@ struct HashFunc<StringView> {
 	}
 };
 
-} // namespace Lumix
+} // namespace black

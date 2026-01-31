@@ -4,7 +4,7 @@
 #include "engine/resource.h"
 
 
-namespace Lumix
+namespace black
 {
 
 struct Sprite final : Resource {
@@ -42,4 +42,4 @@ private:
 };
 
 
-} // namespace Lumix
+} // namespace black

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/lumix.h"
+#include "engine/black.h.h"
 
 #include "core/allocator.h"
 #include "core/color.h"
@@ -14,7 +14,7 @@
 	#include "engine/engine.h"
 #endif
 
-namespace Lumix {
+namespace black {
 
 enum class AttributeSemantic : u8;
 struct GBuffer;
@@ -31,7 +31,7 @@ enum class RenderBufferHandle : u32 {};
 
 static constexpr RenderBufferHandle INVALID_RENDERBUFFER = RenderBufferHandle{0xffFFffFF};
 
-struct LUMIX_RENDERER_API RenderPlugin {
+struct BLACK_RENDERER_API RenderPlugin {
 	virtual ~RenderPlugin() {}
 	// all `RenderPlugin` functions are called during execution of every `Pipeline`
 	virtual void renderUI(struct Pipeline& pipeline) {}
@@ -58,7 +58,7 @@ struct UniformPool;
 struct TransientPool;
 
 //@ object
-struct LUMIX_RENDERER_API Renderer : ISystem {
+struct BLACK_RENDERER_API Renderer : ISystem {
 	struct MemRef {
 		u32 size = 0;
 		void* data = nullptr;
@@ -138,9 +138,9 @@ protected:
 struct UniformPool;
 struct TransientPool;
 
-LUMIX_RENDERER_API TransientSlice alloc(UniformPool& pool, u32 size);
-LUMIX_RENDERER_API TransientSlice alloc(UniformPool& pool, const void* data, u32 size);
-LUMIX_RENDERER_API TransientSlice alloc(TransientPool& pool, u32 size);
+BLACK_RENDERER_API TransientSlice alloc(UniformPool& pool, u32 size);
+BLACK_RENDERER_API TransientSlice alloc(UniformPool& pool, const void* data, u32 size);
+BLACK_RENDERER_API TransientSlice alloc(TransientPool& pool, u32 size);
 
 template <typename T>
 void Renderer::pushJob(const char* name, const T& func) {
@@ -180,5 +180,5 @@ void Renderer::pushJob(const char* name, const T& func) {
 	setupJob(ctx, &Context::run);
 }
 
-} // namespace Lumix
+} // namespace black
 

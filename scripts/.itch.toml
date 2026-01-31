@@ -13,11 +13,11 @@ path = "studio"
 
 [[actions]]
 name = "Documentation"
-path = "https://github.com/nem0/lumixengine/wiki"
+path = "https://github.com/abdulrhmandeveloper2/blackengine/wiki"
 
 [[actions]]
 name = "Source code"
-path = "https://github.com/nem0/lumixengine"
+path = "https://github.com/abdulrhmandeveloper2/blackengine"
 
 [[actions]]
 name = "Video tutorials"

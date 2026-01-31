@@ -20,7 +20,7 @@
 #include "renderer/render_module.h"
 #include "engine/world.h"
 
-namespace Lumix
+namespace black
 {
 
 using DataStream = ParticleSystemResource::DataStream;
@@ -568,7 +568,7 @@ struct ProcessHelper {
 	float4** reg_mem;
 	float* out_mem = nullptr;
 
-	LUMIX_FORCE_INLINE void readArgs(InputMemoryStream& ip, Stream* s, float4* literals, u32 num_args) {
+	BLACK_FORCE_INLINE void readArgs(InputMemoryStream& ip, Stream* s, float4* literals, u32 num_args) {
 		for (u32 i = 0; i < num_args; ++i) {
 			const DataStream stream = ip.read<DataStream>();;
 			switch (stream.type) {
@@ -1654,4 +1654,4 @@ void ParticleSystem::Emitter::fillInstanceData(float* data, PageAllocator& page_
 }
 
 
-} // namespace Lumix
+} // namespace black

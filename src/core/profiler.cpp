@@ -17,7 +17,7 @@
 #include "core/os.h"
 #include "profiler.h"
 
-namespace Lumix {
+namespace black {
 
 namespace profiler {
 
@@ -58,7 +58,7 @@ struct ThreadContext {
 		Page* page = first_page;
 		while (page) {
 			Page* next = page->header.next;
-			LUMIX_DELETE(allocator, page);
+			BLACK_DELETE(allocator, page);
 			page = next;
 		}
 	}
@@ -164,7 +164,7 @@ struct Instance {
 		CloseTrace(trace_task.open_handle);
 		trace_task.destroy();
 		for (ThreadContext* ctx : contexts) {
-			LUMIX_DELETE(tag_allocator, ctx);
+			BLACK_DELETE(tag_allocator, ctx);
 		}
 	}
 
@@ -206,10 +206,10 @@ struct Instance {
 	}
 
 
-	LUMIX_FORCE_INLINE ThreadContext* getThreadContext()
+	BLACK_FORCE_INLINE ThreadContext* getThreadContext()
 	{
 		thread_local ThreadContext* ctx = [&](){
-			ThreadContext* new_ctx = LUMIX_NEW(tag_allocator, ThreadContext)(tag_allocator);
+			ThreadContext* new_ctx = BLACK_NEW(tag_allocator, ThreadContext)(tag_allocator);
 			new_ctx->thread_id = os::getCurrentThreadID();
 			MutexGuard lock(mutex);
 			contexts.push(new_ctx);
@@ -242,7 +242,7 @@ static void flush(ThreadContext& ctx) {
 	if constexpr (lock) ctx.mutex.enter();
 
 	if (ctx.num_pages < 500) {
-		auto* new_page = LUMIX_NEW(ctx.allocator, ThreadContext::Page)();
+		auto* new_page = BLACK_NEW(ctx.allocator, ThreadContext::Page)();
 		memcpy(new_page->buffer, ctx.tmp, ctx.tmp_pos);
 		new_page->header.size = ctx.tmp_pos;
 		if (!ctx.first_page) ctx.first_page = new_page;
@@ -267,7 +267,7 @@ static void flush(ThreadContext& ctx) {
 }
 
 template <bool lock, typename T>
-LUMIX_FORCE_INLINE static void write(ThreadContext& ctx, u64 timestamp, EventType type, const T& value) {
+BLACK_FORCE_INLINE static void write(ThreadContext& ctx, u64 timestamp, EventType type, const T& value) {
 	enum { num_bytes_to_write = sizeof(T) + sizeof(EventHeader) };
 	ASSERT(num_bytes_to_write <= lengthOf(ctx.tmp));
 	
@@ -286,7 +286,7 @@ LUMIX_FORCE_INLINE static void write(ThreadContext& ctx, u64 timestamp, EventTyp
 };
 
 template <bool lock>
-LUMIX_FORCE_INLINE static void write(ThreadContext& ctx, u64 timestamp, EventType type, Span<const u8> data) {
+BLACK_FORCE_INLINE static void write(ThreadContext& ctx, u64 timestamp, EventType type, Span<const u8> data) {
 	const u32 num_bytes_to_write = (u32)data.length() + sizeof(EventHeader);
 	ASSERT(num_bytes_to_write <= lengthOf(ctx.tmp));
 	
@@ -723,6 +723,6 @@ void shutdown() {
 	g_instance.destroy();
 }
 
-} // namespace Lumix
+} // namespace black
 
 } //	namespace profiler

@@ -1,7 +1,7 @@
 #pragma once
 
 
-namespace Lumix
+namespace black
 {
 
 template <typename T, typename R> struct IsSame { static constexpr bool Value = false; };
@@ -60,4 +60,4 @@ template <typename R, typename C, typename... Args> struct ArgsCount<R(C::*)(Arg
 template <typename R, typename C> struct ArgsCount<R(C::*)> { static constexpr u32 value = 0; };
 
 
-} // namespace Lumix
+} // namespace black

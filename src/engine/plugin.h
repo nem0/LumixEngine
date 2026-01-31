@@ -1,10 +1,10 @@
 #pragma once
 
 
-#include "engine/lumix.h"
+#include "engine/black.h.h"
 
 
-namespace Lumix
+namespace black
 {
 
 template <typename T> struct Array;
@@ -12,7 +12,7 @@ template <typename T> struct DelegateList;
 template <typename T> struct UniquePtr;
 
 // manages engine systems/plugins
-struct LUMIX_ENGINE_API SystemManager
+struct BLACK_ENGINE_API SystemManager
 {
 	virtual ~SystemManager() {}
 
@@ -34,7 +34,7 @@ struct LUMIX_ENGINE_API SystemManager
 // Modules inherited from IModule manage components of certain types in single world,
 // e.g. RenderModule manages all render components - models, lights, ... 
 // Each world has its own instance of every type of module, e.g. RenderModule, AnimationModule, ...
-struct LUMIX_ENGINE_API IModule
+struct BLACK_ENGINE_API IModule
 {
 	virtual ~IModule() {}
 
@@ -61,7 +61,7 @@ struct LUMIX_ENGINE_API IModule
 };
 
 // There should be single instance in whole app of every system inherited from ISystem, e.g. only one renderer, one animation system, ...
-struct LUMIX_ENGINE_API ISystem
+struct BLACK_ENGINE_API ISystem
 {
 	virtual ~ISystem();
 
@@ -86,12 +86,12 @@ struct LUMIX_ENGINE_API ISystem
 };
 
 
-} // namespace Lumix
+} // namespace black
 
 
 #ifdef STATIC_PLUGINS
-	#define LUMIX_PLUGIN_ENTRY(plugin_name) extern "C" Lumix::ISystem* createPlugin_##plugin_name(Lumix::Engine& engine)
+	#define BLACK_PLUGIN_ENTRY(plugin_name) extern "C" black.h::ISystem* createPlugin_##plugin_name(black.h::Engine& engine)
 #else
-	#define LUMIX_PLUGIN_ENTRY(plugin_name) extern "C" LUMIX_LIBRARY_EXPORT Lumix::ISystem* createPlugin(Lumix::Engine& engine)
+	#define BLACK_PLUGIN_ENTRY(plugin_name) extern "C" BLACK_LIBRARY_EXPORT black.h::ISystem* createPlugin(black.h::Engine& engine)
 #endif
 

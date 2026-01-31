@@ -1,10 +1,10 @@
 #pragma once
 
 #include "core/atomic.h"
-#include "engine/lumix.h"
+#include "engine/black.h.h"
 #include "gpu/gpu.h"
 
-namespace Lumix {
+namespace black {
 
 struct IAllocator;
 struct Matrix;
@@ -12,7 +12,7 @@ struct Model;
 struct Quat;
 struct Vec3;
 
-struct LUMIX_RENDERER_API Pose {
+struct BLACK_RENDERER_API Pose {
 	explicit Pose(IAllocator& allocator);
 	~Pose();
 
@@ -35,4 +35,4 @@ struct LUMIX_RENDERER_API Pose {
 };
 
 
-} // namespace Lumix
+} // namespace black

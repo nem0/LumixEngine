@@ -1,9 +1,9 @@
 local co = require "scripts/coroutine"
-local lumix_math = require "scripts/math"
+local black.h_math = require "scripts/math"
 
-label = Lumix.Entity.NULL
-player = Lumix.Entity.NULL
-sound = Lumix.Resource:newEmpty("clip")
+label = black.h.Entity.NULL
+player = black.h.Entity.NULL
+sound = black.h.Resource:newEmpty("clip")
 local interactive = false
 
 function playSound(sound)
@@ -13,7 +13,7 @@ end
 
 function update(time_delta)
 	-- check if player is close
-	local dist_squared = lumix_math.distXZSquared(this.position, player.position)	
+	local dist_squared = black.h_math.distXZSquared(this.position, player.position)	
 	interactive = dist_squared < 2
 	-- animate the label if player is close
 	label.property_animator.enabled = interactive
@@ -22,10 +22,10 @@ end
 function calcIKTarget()
 	local button_pos = this.position
 	local player_pos = player.position
-	button_pos = lumix_math.subVec3(button_pos, player_pos) -- relative to player_pos
+	button_pos = black.h_math.subVec3(button_pos, player_pos) -- relative to player_pos
 	local player_rot = player.rotation
 	player_rot[4] = -player_rot[4] --invert rotation
-	button_pos = lumix_math.transformVec3(player_rot, button_pos) --transform to player space
+	button_pos = black.h_math.transformVec3(player_rot, button_pos) --transform to player space
 	return button_pos
 end
 

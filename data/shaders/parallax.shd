@@ -117,7 +117,7 @@ surface_shader_ex({
 		#endif
 
 		// dx shader has internal errors on this
-		#if defined ALPHA_CUTOUT && !defined LUMIX_DX_SHADER 
+		#if defined ALPHA_CUTOUT && !defined BLACK_DX_SHADER 
 			if(data.alpha < 0.5) discard;
 		#endif
 			

@@ -8,11 +8,11 @@
 #include "core/string.h"
 #include "core/tag_allocator.h"
 #include "editor/action.h"
-#include "engine/lumix.h"
+#include "engine/black.h.h"
 
-namespace Lumix {
+namespace black {
 
-struct LUMIX_EDITOR_API MouseSensitivity {
+struct BLACK_EDITOR_API MouseSensitivity {
 	MouseSensitivity(IAllocator& allocator);
 	void gui();
 	float eval(float value);
@@ -26,7 +26,7 @@ struct LUMIX_EDITOR_API MouseSensitivity {
 // workspace settings are stored in the project folder and are shared between all users
 // user settings are stored in the user's home folder and are unique for each user
 // user settings override workspace settings
-struct LUMIX_EDITOR_API Settings {
+struct BLACK_EDITOR_API Settings {
 	enum Storage {
 		WORKSPACE,
 		USER
@@ -127,4 +127,4 @@ struct LUMIX_EDITOR_API Settings {
 	void iterVars(const TextFilter& filter, u32 selected_tab);
 };
 
-} // namespace Lumix
+} // namespace black

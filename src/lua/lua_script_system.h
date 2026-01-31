@@ -11,7 +11,7 @@
 struct lua_State;
 
 
-namespace Lumix
+namespace black
 {
 
 
@@ -104,4 +104,4 @@ struct LuaScriptModule : IModule {
 };
 
 
-} // namespace Lumix
+} // namespace black

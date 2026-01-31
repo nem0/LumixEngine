@@ -2,7 +2,7 @@
 
 #include "core.h"
 
-namespace Lumix {
+namespace black {
 
 struct IAllocator;
 struct OutputMemoryStream;
@@ -11,33 +11,33 @@ template <typename T> struct Span;
 namespace profiler {
 // writing API
 
-LUMIX_CORE_API void init(IAllocator& allocator);
-LUMIX_CORE_API void shutdown();
+BLACK_CORE_API void init(IAllocator& allocator);
+BLACK_CORE_API void shutdown();
 
-LUMIX_CORE_API void setThreadName(const char* name);
-LUMIX_CORE_API void showInProfiler(bool show);
+BLACK_CORE_API void setThreadName(const char* name);
+BLACK_CORE_API void showInProfiler(bool show);
 
-LUMIX_CORE_API void beginBlock(const char* name_literal);
-LUMIX_CORE_API void beginJob(i32 signal_on_finish);
-LUMIX_CORE_API void blockColor(u32 abgr);
-LUMIX_CORE_API void endBlock();
-LUMIX_FORCE_INLINE void endJob() { endBlock(); }
-LUMIX_CORE_API void frame();
-LUMIX_CORE_API void pushString(const char* value);
-LUMIX_CORE_API void pushInt(const char* key_literal, int value);
-LUMIX_CORE_API void pushMutexEvent(u64 mutex_id, u64 begin_enter_time, u64 end_enter_time, u64 begin_exit_time, u64 end_exit_time);
+BLACK_CORE_API void beginBlock(const char* name_literal);
+BLACK_CORE_API void beginJob(i32 signal_on_finish);
+BLACK_CORE_API void blockColor(u32 abgr);
+BLACK_CORE_API void endBlock();
+BLACK_FORCE_INLINE void endJob() { endBlock(); }
+BLACK_CORE_API void frame();
+BLACK_CORE_API void pushString(const char* value);
+BLACK_CORE_API void pushInt(const char* key_literal, int value);
+BLACK_CORE_API void pushMutexEvent(u64 mutex_id, u64 begin_enter_time, u64 end_enter_time, u64 begin_exit_time, u64 end_exit_time);
 
 enum { INVALID_COUNTER = 0xffFFffFF };
-LUMIX_CORE_API u32 createCounter(const char* key_literal, float min);
-LUMIX_CORE_API u32 getCounterHandle(const char* key, float* last_value = nullptr);
-LUMIX_CORE_API void pushCounter(u32 counter, float value);
+BLACK_CORE_API u32 createCounter(const char* key_literal, float min);
+BLACK_CORE_API u32 getCounterHandle(const char* key, float* last_value = nullptr);
+BLACK_CORE_API void pushCounter(u32 counter, float value);
 
-LUMIX_CORE_API void beginGPUBlock(const char* name, u64 timestamp, i64 profiler_link);
-LUMIX_CORE_API void endGPUBlock(u64 timestamp);
-LUMIX_CORE_API void gpuStats(u64 primitives_generated);
-LUMIX_CORE_API void link(i64 link);
-LUMIX_CORE_API i64 createNewLinkID();
-LUMIX_CORE_API void serialize(OutputMemoryStream& blob);
+BLACK_CORE_API void beginGPUBlock(const char* name, u64 timestamp, i64 profiler_link);
+BLACK_CORE_API void endGPUBlock(u64 timestamp);
+BLACK_CORE_API void gpuStats(u64 primitives_generated);
+BLACK_CORE_API void link(i64 link);
+BLACK_CORE_API i64 createNewLinkID();
+BLACK_CORE_API void serialize(OutputMemoryStream& blob);
 
 struct FiberSwitchData {
 	i32 id;
@@ -46,11 +46,11 @@ struct FiberSwitchData {
 	i32 signal;
 };
 
-LUMIX_CORE_API void beforeFiberSwitch();
-LUMIX_CORE_API void signalTriggered(i32 job_system_signal);
-LUMIX_CORE_API FiberSwitchData beginFiberWait(i32 job_system_signal);
-LUMIX_CORE_API void endFiberWait(const FiberSwitchData& switch_data);
-LUMIX_CORE_API float getLastFrameDuration();
+BLACK_CORE_API void beforeFiberSwitch();
+BLACK_CORE_API void signalTriggered(i32 job_system_signal);
+BLACK_CORE_API FiberSwitchData beginFiberWait(i32 job_system_signal);
+BLACK_CORE_API void endFiberWait(const FiberSwitchData& switch_data);
+BLACK_CORE_API float getLastFrameDuration();
 
 struct Scope
 {
@@ -61,9 +61,9 @@ struct Scope
 
 // reading API
 
-LUMIX_CORE_API u32 getOpenBlocks(Span<const char*> output);
-LUMIX_CORE_API bool contextSwitchesEnabled();
-LUMIX_CORE_API u64 frequency();
+BLACK_CORE_API u32 getOpenBlocks(Span<const char*> output);
+BLACK_CORE_API bool contextSwitchesEnabled();
+BLACK_CORE_API u64 frequency();
 
 struct GPUScopeStats {
 	const char* name;
@@ -72,7 +72,7 @@ struct GPUScopeStats {
 	float avg;
 };
 
-LUMIX_CORE_API u32 getGPUScopeStats(Span<GPUScopeStats> out);
+BLACK_CORE_API u32 getGPUScopeStats(Span<GPUScopeStats> out);
 
 struct ContextSwitchRecord
 {
@@ -164,12 +164,12 @@ struct EventHeader
 };
 #pragma pack()
 
-#define LUMIX_CONCAT2(a, b) a ## b
-#define LUMIX_CONCAT(a, b) LUMIX_CONCAT2(a, b)
+#define BLACK_CONCAT2(a, b) a ## b
+#define BLACK_CONCAT(a, b) BLACK_CONCAT2(a, b)
 
 #define PROFILE_FUNCTION() profiler::Scope profile_scope(__FUNCTION__);
-#define PROFILE_BLOCK(name) profiler::Scope LUMIX_CONCAT(profile_scope, __LINE__)(name);
+#define PROFILE_BLOCK(name) profiler::Scope BLACK_CONCAT(profile_scope, __LINE__)(name);
 
 
 } // namespace profiler
-} // namespace Lumix
+} // namespace black

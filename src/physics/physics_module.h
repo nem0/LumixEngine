@@ -7,11 +7,11 @@
 
 
 #ifdef STATIC_PLUGINS
-	#define LUMIX_PHYSICS_API
+	#define BLACK_PHYSICS_API
 #elif defined BUILDING_PHYSICS
-	#define LUMIX_PHYSICS_API LUMIX_LIBRARY_EXPORT
+	#define BLACK_PHYSICS_API BLACK_LIBRARY_EXPORT
 #else
-	#define LUMIX_PHYSICS_API LUMIX_LIBRARY_IMPORT
+	#define BLACK_PHYSICS_API BLACK_LIBRARY_IMPORT
 #endif
 
 
@@ -20,7 +20,7 @@ namespace physx {
 }
 
 
-namespace Lumix
+namespace black
 {
 
 
@@ -362,4 +362,4 @@ struct PhysicsModule : IModule {
 };
 
 
-} // namespace Lumix
+} // namespace black

@@ -23,17 +23,17 @@ end
 function execute()
 	local f, err = loadstring(plugin.settings.lua_console_code)
 	if f == nil then
-		LumixAPI.logError(err)
+		black.hAPI.logError(err)
 	else 
 		if run_on_entity then
 			local selected_count = Editor.getSelectedEntitiesCount()
 			if selected_count == 0 then
-				LumixAPI.logError("No entities selected")
+				black.hAPI.logError("No entities selected")
 			end
 			for i = 1, selected_count do
 				local entity = Editor.getSelectedEntity(i - 1)
 				if entity.lua_script == nil then 
-					LumixAPI.logError("Entity does not have lua script")
+					black.hAPI.logError("Entity does not have lua script")
 					continue
 				end
 				local env = entity.lua_script[1]
@@ -41,7 +41,7 @@ function execute()
 					setfenv(f, env)
 					f()
 				else
-					LumixAPI.logError("Entity does not have lua script")
+					black.hAPI.logError("Entity does not have lua script")
 				end
 			end
 		else

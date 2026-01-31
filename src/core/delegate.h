@@ -5,7 +5,7 @@
 // base on molecular musings blogpost
 
 
-namespace Lumix
+namespace black
 {
 
 template <typename T> struct Delegate;
@@ -116,4 +116,4 @@ auto makeDelegate() {
 };
 
 
-} // namespace Lumix
+} // namespace black

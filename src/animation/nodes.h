@@ -10,7 +10,7 @@
 // Runtime part of animation nodes
 // For editor part of animation nodes see editor_nodes.h
 
-namespace Lumix {
+namespace black {
 
 struct Model;
 struct Pose;
@@ -289,4 +289,4 @@ struct AnimationNode final : PoseNode {
 
 
 } // namespace anim
-} // namespace Lumix
+} // namespace black

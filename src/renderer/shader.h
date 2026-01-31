@@ -8,7 +8,7 @@
 #include "gpu/gpu.h"
 
 
-namespace Lumix
+namespace black
 {
 
 
@@ -24,7 +24,7 @@ struct ShaderKey {
 	const char* semantic_defines;
 };
 
-struct LUMIX_RENDERER_API Shader final : Resource {
+struct BLACK_RENDERER_API Shader final : Resource {
 	struct Header {
 		static const u32 MAGIC = '_SHD';
 		u32 magic = MAGIC;
@@ -123,4 +123,4 @@ struct HashFunc<ShaderKey> {
 	}
 };
 
-} // namespace Lumix
+} // namespace black

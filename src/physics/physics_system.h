@@ -10,7 +10,7 @@ namespace physx {
 	class PxPhysics;
 } // namespace physx
 
-namespace Lumix {
+namespace black {
 
 struct CollisionLayers {
 	u32 filter[32];
@@ -39,4 +39,4 @@ struct PhysicsSystem : ISystem {
 };
 
 
-} // namespace Lumix
+} // namespace black

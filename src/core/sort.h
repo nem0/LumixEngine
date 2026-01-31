@@ -1,6 +1,6 @@
 #pragma once
 
-namespace Lumix {
+namespace black {
 	template <typename T>
 	void insertSort(T* from, T* to) {
 		if (from >= to) return;
@@ -35,7 +35,7 @@ namespace Lumix {
 		}
 	}
 
-	#define LUMIX_SWAP(a, b) \
+	#define BLACK_SWAP(a, b) \
 	do { \
 		T tmp = static_cast<T&&>(a); \
 		(a) = static_cast<T&&>(b); \
@@ -50,31 +50,31 @@ namespace Lumix {
 		for (T* j = from; j < pivot; ++j) {
 			if (lessThan(*j, *pivot)) {
 				++i;
-				LUMIX_SWAP(*i, *j);
+				BLACK_SWAP(*i, *j);
 			}
 		}
 
-		LUMIX_SWAP(*(i + 1), *pivot);
+		BLACK_SWAP(*(i + 1), *pivot);
 		return static_cast<int>(i + 1 - from);
 	}
 
 	template <typename T>
 	int partition(T* from,  T* to) {
 		T* mid = from + (to - from) / 2;
-		if (*mid < *from) LUMIX_SWAP(*mid, *from);
-		if (*(to - 1) < *from) LUMIX_SWAP(*(to - 1), *from);
-		if (*(to - 1) < *mid) LUMIX_SWAP(*(to - 1), *mid);
+		if (*mid < *from) BLACK_SWAP(*mid, *from);
+		if (*(to - 1) < *from) BLACK_SWAP(*(to - 1), *from);
+		if (*(to - 1) < *mid) BLACK_SWAP(*(to - 1), *mid);
 		T* pivot = mid;
 		T* i = from - 1;
 
 		for (T* j = from; j < pivot; ++j) {
 			if (*j < *pivot) {
 				++i;
-				LUMIX_SWAP(*i, *j);
+				BLACK_SWAP(*i, *j);
 			}
 		}
 
-		LUMIX_SWAP(*(i + 1), *pivot);
+		BLACK_SWAP(*(i + 1), *pivot);
 		return static_cast<int>(i + 1 - from);
 	}
 
@@ -91,7 +91,7 @@ namespace Lumix {
 		sort(from + pivot_pos + 1, to, lessThan, depth + 1);
 	}
 
-	#undef LUMIX_SWAP
+	#undef BLACK_SWAP
 
 	template <typename T>
 	void sort(T* from, T* to, u32 depth = 0) {

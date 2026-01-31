@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/lumix.h"
+#include "engine/black.h.h"
 
 #include "core/array.h"
 #include "core/geometry.h"
@@ -14,7 +14,7 @@
 #include "gpu/gpu.h"
 
 
-namespace Lumix {
+namespace black {
 
 struct Material;
 struct Mesh;
@@ -42,7 +42,7 @@ enum class AttributeSemantic : u8 {
 };
 
 //@ struct
-struct LUMIX_RENDERER_API RayCastModelHit {
+struct BLACK_RENDERER_API RayCastModelHit {
 	bool is_hit;
 	float t;
 	DVec3 origin;
@@ -77,7 +77,7 @@ struct SOATransform {
 	float* rw = nullptr;
 };
 
-struct LUMIX_RENDERER_API Mesh {
+struct BLACK_RENDERER_API Mesh {
 	struct Skin {
 		Vec4 weights;
 		i16 indices[4];
@@ -133,7 +133,7 @@ struct LODMeshIndices
 };
 
 //@ object
-struct LUMIX_RENDERER_API Model final : Resource {
+struct BLACK_RENDERER_API Model final : Resource {
 	using BoneMap = HashMap<BoneNameHash, int>;
 
 	enum class FileVersion : u32 {
@@ -241,4 +241,4 @@ private:
 };
 
 
-} // namespace Lumix
+} // namespace black

@@ -2,7 +2,7 @@
 
 #include "core.h"
 
-namespace Lumix {
+namespace black {
 template <typename T> struct Span {
 	Span()
 		: m_begin(nullptr)
@@ -82,4 +82,4 @@ template <typename T> struct Span {
 	T* m_begin;
 	T* m_end;
 };
-} // namespace Lumix
+} // namespace black

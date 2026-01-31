@@ -1,15 +1,15 @@
 #pragma once
 
 #include "core/span.h"
-#include "engine/lumix.h"
+#include "engine/black.h.h"
 
 
-namespace Lumix {
+namespace black {
 
 template <typename T> struct UniquePtr;
 namespace os { struct Event; }
 
-struct LUMIX_ENGINE_API InputSystem {
+struct BLACK_ENGINE_API InputSystem {
 	struct Device {
 		enum Type : u32 {
 			MOUSE,
@@ -87,4 +87,4 @@ struct LUMIX_ENGINE_API InputSystem {
 	virtual Span<Device*> getDevices() = 0;
 };
 
-} // namespace Lumix
+} // namespace black

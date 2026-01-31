@@ -42,7 +42,7 @@
 #include "renderer/shader.h"
 #include "scene_view.h"
 
-namespace Lumix
+namespace black
 {
 
 struct WorldViewImpl final : WorldView {
@@ -619,7 +619,7 @@ void SceneView::makeScreenshot(StringView path) {
 			os::OutputFile file;
 			if (!fs.open(path, file)) {
 				logError("Could not save ", path);
-				LUMIX_DELETE(*allocator, this);
+				BLACK_DELETE(*allocator, this);
 				return;
 			}
 
@@ -629,11 +629,11 @@ void SceneView::makeScreenshot(StringView path) {
 			if (!res) {
 				logError("Could not save ", path);
 			}
-			LUMIX_DELETE(*allocator, this);
+			BLACK_DELETE(*allocator, this);
 		}
 	};
 
-	Callback* cb = LUMIX_NEW(m_app.getAllocator(), Callback);
+	Callback* cb = BLACK_NEW(m_app.getAllocator(), Callback);
 	cb->allocator = &m_app.getAllocator();
 	cb->path = path;
 	cb->size = size;
@@ -643,7 +643,7 @@ void SceneView::makeScreenshot(StringView path) {
 	m_pipeline->getRenderer().getDrawStream().readTexture(texture, delegate);
 }
 
-struct SceneView::RenderPlugin : Lumix::RenderPlugin {
+struct SceneView::RenderPlugin : black.h::RenderPlugin {
 	RenderPlugin(SceneView& view, Renderer& renderer)
 		: m_scene_view(view)
 	{
@@ -943,7 +943,7 @@ void SceneView::toggleProjection() {
 }
 
 void SceneView::init() {
-	m_view = LUMIX_NEW(m_app.getAllocator(), WorldViewImpl)(*this);
+	m_view = BLACK_NEW(m_app.getAllocator(), WorldViewImpl)(*this);
 	m_editor.setView(m_view);
 
 	Engine& engine = m_app.getEngine();
@@ -965,7 +965,7 @@ SceneView::~SceneView()
 	renderer->removePlugin(*m_render_plugin.get());
 
 	m_editor.setView(nullptr);
-	LUMIX_DELETE(m_app.getAllocator(), m_view);
+	BLACK_DELETE(m_app.getAllocator(), m_view);
 }
 
 
@@ -1391,7 +1391,7 @@ void SceneView::onToolbar() {
 		option("Light clusters", Pipeline::DebugShow::LIGHT_CLUSTERS);
 		option("Probe clusters", Pipeline::DebugShow::PROBE_CLUSTERS);
 		Renderer& renderer = m_pipeline->getRenderer();
-		for (Lumix::RenderPlugin* plugin : renderer.getPlugins()) {
+		for (black.h::RenderPlugin* plugin : renderer.getPlugins()) {
 			plugin->debugUI(*m_pipeline);
 		}
 		ImGui::EndPopup();
@@ -1853,4 +1853,4 @@ void SceneView::onGUI() {
 }
 
 
-} // namespace Lumix
+} // namespace black

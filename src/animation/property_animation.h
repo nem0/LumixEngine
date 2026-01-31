@@ -3,7 +3,7 @@
 #include "engine/resource.h"
 #include "animation.h"
 
-namespace Lumix {
+namespace black {
 
 namespace reflection { template <typename T> struct Property; }
 
@@ -65,4 +65,4 @@ private:
 };
 
 
-} // namespace Lumix
+} // namespace black

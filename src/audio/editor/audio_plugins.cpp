@@ -22,7 +22,7 @@
 #include "engine/world.h"
 
 
-using namespace Lumix;
+using namespace black;
 
 
 namespace
@@ -242,8 +242,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 } // anonymous namespace
 
 
-LUMIX_STUDIO_ENTRY(audio) {
+BLACK_STUDIO_ENTRY(audio) {
 	PROFILE_FUNCTION();
 	IAllocator& allocator = app.getAllocator();
-	return LUMIX_NEW(allocator, StudioAppPlugin)(app);
+	return BLACK_NEW(allocator, StudioAppPlugin)(app);
 }

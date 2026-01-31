@@ -1,10 +1,10 @@
 #pragma once
 
-namespace Lumix {
+namespace black {
 
 struct Path;
 struct StudioApp;
 
-LUMIX_RENDERER_API void createModelEditor(const Path& path, StudioApp& app);
+BLACK_RENDERER_API void createModelEditor(const Path& path, StudioApp& app);
 
-} // namespace Lumix
+} // namespace black

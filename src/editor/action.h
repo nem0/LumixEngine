@@ -2,13 +2,13 @@
 
 #include "core/os.h"
 #include "core/string.h"
-#include "engine/lumix.h"
+#include "engine/black.h.h"
 
 struct ImFont;
 
-namespace Lumix {
+namespace black {
 
-struct LUMIX_EDITOR_API Action {
+struct BLACK_EDITOR_API Action {
 	enum Modifiers : u8 {
 		NONE = 0,
 
@@ -77,6 +77,6 @@ struct CommonActions {
 inline Action::Modifiers operator |(Action::Modifiers a, Action::Modifiers b) { return Action::Modifiers((u8)a | (u8)b); }
 inline void operator |= (Action::Modifiers& a, Action::Modifiers b) { a = a | b; }
 
-LUMIX_EDITOR_API void getShortcut(const Action& action, Span<char> buf);
+BLACK_EDITOR_API void getShortcut(const Action& action, Span<char> buf);
 
 }

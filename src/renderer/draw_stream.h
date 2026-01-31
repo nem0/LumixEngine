@@ -7,7 +7,7 @@
 	#include <string.h>
 #endif
 
-namespace Lumix {
+namespace black {
 
 struct DrawStream {
 	DrawStream(struct Renderer& renderer);
@@ -94,11 +94,11 @@ private:
 	void operator =(const DrawStream&) = delete;
 	void operator =(DrawStream&&) = delete;
 
-	LUMIX_FORCE_INLINE u8* alloc(u32 size);
-	LUMIX_FORCE_INLINE void submitCached();
+	BLACK_FORCE_INLINE u8* alloc(u32 size);
+	BLACK_FORCE_INLINE void submitCached();
 	
 	template <typename T>
-	LUMIX_FORCE_INLINE void write(Instruction instruction, const T& val) {
+	BLACK_FORCE_INLINE void write(Instruction instruction, const T& val) {
 		u8* ptr = alloc(sizeof(val) + sizeof(Instruction));
 		memcpy(ptr, &instruction, sizeof(instruction));
 		memcpy(ptr + sizeof(instruction), &val, sizeof(val));
@@ -134,4 +134,4 @@ void DrawStream::pushLambda(const F& f) {
 	new (NewPlaceholder(), payload) F(f);
 }
 
-} // namespace Lumix
+} // namespace black

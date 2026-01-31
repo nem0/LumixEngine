@@ -1,13 +1,13 @@
 #pragma once
 
-#include "lumix.h"
+#include "black.h.h"
 
-namespace Lumix {
+namespace black {
 
 struct IModule;
 
 // contains necessary info to fully (==no other context needed) identify component at runtime
-struct LUMIX_ENGINE_API ComponentUID final {
+struct BLACK_ENGINE_API ComponentUID final {
 	ComponentUID() {
 		module = nullptr;
 		entity = INVALID_ENTITY;

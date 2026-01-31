@@ -4,7 +4,7 @@
 #include "engine/resource.h"
 #include "core/stream.h"
 
-namespace Lumix {
+namespace black {
 
 enum class PrefabVersion : u32 {
 	FIRST,
@@ -13,7 +13,7 @@ enum class PrefabVersion : u32 {
 	LAST
 };
 
-struct LUMIX_ENGINE_API PrefabResource final : Resource {
+struct BLACK_ENGINE_API PrefabResource final : Resource {
 	PrefabResource(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 	ResourceType getType() const override;
 	void unload() override;
@@ -24,4 +24,4 @@ struct LUMIX_ENGINE_API PrefabResource final : Resource {
 	static const ResourceType TYPE;
 };
 
-} // namespace Lumix
+} // namespace black

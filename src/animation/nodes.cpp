@@ -4,7 +4,7 @@
 #include "nodes.h"
 #include "renderer/model.h"
 
-namespace Lumix::anim {
+namespace black::anim {
 
 void serializeNode(OutputMemoryStream& blob, const Node& node) {
 	blob.write(node.type());
@@ -18,14 +18,14 @@ Node* deserializeNode(InputMemoryStream& blob, Controller& ctrl, u32 version) {
 	return n;
 }
 
-static LUMIX_FORCE_INLINE LocalRigidTransform getRootMotionEx(const Animation* anim, Time t0, Time t1) {
+static BLACK_FORCE_INLINE LocalRigidTransform getRootMotionEx(const Animation* anim, Time t0, Time t1) {
 	ASSERT(t0 <= t1);
 	LocalRigidTransform old_tr = anim->getRootMotion(t0).inverted();
 	LocalRigidTransform new_tr = anim->getRootMotion(t1);
 	return old_tr * new_tr;
 }
 
-static LUMIX_FORCE_INLINE LocalRigidTransform getRootMotion(const RuntimeContext& ctx, const Animation* anim, Time t0_abs, Time t1_abs) {
+static BLACK_FORCE_INLINE LocalRigidTransform getRootMotion(const RuntimeContext& ctx, const Animation* anim, Time t0_abs, Time t1_abs) {
 	const Time t0 = t0_abs % anim->getLength();
 	const Time t1 = t1_abs % anim->getLength();
 
@@ -60,27 +60,27 @@ void RuntimeContext::setInput(u32 input_idx, bool value) {
 Node* Node::create(NodeType type, Controller& controller) {
 	switch(type) {
 		case NodeType::LAYERS: ASSERT(false); return nullptr;
-		case NodeType::BLEND1D: return LUMIX_NEW(controller.m_allocator, Blend1DNode)(controller.m_allocator);
-		case NodeType::BLEND2D: return LUMIX_NEW(controller.m_allocator, Blend2DNode)(controller.m_allocator);
-		case NodeType::SELECT: return LUMIX_NEW(controller.m_allocator, SelectNode)(controller.m_allocator);
-		case NodeType::INPUT: return LUMIX_NEW(controller.m_allocator, InputNode);
-		case NodeType::PLAYRATE: return LUMIX_NEW(controller.m_allocator, PlayRateNode)(controller.m_allocator);
-		case NodeType::CONSTANT: return LUMIX_NEW(controller.m_allocator, ConstNode);
-		case NodeType::ANIMATION: return LUMIX_NEW(controller.m_allocator, AnimationNode);
-		case NodeType::SWITCH: return LUMIX_NEW(controller.m_allocator, SwitchNode)(controller.m_allocator);
-		case NodeType::CMP_EQ: return LUMIX_NEW(controller.m_allocator, MathNode<NodeType::CMP_EQ>);
-		case NodeType::CMP_NEQ: return LUMIX_NEW(controller.m_allocator, MathNode<NodeType::CMP_NEQ>);
-		case NodeType::CMP_LT: return LUMIX_NEW(controller.m_allocator, MathNode<NodeType::CMP_LT>);
-		case NodeType::CMP_LTE: return LUMIX_NEW(controller.m_allocator, MathNode<NodeType::CMP_LTE>);
-		case NodeType::CMP_GT: return LUMIX_NEW(controller.m_allocator, MathNode<NodeType::CMP_GT>);
-		case NodeType::CMP_GTE: return LUMIX_NEW(controller.m_allocator, MathNode<NodeType::CMP_GTE>);
-		case NodeType::AND: return LUMIX_NEW(controller.m_allocator, MathNode<NodeType::AND>);
-		case NodeType::OR: return LUMIX_NEW(controller.m_allocator, MathNode<NodeType::OR>);
-		case NodeType::MUL: return LUMIX_NEW(controller.m_allocator, MathNode<NodeType::MUL>);
-		case NodeType::DIV: return LUMIX_NEW(controller.m_allocator, MathNode<NodeType::DIV>);
-		case NodeType::ADD: return LUMIX_NEW(controller.m_allocator, MathNode<NodeType::ADD>);
-		case NodeType::SUB: return LUMIX_NEW(controller.m_allocator, MathNode<NodeType::SUB>);
-		case NodeType::IK: return LUMIX_NEW(controller.m_allocator, IKNode)(controller.m_allocator);
+		case NodeType::BLEND1D: return BLACK_NEW(controller.m_allocator, Blend1DNode)(controller.m_allocator);
+		case NodeType::BLEND2D: return BLACK_NEW(controller.m_allocator, Blend2DNode)(controller.m_allocator);
+		case NodeType::SELECT: return BLACK_NEW(controller.m_allocator, SelectNode)(controller.m_allocator);
+		case NodeType::INPUT: return BLACK_NEW(controller.m_allocator, InputNode);
+		case NodeType::PLAYRATE: return BLACK_NEW(controller.m_allocator, PlayRateNode)(controller.m_allocator);
+		case NodeType::CONSTANT: return BLACK_NEW(controller.m_allocator, ConstNode);
+		case NodeType::ANIMATION: return BLACK_NEW(controller.m_allocator, AnimationNode);
+		case NodeType::SWITCH: return BLACK_NEW(controller.m_allocator, SwitchNode)(controller.m_allocator);
+		case NodeType::CMP_EQ: return BLACK_NEW(controller.m_allocator, MathNode<NodeType::CMP_EQ>);
+		case NodeType::CMP_NEQ: return BLACK_NEW(controller.m_allocator, MathNode<NodeType::CMP_NEQ>);
+		case NodeType::CMP_LT: return BLACK_NEW(controller.m_allocator, MathNode<NodeType::CMP_LT>);
+		case NodeType::CMP_LTE: return BLACK_NEW(controller.m_allocator, MathNode<NodeType::CMP_LTE>);
+		case NodeType::CMP_GT: return BLACK_NEW(controller.m_allocator, MathNode<NodeType::CMP_GT>);
+		case NodeType::CMP_GTE: return BLACK_NEW(controller.m_allocator, MathNode<NodeType::CMP_GTE>);
+		case NodeType::AND: return BLACK_NEW(controller.m_allocator, MathNode<NodeType::AND>);
+		case NodeType::OR: return BLACK_NEW(controller.m_allocator, MathNode<NodeType::OR>);
+		case NodeType::MUL: return BLACK_NEW(controller.m_allocator, MathNode<NodeType::MUL>);
+		case NodeType::DIV: return BLACK_NEW(controller.m_allocator, MathNode<NodeType::DIV>);
+		case NodeType::ADD: return BLACK_NEW(controller.m_allocator, MathNode<NodeType::ADD>);
+		case NodeType::SUB: return BLACK_NEW(controller.m_allocator, MathNode<NodeType::SUB>);
+		case NodeType::IK: return BLACK_NEW(controller.m_allocator, IKNode)(controller.m_allocator);
 		case NodeType::OUTPUT:
 		case NodeType::NONE:
 		case NodeType::TREE: return nullptr; // editor only node
@@ -146,10 +146,10 @@ void AnimationNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32
 }
 
 SelectNode::~SelectNode() {
-	LUMIX_DELETE(m_allocator, m_value);
+	BLACK_DELETE(m_allocator, m_value);
 	
 	for (PoseNode* child : m_children) {
-		LUMIX_DELETE(m_allocator, child);
+		BLACK_DELETE(m_allocator, child);
 	}
 }
 
@@ -250,9 +250,9 @@ Time SelectNode::length(const RuntimeContext& ctx) const {	return Time::fromSeco
 Time SelectNode::time(const RuntimeContext& ctx) const { return Time(0); }
 
 SwitchNode::~SwitchNode() {
-	LUMIX_DELETE(m_allocator, m_value);
-	LUMIX_DELETE(m_allocator, m_true_node);
-	LUMIX_DELETE(m_allocator, m_false_node);
+	BLACK_DELETE(m_allocator, m_value);
+	BLACK_DELETE(m_allocator, m_true_node);
+	BLACK_DELETE(m_allocator, m_false_node);
 }
 
 SwitchNode::SwitchNode(IAllocator& allocator)
@@ -345,9 +345,9 @@ Time SwitchNode::time(const RuntimeContext& ctx) const { return Time(0); }
 
 
 IKNode::~IKNode() {
-	LUMIX_DELETE(m_allocator, m_alpha);
-	LUMIX_DELETE(m_allocator, m_input);
-	LUMIX_DELETE(m_allocator, m_effector_position);
+	BLACK_DELETE(m_allocator, m_alpha);
+	BLACK_DELETE(m_allocator, m_input);
+	BLACK_DELETE(m_allocator, m_effector_position);
 }
 
 IKNode::IKNode(IAllocator& allocator)
@@ -473,8 +473,8 @@ static Blend2DActiveTrio getActiveTrio(const Blend2DNode& node, Vec2 input_val) 
 }
 
 Blend2DNode::~Blend2DNode() {
-	LUMIX_DELETE(m_allocator, m_x_value);
-	LUMIX_DELETE(m_allocator, m_y_value);
+	BLACK_DELETE(m_allocator, m_x_value);
+	BLACK_DELETE(m_allocator, m_y_value);
 }
 
 Blend2DNode::Blend2DNode(IAllocator& allocator)
@@ -623,7 +623,7 @@ static Blend1DActivePair getActivePair(const Blend1DNode& node, float input_val)
 }
 
 Blend1DNode::~Blend1DNode() {
-	LUMIX_DELETE(m_allocator, m_value);
+	BLACK_DELETE(m_allocator, m_value);
 }
 
 Blend1DNode::Blend1DNode(IAllocator& allocator)
@@ -715,8 +715,8 @@ void Blend1DNode::skip(RuntimeContext& ctx) const {
 }
 
 PlayRateNode::~PlayRateNode() {
-	LUMIX_DELETE(m_allocator, m_node);
-	LUMIX_DELETE(m_allocator, m_value);
+	BLACK_DELETE(m_allocator, m_node);
+	BLACK_DELETE(m_allocator, m_value);
 }
 
 PlayRateNode::PlayRateNode(IAllocator& allocator)
@@ -756,4 +756,4 @@ void PlayRateNode::skip(RuntimeContext& ctx) const {
 	m_node->skip(ctx);
 }
 
-} // namespace Lumix::anim
+} // namespace black::anim

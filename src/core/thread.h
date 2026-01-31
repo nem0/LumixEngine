@@ -3,10 +3,10 @@
 #include "core.h"
 
 
-namespace Lumix
+namespace black
 {
 
-struct LUMIX_CORE_API Thread {
+struct BLACK_CORE_API Thread {
 	explicit Thread(struct IAllocator& allocator);
 	virtual ~Thread();
 
@@ -32,4 +32,4 @@ private:
 };
 
 
-} // namespace Lumix
+} // namespace black

@@ -6,7 +6,7 @@ extern "C" {
 	void _WriteBarrier(void);
 }
 
-namespace Lumix
+namespace black
 {
 
 void AtomicI32::operator =(i32 v) { _InterlockedExchange((volatile long*)&value, v); }
@@ -86,4 +86,4 @@ void memoryBarrier()
 }
 
 
-} // namespace Lumix
+} // namespace black

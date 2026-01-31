@@ -2,9 +2,9 @@
 
 #include "core/string.h"
 
-namespace Lumix {
+namespace black {
 
-struct LUMIX_EDITOR_API TextFilter {
+struct BLACK_EDITOR_API TextFilter {
 	bool isActive() const { return count != 0; }
 	void clear() { count = 0; filter[0] = 0; }
 	bool pass(StringView text) const;

@@ -130,12 +130,12 @@ namespace rgbcx
 		// Recommended if you're enabling cEncodeBC1UseLikelyTotalOrderings.
 		cEncodeBC1TwoLeastSquaresPasses = 4,
 				
-		// cEncodeBC1Use3ColorBlocksForBlackPixels allows the BC1 encoder to use 3-color blocks for blocks containing black or very dark pixels. 
+		// cEncodeBC1Use3ColorBlocksForblack.hPixels allows the BC1 encoder to use 3-color blocks for blocks containing black or very dark pixels. 
 		// You shader/engine MUST ignore the alpha channel on textures encoded with this flag.
 		// Average quality goes up substantially for my 100 texture corpus (~.5 dB), so it's worth using if you can.
 		// Note the BC1 encoder does not actually support transparency in 3-color mode.
 		// Don't set when encoding to BC3.
-		cEncodeBC1Use3ColorBlocksForBlackPixels = 8,
+		cEncodeBC1Use3ColorBlocksForblack.hPixels = 8,
 
 		// If cEncodeBC1Use3ColorBlocks is set, the encoder can use 3-color mode for a small but noticeable gain in average quality, but lower perf.
 		// If you also specify the cEncodeBC1UseLikelyTotalOrderings flag, set the total_orderings_to_try3 paramter to the number of total orderings to try.
@@ -201,7 +201,7 @@ namespace rgbcx
 	void encode_bc1(uint32_t level, void* pDst, const uint8_t* pPixels, bool allow_3color, bool use_transparent_texels_for_black);
 
 	// Low-level interface for BC1 encoding.
-	// Always returns a 4 color block, unless cEncodeBC1Use3ColorBlocksForBlackPixels or cEncodeBC1Use3ColorBlock flags are specified. 
+	// Always returns a 4 color block, unless cEncodeBC1Use3ColorBlocksForblack.hPixels or cEncodeBC1Use3ColorBlock flags are specified. 
 	// total_orderings_to_try controls the perf. vs. quality tradeoff on 4-color blocks when the cEncodeBC1UseLikelyTotalOrderings flag is used. It must range between [MIN_TOTAL_ORDERINGS, MAX_TOTAL_ORDERINGS4].
 	// total_orderings_to_try3 controls the perf. vs. quality tradeoff on 3-color bocks when the cEncodeBC1UseLikelyTotalOrderings and the cEncodeBC1Use3ColorBlocks flags are used. Valid range is [0,MAX_TOTAL_ORDERINGS3] (0=disabled).
 	void encode_bc1(void* pDst, const uint8_t* pPixels, uint32_t flags = 0, uint32_t total_orderings_to_try = DEFAULT_TOTAL_ORDERINGS_TO_TRY, uint32_t total_orderings_to_try3 = DEFAULT_TOTAL_ORDERINGS_TO_TRY3);
@@ -2960,86 +2960,86 @@ namespace rgbcx
 		case 5:
 			// stb_dxt HIGHQUAL + permit 3 color (if it's enabled).
 			flags = cEncodeBC1TwoLeastSquaresPasses | cEncodeBC1UseFasterMSEEval;
-			flags |= (allow_3color ? cEncodeBC1Use3ColorBlocks : 0) | (allow_transparent_texels_for_black ? cEncodeBC1Use3ColorBlocksForBlackPixels : 0);
+			flags |= (allow_3color ? cEncodeBC1Use3ColorBlocks : 0) | (allow_transparent_texels_for_black ? cEncodeBC1Use3ColorBlocksForblack.hPixels : 0);
 			break;
 		case 6:
 			flags = cEncodeBC1TwoLeastSquaresPasses | cEncodeBC1UseFasterMSEEval | cEncodeBC1UseLikelyTotalOrderings;
-			flags |= (allow_3color ? cEncodeBC1Use3ColorBlocks : 0) | (allow_transparent_texels_for_black ? cEncodeBC1Use3ColorBlocksForBlackPixels : 0);
+			flags |= (allow_3color ? cEncodeBC1Use3ColorBlocks : 0) | (allow_transparent_texels_for_black ? cEncodeBC1Use3ColorBlocksForblack.hPixels : 0);
 			break;
 		case 7:
 			flags = cEncodeBC1TwoLeastSquaresPasses | cEncodeBC1UseFasterMSEEval | cEncodeBC1UseLikelyTotalOrderings;
-			flags |= (allow_3color ? cEncodeBC1Use3ColorBlocks : 0) | (allow_transparent_texels_for_black ? cEncodeBC1Use3ColorBlocksForBlackPixels : 0);
+			flags |= (allow_3color ? cEncodeBC1Use3ColorBlocks : 0) | (allow_transparent_texels_for_black ? cEncodeBC1Use3ColorBlocksForblack.hPixels : 0);
 			total_orderings4 = 4;
 			break;
 		case 8:
 			flags = cEncodeBC1TwoLeastSquaresPasses | cEncodeBC1UseFasterMSEEval | cEncodeBC1UseLikelyTotalOrderings;
-			flags |= (allow_3color ? cEncodeBC1Use3ColorBlocks : 0) | (allow_transparent_texels_for_black ? cEncodeBC1Use3ColorBlocksForBlackPixels : 0);
+			flags |= (allow_3color ? cEncodeBC1Use3ColorBlocks : 0) | (allow_transparent_texels_for_black ? cEncodeBC1Use3ColorBlocksForblack.hPixels : 0);
 			total_orderings4 = 8;
 			break;
 		case 9:
 			flags = cEncodeBC1TwoLeastSquaresPasses | cEncodeBC1UseLikelyTotalOrderings;
-			flags |= (allow_3color ? cEncodeBC1Use3ColorBlocks : 0) | (allow_transparent_texels_for_black ? cEncodeBC1Use3ColorBlocksForBlackPixels : 0);
+			flags |= (allow_3color ? cEncodeBC1Use3ColorBlocks : 0) | (allow_transparent_texels_for_black ? cEncodeBC1Use3ColorBlocksForblack.hPixels : 0);
 			total_orderings4 = 11;
 			total_orderings3 = 3;
 			break;
 		case 10:
 			flags = cEncodeBC1TwoLeastSquaresPasses | cEncodeBC1UseLikelyTotalOrderings;
-			flags |= (allow_3color ? cEncodeBC1Use3ColorBlocks : 0) | (allow_transparent_texels_for_black ? cEncodeBC1Use3ColorBlocksForBlackPixels : 0);
+			flags |= (allow_3color ? cEncodeBC1Use3ColorBlocks : 0) | (allow_transparent_texels_for_black ? cEncodeBC1Use3ColorBlocksForblack.hPixels : 0);
 			total_orderings4 = 20;
 			total_orderings3 = 8;
 			break;
 		case 11:
 			flags = cEncodeBC1TwoLeastSquaresPasses | cEncodeBC1UseLikelyTotalOrderings;
-			flags |= (allow_3color ? cEncodeBC1Use3ColorBlocks : 0) | (allow_transparent_texels_for_black ? cEncodeBC1Use3ColorBlocksForBlackPixels : 0);
+			flags |= (allow_3color ? cEncodeBC1Use3ColorBlocks : 0) | (allow_transparent_texels_for_black ? cEncodeBC1Use3ColorBlocksForblack.hPixels : 0);
 			total_orderings4 = 28;
 			total_orderings3 = 16;
 			break;
 		case 12:
 			flags = cEncodeBC1TwoLeastSquaresPasses | cEncodeBC1UseLikelyTotalOrderings;
-			flags |= (allow_3color ? cEncodeBC1Use3ColorBlocks : 0) | (allow_transparent_texels_for_black ? cEncodeBC1Use3ColorBlocksForBlackPixels : 0);
+			flags |= (allow_3color ? cEncodeBC1Use3ColorBlocks : 0) | (allow_transparent_texels_for_black ? cEncodeBC1Use3ColorBlocksForblack.hPixels : 0);
 			total_orderings4 = 32;
 			total_orderings3 = 32;
 			break;
 		case 13:
 			flags = cEncodeBC1TwoLeastSquaresPasses | cEncodeBC1UseFullMSEEval | cEncodeBC1UseLikelyTotalOrderings | cEncodeBC1Use6PowerIters | (20 << cEncodeBC1EndpointSearchRoundsShift) | cEncodeBC1TryAllInitialEndponts;
-			flags |= (allow_3color ? cEncodeBC1Use3ColorBlocks : 0) | (allow_transparent_texels_for_black ? cEncodeBC1Use3ColorBlocksForBlackPixels : 0);
+			flags |= (allow_3color ? cEncodeBC1Use3ColorBlocks : 0) | (allow_transparent_texels_for_black ? cEncodeBC1Use3ColorBlocksForblack.hPixels : 0);
 			total_orderings4 = 32;
 			total_orderings3 = 32;
 			break;
 		case 14:
 			flags = cEncodeBC1TwoLeastSquaresPasses | cEncodeBC1UseFullMSEEval | cEncodeBC1UseLikelyTotalOrderings | cEncodeBC1Use6PowerIters | (32 << cEncodeBC1EndpointSearchRoundsShift) | cEncodeBC1TryAllInitialEndponts;
-			flags |= (allow_3color ? cEncodeBC1Use3ColorBlocks : 0) | (allow_transparent_texels_for_black ? cEncodeBC1Use3ColorBlocksForBlackPixels : 0);
+			flags |= (allow_3color ? cEncodeBC1Use3ColorBlocks : 0) | (allow_transparent_texels_for_black ? cEncodeBC1Use3ColorBlocksForblack.hPixels : 0);
 			total_orderings4 = 32;
 			total_orderings3 = 32;
 			break;
 		case 15:
 			flags = cEncodeBC1TwoLeastSquaresPasses | cEncodeBC1UseFullMSEEval | cEncodeBC1UseLikelyTotalOrderings | cEncodeBC1Use6PowerIters | (32 << cEncodeBC1EndpointSearchRoundsShift) | cEncodeBC1TryAllInitialEndponts;
-			flags |= (allow_3color ? cEncodeBC1Use3ColorBlocks : 0) | (allow_transparent_texels_for_black ? cEncodeBC1Use3ColorBlocksForBlackPixels : 0);
+			flags |= (allow_3color ? cEncodeBC1Use3ColorBlocks : 0) | (allow_transparent_texels_for_black ? cEncodeBC1Use3ColorBlocksForblack.hPixels : 0);
 			total_orderings4 = ((((32 + MAX_TOTAL_ORDERINGS4) / 2) + 32) / 2);
 			total_orderings3 = 32;
 			break;
 		case 16:
 			flags = cEncodeBC1TwoLeastSquaresPasses | cEncodeBC1UseFullMSEEval | cEncodeBC1UseLikelyTotalOrderings | cEncodeBC1Use6PowerIters | (256 << cEncodeBC1EndpointSearchRoundsShift) | cEncodeBC1TryAllInitialEndponts;
-			flags |= (allow_3color ? cEncodeBC1Use3ColorBlocks : 0) | (allow_transparent_texels_for_black ? cEncodeBC1Use3ColorBlocksForBlackPixels : 0);
+			flags |= (allow_3color ? cEncodeBC1Use3ColorBlocks : 0) | (allow_transparent_texels_for_black ? cEncodeBC1Use3ColorBlocksForblack.hPixels : 0);
 			total_orderings4 = (32 + MAX_TOTAL_ORDERINGS4) / 2;
 			total_orderings3 = 32;
 			break;
 		case 17:
 			flags = cEncodeBC1TwoLeastSquaresPasses | cEncodeBC1UseFullMSEEval | cEncodeBC1UseLikelyTotalOrderings | cEncodeBC1Use6PowerIters | (256 << cEncodeBC1EndpointSearchRoundsShift) | cEncodeBC1TryAllInitialEndponts;
-			flags |= (allow_3color ? cEncodeBC1Use3ColorBlocks : 0) | (allow_transparent_texels_for_black ? cEncodeBC1Use3ColorBlocksForBlackPixels : 0);
+			flags |= (allow_3color ? cEncodeBC1Use3ColorBlocks : 0) | (allow_transparent_texels_for_black ? cEncodeBC1Use3ColorBlocksForblack.hPixels : 0);
 			total_orderings4 = MAX_TOTAL_ORDERINGS4;
 			total_orderings3 = 32;
 			break;
 		case 18:
 			flags = cEncodeBC1TwoLeastSquaresPasses | cEncodeBC1UseFullMSEEval | cEncodeBC1UseLikelyTotalOrderings | cEncodeBC1Use6PowerIters | cEncodeBC1Iterative | (256 << cEncodeBC1EndpointSearchRoundsShift) | cEncodeBC1TryAllInitialEndponts;
-			flags |= (allow_3color ? cEncodeBC1Use3ColorBlocks : 0) | (allow_transparent_texels_for_black ? cEncodeBC1Use3ColorBlocksForBlackPixels : 0);
+			flags |= (allow_3color ? cEncodeBC1Use3ColorBlocks : 0) | (allow_transparent_texels_for_black ? cEncodeBC1Use3ColorBlocksForblack.hPixels : 0);
 			total_orderings4 = MAX_TOTAL_ORDERINGS4;
 			total_orderings3 = 32;
 			break;
 		case 19:
 			// This hidden mode is *extremely* slow and abuses the encoder. It's just for testing/training.
 			flags = cEncodeBC1TwoLeastSquaresPasses | cEncodeBC1UseFullMSEEval | cEncodeBC1UseLikelyTotalOrderings | cEncodeBC1Use6PowerIters | cEncodeBC1Exhaustive | cEncodeBC1Iterative | (256 << cEncodeBC1EndpointSearchRoundsShift) | cEncodeBC1TryAllInitialEndponts;
-			flags |= (allow_3color ? cEncodeBC1Use3ColorBlocks : 0) | (allow_transparent_texels_for_black ? cEncodeBC1Use3ColorBlocksForBlackPixels : 0);
+			flags |= (allow_3color ? cEncodeBC1Use3ColorBlocks : 0) | (allow_transparent_texels_for_black ? cEncodeBC1Use3ColorBlocksForblack.hPixels : 0);
 			total_orderings4 = 32;
 			total_orderings3 = 32;
 			break;
@@ -3472,7 +3472,7 @@ namespace rgbcx
 			if (results.m_3color)
 			{
 				trial_err = bc1_find_sels3_fullerr(
-					((any_black_pixels) && ((flags & cEncodeBC1Use3ColorBlocksForBlackPixels) != 0)),
+					((any_black_pixels) && ((flags & cEncodeBC1Use3ColorBlocksForblack.hPixels) != 0)),
 					pSrc_pixels, trial_lr, trial_lg, trial_lb, trial_hr, trial_hg, trial_hb, trial_sels, cur_err);
 			}
 			else
@@ -3516,7 +3516,7 @@ namespace rgbcx
 
 		if (j == 0)
 		{
-			encode_bc1_solid_block(pDst, fr, fg, fb, (flags & (cEncodeBC1Use3ColorBlocks | cEncodeBC1Use3ColorBlocksForBlackPixels)) != 0);
+			encode_bc1_solid_block(pDst, fr, fg, fb, (flags & (cEncodeBC1Use3ColorBlocks | cEncodeBC1Use3ColorBlocksForblack.hPixels)) != 0);
 			return;
 		}
 
@@ -3552,7 +3552,7 @@ namespace rgbcx
 		lr = 0, lg = 0, lb = 0, hr = 0, hg = 0, hb = 0;
 								
 		const bool needs_block_error = ((flags & (cEncodeBC1UseLikelyTotalOrderings | cEncodeBC1Use3ColorBlocks | cEncodeBC1UseFullMSEEval | cEncodeBC1EndpointSearchRoundsMask)) != 0) ||
-				(any_black_pixels && ((flags & cEncodeBC1Use3ColorBlocksForBlackPixels) != 0));
+				(any_black_pixels && ((flags & cEncodeBC1Use3ColorBlocksForblack.hPixels) != 0));
 		
 		uint32_t cur_err = UINT32_MAX;
 
@@ -3813,7 +3813,7 @@ namespace rgbcx
 			} // iter_index
 		}
 												
-		if ( ((flags & (cEncodeBC1Use3ColorBlocks | cEncodeBC1Use3ColorBlocksForBlackPixels)) != 0) && (cur_err) )
+		if ( ((flags & (cEncodeBC1Use3ColorBlocks | cEncodeBC1Use3ColorBlocksForblack.hPixels)) != 0) && (cur_err) )
 		{
 			if (flags & cEncodeBC1Use3ColorBlocks)
 			{
@@ -3821,7 +3821,7 @@ namespace rgbcx
 				try_3color_block(pSrc_pixels, flags, cur_err, avg_r, avg_g, avg_b, orig_lr, orig_lg, orig_lb, orig_hr, orig_hg, orig_hb, total_r, total_g, total_b, total_orderings_to_try3, results);
 			}
 
-			if ((any_black_pixels) && ((flags & cEncodeBC1Use3ColorBlocksForBlackPixels) != 0))
+			if ((any_black_pixels) && ((flags & cEncodeBC1Use3ColorBlocksForblack.hPixels) != 0))
 			{
 				assert(needs_block_error);
 				try_3color_block_useblack(pSrc_pixels, flags, cur_err, results);
@@ -4029,7 +4029,7 @@ namespace rgbcx
 		assert(g_initialized);
 
 		// 3-color blocks are not allowed with BC3 (on most GPU's).
-		flags &= ~(cEncodeBC1Use3ColorBlocksForBlackPixels | cEncodeBC1Use3ColorBlocks);
+		flags &= ~(cEncodeBC1Use3ColorBlocksForblack.hPixels | cEncodeBC1Use3ColorBlocks);
 
 		encode_bc4(pDst, pPixels + 3, 4);
 		encode_bc1(static_cast<uint8_t*>(pDst) + 8, pPixels, flags, total_orderings_to_try);

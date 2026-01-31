@@ -3,10 +3,10 @@
 
 int main(int argc, char* argv[])
 {
-	Lumix::os::setCommandLine(argc, argv);
-	auto* app = Lumix::StudioApp::create();
+	black.h::os::setCommandLine(argc, argv);
+	auto* app = black.h::StudioApp::create();
 	app->run();
 	int exit_code = app->getExitCode();
-	Lumix::StudioApp::destroy(*app);
+	black.h::StudioApp::destroy(*app);
 	return exit_code;
 }

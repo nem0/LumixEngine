@@ -9,7 +9,7 @@
 #include "engine/engine.h"
 
 
-namespace Lumix {
+namespace black {
 
 
 struct MouseDevice : InputSystem::Device {
@@ -47,9 +47,9 @@ struct InputSystemImpl final : InputSystem {
 		, m_down_keys(m_allocator)
 		, m_gamepad_states(m_allocator)
 		, m_gamepad_devices(m_allocator) {
-		m_mouse_device = LUMIX_NEW(m_allocator, MouseDevice);
+		m_mouse_device = BLACK_NEW(m_allocator, MouseDevice);
 		m_mouse_device->type = Device::MOUSE;
-		m_keyboard_device = LUMIX_NEW(m_allocator, KeyboardDevice);
+		m_keyboard_device = BLACK_NEW(m_allocator, KeyboardDevice);
 		m_keyboard_device->type = Device::KEYBOARD;
 		m_devices.push(m_keyboard_device);
 		m_devices.push(m_mouse_device);
@@ -69,7 +69,7 @@ struct InputSystemImpl final : InputSystem {
 		} else {
 			// Cleanup if init failed
 			if (m_gamepad_backend) {
-				LUMIX_DELETE(m_allocator, m_gamepad_backend);
+				BLACK_DELETE(m_allocator, m_gamepad_backend);
 				m_gamepad_backend = nullptr;
 			}
 		}
@@ -82,11 +82,11 @@ struct InputSystemImpl final : InputSystem {
 		// Clean up gamepad backend
 		if (m_gamepad_backend) {
 			m_gamepad_backend->shutdown();
-			LUMIX_DELETE(m_allocator, m_gamepad_backend);
+			BLACK_DELETE(m_allocator, m_gamepad_backend);
 		}
 
 		for (Device* device : m_devices) {
-			LUMIX_DELETE(m_allocator, device);
+			BLACK_DELETE(m_allocator, device);
 		}
 	}
 
@@ -120,7 +120,7 @@ struct InputSystemImpl final : InputSystem {
 
 		for (Device* device : m_to_remove) {
 			m_devices.eraseItem(device);
-			LUMIX_DELETE(m_allocator, device);
+			BLACK_DELETE(m_allocator, device);
 		}
 		m_to_remove.clear();
 
@@ -243,7 +243,7 @@ private:
 				// Handle connection changes
 				if (is_connected && !m_gamepad_devices[i]) {
 					// Controller connected
-					GamepadDevice* device = LUMIX_NEW(m_allocator, GamepadDevice)(i);
+					GamepadDevice* device = BLACK_NEW(m_allocator, GamepadDevice)(i);
 					device->type = Device::CONTROLLER;
 					device->last_state = new_state;
 					m_gamepad_devices[i] = device;
@@ -352,4 +352,4 @@ UniquePtr<InputSystem> InputSystem::create(Engine& engine) {
 }
 
 
-} // namespace Lumix
+} // namespace black

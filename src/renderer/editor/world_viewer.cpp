@@ -12,7 +12,7 @@
 #include "renderer/renderer.h"
 #include "world_viewer.h"
 
-namespace Lumix {
+namespace black {
 
 WorldViewer::WorldViewer(StudioApp& app)
 	: m_app(app)

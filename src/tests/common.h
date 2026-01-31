@@ -1,6 +1,6 @@
 #pragma once
 
-namespace Lumix {
+namespace black {
 
 extern int test_count;
 extern int passed_count;
@@ -28,4 +28,4 @@ extern int passed_count;
 		} \
 	} while(0)
 
-} // namespace Lumix
+} // namespace black

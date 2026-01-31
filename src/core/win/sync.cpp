@@ -8,7 +8,7 @@
 #include "core/win/simple_win.h"
 
 
-namespace Lumix
+namespace black
 {
 
 
@@ -127,4 +127,4 @@ MutexGuardProfiled::~MutexGuardProfiled() {
 }
 
 
-} // namespace Lumix
+} // namespace black

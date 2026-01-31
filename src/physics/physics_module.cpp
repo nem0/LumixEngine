@@ -58,7 +58,7 @@
 
 using namespace physx;
 
-namespace Lumix {
+namespace black {
 
 enum class FilterFlags : u32 {
 	VEHICLE = 1 << 0
@@ -852,7 +852,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		heights.resize(width * height);
 		if (bytes_per_pixel == 2)
 		{
-			const i16* LUMIX_RESTRICT data = (const i16*)src_data;
+			const i16* BLACK_RESTRICT data = (const i16*)src_data;
 			for (int j = 0; j < height; ++j)
 			{
 				for (int i = 0; i < width; ++i)
@@ -867,7 +867,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		else
 		{
 			ASSERT(bytes_per_pixel == 1);
-			const u8* LUMIX_RESTRICT data = src_data;
+			const u8* BLACK_RESTRICT data = src_data;
 			for (int j = 0; j < height; ++j)
 			{
 				for (int i = 0; i < width; ++i)
@@ -2538,7 +2538,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		if (terrain.m_heightmap->format == gpu::TextureFormat::R16)
 		{
 			PROFILE_BLOCK("copyData");
-			const i16* LUMIX_RESTRICT data = (const i16*)terrain.m_heightmap->getData();
+			const i16* BLACK_RESTRICT data = (const i16*)terrain.m_heightmap->getData();
 			for (int j = 0; j < height; ++j)
 			{
 				int idx = j * width;
@@ -3878,7 +3878,7 @@ PhysicsModuleImpl::PhysicsModuleImpl(Engine& engine, World& world, PhysicsSystem
 
 UniquePtr<PhysicsModule> PhysicsModule::create(PhysicsSystem& system, World& world, Engine& engine, IAllocator& allocator)
 {
-	PhysicsModuleImpl* impl = LUMIX_NEW(allocator, PhysicsModuleImpl)(engine, world, system, allocator);
+	PhysicsModuleImpl* impl = BLACK_NEW(allocator, PhysicsModuleImpl)(engine, world, system, allocator);
 	impl->m_world.componentTransformed(types::physical_controller).bind<&PhysicsModuleImpl::onControllerMoved>(impl);
 	impl->m_world.componentTransformed(types::rigid_actor).bind<&PhysicsModuleImpl::onActorMoved>(impl);
 	
@@ -3894,7 +3894,7 @@ UniquePtr<PhysicsModule> PhysicsModule::create(PhysicsSystem& system, World& wor
 	impl->m_scene = system.getPhysics()->createScene(sceneDesc);
 	if (!impl->m_scene)
 	{
-		LUMIX_DELETE(allocator, impl);
+		BLACK_DELETE(allocator, impl);
 		return UniquePtr<PhysicsModule>(nullptr, nullptr);
 	}
 
@@ -4069,4 +4069,4 @@ void Heightfield::heightmapLoaded(Resource::State, Resource::State new_state, Re
 }
 
 
-} // namespace Lumix
+} // namespace black

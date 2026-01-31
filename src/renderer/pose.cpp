@@ -6,7 +6,7 @@
 #include "renderer/model.h"
 
 
-namespace Lumix
+namespace black
 {
 
 
@@ -147,4 +147,4 @@ void Pose::computeRelative(Model& model)
 }
 
 
-} // namespace Lumix
+} // namespace black

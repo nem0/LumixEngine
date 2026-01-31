@@ -1,11 +1,11 @@
 @echo off
-REM Compile and run meta for LumixEngine
+REM Compile and run meta for black Engine
 REM read docs/meta.md for more information
 setlocal
 
 set SCRIPTS_DIR=%~dp0
 set ROOT_DIR=%SCRIPTS_DIR%..
-set SLN_PATH=%SCRIPTS_DIR%tmp\vs2022\LumixEngine.sln
+set SLN_PATH=%SCRIPTS_DIR%tmp\vs2022\black Engine.sln
 set META_PATH=%SCRIPTS_DIR%tmp\vs2022\bin\Debug\meta.exe
 
 REM Initialize Visual Studio developer environment

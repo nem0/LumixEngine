@@ -2,7 +2,7 @@
 #include "action.h"
 #include "utils.h"
 
-namespace Lumix {
+namespace black {
 
 EditorAssetPlugin::EditorAssetPlugin(const char* name, const char* ext, ResourceType type, StudioApp& app, IAllocator& allocator)
 	: m_app(app)

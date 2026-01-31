@@ -3,7 +3,7 @@
 
 #include "engine/plugin.h"
 
-namespace Lumix {
+namespace black {
 
 namespace os { enum class CursorType : u32; }
 
@@ -28,4 +28,4 @@ struct GUISystem : ISystem {
 };
 
 
-} // namespace Lumix
+} // namespace black

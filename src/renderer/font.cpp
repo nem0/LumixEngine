@@ -14,7 +14,7 @@
 #include FT_SYNTHESIS_H         // <freetype/ftsynth.h>
 
 
-namespace Lumix
+namespace black
 {
 
 struct Font {
@@ -219,7 +219,7 @@ bool FontManager::build()
 	}
 	else {
 		auto& texture_manager = m_renderer.getTextureManager();
-		m_atlas_texture = LUMIX_NEW(m_allocator, Texture)(Path("draw2d_atlas"), texture_manager, m_renderer, m_allocator);
+		m_atlas_texture = BLACK_NEW(m_allocator, Texture)(Path("draw2d_atlas"), texture_manager, m_renderer, m_allocator);
 	}
 	m_atlas_texture->create(w, h, gpu::TextureFormat::RGBA8, pixels.begin(), pixels.byte_size());
 
@@ -257,7 +257,7 @@ Font* FontResource::addRef(int font_size)
 			return f;
 		}
 	}
-	Font* font = LUMIX_NEW(manager.m_allocator, Font)(manager.m_allocator);
+	Font* font = BLACK_NEW(manager.m_allocator, Font)(manager.m_allocator);
 	font->ref = 1;
 	font->resource = this;
 	font->font_size = font_size;
@@ -279,7 +279,7 @@ void FontResource::removeRef(Font& font)
 	--font.ref;
 	if(font.ref == 0) {
 		auto& manager = (FontManager&)m_resource_manager;
-		LUMIX_DELETE(manager.m_allocator, &font);
+		BLACK_DELETE(manager.m_allocator, &font);
 		manager.m_fonts.eraseItem(&font);
 		manager.m_dirty = true;
 		if (isReady()) manager.build();
@@ -301,26 +301,26 @@ FontManager::FontManager(Renderer& renderer, IAllocator& allocator)
 FontManager::~FontManager()
 {
 	for (Font* font : m_fonts) {
-		LUMIX_DELETE(m_allocator, font);
+		BLACK_DELETE(m_allocator, font);
 	}
 
 	if (m_atlas_texture) {
 		m_atlas_texture->destroy();
-		LUMIX_DELETE(m_allocator, m_atlas_texture);
+		BLACK_DELETE(m_allocator, m_atlas_texture);
 	}
 }
 
 
 Resource* FontManager::createResource(const Path& path)
 {
-	return LUMIX_NEW(m_allocator, FontResource)(path, *this, m_allocator);
+	return BLACK_NEW(m_allocator, FontResource)(path, *this, m_allocator);
 }
 
 
 void FontManager::destroyResource(Resource& resource)
 {
-	LUMIX_DELETE(m_allocator, static_cast<FontResource*>(&resource));
+	BLACK_DELETE(m_allocator, static_cast<FontResource*>(&resource));
 }
 
 
-} // namespace Lumix
+} // namespace black

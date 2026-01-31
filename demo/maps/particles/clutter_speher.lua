@@ -1,7 +1,7 @@
 local start_pos = this.position;
 
 local vel = {10, 0, 0}
-clutter = Lumix.Entity.NULL
+clutter = black.h.Entity.NULL
 
 function randomVelocity()
 	local angle = math.random(0, 6.29)

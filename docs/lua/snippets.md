@@ -78,7 +78,7 @@ function onInputEvent(event : InputEvent)
 		local hit = this.world.renderer:castRay(ray)
 		if hit.is_hit then
 			-- hit.entity, hit.t, etc.
-			LumixAPI.logInfo("Hit entity: " .. tostring(hit.entity))
+			black.hAPI.logInfo("Hit entity: " .. tostring(hit.entity))
 		end
 	end
 end
@@ -88,9 +88,9 @@ end
 ```lua
 function onInputEvent(event : InputEvent)
 	if event.type == "button" and event.device.type == "keyboard" then
-		if event.keycode == LumixAPI.Keycode.W and event.down then
+		if event.keycode == black.hAPI.Keycode.W and event.down then
 			-- Handle W key press
-			LumixAPI.logInfo("W key pressed")
+			black.hAPI.logInfo("W key pressed")
 		end
 	end
 end
@@ -98,13 +98,13 @@ end
 
 ### Instantiate a prefab
 ```lua
-ext_prefab = Lumix.Resource:newEmpty("prefab") -- this is exposed in property grid
+ext_prefab = black.h.Resource:newEmpty("prefab") -- this is exposed in property grid
 local done = false
 
 function update(time_delta)
 	if not done then
 		local e = this.world:instantiatePrefab({0, 3, 0}, ext_prefab)
-		LumixAPI.logInfo("root entity of the instantiated prefab : " .. tostring(e))
+		black.hAPI.logInfo("root entity of the instantiated prefab : " .. tostring(e))
 		done = true
 	end
 end
@@ -120,7 +120,7 @@ function start()
 end
 
 function onLevelLoaded()
-	LumixAPI.logError("level01 loaded")
+	black.hAPI.logError("level01 loaded")
 end
 ```
 
@@ -161,7 +161,7 @@ entity.rigid_actor.spheres[1].radius = 1
         button.parent = canvas
         button.lua_script.scripts:add()
         button.lua_script[1].onButtonClicked = function()
-            LumixAPI.logError("clicked " .. tostring(idx))
+            black.hAPI.logError("clicked " .. tostring(idx))
         end
     end
 ```

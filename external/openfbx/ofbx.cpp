@@ -1138,7 +1138,7 @@ static OptionalError<Property*> readTextProperty(Cursor* cursor, Allocator& allo
 	}
 
 	if (*cursor->current == ',') {
-		// https://github.com/nem0/OpenFBX/issues/85
+		// https://github.com/abdulrhmandeveloper2/OpenFBX/issues/85
 		prop->type = IElementProperty::NONE;
 		prop->value.begin = cursor->current;
 		prop->value.end = cursor->current;
@@ -2634,7 +2634,7 @@ struct OptionalError<Object*> parseCamera(Scene& scene, const Element& element, 
 	CameraImpl* camera = allocator.allocate<CameraImpl>(scene, element);
 
 	camera->projectionType = static_cast<Camera::ProjectionType>(resolveEnumProperty(*camera, "ProjectionType", (int)Camera::ProjectionType::PERSPECTIVE));
-	// try "CameraProjectionType" too, see https://github.com/nem0/OpenFBX/issues/105
+	// try "CameraProjectionType" too, see https://github.com/abdulrhmandeveloper2/OpenFBX/issues/105
 	camera->projectionType = static_cast<Camera::ProjectionType>(resolveEnumProperty(*camera, "CameraProjectionType", (int)camera->projectionType));
 
 	camera->apertureMode = static_cast<Camera::ApertureMode>(resolveEnumProperty(*camera, "ApertureMode", (int)Camera::ApertureMode::HORIZANDVERT));

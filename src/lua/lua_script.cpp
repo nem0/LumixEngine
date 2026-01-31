@@ -5,7 +5,7 @@
 #include "core/stream.h"
 #include "lua_script.h"
 
-namespace Lumix {
+namespace black {
 
 LuaScript::LuaScript(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
@@ -37,4 +37,4 @@ bool LuaScript::load(Span<const u8> mem) {
 	return true;
 }
 
-} // namespace Lumix
+} // namespace black

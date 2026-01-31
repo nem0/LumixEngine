@@ -2,7 +2,7 @@
 
 #include "editor/studio_app.h"
 
-namespace Lumix {
+namespace black {
 
 template <typename T> struct UniquePtr;
 
@@ -55,4 +55,4 @@ struct ControllerEditor {
 };
 
 } // namespace anim
-} // namespace Lumix
+} // namespace black

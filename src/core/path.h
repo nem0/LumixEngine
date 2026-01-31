@@ -5,11 +5,11 @@
 #include "string.h"
 
 
-namespace Lumix {
+namespace black {
 
 struct StringView;
 
-struct LUMIX_CORE_API PathInfo {
+struct BLACK_CORE_API PathInfo {
 	explicit PathInfo(StringView path);
 
 	StringView extension;
@@ -18,7 +18,7 @@ struct LUMIX_CORE_API PathInfo {
 };
 
 
-struct LUMIX_CORE_API Path {
+struct BLACK_CORE_API Path {
 	static char* normalize(StringView in_path, Span<char> out_normalized);
 	static char* normalize(char* in_out_path);
 	static StringView getDir(StringView src);
@@ -73,4 +73,4 @@ template <typename... Args> void Path::append(Args... args) {
 }
 
 
-} // namespace Lumix
+} // namespace black

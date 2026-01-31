@@ -3,7 +3,7 @@
 #include "renderer/editor/particle_script_compiler.h"
 #include "tests/common.h"
 
-using namespace Lumix;
+using namespace black;
 
 namespace {
 

@@ -7,7 +7,7 @@
 #include "core/stream.h"
 #include "renderer/gpu/gpu.h"
 
-namespace Lumix {
+namespace black {
 
 struct ImpostorTexturesContext;
 struct ModelMeta;
@@ -187,4 +187,4 @@ struct ImpostorTexturesContext {
 	Path path;
 };
 
-} // namespace Lumix
+} // namespace black

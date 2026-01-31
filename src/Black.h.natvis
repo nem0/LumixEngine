@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
 
-	<Type Name="Lumix::Array&lt;*&gt;">
+	<Type Name="black.h::Array&lt;*&gt;">
 		<DisplayString Condition="m_data == nullptr">size={m_size}</DisplayString>
 		<DisplayString Condition="m_data != nullptr">size={m_size} [0]=>{m_data[0]}</DisplayString>
 		<Expand>
@@ -12,7 +12,7 @@
 		</Expand>
 	</Type>
 
-	<Type Name="Lumix::Local&lt;*&gt;">
+	<Type Name="black.h::Local&lt;*&gt;">
 		<SmartPointer Usage="Minimal">obj</SmartPointer>
 		<DisplayString Condition="obj == nullptr">null</DisplayString>
 		<DisplayString Condition="obj != nullptr">{obj}</DisplayString>
@@ -21,7 +21,7 @@
 		</Expand>
 	</Type>
 
-	<Type Name="Lumix::UniquePtr&lt;*&gt;">
+	<Type Name="black.h::UniquePtr&lt;*&gt;">
 		<SmartPointer Usage="Minimal">m_ptr</SmartPointer>
 		<DisplayString Condition="m_ptr == nullptr">null</DisplayString>
 		<DisplayString Condition="m_ptr != nullptr">{m_ptr}</DisplayString>
@@ -30,15 +30,15 @@
 		</Expand>
 	</Type>
 
-	<Type Name="Lumix::Path">
+	<Type Name="black.h::Path">
 		<DisplayString>{m_path,sb}</DisplayString>
 	</Type>
 
-	<Type Name="Lumix::gpu::Program">
+	<Type Name="black.h::gpu::Program">
 		<DisplayString>{name,sb}</DisplayString>
 	</Type>
 		
-	<Type Name="Lumix::Vec4">
+	<Type Name="black.h::Vec4">
 		<Expand>
 			<Synthetic Name="x">
 				<DisplayString>{x}</DisplayString>
@@ -55,7 +55,7 @@
 		</Expand>
 	</Type>
 
-	<Type Name="Lumix::Matrix">
+	<Type Name="black.h::Matrix">
 		<Expand>
 			<Synthetic Name="x vec">
 				<DisplayString> {m11}     {m12}     {m13}     {m14}</DisplayString>
@@ -72,16 +72,16 @@
 		</Expand>
 	</Type>
 
-	<Type Name="Lumix::String">
+	<Type Name="black.h::String">
 		<DisplayString Condition="m_size &gt;= sizeof(m_small)">{m_big,sb}</DisplayString>
 		<DisplayString Condition="m_size &lt; sizeof(m_small)">{m_small,sb}</DisplayString>
 	</Type>
 
-	<Type Name="Lumix::StaticString&lt;*&gt;">
+	<Type Name="black.h::StaticString&lt;*&gt;">
 		<DisplayString>{data,na}</DisplayString>
 	</Type>
 
-	<Type Name="Lumix::Span&lt;*&gt;">
+	<Type Name="black.h::Span&lt;*&gt;">
 		<DisplayString Condition="strcmp(&quot;$T1&quot;,&quot;char const&quot;)==0">{m_begin,[m_end - m_begin]}</DisplayString>
 		<DisplayString Condition="m_end == m_begin">size=0</DisplayString>
 		<DisplayString Condition="m_end != m_begin">size={m_end - m_begin} [0]=>{m_begin[0]}</DisplayString>
@@ -93,13 +93,13 @@
 		</Expand>
 	</Type>
 
-	<Type Name="Lumix::StringView">
+	<Type Name="black.h::StringView">
 		<DisplayString>{begin,[end - begin]}</DisplayString>
 	</Type>
 
 
 
-	<Type Name="Lumix::HashMap&lt;*,*&gt;">
+	<Type Name="black.h::HashMap&lt;*,*&gt;">
 		<DisplayString>{{ size={m_size} }}</DisplayString>
 		<Expand>
 			<Item Name="[size]" ExcludeView="simple">m_size</Item>
@@ -117,7 +117,7 @@
 		</Expand>
 	</Type>
 
-	<Type Name="Lumix::ParticleScriptCompiler::IRContext">
+	<Type Name="black.h::ParticleScriptCompiler::IRContext">
 		<DisplayString>IRContext: head={head}</DisplayString>
 		<Expand>
 			<Item Name="head">head</Item>
@@ -139,7 +139,7 @@
 	</Type>
 
 	<!-- ParticleScriptCompiler -->
-	<Type Name="Lumix::ParticleScriptCompiler::IRNode">
+	<Type Name="black.h::ParticleScriptCompiler::IRNode">
 		<DisplayString Condition="type == 0">OP</DisplayString>
 		<DisplayString Condition="type == 1">IF</DisplayString>
 		<DisplayString Condition="type == 2">END</DisplayString>
@@ -148,13 +148,13 @@
 			<Item Name="next">next</Item>
 			<Item Name="prev">prev</Item>
 			<Item Name="ast">ast</Item>
-			<ExpandedItem Condition="type == 0">*(Lumix::ParticleScriptCompiler::IROp*)this</ExpandedItem>
-			<ExpandedItem Condition="type == 1">*(Lumix::ParticleScriptCompiler::IRIf*)this</ExpandedItem>
-			<ExpandedItem Condition="type == 2">*(Lumix::ParticleScriptCompiler::IREnd*)this</ExpandedItem>
+			<ExpandedItem Condition="type == 0">*(black.h::ParticleScriptCompiler::IROp*)this</ExpandedItem>
+			<ExpandedItem Condition="type == 1">*(black.h::ParticleScriptCompiler::IRIf*)this</ExpandedItem>
+			<ExpandedItem Condition="type == 2">*(black.h::ParticleScriptCompiler::IREnd*)this</ExpandedItem>
 		</Expand>
 	</Type>
 
-	<Type Name="Lumix::ParticleScriptCompiler::IROp">
+	<Type Name="black.h::ParticleScriptCompiler::IROp">
 		<DisplayString Condition="instruction == 10">{dst} = {args[0]}</DisplayString>
 		<DisplayString Condition="instruction == 7">{dst} = {args[0]} * {args[1]}</DisplayString>
 		<DisplayString Condition="instruction == 14">{dst} = {args[0]} > {args[1]}</DisplayString>
@@ -167,7 +167,7 @@
 		</Expand>
 	</Type>
 
-	<Type Name="Lumix::ParticleScriptCompiler::IRIf">
+	<Type Name="black.h::ParticleScriptCompiler::IRIf">
 		<DisplayString>If {condition}</DisplayString>
 		<Expand>
 			<Item Name="condition">condition</Item>
@@ -176,11 +176,11 @@
 		</Expand>
 	</Type>
 
-	<Type Name="Lumix::ParticleScriptCompiler::IREnd">
+	<Type Name="black.h::ParticleScriptCompiler::IREnd">
 		<DisplayString>IREnd</DisplayString>
 	</Type>
 
-	<Type Name="Lumix::ParticleScriptCompiler::IRValue">
+	<Type Name="black.h::ParticleScriptCompiler::IRValue">
 		<DisplayString Condition="type == 0">##ERROR##</DisplayString>
 		<DisplayString Condition="type == 1">CH{index}</DisplayString>
 		<DisplayString Condition="type == 2">SYS{index}</DisplayString>

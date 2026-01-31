@@ -5,15 +5,15 @@
 
 
 #ifdef STATIC_PLUGINS
-	#define LUMIX_AUDIO_API
+	#define BLACK_AUDIO_API
 #elif defined BUILDING_AUDIO
-	#define LUMIX_AUDIO_API LUMIX_LIBRARY_EXPORT
+	#define BLACK_AUDIO_API BLACK_LIBRARY_EXPORT
 #else
-	#define LUMIX_AUDIO_API LUMIX_LIBRARY_IMPORT
+	#define BLACK_AUDIO_API BLACK_LIBRARY_IMPORT
 #endif
 
 
-namespace Lumix
+namespace black
 {
 
 
@@ -25,7 +25,7 @@ struct Path;
 template <typename T> struct UniquePtr;
 
 
-struct LUMIX_AUDIO_API AudioDevice
+struct BLACK_AUDIO_API AudioDevice
 {
 	enum class BufferFlags {
 		IS3D = 1,
@@ -75,4 +75,4 @@ struct LUMIX_AUDIO_API AudioDevice
 };
 
 
-} // namespace Lumix
+} // namespace black

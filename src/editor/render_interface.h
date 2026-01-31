@@ -1,13 +1,13 @@
 #pragma once
 
-#include "engine/lumix.h"
+#include "engine/black.h.h"
 
 #ifndef ImTextureID
 	using ImTextureID = void*;
 #endif
 struct ImDrawData;
 
-namespace Lumix {
+namespace black {
 
 namespace gpu {
 	enum class TextureFormat : u32;

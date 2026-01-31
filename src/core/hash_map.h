@@ -5,7 +5,7 @@
 #include "core.h"
 
 
-namespace Lumix
+namespace black
 {
 
 
@@ -467,7 +467,7 @@ private:
 
 	u32 findPos(const Key& key) const {
 		u32 pos = Hasher::get(key) & m_mask;
-		const Slot* LUMIX_RESTRICT slots = m_slots;
+		const Slot* BLACK_RESTRICT slots = m_slots;
 		if (!slots) {
 			ASSERT(m_capacity == 0);
 			return 0;
@@ -488,7 +488,7 @@ private:
 	template <typename K>
 	u32 findPos(const K& key) const {
 		u32 pos = HashFunc<K>::get(key) & m_mask;
-		const Slot* LUMIX_RESTRICT slots = m_slots;
+		const Slot* BLACK_RESTRICT slots = m_slots;
 		if (!slots) {
 			ASSERT(m_capacity == 0);
 			return 0;
@@ -529,4 +529,4 @@ private:
 };
 
 
-} // namespace Lumix
+} // namespace black

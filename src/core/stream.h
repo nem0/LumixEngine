@@ -3,11 +3,11 @@
 #include "core.h"
 #include "span.h"
 
-namespace Lumix {
+namespace black {
 
 template <typename T> struct Array;
 
-struct LUMIX_CORE_API IOutputStream {
+struct BLACK_CORE_API IOutputStream {
 	virtual bool write(const void* buffer, u64 size) = 0;
 
 	IOutputStream& operator << (struct StringView str);
@@ -21,7 +21,7 @@ struct LUMIX_CORE_API IOutputStream {
 	template <typename T> bool writeArray(const Array<T>& value);
 };
 
-struct LUMIX_CORE_API IInputStream {
+struct BLACK_CORE_API IInputStream {
 	virtual bool read(void* buffer, u64 size) = 0;
 	virtual u64 size() const = 0;
 	
@@ -30,7 +30,7 @@ struct LUMIX_CORE_API IInputStream {
 	template <typename T> void readArray(Array<T>* array);
 };
 
-struct LUMIX_CORE_API OutputPagedStream final : IOutputStream {
+struct BLACK_CORE_API OutputPagedStream final : IOutputStream {
 	friend struct InputPagedStream;
 
 	OutputPagedStream(struct PageAllocator& allocator);
@@ -52,7 +52,7 @@ private:
 	Page* m_tail;
 };
 
-struct LUMIX_CORE_API InputPagedStream final : IInputStream {
+struct BLACK_CORE_API InputPagedStream final : IInputStream {
 	InputPagedStream(const OutputPagedStream& src);
 	bool read(void* buffer, u64 size) override;
 
@@ -66,7 +66,7 @@ private:
 	u32 m_page_pos = 0;
 };
 
-struct LUMIX_CORE_API OutputMemoryStream final : IOutputStream {
+struct BLACK_CORE_API OutputMemoryStream final : IOutputStream {
 	explicit OutputMemoryStream(struct IAllocator& allocator);
 	OutputMemoryStream(void* data, u64 size);
 	OutputMemoryStream(OutputMemoryStream&& rhs);
@@ -106,7 +106,7 @@ private:
 	IAllocator* m_allocator;
 };
 
-struct LUMIX_CORE_API InputMemoryStream final : IInputStream {
+struct BLACK_CORE_API InputMemoryStream final : IInputStream {
 	InputMemoryStream(const void* data, u64 size);
 	InputMemoryStream(Span<const u8> data);
 	explicit InputMemoryStream(const OutputMemoryStream& blob);
@@ -177,4 +177,4 @@ template <> inline void OutputMemoryStream::write<bool>(const bool& value)
 	write(&v, sizeof(v));
 }
 
-} // namespace Lumix
+} // namespace black

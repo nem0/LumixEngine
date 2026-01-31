@@ -10,7 +10,7 @@
 #include "engine/world.h"
 
 
-namespace Lumix
+namespace black
 {
 
 
@@ -21,11 +21,11 @@ struct ClipManager final : ResourceManager {
 	{}
 
 	Resource* createResource(const Path& path) override {
-		return LUMIX_NEW(m_allocator, Clip)(path, *this, m_allocator);
+		return BLACK_NEW(m_allocator, Clip)(path, *this, m_allocator);
 	}
 
 	void destroyResource(Resource& resource) override {
-		LUMIX_DELETE(m_allocator, static_cast<Clip*>(&resource));
+		BLACK_DELETE(m_allocator, static_cast<Clip*>(&resource));
 	}
 
 	IAllocator& m_allocator;
@@ -78,11 +78,11 @@ struct AudioSystemImpl final : AudioSystem {
 };
 
 
-LUMIX_PLUGIN_ENTRY(audio) {
+BLACK_PLUGIN_ENTRY(audio) {
 	PROFILE_FUNCTION();
-	return LUMIX_NEW(engine.getAllocator(), AudioSystemImpl)(engine);
+	return BLACK_NEW(engine.getAllocator(), AudioSystemImpl)(engine);
 }
 
 
-} // namespace Lumix
+} // namespace black
 

@@ -21,7 +21,7 @@
 #include "engine/world.h"
 #include "utils.h"
 
-namespace Lumix {
+namespace black {
 
 PropertyGrid::PropertyGrid(StudioApp& app)
 	: m_app(app)
@@ -912,4 +912,4 @@ void PropertyGrid::onGUI() {
 }
 
 
-} // namespace Lumix
+} // namespace black

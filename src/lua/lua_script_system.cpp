@@ -22,7 +22,7 @@
 #include <luacode.h>
 
 
-namespace Lumix {
+namespace black {
 
 static const char* toString(InputSystem::Device::Type type) {
 	switch (type) {
@@ -110,11 +110,11 @@ struct LuaScriptManager final : ResourceManager
 	}
 
 	Resource* createResource(const Path& path) override {
-		return LUMIX_NEW(m_allocator, LuaScript)(path, *this, m_allocator);
+		return BLACK_NEW(m_allocator, LuaScript)(path, *this, m_allocator);
 	}
 
 	void destroyResource(Resource& resource) override {
-		LUMIX_DELETE(m_allocator, static_cast<LuaScript*>(&resource));
+		BLACK_DELETE(m_allocator, static_cast<LuaScript*>(&resource));
 	}
 
 	IAllocator& m_allocator;
@@ -230,14 +230,14 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 			lua_setfield(m_state, -2, "__index");  // [env]
 
 			// set this
-			lua_getglobal(m_state, "Lumix"); // [env, Lumix]
-			lua_getfield(m_state, -1, "Entity"); // [env, Lumix, Lumix.Entity]
-			lua_remove(m_state, -2); // [env, Lumix.Entity]
-			lua_getfield(m_state, -1, "new"); // [env, Lumix.Entity, Entity.new]
-			lua_pushvalue(m_state, -2); // [env, Lumix.Entity, Entity.new, Lumix.Entity]
-			lua_remove(m_state, -3); // [env, Entity.new, Lumix.Entity]
-			LuaWrapper::push(m_state, &module.m_world); // [env, Entity.new, Lumix.Entity, world]
-			LuaWrapper::push(m_state, cmp.m_entity.index); // [env, Entity.new, Lumix.Entity, world, entity_index]
+			lua_getglobal(m_state, "black.h"); // [env, black.h]
+			lua_getfield(m_state, -1, "Entity"); // [env, black.h, black.h.Entity]
+			lua_remove(m_state, -2); // [env, black.h.Entity]
+			lua_getfield(m_state, -1, "new"); // [env, black.h.Entity, Entity.new]
+			lua_pushvalue(m_state, -2); // [env, black.h.Entity, Entity.new, black.h.Entity]
+			lua_remove(m_state, -3); // [env, Entity.new, black.h.Entity]
+			LuaWrapper::push(m_state, &module.m_world); // [env, Entity.new, black.h.Entity, world]
+			LuaWrapper::push(m_state, cmp.m_entity.index); // [env, Entity.new, black.h.Entity, world, entity_index]
 			const bool error = !LuaWrapper::pcall(m_state, 3, 1); // [env, entity]
 			ASSERT(!error);
 			lua_setfield(m_state, -2, "this"); // [env]
@@ -332,14 +332,14 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 			lua_setfield(m_state, -2, "__index");	  // [env]
 
 			// set this
-			lua_getglobal(m_state, "Lumix");					  // [env, Lumix]
-			lua_getfield(m_state, -1, "Entity");				  // [env, Lumix, Lumix.Entity]
-			lua_remove(m_state, -2);							  // [env, Lumix.Entity]
-			lua_getfield(m_state, -1, "new");					  // [env, Lumix.Entity, Entity.new]
-			lua_pushvalue(m_state, -2);							  // [env, Lumix.Entity, Entity.new, Lumix.Entity]
-			lua_remove(m_state, -3);							  // [env, Entity.new, Lumix.Entity]
-			LuaWrapper::push(m_state, &module.m_world);		  // [env, Entity.new, Lumix.Entity, world]
-			LuaWrapper::push(m_state, entity.index);		  // [env, Entity.new, Lumix.Entity, world, entity_index]
+			lua_getglobal(m_state, "black.h");					  // [env, black.h]
+			lua_getfield(m_state, -1, "Entity");				  // [env, black.h, black.h.Entity]
+			lua_remove(m_state, -2);							  // [env, black.h.Entity]
+			lua_getfield(m_state, -1, "new");					  // [env, black.h.Entity, Entity.new]
+			lua_pushvalue(m_state, -2);							  // [env, black.h.Entity, Entity.new, black.h.Entity]
+			lua_remove(m_state, -3);							  // [env, Entity.new, black.h.Entity]
+			LuaWrapper::push(m_state, &module.m_world);		  // [env, Entity.new, black.h.Entity, world]
+			LuaWrapper::push(m_state, entity.index);		  // [env, Entity.new, black.h.Entity, world, entity_index]
 			const bool error = !LuaWrapper::pcall(m_state, 3, 1); // [env, entity]
 			ASSERT(!error);
 			lua_setfield(m_state, -2, "this"); // [env]
@@ -432,8 +432,8 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 			LuaWrapper::DebugGuard guard(L);
 			ASSERT(resource_type);
 			if (!lua_getmetatable(L, idx)) return false; // mt
-			lua_getglobal(L, "Lumix");  // mt, Lumix
-			lua_getfield(L, -1, "Resource"); // mt, Lumix, Resource
+			lua_getglobal(L, "black.h");  // mt, black.h
+			lua_getfield(L, -1, "Resource"); // mt, black.h, Resource
 			bool is_instance = lua_equal(L, -1, -3);
 			lua_pop(L, 3);
 			if (!is_instance) return false;
@@ -443,13 +443,13 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 			return true;
 		}
 
-		bool isLumixClass(lua_State* L, i32 idx, const char* class_name) {
+		bool isblack.hClass(lua_State* L, i32 idx, const char* class_name) {
 			LuaWrapper::DebugGuard guard(L);
 			if (!lua_getmetatable(L, idx)) return false; // mt
 			auto ll = lua_gettop(L);
-			lua_getglobal(L, "Lumix");  // mt, Lumix
+			lua_getglobal(L, "black.h");  // mt, black.h
 			auto ll2 = lua_gettop(L);
-			lua_getfield(L, -1, class_name); // mt, Lumix, class
+			lua_getfield(L, -1, class_name); // mt, black.h, class
 			auto ll3 = lua_gettop(L);
 			bool is_instance = lua_equal(L, -1, -3);
 			auto ll4 = lua_gettop(L);
@@ -506,7 +506,7 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 							case LUA_TBOOLEAN: existing_prop.type = Property::BOOLEAN; break;
 							case LUA_TSTRING: existing_prop.type = Property::STRING; break;
 							case LUA_TTABLE: {
-								if (isLumixClass(inst.m_state, -1, "Entity")) existing_prop.type = Property::ENTITY;
+								if (isblack.hClass(inst.m_state, -1, "Entity")) existing_prop.type = Property::ENTITY;
 								else if (isResource(inst.m_state, -1, &existing_prop.resource_type)) existing_prop.type = Property::RESOURCE;
 								else existing_prop.type = Property::COLOR;
 								break;
@@ -527,7 +527,7 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 							case LUA_TBOOLEAN: prop.type = Property::BOOLEAN; break;
 							case LUA_TSTRING: prop.type = Property::STRING; break;
 							case LUA_TTABLE: {
-								if (isLumixClass(inst.m_state, -1, "Entity")) prop.type = Property::ENTITY;
+								if (isblack.hClass(inst.m_state, -1, "Entity")) prop.type = Property::ENTITY;
 								else if (isResource(inst.m_state, -1, &prop.resource_type)) prop.type = Property::RESOURCE;
 								else prop.type = Property::COLOR;
 								break;
@@ -717,7 +717,7 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 		Path invalid_path;
 		for (auto* script_cmp : m_scripts) {
 			ASSERT(script_cmp);
-			LUMIX_DELETE(m_system.m_allocator, script_cmp);
+			BLACK_DELETE(m_system.m_allocator, script_cmp);
 		}
 	}
 
@@ -1184,7 +1184,7 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 		}
 	}
 
-	LUMIX_FORCE_INLINE void onGUIEvent(EntityRef e, const char* event)
+	BLACK_FORCE_INLINE void onGUIEvent(EntityRef e, const char* event)
 	{
 		auto* inline_call = beginFunctionCallInlineScript(e, event);
 		if (inline_call) {
@@ -1244,14 +1244,14 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 
 	void createScript(EntityRef entity) override {
 		auto& allocator = m_system.m_allocator;
-		ScriptComponent* script = LUMIX_NEW(allocator, ScriptComponent)(*this, entity, allocator);
+		ScriptComponent* script = BLACK_NEW(allocator, ScriptComponent)(*this, entity, allocator);
 		m_scripts.insert(entity, script);
 		m_world.onComponentCreated(entity, types::lua_script, this);
 	}
 
 	void destroyScript(EntityRef entity) override {
 		ScriptComponent* cmp = m_scripts[entity];
-		LUMIX_DELETE(m_system.m_allocator, cmp);
+		BLACK_DELETE(m_system.m_allocator, cmp);
 		m_scripts.erase(entity);
 		m_world.onComponentDestroyed(entity, types::lua_script, this);
 		m_to_start.eraseItems([entity](DeferredStart& element){
@@ -1403,7 +1403,7 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 			EntityRef entity;
 			serializer.read(entity);
 			entity = entity_map.get(entity);
-			ScriptComponent* script = LUMIX_NEW(allocator, ScriptComponent)(*this, entity, allocator);
+			ScriptComponent* script = BLACK_NEW(allocator, ScriptComponent)(*this, entity, allocator);
 
 			m_scripts.insert(script->m_entity, script);
 			int scr_count;
@@ -1842,7 +1842,7 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 		const i32 res_idx = path[0] ? m_system.addLuaResource(Path(path), resource_type) : -1;
 		
 		lua_newtable(L);
-		lua_getglobal(L, "Lumix");
+		lua_getglobal(L, "black.h");
 		lua_getfield(L, -1, "Resource");
 		lua_setmetatable(L, -3);
 		lua_pop(L, 1);
@@ -2278,9 +2278,9 @@ void LuaScriptSystemImpl::createModules(World& world)
 }
 
 
-LUMIX_PLUGIN_ENTRY(lua) {
+BLACK_PLUGIN_ENTRY(lua) {
 	PROFILE_FUNCTION();
-	return LUMIX_NEW(engine.getAllocator(), LuaScriptSystemImpl)(engine);
+	return BLACK_NEW(engine.getAllocator(), LuaScriptSystemImpl)(engine);
 }
 
-} // namespace Lumix
+} // namespace black

@@ -12,11 +12,11 @@
 #include "engine/engine.h"
 #include "engine/plugin.h"
 
-namespace Lumix
+namespace black
 {
-	#define LUMIX_PLUGIN_DECLS
+	#define BLACK_PLUGIN_DECLS
 	#include "plugins.inl"
-	#undef LUMIX_PLUGIN_DECLS
+	#undef BLACK_PLUGIN_DECLS
 
 	ISystem::~ISystem() = default;
 
@@ -35,7 +35,7 @@ namespace Lumix
 		{
 			while (!m_systems.empty())
 			{
-				LUMIX_DELETE(m_engine.getAllocator(), m_systems.back());
+				BLACK_DELETE(m_engine.getAllocator(), m_systems.back());
 				m_systems.pop();
 			}
 
@@ -112,7 +112,7 @@ namespace Lumix
 		{
 			int idx = m_systems.indexOf(system);
 			ASSERT(idx >= 0);
-			LUMIX_DELETE(m_engine.getAllocator(), m_systems[idx]);
+			BLACK_DELETE(m_engine.getAllocator(), m_systems[idx]);
 			os::unloadLibrary(m_libraries[idx]);
 			m_libraries.erase(idx);
 			m_systems.erase(idx);
@@ -144,7 +144,7 @@ namespace Lumix
 					if (!system)
 					{
 						logError("createPlugin failed.");
-						LUMIX_DELETE(m_engine.getAllocator(), system);
+						BLACK_DELETE(m_engine.getAllocator(), system);
 						ASSERT(false);
 					}
 					else

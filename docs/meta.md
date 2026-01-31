@@ -19,7 +19,7 @@ This script will:
 Meta scans `src/` and `plugins/` directories and generates:
 - Reflection headers (`*.gen.h`) alongside module source files
 - `src/lua/lua_capi.gen.h` - Lua C API bindings
-- `data/scripts/lumix.d.lua` - Lua type definitions
+- `data/scripts/black.h.d.lua` - Lua type definitions
 
 # Modules
 
@@ -64,13 +64,13 @@ Values inside enums are automatically parsed by Meta.
 
 ### Lua exposure
 
-Enums marked with `//@ enum` are automatically exposed to Lua under the `LumixAPI` namespace. Each enum becomes a table with its enumerator names as keys and their integer values as values.
+Enums marked with `//@ enum` are automatically exposed to Lua under the `black.hAPI` namespace. Each enum becomes a table with its enumerator names as keys and their integer values as values.
 
 ```lua
 -- Access enum values in Lua
-local align = LumixAPI.TextVAlign.MIDDLE    -- 1
-local motion = LumixAPI.D6Motion.FREE       -- 2
-local cursor = LumixAPI.CursorType.HAND     -- 6
+local align = black.hAPI.TextVAlign.MIDDLE    -- 1
+local motion = black.hAPI.D6Motion.FREE       -- 2
+local cursor = black.hAPI.CursorType.HAND     -- 6
 ```
 
 Examples:
@@ -115,7 +115,7 @@ Examples:
 //@ module RenderModule renderer "Render"
 //@ include "core/geometry.h"
 //@ include "renderer/model.h"
-namespace Lumix
+namespace black
 {
 ...
 //@ functions
@@ -463,7 +463,7 @@ end
 Examples:
 ```cpp
 //@ struct
-struct LUMIX_CORE_API Ray {
+struct BLACK_CORE_API Ray {
 	DVec3 origin;
 	Vec3 dir;
 };
@@ -471,7 +471,7 @@ struct LUMIX_CORE_API Ray {
 
 ```cpp
 //@ struct
-struct LUMIX_RENDERER_API RayCastModelHit {
+struct BLACK_RENDERER_API RayCastModelHit {
 	bool is_hit;
 	float t;
 	DVec3 origin;

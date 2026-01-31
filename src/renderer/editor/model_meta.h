@@ -5,7 +5,7 @@
 #include "core/string.h"
 #include "core/tokenizer.h"
 
-namespace Lumix {
+namespace black {
 
 struct ModelMeta {
 	struct Clip {

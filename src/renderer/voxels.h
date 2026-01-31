@@ -5,7 +5,7 @@
 #include "core/math.h"
 #include "core/stream.h"
 
-namespace Lumix {
+namespace black {
 
 struct Voxels {
 	Voxels(IAllocator& allocator);
@@ -31,4 +31,4 @@ struct Voxels {
 	float m_voxel_size;
 };
 
-} // namespace Lumix
+} // namespace black

@@ -8,7 +8,7 @@
 #include "renderer/particle_system.h"
 #include "tests/common.h"
 
-using namespace Lumix;
+using namespace black;
 
 namespace {
 

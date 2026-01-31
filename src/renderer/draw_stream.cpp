@@ -7,7 +7,7 @@
 #include "engine/engine.h"
 #include "renderer/renderer.h"
 
-namespace Lumix {
+namespace black {
 
 
 struct DrawStream::Page {
@@ -410,7 +410,7 @@ void DrawStream::createProgram(gpu::ProgramHandle prog
 	, u32 prefixes_count
 	, const char* name
 ) {
-	CreateProgramData* data = LUMIX_NEW(gpu::getAllocator(), CreateProgramData)(gpu::getAllocator());
+	CreateProgramData* data = BLACK_NEW(gpu::getAllocator(), CreateProgramData)(gpu::getAllocator());
 	data->program = prog;
 	data->state = state;
 	data->decl = decl;
@@ -797,7 +797,7 @@ void DrawStream::run() {
 						, data->type
 						, data->name.c_str()
 					);
-					LUMIX_DELETE(gpu::getAllocator(), data);
+					BLACK_DELETE(gpu::getAllocator(), data);
 					break;
 				}
 				case Instruction::SET_FRAMEBUFFER_CUBE: {
@@ -996,4 +996,4 @@ void DrawStream::run() {
 	}
 }
 
-} // namespace Lumix
+} // namespace black

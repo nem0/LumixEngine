@@ -6,7 +6,7 @@
 #include "core/tag_allocator.h"
 
 
-namespace Lumix
+namespace black
 {
 
 
@@ -31,4 +31,4 @@ private:
 };
 
 
-} // namespace Lumix
+} // namespace black

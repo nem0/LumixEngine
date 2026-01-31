@@ -28,7 +28,7 @@
 #include "profiler_ui.h"
 
 
-namespace Lumix {
+namespace black {
 
 namespace {
 
@@ -322,7 +322,7 @@ struct MemoryProfilerUI {
 						}
 						n = debug::StackTree::getParent(n);
 					} while (n && strstr(fn_name, "Allocator::") != 0);
-					if (startsWith(fn_name, "Lumix::")) {
+					if (startsWith(fn_name, "black.h::")) {
 						ImGui::Text("%s: L%d:", fn_name + 7, line);
 					}
 					else {
@@ -757,7 +757,7 @@ struct ProfilerUIImpl final : ProfilerUI {
 							Block& b = m_blocks.insert(tmp.id);
 							b.color = Color(0x60, 0x60, 0x60, 0xff).abgr();
 							b.name = "job";
-							if (startsWith(b.name, "Lumix::")) b.name += 7;
+							if (startsWith(b.name, "black.h::")) b.name += 7;
 							else if (startsWith(b.name, "`anonymous-namespace'::")) b.name += 23;
 						}
 						break;
@@ -772,7 +772,7 @@ struct ProfilerUIImpl final : ProfilerUI {
 						else {
 							Block& b = m_blocks.insert(tmp.id);
 							b.name = tmp.name;
-							if (startsWith(b.name, "Lumix::")) b.name += 7;
+							if (startsWith(b.name, "black.h::")) b.name += 7;
 							else if (startsWith(b.name, "`anonymous-namespace'::")) b.name += 23;
 						}
 						break;
@@ -1764,4 +1764,4 @@ UniquePtr<ProfilerUI> createProfilerUI(StudioApp& app) {
 }
 
 
-} // namespace Lumix
+} // namespace black

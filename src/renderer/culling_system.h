@@ -1,8 +1,8 @@
 #pragma once
 
-#include "engine/lumix.h"
+#include "engine/black.h.h"
 
-namespace Lumix
+namespace black
 {
 
 template <typename T> struct Array;
@@ -55,7 +55,7 @@ struct CullResult {
 	EntityRef entities[(4096 - sizeof(header)) / sizeof(EntityRef)];
 };
 
-struct LUMIX_RENDERER_API CullingSystem
+struct BLACK_RENDERER_API CullingSystem
 {
 	CullingSystem() { }
 	virtual ~CullingSystem() { }
@@ -76,4 +76,4 @@ struct LUMIX_RENDERER_API CullingSystem
 	virtual float getRadius(EntityRef entity) = 0;
 };
 
-} // namespace Lumix
+} // namespace black

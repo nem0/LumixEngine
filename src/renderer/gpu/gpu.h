@@ -2,9 +2,9 @@
 
 #include "core/delegate.h"
 #include "core/span.h"
-#include "engine/lumix.h"
+#include "engine/black.h.h"
 
-namespace Lumix {
+namespace black {
 
 struct IAllocator;
 struct PageAllocator;
@@ -214,7 +214,7 @@ struct Attribute {
 };
 #pragma pack()
 
-struct LUMIX_RENDERER_API VertexDecl {
+struct BLACK_RENDERER_API VertexDecl {
 	enum { MAX_ATTRIBUTES = 16 };
 
 	VertexDecl(PrimitiveType pt);
@@ -272,7 +272,7 @@ void enableVSync(bool enable);
 bool isVSyncEnabled();
 void waitFrame(u32 frame);
 bool frameFinished(u32 frame);
-LUMIX_RENDERER_API bool isOriginBottomLeft();
+BLACK_RENDERER_API bool isOriginBottomLeft();
 void checkThread();
 void shutdown();
 int getSize(AttributeType type);
@@ -382,4 +382,4 @@ struct TransientSlice {
 	u8* ptr;
 };
 
-} // namespace Lumix
+} // namespace black

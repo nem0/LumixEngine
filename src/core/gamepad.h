@@ -2,7 +2,7 @@
 
 #include "core/core.h"
 
-namespace Lumix {
+namespace black {
 
 struct GamepadState {
 	struct {
@@ -24,6 +24,6 @@ struct IGamepadBackend {
 	virtual bool isControllerConnected(int index) = 0;
 };
 
-LUMIX_CORE_API IGamepadBackend* createGamepadBackend(struct IAllocator& allocator);
+BLACK_CORE_API IGamepadBackend* createGamepadBackend(struct IAllocator& allocator);
 
-} // namespace Lumix
+} // namespace black

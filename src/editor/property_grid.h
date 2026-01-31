@@ -7,10 +7,10 @@
 #include "editor/text_filter.h"
 
 
-namespace Lumix {
+namespace black {
 
 
-struct LUMIX_EDITOR_API PropertyGrid : StudioApp::GUIPlugin {
+struct BLACK_EDITOR_API PropertyGrid : StudioApp::GUIPlugin {
 	friend struct GridUIVisitor;
 	struct IPlugin {
 		virtual ~IPlugin() {}
@@ -48,4 +48,4 @@ private:
 };
 
 
-} // namespace Lumix
+} // namespace black

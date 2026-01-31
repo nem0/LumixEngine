@@ -14,7 +14,7 @@ local dir_input_idx = -1
 local stance_input_index = -1
 local crouched = false
 local aiming = false
-camera_pivot = Lumix.Entity.NULL
+camera_pivot = black.h.Entity.NULL
 handle_input = true
 
 function onInputEvent(event : InputEvent)
@@ -33,40 +33,40 @@ function onInputEvent(event : InputEvent)
 			end
 		end
 		if event.device.type == "keyboard" then
-			if event.key_id == LumixAPI.Keycode.W then
+			if event.key_id == black.hAPI.Keycode.W then
 				if event.down then
 					forward = 1
 				else
 					forward = 0
 				end
 			end
-			if event.key_id == LumixAPI.Keycode.S then
+			if event.key_id == black.hAPI.Keycode.S then
 				if event.down then
 					backward = 1
 				else
 					backward = 0
 				end
 			end
-			if event.key_id == LumixAPI.Keycode.C then
+			if event.key_id == black.hAPI.Keycode.C then
 				if event.down then
 					crouched = not crouched
 				end
 			end
-			if event.key_id == LumixAPI.Keycode.A then
+			if event.key_id == black.hAPI.Keycode.A then
 				if event.down then
 					left = 1
 				else
 					left = 0
 				end
 			end
-			if event.key_id == LumixAPI.Keycode.D then
+			if event.key_id == black.hAPI.Keycode.D then
 				if event.down then
 					right = 1
 				else
 					right = 0
 				end
 			end
-			if event.key_id == LumixAPI.Keycode.SHIFT then
+			if event.key_id == black.hAPI.Keycode.SHIFT then
 				if event.down then
 					sprint = 1
 				else

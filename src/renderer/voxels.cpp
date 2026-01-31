@@ -2,7 +2,7 @@
 #include "renderer/model.h"
 #include "voxels.h"
 
-namespace Lumix {
+namespace black {
 
 template <typename F>
 static void forEachTriangle(const Mesh& mesh, const F& f) {
@@ -257,4 +257,4 @@ void Voxels::voxelize(Model& model, u32 max_res) {
 	}
 }
 
-} // namespace Lumix
+} // namespace black

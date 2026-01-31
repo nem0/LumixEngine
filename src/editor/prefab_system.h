@@ -1,13 +1,13 @@
 #pragma once
 
-#include "engine/lumix.h"
+#include "engine/black.h.h"
 
 #include "core/hash.h"
 #include "core/hash_map.h"
 
 
 
-namespace Lumix
+namespace black
 {
 
 
@@ -15,7 +15,7 @@ using PrefabHandle = FilePathHash;
 template <typename T> struct UniquePtr;
 enum class WorldVersion : u32;
 
-struct LUMIX_EDITOR_API PrefabSystem
+struct BLACK_EDITOR_API PrefabSystem
 {
 	static UniquePtr<PrefabSystem> create(struct WorldEditor& editor);
 	static void createEditorPlugins(struct StudioApp& app, PrefabSystem& system);
@@ -37,4 +37,4 @@ struct LUMIX_EDITOR_API PrefabSystem
 };
 
 
-} // namespace Lumix
+} // namespace black

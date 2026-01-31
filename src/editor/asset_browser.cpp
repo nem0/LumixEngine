@@ -27,7 +27,7 @@
 #include "utils.h"
 
 
-namespace Lumix {
+namespace black {
 
 
 static void clampText(char* text, int width) {
@@ -122,7 +122,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 	void setProjectDir(const char* base_path) override {
-		Path path(base_path, ".lumix");
+		Path path(base_path, ".black.h");
 		bool success = os::makePath(path.c_str());
 		path.append("/asset_tiles");
 		success = os::makePath(path.c_str()) && success;
@@ -415,7 +415,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	
 	static TileState getState(const FileInfo& info, FileSystem& fs) {
 		const u64 file_path_hash = info.filepath.getHash().getHashValue();
-		const Path path(".lumix/asset_tiles/", file_path_hash, ".lbc");
+		const Path path(".black.h/asset_tiles/", file_path_hash, ".lbc");
 		if (!fs.fileExists(info.filepath)) {
 			StringView master = ResourcePath::getResource(info.filepath);
 			if (master.begin == info.filepath.c_str()) {
@@ -424,7 +424,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 		if (!fs.fileExists(path)) return TileState::NOT_CREATED;
 
-		const Path compiled_path(".lumix/resources/", file_path_hash, ".res");
+		const Path compiled_path(".black.h/resources/", file_path_hash, ".res");
 		const u64 last_modified = fs.getLastModified(path);
 		if (last_modified < fs.getLastModified(info.filepath) || last_modified < fs.getLastModified(compiled_path)) {
 			return TileState::OUTDATED;
@@ -602,7 +602,7 @@ struct AssetBrowserImpl : AssetBrowser {
 			tileIcon(icon, size);
 
 			RenderInterface* ri = m_app.getRenderInterface();
-			const Path path(".lumix/asset_tiles/", tile.filepath.getHash().getHashValue(), ".lbc");
+			const Path path(".black.h/asset_tiles/", tile.filepath.getHash().getHashValue(), ".lbc");
 			FileSystem& fs = m_app.getEngine().getFileSystem();
 			switch (getState(tile, fs)) {
 				case TileState::OK:
@@ -631,7 +631,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	void deleteSelectedFiles() {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		for (const Path& path : m_selected_resources) {
-			const Path res_path(".lumix/resources/", path.getHash().getHashValue(), ".res");
+			const Path res_path(".black.h/resources/", path.getHash().getHashValue(), ".res");
 			fs.deleteFile(res_path);
 			if (!fs.deleteFile(path)) {
 				logError("Failed to delete ", path);
@@ -652,7 +652,7 @@ struct AssetBrowserImpl : AssetBrowser {
 
 	void recreateTiles() {
 		for (FileInfo& fi : m_file_infos) {
-			const Path path(".lumix/asset_tiles/", fi.filepath.getHash().getHashValue(), ".res");
+			const Path path(".black.h/asset_tiles/", fi.filepath.getHash().getHashValue(), ".res");
 			fi.create_called = false;
 			createTile(fi, path.c_str());
 		}
@@ -1505,4 +1505,4 @@ UniquePtr<AssetBrowser> AssetBrowser::create(StudioApp& app) {
 	return UniquePtr<AssetBrowserImpl>::create(app.getAllocator(), app);
 }
 
-} // namespace Lumix
+} // namespace black

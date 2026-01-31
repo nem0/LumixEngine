@@ -9,7 +9,7 @@
 #include "renderer/pose.h"
 
 
-namespace Lumix::anim {
+namespace black::anim {
 
 const ResourceType Controller::TYPE = ResourceType("anim_controller");
 
@@ -35,7 +35,7 @@ void Controller::unload() {
 	m_animation_entries.clear();
 	m_bone_masks.clear();
 	m_inputs.clear();
-	LUMIX_DELETE(m_allocator, m_root);
+	BLACK_DELETE(m_allocator, m_root);
 	m_root = nullptr;
 }
 
@@ -45,11 +45,11 @@ bool Controller::load(Span<const u8> mem) {
 }
 
 void Controller::destroyRuntime(RuntimeContext& ctx) {
-	LUMIX_DELETE(m_allocator, &ctx);
+	BLACK_DELETE(m_allocator, &ctx);
 }
 
 RuntimeContext* Controller::createRuntime(u32 anim_set) {
-	RuntimeContext* ctx = LUMIX_NEW(m_allocator, RuntimeContext)(*this, m_allocator);
+	RuntimeContext* ctx = BLACK_NEW(m_allocator, RuntimeContext)(*this, m_allocator);
 	ctx->inputs.resize(m_inputs.size());
 	memset(ctx->inputs.begin(), 0, ctx->inputs.byte_size());
 	for (u32 i = 0; i < (u32)m_inputs.size(); ++i) {
@@ -292,4 +292,4 @@ void evalBlendStack(const anim::RuntimeContext& ctx, Pose& pose) {
 	}
 }
 
-} // ns Lumix::Anim
+} // ns black.h::Anim

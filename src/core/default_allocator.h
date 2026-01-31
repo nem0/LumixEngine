@@ -4,12 +4,12 @@
 #include "atomic.h"
 #include "sync.h"
 
-namespace Lumix {
+namespace black {
 
 // use buckets for small allocations - relatively fast
 // fallback to system allocator for big allocations
 // use case: use this unless you really require something special
-struct LUMIX_CORE_API DefaultAllocator final : IAllocator {
+struct BLACK_CORE_API DefaultAllocator final : IAllocator {
 	struct Page;
 
 	DefaultAllocator();
@@ -25,4 +25,4 @@ struct LUMIX_CORE_API DefaultAllocator final : IAllocator {
 	Mutex m_mutex;
 };
 
-} // namespace Lumix
+} // namespace black

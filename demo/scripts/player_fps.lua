@@ -8,7 +8,7 @@ local yaw = 0
 local sprint = 0
 local jump = 0
 local pitch = 0
-camera_pivot = Lumix.Entity.NULL
+camera_pivot = black.h.Entity.NULL
 
 function onInputEvent(event : InputEvent)
     if event.type == "axis" and event.device.type == "mouse" then
@@ -17,42 +17,42 @@ function onInputEvent(event : InputEvent)
     end
     if event.type == "button" then
 		if event.device.type == "keyboard" then
-			if event.key_id == LumixAPI.Keycode.W then
+			if event.key_id == black.hAPI.Keycode.W then
                 if event.down then
                     forward = 1
                 else
                     forward = 0
                 end
 			end
-			if event.key_id == LumixAPI.Keycode.S then 
+			if event.key_id == black.hAPI.Keycode.S then 
                 if event.down then
                     backward = 1
                 else
                     backward = 0
                 end
 			end
-			if event.key_id == LumixAPI.Keycode.A then 
+			if event.key_id == black.hAPI.Keycode.A then 
                 if event.down then
                     left = 1
                 else
                     left = 0
                 end
 			end
-			if event.key_id == LumixAPI.Keycode.D then 
+			if event.key_id == black.hAPI.Keycode.D then 
                 if event.down then
                     right = 1
                 else
                     right = 0
                 end
 			end
-			if event.key_id == LumixAPI.Keycode.SHIFT then 
+			if event.key_id == black.hAPI.Keycode.SHIFT then 
                 if event.down then
                     sprint = 1
                 else
                     sprint = 0
                 end
 			end	
-            if event.key_id == LumixAPI.Keycode.SPACE then
+            if event.key_id == black.hAPI.Keycode.SPACE then
                 if event.down then
                     jump = 1
                 else

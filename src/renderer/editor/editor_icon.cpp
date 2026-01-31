@@ -11,7 +11,7 @@
 #include "renderer/model.h"
 #include "renderer/render_module.h"
 
-namespace Lumix {
+namespace black {
 
 const char* ICONS[(int)EditorIcons::IconType::COUNT] = {
 	"phy_controller_icon",
@@ -226,4 +226,4 @@ UniquePtr<EditorIcons> EditorIcons::create(WorldEditor& editor, RenderModule& mo
 }
 
 
-} // namespace Lumix
+} // namespace black

@@ -10,7 +10,7 @@
 #include "renderer/pipeline.h"
 
 
-namespace Lumix
+namespace black
 {
 
 
@@ -137,4 +137,4 @@ private:
 };
 
 
-} // namespace Lumix
+} // namespace black

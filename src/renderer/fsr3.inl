@@ -14,7 +14,7 @@
 #include "pipeline.h"
 #include "renderer.h"
 
-namespace Lumix {
+namespace black {
 
 namespace gpu {
 	void* getDX12Device();
@@ -121,7 +121,7 @@ struct FSR3Plugin : RenderPlugin {
 				.maxUpscaleSize = { (u32)size.x, (u32)size.y },
 			};
 
-			#ifdef LUMIX_DEBUG
+			#ifdef BLACK_DEBUG
 				createUpscale.flags |= FFX_UPSCALE_ENABLE_DEBUG_CHECKING;
 				createUpscale.fpMessage = &ffxMessageCallback;
 			#endif

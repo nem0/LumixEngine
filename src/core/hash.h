@@ -2,12 +2,12 @@
 
 #include "core.h"
 
-namespace Lumix
+namespace black
 {
 
 // use if you want fast hash with low probability of collisions and size (8 bytes) is not an issue
 // can change in future, do not serialize
-struct LUMIX_CORE_API RuntimeHash {
+struct BLACK_CORE_API RuntimeHash {
 	static RuntimeHash fromU64(u64 hash);
 	RuntimeHash() {}
 	explicit RuntimeHash(const char* string);
@@ -19,13 +19,13 @@ struct LUMIX_CORE_API RuntimeHash {
 	u64 getHashValue() const { return hash; }
 private:
 	u64 hash = 0;
-#ifdef LUMIX_DEBUG
+#ifdef BLACK_DEBUG
 	const char* debug_str = nullptr;
 #endif
 };
 
 // same as RuntimeHash, but only 32 bits
-struct LUMIX_CORE_API RuntimeHash32 {
+struct BLACK_CORE_API RuntimeHash32 {
 	static RuntimeHash32 fromU32(u32 hash);
 	RuntimeHash32() {}
 	explicit RuntimeHash32(const char* string);
@@ -41,7 +41,7 @@ private:
 
 // use if you want to serialize it
 // 64bits 
-struct LUMIX_CORE_API StableHash {
+struct BLACK_CORE_API StableHash {
 	static StableHash fromU64(u64 hash);
 	StableHash() {}
 	explicit StableHash(const char* str);
@@ -57,7 +57,7 @@ private:
 };
 
 // same as StableHash, but only 32bits
-struct LUMIX_CORE_API StableHash32 {
+struct BLACK_CORE_API StableHash32 {
 	static StableHash32 fromU32(u32 hash);
 	StableHash32() {}
 	explicit StableHash32(const char* string);
@@ -76,7 +76,7 @@ using FilePathHash = StableHash;
 using BoneNameHash = StableHash;
 
 // begin/end pair cannot cross thread boundaries
-struct LUMIX_CORE_API RollingStableHasher {
+struct BLACK_CORE_API RollingStableHasher {
 	void begin();
 	void update(const void* data, u32 len);
 	StableHash32 end();
@@ -84,7 +84,7 @@ struct LUMIX_CORE_API RollingStableHasher {
 };
 
 // begin/end pair cannot cross thread boundaries
-struct LUMIX_CORE_API RollingHasher {
+struct BLACK_CORE_API RollingHasher {
 	void begin();
 	void update(const void* data, u32 len);
 	RuntimeHash32 end();
@@ -118,4 +118,4 @@ template<> struct HashFunc<RuntimeHash32> {
 	}
 };
 
-} // namespace Lumix
+} // namespace black

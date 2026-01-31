@@ -15,7 +15,7 @@
 #include "engine/engine.h"
 
 
-namespace Lumix
+namespace black
 {
 
 
@@ -593,4 +593,4 @@ UniquePtr<AudioDevice> AudioDevice::create(Engine& engine, IAllocator& allocator
 }
 
 
-} // namespace Lumix
+} // namespace black

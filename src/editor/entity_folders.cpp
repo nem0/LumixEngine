@@ -4,7 +4,7 @@
 #include "engine/engine_hash_funcs.h"
 #include "entity_folders.h"
 
-namespace Lumix {
+namespace black {
 
 EntityFolders::EntityFolders(World& world, IAllocator& allocator)
 	: m_entities(allocator)
@@ -217,7 +217,7 @@ void EntityFolders::renameFolder(FolderHandle folder, StringView new_name) {
 void EntityFolders::moveFolder(FolderHandle folder_id, FolderHandle new_parent_id) {
 	Folder& folder = getFolder(folder_id);
 	Folder& new_parent = getFolder(new_parent_id);
-	#ifdef LUMIX_DEBUG
+	#ifdef BLACK_DEBUG
 		Folder& old_parent = getFolder(folder.parent);
 		ASSERT(new_parent.partition == old_parent.partition);
 	#endif
@@ -316,4 +316,4 @@ void EntityFolders::deserialize(InputMemoryStream& blob, const EntityMap& entity
 	}
 }
 
-} // namespace Lumix
+} // namespace black

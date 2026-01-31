@@ -1,7 +1,7 @@
 local co = require "scripts/coroutine"
 
 if _G["global"] ~= nil then
-	LumixAPI.logError("Only one component with global.lua should exist in the scene")
+	black.hAPI.logError("Only one component with global.lua should exist in the scene")
 end
 
 local global = {

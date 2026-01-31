@@ -27,7 +27,7 @@
 #include "world_editor.h"
 
 
-namespace Lumix
+namespace black
 {
 
 
@@ -355,9 +355,9 @@ void addSphere(WorldView& view, const DVec3& center, float radius, Color color) 
 
 template <typename T> void writeToStream(OutputMemoryStream& stream, T value) {	stream.write(value); }
 template <typename T> T readFromStream(InputMemoryStream& stream) { return stream.read<T>(); }
-template <> LUMIX_EDITOR_API void writeToStream<const Path&>(OutputMemoryStream& stream, const Path& path);
+template <> BLACK_EDITOR_API void writeToStream<const Path&>(OutputMemoryStream& stream, const Path& path);
 	
-template <> LUMIX_EDITOR_API Path readFromStream<Path>(InputMemoryStream& stream)
+template <> BLACK_EDITOR_API Path readFromStream<Path>(InputMemoryStream& stream)
 {
 	const char* c_str = (const char*)stream.getData() + stream.getPosition();
 	Path path(c_str);
@@ -366,20 +366,20 @@ template <> LUMIX_EDITOR_API Path readFromStream<Path>(InputMemoryStream& stream
 }
 
 
-template <> LUMIX_EDITOR_API void writeToStream<const Path&>(OutputMemoryStream& stream, const Path& path) {
+template <> BLACK_EDITOR_API void writeToStream<const Path&>(OutputMemoryStream& stream, const Path& path) {
 	StringView str = path;
 	stream.write(str.begin, str.size());
 	stream.write((char)0);
 }
 
 
-template <> LUMIX_EDITOR_API void writeToStream<Path>(OutputMemoryStream& stream, Path path) {
+template <> BLACK_EDITOR_API void writeToStream<Path>(OutputMemoryStream& stream, Path path) {
 	StringView str = path;
 	stream.write(str.begin, str.size());
 	stream.write((char)0);
 }
 
-template <> LUMIX_EDITOR_API const char* readFromStream<const char*>(InputMemoryStream& stream)
+template <> BLACK_EDITOR_API const char* readFromStream<const char*>(InputMemoryStream& stream)
 {
 	const char* c_str = (const char*)stream.getData() + stream.getPosition();
 	stream.skip(stringLength(c_str) + 1);
@@ -387,7 +387,7 @@ template <> LUMIX_EDITOR_API const char* readFromStream<const char*>(InputMemory
 }
 
 
-template <> LUMIX_EDITOR_API void writeToStream<const char*>(OutputMemoryStream& stream, const char* value)
+template <> BLACK_EDITOR_API void writeToStream<const char*>(OutputMemoryStream& stream, const char* value)
 {
 	stream.write(value, stringLength(value) + 1);
 }
@@ -1642,7 +1642,7 @@ private:
 					gather.resource_manager = &resource_manager;
 					cmp_desc->visit(gather);
 
-					Lumix::save(cmp, m_old_values);
+					black.h::save(cmp, m_old_values);
 				}
 				const PrefabHandle prefab = m_editor.getPrefabSystem().getPrefab(m_entities[i]);
 				m_old_values.write(prefab);
@@ -1707,7 +1707,7 @@ private:
 					new_component.module = module;
 					new_component.type = cmp_type;
 					
-					::Lumix::load(new_component, blob);
+					::black.h::load(new_component, blob);
 				}
 				PrefabHandle tpl;
 				blob.read(tpl);
@@ -1774,7 +1774,7 @@ private:
 			{
 				cmp.entity = entity;
 				world->createComponent(cmp.type, entity);
-				::Lumix::load(cmp, blob);
+				::black.h::load(cmp, blob);
 			}
 		}
 
@@ -1798,7 +1798,7 @@ private:
 
 			for (EntityRef entity : m_entities) {
 				cmp.entity = entity;
-				Lumix::save(cmp, m_old_values);
+				black.h::save(cmp, m_old_values);
 
 				GatherResourcesVisitor gather;
 				gather.cmp = cmp;
@@ -2449,14 +2449,14 @@ public:
 		OutputMemoryStream blob(m_allocator);
 		m_engine.serializeProject(blob, Path("main.unv"));
 
-		if (!fs.saveContentSync(Path("lumix.prj"), blob)) {
-			logError("Failed to save lumix.prj");
+		if (!fs.saveContentSync(Path("black.h.prj"), blob)) {
+			logError("Failed to save black.h.prj");
 		}
 	}
 
 	void loadProject() override {
 		OutputMemoryStream data(m_allocator);
-		if (!m_engine.getFileSystem().getContentSync(Path("lumix.prj"), data)) {
+		if (!m_engine.getFileSystem().getContentSync(Path("black.h.prj"), data)) {
 			logWarning("Project file not found");
 			return;
 		}
@@ -3126,4 +3126,4 @@ UniquePtr<WorldEditor> WorldEditor::create(Engine& engine, IAllocator& allocator
 }
 
 
-} // namespace Lumix
+} // namespace black

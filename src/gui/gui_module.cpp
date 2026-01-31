@@ -19,7 +19,7 @@
 #include "sprite.h"
 #include "imgui/IconsFontAwesome5.h"
 
-namespace Lumix {
+namespace black {
 
 static const float CURSOR_BLINK_PERIOD = 1.0f;
 static gpu::TextureHandle EMPTY_RENDER_TARGET = gpu::INVALID_TEXTURE;
@@ -686,10 +686,10 @@ struct GUIModuleImpl final : GUIModule {
 	~GUIModuleImpl() {
 		for (GUIRect* rect : m_rects) {
 			if (rect->flags & GUIRect::IS_VALID) {
-				LUMIX_DELETE(m_allocator, rect->input_field);
-				LUMIX_DELETE(m_allocator, rect->image);
-				LUMIX_DELETE(m_allocator, rect->text);
-				LUMIX_DELETE(m_allocator, rect);
+				BLACK_DELETE(m_allocator, rect->input_field);
+				BLACK_DELETE(m_allocator, rect->image);
+				BLACK_DELETE(m_allocator, rect->text);
+				BLACK_DELETE(m_allocator, rect);
 			}
 		}
 	}
@@ -947,7 +947,7 @@ struct GUIModuleImpl final : GUIModule {
 			rect = iter.value();
 		}
 		else {
-			rect = LUMIX_NEW(m_allocator, GUIRect);
+			rect = BLACK_NEW(m_allocator, GUIRect);
 			m_rects.insert(entity, rect);
 		}
 		rect->top = {0, 0};
@@ -968,7 +968,7 @@ struct GUIModuleImpl final : GUIModule {
 			iter = m_rects.find(entity);
 		}
 		GUIRect& rect = *iter.value();
-		rect.text = LUMIX_NEW(m_allocator, GUIText)(m_allocator);
+		rect.text = BLACK_NEW(m_allocator, GUIText)(m_allocator);
 
 		m_world.onComponentCreated(entity, types::gui_text, this);
 	}
@@ -1016,7 +1016,7 @@ struct GUIModuleImpl final : GUIModule {
 			iter = m_rects.find(entity);
 		}
 		GUIRect& rect = *iter.value();
-		rect.input_field = LUMIX_NEW(m_allocator, GUIInputField);
+		rect.input_field = BLACK_NEW(m_allocator, GUIInputField);
 
 		m_world.onComponentCreated(entity, types::gui_input_field, this);
 	}
@@ -1030,7 +1030,7 @@ struct GUIModuleImpl final : GUIModule {
 			iter = m_rects.find(entity);
 		}
 		GUIRect& rect = *iter.value();
-		rect.image = LUMIX_NEW(m_allocator, GUIImage);
+		rect.image = BLACK_NEW(m_allocator, GUIImage);
 		rect.image->flags |= GUIImage::IS_ENABLED;
 
 		m_world.onComponentCreated(entity, types::gui_image, this);
@@ -1042,7 +1042,7 @@ struct GUIModuleImpl final : GUIModule {
 		rect->flags &= ~GUIRect::IS_VALID;
 		if (!rect->image && !rect->text && !rect->input_field && !rect->render_target)
 		{
-			LUMIX_DELETE(m_allocator, rect);
+			BLACK_DELETE(m_allocator, rect);
 			m_rects.erase(entity);
 		}
 		m_world.onComponentDestroyed(entity, types::gui_rect, this);
@@ -1069,7 +1069,7 @@ struct GUIModuleImpl final : GUIModule {
 
 	void destroyInputField(EntityRef entity) override {
 		GUIRect* rect = m_rects[entity];
-		LUMIX_DELETE(m_allocator, rect->input_field);
+		BLACK_DELETE(m_allocator, rect->input_field);
 		rect->input_field = nullptr;
 		m_world.onComponentDestroyed(entity, types::gui_input_field, this);
 		checkGarbage(*rect);
@@ -1084,14 +1084,14 @@ struct GUIModuleImpl final : GUIModule {
 		if (rect.flags & GUIRect::IS_VALID) return;
 			
 		const EntityRef e = rect.entity;
-		LUMIX_DELETE(m_allocator, &rect);
+		BLACK_DELETE(m_allocator, &rect);
 		m_rects.erase(e);
 	}
 
 
 	void destroyImage(EntityRef entity) override {
 		GUIRect* rect = m_rects[entity];
-		LUMIX_DELETE(m_allocator, rect->image);
+		BLACK_DELETE(m_allocator, rect->image);
 		rect->image = nullptr;
 		m_world.onComponentDestroyed(entity, types::gui_image, this);
 		checkGarbage(*rect);
@@ -1100,7 +1100,7 @@ struct GUIModuleImpl final : GUIModule {
 
 	void destroyText(EntityRef entity) override {
 		GUIRect* rect = m_rects[entity];
-		LUMIX_DELETE(m_allocator, rect->text);
+		BLACK_DELETE(m_allocator, rect->text);
 		rect->text = nullptr;
 		m_world.onComponentDestroyed(entity, types::gui_text, this);
 		checkGarbage(*rect);
@@ -1174,7 +1174,7 @@ struct GUIModuleImpl final : GUIModule {
 			entity = entity_map.get(entity);
 			auto iter = m_rects.find(entity);
 			if (!iter.isValid()) {
-				GUIRect* rect = LUMIX_NEW(m_allocator, GUIRect);
+				GUIRect* rect = BLACK_NEW(m_allocator, GUIRect);
 				iter = m_rects.insert(entity, rect);
 			}
 			GUIRect* rect = iter.value();
@@ -1192,7 +1192,7 @@ struct GUIModuleImpl final : GUIModule {
 			bool has_image = serializer.read<bool>();
 			if (has_image)
 			{
-				rect->image = LUMIX_NEW(m_allocator, GUIImage);
+				rect->image = BLACK_NEW(m_allocator, GUIImage);
 				const char* tmp = serializer.readString();
 				if (tmp[0] == '\0')
 				{
@@ -1211,13 +1211,13 @@ struct GUIModuleImpl final : GUIModule {
 			bool has_input_field = serializer.read<bool>();
 			if (has_input_field)
 			{
-				rect->input_field = LUMIX_NEW(m_allocator, GUIInputField);
+				rect->input_field = BLACK_NEW(m_allocator, GUIInputField);
 				m_world.onComponentCreated(rect->entity, types::gui_input_field, this);
 			}
 			bool has_text = serializer.read<bool>();
 			if (has_text)
 			{
-				rect->text = LUMIX_NEW(m_allocator, GUIText)(m_allocator);
+				rect->text = BLACK_NEW(m_allocator, GUIText)(m_allocator);
 				GUIText& text = *rect->text;
 				const char* tmp = serializer.readString();
 				serializer.read(text.horizontal_align);
@@ -1331,4 +1331,4 @@ void GUIModule::reflect() {
 	#include "gui_module.gen.h"
 }
 
-} // namespace Lumix
+} // namespace black

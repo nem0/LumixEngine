@@ -23,7 +23,7 @@
 #include "renderer/render_module.h"
 
 
-namespace Lumix
+namespace black
 {
 
 struct Animation;
@@ -841,4 +841,4 @@ void AnimationModule::reflect(Engine& engine) {
 	#include "animation_module.gen.h"
 }
 
-} // namespace Lumix
+} // namespace black

@@ -37,7 +37,7 @@
 #define _NET_WM_STATE_REMOVE 0
 #define _NET_WM_STATE_ADD 1
 
-namespace Lumix::os {
+namespace black::os {
 
 
 static DefaultAllocator s_allocator;
@@ -84,7 +84,7 @@ bool getAppDataDir(Span<char> path) {
 	char* home = getenv("HOME");
 	if (!home) return false;
 	copyString(path, home);
-	catString(path, "/.lumix/");
+	catString(path, "/.black.h/");
 	return true;
 }
 
@@ -109,7 +109,7 @@ void init() {
 
 	struct {
 		KeySym x11;
-		Keycode lumix;
+		Keycode black.h;
 		const char* name;
 	} map[] = {
 		{XK_BackSpace, Keycode::BACKSPACE, "Backspace"},
@@ -287,8 +287,8 @@ void init() {
 	};
 
 	for (const auto& m : map) {
-		s_from_x11_keysym.insert(m.x11, m.lumix);
-		s_keycode_names[(u8)m.lumix] = m.name;
+		s_from_x11_keysym.insert(m.x11, m.black.h);
+		s_keycode_names[(u8)m.black.h] = m.name;
 	}
 	G.net_wm_state_fullscreen_atom = XInternAtom(G.display, "_NET_WM_STATE_FULLSCREEN", False);
 	G.net_wm_state_atom = XInternAtom(G.display, "_NET_WM_STATE", False);
@@ -425,11 +425,11 @@ ThreadID getCurrentThreadID() {
 void logInfo() {
 	struct utsname tmp;
 	if (uname(&tmp) == 0) {
-		Lumix::logInfo("sysname: ", tmp.sysname);
-		Lumix::logInfo("nodename: ", tmp.nodename);
-		Lumix::logInfo("release: ", tmp.release);
-		Lumix::logInfo("version: ", tmp.version);
-		Lumix::logInfo("machine: ", tmp.machine);
+		black.h::logInfo("sysname: ", tmp.sysname);
+		black.h::logInfo("nodename: ", tmp.nodename);
+		black.h::logInfo("release: ", tmp.release);
+		black.h::logInfo("version: ", tmp.version);
+		black.h::logInfo("machine: ", tmp.machine);
 	} else {
 		logWarning("uname failed");
 	}
@@ -657,7 +657,7 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 	XChangeWindowAttributes(display, win, CWBackPixel, &attr);
 
 	if (!args.is_hidden) XMapWindow(display, win);
-	XStoreName(display, win, args.name && args.name[0] ? args.name : "Lumix App");
+	XStoreName(display, win, args.name && args.name[0] ? args.name : "black.h App");
 
 	G.ic = XCreateIC(G.im, XNInputStyle, 0 | XIMPreeditNothing | XIMStatusNothing, XNClientWindow, win, NULL);
 
@@ -1008,7 +1008,7 @@ bool getNextFile(FileIterator* iterator, FileInfo* info) {
 	if (!dir_ent) return false;
 
 	info->is_directory = dir_ent->d_type == DT_DIR;
-	Lumix::copyString(info->filename, dir_ent->d_name);
+	black.h::copyString(info->filename, dir_ent->d_name);
 	return true;
 }
 
@@ -1189,9 +1189,9 @@ u64 getLastModified(StringView _path) {
 	copyString(path, _path);
 
 	struct stat tmp;
-	Lumix::u64 ret = 0;
+	black.h::u64 ret = 0;
 	if (stat(path, &tmp) != 0) return 0;
-	ret = tmp.st_mtim.tv_sec * 1000 + Lumix::u64(tmp.st_mtim.tv_nsec / 1000000);
+	ret = tmp.st_mtim.tv_sec * 1000 + black.h::u64(tmp.st_mtim.tv_nsec / 1000000);
 	return ret;
 }
 
@@ -1358,4 +1358,4 @@ bool write(NetworkStream& stream, const void* data, u32 size) { ASSERT(false); r
 void close(NetworkStream& stream) {}
 
 
-} // namespace Lumix::os
+} // namespace black::os

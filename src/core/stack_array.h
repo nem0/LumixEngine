@@ -3,7 +3,7 @@
 #include "array.h"
 #include "stack_allocator.h"
 
-namespace Lumix {
+namespace black {
 
 // Array with built-in storage
 template <typename T, u32 N>
@@ -27,4 +27,4 @@ private:
 };
 
 
-} // namespace Lumix
+} // namespace black

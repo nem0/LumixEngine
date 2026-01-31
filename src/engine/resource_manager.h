@@ -1,14 +1,14 @@
 #pragma once
 
-#include "engine/lumix.h"
+#include "engine/black.h.h"
 
 #include "core/hash.h"
 #include "core/hash_map.h"
 
 
-namespace Lumix {
+namespace black{
 
-struct LUMIX_ENGINE_API ResourceManager {
+struct BLACK_ENGINE_API ResourceManager {
 	friend struct Resource;
 	friend struct ResourceManagerHub;
 	using ResourceTable = HashMap<FilePathHash, struct Resource*>;
@@ -42,10 +42,10 @@ protected:
 };
 
 
-struct LUMIX_ENGINE_API ResourceManagerHub {
+struct BLACK_ENGINE_API ResourceManagerHub {
 	using ResourceManagerTable = HashMap<ResourceType, ResourceManager*>;
 
-	struct LUMIX_ENGINE_API LoadHook {
+	struct BLACK_ENGINE_API LoadHook {
 		enum class Action { IMMEDIATE, DEFERRED };
 		virtual ~LoadHook() {}
 		virtual void loadRaw(const Path& requester, const Path& path) = 0;

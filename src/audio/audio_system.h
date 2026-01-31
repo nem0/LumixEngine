@@ -4,7 +4,7 @@
 #include "engine/plugin.h"
 
 
-namespace Lumix
+namespace black
 {
 
 
@@ -15,4 +15,4 @@ struct AudioSystem : ISystem
 };
 
 
-} // namespace Lumix
+} // namespace black

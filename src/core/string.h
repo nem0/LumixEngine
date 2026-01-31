@@ -8,15 +8,15 @@
 // it means some are valid only for ascii (e.g. makeLowercase)
 // some functions can return unexpected results e.g. stringLength returns number of bytes for utf-8, not number of characters
 
-namespace Lumix {
+namespace black {
 	
 struct IAllocator;
 template <int SIZE> struct StaticString;
 
-LUMIX_CORE_API int stringLength(const char* str);
+BLACK_CORE_API int stringLength(const char* str);
 
 // a range of characters between begin (inclusive) and end (exclusive)
-struct LUMIX_CORE_API StringView {
+struct BLACK_CORE_API StringView {
 	StringView() {}
 	StringView(Span<const u8> str) : begin((const char*)str.m_begin), end((const char*)str.m_end) {}
 	StringView(const char* str) : begin(str), end(str ? str + stringLength(str) : 0) {}
@@ -37,51 +37,51 @@ struct LUMIX_CORE_API StringView {
 	const char* end = nullptr;
 };
 
-LUMIX_CORE_API char toLower(char c);
-LUMIX_CORE_API const char* findInsensitive(StringView haystack, StringView needle);
-LUMIX_CORE_API void toCStringHex(u8 value, Span<char> output);
-LUMIX_CORE_API void toCStringPretty(i32 value, Span<char> output);
-LUMIX_CORE_API void toCStringPretty(u32 value, Span<char> output);
-LUMIX_CORE_API void toCStringPretty(u64 value, Span<char> output);
-LUMIX_CORE_API char* toCString(bool value, Span<char> output);
-LUMIX_CORE_API char* toCString(i32 value, Span<char> output);
-LUMIX_CORE_API char* toCString(i64 value, Span<char> output);
-LUMIX_CORE_API char* toCString(u64 value, Span<char> output);
-LUMIX_CORE_API char* toCString(u32 value, Span<char> output);
-LUMIX_CORE_API char* toCString(float value, Span<char> output, int after_point);
-LUMIX_CORE_API char* toCString(double value, Span<char> output, int after_point);
+BLACK_CORE_API char toLower(char c);
+BLACK_CORE_API const char* findInsensitive(StringView haystack, StringView needle);
+BLACK_CORE_API void toCStringHex(u8 value, Span<char> output);
+BLACK_CORE_API void toCStringPretty(i32 value, Span<char> output);
+BLACK_CORE_API void toCStringPretty(u32 value, Span<char> output);
+BLACK_CORE_API void toCStringPretty(u64 value, Span<char> output);
+BLACK_CORE_API char* toCString(bool value, Span<char> output);
+BLACK_CORE_API char* toCString(i32 value, Span<char> output);
+BLACK_CORE_API char* toCString(i64 value, Span<char> output);
+BLACK_CORE_API char* toCString(u64 value, Span<char> output);
+BLACK_CORE_API char* toCString(u32 value, Span<char> output);
+BLACK_CORE_API char* toCString(float value, Span<char> output, int after_point);
+BLACK_CORE_API char* toCString(double value, Span<char> output, int after_point);
 
 // conver string from `input` to `value` and returns pointer to the next character after the number
 // does not need to consume the whole input
-LUMIX_CORE_API const char* fromCString(StringView input, i32& value);
-LUMIX_CORE_API const char* fromCString(StringView input, u64& value);
-LUMIX_CORE_API const char* fromCString(StringView input, i64& value);
-LUMIX_CORE_API const char* fromCString(StringView input, u32& value);
-LUMIX_CORE_API const char* fromCString(StringView input, u16& value);
-LUMIX_CORE_API const char* fromCString(StringView input, float& value);
-LUMIX_CORE_API const char* fromCString(StringView input, bool& value);
-LUMIX_CORE_API const char* fromCStringOctal(StringView input, u32& value);
+BLACK_CORE_API const char* fromCString(StringView input, i32& value);
+BLACK_CORE_API const char* fromCString(StringView input, u64& value);
+BLACK_CORE_API const char* fromCString(StringView input, i64& value);
+BLACK_CORE_API const char* fromCString(StringView input, u32& value);
+BLACK_CORE_API const char* fromCString(StringView input, u16& value);
+BLACK_CORE_API const char* fromCString(StringView input, float& value);
+BLACK_CORE_API const char* fromCString(StringView input, bool& value);
+BLACK_CORE_API const char* fromCStringOctal(StringView input, u32& value);
 
-LUMIX_CORE_API char* copyString(Span<char> output, StringView source);
-LUMIX_CORE_API char* catString(Span<char> output, StringView source);
-LUMIX_CORE_API bool makeLowercase(Span<char> output, StringView source);
-LUMIX_CORE_API bool equalStrings(const char* lhs, const char* rhs);
-LUMIX_CORE_API bool equalStrings(StringView lhs, StringView rhs);
-LUMIX_CORE_API bool equalIStrings(StringView lhs, StringView rhs);
-LUMIX_CORE_API int compareString(StringView lhs, StringView rhs);
-LUMIX_CORE_API int compareStringInsensitive(StringView lhs, StringView rhs);
-LUMIX_CORE_API const char* reverseFind(StringView haystack, char c);
-LUMIX_CORE_API const char* find(StringView str, char needle);
-LUMIX_CORE_API const char* find(StringView str, StringView needle);
-LUMIX_CORE_API bool contains(StringView haystack, char needle);
-LUMIX_CORE_API bool startsWith(StringView str, StringView prefix);
-LUMIX_CORE_API bool startsWithInsensitive(StringView str, StringView prefix);
-LUMIX_CORE_API bool endsWith(StringView str, StringView suffix);
-LUMIX_CORE_API bool endsWithInsensitive(StringView str, StringView suffix);
-LUMIX_CORE_API bool isLetter(char c);
-LUMIX_CORE_API bool isNumeric(char c);
-LUMIX_CORE_API bool isUpperCase(char c);
-LUMIX_CORE_API bool isWhitespace(char c);
+BLACK_CORE_API char* copyString(Span<char> output, StringView source);
+BLACK_CORE_API char* catString(Span<char> output, StringView source);
+BLACK_CORE_API bool makeLowercase(Span<char> output, StringView source);
+BLACK_CORE_API bool equalStrings(const char* lhs, const char* rhs);
+BLACK_CORE_API bool equalStrings(StringView lhs, StringView rhs);
+BLACK_CORE_API bool equalIStrings(StringView lhs, StringView rhs);
+BLACK_CORE_API int compareString(StringView lhs, StringView rhs);
+BLACK_CORE_API int compareStringInsensitive(StringView lhs, StringView rhs);
+BLACK_CORE_API const char* reverseFind(StringView haystack, char c);
+BLACK_CORE_API const char* find(StringView str, char needle);
+BLACK_CORE_API const char* find(StringView str, StringView needle);
+BLACK_CORE_API bool contains(StringView haystack, char needle);
+BLACK_CORE_API bool startsWith(StringView str, StringView prefix);
+BLACK_CORE_API bool startsWithInsensitive(StringView str, StringView prefix);
+BLACK_CORE_API bool endsWith(StringView str, StringView suffix);
+BLACK_CORE_API bool endsWithInsensitive(StringView str, StringView suffix);
+BLACK_CORE_API bool isLetter(char c);
+BLACK_CORE_API bool isNumeric(char c);
+BLACK_CORE_API bool isUpperCase(char c);
+BLACK_CORE_API bool isWhitespace(char c);
 
 // string with included fixed-size storage - i.e. it does not allocate
 // example usage: StaticString<MAX_PATH> path(dir, "/", basename, ".", extension);
@@ -129,7 +129,7 @@ private:
 };
 
 // dynamically allocated string, similar to std::string
-struct LUMIX_CORE_API String {
+struct BLACK_CORE_API String {
 	explicit String(IAllocator& allocator);
 	String(const String& rhs, u32 start, u32 length);
 	String(StringView rhs, IAllocator& allocator);
@@ -173,4 +173,4 @@ template <int N> StringView::StringView(const StaticString<N>& str)
 	, end(str.data + stringLength(str.data))
 {}
 
-} // namespace Lumix
+} // namespace black

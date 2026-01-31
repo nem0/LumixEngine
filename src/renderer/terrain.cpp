@@ -16,7 +16,7 @@
 #include "renderer/texture.h"
 #include "engine/world.h"
 
-namespace Lumix {
+namespace black {
 
 struct Sample {
 	Vec3 pos;
@@ -561,4 +561,4 @@ void Terrain::onMaterialLoaded(Resource::State, Resource::State new_state, Resou
 }
 
 
-} // namespace Lumix
+} // namespace black

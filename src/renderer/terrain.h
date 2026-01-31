@@ -10,7 +10,7 @@
 #include "gpu/gpu.h"
 
 
-namespace Lumix
+namespace black
 {
 
 
@@ -36,7 +36,7 @@ enum class GrassRotationMode : i32 {
 	COUNT,
 };
 
-struct LUMIX_RENDERER_API Terrain {
+struct BLACK_RENDERER_API Terrain {
 	struct GrassQuad {
 		gpu::BufferHandle instances = gpu::INVALID_BUFFER;
 		u32 instances_count = 0;
@@ -130,4 +130,4 @@ private:
 };
 
 
-} // namespace Lumix
+} // namespace black

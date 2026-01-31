@@ -8,7 +8,7 @@
 
 //---- Define assertion handler. Defaults to calling assert().
 #ifdef _WIN32
-	#ifdef LUMIX_DEBUG
+	#ifdef BLACK_DEBUG
 		#define IM_ASSERT(_EXPR)  do { if(!(_EXPR)) __debugbreak(); } while(false)
 	#else
 		#define IM_ASSERT(_EXPR)  do {} while(false)
@@ -33,7 +33,7 @@
 	#endif
 #endif
 
-namespace Lumix { struct Vec2; }
+namespace black { struct Vec2; }
 
 #define ImDrawIdx unsigned int
 
@@ -63,8 +63,8 @@ namespace Lumix { struct Vec2; }
 //---- Define constructor and implicit cast operators to convert back<>forth from your math types and ImVec2/ImVec4.
 
 #define IM_VEC2_CLASS_EXTRA                                                         \
-        IMGUI_API ImVec2(const Lumix::Vec2& f);                                               \
-        IMGUI_API operator Lumix::Vec2() const;                                               \
+        IMGUI_API ImVec2(const black.h::Vec2& f);                                               \
+        IMGUI_API operator black.h::Vec2() const;                                               \
         ImVec2 operator+(const ImVec2& rhs) { return ImVec2(x+rhs.x, y+rhs.y); }    \
         ImVec2 operator-(const ImVec2& rhs) { return ImVec2(x-rhs.x, y-rhs.y); }    \
         ImVec2 operator*(const ImVec2& rhs) { return ImVec2(x*rhs.x, y*rhs.y); }    \

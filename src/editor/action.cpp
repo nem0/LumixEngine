@@ -1,7 +1,7 @@
 #include "action.h"
 #include <imgui/IconsFontAwesome5.h>
 
-namespace Lumix {
+namespace black {
 
 CommonActions::CommonActions() 
 	: save{"Common", "Save", "Save", "save", ICON_FA_SAVE}

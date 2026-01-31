@@ -1,5 +1,5 @@
 @echo off
-REM Compile and run tests for LumixEngine
+REM Compile and run tests for black Engine
 
 pushd %~dp0
 REM Enable delayed expansion so ERRORLEVEL can be read correctly inside
@@ -21,7 +21,7 @@ if "%msbuild_cmd%"=="" (
 :msbuild_found
 
 REM Ensure solution exists
-if not exist "tmp\vs2022\LumixEngine.sln" (
+if not exist "tmp\vs2022\black Engine.sln" (
   echo Solution not found, generating with genie.exe...
   genie.exe --with-tests vs2022
   if not %errorlevel%==0 (
@@ -44,7 +44,7 @@ if defined VSINSTALL (
 )
 
 echo Using MSBuild: %msbuild_cmd%
-"%msbuild_cmd%" "tmp\vs2022\LumixEngine.sln" /p:Configuration=Debug /p:Platform=x64 /verbosity:minimal
+"%msbuild_cmd%" "tmp\vs2022\black Engine.sln" /p:Configuration=Debug /p:Platform=x64 /verbosity:minimal
 if not %errorlevel%==0 (
   echo Build failed.
   popd

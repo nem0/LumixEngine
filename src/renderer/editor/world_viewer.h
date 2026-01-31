@@ -6,9 +6,9 @@
 #include "engine/world.h"
 #include "renderer/pipeline.h"
 
-namespace Lumix {
+namespace black {
 
-struct LUMIX_RENDERER_API WorldViewer {
+struct BLACK_RENDERER_API WorldViewer {
 	WorldViewer(struct StudioApp& app);
 	~WorldViewer();
 

@@ -7,7 +7,7 @@
 #include "sync.h"
 
 
-namespace Lumix
+namespace black
 {
 
 struct TagAllocator;
@@ -18,14 +18,14 @@ namespace debug
 
 struct StackNode;
 
-LUMIX_CORE_API void init(IAllocator& allocator);
-LUMIX_CORE_API void shutdown();
-LUMIX_CORE_API void debugBreak();
-LUMIX_CORE_API void debugOutput(const char* message);
-LUMIX_CORE_API void enableFloatingPointTraps(bool enable);
+BLACK_CORE_API void init(IAllocator& allocator);
+BLACK_CORE_API void shutdown();
+BLACK_CORE_API void debugBreak();
+BLACK_CORE_API void debugOutput(const char* message);
+BLACK_CORE_API void enableFloatingPointTraps(bool enable);
 
 #ifdef _WIN32
-struct LUMIX_CORE_API GuardAllocator final : IAllocator {
+struct BLACK_CORE_API GuardAllocator final : IAllocator {
 	void* allocate(size_t size, size_t align) override;
 	void deallocate(void* ptr) override;
 	void* reallocate(void* ptr, size_t new_size, size_t old_size, size_t align) override { 
@@ -35,7 +35,7 @@ struct LUMIX_CORE_API GuardAllocator final : IAllocator {
 };
 #endif
 
-struct LUMIX_CORE_API AllocationInfo {
+struct BLACK_CORE_API AllocationInfo {
 	enum Flags : u16{
 		NONE = 0,
 		IS_VRAM = 0b001 << 1,
@@ -53,17 +53,17 @@ struct LUMIX_CORE_API AllocationInfo {
 	Flags flags = Flags::NONE;
 };
 
-LUMIX_CORE_API void registerAlloc(AllocationInfo& info);
-LUMIX_CORE_API void resizeAlloc(AllocationInfo& info, u64 new_size);
-LUMIX_CORE_API void unregisterAlloc(const AllocationInfo& info);
-LUMIX_CORE_API u64 getRegisteredAllocsSize(); // does not include vram allocations
-LUMIX_CORE_API void checkLeaks();
-LUMIX_CORE_API void checkGuards();
-LUMIX_CORE_API const AllocationInfo* lockAllocationInfos();
-LUMIX_CORE_API void unlockAllocationInfos();
+BLACK_CORE_API void registerAlloc(AllocationInfo& info);
+BLACK_CORE_API void resizeAlloc(AllocationInfo& info, u64 new_size);
+BLACK_CORE_API void unregisterAlloc(const AllocationInfo& info);
+BLACK_CORE_API u64 getRegisteredAllocsSize(); // does not include vram allocations
+BLACK_CORE_API void checkLeaks();
+BLACK_CORE_API void checkGuards();
+BLACK_CORE_API const AllocationInfo* lockAllocationInfos();
+BLACK_CORE_API void unlockAllocationInfos();
 
 
-struct LUMIX_CORE_API Allocator final : IAllocator {
+struct BLACK_CORE_API Allocator final : IAllocator {
 	explicit Allocator(IAllocator& source);
 
 	void* allocate(size_t size, size_t align) override;
@@ -81,10 +81,10 @@ private:
 } // namespace Debug
 
 
-LUMIX_CORE_API void enableCrashReporting(bool enable);
-LUMIX_CORE_API void installUnhandledExceptionHandler();
-LUMIX_CORE_API void clearHardwareBreakpoint(u32 breakpoint_idx);
-LUMIX_CORE_API void setHardwareBreakpoint(u32 breakpoint_idx, const void* mem, u32 size);
+BLACK_CORE_API void enableCrashReporting(bool enable);
+BLACK_CORE_API void installUnhandledExceptionHandler();
+BLACK_CORE_API void clearHardwareBreakpoint(u32 breakpoint_idx);
+BLACK_CORE_API void setHardwareBreakpoint(u32 breakpoint_idx, const void* mem, u32 size);
 
 
-} // namespace Lumix
+} // namespace black

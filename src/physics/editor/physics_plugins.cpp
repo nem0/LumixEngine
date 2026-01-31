@@ -31,7 +31,7 @@
 #include "renderer/model.h"
 #include "renderer/render_module.h"
 
-using namespace Lumix;
+using namespace black;
 
 namespace {
 
@@ -428,7 +428,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 
 	bool exportData(const char* dest_dir) override
 	{
-		#ifndef LUMIX_STATIC_PHYSX
+		#ifndef BLACK_STATIC_PHYSX
 			char exe_path[MAX_PATH];
 			os::getExecutablePath(Span(exe_path));
 			char exe_dir[MAX_PATH];
@@ -1037,9 +1037,9 @@ struct StudioAppPlugin : StudioApp::IPlugin
 } // anonymous
 
 
-LUMIX_STUDIO_ENTRY(physics) {
+BLACK_STUDIO_ENTRY(physics) {
 	PROFILE_FUNCTION();
 	IAllocator& allocator = app.getAllocator();
-	return LUMIX_NEW(allocator, StudioAppPlugin)(app);
+	return BLACK_NEW(allocator, StudioAppPlugin)(app);
 }
 

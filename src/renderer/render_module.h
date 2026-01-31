@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/lumix.h"
+#include "engine/black.h.h"
 
 #include "core/color.h"
 #include "core/array.h"
@@ -16,7 +16,7 @@
 //@ module RenderModule renderer "Render"
 //@ include "core/geometry.h"
 //@ include "renderer/model.h"
-namespace Lumix
+namespace black
 {
 
 
@@ -323,7 +323,7 @@ enum class RenderModuleVersion : i32 {
 	LATEST
 };
 
-struct LUMIX_RENDERER_API RenderModule : IModule
+struct BLACK_RENDERER_API RenderModule : IModule
 {
 	static UniquePtr<RenderModule> createInstance(Renderer& renderer,
 		Engine& engine,

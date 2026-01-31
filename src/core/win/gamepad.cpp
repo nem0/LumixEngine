@@ -4,7 +4,7 @@
 #include "core/profiler.h"
 #include "core/win/simple_win.h"
 
-namespace Lumix {
+namespace black {
 
 typedef decltype(XInputGetState)* XInputGetState_fn_ptr;
 
@@ -80,7 +80,7 @@ struct XInputBackend : public IGamepadBackend {
 };
 
 IGamepadBackend* createGamepadBackend(IAllocator& allocator) {
-	return LUMIX_NEW(allocator, XInputBackend)(allocator);
+	return BLACK_NEW(allocator, XInputBackend)(allocator);
 }
 
-} // namespace Lumix
+} // namespace black

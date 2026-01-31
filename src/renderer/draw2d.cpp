@@ -2,7 +2,7 @@
 #include "font.h"
 
 
-namespace Lumix {
+namespace black {
 
 
 Draw2D::Draw2D(IAllocator& allocator) 
@@ -223,4 +223,4 @@ void Draw2D::addText(const Font& font, const Vec2& pos, Color color, const char*
 	}
 }
 
-} // namespace Lumix
+} // namespace black

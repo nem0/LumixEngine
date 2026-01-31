@@ -8,13 +8,13 @@
 #endif
 
 #ifndef ASSERT
-	#ifdef LUMIX_DEBUG
+	#ifdef BLACK_DEBUG
 		#ifdef _WIN32
-			#define LUMIX_DEBUG_BREAK() __debugbreak()
+			#define BLACK_DEBUG_BREAK() __debugbreak()
 		#else
-			#define LUMIX_DEBUG_BREAK()  raise(SIGTRAP) 
+			#define BLACK_DEBUG_BREAK()  raise(SIGTRAP) 
 		#endif
-		#define ASSERT(x) do { const volatile bool lumix_assert_b____ = !(x); if(lumix_assert_b____) LUMIX_DEBUG_BREAK(); } while (false)
+		#define ASSERT(x) do { const volatile bool black.h_assert_b____ = !(x); if(black.h_assert_b____) BLACK_DEBUG_BREAK(); } while (false)
 	#else
 		#if defined _MSC_VER && !defined __clang__
 			#define ASSERT(x) __assume(x)
@@ -24,7 +24,7 @@
 	#endif
 #endif
 
-namespace Lumix {
+namespace black {
 
 #ifdef MAX_PATH
 	#undef MAX_PATH
@@ -75,23 +75,23 @@ template <typename E> void setFlag(E& flags, E flag, bool set) {
 }
 
 #ifdef _WIN32
-	#define LUMIX_LIBRARY_EXPORT __declspec(dllexport)
-	#define LUMIX_LIBRARY_IMPORT __declspec(dllimport)
-	#define LUMIX_FORCE_INLINE __forceinline
-	#define LUMIX_RESTRICT __restrict
+	#define BLACK_LIBRARY_EXPORT __declspec(dllexport)
+	#define BLACK_LIBRARY_IMPORT __declspec(dllimport)
+	#define BLACK_FORCE_INLINE __forceinline
+	#define BLACK_RESTRICT __restrict
 #else 
-	#define LUMIX_LIBRARY_EXPORT __attribute__((visibility("default")))
-	#define LUMIX_LIBRARY_IMPORT 
-	#define LUMIX_FORCE_INLINE __attribute__((always_inline)) inline
-	#define LUMIX_RESTRICT __restrict__
+	#define BLACK_LIBRARY_EXPORT __attribute__((visibility("default")))
+	#define BLACK_LIBRARY_IMPORT 
+	#define BLACK_FORCE_INLINE __attribute__((always_inline)) inline
+	#define BLACK_RESTRICT __restrict__
 #endif
 
 #ifdef STATIC_PLUGINS
-	#define LUMIX_CORE_API
+	#define BLACK_CORE_API
 #elif defined BUILDING_CORE
-	#define LUMIX_CORE_API LUMIX_LIBRARY_EXPORT
+	#define BLACK_CORE_API BLACK_LIBRARY_EXPORT
 #else
-	#define LUMIX_CORE_API LUMIX_LIBRARY_IMPORT
+	#define BLACK_CORE_API BLACK_LIBRARY_IMPORT
 #endif
 
 #ifdef _MSC_VER
@@ -120,4 +120,4 @@ template <typename E> void setFlag(E& flags, E flag, bool set) {
 	#pragma clang diagnostic ignored "-Wchar-subscripts"
 #endif
 
-} // namespace Lumix
+} // namespace black

@@ -2,7 +2,7 @@
 
 #include "core/allocator.h"
 
-namespace Lumix {
+namespace black {
 
 // one allocation from local memory backing (m_mem), use fallback allocator otherwise
 // use case: StackArray<T, N> to allocate on stack

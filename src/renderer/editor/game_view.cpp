@@ -20,7 +20,7 @@
 #include "renderer/texture.h"
 
 
-namespace Lumix
+namespace black
 {
 
 
@@ -223,7 +223,7 @@ void GameView::controlsGUI(WorldEditor& editor) {
 		option("Probe clusters", Pipeline::DebugShow::PROBE_CLUSTERS);
 		option("AO", Pipeline::DebugShow::AO);
 		Renderer& renderer = m_pipeline->getRenderer();
-		for (Lumix::RenderPlugin* plugin : renderer.getPlugins()) {
+		for (black.h::RenderPlugin* plugin : renderer.getPlugins()) {
 			plugin->debugUI(*m_pipeline);
 		}
 		ImGui::EndPopup();
@@ -351,4 +351,4 @@ void GameView::windowUI(const char* window_name) {
 }
 
 
-} // namespace Lumix
+} // namespace black

@@ -5,9 +5,9 @@
 #include "lua_wrapper.h"
 #include <luacode.h>
 
-namespace Lumix::LuaWrapper {
+namespace black::LuaWrapper {
 
-#ifdef LUMIX_DEBUG
+#ifdef BLACK_DEBUG
 	DebugGuard::DebugGuard(lua_State* L)
 		: L(L) 
 	{
@@ -31,7 +31,7 @@ namespace Lumix::LuaWrapper {
 int traceback(lua_State *L) {
 	if (!lua_isstring(L, 1)) return 1;
 	
-	lua_getfield(L, LUA_GLOBALSINDEX, "LumixDebugCallback");
+	lua_getfield(L, LUA_GLOBALSINDEX, "black.hDebugCallback");
 	if (lua_isfunction(L, -1)) {
 		lua_pushvalue(L, 1);
 		if (lua_pcall(L, 1, 0, 0) != 0) {
@@ -162,14 +162,14 @@ bool toEntity(lua_State* L, int idx, World*& world, EntityRef& entity) {
 }
 
 void pushEntity(lua_State* L, EntityPtr value, World* world) {
-	lua_getglobal(L, "Lumix");						// [Lumix]
-	lua_getfield(L, -1, "Entity");					// [Lumix, Lumix.Entity]
-	lua_remove(L, -2);								// [Lumix.Entity]
-	lua_getfield(L, -1, "new");						// [Lumix.Entity, Entity.new]
-	lua_pushvalue(L, -2);							// [Lumix.Entity, Entity.new, Lumix.Entity]
-	lua_remove(L, -3);								// [Entity.new, Lumix.Entity]
-	lua_pushlightuserdata(L, world);				// [Entity.new, Lumix.Entity, world]
-	lua_pushnumber(L, value.index);					// [Entity.new, Lumix.Entity, world, entity_index]
+	lua_getglobal(L, "black.h");						// [black.h]
+	lua_getfield(L, -1, "Entity");					// [black.h, black.h.Entity]
+	lua_remove(L, -2);								// [black.h.Entity]
+	lua_getfield(L, -1, "new");						// [black.h.Entity, Entity.new]
+	lua_pushvalue(L, -2);							// [black.h.Entity, Entity.new, black.h.Entity]
+	lua_remove(L, -3);								// [Entity.new, black.h.Entity]
+	lua_pushlightuserdata(L, world);				// [Entity.new, black.h.Entity, world]
+	lua_pushnumber(L, value.index);					// [Entity.new, black.h.Entity, world, entity_index]
 	const bool error = !LuaWrapper::pcall(L, 3, 1); // [entity]
 	ASSERT(!error);
 }
@@ -177,7 +177,7 @@ void pushEntity(lua_State* L, EntityPtr value, World* world) {
 void pushObject(lua_State* L, void* obj, StringView type_name) {
 	ASSERT(!type_name.empty());
 	LuaWrapper::DebugGuard guard(L, 1);
-	lua_getglobal(L, "LumixAPI");
+	lua_getglobal(L, "black.hAPI");
 	char tmp[64];
 	copyString(Span(tmp), type_name);
 
@@ -190,12 +190,12 @@ void pushObject(lua_State* L, void* obj, StringView type_name) {
 		return;
 	}
 
-	lua_newtable(L); // [LumixAPI, class, obj]
-	lua_pushlightuserdata(L, obj); // [LumixAPI, class, obj, obj_ptr]
-	lua_setfield(L, -2, "_value"); // [LumixAPI, class, obj]
-	lua_pushvalue(L, -2); // [LumixAPI, class, obj, class]
-	lua_setmetatable(L, -2); // [LumixAPI, class, obj]
-	lua_remove(L, -2); // [LumixAPI, obj]
+	lua_newtable(L); // [black.hAPI, class, obj]
+	lua_pushlightuserdata(L, obj); // [black.hAPI, class, obj, obj_ptr]
+	lua_setfield(L, -2, "_value"); // [black.hAPI, class, obj]
+	lua_pushvalue(L, -2); // [black.hAPI, class, obj, class]
+	lua_setmetatable(L, -2); // [black.hAPI, class, obj]
+	lua_remove(L, -2); // [black.hAPI, obj]
 	lua_remove(L, -2); // [obj]
 }
 
@@ -313,4 +313,4 @@ void argError(lua_State* L, int index, const char* expected_type) {
 }
 
 
-} // namespace Lumix::LuaWrapper
+} // namespace black::LuaWrapper

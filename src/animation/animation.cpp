@@ -10,8 +10,7 @@
 #include "renderer/pose.h"
 
 
-namespace Lumix
-{
+namespace black
 
 Animation::Animation(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
@@ -94,7 +93,7 @@ struct AnimationSampler {
 		return simd_nlerp(q1, q2, t);
 	}
 
-	static LUMIX_FORCE_INLINE LocalRigidTransform maskRootMotion(Animation::Flags flags, const LocalRigidTransform& transform) {
+	static BLACK_FORCE_INLINE LocalRigidTransform maskRootMotion(Animation::Flags flags, const LocalRigidTransform& transform) {
 		LocalRigidTransform root_motion;
 		root_motion.pos = Vec3::ZERO;
 		root_motion.rot = Quat::IDENTITY;
@@ -414,7 +413,7 @@ bool Animation::load(Span<const u8> mem) {
 	}
 
 	if (header.version <= Version::COMPRESSION) {
-		logError(getPath(), ": version too old. Please delete '.lumix' directory and try again");
+		logError(getPath(), ": version too old. Please delete '.black.h' directory and try again");
 		return false;
 	}
 
@@ -436,7 +435,7 @@ bool Animation::load(Span<const u8> mem) {
 	u32 translations_count;
 	file.read(&translations_count, sizeof(translations_count));
 	const u32 size = u32(file.size() - file.getPosition());
-	m_mem.resize(size + 8/*padding for unpacker*/);
+	m_mem.resize(size + 8 /*padding for unpacker*/);
 	file.read(&m_mem[0], size);
 
 	m_translations_frame_size_bits = 0;
@@ -444,13 +443,12 @@ bool Animation::load(Span<const u8> mem) {
 	for (u32 i = 0; i < translations_count; ++i) {
 		auto name = blob.read<BoneNameHash>();
 		auto type = blob.read<Animation::TrackType>();
-		
+
 		if (type == Animation::TrackType::CONSTANT) {
 			ConstTranslationTrack& track = m_const_translations.emplace();
 			track.bone_name = name;
 			blob.read(track.value);
-		}
-		else {
+		} else {
 			TranslationTrack& track = m_translations.emplace();
 			track.bone_name = name;
 			blob.read(track.min);
@@ -460,7 +458,7 @@ bool Animation::load(Span<const u8> mem) {
 			m_translations_frame_size_bits += track.bitsizes[0] + track.bitsizes[1] + track.bitsizes[2];
 		}
 	}
-	
+
 	m_translation_stream = (const u8*)blob.skip((m_translations_frame_size_bits * (m_frame_count + 1) + 7) / 8);
 
 	const u32 rotations_count = blob.read<u32>();
@@ -474,8 +472,7 @@ bool Animation::load(Span<const u8> mem) {
 			ConstRotationTrack& track = m_const_rotations.emplace();
 			track.bone_name = bone_name_hash;
 			blob.read(track.value);
-		}
-		else {
+		} else {
 			RotationTrack& track = m_rotations.emplace();
 			track.bone_name = bone_name_hash;
 			blob.read(track.min);
@@ -483,7 +480,7 @@ bool Animation::load(Span<const u8> mem) {
 			blob.read(track.bitsizes);
 			blob.read(track.offset_bits);
 			blob.read(track.skipped_channel);
-			m_rotations_frame_size_bits += track.bitsizes[0] + track.bitsizes[1] + track.bitsizes[2] + 1/*sign bit*/;
+			m_rotations_frame_size_bits += track.bitsizes[0] + track.bitsizes[1] + track.bitsizes[2] + 1 /*sign bit*/;
 		}
 	}
 
@@ -510,4 +507,4 @@ void Animation::unload()
 }
 
 
-} // namespace Lumix
+} // namespace black

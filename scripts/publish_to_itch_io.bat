@@ -20,12 +20,12 @@ mkdir 3rdparty
 if not %errorlevel%==0 pause
 
 cd 3rdparty
-git.exe clone --depth=1 https://github.com/nem0/PhysX.git physx
+git.exe clone --depth=1 https://github.com/abdulrhmandeveloper2/PhysX.git physx
 if not %errorlevel%==0 pause
 
 REM build static physx
 cd PhysX\physx
-call generate_projects.bat lumix_vc17win64_static
+call generate_projects.bat black.h_vc17win64_static
 if not %errorlevel%==0 pause
 
 %msbuild_cmd% "compiler\vc17win64\PhysXSDK.sln" /p:Configuration=Release /p:Platform=x64
@@ -46,7 +46,7 @@ copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysX_static_64.lib			
 
 REM download dx
 pushd ..\plugins
-git.exe clone https://github.com/nem0/lumixengine_dx.git dx
+git.exe clone https://github.com/abdulrhmandeveloper2/blackengine_dx.git dx
 if not %errorlevel%==0 pause
 popd
 
@@ -55,7 +55,7 @@ bin/windows/genie.exe --static-physx --with-app --nodx vs2022
 if not %errorlevel%==0 pause
 
 REM build studio.exe
-%msbuild_cmd% tmp/vs2022/LumixEngine.sln /p:Configuration=RelWithDebInfo
+%msbuild_cmd% tmp/vs2022/black Engine.sln /p:Configuration=RelWithDebInfo
 if not %errorlevel%==0 pause
 
 REM push gl version
@@ -65,7 +65,7 @@ copy tmp\vs2022\bin\RelWithDebInfo\app.exe itch_io\
 copy .itch.toml itch_io\
 git clean -f -x -d ..\data
 xcopy /E /Y ..\data itch_io
-butler.exe push itch_io mikulasflorek/lumix-engine:win-64-gl
+butler.exe push itch_io mikulasflorek/black.h-engine:win-64-gl
 if not %errorlevel%==0 pause
 
 REM create engine project
@@ -73,7 +73,7 @@ bin/windows/genie.exe --static-physx --with-app vs2022
 if not %errorlevel%==0 pause
 
 REM build studio.exe
-%msbuild_cmd% tmp/vs2022/LumixEngine.sln /p:Configuration=RelWithDebInfo
+%msbuild_cmd% tmp/vs2022/black Engine.sln /p:Configuration=RelWithDebInfo
 if not %errorlevel%==0 pause
 
 REM push gl version
@@ -83,5 +83,5 @@ copy tmp\vs2022\bin\RelWithDebInfo\app.exe itch_io\
 copy .itch.toml itch_io\
 git clean -f -x -d ..\data
 xcopy /E /Y ..\data itch_io
-butler.exe push itch_io mikulasflorek/lumix-engine:win-64-dx
+butler.exe push itch_io mikulasflorek/black.h-engine:win-64-dx
 pause

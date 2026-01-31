@@ -4,7 +4,7 @@
 #include "core/crt.h"
 #include "core/span.h"
 
-namespace Lumix {
+namespace black {
 
 template <typename T> struct Array {
 	explicit Array(IAllocator& allocator)
@@ -362,4 +362,4 @@ protected:
 	T* m_data;
 };
 
-} // namespace Lumix
+} // namespace black

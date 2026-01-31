@@ -15,7 +15,7 @@
 #include "renderer/shader.h"
 #include "renderer/texture.h"
 
-namespace Lumix
+namespace black
 {
 
 
@@ -544,4 +544,4 @@ bool Material::load(Span<const u8> mem) {
 	return true;
 }
 
-} // namespace Lumix
+} // namespace black

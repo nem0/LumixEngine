@@ -10,7 +10,7 @@ pushd %~dp0
 	if not exist %dir_3rdparty_src% mkdir %dir_3rdparty_src%
 	pushd %dir_3rdparty_src%
 	if not exist physx (
-		git.exe clone --depth=1 https://github.com/nem0/PhysX.git physx
+		git.exe clone --depth=1 https://github.com/abdulrhmandeveloper2/PhysX.git physx
 	) else (
 		cd physx
 		git pull

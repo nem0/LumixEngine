@@ -42,7 +42,7 @@ build_recast()
 build_physx()
 {
 	pushd 3rdparty/physx/physx
-	sh generate_projects.sh lumix_gcc5
+	sh generate_projects.sh black.h_gcc5
 	cd compiler/linux-release
 	make
 	popd
@@ -116,10 +116,10 @@ project_menu()
 
 init_3rdparty()
 {
-	download_project "freetype" "https://github.com/nem0/freetype2.git"
-	download_project "luau" "https://github.com/nem0/luau.git"
-	download_project "physx" "https://github.com/nem0/PhysX.git"
-	download_project "recast" "https://github.com/nem0/recastnavigation.git"
+	download_project "freetype" "https://github.com/abdulrhmandeveloper2/freetype2.git"
+	download_project "luau" "https://github.com/abdulrhmandeveloper2/luau.git"
+	download_project "physx" "https://github.com/abdulrhmandeveloper2/PhysX.git"
+	download_project "recast" "https://github.com/abdulrhmandeveloper2/recastnavigation.git"
 
 	build_3rdparty "freetype"
 	build_3rdparty "physx"
@@ -141,8 +141,8 @@ plugins_menu()
 		select opt in "${options[@]}"
 		do
 			case "$REPLY" in
-				1 ) download_plugin "shader_editor" "https://github.com/nem0/lumixengine_shader_editor.git" break;;
-				2 ) download_plugin "visualscript" "https://github.com/nem0/lumixengine_visualscript.git"; break;;
+				1 ) download_plugin "shader_editor" "https://github.com/abdulrhmandeveloper2/blackengine_shader_editor.git" break;;
+				2 ) download_plugin "visualscript" "https://github.com/abdulrhmandeveloper2/blackengine_visualscript.git"; break;;
 				3 ) break 2;;
 			esac
 		done
@@ -158,10 +158,10 @@ thirdparty_menu()
 		select opt in "${options[@]}"
 		do
 			case "$REPLY" in
-				1 ) project_menu "freetype" "https://github.com/nem0/freetype2.git"; break;;
-				2 ) download_project "luau" "https://github.com/nem0/luau.git"; break;;
-				3 ) project_menu "physx" "https://github.com/nem0/PhysX.git"; break;;
-				4 ) project_menu "recast" "https://github.com/nem0/recastnavigation.git"; break;;
+				1 ) project_menu "freetype" "https://github.com/abdulrhmandeveloper2/freetype2.git"; break;;
+				2 ) download_project "luau" "https://github.com/abdulrhmandeveloper2/luau.git"; break;;
+				3 ) project_menu "physx" "https://github.com/abdulrhmandeveloper2/PhysX.git"; break;;
+				4 ) project_menu "recast" "https://github.com/abdulrhmandeveloper2/recastnavigation.git"; break;;
 				5 ) init_3rdparty; break;;
 				6 ) break 2;;
 			esac
@@ -190,7 +190,7 @@ push_to_itch_io()
 		chmod +x butler
 	fi
 
-	./butler push itch_io mikulasflorek/lumix-engine:linux
+	./butler push itch_io mikulasflorek/black.h-engine:linux
 }
 
 build()

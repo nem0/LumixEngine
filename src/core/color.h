@@ -2,7 +2,7 @@
 
 #include "core.h"
 
-namespace Lumix {
+namespace black {
 #pragma pack(1)
 struct Color {
 	Color() {}
@@ -36,4 +36,4 @@ struct Color {
 	enum { RED = 0xff0000ff, GREEN = 0xff00ff00, BLUE = 0xffff0000, BLACK = 0xff000000, WHITE = 0xffFFffFF };
 };
 #pragma pack()
-} // namespace Lumix
+} // namespace black

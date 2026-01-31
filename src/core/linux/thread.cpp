@@ -7,7 +7,7 @@
 #include <pthread.h>
 
 
-namespace Lumix
+namespace black
 {
 
 struct ThreadImpl
@@ -37,7 +37,7 @@ static void* threadFunction(void* ptr)
 
 Thread::Thread(IAllocator& allocator)
 {
-	auto impl = LUMIX_NEW(allocator, ThreadImpl) {allocator};
+	auto impl = BLACK_NEW(allocator, ThreadImpl) {allocator};
 
 	impl->is_running = false;
 	impl->force_exit = false;
@@ -50,7 +50,7 @@ Thread::Thread(IAllocator& allocator)
 
 Thread::~Thread()
 {
-	LUMIX_DELETE(m_implementation->allocator, m_implementation);
+	BLACK_DELETE(m_implementation->allocator, m_implementation);
 }
 
 void Thread::sleep(Mutex& mutex) {
@@ -106,5 +106,5 @@ IAllocator& Thread::getAllocator()
 	return m_implementation->allocator;
 }
 
-} // namespace Lumix
+} // namespace black
 

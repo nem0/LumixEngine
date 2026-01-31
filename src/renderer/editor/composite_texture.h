@@ -8,9 +8,9 @@
 #include "editor/utils.h"
 #include "renderer/gpu/gpu.h"
 
-namespace Lumix {
+namespace black {
 
-struct LUMIX_RENDERER_API CompositeTexture {
+struct BLACK_RENDERER_API CompositeTexture {
 	enum class NodeType : u32;
 	
 	struct Image {
@@ -147,4 +147,4 @@ struct CompositeTextureEditor {
 	static UniquePtr<CompositeTextureEditor> open(const Path& path, StudioApp& app, IAllocator& allocator);
 };
 
-} // namespace Lumix
+} // namespace black

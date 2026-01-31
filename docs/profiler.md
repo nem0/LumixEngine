@@ -2,7 +2,7 @@
 
 ## Profiler Overview
 
-The profiler in LumixEngine is a tool designed to help developers analyze and optimize the performance of their games. It provides detailed insights into CPU and GPU usage, memory consumption, and other critical performance metrics. 
+The profiler in black Engine is a tool designed to help developers analyze and optimize the performance of their games. It provides detailed insights into CPU and GPU usage, memory consumption, and other critical performance metrics. 
 
 The profiler is divided into two components: the Recorder and the Viewer. 
 

@@ -5,11 +5,11 @@
 
 #include "engine/world.h"
 
-namespace Lumix {
+namespace black {
 
 // Group entities in virtual folders (unrelated to filesystem) for better organization of entities
 // This is editor only concept, you should prefer folders to entity hierarchy for performance reasons
-struct LUMIX_EDITOR_API EntityFolders final {
+struct BLACK_EDITOR_API EntityFolders final {
 	using FolderHandle = u64;
 	static constexpr FolderHandle INVALID_FOLDER = 0;
 
@@ -65,4 +65,4 @@ private:
 	bool m_ignore_new_entities = false;
 };
 
-} // namespace Lumix
+} // namespace black

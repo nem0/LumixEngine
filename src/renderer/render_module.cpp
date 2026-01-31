@@ -33,7 +33,7 @@
 #include "renderer/terrain.h"
 #include "renderer/texture.h"
 
-namespace Lumix {
+namespace black {
 
 struct BoneAttachment {
 	EntityRef entity;
@@ -174,7 +174,7 @@ struct RenderModuleImpl final : RenderModule {
 		}
 
 		for (auto* terrain : m_terrains) {
-			LUMIX_DELETE(m_allocator, terrain);
+			BLACK_DELETE(m_allocator, terrain);
 		}
 
 		for (InstancedModel& im : m_instanced_models) {
@@ -194,7 +194,7 @@ struct RenderModuleImpl final : RenderModule {
 			}
 			
 			if (r.model) r.model->decRefCount();
-			LUMIX_DELETE(m_allocator, r.pose);
+			BLACK_DELETE(m_allocator, r.pose);
 		}
 		
 		for(auto iter : m_model_entity_map.iterated()) {
@@ -213,7 +213,7 @@ struct RenderModuleImpl final : RenderModule {
 		}
 
 		for (const ReflectionProbe& probe : m_reflection_probes) {
-			LUMIX_DELETE(m_allocator, probe.load_job);
+			BLACK_DELETE(m_allocator, probe.load_job);
 		}
 
 		m_renderer.getEndFrameDrawStream().destroy(m_reflection_probes_texture);
@@ -857,7 +857,7 @@ struct RenderModuleImpl final : RenderModule {
 			return;
 		}
 		
-		probe.load_job = LUMIX_NEW(m_allocator, ReflectionProbe::LoadJob)(*this, entity, m_allocator);
+		probe.load_job = BLACK_NEW(m_allocator, ReflectionProbe::LoadJob)(*this, entity, m_allocator);
 		FileSystem::ContentCallback cb = makeDelegate<&ReflectionProbe::LoadJob::callback>(probe.load_job);
 		probe.load_job->m_handle = m_engine.getFileSystem().getContent(path, cb);
 	}
@@ -1203,7 +1203,7 @@ struct RenderModuleImpl final : RenderModule {
 			EntityRef entity;
 			serializer.read(entity);
 			entity = entity_map.get(entity);
-			auto* terrain = LUMIX_NEW(m_allocator, Terrain)(m_renderer, entity, *this, m_allocator);
+			auto* terrain = BLACK_NEW(m_allocator, Terrain)(m_renderer, entity, *this, m_allocator);
 			terrain->deserialize(entity, serializer, m_world, *this, version);
 			m_terrains.insert(entity, terrain);
 		}
@@ -1252,7 +1252,7 @@ struct RenderModuleImpl final : RenderModule {
 	
 	void destroyReflectionProbe(EntityRef entity) override {
 		ReflectionProbe& probe = m_reflection_probes[entity];
-		LUMIX_DELETE(m_allocator, probe.load_job);
+		BLACK_DELETE(m_allocator, probe.load_job);
 		m_reflection_probes.erase(entity);
 		m_world.onComponentDestroyed(entity, types::reflection_probe, this);
 	}
@@ -1406,7 +1406,7 @@ struct RenderModuleImpl final : RenderModule {
 
 
 	void destroyTerrain(EntityRef entity) override {
-		LUMIX_DELETE(m_allocator, m_terrains[entity]);
+		BLACK_DELETE(m_allocator, m_terrains[entity]);
 		m_terrains.erase(entity);
 		m_world.onComponentDestroyed(entity, types::terrain, this);
 	}
@@ -1437,7 +1437,7 @@ struct RenderModuleImpl final : RenderModule {
 
 
 	void createTerrain(EntityRef entity) override {
-		Terrain* terrain = LUMIX_NEW(m_allocator, Terrain)(m_renderer, entity, *this, m_allocator);
+		Terrain* terrain = BLACK_NEW(m_allocator, Terrain)(m_renderer, entity, *this, m_allocator);
 		m_terrains.insert(entity, terrain);
 		m_world.onComponentCreated(entity, types::terrain, this);
 	}
@@ -2887,7 +2887,7 @@ struct RenderModuleImpl final : RenderModule {
 		ModelInstance& r = m_model_instances[entity.index];
 		r.meshes = nullptr;
 		r.mesh_count = 0;
-		LUMIX_DELETE(m_allocator, r.pose);
+		BLACK_DELETE(m_allocator, r.pose);
 		r.pose = nullptr;
 
 		m_culling_system->remove(entity);
@@ -2908,7 +2908,7 @@ struct RenderModuleImpl final : RenderModule {
 		ASSERT(!r.pose);
 		u32 num_bones = model->getBones().size();
 		if (num_bones > 0) {
-			r.pose = LUMIX_NEW(m_allocator, Pose)(m_allocator);
+			r.pose = BLACK_NEW(m_allocator, Pose)(m_allocator);
 			r.pose->resize(num_bones);
 			model->getPose(*r.pose);
 		}
@@ -3113,7 +3113,7 @@ struct RenderModuleImpl final : RenderModule {
 		
 		r.meshes = nullptr;
 		r.mesh_count = 0;
-		LUMIX_DELETE(m_allocator, r.pose);
+		BLACK_DELETE(m_allocator, r.pose);
 		r.pose = nullptr;
 		r.dirty = true;
 
@@ -3434,7 +3434,7 @@ void ReflectionProbe::LoadJob::callback(Span<const u8> data, bool success) {
 
 	if (!success) {
 		logError("Failed to load probe ", probe.guid);
-		LUMIX_DELETE(m_allocator, this);
+		BLACK_DELETE(m_allocator, this);
 		return;
 	}
 
@@ -3459,7 +3459,7 @@ void ReflectionProbe::LoadJob::callback(Span<const u8> data, bool success) {
 		}
 	}
 	stream.freeMemory(mem.data, m_module.m_renderer.getAllocator());
-	LUMIX_DELETE(m_allocator, this);
+	BLACK_DELETE(m_allocator, this);
 }
 
 void RenderModule::reflect() {
@@ -3569,4 +3569,4 @@ UniquePtr<RenderModule> RenderModule::createInstance(Renderer& renderer,
 
 
 
-} // namespace Lumix
+} // namespace black

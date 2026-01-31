@@ -14,18 +14,18 @@
 #endif
 
 
-namespace Lumix
+namespace black
 {
 
 ArenaAllocator::ArenaAllocator(u32 reserved, IAllocator& parent, const char* tag)
 	: m_parent(parent)
-	#ifdef LUMIX_DEBUG	
+	#ifdef BLACK_DEBUG	
 		, m_tag_allocator(parent, tag)
 	#endif
 {
 	m_reserved = reserved;
 	m_mem = (u8*)os::memReserve(reserved);
-	#ifdef LUMIX_DEBUG	
+	#ifdef BLACK_DEBUG	
 		m_allocation_info.flags = debug::AllocationInfo::IS_ARENA;
 		m_allocation_info.tag = &m_tag_allocator;
 	#endif
@@ -34,7 +34,7 @@ ArenaAllocator::ArenaAllocator(u32 reserved, IAllocator& parent, const char* tag
 ArenaAllocator::~ArenaAllocator() {
 	ASSERT(m_end == 0);
 	os::memRelease(m_mem, m_reserved);
-	#ifdef LUMIX_DEBUG	
+	#ifdef BLACK_DEBUG	
 		debug::unregisterAlloc(m_allocation_info);
 	#endif
 }
@@ -67,7 +67,7 @@ void* ArenaAllocator::allocate(size_t size, size_t align) {
 	os::memCommit(m_mem + m_commited_bytes, commited - m_commited_bytes);
 	m_commited_bytes = commited;
 
-	#ifdef LUMIX_DEBUG
+	#ifdef BLACK_DEBUG
 		if (m_allocation_info.size == 0) debug::registerAlloc(m_allocation_info);
 		debug::resizeAlloc(m_allocation_info, m_commited_bytes);
 	#endif
@@ -117,4 +117,4 @@ IAllocator& getGlobalAllocator() {
 	return alloc;
 }
 
-} // namespace Lumix
+} // namespace black

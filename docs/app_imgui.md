@@ -2,7 +2,7 @@
 
 By default, ImGui is not enabled in packaged game. To enable ImGui integration, you have to do following:
 
-1. Uncomment `#define LUMIX_APP_IMGUI_INTEGRATION` in [imgui_integration.h](../src/app/imgui_integration.h).
+1. Uncomment `#define BLACK_APP_IMGUI_INTEGRATION` in [imgui_integration.h](../src/app/imgui_integration.h).
 2. Build the solution including `app` project.
 3. In your scene, add following script to an entity:
 
@@ -11,7 +11,7 @@ By default, ImGui is not enabled in packaged game. To enable ImGui integration, 
 	function onInputEvent(event : InputEvent)
 		if event.type == "button" then
 			if event.device.type == "keyboard" then
-				if event.key_id == LumixAPI.Keycode.F11 and event.down then
+				if event.key_id == black.hAPI.Keycode.F11 and event.down then
 					show_imgui = not show_imgui
 				end
 			end

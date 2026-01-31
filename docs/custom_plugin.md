@@ -9,17 +9,17 @@
         - if plugin "myplugin" then
         + if plugin "remote_control" then
     ```
-4. Update `LUMIX_PLUGIN_ENTRY` in `plugins\remote_control\src\myplugin.cpp` to match the plugin's name:
+4. Update `BLACK_PLUGIN_ENTRY` in `plugins\remote_control\src\myplugin.cpp` to match the plugin's name:
     ```diff
-        - LUMIX_PLUGIN_ENTRY(myplugin)
-        + LUMIX_PLUGIN_ENTRY(remote_control)
+        - BLACK_PLUGIN_ENTRY(myplugin)
+        + BLACK_PLUGIN_ENTRY(remote_control)
     ```
     You can rename `myplugin.cpp`, but it does not need to match the plugin's name.
 
-5. Update `LUMIX_STUDIO_ENTRY` in `plugins\remote_control\src\editor\plugins.cpp` to match the plugin's name:
+5. Update `BLACK_STUDIO_ENTRY` in `plugins\remote_control\src\editor\plugins.cpp` to match the plugin's name:
     ```diff
-        - LUMIX_STUDIO_ENTRY(myplugin)
-        + LUMIX_STUDIO_ENTRY(remote_control)
+        - BLACK_STUDIO_ENTRY(myplugin)
+        + BLACK_STUDIO_ENTRY(remote_control)
     ```
     You can rename `myplugin.cpp`, but it does not need to match the plugin's name.
 6. Recreate the solution, for example run `scripts\genie.exe vs2022` from the repository root.

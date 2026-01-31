@@ -9,7 +9,7 @@
 #include "gpu/gpu.h"
 
 
-namespace Lumix {
+namespace black {
 
 
 enum class MaterialIndex : u32;
@@ -18,7 +18,7 @@ struct ResourceManagerHub;
 struct Shader;
 struct Texture;
 
-struct LUMIX_RENDERER_API Material final : Resource {
+struct BLACK_RENDERER_API Material final : Resource {
 	static const int MAX_TEXTURE_COUNT = 16;
 
 	static constexpr u32 MAX_UNIFORMS_FLOATS = 64; 
@@ -108,4 +108,4 @@ private:
 	u32 m_custom_flags;
 };
 
-} // namespace Lumix
+} // namespace black

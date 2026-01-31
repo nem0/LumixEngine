@@ -1,13 +1,13 @@
 #pragma once
 
-#include "engine/lumix.h"
+#include "engine/black.h.h"
 
 #include "core/array.h"
 #include "core/math.h"
 
 
 
-namespace Lumix
+namespace black
 {
 
 
@@ -24,7 +24,7 @@ struct StepConfig {
 	Vec3 scale = Vec3(1, 1, 1);
 };
 
-struct LUMIX_EDITOR_API Config {
+struct BLACK_EDITOR_API Config {
 	enum Mode {
 		TRANSLATE,
 		ROTATE,
@@ -60,13 +60,13 @@ struct LUMIX_EDITOR_API Config {
 	void setAnisotropicScale(bool enable) { anisotropic_scale = enable; }
 };
 
-LUMIX_EDITOR_API bool manipulate(u64 id, WorldView& view, Transform& tr, const Config& cfg);
-LUMIX_EDITOR_API bool box(u64 id, WorldView& view, Transform& tr, Vec3& half_extents, const Config& cfg, bool keep_center);
-LUMIX_EDITOR_API void setDragged(u64 id);
-LUMIX_EDITOR_API bool isActive();
-LUMIX_EDITOR_API void frame();
+BLACK_EDITOR_API bool manipulate(u64 id, WorldView& view, Transform& tr, const Config& cfg);
+BLACK_EDITOR_API bool box(u64 id, WorldView& view, Transform& tr, Vec3& half_extents, const Config& cfg, bool keep_center);
+BLACK_EDITOR_API void setDragged(u64 id);
+BLACK_EDITOR_API bool isActive();
+BLACK_EDITOR_API void frame();
 
 }
 
 
-} // namespace Lumix
+} // namespace black

@@ -2,9 +2,9 @@
 
 #include "core.h"
 
-#if defined(_WIN32) && !defined(LUMIX_NO_CUSTOM_CRT) && !defined __clang__
+#if defined(_WIN32) && !defined(BLACK_NO_CUSTOM_CRT) && !defined __clang__
 	#define _INC_FLOAT // if float.h is imported after this file, MCW_EM is redefined
-	#define LUMIX_CRT_API LUMIX_LIBRARY_IMPORT
+	#define BLACK_CRT_API BLACK_LIBRARY_IMPORT
 	#ifndef MCW_EM
 		#define _EM_OVERFLOW	0x00000004
 		#define _EM_ZERODIVIDE	0x00000008
@@ -23,50 +23,50 @@
 	extern "C" {
 		typedef char* va_list;
 		
-		LUMIX_CRT_API void* __cdecl _aligned_malloc(size_t size, size_t align);
-		LUMIX_CRT_API void __cdecl _aligned_free(void* ptr);
-		LUMIX_CRT_API void* __cdecl _aligned_realloc(void* ptr, size_t size, size_t align);
-		LUMIX_CRT_API void* __cdecl malloc(size_t size);
-		LUMIX_CRT_API void __cdecl free(void* ptr);
+		BLACK_CRT_API void* __cdecl _aligned_malloc(size_t size, size_t align);
+		BLACK_CRT_API void __cdecl _aligned_free(void* ptr);
+		BLACK_CRT_API void* __cdecl _aligned_realloc(void* ptr, size_t size, size_t align);
+		BLACK_CRT_API void* __cdecl malloc(size_t size);
+		BLACK_CRT_API void __cdecl free(void* ptr);
 		int __cdecl memcmp(const void* buf1, const void* buf2, size_t size);
 		void* __cdecl memcpy(void* dst, void const* src, size_t size); __pragma(intrinsic(memcpy))
 		void* __cdecl memmove(void* dst, const void* src, size_t size); __pragma(intrinsic(memmove))
 		void* __cdecl memset(void*  dst, int val, size_t size); __pragma(intrinsic(memset))
 		
-		LUMIX_CRT_API __declspec(noreturn) void __cdecl abort(void);
-		LUMIX_CRT_API unsigned int __cdecl _control87(unsigned int value, unsigned int mask);
+		BLACK_CRT_API __declspec(noreturn) void __cdecl abort(void);
+		BLACK_CRT_API unsigned int __cdecl _control87(unsigned int value, unsigned int mask);
 		
-		LUMIX_CRT_API float __cdecl acosf(float x);
-		LUMIX_CRT_API float __cdecl cosf(float x);
-		LUMIX_CRT_API float __cdecl atan2f(float y, float x);
-		LUMIX_CRT_API float __cdecl tanf(float x);
-		LUMIX_CRT_API float __cdecl asinf(float x);
-		LUMIX_CRT_API float __cdecl sinf(float x);
+		BLACK_CRT_API float __cdecl acosf(float x);
+		BLACK_CRT_API float __cdecl cosf(float x);
+		BLACK_CRT_API float __cdecl atan2f(float y, float x);
+		BLACK_CRT_API float __cdecl tanf(float x);
+		BLACK_CRT_API float __cdecl asinf(float x);
+		BLACK_CRT_API float __cdecl sinf(float x);
 		
-		LUMIX_CRT_API double __cdecl atof(const char* str);
-		LUMIX_CRT_API double __cdecl ceil(double x);
+		BLACK_CRT_API double __cdecl atof(const char* str);
+		BLACK_CRT_API double __cdecl ceil(double x);
 		double __cdecl fabs(double x);
-		LUMIX_CRT_API double __cdecl floor(double _X);
+		BLACK_CRT_API double __cdecl floor(double _X);
 		#ifndef _INC_MATH
 			#define _INC_MATH
 			inline float __cdecl fabsf(float x) { return (float)fabs(x); }
-			LUMIX_CRT_API float __cdecl floorf(float x);
-			LUMIX_CRT_API float __cdecl ceilf(float x);
+			BLACK_CRT_API float __cdecl floorf(float x);
+			BLACK_CRT_API float __cdecl ceilf(float x);
 		#endif
-		LUMIX_CRT_API float fmodf(float x, float y);
-		LUMIX_CRT_API int __cdecl _finite(double x);
+		BLACK_CRT_API float fmodf(float x, float y);
+		BLACK_CRT_API int __cdecl _finite(double x);
 		inline int __cdecl isinf(double x) { return !_finite(x); }
 		
-		LUMIX_CRT_API float __cdecl sqrtf(float x);
+		BLACK_CRT_API float __cdecl sqrtf(float x);
 		double __cdecl sqrt(double _X);
 		double __cdecl log10(double x);
-		LUMIX_CRT_API float __cdecl powf(float x, float y);
+		BLACK_CRT_API float __cdecl powf(float x, float y);
 		double __cdecl pow(double x, double y); __pragma(intrinsic(pow))
 
 		size_t __cdecl strlen(const char* str);
 		int __cdecl strcmp(const char* str, const char* str2);
 		char* strcpy(char* dest, const char* src);
-		LUMIX_CRT_API int __cdecl strncmp(const char* str1, const char* str2, size_t max_count);
+		BLACK_CRT_API int __cdecl strncmp(const char* str1, const char* str2, size_t max_count);
 		const char* __cdecl strstr(const char* str, const char* substr);
 	}
 #elif defined(__linux__) || defined(__clang__)

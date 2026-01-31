@@ -6,7 +6,7 @@
 #include "core/crt.h"
 
 
-namespace Lumix
+namespace black
 {
 	template <typename Key, typename Value>
 	struct AssociativeArray
@@ -296,4 +296,4 @@ namespace Lumix
 	};
 
 
-} // namespace Lumix
+} // namespace black

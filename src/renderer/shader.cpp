@@ -10,7 +10,7 @@
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
 
-namespace Lumix {
+namespace black {
 
 const ResourceType Shader::TYPE("shader");
 
@@ -316,4 +316,4 @@ void Shader::onBeforeReady() {
 }
 
 
-} // namespace Lumix
+} // namespace black

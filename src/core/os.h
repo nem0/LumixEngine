@@ -8,7 +8,7 @@
 #endif
 
 
-namespace Lumix {
+namespace black {
 
 struct StringView;
 struct IAllocator;
@@ -122,7 +122,7 @@ struct Monitor {
 	bool primary;
 };
 	
-struct LUMIX_CORE_API InputFile final : IInputStream {
+struct BLACK_CORE_API InputFile final : IInputStream {
 	InputFile();
 	~InputFile();
 
@@ -142,7 +142,7 @@ private:
 };
 	
 
-struct LUMIX_CORE_API OutputFile final : IOutputStream {
+struct BLACK_CORE_API OutputFile final : IOutputStream {
 	OutputFile();
 	~OutputFile();
 
@@ -172,100 +172,100 @@ struct WindowState {
 	Rect rect;
 };
 
-LUMIX_CORE_API void init();
-LUMIX_CORE_API void abort();
-LUMIX_CORE_API void logInfo();
-LUMIX_CORE_API u32 getCPUsCount();
-LUMIX_CORE_API void sleep(u32 milliseconds);
-LUMIX_CORE_API ThreadID getCurrentThreadID();
+BLACK_CORE_API void init();
+BLACK_CORE_API void abort();
+BLACK_CORE_API void logInfo();
+BLACK_CORE_API u32 getCPUsCount();
+BLACK_CORE_API void sleep(u32 milliseconds);
+BLACK_CORE_API ThreadID getCurrentThreadID();
 
-LUMIX_CORE_API void* memReserve(size_t size);
-LUMIX_CORE_API void memCommit(void* ptr, size_t size);
-LUMIX_CORE_API void memRelease(void* ptr, size_t size); // size must be full size used in reserve
-LUMIX_CORE_API u32 getMemPageSize();
-LUMIX_CORE_API u32 getMemPageAlignment();
-LUMIX_CORE_API u64 getProcessMemory();
+BLACK_CORE_API void* memReserve(size_t size);
+BLACK_CORE_API void memCommit(void* ptr, size_t size);
+BLACK_CORE_API void memRelease(void* ptr, size_t size); // size must be full size used in reserve
+BLACK_CORE_API u32 getMemPageSize();
+BLACK_CORE_API u32 getMemPageAlignment();
+BLACK_CORE_API u64 getProcessMemory();
 
 struct FileIterator;
-LUMIX_CORE_API FileIterator* createFileIterator(StringView path, IAllocator& allocator);
-LUMIX_CORE_API void destroyFileIterator(FileIterator* iterator);
-LUMIX_CORE_API bool getNextFile(FileIterator* iterator, FileInfo* info);
+BLACK_CORE_API FileIterator* createFileIterator(StringView path, IAllocator& allocator);
+BLACK_CORE_API void destroyFileIterator(FileIterator* iterator);
+BLACK_CORE_API bool getNextFile(FileIterator* iterator, FileInfo* info);
 
-LUMIX_CORE_API void setCurrentDirectory(StringView path);
-LUMIX_CORE_API void getCurrentDirectory(Span<char> path);
-LUMIX_CORE_API [[nodiscard]] bool getOpenFilename(Span<char> out, const char* filter, const char* starting_file);
-LUMIX_CORE_API [[nodiscard]] bool getSaveFilename(Span<char> out, const char* filter, const char* default_extension);
-LUMIX_CORE_API [[nodiscard]] bool getOpenDirectory(Span<char> out, const char* starting_dir);
-LUMIX_CORE_API ExecuteOpenResult shellExecuteOpen(StringView path, StringView args, StringView working_dir, bool show_console = true);
-LUMIX_CORE_API ExecuteOpenResult openExplorer(StringView path);
+BLACK_CORE_API void setCurrentDirectory(StringView path);
+BLACK_CORE_API void getCurrentDirectory(Span<char> path);
+BLACK_CORE_API [[nodiscard]] bool getOpenFilename(Span<char> out, const char* filter, const char* starting_file);
+BLACK_CORE_API [[nodiscard]] bool getSaveFilename(Span<char> out, const char* filter, const char* default_extension);
+BLACK_CORE_API [[nodiscard]] bool getOpenDirectory(Span<char> out, const char* starting_dir);
+BLACK_CORE_API ExecuteOpenResult shellExecuteOpen(StringView path, StringView args, StringView working_dir, bool show_console = true);
+BLACK_CORE_API ExecuteOpenResult openExplorer(StringView path);
 
 struct Process;
-LUMIX_CORE_API Process* createProcess(IAllocator& allocator, StringView cmd, StringView working_dir);
-LUMIX_CORE_API u32 readStdOutput(Process& process, Span<char> output);
-LUMIX_CORE_API void destroyProcess(Process& process);
-LUMIX_CORE_API i32 getReturnCode(Process& process);
-LUMIX_CORE_API bool isFinished(Process& process);
+BLACK_CORE_API Process* createProcess(IAllocator& allocator, StringView cmd, StringView working_dir);
+BLACK_CORE_API u32 readStdOutput(Process& process, Span<char> output);
+BLACK_CORE_API void destroyProcess(Process& process);
+BLACK_CORE_API i32 getReturnCode(Process& process);
+BLACK_CORE_API bool isFinished(Process& process);
 
-LUMIX_CORE_API const char* getClipboardText(IAllocator& allocator);
-LUMIX_CORE_API void copyToClipboard(const char* text);
+BLACK_CORE_API const char* getClipboardText(IAllocator& allocator);
+BLACK_CORE_API void copyToClipboard(const char* text);
 
-LUMIX_CORE_API bool deleteFile(StringView path);
-LUMIX_CORE_API [[nodiscard]] bool moveFile(StringView from, StringView to);
-LUMIX_CORE_API size_t getFileSize(StringView path);
-LUMIX_CORE_API bool fileExists(StringView path);
-LUMIX_CORE_API bool dirExists(StringView path);
-LUMIX_CORE_API u64 getLastModified(StringView file);
-LUMIX_CORE_API [[nodiscard]] bool makePath(const char* path);
+BLACK_CORE_API bool deleteFile(StringView path);
+BLACK_CORE_API [[nodiscard]] bool moveFile(StringView from, StringView to);
+BLACK_CORE_API size_t getFileSize(StringView path);
+BLACK_CORE_API bool fileExists(StringView path);
+BLACK_CORE_API bool dirExists(StringView path);
+BLACK_CORE_API u64 getLastModified(StringView file);
+BLACK_CORE_API [[nodiscard]] bool makePath(const char* path);
 
-LUMIX_CORE_API void setCursor(CursorType type);
+BLACK_CORE_API void setCursor(CursorType type);
 // clip mouse cursor to `rect`, on platforms, where this is not possible, clip to `win`
 // pass INVALID_WINDOW to disable clipping
-LUMIX_CORE_API void clipCursor(WindowHandle win, const Rect& rect);
+BLACK_CORE_API void clipCursor(WindowHandle win, const Rect& rect);
 
-LUMIX_CORE_API [[nodiscard]] bool getDropFile(const Event& event, int idx, Span<char> out);
-LUMIX_CORE_API int getDropFileCount(const Event& event);
-LUMIX_CORE_API void finishDrag(const Event& event);
+BLACK_CORE_API [[nodiscard]] bool getDropFile(const Event& event, int idx, Span<char> out);
+BLACK_CORE_API int getDropFileCount(const Event& event);
+BLACK_CORE_API void finishDrag(const Event& event);
 
-LUMIX_CORE_API Point getMouseScreenPos();
-LUMIX_CORE_API void setMouseScreenPos(int x, int y);
-LUMIX_CORE_API void showCursor(bool show);
+BLACK_CORE_API Point getMouseScreenPos();
+BLACK_CORE_API void setMouseScreenPos(int x, int y);
+BLACK_CORE_API void showCursor(bool show);
 
-LUMIX_CORE_API u32 getMonitors(Span<Monitor> monitors);
-LUMIX_CORE_API Point clientToScreen(WindowHandle win, int x, int y);
-LUMIX_CORE_API WindowHandle createWindow(const InitWindowArgs& args);
-LUMIX_CORE_API void showWindow(WindowHandle wnd);
-LUMIX_CORE_API void hideWindow(WindowHandle wnd);
-LUMIX_CORE_API bool getEvent(Event& event);
-LUMIX_CORE_API void destroyWindow(WindowHandle wnd);
-LUMIX_CORE_API Rect getWindowScreenRect(WindowHandle win);
-LUMIX_CORE_API Point getWindowClientSize(WindowHandle win);
-LUMIX_CORE_API void setWindowScreenRect(WindowHandle win, const Rect& rect);
-LUMIX_CORE_API void setWindowTitle(WindowHandle win, const char* title);
-LUMIX_CORE_API void maximizeWindow(WindowHandle win);
-LUMIX_CORE_API void minimizeWindow(WindowHandle win);
-LUMIX_CORE_API WindowState setFullscreen(WindowHandle win);
-LUMIX_CORE_API void restore(WindowHandle win, WindowState state);
-LUMIX_CORE_API void restore(WindowHandle win);
-LUMIX_CORE_API bool isMaximized(WindowHandle win);
-LUMIX_CORE_API bool isMinimized(WindowHandle win);
-LUMIX_CORE_API WindowHandle getFocused();
-LUMIX_CORE_API bool isAppForeground();
+BLACK_CORE_API u32 getMonitors(Span<Monitor> monitors);
+BLACK_CORE_API Point clientToScreen(WindowHandle win, int x, int y);
+BLACK_CORE_API WindowHandle createWindow(const InitWindowArgs& args);
+BLACK_CORE_API void showWindow(WindowHandle wnd);
+BLACK_CORE_API void hideWindow(WindowHandle wnd);
+BLACK_CORE_API bool getEvent(Event& event);
+BLACK_CORE_API void destroyWindow(WindowHandle wnd);
+BLACK_CORE_API Rect getWindowScreenRect(WindowHandle win);
+BLACK_CORE_API Point getWindowClientSize(WindowHandle win);
+BLACK_CORE_API void setWindowScreenRect(WindowHandle win, const Rect& rect);
+BLACK_CORE_API void setWindowTitle(WindowHandle win, const char* title);
+BLACK_CORE_API void maximizeWindow(WindowHandle win);
+BLACK_CORE_API void minimizeWindow(WindowHandle win);
+BLACK_CORE_API WindowState setFullscreen(WindowHandle win);
+BLACK_CORE_API void restore(WindowHandle win, WindowState state);
+BLACK_CORE_API void restore(WindowHandle win);
+BLACK_CORE_API bool isMaximized(WindowHandle win);
+BLACK_CORE_API bool isMinimized(WindowHandle win);
+BLACK_CORE_API WindowHandle getFocused();
+BLACK_CORE_API bool isAppForeground();
 
 
-LUMIX_CORE_API bool isKeyDown(Keycode keycode);
-LUMIX_CORE_API void getKeyName(Keycode keycode, Span<char> out);
-LUMIX_CORE_API int getDPI();
+BLACK_CORE_API bool isKeyDown(Keycode keycode);
+BLACK_CORE_API void getKeyName(Keycode keycode, Span<char> out);
+BLACK_CORE_API int getDPI();
 
-LUMIX_CORE_API [[nodiscard]] bool copyFile(StringView from, StringView to);
-LUMIX_CORE_API void getExecutablePath(Span<char> path);
-LUMIX_CORE_API [[nodiscard]] bool getAppDataDir(Span<char> path);
-LUMIX_CORE_API void messageBox(const char* text);
-LUMIX_CORE_API void setCommandLine(int, char**);
-LUMIX_CORE_API bool getCommandLine(Span<char> output);
-LUMIX_CORE_API void* loadLibrary(const char* path);
-LUMIX_CORE_API void unloadLibrary(void* handle);
-LUMIX_CORE_API void* getLibrarySymbol(void* handle, const char* name);
-LUMIX_CORE_API float getTimeSinceProcessStart();
+BLACK_CORE_API [[nodiscard]] bool copyFile(StringView from, StringView to);
+BLACK_CORE_API void getExecutablePath(Span<char> path);
+BLACK_CORE_API [[nodiscard]] bool getAppDataDir(Span<char> path);
+BLACK_CORE_API void messageBox(const char* text);
+BLACK_CORE_API void setCommandLine(int, char**);
+BLACK_CORE_API bool getCommandLine(Span<char> output);
+BLACK_CORE_API void* loadLibrary(const char* path);
+BLACK_CORE_API void unloadLibrary(void* handle);
+BLACK_CORE_API void* getLibrarySymbol(void* handle, const char* name);
+BLACK_CORE_API float getTimeSinceProcessStart();
 
 enum class NetworkReadResult {
 	SUCCESS,
@@ -273,15 +273,15 @@ enum class NetworkReadResult {
 	FAILED
 };
 
-LUMIX_CORE_API bool initNetwork();
-LUMIX_CORE_API void shutdownNetwork();
-LUMIX_CORE_API struct NetworkStream* listen(const char* ip, u16 port, IAllocator& allocator);
-LUMIX_CORE_API NetworkStream* connect(const char* ip, u16 port, IAllocator& allocator);
-LUMIX_CORE_API NetworkReadResult read(NetworkStream& stream, void* mem, u32 size);
-LUMIX_CORE_API bool write(NetworkStream& stream, const void* data, u32 size);
-LUMIX_CORE_API void close(NetworkStream& stream);
+BLACK_CORE_API bool initNetwork();
+BLACK_CORE_API void shutdownNetwork();
+BLACK_CORE_API struct NetworkStream* listen(const char* ip, u16 port, IAllocator& allocator);
+BLACK_CORE_API NetworkStream* connect(const char* ip, u16 port, IAllocator& allocator);
+BLACK_CORE_API NetworkReadResult read(NetworkStream& stream, void* mem, u32 size);
+BLACK_CORE_API bool write(NetworkStream& stream, const void* data, u32 size);
+BLACK_CORE_API void close(NetworkStream& stream);
 
-struct LUMIX_CORE_API Timer {
+struct BLACK_CORE_API Timer {
 	Timer();
 
 	float tick();
@@ -481,5 +481,5 @@ enum class Keycode : u8 {
 };
 
 } // namespace os
-} // namespace Lumix
+} // namespace black
 

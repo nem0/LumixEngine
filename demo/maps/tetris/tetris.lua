@@ -1,7 +1,7 @@
--- Simple Tetris demo for Lumix Engine
+-- Simple Tetris demo for black.h Engine
 -- Spawns cubes using engine/models/cube.fbx and implements basic gameplay logic
 
-score_counter = Lumix.Entity.NULL -- gui for score
+score_counter = black.h.Entity.NULL -- gui for score
 
 local GRID_W = 10
 local GRID_H = 20
@@ -218,21 +218,21 @@ function onInputEvent(event : InputEvent)
 
     local k = event.key_id
     -- Move left (A)
-    if k == LumixAPI.Keycode.A then
+    if k == black.hAPI.Keycode.A then
         if event.down and canPlace(current.x - 1, current.y, current.blocks) then
             current.x = current.x - 1
             updateCurrentEntities()
         end
     end
     -- Move right (D)
-    if k == LumixAPI.Keycode.D then
+    if k == black.hAPI.Keycode.D then
         if event.down and canPlace(current.x + 1, current.y, current.blocks) then
             current.x = current.x + 1
             updateCurrentEntities()
         end
     end
     -- Soft drop (S)
-    if k == LumixAPI.Keycode.S then
+    if k == black.hAPI.Keycode.S then
         if event.down then
             if canPlace(current.x, current.y - 1, current.blocks) then
                 current.y = current.y - 1
@@ -245,7 +245,7 @@ function onInputEvent(event : InputEvent)
         end
     end
     -- Rotate clockwise (E)
-    if k == LumixAPI.Keycode.E then
+    if k == black.hAPI.Keycode.E then
         if event.down then
             local nb = rotateBlocksCW(current.blocks)
             if canPlace(current.x, current.y, nb) then
@@ -255,7 +255,7 @@ function onInputEvent(event : InputEvent)
         end
     end
     -- Hard drop (Space)
-    if k == LumixAPI.Keycode.SPACE then
+    if k == black.hAPI.Keycode.SPACE then
         if event.down then
             while canPlace(current.x, current.y - 1, current.blocks) do
                 current.y = current.y - 1

@@ -10,7 +10,7 @@ pushd %~dp0
 	if not exist %dir_3rdparty_src% mkdir %dir_3rdparty_src%
 	pushd %dir_3rdparty_src%
 	if not exist freetype (
-		git.exe clone --depth=1 https://github.com/nem0/freetype2.git freetype
+		git.exe clone --depth=1 https://github.com/abdulrhmandeveloper2/freetype2.git freetype
 	) else (
 		cd freetype
 		git pull

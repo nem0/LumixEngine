@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-namespace Lumix
+namespace black
 {
 
 
@@ -65,4 +65,4 @@ void* getParameter()
 } // namespace Fibers
 
 
-} // namespace Lumix
+} // namespace black

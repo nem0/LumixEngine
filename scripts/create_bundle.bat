@@ -5,6 +5,6 @@ cd ..\data
 tar -cvf data.tar .
 move data.tar ../src/studio
 cd ..\scripts\
-%msbuild_cmd% tmp/vs2022/LumixEngine.sln /p:Configuration=RelWithDebInfo
+%msbuild_cmd% tmp/vs2022/black Engine.sln /p:Configuration=RelWithDebInfo
 del ..\src\studio\data.tar
 pause

@@ -5,7 +5,7 @@
 #include "engine/resource.h"
 
 
-namespace Lumix {
+namespace black {
 
 
 struct Clip final : Resource
@@ -42,4 +42,4 @@ private:
 };
 
 
-} // namespace Lumix
+} // namespace black

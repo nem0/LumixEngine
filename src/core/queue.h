@@ -4,7 +4,7 @@
 #include "core/allocator.h"
 
 
-namespace Lumix
+namespace black
 {
 	template <typename T, u32 COUNT>
 	struct Queue

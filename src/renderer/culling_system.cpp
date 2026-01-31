@@ -1,4 +1,4 @@
-#include "engine/lumix.h"
+#include "engine/black.h.h"
 
 #include "core/array.h"
 #include "core/crt.h"
@@ -15,7 +15,7 @@
 #include "culling_system.h"
 
 
-namespace Lumix
+namespace black
 {
 
 static_assert(sizeof(CullResult) == PageAllocator::PAGE_SIZE);
@@ -108,7 +108,7 @@ struct CullingSystemImpl final : CullingSystem
 		}
 
 		void* mem = m_page_allocator.allocate();
-		CellPage* new_cell = new (Lumix::NewPlaceholder(), mem) CellPage;
+		CellPage* new_cell = new (black.h::NewPlaceholder(), mem) CellPage;
 		new_cell->header.origin = cell.header.origin;
 		new_cell->header.indices = cell.header.indices;
 		new_cell->header.next = &cell;
@@ -142,7 +142,7 @@ struct CullingSystemImpl final : CullingSystem
 		auto iter = m_cell_map.find(i);
 		if (!iter.isValid()) {
 			void* mem = m_page_allocator.allocate();
-			CellPage* new_cell = new (Lumix::NewPlaceholder(), mem) CellPage;
+			CellPage* new_cell = new (black.h::NewPlaceholder(), mem) CellPage;
 			new_cell->header.origin = i.pos * double(m_cell_size);
 			new_cell->header.indices = i;
 			m_cell_map.insert(i, new_cell);
@@ -257,16 +257,16 @@ struct CullingSystemImpl final : CullingSystem
 		add(entity, type, pos, radius);
 	}
 
-	LUMIX_FORCE_INLINE void doCulling(const CellPage& cell
+	BLACK_FORCE_INLINE void doCulling(const CellPage& cell
 		, const Frustum& frustum
-		, CullResult* LUMIX_RESTRICT results
+		, CullResult* BLACK_RESTRICT results
 		, PagedList<CullResult>& list
 		, u8 type)
 	{
 		PROFILE_FUNCTION();
-		const Sphere* LUMIX_RESTRICT start = cell.spheres;
-		const Sphere* LUMIX_RESTRICT end = cell.spheres + cell.header.count;
-		const EntityPtr* LUMIX_RESTRICT sphere_to_entity_map = cell.entities;
+		const Sphere* BLACK_RESTRICT start = cell.spheres;
+		const Sphere* BLACK_RESTRICT end = cell.spheres + cell.header.count;
+		const EntityPtr* BLACK_RESTRICT sphere_to_entity_map = cell.entities;
 
 		const float4 px = f4Load(frustum.xs);
 		const float4 py = f4Load(frustum.ys);

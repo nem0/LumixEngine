@@ -3,16 +3,16 @@
 
 #include "core.h"
 
-#define LUMIX_NEW(allocator, ...) new (Lumix::NewPlaceholder(), (allocator).allocate(sizeof(__VA_ARGS__), alignof(__VA_ARGS__))) __VA_ARGS__
-#define LUMIX_DELETE(allocator, var) (allocator).deleteObject(var)
+#define BLACK_NEW(allocator, ...) new (black::NewPlaceholder(), (allocator).allocate(sizeof(__VA_ARGS__), alignof(__VA_ARGS__))) __VA_ARGS__
+#define BLACK_DELETE(allocator, var) (allocator).deleteObject(var)
 
-namespace Lumix { struct NewPlaceholder {}; }
-inline void* operator new(size_t, Lumix::NewPlaceholder, void* where) { return where; }
-inline void operator delete(void*, Lumix::NewPlaceholder,  void*) { } 
+namespace black { struct NewPlaceholder {}; }
+inline void* operator new(size_t, black::NewPlaceholder, void* where) { return where; }
+inline void operator delete(void*, black::NewPlaceholder,  void*) { } 
 
-namespace Lumix {
+namespace black {
 
-struct LUMIX_CORE_API IAllocator {
+struct BLACK_CORE_API IAllocator {
 	virtual ~IAllocator() {}
 	virtual bool isTagAllocator() const { return false; }
 	virtual IAllocator* getParent() const { return nullptr; }
@@ -31,7 +31,7 @@ struct LUMIX_CORE_API IAllocator {
 };
 
 // used for stuff that can't access engine's allocator, e.g. global objects constructed before engine such as logger
-LUMIX_CORE_API IAllocator& getGlobalAllocator();
+BLACK_CORE_API IAllocator& getGlobalAllocator();
 
 template <typename T>
 struct Local
@@ -83,7 +83,7 @@ struct UniquePtr {
 
 	~UniquePtr() {
 		if (m_ptr) {
-			LUMIX_DELETE(*m_allocator, m_ptr);
+			BLACK_DELETE(*m_allocator, m_ptr);
 		}
 	}
 
@@ -93,14 +93,14 @@ struct UniquePtr {
 	template <typename T2>
 	void operator=(UniquePtr<T2>&& rhs) {
 		if (m_ptr) {
-			LUMIX_DELETE(*m_allocator, m_ptr);
+			BLACK_DELETE(*m_allocator, m_ptr);
 		}
 		m_allocator = rhs.getAllocator();
 		m_ptr = static_cast<T*>(rhs.detach());
 	}
 
 	template <typename... Args> static UniquePtr<T> create(IAllocator& allocator, Args&&... args) {
-		return UniquePtr<T>(LUMIX_NEW(allocator, T) (static_cast<Args&&>(args)...), &allocator);
+		return UniquePtr<T>(BLACK_NEW(allocator, T) (static_cast<Args&&>(args)...), &allocator);
 	}
 
 	T* detach() {
@@ -114,7 +114,7 @@ struct UniquePtr {
 
 	void reset() {
 		if (m_ptr) {
-			LUMIX_DELETE(*m_allocator, m_ptr);
+			BLACK_DELETE(*m_allocator, m_ptr);
 		}
 		m_ptr = nullptr;
 		m_allocator = nullptr;
@@ -131,4 +131,4 @@ private:
 	IAllocator* m_allocator = nullptr;
 };
 
-} // namespace Lumix
+} // namespace black

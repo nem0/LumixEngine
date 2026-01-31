@@ -10,24 +10,24 @@ Plugins downloaded this way are placed in the `plugins` directory. *GENie* autom
 
 Note: Plugins in this section are compilable and runnable; some are still in the prototype stage.
 
-* [Node-based shader editor](https://github.com/nem0/lumixengine_shader_editor)
-* [Real-world terrains, roads and buildings](https://github.com/nem0/LumixEngine_maps)
-* [Rml UI](https://github.com/nem0/lumixengine_rml)
-* [Visual scripting](https://github.com/nem0/lumixengine_visualscript)
-* [JavaScript](https://github.com/nem0/LumixEngine_js)
-* [Procedural geometry](https://github.com/nem0/lumixengine_procedural_geom)
-* [Network](https://github.com/nem0/lumixengine_net)
-* [Marketplace](https://github.com/nem0/lumixengine_market)
-* [C#](https://github.com/nem0/lumixengine_csharp)
-* [LiveCode](https://github.com/nem0/lumixengine_livecode)
-* [GLTF importer](https://github.com/nem0/lumixengine_gltf)
+* [Node-based shader editor](https://github.com/abdulrhmandeveloper2/blackengine_shader_editor)
+* [Real-world terrains, roads and buildings](https://github.com/abdulrhmandeveloper2/black Engine_maps)
+* [Rml UI](https://github.com/abdulrhmandeveloper2/blackengine_rml)
+* [Visual scripting](https://github.com/abdulrhmandeveloper2/blackengine_visualscript)
+* [JavaScript](https://github.com/abdulrhmandeveloper2/black Engine_js)
+* [Procedural geometry](https://github.com/abdulrhmandeveloper2/blackengine_procedural_geom)
+* [Network](https://github.com/abdulrhmandeveloper2/blackengine_net)
+* [Marketplace](https://github.com/abdulrhmandeveloper2/blackengine_market)
+* [C#](https://github.com/abdulrhmandeveloper2/blackengine_csharp)
+* [LiveCode](https://github.com/abdulrhmandeveloper2/blackengine_livecode)
+* [GLTF importer](https://github.com/abdulrhmandeveloper2/blackengine_gltf)
 
 # Deprecated
 
 Note: These plugins are not supported and most likely won't build with the latest engine, but can be resurrected.
 
-* [DX11 & DX12](https://github.com/nem0/lumixengine_dx11) - DX12 is now integrated into the engine; older APIs (DX11) are not supported.
-* [FBX importer using Autodesk's SDK](https://github.com/nem0/LumixEngine_fbx)
-* [HTML/CSS rendering](https://github.com/nem0/lumixengine_html)
-* [Turbo Badger](https://github.com/nem0/lumixengine_turbobadger)
+* [DX11 & DX12](https://github.com/abdulrhmandeveloper2/blackengine_dx11) - DX12 is now integrated into the engine; older APIs (DX11) are not supported.
+* [FBX importer using Autodesk's SDK](https://github.com/abdulrhmandeveloper2/black Engine_fbx)
+* [HTML/CSS rendering](https://github.com/abdulrhmandeveloper2/blackengine_html)
+* [Turbo Badger](https://github.com/abdulrhmandeveloper2/blackengine_turbobadger)
 

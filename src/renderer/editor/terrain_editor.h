@@ -12,7 +12,7 @@
 #include "renderer/gpu/gpu.h"
 
 
-namespace Lumix
+namespace black
 {
 
 
@@ -23,7 +23,7 @@ struct RenderModule;
 struct Texture;
 struct Renderer;
 
-struct LUMIX_RENDERER_API TerrainEditor final : StudioApp::MousePlugin {
+struct BLACK_RENDERER_API TerrainEditor final : StudioApp::MousePlugin {
 	enum class Mode {
 		LAYER,
 		HEIGHT,
@@ -116,4 +116,4 @@ private:
 };
 
 
-} // namespace Lumix
+} // namespace black

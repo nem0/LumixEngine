@@ -9,7 +9,7 @@
 #include "renderer/particle_system.h"
 #include "renderer/render_module.h"
 
-namespace Lumix {
+namespace black {
 
 struct ParticleScriptImportEditorWindow : AssetEditorWindow {
 	ParticleScriptImportEditorWindow(const Path& path, StudioApp& app)

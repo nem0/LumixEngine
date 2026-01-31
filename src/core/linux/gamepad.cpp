@@ -1,6 +1,6 @@
 #include "core/gamepad.h"
 
-namespace Lumix
+namespace black
 {
 
 class LinuxGamepadBackend : public IGamepadBackend
@@ -39,7 +39,7 @@ private:
 
 IGamepadBackend* createGamepadBackend(IAllocator& allocator)
 {
-    return LUMIX_NEW(allocator, LinuxGamepadBackend)(allocator);
+    return BLACK_NEW(allocator, LinuxGamepadBackend)(allocator);
 }
 
-} // namespace Lumix
+} // namespace black

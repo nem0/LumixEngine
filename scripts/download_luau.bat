@@ -10,7 +10,7 @@ pushd %~dp0
 	if not exist %dir_3rdparty_src% mkdir %dir_3rdparty_src%
 	pushd %dir_3rdparty_src%
 	if not exist luau (
-		git.exe clone --depth=1 https://github.com/nem0/Luau.git luau
+		git.exe clone --depth=1 https://github.com/abdulrhmandeveloper2/Luau.git luau
 	) else (
 		cd luau
 		git pull

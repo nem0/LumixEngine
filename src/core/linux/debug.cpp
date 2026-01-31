@@ -10,13 +10,13 @@
 static bool g_is_crash_reporting_enabled = false;
 
 
-namespace Lumix {
+namespace black {
 
 
 namespace debug {
 
 
-static Lumix::DefaultAllocator stack_node_allocator;
+static black.h::DefaultAllocator stack_node_allocator;
 
 
 void debugOutput(const char* message) {
@@ -94,7 +94,7 @@ void StackTree::printCallstack(StackNode* node) {
 StackNode* StackTree::insertChildren(StackNode* root_node, void** instruction, void** stack) {
 	StackNode* node = root_node;
 	while (instruction >= stack) {
-		StackNode* new_node = LUMIX_NEW(stack_node_allocator, StackNode)();
+		StackNode* new_node = BLACK_NEW(stack_node_allocator, StackNode)();
 		node->m_first_child = new_node;
 		new_node->m_parent = node;
 		new_node->m_next = nullptr;
@@ -113,7 +113,7 @@ StackNode* StackTree::record() {
 
 	void** ptr = stack + captured_frames_count - 1;
 	if (!m_root) {
-		m_root = LUMIX_NEW(stack_node_allocator, StackNode)();
+		m_root = BLACK_NEW(stack_node_allocator, StackNode)();
 		m_root->m_instruction = *ptr;
 		m_root->m_first_child = nullptr;
 		m_root->m_next = nullptr;
@@ -128,7 +128,7 @@ StackNode* StackTree::record() {
 			node = node->m_next;
 		}
 		if (node->m_instruction != *ptr) {
-			node->m_next = LUMIX_NEW(stack_node_allocator, StackNode);
+			node->m_next = BLACK_NEW(stack_node_allocator, StackNode);
 			node->m_next->m_parent = node->m_parent;
 			node->m_next->m_instruction = *ptr;
 			node->m_next->m_next = nullptr;
@@ -263,7 +263,7 @@ u8* Allocator::getSystemFromUser(void* user_ptr) {
 
 
 void* Allocator::allocate(size_t size, size_t align) {
-#ifndef LUMIX_DEBUG
+#ifndef BLACK_DEBUG
 	return m_source.allocate(size, align);
 #else
 	void* system_ptr;
@@ -306,7 +306,7 @@ void* Allocator::allocate(size_t size, size_t align) {
 
 
 void Allocator::deallocate(void* user_ptr) {
-#ifndef LUMIX_DEBUG
+#ifndef BLACK_DEBUG
 	m_source.deallocate(user_ptr);
 #else
 	if (user_ptr) {
@@ -342,7 +342,7 @@ void Allocator::deallocate(void* user_ptr) {
 
 
 void* Allocator::reallocate(void* user_ptr, size_t new_size, size_t old_size, size_t align) {
-#ifndef LUMIX_DEBUG
+#ifndef BLACK_DEBUG
 	return m_source.reallocate(user_ptr, new_size, old_size, align);
 #else
 	if (user_ptr == nullptr) return allocate(new_size, align);
@@ -375,4 +375,4 @@ void installUnhandledExceptionHandler() {}
 void clearHardwareBreakpoint(u32 breakpoint_idx) { ASSERT(false); /* not implemented */ }
 void setHardwareBreakpoint(u32 breakpoint_idx, const void* mem, u32 size) { ASSERT(false); /* not implemented */ }
 
-} // namespace Lumix
+} // namespace black

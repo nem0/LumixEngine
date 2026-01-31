@@ -2,7 +2,7 @@
 #include "core/hash.h"
 #include "prefab.h"
 
-namespace Lumix
+namespace black
 {
 
 

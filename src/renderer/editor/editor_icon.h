@@ -1,12 +1,12 @@
 #pragma once
 
-#include "engine/lumix.h"
+#include "engine/black.h.h"
 
 #include "core/hash_map.h"
 #include "core/math.h"
 
 
-namespace Lumix
+namespace black
 {
 
 template <typename T> struct Array;

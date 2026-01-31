@@ -1,4 +1,4 @@
-On Windows, all 3rd party libraries are vendored in the LumixEngine repository, either as a binary or in the form of source code. Everything should work out of the box.
+On Windows, all 3rd party libraries are vendored in the black Engine repository, either as a binary or in the form of source code. Everything should work out of the box.
 
 ## Dear ImGui
 
@@ -10,7 +10,7 @@ We utilize [Recast & Detour](https://github.com/recastnavigation/recastnavigatio
 
 ## FreeType2
 
-We utilize [FreeType2](https://github.com/nem0/freetype2.git) for text rendering. On Windows, the prebuilt static library is included in [external/freetype/lib/win](../external/freetype/lib/win/) and is used by default. If you want to build FreeType from source code, use the following steps:
+We utilize [FreeType2](https://github.com/abdulrhmandeveloper2/freetype2.git) for text rendering. On Windows, the prebuilt static library is included in [external/freetype/lib/win](../external/freetype/lib/win/) and is used by default. If you want to build FreeType from source code, use the following steps:
 1. Run [download_freetype.bat](../scripts/download_freetype.bat) to download the FreeType source code.
 2. Regenerate the project using *GENie*.
 3. Build the project.
@@ -26,7 +26,7 @@ If you build Luau from source code like this, it's built as a static library by 
 
 ## PhysX
 
-We utilize [PhysX](https://github.com/nem0/PhysX.git) for physical simulation. On Windows, the prebuilt static library is included in [external/physx/lib/win](../external/physx/lib/win) and is used by default. If you want to build PhysX from source code, use the following steps:
+We utilize [PhysX](https://github.com/abdulrhmandeveloper2/PhysX.git) for physical simulation. On Windows, the prebuilt static library is included in [external/physx/lib/win](../external/physx/lib/win) and is used by default. If you want to build PhysX from source code, use the following steps:
 
 1. Run [download_physx.bat](../scripts/download_physx.bat) to download the PhysX source code.
 2. Regenerate the project using *GENie*.
@@ -45,7 +45,7 @@ We utilize [MikkTSpace](https://github.com/mmikk/MikkTSpace) for generating tang
 
 ## OpenFBX
 
-We utilize [OpenFBX](https://github.com/nem0/OpenFBX/) for loading FBX files due to its high quality and open-source nature. The source code for OpenFBX is included in our repository under [external/openfbx](../external/openfbx/).
+We utilize [OpenFBX](https://github.com/abdulrhmandeveloper2/OpenFBX/) for loading FBX files due to its high quality and open-source nature. The source code for OpenFBX is included in our repository under [external/openfbx](../external/openfbx/).
 
 ## rgbcx
 

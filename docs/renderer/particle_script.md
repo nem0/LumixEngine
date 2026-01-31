@@ -1,6 +1,6 @@
 # Particle Scripts
 
-Particle scripts in Lumix Engine define particle system behavior using a custom scripting language. Scripts are compiled to bytecode and executed on the CPU for high-performance particle simulation.
+Particle scripts in black.h Engine define particle system behavior using a custom scripting language. Scripts are compiled to bytecode and executed on the CPU for high-performance particle simulation.
 
 ## File Extension
 

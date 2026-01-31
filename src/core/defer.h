@@ -1,6 +1,6 @@
 #pragma once
 
-namespace Lumix {
+namespace black {
 
 template <typename F>
 struct Defer {
@@ -20,6 +20,6 @@ Defer<F> operator+(DeferDummy, F&& f) {
 
 #define DEFER_CONCAT_IMPL(x, y) x##y
 #define DEFER_CONCAT(x, y) DEFER_CONCAT_IMPL(x, y)
-#define defer auto DEFER_CONCAT(_defer_, __LINE__) = ::Lumix::DeferDummy{} + [&]()
+#define defer auto DEFER_CONCAT(_defer_, __LINE__) = ::black.h::DeferDummy{} + [&]()
 
 }

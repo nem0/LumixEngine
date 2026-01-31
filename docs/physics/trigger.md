@@ -11,7 +11,7 @@ When an object enters or exits a trigger, the `onTrigger` function is called wit
 
 ```lua
 function onTrigger(entity, touch_lost)
-	LumixAPI.logError("trigger")
-	LumixAPI.logError(entity.name)
+	black.hAPI.logError("trigger")
+	black.hAPI.logError(entity.name)
 end
 ```

@@ -6,7 +6,7 @@
 
 
 //@ module AudioModule audio "Audio"
-namespace Lumix {
+namespace black {
 
 
 struct AudioSystem;
@@ -89,4 +89,4 @@ struct AudioModule : IModule {
 };
 
 
-} // namespace Lumix
+} // namespace black

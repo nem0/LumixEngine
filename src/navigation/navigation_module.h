@@ -10,7 +10,7 @@ struct dtCrowdAgent;
 
 
 //@ module NavigationModule navigation "Navigation"
-namespace Lumix
+namespace black
 {
 
 
@@ -88,4 +88,4 @@ struct NavigationModule : IModule {
 };
 
 
-} // namespace Lumix
+} // namespace black

@@ -3,7 +3,7 @@
 #include "core/array.h"
 #include "core/sync.h"
 
-namespace Lumix {
+namespace black {
 
 template <typename T, u32 CAPACITY>
 struct RingBuffer {
@@ -22,7 +22,7 @@ struct RingBuffer {
 		memoryBarrier();
 	}
 
-	LUMIX_FORCE_INLINE bool pop(T& obj) {
+	BLACK_FORCE_INLINE bool pop(T& obj) {
 		for (;;) {
 			const i32 pos = rd;
 			Item* j = &objects[pos % CAPACITY];
@@ -47,7 +47,7 @@ struct RingBuffer {
 		}
 	}
 
-	LUMIX_FORCE_INLINE void push(const T& obj) {
+	BLACK_FORCE_INLINE void push(const T& obj) {
 		volatile i32 pos = wr;
 		Item* j;
 		for (;;) {
@@ -77,8 +77,8 @@ struct RingBuffer {
 	AtomicI32 rd = 0;
 	AtomicI32 wr = 0;
 	Array<T> m_fallback;
-	Lumix::Mutex mutex;
+	black.h::Mutex mutex;
 };
 
 
-} // namespace Lumix
+} // namespace black

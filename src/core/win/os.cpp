@@ -19,8 +19,8 @@
 
 //Request high performace profiles from mobile chipsets
 extern "C" {
-	LUMIX_LIBRARY_EXPORT DWORD AmdPowerXpressRequestHighPerformance = 0x00000001;
-	LUMIX_LIBRARY_EXPORT DWORD NvOptimusEnablement = 0x00000001;
+	BLACK_LIBRARY_EXPORT DWORD AmdPowerXpressRequestHighPerformance = 0x00000001;
+	BLACK_LIBRARY_EXPORT DWORD NvOptimusEnablement = 0x00000001;
 }
 
 // some winapi calls can fail but we don't have any known way to "fix" the issue
@@ -30,7 +30,7 @@ extern "C" {
 #define FATAL_CHECK(R) do { if (!(R)) abort(); } while(false)
 
 
-namespace Lumix::os
+namespace black::os
 {
 
 struct EventQueue {
@@ -41,7 +41,7 @@ struct EventQueue {
 	};
 
 	void pushBack(const Event& e) {
-		Rec* n = LUMIX_NEW(getGlobalAllocator(), Rec);
+		Rec* n = BLACK_NEW(getGlobalAllocator(), Rec);
 		n->prev = back;
 		if (back) back->next = n;
 		back = n;
@@ -55,7 +55,7 @@ struct EventQueue {
 		Rec* tmp = front;
 		front = tmp->next;
 		if (!front) back = nullptr;
-		LUMIX_DELETE(getGlobalAllocator(), tmp);
+		BLACK_DELETE(getGlobalAllocator(), tmp);
 		return e;
 	}
 
@@ -263,13 +263,13 @@ void logInfo() {
 
 	if (dwVersion < 0x80000000) dwBuild = (DWORD)(HIWORD(dwVersion));
 
-	Lumix::logInfo("OS Version: ", u32(dwMajorVersion), ".", u32(dwMinorVersion), " (", u32(dwBuild), ")");
+	black.h::logInfo("OS Version: ", u32(dwMajorVersion), ".", u32(dwMinorVersion), " (", u32(dwBuild), ")");
 
 	SYSTEM_INFO sys_info;
 	GetSystemInfo(&sys_info);
-	Lumix::logInfo("Page size: ", u32(sys_info.dwPageSize));
-	Lumix::logInfo("Number of processors: ", u32(sys_info.dwNumberOfProcessors));
-	Lumix::logInfo("Allocation granularity: ", u32(sys_info.dwAllocationGranularity));
+	black.h::logInfo("Page size: ", u32(sys_info.dwPageSize));
+	black.h::logInfo("Number of processors: ", u32(sys_info.dwNumberOfProcessors));
+	black.h::logInfo("Allocation granularity: ", u32(sys_info.dwAllocationGranularity));
 }
 
 
@@ -526,7 +526,7 @@ struct WindowData {
 
 void destroyWindow(WindowHandle window) {
 	WindowData* data = (WindowData*)GetWindowLongPtrW((HWND)window, GWLP_USERDATA);
-	if (data) LUMIX_DELETE(getGlobalAllocator(), data);
+	if (data) BLACK_DELETE(getGlobalAllocator(), data);
 	DestroyWindow((HWND)window);
 }
 
@@ -700,7 +700,7 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 		? (args.hit_test_callback ? WS_THICKFRAME | WS_SYSMENU | WS_MAXIMIZEBOX | WS_MINIMIZEBOX : 0)
 		: WS_OVERLAPPEDWINDOW;
 	DWORD ext_style = args.flags & InitWindowArgs::NO_TASKBAR_ICON ? WS_EX_TOOLWINDOW : WS_EX_APPWINDOW;
-	WindowData* window_data = LUMIX_NEW(getGlobalAllocator(), WindowData);
+	WindowData* window_data = BLACK_NEW(getGlobalAllocator(), WindowData);
 	window_data->init_args = args;
 	const HWND hwnd = CreateWindowEx(
 		ext_style,
@@ -1039,7 +1039,7 @@ FileIterator* createFileIterator(StringView path, IAllocator& allocator) {
 		return nullptr;
 	}
 
-	auto* iter = LUMIX_NEW(allocator, FileIterator);
+	auto* iter = BLACK_NEW(allocator, FileIterator);
 	iter->allocator = &allocator;
 	iter->offset = 0;
 	iter->is_first = true;
@@ -1050,7 +1050,7 @@ FileIterator* createFileIterator(StringView path, IAllocator& allocator) {
 
 void destroyFileIterator(FileIterator* iterator) {
 	CloseHandle(iterator->handle);
-	LUMIX_DELETE(*iterator->allocator, iterator);
+	BLACK_DELETE(*iterator->allocator, iterator);
 }
 
 
@@ -1296,7 +1296,7 @@ struct Process {
 };
 
 Process* createProcess(IAllocator& allocator, StringView cmd, StringView working_dir) {
-	Process* p = LUMIX_NEW(allocator, Process);
+	Process* p = BLACK_NEW(allocator, Process);
 	p->allocator = &allocator;
 	
 	// Create pipe for stdout/err
@@ -1306,7 +1306,7 @@ Process* createProcess(IAllocator& allocator, StringView cmd, StringView working
 	sa.bInheritHandle = TRUE;
 	
 	if (!CreatePipe(&p->stdout_read, &p->stdout_write, &sa, 0)) {
-		LUMIX_DELETE(allocator, p);
+		BLACK_DELETE(allocator, p);
 		return nullptr;
 	}
 	
@@ -1314,7 +1314,7 @@ Process* createProcess(IAllocator& allocator, StringView cmd, StringView working
 	if (!SetHandleInformation(p->stdout_read, HANDLE_FLAG_INHERIT, 0)) {
 		CloseHandle(p->stdout_read);
 		CloseHandle(p->stdout_write);
-		LUMIX_DELETE(allocator, p);
+		BLACK_DELETE(allocator, p);
 		return nullptr;
 	}
 	
@@ -1347,7 +1347,7 @@ Process* createProcess(IAllocator& allocator, StringView cmd, StringView working
 	if (!success) {
 		CloseHandle(p->stdout_read);
 		CloseHandle(p->stdout_write);
-		LUMIX_DELETE(allocator, p);
+		BLACK_DELETE(allocator, p);
 		return nullptr;
 	}
 	
@@ -1385,7 +1385,7 @@ void destroyProcess(Process& process) {
 	if (process.stdout_write) CloseHandle(process.stdout_write);
 	if (process.stdout_read) CloseHandle(process.stdout_read);
 	if (process.handle) CloseHandle(process.handle);
-	LUMIX_DELETE(*process.allocator, &process);
+	BLACK_DELETE(*process.allocator, &process);
 }
 
 u32 readStdOutput(Process& process, Span<char> output) {
@@ -1717,7 +1717,7 @@ struct NetworkStream* listen(const char* ip, u16 port, IAllocator& allocator) {
 	closesocket(listen_socket);
 	if (socket == INVALID_SOCKET) return nullptr;
 
-	auto* stream = LUMIX_NEW(allocator, NetworkStream);
+	auto* stream = BLACK_NEW(allocator, NetworkStream);
 	stream->socket = socket;
 	stream->allocator = &allocator;
 	return stream;
@@ -1734,7 +1734,7 @@ NetworkStream* connect(const char* ip, u16 port, IAllocator& allocator) {
 
 	if (::connect(socket, (LPSOCKADDR)&sin, sizeof(sin)) != 0) return nullptr;
 
-	auto* stream = LUMIX_NEW(allocator, NetworkStream);
+	auto* stream = BLACK_NEW(allocator, NetworkStream);
 	stream->socket = socket;
 	stream->allocator = &allocator;
 	return stream;
@@ -1775,4 +1775,4 @@ void close(NetworkStream& stream) {
 }
 
 
-} // namespace Lumix::OS
+} // namespace black::OS

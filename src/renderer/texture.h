@@ -7,7 +7,7 @@
 #include "gpu/gpu.h"
 
 
-namespace Lumix
+namespace black
 {
 struct IInputStream;
 struct IOutputStream;
@@ -71,7 +71,7 @@ static_assert(sizeof(LBCHeader) == 32);
 static_assert(sizeof(RawTextureHeader) == 32);
 
 
-struct LUMIX_RENDERER_API Texture final : Resource {
+struct BLACK_RENDERER_API Texture final : Resource {
 	enum class Flags : u32 {
 		SRGB = 1 << 0,
 	};
@@ -128,4 +128,4 @@ private:
 };
 
 
-} // namespace Lumix
+} // namespace black

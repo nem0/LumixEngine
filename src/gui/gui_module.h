@@ -4,7 +4,7 @@
 #include "engine/plugin.h"
 #include "renderer/gpu/gpu.h"
 
-namespace Lumix
+namespace black
 {
 
 namespace os { enum class CursorType : u32; }
@@ -161,4 +161,4 @@ struct GUIModule : IModule {
 };
 
 
-} // namespace Lumix
+} // namespace black

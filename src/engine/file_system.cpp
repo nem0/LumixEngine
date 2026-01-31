@@ -13,7 +13,7 @@
 
 #include "engine/file_system.h"
 
-namespace Lumix {
+namespace black {
 
 struct FileIterator {
 	os::FileIterator* iter;
@@ -247,7 +247,7 @@ struct FileSystemImpl : FileSystem {
 	FileIterator* createFileIterator(StringView dir) override
 	{
 		const Path path = getFullPath(dir);
-		FileIterator* iter = LUMIX_NEW(m_allocator, FileIterator);
+		FileIterator* iter = BLACK_NEW(m_allocator, FileIterator);
 		iter->iter = os::createFileIterator(path, m_allocator);
 		iter->fs = this;
 		iter->mount_idx = -1;
@@ -255,7 +255,7 @@ struct FileSystemImpl : FileSystem {
 		else if (equalStrings(dir, "/")) iter->mount_idx = 0;
 		else if (equalStrings(dir, "\\")) iter->mount_idx = 0;
 		if (!iter->iter && iter->mount_idx < 0) {
-			LUMIX_DELETE(m_allocator, iter);
+			BLACK_DELETE(m_allocator, iter);
 			return nullptr;
 		}
 		return iter;
@@ -404,7 +404,7 @@ struct PackFileSystem : FileSystemImpl {
 
 void destroyFileIterator(FileIterator* iterator) {
 	os::destroyFileIterator(iterator->iter);
-	LUMIX_DELETE(iterator->fs->m_allocator, iterator);
+	BLACK_DELETE(iterator->fs->m_allocator, iterator);
 }
 
 bool getNextFile(FileIterator* iterator, os::FileInfo* info) {
@@ -432,4 +432,4 @@ UniquePtr<FileSystem> FileSystem::createPacked(const char* pak_path, IAllocator&
 }
 
 
-} // namespace Lumix
+} // namespace black

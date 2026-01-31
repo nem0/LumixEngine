@@ -3,7 +3,7 @@
 #include "core/crt.h"
 #include "core/math.h"
 
-namespace Lumix {
+namespace black {
 
 Tokenizer::Tokenizer(StringView content, const char* filename)
 	: content(content)

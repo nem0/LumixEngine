@@ -10,7 +10,7 @@
 #include "render_interface.h"
 
 
-namespace Lumix {
+namespace black {
 
 namespace Gizmo {
 
@@ -931,4 +931,4 @@ void Config::grab() {
 }
 
 } // namespace Gizmo
-} // namespace Lumix
+} // namespace black

@@ -5,7 +5,7 @@
 #include "engine/reflection.h"
 
 
-namespace Lumix {
+namespace black {
 
 const ResourceType PropertyAnimation::TYPE("property_animation");
 
@@ -106,4 +106,4 @@ void PropertyAnimation::unload()
 }
 
 
-} // namespace Lumix
+} // namespace black

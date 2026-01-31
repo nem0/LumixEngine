@@ -6,7 +6,7 @@
 #include "engine/plugin.h"
 
 
-namespace Lumix {
+namespace black {
 
 namespace reflection {
 	struct Module;

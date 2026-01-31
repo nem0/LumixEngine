@@ -9,7 +9,7 @@
 
 struct ImVec2;
 
-namespace Lumix {
+namespace black {
 
 struct Path;
 struct Pipeline;
@@ -18,7 +18,7 @@ struct RenderModule;
 struct StudioApp;
 
 //@ object
-struct LUMIX_RENDERER_API GameView : StudioApp::GUIPlugin {
+struct BLACK_RENDERER_API GameView : StudioApp::GUIPlugin {
 	friend struct GUIInterface;
 
 	explicit GameView(StudioApp& app);
@@ -72,4 +72,4 @@ private:
 };
 
 
-} // namespace Lumix
+} // namespace black

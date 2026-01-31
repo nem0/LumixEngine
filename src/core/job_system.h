@@ -3,7 +3,7 @@
 #include "atomic.h"
 #include "core.h"
 
-namespace Lumix {
+namespace black {
 
 struct IAllocator;
 
@@ -22,34 +22,34 @@ struct Mutex;
 struct Counter;
 
 // turn signal red from whatevere state it's in
-LUMIX_CORE_API void turnRed(Signal* signal);
+BLACK_CORE_API void turnRed(Signal* signal);
 // turn signal green from whatever state it's in, all waiting fibers are scheduled to execute
-LUMIX_CORE_API void turnGreen(Signal* signal);
+BLACK_CORE_API void turnGreen(Signal* signal);
 // wait for signal to become green, or continues if it's already green, does not change state of the signal
-LUMIX_CORE_API void wait(Signal* signal);
+BLACK_CORE_API void wait(Signal* signal);
 // wait for signal to become green and turn it red, then continue
 // if several fibers are waiting on the same signal, and the signal turns green, only one of the waiting fibers will continue
-LUMIX_CORE_API void waitAndTurnRed(Signal* signal);
+BLACK_CORE_API void waitAndTurnRed(Signal* signal);
 
-LUMIX_CORE_API void wait(Counter* counter);
+BLACK_CORE_API void wait(Counter* counter);
 
-LUMIX_CORE_API void enter(Mutex* mutex);
-LUMIX_CORE_API void exit(Mutex* mutex);
+BLACK_CORE_API void enter(Mutex* mutex);
+BLACK_CORE_API void exit(Mutex* mutex);
 
-LUMIX_CORE_API bool init(u8 workers_count, IAllocator& allocator);
-LUMIX_CORE_API IAllocator& getAllocator();
-LUMIX_CORE_API void shutdown();
-LUMIX_CORE_API u8 getWorkersCount();
+BLACK_CORE_API bool init(u8 workers_count, IAllocator& allocator);
+BLACK_CORE_API IAllocator& getAllocator();
+BLACK_CORE_API void shutdown();
+BLACK_CORE_API u8 getWorkersCount();
 
 // yield current job and push it to worker queue
-LUMIX_CORE_API void moveJobToWorker(u8 worker_index);
+BLACK_CORE_API void moveJobToWorker(u8 worker_index);
 // yield current job, push it to global queue
-LUMIX_CORE_API void yield();
+BLACK_CORE_API void yield();
 
 // run single job, increment on_finished counter, decrement it when job is done
-LUMIX_CORE_API void run(void* data, void(*task)(void*), Counter* on_finish, u8 worker_index = ANY_WORKER);
+BLACK_CORE_API void run(void* data, void(*task)(void*), Counter* on_finish, u8 worker_index = ANY_WORKER);
 // same as calling `run` `num_jobs` times, except it's faster
-LUMIX_CORE_API void runN(void* data, void(*task)(void*), Counter* on_finish, u32 num_jobs);
+BLACK_CORE_API void runN(void* data, void(*task)(void*), Counter* on_finish, u32 num_jobs);
 
 // spawn as many jobs as there are worker threads, and call `f`
 template <typename F> void runOnWorkers(const F& f);
@@ -105,11 +105,11 @@ void runLambda(F&& f, Counter* on_finish, u8 worker) {
 		}, on_finish, worker);
 	}
 	else {
-		F* tmp = LUMIX_NEW(getAllocator(), F)(static_cast<F&&>(f));
+		F* tmp = BLACK_NEW(getAllocator(), F)(static_cast<F&&>(f));
 		run(tmp, [](void* arg){
 			F* f = (F*)arg;
 			(*f)();
-			LUMIX_DELETE(getAllocator(), f);
+			BLACK_DELETE(getAllocator(), f);
 		}, on_finish, worker);
 
 	}
@@ -181,4 +181,4 @@ void forEach(u32 count, u32 step, const F& f) {
 
 } // namespace jobs
 
-} // namespace Lumix
+} // namespace black

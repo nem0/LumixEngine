@@ -8,10 +8,10 @@ obj/
 *.nvuser
 *.orig
 .vscode
-.lumix
+.black.h
 studio.ini
 *.log
-.lumixuser
+.black.huser
 *.unv.bak
 scripts/3rdparty
 !scripts/bin/

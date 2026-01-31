@@ -4,7 +4,7 @@
 #include "core/simd.h"
 
 
-namespace Lumix
+namespace black
 {
 
 Sphere::Sphere() {}
@@ -967,7 +967,7 @@ bool getRayTriangleIntersection(const Vec3& origin,
 }
 
 
-LUMIX_CORE_API bool getSphereTriangleIntersection(const Vec3& center,
+BLACK_CORE_API bool getSphereTriangleIntersection(const Vec3& center,
 	float radius,
 	const Vec3& v0,
 	const Vec3& v1,
@@ -1106,4 +1106,4 @@ bool testOBBCollision(const AABB& a, const Matrix& mtx_b, const AABB& b)
 	return true;
 }
 
-} // namespace Lumix
+} // namespace black

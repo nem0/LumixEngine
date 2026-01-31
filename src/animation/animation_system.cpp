@@ -11,7 +11,7 @@
 #include "engine/world.h"
 
 
-namespace Lumix
+namespace black
 {
 
 struct Animation;
@@ -27,11 +27,11 @@ struct AnimResourceManager final : ResourceManager
 	{}
 
 	Resource* createResource(const Path& path) override {
-		return LUMIX_NEW(m_allocator, T)(path, *this, m_allocator);
+		return BLACK_NEW(m_allocator, T)(path, *this, m_allocator);
 	}
 
 	void destroyResource(Resource& resource) override {
-		LUMIX_DELETE(m_allocator, static_cast<T*>(&resource));
+		BLACK_DELETE(m_allocator, static_cast<T*>(&resource));
 	}
 
 	IAllocator& m_allocator;
@@ -88,8 +88,8 @@ void AnimationSystemImpl::createModules(World& world)
 }
 
 
-LUMIX_PLUGIN_ENTRY(animation) {
+BLACK_PLUGIN_ENTRY(animation) {
 	PROFILE_FUNCTION();
-	return LUMIX_NEW(engine.getAllocator(), AnimationSystemImpl)(engine);
+	return BLACK_NEW(engine.getAllocator(), AnimationSystemImpl)(engine);
 }
 }

@@ -1,10 +1,10 @@
 inherit "maps/demo/button"
 
-spawn_point = Lumix.Entity.NULL
-point0 = Lumix.Entity.NULL
-point1 = Lumix.Entity.NULL
-point2 = Lumix.Entity.NULL
-point3 = Lumix.Entity.NULL
+spawn_point = black.h.Entity.NULL
+point0 = black.h.Entity.NULL
+point1 = black.h.Entity.NULL
+point2 = black.h.Entity.NULL
+point3 = black.h.Entity.NULL
 
 function buttonPressed()
 	local e : Entity = this.world:createEntityEx {

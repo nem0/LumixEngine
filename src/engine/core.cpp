@@ -8,7 +8,7 @@
 #include "engine/reflection.h"
 #include "world.h"
 
-namespace Lumix {
+namespace black {
 
 enum class CoreModuleVersion : i32 {
 	SIGNALS,
@@ -276,7 +276,7 @@ struct CorePlugin : ISystem {
 };
 
 ISystem* createCorePlugin(Engine& engine) {
-	return LUMIX_NEW(engine.getAllocator(), CorePlugin)(engine);
+	return BLACK_NEW(engine.getAllocator(), CorePlugin)(engine);
 }
 
-} // namespace Lumix
+} // namespace black

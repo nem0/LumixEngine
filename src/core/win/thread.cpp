@@ -10,7 +10,7 @@
 #include "core/profiler.h"
 
 
-namespace Lumix
+namespace black
 {
 
 
@@ -88,7 +88,7 @@ static DWORD WINAPI threadFunction(LPVOID ptr)
 
 Thread::Thread(IAllocator& allocator)
 {
-	ThreadImpl* impl = LUMIX_NEW(allocator, ThreadImpl)(allocator);
+	ThreadImpl* impl = BLACK_NEW(allocator, ThreadImpl)(allocator);
 	impl->m_handle = nullptr;
 	impl->m_priority = ::GetThreadPriority(GetCurrentThread());
 	impl->m_is_running = false;
@@ -102,7 +102,7 @@ Thread::Thread(IAllocator& allocator)
 Thread::~Thread()
 {
 	ASSERT(!m_implementation->m_handle);
-	LUMIX_DELETE(m_implementation->m_allocator, m_implementation);
+	BLACK_DELETE(m_implementation->m_allocator, m_implementation);
 }
 
 bool Thread::create(const char* name, bool is_extended)
@@ -168,5 +168,5 @@ IAllocator& Thread::getAllocator()
 	return m_implementation->m_allocator;
 }
 
-} // namespace Lumix
+} // namespace black
 

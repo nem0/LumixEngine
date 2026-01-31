@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/lumix.h"
+#include "engine/black.h.h"
 
 #include "core/array.h"
 #include "core/delegate_list.h"
@@ -8,7 +8,7 @@
 #include "core/tag_allocator.h"
 
 
-namespace Lumix {
+namespace black {
 
 struct ComponentUID;
 struct IModule;
@@ -32,7 +32,7 @@ enum class WorldSerializeFlags : u32 {
 };
 
 // map one EntityPtr to another, used e.g. during additive loading or when instancing a prefab
-struct LUMIX_ENGINE_API EntityMap final {
+struct BLACK_ENGINE_API EntityMap final {
 	EntityMap(IAllocator& allocator);
 	~EntityMap() = default;
 	void reserve(u32 count);
@@ -46,7 +46,7 @@ struct LUMIX_ENGINE_API EntityMap final {
 // manages entities - contains basic entity data such as transforms or names
 // most of the components (rendering, animation, navigation, ...) are implemented in `IModule`s 
 // Each world has one instance of every module inherited from `IModule`
-struct LUMIX_ENGINE_API World {
+struct BLACK_ENGINE_API World {
 	enum { ENTITY_NAME_MAX_LENGTH = 32 };
 	using PartitionHandle = u16;
 	using ArchetypeHandle = u16;
@@ -209,8 +209,8 @@ private:
 };
 
 // to iterate children with range-based for loop: for (EntityRef child : world->childrenOf(parent))
-struct LUMIX_ENGINE_API ChildrenRange {
-	struct LUMIX_ENGINE_API Iterator {
+struct BLACK_ENGINE_API ChildrenRange {
+	struct BLACK_ENGINE_API Iterator {
 		void operator ++();
 		bool operator !=(const Iterator& rhs);
 		EntityRef operator*();
@@ -226,4 +226,4 @@ struct LUMIX_ENGINE_API ChildrenRange {
 	EntityRef parent;
 };
 
-} // namespace Lumix
+} // namespace black

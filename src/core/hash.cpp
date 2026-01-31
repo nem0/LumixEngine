@@ -4,7 +4,7 @@
 #define XXH_IMPLEMENTATION
 #include "xxhash/xxhash.h"
 
-namespace Lumix {
+namespace black {
 	
 StableHash::StableHash(const void* data, u32 len) {
 	hash = XXH3_64bits(data, len);
@@ -20,7 +20,7 @@ RuntimeHash::RuntimeHash(const void* data, u32 len) {
 
 RuntimeHash::RuntimeHash(const char* str) {
 	hash = XXH3_64bits(str, strlen(str));
-#ifdef LUMIX_DEBUG
+#ifdef BLACK_DEBUG
 	debug_str = str;
 #endif
 }
@@ -179,4 +179,4 @@ RuntimeHash32 RollingHasher::end() {
 	return RuntimeHash32::fromU32(u32(result ^ (result >> 32)));
 }
 
-} // namespace Lumix
+} // namespace black

@@ -19,7 +19,7 @@
 #include <imgui/imgui.h>
 
 
-namespace Lumix {
+namespace black {
 
 namespace LuaImGui {
 
@@ -698,7 +698,7 @@ static int LUA_loadWorld(lua_State* L)
 					}
 				}
 			}
-			LUMIX_DELETE(engine->getAllocator(), this);
+			BLACK_DELETE(engine->getAllocator(), this);
 		}
 
 		Engine* engine;
@@ -709,7 +709,7 @@ static int LUA_loadWorld(lua_State* L)
 	};
 
 	FileSystem& fs = engine->getFileSystem();
-	Callback* inst = LUMIX_NEW(engine->getAllocator(), Callback);
+	Callback* inst = BLACK_NEW(engine->getAllocator(), Callback);
 	inst->engine = engine;
 	inst->world = world;
 	inst->path = Path(path);
@@ -888,10 +888,10 @@ void registerEngineAPI(lua_State* L, Engine* engine) {
 	lua_pushcfunction(L, &LUA_loadstring, "loadstring");
 	lua_setglobal(L, "loadstring");
 
-	LuaWrapper::createSystemVariable(L, "LumixAPI", "engine", engine);
+	LuaWrapper::createSystemVariable(L, "black.hAPI", "engine", engine);
 
 	#define REGISTER_FUNCTION(name) \
-		LuaWrapper::createSystemFunction(L, "LumixAPI", #name, \
+		LuaWrapper::createSystemFunction(L, "black.hAPI", #name, \
 			&LuaWrapper::wrap<LUA_##name>); \
 
 	REGISTER_FUNCTION(networkClose);
@@ -930,31 +930,31 @@ void registerEngineAPI(lua_State* L, Engine* engine) {
 	
 	#undef REGISTER_FUNCTION
 	
-	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "getResourcePath", &LuaWrapper::wrap<LUA_getResourcePath>);
+	LuaWrapper::createSystemClosure(L, "black.hAPI", engine, "getResourcePath", &LuaWrapper::wrap<LUA_getResourcePath>);
 
-	LuaWrapper::createSystemFunction(L, "LumixAPI", "resourceTypeFromString", &LUA_resourceTypeFromString);
-	LuaWrapper::createSystemFunction(L, "LumixAPI", "beginProfilerBlock", LuaWrapper::wrap<&profiler::endBlock>);
-	LuaWrapper::createSystemFunction(L, "LumixAPI", "endProfilerBlock", LuaWrapper::wrap<&profiler::beginBlock>);
-	LuaWrapper::createSystemFunction(L, "LumixAPI", "createProfilerCounter", LuaWrapper::wrap<&profiler::createCounter>);
-	LuaWrapper::createSystemFunction(L, "LumixAPI", "pushProfilerCounter", LuaWrapper::wrap<&profiler::pushCounter>);
-	LuaWrapper::createSystemFunction(L, "LumixAPI", "networkRead", &LUA_networkRead);
-	LuaWrapper::createSystemFunction(L, "LumixAPI", "packU32", &LUA_packU32);
-	LuaWrapper::createSystemFunction(L, "LumixAPI", "unpackU32", &LUA_unpackU32);
-	LuaWrapper::createSystemFunction(L, "LumixAPI", "networkConnect", &LUA_networkConnect);
-	LuaWrapper::createSystemFunction(L, "LumixAPI", "networkListen", &LUA_networkListen);
+	LuaWrapper::createSystemFunction(L, "black.hAPI", "resourceTypeFromString", &LUA_resourceTypeFromString);
+	LuaWrapper::createSystemFunction(L, "black.hAPI", "beginProfilerBlock", LuaWrapper::wrap<&profiler::endBlock>);
+	LuaWrapper::createSystemFunction(L, "black.hAPI", "endProfilerBlock", LuaWrapper::wrap<&profiler::beginBlock>);
+	LuaWrapper::createSystemFunction(L, "black.hAPI", "createProfilerCounter", LuaWrapper::wrap<&profiler::createCounter>);
+	LuaWrapper::createSystemFunction(L, "black.hAPI", "pushProfilerCounter", LuaWrapper::wrap<&profiler::pushCounter>);
+	LuaWrapper::createSystemFunction(L, "black.hAPI", "networkRead", &LUA_networkRead);
+	LuaWrapper::createSystemFunction(L, "black.hAPI", "packU32", &LUA_packU32);
+	LuaWrapper::createSystemFunction(L, "black.hAPI", "unpackU32", &LUA_unpackU32);
+	LuaWrapper::createSystemFunction(L, "black.hAPI", "networkConnect", &LUA_networkConnect);
+	LuaWrapper::createSystemFunction(L, "black.hAPI", "networkListen", &LUA_networkListen);
 
 	LuaWrapper::createSystemFunction(L, "LuaScript", "getEnvironment", &LUA_getEnvironment);
 	LuaWrapper::createSystemFunction(L, "LuaScript", "getInlineEnvironment", &LUA_getInlineEnvironment);
 
-	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "loadWorld", LUA_loadWorld);
-	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "hasFilesystemWork", LUA_hasFilesystemWork);
-	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "processFilesystemWork", LUA_processFilesystemWork);
-	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "pause", LUA_pause);
-	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "writeFile", LUA_writeFile);
-	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "loadResource", LUA_loadResource);
-	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "unloadResource", LUA_unloadResource);
+	LuaWrapper::createSystemClosure(L, "black.hAPI", engine, "loadWorld", LUA_loadWorld);
+	LuaWrapper::createSystemClosure(L, "black.hAPI", engine, "hasFilesystemWork", LUA_hasFilesystemWork);
+	LuaWrapper::createSystemClosure(L, "black.hAPI", engine, "processFilesystemWork", LUA_processFilesystemWork);
+	LuaWrapper::createSystemClosure(L, "black.hAPI", engine, "pause", LUA_pause);
+	LuaWrapper::createSystemClosure(L, "black.hAPI", engine, "writeFile", LUA_writeFile);
+	LuaWrapper::createSystemClosure(L, "black.hAPI", engine, "loadResource", LUA_loadResource);
+	LuaWrapper::createSystemClosure(L, "black.hAPI", engine, "unloadResource", LUA_unloadResource);
 
-	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "instantiatePrefab", &LUA_instantiatePrefab);
+	LuaWrapper::createSystemClosure(L, "black.hAPI", engine, "instantiatePrefab", &LUA_instantiatePrefab);
 
 	lua_newtable(L);
 	lua_pushvalue(L, -1);
@@ -1046,150 +1046,150 @@ void registerEngineAPI(lua_State* L, Engine* engine) {
 	lua_pop(L, 1);
 
 	const char* entity_src = R"#(
-		Lumix = {}
-		Lumix.Entity = {}
-		function Lumix.Entity:new(world, entity)
+		black.h = {}
+		black.h.Entity = {}
+		function black.h.Entity:new(world, entity)
 			local e = { _entity = entity, _world = world }
 			setmetatable(e, self)
 			return e
 		end
-		function Lumix.Entity:destroy()
-			LumixAPI.destroyEntity(self._world, self._entity)
+		function black.h.Entity:destroy()
+			black.hAPI.destroyEntity(self._world, self._entity)
 			self._entity = 0xffFFffFF
 		end
-		function Lumix.Entity:createComponent(cmp)
-			LumixAPI.createComponent(self._world, self._entity, cmp)
-			if Lumix[cmp] == nil then
+		function black.h.Entity:createComponent(cmp)
+			black.hAPI.createComponent(self._world, self._entity, cmp)
+			if black.h[cmp] == nil then
 				error("Lua does not know component " .. cmp)
 			end
-			return Lumix[cmp]:new(self._world, self._entity)
+			return black.h[cmp]:new(self._world, self._entity)
 		end
-		function Lumix.Entity:getComponent(cmp)
-			if not LumixAPI.hasComponent(self._world, self._entity, cmp) then return nil end
-			return Lumix[cmp]:new(self._world, self._entity)
+		function black.h.Entity:getComponent(cmp)
+			if not black.hAPI.hasComponent(self._world, self._entity, cmp) then return nil end
+			return black.h[cmp]:new(self._world, self._entity)
 		end
-		function Lumix.Entity:hasComponent(cmp)
-			return LumixAPI.hasComponent(self._world, self._entity, cmp)
+		function black.h.Entity:hasComponent(cmp)
+			return black.hAPI.hasComponent(self._world, self._entity, cmp)
 		end
-		Lumix.Entity.__index = function(table, key)
+		black.h.Entity.__index = function(table, key)
 			if key == "position" then
-				return LumixAPI.getEntityPosition(table._world, table._entity)
+				return black.hAPI.getEntityPosition(table._world, table._entity)
 			elseif key == "local_position" then
-				return LumixAPI.getEntityLocalPosition(table._world, table._entity)
+				return black.hAPI.getEntityLocalPosition(table._world, table._entity)
 			elseif key == "parent" then
-				local p = LumixAPI.getParent(table._world, table._entity)
+				local p = black.hAPI.getParent(table._world, table._entity)
 				if p < 0 then return nil end
-				return Lumix.Entity:new(table._world, p)
+				return black.h.Entity:new(table._world, p)
 			elseif key == "first_child" then
-				local p = LumixAPI.getFirstChild(table._world, table._entity)
+				local p = black.hAPI.getFirstChild(table._world, table._entity)
 				if p < 0 then return nil end
-				return Lumix.Entity:new(table._world, p)
+				return black.h.Entity:new(table._world, p)
 			elseif key == "next_sibling" then
-				local p = LumixAPI.getNextSibling(table._world, table._entity)
+				local p = black.hAPI.getNextSibling(table._world, table._entity)
 				if p < 0 then return nil end
-				return Lumix.Entity:new(table._world, p)
+				return black.h.Entity:new(table._world, p)
 			elseif key == "rotation" then
-				return LumixAPI.getEntityRotation(table._world, table._entity)
+				return black.hAPI.getEntityRotation(table._world, table._entity)
 			elseif key == "name" then
-				return LumixAPI.getEntityName(table._world, table._entity)
+				return black.hAPI.getEntityName(table._world, table._entity)
 			elseif key == "scale" then
-				return LumixAPI.getEntityScale(table._world, table._entity)
+				return black.hAPI.getEntityScale(table._world, table._entity)
 			elseif key == "world" then
-				return Lumix.World:new(table._world)
+				return black.h.World:new(table._world)
 			elseif key == "_world" or key == "_entity" then
 				return rawget(table, key)
-			elseif Lumix.Entity[key] ~= nil then
-				return Lumix.Entity[key]
+			elseif black.h.Entity[key] ~= nil then
+				return black.h.Entity[key]
 			else 
-				if LumixAPI.hasComponent(table._world, table._entity, key) then
-					return Lumix[key]:new(table._world, table._entity)
+				if black.hAPI.hasComponent(table._world, table._entity, key) then
+					return black.h[key]:new(table._world, table._entity)
 				else
 					return nil
 				end
 			end
 		end
-		Lumix.Entity.INVALID = Lumix.Entity:new(nil, -1)
-		Lumix.Entity.NULL = Lumix.Entity.INVALID
+		black.h.Entity.INVALID = black.h.Entity:new(nil, -1)
+		black.h.Entity.NULL = black.h.Entity.INVALID
 
-		Lumix.Entity.__eq = function(a, b)
+		black.h.Entity.__eq = function(a, b)
 			return a._entity == b._entity and a._world == b._world
 		end
 
-		Lumix.Entity.__newindex = function(table, key, value)
+		black.h.Entity.__newindex = function(table, key, value)
 			if key == "position" then
-				LumixAPI.setEntityPosition(table._world, table._entity, value)
+				black.hAPI.setEntityPosition(table._world, table._entity, value)
 			elseif key == "local_position" then
-				LumixAPI.setEntityLocalPosition(table._world, table._entity, value)
+				black.hAPI.setEntityLocalPosition(table._world, table._entity, value)
 			elseif key == "name" then
-				LumixAPI.setEntityName(table._world, table._entity, value)
+				black.hAPI.setEntityName(table._world, table._entity, value)
 			elseif key == "rotation" then
-				LumixAPI.setEntityRotation(table._world, table._entity, value)
+				black.hAPI.setEntityRotation(table._world, table._entity, value)
 			elseif key == "scale" then
-				LumixAPI.setEntityScale(table._world, table._entity, value)
+				black.hAPI.setEntityScale(table._world, table._entity, value)
 			elseif key == "parent" then
-				LumixAPI.setParent(table._world, value._entity, table._entity)
-			elseif Lumix.Entity[key] ~= nil then
-				Lumix.Entity[key] = value
+				black.hAPI.setParent(table._world, value._entity, table._entity)
+			elseif black.h.Entity[key] ~= nil then
+				black.h.Entity[key] = value
 			else
 				error("key " .. tostring(key) .. " not found")
 			end
 		end
 
-		Lumix.World = {}
-		function Lumix.World:create() 
-			local u = LumixAPI.createWorld(LumixAPI.engine)
-			return Lumix.World:new(u)
+		black.h.World = {}
+		function black.h.World:create() 
+			local u = black.hAPI.createWorld(black.hAPI.engine)
+			return black.h.World:new(u)
 		end
-		function Lumix.World:destroy()
-			LumixAPI.destroyWorld(LumixAPI.engine, self.value)
+		function black.h.World:destroy()
+			black.hAPI.destroyWorld(black.hAPI.engine, self.value)
 		end
-		function Lumix.World:load(path, callback_fn)
-			LumixAPI.loadWorld(self.value, path, callback_fn)
+		function black.h.World:load(path, callback_fn)
+			black.hAPI.loadWorld(self.value, path, callback_fn)
 		end
-		function Lumix.World:new(_world)
+		function black.h.World:new(_world)
 			local u = { value = _world }
 			setmetatable(u, self)
 			return u
 		end
-		function Lumix.World:setActivePartition(partition)
-			LumixAPI.setActivePartition(self.value, partition)
+		function black.h.World:setActivePartition(partition)
+			black.hAPI.setActivePartition(self.value, partition)
 		end
-		function Lumix.World:getActivePartition()
-			return LumixAPI.getActivePartition(self.value)
+		function black.h.World:getActivePartition()
+			return black.hAPI.getActivePartition(self.value)
 		end
-		function Lumix.World:createPartition(name)
-			return LumixAPI.createPartition(self.value, name)
+		function black.h.World:createPartition(name)
+			return black.hAPI.createPartition(self.value, name)
 		end
-		function Lumix.World:destroyPartition(partition)
-			return LumixAPI.destroyPartition(self.value, partition)
+		function black.h.World:destroyPartition(partition)
+			return black.hAPI.destroyPartition(self.value, partition)
 		end
-		function Lumix.World:instantiatePrefab(position, prefab)
-			return LumixAPI.instantiatePrefab(self, position, prefab._handle)
+		function black.h.World:instantiatePrefab(position, prefab)
+			return black.hAPI.instantiatePrefab(self, position, prefab._handle)
 		end
-		function Lumix.World:createEntity()
-			local e = LumixAPI.createEntity(self.value)
-			return Lumix.Entity:new(self.value, e)
+		function black.h.World:createEntity()
+			local e = black.hAPI.createEntity(self.value)
+			return black.h.Entity:new(self.value, e)
 		end
-		function Lumix.World.__index(table, key)
-			if Lumix.World[key] ~= nil then
-				return Lumix.World[key]
+		function black.h.World.__index(table, key)
+			if black.h.World[key] ~= nil then
+				return black.h.World[key]
 			else
-				if LumixModules[key] == nil then return nil end
-				local module = LumixAPI.getModule(table.value, key)
-				return LumixModules[key]:new(module)
+				if black.hModules[key] == nil then return nil end
+				local module = black.hAPI.getModule(table.value, key)
+				return black.hModules[key]:new(module)
 			end
 		end
-		function Lumix.World:getModule(name)
-			local module = LumixAPI.getModule(self.value, name)	
-			if LumixModules[name] == nil then return nil end
-			return LumixModules[name]:new(module)
+		function black.h.World:getModule(name)
+			local module = black.hAPI.getModule(self.value, name)	
+			if black.hModules[name] == nil then return nil end
+			return black.hModules[name]:new(module)
 		end
-		function Lumix.World:findEntityByName(parent, name)
-			local p = LumixAPI.findByName(self.value, parent._entity or -1, name)
+		function black.h.World:findEntityByName(parent, name)
+			local p = black.hAPI.findByName(self.value, parent._entity or -1, name)
 			if p < 0 then return nil end
-			return Lumix.Entity:new(self.value, p)
+			return black.h.Entity:new(self.value, p)
 		end
-		function Lumix.World:createEntityEx(desc)
+		function black.h.World:createEntityEx(desc)
 			local ent = self:createEntity()
 			for k, v in pairs(desc) do
 				if k == "position" then
@@ -1208,23 +1208,23 @@ void registerEngineAPI(lua_State* L, Engine* engine) {
 			return ent
 		end
 
-		Lumix.Resource = {}
-		function Lumix.Resource:new(handle, type)
-			local r = { _handle = handle, _type = LumixAPI.resourceTypeFromString(type) }
+		black.h.Resource = {}
+		function black.h.Resource:new(handle, type)
+			local r = { _handle = handle, _type = black.hAPI.resourceTypeFromString(type) }
 			setmetatable(r, self)
 			return r
 		end
-		function Lumix.Resource:newEmpty(type)
-			local r = { _handle = -1, _type = LumixAPI.resourceTypeFromString(type) }
+		function black.h.Resource:newEmpty(type)
+			local r = { _handle = -1, _type = black.hAPI.resourceTypeFromString(type) }
 			setmetatable(r, self)
 			return r
 		end
-		function Lumix.Resource:getPath()
-			return LumixAPI.getResourcePath(self._handle)
+		function black.h.Resource:getPath()
+			return black.hAPI.getResourcePath(self._handle)
 		end
-		function Lumix.Resource.__index(table, key)
-			if Lumix.Resource[key] ~= nil then
-				return Lumix.Resource[key]
+		function black.h.Resource.__index(table, key)
+			if black.h.Resource[key] ~= nil then
+				return black.h.Resource[key]
 			end
 			if key == "path" then
 				return table:getPath()
@@ -1241,7 +1241,7 @@ void registerEngineAPI(lua_State* L, Engine* engine) {
 
 	registerLuaAPI(L);
 
-	lua_getglobal(L, "LumixModules");
+	lua_getglobal(L, "black.hModules");
 	lua_getfield(L, -1, "physics");
 	lua_pushcfunction(L, LUA_raycastEx, "raycastEx");
 	lua_setfield(L, -2, "raycastEx");
@@ -1305,7 +1305,7 @@ static int lua_new_cmp(lua_State* L) {
 static void registerLuaComponent(lua_State* L, const char* cmp_name, lua_CFunction getter, lua_CFunction setter) {
 	const ComponentType cmp_type = reflection::getComponentType(cmp_name);
 	lua_newtable(L);
-	lua_getglobal(L, "Lumix");
+	lua_getglobal(L, "black.h");
 	lua_pushvalue(L, -2);
 	lua_setfield(L, -2, cmp_name);
 	lua_pop(L, 1);
@@ -1338,6 +1338,6 @@ static int lua_new_module(lua_State* L) {
 	return 1;
 }
 
-} // namespace Lumix
+} // namespace black
 
 #include "lua_capi.gen.h"

@@ -25,12 +25,12 @@
 #pragma comment(lib, "DbgHelp.lib")
 
 
-#define LUMIX_ALLOC_GUARDS
+#define BLACK_ALLOC_GUARDS
 
 static bool g_is_crash_reporting_enabled = false;
 
 
-namespace Lumix
+namespace black
 {
 
 
@@ -192,7 +192,7 @@ StackNode* StackTree::insertChildren(StackNode* root_node, void** instruction, v
 	StackNode* node = root_node;
 	while (instruction >= stack)
 	{
-		StackNode* new_node = LUMIX_NEW(m_allocator, StackNode)();
+		StackNode* new_node = BLACK_NEW(m_allocator, StackNode)();
 		node->m_first_child = new_node;
 		new_node->m_parent = node;
 		new_node->m_next = nullptr;
@@ -249,7 +249,7 @@ StackNode* StackTree::record()
 	m_srw_lock.enterExclusive();
 	defer { m_srw_lock.exitExclusive(); };
 	if (!m_root) {
-		m_root = LUMIX_NEW(m_allocator, StackNode)();
+		m_root = BLACK_NEW(m_allocator, StackNode)();
 		m_root->m_instruction = *ptr;
 		m_root->m_first_child = nullptr;
 		m_root->m_next = nullptr;
@@ -266,7 +266,7 @@ StackNode* StackTree::record()
 		}
 
 		if (node->m_instruction != *ptr) {
-			node->m_next = LUMIX_NEW(m_allocator, StackNode);
+			node->m_next = BLACK_NEW(m_allocator, StackNode);
 			node->m_next->m_parent = node->m_parent;
 			node->m_next->m_instruction = *ptr;
 			node->m_next->m_next = nullptr;
@@ -317,7 +317,7 @@ void GuardAllocator::deallocate(void* ptr) {
 
 static size_t getAllocationOffset()
 {
-	#ifdef LUMIX_ALLOC_GUARDS
+	#ifdef BLACK_ALLOC_GUARDS
 		return sizeof(AllocationInfo) + sizeof(ALLOCATION_GUARD);
 	#else
 		return sizeof(AllocationInfo);
@@ -326,7 +326,7 @@ static size_t getAllocationOffset()
 
 
 static size_t getNeededMemory(size_t size) {
-	#ifdef LUMIX_ALLOC_GUARDS
+	#ifdef BLACK_ALLOC_GUARDS
 		return size + sizeof(AllocationInfo) + sizeof(ALLOCATION_GUARD) * 2;
 	#else
 		return size + sizeof(AllocationInfo);
@@ -335,7 +335,7 @@ static size_t getNeededMemory(size_t size) {
 
 
 static size_t getNeededMemory(size_t size, size_t align) {
-	#ifdef LUMIX_ALLOC_GUARDS
+	#ifdef BLACK_ALLOC_GUARDS
 		return size + sizeof(AllocationInfo) + sizeof(ALLOCATION_GUARD) * 2 + align;
 	#else
 		return size + sizeof(AllocationInfo) + align;
@@ -360,7 +360,7 @@ static u8* getUserFromSystem(void* system_ptr, size_t align)
 static u8* getSystemFromUser(void* user_ptr)
 {
 	AllocationInfo* info = getAllocationInfoFromUser(user_ptr);
-	#ifdef LUMIX_ALLOC_GUARDS
+	#ifdef BLACK_ALLOC_GUARDS
 		size_t diff = sizeof(ALLOCATION_GUARD) + sizeof(AllocationInfo);
 	#else
 		size_t diff = sizeof(AllocationInfo);
@@ -392,7 +392,7 @@ void shutdown() {
 }
 
 void checkLeaks() {
-	#ifdef LUMIX_DEBUG
+	#ifdef BLACK_DEBUG
 		if (s_allocation_debug.m_root) {
 			bool first = true;
 			AllocationInfo* info = s_allocation_debug.m_root;
@@ -421,7 +421,7 @@ static void* getUserPtrFromAllocationInfo(AllocationInfo* info)
 }
 
 void checkGuards() {
-	#ifdef LUMIX_ALLOC_GUARDS
+	#ifdef BLACK_ALLOC_GUARDS
 		MutexGuard lock(s_allocation_debug.m_mutex);
 		auto* info = s_allocation_debug.m_root;
 		while (info) {
@@ -517,7 +517,7 @@ void* Allocator::allocate(size_t size, size_t align) {
 		memset(user_ptr, UNINITIALIZED_MEMORY_PATTERN, size);
 	}
 
-	#ifdef LUMIX_ALLOC_GUARDS
+	#ifdef BLACK_ALLOC_GUARDS
 		*(u32*)system_ptr = ALLOCATION_GUARD;
 		*(u32*)((u8*)user_ptr + info->size) = ALLOCATION_GUARD;
 	#endif
@@ -531,7 +531,7 @@ void Allocator::deallocate(void* user_ptr) {
 	AllocationInfo* info = getAllocationInfoFromUser(user_ptr);
 	m_total_size.subtract(info->size);
 	void* system_ptr = getSystemFromUser(user_ptr);
-	#ifdef LUMIX_ALLOC_GUARDS
+	#ifdef BLACK_ALLOC_GUARDS
 		ASSERT(*(u32*)system_ptr == ALLOCATION_GUARD);
 		ASSERT(*(u32*)((u8*)user_ptr + info->size) == ALLOCATION_GUARD);
 	#endif
@@ -787,4 +787,4 @@ void setHardwareBreakpoint(u32 breakpoint_idx, const void* mem, u32 size) {
 }
 
 
-} // namespace Lumix
+} // namespace black

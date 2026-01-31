@@ -6,10 +6,10 @@
 #include "string.h"
 
 
-namespace Lumix {
+namespace black {
 
 namespace os {
-	LUMIX_CORE_API bool getCommandLine(Span<char> output);
+	BLACK_CORE_API bool getCommandLine(Span<char> output);
 }
 
 struct CommandLineParser {
@@ -132,4 +132,4 @@ private:
 };
 
 
-} // namespace Lumix
+} // namespace black

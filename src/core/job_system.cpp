@@ -26,9 +26,9 @@ Invariants:
 	* If a thread calls push(jobA), tryPop() running in parallel on another thread might or might not pop jobA.
 */
 
-#define LUMIX_PROFILE_JOBS
+#define BLACK_PROFILE_JOBS
 
-namespace Lumix::jobs {
+namespace black::jobs {
 
 struct Job {
 	void (*task)(void*) = nullptr;
@@ -68,10 +68,10 @@ struct Work {
 	};
 };
 
-LUMIX_FORCE_INLINE static void wake(WorkerTask& to_wake);
-LUMIX_FORCE_INLINE static void wake(u32 num_jobs);
-LUMIX_FORCE_INLINE static void wake();
-LUMIX_FORCE_INLINE static void executeJob(const Job& job);
+BLACK_FORCE_INLINE static void wake(WorkerTask& to_wake);
+BLACK_FORCE_INLINE static void wake(u32 num_jobs);
+BLACK_FORCE_INLINE static void wake();
+BLACK_FORCE_INLINE static void executeJob(const Job& job);
 
 // single producer, multiple consumer queue
 // we assume strong memory model, so we can don't need to use full barriers in some cases
@@ -82,11 +82,11 @@ struct WorkStealingQueue {
 	static constexpr u32 RING_BUFFER_SIZE = 512;
 	static constexpr u32 SIZE_MASK = RING_BUFFER_SIZE - 1;
 
-	LUMIX_FORCE_INLINE void pushAndWake(const Work& obj);
+	BLACK_FORCE_INLINE void pushAndWake(const Work& obj);
 	// optimized batch push
-	LUMIX_FORCE_INLINE void pushAndWakeN(const Work& obj, u32 num);
+	BLACK_FORCE_INLINE void pushAndWakeN(const Work& obj, u32 num);
 
-	LUMIX_FORCE_INLINE bool tryPop(Work& obj) {
+	BLACK_FORCE_INLINE bool tryPop(Work& obj) {
 		for (;;) {
 			const i32 producing_end = m_producing_end - 1;
 			m_producing_end = producing_end;
@@ -127,7 +127,7 @@ struct WorkStealingQueue {
 		}
 	}
 
-	LUMIX_FORCE_INLINE bool trySteal(Work& obj) {
+	BLACK_FORCE_INLINE bool trySteal(Work& obj) {
 		for (;;) {
 			const i32 stealing_end = m_stealing_end;
 			// read stealing_end first, so we won't miss concurrent trySteal, or tryPop popping the last element
@@ -160,16 +160,16 @@ struct WorkStealingQueue {
 struct WorkQueue {
 	// queue can be modified only when holding mutex
 	AtomicI32 empty = 1; // tryPop can just read this and not lock the mutex if the queue is empty
-	Lumix::Mutex mutex;
+	black.h::Mutex mutex;
 	Array<Work> queue;
 
 	WorkQueue(IAllocator& allocator) : queue(allocator) {}
 
-	LUMIX_FORCE_INLINE bool tryPop(Work& obj) {
+	BLACK_FORCE_INLINE bool tryPop(Work& obj) {
 		// fastest path - empty queue is just one atomic read
 		if (empty) return false;
 
-		Lumix::MutexGuard guard(mutex);
+		black.h::MutexGuard guard(mutex);
 		if (queue.empty()) {
 			empty = 1;
 			return false;
@@ -181,9 +181,9 @@ struct WorkQueue {
 		return true;
 	}
 
-	LUMIX_FORCE_INLINE void pushAndWakeN(const Work& obj, u32 num) {
+	BLACK_FORCE_INLINE void pushAndWakeN(const Work& obj, u32 num) {
 		{
-			Lumix::MutexGuard guard(mutex);
+			black.h::MutexGuard guard(mutex);
 			for (u32 i = 0; i < num; ++i) {
 				queue.push(obj);
 			}
@@ -192,9 +192,9 @@ struct WorkQueue {
 		wake(num);
 	}
 
-	LUMIX_FORCE_INLINE void pushAndWake(const Work& obj, WorkerTask* to_wake) {
+	BLACK_FORCE_INLINE void pushAndWake(const Work& obj, WorkerTask* to_wake) {
 		{
-			Lumix::MutexGuard guard(mutex);
+			black.h::MutexGuard guard(mutex);
 			queue.push(obj);
 			empty = 0;
 		}
@@ -218,7 +218,7 @@ struct System {
 	RingBuffer<FiberJobPair*, 512> m_free_fibers;
 	WorkQueue m_global_queue; // non-worker threads must push here
 	AtomicI32 m_num_sleeping = 0; // if 0, we are sure that no worker is sleeping; if not 0, workers can be in any state
-	Lumix::Mutex m_sleeping_sync;
+	black.h::Mutex m_sleeping_sync;
 	Array<WorkerTask*> m_sleeping_workers; // only access while holding m_sleeping_sync
 };
 
@@ -242,7 +242,7 @@ WorkerTask* getWorker()
 	#pragma clang optimize on
 #endif
 
-LUMIX_FORCE_INLINE static FiberJobPair* popFreeFiber() {
+BLACK_FORCE_INLINE static FiberJobPair* popFreeFiber() {
 	FiberJobPair* new_fiber;
 	bool popped = g_system->m_free_fibers.pop(new_fiber);
 	ASSERT(popped);
@@ -258,15 +258,15 @@ struct WaitingFiber {
 	FiberJobPair* fiber;
 };
 
-LUMIX_FORCE_INLINE WaitingFiber* getWaitingFiberFromState(u64 state) {
+BLACK_FORCE_INLINE WaitingFiber* getWaitingFiberFromState(u64 state) {
 	return (WaitingFiber*)((state & STATE_WAITING_FIBER_MASK) >> 16);
 }
 
-LUMIX_FORCE_INLINE u16 getCounterFromState(u64 state) {
+BLACK_FORCE_INLINE u16 getCounterFromState(u64 state) {
 	return u16(state & STATE_COUNTER_MASK);
 }
 
-LUMIX_FORCE_INLINE u64 makeStateValue(WaitingFiber* fiber, u16 counter) {
+BLACK_FORCE_INLINE u64 makeStateValue(WaitingFiber* fiber, u16 counter) {
 	return (u64(fiber) << 16) | counter;
 }
 
@@ -320,7 +320,7 @@ struct WorkerTask : Thread {
 };
 
 // push fiber to work queue
-LUMIX_FORCE_INLINE static void scheduleFiber(FiberJobPair* fiber) {
+BLACK_FORCE_INLINE static void scheduleFiber(FiberJobPair* fiber) {
 	const u8 worker_idx = fiber->current_job.worker_index;
 	if (worker_idx == ANY_WORKER) {
 		getWorker()->m_wsq.pushAndWake(fiber);
@@ -332,7 +332,7 @@ LUMIX_FORCE_INLINE static void scheduleFiber(FiberJobPair* fiber) {
 
 // try to steal a job from any other worker
 // we have to try all workers, otherwise we could miss a job
-LUMIX_FORCE_INLINE static bool trySteal(Work& work, WorkerTask* stealing_worker) {
+BLACK_FORCE_INLINE static bool trySteal(Work& work, WorkerTask* stealing_worker) {
 	Array<WorkerTask*>& workers = g_system->m_workers;
 	const u32 num_workers = workers.size();	
 	const u32 start = stealing_worker->m_last_steal_idx;
@@ -352,7 +352,7 @@ LUMIX_FORCE_INLINE static bool trySteal(Work& work, WorkerTask* stealing_worker)
 }
 
 // try to pop a job from the queues
-LUMIX_FORCE_INLINE static bool tryPopWork(Work& work, WorkerTask* worker) {
+BLACK_FORCE_INLINE static bool tryPopWork(Work& work, WorkerTask* worker) {
 	// jobs in worker's work queue are rare but usually in the critical path, so we need to try first
 	// try on empty queue is very fast
 	if (worker->m_work_queue.tryPop(work)) return true;
@@ -373,7 +373,7 @@ LUMIX_FORCE_INLINE static bool tryPopWork(Work& work, WorkerTask* worker) {
 // pops some work from the queues, if there are no jobs, worker goes to sleep
 // returns true if there is some work to do
 // return false if the worker should shutdown
-LUMIX_FORCE_INLINE static bool popWork(Work& work, WorkerTask* worker) {
+BLACK_FORCE_INLINE static bool popWork(Work& work, WorkerTask* worker) {
 	while (!worker->m_finished) {
 		for (u32 i = 0; i < 20; ++i) {
 			if (tryPopWork(work, worker)) return true;
@@ -383,7 +383,7 @@ LUMIX_FORCE_INLINE static bool popWork(Work& work, WorkerTask* worker) {
 		g_system->m_num_sleeping.inc();
 		worker->m_is_sleeping = 1;
 		
-		Lumix::MutexGuard guard(g_system->m_sleeping_sync);
+		black.h::MutexGuard guard(g_system->m_sleeping_sync);
 		
 		// we must recheck the queues while holding the mutex, because somebody might have pushed a job in the meantime
 		if (tryPopWork(work, worker)) {
@@ -394,7 +394,7 @@ LUMIX_FORCE_INLINE static bool popWork(Work& work, WorkerTask* worker) {
 
 		// no jobs, let's go to sleep
 		// even if somebody pushed a job in the meantime, we are sure that we will be woken up, since we hold the mutex
-		#ifdef LUMIX_PROFILE_JOBS
+		#ifdef BLACK_PROFILE_JOBS
 			PROFILE_BLOCK("sleeping");
 			profiler::blockColor(Color(0x30, 0x30, 0x30, 0xff).abgr());
 		#endif
@@ -460,11 +460,11 @@ static void afterSwitch() {
 }
 
 // switch from current fiber to a new, free fiber (into `manage` function)
-LUMIX_FORCE_INLINE static void switchFibers(i32 profiler_id) {
+BLACK_FORCE_INLINE static void switchFibers(i32 profiler_id) {
 	WorkerTask* worker = getWorker();
 	FiberJobPair* this_fiber = worker->m_current_fiber;
 	
-	#ifdef LUMIX_PROFILE_JOBS
+	#ifdef BLACK_PROFILE_JOBS
 		const profiler::FiberSwitchData switch_data = profiler::beginFiberWait(profiler_id);
 	#endif
 	FiberJobPair* new_fiber = popFreeFiber();
@@ -475,7 +475,7 @@ LUMIX_FORCE_INLINE static void switchFibers(i32 profiler_id) {
 	
 	// we can be on different worker than before fiber switch, must call getWorker()
 	getWorker()->m_current_fiber = this_fiber;
-	#ifdef LUMIX_PROFILE_JOBS
+	#ifdef BLACK_PROFILE_JOBS
 		profiler::endFiberWait(switch_data);
 	#endif
 }
@@ -497,12 +497,12 @@ void turnGreenEx(Signal* signal) {
 
 void turnGreen(Signal* signal) {
 	turnGreenEx(signal);
-	#ifdef LUMIX_PROFILE_JOBS
+	#ifdef BLACK_PROFILE_JOBS
 		profiler::signalTriggered(signal->generation);
 	#endif
 }
 
-LUMIX_FORCE_INLINE static void decCounter(Counter* counter) {
+BLACK_FORCE_INLINE static void decCounter(Counter* counter) {
 	for (;;) {
 		const u64 state = counter->signal.state;
 		WaitingFiber* fiber;
@@ -531,7 +531,7 @@ LUMIX_FORCE_INLINE static void decCounter(Counter* counter) {
 	}
 }
 
-LUMIX_FORCE_INLINE static void addCounter(Counter* counter, u32 value) {
+BLACK_FORCE_INLINE static void addCounter(Counter* counter, u32 value) {
 	const u64 prev_state = counter->signal.state.add(value);
 	ASSERT(getCounterFromState(prev_state) + value < 0xffFF);
 	
@@ -541,12 +541,12 @@ LUMIX_FORCE_INLINE static void addCounter(Counter* counter, u32 value) {
 	}
 }
 
-LUMIX_FORCE_INLINE static void executeJob(const Job& job) {
-	#ifdef LUMIX_PROFILE_JOBS
+BLACK_FORCE_INLINE static void executeJob(const Job& job) {
+	#ifdef BLACK_PROFILE_JOBS
 		profiler::beginJob(job.dec_on_finish ? job.dec_on_finish->signal.generation : 0);
 	#endif
 	job.task(job.data);
-	#ifdef LUMIX_PROFILE_JOBS
+	#ifdef BLACK_PROFILE_JOBS
 		profiler::endBlock();
 	#endif
 	if (job.dec_on_finish) {
@@ -609,7 +609,7 @@ bool init(u8 workers_count, IAllocator& allocator) {
 
 	const u32 count = workers_count > 1 ? workers_count : 1;
 	for (u32 i = 0; i < count; ++i) {
-		WorkerTask* task = LUMIX_NEW(getAllocator(), WorkerTask)(*g_system, i);
+		WorkerTask* task = BLACK_NEW(getAllocator(), WorkerTask)(*g_system, i);
 		g_system->m_workers.push(task);
 	}
 
@@ -619,7 +619,7 @@ bool init(u8 workers_count, IAllocator& allocator) {
 			task->setAffinityMask((u64)1 << i);
 		}
 		else {
-			LUMIX_DELETE(getAllocator(), task);
+			BLACK_DELETE(getAllocator(), task);
 		}
 	}
 
@@ -649,7 +649,7 @@ void shutdown()
 			task->wakeup();
 		}
 		task->destroy();
-		LUMIX_DELETE(allocator, task);
+		BLACK_DELETE(allocator, task);
 	}
 
 	for (FiberJobPair& fiber : g_system->m_fiber_pool)
@@ -832,19 +832,19 @@ void runN(void* data, void(*task)(void*), Counter* on_finished, u32 num_jobs)
 }
 
 // wake the worker (if any is sleeping)
-LUMIX_FORCE_INLINE static void wake(WorkerTask& worker) {
+BLACK_FORCE_INLINE static void wake(WorkerTask& worker) {
 	if (!worker.m_is_sleeping) return;
 
-	Lumix::MutexGuard guard(g_system->m_sleeping_sync);
+	black.h::MutexGuard guard(g_system->m_sleeping_sync);
 	g_system->m_sleeping_workers.eraseItem(&worker);
 	worker.wakeup();
 }
 
 // wake one worker (if any is sleeping)
-LUMIX_FORCE_INLINE static void wake() {
+BLACK_FORCE_INLINE static void wake() {
 	if (g_system->m_num_sleeping == 0) return;
 
-	Lumix::MutexGuard guard(g_system->m_sleeping_sync);
+	black.h::MutexGuard guard(g_system->m_sleeping_sync);
 	if (g_system->m_sleeping_workers.empty()) return;
 	
 	WorkerTask* to_wake = g_system->m_sleeping_workers.back();
@@ -854,11 +854,11 @@ LUMIX_FORCE_INLINE static void wake() {
 
 
 // wake num workers (or all if num > number of sleeping workers)
-LUMIX_FORCE_INLINE static void wake(u32 num) {
+BLACK_FORCE_INLINE static void wake(u32 num) {
 	// fast path, no workers are sleeping
 	if (g_system->m_num_sleeping == 0) return;
 
-	Lumix::MutexGuard guard(g_system->m_sleeping_sync);
+	black.h::MutexGuard guard(g_system->m_sleeping_sync);
 	for (u32 i = 0; i < num; ++i) {
 		if (g_system->m_sleeping_workers.empty()) return;
 		
@@ -910,4 +910,4 @@ void WorkStealingQueue::pushAndWake(const Work& obj) {
 	wake();
 }
 
-} // namespace Lumix::jobs
+} // namespace black::jobs

@@ -1,4 +1,4 @@
-#include "engine/lumix.h"
+#include "engine/black.h.h"
 
 #include "core/hash.h"
 #include "core/log.h"
@@ -9,7 +9,7 @@
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
 
-namespace Lumix
+namespace black
 {
 
 
@@ -17,7 +17,7 @@ ResourceType::ResourceType(const char* type_name)
 {
 	ASSERT(type_name[0] == 0 || (type_name[0] >= 'a' && type_name[0] <= 'z'));
 	type = RuntimeHash(type_name);
-#ifdef LUMIX_DEBUG
+#ifdef BLACK_DEBUG
 	str = type_name;
 #endif
 }
@@ -122,19 +122,19 @@ void Resource::fileLoaded(Span<const u8> blob, bool success) {
 
 	const CompiledResourceHeader* header = (const CompiledResourceHeader*)blob.begin();
 	m_file_size = blob.length();
-	if (startsWith(getPath(), ".lumix/asset_tiles/")) {
+	if (startsWith(getPath(), ".black.h/asset_tiles/")) {
 		if (!load(blob)) ++m_failed_dep_count;
 	}
 	else if (blob.length() < sizeof(*header)) {
-		logError("Invalid resource file, please delete .lumix directory");
+		logError("Invalid resource file, please delete .black.h directory");
 		++m_failed_dep_count;
 	}
 	else if (header->magic != CompiledResourceHeader::MAGIC) {
-		logError("Invalid resource file, please delete .lumix directory");
+		logError("Invalid resource file, please delete .black.h directory");
 		++m_failed_dep_count;
 	}
 	else if (header->version != 0) {
-		logError("Unsupported resource file version, please delete .lumix directory");
+		logError("Unsupported resource file version, please delete .black.h directory");
 		++m_failed_dep_count;
 	}
 	else if (header->flags & CompiledResourceHeader::COMPRESSED) {
@@ -203,12 +203,12 @@ void Resource::doLoad()
 	FileSystem& fs = m_resource_manager.getOwner().getFileSystem();
 	FileSystem::ContentCallback cb = makeDelegate<&Resource::fileLoaded>(this);
 
-	if (startsWith(m_path, ".lumix/asset_tiles/")) {
+	if (startsWith(m_path, ".black.h/asset_tiles/")) {
 		m_async_op = fs.getContent(m_path, cb);
 	}
 	else {	
 		const FilePathHash hash = m_path.getHash();
-		const Path res_path(".lumix/resources/", hash, ".res");
+		const Path res_path(".black.h/resources/", hash, ".res");
 		m_async_op = fs.getContent(res_path, cb);
 	}
 }
@@ -309,4 +309,4 @@ StringView ResourcePath::getSubresource(StringView str) {
 	return ret;
 }
 
-} // namespace Lumix
+} // namespace black

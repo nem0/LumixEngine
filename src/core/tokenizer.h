@@ -2,10 +2,10 @@
 
 #include "core/string.h"
 
-namespace Lumix {
+namespace black {
 
 // tokenize a string inplace, i.e. it does not allocate memory
-struct LUMIX_CORE_API Tokenizer {
+struct BLACK_CORE_API Tokenizer {
 	// token is a string, number, identifier or symbol, tokens are separated by whitespaces
 	struct Token {
 		enum Type {
@@ -159,6 +159,6 @@ struct ParseItemDesc {
 // `content` must be a sequence of key = value
 // prints error if there's unexpected token
 // uses linear search for `descs`, so it's better to have small number of items
-LUMIX_CORE_API bool parse(StringView content, const char* path, Span<const ParseItemDesc> descs);
+BLACK_CORE_API bool parse(StringView content, const char* path, Span<const ParseItemDesc> descs);
 
 }

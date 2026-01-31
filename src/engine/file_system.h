@@ -1,8 +1,8 @@
 #pragma once
 
-#include "lumix.h"
+#include "black.h"
 
-namespace Lumix {
+namespace black{
 
 template <typename T> struct Delegate;
 template <typename T> struct Span;
@@ -15,13 +15,13 @@ namespace os {
 }
 
 struct FileIterator;
-LUMIX_ENGINE_API void destroyFileIterator(FileIterator* iterator);
-LUMIX_ENGINE_API bool getNextFile(FileIterator* iterator, os::FileInfo* info);
+BLACK_ENGINE_API void destroyFileIterator(FileIterator* iterator);
+BLACK_ENGINE_API bool getNextFile(FileIterator* iterator, os::FileInfo* info);
 
-struct LUMIX_ENGINE_API FileSystem {
+struct BLACK_ENGINE_API FileSystem {
 	using ContentCallback = Delegate<void(Span<const u8>, bool)>;
 
-	struct LUMIX_ENGINE_API AsyncHandle {
+	struct BLACK_ENGINE_API AsyncHandle {
 		static AsyncHandle invalid() { return AsyncHandle(0xffFFffFF); };
 		explicit AsyncHandle(u32 value) : value(value) {}
 		u32 value;
@@ -55,4 +55,4 @@ struct LUMIX_ENGINE_API FileSystem {
 	virtual void cancel(AsyncHandle handle) = 0;
 };
 
-} // namespace Lumix
+} // namespace black

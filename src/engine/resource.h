@@ -1,20 +1,20 @@
 #pragma once
 
-#include "engine/lumix.h"
+#include "engine/black.h.h"
 
 #include "core/delegate_list.h"
 #include "core/path.h"
 #include "engine/file_system.h"
 
 
-namespace Lumix {
+namespace black {
 
-struct LUMIX_ENGINE_API ResourcePath {
+struct BLACK_ENGINE_API ResourcePath {
 	static StringView getSubresource(StringView str);
 	static StringView getResource(StringView str);
 };
 
-struct LUMIX_ENGINE_API ResourceType {
+struct BLACK_ENGINE_API ResourceType {
 	ResourceType() {}
 	explicit ResourceType(const char* type_name);
 	bool operator!=(const ResourceType& rhs) const { return rhs.type != type; }
@@ -22,7 +22,7 @@ struct LUMIX_ENGINE_API ResourceType {
 	bool operator<(const ResourceType& rhs) const { return rhs.type.getHashValue() < type.getHashValue(); }
 	bool isValid() const { return type.getHashValue() != 0; }
 	RuntimeHash type;
-#ifdef LUMIX_DEBUG
+#ifdef BLACK_DEBUG
 	const char* str = nullptr;
 #endif
 };
@@ -44,7 +44,7 @@ struct CompiledResourceHeader {
 };
 #pragma pack()
 
-struct LUMIX_ENGINE_API Resource {
+struct BLACK_ENGINE_API Resource {
 	friend struct ResourceManager;
 	friend struct ResourceManagerHub;
 
@@ -117,4 +117,4 @@ protected:
 }; // struct Resource
 
 
-} // namespace Lumix
+} // namespace black

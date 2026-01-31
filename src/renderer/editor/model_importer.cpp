@@ -24,7 +24,7 @@
 #include "renderer/shader.h"
 #include "renderer/voxels.h"
 
-namespace Lumix {
+namespace black {
 
 static constexpr u32 IMPOSTOR_TILE_SIZE = 512;
 static constexpr u32 IMPOSTOR_COLS = 9;
@@ -1674,4 +1674,4 @@ bool ModelImporter::writeAnimations(const Path& src, const ModelMeta& meta) {
 	return !any_failed;
 }
 
-} // namespace Lumix
+} // namespace black

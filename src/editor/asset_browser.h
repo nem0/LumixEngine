@@ -3,7 +3,7 @@
 #include "core/hash.h"
 #include "editor/studio_app.h"
 
-namespace Lumix {
+namespace black {
 
 template <typename T> struct UniquePtr;
 struct ResourceType;
@@ -12,7 +12,7 @@ struct ResourceType;
 struct AssetBrowser : StudioApp::GUIPlugin {
 	static constexpr int TILE_SIZE = 96;
 
-	struct LUMIX_EDITOR_API IPlugin {
+	struct BLACK_EDITOR_API IPlugin {
 		virtual bool canCreateResource() const { return false; }
 		virtual bool canMultiEdit() { return false; }
 		virtual void createResource(struct OutputMemoryStream& content) {}
@@ -59,4 +59,4 @@ struct AssetBrowser : StudioApp::GUIPlugin {
 };
 
 
-} // namespace Lumix
+} // namespace black

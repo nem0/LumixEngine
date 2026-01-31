@@ -1,7 +1,7 @@
 #include "core/atomic.h"
 
 
-namespace Lumix
+namespace black
 {
 
 
@@ -33,10 +33,10 @@ bool compareExchangePtr(volatile void** value, void* exchange, void* comperand) 
 	return __sync_bool_compare_and_swap(value, comperand, exchange);
 }
 
-LUMIX_CORE_API void memoryBarrier()
+BLACK_CORE_API void memoryBarrier()
 {
 	__sync_synchronize();
 }
 
 
-} // namespace Lumix
+} // namespace black

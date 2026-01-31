@@ -1,4 +1,4 @@
-#include "engine/lumix.h"
+#include "engine/black.h.h"
 
 #include "core/math.h"
 #include "core/profiler.h"
@@ -13,7 +13,7 @@
 #include <RecastAlloc.h>
 
 
-namespace Lumix
+namespace black
 {
 
 
@@ -63,10 +63,10 @@ void NavigationSystem::createModules(World& world)
 }
 
 
-LUMIX_PLUGIN_ENTRY(navigation) {
+BLACK_PLUGIN_ENTRY(navigation) {
 	PROFILE_FUNCTION();
-	return LUMIX_NEW(engine.getAllocator(), NavigationSystem)(engine);
+	return BLACK_NEW(engine.getAllocator(), NavigationSystem)(engine);
 }
 
 
-} // namespace Lumix
+} // namespace black

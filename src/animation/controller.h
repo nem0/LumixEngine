@@ -5,7 +5,7 @@
 #include "animation.h"
 #include "engine/resource.h"
 
-namespace Lumix {
+namespace black {
 
 struct BoneMask;
 struct LocalRigidTransform;
@@ -108,4 +108,4 @@ private:
 };
 
 } // namespace anim
-} // ns Lumix
+} // ns black.h

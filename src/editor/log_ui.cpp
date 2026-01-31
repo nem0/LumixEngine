@@ -8,7 +8,7 @@
 #include "log_ui.h"
 
 
-namespace Lumix
+namespace black
 {
 
 enum class LevelFilter : u8 {
@@ -249,4 +249,4 @@ void LogUI::onGUI()
 }
 
 
-} // namespace Lumix
+} // namespace black

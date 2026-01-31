@@ -1,5 +1,5 @@
-#ifdef LUMIX_BASIS_UNIVERSAL
-	#define LUMIX_NO_CUSTOM_CRT
+#ifdef BLACK_BASIS_UNIVERSAL
+	#define BLACK_NO_CUSTOM_CRT
 	#include <transcoder/basisu_transcoder.h>
 #endif
 #include "core/crt.h"
@@ -17,7 +17,7 @@
 #include "renderer/texture.h"
 #include "stb/stb_image.h"
 
-namespace Lumix
+namespace black
 {
 
 
@@ -233,7 +233,7 @@ void Texture::save() {
 		file.close();
 	}
 	else if (equalIStrings(ext, "tga") && format == gpu::TextureFormat::RGBA8) {
-		Lumix::saveTGA(*this);
+		black.h::saveTGA(*this);
 	}
 	else {
 		logError("Texture ", getPath(), " can not be saved - unsupported format");
@@ -390,7 +390,7 @@ static gpu::TextureHandle loadTexture(Renderer& renderer, const gpu::TextureDesc
 	return handle;
 }
 
-#ifdef LUMIX_BASIS_UNIVERSAL
+#ifdef BLACK_BASIS_UNIVERSAL
 	static bool loadBasisU(Texture& texture, IInputStream& file)
 	{
 		if(texture.data_reference > 0) {
@@ -527,14 +527,14 @@ bool Texture::load(Span<const u8> mem)
 
 	bool loaded = false;
 
-	#ifdef LUMIX_BASIS_UNIVERSAL
+	#ifdef BLACK_BASIS_UNIVERSAL
 		if (equalIStrings(ext, "bsu")) {
 			loaded = loadBasisU(*this, file);
 		} else 
 	#endif
 
 	if (equalIStrings(ext, "dds")) {
-		logWarning("Outdated baked texture ", getPath(), ". Please delete directory .lumix and try again");
+		logWarning("Outdated baked texture ", getPath(), ". Please delete directory .black.h and try again");
 		return false;
 	}
 	
@@ -566,4 +566,4 @@ void Texture::unload()
 }
 
 
-} // namespace Lumix
+} // namespace black

@@ -17,7 +17,7 @@
 #include "engine/world.h"
 #include "imgui/IconsFontAwesome5.h"
 
-namespace Lumix {
+namespace black {
 
 struct Listener
 {
@@ -495,4 +495,4 @@ void AudioModule::reflect(Engine& engine) {
 
 
 
-} // namespace Lumix
+} // namespace black

@@ -3,7 +3,7 @@
 #include "os.h"
 #include "simd.h"
 
-namespace Lumix
+namespace black
 {
 
 static inline float safeInverseScale(float value)
@@ -1567,4 +1567,4 @@ void Matrix::setTranslation(Vec3 t) {
 	columns[3].z = t.z;
 }
 
-} // namespace Lumix
+} // namespace black

@@ -1,21 +1,21 @@
 #pragma once
 
 #include "core/span.h"
-#include "engine/lumix.h"
+#include "engine/black.h.h"
 
 struct ImFont;
 
 #ifdef STATIC_PLUGINS
-	#define LUMIX_STUDIO_ENTRY(plugin_name) \
-		extern "C" Lumix::StudioApp::IPlugin* setStudioApp_##plugin_name(Lumix::StudioApp& app); \
-		extern "C" Lumix::StudioApp::IPlugin* setStudioApp_##plugin_name(Lumix::StudioApp& app)
+	#define BLACK_STUDIO_ENTRY(plugin_name) \
+		extern "C" black.h::StudioApp::IPlugin* setStudioApp_##plugin_name(black.h::StudioApp& app); \
+		extern "C" black.h::StudioApp::IPlugin* setStudioApp_##plugin_name(black.h::StudioApp& app)
 #else
-	#define LUMIX_STUDIO_ENTRY(plugin_name) \
-		extern "C" LUMIX_LIBRARY_EXPORT Lumix::StudioApp::IPlugin* setStudioApp(Lumix::StudioApp& app)
+	#define BLACK_STUDIO_ENTRY(plugin_name) \
+		extern "C" BLACK_LIBRARY_EXPORT black.h::StudioApp::IPlugin* setStudioApp(black.h::StudioApp& app)
 #endif
 
 
-namespace Lumix {
+namespace black {
 
 
 template <typename T> struct Array;
@@ -33,7 +33,7 @@ namespace os {
 }
 
 //@ object
-struct LUMIX_EDITOR_API StudioApp {
+struct BLACK_EDITOR_API StudioApp {
 	struct IPlugin {
 		virtual ~IPlugin() {}
 		virtual void init() = 0;
@@ -44,7 +44,7 @@ struct LUMIX_EDITOR_API StudioApp {
 		virtual bool showGizmo(struct WorldView& view, struct ComponentUID cmp) = 0;
 	};
 
-	struct LUMIX_EDITOR_API MousePlugin {
+	struct BLACK_EDITOR_API MousePlugin {
 		virtual ~MousePlugin() {}
 
 		virtual bool onMouseDown(WorldView& view, int x, int y) { return false; }
@@ -54,7 +54,7 @@ struct LUMIX_EDITOR_API StudioApp {
 		virtual const char* getName() const = 0;
 	};
 
-	struct LUMIX_EDITOR_API GUIPlugin {
+	struct BLACK_EDITOR_API GUIPlugin {
 		virtual ~GUIPlugin() {}
 		virtual void onGUI() = 0;
 		virtual void update(float) {}
@@ -164,4 +164,4 @@ struct LUMIX_EDITOR_API StudioApp {
 };
 
 
-} // namespace Lumix
+} // namespace black

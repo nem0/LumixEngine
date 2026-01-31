@@ -81,7 +81,7 @@ export type Resource = {
 	path : string,
 }
 
-declare Lumix : {
+declare black.h : {
 	Resource : Resource,
 	Entity : Entity
 }
@@ -692,7 +692,7 @@ declare this : Entity
 		asset_browser : AssetBrowser
 	}
 	
-	declare LumixAPI: {
+	declare black.hAPI: {
 		hasFilesystemWork : () -> boolean,
 		
 		engine : any,
