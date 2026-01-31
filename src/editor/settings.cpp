@@ -1369,6 +1369,7 @@ float Settings::getFloat(const char* var_name, float default_value) {
 	if (!var) return default_value;
 
 	switch(var->type) {
+		case Variable::I32: return (float)var->i32_value;
 		case Variable::FLOAT: return var->float_value;
 		case Variable::FLOAT_PTR:
 			// use direct access through pointer, not getBool
@@ -1452,6 +1453,7 @@ void Settings::setFloat(const char* var_name, float value, Storage storage) {
 	if (var) {
 		var->storage = storage;
 		switch(var->type) {
+			case Variable::I32: var->i32_value = (i32)value; return;
 			case Variable::FLOAT: var->float_value = value; return;
 			case Variable::FLOAT_PTR: 
 				// use direct access through pointer, not setFloat

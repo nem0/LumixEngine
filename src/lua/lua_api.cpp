@@ -107,6 +107,16 @@ int DragInt(lua_State* L)
 	return 2;
 }
 
+int InputInt(lua_State* L)
+{
+	auto* name = LuaWrapper::checkArg<const char*>(L, 1);
+	int value = LuaWrapper::checkArg<int>(L, 2);
+	bool changed = ImGui::InputInt(name, &value);
+	lua_pushboolean(L, changed);
+	lua_pushinteger(L, value);
+	return 2;
+}
+
 
 void PushStyleColor(i32 var, const Vec4& color) {
 	ImVec4 v;
@@ -984,6 +994,7 @@ void registerEngineAPI(lua_State* L, Engine* engine) {
 	LuaImGui::registerCFunction(L, "Columns", &LuaWrapper::wrap<&ImGui::Columns>);
 	LuaImGui::registerCFunction(L, "DragFloat", &LuaImGui::DragFloat);
 	LuaImGui::registerCFunction(L, "DragInt", &LuaImGui::DragInt);
+	LuaImGui::registerCFunction(L, "InputInt", &LuaImGui::InputInt);
 	LuaImGui::registerCFunction(L, "Dummy", &LuaWrapper::wrap<&LuaImGui::Dummy>);
 	LuaImGui::registerCFunction(L, "End", &LuaWrapper::wrap<&ImGui::End>);
 	LuaImGui::registerCFunction(L, "EndChildFrame", &LuaWrapper::wrap<&ImGui::EndChildFrame>);

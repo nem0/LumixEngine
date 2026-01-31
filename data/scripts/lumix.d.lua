@@ -112,6 +112,11 @@ type Ray = {
 	dir: Vec3,
 }
 
+type AABB = {
+	min: Vec3,
+	max: Vec3,
+}
+
 type Viewport = {
 	is_ortho: boolean,
 	fov: number,
@@ -176,6 +181,7 @@ type SceneView = {
 type Model = {
 	getOriginBoundingRadius: (Model) -> number,
 	getCenterBoundingRadius: (Model) -> number,
+	getAABB: (Model) -> any,
 }
 
 type Renderer = {

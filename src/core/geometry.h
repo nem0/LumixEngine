@@ -152,6 +152,7 @@ struct alignas(16) LUMIX_CORE_API ShiftedFrustum {
 	DVec3 origin;
 };
 
+//@ struct
 struct LUMIX_CORE_API AABB {
 	AABB();
 	AABB(const Vec3& _min, const Vec3& _max);

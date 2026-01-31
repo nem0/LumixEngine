@@ -2827,6 +2827,25 @@ namespace Lumix {
 				lua_pushcfunction(L, proxy, name);
 				lua_setfield(L, -2, name);
 			}
+			{
+				auto proxy = [](lua_State* L) -> int {
+					LuaWrapper::checkTableArg(L, 1); // self
+					Model* obj;
+					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					auto res = obj->getAABB();
+					lua_newtable(L);
+					LuaWrapper::push(L, "min");
+					LuaWrapper::push(L, res.min);
+					lua_settable(L, -3);
+					LuaWrapper::push(L, "max");
+					LuaWrapper::push(L, res.max);
+					lua_settable(L, -3);
+					return 1;
+				};
+				const char* name = "getAABB";
+				lua_pushcfunction(L, proxy, name);
+				lua_setfield(L, -2, name);
+			}
 			lua_pop(L, 2);
 		}
 		{

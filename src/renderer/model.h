@@ -195,8 +195,9 @@ struct LUMIX_RENDERER_API Model final : Resource {
 	float getOriginBoundingRadius() const { return m_origin_bounding_radius; }
 	//@ function
 	float getCenterBoundingRadius() const { return m_center_bounding_radius; }
-	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Pose* pose, EntityPtr entity, const RayCastModelHit::Filter* filter);
+	//@ function
 	const AABB& getAABB() const { return m_aabb; }
+	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Pose* pose, EntityPtr entity, const RayCastModelHit::Filter* filter);
 	void onBeforeReady() override;
 	const float* getLODDistances() const { return m_lod_distances; }
 	float* getLODDistances() { return m_lod_distances; }

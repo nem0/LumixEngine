@@ -593,17 +593,20 @@ const Viewport& SceneView::getViewport() {
 
 void SceneView::setViewport(const Viewport& vp) {
 	m_view->setViewport(vp);
+	m_pipeline->setViewport(vp);
 }
 
 void SceneView::makeScreenshot(StringView path) {
+	const IVec2 size = m_pipeline->getDisplaySize();
+	if (size.x <= 0 || size.y <= 0) return;
+	
+	m_pipeline->render(false);
 	const gpu::TextureHandle texture = m_pipeline->getOutput();
+
 	if (!texture) {
 		logError("Failed to get the pipeline output when trying to make a screenshot.");
 		return;
 	}
-
-	const IVec2 size = m_pipeline->getDisplaySize();
-	if (size.x <= 0 || size.y <= 0) return;
 
 	struct Callback {
 		StaticString<MAX_PATH> path;

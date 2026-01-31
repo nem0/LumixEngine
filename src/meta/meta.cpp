@@ -1080,12 +1080,20 @@ struct Parser {
 			
 			if (peekChar(line) == '}') break;
 
+			if (equal(peekWord(line), "static")) {
+				continue; // ignore static stuff
+			}
+
 			StringView type = consumeType(line);
 			if (equal(type, "using")) {
 				continue;
 			}
 
 			StringView var_name = consumeIdentifier(line);
+			if (equal(var_name, "(")) {
+				continue; // this is a constructor, ignore
+			}
+
 			StringView after_name = consumeWord(line);
 
 			if (equal(after_name, "(")) {
