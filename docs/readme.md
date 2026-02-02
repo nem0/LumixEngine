@@ -15,6 +15,7 @@
 * [Type checking](lua/type_checking.md)
 * [Properties](lua/properties.md)
 * [Snippets](lua/snippets.md)
+* [Editor plugin](lua/editor_plugin.md)
 
 # Animation
 
