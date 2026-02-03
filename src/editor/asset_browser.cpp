@@ -314,16 +314,18 @@ struct AssetBrowserImpl : AssetBrowser {
 		if (!m_filter.isActive()) {
 			Path tmp(m_dir, "/");
 			FileIterator* iter = fs.createFileIterator(tmp);
-			os::FileInfo info;
-			while (getNextFile(iter, &info)) {
-				if (!info.is_directory) continue;
-				if (info.filename[0] == '.') continue;
+			if (iter) {
+				os::FileInfo info;
+				while (getNextFile(iter, &info)) {
+					if (!info.is_directory) continue;
+					if (info.filename[0] == '.') continue;
 
-				Subdir& dir = m_subdirs.emplace();
-				dir.dir = info.filename;
-				dir.clamped_name = info.filename;
+					Subdir& dir = m_subdirs.emplace();
+					dir.dir = info.filename;
+					dir.clamped_name = info.filename;
+				}
+				destroyFileIterator(iter);
 			}
-			destroyFileIterator(iter);
 		}
 
 		AssetCompiler& compiler = m_app.getAssetCompiler();
