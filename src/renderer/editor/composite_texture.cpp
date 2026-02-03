@@ -66,6 +66,7 @@ enum class CompositeTexture::NodeType : u32 {
 	SQUARE,
 	TRIANGLE,
 	BLUR,
+	VBLUR,
 	CHECKERBOARD,
 	WARP,
 	TWIRL,
@@ -2147,6 +2148,72 @@ struct BlurNode final : CompositeTexture::Node {
 	u32 iterations = 4;
 };
 
+struct VBlurNode final : CompositeTexture::Node {
+	VBlurNode(IAllocator& allocator)
+		: Node(allocator) {}
+
+	CompositeTexture::NodeType getType() const override { return CompositeTexture::NodeType::VBLUR; }
+	bool hasInputPins() const override { return true; }
+	bool hasOutputPins() const override { return true; }
+
+	void serialize(OutputMemoryStream& blob) const override {
+		blob.write(iterations);
+	}
+
+	void deserialize(InputMemoryStream& blob) override {
+		blob.read(iterations);
+	}
+
+	bool generateInternal() override {
+		if (!generateInput(0)) return false;
+
+		CompositeTexture::Image& in = getInputImage(0);
+		CompositeTexture::Image& out = m_outputs.emplace(in.w, in.h, in.channels, m_allocator);
+
+		for (u32 iter = 0; iter < iterations; ++iter) {
+			CompositeTexture::Image& src = iter == 0 ? in : out;
+			if (in.h > 1) {
+				const i32 line_offset = out.w * out.channels;
+				for (u32 i = 0; i < out.w; ++i) {
+					for (u32 ch = 0; ch < out.channels; ++ch) {
+						const u32 idx = i * out.channels + ch;
+						const float* f = &src.pixels[idx];
+						out.pixels[idx] = (f[0] * 2 + f[line_offset]) / 3;
+					}
+
+					for (u32 j = 1; j < out.h - 1; ++j) {
+						u32 idx = (i + j * out.w) * out.channels;
+						for (u32 ch = 0; ch < out.channels; ++ch) {
+							const float* f = &src.pixels[idx + ch];
+							out.pixels[idx + ch] = (f[-line_offset] + *f + f[line_offset]) / 3;
+						}
+					}
+
+					for (u32 ch = 0; ch < out.channels; ++ch) {
+						const u32 idx = (i + (out.h - 1) * out.w) * out.channels + ch;
+						const float* f = &src.pixels[idx];
+						out.pixels[idx] = (f[0] * 2 + f[-line_offset]) / 3;
+					}
+				}
+			} else {
+				memcpy(out.pixels.data(), src.pixels.data(), src.pixels.byte_size());
+			}
+		}
+
+		return true;
+	}
+
+	bool gui() override {
+		nodeTitle("Vertical blur");
+		inputSlot();
+		outputSlot();
+		bool res = ImGui::DragInt("Iterations", (i32*)&iterations, 1, 1, 999999);
+		return res;
+	}
+
+	u32 iterations = 4;
+};
+
 struct CheckerboardNode final : CompositeTexture::Node {
 	CheckerboardNode(IAllocator& allocator) : Node(allocator) {}
 
@@ -2784,6 +2851,7 @@ CompositeTexture::Node* createNode(CompositeTexture::NodeType type, CompositeTex
 		case CompositeTexture::NodeType::GRADIENT_NOISE: node = LUMIX_NEW(allocator, GradientNoiseNode)(allocator); break;
 		case CompositeTexture::NodeType::WAVE_NOISE: node = LUMIX_NEW(allocator, WaveNoiseNode)(allocator); break;
 		case CompositeTexture::NodeType::BLUR: node = LUMIX_NEW(allocator, BlurNode)(allocator); break;
+		case CompositeTexture::NodeType::VBLUR: node = LUMIX_NEW(allocator, VBlurNode)(allocator); break;
 		case CompositeTexture::NodeType::NORMALMAP: node = LUMIX_NEW(allocator, NormalmapNode)(allocator); break;
 		case CompositeTexture::NodeType::TWIRL: node = LUMIX_NEW(allocator, TwirlNode)(allocator); break;
 		case CompositeTexture::NodeType::WARP: node = LUMIX_NEW(allocator, WarpNode)(allocator); break;
@@ -3132,6 +3200,7 @@ struct CompositeTextureEditorImpl : CompositeTextureEditor, NodeEditor {
 		if (visitor.beginCategory("Misc")) {
 			visitor
 				.visitType("Blur", CompositeTexture::NodeType::BLUR, 'B')
+				.visitType("VBlur", CompositeTexture::NodeType::VBLUR, 'V')
 				.visitType("Color", CompositeTexture::NodeType::COLOR, '4')
 				.visitType("Constant", CompositeTexture::NodeType::CONSTANT, '1')
 				.visitType("Merge", CompositeTexture::NodeType::MERGE)
