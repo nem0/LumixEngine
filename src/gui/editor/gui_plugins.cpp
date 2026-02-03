@@ -226,6 +226,10 @@ struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		StringView sv((const char*)src_data.data(), (u32)src_data.size());
 		if (!parse(sv, src.c_str(), descs)) return false;
 
+		if (right < left || bottom < top) {
+			logError("Invalid sprite bounds in ", src, ": right < left or bottom < top");
+		}
+
 		// write compiled
 		OutputMemoryStream compiled(m_app.getAllocator());
 		Sprite::Header header;
