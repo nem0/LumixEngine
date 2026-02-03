@@ -2883,8 +2883,13 @@ struct RenderModuleImpl final : RenderModule {
 		return m_environment_probes[entity].flags & EnvironmentProbe::ENABLED;
 	}
 
-	void modelUnloaded(Model*, EntityRef entity) {
+	void modelUnloaded(Model* model, EntityRef entity) {
 		ModelInstance& r = m_model_instances[entity.index];
+		// reset mesh_materials if it points to model's internal array (no override)
+		// the model's internal array will be freed, so we must not keep the stale pointer
+		if (r.mesh_materials.begin() == model->getMeshMaterials().begin()) {
+			r.mesh_materials = {};
+		}
 		r.meshes = nullptr;
 		r.mesh_count = 0;
 		LUMIX_DELETE(m_allocator, r.pose);
