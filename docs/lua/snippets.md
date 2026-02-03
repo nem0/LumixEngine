@@ -165,3 +165,9 @@ entity.rigid_actor.spheres[1].radius = 1
         end
     end
 ```
+
+### Override a material on model_instance component
+```lua
+local mesh_index = 0
+entity.model_instance:setMaterialOverride(mesh_index, "models/red.mat")
+```

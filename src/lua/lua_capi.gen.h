@@ -2250,6 +2250,23 @@ namespace Lumix {
 		return 1;
 	}
 	
+	int ModelInstance_setMaterialOverride(lua_State* L) {
+		auto [imodule, entity] = checkComponent(L);
+		auto* module = (RenderModule*)imodule;
+		auto mesh_idx = LuaWrapper::checkArg<u32>(L, 2);
+		auto path = LuaWrapper::checkArg<Path>(L, 3);
+		module->setModelInstanceMaterialOverride(entity, mesh_idx, path);
+		return 0;
+	}
+	
+	int ModelInstance_getMaterialOverride(lua_State* L) {
+		auto [imodule, entity] = checkComponent(L);
+		auto* module = (RenderModule*)imodule;
+		auto mesh_idx = LuaWrapper::checkArg<u32>(L, 2);
+		LuaWrapper::push(L, 	module->getModelInstanceMaterialOverride(entity, mesh_idx));
+		return 1;
+	}
+	
 	int model_instance_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
@@ -2260,6 +2277,8 @@ namespace Lumix {
 			case /*source*/17609862876178282011: LuaWrapper::push(L, module->getModelInstancePath(entity)); break;
 			case /*overrideMaterialVec4*/7886464768384394135: lua_pushcfunction(L, ModelInstance_overrideMaterialVec4, "ModelInstance_overrideMaterialVec4"); break;
 			case /*getModel*/6439928831641943397: lua_pushcfunction(L, ModelInstance_getModel, "ModelInstance_getModel"); break;
+			case /*setMaterialOverride*/6835340167870029662: lua_pushcfunction(L, ModelInstance_setMaterialOverride, "ModelInstance_setMaterialOverride"); break;
+			case /*getMaterialOverride*/6878156788127347120: lua_pushcfunction(L, ModelInstance_getMaterialOverride, "ModelInstance_getMaterialOverride"); break;
 			case 0:
 			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}

@@ -454,13 +454,13 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual void setModelInstancePath(EntityRef entity, const Path& path) = 0;
 	virtual bool overrideMaterialVec4(EntityRef entity, u32 mesh_index, const char* uniform_name, Vec4 value) = 0;
 	virtual Model* getModelInstanceModel(EntityRef entity) = 0; //@ function alias getModel
+	virtual void setModelInstanceMaterialOverride(EntityRef entity, u32 mesh_idx, const Path& path) = 0; //@ function alias setMaterialOverride
+	virtual Path getModelInstanceMaterialOverride(EntityRef entity, u32 mesh_idx) = 0; //@ function alias getMaterialOverride
 	//@ end
 	virtual ModelInstance* getModelInstance(EntityRef entity) = 0;
 	virtual Span<const ModelInstance> getModelInstances() const = 0;
 	virtual Span<ModelInstance> getModelInstances() = 0;
 	virtual void setModelInstanceLOD(EntityRef entity, u32 lod) = 0;
-	virtual void setModelInstanceMaterialOverride(EntityRef entity, u32 mesh_idx, const Path& path) = 0;
-	virtual Path getModelInstanceMaterialOverride(EntityRef entity, u32 mesh_idx) = 0;
 	virtual CullResult* getRenderables(const ShiftedFrustum& frustum, RenderableTypes type) const = 0;
 	virtual CullResult* getRenderables(const ShiftedFrustum& frustum) const = 0;
 	virtual EntityPtr getFirstModelInstance() = 0;

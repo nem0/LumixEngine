@@ -584,6 +584,8 @@ type model_instance_component =  {
 	path: string,
 	overrideMaterialVec4: (model_instance_component, number, any, any) -> boolean,
 	getModel: (model_instance_component) -> Model,
+	setMaterialOverride: (model_instance_component, number, string) -> (),
+	getMaterialOverride: (model_instance_component, number) -> string,
 }
 
 type curve_decal_component =  {
