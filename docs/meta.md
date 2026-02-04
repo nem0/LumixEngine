@@ -20,6 +20,7 @@ Meta scans `src/` and `plugins/` directories and generates:
 - Reflection headers (`*.gen.h`) alongside module source files
 - `src/lua/lua_capi.gen.h` - Lua C API bindings
 - `data/scripts/lumix.d.lua` - Lua type definitions
+- `src/engine/component_types.h` and `src/engine/component_types.cpp` - component type declarations and definitions used by the engine
 
 # Modules
 
@@ -104,6 +105,27 @@ Examples:
 virtual EntityPtr raycast(const Vec3& origin, const Vec3& dir, float distance, EntityPtr ignore_entity) = 0;
 virtual void setGravity(const Vec3& gravity) = 0;
 //@ end
+```
+
+### Lua return values and in/out parameters
+
+For functions that end up in the generated Lua bindings (`src/lua/lua_capi.gen.h`):
+
+- A non-`void` return value is returned to Lua as the first result.
+- If the return type is a `//@ struct`, it is returned as a Lua table with its fields.
+- If the return type is a pointer to a `//@ object`, it is returned as a Lua object (via `LuaWrapper::pushObject`).
+
+In addition, **non-const reference parameters** (`T&`, but not `const T&`) are treated as *in/out* parameters and are returned to Lua as additional results, in declaration order, after the main return value (if any). If the function returns `void`, Lua returns only these in/out values.
+
+Example:
+```cpp
+//@ function
+virtual bool getBounds(EntityRef entity, Vec3& out_min, Vec3& out_max) = 0;
+```
+
+Lua usage:
+```lua
+local ok, min, max = this.world:getModule("renderer"):getBounds(entity)
 ```
 
 ## `//@ include`

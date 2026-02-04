@@ -1320,6 +1320,7 @@ static Enum* getEnum(Module& m, StringView name) {
 }
 
 bool consumeArg(StringView& line, Arg& out) {
+	out = Arg();
 	line = skipWhitespaces(line);
 	if (line.size() == 0) return false;
 	StringView word = consumeWord(line);
@@ -1358,6 +1359,29 @@ Object* findObject(StringView object_name) {
 	return nullptr;
 }
 
+i32 pushInOutArgs(OutputStream& out, StringView args) {
+	i32 num = 0;
+	forEachArg(args, [&](const Arg& arg, bool is_first) {
+		if (!arg.is_ref || arg.is_const) return;
+
+		++num;
+		Struct* st_arg = findStruct(arg.type);
+		Object* obj_arg = findObject(arg.type);
+		if (st_arg) {
+			L("\tlua_newtable(L);");
+			for (StructVar& v : st_arg->vars) {
+				L("\tLuaWrapper::push(L, ", arg.name, ".", v.name, ");");
+				L("\tlua_setfield(L, -2, \"", v.name, "\");");
+			}
+		} else if (obj_arg) {
+			L("\tLuaWrapper::pushObject(L, ", arg.name, ", \"", arg.type, "\");");
+		} else {
+			L("\tLuaWrapper::push(L, ", arg.name, ");");
+		}
+	});
+	return num;
+}
+
 void wrap(OutputStream& out, Module& m, Function& f) {
 	L("int ",m.name,"_",f.name,"(lua_State* L) {");
 	L("LuaWrapper::checkTableArg(L, 1);");
@@ -1390,36 +1414,39 @@ void wrap(OutputStream& out, Module& m, Function& f) {
 	});
 
 	Struct* st = findStruct(f.return_type);
-	Object* obj = findObject(withoutSuffix(f.return_type, 1)/*remove pointer '*`*/);
+	Object* obj = findObject(withoutSuffix(f.return_type, 1) /*remove pointer '*`*/);
 	if (st) out.add("\tauto s = ");
-	bool has_return = !equal(f.return_type, "void") && st == nullptr;
-	if (obj) out.add("\tLuaWrapper::pushObject(L, ");
-	else if (has_return) out.add("\tLuaWrapper::push(L, ");
-	out.add("\tmodule->",f.name,"(");
-	forEachArg(args, [&](const Arg& arg, bool is_first){
+	bool has_return = !equal(f.return_type, "void") && st == nullptr && obj == nullptr;
+	if (obj)
+		out.add("\tLuaWrapper::pushObject(L, ");
+	else if (has_return)
+		out.add("\tLuaWrapper::push(L, ");
+	out.add("\tmodule->", f.name, "(");
+	forEachArg(args, [&](const Arg& arg, bool is_first) {
 		if (!is_first) out.add(", ");
 		out.add(arg.name);
 	});
 	out.add(")");
 	if (obj) {
-		L(", \"",withoutSuffix(f.return_type, 1),"\");");
-		L("return 1;");
-	}
-	else if (st) {
+		L(", \"", withoutSuffix(f.return_type, 1), "\");");
+	} else if (st) {
 		L(";");
 		L("\tlua_newtable(L);");
 		for (StructVar& v : st->vars) {
-			L("\tLuaWrapper::push(L, s.",v.name,");");
-			L("\tlua_setfield(L, -2, \"",v.name,"\");");
+			L("\tLuaWrapper::push(L, s.", v.name, ");");
+			L("\tlua_setfield(L, -2, \"", v.name, "\");");
 		}
-		L("\treturn 1;");
+	} else if (has_return) {
+		L(");");
+	} else {
+		L(";");
 	}
-	else if (has_return) {
-		L(");" OUT_ENDL "\treturn 1;");
-	}
-	else {
-		L(";" OUT_ENDL "\treturn 0;");
-	}
+
+	// push inout args
+	i32 return_count = (has_return || st || obj) ? 1 : 0;
+	return_count += pushInOutArgs(out, args);
+
+	L("\treturn ", return_count, ";");
 	L("}" OUT_ENDL);
 }
 
@@ -1468,7 +1495,6 @@ void wrap(OutputStream& out, Module& m, Component& c, Function& f) {
 	out.add(")");
 	if (obj) {
 		L(", \"",withoutSuffix(f.return_type, 1),"\");");
-		L("\treturn 1;");
 	}
 	else if (st) {
 		L(";");
@@ -1477,14 +1503,19 @@ void wrap(OutputStream& out, Module& m, Component& c, Function& f) {
 			L("\tLuaWrapper::push(L, s.",v.name,");");
 			L("\tlua_setfield(L, -2, \"",v.name,"\");");
 		}
-		L("" OUT_ENDL "\treturn 1;");
 	}
 	else if (has_return) {
-		L(");" OUT_ENDL "\treturn 1;");
+		L(");");
 	}
 	else {
-		L(";" OUT_ENDL "\treturn 0;");
+		L(";");
 	}
+	i32 return_count = (has_return || st || obj) ? 1 : 0;
+
+	// push inout args
+	return_count += pushInOutArgs(out, args);
+
+	L("\treturn ", return_count, ";");
 	L("}", OUT_ENDL);
 }
 
@@ -1605,7 +1636,9 @@ void serializeMain(OutputStream& out, Parser& parser) {
 				});
 				L(");");
 				
+				i32 num_returns = 0;
 				if (has_return) {
+					++num_returns;
 					Struct* ret_struct = findStruct(f.return_type);
 					if (ret_struct) {
 						// Push struct as Lua table
@@ -1618,12 +1651,9 @@ void serializeMain(OutputStream& out, Parser& parser) {
 					} else {
 						L("LuaWrapper::push(L, res);");
 					}
-					L("return 1;");
 				}
-				else {
-					L("return 0;");
-				}
-				
+				num_returns += pushInOutArgs(out, f.args);
+				L("return ", num_returns, ";");
 			L("};");
 
 			L("const char* name = \"", f.name, "\";");
@@ -1960,7 +1990,29 @@ void serializeLuaType(OutputStream& out, StringView self_type, const char* self_
 			out.add(", ", toLuaType(arg.type));
 		}
 	});
-	out.add(") -> ",toLuaType(f.return_type), "," OUT_ENDL);
+	out.add(") -> ");
+
+	bool has_return = f.return_type.size() > 0 && !equal(f.return_type, "void");
+	i32 num_returns = has_return ? 1 : 0;
+	forEachArg(f.args, [&](const Arg& arg, bool){
+		if (arg.is_ref && !arg.is_const) ++num_returns;
+	});
+
+	if (num_returns > 1) out.add("(");
+	if (has_return) {
+		out.add(toLuaType(f.return_type));
+	}
+	bool first_ret_val = !has_return;
+	forEachArg(f.args, [&](const Arg& arg, bool){
+		if (!arg.is_ref || arg.is_const) return;
+
+		if (!first_ret_val) out.add(", ");
+		out.add(toLuaType(arg.type));
+		first_ret_val = false;
+	});
+	if (num_returns == 0) out.add("()");
+	else if (num_returns > 1) out.add(")");
+	out.add("," OUT_ENDL);
 }
 
 void serializeComponentTypes(Parser& parser) {

@@ -1818,7 +1818,6 @@ namespace Lumix {
 		lua_setfield(L, -2, "origin");
 		LuaWrapper::push(L, s.dir);
 		lua_setfield(L, -2, "dir");
-		
 		return 1;
 	}
 	
@@ -2628,6 +2627,24 @@ namespace Lumix {
 					return 0;
 				};
 				const char* name = "openEditor";
+				lua_pushcfunction(L, proxy, name);
+				lua_setfield(L, -2, name);
+			}
+			{
+				auto proxy = [](lua_State* L) -> int {
+					LuaWrapper::checkTableArg(L, 1); // self
+					AssetBrowser* obj;
+					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					auto str_id = LuaWrapper::checkArg<const char*>(L, 2);
+					auto buf = LuaWrapper::checkArg<Path>(L, 3);
+					auto type = LuaWrapper::checkArg<ResourceType>(L, 4);
+					auto width = LuaWrapper::checkArg<float>(L, 5);
+					auto res = obj->resourceInput(str_id, buf, type, width);
+					LuaWrapper::push(L, res);
+					LuaWrapper::push(L, buf);
+					return 2;
+				};
+				const char* name = "resourceInput";
 				lua_pushcfunction(L, proxy, name);
 				lua_setfield(L, -2, name);
 			}

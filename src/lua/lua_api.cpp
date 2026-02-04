@@ -1198,6 +1198,10 @@ void registerEngineAPI(lua_State* L, Engine* engine) {
 					ent.rotation = v
 				elseif k == "scale" then
 					ent.scale = v
+				elseif k == "name" then
+					ent.name = v
+				elseif k == "parent" then
+					ent.parent = v
 				else
 					local c = ent:createComponent(k)
 					for k2, v2 in pairs(v) do

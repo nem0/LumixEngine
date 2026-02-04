@@ -3696,10 +3696,6 @@ struct PipelineImpl final : Pipeline {
 				MeshMaterial& mat = mi.mesh_materials[i];
 				if (!mat.material) {
 					mat.material = mi.model->getMeshMaterial(i).material;
-					if (!mat.material) {
-						updated = false;
-						break;
-					}
 					mat.material->incRefCount();
 				}
 				if (!mat.material->isReady()) {

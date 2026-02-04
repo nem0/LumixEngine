@@ -156,6 +156,7 @@ type RayCastModelHit = {
 
 type AssetBrowser = {
 	openEditor: (AssetBrowser, string) -> (),
+	resourceInput: (AssetBrowser, any, string, any, number) -> (boolean, string),
 }
 
 type StudioApp = {
