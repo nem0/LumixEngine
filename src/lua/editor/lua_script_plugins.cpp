@@ -1423,8 +1423,8 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 	}
 
 	static int LUA_getResources(lua_State* L) {
-		auto* studio = LuaWrapper::checkArg<StudioApp*>(L, 1);
-		auto* type = LuaWrapper::checkArg<const char*>(L, 2);
+		auto* studio = LuaWrapper::getClosureObject<StudioApp>(L);
+		auto* type = LuaWrapper::checkArg<const char*>(L, 1);
 
 		AssetCompiler& compiler = studio->getAssetCompiler();
 		if (!ResourceType(type).isValid()) return 0;
@@ -1432,8 +1432,7 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 
 		lua_createtable(L, resources.size(), 0);
 		int i = 0;
-		for (const AssetCompiler::ResourceItem& res : resources)
-		{
+		for (const AssetCompiler::ResourceItem& res : resources) {
 			LuaWrapper::push(L, res.path.c_str());
 			lua_rawseti(L, -2, i + 1);
 			++i;
@@ -1448,7 +1447,7 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 		studio->getWorldEditor().makeParent(parent, child);
 	}
 
-struct SetPropertyVisitor : reflection::IPropertyVisitor {
+	struct SetPropertyVisitor : reflection::IPropertyVisitor {
 		static bool isSameProperty(const char* name, const char* lua_name) {
 			char tmp[128];
 			LuaWrapper::convertPropertyToLuaName(name, Span(tmp));
@@ -1581,31 +1580,29 @@ struct SetPropertyVisitor : reflection::IPropertyVisitor {
 
 		lua_pushvalue(L, 1);
 		lua_pushnil(L);
-		while (lua_next(L, -2) != 0)
-		{
+		while (lua_next(L, -2) != 0) {
 			const char* parameter_name = LuaWrapper::toType<const char*>(L, -2);
-			if (equalStrings(parameter_name, "name"))
-			{
+			if (equalStrings(parameter_name, "name")) {
 				const char* name = LuaWrapper::toType<const char*>(L, -1);
 				editor.setEntityName(e, name);
 			}
-			else if (equalStrings(parameter_name, "position"))
-			{
+			else if (equalStrings(parameter_name, "position")) {
 				const DVec3 pos = LuaWrapper::toType<DVec3>(L, -1);
 				editor.setEntitiesPositions(&e, &pos, 1);
 			}
-			else if (equalStrings(parameter_name, "scale"))
-			{
+			else if (equalStrings(parameter_name, "parent")) {
+				const EntityPtr entity = LuaWrapper::toType<EntityPtr>(L, -1);
+				editor.makeParent(entity, e);
+			}
+			else if (equalStrings(parameter_name, "scale")) {
 				const Vec3 scale = LuaWrapper::toType<Vec3>(L, -1);
 				editor.setEntitiesScale(&e, scale, 1);
 			}
-			else if (equalStrings(parameter_name, "rotation"))
-			{
+			else if (equalStrings(parameter_name, "rotation")) {
 				const Quat rot = LuaWrapper::toType<Quat>(L, -1);
 				editor.setEntitiesRotations(&e, &rot, 1);
 			}
-			else
-			{
+			else {
 				ComponentType cmp_type = reflection::getComponentType(parameter_name);
 				const reflection::ComponentBase* cmp_des = reflection::getComponent(cmp_type);
 				if (!cmp_des) {
@@ -1616,28 +1613,23 @@ struct SetPropertyVisitor : reflection::IPropertyVisitor {
 				editor.addComponent(Span(&e, 1), cmp_type);
 
 				IModule* module = editor.getWorld()->getModule(cmp_type);
-				if (module)
-				{
+				if (module) {
 					ComponentUID cmp(e, cmp_type, module);
-					if (cmp.isValid())
-					{
-						lua_pushvalue(L, -1);
-						lua_pushnil(L);
-						while (lua_next(L, -2) != 0)
-						{
-							const char* property_name = LuaWrapper::toType<const char*>(L, -2);
-							SetPropertyVisitor v;
-							v.property_name = property_name;
-							v.entity = (EntityRef)cmp.entity;
-							v.cmp_type = cmp.type;
-							v.L = L;
-							v.editor = &editor;
-							cmp_des->visit(v);
+					lua_pushvalue(L, -1);
+					lua_pushnil(L);
+					while (lua_next(L, -2) != 0) {
+						const char* property_name = LuaWrapper::toType<const char*>(L, -2);
+						SetPropertyVisitor v;
+						v.property_name = property_name;
+						v.entity = (EntityRef)cmp.entity;
+						v.cmp_type = cmp.type;
+						v.L = L;
+						v.editor = &editor;
+						cmp_des->visit(v);
 
-							lua_pop(L, 1);
-						}
 						lua_pop(L, 1);
 					}
+					lua_pop(L, 1);
 				}
 			}
 			lua_pop(L, 1);
@@ -1874,11 +1866,10 @@ struct SetPropertyVisitor : reflection::IPropertyVisitor {
 		REGISTER_FUNCTION(destroyEntity);
 		REGISTER_FUNCTION(createComponent);
 		REGISTER_FUNCTION(getSelectedEntitiesCount);
-		REGISTER_FUNCTION(getSelectedEntity);
 		#undef REGISTER_FUNCTION
 
 		LuaWrapper::createSystemClosure(L, "Editor", &m_app, "getSelectedEntity", &LUA_getSelectedEntity);
-		LuaWrapper::createSystemFunction(L, "Editor", "getResources", &LUA_getResources);
+		LuaWrapper::createSystemClosure(L, "Editor", &m_app, "getResources", &LUA_getResources);
 		LuaWrapper::createSystemClosure(L, "Editor", &m_app, "createEntityEx", &LUA_createEntityEx);
 		LuaWrapper::createSystemClosure(L, "Editor", &m_app, "makeParent", &LuaWrapper::wrap<LUA_makeParent>);
 
