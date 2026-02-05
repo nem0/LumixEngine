@@ -86,6 +86,8 @@ struct AssetCompilerImpl : AssetCompiler {
 
 	void saveResourceList() {
 		if (m_scan_counter > 0) return;
+		const char* project_dir = m_app.getProjectDir();
+		if (!project_dir || project_dir[0] == '\0') return;
 
 		PROFILE_FUNCTION();
 		os::OutputFile file;
