@@ -273,7 +273,7 @@ type gui_input_field_component =  {
 
 type gui_rect_component =  {
 	enabled: boolean,
-	clip: boolean,
+	clip_content: boolean,
 	left_points: number,
 	left_relative: number,
 	right_points: number,
@@ -285,22 +285,22 @@ type gui_rect_component =  {
 }
 
 type gui_button_component =  {
-	hovered_color_r_g_b_a: any,
+	hovered_color: any,
 	hovered_cursor: any,
 }
 
 type gui_image_component =  {
 	enabled: boolean,
-	color_r_g_b_a: any,
+	color: any,
 	sprite: string,
 }
 
 type gui_text_component =  {
 	font_size: number,
-	color_r_g_b_a: any,
-	font_path: string,
-	halign: any,
-	valign: any,
+	color: any,
+	font: string,
+	horizontal_align: any,
+	vertical_align: any,
 	text: string,
 }
 
@@ -352,8 +352,8 @@ type physics_module = {
 }
 
 type physical_heightfield_component =  {
-	source: string,
-	xzscale: number,
+	heightmap: string,
+	xz_scale: number,
 	yscale: number,
 	layer: number,
 }
@@ -362,9 +362,9 @@ type d6_joint_component =  {
 	xmotion: any,
 	ymotion: any,
 	zmotion: any,
-	swing1motion: any,
-	swing2motion: any,
-	twist_motion: any,
+	swing_1: any,
+	swing_2: any,
+	twist: any,
 	linear_limit: number,
 	twist_limit: Vec2,
 	swing_limit: Vec2,
@@ -408,7 +408,7 @@ type physical_controller_component =  {
 	layer: number,
 	radius: number,
 	height: number,
-	custom_gravity: boolean,
+	use_custom_gravity: boolean,
 	custom_gravity_acceleration: number,
 	use_root_motion: boolean,
 	getGravitySpeed: (physical_controller_component) -> number,
@@ -421,7 +421,7 @@ type rigid_actor_component =  {
 	velocity: Vec3,
 	speed: number,
 	layer: number,
-	dynamic_type: any,
+	dynamic: any,
 	is_trigger: boolean,
 	mesh: string,
 	material: string,
@@ -447,13 +447,13 @@ type wheel_component =  {
 
 type vehicle_component =  {
 	peak_torque: number,
-	max_r_p_m: number,
+	max__r_p_m: number,
 	rpm: number,
 	current_gear: number,
 	speed: number,
 	chassis: string,
 	mass: number,
-	moimultiplier: number,
+	moi_multiplier: number,
 	center_of_mass: Vec3,
 	wheels_layer: number,
 	chassis_layer: number,
@@ -466,7 +466,7 @@ type physical_instanced_cube_component =  {
 
 type physical_instanced_mesh_component =  {
 	layer: number,
-	geom_path: string,
+	mesh: string,
 }
 
 type renderer_module = {
@@ -504,7 +504,7 @@ type camera_component =  {
 
 type decal_component =  {
 	uv_scale: Vec2,
-	material_path: string,
+	material: string,
 	half_extents: Vec3,
 }
 
@@ -560,13 +560,13 @@ type environment_probe_component =  {
 type bone_attachment_component =  {
 	parent: Entity?,
 	bone: number,
-	position: Vec3,
-	rotation: Vec3,
+	relative_position: Vec3,
+	relative_rotation: Vec3,
 	setRotation: (bone_attachment_component, Quat) -> (),
 }
 
 type particle_emitter_component =  {
-	path: string,
+	source: string,
 	autodestroy: boolean,
 	getGlobalID: (particle_emitter_component, any) -> number,
 	setFloatGlobal: (particle_emitter_component, number, number) -> (),
@@ -577,12 +577,12 @@ type particle_emitter_component =  {
 }
 
 type instanced_model_component =  {
-	path: string,
+	model: string,
 }
 
 type model_instance_component =  {
 	enabled: boolean,
-	path: string,
+	source: string,
 	overrideMaterialVec4: (model_instance_component, number, any, any) -> boolean,
 	getModel: (model_instance_component) -> Model,
 	setMaterialOverride: (model_instance_component, number, string) -> (),
@@ -590,17 +590,17 @@ type model_instance_component =  {
 }
 
 type curve_decal_component =  {
-	material_path: string,
+	material: string,
 	half_extents: number,
-	uvscale: Vec2,
+	uv_scale: Vec2,
 	bezier_p0: Vec2,
 	bezier_p2: Vec2,
 }
 
 type terrain_component =  {
 	size: Vec2,
-	material_path: string,
-	xzscale: number,
+	material: string,
+	xz_scale: number,
 	tesselation: number,
 	base_grid_resolution: number,
 	yscale: number,

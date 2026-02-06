@@ -714,7 +714,7 @@ namespace Lumix {
 							case /*path*/8756705481922369689: module->setScriptPath(entity, index, LuaWrapper::checkArg<Path>(L, 3)); break;
 							
 							case 0:	
-							default: { luaL_error(L, "Unknown property %ss", prop_name); break; }
+							default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 						}
 						return 0;
 					};
@@ -1345,7 +1345,7 @@ namespace Lumix {
 							case /*rotation_offset*/6621896392170407801: module->setBoxOffsetRotation(entity, index, LuaWrapper::checkArg<Vec3>(L, 3)); break;
 							
 							case 0:	
-							default: { luaL_error(L, "Unknown property %ss", prop_name); break; }
+							default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 						}
 						return 0;
 					};
@@ -1439,7 +1439,7 @@ namespace Lumix {
 							case /*position_offset*/15220513277102850184: module->setSphereOffsetPosition(entity, index, LuaWrapper::checkArg<Vec3>(L, 3)); break;
 							
 							case 0:	
-							default: { luaL_error(L, "Unknown property %ss", prop_name); break; }
+							default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 						}
 						return 0;
 					};
@@ -2414,7 +2414,7 @@ namespace Lumix {
 							case /*spacing*/2859594769824822931: module->setGrassSpacing(entity, index, LuaWrapper::checkArg<float>(L, 3)); break;
 							
 							case 0:	
-							default: { luaL_error(L, "Unknown property %ss", prop_name); break; }
+							default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 						}
 						return 0;
 					};

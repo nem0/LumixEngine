@@ -1836,7 +1836,7 @@ void serializeLuaArrayGetter(OutputStream& out, Module& m, Component& c, ArrayPr
 
 	out.add(R"#(
 			case 0:	
-			default: { luaL_error(L, "Unknown property %ss", prop_name); break; }
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 			}
 			return 0;
 			};
@@ -2177,8 +2177,17 @@ void serializeLuaTypes(OutputStream& out_formatted) {
 			L("type ",c.id,"_component =  {");
 			for (Property& p : c.properties) {
 				char tmp[256];
-				toID(p.name, Span(tmp, tmp + 256));
-				if (!isBlob(p) && p.type.size() > 0) L("	",tmp,": ", toLuaType(p.type), ",");
+				StringView lua_name;
+				if (p.is_var) {
+					lua_name = p.name;
+				}
+				else {
+					toID(pickLabel(p.name, p.attributes.label), Span(tmp, tmp + 256));
+					lua_name = makeStringView(tmp);
+				}
+				if (!isBlob(p) && p.type.size() > 0) {
+					L("\t", lua_name, ": ", toLuaType(p.type), ",");
+				}
 			}
 			for (Function& f : c.functions) {
 				serializeLuaType(out, c.id, "_component", f, true);
