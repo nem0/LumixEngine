@@ -1204,7 +1204,37 @@ void registerEngineAPI(lua_State* L, Engine* engine) {
 				else
 					local c = ent:createComponent(k)
 					for k2, v2 in pairs(v) do
-						c[k2] = v2
+						local maybe_arr = c[k2]
+						if type(maybe_arr) == "table" and type(maybe_arr.add) == "function" then
+							if type(v2) ~= "table" then
+								error("Expected table for array property '" .. tostring(k2) .. "'")
+							end
+							local max_i = 0
+							local count = 0
+							for kk, _ in pairs(v2) do
+								if type(kk) ~= "number" or kk ~= math.floor(kk) or kk < 1 then
+									error("Array property '" .. tostring(k2) .. "' must use 1..N integer indices")
+								end
+								count = count + 1
+								if kk > max_i then max_i = kk end
+							end
+							if count ~= max_i then
+								error("Array property '" .. tostring(k2) .. "' must be contiguous (no holes, no extra keys)")
+							end
+							for i = 1, max_i do
+								local item_desc = v2[i]
+								if type(item_desc) ~= "table" then
+									error("Array property '" .. tostring(k2) .. "' item " .. tostring(i) .. " must be a table")
+								end
+								maybe_arr:add()
+								local item = maybe_arr[i]
+								for k3, v3 in pairs(item_desc) do
+									item[k3] = v3
+								end
+							end
+						else
+							c[k2] = v2
+						end
 					end
 				end
 			end
