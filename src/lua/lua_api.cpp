@@ -616,10 +616,9 @@ static i32 LUA_getParent(lua_State* L, World* world, i32 entity)
 	return world->getParent({entity}).index;
 }
 
-static i32 LUA_findByName(lua_State* L, World* world, i32 entity, const char* name)
+static i32 LUA_findByName(lua_State* L, World* world, i32 parent, const char* name)
 {
-	if (entity < 0) luaL_argerror(L, 2, "Invalid entity");
-	return world->findByName(EntityPtr{entity}, name).index;
+	return world->findByName(EntityPtr{parent}, name).index;
 }
 
 static void LUA_setParent(lua_State* L, World* world, i32 parent, i32 child)

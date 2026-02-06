@@ -44,7 +44,7 @@ for i = 1, 7 do
 			-- this.world:createEntityEx { -- use ingame, is not undoable
 				position = { i  * 3, j * 3, k * 3 },
 				model_instance = { source = "engine/models/cube.fbx" },
-				rigid_actor = { dynamic = 1, box_geometry = { {} } }
+				rigid_actor = { dynamic = 1, boxes = { {} } }
 			}
 		end
 	end
@@ -130,11 +130,25 @@ local entity = Editor.createEntityEx { -- use only in editor, not accessible ing
 -- local entity = this.world:createEntityEx { -- use ingame, is not undoable
     position = {0, 0, 0},
     model_instance = { source = "engine/models/sphere.fbx" },
-    rigid_actor = { dynamic_type = 1 }
+    rigid_actor = { dynamic = 1 }
 }
 
 entity.rigid_actor.spheres:add()
 entity.rigid_actor.spheres[1].radius = 1
+```
+
+Array properties can also be specified directly in `Editor.createEntityEx` as arrays of tables:
+
+```lua
+local e = Editor.createEntityEx {
+	name = "scripted",
+	lua_script = {
+		scripts = {
+			{ path = "scripts/a.lua" },
+			{ path = "scripts/b.lua" },
+		}
+	}
+}
 ```
 
 ### GUI button click handler
@@ -156,9 +170,9 @@ entity.rigid_actor.spheres[1].radius = 1
                 font_size = 30,
                 font = "/engine/editor/fonts/notosans-bold.ttf"
             },
-            lua_script = {}
+            lua_script = {},
+        	parent = canvas
         })
-        button.parent = canvas
         button.lua_script.scripts:add()
         button.lua_script[1].onButtonClicked = function()
             LumixAPI.logError("clicked " .. tostring(idx))

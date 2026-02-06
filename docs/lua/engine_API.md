@@ -85,7 +85,7 @@ declare class World
 	createEntity : () -> Entity,
 	createEntityEx : (any) -> Entity,
 	destroyEntity : (Entity) -> (),
-	findEntityByName : (string) -> Entity?
+	findEntityByName : (Entity?, string) -> Entity?
 
 	... all modules
 end

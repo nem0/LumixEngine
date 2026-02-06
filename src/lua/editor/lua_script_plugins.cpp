@@ -1308,7 +1308,9 @@ Editor.addAction {
 		for i = 1, 10 do
 			Editor.createEntityEx {
 				position = { 3 * i, 0, 0 },
-				model_instance = { Source = "engine/models/cube.fbx" }
+				model_instance = { source = "engine/models/cube.fbx" },
+				-- array properties are specified as arrays of tables:
+				-- lua_script = { scripts = { { path = "scripts/my_script.lua" } } }
 			}
 		end
 	end
@@ -1464,7 +1466,7 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 			}
 
 			int val = (int)lua_tointeger(L, -1);
-			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
+			editor->setProperty(cmp_type, array_desc_name, array_index, prop.name, Span(&entity, 1), val);
 		}
 
 		void visit(const reflection::Property<u32>& prop) override
@@ -1473,7 +1475,7 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 			if (!lua_isnumber(L, -1)) return;
 
 			const u32 val = (u32)lua_tointeger(L, -1);
-			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
+			editor->setProperty(cmp_type, array_desc_name, array_index, prop.name, Span(&entity, 1), val);
 		}
 
 		void visit(const reflection::Property<float>& prop) override
@@ -1482,7 +1484,7 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 			if (!lua_isnumber(L, -1)) return;
 
 			float val = (float)lua_tonumber(L, -1);
-			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
+			editor->setProperty(cmp_type, array_desc_name, array_index, prop.name, Span(&entity, 1), val);
 		}
 
 		void visit(const reflection::Property<Vec2>& prop) override
@@ -1491,7 +1493,7 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 			if (!LuaWrapper::isType<Vec2>(L, -1)) return;
 
 			const Vec2 val = LuaWrapper::toType<Vec2>(L, -1);
-			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
+			editor->setProperty(cmp_type, array_desc_name, array_index, prop.name, Span(&entity, 1), val);
 		}
 
 		void visit(const reflection::Property<Vec3>& prop) override
@@ -1500,7 +1502,7 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 			if (!LuaWrapper::isType<Vec3>(L, -1)) return;
 
 			const Vec3 val = LuaWrapper::toType<Vec3>(L, -1);
-			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
+			editor->setProperty(cmp_type, array_desc_name, array_index, prop.name, Span(&entity, 1), val);
 		}
 
 		void visit(const reflection::Property<IVec3>& prop) override
@@ -1509,7 +1511,7 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 			if (!LuaWrapper::isType<IVec3>(L, -1)) return;
 
 			const IVec3 val = LuaWrapper::toType<IVec3>(L, -1);
-			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
+			editor->setProperty(cmp_type, array_desc_name, array_index, prop.name, Span(&entity, 1), val);
 		}
 
 		void visit(const reflection::Property<Vec4>& prop) override
@@ -1518,7 +1520,7 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 			if (!LuaWrapper::isType<Vec4>(L, -1)) return;
 
 			const Vec4 val = LuaWrapper::toType<Vec4>(L, -1);
-			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
+			editor->setProperty(cmp_type, array_desc_name, array_index, prop.name, Span(&entity, 1), val);
 		}
 		
 		void visit(const reflection::Property<const char*>& prop) override
@@ -1527,7 +1529,7 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 			if (!lua_isstring(L, -1)) return;
 
 			const char* str = lua_tostring(L, -1);
-			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), str);
+			editor->setProperty(cmp_type, array_desc_name, array_index, prop.name, Span(&entity, 1), str);
 		}
 
 
@@ -1537,7 +1539,7 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 			if (!lua_isstring(L, -1)) return;
 
 			const char* str = lua_tostring(L, -1);
-			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), Path(str));
+			editor->setProperty(cmp_type, array_desc_name, array_index, prop.name, Span(&entity, 1), Path(str));
 		}
 
 
@@ -1547,12 +1549,48 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 			if (!lua_isboolean(L, -1)) return;
 
 			bool val = lua_toboolean(L, -1) != 0;
-			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
+			editor->setProperty(cmp_type, array_desc_name, array_index, prop.name, Span(&entity, 1), val);
 		}
 
 		void visit(const reflection::Property<EntityPtr>& prop) override { notSupported(prop); }
-		void visit(const reflection::ArrayProperty& prop) override { notSupported(prop); }
 		void visit(const reflection::BlobProperty& prop) override { notSupported(prop); }
+
+		void visit(const reflection::ArrayProperty& prop) override {
+			if (!isSameProperty(prop.name, property_name)) return;
+			if (!lua_istable(L, -1)) {
+				logError("Expected table for array property ", prop.name);
+				return;
+			}
+
+			IModule* module = editor->getWorld()->getModule(cmp_type);
+			ComponentUID cmp(entity, cmp_type, module);
+
+			const int len = (int)lua_objlen(L, -1);
+			for (int i = 0; i < len; ++i) {
+				editor->addArrayPropertyItem(cmp, prop.name);
+
+				lua_rawgeti(L, -1, i + 1); // lua arrays are 1-based
+				if (lua_istable(L, -1)) {
+					lua_pushnil(L);
+					while (lua_next(L, -2) != 0) {
+						const char* child_property_name = LuaWrapper::toType<const char*>(L, -2);
+
+						SetPropertyVisitor child_visitor;
+						child_visitor.property_name = child_property_name;
+						child_visitor.entity = entity;
+						child_visitor.cmp_type = cmp_type;
+						child_visitor.L = L;
+						child_visitor.editor = editor;
+						child_visitor.array_desc_name = prop.name;
+						child_visitor.array_index = i;
+						prop.visitChildren(child_visitor);
+
+						lua_pop(L, 1);
+					}
+				}
+				lua_pop(L, 1);
+			}
+		}
 
 		template <typename T>
 		void notSupported(const T& prop)
@@ -1567,6 +1605,8 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 		ComponentType cmp_type;
 		const char* property_name;
 		WorldEditor* editor;
+		const char* array_desc_name = "";
+		int array_index = 0;
 	};
 
 	static int LUA_createEntityEx(lua_State* L) {
