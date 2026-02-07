@@ -628,11 +628,31 @@ static void LUA_setParent(lua_State* L, World* world, i32 parent, i32 child)
 }
 
 
-static const char* LUA_getEntityName(World* univ, i32 entity) { return univ->getEntityName({entity}); }
-static void LUA_setEntityName(World* univ, i32 entity, const char* name) { univ->setEntityName({entity}, name); }
-static void LUA_setEntityScale(World* univ, i32 entity, const Vec3& scale) { univ->setScale({entity}, scale); }
-static void LUA_setEntityPosition(World* univ, i32 entity, const DVec3& pos) { univ->setPosition({entity}, pos); }
-static void LUA_setEntityLocalPosition(World* univ, i32 entity, const DVec3& pos) { univ->setLocalPosition({entity}, pos); }
+static const char* LUA_getEntityName(lua_State* L, World* univ, i32 entity) { 
+	if (entity < 0) luaL_argerror(L, 2, "Invalid entity");
+	return univ->getEntityName({entity});
+}
+
+static void LUA_setEntityName(lua_State* L, World* univ, i32 entity, const char* name) {
+	if (entity < 0) luaL_argerror(L, 2, "Invalid entity");
+	univ->setEntityName({entity}, name);
+}
+
+static void LUA_setEntityScale(lua_State* L, World* univ, i32 entity, const Vec3& scale) {
+	if (entity < 0) luaL_argerror(L, 2, "Invalid entity");
+	univ->setScale({entity}, scale);
+}
+
+static void LUA_setEntityPosition(lua_State* L, World* univ, i32 entity, const DVec3& pos) {
+	if (entity < 0) luaL_argerror(L, 2, "Invalid entity");
+	univ->setPosition({entity}, pos);
+}
+
+static void LUA_setEntityLocalPosition(lua_State* L, World* univ, i32 entity, const DVec3& pos) {
+	if (entity < 0) luaL_argerror(L, 2, "Invalid entity");
+	univ->setLocalPosition({entity}, pos);
+}
+
 static World* LUA_createWorld(Engine* engine) { return &engine->createWorld(); }
 static void LUA_destroyWorld(Engine* engine, World* world) { engine->destroyWorld(*world); }
 
