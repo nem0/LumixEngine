@@ -365,7 +365,7 @@ bool ModelImporter::writeSubmodels(const Path& src, const ModelMeta& meta) {
 		const BoneNameHash root_motion_bone(meta.root_motion_bone.c_str());
 		write(root_motion_bone);
 		writeSubmesh(src, i, meta);
-		writeGeometry(i);
+		writeGeometry(i, meta);
 		write((i32)0);
 
 		// lods
@@ -728,10 +728,10 @@ void ModelImporter::writeImpostorVertices(float center_y, Vec2 bounding_cylinder
 	}
 }
 
-void ModelImporter::writeGeometry(u32 geom_idx) {
+void ModelImporter::writeGeometry(u32 geom_idx, const ModelMeta& meta) {
 	PROFILE_FUNCTION();
 	// TODO lods
-	const ImportGeometry& geom = m_geometries[geom_idx];
+	ImportGeometry& geom = m_geometries[geom_idx];
 	
 	const bool are_indices_16_bit = geom.index_size == sizeof(u16);
 	write(geom.index_size);
@@ -762,9 +762,40 @@ void ModelImporter::writeGeometry(u32 geom_idx) {
 		aabb.addPoint(p);
 	}
 
-	float center_radius_squared = 0;
-	const Vec3 center = (aabb.max + aabb.min) * 0.5f;
+	Vec3 center = (aabb.max + aabb.min) * 0.5f;
 
+	if (meta.origin != ModelMeta::Origin::SOURCE) {
+		u8* out = geom.vertex_buffer.getMutableData();
+		for (u32 i = 0; i < vertex_count; ++i) {
+			Vec3 p;
+			memcpy(&p, out + vertex_size * i, sizeof(p));
+			p.x -= center.x;
+			p.z -= center.z;
+			if (meta.origin == ModelMeta::Origin::CENTER) {
+				p.y -= center.y;
+			}
+			else if (meta.origin == ModelMeta::Origin::BOTTOM) {
+				p.y -= aabb.min.y;
+			}
+			memcpy(out + vertex_size * i, &p, sizeof(p));
+		}
+
+		aabb.min -= center;
+		aabb.max -= center;
+		if (meta.origin == ModelMeta::Origin::CENTER_XZ) {
+			aabb.min.y += center.y;
+			aabb.max.y += center.y;
+		}
+		else if (meta.origin == ModelMeta::Origin::BOTTOM) {
+			const float bottom_offset = aabb.min.y + center.y;
+			aabb.min.y -= bottom_offset;
+			aabb.max.y -= bottom_offset;
+		}
+		center = (aabb.min + aabb.max) * 0.5f;
+	}
+
+	float center_radius_squared = 0;
+	origin_radius_squared = 0;
 	positions = geom.vertex_buffer.data();
 	for (u32 i = 0; i < vertex_count; ++i) {
 		Vec3 p;
@@ -772,6 +803,7 @@ void ModelImporter::writeGeometry(u32 geom_idx) {
 		positions += vertex_size;
 		const float d = squaredLength(p - center);
 		center_radius_squared = maximum(d, center_radius_squared);
+		origin_radius_squared = maximum(squaredLength(p), origin_radius_squared);
 	}
 
 	write((i32)geom.vertex_buffer.size());
@@ -1005,6 +1037,9 @@ void ModelImporter::writeGeometry(const ModelMeta& meta) {
 					if (meta.origin == ModelMeta::Origin::CENTER) {
 						p.y -= center.y;
 					}
+					else if (meta.origin == ModelMeta::Origin::BOTTOM) {
+						p.y -= aabb.min.y;
+					}
 					memcpy(out + vertex_size * i, &p, sizeof(p));
 				}
 				out += geom.vertex_buffer.size();
@@ -1013,9 +1048,14 @@ void ModelImporter::writeGeometry(const ModelMeta& meta) {
 
 		aabb.min -= center;
 		aabb.max -= center;
-		if (meta.origin == ModelMeta::Origin::BOTTOM) {
+		if (meta.origin == ModelMeta::Origin::CENTER_XZ) {
 			aabb.min.y += center.y;
 			aabb.max.y += center.y;
+		}
+		else if (meta.origin == ModelMeta::Origin::BOTTOM) {
+			const float bottom_offset = aabb.min.y + center.y;
+			aabb.min.y -= bottom_offset;
+			aabb.max.y -= bottom_offset;
 		}
 		center = (aabb.min + aabb.max) * 0.5f;
 		center_xz0 = Vec3(0, center.y, 0);

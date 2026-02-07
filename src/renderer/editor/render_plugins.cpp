@@ -2130,6 +2130,10 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 						m_meta.origin = ModelMeta::Origin::CENTER;
 						saveUndo(true);
 					}
+					if (ImGui::Selectable("Center XZ")) {
+						m_meta.origin = ModelMeta::Origin::CENTER_XZ;
+						saveUndo(true);
+					}
 					if (ImGui::Selectable("Bottom")) {
 						m_meta.origin = ModelMeta::Origin::BOTTOM;
 						saveUndo(true);

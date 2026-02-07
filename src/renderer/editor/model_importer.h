@@ -147,7 +147,7 @@ protected:
 	void writeMeshes(const Path& src, const ModelMeta& meta);
 	void writeLODs(const ModelMeta& meta);
 	void writeGeometry(const ModelMeta& meta);
-	void writeGeometry(u32 geom_idx);
+	void writeGeometry(u32 geom_idx, const ModelMeta& meta);
 	void writeSkeleton(const ModelMeta& meta);
 	bool findTexture(StringView src_dir, StringView ext, ImportTexture& tex) const;
 	void bakeVertexAO(float min_ao);

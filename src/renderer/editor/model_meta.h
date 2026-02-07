@@ -23,7 +23,8 @@ struct ModelMeta {
 	enum class Origin : i32 {
 		SOURCE, // keep vertex data as is
 		CENTER, // center all meshes as a group
-		BOTTOM, // same as center, but don't change Y coordinate
+		CENTER_XZ, // center X and Z, keep Y unchanged
+		BOTTOM, // center X and Z, move bottom to Y=0
 	};
 
 	static const char* toString(Physics value) {
@@ -39,8 +40,9 @@ struct ModelMeta {
 	static const char* toString(Origin value) {
 		switch (value) {
 			case Origin::SOURCE: return "source";
-			case Origin::BOTTOM: return "bottom";
 			case Origin::CENTER: return "center";
+			case Origin::CENTER_XZ: return "center_xz";
+			case Origin::BOTTOM: return "bottom";
 		}
 		ASSERT(false);
 		return "none";
@@ -59,8 +61,9 @@ struct ModelMeta {
 	static const char* toUIString(Origin value) {
 		switch (value) {
 			case Origin::SOURCE: return "Keep";
-			case Origin::BOTTOM: return "Bottom";
 			case Origin::CENTER: return "Center";
+			case Origin::CENTER_XZ: return "Center XZ";
+			case Origin::BOTTOM: return "Bottom";
 		}
 		ASSERT(false);
 		return "none";
@@ -205,7 +208,12 @@ struct ModelMeta {
 
 		if (equalIStrings(tmp_origin, "center")) origin = Origin::CENTER;
 		else if (equalIStrings(tmp_origin, "bottom")) origin = Origin::BOTTOM;
-		else origin = Origin::SOURCE;
+		else if (equalIStrings(tmp_origin, "center_xz")) origin = Origin::CENTER_XZ;
+		else if (tmp_origin.size() == 0) origin = Origin::SOURCE;
+		else {
+			logError(path, ": unknown origin ", tmp_origin);
+			return;
+		}
 
 		clips.clear();	
 		if (!tmp_clips.empty()) {
