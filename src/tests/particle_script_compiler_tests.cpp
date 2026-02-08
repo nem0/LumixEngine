@@ -2479,6 +2479,27 @@ bool testEmitAfterBlock() {
 	return true;
 }
 
+bool testNegativeEmitterSettings() {
+	const char* code = R"(
+		emitter test {
+			material "particles/particle.mat"
+			emit_move_distance -1.5
+			emit_per_second -2.25
+		}
+	)";
+
+	TestableCompiler compiler;
+	OutputMemoryStream compiled(getGlobalAllocator());
+	ASSERT_TRUE(compiler.compile(Path("negative_emitter_settings.pat"), code, compiled), "Compilation should succeed");
+
+	const auto* emitter = compiler.getEmitter(0);
+	ASSERT_TRUE(emitter != nullptr, "Emitter should be compiled");
+	ASSERT_TRUE(fabsf(emitter->m_emit_move_distance - (-1.5f)) < 0.001f, "emit_move_distance should be -1.5");
+	ASSERT_TRUE(fabsf(emitter->m_emit_per_second - (-2.25f)) < 0.001f, "emit_per_second should be -2.25");
+
+	return true;
+}
+
 // Regression test for optimizer reorder/fold affecting swizzle -> channel writes
 bool testOptimizerRegression() {
 	const char* code = R"(
@@ -2735,5 +2756,6 @@ void runParticleScriptCompilerTests() {
 	RUN_TEST(testElseIf);
 	RUN_TEST(testInputs);
 	RUN_TEST(testEmitAfterBlock);
+	RUN_TEST(testNegativeEmitterSettings);
 	RUN_TEST(testFunctionGeneric);
 }

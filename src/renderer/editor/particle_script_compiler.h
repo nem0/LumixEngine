@@ -3102,7 +3102,21 @@ struct ParticleScriptCompiler {
 	}
 
 	float consumeFloat() {
-		return asFloat(consumeToken());
+		Token t = consumeToken();
+		if (t.type == Token::MINUS) {
+			Token num_token = consumeToken();
+			if (num_token.type != Token::NUMBER) {
+				error(num_token.value, "Expected number after '-'.");
+				return 0.0f;
+			}
+			float v = asFloat(num_token);
+			return -v;
+		}
+		if (t.type != Token::NUMBER) {
+			error(t.value, "Expected number.");
+			return 0.0f;
+		}
+		return asFloat(t);
 	}
 
 	u32 consumeU32() {
