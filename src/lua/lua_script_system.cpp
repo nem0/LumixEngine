@@ -1269,7 +1269,10 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 
 		auto writeOne = [&]() {
 			switch (prop.type) {
-				case Property::ANY: ASSERT(false); break;
+				case Property::ANY:
+					// TODO we can get here by starting to game while a script failed to load
+					ASSERT(false);
+					break;
 				case Property::BOOLEAN: {
 					bool b = lua_toboolean(L, -1) != 0;
 					stream.write((u8)b);

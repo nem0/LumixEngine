@@ -1331,9 +1331,41 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 				}
 				break;
 			}
+			case InstructionType::RAND: {
+				DataStream dst = ip.read<DataStream>();
+				float range_from = ip.read<float>();
+				float range_to = ip.read<float>();
+				if (dst.type == DataStream::OUT) {
+					const u32 stride = emitter.resource_emitter.outputs_count;
+					float* out = ctx.output_memory + dst.index + fromf4 * 4 * stride;
+					for (i32 i = 0, j = 0; i < stepf4 * 4; ++i, j += stride) {
+						out[j] = randFloat(range_from, range_to);
+					}
+				}
+				else if (dst.type == DataStream::REGISTER) {
+					float4* result = ctx.registers[dst.index] + fromf4;
+					for (i32 i = 0; i < stepf4; ++i) {
+						result[i] = f4Init(
+							randFloat(range_from, range_to),
+							randFloat(range_from, range_to),
+							randFloat(range_from, range_to),
+							randFloat(range_from, range_to)
+						);
+					}
+				}
+				else if (dst.type == DataStream::CHANNEL) {
+					float* out = emitter.channels[dst.index].data + fromf4 * 4;
+					for (i32 i = 0; i < stepf4 * 4; ++i) {
+						out[i] = randFloat(range_from, range_to);
+					}
+				}
+				else {
+					ASSERT(false);
+				}
+				break;
+			}
 			case InstructionType::NOT:
 			case InstructionType::END:
-			case InstructionType::RAND:
 			case InstructionType::MESH:
 				ASSERT(false);
 				break;

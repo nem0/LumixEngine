@@ -660,6 +660,7 @@ static void LUA_destroyEntity(lua_State* L, World* world, i32 entity) {
 	// we defer destruction to avoid scripts destroying themselves while being used
 	// or destroying other components which are using them (e.g. destroying button from callback in the button)
 	if (entity < 0) luaL_argerror(L, 2, "Invalid entity");
+	if (!world->hasEntity({entity})) luaL_argerror(L, 2, "Invalid entity");
 	auto* module = (LuaScriptModule*)world->getModule("lua_script");
 	module->deferEntityDestruction({entity});
 }
