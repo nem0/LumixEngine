@@ -513,7 +513,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 			const InputSystem& input_system = m_app.getEngine().getInputSystem();
 			Span<const InputSystem::Event> events = input_system.getEvents();
 			for (const InputSystem::Event& e : events) {
-				if (e.device->type == InputSystem::Device::CONTROLLER && e.type == InputSystem::Event::AXIS) {
+				if (e.device->type == InputSystem::Device::GAMEPAD && e.type == InputSystem::Event::AXIS) {
 					if (m_controller_debug_mapping.axis_x >= 0) {
 						module->setAnimatorInput(entity, m_controller_debug_mapping.axis_x, e.data.axis.x);
 					}
@@ -526,7 +526,7 @@ struct ControllerEditorImpl : ControllerEditor, AssetBrowser::IPlugin, AssetComp
 
 		bool isControllerConnected() const {
 			for (const InputSystem::Device* device : m_app.getEngine().getInputSystem().getDevices()) {
-				if (device->type == InputSystem::Device::CONTROLLER) return true;
+				if (device->type == InputSystem::Device::GAMEPAD) return true;
 			}
 			return false;
 		}

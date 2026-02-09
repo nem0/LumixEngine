@@ -2276,7 +2276,7 @@ void serializeLuaTypes(OutputStream& out_formatted) {
 
 	out.add(R"#(
 	type InputDevice = {
-		type : "mouse" | "keyboard",
+		type : "mouse" | "keyboard" | "gamepad",
 		index : number
 	}
 

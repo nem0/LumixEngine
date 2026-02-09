@@ -244,7 +244,7 @@ private:
 				if (is_connected && !m_gamepad_devices[i]) {
 					// Controller connected
 					GamepadDevice* device = LUMIX_NEW(m_allocator, GamepadDevice)(i);
-					device->type = Device::CONTROLLER;
+					device->type = Device::GAMEPAD;
 					device->last_state = new_state;
 					m_gamepad_devices[i] = device;
 					addDevice(device);

@@ -28,7 +28,7 @@ static const char* toString(InputSystem::Device::Type type) {
 	switch (type) {
 		case InputSystem::Device::KEYBOARD: return "keyboard";
 		case InputSystem::Device::MOUSE: return "mouse";
-		case InputSystem::Device::CONTROLLER: return "controller";
+		case InputSystem::Device::GAMEPAD: return "gamepad";
 	}
 	ASSERT(false);
 	return "N/A";
@@ -1609,6 +1609,8 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 				lua_setfield(L, -2, "x_abs"); // [lua_event]
 				LuaWrapper::push(L, event.data.axis.y_abs); // [lua_event, axis.y_abs]
 				lua_setfield(L, -2, "y_abs"); // [lua_event]
+				LuaWrapper::push(L, (u32)event.data.axis.axis); // [lua_event, axis.axis]
+				lua_setfield(L, -2, "axis"); // [lua_event]
 				break;
 			case InputSystem::Event::TEXT_INPUT:
 				LuaWrapper::push(L, event.data.text.utf8); // [lua_event, utf8]

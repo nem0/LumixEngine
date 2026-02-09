@@ -1432,8 +1432,8 @@ struct RenderModuleImpl final : RenderModule {
 		camera.ortho_size = 10;
 		camera.entity = entity;
 		camera.fov = degreesToRadians(60);
-		camera.screen_width = 800;
-		camera.screen_height = 600;
+		camera.screen_width = -1;
+		camera.screen_height = -1;
 		camera.near = 0.1f;
 		camera.far = 10000.0f;
 		m_cameras.insert(entity, camera);

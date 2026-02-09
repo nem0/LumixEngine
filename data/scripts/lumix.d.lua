@@ -926,7 +926,7 @@ declare this : Entity
 	
 	
 	type InputDevice = {
-		type : "mouse" | "keyboard",
+		type : "mouse" | "keyboard" | "gamepad",
 		index : number
 	}
 	

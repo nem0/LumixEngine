@@ -14,7 +14,7 @@ struct LUMIX_ENGINE_API InputSystem {
 		enum Type : u32 {
 			MOUSE,
 			KEYBOARD,
-			CONTROLLER
+			GAMEPAD
 		};
 
 		Type type;
@@ -34,7 +34,7 @@ struct LUMIX_ENGINE_API InputSystem {
 	};
 
 	struct AxisEvent {
-		enum Axis {
+		enum Axis : u32 {
 			LTRIGGER,
 			RTRIGGER,
 			LTHUMB,

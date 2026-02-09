@@ -96,6 +96,30 @@ function onInputEvent(event : InputEvent)
 end
 ```
 
+### Handling gamepad input
+```lua
+function onInputEvent(event : InputEvent)
+	if event.type == "button" and event.device.type == "gamepad" then
+		if event.key_id == 0 and event.down then  -- A button pressed
+			LumixAPI.logInfo("Gamepad A button pressed")
+		elseif event.key_id == 1 and event.down then  -- B button pressed
+			LumixAPI.logInfo("Gamepad B button pressed")
+		end
+	elseif event.type == "axis" and event.device.type == "gamepad" then
+		if event.axis == 3 then  -- Right thumbstick (RTHUMB)
+			local x = event.x  -- Left/right movement (-1 to 1)
+			local y = event.y  -- Up/down movement (-1 to 1)
+			LumixAPI.logInfo("Right stick: x=" .. x .. ", y=" .. y)
+		elseif event.axis == 1 then  -- Right trigger (RTRIGGER)
+			local trigger_value = event.x  -- 0 to 1
+			if trigger_value > 0.5 then
+				LumixAPI.logInfo("Right trigger pressed: " .. trigger_value)
+			end
+		end
+	end
+end
+```
+
 ### Instantiate a prefab
 ```lua
 ext_prefab = Lumix.Resource:newEmpty("prefab") -- this is exposed in property grid
