@@ -21,10 +21,6 @@ Who is using it?
 
 ![4k_1](https://user-images.githubusercontent.com/153526/144655096-dd289dc3-c2a3-4a9d-a02c-0f55e87115aa.jpg)
 
-* [YAP](https://mikulasflorek.itch.io/yap) 
-
-![YAP](https://img.itch.zone/aW1nLzQ2NzExMjkucG5n/original/6nkV%2B%2B.png)
-
 ## Showcase Projects
 
 A small collection of sample projects built with the Lumix Engine. See the full showcase at https://github.com/nem0/lumix_showcase.
