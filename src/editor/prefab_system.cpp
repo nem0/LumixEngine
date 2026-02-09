@@ -422,7 +422,7 @@ public:
 		for (PrefabHandle& p : m_entity_to_prefab) {
 			if (p != prefab) continue;
 			const i32 idx = i32(&p - m_entity_to_prefab.begin());
-			const EntityRef e = {idx};
+			const EntityRef e {idx};
 			if (!m_roots.find(e).isValid()) continue;
 
 			const Transform tr = m_world->getTransform(e);

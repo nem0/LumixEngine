@@ -1771,7 +1771,6 @@ void serializeLuaArrayGetter(OutputStream& out, Module& m, Component& c, ArrayPr
 				return 1;
 			}
 			else {
-				ASSERT(false);
 				luaL_error(L, "Unknown property %s", prop_name);
 			}
 		}
@@ -1780,7 +1779,7 @@ void serializeLuaArrayGetter(OutputStream& out, Module& m, Component& c, ArrayPr
 			LuaWrapper::checkTableArg(L, 1);
 			const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
 			auto* module = LuaWrapper::toType<GetterModule*>(L, lua_upvalueindex(1));
-			EntityRef entity = {LuaWrapper::toType<i32>(L, lua_upvalueindex(2))};
+			EntityRef entity {LuaWrapper::toType<i32>(L, lua_upvalueindex(2))};
 			i32 index = LuaWrapper::toType<int>(L, lua_upvalueindex(3));
 			XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
 			switch (name_hash) {
@@ -1812,7 +1811,7 @@ void serializeLuaArrayGetter(OutputStream& out, Module& m, Component& c, ArrayPr
 			const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
 			XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
 			auto* module = LuaWrapper::toType<GetterModule*>(L, lua_upvalueindex(1));
-			EntityRef entity = {LuaWrapper::toType<i32>(L, lua_upvalueindex(2))};
+			EntityRef entity {LuaWrapper::toType<i32>(L, lua_upvalueindex(2))};
 			i32 index = LuaWrapper::toType<int>(L, lua_upvalueindex(3));
 			switch (name_hash) {
 	)#");	
@@ -2137,6 +2136,7 @@ void serializeLuaTypes(OutputStream& out_formatted) {
 		createPartition : (World, string) -> number,
 		destroyPartition : (World, number) -> (),
 		load : (World, string, any) -> (),
+		getAllEntities : (World) -> any,
 		getModule : (World, string) -> any,
 		createEntity : (World) -> Entity,
 		createEntityEx : (World, any) -> Entity,

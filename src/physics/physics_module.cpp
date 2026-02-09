@@ -278,8 +278,8 @@ struct PhysicsModuleImpl final : PhysicsModule
 
 				ContactData contact_data;
 				contact_data.position = fromPhysx(contact.position);
-				contact_data.e1 = {(int)(intptr_t)(pairHeader.actors[0]->userData)};
-				contact_data.e2 = {(int)(intptr_t)(pairHeader.actors[1]->userData)};
+				contact_data.e1 = EntityRef{(int)(intptr_t)(pairHeader.actors[0]->userData)};
+				contact_data.e2 = EntityRef{(int)(intptr_t)(pairHeader.actors[1]->userData)};
 
 				m_module.onContact(contact_data);
 			}
@@ -294,8 +294,8 @@ struct PhysicsModuleImpl final : PhysicsModule
 					PxTriggerPairFlag::eREMOVED_SHAPE_TRIGGER | PxTriggerPairFlag::eREMOVED_SHAPE_OTHER;
 				if (pairs[i].flags & REMOVED_FLAGS) continue;
 
-				EntityRef e1 = {(int)(intptr_t)(pairs[i].triggerActor->userData)};
-				EntityRef e2 = {(int)(intptr_t)(pairs[i].otherActor->userData)};
+				EntityRef e1 = EntityRef{(int)(intptr_t)(pairs[i].triggerActor->userData)};
+				EntityRef e2 = EntityRef{(int)(intptr_t)(pairs[i].otherActor->userData)};
 
 				m_module.onTrigger(e1, e2, pairs[i].status == PxPairFlag::eNOTIFY_TOUCH_LOST);
 			}
@@ -893,7 +893,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 
 
 	int getJointCount() override { return m_joints.size(); }
-	EntityRef getJointEntity(int index) override { return {m_joints.getKey(index).index}; }
+	EntityRef getJointEntity(int index) override { return EntityRef{m_joints.getKey(index).index}; }
 
 
 	PxDistanceJoint* getDistanceJoint(EntityRef entity)
@@ -2406,7 +2406,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		{
 			if (layer >= 0)
 			{
-				const EntityRef hit_entity = {(int)(intptr_t)actor->userData};
+				const EntityRef hit_entity = EntityRef{(int)(intptr_t)actor->userData};
 				const auto iter = module->m_actors.find(hit_entity);
 				if (iter.isValid())
 				{
@@ -2490,7 +2490,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		{
 			if (m_joints.at(i).connected_body == entity)
 			{
-				setJointConnectedBody({m_joints.getKey(i).index}, INVALID_ENTITY);
+				setJointConnectedBody(EntityRef{m_joints.getKey(i).index}, INVALID_ENTITY);
 			}
 		}
 	}

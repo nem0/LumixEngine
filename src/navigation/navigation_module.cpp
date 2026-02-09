@@ -132,7 +132,7 @@ struct NavigationModuleImpl final : NavigationModule
 			zone.crowd->removeAgent(agent.agent);
 			addCrowdAgent(iter.value(), zone);
 			if (!agent.is_finished) {
-				navigate({entity.index}, target_pos, speed, agent.stop_distance);
+				navigate(entity, target_pos, speed, agent.stop_distance);
 			}
 		}
 	}

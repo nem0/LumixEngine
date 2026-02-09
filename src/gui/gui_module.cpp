@@ -510,7 +510,7 @@ struct GUIModuleImpl final : GUIModule {
 			if (entity.isValid()) return entity;
 		}
 
-		return intersect ? rect.entity : INVALID_ENTITY;
+		return intersect ? (EntityPtr)rect.entity : INVALID_ENTITY;
 	}
 	
 	EntityPtr getRectAt(const Vec2& pos) const override { return getRectAtEx(pos, m_canvas_size, INVALID_ENTITY); }

@@ -2803,7 +2803,7 @@ struct PipelineImpl final : Pipeline {
 			u8 prev_bucket = (sort_keys[from] >> SORT_KEY_BUCKET_SHIFT) + 1; // make sure it's different from the first bucket, so first iteration is properly initialized
 
 			for (u32 i = from; i < to; ++i) {
-				const EntityRef entity = {int(renderables[i] & 0xFFffFFff)};
+				const EntityRef entity {int(renderables[i] & 0xFFffFFff)};
 				const DrawCommandTypes type = DrawCommandTypes((renderables[i] >> SORT_VALUE_TYPE_SHIFT) & SORT_VALUE_TYPE_MASK);
 				const u8 bucket = sort_keys[i] >> SORT_KEY_BUCKET_SHIFT;
 
@@ -3050,7 +3050,7 @@ struct PipelineImpl final : Pipeline {
 							u8* instance_data = slice.ptr;
 
 							for (i32 j = start_i; j < start_i + (i32)count; ++j) {
-								const EntityRef e = { i32(renderables[j] & 0xFFffFFff) };
+								const EntityRef e { i32(renderables[j] & 0xFFffFFff) };
 								const Transform& tr = transforms[e.index];
 								const Vec3 pos_ws = Vec3(tr.pos - camera_pos);
 								const float lod_d = model_instances[e.index].lod - mesh_lod;
@@ -3094,7 +3094,7 @@ struct PipelineImpl final : Pipeline {
 							const TransientSlice slice = alloc(transient_pool, count * (sizeof(Vec4) * 3));
 							u8* instance_data = slice.ptr;
 							for (int j = start_i; j < start_i + (i32)count; ++j) {
-								const EntityRef e = { i32(renderables[j] & 0xFFffFFff) };
+								const EntityRef e { i32(renderables[j] & 0xFFffFFff) };
 								const Transform& tr = transforms[e.index];
 								const Vec3 lpos = Vec3(tr.pos - camera_pos);
 								const float lod_d = model_instances[e.index].lod - mesh_lod;
@@ -3152,7 +3152,7 @@ struct PipelineImpl final : Pipeline {
 						for (u32 j = start_i; j <= i; ++j) {
 							SkinnedInstanceData* skin_draw_data = (SkinnedInstanceData*)instance_buffer.ptr + j - start_i;
 
-							const EntityRef e = {int(renderables[j] & 0xFFffFFff)};
+							const EntityRef e {int(renderables[j] & 0xFFffFFff)};
 							ModelInstance* mi2 = &model_instances[e.index];
 							const Transform& tr = transforms[e.index];
 							
@@ -3206,7 +3206,7 @@ struct PipelineImpl final : Pipeline {
 						DecalData* beg = (DecalData*)slice.ptr;
 						DecalData* end = (DecalData*)(slice.ptr + (count - 1) * sizeof(DecalData));
 						for(u32 j = start_i; j < i; ++j) {
-							const EntityRef e = {int(renderables[j] & 0x00ffFFff)};
+							const EntityRef e {int(renderables[j] & 0x00ffFFff)};
 							const Transform& tr = transforms[e.index];
 							const Vec3 lpos = Vec3(tr.pos - camera_pos);
 							const Decal& decal = m_module->getDecal(e);
@@ -3268,7 +3268,7 @@ struct PipelineImpl final : Pipeline {
 						DecalData* beg = (DecalData*)slice.ptr;
 						DecalData* end = (DecalData*)(slice.ptr + (count - 1) * sizeof(DecalData));
 						for(u32 j = start_i; j < i; ++j) {
-							const EntityRef e = {int(renderables[j] & 0x00ffFFff)};
+							const EntityRef e {int(renderables[j] & 0x00ffFFff)};
 							const Transform& tr = transforms[e.index];
 							const Vec3 lpos = Vec3(tr.pos - camera_pos);
 							const CurveDecal& decal = m_module->getCurveDecal(e);
@@ -3986,7 +3986,7 @@ struct PipelineImpl final : Pipeline {
 
 				while (group) {
 					for (u32 i = 0; i < group->count; ++i) {
-						const EntityRef e = { (i32)group->renderables[i] };
+						const EntityRef e { (i32)group->renderables[i] };
 						const Transform& tr = transforms[e.index];
 						const Vec3 lpos = Vec3(tr.pos - camera_pos);
 						const float lod_d = model_instances[e.index].lod - mesh_lod;

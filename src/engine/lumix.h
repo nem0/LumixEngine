@@ -7,8 +7,7 @@ namespace Lumix {
 struct EntityRef;
 struct StringView;
 
-struct EntityPtr
-{
+struct EntityPtr {
 	EntityPtr() : index(-1) {}
 	explicit EntityPtr(i32 index) : index(index) {}
 	i32 index;
@@ -22,9 +21,11 @@ struct EntityPtr
 	inline EntityRef operator *() const;
 };
 
-struct EntityRef
-{
-	i32 index;
+struct EntityRef {
+	EntityRef() {}
+	explicit EntityRef(EntityPtr e) { ASSERT(e.index >= 0); index = e.index; }
+	explicit EntityRef(i32 idx) { ASSERT(idx >= 0); index = idx; }
+	i32 index = -1;
 	bool operator==(const EntityRef& rhs) const { return rhs.index == index; }
 	bool operator<(const EntityRef& rhs) const { return rhs.index < index; }
 	bool operator>(const EntityRef& rhs) const { return rhs.index > index; }
@@ -32,8 +33,7 @@ struct EntityRef
 	operator EntityPtr() const { return EntityPtr{index}; }
 };
 
-struct ComponentType
-{
+struct ComponentType {
 	enum { MAX_TYPES_COUNT = 64 };
 
 	i32 index;
@@ -47,12 +47,12 @@ const EntityPtr INVALID_ENTITY = EntityPtr{-1};
 
 inline EntityPtr::operator EntityRef() const {
 	ASSERT(isValid());
-	return {index};
+	return EntityRef{index};
 }
 
 inline EntityRef EntityPtr::operator*() const {
 	ASSERT(isValid());
-	return {index};
+	return EntityRef{index};
 }
 
 #ifdef STATIC_PLUGINS

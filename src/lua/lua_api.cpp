@@ -489,11 +489,11 @@ static void LUA_createComponent(lua_State* L, World* world, i32 entity, const ch
 	ComponentType cmp_type = reflection::getComponentType(type);
 	IModule* module = world->getModule(cmp_type);
 	if (!module) luaL_error(L, "unknown component type %s", type);
-	if (world->hasComponent({entity}, cmp_type)) {
+	if (world->hasComponent(EntityRef{entity}, cmp_type)) {
 		logWarning("Component %s already exists in entity %d", type, entity);
 		return;
 	}
-	world->createComponent(cmp_type, {entity});
+	world->createComponent(cmp_type, EntityRef{entity});
 }
 
 
@@ -502,7 +502,7 @@ static bool LUA_hasComponent(World* world, i32 entity, const char* type)
 	if (entity < 0) return false;
 	if (!world) return false;
 	ComponentType cmp_type = reflection::getComponentType(type);
-	return world->hasComponent({entity}, cmp_type);
+	return world->hasComponent(EntityRef{entity}, cmp_type);
 }
 
 
@@ -522,12 +522,12 @@ static int LUA_setEntityRotation(lua_State* L)
 	{
 		Vec3 axis = LuaWrapper::checkArg<Vec3>(L, 3);
 		float angle = LuaWrapper::checkArg<float>(L, 4);
-		univ->setRotation({ entity_index }, Quat(axis, angle));
+		univ->setRotation(EntityRef{ entity_index }, Quat(axis, angle));
 	}
 	else
 	{
 		Quat rot = LuaWrapper::checkArg<Quat>(L, 3);
-		univ->setRotation({ entity_index }, rot);
+		univ->setRotation(EntityRef{ entity_index }, rot);
 	}
 	return 0;
 }
@@ -574,51 +574,65 @@ static const char* LUA_getResourcePath(lua_State* L, i32 handle) {
 static DVec3 LUA_getEntityPosition(lua_State* L, World* world, i32 entity)
 {
 	if (entity < 0) luaL_argerror(L, 2, "Invalid entity");
-	return world->getPosition({entity});
+	return world->getPosition(EntityRef{entity});
 }
 
 static DVec3 LUA_getEntityLocalPosition(lua_State* L, World* world, i32 entity)
 {
 	if (entity < 0) luaL_argerror(L, 2, "Invalid entity");
-	return world->getLocalTransform({entity}).pos;
+	return world->getLocalTransform(EntityRef{entity}).pos;
 }
 
 
 static Quat LUA_getEntityRotation(lua_State* L, World* world, i32 entity)
 {
 	if (entity < 0) luaL_argerror(L, 2, "Invalid entity");
-	return world->getRotation({entity});
+	return world->getRotation(EntityRef{entity});
 }
 
 
 static Vec3 LUA_getEntityScale(lua_State* L, World* world, i32 entity)
 {
 	if (entity < 0) luaL_argerror(L, 2, "Invalid entity");
-	return world->getScale({entity});
+	return world->getScale(EntityRef{entity});
 }
 
 
 static i32 LUA_getFirstChild(lua_State* L, World* world, i32 entity)
 {
 	if (entity < 0) luaL_argerror(L, 2, "Invalid entity");
-	return world->getFirstChild({entity}).index;
+	return world->getFirstChild(EntityRef{entity}).index;
 }
 
 static i32 LUA_getNextSibling(lua_State* L, World* world, i32 entity)
 {
 	if (entity < 0) luaL_argerror(L, 2, "Invalid entity");
-	return world->getNextSibling({entity}).index;
+	return world->getNextSibling(EntityRef{entity}).index;
 }
 
 static i32 LUA_getParent(lua_State* L, World* world, i32 entity)
 {
 	if (entity < 0) luaL_argerror(L, 2, "Invalid entity");
-	return world->getParent({entity}).index;
+	return world->getParent(EntityRef{entity}).index;
 }
 
 static i32 LUA_findByName(lua_State* L, World* world, i32 parent, const char* name)
 {
 	return world->findByName(EntityPtr{parent}, name).index;
+}
+
+static i32 LUA_getAllEntities(lua_State* L) {
+	World* world = LuaWrapper::checkArg<World*>(L, 1);
+	lua_newtable(L);
+	EntityPtr e = world->getFirstEntity();
+	int i = 1;
+	while (e.isValid()) {
+		LuaWrapper::pushEntity(L, e, world);
+		lua_rawseti(L, -2, i);
+		e = world->getNextEntity(EntityRef{e});
+		++i;
+	}
+	return 1;
 }
 
 static void LUA_setParent(lua_State* L, World* world, i32 parent, i32 child)
@@ -630,27 +644,27 @@ static void LUA_setParent(lua_State* L, World* world, i32 parent, i32 child)
 
 static const char* LUA_getEntityName(lua_State* L, World* univ, i32 entity) { 
 	if (entity < 0) luaL_argerror(L, 2, "Invalid entity");
-	return univ->getEntityName({entity});
+	return univ->getEntityName(EntityRef{entity});
 }
 
 static void LUA_setEntityName(lua_State* L, World* univ, i32 entity, const char* name) {
 	if (entity < 0) luaL_argerror(L, 2, "Invalid entity");
-	univ->setEntityName({entity}, name);
+	univ->setEntityName(EntityRef{entity}, name);
 }
 
 static void LUA_setEntityScale(lua_State* L, World* univ, i32 entity, const Vec3& scale) {
 	if (entity < 0) luaL_argerror(L, 2, "Invalid entity");
-	univ->setScale({entity}, scale);
+	univ->setScale(EntityRef{entity}, scale);
 }
 
 static void LUA_setEntityPosition(lua_State* L, World* univ, i32 entity, const DVec3& pos) {
 	if (entity < 0) luaL_argerror(L, 2, "Invalid entity");
-	univ->setPosition({entity}, pos);
+	univ->setPosition(EntityRef{entity}, pos);
 }
 
 static void LUA_setEntityLocalPosition(lua_State* L, World* univ, i32 entity, const DVec3& pos) {
 	if (entity < 0) luaL_argerror(L, 2, "Invalid entity");
-	univ->setLocalPosition({entity}, pos);
+	univ->setLocalPosition(EntityRef{entity}, pos);
 }
 
 static World* LUA_createWorld(Engine* engine) { return &engine->createWorld(); }
@@ -660,9 +674,9 @@ static void LUA_destroyEntity(lua_State* L, World* world, i32 entity) {
 	// we defer destruction to avoid scripts destroying themselves while being used
 	// or destroying other components which are using them (e.g. destroying button from callback in the button)
 	if (entity < 0) luaL_argerror(L, 2, "Invalid entity");
-	if (!world->hasEntity({entity})) luaL_argerror(L, 2, "Invalid entity");
+	if (!world->hasEntity(EntityRef{entity})) luaL_argerror(L, 2, "Invalid entity");
 	auto* module = (LuaScriptModule*)world->getModule("lua_script");
-	module->deferEntityDestruction({entity});
+	module->deferEntityDestruction(EntityRef{entity});
 }
 
 static void LUA_logError(const char* text) { logError(text); }
@@ -821,7 +835,7 @@ static int LUA_getInlineEnvironment(lua_State* L) {
 		LuaWrapper::argError(L, 1, "entity");
 	}
 
-	const EntityRef entity = {LuaWrapper::toType<i32>(L, -1)};
+	const EntityRef entity {LuaWrapper::toType<i32>(L, -1)};
 	lua_pop(L, 1);
 
 	if (LuaWrapper::getField(L, 1, "_world") != LUA_TLIGHTUSERDATA) {
@@ -861,7 +875,7 @@ static int LUA_getEnvironment(lua_State* L)
 		lua_pop(L, 1);
 		LuaWrapper::argError(L, 1, "entity");
 	}
-	const EntityRef entity = {LuaWrapper::toType<i32>(L, -1)};
+	const EntityRef entity {LuaWrapper::toType<i32>(L, -1)};
 	lua_pop(L, 1);
 
 	if (LuaWrapper::getField(L, 1, "_world") != LUA_TLIGHTUSERDATA) {
@@ -952,6 +966,7 @@ void registerEngineAPI(lua_State* L, Engine* engine) {
 	
 	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "getResourcePath", &LuaWrapper::wrap<LUA_getResourcePath>);
 
+	LuaWrapper::createSystemFunction(L, "LumixAPI", "getAllEntities", &LUA_getAllEntities);
 	LuaWrapper::createSystemFunction(L, "LumixAPI", "resourceTypeFromString", &LUA_resourceTypeFromString);
 	LuaWrapper::createSystemFunction(L, "LumixAPI", "beginProfilerBlock", LuaWrapper::wrap<&profiler::endBlock>);
 	LuaWrapper::createSystemFunction(L, "LumixAPI", "endProfilerBlock", LuaWrapper::wrap<&profiler::beginBlock>);
@@ -1204,6 +1219,9 @@ void registerEngineAPI(lua_State* L, Engine* engine) {
 			if LumixModules[name] == nil then return nil end
 			return LumixModules[name]:new(module)
 		end
+		function Lumix.World:getAllEntities()
+			return LumixAPI.getAllEntities(self.value);
+		end
 		function Lumix.World:findEntityByName(parent, name)
 			local p = LumixAPI.findByName(self.value, parent._entity or -1, name)
 			if p < 0 then return nil end
@@ -1319,7 +1337,7 @@ checkComponent(lua_State* L) {
 		ASSERT(false);
 		luaL_error(L, "Internal error");
 	}
-	EntityRef entity = {LuaWrapper::toType<int>(L, -1)};
+	EntityRef entity {LuaWrapper::toType<int>(L, -1)};
 	lua_pop(L, 1);
 	return {module, entity};
 }
@@ -1341,7 +1359,7 @@ static int lua_new_cmp(lua_State* L) {
 	LuaWrapper::DebugGuard guard(L, 1);
 	LuaWrapper::checkTableArg(L, 1); // self
 	const World* world = LuaWrapper::checkArg<World*>(L, 2);
-	const EntityRef e = {LuaWrapper::checkArg<i32>(L, 3)};
+	const EntityRef e {LuaWrapper::checkArg<i32>(L, 3)};
 		
 	LuaWrapper::getField(L, 1, "cmp_type");
 	const int cmp_type = LuaWrapper::toType<int>(L, -1);

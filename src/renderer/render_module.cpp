@@ -2269,7 +2269,7 @@ struct RenderModuleImpl final : RenderModule {
 
 	void setCameraScreenSize(EntityRef camera, int w, int h) override
 	{
-		auto& cam = m_cameras[{camera.index}];
+		auto& cam = m_cameras[camera];
 		cam.screen_width = (float)w;
 		cam.screen_height = (float)h;
 	}
@@ -2277,7 +2277,7 @@ struct RenderModuleImpl final : RenderModule {
 
 	Vec2 getCameraScreenSize(EntityRef camera) override
 	{
-		auto& cam = m_cameras[{camera.index}];
+		auto& cam = m_cameras[camera];
 		return Vec2(cam.screen_width, cam.screen_height);
 	}
 
@@ -2967,7 +2967,7 @@ struct RenderModuleImpl final : RenderModule {
 		{
 			if ((m_model_instances[i].flags & ModelInstance::VALID) && m_model_instances[i].model == model)
 			{
-				modelUnloaded(model, {i});
+				modelUnloaded(model, EntityRef{i});
 			}
 		}
 	}

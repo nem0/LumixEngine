@@ -92,6 +92,7 @@ export type World = {
 	createPartition : (World, string) -> number,
 	destroyPartition : (World, number) -> (),
 	load : (World, string, any) -> (),
+	getAllEntities : (World) -> any,
 	getModule : (World, string) -> any,
 	createEntity : (World) -> Entity,
 	createEntityEx : (World, any) -> Entity,

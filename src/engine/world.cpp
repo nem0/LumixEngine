@@ -165,7 +165,7 @@ World::PartitionHandle World::createPartition(const char* name) {
 void World::destroyPartition(PartitionHandle partition) {
 	for (EntityData& e : m_entities) {
 		if (!e.valid) continue;
-		if (e.partition == partition) destroyEntity({i32(&e - m_entities.begin())});
+		if (e.partition == partition) destroyEntity(EntityRef{i32(&e - m_entities.begin())});
 	}
 	m_partitions.eraseItems([&](const Partition& p){ return p.handle == partition; });
 }
@@ -842,7 +842,7 @@ void World::serialize(OutputMemoryStream& serializer, WorldSerializeFlags flags)
 
 	for (u32 i = 0, c = m_entities.size(); i < c; ++i) {
 		if (!m_entities[i].valid) continue;
-		const EntityRef e = {(i32)i};
+		const EntityRef e {(i32)i};
 		blob.write(e);
 		blob.write(m_transforms[i].pos);
 		blob.write(m_transforms[i].rot);

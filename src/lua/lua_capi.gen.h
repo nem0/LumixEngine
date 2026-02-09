@@ -682,7 +682,6 @@ namespace Lumix {
 							return 1;
 						}
 						else {
-							ASSERT(false);
 							luaL_error(L, "Unknown property %s", prop_name);
 						}
 					}
@@ -691,7 +690,7 @@ namespace Lumix {
 						LuaWrapper::checkTableArg(L, 1);
 						const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
 						auto* module = LuaWrapper::toType<GetterModule*>(L, lua_upvalueindex(1));
-						EntityRef entity = {LuaWrapper::toType<i32>(L, lua_upvalueindex(2))};
+						EntityRef entity {LuaWrapper::toType<i32>(L, lua_upvalueindex(2))};
 						i32 index = LuaWrapper::toType<int>(L, lua_upvalueindex(3));
 						XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
 						switch (name_hash) {
@@ -707,7 +706,7 @@ namespace Lumix {
 						const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
 						XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
 						auto* module = LuaWrapper::toType<GetterModule*>(L, lua_upvalueindex(1));
-						EntityRef entity = {LuaWrapper::toType<i32>(L, lua_upvalueindex(2))};
+						EntityRef entity {LuaWrapper::toType<i32>(L, lua_upvalueindex(2))};
 						i32 index = LuaWrapper::toType<int>(L, lua_upvalueindex(3));
 						switch (name_hash) {
 							case /*enabled*/13840943435668507618: module->enableScript(entity, index, LuaWrapper::checkArg<bool>(L, 3)); break;
@@ -1311,7 +1310,6 @@ namespace Lumix {
 							return 1;
 						}
 						else {
-							ASSERT(false);
 							luaL_error(L, "Unknown property %s", prop_name);
 						}
 					}
@@ -1320,7 +1318,7 @@ namespace Lumix {
 						LuaWrapper::checkTableArg(L, 1);
 						const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
 						auto* module = LuaWrapper::toType<GetterModule*>(L, lua_upvalueindex(1));
-						EntityRef entity = {LuaWrapper::toType<i32>(L, lua_upvalueindex(2))};
+						EntityRef entity {LuaWrapper::toType<i32>(L, lua_upvalueindex(2))};
 						i32 index = LuaWrapper::toType<int>(L, lua_upvalueindex(3));
 						XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
 						switch (name_hash) {
@@ -1337,7 +1335,7 @@ namespace Lumix {
 						const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
 						XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
 						auto* module = LuaWrapper::toType<GetterModule*>(L, lua_upvalueindex(1));
-						EntityRef entity = {LuaWrapper::toType<i32>(L, lua_upvalueindex(2))};
+						EntityRef entity {LuaWrapper::toType<i32>(L, lua_upvalueindex(2))};
 						i32 index = LuaWrapper::toType<int>(L, lua_upvalueindex(3));
 						switch (name_hash) {
 							case /*half_extents*/854520953009164070: module->setBoxHalfExtents(entity, index, LuaWrapper::checkArg<Vec3>(L, 3)); break;
@@ -1407,7 +1405,6 @@ namespace Lumix {
 							return 1;
 						}
 						else {
-							ASSERT(false);
 							luaL_error(L, "Unknown property %s", prop_name);
 						}
 					}
@@ -1416,7 +1413,7 @@ namespace Lumix {
 						LuaWrapper::checkTableArg(L, 1);
 						const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
 						auto* module = LuaWrapper::toType<GetterModule*>(L, lua_upvalueindex(1));
-						EntityRef entity = {LuaWrapper::toType<i32>(L, lua_upvalueindex(2))};
+						EntityRef entity {LuaWrapper::toType<i32>(L, lua_upvalueindex(2))};
 						i32 index = LuaWrapper::toType<int>(L, lua_upvalueindex(3));
 						XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
 						switch (name_hash) {
@@ -1432,7 +1429,7 @@ namespace Lumix {
 						const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
 						XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
 						auto* module = LuaWrapper::toType<GetterModule*>(L, lua_upvalueindex(1));
-						EntityRef entity = {LuaWrapper::toType<i32>(L, lua_upvalueindex(2))};
+						EntityRef entity {LuaWrapper::toType<i32>(L, lua_upvalueindex(2))};
 						i32 index = LuaWrapper::toType<int>(L, lua_upvalueindex(3));
 						switch (name_hash) {
 							case /*radius*/3015162214864260720: module->setSphereRadius(entity, index, LuaWrapper::checkArg<float>(L, 3)); break;
@@ -2380,7 +2377,6 @@ namespace Lumix {
 							return 1;
 						}
 						else {
-							ASSERT(false);
 							luaL_error(L, "Unknown property %s", prop_name);
 						}
 					}
@@ -2389,7 +2385,7 @@ namespace Lumix {
 						LuaWrapper::checkTableArg(L, 1);
 						const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
 						auto* module = LuaWrapper::toType<GetterModule*>(L, lua_upvalueindex(1));
-						EntityRef entity = {LuaWrapper::toType<i32>(L, lua_upvalueindex(2))};
+						EntityRef entity {LuaWrapper::toType<i32>(L, lua_upvalueindex(2))};
 						i32 index = LuaWrapper::toType<int>(L, lua_upvalueindex(3));
 						XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
 						switch (name_hash) {
@@ -2407,7 +2403,7 @@ namespace Lumix {
 						const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
 						XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
 						auto* module = LuaWrapper::toType<GetterModule*>(L, lua_upvalueindex(1));
-						EntityRef entity = {LuaWrapper::toType<i32>(L, lua_upvalueindex(2))};
+						EntityRef entity {LuaWrapper::toType<i32>(L, lua_upvalueindex(2))};
 						i32 index = LuaWrapper::toType<int>(L, lua_upvalueindex(3));
 						switch (name_hash) {
 							case /*rotation_mode*/217713799092262575: module->setGrassRotationMode(entity, index, (GrassRotationMode)LuaWrapper::checkArg<i32>(L, 3)); break;
