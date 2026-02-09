@@ -227,7 +227,14 @@ struct RenderModuleImpl final : RenderModule {
 
 	ISystem& getSystem() const override { return m_renderer; }
 
+	float getCameraScreenWidth(EntityRef entity) override {
+		return m_cameras[entity].screen_width;
+	}
 
+	float getCameraScreenHeight(EntityRef entity) override {
+		return m_cameras[entity].screen_height;
+	}
+	
 	Ray getCameraRay(EntityRef camera_entity, const Vec2& screen_pos) override
 	{
 		Ray out;
@@ -2236,9 +2243,6 @@ struct RenderModuleImpl final : RenderModule {
 		return m_culling_system->cull(frustum);
 	}
 
-
-	float getCameraScreenWidth(EntityRef camera) override { return m_cameras[camera].screen_width; }
-	float getCameraScreenHeight(EntityRef camera) override { return m_cameras[camera].screen_height; }
 
 	Camera& getCamera(EntityRef entity) override { return m_cameras[entity]; }
 

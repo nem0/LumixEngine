@@ -1843,6 +1843,8 @@ namespace Lumix {
 			case /*bloom_accomodation_speed*/625785543228489392: LuaWrapper::push(L, module->getCamera(entity).bloom_accomodation_speed); break;
 			case /*bloom_avg_bloom_multiplier*/11648327012290020021: LuaWrapper::push(L, module->getCamera(entity).bloom_avg_bloom_multiplier); break;
 			case /*bloom_exposure*/13164642978374509665: LuaWrapper::push(L, module->getCamera(entity).bloom_exposure); break;
+			case /*screen_width*/5674180580906509646: LuaWrapper::push(L, module->getCameraScreenWidth(entity)); break;
+			case /*screen_height*/1964666338642049537: LuaWrapper::push(L, module->getCameraScreenHeight(entity)); break;
 			case /*getRay*/17827108223211535328: lua_pushcfunction(L, Camera_getRay, "Camera_getRay"); break;
 			case 0:
 			default: { luaL_error(L, "Unknown property %s", prop_name); break; }

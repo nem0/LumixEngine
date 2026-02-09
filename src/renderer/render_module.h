@@ -380,7 +380,14 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	
 	//@ component Camera
 	virtual Ray getCameraRay(EntityRef entity, const Vec2& screen_pos) = 0; //@ function alias getRay
+	virtual float getCameraScreenWidth(EntityRef entity) = 0;
+	virtual float getCameraScreenHeight(EntityRef entity) = 0;
 	//@ end
+
+	virtual Camera& getCamera(EntityRef entity) = 0;
+	virtual Matrix getCameraProjection(EntityRef entity) = 0;
+	virtual void setCameraScreenSize(EntityRef entity, int w, int h) = 0;
+	virtual Vec2 getCameraScreenSize(EntityRef entity) = 0;
 	
 	virtual EntityPtr getActiveCamera() const = 0;
 	virtual	struct Viewport getCameraViewport(EntityRef camera) const = 0;
@@ -412,13 +419,6 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual void clearDebugTriangles() = 0;
 	virtual const Array<DebugTriangle>& getDebugTriangles() const = 0;
 	virtual const Array<DebugLine>& getDebugLines() const = 0;
-
-	virtual Camera& getCamera(EntityRef entity) = 0;
-	virtual Matrix getCameraProjection(EntityRef entity) = 0;
-	virtual float getCameraScreenWidth(EntityRef entity) = 0;
-	virtual float getCameraScreenHeight(EntityRef entity) = 0;
-	virtual void setCameraScreenSize(EntityRef entity, int w, int h) = 0;
-	virtual Vec2 getCameraScreenSize(EntityRef entity) = 0;
 
 	//@ component ParticleEmitter
 	virtual void setParticleEmitterPath(EntityRef entity, const Path& path) = 0; //@ label "Source" resource_type ParticleSystemResource::TYPE

@@ -499,6 +499,8 @@ type camera_component =  {
 	bloom_accomodation_speed: number,
 	bloom_avg_bloom_multiplier: number,
 	bloom_exposure: number,
+	screen_width: number,
+	screen_height: number,
 	getRay: (camera_component, Vec2) -> Ray,
 }
 
