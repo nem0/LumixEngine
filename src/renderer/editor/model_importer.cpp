@@ -119,6 +119,16 @@ u64 pack(const Vec3& p, const TranslationTrack& track) {
 bool clampBitsizes(Span<u8> values) {
 	u32 total = 0;
 	for (u8 v : values) total += v;
+
+	if (total == 0) return false;
+
+	for (u8& v : values) {
+		if (v == 0) {
+			++v;
+			++total;
+		}
+	}
+
 	if (total > 64) {
 		u32 over = total - 64;
 		u32 i =  0;
@@ -1532,12 +1542,12 @@ bool ModelImporter::writeAnimations(const Path& src, const ModelMeta& meta) {
 						min = minimum(p, min);
 						max = maximum(p, max);
 					}
-					const u8 bitsizes[] = {
+					u8 bitsizes[] = {
 						(u8)log2(u32((max.x - min.x) / 0.00005f / meta.anim_translation_error)),
 						(u8)log2(u32((max.y - min.y) / 0.00005f / meta.anim_translation_error)),
 						(u8)log2(u32((max.z - min.z) / 0.00005f / meta.anim_translation_error))
 					};
-					const u8 bitsize = (bitsizes[0] + bitsizes[1] + bitsizes[2]);
+					u8 bitsize = (bitsizes[0] + bitsizes[1] + bitsizes[2]);
 
 					if (bitsize == 0) {
 						translation_tracks[bone_idx].is_const = true;
@@ -1545,6 +1555,11 @@ bool ModelImporter::writeAnimations(const Path& src, const ModelMeta& meta) {
 						write(keys[0].pos);
 					}
 					else {
+						bitsizes[0] = maximum(1, bitsizes[0]);
+						bitsizes[1] = maximum(1, bitsizes[1]);
+						bitsizes[2] = maximum(1, bitsizes[2]);
+						bitsize = (bitsizes[0] + bitsizes[1] + bitsizes[2]);
+
 						translation_tracks[bone_idx].is_const = false;
 						write(Animation::TrackType::ANIMATED);
 
