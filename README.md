@@ -28,16 +28,11 @@ Who is using it?
 ## Showcase Projects
 
 A small collection of sample projects built with the Lumix Engine. See the full showcase at https://github.com/nem0/lumix_showcase.
-
-- [Asteroids](https://github.com/nem0/lumix_showcase/tree/master/asteroids) — a simple Asteroids-style game (see project README).
-- [Tower Defense](https://github.com/nem0/lumix_showcase/tree/master/tower_defense) — tower defense demo with visual effects and UI.
-- [Chess](https://github.com/nem0/lumix_showcase/tree/master/chess) — chess demo with particles and effects.
- 
-<p>
-	<a href="https://github.com/nem0/lumix_showcase/tree/master/asteroids"><img src="https://raw.githubusercontent.com/nem0/lumix_showcase/master/asteroids/screenshot.png" width="220" alt="Asteroids screenshot"/></a>
-	<a href="https://github.com/nem0/lumix_showcase/tree/master/tower_defense"><img src="https://raw.githubusercontent.com/nem0/lumix_showcase/master/tower_defense/screenshot.png" width="220" alt="Tower Defense screenshot"/></a>
-	<a href="https://github.com/nem0/lumix_showcase/tree/master/chess"><img src="https://raw.githubusercontent.com/nem0/lumix_showcase/master/chess/screenshot.png" width="220" alt="Chess screenshot"/></a>
-</p>
+| Project | Repository | Preview |
+|---|---|---|
+| Asteroids | [asteroids](https://github.com/nem0/lumix_showcase/tree/master/asteroids) | <a href="https://github.com/nem0/lumix_showcase/tree/master/asteroids"><img src="https://raw.githubusercontent.com/nem0/lumix_showcase/master/asteroids/screenshot.png" width="220" alt="Asteroids screenshot"/></a> |
+| Tower Defense | [tower_defense](https://github.com/nem0/lumix_showcase/tree/master/tower_defense) | <a href="https://github.com/nem0/lumix_showcase/tree/master/tower_defense"><img src="https://raw.githubusercontent.com/nem0/lumix_showcase/master/tower_defense/screenshot.png" width="220" alt="Tower Defense screenshot"/></a> |
+| Chess | [chess](https://github.com/nem0/lumix_showcase/tree/master/chess) | <a href="https://github.com/nem0/lumix_showcase/tree/master/chess"><img src="https://raw.githubusercontent.com/nem0/lumix_showcase/master/chess/screenshot.png" width="220" alt="Chess screenshot"/></a> |
 
 Project generator
 
