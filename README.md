@@ -28,11 +28,13 @@ Who is using it?
 ## Showcase Projects
 
 A small collection of sample projects built with the Lumix Engine. See the full showcase at https://github.com/nem0/lumix_showcase.
-| Project | Repository | Preview |
-|---|---|---|
-| Asteroids | [asteroids](https://github.com/nem0/lumix_showcase/tree/master/asteroids) | <a href="https://github.com/nem0/lumix_showcase/tree/master/asteroids"><img src="https://raw.githubusercontent.com/nem0/lumix_showcase/master/asteroids/screenshot.png" width="220" alt="Asteroids screenshot"/></a> |
-| Tower Defense | [tower_defense](https://github.com/nem0/lumix_showcase/tree/master/tower_defense) | <a href="https://github.com/nem0/lumix_showcase/tree/master/tower_defense"><img src="https://raw.githubusercontent.com/nem0/lumix_showcase/master/tower_defense/screenshot.png" width="220" alt="Tower Defense screenshot"/></a> |
-| Chess | [chess](https://github.com/nem0/lumix_showcase/tree/master/chess) | <a href="https://github.com/nem0/lumix_showcase/tree/master/chess"><img src="https://raw.githubusercontent.com/nem0/lumix_showcase/master/chess/screenshot.png" width="220" alt="Chess screenshot"/></a> |
+
+| Project | Preview |
+|---|---|
+| [Asteroids](https://github.com/nem0/lumix_showcase/tree/master/asteroids) | <a href="https://github.com/nem0/lumix_showcase/tree/master/asteroids"><img src="https://raw.githubusercontent.com/nem0/lumix_showcase/master/asteroids/screenshot.png" width="220" alt="Asteroids screenshot"/></a> |
+| [Tower defense](https://github.com/nem0/lumix_showcase/tree/master/tower_defense) | <a href="https://github.com/nem0/lumix_showcase/tree/master/tower_defense"><img src="https://raw.githubusercontent.com/nem0/lumix_showcase/master/tower_defense/screenshot.png" width="220" alt="Tower Defense screenshot"/></a> |
+| [Chess](https://github.com/nem0/lumix_showcase/tree/master/chess) | <a href="https://github.com/nem0/lumix_showcase/tree/master/chess"><img src="https://raw.githubusercontent.com/nem0/lumix_showcase/master/chess/screenshot.png" width="220" alt="Chess screenshot"/></a> |
+| [Platformer](https://github.com/nem0/lumix_showcase/tree/master/platformer) | <a href="https://github.com/nem0/lumix_showcase/tree/master/platformer"><img src="https://raw.githubusercontent.com/nem0/lumix_showcase/master/platformer/screenshot.png" width="220" alt="Platformer screenshot"/></a> |
 
 Project generator
 
