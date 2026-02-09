@@ -27,7 +27,7 @@ Who is using it?
 
 * [Tower Defense](https://github.com/nem0/tower_defense_lumix)
 
-![Tower Defense](https://raw.githubusercontent.com/nem0/tower_defense_lumix/master/screenshot.png)
+![Tower Defense](https://raw.githubusercontent.com/nem0/lumix_showcase/refs/heads/master/tower_defense/screenshot.png)
 
 Project generator
 
