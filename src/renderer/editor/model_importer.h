@@ -156,6 +156,8 @@ protected:
 	bool writeModel(const Path& src, const ModelMeta& meta);
 	bool writeAnimations(const Path& src, const ModelMeta& meta);
 	bool writePhysics(const Path& src, const ModelMeta& meta);
+	void computeNormals(OutputMemoryStream& unindexed_triangles, u32 vertex_size, u32 normal_offset);
+
 
 	// compute AO, auto LODs, etc.
 	// call this from parse when appropriate

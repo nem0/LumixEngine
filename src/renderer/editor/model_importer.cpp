@@ -247,6 +247,25 @@ ModelImporter::ModelImporter(struct StudioApp& app)
 	, m_lights(app.getAllocator())
 {}
 
+void ModelImporter::computeNormals(OutputMemoryStream& unindexed_triangles, u32 vertex_size, u32 normal_offset) {
+	PROFILE_FUNCTION();
+	const int vertex_count = int(unindexed_triangles.size() / vertex_size);
+
+	const u8* positions = unindexed_triangles.getMutableData();
+	u8* normals = unindexed_triangles.getMutableData() + normal_offset;
+
+	for (int i = 0; i < vertex_count; i += 3) {
+		Vec3 v0; memcpy(&v0, positions + i * vertex_size, sizeof(v0));
+		Vec3 v1; memcpy(&v1, positions + (i + 1) * vertex_size, sizeof(v1));
+		Vec3 v2; memcpy(&v2, positions + (i + 2) * vertex_size, sizeof(v2));
+		Vec3 n = normalize(cross(v1 - v0, v2 - v0));
+		u32 npacked = packF4u(n);
+
+		memcpy(normals + i * vertex_size, &npacked, sizeof(npacked));
+		memcpy(normals + (i + 1) * vertex_size, &npacked, sizeof(npacked));
+		memcpy(normals + (i + 2) * vertex_size, &npacked, sizeof(npacked));
+	}
+}
 
 u32 ModelImporter::packF4u(const Vec3& vec) {
 	const i8 xx = i8(clamp((vec.x * 0.5f + 0.5f) * 255, 0.f, 255.f) - 128);

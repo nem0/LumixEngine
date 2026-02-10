@@ -183,28 +183,6 @@ struct FBXImporter : ModelImporter {
 		return mesh.vertex_buffer.size() / vertex_size < (1 << 16);
 	}
 
-	// flat shading
-	static void computeNormals(OutputMemoryStream& unindexed_triangles, const VertexLayout& layout) {
-		PROFILE_FUNCTION();
-		const u32 vertex_size = layout.size;
-		const int vertex_count = int(unindexed_triangles.size() / vertex_size);
-
-		const u8* positions = unindexed_triangles.getMutableData();
-		u8* normals = unindexed_triangles.getMutableData() + layout.normal_offset;
-
-		for (int i = 0; i < vertex_count; i += 3) {
-			Vec3 v0; memcpy(&v0, positions + i * vertex_size, sizeof(v0));
-			Vec3 v1; memcpy(&v1, positions + (i + 1) * vertex_size, sizeof(v1));
-			Vec3 v2; memcpy(&v2, positions + (i + 2) * vertex_size, sizeof(v2));
-			Vec3 n = normalize(cross(v1 - v0, v2 - v0));
-			u32 npacked = packF4u(n);
-
-			memcpy(normals + i * vertex_size, &npacked, sizeof(npacked));
-			memcpy(normals + (i + 1) * vertex_size, &npacked, sizeof(npacked));
-			memcpy(normals + (i + 2) * vertex_size, &npacked, sizeof(npacked));
-		}
-	}
-
 	static void computeTangents(OutputMemoryStream& unindexed_triangles, const VertexLayout& layout, const Path& path) {
 		PROFILE_FUNCTION();
 
@@ -469,7 +447,7 @@ struct FBXImporter : ModelImporter {
 					triangulate(unindexed_triangles, import_geom, partition, geom, nullptr, meta, tri_indices_tmp);
 				}
 
-				if (!normals.values || meta.force_recompute_normals) computeNormals(unindexed_triangles, vertex_layout);
+				if (!normals.values || meta.force_recompute_normals) computeNormals(unindexed_triangles, vertex_layout.size, vertex_layout.normal_offset);
 
 				if (compute_tangents) {
 					if (meta.use_mikktspace) {
