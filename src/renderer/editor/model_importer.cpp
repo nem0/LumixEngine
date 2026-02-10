@@ -1522,7 +1522,12 @@ bool ModelImporter::writeAnimations(const Path& src, const ModelMeta& meta) {
 			header.magic = Animation::HEADER_MAGIC;
 			header.version = Animation::Version::LAST;
 			write(header);
-			m_out_file.writeString(meta.skeleton.c_str());
+			if (meta.skeleton.length() == 0) {
+				m_out_file.writeString(src);
+			}
+			else {
+				m_out_file.writeString(meta.skeleton.c_str());
+			}
 			write(anim.fps);
 			write(samples_count - 1);
 			write(meta.root_motion_flags);

@@ -337,6 +337,7 @@ struct AssetCompilerImpl : AssetCompiler {
 	void processDir(StringView dir, u64 list_last_modified) {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		auto* iter = fs.createFileIterator(dir);
+		if (!iter) return; // the directory can be removed while we are processing stuff
 		os::FileInfo info;
 		while (getNextFile(iter, &info)) {
 			if (info.filename[0] == '.') continue;
