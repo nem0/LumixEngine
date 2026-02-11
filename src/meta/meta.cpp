@@ -273,6 +273,9 @@ char peekChar(StringView str) {
 
 StringView consumeType(StringView& str) {
 	StringView word = consumeWord(str);
+	if (equal(word, "struct")) { // struct S* foo();
+		word = consumeWord(str);
+	}
 	if (equal(word, "const")) {
 		StringView word2 = consumeWord(str);
 		word.end = word2.end;
