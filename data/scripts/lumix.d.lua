@@ -188,6 +188,14 @@ type Model = {
 	getAABB: (Model) -> any,
 }
 
+type Pipeline = {
+	render: (Pipeline, boolean) -> boolean,
+	setWorld: (Pipeline, any) -> (),
+	setViewport: (Pipeline, Viewport) -> (),
+	setClearColor: (Pipeline, Vec3) -> (),
+	getOutput: (Pipeline) -> any,
+}
+
 type Renderer = {
 	getLODMultiplier: (Renderer) -> number,
 	setLODMultiplier: (Renderer, number) -> (),
@@ -269,6 +277,7 @@ type gui_canvas_component =  {
 }
 
 type gui_render_target_component =  {
+	setTexture: (gui_render_target_component, any) -> (),
 }
 
 type gui_input_field_component =  {
@@ -710,7 +719,8 @@ declare this : Entity
 		logError : (string) -> (),
 		logInfo : (string) -> (),
 		loadResource : (any, path:string, restype:string) -> any,
-		writeFile : (string, string) -> boolean
+		writeFile : (string, string) -> boolean,
+		createPipeline : () -> Pipeline,
 		CursorType : {
 			DEFAULT : number,
 			SIZE_NS : number,

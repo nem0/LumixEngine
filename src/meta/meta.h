@@ -214,6 +214,7 @@ struct Arg {
 	StringView name;
 	bool is_const = false;
 	bool is_ref = false;
+	bool is_ptr = false;
 };
 
 struct MetaData {

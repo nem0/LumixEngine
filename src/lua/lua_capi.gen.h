@@ -6,6 +6,7 @@
 #include "renderer/editor/game_view.h"
 #include "renderer/editor/scene_view.h"
 #include "renderer/model.h"
+#include "renderer/pipeline.h"
 #include "renderer/renderer.h"
 #include "animation/animation_module.h"
 #include "audio/audio_module.h"
@@ -464,12 +465,21 @@ namespace Lumix {
 		return 0;
 	}
 	
+	int RenderTarget_setTexture(lua_State* L) {
+		auto [imodule, entity] = checkComponent(L);
+		auto* module = (GUIModule*)imodule;
+		auto texture_handle = LuaWrapper::checkArg<gpu::TextureHandle>(L, 2);
+		module->setRenderTargetTexture(entity, texture_handle);
+		return 0;
+	}
+	
 	int gui_render_target_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (GUIModule*)imodule;
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
 		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
 		switch (name_hash) {
+			case /*setTexture*/18321453185822703306: lua_pushcfunction(L, RenderTarget_setTexture, "RenderTarget_setTexture"); break;
 			case 0:
 			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
 		}
@@ -2796,16 +2806,16 @@ namespace Lumix {
 					SceneView* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
 					Viewport vp;
-					if(!LuaWrapper::checkField(L, 2, "is_ortho", &vp.is_ortho)) luaL_error(L, "Invalid argument");
-					if(!LuaWrapper::checkField(L, 2, "fov", &vp.fov)) luaL_error(L, "Invalid argument");
-					if(!LuaWrapper::checkField(L, 2, "ortho_size", &vp.ortho_size)) luaL_error(L, "Invalid argument");
-					if(!LuaWrapper::checkField(L, 2, "w", &vp.w)) luaL_error(L, "Invalid argument");
-					if(!LuaWrapper::checkField(L, 2, "h", &vp.h)) luaL_error(L, "Invalid argument");
-					if(!LuaWrapper::checkField(L, 2, "pos", &vp.pos)) luaL_error(L, "Invalid argument");
-					if(!LuaWrapper::checkField(L, 2, "rot", &vp.rot)) luaL_error(L, "Invalid argument");
-					if(!LuaWrapper::checkField(L, 2, "near", &vp.near)) luaL_error(L, "Invalid argument");
-					if(!LuaWrapper::checkField(L, 2, "far", &vp.far)) luaL_error(L, "Invalid argument");
-					if(!LuaWrapper::checkField(L, 2, "pixel_offset", &vp.pixel_offset)) luaL_error(L, "Invalid argument");
+					if (!LuaWrapper::checkField(L, 2, "is_ortho", &vp.is_ortho)) luaL_error(L, "Invalid argument");
+					if (!LuaWrapper::checkField(L, 2, "fov", &vp.fov)) luaL_error(L, "Invalid argument");
+					if (!LuaWrapper::checkField(L, 2, "ortho_size", &vp.ortho_size)) luaL_error(L, "Invalid argument");
+					if (!LuaWrapper::checkField(L, 2, "w", &vp.w)) luaL_error(L, "Invalid argument");
+					if (!LuaWrapper::checkField(L, 2, "h", &vp.h)) luaL_error(L, "Invalid argument");
+					if (!LuaWrapper::checkField(L, 2, "pos", &vp.pos)) luaL_error(L, "Invalid argument");
+					if (!LuaWrapper::checkField(L, 2, "rot", &vp.rot)) luaL_error(L, "Invalid argument");
+					if (!LuaWrapper::checkField(L, 2, "near", &vp.near)) luaL_error(L, "Invalid argument");
+					if (!LuaWrapper::checkField(L, 2, "far", &vp.far)) luaL_error(L, "Invalid argument");
+					if (!LuaWrapper::checkField(L, 2, "pixel_offset", &vp.pixel_offset)) luaL_error(L, "Invalid argument");
 					obj->setViewport(vp);
 					return 0;
 				};
@@ -2877,6 +2887,92 @@ namespace Lumix {
 					return 1;
 				};
 				const char* name = "getAABB";
+				lua_pushcfunction(L, proxy, name);
+				lua_setfield(L, -2, name);
+			}
+			lua_pop(L, 2);
+		}
+		{
+			lua_getglobal(L, "LumixAPI");
+			lua_newtable(L);
+			lua_pushvalue(L, -1);
+			lua_setfield(L, -3, "Pipeline");
+			lua_pushvalue(L, -1);
+			lua_setfield(L, -2, "__index");
+			{
+				auto proxy = [](lua_State* L) -> int {
+					LuaWrapper::checkTableArg(L, 1); // self
+					Pipeline* obj;
+					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					auto only_2d = LuaWrapper::checkArg<bool>(L, 2);
+					auto res = obj->render(only_2d);
+					LuaWrapper::push(L, res);
+					return 1;
+				};
+				const char* name = "render";
+				lua_pushcfunction(L, proxy, name);
+				lua_setfield(L, -2, name);
+			}
+			{
+				auto proxy = [](lua_State* L) -> int {
+					LuaWrapper::checkTableArg(L, 1); // self
+					Pipeline* obj;
+					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					World* world;
+					if (!LuaWrapper::checkField(L, 2, "value", &world)) luaL_error(L, "Invalid argument");
+					obj->setWorld(world);
+					return 0;
+				};
+				const char* name = "setWorld";
+				lua_pushcfunction(L, proxy, name);
+				lua_setfield(L, -2, name);
+			}
+			{
+				auto proxy = [](lua_State* L) -> int {
+					LuaWrapper::checkTableArg(L, 1); // self
+					Pipeline* obj;
+					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					Viewport viewport;
+					if (!LuaWrapper::checkField(L, 2, "is_ortho", &viewport.is_ortho)) luaL_error(L, "Invalid argument");
+					if (!LuaWrapper::checkField(L, 2, "fov", &viewport.fov)) luaL_error(L, "Invalid argument");
+					if (!LuaWrapper::checkField(L, 2, "ortho_size", &viewport.ortho_size)) luaL_error(L, "Invalid argument");
+					if (!LuaWrapper::checkField(L, 2, "w", &viewport.w)) luaL_error(L, "Invalid argument");
+					if (!LuaWrapper::checkField(L, 2, "h", &viewport.h)) luaL_error(L, "Invalid argument");
+					if (!LuaWrapper::checkField(L, 2, "pos", &viewport.pos)) luaL_error(L, "Invalid argument");
+					if (!LuaWrapper::checkField(L, 2, "rot", &viewport.rot)) luaL_error(L, "Invalid argument");
+					if (!LuaWrapper::checkField(L, 2, "near", &viewport.near)) luaL_error(L, "Invalid argument");
+					if (!LuaWrapper::checkField(L, 2, "far", &viewport.far)) luaL_error(L, "Invalid argument");
+					if (!LuaWrapper::checkField(L, 2, "pixel_offset", &viewport.pixel_offset)) luaL_error(L, "Invalid argument");
+					obj->setViewport(viewport);
+					return 0;
+				};
+				const char* name = "setViewport";
+				lua_pushcfunction(L, proxy, name);
+				lua_setfield(L, -2, name);
+			}
+			{
+				auto proxy = [](lua_State* L) -> int {
+					LuaWrapper::checkTableArg(L, 1); // self
+					Pipeline* obj;
+					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					auto color = LuaWrapper::checkArg<Vec3>(L, 2);
+					obj->setClearColor(color);
+					return 0;
+				};
+				const char* name = "setClearColor";
+				lua_pushcfunction(L, proxy, name);
+				lua_setfield(L, -2, name);
+			}
+			{
+				auto proxy = [](lua_State* L) -> int {
+					LuaWrapper::checkTableArg(L, 1); // self
+					Pipeline* obj;
+					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					auto res = obj->getOutput();
+					LuaWrapper::push(L, res);
+					return 1;
+				};
+				const char* name = "getOutput";
 				lua_pushcfunction(L, proxy, name);
 				lua_setfield(L, -2, name);
 			}

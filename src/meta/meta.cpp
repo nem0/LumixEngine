@@ -1337,6 +1337,10 @@ bool consumeArg(StringView& line, Arg& out) {
 		out.is_ref = true;
 		word.end -= 1;
 	}
+	if (endsWith(word, "*")) {
+		out.is_ptr = true;
+		word.end -= 1;
+	}
 	out.type = word;
 	word = consumeWord(line);
 	out.name = word;
@@ -1407,11 +1411,8 @@ void wrap(OutputStream& out, Module& m, Function& f) {
 			if (obj) {
 				L("\tif(!LuaWrapper::checkField(L, ",(arg_idx + 2),", \"_object\", &",arg.name,")) luaL_error(L, \"Invalid argument\");");
 			}
-			else if (arg.is_const && equal(arg.type, "char*")) {
-				L("\tauto ",arg.name," = LuaWrapper::checkArg<const char*>(L, ",(arg_idx + 2),");");
-			}
 			else {
-				L("\tauto ",arg.name," = LuaWrapper::checkArg<",arg.type,">(L, ",(arg_idx + 2),");");
+				L("\tauto ",arg.name," = LuaWrapper::checkArg<", (arg.is_const && arg.is_ptr ? "const " : ""), arg.type, (arg.is_ptr ? "*" : ""), ">(L, ",(arg_idx + 2),");");
 			}
 		}
 	});
@@ -1476,11 +1477,8 @@ void wrap(OutputStream& out, Module& m, Component& c, Function& f) {
 		else if (obj_arg) {
 			L("\tif(!LuaWrapper::checkField(L, ",(arg_idx + 1),", \"_object\", &",arg.name,")) luaL_error(L, \"Invalid argument\");");
 		}
-		else if (arg.is_const && equal(arg.type, "char*")) {
-			L("\tauto ",arg.name," = LuaWrapper::checkArg<const char*>(L, ",(arg_idx + 1),");");
-		}
 		else {
-			L("\tauto ",arg.name," = LuaWrapper::checkArg<",arg.type,">(L, ",(arg_idx + 1),");");
+			L("\tauto ",arg.name," = LuaWrapper::checkArg<", (arg.is_const && arg.is_ptr ? "const " : ""), arg.type, (arg.is_ptr ? "*" : ""), ">(L, ",(arg_idx + 1),");");
 		}
 	});
 
@@ -1615,13 +1613,17 @@ void serializeMain(OutputStream& out, Parser& parser) {
 				forEachArg(f.args, [&](const Arg& arg, bool){
 					++idx;
 					Struct* arg_st = findStruct(arg.type);
-					if (arg_st) {
+					if (arg.is_ptr && equal(arg.type, "World")) {
+						L("\tWorld* ", arg.name, ";");
+						L("\tif (!LuaWrapper::checkField(L, ",(idx + 1),", \"value\", &",arg.name,")) luaL_error(L, \"Invalid argument\");");
+					}
+					else if (arg_st) {
 						L("\t", arg.type, " ", arg.name, ";");
 						for (StructVar& v : arg_st->vars) {
-							L("\tif(!LuaWrapper::checkField(L, ", (idx + 1), ", \"", v.name, "\", &", arg.name, ".", v.name, ")) luaL_error(L, \"Invalid argument\");");
+							L("\tif (!LuaWrapper::checkField(L, ", (idx + 1), ", \"", v.name, "\", &", arg.name, ".", v.name, ")) luaL_error(L, \"Invalid argument\");");
 						}
 					}
-					else if (arg.is_const && equal(arg.type, "char*")) {
+					else if (arg.is_const && arg.is_ptr && equal(arg.type, "char")) {
 						L("\tauto ",arg.name," = LuaWrapper::checkArg<const char*>(L, ",(idx + 1),");");
 					}
 					else {
@@ -2258,7 +2260,8 @@ void serializeLuaTypes(OutputStream& out_formatted) {
 		logError : (string) -> (),
 		logInfo : (string) -> (),
 		loadResource : (any, path:string, restype:string) -> any,
-		writeFile : (string, string) -> boolean
+		writeFile : (string, string) -> boolean,
+		createPipeline : () -> Pipeline,
 	)#");
 
 	// Emit enum typings into LumixAPI so editors see LumixAPI.<EnumName>.<Member>

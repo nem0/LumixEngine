@@ -84,6 +84,7 @@ struct GUIModule : IModule {
 	//@ end
 
 	//@ component RenderTarget id gui_render_target
+	virtual void setRenderTargetTexture(EntityRef entity, gpu::TextureHandle texture_handle) = 0; //@ function alias setTexture
 	//@ end
 
 	//@ component InputField id gui_input_field icon ICON_FA_KEYBOARD
@@ -148,8 +149,6 @@ struct GUIModule : IModule {
 	virtual const char* getText(EntityRef entity) = 0;						//@ getter Text 
 	virtual void setText(EntityRef entity, const char* text) = 0;			//@ setter Text multiline
 	//@ end
-
-	virtual void setRenderTarget(EntityRef entity, gpu::TextureHandle* texture_handle) = 0;
 
 	//@ events
 	virtual DelegateList<void(EntityRef)>& buttonClicked() = 0;

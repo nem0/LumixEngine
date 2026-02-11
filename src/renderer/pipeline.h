@@ -80,25 +80,31 @@ struct GBuffer {
 	RenderBufferHandle DS;
 };
 
+//@ object
 struct LUMIX_RENDERER_API Pipeline {
 	static UniquePtr<Pipeline> create(Renderer& renderer, PipelineType type);
 	
 	virtual ~Pipeline() {}
 
+	//@ function
 	virtual bool render(bool only_2d) = 0;
 	virtual void render3DUI(EntityRef e, const struct Draw2D& drawdata, Vec2 canvas_size, bool orient_to_cam) = 0;
+	//@ function
 	virtual void setWorld(struct World* world) = 0;
 	virtual RenderModule* getModule() const = 0;
 	virtual Renderer& getRenderer() const = 0;
+	//@ function
 	virtual void setViewport(const Viewport& viewport) = 0;
 	virtual const Viewport& getViewport() = 0;
 	virtual const IVec2& getDisplaySize() const = 0;
 	virtual void setIndirectLightMultiplier(float value) = 0;
 	virtual void enablePixelJitter(bool enable) = 0;
+	//@ function
 	virtual void setClearColor(Vec3 color) = 0;
 
 	virtual Draw2D& getDraw2D() = 0;
 	virtual void clearDraw2D() = 0;
+	//@ function
 	virtual gpu::TextureHandle getOutput() = 0;
 
 	virtual void blitOutputToScreen() = 0;

@@ -1723,6 +1723,11 @@ struct PipelineImpl final : Pipeline {
 	bool render(bool only_2d) override {
 		PROFILE_FUNCTION();
 
+		if (!m_module) {
+			logError("Pipeline is missing world, render won't run");
+			return false;
+		}
+
 		if (m_viewport.w <= 0 || m_viewport.h <= 0) {
 			if (m_module) {
 				m_module->clearDebugLines();

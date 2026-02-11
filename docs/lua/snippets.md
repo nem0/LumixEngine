@@ -209,3 +209,45 @@ local e = Editor.createEntityEx {
 local mesh_index = 0
 entity.model_instance:setMaterialOverride(mesh_index, "models/red.mat")
 ```
+
+### Render to texture in UI
+```lua
+local world = nil
+local pipeline = nil
+local cube = nil
+local yaw = 0
+
+function start()
+    world = Lumix.World.create()
+    pipeline = LumixAPI.createPipeline()
+    pipeline:setWorld(world)
+
+    cube = world:createEntityEx {
+        position = {0, 0, 0},
+        model_instance = { source = "engine/models/cube.fbx" }
+    }
+
+    local viewport = {
+		 -- fill viewport members
+	}
+        
+    pipeline:setViewport(viewport)
+    pipeline:setClearColor({0.2, 0.2, 0.2})
+    this:createComponent("gui_render_target")
+end
+
+function update(time_delta)
+    cube.rotation = { 0, math.sin(yaw * 0.5), 0, math.cos(yaw * 0.5) }
+    yaw = yaw + time_delta
+    pipeline:render(false)
+    local output = pipeline:getOutput()
+    this.gui_render_target:setTexture(output);
+end
+
+function onDestroy()
+    if world then
+        world:destroy()
+        world = nil
+    end
+end
+```

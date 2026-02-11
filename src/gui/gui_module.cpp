@@ -22,7 +22,6 @@
 namespace Lumix {
 
 static const float CURSOR_BLINK_PERIOD = 1.0f;
-static gpu::TextureHandle EMPTY_RENDER_TARGET = gpu::INVALID_TEXTURE;
 
 struct GUIText
 {
@@ -134,7 +133,7 @@ struct GUIRect {
 	GUIImage* image = nullptr;
 	GUIText* text = nullptr;
 	GUIInputField* input_field = nullptr;
-	gpu::TextureHandle* render_target = nullptr;
+	gpu::TextureHandle render_target = gpu::INVALID_TEXTURE;
 };
 
 struct GUIModuleImpl final : GUIModule {
@@ -261,9 +260,9 @@ struct GUIModuleImpl final : GUIModule {
 			}
 		}
 
-		if (rect.render_target && *rect.render_target)
+		if (rect.render_target)
 		{
-			draw.addImage(rect.render_target, { l, t }, { r, b }, {0, 0}, {1, 1}, Color::WHITE);
+			draw.addImage(&rect.render_target, { l, t }, { r, b }, {0, 0}, {1, 1}, Color::WHITE);
 		}
 
 		if (rect.text) {
@@ -982,7 +981,6 @@ struct GUIModuleImpl final : GUIModule {
 			createRect(entity);
 			iter = m_rects.find(entity);
 		}
-		iter.value()->render_target = &EMPTY_RENDER_TARGET;
 		m_world.onComponentCreated(entity, types::gui_render_target, this);
 	}
 
@@ -1262,8 +1260,7 @@ struct GUIModuleImpl final : GUIModule {
 		}
 	}
 	
-	void setRenderTarget(EntityRef entity, gpu::TextureHandle* texture_handle) override
-	{
+	void setRenderTargetTexture(EntityRef entity, gpu::TextureHandle texture_handle) override {
 		m_rects[entity]->render_target = texture_handle;
 	}
 
