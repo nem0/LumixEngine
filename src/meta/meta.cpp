@@ -2134,16 +2134,18 @@ void serializeLuaTypes(OutputStream& out_formatted) {
 	}
 
 	export type World = {
+		create : () -> World,
+		destroy : (World) -> (),
+		load : (World, string, any) -> (),
+		instantiatePrefab : (World, Vec3, Resource) -> Entity,
 		getActivePartition : (World) -> number,
 		setActivePartition : (World, number) -> (),
 		createPartition : (World, string) -> number,
 		destroyPartition : (World, number) -> (),
-		load : (World, string, any) -> (),
 		getAllEntities : (World) -> any,
 		getModule : (World, string) -> any,
 		createEntity : (World) -> Entity,
 		createEntityEx : (World, any) -> Entity,
-		destroyEntity : (Entity) -> (),
 		findEntityByName : (World, Entity, string) -> Entity,
 	)#");
 
@@ -2207,6 +2209,9 @@ void serializeLuaTypes(OutputStream& out_formatted) {
 		parent : Entity?,
 		rotation : any,
 		position : Vec3,
+		local_position : Vec3,
+		first_child : Entity?,
+		next_sibling : Entity?,
 		scale : Vec3,
 		hasComponent : (Entity, any) -> boolean,
 		getComponent : (Entity, any) -> any,
