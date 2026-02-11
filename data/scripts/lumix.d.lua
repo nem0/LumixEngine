@@ -876,14 +876,26 @@ declare this : Entity
 			PA1 : number,
 			OEM_CLEAR : number,
 			A : number,
+			B : number,
 			C : number,
 			D : number,
 			E : number,
 			F : number,
+			G : number,
+			H : number,
+			I : number,
+			J : number,
 			K : number,
+			L : number,
+			M : number,
+			N : number,
+			O : number,
 			P : number,
+			Q : number,
 			R : number,
 			S : number,
+			T : number,
+			U : number,
 			V : number,
 			W : number,
 			X : number,
@@ -940,6 +952,12 @@ declare this : Entity
 		y_abs : number
 	}
 	
+	type MouseWheelInputEvent = {
+		type : "mouse_wheel",	
+		x : number,
+		y : number
+	}
+	
 	type ButtonInputEvent = {
 		type : "button",
 		device : InputDevice,
@@ -950,5 +968,5 @@ declare this : Entity
 		y : number
 	}
 	
-	export type InputEvent = ButtonInputEvent | AxisInputEvent
+	export type InputEvent = ButtonInputEvent | AxisInputEvent | MouseWheelInputEvent
 	
