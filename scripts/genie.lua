@@ -911,6 +911,8 @@ if build_luau then
 			, "../external/_repos/luau/Ast/src/**.h"
 			, "../external/_repos/luau/CodeGen/src/**.cpp"
 			, "../external/_repos/luau/CodeGen/src/**.h"
+			, "../external/_repos/luau/Common/src/**.cpp"
+			, "../external/_repos/luau/Common/src/**.h"
 			, "../external/_repos/luau/Compiler/src/**.cpp"
 			, "../external/_repos/luau/Compiler/src/**.h"
 			, "../external/_repos/luau/VM/src/**.cpp"
@@ -954,6 +956,7 @@ if build_luau then
 				"LUA_API=__declspec(dllexport)",
 				"LUACODE_API=__declspec(dllexport)"
 			}
+			buildoptions_cpp { "/wd4267" }
 		configuration {}
 
 	if not luau_dynamic then

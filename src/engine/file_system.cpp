@@ -403,7 +403,7 @@ struct PackFileSystem : FileSystemImpl {
 };
 
 void destroyFileIterator(FileIterator* iterator) {
-	os::destroyFileIterator(iterator->iter);
+	if (iterator->iter) os::destroyFileIterator(iterator->iter);
 	LUMIX_DELETE(iterator->fs->m_allocator, iterator);
 }
 
@@ -418,6 +418,7 @@ bool getNextFile(FileIterator* iterator, os::FileInfo* info) {
 		}
 		return true;
 	}
+	if (!iterator->iter) return false;
 	return os::getNextFile(iterator->iter, info);
 }
 
