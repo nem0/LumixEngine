@@ -2289,6 +2289,12 @@ void serializeLuaTypes(OutputStream& out_formatted) {
 		y_abs : number
 	}
 
+	type MouseWheelInputEvent = {
+		type : "mouse_wheel",	
+		x : number,
+		y : number
+	}
+
 	type ButtonInputEvent = {
 		type : "button",
 		device : InputDevice,
@@ -2299,7 +2305,7 @@ void serializeLuaTypes(OutputStream& out_formatted) {
 		y : number
 	}
 
-	export type InputEvent = ButtonInputEvent | AxisInputEvent
+	export type InputEvent = ButtonInputEvent | AxisInputEvent | MouseWheelInputEvent
 	)#");
 
 	// format output

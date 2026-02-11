@@ -914,6 +914,7 @@ struct GUIModuleImpl final : GUIModule {
 						handleKeyboardButtonEvent(event);
 					}
 					break;
+				case InputSystem::Event::MOUSE_WHEEL:	
 				case InputSystem::Event::DEVICE_ADDED:	
 				case InputSystem::Event::DEVICE_REMOVED:
 					break;

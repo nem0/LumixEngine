@@ -158,6 +158,15 @@ struct InputSystemImpl final : InputSystem {
 				injectEvent(input_event);
 				break;
 			}
+			case os::Event::Type::MOUSE_WHEEL: {
+				Event input_event;
+				input_event.type = Event::MOUSE_WHEEL;
+				input_event.device = m_mouse_device;
+				input_event.data.mouse_wheel.x = 0; // TODO
+				input_event.data.mouse_wheel.y = (float)event.mouse_wheel.amount;
+				injectEvent(input_event);
+				break;
+			}
 			case os::Event::Type::KEY: {
 				Event input_event;
 				input_event.type = Event::BUTTON;

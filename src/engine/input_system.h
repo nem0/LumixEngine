@@ -52,10 +52,15 @@ struct LUMIX_ENGINE_API InputSystem {
 		u32 utf8;
 	};
 
+	struct MouseWheelEvent {
+		float x, y;
+	};
+
 	struct Event {
 		enum Type : u32 {
 			BUTTON,
 			AXIS,
+			MOUSE_WHEEL,
 			TEXT_INPUT,
 			DEVICE_ADDED,
 			DEVICE_REMOVED
@@ -67,6 +72,7 @@ struct LUMIX_ENGINE_API InputSystem {
 			ButtonEvent button;
 			AxisEvent axis;
 			TextEvent text;
+			MouseWheelEvent mouse_wheel;
 		} data;
 	};
 

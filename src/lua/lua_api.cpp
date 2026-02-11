@@ -490,7 +490,7 @@ static void LUA_createComponent(lua_State* L, World* world, i32 entity, const ch
 	IModule* module = world->getModule(cmp_type);
 	if (!module) luaL_error(L, "unknown component type %s", type);
 	if (world->hasComponent(EntityRef{entity}, cmp_type)) {
-		logWarning("Component %s already exists in entity %d", type, entity);
+		logWarning("Component ", type, " already exists in entity ", entity);
 		return;
 	}
 	world->createComponent(cmp_type, EntityRef{entity});

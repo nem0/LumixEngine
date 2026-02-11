@@ -36,6 +36,7 @@ static const char* toString(InputSystem::Device::Type type) {
 
 static const char* toString(InputSystem::Event::Type type) {
 	switch (type) {
+		case InputSystem::Event::MOUSE_WHEEL: return "mouse_wheel";
 		case InputSystem::Event::AXIS: return "axis";
 		case InputSystem::Event::BUTTON: return "button";
 		case InputSystem::Event::TEXT_INPUT: return "text_input";
@@ -1598,6 +1599,12 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 				LuaWrapper::push(L, event.data.button.x); // [lua_event, button.x_abs]
 				lua_setfield(L, -2, "x"); // [lua_event]
 				LuaWrapper::push(L, event.data.button.y); // [lua_event, button.y_abs]
+				lua_setfield(L, -2, "y"); // [lua_event]
+				break;
+			case InputSystem::Event::MOUSE_WHEEL:
+				LuaWrapper::push(L, event.data.mouse_wheel.x); // [lua_event, mouse_wheel.x]
+				lua_setfield(L, -2, "x"); // [lua_event]
+				LuaWrapper::push(L, event.data.mouse_wheel.y); // [lua_event, mouse_wheel.y]
 				lua_setfield(L, -2, "y"); // [lua_event]
 				break;
 			case InputSystem::Event::AXIS:
