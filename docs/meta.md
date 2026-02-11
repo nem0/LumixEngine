@@ -436,7 +436,7 @@ Objects are accessed through module functions or global tables. For example, `GU
 
 ```lua
 -- Get GUISystem through the gui module and enable the cursor
-this.world:getModule("gui"):getSystem():enableCursor(true)
+this.world.gui:getSystem():enableCursor(true)
 ```
 
 Editor objects like `SceneView` and `AssetBrowser` are accessed through the global `Editor` table:

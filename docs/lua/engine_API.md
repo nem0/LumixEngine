@@ -95,6 +95,7 @@ World can be accessed through `Entity`. Each module is automatically exposed in 
 
 ```lua
 local gui = this.world:getModule("gui")
+local also_gui = this.world.gui
 ```
 
 ```lua

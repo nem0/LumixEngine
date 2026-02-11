@@ -31,7 +31,7 @@ end
 
 ```lua
 function start()
-	this.world:getModule("gui"):getSystem():enableCursor(true)
+	this.world.gui:getSystem():enableCursor(true)
 end
 ```
 
