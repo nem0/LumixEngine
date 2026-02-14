@@ -17,6 +17,13 @@
 * [Snippets](lua/snippets.md)
 * [Editor plugin](lua/editor_plugin.md)
 
+# Ingame UI
+* [Text-based markup](ui/markup.md)
+* [Style](ui/style.md)
+* [Layout](ui/layout.md)
+* [Elements and attributes](ui/elements_attributes.md)
+* [Animations](ui/animations.md)
+
 # Animation
 
 * [Animation graph](animation/graph.md)
