@@ -3,6 +3,7 @@
 #include "editor/asset_browser.h"
 #include "editor/studio_app.h"
 #include "gui/gui_system.h"
+#include "gui_ng/gui_ng_system.h"
 #include "renderer/editor/game_view.h"
 #include "renderer/editor/scene_view.h"
 #include "renderer/model.h"
@@ -12,6 +13,7 @@
 #include "audio/audio_module.h"
 #include "engine/core.h"
 #include "gui/gui_module.h"
+#include "gui_ng/gui_ng_module.h"
 #include "lua/lua_script_system.h"
 #include "navigation/navigation_module.h"
 #include "physics/physics_module.h"
@@ -660,6 +662,9 @@ namespace Lumix {
 		return 0;
 	}
 	
+}
+
+namespace Lumix {
 }
 
 namespace Lumix {
@@ -2724,6 +2729,15 @@ namespace Lumix {
 				lua_pushcfunction(L, proxy, name);
 				lua_setfield(L, -2, name);
 			}
+			lua_pop(L, 2);
+		}
+		{
+			lua_getglobal(L, "LumixAPI");
+			lua_newtable(L);
+			lua_pushvalue(L, -1);
+			lua_setfield(L, -3, "GUINGSystem");
+			lua_pushvalue(L, -1);
+			lua_setfield(L, -2, "__index");
 			lua_pop(L, 2);
 		}
 		{

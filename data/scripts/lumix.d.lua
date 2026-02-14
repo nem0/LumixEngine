@@ -104,6 +104,7 @@ export type World = {
 	audio: audio_module,
 	core: core_module,
 	gui: gui_module,
+	gui_ng: gui_ng_module,
 	lua_script: lua_script_module,
 	navigation: navigation_module,
 	physics: physics_module,
@@ -170,6 +171,9 @@ type StudioApp = {
 
 type GUISystem = {
 	enableCursor: (GUISystem, boolean) -> (),
+}
+
+type GUINGSystem = {
 }
 
 type GameView = {
@@ -314,6 +318,9 @@ type gui_text_component =  {
 	horizontal_align: any,
 	vertical_align: any,
 	text: string,
+}
+
+type gui_ng_module = {
 }
 
 type lua_script_module = {
