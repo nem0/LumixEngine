@@ -21,38 +21,34 @@ setlocal
 	echo  1. Go back
 	echo  2. Empty plugin template
 	echo  3. Maps
-	echo  4. Shader editor
-	echo  5. GLTF importer
-	echo  6. Network
-	echo  7. JS
-	echo  8. C#
-	echo  9. Visual script
-	echo  A. Procedural geometry
-	echo  B. Marketplace
-	echo  C. LiveCode 
-	echo  D. Basis Universal
-	echo  E. Jolt
-	echo  F. Bolt script
-	echo  G. Remote control
+	echo  4. GLTF importer
+	echo  5. Network
+	echo  6. JS
+	echo  7. C#
+	echo  8. Procedural geometry
+	echo  9. Marketplace
+	echo  A. LiveCode 
+	echo  B. Basis Universal
+	echo  C. Jolt
+	echo  D. Bolt script
+	echo  E. Remote control
 	echo ===============================
-	choice /C 123456789ABCDEFG /N /M "Your choice:"
+	choice /C 123456789ABCDE /N /M "Your choice:"
 	echo.
 	if %errorlevel%==1 exit /B 0
 	if %errorlevel%==2 call :empty_plugin
 	if %errorlevel%==3 call :map_plugin
-	if %errorlevel%==4 call :shader_editor_plugin
-	if %errorlevel%==5 call :glft_import_plugin
-	if %errorlevel%==6 call :network_plugin
-	if %errorlevel%==7 call :js_plugin
-	if %errorlevel%==8 call :cs_plugin
-	if %errorlevel%==9 call :visual_script_plugin
-	if %errorlevel%==10 call :procedural_geom_plugin
-	if %errorlevel%==11 call :marketplace_plugin
-	if %errorlevel%==12 call :livecode_plugin
-	if %errorlevel%==13 call :basisu
-	if %errorlevel%==14 call :jolt_plugin
-	if %errorlevel%==15 call :bolt_plugin
-	if %errorlevel%==16 call :remote_control
+	if %errorlevel%==4 call :glft_import_plugin
+	if %errorlevel%==5 call :network_plugin
+	if %errorlevel%==6 call :js_plugin
+	if %errorlevel%==7 call :cs_plugin
+	if %errorlevel%==8 call :procedural_geom_plugin
+	if %errorlevel%==9 call :marketplace_plugin
+	if %errorlevel%==10 call :livecode_plugin
+	if %errorlevel%==11 call :basisu
+	if %errorlevel%==12 call :jolt_plugin
+	if %errorlevel%==13 call :bolt_plugin
+	if %errorlevel%==14 call :remote_control
 goto :begin
 
 :glft_import_plugin
@@ -110,36 +106,6 @@ exit /B 0
 		popd
 	) else (
 		cd csharp
-		git pull
-	)
-	popd
-exit /B 0
-
-:visual_script_plugin
-	if not exist ..\plugins mkdir ..\plugins
-	pushd ..\plugins
-	if not exist visualscript (
-		git.exe clone https://github.com/nem0/lumixengine_visualscript.git visualscript
-		pushd visualscript
-		git remote add origin2 git@github.com:nem0/lumixengine_visualscript.git
-		popd
-	) else (
-		cd visualscript
-		git pull
-	)
-	popd
-exit /B 0
-
-:shader_editor_plugin
-	if not exist ..\plugins mkdir ..\plugins
-	pushd ..\plugins
-	if not exist shader_editor (
-		git.exe clone https://github.com/nem0/lumixengine_shader_editor.git shader_editor
-		pushd shader_editor
-		git remote add origin2 git@github.com:nem0/lumixengine_shader_editor.git
-		popd
-	) else (
-		cd shader_editor
 		git pull
 	)
 	popd
