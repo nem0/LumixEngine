@@ -2262,6 +2262,7 @@ void serializeLuaTypes(OutputStream& out_formatted) {
 		loadResource : (any, path:string, restype:string) -> any,
 		writeFile : (string, string) -> boolean,
 		createPipeline : () -> Pipeline,
+		destroyPipeline : (Pipeline) -> (),
 	)#");
 
 	// Emit enum typings into LumixAPI so editors see LumixAPI.<EnumName>.<Member>

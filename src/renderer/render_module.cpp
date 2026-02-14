@@ -565,6 +565,11 @@ struct RenderModuleImpl final : RenderModule {
 		profiler::pushCounter(killed_particles_stat, (float)stats.killed);
 		profiler::pushCounter(processed_particles_stat, (float)stats.processed);
 
+		// Since entities in to_delete can be in parent-child relationship and destroyEntity is recursive,
+		// we unparent everything to avoid double-destroy
+		for (EntityRef e : to_delete) {
+			m_world.setParent(INVALID_ENTITY, e);
+		}
 		for (EntityRef e : to_delete) {
 			m_world.destroyEntity(e);
 		}

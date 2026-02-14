@@ -61,20 +61,6 @@ struct PrefabSystemImpl final : PrefabSystem
 		}
 
 
-		void destroyEntityRecursive(EntityPtr entity) const
-		{
-			if (!entity.isValid()) return;
-			
-			EntityRef e = (EntityRef)entity;
-			World& world = *editor.getWorld();
-			destroyEntityRecursive(world.getFirstChild(e));
-			destroyEntityRecursive(world.getNextSibling(e));
-
-			world.destroyEntity(e);
-
-		}
-
-
 		bool execute() override
 		{
 			ASSERT(entities.empty());
@@ -101,7 +87,6 @@ struct PrefabSystemImpl final : PrefabSystem
 			World& world = *editor.getWorld();
 
 			for (EntityRef e : entities) {
-				destroyEntityRecursive(world.getFirstChild(e));
 				world.destroyEntity(e);
 			}
 			entities.clear();
@@ -324,21 +309,6 @@ public:
 	}
 
 
-	static void destroySubtree(World& world, EntityPtr entity)
-	{
-		if (!entity.isValid()) return;
-
-		const EntityRef e = (EntityRef)entity;
-
-		const EntityPtr child = world.getFirstChild(e);
-		destroySubtree(world, child);
-
-		const EntityPtr sib = world.getNextSibling(e);
-		destroySubtree(world, sib);
-
-		world.destroyEntity(e);
-	}
-
 	void breakPrefabRecursive(EntityRef e) {
 		m_entity_to_prefab[e.index] = FilePathHash();
 		const EntityPtr child = m_world->getFirstChild(e);
@@ -398,7 +368,6 @@ public:
 				EntityFolders::FolderHandle folder = folders.getFolder(iter.key());
 
 				m_deferred_instances.push({prefab_res, tr, parent, folder});
-				destroySubtree(*m_world, m_world->getFirstChild(iter.key()));
 				m_world->destroyEntity(iter.key());
 			}
 		}
@@ -430,7 +399,6 @@ public:
 			EntityFolders::FolderHandle folder = folders.getFolder(e);
 
 			m_deferred_instances.push({m_resources[prefab].resource, tr, parent, folder});
-			destroySubtree(*m_world, m_world->getFirstChild(e));
 			m_world->destroyEntity(e);
 		}
 	}

@@ -721,6 +721,7 @@ declare this : Entity
 		loadResource : (any, path:string, restype:string) -> any,
 		writeFile : (string, string) -> boolean,
 		createPipeline : () -> Pipeline,
+		destroyPipeline : (Pipeline) -> (),
 		CursorType : {
 			DEFAULT : number,
 			SIZE_NS : number,

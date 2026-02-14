@@ -2724,17 +2724,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		}
 	}
 	
-	static void destroyEntityRecursive(World& world, EntityPtr entity)
-	{
-		if (!entity.isValid()) return;
-			
-		EntityRef e = (EntityRef)entity;
-		destroyEntityRecursive(world, world.getFirstChild(e));
-		destroyEntityRecursive(world, world.getNextSibling(e));
-
-		world.destroyEntity(e);
-	}
-
 	void update() override
 	{
 		if (m_multi_editor) m_multi_editor->gui();
@@ -2748,7 +2737,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		if (m_tile.wait_for_readback) {
 			if (m_tile.readback_done) {
 				m_tile.wait_for_readback = false;
-				destroyEntityRecursive(*m_tile.world, (EntityRef)m_tile.entity);
+				m_tile.world->destroyEntity(*m_tile.entity);
 				Engine& engine = m_app.getEngine();
 				FileSystem& fs = engine.getFileSystem();
 				const Path path(".lumix/asset_tiles/", m_tile.out_path_hash, ".lbc");

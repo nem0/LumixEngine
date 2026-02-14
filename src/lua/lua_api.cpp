@@ -435,6 +435,19 @@ static void LUA_networkClose(os::NetworkStream* stream) {
 	return os::close(*stream);
 }
 
+static int LUA_destroyPipeline(lua_State* L) {
+	LuaWrapper::DebugGuard guard(L);
+	lua_getglobal(L, "LumixAPI");
+	lua_getfield(L, -1, "engine");
+	Engine* engine = LuaWrapper::toType<Engine*>(L, -1);
+	lua_pop(L, 2);
+	auto* renderer = (Renderer*)engine->getSystemManager().getSystem("renderer");
+
+	auto* pipeline = LuaWrapper::checkArg<Pipeline*>(L, 1);
+	LUMIX_DELETE(renderer->getAllocator(), pipeline);
+	return 0;
+}
+
 static int LUA_createPipeline(lua_State* L) {
 	LuaWrapper::DebugGuard guard(L, 1);
 	lua_getglobal(L, "LumixAPI");
@@ -991,6 +1004,7 @@ void registerEngineAPI(lua_State* L, Engine* engine) {
 	LuaWrapper::createSystemFunction(L, "LumixAPI", "networkConnect", &LUA_networkConnect);
 	LuaWrapper::createSystemFunction(L, "LumixAPI", "networkListen", &LUA_networkListen);
 	LuaWrapper::createSystemFunction(L, "LumixAPI", "createPipeline", &LUA_createPipeline);
+	LuaWrapper::createSystemFunction(L, "LumixAPI", "destroyPipeline", &LUA_destroyPipeline);
 
 	LuaWrapper::createSystemFunction(L, "LuaScript", "getEnvironment", &LUA_getEnvironment);
 	LuaWrapper::createSystemFunction(L, "LuaScript", "getInlineEnvironment", &LUA_getInlineEnvironment);

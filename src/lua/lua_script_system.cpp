@@ -1271,7 +1271,7 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 		auto writeOne = [&]() {
 			switch (prop.type) {
 				case Property::ANY:
-					// TODO we can get here by starting to game while a script failed to load
+					// TODO we can get here by starting the game when a script failed to load
 					ASSERT(false);
 					break;
 				case Property::BOOLEAN: {
@@ -1658,8 +1658,7 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 	}
 
 
-	void update(float time_delta) override
-	{
+	void update(float time_delta) override {
 		PROFILE_FUNCTION();
 
 		if (!m_is_game_running) return;
@@ -1668,18 +1667,15 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 		processInputEvents();
 		updateTimers(time_delta);
 
-		for (int i = 0; i < m_updates.size(); ++i)
-		{
+		for (int i = 0; i < m_updates.size(); ++i) {
 			CallbackData update_item = m_updates[i];
 			LuaWrapper::DebugGuard guard(update_item.state, 0);
 			lua_rawgeti(update_item.state, LUA_REGISTRYINDEX, update_item.environment);
-			if (lua_type(update_item.state, -1) != LUA_TTABLE)
-			{
+			if (lua_type(update_item.state, -1) != LUA_TTABLE) {
 				ASSERT(false);
 			}
 			lua_getfield(update_item.state, -1, "update");
-			if (lua_type(update_item.state, -1) != LUA_TFUNCTION)
-			{
+			if (lua_type(update_item.state, -1) != LUA_TFUNCTION) {
 				lua_pop(update_item.state, 2);
 				continue;
 			}
@@ -1689,6 +1685,10 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 			lua_pop(update_item.state, 1);
 		}
 
+		for (EntityRef e : m_deferred_destructions) {
+			// to avoid double-destroy 
+			m_world.setParent(INVALID_ENTITY, e);
+		}
 		for (EntityRef e : m_deferred_destructions) {
 			m_world.destroyEntity(e);
 		}

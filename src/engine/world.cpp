@@ -518,16 +518,20 @@ EntityRef World::createEntity(const DVec3& position, const Quat& rotation)
 	return entity;
 }
 
-
-void World::destroyEntity(EntityRef entity)
-{
+void World::destroyEntity(EntityRef entity) {
 	EntityData& entity_data = m_entities[entity.index];
 	ASSERT(entity_data.valid);
-	for (EntityPtr first_child = getFirstChild(entity); first_child.isValid(); first_child = getFirstChild(entity)) {
-		setParent(INVALID_ENTITY, (EntityRef)first_child);
+	// destroy all children recursively
+	EntityPtr child = getFirstChild(entity);
+	while (child.isValid()) {
+		destroyEntity((EntityRef)child);
+		child = getFirstChild(entity);
 	}
+
+	// remove itself from hierarchy
 	setParent(INVALID_ENTITY, entity);
 
+	// destroy components
 	const ArchetypeManager::Archetype& archetype = m_archetype_manager->get(entity_data.archetype);
 	for (ComponentType type : archetype.types) {
 		IModule* module = m_component_type_map[type.index]->module;
@@ -535,24 +539,24 @@ void World::destroyEntity(EntityRef entity)
 		destroy_method(module, entity);
 	}
 
+	// clear entity_data
 	entity_data.next = m_first_free_slot;
 	entity_data.prev = -1;
 	entity_data.hierarchy = -1;
 	
 	entity_data.valid = false;
-	if (m_first_free_slot >= 0)
-	{
+	if (m_first_free_slot >= 0) {
 		m_entities[m_first_free_slot].prev = entity.index;
 	}
 
-	if (entity_data.name >= 0)
-	{
+	if (entity_data.name >= 0) {
 		m_entities[m_names.back().entity.index].name = entity_data.name;
 		m_names.swapAndPop(entity_data.name);
 		entity_data.name = -1;
 	}
 
 	m_first_free_slot = entity.index;
+	// callback
 	m_entity_destroyed.invoke(entity);
 }
 

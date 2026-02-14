@@ -237,21 +237,21 @@ struct GUIModuleImpl final : GUIModule {
 						sprite->bottom / (float)tex->height
 					};
 
-					draw.addImage(&tex->handle, { l, t }, { pos.l, pos.t }, { 0, 0 }, { uvs.l, uvs.t }, color);
-					draw.addImage(&tex->handle, { pos.l, t }, { pos.r, pos.t }, { uvs.l, 0 }, { uvs.r, uvs.t }, color);
-					draw.addImage(&tex->handle, { pos.r, t }, { r, pos.t }, { uvs.r, 0 }, { 1, uvs.t }, color);
+					draw.addImage(tex->handle, { l, t }, { pos.l, pos.t }, { 0, 0 }, { uvs.l, uvs.t }, color);
+					draw.addImage(tex->handle, { pos.l, t }, { pos.r, pos.t }, { uvs.l, 0 }, { uvs.r, uvs.t }, color);
+					draw.addImage(tex->handle, { pos.r, t }, { r, pos.t }, { uvs.r, 0 }, { 1, uvs.t }, color);
 
-					draw.addImage(&tex->handle, { l, pos.t }, { pos.l, pos.b }, { 0, uvs.t }, { uvs.l, uvs.b }, color);
-					draw.addImage(&tex->handle, { pos.l, pos.t }, { pos.r, pos.b }, { uvs.l, uvs.t }, { uvs.r, uvs.b }, color);
-					draw.addImage(&tex->handle, { pos.r, pos.t }, { r, pos.b }, { uvs.r, uvs.t }, { 1, uvs.b }, color);
+					draw.addImage(tex->handle, { l, pos.t }, { pos.l, pos.b }, { 0, uvs.t }, { uvs.l, uvs.b }, color);
+					draw.addImage(tex->handle, { pos.l, pos.t }, { pos.r, pos.b }, { uvs.l, uvs.t }, { uvs.r, uvs.b }, color);
+					draw.addImage(tex->handle, { pos.r, pos.t }, { r, pos.b }, { uvs.r, uvs.t }, { 1, uvs.b }, color);
 
-					draw.addImage(&tex->handle, { l, pos.b }, { pos.l, b }, { 0, uvs.b }, { uvs.l, 1 }, color);
-					draw.addImage(&tex->handle, { pos.l, pos.b }, { pos.r, b }, { uvs.l, uvs.b }, { uvs.r, 1 }, color);
-					draw.addImage(&tex->handle, { pos.r, pos.b }, { r, b }, { uvs.r, uvs.b }, { 1, 1 }, color);
+					draw.addImage(tex->handle, { l, pos.b }, { pos.l, b }, { 0, uvs.b }, { uvs.l, 1 }, color);
+					draw.addImage(tex->handle, { pos.l, pos.b }, { pos.r, b }, { uvs.l, uvs.b }, { uvs.r, 1 }, color);
+					draw.addImage(tex->handle, { pos.r, pos.b }, { r, b }, { uvs.r, uvs.b }, { 1, 1 }, color);
 				}
 				else
 				{
-					draw.addImage(&tex->handle, { l, t }, { r, b }, {0, 0}, {1, 1}, color);
+					draw.addImage(tex->handle, { l, t }, { r, b }, {0, 0}, {1, 1}, color);
 				}
 			}
 			else
@@ -262,7 +262,7 @@ struct GUIModuleImpl final : GUIModule {
 
 		if (rect.render_target)
 		{
-			draw.addImage(&rect.render_target, { l, t }, { r, b }, {0, 0}, {1, 1}, Color::WHITE);
+			draw.addImage(rect.render_target, { l, t }, { r, b }, {0, 0}, {1, 1}, Color::WHITE);
 		}
 
 		if (rect.text) {

@@ -1601,28 +1601,24 @@ private:
 		}
 
 
-		bool execute() override
-		{
+		bool execute() override {
 			World* world = m_editor.getWorld();
 			m_transformations.clear();
 			m_old_values.clear();
 			ResourceManagerHub& resource_manager = m_editor.getEngine().getResourceManager();
-			for (int i = 0; i < m_entities.size(); ++i)
-			{
-				m_transformations.emplace(world->getTransform(m_entities[i]));
-				const u32 count = world->getComponents(m_entities[i]).length();
-				m_old_values.writeString(world->getEntityName(m_entities[i]));
-				EntityPtr parent = world->getParent(m_entities[i]);
-				const EntityFolders::FolderHandle folder = m_editor.m_entity_folders->getFolder(m_entities[i]);
+			for (EntityRef e : m_entities) {
+				m_transformations.emplace(world->getTransform(e));
+				const u32 count = world->getComponents(e).length();
+				m_old_values.writeString(world->getEntityName(e));
+				EntityPtr parent = world->getParent(e);
+				const EntityFolders::FolderHandle folder = m_editor.m_entity_folders->getFolder(e);
 				m_old_values.write(folder);
 				m_old_values.write(parent);
-				if (parent.isValid())
-				{
-					Transform local_tr = world->getLocalTransform(m_entities[i]);
+				if (parent.isValid()) {
+					Transform local_tr = world->getLocalTransform(e);
 					m_old_values.write(local_tr);
 				}
-				for (EntityRef child : world->childrenOf(m_entities[i]))
-				{
+				for (EntityRef child : world->childrenOf(e)) {
 					m_old_values.write(child);
 					Transform local_tr = world->getLocalTransform(child);
 					m_old_values.write(local_tr);
@@ -1630,8 +1626,8 @@ private:
 				m_old_values.write(INVALID_ENTITY);
 
 				m_old_values.write(count);
-				for (ComponentType cmp_type : world->getComponents(m_entities[i])) {
-					ComponentUID cmp(m_entities[i], cmp_type, world->getModule(cmp_type));
+				for (ComponentType cmp_type : world->getComponents(e)) {
+					ComponentUID cmp(e, cmp_type, world->getModule(cmp_type));
 					m_old_values.write(cmp.type);
 					const reflection::ComponentBase* cmp_desc = reflection::getComponent(cmp.type);
 
@@ -1644,11 +1640,14 @@ private:
 
 					Lumix::save(cmp, m_old_values);
 				}
-				const PrefabHandle prefab = m_editor.getPrefabSystem().getPrefab(m_entities[i]);
+				const PrefabHandle prefab = m_editor.getPrefabSystem().getPrefab(e);
 				m_old_values.write(prefab);
 			}
-			for (EntityRef e : m_entities)
-			{
+			// to avoid double-destroy
+			for (EntityRef e : m_entities) {
+				world->setParent(INVALID_ENTITY, e);
+			}
+			for (EntityRef e : m_entities) {
 				world->destroyEntity(e);
 			}
 			return true;
@@ -1852,15 +1851,9 @@ private:
 			return true;
 		}
 
-
-		void undo() override
-		{
-			ASSERT(m_entity.isValid());
-
-			const EntityRef e = (EntityRef)m_entity;
-			m_editor.getWorld()->destroyEntity(e);
+		void undo() override {
+			m_editor.getWorld()->destroyEntity(*m_entity);
 		}
-
 
 		bool merge(IEditorCommand&) override { return false; }
 		const char* getType() override { return "add_entity"; }
@@ -3086,10 +3079,14 @@ struct PasteEntityCommand final : IEditorCommand {
 	}
 
 
-	void undo() override
-	{
-		for (auto entity : m_entities) {
-			m_editor.getWorld()->destroyEntity(entity);
+	void undo() override {
+		World* world = m_editor.getWorld();
+		for (EntityRef entity : m_entities) {
+			world->setParent(INVALID_ENTITY, entity);
+		}
+
+		for (EntityRef entity : m_entities) {
+			world->destroyEntity(entity);
 		}
 	}
 
