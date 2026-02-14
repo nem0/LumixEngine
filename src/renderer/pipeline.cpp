@@ -1633,8 +1633,6 @@ struct PipelineImpl final : Pipeline {
 			}
 		}
 		
-		render2D(result);
-
 		const bool is_debug_output = debugOutput(gbuffer, result);
 
 		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
@@ -1648,6 +1646,8 @@ struct PipelineImpl final : Pipeline {
 		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
 			result = plugin->renderAfterTonemap(gbuffer, result, *this);
 		}
+
+		render2D(result);
 
 		m_sort_keys_group.end();
 		m_sort_keys_group.wait();
