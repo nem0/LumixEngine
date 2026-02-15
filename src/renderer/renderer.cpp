@@ -370,7 +370,7 @@ struct GPUProfiler
 	{
 		PROFILE_FUNCTION();
 		jobs::MutexGuard lock(m_mutex);
-		u32 processed = 0;
+		i32 processed = 0;
 		while (processed < m_queries.size()) {
 			Query q = m_queries[processed];
 			
