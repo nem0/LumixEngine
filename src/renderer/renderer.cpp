@@ -370,8 +370,9 @@ struct GPUProfiler
 	{
 		PROFILE_FUNCTION();
 		jobs::MutexGuard lock(m_mutex);
-		while (!m_queries.empty()) {
-			Query q = m_queries[0];
+		u32 processed = 0;
+		while (processed < m_queries.size()) {
+			Query q = m_queries[processed];
 			
 			if (!gpu::isQueryReady(q.handle)) break;
 
@@ -390,7 +391,10 @@ struct GPUProfiler
 				profiler::beginGPUBlock(q.name, timestamp, q.profiler_link);
 			}
 			m_pool.push(q.handle);
-			m_queries.erase(0);
+			++processed;
+		}
+		if (processed > 0) {
+			m_queries.eraseRange(0, processed);
 		}
 	}
 
