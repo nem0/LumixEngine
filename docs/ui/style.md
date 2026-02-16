@@ -13,14 +13,14 @@ style {
 
 ## Goals
 
-- Simple, familiar syntax (type / .class / #id selectors)
+- Simple, familiar syntax (type / .class / $id selectors)
 - Minimal selector complexity to keep matching fast
 - Styles can change any attribute on elements. See [list of all attributes](elements_attributes.md).
 
 ## Selectors & precedence
 
-- Supported selectors: `type`, `.class`, `#id`, and `parent > child` (direct child).
-- Precedence (highest → lowest): inline style > `#id` > `.class` > `type` > stylesheet order.
+- Supported selectors: `type`, `.class`, `$id`, and `parent > child` (direct child).
+- Precedence (highest → lowest): inline style > `$id` > `.class` > `type` > stylesheet order.
 
 ## Inheritance
 
@@ -34,7 +34,7 @@ explicit overrides where needed.
 Rules:
 
 - A child uses the parent's computed value for an attribute only when the
-	child has no value provided by any source (inline style, `#id`, `.class`,
+	child has no value provided by any source (inline style, `$id`, `.class`,
 	`type` selector, or earlier stylesheet rules).
 - Precedence still applies: inline styles and higher-precedence selectors
 	override inherited values.

@@ -9,7 +9,7 @@ style {
 	panel.menu {
 		width: 420;
 		padding: 16;
-		background-color: #1e1f25;
+		bg-color: #1e1f25;
 	}
 
 	text.title {
@@ -20,7 +20,7 @@ style {
 	}
 
 	button.primary {
-		background-color: #2ea44f;
+		bg-color: #2ea44f;
 		color: #ffffff;
 		padding: 10;
 		width: 12em;
@@ -29,7 +29,7 @@ style {
 	}
 
 	button.secondary {
-		background-color: #3a3f4a;
+		bg-color: #3a3f4a;
 		color: #ffffff;
 		padding: 8;
 		width: 10em;
