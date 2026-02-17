@@ -23,6 +23,7 @@
 * [Layout](ui/layout.md)
 * [Elements and attributes](ui/elements_attributes.md)
 * [Animations](ui/animations.md)
+* [Snippets](ui/snippets.md)
 
 # Animation
 
