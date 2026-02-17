@@ -20,8 +20,6 @@
 
 ## Text
 
-**Unified Text Model**: `text` element is syntactic sugar for `panel width=fit-content height=fit-content`. Quoted strings are inline text nodes that flow with other elements.
-
 ### Inline Text Nodes (Quoted Strings)
 Quoted strings create inline text that flows horizontally with sibling elements, wrapping at container edges.
 
@@ -35,28 +33,14 @@ panel {
 
 **Result**: `Hello, World!.` (flows as single line)
 
-### Styled Text (Text Elements)
-For styling, use `text` elements (auto-sized panels).
+### Styled Text
+For styling, use `panel` elements.
 
 ```css
 panel {
-    text value="Hello, " color=#00f
-    text value="World!" font-size=1.2em color=#f00
-    text value="." font-size=0.8em
-}
-```
-
-**Result**: `Hello, World!.` (with styling)
-
-### Text Element (Auto-sized Panel)
-```css
-text value="Centered Label" bg-color=#eee padding=4
-```
-
-**Equivalent to**:
-```css
-panel width=fit-content height=fit-content bg-color=#eee padding=4 {
-    "Centered Label"
+    panel color=#00f {"Hello, "}
+    panel font-size=1.2em color=#f00 { "World!" }
+    panel font-size=0.8em { "." }
 }
 ```
 
@@ -66,7 +50,7 @@ Text nodes flow inline with blocks until they hit a block element.
 ```css
 panel direction=row {
     "Label: "
-    panel width=100 input
+    panel width=100 { input }
     " (optional)"
 }
 ```

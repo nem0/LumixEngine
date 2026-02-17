@@ -413,7 +413,7 @@ virtual GrassRotationMode getGrassRotationMode(EntityRef entity, int index) = 0;
 
 # Objects
 
-`//@ object` marks a struct or class whose methods should be exposed to Lua scripting. Unlike modules and components (which represent game world systems), objects are standalone types that exist outside the ECS—such as editor plugins, utility classes, or system interfaces.
+`//@ object` marks a struct or class whose methods should be exposed to Lua scripting. Unlike modules and components (which represent game world systems), objects are standalone types that exist outside the ECS-such as editor plugins, utility classes, or system interfaces.
 
 Methods marked with `//@ function` inside the object block are emitted in the generated Lua bindings.
 
@@ -465,9 +465,9 @@ This binds `scene_view` and `asset_browser` as fields on the global `Editor` tab
 
 # Structs
 
-`//@ struct` marks a plain data struct to be exposed to Lua. Unlike `//@ component_struct` (which defines ECS components), `//@ struct` is for standalone types used as function parameters or return values—such as raycast results or geometric primitives.
+`//@ struct` marks a plain data struct to be exposed to Lua. Unlike `//@ component_struct` (which defines ECS components), `//@ struct` is for standalone types used as function parameters or return values-such as raycast results or geometric primitives.
 
-The struct must immediately follow on the next line. All fields are automatically parsed until the closing `}`. Each field must be on its own line with the format `Type name;`. Lines starting with `using` are skipped. No explicit `//@ property` marker is needed—all fields are exposed.
+The struct must immediately follow on the next line. All fields are automatically parsed until the closing `}`. Each field must be on its own line with the format `Type name;`. Lines starting with `using` are skipped. No explicit `//@ property` marker is needed-all fields are exposed.
 
 **Difference from `//@ object`:** Use `//@ struct` for plain data containers (POD-like types with public fields, passed by value or as results). Use `//@ object` for service/interface types with methods that need to be called from Lua. Structs expose fields; objects expose functions. Structs are passed by value, objects are passed by reference.
 

@@ -7,7 +7,7 @@ We adopt a braces-based, human-friendly syntax as the canonical form. Braces are
 ```
 panel id=main width=800 height=600 {
     panel class=title {
-        text value="Game Menu"
+        "Game Menu"
     }
     panel {
         panel class=primary width=8em height=2em { "Start" }
@@ -26,7 +26,7 @@ panel id=main width=800 height=600 {
         "Multiline text
             is on 
             multiple lines"
-        text value="Some other text" font="path/to/font.ttf" font_size=13
+        panel font="path/to/font.ttf" font_size=13 { "Some other text" }
         "How to \"escape\" quotes"
     }
     panel {
