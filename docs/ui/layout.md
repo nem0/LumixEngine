@@ -1,197 +1,399 @@
 # UI Layout
 
-## Root Elements
+## Table of Contents
 
-Root elements (elements at the top level of the document) are laid out as if they are children of an implicit panel with `direction=column`. This means they are arranged vertically, one below the other, starting from the top of the screen.
+- [Text](#text)
+- [Element Sizing](#element-sizing)
+  - [Units](#units)
+  - [Fit-Content](#fit-content)
+- [Element Positioning](#element-positioning)
+  - [Positioning Algorithm](#positioning-algorithm)
+  - [Justification](#justification)
+  - [Off-axis Alignment](#off-axis-alignment)
+  - [Wrapping](#wrapping)
+  - [Margins and Padding](#margins-and-padding)
+    - [Margins](#margins)
+    - [Padding](#padding)
+    - [Margin-Padding Interaction](#margin-padding-interaction)
+    - [Positioning Calculations](#positioning-calculations)
+- [Z-Order (Implicit Stacking)](#z-order-implicit-stacking)
 
-For example, if you have:
+## Text
 
-```
-panel width=200 height=100 { ... }
-panel width=150 height=80 { ... }
-```
+**Unified Text Model**: `text` element is syntactic sugar for `panel width=fit-content height=fit-content`. Quoted strings are inline text nodes that flow with other elements.
 
-The first panel will be positioned at (0, 0), and the second at (0, 100), assuming no margins.
-
-### Margins and Padding for Root Elements
-
-For root elements, margins are applied relative to the viewport edges, creating space between the element and the screen boundaries. Padding on root elements is added to the implicit panel's content area, effectively offsetting the layout of child elements within the root.
-
-For example:
-- A root panel with `margin=10` will position its content 10 pixels from the top and left edges of the viewport.
-- A root panel with `padding=20` will inset its child elements by 20 pixels from the panel's edges.
-
-## Final size of elements
-
-The width and height of UI elements are determined by the same set of rules, collectively referred to as dimensions. When a dimension is explicitly set, it defines the element's final size in that direction. If a dimension is omitted, it defaults to fit-content.
-
-For example, the following two declarations are equivalent:
+### Inline Text Nodes (Quoted Strings)
+Quoted strings create inline text that flows horizontally with sibling elements, wrapping at container edges.
 
 ```css
-panel { 
+panel {
+    "Hello, "
+    "World!"
+    "."
+}
 ```
 
-is the same as
+**Result**: `Hello, World!.` (flows as single line)
+
+### Styled Text (Text Elements)
+For styling, use `text` elements (auto-sized panels).
 
 ```css
-panel width=fit-content height=fit-content {
+panel {
+    text value="Hello, " color=#00f
+    text value="World!" font-size=1.2em color=#f00
+    text value="." font-size=0.8em
+}
+```
+
+**Result**: `Hello, World!.` (with styling)
+
+### Text Element (Auto-sized Panel)
+```css
+text value="Centered Label" bg-color=#eee padding=4
+```
+
+**Equivalent to**:
+```css
+panel width=fit-content height=fit-content bg-color=#eee padding=4 {
+    "Centered Label"
+}
+```
+
+### Mixed Content Flow
+Text nodes flow inline with blocks until they hit a block element.
+
+```css
+panel direction=row {
+    "Label: "
+    panel width=100 input
+    " (optional)"
+}
+```
+
+**Result**: `Label: [input] (optional)`
+
+### Text Properties
+
+| Property | Description | Default / Values |
+|----------|-------------|------------------|
+| `value` | The text content to display | `""` |
+| `align` | Text alignment | `left` |
+| `font-size` | Text size | `12` |
+| `font` | Font file path | (no default) |
+| `color` | Text color | `"#000000"` |
+
+**Text nodes flow inline** with blocks; `text` elements are blocks with fit-content sizing.
+
+
+## Element Sizing
+
+Each UI element has `width` and `height` attributes that control its size, known as dimensions. Set them explicitly for a fixed size; otherwise, they default to `fit-content`, sizing the element to its content. Root elements behave like they are children of a panel that covers the whole screen with 0 padding.
+
+Example
+```css
+panel width=50% height=3em { ... }
 ```
 
 ### Units
 
-You can use several units when specifying dimensions:
+Dimensions support these units:
 
-- (no unit) — pixels (default)  
-    Example: `panel width=200 { ... }` sets the width to 200 pixels.
+- **Pixels** (default): Fixed pixel values. E.g., `width=200` for 200 pixels.
 
-- `em` — relative to the font size  
-    Example: `button height=2em { ... }` sets the height to twice the current font size.
+- **em**: Scales with element's font size. E.g., `height=2em` for twice the font height.
 
-- `%` — percentage of the parent element's size. For root elements, this is the viewport size.  
-    Example: `container width=50% { ... }` sets the width to half of the parent element.
+- **%**: Percentage of parent (or viewport for roots). E.g., `width=50%` for half the parent's width.
 
-- `fit-content` — automatically sizes the element to fit its content. For containers, "content" refers to the combined size of all child elements after layout.  
-    Example: `label width=fit-content { ... }` sets the width to match the label's content.
+- **fit-content**: Auto-size to content. For panels, sums child sizes. E.g., `width=fit-content`.
 
-You can use different units for each dimension.
+Mix units freely, e.g., `width=50% height=2em`.
 
-Example: `panel width=50% height=2em { ... }`
+### Fit-Content
 
-## Fit-Content Interactions
-
-### With Margins
-Margins are applied outside the element's content area and do not affect the size calculated by `fit-content`. The element is first sized to fit its content, then margins are added to determine its final position and spacing relative to siblings.
-
-### With Padding
-Padding is included in the content size calculation. When an element uses `fit-content`, the padding is added to the natural size of the content to determine the element's dimensions.
-
-
-## Step-by-step algorithm for computing final position
-
-1. **Determine available space**: The parent container's size is established, either from its own dimensions or from its parent.
-
-2. **Determine children sizes**: 
-Measure each child element based on its specified dimensions, units, and layout constraints. 
-
-3. **Layout children in direction**: Arrange child elements sequentially along the main axis (horizontal for `row`, vertical for `column`) based on the `direction` attribute.
-
-4. **Apply justify-content**: Distribute the child elements along the main axis according to the `justify-content` attribute:
-   - `start`: Elements are placed sequentially starting from the beginning of the container. The first element's position is set to the container's start edge plus the container's padding. Each subsequent element is positioned immediately after the previous element, accounting for the previous element's size and margin.
-   - `center`: Elements are centered as a group within the container, regardless of their individual sizes. The total combined width of all elements along the main axis (including their margins) is calculated, and the group is offset so that its center aligns with the container's center. The offset is (container_size - total_combined_width) / 2.
-   - `end`: Elements are placed starting from the end of the container. The last element is positioned at the container's end edge minus the container's padding. Elements are laid out in reverse order, with each preceding element positioned before the next, accounting for sizes and margins.
-   - `space-between`: Elements are distributed evenly with the first element at the start and the last at the end. The remaining space (container_size - total_element_sizes - total_margins - container_padding) is divided equally among the gaps between elements. If there are n elements, there are n-1 gaps, each getting space = remaining_space / (n-1).
-   - `space-around`: Elements are distributed with equal space around each. The total available space is divided equally around all elements. For n elements, the space per element is total_space / (2n), applied to both sides of each element.
-
-5. **Apply margins and padding**: Adjust the positions and sizes of elements by adding margins (space outside the element) and padding (space inside the element border).
-
-6. **Compute final positions**: Calculate the absolute screen positions for each element based on the layout and parent positions. 
-
-### Justify-Content Visual Examples
-
-The following ASCII art illustrates how each `justify-content` option distributes elements horizontally within a container (assuming `direction=row`):
-
-#### `start`
+```js
+function fitContentSize(container):
+    size = 0
+    for child in container.children:
+        size += child.size + child.margin
+    size += container.padding
+    return size
 ```
-+---------------------------------+
-| [elem1] [elem2] [elem3]         |
-+---------------------------------+
+
+When using `fit-content` sizing, margins are included in the total size calculation for containers, ensuring spacing between children is preserved. Padding is added to the computed fit-content size, so the container's total size is the sum of child sizes (plus margins) and its own padding.
+
+#### With Percentage Units
+
+When a parent container uses `fit-content` sizing and child elements specify dimensions in percentage units (%), the layout algorithm faces an edge case: percentage values are relative to the parent's size, but the parent's size is being determined based on the children's sizes.
+
+In this implementation, children are measured assuming 0 available space. For elements with percentage-based dimensions, percentages resolve to 0 since 0% of any size is 0.
+
+## Element Positioning
+
+The layout system positions elements within containers using this algorithm:
+
+### Positioning Algorithm
+
+```js
+function layoutContainer(container):
+    // 1. Determine container size
+    if container.width == 'fit-content' or container.height == 'fit-content':
+        // Measure children with 0 available space
+        for each child in container.children:
+            child.size = calculateSize(child, 0)
+        
+        // Calculate container size as sum of children
+        containerSize = sumChildSizes(container.children, container.direction)
+    else:
+        // Use fixed or inherited size
+        containerSize = getSize(container)
+        
+        // Measure children with container constraints
+        for each child in container.children:
+            child.size = calculateSize(child, containerSize)
+
+    // 2. Arrange by direction with wrapping
+    mainAxis = (container.direction == 'row') ? 'horizontal' : 'vertical'
+    if container.wrap == 'wrap':
+        // Wrap children into multiple lines/columns
+        lines = wrapChildrenIntoLines(container.children, mainAxis, containerSize)
+        for each line in lines:
+            positionChildrenSequentially(line.children, mainAxis, container)
+            justifyChildren(line.children, container.justifyContent, mainAxis, line.size)
+    else:
+        positionChildrenSequentially(container.children, mainAxis, container)
+        justifyChildren(container.children, container.justifyContent, mainAxis, containerSize)
+        // For 'clip', overflowing content is not rendered
+
+    // 3. Incorporate margins and padding
+    applyMarginsAndPadding(container.children, container)
+
+    // 4. Calculate positions
+    for each child in container.children:
+        child.absolutePosition = computeAbsolutePosition(child, container)
 ```
-Elements are placed at the start of the container.
 
-#### `center`
+### Justification
+
+```js
+function positionChildrenSequentially(children, mainAxis, container):
+    // Start positioning from container's padding
+    if mainAxis == 'horizontal':
+        currentPosition = container.paddingLeft
+    else:  // vertical
+        currentPosition = container.paddingTop
+
+    for each child in children:
+        // Position child at current position plus its margin
+        if mainAxis == 'horizontal':
+            child.relativeX = currentPosition + child.marginLeft
+            child.relativeY = container.paddingTop + child.marginTop
+            // Advance position by child's size plus margin
+            currentPosition += child.width + child.marginLeft + child.marginRight
+        else:  // vertical
+            child.relativeX = container.paddingLeft + child.marginLeft
+            child.relativeY = currentPosition + child.marginTop
+            currentPosition += child.height + child.marginTop + child.marginBottom
 ```
-+---------------------------------+
-|      [elem1] [elem2] [elem3]     |
-+---------------------------------+
+
+The `justify-content` property then adjusts these positions to achieve the desired distribution. Options include:
+
+- **`start`**: Elements are placed sequentially starting from the container's start edge plus padding. Each subsequent element is positioned immediately after the previous, accounting for size and margin.
+  ```
+  +---------------------------------+
+  |[elem1][elem2][elem3]            |
+  +---------------------------------+
+  ```
+
+- **`center`**: Elements are centered as a group. The total combined size (including margins) is calculated, and the group is offset by (container_size - total_combined_size) / 2.
+  ```
+  +---------------------------------+
+  |      [elem1][elem2][elem3]      |
+  +---------------------------------+
+  ```
+
+- **`end`**: Elements are placed starting from the container's end edge minus padding. Laid out in reverse order, with each preceding element before the next.
+  ```
+  +---------------------------------+
+  |          [elem1][elem2][elem3]  |
+  +---------------------------------+
+  ```
+
+- **`space-between`**: Elements are evenly distributed with the first at start and last at end. Remaining space (container_size - total_sizes - margins - padding) is divided equally among n-1 gaps. With a single child, `space-between` behaves like `start`.
+  ```
+  +---------------------------------+
+  |[elem1]      [elem2]      [elem3]|
+  +---------------------------------+
+  ```
+
+- **`space-around`**: Equal space is added around each element. Total space is divided equally around n elements, with each getting space / (2n) on both sides. With a single child, `space-around` behaves like `center`.
+  ```
+  +---------------------------------+
+  |   [elem1]   [elem2]   [elem3]   |
+  +---------------------------------+
+
+### Off-axis alignment
+
+Off-axis alignment controls how child elements are positioned along the axis perpendicular to the container's main axis. For `direction=row`, the off-axis is vertical; for `direction=column`, it's horizontal.
+
+The `align-items` property specifies alignment for children.
+
+Options include:
+
+- **`start`**: Elements are aligned to the start of the off-axis (top for row, left for column).
+  ```
+  Container (direction=row, align-items=start):
+  +----------------+
+  |[elem1] [elem2] |
+  |                |
+  +----------------+
+  ```
+
+- **`center`**: Elements are centered along the off-axis.
+  ```
+  Container (direction=row, align-items=center):
+  +-----------------+
+  |                 |
+  | [elem1] [elem2] |
+  |                 |
+  +-----------------+
+  ```
+
+- **`end`**: Elements are aligned to the end of the off-axis (bottom for row, right for column).
+  ```
+  Container (direction=row, align-items=end):
+  +-----------------+
+  |                 |
+  | [elem1] [elem2] |
+  +-----------------+
+  ```
+
+- **`stretch`** (fill): Elements stretch to fill the available space along the off-axis. This is the default behavior.
+  ```
+  Container (direction=row, align-items=stretch):
+  +-----------------+
+  | +-----+ +-----+ |
+  | |elem1| |elem2| |
+  | +-----+ +-----+ |
+  +-----------------+
+  ```
+
+When `align-items=stretch`, elements expand to match the container's size in the off-axis direction, minus padding and margins.
+
+### Wrapping
+
+The `wrap` property controls whether child elements wrap to new lines or columns when they exceed the container's size along the main axis. When `wrap=true`, elements that don't fit on the current line move to the next line (for `direction=row`) or next column (for `direction=column`).
+
+- **`wrap=false`** (default): Elements stay on a single line/column, potentially overflowing the container.
+  ```
+  Container (direction=row, wrap=false):
+  +----------------------+
+  |[elem1][elem2][elem3] | <- overflows elem4,5...
+  +----------------------+
+  ```
+
+- **`wrap=true`**: Elements wrap to new lines when they don't fit.
+  ```
+  Container (direction=row, wrap=true):
+  +----------------------+
+  |[elem1][elem2][elem3] |
+  |[elem4][elem5]        |
+  +----------------------+
+  ```
+
+Justification is applied to each row/column separately.
+
+### Margins and Padding
+
+Margins and padding add space around and inside elements to control layout and appearance.
+
 ```
-Elements are centered as a group within the container.
-
-#### `end`
-```
-+---------------------------------+
-|         [elem1] [elem2] [elem3] |
-+---------------------------------+
-```
-Elements are placed at the end of the container.
-
-#### `space-between`
-```
-+---------------------------------+
-|[elem1]      [elem2]      [elem3]|
-+---------------------------------+
-```
-Elements are evenly distributed with the first at start and last at end.
-
-#### `space-around`
-```
-+---------------------------------+
-|  [elem1]   [elem2]   [elem3]    |
-+---------------------------------+
-```
-Equal space is distributed around each element.
-
-## Margins and Padding
-
-Margins and padding control spacing around and within elements.
-
-### Margins
-Margins create space outside the element's border and affect only the element's positioning, not its size. They determine the distance between elements and their containers.
-
-- Margins do not increase the element's width or height; they are added externally.
-- Example: `panel margin=10 { ... }` adds 10 pixels of space around the panel.
-
-### Padding
-Padding creates space inside the element's border and affects the element's size by expanding its content area.
-
-- Padding increases the element's total size.
-- Example: `panel padding=10 { ... }` adds 10 pixels of space inside the panel, increasing its size.
-
-### Visual Representation
-The following ASCII art illustrates the relationship between margin, padding, and the element's content area:
-
-```
-+-----------------------------+ 
++-----------------------------+
 |          margin             |
-|  +-----------------------+  | <- border/size of the element
+|  +-----------------------+  | <- total size
 |  |      padding          |  |
 |  |  +-----------------+  |  |
-|  |  |                 |  |  |
-|  |  |    content      |  |  |
-|  |  |   (width x      |  |  |
-|  |  |    height)      |  |  |
-|  |  |                 |  |  |
+|  |  |   content       |  |  |
+|  |  | (width x height)|  |  |
 |  |  +-----------------+  |  |
 |  |      padding          |  |
-|  +-----------------------+  | <- border/size of the element
+|  +-----------------------+  | <- total size
 |          margin             |
 +-----------------------------+
 ```
 
-- **Width**: The horizontal size of the content area.
-- **Height**: The vertical size of the content area.
-- **Total element width** = width + padding-left + padding-right
-- **Total element height** = height + padding-top + padding-bottom
-- **Margins** are outside the element and do not affect its size.
+- Total width = content width + left padding + right padding
+- Total height = content height + top padding + bottom padding
+- Margins are external and don't affect total size.
 
-### Positioning Formulas
-The exact position of a child element is calculated as follows:
-- child.x = parent.x + parent.padding_left + child.margin_left
-- child.y = parent.y + parent.padding_top + child.margin_top
+#### Margins
+Margins provide external spacing between elements and their containers, affecting position but not size.
 
-## Z-order (implicit stacking)
+- Added outside the element's border.
+- Example: `margin=10` creates 10px space around the element.
 
-There is no explicit `z-order` property in the system. Stacking
-is determined implicitly by the widget tree and the order widgets are
-declared or added at runtime:
+##### Margin Collapsing
+Adjacent margins combine into the larger value to prevent excessive gaps.
 
-- Rendering order: a parent is rendered before its children; children
-  are therefore drawn on top of their parent.
-- Sibling order: later siblings (declared later in markup or appended at
-  runtime) are rendered on top of earlier siblings.
-- Hit-testing and input dispatch follow this same top-to-bottom order:
-  the visually top-most, visible widget receives pointer events first.
+- Between siblings: uses the maximum of adjacent margins.
+- Does not combine with padding.
+- Both vertical and horizontal margins collapse.
 
-To change stacking, reorder or reparent widgets in markup or at runtime
-(for example, move a widget to the end of its parent's children). For
-transient UI that must appear above everything else (popups, overlays),
-attach it to a dedicated top-level container.
+```
+Before collapse (margins would add up to 30px space):
++--------+       +--------+
+| Elem1  | = = = | Elem2  |
++--------+       +--------+
+        10px + 20px
+
+After collapse (maximum margin used, 20px space):
++--------+     +--------+
+| Elem1  | = = | Elem2  |
++--------+     +--------+
+          20px
+```
+
+#### Padding
+Padding adds internal space within the element's border, expanding its total size.
+
+- Increases the content area.
+- Example: `padding=10` adds 10px inside the border.
+
+#### Margin-Padding Interaction
+The child's margin provides spacing from the parent's content edge (inside the padding), positioning elements within the parent's padded area.
+
+- Margins are external to the child element.
+- Padding defines the parent's inner content boundary.
+
+#### Positioning Calculations
+Child element position relative to parent:
+- x = parent.x + parent.padding_left + child.margin_left
+- y = parent.y + parent.padding_top + child.margin_top
+
+## Z-Order (Implicit Stacking)
+
+In UI systems, z-order determines the visual layering of elements, controlling which elements appear on top of others. Unlike many UI frameworks that provide an explicit `z-index` property, this system uses implicit stacking based on the widget hierarchy and declaration order.
+
+### Stacking Rules
+
+Stacking is determined by the following implicit rules:
+
+1. **Parent-Child Relationship**: Parents are rendered before their children, meaning children are drawn on top of their parents. This creates a natural layering where nested elements appear above their containers.
+
+2. **Sibling Order**: Among siblings within the same parent, elements declared or added later in the markup or at runtime appear on top of those declared earlier. This follows a "last-in, top-most" principle.
+
+3. **Tree Depth**: Deeper elements in the widget tree (grandchildren, etc.) naturally stack above shallower elements due to the parent-child rendering order.
+
+### Rendering and Input Handling
+
+- **Rendering Order**: Elements are drawn in the order defined by the stacking rules, with later elements compositing over earlier ones.
+- **Hit-Testing**: Input events (mouse clicks, touches) are dispatched to the top-most visible element under the pointer. The system traverses the widget tree in reverse stacking order, testing elements from top to bottom until a hit is found.
+- **Event Propagation**: Events bubble up through the hierarchy, but only the top-most element receives the initial event.
+
+### Manipulating Stacking
+
+To change an element's stacking position:
+
+- **Reorder Siblings**: Move a widget to a different position in its parent's child list. Widgets at the end of the list appear on top.
+- **Reparent Elements**: Attach a widget to a different parent to change its stacking context.
+- **Runtime Manipulation**: Use API calls to reorder children dynamically, such as bringing a widget to the front by moving it to the end of its parent's children.

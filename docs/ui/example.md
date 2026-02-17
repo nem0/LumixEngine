@@ -19,7 +19,7 @@ style {
 		margin: 12;
 	}
 
-	button.primary {
+	.primary {
 		bg-color: #2ea44f;
 		color: #ffffff;
 		padding: 10;
@@ -28,7 +28,7 @@ style {
 		margin: 6;
 	}
 
-	button.secondary {
+	.secondary {
 		bg-color: #3a3f4a;
 		color: #ffffff;
 		padding: 8;
@@ -52,10 +52,10 @@ panel id="ui_root" width=100% height=100% {
 
 			/* Main actions */
 			panel {
-				button id="start" class="primary" { "Start Game" }
-				button id="continue" class="primary" { "Continue" }
-				button id="options" class="secondary" { "Options" }
-				button id="quit" class="secondary" { "Quit" }
+				panel id="start" class="primary" { "Start Game" }
+				panel id="continue" class="primary" { "Continue" }
+				panel id="options" class="secondary" { "Options" }
+				panel id="quit" class="secondary" { "Quit" }
 			}
 		}
 
@@ -65,23 +65,23 @@ panel id="ui_root" width=100% height=100% {
 
 			/* Volume row: label + numeric input */
 			panel class=settings_row {
-				text value="Volume" align=left
-				input id="volume" value="75" width=6em
+                "Volume: "
+                input id="volume" value="75" width=6em
 			}
 
 			/* Resolution row: simple selectable options */
 			panel class=settings_row {
-				text value="Resolution" align=left
-				panel {
-					button id="res_1920" class="secondary" width=10em { "1920x1080" }
-					button id="res_1280" class="secondary" width=10em { "1280x720" }
-				}
+                "Resolution: "
+                panel {
+                    panel id="res_1920" class="secondary" width=10em { "1920x1080" }
+                    panel id="res_1280" class="secondary" width=10em { "1280x720" }
+                }
 			}
 
 			/* Apply / Back */
 			panel {
-				button id="apply" class="primary" width=10em { "Apply" }
-				button id="back" class="secondary" width=10em { "Back" }
+				panel id="apply" class="primary" width=10em { "Apply" }
+				panel id="back" class="secondary" width=10em { "Back" }
 			}
 		}
 	}

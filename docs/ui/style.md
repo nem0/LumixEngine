@@ -44,13 +44,3 @@ Rules:
 - Inheritance flows along the widget tree (parent → child). Selector forms
 	such as `parent > child` affect matching and specificity but do not change
 	the fundamental inheritance mechanism.
-
-Example:
-
-```css
-panel { font-size: 14; color: #ffffff; }
-text { }                /* inherits font-size and color from parent panel */
-text.small { font-size: 12; } /* overrides inherited font-size */
-```
-
-

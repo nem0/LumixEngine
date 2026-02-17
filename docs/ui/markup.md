@@ -10,11 +10,11 @@ panel id=main width=800 height=600 {
         text value="Game Menu"
     }
     panel {
-        button class=primary width=8em height=2em { "Start" }
-        button width=8em height=2em { "Options" }
-        button class=danger width=8em height=2em { "Quit" }
+        panel class=primary width=8em height=2em { "Start" }
+        panel width=8em height=2em { "Options" }
+        panel class=danger width=8em height=2em { "Quit" }
     }
-    panel background_color=#f0f0f0 {
+    panel bg-color=#f0f0f0 {
         "Some text with background color"
     }
     panel {
@@ -88,9 +88,10 @@ COLOR         := '#' [0-9A-Fa-f]{6}
 - Elements are case-sensitive identifiers that name the UI widget/type.
 - Attributes are key/value pairs. Values may be quoted strings, identifiers, numbers, percentages, or colors. Whitespace around `=` is allowed.
 - Colors are specified in hexadecimal format with a `#` prefix, e.g. `#FF0000` (6-digit).
-- A block (braced) element contains child elements and/or text children.
-- Leaf elements **must** be written without braces when they have no children. Example: `button text="Start" class=primary`.
+- A block (braced) element contains child elements.
 - Text content inside a block must use quoted strings. Quoted strings may span multiple lines, allowing natural multiline content without special delimiters.
-- A quoted string used where an element is expected is treated as an implicit `text` element (equivalent to `text value="..."`). Unquoted bare text is not allowed.
-- Inside double-quoted strings use `\"` to escape quotes, `\\` for backslash, and common escapes `\n`, `\t`, `\r` are supported. Parsers MAY trim a common indentation prefix from multi-line strings to improve authoring ergonomics.
+- A quoted string creates an inline text node that flows with other elements.
+- `text` element is syntactic sugar for `panel width=fit-content height=fit-content` containing text nodes.
+- Unquoted bare text is not allowed.
+- Inside double-quoted strings use `\"` to escape quotes, `\\` for backslash, and common escapes `\n`, `\t`, `\r` are supported.
 
