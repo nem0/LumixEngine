@@ -20,7 +20,7 @@ style {
 ## Selectors & precedence
 
 - Supported selectors: `type`, `.class`, `$id`, and `parent > child` (direct child).
-- Precedence (highest → lowest): inline style > `$id` > `.class` > `type` > stylesheet order.
+- Precedence (highest -> lowest): inline style > `$id` > `.class` > `type` > stylesheet order.
 
 ## Inheritance
 
@@ -41,6 +41,6 @@ Rules:
 - Shorthands follow normal expansion rules; inheritance applies per
 	sub-attribute where meaningful. For example, a parent `padding` does not
 	implicitly force child `padding` values unless the child is left unset.
-- Inheritance flows along the widget tree (parent → child). Selector forms
+- Inheritance flows along the widget tree (parent -> child). Selector forms
 	such as `parent > child` affect matching and specificity but do not change
 	the fundamental inheritance mechanism.

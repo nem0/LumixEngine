@@ -3,6 +3,8 @@
 ## Table of Contents
 
 - [Text](#text)
+  - [Inline Flow](#inline-flow)
+  - [Text Alignment](#text-alignment)
 - [Element Sizing](#element-sizing)
   - [Units](#units)
   - [Fit-Content](#fit-content)
@@ -20,55 +22,90 @@
 
 ## Text
 
-### Inline Text Nodes (Quoted Strings)
-Quoted strings create inline text that flows horizontally with sibling elements, wrapping at container edges.
+Text paragraphs are created using `span` elements with a `value` attribute or quoted strings inside a `panel`. Text flows inline within the panel and wraps to multiple lines when the unwrapped width exceeds the available panel width (minus padding) and `wrap=true`.
 
 ```css
 panel {
-    "Hello, "
-    "World!"
-    "."
+  "Some text"
+  span color=#ff0000 value="Some other, red text"
 }
 ```
 
-**Result**: `Hello, World!.` (flows as single line)
+### Inline Flow
 
-### Styled Text
-For styling, use `panel` elements.
+Inline flow arranges **separate inline elements** (`span`s, text strings) sequentially along the container's main axis:
+- `direction="row"` -> spans side-by-side -> `"A" "B"` becomes `A B`
+- `direction="column"` -> spans stacked -> `"A"` above `"B"`
+
+Text strings always render **horizontally** (left-to-right), regardless of `direction`.
+
+**Breaks occur** only from **block elements**.
+
+**Row direction example**:
 
 ```css
-panel {
-    panel color=#00f {"Hello, "}
-    panel font-size=1.2em color=#f00 { "World!" }
-    panel font-size=0.8em { "." }
+panel direction="row" {
+  "First line text flows here"
+  panel width=100 height=50 "Block panel causes line break"
+  span "and text continues on new line below"
 }
 ```
 
-### Mixed Content Flow
-Text nodes flow inline with blocks until they hit a block element.
+Visual result:
+
+```
++------------------------------+
+| First line text flows here   |
+| +---------------------+      |
+| | Block panel causes  |      |
+| | line break          |      |
+| +---------------------+      |
+| and text continues on new    |
+| line below                   |
++------------------------------+
+```
+
+**Column direction example** (note: `"Text above"` renders horizontally within its inline slot):
 
 ```css
-panel direction=row {
-    "Label: "
-    panel width=100 { input }
-    " (optional)"
+panel direction="column" {
+  span "Text above"
+  panel width=100 height=50 bgColor="red" { }
+  span "Text below"
 }
 ```
 
-**Result**: `Label: [input] (optional)`
+Visual result:
 
-### Text Properties
+```
++-------+
+| Text  |
+| above |  <- horizontal text
++-------+
+|       |
+|       | <- red panel
+|       |
++-------+
+| Text  |
+| below |  <- horizontal text
++-------+
+```
 
-| Property | Description | Default / Values |
-|----------|-------------|------------------|
-| `value` | The text content to display | `""` |
-| `align` | Text alignment | `left` |
-| `font-size` | Text size | `12` |
-| `font` | Font file path | (no default) |
-| `color` | Text color | `"#000000"` |
+This approach treats inline elements as a unified flow, with blocks serving as natural separators.
 
-**Text nodes flow inline** with blocks; `text` elements are blocks with fit-content sizing.
+### Text Alignment
 
+Text alignment controls how text is positioned horizontally within its container. The `text-align` attribute can be set to `left`, `center`, or `right`, with `left` as the default.
+
+```css
+panel text-align="center" {
+  "Centered text"
+}
+```
+
+For multi-line text, each line is aligned independently according to the `text-align` value.
+
+Text alignment is inherited by child elements that contain text.
 
 ## Element Sizing
 
@@ -112,6 +149,10 @@ When a parent container uses `fit-content` sizing and child elements specify dim
 
 In this implementation, children are measured assuming 0 available space. For elements with percentage-based dimensions, percentages resolve to 0 since 0% of any size is 0.
 
+#### With Text Elements
+
+For text elements (inline text nodes or `text` blocks), measuring with 0 available space means assuming infinite width: text does not wrap and is treated as a single line. The width is calculated as the full rendered width of the text string in pixels, and height is based on the font size (typically the line height). This prevents collapsing to zero size while avoiding the need for a predefined width constraint.
+
 ## Element Positioning
 
 The layout system positions elements within containers using this algorithm:
@@ -126,8 +167,12 @@ function layoutContainer(container):
         for each child in container.children:
             child.size = calculateSize(child, 0)
         
-        // Calculate container size as sum of children
-        containerSize = sumChildSizes(container.children, container.direction)
+        // Calculate container size as sum of children plus padding
+        containerSize = sumChildSizes(container.children, container.direction) + container.padding
+        if container.width == 'fit-content':
+            container.width = containerSize.width
+        if container.height == 'fit-content':
+            container.height = containerSize.height
     else:
         // Use fixed or inherited size
         containerSize = getSize(container)
@@ -138,21 +183,34 @@ function layoutContainer(container):
 
     // 2. Arrange by direction with wrapping
     mainAxis = (container.direction == 'row') ? 'horizontal' : 'vertical'
+    crossAxis = (mainAxis == 'horizontal') ? 'vertical' : 'horizontal'
     if container.wrap == 'wrap':
-        // Wrap children into multiple lines/columns
-        lines = wrapChildrenIntoLines(container.children, mainAxis, containerSize)
+        // Wrap children into lines (each line is an object with children, size, and crossPos)
+        lines = wrapChildrenIntoLines(container.children, mainAxis, containerSize[mainAxis])
+        
+        // Position lines along cross-axis starting from container padding
+        currentCrossPos = container.padding[crossAxis == 'vertical' ? 'top' : 'left']
         for each line in lines:
-            positionChildrenSequentially(line.children, mainAxis, container)
-            justifyChildren(line.children, container.justifyContent, mainAxis, line.size)
+            line.crossPos = currentCrossPos
+            // Position children sequentially within the line along main-axis
+            positionChildrenSequentially(line.children, mainAxis, 0)  // No padding for lines
+            // Justify children within the line
+            justifyChildren(line.children, container.justifyContent, mainAxis, containerSize[mainAxis])
+            // Align children off-axis within the line
+            alignChildrenOffAxis(line.children, container.alignItems, crossAxis, line.size[crossAxis])
+            // Advance cross position by line size
+            currentCrossPos += line.size[crossAxis]
     else:
-        positionChildrenSequentially(container.children, mainAxis, container)
-        justifyChildren(container.children, container.justifyContent, mainAxis, containerSize)
+        // No wrapping: treat all children as one line
+        positionChildrenSequentially(container.children, mainAxis, container.padding[mainAxis == 'horizontal' ? 'left' : 'top'])
+        justifyChildren(container.children, container.justifyContent, mainAxis, containerSize[mainAxis])
+        alignChildrenOffAxis(container.children, container.alignItems, crossAxis, containerSize[crossAxis])
         // For 'clip', overflowing content is not rendered
 
-    // 3. Incorporate margins and padding
+    // 3. Incorporate margins and padding (adjust positions for margins if not already handled)
     applyMarginsAndPadding(container.children, container)
 
-    // 4. Calculate positions
+    // 4. Calculate absolute positions
     for each child in container.children:
         child.absolutePosition = computeAbsolutePosition(child, container)
 ```
@@ -160,27 +218,76 @@ function layoutContainer(container):
 ### Justification
 
 ```js
-function positionChildrenSequentially(children, mainAxis, container):
-    // Start positioning from container's padding
-    if mainAxis == 'horizontal':
-        currentPosition = container.paddingLeft
-    else:  // vertical
-        currentPosition = container.paddingTop
+function positionChildrenSequentially(children, mainAxis, paddingStart, paddingOff):
+    // Start positioning from given padding
+    currentPosition = paddingStart
+    previousMargin = 0
 
     for each child in children:
-        // Position child at current position plus its margin
+        // Calculate gap with margin collapsing along main axis
         if mainAxis == 'horizontal':
-            child.relativeX = currentPosition + child.marginLeft
-            child.relativeY = container.paddingTop + child.marginTop
-            // Advance position by child's size plus margin
-            currentPosition += child.width + child.marginLeft + child.marginRight
+            gap = max(previousMargin, child.marginLeft)
+            child.relativeX = currentPosition + gap
+            child.relativeY = paddingOff + child.marginTop  // Off-axis margin (no collapsing assumed)
+            currentPosition += gap + child.width
+            previousMargin = child.marginRight
         else:  // vertical
-            child.relativeX = container.paddingLeft + child.marginLeft
-            child.relativeY = currentPosition + child.marginTop
-            currentPosition += child.height + child.marginTop + child.marginBottom
+            gap = max(previousMargin, child.marginTop)
+            child.relativeX = paddingOff + child.marginLeft  // Off-axis margin
+            child.relativeY = currentPosition + gap
+            currentPosition += gap + child.height
+            previousMargin = child.marginBottom
+
+function justifyChildren(children, justifyContent, mainAxis, availableSize):
+    totalSize = 0
+    for each child in children:
+        totalSize += child.size[mainAxis == 'horizontal' ? 'width' : 'height']
+        // Include margins in totalSize for spacing
+        if mainAxis == 'horizontal':
+            totalSize += child.marginLeft + child.marginRight
+        else:
+            totalSize += child.marginTop + child.marginBottom
+    // Subtract margins already accounted for in gaps (simplified: assume first/last margins not double-counted)
+    remainingSpace = availableSize - totalSize
+
+    if justifyContent == 'start':
+        // No change needed
+        pass
+    elif justifyContent == 'center':
+        offset = remainingSpace / 2
+        for each child:
+            if mainAxis == 'horizontal':
+                child.relativeX += offset
+            else:
+                child.relativeY += offset
+    elif justifyContent == 'end':
+        offset = remainingSpace
+        for each child:
+            if mainAxis == 'horizontal':
+                child.relativeX += offset
+            else:
+                child.relativeY += offset
+    elif justifyContent == 'space-between' and len(children) > 1:
+        gap = remainingSpace / (len(children) - 1)
+        currentOffset = 0
+        for i in 1 to len(children)-1:
+            currentOffset += gap
+            if mainAxis == 'horizontal':
+                children[i].relativeX += currentOffset
+            else:
+                children[i].relativeY += currentOffset
+    elif justifyContent == 'space-around':
+        gap = remainingSpace / len(children)
+        currentOffset = gap / 2
+        for each child:
+            if mainAxis == 'horizontal':
+                child.relativeX += currentOffset
+            else:
+                child.relativeY += currentOffset
+            currentOffset += gap
 ```
 
-The `justify-content` property then adjusts these positions to achieve the desired distribution. Options include:
+The `justify-content` property adjusts positions along the main axis to achieve the desired distribution. Options include:
 
 - **`start`**: Elements are placed sequentially starting from the container's start edge plus padding. Each subsequent element is positioned immediately after the previous, accounting for size and margin.
   ```
@@ -264,6 +371,31 @@ Options include:
 
 When `align-items=stretch`, elements expand to match the container's size in the off-axis direction, minus padding and margins.
 
+```js
+function alignChildrenOffAxis(children, alignItems, crossAxis, availableSize):
+    for each child in children:
+        if alignItems == 'start':
+            // No change (already at start)
+            pass
+        elif alignItems == 'center':
+            offset = (availableSize - child.size[crossAxis == 'vertical' ? 'height' : 'width']) / 2
+            if crossAxis == 'vertical':
+                child.relativeY += offset
+            else:
+                child.relativeX += offset
+        elif alignItems == 'end':
+            offset = availableSize - child.size[crossAxis == 'vertical' ? 'height' : 'width']
+            if crossAxis == 'vertical':
+                child.relativeY += offset
+            else:
+                child.relativeX += offset
+        elif alignItems == 'stretch':
+            if crossAxis == 'vertical':
+                child.height = availableSize - child.marginTop - child.marginBottom
+            else:
+                child.width = availableSize - child.marginLeft - child.marginRight
+```
+
 ### Wrapping
 
 The `wrap` property controls whether child elements wrap to new lines or columns when they exceed the container's size along the main axis. When `wrap=true`, elements that don't fit on the current line move to the next line (for `direction=row`) or next column (for `direction=column`).
@@ -286,6 +418,8 @@ The `wrap` property controls whether child elements wrap to new lines or columns
   ```
 
 Justification is applied to each row/column separately.
+
+When `wrap=true` creates multiple lines (or columns), and the container's size along the cross-axis is larger than the combined size of all lines, the lines are distributed starting from the container's start edge along the cross-axis. This means lines bunch at the top (for `direction=row`) or left (for `direction=column`), with any extra space remaining unused.
 
 ### Margins and Padding
 
@@ -350,9 +484,11 @@ The child's margin provides spacing from the parent's content edge (inside the p
 - Padding defines the parent's inner content boundary.
 
 #### Positioning Calculations
-Child element position relative to parent:
-- x = parent.x + parent.padding_left + child.margin_left
-- y = parent.y + parent.padding_top + child.margin_top
+Child element position relative to parent (for sequential layout with margin collapsing):
+- x = parent.x + parent.padding_left + collapsed_margin_left
+- y = parent.y + parent.padding_top + collapsed_margin_top
+
+Where `collapsed_margin_left` is the maximum of the child's left margin and the previous sibling's right margin (or just the child's left margin for the first child). Similarly for vertical.
 
 ## Z-Order (Implicit Stacking)
 
