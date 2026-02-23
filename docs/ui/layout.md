@@ -3,7 +3,9 @@
 ## Table of Contents
 
 - [Text](#text)
+  - [Multiline Strings](#multiline-strings)
   - [Inline Flow](#inline-flow)
+  - [Line Breaks](#line-breaks)
   - [Text Alignment](#text-alignment)
 - [Element Sizing](#element-sizing)
   - [Units](#units)
@@ -11,7 +13,7 @@
 - [Element Positioning](#element-positioning)
   - [Positioning Algorithm](#positioning-algorithm)
   - [Justification](#justification)
-  - [Off-axis Alignment](#off-axis-alignment)
+  - [Off-axis alignment](#off-axis-alignment)
   - [Wrapping](#wrapping)
   - [Margins and Padding](#margins-and-padding)
     - [Margins](#margins)
@@ -31,6 +33,29 @@ panel {
 }
 ```
 
+### Multiline Strings
+
+Quoted strings in markup can span multiple lines, but newlines (`\n`) and carriage returns (`\r`) are treated as whitespace and do not create line breaks in the layout. This matches HTML behavior where whitespace is normalized. Additionally, consecutive whitespace characters (spaces, tabs, newlines) are collapsed into a single space for both measurement and rendering.
+
+```css
+panel {
+  "This is multiline text
+  that spans markup lines
+  but renders as single line"
+}
+```
+
+The above renders as: `This is multiline text that spans markup lines but renders as single line`
+
+```css
+panel {
+  "Text   with    multiple    spaces"
+}
+```
+
+The above renders as: `Text with multiple spaces` (consecutive spaces collapsed)
+
+
 ### Inline Flow
 
 Inline flow arranges **separate inline elements** (`span`s, text strings) sequentially along the container's main axis:
@@ -39,7 +64,22 @@ Inline flow arranges **separate inline elements** (`span`s, text strings) sequen
 
 Text strings always render **horizontally** (left-to-right), regardless of `direction`.
 
-**Breaks occur** only from **block elements**.
+#### Baseline Alignment in Inline Flow
+
+To ensure proper visual alignment of text and inline elements, the layout system employs baseline alignment. The baseline is the imaginary line on which text characters rest.
+
+- For text elements (`span`s and quoted strings), the baseline is determined by the font's baseline metric, which positions the text appropriately relative to its container.
+- For non-text inline elements (such as images or icons), the baseline defaults to the element's bottom edge.
+
+In a line of inline elements, the layout algorithm:
+1. Calculates the dominant baseline for the line, typically the baseline of the tallest text element or the first element with a defined baseline.
+2. Positions each inline element so that its baseline aligns with the line's baseline.
+
+This alignment ensures that mixed content (e.g., text of varying sizes or text alongside icons) appears visually consistent and readable, preventing awkward vertical offsets that could disrupt the flow.
+
+### Line Breaks
+
+**Line breaks in inline flow are triggered exclusively by block elements**. When a block element appears, it causes a line break, positioning itself at the start of the new line and forcing any subsequent inline elements to start on the following line.
 
 **Row direction example**:
 
@@ -95,21 +135,21 @@ This approach treats inline elements as a unified flow, with blocks serving as n
 
 ### Text Alignment
 
-Text alignment controls how text is positioned horizontally within its container. The `text-align` attribute can be set to `left`, `center`, or `right`, with `left` as the default.
+Text alignment controls how text is positioned horizontally within its container. The `align` attribute can be set to `left`, `center`, or `right`, with `left` as the default.
 
 ```css
-panel text-align="center" {
+panel align=center {
   "Centered text"
 }
 ```
 
-For multi-line text, each line is aligned independently according to the `text-align` value.
+For multi-line text, each line is aligned independently according to the `align` value.
 
 Text alignment is inherited by child elements that contain text.
 
 ## Element Sizing
 
-Each UI element has `width` and `height` attributes that control its size, known as dimensions. Set them explicitly for a fixed size; otherwise, they default to `fit-content`, sizing the element to its content. Root elements behave like they are children of a panel that covers the whole screen with 0 padding.
+Each UI element has `width` and `height` attributes that control its size, known as dimensions. Set them explicitly for a fixed size; otherwise, they default to `fit-content`, sizing the element to its content. Root elements behave like they are children of a panel that covers the whole screen with 0 padding and `direction=column`.
 
 Example
 ```css
@@ -154,6 +194,8 @@ In this implementation, children are measured assuming 0 available space. For el
 For text elements (inline text nodes or `text` blocks), measuring with 0 available space means assuming infinite width: text does not wrap and is treated as a single line. The width is calculated as the full rendered width of the text string in pixels, and height is based on the font size (typically the line height). This prevents collapsing to zero size while avoiding the need for a predefined width constraint.
 
 ## Element Positioning
+
+The `direction` attribute controls the primary axis along which child elements are arranged within a container. When set to `row`, children are positioned horizontally from left to right. When set to `column` (the default), children are positioned vertically from top to bottom.
 
 The layout system positions elements within containers using this algorithm:
 
@@ -205,7 +247,6 @@ function layoutContainer(container):
         positionChildrenSequentially(container.children, mainAxis, container.padding[mainAxis == 'horizontal' ? 'left' : 'top'])
         justifyChildren(container.children, container.justifyContent, mainAxis, containerSize[mainAxis])
         alignChildrenOffAxis(container.children, container.alignItems, crossAxis, containerSize[crossAxis])
-        // For 'clip', overflowing content is not rendered
 
     // 3. Incorporate margins and padding (adjust positions for margins if not already handled)
     applyMarginsAndPadding(container.children, container)
@@ -417,9 +458,11 @@ The `wrap` property controls whether child elements wrap to new lines or columns
   +----------------------+
   ```
 
-Justification is applied to each row/column separately.
+Justification and item aligment are applied to each row/column separately.
 
 When `wrap=true` creates multiple lines (or columns), and the container's size along the cross-axis is larger than the combined size of all lines, the lines are distributed starting from the container's start edge along the cross-axis. This means lines bunch at the top (for `direction=row`) or left (for `direction=column`), with any extra space remaining unused.
+
+When `wrap=true`, `align-items` is applied to each wrapped line or column individually, rather than to the entire container. Each line's cross-axis size is determined by the tallest element in that line (for `direction=row`) or the widest element in that column (for `direction=column`), and alignment is calculated relative to that line's size.
 
 ### Margins and Padding
 
@@ -456,19 +499,20 @@ Adjacent margins combine into the larger value to prevent excessive gaps.
 - Between siblings: uses the maximum of adjacent margins.
 - Does not combine with padding.
 - Both vertical and horizontal margins collapse.
+- Margins do not collapse when there is no sibling, such as with a single child or when the first child has left padding.
 
 ```
 Before collapse (margins would add up to 30px space):
-+--------+       +--------+
-| Elem1  | = = = | Elem2  |
-+--------+       +--------+
-        10px + 20px
+  +--------+       +--------+
+= | Elem1  | = = = | Elem2  | ==
+  +--------+       +--------+
+           10px + 20px
 
 After collapse (maximum margin used, 20px space):
-+--------+     +--------+
-| Elem1  | = = | Elem2  |
-+--------+     +--------+
-          20px
+  +--------+     +--------+
+= | Elem1  | = = | Elem2  | ==
+  +--------+     +--------+
+             20px
 ```
 
 #### Padding

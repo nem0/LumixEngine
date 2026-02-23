@@ -1971,6 +1971,7 @@ public:
 			logError("Failed to save world ", path);
 		}
 		
+		m_world->setPath(Path(path));
 		m_is_world_changed = false;
 	}
 
@@ -2278,6 +2279,7 @@ public:
 		}
 
 		ASSERT(m_world);
+		Path path = m_world->getPath();
 		m_engine.getResourceManager().enableUnload(false);
 		m_engine.stopGame(*m_world);
 		selectEntities({}, false);
@@ -2297,7 +2299,7 @@ public:
 			m_selected_entities.clear();
 			
 			InputMemoryStream blob(m_game_mode_file);
-			loadWorld(blob, "game mode", false, true);
+			loadWorld(blob, path.c_str(), false, true);
 		}
 		m_game_mode_file.clear();
 		if(m_selected_entity_on_game_mode.isValid()) {
@@ -2516,6 +2518,7 @@ public:
 		EntityMap entity_map(m_allocator);
 		m_entity_folders->ignoreNewEntities(true);
 		WorldVersion editor_header_version;
+		if (!additive) m_world->setPath(Path(name));
 		if (m_world->deserialize(blob, entity_map, editor_header_version)) {
 			m_entity_folders->ignoreNewEntities(false);
 			m_prefab_system->deserialize(blob, entity_map, editor_header_version);

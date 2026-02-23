@@ -20,6 +20,7 @@ struct Color {
 		, a(a) {}
 
 	u32 abgr() const { return ((u32)a << 24) | ((u32)b << 16) | ((u32)g << 8) | (u32)r; }
+	bool operator==(const Color& rhs) { return abgr() == rhs.abgr(); }
 	bool operator!=(const Color& rhs) { return abgr() != rhs.abgr(); }
 	void operator*=(const Color& rhs) {
 		r = u8((u32(rhs.r) * r) >> 8);

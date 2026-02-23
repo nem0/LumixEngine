@@ -1,5 +1,6 @@
 #include "draw2d.h"
 #include "font.h"
+#include "core/string.h"
 
 
 namespace Lumix {
@@ -172,8 +173,8 @@ void Draw2D::addImage(gpu::TextureHandle tex, const Vec2& from, const Vec2& to, 
 	cmd->indices_count += 6;
 }
 
-void Draw2D::addText(const Font& font, const Vec2& pos, Color color, const char* str) {
-	if (!*str) return;
+void Draw2D::addText(const Font& font, const Vec2& pos, Color color, StringView str) {
+	if (str.empty()) return;
 	Cmd* cmd = &m_cmds.back();
 
 	if (cmd->texture && cmd->indices_count != 0) {
@@ -191,19 +192,68 @@ void Draw2D::addText(const Font& font, const Vec2& pos, Color color, const char*
 	p.x = float(int(p.x));
 	p.y = float(int(p.y));
 
-	for (const char* c = str; *c; ++c) {
+	bool prev_was_space = false;
+	for (const char* c = str.begin; c != str.end; ++c) {
 		if (*c == '\r') continue;
-		if (*c == '\n') {
-			p.x = float(int(pos.x));
-			p.y += getAdvanceY(font);
-			continue;
-		}
+		bool is_whitespace = isWhitespace(*c);
+		if (is_whitespace && prev_was_space) continue;
+	
 		const Glyph* glyph = findGlyph(font, *c);
 		if (!glyph) {
 			p.x += 16;
 			continue;
 		}
+		prev_was_space = is_whitespace;
+		const u32 voff = m_vertices.size();
+		m_indices.push(voff);
+		m_indices.push(voff + 1);
+		m_indices.push(voff + 2);
+
+		m_indices.push(voff);
+		m_indices.push(voff + 2);
+		m_indices.push(voff + 3);
+
+		m_vertices.push({ p + Vec2(glyph->x0, glyph->y0), { glyph->u0, glyph->v0 }, color });
+		m_vertices.push({ p + Vec2(glyph->x1, glyph->y0), { glyph->u1, glyph->v0 }, color });
+		m_vertices.push({ p + Vec2(glyph->x1, glyph->y1), { glyph->u1, glyph->v1 }, color });
+		m_vertices.push({ p + Vec2(glyph->x0, glyph->y1), { glyph->u0, glyph->v1 }, color });
+		
+		p.x += glyph->advance_x;
+		cmd->indices_count += 6;
+	}
+}
+
+void Draw2D::addText(const Font& font, const Vec2& pos, Color color, const char* str) {
+	if (!str || !str[0]) return;
+	Cmd* cmd = &m_cmds.back();
+
+	if (cmd->texture && cmd->indices_count != 0) {
+		cmd = &m_cmds.emplace();
+		const Rect& r = m_clip_queue.back();
+		cmd->clip_pos = r.from;
+		cmd->clip_size = r.to - r.from;
+		cmd->indices_count = 0;
+		cmd->index_offset = m_indices.size();
+	}
+
+	cmd->texture = gpu::INVALID_TEXTURE;
 	
+	Vec2 p = pos;
+	p.x = float(int(p.x));
+	p.y = float(int(p.y));
+
+	bool prev_was_space = false;
+	for (const char* c = str; *c; ++c) {
+		if (*c == '\r') continue;
+		bool is_whitespace = isWhitespace(*c);
+		if (is_whitespace && prev_was_space) continue;
+	
+		const Glyph* glyph = findGlyph(font, *c);
+		if (!glyph) {
+			p.x += 16;
+			continue;
+		}
+		prev_was_space = is_whitespace;
 		const u32 voff = m_vertices.size();
 		m_indices.push(voff);
 		m_indices.push(voff + 1);

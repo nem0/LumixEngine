@@ -1,6 +1,7 @@
 #include "core/array.h"
 #include "core/log.h"
 #include "core/stream.h"
+#include "core/string.h"
 #include "font.h"
 #include "renderer/texture.h"
 #include "renderer/renderer.h"
@@ -24,12 +25,14 @@ struct Font {
 	u32 font_size = 0;
 	float descender = 0;
 	float ascender = 0;
+	float height = 0;
 	u32 ref = 0;
 };
 
 float getAdvanceY(const Font& font) { return float(font.font_size); }
 float getDescender(const Font& font) { return font.descender; }
 float getAscender(const Font& font) { return font.ascender; }
+float getHeight(const Font& font) { return font.height; }
 
 const Glyph* findGlyph(const Font& font, u32 codepoint) {
 	auto iter = font.glyphs.find(codepoint);
@@ -40,9 +43,27 @@ const Glyph* findGlyph(const Font& font, u32 codepoint) {
 Vec2 measureTextA(const Font& font, const char* str, const char* str_end) {
 	Vec2 res;
 	res.x = 0;
-	res.y = (float)font.font_size;
+	res.y = font.height;
 	const char* c = str;
+	bool prev_was_space = false;
 	while (*c && c != str_end) {
+		if (*c == '\r') {
+			++c;
+			continue;
+		}
+		if (isWhitespace(*c)) {
+			if (!prev_was_space) {
+				auto iter = font.glyphs.find(' ');
+				if (iter.isValid()) {
+					const Glyph& glyph = iter.value();
+					res.x += glyph.advance_x;
+				}
+				prev_was_space = true;
+			}
+			++c;
+			continue;
+		}
+		prev_was_space = false;
 		auto iter = font.glyphs.find(*c);
 		if (iter.isValid()) {
 			const Glyph& glyph = iter.value();
@@ -156,6 +177,7 @@ bool FontManager::build()
 		
 		font->descender = face->size->metrics.descender / 64.f;
 		font->ascender = face->size->metrics.ascender / 64.f;
+		font->height = face->size->metrics.height / 64.f;
 		for (Glyph& c : font->glyphs) {
 			c.u0 = c.v0 = 0;
 			c.u1 = c.v1 = 1;

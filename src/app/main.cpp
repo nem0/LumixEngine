@@ -114,6 +114,7 @@ struct Runner final
 		InputMemoryStream blob(data);
 		EntityMap entity_map(m_allocator);
 
+		m_world->setPath(Path(path));
 		WorldVersion editor_version;
 		if (!m_world->deserialize(blob, entity_map, editor_version)) {
 			logError("Failed to deserialize ", path);

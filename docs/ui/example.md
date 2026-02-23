@@ -44,44 +44,44 @@ style {
 	}
 }
 
-panel id="ui_root" width=100% height=100% {
+panel [id="ui_root" width=100% height=100%] {
 	/* Centered overlay panel */
-	panel id="overlay" {
-		panel id="menu" class=menu {
-			text class=title value="My Game"
+	panel [id="overlay"] {
+		panel [id="menu" class=menu] {
+			text [class=title value="My Game"]
 
 			/* Main actions */
 			panel {
-				panel id="start" class="primary" { "Start Game" }
-				panel id="continue" class="primary" { "Continue" }
-				panel id="options" class="secondary" { "Options" }
-				panel id="quit" class="secondary" { "Quit" }
+				panel [id="start" class="primary"] { "Start Game" }
+				panel [id="continue" class="primary"] { "Continue" }
+				panel [id="options" class="secondary"] { "Options" }
+				panel [id="quit" class="secondary"] { "Quit" }
 			}
 		}
 
 		/* Settings overlay (hidden by default, shown when Options pressed) */
-		panel id="settings_panel" width=360 class=menu visible=false {
-			text class=title value="Settings"
+		panel [id="settings_panel" width=360 class=menu visible=false] {
+			text [class=title value="Settings"]
 
 			/* Volume row: label + numeric input */
-			panel class=settings_row {
+			panel [class=settings_row] {
                 "Volume: "
-                input id="volume" value="75" width=6em
+                input [id="volume" value="75" width=6em]
 			}
 
 			/* Resolution row: simple selectable options */
-			panel class=settings_row {
+			panel [class=settings_row] {
                 "Resolution: "
                 panel {
-                    panel id="res_1920" class="secondary" width=10em { "1920x1080" }
-                    panel id="res_1280" class="secondary" width=10em { "1280x720" }
+                    panel [id="res_1920" class="secondary" width=10em] { "1920x1080" }
+                    panel [id="res_1280" class="secondary" width=10em] { "1280x720" }
                 }
 			}
 
 			/* Apply / Back */
 			panel {
-				panel id="apply" class="primary" width=10em { "Apply" }
-				panel id="back" class="secondary" width=10em { "Back" }
+				panel [id="apply" class="primary" width=10em] { "Apply" }
+				panel [id="back" class="secondary" width=10em] { "Back" }
 			}
 		}
 	}

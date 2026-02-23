@@ -5,6 +5,7 @@
 #include "core/array.h"
 #include "core/delegate_list.h"
 #include "core/math.h"
+#include "core/path.h"
 #include "core/tag_allocator.h"
 
 
@@ -62,6 +63,8 @@ struct LUMIX_ENGINE_API World {
 	~World();
 
 	IAllocator& getAllocator() { return m_allocator; }
+	const Path& getPath() const { return m_path; }
+	void setPath(const Path& path) { m_path = path; }
 	const Transform* getTransforms() const { return m_transforms.begin(); }
 	void emplaceEntity(EntityRef entity);
 	EntityRef createEntity(const DVec3& position, const Quat& rotation);
@@ -179,6 +182,7 @@ private:
 
 	TagAllocator m_allocator;
 	Engine& m_engine;
+	Path m_path;
 	Local<ComponentTypeEntry> m_component_type_map[ComponentType::MAX_TYPES_COUNT];
 	Array<UniquePtr<IModule>> m_modules;
 	struct ArchetypeManager;

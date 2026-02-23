@@ -20,7 +20,7 @@ Supported by all elements.
 | `height` | Sets the element's height. | `fit-content` |
 | `margin` | Space outside the element border in all directions. | `0` |
 | `padding` | Space inside the element border, around the content in all directions. | `0` |
-| `text-align` | Text alignment. Values: `left`, `center`, `right`. | `left` |
+| `align` | Text alignment. Values: `left`, `center`, `right`. | `left` |
 
 These attributes accept `NUMBER`, `PERCENT` (e.g. `50%`), `em` units (e.g. `2em`), or the `fit-content` keyword (for example: `width=fit-content`).
 
@@ -54,7 +54,7 @@ Inline text container for styling text without creating a block element. It does
 | Attribute | Description | Default / Values |
 |---|---|---|
 | `value` | The text content to display within the span. | (no default) |
-| `color` | Text color for the span content. | inherited |
+| `color` | Text color for the span content. | inherited (default black) |
 | `font` | Font file path for the span content. | inherited |
 | `font-size` | Font size for the span content. | inherited |
 
@@ -89,7 +89,7 @@ Attributes cannot be specified directly on quoted strings, but they can inherit 
 The following attributes are inherited from parent elements to their descendants:
 
 - `visible` - Controls the visibility of the element and its descendants.
-- `text-align` - Text alignment, inherited for text content.
+- `align` - Text alignment, inherited for text content.
 - `color` - Text color, inherited by inline text content.
 - `font` - Font file path, inherited for text rendering.
 - `font-size` - Font size, inherited for text rendering.

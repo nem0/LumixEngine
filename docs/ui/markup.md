@@ -4,38 +4,38 @@ We adopt a braces-based, human-friendly syntax as the canonical form. Braces are
 
 *Example:*
 
-```
-panel id=main width=800 height=600 {
-    panel class=title {
+```c++
+panel [id="main" width=800 height=600] {
+    panel [class="title"] {
         "Game Menu"
     }
     panel {
-        panel class=primary width=8em height=2em { "Start" }
-        panel width=8em height=2em { "Options" }
-        panel class=danger width=8em height=2em { "Quit" }
+        panel [class="primary" width=8em height=2em] { "Start" }
+        panel [width=8em height=2em] { "Options" }
+        panel [class="danger" width=8em height=2em] { "Quit" }
     }
-    panel bg-color=#f0f0f0 {
+    panel [bg-color=#f0f0f0] {
         "Some text with background color"
     }
     panel {
         "Some text"
-        image src="path/to/image.png" width=100 height=100
-        image src="path/to/image2.png" width=100 height=100
+        image [src="path/to/image.png" width=100 height=100]
+        image [src="path/to/image2.png" width=100 height=100]
     }
     panel {
         "Multiline text
             is on 
             multiple lines"
-        panel font="path/to/font.ttf" font_size=13 { "Some other text" }
+        panel [font="path/to/font.ttf" font_size=13] { "Some other text" }
         "How to \"escape\" quotes"
     }
     panel {
-        panel width=50% {
+        panel [width=50%] {
             "Left panel content"
         }
-        panel width=50% {
+        panel [width=50%] {
             "Right panel content"
-            image src="path/to/image.png" width=100 height=100
+            image [src="path/to/image.png" width=100 height=100]
         }
     }
 }
@@ -54,6 +54,7 @@ panel id=main width=800 height=600 {
 - **Braces**: `{` and `}` used to group children inside an element.
 - **Whitespace**: separates tokens, ignored except inside strings.
 - **Comment**: `//` to end of line or `/* */` block comments (comments are skipped by the lexer).
+- **Brackets**: `[` and `]` used to enclose attributes.
 
 ### Syntax
 
@@ -61,7 +62,7 @@ panel id=main width=800 height=600 {
 document      := element*
 
 element       := STRING                // text node (quoted)
-               | IDENT attribute* element_terminator
+               | IDENT attributes element_terminator
 
 element_terminator := block | terminator
 
@@ -69,7 +70,9 @@ block         := '{' element* '}'
 
 terminator    := NEWLINE | EOF | '}'    // element without block is a leaf
 
-attribute     := IDENT '=' value
+attributes   := '[' attribute* ']'
+
+attribute    := IDENT '=' value
 
 value         := STRING
                | NUMBER
@@ -86,10 +89,10 @@ COLOR         := '#' [0-9A-Fa-f]{6}
 
 ### Notes
 - Elements are case-sensitive identifiers that name the UI widget/type.
-- Attributes are key/value pairs. Values may be quoted strings, identifiers, numbers, percentages, or colors. Whitespace around `=` is allowed.
+- Attributes are key/value pairs grouped in square brackets `[]`. Values may be quoted strings, identifiers, numbers, percentages, or colors. Whitespace around `=` is allowed.
 - Colors are specified in hexadecimal format with a `#` prefix, e.g. `#FF0000` (6-digit).
 - A block (braced) element contains child elements.
-- Text content inside a block must use quoted strings. Quoted strings may span multiple lines, allowing natural multiline content without special delimiters.
+- Text content inside a block must use quoted strings. Quoted strings may span multiple lines for readability, but newlines are treated as whitespace and do not create line breaks in the rendered output.
 - A quoted string creates an inline text node that flows with other elements.
 - `text` element is syntactic sugar for `panel width=fit-content height=fit-content` containing text nodes.
 - Unquoted bare text is not allowed.

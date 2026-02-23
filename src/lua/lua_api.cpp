@@ -744,6 +744,7 @@ static int LUA_loadWorld(lua_State* L)
 				InputMemoryStream blob(mem);
 				EntityMap entity_map(engine->getAllocator());
 				WorldVersion editor_version;
+				world->setPath(Path(path));
 				if (!world->deserialize(blob, entity_map, editor_version)) {
 					logError("Failed to deserialize world ", path);
 				} else {

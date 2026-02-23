@@ -896,8 +896,7 @@ void World::serialize(OutputMemoryStream& serializer, WorldSerializeFlags flags)
 	sizes[1] = u32(serializer.size() - offset - sizeof(u32) * 2); // compressed size
 }
 
-bool World::deserialize(InputMemoryStream& input, EntityMap& entity_map, WorldVersion& version)
-{
+bool World::deserialize(InputMemoryStream& input, EntityMap& entity_map, WorldVersion& version) {
 	WorldHeader header;
 	WorldHeaderLegacy::Version legacy_version = WorldHeaderLegacy::Version::LAST;
 	input.read(header);

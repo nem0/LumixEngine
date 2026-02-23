@@ -1,12 +1,17 @@
 #include "tests/common.h"
 #include "core/debug.h"
 #include "core/log_callback.h"
+#include "core/profiler.h"
 #include "core/string.h"
 #include <stdio.h>
 
 void runParticleScriptTokenizerTests();
 void runParticleScriptCompilerTests();
 void runParticleScriptCollectorTests();
+void runUITokenizerTests();
+void runUITests();
+void runUIStyleTests();
+void runUILayoutTests();
 
 namespace Lumix {
 	int test_count = 0;
@@ -27,12 +32,18 @@ static void consoleLog(Lumix::LogLevel level, const char* message) {
 int main(int argc, char* argv[]) {
 	Lumix::registerLogCallback<&consoleLog>();
 	Lumix::debug::init(Lumix::getGlobalAllocator());
+	Lumix::profiler::init(Lumix::getGlobalAllocator());
 	
 	runParticleScriptTokenizerTests();
 	runParticleScriptCompilerTests();
 	runParticleScriptCollectorTests();
+	runUITokenizerTests();
+	runUITests();
+	runUIStyleTests();
+	runUILayoutTests();
 	Lumix::logInfo("=== Test Results: ", Lumix::passed_count, "/", Lumix::test_count, " passed ===");
 
+	Lumix::profiler::shutdown();
 	Lumix::unregisterLogCallback<&consoleLog>();
 	return (Lumix::passed_count == Lumix::test_count) ? 0 : 1;
 }
