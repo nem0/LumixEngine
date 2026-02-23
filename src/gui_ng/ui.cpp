@@ -368,7 +368,11 @@ bool Document::parseElements(u32 parent_index) {
 				} else {
 					m_roots.push(elem_idx);
 				}
-				elem.value = token.value;
+				if (token.type == Token::STRING) {
+					elem.value = StringView{token.value.begin - 1, token.value.end + 1};
+				} else {
+					elem.value = token.value;
+				}
 				bool is_break = false;
 				while (!is_break) {
 					Token next = m_tokenizer.peekToken();
@@ -390,6 +394,9 @@ bool Document::parseElements(u32 parent_index) {
 							return true; // end of the parent container
 						default: 
 							elem.value.end = next.value.end;
+							if (next.type == Token::STRING) {
+								elem.value.end += 1;
+							}
 							m_tokenizer.consumeToken();
 							break;
 					}

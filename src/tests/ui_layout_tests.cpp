@@ -1397,6 +1397,42 @@ bool testMultilineStringLayout() {
 	return true;
 }
 
+bool testDoubleQuotesInText() {
+	// Citation: layout.md - Text
+	// "Double quotes (`"`) in text content are treated as regular characters and render as expected without any special handling, since text is unquoted in the markup."
+	logInfo("Running testDoubleQuotesInText");
+	MockFontManager mock;
+	ui::Document doc(&mock, getGlobalAllocator());
+	ASSERT_PARSE(doc, R"(
+		[panel width=fit-content height=fit-content font="arial.ttf" font-size=16] {
+			"Hello "world""
+		}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	Span<u32> root_indices = doc.m_roots;
+	ASSERT_EQ(1, root_indices.size(), "Should parse 1 root element");
+	ui::Element* panel = doc.getElement(root_indices[0]);
+	ASSERT_TAG(panel, PANEL);
+
+	// Check child text element
+	ASSERT_EQ(1, panel->children.size(), "Panel should have 1 child");
+	ui::Element* textElem = doc.getElement(panel->children[0]);
+	ASSERT_TAG(textElem, SPAN);
+
+	// Assert text element layout includes quotes
+	// Text is "Hello "world"", 15 characters (4 doublequotes are counted), each 8px wide = 120px
+	ASSERT_FLOAT_EQ(120.0f, textElem->size.x, "Text width should include double quotes");
+	ASSERT_FLOAT_EQ(16.0f, textElem->size.y, "Text height should be single line");
+	ASSERT_FLOAT_EQ(0.0f, textElem->position.x, "Text x position should be 0");
+	ASSERT_FLOAT_EQ(0.0f, textElem->position.y, "Text y position should be 0");
+
+	// Assert panel layout (fits the text)
+	ASSERT_FLOAT_EQ(120.0f, panel->size.x, "Panel width should fit text width");
+	ASSERT_FLOAT_EQ(16.0f, panel->size.y, "Panel height should fit text height");
+
+	return true;
+}
+
 bool testTextHorizontalRendering() {
 	// Citation: layout.md - Inline Flow
 	// "Text strings always render horizontally (left-to-right), regardless of `direction`."
@@ -1598,6 +1634,7 @@ bool testAlignRight() {
 } // namespace
 
 void runUILayoutTests() {
+	logInfo("=== Running UI Layout Tests ===");
 	RUN_TEST(testTwoPanelsLayout);
 	RUN_TEST(testLayoutDirection);
 	RUN_TEST(testJustifyContent);
@@ -1640,6 +1677,7 @@ void runUILayoutTests() {
 	RUN_TEST(testTextWrapping);
 	RUN_TEST(testWrappingInheritance);
 	RUN_TEST(testMultilineStringLayout);
+	RUN_TEST(testDoubleQuotesInText);
 	RUN_TEST(testTextHorizontalRendering);
 	RUN_TEST(testBaselineAlignment);
 	RUN_TEST(testAlignCenterMultipleSpans);

@@ -24,12 +24,20 @@
 
 ## Text
 
-Text paragraphs are created using `span` elements with a `value` attribute or unquoted text inside a `panel`. Text flows inline within the panel and wraps to multiple lines when the unwrapped width exceeds the available panel width (minus padding) and `wrap=true`.
+Text paragraphs are created using `span` elements with a `value` attribute or unquoted text inside a `panel`. Text flows inline within the panel and wraps to multiple lines when the unwrapped width exceeds the available panel width (minus padding) and `wrap=true`. 
 
 ```css
 [panel] {
   Some text
   [span color=#ff0000 value="Some other, red text"]
+}
+```
+
+Double quotes (`"`) in text content are treated as regular characters and render as expected without any special handling, since text is unquoted in the markup. The following example renders three characters:
+
+```css
+[panel] {
+  "a"
 }
 ```
 

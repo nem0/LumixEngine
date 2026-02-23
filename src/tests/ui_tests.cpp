@@ -356,9 +356,9 @@ bool testMultilineStringLayout() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
 		[panel width=fit-content height=fit-content font="arial.ttf" font-size=16] {
-			"Line 1
+			Line 1
 			Line 2
-			Line 3"
+			Line 3
 		}
 	)");
 	doc.computeLayout(Vec2(800, 600));
