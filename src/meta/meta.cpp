@@ -355,6 +355,10 @@ void OutputStream::append(const char* v) {
 	append(makeStringView(v));
 }
 
+void OutputStream::append(const char v) {
+	append(StringView(&v, &v + 1));
+}
+
 void OutputStream::append(XXH64_hash_t hash) {
 	char cstr[32] = "";
 	_ui64toa_s(hash, cstr, sizeof(cstr), 10);
@@ -1021,6 +1025,18 @@ struct Parser {
 	}
 
 	void parseObject(StringView def) {
+		StringView word = consumeWord(def);
+		StringView full;
+		while (word.size() > 0) {
+			if (equal(word, "full")) {
+				full = consumeIdentifier(def);
+			}
+			else {
+				logError("Unknown ", word);
+			}
+			word = consumeWord(def);
+		}
+
 		StringView line;
 		if (!readLine(line)) {
 			logError("Expected struct");
@@ -1033,6 +1049,7 @@ struct Parser {
 		}
 
 		Object& o = objects.emplace(allocator);
+		o.full = full.size() > 0 ? full : struct_name;
 		o.name = struct_name;
 		o.filename = (char*)allocator.allocate(filename.size() + 1);
 		strncpy_s(o.filename, filename.size() + 1, filename.begin, filename.size());
@@ -1063,7 +1080,19 @@ struct Parser {
 	}
 
 	
-	void parseStruct() {
+	void parseStruct(StringView def) {
+		StringView word = consumeWord(def);
+		StringView full;
+		while (word.size() > 0) {
+			if (equal(word, "full")) {
+				full = consumeIdentifier(def);
+			}
+			else {
+				logError("Unknown ", word);
+			}
+			word = consumeWord(def);
+		}
+
 		StringView line;
 		if (!readLine(line)) {
 			logError("Expected struct");
@@ -1076,6 +1105,7 @@ struct Parser {
 		}
 		Struct& s = structs.emplace(allocator);
 		s.name = name;
+		s.full = full.size() > 0 ? full : name;
 
 		while (readLine(line)) {
 			line = skipWhitespaces(line);
@@ -1127,7 +1157,7 @@ struct Parser {
 				parseEnum(line, enums);
 			}
 			else if (equal(word, "struct")) {
-				parseStruct();
+				parseStruct(line);
 			}
 			else if (equal(word, "object")) {
 				parseObject(line);
@@ -1354,14 +1384,21 @@ Struct* findStruct(StringView struct_name) {
 	if (*(struct_name.end - 1) == '&') --struct_name.end;
 
 	for (Struct& s : parser.structs) {
-		if (equal(s.name, struct_name)) return &s;
+		if (equal(s.full, struct_name)) return &s;
 	}
 	return nullptr;
 }
 
 Object* findObject(StringView object_name) {
 	for (Object& o : parser.objects) {
-		if (equal(o.name, object_name)) return &o;
+		if (equal(o.full, object_name)) return &o;
+	}
+	return nullptr;
+}
+
+Enum* findEnum(StringView enum_name) {
+	for (Enum& e : parser.enums) {
+		if (equal(e.name, enum_name) || equal(e.full, enum_name)) return &e;
 	}
 	return nullptr;
 }
@@ -1377,7 +1414,11 @@ i32 pushInOutArgs(OutputStream& out, StringView args) {
 		if (st_arg) {
 			L("\tlua_newtable(L);");
 			for (StructVar& v : st_arg->vars) {
-				L("\tLuaWrapper::push(L, ", arg.name, ".", v.name, ");");
+				if (findEnum(v.type)) {
+					L("\tLuaWrapper::push(L, (int)", arg.name, ".", v.name, ");");
+				} else {
+					L("\tLuaWrapper::push(L, ", arg.name, ".", v.name, ");");
+				}
 				L("\tlua_setfield(L, -2, \"", v.name, "\");");
 			}
 		} else if (obj_arg) {
@@ -1387,6 +1428,17 @@ i32 pushInOutArgs(OutputStream& out, StringView args) {
 		}
 	});
 	return num;
+}
+
+// replace ':' in namespaced types with '_'
+// e.g. ui::Document => ui_Document
+static void outputLuaObjectTypename(OutputStream& out, StringView type) {
+	for (const char* c = type.begin; c < type.end; ++c) {
+		if (*c == ':') {
+			if (c == type.begin || *(c - 1) != ':') out.add('_');
+		}
+		else out.add(*c);
+	}
 }
 
 void wrap(OutputStream& out, Module& m, Function& f) {
@@ -1432,7 +1484,10 @@ void wrap(OutputStream& out, Module& m, Function& f) {
 	});
 	out.add(")");
 	if (obj) {
-		L(", \"", withoutSuffix(f.return_type, 1), "\");");
+		out.add(", \"");
+		StringView return_type = withoutSuffix(f.return_type, 1); // without pointer '*'
+		outputLuaObjectTypename(out, return_type);
+		out.add("\");" OUT_ENDL);
 	} else if (st) {
 		L(";");
 		L("\tlua_newtable(L);");
@@ -1598,7 +1653,10 @@ void serializeMain(OutputStream& out, Parser& parser) {
 		L("lua_getglobal(L, \"LumixAPI\");");
 		L("lua_newtable(L);");
 		L("lua_pushvalue(L, -1);");
-		L("lua_setfield(L, -3, \"",o.name,"\");");
+		
+		out.add("lua_setfield(L, -3, \"");
+		outputLuaObjectTypename(out, o.full);
+		out.add("\");" OUT_ENDL);
 		L("lua_pushvalue(L, -1);");
 		L("lua_setfield(L, -2, \"__index\");");
 
@@ -1606,7 +1664,7 @@ void serializeMain(OutputStream& out, Parser& parser) {
 			L("{");
 			L("auto proxy = [](lua_State* L) -> int {");
 				L("LuaWrapper::checkTableArg(L, 1); // self");
-				L(o.name, "* obj;");
+				L(o.full, "* obj;");
 				L("if (!LuaWrapper::checkField(L, 1, \"_value\", &obj)) luaL_error(L, \"Invalid object\");");
 				
 				i32 idx = 0;
@@ -1650,7 +1708,11 @@ void serializeMain(OutputStream& out, Parser& parser) {
 						L("lua_newtable(L);");
 						for (StructVar& var : ret_struct->vars) {
 							L("LuaWrapper::push(L, \"", var.name, "\");");
-							L("LuaWrapper::push(L, res.", var.name, ");");
+							if (findEnum(var.type)) {
+								L("LuaWrapper::push(L, (int)res.", var.name, ");");
+							} else {
+								L("LuaWrapper::push(L, res.", var.name, ");");
+							}
 							L("lua_settable(L, -3);");
 						}
 					} else {

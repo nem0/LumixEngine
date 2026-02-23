@@ -4,6 +4,7 @@
 #include "editor/studio_app.h"
 #include "gui/gui_system.h"
 #include "gui_ng/gui_ng_system.h"
+#include "gui_ng/ui.h"
 #include "renderer/editor/game_view.h"
 #include "renderer/editor/scene_view.h"
 #include "renderer/model.h"
@@ -665,6 +666,14 @@ namespace Lumix {
 }
 
 namespace Lumix {
+	int GUINGModule_getDocument(lua_State* L) {
+		LuaWrapper::checkTableArg(L, 1);
+		GUINGModule* module;
+		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+		LuaWrapper::pushObject(L, 	module->getDocument(), "ui_Document");
+		return 1;
+	}
+	
 }
 
 namespace Lumix {
@@ -2579,6 +2588,20 @@ namespace Lumix {
 			lua_newtable(L);
 			lua_getglobal(L, "LumixModules");
 			lua_pushvalue(L, -2);
+			lua_setfield(L, -2, "gui_ng");
+			lua_pop(L, 1);
+			lua_pushvalue(L, -1);
+			lua_setfield(L, -2, "__index");
+			lua_pushcfunction(L, lua_new_module, "new");
+			lua_setfield(L, -2, "new");
+			lua_pushcfunction(L, GUINGModule_getDocument, "getDocument");
+			lua_setfield(L, -2, "getDocument");
+			lua_pop(L, 1);
+		}
+		{
+			lua_newtable(L);
+			lua_getglobal(L, "LumixModules");
+			lua_pushvalue(L, -2);
 			lua_setfield(L, -2, "physics");
 			lua_pop(L, 1);
 			lua_pushvalue(L, -1);
@@ -2738,6 +2761,60 @@ namespace Lumix {
 			lua_setfield(L, -3, "GUINGSystem");
 			lua_pushvalue(L, -1);
 			lua_setfield(L, -2, "__index");
+			lua_pop(L, 2);
+		}
+		{
+			lua_getglobal(L, "LumixAPI");
+			lua_newtable(L);
+			lua_pushvalue(L, -1);
+			lua_setfield(L, -3, "ui_Document");
+			lua_pushvalue(L, -1);
+			lua_setfield(L, -2, "__index");
+			{
+				auto proxy = [](lua_State* L) -> int {
+					LuaWrapper::checkTableArg(L, 1); // self
+					ui::Document* obj;
+					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					auto res = obj->getNumEvents();
+					LuaWrapper::push(L, res);
+					return 1;
+				};
+				const char* name = "getNumEvents";
+				lua_pushcfunction(L, proxy, name);
+				lua_setfield(L, -2, name);
+			}
+			{
+				auto proxy = [](lua_State* L) -> int {
+					LuaWrapper::checkTableArg(L, 1); // self
+					ui::Document* obj;
+					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					auto index = LuaWrapper::checkArg<u32>(L, 2);
+					auto res = obj->getEvent(index);
+					lua_newtable(L);
+					LuaWrapper::push(L, "type");
+					LuaWrapper::push(L, (int)res.type);
+					lua_settable(L, -3);
+					LuaWrapper::push(L, "position");
+					LuaWrapper::push(L, res.position);
+					lua_settable(L, -3);
+					LuaWrapper::push(L, "element_index");
+					LuaWrapper::push(L, res.element_index);
+					lua_settable(L, -3);
+					LuaWrapper::push(L, "key_code");
+					LuaWrapper::push(L, res.key_code);
+					lua_settable(L, -3);
+					LuaWrapper::push(L, "text_utf8");
+					LuaWrapper::push(L, res.text_utf8);
+					lua_settable(L, -3);
+					LuaWrapper::push(L, "wheel_y");
+					LuaWrapper::push(L, res.wheel_y);
+					lua_settable(L, -3);
+					return 1;
+				};
+				const char* name = "getEvent";
+				lua_pushcfunction(L, proxy, name);
+				lua_setfield(L, -2, name);
+			}
 			lua_pop(L, 2);
 		}
 		{
@@ -3425,6 +3502,30 @@ namespace Lumix {
 			LuaWrapper::push(L, 255);
 			lua_setfield(L, -2, "MAX");
 			lua_setfield(L, -2, "Keycode");
+			lua_pop(L, 1);
+		}
+		{
+			lua_getglobal(L, "LumixAPI");
+			lua_newtable(L);
+			LuaWrapper::push(L, 0);
+			lua_setfield(L, -2, "MOUSE_DOWN");
+			LuaWrapper::push(L, 1);
+			lua_setfield(L, -2, "MOUSE_UP");
+			LuaWrapper::push(L, 2);
+			lua_setfield(L, -2, "MOUSE_MOVE");
+			LuaWrapper::push(L, 3);
+			lua_setfield(L, -2, "MOUSE_WHEEL");
+			LuaWrapper::push(L, 4);
+			lua_setfield(L, -2, "KEY_DOWN");
+			LuaWrapper::push(L, 5);
+			lua_setfield(L, -2, "KEY_UP");
+			LuaWrapper::push(L, 6);
+			lua_setfield(L, -2, "TEXT_INPUT");
+			LuaWrapper::push(L, 7);
+			lua_setfield(L, -2, "CLICK");
+			LuaWrapper::push(L, 8);
+			lua_setfield(L, -2, "INVALID");
+			lua_setfield(L, -2, "EventType");
 			lua_pop(L, 1);
 		}
 		{

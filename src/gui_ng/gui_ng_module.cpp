@@ -1,9 +1,11 @@
 #include "core/allocator.h"
 #include "core/color.h"
+#include "core/delegate_list.h"
 #include "core/log.h"
 #include "core/path.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
+#include "engine/input_system.h"
 #include "engine/world.h"
 #include "gui_ng/ui.h"
 #include "gui_ng_module.h"
@@ -16,7 +18,7 @@ namespace Lumix {
 
 	
 struct GUINGModuleImpl : GUINGModule {
-	
+
 	GUINGModuleImpl(GUINGSystem& system, World& world, IAllocator& allocator)
 		: m_system(system)
 		, m_world(world)
@@ -29,6 +31,10 @@ struct GUINGModuleImpl : GUINGModule {
 
 	static UniquePtr<GUINGModule> createInstance(GUINGSystem& system, World& world, IAllocator& allocator) {
 		return UniquePtr<GUINGModuleImpl>::create(allocator, system, world, allocator);
+	}
+
+	ui::Document* getDocument() override {
+		return &m_document;
 	}
 
 	void startGame() override {
@@ -54,7 +60,17 @@ struct GUINGModuleImpl : GUINGModule {
 	ISystem& getSystem() const override { return m_system; }
 	World& getWorld() override { return m_world; }
 
+	void handleInput() {
+		InputSystem& input = m_system.getEngine().getInputSystem();
+		Span<const InputSystem::Event> events = input.getEvents();
+		for (const InputSystem::Event& event : events) {
+			m_document.injectEvent(event);
+		}
+	}
+
 	void update(float time_delta) override {
+		m_document.clearEvents();
+		handleInput();
 		if (m_canvas_size != m_previous_canvas_size) {
 			m_previous_canvas_size = m_canvas_size;
 			m_document.computeLayout(m_canvas_size);

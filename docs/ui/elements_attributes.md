@@ -66,24 +66,6 @@ Quoted string can be used in place of a span.
 "text"
 ```
 
-### Quoted strings
-
-In place where span can be used, we can put just quoted string, which is equivalent to span with only value attribute.
-
-```css
-
-## input
-
-**TODO:** Document input attributes.
-
-## canvas
-
-Drawable area for custom rendering.
-
-## Inline text – Quoted strings
-
-Attributes cannot be specified directly on quoted strings, but they can inherit relevant attributes from their parent elements.
-
 ## Inheritable Attributes
 
 The following attributes are inherited from parent elements to their descendants:

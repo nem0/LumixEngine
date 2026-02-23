@@ -43,21 +43,9 @@ static Tag parseTag(StringView str) {
 	const char* s = str.begin;
 
 	switch (s[0]) {
-		case 'c':
-			if (len == 6 && memcmp(s, "canvas", 6) == 0) return Tag::CANVAS;
-			break;
-		case 'i':
-			if (len == 5) {
-				if (s[1] == 'n' && memcmp(s, "input", 5) == 0) return Tag::INPUT;
-				if (s[1] == 'm' && memcmp(s, "image", 5) == 0) return Tag::IMAGE;
-			}
-			break;
-		case 'p':
-			if (len == 5 && memcmp(s, "panel", 5) == 0) return Tag::PANEL;
-			break;
-		case 's':
-			if (len == 4 && memcmp(s, "span", 4) == 0) return Tag::SPAN;
-			break;
+		case 'i': if (len == 5 && memcmp(s, "image", 5) == 0) return Tag::IMAGE; break;
+		case 'p': if (len == 5 && memcmp(s, "panel", 5) == 0) return Tag::PANEL; break;
+		case 's': if (len == 4 && memcmp(s, "span", 4) == 0) return Tag::SPAN; break;
 	}
 	return Tag::INVALID;
 }
@@ -936,6 +924,33 @@ void Document::render(Draw2D& draw) const {
 	}
 }
 
+static bool contains(const Element& elem, Vec2 pos) {
+	return pos.x >= elem.position.x && pos.x <= elem.position.x + elem.size.x &&
+			pos.y >= elem.position.y && pos.y <= elem.position.y + elem.size.y;
+}
+
+Element* Document::getElementAt(Vec2 pos) {
+	for (u32 root_id : m_roots) {
+		Element* root = &m_elements[root_id]; 
+		if (!contains(*root, pos)) continue;
+
+		Element* elem = root;
+		for (;;) {
+			bool found_child = false;
+			for (u32 child_id : elem->children) {
+				Element* child = &m_elements[child_id];
+				if (contains(*child, pos)) {
+					elem = child;
+					found_child = true;
+					break;
+				}
+			}
+			if (!found_child) return elem;
+		}
+	}
+	return nullptr;
+}
+
 bool Document::parse(StringView content, const char* filename) {
 	PROFILE_FUNCTION();
 	m_elements.clear();
@@ -951,6 +966,75 @@ bool Document::parse(StringView content, const char* filename) {
 		applyStylesheet(*this, elem);
 	}
 	return true;
+}
+
+Span<const Event> Document::getEvents() {
+	return Span(m_events.begin(), m_events.size());
+}
+
+void Document::clearEvents() {
+	m_events.clear();
+}
+
+void Document::injectEvent(const InputSystem::Event& event) {
+	switch (event.type) {
+		case InputSystem::Event::BUTTON: {
+			const auto& btn = event.data.button;
+			if (event.device->type == InputSystem::Device::MOUSE) {
+				Event ui_event;
+				ui_event.type = btn.down ? EventType::MOUSE_DOWN : EventType::MOUSE_UP;
+				ui_event.position = Vec2(btn.x, btn.y);
+				ui_event.key_code = btn.key_id;
+				Element* elem = getElementAt(ui_event.position);
+				ui_event.element_index = elem ? u32(elem - m_elements.begin()) : 0;
+				m_events.push(ui_event);
+				if (!btn.down) {
+					// add click
+					ui_event.type = EventType::CLICK;
+					m_events.push(ui_event);
+				}
+			} else if (event.device->type == InputSystem::Device::KEYBOARD) {
+				Event ui_event;
+				ui_event.type = btn.down ? EventType::KEY_DOWN : EventType::KEY_UP;
+				ui_event.key_code = btn.key_id;
+				ui_event.position = Vec2(0, 0);
+				ui_event.element_index = 0; // TODO: focused element
+				m_events.push(ui_event);
+			}
+			break;
+		}
+		case InputSystem::Event::AXIS: {
+			if (event.device->type == InputSystem::Device::MOUSE) {
+				Event ui_event;
+				ui_event.type = EventType::MOUSE_MOVE;
+				ui_event.position = Vec2(event.data.axis.x_abs, event.data.axis.y_abs);
+				Element* elem = getElementAt(ui_event.position);
+				ui_event.element_index = elem ? u32(elem - m_elements.begin()) : 0;
+				m_events.push(ui_event);
+			}
+			break;
+		}
+		case InputSystem::Event::MOUSE_WHEEL: {
+			Event ui_event;
+			ui_event.type = EventType::MOUSE_WHEEL;
+			ui_event.position = Vec2(event.data.mouse_wheel.x, event.data.mouse_wheel.y);
+			ui_event.wheel_y = event.data.mouse_wheel.y;
+			Element* elem = getElementAt(ui_event.position);
+			ui_event.element_index = elem ? u32(elem - m_elements.begin()) : 0;
+			m_events.push(ui_event);
+			break;
+		}
+		case InputSystem::Event::TEXT_INPUT: {
+			Event ui_event;
+			ui_event.type = EventType::TEXT_INPUT;
+			ui_event.text_utf8 = event.data.text.utf8;
+			ui_event.element_index = 0; // TODO: focused element
+			m_events.push(ui_event);
+			break;
+		}
+		default:
+			break;
+	}
 }
 
 } // namespace Lumix::ui

@@ -134,6 +134,15 @@ type Viewport = {
 	pixel_offset: Vec2,
 }
 
+type Event = {
+	type: any,
+	position: Vec2,
+	element_index: number,
+	key_code: number,
+	text_utf8: number,
+	wheel_y: number,
+}
+
 type RaycastHit = {
 	position: Vec3,
 	normal: Vec3,
@@ -174,6 +183,11 @@ type GUISystem = {
 }
 
 type GUINGSystem = {
+}
+
+type Document = {
+	getNumEvents: (Document) -> number,
+	getEvent: (Document, number) -> any,
 }
 
 type GameView = {
@@ -321,6 +335,7 @@ type gui_text_component =  {
 }
 
 type gui_ng_module = {
+	getDocument: (gui_ng_module) -> any,
 }
 
 type lua_script_module = {
@@ -926,6 +941,17 @@ declare this : Entity
 			Z : number,
 			INVALID : number,
 			MAX : number,
+		},
+		EventType : {
+			MOUSE_DOWN : number,
+			MOUSE_UP : number,
+			MOUSE_MOVE : number,
+			MOUSE_WHEEL : number,
+			KEY_DOWN : number,
+			KEY_UP : number,
+			TEXT_INPUT : number,
+			CLICK : number,
+			INVALID : number,
 		},
 		GrassRotationMode : {
 			Y_UP : number,

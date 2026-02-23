@@ -16,17 +16,14 @@ bool testDocumentParseSimple() {
 	ASSERT_PARSE(doc, "[panel] {}");
 	ASSERT_EQ(1, doc.m_roots.size(), "Parse should parse 1 element");
 	
-	ASSERT_PARSE(doc, "[input]");
-	ASSERT_EQ(1, doc.m_roots.size(), "Parse should parse 1 element");
-
-	ASSERT_PARSE(doc, "[canvas]");
-	ASSERT_EQ(1, doc.m_roots.size(), "Parse should parse 1 element");
-
 	ASSERT_PARSE(doc, "[image]");
-	ASSERT_EQ(1, doc.m_roots.size(), "Parse image markup should parse 1 element");
+	ASSERT_EQ(1, doc.m_roots.size(), "Parse should parse 1 element");
+
+	ASSERT_PARSE(doc, "[span]");
+	ASSERT_EQ(1, doc.m_roots.size(), "Parse should parse 1 element");
 
 	ASSERT_PARSE(doc, "text");
-	ASSERT_EQ(1, doc.m_roots.size(), "Parse text markup should parse 1 element");
+	ASSERT_EQ(1, doc.m_roots.size(), "Parse should parse 1 element");
 
 	return true;
 }
@@ -168,39 +165,6 @@ bool testImageAttributes() {
 	ASSERT_EQ("cover", attrs[1].value, "Fit should be cover");
 	return true;
 }
-
-bool testInputAttributes() {
-	MockDocument doc;
-	ASSERT_PARSE(doc, "[input value=\"val\" placeholder=\"ph\"]");
-	ASSERT_EQ(1, doc.m_roots.size(), "Should parse 1 element");
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
-	Span<ui::Attribute> attrs = root->attributes;
-	ASSERT_EQ(1, attrs.size(), "Should have 1 attribute");
-	ASSERT_ATTRIBUTE(root, 0, PLACEHOLDER);
-	ASSERT_EQ("ph", attrs[0].value, "Placeholder should be ph");
-	ASSERT_EQ("val", root->value, "Value should be val");
-	return true;
-}
-
-} // namespace
-
-/*
-	TODO: Missing UI Tests (based on docs/ui/)
-
-  - [ ] Selector matching (type, .class, #id, parent > child)
-  - [ ] Style precedence rules (inline > #id > .class > type > stylesheet order)
-  - [ ] Style inheritance for attributes like font, font-size, color, visibility
-  - [ ] Style application to elements and attribute overrides
-  - [ ] wrap behavior for overflowing children
-  - [ ] Z-order and implicit stacking based on tree order
-  - [ ] Canvas element functionality
-  - [ ] Button element behavior (though interaction may require runtime tests)
-  - [ ] Error handling for invalid syntax
-  - [ ] Visibility attribute effects
-  - [ ] Font-related attributes (though may require rendering context)
-  - [ ] Layout algorithm step-by-step verification
-  - [ ] Hit-testing order based on z-order rules
-*/
 
 bool testDefaultValues() {
 	MockDocument doc;
@@ -452,6 +416,8 @@ bool testMultilineStringMeasurement() {
 	return true;
 }
 
+} // namespace
+
 void runUITests() {
 	RUN_TEST(testDocumentParseEmpty);
 	RUN_TEST(testDocumentParseSimple);
@@ -463,7 +429,6 @@ void runUITests() {
 	RUN_TEST(testBlockAttributes);
 	RUN_TEST(testPanelAttributes);
 	RUN_TEST(testImageAttributes);
-	RUN_TEST(testInputAttributes);
 	RUN_TEST(testDefaultValues);
 	RUN_TEST(testSpanAndQuotedStringEquivalence);
 	RUN_TEST(testFontAttribute);

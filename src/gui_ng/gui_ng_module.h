@@ -22,6 +22,9 @@ struct GUINGModule : IModule {
 	static UniquePtr<GUINGModule> createInstance(struct GUINGSystem& system, World& world, struct IAllocator& allocator);
 	static void reflect();
 
+	//@ functions
+	virtual ui::Document* getDocument() = 0; // TODO use a reference once meta supports references
+	//@ end
 	virtual void render(struct Pipeline& pipeline, Vec2 size) = 0;
 };
 

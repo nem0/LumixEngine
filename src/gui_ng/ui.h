@@ -4,6 +4,7 @@
 #include "core/color.h"
 #include "core/math.h"
 #include "core/string.h"
+#include "engine/input_system.h"
 #include "ui_tokenizer.h"
 
 namespace Lumix {
@@ -14,8 +15,6 @@ namespace ui {
 
 enum class Tag : u8 {
 	PANEL,
-	INPUT,
-	CANVAS,
 	IMAGE,
 	SPAN,
 	INVALID
@@ -136,6 +135,30 @@ struct Element {
 	bool wrap = false;
 };
 
+//@ enum full ui::EventType
+enum class EventType {
+	MOUSE_DOWN,
+	MOUSE_UP,
+	MOUSE_MOVE,
+	MOUSE_WHEEL,
+	KEY_DOWN,
+	KEY_UP,
+	TEXT_INPUT,
+	CLICK,
+	INVALID
+};
+
+//@ struct full ui::Event
+struct Event {
+	EventType type = EventType::INVALID;
+	Vec2 position;
+	u32 element_index = 0;
+	i32 key_code = 0;
+	u32 text_utf8 = 0;
+	float wheel_y = 0;
+};
+
+//@ object full ui::Document
 struct Document {
 	using Token = UITokenizer::Token;
 
@@ -159,6 +182,7 @@ struct Document {
 		, m_allocator(allocator)
 		, m_canvas_size(0, 0)
 		, m_content(allocator)
+		, m_events(allocator)
 	{}
 
 	bool parse(StringView content, const char* filename);
@@ -166,6 +190,17 @@ struct Document {
 	const Element* getElement(u32 index) const { return &m_elements[index]; }
 	void computeLayout(Vec2 canvas_size);
 	void render(Draw2D& draw) const;
+	Element* getElementAt(Vec2 pos);
+
+	Span<const Event> getEvents();
+	void injectEvent(const InputSystem::Event& event);
+	void clearEvents();
+
+	// TODO replace this with getEvents once meta supports Span
+	//@ function
+	u32 getNumEvents() { return m_events.size(); }
+	//@ function
+	ui::Event getEvent(u32 index) { return m_events[index]; }
 
 private:
 	template <typename... Args>
@@ -179,6 +214,8 @@ private:
 	bool parseStyleBlock();
 	bool consume(Token::Type type, Token* out_token = nullptr);
 	bool tryConsume(Token::Type type, Token* out_token = nullptr);
+
+	Array<Event> m_events;
 };
 
 } // namespace ui

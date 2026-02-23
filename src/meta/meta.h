@@ -199,6 +199,7 @@ struct Module {
 struct Object {
 	Object(IAllocator& allocator) : functions(allocator) {}
 	StringView name;
+	StringView full;
 	char* filename;
 	ExpArray<Function> functions;
 };
@@ -206,6 +207,7 @@ struct Object {
 struct Struct {
 	Struct(IAllocator& allocator) : vars(allocator) {}
 	StringView name;
+	StringView full;
 	ExpArray<StructVar> vars;
 };
 
@@ -249,6 +251,7 @@ struct OutputStream {
 		(append(args), ...);
 	}
 
+	void append(const char v);
 	void append(const char* v);
 	void append(XXH64_hash_t hash);
 	void append(i32 value);

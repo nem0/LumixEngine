@@ -183,10 +183,7 @@ void pushObject(lua_State* L, void* obj, StringView type_name) {
 
 	if (LuaWrapper::getField(L, -1, tmp) != LUA_TTABLE) {
 		lua_pop(L, 2);
-		lua_newtable(L);
-		lua_pushlightuserdata(L, obj);
-		lua_setfield(L, -2, "_value");
-		ASSERT(false);
+		luaL_error(L, "Unknown type: %s", tmp);
 		return;
 	}
 
