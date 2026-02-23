@@ -5,34 +5,34 @@
 ```c++
 [panel id="main" width=800 height=600] {
     [panel class="title"] {
-        "Game Menu"
+        Game Menu
     }
     [panel] {
-        [panel class="primary" width=8em height=2em] { "Start" }
-        [panel width=8em height=2em] { "Options" }
-        [panel class="danger" width=8em height=2em] { "Quit" }
+        [panel class="primary" width=8em height=2em] { Start }
+        [panel width=8em height=2em] { Options }
+        [panel class="danger" width=8em height=2em] { Quit }
     }
     [panel bg-color=#f0f0f0] {
-        "Some text with background color"
+        Some text with background color
     }
     [panel] {
-        "Some text"
+        Some text
         [image src="path/to/image.png" width=100 height=100]
         [image src="path/to/image2.png" width=100 height=100]
     }
     [panel] {
-        "Multiline text
+        Multiline text
             is on 
-            multiple lines"
-        [panel font="path/to/font.ttf" font_size=13] { "Some other text" }
-        "How to \"escape\" quotes"
+            multiple lines
+        [panel font="path/to/font.ttf" font_size=13] { Some other text }
+        How to "escape" quotes
     }
     [panel] {
         [panel width=50%] {
-            "Left panel content"
+            Left panel content
         }
         [panel width=50%] {
-            "Right panel content"
+            Right panel content
             [image src="path/to/image.png" width=100 height=100]
         }
     }
@@ -46,8 +46,9 @@ The markup language also supports CSS-like style blocks for defining reusable st
 ### Tokens
 
 - **Identifier**: element and attribute names, e.g. `panel`, `text`, `class`.
-- **String**: double-quoted text for strings, e.g. "Game Menu". Can span multiple lines.
+- **String**: double-quoted text for attribute values, e.g. "center".
 - **Number**: integer or float, e.g. `100`, `50.5`.
+- **Text**: unquoted text for content, e.g. `Game Menu`.
 - **Percentage**: number followed by `%`, e.g. `50%`.
 - **EM**: number followed by `em`, e.g. `2em`.
 - **Color**: hexadecimal color values prefixed with `#`, e.g. `#FF0000`.
@@ -66,11 +67,13 @@ The markup language also supports CSS-like style blocks for defining reusable st
 ```
 markup ::= element*
 
-element ::= '[' identifier attribute* ']' '{' (element | string)* '}'
+element ::= '[' identifier attribute* ']' '{' (element | text)* '}'
 
 attribute ::= identifier '=' (string | number | number '%' | number 'em' | '#' hexdigit{6} | identifier)
 
 string ::= '"' (any char except '"' and '\' | '\\' ('"' | '\' | 'n' | 't' | 'r'))* '"'
+
+text ::= (any char except '{' '}' '[' ']')*
 
 number ::= digit+ ('.' digit+)?
 
@@ -88,9 +91,7 @@ letter ::= 'a'-'z' | 'A'-'Z'
 - Attributes are key/value pairs grouped in square brackets `[]` with a tag. Values may be quoted strings, identifiers, numbers, percentages, or colors. Whitespace around `=` is allowed.
 - Colors are specified in hexadecimal format with a `#` prefix, e.g. `#FF0000` (6-digit).
 - A block (braced) element contains child elements.
-- Text content inside a block must use quoted strings. Quoted strings may span multiple lines for readability, but newlines are treated as whitespace and do not create line breaks in the rendered output.
-- A quoted string creates an inline text node that flows with other elements.
-- `text` element is syntactic sugar for `panel width=fit-content height=fit-content` containing text nodes.
-- Unquoted bare text is not allowed.
-- Inside double-quoted strings use `\"` to escape quotes, `\\` for backslash, and common escapes `\n`, `\t`, `\r` are supported.
+- Text content inside a block can be unquoted text, treated as spans. Unquoted text may span multiple lines for readability, but newlines are treated as whitespace and do not create line breaks in the rendered output.
+- Unquoted text creates an inline text span that flows with other elements.
+- Inside double-quoted attribute values use `\"` to escape quotes, `\\` for backslash, and common escapes `\n`, `\t`, `\r` are supported.
 

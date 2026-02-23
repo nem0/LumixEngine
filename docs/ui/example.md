@@ -52,10 +52,10 @@ style {
 
 			/* Main actions */
 			[panel] {
-				[panel id="start" class="primary"] { "Start Game" }
-				[panel id="continue" class="primary"] { "Continue" }
-				[panel id="options" class="secondary"] { "Options" }
-				[panel id="quit" class="secondary"] { "Quit" }
+				[panel id="start" class="primary"] { Start Game }
+				[panel id="continue" class="primary"] { Continue }
+				[panel id="options" class="secondary"] { Options }
+				[panel id="quit" class="secondary"] { Quit }
 			}
 		}
 

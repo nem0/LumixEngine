@@ -43,7 +43,7 @@
 
 ```css
 [panel width=200 height=100 bg-color=#ffffff] {
-    "Hello World"
+    Hello World
 }
 ```
 
@@ -51,7 +51,7 @@
 
 ```css
 [panel id="my_panel" class="container" width=300 height=200] {
-    "Content here"
+    Content here
 }
 ```
 
@@ -60,10 +60,10 @@
 ```css
 [panel] {
     [panel width=50%] {
-        "Left side"
+        Left side
     }
     [panel width=50%] {
-        "Right side"
+        Right side
     }
 }
 ```
@@ -74,7 +74,7 @@
 
 ```css
 [panel] {
-    "This is some text"
+    This is some text
 }
 ```
 
@@ -82,8 +82,8 @@
 
 ```css
 [panel] {
-    span [color=#ff0000 value="Red text"]
-    " and normal text"
+    [span color=#ff0000 value="Red text"]
+     and normal text
 }
 ```
 
@@ -91,7 +91,7 @@
 
 ```css
 [panel align=center width=200] {
-    "Centered text"
+    Centered text
 }
 ```
 
@@ -99,8 +99,8 @@
 
 ```css
 [panel] {
-    "This is multiline text
-    that spans several lines"
+    This is multiline text
+    that spans several lines
 }
 ```
 
@@ -145,7 +145,7 @@
 ```css
 [panel width=100% height=100% justify-content="center" align-items="center"] {
     [panel width=200 height=100 bg-color=#cccccc] {
-        "Centered content"
+        Centered content
     }
 }
 ```
@@ -154,11 +154,11 @@
 
 ```css
 [panel width=200 direction="row" wrap="true"] {
-    [panel width=100 height=100 bg-color=#ff0000] { "1" }
-    [panel width=100 height=100 bg-color=#00ff00] { "2" }
-    [panel width=100 height=100 bg-color=#0000ff] { "3" }
-    [panel width=100 height=100 bg-color=#ffff00] { "4" }
-    [panel width=100 height=100 bg-color=#ff00ff] { "5" }
+    [panel width=100 height=100 bg-color=#ff0000] { 1 }
+    [panel width=100 height=100 bg-color=#00ff00] { 2 }
+    [panel width=100 height=100 bg-color=#0000ff] { 3 }
+    [panel width=100 height=100 bg-color=#ffff00] { 4 }
+    [panel width=100 height=100 bg-color=#ff00ff] { 5 }
 }
 ```
 
@@ -201,7 +201,7 @@ style {
 }
 
 [panel id="my_id"] {
-    "Specific panel"
+    Specific panel
 }
 ```
 
@@ -221,7 +221,7 @@ style {
 
 ```css
 [panel class="button" width=120 height=40 bg-color=#007bff] {
-    "Click Me"
+    Click Me
 }
 ```
 
@@ -231,11 +231,11 @@ style {
 
 ```css
 [panel direction="column" padding=20] {
-    [panel align=center] { "Game Title" }
+    [panel align=center] { Game Title }
     [panel direction="column"] {
-        [panel class="menu_item"] { "Start Game" }
-        [panel class="menu_item"] { "Options" }
-        [panel class="menu_item"] { "Quit" }
+        [panel class="menu_item"] { Start Game }
+        [panel class="menu_item"] { Options }
+        [panel class="menu_item"] { Quit }
     }
 }
 ```
@@ -244,11 +244,11 @@ style {
 
 ```css
 [panel class="card" width=300 padding=15 bg-color=#ffffff] {
-    [panel] { "Card Title" }
-    [panel] { "Card content goes here..." }
+    [panel] { Card Title }
+    [panel] { Card content goes here... }
     [panel direction="row" justify-content="end"] {
-        [panel class="button"] { "OK" }
-        [panel class="button"] { "Cancel" }
+        [panel class="button"] { OK }
+        [panel class="button"] { Cancel }
     }
 }
 ```
@@ -258,10 +258,10 @@ style {
 ```css
 [panel direction="row"] {
     [panel width=30%] {
-        "Sidebar"
+        Sidebar
     }
     [panel width=70%] {
-        "Main content"
+        Main content
     }
 }
 ```
@@ -272,7 +272,7 @@ style {
 
 ```css
 [panel width=50% height=50%] {
-    "Half size panel"
+    Half size panel
 }
 ```
 
@@ -280,7 +280,7 @@ style {
 
 ```css
 [panel width=10em height=2em] {
-    "Sized with em units"
+    Sized with em units
 }
 ```
 
@@ -288,7 +288,7 @@ style {
 
 ```css
 [panel width="fit-content"] {
-    "This panel sizes to content"
+    This panel sizes to content
 }
 ```
 
@@ -298,6 +298,6 @@ style {
 
 ```css
 [panel bg-color=#ff5733] {
-    "Orange background"
+    Orange background
 }
 ```

@@ -1200,9 +1200,9 @@ bool testLineBreaks() {
 	ui::Document doc(&mock, getGlobalAllocator());
 	ASSERT_PARSE(doc, R"(
 		[panel width=200 height=100 direction=row font="arial.ttf" font-size=16] {
-			"First"
-			[panel width=50 height=20] { "Block" }
-			"Second"
+			First
+			[panel width=50 height=20] { Block }
+			Second
 		}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -1238,7 +1238,7 @@ bool testFitContentWithInlineText() {
 	ui::Document doc(&mock, getGlobalAllocator());
 	ASSERT_PARSE(doc, R"(
 		[panel width=fit-content height=fit-content direction=row font="arial.ttf" font-size=16] {
-			"Text"
+			Text
 		}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -1306,13 +1306,13 @@ bool testWrappingInheritance() {
 	ASSERT_PARSE(doc, R"(
 		[panel width=120 height=fit-content wrap=true direction=row font="arial.ttf" font-size=16] {
 			[panel width=60 height=fit-content] {
-				"Short text should not wrap"
+				Short text should not wrap
 			}
 			[panel width=60 height=fit-content wrap=false] {
-				"This is a long text that should not wrap in this panel"
+				This is a long text that should not wrap in this panel
 			}
 			[panel width=60 height=fit-content] {
-				"This is a long text that should not wrap in this panel because wrap is not inherited"
+				This is a long text that should not wrap in this panel because wrap is not inherited
 			}
 		}
 	)");
@@ -1356,7 +1356,9 @@ bool testMultilineStringLayout() {
 	ui::Document doc(&mock, getGlobalAllocator());
 	ASSERT_PARSE(doc, R"(
 		[panel width=fit-content height=fit-content font="arial.ttf" font-size=16] {
-			"Line 1\nLine 2\nLine 3"
+			Line 1
+			Line 2
+			Line 3
 		}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -1382,14 +1384,14 @@ bool testMultilineStringLayout() {
 
 	// Assert text element layout
 	// Text is "Line 1\nLine 2\nLine 3", \n treated as spaces, so full text width
-	// 22 chars, 22*8 = 176, single line height = 16
-	ASSERT_FLOAT_EQ(176.0f, textElem->size.x, "Text width should be the full text width (HTML-compatible)");
+	// 20 chars, 20*8 = 160, single line height = 16
+	ASSERT_FLOAT_EQ(160.0f, textElem->size.x, "Text width should be the full text width (HTML-compatible)");
 	ASSERT_FLOAT_EQ(16.0f, textElem->size.y, "Text height should be single line (HTML-compatible)");
 	ASSERT_FLOAT_EQ(0.0f, textElem->position.x, "Text x position should be 0");
 	ASSERT_FLOAT_EQ(0.0f, textElem->position.y, "Text y position should be 0");
 
 	// Assert panel layout (fits the text)
-	ASSERT_FLOAT_EQ(176.0f, panel->size.x, "Panel width should fit text width");
+	ASSERT_FLOAT_EQ(160.0f, panel->size.x, "Panel width should fit text width");
 	ASSERT_FLOAT_EQ(16.0f, panel->size.y, "Panel height should fit text height");
 
 	return true;
@@ -1402,8 +1404,8 @@ bool testTextHorizontalRendering() {
 	ui::Document doc(&mock, getGlobalAllocator());
 	ASSERT_PARSE(doc, R"(
 		[panel direction=column font="arial.ttf" font-size=16] {
-			"First text"
-			"Second text"
+			[span value="First text"]
+			[span value="Second text"]
 		}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -1548,7 +1550,7 @@ bool testAlignCenter() {
 	ui::Document doc(&mock, getGlobalAllocator());
 	ASSERT_PARSE(doc, R"(
 		[panel width=400 align=center font="arial.ttf" font-size=16] {
-			"Centered Text"
+			Centered Text
 		}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -1574,7 +1576,7 @@ bool testAlignRight() {
 	ui::Document doc(&mock, getGlobalAllocator());
 	ASSERT_PARSE(doc, R"(
 		[panel width=400 align=right font="arial.ttf" font-size=16] {
-			"Right Aligned Text"
+			Right Aligned Text
 		}
 	)");
 	doc.computeLayout(Vec2(800, 600));

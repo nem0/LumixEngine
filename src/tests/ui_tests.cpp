@@ -25,7 +25,7 @@ bool testDocumentParseSimple() {
 	ASSERT_PARSE(doc, "[image]");
 	ASSERT_EQ(1, doc.m_roots.size(), "Parse image markup should parse 1 element");
 
-	ASSERT_PARSE(doc, "\"text\"");
+	ASSERT_PARSE(doc, "text");
 	ASSERT_EQ(1, doc.m_roots.size(), "Parse text markup should parse 1 element");
 
 	return true;
@@ -70,7 +70,7 @@ bool testAttributes() {
 
 bool testDocumentParseComplexNesting() {
 	MockDocument doc;
-	ASSERT_PARSE(doc, "[panel] { [panel] { \"text\" } [panel] { \"other panel\" } }");
+	ASSERT_PARSE(doc, "[panel] { [panel] { text } [panel] { other panel } }");
 	ASSERT_EQ(1, doc.m_roots.size(), "Parse complex nested markup should parse 1 root");
 	
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
@@ -244,14 +244,14 @@ bool testSpanAndQuotedStringEquivalence() {
 	ASSERT_EQ("hello", child1->value, "Value should be hello");
 
 	MockDocument doc2;
-	ASSERT_PARSE(doc2, "[panel] { \"hello\" }");
+	ASSERT_PARSE(doc2, "[panel] { hello }");
 	ASSERT_EQ(1, doc2.m_roots.size(), "Should parse 1 root element");
 	ui::Element* root2 = doc2.getElement(doc2.m_roots[0]);
 	ASSERT_EQ(1, root2->children.size(), "Root should have 1 child");
 	ui::Element* child2 = doc2.getElement(root2->children[0]);
 	ASSERT_TAG(child2, SPAN);
 	Span<ui::Attribute> attrs2 = child2->attributes;
-	ASSERT_EQ(0, attrs2.size(), "Quoted string should have 0 attributes");
+	ASSERT_EQ(0, attrs2.size(), "Text should have 0 attributes");
 	ASSERT_EQ("hello", child2->value, "Value should be hello");
 
 	return true;
@@ -311,7 +311,7 @@ bool testFontSizeAttribute() {
 
 bool testFontInheritance() {
 	MockDocument doc;
-	ASSERT_PARSE(doc, "[panel font=\"arial.ttf\"] { \"hello\" }");
+	ASSERT_PARSE(doc, "[panel font=\"arial.ttf\"] { hello }");
 	ASSERT_EQ(1, doc.m_roots.size(), "Should parse 1 root element");
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	doc.computeLayout(Vec2(800, 600));
@@ -329,7 +329,7 @@ bool testFontInheritance() {
 
 bool testFontInheritanceDeep() {
 	MockDocument doc;
-	ASSERT_PARSE(doc, "[panel font=\"arial.ttf\"] { [panel] { \"hello\" } }");
+	ASSERT_PARSE(doc, "[panel font=\"arial.ttf\"] { [panel] { hello } }");
 	ASSERT_EQ(1, doc.m_roots.size(), "Should parse 1 root element");
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	doc.computeLayout(Vec2(800, 600));

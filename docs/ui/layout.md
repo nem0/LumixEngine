@@ -24,24 +24,24 @@
 
 ## Text
 
-Text paragraphs are created using `span` elements with a `value` attribute or quoted strings inside a `panel`. Text flows inline within the panel and wraps to multiple lines when the unwrapped width exceeds the available panel width (minus padding) and `wrap=true`.
+Text paragraphs are created using `span` elements with a `value` attribute or unquoted text inside a `panel`. Text flows inline within the panel and wraps to multiple lines when the unwrapped width exceeds the available panel width (minus padding) and `wrap=true`.
 
 ```css
 [panel] {
-  "Some text"
+  Some text
   [span color=#ff0000 value="Some other, red text"]
 }
 ```
 
 ### Multiline Strings
 
-Quoted strings in markup can span multiple lines, but newlines (`\n`) and carriage returns (`\r`) are treated as whitespace and do not create line breaks in the layout. This matches HTML behavior where whitespace is normalized. Additionally, consecutive whitespace characters (spaces, tabs, newlines) are collapsed into a single space for both measurement and rendering.
+Unquoted text in markup can span multiple lines, but newlines (`\n`) and carriage returns (`\r`) are treated as whitespace and do not create line breaks in the layout. This matches HTML behavior where whitespace is normalized. Additionally, consecutive whitespace characters (spaces, tabs, newlines) are collapsed into a single space for both measurement and rendering.
 
 ```css
 [panel] {
-  "This is multiline text
+  This is multiline text
   that spans markup lines
-  but renders as single line"
+  but renders as single line
 }
 ```
 
@@ -49,7 +49,7 @@ The above renders as: `This is multiline text that spans markup lines but render
 
 ```css
 [panel] {
-  "Text   with    multiple    spaces"
+  Text   with    multiple    spaces
 }
 ```
 
@@ -62,13 +62,13 @@ Inline flow arranges **separate inline elements** (`span`s, text strings) sequen
 - `direction="row"` -> spans side-by-side -> `"A" "B"` becomes `A B`
 - `direction="column"` -> spans stacked -> `"A"` above `"B"`
 
-Text strings always render **horizontally** (left-to-right), regardless of `direction`.
+Text content always renders **horizontally** (left-to-right), regardless of `direction`.
 
 #### Baseline Alignment in Inline Flow
 
 To ensure proper visual alignment of text and inline elements, the layout system employs baseline alignment. The baseline is the imaginary line on which text characters rest.
 
-- For text elements (`span`s and quoted strings), the baseline is determined by the font's baseline metric, which positions the text appropriately relative to its container.
+- For text elements (`span`s and unquoted text), the baseline is determined by the font's baseline metric, which positions the text appropriately relative to its container.
 - For non-text inline elements (such as images or icons), the baseline defaults to the element's bottom edge.
 
 In a line of inline elements, the layout algorithm:
@@ -85,8 +85,8 @@ This alignment ensures that mixed content (e.g., text of varying sizes or text a
 
 ```css
 [panel direction="row"] {
-  "First line text flows here"
-  [panel width=100 height=50] { "Block panel causes line break" }
+  First line text flows here
+  [panel width=100 height=50] { Block panel causes line break }
   [span value="and text continues on new line below"]
 }
 ```

@@ -298,32 +298,13 @@ bool Document::parseElements(u32 parent_index) {
 					return false;
 				}
 				return true;
+			case Token::RBRACKET: error(token.value, m_tokenizer, "unexpected ']'"); return false;
 			case Token::RBRACE:
 				if (parent_index == 0xFFFF'FFFF) {
 					error(token.value, m_tokenizer, "unexpected '}' at root level");
 					return false;
 				}
 				return true; // end of block
-			case Token::STRING: {
-				// Handle text elements: strings are treated as text content
-				Element& elem = m_elements.emplace(Tag::SPAN, m_allocator);
-				elem.value = token.value;
-				u32 elem_idx = m_elements.size() - 1;
-				if (parent_index != 0xFFFF'FFFF) {
-					m_elements[parent_index].children.push(elem_idx);
-				} else {
-					m_roots.push(elem_idx);
-				}
-				continue;
-			}
-			case Token::IDENTIFIER: {
-				if (token.value != "style") {
-					error(token.value, m_tokenizer, "unexpected identifier ", token.value);
-					return false;
-				}
-				if (!parseStyleBlock()) return false;
-				break;
-			}
 			case Token::LBRACKET: {
 				if (!consume(Token::IDENTIFIER, &token)) return false;
 				Tag tag = parseTag(token.value);
@@ -380,9 +361,47 @@ bool Document::parseElements(u32 parent_index) {
 				}
 				break;
 			}
-			default:
-				error(token.value, m_tokenizer, "Unexpected ", tokenTypeToString(token.type));
-				return false;
+			default: {
+				if (token.type == Token::IDENTIFIER && token.value == "style" && parent_index == 0xffff'FFFF) {
+					if (!parseStyleBlock()) return false;
+					break;
+				}
+				// treat as text
+				Element& elem = m_elements.emplace(Tag::SPAN, m_allocator);
+				u32 elem_idx = m_elements.size() - 1;
+				if (parent_index != 0xFFFF'FFFF) {
+					m_elements[parent_index].children.push(elem_idx);
+				} else {
+					m_roots.push(elem_idx);
+				}
+				elem.value = token.value;
+				bool is_break = false;
+				while (!is_break) {
+					Token next = m_tokenizer.peekToken();
+					switch (next.type) {
+						case Token::ERROR: return false;
+						case Token::UNDEFINED: return false;
+						case Token::EOF: 
+							if (parent_index == 0xffff'FFFF) return true;
+
+							error(token.value, m_tokenizer, "unexpected EOF");
+							return false;
+						case Token::LBRACKET: is_break = true; break; // start of an element
+						case Token::RBRACE: 
+							if (parent_index == 0xffff'FFFF) {
+								error(token.value, m_tokenizer, "unexpected right brace");
+								return false;
+							}
+							m_tokenizer.consumeToken();
+							return true; // end of the parent container
+						default: 
+							elem.value.end = next.value.end;
+							m_tokenizer.consumeToken();
+							break;
+					}
+				}
+				break;
+			}
 		}
 	}
 }
