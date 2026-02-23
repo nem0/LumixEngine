@@ -1,10 +1,10 @@
 # Style
 
 This document describes the in-game GUI styling system: a small, CSS-like language
-optimized for simplicity and runtime performance. Style is defined in the same file as UI. The style is defined in `style` block:
+optimized for simplicity and runtime performance. Style is defined in the same file as UI. The style is defined in `[style]` block:
 
 ```css
-style {
+[style] {
 	.some_class {
 		width: 50%;
 	}

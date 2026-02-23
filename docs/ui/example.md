@@ -5,7 +5,7 @@ contains a `style` block and the markup for a playable menu UI demonstrating
 layout, sizing, classes, and commonly used attributes.
 
 ```c++
-style {
+[style] {
 	panel.menu {
 		width: 420;
 		padding: 16;

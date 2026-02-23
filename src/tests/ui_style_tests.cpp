@@ -7,17 +7,17 @@ namespace {
 
 bool testEmptyStyleBlock() {
 	MockDocument doc;
-	ASSERT_PARSE(doc, "style {}");
+	ASSERT_PARSE(doc, "[style] {}");
 	Span<u32> root_indices = doc.m_roots;
 	ASSERT_EQ(0, root_indices.size(), "Style block should not create elements");
-	
+
 	return true;
 }
 
 bool testStyleWithRules() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-		style {
+		[style] {
 			.some_class {
 				width: 50%;
 				height: 100;
@@ -39,7 +39,7 @@ bool testStyleWithRules() {
 bool testStyleApplication() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-		style {
+		[style] {
 			.some_class {
 				width: 50%;
 			}

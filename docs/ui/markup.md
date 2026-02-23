@@ -39,7 +39,7 @@
 }
 ```
 
-The markup language also supports CSS-like style blocks for defining reusable styles. See [Style documentation](style.md) for details.
+The markup language also supports CSS-like [style] blocks for defining reusable styles. See [Style documentation](style.md) for details.
 
 ## Grammar
 

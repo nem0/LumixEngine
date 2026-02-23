@@ -167,7 +167,7 @@
 ### Basic Style Block
 
 ```css
-style {
+[style] {
     .my_class {
         bg-color: #ffffff;
         color: #000000;
@@ -183,7 +183,7 @@ style {
 ### Type Selector
 
 ```css
-style {
+[style] {
     [panel] {
         bg-color: #f0f0f0;
     }
@@ -193,7 +193,7 @@ style {
 ### ID Selector
 
 ```css
-style {
+[style] {
     $my_id {
         width: 200;
         height: 100;
@@ -208,7 +208,7 @@ style {
 ### Child Selector
 
 ```css
-style {
+[style] {
     panel > [panel] {
         margin: 5;
     }

@@ -307,6 +307,17 @@ bool Document::parseElements(u32 parent_index) {
 				return true; // end of block
 			case Token::LBRACKET: {
 				if (!consume(Token::IDENTIFIER, &token)) return false;
+
+				if (token.value == "style") {
+					if (parent_index != 0xffff'FFFF) {
+						error(token.value, m_tokenizer, "[style] must be at the root level");
+						return false;
+					}
+					if (!consume(Token::RBRACKET, &token)) return false;
+					if (!parseStyleBlock()) return false;
+					break;
+				}
+				
 				Tag tag = parseTag(token.value);
 				if (tag == Tag::INVALID) {
 					if (token.value == "style") {
@@ -362,11 +373,6 @@ bool Document::parseElements(u32 parent_index) {
 				break;
 			}
 			default: {
-				if (token.type == Token::IDENTIFIER && token.value == "style" && parent_index == 0xffff'FFFF) {
-					if (!parseStyleBlock()) return false;
-					break;
-				}
-				// treat as text
 				Element& elem = m_elements.emplace(Tag::SPAN, m_allocator);
 				u32 elem_idx = m_elements.size() - 1;
 				if (parent_index != 0xFFFF'FFFF) {
