@@ -317,6 +317,15 @@ bool Document::parseElements(u32 parent_index) {
 				continue;
 			}
 			case Token::IDENTIFIER: {
+				if (token.value != "style") {
+					error(token.value, m_tokenizer, "unexpected identifier ", token.value);
+					return false;
+				}
+				if (!parseStyleBlock()) return false;
+				break;
+			}
+			case Token::LBRACKET: {
+				if (!consume(Token::IDENTIFIER, &token)) return false;
 				Tag tag = parseTag(token.value);
 				if (tag == Tag::INVALID) {
 					if (token.value == "style") {
@@ -335,30 +344,28 @@ bool Document::parseElements(u32 parent_index) {
 					m_roots.push(elem_idx);
 				}
 
-				if (tryConsume(Token::LBRACKET)) {
-					// Parse element attributes: key="value" pairs enclosed in []
-					for (;;) {
-						if (tryConsume(Token::RBRACKET)) break;
-						Token name_token;
-						if (!consume(Token::IDENTIFIER, &name_token)) return false;
-						if (!consume(Token::EQUALS)) return false;
-				
-						Token value = m_tokenizer.consumeToken();
-						if (value.type != Token::STRING && value.type != Token::IDENTIFIER && value.type != Token::NUMBER && value.type != Token::PERCENTAGE && value.type != Token::EM && value.type != Token::COLOR) {
-							error(value.value, m_tokenizer, "expected attribute value, got ", tokenTypeToString(value.type));
-							return false;
-						}
+				// Parse element attributes: key="value" pairs enclosed in []
+				for (;;) {
+					if (tryConsume(Token::RBRACKET)) break;
+					Token name_token;
+					if (!consume(Token::IDENTIFIER, &name_token)) return false;
+					if (!consume(Token::EQUALS)) return false;
+			
+					Token value = m_tokenizer.consumeToken();
+					if (value.type != Token::STRING && value.type != Token::IDENTIFIER && value.type != Token::NUMBER && value.type != Token::PERCENTAGE && value.type != Token::EM && value.type != Token::COLOR) {
+						error(value.value, m_tokenizer, "expected attribute value, got ", tokenTypeToString(value.type));
+						return false;
+					}
 
-						AttributeName name = parseAttributeName(name_token.value);
-						switch (name) {
-							case AttributeName::VALUE: elem.value = value.value; break;
-							case AttributeName::CLASS: elem.style_class = value.value; break;
-							default: {
-								Attribute& attr = elem.attributes.emplace();
-								attr.type = name;
-								attr.value = value.value;
-								break;
-							}
+					AttributeName name = parseAttributeName(name_token.value);
+					switch (name) {
+						case AttributeName::VALUE: elem.value = value.value; break;
+						case AttributeName::CLASS: elem.style_class = value.value; break;
+						default: {
+							Attribute& attr = elem.attributes.emplace();
+							attr.type = name;
+							attr.value = value.value;
+							break;
 						}
 					}
 					token = m_tokenizer.peekToken();
@@ -374,7 +381,7 @@ bool Document::parseElements(u32 parent_index) {
 				break;
 			}
 			default:
-				error(token.value, m_tokenizer, "expected identifier, got ", tokenTypeToString(token.type));
+				error(token.value, m_tokenizer, "Unexpected ", tokenTypeToString(token.type));
 				return false;
 		}
 	}
@@ -734,7 +741,7 @@ static void applyAttributes(Document& doc, Element& elem, const ParentContext& p
 	for (int i = 0; i < 4; ++i) {
 		float ref_size = (i % 2 == 0) ? parent.size.y : parent.size.x;
 		elem.margins[i] = computeAbsoluteSize(margin_unit, ref_size, elem.font_size);
-		elem.paddings[i] = computeAbsoluteSize(padding_unit, parent.size.x, elem.font_size);
+		elem.paddings[i] = computeAbsoluteSize(padding_unit, ref_size, elem.font_size);
 	}
 
 	ctx.size = elem.size;

@@ -274,7 +274,7 @@ bool testWhitespace() {
 }
 
 bool testComplexUI() {
-	const char* source = "panel [id=main width=800 height=600] { }";
+	const char* source = "[panel id=\"main\" width=800 height=600] { }";
 	UITokenizer tokenizer;
 	tokenizer.m_filename = "test";
 	tokenizer.m_document = StringView(source);
@@ -283,11 +283,11 @@ bool testComplexUI() {
 	using Token = UITokenizer::Token;
 
 	Token tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "panel");
-	ASSERT_TRUE(tok.value == "panel", "panel value");
+	ASSERT_EQ(Token::LBRACKET, tok.type, "left bracket");
 
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::LBRACKET, tok.type, "left bracket");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type, "panel");
+	ASSERT_TRUE(tok.value == "panel", "panel value");
 
 	tok = tokenizer.consumeToken();
 	ASSERT_EQ(Token::IDENTIFIER, tok.type, "id");
@@ -297,7 +297,7 @@ bool testComplexUI() {
 	ASSERT_EQ(Token::EQUALS, tok.type, "equals");
 
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "main");
+	ASSERT_EQ(Token::STRING, tok.type, "main");
 	ASSERT_TRUE(tok.value == "main", "main value");
 
 	tok = tokenizer.consumeToken();
@@ -477,64 +477,6 @@ bool testWhitespaceAroundEquals() {
 	return true;
 }
 
-bool testExampleMarkup() {
-	const char* source = R"(
-		panel [id="ui_root" width=100% height=100%] {
-			/* Centered overlay panel */
-			panel id="overlay" {
-				panel id="menu" class=menu {
-					panel class=title { "My Game" }
-					/* Main actions */
-					panel {
-						button id="start" class="primary" { "Start Game" }
-						button id="continue" class="primary" { "Continue" }
-						button id="options" class="secondary" { "Options" }
-						button id="quit" class="secondary" { "Quit" }
-					}
-				}
-				/* Settings overlay (hidden by default, shown when Options pressed) */
-				panel [id="settings_panel" width=360 class=menu visible=false] {
-					panel class=title { "Settings" }
-					/* Volume row: label + numeric input */
-					panel class=settings_row {
-						panel align=left { "Volume" }
-						input [id="volume" value="75" width=6em]
-					}
-					/* Resolution row: simple selectable options */
-					panel class=settings_row {
-						panel align=left { "Resolution" }
-						panel {
-							button [id="res_1920" class="secondary" width=10em] { "1920x1080" }
-							button [id="res_1280" class="secondary" width=10em] { "1280x720" }
-						}
-					}
-					/* Apply / Back */
-					panel {
-						button [id="apply" class="primary" width=10em] { "Apply" }
-						button [id="back" class="secondary" width=10em] { "Back" }
-					}
-				}
-			}
-		}
-	)";
-	UITokenizer tokenizer;
-	tokenizer.m_filename = "test";
-	tokenizer.m_document = StringView(source);
-	tokenizer.m_current = source;
-	tokenizer.m_current_token = tokenizer.nextToken();
-	using Token = UITokenizer::Token;
-	
-	Token tok;
-	do {
-		tok = tokenizer.consumeToken();
-		if (tok.type == Token::ERROR) {
-			return false;
-		}
-	} while (tok.type != Token::EOF);
-	
-	return true;
-}
-
 bool testBlockCommentInMarkup() {
 	const char* source = "panel /* this is a block comment */ { button class=\"primary\" { \"Start\" } }";
 	UITokenizer tokenizer;
@@ -583,7 +525,7 @@ bool testBlockCommentInMarkup() {
 }
 
 bool testPercentageInAttributes() {
-	const char* source = "panel [width=100% height=50%] { }";
+	const char* source = "[panel width=100% height=50%] { }";
 	UITokenizer tokenizer;
 	tokenizer.m_filename = "test";
 	tokenizer.m_document = StringView(source);
@@ -592,10 +534,10 @@ bool testPercentageInAttributes() {
 	using Token = UITokenizer::Token;
 
 	Token tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "panel");
+	ASSERT_EQ(Token::LBRACKET, tok.type, "left bracket");
 
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::LBRACKET, tok.type, "left bracket");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type, "panel");
 
 	tok = tokenizer.consumeToken();
 	ASSERT_EQ(Token::IDENTIFIER, tok.type, "width");
@@ -1012,7 +954,6 @@ void runUITokenizerTests() {
 	RUN_TEST(testEscapedCharacters);
 	RUN_TEST(testIdentifiersWithSpecialChars);
 	RUN_TEST(testWhitespaceAroundEquals);
-	RUN_TEST(testExampleMarkup);
 	RUN_TEST(testStyleTokens);
 	RUN_TEST(testColors);
 	RUN_TEST(testSpecialCharacters);

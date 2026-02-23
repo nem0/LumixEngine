@@ -61,7 +61,7 @@ Inline text container for styling text without creating a block element. It does
 Quoted string can be used in place of a span.
 
 ```css
-span value="text"
+[span value="text"]
 // is the same as
 "text"
 ```

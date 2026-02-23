@@ -42,7 +42,7 @@
 ### Simple Panel
 
 ```css
-panel [width=200 height=100 bg-color=#ffffff] {
+[panel width=200 height=100 bg-color=#ffffff] {
     "Hello World"
 }
 ```
@@ -50,7 +50,7 @@ panel [width=200 height=100 bg-color=#ffffff] {
 ### Panel with ID and Class
 
 ```css
-panel [id="my_panel" class="container" width=300 height=200] {
+[panel id="my_panel" class="container" width=300 height=200] {
     "Content here"
 }
 ```
@@ -58,11 +58,11 @@ panel [id="my_panel" class="container" width=300 height=200] {
 ### Nested Panels
 
 ```css
-panel {
-    panel [width=50%] {
+[panel] {
+    [panel width=50%] {
         "Left side"
     }
-    panel [width=50%] {
+    [panel width=50%] {
         "Right side"
     }
 }
@@ -73,7 +73,7 @@ panel {
 ### Basic Text
 
 ```css
-panel {
+[panel] {
     "This is some text"
 }
 ```
@@ -81,7 +81,7 @@ panel {
 ### Styled Text with Span
 
 ```css
-panel {
+[panel] {
     span [color=#ff0000 value="Red text"]
     " and normal text"
 }
@@ -90,7 +90,7 @@ panel {
 ### Text Alignment
 
 ```css
-panel [align=center width=200] {
+[panel align=center width=200] {
     "Centered text"
 }
 ```
@@ -98,9 +98,9 @@ panel [align=center width=200] {
 ### Multi-line Text
 
 ```css
-panel {
+[panel] {
     "This is multiline text
-that spans several lines"
+    that spans several lines"
 }
 ```
 
@@ -109,13 +109,13 @@ that spans several lines"
 ### Basic Image
 
 ```css
-image [src="path/to/image.png" width=100 height=100]
+[image src="path/to/image.png" width=100 height=100]
 ```
 
 ### Image with Fit Options
 
 ```css
-image [src="path/to/image.png" width=200 height=150 fit="cover"]
+[image src="path/to/image.png" width=200 height=150 fit="cover"]
 ```
 
 ## Layout Examples
@@ -123,28 +123,28 @@ image [src="path/to/image.png" width=200 height=150 fit="cover"]
 ### Horizontal Layout (Row)
 
 ```css
-panel [direction="row"] {
-    panel [width=100 height=50 bg-color=#ff0000] { }
-    panel [width=100 height=50 bg-color=#00ff00] { }
-    panel [width=100 height=50 bg-color=#0000ff] { }
+[panel direction="row"] {
+    [panel width=100 height=50 bg-color=#ff0000] { }
+    [panel width=100 height=50 bg-color=#00ff00] { }
+    [panel width=100 height=50 bg-color=#0000ff] { }
 }
 ```
 
 ### Vertical Layout (Column)
 
 ```css
-panel [direction="column"] {
-    panel [width=100 height=50 bg-color=#ff0000] { }
-    panel [width=100 height=50 bg-color=#00ff00] { }
-    panel [width=100 height=50 bg-color=#0000ff] { }
+[panel direction="column"] {
+    [panel width=100 height=50 bg-color=#ff0000] { }
+    [panel width=100 height=50 bg-color=#00ff00] { }
+    [panel width=100 height=50 bg-color=#0000ff] { }
 }
 ```
 
 ### Centered Content
 
 ```css
-panel [width=100% height=100% justify-content="center" align-items="center"] {
-    panel [width=200 height=100 bg-color=#cccccc] {
+[panel width=100% height=100% justify-content="center" align-items="center"] {
+    [panel width=200 height=100 bg-color=#cccccc] {
         "Centered content"
     }
 }
@@ -153,12 +153,12 @@ panel [width=100% height=100% justify-content="center" align-items="center"] {
 ### Grid-like Layout with Wrapping
 
 ```css
-panel [width=200 direction="row" wrap="true"] {
-    panel [width=100 height=100 bg-color=#ff0000] { "1" }
-    panel [width=100 height=100 bg-color=#00ff00] { "2" }
-    panel [width=100 height=100 bg-color=#0000ff] { "3" }
-    panel [width=100 height=100 bg-color=#ffff00] { "4" }
-    panel [width=100 height=100 bg-color=#ff00ff] { "5" }
+[panel width=200 direction="row" wrap="true"] {
+    [panel width=100 height=100 bg-color=#ff0000] { "1" }
+    [panel width=100 height=100 bg-color=#00ff00] { "2" }
+    [panel width=100 height=100 bg-color=#0000ff] { "3" }
+    [panel width=100 height=100 bg-color=#ffff00] { "4" }
+    [panel width=100 height=100 bg-color=#ff00ff] { "5" }
 }
 ```
 
@@ -175,7 +175,7 @@ style {
     }
 }
 
-panel [class="my_class"] {
+[panel class="my_class"] {
     "Styled text"
 }
 ```
@@ -184,7 +184,7 @@ panel [class="my_class"] {
 
 ```css
 style {
-    panel {
+    [panel] {
         bg-color: #f0f0f0;
     }
 }
@@ -200,7 +200,7 @@ style {
     }
 }
 
-panel [id="my_id"] {
+[panel id="my_id"] {
     "Specific panel"
 }
 ```
@@ -209,7 +209,7 @@ panel [id="my_id"] {
 
 ```css
 style {
-    panel > panel {
+    panel > [panel] {
         margin: 5;
     }
 }
@@ -220,7 +220,7 @@ style {
 ### Button-like Panel
 
 ```css
-panel [class="button" width=120 height=40 bg-color=#007bff] {
+[panel class="button" width=120 height=40 bg-color=#007bff] {
     "Click Me"
 }
 ```
@@ -230,12 +230,12 @@ panel [class="button" width=120 height=40 bg-color=#007bff] {
 ### Menu Layout
 
 ```css
-panel [direction="column" padding=20] {
-    panel [align=center] { "Game Title" }
-    panel [direction="column"] {
-        panel [class="menu_item"] { "Start Game" }
-        panel [class="menu_item"] { "Options" }
-        panel [class="menu_item"] { "Quit" }
+[panel direction="column" padding=20] {
+    [panel align=center] { "Game Title" }
+    [panel direction="column"] {
+        [panel class="menu_item"] { "Start Game" }
+        [panel class="menu_item"] { "Options" }
+        [panel class="menu_item"] { "Quit" }
     }
 }
 ```
@@ -243,12 +243,12 @@ panel [direction="column" padding=20] {
 ### Card Layout
 
 ```css
-panel [class="card" width=300 padding=15 bg-color=#ffffff] {
-    panel { "Card Title" }
-    panel { "Card content goes here..." }
-    panel [direction="row" justify-content="end"] {
-        panel [class="button"] { "OK" }
-        panel [class="button"] { "Cancel" }
+[panel class="card" width=300 padding=15 bg-color=#ffffff] {
+    [panel] { "Card Title" }
+    [panel] { "Card content goes here..." }
+    [panel direction="row" justify-content="end"] {
+        [panel class="button"] { "OK" }
+        [panel class="button"] { "Cancel" }
     }
 }
 ```
@@ -256,11 +256,11 @@ panel [class="card" width=300 padding=15 bg-color=#ffffff] {
 ### Responsive Layout
 
 ```css
-panel [direction="row"] {
-    panel [width=30%] {
+[panel direction="row"] {
+    [panel width=30%] {
         "Sidebar"
     }
-    panel [width=70%] {
+    [panel width=70%] {
         "Main content"
     }
 }
@@ -271,7 +271,7 @@ panel [direction="row"] {
 ### Percentage Sizing
 
 ```css
-panel [width=50% height=50%] {
+[panel width=50% height=50%] {
     "Half size panel"
 }
 ```
@@ -279,7 +279,7 @@ panel [width=50% height=50%] {
 ### EM Units
 
 ```css
-panel [width=10em height=2em] {
+[panel width=10em height=2em] {
     "Sized with em units"
 }
 ```
@@ -287,7 +287,7 @@ panel [width=10em height=2em] {
 ### Fit Content
 
 ```css
-panel [width="fit-content"] {
+[panel width="fit-content"] {
     "This panel sizes to content"
 }
 ```
@@ -297,7 +297,7 @@ panel [width="fit-content"] {
 ### Hex Colors
 
 ```css
-panel [bg-color=#ff5733] {
+[panel bg-color=#ff5733] {
     "Orange background"
 }
 ```

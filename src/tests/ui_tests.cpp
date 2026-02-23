@@ -13,19 +13,16 @@ bool testDocumentParseEmpty() {
 
 bool testDocumentParseSimple() {
 	MockDocument doc;
-	ASSERT_PARSE(doc, "panel {}");
+	ASSERT_PARSE(doc, "[panel] {}");
 	ASSERT_EQ(1, doc.m_roots.size(), "Parse should parse 1 element");
 	
-	ASSERT_PARSE(doc, "panel");
+	ASSERT_PARSE(doc, "[input]");
 	ASSERT_EQ(1, doc.m_roots.size(), "Parse should parse 1 element");
 
-	ASSERT_PARSE(doc, "input");
+	ASSERT_PARSE(doc, "[canvas]");
 	ASSERT_EQ(1, doc.m_roots.size(), "Parse should parse 1 element");
 
-	ASSERT_PARSE(doc, "canvas");
-	ASSERT_EQ(1, doc.m_roots.size(), "Parse should parse 1 element");
-
-	ASSERT_PARSE(doc, "image");
+	ASSERT_PARSE(doc, "[image]");
 	ASSERT_EQ(1, doc.m_roots.size(), "Parse image markup should parse 1 element");
 
 	ASSERT_PARSE(doc, "\"text\"");
@@ -46,7 +43,7 @@ bool testDocumentParseInvalidClosingBrace() {
 
 bool testDocumentParseNested() {
 	MockDocument doc;
-	ASSERT_PARSE(doc, "panel { panel }");
+	ASSERT_PARSE(doc, "[panel] { [panel] }");
 	ASSERT_EQ(1, doc.m_roots.size(), "Parse nested markup should parse 1 root");
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	ASSERT_EQ(1, root->children.size(), "Root should have 1 child");
@@ -58,7 +55,7 @@ bool testDocumentParseNested() {
 
 bool testAttributes() {
 	MockDocument doc;
-	ASSERT_PARSE(doc, "panel [width=800 height=640 id=\"someid\"] { panel {} }");
+	ASSERT_PARSE(doc, "[panel width=800 height=640 id=\"someid\"] { [panel] {} }");
 	ASSERT_EQ(1, doc.m_roots.size(), "Parse attributes should parse 1 root");
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	ASSERT_TAG(root, PANEL);
@@ -73,7 +70,7 @@ bool testAttributes() {
 
 bool testDocumentParseComplexNesting() {
 	MockDocument doc;
-	ASSERT_PARSE(doc, "panel { panel { \"text\" } panel { \"other panel\" } }");
+	ASSERT_PARSE(doc, "[panel] { [panel] { \"text\" } [panel] { \"other panel\" } }");
 	ASSERT_EQ(1, doc.m_roots.size(), "Parse complex nested markup should parse 1 root");
 	
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
@@ -99,7 +96,7 @@ bool testDocumentParseComplexNesting() {
 
 bool testEveryElementAttributes() {
 	MockDocument doc;
-	ASSERT_PARSE(doc, "panel [id=\"testid\" class=\"testclass\" visible=false font-size=14 font=\"arial.ttf\" color=\"#ffffff\"]");
+	ASSERT_PARSE(doc, "[panel id=\"testid\" class=\"testclass\" visible=false font-size=14 font=\"arial.ttf\" color=\"#ffffff\"]");
 	ASSERT_EQ(1, doc.m_roots.size(), "Should parse 1 element");
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	Span<ui::Attribute> attrs = root->attributes;
@@ -120,7 +117,7 @@ bool testEveryElementAttributes() {
 
 bool testBlockAttributes() {
 	MockDocument doc;
-	ASSERT_PARSE(doc, "panel [width=50% height=200 margin=10 padding=5]");
+	ASSERT_PARSE(doc, "[panel width=50% height=200 margin=10 padding=5]");
 	ASSERT_EQ(1, doc.m_roots.size(), "Should parse 1 element");
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	Span<ui::Attribute> attrs = root->attributes;
@@ -138,7 +135,7 @@ bool testBlockAttributes() {
 
 bool testPanelAttributes() {
 	MockDocument doc;
-	ASSERT_PARSE(doc, "panel [background-image=\"bg.png\" background-fit=cover bg-color=#000000 direction=column wrap=true justify-content=center]");
+	ASSERT_PARSE(doc, "[panel background-image=\"bg.png\" background-fit=cover bg-color=#000000 direction=column wrap=true justify-content=center]");
 	ASSERT_EQ(1, doc.m_roots.size(), "Should parse 1 element");
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	Span<ui::Attribute> attrs = root->attributes;
@@ -160,7 +157,7 @@ bool testPanelAttributes() {
 
 bool testImageAttributes() {
 	MockDocument doc;
-	ASSERT_PARSE(doc, "image [src=\"img.png\" fit=cover]");
+	ASSERT_PARSE(doc, "[image src=\"img.png\" fit=cover]");
 	ASSERT_EQ(1, doc.m_roots.size(), "Should parse 1 element");
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	Span<ui::Attribute> attrs = root->attributes;
@@ -174,7 +171,7 @@ bool testImageAttributes() {
 
 bool testInputAttributes() {
 	MockDocument doc;
-	ASSERT_PARSE(doc, "input [value=\"val\" placeholder=\"ph\"]");
+	ASSERT_PARSE(doc, "[input value=\"val\" placeholder=\"ph\"]");
 	ASSERT_EQ(1, doc.m_roots.size(), "Should parse 1 element");
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	Span<ui::Attribute> attrs = root->attributes;
@@ -207,7 +204,7 @@ bool testInputAttributes() {
 
 bool testDefaultValues() {
 	MockDocument doc;
-	ASSERT_PARSE(doc, "panel {}");
+	ASSERT_PARSE(doc, "[panel] {}");
 	ASSERT_EQ(1, doc.m_roots.size(), "Should parse 1 element");
 	ui::Element* elem = doc.getElement(doc.m_roots[0]);
 	
@@ -236,7 +233,7 @@ bool testDefaultValues() {
 
 bool testSpanAndQuotedStringEquivalence() {
 	MockDocument doc1;
-	ASSERT_PARSE(doc1, "panel { span [value=\"hello\"] }");
+	ASSERT_PARSE(doc1, "[panel] { [span value=\"hello\"] }");
 	ASSERT_EQ(1, doc1.m_roots.size(), "Should parse 1 root element");
 	ui::Element* root1 = doc1.getElement(doc1.m_roots[0]);
 	ASSERT_EQ(1, root1->children.size(), "Root should have 1 child");
@@ -247,7 +244,7 @@ bool testSpanAndQuotedStringEquivalence() {
 	ASSERT_EQ("hello", child1->value, "Value should be hello");
 
 	MockDocument doc2;
-	ASSERT_PARSE(doc2, "panel { \"hello\" }");
+	ASSERT_PARSE(doc2, "[panel] { \"hello\" }");
 	ASSERT_EQ(1, doc2.m_roots.size(), "Should parse 1 root element");
 	ui::Element* root2 = doc2.getElement(doc2.m_roots[0]);
 	ASSERT_EQ(1, root2->children.size(), "Root should have 1 child");
@@ -263,7 +260,7 @@ bool testSpanAndQuotedStringEquivalence() {
 bool testFontAttribute() {
 	// Test font attribute on span element
 	MockDocument doc;
-	ASSERT_PARSE(doc, "panel [font=\"arial.ttf\"] { span [value=\"hello\" font=\"times.ttf\"] }");
+	ASSERT_PARSE(doc, "[panel font=\"arial.ttf\"] { [span value=\"hello\" font=\"times.ttf\"] }");
 	ASSERT_EQ(1, doc.m_roots.size(), "Should parse 1 root element");
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	ASSERT_EQ(1, root->children.size(), "Root should have 1 child");
@@ -289,7 +286,7 @@ bool testFontAttribute() {
 bool testFontSizeAttribute() {
 	// Test font-size attribute on span element
 	MockDocument doc;
-	ASSERT_PARSE(doc, "panel [font-size=16] { span [value=\"hello\" font-size=24] }");
+	ASSERT_PARSE(doc, "[panel font-size=16] { [span value=\"hello\" font-size=24] }");
 	ASSERT_EQ(1, doc.m_roots.size(), "Should parse 1 root element");
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	ASSERT_EQ(1, root->children.size(), "Root should have 1 child");
@@ -314,7 +311,7 @@ bool testFontSizeAttribute() {
 
 bool testFontInheritance() {
 	MockDocument doc;
-	ASSERT_PARSE(doc, "panel [font=\"arial.ttf\"] { \"hello\" }");
+	ASSERT_PARSE(doc, "[panel font=\"arial.ttf\"] { \"hello\" }");
 	ASSERT_EQ(1, doc.m_roots.size(), "Should parse 1 root element");
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	doc.computeLayout(Vec2(800, 600));
@@ -332,7 +329,7 @@ bool testFontInheritance() {
 
 bool testFontInheritanceDeep() {
 	MockDocument doc;
-	ASSERT_PARSE(doc, "panel [font=\"arial.ttf\"] { panel { \"hello\" } }");
+	ASSERT_PARSE(doc, "[panel font=\"arial.ttf\"] { [panel] { \"hello\" } }");
 	ASSERT_EQ(1, doc.m_roots.size(), "Should parse 1 root element");
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	doc.computeLayout(Vec2(800, 600));
@@ -355,7 +352,7 @@ bool testFontInheritanceDeep() {
 
 bool testColorInheritance() {
 	MockDocument doc;
-	ASSERT_PARSE(doc, "panel [color=\"#ff0000\"] { \"hello\" }");
+	ASSERT_PARSE(doc, "[panel color=\"#ff0000\"] { \"hello\" }");
 	ASSERT_EQ(1, doc.m_roots.size(), "Should parse 1 root element");
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	doc.computeLayout(Vec2(800, 600));
@@ -371,7 +368,7 @@ bool testColorInheritance() {
 
 bool testColorInheritanceDeep() {
 	MockDocument doc;
-	ASSERT_PARSE(doc, "panel [color=\"#00ff00\"] { panel { \"hello\" } }");
+	ASSERT_PARSE(doc, "[panel color=\"#00ff00\"] { [panel] { \"hello\" } }");
 	ASSERT_EQ(1, doc.m_roots.size(), "Should parse 1 root element");
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	doc.computeLayout(Vec2(800, 600));
@@ -394,7 +391,7 @@ bool testMultilineStringLayout() {
 	// Test that multiline strings in UI layout are treated HTML-compatible
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-		panel [width=fit-content height=fit-content font="arial.ttf" font-size=16] {
+		[panel width=fit-content height=fit-content font="arial.ttf" font-size=16] {
 			"Line 1
 			Line 2
 			Line 3"

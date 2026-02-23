@@ -27,9 +27,9 @@
 Text paragraphs are created using `span` elements with a `value` attribute or quoted strings inside a `panel`. Text flows inline within the panel and wraps to multiple lines when the unwrapped width exceeds the available panel width (minus padding) and `wrap=true`.
 
 ```css
-panel {
+[panel] {
   "Some text"
-  span color=#ff0000 value="Some other, red text"
+  [span color=#ff0000 value="Some other, red text"]
 }
 ```
 
@@ -38,7 +38,7 @@ panel {
 Quoted strings in markup can span multiple lines, but newlines (`\n`) and carriage returns (`\r`) are treated as whitespace and do not create line breaks in the layout. This matches HTML behavior where whitespace is normalized. Additionally, consecutive whitespace characters (spaces, tabs, newlines) are collapsed into a single space for both measurement and rendering.
 
 ```css
-panel {
+[panel] {
   "This is multiline text
   that spans markup lines
   but renders as single line"
@@ -48,7 +48,7 @@ panel {
 The above renders as: `This is multiline text that spans markup lines but renders as single line`
 
 ```css
-panel {
+[panel] {
   "Text   with    multiple    spaces"
 }
 ```
@@ -84,10 +84,10 @@ This alignment ensures that mixed content (e.g., text of varying sizes or text a
 **Row direction example**:
 
 ```css
-panel direction="row" {
+[panel direction="row"] {
   "First line text flows here"
-  panel width=100 height=50 "Block panel causes line break"
-  span "and text continues on new line below"
+  [panel width=100 height=50] { "Block panel causes line break" }
+  [span value="and text continues on new line below"]
 }
 ```
 
@@ -108,10 +108,10 @@ Visual result:
 **Column direction example** (note: `"Text above"` renders horizontally within its inline slot):
 
 ```css
-panel direction="column" {
-  span "Text above"
-  panel width=100 height=50 bgColor="red" { }
-  span "Text below"
+[panel direction="column"] {
+  [span value="Text above"]
+  [panel width=100 height=50 bgColor="red"] { }
+  [span value="Text below"]
 }
 ```
 
@@ -138,7 +138,7 @@ This approach treats inline elements as a unified flow, with blocks serving as n
 Text alignment controls how text is positioned horizontally within its container. The `align` attribute can be set to `left`, `center`, or `right`, with `left` as the default.
 
 ```css
-panel align=center {
+[panel align=center] {
   "Centered text"
 }
 ```
@@ -153,7 +153,7 @@ Each UI element has `width` and `height` attributes that control its size, known
 
 Example
 ```css
-panel width=50% height=3em { ... }
+[panel width=50% height=3em] { ... }
 ```
 
 ### Units
