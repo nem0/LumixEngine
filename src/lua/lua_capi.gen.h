@@ -24,6 +24,281 @@
 #define XXH_STATIC_LINKING_ONLY
 #include "xxhash/xxhash.h"
 
+namespace Lumix::LuaWrapper {
+	void push(lua_State* L, os::CursorType value) { LuaWrapper::push(L, (i32)value); }
+	template <> os::CursorType checkArg<os::CursorType>(lua_State* L, int index) { return (os::CursorType)checkArg<i32>(L, index); }
+	
+	void push(lua_State* L, os::Keycode value) { LuaWrapper::push(L, (i32)value); }
+	template <> os::Keycode checkArg<os::Keycode>(lua_State* L, int index) { return (os::Keycode)checkArg<i32>(L, index); }
+	
+	void push(lua_State* L, ui::EventType value) { LuaWrapper::push(L, (i32)value); }
+	template <> ui::EventType checkArg<ui::EventType>(lua_State* L, int index) { return (ui::EventType)checkArg<i32>(L, index); }
+	
+	void push(lua_State* L, GrassRotationMode value) { LuaWrapper::push(L, (i32)value); }
+	template <> GrassRotationMode checkArg<GrassRotationMode>(lua_State* L, int index) { return (GrassRotationMode)checkArg<i32>(L, index); }
+	
+	void push(lua_State* L, const Ray& value) {
+		lua_newtable(L);
+		push(L, value.origin);
+		lua_setfield(L, -2, "origin");
+		push(L, value.dir);
+		lua_setfield(L, -2, "dir");
+	}
+	template <> Ray checkArg<Ray>(lua_State* L, int index) {
+		Ray res;
+		if (!lua_istable(L, index)) luaL_argerror(L, index, "expected table");
+		lua_getfield(L, index, "origin");
+		res.origin = checkArg<DVec3>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "dir");
+		res.dir = checkArg<Vec3>(L, -1);
+		lua_pop(L, 1);
+		return res;
+	}
+	void push(lua_State* L, const AABB& value) {
+		lua_newtable(L);
+		push(L, value.min);
+		lua_setfield(L, -2, "min");
+		push(L, value.max);
+		lua_setfield(L, -2, "max");
+	}
+	template <> AABB checkArg<AABB>(lua_State* L, int index) {
+		AABB res;
+		if (!lua_istable(L, index)) luaL_argerror(L, index, "expected table");
+		lua_getfield(L, index, "min");
+		res.min = checkArg<Vec3>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "max");
+		res.max = checkArg<Vec3>(L, -1);
+		lua_pop(L, 1);
+		return res;
+	}
+	void push(lua_State* L, const Viewport& value) {
+		lua_newtable(L);
+		push(L, value.is_ortho);
+		lua_setfield(L, -2, "is_ortho");
+		push(L, value.fov);
+		lua_setfield(L, -2, "fov");
+		push(L, value.ortho_size);
+		lua_setfield(L, -2, "ortho_size");
+		push(L, value.w);
+		lua_setfield(L, -2, "w");
+		push(L, value.h);
+		lua_setfield(L, -2, "h");
+		push(L, value.pos);
+		lua_setfield(L, -2, "pos");
+		push(L, value.rot);
+		lua_setfield(L, -2, "rot");
+		push(L, value.near);
+		lua_setfield(L, -2, "near");
+		push(L, value.far);
+		lua_setfield(L, -2, "far");
+		push(L, value.pixel_offset);
+		lua_setfield(L, -2, "pixel_offset");
+	}
+	template <> Viewport checkArg<Viewport>(lua_State* L, int index) {
+		Viewport res;
+		if (!lua_istable(L, index)) luaL_argerror(L, index, "expected table");
+		lua_getfield(L, index, "is_ortho");
+		res.is_ortho = checkArg<bool>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "fov");
+		res.fov = checkArg<float>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "ortho_size");
+		res.ortho_size = checkArg<float>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "w");
+		res.w = checkArg<int>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "h");
+		res.h = checkArg<int>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "pos");
+		res.pos = checkArg<DVec3>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "rot");
+		res.rot = checkArg<Quat>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "near");
+		res.near = checkArg<float>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "far");
+		res.far = checkArg<float>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "pixel_offset");
+		res.pixel_offset = checkArg<Vec2>(L, -1);
+		lua_pop(L, 1);
+		return res;
+	}
+	void push(lua_State* L, const ui::Event& value) {
+		lua_newtable(L);
+		push(L, value.type);
+		lua_setfield(L, -2, "type");
+		push(L, value.position);
+		lua_setfield(L, -2, "position");
+		push(L, value.element_index);
+		lua_setfield(L, -2, "element_index");
+		push(L, value.key_code);
+		lua_setfield(L, -2, "key_code");
+		push(L, value.text_utf8);
+		lua_setfield(L, -2, "text_utf8");
+		push(L, value.wheel_y);
+		lua_setfield(L, -2, "wheel_y");
+	}
+	template <> ui::Event checkArg<ui::Event>(lua_State* L, int index) {
+		ui::Event res;
+		if (!lua_istable(L, index)) luaL_argerror(L, index, "expected table");
+		lua_getfield(L, index, "type");
+		res.type = checkArg<ui::EventType>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "position");
+		res.position = checkArg<Vec2>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "element_index");
+		res.element_index = checkArg<u32>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "key_code");
+		res.key_code = checkArg<i32>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "text_utf8");
+		res.text_utf8 = checkArg<u32>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "wheel_y");
+		res.wheel_y = checkArg<float>(L, -1);
+		lua_pop(L, 1);
+		return res;
+	}
+	void push(lua_State* L, const RaycastHit& value) {
+		lua_newtable(L);
+		push(L, value.position);
+		lua_setfield(L, -2, "position");
+		push(L, value.normal);
+		lua_setfield(L, -2, "normal");
+		push(L, value.entity);
+		lua_setfield(L, -2, "entity");
+	}
+	template <> RaycastHit checkArg<RaycastHit>(lua_State* L, int index) {
+		RaycastHit res;
+		if (!lua_istable(L, index)) luaL_argerror(L, index, "expected table");
+		lua_getfield(L, index, "position");
+		res.position = checkArg<Vec3>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "normal");
+		res.normal = checkArg<Vec3>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "entity");
+		res.entity = checkArg<EntityPtr>(L, -1);
+		lua_pop(L, 1);
+		return res;
+	}
+	void push(lua_State* L, const SweepHit& value) {
+		lua_newtable(L);
+		push(L, value.position);
+		lua_setfield(L, -2, "position");
+		push(L, value.normal);
+		lua_setfield(L, -2, "normal");
+		push(L, value.entity);
+		lua_setfield(L, -2, "entity");
+		push(L, value.distance);
+		lua_setfield(L, -2, "distance");
+	}
+	template <> SweepHit checkArg<SweepHit>(lua_State* L, int index) {
+		SweepHit res;
+		if (!lua_istable(L, index)) luaL_argerror(L, index, "expected table");
+		lua_getfield(L, index, "position");
+		res.position = checkArg<Vec3>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "normal");
+		res.normal = checkArg<Vec3>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "entity");
+		res.entity = checkArg<EntityPtr>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "distance");
+		res.distance = checkArg<float>(L, -1);
+		lua_pop(L, 1);
+		return res;
+	}
+	void push(lua_State* L, const RayCastModelHit& value) {
+		lua_newtable(L);
+		push(L, value.is_hit);
+		lua_setfield(L, -2, "is_hit");
+		push(L, value.t);
+		lua_setfield(L, -2, "t");
+		push(L, value.origin);
+		lua_setfield(L, -2, "origin");
+		push(L, value.dir);
+		lua_setfield(L, -2, "dir");
+		push(L, value.mesh);
+		lua_setfield(L, -2, "mesh");
+		push(L, value.entity);
+		lua_setfield(L, -2, "entity");
+		push(L, value.component_type);
+		lua_setfield(L, -2, "component_type");
+		push(L, value.subindex);
+		lua_setfield(L, -2, "subindex");
+	}
+	template <> RayCastModelHit checkArg<RayCastModelHit>(lua_State* L, int index) {
+		RayCastModelHit res;
+		if (!lua_istable(L, index)) luaL_argerror(L, index, "expected table");
+		lua_getfield(L, index, "is_hit");
+		res.is_hit = checkArg<bool>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "t");
+		res.t = checkArg<float>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "origin");
+		res.origin = checkArg<DVec3>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "dir");
+		res.dir = checkArg<Vec3>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "mesh");
+		res.mesh = checkArg<Mesh*>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "entity");
+		res.entity = checkArg<EntityPtr>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "component_type");
+		res.component_type = checkArg<ComponentType>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "subindex");
+		res.subindex = checkArg<u32>(L, -1);
+		lua_pop(L, 1);
+		return res;
+	}
+	void push(lua_State* L, AssetBrowser* value) {
+		pushObject(L, (void*)value, "AssetBrowser");
+	}
+	void push(lua_State* L, StudioApp* value) {
+		pushObject(L, (void*)value, "StudioApp");
+	}
+	void push(lua_State* L, GUISystem* value) {
+		pushObject(L, (void*)value, "GUISystem");
+	}
+	void push(lua_State* L, GUINGSystem* value) {
+		pushObject(L, (void*)value, "GUINGSystem");
+	}
+	void push(lua_State* L, ui::Document* value) {
+		pushObject(L, (void*)value, "ui_Document");
+	}
+	void push(lua_State* L, GameView* value) {
+		pushObject(L, (void*)value, "GameView");
+	}
+	void push(lua_State* L, SceneView* value) {
+		pushObject(L, (void*)value, "SceneView");
+	}
+	void push(lua_State* L, Model* value) {
+		pushObject(L, (void*)value, "Model");
+	}
+	void push(lua_State* L, Pipeline* value) {
+		pushObject(L, (void*)value, "Pipeline");
+	}
+	void push(lua_State* L, Renderer* value) {
+		pushObject(L, (void*)value, "Renderer");
+	}
+}
 namespace Lumix {
 	int property_animator_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
@@ -434,7 +709,7 @@ namespace Lumix {
 		LuaWrapper::checkTableArg(L, 1);
 		GUIModule* module;
 		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
-		LuaWrapper::pushObject(L, 	module->getSystemPtr(), "GUISystem");
+		LuaWrapper::push(L, 	module->getSystemPtr());
 		return 1;
 	}
 	
@@ -670,7 +945,7 @@ namespace Lumix {
 		LuaWrapper::checkTableArg(L, 1);
 		GUINGModule* module;
 		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
-		LuaWrapper::pushObject(L, 	module->getDocument(), "ui_Document");
+		LuaWrapper::push(L, 	module->getDocument());
 		return 1;
 	}
 	
@@ -1685,29 +1960,9 @@ namespace Lumix {
 		LuaWrapper::checkTableArg(L, 1);
 		RenderModule* module;
 		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
-		Ray ray;
-		
-		if(!LuaWrapper::checkField(L, 2, "origin", &ray.origin)) luaL_error(L, "Invalid argument");
-		if(!LuaWrapper::checkField(L, 2, "dir", &ray.dir)) luaL_error(L, "Invalid argument");
+		auto ray = LuaWrapper::checkArg<Ray>(L, 2);
 		auto ignore = LuaWrapper::checkArg<EntityPtr>(L, 3);
-		auto s = 	module->castRay(ray, ignore);
-		lua_newtable(L);
-		LuaWrapper::push(L, s.is_hit);
-		lua_setfield(L, -2, "is_hit");
-		LuaWrapper::push(L, s.t);
-		lua_setfield(L, -2, "t");
-		LuaWrapper::push(L, s.origin);
-		lua_setfield(L, -2, "origin");
-		LuaWrapper::push(L, s.dir);
-		lua_setfield(L, -2, "dir");
-		LuaWrapper::push(L, s.mesh);
-		lua_setfield(L, -2, "mesh");
-		LuaWrapper::push(L, s.entity);
-		lua_setfield(L, -2, "entity");
-		LuaWrapper::push(L, s.component_type);
-		lua_setfield(L, -2, "component_type");
-		LuaWrapper::push(L, s.subindex);
-		lua_setfield(L, -2, "subindex");
+		LuaWrapper::push(L, 	module->castRay(ray, ignore));
 		return 1;
 	}
 	
@@ -1715,28 +1970,8 @@ namespace Lumix {
 		LuaWrapper::checkTableArg(L, 1);
 		RenderModule* module;
 		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
-		Ray ray;
-		
-		if(!LuaWrapper::checkField(L, 2, "origin", &ray.origin)) luaL_error(L, "Invalid argument");
-		if(!LuaWrapper::checkField(L, 2, "dir", &ray.dir)) luaL_error(L, "Invalid argument");
-		auto s = 	module->castRayTerrain(ray);
-		lua_newtable(L);
-		LuaWrapper::push(L, s.is_hit);
-		lua_setfield(L, -2, "is_hit");
-		LuaWrapper::push(L, s.t);
-		lua_setfield(L, -2, "t");
-		LuaWrapper::push(L, s.origin);
-		lua_setfield(L, -2, "origin");
-		LuaWrapper::push(L, s.dir);
-		lua_setfield(L, -2, "dir");
-		LuaWrapper::push(L, s.mesh);
-		lua_setfield(L, -2, "mesh");
-		LuaWrapper::push(L, s.entity);
-		lua_setfield(L, -2, "entity");
-		LuaWrapper::push(L, s.component_type);
-		lua_setfield(L, -2, "component_type");
-		LuaWrapper::push(L, s.subindex);
-		lua_setfield(L, -2, "subindex");
+		auto ray = LuaWrapper::checkArg<Ray>(L, 2);
+		LuaWrapper::push(L, 	module->castRayTerrain(ray));
 		return 1;
 	}
 	
@@ -1833,12 +2068,7 @@ namespace Lumix {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
 		auto screen_pos = LuaWrapper::checkArg<Vec2>(L, 2);
-		auto s = 	module->getCameraRay(entity, screen_pos);
-		lua_newtable(L);
-		LuaWrapper::push(L, s.origin);
-		lua_setfield(L, -2, "origin");
-		LuaWrapper::push(L, s.dir);
-		lua_setfield(L, -2, "dir");
+		LuaWrapper::push(L, 	module->getCameraRay(entity, screen_pos));
 		return 1;
 	}
 	
@@ -2268,7 +2498,7 @@ namespace Lumix {
 	int ModelInstance_getModel(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (RenderModule*)imodule;
-		LuaWrapper::pushObject(L, 	module->getModelInstanceModel(entity), "Model");
+		LuaWrapper::push(L, 	module->getModelInstanceModel(entity));
 		return 1;
 	}
 	
@@ -2790,25 +3020,7 @@ namespace Lumix {
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
 					auto index = LuaWrapper::checkArg<u32>(L, 2);
 					auto res = obj->getEvent(index);
-					lua_newtable(L);
-					LuaWrapper::push(L, "type");
-					LuaWrapper::push(L, (int)res.type);
-					lua_settable(L, -3);
-					LuaWrapper::push(L, "position");
-					LuaWrapper::push(L, res.position);
-					lua_settable(L, -3);
-					LuaWrapper::push(L, "element_index");
-					LuaWrapper::push(L, res.element_index);
-					lua_settable(L, -3);
-					LuaWrapper::push(L, "key_code");
-					LuaWrapper::push(L, res.key_code);
-					lua_settable(L, -3);
-					LuaWrapper::push(L, "text_utf8");
-					LuaWrapper::push(L, res.text_utf8);
-					lua_settable(L, -3);
-					LuaWrapper::push(L, "wheel_y");
-					LuaWrapper::push(L, res.wheel_y);
-					lua_settable(L, -3);
+					LuaWrapper::push(L, res);
 					return 1;
 				};
 				const char* name = "getEvent";
@@ -2854,37 +3066,7 @@ namespace Lumix {
 					SceneView* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
 					auto res = obj->getViewport();
-					lua_newtable(L);
-					LuaWrapper::push(L, "is_ortho");
-					LuaWrapper::push(L, res.is_ortho);
-					lua_settable(L, -3);
-					LuaWrapper::push(L, "fov");
-					LuaWrapper::push(L, res.fov);
-					lua_settable(L, -3);
-					LuaWrapper::push(L, "ortho_size");
-					LuaWrapper::push(L, res.ortho_size);
-					lua_settable(L, -3);
-					LuaWrapper::push(L, "w");
-					LuaWrapper::push(L, res.w);
-					lua_settable(L, -3);
-					LuaWrapper::push(L, "h");
-					LuaWrapper::push(L, res.h);
-					lua_settable(L, -3);
-					LuaWrapper::push(L, "pos");
-					LuaWrapper::push(L, res.pos);
-					lua_settable(L, -3);
-					LuaWrapper::push(L, "rot");
-					LuaWrapper::push(L, res.rot);
-					lua_settable(L, -3);
-					LuaWrapper::push(L, "near");
-					LuaWrapper::push(L, res.near);
-					lua_settable(L, -3);
-					LuaWrapper::push(L, "far");
-					LuaWrapper::push(L, res.far);
-					lua_settable(L, -3);
-					LuaWrapper::push(L, "pixel_offset");
-					LuaWrapper::push(L, res.pixel_offset);
-					lua_settable(L, -3);
+					LuaWrapper::push(L, res);
 					return 1;
 				};
 				const char* name = "getViewport";
@@ -2896,17 +3078,7 @@ namespace Lumix {
 					LuaWrapper::checkTableArg(L, 1); // self
 					SceneView* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
-					Viewport vp;
-					if (!LuaWrapper::checkField(L, 2, "is_ortho", &vp.is_ortho)) luaL_error(L, "Invalid argument");
-					if (!LuaWrapper::checkField(L, 2, "fov", &vp.fov)) luaL_error(L, "Invalid argument");
-					if (!LuaWrapper::checkField(L, 2, "ortho_size", &vp.ortho_size)) luaL_error(L, "Invalid argument");
-					if (!LuaWrapper::checkField(L, 2, "w", &vp.w)) luaL_error(L, "Invalid argument");
-					if (!LuaWrapper::checkField(L, 2, "h", &vp.h)) luaL_error(L, "Invalid argument");
-					if (!LuaWrapper::checkField(L, 2, "pos", &vp.pos)) luaL_error(L, "Invalid argument");
-					if (!LuaWrapper::checkField(L, 2, "rot", &vp.rot)) luaL_error(L, "Invalid argument");
-					if (!LuaWrapper::checkField(L, 2, "near", &vp.near)) luaL_error(L, "Invalid argument");
-					if (!LuaWrapper::checkField(L, 2, "far", &vp.far)) luaL_error(L, "Invalid argument");
-					if (!LuaWrapper::checkField(L, 2, "pixel_offset", &vp.pixel_offset)) luaL_error(L, "Invalid argument");
+					auto vp = LuaWrapper::checkArg<Viewport>(L, 2);
 					obj->setViewport(vp);
 					return 0;
 				};
@@ -2968,13 +3140,7 @@ namespace Lumix {
 					Model* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
 					auto res = obj->getAABB();
-					lua_newtable(L);
-					LuaWrapper::push(L, "min");
-					LuaWrapper::push(L, res.min);
-					lua_settable(L, -3);
-					LuaWrapper::push(L, "max");
-					LuaWrapper::push(L, res.max);
-					lua_settable(L, -3);
+					LuaWrapper::push(L, res);
 					return 1;
 				};
 				const char* name = "getAABB";
@@ -3023,17 +3189,7 @@ namespace Lumix {
 					LuaWrapper::checkTableArg(L, 1); // self
 					Pipeline* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
-					Viewport viewport;
-					if (!LuaWrapper::checkField(L, 2, "is_ortho", &viewport.is_ortho)) luaL_error(L, "Invalid argument");
-					if (!LuaWrapper::checkField(L, 2, "fov", &viewport.fov)) luaL_error(L, "Invalid argument");
-					if (!LuaWrapper::checkField(L, 2, "ortho_size", &viewport.ortho_size)) luaL_error(L, "Invalid argument");
-					if (!LuaWrapper::checkField(L, 2, "w", &viewport.w)) luaL_error(L, "Invalid argument");
-					if (!LuaWrapper::checkField(L, 2, "h", &viewport.h)) luaL_error(L, "Invalid argument");
-					if (!LuaWrapper::checkField(L, 2, "pos", &viewport.pos)) luaL_error(L, "Invalid argument");
-					if (!LuaWrapper::checkField(L, 2, "rot", &viewport.rot)) luaL_error(L, "Invalid argument");
-					if (!LuaWrapper::checkField(L, 2, "near", &viewport.near)) luaL_error(L, "Invalid argument");
-					if (!LuaWrapper::checkField(L, 2, "far", &viewport.far)) luaL_error(L, "Invalid argument");
-					if (!LuaWrapper::checkField(L, 2, "pixel_offset", &viewport.pixel_offset)) luaL_error(L, "Invalid argument");
+					auto viewport = LuaWrapper::checkArg<Viewport>(L, 2);
 					obj->setViewport(viewport);
 					return 0;
 				};

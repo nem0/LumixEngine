@@ -1377,28 +1377,9 @@ bool consumeArg(StringView& line, Arg& out) {
 	return true;
 }
 
-Struct* findStruct(StringView struct_name) {
-	if (struct_name.size() == 0) return nullptr;
-	// TODO proper type support
-	if (startsWith(struct_name, "const")) struct_name.begin += 6;
-	if (*(struct_name.end - 1) == '&') --struct_name.end;
-
-	for (Struct& s : parser.structs) {
-		if (equal(s.full, struct_name)) return &s;
-	}
-	return nullptr;
-}
-
 Object* findObject(StringView object_name) {
 	for (Object& o : parser.objects) {
 		if (equal(o.full, object_name)) return &o;
-	}
-	return nullptr;
-}
-
-Enum* findEnum(StringView enum_name) {
-	for (Enum& e : parser.enums) {
-		if (equal(e.name, enum_name) || equal(e.full, enum_name)) return &e;
 	}
 	return nullptr;
 }
@@ -1409,23 +1390,7 @@ i32 pushInOutArgs(OutputStream& out, StringView args) {
 		if (!arg.is_ref || arg.is_const) return;
 
 		++num;
-		Struct* st_arg = findStruct(arg.type);
-		Object* obj_arg = findObject(arg.type);
-		if (st_arg) {
-			L("\tlua_newtable(L);");
-			for (StructVar& v : st_arg->vars) {
-				if (findEnum(v.type)) {
-					L("\tLuaWrapper::push(L, (int)", arg.name, ".", v.name, ");");
-				} else {
-					L("\tLuaWrapper::push(L, ", arg.name, ".", v.name, ");");
-				}
-				L("\tlua_setfield(L, -2, \"", v.name, "\");");
-			}
-		} else if (obj_arg) {
-			L("\tLuaWrapper::pushObject(L, ", arg.name, ", \"", arg.type, "\");");
-		} else {
-			L("\tLuaWrapper::push(L, ", arg.name, ");");
-		}
+		L("\tLuaWrapper::push(L, ", arg.name, ");");
 	});
 	return num;
 }
@@ -1451,58 +1416,31 @@ void wrap(OutputStream& out, Module& m, Function& f) {
 	StringView args = f.args;
 	forEachArg(args, [&](const Arg& arg, bool is_first) {
 		++arg_idx;
-		Struct* st = findStruct(arg.type);
-		if (st) {
-			L("\t",arg.type," ",arg.name,";" OUT_ENDL);
-			for (StructVar& v : st->vars) {
-				L("\tif(!LuaWrapper::checkField(L, ",(arg_idx + 2),", \"",v.name,"\", &",arg.name,".",v.name,")) luaL_error(L, \"Invalid argument\");");
-			}
+		Object* obj = findObject(arg.type);
+		if (obj) {
+			L("\tif(!LuaWrapper::checkField(L, ",(arg_idx + 2),", \"_object\", &",arg.name,")) luaL_error(L, \"Invalid argument\");");
 		}
 		else {
-			Object* obj = findObject(arg.type);
-			if (obj) {
-				L("\tif(!LuaWrapper::checkField(L, ",(arg_idx + 2),", \"_object\", &",arg.name,")) luaL_error(L, \"Invalid argument\");");
-			}
-			else {
-				L("\tauto ",arg.name," = LuaWrapper::checkArg<", (arg.is_const && arg.is_ptr ? "const " : ""), arg.type, (arg.is_ptr ? "*" : ""), ">(L, ",(arg_idx + 2),");");
-			}
+			L("\tauto ",arg.name," = LuaWrapper::checkArg<", (arg.is_const && arg.is_ptr ? "const " : ""), arg.type, (arg.is_ptr ? "*" : ""), ">(L, ",(arg_idx + 2),");");
 		}
 	});
 
-	Struct* st = findStruct(f.return_type);
-	Object* obj = findObject(withoutSuffix(f.return_type, 1) /*remove pointer '*`*/);
-	if (st) out.add("\tauto s = ");
-	bool has_return = !equal(f.return_type, "void") && st == nullptr && obj == nullptr;
-	if (obj)
-		out.add("\tLuaWrapper::pushObject(L, ");
-	else if (has_return)
-		out.add("\tLuaWrapper::push(L, ");
+	bool has_return = !equal(f.return_type, "void");
+	if (has_return) out.add("\tLuaWrapper::push(L, ");
 	out.add("\tmodule->", f.name, "(");
 	forEachArg(args, [&](const Arg& arg, bool is_first) {
 		if (!is_first) out.add(", ");
 		out.add(arg.name);
 	});
 	out.add(")");
-	if (obj) {
-		out.add(", \"");
-		StringView return_type = withoutSuffix(f.return_type, 1); // without pointer '*'
-		outputLuaObjectTypename(out, return_type);
-		out.add("\");" OUT_ENDL);
-	} else if (st) {
-		L(";");
-		L("\tlua_newtable(L);");
-		for (StructVar& v : st->vars) {
-			L("\tLuaWrapper::push(L, s.", v.name, ");");
-			L("\tlua_setfield(L, -2, \"", v.name, "\");");
-		}
-	} else if (has_return) {
+	if (has_return) {
 		L(");");
 	} else {
 		L(";");
 	}
 
 	// push inout args
-	i32 return_count = (has_return || st || obj) ? 1 : 0;
+	i32 return_count = has_return ? 1 : 0;
 	return_count += pushInOutArgs(out, args);
 
 	L("\treturn ", return_count, ";");
@@ -1521,15 +1459,8 @@ void wrap(OutputStream& out, Module& m, Component& c, Function& f) {
 	forEachArg(args, [&](const Arg& arg, bool is_first) {
 		++arg_idx;
 		if (is_first) return; // skip entity, we alredy have it
-		Struct* st_arg = findStruct(arg.type);
 		Object* obj_arg = findObject(arg.type);
-		if (st_arg) {
-			L("\t",arg.type," ",arg.name,";" OUT_ENDL);
-			for (StructVar& v : st_arg->vars) {
-				L("\tif(!LuaWrapper::checkField(L, ",(arg_idx + 1),", \"",v.name,"\", &",arg.name,".",v.name,")) luaL_error(L, \"Invalid argument\");");
-			}
-		}
-		else if (obj_arg) {
+		if (obj_arg) {
 			L("\tif(!LuaWrapper::checkField(L, ",(arg_idx + 1),", \"_object\", &",arg.name,")) luaL_error(L, \"Invalid argument\");");
 		}
 		else {
@@ -1537,36 +1468,21 @@ void wrap(OutputStream& out, Module& m, Component& c, Function& f) {
 		}
 	});
 
-	Struct* st = findStruct(f.return_type);
-	Object* obj = findObject(withoutSuffix(f.return_type, 1)/*remove pointer '*`*/);
-	if (st) out.add("\tauto s = ");
-	bool has_return = !equal(f.return_type, "void") && st == nullptr && obj == nullptr;
-	if (obj) out.add("\tLuaWrapper::pushObject(L, ");
-	else if (has_return) out.add("\tLuaWrapper::push(L, ");
+	bool has_return = !equal(f.return_type, "void");
+	if (has_return) out.add("\tLuaWrapper::push(L, ");
 	out.add("\tmodule->",f.name,"(entity");
 	forEachArg(args, [&](const Arg& arg, bool is_first){
 		if (is_first) return;
 		out.add(", ", arg.name);
 	});
 	out.add(")");
-	if (obj) {
-		L(", \"",withoutSuffix(f.return_type, 1),"\");");
-	}
-	else if (st) {
-		L(";");
-		L("\tlua_newtable(L);");
-		for (StructVar& v : st->vars) {
-			L("\tLuaWrapper::push(L, s.",v.name,");");
-			L("\tlua_setfield(L, -2, \"",v.name,"\");");
-		}
-	}
-	else if (has_return) {
+	if (has_return) {
 		L(");");
 	}
 	else {
 		L(";");
 	}
-	i32 return_count = (has_return || st || obj) ? 1 : 0;
+	i32 return_count = has_return ? 1 : 0;
 
 	// push inout args
 	return_count += pushInOutArgs(out, args);
@@ -1670,16 +1586,9 @@ void serializeMain(OutputStream& out, Parser& parser) {
 				i32 idx = 0;
 				forEachArg(f.args, [&](const Arg& arg, bool){
 					++idx;
-					Struct* arg_st = findStruct(arg.type);
 					if (arg.is_ptr && equal(arg.type, "World")) {
 						L("\tWorld* ", arg.name, ";");
 						L("\tif (!LuaWrapper::checkField(L, ",(idx + 1),", \"value\", &",arg.name,")) luaL_error(L, \"Invalid argument\");");
-					}
-					else if (arg_st) {
-						L("\t", arg.type, " ", arg.name, ";");
-						for (StructVar& v : arg_st->vars) {
-							L("\tif (!LuaWrapper::checkField(L, ", (idx + 1), ", \"", v.name, "\", &", arg.name, ".", v.name, ")) luaL_error(L, \"Invalid argument\");");
-						}
 					}
 					else if (arg.is_const && arg.is_ptr && equal(arg.type, "char")) {
 						L("\tauto ",arg.name," = LuaWrapper::checkArg<const char*>(L, ",(idx + 1),");");
@@ -1702,22 +1611,7 @@ void serializeMain(OutputStream& out, Parser& parser) {
 				i32 num_returns = 0;
 				if (has_return) {
 					++num_returns;
-					Struct* ret_struct = findStruct(f.return_type);
-					if (ret_struct) {
-						// Push struct as Lua table
-						L("lua_newtable(L);");
-						for (StructVar& var : ret_struct->vars) {
-							L("LuaWrapper::push(L, \"", var.name, "\");");
-							if (findEnum(var.type)) {
-								L("LuaWrapper::push(L, (int)res.", var.name, ");");
-							} else {
-								L("LuaWrapper::push(L, res.", var.name, ");");
-							}
-							L("lua_settable(L, -3);");
-						}
-					} else {
-						L("LuaWrapper::push(L, res);");
-					}
+					L("LuaWrapper::push(L, res);");
 				}
 				num_returns += pushInOutArgs(out, f.args);
 				L("return ", num_returns, ";");
@@ -1999,6 +1893,56 @@ void serializeLuaPropertyGetter(OutputStream& out, Module& m, Component& c) {
 	L("}");
 	L("\treturn 1;");
 	L("}" OUT_ENDL);
+}
+
+void serializeLuaHelpers(OutputStream& out) {
+	// enums 
+	L("namespace Lumix::LuaWrapper {");
+	for (Enum& e : parser.enums) {
+		L(" void push(lua_State* L, ", e.full, " value) { LuaWrapper::push(L, (i32)value); }");
+		L("template <> ", e.full, " checkArg<", e.full, ">(lua_State* L, int index) { return (", e.full, ")checkArg<i32>(L, index); }");
+		out.add(OUT_ENDL);
+	}
+
+	// structs
+	for (Struct& s : parser.structs) {
+		L("void push(lua_State* L, const ", s.full, "& value) {");
+		L("\tlua_newtable(L);");
+		for (StructVar& v : s.vars) {
+			L("\tpush(L, value.", v.name, ");");
+			L("\tlua_setfield(L, -2, \"", v.name, "\");");
+		}
+		L("}");
+
+		L("template <> ", s.full, " checkArg<", s.full, ">(lua_State* L, int index) {");
+		L("\t", s.full, " res;");
+		L("\tif (!lua_istable(L, index)) luaL_argerror(L, index, \"expected table\");");
+		for (StructVar& v : s.vars) {
+			StringView type = v.type;
+			for (Enum& e : parser.enums) {
+				if (equal(e.name, v.type)) {
+					type = e.full;
+					break;
+				}
+			}
+			L("\tlua_getfield(L, index, \"", v.name, "\");");
+			L("\tres.", v.name, " = checkArg<", type, ">(L, -1);");
+			L("\tlua_pop(L, 1);");
+		}
+		L("\treturn res;");
+		L("}");
+	}
+	
+	// objects
+	for (Object& o : parser.objects) {
+		L("void push(lua_State* L, ", o.full, "* value) {");
+		out.add("\tpushObject(L, (void*)value, \"");
+		outputLuaObjectTypename(out, o.full);
+		out.add("\");" OUT_ENDL);
+		L("}");
+	}
+
+	L("}");
 }
 
 void serializeLuaCAPI(OutputStream& out, Module& m) {
@@ -2595,6 +2539,8 @@ int main() {
 	lua_capi_stream.add("#include \"xxhash/xxhash.h\"" OUT_ENDL);
 
 	lua_capi_stream.add(OUT_ENDL);
+
+	serializeLuaHelpers(lua_capi_stream);
 
 	for (Module& m : parser.modules) {
 		char out_path[MAX_PATH];
