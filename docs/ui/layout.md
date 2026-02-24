@@ -176,6 +176,8 @@ Dimensions support these units:
 
 - **fit-content**: Auto-size to content. For panels, sums child sizes. E.g., `width=fit-content`.
 
+- **fill**: Expands the element to fill the remaining space in the parent container. 
+
 Mix units freely, e.g., `width=50% height=2em`.
 
 ### Fit-Content
@@ -190,6 +192,39 @@ function fitContentSize(container):
 ```
 
 When using `fit-content` sizing, margins are included in the total size calculation for containers, ensuring spacing between children is preserved. Padding is added to the computed fit-content size, so the container's total size is the sum of child sizes (plus margins) and its own padding.
+
+### Fill
+
+The `fill` unit allows an element to expand and occupy the remaining available space in its parent container along the specified dimension. This is useful for creating flexible layouts where one element takes up the leftover space after other elements are sized.
+
+For example, in a horizontal layout with fixed-width elements and one `fill` element, the `fill` element will stretch to fill the remaining width.
+
+```css
+[panel direction="row" width=350] {
+  [panel width=100] { Fixed width }
+  [panel width=fill] { This fills the rest }
+}
+```
+
+Fill respects margins and padding of the parent container. It means that for a single child element, `fill` expands to occupy the available space within the parent's content area (after subtracting padding), whereas `width=100%` makes the element span the full width of the parent, including any padding. This means `fill` results in a slightly smaller size when the parent has padding, as it fits inside the padded area.
+
+When `wrap=true`, `fill` elements expand to fill all remaining space in their current row, starting from their position after preceding elements. Subsequent elements that don't fit wrap to the next row.
+
+```css
+[panel width=350 direction=row wrap=true] {
+  [panel width=100 height=1em] { First (y=0) }
+  [panel width=fill height=1em] { Fills remaining in row (350 - 100, y=0) }
+  [panel width=150 height=1em] { Second, wraps to next row, (y=1em) }
+  [panel width=fill height=1em] { Fills remaining in row (350 - 150, y=1em)  }
+}
+```
+
+```css
+[panel width=350 direction=row wrap=true] {
+  [panel width=fill height=1em] { Fills the first row (w=350, y=0)  }
+  [panel width=fill height=1em] { Fills the second row (w=350, y=1em)  }
+}
+```
 
 #### With Percentage Units
 
@@ -408,7 +443,7 @@ Options include:
   +-----------------+
   ```
 
-- **`stretch`** (fill): Elements stretch to fill the available space along the off-axis. This is the default behavior.
+- **`stretch`**: Elements stretch to fill the available space along the off-axis.
   ```
   Container (direction=row, align-items=stretch):
   +-----------------+

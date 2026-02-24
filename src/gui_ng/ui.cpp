@@ -413,6 +413,8 @@ static ParsedUnit parseUnit(StringView str) {
 	if (!str.empty()) {
 		if (str == "fit-content") {
 			unit = Unit::FIT_CONTENT;
+		} else if (str == "fill") {
+			unit = Unit::FILL;
 		} else {
 			fromCString(str, value);
 			if (str.size() >= 1 && str.back() == '%') {
@@ -597,6 +599,8 @@ static void layoutChildren(Document& doc, Element& parent) {
 
 	};
 
+
+
 	float current_main_pos = main_start;
 	float current_cross_pos = cross_start;
 	u32 current_line_start = 0;
@@ -612,7 +616,26 @@ static void layoutChildren(Document& doc, Element& parent) {
 
 		float margin_start = get_margin_start(child);
 		float margin_end = get_margin_end(child);
+		bool is_fill = is_row ? child.fill_width : child.fill_height;
 		float child_main_size = get_main_size(child);
+		if (is_fill) {
+			child_main_size = maximum(0.0f, parent_main_size - (current_main_pos - main_start) - margin_start);
+			if (child_main_size == 0 && wrap) {
+				// Process current line if there are elements
+				if (i > current_line_start) {
+					processLine(current_line_start, i - 1, current_cross_pos, current_line_max_cross);
+				}
+				// Start new line
+				current_line_start = i;
+				current_main_pos = main_start;
+				current_cross_pos += current_line_max_cross;
+				current_line_max_cross = 0;
+				is_first_in_line = true;
+				// Recalculate size for fill element on new line
+				child_main_size = maximum(0.0f, parent_main_size - margin_start);
+			}
+			get_main_size(child) = child_main_size;
+		}
 		float effective_margin = is_first_in_line ? margin_start : maximum(prev_margin_end, margin_start);
 
 		// Check if fits in current line
@@ -700,8 +723,12 @@ static void applyAttributes(Document& doc, Element& elem, const ParentContext& p
 				if (width_unit.unit == Unit::FIT_CONTENT) {
 					elem.fit_content_width = true;
 					elem.size.x = 0;
+				} else if (width_unit.unit == Unit::FILL) {
+					elem.fill_width = true;
+					elem.size.x = 0;
 				} else {
 					elem.fit_content_width = false;
+					elem.fill_width = false;
 				}
 				break;
 			}
@@ -710,8 +737,12 @@ static void applyAttributes(Document& doc, Element& elem, const ParentContext& p
 				if (height_unit.unit == Unit::FIT_CONTENT) {
 					elem.fit_content_height = true;
 					elem.size.y = 0;
+				} else if (height_unit.unit == Unit::FILL) {
+					elem.fill_height = true;
+					elem.size.y = 0;
 				} else {
 					elem.fit_content_height = false;
+					elem.fill_height = false;
 				}
 				break;
 			}

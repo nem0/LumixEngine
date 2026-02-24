@@ -77,7 +77,8 @@ enum class Unit : u8 {
 	PIXELS,
 	PERCENT,
 	EM,
-	FIT_CONTENT
+	FIT_CONTENT,
+	FILL
 };
 
 struct IFontManager {
@@ -132,6 +133,8 @@ struct Element {
 	Align text_align = Align::LEFT;
 	bool fit_content_width = false;
 	bool fit_content_height = false;
+	bool fill_width = false;
+	bool fill_height = false;
 	bool wrap = false;
 };
 

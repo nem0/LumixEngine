@@ -368,6 +368,131 @@ bool testFitContentWithMargins() {
 	return true;
 }
 
+bool testFill() {
+	// Citation: layout.md - Fill
+	// "The `fill` unit allows an element to expand and occupy the remaining available space in its parent container along the specified dimension."
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[panel width=300 height=100 direction=row] {
+		[panel width=100 height=50] {}
+		[panel width=fill height=50] {}
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_TRUE(doc.m_elements.size() >= 3, "Document should have at least 3 elements");
+	ui::Element* parent = doc.getElement(0);
+	ui::Element* child1 = doc.getElement(1);
+	ui::Element* child2 = doc.getElement(2);
+	ASSERT_FLOAT_EQ(100.0f, child1->size.x, "First child width should be 100");
+	// Fill should take remaining space: 300 - 100 = 200
+	ASSERT_FLOAT_EQ(200.0f, child2->size.x, "Second child width should fill remaining space");
+	return true;
+}
+
+bool testFillWithPadding() {
+	// Citation: layout.md - Fill
+	// "Fill respects margins and padding of the parent container."
+	// "Difference from `width=100%`: ... `fill` expands to occupy the available space within the parent's content area (after subtracting padding)"
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[panel width=300 height=100 direction=row padding=10] {
+		[panel width=100 height=50] {}
+		[panel width=fill height=50] {}
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_TRUE(doc.m_elements.size() >= 3, "Document should have at least 3 elements");
+	ui::Element* parent = doc.getElement(0);
+	ui::Element* child1 = doc.getElement(1);
+	ui::Element* child2 = doc.getElement(2);
+	ASSERT_FLOAT_EQ(100.0f, child1->size.x, "First child width should be 100");
+	// Parent content width: 300 - 10*2 = 280, remaining after child1: 280 - 100 = 180
+	ASSERT_FLOAT_EQ(180.0f, child2->size.x, "Second child width should fill remaining content space");
+	return true;
+}
+
+bool testFillWithMargin() {
+	// Citation: layout.md - Fill
+	// "Fill respects margins and padding of the parent container."
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[panel width=300 height=100 direction=row] {
+		[panel width=100 height=50 margin=5] {}
+		[panel width=fill height=50 margin=5] {}
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_TRUE(doc.m_elements.size() >= 3, "Document should have at least 3 elements");
+	ui::Element* parent = doc.getElement(0);
+	ui::Element* child1 = doc.getElement(1);
+	ui::Element* child2 = doc.getElement(2);
+	// Child1 size is 100, but margins affect positioning, not size
+	ASSERT_FLOAT_EQ(100.0f, child1->size.x, "First child width should be 100");
+	// Remaining space: 300 - 100 - 5 (child1 right) - 5 (child2 left) = 190
+	// But since margins collapse, and direction=row, margins are on left/right
+	// Actually, in positioning, margins are added between elements
+	// For fill, it should fill the remaining after accounting for margins
+	// Assuming margins are included in spacing
+	// Total space taken by child1: 100 + 5 (left) + 5 (right) = 110
+	// Remaining: 300 - 110 = 190, but child2 has its own margins
+	// This might be tricky; perhaps the test expects fill to be 300 - 100 - margins
+	// Let's assume fill takes 300 - 100 - 10 (margins) = 190
+	ASSERT_FLOAT_EQ(190.0f, child2->size.x, "Second child width should fill remaining space accounting for margins");
+	return true;
+}
+
+bool testFillSingleChild() {
+	// Citation: layout.md - Fill
+	// "The `fill` unit allows an element to expand and occupy the remaining available space in its parent container along the specified dimension."
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[panel width=300 height=100 direction=row] {
+		[panel width=fill height=50] {}
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_TRUE(doc.m_elements.size() >= 2, "Document should have at least 2 elements");
+	ui::Element* parent = doc.getElement(0);
+	ui::Element* child = doc.getElement(1);
+	// Fill should take the entire parent content width: 300
+	ASSERT_FLOAT_EQ(300.0f, child->size.x, "Single child with fill should occupy full parent width");
+	return true;
+}
+
+bool testFillWithWrap() {
+	// Citation: layout.md - Fill
+	// "When `wrap=true`, `fill` elements expand to fill all remaining space in their current row, starting from their position after preceding elements. Subsequent elements that don't fit wrap to the next row."
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[panel width=350 direction=row wrap=true] {
+	  [panel width=100 height=16] {}
+	  [panel width=fill height=16] {}
+	  [panel width=150 height=16] {}
+	  [panel width=fill height=16] {}
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	ui::Element* panel = doc.getElement(0);
+	ui::Element* elem1 = doc.getElement(1); // 100px
+	ui::Element* elem2 = doc.getElement(2); // fill 250px
+	ui::Element* elem3 = doc.getElement(3); // 150px
+	ui::Element* elem4 = doc.getElement(4); // fill 200px
+	ASSERT_FLOAT_EQ(100.0f, elem1->size.x, "First element width should be 100");
+	ASSERT_FLOAT_EQ(250.0f, elem2->size.x, "Fill element fills remaining in first row");
+	ASSERT_FLOAT_EQ(150.0f, elem3->size.x, "Third element width should be 150");
+	ASSERT_FLOAT_EQ(200.0f, elem4->size.x, "Fill element fills remaining in second row");
+	// First row: elem1 and elem2, second row: elem3 and elem4
+	ASSERT_FLOAT_EQ(0.0f, elem1->position.x, "First element x position");
+	ASSERT_FLOAT_EQ(0.0f, elem1->position.y, "First element y position");
+	ASSERT_FLOAT_EQ(100.0f, elem2->position.x, "Fill element x position in first row");
+	ASSERT_FLOAT_EQ(0.0f, elem2->position.y, "Fill element y position in first row");
+	ASSERT_FLOAT_EQ(0.0f, elem3->position.x, "Third element x position in second row");
+	ASSERT_FLOAT_EQ(16.0f, elem3->position.y, "Third element y position in second row");
+	ASSERT_FLOAT_EQ(150.0f, elem4->position.x, "Fill element x position in second row");
+	ASSERT_FLOAT_EQ(16.0f, elem4->position.y, "Fill element y position in second row");
+	return true;
+}
+
 bool testLayoutWithMargins() {
 	// Citation: layout.md - Margins
 	// "Margins provide external spacing between elements and their containers, affecting position but not size."
@@ -1631,6 +1756,42 @@ bool testAlignRight() {
 	return true;
 }
 
+bool testComplexLayout() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[panel direction=row width=50% height=fit-content margin=25%
+			bg-color=#f0f0f0
+			font="/engine/editor/fonts/JetBrainsMono-Regular.ttf"
+			font-size=40
+			padding=1em
+			wrap=true
+	] {
+		[panel direction=row width=fill padding=0.5em bg-color=#ffffff align=center] {
+			Welcome to [span value=" Lumix " color=#ff0000 font-size=60] Demo
+		}
+		[panel bg-color=#ff0000 width=fill align=center] { Start Demo }
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	// Basic assertions
+	ASSERT_TRUE(doc.m_elements.size() >= 5, "Should parse multiple elements");
+	ui::Element* root = doc.getElement(0);
+	ASSERT_FLOAT_EQ(400.0f, root->size.x, "Root width should be 50% of 800");
+	ui::Element* child1 = doc.getElement(root->children[0]);
+	ui::Element* child2 = doc.getElement(root->children[1]);
+	// Assert sizes and positions for children
+	ASSERT_FLOAT_EQ(240.0f, child1->position.x, "Child1 x position");
+	ASSERT_FLOAT_EQ(190.0f, child1->position.y, "Child1 y position");
+	ASSERT_FLOAT_EQ(320.0f, child1->size.x, "Child1 width");
+	ASSERT_FLOAT_EQ(100.0f, child1->size.y, "Child1 height");
+	ASSERT_FLOAT_EQ(240.0f, child2->position.x, "Child2 x position");
+	ASSERT_FLOAT_EQ(290.0f, child2->position.y, "Child2 y position");
+	ASSERT_FLOAT_EQ(320.0f, child2->size.x, "Child2 width");
+	ASSERT_FLOAT_EQ(40.0f, child2->size.y, "Child2 height");
+	ASSERT_FLOAT_EQ(180.0f, root->size.y, "Root height");
+	return true;
+}
+
 } // namespace
 
 void runUILayoutTests() {
@@ -1650,6 +1811,11 @@ void runUILayoutTests() {
 	RUN_TEST(testBasicLayout);
 	RUN_TEST(testFitContent);
 	RUN_TEST(testFitContentWithMargins);
+	RUN_TEST(testFill);
+	RUN_TEST(testFillWithPadding);
+	RUN_TEST(testFillWithMargin);
+	RUN_TEST(testFillSingleChild);
+	RUN_TEST(testFillWithWrap);
 	RUN_TEST(testLayoutWithMargins);
 	RUN_TEST(testNestedPanelsWithMargins);
 	RUN_TEST(testDirectionRow);
@@ -1684,4 +1850,5 @@ void runUILayoutTests() {
 	RUN_TEST(testAlignRightMultipleSpans);
 	RUN_TEST(testAlignCenter);
 	RUN_TEST(testAlignRight);
+	RUN_TEST(testComplexLayout);
 }

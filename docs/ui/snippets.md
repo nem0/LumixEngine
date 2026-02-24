@@ -34,6 +34,7 @@
   - [Percentage Sizing](#percentage-sizing)
   - [EM Units](#em-units)
   - [Fit Content](#fit-content)
+  - [Fill](#fill)
 - [Colors and Theming](#colors-and-theming)
   - [Hex Colors](#hex-colors)
 
@@ -289,6 +290,15 @@
 ```css
 [panel width="fit-content"] {
     This panel sizes to content
+}
+```
+
+### Fill
+
+```css
+[panel direction="row" width=300] {
+    [panel width=100] { Fixed size }
+    [panel width="fill"] { Fills remaining space }
 }
 ```
 

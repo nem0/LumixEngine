@@ -8,7 +8,7 @@
 | `class` | One or more class names for grouping and shared styling or behavior. Values should be enclosed in double quotes. | (no default) |
 | `visible` | Controls the visibility of the element. | `true` |
 
-Note: sizing-related attributes (see below) accept numeric values, percentages, `em` units, or the keyword `fit-content` to size an element to its content (subject to parent constraints).
+Note: sizing-related attributes (see below) accept numeric values, percentages, `em` units, or the keywords `fit-content` or `fill` to size an element to its content (subject to parent constraints).
 
 ## Sizing and layout properties
 
@@ -22,7 +22,7 @@ Supported by all elements.
 | `padding` | Space inside the element border, around the content in all directions. | `0` |
 | `align` | Text alignment. Values: `left`, `center`, `right`. | `left` |
 
-These attributes accept `NUMBER`, `PERCENT` (e.g. `50%`), `em` units (e.g. `2em`), or the `fit-content` keyword (for example: `width=fit-content`).
+These attributes accept `NUMBER`, `PERCENT` (e.g. `50%`), `em` units (e.g. `2em`), the `fit-content` keyword, or the `fill` keyword (for example: `width=fit-content` or `width=fill`).
 
 ## panel
 
@@ -36,7 +36,7 @@ Rectangular container that can have children.
 | `direction` | Layout direction of child elements. Values: `row` (horizontal), `column` (vertical). | `row` |
 | `wrap` | Layout overflow behavior. Values: `true`, `false`. | `false` |
 | `justify-content` | Distribution of child elements along the main axis. Values: `start`, `center`, `end`, `space-between`, `space-around`. | `start` |
-| `align-items` | Cross-axis alignment for children. Values: `start`, `center`, `end`, `stretch`. | `stretch` |
+| `align-items` | Cross-axis alignment for children. Values: `start`, `center`, `end`, `stretch`. | `start` |
 
 ## image
 
