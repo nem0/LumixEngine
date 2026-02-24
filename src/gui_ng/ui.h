@@ -192,15 +192,10 @@ struct Document {
 	void render(Draw2D& draw) const;
 	Element* getElementAt(Vec2 pos);
 
+	//@ function
 	Span<const Event> getEvents();
 	void injectEvent(const InputSystem::Event& event);
 	void clearEvents();
-
-	// TODO replace this with getEvents once meta supports Span
-	//@ function
-	u32 getNumEvents() { return m_events.size(); }
-	//@ function
-	ui::Event getEvent(u32 index) { return m_events[index]; }
 
 private:
 	template <typename... Args>

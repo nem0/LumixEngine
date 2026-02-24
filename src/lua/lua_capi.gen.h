@@ -3005,25 +3005,11 @@ namespace Lumix {
 					LuaWrapper::checkTableArg(L, 1); // self
 					ui::Document* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
-					auto res = obj->getNumEvents();
+					auto res = obj->getEvents();
 					LuaWrapper::push(L, res);
 					return 1;
 				};
-				const char* name = "getNumEvents";
-				lua_pushcfunction(L, proxy, name);
-				lua_setfield(L, -2, name);
-			}
-			{
-				auto proxy = [](lua_State* L) -> int {
-					LuaWrapper::checkTableArg(L, 1); // self
-					ui::Document* obj;
-					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
-					auto index = LuaWrapper::checkArg<u32>(L, 2);
-					auto res = obj->getEvent(index);
-					LuaWrapper::push(L, res);
-					return 1;
-				};
-				const char* name = "getEvent";
+				const char* name = "getEvents";
 				lua_pushcfunction(L, proxy, name);
 				lua_setfield(L, -2, name);
 			}

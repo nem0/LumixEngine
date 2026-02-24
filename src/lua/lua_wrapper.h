@@ -4,6 +4,7 @@
 
 #include "core/color.h"
 #include "core/math.h"
+#include "core/span.h"
 #include "core/metaprogramming.h"
 #include "core/path.h"
 #include "engine/resource.h"
@@ -462,6 +463,16 @@ template <typename T> inline void push(lua_State* L, T* value)
 template <typename T> inline void push(lua_State* L, const T* value)
 {
 	lua_pushlightuserdata(L, (T*)value);
+}
+
+template <typename T> inline void push(lua_State* L, Span<const T> value) {
+	void push(lua_State*, const T&);
+	u32 n = value.length();
+	lua_createtable(L, n, 0);
+	for (u32 i = 0; i < n; ++i) {
+		push(L, value[i]);
+		lua_rawseti(L, -2, i + 1);
+	}
 }
 
 inline void push(lua_State* L, float value)
