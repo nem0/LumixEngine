@@ -1,6 +1,8 @@
 #include "core/log.h"
 #include "core/profiler.h"
 #include "core/string.h"
+#include "engine/resource_manager.h"
+#include "gui/sprite.h"
 #include "renderer/draw2d.h"
 #include "renderer/font.h"
 #include "ui.h"
@@ -703,6 +705,7 @@ static void applyAttributes(Document& doc, Element& elem, const ParentContext& p
 	elem.font_size = parent.font_size;
 	elem.color = parent.color;
 	elem.bg_color = Color(0);
+	elem.bg_image = StringView();
 	for (int i = 0; i < 4; ++i) {
 		elem.margins[i] = 0;
 		elem.paddings[i] = 0;
@@ -768,6 +771,13 @@ static void applyAttributes(Document& doc, Element& elem, const ParentContext& p
 			}
 			case AttributeName::FONT: ctx.font = attr.value; break;
 			case AttributeName::BG_COLOR: elem.bg_color = parseColor(attr.value); break;
+			case AttributeName::BACKGROUND_IMAGE: {
+				elem.bg_image = attr.value;
+				if (doc.m_resource_manager && !attr.value.empty()) {
+					elem.bg_sprite = doc.m_resource_manager->load<Sprite>(Path(attr.value));
+				}
+				break;
+			}
 			case AttributeName::VALUE: elem.value = attr.value; break;
 			case AttributeName::JUSTIFY_CONTENT: elem.justify_content = parseJustifyContent(attr.value); break;
 			case AttributeName::ALIGN_ITEMS: elem.align_items = parseAlignItems(attr.value); break;
@@ -937,7 +947,12 @@ static void renderElement(Draw2D& draw, const Document& doc, u32 element_idx, co
 	Vec2 size = Vec2(element.size.x, element.size.y);
 
 	switch (element.tag) {
-		case Tag::PANEL: draw.addRectFilled(pos, pos + size, element.bg_color); break;
+		case Tag::PANEL: {
+			if (element.bg_sprite) {
+				element.bg_sprite->render(draw, pos.x, pos.y, pos.x + size.x, pos.y + size.y, Color::WHITE);
+			}
+			draw.addRectFilled(pos, pos + size, element.bg_color); break;
+		}
 		case Tag::SPAN: {
 			if (element.font_handle && !element.value.empty()) {
 				const Font& font = *(const Font*)element.font_handle;

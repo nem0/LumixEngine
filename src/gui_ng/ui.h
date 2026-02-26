@@ -10,6 +10,7 @@
 namespace Lumix {
 
 struct Draw2D;
+struct Sprite;
 
 namespace ui {
 
@@ -119,6 +120,8 @@ struct Element {
 	// runtime computed data
 	StringView value;
 	StringView style_class;
+	StringView bg_image;
+	Sprite* bg_sprite = nullptr;
 	IFontManager::FontHandle font_handle = nullptr;
 	Vec2 position;
 	Vec2 size;
@@ -171,6 +174,7 @@ struct Document {
 	bool m_suppress_logging = false;
 	UITokenizer m_tokenizer;
 	IFontManager* m_font_manager;
+	struct ResourceManagerHub* m_resource_manager;
 	IAllocator& m_allocator;
 	Vec2 m_canvas_size;
 	String m_content;
@@ -182,6 +186,7 @@ struct Document {
 		, m_suppress_logging(false)
 		, m_tokenizer()
 		, m_font_manager(font_manager)
+		, m_resource_manager(nullptr)
 		, m_allocator(allocator)
 		, m_canvas_size(0, 0)
 		, m_content(allocator)

@@ -6,6 +6,7 @@
 #include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/input_system.h"
+#include "engine/resource_manager.h"
 #include "engine/world.h"
 #include "gui_ng/ui.h"
 #include "gui_ng_module.h"
@@ -25,7 +26,9 @@ struct GUINGModuleImpl : GUINGModule {
 		, m_allocator(allocator)
 		, m_font_manager(m_system.getEngine())
 		, m_document(&m_font_manager, m_allocator)
-	{}
+	{
+		m_document.m_resource_manager = &m_system.getEngine().getResourceManager();
+	}
 
 	~GUINGModuleImpl() {}
 

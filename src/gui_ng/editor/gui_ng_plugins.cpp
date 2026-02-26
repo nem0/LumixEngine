@@ -65,6 +65,7 @@ struct UIEditorWindow : AssetEditorWindow {
 		m_pipeline = Pipeline::create(renderer, PipelineType::GUI_EDITOR);
 		m_font_manager = LUMIX_NEW(m_app.getAllocator(), UIFontManager)(engine);
 		m_document = LUMIX_NEW(m_app.getAllocator(), ui::Document)(m_font_manager, m_app.getAllocator());
+		m_document->m_resource_manager = &engine.getResourceManager();
 
 		m_editor = createGUICodeEditor(m_app);
 		m_editor->focus();
