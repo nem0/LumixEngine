@@ -10,6 +10,7 @@
 - [Element Sizing](#element-sizing)
   - [Units](#units)
   - [Fit-Content](#fit-content)
+  - [Grow](#grow)
 - [Element Positioning](#element-positioning)
   - [Positioning Algorithm](#positioning-algorithm)
   - [Justification](#justification)
@@ -176,8 +177,6 @@ Dimensions support these units:
 
 - **fit-content**: Auto-size to content. For panels, sums child sizes. E.g., `width=fit-content`.
 
-- **fill**: Expands the element to fill the remaining space in the parent container. 
-
 Mix units freely, e.g., `width=50% height=2em`.
 
 ### Fit-Content
@@ -193,38 +192,40 @@ function fitContentSize(container):
 
 When using `fit-content` sizing, margins are included in the total size calculation for containers, ensuring spacing between children is preserved. Padding is added to the computed fit-content size, so the container's total size is the sum of child sizes (plus margins) and its own padding.
 
-### Fill
+### Grow
 
-The `fill` unit allows an element to expand and occupy the remaining available space in its parent container along the specified dimension. This is useful for creating flexible layouts where one element takes up the leftover space after other elements are sized.
-
-For example, in a horizontal layout with fixed-width elements and one `fill` element, the `fill` element will stretch to fill the remaining width.
+The `grow` attribute controls how an element expands to fill available space in its parent container along the main axis, similar to CSS `flex-grow`. It is a numeric weight (default `0`, meaning no growing). Elements with a non-zero `grow` value share the remaining space in proportion to their weights after all fixed-size children have been measured.
 
 ```css
 [panel direction="row" width=350] {
   [panel width=100] { Fixed width }
-  [panel width=fill] { This fills the rest }
+  [panel grow=1] { Grows to fill the rest (250px) }
 }
 ```
 
-Fill respects margins and padding of the parent container. It means that for a single child element, `fill` expands to occupy the available space within the parent's content area (after subtracting padding), whereas `width=100%` makes the element span the full width of the parent, including any padding. This means `fill` results in a slightly smaller size when the parent has padding, as it fits inside the padded area.
-
-When `wrap=true`, `fill` elements expand to fill all remaining space in their current row, starting from their position after preceding elements. Subsequent elements that don't fit wrap to the next row.
+Multiple growing elements split the remaining space proportionally:
 
 ```css
-[panel width=350 direction=row wrap=true] {
-  [panel width=100 height=1em] { First (y=0) }
-  [panel width=fill height=1em] { Fills remaining in row (350 - 100, y=0) }
-  [panel width=150 height=1em] { Second, wraps to next row, (y=1em) }
-  [panel width=fill height=1em] { Fills remaining in row (350 - 150, y=1em)  }
+[panel direction="row" width=400] {
+  [panel width=100] { Fixed (100px) }
+  [panel grow=2] { Gets 2/3 of remaining 300px = 200px }
+  [panel grow=1] { Gets 1/3 of remaining 300px = 100px }
 }
 ```
 
+Left-fill-right (the classic toolbar pattern) works correctly because growing is computed in a two-pass manner — fixed children are sized first, then remaining space is distributed among all `grow` children:
+
 ```css
-[panel width=350 direction=row wrap=true] {
-  [panel width=fill height=1em] { Fills the first row (w=350, y=0)  }
-  [panel width=fill height=1em] { Fills the second row (w=350, y=1em)  }
+[panel direction="row" width=400] {
+  [panel width=100] { Left }
+  [panel grow=1] { Middle (200px) }
+  [panel width=100] { Right }
 }
 ```
+
+Grow respects the parent's padding: available space is the content area after subtracting padding, and each growing child's margin is also subtracted before distributing.
+
+When `wrap=true`, growing is applied per row (or per column for `direction=column`) independently, distributing the leftover space within each line after fixed-size children on that line are measured.
 
 #### With Percentage Units
 
@@ -269,6 +270,16 @@ function layoutContainer(container):
     // 2. Arrange by direction with wrapping
     mainAxis = (container.direction == 'row') ? 'horizontal' : 'vertical'
     crossAxis = (mainAxis == 'horizontal') ? 'vertical' : 'horizontal'
+
+    function distributeGrow(children, availableMain):
+        // Two-pass grow distribution within a line
+        fixedTotal = sum of (child.size[mainAxis] + child.margins[mainAxis]) for child where child.grow == 0
+        totalGrow  = sum of child.grow for child where child.grow > 0
+        remaining  = availableMain - fixedTotal
+        for each child where child.grow > 0:
+            child.size[mainAxis] = max(0, remaining * child.grow / totalGrow)
+                                   - child.margins[mainAxis]
+
     if container.wrap == 'wrap':
         // Wrap children into lines (each line is an object with children, size, and crossPos)
         lines = wrapChildrenIntoLines(container.children, mainAxis, containerSize[mainAxis])
@@ -277,6 +288,8 @@ function layoutContainer(container):
         currentCrossPos = container.padding[crossAxis == 'vertical' ? 'top' : 'left']
         for each line in lines:
             line.crossPos = currentCrossPos
+            // Distribute grow within this line
+            distributeGrow(line.children, containerSize[mainAxis])
             // Position children sequentially within the line along main-axis
             positionChildrenSequentially(line.children, mainAxis, 0)  // No padding for lines
             // Justify children within the line
@@ -286,7 +299,8 @@ function layoutContainer(container):
             // Advance cross position by line size
             currentCrossPos += line.size[crossAxis]
     else:
-        // No wrapping: treat all children as one line
+        // No wrapping: distribute grow across all children then treat as one line
+        distributeGrow(container.children, containerSize[mainAxis])
         positionChildrenSequentially(container.children, mainAxis, container.padding[mainAxis == 'horizontal' ? 'left' : 'top'])
         justifyChildren(container.children, container.justifyContent, mainAxis, containerSize[mainAxis])
         alignChildrenOffAxis(container.children, container.alignItems, crossAxis, containerSize[crossAxis])

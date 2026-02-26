@@ -35,6 +35,8 @@ struct Sprite final : Resource {
 	i32 left = 0;
 	i32 right = 0;
 
+	void render(struct Draw2D& draw, float l, float t, float r, float b, struct Color color);
+
 	static const ResourceType TYPE;
 
 private:

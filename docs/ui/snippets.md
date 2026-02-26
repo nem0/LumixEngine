@@ -34,7 +34,7 @@
   - [Percentage Sizing](#percentage-sizing)
   - [EM Units](#em-units)
   - [Fit Content](#fit-content)
-  - [Fill](#fill)
+  - [Grow](#grow)
 - [Colors and Theming](#colors-and-theming)
   - [Hex Colors](#hex-colors)
 
@@ -293,12 +293,31 @@
 }
 ```
 
-### Fill
+### Grow
 
 ```css
 [panel direction="row" width=300] {
     [panel width=100] { Fixed size }
-    [panel width="fill"] { Fills remaining space }
+    [panel grow=1] { Fills remaining space }
+}
+```
+
+Left-fill-right (fixed on both sides, growing middle):
+
+```css
+[panel direction="row" width=400] {
+    [panel width=100] { Left }
+    [panel grow=1] { Middle }
+    [panel width=100] { Right }
+}
+```
+
+Split remaining space in a 2:1 ratio:
+
+```css
+[panel direction="row" width=400] {
+    [panel grow=2] { Gets 2/3 }
+    [panel grow=1] { Gets 1/3 }
 }
 ```
 

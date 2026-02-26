@@ -132,7 +132,7 @@ bool testBlockAttributes() {
 
 bool testPanelAttributes() {
 	MockDocument doc;
-	ASSERT_PARSE(doc, "[panel background-image=\"bg.png\" background-fit=cover bg-color=#000000 direction=column wrap=true justify-content=center]");
+	ASSERT_PARSE(doc, "[panel bg-image=\"bg.png\" bg-fit=cover bg-color=#000000 direction=column wrap=true justify-content=center]");
 	ASSERT_EQ(1, doc.m_roots.size(), "Should parse 1 element");
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	Span<ui::Attribute> attrs = root->attributes;

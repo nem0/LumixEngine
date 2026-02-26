@@ -62,8 +62,8 @@ static AttributeName parseAttributeName(StringView str) {
 			break;
 		case 'b':
 			if (len == 8 && memcmp(s, "bg-color", 8) == 0) return AttributeName::BG_COLOR;
-			if (len == 14 && memcmp(s, "background-fit", 14) == 0) return AttributeName::BACKGROUND_FIT;
-			if (len == 16 && memcmp(s, "background-image", 16) == 0) return AttributeName::BACKGROUND_IMAGE;
+			if (len == 6 && memcmp(s, "bg-fit", 6) == 0) return AttributeName::BACKGROUND_FIT;
+			if (len == 8 && memcmp(s, "bg-image", 8) == 0) return AttributeName::BACKGROUND_IMAGE;
 			break;
 		case 'c':
 			if (len == 5 && memcmp(s, "class", 5) == 0) return AttributeName::CLASS;
