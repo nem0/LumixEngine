@@ -20,15 +20,11 @@ if "%msbuild_cmd%"=="" (
 )
 :msbuild_found
 
-REM Ensure solution exists
-if not exist "tmp\vs2022\LumixEngine.sln" (
-  echo Solution not found, generating with genie.exe...
-  genie.exe --with-tests vs2022
-  if not %errorlevel%==0 (
-    echo Failed to generate solution.
-    popd
-    exit /b 1
-  )
+genie.exe --with-tests vs2022
+if not %errorlevel%==0 (
+  echo Failed to generate solution.
+  popd
+  exit /b 1
 )
 
 REM Build solution
@@ -65,7 +61,7 @@ if exist "tmp\vs2022\bin\Debug\tests.exe" (
   echo All tests completed successfully.
   exit /b 0
 ) else (
-  echo No test executables found in %BIN_DIR%
+  echo No test executable found at tmp\vs2022\bin\Debug\tests.exe
   popd
   exit /b 2
 )

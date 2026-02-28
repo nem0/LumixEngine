@@ -2,6 +2,8 @@
 
 ## Table of Contents
 
+
+- [Layout Algorithm Overview](#layout-algorithm-overview)
 - [Text](#text)
   - [Multiline Strings](#multiline-strings)
   - [Inline Flow](#inline-flow)
@@ -22,6 +24,20 @@
     - [Margin-Padding Interaction](#margin-padding-interaction)
     - [Positioning Calculations](#positioning-calculations)
 - [Z-Order (Implicit Stacking)](#z-order-implicit-stacking)
+
+## Layout Algorithm Overview
+
+| Index | Step | What Happens | Computed / Updated Properties |
+| --- | --- | --- | --- |
+| 1.1. | Base widths (top-down) | Resolve explicit width-like units and measure unwrapped text for spans | `width` (pixels/%, `em`), horizontal `margin-left`/`margin-right`, horizontal `padding-left`/`padding-right`, text intrinsic width for spans (unwrapped) |
+| 1.2. | Fit-content widths (bottom-up) | Infer container widths from children | `width` for `fit-content` parents (row: sum of child widths + margins + padding; column: max child width + margins + padding) |
+| 1.3. | Form lines | Split children into lines/columns when `wrap=true` | Per-container `lines` (child index ranges per line), per-line max cross size seed |
+| 1.4. | Distribute grow on width (per line) | Share remaining main-axis space among `grow>0` children | Updated child `width` on each line; respects horizontal padding and collapsed margins; only along main axis (`direction=row`). Also stretch children if parent is `align-items=stretch direction=column` |
+| 2. | Wrap text | Break span text into visual lines and place them horizontally | Per-span `lines` (with positions), text `height` from wrapped lines, per-line horizontal offset using `align` (`left`/`center`/`right`) |
+| 3.1. | Base heights (top-down) | Resolve explicit height-like units | `height` (pixels/%, `em`), vertical `margin-top`/`margin-bottom`, vertical `padding-top`/`padding-bottom` |
+| 3.2. | Fit-content heights (bottom-up) | Infer container heights from children | `height` for `fit-content` parents (column: sum of child heights + margins + padding; row: max child height + margins + padding) |
+| 3.3. | Distribute grow on height | Share remaining main-axis space among `grow>0` along height | Updated `height` where the main axis is vertical (`direction=column`); may stretch cross-axis when `align-items=stretch` is in effect |
+| 4. | Compute positions | Final placement along main and cross axes | `position.x`, `position.y`; margin collapsing; `justify-content` (main-axis distribution); `align-items` (cross-axis alignment per line); per-line application when `wrap=true` |
 
 ## Text
 
@@ -67,9 +83,8 @@ The above renders as: `Text with multiple spaces` (consecutive spaces collapsed)
 
 ### Inline Flow
 
-Inline flow arranges **separate inline elements** (`span`s, text strings) sequentially along the container's main axis:
-- `direction="row"` -> spans side-by-side -> `"A" "B"` becomes `A B`
-- `direction="column"` -> spans stacked -> `"A"` above `"B"`
+Inline flow arranges **separate inline elements** (`span`s, text strings) horizontally, regardless of the container's direction:
+- spans side-by-side -> `"A" "B"` becomes `A B`
 
 Text content always renders **horizontally** (left-to-right), regardless of `direction`.
 
@@ -181,15 +196,6 @@ Mix units freely, e.g., `width=50% height=2em`.
 
 ### Fit-Content
 
-```js
-function fitContentSize(container):
-    size = 0
-    for child in container.children:
-        size += child.size + child.margin
-    size += container.padding
-    return size
-```
-
 When using `fit-content` sizing, margins are included in the total size calculation for containers, ensuring spacing between children is preserved. Padding is added to the computed fit-content size, so the container's total size is the sum of child sizes (plus margins) and its own padding.
 
 ### Grow
@@ -243,147 +249,7 @@ The `direction` attribute controls the primary axis along which child elements a
 
 The layout system positions elements within containers using this algorithm:
 
-### Positioning Algorithm
-
-```js
-function layoutContainer(container):
-    // 1. Determine container size
-    if container.width == 'fit-content' or container.height == 'fit-content':
-        // Measure children with 0 available space
-        for each child in container.children:
-            child.size = calculateSize(child, 0)
-        
-        // Calculate container size as sum of children plus padding
-        containerSize = sumChildSizes(container.children, container.direction) + container.padding
-        if container.width == 'fit-content':
-            container.width = containerSize.width
-        if container.height == 'fit-content':
-            container.height = containerSize.height
-    else:
-        // Use fixed or inherited size
-        containerSize = getSize(container)
-        
-        // Measure children with container constraints
-        for each child in container.children:
-            child.size = calculateSize(child, containerSize)
-
-    // 2. Arrange by direction with wrapping
-    mainAxis = (container.direction == 'row') ? 'horizontal' : 'vertical'
-    crossAxis = (mainAxis == 'horizontal') ? 'vertical' : 'horizontal'
-
-    function distributeGrow(children, availableMain):
-        // Two-pass grow distribution within a line
-        fixedTotal = sum of (child.size[mainAxis] + child.margins[mainAxis]) for child where child.grow == 0
-        totalGrow  = sum of child.grow for child where child.grow > 0
-        remaining  = availableMain - fixedTotal
-        for each child where child.grow > 0:
-            child.size[mainAxis] = max(0, remaining * child.grow / totalGrow)
-                                   - child.margins[mainAxis]
-
-    if container.wrap == 'wrap':
-        // Wrap children into lines (each line is an object with children, size, and crossPos)
-        lines = wrapChildrenIntoLines(container.children, mainAxis, containerSize[mainAxis])
-        
-        // Position lines along cross-axis starting from container padding
-        currentCrossPos = container.padding[crossAxis == 'vertical' ? 'top' : 'left']
-        for each line in lines:
-            line.crossPos = currentCrossPos
-            // Distribute grow within this line
-            distributeGrow(line.children, containerSize[mainAxis])
-            // Position children sequentially within the line along main-axis
-            positionChildrenSequentially(line.children, mainAxis, 0)  // No padding for lines
-            // Justify children within the line
-            justifyChildren(line.children, container.justifyContent, mainAxis, containerSize[mainAxis])
-            // Align children off-axis within the line
-            alignChildrenOffAxis(line.children, container.alignItems, crossAxis, line.size[crossAxis])
-            // Advance cross position by line size
-            currentCrossPos += line.size[crossAxis]
-    else:
-        // No wrapping: distribute grow across all children then treat as one line
-        distributeGrow(container.children, containerSize[mainAxis])
-        positionChildrenSequentially(container.children, mainAxis, container.padding[mainAxis == 'horizontal' ? 'left' : 'top'])
-        justifyChildren(container.children, container.justifyContent, mainAxis, containerSize[mainAxis])
-        alignChildrenOffAxis(container.children, container.alignItems, crossAxis, containerSize[crossAxis])
-
-    // 3. Incorporate margins and padding (adjust positions for margins if not already handled)
-    applyMarginsAndPadding(container.children, container)
-
-    // 4. Calculate absolute positions
-    for each child in container.children:
-        child.absolutePosition = computeAbsolutePosition(child, container)
-```
-
 ### Justification
-
-```js
-function positionChildrenSequentially(children, mainAxis, paddingStart, paddingOff):
-    // Start positioning from given padding
-    currentPosition = paddingStart
-    previousMargin = 0
-
-    for each child in children:
-        // Calculate gap with margin collapsing along main axis
-        if mainAxis == 'horizontal':
-            gap = max(previousMargin, child.marginLeft)
-            child.relativeX = currentPosition + gap
-            child.relativeY = paddingOff + child.marginTop  // Off-axis margin (no collapsing assumed)
-            currentPosition += gap + child.width
-            previousMargin = child.marginRight
-        else:  // vertical
-            gap = max(previousMargin, child.marginTop)
-            child.relativeX = paddingOff + child.marginLeft  // Off-axis margin
-            child.relativeY = currentPosition + gap
-            currentPosition += gap + child.height
-            previousMargin = child.marginBottom
-
-function justifyChildren(children, justifyContent, mainAxis, availableSize):
-    totalSize = 0
-    for each child in children:
-        totalSize += child.size[mainAxis == 'horizontal' ? 'width' : 'height']
-        // Include margins in totalSize for spacing
-        if mainAxis == 'horizontal':
-            totalSize += child.marginLeft + child.marginRight
-        else:
-            totalSize += child.marginTop + child.marginBottom
-    // Subtract margins already accounted for in gaps (simplified: assume first/last margins not double-counted)
-    remainingSpace = availableSize - totalSize
-
-    if justifyContent == 'start':
-        // No change needed
-        pass
-    elif justifyContent == 'center':
-        offset = remainingSpace / 2
-        for each child:
-            if mainAxis == 'horizontal':
-                child.relativeX += offset
-            else:
-                child.relativeY += offset
-    elif justifyContent == 'end':
-        offset = remainingSpace
-        for each child:
-            if mainAxis == 'horizontal':
-                child.relativeX += offset
-            else:
-                child.relativeY += offset
-    elif justifyContent == 'space-between' and len(children) > 1:
-        gap = remainingSpace / (len(children) - 1)
-        currentOffset = 0
-        for i in 1 to len(children)-1:
-            currentOffset += gap
-            if mainAxis == 'horizontal':
-                children[i].relativeX += currentOffset
-            else:
-                children[i].relativeY += currentOffset
-    elif justifyContent == 'space-around':
-        gap = remainingSpace / len(children)
-        currentOffset = gap / 2
-        for each child:
-            if mainAxis == 'horizontal':
-                child.relativeX += currentOffset
-            else:
-                child.relativeY += currentOffset
-            currentOffset += gap
-```
 
 The `justify-content` property adjusts positions along the main axis to achieve the desired distribution. Options include:
 
@@ -468,31 +334,6 @@ Options include:
   ```
 
 When `align-items=stretch`, elements expand to match the container's size in the off-axis direction, minus padding and margins.
-
-```js
-function alignChildrenOffAxis(children, alignItems, crossAxis, availableSize):
-    for each child in children:
-        if alignItems == 'start':
-            // No change (already at start)
-            pass
-        elif alignItems == 'center':
-            offset = (availableSize - child.size[crossAxis == 'vertical' ? 'height' : 'width']) / 2
-            if crossAxis == 'vertical':
-                child.relativeY += offset
-            else:
-                child.relativeX += offset
-        elif alignItems == 'end':
-            offset = availableSize - child.size[crossAxis == 'vertical' ? 'height' : 'width']
-            if crossAxis == 'vertical':
-                child.relativeY += offset
-            else:
-                child.relativeX += offset
-        elif alignItems == 'stretch':
-            if crossAxis == 'vertical':
-                child.height = availableSize - child.marginTop - child.marginBottom
-            else:
-                child.width = availableSize - child.marginLeft - child.marginRight
-```
 
 ### Wrapping
 

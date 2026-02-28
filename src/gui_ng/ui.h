@@ -43,6 +43,7 @@ enum class AttributeName : u8 {
 	ALIGN,
 	SRC,
 	FIT,
+	GROW,
 	PLACEHOLDER,
 
 	INVALID
@@ -78,8 +79,7 @@ enum class Unit : u8 {
 	PIXELS,
 	PERCENT,
 	EM,
-	FIT_CONTENT,
-	FILL
+	FIT_CONTENT
 };
 
 struct IFontManager {
@@ -109,13 +109,19 @@ struct Stylesheet {
 	Span<StyleRule> getRules() { return Span(m_rules.begin(), m_rules.size()); }
 };
 
+struct SpanLine {
+	StringView text; // substring of span's value
+	Vec2 pos; // pos.y is baseline
+};
+
 struct Element {
 	Element() = default;
-	Element(Tag t, IAllocator& allocator) : tag(t), children(allocator), attributes(allocator) {}
+	Element(Tag t, IAllocator& allocator) : tag(t), children(allocator), attributes(allocator), lines(allocator) {}
 
 	Tag tag;
 	Array<u32> children;
 	Array<Attribute> attributes;
+	Array<SpanLine> lines;
 
 	// runtime computed data
 	StringView value;
@@ -134,10 +140,7 @@ struct Element {
 	JustifyContent justify_content = JustifyContent::START;
 	AlignItems align_items = AlignItems::STRETCH;
 	Align text_align = Align::LEFT;
-	bool fit_content_width = false;
-	bool fit_content_height = false;
-	bool fill_width = false;
-	bool fill_height = false;
+	float grow = 0;
 	bool wrap = false;
 };
 

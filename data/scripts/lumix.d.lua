@@ -186,8 +186,7 @@ type GUINGSystem = {
 }
 
 type Document = {
-	getNumEvents: (Document) -> number,
-	getEvent: (Document, number) -> any,
+	getEvents: (Document) -> any,
 }
 
 type GameView = {

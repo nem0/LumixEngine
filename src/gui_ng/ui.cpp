@@ -1,5 +1,6 @@
 #include "core/log.h"
 #include "core/profiler.h"
+#include "core/stack_array.h"
 #include "core/string.h"
 #include "engine/resource_manager.h"
 #include "gui/sprite.h"
@@ -74,10 +75,13 @@ static AttributeName parseAttributeName(StringView str) {
 		case 'd':
 			if (len == 9 && memcmp(s, "direction", 9) == 0) return AttributeName::DIRECTION;
 			break;
-		case 'f':
+			case 'f':
 			if (len == 3 && memcmp(s, "fit", 3) == 0) return AttributeName::FIT;
 			if (len == 4 && memcmp(s, "font", 4) == 0) return AttributeName::FONT;
 			if (len == 9 && memcmp(s, "font-size", 9) == 0) return AttributeName::FONT_SIZE;
+			break;
+		case 'g':
+			if (len == 4 && memcmp(s, "grow", 4) == 0) return AttributeName::GROW;
 			break;
 		case 'h':
 			if (len == 6 && memcmp(s, "height", 6) == 0) return AttributeName::HEIGHT;
@@ -415,8 +419,6 @@ static ParsedUnit parseUnit(StringView str) {
 	if (!str.empty()) {
 		if (str == "fit-content") {
 			unit = Unit::FIT_CONTENT;
-		} else if (str == "fill") {
-			unit = Unit::FILL;
 		} else {
 			fromCString(str, value);
 			if (str.size() >= 1 && str.back() == '%') {
@@ -440,6 +442,7 @@ static float computeAbsoluteSize(const ParsedUnit& unit, float parent_size, floa
 		default: return unit.value;
 	}
 }
+
 
 // Positions child elements within their parent container based on layout direction and margins.
 // For row direction, children are laid out horizontally; for column, vertically.
@@ -468,28 +471,82 @@ static void layoutChildren(Document& doc, Element& parent) {
 
 	// Helper to process a line
 	auto processLine = [&](u32 start, u32 end, float line_cross_pos, float line_max_cross) {
-		// Check if this is an inline line (all elements are spans)
-		bool is_inline_line = doc.m_elements[parent.children[start]].tag == Tag::SPAN;
-
-		if (is_inline_line) {
-			// Baseline alignment for inline elements
-			float dominant_baseline = 0.0f;
+		// Distribute remaining main-axis space to growable children within this line
+		// This ensures growth respects line breaks and wrapping.
+		{
+			float available_main = parent_main_end - main_start;
+			float used_main = get_margin_start(doc.m_elements[parent.children[start]]); // margin_start of first child
+			float sum_grow = 0;
+			float prev_m_end = 0;
 			for (u32 i = start; i <= end; ++i) {
 				Element& child = doc.m_elements[parent.children[i]];
-				if (child.font_handle && doc.m_font_manager) {
-					float ascender = doc.m_font_manager->getAscender(child.font_handle);
-					dominant_baseline = maximum(dominant_baseline, ascender);
+				float m_start = get_margin_start(child);
+				float m_end = get_margin_end(child);
+				float between = (i == start) ? 0.f : maximum(prev_m_end, m_start);
+				used_main += between + get_main_size(child);
+				prev_m_end = m_end;
+				sum_grow += child.grow;
+			}
+			used_main += prev_m_end; // margin_end of last child
+
+			float remaining = available_main - used_main;
+			if (sum_grow > 0.f && remaining > 0.f) {
+				for (u32 i = start; i <= end; ++i) {
+					Element& child = doc.m_elements[parent.children[i]];
+					if (child.grow > 0.f) {
+						get_main_size(child) += remaining * (child.grow / sum_grow);
+					}
+				}
+				// Recompute positions for the line after growth
+				float current_pos = main_start;
+				prev_m_end = 0;
+				for (u32 i = start; i <= end; ++i) {
+					Element& child = doc.m_elements[parent.children[i]];
+					float m_start = get_margin_start(child);
+					float m_end = get_margin_end(child);
+					float eff = (i == start) ? m_start : maximum(prev_m_end, m_start);
+					get_main_pos(child) = current_pos + eff;
+					current_pos += eff + get_main_size(child);
+					prev_m_end = m_end;
 				}
 			}
+		}
+		// Check if this is an inline line (all elements are spans in row direction)
+		Element& first_child = doc.m_elements[parent.children[start]];
+		bool is_inline_line = first_child.tag == Tag::SPAN;
+
+		if (is_inline_line) {
 			for (u32 i = start; i <= end; ++i) {
 				u32 child_idx = parent.children[i];
 				Element& child = doc.m_elements[child_idx];
-				float margin_cross_start = get_margin_cross_start(child);
-				float ascender = child.font_handle && doc.m_font_manager ? doc.m_font_manager->getAscender(child.font_handle) : 0.0f;
-				float cross_pos = line_cross_pos + margin_cross_start + (dominant_baseline - ascender);
-				get_cross_pos(child) = cross_pos;
+				if (!child.lines.empty()) {
+					float asc = doc.m_font_manager->getAscender(child.font_handle);
+					float height = doc.m_font_manager->getHeight(child.font_handle);
+					float min_x = FLT_MAX;
+					float min_y = FLT_MAX;
+					float max_x = -FLT_MAX;
+					float max_y = -FLT_MAX;
+					for (SpanLine& line : child.lines) {
+						Vec2 text_size = doc.m_font_manager->measureTextA(child.font_handle, line.text);
+						if (is_row) {
+							line.pos.y += line_cross_pos;
+							line.pos.x += parent.position.x + parent.paddings[3];
+						}
+						else {
+							line.pos.y += parent.position.y + parent.paddings[0];
+							line.pos.x += line_cross_pos;
+						}
+						min_x = minimum(min_x, line.pos.x);
+						max_x = maximum(max_x, line.pos.x + text_size.x);
+						min_y = minimum(min_y, line.pos.y - asc);
+						max_y = maximum(max_y, line.pos.y - asc + height);
+					}
+					child.position = Vec2(min_x, min_y);
+					child.size = Vec2(max_x - min_x, max_y - min_y);
+				}
 			}
-		} else {
+		}
+		else {
 			// Apply cross-axis alignment (align-items)
 			float available_cross = wrap ? line_max_cross : (is_row ? parent.size.y - parent.paddings[0] - parent.paddings[2] : parent.size.x - parent.paddings[3] - parent.paddings[1]);
 			for (u32 i = start; i <= end; ++i) {
@@ -507,11 +564,7 @@ static void layoutChildren(Document& doc, Element& parent) {
 					cross_pos = line_cross_pos + available_cross - child_cross_size - margin_cross_end;
 				} else if (parent.align_items == AlignItems::STRETCH) {
 					cross_pos = line_cross_pos + margin_cross_start;
-					if (is_row && child.fit_content_height) {
-						child.size.y = maximum(0.0f, available_cross - margin_cross_start - margin_cross_end);
-					} else if (!is_row && child.fit_content_width) {
-						child.size.x = maximum(0.0f, available_cross - margin_cross_start - margin_cross_end);
-					}
+					get_cross_size(child) = maximum(0.0f, available_cross - margin_cross_start - margin_cross_end);
 				}
 				get_cross_pos(child) = cross_pos;
 			}
@@ -569,39 +622,7 @@ static void layoutChildren(Document& doc, Element& parent) {
 				}
 			}
 		}
-
-		// Apply text alignment for inline lines
-		if (is_inline_line && parent.text_align != Align::LEFT) {
-			float min_x = FLT_MAX, max_x = -FLT_MAX;
-			for (u32 i = start; i <= end; ++i) {
-				Element& child = doc.m_elements[parent.children[i]];
-				float pos = child.position.x, size = child.size.x;
-				min_x = minimum(min_x, pos);
-				max_x = maximum(max_x, pos + size);
-			}
-			float total_span = max_x - min_x;
-			float available = parent.size.x - parent.paddings[3] - parent.paddings[1];
-			float shift = 0.0f;
-			switch (parent.text_align) {
-				case Align::CENTER:
-					shift = (available - total_span) * 0.5f - (min_x - (parent.position.x + parent.paddings[3]));
-					break;
-				case Align::RIGHT:
-					shift = available - total_span - (min_x - (parent.position.x + parent.paddings[3]));
-					break;
-				default:
-					break;
-			}
-			if (shift != 0.0f) {
-				for (u32 i = start; i <= end; ++i) {
-					doc.m_elements[parent.children[i]].position.x += shift;
-				}
-			}
-		}
-
 	};
-
-
 
 	float current_main_pos = main_start;
 	float current_cross_pos = cross_start;
@@ -618,32 +639,13 @@ static void layoutChildren(Document& doc, Element& parent) {
 
 		float margin_start = get_margin_start(child);
 		float margin_end = get_margin_end(child);
-		bool is_fill = is_row ? child.fill_width : child.fill_height;
 		float child_main_size = get_main_size(child);
-		if (is_fill) {
-			child_main_size = maximum(0.0f, parent_main_size - (current_main_pos - main_start) - margin_start);
-			if (child_main_size == 0 && wrap) {
-				// Process current line if there are elements
-				if (i > current_line_start) {
-					processLine(current_line_start, i - 1, current_cross_pos, current_line_max_cross);
-				}
-				// Start new line
-				current_line_start = i;
-				current_main_pos = main_start;
-				current_cross_pos += current_line_max_cross;
-				current_line_max_cross = 0;
-				is_first_in_line = true;
-				// Recalculate size for fill element on new line
-				child_main_size = maximum(0.0f, parent_main_size - margin_start);
-			}
-			get_main_size(child) = child_main_size;
-		}
 		float effective_margin = is_first_in_line ? margin_start : maximum(prev_margin_end, margin_start);
 
 		// Check if fits in current line
 		if (!is_first_in_line) {
 			Tag prev_tag = doc.m_elements[parent.children[i - 1]].tag;
-			if (wrap && current_main_pos + effective_margin + child_main_size > parent_main_end
+			if (wrap && current_main_pos + effective_margin + child_main_size > parent_main_end && child.tag != Tag::SPAN // panel does not fit in current line
 				|| child.tag == Tag::PANEL && prev_tag == Tag::SPAN // panel causes line break before itself
 				|| child.tag == Tag::SPAN && prev_tag == Tag::PANEL // panel causes line break after itself
 			) {
@@ -689,15 +691,128 @@ struct ParentContext {
 	Color color = Color::BLACK;
 	Align align = Align::LEFT;
 	// not inheritable
-	bool wrap = false;
 	Vec2 size;
 };
 
-static void applyAttributes(Document& doc, Element& elem, const ParentContext& parent) {
+static void distributeGrowWidth(Document& doc, Element& elem) {
+	if (elem.children.empty()) return;
+
+	if (elem.direction == Direction::ROW) {
+		float sum_grow = 0;
+		float remaining_w = elem.size.x - elem.paddings[1] - elem.paddings[3];
+		float prev_margin = 0;
+		for (u32 child_idx : elem.children) {
+			const Element& child = doc.m_elements[child_idx];
+			sum_grow += child.grow;
+			remaining_w -= child.size.x + maximum(prev_margin, child.margins[3]);
+			prev_margin = child.margins[1];
+		}
+		remaining_w -= prev_margin;
+
+		if (sum_grow > 0) {
+			for (u32 child_idx : elem.children) {
+				Element& child = doc.m_elements[child_idx];
+				if (child.grow > 0) {
+					child.size.x += remaining_w * child.grow / sum_grow;
+				}
+			}
+		}
+	} else if (elem.direction == Direction::COLUMN && elem.align_items == AlignItems::STRETCH) {
+		// In column direction, cross axis is width. Stretch children to fill parent's content width.
+		float content_w = elem.size.x - elem.paddings[1] - elem.paddings[3];
+		for (u32 child_idx : elem.children) {
+			Element& child = doc.m_elements[child_idx];
+			if (child.tag == Tag::SPAN) continue;
+			child.size.x = maximum(0.0f, content_w - child.margins[1] - child.margins[3]);
+		}
+	}
+
+	for (u32 child_idx : elem.children) {
+		distributeGrowWidth(doc, doc.m_elements[child_idx]);
+	}
+}
+
+// compute heights of consecutive spans in element, starting from child_idx
+static float computeSpansHeight(Document& doc, Element& element, i32 child_idx) {
+	i32 end_idx = child_idx;
+	while (end_idx < element.children.size() && doc.m_elements[element.children[end_idx]].tag == Tag::SPAN) {
+		++end_idx;
+	}
+	if (end_idx == child_idx) return 0;
+
+	const Element& last = doc.m_elements[element.children[end_idx - 1]];
+	if (end_idx == child_idx + 1 && last.lines.empty()) {
+		return doc.m_font_manager->getHeight(last.font_handle);
+	}
+	const SpanLine& last_line = last.lines.last();
+
+	float asc = doc.m_font_manager->getAscender(last.font_handle);
+	float height = doc.m_font_manager->getHeight(last.font_handle);
+	return last_line.pos.y - asc + height;
+}
+
+static void computeBaseHeights(Document& doc, Element& elem, Element* parent_elem, const ParentContext& parent) {
+	ParsedUnit height_unit = {0, Unit::FIT_CONTENT};
+	ParsedUnit margin_unit = {0, Unit::PIXELS};
+	ParsedUnit padding_unit = {0, Unit::PIXELS};
+
+	for (const Attribute& attr : elem.attributes) {
+		switch (attr.type) {
+			case AttributeName::MARGIN: margin_unit = parseUnit(attr.value); break;
+			case AttributeName::PADDING: padding_unit = parseUnit(attr.value); break;
+			case AttributeName::HEIGHT: {
+				height_unit = parseUnit(attr.value);
+				break;
+			}
+			default: break;
+		}
+	}
+
+	if (elem.tag == Tag::SPAN) return;
+
+	elem.margins[0] = elem.margins[2] = computeAbsoluteSize(margin_unit, parent.size.y, elem.font_size);
+	elem.paddings[0] = elem.paddings[2] = computeAbsoluteSize(padding_unit, parent.size.y, elem.font_size);
+
+	if (height_unit.unit != Unit::FIT_CONTENT) {
+		elem.size.y = computeAbsoluteSize(height_unit, parent.size.y, elem.font_size);
+	}
+
+	ParentContext ctx = parent;
+	ctx.size = elem.size;
+	for (u32 child_idx : elem.children) {
+		computeBaseHeights(doc, doc.m_elements[child_idx], &elem, ctx);
+	}
+
+	if (height_unit.unit == Unit::FIT_CONTENT) {
+		if (elem.direction == Direction::ROW) {
+			float max_height = 0;
+			for (u32 child_idx : elem.children) {
+				Element& child = doc.m_elements[child_idx];
+				float child_height = child.size.y + child.margins[0] + child.margins[2];
+				if (child_height > max_height) max_height = child_height;
+			}
+			elem.size.y = max_height + elem.paddings[0] + elem.paddings[2];
+		} else {
+			float sum_height = 0;
+			for (u32 i = 0, n = elem.children.size(); i < n; ++i) {
+				Element& child = doc.m_elements[elem.children[i]];
+				if (child.tag == Tag::SPAN) {
+					sum_height += computeSpansHeight(doc, elem, i);
+					i += 1; // skip the consecutive spans
+					while (i < n && doc.m_elements[elem.children[i]].tag == Tag::SPAN) ++i;
+					--i;
+				} else {
+					sum_height += child.size.y + child.margins[0] + child.margins[2];
+				}
+			}
+			elem.size.y = sum_height + elem.paddings[0] + elem.paddings[2];
+		}
+	}
+}
+
+static void computeBaseWidths(Document& doc, Element& elem, Element* parent_elem, const ParentContext& parent) {
 	elem.position = Vec2(0, 0);
 	elem.size = Vec2(0, 0);
-	elem.fit_content_width = true;
-	elem.fit_content_height = true;
 	elem.wrap = false;
 	elem.justify_content = JustifyContent::START;
 	elem.align_items = AlignItems::START;
@@ -714,8 +829,7 @@ static void applyAttributes(Document& doc, Element& elem, const ParentContext& p
 	ParentContext ctx = parent;
 	ctx.size = Vec2(0);
 
-	ParsedUnit width_unit = {0, Unit::PIXELS};
-	ParsedUnit height_unit = {0, Unit::PIXELS};
+	ParsedUnit width_unit = {0, Unit::FIT_CONTENT};
 	ParsedUnit margin_unit = {0, Unit::PIXELS};
 	ParsedUnit padding_unit = {0, Unit::PIXELS};
 
@@ -723,32 +837,9 @@ static void applyAttributes(Document& doc, Element& elem, const ParentContext& p
 		switch (attr.type) {
 			case AttributeName::WIDTH: {
 				width_unit = parseUnit(attr.value);
-				if (width_unit.unit == Unit::FIT_CONTENT) {
-					elem.fit_content_width = true;
-					elem.size.x = 0;
-				} else if (width_unit.unit == Unit::FILL) {
-					elem.fill_width = true;
-					elem.size.x = 0;
-				} else {
-					elem.fit_content_width = false;
-					elem.fill_width = false;
-				}
 				break;
 			}
-			case AttributeName::HEIGHT: {
-				height_unit = parseUnit(attr.value);
-				if (height_unit.unit == Unit::FIT_CONTENT) {
-					elem.fit_content_height = true;
-					elem.size.y = 0;
-				} else if (height_unit.unit == Unit::FILL) {
-					elem.fill_height = true;
-					elem.size.y = 0;
-				} else {
-					elem.fit_content_height = false;
-					elem.fill_height = false;
-				}
-				break;
-			}
+			case AttributeName::GROW: fromCString(attr.value, elem.grow); break;
 			case AttributeName::DIRECTION: {
 				if (attr.value == "row") elem.direction = Direction::ROW;
 				else elem.direction = Direction::COLUMN;
@@ -788,71 +879,33 @@ static void applyAttributes(Document& doc, Element& elem, const ParentContext& p
 		}
 	}
 
-	// Load font if both font and font_size are set
-	if (doc.m_font_manager && !ctx.font.empty() && elem.font_size > 0) {
-		elem.font_handle = doc.m_font_manager->loadFont(ctx.font, (i32)elem.font_size);
+	if (elem.tag == Tag::SPAN) {
+		if (!ctx.font.empty() && doc.m_font_manager) {
+			elem.font_handle = doc.m_font_manager->loadFont(ctx.font, (i32)ctx.font_size);
+			if (elem.font_handle && !elem.value.empty()) {
+				elem.size = doc.m_font_manager->measureTextA(elem.font_handle, elem.value);
+			}
+		}
+		return;
 	}
 
-	if (!elem.fit_content_width) {
+	if (width_unit.unit != Unit::FIT_CONTENT) {
 		elem.size.x = computeAbsoluteSize(width_unit, parent.size.x, elem.font_size);
 	}
-	if (!elem.fit_content_height) {
-		elem.size.y = computeAbsoluteSize(height_unit, parent.size.y, elem.font_size);
-	}
-	for (int i = 0; i < 4; ++i) {
-		float ref_size = (i % 2 == 0) ? parent.size.y : parent.size.x;
-		elem.margins[i] = computeAbsoluteSize(margin_unit, ref_size, elem.font_size);
-		elem.paddings[i] = computeAbsoluteSize(padding_unit, ref_size, elem.font_size);
-	}
+	elem.margins[1] = computeAbsoluteSize(margin_unit, parent.size.x, elem.font_size);
+	elem.margins[3] = elem.margins[1];
+	elem.paddings[1] = computeAbsoluteSize(padding_unit, parent.size.x, elem.font_size);
+	elem.paddings[3] = elem.paddings[1];
 
 	ctx.size = elem.size;
-	ctx.wrap = elem.wrap;
 	for (u32 child_idx : elem.children) {
-		applyAttributes(doc, doc.m_elements[child_idx], ctx);
+		computeBaseWidths(doc, doc.m_elements[child_idx], &elem, ctx);
 	}
 
-	// Compute text sizes, handling word wrapping if enabled
-	if (elem.tag == Tag::SPAN && doc.m_font_manager) {
-		StringView value = elem.value;
-		if (!value.empty()) {
-			IFontManager::FontHandle font_handle = elem.font_handle;
-			Vec2 size = doc.m_font_manager->measureTextA(font_handle, value);
-			// Determine available width and whether wrapping is enabled
-			float max_width = parent.size.x;
-			if (parent.wrap && max_width > 0 && size.x > max_width) {
-				// Perform simple greedy word wrapping
-				float line_width = 0.f;
-				int lines = 1;
-				int start = 0;
-				for (u32 i = 0; i < value.size(); ++i) {
-					if (value[i] == ' ' || i == value.size() - 1) {
-						u32 end = (i == value.size() - 1) ? i + 1 : i;
-						StringView word(value.begin + start, value.begin + end);
-						float word_width = doc.m_font_manager->measureTextA(font_handle, word).x;
-						if (line_width + word_width > max_width && line_width > 0) {
-							// Start new line with current word
-							line_width = word_width + (value[i] == ' ' ? doc.m_font_manager->measureTextA(font_handle, StringView(" ")).x : 0);
-							++lines;
-						} else {
-							line_width += word_width;
-							if (value[i] == ' ') line_width += doc.m_font_manager->measureTextA(font_handle, StringView(" ")).x;
-						}
-						start = i + 1;
-					}
-				}
-				elem.size.x = size.x; // Keep original width for alignment
-				elem.size.y = lines * doc.m_font_manager->getHeight(font_handle);
-			} else {
-				elem.size = size;
-			}
-			elem.fit_content_width = false;
-			elem.fit_content_height = false;
-		}
-	}
-
+	// bottom-up size computation	
 	// Compute sizes for elements with fit-content dimensions
-	if (elem.fit_content_width) {
-		bool is_row = elem.direction == Direction::ROW;
+	bool is_row = elem.direction == Direction::ROW;
+	if (width_unit.unit == Unit::FIT_CONTENT) {
 		if (is_row) {
 			// In row direction, width is sum of child widths plus margins
 			float sum_width = 0;
@@ -863,7 +916,6 @@ static void applyAttributes(Document& doc, Element& elem, const ParentContext& p
 			elem.size.x = sum_width + elem.paddings[1] + elem.paddings[3];
 		} else {
 			// In column direction, width is max of child widths plus margins
-			// TODO handle wrapping
 			float max_width = 0;
 			for (u32 child_idx : elem.children) {
 				Element& child = doc.m_elements[child_idx];
@@ -871,28 +923,6 @@ static void applyAttributes(Document& doc, Element& elem, const ParentContext& p
 				if (child_width > max_width) max_width = child_width;
 			}
 			elem.size.x = max_width + elem.paddings[1] + elem.paddings[3];
-		}
-	}
-	if (elem.fit_content_height) {
-		bool is_row = elem.direction == Direction::ROW;
-		if (is_row) {
-			// In row direction, height is max of child heights plus margins
-			// TODO handle wrapping
-			float max_height = 0;
-			for (u32 child_idx : elem.children) {
-				Element& child = doc.m_elements[child_idx];
-				float child_height = child.size.y + child.margins[0] + child.margins[2];
-				if (child_height > max_height) max_height = child_height;
-			}
-			elem.size.y = max_height + elem.paddings[0] + elem.paddings[2];
-		} else {
-			// In column direction, height is sum of child heights plus margins
-			float sum_height = 0;
-			for (u32 child_idx : elem.children) {
-				Element& child = doc.m_elements[child_idx];
-				sum_height += child.size.y + child.margins[0] + child.margins[2];
-			}
-			elem.size.y = sum_height + elem.paddings[0] + elem.paddings[2];
 		}
 	}
 }
@@ -913,15 +943,226 @@ static void applyStylesheet(Document& doc, Element& elem) {
 	}
 }
 
+struct WordWrap {
+	StringView text;
+	float width;
+	bool overflow;
+};
+
+
+// Determines how much of 'text' can fit in a single line between 'left' and 'right' pixel boundaries.
+// Returns the substr that fits and its width (in pixels). If the whole text fits, returns it all.
+WordWrap wordWrap(Document& doc, IFontManager::FontHandle font, StringView text, float left, float right) {
+	ASSERT(right >= left);
+	ASSERT(!text.empty());
+	WordWrap res;
+	Vec2 size = doc.m_font_manager->measureTextA(font, text);
+	// whole text fits
+	if (size.x <= right - left) {
+		res.text = text;
+		res.width = size.x;
+		res.overflow = false;
+		return res;
+	}
+
+	const float avail = right - left;
+	res.text = StringView(text.begin, (u32)0);
+	res.width = 0.f;
+	res.overflow = true;
+
+	const char* s = text.begin;
+	const char* e = text.end;
+	const char* cur = s;
+	const char* last_space = nullptr;
+	float width_at_last_good = 0.f;
+	float width_at_last_space = 0.f;
+
+	// Grow substring until it no longer fits; remember last breakable position (space)
+	while (cur < e) {
+		++cur;
+		StringView candidate(s, (u32)(cur - s));
+		Vec2 w = doc.m_font_manager->measureTextA(font, candidate);
+		if (w.x > avail) break;
+		width_at_last_good = w.x;
+		if (*(cur - 1) == ' ') {
+			last_space = cur - 1;
+			width_at_last_space = w.x;
+		}
+	}
+
+	// Prefer breaking at the last space that fits
+	if (last_space && last_space > s) {
+		StringView out(s, (u32)(last_space - s)); // exclude trailing space
+		Vec2 w = doc.m_font_manager->measureTextA(font, out);
+		res.text = out;
+		res.width = w.x;
+		return res;
+	}
+
+	// Otherwise, break at the last character that fits
+	if (width_at_last_good > 0.f) {
+		const char* out_end = cur - 1; // last fitting character end
+		StringView out(s, (u32)(out_end - s));
+		res.text = out;
+		res.width = width_at_last_good;
+		return res;
+	}
+
+	// Fallback: force at least one character to make progress
+	StringView one(s, (u32)1);
+	Vec2 w = doc.m_font_manager->measureTextA(font, one);
+	res.text = one;
+	res.width = minimum(w.x, avail);
+	return res;
+}
+
+struct RowLine { Element* child; SpanLine* line; };
+
+static float layoutRowVertical(Document& doc, Element& parent, StackArray<RowLine, 32>& row_lines, float row_y_pos) {
+    if (row_lines.empty()) return 0;
+
+    // baseline align
+    float max_ascender = 0, max_height = 0;
+	for (RowLine& rl : row_lines) {
+        float asc = doc.m_font_manager->getAscender(rl.child->font_handle);
+        float height = doc.m_font_manager->getHeight(rl.child->font_handle);
+        max_ascender = maximum(max_ascender, asc);
+        max_height = maximum(max_height, height);
+        rl.child->size.y += height;
+    }
+    for (RowLine& rl : row_lines) {
+        rl.line->pos.y = row_y_pos + max_ascender;
+    }
+
+	// horizontal align
+    if (parent.text_align != Align::LEFT) {
+        float min_x = FLT_MAX, max_x = -FLT_MAX;
+        for (RowLine& rl : row_lines) {
+            Vec2 w = doc.m_font_manager->measureTextA(rl.child->font_handle, rl.line->text);
+            min_x = minimum(min_x, rl.line->pos.x);
+            max_x = maximum(max_x, rl.line->pos.x + w.x);
+        }
+        if (min_x <= max_x) {
+            float used = max_x - min_x;
+            float avail = parent.size.x - parent.paddings[1] - parent.paddings[3];
+            float shift = 0;
+            switch (parent.text_align) {
+                case Align::LEFT: break;
+                case Align::CENTER: shift = (avail - used) * 0.5f - min_x; break;
+                case Align::RIGHT: shift = avail - used - min_x; break;
+            }
+            if (shift != 0) {
+                for (RowLine& rl : row_lines) {
+                    rl.line->pos.x += shift;
+                }
+            }
+        }
+    }
+	row_lines.clear();
+    return max_height;
+}
+
+// word wrapping and line breaking based on the parent's width and wrap setting.
+static void wrapSpans(Document& doc, Element& parent, i32 start_span_idx, i32 end_span_idx) {
+	float x = 0;
+	const float content_width = parent.size.x - parent.paddings[3] - parent.paddings[1];
+	bool wrap_enabled = parent.wrap && parent.size.x > 0;
+	// First pass: wrap width
+	for (i32 child_idx = start_span_idx; child_idx < end_span_idx; ++child_idx) {
+		Element& span = doc.m_elements[parent.children[child_idx]];
+		span.lines.clear();
+		if (!span.font_handle || span.value.empty()) continue;
+		
+		StringView text = span.value;
+		if (wrap_enabled) {
+			while (!text.empty()) {
+				WordWrap wrap = wordWrap(doc, span.font_handle, text, x, content_width);
+				SpanLine& line = span.lines.emplace();
+				line.text = wrap.text;
+				line.pos.x = x;
+				x += wrap.width;
+				if (wrap.overflow) x = 0;
+				text.removePrefix(wrap.text.size());
+			}
+		} else {
+			SpanLine& line = span.lines.emplace();
+			line.text = text;
+			line.pos.x = x;
+			line.pos.y = 0;
+			Vec2 w = doc.m_font_manager->measureTextA(span.font_handle, text);
+			x += w.x;
+		}
+	}
+
+	// Second pass: Group SpanLines into rows and layout each row
+	float row_y = 0;
+	StackArray<RowLine, 32> row_lines(doc.m_allocator);
+	float prev_x = FLT_MAX;
+	for (i32 child_idx = start_span_idx; child_idx < end_span_idx; ++child_idx) {
+		Element& child = doc.m_elements[parent.children[child_idx]];
+		child.size.y = 0;
+		for (SpanLine& line : child.lines) {
+			bool is_new_row = line.pos.x <= prev_x;
+			if (is_new_row) {
+				row_y += layoutRowVertical(doc, parent, row_lines, row_y);
+			}
+			prev_x = line.pos.x;
+			row_lines.emplace(&child, &line);
+		}
+	}
+	// Layout last row
+	layoutRowVertical(doc, parent, row_lines, row_y);
+}
+
+// compute wrapping on word boundaries, fill Element::lines
+static void wrapText(Document& doc, u32 element_index) {
+	Element& elem = doc.m_elements[element_index];
+	elem.lines.clear();
+
+	if (elem.tag == Tag::SPAN) {
+		// TODO top level span without container
+		ASSERT(false);
+	}
+
+	for (u32 i = 0, n = elem.children.size(); i < n; ++i) {
+		Element& child = doc.m_elements[elem.children[i]];
+		if (child.tag != Tag::SPAN) {
+			wrapText(doc, elem.children[i]);
+			continue;
+		}
+
+		i32 start_i = i; 
+		i32 end_i = i + 1;
+		while (end_i < elem.children.size() && doc.m_elements[elem.children[end_i]].tag == Tag::SPAN) {
+			++end_i;
+		}
+		i = end_i - 1;
+
+		wrapSpans(doc, elem, start_i, end_i);
+	}
+}
+
 void Document::computeLayout(Vec2 canvas_size) {
 	PROFILE_FUNCTION();
 	m_canvas_size = canvas_size;
 	ParentContext root_inherit;
 	root_inherit.size = canvas_size;
 	for (u32 root_idx : m_roots) {
-		applyAttributes(*this, m_elements[root_idx], root_inherit);		
+		computeBaseWidths(*this, m_elements[root_idx], nullptr, root_inherit);		
 	}
 	
+	for (u32 root_idx : m_roots) {
+		distributeGrowWidth(*this, m_elements[root_idx]);
+	}
+
+	for (u32 root_idx : m_roots) {
+		wrapText(*this, root_idx);
+	}
+
+	for (u32 root_idx : m_roots) {
+		computeBaseHeights(*this, m_elements[root_idx], nullptr, root_inherit);		
+	}
+
 	// Layout root elements as if in a panel with direction=column
 	float y_offset = 0;
 	float prev_bottom_margin = 0;
@@ -956,9 +1197,15 @@ static void renderElement(Draw2D& draw, const Document& doc, u32 element_idx, co
 		case Tag::SPAN: {
 			if (element.font_handle && !element.value.empty()) {
 				const Font& font = *(const Font*)element.font_handle;
-				Vec2 text_size = doc.m_font_manager->measureTextA(element.font_handle, element.value);
-				Vec2 text_pos = pos + Vec2(0, getAscender(font));
-				draw.addText(font, text_pos, element.color, element.value);
+				if (!element.lines.empty()) {
+					for (const SpanLine& line : element.lines) {
+						draw.addText(font, line.pos, element.color, line.text);
+					}
+				} else {
+					// fallback
+					Vec2 text_pos = pos + Vec2(0, getAscender(font));
+					draw.addText(font, text_pos, element.color, element.value);
+				}
 			}
 			break;
 		}

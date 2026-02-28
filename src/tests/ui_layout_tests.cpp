@@ -368,14 +368,14 @@ bool testFitContentWithMargins() {
 	return true;
 }
 
-bool testFill() {
+bool testGrow() {
 	// Citation: layout.md - Fill
 	// "The `fill` unit allows an element to expand and occupy the remaining available space in its parent container along the specified dimension."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
 	[panel width=300 height=100 direction=row] {
 		[panel width=100 height=50] {}
-		[panel width=fill height=50] {}
+		[panel grow=1 height=50] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -389,7 +389,7 @@ bool testFill() {
 	return true;
 }
 
-bool testFillWithPadding() {
+bool testGrowWithPadding() {
 	// Citation: layout.md - Fill
 	// "Fill respects margins and padding of the parent container."
 	// "Difference from `width=100%`: ... `fill` expands to occupy the available space within the parent's content area (after subtracting padding)"
@@ -397,7 +397,7 @@ bool testFillWithPadding() {
 	ASSERT_PARSE(doc, R"(
 	[panel width=300 height=100 direction=row padding=10] {
 		[panel width=100 height=50] {}
-		[panel width=fill height=50] {}
+		[panel grow=1 height=50] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -411,14 +411,14 @@ bool testFillWithPadding() {
 	return true;
 }
 
-bool testFillWithMargin() {
+bool testGrowWithMargin() {
 	// Citation: layout.md - Fill
 	// "Fill respects margins and padding of the parent container."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
 	[panel width=300 height=100 direction=row] {
 		[panel width=100 height=50 margin=5] {}
-		[panel width=fill height=50 margin=5] {}
+		[panel grow=1 height=50 margin=5] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -426,28 +426,19 @@ bool testFillWithMargin() {
 	ui::Element* parent = doc.getElement(0);
 	ui::Element* child1 = doc.getElement(1);
 	ui::Element* child2 = doc.getElement(2);
-	// Child1 size is 100, but margins affect positioning, not size
+
 	ASSERT_FLOAT_EQ(100.0f, child1->size.x, "First child width should be 100");
-	// Remaining space: 300 - 100 - 5 (child1 right) - 5 (child2 left) = 190
-	// But since margins collapse, and direction=row, margins are on left/right
-	// Actually, in positioning, margins are added between elements
-	// For fill, it should fill the remaining after accounting for margins
-	// Assuming margins are included in spacing
-	// Total space taken by child1: 100 + 5 (left) + 5 (right) = 110
-	// Remaining: 300 - 110 = 190, but child2 has its own margins
-	// This might be tricky; perhaps the test expects fill to be 300 - 100 - margins
-	// Let's assume fill takes 300 - 100 - 10 (margins) = 190
-	ASSERT_FLOAT_EQ(190.0f, child2->size.x, "Second child width should fill remaining space accounting for margins");
+	ASSERT_FLOAT_EQ(185.0f, child2->size.x, "Second child width should fill remaining space accounting for margins");
 	return true;
 }
 
-bool testFillSingleChild() {
+bool testGrowSingleChild() {
 	// Citation: layout.md - Fill
 	// "The `fill` unit allows an element to expand and occupy the remaining available space in its parent container along the specified dimension."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
 	[panel width=300 height=100 direction=row] {
-		[panel width=fill height=50] {}
+		[panel grow=1 height=50] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -459,37 +450,73 @@ bool testFillSingleChild() {
 	return true;
 }
 
-bool testFillWithWrap() {
-	// Citation: layout.md - Fill
-	// "When `wrap=true`, `fill` elements expand to fill all remaining space in their current row, starting from their position after preceding elements. Subsequent elements that don't fit wrap to the next row."
+bool testGrowProportional() {
+	// Grow should distribute remaining space proportionally to weights
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=350 direction=row wrap=true] {
-	  [panel width=100 height=16] {}
-	  [panel width=fill height=16] {}
-	  [panel width=150 height=16] {}
-	  [panel width=fill height=16] {}
+	[panel width=400 direction=row] {
+		[panel width=100 height=50] {}
+		[panel grow=2 height=50] {}
+		[panel grow=1 height=50] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
-	ui::Element* panel = doc.getElement(0);
-	ui::Element* elem1 = doc.getElement(1); // 100px
-	ui::Element* elem2 = doc.getElement(2); // fill 250px
-	ui::Element* elem3 = doc.getElement(3); // 150px
-	ui::Element* elem4 = doc.getElement(4); // fill 200px
-	ASSERT_FLOAT_EQ(100.0f, elem1->size.x, "First element width should be 100");
-	ASSERT_FLOAT_EQ(250.0f, elem2->size.x, "Fill element fills remaining in first row");
-	ASSERT_FLOAT_EQ(150.0f, elem3->size.x, "Third element width should be 150");
-	ASSERT_FLOAT_EQ(200.0f, elem4->size.x, "Fill element fills remaining in second row");
-	// First row: elem1 and elem2, second row: elem3 and elem4
-	ASSERT_FLOAT_EQ(0.0f, elem1->position.x, "First element x position");
-	ASSERT_FLOAT_EQ(0.0f, elem1->position.y, "First element y position");
-	ASSERT_FLOAT_EQ(100.0f, elem2->position.x, "Fill element x position in first row");
-	ASSERT_FLOAT_EQ(0.0f, elem2->position.y, "Fill element y position in first row");
-	ASSERT_FLOAT_EQ(0.0f, elem3->position.x, "Third element x position in second row");
-	ASSERT_FLOAT_EQ(16.0f, elem3->position.y, "Third element y position in second row");
-	ASSERT_FLOAT_EQ(150.0f, elem4->position.x, "Fill element x position in second row");
-	ASSERT_FLOAT_EQ(16.0f, elem4->position.y, "Fill element y position in second row");
+	ui::Element* parent = doc.getElement(0);
+	ui::Element* child1 = doc.getElement(1);
+	ui::Element* child2 = doc.getElement(2);
+	ui::Element* child3 = doc.getElement(3);
+
+	// Remaining after child1: 400 - 100 = 300. Weights 2 and 1 -> 200 and 100
+	ASSERT_FLOAT_EQ(100.0f, child1->size.x, "First child width should be 100");
+	ASSERT_FLOAT_EQ(200.0f, child2->size.x, "Second child should get 2/3 of remaining space (200)");
+	ASSERT_FLOAT_EQ(100.0f, child3->size.x, "Third child should get 1/3 of remaining space (100)");
+	return true;
+}
+
+bool testGrowRespectsPadding() {
+	// Grow should respect parent padding when computing available space
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[panel width=400 padding=10 direction=row] {
+		[panel width=100 height=50] {}
+		[panel grow=1 height=50] {}
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	ui::Element* parent = doc.getElement(0);
+	ui::Element* child1 = doc.getElement(1);
+	ui::Element* child2 = doc.getElement(2);
+
+	// Parent content width = 400 - 10*2 = 380; remaining after child1 = 280
+	ASSERT_FLOAT_EQ(100.0f, child1->size.x, "First child width should be 100");
+	ASSERT_FLOAT_EQ(280.0f, child2->size.x, "Growing child should get remaining content width (280)");
+	return true;
+}
+
+bool testGrowMiddle() {
+	// Verify that a grow element in the middle expands to fill remaining space
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[panel width=300 height=50 direction=row] {
+		[panel width=50 height=50] {}
+		[panel grow=1 height=50] {}
+		[panel width=100 height=50] {}
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_TRUE(doc.m_elements.size() >= 4, "Document should have at least 4 elements");
+	ui::Element* parent = doc.getElement(0);
+	ui::Element* left = doc.getElement(1);
+	ui::Element* middle = doc.getElement(2);
+	ui::Element* right = doc.getElement(3);
+	// Sizes: left 50, right 100, middle should fill remaining: 300 - 50 - 100 = 150
+	ASSERT_FLOAT_EQ(50.0f, left->size.x, "Left child width should be 50");
+	ASSERT_FLOAT_EQ(100.0f, right->size.x, "Right child width should be 100");
+	ASSERT_FLOAT_EQ(150.0f, middle->size.x, "Middle child should fill remaining space (150)");
+	// Positions: left at 0, middle at 50, right at 200
+	ASSERT_FLOAT_EQ(0.0f, left->position.x, "Left child x should be 0");
+	ASSERT_FLOAT_EQ(50.0f, middle->position.x, "Middle child x should be after left child (50)");
+	ASSERT_FLOAT_EQ(200.0f, right->position.x, "Right child x should be after middle child (200)");
 	return true;
 }
 
@@ -1077,8 +1104,8 @@ bool testAlignItemsCenter() {
 	ui::Element* btn1 = doc.getElement(1);
 	ui::Element* btn2 = doc.getElement(2);
 
-	// Panel height=200, buttons height=30, so center at (200-30)/2 = 85
-	float expected_y = (200.0f - 30.0f) * 0.5f; // 85
+	// Center: buttons should be centered vertically
+	float expected_y = (panel->size.y - btn1->size.y) / 2.0f; // (200 - 30) / 2 = 85
 	ASSERT_EQ(expected_y, btn1->position.y, "First button y should be centered");
 	ASSERT_EQ(expected_y, btn2->position.y, "Second button y should be centered");
 
@@ -1146,10 +1173,10 @@ bool testAlignItemsStretch() {
 	ui::Element* btn2 = doc.getElement(2);
 
 	// Stretch: buttons should fill the height, so height=200
-	ASSERT_EQ(0.0f, btn1->position.y, "First button y should be at start");
-	ASSERT_EQ(200.0f, btn1->size.y, "First button should stretch to full height");
-	ASSERT_EQ(0.0f, btn2->position.y, "Second button y should be at start");
-	ASSERT_EQ(200.0f, btn2->size.y, "Second button should stretch to full height");
+	ASSERT_EQ(0.0f, btn1->position.y, "First panel y should be at start");
+	ASSERT_EQ(200.0f, btn1->size.y, "First panel should stretch to full height");
+	ASSERT_EQ(0.0f, btn2->position.y, "Second panel y should be at start");
+	ASSERT_EQ(200.0f, btn2->size.y, "Second panel should stretch to full height");
 
 	return true;
 }
@@ -1197,6 +1224,46 @@ bool testAlignItemsStretchMargins() {
 	// Positions should account for parent padding and child top margin
 	ASSERT_FLOAT_EQ(parent->position.y + pad_top + c1_top, child1->position.y, "Child1 y should account for parent padding and child top margin");
 	ASSERT_FLOAT_EQ(parent->position.y + pad_top + c2_top, child2->position.y, "Child2 y should account for parent padding and child top margin");
+
+	return true;
+}
+
+bool testAlignItemsStretchWithText() {
+	// Test align-items=stretch with a child panel containing right-aligned text
+	MockFontManager mock;
+	ui::Document doc(&mock, getGlobalAllocator());
+	ASSERT_PARSE(doc, R"(
+	[panel width=400 height=200 align-items=stretch direction=column] {
+		[panel align=right font="arial.ttf" font-size=16] {
+			Right Text
+		}
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	Span<u32> root_indices = doc.m_roots;
+	ASSERT_EQ(1, root_indices.size(), "Should parse 1 root element");
+	ui::Element* parent = doc.getElement(root_indices[0]);
+	ASSERT_EQ(1, parent->children.size(), "Parent should have 1 child");
+	ui::Element* child_panel = doc.getElement(parent->children[0]);
+
+	// Parent panel: width=400, height=200, direction=row, align-items=stretch
+	ASSERT_FLOAT_EQ(400.0f, parent->size.x, "Parent width should be 400");
+	ASSERT_FLOAT_EQ(200.0f, parent->size.y, "Parent height should be 200");
+
+	ASSERT_FLOAT_EQ(400.0f, child_panel->size.x, "Child panel width should be stretched");
+	ASSERT_FLOAT_EQ(16.0f, child_panel->size.y, "Child panel height should be one line");
+
+	// Child panel has one child: the text element
+	ASSERT_EQ(1, child_panel->children.size(), "Child panel should have 1 child (text element)");
+	ui::Element* text_elem = doc.getElement(child_panel->children[0]);
+	ASSERT_TAG(text_elem, SPAN);
+
+	// Text element: single line, right-aligned within child panel
+	ASSERT_EQ(1, text_elem->lines.size(), "Text should have 1 line");
+	float text_width = text_elem->size.x;
+	ASSERT_FLOAT_EQ(child_panel->size.x - text_width, text_elem->lines[0].pos.x, "Text line x should be right-aligned in child panel");
+	// Baseline y position: assuming ascender for font-size=16 is ~12.8px
+	ASSERT_FLOAT_EQ(12.8f, text_elem->lines[0].pos.y, "Text line y should be at baseline (~12.8px)");
 
 	return true;
 }
@@ -1340,16 +1407,18 @@ bool testLineBreaks() {
 	ui::Element* text2 = doc.getElement(children[2]);
 
 	// First text at start
-	ASSERT_FLOAT_EQ(0.0f, text1->position.x, "First text x should be 0");
-	ASSERT_FLOAT_EQ(0.0f, text1->position.y, "First text y should be 0");
+	ASSERT_EQ(1, text1->lines.size(), "First text should have 1 line");
+	ASSERT_FLOAT_EQ(0.0f, text1->lines[0].pos.x, "First text line x should be 0");
+	ASSERT_FLOAT_EQ(12.8f, text1->lines[0].pos.y, "First text line y should be 12.8");
 
 	// Block causes line break, positioned at start of new line
 	ASSERT_FLOAT_EQ(0.0f, block->position.x, "Block x should be 0");
 	ASSERT_FLOAT_EQ(16.0f, block->position.y, "Block y should be font height (16)");
 
 	// Second text on following line
-	ASSERT_FLOAT_EQ(0.0f, text2->position.x, "Second text x should be 0");
-	ASSERT_FLOAT_EQ(36.0f, text2->position.y, "Second text y should be block y + block height (16 + 20)");
+	ASSERT_EQ(1, text2->lines.size(), "Second text should have 1 line");
+	ASSERT_FLOAT_EQ(0.0f, text2->lines[0].pos.x, "Second text line x should be 0");
+	ASSERT_FLOAT_EQ(48.8f, text2->lines[0].pos.y, "Second text line y should be block y + block height (16 + 20 + 12.8)");
 
 	return true;
 }
@@ -1377,15 +1446,16 @@ bool testFitContentWithInlineText() {
 	return true;
 }
 
-bool testTextWrapping() {
+bool testTextNoWrapping() {
 	// Citation: layout.md - Text
 	// "Text flows inline within the panel and wraps to multiple lines when
 	// the unwrapped width exceeds the available panel width (minus padding) and `wrap=true`."
+	// When wrap=false, text should not wrap.
 	MockFontManager mock;
 	ui::Document doc(&mock, getGlobalAllocator());
 	ASSERT_PARSE(doc, R"(
-		[panel width=100 height=fit-content wrap=true font="arial.ttf" font-size=16] {
-			"This is a very long text that should wrap to multiple lines"
+		[panel width=100 height=fit-content wrap=false font="arial.ttf" font-size=16] {
+			This is a very long text that should not wrap even if it exceeds the panel width
 		}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -1393,33 +1463,65 @@ bool testTextWrapping() {
 	ASSERT_EQ(1, root_indices.size(), "Should parse 1 root element");
 	ui::Element* panel = doc.getElement(root_indices[0]);
 	ASSERT_TAG(panel, PANEL);
-	Span<ui::Attribute> attrs = panel->attributes;
-	ASSERT_EQ(5, attrs.size(), "Panel should have 5 attributes");
-	ASSERT_ATTRIBUTE(panel, 0, WIDTH);
-	ASSERT_EQ("100", attrs[0].value, "Width should be 100");
-	ASSERT_ATTRIBUTE(panel, 1, HEIGHT);
-	ASSERT_EQ("fit-content", attrs[1].value, "Height should be fit-content");
-	ASSERT_ATTRIBUTE(panel, 2, WRAP);
-	ASSERT_EQ("true", attrs[2].value, "Wrap should be true");
-	ASSERT_ATTRIBUTE(panel, 3, FONT);
-	ASSERT_EQ("arial.ttf", attrs[3].value, "Font should be arial.ttf");
-	ASSERT_ATTRIBUTE(panel, 4, FONT_SIZE);
-	ASSERT_EQ("16", attrs[4].value, "Font size should be 16");
 
 	// Check child text element
 	ASSERT_EQ(1, panel->children.size(), "Panel should have 1 child");
 	ui::Element* textElem = doc.getElement(panel->children[0]);
 	ASSERT_TAG(textElem, SPAN);
 
-	// Assert text element layout
-	ASSERT_EQ(0.0f, textElem->position.x, "Text x position should be 0");
-	ASSERT_EQ(0.0f, textElem->position.y, "Text y position should be 0");
-	ASSERT_TRUE(textElem->size.x > 100.0f, "Text width should be full width");
-	ASSERT_TRUE(textElem->size.y > 16.0f, "Text height should be greater than single line height due to wrapping");
+	// Text should not wrap; only one line
+	ASSERT_EQ(1, textElem->lines.size(), "Text should be a single unwrapped line");
+	// Panel width is 100, text overflows, so check that text size.x > panel->size.x
+	ASSERT_TRUE(textElem->size.x > panel->size.x, "Text should overflow panel width");
+	// Height is lineheight (font size)
+	ASSERT_EQ(16.0f, textElem->size.y, "Text height should be single line height");
+	// Position is at panel padding (default 0)
+	ASSERT_EQ(0.0f, textElem->lines[0].pos.x, "Text x should be 0");
+	ASSERT_EQ(12.8f, textElem->lines[0].pos.y, "Text y should be 0");
+	return true;
+}
+
+bool testTextWrapping() {
+	// Citation: layout.md - Text
+	// "Text flows inline within the panel and wraps to multiple lines when
+	// the unwrapped width exceeds the available panel width (minus padding) and `wrap=true`."
+	MockFontManager mock;
+	ui::Document doc(&mock, getGlobalAllocator());
+	ASSERT_PARSE(doc, R"(
+		[panel width=120 height=fit-content wrap=true padding=10 font="arial.ttf" font-size=16] {
+			This is a very long text that should wrap at the content width minus padding
+		}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	Span<u32> root_indices = doc.m_roots;
+	ASSERT_EQ(1, root_indices.size(), "Should parse 1 root element");
+	ui::Element* panel = doc.getElement(root_indices[0]);
+	ASSERT_TAG(panel, PANEL);
+
+	// Check child text element
+	ASSERT_EQ(1, panel->children.size(), "Panel should have 1 child");
+	ui::Element* textElem = doc.getElement(panel->children[0]);
+	ASSERT_TAG(textElem, SPAN);
+
+	// Assert text element layout - should wrap at content width (120 - 10 - 10 = 100)
+	ASSERT_TRUE(textElem->lines.size() > 1, "Text should wrap to multiple lines");
+	ASSERT_EQ(10.0f, textElem->lines[0].pos.x, "Text x position should account for left padding");
+	ASSERT_EQ(22.8f, textElem->lines[0].pos.y, "Text y position should account for top padding");
+
+	// Assert each line fits within the parent's content box (accounts for padding)
+	float left = panel->position.x + panel->paddings[3];
+	float right = panel->position.x + panel->size.x - panel->paddings[1];
+	for (const auto& line : textElem->lines) {
+		Vec2 w = doc.m_font_manager->measureTextA(textElem->font_handle, line.text);
+		ASSERT_TRUE(line.pos.x >= left, "Line x should be within content left (with padding)");
+		ASSERT_TRUE(line.pos.x + w.x <= right, "Line should not exceed content right (with padding)");
+	}
 
 	// Assert panel layout
-	ASSERT_EQ(100.0f, panel->size.x, "Panel width should be 100");
-	ASSERT_TRUE(panel->size.y > 16.0f, "Panel height should be greater than single line height due to wrapping");
+	ASSERT_EQ(120.0f, panel->size.x, "Panel width should be 120");
+	float expected_height = textElem->lines.size() * 16.0f + panel->paddings[0] + panel->paddings[2];
+	ASSERT_FLOAT_EQ(expected_height, panel->size.y, "Panel height should fit all wrapped lines plus padding");
+
 	return true;
 }
 
@@ -1512,8 +1614,9 @@ bool testMultilineStringLayout() {
 	// 20 chars, 20*8 = 160, single line height = 16
 	ASSERT_FLOAT_EQ(160.0f, textElem->size.x, "Text width should be the full text width (HTML-compatible)");
 	ASSERT_FLOAT_EQ(16.0f, textElem->size.y, "Text height should be single line (HTML-compatible)");
-	ASSERT_FLOAT_EQ(0.0f, textElem->position.x, "Text x position should be 0");
-	ASSERT_FLOAT_EQ(0.0f, textElem->position.y, "Text y position should be 0");
+	ASSERT_EQ(1, textElem->lines.size(), "Text should be a single unwrapped line");
+	ASSERT_FLOAT_EQ(0.0f, textElem->lines[0].pos.x, "Text x position should be 0");
+	ASSERT_FLOAT_EQ(12.8f, textElem->lines[0].pos.y, "Text y position should be 0");
 
 	// Assert panel layout (fits the text)
 	ASSERT_FLOAT_EQ(160.0f, panel->size.x, "Panel width should fit text width");
@@ -1548,8 +1651,10 @@ bool testDoubleQuotesInText() {
 	// Text is "Hello "world"", 15 characters (4 doublequotes are counted), each 8px wide = 120px
 	ASSERT_FLOAT_EQ(120.0f, textElem->size.x, "Text width should include double quotes");
 	ASSERT_FLOAT_EQ(16.0f, textElem->size.y, "Text height should be single line");
-	ASSERT_FLOAT_EQ(0.0f, textElem->position.x, "Text x position should be 0");
-	ASSERT_FLOAT_EQ(0.0f, textElem->position.y, "Text y position should be 0");
+
+	ASSERT_EQ(1, textElem->lines.size(), "Text should have 1 line");
+	ASSERT_FLOAT_EQ(0.0f, textElem->lines[0].pos.x, "Text x position should be 0");
+	ASSERT_FLOAT_EQ(12.8f, textElem->lines[0].pos.y, "Text y position should be 0");
 
 	// Assert panel layout (fits the text)
 	ASSERT_FLOAT_EQ(120.0f, panel->size.x, "Panel width should fit text width");
@@ -1578,13 +1683,11 @@ bool testTextHorizontalRendering() {
 	ui::Element* text1 = doc.getElement(panel->children[0]);
 	ui::Element* text2 = doc.getElement(panel->children[1]);
 
-	// In column direction, text strings should be stacked vertically
-	// Both should start at x=0 (left-aligned)
 	ASSERT_FLOAT_EQ(0.0f, text1->position.x, "First text x should be 0");
-	ASSERT_FLOAT_EQ(0.0f, text2->position.x, "Second text x should be 0");
+	ASSERT_FLOAT_EQ(80.0f, text2->position.x, "Second text should be next to the first one");
 
 	// Second text should be below first text (stacked vertically)
-	ASSERT_FLOAT_EQ(text1->position.y + text1->size.y, text2->position.y, "Second text should be below first text");
+	ASSERT_FLOAT_EQ(text1->position.y, text2->position.y, "Second text should be on the same line as first text");
 
 	return true;
 }
@@ -1616,12 +1719,12 @@ bool testBaselineAlignment() {
 	// Baseline alignment should position elements so their baselines align
 	// The baseline is at position.y + ascender
 	// All spans should have the same baseline y-coordinate
-	float smallAscender = doc.m_font_manager->getAscender(smallText->font_handle);
-	float normalAscender = doc.m_font_manager->getAscender(normalText->font_handle);
-	float largeAscender = doc.m_font_manager->getAscender(largeText->font_handle);
-	float smallBaseline = smallText->position.y + smallAscender;
-	float normalBaseline = normalText->position.y + normalAscender;
-	float largeBaseline = largeText->position.y + largeAscender;
+	ASSERT_EQ(1, smallText->lines.size(), "Small text span should have 1 line");
+	ASSERT_EQ(1, normalText->lines.size(), "Normal text span should have 1 line");
+	ASSERT_EQ(1, largeText->lines.size(), "Large text span should have 1 line");
+	float smallBaseline = smallText->lines[0].pos.y;
+	float normalBaseline = normalText->lines[0].pos.y;
+	float largeBaseline = largeText->lines[0].pos.y;
 
 	ASSERT_FLOAT_EQ(normalBaseline, smallBaseline, "Small text baseline should align with normal text");
 	ASSERT_FLOAT_EQ(normalBaseline, largeBaseline, "Large text baseline should align with normal text");
@@ -1629,11 +1732,50 @@ bool testBaselineAlignment() {
 	return true;
 
 	// All elements should be on the same baseline (y position should account for baseline alignment)
-	// For now, this will fail as baseline alignment is not implemented
-	float expectedBaselineY = 0.0f; // This should be calculated based on the dominant baseline
+	float expectedBaselineY = 0.0f;
 	ASSERT_FLOAT_EQ(expectedBaselineY, smallText->position.y + smallText->size.y, "Small text baseline should align");
 	ASSERT_FLOAT_EQ(expectedBaselineY, normalText->position.y + normalText->size.y, "Normal text baseline should align");
 	ASSERT_FLOAT_EQ(expectedBaselineY, largeText->position.y + largeText->size.y, "Large text baseline should align");
+
+	// Assert x positions for baseline alignment
+	ASSERT_FLOAT_EQ(0.0f, smallText->position.x, "Small text x should be 0");
+	ASSERT_FLOAT_EQ(smallText->size.x, normalText->position.x, "Normal text x should be after small text");
+	ASSERT_FLOAT_EQ(smallText->size.x + normalText->size.x, largeText->position.x, "Large text x should be after normal text");
+
+	return true;
+}
+
+bool testBaselineAlignmentWithWrapping() {
+	// Test baseline alignment with text wrapping
+	MockFontManager mock;
+	ui::Document doc(&mock, getGlobalAllocator());
+	ASSERT_PARSE(doc, R"(
+		[panel direction=row wrap=true width=200 font="arial.ttf" font-size=16] {
+			[span value="Small" font-size=12]
+			[span value="This is a very long text that should wrap to the next line" font-size=16]
+			[span value="Large" font-size=20]
+		}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	Span<u32> root_indices = doc.m_roots;
+	ASSERT_EQ(1, root_indices.size(), "Should parse 1 root element");
+	ui::Element* panel = doc.getElement(root_indices[0]);
+	ASSERT_EQ(3, panel->children.size(), "Panel should have 3 children");
+
+	ui::Element* smallText = doc.getElement(panel->children[0]);
+	ui::Element* normalText = doc.getElement(panel->children[1]);
+	ui::Element* largeText = doc.getElement(panel->children[2]);
+
+	// The long 16px span should wrap (be taller than a single line)
+	ASSERT_TRUE(normalText->lines.size() > 1, "Normal text should wrap");
+	ASSERT_EQ(3, normalText->lines.size(), "Normal text should be on 3 lines");
+	ASSERT_EQ(1, largeText->lines.size(), "Large text should be on one line");
+
+	// With wrap=true and inline spans measured to available width, each span occupies its own line.
+	// So expect strictly increasing y positions per span in flow order.
+	ASSERT_FLOAT_EQ(12.8f, normalText->lines[0].pos.y, "Normal text should start on top");
+	ASSERT_FLOAT_EQ(12.8f, smallText->lines[0].pos.y, "Small text should be baselined alingned to normal text");
+	ASSERT_TRUE(largeText->lines[0].pos.y > normalText->lines[0].pos.y, "Large text should be on a subsequent line after normal text");
 
 	return true;
 }
@@ -1665,9 +1807,27 @@ bool testAlignCenterMultipleSpans() {
 	// Panel width is 400, so centered group should start at (400 - totalWidth) / 2
 	float expectedStartX = (400.0f - totalWidth) / 2.0f;
 
-	// Currently this will fail because text alignment for multiple spans is not implemented
-	ASSERT_FLOAT_EQ(expectedStartX, span1->position.x, "First span should be centered");
+	ASSERT_EQ(1, span1->lines.size(), "First span should have 1 line");
+	ASSERT_EQ(1, span2->lines.size(), "Second span should have 1 line");
+	ASSERT_EQ(1, span3->lines.size(), "Third span should have 1 line");
+	ASSERT_FLOAT_EQ(expectedStartX, span1->lines[0].pos.x, "First span should be centered");
+	ASSERT_TRUE(span1->lines[0].pos.x < span2->lines[0].pos.x, "First span should be before the second span");
+	ASSERT_TRUE(span2->lines[0].pos.x < span3->lines[0].pos.x, "Second span should be before the third span");
+	ASSERT_EQ(1, span1->lines.size(), "First span has 1 line");
+	ASSERT_EQ(1, span2->lines.size(), "Second span has 1 line");
+	ASSERT_EQ(1, span3->lines.size(), "Third span has 1 line");
 
+	// Assert that the x position of each line in span1, span2, span3 matches the expectedStartX
+	for (const auto& line : span1->lines) {
+		ASSERT_FLOAT_EQ(expectedStartX, line.pos.x, "Span1 line x should be centered");
+	}
+	for (const auto& line : span2->lines) {
+		ASSERT_FLOAT_EQ(expectedStartX + span1->size.x, line.pos.x, "Span2 line x should be after span1");
+	}
+	for (const auto& line : span3->lines) {
+		ASSERT_FLOAT_EQ(expectedStartX + span1->size.x + span2->size.x, line.pos.x, "Span3 line x should be after span2");
+	}
+	
 	return true;
 }
 
@@ -1698,8 +1858,12 @@ bool testAlignRightMultipleSpans() {
 	// Panel width is 400, so right-aligned group should start at 400 - totalWidth
 	float expectedStartX = 400.0f - totalWidth;
 
-	// Currently this will fail because text alignment for multiple spans is not implemented
-	ASSERT_FLOAT_EQ(expectedStartX, span1->position.x, "First span should be right-aligned");
+	ASSERT_EQ(1, span1->lines.size(), "First span should have 1 line");
+	ASSERT_EQ(1, span2->lines.size(), "Second span should have 1 line");
+	ASSERT_EQ(1, span3->lines.size(), "Third span should have 1 line");
+	ASSERT_FLOAT_EQ(expectedStartX, span1->lines[0].pos.x, "First span should be right-aligned");
+	ASSERT_FLOAT_EQ(expectedStartX + span1->size.x, span2->lines[0].pos.x, "Second span should be after first");
+	ASSERT_FLOAT_EQ(expectedStartX + span1->size.x + span2->size.x, span3->lines[0].pos.x, "Third span should be after second");
 
 	return true;
 }
@@ -1725,7 +1889,8 @@ bool testAlignCenter() {
 	// Text should be centered within the 400px panel
 	// Assuming text width is calculated, it should be positioned at (400 - text_width) / 2
 	float expectedX = (400.0f - text->size.x) / 2.0f;
-	ASSERT_FLOAT_EQ(expectedX, text->position.x, "Text should be centered horizontally");
+	ASSERT_EQ(1, text->lines.size(), "Text should have 1 line");
+	ASSERT_FLOAT_EQ(expectedX, text->lines[0].pos.x, "Text should be centered horizontally");
 
 	return true;
 }
@@ -1751,44 +1916,9 @@ bool testAlignRight() {
 	// Text should be right-aligned within the 400px panel
 	// It should be positioned at 400 - text_width
 	float expectedX = 400.0f - text->size.x;
-	ASSERT_FLOAT_EQ(expectedX, text->position.x, "Text should be right-aligned horizontally");
+	ASSERT_EQ(1, text->lines.size(), "Text should have 1 line");
+	ASSERT_FLOAT_EQ(expectedX, text->lines[0].pos.x, "Text should be right-aligned horizontally");
 
-	return true;
-}
-
-bool testComplexLayout() {
-	MockDocument doc;
-	ASSERT_PARSE(doc, R"(
-	[panel direction=row width=50% height=fit-content margin=25%
-			bg-color=#f0f0f0
-			font="/engine/editor/fonts/JetBrainsMono-Regular.ttf"
-			font-size=40
-			padding=1em
-			wrap=true
-	] {
-		[panel direction=row width=fill padding=0.5em bg-color=#ffffff align=center] {
-			Welcome to [span value=" Lumix " color=#ff0000 font-size=60] Demo
-		}
-		[panel bg-color=#ff0000 width=fill align=center] { Start Demo }
-	}
-	)");
-	doc.computeLayout(Vec2(800, 600));
-	// Basic assertions
-	ASSERT_TRUE(doc.m_elements.size() >= 5, "Should parse multiple elements");
-	ui::Element* root = doc.getElement(0);
-	ASSERT_FLOAT_EQ(400.0f, root->size.x, "Root width should be 50% of 800");
-	ui::Element* child1 = doc.getElement(root->children[0]);
-	ui::Element* child2 = doc.getElement(root->children[1]);
-	// Assert sizes and positions for children
-	ASSERT_FLOAT_EQ(240.0f, child1->position.x, "Child1 x position");
-	ASSERT_FLOAT_EQ(190.0f, child1->position.y, "Child1 y position");
-	ASSERT_FLOAT_EQ(320.0f, child1->size.x, "Child1 width");
-	ASSERT_FLOAT_EQ(100.0f, child1->size.y, "Child1 height");
-	ASSERT_FLOAT_EQ(240.0f, child2->position.x, "Child2 x position");
-	ASSERT_FLOAT_EQ(290.0f, child2->position.y, "Child2 y position");
-	ASSERT_FLOAT_EQ(320.0f, child2->size.x, "Child2 width");
-	ASSERT_FLOAT_EQ(40.0f, child2->size.y, "Child2 height");
-	ASSERT_FLOAT_EQ(180.0f, root->size.y, "Root height");
 	return true;
 }
 
@@ -1796,59 +1926,63 @@ bool testComplexLayout() {
 
 void runUILayoutTests() {
 	logInfo("=== Running UI Layout Tests ===");
-	RUN_TEST(testTwoPanelsLayout);
-	RUN_TEST(testLayoutDirection);
-	RUN_TEST(testJustifyContent);
-	RUN_TEST(testJustifyStart);
-	RUN_TEST(testJustifyEnd);
-	RUN_TEST(testJustifySpaceBetween);
-	RUN_TEST(testJustifySpaceAround);
-	RUN_TEST(testJustifySpaceAroundSingleChild);
-	RUN_TEST(testJustifySpaceBetweenSingleChild);
-	RUN_TEST(testPercentLayout);
-	RUN_TEST(testPercentMargins);
-	RUN_TEST(testMarginPadding);
+	RUN_TEST(testAdvancedFitContent);
+	RUN_TEST(testAlignCenter);
+	RUN_TEST(testAlignCenterMultipleSpans);
+	RUN_TEST(testAlignItemsCenter);
+	RUN_TEST(testAlignItemsEnd);
+	RUN_TEST(testAlignItemsStart);
+	RUN_TEST(testAlignItemsStretch);
+	RUN_TEST(testAlignItemsStretchMargins);
+	RUN_TEST(testAlignItemsStretchWithText);
+	RUN_TEST(testAlignItemsWithWrap);
+	RUN_TEST(testAlignRight);
+	RUN_TEST(testAlignRightMultipleSpans);
+	RUN_TEST(testBaselineAlignment);
+	RUN_TEST(testBaselineAlignmentWithWrapping);
 	RUN_TEST(testBasicLayout);
-	RUN_TEST(testFitContent);
-	RUN_TEST(testFitContentWithMargins);
-	RUN_TEST(testFill);
-	RUN_TEST(testFillWithPadding);
-	RUN_TEST(testFillWithMargin);
-	RUN_TEST(testFillSingleChild);
-	RUN_TEST(testFillWithWrap);
-	RUN_TEST(testLayoutWithMargins);
-	RUN_TEST(testNestedPanelsWithMargins);
-	RUN_TEST(testDirectionRow);
+	RUN_TEST(testDefaultFitContentLeaf);
+	RUN_TEST(testDefaultFitContentSimple);
 	RUN_TEST(testDirectionColumn);
 	RUN_TEST(testDirectionDefault);
-	RUN_TEST(testNestedPanelsDifferentDirections);
-	RUN_TEST(testAdvancedFitContent);
-	RUN_TEST(testDefaultFitContentSimple);
-	RUN_TEST(testDefaultFitContentLeaf);
-	RUN_TEST(testVerticalMarginCollapse);
-	RUN_TEST(testHorizontalMarginCollapse);
-	RUN_TEST(testWrap);
-	RUN_TEST(testNoWrap);
-	RUN_TEST(testAlignItemsCenter);
-	RUN_TEST(testAlignItemsStart);
-	RUN_TEST(testAlignItemsEnd);
-	RUN_TEST(testAlignItemsStretch);
-	RUN_TEST(testAlignItemsWithWrap);
-	RUN_TEST(testJustifyContentWithWrap);
-	RUN_TEST(testWrapCrossAxisDistribution);
-	RUN_TEST(testInvalidTag);
-	RUN_TEST(testAlignItemsStretchMargins);
-	RUN_TEST(testLineBreaks);
-	RUN_TEST(testFitContentWithInlineText);
-	RUN_TEST(testTextWrapping);
-	RUN_TEST(testWrappingInheritance);
-	RUN_TEST(testMultilineStringLayout);
+	RUN_TEST(testDirectionRow);
 	RUN_TEST(testDoubleQuotesInText);
+	RUN_TEST(testFitContent);
+	RUN_TEST(testFitContentWithInlineText);
+	RUN_TEST(testFitContentWithMargins);
+	RUN_TEST(testGrow);
+	RUN_TEST(testGrowMiddle);
+	RUN_TEST(testGrowProportional);
+	RUN_TEST(testGrowRespectsPadding);
+	RUN_TEST(testGrowSingleChild);
+	RUN_TEST(testGrowWithMargin);
+	RUN_TEST(testGrowWithPadding);
+	RUN_TEST(testHorizontalMarginCollapse);
+	RUN_TEST(testInvalidTag);
+	RUN_TEST(testJustifyContent);
+	RUN_TEST(testJustifyContentWithWrap);
+	RUN_TEST(testJustifyEnd);
+	RUN_TEST(testJustifySpaceAround);
+	RUN_TEST(testJustifySpaceAroundSingleChild);
+	RUN_TEST(testJustifySpaceBetween);
+	RUN_TEST(testJustifySpaceBetweenSingleChild);
+	RUN_TEST(testJustifyStart);
+	RUN_TEST(testLayoutDirection);
+	RUN_TEST(testLayoutWithMargins);
+	RUN_TEST(testLineBreaks);
+	RUN_TEST(testMarginPadding);
+	RUN_TEST(testMultilineStringLayout);
+	RUN_TEST(testNestedPanelsDifferentDirections);
+	RUN_TEST(testNestedPanelsWithMargins);
+	RUN_TEST(testNoWrap);
+	RUN_TEST(testPercentLayout);
+	RUN_TEST(testPercentMargins);
 	RUN_TEST(testTextHorizontalRendering);
-	RUN_TEST(testBaselineAlignment);
-	RUN_TEST(testAlignCenterMultipleSpans);
-	RUN_TEST(testAlignRightMultipleSpans);
-	RUN_TEST(testAlignCenter);
-	RUN_TEST(testAlignRight);
-	RUN_TEST(testComplexLayout);
+	RUN_TEST(testTextWrapping);
+	RUN_TEST(testTextNoWrapping);
+	RUN_TEST(testTwoPanelsLayout);
+	RUN_TEST(testVerticalMarginCollapse);
+	RUN_TEST(testWrap);
+	RUN_TEST(testWrapCrossAxisDistribution);
+	RUN_TEST(testWrappingInheritance);
 }
