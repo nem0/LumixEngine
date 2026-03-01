@@ -29,14 +29,14 @@
 
 | Index | Step | What Happens | Computed / Updated Properties |
 | --- | --- | --- | --- |
-| 1.1. | Base widths (top-down) | Resolve explicit width-like units and measure unwrapped text for spans | `width` (pixels/%, `em`), horizontal `margin-left`/`margin-right`, horizontal `padding-left`/`padding-right`, text intrinsic width for spans (unwrapped) |
+| 1.1. | Base widths (top-down) | Resolve explicit width-like units and measure unwrapped text for spans | `width` (pixels/`em`, `%` for known-width parents), horizontal `margin-left`/`margin-right`, horizontal `padding-left`/`padding-right`, text intrinsic width for spans (unwrapped) |
 | 1.2. | Fit-content widths (bottom-up) | Infer container widths from children | `width` for `fit-content` parents (row: sum of child widths + margins + padding; column: max child width + margins + padding) |
 | 1.3. | Form lines | Split children into lines/columns when `wrap=true` | Per-container `lines` (child index ranges per line), per-line max cross size seed |
-| 1.4. | Distribute grow on width (per line) | Share remaining main-axis space among `grow>0` children | Updated child `width` on each line; respects horizontal padding and collapsed margins; only along main axis (`direction=row`). Also stretch children if parent is `align-items=stretch direction=column` |
+| 1.4. | Compute parent-relative widths - grow, %, stretch (top-down, per line) | Share remaining main-axis space among `grow>0` children and resolve percentage-based widths using final parent sizes | Updated child `width` on each line; respects horizontal padding and collapsed margins; only along main axis (`direction=row`). Also stretch children if parent is `align-items=stretch direction=column`. Percentage widths resolved using finalized parent width. |
 | 2. | Wrap text | Break span text into visual lines and place them horizontally | Per-span `lines` (with positions), text `height` from wrapped lines, per-line horizontal offset using `align` (`left`/`center`/`right`) |
 | 3.1. | Base heights (top-down) | Resolve explicit height-like units | `height` (pixels/%, `em`), vertical `margin-top`/`margin-bottom`, vertical `padding-top`/`padding-bottom` |
 | 3.2. | Fit-content heights (bottom-up) | Infer container heights from children | `height` for `fit-content` parents (column: sum of child heights + margins + padding; row: max child height + margins + padding) |
-| 3.3. | Distribute grow on height | Share remaining main-axis space among `grow>0` along height | Updated `height` where the main axis is vertical (`direction=column`); may stretch cross-axis when `align-items=stretch` is in effect |
+| 3.3. | Compute parent-relative heights | Share remaining main-axis space among `grow>0` along height | Updated `height` where the main axis is vertical (`direction=column`); may stretch cross-axis when `align-items=stretch` is in effect |
 | 4. | Compute positions | Final placement along main and cross axes | `position.x`, `position.y`; margin collapsing; `justify-content` (main-axis distribution); `align-items` (cross-axis alignment per line); per-line application when `wrap=true` |
 
 ## Text
@@ -235,9 +235,17 @@ When `wrap=true`, growing is applied per row (or per column for `direction=colum
 
 #### With Percentage Units
 
-When a parent container uses `fit-content` sizing and child elements specify dimensions in percentage units (%), the layout algorithm faces an edge case: percentage values are relative to the parent's size, but the parent's size is being determined based on the children's sizes.
+Percentage-based dimensions (e.g., `width=100%`) are resolved in **step 1.4**, after the parent's width has been finalized by grow distribution. This ensures that:
 
-In this implementation, children are measured assuming 0 available space. For elements with percentage-based dimensions, percentages resolve to 0 since 0% of any size is 0.
+- A child with `width=100%` correctly resolves to 100% of the parent's **final** width, even if the parent has `grow=1`
+- Percentage widths are deferred during step 1.1 (base widths) and only resolved after all parent sizing is complete
+- The layout algorithm avoids the circular dependency where a parent's size depends on children, but children's percentage sizes depend on the parent
+
+**Example**: A parent with `grow=1` and a child with `width=100%`:
+1. Step 1.4 grows the parent to fill available space (e.g., 300px)
+2. Step 1.4 then resolves the child's `width=100%` to 300px (100% of the parent's final width)
+
+This approach ensures correct sizing in all cases, including nested growing containers with percentage-based children.
 
 #### With Text Elements
 

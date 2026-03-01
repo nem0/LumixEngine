@@ -25,6 +25,7 @@ struct UIToken {
 		DOT,		// .
 		COLOR,		// color
 		DOLLAR,		// $
+		TEXT,		// raw text characters (special chars, etc.)
 	};
 
 	UIToken() : type(UNDEFINED) {}
@@ -122,8 +123,7 @@ struct UITokenizer {
 			advance();
 			type = UIToken::EM;
 		}
-		if (m_current == m_document.end || isWhitespace(*m_current) || *m_current == ';' || *m_current == ']') return makeToken(type);
-		return makeToken(UIToken::ERROR);
+		return makeToken(type);
 	}
 
 	Token stringToken() {
@@ -150,6 +150,19 @@ struct UITokenizer {
 		}
 		if (m_current != m_document.end && !isWhitespace(*m_current) && *m_current != ';' && *m_current != ']') return makeToken(UIToken::ERROR);
 		return makeToken(UIToken::COLOR);
+	}
+
+	Token textToken() {
+		// Consume special characters as text until we hit a structural token or whitespace
+		while (m_current != m_document.end && !isWhitespace(*m_current)) {
+			char c = peekChar();
+			// Stop at structural tokens
+			if (c == '{' || c == '}' || c == '[' || c == ']' || c == '=' || c == ':' || c == ';' || c == '.' || c == '$' || c == '#' || c == '"') {
+				break;
+			}
+			advance();
+		}
+		return makeToken(UIToken::TEXT);
 	}
 
 	Token consumeToken() {
@@ -181,7 +194,8 @@ struct UITokenizer {
 			case '$': return makeToken(UIToken::DOLLAR);
 		}
 
-		return makeToken(UIToken::ERROR);
+		// Treat unrecognized characters as text
+		return textToken();
 	}
 
 	Token peekToken() {

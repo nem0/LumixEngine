@@ -51,7 +51,7 @@
 ### Panel with ID and Class
 
 ```css
-[panel id="my_panel" class="container" width=300 height=200] {
+[panel id="my_panel" .container width=300 height=200] {
     Content here
 }
 ```
@@ -176,7 +176,7 @@
     }
 }
 
-[panel class="my_class"] {
+[panel .my_class] {
     "Styled text"
 }
 ```
@@ -221,7 +221,7 @@
 ### Button-like Panel
 
 ```css
-[panel class="button" width=120 height=40 bg-color=#007bff] {
+[panel .button width=120 height=40 bg-color=#007bff] {
     Click Me
 }
 ```
@@ -234,9 +234,9 @@
 [panel direction="column" padding=20] {
     [panel align=center] { Game Title }
     [panel direction="column"] {
-        [panel class="menu_item"] { Start Game }
-        [panel class="menu_item"] { Options }
-        [panel class="menu_item"] { Quit }
+        [panel .menu_item] { Start Game }
+        [panel .menu_item] { Options }
+        [panel .menu_item] { Quit }
     }
 }
 ```
@@ -244,12 +244,12 @@
 ### Card Layout
 
 ```css
-[panel class="card" width=300 padding=15 bg-color=#ffffff] {
+[panel .card width=300 padding=15 bg-color=#ffffff] {
     [panel] { Card Title }
     [panel] { Card content goes here... }
     [panel direction="row" justify-content="end"] {
-        [panel class="button"] { OK }
-        [panel class="button"] { Cancel }
+        [panel .button] { OK }
+        [panel .button] { Cancel }
     }
 }
 ```

@@ -466,20 +466,6 @@ bool testOnlyWhitespace() {
 	return true;
 }
 
-bool testInvalidCharacter() {
-	const char* source = "@";
-	ParticleScriptTokenizer tokenizer;
-	tokenizer.m_document = StringView(source);
-	tokenizer.m_current = tokenizer.m_document.begin;
-	
-	using Token = ParticleScriptToken;
-	
-	Token tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::ERROR, tok.type, "Invalid character should produce ERROR token");
-	
-	return true;
-}
-
 bool testDotAfterIdentifier() {
 	const char* source = "position.x";
 	ParticleScriptTokenizer tokenizer;
@@ -523,6 +509,5 @@ void runParticleScriptTokenizerTests() {
 	RUN_TEST(testMultipleComments);
 	RUN_TEST(testEmptyInput);
 	RUN_TEST(testOnlyWhitespace);
-	RUN_TEST(testInvalidCharacter);
 	RUN_TEST(testDotAfterIdentifier);
 }

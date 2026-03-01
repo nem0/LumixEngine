@@ -1,0 +1,63 @@
+[style] {
+	.demo-panel {
+		width: 400;
+		height: 70;
+		margin: 10;
+		padding: 10;
+		bg-color: #333333;
+	}
+
+	.demo-item {
+		width: 40;
+		height: 40;
+		margin: 5;
+		padding: 5;
+		bg-color: #666666;
+		align: center;
+	}
+
+	.demo-label {
+		font-size: 40;
+		color: #ffffff;
+		margin: 5;
+	}
+}
+
+[panel direction=column font="/engine/editor/fonts/JetBrainsMono-Regular.ttf" font-size=30] {
+	[panel .demo-label] { Justify-Content Showcase }
+
+	[panel .demo-label] { start - Items aligned to the start of the container }
+	[panel .demo-panel direction=row justify-content=start] {
+		[panel .demo-item] { 1 }
+		[panel .demo-item] { 2 }
+		[panel .demo-item] { 3 }
+	}
+
+	[panel .demo-label] { center - Items centered as a group }
+	[panel .demo-panel direction=row justify-content=center] {
+		[panel .demo-item] { 1 }
+		[panel .demo-item] { 2 }
+		[panel .demo-item] { 3 }
+	}
+
+	[panel .demo-label] { end - Items aligned to the end of the container }
+	[panel .demo-panel direction=row justify-content=end] {
+		[panel .demo-item] { 1 }
+		[panel .demo-item] { 2 }
+		[panel .demo-item] { 3 }
+	}
+
+	[panel .demo-label] { space-between - Equal space between items, first at start, last at end }
+	[panel .demo-panel direction=row justify-content=space-between] {
+		[panel .demo-item] { 1 }
+		[panel .demo-item] { 2 }
+		[panel .demo-item] { 3 }
+	}
+
+	[panel .demo-label] { space-around - Equal space around each item }
+	[panel .demo-panel direction=row justify-content=space-around] {
+		[panel .demo-item] { 1 }
+		[panel .demo-item] { 2 }
+		[panel .demo-item] { 3 }
+	}
+}

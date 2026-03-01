@@ -1,0 +1,54 @@
+[style] {
+	.demo-panel {
+		width: 400;
+		margin: 10;
+		padding: 10;
+		bg-color: #333333;
+	}
+
+	.demo-item {
+		width: 40;
+		margin: 5;
+		padding: 5;
+		bg-color: #666666;
+		align: center;
+	}
+
+	.demo-label {
+		font-size: 40;
+		color: #ffffff;
+		margin: 5;
+	}
+}
+
+[panel direction=column font="/engine/editor/fonts/JetBrainsMono-Regular.ttf" font-size=25] {
+	[panel .demo-label] { Align-Items Showcase }
+
+	[panel .demo-label] { start - Items aligned to the start of the cross axis }
+	[panel .demo-panel direction=row align-items=start] {
+		[panel .demo-item height=40] { 1 }
+		[panel .demo-item height=60] { 2 }
+		[panel .demo-item height=50] { 3 }
+	}
+
+	[panel .demo-label] { center - Items centered on the cross axis }
+	[panel .demo-panel direction=row align-items=center] {
+		[panel .demo-item height=40] { 1 }
+		[panel .demo-item height=60] { 2 }
+		[panel .demo-item height=50] { 3 }
+	}
+
+	[panel .demo-label] { end - Items aligned to the end of the cross axis }
+	[panel .demo-panel direction=row align-items=end] {
+		[panel .demo-item height=40] { 1 }
+		[panel .demo-item height=60] { 2 }
+		[panel .demo-item height=50] { 3 }
+	}
+
+	[panel .demo-label] { stretch - Items stretched to fill the cross axis }
+	[panel .demo-panel direction=row align-items=stretch] {
+		[panel .demo-item height=40] { 1 }
+		[panel .demo-item height=60] { 2 }
+		[panel .demo-item height=50] { 3 }
+	}
+}

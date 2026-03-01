@@ -1,11 +1,14 @@
 #pragma once
 
 #include "core/string.h"
+#include "renderer/font.h"
 #include "gui_ng/ui.h"
 
 namespace Lumix {
 
 struct MockFontManager : ui::IFontManager {
+	bool isReady(FontHandle) override { return true; }
+
 	ui::IFontManager::FontHandle loadFont(StringView path, int font_size) override {
 		// Return a dummy handle that includes path hash and font_size for uniqueness
 		size_t hash = 0;
@@ -16,6 +19,7 @@ struct MockFontManager : ui::IFontManager {
 		size_t combined = (hash << 32) | (size_t)font_size;
 		return (ui::IFontManager::FontHandle)(uintptr)combined;
 	}
+
 	Vec2 measureTextA(FontHandle font, StringView text) override {
 		// Dummy measurement using font_size for height, skip \r, treat \n as space, collapse spaces and tabs
 		size_t combined = (size_t)(uintptr)font;
@@ -47,6 +51,49 @@ struct MockFontManager : ui::IFontManager {
 		size_t combined = (size_t)(uintptr)font;
 		int font_size = (int)(combined & 0xFFFFFFFF);
 		return (float)font_size * 0.8f; // Mock ascender
+	}
+
+	WrappedText wrapText(FontHandle font, StringView text, float width) override {
+		WrappedText result;
+		size_t combined = (size_t)(uintptr)font;
+		int font_size = (int)(combined & 0xFFFFFFFF);
+		float char_width = font_size * 0.5f;
+		float current_width = 0;
+		const char* last_space = nullptr;
+		const char* c = text.begin;
+		while (c < text.end) {
+			if (isWhitespace(*c)) {
+				current_width += char_width;
+				if (current_width > width) {
+					if (last_space) {
+						result.wrapped = StringView(text.begin, last_space);
+						result.broken = WrappedText::SPACE;
+					} else {
+						result.wrapped = StringView(text.begin, c);
+						result.broken = WrappedText::MIDWORD;
+					}
+					return result;
+				}
+				last_space = c;
+				while (c < text.end && isWhitespace(*c)) ++c;
+				continue;
+			}
+			current_width += char_width;
+			if (current_width > width) {
+				if (last_space) {
+					result.wrapped = StringView(text.begin, last_space);
+					result.broken = WrappedText::SPACE;
+				} else {
+					result.wrapped = StringView(text.begin, c);
+					result.broken = WrappedText::MIDWORD;
+				}
+				return result;
+			}
+			++c;
+		}
+		result.wrapped = text;
+		result.broken = WrappedText::NO;
+		return result;
 	}
 };
 

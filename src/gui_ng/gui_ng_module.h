@@ -13,6 +13,8 @@ struct UIFontManager : ui::IFontManager {
 	Vec2 measureTextA(FontHandle font, StringView text) override;
 	float getHeight(FontHandle font) override;
 	float getAscender(FontHandle font) override;
+	bool isReady(FontHandle font) override;
+	WrappedText wrapText(FontHandle font, StringView text, float width) override;
 
 	Engine& m_engine;
 };

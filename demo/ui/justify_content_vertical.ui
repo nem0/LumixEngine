@@ -1,0 +1,89 @@
+[style] {
+	.demo-hpanel {
+		width: 400;
+		height: 70;
+		margin: 10;
+		padding: 10;
+		bg-color: #333333;
+	}
+
+	.demo-vpanel {
+		height: 400;
+		margin: 10;
+		padding: 10;
+		bg-color: #333333;
+		direction: column;
+		align-items: stretch;
+	}
+
+	.demo-item {
+		width: 40;
+		height: 40;
+		margin: 5;
+		padding: 5;
+		bg-color: #666666;
+		align: center;
+	}
+
+	.demo-label {
+		font-size: 40;
+		color: #ffffff;
+		margin: 5;
+	}
+
+	.col {
+		width: 10em;
+		align-items: stretch;
+	}
+}
+
+[panel direction=column font="/engine/editor/fonts/JetBrainsMono-Regular.ttf" font-size=30] {
+	[panel .demo-label] { Vertical Layouts }
+
+	[panel direction=row] {
+		[panel .col bg-color=#000000] {
+			[panel .demo-label] { start }
+			[panel .demo-vpanel justify-content=start] {
+				[panel .demo-item] { 1 }
+				[panel .demo-item] { 2 }
+				[panel .demo-item] { 3 }
+			}
+		}
+
+		[panel .col] {
+			[panel .demo-label] { center }
+			[panel .demo-vpanel justify-content=center] {
+				[panel .demo-item] { 1 }
+				[panel .demo-item] { 2 }
+				[panel .demo-item] { 3 }
+			}
+		}
+
+		[panel .col bg-color=#000000] {
+			[panel .demo-label] { end }
+			[panel .demo-vpanel justify-content=end] {
+				[panel .demo-item] { 1 }
+				[panel .demo-item] { 2 }
+				[panel .demo-item] { 3 }
+			}
+		}
+
+		[panel .col] {
+			[panel .demo-label] { space-between }
+			[panel .demo-vpanel justify-content=space-between] {
+				[panel .demo-item] { 1 }
+				[panel .demo-item] { 2 }
+				[panel .demo-item] { 3 }
+			}
+		}
+
+		[panel .col bg-color=#000000] {
+			[panel .demo-label] { space-around }
+			[panel .demo-vpanel justify-content=space-around] {
+				[panel .demo-item] { 1 }
+				[panel .demo-item] { 2 }
+				[panel .demo-item] { 3 }
+			}
+		}
+	}
+}

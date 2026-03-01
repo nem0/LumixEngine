@@ -27,18 +27,76 @@ struct Font {
 	float ascender = 0;
 	float height = 0;
 	u32 ref = 0;
+	bool is_built = false;
 };
 
 float getAdvanceY(const Font& font) { return float(font.font_size); }
 float getDescender(const Font& font) { return font.descender; }
 float getAscender(const Font& font) { return font.ascender; }
 float getHeight(const Font& font) { return font.height; }
+bool isBuilt(const Font& font) { return font.is_built; }
+
 
 const Glyph* findGlyph(const Font& font, u32 codepoint) {
 	auto iter = font.glyphs.find(codepoint);
 	if (!iter.isValid()) return nullptr;
 	return &iter.value();
 }
+
+// wrap one line
+WrappedText wrapText(const Font& font, StringView text, float width) {
+	WrappedText result;
+
+	float space_advance_x = font.ascender; // we use ascender as fallback value
+	auto space_iter = font.glyphs.find(' ');
+	if (space_iter.isValid()) {
+		space_advance_x = space_iter.value().advance_x;
+	}
+
+	float current_width = 0;
+	const char* last_space = nullptr;
+	const char* c = text.begin;
+	while (c < text.end) {
+		if (isWhitespace(*c)) {
+			current_width += space_advance_x;
+			if (current_width > width) {
+				if (last_space) {
+					result.wrapped = StringView(text.begin, last_space);
+					result.broken = WrappedText::SPACE;
+				} else {
+					result.wrapped = StringView(text.begin, c);
+					result.broken = WrappedText::MIDWORD;
+				}
+				return result;
+			}
+			last_space = c;
+			// Skip consecutive whitespace
+			while (c < text.end && isWhitespace(*c)) ++c;
+			continue;
+		}
+		auto iter = font.glyphs.find(*c);
+		if (iter.isValid()) {
+			const Glyph& glyph = iter.value();
+			if (current_width + glyph.advance_x > width) {
+				if (last_space) {
+					result.wrapped = StringView(text.begin, last_space);
+					result.broken = WrappedText::SPACE;
+				} else {
+					result.wrapped = StringView(text.begin, c);
+					result.broken = WrappedText::MIDWORD;
+				}
+				return result;
+			}
+			current_width += glyph.advance_x;
+		}
+		++c;
+	}
+	
+	result.wrapped = text;
+	result.broken = WrappedText::NO;
+	return result;
+}
+
 
 Vec2 measureTextA(const Font& font, const char* str, const char* str_end) {
 	Vec2 res;
@@ -203,6 +261,7 @@ bool FontManager::build()
 			c.x1 = float(c.x0 + r.w - 2 * PADDING);
 			c.y1 = float(c.y0 + r.h - 2 * PADDING);
 		}
+		font->is_built = true;
 	}
 
 	stbrp_context ctx;
@@ -280,6 +339,7 @@ Font* FontResource::addRef(int font_size)
 		}
 	}
 	Font* font = LUMIX_NEW(manager.m_allocator, Font)(manager.m_allocator);
+	font->is_built = false;
 	font->ref = 1;
 	font->resource = this;
 	font->font_size = font_size;

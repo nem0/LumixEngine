@@ -11,11 +11,6 @@
 
 namespace Lumix::ui {
 
-struct ParsedUnit {
-	float value;
-	Unit unit;
-};
-
 static const char* tokenTypeToString(UITokenizer::Token::Type type) {
 	switch (type) {
 		case UITokenizer::Token::UNDEFINED: return "UNDEFINED";
@@ -36,6 +31,7 @@ static const char* tokenTypeToString(UITokenizer::Token::Type type) {
 		case UITokenizer::Token::DOLLAR: return "DOLLAR";
 		case UITokenizer::Token::LBRACKET: return "LBRACKET";
 		case UITokenizer::Token::RBRACKET: return "RBRACKET";
+		case UITokenizer::Token::TEXT: return "TEXT";
 	}
 	return "UNKNOWN";
 }
@@ -112,7 +108,6 @@ static AttributeName parseAttributeName(StringView str) {
 			break;
 	}
 
-	logError("Unknown UI attribute: ", str);
 	return AttributeName::INVALID;
 }
 
@@ -193,7 +188,7 @@ bool Document::tryConsume(Token::Type type, Token* out_token) {
 bool Document::consume(Token::Type type, Token* out_token) {
 	Token t;
 	if (!tryConsume(type, &t)) {
-		error(t.value, m_tokenizer, "expected ", tokenTypeToString(type), ", got ", tokenTypeToString(t.type));
+		error(m_tokenizer.m_current_token.value, m_tokenizer, "expected ", tokenTypeToString(type), ", got ", tokenTypeToString(t.type));
 		return false;
 	}
 	if (out_token) *out_token = t;
@@ -274,6 +269,11 @@ bool Document::parseStyleBlock() {
 			Attribute& attr = attrs.emplace();
 			attr.value = token.value;
 			attr.type = parseAttributeName(name);
+			if (attr.type == AttributeName::INVALID) {
+				error(name, m_tokenizer, "unknown attribute '", name, "'");
+				return false;
+			}
+			
 			if (!consume(Token::SEMICOLON)) return false;
 		}
 
@@ -293,6 +293,49 @@ bool Document::parseElements(u32 parent_index) {
 				}
 				return true;
 			case Token::RBRACKET: error(token.value, m_tokenizer, "unexpected ']'"); return false;
+			case Token::TEXT: {
+				// TEXT tokens at root level become SPAN elements with text content
+				Element& elem = m_elements.emplace(Tag::SPAN, m_allocator);
+				u32 elem_idx = m_elements.size() - 1;
+				if (parent_index != 0xFFFF'FFFF) {
+					m_elements[parent_index].children.push(elem_idx);
+				} else {
+					m_roots.push(elem_idx);
+				}
+				elem.value = token.value;
+				
+				// Accumulate consecutive text tokens
+				bool is_break = false;
+				while (!is_break) {
+					Token next = m_tokenizer.peekToken();
+					switch (next.type) {
+						case Token::TEXT:
+							elem.value.end = next.value.end;
+							m_tokenizer.consumeToken();
+							break;
+						case Token::LBRACKET: is_break = true; break;
+						case Token::RBRACE:
+							if (parent_index == 0xffff'FFFF) {
+								error(token.value, m_tokenizer, "unexpected right brace");
+								return false;
+							}
+							m_tokenizer.consumeToken();
+							return true;
+						case Token::EOF:
+							if (parent_index == 0xffff'FFFF) return true;
+							error(token.value, m_tokenizer, "unexpected EOF");
+							return false;
+						default:
+							elem.value.end = next.value.end;
+							if (next.type == Token::STRING) {
+								elem.value.end += 1;
+							}
+							m_tokenizer.consumeToken();
+							break;
+					}
+				}
+				break;
+			}
 			case Token::RBRACE:
 				if (parent_index == 0xFFFF'FFFF) {
 					error(token.value, m_tokenizer, "unexpected '}' at root level");
@@ -334,6 +377,13 @@ bool Document::parseElements(u32 parent_index) {
 				for (;;) {
 					if (tryConsume(Token::RBRACKET)) break;
 					Token name_token;
+					if (m_tokenizer.peekToken().type == Token::DOT) {
+						if (!consume(Token::DOT)) return false;	
+						if (!consume(Token::IDENTIFIER, &name_token)) return false;	
+						elem.style_class = name_token.value;  // TODO multiple clases
+						continue;
+					}
+
 					if (!consume(Token::IDENTIFIER, &name_token)) return false;
 					if (!consume(Token::EQUALS)) return false;
 			
@@ -344,15 +394,17 @@ bool Document::parseElements(u32 parent_index) {
 					}
 
 					AttributeName name = parseAttributeName(name_token.value);
-					switch (name) {
-						case AttributeName::VALUE: elem.value = value.value; break;
-						case AttributeName::CLASS: elem.style_class = value.value; break;
-						default: {
-							Attribute& attr = elem.attributes.emplace();
-							attr.type = name;
-							attr.value = value.value;
-							break;
-						}
+					if (name == AttributeName::INVALID) {
+						error(name_token.value, m_tokenizer, "unknown attribute '", name_token.value, "'");
+						return false;
+					}
+					if (name == AttributeName::VALUE) {
+						elem.value = value.value;
+					}
+					else {
+						Attribute& attr = elem.attributes.emplace();
+						attr.type = name;
+						attr.value = value.value;
 					}
 					token = m_tokenizer.peekToken();
 				}
@@ -398,6 +450,11 @@ bool Document::parseElements(u32 parent_index) {
 							}
 							m_tokenizer.consumeToken();
 							return true; // end of the parent container
+						case Token::TEXT:
+							// Include TEXT tokens in the element value
+							elem.value.end = next.value.end;
+							m_tokenizer.consumeToken();
+							break;
 						default: 
 							elem.value.end = next.value.end;
 							if (next.type == Token::STRING) {
@@ -443,242 +500,186 @@ static float computeAbsoluteSize(const ParsedUnit& unit, float parent_size, floa
 	}
 }
 
+static u32 layoutSpans(Document& doc, Element& parent, u32 first_span_idx, float x, float y) {
+	u32 count = 0;
+	for (i32 i = first_span_idx; i < parent.children.size(); ++i) {
+		u32 child_idx = parent.children[i];
+		Element& child = doc.m_elements[child_idx];
+		if (child.tag != Tag::SPAN) break;
+		if (child.lines.empty()) {
+			child.position.x = x;
+			child.position.y = y;
+		}
+		else {
+			for (SpanLine& line : child.lines) {
+				line.pos.x += x;
+				line.pos.y += y;
+			}
+			child.position = child.lines[0].pos;
+		}
+		++count;
+	}
+	return count;
+}
+
+// Positions child elements within their parent container based on layout direction and margins.
+// For row direction, children are laid out horizontally; for column, vertically.
+// Margins between adjacent children collapse to the maximum value.
+static void layoutChildrenHorizontal(Document& doc, Element& parent) {
+	float start_x = parent.position.x + parent.paddings[3];
+	float y = parent.position.y + parent.paddings[0];
+
+	for (u32 i = 0, n = parent.children.size(); i < n; ++i) {
+		u32 child_idx = parent.children[i];
+		if (doc.m_elements[child_idx].tag == Tag::SPAN) {
+			i += layoutSpans(doc, parent, i, start_x, y) - 1;
+			y += doc.m_elements[child_idx].size.y;
+		}
+		else {
+			float prev_margin = 0;
+			i32 row_start = i;
+			i32 row_end;
+			float max_h = 0;
+			float available_w = parent.size.x - parent.paddings[1] - parent.paddings[3];
+			for (row_end = i; row_end < parent.children.size(); ++row_end) {
+				Element& child = doc.m_elements[parent.children[row_end]];
+				float wtmp = child.size.x + maximum(prev_margin, child.margins[3]);
+				if (available_w < wtmp + child.margins[1] && parent.wrap || child.tag == Tag::SPAN) {
+					break;
+				}
+				max_h = maximum(max_h, child.size.y + child.margins[0] + child.margins[2]);
+				available_w -= wtmp;
+				prev_margin = child.margins[1];
+			}
+			available_w -= doc.m_elements[parent.children[row_end - 1]].margins[1];
+
+			// layout row_start <-> row_end
+			float x = start_x;
+			float space = 0;
+			switch (parent.justify_content) {
+				case JustifyContent::END: x += available_w; break;
+				case JustifyContent::CENTER: x += available_w / 2; break;
+				case JustifyContent::SPACE_BETWEEN: space = available_w / (row_end - row_start - 1); break;
+				case JustifyContent::SPACE_AROUND: 
+					space = available_w / (row_end - row_start + 1);
+					x += space;
+					break;
+				default: break;
+			}
+
+			prev_margin = 0;
+			for (i32 j = row_start; j < row_end; ++j) {
+				Element& child = doc.m_elements[parent.children[j]];
+				child.position.x = x + maximum(prev_margin, child.margins[3]);
+				child.position.y = y + child.margins[0];
+				switch (parent.align_items) {
+					case AlignItems::START: break;
+					case AlignItems::END: child.position.y = y + max_h - child.size.y - child.margins[2]; break;
+					case AlignItems::CENTER: child.position.y = y + (max_h - child.size.y) / 2; break;
+					case AlignItems::STRETCH: child.size.y = max_h - child.margins[0] - child.margins[2]; break;
+				}
+				prev_margin = child.margins[1];
+				x = child.position.x + child.size.x + space;
+			}
+			
+			// prepare for next row or end
+			y += max_h;
+			i = row_end - 1;
+		}
+	}
+}
+
+static void layoutChildrenVertical(Document& doc, Element& parent) {
+	float x = parent.position.x + parent.paddings[3];
+	float available_w = parent.size.x - parent.paddings[1] - parent.paddings[3];
+
+	// First, compute total height used
+	float total_height = 0;
+	float prev_margin = 0;
+	for (u32 i = 0, n = parent.children.size(); i < n; ++i) {
+		u32 child_idx = parent.children[i];
+		Element& child = doc.m_elements[child_idx];
+		if (child.tag == Tag::SPAN) {
+			total_height += child.size.y + prev_margin;
+			prev_margin = 0;
+			while (i < n && doc.m_elements[parent.children[i]].tag == Tag::SPAN) {
+				++i;
+			}
+			--i;
+		}
+		else {
+			total_height += child.size.y + maximum(prev_margin, child.margins[0]);
+			prev_margin = child.margins[2];
+		}
+	}
+	total_height += prev_margin; // add the last bottom margin
+
+	float available_h = parent.size.y - parent.paddings[0] - parent.paddings[2];
+	float remaining = available_h - total_height;
+
+	// Apply justify_content
+	float start_y = parent.position.y + parent.paddings[0];
+	float space = 0;
+	switch (parent.justify_content) {
+		case JustifyContent::START: break;
+		case JustifyContent::END: start_y += remaining; break;
+		case JustifyContent::CENTER: start_y += remaining / 2; break;
+		case JustifyContent::SPACE_BETWEEN:
+			if (parent.children.size() > 1) space = remaining / (parent.children.size() - 1);
+			break;
+		case JustifyContent::SPACE_AROUND:
+			space = remaining / (parent.children.size() + 1);
+			start_y += space;
+			break;
+		default: break;
+	}
+
+	// Now position the children
+	float y = start_y;
+	prev_margin = 0;
+	for (u32 i = 0, n = parent.children.size(); i < n; ++i) {
+		u32 child_idx = parent.children[i];
+		Element& child = doc.m_elements[child_idx];
+		if (child.tag == Tag::SPAN) {
+			i += layoutSpans(doc, parent, i, x + prev_margin, y) - 1;
+			y += child.size.y + space;
+		}
+		else {
+			child.position.y = y + maximum(prev_margin, child.margins[0]);
+
+			// Apply align-items for horizontal positioning
+			switch (parent.align_items) {
+				case AlignItems::START:
+					child.position.x = x + child.margins[3];
+					break;
+				case AlignItems::END:
+					child.position.x = parent.position.x + parent.size.x - parent.paddings[1] - child.size.x - child.margins[1];
+					break;
+				case AlignItems::CENTER:
+					child.position.x = x + (available_w - child.size.x) / 2;
+					break;
+				case AlignItems::STRETCH:
+					child.position.x = x + child.margins[3];
+					break;
+			}
+
+			prev_margin = child.margins[2];
+			y = child.position.y + child.size.y + space;
+			for (SpanLine& line : child.lines) {
+				line.pos.x += child.position.x;
+				line.pos.y += child.position.y;
+			}
+		}
+	}
+}
 
 // Positions child elements within their parent container based on layout direction and margins.
 // For row direction, children are laid out horizontally; for column, vertically.
 // Margins between adjacent children collapse to the maximum value.
 static void layoutChildren(Document& doc, Element& parent) {
-	if (parent.children.empty()) return;
+	if (parent.direction == Direction::ROW) layoutChildrenHorizontal(doc, parent);
+	else layoutChildrenVertical(doc, parent);
 
-	const bool is_row = parent.direction == Direction::ROW;
-	const bool wrap = parent.wrap;
-
-	// Lambda functions to abstract main/cross axes for easier direction-agnostic code
-	auto get_main_pos = [is_row](Element& e) -> float& { return is_row ? e.position.x : e.position.y; };
-	auto get_main_size = [is_row](Element& e) -> float& { return is_row ? e.size.x : e.size.y; };
-	auto get_cross_pos = [is_row](Element& e) -> float& { return is_row ? e.position.y : e.position.x; };
-	auto get_cross_size = [is_row](Element& e) -> float& { return is_row ? e.size.y : e.size.x; };
-	auto get_margin_start = [is_row](Element& e) { return is_row ? e.margins[3] : e.margins[0]; };
-	auto get_margin_end = [is_row](Element& e) { return is_row ? e.margins[1] : e.margins[2]; };
-	auto get_margin_cross_start = [is_row](Element& e) { return is_row ? e.margins[0] : e.margins[3]; };
-	auto get_margin_cross_end = [is_row](Element& e) { return is_row ? e.margins[2] : e.margins[1]; };
-
-	// Calculate container boundaries accounting for padding
-	float main_start = is_row ? parent.position.x + parent.paddings[3] : parent.position.y + parent.paddings[0];
-	float cross_start = is_row ? parent.position.y + parent.paddings[0] : parent.position.x + parent.paddings[3];
-	float parent_main_size = is_row ? parent.size.x - parent.paddings[3] - parent.paddings[1] : parent.size.y - parent.paddings[0] - parent.paddings[2];
-	float parent_main_end = main_start + parent_main_size;
-
-	// Helper to process a line
-	auto processLine = [&](u32 start, u32 end, float line_cross_pos, float line_max_cross) {
-		// Distribute remaining main-axis space to growable children within this line
-		// This ensures growth respects line breaks and wrapping.
-		{
-			float available_main = parent_main_end - main_start;
-			float used_main = get_margin_start(doc.m_elements[parent.children[start]]); // margin_start of first child
-			float sum_grow = 0;
-			float prev_m_end = 0;
-			for (u32 i = start; i <= end; ++i) {
-				Element& child = doc.m_elements[parent.children[i]];
-				float m_start = get_margin_start(child);
-				float m_end = get_margin_end(child);
-				float between = (i == start) ? 0.f : maximum(prev_m_end, m_start);
-				used_main += between + get_main_size(child);
-				prev_m_end = m_end;
-				sum_grow += child.grow;
-			}
-			used_main += prev_m_end; // margin_end of last child
-
-			float remaining = available_main - used_main;
-			if (sum_grow > 0.f && remaining > 0.f) {
-				for (u32 i = start; i <= end; ++i) {
-					Element& child = doc.m_elements[parent.children[i]];
-					if (child.grow > 0.f) {
-						get_main_size(child) += remaining * (child.grow / sum_grow);
-					}
-				}
-				// Recompute positions for the line after growth
-				float current_pos = main_start;
-				prev_m_end = 0;
-				for (u32 i = start; i <= end; ++i) {
-					Element& child = doc.m_elements[parent.children[i]];
-					float m_start = get_margin_start(child);
-					float m_end = get_margin_end(child);
-					float eff = (i == start) ? m_start : maximum(prev_m_end, m_start);
-					get_main_pos(child) = current_pos + eff;
-					current_pos += eff + get_main_size(child);
-					prev_m_end = m_end;
-				}
-			}
-		}
-		// Check if this is an inline line (all elements are spans in row direction)
-		Element& first_child = doc.m_elements[parent.children[start]];
-		bool is_inline_line = first_child.tag == Tag::SPAN;
-
-		if (is_inline_line) {
-			for (u32 i = start; i <= end; ++i) {
-				u32 child_idx = parent.children[i];
-				Element& child = doc.m_elements[child_idx];
-				if (!child.lines.empty()) {
-					float asc = doc.m_font_manager->getAscender(child.font_handle);
-					float height = doc.m_font_manager->getHeight(child.font_handle);
-					float min_x = FLT_MAX;
-					float min_y = FLT_MAX;
-					float max_x = -FLT_MAX;
-					float max_y = -FLT_MAX;
-					for (SpanLine& line : child.lines) {
-						Vec2 text_size = doc.m_font_manager->measureTextA(child.font_handle, line.text);
-						if (is_row) {
-							line.pos.y += line_cross_pos;
-							line.pos.x += parent.position.x + parent.paddings[3];
-						}
-						else {
-							line.pos.y += parent.position.y + parent.paddings[0];
-							line.pos.x += line_cross_pos;
-						}
-						min_x = minimum(min_x, line.pos.x);
-						max_x = maximum(max_x, line.pos.x + text_size.x);
-						min_y = minimum(min_y, line.pos.y - asc);
-						max_y = maximum(max_y, line.pos.y - asc + height);
-					}
-					child.position = Vec2(min_x, min_y);
-					child.size = Vec2(max_x - min_x, max_y - min_y);
-				}
-			}
-		}
-		else {
-			// Apply cross-axis alignment (align-items)
-			float available_cross = wrap ? line_max_cross : (is_row ? parent.size.y - parent.paddings[0] - parent.paddings[2] : parent.size.x - parent.paddings[3] - parent.paddings[1]);
-			for (u32 i = start; i <= end; ++i) {
-				u32 child_idx = parent.children[i];
-				Element& child = doc.m_elements[child_idx];
-				float child_cross_size = get_cross_size(child);
-				float margin_cross_start = get_margin_cross_start(child);
-				float margin_cross_end = get_margin_cross_end(child);
-				float cross_pos;
-				if (parent.align_items == AlignItems::START) {
-					cross_pos = line_cross_pos + margin_cross_start;
-				} else if (parent.align_items == AlignItems::CENTER) {
-					cross_pos = line_cross_pos + margin_cross_start + (available_cross - child_cross_size - margin_cross_start - margin_cross_end) * 0.5f;
-				} else if (parent.align_items == AlignItems::END) {
-					cross_pos = line_cross_pos + available_cross - child_cross_size - margin_cross_end;
-				} else if (parent.align_items == AlignItems::STRETCH) {
-					cross_pos = line_cross_pos + margin_cross_start;
-					get_cross_size(child) = maximum(0.0f, available_cross - margin_cross_start - margin_cross_end);
-				}
-				get_cross_pos(child) = cross_pos;
-			}
-		}
-
-		// Apply main-axis justification (justify-content)
-		if (parent.justify_content != JustifyContent::START) {
-			float min_main = FLT_MAX, max_main = -FLT_MAX;
-			for (u32 i = start; i <= end; ++i) {
-				Element& child = doc.m_elements[parent.children[i]];
-				float pos = get_main_pos(child), size = get_main_size(child);
-				min_main = minimum(min_main, pos);
-				max_main = maximum(max_main, pos + size);
-			}
-			float total_span = max_main - min_main;
-			float available_main = parent_main_end - main_start;
-			float shift = 0.0f;
-			switch (parent.justify_content) {
-				case JustifyContent::CENTER:
-					shift = (available_main - total_span) * 0.5f - (min_main - main_start);
-					break;
-				case JustifyContent::END:
-					shift = available_main - total_span - (min_main - main_start);
-					break;
-				case JustifyContent::SPACE_BETWEEN:
-					if (end > start) {
-						float space = (available_main - total_span) / (end - start);
-						float current_pos = main_start;
-						for (u32 i = start; i <= end; ++i) {
-							Element& child = doc.m_elements[parent.children[i]];
-							float size = get_main_size(child);
-							get_main_pos(child) = current_pos;
-							current_pos += size + space;
-						}
-					}
-					break;
-				case JustifyContent::SPACE_AROUND:
-					if (end >= start) {
-						float space = (available_main - total_span) / (end - start + 1);
-						float current_pos = main_start + space * 0.5f;
-						for (u32 i = start; i <= end; ++i) {
-							Element& child = doc.m_elements[parent.children[i]];
-							float size = get_main_size(child);
-							get_main_pos(child) = current_pos;
-							current_pos += size + space;
-						}
-					}
-					break;
-				default:
-					break;
-			}
-			if (shift != 0.0f) {
-				for (u32 i = start; i <= end; ++i) {
-					get_main_pos(doc.m_elements[parent.children[i]]) += shift;
-				}
-			}
-		}
-	};
-
-	float current_main_pos = main_start;
-	float current_cross_pos = cross_start;
-	u32 current_line_start = 0;
-	float prev_margin_end = 0;
-	bool is_first_in_line = true;
-	float current_line_max_cross = 0;
-
-	for (u32 i = 0, n = (u32)parent.children.size(); i < n; ++i) {
-		u32 child_idx = parent.children[i];
-		Element& child = doc.m_elements[child_idx];
-		// TODO do we need this? how can it happen?
-		if (get_main_pos(child) != 0 || get_cross_pos(child) != 0) continue; // Skip already positioned elements
-
-		float margin_start = get_margin_start(child);
-		float margin_end = get_margin_end(child);
-		float child_main_size = get_main_size(child);
-		float effective_margin = is_first_in_line ? margin_start : maximum(prev_margin_end, margin_start);
-
-		// Check if fits in current line
-		if (!is_first_in_line) {
-			Tag prev_tag = doc.m_elements[parent.children[i - 1]].tag;
-			if (wrap && current_main_pos + effective_margin + child_main_size > parent_main_end && child.tag != Tag::SPAN // panel does not fit in current line
-				|| child.tag == Tag::PANEL && prev_tag == Tag::SPAN // panel causes line break before itself
-				|| child.tag == Tag::SPAN && prev_tag == Tag::PANEL // panel causes line break after itself
-			) {
-				// Process current line
-				processLine(current_line_start, i - 1, current_cross_pos, current_line_max_cross);
-				// Start new line
-				current_line_start = i;
-				current_main_pos = main_start;
-				current_cross_pos += current_line_max_cross;
-				current_line_max_cross = 0;
-				effective_margin = 0;
-				is_first_in_line = true;
-			}
-		}
-
-		// Set main position
-		get_main_pos(child) = current_main_pos + effective_margin;
-
-		// Update line max cross size
-		float child_cross_size = get_cross_size(child) + get_margin_cross_start(child) + get_margin_cross_end(child);
-		if (child_cross_size > current_line_max_cross) current_line_max_cross = child_cross_size;
-
-		current_main_pos += effective_margin + child_main_size;
-		prev_margin_end = margin_end;
-		is_first_in_line = false;
-	}
-
-	// Process last line
-	if (current_line_start < (u32)parent.children.size()) {
-		processLine(current_line_start, (u32)parent.children.size() - 1, current_cross_pos, current_line_max_cross);
-	}
-
-	// Recursively layout children's children
 	for (u32 child_idx : parent.children) {
 		layoutChildren(doc, doc.m_elements[child_idx]);
 	}
@@ -694,7 +695,8 @@ struct ParentContext {
 	Vec2 size;
 };
 
-static void distributeGrowWidth(Document& doc, Element& elem) {
+// distribute grow and compute %-based widths
+static void computeParentRelativeWidth(Document& doc, Element& elem) {
 	if (elem.children.empty()) return;
 
 	if (elem.direction == Direction::ROW) {
@@ -706,14 +708,17 @@ static void distributeGrowWidth(Document& doc, Element& elem) {
 			sum_grow += child.grow;
 			remaining_w -= child.size.x + maximum(prev_margin, child.margins[3]);
 			prev_margin = child.margins[1];
+		
 		}
 		remaining_w -= prev_margin;
 
 		if (sum_grow > 0) {
-			for (u32 child_idx : elem.children) {
-				Element& child = doc.m_elements[child_idx];
-				if (child.grow > 0) {
-					child.size.x += remaining_w * child.grow / sum_grow;
+			if (remaining_w > 0) {
+				for (u32 child_idx : elem.children) {
+					Element& child = doc.m_elements[child_idx];
+					if (child.grow > 0) {
+						child.size.x += remaining_w * child.grow / sum_grow;
+					}
 				}
 			}
 		}
@@ -723,12 +728,18 @@ static void distributeGrowWidth(Document& doc, Element& elem) {
 		for (u32 child_idx : elem.children) {
 			Element& child = doc.m_elements[child_idx];
 			if (child.tag == Tag::SPAN) continue;
-			child.size.x = maximum(0.0f, content_w - child.margins[1] - child.margins[3]);
+			if (child.width_unit.unit == Unit::FIT_CONTENT) {
+				child.size.x = maximum(0.0f, content_w - child.margins[1] - child.margins[3]);
+			}
 		}
 	}
 
 	for (u32 child_idx : elem.children) {
-		distributeGrowWidth(doc, doc.m_elements[child_idx]);
+		Element& child = doc.m_elements[child_idx];
+		if (child.width_unit.unit == Unit::PERCENT) {
+			child.size.x = computeAbsoluteSize(child.width_unit, elem.size.x, child.font_size);
+		}
+		computeParentRelativeWidth(doc, doc.m_elements[child_idx]);
 	}
 }
 
@@ -752,7 +763,7 @@ static float computeSpansHeight(Document& doc, Element& element, i32 child_idx) 
 }
 
 static void computeBaseHeights(Document& doc, Element& elem, Element* parent_elem, const ParentContext& parent) {
-	ParsedUnit height_unit = {0, Unit::FIT_CONTENT};
+	elem.height_unit = {0, Unit::FIT_CONTENT};
 	ParsedUnit margin_unit = {0, Unit::PIXELS};
 	ParsedUnit padding_unit = {0, Unit::PIXELS};
 
@@ -761,7 +772,7 @@ static void computeBaseHeights(Document& doc, Element& elem, Element* parent_ele
 			case AttributeName::MARGIN: margin_unit = parseUnit(attr.value); break;
 			case AttributeName::PADDING: padding_unit = parseUnit(attr.value); break;
 			case AttributeName::HEIGHT: {
-				height_unit = parseUnit(attr.value);
+				elem.height_unit = parseUnit(attr.value);
 				break;
 			}
 			default: break;
@@ -773,8 +784,8 @@ static void computeBaseHeights(Document& doc, Element& elem, Element* parent_ele
 	elem.margins[0] = elem.margins[2] = computeAbsoluteSize(margin_unit, parent.size.y, elem.font_size);
 	elem.paddings[0] = elem.paddings[2] = computeAbsoluteSize(padding_unit, parent.size.y, elem.font_size);
 
-	if (height_unit.unit != Unit::FIT_CONTENT) {
-		elem.size.y = computeAbsoluteSize(height_unit, parent.size.y, elem.font_size);
+	if (elem.height_unit.unit != Unit::FIT_CONTENT) {
+		elem.size.y = computeAbsoluteSize(elem.height_unit, parent.size.y, elem.font_size);
 	}
 
 	ParentContext ctx = parent;
@@ -783,7 +794,7 @@ static void computeBaseHeights(Document& doc, Element& elem, Element* parent_ele
 		computeBaseHeights(doc, doc.m_elements[child_idx], &elem, ctx);
 	}
 
-	if (height_unit.unit == Unit::FIT_CONTENT) {
+	if (elem.height_unit.unit == Unit::FIT_CONTENT) {
 		if (elem.direction == Direction::ROW) {
 			float max_height = 0;
 			for (u32 child_idx : elem.children) {
@@ -810,17 +821,49 @@ static void computeBaseHeights(Document& doc, Element& elem, Element* parent_ele
 	}
 }
 
+static void computeParentRelativeHeights(Document& doc, Element& elem) {
+	// TODO
+	/*if (elem.direction == Direction::COLUMN) {
+		float sum_grow = 0;
+		float remaining_h = elem.size.y - elem.paddings[0] - elem.paddings[2];
+		float prev_margin = 0;
+		for (u32 child_idx : elem.children) {
+			const Element& child = doc.m_elements[child_idx];
+			sum_grow += child.grow;
+			remaining_h -= child.size.y + maximum(prev_margin, child.margins[0]);
+			prev_margin = child.margins[2];
+		}
+		remaining_h -= prev_margin;
+
+		if (sum_grow > 0 && remaining_h > 0) {
+			for (u32 child_idx : elem.children) {
+				Element& child = doc.m_elements[child_idx];
+				if (child.grow > 0) {
+					child.size.y += remaining_h * child.grow / sum_grow;
+				}
+			}
+		}
+	}*/
+
+	for (u32 child_idx : elem.children) {
+		Element& child = doc.m_elements[child_idx];
+		if (child.height_unit.unit == Unit::PERCENT) {
+			child.size.y = computeAbsoluteSize(child.height_unit, elem.size.y, child.font_size);
+		}
+		computeParentRelativeHeights(doc, child);
+	}
+}
+
 static void computeBaseWidths(Document& doc, Element& elem, Element* parent_elem, const ParentContext& parent) {
 	elem.position = Vec2(0, 0);
 	elem.size = Vec2(0, 0);
-	elem.wrap = false;
+	elem.wrap = true;
 	elem.justify_content = JustifyContent::START;
 	elem.align_items = AlignItems::START;
 	elem.text_align = parent.align;
 	elem.font_size = parent.font_size;
 	elem.color = parent.color;
 	elem.bg_color = Color(0);
-	elem.bg_image = StringView();
 	for (int i = 0; i < 4; ++i) {
 		elem.margins[i] = 0;
 		elem.paddings[i] = 0;
@@ -829,14 +872,14 @@ static void computeBaseWidths(Document& doc, Element& elem, Element* parent_elem
 	ParentContext ctx = parent;
 	ctx.size = Vec2(0);
 
-	ParsedUnit width_unit = {0, Unit::FIT_CONTENT};
+	elem.width_unit = {0, Unit::FIT_CONTENT};
 	ParsedUnit margin_unit = {0, Unit::PIXELS};
 	ParsedUnit padding_unit = {0, Unit::PIXELS};
 
 	for (const Attribute& attr : elem.attributes) {
 		switch (attr.type) {
 			case AttributeName::WIDTH: {
-				width_unit = parseUnit(attr.value);
+				elem.width_unit = parseUnit(attr.value);
 				break;
 			}
 			case AttributeName::GROW: fromCString(attr.value, elem.grow); break;
@@ -850,28 +893,17 @@ static void computeBaseWidths(Document& doc, Element& elem, Element* parent_elem
 				ctx.align = elem.text_align;
 				break;
 			}
-			case AttributeName::FONT_SIZE: {
-				fromCString(attr.value, elem.font_size);
-				ctx.font_size = elem.font_size;
-				break;
-			}
 			case AttributeName::COLOR: {
 				elem.color = parseColor(attr.value);
 				ctx.color = elem.color;
 				break;
 			}
-			case AttributeName::FONT: ctx.font = attr.value; break;
 			case AttributeName::BG_COLOR: elem.bg_color = parseColor(attr.value); break;
-			case AttributeName::BACKGROUND_IMAGE: {
-				elem.bg_image = attr.value;
-				if (doc.m_resource_manager && !attr.value.empty()) {
-					elem.bg_sprite = doc.m_resource_manager->load<Sprite>(Path(attr.value));
-				}
-				break;
-			}
 			case AttributeName::VALUE: elem.value = attr.value; break;
 			case AttributeName::JUSTIFY_CONTENT: elem.justify_content = parseJustifyContent(attr.value); break;
 			case AttributeName::ALIGN_ITEMS: elem.align_items = parseAlignItems(attr.value); break;
+			case AttributeName::FONT: ctx.font = attr.value; break;
+			case AttributeName::FONT_SIZE: ctx.font_size = (float)atof(attr.value.begin); break;
 			case AttributeName::WRAP: elem.wrap = attr.value == "true"; break;
 			case AttributeName::PADDING: padding_unit = parseUnit(attr.value); break;
 			case AttributeName::MARGIN: margin_unit = parseUnit(attr.value); break;
@@ -880,17 +912,14 @@ static void computeBaseWidths(Document& doc, Element& elem, Element* parent_elem
 	}
 
 	if (elem.tag == Tag::SPAN) {
-		if (!ctx.font.empty() && doc.m_font_manager) {
-			elem.font_handle = doc.m_font_manager->loadFont(ctx.font, (i32)ctx.font_size);
-			if (elem.font_handle && !elem.value.empty()) {
-				elem.size = doc.m_font_manager->measureTextA(elem.font_handle, elem.value);
-			}
+		if (doc.m_font_manager && elem.font_handle && !elem.value.empty()) {
+			elem.size = doc.m_font_manager->measureTextA(elem.font_handle, elem.value);
 		}
 		return;
 	}
 
-	if (width_unit.unit != Unit::FIT_CONTENT) {
-		elem.size.x = computeAbsoluteSize(width_unit, parent.size.x, elem.font_size);
+	if (elem.width_unit.unit != Unit::FIT_CONTENT) {
+		elem.size.x = computeAbsoluteSize(elem.width_unit, parent.size.x, elem.font_size);
 	}
 	elem.margins[1] = computeAbsoluteSize(margin_unit, parent.size.x, elem.font_size);
 	elem.margins[3] = elem.margins[1];
@@ -903,9 +932,9 @@ static void computeBaseWidths(Document& doc, Element& elem, Element* parent_elem
 	}
 
 	// bottom-up size computation	
-	// Compute sizes for elements with fit-content dimensions
+	// fit-content
 	bool is_row = elem.direction == Direction::ROW;
-	if (width_unit.unit == Unit::FIT_CONTENT) {
+	if (elem.width_unit.unit == Unit::FIT_CONTENT) {
 		if (is_row) {
 			// In row direction, width is sum of child widths plus margins
 			float sum_width = 0;
@@ -917,9 +946,21 @@ static void computeBaseWidths(Document& doc, Element& elem, Element* parent_elem
 		} else {
 			// In column direction, width is max of child widths plus margins
 			float max_width = 0;
-			for (u32 child_idx : elem.children) {
+			for (u32 i = 0, n = elem.children.size(); i < n; ++i) {
+				u32 child_idx = elem.children[i];
 				Element& child = doc.m_elements[child_idx];
-				float child_width = child.size.x + child.margins[1] + child.margins[3];
+				float child_width;
+				if (child.tag == Tag::SPAN) {
+					child_width = 0;
+					while (i < n && doc.m_elements[elem.children[i]].tag == Tag::SPAN) {
+						child_width += doc.m_elements[elem.children[i]].size.x;
+						++i;
+					}
+					--i;
+				}
+				else {
+					 child_width = child.size.x + child.margins[1] + child.margins[3];
+				}
 				if (child_width > max_width) max_width = child_width;
 			}
 			elem.size.x = max_width + elem.paddings[1] + elem.paddings[3];
@@ -944,9 +985,14 @@ static void applyStylesheet(Document& doc, Element& elem) {
 }
 
 struct WordWrap {
+	enum Overflow {
+		NO,
+		SPACE,
+		MIDWORD
+	};
 	StringView text;
 	float width;
-	bool overflow;
+	Overflow overflow;
 };
 
 
@@ -961,14 +1007,13 @@ WordWrap wordWrap(Document& doc, IFontManager::FontHandle font, StringView text,
 	if (size.x <= right - left) {
 		res.text = text;
 		res.width = size.x;
-		res.overflow = false;
+		res.overflow = WordWrap::NO;
 		return res;
 	}
 
 	const float avail = right - left;
 	res.text = StringView(text.begin, (u32)0);
 	res.width = 0.f;
-	res.overflow = true;
 
 	const char* s = text.begin;
 	const char* e = text.end;
@@ -996,6 +1041,7 @@ WordWrap wordWrap(Document& doc, IFontManager::FontHandle font, StringView text,
 		Vec2 w = doc.m_font_manager->measureTextA(font, out);
 		res.text = out;
 		res.width = w.x;
+		res.overflow = WordWrap::SPACE;
 		return res;
 	}
 
@@ -1005,6 +1051,7 @@ WordWrap wordWrap(Document& doc, IFontManager::FontHandle font, StringView text,
 		StringView out(s, (u32)(out_end - s));
 		res.text = out;
 		res.width = width_at_last_good;
+		res.overflow = WordWrap::MIDWORD;
 		return res;
 	}
 
@@ -1013,6 +1060,7 @@ WordWrap wordWrap(Document& doc, IFontManager::FontHandle font, StringView text,
 	Vec2 w = doc.m_font_manager->measureTextA(font, one);
 	res.text = one;
 	res.width = minimum(w.x, avail);
+	res.overflow = WordWrap::MIDWORD;
 	return res;
 }
 
@@ -1062,10 +1110,18 @@ static float layoutRowVertical(Document& doc, Element& parent, StackArray<RowLin
     return max_height;
 }
 
+static StringView trimLeadingWhitespace(StringView text) {
+	while (!text.empty() && isWhitespace(text[0])) {
+		text.removePrefix(1);
+	}
+	return text;
+}
+
 // word wrapping and line breaking based on the parent's width and wrap setting.
 static void wrapSpans(Document& doc, Element& parent, i32 start_span_idx, i32 end_span_idx) {
 	float x = 0;
 	const float content_width = parent.size.x - parent.paddings[3] - parent.paddings[1];
+	if (content_width <= 0) return;
 	bool wrap_enabled = parent.wrap && parent.size.x > 0;
 	// First pass: wrap width
 	for (i32 child_idx = start_span_idx; child_idx < end_span_idx; ++child_idx) {
@@ -1074,14 +1130,26 @@ static void wrapSpans(Document& doc, Element& parent, i32 start_span_idx, i32 en
 		if (!span.font_handle || span.value.empty()) continue;
 		
 		StringView text = span.value;
+		if (x == 0) text = trimLeadingWhitespace(text);
 		if (wrap_enabled) {
 			while (!text.empty()) {
 				WordWrap wrap = wordWrap(doc, span.font_handle, text, x, content_width);
 				SpanLine& line = span.lines.emplace();
+				if (x > 0 && wrap.overflow == WordWrap::MIDWORD) {
+					// try next line
+					WordWrap wrap2 = wordWrap(doc, span.font_handle, trimLeadingWhitespace(text), 0, content_width);
+					if (wrap2.overflow != WordWrap::MIDWORD) {
+						text = trimLeadingWhitespace(text);
+						wrap = wrap2;
+						x = 0;
+					}
+				}
 				line.text = wrap.text;
 				line.pos.x = x;
 				x += wrap.width;
-				if (wrap.overflow) x = 0;
+				if (wrap.overflow != WordWrap::NO) {
+					x = 0;
+				}
 				text.removePrefix(wrap.text.size());
 			}
 		} else {
@@ -1097,7 +1165,7 @@ static void wrapSpans(Document& doc, Element& parent, i32 start_span_idx, i32 en
 	// Second pass: Group SpanLines into rows and layout each row
 	float row_y = 0;
 	StackArray<RowLine, 32> row_lines(doc.m_allocator);
-	float prev_x = FLT_MAX;
+	float prev_x = -1;
 	for (i32 child_idx = start_span_idx; child_idx < end_span_idx; ++child_idx) {
 		Element& child = doc.m_elements[parent.children[child_idx]];
 		child.size.y = 0;
@@ -1111,7 +1179,13 @@ static void wrapSpans(Document& doc, Element& parent, i32 start_span_idx, i32 en
 		}
 	}
 	// Layout last row
-	layoutRowVertical(doc, parent, row_lines, row_y);
+	row_y = layoutRowVertical(doc, parent, row_lines, row_y);
+	
+	// 
+	for (i32 child_idx = start_span_idx; child_idx < end_span_idx; ++child_idx) {
+		Element& span = doc.m_elements[parent.children[child_idx]];
+		span.size.y = row_y;
+	}
 }
 
 // compute wrapping on word boundaries, fill Element::lines
@@ -1142,6 +1216,7 @@ static void wrapText(Document& doc, u32 element_index) {
 	}
 }
 
+
 void Document::computeLayout(Vec2 canvas_size) {
 	PROFILE_FUNCTION();
 	m_canvas_size = canvas_size;
@@ -1152,7 +1227,7 @@ void Document::computeLayout(Vec2 canvas_size) {
 	}
 	
 	for (u32 root_idx : m_roots) {
-		distributeGrowWidth(*this, m_elements[root_idx]);
+		computeParentRelativeWidth(*this, m_elements[root_idx]);
 	}
 
 	for (u32 root_idx : m_roots) {
@@ -1163,11 +1238,18 @@ void Document::computeLayout(Vec2 canvas_size) {
 		computeBaseHeights(*this, m_elements[root_idx], nullptr, root_inherit);		
 	}
 
+	for (u32 root_idx : m_roots) {
+		computeParentRelativeHeights(*this, m_elements[root_idx]);
+	}
+
 	// Layout root elements as if in a panel with direction=column
 	float y_offset = 0;
 	float prev_bottom_margin = 0;
 	for (u32 root_idx : m_roots) {
 		Element& root = m_elements[root_idx];
+		if (root.height_unit.unit == Unit::PERCENT) {
+			root.size.y = computeAbsoluteSize(root.height_unit, canvas_size.y, root.font_size);
+		}
 		float top_margin = root.margins[0];
 		float gap = maximum(prev_bottom_margin, top_margin);
 		root.position.y = y_offset + gap;
@@ -1192,7 +1274,9 @@ static void renderElement(Draw2D& draw, const Document& doc, u32 element_idx, co
 			if (element.bg_sprite) {
 				element.bg_sprite->render(draw, pos.x, pos.y, pos.x + size.x, pos.y + size.y, Color::WHITE);
 			}
-			draw.addRectFilled(pos, pos + size, element.bg_color); break;
+			else {
+				draw.addRectFilled(pos, pos + size, element.bg_color); break;
+			}
 		}
 		case Tag::SPAN: {
 			if (element.font_handle && !element.value.empty()) {
@@ -1251,6 +1335,36 @@ Element* Document::getElementAt(Vec2 pos) {
 	return nullptr;
 }
 
+static void loadResources(Document& doc, u32 element_index, const ParentContext& parent) {
+	Element& elem = doc.m_elements[element_index];
+	ParentContext ctx = parent;
+
+	for (const Attribute& attr : elem.attributes) {
+		switch (attr.type) {
+			case AttributeName::FONT: ctx.font = attr.value; break;
+			case AttributeName::FONT_SIZE: 
+				fromCString(attr.value, elem.font_size);
+				ctx.font_size = elem.font_size;
+				break;
+			case AttributeName::BACKGROUND_IMAGE: {
+				if (doc.m_resource_manager && !attr.value.empty()) {
+					elem.bg_sprite = doc.m_resource_manager->load<Sprite>(Path(attr.value));
+				}
+				break;
+			}
+			default: break;
+		}
+	}
+
+	if (!ctx.font.empty() && doc.m_font_manager) {
+		elem.font_handle = doc.m_font_manager->loadFont(ctx.font, (i32)ctx.font_size);
+	}
+
+	for (u32 child_idx : elem.children) {
+		loadResources(doc, child_idx, ctx);
+	}
+}
+
 bool Document::parse(StringView content, const char* filename) {
 	PROFILE_FUNCTION();
 	m_elements.clear();
@@ -1265,6 +1379,13 @@ bool Document::parse(StringView content, const char* filename) {
 	for (Element& elem : m_elements) {
 		applyStylesheet(*this, elem);
 	}
+
+	for (u32 root_idx : m_roots) {
+		ParentContext ctx;
+		ctx.font = "/engine/editor/fonts/JetBrainsMono-Regular.ttf";
+		loadResources(*this, root_idx, ctx);
+	}
+
 	return true;
 }
 
@@ -1335,6 +1456,14 @@ void Document::injectEvent(const InputSystem::Event& event) {
 		default:
 			break;
 	}
+}
+
+bool Document::areDependenciesReady() const {
+	for (const Element& elem : m_elements) {
+		if (elem.bg_sprite && !elem.bg_sprite->isReady()) return false;
+		if (elem.font_handle && !m_font_manager->isReady(elem.font_handle)) return false;
+	}
+	return true;
 }
 
 } // namespace Lumix::ui

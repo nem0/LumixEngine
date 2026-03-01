@@ -9,6 +9,7 @@
 #include "engine/resource_manager.h"
 #include "engine/world.h"
 #include "gui_ng/ui.h"
+#include "gui_ng/ui_resource.h"
 #include "gui_ng_module.h"
 #include "gui_ng_system.h"
 #include "renderer/draw2d.h"
@@ -49,11 +50,9 @@ struct GUINGModuleImpl : GUINGModule {
 		copyString(tmp, ui_path.c_str());
 		Path::replaceExtension(tmp, "ui");
 		ui_path = tmp;
-		FileSystem& fs = m_system.getEngine().getFileSystem();
-		OutputMemoryStream content(m_allocator);
-		if (fs.getContentSync(ui_path, content)) {
-			StringView markup((const char*)content.data(), (u32)content.size());
-			m_document.parse(markup, ui_path.c_str());
+		auto* res = m_system.getEngine().getResourceManager().load<UIDocument>(ui_path);
+		if (res && res->getState() == Resource::State::READY) {
+			m_document.parse(res->getBlob(), ui_path.c_str());
 		}
 	}
 
@@ -121,6 +120,16 @@ float UIFontManager::getHeight(FontHandle font) {
 float UIFontManager::getAscender(FontHandle font) {
 	if (!font) return 12.8f;
 	return Lumix::getAscender(*static_cast<Font*>(font));
+}
+
+bool UIFontManager::isReady(FontHandle font) {
+	if (!font) return false;
+	return Lumix::isBuilt(*static_cast<Font*>(font));
+}
+
+WrappedText UIFontManager::wrapText(FontHandle font, StringView text, float width) {
+	return Lumix::wrapText(*static_cast<Font*>(font), text, width);
+
 }
 
 UniquePtr<GUINGModule> GUINGModule::createInstance(GUINGSystem& system, World& world, IAllocator& allocator) {

@@ -93,7 +93,7 @@ bool testDocumentParseComplexNesting() {
 
 bool testEveryElementAttributes() {
 	MockDocument doc;
-	ASSERT_PARSE(doc, "[panel id=\"testid\" class=\"testclass\" visible=false font-size=14 font=\"arial.ttf\" color=\"#ffffff\"]");
+	ASSERT_PARSE(doc, "[panel id=\"testid\" .testclass visible=false font-size=14 font=\"arial.ttf\" color=\"#ffffff\"]");
 	ASSERT_EQ(1, doc.m_roots.size(), "Should parse 1 element");
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	Span<ui::Attribute> attrs = root->attributes;
@@ -417,6 +417,38 @@ bool testMultilineStringMeasurement() {
 	return true;
 }
 
+bool testTextWithSpecialChars() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[panel] { ,-=()*&^@! }");
+	ASSERT_EQ(1, doc.m_roots.size(), "Should parse 1 root");
+	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_TAG(root, PANEL);
+	ASSERT_EQ(1, root->children.size(), "Panel should have 1 child");
+	ui::Element* child = doc.getElement(root->children[0]);
+	ASSERT_TAG(child, SPAN);
+	ASSERT_EQ(",-=()*&^@!", child->value, "Text should match");
+	return true;
+}
+
+bool testSpaceBetweenSpans() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[panel direction=row font=\"arial.ttf\" font-size=16] { [span value=\"hello\"] [span value=\"world\"] }");
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_EQ(1, doc.m_roots.size(), "Should parse 1 root");
+	ui::Element* panel = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(2, panel->children.size(), "Panel should have 3 children");
+	ui::Element* span1 = doc.getElement(panel->children[0]);
+	ui::Element* span2 = doc.getElement(panel->children[1]);
+	ASSERT_TAG(span1, SPAN);
+	ASSERT_TAG(span2, SPAN);
+	ASSERT_EQ("hello", span1->value, "Span1 value");
+	ASSERT_EQ("world", span2->value, "Span2 value");
+	ASSERT_EQ(1, span1->lines.size(), "Span1 has 1 line");
+	ASSERT_EQ(1, span2->lines.size(), "Span2 has 1 line");
+	ASSERT_FLOAT_EQ(span1->lines[0].pos.x + span1->size.x, span2->lines[0].pos.x, "Span2 should start right after span1 (without space)");
+	return true;
+}
+
 } // namespace
 
 void runUITests() {
@@ -441,4 +473,6 @@ void runUITests() {
 	RUN_TEST(testColorInheritanceDeep);
 	RUN_TEST(testMultilineStringMeasurement);
 	RUN_TEST(testMultilineStringLayout);
+	RUN_TEST(testTextWithSpecialChars);
+	RUN_TEST(testSpaceBetweenSpans);
 }

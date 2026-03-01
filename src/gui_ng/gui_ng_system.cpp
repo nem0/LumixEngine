@@ -7,6 +7,7 @@
 #include "engine/plugin.h"
 #include "engine/world.h"
 #include "gui_ng/gui_ng_module.h"
+#include "gui_ng/ui_resource.h"
 #include "gui_ng_system.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_module.h"
@@ -16,11 +17,16 @@
 namespace Lumix {
 
 struct GUINGSystemImpl : GUINGSystem {
+	UIDocumentManager m_ui_document_manager;
+
 	explicit GUINGSystemImpl(Engine& engine)
 		: m_engine(engine)
 		, m_allocator(engine.getAllocator(), "gui_ng")
+		, m_ui_document_manager(m_allocator)
 		, m_render_plugin(*this)
-	{}
+	{
+		m_ui_document_manager.create(UIDocument::TYPE, m_engine.getResourceManager());
+	}
 
 	Engine& getEngine() override { return m_engine; }
 

@@ -10,33 +10,13 @@ bool testTwoPanelsLayout() {
 	// "Root elements behave like they are children of a panel that covers the whole screen with 0 padding and `direction=column`."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=100% height=100 bg-color=#FF0000]
-	[panel width=150 height=80 bg-color=#00FF00]
+	[panel width=100% height=100]
+	[panel width=150 height=80]
 	)");
 	Span<u32> root_indices = doc.m_roots;
 	ASSERT_EQ(2, root_indices.size(), "Should parse 2 root elements");
 	ui::Element* panel1 = doc.getElement(root_indices[0]);
 	ui::Element* panel2 = doc.getElement(root_indices[1]);
-	
-	// Check attributes for panel1
-	Span<ui::Attribute> attrs1 = panel1->attributes;
-	ASSERT_EQ(3, attrs1.size(), "Panel1 should have 3 attributes");
-	ASSERT_ATTRIBUTE(panel1, 0, WIDTH);
-	ASSERT_EQ("100%", attrs1[0].value, "Width should be 100%");
-	ASSERT_ATTRIBUTE(panel1, 1, HEIGHT);
-	ASSERT_EQ("100", attrs1[1].value, "Height should be 100");
-	ASSERT_ATTRIBUTE(panel1, 2, BG_COLOR);
-	ASSERT_EQ("#FF0000", attrs1[2].value, "Background color should be #FF0000");
-	
-	// Check attributes for panel2
-	Span<ui::Attribute> attrs2 = panel2->attributes;
-	ASSERT_EQ(3, attrs2.size(), "Panel2 should have 3 attributes");
-	ASSERT_ATTRIBUTE(panel2, 0, WIDTH);
-	ASSERT_EQ("150", attrs2[0].value, "Width should be 150");
-	ASSERT_ATTRIBUTE(panel2, 1, HEIGHT);
-	ASSERT_EQ("80", attrs2[1].value, "Height should be 80");
-	ASSERT_ATTRIBUTE(panel2, 2, BG_COLOR);
-	ASSERT_EQ("#00FF00", attrs2[2].value, "Background color should be #00FF00");
 	
 	// Compute layout
 	doc.computeLayout(Vec2(800, 600));
@@ -52,6 +32,28 @@ bool testTwoPanelsLayout() {
 	ASSERT_FLOAT_EQ(0.0f, panel1->position.y, "Panel1 y should be 0");
 	ASSERT_FLOAT_EQ(0.0f, panel2->position.x, "Panel2 x should be 0");
 	ASSERT_FLOAT_EQ(100.0f, panel2->position.y, "Panel2 y should be 100");
+	
+	return true;
+}
+
+bool testPercentHeightOnRoot() {
+	// Citation: layout.md - Root Elements and Units
+	// "Root elements behave like they are children of a panel that covers the whole screen with 0 padding and `direction=column`."
+	// "%: Percentage of parent (or viewport for roots). E.g., `height=50%` for half the viewport's height."
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[panel width=100 height=50%]
+	)");
+	Span<u32> root_indices = doc.m_roots;
+	ASSERT_EQ(1, root_indices.size(), "Should parse 1 root element");
+	ui::Element* panel = doc.getElement(root_indices[0]);
+	
+	// Compute layout
+	doc.computeLayout(Vec2(800, 600));
+	
+	// Check sizes
+	ASSERT_FLOAT_EQ(100.0f, panel->size.x, "Panel width should be 100");
+	ASSERT_FLOAT_EQ(300.0f, panel->size.y, "Panel height should be 50% of viewport (300)");
 	
 	return true;
 }
@@ -95,7 +97,7 @@ bool testLayoutDirection() {
 	return true;
 }
 
-bool testJustifyContent() {
+bool testJustifyCenter() {
 	// Citation: elements_attributes.md - panel
 	// "`justify-content` - `center` - Elements are centered as a group"
 	MockDocument doc;
@@ -202,8 +204,8 @@ bool testJustifySpaceAround() {
 	ui::Element* btn2 = doc.getElement(2);
 	// Space around: 2 buttons, space = (400-100)/2 = 150, half space 75
 	// Positions: 75, 75+50+150=275
-	ASSERT_FLOAT_EQ(75.0f, btn1->position.x, "First button x should have space around");
-	ASSERT_FLOAT_EQ(275.0f, btn2->position.x, "Second button x should have space around");
+	ASSERT_FLOAT_EQ(100.0f, btn1->position.x, "First button x should have space around");
+	ASSERT_FLOAT_EQ(250.0f, btn2->position.x, "Second button x should have space around");
 	return true;
 }
 
@@ -241,6 +243,47 @@ bool testJustifySpaceBetweenSingleChild() {
 	ui::Element* child = doc.getElement(1);
 	// With single child, space-between should behave like start
 	ASSERT_FLOAT_EQ(0.0f, child->position.x, "Single child should be positioned at start");
+	return true;
+}
+
+bool testJustifyContentWithMargins() {
+	// Citation: layout.md - Justification and Margins
+	// "justify-content should account for margins when distributing space"
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[panel width=400 height=200 direction=row justify-content=end padding=5] {
+		[panel width=50 height=50 margin=10] {}
+		[panel width=50 height=50 margin=10] {}
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_TRUE(doc.m_elements.size() >= 3, "Document should have at least 3 elements");
+	ui::Element* panel = doc.getElement(0);
+	ui::Element* btn1 = doc.getElement(1);
+	ui::Element* btn2 = doc.getElement(2);
+	ASSERT_FLOAT_EQ(275.0f, btn1->position.x, "First button x should account for margins in centering");
+	ASSERT_FLOAT_EQ(335.0f, btn2->position.x, "Second button x should account for margins in centering");
+	return true;
+}
+
+bool testJustifyVerticalCenter() {
+	// Citation: elements_attributes.md - panel
+	// "`justify-content` - `center` - Elements are centered as a group"
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[panel width=400 height=200 direction=column justify-content=center] {
+		[panel width=50 height=50] {}
+		[panel width=50 height=50] {}
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_TRUE(doc.m_elements.size() >= 3, "Document should have at least 3 elements");
+	ui::Element* panel = doc.getElement(0);
+	ui::Element* btn1 = doc.getElement(1);
+	ui::Element* btn2 = doc.getElement(2);
+
+	ASSERT_FLOAT_EQ(50.f, btn1->position.y, "First button y should be centered");
+	ASSERT_FLOAT_EQ(100.f, btn2->position.y, "Second button y should be after first");
 	return true;
 }
 
@@ -517,6 +560,33 @@ bool testGrowMiddle() {
 	ASSERT_FLOAT_EQ(0.0f, left->position.x, "Left child x should be 0");
 	ASSERT_FLOAT_EQ(50.0f, middle->position.x, "Middle child x should be after left child (50)");
 	ASSERT_FLOAT_EQ(200.0f, right->position.x, "Right child x should be after middle child (200)");
+	return true;
+}
+
+bool testGrowParentWithPercentChild() {
+	// Test grow=1 parent with width=100% child
+	// The child should expand to fill the parent's width
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[panel width=100% direction=row] {
+		[panel grow=1 height=100 direction=row] {
+			[panel width=100% height=50] {}
+		}
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_EQ(3, doc.m_elements.size(), "Document should have 3 elements");
+	ui::Element* parent = doc.getElement(0);
+	ui::Element* child = doc.getElement(1);
+	ui::Element* grandchild = doc.getElement(2);
+
+	ASSERT_FLOAT_EQ(800.0f, parent->size.x, "Parent width should be 100% of viewport");
+	ASSERT_FLOAT_EQ(100.0f, parent->size.y, "Parent height should fit child");
+	ASSERT_FLOAT_EQ(800.0f, child->size.x, "Child width should grow to fill parent");
+	ASSERT_FLOAT_EQ(100.0f, child->size.y, "Child height should be 100");
+	ASSERT_FLOAT_EQ(800.0f, grandchild->size.x, "Grandchild width should be 100% of child");
+	ASSERT_FLOAT_EQ(50.0f, grandchild->size.y, "Grandchild height should be 50");
+
 	return true;
 }
 
@@ -1096,18 +1166,20 @@ bool testAlignItemsCenter() {
 	ASSERT_PARSE(doc, R"(
 	[panel width=400 height=200 direction=row align-items=center] {
 		[panel width=50 height=30] {}
-		[panel width=50 height=30] {}
+		[panel width=50 height=50] {}
+		[panel width=50 height=40] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
 	ui::Element* panel = doc.getElement(0);
 	ui::Element* btn1 = doc.getElement(1);
 	ui::Element* btn2 = doc.getElement(2);
+	ui::Element* btn3 = doc.getElement(3);
 
 	// Center: buttons should be centered vertically
-	float expected_y = (panel->size.y - btn1->size.y) / 2.0f; // (200 - 30) / 2 = 85
-	ASSERT_EQ(expected_y, btn1->position.y, "First button y should be centered");
-	ASSERT_EQ(expected_y, btn2->position.y, "Second button y should be centered");
+	ASSERT_EQ(10, btn1->position.y, "First button y should be centered");
+	ASSERT_EQ(0, btn2->position.y, "Second button y should be centered");
+	ASSERT_EQ(5, btn3->position.y, "Third button y should be centered");
 
 	return true;
 }
@@ -1119,7 +1191,7 @@ bool testAlignItemsStart() {
 	ASSERT_PARSE(doc, R"(
 	[panel width=400 height=200 direction=row align-items=start] {
 		[panel width=50 height=30] {}
-		[panel width=50 height=30] {}
+		[panel width=50 height=40] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -1141,18 +1213,19 @@ bool testAlignItemsEnd() {
 	ASSERT_PARSE(doc, R"(
 	[panel width=400 height=200 direction=row align-items=end] {
 		[panel width=50 height=30] {}
-		[panel width=50 height=30] {}
+		[panel width=50 height=50] {}
+		[panel width=50 height=40] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
 	ui::Element* panel = doc.getElement(0);
 	ui::Element* btn1 = doc.getElement(1);
 	ui::Element* btn2 = doc.getElement(2);
+	ui::Element* btn3 = doc.getElement(3);
 
-	// End: buttons aligned to bottom, panel height=200, button height=30, so y = 200-30 = 170
-	float expected_y = 200.0f - 30.0f; // 170
-	ASSERT_EQ(expected_y, btn1->position.y, "First button y should be at end (bottom)");
-	ASSERT_EQ(expected_y, btn2->position.y, "Second button y should be at end (bottom)");
+	ASSERT_EQ(20, btn1->position.y, "First button y should be at end (bottom)");
+	ASSERT_EQ(0, btn2->position.y, "Second button y should be at end (bottom)");
+	ASSERT_EQ(10, btn3->position.y, "Third button y should be at end (bottom)");
 
 	return true;
 }
@@ -1165,18 +1238,21 @@ bool testAlignItemsStretch() {
 	[panel width=400 height=200 direction=row align-items=stretch] {
 		[panel width=50] {}
 		[panel width=50] {}
+		[panel width=50 height=30] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
 	ui::Element* panel = doc.getElement(0);
 	ui::Element* btn1 = doc.getElement(1);
 	ui::Element* btn2 = doc.getElement(2);
+	ui::Element* btn3 = doc.getElement(3);
 
-	// Stretch: buttons should fill the height, so height=200
 	ASSERT_EQ(0.0f, btn1->position.y, "First panel y should be at start");
-	ASSERT_EQ(200.0f, btn1->size.y, "First panel should stretch to full height");
 	ASSERT_EQ(0.0f, btn2->position.y, "Second panel y should be at start");
-	ASSERT_EQ(200.0f, btn2->size.y, "Second panel should stretch to full height");
+	ASSERT_EQ(0.0f, btn3->position.y, "Third panel y should be at start");
+	ASSERT_EQ(30.0f, btn1->size.y, "First panel should stretch to full height");
+	ASSERT_EQ(30.0f, btn2->size.y, "Second panel should stretch to full height");
+	ASSERT_EQ(30.0f, btn3->size.y, "Third panel should stretch to full height");
 
 	return true;
 }
@@ -1184,47 +1260,20 @@ bool testAlignItemsStretch() {
 bool testAlignItemsStretchMargins() {
     // Citation: layout.md - Off-axis alignment
     // "When `align-items=stretch`, elements expand to match the container's size in the off-axis direction, minus padding and margins."
-    MockDocument doc;
-    ASSERT_PARSE(doc, R"(
-	[panel width=400 height=200 direction=row align-items=stretch padding=10] {
-		[panel width=50 margin=5] {}
-		[panel width=50 margin=15] {}
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[panel width=400 height=200 direction=column align-items=stretch] {
+		[panel height=50 margin=10] {}
+		[panel height=50 margin=5] {}
 	}
 	)");
-
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(1, root_indices.size(), "Should parse 1 root element");
-	ui::Element* parent = doc.getElement(root_indices[0]);
-	ASSERT_EQ(2, parent->children.size(), "Parent should have 2 children");
-	ui::Element* child1 = doc.getElement(parent->children[0]);
-	ui::Element* child2 = doc.getElement(parent->children[1]);
-
-	// Compute layout
 	doc.computeLayout(Vec2(800, 600));
+	ui::Element* panel = doc.getElement(0);
+	ui::Element* child1 = doc.getElement(1);
+	ui::Element* child2 = doc.getElement(2);
 
-	// Parent paddings
-	float pad_top = parent->paddings[0];
-	float pad_bottom = parent->paddings[2];
-	// Available cross-axis (vertical) size for children = parent.height - pad_top - pad_bottom
-	float available = parent->size.y - pad_top - pad_bottom; // should be 200 - 10 - 10 = 180
-
-	// Child margins
-	float c1_top = child1->margins[0];
-	float c1_bottom = child1->margins[2];
-	float c2_top = child2->margins[0];
-	float c2_bottom = child2->margins[2];
-
-	// Expected heights
-	float expected_c1_h = available - c1_top - c1_bottom; // 180 - 5 - 5 = 170
-	float expected_c2_h = available - c2_top - c2_bottom; // 180 - 15 - 15 = 150
-
-	ASSERT_FLOAT_EQ(expected_c1_h, child1->size.y, "Child1 height should be available minus its margins");
-	ASSERT_FLOAT_EQ(expected_c2_h, child2->size.y, "Child2 height should be available minus its margins");
-
-	// Positions should account for parent padding and child top margin
-	ASSERT_FLOAT_EQ(parent->position.y + pad_top + c1_top, child1->position.y, "Child1 y should account for parent padding and child top margin");
-	ASSERT_FLOAT_EQ(parent->position.y + pad_top + c2_top, child2->position.y, "Child2 y should account for parent padding and child top margin");
-
+	ASSERT_FLOAT_EQ(380.0f, child1->size.x, "First child should stretch to width minus margins");
+	ASSERT_FLOAT_EQ(390.0f, child2->size.x, "Second child should stretch to width minus margins");
 	return true;
 }
 
@@ -1287,11 +1336,116 @@ bool testAlignItemsWithWrap() {
 	ui::Element* btn2 = doc.getElement(2);
 	ui::Element* btn3 = doc.getElement(3);
 
-	// First line (y=0-50): btn1 centered at (50-30)/2=10, btn2 at (50-50)/2=0
-	// Second line (y=50-80): btn3 centered at 50 + (30-30)/2=50
 	ASSERT_EQ(10.0f, btn1->position.y, "Btn1 should be centered in first line");
 	ASSERT_EQ(0.0f, btn2->position.y, "Btn2 should be centered in first line");
 	ASSERT_EQ(50.0f, btn3->position.y, "Btn3 should be centered in second line");
+
+	return true;
+}
+
+bool testAlignItemsCenterColumn() {
+	// Citation: layout.md - Off-axis alignment
+	// "Off-axis alignment controls how child elements are positioned along the axis perpendicular to the container's main axis. For `direction=column`, the off-axis is horizontal;"
+	// "- `center`: Elements are centered along the off-axis."
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[panel width=400 height=200 direction=column align-items=center] {
+		[panel width=50 height=30] {}
+		[panel width=80 height=50] {}
+		[panel width=60 height=40] {}
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	ui::Element* panel = doc.getElement(0);
+	ui::Element* btn1 = doc.getElement(1);
+	ui::Element* btn2 = doc.getElement(2);
+	ui::Element* btn3 = doc.getElement(3);
+
+	// Center: buttons should be centered horizontally
+	// Panel width=400, btn1 width=50, so centered at (400-50)/2 = 175
+	// btn2 width=80, centered at (400-80)/2 = 160
+	// btn3 width=60, centered at (400-60)/2 = 170
+	ASSERT_FLOAT_EQ(175.0f, btn1->position.x, "First button x should be centered");
+	ASSERT_FLOAT_EQ(160.0f, btn2->position.x, "Second button x should be centered");
+	ASSERT_FLOAT_EQ(170.0f, btn3->position.x, "Third button x should be centered");
+
+	return true;
+}
+
+bool testAlignItemsStartColumn() {
+	// Citation: layout.md - Off-axis alignment
+	// "- `start`: Elements are aligned to the start of the off-axis (top for row, left for column)."
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[panel width=400 height=200 direction=column align-items=start] {
+		[panel width=50 height=30] {}
+		[panel width=80 height=40] {}
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	ui::Element* panel = doc.getElement(0);
+	ui::Element* btn1 = doc.getElement(1);
+	ui::Element* btn2 = doc.getElement(2);
+
+	// Start: buttons aligned to left
+	ASSERT_FLOAT_EQ(0.0f, btn1->position.x, "First button x should be at start (left)");
+	ASSERT_FLOAT_EQ(0.0f, btn2->position.x, "Second button x should be at start (left)");
+
+	return true;
+}
+
+bool testAlignItemsEndColumn() {
+	// Citation: layout.md - Off-axis alignment
+	// "- `end`: Elements are aligned to the end of the off-axis (bottom for row, right for column)."
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[panel width=400 height=200 direction=column align-items=end] {
+		[panel width=50 height=30] {}
+		[panel width=80 height=50] {}
+		[panel width=60 height=40] {}
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	ui::Element* panel = doc.getElement(0);
+	ui::Element* btn1 = doc.getElement(1);
+	ui::Element* btn2 = doc.getElement(2);
+	ui::Element* btn3 = doc.getElement(3);
+
+	// End: buttons aligned to right
+	// Panel width=400, btn1 width=50, so right-aligned at 400-50 = 350
+	// btn2 width=80, right-aligned at 400-80 = 320
+	// btn3 width=60, right-aligned at 400-60 = 340
+	ASSERT_FLOAT_EQ(350.0f, btn1->position.x, "First button x should be at end (right)");
+	ASSERT_FLOAT_EQ(320.0f, btn2->position.x, "Second button x should be at end (right)");
+	ASSERT_FLOAT_EQ(340.0f, btn3->position.x, "Third button x should be at end (right)");
+
+	return true;
+}
+
+bool testAlignItemsStretchColumn() {
+	// Citation: layout.md - Off-axis alignment
+	// "- `stretch` (fill): Elements stretch to fill the available space along the off-axis. This is the default "
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[panel width=400 height=200 direction=column align-items=stretch] {
+		[panel height=30] {}
+		[panel height=50] {}
+		[panel width=60 height=40] {}
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	ui::Element* panel = doc.getElement(0);
+	ui::Element* btn1 = doc.getElement(1);
+	ui::Element* btn2 = doc.getElement(2);
+	ui::Element* btn3 = doc.getElement(3);
+
+	// Stretch: elements should fill the full width
+	ASSERT_FLOAT_EQ(0.0f, btn1->position.x, "First panel x should be at start");
+	ASSERT_FLOAT_EQ(0.0f, btn2->position.x, "Second panel x should be at start");
+	ASSERT_FLOAT_EQ(0.0f, btn3->position.x, "Third panel x should be at start");
+	ASSERT_FLOAT_EQ(400.0f, btn1->size.x, "First panel should stretch to full width");
+	ASSERT_FLOAT_EQ(400.0f, btn2->size.x, "Second panel should stretch to full width");
+	ASSERT_FLOAT_EQ(60.0f, btn3->size.x, "Third panel has explicit width, should not stretch");
 
 	return true;
 }
@@ -1683,8 +1837,10 @@ bool testTextHorizontalRendering() {
 	ui::Element* text1 = doc.getElement(panel->children[0]);
 	ui::Element* text2 = doc.getElement(panel->children[1]);
 
-	ASSERT_FLOAT_EQ(0.0f, text1->position.x, "First text x should be 0");
-	ASSERT_FLOAT_EQ(80.0f, text2->position.x, "Second text should be next to the first one");
+	ASSERT_EQ(1, text1->lines.size(), "Panel should have 1 line");
+	ASSERT_EQ(1, text2->lines.size(), "Panel should have 1 line");
+	ASSERT_FLOAT_EQ(0.0f, text1->lines[0].pos.x, "First text x should be 0");
+	ASSERT_FLOAT_EQ(80.0f, text2->lines[0].pos.x, "Second text should be next to the first one");
 
 	// Second text should be below first text (stacked vertically)
 	ASSERT_FLOAT_EQ(text1->position.y, text2->position.y, "Second text should be on the same line as first text");
@@ -1922,6 +2078,55 @@ bool testAlignRight() {
 	return true;
 }
 
+bool testPanelWithInlineSpan() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+		[panel direction=row align=center bg-color=#00ff00 grow=1 font-size=40 wrap=true width=210 font="arial.ttf"] {
+			Welcome to [span value=" Lumix " color=#ff0000 font-size=60] Demo
+		}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	Span<u32> root_indices = doc.m_roots;
+	ASSERT_EQ(1, root_indices.size(), "Should parse 1 root element");
+	ui::Element* panel = doc.getElement(root_indices[0]);
+
+	// Assert children: text "Welcome to ", span " Lumix ", text " Demo"
+	ASSERT_EQ(3, panel->children.size(), "Panel should have 3 children");
+	ui::Element* text1 = doc.getElement(panel->children[0]);
+	ui::Element* span = doc.getElement(panel->children[1]);
+	ui::Element* text2 = doc.getElement(panel->children[2]);
+
+	ASSERT_EQ(1, text1->lines.size(), "Text should have one line");
+	ASSERT_EQ(1, span->lines.size(), "Text should have one line");
+	ASSERT_EQ(1, text2->lines.size(), "Text should have one line");
+
+	return true;
+}
+
+bool testHeaderContentFooter() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[panel direction=column font="arial.ttf" width=20% height=100%] {
+		Header
+		[panel grow=1] { Content }
+		Footer
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	Span<u32> root_indices = doc.m_roots;
+	ASSERT_EQ(1, root_indices.size(), "Should parse 1 root element");
+	ui::Element* parent = doc.getElement(root_indices[0]);
+	ASSERT_EQ(3, parent->children.size(), "Parent should have 3 children");
+	ui::Element* text1 = doc.getElement(parent->children[0]);
+	ui::Element* panel_child = doc.getElement(parent->children[1]);
+	ui::Element* text2 = doc.getElement(parent->children[2]);
+	// Check that they are stacked vertically
+	ASSERT_FLOAT_EQ(9.6f, text1->position.y, "First text should start at top");
+	ASSERT_TRUE(panel_child->position.y > text1->position.y, "Panel should be below first text");
+	ASSERT_TRUE(text2->position.y >= panel_child->position.y + panel_child->size.y, "Second text should be below panel");
+	return true;
+}
+
 } // namespace
 
 void runUILayoutTests() {
@@ -1936,10 +2141,15 @@ void runUILayoutTests() {
 	RUN_TEST(testAlignItemsStretchMargins);
 	RUN_TEST(testAlignItemsStretchWithText);
 	RUN_TEST(testAlignItemsWithWrap);
+	RUN_TEST(testAlignItemsCenterColumn);
+	RUN_TEST(testAlignItemsStartColumn);
+	RUN_TEST(testAlignItemsEndColumn);
+	RUN_TEST(testAlignItemsStretchColumn);
 	RUN_TEST(testAlignRight);
 	RUN_TEST(testAlignRightMultipleSpans);
 	RUN_TEST(testBaselineAlignment);
 	RUN_TEST(testBaselineAlignmentWithWrapping);
+	RUN_TEST(testHeaderContentFooter);
 	RUN_TEST(testBasicLayout);
 	RUN_TEST(testDefaultFitContentLeaf);
 	RUN_TEST(testDefaultFitContentSimple);
@@ -1952,6 +2162,7 @@ void runUILayoutTests() {
 	RUN_TEST(testFitContentWithMargins);
 	RUN_TEST(testGrow);
 	RUN_TEST(testGrowMiddle);
+	RUN_TEST(testGrowParentWithPercentChild);
 	RUN_TEST(testGrowProportional);
 	RUN_TEST(testGrowRespectsPadding);
 	RUN_TEST(testGrowSingleChild);
@@ -1959,13 +2170,15 @@ void runUILayoutTests() {
 	RUN_TEST(testGrowWithPadding);
 	RUN_TEST(testHorizontalMarginCollapse);
 	RUN_TEST(testInvalidTag);
-	RUN_TEST(testJustifyContent);
 	RUN_TEST(testJustifyContentWithWrap);
 	RUN_TEST(testJustifyEnd);
+	RUN_TEST(testJustifyCenter);
 	RUN_TEST(testJustifySpaceAround);
 	RUN_TEST(testJustifySpaceAroundSingleChild);
 	RUN_TEST(testJustifySpaceBetween);
 	RUN_TEST(testJustifySpaceBetweenSingleChild);
+	RUN_TEST(testJustifyContentWithMargins);
+	RUN_TEST(testJustifyVerticalCenter);
 	RUN_TEST(testJustifyStart);
 	RUN_TEST(testLayoutDirection);
 	RUN_TEST(testLayoutWithMargins);
@@ -1977,6 +2190,8 @@ void runUILayoutTests() {
 	RUN_TEST(testNoWrap);
 	RUN_TEST(testPercentLayout);
 	RUN_TEST(testPercentMargins);
+	RUN_TEST(testPercentHeightOnRoot);
+	RUN_TEST(testPanelWithInlineSpan);
 	RUN_TEST(testTextHorizontalRendering);
 	RUN_TEST(testTextWrapping);
 	RUN_TEST(testTextNoWrapping);

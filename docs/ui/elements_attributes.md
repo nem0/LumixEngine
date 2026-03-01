@@ -5,8 +5,9 @@
 | Attribute | Description | Default / Values |
 |---|---|---|
 | `id` | Unique identifier for the element; allows referencing or manipulating the element individually. Values should be enclosed in double quotes ("..."). | (no default) |
-| `class` | One or more class names for grouping and shared styling or behavior. Values should be enclosed in double quotes. | (no default) |
 | `visible` | Controls the visibility of the element. | `true` |
+
+Classes can be assigned to elements using the `.classname` syntax, e.g., `[panel .myclass]`. Multiple classes can be assigned by chaining them: `[panel .class1 .class2]`.
 
 Note: sizing-related attributes (see below) accept numeric values, percentages, `em` units, or the keyword `fit-content`. To make an element grow into available space use the `grow` attribute instead.
 
@@ -35,7 +36,7 @@ Rectangular container that can have children.
 | `bg-fit` | How the background image is scaled. Values: `cover`, `contain`, `fill`, `none`. | `fill` |
 | `bg-color` | Background color of the panel. | `transparent` |
 | `direction` | Layout direction of child elements. Values: `row` (horizontal), `column` (vertical). | `row` |
-| `wrap` | Layout overflow behavior. Values: `true`, `false`. | `false` |
+| `wrap` | Layout overflow behavior. Values: `true`, `false`. | `true` |
 | `justify-content` | Distribution of child elements along the main axis. Values: `start`, `center`, `end`, `space-between`, `space-around`. | `start` |
 | `align-items` | Cross-axis alignment for children. Values: `start`, `center`, `end`, `stretch`. | `start` |
 

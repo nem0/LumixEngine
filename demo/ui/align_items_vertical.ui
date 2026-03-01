@@ -1,0 +1,54 @@
+[style] {
+	.demo-panel {
+		width: 400;
+		margin: 10;
+		padding: 10;
+		bg-color: #333333;
+	}
+
+	.demo-item {
+		height: 40;
+		margin: 5;
+		padding: 5;
+		bg-color: #666666;
+		align: center;
+	}
+
+	.demo-label {
+		font-size: 40;
+		color: #ffffff;
+		margin: 5;
+	}
+}
+
+[panel direction=column font="/engine/editor/fonts/JetBrainsMono-Regular.ttf" font-size=25] {
+	[panel .demo-label] { Align-Items Vertical Layout Showcase }
+
+	[panel .demo-label] { start - Items aligned to the left (start of cross axis) }
+	[panel .demo-panel direction=column align-items=start] {
+		[panel .demo-item] { 1 }
+		[panel .demo-item] { 2 }
+		[panel .demo-item] { 3 }
+	}
+
+	[panel .demo-label] { center - Items centered horizontally (cross axis) }
+	[panel .demo-panel direction=column align-items=center] {
+		[panel .demo-item width=60] { 1 }
+		[panel .demo-item width=80] { 2 }
+		[panel .demo-item width=70] { 3 }
+	}
+
+	[panel .demo-label] { end - Items aligned to the right (end of cross axis) }
+	[panel .demo-panel direction=column align-items=end] {
+		[panel .demo-item width=60] { 1 }
+		[panel .demo-item width=80] { 2 }
+		[panel .demo-item width=70] { 3 }
+	}
+
+	[panel .demo-label] { stretch - Items stretched to fill width (cross axis) }
+	[panel .demo-panel direction=column align-items=stretch] {
+		[panel .demo-item] { 1 }
+		[panel .demo-item] { 2 }
+		[panel .demo-item width=100] { 3 }
+	}
+}

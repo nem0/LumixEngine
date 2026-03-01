@@ -44,7 +44,7 @@ bool testStyleApplication() {
 				width: 50%;
 			}
 		}
-		[panel class="some_class"] {
+		[panel .some_class] {
 		}
 	)");
 	Span<u32> roots = doc.m_roots;

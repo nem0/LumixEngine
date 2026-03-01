@@ -11,6 +11,7 @@ namespace Lumix {
 
 struct Draw2D;
 struct Sprite;
+struct WrappedText;
 
 namespace ui {
 
@@ -82,12 +83,19 @@ enum class Unit : u8 {
 	FIT_CONTENT
 };
 
+struct ParsedUnit {
+	float value;
+	Unit unit;
+};
+
 struct IFontManager {
 	using FontHandle = void*;
 	virtual FontHandle loadFont(StringView path, int font_size) = 0;
 	virtual Vec2 measureTextA(FontHandle font, StringView text) = 0;
 	virtual float getHeight(FontHandle font) = 0;
 	virtual float getAscender(FontHandle font) = 0;
+	virtual bool isReady(FontHandle font) = 0;
+	virtual WrappedText wrapText(FontHandle font, StringView text, float width) = 0;
 };
 
 struct Attribute {
@@ -126,7 +134,6 @@ struct Element {
 	// runtime computed data
 	StringView value;
 	StringView style_class;
-	StringView bg_image;
 	Sprite* bg_sprite = nullptr;
 	IFontManager::FontHandle font_handle = nullptr;
 	Vec2 position;
@@ -142,6 +149,8 @@ struct Element {
 	Align text_align = Align::LEFT;
 	float grow = 0;
 	bool wrap = false;
+	ParsedUnit width_unit = {0, Unit::FIT_CONTENT};
+	ParsedUnit height_unit = {0, Unit::FIT_CONTENT};
 };
 
 //@ enum full ui::EventType
@@ -207,6 +216,7 @@ struct Document {
 	Span<const Event> getEvents();
 	void injectEvent(const InputSystem::Event& event);
 	void clearEvents();
+	bool areDependenciesReady() const;
 
 private:
 	template <typename... Args>

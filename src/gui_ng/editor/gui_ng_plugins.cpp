@@ -21,6 +21,8 @@
 #include "engine/file_system.h"
 #include "gui_ng/gui_ng_module.h"
 #include "gui_ng/ui.h"
+#include "gui_ng/ui_resource.h"
+#include "gui/sprite.h"
 #include "renderer/draw2d.h"
 #include "renderer/font.h"
 #include "renderer/gpu/gpu.h"
@@ -28,10 +30,6 @@
 #include "renderer/renderer.h"
 
 namespace Lumix {
-
-
-
-static ResourceType UI_DOCUMENT_TYPE("ui_document");
 
 struct UIEditorWindow : AssetEditorWindow {
 	static inline const char* s_autocomplete_words[] = {
@@ -77,7 +75,7 @@ struct UIEditorWindow : AssetEditorWindow {
 			m_stored_text.resize((u32)blob.size());
 			memcpy(m_stored_text.getMutableData(), blob.data(), blob.size());
 			StringView text(m_stored_text.c_str(), m_stored_text.length());
-			m_parse_success = m_document->parse(text, "markup");
+			m_parse_success = m_document->parse(text, m_path.c_str());
 			m_needs_layout = true;
 		}
 	}
@@ -116,8 +114,8 @@ struct UIEditorWindow : AssetEditorWindow {
 		m_stored_text.resize((u32)blob.size());
 		memcpy(m_stored_text.getMutableData(), blob.data(), blob.size());
 		StringView text(m_stored_text.c_str(), m_stored_text.length());
-		m_parse_success = m_document->parse(text, "markup");
-		m_needs_layout = true;	
+		m_parse_success = m_document->parse(text, m_path.c_str());
+		m_needs_layout = true;
 	}
 
 	void windowGUI() override {
@@ -140,33 +138,35 @@ struct UIEditorWindow : AssetEditorWindow {
 		ImVec2 canvas_size = ImGui::GetContentRegionAvail();
 		if (canvas_size.x > 0 && canvas_size.y > 0) {
 			Vec2 current_canvas_size(canvas_size.x, canvas_size.y);
-			if (current_canvas_size != m_previous_canvas_size || m_needs_layout) {
-				m_previous_canvas_size = current_canvas_size;
-				if (m_parse_success) {
-					m_document->computeLayout(Vec2(canvas_size.x, canvas_size.y));
-				}
-				m_needs_layout = false;
-			}
 			if (m_parse_success) {
-				Viewport vp = {};
-				vp.w = (int)canvas_size.x;
-				vp.h = (int)canvas_size.y;
-				m_pipeline->setWorld(m_app.getWorldEditor().getWorld());
-				m_pipeline->setViewport(vp);
-				m_pipeline->setClearColor(m_clear_color);
+				if (m_document->areDependenciesReady()) { // TODO this is O(n)
+					if (current_canvas_size != m_previous_canvas_size || m_needs_layout) {
+						m_previous_canvas_size = current_canvas_size;
+						m_document->computeLayout(Vec2(canvas_size.x, canvas_size.y));
+						m_needs_layout = false;
+					}
+					Viewport vp = {};
+					vp.w = (int)canvas_size.x;
+					vp.h = (int)canvas_size.y;
+					m_pipeline->setWorld(m_app.getWorldEditor().getWorld());
+					m_pipeline->setViewport(vp);
+					m_pipeline->setClearColor(m_clear_color);
 
-				Draw2D& draw2d = m_pipeline->getDraw2D();
-				m_document->render(draw2d);
+					Draw2D& draw2d = m_pipeline->getDraw2D();
+					m_document->render(draw2d);
 
-				if (m_pipeline->render(true)) {
-					gpu::TextureHandle texture_handle = m_pipeline->getOutput();
-					if (texture_handle) {
-						if (gpu::isOriginBottomLeft()) {
-							ImGui::Image(texture_handle, canvas_size, ImVec2(0, 1), ImVec2(1, 0));
-						} else {
-							ImGui::Image(texture_handle, canvas_size);
+					if (m_pipeline->render(true)) {
+						gpu::TextureHandle texture_handle = m_pipeline->getOutput();
+						if (texture_handle) {
+							if (gpu::isOriginBottomLeft()) {
+								ImGui::Image(texture_handle, canvas_size, ImVec2(0, 1), ImVec2(1, 0));
+							} else {
+								ImGui::Image(texture_handle, canvas_size);
+							}
 						}
 					}
+				} else {
+					ImGui::Text("Loading...");
 				}
 			}
 		}
@@ -272,11 +272,11 @@ struct UIPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	explicit UIPlugin(StudioApp& app)
 		: m_app(app)
 	{
-		app.getAssetCompiler().registerExtension("ui", UI_DOCUMENT_TYPE);
+		app.getAssetCompiler().registerExtension("ui", UIDocument::TYPE);
 	}
 
 	void addSubresources(AssetCompiler& compiler, const Path& path, AtomicI32&) override {
-		compiler.addResource(UI_DOCUMENT_TYPE, path);
+		compiler.addResource(UIDocument::TYPE, path);
 	}
 
 	void openEditor(const Path& path) override {
@@ -293,7 +293,7 @@ struct UIPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	}
 	const char* getIcon() const override { return ICON_FA_FILE_CODE; }
 	const char* getLabel() const override { return "UI Document"; }
-	ResourceType getResourceType() const override { return UI_DOCUMENT_TYPE; }
+	ResourceType getResourceType() const override { return UIDocument::TYPE; }
 
 	StudioApp& m_app;
 };
