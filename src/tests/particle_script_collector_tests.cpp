@@ -38,11 +38,11 @@ bool testCollectorSimpleDeclarations() {
 		if (equalStrings(s.name, "my_emitter")) found_emitter = true;
 	}
 
-	ASSERT_TRUE(found_fn, "function not found");
-	ASSERT_TRUE(found_var, "var not found");
-	ASSERT_TRUE(found_const, "const not found");
-	ASSERT_TRUE(found_global, "global not found");
-	ASSERT_TRUE(found_emitter, "emitter not found");
+	ASSERT_TRUE(found_fn);
+	ASSERT_TRUE(found_var);
+	ASSERT_TRUE(found_const);
+	ASSERT_TRUE(found_global);
+	ASSERT_TRUE(found_emitter);
 
 	return true;
 }
@@ -64,8 +64,8 @@ bool testCollectorStopAtCursor() {
 		if (equalStrings(s.name, "after")) found_after = true;
 	}
 
-	ASSERT_TRUE(found_before, "before not found");
-	ASSERT_TRUE(!found_after, "after should not be found");
+	ASSERT_TRUE(found_before);
+	ASSERT_TRUE(!found_after);
 
 	return true;
 }
@@ -88,8 +88,8 @@ bool testCollectorNestedScope() {
 		}
 	}
 
-	ASSERT_TRUE(found_b, "symbol b not found");
-	ASSERT_TRUE(b_scope != 0, "symbol b should be in inner scope");
+	ASSERT_TRUE(found_b);
+	ASSERT_TRUE(b_scope != 0);
 
 	// verify scope exists and contains symbol range
 	bool scope_ok = false;
@@ -106,7 +106,7 @@ bool testCollectorNestedScope() {
 		}
 	}
 
-	ASSERT_TRUE(scope_ok, "scope for b doesn't enclose symbol");
+	ASSERT_TRUE(scope_ok);
 	return true;
 }
 
@@ -118,8 +118,8 @@ bool testCollectorTruncation() {
 	opts.max_symbols = 1;
 	ParticleScriptCompiler::CollectorResult res = ParticleScriptCompiler::collectSymbolsFromBuffer(allocator, src, 0, opts);
 
-	ASSERT_TRUE(res.truncated, "result should be truncated");
-	ASSERT_TRUE(res.symbols.size() == 1, "should contain only one symbol when truncated");
+	ASSERT_TRUE(res.truncated);
+	ASSERT_TRUE(res.symbols.size() == 1);
 	return true;
 }
 
@@ -127,14 +127,14 @@ bool testCollectorCursorScope() {
 	IAllocator& allocator = getGlobalAllocator();
 	const char* src = "fn outer() { var o; { var inner; } }";
 	const char* pos = strstr(src, "inner");
-	ASSERT_TRUE(pos != nullptr, "failed to find inner");
+	ASSERT_TRUE(pos != nullptr);
 	int cursor = int(pos - src) + 1; // inside inner block
 
 	ParticleScriptCompiler::CollectorOptions opts;
 	opts.stop_at_cursor_only = true;
 	ParticleScriptCompiler::CollectorResult res = ParticleScriptCompiler::collectSymbolsFromBuffer(allocator, src, cursor, opts);
 
-	ASSERT_TRUE(res.cursor_scope_id != -1, "cursor scope should be found");
+	ASSERT_TRUE(res.cursor_scope_id != -1);
 
 	// find the scope and ensure it's a Block
 	bool is_block = false;
@@ -146,7 +146,7 @@ bool testCollectorCursorScope() {
 		}
 	}
 
-	ASSERT_TRUE(is_block, "cursor scope should be a Block");
+	ASSERT_TRUE(is_block);
 	return true;
 }
 
@@ -178,9 +178,9 @@ bool testCollectorEmitterFields() {
 		if (equalStrings(s.name, "local_in_emitter") && s.kind == ParticleScriptCompiler::SymbolKind::EmitterField) found_local = true;
 	}
 
-	ASSERT_TRUE(found_pos, "out pos missing");
-	ASSERT_TRUE(found_vel, "in vel missing");
-	ASSERT_TRUE(found_local, "var inside emitter missing");
+	ASSERT_TRUE(found_pos);
+	ASSERT_TRUE(found_vel);
+	ASSERT_TRUE(found_local);
 	return true;
 }
 

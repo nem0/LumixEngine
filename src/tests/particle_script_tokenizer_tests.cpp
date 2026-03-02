@@ -16,55 +16,55 @@ bool testSimpleTokens() {
 	using Token = ParticleScriptToken;
 	
 	Token tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::LEFT_PAREN, tok.type, "LEFT_PAREN");
+	ASSERT_EQ(Token::LEFT_PAREN, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::RIGHT_PAREN, tok.type, "RIGHT_PAREN");
+	ASSERT_EQ(Token::RIGHT_PAREN, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::LEFT_BRACE, tok.type, "LEFT_BRACE");
+	ASSERT_EQ(Token::LEFT_BRACE, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::RIGHT_BRACE, tok.type, "RIGHT_BRACE");
+	ASSERT_EQ(Token::RIGHT_BRACE, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::SEMICOLON, tok.type, "SEMICOLON");
+	ASSERT_EQ(Token::SEMICOLON, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::COLON, tok.type, "COLON");
+	ASSERT_EQ(Token::COLON, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::COMMA, tok.type, "COMMA");
+	ASSERT_EQ(Token::COMMA, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::DOT, tok.type, "DOT");
+	ASSERT_EQ(Token::DOT, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::PLUS, tok.type, "PLUS");
+	ASSERT_EQ(Token::PLUS, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::MINUS, tok.type, "MINUS");
+	ASSERT_EQ(Token::MINUS, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::STAR, tok.type, "STAR");
+	ASSERT_EQ(Token::STAR, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::SLASH, tok.type, "SLASH");
+	ASSERT_EQ(Token::SLASH, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::PERCENT, tok.type, "PERCENT");
+	ASSERT_EQ(Token::PERCENT, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::EQUAL, tok.type, "EQUAL");
+	ASSERT_EQ(Token::EQUAL, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::LT, tok.type, "LT");
+	ASSERT_EQ(Token::LT, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::GT, tok.type, "GT");
+	ASSERT_EQ(Token::GT, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::EOF, tok.type, "EOF");
+	ASSERT_EQ(Token::EOF, tok.type);
 	
 	return true;
 }
@@ -78,20 +78,20 @@ bool testNumbers() {
 	using Token = ParticleScriptToken;
 	
 	Token tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::NUMBER, tok.type, "First number");
-	ASSERT_TRUE(tok.value == "123", "First number value");
+	ASSERT_EQ(Token::NUMBER, tok.type);
+	ASSERT_TRUE(tok.value == "123");
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::NUMBER, tok.type, "Second number");
-	ASSERT_TRUE(tok.value == "456.789", "Second number value");
+	ASSERT_EQ(Token::NUMBER, tok.type);
+	ASSERT_TRUE(tok.value == "456.789");
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::NUMBER, tok.type, "Third number");
-	ASSERT_TRUE(tok.value == "0", "Third number value");
+	ASSERT_EQ(Token::NUMBER, tok.type);
+	ASSERT_TRUE(tok.value == "0");
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::NUMBER, tok.type, "Fourth number");
-	ASSERT_TRUE(tok.value == "1.0", "Fourth number value");
+	ASSERT_EQ(Token::NUMBER, tok.type);
+	ASSERT_TRUE(tok.value == "1.0");
 	
 	return true;
 }
@@ -105,7 +105,7 @@ bool testInvalidNumber() {
 	using Token = ParticleScriptToken;
 	
 	Token tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::ERROR, tok.type, "Invalid number should produce ERROR token");
+	ASSERT_EQ(Token::ERROR, tok.type);
 	
 	return true;
 }
@@ -119,16 +119,16 @@ bool testStrings() {
 	using Token = ParticleScriptToken;
 	
 	Token tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::STRING, tok.type, "First string");
-	ASSERT_TRUE(tok.value == "hello", "First string value");
+	ASSERT_EQ(Token::STRING, tok.type);
+	ASSERT_TRUE(tok.value == "hello");
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::STRING, tok.type, "Second string");
-	ASSERT_TRUE(tok.value == "world with spaces", "Second string value");
+	ASSERT_EQ(Token::STRING, tok.type);
+	ASSERT_TRUE(tok.value == "world with spaces");
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::STRING, tok.type, "Empty string");
-	ASSERT_TRUE(tok.value == "", "Empty string value");
+	ASSERT_EQ(Token::STRING, tok.type);
+	ASSERT_TRUE(tok.value == "");
 	
 	return true;
 }
@@ -142,7 +142,7 @@ bool testUnterminatedString() {
 	using Token = ParticleScriptToken;
 	
 	Token tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::ERROR, tok.type, "Unterminated string should produce ERROR token");
+	ASSERT_EQ(Token::ERROR, tok.type);
 	
 	return true;
 }
@@ -156,24 +156,24 @@ bool testIdentifiers() {
 	using Token = ParticleScriptToken;
 	
 	Token tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "First identifier");
-	ASSERT_TRUE(tok.value == "foo", "First identifier value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "foo");
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "Second identifier");
-	ASSERT_TRUE(tok.value == "bar", "Second identifier value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "bar");
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "Third identifier");
-	ASSERT_TRUE(tok.value == "_test", "Third identifier value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "_test");
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "Fourth identifier");
-	ASSERT_TRUE(tok.value == "test123", "Fourth identifier value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "test123");
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "Fifth identifier");
-	ASSERT_TRUE(tok.value == "_123", "Fifth identifier value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "_123");
 	
 	return true;
 }
@@ -187,46 +187,46 @@ bool testKeywords() {
 	using Token = ParticleScriptToken;
 	
 	Token tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::CONST, tok.type, "const keyword");
+	ASSERT_EQ(Token::CONST, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::GLOBAL, tok.type, "global keyword");
+	ASSERT_EQ(Token::GLOBAL, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::EMITTER, tok.type, "emitter keyword");
+	ASSERT_EQ(Token::EMITTER, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::FN, tok.type, "fn keyword");
+	ASSERT_EQ(Token::FN, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::VAR, tok.type, "var keyword");
+	ASSERT_EQ(Token::VAR, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::OUT, tok.type, "out keyword");
+	ASSERT_EQ(Token::OUT, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::IN, tok.type, "in keyword");
+	ASSERT_EQ(Token::IN, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::LET, tok.type, "let keyword");
+	ASSERT_EQ(Token::LET, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::IMPORT, tok.type, "import keyword");
+	ASSERT_EQ(Token::IMPORT, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::IF, tok.type, "if keyword");
+	ASSERT_EQ(Token::IF, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::ELSE, tok.type, "else keyword");
+	ASSERT_EQ(Token::ELSE, tok.type);
 
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::AND, tok.type, "and keyword");
+	ASSERT_EQ(Token::AND, tok.type);
 
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::OR, tok.type, "or keyword");
+	ASSERT_EQ(Token::OR, tok.type);
 
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::NOT, tok.type, "not keyword");
+	ASSERT_EQ(Token::NOT, tok.type);
 
 	return true;
 }
@@ -240,58 +240,58 @@ bool testKeywordPrefixes() {
 	using Token = ParticleScriptToken;
 	
 	Token tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "cons should be identifier");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "constants should be identifier");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "emi should be identifier");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "emitters should be identifier");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "fnn should be identifier");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "global2 should be identifier");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "vary should be identifier");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "output should be identifier");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "input should be identifier");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "lets should be identifier");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "returns should be identifier");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "importing should be identifier");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "iff should be identifier");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "elses should be identifier");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "an should be identifier");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "andd should be identifier");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "orr should be identifier");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "nott should be identifier");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
 	
 	return true;
 }
@@ -305,15 +305,15 @@ bool testWhitespace() {
 	using Token = ParticleScriptToken;
 	
 	Token tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::NUMBER, tok.type, "Should skip leading whitespace");
-	ASSERT_TRUE(tok.value == "123", "Number value");
+	ASSERT_EQ(Token::NUMBER, tok.type);
+	ASSERT_TRUE(tok.value == "123");
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "Should skip whitespace between tokens");
-	ASSERT_TRUE(tok.value == "foo", "Identifier value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "foo");
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::EOF, tok.type, "Should skip trailing whitespace");
+	ASSERT_EQ(Token::EOF, tok.type);
 	
 	return true;
 }
@@ -327,12 +327,12 @@ bool testComments() {
 	using Token = ParticleScriptToken;
 	
 	Token tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::NUMBER, tok.type, "First number");
-	ASSERT_TRUE(tok.value == "123", "First number value");
+	ASSERT_EQ(Token::NUMBER, tok.type);
+	ASSERT_TRUE(tok.value == "123");
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::NUMBER, tok.type, "Second number after comment");
-	ASSERT_TRUE(tok.value == "456", "Second number value");
+	ASSERT_EQ(Token::NUMBER, tok.type);
+	ASSERT_TRUE(tok.value == "456");
 	
 	return true;
 }
@@ -346,10 +346,10 @@ bool testCommentAtEnd() {
 	using Token = ParticleScriptToken;
 	
 	Token tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::NUMBER, tok.type, "Number before comment");
+	ASSERT_EQ(Token::NUMBER, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::EOF, tok.type, "Should reach EOF after comment");
+	ASSERT_EQ(Token::EOF, tok.type);
 	
 	return true;
 }
@@ -363,28 +363,28 @@ bool testComplexExpression() {
 	using Token = ParticleScriptToken;
 	
 	Token tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::LET, tok.type, "let keyword");
+	ASSERT_EQ(Token::LET, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "identifier x");
-	ASSERT_TRUE(tok.value == "x", "x value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "x");
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::EQUAL, tok.type, "equal sign");
+	ASSERT_EQ(Token::EQUAL, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::NUMBER, tok.type, "number 3.14");
-	ASSERT_TRUE(tok.value == "3.14", "3.14 value");
+	ASSERT_EQ(Token::NUMBER, tok.type);
+	ASSERT_TRUE(tok.value == "3.14");
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::STAR, tok.type, "multiplication");
+	ASSERT_EQ(Token::STAR, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "identifier radius");
-	ASSERT_TRUE(tok.value == "radius", "radius value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "radius");
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::SEMICOLON, tok.type, "semicolon");
+	ASSERT_EQ(Token::SEMICOLON, tok.type);
 	
 	return true;
 }
@@ -398,23 +398,23 @@ bool testFunctionDefinition() {
 	using Token = ParticleScriptToken;
 	
 	Token tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::FN, tok.type, "fn keyword");
+	ASSERT_EQ(Token::FN, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "function name");
-	ASSERT_TRUE(tok.value == "update", "update value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "update");
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::LEFT_PAREN, tok.type, "left paren");
+	ASSERT_EQ(Token::LEFT_PAREN, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::RIGHT_PAREN, tok.type, "right paren");
+	ASSERT_EQ(Token::RIGHT_PAREN, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::LEFT_BRACE, tok.type, "left brace");
+	ASSERT_EQ(Token::LEFT_BRACE, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::RIGHT_BRACE, tok.type, "right brace");
+	ASSERT_EQ(Token::RIGHT_BRACE, tok.type);
 	
 	return true;
 }
@@ -428,12 +428,12 @@ bool testMultipleComments() {
 	using Token = ParticleScriptToken;
 	
 	Token tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::NUMBER, tok.type, "First number");
-	ASSERT_TRUE(tok.value == "123", "First number value");
+	ASSERT_EQ(Token::NUMBER, tok.type);
+	ASSERT_TRUE(tok.value == "123");
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::NUMBER, tok.type, "Second number");
-	ASSERT_TRUE(tok.value == "456", "Second number value");
+	ASSERT_EQ(Token::NUMBER, tok.type);
+	ASSERT_TRUE(tok.value == "456");
 	
 	return true;
 }
@@ -447,7 +447,7 @@ bool testEmptyInput() {
 	using Token = ParticleScriptToken;
 	
 	Token tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::EOF, tok.type, "Empty input should return EOF");
+	ASSERT_EQ(Token::EOF, tok.type);
 	
 	return true;
 }
@@ -461,7 +461,7 @@ bool testOnlyWhitespace() {
 	using Token = ParticleScriptToken;
 	
 	Token tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::EOF, tok.type, "Only whitespace should return EOF");
+	ASSERT_EQ(Token::EOF, tok.type);
 	
 	return true;
 }
@@ -475,15 +475,15 @@ bool testDotAfterIdentifier() {
 	using Token = ParticleScriptToken;
 	
 	Token tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "position identifier");
-	ASSERT_TRUE(tok.value == "position", "position value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "position");
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::DOT, tok.type, "dot");
+	ASSERT_EQ(Token::DOT, tok.type);
 	
 	tok = tokenizer.nextToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "x identifier");
-	ASSERT_TRUE(tok.value == "x", "x value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "x");
 	
 	return true;
 }

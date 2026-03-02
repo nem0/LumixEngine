@@ -116,7 +116,7 @@
 ### Image with Fit Options
 
 ```css
-[image src="path/to/image.png" width=200 height=150 fit="cover"]
+[image src="path/to/image.png" width=200 height=150 fit=cover]
 ```
 
 ## Layout Examples
@@ -124,7 +124,7 @@
 ### Horizontal Layout (Row)
 
 ```css
-[panel direction="row"] {
+[panel direction=row] {
     [panel width=100 height=50 bg-color=#ff0000] { }
     [panel width=100 height=50 bg-color=#00ff00] { }
     [panel width=100 height=50 bg-color=#0000ff] { }
@@ -134,7 +134,7 @@
 ### Vertical Layout (Column)
 
 ```css
-[panel direction="column"] {
+[panel direction=column] {
     [panel width=100 height=50 bg-color=#ff0000] { }
     [panel width=100 height=50 bg-color=#00ff00] { }
     [panel width=100 height=50 bg-color=#0000ff] { }
@@ -144,7 +144,7 @@
 ### Centered Content
 
 ```css
-[panel width=100% height=100% justify-content="center" align-items="center"] {
+[panel width=100% height=100% justify-content=center align-items=center] {
     [panel width=200 height=100 bg-color=#cccccc] {
         Centered content
     }
@@ -154,7 +154,7 @@
 ### Grid-like Layout with Wrapping
 
 ```css
-[panel width=200 direction="row" wrap="true"] {
+[panel width=200 direction=row wrap=true] {
     [panel width=100 height=100 bg-color=#ff0000] { 1 }
     [panel width=100 height=100 bg-color=#00ff00] { 2 }
     [panel width=100 height=100 bg-color=#0000ff] { 3 }
@@ -177,7 +177,7 @@
 }
 
 [panel .my_class] {
-    "Styled text"
+    Styled text
 }
 ```
 
@@ -231,9 +231,9 @@
 ### Menu Layout
 
 ```css
-[panel direction="column" padding=20] {
+[panel direction=column padding=20] {
     [panel align=center] { Game Title }
-    [panel direction="column"] {
+    [panel direction=column] {
         [panel .menu_item] { Start Game }
         [panel .menu_item] { Options }
         [panel .menu_item] { Quit }
@@ -247,7 +247,7 @@
 [panel .card width=300 padding=15 bg-color=#ffffff] {
     [panel] { Card Title }
     [panel] { Card content goes here... }
-    [panel direction="row" justify-content="end"] {
+    [panel direction=row justify-content=end] {
         [panel .button] { OK }
         [panel .button] { Cancel }
     }
@@ -257,7 +257,7 @@
 ### Responsive Layout
 
 ```css
-[panel direction="row"] {
+[panel direction=row] {
     [panel width=30%] {
         Sidebar
     }
@@ -288,7 +288,7 @@
 ### Fit Content
 
 ```css
-[panel width="fit-content"] {
+[panel width=fit-content] {
     This panel sizes to content
 }
 ```
@@ -296,7 +296,7 @@
 ### Grow
 
 ```css
-[panel direction="row" width=300] {
+[panel direction=row width=300] {
     [panel width=100] { Fixed size }
     [panel grow=1] { Fills remaining space }
 }
@@ -305,7 +305,7 @@
 Left-fill-right (fixed on both sides, growing middle):
 
 ```css
-[panel direction="row" width=400] {
+[panel direction=row width=400] {
     [panel width=100] { Left }
     [panel grow=1] { Middle }
     [panel width=100] { Right }
@@ -315,7 +315,7 @@ Left-fill-right (fixed on both sides, growing middle):
 Split remaining space in a 2:1 ratio:
 
 ```css
-[panel direction="row" width=400] {
+[panel direction=row width=400] {
     [panel grow=2] { Gets 2/3 }
     [panel grow=1] { Gets 1/3 }
 }

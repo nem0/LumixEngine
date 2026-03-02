@@ -127,9 +127,8 @@ bool UIFontManager::isReady(FontHandle font) {
 	return Lumix::isBuilt(*static_cast<Font*>(font));
 }
 
-WrappedText UIFontManager::wrapText(FontHandle font, StringView text, float width) {
-	return Lumix::wrapText(*static_cast<Font*>(font), text, width);
-
+SplitWord UIFontManager::splitFirstWord(FontHandle font, StringView text) {
+	return Lumix::splitFirstWord(*static_cast<Font*>(font), text);
 }
 
 UniquePtr<GUINGModule> GUINGModule::createInstance(GUINGSystem& system, World& world, IAllocator& allocator) {

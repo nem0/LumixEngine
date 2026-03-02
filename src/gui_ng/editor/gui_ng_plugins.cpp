@@ -126,14 +126,22 @@ struct UIEditorWindow : AssetEditorWindow {
 			if (actions.open_externally.iconButton(true, &m_app)) m_app.getAssetBrowser().openInExternalEditor(m_path);
 			if (actions.view_in_browser.iconButton(true, &m_app)) m_app.getAssetBrowser().locate(m_path);
 			if (ImGuiEx::IconButton(ICON_FA_SYNC, "Refresh")) refresh();
+			ImGui::SameLine();
+			if (ImGuiEx::IconButton(m_show_debug_view ? ICON_FA_EYE_SLASH : ICON_FA_EYE, m_show_debug_view ? "Hide Debug View" : "Show Debug View")) {
+				m_show_debug_view = !m_show_debug_view;
+			}
 			ImGui::EndMenuBar();
 		}
 
-		ImGui::Columns(2);
+		ImGui::Columns(m_show_debug_view ? 3 : 2);
 		if (m_editor->gui("codeeditor", ImVec2(0, 0), m_app.getMonospaceFont(), m_app.getDefaultFont())) m_dirty = true;
 		handleAutocomplete();
 		autocompletePopupGUI();
 		ImGui::NextColumn();
+		if (m_show_debug_view) {
+			debugTreeViewGUI();
+			ImGui::NextColumn();
+		}
 		ImGui::ColorEdit3("Background", &m_clear_color.x);
 		ImVec2 canvas_size = ImGui::GetContentRegionAvail();
 		if (canvas_size.x > 0 && canvas_size.y > 0) {
@@ -155,6 +163,17 @@ struct UIEditorWindow : AssetEditorWindow {
 					Draw2D& draw2d = m_pipeline->getDraw2D();
 					m_document->render(draw2d);
 
+					// Draw highlight for hovered element
+					if (m_hovered_element_idx != 0xFFFFFFF) {
+						const ui::Element* hovered_element = m_document->getElement(m_hovered_element_idx);
+						if (hovered_element) {
+							Color highlight_fill(255, 128, 0, 76); // Orange with 30% alpha
+							Color highlight_border(255, 255, 0, 255); // Yellow
+							draw2d.addRectFilled(hovered_element->position, hovered_element->position + hovered_element->size, highlight_fill);
+							draw2d.addRect(hovered_element->position, hovered_element->position + hovered_element->size, highlight_border, 2.0f);
+						}
+					}
+
 					if (m_pipeline->render(true)) {
 						gpu::TextureHandle texture_handle = m_pipeline->getOutput();
 						if (texture_handle) {
@@ -171,6 +190,63 @@ struct UIEditorWindow : AssetEditorWindow {
 			}
 		}
 		ImGui::Columns(1);
+	}
+
+	void debugTreeViewGUI() {
+		m_hovered_element_idx = 0xFFFFFFF;
+		if (!m_parse_success) return;
+
+		if (ImGui::CollapsingHeader("Debug Tree View", ImGuiTreeNodeFlags_DefaultOpen)) {
+			for (u32 root_idx : m_document->m_roots) {
+				debugElementGUI(root_idx, 0);
+			}
+		}
+	}
+
+	void debugElementGUI(u32 element_idx, int depth) {
+		const ui::Element* element = m_document->getElement(element_idx);
+		if (!element) return;
+
+		const char* tag_names[] = { "panel", "image", "span", "invalid" };
+		const char* tag_name = element->tag < ui::Tag::INVALID ? tag_names[(u8)element->tag] : "unknown";
+
+		StaticString<256> label;
+		StaticString<32> size_str;
+		size_str.append(" (", element->size.x, "x", element->size.y, ")");
+
+		if (element->value.empty()) {
+			label.append(tag_name, size_str, "##", element_idx);
+		} else {
+			StaticString<64> value_preview;
+			u32 preview_len = minimum((u32)60, element->value.size());
+			value_preview.append(StringView(element->value.begin, preview_len));
+			if (element->value.size() > 60) {
+				value_preview.append("...");
+			}
+			label.append(tag_name, size_str, " \"", value_preview, "\"##", element_idx);
+		}
+
+		ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
+		if (element->children.empty()) flags |= ImGuiTreeNodeFlags_Leaf;
+
+		bool open = ImGui::TreeNodeEx(label, flags);
+		if (ImGui::IsItemHovered()) {
+			m_hovered_element_idx = element_idx;
+			ImGui::BeginTooltip();
+			ImGui::Text("Position: (%.1f, %.1f)", element->position.x, element->position.y);
+			ImGui::Text("Size: (%.1f, %.1f)", element->size.x, element->size.y);
+			if (!element->style_class.empty()) {
+				ImGui::Text("Class: %.*s", (int)element->style_class.size(), element->style_class.begin);
+			}
+			ImGui::EndTooltip();
+		}
+
+		if (open) {
+			for (u32 child_idx : element->children) {
+				debugElementGUI(child_idx, depth + 1);
+			}
+			ImGui::TreePop();
+		}
 	}
 
 	void handleAutocomplete() {
@@ -266,6 +342,8 @@ struct UIEditorWindow : AssetEditorWindow {
 	bool m_needs_layout = false;
 	UniquePtr<Pipeline> m_pipeline;
 	Vec3 m_clear_color = Vec3(0.5f, 0.5f, 0.5f);
+	u32 m_hovered_element_idx = 0xFFFFFFF;
+	bool m_show_debug_view = false;
 };
 
 struct UIPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {

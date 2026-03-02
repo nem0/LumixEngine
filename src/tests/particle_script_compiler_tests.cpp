@@ -225,37 +225,37 @@ bool testCompileTimeEval(const char* src, float value) {
 
 // Test constant declarations with literal values and expressions
 bool testCompileTimeEval() {
-	ASSERT_TRUE(testCompileTimeEval("2 + 3", 5.0f), "2 + 3 should be folded to 5");
-	ASSERT_TRUE(testCompileTimeEval("10 - 3", 7.0f), "10 - 3 should be folded to 7");
-	ASSERT_TRUE(testCompileTimeEval("4 * 5", 20.0f), "4 * 5 should be folded to 20");
-	ASSERT_TRUE(testCompileTimeEval("20 / 4", 5.0f), "20 / 4 should be folded to 5");
-	ASSERT_TRUE(testCompileTimeEval("10 % 3", 1.0f), "10 % 3 should be folded to 1");
-	ASSERT_TRUE(testCompileTimeEval("2 + 3 * 4", 14.0f), "2 + 3 * 4 should be folded to 14");
-	ASSERT_TRUE(testCompileTimeEval("(2 + 3) * 4", 20.0f), "(2 + 3) * 4 should be folded to 20");
-	ASSERT_TRUE(testCompileTimeEval("10 - 2 - 3", 5.0f), "10 - 2 - 3 should be folded to 5");
-	ASSERT_TRUE(testCompileTimeEval("100 / 5 / 2", 10.0f), "100 / 5 / 2 should be folded to 10");
-	ASSERT_TRUE(testCompileTimeEval("-5 + 3", -2.0f), "-5 + 3 should be folded to -2");
-	ASSERT_TRUE(testCompileTimeEval("-(2 + 3)", -5.0f), "-(2 + 3) should be folded to -5");
-	ASSERT_TRUE(testCompileTimeEval("2 * 3 + 4 * 5", 26.0f), "2 * 3 + 4 * 5 should be folded to 26");
-	ASSERT_TRUE(testCompileTimeEval("sqrt(16)", 4.0f), "sqrt(16) should be folded to 4");
-	ASSERT_TRUE(testCompileTimeEval("sqrt(25)", 5.0f), "sqrt(25) should be folded to 5");
-	ASSERT_TRUE(testCompileTimeEval("sqrt(4) + sqrt(9)", 5.0f), "sqrt(4) + sqrt(9) should be folded to 5");
-	ASSERT_TRUE(testCompileTimeEval("sin(0)", 0.0f), "sin(0) should be folded to 0");
-	ASSERT_TRUE(testCompileTimeEval("cos(0)", 1.0f), "cos(0) should be folded to 1");
-	ASSERT_TRUE(testCompileTimeEval("min(3, 7)", 3.0f), "min(3, 7) should be folded to 3");
-	ASSERT_TRUE(testCompileTimeEval("max(3, 7)", 7.0f), "max(3, 7) should be folded to 7");
-	ASSERT_TRUE(testCompileTimeEval("min(5, 2) + max(1, 4)", 6.0f), "min(5, 2) + max(1, 4) should be folded to 6");
-	ASSERT_TRUE(testCompileTimeEval("2.5 + 3.5", 6.0f), "2.5 + 3.5 should be folded to 6");
-	ASSERT_TRUE(testCompileTimeEval("10.5 - 3.2", 7.3f), "10.5 - 3.2 should be folded to 7.3");
-	ASSERT_TRUE(testCompileTimeEval("2.5 * 4.0", 10.0f), "2.5 * 4.0 should be folded to 10");
-	ASSERT_TRUE(testCompileTimeEval("7.5 / 2.5", 3.0f), "7.5 / 2.5 should be folded to 3");
-	ASSERT_TRUE(testCompileTimeEval("0.5 + 0.25 * 4.0", 1.5f), "0.5 + 0.25 * 4.0 should be folded to 1.5");
-	ASSERT_TRUE(testCompileTimeEval("-3.14 + 1.14", -2.0f), "-3.14 + 1.14 should be folded to -2");
-	ASSERT_TRUE(testCompileTimeEval("sqrt(max(16, 9))", 4.0f), "sqrt(max(16, 9)) should be folded to 4");
-	ASSERT_TRUE(testCompileTimeEval("2 * sqrt(4) + 3", 7.0f), "2 * sqrt(4) + 3 should be folded to 7");
-	ASSERT_TRUE(testCompileTimeEval("sin(cos(0))", 0.8414709848f), "sin(cos(0)) should be folded to sin(1)");
-	ASSERT_TRUE(testCompileTimeEval("max(min(5, 3), 2)", 3.0f), "max(min(5, 3), 2) should be folded to 3");
-	ASSERT_TRUE(testCompileTimeEval("sqrt(9) * sqrt(4)", 6.0f), "sqrt(9) * sqrt(4) should be folded to 6");
+	ASSERT_TRUE(testCompileTimeEval("2 + 3", 5.0f));
+	ASSERT_TRUE(testCompileTimeEval("10 - 3", 7.0f));
+	ASSERT_TRUE(testCompileTimeEval("4 * 5", 20.0f));
+	ASSERT_TRUE(testCompileTimeEval("20 / 4", 5.0f));
+	ASSERT_TRUE(testCompileTimeEval("10 % 3", 1.0f));
+	ASSERT_TRUE(testCompileTimeEval("2 + 3 * 4", 14.0f));
+	ASSERT_TRUE(testCompileTimeEval("(2 + 3) * 4", 20.0f));
+	ASSERT_TRUE(testCompileTimeEval("10 - 2 - 3", 5.0f));
+	ASSERT_TRUE(testCompileTimeEval("100 / 5 / 2", 10.0f));
+	ASSERT_TRUE(testCompileTimeEval("-5 + 3", -2.0f));
+	ASSERT_TRUE(testCompileTimeEval("-(2 + 3)", -5.0f));
+	ASSERT_TRUE(testCompileTimeEval("2 * 3 + 4 * 5", 26.0f));
+	ASSERT_TRUE(testCompileTimeEval("sqrt(16)", 4.0f));
+	ASSERT_TRUE(testCompileTimeEval("sqrt(25)", 5.0f));
+	ASSERT_TRUE(testCompileTimeEval("sqrt(4) + sqrt(9)", 5.0f));
+	ASSERT_TRUE(testCompileTimeEval("sin(0)", 0.0f));
+	ASSERT_TRUE(testCompileTimeEval("cos(0)", 1.0f));
+	ASSERT_TRUE(testCompileTimeEval("min(3, 7)", 3.0f));
+	ASSERT_TRUE(testCompileTimeEval("max(3, 7)", 7.0f));
+	ASSERT_TRUE(testCompileTimeEval("min(5, 2) + max(1, 4)", 6.0f));
+	ASSERT_TRUE(testCompileTimeEval("2.5 + 3.5", 6.0f));
+	ASSERT_TRUE(testCompileTimeEval("10.5 - 3.2", 7.3f));
+	ASSERT_TRUE(testCompileTimeEval("2.5 * 4.0", 10.0f));
+	ASSERT_TRUE(testCompileTimeEval("7.5 / 2.5", 3.0f));
+	ASSERT_TRUE(testCompileTimeEval("0.5 + 0.25 * 4.0", 1.5f));
+	ASSERT_TRUE(testCompileTimeEval("-3.14 + 1.14", -2.0f));
+	ASSERT_TRUE(testCompileTimeEval("sqrt(max(16, 9))", 4.0f));
+	ASSERT_TRUE(testCompileTimeEval("2 * sqrt(4) + 3", 7.0f));
+	ASSERT_TRUE(testCompileTimeEval("sin(cos(0))", 0.8414709848f));
+	ASSERT_TRUE(testCompileTimeEval("max(min(5, 3), 2)", 3.0f));
+	ASSERT_TRUE(testCompileTimeEval("sqrt(9) * sqrt(4)", 6.0f));
 	return true;
 }
 
@@ -308,24 +308,24 @@ bool testCompileTimeConstUsingUserFunction() {
 
 	TestableCompiler compiler;
 	OutputMemoryStream compiled(getGlobalAllocator());
-	ASSERT_TRUE(compiler.compile(Path("const_eval_user_func.pat"), code, compiled), "Compilation should succeed");
+	ASSERT_TRUE(compiler.compile(Path("const_eval_user_func.pat"), code, compiled));
 
 	const ParticleScriptCompiler::Constant* C = compiler.findConstant("C");
-	ASSERT_TRUE(C != nullptr, "C should be present");
-	ASSERT_TRUE(C->type == ParticleScriptCompiler::ValueType::FLOAT, "C should be float");
-	ASSERT_TRUE(fabsf(C->value[0] - 7.f) < 0.001f, "C should be 7");
+	ASSERT_TRUE(C != nullptr);
+	ASSERT_TRUE(C->type == ParticleScriptCompiler::ValueType::FLOAT);
+	ASSERT_TRUE(fabsf(C->value[0] - 7.f) < 0.001f);
 
 	const ParticleScriptCompiler::Constant* D = compiler.findConstant("D");
-	ASSERT_TRUE(D != nullptr, "D should be present");
-	ASSERT_TRUE(D->type == ParticleScriptCompiler::ValueType::FLOAT, "D should be float");
-	ASSERT_TRUE(fabsf(D->value[0] - 14.f) < 0.001f, "D should be 14");
+	ASSERT_TRUE(D != nullptr);
+	ASSERT_TRUE(D->type == ParticleScriptCompiler::ValueType::FLOAT);
+	ASSERT_TRUE(fabsf(D->value[0] - 14.f) < 0.001f);
 
 	const ParticleScriptCompiler::Constant* V = compiler.findConstant("V");
-	ASSERT_TRUE(V != nullptr, "V should be present");
-	ASSERT_TRUE(V->type == ParticleScriptCompiler::ValueType::FLOAT3, "V should be float3");
-	ASSERT_TRUE(fabsf(V->value[0] - 1.f) < 0.001f, "V.x should be 1");
-	ASSERT_TRUE(fabsf(V->value[1] - 2.f) < 0.001f, "V.y should be 2");
-	ASSERT_TRUE(fabsf(V->value[2] - 3.f) < 0.001f, "V.z should be 3");
+	ASSERT_TRUE(V != nullptr);
+	ASSERT_TRUE(V->type == ParticleScriptCompiler::ValueType::FLOAT3);
+	ASSERT_TRUE(fabsf(V->value[0] - 1.f) < 0.001f);
+	ASSERT_TRUE(fabsf(V->value[1] - 2.f) < 0.001f);
+	ASSERT_TRUE(fabsf(V->value[2] - 3.f) < 0.001f);
 
 	return true;
 }
@@ -383,36 +383,36 @@ bool testCompileTimeConstFloatN() {
 	)";
 
 	ParticleScriptRunner runner;
-	ASSERT_TRUE(runner.compile(code), "Compilation should succeed");
+	ASSERT_TRUE(runner.compile(code));
 	
 	const ParticleScriptCompiler::Constant* B = runner.compiler.findConstant("B");
-	ASSERT_TRUE(B != nullptr, "B should be present");
-	ASSERT_TRUE(B->type == ParticleScriptCompiler::ValueType::FLOAT3, "B should be float3");
-	ASSERT_TRUE(fabsf(B->value[0] - 1.f) < 0.001f, "B.x should be 1");
-	ASSERT_TRUE(fabsf(B->value[1] - 2.f) < 0.001f, "B.y should be 2");
-	ASSERT_TRUE(fabsf(B->value[2] - 3.f) < 0.001f, "B.z should be 3");
+	ASSERT_TRUE(B != nullptr);
+	ASSERT_TRUE(B->type == ParticleScriptCompiler::ValueType::FLOAT3);
+	ASSERT_TRUE(fabsf(B->value[0] - 1.f) < 0.001f);
+	ASSERT_TRUE(fabsf(B->value[1] - 2.f) < 0.001f);
+	ASSERT_TRUE(fabsf(B->value[2] - 3.f) < 0.001f);
 
 	const ParticleScriptCompiler::Constant* C = runner.compiler.findConstant("C");
-	ASSERT_TRUE(C != nullptr, "C should be present");
-	ASSERT_TRUE(C->type == ParticleScriptCompiler::ValueType::FLOAT4, "C should be float4");
-	ASSERT_TRUE(fabsf(C->value[0] - 4.f) < 0.001f, "C.x should be 4");
-	ASSERT_TRUE(fabsf(C->value[1] - 5.f) < 0.001f, "C.y should be 5");
-	ASSERT_TRUE(fabsf(C->value[2] - 6.f) < 0.001f, "C.z should be 6");
-	ASSERT_TRUE(fabsf(C->value[3] - 7.f) < 0.001f, "C.w should be 7");
+	ASSERT_TRUE(C != nullptr);
+	ASSERT_TRUE(C->type == ParticleScriptCompiler::ValueType::FLOAT4);
+	ASSERT_TRUE(fabsf(C->value[0] - 4.f) < 0.001f);
+	ASSERT_TRUE(fabsf(C->value[1] - 5.f) < 0.001f);
+	ASSERT_TRUE(fabsf(C->value[2] - 6.f) < 0.001f);
+	ASSERT_TRUE(fabsf(C->value[3] - 7.f) < 0.001f);
 
 	const ParticleScriptCompiler::Constant* NEG_VEC = runner.compiler.findConstant("NEG_VEC");
-	ASSERT_TRUE(NEG_VEC != nullptr, "NEG_VEC should be present");
-	ASSERT_TRUE(NEG_VEC->type == ParticleScriptCompiler::ValueType::FLOAT3, "NEG_VEC should be float3");
-	ASSERT_TRUE(fabsf(NEG_VEC->value[0] - (-1.f)) < 0.001f, "NEG_VEC.x should be -1");
-	ASSERT_TRUE(fabsf(NEG_VEC->value[1] - (-2.f)) < 0.001f, "NEG_VEC.y should be -2");
-	ASSERT_TRUE(fabsf(NEG_VEC->value[2] - (-3.f)) < 0.001f, "NEG_VEC.z should be -3");
+	ASSERT_TRUE(NEG_VEC != nullptr);
+	ASSERT_TRUE(NEG_VEC->type == ParticleScriptCompiler::ValueType::FLOAT3);
+	ASSERT_TRUE(fabsf(NEG_VEC->value[0] - (-1.f)) < 0.001f);
+	ASSERT_TRUE(fabsf(NEG_VEC->value[1] - (-2.f)) < 0.001f);
+	ASSERT_TRUE(fabsf(NEG_VEC->value[2] - (-3.f)) < 0.001f);
 
 	runner.runEmit();
 
-	ASSERT_TRUE(fabsf(runner.getChannel(0) - 4.0f) < 0.001f, "v should be 4 after emit");
-	ASSERT_TRUE(fabsf(runner.getChannel(1) - 5.0f) < 0.001f, "v should be 5 after emit");
-	ASSERT_TRUE(fabsf(runner.getChannel(2) - 6.0f) < 0.001f, "v should be 6 after emit");
-	ASSERT_TRUE(fabsf(runner.getChannel(3) - 7.0f) < 0.001f, "v should be 7 after emit");
+	ASSERT_TRUE(fabsf(runner.getChannel(0) - 4.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(1) - 5.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(2) - 6.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(3) - 7.0f) < 0.001f);
 
 	return true;
 }
@@ -469,42 +469,42 @@ bool testCompileEmitterVariables() {
 	OutputMemoryStream output(getGlobalAllocator());
 	
 	bool success = compiler.compile(Path("test.pat"), emitter_code, output);
-	ASSERT_TRUE(success, "Emitter with input/output/var compilation should succeed");
-	ASSERT_TRUE(output.size() > 0, "Output should contain compiled data");
+	ASSERT_TRUE(success);
+	ASSERT_TRUE(output.size() > 0);
 	
 	const auto* emitter = compiler.getEmitter(0);
-	ASSERT_TRUE(emitter != nullptr, "Emitter should be compiled");
+	ASSERT_TRUE(emitter != nullptr);
 	
 	// Verify input variables
-	ASSERT_TRUE(emitter->m_inputs.size() == 3, "Should have 3 input variables");
-	ASSERT_TRUE(equalStrings(emitter->m_inputs[0].name, "in_position"), "First input should be in_position");
-	ASSERT_TRUE(emitter->m_inputs[0].type == ParticleScriptCompiler::ValueType::FLOAT3, "in_position should be float3");
-	ASSERT_TRUE(equalStrings(emitter->m_inputs[1].name, "in_velocity"), "Second input should be in_velocity");
-	ASSERT_TRUE(emitter->m_inputs[1].type == ParticleScriptCompiler::ValueType::FLOAT3, "in_velocity should be float3");
-	ASSERT_TRUE(equalStrings(emitter->m_inputs[2].name, "in_color"), "Third input should be in_color");
-	ASSERT_TRUE(emitter->m_inputs[2].type == ParticleScriptCompiler::ValueType::FLOAT3, "in_color should be float3");
+	ASSERT_TRUE(emitter->m_inputs.size() == 3);
+	ASSERT_TRUE(equalStrings(emitter->m_inputs[0].name, "in_position"));
+	ASSERT_TRUE(emitter->m_inputs[0].type == ParticleScriptCompiler::ValueType::FLOAT3);
+	ASSERT_TRUE(equalStrings(emitter->m_inputs[1].name, "in_velocity"));
+	ASSERT_TRUE(emitter->m_inputs[1].type == ParticleScriptCompiler::ValueType::FLOAT3);
+	ASSERT_TRUE(equalStrings(emitter->m_inputs[2].name, "in_color"));
+	ASSERT_TRUE(emitter->m_inputs[2].type == ParticleScriptCompiler::ValueType::FLOAT3);
 	
 	// Verify output variables
-	ASSERT_TRUE(emitter->m_outputs.size() == 4, "Should have 4 output variables");
-	ASSERT_TRUE(equalStrings(emitter->m_outputs[0].name, "i_position"), "First output should be i_position");
-	ASSERT_TRUE(emitter->m_outputs[0].type == ParticleScriptCompiler::ValueType::FLOAT3, "i_position should be float3");
-	ASSERT_TRUE(equalStrings(emitter->m_outputs[1].name, "i_scale"), "Second output should be i_scale");
-	ASSERT_TRUE(emitter->m_outputs[1].type == ParticleScriptCompiler::ValueType::FLOAT, "i_scale should be float");
-	ASSERT_TRUE(equalStrings(emitter->m_outputs[2].name, "i_color"), "Third output should be i_color");
-	ASSERT_TRUE(emitter->m_outputs[2].type == ParticleScriptCompiler::ValueType::FLOAT4, "i_color should be float4");
-	ASSERT_TRUE(equalStrings(emitter->m_outputs[3].name, "i_rotation"), "Fourth output should be i_rotation");
-	ASSERT_TRUE(emitter->m_outputs[3].type == ParticleScriptCompiler::ValueType::FLOAT, "i_rotation should be float");
+	ASSERT_TRUE(emitter->m_outputs.size() == 4);
+	ASSERT_TRUE(equalStrings(emitter->m_outputs[0].name, "i_position"));
+	ASSERT_TRUE(emitter->m_outputs[0].type == ParticleScriptCompiler::ValueType::FLOAT3);
+	ASSERT_TRUE(equalStrings(emitter->m_outputs[1].name, "i_scale"));
+	ASSERT_TRUE(emitter->m_outputs[1].type == ParticleScriptCompiler::ValueType::FLOAT);
+	ASSERT_TRUE(equalStrings(emitter->m_outputs[2].name, "i_color"));
+	ASSERT_TRUE(emitter->m_outputs[2].type == ParticleScriptCompiler::ValueType::FLOAT4);
+	ASSERT_TRUE(equalStrings(emitter->m_outputs[3].name, "i_rotation"));
+	ASSERT_TRUE(emitter->m_outputs[3].type == ParticleScriptCompiler::ValueType::FLOAT);
 	
 	// Verify var variables
-	ASSERT_TRUE(emitter->m_vars.size() == 5, "Should have 5 var variables");
-	ASSERT_TRUE(equalStrings(emitter->m_vars[0].name, "position"), "First var should be position");
-	ASSERT_TRUE(emitter->m_vars[0].type == ParticleScriptCompiler::ValueType::FLOAT3, "position should be float3");
-	ASSERT_TRUE(equalStrings(emitter->m_vars[1].name, "velocity"), "Second var should be velocity");
-	ASSERT_TRUE(emitter->m_vars[1].type == ParticleScriptCompiler::ValueType::FLOAT3, "velocity should be float3");
-	ASSERT_TRUE(equalStrings(emitter->m_vars[2].name, "lifetime"), "Third var should be lifetime");
-	ASSERT_TRUE(emitter->m_vars[2].type == ParticleScriptCompiler::ValueType::FLOAT, "lifetime should be float");
-	ASSERT_TRUE(equalStrings(emitter->m_vars[3].name, "age"), "Fourth var should be age");
-	ASSERT_TRUE(emitter->m_vars[3].type == ParticleScriptCompiler::ValueType::FLOAT, "age should be float");
+	ASSERT_TRUE(emitter->m_vars.size() == 5);
+	ASSERT_TRUE(equalStrings(emitter->m_vars[0].name, "position"));
+	ASSERT_TRUE(emitter->m_vars[0].type == ParticleScriptCompiler::ValueType::FLOAT3);
+	ASSERT_TRUE(equalStrings(emitter->m_vars[1].name, "velocity"));
+	ASSERT_TRUE(emitter->m_vars[1].type == ParticleScriptCompiler::ValueType::FLOAT3);
+	ASSERT_TRUE(equalStrings(emitter->m_vars[2].name, "lifetime"));
+	ASSERT_TRUE(emitter->m_vars[2].type == ParticleScriptCompiler::ValueType::FLOAT);
+	ASSERT_TRUE(equalStrings(emitter->m_vars[3].name, "age"));
+	ASSERT_TRUE(emitter->m_vars[3].type == ParticleScriptCompiler::ValueType::FLOAT);
 	
 	return true;
 }
@@ -564,20 +564,20 @@ bool testCompileCompounds() {
 	OutputMemoryStream output(getGlobalAllocator());
 	
 	bool success = compiler.compile(Path("test.pat"), emitter_code, output);
-	ASSERT_TRUE(success, "Compilation with compound types should succeed");
-	ASSERT_TRUE(output.size() > 0, "Output should contain compiled data");
+	ASSERT_TRUE(success);
+	ASSERT_TRUE(output.size() > 0);
 	
 	const auto* emitter = compiler.getEmitter(0);
-	ASSERT_TRUE(emitter != nullptr, "Emitter should be compiled");
+	ASSERT_TRUE(emitter != nullptr);
 	
 	// Verify compound variable types
-	ASSERT_TRUE(emitter->m_vars.size() == 3, "Should have 3 var variables");
-	ASSERT_TRUE(equalStrings(emitter->m_vars[0].name, "pos"), "First var should be pos");
-	ASSERT_TRUE(emitter->m_vars[0].type == ParticleScriptCompiler::ValueType::FLOAT3, "pos should be float3");
-	ASSERT_TRUE(equalStrings(emitter->m_vars[1].name, "col"), "Second var should be col");
-	ASSERT_TRUE(emitter->m_vars[1].type == ParticleScriptCompiler::ValueType::FLOAT4, "col should be float4");
-	ASSERT_TRUE(equalStrings(emitter->m_vars[2].name, "vel"), "Third var should be vel");
-	ASSERT_TRUE(emitter->m_vars[2].type == ParticleScriptCompiler::ValueType::FLOAT3, "vel should be float3");
+	ASSERT_TRUE(emitter->m_vars.size() == 3);
+	ASSERT_TRUE(equalStrings(emitter->m_vars[0].name, "pos"));
+	ASSERT_TRUE(emitter->m_vars[0].type == ParticleScriptCompiler::ValueType::FLOAT3);
+	ASSERT_TRUE(equalStrings(emitter->m_vars[1].name, "col"));
+	ASSERT_TRUE(emitter->m_vars[1].type == ParticleScriptCompiler::ValueType::FLOAT4);
+	ASSERT_TRUE(equalStrings(emitter->m_vars[2].name, "vel"));
+	ASSERT_TRUE(emitter->m_vars[2].type == ParticleScriptCompiler::ValueType::FLOAT3);
 	
 	return true;
 }
@@ -634,32 +634,32 @@ bool testExecution() {
 	)";
 
 	ParticleScriptRunner runner;
-	ASSERT_TRUE(runner.compile(code), "Compilation should succeed");
+	ASSERT_TRUE(runner.compile(code));
 
 	runner.runEmit();
 
 	// After emit: value=42, pos={1,2,3}, flag=1 (from if value > 40)
-	ASSERT_TRUE(fabsf(runner.getChannel(0) - 42.0f) < 0.001f, "value should be 42 after emit");
-	ASSERT_TRUE(fabsf(runner.getChannel(1) - 1.0f) < 0.001f, "pos.x should be 1 after emit");
-	ASSERT_TRUE(fabsf(runner.getChannel(2) - 2.0f) < 0.001f, "pos.y should be 2 after emit");
-	ASSERT_TRUE(fabsf(runner.getChannel(3) - 3.0f) < 0.001f, "pos.z should be 3 after emit");
-	ASSERT_TRUE(fabsf(runner.getChannel(4) - 1.0f) < 0.001f, "flag should be 1 after emit (if true branch)");
+	ASSERT_TRUE(fabsf(runner.getChannel(0) - 42.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(1) - 1.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(2) - 2.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(3) - 3.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(4) - 1.0f) < 0.001f);
 
 	runner.runUpdate();
 
 	// After update: value=52, pos.x=2, flag=111 (1 + 10 from nested if + 100 from value < 100)
-	ASSERT_TRUE(fabsf(runner.getChannel(0) - 52.0f) < 0.001f, "value should be 52 after update");
-	ASSERT_TRUE(fabsf(runner.getChannel(1) - 2.0f) < 0.001f, "pos.x should be 2 after update");
-	ASSERT_TRUE(fabsf(runner.getChannel(4) - 111.0f) < 0.001f, "flag should be 111 after update (nested conditionals)");
+	ASSERT_TRUE(fabsf(runner.getChannel(0) - 52.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(1) - 2.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(4) - 111.0f) < 0.001f);
 
 	runner.runOutput();
 
 	// Check output memory: i_value=52, i_pos={2,2,3}, i_flag=111
-	ASSERT_TRUE(fabsf(runner.getOutput(0) - 52.0f) < 0.001f, "i_value should be 52");
-	ASSERT_TRUE(fabsf(runner.getOutput(1) - 2.0f) < 0.001f, "i_pos.x should be 2");
-	ASSERT_TRUE(fabsf(runner.getOutput(2) - 2.0f) < 0.001f, "i_pos.y should be 2");
-	ASSERT_TRUE(fabsf(runner.getOutput(3) - 3.0f) < 0.001f, "i_pos.z should be 3");
-	ASSERT_TRUE(fabsf(runner.getOutput(4) - 111.0f) < 0.001f, "i_flag should be 111");
+	ASSERT_TRUE(fabsf(runner.getOutput(0) - 52.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(1) - 2.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(2) - 2.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(3) - 3.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(4) - 111.0f) < 0.001f);
 
 	return true;
 }
@@ -712,31 +712,31 @@ bool testLocalVars() {
 	)";
 
 	ParticleScriptRunner runner;
-	ASSERT_TRUE(runner.compile(code), "Compilation should succeed");
+	ASSERT_TRUE(runner.compile(code));
 
 	runner.runEmit();
 
 	// After emit: result=115 (15 + 100 from inferred), vec={2,4,6}
-	ASSERT_TRUE(fabsf(runner.getChannel(0) - 115.0f) < 0.001f, "result should be 115 after emit");
-	ASSERT_TRUE(fabsf(runner.getChannel(1) - 2.0f) < 0.001f, "vec.x should be 2 after emit");
-	ASSERT_TRUE(fabsf(runner.getChannel(2) - 4.0f) < 0.001f, "vec.y should be 4 after emit");
-	ASSERT_TRUE(fabsf(runner.getChannel(3) - 6.0f) < 0.001f, "vec.z should be 6 after emit");
+	ASSERT_TRUE(fabsf(runner.getChannel(0) - 115.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(1) - 2.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(2) - 4.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(3) - 6.0f) < 0.001f);
 
 	runner.runUpdate();
 
 	// After update: result=330 (115 * 2 + 100), vec={3,5,7}
-	ASSERT_TRUE(fabsf(runner.getChannel(0) - 330.0f) < 0.001f, "result should be 330 after update");
-	ASSERT_TRUE(fabsf(runner.getChannel(1) - 3.0f) < 0.001f, "vec.x should be 3 after update");
-	ASSERT_TRUE(fabsf(runner.getChannel(2) - 5.0f) < 0.001f, "vec.y should be 5 after update");
-	ASSERT_TRUE(fabsf(runner.getChannel(3) - 7.0f) < 0.001f, "vec.z should be 7 after update");
+	ASSERT_TRUE(fabsf(runner.getChannel(0) - 330.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(1) - 3.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(2) - 5.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(3) - 7.0f) < 0.001f);
 
 	runner.runOutput();
 
 	// Check output memory
-	ASSERT_TRUE(fabsf(runner.getOutput(0) - 330.0f) < 0.001f, "i_result should be 330");
-	ASSERT_TRUE(fabsf(runner.getOutput(1) - 3.0f) < 0.001f, "i_vec.x should be 3");
-	ASSERT_TRUE(fabsf(runner.getOutput(2) - 5.0f) < 0.001f, "i_vec.y should be 5");
-	ASSERT_TRUE(fabsf(runner.getOutput(3) - 7.0f) < 0.001f, "i_vec.z should be 7");
+	ASSERT_TRUE(fabsf(runner.getOutput(0) - 330.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(1) - 3.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(2) - 5.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(3) - 7.0f) < 0.001f);
 
 	return true;
 }
@@ -803,31 +803,31 @@ bool testUserFunctions() {
 	)";
 
 	ParticleScriptRunner runner;
-	ASSERT_TRUE(runner.compile(code), "Compilation should succeed");
+	ASSERT_TRUE(runner.compile(code));
 
 	runner.runEmit();
 
 	// After emit: result=20, vec={2,4,6}
-	ASSERT_TRUE(fabsf(runner.getChannel(0) - 20.0f) < 0.001f, "result should be 20 after emit");
-	ASSERT_TRUE(fabsf(runner.getChannel(1) - 2.0f) < 0.001f, "vec.x should be 2 after emit");
-	ASSERT_TRUE(fabsf(runner.getChannel(2) - 4.0f) < 0.001f, "vec.y should be 4 after emit");
-	ASSERT_TRUE(fabsf(runner.getChannel(3) - 6.0f) < 0.001f, "vec.z should be 6 after emit");
+	ASSERT_TRUE(fabsf(runner.getChannel(0) - 20.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(1) - 2.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(2) - 4.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(3) - 6.0f) < 0.001f);
 
 	runner.runUpdate();
 
 	// After update: result=60, vec={1,2,3}
-	ASSERT_TRUE(fabsf(runner.getChannel(0) - 60.0f) < 0.001f, "result should be 60 after update");
-	ASSERT_TRUE(fabsf(runner.getChannel(1) - 1.0f) < 0.001f, "vec.x should be 1 after update");
-	ASSERT_TRUE(fabsf(runner.getChannel(2) - 2.0f) < 0.001f, "vec.y should be 2 after update");
-	ASSERT_TRUE(fabsf(runner.getChannel(3) - 3.0f) < 0.001f, "vec.z should be 3 after update");
+	ASSERT_TRUE(fabsf(runner.getChannel(0) - 60.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(1) - 1.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(2) - 2.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(3) - 3.0f) < 0.001f);
 
 	runner.runOutput();
 
 	// Check output memory
-	ASSERT_TRUE(fabsf(runner.getOutput(0) - 60.0f) < 0.001f, "i_result should be 60");
-	ASSERT_TRUE(fabsf(runner.getOutput(1) - 1.0f) < 0.001f, "i_vec.x should be 1");
-	ASSERT_TRUE(fabsf(runner.getOutput(2) - 2.0f) < 0.001f, "i_vec.y should be 2");
-	ASSERT_TRUE(fabsf(runner.getOutput(3) - 3.0f) < 0.001f, "i_vec.z should be 3");
+	ASSERT_TRUE(fabsf(runner.getOutput(0) - 60.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(1) - 1.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(2) - 2.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(3) - 3.0f) < 0.001f);
 
 	return true;
 }
@@ -853,14 +853,14 @@ bool testInferResultType() {
 	)";
 
 	ParticleScriptRunner runner;
-	ASSERT_TRUE(runner.compile(code), "Compilation should succeed and infer result as float3");
+	ASSERT_TRUE(runner.compile(code));
 
 	runner.runEmit();
 	runner.runOutput();
 
-	ASSERT_TRUE(fabsf(runner.getOutput(0) - 1.0f) < 0.001f, "o1.x should be 1");
-	ASSERT_TRUE(fabsf(runner.getOutput(1) - 2.0f) < 0.001f, "o1.y should be 2");
-	ASSERT_TRUE(fabsf(runner.getOutput(2) - 4.0f) < 0.001f, "o1.z should be 4");
+	ASSERT_TRUE(fabsf(runner.getOutput(0) - 1.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(1) - 2.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(2) - 4.0f) < 0.001f);
 
 	return true;
 }
@@ -901,15 +901,15 @@ bool testUserFunctionDuckTyping() {
 	)";
 
 	ParticleScriptRunner runner;
-	ASSERT_TRUE(runner.compile(code), "Compilation should succeed");
+	ASSERT_TRUE(runner.compile(code));
 
 	runner.runEmit();
 	runner.runUpdate();
 	runner.runOutput();
 
 	// Check that duck typing works - function accepts both float3 and float4
-	ASSERT_TRUE(fabsf(runner.getOutput(0) - 6.0f) < 0.001f, "i_sum3 should be 6 (1+2+3)");
-	ASSERT_TRUE(fabsf(runner.getOutput(1) - 15.0f) < 0.001f, "i_sum4 should be 15 (4+5+6)");
+	ASSERT_TRUE(fabsf(runner.getOutput(0) - 6.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(1) - 15.0f) < 0.001f);
 
 	return true;
 }
@@ -944,19 +944,19 @@ bool testFunctionGeneric() {
 	)";
 
 	ParticleScriptRunner runner;
-	ASSERT_TRUE(runner.compile(code), "Compilation should succeed");
+	ASSERT_TRUE(runner.compile(code));
 
 	runner.runEmit();
 	runner.runOutput();
 
-	ASSERT_TRUE(fabsf(runner.getOutput(0) - 1.0f) < 0.001f, "o3.x should be 1");
-	ASSERT_TRUE(fabsf(runner.getOutput(1) - 2.0f) < 0.001f, "o3.y should be 2");
-	ASSERT_TRUE(fabsf(runner.getOutput(2) - 3.0f) < 0.001f, "o3.z should be 3");
+	ASSERT_TRUE(fabsf(runner.getOutput(0) - 1.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(1) - 2.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(2) - 3.0f) < 0.001f);
 
-	ASSERT_TRUE(fabsf(runner.getOutput(3) - 4.0f) < 0.001f, "o4.x should be 4");
-	ASSERT_TRUE(fabsf(runner.getOutput(4) - 5.0f) < 0.001f, "o4.y should be 5");
-	ASSERT_TRUE(fabsf(runner.getOutput(5) - 6.0f) < 0.001f, "o4.z should be 6");
-	ASSERT_TRUE(fabsf(runner.getOutput(6) - 7.0f) < 0.001f, "o4.w should be 7");
+	ASSERT_TRUE(fabsf(runner.getOutput(3) - 4.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(4) - 5.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(5) - 6.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(6) - 7.0f) < 0.001f);
 
 	return true;
 }
@@ -1042,24 +1042,21 @@ bool testFolding() {
 
 	TestableCompiler folded_compiler;
 	OutputMemoryStream folded_output(getGlobalAllocator());
-	ASSERT_TRUE(folded_compiler.compile(Path("test.pat"), folded_code, folded_output), "Folded code compilation should succeed");
+	ASSERT_TRUE(folded_compiler.compile(Path("test.pat"), folded_code, folded_output));
 
 	TestableCompiler literal_compiler;
 	OutputMemoryStream literal_output(getGlobalAllocator());
-	ASSERT_TRUE(literal_compiler.compile(Path("test.pat"), literal_code, literal_output), "Literal code compilation should succeed");
+	ASSERT_TRUE(literal_compiler.compile(Path("test.pat"), literal_code, literal_output));
 
 	const auto* folded_emitter = folded_compiler.getEmitter(0);
 	const auto* literal_emitter = literal_compiler.getEmitter(0);
-	ASSERT_TRUE(folded_emitter != nullptr, "Folded emitter should exist");
-	ASSERT_TRUE(literal_emitter != nullptr, "Literal emitter should exist");
+	ASSERT_TRUE(folded_emitter != nullptr);
+	ASSERT_TRUE(literal_emitter != nullptr);
 
 	// Constant folding should produce same instruction count as pre-computed literals
-	ASSERT_TRUE(folded_emitter->m_num_emit_instructions == literal_emitter->m_num_emit_instructions,
-		"Emit instruction count should match after folding");
-	ASSERT_TRUE(folded_emitter->m_num_update_instructions == literal_emitter->m_num_update_instructions,
-		"Update instruction count should match after folding");
-	ASSERT_TRUE(folded_emitter->m_num_output_instructions == literal_emitter->m_num_output_instructions,
-		"Output instruction count should match after folding");
+	ASSERT_TRUE(folded_emitter->m_num_emit_instructions == literal_emitter->m_num_emit_instructions);
+	ASSERT_TRUE(folded_emitter->m_num_update_instructions == literal_emitter->m_num_update_instructions);
+	ASSERT_TRUE(folded_emitter->m_num_output_instructions == literal_emitter->m_num_output_instructions);
 
 	return true;
 }
@@ -1175,31 +1172,27 @@ bool testIfConditionalsFolding() {
 	)";
 
 	ParticleScriptRunner folded_runner;
-	ASSERT_TRUE(folded_runner.compile(folded_code), "Folded runner compilation should succeed");
+	ASSERT_TRUE(folded_runner.compile(folded_code));
 	folded_runner.runEmit();
 	folded_runner.runUpdate();
 	folded_runner.runOutput();
 
 	ParticleScriptRunner literal_runner;
-	ASSERT_TRUE(literal_runner.compile(literal_code), "Literal runner compilation should succeed");
+	ASSERT_TRUE(literal_runner.compile(literal_code));
 	literal_runner.runEmit();
 	literal_runner.runUpdate();
 	literal_runner.runOutput();
 
 	// Check that the output value is the same
-	ASSERT_TRUE(fabsf(folded_runner.getChannel(0) - literal_runner.getChannel(0)) < 0.001f,
-		"Runtime output value should match after constant folding");
+	ASSERT_TRUE(fabsf(folded_runner.getChannel(0) - literal_runner.getChannel(0)) < 0.001f);
 
 	const auto* folded_emitter = folded_runner.compiler.getEmitter(0);
 	const auto* literal_emitter = literal_runner.compiler.getEmitter(0);
 
 	// Constant folding of if conditionals should produce same instruction count as pre-computed code
-	ASSERT_TRUE(folded_emitter->m_num_emit_instructions == literal_emitter->m_num_emit_instructions,
-		"Emit instruction count should match after folding if conditionals");
-	ASSERT_TRUE(folded_emitter->m_num_update_instructions == literal_emitter->m_num_update_instructions,
-		"Update instruction count should match after folding if conditionals");
-	ASSERT_TRUE(folded_emitter->m_num_output_instructions == literal_emitter->m_num_output_instructions,
-		"Output instruction count should match after folding if conditionals");
+	ASSERT_TRUE(folded_emitter->m_num_emit_instructions == literal_emitter->m_num_emit_instructions);
+	ASSERT_TRUE(folded_emitter->m_num_update_instructions == literal_emitter->m_num_update_instructions);
+	ASSERT_TRUE(folded_emitter->m_num_output_instructions == literal_emitter->m_num_output_instructions);
 	return true;
 }
 
@@ -1259,29 +1252,29 @@ bool testSyscalls() {
 	)";
 
 	ParticleScriptRunner runner;
-	ASSERT_TRUE(runner.compile(code), "Compilation should succeed");
+	ASSERT_TRUE(runner.compile(code));
 
 	runner.runEmit();
 
 	// After emit: result=29, vec={0, 0, 1}
-	ASSERT_TRUE(fabsf(runner.getChannel(0) - 29.0f) < 0.001f, "result should be 29 after emit");
+	ASSERT_TRUE(fabsf(runner.getChannel(0) - 29.0f) < 0.001f);
 	// a=16, b=9 are channels 1 and 2
 	// vec is channels 3,4,5
-	ASSERT_TRUE(fabsf(runner.getChannel(3) - 0.0f) < 0.001f, "vec.x should be 0 after emit");
-	ASSERT_TRUE(fabsf(runner.getChannel(4) - 0.0f) < 0.001f, "vec.y should be 0 (sin(0)) after emit");
-	ASSERT_TRUE(fabsf(runner.getChannel(5) - 1.0f) < 0.001f, "vec.z should be 1 (cos(0)) after emit");
+	ASSERT_TRUE(fabsf(runner.getChannel(3) - 0.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(4) - 0.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(5) - 1.0f) < 0.001f);
 
 	runner.runUpdate();
 
 	// After update: result=9, vec.x=sqrt(29)~5.385
-	ASSERT_TRUE(fabsf(runner.getChannel(0) - 9.0f) < 0.001f, "result should be 9 after update");
-	ASSERT_TRUE(fabsf(runner.getChannel(3) - sqrtf(29.0f)) < 0.001f, "vec.x should be sqrt(29) after update");
+	ASSERT_TRUE(fabsf(runner.getChannel(0) - 9.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(3) - sqrtf(29.0f)) < 0.001f);
 
 	runner.runOutput();
 
 	// Check output memory
-	ASSERT_TRUE(fabsf(runner.getOutput(0) - 9.0f) < 0.001f, "i_result should be 9");
-	ASSERT_TRUE(fabsf(runner.getOutput(1) - sqrtf(29.0f)) < 0.001f, "i_vec.x should be sqrt(29)");
+	ASSERT_TRUE(fabsf(runner.getOutput(0) - 9.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(1) - sqrtf(29.0f)) < 0.001f);
 
 	return true;
 }
@@ -1330,7 +1323,7 @@ bool testSystemValues() {
 	)";
 
 	ParticleScriptRunner runner;
-	ASSERT_TRUE(runner.compile(code), "Compilation should succeed");
+	ASSERT_TRUE(runner.compile(code));
 
 	// Set custom system values
 	runner.system_values[(u8)ParticleSystemValues::TIME_DELTA] = 0.1f;
@@ -1343,10 +1336,10 @@ bool testSystemValues() {
 
 	// Check emit captured system values
 	// total=5.0, pos={100,200,300}, vel={10,20,30}
-	ASSERT_TRUE(fabsf(runner.getChannel(1) - 5.0f) < 0.001f, "total should be 5.0 after emit");
-	ASSERT_TRUE(fabsf(runner.getChannel(2) - 100.0f) < 0.001f, "pos.x should be 100 after emit");
-	ASSERT_TRUE(fabsf(runner.getChannel(3) - 200.0f) < 0.001f, "pos.y should be 200 after emit");
-	ASSERT_TRUE(fabsf(runner.getChannel(4) - 300.0f) < 0.001f, "pos.z should be 300 after emit");
+	ASSERT_TRUE(fabsf(runner.getChannel(1) - 5.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(2) - 100.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(3) - 200.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(4) - 300.0f) < 0.001f);
 
 	// Update system values for update phase
 	runner.system_values[(u8)ParticleSystemValues::TIME_DELTA] = 0.5f;
@@ -1355,20 +1348,20 @@ bool testSystemValues() {
 	runner.runUpdate();
 
 	// After update: dt=0.5, pos = pos + vel * 0.5 = {100+5, 200+10, 300+15} = {105, 210, 315}
-	ASSERT_TRUE(fabsf(runner.getChannel(0) - 0.5f) < 0.001f, "dt should be 0.5 after update");
-	ASSERT_TRUE(fabsf(runner.getChannel(1) - 5.5f) < 0.001f, "total should be 5.5 after update");
-	ASSERT_TRUE(fabsf(runner.getChannel(2) - 105.0f) < 0.001f, "pos.x should be 105 after update");
-	ASSERT_TRUE(fabsf(runner.getChannel(3) - 210.0f) < 0.001f, "pos.y should be 210 after update");
-	ASSERT_TRUE(fabsf(runner.getChannel(4) - 315.0f) < 0.001f, "pos.z should be 315 after update");
+	ASSERT_TRUE(fabsf(runner.getChannel(0) - 0.5f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(1) - 5.5f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(2) - 105.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(3) - 210.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(4) - 315.0f) < 0.001f);
 
 	runner.runOutput();
 
 	// Verify outputs
-	ASSERT_TRUE(fabsf(runner.getOutput(0) - 0.5f) < 0.001f, "i_dt should be 0.5");
-	ASSERT_TRUE(fabsf(runner.getOutput(1) - 5.5f) < 0.001f, "i_total should be 5.5");
-	ASSERT_TRUE(fabsf(runner.getOutput(2) - 105.0f) < 0.001f, "i_pos.x should be 105");
-	ASSERT_TRUE(fabsf(runner.getOutput(3) - 210.0f) < 0.001f, "i_pos.y should be 210");
-	ASSERT_TRUE(fabsf(runner.getOutput(4) - 315.0f) < 0.001f, "i_pos.z should be 315");
+	ASSERT_TRUE(fabsf(runner.getOutput(0) - 0.5f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(1) - 5.5f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(2) - 105.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(3) - 210.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(4) - 315.0f) < 0.001f);
 
 	return true;
 }
@@ -2142,10 +2135,10 @@ bool testBasicImport() {
 		const SCALE = 2.0;
 		fn double(x) { result = x * SCALE; }
 	)");
-	ASSERT_TRUE(runner.compile(main_script), "Runner compilation should succeed");
+	ASSERT_TRUE(runner.compile(main_script));
 	runner.runEmit();
 	runner.runOutput();
-	ASSERT_TRUE(fabsf(runner.getOutput(0) - 10.0f) < 0.001f, "Imported function should work correctly");
+	ASSERT_TRUE(fabsf(runner.getOutput(0) - 10.0f) < 0.001f);
 
 	return true;
 }
@@ -2169,10 +2162,10 @@ bool testNestedImport() {
 		}
 	)";
 
-	ASSERT_TRUE(runner.compile(main_script), "Runner compilation should succeed");
+	ASSERT_TRUE(runner.compile(main_script));
 	runner.runEmit();
 	runner.runOutput();
-	ASSERT_TRUE(fabsf(runner.getOutput(0) - 4.0f) < 0.001f, "Nested import should work correctly");
+	ASSERT_TRUE(fabsf(runner.getOutput(0) - 4.0f) < 0.001f);
 
 	return true;
 }
@@ -2191,7 +2184,7 @@ bool testImportErrors() {
 
 	OutputMemoryStream output(getGlobalAllocator());
 	bool success = compiler.compile(Path("missing_import.pat"), main_script, output);
-	ASSERT_TRUE(!success, "Compilation should fail with missing import file");
+	ASSERT_TRUE(!success);
 
 	return true;
 }
@@ -2256,48 +2249,48 @@ bool testMultipleEmitters() {
 	OutputMemoryStream output(getGlobalAllocator());
 
 	bool success = compiler.compile(Path("multi_emitter.pat"), multi_emitter_code, output);
-	ASSERT_TRUE(success, "Compilation with multiple emitters should succeed");
-	ASSERT_TRUE(output.size() > 0, "Output should contain compiled data");
+	ASSERT_TRUE(success);
+	ASSERT_TRUE(output.size() > 0);
 
 	// Verify first emitter
 	const auto* emitter1 = compiler.getEmitter(0);
-	ASSERT_TRUE(emitter1 != nullptr, "First emitter should be compiled");
+	ASSERT_TRUE(emitter1 != nullptr);
 
 	// Check emitter1 outputs
-	ASSERT_TRUE(emitter1->m_outputs.size() == 2, "Emitter1 should have 2 output variables");
-	ASSERT_TRUE(equalStrings(emitter1->m_outputs[0].name, "i_position"), "Emitter1 first output should be i_position");
-	ASSERT_TRUE(emitter1->m_outputs[0].type == ParticleScriptCompiler::ValueType::FLOAT3, "i_position should be float3");
-	ASSERT_TRUE(equalStrings(emitter1->m_outputs[1].name, "i_scale"), "Emitter1 second output should be i_scale");
-	ASSERT_TRUE(emitter1->m_outputs[1].type == ParticleScriptCompiler::ValueType::FLOAT, "i_scale should be float");
+	ASSERT_TRUE(emitter1->m_outputs.size() == 2);
+	ASSERT_TRUE(equalStrings(emitter1->m_outputs[0].name, "i_position"));
+	ASSERT_TRUE(emitter1->m_outputs[0].type == ParticleScriptCompiler::ValueType::FLOAT3);
+	ASSERT_TRUE(equalStrings(emitter1->m_outputs[1].name, "i_scale"));
+	ASSERT_TRUE(emitter1->m_outputs[1].type == ParticleScriptCompiler::ValueType::FLOAT);
 
 	// Check emitter1 vars
-	ASSERT_TRUE(emitter1->m_vars.size() == 2, "Emitter1 should have 2 var variables");
-	ASSERT_TRUE(equalStrings(emitter1->m_vars[0].name, "position"), "Emitter1 first var should be position");
-	ASSERT_TRUE(emitter1->m_vars[0].type == ParticleScriptCompiler::ValueType::FLOAT3, "position should be float3");
-	ASSERT_TRUE(equalStrings(emitter1->m_vars[1].name, "scale"), "Emitter1 second var should be scale");
-	ASSERT_TRUE(emitter1->m_vars[1].type == ParticleScriptCompiler::ValueType::FLOAT, "scale should be float");
+	ASSERT_TRUE(emitter1->m_vars.size() == 2);
+	ASSERT_TRUE(equalStrings(emitter1->m_vars[0].name, "position"));
+	ASSERT_TRUE(emitter1->m_vars[0].type == ParticleScriptCompiler::ValueType::FLOAT3);
+	ASSERT_TRUE(equalStrings(emitter1->m_vars[1].name, "scale"));
+	ASSERT_TRUE(emitter1->m_vars[1].type == ParticleScriptCompiler::ValueType::FLOAT);
 
 	// Verify second emitter
 	const auto* emitter2 = compiler.getEmitter(1);
-	ASSERT_TRUE(emitter2 != nullptr, "Second emitter should be compiled");
+	ASSERT_TRUE(emitter2 != nullptr);
 
 	// Check emitter2 outputs
-	ASSERT_TRUE(emitter2->m_outputs.size() == 2, "Emitter2 should have 2 output variables");
-	ASSERT_TRUE(equalStrings(emitter2->m_outputs[0].name, "i_velocity"), "Emitter2 first output should be i_velocity");
-	ASSERT_TRUE(emitter2->m_outputs[0].type == ParticleScriptCompiler::ValueType::FLOAT3, "i_velocity should be float3");
-	ASSERT_TRUE(equalStrings(emitter2->m_outputs[1].name, "i_color"), "Emitter2 second output should be i_color");
-	ASSERT_TRUE(emitter2->m_outputs[1].type == ParticleScriptCompiler::ValueType::FLOAT4, "i_color should be float4");
+	ASSERT_TRUE(emitter2->m_outputs.size() == 2);
+	ASSERT_TRUE(equalStrings(emitter2->m_outputs[0].name, "i_velocity"));
+	ASSERT_TRUE(emitter2->m_outputs[0].type == ParticleScriptCompiler::ValueType::FLOAT3);
+	ASSERT_TRUE(equalStrings(emitter2->m_outputs[1].name, "i_color"));
+	ASSERT_TRUE(emitter2->m_outputs[1].type == ParticleScriptCompiler::ValueType::FLOAT4);
 
 	// Check emitter2 vars
-	ASSERT_TRUE(emitter2->m_vars.size() == 2, "Emitter2 should have 2 var variables");
-	ASSERT_TRUE(equalStrings(emitter2->m_vars[0].name, "velocity"), "Emitter2 first var should be velocity");
-	ASSERT_TRUE(emitter2->m_vars[0].type == ParticleScriptCompiler::ValueType::FLOAT3, "velocity should be float3");
-	ASSERT_TRUE(equalStrings(emitter2->m_vars[1].name, "color"), "Emitter2 second var should be color");
-	ASSERT_TRUE(emitter2->m_vars[1].type == ParticleScriptCompiler::ValueType::FLOAT4, "color should be float4");
+	ASSERT_TRUE(emitter2->m_vars.size() == 2);
+	ASSERT_TRUE(equalStrings(emitter2->m_vars[0].name, "velocity"));
+	ASSERT_TRUE(emitter2->m_vars[0].type == ParticleScriptCompiler::ValueType::FLOAT3);
+	ASSERT_TRUE(equalStrings(emitter2->m_vars[1].name, "color"));
+	ASSERT_TRUE(emitter2->m_vars[1].type == ParticleScriptCompiler::ValueType::FLOAT4);
 
 	// Verify no third emitter
 	const auto* emitter3 = compiler.getEmitter(2);
-	ASSERT_TRUE(emitter3 == nullptr, "There should be no third emitter");
+	ASSERT_TRUE(emitter3 == nullptr);
 
 	return true;
 }
@@ -2328,12 +2321,12 @@ bool testUnusedLocalOptimization() {
 	)";
 
 	ParticleScriptRunner runner_with;
-	ASSERT_TRUE(runner_with.compile(code_with_unused), "Compilation with unused local should succeed");
+	ASSERT_TRUE(runner_with.compile(code_with_unused));
 
 	ParticleScriptRunner runner_without;
-	ASSERT_TRUE(runner_without.compile(code_without_unused), "Compilation without unused local should succeed");
+	ASSERT_TRUE(runner_without.compile(code_without_unused));
 
-	ASSERT_TRUE(runner_with.num_emit_registers == runner_without.num_emit_registers, "Unused local should not increase register count");
+	ASSERT_TRUE(runner_with.num_emit_registers == runner_without.num_emit_registers);
 
 	return true;
 }
@@ -2359,11 +2352,11 @@ bool testUnaryMinus() {
 	)";
 
 	ParticleScriptRunner runner;
-	ASSERT_TRUE(runner.compile(code), "Compilation with unary minus should succeed");
+	ASSERT_TRUE(runner.compile(code));
 
 	runner.runEmit();
 	runner.runUpdate();
-	ASSERT_TRUE(fabsf(runner.getChannel(0) - (-50.0f)) < 0.001f, "result should be -5 after emit");
+	ASSERT_TRUE(fabsf(runner.getChannel(0) - (-50.0f)) < 0.001f);
 
 	return true;
 }
@@ -2427,25 +2420,25 @@ bool testSwizzling() {
 	)";
 
 	ParticleScriptRunner runner;
-	ASSERT_TRUE(runner.compile(code), "Compilation with swizzling should succeed");
+	ASSERT_TRUE(runner.compile(code));
 
 	runner.runEmit();
 	runner.runOutput();
 
 	// Check vec2: should be {8, 40}
-	ASSERT_TRUE(fabsf(runner.getOutput(0) - 8.0f) < 0.001f, "i_vec2.x should be 8");
-	ASSERT_TRUE(fabsf(runner.getOutput(1) - 40.0f) < 0.001f, "i_vec2.y should be 40");
+	ASSERT_TRUE(fabsf(runner.getOutput(0) - 8.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(1) - 40.0f) < 0.001f);
 
 	// Check vec3: should be {8, 40, 30}
-	ASSERT_TRUE(fabsf(runner.getOutput(2) - 8.0f) < 0.001f, "i_vec3.x should be 8");
-	ASSERT_TRUE(fabsf(runner.getOutput(3) - 40.0f) < 0.001f, "i_vec3.y should be 40");
-	ASSERT_TRUE(fabsf(runner.getOutput(4) - 30.0f) < 0.001f, "i_vec3.z should be 30");
+	ASSERT_TRUE(fabsf(runner.getOutput(2) - 8.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(3) - 40.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(4) - 30.0f) < 0.001f);
 
 	// Check vec4: should be {10, 20, 8, 40}
-	ASSERT_TRUE(fabsf(runner.getOutput(5) - 10.0f) < 0.001f, "i_vec4.x should be 10");
-	ASSERT_TRUE(fabsf(runner.getOutput(6) - 20.0f) < 0.001f, "i_vec4.y should be 20");
-	ASSERT_TRUE(fabsf(runner.getOutput(7) - 8.0f) < 0.001f, "i_vec4.z should be 8");
-	ASSERT_TRUE(fabsf(runner.getOutput(8) - 40.0f) < 0.001f, "i_vec4.w should be 40");
+	ASSERT_TRUE(fabsf(runner.getOutput(5) - 10.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(6) - 20.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(7) - 8.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(8) - 40.0f) < 0.001f);
 
 	return true;
 }
@@ -2490,12 +2483,12 @@ bool testNegativeEmitterSettings() {
 
 	TestableCompiler compiler;
 	OutputMemoryStream compiled(getGlobalAllocator());
-	ASSERT_TRUE(compiler.compile(Path("negative_emitter_settings.pat"), code, compiled), "Compilation should succeed");
+	ASSERT_TRUE(compiler.compile(Path("negative_emitter_settings.pat"), code, compiled));
 
 	const auto* emitter = compiler.getEmitter(0);
-	ASSERT_TRUE(emitter != nullptr, "Emitter should be compiled");
-	ASSERT_TRUE(fabsf(emitter->m_emit_move_distance - (-1.5f)) < 0.001f, "emit_move_distance should be -1.5");
-	ASSERT_TRUE(fabsf(emitter->m_emit_per_second - (-2.25f)) < 0.001f, "emit_per_second should be -2.25");
+	ASSERT_TRUE(emitter != nullptr);
+	ASSERT_TRUE(fabsf(emitter->m_emit_move_distance - (-1.5f)) < 0.001f);
+	ASSERT_TRUE(fabsf(emitter->m_emit_per_second - (-2.25f)) < 0.001f);
 
 	return true;
 }
@@ -2521,12 +2514,12 @@ bool testOptimizerRegression() {
 	)";
 
 	ParticleScriptRunner runner;
-	ASSERT_TRUE(runner.compile(code), "Compilation should succeed");
+	ASSERT_TRUE(runner.compile(code));
 
 	runner.runEmit();
 
-	ASSERT_TRUE(fabsf(runner.getChannel(0, 0) - 40.0f) < 0.001f, "a should be 40");
-	ASSERT_TRUE(fabsf(runner.getChannel(1, 0) - 40.0f) < 0.001f, "b should be 40");
+	ASSERT_TRUE(fabsf(runner.getChannel(0, 0) - 40.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(1, 0) - 40.0f) < 0.001f);
 
 	return true;
 }
@@ -2575,12 +2568,12 @@ bool testLogicOperators() {
 	)";
 
 	ParticleScriptRunner runner;
-	ASSERT_TRUE(runner.compile(code), "Compilation with logic operators should succeed");
+	ASSERT_TRUE(runner.compile(code));
 
 	runner.runEmit();
 	runner.runUpdate();
 	// Expected: 1 (and true) + 2 (or true) + 4 (not true) = 7, then *2 = 14
-	ASSERT_TRUE(fabsf(runner.getChannel(0) - 14.0f) < 0.001f, "result should be 14 after logic operations");
+	ASSERT_TRUE(fabsf(runner.getChannel(0) - 14.0f) < 0.001f);
 
 	return true;
 }
@@ -2605,12 +2598,12 @@ bool testIfElse() {
 	)";
 
 	ParticleScriptRunner runner;
-	ASSERT_TRUE(runner.compile(code), "Compilation should succeed");
+	ASSERT_TRUE(runner.compile(code));
 
 	runner.runEmit();
 	runner.runUpdate();
 
-	ASSERT_TRUE(fabsf(runner.getChannel(0) - 2.0f) < 0.001f, "flag should be 2 (true branch)");
+	ASSERT_TRUE(fabsf(runner.getChannel(0) - 2.0f) < 0.001f);
 
 	return true;
 }
@@ -2636,12 +2629,12 @@ bool testElseIf() {
 	)";
 
 	ParticleScriptRunner runner;
-	ASSERT_TRUE(runner.compile(code), "Compilation should succeed");
+	ASSERT_TRUE(runner.compile(code));
 
 	runner.runEmit();
 	runner.runUpdate();
 
-	ASSERT_TRUE(fabsf(runner.getChannel(0) - 5.0f) < 0.001f, "v should be 5 (else-if branch)");
+	ASSERT_TRUE(fabsf(runner.getChannel(0) - 5.0f) < 0.001f);
 
 	return true;
 }
@@ -2683,20 +2676,20 @@ bool testInputs() {
 	)";
 
 	ParticleScriptRunner runner;
-	ASSERT_TRUE(runner.compile(code), "Compilation with inputs should succeed");
+	ASSERT_TRUE(runner.compile(code));
 
 	// Set input values: in_pos = {10, 20, 30}, in_vel = {1, 2, 3}, in_scale = 2.0
 	float inputs[] = {10, 20, 30, 1, 2, 3, 2.0f};
 	runner.runEmit(Span(inputs, sizeof(inputs) / sizeof(inputs[0])));
 
 	// After emit: position = {11, 20, 30}, velocity = {2, 4, 6}, scale = 2.5
-	ASSERT_TRUE(fabsf(runner.getChannel(0) - 11.0f) < 0.001f, "position.x should be 11");
-	ASSERT_TRUE(fabsf(runner.getChannel(1) - 20.0f) < 0.001f, "position.y should be 20");
-	ASSERT_TRUE(fabsf(runner.getChannel(2) - 30.0f) < 0.001f, "position.z should be 30");
-	ASSERT_TRUE(fabsf(runner.getChannel(3) - 2.0f) < 0.001f, "velocity.x should be 2");
-	ASSERT_TRUE(fabsf(runner.getChannel(4) - 4.0f) < 0.001f, "velocity.y should be 4");
-	ASSERT_TRUE(fabsf(runner.getChannel(5) - 6.0f) < 0.001f, "velocity.z should be 6");
-	ASSERT_TRUE(fabsf(runner.getChannel(6) - 2.5f) < 0.001f, "scale should be 2.5");
+	ASSERT_TRUE(fabsf(runner.getChannel(0) - 11.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(1) - 20.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(2) - 30.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(3) - 2.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(4) - 4.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(5) - 6.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(6) - 2.5f) < 0.001f);
 
 	runner.runUpdate();
 
@@ -2704,20 +2697,20 @@ bool testInputs() {
 	float expected_x = 11.0f + 2.0f * 0.016f;
 	float expected_y = 20.0f + 4.0f * 0.016f;
 	float expected_z = 30.0f + 6.0f * 0.016f;
-	ASSERT_TRUE(fabsf(runner.getChannel(0) - expected_x) < 0.001f, "position.x after update");
-	ASSERT_TRUE(fabsf(runner.getChannel(1) - expected_y) < 0.001f, "position.y after update");
-	ASSERT_TRUE(fabsf(runner.getChannel(2) - expected_z) < 0.001f, "position.z after update");
+	ASSERT_TRUE(fabsf(runner.getChannel(0) - expected_x) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(1) - expected_y) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getChannel(2) - expected_z) < 0.001f);
 
 	runner.runOutput();
 
 	// Check output memory
-	ASSERT_TRUE(fabsf(runner.getOutput(0) - expected_x) < 0.001f, "i_position.x");
-	ASSERT_TRUE(fabsf(runner.getOutput(1) - expected_y) < 0.001f, "i_position.y");
-	ASSERT_TRUE(fabsf(runner.getOutput(2) - expected_z) < 0.001f, "i_position.z");
-	ASSERT_TRUE(fabsf(runner.getOutput(3) - 2.0f) < 0.001f, "i_velocity.x");
-	ASSERT_TRUE(fabsf(runner.getOutput(4) - 4.0f) < 0.001f, "i_velocity.y");
-	ASSERT_TRUE(fabsf(runner.getOutput(5) - 6.0f) < 0.001f, "i_velocity.z");
-	ASSERT_TRUE(fabsf(runner.getOutput(6) - 2.5f) < 0.001f, "i_scale");
+	ASSERT_TRUE(fabsf(runner.getOutput(0) - expected_x) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(1) - expected_y) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(2) - expected_z) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(3) - 2.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(4) - 4.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(5) - 6.0f) < 0.001f);
+	ASSERT_TRUE(fabsf(runner.getOutput(6) - 2.5f) < 0.001f);
 	return true;
 }
 

@@ -14,7 +14,7 @@ struct UIFontManager : ui::IFontManager {
 	float getHeight(FontHandle font) override;
 	float getAscender(FontHandle font) override;
 	bool isReady(FontHandle font) override;
-	WrappedText wrapText(FontHandle font, StringView text, float width) override;
+	SplitWord splitFirstWord(FontHandle font, StringView text) override;
 
 	Engine& m_engine;
 };

@@ -53,47 +53,24 @@ struct MockFontManager : ui::IFontManager {
 		return (float)font_size * 0.8f; // Mock ascender
 	}
 
-	WrappedText wrapText(FontHandle font, StringView text, float width) override {
-		WrappedText result;
-		size_t combined = (size_t)(uintptr)font;
-		int font_size = (int)(combined & 0xFFFFFFFF);
-		float char_width = font_size * 0.5f;
-		float current_width = 0;
-		const char* last_space = nullptr;
-		const char* c = text.begin;
-		while (c < text.end) {
-			if (isWhitespace(*c)) {
-				current_width += char_width;
-				if (current_width > width) {
-					if (last_space) {
-						result.wrapped = StringView(text.begin, last_space);
-						result.broken = WrappedText::SPACE;
-					} else {
-						result.wrapped = StringView(text.begin, c);
-						result.broken = WrappedText::MIDWORD;
-					}
-					return result;
-				}
-				last_space = c;
-				while (c < text.end && isWhitespace(*c)) ++c;
-				continue;
-			}
-			current_width += char_width;
-			if (current_width > width) {
-				if (last_space) {
-					result.wrapped = StringView(text.begin, last_space);
-					result.broken = WrappedText::SPACE;
-				} else {
-					result.wrapped = StringView(text.begin, c);
-					result.broken = WrappedText::MIDWORD;
-				}
-				return result;
-			}
-			++c;
-		}
-		result.wrapped = text;
-		result.broken = WrappedText::NO;
-		return result;
+	SplitWord splitFirstWord(FontHandle font, StringView text) override {
+		// Trim leading whitespace
+		while (text.begin != text.end && isWhitespace(*text.begin)) ++text.begin;
+
+		const char* head_start = text.begin;
+		const char* head_end = head_start;
+		while (head_end != text.end && !isWhitespace(*head_end)) ++head_end;
+
+		StringView head(head_start, head_end);
+		StringView tail(head_end, text.end);
+
+		float head_width = measureTextA(font, head).x;
+
+		SplitWord res;
+		res.head = head;
+		res.tail = tail;
+		res.head_width = head_width;
+		return res;
 	}
 };
 
@@ -105,25 +82,25 @@ struct MockDocument : ui::Document {
 extern int test_count;
 extern int passed_count;
 
-#define ASSERT_EQ(expected, actual, message) \
+#define ASSERT_EQ(expected, actual) \
 	if ((expected) != (actual)) { \
-		logError("TEST FAILED at ", __FILE__, ":", __LINE__, ": ", message, " - Expected: ", expected, ", Actual: ", actual); \
+		logError("TEST FAILED at ", __FILE__, ":", __LINE__, ": Expected: ", expected, ", Actual: ", actual); \
 		return false; \
 	}
 
-#define ASSERT_FLOAT_EQ(expected, actual, message) \
+#define ASSERT_FLOAT_EQ(expected, actual) \
 	{ \
 		float diff = (expected) - (actual); \
 		if (diff < 0) diff = -diff; \
 		if (diff >= 0.01f) { \
-			logError("TEST FAILED at ", __FILE__, ":", __LINE__, ": ", message, " - Expected: ", expected, ", Actual: ", actual); \
+			logError("TEST FAILED at ", __FILE__, ":", __LINE__, ": Expected: ", expected, ", Actual: ", actual); \
 			return false; \
 		} \
 	}
 
-#define ASSERT_TRUE(condition, message) \
+#define ASSERT_TRUE(condition) \
 	if (!(condition)) { \
-		logError("TEST FAILED at ", __FILE__, ":", __LINE__, ": ", message); \
+		logError("TEST FAILED at ", __FILE__, ":", __LINE__, ": ", #condition); \
 		return false; \
 	}
 
@@ -140,17 +117,17 @@ extern int passed_count;
 #define ASSERT_PARSE(doc, s) \
 	do { \
 		bool _res = (doc).parse(s, "test.ui"); \
-		ASSERT_TRUE(_res, "Failed to parse"); \
+		ASSERT_TRUE(_res); \
 	} while(false)
 
 #define ASSERT_TAG(elem, tag_enum) \
-	ASSERT_EQ((int)ui::Tag::tag_enum, (int)(elem)->tag, "Expected tag " #tag_enum)
+	ASSERT_EQ((int)ui::Tag::tag_enum, (int)(elem)->tag)
 
 #define ASSERT_ATTRIBUTE(elem, index, attr_enum) \
 	do { \
 		Span<ui::Attribute> _attrs = (elem)->attributes; \
-		ASSERT_TRUE(_attrs.size() > index, #elem " does not have attribute at index " #index); \
-		ASSERT_EQ((int)ui::AttributeName::attr_enum, (int)_attrs[index].type, #elem "'s attribute at index " #index " should be " #attr_enum); \
+		ASSERT_TRUE(_attrs.size() > index); \
+		ASSERT_EQ((int)ui::AttributeName::attr_enum, (int)_attrs[index].type); \
 	} while(false)
 
 

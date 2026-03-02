@@ -18,16 +18,16 @@ bool testSimpleTokens() {
 	using Token = UITokenizer::Token;
 	
 	Token tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::LBRACE, tok.type, "LBRACE");
+	ASSERT_EQ(Token::LBRACE, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::RBRACE, tok.type, "RBRACE");
+	ASSERT_EQ(Token::RBRACE, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::EQUALS, tok.type, "EQUALS");
+	ASSERT_EQ(Token::EQUALS, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::EOF, tok.type, "EOF");
+	ASSERT_EQ(Token::EOF, tok.type);
 	
 	return true;
 }
@@ -42,20 +42,20 @@ bool testIdentifiers() {
 	using Token = UITokenizer::Token;
 	
 	Token tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "First identifier");
-	ASSERT_TRUE(tok.value == "panel", "First identifier value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "panel");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "Second identifier");
-	ASSERT_TRUE(tok.value == "button", "Second identifier value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "button");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "Third identifier");
-	ASSERT_TRUE(tok.value == "class", "Third identifier value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "class");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "Fourth identifier");
-	ASSERT_TRUE(tok.value == "id", "Fourth identifier value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "id");
 	
 	return true;
 }
@@ -70,20 +70,20 @@ bool testStrings() {
 	using Token = UITokenizer::Token;
 	
 	Token tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::STRING, tok.type, "First string");
-	ASSERT_TRUE(tok.value == "hello", "First string value");
+	ASSERT_EQ(Token::STRING, tok.type);
+	ASSERT_TRUE(tok.value == "hello");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::STRING, tok.type, "Second string");
-	ASSERT_TRUE(tok.value == "world with spaces", "Second string value");
+	ASSERT_EQ(Token::STRING, tok.type);
+	ASSERT_TRUE(tok.value == "world with spaces");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::STRING, tok.type, "Empty string");
-	ASSERT_TRUE(tok.value == "", "Empty string value");
+	ASSERT_EQ(Token::STRING, tok.type);
+	ASSERT_TRUE(tok.value == "");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::STRING, tok.type, "Escaped string");
-	ASSERT_TRUE(tok.value == "escaped \\\"quote\\\"", "Escaped string value");
+	ASSERT_EQ(Token::STRING, tok.type);
+	ASSERT_TRUE(tok.value == "escaped \\\"quote\\\"");
 	
 	return true;
 }
@@ -98,7 +98,7 @@ bool testUnterminatedString() {
 	using Token = UITokenizer::Token;
 	
 	Token tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::ERROR, tok.type, "Unterminated string should produce ERROR token");
+	ASSERT_EQ(Token::ERROR, tok.type);
 	
 	return true;
 }
@@ -113,20 +113,20 @@ bool testNumbers() {
 	using Token = UITokenizer::Token;
 	
 	Token tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::NUMBER, tok.type, "First number");
-	ASSERT_TRUE(tok.value == "123", "First number value");
+	ASSERT_EQ(Token::NUMBER, tok.type);
+	ASSERT_TRUE(tok.value == "123");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::NUMBER, tok.type, "Second number");
-	ASSERT_TRUE(tok.value == "456.789", "Second number value");
+	ASSERT_EQ(Token::NUMBER, tok.type);
+	ASSERT_TRUE(tok.value == "456.789");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::NUMBER, tok.type, "Third number");
-	ASSERT_TRUE(tok.value == "0", "Third number value");
+	ASSERT_EQ(Token::NUMBER, tok.type);
+	ASSERT_TRUE(tok.value == "0");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::NUMBER, tok.type, "Fourth number");
-	ASSERT_TRUE(tok.value == "1.0", "Fourth number value");
+	ASSERT_EQ(Token::NUMBER, tok.type);
+	ASSERT_TRUE(tok.value == "1.0");
 	
 	return true;
 }
@@ -141,16 +141,16 @@ bool testPercentages() {
 	using Token = UITokenizer::Token;
 	
 	Token tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::PERCENTAGE, tok.type, "First percentage");
-	ASSERT_TRUE(tok.value == "50%", "First percentage value");
+	ASSERT_EQ(Token::PERCENTAGE, tok.type);
+	ASSERT_TRUE(tok.value == "50%");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::PERCENTAGE, tok.type, "Second percentage");
-	ASSERT_TRUE(tok.value == "100%", "Second percentage value");
+	ASSERT_EQ(Token::PERCENTAGE, tok.type);
+	ASSERT_TRUE(tok.value == "100%");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::PERCENTAGE, tok.type, "Third percentage");
-	ASSERT_TRUE(tok.value == "0%", "Third percentage value");
+	ASSERT_EQ(Token::PERCENTAGE, tok.type);
+	ASSERT_TRUE(tok.value == "0%");
 	
 	return true;
 }
@@ -165,16 +165,16 @@ bool testEm() {
 	using Token = UITokenizer::Token;
 	
 	Token tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::EM, tok.type, "First em");
-	ASSERT_TRUE(tok.value == "1.5em", "First em value");
+	ASSERT_EQ(Token::EM, tok.type);
+	ASSERT_TRUE(tok.value == "1.5em");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::EM, tok.type, "Second em");
-	ASSERT_TRUE(tok.value == "2em", "Second em value");
+	ASSERT_EQ(Token::EM, tok.type);
+	ASSERT_TRUE(tok.value == "2em");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::EM, tok.type, "Third em");
-	ASSERT_TRUE(tok.value == "10em", "Third em value");
+	ASSERT_EQ(Token::EM, tok.type);
+	ASSERT_TRUE(tok.value == "10em");
 	
 	return true;
 }
@@ -189,8 +189,8 @@ bool testEmFollowedByIdentifier() {
 	using Token = UITokenizer::Token;
 	
 	Token tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "emsome");
-	ASSERT_TRUE(tok.value == "emsome", "emsome value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "emsome");
 	
 	return true;
 }
@@ -205,16 +205,16 @@ bool testComments() {
 	using Token = UITokenizer::Token;
 	
 	Token tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "First identifier");
-	ASSERT_TRUE(tok.value == "panel", "First identifier value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "panel");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "Second identifier");
-	ASSERT_TRUE(tok.value == "button", "Second identifier value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "button");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "Third identifier");
-	ASSERT_TRUE(tok.value == "text", "Third identifier value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "text");
 	
 	return true;
 }
@@ -229,7 +229,7 @@ bool testUnterminatedBlockComment() {
 	using Token = UITokenizer::Token;
 	
 	Token tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::EOF, tok.type, "Unterminated block comment should be treated as whitespace and result in EOF");
+	ASSERT_EQ(Token::EOF, tok.type);
 	
 	return true;
 }
@@ -244,15 +244,15 @@ bool testWhitespace() {
 	using Token = UITokenizer::Token;
 	
 	Token tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "First identifier after whitespace");
-	ASSERT_TRUE(tok.value == "panel", "First identifier value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "panel");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "Second identifier after whitespace");
-	ASSERT_TRUE(tok.value == "button", "Second identifier value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "button");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::EOF, tok.type, "EOF after whitespace");
+	ASSERT_EQ(Token::EOF, tok.type);
 	
 	return true;
 }
@@ -267,53 +267,53 @@ bool testComplexUI() {
 	using Token = UITokenizer::Token;
 
 	Token tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::LBRACKET, tok.type, "left bracket");
+	ASSERT_EQ(Token::LBRACKET, tok.type);
 
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "panel");
-	ASSERT_TRUE(tok.value == "panel", "panel value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "panel");
 
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "id");
-	ASSERT_TRUE(tok.value == "id", "id value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "id");
 
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::EQUALS, tok.type, "equals");
+	ASSERT_EQ(Token::EQUALS, tok.type);
 
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::STRING, tok.type, "main");
-	ASSERT_TRUE(tok.value == "main", "main value");
+	ASSERT_EQ(Token::STRING, tok.type);
+	ASSERT_TRUE(tok.value == "main");
 
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "width");
-	ASSERT_TRUE(tok.value == "width", "width value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "width");
 
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::EQUALS, tok.type, "equals");
+	ASSERT_EQ(Token::EQUALS, tok.type);
 
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::NUMBER, tok.type, "800");
-	ASSERT_TRUE(tok.value == "800", "800 value");
+	ASSERT_EQ(Token::NUMBER, tok.type);
+	ASSERT_TRUE(tok.value == "800");
 
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "height");
-	ASSERT_TRUE(tok.value == "height", "height value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "height");
 
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::EQUALS, tok.type, "equals");
+	ASSERT_EQ(Token::EQUALS, tok.type);
 
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::NUMBER, tok.type, "600");
-	ASSERT_TRUE(tok.value == "600", "600 value");
+	ASSERT_EQ(Token::NUMBER, tok.type);
+	ASSERT_TRUE(tok.value == "600");
 
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::RBRACKET, tok.type, "right bracket");
+	ASSERT_EQ(Token::RBRACKET, tok.type);
 
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::LBRACE, tok.type, "left brace");
+	ASSERT_EQ(Token::LBRACE, tok.type);
 
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::RBRACE, tok.type, "right brace");
+	ASSERT_EQ(Token::RBRACE, tok.type);
 
 	return true;
 }
@@ -328,7 +328,7 @@ bool testEmptyInput() {
 	using Token = UITokenizer::Token;
 	
 	Token tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::EOF, tok.type, "Empty input should produce EOF");
+	ASSERT_EQ(Token::EOF, tok.type);
 	
 	return true;
 }
@@ -343,7 +343,7 @@ bool testOnlyWhitespace() {
 	using Token = UITokenizer::Token;
 	
 	Token tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::EOF, tok.type, "Only whitespace should produce EOF");
+	ASSERT_EQ(Token::EOF, tok.type);
 	
 	return true;
 }
@@ -358,12 +358,12 @@ bool testMultilineStrings() {
 	using Token = UITokenizer::Token;
 	
 	Token tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::STRING, tok.type, "Multiline string");
-	ASSERT_TRUE(tok.value == "line1\nline2", "Multiline string value");
+	ASSERT_EQ(Token::STRING, tok.type);
+	ASSERT_TRUE(tok.value == "line1\nline2");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::STRING, tok.type, "Indented multiline string");
-	ASSERT_TRUE(tok.value == "  indented\n    more", "Indented multiline string value");
+	ASSERT_EQ(Token::STRING, tok.type);
+	ASSERT_TRUE(tok.value == "  indented\n    more");
 	
 	return true;
 }
@@ -378,12 +378,12 @@ bool testEscapedCharacters() {
 	using Token = UITokenizer::Token;
 	
 	Token tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::STRING, tok.type, "Escaped quote");
-	ASSERT_TRUE(tok.value == "quote \\\" here", "Escaped quote value");
+	ASSERT_EQ(Token::STRING, tok.type);
+	ASSERT_TRUE(tok.value == "quote \\\" here");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::STRING, tok.type, "Escaped sequences");
-	ASSERT_TRUE(tok.value == "newline \\n tab \\t backslash \\\\", "Escaped sequences value");
+	ASSERT_EQ(Token::STRING, tok.type);
+	ASSERT_TRUE(tok.value == "newline \\n tab \\t backslash \\\\");
 	
 	return true;
 }
@@ -398,20 +398,20 @@ bool testIdentifiersWithSpecialChars() {
 	using Token = UITokenizer::Token;
 	
 	Token tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "Identifier with underscore");
-	ASSERT_TRUE(tok.value == "panel_name", "Identifier with underscore value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "panel_name");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "Identifier with hyphen");
-	ASSERT_TRUE(tok.value == "button-class", "Identifier with hyphen value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "button-class");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "Identifier starting with underscore");
-	ASSERT_TRUE(tok.value == "_private", "Identifier starting with underscore value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "_private");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "Identifier with numbers");
-	ASSERT_TRUE(tok.value == "attr_123", "Identifier with numbers value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "attr_123");
 	
 	return true;
 }
@@ -426,26 +426,26 @@ bool testWhitespaceAroundEquals() {
 	using Token = UITokenizer::Token;
 	
 	Token tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "width");
-	ASSERT_TRUE(tok.value == "width", "width value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "width");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::EQUALS, tok.type, "equals with spaces");
+	ASSERT_EQ(Token::EQUALS, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::NUMBER, tok.type, "800");
-	ASSERT_TRUE(tok.value == "800", "800 value");
+	ASSERT_EQ(Token::NUMBER, tok.type);
+	ASSERT_TRUE(tok.value == "800");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "height");
-	ASSERT_TRUE(tok.value == "height", "height value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "height");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::EQUALS, tok.type, "equals without spaces");
+	ASSERT_EQ(Token::EQUALS, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::NUMBER, tok.type, "600");
-	ASSERT_TRUE(tok.value == "600", "600 value");
+	ASSERT_EQ(Token::NUMBER, tok.type);
+	ASSERT_TRUE(tok.value == "600");
 
 	return true;
 }
@@ -460,39 +460,39 @@ bool testBlockCommentInMarkup() {
 	using Token = UITokenizer::Token;
 	
 	Token tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "panel");
-	ASSERT_TRUE(tok.value == "panel", "panel value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "panel");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::LBRACE, tok.type, "left brace");
+	ASSERT_EQ(Token::LBRACE, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "button");
-	ASSERT_TRUE(tok.value == "button", "button value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "button");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "class");
-	ASSERT_TRUE(tok.value == "class", "class value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "class");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::EQUALS, tok.type, "equals");
+	ASSERT_EQ(Token::EQUALS, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::STRING, tok.type, "primary");
-	ASSERT_TRUE(tok.value == "primary", "primary value");
+	ASSERT_EQ(Token::STRING, tok.type);
+	ASSERT_TRUE(tok.value == "primary");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::LBRACE, tok.type, "left brace 2");
+	ASSERT_EQ(Token::LBRACE, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::STRING, tok.type, "Start");
-	ASSERT_TRUE(tok.value == "Start", "Start value");
+	ASSERT_EQ(Token::STRING, tok.type);
+	ASSERT_TRUE(tok.value == "Start");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::RBRACE, tok.type, "right brace 2");
+	ASSERT_EQ(Token::RBRACE, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::RBRACE, tok.type, "right brace");
+	ASSERT_EQ(Token::RBRACE, tok.type);
 	
 	return true;
 }
@@ -507,39 +507,39 @@ bool testPercentageInAttributes() {
 	using Token = UITokenizer::Token;
 
 	Token tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::LBRACKET, tok.type, "left bracket");
+	ASSERT_EQ(Token::LBRACKET, tok.type);
 
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "panel");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
 
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "width");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
 
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::EQUALS, tok.type, "equals");
+	ASSERT_EQ(Token::EQUALS, tok.type);
 
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::PERCENTAGE, tok.type, "100%");
-	ASSERT_TRUE(tok.value == "100%", "100% value");
+	ASSERT_EQ(Token::PERCENTAGE, tok.type);
+	ASSERT_TRUE(tok.value == "100%");
 
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "height");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
 
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::EQUALS, tok.type, "equals");
+	ASSERT_EQ(Token::EQUALS, tok.type);
 
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::PERCENTAGE, tok.type, "50%");
-	ASSERT_TRUE(tok.value == "50%", "50% value");
+	ASSERT_EQ(Token::PERCENTAGE, tok.type);
+	ASSERT_TRUE(tok.value == "50%");
 
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::RBRACKET, tok.type, "right bracket");
+	ASSERT_EQ(Token::RBRACKET, tok.type);
 
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::LBRACE, tok.type, "left brace");
+	ASSERT_EQ(Token::LBRACE, tok.type);
 
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::RBRACE, tok.type, "right brace");
+	ASSERT_EQ(Token::RBRACE, tok.type);
 
 	return true;
 }
@@ -554,40 +554,40 @@ bool testQuotedAttributeValues() {
 	using Token = UITokenizer::Token;
 	
 	Token tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "button");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::LBRACKET, tok.type, "left bracket");
+	ASSERT_EQ(Token::LBRACKET, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "class");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::EQUALS, tok.type, "equals");
+	ASSERT_EQ(Token::EQUALS, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::STRING, tok.type, "primary");
+	ASSERT_EQ(Token::STRING, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "id");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::EQUALS, tok.type, "equals");
+	ASSERT_EQ(Token::EQUALS, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::STRING, tok.type, "start");
+	ASSERT_EQ(Token::STRING, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "width");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::EQUALS, tok.type, "equals");
+	ASSERT_EQ(Token::EQUALS, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::STRING, tok.type, "12em");
+	ASSERT_EQ(Token::STRING, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::RBRACKET, tok.type, "right bracket");
+	ASSERT_EQ(Token::RBRACKET, tok.type);
 	
 	return true;
 }
@@ -603,8 +603,8 @@ bool testInvalidEscapeSequence() {
 	
 	Token tok = tokenizer.consumeToken();
 	// Actually, the tokenizer accepts any escape sequence, so this should be a valid string
-	ASSERT_EQ(Token::STRING, tok.type, "Escape sequences are accepted");
-	ASSERT_TRUE(tok.value == "invalid \\z escape", "Escape sequence value");
+	ASSERT_EQ(Token::STRING, tok.type);
+	ASSERT_TRUE(tok.value == "invalid \\z escape");
 	
 	return true;
 }
@@ -619,7 +619,7 @@ bool testUnterminatedLineComment() {
 	using Token = UITokenizer::Token;
 	
 	Token tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::EOF, tok.type, "Line comment should be treated as whitespace, resulting in EOF");
+	ASSERT_EQ(Token::EOF, tok.type);
 	
 	return true;
 }
@@ -635,8 +635,8 @@ bool testInvalidStringEscape() {
 	
 	Token tok = tokenizer.consumeToken();
 	// The tokenizer accepts any escape sequence
-	ASSERT_EQ(Token::STRING, tok.type, "String with escape");
-	ASSERT_TRUE(tok.value == "string with \\x invalid hex", "String with escape value");
+	ASSERT_EQ(Token::STRING, tok.type);
+	ASSERT_TRUE(tok.value == "string with \\x invalid hex");
 	
 	return true;
 }
@@ -653,8 +653,8 @@ bool testNumberStartingWithZero() {
 	Token tok = tokenizer.consumeToken();
 	// This might be valid or invalid depending on implementation, but let's test it
 	// For now, assuming leading zeros are allowed
-	ASSERT_EQ(Token::NUMBER, tok.type, "Number with leading zero");
-	ASSERT_TRUE(tok.value == "0123", "Number with leading zero value");
+	ASSERT_EQ(Token::NUMBER, tok.type);
+	ASSERT_TRUE(tok.value == "0123");
 	
 	return true;
 }
@@ -670,7 +670,7 @@ bool testStringWithBackslashAtEnd() {
 	
 	Token tok = tokenizer.consumeToken();
 	// Backslash at end of string should cause ERROR
-	ASSERT_EQ(Token::ERROR, tok.type, "String with backslash at end should produce ERROR token");
+	ASSERT_EQ(Token::ERROR, tok.type);
 	
 	return true;
 }
@@ -685,61 +685,61 @@ bool testStyleTokens() {
 	using Token = UITokenizer::Token;
 	
 	Token tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::DOT, tok.type, "dot");
+	ASSERT_EQ(Token::DOT, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "primary identifier");
-	ASSERT_TRUE(tok.value == "primary", "primary value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "primary");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::LBRACE, tok.type, "LBRACE");
+	ASSERT_EQ(Token::LBRACE, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "color identifier");
-	ASSERT_TRUE(tok.value == "color", "color value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "color");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::COLON, tok.type, "COLON");
+	ASSERT_EQ(Token::COLON, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "red identifier");
-	ASSERT_TRUE(tok.value == "red", "red value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "red");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::SEMICOLON, tok.type, "SEMICOLON");
+	ASSERT_EQ(Token::SEMICOLON, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "width identifier");
-	ASSERT_TRUE(tok.value == "width", "width value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "width");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::COLON, tok.type, "COLON");
+	ASSERT_EQ(Token::COLON, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::PERCENTAGE, tok.type, "100%");
-	ASSERT_TRUE(tok.value == "100%", "100% value");
+	ASSERT_EQ(Token::PERCENTAGE, tok.type);
+	ASSERT_TRUE(tok.value == "100%");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::SEMICOLON, tok.type, "SEMICOLON");
+	ASSERT_EQ(Token::SEMICOLON, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::RBRACE, tok.type, "RBRACE");
+	ASSERT_EQ(Token::RBRACE, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::DOLLAR, tok.type, "DOLLAR");
+	ASSERT_EQ(Token::DOLLAR, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::IDENTIFIER, tok.type, "main_menu identifier");
-	ASSERT_TRUE(tok.value == "main_menu", "main_menu value");
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	ASSERT_TRUE(tok.value == "main_menu");
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::LBRACE, tok.type, "LBRACE");
+	ASSERT_EQ(Token::LBRACE, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::RBRACE, tok.type, "RBRACE");
+	ASSERT_EQ(Token::RBRACE, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::EOF, tok.type, "EOF");
+	ASSERT_EQ(Token::EOF, tok.type);
 	
 	return true;
 }
@@ -754,18 +754,18 @@ const char* source = "#FF0000 #abc #123456 #def";
 	using Token = UITokenizer::Token;
 	
 	Token tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::COLOR, tok.type, "First color");
-	ASSERT_TRUE(tok.value == "#FF0000", "#FF0000 value");
+	ASSERT_EQ(Token::COLOR, tok.type);
+	ASSERT_TRUE(tok.value == "#FF0000");
 	
 	tok = tokenizer.consumeToken();
-ASSERT_EQ(Token::ERROR, tok.type, "Second color should be ERROR");
+ASSERT_EQ(Token::ERROR, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::COLOR, tok.type, "Third color");
-	ASSERT_TRUE(tok.value == "#123456", "#123456 value");
+	ASSERT_EQ(Token::COLOR, tok.type);
+	ASSERT_TRUE(tok.value == "#123456");
 	
 	tok = tokenizer.consumeToken();
-ASSERT_EQ(Token::ERROR, tok.type, "Fourth color should be ERROR");
+ASSERT_EQ(Token::ERROR, tok.type);
 	
 	return true;
 }
@@ -780,31 +780,31 @@ bool testSpecialCharacters() {
 	using Token = UITokenizer::Token;
 	
 	Token tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::EQUALS, tok.type, "EQUALS");
+	ASSERT_EQ(Token::EQUALS, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::LBRACE, tok.type, "LBRACE");
+	ASSERT_EQ(Token::LBRACE, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::RBRACE, tok.type, "RBRACE");
+	ASSERT_EQ(Token::RBRACE, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::COLON, tok.type, "COLON");
+	ASSERT_EQ(Token::COLON, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::SEMICOLON, tok.type, "SEMICOLON");
+	ASSERT_EQ(Token::SEMICOLON, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::DOT, tok.type, "DOT");
+	ASSERT_EQ(Token::DOT, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::ERROR, tok.type, "ERROR");
+	ASSERT_EQ(Token::ERROR, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::DOLLAR, tok.type, "DOLLAR");
+	ASSERT_EQ(Token::DOLLAR, tok.type);
 	
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::EOF, tok.type, "EOF");
+	ASSERT_EQ(Token::EOF, tok.type);
 	
 	return true;
 }
@@ -819,14 +819,14 @@ bool testColorParsingStrictness() {
 	using Token = UITokenizer::Token;
 
 	Token tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::ERROR, tok.type, "#000 should be ERROR");
+	ASSERT_EQ(Token::ERROR, tok.type);
 
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::COLOR, tok.type, "#000000 should be COLOR");
-	ASSERT_TRUE(tok.value == "#000000", "#000000 value");
+	ASSERT_EQ(Token::COLOR, tok.type);
+	ASSERT_TRUE(tok.value == "#000000");
 
 	tok = tokenizer.consumeToken();
-	ASSERT_EQ(Token::EOF, tok.type, "EOF");
+	ASSERT_EQ(Token::EOF, tok.type);
 
 	return true;
 }

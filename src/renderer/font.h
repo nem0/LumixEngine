@@ -26,14 +26,10 @@ struct Glyph {
 	float advance_x;
 };
 
-struct WrappedText {
-	enum Break {
-		NO,
-		SPACE,
-		MIDWORD
-	};
-	StringView wrapped;
-	Break broken;
+struct SplitWord {
+	StringView head;
+	StringView tail;
+	float head_width;
 };
 
 LUMIX_RENDERER_API Vec2 measureTextA(const Font& font, const char* str, const char* str_end);
@@ -43,7 +39,7 @@ LUMIX_RENDERER_API float getDescender(const Font& font);
 LUMIX_RENDERER_API float getAscender(const Font& font);
 LUMIX_RENDERER_API float getHeight(const Font& font);
 LUMIX_RENDERER_API bool isBuilt(const Font& font);
-LUMIX_RENDERER_API WrappedText wrapText(const Font& font, StringView text, float width);
+LUMIX_RENDERER_API SplitWord splitFirstWord(const Font& font, StringView text);
 
 
 struct LUMIX_RENDERER_API FontResource final : Resource

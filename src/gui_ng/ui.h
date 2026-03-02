@@ -11,7 +11,7 @@ namespace Lumix {
 
 struct Draw2D;
 struct Sprite;
-struct WrappedText;
+struct SplitWord;
 
 namespace ui {
 
@@ -95,7 +95,7 @@ struct IFontManager {
 	virtual float getHeight(FontHandle font) = 0;
 	virtual float getAscender(FontHandle font) = 0;
 	virtual bool isReady(FontHandle font) = 0;
-	virtual WrappedText wrapText(FontHandle font, StringView text, float width) = 0;
+	virtual SplitWord splitFirstWord(FontHandle font, StringView text) = 0;
 };
 
 struct Attribute {
@@ -120,6 +120,11 @@ struct Stylesheet {
 struct SpanLine {
 	StringView text; // substring of span's value
 	Vec2 pos; // pos.y is baseline
+	float width;
+};
+
+struct MarginPaddings {
+	float top, right, bottom, left;
 };
 
 struct Element {
@@ -129,20 +134,20 @@ struct Element {
 	Tag tag;
 	Array<u32> children;
 	Array<Attribute> attributes;
-	Array<SpanLine> lines;
-
+	
 	// runtime computed data
+	Vec2 position;
+	Vec2 size;
 	StringView value;
+	Array<SpanLine> lines;
 	StringView style_class;
 	Sprite* bg_sprite = nullptr;
 	IFontManager::FontHandle font_handle = nullptr;
-	Vec2 position;
-	Vec2 size;
 	float font_size = 0;
 	Color color = Color::WHITE;
 	Color bg_color = Color::BLACK;
-	float margins[4]; // top, right, bottom, left
-	float paddings[4]; // top, right, bottom, left
+	MarginPaddings margins;
+	MarginPaddings paddings;
 	Direction direction = Direction::COLUMN;
 	JustifyContent justify_content = JustifyContent::START;
 	AlignItems align_items = AlignItems::STRETCH;

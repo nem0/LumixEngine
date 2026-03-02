@@ -43,60 +43,23 @@ const Glyph* findGlyph(const Font& font, u32 codepoint) {
 	return &iter.value();
 }
 
-// wrap one line
-WrappedText wrapText(const Font& font, StringView text, float width) {
-	WrappedText result;
-
-	float space_advance_x = font.ascender; // we use ascender as fallback value
-	auto space_iter = font.glyphs.find(' ');
-	if (space_iter.isValid()) {
-		space_advance_x = space_iter.value().advance_x;
-	}
-
-	float current_width = 0;
-	const char* last_space = nullptr;
-	const char* c = text.begin;
-	while (c < text.end) {
-		if (isWhitespace(*c)) {
-			current_width += space_advance_x;
-			if (current_width > width) {
-				if (last_space) {
-					result.wrapped = StringView(text.begin, last_space);
-					result.broken = WrappedText::SPACE;
-				} else {
-					result.wrapped = StringView(text.begin, c);
-					result.broken = WrappedText::MIDWORD;
-				}
-				return result;
-			}
-			last_space = c;
-			// Skip consecutive whitespace
-			while (c < text.end && isWhitespace(*c)) ++c;
-			continue;
-		}
-		auto iter = font.glyphs.find(*c);
-		if (iter.isValid()) {
-			const Glyph& glyph = iter.value();
-			if (current_width + glyph.advance_x > width) {
-				if (last_space) {
-					result.wrapped = StringView(text.begin, last_space);
-					result.broken = WrappedText::SPACE;
-				} else {
-					result.wrapped = StringView(text.begin, c);
-					result.broken = WrappedText::MIDWORD;
-				}
-				return result;
-			}
-			current_width += glyph.advance_x;
-		}
-		++c;
-	}
+SplitWord splitFirstWord(const Font& font, StringView text) {
+	// trim leading whitespace
+	while (text.begin < text.end && isWhitespace(*text.begin)) ++text.begin;
 	
-	result.wrapped = text;
-	result.broken = WrappedText::NO;
-	return result;
-}
+	SplitWord res;
+	res.head.begin = text.begin;
+	res.head.end = text.begin;
+	res.tail = text;
+	// find the first whitespace
+	while (res.head.end != text.end && !isWhitespace(*res.head.end)) ++res.head.end;
+	res.tail.begin = res.head.end;
 
+	// measure the word
+	Vec2 size = measureTextA(font, res.head.begin, res.head.end);
+	res.head_width = size.x;
+	return res;
+}
 
 Vec2 measureTextA(const Font& font, const char* str, const char* str_end) {
 	Vec2 res;

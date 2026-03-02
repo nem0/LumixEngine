@@ -5,8 +5,9 @@
 
 - [Layout Algorithm Overview](#layout-algorithm-overview)
 - [Text](#text)
-  - [Multiline Strings](#multiline-strings)
-  - [Inline Flow](#inline-flow)
+  - [Whitespace Handling](#whitespace-handling)
+  - [Inline Flow and Spacing](#inline-flow-and-spacing)
+  - [Text Wrapping](#text-wrapping)
   - [Line Breaks](#line-breaks)
   - [Text Alignment](#text-alignment)
 - [Element Sizing](#element-sizing)
@@ -39,71 +40,65 @@
 | 3.3. | Compute parent-relative heights | Share remaining main-axis space among `grow>0` along height | Updated `height` where the main axis is vertical (`direction=column`); may stretch cross-axis when `align-items=stretch` is in effect |
 | 4. | Compute positions | Final placement along main and cross axes | `position.x`, `position.y`; margin collapsing; `justify-content` (main-axis distribution); `align-items` (cross-axis alignment per line); per-line application when `wrap=true` |
 
+_Note: The implementation may reorder the steps internally, but the behavior must match the sequence described above._
+
 ## Text
 
-Text paragraphs are created using `span` elements with a `value` attribute or unquoted text inside a `panel`. Text flows inline within the panel and wraps to multiple lines when the unwrapped width exceeds the available panel width (minus padding) and `wrap=true`. 
+Text content in UI panels is created using `span` elements with a `value` attribute or unquoted text directly inside a panel block. Text flows inline and can wrap to multiple lines when `wrap=true` and the content exceeds the panel's available width (after subtracting padding).
 
 ```css
 [panel] {
-  Some text
-  [span color=#ff0000 value="Some other, red text"]
+  Some unquoted text
+  [span color=#ff0000 value="Styled text"]
 }
 ```
 
-Double quotes (`"`) in text content are treated as regular characters and render as expected without any special handling, since text is unquoted in the markup. The following example renders three characters:
+### Whitespace Handling
+
+Whitespace in text content is normalized similarly to HTML:
+- Newlines (`\n`), carriage returns (`\r`), tabs, and spaces are treated as whitespace.
+- Consecutive whitespace characters are collapsed into a single space.
+- Leading and trailing whitespace is trimmed.
+
+Unquoted text spanning multiple lines in markup is treated as a single line:
 
 ```css
 [panel] {
-  "a"
+  This is multiline
+  text in markup
 }
 ```
 
-### Multiline Strings
+Renders as: `This is multiline text in markup`
 
-Unquoted text in markup can span multiple lines, but newlines (`\n`) and carriage returns (`\r`) are treated as whitespace and do not create line breaks in the layout. This matches HTML behavior where whitespace is normalized. Additionally, consecutive whitespace characters (spaces, tabs, newlines) are collapsed into a single space for both measurement and rendering.
+### Inline Flow and Spacing
 
-```css
-[panel] {
-  This is multiline text
-  that spans markup lines
-  but renders as single line
-}
-```
+Text elements (`span`s and unquoted text) are arranged horizontally in inline flow, regardless of the container's `direction`:
+- Text always renders left-to-right.
+- No space is added between adjacent spans; they are placed contiguously.
+- To include spaces, they must be part of the text content.
 
-The above renders as: `This is multiline text that spans markup lines but renders as single line`
+Examples:
+- `[span value="Hello"] [span value="world"]` renders as `Helloworld`
+- `[span value="Hello "] [span value="world"]` renders as `Hello world`
 
-```css
-[panel] {
-  Text   with    multiple    spaces
-}
-```
+#### Baseline Alignment
 
-The above renders as: `Text with multiple spaces` (consecutive spaces collapsed)
+For visual consistency, inline elements align to a baseline:
+- Text baselines are determined by font metrics.
+- Non-text elements (e.g., icons) align to their bottom edge.
+- The line's baseline is set by the tallest text element.
 
+### Text Wrapping
 
-### Inline Flow
-
-Inline flow arranges **separate inline elements** (`span`s, text strings) horizontally, regardless of the container's direction:
-- spans side-by-side -> `"A" "B"` becomes `A B`
-
-Text content always renders **horizontally** (left-to-right), regardless of `direction`.
-
-#### Baseline Alignment in Inline Flow
-
-To ensure proper visual alignment of text and inline elements, the layout system employs baseline alignment. The baseline is the imaginary line on which text characters rest.
-
-- For text elements (`span`s and unquoted text), the baseline is determined by the font's baseline metric, which positions the text appropriately relative to its container.
-- For non-text inline elements (such as images or icons), the baseline defaults to the element's bottom edge.
-
-In a line of inline elements, the layout algorithm:
-1. Calculates the dominant baseline for the line, typically the baseline of the tallest text element or the first element with a defined baseline.
-2. Positions each inline element so that its baseline aligns with the line's baseline.
-
-This alignment ensures that mixed content (e.g., text of varying sizes or text alongside icons) appears visually consistent and readable, preventing awkward vertical offsets that could disrupt the flow.
+When `wrap=true`, text wraps to new lines using word boundaries:
+- Words are split at spaces, and lines break when a word doesn't fit.
+- Spaces are preserved between words on the same line.
+- Wrapping occurs at the panel's content width (width minus padding).
 
 ### Line Breaks
 
-**Line breaks in inline flow are triggered exclusively by block elements**. When a block element appears, it causes a line break, positioning itself at the start of the new line and forcing any subsequent inline elements to start on the following line.
+Line breaks occur only at block-level elements. Inline elements flow continuously until a block element forces a new line.
 
 **Row direction example**:
 
@@ -278,7 +273,7 @@ The `justify-content` property adjusts positions along the main axis to achieve 
 - **`end`**: Elements are placed starting from the container's end edge minus padding. Laid out in reverse order, with each preceding element before the next.
   ```
   +---------------------------------+
-  |          [elem1][elem2][elem3]  |
+  |            [elem1][elem2][elem3]|
   +---------------------------------+
   ```
 
