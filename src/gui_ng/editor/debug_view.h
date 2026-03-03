@@ -8,12 +8,6 @@
 #include "renderer/draw2d.h"
 #include <imgui/imgui.h>
 
-/*
-[X] Bounding box visualization, margins, paddings
-[ ] Detailed property viewer + live edit? 
-[ ] Event logging: Display recent UI events with timestamps
-*/
-
 namespace Lumix::ui {
 
 static bool g_show_element_outlines = false;
