@@ -2,15 +2,17 @@
 		bg-color=#f0f0f0 
 		font="/engine/editor/fonts/JetBrainsMono-Regular.ttf" 
 		font-size=40
+		align-items=stretch
 ] {
-    [panel direction=row width=100% padding=0.5em bg-color=#ffffff align=center] {
-        "Welcome to" [span value=" Lumix " color=#ff0000 font-size=60] "Demo"
+    [panel direction=row padding=0.5em bg-color=#ffffff align=center] {
+        Welcome to [span value=" Lumix " color=#ff0000 font-size=60] Demo
     }
-    [panel direction=column width=100% padding=0.5em bg-color=#e0e0e0] {
-        [panel width=100% align=center] { "Start Demo" }
-        [panel width=100% align=center] { "Settings" }
+    [panel direction=column padding=0.5em bg-color=#e0e0e0 align-items=stretch] {
+        [panel align=center margin=0.2em] { Start Demo }
+        [panel align=center margin=0.2em] { Settings }
     }
-    [panel direction=column width=100% height=50% padding=0.5em bg-color=#ffffff align=center padding=1em] {
-        "Demo Content Here"
+    [panel direction=column padding=0.5em bg-color=#ffffff align=center padding=1em] {
+        Demo Content Here
+
     }
 }

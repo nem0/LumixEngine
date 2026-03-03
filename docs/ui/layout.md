@@ -15,7 +15,6 @@
   - [Fit-Content](#fit-content)
   - [Grow](#grow)
 - [Element Positioning](#element-positioning)
-  - [Positioning Algorithm](#positioning-algorithm)
   - [Justification](#justification)
   - [Off-axis alignment](#off-axis-alignment)
   - [Wrapping](#wrapping)
@@ -254,7 +253,9 @@ The layout system positions elements within containers using this algorithm:
 
 ### Justification
 
-The `justify-content` property adjusts positions along the main axis to achieve the desired distribution. Options include:
+The `justify-content` property adjusts positions along the main axis to achieve the desired distribution. In all justification modes, margins between elements are preserved and included in the positioning calculations, while the container's padding defines the inner content area within which justification occurs.
+
+Options include:
 
 - **`start`**: Elements are placed sequentially starting from the container's start edge plus padding. Each subsequent element is positioned immediately after the previous, accounting for size and margin.
   ```

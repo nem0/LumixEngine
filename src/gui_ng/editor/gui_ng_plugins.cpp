@@ -7,6 +7,7 @@
 #include "core/sort.h"
 #include "core/stream.h"
 #include "core/string.h"
+#include "debug_view.h"
 #include "editor/action.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
@@ -139,7 +140,9 @@ struct UIEditorWindow : AssetEditorWindow {
 		autocompletePopupGUI();
 		ImGui::NextColumn();
 		if (m_show_debug_view) {
-			debugTreeViewGUI();
+			if (m_parse_success) {
+				debugViewGUI(*m_document, m_hovered_element_idx);
+			}
 			ImGui::NextColumn();
 		}
 		ImGui::ColorEdit3("Background", &m_clear_color.x);
@@ -163,16 +166,7 @@ struct UIEditorWindow : AssetEditorWindow {
 					Draw2D& draw2d = m_pipeline->getDraw2D();
 					m_document->render(draw2d);
 
-					// Draw highlight for hovered element
-					if (m_hovered_element_idx != 0xFFFFFFF) {
-						const ui::Element* hovered_element = m_document->getElement(m_hovered_element_idx);
-						if (hovered_element) {
-							Color highlight_fill(255, 128, 0, 76); // Orange with 30% alpha
-							Color highlight_border(255, 255, 0, 255); // Yellow
-							draw2d.addRectFilled(hovered_element->position, hovered_element->position + hovered_element->size, highlight_fill);
-							draw2d.addRect(hovered_element->position, hovered_element->position + hovered_element->size, highlight_border, 2.0f);
-						}
-					}
+					ui::drawDebugVisualizations(draw2d, *m_document, m_hovered_element_idx);
 
 					if (m_pipeline->render(true)) {
 						gpu::TextureHandle texture_handle = m_pipeline->getOutput();
@@ -181,6 +175,27 @@ struct UIEditorWindow : AssetEditorWindow {
 								ImGui::Image(texture_handle, canvas_size, ImVec2(0, 1), ImVec2(1, 0));
 							} else {
 								ImGui::Image(texture_handle, canvas_size);
+							}
+							if (ImGui::IsItemHovered()) {
+								ImVec2 rect_min = ImGui::GetItemRectMin();
+								ImVec2 rect_max = ImGui::GetItemRectMax();
+								ImVec2 mouse_pos = ImGui::GetMousePos();
+								float relative_x = mouse_pos.x - rect_min.x;
+								float relative_y = mouse_pos.y - rect_min.y;
+								float canvas_x = relative_x / (rect_max.x - rect_min.x) * canvas_size.x;
+								float canvas_y;
+								if (gpu::isOriginBottomLeft()) {
+									canvas_y = (1.0f - relative_y / (rect_max.y - rect_min.y)) * canvas_size.y;
+								} else {
+									canvas_y = relative_y / (rect_max.y - rect_min.y) * canvas_size.y;
+								}
+								Vec2 canvas_pos(canvas_x, canvas_y);
+								ui::Element* elem = m_document->getElementAt(canvas_pos);
+								if (elem) {
+									m_hovered_element_idx = (u32)(elem - &m_document->m_elements[0]);
+								} else {
+									m_hovered_element_idx = 0xFFFFFFF;
+								}
 							}
 						}
 					}
@@ -192,62 +207,7 @@ struct UIEditorWindow : AssetEditorWindow {
 		ImGui::Columns(1);
 	}
 
-	void debugTreeViewGUI() {
-		m_hovered_element_idx = 0xFFFFFFF;
-		if (!m_parse_success) return;
 
-		if (ImGui::CollapsingHeader("Debug Tree View", ImGuiTreeNodeFlags_DefaultOpen)) {
-			for (u32 root_idx : m_document->m_roots) {
-				debugElementGUI(root_idx, 0);
-			}
-		}
-	}
-
-	void debugElementGUI(u32 element_idx, int depth) {
-		const ui::Element* element = m_document->getElement(element_idx);
-		if (!element) return;
-
-		const char* tag_names[] = { "panel", "image", "span", "invalid" };
-		const char* tag_name = element->tag < ui::Tag::INVALID ? tag_names[(u8)element->tag] : "unknown";
-
-		StaticString<256> label;
-		StaticString<32> size_str;
-		size_str.append(" (", element->size.x, "x", element->size.y, ")");
-
-		if (element->value.empty()) {
-			label.append(tag_name, size_str, "##", element_idx);
-		} else {
-			StaticString<64> value_preview;
-			u32 preview_len = minimum((u32)60, element->value.size());
-			value_preview.append(StringView(element->value.begin, preview_len));
-			if (element->value.size() > 60) {
-				value_preview.append("...");
-			}
-			label.append(tag_name, size_str, " \"", value_preview, "\"##", element_idx);
-		}
-
-		ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
-		if (element->children.empty()) flags |= ImGuiTreeNodeFlags_Leaf;
-
-		bool open = ImGui::TreeNodeEx(label, flags);
-		if (ImGui::IsItemHovered()) {
-			m_hovered_element_idx = element_idx;
-			ImGui::BeginTooltip();
-			ImGui::Text("Position: (%.1f, %.1f)", element->position.x, element->position.y);
-			ImGui::Text("Size: (%.1f, %.1f)", element->size.x, element->size.y);
-			if (!element->style_class.empty()) {
-				ImGui::Text("Class: %.*s", (int)element->style_class.size(), element->style_class.begin);
-			}
-			ImGui::EndTooltip();
-		}
-
-		if (open) {
-			for (u32 child_idx : element->children) {
-				debugElementGUI(child_idx, depth + 1);
-			}
-			ImGui::TreePop();
-		}
-	}
 
 	void handleAutocomplete() {
 		if (!m_editor->canHandleInput()) return;

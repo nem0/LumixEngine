@@ -13,11 +13,9 @@
 }
 [panel width=100% height=100% font-size=30] {
 	[panel .header] { Space removed }
-	[panel padding=1em direction=row] {
 		[panel .odd_row] { [span value="AAA"][span value="000"] }
 		[panel .even_row] { [span value="AAA"]      [span value="000"] }
 		[panel .odd_row] { [span value="AAA"] 000 }
-	}
 	
 	[panel .header] { Space kept }
 		[panel .odd_row] { AAA 000 }

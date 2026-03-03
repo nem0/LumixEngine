@@ -1,4 +1,5 @@
 #include "core/log.h"
+#include "core/os.h"
 #include "core/profiler.h"
 #include "core/stack_array.h"
 #include "core/string.h"
@@ -1097,6 +1098,7 @@ static void wrapSpans(Document& doc, Element& parent, i32 start_span_idx, i32 en
 					x += split.head_width;
 				}
 				text = split.tail;
+				if (text.empty()) is_prev_space = false;
 			}
 		} else {
 			SpanLine& line = span.lines.emplace();
@@ -1165,6 +1167,9 @@ static void wrapText(Document& doc, u32 element_index) {
 
 void Document::computeLayout(Vec2 canvas_size) {
 	PROFILE_FUNCTION();
+	
+	os::Timer timer;
+	m_layout_duration = 0;
 	m_canvas_size = canvas_size;
 	ParentContext root_inherit;
 	root_inherit.size = canvas_size;
@@ -1208,6 +1213,8 @@ void Document::computeLayout(Vec2 canvas_size) {
 	for (u32 root_idx : m_roots) {
 		layoutChildren(*this, m_elements[root_idx]);
 	}
+	
+	m_layout_duration = timer.getTimeSinceStart();
 }
 
 static void renderElement(Draw2D& draw, const Document& doc, u32 element_idx, const Element* parent) {
@@ -1247,29 +1254,37 @@ static void renderElement(Draw2D& draw, const Document& doc, u32 element_idx, co
 	}
 }
 
-void Document::render(Draw2D& draw) const {
+void Document::render(Draw2D& draw) {
 	PROFILE_FUNCTION();
+	os::Timer timer;
+	m_render_duration = 0;
 	for (u32 root_idx : m_roots) {
 		renderElement(draw, *this, root_idx, nullptr);
 	}
+	m_render_duration = timer.getTimeSinceStart();
 }
 
-static bool contains(const Element& elem, Vec2 pos) {
-	return pos.x >= elem.position.x && pos.x <= elem.position.x + elem.size.x &&
-			pos.y >= elem.position.y && pos.y <= elem.position.y + elem.size.y;
+static bool contains(const Element& elem, Vec2 pos, IFontManager* font_manager) {
+	Vec2 elem_pos = elem.position;
+	if (elem.tag == Tag::SPAN && elem.font_handle && font_manager) {
+		float asc = font_manager->getAscender(elem.font_handle);
+		elem_pos.y -= asc;
+	}
+	return pos.x >= elem_pos.x && pos.x <= elem_pos.x + elem.size.x &&
+			pos.y >= elem_pos.y && pos.y <= elem_pos.y + elem.size.y;
 }
 
 Element* Document::getElementAt(Vec2 pos) {
 	for (u32 root_id : m_roots) {
 		Element* root = &m_elements[root_id]; 
-		if (!contains(*root, pos)) continue;
+		if (!contains(*root, pos, m_font_manager)) continue;
 
 		Element* elem = root;
 		for (;;) {
 			bool found_child = false;
 			for (u32 child_id : elem->children) {
 				Element* child = &m_elements[child_id];
-				if (contains(*child, pos)) {
+				if (contains(*child, pos, m_font_manager)) {
 					elem = child;
 					found_child = true;
 					break;
@@ -1313,6 +1328,8 @@ static void loadResources(Document& doc, u32 element_index, const ParentContext&
 
 bool Document::parse(StringView content, const char* filename) {
 	PROFILE_FUNCTION();
+	os::Timer timer;
+	m_parse_duration = 0;
 	m_elements.clear();
 	m_roots.clear();
 	m_content = content;
@@ -1320,7 +1337,6 @@ bool Document::parse(StringView content, const char* filename) {
 	m_tokenizer.m_document = m_content;
 	m_tokenizer.m_current = m_content.c_str();
 	m_tokenizer.m_current_token = m_tokenizer.nextToken();
-
 	if (!parseElements(0xFFFF'FFFF)) return false;
 	for (Element& elem : m_elements) {
 		applyStylesheet(*this, elem);
@@ -1332,6 +1348,7 @@ bool Document::parse(StringView content, const char* filename) {
 		loadResources(*this, root_idx, ctx);
 	}
 
+	m_parse_duration = timer.getTimeSinceStart();
 	return true;
 }
 

@@ -10,6 +10,7 @@
 namespace Lumix {
 
 struct Draw2D;
+struct ResourceManagerHub;
 struct Sprite;
 struct SplitWord;
 
@@ -191,10 +192,13 @@ struct Document {
 	bool m_suppress_logging = false;
 	UITokenizer m_tokenizer;
 	IFontManager* m_font_manager;
-	struct ResourceManagerHub* m_resource_manager;
+	ResourceManagerHub* m_resource_manager;
 	IAllocator& m_allocator;
 	Vec2 m_canvas_size;
 	String m_content;
+	float m_layout_duration = 0;
+	float m_parse_duration = 0;
+	float m_render_duration = 0;
 
 	Document(IFontManager* font_manager, IAllocator& allocator)
 		: m_elements(allocator)
@@ -214,7 +218,7 @@ struct Document {
 	Element* getElement(u32 index) { return &m_elements[index]; }
 	const Element* getElement(u32 index) const { return &m_elements[index]; }
 	void computeLayout(Vec2 canvas_size);
-	void render(Draw2D& draw) const;
+	void render(Draw2D& draw);
 	Element* getElementAt(Vec2 pos);
 
 	//@ function
