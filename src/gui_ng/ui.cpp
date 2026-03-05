@@ -113,8 +113,8 @@ static AttributeName parseAttributeName(StringView str) {
 	return AttributeName::INVALID;
 }
 
-static bool hasClassId(Span<InternString> ids, u32 id) {
-	for (InternString i : ids) if ((u32)i == id) return true;
+static bool hasClassId(Span<InternString> ids, InternString id) {
+	for (InternString i : ids) if (i == id) return true;
 	return false;
 }
 
@@ -412,9 +412,9 @@ bool Document::parseElements(u32 parent_index) {
 					if (m_tokenizer.peekToken().type == Token::DOT) {
 						if (!consume(Token::DOT)) return false;	
 						if (!consume(Token::IDENTIFIER, &name_token)) return false;	
-						u32 class_id = (u32)m_intern_table.intern(name_token.value);
+						InternString class_id = m_intern_table.intern(name_token.value);
 						if (!hasClassId(elem.classes, class_id)) {
-							elem.classes.push((InternString)class_id);
+							elem.classes.push(class_id);
 						}
 						continue;
 					}
@@ -1001,16 +1001,53 @@ static void computeBaseWidths(Document& doc, Element& elem, Element* parent_elem
 	}
 }
 
+void Stylesheet::buildIndex() {
+	m_class_index.clear();
+	for (u32 rule_idx = 0; rule_idx < (u32)m_rules.size(); ++rule_idx) {
+		const StyleRule& rule = m_rules[rule_idx];
+		for (InternString class_id : rule.classes) {
+			auto iter = m_class_index.find(class_id);
+			if (iter.isValid()) {
+				iter.value().push(rule_idx);
+			} else {
+				Array<u32> indices(m_allocator);
+				indices.push(rule_idx);
+				m_class_index.insert(class_id, indices.move());
+			}
+		}
+	}
+}
+
 static void applyStylesheet(Document& doc, Element& elem) {
-	// TODO this only matches class, add the rest
-	// TODO hashmap or something
-	for (const StyleRule& rule : doc.m_stylesheet.m_rules) {
+	if (elem.classes.empty()) return;
+
+	StackArray<u32, 32> candidates(doc.m_allocator);
+
+	for (InternString class_id : elem.classes) {
+		auto iter = doc.m_stylesheet.m_class_index.find(class_id);
+		if (iter.isValid()) {
+			for (u32 rule_idx : iter.value()) {
+				bool already_added = false;
+				for (u32 existing : candidates) {
+					if (existing == rule_idx) {
+						already_added = true;
+						break;
+					}
+				}
+				if (!already_added) {
+					candidates.push(rule_idx);
+				}
+			}
+		}
+	}
+
+	for (u32 rule_idx : candidates) {
+		const StyleRule& rule = doc.m_stylesheet.m_rules[rule_idx];
 		if (rule.classes.empty()) continue;
 
 		bool match = true;
 		for (InternString cid : rule.classes) {
-			u32 class_id = (u32)cid;
-			if (!hasClassId(elem.classes, class_id)) {
+			if (!hasClassId(elem.classes, cid)) {
 				match = false;
 				break;
 			}
@@ -1329,10 +1366,10 @@ void Document::addClass(u32 element_index, StringView classname) {
 	if (classname.empty()) return;
 	
 	Element& elem = m_elements[element_index];
-	u32 class_id = (u32)m_intern_table.intern(classname);
+	InternString class_id = m_intern_table.intern(classname);
 	if (hasClassId(elem.classes, class_id)) return;
 	
-	elem.classes.push((InternString)class_id);
+	elem.classes.push(class_id);
 	
 	refreshAfterClassMutation(*this, element_index);
 }
@@ -1342,11 +1379,11 @@ void Document::removeClass(u32 element_index, StringView classname) {
 	if (classname.empty()) return;
 	
 	Element& elem = m_elements[element_index];
-	u32 class_id = (u32)m_intern_table.intern(classname);
+	InternString class_id = m_intern_table.intern(classname);
 	
 	// Find and remove the class_id
 	for (i32 i = 0; i < (i32)elem.classes.size(); ++i) {
-		if ((u32)elem.classes[i] == class_id) {
+		if (elem.classes[i] == class_id) {
 			elem.classes.erase(i);
 			break;
 		}
@@ -1423,6 +1460,7 @@ bool Document::parse(StringView content, const char* filename) {
 	m_tokenizer.m_current = m_content.c_str();
 	m_tokenizer.m_current_token = m_tokenizer.nextToken();
 	if (!parseElements(0xFFFF'FFFF)) return false;
+	m_stylesheet.buildIndex();
 	recomputeStyles();
 
 	for (u32 root_idx : m_roots) {

@@ -134,9 +134,12 @@ struct StyleRule {
 
 struct Stylesheet {
 	Array<StyleRule> m_rules;
+	HashMap<InternString, Array<u32>> m_class_index;
+	IAllocator& m_allocator;
 
-	Stylesheet(IAllocator& allocator) : m_rules(allocator) {}
+	Stylesheet(IAllocator& allocator) : m_rules(allocator), m_class_index(allocator), m_allocator(allocator) {}
 	Span<StyleRule> getRules() { return Span(m_rules.begin(), m_rules.size()); }
+	void buildIndex();
 };
 
 struct SpanLine {
@@ -274,4 +277,12 @@ private:
 };
 
 } // namespace ui
+
+template <>
+struct HashFunc<ui::InternString> {
+	static u32 get(const ui::InternString& key) {
+		return HashFunc<u32>::get((u32)key);
+	}
+};
+
 } // namespace Lumix
