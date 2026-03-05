@@ -949,6 +949,14 @@ namespace Lumix {
 		return 1;
 	}
 	
+	int GUINGModule_isReady(lua_State* L) {
+		LuaWrapper::checkTableArg(L, 1);
+		GUINGModule* module;
+		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+		LuaWrapper::push(L, 	module->isReady());
+		return 1;
+	}
+	
 }
 
 namespace Lumix {
@@ -2826,6 +2834,8 @@ namespace Lumix {
 			lua_setfield(L, -2, "new");
 			lua_pushcfunction(L, GUINGModule_getDocument, "getDocument");
 			lua_setfield(L, -2, "getDocument");
+			lua_pushcfunction(L, GUINGModule_isReady, "isReady");
+			lua_setfield(L, -2, "isReady");
 			lua_pop(L, 1);
 		}
 		{
@@ -3666,6 +3676,10 @@ namespace Lumix {
 			LuaWrapper::push(L, 7);
 			lua_setfield(L, -2, "CLICK");
 			LuaWrapper::push(L, 8);
+			lua_setfield(L, -2, "MOUSE_ENTER");
+			LuaWrapper::push(L, 9);
+			lua_setfield(L, -2, "MOUSE_LEAVE");
+			LuaWrapper::push(L, 10);
 			lua_setfield(L, -2, "INVALID");
 			lua_setfield(L, -2, "EventType");
 			lua_pop(L, 1);

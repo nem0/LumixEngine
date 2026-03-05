@@ -26,6 +26,7 @@ struct GUINGModule : IModule {
 
 	//@ functions
 	virtual ui::Document* getDocument() = 0; // TODO use a reference once meta supports references
+	virtual bool isReady() const = 0;
 	//@ end
 	virtual void render(struct Pipeline& pipeline, Vec2 size) = 0;
 };

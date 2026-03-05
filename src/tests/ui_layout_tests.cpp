@@ -462,6 +462,60 @@ bool testGrowProportional() {
 	return true;
 }
 
+bool testGrowVertical() {
+	// Citation: layout.md - Grow
+	// "The `grow` attribute controls how an element expands
+	// to fill available space in its parent container along the main axis"
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[panel width=200 height=300 direction=column] {
+		[panel width=100 height=50] {}
+		[panel grow=1 width=100] {}
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_TRUE(doc.m_elements.size() >= 3);
+	ui::Element* parent = doc.getElement(0);
+	ui::Element* child1 = doc.getElement(1);
+	ui::Element* child2 = doc.getElement(2);
+
+	ASSERT_FLOAT_EQ(50.0f, child1->size.y);
+	ASSERT_FLOAT_EQ(250.0f, child2->size.y);
+	ASSERT_FLOAT_EQ(0.0f, child1->position.y);
+	ASSERT_FLOAT_EQ(50.0f, child2->position.y);
+
+	return true;
+}
+
+bool testGrowVerticalMiddle() {
+	// Citation: layout.md - Grow
+	// "The `grow` attribute controls how an element expands
+	// to fill available space in its parent container along the main axis"
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[panel width=200 height=300 direction=column] {
+		[panel width=100 height=50] {}
+		[panel grow=1 width=100] {}
+		[panel width=100 height=100] {}
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_TRUE(doc.m_elements.size() >= 4);
+	ui::Element* top = doc.getElement(1);
+	ui::Element* middle = doc.getElement(2);
+	ui::Element* bottom = doc.getElement(3);
+
+	ASSERT_FLOAT_EQ(50.0f, top->size.y);
+	ASSERT_FLOAT_EQ(150.0f, middle->size.y);
+	ASSERT_FLOAT_EQ(100.0f, bottom->size.y);
+
+	ASSERT_FLOAT_EQ(0.0f, top->position.y);
+	ASSERT_FLOAT_EQ(50.0f, middle->position.y);
+	ASSERT_FLOAT_EQ(200.0f, bottom->position.y);
+
+	return true;
+}
+
 bool testGrowMiddle() {
 	// Citation: layout.md - Grow
 	// "Left-fill-right (the classic toolbar pattern) works correctly because 
@@ -1875,6 +1929,8 @@ void runUILayoutTests() {
 	RUN_TEST(testGrowMiddle);
 	RUN_TEST(testGrowParentWithPercentChild);
 	RUN_TEST(testGrowProportional);
+	RUN_TEST(testGrowVertical);
+	RUN_TEST(testGrowVerticalMiddle);
 	RUN_TEST(testGrowSingleChild);
 	RUN_TEST(testGrowWithMargin);
 	RUN_TEST(testGrowWithPadding);

@@ -7,6 +7,7 @@
 #include "gui/sprite.h"
 #include "renderer/draw2d.h"
 #include "renderer/font.h"
+#include <cstring>
 #include "ui.h"
 #include "ui_tokenizer.h"
 
@@ -112,6 +113,37 @@ static AttributeName parseAttributeName(StringView str) {
 	return AttributeName::INVALID;
 }
 
+static bool hasClassId(Span<InternString> ids, u32 id) {
+	for (InternString i : ids) if ((u32)i == id) return true;
+	return false;
+}
+
+static int sourcePriority(AttributeSource source) {
+	return source == AttributeSource::ELEMENT ? 2 : 1;
+}
+
+static void upsertAttribute(Element& elem, AttributeName type, StringView value, AttributeSource source) {
+	const int incoming_prio = sourcePriority(source);
+
+	for (const Attribute& attr : elem.attributes) {
+		if (attr.type != type) continue;
+		if (sourcePriority(attr.source) > incoming_prio) return;
+	}
+
+	for (i32 i = elem.attributes.size() - 1; i >= 0; --i) {
+		const Attribute& attr = elem.attributes[i];
+		if (attr.type != type) continue;
+		if (sourcePriority(attr.source) <= incoming_prio) {
+			elem.attributes.erase(i);
+		}
+	}
+
+	Attribute& attr = elem.attributes.emplace();
+	attr.type = type;
+	attr.value = value;
+	attr.source = source;
+}
+
 static JustifyContent parseJustifyContent(StringView value) {
     const u32 len = (u32)value.size();
     if (len == 0) return JustifyContent::START;
@@ -205,22 +237,30 @@ bool Document::parseStyleBlock() {
 		// TODO test for unclosed style block
 		if (token.type == Token::RBRACE) return true;
 		
-		StringView selector;
+		StyleRule& rule = m_stylesheet.m_rules.emplace(m_allocator);
+
 		const char* selector_start = token.value.begin;
 		// Parse selector: supports .class, $id, or element.class combinations
 		if (token.type == Token::DOT) {
 			// Class selector: .classname
 			Token id_token;
 			if (!consume(Token::IDENTIFIER, &id_token)) return false;
-			selector = StringView(selector_start, (u32)(id_token.value.end - selector_start));
+			rule.classes.push(m_intern_table.intern(id_token.value));
+			for (;;) {
+				if (m_tokenizer.peekToken().type == Token::DOT) {
+					m_tokenizer.consumeToken();
+					if (!consume(Token::IDENTIFIER, &id_token)) return false;
+					rule.classes.push(m_intern_table.intern(id_token.value));
+				}
+				else break;
+			}
 		} else if (token.type == Token::DOLLAR) {
 			// ID selector: $idname
 			Token id_token;
 			if (!consume(Token::IDENTIFIER, &id_token)) return false;
-			selector = StringView(selector_start, (u32)(id_token.value.end - selector_start));
+			// TODO: support ID selectors in matcher
 		} else if (token.type == Token::IDENTIFIER) {
 			// Element selector, possibly with class/id modifiers
-			selector = token.value;
 			for (;;) {
 				Token next = m_tokenizer.peekToken();
 				if (next.type == Token::DOT) {
@@ -228,13 +268,12 @@ bool Document::parseStyleBlock() {
 					if (!consume(Token::DOT)) return false;
 					Token id_token;
 					if (!consume(Token::IDENTIFIER, &id_token)) return false;
-					selector = StringView(selector_start, (u32)(id_token.value.end - selector_start));
+					rule.classes.push(m_intern_table.intern(id_token.value));
 				} else if (next.type == Token::DOLLAR) {
 					// Append ID modifier
 					if (!consume(Token::DOLLAR)) return false;
 					Token id_token;
 					if (!consume(Token::IDENTIFIER, &id_token)) return false;
-					selector = StringView(selector_start, (u32)(id_token.value.end - selector_start));
 				} else {
 					break;
 				}
@@ -247,7 +286,6 @@ bool Document::parseStyleBlock() {
 		if (!consume(Token::LBRACE)) return false;
 
 		// parse style attributes
-		Array<Attribute> attrs(m_allocator);
 		for (;;) {
 			token = m_tokenizer.consumeToken();
 			// TODO test for unclosed rule
@@ -267,9 +305,10 @@ bool Document::parseStyleBlock() {
 				return false;
 			}
 			
-			Attribute& attr = attrs.emplace();
+			Attribute& attr = rule.attributes.emplace();
 			attr.value = token.value;
 			attr.type = parseAttributeName(name);
+			attr.source = AttributeSource::STYLESHEET;
 			if (attr.type == AttributeName::INVALID) {
 				error(name, m_tokenizer, "unknown attribute '", name, "'");
 				return false;
@@ -277,8 +316,6 @@ bool Document::parseStyleBlock() {
 			
 			if (!consume(Token::SEMICOLON)) return false;
 		}
-
-		m_stylesheet.m_rules.push(StyleRule(selector, static_cast<Array<Attribute>&&>(attrs)));
 	}
 }
 
@@ -295,7 +332,6 @@ bool Document::parseElements(u32 parent_index) {
 				return true;
 			case Token::RBRACKET: error(token.value, m_tokenizer, "unexpected ']'"); return false;
 			case Token::TEXT: {
-				// TEXT tokens at root level become SPAN elements with text content
 				Element& elem = m_elements.emplace(Tag::SPAN, m_allocator);
 				u32 elem_idx = m_elements.size() - 1;
 				if (parent_index != 0xFFFF'FFFF) {
@@ -376,7 +412,10 @@ bool Document::parseElements(u32 parent_index) {
 					if (m_tokenizer.peekToken().type == Token::DOT) {
 						if (!consume(Token::DOT)) return false;	
 						if (!consume(Token::IDENTIFIER, &name_token)) return false;	
-						elem.style_class = name_token.value;  // TODO multiple clases
+						u32 class_id = (u32)m_intern_table.intern(name_token.value);
+						if (!hasClassId(elem.classes, class_id)) {
+							elem.classes.push((InternString)class_id);
+						}
 						continue;
 					}
 
@@ -398,9 +437,7 @@ bool Document::parseElements(u32 parent_index) {
 						elem.value = value.value;
 					}
 					else {
-						Attribute& attr = elem.attributes.emplace();
-						attr.type = name;
-						attr.value = value.value;
+						upsertAttribute(elem, name, value.value, AttributeSource::ELEMENT);
 					}
 					token = m_tokenizer.peekToken();
 				}
@@ -749,7 +786,7 @@ static float computeSpansHeight(Document& doc, Element& element, i32 child_idx) 
 	if (end_idx == child_idx) return 0;
 
 	const Element& last = doc.m_elements[element.children[end_idx - 1]];
-	if (end_idx == child_idx + 1 && last.lines.empty()) {
+	if (last.lines.empty()) {
 		return doc.m_font_manager->getHeight(last.font_handle);
 	}
 	const SpanLine& last_line = last.lines.last();
@@ -819,8 +856,7 @@ static void computeBaseHeights(Document& doc, Element& elem, Element* parent_ele
 }
 
 static void computeParentRelativeHeights(Document& doc, Element& elem) {
-	// TODO
-	/*if (elem.direction == Direction::COLUMN) {
+	if (elem.direction == Direction::COLUMN) {
 		float sum_grow = 0;
 		float remaining_h = elem.size.y - elem.paddings.top - elem.paddings.bottom;
 		float prev_margin = 0;
@@ -840,7 +876,7 @@ static void computeParentRelativeHeights(Document& doc, Element& elem) {
 				}
 			}
 		}
-	}*/
+	}
 
 	for (u32 child_idx : elem.children) {
 		Element& child = doc.m_elements[child_idx];
@@ -906,6 +942,8 @@ static void computeBaseWidths(Document& doc, Element& elem, Element* parent_elem
 		}
 	}
 
+	elem.font_size = ctx.font_size;
+
 	if (elem.tag == Tag::SPAN) {
 		if (doc.m_font_manager && elem.font_handle && !elem.value.empty()) {
 			elem.size = doc.m_font_manager->measureTextA(elem.font_handle, elem.value);
@@ -964,16 +1002,23 @@ static void computeBaseWidths(Document& doc, Element& elem, Element* parent_elem
 }
 
 static void applyStylesheet(Document& doc, Element& elem) {
-	if (elem.style_class.empty()) return;
-
-	// TODO this only matches single class, add the rest
+	// TODO this only matches class, add the rest
 	// TODO hashmap or something
 	for (const StyleRule& rule : doc.m_stylesheet.m_rules) {
-		if (rule.selector.begin[0] != '.') continue;
-		if (equalStrings(rule.selector.withoutLeft(1), elem.style_class)) {
-			elem.attributes.reserve(elem.attributes.size() + rule.attributes.size());
+		if (rule.classes.empty()) continue;
+
+		bool match = true;
+		for (InternString cid : rule.classes) {
+			u32 class_id = (u32)cid;
+			if (!hasClassId(elem.classes, class_id)) {
+				match = false;
+				break;
+			}
+		}
+
+		if (match) {
 			for (const Attribute& attr : rule.attributes) {
-				elem.attributes.emplace(attr);
+				upsertAttribute(elem, attr.type, attr.value, AttributeSource::STYLESHEET);
 			}
 		}
 	}
@@ -1228,8 +1273,9 @@ static void renderElement(Draw2D& draw, const Document& doc, u32 element_idx, co
 				element.bg_sprite->render(draw, pos.x, pos.y, pos.x + size.x, pos.y + size.y, Color::WHITE);
 			}
 			else {
-				draw.addRectFilled(pos, pos + size, element.bg_color); break;
+				draw.addRectFilled(pos, pos + size, element.bg_color);
 			}
+			break;
 		}
 		case Tag::SPAN: {
 			if (element.font_handle && !element.value.empty()) {
@@ -1274,6 +1320,41 @@ static bool contains(const Element& elem, Vec2 pos, IFontManager* font_manager) 
 			pos.y >= elem_pos.y && pos.y <= elem_pos.y + elem.size.y;
 }
 
+static void refreshAfterClassMutation(Document& doc, u32 element_index) {
+	doc.recomputeStyles();
+}
+
+void Document::addClass(u32 element_index, StringView classname) {
+	if (element_index >= (u32)m_elements.size()) return;
+	if (classname.empty()) return;
+	
+	Element& elem = m_elements[element_index];
+	u32 class_id = (u32)m_intern_table.intern(classname);
+	if (hasClassId(elem.classes, class_id)) return;
+	
+	elem.classes.push((InternString)class_id);
+	
+	refreshAfterClassMutation(*this, element_index);
+}
+
+void Document::removeClass(u32 element_index, StringView classname) {
+	if (element_index >= (u32)m_elements.size()) return;
+	if (classname.empty()) return;
+	
+	Element& elem = m_elements[element_index];
+	u32 class_id = (u32)m_intern_table.intern(classname);
+	
+	// Find and remove the class_id
+	for (i32 i = 0; i < (i32)elem.classes.size(); ++i) {
+		if ((u32)elem.classes[i] == class_id) {
+			elem.classes.erase(i);
+			break;
+		}
+	}
+	
+	refreshAfterClassMutation(*this, element_index);
+}
+
 Element* Document::getElementAt(Vec2 pos) {
 	for (u32 root_id : m_roots) {
 		Element* root = &m_elements[root_id]; 
@@ -1299,6 +1380,10 @@ Element* Document::getElementAt(Vec2 pos) {
 static void loadResources(Document& doc, u32 element_index, const ParentContext& parent) {
 	Element& elem = doc.m_elements[element_index];
 	ParentContext ctx = parent;
+
+	elem.font_size = ctx.font_size;
+	elem.color = ctx.color;
+	elem.text_align = ctx.align;
 
 	for (const Attribute& attr : elem.attributes) {
 		switch (attr.type) {
@@ -1338,9 +1423,7 @@ bool Document::parse(StringView content, const char* filename) {
 	m_tokenizer.m_current = m_content.c_str();
 	m_tokenizer.m_current_token = m_tokenizer.nextToken();
 	if (!parseElements(0xFFFF'FFFF)) return false;
-	for (Element& elem : m_elements) {
-		applyStylesheet(*this, elem);
-	}
+	recomputeStyles();
 
 	for (u32 root_idx : m_roots) {
 		ParentContext ctx;
@@ -1373,7 +1456,6 @@ void Document::injectEvent(const InputSystem::Event& event) {
 				ui_event.element_index = elem ? u32(elem - m_elements.begin()) : 0;
 				m_events.push(ui_event);
 				if (!btn.down) {
-					// add click
 					ui_event.type = EventType::CLICK;
 					m_events.push(ui_event);
 				}
@@ -1389,11 +1471,32 @@ void Document::injectEvent(const InputSystem::Event& event) {
 		}
 		case InputSystem::Event::AXIS: {
 			if (event.device->type == InputSystem::Device::MOUSE) {
+				Vec2 pos(event.data.axis.x_abs, event.data.axis.y_abs);
+				Element* elem = getElementAt(pos);
+				u32 new_hovered_index = elem ? u32(elem - m_elements.begin()) : 0xFFFF'FFFF;
+
+				if (new_hovered_index != m_hovered_element_index) {
+					if (m_hovered_element_index != 0xFFFF'FFFF) {
+						Event leave_event;
+						leave_event.type = EventType::MOUSE_LEAVE;
+						leave_event.position = pos;
+						leave_event.element_index = m_hovered_element_index;
+						m_events.push(leave_event);
+					}
+					if (new_hovered_index != 0xFFFF'FFFF) {
+						Event enter_event;
+						enter_event.type = EventType::MOUSE_ENTER;
+						enter_event.position = pos;
+						enter_event.element_index = new_hovered_index;
+						m_events.push(enter_event);
+					}
+					m_hovered_element_index = new_hovered_index;
+				}
+
 				Event ui_event;
 				ui_event.type = EventType::MOUSE_MOVE;
-				ui_event.position = Vec2(event.data.axis.x_abs, event.data.axis.y_abs);
-				Element* elem = getElementAt(ui_event.position);
-				ui_event.element_index = elem ? u32(elem - m_elements.begin()) : 0;
+				ui_event.position = pos;
+				ui_event.element_index = new_hovered_index != 0xFFFF'FFFF ? new_hovered_index : 0;
 				m_events.push(ui_event);
 			}
 			break;
@@ -1427,6 +1530,39 @@ bool Document::areDependenciesReady() const {
 		if (elem.font_handle && !m_font_manager->isReady(elem.font_handle)) return false;
 	}
 	return true;
+}
+
+void Document::recomputeStyles() {
+	for (Element& elem : m_elements) {
+		for (i32 i = elem.attributes.size() - 1; i >= 0; --i) {
+			if (elem.attributes[i].source == AttributeSource::STYLESHEET) {
+				elem.attributes.erase(i);
+			}
+		}
+	}
+	for (Element& elem : m_elements) {
+		applyStylesheet(*this, elem);
+	}
+	for (u32 root_idx : m_roots) {
+		ParentContext ctx;
+		ctx.font = "/engine/editor/fonts/JetBrainsMono-Regular.ttf";
+		loadResources(*this, root_idx, ctx);
+	}
+}
+
+InternString InternTable::intern(StringView s) {
+	auto iter = map.find(s);
+	if (iter.isValid()) return (InternString)iter.value();
+	
+	InternString id = (InternString)(strings.size() + 1); // 0 is reserved for invalid
+	strings.emplace(s, allocator);
+	map.insert(strings.back(), (u32)id);
+	return id;
+}
+
+StringView InternTable::resolve(InternString id) const {
+	if (id == InternString::INVALID || (size_t)id > strings.size()) return StringView();
+	return strings[(size_t)id - 1];
 }
 
 } // namespace Lumix::ui

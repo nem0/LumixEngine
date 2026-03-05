@@ -2,5 +2,6 @@
 
 reflection::build_module("gui_ng")
 	.function<(ui::Document* (GUINGModule::*)())&GUINGModule::getDocument>("getDocument")
+	.function<(bool (GUINGModule::*)())&GUINGModule::isReady>("isReady")
 ;
 

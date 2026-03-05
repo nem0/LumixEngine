@@ -2,6 +2,7 @@
 
 #include "core/array.h"
 #include "core/color.h"
+#include "core/hash_map.h"
 #include "core/math.h"
 #include "core/string.h"
 #include "engine/input_system.h"
@@ -49,6 +50,11 @@ enum class AttributeName : u8 {
 	PLACEHOLDER,
 
 	INVALID
+};
+
+enum class AttributeSource : u8 {
+	ELEMENT,
+	STYLESHEET
 };
 
 enum class Direction : u8 {
@@ -99,16 +105,31 @@ struct IFontManager {
 	virtual SplitWord splitFirstWord(FontHandle font, StringView text) = 0;
 };
 
+enum class InternString : u32 { INVALID = 0 };
+
+struct InternTable {
+	Array<String> strings;
+	HashMap<StringView, u32> map;
+	IAllocator& allocator;
+
+	InternTable(IAllocator& allocator) : strings(allocator), map(allocator), allocator(allocator) {}
+
+	InternString intern(StringView s);
+	StringView resolve(InternString id) const;
+};
+
 struct Attribute {
 	AttributeName type;
 	StringView value;
+	AttributeSource source;
 };
 
 struct StyleRule {
-	StringView selector;
+	Array<InternString> classes;
 	Array<Attribute> attributes;
 
-	StyleRule(StringView sel, Array<Attribute>&& attrs) : selector(sel), attributes(attrs.move()) {}
+	StyleRule(IAllocator& allocator) : classes(allocator), attributes(allocator) {}
+	StyleRule(StyleRule&& other) : classes(other.classes.move()), attributes(other.attributes.move()) {}
 };
 
 struct Stylesheet {
@@ -124,31 +145,31 @@ struct SpanLine {
 	float width;
 };
 
-struct MarginPaddings {
+struct BoxSpacing {
 	float top, right, bottom, left;
 };
 
 struct Element {
 	Element() = default;
-	Element(Tag t, IAllocator& allocator) : tag(t), children(allocator), attributes(allocator), lines(allocator) {}
+	Element(Tag t, IAllocator& allocator) : tag(t), children(allocator), attributes(allocator), lines(allocator), classes(allocator) {}
 
 	Tag tag;
 	Array<u32> children;
 	Array<Attribute> attributes;
+	Array<InternString> classes;
 	
 	// runtime computed data
 	Vec2 position;
 	Vec2 size;
 	StringView value;
 	Array<SpanLine> lines;
-	StringView style_class;
 	Sprite* bg_sprite = nullptr;
 	IFontManager::FontHandle font_handle = nullptr;
 	float font_size = 0;
 	Color color = Color::WHITE;
 	Color bg_color = Color::BLACK;
-	MarginPaddings margins;
-	MarginPaddings paddings;
+	BoxSpacing margins;
+	BoxSpacing paddings;
 	Direction direction = Direction::COLUMN;
 	JustifyContent justify_content = JustifyContent::START;
 	AlignItems align_items = AlignItems::STRETCH;
@@ -169,6 +190,8 @@ enum class EventType {
 	KEY_UP,
 	TEXT_INPUT,
 	CLICK,
+	MOUSE_ENTER,
+	MOUSE_LEAVE,
 	INVALID
 };
 
@@ -189,6 +212,7 @@ struct Document {
 	Array<Element> m_elements;
 	Array<u32> m_roots;
 	Stylesheet m_stylesheet;
+	InternTable m_intern_table;
 	bool m_suppress_logging = false;
 	UITokenizer m_tokenizer;
 	IFontManager* m_font_manager;
@@ -199,11 +223,13 @@ struct Document {
 	float m_layout_duration = 0;
 	float m_parse_duration = 0;
 	float m_render_duration = 0;
+	u32 m_hovered_element_index = 0xFFFF'FFFF;
 
 	Document(IFontManager* font_manager, IAllocator& allocator)
 		: m_elements(allocator)
 		, m_roots(allocator)
 		, m_stylesheet(allocator)
+		, m_intern_table(allocator)
 		, m_suppress_logging(false)
 		, m_tokenizer()
 		, m_font_manager(font_manager)
@@ -220,6 +246,10 @@ struct Document {
 	void computeLayout(Vec2 canvas_size);
 	void render(Draw2D& draw);
 	Element* getElementAt(Vec2 pos);
+
+	void addClass(u32 element_index, StringView classname);
+	void removeClass(u32 element_index, StringView classname);
+	void recomputeStyles();
 
 	//@ function
 	Span<const Event> getEvents();

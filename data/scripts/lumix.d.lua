@@ -335,6 +335,7 @@ type gui_text_component =  {
 
 type gui_ng_module = {
 	getDocument: (gui_ng_module) -> any,
+	isReady: (gui_ng_module) -> boolean,
 }
 
 type lua_script_module = {
@@ -950,6 +951,8 @@ declare this : Entity
 			KEY_UP : number,
 			TEXT_INPUT : number,
 			CLICK : number,
+			MOUSE_ENTER : number,
+			MOUSE_LEAVE : number,
 			INVALID : number,
 		},
 		GrassRotationMode : {

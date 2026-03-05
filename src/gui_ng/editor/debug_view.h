@@ -26,8 +26,16 @@ static void debugElementGUI(const Document& document, u32 element_idx, int depth
 	StaticString<64> size_str;
 	size_str.append(" (", element->size.x, "x", element->size.y, ")");
 
-	if (!element->style_class.empty()) {
-		size_str.append(" .", StringView(element->style_class.begin, element->style_class.size()));
+	if (!element->classes.empty()) {
+		size_str.append(" .");
+		bool first = true;
+		for (InternString cid : element->classes) {
+			u32 class_id = (u32)cid;
+			StringView class_name = document.m_intern_table.resolve((InternString)class_id);
+			if (!first) size_str.append(" ");
+			size_str.append(class_name);
+			first = false;
+		}
 	}
 
 	if (!element->attributes.empty()) {
@@ -71,8 +79,17 @@ static void debugElementGUI(const Document& document, u32 element_idx, int depth
 		ImGui::Text("Size: (%.1f, %.1f)", element->size.x, element->size.y);
 		ImGui::Text("Children: %d", element->children.size());
 
-		if (!element->style_class.empty()) {
-			ImGui::Text("Class: %.*s", (int)element->style_class.size(), element->style_class.begin);
+		if (!element->classes.empty()) {
+			StaticString<256> class_str;
+			bool first = true;
+			for (InternString cid : element->classes) {
+				u32 class_id = (u32)cid;
+				StringView class_name = document.m_intern_table.resolve((InternString)class_id);
+				if (!first) class_str.append(" ");
+				class_str.append(class_name);
+				first = false;
+			}
+			ImGui::Text("Class: %s", class_str.data);
 		}
 
 		if (!element->attributes.empty()) {

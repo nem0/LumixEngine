@@ -2,12 +2,36 @@
 #include "tests/common.h"
 
 using namespace Lumix;
+using namespace ui;
 
 namespace {
 
 bool testDocumentParseEmpty() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "");
+	return true;
+}
+
+bool testInternTableSemantics() {
+	MockDocument doc;
+	
+	// Test same string returns same id
+	u32 id1 = (u32)doc.m_intern_table.intern("class1");
+	u32 id2 = (u32)doc.m_intern_table.intern("class1");
+	ASSERT_EQ(id1, id2);
+	
+	// Test different strings return different ids
+	u32 id3 = (u32)doc.m_intern_table.intern("class2");
+	ASSERT_TRUE(id1 != id3);
+	
+	// Test resolve
+	StringView resolved = doc.m_intern_table.resolve((InternString)id1);
+	ASSERT_EQ(resolved, "class1");
+	
+	// Test invalid id
+	StringView invalid = doc.m_intern_table.resolve(InternString::INVALID);
+	ASSERT_EQ(invalid.size(), 0);
+	
 	return true;
 }
 
@@ -108,7 +132,47 @@ bool testEveryElementAttributes() {
 	ASSERT_EQ("arial.ttf", attrs[3].value);
 	ASSERT_ATTRIBUTE(root, 4, COLOR);
 	ASSERT_EQ("#ffffff", attrs[4].value);
-	ASSERT_TRUE(root->style_class == "testclass");
+	return true;
+}
+
+bool testMultipleClasses() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[panel .class1 .class2 .class3]");
+	ASSERT_EQ(1, doc.m_roots.size());
+	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(3, root->classes.size());
+	StringView class1 = doc.m_intern_table.resolve(root->classes[0]);
+	StringView class2 = doc.m_intern_table.resolve(root->classes[1]);
+	StringView class3 = doc.m_intern_table.resolve(root->classes[2]);
+	ASSERT_EQ("class1", class1);
+	ASSERT_EQ("class2", class2);
+	ASSERT_EQ("class3", class3);
+	
+	return true;
+}
+
+bool testSingleClass() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[panel .singleclass]");
+	ASSERT_EQ(1, doc.m_roots.size());
+	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, root->classes.size());
+	StringView class_name = doc.m_intern_table.resolve(root->classes[0]);
+	ASSERT_EQ("singleclass", class_name);
+	return true;
+}
+
+bool testDuplicateClasses() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[panel .dup .other .dup]");
+	ASSERT_EQ(1, doc.m_roots.size());
+	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	// Should dedup, first occurrence wins, order preserved
+	ASSERT_EQ(2, root->classes.size());
+	StringView class1 = doc.m_intern_table.resolve(root->classes[0]);
+	StringView class2 = doc.m_intern_table.resolve(root->classes[1]);
+	ASSERT_EQ("dup", class1);
+	ASSERT_EQ("other", class2);
 	return true;
 }
 
@@ -434,16 +498,292 @@ bool testSpaceBetweenSpans() {
 	return true;
 }
 
+bool testParseAndRuntimeMutation() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+		[style] {
+			.initial {
+				width: 100%;
+				color: red;
+			}
+			.added {
+				height: 200;
+			}
+		}
+		[panel .initial] {
+		}
+	)");
+	Span<u32> roots = doc.m_roots;
+	ASSERT_EQ(1, doc.m_roots.size());
+	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	
+	// Initial: has width and color from .initial
+	bool has_width_100 = false;
+	bool has_color_red = false;
+	for (const ui::Attribute& attr : root->attributes) {
+		if (attr.type == ui::AttributeName::WIDTH && equalStrings(attr.value, "100%")) has_width_100 = true;
+		if (attr.type == ui::AttributeName::COLOR && equalStrings(attr.value, "red")) has_color_red = true;
+	}
+	ASSERT_TRUE(has_width_100);
+	ASSERT_TRUE(has_color_red);
+	
+	// Runtime: add .added class
+	doc.addClass(roots[0], "added");
+	
+	// Now should have height too
+	bool has_height_200 = false;
+	for (const ui::Attribute& attr : root->attributes) {
+		if (attr.type == ui::AttributeName::HEIGHT && equalStrings(attr.value, "200")) has_height_200 = true;
+	}
+	ASSERT_TRUE(has_height_200);
+	// And still have the others
+	has_width_100 = false;
+	has_color_red = false;
+	for (const ui::Attribute& attr : root->attributes) {
+		if (attr.type == ui::AttributeName::WIDTH && equalStrings(attr.value, "100%")) has_width_100 = true;
+		if (attr.type == ui::AttributeName::COLOR && equalStrings(attr.value, "red")) has_color_red = true;
+	}
+	ASSERT_TRUE(has_width_100);
+	ASSERT_TRUE(has_color_red);
+	
+	return true;
+}
+
+bool testComplexMutationSequence() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+		[style] {
+			.a { width: 10%; }
+			.b { height: 20; }
+			.c { margin: 5; }
+			.d { padding: 3; }
+		}
+		[panel .a .b] {
+		}
+	)");
+	Span<u32> roots = doc.m_roots;
+	ASSERT_EQ(1, doc.m_roots.size());
+	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	
+	// Initial: .a and .b applied
+	int initial_attrs = root->attributes.size();
+	
+	// Add .c
+	doc.addClass(roots[0], "c");
+	int after_add_c = root->attributes.size();
+	ASSERT_TRUE(after_add_c > initial_attrs);
+	
+	// Add .d
+	doc.addClass(roots[0], "d");
+	int after_add_d = root->attributes.size();
+	ASSERT_TRUE(after_add_d > after_add_c);
+	
+	// Remove .b
+	doc.removeClass(roots[0], "b");
+	int after_remove_b = root->attributes.size();
+	ASSERT_TRUE(after_remove_b < after_add_d);
+	
+	// Remove .a and .c
+	doc.removeClass(roots[0], "a");
+	doc.removeClass(roots[0], "c");
+	int final_attrs = root->attributes.size();
+	
+	// Should only have .d
+	bool has_padding = false;
+	int attr_count = 0;
+	for (const ui::Attribute& attr : root->attributes) {
+		attr_count++;
+		if (attr.type == ui::AttributeName::PADDING && equalStrings(attr.value, "3")) has_padding = true;
+	}
+	ASSERT_TRUE(has_padding);
+	ASSERT_EQ(1, attr_count);
+	
+	return true;
+}
+
+struct MockMouseDevice : InputSystem::Device {
+	MockMouseDevice() { type = InputSystem::Device::MOUSE; }
+	void update(float dt) override {}
+	const char* getName() const override { return "MockMouse"; }
+};
+
+bool testHoverEvents() {
+	MockDocument doc;
+	doc.m_canvas_size = Vec2(800, 600);
+	// Create two panels: one at (0,0) with size (100,100), another below it at (0,100) with size (100,100)
+	ASSERT_PARSE(doc, "[panel .p1 width=100 height=100] {} [panel .p2 width=100 height=100] {}");
+	doc.computeLayout(doc.m_canvas_size);
+
+	MockMouseDevice mouse;
+	InputSystem::Event ev;
+	ev.device = &mouse;
+	ev.type = InputSystem::Event::AXIS;
+	ev.data.axis.x_abs = 50;
+	ev.data.axis.y_abs = 50;
+
+	// Initial move to (50,50) - should enter .p1 (index 0)
+	doc.injectEvent(ev);
+	
+	{
+		Span<const ui::Event> events = doc.getEvents();
+		bool found_enter = false;
+		for (const ui::Event& e : events) {
+			if (e.type == ui::EventType::MOUSE_ENTER && e.element_index == 0) {
+				found_enter = true;
+			}
+		}
+		if (!found_enter) { logError("Initial MOUSE_ENTER not found for index 0"); return false; }
+	}
+	doc.clearEvents();
+
+	// Move to (50, 150) - should leave .p1 (index 0) and enter .p2 (index 1)
+	ev.data.axis.y_abs = 150;
+	doc.injectEvent(ev);
+
+	{
+		Span<const ui::Event> events = doc.getEvents();
+		bool found_leave = false;
+		bool found_enter = false;
+		u32 leave_idx = 0xFFFF'FFFF;
+		u32 enter_idx = 0xFFFF'FFFF;
+
+		for (const ui::Event& e : events) {
+			if (e.type == ui::EventType::MOUSE_LEAVE) {
+				found_leave = true;
+				leave_idx = e.element_index;
+			}
+			if (e.type == ui::EventType::MOUSE_ENTER) {
+				found_enter = true;
+				enter_idx = e.element_index;
+			}
+		}
+		if (!found_leave) { logError("MOUSE_LEAVE not found"); return false; }
+		ASSERT_EQ(0, (int)leave_idx);
+		if (!found_enter) { logError("MOUSE_ENTER not found"); return false; }
+		ASSERT_EQ(1, (int)enter_idx);
+	}
+	doc.clearEvents();
+
+	// Move to (300, 300) - should leave .p2 (index 1) and enter nothing
+	ev.data.axis.x_abs = 300;
+	ev.data.axis.y_abs = 300;
+	doc.injectEvent(ev);
+
+	{
+		Span<const ui::Event> events = doc.getEvents();
+		bool found_leave = false;
+		bool found_enter = false;
+		u32 leave_idx = 0xFFFF'FFFF;
+
+		for (const ui::Event& e : events) {
+			if (e.type == ui::EventType::MOUSE_LEAVE) {
+				found_leave = true;
+				leave_idx = e.element_index;
+			}
+			if (e.type == ui::EventType::MOUSE_ENTER) {
+				found_enter = true;
+			}
+		}
+		if (!found_leave) { logError("MOUSE_LEAVE not found when leaving elements"); return false; }
+		ASSERT_EQ(1, (int)leave_idx);
+		if (found_enter) { logError("Unexpected MOUSE_ENTER when moving to empty space"); return false; }
+	}
+
+	return true;
+}
+
+bool testDemoUI() {
+	MockDocument doc;
+	const char* ui_content = R"(
+	[style] {
+		.button {
+			width: 120;
+			bg-color: #ffffFF;
+			align: center;
+			padding: 0.5em;
+			margin: 1em;
+		}
+
+		.hovered {
+			bg-color: #ff0000;
+		}
+	}
+	[panel direction=row padding=20 width=100% font-size=20 bg-color=#00ff00] {
+		[panel .button] { Button 1 }
+		[panel .button] { Button 2 }
+	}
+	)";
+	ASSERT_PARSE(doc, ui_content);
+	
+	Span<u32> roots = doc.m_roots;
+	ASSERT_EQ(1, roots.size());
+	
+	Span<ui::StyleRule> rules = doc.m_stylesheet.getRules();
+	ASSERT_EQ(2, rules.size());
+	
+	ui::Element* root = doc.getElement(roots[0]);
+	ASSERT_TAG(root, PANEL);
+	ASSERT_EQ(2, root->children.size());
+	
+	doc.computeLayout(Vec2(800, 600));
+	
+	ASSERT_FLOAT_EQ(800.0f, root->size.x);
+	ASSERT_TRUE(root->size.y > 0.0f);
+	
+	ui::Element* button1 = doc.getElement(root->children[0]);
+	ui::Element* button2 = doc.getElement(root->children[1]);
+	
+	ASSERT_FLOAT_EQ(40.0f, button1->position.x);
+	ASSERT_FLOAT_EQ(180.0f, button2->position.x);
+	
+	ASSERT_FLOAT_EQ(button1->position.y, button2->position.y);
+	
+	float expected_width = 120.0f;
+	ASSERT_FLOAT_EQ(expected_width, button1->size.x);
+	ASSERT_FLOAT_EQ(expected_width, button2->size.x);
+	
+	doc.addClass(root->children[0], "hovered");
+	
+	bool has_hovered_bg = false;
+	for (const ui::Attribute& attr : button1->attributes) {
+		if (attr.type == ui::AttributeName::BG_COLOR && equalStrings(attr.value, "#ff0000")) {
+			has_hovered_bg = true;
+			break;
+		}
+	}
+	ASSERT_TRUE(has_hovered_bg);
+	
+	// reassert, layout should not change
+	ASSERT_FLOAT_EQ(800.0f, root->size.x);
+	ASSERT_TRUE(root->size.y > 0.0f);
+	
+	ASSERT_FLOAT_EQ(40.0f, button1->position.x);
+	ASSERT_FLOAT_EQ(180.0f, button2->position.x);
+	
+	ASSERT_FLOAT_EQ(button1->position.y, button2->position.y);
+	
+	ASSERT_FLOAT_EQ(expected_width, button1->size.x);
+	ASSERT_FLOAT_EQ(expected_width, button2->size.x);
+
+	return true;
+}
+
 } // namespace
 
 void runUITests() {
+	logInfo("=== Running UI Tests ===");
+	
 	RUN_TEST(testDocumentParseEmpty);
+	RUN_TEST(testInternTableSemantics);
 	RUN_TEST(testDocumentParseSimple);
 	RUN_TEST(testDocumentParseInvalidClosingBrace);
 	RUN_TEST(testDocumentParseNested);
 	RUN_TEST(testDocumentParseComplexNesting);
 	RUN_TEST(testAttributes);
 	RUN_TEST(testEveryElementAttributes);
+	RUN_TEST(testMultipleClasses);
+	RUN_TEST(testSingleClass);
+	RUN_TEST(testDuplicateClasses);
 	RUN_TEST(testBlockAttributes);
 	RUN_TEST(testPanelAttributes);
 	RUN_TEST(testImageAttributes);
@@ -460,4 +800,8 @@ void runUITests() {
 	RUN_TEST(testMultilineStringLayout);
 	RUN_TEST(testTextWithSpecialChars);
 	RUN_TEST(testSpaceBetweenSpans);
+	RUN_TEST(testParseAndRuntimeMutation);
+	RUN_TEST(testComplexMutationSequence);
+	RUN_TEST(testHoverEvents);
+	RUN_TEST(testDemoUI);
 }
