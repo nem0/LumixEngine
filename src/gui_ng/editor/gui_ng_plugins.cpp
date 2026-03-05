@@ -57,7 +57,6 @@ struct UIEditorWindow : AssetEditorWindow {
 		, m_path(path)
 		, m_stored_text(app.getAllocator())
 		, m_autocomplete_list(app.getAllocator())
-		, m_autocomplete_action("UI Editor", "Autocomplete", "Autocomplete", "ui_autocomplete", "", Action::NORMAL)
 	{
 		Engine& engine = m_app.getEngine();
 		Renderer& renderer = *static_cast<Renderer*>(engine.getSystemManager().getSystem("renderer"));
@@ -212,7 +211,7 @@ struct UIEditorWindow : AssetEditorWindow {
 	void handleAutocomplete() {
 		if (!m_editor->canHandleInput()) return;
 		if (m_editor->getNumCursors() != 1) return;
-		if (!m_app.checkShortcut(m_autocomplete_action)) return;
+		if (!m_app.checkShortcut(m_app.getCommonActions().autocomplete)) return;
 
 		StringView prefix = m_editor->getPrefix();
 
@@ -294,7 +293,6 @@ struct UIEditorWindow : AssetEditorWindow {
 	Array<String> m_autocomplete_list;
 	u32 m_autocomplete_selection_idx = 0;
 	TextFilter m_autocomplete_filter;
-	Action m_autocomplete_action;
 	ui::IFontManager* m_font_manager = nullptr;
 	ui::Document* m_document = nullptr;
 	Vec2 m_previous_canvas_size = Vec2(0, 0);

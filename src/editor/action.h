@@ -72,6 +72,7 @@ struct CommonActions {
 	Action close_window;
 	Action open_externally;
 	Action view_in_browser;
+	Action autocomplete;
 };
 
 inline Action::Modifiers operator |(Action::Modifiers a, Action::Modifiers b) { return Action::Modifiers((u8)a | (u8)b); }

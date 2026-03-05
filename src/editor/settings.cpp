@@ -76,6 +76,7 @@ static bool shortcutInput(char* button_label, Action& action, StudioApp& app) {
 				case os::Keycode::RETURN:
 					action.shortcut = editing.shortcut;
 					action.modifiers = editing.modifiers;
+					res = true;
 					app.setCaptureInput(false);
 					ImGui::CloseCurrentPopup();
 					break;
@@ -948,6 +949,7 @@ static void shortcutsGUI(const TextFilter& filter, Settings& settings) {
 			ImGui::TableNextColumn();
 			if (shortcutInput(button_label, *a, settings.m_app)) {
 				settings.m_edit_action = a;
+				settings.m_dirty = true;
 			}
 			ImGui::PopID();
 		}

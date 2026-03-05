@@ -24,6 +24,7 @@ CommonActions::CommonActions()
 	, close_window{"Common", "Close", "Close window", "close_window", ""}
 	, open_externally{"Common", "Open externally", "Open externally", "open_externally", ICON_FA_EXTERNAL_LINK_ALT}
 	, view_in_browser{"Common", "View in browser", "View in asset browser", "view_in_asset_browser", ICON_FA_SEARCH}
+	, autocomplete{"Common", "Autocomplete", "Autocomplete", "edit_autocomplete", ICON_FA_LIGHTBULB }
 {}
 
 }

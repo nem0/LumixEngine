@@ -771,6 +771,9 @@ static void computeParentRelativeWidth(Document& doc, Element& elem) {
 	for (u32 child_idx : elem.children) {
 		Element& child = doc.m_elements[child_idx];
 		if (child.width_unit.unit == Unit::PERCENT) {
+			if (elem.width_unit.unit == Unit::FIT_CONTENT) {
+				logError("Element with fit-content width has child with percent width");
+			}
 			child.size.x = computeAbsoluteSize(child.width_unit, elem.size.x, child.font_size);
 		}
 		computeParentRelativeWidth(doc, doc.m_elements[child_idx]);
