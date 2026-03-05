@@ -44,7 +44,7 @@ bool testStyleApplication() {
 				width: 50%;
 			}
 		}
-		[panel .some_class] {
+		[box .some_class] {
 		}
 	)");
 	Span<u32> roots = doc.m_roots;
@@ -70,7 +70,7 @@ bool testInlineOverridesStylesheet() {
 				width: 50%;
 			}
 		}
-		[panel .some_class width=75%] {
+		[box .some_class width=75%] {
 		}
 	)");
 	Span<u32> roots = doc.m_roots;
@@ -99,7 +99,7 @@ bool testMultipleClassesMatching() {
 				height: 100;
 			}
 		}
-		[panel .class1 .class2] {
+		[box .class1 .class2] {
 		}
 	)");
 	Span<u32> roots = doc.m_roots;
@@ -129,7 +129,7 @@ bool testClassNotMatching() {
 				width: 50%;
 			}
 		}
-		[panel .present] {
+		[box .present] {
 		}
 	)");
 	Span<u32> roots = doc.m_roots;
@@ -155,7 +155,7 @@ bool testRecomputeIdempotence() {
 				height: 100;
 			}
 		}
-		[panel .some_class] {
+		[box .some_class] {
 		}
 	)");
 	Span<u32> roots = doc.m_roots;
@@ -190,7 +190,7 @@ bool testAddClassWithFontAttribute() {
 				font-size: 28;
 			}
 		}
-		[panel] {
+		[box] {
 		}
 	)");
 	Span<u32> roots = doc.m_roots;
@@ -218,7 +218,7 @@ bool testRemoveClassWithFontAttribute() {
 				font-size: 28;
 			}
 		}
-		[panel .large_font] {
+		[box .large_font] {
 		}
 	)");
 	Span<u32> roots = doc.m_roots;
@@ -253,7 +253,7 @@ bool testAddClassDuplicateNoOp() {
 				width: 50%;
 			}
 		}
-		[panel] {
+		[box] {
 		}
 	)");
 	Span<u32> roots = doc.m_roots;
@@ -304,7 +304,7 @@ bool testRemoveClassRemovesEffect() {
 				width: 50%;
 			}
 		}
-		[panel .test_class] {
+		[box .test_class] {
 		}
 	)");
 	Span<u32> roots = doc.m_roots;
@@ -343,7 +343,7 @@ bool testRemoveAbsentClassNoOp() {
 				width: 50%;
 			}
 		}
-		[panel .present] {
+		[box .present] {
 		}
 	)");
 	Span<u32> roots = doc.m_roots;
@@ -385,7 +385,7 @@ bool testRemoveClassRetainsOthers() {
 				height: 100;
 			}
 		}
-		[panel .class1 .class2] {
+		[box .class1 .class2] {
 		}
 	)");
 	Span<u32> roots = doc.m_roots;
@@ -434,7 +434,7 @@ bool testInlineOverridesClass() {
 				width: 50%;
 			}
 		}
-		[panel .test_class width=75%] {
+		[box .test_class width=75%] {
 		}
 	)");
 	Span<u32> roots = doc.m_roots;
@@ -463,7 +463,7 @@ bool testMultipleClassPrecedence() {
 				width: 75%;
 			}
 		}
-		[panel .class1 .class2] {
+		[box .class1 .class2] {
 		}
 	)");
 	Span<u32> roots = doc.m_roots;
@@ -492,7 +492,7 @@ bool testAddRemoveStability() {
 				height: 100;
 			}
 		}
-		[panel] {
+		[box] {
 		}
 	)");
 	Span<u32> roots = doc.m_roots;
@@ -574,7 +574,7 @@ bool testCompoundClassSelectorMatchesAllClasses() {
 				width: 75%;
 			}
 		}
-		[panel .button .hovered] {
+		[box .button .hovered] {
 		}
 	)");
 	Span<u32> roots = doc.m_roots;
@@ -599,7 +599,7 @@ bool testCompoundClassSelectorDoesNotMatchWhenMissingClass() {
 				width: 75%;
 			}
 		}
-		[panel .button] {
+		[box .button] {
 		}
 	)");
 	Span<u32> roots = doc.m_roots;
@@ -627,7 +627,7 @@ bool testCompoundAndSingleClassRulesBothApply() {
 				width: 75%;
 			}
 		}
-		[panel .button .hovered] {
+		[box .button .hovered] {
 		}
 	)");
 	Span<u32> roots = doc.m_roots;

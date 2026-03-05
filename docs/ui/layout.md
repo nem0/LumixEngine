@@ -43,10 +43,10 @@ _Note: The implementation may reorder the steps internally, but the behavior mus
 
 ## Text
 
-Text content in UI panels is created using `span` elements with a `value` attribute or unquoted text directly inside a panel block. Text flows inline and can wrap to multiple lines when `wrap=true` and the content exceeds the panel's available width (after subtracting padding).
+Text content in UI panels is created using `span` elements with a `value` attribute or unquoted text directly inside a box block. Text flows inline and can wrap to multiple lines when `wrap=true` and the content exceeds the box's available width (after subtracting padding).
 
 ```css
-[panel] {
+[box] {
   Some unquoted text
   [span color=#ff0000 value="Styled text"]
 }
@@ -62,7 +62,7 @@ Whitespace in text content is normalized similarly to HTML:
 Unquoted text spanning multiple lines in markup is treated as a single line:
 
 ```css
-[panel] {
+[box] {
   This is multiline
   text in markup
 }
@@ -93,7 +93,7 @@ For visual consistency, inline elements align to a baseline:
 When `wrap=true`, text wraps to new lines using word boundaries:
 - Words are split at spaces, and lines break when a word doesn't fit.
 - Spaces are preserved between words on the same line.
-- Wrapping occurs at the panel's content width (width minus padding).
+- Wrapping occurs at the box's content width (width minus padding).
 
 ### Line Breaks
 
@@ -102,9 +102,9 @@ Line breaks occur only at block-level elements. Inline elements flow continuousl
 **Row direction example**:
 
 ```css
-[panel direction="row"] {
+[box direction="row"] {
   First line text flows here
-  [panel width=100 height=50] { Block panel causes line break }
+  [box width=100 height=50] { Block box causes line break }
   [span value="and text continues on new line below"]
 }
 ```
@@ -115,7 +115,7 @@ Visual result:
 +------------------------------+
 | First line text flows here   |
 | +---------------------+      |
-| | Block panel causes  |      |
+| | Block box causes    |      |
 | | line break          |      |
 | +---------------------+      |
 | and text continues on new    |
@@ -126,9 +126,9 @@ Visual result:
 **Column direction example** (note: `"Text above"` renders horizontally within its inline slot):
 
 ```css
-[panel direction="column"] {
+[box direction="column"] {
   [span value="Text above"]
-  [panel width=100 height=50 bgColor="red"] { }
+  [box width=100 height=50 bgColor="red"] { }
   [span value="Text below"]
 }
 ```
@@ -141,7 +141,7 @@ Visual result:
 | above |  <- horizontal text
 +-------+
 |       |
-|       | <- red panel
+|       | <- red box
 |       |
 +-------+
 | Text  |
@@ -156,7 +156,7 @@ This approach treats inline elements as a unified flow, with blocks serving as n
 Text alignment controls how text is positioned horizontally within its container. The `align` attribute can be set to `left`, `center`, or `right`, with `left` as the default.
 
 ```css
-[panel align=center] {
+[box align=center] {
   "Centered text"
 }
 ```
@@ -167,11 +167,11 @@ Text alignment is inherited by child elements that contain text.
 
 ## Element Sizing
 
-Each UI element has `width` and `height` attributes that control its size, known as dimensions. Set them explicitly for a fixed size; otherwise, they default to `fit-content`, sizing the element to its content. Root elements behave like they are children of a panel that covers the whole screen with 0 padding and `direction=column`.
+Each UI element has `width` and `height` attributes that control its size, known as dimensions. Set them explicitly for a fixed size; otherwise, they default to `fit-content`, sizing the element to its content. Root elements behave like they are children of a box that covers the whole screen with 0 padding and `direction=column`.
 
 Example
 ```css
-[panel width=50% height=3em] { ... }
+[box width=50% height=3em] { ... }
 ```
 
 ### Units
@@ -197,29 +197,29 @@ When using `fit-content` sizing, margins are included in the total size calculat
 The `grow` attribute controls how an element expands to fill available space in its parent container along the main axis, similar to CSS `flex-grow`. It is a numeric weight (default `0`, meaning no growing). Elements with a non-zero `grow` value share the remaining space in proportion to their weights after all fixed-size children have been measured.
 
 ```css
-[panel direction="row" width=350] {
-  [panel width=100] { Fixed width }
-  [panel grow=1] { Grows to fill the rest (250px) }
+[box direction="row" width=350] {
+  [box width=100] { Fixed width }
+  [box grow=1] { Grows to fill the rest (250px) }
 }
 ```
 
 Multiple growing elements split the remaining space proportionally:
 
 ```css
-[panel direction="row" width=400] {
-  [panel width=100] { Fixed (100px) }
-  [panel grow=2] { Gets 2/3 of remaining 300px = 200px }
-  [panel grow=1] { Gets 1/3 of remaining 300px = 100px }
+[box direction="row" width=400] {
+  [box width=100] { Fixed (100px) }
+  [box grow=2] { Gets 2/3 of remaining 300px = 200px }
+  [box grow=1] { Gets 1/3 of remaining 300px = 100px }
 }
 ```
 
 Left-fill-right (the classic toolbar pattern) works correctly because growing is computed in a two-pass manner — fixed children are sized first, then remaining space is distributed among all `grow` children:
 
 ```css
-[panel direction="row" width=400] {
-  [panel width=100] { Left }
-  [panel grow=1] { Middle (200px) }
-  [panel width=100] { Right }
+[box direction="row" width=400] {
+  [box width=100] { Left }
+  [box grow=1] { Middle (200px) }
+  [box width=100] { Right }
 }
 ```
 

@@ -11,21 +11,21 @@
 		width: 100%;
 	}
 }
-[panel width=100% height=100% font-size=30] {
-	[panel .header] { Space removed }
-	[panel padding=1em direction=column width=100%] {
-		[panel .odd_row] { [span value="AAA"][span value="000"] }
-		[panel .even_row] { [span value="AAA"]      [span value="000"] }
-		[panel .odd_row] { [span value="AAA"] 000 }
+[box width=100% height=100% font-size=30] {
+	[box .header] { Space removed }
+	[box padding=1em direction=column width=100%] {
+		[box .odd_row] { [span value="AAA"][span value="000"] }
+		[box .even_row] { [span value="AAA"]      [span value="000"] }
+		[box .odd_row] { [span value="AAA"] 000 }
 	}
 	
-	[panel .header] { Space kept }
-	[panel padding=1em direction=column width=100%] {
-		[panel .odd_row] { AAA 000 }
-		[panel .even_row] { [span value="AAA "][span value="000"] }
-		[panel .odd_row] { [span value="AAA "][span value=" 000"] }
-		[panel .even_row] { [span value="AAA"][span value=" 000"] }
-		[panel .odd_row] { AAA [span value=" 000"] }
-		[panel .even_row] { [span value="AAA "] 000 }
+	[box .header] { Space kept }
+	[box padding=1em direction=column width=100%] {
+		[box .odd_row] { AAA 000 }
+		[box .even_row] { [span value="AAA "][span value="000"] }
+		[box .odd_row] { [span value="AAA "][span value=" 000"] }
+		[box .even_row] { [span value="AAA"][span value=" 000"] }
+		[box .odd_row] { AAA [span value=" 000"] }
+		[box .even_row] { [span value="AAA "] 000 }
 	}
 }

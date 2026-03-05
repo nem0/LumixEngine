@@ -46,7 +46,7 @@ static bool isIdentifierChar(char c) { return c == '_' || c == '-' || isLetter(c
 
 static bool tokenize(const char* str, u32& token_len, u8& token_type, u8 prev_token_type) {
 	static const char* tags[] = {
-		"panel",
+		"box",
 		"image",
 		"span",
 	};

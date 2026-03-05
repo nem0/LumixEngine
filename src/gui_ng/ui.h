@@ -18,7 +18,7 @@ struct SplitWord;
 namespace ui {
 
 enum class Tag : u8 {
-	PANEL,
+	BOX,
 	IMAGE,
 	SPAN,
 	INVALID

@@ -21,34 +21,34 @@
 	}
 }
 
-[panel direction=column font="/engine/editor/fonts/JetBrainsMono-Regular.ttf" font-size=25] {
-	[panel .demo-label] { Align-Items Vertical Layout Showcase }
+[box direction=column font="/engine/editor/fonts/JetBrainsMono-Regular.ttf" font-size=25] {
+	[box .demo-label] { Align-Items Vertical Layout Showcase }
 
-	[panel .demo-label] { start - Items aligned to the left (start of cross axis) }
-	[panel .demo-panel direction=column align-items=start] {
-		[panel .demo-item] { 1 }
-		[panel .demo-item] { 2 }
-		[panel .demo-item] { 3 }
+	[box .demo-label] { start - Items aligned to the left (start of cross axis) }
+	[box .demo-panel direction=column align-items=start] {
+		[box .demo-item] { 1 }
+		[box .demo-item] { 2 }
+		[box .demo-item] { 3 }
 	}
 
-	[panel .demo-label] { center - Items centered horizontally (cross axis) }
-	[panel .demo-panel direction=column align-items=center] {
-		[panel .demo-item width=60] { 1 }
-		[panel .demo-item width=80] { 2 }
-		[panel .demo-item width=70] { 3 }
+	[box .demo-label] { center - Items centered horizontally (cross axis) }
+	[box .demo-panel direction=column align-items=center] {
+		[box .demo-item width=60] { 1 }
+		[box .demo-item width=80] { 2 }
+		[box .demo-item width=70] { 3 }
 	}
 
-	[panel .demo-label] { end - Items aligned to the right (end of cross axis) }
-	[panel .demo-panel direction=column align-items=end] {
-		[panel .demo-item width=60] { 1 }
-		[panel .demo-item width=80] { 2 }
-		[panel .demo-item width=70] { 3 }
+	[box .demo-label] { end - Items aligned to the right (end of cross axis) }
+	[box .demo-panel direction=column align-items=end] {
+		[box .demo-item width=60] { 1 }
+		[box .demo-item width=80] { 2 }
+		[box .demo-item width=70] { 3 }
 	}
 
-	[panel .demo-label] { stretch - Items stretched to fill width (cross axis) }
-	[panel .demo-panel direction=column align-items=stretch] {
-		[panel .demo-item] { 1 }
-		[panel .demo-item] { 2 }
-		[panel .demo-item width=100] { 3 }
+	[box .demo-label] { stretch - Items stretched to fill width (cross axis) }
+	[box .demo-panel direction=column align-items=stretch] {
+		[box .demo-item] { 1 }
+		[box .demo-item] { 2 }
+		[box .demo-item width=100] { 3 }
 	}
 }

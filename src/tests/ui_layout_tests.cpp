@@ -7,11 +7,11 @@ namespace {
 
 bool testTwoPanelsLayout() {
 	// Citation: layout.md - Element Sizing
-	// "Root elements behave like they are children of a panel that covers the whole screen with 0 padding and `direction=column`."
+	// "Root elements behave like they are children of a box that covers the whole screen with 0 padding and `direction=column`."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=100% height=100]
-	[panel width=150 height=80]
+	[box width=100% height=100]
+	[box width=150 height=80]
 	)");
 	Span<u32> root_indices = doc.m_roots;
 	ASSERT_EQ(2, root_indices.size());
@@ -35,11 +35,11 @@ bool testTwoPanelsLayout() {
 
 bool testPercentHeightOnRoot() {
 	// Citation: layout.md - Element Sizing
-	// "Root elements behave like they are children of a panel that covers the whole screen with 0 padding and `direction=column`."
+	// "Root elements behave like they are children of a box that covers the whole screen with 0 padding and `direction=column`."
 	// "%: Percentage of parent (or viewport for roots). E.g., `width=50%` for half the parent's width.
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=100 height=50%]
+	[box width=100 height=50%]
 	)");
 	Span<u32> root_indices = doc.m_roots;
 	ASSERT_EQ(1, root_indices.size());
@@ -60,9 +60,9 @@ bool testJustifyCenter() {
 
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=400 height=200 direction=row justify-content=center] {
-		[panel width=50 height=50] {}
-		[panel width=50 height=50] {}
+	[box width=400 height=200 direction=row justify-content=center] {
+		[box width=50 height=50] {}
+		[box width=50 height=50] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -82,9 +82,9 @@ bool testJustifyStart() {
 	// "- `start`: Elements are placed sequentially starting from the container's start edge plus padding"
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=400 height=200 direction=row justify-content=start] {
-		[panel width=50 height=50] {}
-		[panel width=50 height=50] {}
+	[box width=400 height=200 direction=row justify-content=start] {
+		[box width=50 height=50] {}
+		[box width=50 height=50] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -103,9 +103,9 @@ bool testJustifyEnd() {
 	// "- `end`: Elements are placed starting from the container's end edge minus padding."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=400 height=200 direction=row justify-content=end] {
-		[panel width=50 height=50] {}
-		[panel width=50 height=50] {}
+	[box width=400 height=200 direction=row justify-content=end] {
+		[box width=50 height=50] {}
+		[box width=50 height=50] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -125,10 +125,10 @@ bool testJustifySpaceBetween() {
 	// Remaining space (container_size - total_sizes - margins - padding) is divided equally among n-1 gaps."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=400 height=200 direction=row justify-content=space-between] {
-		[panel width=50 height=50] {}
-		[panel width=50 height=50] {}
-		[panel width=50 height=50] {}
+	[box width=400 height=200 direction=row justify-content=space-between] {
+		[box width=50 height=50] {}
+		[box width=50 height=50] {}
+		[box width=50 height=50] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -145,14 +145,14 @@ bool testJustifySpaceBetween() {
 }
 
 bool testJustifySpaceAround() {
-	// Citation: elements_attributes.md - panel
+	// Citation: elements_attributes.md - box
 	// "- `space-around`: Equal space is added around each element.
 	// Total space is divided equally around n elements, with each getting space / (2n) on both sides."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=400 height=200 direction=row justify-content=space-around] {
-		[panel width=50 height=50] {}
-		[panel width=50 height=50] {}
+	[box width=400 height=200 direction=row justify-content=space-around] {
+		[box width=50 height=50] {}
+		[box width=50 height=50] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -171,8 +171,8 @@ bool testJustifySpaceAroundSingleChild() {
 	// "With a single child, `space-around` behaves like `center`."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=400 height=200 direction=row justify-content=space-around] {
-		[panel width=50 height=50] {}
+	[box width=400 height=200 direction=row justify-content=space-around] {
+		[box width=50 height=50] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -188,8 +188,8 @@ bool testJustifySpaceBetweenSingleChild() {
 	// "With a single child, `space-between` behaves like `start`."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=400 height=200 direction=row justify-content=space-between] {
-		[panel width=50 height=50] {}
+	[box width=400 height=200 direction=row justify-content=space-between] {
+		[box width=50 height=50] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -205,9 +205,9 @@ bool testJustifyContentWithMargins() {
 	// "In all justification modes, margins between elements are preserved and included in the positioning calculations"
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=400 height=200 direction=row justify-content=end padding=5] {
-		[panel width=50 height=50 margin=10] {}
-		[panel width=50 height=50 margin=10] {}
+	[box width=400 height=200 direction=row justify-content=end padding=5] {
+		[box width=50 height=50 margin=10] {}
+		[box width=50 height=50 margin=10] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -225,9 +225,9 @@ bool testJustifyVerticalCenter() {
 	// "- `center`: Elements are centered as a group."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=400 height=200 direction=column justify-content=center] {
-		[panel width=50 height=50] {}
-		[panel width=50 height=50] {}
+	[box width=400 height=200 direction=column justify-content=center] {
+		[box width=50 height=50] {}
+		[box width=50 height=50] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -246,8 +246,8 @@ bool testPercentLayout() {
 	// "%: Percentage of parent (or viewport for roots). E.g., `width=50%` for half the parent's width."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=400 height=200] {
-		[panel width=50% height=50%] {}
+	[box width=400 height=200] {
+		[box width=50% height=50%] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -267,8 +267,8 @@ bool testPercentMargins() {
 	// "%: Percentage of parent (or viewport for roots). E.g., `width=50%` for half the parent's width."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=400 height=200] {
-		[panel margin=10%] {}
+	[box width=400 height=200] {
+		[box margin=10%] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -289,8 +289,8 @@ bool testMarginPadding() {
 	// "Padding adds internal space within the element's border, expanding its total size."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=400 height=200 margin=10 padding=5] {
-		[panel width=50 height=50] {}
+	[box width=400 height=200 margin=10 padding=5] {
+		[box width=50 height=50] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -310,7 +310,7 @@ bool testBasicLayout() {
 	// Citation: layout.md - Element Sizing
 	// "Each UI element has `width` and `height` attributes that control its size, known as dimensions. Set them explicitly for a fixed size;"
 	MockDocument doc;
-	ASSERT_PARSE(doc, "[panel width=200 height=100] {}");
+	ASSERT_PARSE(doc, "[box width=200 height=100] {}");
 	doc.computeLayout(Vec2(800, 600));
 	ASSERT_TRUE(doc.m_elements.size() >= 1);
 	ui::Element* elem = doc.getElement(0);
@@ -324,8 +324,8 @@ bool testFitContent() {
 	// "- fit-content: Auto-size to content. For panels, sums child sizes. E.g., `width=fit-content`."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=fit-content height=fit-content] {
-		[panel width=640 height=480] {}
+	[box width=fit-content height=fit-content] {
+		[box width=640 height=480] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -341,8 +341,8 @@ bool testFitContentWithMargins() {
 	// "When using `fit-content` sizing, margins are included in the total size calculation for containers, ensuring spacing between children is preserved."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel height=fit-content] {
-		[panel height=100 margin=10] {}
+	[box height=fit-content] {
+		[box height=100 margin=10] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -359,9 +359,9 @@ bool testGrow() {
 	// to fill available space in its parent container along the main axis"
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=300 height=100 direction=row] {
-		[panel width=100 height=50] {}
-		[panel grow=1 height=50] {}
+	[box width=300 height=100 direction=row] {
+		[box width=100 height=50] {}
+		[box grow=1 height=50] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -381,9 +381,9 @@ bool testGrowWithPadding() {
 	// after subtracting padding, and each growing child's margin is also subtracted before distributing."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=300 height=100 direction=row padding=10] {
-		[panel width=100 height=50] {}
-		[panel grow=1 height=50] {}
+	[box width=300 height=100 direction=row padding=10] {
+		[box width=100 height=50] {}
+		[box grow=1 height=50] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -403,9 +403,9 @@ bool testGrowWithMargin() {
 	// after subtracting padding, and each growing child's margin is also subtracted before distributing."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=300 height=100 direction=row] {
-		[panel width=100 height=50 margin=5] {}
-		[panel grow=1 height=50 margin=5] {}
+	[box width=300 height=100 direction=row] {
+		[box width=100 height=50 margin=5] {}
+		[box grow=1 height=50 margin=5] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -425,8 +425,8 @@ bool testGrowSingleChild() {
 	// to fill available space in its parent container along the main axis"
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=300 height=100 direction=row] {
-		[panel grow=1 height=50] {}
+	[box width=300 height=100 direction=row] {
+		[box grow=1 height=50] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -444,10 +444,10 @@ bool testGrowProportional() {
 	// to their weights after all fixed-size children have been measured."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=400 direction=row] {
-		[panel width=100 height=50] {}
-		[panel grow=2 height=50] {}
-		[panel grow=1 height=50] {}
+	[box width=400 direction=row] {
+		[box width=100 height=50] {}
+		[box grow=2 height=50] {}
+		[box grow=1 height=50] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -468,9 +468,9 @@ bool testGrowVertical() {
 	// to fill available space in its parent container along the main axis"
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=200 height=300 direction=column] {
-		[panel width=100 height=50] {}
-		[panel grow=1 width=100] {}
+	[box width=200 height=300 direction=column] {
+		[box width=100 height=50] {}
+		[box grow=1 width=100] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -493,10 +493,10 @@ bool testGrowVerticalMiddle() {
 	// to fill available space in its parent container along the main axis"
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=200 height=300 direction=column] {
-		[panel width=100 height=50] {}
-		[panel grow=1 width=100] {}
-		[panel width=100 height=100] {}
+	[box width=200 height=300 direction=column] {
+		[box width=100 height=50] {}
+		[box grow=1 width=100] {}
+		[box width=100 height=100] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -523,10 +523,10 @@ bool testGrowMiddle() {
 	// then remaining space is distributed among all `grow` children:"
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=300 height=50 direction=row] {
-		[panel width=50 height=50] {}
-		[panel grow=1 height=50] {}
-		[panel width=100 height=50] {}
+	[box width=300 height=50 direction=row] {
+		[box width=50 height=50] {}
+		[box grow=1 height=50] {}
+		[box width=100 height=50] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -552,9 +552,9 @@ bool testGrowParentWithPercentChild() {
 	// after the parent's width has been finalized by grow distribution."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=100% direction=row] {
-		[panel grow=1 height=100 direction=row] {
-			[panel width=100% height=50] {}
+	[box width=100% direction=row] {
+		[box grow=1 height=100 direction=row] {
+			[box width=100% height=50] {}
 		}
 	}
 	)");
@@ -580,8 +580,8 @@ bool testLayoutWithMargins() {
 	// "Adjacent margins combine into the larger value to prevent excessive gaps."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=200 height=100 margin=10] {}
-	[panel width=150 height=80 margin=5] {}
+	[box width=200 height=100 margin=10] {}
+	[box width=150 height=80 margin=5] {}
 	)");
 	Span<u32> root_indices = doc.m_roots;
 	ASSERT_EQ(2, root_indices.size());
@@ -603,9 +603,9 @@ bool testNestedPanelsWithMargins() {
 	// "Child element position relative to parent (for sequential layout with margin collapsing):"
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=400 height=300 padding=10] {
-		[panel width=200 height=100 margin=5] {}
-		[panel width=150 height=80 margin=10] {}
+	[box width=400 height=300 padding=10] {
+		[box width=200 height=100 margin=5] {}
+		[box width=150 height=80 margin=10] {}
 	}
 	)");
 	Span<u32> root_indices = doc.m_roots;
@@ -637,9 +637,9 @@ bool testDirectionRow() {
 	// "The `direction` attribute controls the primary axis along which child elements are arranged within a container. When set to `row`, children are positioned horizontally from left to right."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel direction=row padding=0] {
-		[panel width=100 height=50 margin=0] {}
-		[panel width=150 height=50 margin=0] {}
+	[box direction=row padding=0] {
+		[box width=100 height=50 margin=0] {}
+		[box width=150 height=50 margin=0] {}
 	}
 	)");
 	Span<u32> root_indices = doc.m_roots;
@@ -669,9 +669,9 @@ bool testDirectionColumn() {
 	// "When set to `column` (the default), children are positioned vertically from top to bottom."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel direction=column] {
-		[panel width=100 height=50 margin=5] {}
-		[panel width=100 height=80 margin=5] {}
+	[box direction=column] {
+		[box width=100 height=50 margin=5] {}
+		[box width=100 height=80 margin=5] {}
 	}
 	)");
 	Span<u32> root_indices = doc.m_roots;
@@ -701,9 +701,9 @@ bool testDirectionDefault() {
 	// "When set to `column` (the default), children are positioned vertically from top to bottom."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel] {
-		[panel width=100 height=50] {}
-		[panel width=100 height=80] {}
+	[box] {
+		[box width=100 height=50] {}
+		[box width=100 height=80] {}
 	}
 	)");
 	Span<u32> root_indices = doc.m_roots;
@@ -734,15 +734,15 @@ bool testNestedPanelsDifferentDirections() {
 	// "When set to `column` (the default), children are positioned vertically from top to bottom."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel direction=row width=800 height=600 bg-color=#000000] {
-		[panel direction=column width=150] {
-			[panel width=100 height=50 bg-color=#ffffff] {}
-			[panel width=100 height=60 bg-color=#ff00ff] {}
+	[box direction=row width=800 height=600 bg-color=#000000] {
+		[box direction=column width=150] {
+			[box width=100 height=50 bg-color=#ffffff] {}
+			[box width=100 height=60 bg-color=#ff00ff] {}
 		}
-		[panel direction=column width=200] {
-			[panel width=150 height=40 bg-color=#0000ff] {}
-			[panel width=150 height=70 bg-color=#ff0000] {}
-			[panel width=150 height=30 bg-color=#00ff00] {}
+		[box direction=column width=200] {
+			[box width=150 height=40 bg-color=#0000ff] {}
+			[box width=150 height=70 bg-color=#ff0000] {}
+			[box width=150 height=30 bg-color=#00ff00] {}
 		}
 	}
 	)");
@@ -798,13 +798,13 @@ bool testAdvancedFitContent() {
 	// "- fit-content: Auto-size to content. For panels, sums child sizes. E.g., `width=fit-content`."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=fit-content height=fit-content direction=row] {
-		[panel width=fit-content height=100] {
-			[panel width=200 height=50] {}
+	[box width=fit-content height=fit-content direction=row] {
+		[box width=fit-content height=100] {
+			[box width=200 height=50] {}
 		}
-		[panel width=100 height=fit-content] {
-			[panel height=30] {}
-			[panel height=40] {}
+		[box width=100 height=fit-content] {
+			[box height=30] {}
+			[box height=40] {}
 		}
 	}
 	)");
@@ -859,9 +859,9 @@ bool testDefaultFitContentSimple() {
 	// "| `width` | Sets the element's width. | `fit-content` |"
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel] {
-		[panel width=50 height=30] {}
-		[panel width=70 height=40] {}
+	[box] {
+		[box width=50 height=30] {}
+		[box width=70 height=40] {}
 	}
 	)");
 	Span<u32> root_indices = doc.m_roots;
@@ -884,8 +884,8 @@ bool testDefaultFitContentLeaf() {
 	// "Each UI element has `width` and `height` attributes that control its size, known as dimensions. Set them explicitly for a fixed size; otherwise, they default to `fit-content`,"
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=200 height=100] {
-		[panel] {}
+	[box width=200 height=100] {
+		[box] {}
 	}
 	)");
 	Span<u32> root_indices = doc.m_roots;
@@ -910,9 +910,9 @@ bool testVerticalMarginCollapse() {
 	// "Adjacent margins combine into the larger value to prevent excessive gaps."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel] {
-		[panel margin=10 height=50] {}
-		[panel margin=20 height=50] {}
+	[box] {
+		[box margin=10 height=50] {}
+		[box margin=20 height=50] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -934,9 +934,9 @@ bool testHorizontalMarginCollapse() {
 	// "Adjacent margins combine into the larger value to prevent excessive gaps."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel direction=row] {
-		[panel margin=10 width=50] {}
-		[panel margin=20 width=50] {}
+	[box direction=row] {
+		[box margin=10 width=50] {}
+		[box margin=20 width=50] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -958,10 +958,10 @@ bool testWrap() {
 	// "When `wrap=true`, elements that don't fit on the current line move to the next line (for `direction=row`)"
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=100 height=100 direction=row wrap=true] {
-		[panel width=50 height=50] {}
-		[panel width=50 height=50] {}
-		[panel width=50 height=50] {}
+	[box width=100 height=100 direction=row wrap=true] {
+		[box width=50 height=50] {}
+		[box width=50 height=50] {}
+		[box width=50 height=50] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -988,10 +988,10 @@ bool testNoWrap() {
 	// "`wrap=false` (default): Elements stay on a single line/column, potentially overflowing the container."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=100 height=100 direction=row wrap=nowrap] {
-		[panel width=50 height=50] {}
-		[panel width=50 height=50] {}
-		[panel width=50 height=50] {}
+	[box width=100 height=100 direction=row wrap=nowrap] {
+		[box width=50 height=50] {}
+		[box width=50 height=50] {}
+		[box width=50 height=50] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -1019,10 +1019,10 @@ bool testAlignItemsCenter() {
 	// "- `center`: Elements are centered along the off-axis."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=400 height=200 direction=row align-items=center] {
-		[panel width=50 height=30] {}
-		[panel width=50 height=50] {}
-		[panel width=50 height=40] {}
+	[box width=400 height=200 direction=row align-items=center] {
+		[box width=50 height=30] {}
+		[box width=50 height=50] {}
+		[box width=50 height=40] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -1043,9 +1043,9 @@ bool testAlignItemsStart() {
 	// "- `start`: Elements are aligned to the start of the off-axis (top for row, left for column)."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=400 height=200 direction=row align-items=start] {
-		[panel width=50 height=30] {}
-		[panel width=50 height=40] {}
+	[box width=400 height=200 direction=row align-items=start] {
+		[box width=50 height=30] {}
+		[box width=50 height=40] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -1064,10 +1064,10 @@ bool testAlignItemsEnd() {
 	// "- `end`: Elements are aligned to the end of the off-axis (bottom for row, right for column)."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=400 height=200 direction=row align-items=end] {
-		[panel width=50 height=30] {}
-		[panel width=50 height=50] {}
-		[panel width=50 height=40] {}
+	[box width=400 height=200 direction=row align-items=end] {
+		[box width=50 height=30] {}
+		[box width=50 height=50] {}
+		[box width=50 height=40] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -1088,10 +1088,10 @@ bool testAlignItemsStretch() {
 	// "- `stretch` (fill): Elements stretch to fill the available space along the off-axis. This is the default "
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=400 height=200 direction=row align-items=stretch] {
-		[panel width=50] {}
-		[panel width=50] {}
-		[panel width=50 height=30] {}
+	[box width=400 height=200 direction=row align-items=stretch] {
+		[box width=50] {}
+		[box width=50] {}
+		[box width=50 height=30] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -1115,9 +1115,9 @@ bool testAlignItemsStretchMargins() {
     // "When `align-items=stretch`, elements expand to match the container's size in the off-axis direction, minus padding and margins."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=400 height=200 direction=column align-items=stretch] {
-		[panel height=50 margin=10] {}
-		[panel height=50 margin=5] {}
+	[box width=400 height=200 direction=column align-items=stretch] {
+		[box height=50 margin=10] {}
+		[box height=50 margin=5] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -1131,12 +1131,12 @@ bool testAlignItemsStretchMargins() {
 }
 
 bool testAlignItemsStretchWithText() {
-	// Test align-items=stretch with a child panel containing right-aligned text
+	// Test align-items=stretch with a child box containing right-aligned text
 	MockFontManager mock;
 	ui::Document doc(&mock, getGlobalAllocator());
 	ASSERT_PARSE(doc, R"(
-	[panel width=400 height=200 align-items=stretch direction=column] {
-		[panel align=right font="arial.ttf" font-size=16] {
+	[box width=400 height=200 align-items=stretch direction=column] {
+		[box align=right font="arial.ttf" font-size=16] {
 			Right Text
 		}
 	}
@@ -1172,10 +1172,10 @@ bool testAlignItemsWithWrap() {
 	// "Justification and item aligment are applied to each row/column separately."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=100 height=200 direction=row wrap=true align-items=center] {
-		[panel width=50 height=30] {}
-		[panel width=50 height=50] {}
-		[panel width=50 height=30] {}
+	[box width=100 height=200 direction=row wrap=true align-items=center] {
+		[box width=50 height=30] {}
+		[box width=50 height=50] {}
+		[box width=50 height=30] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -1197,10 +1197,10 @@ bool testAlignItemsCenterColumn() {
 	// "- `center`: Elements are centered along the off-axis."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=400 height=200 direction=column align-items=center] {
-		[panel width=50 height=30] {}
-		[panel width=80 height=50] {}
-		[panel width=60 height=40] {}
+	[box width=400 height=200 direction=column align-items=center] {
+		[box width=50 height=30] {}
+		[box width=80 height=50] {}
+		[box width=60 height=40] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -1221,9 +1221,9 @@ bool testAlignItemsStartColumn() {
 	// "- `start`: Elements are aligned to the start of the off-axis (top for row, left for column)."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=400 height=200 direction=column align-items=start] {
-		[panel width=50 height=30] {}
-		[panel width=80 height=40] {}
+	[box width=400 height=200 direction=column align-items=start] {
+		[box width=50 height=30] {}
+		[box width=80 height=40] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -1242,10 +1242,10 @@ bool testAlignItemsEndColumn() {
 	// "- `end`: Elements are aligned to the end of the off-axis (bottom for row, right for column)."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=400 height=200 direction=column align-items=end] {
-		[panel width=50 height=30] {}
-		[panel width=80 height=50] {}
-		[panel width=60 height=40] {}
+	[box width=400 height=200 direction=column align-items=end] {
+		[box width=50 height=30] {}
+		[box width=80 height=50] {}
+		[box width=60 height=40] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -1266,10 +1266,10 @@ bool testAlignItemsStretchColumn() {
 	// "- `stretch` (fill): Elements stretch to fill the available space along the off-axis. This is the default "
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=400 height=200 direction=column align-items=stretch] {
-		[panel height=30] {}
-		[panel height=50] {}
-		[panel width=60 height=40] {}
+	[box width=400 height=200 direction=column align-items=stretch] {
+		[box height=30] {}
+		[box height=50] {}
+		[box width=60 height=40] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -1293,10 +1293,10 @@ bool testJustifyContentWithWrap() {
 	// "Justification and item aligment are applied to each row/column separately."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=100 height=200 direction=row wrap=wrap justify-content=center] {
-		[panel width=50 height=50] {}
-		[panel width=50 height=50] {}
-		[panel width=50 height=50] {}
+	[box width=100 height=200 direction=row wrap=wrap justify-content=center] {
+		[box width=50 height=50] {}
+		[box width=50 height=50] {}
+		[box width=50 height=50] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -1307,10 +1307,10 @@ bool testJustifyContentWithWrap() {
 
 	MockDocument doc2;
 	ASSERT_PARSE(doc2, R"(
-	[panel width=200 height=200 direction=row wrap=wrap justify-content=center] {
-		[panel width=50 height=30] {}
-		[panel width=50 height=50] {}
-		[panel width=50 height=30] {}
+	[box width=200 height=200 direction=row wrap=wrap justify-content=center] {
+		[box width=50 height=30] {}
+		[box width=50 height=50] {}
+		[box width=50 height=30] {}
 	}
 	)");
 	doc2.computeLayout(Vec2(800, 600));
@@ -1337,10 +1337,10 @@ bool testWrapCrossAxisDistribution() {
 	// with any extra space remaining unused."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel width=100 height=200 direction=row wrap=true] {
-		[panel width=50 height=25] {}
-		[panel width=50 height=25] {}
-		[panel width=50 height=25] {}
+	[box width=100 height=200 direction=row wrap=true] {
+		[box width=50 height=25] {}
+		[box width=50 height=25] {}
+		[box width=50 height=25] {}
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -1363,9 +1363,9 @@ bool testLineBreaks() {
 	MockFontManager mock;
 	ui::Document doc(&mock, getGlobalAllocator());
 	ASSERT_PARSE(doc, R"(
-		[panel width=200 height=100 direction=row font="arial.ttf" font-size=16] {
+		[box width=200 height=100 direction=row font="arial.ttf" font-size=16] {
 			First
-			[panel width=50 height=20] { Block }
+			[box width=50 height=20] { Block }
 			Second
 		}
 	)");
@@ -1400,7 +1400,7 @@ bool testFitContentWithInlineText() {
 	MockFontManager mock;
 	ui::Document doc(&mock, getGlobalAllocator());
 	ASSERT_PARSE(doc, R"(
-		[panel width=fit-content height=fit-content direction=row font="arial.ttf" font-size=16] {
+		[box width=fit-content height=fit-content direction=row font="arial.ttf" font-size=16] {
 			Text
 		}
 	)");
@@ -1417,13 +1417,13 @@ bool testFitContentWithInlineText() {
 bool testTextNoWrapping() {
 	// Citation: layout.md - Text
 	// "Text flows inline and can wrap to multiple lines when `wrap=true`
-	// and the content exceeds the panel's available width (after subtracting padding)."
+	// and the content exceeds the box's available width (after subtracting padding)."
 
 	MockFontManager mock;
 	ui::Document doc(&mock, getGlobalAllocator());
 	ASSERT_PARSE(doc, R"(
-		[panel width=100 height=fit-content wrap=false font="arial.ttf" font-size=16] {
-			This is a very long text that should not wrap even if it exceeds the panel width
+		[box width=100 height=fit-content wrap=false font="arial.ttf" font-size=16] {
+			This is a very long text that should not wrap even if it exceeds the box width
 		}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -1450,7 +1450,7 @@ bool testSpanCenteringWithTrailingWhitespace() {\
 	MockFontManager mock;
 	ui::Document doc(&mock, getGlobalAllocator());
 	ASSERT_PARSE(doc, R"(
-	[panel width=200 align=center font="arial.ttf" font-size=16] {
+	[box width=200 align=center font="arial.ttf" font-size=16] {
 		[span value="Hello   "]
 	}
 	)");
@@ -1468,11 +1468,11 @@ bool testSpanCenteringWithTrailingWhitespace() {\
 bool testTextWrapping() {
 	// Citation: layout.md - Text
 	// "Text flows inline and can wrap to multiple lines when `wrap=true`
-	// and the content exceeds the panel's available width (after subtracting padding)."
+	// and the content exceeds the box's available width (after subtracting padding)."
 	MockFontManager mock;
 	ui::Document doc(&mock, getGlobalAllocator());
 	ASSERT_PARSE(doc, R"(
-		[panel width=120 height=fit-content wrap=true padding=10 font="arial.ttf" font-size=16] {
+		[box width=120 height=fit-content wrap=true padding=10 font="arial.ttf" font-size=16] {
 			This is a very long text that should wrap at the content width minus padding
 		}
 	)");
@@ -1494,7 +1494,6 @@ bool testTextWrapping() {
 		ASSERT_TRUE(line.pos.x + line.width <= right);
 	}
 
-	// Assert panel layout
 	ASSERT_EQ(120.0f, panel->size.x);
 	float expected_height = textElem->lines.size() * 16.0f + panel->paddings.top + panel->paddings.bottom;
 	ASSERT_FLOAT_EQ(expected_height, panel->size.y);
@@ -1508,12 +1507,12 @@ bool testWrappingInheritance() {
 	MockFontManager mock;
 	ui::Document doc(&mock, getGlobalAllocator());
 	ASSERT_PARSE(doc, R"(
-		[panel width=120 height=fit-content wrap=false direction=row font="arial.ttf" font-size=16] {
-			[panel width=60 height=fit-content] {
+		[box width=120 height=fit-content wrap=false direction=row font="arial.ttf" font-size=16] {
+			[box width=60 height=fit-content] {
 				Should wrap, wrap is not inherited and default is true
 			}
-			[panel width=60 height=fit-content wrap=false] {
-				This is a long text that should not wrap in this panel
+			[box width=60 height=fit-content wrap=false] {
+				This is a long text that should not wrap in this box
 			}
 		}
 	)");
@@ -1540,7 +1539,7 @@ bool testMultilineStringLayout() {
 	MockFontManager mock;
 	ui::Document doc(&mock, getGlobalAllocator());
 	ASSERT_PARSE(doc, R"(
-		[panel width=fit-content height=fit-content font="arial.ttf" font-size=16] {
+		[box width=fit-content height=fit-content font="arial.ttf" font-size=16] {
 			Line 1
 			Line 2
 			Line 3
@@ -1572,7 +1571,7 @@ bool testDoubleQuotesInText() {
 	MockFontManager mock;
 	ui::Document doc(&mock, getGlobalAllocator());
 	ASSERT_PARSE(doc, R"(
-		[panel width=fit-content height=fit-content font="arial.ttf" font-size=16] {
+		[box width=fit-content height=fit-content font="arial.ttf" font-size=16] {
 			"Hello "world""
 		}
 	)");
@@ -1603,7 +1602,7 @@ bool testTextHorizontalRendering() {
 	MockFontManager mock;
 	ui::Document doc(&mock, getGlobalAllocator());
 	ASSERT_PARSE(doc, R"(
-		[panel direction=column font="arial.ttf" font-size=16] {
+		[box direction=column font="arial.ttf" font-size=16] {
 			[span value="First text"]
 			[span value="Second text"]
 		}
@@ -1635,7 +1634,7 @@ bool testBaselineAlignment() {
 	MockFontManager mock;
 	ui::Document doc(&mock, getGlobalAllocator());
 	ASSERT_PARSE(doc, R"(
-		[panel direction=row font="arial.ttf" font-size=16] {
+		[box direction=row font="arial.ttf" font-size=16] {
 			[span value="Small text" font-size=12]
 			[span value="Normal text" font-size=16]
 			[span value="Large text" font-size=20]
@@ -1683,7 +1682,7 @@ bool testBaselineAlignmentWithWrapping() {
 	MockFontManager mock;
 	ui::Document doc(&mock, getGlobalAllocator());
 	ASSERT_PARSE(doc, R"(
-		[panel direction=row wrap=true width=200 font="arial.ttf" font-size=16] {
+		[box direction=row wrap=true width=200 font="arial.ttf" font-size=16] {
 			[span value="Small" font-size=12]
 			[span value="This is a very long text that should wrap to the next line" font-size=16]
 			[span value="Large" font-size=20]
@@ -1716,7 +1715,7 @@ bool testAlignCenterMultipleSpans() {
 	MockFontManager mock;
 	ui::Document doc(&mock, getGlobalAllocator());
 	ASSERT_PARSE(doc, R"(
-		[panel width=400 align=center font="arial.ttf" font-size=16 direction=row] {
+		[box width=400 align=center font="arial.ttf" font-size=16 direction=row] {
 			[span value="First"]
 			[span value="Second"]
 			[span value="Third"]
@@ -1732,9 +1731,7 @@ bool testAlignCenterMultipleSpans() {
 	ui::Element* span2 = doc.getElement(panel->children[1]);
 	ui::Element* span3 = doc.getElement(panel->children[2]);
 
-	// Calculate total width of spans
 	float totalWidth = span1->size.x + span2->size.x + span3->size.x;
-	// Panel width is 400, so centered group should start at (400 - totalWidth) / 2
 	float expectedStartX = (400.0f - totalWidth) / 2.0f;
 
 	ASSERT_EQ(1, span1->lines.size());
@@ -1760,7 +1757,7 @@ bool testAlignRightMultipleSpans() {
 	MockFontManager mock;
 	ui::Document doc(&mock, getGlobalAllocator());
 	ASSERT_PARSE(doc, R"(
-		[panel width=400 align=right font="arial.ttf" font-size=16 direction=row] {
+		[box width=400 align=right font="arial.ttf" font-size=16 direction=row] {
 			[span value="First"]
 			[span value="Second"]
 			[span value="Third"]
@@ -1795,7 +1792,7 @@ bool testAlignCenter() {
 	MockFontManager mock;
 	ui::Document doc(&mock, getGlobalAllocator());
 	ASSERT_PARSE(doc, R"(
-		[panel width=400 align=center font="arial.ttf" font-size=16] {
+		[box width=400 align=center font="arial.ttf" font-size=16] {
 			Centered Text
 		}
 	)");
@@ -1820,7 +1817,7 @@ bool testAlignRight() {
 	MockFontManager mock;
 	ui::Document doc(&mock, getGlobalAllocator());
 	ASSERT_PARSE(doc, R"(
-		[panel width=400 align=right font="arial.ttf" font-size=16] {
+		[box width=400 align=right font="arial.ttf" font-size=16] {
 			Right Aligned Text
 		}
 	)");
@@ -1847,7 +1844,7 @@ bool testPanelWithInlineSpan() {
 	// - Leading and trailing whitespace is trimmed."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-		[panel direction=row align=center font-size=40 wrap=true width=100% font="arial.ttf"] {
+		[box direction=row align=center font-size=40 wrap=true width=100% font="arial.ttf"] {
 			Welcome to [span value=" Lumix " font-size=60] Demo
 		}
 	)");
@@ -1871,9 +1868,9 @@ bool testPanelWithInlineSpan() {
 bool testHeaderContentFooter() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[panel direction=column font="arial.ttf" width=20% height=100%] {
+	[box direction=column font="arial.ttf" width=20% height=100%] {
 		Header
-		[panel grow=1] { Content }
+		[box grow=1] { Content }
 		Footer
 	}
 	)");

@@ -33,7 +33,7 @@ bool testSimpleTokens() {
 }
 
 bool testIdentifiers() {
-	const char* source = "panel button class id";
+	const char* source = "box button class id";
 	UITokenizer tokenizer;
 	tokenizer.m_filename = "test";
 	tokenizer.m_document = StringView(source);
@@ -43,7 +43,7 @@ bool testIdentifiers() {
 	
 	Token tok = tokenizer.consumeToken();
 	ASSERT_EQ(Token::IDENTIFIER, tok.type);
-	ASSERT_TRUE(tok.value == "panel");
+	ASSERT_TRUE(tok.value == "box");
 	
 	tok = tokenizer.consumeToken();
 	ASSERT_EQ(Token::IDENTIFIER, tok.type);
@@ -196,7 +196,7 @@ bool testEmFollowedByIdentifier() {
 }
 
 bool testComments() {
-	const char* source = "panel // this is a comment\nbutton /* block comment */ text";
+	const char* source = "box // this is a comment\nbutton /* block comment */ text";
 	UITokenizer tokenizer;
 	tokenizer.m_filename = "test";
 	tokenizer.m_document = StringView(source);
@@ -206,7 +206,7 @@ bool testComments() {
 	
 	Token tok = tokenizer.consumeToken();
 	ASSERT_EQ(Token::IDENTIFIER, tok.type);
-	ASSERT_TRUE(tok.value == "panel");
+	ASSERT_TRUE(tok.value == "box");
 	
 	tok = tokenizer.consumeToken();
 	ASSERT_EQ(Token::IDENTIFIER, tok.type);
@@ -235,7 +235,7 @@ bool testUnterminatedBlockComment() {
 }
 
 bool testWhitespace() {
-	const char* source = "  \t  \n  panel  \t  button  \n  ";
+	const char* source = "  \t  \n  box  \t  button  \n  ";
 	UITokenizer tokenizer;
 	tokenizer.m_filename = "test";
 	tokenizer.m_document = StringView(source);
@@ -245,7 +245,7 @@ bool testWhitespace() {
 	
 	Token tok = tokenizer.consumeToken();
 	ASSERT_EQ(Token::IDENTIFIER, tok.type);
-	ASSERT_TRUE(tok.value == "panel");
+	ASSERT_TRUE(tok.value == "box");
 	
 	tok = tokenizer.consumeToken();
 	ASSERT_EQ(Token::IDENTIFIER, tok.type);
@@ -258,7 +258,7 @@ bool testWhitespace() {
 }
 
 bool testComplexUI() {
-	const char* source = "[panel id=\"main\" width=800 height=600] { }";
+	const char* source = "[box id=\"main\" width=800 height=600] { }";
 	UITokenizer tokenizer;
 	tokenizer.m_filename = "test";
 	tokenizer.m_document = StringView(source);
@@ -271,7 +271,7 @@ bool testComplexUI() {
 
 	tok = tokenizer.consumeToken();
 	ASSERT_EQ(Token::IDENTIFIER, tok.type);
-	ASSERT_TRUE(tok.value == "panel");
+	ASSERT_TRUE(tok.value == "box");
 
 	tok = tokenizer.consumeToken();
 	ASSERT_EQ(Token::IDENTIFIER, tok.type);
@@ -451,7 +451,7 @@ bool testWhitespaceAroundEquals() {
 }
 
 bool testBlockCommentInMarkup() {
-	const char* source = "panel /* this is a block comment */ { button class=\"primary\" { \"Start\" } }";
+	const char* source = "box /* this is a block comment */ { button class=\"primary\" { \"Start\" } }";
 	UITokenizer tokenizer;
 	tokenizer.m_filename = "test";
 	tokenizer.m_document = StringView(source);
@@ -461,7 +461,7 @@ bool testBlockCommentInMarkup() {
 	
 	Token tok = tokenizer.consumeToken();
 	ASSERT_EQ(Token::IDENTIFIER, tok.type);
-	ASSERT_TRUE(tok.value == "panel");
+	ASSERT_TRUE(tok.value == "box");
 	
 	tok = tokenizer.consumeToken();
 	ASSERT_EQ(Token::LBRACE, tok.type);
@@ -498,7 +498,7 @@ bool testBlockCommentInMarkup() {
 }
 
 bool testPercentageInAttributes() {
-	const char* source = "[panel width=100% height=50%] { }";
+	const char* source = "[box width=100% height=50%] { }";
 	UITokenizer tokenizer;
 	tokenizer.m_filename = "test";
 	tokenizer.m_document = StringView(source);

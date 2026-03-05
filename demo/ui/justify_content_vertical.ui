@@ -37,52 +37,52 @@
 	}
 }
 
-[panel direction=column font="/engine/editor/fonts/JetBrainsMono-Regular.ttf" font-size=30] {
-	[panel .demo-label] { Vertical Layouts }
+[box direction=column font="/engine/editor/fonts/JetBrainsMono-Regular.ttf" font-size=30] {
+	[box .demo-label] { Vertical Layouts }
 
-	[panel direction=row] {
-		[panel .col bg-color=#000000] {
-			[panel .demo-label] { start }
-			[panel .demo-vpanel justify-content=start] {
-				[panel .demo-item] { 1 }
-				[panel .demo-item] { 2 }
-				[panel .demo-item] { 3 }
+	[box direction=row] {
+		[box .col bg-color=#000000] {
+			[box .demo-label] { start }
+			[box .demo-vpanel justify-content=start] {
+				[box .demo-item] { 1 }
+				[box .demo-item] { 2 }
+				[box .demo-item] { 3 }
 			}
 		}
 
-		[panel .col] {
-			[panel .demo-label] { center }
-			[panel .demo-vpanel justify-content=center] {
-				[panel .demo-item] { 1 }
-				[panel .demo-item] { 2 }
-				[panel .demo-item] { 3 }
+		[box .col] {
+			[box .demo-label] { center }
+			[box .demo-vpanel justify-content=center] {
+				[box .demo-item] { 1 }
+				[box .demo-item] { 2 }
+				[box .demo-item] { 3 }
 			}
 		}
 
-		[panel .col bg-color=#000000] {
-			[panel .demo-label] { end }
-			[panel .demo-vpanel justify-content=end] {
-				[panel .demo-item] { 1 }
-				[panel .demo-item] { 2 }
-				[panel .demo-item] { 3 }
+		[box .col bg-color=#000000] {
+			[box .demo-label] { end }
+			[box .demo-vpanel justify-content=end] {
+				[box .demo-item] { 1 }
+				[box .demo-item] { 2 }
+				[box .demo-item] { 3 }
 			}
 		}
 
-		[panel .col] {
-			[panel .demo-label] { space-between }
-			[panel .demo-vpanel justify-content=space-between] {
-				[panel .demo-item] { 1 }
-				[panel .demo-item] { 2 }
-				[panel .demo-item] { 3 }
+		[box .col] {
+			[box .demo-label] { space-between }
+			[box .demo-vpanel justify-content=space-between] {
+				[box .demo-item] { 1 }
+				[box .demo-item] { 2 }
+				[box .demo-item] { 3 }
 			}
 		}
 
-		[panel .col bg-color=#000000] {
-			[panel .demo-label] { space-around }
-			[panel .demo-vpanel justify-content=space-around] {
-				[panel .demo-item] { 1 }
-				[panel .demo-item] { 2 }
-				[panel .demo-item] { 3 }
+		[box .col bg-color=#000000] {
+			[box .demo-label] { space-around }
+			[box .demo-vpanel justify-content=space-around] {
+				[box .demo-item] { 1 }
+				[box .demo-item] { 2 }
+				[box .demo-item] { 3 }
 			}
 		}
 	}

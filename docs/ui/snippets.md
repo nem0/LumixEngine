@@ -3,9 +3,9 @@
 ## Table of Contents
 
 - [Basic Elements](#basic-elements)
-  - [Simple Panel](#simple-panel)
-  - [Panel with ID and Class](#panel-with-id-and-class)
-  - [Nested Panels](#nested-panels)
+  - [Simple Box](#simple-box)
+  - [Box with ID and Class](#box-with-id-and-class)
+  - [Nested Boxes](#nested-boxes)
 - [Text Elements](#text-elements)
   - [Basic Text](#basic-text)
   - [Styled Text with Span](#styled-text-with-span)
@@ -25,7 +25,7 @@
   - [ID Selector](#id-selector)
   - [Child Selector](#child-selector)
 - [Forms and Inputs](#forms-and-inputs)
-  - [Button-like Panel](#button-like-panel)
+  - [Button-like Box](#button-like-box)
 - [Advanced Examples](#advanced-examples)
   - [Menu Layout](#menu-layout)
   - [Card Layout](#card-layout)
@@ -40,30 +40,30 @@
 
 ## Basic Elements
 
-### Simple Panel
+### Simple Box
 
 ```css
-[panel width=200 height=100 bg-color=#ffffff] {
+[box width=200 height=100 bg-color=#ffffff] {
     Hello World
 }
 ```
 
-### Panel with ID and Class
+### Box with ID and Class
 
 ```css
-[panel id="my_panel" .container width=300 height=200] {
+[box id="my_panel" .container width=300 height=200] {
     Content here
 }
 ```
 
-### Nested Panels
+### Nested Boxes
 
 ```css
-[panel] {
-    [panel width=50%] {
+[box] {
+    [box width=50%] {
         Left side
     }
-    [panel width=50%] {
+    [box width=50%] {
         Right side
     }
 }
@@ -74,7 +74,7 @@
 ### Basic Text
 
 ```css
-[panel] {
+[box] {
     This is some text
 }
 ```
@@ -82,7 +82,7 @@
 ### Styled Text with Span
 
 ```css
-[panel] {
+[box] {
     [span color=#ff0000 value="Red text"]
      and normal text
 }
@@ -91,7 +91,7 @@
 ### Text Alignment
 
 ```css
-[panel align=center width=200] {
+[box align=center width=200] {
     Centered text
 }
 ```
@@ -99,7 +99,7 @@
 ### Multi-line Text
 
 ```css
-[panel] {
+[box] {
     This is multiline text
     that spans several lines
 }
@@ -124,28 +124,28 @@
 ### Horizontal Layout (Row)
 
 ```css
-[panel direction=row] {
-    [panel width=100 height=50 bg-color=#ff0000] { }
-    [panel width=100 height=50 bg-color=#00ff00] { }
-    [panel width=100 height=50 bg-color=#0000ff] { }
+[box direction=row] {
+    [box width=100 height=50 bg-color=#ff0000] { }
+    [box width=100 height=50 bg-color=#00ff00] { }
+    [box width=100 height=50 bg-color=#0000ff] { }
 }
 ```
 
 ### Vertical Layout (Column)
 
 ```css
-[panel direction=column] {
-    [panel width=100 height=50 bg-color=#ff0000] { }
-    [panel width=100 height=50 bg-color=#00ff00] { }
-    [panel width=100 height=50 bg-color=#0000ff] { }
+[box direction=column] {
+    [box width=100 height=50 bg-color=#ff0000] { }
+    [box width=100 height=50 bg-color=#00ff00] { }
+    [box width=100 height=50 bg-color=#0000ff] { }
 }
 ```
 
 ### Centered Content
 
 ```css
-[panel width=100% height=100% justify-content=center align-items=center] {
-    [panel width=200 height=100 bg-color=#cccccc] {
+[box width=100% height=100% justify-content=center align-items=center] {
+    [box width=200 height=100 bg-color=#cccccc] {
         Centered content
     }
 }
@@ -154,12 +154,12 @@
 ### Grid-like Layout with Wrapping
 
 ```css
-[panel width=200 direction=row wrap=true] {
-    [panel width=100 height=100 bg-color=#ff0000] { 1 }
-    [panel width=100 height=100 bg-color=#00ff00] { 2 }
-    [panel width=100 height=100 bg-color=#0000ff] { 3 }
-    [panel width=100 height=100 bg-color=#ffff00] { 4 }
-    [panel width=100 height=100 bg-color=#ff00ff] { 5 }
+[box width=200 direction=row wrap=true] {
+    [box width=100 height=100 bg-color=#ff0000] { 1 }
+    [box width=100 height=100 bg-color=#00ff00] { 2 }
+    [box width=100 height=100 bg-color=#0000ff] { 3 }
+    [box width=100 height=100 bg-color=#ffff00] { 4 }
+    [box width=100 height=100 bg-color=#ff00ff] { 5 }
 }
 ```
 
@@ -176,7 +176,7 @@
     }
 }
 
-[panel .my_class] {
+[box .my_class] {
     Styled text
 }
 ```
@@ -185,7 +185,7 @@
 
 ```css
 [style] {
-    [panel] {
+    [box] {
         bg-color: #f0f0f0;
     }
 }
@@ -201,8 +201,8 @@
     }
 }
 
-[panel id="my_id"] {
-    Specific panel
+[box id="my_id"] {
+    Specific box
 }
 ```
 
@@ -210,7 +210,7 @@
 
 ```css
 [style] {
-    panel > [panel] {
+    box > [box] {
         margin: 5;
     }
 }
@@ -218,10 +218,10 @@
 
 ## Forms and Inputs
 
-### Button-like Panel
+### Button-like Box
 
 ```css
-[panel .button width=120 height=40 bg-color=#007bff] {
+[box .button width=120 height=40 bg-color=#007bff] {
     Click Me
 }
 ```
@@ -231,12 +231,12 @@
 ### Menu Layout
 
 ```css
-[panel direction=column padding=20] {
-    [panel align=center] { Game Title }
-    [panel direction=column] {
-        [panel .menu_item] { Start Game }
-        [panel .menu_item] { Options }
-        [panel .menu_item] { Quit }
+[box direction=column padding=20] {
+    [box align=center] { Game Title }
+    [box direction=column] {
+        [box .menu_item] { Start Game }
+        [box .menu_item] { Options }
+        [box .menu_item] { Quit }
     }
 }
 ```
@@ -244,12 +244,12 @@
 ### Card Layout
 
 ```css
-[panel .card width=300 padding=15 bg-color=#ffffff] {
-    [panel] { Card Title }
-    [panel] { Card content goes here... }
-    [panel direction=row justify-content=end] {
-        [panel .button] { OK }
-        [panel .button] { Cancel }
+[box .card width=300 padding=15 bg-color=#ffffff] {
+    [box] { Card Title }
+    [box] { Card content goes here... }
+    [box direction=row justify-content=end] {
+        [box .button] { OK }
+        [box .button] { Cancel }
     }
 }
 ```
@@ -257,11 +257,11 @@
 ### Responsive Layout
 
 ```css
-[panel direction=row] {
-    [panel width=30%] {
+[box direction=row] {
+    [box width=30%] {
         Sidebar
     }
-    [panel width=70%] {
+    [box width=70%] {
         Main content
     }
 }
@@ -272,15 +272,15 @@
 ### Percentage Sizing
 
 ```css
-[panel width=50% height=50%] {
-    Half size panel
+[box width=50% height=50%] {
+    Half size box
 }
 ```
 
 ### EM Units
 
 ```css
-[panel width=10em height=2em] {
+[box width=10em height=2em] {
     Sized with em units
 }
 ```
@@ -288,36 +288,36 @@
 ### Fit Content
 
 ```css
-[panel width=fit-content] {
-    This panel sizes to content
+[box width=fit-content] {
+    This box sizes to content
 }
 ```
 
 ### Grow
 
 ```css
-[panel direction=row width=300] {
-    [panel width=100] { Fixed size }
-    [panel grow=1] { Fills remaining space }
+[box direction=row width=300] {
+    [box width=100] { Fixed size }
+    [box grow=1] { Fills remaining space }
 }
 ```
 
 Left-fill-right (fixed on both sides, growing middle):
 
 ```css
-[panel direction=row width=400] {
-    [panel width=100] { Left }
-    [panel grow=1] { Middle }
-    [panel width=100] { Right }
+[box direction=row width=400] {
+    [box width=100] { Left }
+    [box grow=1] { Middle }
+    [box width=100] { Right }
 }
 ```
 
 Split remaining space in a 2:1 ratio:
 
 ```css
-[panel direction=row width=400] {
-    [panel grow=2] { Gets 2/3 }
-    [panel grow=1] { Gets 1/3 }
+[box direction=row width=400] {
+    [box grow=2] { Gets 2/3 }
+    [box grow=1] { Gets 1/3 }
 }
 ```
 
@@ -326,7 +326,7 @@ Split remaining space in a 2:1 ratio:
 ### Hex Colors
 
 ```css
-[panel bg-color=#ff5733] {
+[box bg-color=#ff5733] {
     Orange background
 }
 ```

@@ -34,7 +34,7 @@ namespace Lumix {
 
 struct UIEditorWindow : AssetEditorWindow {
 	static inline const char* s_autocomplete_words[] = {
-		"panel",
+		"box",
 		"span",
 		"direction",
 		"width",
@@ -324,7 +324,7 @@ struct UIPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	bool canCreateResource() const override { return true; }
 	const char* getDefaultExtension() const override { return "ui"; }
 	void createResource(OutputMemoryStream& content) override {
-		const char* template_str = R"([panel width=100% height=2em padding=0.5em bg-color=#ffffff align=center font="/engine/editor/fonts/JetBrainsMono-Regular.ttf" font-size=60] { "Hello World" })";
+		const char* template_str = R"([box width=100% height=2em padding=0.5em bg-color=#ffffff align=center font="/engine/editor/fonts/JetBrainsMono-Regular.ttf" font-size=60] { "Hello World" })";
 		content.write(template_str, stringLength(template_str));
 	}
 	const char* getIcon() const override { return ICON_FA_FILE_CODE; }

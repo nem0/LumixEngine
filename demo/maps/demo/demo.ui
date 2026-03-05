@@ -1,17 +1,23 @@
-[panel direction=column width=50% height=50% margin=25%
+[style] {
+	.hovered {
+		bg-color: #ff0000;
+		align: right;
+	}
+}
+[box direction=column width=50% height=50% margin=25%
 		bg-color=#f0f0f0 
 		font="/engine/editor/fonts/JetBrainsMono-Regular.ttf" 
 		font-size=40
 		align-items=stretch
 ] {
-    [panel direction=row padding=0.5em bg-color=#ffffff align=center] {
+    [box direction=row padding=0.5em align=center] {
         Welcome to [span value=" Lumix " color=#ff0000 font-size=60] Demo
     }
-    [panel direction=column padding=0.5em bg-color=#e0e0e0 align-items=stretch] {
-        [panel align=center margin=0.2em] { Start Demo }
-        [panel align=center margin=0.2em] { Settings }
+    [box direction=column padding=0.5em align-items=stretch] {
+        [box margin=0.2em] { Start Demo }
+        [box margin=0.2em] { Settings }
     }
-    [panel direction=column padding=0.5em bg-color=#ffffff align=center padding=1em] {
+    [box direction=column padding=0.5em align=center padding=1em] {
         Demo Content Here
 
     }

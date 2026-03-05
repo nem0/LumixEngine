@@ -19,7 +19,7 @@ static void debugElementGUI(const Document& document, u32 element_idx, int depth
 	const Element* element = document.getElement(element_idx);
 	if (!element) return;
 
-	const char* tag_names[] = { "panel", "image", "span", "invalid" };
+	const char* tag_names[] = { "box", "image", "span", "invalid" };
 	const char* tag_name = element->tag < Tag::INVALID ? tag_names[(u8)element->tag] : "unknown";
 
 	StaticString<512> label;
@@ -59,7 +59,7 @@ static void debugElementGUI(const Document& document, u32 element_idx, int depth
 
 	ImVec4 type_color;
 	switch (element->tag) {
-		case Tag::PANEL: type_color = ImVec4(0.8f, 0.6f, 0.4f, 1.0f); break;
+		case Tag::BOX: type_color = ImVec4(0.8f, 0.6f, 0.4f, 1.0f); break;
 		case Tag::IMAGE: type_color = ImVec4(0.4f, 0.8f, 0.6f, 1.0f); break;
 		case Tag::SPAN: type_color = ImVec4(0.6f, 0.4f, 0.8f, 1.0f); break;
 		default: type_color = ImVec4(0.7f, 0.7f, 0.7f, 1.0f); break;

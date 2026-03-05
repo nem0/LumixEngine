@@ -23,41 +23,41 @@
 	}
 }
 
-[panel direction=column font="/engine/editor/fonts/JetBrainsMono-Regular.ttf" font-size=30] {
-	[panel .demo-label] { Justify-Content Showcase }
+[box direction=column font="/engine/editor/fonts/JetBrainsMono-Regular.ttf" font-size=30] {
+	[box .demo-label] { Justify-Content Showcase }
 
-	[panel .demo-label] { start - Items aligned to the start of the container }
-	[panel .demo-panel direction=row justify-content=start] {
-		[panel .demo-item] { 1 }
-		[panel .demo-item] { 2 }
-		[panel .demo-item] { 3 }
+	[box .demo-label] { start - Items aligned to the start of the container }
+	[box .demo-panel direction=row justify-content=start] {
+		[box .demo-item] { 1 }
+		[box .demo-item] { 2 }
+		[box .demo-item] { 3 }
 	}
 
-	[panel .demo-label] { center - Items centered as a group }
-	[panel .demo-panel direction=row justify-content=center] {
-		[panel .demo-item] { 1 }
-		[panel .demo-item] { 2 }
-		[panel .demo-item] { 3 }
+	[box .demo-label] { center - Items centered as a group }
+	[box .demo-panel direction=row justify-content=center] {
+		[box .demo-item] { 1 }
+		[box .demo-item] { 2 }
+		[box .demo-item] { 3 }
 	}
 
-	[panel .demo-label] { end - Items aligned to the end of the container }
-	[panel .demo-panel direction=row justify-content=end] {
-		[panel .demo-item] { 1 }
-		[panel .demo-item] { 2 }
-		[panel .demo-item] { 3 }
+	[box .demo-label] { end - Items aligned to the end of the container }
+	[box .demo-panel direction=row justify-content=end] {
+		[box .demo-item] { 1 }
+		[box .demo-item] { 2 }
+		[box .demo-item] { 3 }
 	}
 
-	[panel .demo-label] { space-between - Equal space between items, first at start, last at end }
-	[panel .demo-panel direction=row justify-content=space-between] {
-		[panel .demo-item] { 1 }
-		[panel .demo-item] { 2 }
-		[panel .demo-item] { 3 }
+	[box .demo-label] { space-between - Equal space between items, first at start, last at end }
+	[box .demo-panel direction=row justify-content=space-between] {
+		[box .demo-item] { 1 }
+		[box .demo-item] { 2 }
+		[box .demo-item] { 3 }
 	}
 
-	[panel .demo-label] { space-around - Equal space around each item }
-	[panel .demo-panel direction=row justify-content=space-around] {
-		[panel .demo-item] { 1 }
-		[panel .demo-item] { 2 }
-		[panel .demo-item] { 3 }
+	[box .demo-label] { space-around - Equal space around each item }
+	[box .demo-panel direction=row justify-content=space-around] {
+		[box .demo-item] { 1 }
+		[box .demo-item] { 2 }
+		[box .demo-item] { 3 }
 	}
 }

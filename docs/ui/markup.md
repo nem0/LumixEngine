@@ -3,36 +3,36 @@
 *Example:*
 
 ```c++
-[panel id="main" width=800 height=600] {
-    [panel .title] {
+[box id="main" width=800 height=600] {
+    [box .title] {
         Game Menu
     }
-    [panel] {
-        [panel .primary width=8em height=2em] { Start }
-        [panel width=8em height=2em] { Options }
-        [panel .danger width=8em height=2em] { Quit }
+    [box] {
+        [box .primary width=8em height=2em] { Start }
+        [box width=8em height=2em] { Options }
+        [box .danger width=8em height=2em] { Quit }
     }
-    [panel bg-color=#f0f0f0] {
+    [box bg-color=#f0f0f0] {
         Some text with background color
     }
-    [panel] {
+    [box] {
         Some text
         [image src="path/to/image.png" width=100 height=100]
         [image src="path/to/image2.png" width=100 height=100]
     }
-    [panel] {
+    [box] {
         Multiline text
             is on 
             multiple lines
-        [panel font="path/to/font.ttf" font_size=13] { Some other text }
+        [box font="path/to/font.ttf" font_size=13] { Some other text }
         How to "escape" quotes
     }
-    [panel] {
-        [panel width=50%] {
-            Left panel content
+    [box] {
+        [box width=50%] {
+            Left box content
         }
-        [panel width=50%] {
-            Right panel content
+        [box width=50%] {
+            Right box content
             [image src="path/to/image.png" width=100 height=100]
         }
     }
@@ -45,7 +45,7 @@ The markup language also supports CSS-like [style] blocks for defining reusable 
 
 ### Tokens
 
-- **Identifier**: element and attribute names, e.g. `panel`, `text`, `width`.
+- **Identifier**: element and attribute names, e.g. `box`, `text`, `width`.
 - **String**: double-quoted text for attribute values, e.g. "center".
 - **Number**: integer or float, e.g. `100`, `50.5`.
 - **Text**: unquoted text for content, e.g. `Game Menu`.

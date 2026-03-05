@@ -43,10 +43,10 @@ static Tag parseTag(StringView str) {
 	if (len == 0) return Tag::INVALID;
 	const char* s = str.begin;
 
-	switch (s[0]) {
-		case 'i': if (len == 5 && memcmp(s, "image", 5) == 0) return Tag::IMAGE; break;
-		case 'p': if (len == 5 && memcmp(s, "panel", 5) == 0) return Tag::PANEL; break;
-		case 's': if (len == 4 && memcmp(s, "span", 4) == 0) return Tag::SPAN; break;
+	switch (len) {
+		case 3: if (memcmp(s, "box", 3) == 0) return Tag::BOX; break;
+		case 4: if (memcmp(s, "span", 4) == 0) return Tag::SPAN; break;
+		case 5: if (memcmp(s, "image", 5) == 0) return Tag::IMAGE; break;
 	}
 	return Tag::INVALID;
 }
@@ -1308,7 +1308,7 @@ static void renderElement(Draw2D& draw, const Document& doc, u32 element_idx, co
 	Vec2 size = Vec2(element.size.x, element.size.y);
 
 	switch (element.tag) {
-		case Tag::PANEL: {
+		case Tag::BOX: {
 			if (element.bg_sprite) {
 				element.bg_sprite->render(draw, pos.x, pos.y, pos.x + size.x, pos.y + size.y, Color::WHITE);
 			}
