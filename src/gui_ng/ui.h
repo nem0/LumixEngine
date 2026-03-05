@@ -105,7 +105,7 @@ struct IFontManager {
 	virtual SplitWord splitFirstWord(FontHandle font, StringView text) = 0;
 };
 
-enum class InternString : u32 { INVALID = 0 };
+enum class InternString : u16 { INVALID = 0 };
 
 struct InternTable {
 	Array<String> strings;
@@ -281,7 +281,7 @@ private:
 template <>
 struct HashFunc<ui::InternString> {
 	static u32 get(const ui::InternString& key) {
-		return HashFunc<u32>::get((u32)key);
+		return HashFunc<u32>::get(static_cast<u32>(key));
 	}
 };
 

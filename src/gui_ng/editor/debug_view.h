@@ -30,8 +30,7 @@ static void debugElementGUI(const Document& document, u32 element_idx, int depth
 		size_str.append(" .");
 		bool first = true;
 		for (InternString cid : element->classes) {
-			u32 class_id = (u32)cid;
-			StringView class_name = document.m_intern_table.resolve((InternString)class_id);
+			StringView class_name = document.m_intern_table.resolve(cid);
 			if (!first) size_str.append(" ");
 			size_str.append(class_name);
 			first = false;
@@ -83,8 +82,7 @@ static void debugElementGUI(const Document& document, u32 element_idx, int depth
 			StaticString<256> class_str;
 			bool first = true;
 			for (InternString cid : element->classes) {
-				u32 class_id = (u32)cid;
-				StringView class_name = document.m_intern_table.resolve((InternString)class_id);
+				StringView class_name = document.m_intern_table.resolve(cid);
 				if (!first) class_str.append(" ");
 				class_str.append(class_name);
 				first = false;
