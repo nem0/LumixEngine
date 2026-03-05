@@ -4,6 +4,7 @@
 #include <windef.h>
 #include <winbase.h>
 #include <winver.h>
+#include <cstdio>
 #pragma warning (push)
 #pragma warning (disable: 4091) // declaration of 'xx' hides previous local declaration
 #include <DbgHelp.h>
@@ -27,15 +28,13 @@
 
 #define LUMIX_ALLOC_GUARDS
 
-static bool g_is_crash_reporting_enabled = false;
 
 
-namespace Lumix
-{
+namespace Lumix {
+	
+static CrashReportFlags g_crash_report_flags = CrashReportFlags::ENABLED;
 
-
-namespace debug
-{
+namespace debug {
 
 
 void enableFloatingPointTraps(bool enable)
@@ -160,12 +159,11 @@ void StackTree::printCallstack(StackNode* node)
 		symbol->MaxNameLen = 255;
 		symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
 		BOOL success = SymFromAddr(process, (DWORD64)(node->m_instruction), 0, symbol);
-		if (success)
-		{
-			IMAGEHLP_LINE line;
+		if (success) {
+			IMAGEHLP_LINE64 line;
 			DWORD offset;
-			if (SymGetLineFromAddr(process, (DWORD64)(node->m_instruction), &offset, &line))
-			{
+			line.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
+			if (SymGetLineFromAddr64(process, (DWORD64)(node->m_instruction), &offset, &line)) {
 				OutputDebugString("\t");
 				OutputDebugString(line.FileName);
 				OutputDebugString("(");
@@ -631,26 +629,88 @@ static void getStack(CONTEXT& context, Span<char> out)
 		DWORD num_char = UnDecorateSymbolName(symbol->Name, (PSTR)name, 256, UNDNAME_COMPLETE);
 
 		if (num_char == 0) return;
-		catString(out, symbol->Name);
+
+		// Get file and line information
+		IMAGEHLP_LINE64 line_info = {};
+		line_info.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
+		DWORD line_displacement;
+		if (SymGetLineFromAddr64(process, (DWORD64)stack.AddrPC.Offset, &line_displacement, &line_info))
+		{
+			catString(out, line_info.FileName);
+			catString(out, "(");
+			char line_num[16];
+			toCString((u32)line_info.LineNumber, Span(line_num));
+			catString(out, line_num);
+			catString(out, "): ");
+		}
+
+		catString(out, name);
 		catString(out, "\n");
 
 	} while (result);
 }
 
 
+template <int SIZE>
+static void describeException(PEXCEPTION_RECORD exception_record, StaticString<SIZE>& message) {
+	const char* exception_name = "Unknown Exception";
+	
+	switch (exception_record->ExceptionCode) {
+		case EXCEPTION_ACCESS_VIOLATION: exception_name = "Access Violation"; break;
+		case EXCEPTION_ARRAY_BOUNDS_EXCEEDED: exception_name = "Array Bounds Exceeded"; break;
+		case EXCEPTION_BREAKPOINT: exception_name = "Breakpoint"; break;
+		case EXCEPTION_DATATYPE_MISALIGNMENT: exception_name = "Data Type Misalignment"; break;
+		case EXCEPTION_FLT_DENORMAL_OPERAND: exception_name = "Float Denormal Operand"; break;
+		case EXCEPTION_FLT_DIVIDE_BY_ZERO: exception_name = "Float Divide by Zero"; break;
+		case EXCEPTION_FLT_INEXACT_RESULT: exception_name = "Float Inexact Result"; break;
+		case EXCEPTION_FLT_INVALID_OPERATION: exception_name = "Float Invalid Operation"; break;
+		case EXCEPTION_FLT_OVERFLOW: exception_name = "Float Overflow"; break;
+		case EXCEPTION_FLT_STACK_CHECK: exception_name = "Float Stack Check"; break;
+		case EXCEPTION_FLT_UNDERFLOW: exception_name = "Float Underflow"; break;
+		case EXCEPTION_ILLEGAL_INSTRUCTION: exception_name = "Illegal Instruction"; break;
+		case EXCEPTION_IN_PAGE_ERROR: exception_name = "In Page Error"; break;
+		case EXCEPTION_INT_DIVIDE_BY_ZERO: exception_name = "Integer Divide by Zero"; break;
+		case EXCEPTION_INT_OVERFLOW: exception_name = "Integer Overflow"; break;
+		case EXCEPTION_PRIV_INSTRUCTION: exception_name = "Privileged Instruction"; break;
+		case EXCEPTION_SINGLE_STEP: exception_name = "Single Step"; break;
+		case EXCEPTION_STACK_OVERFLOW: exception_name = "Stack Overflow"; break;
+	}
+	
+	message.append(exception_name);
+	char tmp[19];
+	toCStringHex((u32)exception_record->ExceptionCode, Span(tmp));
+	message.append(" (0x", tmp, ")");
+	
+	// For access violations, provide additional details
+	if (exception_record->ExceptionCode == EXCEPTION_ACCESS_VIOLATION && 
+		exception_record->NumberParameters >= 2) {
+		message.append(" - ");
+		if (exception_record->ExceptionInformation[0] == 0) {
+			message.append("read at address ");
+		} else if (exception_record->ExceptionInformation[0] == 1) {
+			message.append("write at address ");
+		} else {
+			message.append("execute at address ");
+		}
+		char addr_buf[17];
+		toCStringHex((u64)exception_record->ExceptionInformation[1], Span(addr_buf, 17));
+		message.append("0x", addr_buf);
+	}
+}
+
+
 static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 {
-	if (!g_is_crash_reporting_enabled) return EXCEPTION_CONTINUE_SEARCH;
+	if (!isFlagSet(g_crash_report_flags, CrashReportFlags::ENABLED)) return EXCEPTION_CONTINUE_SEARCH;
 
 	HANDLE process = GetCurrentProcess();
-	SymInitialize(process, nullptr, TRUE);
+	BOOL sym_init_success = SymInitialize(process, nullptr, TRUE);
 	debug::StackTree::refreshModuleList();
 
-	struct CrashInfo
-	{
+	struct CrashInfo {
 		LPEXCEPTION_POINTERS info;
 		DWORD thread_id;
-		StaticString<4096> message;
+		StaticString<16386> message;
 	};
 
 	CrashInfo crash_info = { info, GetCurrentThreadId() };
@@ -666,6 +726,11 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 	}
 	crash_info.message.append("\n");
 	
+	if (!sym_init_success) {
+		DWORD error = GetLastError();
+		crash_info.message.append("Warning: Failed to initialize symbols (Error: ", (u32)error, ")\n");
+	}
+	
 	auto dumper = [](void* data) -> DWORD {
 		LPEXCEPTION_POINTERS info = ((CrashInfo*)data)->info;
 		auto& message = ((CrashInfo*)data)->message;
@@ -673,10 +738,16 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 
 		if (info) {
 			getStack(*info->ContextRecord, Span(message.data));
-			message.append("\nCode: ", (u32)info->ExceptionRecord->ExceptionCode);
-			message.append("\nAddress: ", (uintptr)info->ExceptionRecord->ExceptionAddress);
-			message.append("\nBase: ", (uintptr)base);
-			os::messageBox(message);
+			message.append("\nException: ");
+			describeException(info->ExceptionRecord, message);
+			char addr_buf[17];
+			toCStringHex((u64)info->ExceptionRecord->ExceptionAddress, Span(addr_buf));
+			message.append("\nAddress: 0x", addr_buf);
+			toCStringHex((u64)base, Span(addr_buf));
+			message.append("\nBase: 0x", addr_buf, "\n");
+			if (isFlagSet(g_crash_report_flags, CrashReportFlags::MESSAGE_BOX)) {
+				os::messageBox(message);
+			}
 		}
 
 		char minidump_path[MAX_PATH];
@@ -695,27 +766,34 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 		minidump_exception_info.ExceptionPointers = info;
 		minidump_exception_info.ClientPointers = FALSE;
 
-		MiniDumpWriteDump(process,
+		BOOL dump_success = MiniDumpWriteDump(process,
 			process_id,
 			file,
 			minidump_type,
 			info ? &minidump_exception_info : nullptr,
 			nullptr,
 			nullptr);
+		if (!dump_success) {
+			DWORD error = GetLastError();
+			message.append("Warning: Failed to write minidump (Error: ", (u32)error, ")\n");
+		}
 		CloseHandle(file);
 
 		minidump_type = (MINIDUMP_TYPE)(MiniDumpWithFullMemory | MiniDumpWithFullMemoryInfo |
 			MiniDumpFilterMemory | MiniDumpWithHandleData |
 			MiniDumpWithThreadInfo | MiniDumpWithUnloadedModules);
 		file = CreateFile("fulldump.dmp", GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-		MiniDumpWriteDump(process,
+		BOOL full_dump_success = MiniDumpWriteDump(process,
 			process_id,
 			file,
 			minidump_type,
 			info ? &minidump_exception_info : nullptr,
 			nullptr,
 			nullptr);
-
+		if (!full_dump_success) {
+			DWORD error = GetLastError();
+			message.append("Warning: Failed to write full dump (Error: ", (u32)error, ")\n");
+		}
 		CloseHandle(file);
 		return 0;
 	};
@@ -724,20 +802,21 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 	HANDLE handle = CreateThread(0, 0x8000, dumper, &crash_info, 0, &thread_id);
 	WaitForSingleObject(handle, INFINITE);
 
-	logError(crash_info.message);
+	if (isFlagSet(g_crash_report_flags, CrashReportFlags::LOG)) {
+		logError(crash_info.message);
+	}
+	if (isFlagSet(g_crash_report_flags, CrashReportFlags::STDERR)) {
+		fprintf(stderr, "%s", crash_info.message.data);
+	}
 
 	return EXCEPTION_CONTINUE_SEARCH;
 }
 
-
-void enableCrashReporting(bool enable)
-{
-	g_is_crash_reporting_enabled = enable;
+void configureCrashReport(CrashReportFlags flags) {
+	g_crash_report_flags = flags;
 }
 
-
-void installUnhandledExceptionHandler()
-{
+void installUnhandledExceptionHandler() {
 	SetUnhandledExceptionFilter(unhandledExceptionHandler);
 }
 

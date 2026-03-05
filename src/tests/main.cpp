@@ -32,6 +32,8 @@ static void consoleLog(Lumix::LogLevel level, const char* message) {
 int main(int argc, char* argv[]) {
 	Lumix::registerLogCallback<&consoleLog>();
 	Lumix::debug::init(Lumix::getGlobalAllocator());
+	Lumix::configureCrashReport(Lumix::CrashReportFlags::ENABLED | Lumix::CrashReportFlags::STDERR);
+	Lumix::installUnhandledExceptionHandler();
 	Lumix::profiler::init(Lumix::getGlobalAllocator());
 	
 	runParticleScriptTokenizerTests();

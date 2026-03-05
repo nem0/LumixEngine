@@ -2257,8 +2257,8 @@ struct StudioAppImpl final : StudioApp {
 		logInfo("Loading settings...");
 
 		m_settings.load(user_data_only);
-		if (CommandLineParser::isOn("-no_crash_report")) enableCrashReporting(false);
-		else enableCrashReporting(m_crash_reporting);
+		if (CommandLineParser::isOn("-no_crash_report") || !m_crash_reporting) configureCrashReport(CrashReportFlags::DISABLED);
+		else configureCrashReport(CrashReportFlags::ENABLE_ALL);
 
 		m_recent_folders.clear();
 		for (u32 i = 0; i < 5; ++i) {

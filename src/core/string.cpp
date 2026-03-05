@@ -682,6 +682,44 @@ void toCStringHex(u8 value, Span<char> output)
 	return;
 }
 
+char* toCStringHex(u32 value, Span<char> output) {
+	u32 length = output.length();
+	if (length < 9) return nullptr;  // 8 hex digits + null terminator
+
+	char* c = output.begin();
+	for (i32 i = 7; i >= 0; --i) {
+		u8 nibble = (value >> (i * 4)) & 0xF;
+		if (nibble > 9) {
+			*c = 'A' + nibble - 10;
+		}
+		else {
+			*c = '0' + nibble;
+		}
+		++c;
+	}
+	*c = 0;
+	return c;
+}
+
+char* toCStringHex(u64 value, Span<char> output) {
+	u32 length = output.length();
+	if (length < 17) return nullptr;  // 16 hex digits + null terminator
+
+	char* c = output.begin();
+	for (i32 i = 15; i >= 0; --i) {
+		u8 nibble = (value >> (i * 4)) & 0xF;
+		if (nibble > 9) {
+			*c = 'A' + nibble - 10;
+		}
+		else {
+			*c = '0' + nibble;
+		}
+		++c;
+	}
+	*c = 0;
+	return c;
+}
+
 char* toCString(u32 value, Span<char> output)
 {
 	char* c = output.begin();

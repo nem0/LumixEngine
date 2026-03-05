@@ -1,20 +1,16 @@
 #pragma once
 
-
 #include "allocator.h"
 #include "atomic.h"
 #include "core.h"
 #include "sync.h"
 
-
-namespace Lumix
-{
+namespace Lumix {
 
 struct TagAllocator;
 template <typename T> struct Span;
 
-namespace debug
-{
+namespace debug {
 
 struct StackNode;
 
@@ -81,7 +77,17 @@ private:
 } // namespace Debug
 
 
-LUMIX_CORE_API void enableCrashReporting(bool enable);
+enum class CrashReportFlags : u32 {
+	ENABLED = 1 << 0,
+	MESSAGE_BOX = 1 << 1,
+	LOG = 1 << 2,
+	STDERR = 1 << 3,
+
+	ENABLE_ALL = ENABLED | MESSAGE_BOX | LOG | STDERR,
+	DISABLED = 0,
+};
+
+LUMIX_CORE_API void configureCrashReport(CrashReportFlags flags);
 LUMIX_CORE_API void installUnhandledExceptionHandler();
 LUMIX_CORE_API void clearHardwareBreakpoint(u32 breakpoint_idx);
 LUMIX_CORE_API void setHardwareBreakpoint(u32 breakpoint_idx, const void* mem, u32 size);
