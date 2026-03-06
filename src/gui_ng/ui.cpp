@@ -63,8 +63,8 @@ static AttributeName parseAttributeName(StringView str) {
 			break;
 		case 'b':
 			if (len == 8 && memcmp(s, "bg-color", 8) == 0) return AttributeName::BG_COLOR;
-			if (len == 6 && memcmp(s, "bg-fit", 6) == 0) return AttributeName::BACKGROUND_FIT;
-			if (len == 8 && memcmp(s, "bg-image", 8) == 0) return AttributeName::BACKGROUND_IMAGE;
+			if (len == 6 && memcmp(s, "bg-fit", 6) == 0) return AttributeName::BG_FIT;
+			if (len == 8 && memcmp(s, "bg-image", 8) == 0) return AttributeName::BG_IMAGE;
 			break;
 		case 'c':
 			if (len == 5 && memcmp(s, "class", 5) == 0) return AttributeName::CLASS;
@@ -92,9 +92,17 @@ static AttributeName parseAttributeName(StringView str) {
 			break;
 		case 'm':
 			if (len == 6 && memcmp(s, "margin", 6) == 0) return AttributeName::MARGIN;
+			if (len == 11 && memcmp(s, "margin-left", 11) == 0) return AttributeName::MARGIN_LEFT;
+			if (len == 12 && memcmp(s, "margin-right", 12) == 0) return AttributeName::MARGIN_RIGHT;
+			if (len == 10 && memcmp(s, "margin-top", 10) == 0) return AttributeName::MARGIN_TOP;
+			if (len == 13 && memcmp(s, "margin-bottom", 13) == 0) return AttributeName::MARGIN_BOTTOM;
 			break;
 		case 'p':
 			if (len == 7 && memcmp(s, "padding", 7) == 0) return AttributeName::PADDING;
+			if (len == 12 && memcmp(s, "padding-left", 12) == 0) return AttributeName::PADDING_LEFT;
+			if (len == 13 && memcmp(s, "padding-right", 13) == 0) return AttributeName::PADDING_RIGHT;
+			if (len == 11 && memcmp(s, "padding-top", 11) == 0) return AttributeName::PADDING_TOP;
+			if (len == 14 && memcmp(s, "padding-bottom", 14) == 0) return AttributeName::PADDING_BOTTOM;
 			if (len == 11 && memcmp(s, "placeholder", 11) == 0) return AttributeName::PLACEHOLDER;
 			break;
 		case 's':
@@ -776,21 +784,27 @@ static float computeSpansHeight(Document& doc, Element& element, i32 child_idx) 
 }
 
 static void computeBaseHeights(Document& doc, Element& elem, Element* parent_elem, const ParentContext& parent) {
-	ParsedUnit margin_unit = {0, Unit::PIXELS};
-	ParsedUnit padding_unit = {0, Unit::PIXELS};
+	ParsedUnit margin_unit[2] = {{0, Unit::PIXELS}, {0, Unit::PIXELS}};
+	ParsedUnit padding_unit[2] = {{0, Unit::PIXELS}, {0, Unit::PIXELS}};
 
 	for (const Attribute& attr : elem.attributes) {
 		switch (attr.type) {
-			case AttributeName::MARGIN: margin_unit = parseUnit(attr.value); break;
-			case AttributeName::PADDING: padding_unit = parseUnit(attr.value); break;
+			case AttributeName::MARGIN: margin_unit[0] = margin_unit[1] = parseUnit(attr.value); break;
+			case AttributeName::PADDING: padding_unit[0] = padding_unit[1] = parseUnit(attr.value); break;
+			case AttributeName::PADDING_TOP: padding_unit[0] = parseUnit(attr.value); break;
+			case AttributeName::PADDING_BOTTOM: padding_unit[1] = parseUnit(attr.value); break;
+			case AttributeName::MARGIN_TOP: margin_unit[0] = parseUnit(attr.value); break;
+			case AttributeName::MARGIN_BOTTOM: margin_unit[1] = parseUnit(attr.value); break;
 			default: break;
 		}
 	}
 
 	if (elem.tag == Tag::SPAN) return;
 
-	elem.margins.top = elem.margins.bottom = computeAbsoluteSize(margin_unit, parent.size.y, elem.font_size);
-	elem.paddings.top = elem.paddings.bottom = computeAbsoluteSize(padding_unit, parent.size.y, elem.font_size);
+	elem.margins.top = computeAbsoluteSize(margin_unit[0], parent.size.y, elem.font_size);
+	elem.margins.bottom = computeAbsoluteSize(margin_unit[1], parent.size.y, elem.font_size);
+	elem.paddings.top = computeAbsoluteSize(padding_unit[0], parent.size.y, elem.font_size);
+	elem.paddings.bottom = computeAbsoluteSize(padding_unit[1], parent.size.y, elem.font_size);
 
 	if (elem.height_unit.unit != Unit::FIT_CONTENT) {
 		elem.size.y = computeAbsoluteSize(elem.height_unit, parent.size.y, elem.font_size);
@@ -870,14 +884,18 @@ static void computeBaseWidths(Document& doc, Element& elem, Element* parent_elem
 	ParentContext ctx = parent;
 	ctx.size = Vec2(0);
 
-	ParsedUnit margin_unit = {0, Unit::PIXELS};
-	ParsedUnit padding_unit = {0, Unit::PIXELS};
+	ParsedUnit margin_unit[2] = {{0, Unit::PIXELS}, {0, Unit::PIXELS}};
+	ParsedUnit padding_unit[2] = {{0, Unit::PIXELS}, {0, Unit::PIXELS}};
 
 	for (const Attribute& attr : elem.attributes) {
 		switch (attr.type) {
 			case AttributeName::FONT: ctx.font = attr.value; break;
-			case AttributeName::PADDING: padding_unit = parseUnit(attr.value); break;
-			case AttributeName::MARGIN: margin_unit = parseUnit(attr.value); break;
+			case AttributeName::PADDING: padding_unit[0] = padding_unit[1] = parseUnit(attr.value); break;
+			case AttributeName::MARGIN: margin_unit[0] = margin_unit[1] = parseUnit(attr.value); break;
+			case AttributeName::PADDING_LEFT: padding_unit[0] = parseUnit(attr.value); break;
+			case AttributeName::PADDING_RIGHT: padding_unit[1] = parseUnit(attr.value); break;
+			case AttributeName::MARGIN_LEFT: margin_unit[0] = parseUnit(attr.value); break;
+			case AttributeName::MARGIN_RIGHT: margin_unit[1] = parseUnit(attr.value); break;
 			default: break;
 		}
 	}
@@ -892,10 +910,10 @@ static void computeBaseWidths(Document& doc, Element& elem, Element* parent_elem
 	if (elem.width_unit.unit != Unit::FIT_CONTENT) {
 		elem.size.x = computeAbsoluteSize(elem.width_unit, parent.size.x, elem.font_size);
 	}
-	elem.margins.right = computeAbsoluteSize(margin_unit, parent.size.x, elem.font_size);
-	elem.margins.left = elem.margins.right;
-	elem.paddings.right = computeAbsoluteSize(padding_unit, parent.size.x, elem.font_size);
-	elem.paddings.left = elem.paddings.right;
+	elem.margins.left = computeAbsoluteSize(margin_unit[0], parent.size.x, elem.font_size);
+	elem.margins.right = computeAbsoluteSize(margin_unit[1], parent.size.x, elem.font_size);
+	elem.paddings.left = computeAbsoluteSize(padding_unit[0], parent.size.x, elem.font_size);
+	elem.paddings.right = computeAbsoluteSize(padding_unit[1], parent.size.x, elem.font_size);
 
 	ctx.size = elem.size;
 	for (u32 child_idx : elem.children) {
@@ -1409,7 +1427,7 @@ static void loadResources(Document& doc, u32 element_index, const ParentContext&
 				fromCString(attr.value, elem.font_size);
 				ctx.font_size = elem.font_size;
 				break;
-			case AttributeName::BACKGROUND_IMAGE: {
+			case AttributeName::BG_IMAGE: {
 				if (doc.m_resource_manager && !attr.value.empty()) {
 					elem.bg_sprite = doc.m_resource_manager->load<Sprite>(Path(attr.value));
 				}

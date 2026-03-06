@@ -306,6 +306,108 @@ bool testMarginPadding() {
 	return true;
 }
 
+bool testHorizontalSideSpecificMarginPadding() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[box width=300 height=100 direction=row padding-left=11 padding-right=13] {
+		[box width=50 height=20 margin-left=7 margin-right=17] {}
+		[box width=30 height=20 margin-left=5 margin-right=3] {}
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_TRUE(doc.m_elements.size() >= 3);
+	ui::Element* parent = doc.getElement(0);
+	ui::Element* first = doc.getElement(1);
+	ui::Element* second = doc.getElement(2);
+
+	ASSERT_FLOAT_EQ(11.0f, parent->paddings.left);
+	ASSERT_FLOAT_EQ(13.0f, parent->paddings.right);
+
+	ASSERT_FLOAT_EQ(7.0f, first->margins.left);
+	ASSERT_FLOAT_EQ(17.0f, first->margins.right);
+	ASSERT_FLOAT_EQ(5.0f, second->margins.left);
+	ASSERT_FLOAT_EQ(3.0f, second->margins.right);
+
+	ASSERT_FLOAT_EQ(18.0f, first->position.x);
+	ASSERT_FLOAT_EQ(85.0f, second->position.x);
+
+	return true;
+}
+
+bool testVerticalSideSpecificMarginPadding() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[box width=200 height=300 direction=column padding-top=11 padding-bottom=13] {
+		[box width=50 height=20 margin-top=7 margin-bottom=17] {}
+		[box width=30 height=30 margin-top=5 margin-bottom=3] {}
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_TRUE(doc.m_elements.size() >= 3);
+	ui::Element* parent = doc.getElement(0);
+	ui::Element* first = doc.getElement(1);
+	ui::Element* second = doc.getElement(2);
+
+	ASSERT_FLOAT_EQ(11.0f, parent->paddings.top);
+	ASSERT_FLOAT_EQ(13.0f, parent->paddings.bottom);
+
+	ASSERT_FLOAT_EQ(7.0f, first->margins.top);
+	ASSERT_FLOAT_EQ(17.0f, first->margins.bottom);
+	ASSERT_FLOAT_EQ(5.0f, second->margins.top);
+	ASSERT_FLOAT_EQ(3.0f, second->margins.bottom);
+
+	ASSERT_FLOAT_EQ(18.0f, first->position.y);
+	ASSERT_FLOAT_EQ(55.0f, second->position.y);
+
+	return true;
+}
+
+bool testSideSpecificShorthandPrecedence() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[box width=100 height=100 direction=column padding=10 padding-top=3 padding-bottom=4] {
+		[box width=10 height=10 margin=8 margin-top=1 margin-bottom=2] {}
+	}
+	[box width=100 height=100 direction=column padding-top=3 padding=10] {
+		[box width=10 height=10 margin-top=1 margin=8] {}
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_EQ(2, doc.m_roots.size());
+
+	ui::Element* parent1 = doc.getElement(doc.m_roots[0]);
+	ui::Element* parent2 = doc.getElement(doc.m_roots[1]);
+	ASSERT_EQ(1, parent1->children.size());
+	ASSERT_EQ(1, parent2->children.size());
+	ui::Element* child1 = doc.getElement(parent1->children[0]);
+	ui::Element* child2 = doc.getElement(parent2->children[0]);
+
+	ASSERT_FLOAT_EQ(10.0f, parent1->paddings.left);
+	ASSERT_FLOAT_EQ(10.0f, parent1->paddings.right);
+	ASSERT_FLOAT_EQ(3.0f, parent1->paddings.top);
+	ASSERT_FLOAT_EQ(4.0f, parent1->paddings.bottom);
+
+	ASSERT_FLOAT_EQ(8.0f, child1->margins.left);
+	ASSERT_FLOAT_EQ(8.0f, child1->margins.right);
+	ASSERT_FLOAT_EQ(1.0f, child1->margins.top);
+	ASSERT_FLOAT_EQ(2.0f, child1->margins.bottom);
+
+	ASSERT_FLOAT_EQ(10.0f, parent2->paddings.left);
+	ASSERT_FLOAT_EQ(10.0f, parent2->paddings.right);
+	ASSERT_FLOAT_EQ(10.0f, parent2->paddings.top);
+	ASSERT_FLOAT_EQ(10.0f, parent2->paddings.bottom);
+
+	ASSERT_FLOAT_EQ(8.0f, child2->margins.left);
+	ASSERT_FLOAT_EQ(8.0f, child2->margins.right);
+	ASSERT_FLOAT_EQ(8.0f, child2->margins.top);
+	ASSERT_FLOAT_EQ(8.0f, child2->margins.bottom);
+
+	ASSERT_FLOAT_EQ(parent1->position.y + 4.0f, child1->position.y);
+	ASSERT_FLOAT_EQ(parent2->position.y + 18.0f, child2->position.y);
+
+	return true;
+}
+
 bool testBasicLayout() {
 	// Citation: layout.md - Element Sizing
 	// "Each UI element has `width` and `height` attributes that control its size, known as dimensions. Set them explicitly for a fixed size;"
@@ -1945,6 +2047,9 @@ void runUILayoutTests() {
 	RUN_TEST(testLayoutWithMargins);
 	RUN_TEST(testLineBreaks);
 	RUN_TEST(testMarginPadding);
+	RUN_TEST(testHorizontalSideSpecificMarginPadding);
+	RUN_TEST(testVerticalSideSpecificMarginPadding);
+	RUN_TEST(testSideSpecificShorthandPrecedence);
 	RUN_TEST(testMultilineStringLayout);
 	RUN_TEST(testNestedPanelsDifferentDirections);
 	RUN_TEST(testNestedPanelsWithMargins);

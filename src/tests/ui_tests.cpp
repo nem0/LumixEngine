@@ -196,9 +196,9 @@ bool testPanelAttributes() {
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	Span<ui::Attribute> attrs = root->attributes;
 	ASSERT_EQ(6, attrs.size());
-	ASSERT_ATTRIBUTE(root, 0, BACKGROUND_IMAGE);
+	ASSERT_ATTRIBUTE(root, 0, BG_IMAGE);
 	ASSERT_EQ("bg.png", attrs[0].value);
-	ASSERT_ATTRIBUTE(root, 1, BACKGROUND_FIT);
+	ASSERT_ATTRIBUTE(root, 1, BG_FIT);
 	ASSERT_EQ("cover", attrs[1].value);
 	ASSERT_ATTRIBUTE(root, 2, BG_COLOR);
 	ASSERT_EQ("#000000", attrs[2].value);
