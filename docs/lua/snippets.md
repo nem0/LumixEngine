@@ -1,3 +1,21 @@
+## Table of contents
+
+- [Accessing transform properties (position, rotation, scale)](#accessing-transform-properties-position-rotation-scale)
+- [Accessing components and their properties](#accessing-components-and-their-properties)
+- [Show mouse cursor ingame](#show-mouse-cursor-ingame)
+- [Create a grid 7 x 120 x 7 cubes with box physics](#create-a-grid-7-x-120-x-7-cubes-with-box-physics)
+- [Destroy entities in editor and ingame](#destroy-entities-in-editor-and-ingame)
+- [raycastEx](#raycastex)
+- [Raycast from mouse screen coordinates in input handler](#raycast-from-mouse-screen-coordinates-in-input-handler)
+- [Handling keyboard input](#handling-keyboard-input)
+- [Handling gamepad input](#handling-gamepad-input)
+- [Instantiate a prefab](#instantiate-a-prefab)
+- [Load another world as a partition of current world](#load-another-world-as-a-partition-of-current-world)
+- [How to handle array properties](#how-to-handle-array-properties)
+- [GUI button click handler](#gui-button-click-handler)
+- [Override a material on model_instance component](#override-a-material-on-model_instance-component)
+- [Render to texture in UI](#render-to-texture-in-ui)
+
 ### Accessing transform properties (position, rotation, scale)
 ```lua
 -- Position is a table {x, y, z}

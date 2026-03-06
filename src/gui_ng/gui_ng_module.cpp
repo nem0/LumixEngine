@@ -100,25 +100,8 @@ struct GUINGModuleImpl : GUINGModule {
 		}
 	}
 
-	void handleUIEvents() {
-		Span<const ui::Event> events = m_document.getEvents();
-		for (const ui::Event& event : events) {
-			switch (event.type) {
-				case ui::EventType::MOUSE_ENTER:
-					m_document.addClass(event.element_index, "hovered");
-					break;
-				case ui::EventType::MOUSE_LEAVE:
-					m_document.removeClass(event.element_index, "hovered");
-					break;
-				default:
-					break;
-			}
-		}
-	}
-
 	void update(float time_delta) override {
 		handleInput();
-		handleUIEvents();
 		m_document.clearEvents();
 		if (m_is_ready && m_canvas_size != m_previous_canvas_size) {
 			m_previous_canvas_size = m_canvas_size;

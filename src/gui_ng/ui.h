@@ -274,6 +274,8 @@ private:
 	bool parseStyleBlock();
 	bool consume(Token::Type type, Token* out_token = nullptr);
 	bool tryConsume(Token::Type type, Token* out_token = nullptr);
+	void addClassRaw(u32 element_index, StringView classname);
+	void removeClassRaw(u32 element_index, StringView classname);
 
 	Array<Event> m_events;
 };

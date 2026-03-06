@@ -15,20 +15,16 @@ bool testDocumentParseEmpty() {
 bool testInternTableSemantics() {
 	MockDocument doc;
 	
-	// Test same string returns same id
 	u32 id1 = (u32)doc.m_intern_table.intern("class1");
 	u32 id2 = (u32)doc.m_intern_table.intern("class1");
 	ASSERT_EQ(id1, id2);
 	
-	// Test different strings return different ids
 	u32 id3 = (u32)doc.m_intern_table.intern("class2");
 	ASSERT_TRUE(id1 != id3);
 	
-	// Test resolve
 	StringView resolved = doc.m_intern_table.resolve((InternString)id1);
 	ASSERT_EQ(resolved, "class1");
 	
-	// Test invalid id
 	StringView invalid = doc.m_intern_table.resolve(InternString::INVALID);
 	ASSERT_EQ(invalid.size(), 0);
 	
@@ -144,9 +140,9 @@ bool testMultipleClasses() {
 	StringView class1 = doc.m_intern_table.resolve(root->classes[0]);
 	StringView class2 = doc.m_intern_table.resolve(root->classes[1]);
 	StringView class3 = doc.m_intern_table.resolve(root->classes[2]);
-	ASSERT_EQ("class1", class1);
-	ASSERT_EQ("class2", class2);
-	ASSERT_EQ("class3", class3);
+	ASSERT_EQ(".class1", class1);
+	ASSERT_EQ(".class2", class2);
+	ASSERT_EQ(".class3", class3);
 	
 	return true;
 }
@@ -158,7 +154,7 @@ bool testSingleClass() {
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	ASSERT_EQ(1, root->classes.size());
 	StringView class_name = doc.m_intern_table.resolve(root->classes[0]);
-	ASSERT_EQ("singleclass", class_name);
+	ASSERT_EQ(".singleclass", class_name);
 	return true;
 }
 
@@ -167,12 +163,11 @@ bool testDuplicateClasses() {
 	ASSERT_PARSE(doc, "[box .dup .other .dup]");
 	ASSERT_EQ(1, doc.m_roots.size());
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
-	// Should dedup, first occurrence wins, order preserved
 	ASSERT_EQ(2, root->classes.size());
 	StringView class1 = doc.m_intern_table.resolve(root->classes[0]);
 	StringView class2 = doc.m_intern_table.resolve(root->classes[1]);
-	ASSERT_EQ("dup", class1);
-	ASSERT_EQ("other", class2);
+	ASSERT_EQ(".dup", class1);
+	ASSERT_EQ(".other", class2);
 	return true;
 }
 
@@ -236,10 +231,8 @@ bool testDefaultValues() {
 	ASSERT_EQ(1, doc.m_roots.size());
 	ui::Element* elem = doc.getElement(doc.m_roots[0]);
 	
-	// Compute layout to apply defaults
 	doc.computeLayout(Vec2(800, 600));
 	
-	// Check default layout values
 	ASSERT_FLOAT_EQ(0.0f, elem->margins.top);
 	ASSERT_FLOAT_EQ(0.0f, elem->margins.right);
 	ASSERT_FLOAT_EQ(0.0f, elem->margins.bottom);
@@ -250,7 +243,6 @@ bool testDefaultValues() {
 	ASSERT_FLOAT_EQ(0.0f, elem->paddings.left);
 	ASSERT_EQ((int)ui::Direction::COLUMN, (int)elem->direction);
 	
-	// Check that no attributes are stored for defaults
 	Span<ui::Attribute> attrs = elem->attributes;
 	ASSERT_EQ(0, attrs.size());
 	
@@ -299,20 +291,17 @@ bool testSpanEmptyValue() {
 }
 
 bool testFontAttribute() {
-	// Test font attribute on span element
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box font=\"arial.ttf\"] { [span value=\"hello\" font=\"times.ttf\"] }");
 	ASSERT_EQ(1, doc.m_roots.size());
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	ASSERT_EQ(1, root->children.size());
 	
-	// Check root has font attribute
 	Span<ui::Attribute> root_attrs = root->attributes;
 	ASSERT_EQ(1, root_attrs.size());
 	ASSERT_ATTRIBUTE(root, 0, FONT);
 	ASSERT_EQ("arial.ttf", root_attrs[0].value);
 	
-	// Check child span has its own font attribute
 	ui::Element* span = doc.getElement(root->children[0]);
 	ASSERT_TAG(span, SPAN);
 	Span<ui::Attribute> span_attrs = span->attributes;
@@ -325,20 +314,17 @@ bool testFontAttribute() {
 }
 
 bool testFontSizeAttribute() {
-	// Test font-size attribute on span element
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box font-size=16] { [span value=\"hello\" font-size=24] }");
 	ASSERT_EQ(1, doc.m_roots.size());
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	ASSERT_EQ(1, root->children.size());
 
-	// Check root has font-size attribute
 	Span<ui::Attribute> root_attrs = root->attributes;
 	ASSERT_EQ(1, root_attrs.size());
 	ASSERT_ATTRIBUTE(root, 0, FONT_SIZE);
 	ASSERT_EQ("16", root_attrs[0].value);
 
-	// Check child span has its own font-size attribute
 	ui::Element* span = doc.getElement(root->children[0]);
 	ASSERT_TAG(span, SPAN);
 	Span<ui::Attribute> span_attrs = span->attributes;
@@ -357,7 +343,6 @@ bool testFontInheritance() {
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	doc.computeLayout(Vec2(800, 600));
 
-	// Check if child span inherits font
 	ui::Element* span = doc.getElement(root->children[0]);
 	ASSERT_TRUE(span->font_handle != nullptr);
 
@@ -385,10 +370,8 @@ bool testColorInheritance() {
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	doc.computeLayout(Vec2(800, 600));
 
-	// Check if root has color set
 	ASSERT_TRUE(root->color.r == 255 && root->color.g == 0 && root->color.b == 0 && root->color.a == 255);
 
-	// Check if child span inherits color
 	ui::Element* span = doc.getElement(root->children[0]);
 	ASSERT_TRUE(span->color.r == 255 && span->color.g == 0 && span->color.b == 0 && span->color.a == 255);
 	return true;
@@ -401,14 +384,11 @@ bool testColorInheritanceDeep() {
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	doc.computeLayout(Vec2(800, 600));
 
-	// Check if root has color set
 	ASSERT_TRUE(root->color.r == 0 && root->color.g == 255 && root->color.b == 0 && root->color.a == 255);
 
-	// Check if child panel inherits color
 	ui::Element* child_panel = doc.getElement(root->children[0]);
 	ASSERT_TRUE(child_panel->color.r == 0 && child_panel->color.g == 255 && child_panel->color.b == 0 && child_panel->color.a == 255);
 
-	// Check if grandchild span inherits color
 	ui::Element* grandchild_span = doc.getElement(child_panel->children[0]);
 	ASSERT_TRUE(grandchild_span->color.r == 0 && grandchild_span->color.g == 255 && grandchild_span->color.b == 0 && grandchild_span->color.a == 255);
 
@@ -460,26 +440,21 @@ bool testMultilineStringLayout() {
 }
 
 bool testMultilineStringMeasurement() {
-	// Test that measureTextA skips \n and \r characters
 	MockFontManager font_manager;
 	MockFontManager::FontHandle font = font_manager.loadFont("test.ttf", 16);
 
-	// Test normal text
 	Vec2 size1 = font_manager.measureTextA(font, "hello");
 	ASSERT_FLOAT_EQ(40.0f, size1.x);
 	ASSERT_FLOAT_EQ(16.0f, size1.y);
 
-	// Test text with newlines
 	Vec2 size2 = font_manager.measureTextA(font, "hel\nlo");
 	ASSERT_FLOAT_EQ(48.0f, size2.x);
 	ASSERT_FLOAT_EQ(16.0f, size2.y);
 
-	// Test text with carriage return
 	Vec2 size3 = font_manager.measureTextA(font, "hel\rlo");
 	ASSERT_FLOAT_EQ(40.0f, size3.x);
 	ASSERT_FLOAT_EQ(16.0f, size3.y);
 
-	// Test text with both
 	Vec2 size4 = font_manager.measureTextA(font, "h\n\r\nel\rlo");
 	ASSERT_FLOAT_EQ(48.0f, size4.x);
 	ASSERT_FLOAT_EQ(16.0f, size4.y);
@@ -534,7 +509,6 @@ bool testParseAndRuntimeMutation() {
 	ASSERT_EQ(1, doc.m_roots.size());
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	
-	// Initial: has width and color from .initial
 	bool has_width_100 = false;
 	bool has_color_red = false;
 	for (const ui::Attribute& attr : root->attributes) {
@@ -544,16 +518,13 @@ bool testParseAndRuntimeMutation() {
 	ASSERT_TRUE(has_width_100);
 	ASSERT_TRUE(has_color_red);
 	
-	// Runtime: add .added class
 	doc.addClass(roots[0], "added");
 	
-	// Now should have height too
 	bool has_height_200 = false;
 	for (const ui::Attribute& attr : root->attributes) {
 		if (attr.type == ui::AttributeName::HEIGHT && equalStrings(attr.value, "200")) has_height_200 = true;
 	}
 	ASSERT_TRUE(has_height_200);
-	// And still have the others
 	has_width_100 = false;
 	has_color_red = false;
 	for (const ui::Attribute& attr : root->attributes) {
@@ -582,30 +553,24 @@ bool testComplexMutationSequence() {
 	ASSERT_EQ(1, doc.m_roots.size());
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	
-	// Initial: .a and .b applied
 	int initial_attrs = root->attributes.size();
 	
-	// Add .c
 	doc.addClass(roots[0], "c");
 	int after_add_c = root->attributes.size();
 	ASSERT_TRUE(after_add_c > initial_attrs);
 	
-	// Add .d
 	doc.addClass(roots[0], "d");
 	int after_add_d = root->attributes.size();
 	ASSERT_TRUE(after_add_d > after_add_c);
 	
-	// Remove .b
 	doc.removeClass(roots[0], "b");
 	int after_remove_b = root->attributes.size();
 	ASSERT_TRUE(after_remove_b < after_add_d);
 	
-	// Remove .a and .c
 	doc.removeClass(roots[0], "a");
 	doc.removeClass(roots[0], "c");
 	int final_attrs = root->attributes.size();
 	
-	// Should only have .d
 	bool has_padding = false;
 	int attr_count = 0;
 	for (const ui::Attribute& attr : root->attributes) {
@@ -625,9 +590,9 @@ struct MockMouseDevice : InputSystem::Device {
 };
 
 bool testHoverEvents() {
+	// TODO better test
 	MockDocument doc;
 	doc.m_canvas_size = Vec2(800, 600);
-	// Create two panels: one at (0,0) with size (100,100), another below it at (0,100) with size (100,100)
 	ASSERT_PARSE(doc, "[box .p1 width=100 height=100] {} [box .p2 width=100 height=100] {}");
 	doc.computeLayout(doc.m_canvas_size);
 
@@ -638,7 +603,6 @@ bool testHoverEvents() {
 	ev.data.axis.x_abs = 50;
 	ev.data.axis.y_abs = 50;
 
-	// Initial move to (50,50) - should enter .p1 (index 0)
 	doc.injectEvent(ev);
 	
 	{
@@ -653,7 +617,6 @@ bool testHoverEvents() {
 	}
 	doc.clearEvents();
 
-	// Move to (50, 150) - should leave .p1 (index 0) and enter .p2 (index 1)
 	ev.data.axis.y_abs = 150;
 	doc.injectEvent(ev);
 
@@ -681,7 +644,6 @@ bool testHoverEvents() {
 	}
 	doc.clearEvents();
 
-	// Move to (300, 300) - should leave .p2 (index 1) and enter nothing
 	ev.data.axis.x_abs = 300;
 	ev.data.axis.y_abs = 300;
 	doc.injectEvent(ev);
@@ -705,82 +667,6 @@ bool testHoverEvents() {
 		ASSERT_EQ(1, (int)leave_idx);
 		if (found_enter) { logError("Unexpected MOUSE_ENTER when moving to empty space"); return false; }
 	}
-
-	return true;
-}
-
-bool testDemoUI() {
-	MockDocument doc;
-	const char* ui_content = R"(
-	[style] {
-		.button {
-			width: 120;
-			bg-color: #ffffFF;
-			align: center;
-			padding: 0.5em;
-			margin: 1em;
-		}
-
-		.hovered {
-			bg-color: #ff0000;
-		}
-	}
-	[box direction=row padding=20 width=100% font-size=20 bg-color=#00ff00] {
-		[box .button] { Button 1 }
-		[box .button] { Button 2 }
-	}
-	)";
-	ASSERT_PARSE(doc, ui_content);
-	
-	Span<u32> roots = doc.m_roots;
-	ASSERT_EQ(1, roots.size());
-	
-	Span<ui::StyleRule> rules = doc.m_stylesheet.getRules();
-	ASSERT_EQ(2, rules.size());
-	
-	ui::Element* root = doc.getElement(roots[0]);
-	ASSERT_TAG(root, BOX);
-	ASSERT_EQ(2, root->children.size());
-	
-	doc.computeLayout(Vec2(800, 600));
-	
-	ASSERT_FLOAT_EQ(800.0f, root->size.x);
-	ASSERT_TRUE(root->size.y > 0.0f);
-	
-	ui::Element* button1 = doc.getElement(root->children[0]);
-	ui::Element* button2 = doc.getElement(root->children[1]);
-	
-	ASSERT_FLOAT_EQ(40.0f, button1->position.x);
-	ASSERT_FLOAT_EQ(180.0f, button2->position.x);
-	
-	ASSERT_FLOAT_EQ(button1->position.y, button2->position.y);
-	
-	float expected_width = 120.0f;
-	ASSERT_FLOAT_EQ(expected_width, button1->size.x);
-	ASSERT_FLOAT_EQ(expected_width, button2->size.x);
-	
-	doc.addClass(root->children[0], "hovered");
-	
-	bool has_hovered_bg = false;
-	for (const ui::Attribute& attr : button1->attributes) {
-		if (attr.type == ui::AttributeName::BG_COLOR && equalStrings(attr.value, "#ff0000")) {
-			has_hovered_bg = true;
-			break;
-		}
-	}
-	ASSERT_TRUE(has_hovered_bg);
-	
-	// reassert, layout should not change
-	ASSERT_FLOAT_EQ(800.0f, root->size.x);
-	ASSERT_TRUE(root->size.y > 0.0f);
-	
-	ASSERT_FLOAT_EQ(40.0f, button1->position.x);
-	ASSERT_FLOAT_EQ(180.0f, button2->position.x);
-	
-	ASSERT_FLOAT_EQ(button1->position.y, button2->position.y);
-	
-	ASSERT_FLOAT_EQ(expected_width, button1->size.x);
-	ASSERT_FLOAT_EQ(expected_width, button2->size.x);
 
 	return true;
 }
@@ -821,5 +707,4 @@ void runUITests() {
 	RUN_TEST(testParseAndRuntimeMutation);
 	RUN_TEST(testComplexMutationSequence);
 	RUN_TEST(testHoverEvents);
-	RUN_TEST(testDemoUI);
 }

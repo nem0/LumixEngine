@@ -19,7 +19,7 @@ optimized for simplicity and runtime performance. Style is defined in the same f
 
 ## Selectors & precedence
 
-- Supported selectors: `type`, `.class`, `$id`, and `parent > child` (direct child).
+- Supported selectors: `type`, `.class`, `$id`, `parent > child` (direct child), and pseudoclasses such as `:hover`.
 - Precedence (highest -> lowest): inline style > `$id` > `.class` > `type` > stylesheet order.
 
 ## Inheritance
@@ -44,3 +44,29 @@ Rules:
 - Inheritance flows along the widget tree (parent -> child). Selector forms
 	such as `parent > child` affect matching and specificity but do not change
 	the fundamental inheritance mechanism.
+
+## Hovered state
+
+Use the `:hover` pseudoclass to target elements while the mouse cursor is over
+them.
+
+Use it directly in style selectors:
+
+```css
+[style] {
+	.button {
+		bg-color: #3a3a3a;
+		color: #ffffff;
+	}
+
+	.button:hover {
+		bg-color: #4a4a4a;
+	}
+}
+```
+
+Notes:
+
+- `.button:hover` matches `.button` elements currently in hovered state.
+- `:hover` participates in normal precedence rules and has class-level
+	specificity.

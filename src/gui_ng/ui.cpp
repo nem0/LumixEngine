@@ -240,50 +240,25 @@ bool Document::parseStyleBlock() {
 		StyleRule& rule = m_stylesheet.m_rules.emplace(m_allocator);
 
 		const char* selector_start = token.value.begin;
-		// Parse selector: supports .class, $id, or element.class combinations
-		if (token.type == Token::DOT) {
-			// Class selector: .classname
-			Token id_token;
-			if (!consume(Token::IDENTIFIER, &id_token)) return false;
-			rule.classes.push(m_intern_table.intern(id_token.value));
-			for (;;) {
-				if (m_tokenizer.peekToken().type == Token::DOT) {
-					m_tokenizer.consumeToken();
-					if (!consume(Token::IDENTIFIER, &id_token)) return false;
-					rule.classes.push(m_intern_table.intern(id_token.value));
-				}
-				else break;
-			}
-		} else if (token.type == Token::DOLLAR) {
-			// ID selector: $idname
-			Token id_token;
-			if (!consume(Token::IDENTIFIER, &id_token)) return false;
-			// TODO: support ID selectors in matcher
-		} else if (token.type == Token::IDENTIFIER) {
-			// Element selector, possibly with class/id modifiers
-			for (;;) {
-				Token next = m_tokenizer.peekToken();
-				if (next.type == Token::DOT) {
-					// Append class modifier
-					if (!consume(Token::DOT)) return false;
+		while(token.type != Token::LBRACE) {
+			switch (token.type) {
+				case Token::DOLLAR:
+				case Token::IDENTIFIER:
+					ASSERT(false); // TODO
+					break;
+				case Token::COLON:
+				case Token::DOT: {
 					Token id_token;
 					if (!consume(Token::IDENTIFIER, &id_token)) return false;
-					rule.classes.push(m_intern_table.intern(id_token.value));
-				} else if (next.type == Token::DOLLAR) {
-					// Append ID modifier
-					if (!consume(Token::DOLLAR)) return false;
-					Token id_token;
-					if (!consume(Token::IDENTIFIER, &id_token)) return false;
-				} else {
+					rule.classes.push(m_intern_table.intern(StringView(token.value.begin, id_token.value.end)));
 					break;
 				}
+				default:
+					error(token.value, m_tokenizer, "expected selector, got ", tokenTypeToString(token.type));
+					return false;
 			}
-		} else {
-			error(token.value, m_tokenizer, "expected selector (. $ or identifier), got ", tokenTypeToString(token.type));
-			return false;
+			token = m_tokenizer.consumeToken();
 		}
-
-		if (!consume(Token::LBRACE)) return false;
 
 		// parse style attributes
 		for (;;) {
@@ -410,9 +385,10 @@ bool Document::parseElements(u32 parent_index) {
 					if (tryConsume(Token::RBRACKET)) break;
 					Token name_token;
 					if (m_tokenizer.peekToken().type == Token::DOT) {
-						if (!consume(Token::DOT)) return false;	
+						const char* dot = m_tokenizer.peekToken().value.begin;
+						if (!consume(Token::DOT)) return false;
 						if (!consume(Token::IDENTIFIER, &name_token)) return false;	
-						InternString class_id = m_intern_table.intern(name_token.value);
+						InternString class_id = m_intern_table.intern({dot, name_token.value.end});
 						if (!hasClassId(elem.classes, class_id)) {
 							elem.classes.push(class_id);
 						}
@@ -1356,10 +1332,16 @@ static bool contains(const Element& elem, Vec2 pos, IFontManager* font_manager) 
 }
 
 void Document::addClass(u32 element_index, StringView classname) {
+	StaticString<256> tmp(".", classname);
+	addClassRaw(element_index, tmp);
+}
+
+void Document::addClassRaw(u32 element_index, StringView classname) {
 	if (element_index >= (u32)m_elements.size()) return;
 	if (classname.empty()) return;
 	
 	Element& elem = m_elements[element_index];
+	
 	InternString class_id = m_intern_table.intern(classname);
 	if (hasClassId(elem.classes, class_id)) return;
 	
@@ -1370,6 +1352,11 @@ void Document::addClass(u32 element_index, StringView classname) {
 }
 
 void Document::removeClass(u32 element_index, StringView classname) {
+	StaticString<256> tmp(".", classname);
+	removeClassRaw(element_index, tmp);
+}
+
+void Document::removeClassRaw(u32 element_index, StringView classname) {
 	if (element_index >= (u32)m_elements.size()) return;
 	if (classname.empty()) return;
 	
@@ -1535,6 +1522,7 @@ void Document::injectEvent(const InputSystem::Event& event) {
 					leave_event.position = pos;
 					leave_event.element_index = m_hovered_elements[i];
 					m_events.push(leave_event);
+					removeClassRaw(leave_event.element_index, ":hover");
 				}
 
 				for (u32 i = common_prefix; i < new_size; ++i) {
@@ -1543,6 +1531,7 @@ void Document::injectEvent(const InputSystem::Event& event) {
 					enter_event.position = pos;
 					enter_event.element_index = new_hovered_path[i];
 					m_events.push(enter_event);
+					addClassRaw(enter_event.element_index, ":hover");
 				}
 
 				m_hovered_elements.clear();
