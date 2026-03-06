@@ -800,7 +800,6 @@ static float computeSpansHeight(Document& doc, Element& element, i32 child_idx) 
 }
 
 static void computeBaseHeights(Document& doc, Element& elem, Element* parent_elem, const ParentContext& parent) {
-	elem.height_unit = {0, Unit::FIT_CONTENT};
 	ParsedUnit margin_unit = {0, Unit::PIXELS};
 	ParsedUnit padding_unit = {0, Unit::PIXELS};
 
@@ -808,10 +807,6 @@ static void computeBaseHeights(Document& doc, Element& elem, Element* parent_ele
 		switch (attr.type) {
 			case AttributeName::MARGIN: margin_unit = parseUnit(attr.value); break;
 			case AttributeName::PADDING: padding_unit = parseUnit(attr.value); break;
-			case AttributeName::HEIGHT: {
-				elem.height_unit = parseUnit(attr.value);
-				break;
-			}
 			default: break;
 		}
 	}
@@ -893,59 +888,23 @@ static void computeParentRelativeHeights(Document& doc, Element& elem) {
 static void computeBaseWidths(Document& doc, Element& elem, Element* parent_elem, const ParentContext& parent) {
 	elem.position = Vec2(0, 0);
 	elem.size = Vec2(0, 0);
-	elem.wrap = true;
-	elem.justify_content = JustifyContent::START;
-	elem.align_items = AlignItems::START;
-	elem.text_align = parent.align;
-	elem.font_size = parent.font_size;
-	elem.color = parent.color;
-	elem.bg_color = Color(0);
 	memset(&elem.margins, 0, sizeof(elem.margins));
 	memset(&elem.paddings, 0, sizeof(elem.paddings));
 
 	ParentContext ctx = parent;
 	ctx.size = Vec2(0);
 
-	elem.width_unit = {0, Unit::FIT_CONTENT};
 	ParsedUnit margin_unit = {0, Unit::PIXELS};
 	ParsedUnit padding_unit = {0, Unit::PIXELS};
 
 	for (const Attribute& attr : elem.attributes) {
 		switch (attr.type) {
-			case AttributeName::WIDTH: {
-				elem.width_unit = parseUnit(attr.value);
-				break;
-			}
-			case AttributeName::GROW: fromCString(attr.value, elem.grow); break;
-			case AttributeName::DIRECTION: {
-				if (attr.value == "row") elem.direction = Direction::ROW;
-				else elem.direction = Direction::COLUMN;
-				break;
-			}
-			case AttributeName::ALIGN: {
-				elem.text_align = parseAlign(attr.value);
-				ctx.align = elem.text_align;
-				break;
-			}
-			case AttributeName::COLOR: {
-				elem.color = parseColor(attr.value);
-				ctx.color = elem.color;
-				break;
-			}
-			case AttributeName::BG_COLOR: elem.bg_color = parseColor(attr.value); break;
-			case AttributeName::VALUE: elem.value = attr.value; break;
-			case AttributeName::JUSTIFY_CONTENT: elem.justify_content = parseJustifyContent(attr.value); break;
-			case AttributeName::ALIGN_ITEMS: elem.align_items = parseAlignItems(attr.value); break;
 			case AttributeName::FONT: ctx.font = attr.value; break;
-			case AttributeName::FONT_SIZE: ctx.font_size = (float)atof(attr.value.begin); break;
-			case AttributeName::WRAP: elem.wrap = attr.value == "true"; break;
 			case AttributeName::PADDING: padding_unit = parseUnit(attr.value); break;
 			case AttributeName::MARGIN: margin_unit = parseUnit(attr.value); break;
 			default: break;
 		}
 	}
-
-	elem.font_size = ctx.font_size;
 
 	if (elem.tag == Tag::SPAN) {
 		if (doc.m_font_manager && elem.font_handle && !elem.value.empty()) {
@@ -1021,9 +980,8 @@ void Stylesheet::buildIndex() {
 	}
 }
 
-static void applyStylesheet(Document& doc, Element& elem) {
-	if (elem.classes.empty()) return;
-
+static void applyStylesheet(Document& doc, u32 element_index, const ParentContext& parent) {
+	Element& elem = doc.m_elements[element_index];
 	StackArray<u32, 32> candidates(doc.m_allocator);
 
 	for (InternString class_id : elem.classes) {
@@ -1061,6 +1019,43 @@ static void applyStylesheet(Document& doc, Element& elem) {
 				upsertAttribute(elem, attr.type, attr.value, AttributeSource::STYLESHEET);
 			}
 		}
+	}
+
+	ParentContext ctx = parent;
+	for (const Attribute& attr : elem.attributes) {
+		switch (attr.type) {
+			case AttributeName::WIDTH: elem.width_unit = parseUnit(attr.value); break;
+			case AttributeName::HEIGHT: elem.height_unit = parseUnit(attr.value); break;
+			case AttributeName::GROW: fromCString(attr.value, elem.grow); break;
+			case AttributeName::DIRECTION: {
+				if (attr.value == "row") elem.direction = Direction::ROW;
+				else elem.direction = Direction::COLUMN;
+				break;
+			}
+			case AttributeName::ALIGN: {
+				ctx.align = parseAlign(attr.value);
+				break;
+			}
+			case AttributeName::COLOR: {
+				elem.color = parseColor(attr.value);
+				ctx.color = elem.color;
+				break;
+			}
+			case AttributeName::BG_COLOR: elem.bg_color = parseColor(attr.value); break;
+			case AttributeName::VALUE: elem.value = attr.value; break;
+			case AttributeName::JUSTIFY_CONTENT: elem.justify_content = parseJustifyContent(attr.value); break;
+			case AttributeName::ALIGN_ITEMS: elem.align_items = parseAlignItems(attr.value); break;
+			case AttributeName::FONT_SIZE: ctx.font_size = (float)atof(attr.value.begin); break;
+			case AttributeName::WRAP: elem.wrap = attr.value == "true"; break;
+			default: break; // TODO remove the default case
+		}
+	}
+	elem.font_size = ctx.font_size;
+	elem.color = ctx.color;
+	elem.text_align = ctx.align;
+
+	for (u32 child_idx : elem.children) {
+		applyStylesheet(doc, child_idx, ctx);
 	}
 }
 
@@ -1360,11 +1355,6 @@ static bool contains(const Element& elem, Vec2 pos, IFontManager* font_manager) 
 			pos.y >= elem_pos.y && pos.y <= elem_pos.y + elem.size.y;
 }
 
-static void refreshAfterClassMutation(Document& doc, u32 element_index) {
-	doc.recomputeStyles();
-	doc.computeLayout(doc.m_canvas_size);
-}
-
 void Document::addClass(u32 element_index, StringView classname) {
 	if (element_index >= (u32)m_elements.size()) return;
 	if (classname.empty()) return;
@@ -1375,7 +1365,8 @@ void Document::addClass(u32 element_index, StringView classname) {
 	
 	elem.classes.push(class_id);
 	
-	refreshAfterClassMutation(*this, element_index);
+	recomputeStyles();
+	computeLayout(m_canvas_size);
 }
 
 void Document::removeClass(u32 element_index, StringView classname) {
@@ -1385,7 +1376,6 @@ void Document::removeClass(u32 element_index, StringView classname) {
 	Element& elem = m_elements[element_index];
 	InternString class_id = m_intern_table.intern(classname);
 	
-	// Find and remove the class_id
 	for (i32 i = 0; i < (i32)elem.classes.size(); ++i) {
 		if (elem.classes[i] == class_id) {
 			elem.classes.erase(i);
@@ -1393,7 +1383,8 @@ void Document::removeClass(u32 element_index, StringView classname) {
 		}
 	}
 	
-	refreshAfterClassMutation(*this, element_index);
+	recomputeStyles();
+	computeLayout(m_canvas_size);
 }
 
 Element* Document::getElementAt(Vec2 pos) {
@@ -1456,6 +1447,7 @@ bool Document::parse(StringView content, const char* filename) {
 	m_parse_duration = 0;
 	m_elements.clear();
 	m_roots.clear();
+	m_stylesheet.m_rules.clear();
 	m_content = content;
 	m_tokenizer.m_filename = filename;
 	m_tokenizer.m_document = m_content;
@@ -1464,12 +1456,6 @@ bool Document::parse(StringView content, const char* filename) {
 	if (!parseElements(0xFFFF'FFFF)) return false;
 	m_stylesheet.buildIndex();
 	recomputeStyles();
-
-	for (u32 root_idx : m_roots) {
-		ParentContext ctx;
-		ctx.font = "/engine/editor/fonts/JetBrainsMono-Regular.ttf";
-		loadResources(*this, root_idx, ctx);
-	}
 
 	m_parse_duration = timer.getTimeSinceStart();
 	return true;
@@ -1512,26 +1498,59 @@ void Document::injectEvent(const InputSystem::Event& event) {
 		case InputSystem::Event::AXIS: {
 			if (event.device->type == InputSystem::Device::MOUSE) {
 				Vec2 pos(event.data.axis.x_abs, event.data.axis.y_abs);
-				Element* elem = getElementAt(pos);
-				u32 new_hovered_index = elem ? u32(elem - m_elements.begin()) : 0xFFFF'FFFF;
+				StackArray<u32, 16> new_hovered_path(m_allocator);
+				for (u32 root_id : m_roots) {
+					Element* root = &m_elements[root_id];
+					if (!contains(*root, pos, m_font_manager)) continue;
 
-				if (new_hovered_index != m_hovered_element_index) {
-					if (m_hovered_element_index != 0xFFFF'FFFF) {
-						Event leave_event;
-						leave_event.type = EventType::MOUSE_LEAVE;
-						leave_event.position = pos;
-						leave_event.element_index = m_hovered_element_index;
-						m_events.push(leave_event);
+					new_hovered_path.push(root_id);
+					Element* elem = root;
+					for (;;) {
+						bool found_child = false;
+						for (u32 child_id : elem->children) {
+							Element* child = &m_elements[child_id];
+							if (contains(*child, pos, m_font_manager)) {
+								new_hovered_path.push(child_id);
+								elem = child;
+								found_child = true;
+								break;
+							}
+						}
+						if (!found_child) break;
 					}
-					if (new_hovered_index != 0xFFFF'FFFF) {
-						Event enter_event;
-						enter_event.type = EventType::MOUSE_ENTER;
-						enter_event.position = pos;
-						enter_event.element_index = new_hovered_index;
-						m_events.push(enter_event);
-					}
-					m_hovered_element_index = new_hovered_index;
+					break;
 				}
+
+				u32 common_prefix = 0;
+				const u32 old_size = (u32)m_hovered_elements.size();
+				const u32 new_size = (u32)new_hovered_path.size();
+				const u32 min_size = minimum(old_size, new_size);
+				while (common_prefix < min_size && m_hovered_elements[common_prefix] == new_hovered_path[common_prefix]) {
+					++common_prefix;
+				}
+
+				for (i32 i = (i32)old_size - 1; i >= (i32)common_prefix; --i) {
+					Event leave_event;
+					leave_event.type = EventType::MOUSE_LEAVE;
+					leave_event.position = pos;
+					leave_event.element_index = m_hovered_elements[i];
+					m_events.push(leave_event);
+				}
+
+				for (u32 i = common_prefix; i < new_size; ++i) {
+					Event enter_event;
+					enter_event.type = EventType::MOUSE_ENTER;
+					enter_event.position = pos;
+					enter_event.element_index = new_hovered_path[i];
+					m_events.push(enter_event);
+				}
+
+				m_hovered_elements.clear();
+				for (u32 hovered_idx : new_hovered_path) {
+					m_hovered_elements.push(hovered_idx);
+				}
+
+				u32 new_hovered_index = new_hovered_path.empty() ? 0xFFFF'FFFF : new_hovered_path.back();
 
 				Event ui_event;
 				ui_event.type = EventType::MOUSE_MOVE;
@@ -1580,12 +1599,13 @@ void Document::recomputeStyles() {
 			}
 		}
 	}
-	for (Element& elem : m_elements) {
-		applyStylesheet(*this, elem);
+
+	ParentContext ctx;
+	ctx.font = "/engine/editor/fonts/JetBrainsMono-Regular.ttf";
+	for (u32 root_idx : m_roots) {
+		applyStylesheet(*this, root_idx, ctx);
 	}
 	for (u32 root_idx : m_roots) {
-		ParentContext ctx;
-		ctx.font = "/engine/editor/fonts/JetBrainsMono-Regular.ttf";
 		loadResources(*this, root_idx, ctx);
 	}
 }

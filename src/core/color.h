@@ -34,7 +34,7 @@ struct Color {
 	u8 b;
 	u8 a;
 
-	enum { RED = 0xff0000ff, GREEN = 0xff00ff00, BLUE = 0xffff0000, BLACK = 0xff000000, WHITE = 0xffFFffFF };
+	enum { RED = 0xff0000ff, GREEN = 0xff00ff00, BLUE = 0xffff0000, BLACK = 0xff000000, WHITE = 0xffFFffFF, TRANSPARENT = 0x0000'0000 };
 };
 #pragma pack()
 } // namespace Lumix

@@ -553,7 +553,7 @@ bool testGrowParentWithPercentChild() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
 	[box width=100% direction=row] {
-		[box grow=1 height=100 direction=row] {
+		[box width=50 grow=1 height=100 direction=row] {
 			[box width=100% height=50] {}
 		}
 	}
@@ -808,6 +808,8 @@ bool testAdvancedFitContent() {
 		}
 	}
 	)");
+	doc.computeLayout(Vec2(800, 600));
+
 	Span<u32> root_indices = doc.m_roots;
 	ASSERT_EQ(1, root_indices.size());
 	ui::Element* parent = doc.getElement(root_indices[0]);
@@ -821,9 +823,7 @@ bool testAdvancedFitContent() {
 	ASSERT_EQ(2, child2->children.size());
 	ui::Element* grandchild2_1 = doc.getElement(child2->children[0]);
 	ui::Element* grandchild2_2 = doc.getElement(child2->children[1]);
-	
-	doc.computeLayout(Vec2(800, 600));
-	
+		
 	ASSERT_FLOAT_EQ(200.0f, child1->size.x);
 	ASSERT_FLOAT_EQ(100.0f, child1->size.y);
 	

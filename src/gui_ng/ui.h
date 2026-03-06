@@ -4,6 +4,7 @@
 #include "core/color.h"
 #include "core/hash_map.h"
 #include "core/math.h"
+#include "core/stack_array.h"
 #include "core/string.h"
 #include "engine/input_system.h"
 #include "ui_tokenizer.h"
@@ -170,15 +171,15 @@ struct Element {
 	IFontManager::FontHandle font_handle = nullptr;
 	float font_size = 0;
 	Color color = Color::WHITE;
-	Color bg_color = Color::BLACK;
+	Color bg_color = Color::TRANSPARENT;
 	BoxSpacing margins;
 	BoxSpacing paddings;
 	Direction direction = Direction::COLUMN;
 	JustifyContent justify_content = JustifyContent::START;
-	AlignItems align_items = AlignItems::STRETCH;
+	AlignItems align_items = AlignItems::START;
 	Align text_align = Align::LEFT;
 	float grow = 0;
-	bool wrap = false;
+	bool wrap = true;
 	ParsedUnit width_unit = {0, Unit::FIT_CONTENT};
 	ParsedUnit height_unit = {0, Unit::FIT_CONTENT};
 };
@@ -226,7 +227,7 @@ struct Document {
 	float m_layout_duration = 0;
 	float m_parse_duration = 0;
 	float m_render_duration = 0;
-	u32 m_hovered_element_index = 0xFFFF'FFFF;
+	StackArray<u32, 16> m_hovered_elements;
 
 	Document(IFontManager* font_manager, IAllocator& allocator)
 		: m_elements(allocator)
@@ -240,6 +241,7 @@ struct Document {
 		, m_allocator(allocator)
 		, m_canvas_size(0, 0)
 		, m_content(allocator)
+		, m_hovered_elements(allocator)
 		, m_events(allocator)
 	{}
 

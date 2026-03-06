@@ -30,6 +30,7 @@
 #endif
 #include <dxgi1_6.h>
 #include <malloc.h>
+#undef TRANSPARENT // thank you MS
 
 #include "renderer/gpu/renderdoc_app.h"
 #pragma comment(lib, "d3dcompiler.lib")

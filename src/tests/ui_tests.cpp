@@ -415,6 +415,23 @@ bool testColorInheritanceDeep() {
 	return true;
 }
 
+bool testAlignInheritance() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[box align=center] { [box] { \"hello\" } }");
+	ASSERT_EQ(1, doc.m_roots.size());
+	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_EQ((i32)ui::Align::CENTER, (i32)root->text_align);
+
+	ui::Element* child_panel = doc.getElement(root->children[0]);
+	ASSERT_EQ((i32)ui::Align::CENTER, (i32)child_panel->text_align);
+
+	ui::Element* grandchild_span = doc.getElement(child_panel->children[0]);
+	ASSERT_EQ((i32)ui::Align::CENTER, (i32)grandchild_span->text_align);
+
+	return true;
+}
+
 bool testMultilineStringLayout() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
@@ -796,6 +813,7 @@ void runUITests() {
 	RUN_TEST(testFontInheritanceDeep);
 	RUN_TEST(testColorInheritance);
 	RUN_TEST(testColorInheritanceDeep);
+	RUN_TEST(testAlignInheritance);
 	RUN_TEST(testMultilineStringMeasurement);
 	RUN_TEST(testMultilineStringLayout);
 	RUN_TEST(testTextWithSpecialChars);

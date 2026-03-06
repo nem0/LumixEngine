@@ -116,8 +116,8 @@ extern int passed_count;
 
 #define ASSERT_PARSE(doc, s) \
 	do { \
-		bool _res = (doc).parse(s, "test.ui"); \
-		ASSERT_TRUE(_res); \
+		bool parsed = (doc).parse(s, "test.ui"); \
+		ASSERT_TRUE(parsed); \
 	} while(false)
 
 #define ASSERT_TAG(elem, tag_enum) \
