@@ -1,4 +1,5 @@
 high prio (feature parity with the old ui, before we can merge):
+* :hovered, etc.
 * editor/debug view UX
 * clipping
 * styling
@@ -18,7 +19,6 @@ low prio or optional:
 * optimizations
 * changes at runtime/minimal layout recompute
 * grid layout?
-* :hovered, etc.
 * detailed property viewer + live edit? 
 * event logging - Display recent UI events with timestamps
 * border, rounded corners

@@ -1362,6 +1362,7 @@ static bool contains(const Element& elem, Vec2 pos, IFontManager* font_manager) 
 
 static void refreshAfterClassMutation(Document& doc, u32 element_index) {
 	doc.recomputeStyles();
+	doc.computeLayout(doc.m_canvas_size);
 }
 
 void Document::addClass(u32 element_index, StringView classname) {
@@ -1422,8 +1423,6 @@ static void loadResources(Document& doc, u32 element_index, const ParentContext&
 	ParentContext ctx = parent;
 
 	elem.font_size = ctx.font_size;
-	elem.color = ctx.color;
-	elem.text_align = ctx.align;
 
 	for (const Attribute& attr : elem.attributes) {
 		switch (attr.type) {

@@ -105,7 +105,6 @@ struct GUINGModuleImpl : GUINGModule {
 		for (const ui::Event& event : events) {
 			switch (event.type) {
 				case ui::EventType::MOUSE_ENTER:
-					// TODO this is called, but seem not to work
 					m_document.addClass(event.element_index, "hovered");
 					break;
 				case ui::EventType::MOUSE_LEAVE:
