@@ -1,9 +1,12 @@
 #define NOGDI
 #define WIN32_LEAN_AND_MEAN
 #define _AMD64_
+#include <windows.h>
 #include <windef.h>
 #include <winbase.h>
 #include <winver.h>
+#include <winhttp.h>
+#include <bcrypt.h>
 #include <cstdio>
 #pragma warning (push)
 #pragma warning (disable: 4091) // declaration of 'xx' hides previous local declaration
@@ -24,6 +27,8 @@
 
 
 #pragma comment(lib, "DbgHelp.lib")
+#pragma comment(lib, "bcrypt.lib")
+#pragma comment(lib, "winhttp.lib")
 
 
 #define LUMIX_ALLOC_GUARDS
@@ -33,6 +38,193 @@
 namespace Lumix {
 	
 static CrashReportFlags g_crash_report_flags = CrashReportFlags::ENABLED;
+
+namespace sentry {
+
+struct SentryData {
+	IAllocator* s_allocator = nullptr;
+	StaticString<256*1024> envelope;
+	char log_data[131072];
+};
+
+static SentryData* s_sentry_data = nullptr;
+
+static void sendToSentry(const char* message) {
+	// https://sentry.io/settings/lumixengine/projects/native/keys/
+	static const char* key = "b3fa911595fa4631eabf0ec1f8618ad9";
+	static const char* host = "o4510992885809152.ingest.de.sentry.io";
+	static const char* project = "4510992907501648";
+
+	auto readLogFile = [](char* data, u32 max_size) -> u32 {
+		auto readFromPath = [data, max_size](const char* path) -> u32 {
+			HANDLE file = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+			if (file == INVALID_HANDLE_VALUE) return 0;
+
+			LARGE_INTEGER size;
+			if (!GetFileSizeEx(file, &size) || size.QuadPart <= 0) {
+				CloseHandle(file);
+				return 0;
+			}
+
+			DWORD to_read = size.QuadPart > max_size ? max_size : (DWORD)size.QuadPart;
+			DWORD read = 0;
+			if (!ReadFile(file, data, to_read, &read, nullptr)) {
+				CloseHandle(file);
+				return 0;
+			}
+			CloseHandle(file);
+			return read;
+		};
+
+		auto readFromDir = [&readFromPath](const char* dir, const char* relative) -> u32 {
+			StaticString<MAX_PATH> path(dir, "/", relative);
+			return readFromPath(path.data);
+		};
+
+		if (u32 read = readFromPath("lumix.log")) return read;
+
+		char current_dir[MAX_PATH];
+		os::getCurrentDirectory(Span(current_dir));
+		if (u32 read = readFromDir(current_dir, "lumix.log")) return read;
+		if (u32 read = readFromDir(current_dir, "data/lumix.log")) return read;
+
+		char exe_path[MAX_PATH];
+		os::getExecutablePath(Span(exe_path));
+		StaticString<MAX_PATH> exe_dir(Path::getDir(exe_path));
+		if (u32 read = readFromDir(exe_dir.data, "lumix.log")) return read;
+		if (u32 read = readFromDir(exe_dir.data, "data/lumix.log")) return read;
+
+		StringView d = Path::getDir(Path::getDir(Path::getDir(Path::getDir(Path::getDir(exe_dir.data)))));
+		if (d.size() > 0) {
+			StaticString<MAX_PATH> repo_data(d, "/data/lumix.log");
+			if (u32 read = readFromPath(repo_data.data)) return read;
+		}
+
+		return 0;
+	};
+
+	// Build event id as UUIDv4 without dashes (32 lowercase hex chars)
+	u8 uuid[16];
+	if (BCryptGenRandom(nullptr, uuid, sizeof(uuid), BCRYPT_USE_SYSTEM_PREFERRED_RNG) < 0) return;
+	uuid[6] = (uuid[6] & 0x0F) | 0x40;
+	uuid[8] = (uuid[8] & 0x3F) | 0x80;
+	char event_id[33];
+	for (int i = 0; i < 16; ++i) {
+		u8 v = uuid[i];
+		event_id[i * 2] = "0123456789abcdef"[(v >> 4) & 0xF];
+		event_id[i * 2 + 1] = "0123456789abcdef"[v & 0xF];
+	}
+	event_id[32] = '\0';
+
+	// Get current timestamp in seconds since epoch
+	FILETIME ft;
+	GetSystemTimeAsFileTime(&ft);
+	LARGE_INTEGER li;
+	li.LowPart = ft.dwLowDateTime;
+	li.HighPart = ft.dwHighDateTime;
+	u64 timestamp = (li.QuadPart - 116444736000000000ULL) / 10000000ULL;
+
+	auto& envelope = s_sentry_data->envelope;
+	envelope = "";
+	envelope.append("{\"event_id\":\"", event_id, "\",\"dsn\":\"https://", key, "@", host, "/", project, "\"}\n");
+	envelope.append("{\"type\":\"event\"}\n");
+	envelope.append("{\"event_id\":\"", event_id, "\",\"timestamp\":", (u64)timestamp, ",\"platform\":\"native\",\"message\":\"");
+
+	const char* src = message;
+	while (*src) {
+		switch (*src) {
+			case '"': envelope.append("\\\""); break;
+			case '\\': envelope.append("\\\\"); break;
+			case '\b': envelope.append("\\b"); break;
+			case '\f': envelope.append("\\f"); break;
+			case '\n': envelope.append("\\n"); break;
+			case '\r': envelope.append("\\r"); break;
+			case '\t': envelope.append("\\t"); break;
+			default:
+				if ((u8)*src < 0x20) {
+					char hex[3];
+					toCStringHex((u8)*src, Span(hex));
+					hex[2] = '\0';
+					envelope.append("\\u00", hex);
+				}
+				else {
+					envelope.append(*src);
+				}
+				break;
+		}
+		++src;
+	}
+	envelope.append("\",\"level\":\"fatal\"}\n");
+
+	const u32 log_data_size = readLogFile(s_sentry_data->log_data, 131072);
+	if (log_data_size > 0) {
+		envelope.append("{\"type\":\"attachment\",\"length\":", log_data_size, ",\"filename\":\"lumix.log\",\"content_type\":\"text/plain\"}\n");
+		envelope.append(StringView(s_sentry_data->log_data, s_sentry_data->log_data + log_data_size), "\n");
+	}
+
+	// Convert to wide
+	wchar_t whost[256];
+	if (!MultiByteToWideChar(CP_UTF8, 0, host, -1, whost, 256)) return;
+
+	// Build URL
+	StaticString<1024> narrow_url;
+	narrow_url.append("/api/", project, "/envelope/?sentry_key=", key, "&sentry_version=7");
+	wchar_t url[1024];
+	if (!MultiByteToWideChar(CP_UTF8, 0, narrow_url.data, -1, url, 1024)) return;
+
+	// Send HTTP POST
+	HINTERNET hSession = WinHttpOpen(L"LumixEngine/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+	if (!hSession) return;
+	WinHttpSetTimeouts(hSession, 2000, 2000, 2000, 2000);
+	HINTERNET hConnect = WinHttpConnect(hSession, whost, INTERNET_DEFAULT_HTTPS_PORT, 0);
+	if (!hConnect) {
+		WinHttpCloseHandle(hSession);
+		return;
+	}
+	HINTERNET hRequest = WinHttpOpenRequest(hConnect, L"POST", url, NULL, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE);
+	if (!hRequest) {
+		WinHttpCloseHandle(hConnect);
+		WinHttpCloseHandle(hSession);
+		return;
+	}
+	wchar_t wheaders[] = L"Content-Type: application/x-sentry-envelope\r\n";
+	if (!WinHttpSendRequest(hRequest, wheaders, -1, (LPVOID)envelope.data, (DWORD)strlen(envelope.data), (DWORD)strlen(envelope.data), 0)) {
+		WinHttpCloseHandle(hRequest);
+		WinHttpCloseHandle(hConnect);
+		WinHttpCloseHandle(hSession);
+		return;
+	}
+	if (!WinHttpReceiveResponse(hRequest, NULL)) {
+		WinHttpCloseHandle(hRequest);
+		WinHttpCloseHandle(hConnect);
+		WinHttpCloseHandle(hSession);
+		return;
+	}
+	DWORD status_code = 0;
+	DWORD status_code_size = sizeof(status_code);
+	if (!WinHttpQueryHeaders(hRequest,
+		WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+		WINHTTP_HEADER_NAME_BY_INDEX,
+		&status_code,
+		&status_code_size,
+		WINHTTP_NO_HEADER_INDEX)) {
+		WinHttpCloseHandle(hRequest);
+		WinHttpCloseHandle(hConnect);
+		WinHttpCloseHandle(hSession);
+		return;
+	}
+	if (status_code < 200 || status_code >= 300) {
+		WinHttpCloseHandle(hRequest);
+		WinHttpCloseHandle(hConnect);
+		WinHttpCloseHandle(hSession);
+		return;
+	}
+	WinHttpCloseHandle(hRequest);
+	WinHttpCloseHandle(hConnect);
+	WinHttpCloseHandle(hSession);
+}
+
+} // namespace sentry
 
 namespace debug {
 
@@ -383,9 +575,15 @@ static struct AllocationDebugSystem {
 
 void init(IAllocator& allocator) {
 	s_stack_tree.create(allocator);
+	sentry::s_sentry_data = LUMIX_NEW(allocator, sentry::SentryData)();
+	sentry::s_sentry_data->s_allocator = &allocator;
 }
 
 void shutdown() {
+	if (sentry::s_sentry_data) {
+		LUMIX_DELETE(*sentry::s_sentry_data->s_allocator, sentry::s_sentry_data);
+	}
+	sentry::s_sentry_data = nullptr;
 	s_stack_tree.destroy();
 }
 
@@ -698,7 +896,6 @@ static void describeException(PEXCEPTION_RECORD exception_record, StaticString<S
 	}
 }
 
-
 static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 {
 	if (!isFlagSet(g_crash_report_flags, CrashReportFlags::ENABLED)) return EXCEPTION_CONTINUE_SEARCH;
@@ -748,6 +945,10 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 			if (isFlagSet(g_crash_report_flags, CrashReportFlags::MESSAGE_BOX)) {
 				os::messageBox(message);
 			}
+		}
+
+		if (isFlagSet(g_crash_report_flags, CrashReportFlags::SENTRY)) {
+			sentry::sendToSentry(message.data);
 		}
 
 		char minidump_path[MAX_PATH];

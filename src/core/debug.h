@@ -82,8 +82,9 @@ enum class CrashReportFlags : u32 {
 	MESSAGE_BOX = 1 << 1,
 	LOG = 1 << 2,
 	STDERR = 1 << 3,
+	SENTRY = 1 << 4,
 
-	ENABLE_ALL = ENABLED | MESSAGE_BOX | LOG | STDERR,
+	ENABLE_ALL = ENABLED | MESSAGE_BOX | LOG | STDERR | SENTRY,
 	DISABLED = 0,
 };
 

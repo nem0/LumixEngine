@@ -117,7 +117,7 @@ OutputFile::~OutputFile()
 
 bool OutputFile::open(const char* path)
 {
-	m_handle = (HANDLE)::CreateFileA(path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+	m_handle = (HANDLE)::CreateFileA(path, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
 	m_is_error = INVALID_HANDLE_VALUE == m_handle;
 	return !m_is_error;
 }

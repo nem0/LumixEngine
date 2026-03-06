@@ -369,6 +369,7 @@ void enableCrashReporting(bool enable) {
 }
 
 
+void configureCrashReport(CrashReportFlags flags) {}
 void installUnhandledExceptionHandler() {}
 
 

@@ -9,6 +9,7 @@
 * [Transform](transform.md)
 * [Job System](job_system.md)
 * [Profiler](profiler.md)
+* [Crash Reporting](crash_reporting.md)
 
 # Lua
 * [Engine API](lua/engine_API.md)

@@ -1,4 +1,4 @@
-high prio (before we can merge):
+high prio (feature parity with the old ui, before we can merge):
 * editor/debug view UX
 * clipping
 * styling
@@ -10,9 +10,9 @@ high prio (before we can merge):
 * min-width?
 * update demo/showcase projects to use the new ui
 * fixed leaks
+* margin/padding per side, i.e. margin-top, etc.
 
 low prio or optional:
-* margin/padding per side, i.e. margin-top, etc.
 * DPI
 * includes
 * optimizations
