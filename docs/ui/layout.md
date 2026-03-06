@@ -394,6 +394,8 @@ Margins provide external spacing between elements and their containers, affectin
 
 - Added outside the element's border.
 - Example: `margin=10` creates 10px space around the element.
+- Side-specific variants are supported: `margin-left`, `margin-right`, `margin-top`, `margin-bottom`.
+- Spacing declarations are order-dependent: the later declaration overrides earlier values for the affected side.
 
 ##### Margin Collapsing
 Adjacent margins combine into the larger value to prevent excessive gaps.
@@ -422,6 +424,8 @@ Padding adds internal space within the element's border, expanding its total siz
 
 - Increases the content area.
 - Example: `padding=10` adds 10px inside the border.
+- Side-specific variants are supported: `padding-left`, `padding-right`, `padding-top`, `padding-bottom`.
+- Spacing declarations are order-dependent: the later declaration overrides earlier values for the affected side.
 
 #### Margin-Padding Interaction
 The child's margin provides spacing from the parent's content edge (inside the padding), positioning elements within the parent's padded area.

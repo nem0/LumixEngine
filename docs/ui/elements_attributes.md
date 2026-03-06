@@ -21,10 +21,20 @@ Supported by all elements.
 | `height` | Sets the element's height. | `fit-content` |
 | `grow` | Grow weight along the parent's main axis, similar to CSS `flex-grow`. A value of `0` (default) means no growing. Growing elements share remaining space proportionally to their weights after all fixed-size siblings are measured. | `0` |
 | `margin` | Space outside the element border in all directions. | `0` |
+| `margin-left` | Space outside the element border on the left side. | `0` |
+| `margin-right` | Space outside the element border on the right side. | `0` |
+| `margin-top` | Space outside the element border on the top side. | `0` |
+| `margin-bottom` | Space outside the element border on the bottom side. | `0` |
 | `padding` | Space inside the element border, around the content in all directions. | `0` |
+| `padding-left` | Inner space on the left side. | `0` |
+| `padding-right` | Inner space on the right side. | `0` |
+| `padding-top` | Inner space on the top side. | `0` |
+| `padding-bottom` | Inner space on the bottom side. | `0` |
 | `align` | Text alignment. Values: `left`, `center`, `right`. | `left` |
 
 The `width` and `height` attributes accept `NUMBER`, `PERCENT` (e.g. `50%`), `em` units (e.g. `2em`), or the `fit-content` keyword (for example: `width=fit-content` or `width=50%`).
+
+For spacing attributes, values are applied in declaration order (last one wins). This means side-specific attributes can override shorthand when written later, and shorthand can override side-specific attributes when written later.
 
 ## box
 
