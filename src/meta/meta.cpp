@@ -1058,7 +1058,10 @@ struct Parser {
 			StringView word = consumeWord(line);
 			if (equal(word, "//@")) {
 				word = consumeWord(line);
-				if (equal(word, "function")) {
+				if (equal(word, "end")) {
+					break;
+				}
+				else if (equal(word, "function")) {
 					if (!readLine(line)) {
 						logError("Expected new line with function");
 						continue;
