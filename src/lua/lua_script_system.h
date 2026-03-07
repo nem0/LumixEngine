@@ -77,7 +77,7 @@ struct LuaScriptModule : IModule {
 	//@ end
 	virtual void createScript(EntityRef entity) = 0;
 	virtual void destroyScript(EntityRef entity) = 0;
-	virtual int getEnvironment(EntityRef entity, int scr_index) = 0;
+	virtual int getEnvironment(EntityRef entity, u32 scr_index) = 0;
 	
 	virtual IFunctionCall* beginFunctionCall(EntityRef entity, int scr_index, const char* function) = 0;
 	virtual IFunctionCall* beginFunctionCallInlineScript(EntityRef entity, const char* function) = 0;

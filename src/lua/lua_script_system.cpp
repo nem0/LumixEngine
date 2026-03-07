@@ -956,9 +956,9 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 	}
 
 
-	int getEnvironment(EntityRef entity, int scr_index) override {
+	int getEnvironment(EntityRef entity, u32 scr_index) override {
 		const Array<ScriptInstance>& scripts = m_scripts[entity]->m_scripts;
-		if (scr_index >= scripts.size()) return -1;
+		if (scr_index >= (u32)scripts.size()) return -1;
 		return scripts[scr_index].m_environment;
 	}
 
