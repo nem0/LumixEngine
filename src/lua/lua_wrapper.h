@@ -215,7 +215,7 @@ template <> inline EntityRef toType(lua_State* L, int index) {
 
 template <> inline EntityPtr toType(lua_State* L, int index) {
 	if (getField(L, index, "_entity") == LUA_TNUMBER) {
-		const EntityRef e {(i32)lua_tointeger(L, -1)};
+		const EntityPtr e {(i32)lua_tointeger(L, -1)};
 		lua_pop(L, 1);
 		return e;
 	}
