@@ -228,6 +228,10 @@ struct Element {
 	void setVisible(bool show);
 	//@ function 
 	void setText(StringView value);
+	//@ function
+	void setWidth(StringView value);
+	//@ function 
+	void setBGImage(const Path& path);
 };
 //@ end
 

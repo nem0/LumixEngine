@@ -505,6 +505,17 @@ void Element::setVisible(bool show) {
 	m_document.computeLayout(m_document.m_canvas_size);
 }
 
+void Element::setBGImage(const Path& path) {
+	// since we can't ensure path lifetime, we store the path in intern string table
+	InternString s = m_document.m_intern_table.intern(path);
+	StringView sv = m_document.m_intern_table.resolve(s);
+	upsertAttribute(*this, AttributeName::BG_IMAGE, sv, AttributeSource::ELEMENT);
+	if (m_document.m_resource_manager) {
+		bg_sprite = m_document.m_resource_manager->load<Sprite>(path);
+	}
+
+}
+
 void Element::setText(StringView v) {
 	upsertAttribute(*this, AttributeName::TEXT, v, AttributeSource::ELEMENT);
 
@@ -530,6 +541,12 @@ static ParsedUnit parseUnit(StringView str) {
 		}
 	}
 	return {value, unit};
+}
+
+void Element::setWidth(StringView value) {
+	upsertAttribute(*this, AttributeName::WIDTH, value, AttributeSource::ELEMENT);
+	width_unit = parseUnit(value);
+	m_document.computeLayout(m_document.m_canvas_size);
 }
 
 static float computeAbsoluteSize(const ParsedUnit& unit, float parent_size, float font_size) {

@@ -1,5 +1,6 @@
 high prio (feature parity with the old ui, before we can merge):
 * main.unv -> demo.unv, UI is not updated
+* button with label and we click on label - only label receives click event
 * prepare for old ui to be removed
 * update demo/showcase projects to use the new ui
 * clipping
@@ -11,7 +12,6 @@ high prio (feature parity with the old ui, before we can merge):
 low prio or optional:
 * inline 3d ui component - ui source as property, not as a resource file
 * min-width?
-* absolute/relative positioning?
 * examples: scrolling, checkbox, drag & drop, tooltip, dropdown, slider
 * DPI
 * includes

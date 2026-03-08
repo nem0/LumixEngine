@@ -2932,6 +2932,7 @@ namespace Lumix {
 					LuaWrapper::checkTableArg(L, 1); // self
 					AssetBrowser* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
 					auto resource = LuaWrapper::checkArg<Path>(L, 2);
 					obj->openEditor(resource);
 					return 0;
@@ -2945,6 +2946,7 @@ namespace Lumix {
 					LuaWrapper::checkTableArg(L, 1); // self
 					AssetBrowser* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
 					auto str_id = LuaWrapper::checkArg<const char*>(L, 2);
 					auto buf = LuaWrapper::checkArg<Path>(L, 3);
 					auto type = LuaWrapper::checkArg<ResourceType>(L, 4);
@@ -2972,6 +2974,7 @@ namespace Lumix {
 					LuaWrapper::checkTableArg(L, 1); // self
 					StudioApp* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
 					auto exit_code = LuaWrapper::checkArg<int>(L, 2);
 					obj->exitWithCode(exit_code);
 					return 0;
@@ -2985,6 +2988,7 @@ namespace Lumix {
 					LuaWrapper::checkTableArg(L, 1); // self
 					StudioApp* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
 					obj->exitGameMode();
 					return 0;
 				};
@@ -2997,6 +3001,7 @@ namespace Lumix {
 					LuaWrapper::checkTableArg(L, 1); // self
 					StudioApp* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
 					obj->newWorld();
 					return 0;
 				};
@@ -3018,6 +3023,7 @@ namespace Lumix {
 					LuaWrapper::checkTableArg(L, 1); // self
 					GUISystem* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
 					auto enable = LuaWrapper::checkArg<bool>(L, 2);
 					obj->enableCursor(enable);
 					return 0;
@@ -3049,6 +3055,7 @@ namespace Lumix {
 					LuaWrapper::checkTableArg(L, 1); // self
 					ui::Element* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
 					auto res = obj->getID();
 					LuaWrapper::push(L, res);
 					return 1;
@@ -3062,6 +3069,7 @@ namespace Lumix {
 					LuaWrapper::checkTableArg(L, 1); // self
 					ui::Element* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
 					auto show = LuaWrapper::checkArg<bool>(L, 2);
 					obj->setVisible(show);
 					return 0;
@@ -3075,11 +3083,40 @@ namespace Lumix {
 					LuaWrapper::checkTableArg(L, 1); // self
 					ui::Element* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
 					auto value = LuaWrapper::checkArg<StringView>(L, 2);
 					obj->setText(value);
 					return 0;
 				};
 				const char* name = "setText";
+				lua_pushcfunction(L, proxy, name);
+				lua_setfield(L, -2, name);
+			}
+			{
+				auto proxy = [](lua_State* L) -> int {
+					LuaWrapper::checkTableArg(L, 1); // self
+					ui::Element* obj;
+					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
+					auto value = LuaWrapper::checkArg<StringView>(L, 2);
+					obj->setWidth(value);
+					return 0;
+				};
+				const char* name = "setWidth";
+				lua_pushcfunction(L, proxy, name);
+				lua_setfield(L, -2, name);
+			}
+			{
+				auto proxy = [](lua_State* L) -> int {
+					LuaWrapper::checkTableArg(L, 1); // self
+					ui::Element* obj;
+					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
+					auto path = LuaWrapper::checkArg<Path>(L, 2);
+					obj->setBGImage(path);
+					return 0;
+				};
+				const char* name = "setBGImage";
 				lua_pushcfunction(L, proxy, name);
 				lua_setfield(L, -2, name);
 			}
@@ -3097,6 +3134,7 @@ namespace Lumix {
 					LuaWrapper::checkTableArg(L, 1); // self
 					ui::Document* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
 					auto index = LuaWrapper::checkArg<u32>(L, 2);
 					auto res = obj->getElement(index);
 					LuaWrapper::push(L, res);
@@ -3111,6 +3149,7 @@ namespace Lumix {
 					LuaWrapper::checkTableArg(L, 1); // self
 					ui::Document* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
 					auto id = LuaWrapper::checkArg<const char*>(L, 2);
 					auto res = obj->getElementByID(id);
 					LuaWrapper::push(L, res);
@@ -3125,6 +3164,7 @@ namespace Lumix {
 					LuaWrapper::checkTableArg(L, 1); // self
 					ui::Document* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
 					auto res = obj->getEvents();
 					LuaWrapper::push(L, res);
 					return 1;
@@ -3147,6 +3187,7 @@ namespace Lumix {
 					LuaWrapper::checkTableArg(L, 1); // self
 					GameView* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
 					auto enable = LuaWrapper::checkArg<bool>(L, 2);
 					auto w = LuaWrapper::checkArg<int>(L, 3);
 					auto h = LuaWrapper::checkArg<int>(L, 4);
@@ -3171,6 +3212,7 @@ namespace Lumix {
 					LuaWrapper::checkTableArg(L, 1); // self
 					SceneView* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
 					auto res = obj->getViewport();
 					LuaWrapper::push(L, res);
 					return 1;
@@ -3184,6 +3226,7 @@ namespace Lumix {
 					LuaWrapper::checkTableArg(L, 1); // self
 					SceneView* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
 					auto vp = LuaWrapper::checkArg<Viewport>(L, 2);
 					obj->setViewport(vp);
 					return 0;
@@ -3197,6 +3240,7 @@ namespace Lumix {
 					LuaWrapper::checkTableArg(L, 1); // self
 					SceneView* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
 					auto path = LuaWrapper::checkArg<StringView>(L, 2);
 					obj->makeScreenshot(path);
 					return 0;
@@ -3219,6 +3263,7 @@ namespace Lumix {
 					LuaWrapper::checkTableArg(L, 1); // self
 					Model* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
 					auto res = obj->getOriginBoundingRadius();
 					LuaWrapper::push(L, res);
 					return 1;
@@ -3232,6 +3277,7 @@ namespace Lumix {
 					LuaWrapper::checkTableArg(L, 1); // self
 					Model* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
 					auto res = obj->getCenterBoundingRadius();
 					LuaWrapper::push(L, res);
 					return 1;
@@ -3245,6 +3291,7 @@ namespace Lumix {
 					LuaWrapper::checkTableArg(L, 1); // self
 					Model* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
 					auto res = obj->getAABB();
 					LuaWrapper::push(L, res);
 					return 1;
@@ -3267,6 +3314,7 @@ namespace Lumix {
 					LuaWrapper::checkTableArg(L, 1); // self
 					Pipeline* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
 					auto only_2d = LuaWrapper::checkArg<bool>(L, 2);
 					auto res = obj->render(only_2d);
 					LuaWrapper::push(L, res);
@@ -3281,6 +3329,7 @@ namespace Lumix {
 					LuaWrapper::checkTableArg(L, 1); // self
 					Pipeline* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
 					World* world;
 					if (!LuaWrapper::checkField(L, 2, "value", &world)) luaL_error(L, "Invalid argument");
 					obj->setWorld(world);
@@ -3295,6 +3344,7 @@ namespace Lumix {
 					LuaWrapper::checkTableArg(L, 1); // self
 					Pipeline* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
 					auto viewport = LuaWrapper::checkArg<Viewport>(L, 2);
 					obj->setViewport(viewport);
 					return 0;
@@ -3308,6 +3358,7 @@ namespace Lumix {
 					LuaWrapper::checkTableArg(L, 1); // self
 					Pipeline* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
 					auto color = LuaWrapper::checkArg<Vec3>(L, 2);
 					obj->setClearColor(color);
 					return 0;
@@ -3321,6 +3372,7 @@ namespace Lumix {
 					LuaWrapper::checkTableArg(L, 1); // self
 					Pipeline* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
 					auto res = obj->getOutput();
 					LuaWrapper::push(L, res);
 					return 1;
@@ -3343,6 +3395,7 @@ namespace Lumix {
 					LuaWrapper::checkTableArg(L, 1); // self
 					Renderer* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
 					auto res = obj->getLODMultiplier();
 					LuaWrapper::push(L, res);
 					return 1;
@@ -3356,6 +3409,7 @@ namespace Lumix {
 					LuaWrapper::checkTableArg(L, 1); // self
 					Renderer* obj;
 					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
 					auto value = LuaWrapper::checkArg<float>(L, 2);
 					obj->setLODMultiplier(value);
 					return 0;

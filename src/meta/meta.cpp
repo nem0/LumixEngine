@@ -1585,6 +1585,7 @@ void serializeMain(OutputStream& out, Parser& parser) {
 				L("LuaWrapper::checkTableArg(L, 1); // self");
 				L(o.full, "* obj;");
 				L("if (!LuaWrapper::checkField(L, 1, \"_value\", &obj)) luaL_error(L, \"Invalid object\");");
+				L("if (!obj) return 0;");
 				
 				i32 idx = 0;
 				forEachArg(f.args, [&](const Arg& arg, bool){
