@@ -5,7 +5,7 @@
 | Attribute | Description | Default / Values |
 |---|---|---|
 | `id` | Unique identifier for the element; allows referencing or manipulating the element individually. Values should be enclosed in double quotes ("..."). | (no default) |
-| `visible` | Controls the visibility of the element. | `true` |
+| `visible` | Controls the visibility of the element and its descendants. When an ancestor is not visible, descendants are not visible even if their `visible` is set to `true`. | `true` |
 
 Classes can be assigned to elements using the `.classname` syntax, e.g., `[box .myclass]`. Multiple classes can be assigned by chaining them: `[box .class1 .class2]`.
 
@@ -82,7 +82,6 @@ Quoted string can be used in place of a span.
 
 The following attributes are inherited from parent elements to their descendants:
 
-- `visible` - Controls the visibility of the element and its descendants.
 - `align` - Text alignment, inherited for text content.
 - `color` - Text color, inherited by inline text content.
 - `font` - Font file path, inherited for text rendering.

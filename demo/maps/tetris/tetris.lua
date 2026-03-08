@@ -1,8 +1,6 @@
 -- Simple Tetris demo for Lumix Engine
 -- Spawns cubes using engine/models/cube.fbx and implements basic gameplay logic
 
-score_counter = Lumix.Entity.NULL -- gui for score
-
 local GRID_W = 10
 local GRID_H = 20
 local CELL_SIZE = 2.1 -- world units between cubes
@@ -148,7 +146,8 @@ local function clearLines()
     end
     if removed > 0 then
         score = score + removed * 100
-        score_counter.gui_text.text = "Score: " .. tostring(score)
+        local doc = this.world.ui:getDocument()
+		doc:getElementByID("score"):setText("Score: " .. tostring(score))
     end
 end
 

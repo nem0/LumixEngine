@@ -23,6 +23,7 @@
 * [Style](ui/style.md)
 * [Layout](ui/layout.md)
 * [Elements and attributes](ui/elements_attributes.md)
+* [3D UI](ui/3d_ui.md)
 * [Animations](ui/animations.md)
 * [Snippets](ui/snippets.md)
 * [TODO](ui/todo.md)

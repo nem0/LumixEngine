@@ -98,7 +98,7 @@ struct EditorIconsImpl final : EditorIcons {
 		World& world = *m_editor.getWorld();
 		
 		if (world.hasComponent(entity, types::model_instance)) return;
-		if (world.hasComponent(entity, types::gui_rect)) return;
+		if (world.hasComponent(entity, types::ui_3d)) return;
 
 		auto& icon = m_icons.insert(entity);
 		icon.entity = entity;

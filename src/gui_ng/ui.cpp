@@ -62,34 +62,28 @@ static AttributeName parseAttributeName(StringView str) {
 			if (len == 11 && memcmp(s, "align-items", 11) == 0) return AttributeName::ALIGN_ITEMS;
 			break;
 		case 'b':
-			if (len == 8 && memcmp(s, "bg-color", 8) == 0) return AttributeName::BG_COLOR;
 			if (len == 6 && memcmp(s, "bg-fit", 6) == 0) return AttributeName::BG_FIT;
-			if (len == 8 && memcmp(s, "bg-image", 8) == 0) return AttributeName::BG_IMAGE;
+			if (len == 8) {
+				if (memcmp(s, "bg-color", 8) == 0) return AttributeName::BG_COLOR;
+				if (memcmp(s, "bg-image", 8) == 0) return AttributeName::BG_IMAGE;
+			}
 			break;
 		case 'c':
-			if (len == 5 && memcmp(s, "class", 5) == 0) return AttributeName::CLASS;
-			if (len == 5 && memcmp(s, "color", 5) == 0) return AttributeName::COLOR;
+			if (len == 5) {
+				if (memcmp(s, "class", 5) == 0) return AttributeName::CLASS;
+				if (memcmp(s, "color", 5) == 0) return AttributeName::COLOR;
+			}
 			break;
-		case 'd':
-			if (len == 9 && memcmp(s, "direction", 9) == 0) return AttributeName::DIRECTION;
-			break;
-			case 'f':
+		case 'd': if (memcmp(s, "direction", 9) == 0) return AttributeName::DIRECTION; break;
+		case 'f':
 			if (len == 3 && memcmp(s, "fit", 3) == 0) return AttributeName::FIT;
 			if (len == 4 && memcmp(s, "font", 4) == 0) return AttributeName::FONT;
 			if (len == 9 && memcmp(s, "font-size", 9) == 0) return AttributeName::FONT_SIZE;
 			break;
-		case 'g':
-			if (len == 4 && memcmp(s, "grow", 4) == 0) return AttributeName::GROW;
-			break;
-		case 'h':
-			if (len == 6 && memcmp(s, "height", 6) == 0) return AttributeName::HEIGHT;
-			break;
-		case 'i':
-			if (len == 2 && memcmp(s, "id", 2) == 0) return AttributeName::ID;
-			break;
-		case 'j':
-			if (len == 15 && memcmp(s, "justify-content", 15) == 0) return AttributeName::JUSTIFY_CONTENT;
-			break;
+		case 'g': if (memcmp(s, "grow", 4) == 0) return AttributeName::GROW; break;
+		case 'h': if (memcmp(s, "height", 6) == 0) return AttributeName::HEIGHT; break;
+		case 'i': if (memcmp(s, "id", 2) == 0) return AttributeName::ID; break;
+		case 'j': if (memcmp(s, "justify-content", 15) == 0) return AttributeName::JUSTIFY_CONTENT; break;
 		case 'm':
 			if (len == 6 && memcmp(s, "margin", 6) == 0) return AttributeName::MARGIN;
 			if (len == 11 && memcmp(s, "margin-left", 11) == 0) return AttributeName::MARGIN_LEFT;
@@ -101,17 +95,15 @@ static AttributeName parseAttributeName(StringView str) {
 			if (len == 7 && memcmp(s, "padding", 7) == 0) return AttributeName::PADDING;
 			if (len == 12 && memcmp(s, "padding-left", 12) == 0) return AttributeName::PADDING_LEFT;
 			if (len == 13 && memcmp(s, "padding-right", 13) == 0) return AttributeName::PADDING_RIGHT;
-			if (len == 11 && memcmp(s, "padding-top", 11) == 0) return AttributeName::PADDING_TOP;
 			if (len == 14 && memcmp(s, "padding-bottom", 14) == 0) return AttributeName::PADDING_BOTTOM;
-			if (len == 11 && memcmp(s, "placeholder", 11) == 0) return AttributeName::PLACEHOLDER;
+			if (len == 11) {
+				if (memcmp(s, "padding-top", 11) == 0) return AttributeName::PADDING_TOP;
+				if (memcmp(s, "placeholder", 11) == 0) return AttributeName::PLACEHOLDER;
+			}
 			break;
-		case 's':
-			if (len == 3 && memcmp(s, "src", 3) == 0) return AttributeName::SRC;
-			break;
-		case 'v':
-			if (len == 5 && memcmp(s, "value", 5) == 0) return AttributeName::VALUE;
-			if (len == 7 && memcmp(s, "visible", 7) == 0) return AttributeName::VISIBLE;
-			break;
+		case 's': if (memcmp(s, "src", 3) == 0) return AttributeName::SRC; break;
+		case 't': if (memcmp(s, "text", 4) == 0) return AttributeName::TEXT; break;
+		case 'v': if (memcmp(s, "visible", 7) == 0) return AttributeName::VISIBLE; break;
 		case 'w':
 			if (len == 5 && memcmp(s, "width", 5) == 0) return AttributeName::WIDTH;
 			if (len == 4 && memcmp(s, "wrap", 4) == 0) return AttributeName::WRAP;
@@ -315,14 +307,14 @@ bool Document::parseElements(u32 parent_index) {
 				return true;
 			case Token::RBRACKET: error(token.value, m_tokenizer, "unexpected ']'"); return false;
 			case Token::TEXT: {
-				Element& elem = m_elements.emplace(Tag::SPAN, m_allocator);
+				Element& elem = m_elements.emplace(Tag::SPAN, m_allocator, *this);
 				u32 elem_idx = m_elements.size() - 1;
 				if (parent_index != 0xFFFF'FFFF) {
 					m_elements[parent_index].children.push(elem_idx);
 				} else {
 					m_roots.push(elem_idx);
 				}
-				elem.value = token.value;
+				elem.text = token.value;
 				
 				// Accumulate consecutive text tokens
 				bool is_break = false;
@@ -330,7 +322,7 @@ bool Document::parseElements(u32 parent_index) {
 					Token next = m_tokenizer.peekToken();
 					switch (next.type) {
 						case Token::TEXT:
-							elem.value.end = next.value.end;
+							elem.text.end = next.value.end;
 							m_tokenizer.consumeToken();
 							break;
 						case Token::LBRACKET: is_break = true; break;
@@ -346,9 +338,9 @@ bool Document::parseElements(u32 parent_index) {
 							error(token.value, m_tokenizer, "unexpected EOF");
 							return false;
 						default:
-							elem.value.end = next.value.end;
+							elem.text.end = next.value.end;
 							if (next.type == Token::STRING) {
-								elem.value.end += 1;
+								elem.text.end += 1;
 							}
 							m_tokenizer.consumeToken();
 							break;
@@ -380,7 +372,7 @@ bool Document::parseElements(u32 parent_index) {
 					return false;
 				}
 
-				Element& elem = m_elements.emplace(tag, m_allocator);
+				Element& elem = m_elements.emplace(tag, m_allocator, *this);
 				u32 elem_idx = m_elements.size() - 1;
 				if (parent_index != 0xFFFF'FFFF) {
 					m_elements[parent_index].children.push(elem_idx);
@@ -392,7 +384,17 @@ bool Document::parseElements(u32 parent_index) {
 				for (;;) {
 					if (tryConsume(Token::RBRACKET)) break;
 					Token name_token;
-					if (m_tokenizer.peekToken().type == Token::DOT) {
+					Token peeked = m_tokenizer.peekToken();
+					// id
+					if (peeked.type == Token::DOLLAR) {
+						if (!consume(Token::DOLLAR)) return false;
+						if (!consume(Token::IDENTIFIER, &name_token)) return false;	
+						elem.id = name_token.value;
+						continue;
+					}
+
+					// class
+					if (peeked.type == Token::DOT) {
 						const char* dot = m_tokenizer.peekToken().value.begin;
 						if (!consume(Token::DOT)) return false;
 						if (!consume(Token::IDENTIFIER, &name_token)) return false;	
@@ -403,6 +405,7 @@ bool Document::parseElements(u32 parent_index) {
 						continue;
 					}
 
+					// attribute
 					if (!consume(Token::IDENTIFIER, &name_token)) return false;
 					if (!consume(Token::EQUALS)) return false;
 			
@@ -417,8 +420,8 @@ bool Document::parseElements(u32 parent_index) {
 						error(name_token.value, m_tokenizer, "unknown attribute '", name_token.value, "'");
 						return false;
 					}
-					if (name == AttributeName::VALUE) {
-						elem.value = value.value;
+					if (name == AttributeName::TEXT) {
+						elem.text = value.value;
 					}
 					else {
 						upsertAttribute(elem, name, value.value, AttributeSource::ELEMENT);
@@ -436,7 +439,7 @@ bool Document::parseElements(u32 parent_index) {
 				break;
 			}
 			default: {
-				Element& elem = m_elements.emplace(Tag::SPAN, m_allocator);
+				Element& elem = m_elements.emplace(Tag::SPAN, m_allocator, *this);
 				u32 elem_idx = m_elements.size() - 1;
 				if (parent_index != 0xFFFF'FFFF) {
 					m_elements[parent_index].children.push(elem_idx);
@@ -444,9 +447,9 @@ bool Document::parseElements(u32 parent_index) {
 					m_roots.push(elem_idx);
 				}
 				if (token.type == Token::STRING) {
-					elem.value = StringView{token.value.begin - 1, token.value.end + 1};
+					elem.text = StringView{token.value.begin - 1, token.value.end + 1};
 				} else {
-					elem.value = token.value;
+					elem.text = token.value;
 				}
 				bool is_break = false;
 				while (!is_break) {
@@ -469,13 +472,13 @@ bool Document::parseElements(u32 parent_index) {
 							return true; // end of the parent container
 						case Token::TEXT:
 							// Include TEXT tokens in the element value
-							elem.value.end = next.value.end;
+							elem.text.end = next.value.end;
 							m_tokenizer.consumeToken();
 							break;
 						default: 
-							elem.value.end = next.value.end;
+							elem.text.end = next.value.end;
 							if (next.type == Token::STRING) {
-								elem.value.end += 1;
+								elem.text.end += 1;
 							}
 							m_tokenizer.consumeToken();
 							break;
@@ -485,6 +488,21 @@ bool Document::parseElements(u32 parent_index) {
 			}
 		}
 	}
+}
+
+void Element::setVisible(bool show) {
+	upsertAttribute(*this, AttributeName::VISIBLE, show ? "true" : "false", AttributeSource::ELEMENT);
+
+	if (visible == show) return;
+	visible = show;
+	m_document.computeLayout(m_document.m_canvas_size);
+}
+
+void Element::setText(StringView v) {
+	upsertAttribute(*this, AttributeName::TEXT, v, AttributeSource::ELEMENT);
+
+	text = v;
+	m_document.computeLayout(m_document.m_canvas_size);
 }
 
 static ParsedUnit parseUnit(StringView str) {
@@ -695,6 +713,7 @@ static void layoutChildrenVertical(Document& doc, Element& parent) {
 // For row direction, children are laid out horizontally; for column, vertically.
 // Margins between adjacent children collapse to the maximum value.
 static void layoutChildren(Document& doc, Element& parent) {
+	if (!parent.visible) return;
 	if (parent.direction == Direction::ROW) layoutChildrenHorizontal(doc, parent);
 	else layoutChildrenVertical(doc, parent);
 
@@ -715,6 +734,7 @@ struct ParentContext {
 
 // distribute grow and compute %-based widths
 static void computeParentRelativeWidth(Document& doc, Element& elem) {
+	if (!elem.visible) return;
 	if (elem.children.empty()) return;
 
 	if (elem.direction == Direction::ROW) {
@@ -784,6 +804,8 @@ static float computeSpansHeight(Document& doc, Element& element, i32 child_idx) 
 }
 
 static void computeBaseHeights(Document& doc, Element& elem, Element* parent_elem, const ParentContext& parent) {
+	if (!elem.visible) return;
+
 	ParsedUnit margin_unit[2] = {{0, Unit::PIXELS}, {0, Unit::PIXELS}};
 	ParsedUnit padding_unit[2] = {{0, Unit::PIXELS}, {0, Unit::PIXELS}};
 
@@ -844,6 +866,7 @@ static void computeBaseHeights(Document& doc, Element& elem, Element* parent_ele
 }
 
 static void computeParentRelativeHeights(Document& doc, Element& elem) {
+	if (!elem.visible) return;
 	if (elem.direction == Direction::COLUMN) {
 		float sum_grow = 0;
 		float remaining_h = elem.size.y - elem.paddings.top - elem.paddings.bottom;
@@ -880,6 +903,7 @@ static void computeBaseWidths(Document& doc, Element& elem, Element* parent_elem
 	elem.size = Vec2(0, 0);
 	memset(&elem.margins, 0, sizeof(elem.margins));
 	memset(&elem.paddings, 0, sizeof(elem.paddings));
+	if (!elem.visible) return;
 
 	ParentContext ctx = parent;
 	ctx.size = Vec2(0);
@@ -901,8 +925,8 @@ static void computeBaseWidths(Document& doc, Element& elem, Element* parent_elem
 	}
 
 	if (elem.tag == Tag::SPAN) {
-		if (doc.m_font_manager && elem.font_handle && !elem.value.empty()) {
-			elem.size = doc.m_font_manager->measureTextA(elem.font_handle, elem.value);
+		if (doc.m_font_manager && elem.font_handle && !elem.text.empty()) {
+			elem.size = doc.m_font_manager->measureTextA(elem.font_handle, elem.text);
 		}
 		return;
 	}
@@ -1026,6 +1050,7 @@ static void applyStylesheet(Document& doc, u32 element_index, const ParentContex
 				else elem.direction = Direction::COLUMN;
 				break;
 			}
+			case AttributeName::VISIBLE: elem.visible = attr.value == "true"; break;
 			case AttributeName::ALIGN: {
 				ctx.align = parseAlign(attr.value);
 				break;
@@ -1036,7 +1061,7 @@ static void applyStylesheet(Document& doc, u32 element_index, const ParentContex
 				break;
 			}
 			case AttributeName::BG_COLOR: elem.bg_color = parseColor(attr.value); break;
-			case AttributeName::VALUE: elem.value = attr.value; break;
+			case AttributeName::TEXT: elem.text = attr.value; break;
 			case AttributeName::JUSTIFY_CONTENT: elem.justify_content = parseJustifyContent(attr.value); break;
 			case AttributeName::ALIGN_ITEMS: elem.align_items = parseAlignItems(attr.value); break;
 			case AttributeName::FONT_SIZE: ctx.font_size = (float)atof(attr.value.begin); break;
@@ -1127,12 +1152,12 @@ static void wrapSpans(Document& doc, Element& parent, i32 start_span_idx, i32 en
 	for (i32 child_idx = start_span_idx; child_idx < end_span_idx; ++child_idx) {
 		Element& span = doc.m_elements[parent.children[child_idx]];
 		span.lines.clear();
-		if (!span.font_handle || span.value.empty()) continue;
+		if (!span.font_handle || span.text.empty()) continue;
 
 		StringView space(" ", 1);
 		const float space_w = doc.m_font_manager->measureTextA(span.font_handle, space).x;
 
-		StringView text = span.value;
+		StringView text = span.text;
 		if (wrap_enabled) {
 			SpanLine* line = nullptr;
 			while (!text.empty()) {
@@ -1214,6 +1239,7 @@ static void wrapSpans(Document& doc, Element& parent, i32 start_span_idx, i32 en
 static void wrapText(Document& doc, u32 element_index) {
 	Element& elem = doc.m_elements[element_index];
 	elem.lines.clear();
+	if (!elem.visible) return;
 
 	if (elem.tag == Tag::SPAN) {
 		// TODO top level span without container
@@ -1238,6 +1264,23 @@ static void wrapText(Document& doc, u32 element_index) {
 	}
 }
 
+Element* Document::getElementByID(const char* id) {
+	if (!id || !id[0]) return nullptr;
+
+	StringView id_view(id);
+	if (id[0] == '$') {
+		if (!id[1]) return nullptr;
+		id_view = StringView(id + 1);
+	}
+
+	for (Element& elem : m_elements) {
+		if (!elem.id.empty() && elem.id == id_view) {
+			return &elem;
+		}
+	}
+
+	return nullptr;
+}
 
 void Document::computeLayout(Vec2 canvas_size) {
 	PROFILE_FUNCTION();
@@ -1272,6 +1315,7 @@ void Document::computeLayout(Vec2 canvas_size) {
 	float prev_bottom_margin = 0;
 	for (u32 root_idx : m_roots) {
 		Element& root = m_elements[root_idx];
+		if (!root.visible) continue;
 		if (root.height_unit.unit == Unit::PERCENT) {
 			root.size.y = computeAbsoluteSize(root.height_unit, canvas_size.y, root.font_size);
 		}
@@ -1293,6 +1337,7 @@ void Document::computeLayout(Vec2 canvas_size) {
 
 static void renderElement(Draw2D& draw, const Document& doc, u32 element_idx, const Element* parent) {
 	const Element& element = *doc.getElement(element_idx);
+	if (!element.visible) return;
 	Vec2 pos = Vec2(element.position.x, element.position.y);
 	Vec2 size = Vec2(element.size.x, element.size.y);
 
@@ -1301,13 +1346,13 @@ static void renderElement(Draw2D& draw, const Document& doc, u32 element_idx, co
 			if (element.bg_sprite) {
 				element.bg_sprite->render(draw, pos.x, pos.y, pos.x + size.x, pos.y + size.y, Color::WHITE);
 			}
-			else {
+			else if (element.bg_color.a > 0) {
 				draw.addRectFilled(pos, pos + size, element.bg_color);
 			}
 			break;
 		}
 		case Tag::SPAN: {
-			if (element.font_handle && !element.value.empty()) {
+			if (element.font_handle && !element.text.empty()) {
 				const Font& font = *(const Font*)element.font_handle;
 				if (!element.lines.empty()) {
 					for (const SpanLine& line : element.lines) {
@@ -1316,7 +1361,7 @@ static void renderElement(Draw2D& draw, const Document& doc, u32 element_idx, co
 				} else {
 					// fallback
 					Vec2 text_pos = pos + Vec2(0, getAscender(font));
-					draw.addText(font, text_pos, element.color, element.value);
+					draw.addText(font, text_pos, element.color, element.text);
 				}
 			}
 			break;

@@ -1,30 +1,30 @@
 #include "ui_resource.h"
 #include "core/log.h"
 
-namespace Lumix {
+namespace Lumix::ui {
 
-const ResourceType UIDocument::TYPE("ui");
+const ResourceType DocumentResource::TYPE("ui");
 
-UIDocument::UIDocument(const Path& path, ResourceManager& manager, IAllocator& allocator)
+DocumentResource::DocumentResource(const Path& path, ResourceManager& manager, IAllocator& allocator)
 	: Resource(path, manager, allocator)
-	, m_blob()
+	, m_content(allocator)
 {}
 
-void UIDocument::unload() {
-	m_blob = Span<const u8>();
+void DocumentResource::unload() {
+	m_content = "";
 }
 
-bool UIDocument::load(Span<const u8> mem) {
-	m_blob = mem;
+bool DocumentResource::load(Span<const u8> mem) {
+	m_content = StringView((const char*)mem.m_begin, mem.length());
 	return true;
 }
 
-Resource* UIDocumentManager::createResource(const Path& path) {
-	return LUMIX_NEW(m_allocator, UIDocument)(path, *this, m_allocator);
+Resource* DocumentResourceManager::createResource(const Path& path) {
+	return LUMIX_NEW(m_allocator, DocumentResource)(path, *this, m_allocator);
 }
 
-void UIDocumentManager::destroyResource(Resource& resource) {
-	LUMIX_DELETE(m_allocator, static_cast<UIDocument*>(&resource));
+void DocumentResourceManager::destroyResource(Resource& resource) {
+	LUMIX_DELETE(m_allocator, static_cast<DocumentResource*>(&resource));
 }
 
 } // namespace Lumix

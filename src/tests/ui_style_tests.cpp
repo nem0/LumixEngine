@@ -198,6 +198,58 @@ bool testRecomputeIdempotence() {
 	return true;
 }
 
+bool testSetVisiblePersistsAcrossStyleRecompute() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+		[style] {
+			.hovered {
+				visible: true;
+			}
+		}
+		[box] {
+		}
+		[box] {
+		}
+	)");
+
+	Span<u32> roots = doc.m_roots;
+	ASSERT_EQ(2, (int)roots.size());
+
+	ui::Element& first = doc.m_elements[roots[0]];
+	ui::Element& second = doc.m_elements[roots[1]];
+
+	ASSERT_EQ(true, first.visible);
+	ASSERT_EQ(true, second.visible);
+
+	first.setVisible(false);
+	ASSERT_EQ(false, first.visible);
+
+	bool has_visible_false = false;
+	for (const ui::Attribute& attr : first.attributes) {
+		if (attr.type == ui::AttributeName::VISIBLE && equalStrings(attr.value, "false")) {
+			has_visible_false = true;
+			break;
+		}
+	}
+	ASSERT_EQ(true, has_visible_false);
+
+	doc.addClass(roots[1], "hovered");
+
+	ASSERT_EQ(false, first.visible);
+	ASSERT_EQ(true, second.visible);
+
+	has_visible_false = false;
+	for (const ui::Attribute& attr : first.attributes) {
+		if (attr.type == ui::AttributeName::VISIBLE && equalStrings(attr.value, "false")) {
+			has_visible_false = true;
+			break;
+		}
+	}
+	ASSERT_EQ(true, has_visible_false);
+
+	return true;
+}
+
 bool testAddClassWithFontAttribute() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
@@ -642,6 +694,7 @@ void runUIStyleTests() {
 	RUN_TEST(testMultipleClassesMatching);
 	RUN_TEST(testClassNotMatching);
 	RUN_TEST(testRecomputeIdempotence);
+	RUN_TEST(testSetVisiblePersistsAcrossStyleRecompute);
 	RUN_TEST(testAddClassWithFontAttribute);
 	RUN_TEST(testRemoveClassWithFontAttribute);
 	RUN_TEST(testAddClassDuplicateNoOp);

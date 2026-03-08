@@ -5,7 +5,7 @@
 namespace Lumix {
 
 //@ object
-struct GUINGSystem : ISystem {
+struct UISystem : ISystem {
 	virtual Engine& getEngine() = 0;
 	// TODO: Add GUI NG system functions
 };

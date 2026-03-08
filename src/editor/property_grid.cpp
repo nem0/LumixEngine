@@ -726,37 +726,35 @@ void PropertyGrid::showCoreProperties(Span<const EntityRef> entities, WorldEdito
 			ImGuiEx::Label("Parent");
 			ImGui::TextUnformatted(name);
 
-			if (!world.hasComponent(entities[0], types::gui_rect) || world.hasComponent(entities[0], types::gui_canvas)) {
-				Transform tr = world.getLocalTransform(entities[0]);
-				DVec3 old_pos = tr.pos;
-				ImGuiEx::Label("Local position");
-				if (ImGui::DragScalarN("##lcl_pos", ImGuiDataType_Double, &tr.pos.x, 3, 1.f))
+			Transform tr = world.getLocalTransform(entities[0]);
+			DVec3 old_pos = tr.pos;
+			ImGuiEx::Label("Local position");
+			if (ImGui::DragScalarN("##lcl_pos", ImGuiDataType_Double, &tr.pos.x, 3, 1.f))
+			{
+				WorldEditor::Coordinate coord = WorldEditor::Coordinate::NONE;
+				if (tr.pos.x != old_pos.x) coord = WorldEditor::Coordinate::X;
+				if (tr.pos.y != old_pos.y) coord = WorldEditor::Coordinate::Y;
+				if (tr.pos.z != old_pos.z) coord = WorldEditor::Coordinate::Z;
+				if (coord != WorldEditor::Coordinate::NONE)
 				{
-					WorldEditor::Coordinate coord = WorldEditor::Coordinate::NONE;
-					if (tr.pos.x != old_pos.x) coord = WorldEditor::Coordinate::X;
-					if (tr.pos.y != old_pos.y) coord = WorldEditor::Coordinate::Y;
-					if (tr.pos.z != old_pos.z) coord = WorldEditor::Coordinate::Z;
-					if (coord != WorldEditor::Coordinate::NONE)
-					{
-						editor.setEntitiesLocalCoordinate(&entities[0], entities.size(), (&tr.pos.x)[(int)coord], coord);
-					}
+					editor.setEntitiesLocalCoordinate(&entities[0], entities.size(), (&tr.pos.x)[(int)coord], coord);
 				}
+			}
 				
-				ImGuiEx::Label("Local rotation");
-				const Vec3 old_euler = tr.rot.toEuler();
-				Vec3 euler = old_euler;
-				if (ImGuiEx::InputRotation("##lcl_rot", &euler.x)) {
-					Array<Quat> rots(m_app.getAllocator());
-					for (EntityRef entity : entities) {
-						Vec3 tmp = world.getLocalTransform(entity).rot.toEuler();
+			ImGuiEx::Label("Local rotation");
+			const Vec3 old_euler = tr.rot.toEuler();
+			Vec3 euler = old_euler;
+			if (ImGuiEx::InputRotation("##lcl_rot", &euler.x)) {
+				Array<Quat> rots(m_app.getAllocator());
+				for (EntityRef entity : entities) {
+					Vec3 tmp = world.getLocalTransform(entity).rot.toEuler();
 			
-						if (fabs(euler.x - old_euler.x) > 0.0001f) tmp.x = euler.x;
-						if (fabs(euler.y - old_euler.y) > 0.0001f) tmp.y = euler.y;
-						if (fabs(euler.z - old_euler.z) > 0.0001f) tmp.z = euler.z;
-						rots.emplace().fromEuler(tmp);
-					}
-					editor.setEntitiesLocalRotation(&entities[0], &rots[0], entities.size());
+					if (fabs(euler.x - old_euler.x) > 0.0001f) tmp.x = euler.x;
+					if (fabs(euler.y - old_euler.y) > 0.0001f) tmp.y = euler.y;
+					if (fabs(euler.z - old_euler.z) > 0.0001f) tmp.z = euler.z;
+					rots.emplace().fromEuler(tmp);
 				}
+				editor.setEntitiesLocalRotation(&entities[0], &rots[0], entities.size());
 			}
 		}
 	}

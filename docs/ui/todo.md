@@ -1,17 +1,18 @@
 high prio (feature parity with the old ui, before we can merge):
-* editor/debug view UX
+* main.unv -> demo.unv, UI is not updated
+* prepare for old ui to be removed
+* update demo/showcase projects to use the new ui
 * clipping
-* styling
-* text input
 * error handling/reporting
 * image element
-* examples: scrolling, checkbox, drag & drop, tooltip, dropdown, slider
-* absolute/relative positioning?
-* min-width?
-* update demo/showcase projects to use the new ui
 * fixed leaks
+* text input
 
 low prio or optional:
+* inline 3d ui component - ui source as property, not as a resource file
+* min-width?
+* absolute/relative positioning?
+* examples: scrolling, checkbox, drag & drop, tooltip, dropdown, slider
 * DPI
 * includes
 * optimizations

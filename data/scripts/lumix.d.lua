@@ -104,7 +104,7 @@ export type World = {
 	audio: audio_module,
 	core: core_module,
 	gui: gui_module,
-	gui_ng: gui_ng_module,
+	ui: ui_module,
 	lua_script: lua_script_module,
 	navigation: navigation_module,
 	physics: physics_module,
@@ -182,10 +182,18 @@ type GUISystem = {
 	enableCursor: (GUISystem, boolean) -> (),
 }
 
-type GUINGSystem = {
+type UISystem = {
+}
+
+type Element = {
+	getID: (Element) -> any,
+	setVisible: (Element, boolean) -> (),
+	setText: (Element, any) -> (),
 }
 
 type Document = {
+	getElement: (Document, number) -> Element,
+	getElementByID: (Document, any) -> Element,
 	getEvents: (Document) -> any,
 }
 
@@ -333,9 +341,15 @@ type gui_text_component =  {
 	text: string,
 }
 
-type gui_ng_module = {
-	getDocument: (gui_ng_module) -> any,
-	isReady: (gui_ng_module) -> boolean,
+type ui_module = {
+	getDocument: (ui_module) -> any,
+	isReady: (ui_module) -> boolean,
+}
+
+type ui_3d_component =  {
+	source: string,
+	virtual_size: Vec2,
+	orient_to_camera: boolean,
 }
 
 type lua_script_module = {
@@ -680,6 +694,7 @@ export type Entity = {
 	gui_button: gui_button_component,
 	gui_image: gui_image_component,
 	gui_text: gui_text_component,
+	ui_3d: ui_3d_component,
 	lua_script: lua_script_component,
 	lua_script_inline: lua_script_inline_component,
 	navmesh_zone: navmesh_zone_component,

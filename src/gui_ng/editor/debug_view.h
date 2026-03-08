@@ -41,13 +41,13 @@ static void debugElementGUI(const Document& document, u32 element_idx, int depth
 		size_str.append(" [", element->attributes.size(), " attrs]");
 	}
 
-	if (element->value.empty()) {
+	if (element->text.empty()) {
 		label.append(tag_name, size_str, "##", element_idx);
 	} else {
 		StaticString<128> value_preview;
-		u32 preview_len = minimum((u32)100, element->value.size());
-		value_preview.append(StringView(element->value.begin, preview_len));
-		if (element->value.size() > 100) {
+		u32 preview_len = minimum((u32)100, element->text.size());
+		value_preview.append(StringView(element->text.begin, preview_len));
+		if (element->text.size() > 100) {
 			value_preview.append("...");
 		}
 		label.append(tag_name, size_str, " \"", value_preview, "\"##", element_idx);

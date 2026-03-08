@@ -3,27 +3,28 @@
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
 #include "core/span.h"
+#include "core/string.h"
 
-namespace Lumix {
+namespace Lumix::ui {
 
-struct UIDocument final : Resource {
-	UIDocument(const Path& path, ResourceManager& manager, IAllocator& allocator);
+struct DocumentResource final : Resource {
+	DocumentResource(const Path& path, ResourceManager& manager, IAllocator& allocator);
 
 	ResourceType getType() const override { return TYPE; }
 
 	void unload() override;
 	bool load(Span<const u8> mem) override;
 
-	Span<const u8> getBlob() const { return m_blob; }
+	const String& getContent() const { return m_content; }
 
 	static const ResourceType TYPE;
 
 private:
-	Span<const u8> m_blob;
+	String m_content;
 };
 
-struct UIDocumentManager final : ResourceManager {
-	explicit UIDocumentManager(IAllocator& allocator) : ResourceManager(allocator) {}
+struct DocumentResourceManager final : ResourceManager {
+	explicit DocumentResourceManager(IAllocator& allocator) : ResourceManager(allocator) {}
 
 	Resource* createResource(const Path& path) override;
 	void destroyResource(Resource& resource) override;

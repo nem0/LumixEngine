@@ -10,7 +10,6 @@ function onInputEvent(event : InputEvent)
 			end)
 
 			loaded = true
-			this.gui_rect.enabled = false
 		end
 	end
 end

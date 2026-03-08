@@ -1,24 +1,48 @@
 [style] {
-	.hovered {
-		bg-color: #ff0000;
-		align: right;
+	.button {
+		bg-color: #aaaaaa;
+		width: 10em;
+		padding: 0.2em;
+		margin: 0.2em;
+		align: center;
+	}
+	.button:hover {
+		bg-color: #cccccc;
 	}
 }
-[box direction=column width=50% height=50% margin=25%
+
+[box width=100% height=100% align-items=center justify-content=center] {
+	[box direction=column width=30em 
 		bg-color=#f0f0f0 
 		font="/engine/editor/fonts/JetBrainsMono-Regular.ttf" 
 		font-size=40
 		align-items=stretch
-] {
-    [box direction=row padding=0.5em align=center] {
-        Welcome to [span value=" Lumix " color=#ff0000 font-size=60] Demo
-    }
-    [box direction=column padding=0.5em align-items=stretch] {
-        [box margin=0.2em] { Start Demo }
-        [box margin=0.2em] { Settings }
-    }
-    [box direction=column padding=0.5em align=center padding=1em] {
-        Demo Content Here
-
-    }
+		padding=1.5em
+	] {
+	    [box direction=row align=center] {
+	        Welcome to [span value=" Lumix " color=#ff0000 font-size=60] Demo
+	    }
+	    [box padding=0.5em align-items=center align=center] {
+	        [box .button $start] { Start Demo }
+	    }
+	    [box align=center] {
+	        Press W, A, S, D to move. Use mouse to look around.
+	
+	    }
+	}
 }
+
+[box $runtime_ui
+	font="/engine/editor/fonts/JetBrainsMono-Regular.ttf"
+	font-size=30
+	width=50%
+	height=50%
+	margin=25%
+	bg-color=#ffFFff
+	justify-content=center
+	align-items=center
+	visible=false
+] {
+	[box $close .button] { Press to close }
+}
+

@@ -16,21 +16,22 @@
 
 namespace Lumix {
 
-struct GUINGSystemImpl : GUINGSystem {
-	UIDocumentManager m_ui_document_manager;
+struct UISystemImpl : UISystem {
+	ui::DocumentResourceManager m_ui_document_manager;
 
-	explicit GUINGSystemImpl(Engine& engine)
+	explicit UISystemImpl(Engine& engine)
 		: m_engine(engine)
-		, m_allocator(engine.getAllocator(), "gui_ng")
+		, m_allocator(engine.getAllocator(), "ui")
 		, m_ui_document_manager(m_allocator)
 		, m_render_plugin(*this)
 	{
-		m_ui_document_manager.create(UIDocument::TYPE, m_engine.getResourceManager());
+		UIModule::reflect();
+		m_ui_document_manager.create(ui::DocumentResource::TYPE, m_engine.getResourceManager());
 	}
 
 	Engine& getEngine() override { return m_engine; }
 
-	const char* getName() const override { return "gui_ng"; }
+	const char* getName() const override { return "ui"; }
 
 	void serialize(OutputMemoryStream& stream) const override {}
 
@@ -47,12 +48,12 @@ struct GUINGSystemImpl : GUINGSystem {
 	}
 
 	void createModules(World& world) override {
-		UniquePtr<GUINGModule> module = GUINGModule::createInstance(*this, world, m_allocator);
+		UniquePtr<UIModule> module = UIModule::createInstance(*this, world, m_allocator);
 		world.addModule(std::move(module));
 	}
 
 	struct RenderPlugin : Lumix::RenderPlugin {
-		RenderPlugin(GUINGSystemImpl& system)
+		RenderPlugin(UISystemImpl& system)
 			: m_system(system)
 		{}
 
@@ -60,17 +61,20 @@ struct GUINGSystemImpl : GUINGSystem {
 			Renderer& renderer = pipeline.getRenderer();
 			renderer.setRenderTargets(Span(&input, 1), gbuffer.DS, gpu::FramebufferFlags::READONLY_DEPTH);
 			PipelineType type = pipeline.getType();
-			if (type != PipelineType::GAME_VIEW) return input;
-			GUINGModule* module = (GUINGModule*)pipeline.getModule()->getWorld().getModule("gui_ng");
+			if (type != PipelineType::GAME_VIEW && type != PipelineType::SCENE_VIEW) return input;
+			UIModule* module = (UIModule*)pipeline.getModule()->getWorld().getModule("ui");
 			if (module) {
 				const Viewport& vp = pipeline.getViewport();
 				Vec2 size = Vec2((float)vp.w, (float)vp.h);
-				module->render(pipeline, size);
+				if (type == PipelineType::GAME_VIEW) {
+					module->render(pipeline, size);
+				}
+				module->render3D(pipeline);
 			}
 			return input;
 		}
 
-		GUINGSystemImpl& m_system;
+		UISystemImpl& m_system;
 	};
 
 private:
@@ -79,12 +83,12 @@ private:
 	RenderPlugin m_render_plugin;
 };
 
-UniquePtr<ISystem> createGUINGSystem(Engine& engine, IAllocator& allocator) {
-	return UniquePtr<GUINGSystemImpl>::create(allocator, engine);
+UniquePtr<ISystem> createUISystem(Engine& engine, IAllocator& allocator) {
+	return UniquePtr<UISystemImpl>::create(allocator, engine);
 }
 
 } // namespace Lumix
 
 LUMIX_PLUGIN_ENTRY(gui_ng) {
-	return LUMIX_NEW(engine.getAllocator(), Lumix::GUINGSystemImpl)(engine);
+	return LUMIX_NEW(engine.getAllocator(), Lumix::UISystemImpl)(engine);
 }

@@ -251,7 +251,7 @@ bool testDefaultValues() {
 
 bool testSpanAndQuotedStringEquivalence() {
 	MockDocument doc1;
-	ASSERT_PARSE(doc1, "[box] { [span value=\"hello\"] }");
+	ASSERT_PARSE(doc1, "[box] { [span text=\"hello\"] }");
 	ASSERT_EQ(1, doc1.m_roots.size());
 	ui::Element* root1 = doc1.getElement(doc1.m_roots[0]);
 	ASSERT_EQ(1, root1->children.size());
@@ -259,7 +259,7 @@ bool testSpanAndQuotedStringEquivalence() {
 	ASSERT_TAG(child1, SPAN);
 	Span<ui::Attribute> attrs1 = child1->attributes;
 	ASSERT_EQ(0, attrs1.size());
-	ASSERT_EQ("hello", child1->value);
+	ASSERT_EQ("hello", child1->text);
 
 	MockDocument doc2;
 	ASSERT_PARSE(doc2, "[box] { hello }");
@@ -270,14 +270,14 @@ bool testSpanAndQuotedStringEquivalence() {
 	ASSERT_TAG(child2, SPAN);
 	Span<ui::Attribute> attrs2 = child2->attributes;
 	ASSERT_EQ(0, attrs2.size());
-	ASSERT_EQ("hello", child2->value);
+	ASSERT_EQ("hello", child2->text);
 
 	return true;
 }
 
 bool testSpanEmptyValue() {
 	MockDocument doc;
-	ASSERT_PARSE(doc, "[box] { [span value=\"\"] }");
+	ASSERT_PARSE(doc, "[box] { [span text=\"\"] }");
 	ASSERT_EQ(1, doc.m_roots.size());
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	ASSERT_EQ(1, root->children.size());
@@ -285,14 +285,14 @@ bool testSpanEmptyValue() {
 	ASSERT_TAG(child, SPAN);
 	Span<ui::Attribute> attrs = child->attributes;
 	ASSERT_EQ(0, attrs.size());
-	ASSERT_EQ("", child->value);
+	ASSERT_EQ("", child->text);
 
 	return true;
 }
 
 bool testFontAttribute() {
 	MockDocument doc;
-	ASSERT_PARSE(doc, "[box font=\"arial.ttf\"] { [span value=\"hello\" font=\"times.ttf\"] }");
+	ASSERT_PARSE(doc, "[box font=\"arial.ttf\"] { [span text=\"hello\" font=\"times.ttf\"] }");
 	ASSERT_EQ(1, doc.m_roots.size());
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	ASSERT_EQ(1, root->children.size());
@@ -308,14 +308,14 @@ bool testFontAttribute() {
 	ASSERT_EQ(1, span_attrs.size());
 	ASSERT_ATTRIBUTE(span, 0, FONT);
 	ASSERT_EQ("times.ttf", span_attrs[0].value);
-	ASSERT_EQ("hello", span->value);
+	ASSERT_EQ("hello", span->text);
 	
 	return true;
 }
 
 bool testFontSizeAttribute() {
 	MockDocument doc;
-	ASSERT_PARSE(doc, "[box font-size=16] { [span value=\"hello\" font-size=24] }");
+	ASSERT_PARSE(doc, "[box font-size=16] { [span text=\"hello\" font-size=24] }");
 	ASSERT_EQ(1, doc.m_roots.size());
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	ASSERT_EQ(1, root->children.size());
@@ -331,7 +331,7 @@ bool testFontSizeAttribute() {
 	ASSERT_EQ(1, span_attrs.size());
 	ASSERT_ATTRIBUTE(span, 0, FONT_SIZE);
 	ASSERT_EQ("24", span_attrs[0].value);
-	ASSERT_EQ("hello", span->value);
+	ASSERT_EQ("hello", span->text);
 
 	return true;
 }
@@ -471,13 +471,13 @@ bool testTextWithSpecialChars() {
 	ASSERT_EQ(1, root->children.size());
 	ui::Element* child = doc.getElement(root->children[0]);
 	ASSERT_TAG(child, SPAN);
-	ASSERT_EQ(",-=()*&^@!", child->value);
+	ASSERT_EQ(",-=()*&^@!", child->text);
 	return true;
 }
 
 bool testSpaceBetweenSpans() {
 	MockDocument doc;
-	ASSERT_PARSE(doc, "[box direction=row font=\"arial.ttf\" font-size=16] { [span value=\"hello\"] [span value=\"world\"] }");
+	ASSERT_PARSE(doc, "[box direction=row font=\"arial.ttf\" font-size=16] { [span text=\"hello\"] [span text=\"world\"] }");
 	doc.computeLayout(Vec2(800, 600));
 	ASSERT_EQ(1, doc.m_roots.size());
 	ui::Element* panel = doc.getElement(doc.m_roots[0]);

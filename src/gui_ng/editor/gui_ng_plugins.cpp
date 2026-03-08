@@ -304,15 +304,15 @@ struct UIEditorWindow : AssetEditorWindow {
 	bool m_show_debug_view = false;
 };
 
-struct UIPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
-	explicit UIPlugin(StudioApp& app)
+struct UIAssetPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
+	explicit UIAssetPlugin(StudioApp& app)
 		: m_app(app)
 	{
-		app.getAssetCompiler().registerExtension("ui", UIDocument::TYPE);
+		app.getAssetCompiler().registerExtension("ui", ui::DocumentResource::TYPE);
 	}
 
 	void addSubresources(AssetCompiler& compiler, const Path& path, AtomicI32&) override {
-		compiler.addResource(UIDocument::TYPE, path);
+		compiler.addResource(ui::DocumentResource::TYPE, path);
 	}
 
 	void openEditor(const Path& path) override {
@@ -329,15 +329,15 @@ struct UIPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	}
 	const char* getIcon() const override { return ICON_FA_FILE_CODE; }
 	const char* getLabel() const override { return "UI Document"; }
-	ResourceType getResourceType() const override { return UIDocument::TYPE; }
+	ResourceType getResourceType() const override { return ui::DocumentResource::TYPE; }
 
 	StudioApp& m_app;
 };
 
-struct GUINGPlugin : StudioApp::IPlugin {
-	GUINGPlugin(StudioApp& app) : m_app(app), m_ui_plugin(app) {}
+struct UIPlugin : StudioApp::IPlugin {
+	UIPlugin(StudioApp& app) : m_app(app), m_ui_plugin(app) {}
 
-	const char* getName() const override { return "gui_ng"; }
+	const char* getName() const override { return "ui"; }
 
 	void init() override {
 		const char* ui_exts[] = {"ui"};
@@ -350,18 +350,18 @@ struct GUINGPlugin : StudioApp::IPlugin {
 		return false;
 	}
 
-	~GUINGPlugin() {
+	~UIPlugin() {
 		m_app.getAssetBrowser().removePlugin(m_ui_plugin);
 		m_app.getAssetCompiler().removePlugin(m_ui_plugin);
 	}
 
 private:
 	StudioApp& m_app;
-	UIPlugin m_ui_plugin;
+	UIAssetPlugin m_ui_plugin;
 };
 
 LUMIX_STUDIO_ENTRY(gui_ng) {
-	return LUMIX_NEW(app.getAllocator(), GUINGPlugin)(app);
+	return LUMIX_NEW(app.getAllocator(), UIPlugin)(app);
 }
 
 } // namespace Lumix

@@ -1553,7 +1553,7 @@ bool testSpanCenteringWithTrailingWhitespace() {\
 	ui::Document doc(&mock, getGlobalAllocator());
 	ASSERT_PARSE(doc, R"(
 	[box width=200 align=center font="arial.ttf" font-size=16] {
-		[span value="Hello   "]
+		[span text="Hello   "]
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -1705,8 +1705,8 @@ bool testTextHorizontalRendering() {
 	ui::Document doc(&mock, getGlobalAllocator());
 	ASSERT_PARSE(doc, R"(
 		[box direction=column font="arial.ttf" font-size=16] {
-			[span value="First text"]
-			[span value="Second text"]
+			[span text="First text"]
+			[span text="Second text"]
 		}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -1737,9 +1737,9 @@ bool testBaselineAlignment() {
 	ui::Document doc(&mock, getGlobalAllocator());
 	ASSERT_PARSE(doc, R"(
 		[box direction=row font="arial.ttf" font-size=16] {
-			[span value="Small text" font-size=12]
-			[span value="Normal text" font-size=16]
-			[span value="Large text" font-size=20]
+			[span text="Small text" font-size=12]
+			[span text="Normal text" font-size=16]
+			[span text="Large text" font-size=20]
 		}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -1785,9 +1785,9 @@ bool testBaselineAlignmentWithWrapping() {
 	ui::Document doc(&mock, getGlobalAllocator());
 	ASSERT_PARSE(doc, R"(
 		[box direction=row wrap=true width=200 font="arial.ttf" font-size=16] {
-			[span value="Small" font-size=12]
-			[span value="This is a very long text that should wrap to the next line" font-size=16]
-			[span value="Large" font-size=20]
+			[span text="Small" font-size=12]
+			[span text="This is a very long text that should wrap to the next line" font-size=16]
+			[span text="Large" font-size=20]
 		}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -1818,9 +1818,9 @@ bool testAlignCenterMultipleSpans() {
 	ui::Document doc(&mock, getGlobalAllocator());
 	ASSERT_PARSE(doc, R"(
 		[box width=400 align=center font="arial.ttf" font-size=16 direction=row] {
-			[span value="First"]
-			[span value="Second"]
-			[span value="Third"]
+			[span text="First"]
+			[span text="Second"]
+			[span text="Third"]
 		}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -1860,9 +1860,9 @@ bool testAlignRightMultipleSpans() {
 	ui::Document doc(&mock, getGlobalAllocator());
 	ASSERT_PARSE(doc, R"(
 		[box width=400 align=right font="arial.ttf" font-size=16 direction=row] {
-			[span value="First"]
-			[span value="Second"]
-			[span value="Third"]
+			[span text="First"]
+			[span text="Second"]
+			[span text="Third"]
 		}
 	)");
 	doc.computeLayout(Vec2(800, 600));
@@ -1947,7 +1947,7 @@ bool testPanelWithInlineSpan() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
 		[box direction=row align=center font-size=40 wrap=true width=100% font="arial.ttf"] {
-			Welcome to [span value=" Lumix " font-size=60] Demo
+			Welcome to [span text=" Lumix " font-size=60] Demo
 		}
 	)");
 	doc.computeLayout(Vec2(800, 600));

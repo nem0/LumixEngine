@@ -1,0 +1,5 @@
+[box width=100% height=100% justify-content=center] {
+	[box width=100% height=2em padding=0.5em bg-color=#ffffff align=center font="/engine/editor/fonts/Roboto-Bold.ttf" font-size=60] { 
+		Press any key to load demo
+	}
+}

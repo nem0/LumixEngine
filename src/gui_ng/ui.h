@@ -18,6 +18,8 @@ struct SplitWord;
 
 namespace ui {
 
+struct Document;
+
 enum class Tag : u8 {
 	BOX,
 	IMAGE,
@@ -43,7 +45,7 @@ enum class AttributeName : u8 {
 	WRAP,
 	JUSTIFY_CONTENT,
 	ALIGN_ITEMS,
-	VALUE,
+	TEXT,
 	ALIGN,
 	SRC,
 	FIT,
@@ -161,19 +163,29 @@ struct BoxSpacing {
 	float top, right, bottom, left;
 };
 
+//@ object full ui::Element
 struct Element {
-	Element() = default;
-	Element(Tag t, IAllocator& allocator) : tag(t), children(allocator), attributes(allocator), lines(allocator), classes(allocator) {}
-
+	Element() = delete;
+	Element(Tag t, IAllocator& allocator, Document& doc)
+		: tag(t)
+		, children(allocator)
+		, attributes(allocator)
+		, classes(allocator)
+		, lines(allocator)
+		, m_document(doc)
+	{}
+		
+	Document& m_document;
 	Tag tag;
 	Array<u32> children;
 	Array<Attribute> attributes;
 	Array<InternString> classes;
+	StringView id;
 	
 	// runtime computed data
 	Vec2 position;
 	Vec2 size;
-	StringView value;
+	StringView text;
 	Array<SpanLine> lines;
 	Sprite* bg_sprite = nullptr;
 	IFontManager::FontHandle font_handle = nullptr;
@@ -188,9 +200,18 @@ struct Element {
 	Align text_align = Align::LEFT;
 	float grow = 0;
 	bool wrap = true;
+	bool visible = true;
 	ParsedUnit width_unit = {0, Unit::FIT_CONTENT};
 	ParsedUnit height_unit = {0, Unit::FIT_CONTENT};
+
+	//@ function
+	StringView getID() { return id; }
+	//@ function 
+	void setVisible(bool show);
+	//@ function 
+	void setText(StringView value);
 };
+//@ end
 
 //@ enum full ui::EventType
 enum class EventType {
@@ -254,11 +275,14 @@ struct Document {
 	{}
 
 	bool parse(StringView content, const char* filename);
+	//@ function
 	Element* getElement(u32 index) { return &m_elements[index]; }
 	const Element* getElement(u32 index) const { return &m_elements[index]; }
 	void computeLayout(Vec2 canvas_size);
 	void render(Draw2D& draw);
 	Element* getElementAt(Vec2 pos);
+	//@ function
+	Element* getElementByID(const char* id);
 
 	void addClass(u32 element_index, StringView classname);
 	void removeClass(u32 element_index, StringView classname);
