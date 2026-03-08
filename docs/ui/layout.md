@@ -440,6 +440,17 @@ Child element position relative to parent (for sequential layout with margin col
 
 Where `collapsed_margin_left` is the maximum of the child's left margin and the previous sibling's right margin (or just the child's left margin for the first child). Similarly for vertical.
 
+Position mode and offsets are then applied:
+
+- `position=relative`: the element keeps its place in flow and final position becomes:
+  - x = flow_x + left
+  - y = flow_y + top
+- `position=absolute`: the element is taken out of normal flow and positioned from the parent content origin:
+  - x = parent.x + parent.padding_left + left
+  - y = parent.y + parent.padding_top + top
+
+Absolute-positioned elements do not participate in sibling flow spacing (`justify-content`, line packing, or margin collapsing with flow siblings).
+
 ## Z-Order (Implicit Stacking)
 
 In UI systems, z-order determines the visual layering of elements, controlling which elements appear on top of others. Unlike many UI frameworks that provide an explicit `z-index` property, this system uses implicit stacking based on the widget hierarchy and declaration order.

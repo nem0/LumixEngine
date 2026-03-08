@@ -84,6 +84,7 @@ static AttributeName parseAttributeName(StringView str) {
 		case 'h': if (memcmp(s, "height", 6) == 0) return AttributeName::HEIGHT; break;
 		case 'i': if (memcmp(s, "id", 2) == 0) return AttributeName::ID; break;
 		case 'j': if (memcmp(s, "justify-content", 15) == 0) return AttributeName::JUSTIFY_CONTENT; break;
+		case 'l': if (memcmp(s, "left", 4) == 0) return AttributeName::LEFT; break;
 		case 'm':
 			if (len == 6 && memcmp(s, "margin", 6) == 0) return AttributeName::MARGIN;
 			if (len == 11 && memcmp(s, "margin-left", 11) == 0) return AttributeName::MARGIN_LEFT;
@@ -93,6 +94,7 @@ static AttributeName parseAttributeName(StringView str) {
 			break;
 		case 'p':
 			if (len == 7 && memcmp(s, "padding", 7) == 0) return AttributeName::PADDING;
+			if (len == 8 && memcmp(s, "position", 8) == 0) return AttributeName::POSITION;
 			if (len == 12 && memcmp(s, "padding-left", 12) == 0) return AttributeName::PADDING_LEFT;
 			if (len == 13 && memcmp(s, "padding-right", 13) == 0) return AttributeName::PADDING_RIGHT;
 			if (len == 14 && memcmp(s, "padding-bottom", 14) == 0) return AttributeName::PADDING_BOTTOM;
@@ -102,7 +104,10 @@ static AttributeName parseAttributeName(StringView str) {
 			}
 			break;
 		case 's': if (memcmp(s, "src", 3) == 0) return AttributeName::SRC; break;
-		case 't': if (memcmp(s, "text", 4) == 0) return AttributeName::TEXT; break;
+		case 't':
+			if (len == 4 && memcmp(s, "text", 4) == 0) return AttributeName::TEXT;
+			if (len == 3 && memcmp(s, "top", 3) == 0) return AttributeName::TOP;
+			break;
 		case 'v': if (memcmp(s, "visible", 7) == 0) return AttributeName::VISIBLE; break;
 		case 'w':
 			if (len == 5 && memcmp(s, "width", 5) == 0) return AttributeName::WIDTH;

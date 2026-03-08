@@ -189,6 +189,44 @@ bool testBlockAttributes() {
 	return true;
 }
 
+bool testTopLeftAttributesParse() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[box top=12 left=34]");
+	ASSERT_EQ(1, doc.m_roots.size());
+	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	Span<ui::Attribute> attrs = root->attributes;
+	ASSERT_EQ(2, attrs.size());
+	ASSERT_ATTRIBUTE(root, 0, TOP);
+	ASSERT_EQ("12", attrs[0].value);
+	ASSERT_ATTRIBUTE(root, 1, LEFT);
+	ASSERT_EQ("34", attrs[1].value);
+	return true;
+}
+
+bool testPositionAttributeParse() {
+	{
+		MockDocument doc;
+		ASSERT_PARSE(doc, "[box position=relative]");
+		ASSERT_EQ(1, doc.m_roots.size());
+		ui::Element* root = doc.getElement(doc.m_roots[0]);
+		Span<ui::Attribute> attrs = root->attributes;
+		ASSERT_EQ(1, attrs.size());
+		ASSERT_ATTRIBUTE(root, 0, POSITION);
+		ASSERT_EQ("relative", attrs[0].value);
+	}
+	{
+		MockDocument doc;
+		ASSERT_PARSE(doc, "[box position=absolute]");
+		ASSERT_EQ(1, doc.m_roots.size());
+		ui::Element* root = doc.getElement(doc.m_roots[0]);
+		Span<ui::Attribute> attrs = root->attributes;
+		ASSERT_EQ(1, attrs.size());
+		ASSERT_ATTRIBUTE(root, 0, POSITION);
+		ASSERT_EQ("absolute", attrs[0].value);
+	}
+	return true;
+}
+
 bool testPanelAttributes() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box bg-image=\"bg.png\" bg-fit=cover bg-color=#000000 direction=column wrap=true justify-content=center]");
@@ -688,6 +726,8 @@ void runUITests() {
 	RUN_TEST(testSingleClass);
 	RUN_TEST(testDuplicateClasses);
 	RUN_TEST(testBlockAttributes);
+	RUN_TEST(testTopLeftAttributesParse);
+	RUN_TEST(testPositionAttributeParse);
 	RUN_TEST(testPanelAttributes);
 	RUN_TEST(testImageAttributes);
 	RUN_TEST(testDefaultValues);
