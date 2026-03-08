@@ -22,6 +22,8 @@ Supported by all elements.
 | `position` | Positioning mode. Values: `relative`, `absolute`. Relative elements participate in normal flow, absolute elements are placed using offsets relative to the parent content box. | `relative` |
 | `top` | Vertical offset for positioned elements. Moves the element down when positive. | `0` |
 | `left` | Horizontal offset for positioned elements. Moves the element right when positive. | `0` |
+| `pivot-x` | Horizontal pivot for `position=absolute`. Interpreted in element space and subtracted from final absolute x position. | `0` |
+| `pivot-y` | Vertical pivot for `position=absolute`. Interpreted in element space and subtracted from final absolute y position. | `0` |
 | `grow` | Grow weight along the parent's main axis, similar to CSS `flex-grow`. A value of `0` (default) means no growing. Growing elements share remaining space proportionally to their weights after all fixed-size siblings are measured. | `0` |
 | `margin` | Space outside the element border in all directions. | `0` |
 | `margin-left` | Space outside the element border on the left side. | `0` |
@@ -38,6 +40,8 @@ Supported by all elements.
 The `width` and `height` attributes accept `NUMBER`, `PERCENT` (e.g. `50%`), `em` units (e.g. `2em`), or the `fit-content` keyword (for example: `width=fit-content` or `width=50%`).
 
 `top` and `left` apply when `position` is set. For `position=relative`, offsets are applied after normal flow placement. For `position=absolute`, offsets are resolved from the parent content origin (inside parent padding).
+
+`pivot-x` and `pivot-y` apply only when `position=absolute` and use the same unit format as `top`/`left` (`NUMBER`, `%`, `em`). Percent values are relative to the element's own size on the corresponding axis (`pivot-x` from element width, `pivot-y` from element height). Final absolute position is computed as base absolute position plus `left`/`top` minus pivot offsets. Defaults are `0`, which preserves top-left behavior.
 
 For spacing attributes, values are applied in declaration order (last one wins). This means side-specific attributes can override shorthand when written later, and shorthand can override side-specific attributes when written later.
 

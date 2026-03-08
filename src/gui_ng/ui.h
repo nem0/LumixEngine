@@ -38,6 +38,8 @@ enum class AttributeName : u8 {
 	HEIGHT,
 	TOP,
 	LEFT,
+	PIVOT_X,
+	PIVOT_Y,
 	POSITION,
 	MARGIN,
 	PADDING,
@@ -97,6 +99,11 @@ enum class Align : u8 {
 	RIGHT
 };
 
+enum PositionMode : u8 {
+	RELATIVE,
+	ABSOLUTE
+};
+
 enum class Unit : u8 {
 	PIXELS,
 	PERCENT,
@@ -108,6 +115,9 @@ struct ParsedUnit {
 	float value;
 	Unit unit;
 };
+
+AttributeName parseAttributeName(StringView str);
+Tag parseTag(StringView str);
 
 struct IFontManager {
 	using FontHandle = void*;
@@ -186,8 +196,11 @@ struct Element {
 	StringView id;
 	
 	// runtime computed data
-	Vec2 position;
-	Vec2 size;
+	PositionMode position_mode = PositionMode::RELATIVE;
+	float left = 0;
+	float top = 0;
+	Vec2 position = {0, 0};
+	Vec2 size = {0, 0};
 	StringView text;
 	Array<SpanLine> lines;
 	Sprite* bg_sprite = nullptr;
@@ -206,6 +219,8 @@ struct Element {
 	bool visible = true;
 	ParsedUnit width_unit = {0, Unit::FIT_CONTENT};
 	ParsedUnit height_unit = {0, Unit::FIT_CONTENT};
+	ParsedUnit pivot_x_unit = {0, Unit::PIXELS};
+	ParsedUnit pivot_y_unit = {0, Unit::PIXELS};
 
 	//@ function
 	StringView getID() { return id; }

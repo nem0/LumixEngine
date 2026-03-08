@@ -2,6 +2,7 @@
 
 #include "editor/studio_app.h"
 #include "editor/utils.h"
+#include "../ui.h"
 
 namespace Lumix {
 
@@ -12,7 +13,6 @@ static inline const u32 token_colors[] = {
 	IM_COL32(0xe1, 0xe1, 0xe1, 0xff), // IDENTIFIER
 	IM_COL32(0x93, 0xDD, 0xFA, 0xff), // NUMBER
 	IM_COL32(0xE5, 0x8A, 0xC9, 0xff), // STRING
-	IM_COL32(0xf7, 0xc9, 0x5c, 0xff), // KEYWORD
 	IM_COL32(0x4A, 0x90, 0xE2, 0xff), // TAG
 	IM_COL32(0xC7, 0x78, 0xDD, 0xff), // ATTRIBUTE
 	IM_COL32(0xFF, 0xA9, 0x4D, 0xff), // OPERATOR
@@ -27,7 +27,6 @@ enum class TokenType : u8 {
 	IDENTIFIER,
 	NUMBER,
 	STRING,
-	KEYWORD,
 	TAG,
 	ATTRIBUTE,
 	OPERATOR,
@@ -45,42 +44,6 @@ static bool isIdentifierStart(char c) { return c == '_' || isLetter(c); }
 static bool isIdentifierChar(char c) { return c == '_' || c == '-' || isLetter(c) || isNumeric(c); }
 
 static bool tokenize(const char* str, u32& token_len, u8& token_type, u8 prev_token_type) {
-	static const char* tags[] = {
-		"box",
-		"image",
-		"span",
-	};
-	static const char* keywords[] = {
-		"fit-content",
-		"row",
-		"column",
-		"true",
-		"false"
-	};
-	static const char* attributes[] = {
-		"id",
-		"class",
-		"visible",
-		"width",
-		"height",
-		"margin",
-		"padding",
-		"align",
-		"bg-image",
-		"bg-fit",
-		"bg-color",
-		"direction",
-		"wrap",
-		"justify-content",
-		"align-items",
-		"src",
-		"fit",
-		"value",
-		"color",
-		"font",
-		"font-size"
-	};
-
 	const char* c = str;
 	if (!*c) {
 		switch (prev_token_type) {
@@ -196,23 +159,14 @@ static bool tokenize(const char* str, u32& token_len, u8& token_type, u8 prev_to
 		while (*c && isIdentifierChar(*c)) ++c;
 		token_len = u32(c - str);
 		StringView token_view(str, str + token_len);
-		for (const char* tag : tags) {
-			if (equalStrings(tag, token_view)) {
-				token_type = (u8)TokenType::TAG;
-				return *c;
-			}
+		if (ui::parseTag(token_view) != ui::Tag::INVALID) {
+			token_type = (u8)TokenType::TAG;
+			return *c;
 		}
-		for (const char* kw : keywords) {
-			if (equalStrings(kw, token_view)) {
-				token_type = (u8)TokenType::KEYWORD;
-				return *c;
-			}
-		}
-		for (const char* attr : attributes) {
-			if (equalStrings(attr, token_view)) {
-				token_type = (u8)TokenType::ATTRIBUTE;
-				return *c;
-			}
+		ui::AttributeName attr = ui::parseAttributeName(token_view);
+		if (attr != ui::AttributeName::INVALID) {
+			token_type = (u8)TokenType::ATTRIBUTE;
+			return *c;
 		}
 		token_type = (u8)TokenType::IDENTIFIER;
 		return *c;

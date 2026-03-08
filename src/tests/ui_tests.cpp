@@ -203,6 +203,20 @@ bool testTopLeftAttributesParse() {
 	return true;
 }
 
+bool testPivotAttributesParse() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[box pivot-x=50% pivot-y=2em]");
+	ASSERT_EQ(1, doc.m_roots.size());
+	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	Span<ui::Attribute> attrs = root->attributes;
+	ASSERT_EQ(2, attrs.size());
+	ASSERT_ATTRIBUTE(root, 0, PIVOT_X);
+	ASSERT_EQ("50%", attrs[0].value);
+	ASSERT_ATTRIBUTE(root, 1, PIVOT_Y);
+	ASSERT_EQ("2em", attrs[1].value);
+	return true;
+}
+
 bool testPositionAttributeParse() {
 	{
 		MockDocument doc;
@@ -727,6 +741,7 @@ void runUITests() {
 	RUN_TEST(testDuplicateClasses);
 	RUN_TEST(testBlockAttributes);
 	RUN_TEST(testTopLeftAttributesParse);
+	RUN_TEST(testPivotAttributesParse);
 	RUN_TEST(testPositionAttributeParse);
 	RUN_TEST(testPanelAttributes);
 	RUN_TEST(testImageAttributes);

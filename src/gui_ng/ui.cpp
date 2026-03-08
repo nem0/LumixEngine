@@ -38,7 +38,7 @@ static const char* tokenTypeToString(UITokenizer::Token::Type type) {
 	return "UNKNOWN";
 }
 
-static Tag parseTag(StringView str) {
+Tag parseTag(StringView str) {
 	const u32 len = (u32)str.size();
 	if (len == 0) return Tag::INVALID;
 	const char* s = str.begin;
@@ -51,7 +51,7 @@ static Tag parseTag(StringView str) {
 	return Tag::INVALID;
 }
 
-static AttributeName parseAttributeName(StringView str) {
+AttributeName parseAttributeName(StringView str) {
 	const u32 len = (u32)str.size();
 	if (len == 0) return AttributeName::INVALID;
 	const char* s = str.begin;
@@ -93,6 +93,8 @@ static AttributeName parseAttributeName(StringView str) {
 			if (len == 13 && memcmp(s, "margin-bottom", 13) == 0) return AttributeName::MARGIN_BOTTOM;
 			break;
 		case 'p':
+			if (len == 7 && memcmp(s, "pivot-x", 7) == 0) return AttributeName::PIVOT_X;
+			if (len == 7 && memcmp(s, "pivot-y", 7) == 0) return AttributeName::PIVOT_Y;
 			if (len == 7 && memcmp(s, "padding", 7) == 0) return AttributeName::PADDING;
 			if (len == 8 && memcmp(s, "position", 8) == 0) return AttributeName::POSITION;
 			if (len == 12 && memcmp(s, "padding-left", 12) == 0) return AttributeName::PADDING_LEFT;
@@ -571,6 +573,7 @@ static void layoutChildrenHorizontal(Document& doc, Element& parent) {
 
 	for (u32 i = 0, n = parent.children.size(); i < n; ++i) {
 		u32 child_idx = parent.children[i];
+		if (doc.m_elements[child_idx].position_mode == PositionMode::ABSOLUTE) continue;
 		if (doc.m_elements[child_idx].tag == Tag::SPAN) {
 			i += layoutSpans(doc, parent, i, start_x, y) - 1;
 			y += doc.m_elements[child_idx].size.y;
@@ -579,10 +582,13 @@ static void layoutChildrenHorizontal(Document& doc, Element& parent) {
 			float prev_margin = 0;
 			i32 row_start = i;
 			i32 row_end;
+			i32 last_flow_child = -1;
+			i32 flow_count = 0;
 			float max_h = 0;
 			float available_w = parent.size.x - parent.paddings.right - parent.paddings.left;
 			for (row_end = i; row_end < parent.children.size(); ++row_end) {
 				Element& child = doc.m_elements[parent.children[row_end]];
+				if (child.position_mode == PositionMode::ABSOLUTE) continue;
 				float wtmp = child.size.x + maximum(prev_margin, child.margins.left);
 				if (available_w < wtmp + child.margins.right && parent.wrap || child.tag == Tag::SPAN) {
 					break;
@@ -590,9 +596,11 @@ static void layoutChildrenHorizontal(Document& doc, Element& parent) {
 				max_h = maximum(max_h, child.size.y + child.margins.top + child.margins.bottom);
 				available_w -= wtmp;
 				prev_margin = child.margins.right;
+				last_flow_child = row_end;
+				++flow_count;
 			}
-			if (row_end == row_start) continue;
-			available_w -= doc.m_elements[parent.children[row_end - 1]].margins.right;
+			if (flow_count == 0) continue;
+			available_w -= doc.m_elements[parent.children[last_flow_child]].margins.right;
 
 			// layout row_start <-> row_end
 			float x = start_x;
@@ -600,9 +608,9 @@ static void layoutChildrenHorizontal(Document& doc, Element& parent) {
 			switch (parent.justify_content) {
 				case JustifyContent::END: x += available_w; break;
 				case JustifyContent::CENTER: x += available_w / 2; break;
-				case JustifyContent::SPACE_BETWEEN: space = available_w / (row_end - row_start - 1); break;
+				case JustifyContent::SPACE_BETWEEN: if (flow_count > 1) space = available_w / (flow_count - 1); break;
 				case JustifyContent::SPACE_AROUND: 
-					space = available_w / (row_end - row_start + 1);
+					space = available_w / (flow_count + 1);
 					x += space;
 					break;
 				default: break;
@@ -611,6 +619,7 @@ static void layoutChildrenHorizontal(Document& doc, Element& parent) {
 			prev_margin = 0;
 			for (i32 j = row_start; j < row_end; ++j) {
 				Element& child = doc.m_elements[parent.children[j]];
+				if (child.position_mode == PositionMode::ABSOLUTE) continue;
 				child.position.x = x + maximum(prev_margin, child.margins.left);
 				child.position.y = y + child.margins.top;
 				switch (parent.align_items) {
@@ -636,13 +645,16 @@ static void layoutChildrenVertical(Document& doc, Element& parent) {
 
 	// First, compute total height used
 	float total_height = 0;
+	u32 flow_count = 0;
 	float prev_margin = 0;
 	for (u32 i = 0, n = parent.children.size(); i < n; ++i) {
 		u32 child_idx = parent.children[i];
 		Element& child = doc.m_elements[child_idx];
+		if (child.position_mode == PositionMode::ABSOLUTE) continue;
 		if (child.tag == Tag::SPAN) {
 			total_height += child.size.y + prev_margin;
 			prev_margin = 0;
+			++flow_count;
 			while (i < n && doc.m_elements[parent.children[i]].tag == Tag::SPAN) {
 				++i;
 			}
@@ -651,6 +663,7 @@ static void layoutChildrenVertical(Document& doc, Element& parent) {
 		else {
 			total_height += child.size.y + maximum(prev_margin, child.margins.top);
 			prev_margin = child.margins.bottom;
+			++flow_count;
 		}
 	}
 	total_height += prev_margin; // add the last bottom margin
@@ -666,10 +679,10 @@ static void layoutChildrenVertical(Document& doc, Element& parent) {
 		case JustifyContent::END: start_y += remaining; break;
 		case JustifyContent::CENTER: start_y += remaining / 2; break;
 		case JustifyContent::SPACE_BETWEEN:
-			if (parent.children.size() > 1) space = remaining / (parent.children.size() - 1);
+			if (flow_count > 1) space = remaining / (flow_count - 1);
 			break;
 		case JustifyContent::SPACE_AROUND:
-			space = remaining / (parent.children.size() + 1);
+			space = remaining / (flow_count + 1);
 			start_y += space;
 			break;
 		default: break;
@@ -681,6 +694,7 @@ static void layoutChildrenVertical(Document& doc, Element& parent) {
 	for (u32 i = 0, n = parent.children.size(); i < n; ++i) {
 		u32 child_idx = parent.children[i];
 		Element& child = doc.m_elements[child_idx];
+		if (child.position_mode == PositionMode::ABSOLUTE) continue;
 		if (child.tag == Tag::SPAN) {
 			i += layoutSpans(doc, parent, i, x + prev_margin, y) - 1;
 			y += child.size.y + space;
@@ -719,11 +733,23 @@ static void layoutChildrenVertical(Document& doc, Element& parent) {
 // Margins between adjacent children collapse to the maximum value.
 static void layoutChildren(Document& doc, Element& parent) {
 	if (!parent.visible) return;
+	if (parent.position_mode == PositionMode::RELATIVE) {
+		parent.position.x += parent.left;
+		parent.position.y += parent.top;
+	}
+	
 	if (parent.direction == Direction::ROW) layoutChildrenHorizontal(doc, parent);
 	else layoutChildrenVertical(doc, parent);
 
 	for (u32 child_idx : parent.children) {
-		layoutChildren(doc, doc.m_elements[child_idx]);
+		Element& child = doc.m_elements[child_idx];
+		if (child.position_mode == PositionMode::ABSOLUTE) {
+			const float pivot_x = computeAbsoluteSize(child.pivot_x_unit, child.size.x, child.font_size);
+			const float pivot_y = computeAbsoluteSize(child.pivot_y_unit, child.size.y, child.font_size);
+			child.position.x = parent.position.x + parent.paddings.left + child.left - pivot_x;
+			child.position.y = parent.position.y + parent.paddings.top + child.top - pivot_y;
+		}
+		layoutChildren(doc, child);
 	}
 }
 
@@ -813,6 +839,7 @@ static void computeBaseHeights(Document& doc, Element& elem, Element* parent_ele
 
 	ParsedUnit margin_unit[2] = {{0, Unit::PIXELS}, {0, Unit::PIXELS}};
 	ParsedUnit padding_unit[2] = {{0, Unit::PIXELS}, {0, Unit::PIXELS}};
+	ParsedUnit top_unit = {0, Unit::PIXELS};
 
 	for (const Attribute& attr : elem.attributes) {
 		switch (attr.type) {
@@ -822,6 +849,7 @@ static void computeBaseHeights(Document& doc, Element& elem, Element* parent_ele
 			case AttributeName::PADDING_BOTTOM: padding_unit[1] = parseUnit(attr.value); break;
 			case AttributeName::MARGIN_TOP: margin_unit[0] = parseUnit(attr.value); break;
 			case AttributeName::MARGIN_BOTTOM: margin_unit[1] = parseUnit(attr.value); break;
+			case AttributeName::TOP: top_unit = parseUnit(attr.value); break;
 			default: break;
 		}
 	}
@@ -832,6 +860,7 @@ static void computeBaseHeights(Document& doc, Element& elem, Element* parent_ele
 	elem.margins.bottom = computeAbsoluteSize(margin_unit[1], parent.size.y, elem.font_size);
 	elem.paddings.top = computeAbsoluteSize(padding_unit[0], parent.size.y, elem.font_size);
 	elem.paddings.bottom = computeAbsoluteSize(padding_unit[1], parent.size.y, elem.font_size);
+	elem.top = computeAbsoluteSize(top_unit, parent.size.y, elem.font_size);
 
 	if (elem.height_unit.unit != Unit::FIT_CONTENT) {
 		elem.size.y = computeAbsoluteSize(elem.height_unit, parent.size.y, elem.font_size);
@@ -904,6 +933,7 @@ static void computeParentRelativeHeights(Document& doc, Element& elem) {
 }
 
 static void computeBaseWidths(Document& doc, Element& elem, Element* parent_elem, const ParentContext& parent) {
+	elem.left = elem.top = 0;
 	elem.position = Vec2(0, 0);
 	elem.size = Vec2(0, 0);
 	memset(&elem.margins, 0, sizeof(elem.margins));
@@ -915,6 +945,7 @@ static void computeBaseWidths(Document& doc, Element& elem, Element* parent_elem
 
 	ParsedUnit margin_unit[2] = {{0, Unit::PIXELS}, {0, Unit::PIXELS}};
 	ParsedUnit padding_unit[2] = {{0, Unit::PIXELS}, {0, Unit::PIXELS}};
+	ParsedUnit left_unit = {0, Unit::PIXELS};
 
 	for (const Attribute& attr : elem.attributes) {
 		switch (attr.type) {
@@ -925,6 +956,7 @@ static void computeBaseWidths(Document& doc, Element& elem, Element* parent_elem
 			case AttributeName::PADDING_RIGHT: padding_unit[1] = parseUnit(attr.value); break;
 			case AttributeName::MARGIN_LEFT: margin_unit[0] = parseUnit(attr.value); break;
 			case AttributeName::MARGIN_RIGHT: margin_unit[1] = parseUnit(attr.value); break;
+			case AttributeName::LEFT: left_unit = parseUnit(attr.value); break;
 			default: break;
 		}
 	}
@@ -943,6 +975,7 @@ static void computeBaseWidths(Document& doc, Element& elem, Element* parent_elem
 	elem.margins.right = computeAbsoluteSize(margin_unit[1], parent.size.x, elem.font_size);
 	elem.paddings.left = computeAbsoluteSize(padding_unit[0], parent.size.x, elem.font_size);
 	elem.paddings.right = computeAbsoluteSize(padding_unit[1], parent.size.x, elem.font_size);
+	elem.left = computeAbsoluteSize(left_unit, parent.size.x, elem.font_size);
 
 	ctx.size = elem.size;
 	for (u32 child_idx : elem.children) {
@@ -1047,6 +1080,13 @@ static void applyStylesheet(Document& doc, u32 element_index, const ParentContex
 	ParentContext ctx = parent;
 	for (const Attribute& attr : elem.attributes) {
 		switch (attr.type) {
+			case AttributeName::POSITION: {
+				if (attr.value == "absolute") elem.position_mode = PositionMode::ABSOLUTE;
+				else elem.position_mode = PositionMode::RELATIVE;
+				break;
+			}
+			case AttributeName::PIVOT_X: elem.pivot_x_unit = parseUnit(attr.value); break;
+			case AttributeName::PIVOT_Y: elem.pivot_y_unit = parseUnit(attr.value); break;
 			case AttributeName::WIDTH: elem.width_unit = parseUnit(attr.value); break;
 			case AttributeName::HEIGHT: elem.height_unit = parseUnit(attr.value); break;
 			case AttributeName::GROW: fromCString(attr.value, elem.grow); break;
@@ -1323,6 +1363,13 @@ void Document::computeLayout(Vec2 canvas_size) {
 		if (!root.visible) continue;
 		if (root.height_unit.unit == Unit::PERCENT) {
 			root.size.y = computeAbsoluteSize(root.height_unit, canvas_size.y, root.font_size);
+		}
+		if (root.position_mode == PositionMode::ABSOLUTE) {
+			const float pivot_x = computeAbsoluteSize(root.pivot_x_unit, root.size.x, root.font_size);
+			const float pivot_y = computeAbsoluteSize(root.pivot_y_unit, root.size.y, root.font_size);
+			root.position.x = root.left - pivot_x;
+			root.position.y = root.top - pivot_y;
+			continue;
 		}
 		float top_margin = root.margins.top;
 		float gap = maximum(prev_bottom_margin, top_margin);

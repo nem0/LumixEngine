@@ -734,6 +734,115 @@ bool testNestedPanelsWithMargins() {
 	return true;
 }
 
+bool testRelativePositionOffsets() {
+	// Intentionally captures desired behavior before implementation.
+	// Expected: `position=relative` offsets the final position by `left` and `top`.
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[box width=200 height=100] {
+		[box width=50 height=20 position=relative left=15 top=10] {}
+		[box width=50 height=20] {}
+	}
+	)");
+
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_TRUE(doc.m_elements.size() >= 3);
+
+	ui::Element* parent = doc.getElement(0);
+	ui::Element* first = doc.getElement(1);
+	ui::Element* second = doc.getElement(2);
+
+	ASSERT_FLOAT_EQ(parent->position.x + 15.0f, first->position.x);
+	ASSERT_FLOAT_EQ(parent->position.y + 10.0f, first->position.y);
+	ASSERT_FLOAT_EQ(parent->position.y + 20.0f, second->position.y);
+
+	return true;
+}
+
+bool testAbsolutePositionOffsets() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[box width=200 height=100 margin=20 padding-left=7 padding-top=11] {
+		[box width=50 height=20 position=absolute left=15 top=10] {}
+	}
+	)");
+
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_TRUE(doc.m_elements.size() >= 2);
+
+	ui::Element* parent = doc.getElement(0);
+	ui::Element* child = doc.getElement(1);
+
+	ASSERT_FLOAT_EQ(parent->position.x + parent->paddings.left + 15.0f, child->position.x);
+	ASSERT_FLOAT_EQ(parent->position.y + parent->paddings.top + 10.0f, child->position.y);
+
+	return true;
+}
+
+bool testAbsolutePositionOffsetsWithPivot() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[box width=200 height=100 margin=20 padding-left=7 padding-top=11] {
+		[box width=50 height=20 position=absolute left=15 top=10 pivot-x=50% pivot-y=50%] {}
+	}
+	)");
+
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_TRUE(doc.m_elements.size() >= 2);
+
+	ui::Element* parent = doc.getElement(0);
+	ui::Element* child = doc.getElement(1);
+
+	ASSERT_FLOAT_EQ(parent->position.x + parent->paddings.left + 15.0f - child->size.x * 0.5f, child->position.x);
+	ASSERT_FLOAT_EQ(parent->position.y + parent->paddings.top + 10.0f - child->size.y * 0.5f, child->position.y);
+
+	return true;
+}
+
+bool testAbsoluteRootPositionOffsetsWithPivot() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[box width=120 height=80 position=absolute left=30 top=40 pivot-x=50% pivot-y=50%]
+	)");
+
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_TRUE(doc.m_elements.size() >= 1);
+
+	ui::Element* root = doc.getElement(0);
+
+	ASSERT_FLOAT_EQ(30.0f - root->size.x * 0.5f, root->position.x);
+	ASSERT_FLOAT_EQ(40.0f - root->size.y * 0.5f, root->position.y);
+
+	return true;
+}
+
+bool testAbsoluteDoesNotParticipateInFlow() {
+	// Citation: layout.md - Positioning Calculations
+	// "Absolute-positioned elements do not participate in sibling flow spacing (`justify-content`, line packing, or margin collapsing with flow siblings)."
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[box width=300 height=100 direction=row] {
+		[box width=50 height=20] {}
+		[box width=40 height=20 position=absolute left=100 top=0] {}
+		[box width=50 height=20] {}
+	}
+	)");
+
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_TRUE(doc.m_elements.size() >= 4);
+
+	ui::Element* parent = doc.getElement(0);
+	ui::Element* first = doc.getElement(1);
+	ui::Element* absolute_child = doc.getElement(2);
+	ui::Element* second = doc.getElement(3);
+
+	ASSERT_FLOAT_EQ(parent->position.x, first->position.x);
+	ASSERT_FLOAT_EQ(parent->position.x + 100.0f, absolute_child->position.x);
+	ASSERT_FLOAT_EQ(parent->position.x + 50.0f, second->position.x);
+
+	return true;
+}
+
 bool testDirectionRow() {
 	// Citation: layout.md - Element Positioning
 	// "The `direction` attribute controls the primary axis along which child elements are arranged within a container. When set to `row`, children are positioned horizontally from left to right."
@@ -2053,6 +2162,11 @@ void runUILayoutTests() {
 	RUN_TEST(testMultilineStringLayout);
 	RUN_TEST(testNestedPanelsDifferentDirections);
 	RUN_TEST(testNestedPanelsWithMargins);
+	RUN_TEST(testRelativePositionOffsets);
+	RUN_TEST(testAbsolutePositionOffsets);
+	RUN_TEST(testAbsolutePositionOffsetsWithPivot);
+	RUN_TEST(testAbsoluteRootPositionOffsetsWithPivot);
+	RUN_TEST(testAbsoluteDoesNotParticipateInFlow);
 	RUN_TEST(testNoWrap);
 	RUN_TEST(testPercentLayout);
 	RUN_TEST(testPercentMargins);

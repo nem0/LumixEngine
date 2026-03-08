@@ -446,8 +446,10 @@ Position mode and offsets are then applied:
   - x = flow_x + left
   - y = flow_y + top
 - `position=absolute`: the element is taken out of normal flow and positioned from the parent content origin:
-  - x = parent.x + parent.padding_left + left
-  - y = parent.y + parent.padding_top + top
+  - x = parent.x + parent.padding_left + left - pivot_x
+  - y = parent.y + parent.padding_top + top - pivot_y
+
+Where `pivot_x` and `pivot_y` come from `pivot-x` and `pivot-y` attributes (default `0`). Percent pivots are resolved from the absolute element's own final size (`pivot-x` from width, `pivot-y` from height). This applies to all absolute elements, including absolute roots where the base origin is the canvas origin.
 
 Absolute-positioned elements do not participate in sibling flow spacing (`justify-content`, line packing, or margin collapsing with flow siblings).
 
