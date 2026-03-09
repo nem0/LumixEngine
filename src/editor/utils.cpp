@@ -938,6 +938,7 @@ struct CodeEditorImpl final : CodeEditor {
 		, m_underlines(m_allocator)
 		, m_cursors(m_allocator)
 		, m_undo_stack(m_allocator)
+		, m_dpi_scale(maximum(1.f, os::getDPI() / 96.f))
 	{
 		m_cursors.emplace(Cursor{0, 0});
 	}
@@ -1777,11 +1778,12 @@ struct CodeEditorImpl final : CodeEditor {
 			m_search_visible = false;
 		}
 		
+		const float search_width = 350.f * m_dpi_scale;
 		ImVec2 p = text_area_pos;
-		p.x += text_area_size.x - 350;
+		p.x += text_area_size.x - search_width;
 		p.x = maximum(p.x, text_area_pos.x);
 		ImGui::SetNextWindowPos(p, ImGuiCond_Always);
-		ImGui::SetNextWindowSize(ImVec2(350, ImGui::GetTextLineHeightWithSpacing()));
+		ImGui::SetNextWindowSize(ImVec2(search_width, ImGui::GetTextLineHeightWithSpacing()));
 		ImGui::Begin("search", nullptr, ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
 		ImGuiInputTextFlags flags = ImGuiInputTextFlags_AutoSelectAll;
 		if (font) ImGui::PushFont(font);
@@ -1903,7 +1905,7 @@ struct CodeEditorImpl final : CodeEditor {
 		}
 
 		ImVec2 child_pos = ImGui::GetCursorScreenPos();
-		ImGui::PushFont(code_font, maximum(1.f, (float)s_font_size));
+		ImGui::PushFont(code_font, maximum(1.f, (float)s_font_size * m_dpi_scale));
 		u32 version = m_version;
 		ImGuiIO& io = ImGui::GetIO();
 		const ImGuiStyle& style = ImGui::GetStyle();
@@ -2069,7 +2071,7 @@ struct CodeEditorImpl final : CodeEditor {
 			for (i32 i = 0; i < m_cursors.size(); ++i) {
 				Cursor& c = m_cursors[i];
 				ImVec2 cursor_pos = textToScreenPos(c.col, c.line);
-				if (draw_cursors) dl->AddRectFilled(cursor_pos, cursor_pos + ImVec2(1, line_height), code_color);
+				if (draw_cursors) dl->AddRectFilled(cursor_pos, cursor_pos + ImVec2(maximum(1.f, m_dpi_scale), line_height), code_color);
 				if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow)) moveCursorLeft(c, io.KeyCtrl);
 				else if (ImGui::IsKeyPressed(ImGuiKey_RightArrow)) moveCursorRight(c, io.KeyCtrl);
 				else if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) io.KeyAlt ? moveLinesUp() :  moveCursorUp(c);
@@ -2323,6 +2325,7 @@ struct CodeEditorImpl final : CodeEditor {
 	Array<UndoRecord> m_undo_stack;
 	i32 m_undo_stack_idx = -1;
 	ImVec2 m_text_area_screen_pos;
+	float m_dpi_scale = 1;
 	
 	bool m_is_readonly = false;
 	bool m_handle_input = false;
