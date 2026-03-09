@@ -113,21 +113,23 @@ bool testDocumentParseComplexNesting() {
 
 bool testEveryElementAttributes() {
 	MockDocument doc;
-	ASSERT_PARSE(doc, "[box id=\"testid\" .testclass visible=false font-size=14 font=\"arial.ttf\" color=\"#ffffff\"]");
+	ASSERT_PARSE(doc, "[box id=\"testid\" .testclass visible=false opacity=0.75 font-size=14 font=\"arial.ttf\" color=\"#ffffff\"]");
 	ASSERT_EQ(1, doc.m_roots.size());
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	Span<ui::Attribute> attrs = root->attributes;
-	ASSERT_EQ(5, attrs.size());
+	ASSERT_EQ(6, attrs.size());
 	ASSERT_ATTRIBUTE(root, 0, ID);
 	ASSERT_EQ("testid", attrs[0].value);
 	ASSERT_ATTRIBUTE(root, 1, VISIBLE);
 	ASSERT_EQ("false", attrs[1].value);
-	ASSERT_ATTRIBUTE(root, 2, FONT_SIZE);
-	ASSERT_EQ("14", attrs[2].value);
-	ASSERT_ATTRIBUTE(root, 3, FONT);
-	ASSERT_EQ("arial.ttf", attrs[3].value);
-	ASSERT_ATTRIBUTE(root, 4, COLOR);
-	ASSERT_EQ("#ffffff", attrs[4].value);
+	ASSERT_ATTRIBUTE(root, 2, OPACITY);
+	ASSERT_EQ("0.75", attrs[2].value);
+	ASSERT_ATTRIBUTE(root, 3, FONT_SIZE);
+	ASSERT_EQ("14", attrs[3].value);
+	ASSERT_ATTRIBUTE(root, 4, FONT);
+	ASSERT_EQ("arial.ttf", attrs[4].value);
+	ASSERT_ATTRIBUTE(root, 5, COLOR);
+	ASSERT_EQ("#ffffff", attrs[5].value);
 	return true;
 }
 
@@ -238,6 +240,81 @@ bool testPositionAttributeParse() {
 		ASSERT_ATTRIBUTE(root, 0, POSITION);
 		ASSERT_EQ("absolute", attrs[0].value);
 	}
+	return true;
+}
+
+bool testPositionPresetAttributeParse() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[box position=center]");
+	ASSERT_EQ(1, doc.m_roots.size());
+	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	Span<ui::Attribute> attrs = root->attributes;
+	ASSERT_EQ(1, attrs.size());
+	ASSERT_ATTRIBUTE(root, 0, POSITION);
+	ASSERT_EQ("center", attrs[0].value);
+	return true;
+}
+
+bool testClippingAttributeParse() {
+	{
+		MockDocument doc;
+		ASSERT_PARSE(doc, "[box clipping=true]");
+		ASSERT_EQ(1, doc.m_roots.size());
+		ui::Element* root = doc.getElement(doc.m_roots[0]);
+		Span<ui::Attribute> attrs = root->attributes;
+		ASSERT_EQ(1, attrs.size());
+		ASSERT_ATTRIBUTE(root, 0, CLIPPING);
+		ASSERT_EQ("true", attrs[0].value);
+	}
+	{
+		MockDocument doc;
+		ASSERT_PARSE(doc, "[box clipping=false]");
+		ASSERT_EQ(1, doc.m_roots.size());
+		ui::Element* root = doc.getElement(doc.m_roots[0]);
+		Span<ui::Attribute> attrs = root->attributes;
+		ASSERT_EQ(1, attrs.size());
+		ASSERT_ATTRIBUTE(root, 0, CLIPPING);
+		ASSERT_EQ("false", attrs[0].value);
+	}
+	return true;
+}
+
+bool testPositionPresetsLayout() {
+	struct PositionCase {
+		const char* value;
+		float expected_x;
+		float expected_y;
+	};
+
+	const PositionCase cases[] = {
+		{"top-left", 0.0f, 0.0f},
+		{"top-center", 350.0f, 0.0f},
+		{"top-right", 700.0f, 0.0f},
+		{"middle-left", 0.0f, 275.0f},
+		{"middle-center", 350.0f, 275.0f},
+		{"middle-right", 700.0f, 275.0f},
+		{"bottom-left", 0.0f, 550.0f},
+		{"bottom-center", 350.0f, 550.0f},
+		{"bottom-right", 700.0f, 550.0f},
+		{"center", 350.0f, 275.0f}
+	};
+
+	for (const PositionCase& position_case : cases) {
+		MockDocument doc;
+		StaticString<256> source("[box width=800 height=600] { [box width=100 height=50 position=", position_case.value, "] }");
+		ASSERT_PARSE(doc, source);
+		doc.computeLayout(Vec2(800, 600));
+
+		ASSERT_EQ(1, doc.m_roots.size());
+		ui::Element* root = doc.getElement(doc.m_roots[0]);
+		ASSERT_EQ(1, root->children.size());
+		ui::Element* child = doc.getElement(root->children[0]);
+
+		ASSERT_EQ((int)ui::PositionMode::ABSOLUTE, (int)child->position_mode);
+		ASSERT_FLOAT_EQ(position_case.expected_x, child->position.x);
+		ASSERT_FLOAT_EQ(position_case.expected_y, child->position.y);
+	}
+
 	return true;
 }
 
@@ -447,6 +524,37 @@ bool testColorInheritanceDeep() {
 	return true;
 }
 
+bool testColorAlphaSupport() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[box color=#11223344 bg-color=#55667788] { [box] { \"hello\" } }");
+	ASSERT_EQ(1, doc.m_roots.size());
+	doc.computeLayout(Vec2(800, 600));
+
+	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(0x11, (int)root->color.r);
+	ASSERT_EQ(0x22, (int)root->color.g);
+	ASSERT_EQ(0x33, (int)root->color.b);
+	ASSERT_EQ(0x44, (int)root->color.a);
+	ASSERT_EQ(0x55, (int)root->bg_color.r);
+	ASSERT_EQ(0x66, (int)root->bg_color.g);
+	ASSERT_EQ(0x77, (int)root->bg_color.b);
+	ASSERT_EQ(0x88, (int)root->bg_color.a);
+
+	ui::Element* child_panel = doc.getElement(root->children[0]);
+	ASSERT_EQ(0x11, (int)child_panel->color.r);
+	ASSERT_EQ(0x22, (int)child_panel->color.g);
+	ASSERT_EQ(0x33, (int)child_panel->color.b);
+	ASSERT_EQ(0x44, (int)child_panel->color.a);
+
+	ui::Element* grandchild_span = doc.getElement(child_panel->children[0]);
+	ASSERT_EQ(0x11, (int)grandchild_span->color.r);
+	ASSERT_EQ(0x22, (int)grandchild_span->color.g);
+	ASSERT_EQ(0x33, (int)grandchild_span->color.b);
+	ASSERT_EQ(0x44, (int)grandchild_span->color.a);
+
+	return true;
+}
+
 bool testAlignInheritance() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box align=center] { [box] { \"hello\" } }");
@@ -460,6 +568,40 @@ bool testAlignInheritance() {
 
 	ui::Element* grandchild_span = doc.getElement(child_panel->children[0]);
 	ASSERT_EQ((i32)ui::Align::CENTER, (i32)grandchild_span->text_align);
+
+	return true;
+}
+
+bool testOpacityInheritance() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[box opacity=0.5] { [box] { \"hello\" } }");
+	ASSERT_EQ(1, doc.m_roots.size());
+	ui::Element* root = doc.getElement(doc.m_roots[0]);
+
+	ASSERT_FLOAT_EQ(0.5f, root->opacity);
+
+	ui::Element* child_panel = doc.getElement(root->children[0]);
+	ASSERT_FLOAT_EQ(0.5f, child_panel->opacity);
+
+	ui::Element* grandchild_span = doc.getElement(child_panel->children[0]);
+	ASSERT_FLOAT_EQ(0.5f, grandchild_span->opacity);
+
+	return true;
+}
+
+bool testOpacityInheritanceAndOverride() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[box opacity=0.5] { [box opacity=0.5] { [span opacity=0.2 text=\"hello\"] } }");
+	ASSERT_EQ(1, doc.m_roots.size());
+	ui::Element* root = doc.getElement(doc.m_roots[0]);
+
+	ASSERT_FLOAT_EQ(0.5f, root->opacity);
+
+	ui::Element* child_panel = doc.getElement(root->children[0]);
+	ASSERT_FLOAT_EQ(0.25f, child_panel->opacity);
+
+	ui::Element* grandchild_span = doc.getElement(child_panel->children[0]);
+	ASSERT_FLOAT_EQ(0.05f, grandchild_span->opacity);
 
 	return true;
 }
@@ -641,6 +783,170 @@ struct MockMouseDevice : InputSystem::Device {
 	const char* getName() const override { return "MockMouse"; }
 };
 
+static void injectMouseButton(MockDocument& doc, MockMouseDevice& mouse, bool down, float x, float y) {
+	InputSystem::Event ev;
+	ev.device = &mouse;
+	ev.type = InputSystem::Event::BUTTON;
+	ev.data.button.down = down;
+	ev.data.button.key_id = 0;
+	ev.data.button.x = x;
+	ev.data.button.y = y;
+	doc.injectEvent(ev);
+}
+
+bool testOnClickAttributeParseOnBox() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[box on-click=foo]");
+	ASSERT_EQ(1, doc.m_roots.size());
+	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, root->attributes.size());
+	ASSERT_ATTRIBUTE(root, 0, ON_CLICK);
+	ASSERT_EQ("foo", root->attributes[0].value);
+	return true;
+}
+
+bool testOnClickAttributeRejectedOnNonBox() {
+	MockDocument doc;
+	doc.m_suppress_logging = true;
+	ASSERT_EQ(false, doc.parse("[span on-click=foo]", "test.ui"));
+	ASSERT_EQ(false, doc.parse("[image on-click=foo]", "test.ui"));
+	return true;
+}
+
+bool testActionEventEmittedOnReleaseOverClickableBox() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[box width=100 height=100 on-click=foo]");
+	doc.computeLayout(Vec2(800, 600));
+
+	MockMouseDevice mouse;
+	injectMouseButton(doc, mouse, true, 50, 50);
+	injectMouseButton(doc, mouse, false, 50, 50);
+
+	int action_count = 0;
+	for (const ui::Event& e : doc.getEvents()) {
+		if (e.type != ui::EventType::ACTION) continue;
+		++action_count;
+		ASSERT_EQ(0, (int)e.element_index);
+		ASSERT_EQ("foo", e.action);
+	}
+	ASSERT_EQ(1, action_count);
+	return true;
+}
+
+bool testActionEventNotEmittedWithoutOnClick() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[box width=100 height=100]");
+	doc.computeLayout(Vec2(800, 600));
+
+	MockMouseDevice mouse;
+	injectMouseButton(doc, mouse, true, 50, 50);
+	injectMouseButton(doc, mouse, false, 50, 50);
+
+	for (const ui::Event& e : doc.getEvents()) {
+		if (e.type == ui::EventType::ACTION) {
+			logError("Unexpected ACTION event for box without on-click");
+			return false;
+		}
+	}
+	return true;
+}
+
+bool testActionEventNotEmittedForSpan() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[box width=200 height=100] { [span text=hello] }");
+	doc.computeLayout(Vec2(800, 600));
+
+	MockMouseDevice mouse;
+	injectMouseButton(doc, mouse, true, 10, 10);
+	injectMouseButton(doc, mouse, false, 10, 10);
+
+	for (const ui::Event& e : doc.getEvents()) {
+		if (e.type == ui::EventType::ACTION) {
+			logError("Unexpected ACTION event for span click");
+			return false;
+		}
+	}
+	return true;
+}
+
+bool testActionEventNotEmittedOutside() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[box width=100 height=100 on-click=foo]");
+	doc.computeLayout(Vec2(800, 600));
+
+	MockMouseDevice mouse;
+	injectMouseButton(doc, mouse, true, 400, 400);
+	injectMouseButton(doc, mouse, false, 400, 400);
+
+	for (const ui::Event& e : doc.getEvents()) {
+		if (e.type == ui::EventType::ACTION) {
+			logError("Unexpected ACTION event for click outside");
+			return false;
+		}
+	}
+	return true;
+}
+
+bool testActionEventMultipleBoxesTargeting() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[box width=100 height=100 on-click=foo] [box width=100 height=100 on-click=bar]");
+	doc.computeLayout(Vec2(800, 600));
+
+	MockMouseDevice mouse;
+	injectMouseButton(doc, mouse, true, 50, 150);
+	injectMouseButton(doc, mouse, false, 50, 150);
+
+	int action_count = 0;
+	for (const ui::Event& e : doc.getEvents()) {
+		if (e.type != ui::EventType::ACTION) continue;
+		++action_count;
+		ASSERT_EQ(1, (int)e.element_index);
+		ASSERT_EQ("bar", e.action);
+	}
+	ASSERT_EQ(1, action_count);
+	return true;
+}
+
+bool testActionEventEmittedViaAncestorOnClick() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[box width=200 height=100 on-click=parent] { [span text=hello] }");
+	doc.computeLayout(Vec2(800, 600));
+
+	MockMouseDevice mouse;
+	injectMouseButton(doc, mouse, true, 10, 10);
+	injectMouseButton(doc, mouse, false, 10, 10);
+
+	int action_count = 0;
+	for (const ui::Event& e : doc.getEvents()) {
+		if (e.type != ui::EventType::ACTION) continue;
+		++action_count;
+		ASSERT_EQ(0, (int)e.element_index);
+		ASSERT_EQ("parent", e.action);
+	}
+	ASSERT_EQ(1, action_count);
+	return true;
+}
+
+bool testActionEventEmittedViaGrandparentOnClick() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[box width=200 height=100 on-click=grand] { [box width=200 height=100] { [span text=hello] } }");
+	doc.computeLayout(Vec2(800, 600));
+
+	MockMouseDevice mouse;
+	injectMouseButton(doc, mouse, true, 10, 10);
+	injectMouseButton(doc, mouse, false, 10, 10);
+
+	int action_count = 0;
+	for (const ui::Event& e : doc.getEvents()) {
+		if (e.type != ui::EventType::ACTION) continue;
+		++action_count;
+		ASSERT_EQ(0, (int)e.element_index);
+		ASSERT_EQ("grand", e.action);
+	}
+	ASSERT_EQ(1, action_count);
+	return true;
+}
+
 bool testHoverEvents() {
 	// TODO better test
 	MockDocument doc;
@@ -723,6 +1029,26 @@ bool testHoverEvents() {
 	return true;
 }
 
+bool testDPIScaling() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[box width=10 height=10] { [span font-size=10 text=\"abcd\"] }");
+	doc.computeLayout(Vec2(200, 200));
+
+	Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_FLOAT_EQ(10.0f, root->size.x);
+	ASSERT_FLOAT_EQ(10.0f, root->size.y);
+	ASSERT_EQ(1, root->children.size());
+	Element* span = doc.getElement(root->children[0]);
+	ASSERT_FLOAT_EQ(20.0f, span->size.x);
+
+	doc.setDPIScale(2.0f);
+
+	ASSERT_FLOAT_EQ(20.0f, root->size.x);
+	ASSERT_FLOAT_EQ(20.0f, root->size.y);
+	ASSERT_FLOAT_EQ(40.0f, span->size.x);
+	return true;
+}
+
 } // namespace
 
 void runUITests() {
@@ -743,6 +1069,9 @@ void runUITests() {
 	RUN_TEST(testTopLeftAttributesParse);
 	RUN_TEST(testPivotAttributesParse);
 	RUN_TEST(testPositionAttributeParse);
+	RUN_TEST(testPositionPresetAttributeParse);
+	RUN_TEST(testClippingAttributeParse);
+	RUN_TEST(testPositionPresetsLayout);
 	RUN_TEST(testPanelAttributes);
 	RUN_TEST(testImageAttributes);
 	RUN_TEST(testDefaultValues);
@@ -754,12 +1083,25 @@ void runUITests() {
 	RUN_TEST(testFontInheritanceDeep);
 	RUN_TEST(testColorInheritance);
 	RUN_TEST(testColorInheritanceDeep);
+	RUN_TEST(testColorAlphaSupport);
 	RUN_TEST(testAlignInheritance);
+	RUN_TEST(testOpacityInheritance);
+	RUN_TEST(testOpacityInheritanceAndOverride);
 	RUN_TEST(testMultilineStringMeasurement);
 	RUN_TEST(testMultilineStringLayout);
 	RUN_TEST(testTextWithSpecialChars);
 	RUN_TEST(testSpaceBetweenSpans);
 	RUN_TEST(testParseAndRuntimeMutation);
 	RUN_TEST(testComplexMutationSequence);
+	RUN_TEST(testOnClickAttributeParseOnBox);
+	RUN_TEST(testOnClickAttributeRejectedOnNonBox);
+	RUN_TEST(testActionEventEmittedOnReleaseOverClickableBox);
+	RUN_TEST(testActionEventNotEmittedWithoutOnClick);
+	RUN_TEST(testActionEventNotEmittedForSpan);
+	RUN_TEST(testActionEventNotEmittedOutside);
+	RUN_TEST(testActionEventMultipleBoxesTargeting);
+	RUN_TEST(testActionEventEmittedViaAncestorOnClick);
+	RUN_TEST(testActionEventEmittedViaGrandparentOnClick);
 	RUN_TEST(testHoverEvents);
+	RUN_TEST(testDPIScaling);
 }

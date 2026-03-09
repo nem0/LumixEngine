@@ -6,6 +6,8 @@
 |---|---|---|
 | `id` | Unique identifier for the element; allows referencing or manipulating the element individually. Values should be enclosed in double quotes ("..."). | (no default) |
 | `visible` | Controls the visibility of the element and its descendants. When an ancestor is not visible, descendants are not visible even if their `visible` is set to `true`. | `true` |
+| `opacity` | Opacity multiplier for the element and its descendants. Accepts `NUMBER` (`0` to `1`) or `PERCENT` (`0%` to `100%`). Values outside range are clamped. | inherited (`1`) |
+| `clipping` | Enables clipping to the element rectangle. When `true`, both the element content and all descendants are clipped to that element bounds (after layout, in screen space). | `false` (`true`/`false`) |
 
 Classes can be assigned to elements using the `.classname` syntax, e.g., `[box .myclass]`. Multiple classes can be assigned by chaining them: `[box .class1 .class2]`.
 
@@ -19,7 +21,7 @@ Supported by all elements.
 |---|---|---|
 | `width` | Sets the element's width. | `fit-content` |
 | `height` | Sets the element's height. | `fit-content` |
-| `position` | Positioning mode. Values: `relative`, `absolute`. Relative elements participate in normal flow, absolute elements are placed using offsets relative to the parent content box. | `relative` |
+| `position` | Positioning mode or anchor preset. Values: `relative`, `absolute`, `center`, `top-left`, `top-center`, `top-right`, `middle-left`, `middle-center`, `middle-right`, `bottom-left`, `bottom-center`, `bottom-right`. Relative elements participate in normal flow, absolute elements and presets are placed using offsets relative to the parent content box. | `relative` |
 | `top` | Vertical offset for positioned elements. Moves the element down when positive. | `0` |
 | `left` | Horizontal offset for positioned elements. Moves the element right when positive. | `0` |
 | `pivot-x` | Horizontal pivot for `position=absolute`. Interpreted in element space and subtracted from final absolute x position. | `0` |
@@ -43,6 +45,18 @@ The `width` and `height` attributes accept `NUMBER`, `PERCENT` (e.g. `50%`), `em
 
 `pivot-x` and `pivot-y` apply only when `position=absolute` and use the same unit format as `top`/`left` (`NUMBER`, `%`, `em`). Percent values are relative to the element's own size on the corresponding axis (`pivot-x` from element width, `pivot-y` from element height). Final absolute position is computed as base absolute position plus `left`/`top` minus pivot offsets. Defaults are `0`, which preserves top-left behavior.
 
+Position presets are shorthand for `position=absolute` + offsets + pivots:
+
+- `center` and `middle-center` = `position=absolute left=50% top=50% pivot-x=50% pivot-y=50%`
+- `top-left` = `position=absolute left=0 top=0 pivot-x=0 pivot-y=0`
+- `top-center` = `position=absolute left=50% top=0 pivot-x=50% pivot-y=0`
+- `top-right` = `position=absolute left=100% top=0 pivot-x=100% pivot-y=0`
+- `middle-left` = `position=absolute left=0 top=50% pivot-x=0 pivot-y=50%`
+- `middle-right` = `position=absolute left=100% top=50% pivot-x=100% pivot-y=50%`
+- `bottom-left` = `position=absolute left=0 top=100% pivot-x=0 pivot-y=100%`
+- `bottom-center` = `position=absolute left=50% top=100% pivot-x=50% pivot-y=100%`
+- `bottom-right` = `position=absolute left=100% top=100% pivot-x=100% pivot-y=100%`
+
 For spacing attributes, values are applied in declaration order (last one wins). This means side-specific attributes can override shorthand when written later, and shorthand can override side-specific attributes when written later.
 
 ## box
@@ -54,6 +68,7 @@ Rectangular container that can have children.
 | `bg-image` | Background image for the box. Accepts a path to an image file. | (no default) |
 | `bg-fit` | How the background image is scaled. Values: `cover`, `contain`, `fill`, `none`. | `fill` |
 | `bg-color` | Background color of the box. | `transparent` |
+| `on-click` | Action name emitted as an `ACTION` UI event when mouse button is released over this box. | (no default) |
 | `direction` | Layout direction of child elements. Values: `row` (horizontal), `column` (vertical). | `row` |
 | `wrap` | Layout overflow behavior. Values: `true`, `false`. | `true` |
 | `justify-content` | Distribution of child elements along the main axis. Values: `start`, `center`, `end`, `space-between`, `space-around`. | `start` |
@@ -95,3 +110,9 @@ The following attributes are inherited from parent elements to their descendants
 - `color` - Text color, inherited by inline text content.
 - `font` - Font file path, inherited for text rendering.
 - `font-size` - Font size, inherited for text rendering.
+- `opacity` - Opacity multiplier, inherited and multiplied through the hierarchy.
+
+Color format note:
+
+- `color` and `bg-color` accept hex values in `#RRGGBB` or `#RRGGBBAA` format.
+- The optional `AA` suffix is alpha (`00` transparent to `FF` opaque).

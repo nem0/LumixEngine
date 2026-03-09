@@ -10,13 +10,12 @@ function update(time_delta)
 	local events = doc:getEvents()
 
 	for _, e in ipairs(events) do
-		if e.type == LumixAPI.EventType.CLICK then
-			local element = doc:getElement(e.element_index)
-			if element:getID() == "close" then
+		if e.type == LumixAPI.EventType.ACTION then
+			if e.action == "close" then
 				local elem = doc:getElementByID("runtime_ui")
 				player.lua_script[1].handle_input = true
 				elem:setVisible(false)
-			elseif element:getID() == "start" then
+			elseif e.action == "start" then
 				player.lua_script[1].handle_input = true
 				doc:getElement(0):setVisible(false)
 				this.world.gui:getSystem():enableCursor(false)

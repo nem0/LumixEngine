@@ -51,7 +51,7 @@ The markup language also supports CSS-like [style] blocks for defining reusable 
 - **Text**: unquoted text for content, e.g. `Game Menu`.
 - **Percentage**: number followed by `%`, e.g. `50%`.
 - **EM**: number followed by `em`, e.g. `2em`.
-- **Color**: hexadecimal color values prefixed with `#`, e.g. `#FF0000`.
+- **Color**: hexadecimal color values prefixed with `#`, e.g. `#FF0000` or `#FF000080`.
 - **Assignment**: the `=` sign used to bind attributes to values (whitespace around `=` is allowed).
 - **Braces**: `{` and `}` used to group children inside an element.
 - **Colon**: `:` used in style property declarations.
@@ -69,7 +69,7 @@ markup ::= element*
 
 element ::= '[' identifier attribute* ']' '{' (element | text)* '}'
 
-attribute ::= identifier '=' (string | number | number '%' | number 'em' | '#' hexdigit{6} | identifier) | '.' identifier | '$' identifier
+attribute ::= identifier '=' (string | number | number '%' | number 'em' | '#' hexdigit{6,8} | identifier) | '.' identifier | '$' identifier
 
 string ::= '"' (any char except '"' and '\' | '\\' ('"' | '\' | 'n' | 't' | 'r'))* '"'
 
@@ -91,7 +91,7 @@ letter ::= 'a'-'z' | 'A'-'Z'
 - Attributes are key/value pairs grouped in square brackets `[]` with a tag. Values may be quoted strings, identifiers, numbers, percentages, or colors. Whitespace around `=` is allowed.
 - Classes can be assigned using `.classname` syntax.
 - IDs can be assigned using `$id` syntax.
-- Colors are specified in hexadecimal format with a `#` prefix, e.g. `#FF0000` (6-digit).
+- Colors are specified in hexadecimal format with a `#` prefix, e.g. `#FF0000` (`RRGGBB`) or `#FF000080` (`RRGGBBAA`).
 - A block (braced) element contains child elements.
 - Text content inside a block can be unquoted text, treated as spans. Unquoted text may span multiple lines for readability, but newlines are treated as whitespace and do not create line breaks in the rendered output.
 - Unquoted text creates an inline text span that flows with other elements.

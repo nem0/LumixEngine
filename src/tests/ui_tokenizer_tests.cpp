@@ -745,7 +745,7 @@ bool testStyleTokens() {
 }
 
 bool testColors() {
-const char* source = "#FF0000 #abc #123456 #def";
+	const char* source = "#FF0000 #11223344 #abc #123456 #def";
 	UITokenizer tokenizer;
 	tokenizer.m_filename = "test";
 	tokenizer.m_document = StringView(source);
@@ -756,16 +756,20 @@ const char* source = "#FF0000 #abc #123456 #def";
 	Token tok = tokenizer.consumeToken();
 	ASSERT_EQ(Token::COLOR, tok.type);
 	ASSERT_TRUE(tok.value == "#FF0000");
+
+	tok = tokenizer.consumeToken();
+	ASSERT_EQ(Token::COLOR, tok.type);
+	ASSERT_TRUE(tok.value == "#11223344");
 	
 	tok = tokenizer.consumeToken();
-ASSERT_EQ(Token::ERROR, tok.type);
+	ASSERT_EQ(Token::ERROR, tok.type);
 	
 	tok = tokenizer.consumeToken();
 	ASSERT_EQ(Token::COLOR, tok.type);
 	ASSERT_TRUE(tok.value == "#123456");
 	
 	tok = tokenizer.consumeToken();
-ASSERT_EQ(Token::ERROR, tok.type);
+	ASSERT_EQ(Token::ERROR, tok.type);
 	
 	return true;
 }
@@ -810,7 +814,7 @@ bool testSpecialCharacters() {
 }
 
 bool testColorParsingStrictness() {
-	const char* source = "#000 #000000";
+	const char* source = "#000 #000000 #00000000 #000000000";
 	UITokenizer tokenizer;
 	tokenizer.m_filename = "test";
 	tokenizer.m_document = StringView(source);
@@ -824,6 +828,13 @@ bool testColorParsingStrictness() {
 	tok = tokenizer.consumeToken();
 	ASSERT_EQ(Token::COLOR, tok.type);
 	ASSERT_TRUE(tok.value == "#000000");
+
+	tok = tokenizer.consumeToken();
+	ASSERT_EQ(Token::COLOR, tok.type);
+	ASSERT_TRUE(tok.value == "#00000000");
+
+	tok = tokenizer.consumeToken();
+	ASSERT_EQ(Token::ERROR, tok.type);
 
 	tok = tokenizer.consumeToken();
 	ASSERT_EQ(Token::EOF, tok.type);

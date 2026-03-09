@@ -773,8 +773,8 @@ bool testAbsolutePositionOffsets() {
 	ui::Element* parent = doc.getElement(0);
 	ui::Element* child = doc.getElement(1);
 
-	ASSERT_FLOAT_EQ(parent->position.x + parent->paddings.left + 15.0f, child->position.x);
-	ASSERT_FLOAT_EQ(parent->position.y + parent->paddings.top + 10.0f, child->position.y);
+	ASSERT_FLOAT_EQ(parent->position.x + 15.0f, child->position.x);
+	ASSERT_FLOAT_EQ(parent->position.y + 10.0f, child->position.y);
 
 	return true;
 }
@@ -793,8 +793,8 @@ bool testAbsolutePositionOffsetsWithPivot() {
 	ui::Element* parent = doc.getElement(0);
 	ui::Element* child = doc.getElement(1);
 
-	ASSERT_FLOAT_EQ(parent->position.x + parent->paddings.left + 15.0f - child->size.x * 0.5f, child->position.x);
-	ASSERT_FLOAT_EQ(parent->position.y + parent->paddings.top + 10.0f - child->size.y * 0.5f, child->position.y);
+	ASSERT_FLOAT_EQ(parent->position.x + 15.0f - child->size.x * 0.5f, child->position.x);
+	ASSERT_FLOAT_EQ(parent->position.y + 10.0f - child->size.y * 0.5f, child->position.y);
 
 	return true;
 }

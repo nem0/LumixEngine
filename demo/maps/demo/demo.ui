@@ -20,10 +20,10 @@
 		padding=1.5em
 	] {
 	    [box direction=row align=center] {
-	        Welcome to [span value=" Lumix " color=#ff0000 font-size=60] Demo
+	        Welcome to [span text=" Lumix " color=#ff0000 font-size=60] Demo
 	    }
 	    [box padding=0.5em align-items=center align=center] {
-	        [box .button $start] { Start Demo }
+	        [box .button on-click=start] { Start Demo }
 	    }
 	    [box align=center] {
 	        Press W, A, S, D to move. Use mouse to look around.
@@ -43,6 +43,6 @@
 	align-items=center
 	visible=false
 ] {
-	[box $close .button] { Press to close }
+	[box .button on-click=close] { Press to close }
 }
 

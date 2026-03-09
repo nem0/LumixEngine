@@ -140,6 +140,8 @@ namespace Lumix::LuaWrapper {
 		lua_setfield(L, -2, "position");
 		push(L, value.element_index);
 		lua_setfield(L, -2, "element_index");
+		push(L, value.action);
+		lua_setfield(L, -2, "action");
 		push(L, value.key_code);
 		lua_setfield(L, -2, "key_code");
 		push(L, value.text_utf8);
@@ -158,6 +160,9 @@ namespace Lumix::LuaWrapper {
 		lua_pop(L, 1);
 		lua_getfield(L, index, "element_index");
 		res.element_index = checkArg<u32>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "action");
+		res.action = checkArg<StringView>(L, -1);
 		lua_pop(L, 1);
 		lua_getfield(L, index, "key_code");
 		res.key_code = checkArg<i32>(L, -1);
@@ -3838,7 +3843,7 @@ namespace Lumix {
 			LuaWrapper::push(L, 6);
 			lua_setfield(L, -2, "TEXT_INPUT");
 			LuaWrapper::push(L, 7);
-			lua_setfield(L, -2, "CLICK");
+			lua_setfield(L, -2, "ACTION");
 			LuaWrapper::push(L, 8);
 			lua_setfield(L, -2, "MOUSE_ENTER");
 			LuaWrapper::push(L, 9);

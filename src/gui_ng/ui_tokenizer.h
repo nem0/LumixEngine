@@ -144,9 +144,19 @@ struct UITokenizer {
 	}
 
 	Token colorToken() {
-		for (int i = 0; i < 6; ++i) {
-			if (!isHexDigit(peekChar())) return makeToken(UIToken::ERROR);
+		int digits = 0;
+		while (digits < 8 && isHexDigit(peekChar())) {
 			advance();
+			++digits;
+		}
+
+		if (digits != 6 && digits != 8) return makeToken(UIToken::ERROR);
+
+		if (m_current != m_document.end && isHexDigit(*m_current)) {
+			while (m_current != m_document.end && isHexDigit(*m_current)) {
+				advance();
+			}
+			return makeToken(UIToken::ERROR);
 		}
 		if (m_current != m_document.end && !isWhitespace(*m_current) && *m_current != ';' && *m_current != ']') return makeToken(UIToken::ERROR);
 		return makeToken(UIToken::COLOR);

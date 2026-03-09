@@ -28,8 +28,9 @@ Certain style attributes are inherited from a widget's parent when the child
 doesn't supply its own value. This keeps styles compact while allowing
 explicit overrides where needed.
 
-- Inherited by default: `font`, `font-size`, `color`, `visibility`, and simple text-related attributes.
+- Inherited by default: `font`, `font-size`, `color`, `opacity`, `visibility`, and simple text-related attributes.
 - Other are not inherited.
+- `font-size` is computed with document DPI scale (see `Document::setDPIScale`).
 
 Rules:
 
@@ -44,6 +45,8 @@ Rules:
 - Inheritance flows along the widget tree (parent -> child). Selector forms
 	such as `parent > child` affect matching and specificity but do not change
 	the fundamental inheritance mechanism.
+- `opacity` composes multiplicatively through the hierarchy (effective opacity
+	is parent opacity multiplied by element opacity).
 
 ## Hovered state
 
@@ -70,3 +73,4 @@ Notes:
 - `.button:hover` matches `.button` elements currently in hovered state.
 - `:hover` participates in normal precedence rules and has class-level
 	specificity.
+- Color properties such as `color` and `bg-color` accept `#RRGGBB` and `#RRGGBBAA`.

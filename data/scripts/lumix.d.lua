@@ -138,6 +138,7 @@ type Event = {
 	type: any,
 	position: Vec2,
 	element_index: number,
+	action: any,
 	key_code: number,
 	text_utf8: number,
 	wheel_y: number,
@@ -189,6 +190,8 @@ type Element = {
 	getID: (Element) -> any,
 	setVisible: (Element, boolean) -> (),
 	setText: (Element, any) -> (),
+	setWidth: (Element, any) -> (),
+	setBGImage: (Element, string) -> (),
 }
 
 type Document = {
@@ -965,7 +968,7 @@ declare this : Entity
 			KEY_DOWN : number,
 			KEY_UP : number,
 			TEXT_INPUT : number,
-			CLICK : number,
+			ACTION : number,
 			MOUSE_ENTER : number,
 			MOUSE_LEAVE : number,
 			INVALID : number,

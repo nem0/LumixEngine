@@ -123,8 +123,14 @@ static bool tokenize(const char* str, u32& token_len, u8& token_type, u8 prev_to
 	if (*c == '#') {
 		++c;
 		int len = 0;
-		while (*c && isHexDigit(*c) && len < 6) { ++c; ++len; }
-		if (len == 6) {
+		while (*c && isHexDigit(*c) && len < 8) { ++c; ++len; }
+		if (*c && isHexDigit(*c)) {
+			while (*c && isHexDigit(*c)) ++c;
+			token_type = (u8)TokenType::ERROR;
+			token_len = u32(c - str);
+			return *c;
+		}
+		if ((len == 6 || len == 8) && (!*c || isWhitespace(*c) || *c == ';' || *c == ']')) {
 			token_type = (u8)TokenType::COLOR;
 		} else {
 			token_type = (u8)TokenType::ERROR;

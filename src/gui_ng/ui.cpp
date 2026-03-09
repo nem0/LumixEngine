@@ -73,6 +73,7 @@ AttributeName parseAttributeName(StringView str) {
 				if (memcmp(s, "class", 5) == 0) return AttributeName::CLASS;
 				if (memcmp(s, "color", 5) == 0) return AttributeName::COLOR;
 			}
+			if (len == 8 && memcmp(s, "clipping", 8) == 0) return AttributeName::CLIPPING;
 			break;
 		case 'd': if (memcmp(s, "direction", 9) == 0) return AttributeName::DIRECTION; break;
 		case 'f':
@@ -91,6 +92,10 @@ AttributeName parseAttributeName(StringView str) {
 			if (len == 12 && memcmp(s, "margin-right", 12) == 0) return AttributeName::MARGIN_RIGHT;
 			if (len == 10 && memcmp(s, "margin-top", 10) == 0) return AttributeName::MARGIN_TOP;
 			if (len == 13 && memcmp(s, "margin-bottom", 13) == 0) return AttributeName::MARGIN_BOTTOM;
+			break;
+		case 'o':
+			if (len == 7 && memcmp(s, "opacity", 7) == 0) return AttributeName::OPACITY;
+			if (len == 8 && memcmp(s, "on-click", 8) == 0) return AttributeName::ON_CLICK;
 			break;
 		case 'p':
 			if (len == 7 && memcmp(s, "pivot-x", 7) == 0) return AttributeName::PIVOT_X;
@@ -196,8 +201,72 @@ static Align parseAlign(StringView value) {
     return Align::LEFT;
 }
 
+enum class PositionAnchor : u8 {
+	START,
+	CENTER,
+	END
+};
+
+static ParsedUnit toAnchorUnit(PositionAnchor anchor) {
+	switch (anchor) {
+		case PositionAnchor::START: return {0, Unit::PERCENT};
+		case PositionAnchor::CENTER: return {50, Unit::PERCENT};
+		case PositionAnchor::END: return {100, Unit::PERCENT};
+	}
+	return {0, Unit::PERCENT};
+}
+
+static bool parsePositionPreset(StringView value, PositionAnchor& horizontal, PositionAnchor& vertical) {
+	if (value == "center" || value == "middle-center") {
+		horizontal = PositionAnchor::CENTER;
+		vertical = PositionAnchor::CENTER;
+		return true;
+	}
+	if (value == "top-left") {
+		horizontal = PositionAnchor::START;
+		vertical = PositionAnchor::START;
+		return true;
+	}
+	if (value == "top-center") {
+		horizontal = PositionAnchor::CENTER;
+		vertical = PositionAnchor::START;
+		return true;
+	}
+	if (value == "top-right") {
+		horizontal = PositionAnchor::END;
+		vertical = PositionAnchor::START;
+		return true;
+	}
+	if (value == "middle-left") {
+		horizontal = PositionAnchor::START;
+		vertical = PositionAnchor::CENTER;
+		return true;
+	}
+	if (value == "middle-right") {
+		horizontal = PositionAnchor::END;
+		vertical = PositionAnchor::CENTER;
+		return true;
+	}
+	if (value == "bottom-left") {
+		horizontal = PositionAnchor::START;
+		vertical = PositionAnchor::END;
+		return true;
+	}
+	if (value == "bottom-center") {
+		horizontal = PositionAnchor::CENTER;
+		vertical = PositionAnchor::END;
+		return true;
+	}
+	if (value == "bottom-right") {
+		horizontal = PositionAnchor::END;
+		vertical = PositionAnchor::END;
+		return true;
+	}
+	return false;
+}
+
 static Color parseColor(StringView str) {
-	if (str.size() != 7 || str[0] != '#') return Color::BLACK;
+	if ((str.size() != 7 && str.size() != 9) || str[0] != '#') return Color::BLACK;
 	auto hexToInt = [](const char* s, int len) -> int {
 		int res = 0;
 		for (int i = 0; i < len; ++i) {
@@ -214,8 +283,9 @@ static Color parseColor(StringView str) {
 	int r = hexToInt(str.begin + 1, 2);
 	int g = hexToInt(str.begin + 3, 2);
 	int b = hexToInt(str.begin + 5, 2);
-	if (r < 0 || g < 0 || b < 0) return Color::BLACK;
-	return Color(u8(r), u8(g), u8(b), 255);
+	int a = str.size() == 9 ? hexToInt(str.begin + 7, 2) : 255;
+	if (r < 0 || g < 0 || b < 0 || a < 0) return Color::BLACK;
+	return Color(u8(r), u8(g), u8(b), u8(a));
 }
 
 bool Document::tryConsume(Token::Type type, Token* out_token) {
@@ -427,6 +497,10 @@ bool Document::parseElements(u32 parent_index) {
 						error(name_token.value, m_tokenizer, "unknown attribute '", name_token.value, "'");
 						return false;
 					}
+					if (name == AttributeName::ON_CLICK && tag != Tag::BOX) {
+						error(name_token.value, m_tokenizer, "attribute 'on-click' is allowed only on [box]");
+						return false;
+					}
 					if (name == AttributeName::TEXT) {
 						elem.text = value.value;
 					}
@@ -543,15 +617,30 @@ static ParsedUnit parseUnit(StringView str) {
 	return {value, unit};
 }
 
+static float parseFontSize(StringView value, float dpi_scale) {
+	float font_size = 12.0f;
+	fromCString(value, font_size);
+	return font_size * dpi_scale;
+}
+
+static float parseOpacity(StringView value) {
+	float opacity = 1.0f;
+	fromCString(value, opacity);
+	if (!value.empty() && value.back() == '%') {
+		opacity *= 0.01f;
+	}
+	return minimum(1.0f, maximum(0.0f, opacity));
+}
+
 void Element::setWidth(StringView value) {
 	upsertAttribute(*this, AttributeName::WIDTH, value, AttributeSource::ELEMENT);
 	width_unit = parseUnit(value);
 	m_document.computeLayout(m_document.m_canvas_size);
 }
 
-static float computeAbsoluteSize(const ParsedUnit& unit, float parent_size, float font_size) {
+static float computeAbsoluteSize(const ParsedUnit& unit, float parent_size, float font_size, float dpi_scale) {
 	switch (unit.unit) {
-		case Unit::PIXELS: return unit.value;
+		case Unit::PIXELS: return unit.value * dpi_scale;
 		case Unit::PERCENT: return unit.value / 100.0f * parent_size;
 		case Unit::EM: return unit.value * font_size;
 		case Unit::FIT_CONTENT: return 0.0f; // TODO
@@ -761,10 +850,10 @@ static void layoutChildren(Document& doc, Element& parent) {
 	for (u32 child_idx : parent.children) {
 		Element& child = doc.m_elements[child_idx];
 		if (child.position_mode == PositionMode::ABSOLUTE) {
-			const float pivot_x = computeAbsoluteSize(child.pivot_x_unit, child.size.x, child.font_size);
-			const float pivot_y = computeAbsoluteSize(child.pivot_y_unit, child.size.y, child.font_size);
-			child.position.x = parent.position.x + parent.paddings.left + child.left - pivot_x;
-			child.position.y = parent.position.y + parent.paddings.top + child.top - pivot_y;
+			const float pivot_x = computeAbsoluteSize(child.pivot_x_unit, child.size.x, child.font_size, doc.m_dpi_scale);
+			const float pivot_y = computeAbsoluteSize(child.pivot_y_unit, child.size.y, child.font_size, doc.m_dpi_scale);
+			child.position.x = parent.position.x + child.left - pivot_x;
+			child.position.y = parent.position.y + child.top - pivot_y;
 		}
 		layoutChildren(doc, child);
 	}
@@ -776,8 +865,10 @@ struct ParentContext {
 	StringView font;
 	Color color = Color::BLACK;
 	Align align = Align::LEFT;
+	float opacity = 1.0f;
 	// not inheritable
 	Vec2 size;
+	Vec2 content_size;
 };
 
 // distribute grow and compute %-based widths
@@ -826,7 +917,7 @@ static void computeParentRelativeWidth(Document& doc, Element& elem) {
 			if (elem.width_unit.unit == Unit::FIT_CONTENT) {
 				logError("Element with fit-content width has child with percent width");
 			}
-			child.size.x = computeAbsoluteSize(child.width_unit, elem.size.x, child.font_size);
+			child.size.x = computeAbsoluteSize(child.width_unit, elem.size.x, child.font_size, doc.m_dpi_scale);
 		}
 		computeParentRelativeWidth(doc, doc.m_elements[child_idx]);
 	}
@@ -867,24 +958,33 @@ static void computeBaseHeights(Document& doc, Element& elem, Element* parent_ele
 			case AttributeName::MARGIN_TOP: margin_unit[0] = parseUnit(attr.value); break;
 			case AttributeName::MARGIN_BOTTOM: margin_unit[1] = parseUnit(attr.value); break;
 			case AttributeName::TOP: top_unit = parseUnit(attr.value); break;
+			case AttributeName::POSITION: {
+				PositionAnchor horizontal;
+				PositionAnchor vertical;
+				if (parsePositionPreset(attr.value, horizontal, vertical)) {
+					top_unit = toAnchorUnit(vertical);
+				}
+				break;
+			}
 			default: break;
 		}
 	}
 
 	if (elem.tag == Tag::SPAN) return;
 
-	elem.margins.top = computeAbsoluteSize(margin_unit[0], parent.size.y, elem.font_size);
-	elem.margins.bottom = computeAbsoluteSize(margin_unit[1], parent.size.y, elem.font_size);
-	elem.paddings.top = computeAbsoluteSize(padding_unit[0], parent.size.y, elem.font_size);
-	elem.paddings.bottom = computeAbsoluteSize(padding_unit[1], parent.size.y, elem.font_size);
-	elem.top = computeAbsoluteSize(top_unit, parent.size.y, elem.font_size);
+	elem.margins.top = computeAbsoluteSize(margin_unit[0], parent.content_size.y, elem.font_size, doc.m_dpi_scale);
+	elem.margins.bottom = computeAbsoluteSize(margin_unit[1], parent.content_size.y, elem.font_size, doc.m_dpi_scale);
+	elem.paddings.top = computeAbsoluteSize(padding_unit[0], parent.content_size.y, elem.font_size, doc.m_dpi_scale);
+	elem.paddings.bottom = computeAbsoluteSize(padding_unit[1], parent.content_size.y, elem.font_size, doc.m_dpi_scale);
+	elem.top = computeAbsoluteSize(top_unit, parent.size.y, elem.font_size, doc.m_dpi_scale);
 
 	if (elem.height_unit.unit != Unit::FIT_CONTENT) {
-		elem.size.y = computeAbsoluteSize(elem.height_unit, parent.size.y, elem.font_size);
+		elem.size.y = computeAbsoluteSize(elem.height_unit, elem.position_mode == PositionMode::ABSOLUTE ? parent.size.y : parent.content_size.y, elem.font_size, doc.m_dpi_scale);
 	}
 
 	ParentContext ctx = parent;
 	ctx.size = elem.size;
+	ctx.content_size = elem.size - Vec2(elem.paddings.left + elem.paddings.right, elem.paddings.top + elem.paddings.bottom);
 	for (u32 child_idx : elem.children) {
 		computeBaseHeights(doc, doc.m_elements[child_idx], &elem, ctx);
 	}
@@ -943,7 +1043,7 @@ static void computeParentRelativeHeights(Document& doc, Element& elem) {
 	for (u32 child_idx : elem.children) {
 		Element& child = doc.m_elements[child_idx];
 		if (child.height_unit.unit == Unit::PERCENT) {
-			child.size.y = computeAbsoluteSize(child.height_unit, elem.size.y, child.font_size);
+			child.size.y = computeAbsoluteSize(child.height_unit, elem.size.y, child.font_size, doc.m_dpi_scale);
 		}
 		computeParentRelativeHeights(doc, child);
 	}
@@ -974,6 +1074,14 @@ static void computeBaseWidths(Document& doc, Element& elem, Element* parent_elem
 			case AttributeName::MARGIN_LEFT: margin_unit[0] = parseUnit(attr.value); break;
 			case AttributeName::MARGIN_RIGHT: margin_unit[1] = parseUnit(attr.value); break;
 			case AttributeName::LEFT: left_unit = parseUnit(attr.value); break;
+			case AttributeName::POSITION: {
+				PositionAnchor horizontal;
+				PositionAnchor vertical;
+				if (parsePositionPreset(attr.value, horizontal, vertical)) {
+					left_unit = toAnchorUnit(horizontal);
+				}
+				break;
+			}
 			default: break;
 		}
 	}
@@ -986,15 +1094,16 @@ static void computeBaseWidths(Document& doc, Element& elem, Element* parent_elem
 	}
 
 	if (elem.width_unit.unit != Unit::FIT_CONTENT) {
-		elem.size.x = computeAbsoluteSize(elem.width_unit, parent.size.x, elem.font_size);
+		elem.size.x = computeAbsoluteSize(elem.width_unit, elem.position_mode == PositionMode::ABSOLUTE ? parent.size.x : parent.content_size.x, elem.font_size, doc.m_dpi_scale);
 	}
-	elem.margins.left = computeAbsoluteSize(margin_unit[0], parent.size.x, elem.font_size);
-	elem.margins.right = computeAbsoluteSize(margin_unit[1], parent.size.x, elem.font_size);
-	elem.paddings.left = computeAbsoluteSize(padding_unit[0], parent.size.x, elem.font_size);
-	elem.paddings.right = computeAbsoluteSize(padding_unit[1], parent.size.x, elem.font_size);
-	elem.left = computeAbsoluteSize(left_unit, parent.size.x, elem.font_size);
+	elem.margins.left = computeAbsoluteSize(margin_unit[0], parent.content_size.x, elem.font_size, doc.m_dpi_scale);
+	elem.margins.right = computeAbsoluteSize(margin_unit[1], parent.content_size.x, elem.font_size, doc.m_dpi_scale);
+	elem.paddings.left = computeAbsoluteSize(padding_unit[0], parent.content_size.x, elem.font_size, doc.m_dpi_scale);
+	elem.paddings.right = computeAbsoluteSize(padding_unit[1], parent.content_size.x, elem.font_size, doc.m_dpi_scale);
+	elem.left = computeAbsoluteSize(left_unit, parent.size.x, elem.font_size, doc.m_dpi_scale);
 
 	ctx.size = elem.size;
+	ctx.content_size = elem.size - Vec2(elem.paddings.left + elem.paddings.right, elem.paddings.top + elem.paddings.bottom);
 	for (u32 child_idx : elem.children) {
 		computeBaseWidths(doc, doc.m_elements[child_idx], &elem, ctx);
 	}
@@ -1095,11 +1204,24 @@ static void applyStylesheet(Document& doc, u32 element_index, const ParentContex
 	}
 
 	ParentContext ctx = parent;
+	float local_opacity = 1.0f;
+	elem.clipping = false;
 	for (const Attribute& attr : elem.attributes) {
 		switch (attr.type) {
 			case AttributeName::POSITION: {
-				if (attr.value == "absolute") elem.position_mode = PositionMode::ABSOLUTE;
-				else elem.position_mode = PositionMode::RELATIVE;
+				PositionAnchor horizontal;
+				PositionAnchor vertical;
+				if (attr.value == "absolute") {
+					elem.position_mode = PositionMode::ABSOLUTE;
+				}
+				else if (parsePositionPreset(attr.value, horizontal, vertical)) {
+					elem.position_mode = PositionMode::ABSOLUTE;
+					elem.pivot_x_unit = toAnchorUnit(horizontal);
+					elem.pivot_y_unit = toAnchorUnit(vertical);
+				}
+				else {
+					elem.position_mode = PositionMode::RELATIVE;
+				}
 				break;
 			}
 			case AttributeName::PIVOT_X: elem.pivot_x_unit = parseUnit(attr.value); break;
@@ -1122,11 +1244,13 @@ static void applyStylesheet(Document& doc, u32 element_index, const ParentContex
 				ctx.color = elem.color;
 				break;
 			}
+			case AttributeName::OPACITY: local_opacity = parseOpacity(attr.value); break;
+			case AttributeName::CLIPPING: elem.clipping = attr.value == "true"; break;
 			case AttributeName::BG_COLOR: elem.bg_color = parseColor(attr.value); break;
 			case AttributeName::TEXT: elem.text = attr.value; break;
 			case AttributeName::JUSTIFY_CONTENT: elem.justify_content = parseJustifyContent(attr.value); break;
 			case AttributeName::ALIGN_ITEMS: elem.align_items = parseAlignItems(attr.value); break;
-			case AttributeName::FONT_SIZE: ctx.font_size = (float)atof(attr.value.begin); break;
+			case AttributeName::FONT_SIZE: ctx.font_size = parseFontSize(attr.value, doc.m_dpi_scale); break;
 			case AttributeName::WRAP: elem.wrap = attr.value == "true"; break;
 			default: break; // TODO remove the default case
 		}
@@ -1134,6 +1258,8 @@ static void applyStylesheet(Document& doc, u32 element_index, const ParentContex
 	elem.font_size = ctx.font_size;
 	elem.color = ctx.color;
 	elem.text_align = ctx.align;
+	elem.opacity = minimum(1.0f, maximum(0.0f, ctx.opacity * local_opacity));
+	ctx.opacity = elem.opacity;
 
 	for (u32 child_idx : elem.children) {
 		applyStylesheet(doc, child_idx, ctx);
@@ -1352,6 +1478,7 @@ void Document::computeLayout(Vec2 canvas_size) {
 	m_canvas_size = canvas_size;
 	ParentContext root_inherit;
 	root_inherit.size = canvas_size;
+	root_inherit.content_size = canvas_size;
 	for (u32 root_idx : m_roots) {
 		computeBaseWidths(*this, m_elements[root_idx], nullptr, root_inherit);		
 	}
@@ -1379,11 +1506,11 @@ void Document::computeLayout(Vec2 canvas_size) {
 		Element& root = m_elements[root_idx];
 		if (!root.visible) continue;
 		if (root.height_unit.unit == Unit::PERCENT) {
-			root.size.y = computeAbsoluteSize(root.height_unit, canvas_size.y, root.font_size);
+			root.size.y = computeAbsoluteSize(root.height_unit, canvas_size.y, root.font_size, m_dpi_scale);
 		}
 		if (root.position_mode == PositionMode::ABSOLUTE) {
-			const float pivot_x = computeAbsoluteSize(root.pivot_x_unit, root.size.x, root.font_size);
-			const float pivot_y = computeAbsoluteSize(root.pivot_y_unit, root.size.y, root.font_size);
+			const float pivot_x = computeAbsoluteSize(root.pivot_x_unit, root.size.x, root.font_size, m_dpi_scale);
+			const float pivot_y = computeAbsoluteSize(root.pivot_y_unit, root.size.y, root.font_size, m_dpi_scale);
 			root.position.x = root.left - pivot_x;
 			root.position.y = root.top - pivot_y;
 			continue;
@@ -1404,33 +1531,52 @@ void Document::computeLayout(Vec2 canvas_size) {
 	m_layout_duration = timer.getTimeSinceStart();
 }
 
+static u8 applyOpacityToAlpha(u8 alpha, float opacity) {
+	const float a = (float)alpha * opacity;
+	return (u8)minimum(255.0f, maximum(0.0f, a));
+}
+
 static void renderElement(Draw2D& draw, const Document& doc, u32 element_idx, const Element* parent) {
 	const Element& element = *doc.getElement(element_idx);
 	if (!element.visible) return;
 	Vec2 pos = Vec2(element.position.x, element.position.y);
 	Vec2 size = Vec2(element.size.x, element.size.y);
+	const bool use_clipping = element.clipping && size.x > 0 && size.y > 0;
+	if (use_clipping) {
+		draw.pushClipRect(pos, pos + size);
+	}
 
 	switch (element.tag) {
 		case Tag::BOX: {
 			if (element.bg_sprite) {
-				element.bg_sprite->render(draw, pos.x, pos.y, pos.x + size.x, pos.y + size.y, Color::WHITE);
+				const u8 alpha = applyOpacityToAlpha(255, element.opacity);
+				if (alpha > 0) {
+					element.bg_sprite->render(draw, pos.x, pos.y, pos.x + size.x, pos.y + size.y, Color(255, 255, 255, alpha));
+				}
 			}
 			else if (element.bg_color.a > 0) {
-				draw.addRectFilled(pos, pos + size, element.bg_color);
+				Color bg = element.bg_color;
+				bg.a = applyOpacityToAlpha(bg.a, element.opacity);
+				if (bg.a > 0) {
+					draw.addRectFilled(pos, pos + size, bg);
+				}
 			}
 			break;
 		}
 		case Tag::SPAN: {
 			if (element.font_handle && !element.text.empty()) {
 				const Font& font = *(const Font*)element.font_handle;
+				Color text_color = element.color;
+				text_color.a = applyOpacityToAlpha(text_color.a, element.opacity);
+				if (text_color.a == 0) break;
 				if (!element.lines.empty()) {
 					for (const SpanLine& line : element.lines) {
-						draw.addText(font, line.pos, element.color, line.text);
+						draw.addText(font, line.pos, text_color, line.text);
 					}
 				} else {
 					// fallback
 					Vec2 text_pos = pos + Vec2(0, getAscender(font));
-					draw.addText(font, text_pos, element.color, element.text);
+					draw.addText(font, text_pos, text_color, element.text);
 				}
 			}
 			break;
@@ -1440,6 +1586,10 @@ static void renderElement(Draw2D& draw, const Document& doc, u32 element_idx, co
 
 	for (u32 child_idx : element.children) {
 		renderElement(draw, doc, child_idx, &element);
+	}
+
+	if (use_clipping) {
+		draw.popClipRect();
 	}
 }
 
@@ -1461,6 +1611,50 @@ static bool contains(const Element& elem, Vec2 pos, IFontManager* font_manager) 
 	}
 	return pos.x >= elem_pos.x && pos.x <= elem_pos.x + elem.size.x &&
 			pos.y >= elem_pos.y && pos.y <= elem_pos.y + elem.size.y;
+}
+
+static StringView getAttributeValue(const Element& elem, AttributeName name) {
+	for (const Attribute& attr : elem.attributes) {
+		if (attr.type == name) return attr.value;
+	}
+	return {};
+}
+
+static Element* getActionTargetAt(Document& doc, Vec2 pos) {
+	for (u32 root_id : doc.m_roots) {
+		Element* root = &doc.m_elements[root_id];
+		if (!contains(*root, pos, doc.m_font_manager)) continue;
+
+		StackArray<u32, 16> path(doc.m_allocator);
+		path.push(root_id);
+
+		Element* elem = root;
+		for (;;) {
+			bool found_child = false;
+			for (u32 child_id : elem->children) {
+				Element* child = &doc.m_elements[child_id];
+				if (contains(*child, pos, doc.m_font_manager)) {
+					path.push(child_id);
+					elem = child;
+					found_child = true;
+					break;
+				}
+			}
+			if (!found_child) break;
+		}
+
+		for (i32 i = (i32)path.size() - 1; i >= 0; --i) {
+			Element& candidate = doc.m_elements[path[i]];
+			if (candidate.tag != Tag::BOX) continue;
+			if (!getAttributeValue(candidate, AttributeName::ON_CLICK).empty()) {
+				return &candidate;
+			}
+		}
+
+		return nullptr;
+	}
+
+	return nullptr;
 }
 
 void Document::addClass(u32 element_index, StringView classname) {
@@ -1538,7 +1732,7 @@ static void loadResources(Document& doc, u32 element_index, const ParentContext&
 		switch (attr.type) {
 			case AttributeName::FONT: ctx.font = attr.value; break;
 			case AttributeName::FONT_SIZE: 
-				fromCString(attr.value, elem.font_size);
+				elem.font_size = parseFontSize(attr.value, doc.m_dpi_scale);
 				ctx.font_size = elem.font_size;
 				break;
 			case AttributeName::BG_IMAGE: {
@@ -1601,8 +1795,17 @@ void Document::injectEvent(const InputSystem::Event& event) {
 				ui_event.element_index = elem ? u32(elem - m_elements.begin()) : 0;
 				m_events.push(ui_event);
 				if (!btn.down) {
-					ui_event.type = EventType::CLICK;
-					m_events.push(ui_event);
+					Element* action_elem = getActionTargetAt(*this, ui_event.position);
+					const StringView action = action_elem ? getAttributeValue(*action_elem, AttributeName::ON_CLICK) : StringView();
+					if (!action.empty()) {
+						Event action_event;
+						action_event.type = EventType::ACTION;
+						action_event.position = ui_event.position;
+						action_event.element_index = action_elem ? u32(action_elem - m_elements.begin()) : 0;
+						action_event.key_code = ui_event.key_code;
+						action_event.action = action;
+						m_events.push(action_event);
+					}
 				}
 			} else if (event.device->type == InputSystem::Device::KEYBOARD) {
 				Event ui_event;
@@ -1712,6 +1915,14 @@ bool Document::areDependenciesReady() const {
 	return true;
 }
 
+void Document::setDPIScale(float scale) {
+	if (scale <= 0) scale = 1.0f;
+	if (m_dpi_scale == scale) return;
+	m_dpi_scale = scale;
+	recomputeStyles();
+	computeLayout(m_canvas_size);
+}
+
 void Document::recomputeStyles() {
 	for (Element& elem : m_elements) {
 		for (i32 i = elem.attributes.size() - 1; i >= 0; --i) {
@@ -1722,6 +1933,7 @@ void Document::recomputeStyles() {
 	}
 
 	ParentContext ctx;
+	ctx.font_size = 12.0f * m_dpi_scale;
 	ctx.font = "/engine/editor/fonts/JetBrainsMono-Regular.ttf";
 	for (u32 root_idx : m_roots) {
 		applyStylesheet(*this, root_idx, ctx);

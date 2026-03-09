@@ -1,15 +1,15 @@
 high prio (feature parity with the old ui, before we can merge):
 * main.unv -> demo.unv, UI is not updated
-* button with label and we click on label - only label receives click event
+* click on ui should stop propagating ingame
+
 * prepare for old ui to be removed
 * update demo/showcase projects to use the new ui
-* clipping
 * error handling/reporting
-* image element
 * fixed leaks
 * text input
 
 low prio or optional:
+* image element
 * inline 3d ui component - ui source as property, not as a resource file
 * min-width?
 * examples: scrolling, checkbox, drag & drop, tooltip, dropdown, slider

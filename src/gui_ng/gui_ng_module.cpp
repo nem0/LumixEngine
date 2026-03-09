@@ -2,6 +2,7 @@
 #include "core/color.h"
 #include "core/delegate_list.h"
 #include "core/log.h"
+#include "core/os.h"
 #include "core/path.h"
 #include "engine/component_types.h"
 #include "engine/engine.h"
@@ -99,6 +100,8 @@ struct UIModuleImpl : UIModule {
 		, m_draw_2d(m_allocator)
 	{
 		m_document.m_resource_manager = &m_system.getEngine().getResourceManager();
+		m_dpi_scale = os::getDPI() / 96.0f;
+		m_document.setDPIScale(m_dpi_scale);
 	}
 
 	~UIModuleImpl() {
@@ -244,6 +247,13 @@ struct UIModuleImpl : UIModule {
 	World& getWorld() override { return m_world; }
 
 	void update(float time_delta) override {
+		const float dpi_scale = os::getDPI() / 96.0f;
+		if (dpi_scale < m_dpi_scale - 0.001f || dpi_scale > m_dpi_scale + 0.001f) {
+			m_dpi_scale = dpi_scale;
+			m_previous_canvas_size = Vec2(-1, -1);
+			m_document.setDPIScale(m_dpi_scale);
+		}
+
 		m_document.clearEvents();
 		InputSystem& input = m_system.getEngine().getInputSystem();
 		Span<const InputSystem::Event> events = input.getEvents();
@@ -297,6 +307,7 @@ struct UIModuleImpl : UIModule {
 	ui::DocumentResource* m_ui_resource = nullptr;
 	Vec2 m_canvas_size = Vec2(800, 600);
 	Vec2 m_previous_canvas_size = Vec2(-1, -1);
+	float m_dpi_scale = 1.0f;
 	bool m_is_ready = false;
 	HashMap<EntityRef, UI3DComponent*> m_ui_3d_components;
 	Draw2D m_draw_2d;

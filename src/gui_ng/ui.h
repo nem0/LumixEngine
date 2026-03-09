@@ -34,6 +34,8 @@ enum class AttributeName : u8 {
 	FONT_SIZE,
 	FONT,
 	COLOR,
+	OPACITY,
+	CLIPPING,
 	WIDTH,
 	HEIGHT,
 	TOP,
@@ -55,6 +57,7 @@ enum class AttributeName : u8 {
 	SRC,
 	FIT,
 	GROW,
+	ON_CLICK,
 	PLACEHOLDER,
 	MARGIN_TOP,
 	MARGIN_RIGHT,
@@ -207,6 +210,7 @@ struct Element {
 	IFontManager::FontHandle font_handle = nullptr;
 	float font_size = 0;
 	Color color = Color::WHITE;
+	float opacity = 1.0f;
 	Color bg_color = Color::TRANSPARENT;
 	BoxSpacing margins;
 	BoxSpacing paddings;
@@ -217,6 +221,7 @@ struct Element {
 	float grow = 0;
 	bool wrap = true;
 	bool visible = true;
+	bool clipping = false;
 	ParsedUnit width_unit = {0, Unit::FIT_CONTENT};
 	ParsedUnit height_unit = {0, Unit::FIT_CONTENT};
 	ParsedUnit pivot_x_unit = {0, Unit::PIXELS};
@@ -244,7 +249,7 @@ enum class EventType {
 	KEY_DOWN,
 	KEY_UP,
 	TEXT_INPUT,
-	CLICK,
+	ACTION,
 	MOUSE_ENTER,
 	MOUSE_LEAVE,
 	INVALID
@@ -255,6 +260,7 @@ struct Event {
 	EventType type = EventType::INVALID;
 	Vec2 position;
 	u32 element_index = 0;
+	StringView action;
 	i32 key_code = 0;
 	u32 text_utf8 = 0;
 	float wheel_y = 0;
@@ -275,6 +281,7 @@ struct Document {
 	IAllocator& m_allocator;
 	Vec2 m_canvas_size;
 	String m_content;
+	float m_dpi_scale = 1.0f;
 	float m_layout_duration = 0;
 	float m_parse_duration = 0;
 	float m_render_duration = 0;
@@ -303,6 +310,8 @@ struct Document {
 	void computeLayout(Vec2 canvas_size);
 	void render(Draw2D& draw);
 	Element* getElementAt(Vec2 pos);
+	void setDPIScale(float scale);
+	float getDPIScale() const { return m_dpi_scale; }
 	//@ function
 	Element* getElementByID(const char* id);
 

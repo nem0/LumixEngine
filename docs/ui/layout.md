@@ -12,6 +12,7 @@
   - [Text Alignment](#text-alignment)
 - [Element Sizing](#element-sizing)
   - [Units](#units)
+  - [DPI Scaling](#dpi-scaling)
   - [Fit-Content](#fit-content)
   - [Grow](#grow)
 - [Element Positioning](#element-positioning)
@@ -187,6 +188,18 @@ Dimensions support these units:
 - **fit-content**: Auto-size to content. For panels, sums child sizes. E.g., `width=fit-content`.
 
 Mix units freely, e.g., `width=50% height=2em`.
+
+### DPI Scaling
+
+`gui_ng` supports DPI-aware sizing through document scale.
+
+- `Document::setDPIScale(scale)` sets the UI scale factor (`1.0` means baseline 96 DPI).
+- Pixel units are multiplied by DPI scale (`width=200` becomes `400` at scale `2.0`).
+- `font-size` is multiplied by DPI scale before text measurement and layout.
+- `em` units follow the scaled font size, so they scale naturally.
+- Percentage units (`%`) are not directly multiplied by DPI; they remain relative to parent/canvas size.
+
+In runtime `gui_ng` module (screen-space UI), DPI scale is driven from OS DPI as `os::getDPI() / 96.0`.
 
 ### Fit-Content
 
@@ -445,9 +458,16 @@ Position mode and offsets are then applied:
 - `position=relative`: the element keeps its place in flow and final position becomes:
   - x = flow_x + left
   - y = flow_y + top
-- `position=absolute`: the element is taken out of normal flow and positioned from the parent content origin:
-  - x = parent.x + parent.padding_left + left - pivot_x
-  - y = parent.y + parent.padding_top + top - pivot_y
+- `position=absolute`: the element is taken out of normal flow and positioned from the parent origin:
+  - x = parent.x + left - pivot_x
+  - y = parent.y + top - pivot_y
+
+- `position` anchor presets are aliases for absolute positioning with matching edge/center pivots:
+  - `center` and `middle-center`: left=50%, top=50%, pivot-x=50%, pivot-y=50%
+  - `top-left`, `top-center`, `top-right`
+  - `middle-left`, `middle-right`
+  - `bottom-left`, `bottom-center`, `bottom-right`
+  - For each preset, horizontal token maps left/pivot-x to `0%`, `50%`, or `100%` and vertical token maps top/pivot-y to `0%`, `50%`, or `100%`.
 
 Where `pivot_x` and `pivot_y` come from `pivot-x` and `pivot-y` attributes (default `0`). Percent pivots are resolved from the absolute element's own final size (`pivot-x` from width, `pivot-y` from height). This applies to all absolute elements, including absolute roots where the base origin is the canvas origin.
 
