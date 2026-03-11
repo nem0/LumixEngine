@@ -76,17 +76,17 @@ AttributeName parseAttributeName(StringView str) {
 			}
 			if (len == 8 && memcmp(s, "clipping", 8) == 0) return AttributeName::CLIPPING;
 			break;
-		case 'd': if (memcmp(s, "direction", 9) == 0) return AttributeName::DIRECTION; break;
+		case 'd': if (len == 9 && memcmp(s, "direction", 9) == 0) return AttributeName::DIRECTION; break;
 		case 'f':
 			if (len == 3 && memcmp(s, "fit", 3) == 0) return AttributeName::FIT;
 			if (len == 4 && memcmp(s, "font", 4) == 0) return AttributeName::FONT;
 			if (len == 9 && memcmp(s, "font-size", 9) == 0) return AttributeName::FONT_SIZE;
 			break;
-		case 'g': if (memcmp(s, "grow", 4) == 0) return AttributeName::GROW; break;
-		case 'h': if (memcmp(s, "height", 6) == 0) return AttributeName::HEIGHT; break;
-		case 'i': if (memcmp(s, "id", 2) == 0) return AttributeName::ID; break;
-		case 'j': if (memcmp(s, "justify-content", 15) == 0) return AttributeName::JUSTIFY_CONTENT; break;
-		case 'l': if (memcmp(s, "left", 4) == 0) return AttributeName::LEFT; break;
+		case 'g': if (len == 4 && memcmp(s, "grow", 4) == 0) return AttributeName::GROW; break;
+		case 'h': if (len == 6 && memcmp(s, "height", 6) == 0) return AttributeName::HEIGHT; break;
+		case 'i': if (len == 2 && memcmp(s, "id", 2) == 0) return AttributeName::ID; break;
+		case 'j': if (len == 15 && memcmp(s, "justify-content", 15) == 0) return AttributeName::JUSTIFY_CONTENT; break;
+		case 'l': if (len == 4 && memcmp(s, "left", 4) == 0) return AttributeName::LEFT; break;
 		case 'm':
 			if (len == 6 && memcmp(s, "margin", 6) == 0) return AttributeName::MARGIN;
 			if (len == 11 && memcmp(s, "margin-left", 11) == 0) return AttributeName::MARGIN_LEFT;
@@ -111,12 +111,12 @@ AttributeName parseAttributeName(StringView str) {
 				if (memcmp(s, "placeholder", 11) == 0) return AttributeName::PLACEHOLDER;
 			}
 			break;
-		case 's': if (memcmp(s, "src", 3) == 0) return AttributeName::SRC; break;
+		case 's': if (len == 3 && memcmp(s, "src", 3) == 0) return AttributeName::SRC; break;
 		case 't':
 			if (len == 4 && memcmp(s, "text", 4) == 0) return AttributeName::TEXT;
 			if (len == 3 && memcmp(s, "top", 3) == 0) return AttributeName::TOP;
 			break;
-		case 'v': if (memcmp(s, "visible", 7) == 0) return AttributeName::VISIBLE; break;
+		case 'v': if (len == 7 && memcmp(s, "visible", 7) == 0) return AttributeName::VISIBLE; break;
 		case 'w':
 			if (len == 5 && memcmp(s, "width", 5) == 0) return AttributeName::WIDTH;
 			if (len == 4 && memcmp(s, "wrap", 4) == 0) return AttributeName::WRAP;
