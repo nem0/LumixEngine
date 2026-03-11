@@ -1335,6 +1335,12 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 		lua_pop(inst.m_state, 2);
 	}
 
+	bool shouldSerialize() override {
+		if (!m_property_names.empty()) return true;
+		if (!m_inline_scripts.empty()) return true;
+		if (!m_scripts.empty()) return true;
+		return false;
+	}
 
 	void serialize(OutputMemoryStream& serializer) override {
 		serializer.write(m_property_names.size());

@@ -874,8 +874,13 @@ void World::serialize(OutputMemoryStream& serializer, WorldSerializeFlags flags)
 		}
 	}
 
-	blob.write((i32)m_modules.size());
+	i32 num_serialized_modules = 0;
 	for (const UniquePtr<IModule>& module : m_modules) {
+		if (module->shouldSerialize()) ++num_serialized_modules;
+	}
+	blob.write(num_serialized_modules);
+	for (const UniquePtr<IModule>& module : m_modules) {
+		if (!module->shouldSerialize()) continue;
 		blob.writeString(module->getName());
 		blob.write(module->getVersion());
 		module->serialize(blob);

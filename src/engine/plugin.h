@@ -34,11 +34,11 @@ struct LUMIX_ENGINE_API SystemManager
 // Modules inherited from IModule manage components of certain types in single world,
 // e.g. RenderModule manages all render components - models, lights, ... 
 // Each world has its own instance of every type of module, e.g. RenderModule, AnimationModule, ...
-struct LUMIX_ENGINE_API IModule
-{
+struct LUMIX_ENGINE_API IModule {
 	virtual ~IModule() {}
 
 	virtual void init() {}
+	virtual bool shouldSerialize() { return true; }
 	virtual void serialize(struct OutputMemoryStream& serializer) = 0;
 	virtual void deserialize(struct InputMemoryStream& serialize, const struct EntityMap& entity_map, i32 version) = 0;
 	virtual void beforeReload(OutputMemoryStream& serializer) {}

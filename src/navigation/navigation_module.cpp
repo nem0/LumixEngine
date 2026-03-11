@@ -1536,6 +1536,12 @@ struct NavigationModuleImpl final : NavigationModule
 
 	const char* getName() const override { return "navigation"; }
 
+	bool shouldSerialize() override {
+		if (m_agents.size() != 0) return true;
+		if (m_zones.size() != 0) return true;
+		return false;
+	}
+
 	void serialize(OutputMemoryStream& serializer) override
 	{
 		int count = m_zones.size();

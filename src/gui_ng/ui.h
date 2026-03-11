@@ -86,7 +86,7 @@ enum class JustifyContent : u8 {
 	CENTER,
 	END,
 	SPACE_BETWEEN,
-	SPACE_AROUND
+	SPACE_AROUND,
 };
 
 enum class AlignItems : u8 {
@@ -99,7 +99,7 @@ enum class AlignItems : u8 {
 enum class Align : u8 {
 	LEFT,
 	CENTER,
-	RIGHT
+	RIGHT,
 };
 
 enum PositionMode : u8 {
@@ -146,9 +146,25 @@ struct InternTable {
 };
 
 struct Attribute {
-	AttributeName type;
-	StringView value;
-	AttributeSource source;
+	Attribute() : parsed_unit{0, Unit::PIXELS} {}
+
+	AttributeName type = AttributeName::INVALID;
+	AttributeSource source = AttributeSource::ELEMENT;
+	union {
+		StringView value;
+		ParsedUnit parsed_unit;
+		Direction direction;
+		Align align;
+		JustifyContent justify;
+		AlignItems align_items;
+		Color color;
+		float grow;
+		float opacity;
+		float font_size;
+		bool visible;
+		bool wrap;
+		bool clip;
+	};
 };
 
 struct StyleRule {
@@ -339,6 +355,7 @@ private:
 	bool tryConsume(Token::Type type, Token* out_token = nullptr);
 	void addClassRaw(u32 element_index, StringView classname);
 	void removeClassRaw(u32 element_index, StringView classname);
+	bool parseAttributeValue(Element& elem, AttributeName name, StringView value);
 
 	Array<Event> m_events;
 };

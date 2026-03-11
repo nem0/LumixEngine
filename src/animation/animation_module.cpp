@@ -255,6 +255,12 @@ struct AnimationModuleImpl final : AnimationModule {
 		m_world.onComponentDestroyed(entity, types::animator, this);
 	}
 
+	bool shouldSerialize() override {
+		if (m_animables.size() != 0) return true;
+		if (m_property_animators.size() != 0) return true;
+		if (m_animators.size() != 0) return true;
+		return false;
+	}
 
 	void serialize(OutputMemoryStream& serializer) override
 	{

@@ -5,6 +5,46 @@ using namespace Lumix;
 
 namespace {
 
+static bool hasParsedUnit(const ui::Attribute& attr, ui::AttributeName name, float value, ui::Unit unit) {
+	return attr.type == name && attr.parsed_unit.unit == unit && attr.parsed_unit.value == value;
+}
+
+static bool sameAttributeValue(const ui::Attribute& a, const ui::Attribute& b) {
+	if (a.type != b.type) return false;
+	switch (a.type) {
+		case ui::AttributeName::WIDTH:
+		case ui::AttributeName::HEIGHT:
+		case ui::AttributeName::TOP:
+		case ui::AttributeName::LEFT:
+		case ui::AttributeName::PIVOT_X:
+		case ui::AttributeName::PIVOT_Y:
+		case ui::AttributeName::MARGIN:
+		case ui::AttributeName::MARGIN_TOP:
+		case ui::AttributeName::MARGIN_RIGHT:
+		case ui::AttributeName::MARGIN_BOTTOM:
+		case ui::AttributeName::MARGIN_LEFT:
+		case ui::AttributeName::PADDING:
+		case ui::AttributeName::PADDING_TOP:
+		case ui::AttributeName::PADDING_RIGHT:
+		case ui::AttributeName::PADDING_BOTTOM:
+		case ui::AttributeName::PADDING_LEFT:
+			return a.parsed_unit.value == b.parsed_unit.value && a.parsed_unit.unit == b.parsed_unit.unit;
+		case ui::AttributeName::VISIBLE: return a.visible == b.visible;
+		case ui::AttributeName::WRAP: return a.wrap == b.wrap;
+		case ui::AttributeName::CLIPPING: return a.clip == b.clip;
+		case ui::AttributeName::DIRECTION: return a.direction == b.direction;
+		case ui::AttributeName::ALIGN: return a.align == b.align;
+		case ui::AttributeName::JUSTIFY_CONTENT: return a.justify == b.justify;
+		case ui::AttributeName::ALIGN_ITEMS: return a.align_items == b.align_items;
+		case ui::AttributeName::COLOR:
+		case ui::AttributeName::BG_COLOR: return a.color == b.color;
+		case ui::AttributeName::GROW: return a.grow == b.grow;
+		case ui::AttributeName::OPACITY: return a.opacity == b.opacity;
+		case ui::AttributeName::FONT_SIZE: return a.font_size == b.font_size;
+		default: return a.value == b.value;
+	}
+}
+
 bool testEmptyStyleBlock() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[style] {}");
@@ -30,7 +70,10 @@ bool testHoverPseudoclass() {
 	ASSERT_EQ(1, rules.size());
 	ASSERT_EQ(1, rules[0].attributes.size());
 	ASSERT_EQ((int)ui::AttributeName::BG_COLOR, (int)rules[0].attributes[0].type);
-	ASSERT_EQ("#ff0000", rules[0].attributes[0].value);
+	ASSERT_EQ(0xff, rules[0].attributes[0].color.r);
+	ASSERT_EQ(0, rules[0].attributes[0].color.g);
+	ASSERT_EQ(0, rules[0].attributes[0].color.b);
+	ASSERT_EQ(0xff, rules[0].attributes[0].color.a);
 	return true;
 }
 
@@ -51,9 +94,11 @@ bool testStyleWithRules() {
 	ASSERT_EQ(1, rules.size());
 	ASSERT_EQ(2, rules[0].attributes.size());
 	ASSERT_EQ((int)ui::AttributeName::WIDTH, (int)rules[0].attributes[0].type);
-	ASSERT_EQ("50%", rules[0].attributes[0].value);
+	ASSERT_FLOAT_EQ(50.0f, rules[0].attributes[0].parsed_unit.value);
+	ASSERT_EQ((int)ui::Unit::PERCENT, (int)rules[0].attributes[0].parsed_unit.unit);
 	ASSERT_EQ((int)ui::AttributeName::HEIGHT, (int)rules[0].attributes[1].type);
-	ASSERT_EQ("100", rules[0].attributes[1].value);
+	ASSERT_FLOAT_EQ(100.0f, rules[0].attributes[1].parsed_unit.value);
+	ASSERT_EQ((int)ui::Unit::PIXELS, (int)rules[0].attributes[1].parsed_unit.unit);
 	return true;
 }
 
@@ -123,7 +168,7 @@ bool testStyleApplication() {
 
 	bool has_width = false;
 	for (const ui::Attribute& attr : elem.attributes) {
-		if (attr.type == ui::AttributeName::WIDTH && attr.value.size() == 3 && memcmp(attr.value.begin, "50%", 3) == 0) {
+		if (hasParsedUnit(attr, ui::AttributeName::WIDTH, 50.0f, ui::Unit::PERCENT)) {
 			has_width = true;
 			break;
 		}
@@ -149,7 +194,7 @@ bool testInlineOverridesStylesheet() {
 
 	bool has_correct_width = false;
 	for (const ui::Attribute& attr : elem.attributes) {
-		if (attr.type == ui::AttributeName::WIDTH && attr.value.size() == 3 && memcmp(attr.value.begin, "75%", 3) == 0) {
+		if (hasParsedUnit(attr, ui::AttributeName::WIDTH, 75.0f, ui::Unit::PERCENT)) {
 			has_correct_width = true;
 			break;
 		}
@@ -278,10 +323,10 @@ bool testMultipleClassesMatching() {
 	bool has_width = false;
 	bool has_height = false;
 	for (const ui::Attribute& attr : elem.attributes) {
-		if (attr.type == ui::AttributeName::WIDTH && equalStrings(attr.value, "50%")) {
+		if (hasParsedUnit(attr, ui::AttributeName::WIDTH, 50.0f, ui::Unit::PERCENT)) {
 			has_width = true;
 		}
-		if (attr.type == ui::AttributeName::HEIGHT && equalStrings(attr.value, "100")) {
+		if (hasParsedUnit(attr, ui::AttributeName::HEIGHT, 100.0f, ui::Unit::PIXELS)) {
 			has_height = true;
 		}
 	}
@@ -340,7 +385,7 @@ bool testRecomputeIdempotence() {
 	ASSERT_EQ(original_attrs.size(), elem.attributes.size());
 	for (size_t i = 0; i < original_attrs.size(); ++i) {
 		ASSERT_EQ((int)original_attrs[(u32)i].type, (int)elem.attributes[(u32)i].type);
-		ASSERT_EQ(original_attrs[(u32)i].value, elem.attributes[(u32)i].value);
+		ASSERT_EQ(true, sameAttributeValue(original_attrs[(u32)i], elem.attributes[(u32)i]));
 	}
 	
 	return true;
@@ -374,7 +419,7 @@ bool testSetVisiblePersistsAcrossStyleRecompute() {
 
 	bool has_visible_false = false;
 	for (const ui::Attribute& attr : first.attributes) {
-		if (attr.type == ui::AttributeName::VISIBLE && equalStrings(attr.value, "false")) {
+		if (attr.type == ui::AttributeName::VISIBLE && !attr.visible) {
 			has_visible_false = true;
 			break;
 		}
@@ -388,7 +433,7 @@ bool testSetVisiblePersistsAcrossStyleRecompute() {
 
 	has_visible_false = false;
 	for (const ui::Attribute& attr : first.attributes) {
-		if (attr.type == ui::AttributeName::VISIBLE && equalStrings(attr.value, "false")) {
+		if (attr.type == ui::AttributeName::VISIBLE && !attr.visible) {
 			has_visible_false = true;
 			break;
 		}
@@ -475,7 +520,7 @@ bool testAddClassDuplicateNoOp() {
 	
 	has_width = false;
 	for (const ui::Attribute& attr : elem.attributes) {
-		if (attr.type == ui::AttributeName::WIDTH && equalStrings(attr.value, "50%")) {
+		if (hasParsedUnit(attr, ui::AttributeName::WIDTH, 50.0f, ui::Unit::PERCENT)) {
 			has_width = true;
 		}
 	}
@@ -485,7 +530,7 @@ bool testAddClassDuplicateNoOp() {
 	
 	has_width = false;
 	for (const ui::Attribute& attr : elem.attributes) {
-		if (attr.type == ui::AttributeName::WIDTH && equalStrings(attr.value, "50%")) {
+		if (hasParsedUnit(attr, ui::AttributeName::WIDTH, 50.0f, ui::Unit::PERCENT)) {
 			has_width = true;
 		}
 	}
@@ -511,7 +556,7 @@ bool testRemoveClassRemovesEffect() {
 	
 	bool has_width = false;
 	for (const ui::Attribute& attr : elem.attributes) {
-		if (attr.type == ui::AttributeName::WIDTH && equalStrings(attr.value, "50%")) {
+		if (hasParsedUnit(attr, ui::AttributeName::WIDTH, 50.0f, ui::Unit::PERCENT)) {
 			has_width = true;
 		}
 	}
@@ -547,7 +592,7 @@ bool testRemoveAbsentClassNoOp() {
 	
 	bool has_width = false;
 	for (const ui::Attribute& attr : elem.attributes) {
-		if (attr.type == ui::AttributeName::WIDTH && equalStrings(attr.value, "50%")) {
+		if (hasParsedUnit(attr, ui::AttributeName::WIDTH, 50.0f, ui::Unit::PERCENT)) {
 			has_width = true;
 		}
 	}
@@ -557,7 +602,7 @@ bool testRemoveAbsentClassNoOp() {
 	
 	has_width = false;
 	for (const ui::Attribute& attr : elem.attributes) {
-		if (attr.type == ui::AttributeName::WIDTH && equalStrings(attr.value, "50%")) {
+		if (hasParsedUnit(attr, ui::AttributeName::WIDTH, 50.0f, ui::Unit::PERCENT)) {
 			has_width = true;
 		}
 	}
@@ -587,10 +632,10 @@ bool testRemoveClassRetainsOthers() {
 	bool has_width = false;
 	bool has_height = false;
 	for (const ui::Attribute& attr : elem.attributes) {
-		if (attr.type == ui::AttributeName::WIDTH && equalStrings(attr.value, "50%")) {
+		if (hasParsedUnit(attr, ui::AttributeName::WIDTH, 50.0f, ui::Unit::PERCENT)) {
 			has_width = true;
 		}
-		if (attr.type == ui::AttributeName::HEIGHT && equalStrings(attr.value, "100")) {
+		if (hasParsedUnit(attr, ui::AttributeName::HEIGHT, 100.0f, ui::Unit::PIXELS)) {
 			has_height = true;
 		}
 	}
@@ -605,7 +650,7 @@ bool testRemoveClassRetainsOthers() {
 		if (attr.type == ui::AttributeName::WIDTH) {
 			has_width = true;
 		}
-		if (attr.type == ui::AttributeName::HEIGHT && equalStrings(attr.value, "100")) {
+		if (hasParsedUnit(attr, ui::AttributeName::HEIGHT, 100.0f, ui::Unit::PIXELS)) {
 			has_height = true;
 		}
 	}
@@ -632,7 +677,7 @@ bool testInlineOverridesClass() {
 	
 	bool has_correct_width = false;
 	for (const ui::Attribute& attr : elem.attributes) {
-		if (attr.type == ui::AttributeName::WIDTH && equalStrings(attr.value, "75%")) {
+		if (hasParsedUnit(attr, ui::AttributeName::WIDTH, 75.0f, ui::Unit::PERCENT)) {
 			has_correct_width = true;
 		}
 	}
@@ -660,7 +705,7 @@ bool testMultipleClassPrecedence() {
 	
 	bool has_correct_width = false;
 	for (const ui::Attribute& attr : elem.attributes) {
-		if (attr.type == ui::AttributeName::WIDTH && equalStrings(attr.value, "75%")) {
+		if (hasParsedUnit(attr, ui::AttributeName::WIDTH, 75.0f, ui::Unit::PERCENT)) {
 			has_correct_width = true;
 		}
 	}
@@ -692,7 +737,7 @@ bool testAddRemoveStability() {
 	int attr_count_after_add_a = elem.attributes.size();
 	bool has_width_50 = false;
 	for (const ui::Attribute& attr : elem.attributes) {
-		if (attr.type == ui::AttributeName::WIDTH && equalStrings(attr.value, "50%")) {
+		if (hasParsedUnit(attr, ui::AttributeName::WIDTH, 50.0f, ui::Unit::PERCENT)) {
 			has_width_50 = true;
 		}
 	}
@@ -702,7 +747,7 @@ bool testAddRemoveStability() {
 	int attr_count_after_add_b = elem.attributes.size();
 	bool has_height_100 = false;
 	for (const ui::Attribute& attr : elem.attributes) {
-		if (attr.type == ui::AttributeName::HEIGHT && equalStrings(attr.value, "100")) {
+		if (hasParsedUnit(attr, ui::AttributeName::HEIGHT, 100.0f, ui::Unit::PIXELS)) {
 			has_height_100 = true;
 		}
 	}
@@ -719,7 +764,7 @@ bool testAddRemoveStability() {
 	ASSERT_EQ(false, has_width_50);
 	has_height_100 = false;
 	for (const ui::Attribute& attr : elem.attributes) {
-		if (attr.type == ui::AttributeName::HEIGHT && equalStrings(attr.value, "100")) {
+		if (hasParsedUnit(attr, ui::AttributeName::HEIGHT, 100.0f, ui::Unit::PIXELS)) {
 			has_height_100 = true;
 		}
 	}
@@ -729,14 +774,14 @@ bool testAddRemoveStability() {
 	int attr_count_after_readd_a = elem.attributes.size();
 	has_width_50 = false;
 	for (const ui::Attribute& attr : elem.attributes) {
-		if (attr.type == ui::AttributeName::WIDTH && equalStrings(attr.value, "50%")) {
+		if (hasParsedUnit(attr, ui::AttributeName::WIDTH, 50.0f, ui::Unit::PERCENT)) {
 			has_width_50 = true;
 		}
 	}
 	ASSERT_EQ(true, has_width_50);
 	has_height_100 = false;
 	for (const ui::Attribute& attr : elem.attributes) {
-		if (attr.type == ui::AttributeName::HEIGHT && equalStrings(attr.value, "100")) {
+		if (hasParsedUnit(attr, ui::AttributeName::HEIGHT, 100.0f, ui::Unit::PIXELS)) {
 			has_height_100 = true;
 		}
 	}
@@ -764,7 +809,7 @@ bool testCompoundClassSelectorMatchesAllClasses() {
 
 	bool has_width = false;
 	for (const ui::Attribute& attr : elem.attributes) {
-		if (attr.type == ui::AttributeName::WIDTH && equalStrings(attr.value, "75%")) {
+		if (hasParsedUnit(attr, ui::AttributeName::WIDTH, 75.0f, ui::Unit::PERCENT)) {
 			has_width = true;
 		}
 	}
@@ -818,10 +863,10 @@ bool testCompoundAndSingleClassRulesBothApply() {
 	bool has_width = false;
 	bool has_height = false;
 	for (const ui::Attribute& attr : elem.attributes) {
-		if (attr.type == ui::AttributeName::WIDTH && equalStrings(attr.value, "75%")) {
+		if (hasParsedUnit(attr, ui::AttributeName::WIDTH, 75.0f, ui::Unit::PERCENT)) {
 			has_width = true;
 		}
-		if (attr.type == ui::AttributeName::HEIGHT && equalStrings(attr.value, "100")) {
+		if (hasParsedUnit(attr, ui::AttributeName::HEIGHT, 100.0f, ui::Unit::PIXELS)) {
 			has_height = true;
 		}
 	}

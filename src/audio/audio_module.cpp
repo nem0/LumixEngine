@@ -291,6 +291,13 @@ struct AudioModuleImpl final : AudioModule
 		m_world.onComponentDestroyed(entity, types::ambient_sound, this);
 	}
 
+	bool shouldSerialize() override {
+		if (m_listener.entity.isValid()) return true;
+		if (m_ambient_sounds.size() != 0) return true;
+		if (m_echo_zones.size() != 0) return true;
+		if (m_chorus_zones.size() != 0) return true;
+		return false;
+	}
 
 	void serialize(OutputMemoryStream& serializer) override
 	{

@@ -1066,6 +1066,12 @@ struct GUIModuleImpl final : GUIModule {
 		checkGarbage(*rect);
 	}
 
+	bool shouldSerialize() override {
+		if (!m_rects.empty()) return true;
+		if (!m_buttons.empty()) return true;
+		if (!m_canvas.empty()) return true;
+		return false;
+	}
 
 	void serialize(OutputMemoryStream& serializer) override
 	{

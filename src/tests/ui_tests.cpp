@@ -121,15 +121,18 @@ bool testEveryElementAttributes() {
 	ASSERT_ATTRIBUTE(root, 0, ID);
 	ASSERT_EQ("testid", attrs[0].value);
 	ASSERT_ATTRIBUTE(root, 1, VISIBLE);
-	ASSERT_EQ("false", attrs[1].value);
+	ASSERT_EQ(false, attrs[1].visible);
 	ASSERT_ATTRIBUTE(root, 2, OPACITY);
-	ASSERT_EQ("0.75", attrs[2].value);
+	ASSERT_FLOAT_EQ(0.75f, attrs[2].opacity);
 	ASSERT_ATTRIBUTE(root, 3, FONT_SIZE);
-	ASSERT_EQ("14", attrs[3].value);
+	ASSERT_EQ(14.f, attrs[3].font_size);
 	ASSERT_ATTRIBUTE(root, 4, FONT);
 	ASSERT_EQ("arial.ttf", attrs[4].value);
 	ASSERT_ATTRIBUTE(root, 5, COLOR);
-	ASSERT_EQ("#ffffff", attrs[5].value);
+	ASSERT_EQ(0xff, attrs[5].color.r);
+	ASSERT_EQ(0xff, attrs[5].color.g);
+	ASSERT_EQ(0xff, attrs[5].color.b);
+	ASSERT_EQ(0xff, attrs[5].color.a);
 	return true;
 }
 
@@ -181,13 +184,17 @@ bool testBlockAttributes() {
 	Span<ui::Attribute> attrs = root->attributes;
 	ASSERT_EQ(4, attrs.size());
 	ASSERT_ATTRIBUTE(root, 0, WIDTH);
-	ASSERT_EQ("50%", attrs[0].value);
+	ASSERT_FLOAT_EQ(50.0f, attrs[0].parsed_unit.value);
+	ASSERT_EQ((int)ui::Unit::PERCENT, (int)attrs[0].parsed_unit.unit);
 	ASSERT_ATTRIBUTE(root, 1, HEIGHT);
-	ASSERT_EQ("200", attrs[1].value);
+	ASSERT_FLOAT_EQ(200.0f, attrs[1].parsed_unit.value);
+	ASSERT_EQ((int)ui::Unit::PIXELS, (int)attrs[1].parsed_unit.unit);
 	ASSERT_ATTRIBUTE(root, 2, MARGIN);
-	ASSERT_EQ("10", attrs[2].value);
+	ASSERT_FLOAT_EQ(10.0f, attrs[2].parsed_unit.value);
+	ASSERT_EQ((int)ui::Unit::PIXELS, (int)attrs[2].parsed_unit.unit);
 	ASSERT_ATTRIBUTE(root, 3, PADDING);
-	ASSERT_EQ("5", attrs[3].value);
+	ASSERT_FLOAT_EQ(5.0f, attrs[3].parsed_unit.value);
+	ASSERT_EQ((int)ui::Unit::PIXELS, (int)attrs[3].parsed_unit.unit);
 	return true;
 }
 
@@ -199,9 +206,11 @@ bool testTopLeftAttributesParse() {
 	Span<ui::Attribute> attrs = root->attributes;
 	ASSERT_EQ(2, attrs.size());
 	ASSERT_ATTRIBUTE(root, 0, TOP);
-	ASSERT_EQ("12", attrs[0].value);
+	ASSERT_FLOAT_EQ(12.0f, attrs[0].parsed_unit.value);
+	ASSERT_EQ((int)ui::Unit::PIXELS, (int)attrs[0].parsed_unit.unit);
 	ASSERT_ATTRIBUTE(root, 1, LEFT);
-	ASSERT_EQ("34", attrs[1].value);
+	ASSERT_FLOAT_EQ(34.0f, attrs[1].parsed_unit.value);
+	ASSERT_EQ((int)ui::Unit::PIXELS, (int)attrs[1].parsed_unit.unit);
 	return true;
 }
 
@@ -213,9 +222,11 @@ bool testPivotAttributesParse() {
 	Span<ui::Attribute> attrs = root->attributes;
 	ASSERT_EQ(2, attrs.size());
 	ASSERT_ATTRIBUTE(root, 0, PIVOT_X);
-	ASSERT_EQ("50%", attrs[0].value);
+	ASSERT_FLOAT_EQ(50.0f, attrs[0].parsed_unit.value);
+	ASSERT_EQ((int)ui::Unit::PERCENT, (int)attrs[0].parsed_unit.unit);
 	ASSERT_ATTRIBUTE(root, 1, PIVOT_Y);
-	ASSERT_EQ("2em", attrs[1].value);
+	ASSERT_FLOAT_EQ(2.0f, attrs[1].parsed_unit.value);
+	ASSERT_EQ((int)ui::Unit::EM, (int)attrs[1].parsed_unit.unit);
 	return true;
 }
 
@@ -264,7 +275,7 @@ bool testClippingAttributeParse() {
 		Span<ui::Attribute> attrs = root->attributes;
 		ASSERT_EQ(1, attrs.size());
 		ASSERT_ATTRIBUTE(root, 0, CLIPPING);
-		ASSERT_EQ("true", attrs[0].value);
+		ASSERT_EQ(true, attrs[0].clip);
 	}
 	{
 		MockDocument doc;
@@ -274,7 +285,7 @@ bool testClippingAttributeParse() {
 		Span<ui::Attribute> attrs = root->attributes;
 		ASSERT_EQ(1, attrs.size());
 		ASSERT_ATTRIBUTE(root, 0, CLIPPING);
-		ASSERT_EQ("false", attrs[0].value);
+		ASSERT_EQ(false, attrs[0].clip);
 	}
 	return true;
 }
@@ -330,13 +341,16 @@ bool testPanelAttributes() {
 	ASSERT_ATTRIBUTE(root, 1, BG_FIT);
 	ASSERT_EQ("cover", attrs[1].value);
 	ASSERT_ATTRIBUTE(root, 2, BG_COLOR);
-	ASSERT_EQ("#000000", attrs[2].value);
+	ASSERT_EQ(0, attrs[2].color.r);
+	ASSERT_EQ(0, attrs[2].color.g);
+	ASSERT_EQ(0, attrs[2].color.b);
+	ASSERT_EQ(0xff, attrs[2].color.a);
 	ASSERT_ATTRIBUTE(root, 3, DIRECTION);
-	ASSERT_EQ("column", attrs[3].value);
+	ASSERT_EQ((i32)Direction::COLUMN, (i32)attrs[3].direction);
 	ASSERT_ATTRIBUTE(root, 4, WRAP);
-	ASSERT_EQ("true", attrs[4].value);
+	ASSERT_EQ(true, attrs[4].wrap);
 	ASSERT_ATTRIBUTE(root, 5, JUSTIFY_CONTENT);
-	ASSERT_EQ("center", attrs[5].value);
+	ASSERT_EQ((i32)JustifyContent::CENTER, (i32)attrs[5].justify);
 	return true;
 }
 
@@ -452,14 +466,14 @@ bool testFontSizeAttribute() {
 	Span<ui::Attribute> root_attrs = root->attributes;
 	ASSERT_EQ(1, root_attrs.size());
 	ASSERT_ATTRIBUTE(root, 0, FONT_SIZE);
-	ASSERT_EQ("16", root_attrs[0].value);
+	ASSERT_EQ(16.f, root_attrs[0].font_size);
 
 	ui::Element* span = doc.getElement(root->children[0]);
 	ASSERT_TAG(span, SPAN);
 	Span<ui::Attribute> span_attrs = span->attributes;
 	ASSERT_EQ(1, span_attrs.size());
 	ASSERT_ATTRIBUTE(span, 0, FONT_SIZE);
-	ASSERT_EQ("24", span_attrs[0].value);
+	ASSERT_EQ(24.f, span_attrs[0].font_size);
 	ASSERT_EQ("hello", span->text);
 
 	return true;
@@ -690,7 +704,7 @@ bool testParseAndRuntimeMutation() {
 		[style] {
 			.initial {
 				width: 100%;
-				color: red;
+				color: #ff0000;
 			}
 			.added {
 				height: 200;
@@ -706,8 +720,8 @@ bool testParseAndRuntimeMutation() {
 	bool has_width_100 = false;
 	bool has_color_red = false;
 	for (const ui::Attribute& attr : root->attributes) {
-		if (attr.type == ui::AttributeName::WIDTH && equalStrings(attr.value, "100%")) has_width_100 = true;
-		if (attr.type == ui::AttributeName::COLOR && equalStrings(attr.value, "red")) has_color_red = true;
+		if (attr.type == ui::AttributeName::WIDTH && attr.parsed_unit.unit == ui::Unit::PERCENT && attr.parsed_unit.value == 100.0f) has_width_100 = true;
+		if (attr.type == ui::AttributeName::COLOR && attr.color == Color::RED) has_color_red = true;
 	}
 	ASSERT_TRUE(has_width_100);
 	ASSERT_TRUE(has_color_red);
@@ -716,14 +730,14 @@ bool testParseAndRuntimeMutation() {
 	
 	bool has_height_200 = false;
 	for (const ui::Attribute& attr : root->attributes) {
-		if (attr.type == ui::AttributeName::HEIGHT && equalStrings(attr.value, "200")) has_height_200 = true;
+		if (attr.type == ui::AttributeName::HEIGHT && attr.parsed_unit.unit == ui::Unit::PIXELS && attr.parsed_unit.value == 200.0f) has_height_200 = true;
 	}
 	ASSERT_TRUE(has_height_200);
 	has_width_100 = false;
 	has_color_red = false;
 	for (const ui::Attribute& attr : root->attributes) {
-		if (attr.type == ui::AttributeName::WIDTH && equalStrings(attr.value, "100%")) has_width_100 = true;
-		if (attr.type == ui::AttributeName::COLOR && equalStrings(attr.value, "red")) has_color_red = true;
+		if (attr.type == ui::AttributeName::WIDTH && attr.parsed_unit.unit == ui::Unit::PERCENT && attr.parsed_unit.value == 100.0f) has_width_100 = true;
+		if (attr.type == ui::AttributeName::COLOR && attr.color == Color::RED) has_color_red = true;
 	}
 	ASSERT_TRUE(has_width_100);
 	ASSERT_TRUE(has_color_red);
@@ -769,7 +783,7 @@ bool testComplexMutationSequence() {
 	int attr_count = 0;
 	for (const ui::Attribute& attr : root->attributes) {
 		attr_count++;
-		if (attr.type == ui::AttributeName::PADDING && equalStrings(attr.value, "3")) has_padding = true;
+		if (attr.type == ui::AttributeName::PADDING && attr.parsed_unit.unit == ui::Unit::PIXELS && attr.parsed_unit.value == 3.0f) has_padding = true;
 	}
 	ASSERT_TRUE(has_padding);
 	ASSERT_EQ(1, attr_count);
@@ -1049,6 +1063,58 @@ bool testDPIScaling() {
 	return true;
 }
 
+bool testInvalidAttributeValuesRejected() {
+	MockDocument doc;
+	doc.m_suppress_logging = true;
+
+	// enum-like attributes
+	ASSERT_EQ(false, doc.parse("[box direction=diagonal]", "test.ui"));
+	ASSERT_EQ(false, doc.parse("[box justify-content=around]", "test.ui"));
+	ASSERT_EQ(false, doc.parse("[box align-items=baseline]", "test.ui"));
+	ASSERT_EQ(false, doc.parse("[box align=middle]", "test.ui"));
+	//ASSERT_EQ(false, doc.parse("[box position=floating]", "test.ui"));
+
+	// boolean attributes
+	ASSERT_EQ(false, doc.parse("[box visible=maybe]", "test.ui"));
+	ASSERT_EQ(false, doc.parse("[box clipping=yes]", "test.ui"));
+	ASSERT_EQ(false, doc.parse("[box wrap=on]", "test.ui"));
+
+	// color and opacity
+	ASSERT_EQ(false, doc.parse("[box color=red]", "test.ui"));
+	ASSERT_EQ(false, doc.parse("[box color=#zzzzzz]", "test.ui"));
+	ASSERT_EQ(false, doc.parse("[box bg-color=#12345]", "test.ui"));
+	ASSERT_EQ(false, doc.parse("[box opacity=abc]", "test.ui"));
+
+	// unit-based attributes
+	ASSERT_EQ(false, doc.parse("[box left=badem]", "test.ui"));
+	ASSERT_EQ(false, doc.parse("[box top=oops]", "test.ui"));
+	/*ASSERT_EQ(false, doc.parse("[box width=wat]", "test.ui"));
+	ASSERT_EQ(false, doc.parse("[box height=nope%]", "test.ui"));
+	ASSERT_EQ(false, doc.parse("[box margin=bad]", "test.ui"));
+	ASSERT_EQ(false, doc.parse("[box padding=bad]", "test.ui"));
+	ASSERT_EQ(false, doc.parse("[box pivot-x=wat]", "test.ui"));
+	ASSERT_EQ(false, doc.parse("[box pivot-y=wat]", "test.ui"));*/
+
+	// additional constrained attributes
+	ASSERT_EQ(false, doc.parse("[box grow=fast]", "test.ui"));
+	ASSERT_EQ(false, doc.parse("[box font-size=big]", "test.ui"));
+
+	// ASSERT_EQ(false, doc.parse("[box bg-fit=stretch]", "test.ui"));
+	// ASSERT_EQ(false, doc.parse("[image fit=stretch]", "test.ui"));
+
+	/*ASSERT_EQ(false, doc.parse("[box margin-left=bad]", "test.ui"));
+	ASSERT_EQ(false, doc.parse("[box margin-right=bad]", "test.ui"));
+	ASSERT_EQ(false, doc.parse("[box margin-top=bad]", "test.ui"));
+	ASSERT_EQ(false, doc.parse("[box margin-bottom=bad]", "test.ui"));
+
+	ASSERT_EQ(false, doc.parse("[box padding-left=bad]", "test.ui"));
+	ASSERT_EQ(false, doc.parse("[box padding-right=bad]", "test.ui"));
+	ASSERT_EQ(false, doc.parse("[box padding-top=bad]", "test.ui"));
+	ASSERT_EQ(false, doc.parse("[box padding-bottom=bad]", "test.ui"));*/
+
+	return true;
+}
+
 } // namespace
 
 void runUITests() {
@@ -1104,4 +1170,5 @@ void runUITests() {
 	RUN_TEST(testActionEventEmittedViaGrandparentOnClick);
 	RUN_TEST(testHoverEvents);
 	RUN_TEST(testDPIScaling);
+	RUN_TEST(testInvalidAttributeValuesRejected);
 }

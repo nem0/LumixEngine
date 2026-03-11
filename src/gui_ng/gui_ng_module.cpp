@@ -210,6 +210,10 @@ struct UIModuleImpl : UIModule {
 		m_is_ready = false;
 	}
 
+	bool shouldSerialize() override {
+		return !m_ui_3d_components.empty();
+	}
+
 	void serialize(OutputMemoryStream& serializer) override {
 		serializer.write(m_ui_3d_components.size());
 		for (UI3DComponent* component : m_ui_3d_components) {

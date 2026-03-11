@@ -1,4 +1,5 @@
 #include "core/log.h"
+#include "core/math.h"
 #include "core/os.h"
 #include "core/profiler.h"
 #include "core/stack_array.h"
@@ -134,71 +135,275 @@ static int sourcePriority(AttributeSource source) {
 	return source == AttributeSource::ELEMENT ? 2 : 1;
 }
 
-static void upsertAttribute(Element& elem, AttributeName type, StringView value, AttributeSource source) {
+static bool parseBool(StringView value, bool& out) {
+	if (value == "true") {
+		out = true;
+		return true;
+	}
+	if (value == "false") {
+		out = false;
+		return true;
+	}
+	return false;
+}
+
+static bool parseColor(StringView str, Color& out) {
+	if ((str.size() != 7 && str.size() != 9) || str[0] != '#') return false;
+	auto hexToInt = [](const char* s, int len) -> int {
+		int res = 0;
+		for (int i = 0; i < len; ++i) {
+			char c = s[i];
+			int d = 0;
+			if (c >= '0' && c <= '9') d = c - '0';
+			else if (c >= 'a' && c <= 'f') d = 10 + (c - 'a');
+			else if (c >= 'A' && c <= 'F') d = 10 + (c - 'A');
+			else return -1;
+			res = res * 16 + d;
+		}
+		return res;
+	};
+	int r = hexToInt(str.begin + 1, 2);
+	int g = hexToInt(str.begin + 3, 2);
+	int b = hexToInt(str.begin + 5, 2);
+	int a = str.size() == 9 ? hexToInt(str.begin + 7, 2) : 255;
+	if (r < 0 || g < 0 || b < 0 || a < 0) return false;
+	out = Color(u8(r), u8(g), u8(b), u8(a));
+	return true;
+}
+
+static bool parseOpacity(StringView value, float& out) {
+	float opacity = 0.0f;
+	const char* end = fromCString(value, opacity);
+	if (!end) return false;
+
+	if (end == value.end - 1 && *end == '%') {
+		opacity *= 0.01f;
+	}
+	else if (end != value.end) {
+		return false;
+	}
+
+	out = clamp(opacity, 0.f, 1.f);
+	return true;
+}
+
+static const char* attributeNameToString(AttributeName name) {
+	switch (name) {
+		case AttributeName::ALIGN: return "align";
+		case AttributeName::ALIGN_ITEMS: return "align-items";
+		case AttributeName::BG_COLOR: return "bg-color";
+		case AttributeName::CLIPPING: return "clipping";
+		case AttributeName::COLOR: return "color";
+		case AttributeName::DIRECTION: return "direction";
+		case AttributeName::JUSTIFY_CONTENT: return "justify-content";
+		case AttributeName::OPACITY: return "opacity";
+		case AttributeName::VISIBLE: return "visible";
+		case AttributeName::WRAP: return "wrap";
+		default: return "attribute";
+	}
+}
+
+static bool parseUnit(StringView str, ParsedUnit& out) {
+	out.value = 0.0f;
+	out.unit = Unit::PIXELS;
+	if (str.empty()) return false;
+
+	if (str == "fit-content") {
+		out.value = 0.0f;
+		out.unit = Unit::FIT_CONTENT;
+		return true;
+	}
+
+	Unit unit = Unit::PIXELS;
+	StringView number(str);
+	u32 len = (u32)str.size();
+	if (len > 0 && str.back() == '%') {
+		if (len == 1) return false;
+		unit = Unit::PERCENT;
+		number = StringView(str.begin, str.end - 1);
+	} else if (len >= 2 && *(str.end - 2) == 'e' && str.back() == 'm') {
+		if (len == 2) return false;
+		unit = Unit::EM;
+		number = StringView(str.begin, str.end - 2);
+	}
+
+	if (number.empty()) return false;
+
+	const char* end = fromCString(number, out.value);
+	if (!end || end != number.end) return false;
+
+	out.unit = unit;
+	return true;
+}
+
+static bool parseTypedAttributeValue(Document& doc, AttributeName name, StringView value, Attribute& out) {
+	switch (name) {
+		case AttributeName::ALIGN: {
+			const u32 len = (u32)value.size();
+			if (len == 0) return false;
+			const char* s = value.begin;
+			switch (len) {
+				case 4: if (memcmp(s, "left", 4) == 0) { out.align = Align::LEFT; return true; } break;
+				case 5: if (memcmp(s, "right", 5) == 0) { out.align = Align::RIGHT; return true; } break;
+				case 6: if (memcmp(s, "center", 6) == 0) { out.align = Align::CENTER; return true; } break;
+			}
+			return false;
+		}
+		case AttributeName::ALIGN_ITEMS: {
+			const u32 len = (u32)value.size();
+			const char* s = value.begin;
+			switch (len) {
+				case 3: if (memcmp(s, "end", 3) == 0) { out.align_items = AlignItems::END; return true; } break;
+				case 5: if (memcmp(s, "start", 5) == 0) { out.align_items = AlignItems::START; return true; } break;
+				case 6: if (memcmp(s, "center", 6) == 0) { out.align_items = AlignItems::CENTER; return true; } break;
+				case 7: if (memcmp(s, "stretch", 7) == 0) { out.align_items = AlignItems::STRETCH; return true; } break;
+			}
+			return false;
+		}
+		case AttributeName::DIRECTION: {
+			const u32 len = (u32)value.size();
+			const char* s = value.begin;
+			switch (len) {
+				case 3: if (memcmp(s, "row", 3) == 0) { out.direction = Direction::ROW; return true; } break;
+				case 6: if (memcmp(s, "column", 6) == 0) {  out.direction = Direction::COLUMN; return true; } break;
+			}
+			return false;
+		}
+		case AttributeName::JUSTIFY_CONTENT: {
+			const u32 len = (u32)value.size();
+			if (len == 0) return false;
+			const char* s = value.begin;
+			switch (value[0]) {
+				case 's':
+					if (len == 5 && memcmp(s, "start", 5) == 0) { out.justify = JustifyContent::START; return true; }
+					if (len == 13 && memcmp(s, "space-between", 13) == 0) { out.justify = JustifyContent::SPACE_BETWEEN; return true; }
+					if (len == 12 && memcmp(s, "space-around", 12) == 0) { out.justify = JustifyContent::SPACE_AROUND; return true; }
+					break;
+				case 'c': if (len == 6 && memcmp(s, "center", 6) == 0) { out.justify = JustifyContent::CENTER; return true; } break;
+				case 'e': if (len == 3 && memcmp(s, "end", 3) == 0) { out.justify = JustifyContent::END; return true; } break;
+			}
+			return false;
+		}
+		case AttributeName::GROW: {
+			float grow = 0;
+			if (!fromCString(value, grow) || grow < 0 || grow != grow) return false;
+			out.grow = grow;
+			return true;
+		}
+		case AttributeName::FONT_SIZE: {
+			float font_size = 12.0f;
+			const char* end = fromCString(value, font_size);
+			if (!end || font_size < 0 || font_size != font_size) return false;
+			out.font_size = font_size;
+			return true;
+		}
+		case AttributeName::WIDTH:
+		case AttributeName::HEIGHT:
+		case AttributeName::TOP:
+		case AttributeName::LEFT:
+		case AttributeName::PIVOT_X:
+		case AttributeName::PIVOT_Y:
+		case AttributeName::MARGIN:
+		case AttributeName::MARGIN_TOP:
+		case AttributeName::MARGIN_RIGHT:
+		case AttributeName::MARGIN_BOTTOM:
+		case AttributeName::MARGIN_LEFT:
+		case AttributeName::PADDING:
+		case AttributeName::PADDING_TOP:
+		case AttributeName::PADDING_RIGHT:
+		case AttributeName::PADDING_BOTTOM:
+		case AttributeName::PADDING_LEFT: {
+			if (!parseUnit(value, out.parsed_unit)) return false;
+			return true;
+		}
+		case AttributeName::VISIBLE: return parseBool(value, out.visible);
+		case AttributeName::WRAP: return parseBool(value, out.wrap);
+		case AttributeName::CLIPPING: return parseBool(value, out.clip);
+		case AttributeName::OPACITY: return parseOpacity(value, out.opacity);
+		case AttributeName::COLOR:
+		case AttributeName::BG_COLOR: return parseColor(value, out.color);
+		default:
+			out.value = value;
+			return true;
+	}
+}
+
+bool Document::parseAttributeValue(Element& elem, AttributeName name, StringView value) {
+	if (name == AttributeName::ON_CLICK && elem.tag != Tag::BOX) {
+		error(m_tokenizer.m_current_token.value, m_tokenizer, "attribute 'on-click' is allowed only on [box]");
+		return false;
+	}
+	if (name == AttributeName::TEXT) {
+		elem.text = value;
+		return true;
+	}
+
+	Attribute attr;
+	attr.type = name;
+	attr.source = AttributeSource::ELEMENT;
+	if (!parseTypedAttributeValue(*this, name, value, attr)) {
+		error(value, m_tokenizer, "invalid value '", value, "' for attribute '", attributeNameToString(name), "'");
+		return false;
+	}
+	elem.attributes.push(attr);
+	return true;
+}
+
+template <AttributeName N, typename T>
+static void upsertAttribute(Element& elem, const T& value, AttributeSource source) {
+	const int incoming_prio = sourcePriority(source);
+	
+	for (const Attribute& attr : elem.attributes) {
+		if (attr.type != N) continue;
+		if (sourcePriority(attr.source) > incoming_prio) return;
+	}
+	
+	for (i32 i = elem.attributes.size() - 1; i >= 0; --i) {
+		const Attribute& attr = elem.attributes[i];
+		if (attr.type != N) continue;
+		if (sourcePriority(attr.source) <= incoming_prio) {
+			elem.attributes.erase(i);
+		}
+	}
+	
+	Attribute& attr = elem.attributes.emplace();
+	attr.type = N;
+	if constexpr (N == AttributeName::DIRECTION) attr.direction = value;
+	else if constexpr (N == AttributeName::ALIGN) attr.align = value;
+	else if constexpr (N == AttributeName::JUSTIFY_CONTENT) attr.justify = value;
+	else if constexpr (N == AttributeName::ALIGN_ITEMS) attr.align_items = value;
+	else if constexpr (N == AttributeName::VISIBLE) attr.visible = value;
+	else if constexpr (N == AttributeName::WRAP) attr.wrap = value;
+	else if constexpr (N == AttributeName::CLIPPING) attr.clip = value;
+	else if constexpr (N == AttributeName::OPACITY) attr.opacity = value;
+	else if constexpr (N == AttributeName::WIDTH) {
+		if (!parseUnit(value, attr.parsed_unit)) {
+			logError("invalid value '", value, "' for attribute '", attributeNameToString(N), "'");
+		}
+	}
+	else attr.value = value;
+	attr.source = source;
+}
+
+static void upsertAttribute(Element& elem, const Attribute& incoming, AttributeSource source) {
 	const int incoming_prio = sourcePriority(source);
 
 	for (const Attribute& attr : elem.attributes) {
-		if (attr.type != type) continue;
+		if (attr.type != incoming.type) continue;
 		if (sourcePriority(attr.source) > incoming_prio) return;
 	}
 
 	for (i32 i = elem.attributes.size() - 1; i >= 0; --i) {
 		const Attribute& attr = elem.attributes[i];
-		if (attr.type != type) continue;
+		if (attr.type != incoming.type) continue;
 		if (sourcePriority(attr.source) <= incoming_prio) {
 			elem.attributes.erase(i);
 		}
 	}
 
 	Attribute& attr = elem.attributes.emplace();
-	attr.type = type;
-	attr.value = value;
+	attr = incoming;
 	attr.source = source;
-}
-
-static JustifyContent parseJustifyContent(StringView value) {
-    const u32 len = (u32)value.size();
-    if (len == 0) return JustifyContent::START;
-    const char* s = value.begin;
-    switch (value[0]) {
-        case 's':
-            if (len == 5 && memcmp(s, "start", 5) == 0) return JustifyContent::START;
-            if (len == 13 && memcmp(s, "space-between", 13) == 0) return JustifyContent::SPACE_BETWEEN;
-            if (len == 12 && memcmp(s, "space-around", 12) == 0) return JustifyContent::SPACE_AROUND;
-            break;
-        case 'c':
-            if (len == 6 && memcmp(s, "center", 6) == 0) return JustifyContent::CENTER;
-            break;
-        case 'e':
-            if (len == 3 && memcmp(s, "end", 3) == 0) return JustifyContent::END;
-            break;
-    }
-    return JustifyContent::START;
-}
-
-static AlignItems parseAlignItems(StringView value) {
-    const u32 len = (u32)value.size();
-    const char* s = value.begin;
-    switch (len) {
-        case 0: return AlignItems::START;
-		case 3: if (memcmp(s, "end", 3) == 0) return AlignItems::END; break;
-        case 5: if (memcmp(s, "start", 5) == 0) return AlignItems::START; break;
-        case 6: if (memcmp(s, "center", 6) == 0) return AlignItems::CENTER; break;
-        case 7: if (memcmp(s, "stretch", 7) == 0) return AlignItems::STRETCH; break;
-    }
-    return AlignItems::START;
-}
-
-static Align parseAlign(StringView value) {
-    const u32 len = (u32)value.size();
-    const char* s = value.begin;
-    switch (len) {
-		case 0: return Align::LEFT;
-        case 4: if (memcmp(s, "left", 4) == 0) return Align::LEFT; break;
-        case 5: if (memcmp(s, "right", 5) == 0) return Align::RIGHT; break;
-        case 6: if (memcmp(s, "center", 6) == 0) return Align::CENTER; break;
-    }
-    return Align::LEFT;
 }
 
 enum class PositionAnchor : u8 {
@@ -263,29 +468,6 @@ static bool parsePositionPreset(StringView value, PositionAnchor& horizontal, Po
 		return true;
 	}
 	return false;
-}
-
-static Color parseColor(StringView str) {
-	if ((str.size() != 7 && str.size() != 9) || str[0] != '#') return Color::BLACK;
-	auto hexToInt = [](const char* s, int len) -> int {
-		int res = 0;
-		for (int i = 0; i < len; ++i) {
-			char c = s[i];
-			int d = 0;
-			if (c >= '0' && c <= '9') d = c - '0';
-			else if (c >= 'a' && c <= 'f') d = 10 + (c - 'a');
-			else if (c >= 'A' && c <= 'F') d = 10 + (c - 'A');
-			else return -1;
-			res = res * 16 + d;
-		}
-		return res;
-	};
-	int r = hexToInt(str.begin + 1, 2);
-	int g = hexToInt(str.begin + 3, 2);
-	int b = hexToInt(str.begin + 5, 2);
-	int a = str.size() == 9 ? hexToInt(str.begin + 7, 2) : 255;
-	if (r < 0 || g < 0 || b < 0 || a < 0) return Color::BLACK;
-	return Color(u8(r), u8(g), u8(b), u8(a));
 }
 
 bool Document::tryConsume(Token::Type type, Token* out_token) {
@@ -358,11 +540,14 @@ bool Document::parseStyleBlock() {
 			}
 			
 			Attribute& attr = rule.attributes.emplace();
-			attr.value = token.value;
 			attr.type = parseAttributeName(name);
 			attr.source = AttributeSource::STYLESHEET;
 			if (attr.type == AttributeName::INVALID) {
 				error(name, m_tokenizer, "unknown attribute '", name, "'");
+				return false;
+			}
+			if (!parseTypedAttributeValue(*this, attr.type, token.value, attr)) {
+				error(token.value, m_tokenizer, "invalid value '", token.value, "' for attribute '", attributeNameToString(attr.type), "'");
 				return false;
 			}
 			
@@ -497,16 +682,7 @@ bool Document::parseElements(u32 parent_index) {
 						error(name_token.value, m_tokenizer, "unknown attribute '", name_token.value, "'");
 						return false;
 					}
-					if (name == AttributeName::ON_CLICK && tag != Tag::BOX) {
-						error(name_token.value, m_tokenizer, "attribute 'on-click' is allowed only on [box]");
-						return false;
-					}
-					if (name == AttributeName::TEXT) {
-						elem.text = value.value;
-					}
-					else {
-						upsertAttribute(elem, name, value.value, AttributeSource::ELEMENT);
-					}
+					if (!parseAttributeValue(elem, name, value.value)) return false;
 					token = m_tokenizer.peekToken();
 				}
 
@@ -572,7 +748,7 @@ bool Document::parseElements(u32 parent_index) {
 }
 
 void Element::setVisible(bool show) {
-	upsertAttribute(*this, AttributeName::VISIBLE, show ? "true" : "false", AttributeSource::ELEMENT);
+	upsertAttribute<AttributeName::VISIBLE>(*this, show, AttributeSource::ELEMENT);
 
 	if (visible == show) return;
 	visible = show;
@@ -583,7 +759,7 @@ void Element::setBGImage(const Path& path) {
 	// since we can't ensure path lifetime, we store the path in intern string table
 	InternString s = m_document.m_intern_table.intern(path);
 	StringView sv = m_document.m_intern_table.resolve(s);
-	upsertAttribute(*this, AttributeName::BG_IMAGE, sv, AttributeSource::ELEMENT);
+	upsertAttribute<AttributeName::BG_IMAGE>(*this, sv, AttributeSource::ELEMENT);
 	if (m_document.m_resource_manager) {
 		bg_sprite = m_document.m_resource_manager->load<Sprite>(path);
 	}
@@ -591,50 +767,16 @@ void Element::setBGImage(const Path& path) {
 }
 
 void Element::setText(StringView v) {
-	upsertAttribute(*this, AttributeName::TEXT, v, AttributeSource::ELEMENT);
+	upsertAttribute<AttributeName::TEXT>(*this, v, AttributeSource::ELEMENT);
 
 	text = v;
 	m_document.computeLayout(m_document.m_canvas_size);
 }
 
-static ParsedUnit parseUnit(StringView str) {
-	float value = 0.0f;
-	Unit unit = Unit::PIXELS;
-	if (!str.empty()) {
-		if (str == "fit-content") {
-			unit = Unit::FIT_CONTENT;
-		} else {
-			fromCString(str, value);
-			if (str.size() >= 1 && str.back() == '%') {
-				unit = Unit::PERCENT;
-			} else if (str.size() >= 2 && *(str.end - 2) == 'e' && str.back() == 'm') {
-				unit = Unit::EM;
-			} else {
-				unit = Unit::PIXELS;
-			}
-		}
-	}
-	return {value, unit};
-}
-
-static float parseFontSize(StringView value, float dpi_scale) {
-	float font_size = 12.0f;
-	fromCString(value, font_size);
-	return font_size * dpi_scale;
-}
-
-static float parseOpacity(StringView value) {
-	float opacity = 1.0f;
-	fromCString(value, opacity);
-	if (!value.empty() && value.back() == '%') {
-		opacity *= 0.01f;
-	}
-	return minimum(1.0f, maximum(0.0f, opacity));
-}
-
 void Element::setWidth(StringView value) {
-	upsertAttribute(*this, AttributeName::WIDTH, value, AttributeSource::ELEMENT);
-	width_unit = parseUnit(value);
+	upsertAttribute<AttributeName::WIDTH>(*this, value, AttributeSource::ELEMENT);
+	ParsedUnit parsed = {0, Unit::PIXELS};
+	width_unit = parsed;
 	m_document.computeLayout(m_document.m_canvas_size);
 }
 
@@ -865,6 +1007,7 @@ struct ParentContext {
 	StringView font;
 	Color color = Color::BLACK;
 	Align align = Align::LEFT;
+	JustifyContent justify = JustifyContent::START;
 	float opacity = 1.0f;
 	// not inheritable
 	Vec2 size;
@@ -951,13 +1094,13 @@ static void computeBaseHeights(Document& doc, Element& elem, Element* parent_ele
 
 	for (const Attribute& attr : elem.attributes) {
 		switch (attr.type) {
-			case AttributeName::MARGIN: margin_unit[0] = margin_unit[1] = parseUnit(attr.value); break;
-			case AttributeName::PADDING: padding_unit[0] = padding_unit[1] = parseUnit(attr.value); break;
-			case AttributeName::PADDING_TOP: padding_unit[0] = parseUnit(attr.value); break;
-			case AttributeName::PADDING_BOTTOM: padding_unit[1] = parseUnit(attr.value); break;
-			case AttributeName::MARGIN_TOP: margin_unit[0] = parseUnit(attr.value); break;
-			case AttributeName::MARGIN_BOTTOM: margin_unit[1] = parseUnit(attr.value); break;
-			case AttributeName::TOP: top_unit = parseUnit(attr.value); break;
+			case AttributeName::MARGIN: margin_unit[0] = margin_unit[1] = attr.parsed_unit; break;
+			case AttributeName::PADDING: padding_unit[0] = padding_unit[1] = attr.parsed_unit; break;
+			case AttributeName::PADDING_TOP: padding_unit[0] = attr.parsed_unit; break;
+			case AttributeName::PADDING_BOTTOM: padding_unit[1] = attr.parsed_unit; break;
+			case AttributeName::MARGIN_TOP: margin_unit[0] = attr.parsed_unit; break;
+			case AttributeName::MARGIN_BOTTOM: margin_unit[1] = attr.parsed_unit; break;
+			case AttributeName::TOP: top_unit = attr.parsed_unit; break;
 			case AttributeName::POSITION: {
 				PositionAnchor horizontal;
 				PositionAnchor vertical;
@@ -1067,13 +1210,13 @@ static void computeBaseWidths(Document& doc, Element& elem, Element* parent_elem
 	for (const Attribute& attr : elem.attributes) {
 		switch (attr.type) {
 			case AttributeName::FONT: ctx.font = attr.value; break;
-			case AttributeName::PADDING: padding_unit[0] = padding_unit[1] = parseUnit(attr.value); break;
-			case AttributeName::MARGIN: margin_unit[0] = margin_unit[1] = parseUnit(attr.value); break;
-			case AttributeName::PADDING_LEFT: padding_unit[0] = parseUnit(attr.value); break;
-			case AttributeName::PADDING_RIGHT: padding_unit[1] = parseUnit(attr.value); break;
-			case AttributeName::MARGIN_LEFT: margin_unit[0] = parseUnit(attr.value); break;
-			case AttributeName::MARGIN_RIGHT: margin_unit[1] = parseUnit(attr.value); break;
-			case AttributeName::LEFT: left_unit = parseUnit(attr.value); break;
+			case AttributeName::PADDING: padding_unit[0] = padding_unit[1] = attr.parsed_unit; break;
+			case AttributeName::MARGIN: margin_unit[0] = margin_unit[1] = attr.parsed_unit; break;
+			case AttributeName::PADDING_LEFT: padding_unit[0] = attr.parsed_unit; break;
+			case AttributeName::PADDING_RIGHT: padding_unit[1] = attr.parsed_unit; break;
+			case AttributeName::MARGIN_LEFT: margin_unit[0] = attr.parsed_unit; break;
+			case AttributeName::MARGIN_RIGHT: margin_unit[1] = attr.parsed_unit; break;
+			case AttributeName::LEFT: left_unit = attr.parsed_unit; break;
 			case AttributeName::POSITION: {
 				PositionAnchor horizontal;
 				PositionAnchor vertical;
@@ -1198,7 +1341,7 @@ static void applyStylesheet(Document& doc, u32 element_index, const ParentContex
 
 		if (match) {
 			for (const Attribute& attr : rule.attributes) {
-				upsertAttribute(elem, attr.type, attr.value, AttributeSource::STYLESHEET);
+				upsertAttribute(elem, attr, AttributeSource::STYLESHEET);
 			}
 		}
 	}
@@ -1224,34 +1367,29 @@ static void applyStylesheet(Document& doc, u32 element_index, const ParentContex
 				}
 				break;
 			}
-			case AttributeName::PIVOT_X: elem.pivot_x_unit = parseUnit(attr.value); break;
-			case AttributeName::PIVOT_Y: elem.pivot_y_unit = parseUnit(attr.value); break;
-			case AttributeName::WIDTH: elem.width_unit = parseUnit(attr.value); break;
-			case AttributeName::HEIGHT: elem.height_unit = parseUnit(attr.value); break;
-			case AttributeName::GROW: fromCString(attr.value, elem.grow); break;
+			case AttributeName::PIVOT_X: elem.pivot_x_unit = attr.parsed_unit; break;
+			case AttributeName::PIVOT_Y: elem.pivot_y_unit = attr.parsed_unit; break;
+			case AttributeName::WIDTH: elem.width_unit = attr.parsed_unit; break;
+			case AttributeName::HEIGHT: elem.height_unit = attr.parsed_unit; break;
+			case AttributeName::GROW: elem.grow = attr.grow; break;
 			case AttributeName::DIRECTION: {
-				if (attr.value == "row") elem.direction = Direction::ROW;
-				else elem.direction = Direction::COLUMN;
+				elem.direction = attr.direction;
 				break;
 			}
-			case AttributeName::VISIBLE: elem.visible = attr.value == "true"; break;
-			case AttributeName::ALIGN: {
-				ctx.align = parseAlign(attr.value);
-				break;
-			}
-			case AttributeName::COLOR: {
-				elem.color = parseColor(attr.value);
+			case AttributeName::VISIBLE: elem.visible = attr.visible; break;
+			case AttributeName::ALIGN: ctx.align = attr.align; break;
+			case AttributeName::COLOR:
+				elem.color = attr.color;
 				ctx.color = elem.color;
 				break;
-			}
-			case AttributeName::OPACITY: local_opacity = parseOpacity(attr.value); break;
-			case AttributeName::CLIPPING: elem.clipping = attr.value == "true"; break;
-			case AttributeName::BG_COLOR: elem.bg_color = parseColor(attr.value); break;
+			case AttributeName::OPACITY: local_opacity = attr.opacity; break;
+			case AttributeName::CLIPPING: elem.clipping = attr.clip; break;
+			case AttributeName::BG_COLOR: elem.bg_color = attr.color; break;
 			case AttributeName::TEXT: elem.text = attr.value; break;
-			case AttributeName::JUSTIFY_CONTENT: elem.justify_content = parseJustifyContent(attr.value); break;
-			case AttributeName::ALIGN_ITEMS: elem.align_items = parseAlignItems(attr.value); break;
-			case AttributeName::FONT_SIZE: ctx.font_size = parseFontSize(attr.value, doc.m_dpi_scale); break;
-			case AttributeName::WRAP: elem.wrap = attr.value == "true"; break;
+			case AttributeName::JUSTIFY_CONTENT: elem.justify_content = attr.justify; break;
+			case AttributeName::ALIGN_ITEMS: elem.align_items = attr.align_items; break;
+			case AttributeName::FONT_SIZE: ctx.font_size = attr.font_size * doc.m_dpi_scale; break;
+			case AttributeName::WRAP: elem.wrap = attr.wrap; break;
 			default: break; // TODO remove the default case
 		}
 	}
@@ -1731,8 +1869,8 @@ static void loadResources(Document& doc, u32 element_index, const ParentContext&
 	for (const Attribute& attr : elem.attributes) {
 		switch (attr.type) {
 			case AttributeName::FONT: ctx.font = attr.value; break;
-			case AttributeName::FONT_SIZE: 
-				elem.font_size = parseFontSize(attr.value, doc.m_dpi_scale);
+			case AttributeName::FONT_SIZE:
+				elem.font_size = attr.font_size * doc.m_dpi_scale;
 				ctx.font_size = elem.font_size;
 				break;
 			case AttributeName::BG_IMAGE: {

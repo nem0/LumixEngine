@@ -1199,7 +1199,7 @@ bool testNoWrap() {
 	// "`wrap=false` (default): Elements stay on a single line/column, potentially overflowing the container."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[box width=100 height=100 direction=row wrap=nowrap] {
+	[box width=100 height=100 direction=row wrap=false] {
 		[box width=50 height=50] {}
 		[box width=50 height=50] {}
 		[box width=50 height=50] {}
@@ -1504,7 +1504,7 @@ bool testJustifyContentWithWrap() {
 	// "Justification and item aligment are applied to each row/column separately."
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
-	[box width=100 height=200 direction=row wrap=wrap justify-content=center] {
+	[box width=100 height=200 direction=row wrap=true justify-content=center] {
 		[box width=50 height=50] {}
 		[box width=50 height=50] {}
 		[box width=50 height=50] {}
@@ -1518,7 +1518,7 @@ bool testJustifyContentWithWrap() {
 
 	MockDocument doc2;
 	ASSERT_PARSE(doc2, R"(
-	[box width=200 height=200 direction=row wrap=wrap justify-content=center] {
+	[box width=200 height=200 direction=row wrap=true justify-content=center] {
 		[box width=50 height=30] {}
 		[box width=50 height=50] {}
 		[box width=50 height=30] {}
