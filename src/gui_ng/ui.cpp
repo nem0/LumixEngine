@@ -293,7 +293,7 @@ static bool parseTypedAttributeValue(Document& doc, AttributeName name, StringVi
 		case AttributeName::FONT_SIZE: {
 			float font_size = 12.0f;
 			const char* end = fromCString(value, font_size);
-			if (!end || font_size < 0 || font_size != font_size) return false;
+			if (!end || end != value.end || font_size < 0 || font_size != font_size) return false;
 			out.font_size = font_size;
 			return true;
 		}
@@ -680,6 +680,10 @@ bool Document::parseElements(u32 parent_index) {
 					AttributeName name = parseAttributeName(name_token.value);
 					if (name == AttributeName::INVALID) {
 						error(name_token.value, m_tokenizer, "unknown attribute '", name_token.value, "'");
+						return false;
+					}
+					if ((name == AttributeName::COLOR || name == AttributeName::BG_COLOR) && value.type != Token::COLOR) {
+						error(value.value, m_tokenizer, "invalid value '", value.value, "' for attribute '", attributeNameToString(name), "'");
 						return false;
 					}
 					if (!parseAttributeValue(elem, name, value.value)) return false;

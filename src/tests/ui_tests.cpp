@@ -113,7 +113,7 @@ bool testDocumentParseComplexNesting() {
 
 bool testEveryElementAttributes() {
 	MockDocument doc;
-	ASSERT_PARSE(doc, "[box id=\"testid\" .testclass visible=false opacity=0.75 font-size=14 font=\"arial.ttf\" color=\"#ffffff\"]");
+	ASSERT_PARSE(doc, "[box id=\"testid\" .testclass visible=false opacity=0.75 font-size=14 font=\"arial.ttf\" color=#ffffff]");
 	ASSERT_EQ(1, doc.m_roots.size());
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	Span<ui::Attribute> attrs = root->attributes;
@@ -508,7 +508,7 @@ bool testFontInheritanceDeep() {
 
 bool testColorInheritance() {
 	MockDocument doc;
-	ASSERT_PARSE(doc, "[box color=\"#ff0000\"] { \"hello\" }");
+	ASSERT_PARSE(doc, "[box color=#ff0000] { \"hello\" }");
 	ASSERT_EQ(1, doc.m_roots.size());
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	doc.computeLayout(Vec2(800, 600));
@@ -522,7 +522,7 @@ bool testColorInheritance() {
 
 bool testColorInheritanceDeep() {
 	MockDocument doc;
-	ASSERT_PARSE(doc, "[box color=\"#00ff00\"] { [box] { \"hello\" } }");
+	ASSERT_PARSE(doc, "[box color=#00ff00] { [box] { \"hello\" } }");
 	ASSERT_EQ(1, doc.m_roots.size());
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	doc.computeLayout(Vec2(800, 600));
@@ -1081,28 +1081,32 @@ bool testInvalidAttributeValuesRejected() {
 
 	// color and opacity
 	ASSERT_EQ(false, doc.parse("[box color=red]", "test.ui"));
+	ASSERT_EQ(false, doc.parse("[box color=#12345]", "test.ui"));
 	ASSERT_EQ(false, doc.parse("[box color=#zzzzzz]", "test.ui"));
 	ASSERT_EQ(false, doc.parse("[box bg-color=#12345]", "test.ui"));
 	ASSERT_EQ(false, doc.parse("[box opacity=abc]", "test.ui"));
+	ASSERT_EQ(false, doc.parse("[box font-size=\"12abc\"]", "test.ui"));
+	ASSERT_EQ(false, doc.parse("[box color=\"#ff0000\"]", "test.ui"));
 
 	// unit-based attributes
 	ASSERT_EQ(false, doc.parse("[box left=badem]", "test.ui"));
 	ASSERT_EQ(false, doc.parse("[box top=oops]", "test.ui"));
-	/*ASSERT_EQ(false, doc.parse("[box width=wat]", "test.ui"));
+	ASSERT_EQ(false, doc.parse("[box width=wat]", "test.ui"));
 	ASSERT_EQ(false, doc.parse("[box height=nope%]", "test.ui"));
 	ASSERT_EQ(false, doc.parse("[box margin=bad]", "test.ui"));
 	ASSERT_EQ(false, doc.parse("[box padding=bad]", "test.ui"));
 	ASSERT_EQ(false, doc.parse("[box pivot-x=wat]", "test.ui"));
-	ASSERT_EQ(false, doc.parse("[box pivot-y=wat]", "test.ui"));*/
+	ASSERT_EQ(false, doc.parse("[box pivot-y=wat]", "test.ui"));
 
 	// additional constrained attributes
 	ASSERT_EQ(false, doc.parse("[box grow=fast]", "test.ui"));
 	ASSERT_EQ(false, doc.parse("[box font-size=big]", "test.ui"));
 
-	// ASSERT_EQ(false, doc.parse("[box bg-fit=stretch]", "test.ui"));
-	// ASSERT_EQ(false, doc.parse("[image fit=stretch]", "test.ui"));
+	// TODO
+	//ASSERT_EQ(false, doc.parse("[box bg-fit=stretch]", "test.ui"));
+	//ASSERT_EQ(false, doc.parse("[image fit=stretch]", "test.ui"));
 
-	/*ASSERT_EQ(false, doc.parse("[box margin-left=bad]", "test.ui"));
+	ASSERT_EQ(false, doc.parse("[box margin-left=bad]", "test.ui"));
 	ASSERT_EQ(false, doc.parse("[box margin-right=bad]", "test.ui"));
 	ASSERT_EQ(false, doc.parse("[box margin-top=bad]", "test.ui"));
 	ASSERT_EQ(false, doc.parse("[box margin-bottom=bad]", "test.ui"));
@@ -1110,7 +1114,7 @@ bool testInvalidAttributeValuesRejected() {
 	ASSERT_EQ(false, doc.parse("[box padding-left=bad]", "test.ui"));
 	ASSERT_EQ(false, doc.parse("[box padding-right=bad]", "test.ui"));
 	ASSERT_EQ(false, doc.parse("[box padding-top=bad]", "test.ui"));
-	ASSERT_EQ(false, doc.parse("[box padding-bottom=bad]", "test.ui"));*/
+	ASSERT_EQ(false, doc.parse("[box padding-bottom=bad]", "test.ui"));
 
 	return true;
 }

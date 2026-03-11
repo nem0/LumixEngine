@@ -94,12 +94,12 @@ Inline text container for styling text without creating a block element. It does
 | `font` | Font file path for the span content. | inherited |
 | `font-size` | Font size for the span content. | inherited |
 
-Quoted string can be used in place of a span.
+Text outside of `[]` can be used in place of a span.
 
 ```css
-[span value="text"]
+[box] { [span value="text"] }
 // is the same as
-"text"
+[box] { text }
 ```
 
 ## Inheritable Attributes
