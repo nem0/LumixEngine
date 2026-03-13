@@ -15,7 +15,7 @@ Note: sizing-related attributes (see below) accept numeric values, percentages, 
 
 ## Sizing and layout properties
 
-Supported by all elements.
+Supported by all box elements.
 
 | Attribute | Description | Default / Values |
 |---|---|---|
@@ -41,7 +41,7 @@ Supported by all elements.
 
 The `width` and `height` attributes accept `NUMBER`, `PERCENT` (e.g. `50%`), `em` units (e.g. `2em`), or the `fit-content` keyword (for example: `width=fit-content` or `width=50%`).
 
-`top` and `left` apply when `position` is set. For `position=relative`, offsets are applied after normal flow placement. For `position=absolute`, offsets are resolved from the parent content origin (inside parent padding).
+`top` and `left` apply when `position` is set. For `position=relative`, offsets are applied after normal flow placement. For `position=absolute`, offsets are resolved from the parent origin (padding is ignored).
 
 `pivot-x` and `pivot-y` apply only when `position=absolute` and use the same unit format as `top`/`left` (`NUMBER`, `%`, `em`). Percent values are relative to the element's own size on the corresponding axis (`pivot-x` from element width, `pivot-y` from element height). Final absolute position is computed as base absolute position plus `left`/`top` minus pivot offsets. Defaults are `0`, which preserves top-left behavior.
 
@@ -69,10 +69,17 @@ Rectangular container that can have children.
 | `bg-fit` | How the background image is scaled. Values: `cover`, `contain`, `fill`, `none`. | `fill` |
 | `bg-color` | Background color of the box. | `transparent` |
 | `on-click` | Action name emitted as an `ACTION` UI event when mouse button is released over this box. | (no default) |
-| `direction` | Layout direction of child elements. Values: `row` (horizontal), `column` (vertical). | `row` |
+| `direction` | Layout direction of child elements. Values: `row` (horizontal), `column` (vertical). | `column` |
 | `wrap` | Layout overflow behavior. Values: `true`, `false`. | `true` |
 | `justify-content` | Distribution of child elements along the main axis. Values: `start`, `center`, `end`, `space-between`, `space-around`. | `start` |
 | `align-items` | Cross-axis alignment for children. Values: `start`, `center`, `end`, `stretch`. | `start` |
+
+`bg-fit` value behavior:
+
+- `fill`: Stretches the background image to match the box width and height. Aspect ratio is not preserved.
+- `contain`: Scales the image uniformly so the whole image is visible inside the box. Aspect ratio is preserved; empty space may remain on one axis.
+- `cover`: Scales the image uniformly to fully cover the box. Aspect ratio is preserved; parts of the image may be cropped.
+- `none`: Draws the image at its original size (no scaling).
 
 ## image
 
@@ -85,11 +92,11 @@ Displays an image.
 
 ## span
 
-Inline text container for styling text without creating a block element. It does no have children, text is in `value` attribute.
+Inline text container for styling text without creating a block element. It does no have children, text is in `text` attribute.
 
 | Attribute | Description | Default / Values |
 |---|---|---|
-| `value` | The text content to display within the span. | (no default) |
+| `text` | The text content to display within the span. | (no default) |
 | `color` | Text color for the span content. | inherited (default black) |
 | `font` | Font file path for the span content. | inherited |
 | `font-size` | Font size for the span content. | inherited |

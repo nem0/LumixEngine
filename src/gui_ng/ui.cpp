@@ -778,6 +778,12 @@ void Element::setText(StringView v) {
 }
 
 void Element::setWidth(StringView value) {
+	ParsedUnit parsed;
+	if (!parseUnit(value, parsed)) {
+		logError("invalid value '", value, "' for attribute '", attributeNameToString(AttributeName::WIDTH), "'");
+		return;
+	}
+
 	upsertAttribute<AttributeName::WIDTH>(*this, value, AttributeSource::ELEMENT);
 	ParsedUnit parsed = {0, Unit::PIXELS};
 	width_unit = parsed;
@@ -1029,6 +1035,7 @@ static void computeParentRelativeWidth(Document& doc, Element& elem) {
 		float prev_margin = 0;
 		for (u32 child_idx : elem.children) {
 			const Element& child = doc.m_elements[child_idx];
+			if (child.position_mode == PositionMode::ABSOLUTE) continue;
 			sum_grow += child.grow;
 			remaining_w -= child.size.x + maximum(prev_margin, child.margins.left);
 			prev_margin = child.margins.right;
@@ -1040,6 +1047,7 @@ static void computeParentRelativeWidth(Document& doc, Element& elem) {
 			if (remaining_w > 0) {
 				for (u32 child_idx : elem.children) {
 					Element& child = doc.m_elements[child_idx];
+					if (child.position_mode == PositionMode::ABSOLUTE) continue;
 					if (child.grow > 0) {
 						child.size.x += remaining_w * child.grow / sum_grow;
 					}
@@ -1051,6 +1059,7 @@ static void computeParentRelativeWidth(Document& doc, Element& elem) {
 		float content_w = elem.size.x - elem.paddings.right - elem.paddings.left;
 		for (u32 child_idx : elem.children) {
 			Element& child = doc.m_elements[child_idx];
+			if (child.position_mode == PositionMode::ABSOLUTE) continue;
 			if (child.tag == Tag::SPAN) continue;
 			if (child.width_unit.unit == Unit::FIT_CONTENT) {
 				child.size.x = maximum(0.0f, content_w - child.margins.right - child.margins.left);
@@ -1171,6 +1180,7 @@ static void computeParentRelativeHeights(Document& doc, Element& elem) {
 		float prev_margin = 0;
 		for (u32 child_idx : elem.children) {
 			const Element& child = doc.m_elements[child_idx];
+			if (child.position_mode == PositionMode::ABSOLUTE) continue;
 			sum_grow += child.grow;
 			remaining_h -= child.size.y + maximum(prev_margin, child.margins.top);
 			prev_margin = child.margins.bottom;
@@ -1180,6 +1190,7 @@ static void computeParentRelativeHeights(Document& doc, Element& elem) {
 		if (sum_grow > 0 && remaining_h > 0) {
 			for (u32 child_idx : elem.children) {
 				Element& child = doc.m_elements[child_idx];
+				if (child.position_mode == PositionMode::ABSOLUTE) continue;
 				if (child.grow > 0) {
 					child.size.y += remaining_h * child.grow / sum_grow;
 				}

@@ -843,6 +843,64 @@ bool testAbsoluteDoesNotParticipateInFlow() {
 	return true;
 }
 
+bool testAbsoluteDoesNotAffectGrowRemainingSpaceRow() {
+	// Citation: layout.md - Positioning Calculations
+	// "Absolute-positioned elements do not participate in sibling flow spacing."
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[box width=300 height=100 direction=row] {
+		[box width=100 height=20] {}
+		[box width=80 height=20 position=absolute left=0 top=0] {}
+		[box grow=1 height=20] {}
+	}
+	)");
+
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_TRUE(doc.m_elements.size() >= 4);
+
+	ui::Element* parent = doc.getElement(0);
+	ui::Element* fixed = doc.getElement(1);
+	ui::Element* absolute_child = doc.getElement(2);
+	ui::Element* grow_child = doc.getElement(3);
+
+	ASSERT_FLOAT_EQ(100.0f, fixed->size.x);
+	ASSERT_FLOAT_EQ(parent->position.x, fixed->position.x);
+	ASSERT_FLOAT_EQ(parent->position.x, absolute_child->position.x);
+	ASSERT_FLOAT_EQ(200.0f, grow_child->size.x);
+	ASSERT_FLOAT_EQ(parent->position.x + 100.0f, grow_child->position.x);
+
+	return true;
+}
+
+bool testAbsoluteDoesNotAffectGrowRemainingSpaceColumn() {
+	// Citation: layout.md - Positioning Calculations
+	// "Absolute-positioned elements do not participate in sibling flow spacing."
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[box width=200 height=300 direction=column] {
+		[box width=100 height=50] {}
+		[box width=100 height=60 position=absolute left=0 top=0] {}
+		[box grow=1 width=100] {}
+	}
+	)");
+
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_TRUE(doc.m_elements.size() >= 4);
+
+	ui::Element* parent = doc.getElement(0);
+	ui::Element* fixed = doc.getElement(1);
+	ui::Element* absolute_child = doc.getElement(2);
+	ui::Element* grow_child = doc.getElement(3);
+
+	ASSERT_FLOAT_EQ(50.0f, fixed->size.y);
+	ASSERT_FLOAT_EQ(parent->position.y, fixed->position.y);
+	ASSERT_FLOAT_EQ(parent->position.y, absolute_child->position.y);
+	ASSERT_FLOAT_EQ(250.0f, grow_child->size.y);
+	ASSERT_FLOAT_EQ(parent->position.y + 50.0f, grow_child->position.y);
+
+	return true;
+}
+
 bool testDirectionRow() {
 	// Citation: layout.md - Element Positioning
 	// "The `direction` attribute controls the primary axis along which child elements are arranged within a container. When set to `row`, children are positioned horizontally from left to right."
@@ -2076,6 +2134,70 @@ bool testPanelWithInlineSpan() {
 	return true;
 }
 
+bool testImageLayoutInlineFlow() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[box direction=row width=200 height=40 font=\"arial.ttf\" font-size=16] { [span text=\"aa\"] [image width=20 height=10] [span text=\"bb\"] }");
+	doc.computeLayout(Vec2(800, 600));
+
+	ASSERT_EQ(1, doc.m_roots.size());
+	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(3, root->children.size());
+
+	ui::Element* span1 = doc.getElement(root->children[0]);
+	ui::Element* image = doc.getElement(root->children[1]);
+	ui::Element* span2 = doc.getElement(root->children[2]);
+
+	ASSERT_TAG(span1, SPAN);
+	ASSERT_TAG(image, IMAGE);
+	ASSERT_TAG(span2, SPAN);
+	ASSERT_EQ(1, span1->lines.size());
+	ASSERT_EQ(1, span2->lines.size());
+	ASSERT_FLOAT_EQ(20.0f, image->size.x);
+	ASSERT_FLOAT_EQ(10.0f, image->size.y);
+	ASSERT_FLOAT_EQ(span1->lines[0].pos.x + span1->size.x, image->position.x);
+	ASSERT_FLOAT_EQ(image->position.x + image->size.x, span2->lines[0].pos.x);
+	return true;
+}
+
+bool testImageLayoutExplicitWidthHeight() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[image width=64 height=32]");
+	doc.computeLayout(Vec2(800, 600));
+
+	ASSERT_EQ(1, doc.m_roots.size());
+	ui::Element* image = doc.getElement(doc.m_roots[0]);
+	ASSERT_TAG(image, IMAGE);
+	ASSERT_FLOAT_EQ(64.0f, image->size.x);
+	ASSERT_FLOAT_EQ(32.0f, image->size.y);
+	return true;
+}
+
+bool testImageLayoutAspectRatioFromWidth() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[image src=\"img_200x100.png\" width=80]");
+	doc.computeLayout(Vec2(800, 600));
+
+	ASSERT_EQ(1, doc.m_roots.size());
+	ui::Element* image = doc.getElement(doc.m_roots[0]);
+	ASSERT_TAG(image, IMAGE);
+	ASSERT_FLOAT_EQ(80.0f, image->size.x);
+	ASSERT_FLOAT_EQ(40.0f, image->size.y);
+	return true;
+}
+
+bool testImageLayoutAspectRatioFromHeight() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[image src=\"img_200x100.png\" height=25]");
+	doc.computeLayout(Vec2(800, 600));
+
+	ASSERT_EQ(1, doc.m_roots.size());
+	ui::Element* image = doc.getElement(doc.m_roots[0]);
+	ASSERT_TAG(image, IMAGE);
+	ASSERT_FLOAT_EQ(50.0f, image->size.x);
+	ASSERT_FLOAT_EQ(25.0f, image->size.y);
+	return true;
+}
+
 bool testHeaderContentFooter() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
@@ -2167,11 +2289,17 @@ void runUILayoutTests() {
 	RUN_TEST(testAbsolutePositionOffsetsWithPivot);
 	RUN_TEST(testAbsoluteRootPositionOffsetsWithPivot);
 	RUN_TEST(testAbsoluteDoesNotParticipateInFlow);
+	RUN_TEST(testAbsoluteDoesNotAffectGrowRemainingSpaceRow);
+	RUN_TEST(testAbsoluteDoesNotAffectGrowRemainingSpaceColumn);
 	RUN_TEST(testNoWrap);
 	RUN_TEST(testPercentLayout);
 	RUN_TEST(testPercentMargins);
 	RUN_TEST(testPercentHeightOnRoot);
 	RUN_TEST(testPanelWithInlineSpan);
+	RUN_TEST(testImageLayoutInlineFlow);
+	RUN_TEST(testImageLayoutExplicitWidthHeight);
+	RUN_TEST(testImageLayoutAspectRatioFromWidth);
+	RUN_TEST(testImageLayoutAspectRatioFromHeight);
 	RUN_TEST(testTextHorizontalRendering);
 	RUN_TEST(testTextWrapping);
 	RUN_TEST(testTextNoWrapping);

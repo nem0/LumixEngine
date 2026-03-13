@@ -35,11 +35,11 @@ bool testDocumentParseSimple() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box] {}");
 	ASSERT_EQ(1, doc.m_roots.size());
-	
-	ASSERT_PARSE(doc, "[image]");
-	ASSERT_EQ(1, doc.m_roots.size());
 
 	ASSERT_PARSE(doc, "[span]");
+	ASSERT_EQ(1, doc.m_roots.size());
+
+	ASSERT_PARSE(doc, "[image]");
 	ASSERT_EQ(1, doc.m_roots.size());
 
 	ASSERT_PARSE(doc, "text");
@@ -356,15 +356,19 @@ bool testPanelAttributes() {
 
 bool testImageAttributes() {
 	MockDocument doc;
-	ASSERT_PARSE(doc, "[image src=\"img.png\" fit=cover]");
+	ASSERT_PARSE(doc, "[image src=\"img.png\" width=64 height=32]");
 	ASSERT_EQ(1, doc.m_roots.size());
 	ui::Element* root = doc.getElement(doc.m_roots[0]);
 	Span<ui::Attribute> attrs = root->attributes;
-	ASSERT_EQ(2, attrs.size());
+	ASSERT_EQ(3, attrs.size());
 	ASSERT_ATTRIBUTE(root, 0, SRC);
 	ASSERT_EQ("img.png", attrs[0].value);
-	ASSERT_ATTRIBUTE(root, 1, FIT);
-	ASSERT_EQ("cover", attrs[1].value);
+	ASSERT_ATTRIBUTE(root, 1, WIDTH);
+	ASSERT_FLOAT_EQ(64.0f, attrs[1].parsed_unit.value);
+	ASSERT_EQ((int)ui::Unit::PIXELS, (int)attrs[1].parsed_unit.unit);
+	ASSERT_ATTRIBUTE(root, 2, HEIGHT);
+	ASSERT_FLOAT_EQ(32.0f, attrs[2].parsed_unit.value);
+	ASSERT_EQ((int)ui::Unit::PIXELS, (int)attrs[2].parsed_unit.unit);
 	return true;
 }
 
@@ -791,6 +795,46 @@ bool testComplexMutationSequence() {
 	return true;
 }
 
+bool testSetWidthUpdatesPixelsAndLayout() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+		[box width=100 height=20] {
+		}
+	)");
+
+	ASSERT_EQ(1, doc.m_roots.size());
+	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_FLOAT_EQ(100.0f, root->size.x);
+
+	root->setWidth("250");
+
+	ASSERT_FLOAT_EQ(250.0f, root->width_unit.value);
+	ASSERT_EQ((int)ui::Unit::PIXELS, (int)root->width_unit.unit);
+	ASSERT_FLOAT_EQ(250.0f, root->size.x);
+	return true;
+}
+
+bool testSetWidthUpdatesPercentAndLayout() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+		[box width=50% height=20] {
+		}
+	)");
+
+	ASSERT_EQ(1, doc.m_roots.size());
+	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_FLOAT_EQ(400.0f, root->size.x);
+
+	root->setWidth("25%");
+
+	ASSERT_FLOAT_EQ(25.0f, root->width_unit.value);
+	ASSERT_EQ((int)ui::Unit::PERCENT, (int)root->width_unit.unit);
+	ASSERT_FLOAT_EQ(200.0f, root->size.x);
+	return true;
+}
+
 struct MockMouseDevice : InputSystem::Device {
 	MockMouseDevice() { type = InputSystem::Device::MOUSE; }
 	void update(float dt) override {}
@@ -823,7 +867,6 @@ bool testOnClickAttributeRejectedOnNonBox() {
 	MockDocument doc;
 	doc.m_suppress_logging = true;
 	ASSERT_EQ(false, doc.parse("[span on-click=foo]", "test.ui"));
-	ASSERT_EQ(false, doc.parse("[image on-click=foo]", "test.ui"));
 	return true;
 }
 
@@ -1101,10 +1144,7 @@ bool testInvalidAttributeValuesRejected() {
 	// additional constrained attributes
 	ASSERT_EQ(false, doc.parse("[box grow=fast]", "test.ui"));
 	ASSERT_EQ(false, doc.parse("[box font-size=big]", "test.ui"));
-
-	// TODO
 	//ASSERT_EQ(false, doc.parse("[box bg-fit=stretch]", "test.ui"));
-	//ASSERT_EQ(false, doc.parse("[image fit=stretch]", "test.ui"));
 
 	ASSERT_EQ(false, doc.parse("[box margin-left=bad]", "test.ui"));
 	ASSERT_EQ(false, doc.parse("[box margin-right=bad]", "test.ui"));
@@ -1163,6 +1203,8 @@ void runUITests() {
 	RUN_TEST(testSpaceBetweenSpans);
 	RUN_TEST(testParseAndRuntimeMutation);
 	RUN_TEST(testComplexMutationSequence);
+	RUN_TEST(testSetWidthUpdatesPixelsAndLayout);
+	RUN_TEST(testSetWidthUpdatesPercentAndLayout);
 	RUN_TEST(testOnClickAttributeParseOnBox);
 	RUN_TEST(testOnClickAttributeRejectedOnNonBox);
 	RUN_TEST(testActionEventEmittedOnReleaseOverClickableBox);
