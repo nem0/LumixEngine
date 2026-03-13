@@ -785,7 +785,6 @@ void Element::setWidth(StringView value) {
 	}
 
 	upsertAttribute<AttributeName::WIDTH>(*this, value, AttributeSource::ELEMENT);
-	ParsedUnit parsed = {0, Unit::PIXELS};
 	width_unit = parsed;
 	m_document.computeLayout(m_document.m_canvas_size);
 }
