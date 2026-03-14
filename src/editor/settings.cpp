@@ -316,7 +316,9 @@ static void saveStyle(OutputMemoryStream& blob) {
 	#undef SAVE_FLOAT
 	#undef SAVE_VEC2
 
-	blob << "\tdpi = " << os::getDPI() << "\n";
+	i32 dpi = os::getDPI();
+	if (dpi <= 0) dpi = 96;
+	blob << "\tdpi = " << dpi  << "\n";
 
 	blob << "}\n";
 }

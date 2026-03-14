@@ -2174,7 +2174,7 @@ bool testImageLayoutExplicitWidthHeight() {
 
 bool testImageLayoutAspectRatioFromWidth() {
 	MockDocument doc;
-	ASSERT_PARSE(doc, "[image src=\"img_200x100.png\" width=80]");
+	ASSERT_PARSE(doc, "[image src=\"img.png\" width=80]");
 	doc.computeLayout(Vec2(800, 600));
 
 	ASSERT_EQ(1, doc.m_roots.size());
@@ -2187,7 +2187,7 @@ bool testImageLayoutAspectRatioFromWidth() {
 
 bool testImageLayoutAspectRatioFromHeight() {
 	MockDocument doc;
-	ASSERT_PARSE(doc, "[image src=\"img_200x100.png\" height=25]");
+	ASSERT_PARSE(doc, "[image src=\"img.png\" height=25]");
 	doc.computeLayout(Vec2(800, 600));
 
 	ASSERT_EQ(1, doc.m_roots.size());

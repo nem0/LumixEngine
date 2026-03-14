@@ -88,7 +88,15 @@ Displays an image.
 | Attribute | Description | Default / Values |
 |---|---|---|
 | `src` | Path to the image file. | `""` |
-| `fit` | How the image fits within its bounds. Values: `fill`, `contain`, `cover`, `none`. | `contain` |
+| `width` | Display width of the image. | intrinsic bitmap width |
+| `height` | Display height of the image. | intrinsic bitmap height |
+
+Sizing behavior:
+
+- If only `width` is set, `height` is derived from the intrinsic aspect ratio.
+- If only `height` is set, `width` is derived from the intrinsic aspect ratio.
+- If both `width` and `height` are set, both values are used as-is.
+- If neither is set, intrinsic bitmap width and height are used.
 
 ## span
 

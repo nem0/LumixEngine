@@ -1097,54 +1097,15 @@ static float computeSpansHeight(Document& doc, Element& element, i32 child_idx) 
 	return last_line.pos.y - asc + height;
 }
 
-static void computeBaseHeights(Document& doc, Element& elem, Element* parent_elem, const ParentContext& parent) {
+
+static void computeFitContentHeights(Document& doc, Element& elem) {
 	if (!elem.visible) return;
 
-	ParsedUnit margin_unit[2] = {{0, Unit::PIXELS}, {0, Unit::PIXELS}};
-	ParsedUnit padding_unit[2] = {{0, Unit::PIXELS}, {0, Unit::PIXELS}};
-	ParsedUnit top_unit = {0, Unit::PIXELS};
-
-	for (const Attribute& attr : elem.attributes) {
-		switch (attr.type) {
-			case AttributeName::MARGIN: margin_unit[0] = margin_unit[1] = attr.parsed_unit; break;
-			case AttributeName::PADDING: padding_unit[0] = padding_unit[1] = attr.parsed_unit; break;
-			case AttributeName::PADDING_TOP: padding_unit[0] = attr.parsed_unit; break;
-			case AttributeName::PADDING_BOTTOM: padding_unit[1] = attr.parsed_unit; break;
-			case AttributeName::MARGIN_TOP: margin_unit[0] = attr.parsed_unit; break;
-			case AttributeName::MARGIN_BOTTOM: margin_unit[1] = attr.parsed_unit; break;
-			case AttributeName::TOP: top_unit = attr.parsed_unit; break;
-			case AttributeName::POSITION: {
-				PositionAnchor horizontal;
-				PositionAnchor vertical;
-				if (parsePositionPreset(attr.value, horizontal, vertical)) {
-					top_unit = toAnchorUnit(vertical);
-				}
-				break;
-			}
-			default: break;
-		}
-	}
-
-	if (elem.tag == Tag::SPAN) return;
-
-	elem.margins.top = computeAbsoluteSize(margin_unit[0], parent.content_size.y, elem.font_size, doc.m_dpi_scale);
-	elem.margins.bottom = computeAbsoluteSize(margin_unit[1], parent.content_size.y, elem.font_size, doc.m_dpi_scale);
-	elem.paddings.top = computeAbsoluteSize(padding_unit[0], parent.content_size.y, elem.font_size, doc.m_dpi_scale);
-	elem.paddings.bottom = computeAbsoluteSize(padding_unit[1], parent.content_size.y, elem.font_size, doc.m_dpi_scale);
-	elem.top = computeAbsoluteSize(top_unit, parent.size.y, elem.font_size, doc.m_dpi_scale);
-
-	if (elem.height_unit.unit != Unit::FIT_CONTENT) {
-		elem.size.y = computeAbsoluteSize(elem.height_unit, elem.position_mode == PositionMode::ABSOLUTE ? parent.size.y : parent.content_size.y, elem.font_size, doc.m_dpi_scale);
-	}
-
-	ParentContext ctx = parent;
-	ctx.size = elem.size;
-	ctx.content_size = elem.size - Vec2(elem.paddings.left + elem.paddings.right, elem.paddings.top + elem.paddings.bottom);
 	for (u32 child_idx : elem.children) {
-		computeBaseHeights(doc, doc.m_elements[child_idx], &elem, ctx);
+		computeFitContentHeights(doc, doc.m_elements[child_idx]);
 	}
-
-	if (elem.height_unit.unit == Unit::FIT_CONTENT) {
+	
+	if (elem.height_unit.unit == Unit::FIT_CONTENT && elem.tag != Tag::SPAN) {
 		if (elem.direction == Direction::ROW) {
 			float max_height = 0;
 			for (u32 child_idx : elem.children) {
@@ -1206,7 +1167,7 @@ static void computeParentRelativeHeights(Document& doc, Element& elem) {
 	}
 }
 
-static void computeBaseWidths(Document& doc, Element& elem, Element* parent_elem, const ParentContext& parent) {
+static void computeBaseSizes(Document& doc, Element& elem, const ParentContext& parent) {
 	elem.left = elem.top = 0;
 	elem.position = Vec2(0, 0);
 	elem.size = Vec2(0, 0);
@@ -1217,25 +1178,40 @@ static void computeBaseWidths(Document& doc, Element& elem, Element* parent_elem
 	ParentContext ctx = parent;
 	ctx.size = Vec2(0);
 
-	ParsedUnit margin_unit[2] = {{0, Unit::PIXELS}, {0, Unit::PIXELS}};
-	ParsedUnit padding_unit[2] = {{0, Unit::PIXELS}, {0, Unit::PIXELS}};
+	ParsedUnit margin_x_unit[2] = {{0, Unit::PIXELS}, {0, Unit::PIXELS}};
+	ParsedUnit margin_y_unit[2] = {{0, Unit::PIXELS}, {0, Unit::PIXELS}};
+	ParsedUnit padding_x_unit[2] = {{0, Unit::PIXELS}, {0, Unit::PIXELS}};
+	ParsedUnit padding_y_unit[2] = {{0, Unit::PIXELS}, {0, Unit::PIXELS}};
 	ParsedUnit left_unit = {0, Unit::PIXELS};
+	ParsedUnit top_unit = {0, Unit::PIXELS};
 
 	for (const Attribute& attr : elem.attributes) {
 		switch (attr.type) {
 			case AttributeName::FONT: ctx.font = attr.value; break;
-			case AttributeName::PADDING: padding_unit[0] = padding_unit[1] = attr.parsed_unit; break;
-			case AttributeName::MARGIN: margin_unit[0] = margin_unit[1] = attr.parsed_unit; break;
-			case AttributeName::PADDING_LEFT: padding_unit[0] = attr.parsed_unit; break;
-			case AttributeName::PADDING_RIGHT: padding_unit[1] = attr.parsed_unit; break;
-			case AttributeName::MARGIN_LEFT: margin_unit[0] = attr.parsed_unit; break;
-			case AttributeName::MARGIN_RIGHT: margin_unit[1] = attr.parsed_unit; break;
+			case AttributeName::PADDING:
+				padding_x_unit[0] = padding_x_unit[1] = attr.parsed_unit;
+				padding_y_unit[0] = padding_y_unit[1] = attr.parsed_unit;
+				break;
+			case AttributeName::MARGIN:
+				margin_x_unit[0] = margin_x_unit[1] = attr.parsed_unit;
+				margin_y_unit[0] = margin_y_unit[1] = attr.parsed_unit;
+				break;
+			case AttributeName::PADDING_LEFT: padding_x_unit[0] = attr.parsed_unit; break;
+			case AttributeName::PADDING_RIGHT: padding_x_unit[1] = attr.parsed_unit; break;
+			case AttributeName::MARGIN_LEFT: margin_x_unit[0] = attr.parsed_unit; break;
+			case AttributeName::MARGIN_RIGHT: margin_x_unit[1] = attr.parsed_unit; break;
+			case AttributeName::PADDING_TOP: padding_y_unit[0] = attr.parsed_unit; break;
+			case AttributeName::PADDING_BOTTOM: padding_y_unit[1] = attr.parsed_unit; break;
+			case AttributeName::MARGIN_TOP: margin_y_unit[0] = attr.parsed_unit; break;
+			case AttributeName::MARGIN_BOTTOM: margin_y_unit[1] = attr.parsed_unit; break;
 			case AttributeName::LEFT: left_unit = attr.parsed_unit; break;
+			case AttributeName::TOP: top_unit = attr.parsed_unit; break;
 			case AttributeName::POSITION: {
 				PositionAnchor horizontal;
 				PositionAnchor vertical;
 				if (parsePositionPreset(attr.value, horizontal, vertical)) {
 					left_unit = toAnchorUnit(horizontal);
+					top_unit = toAnchorUnit(vertical);
 				}
 				break;
 			}
@@ -1253,16 +1229,24 @@ static void computeBaseWidths(Document& doc, Element& elem, Element* parent_elem
 	if (elem.width_unit.unit != Unit::FIT_CONTENT) {
 		elem.size.x = computeAbsoluteSize(elem.width_unit, elem.position_mode == PositionMode::ABSOLUTE ? parent.size.x : parent.content_size.x, elem.font_size, doc.m_dpi_scale);
 	}
-	elem.margins.left = computeAbsoluteSize(margin_unit[0], parent.content_size.x, elem.font_size, doc.m_dpi_scale);
-	elem.margins.right = computeAbsoluteSize(margin_unit[1], parent.content_size.x, elem.font_size, doc.m_dpi_scale);
-	elem.paddings.left = computeAbsoluteSize(padding_unit[0], parent.content_size.x, elem.font_size, doc.m_dpi_scale);
-	elem.paddings.right = computeAbsoluteSize(padding_unit[1], parent.content_size.x, elem.font_size, doc.m_dpi_scale);
+	if (elem.height_unit.unit != Unit::FIT_CONTENT) {
+		elem.size.y = computeAbsoluteSize(elem.height_unit, elem.position_mode == PositionMode::ABSOLUTE ? parent.size.y : parent.content_size.y, elem.font_size, doc.m_dpi_scale);
+	}
+	elem.margins.left = computeAbsoluteSize(margin_x_unit[0], parent.content_size.x, elem.font_size, doc.m_dpi_scale);
+	elem.margins.right = computeAbsoluteSize(margin_x_unit[1], parent.content_size.x, elem.font_size, doc.m_dpi_scale);
+	elem.margins.top = computeAbsoluteSize(margin_y_unit[0], parent.content_size.y, elem.font_size, doc.m_dpi_scale);
+	elem.margins.bottom = computeAbsoluteSize(margin_y_unit[1], parent.content_size.y, elem.font_size, doc.m_dpi_scale);
+	elem.paddings.left = computeAbsoluteSize(padding_x_unit[0], parent.content_size.x, elem.font_size, doc.m_dpi_scale);
+	elem.paddings.right = computeAbsoluteSize(padding_x_unit[1], parent.content_size.x, elem.font_size, doc.m_dpi_scale);
+	elem.paddings.top = computeAbsoluteSize(padding_y_unit[0], parent.content_size.y, elem.font_size, doc.m_dpi_scale);
+	elem.paddings.bottom = computeAbsoluteSize(padding_y_unit[1], parent.content_size.y, elem.font_size, doc.m_dpi_scale);
 	elem.left = computeAbsoluteSize(left_unit, parent.size.x, elem.font_size, doc.m_dpi_scale);
+	elem.top = computeAbsoluteSize(top_unit, parent.size.y, elem.font_size, doc.m_dpi_scale);
 
 	ctx.size = elem.size;
 	ctx.content_size = elem.size - Vec2(elem.paddings.left + elem.paddings.right, elem.paddings.top + elem.paddings.bottom);
 	for (u32 child_idx : elem.children) {
-		computeBaseWidths(doc, doc.m_elements[child_idx], &elem, ctx);
+		computeBaseSizes(doc, doc.m_elements[child_idx], ctx);
 	}
 
 	// bottom-up size computation	
@@ -1576,8 +1560,7 @@ static void wrapSpans(Document& doc, Element& parent, i32 start_span_idx, i32 en
 }
 
 // compute wrapping on word boundaries, fill Element::lines
-static void wrapText(Document& doc, u32 element_index) {
-	Element& elem = doc.m_elements[element_index];
+static void wrapText(Document& doc, Element& elem) {
 	elem.lines.clear();
 	if (!elem.visible) return;
 
@@ -1589,7 +1572,7 @@ static void wrapText(Document& doc, u32 element_index) {
 	for (u32 i = 0, n = elem.children.size(); i < n; ++i) {
 		Element& child = doc.m_elements[elem.children[i]];
 		if (child.tag != Tag::SPAN) {
-			wrapText(doc, elem.children[i]);
+			wrapText(doc, doc.m_elements[elem.children[i]]);
 			continue;
 		}
 
@@ -1632,23 +1615,12 @@ void Document::computeLayout(Vec2 canvas_size) {
 	root_inherit.size = canvas_size;
 	root_inherit.content_size = canvas_size;
 	for (u32 root_idx : m_roots) {
-		computeBaseWidths(*this, m_elements[root_idx], nullptr, root_inherit);		
-	}
-	
-	for (u32 root_idx : m_roots) {
-		computeParentRelativeWidth(*this, m_elements[root_idx]);
-	}
-
-	for (u32 root_idx : m_roots) {
-		wrapText(*this, root_idx);
-	}
-
-	for (u32 root_idx : m_roots) {
-		computeBaseHeights(*this, m_elements[root_idx], nullptr, root_inherit);		
-	}
-
-	for (u32 root_idx : m_roots) {
-		computeParentRelativeHeights(*this, m_elements[root_idx]);
+		Element& elem = m_elements[root_idx];
+		computeBaseSizes(*this, elem, root_inherit);
+		computeParentRelativeWidth(*this, elem);
+		wrapText(*this, elem);
+		computeFitContentHeights(*this, elem);		
+		computeParentRelativeHeights(*this, elem);
 	}
 
 	// Layout root elements as if in a panel with direction=column
