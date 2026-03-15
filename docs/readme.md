@@ -46,6 +46,7 @@
 
 # Editor
 
+* [Command line options](command_line.md)
 * [Engine data and project directories](editor/project_directory.md)
 * [Editor actions](editor/action.md)
 * [Extending property_grid](editor/extending_property_grid.md)
