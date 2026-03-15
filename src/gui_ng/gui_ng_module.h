@@ -21,6 +21,15 @@ struct UIFontManager : ui::IFontManager {
 	Engine& m_engine;
 };
 
+struct UIImageManager : ui::IImageManager {
+	UIImageManager(Engine& engine) : m_engine(&engine) {}
+
+	ImageHandle loadImage(StringView path) override;
+	bool isReady(ImageHandle image) override;
+	Vec2 getIntrinsicSize(ImageHandle image) override;
+	Engine* m_engine;
+};
+
 //@ module UIModule ui "UI"
 struct UIModule : IModule {
 	static UniquePtr<UIModule> createInstance(struct UISystem& system, World& world, struct IAllocator& allocator);

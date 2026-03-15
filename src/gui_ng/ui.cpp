@@ -8,7 +8,7 @@
 #include "gui/sprite.h"
 #include "renderer/draw2d.h"
 #include "renderer/font.h"
-#include <cstring>
+#include "renderer/texture.h"
 #include "ui.h"
 #include "ui_tokenizer.h"
 
@@ -37,6 +37,10 @@ static const char* tokenTypeToString(UITokenizer::Token::Type type) {
 		case UITokenizer::Token::TEXT: return "TEXT";
 	}
 	return "UNKNOWN";
+}
+
+static bool isInlineTag(Tag tag) {
+	return tag == Tag::SPAN || tag == Tag::IMAGE;
 }
 
 Tag parseTag(StringView str) {
@@ -799,24 +803,40 @@ static float computeAbsoluteSize(const ParsedUnit& unit, float parent_size, floa
 	}
 }
 
-static u32 layoutSpans(Document& doc, Element& parent, u32 first_span_idx, float x, float y) {
+static u32 offsetInlineRun(Document& doc, Element& parent, u32 first_span_idx, float x, float y) {
 	u32 count = 0;
 	for (i32 i = first_span_idx; i < parent.children.size(); ++i) {
 		u32 child_idx = parent.children[i];
 		Element& child = doc.m_elements[child_idx];
-		if (child.tag != Tag::SPAN) break;
-		if (child.lines.empty()) {
-			child.position.x = x;
-			child.position.y = y;
-		}
-		else {
-			for (SpanLine& line : child.lines) {
-				line.pos.x += x;
-				line.pos.y += y;
+		switch (child.tag) {
+			default: return count;
+			case Tag::IMAGE:
+				if (child.lines.empty()) {
+					child.position.x += x;
+					child.position.y += y;
+				}
+				else {
+					child.position.x = child.lines[0].pos.x + x;
+					child.position.y = child.lines[0].pos.y + y;
+				}
+				++count;
+				break;
+			case Tag::SPAN: {
+				if (child.lines.empty()) {
+					child.position.x = x;
+					child.position.y = y;
+				}
+				else {
+					for (SpanLine& line : child.lines) {
+						line.pos.x += x;
+						line.pos.y += y;
+					}
+					child.position = child.lines[0].pos;
+				}
+				++count;
+				break;
 			}
-			child.position = child.lines[0].pos;
 		}
-		++count;
 	}
 	return count;
 }
@@ -830,68 +850,83 @@ static void layoutChildrenHorizontal(Document& doc, Element& parent) {
 
 	for (u32 i = 0, n = parent.children.size(); i < n; ++i) {
 		u32 child_idx = parent.children[i];
-		if (doc.m_elements[child_idx].position_mode == PositionMode::ABSOLUTE) continue;
-		if (doc.m_elements[child_idx].tag == Tag::SPAN) {
-			i += layoutSpans(doc, parent, i, start_x, y) - 1;
-			y += doc.m_elements[child_idx].size.y;
+		Element& child = doc.m_elements[child_idx];
+		if (child.position_mode == PositionMode::ABSOLUTE) continue;
+		if (!child.visible) continue;
+
+		if (isInlineTag(doc.m_elements[child_idx].tag)) {
+			// inline runs
+			i += offsetInlineRun(doc, parent, i, start_x, y) - 1;
+			y += child.size.y;
 		}
-		else {
+		else { // boxes
+			struct BoxRow {
+				i32 from;
+				i32 to;
+				float free_width;
+				float height;
+			};
+
+			BoxRow row;
+			row.from = i;
+			row.free_width = parent.size.x - parent.paddings.right - parent.paddings.left;
+			row.height = 0;
+			
 			float prev_margin = 0;
-			i32 row_start = i;
-			i32 row_end;
 			i32 last_flow_child = -1;
 			i32 flow_count = 0;
-			float max_h = 0;
-			float available_w = parent.size.x - parent.paddings.right - parent.paddings.left;
-			for (row_end = i; row_end < parent.children.size(); ++row_end) {
-				Element& child = doc.m_elements[parent.children[row_end]];
-				if (child.position_mode == PositionMode::ABSOLUTE) continue;
-				float wtmp = child.size.x + maximum(prev_margin, child.margins.left);
-				if (available_w < wtmp + child.margins.right && parent.wrap || child.tag == Tag::SPAN) {
-					break;
-				}
-				max_h = maximum(max_h, child.size.y + child.margins.top + child.margins.bottom);
-				available_w -= wtmp;
-				prev_margin = child.margins.right;
-				last_flow_child = row_end;
+			for (row.to = i; row.to < parent.children.size(); ++row.to) {
+				Element& row_child = doc.m_elements[parent.children[row.to]];
+				if (row_child.position_mode == PositionMode::ABSOLUTE) continue;
+				if (!row_child.visible) continue;
+
+				float wtmp = row_child.size.x + maximum(prev_margin, row_child.margins.left);
+				bool overflow = row.free_width < wtmp + row_child.margins.right && parent.wrap;				
+				if (overflow || isInlineTag(row_child.tag)) break;
+
+				row.height = maximum(row.height, row_child.size.y + row_child.margins.top + row_child.margins.bottom);
+				row.free_width -= wtmp;
+				prev_margin = row_child.margins.right;
+				last_flow_child = row.to;
 				++flow_count;
 			}
 			if (flow_count == 0) continue;
-			available_w -= doc.m_elements[parent.children[last_flow_child]].margins.right;
 
-			// layout row_start <-> row_end
+			row.free_width -= doc.m_elements[parent.children[last_flow_child]].margins.right;
+
 			float x = start_x;
 			float space = 0;
 			switch (parent.justify_content) {
-				case JustifyContent::END: x += available_w; break;
-				case JustifyContent::CENTER: x += available_w / 2; break;
-				case JustifyContent::SPACE_BETWEEN: if (flow_count > 1) space = available_w / (flow_count - 1); break;
+				case JustifyContent::END: x += row.free_width; break;
+				case JustifyContent::CENTER: x += row.free_width / 2; break;
+				case JustifyContent::SPACE_BETWEEN:
+					if (flow_count > 1) space = row.free_width / (flow_count - 1);
+					break;
 				case JustifyContent::SPACE_AROUND: 
-					space = available_w / (flow_count + 1);
+					space = row.free_width / (flow_count + 1);
 					x += space;
 					break;
 				default: break;
 			}
 
 			prev_margin = 0;
-			for (i32 j = row_start; j < row_end; ++j) {
-				Element& child = doc.m_elements[parent.children[j]];
-				if (child.position_mode == PositionMode::ABSOLUTE) continue;
-				child.position.x = x + maximum(prev_margin, child.margins.left);
-				child.position.y = y + child.margins.top;
+			for (i32 j = row.from; j < row.to; ++j) {
+				Element& row_child = doc.m_elements[parent.children[j]];
+				if (row_child.position_mode == PositionMode::ABSOLUTE) continue;
+				row_child.position.x = x + maximum(prev_margin, row_child.margins.left);
+				row_child.position.y = y + row_child.margins.top;
 				switch (parent.align_items) {
 					case AlignItems::START: break;
-					case AlignItems::END: child.position.y = y + max_h - child.size.y - child.margins.bottom; break;
-					case AlignItems::CENTER: child.position.y = y + (max_h - child.size.y) / 2; break;
-					case AlignItems::STRETCH: child.size.y = max_h - child.margins.top - child.margins.bottom; break;
+					case AlignItems::END: row_child.position.y = y + row.height - row_child.size.y - row_child.margins.bottom; break;
+					case AlignItems::CENTER: row_child.position.y = y + (row.height - row_child.size.y) / 2; break;
+					case AlignItems::STRETCH: row_child.size.y = row.height - row_child.margins.top - row_child.margins.bottom; break;
 				}
-				prev_margin = child.margins.right;
-				x = child.position.x + child.size.x + space;
+				prev_margin = row_child.margins.right;
+				x = row_child.position.x + row_child.size.x + space;
 			}
 			
-			// prepare for next row or end
-			y += max_h;
-			i = row_end - 1;
+			y += row.height;
+			i = row.to - 1;
 		}
 	}
 }
@@ -908,11 +943,13 @@ static void layoutChildrenVertical(Document& doc, Element& parent) {
 		u32 child_idx = parent.children[i];
 		Element& child = doc.m_elements[child_idx];
 		if (child.position_mode == PositionMode::ABSOLUTE) continue;
-		if (child.tag == Tag::SPAN) {
+		if (!child.visible) continue;
+
+		if (isInlineTag(child.tag)) {
 			total_height += child.size.y + prev_margin;
 			prev_margin = 0;
 			++flow_count;
-			while (i < n && doc.m_elements[parent.children[i]].tag == Tag::SPAN) {
+			while (i < n && isInlineTag(doc.m_elements[parent.children[i]].tag)) {
 				++i;
 			}
 			--i;
@@ -952,8 +989,8 @@ static void layoutChildrenVertical(Document& doc, Element& parent) {
 		u32 child_idx = parent.children[i];
 		Element& child = doc.m_elements[child_idx];
 		if (child.position_mode == PositionMode::ABSOLUTE) continue;
-		if (child.tag == Tag::SPAN) {
-			i += layoutSpans(doc, parent, i, x + prev_margin, y) - 1;
+		if (isInlineTag(child.tag)) {
+			i += offsetInlineRun(doc, parent, i, x + prev_margin, y) - 1;
 			y += child.size.y + space;
 		}
 		else {
@@ -1059,7 +1096,7 @@ static void computeParentRelativeWidth(Document& doc, Element& elem) {
 		for (u32 child_idx : elem.children) {
 			Element& child = doc.m_elements[child_idx];
 			if (child.position_mode == PositionMode::ABSOLUTE) continue;
-			if (child.tag == Tag::SPAN) continue;
+			if (isInlineTag(child.tag)) continue;
 			if (child.width_unit.unit == Unit::FIT_CONTENT) {
 				child.size.x = maximum(0.0f, content_w - child.margins.right - child.margins.left);
 			}
@@ -1078,10 +1115,11 @@ static void computeParentRelativeWidth(Document& doc, Element& elem) {
 	}
 }
 
-// compute heights of consecutive spans in element, starting from child_idx
-static float computeSpansHeight(Document& doc, Element& element, i32 child_idx) {
+// compute heights of inline run starting at child_idx
+static float computeInlineRunHeight(Document& doc, Element& element, i32 child_idx) {
+	// TODO images
 	i32 end_idx = child_idx;
-	while (end_idx < element.children.size() && doc.m_elements[element.children[end_idx]].tag == Tag::SPAN) {
+	while (end_idx < element.children.size() && isInlineTag(doc.m_elements[element.children[end_idx]].tag)) {
 		++end_idx;
 	}
 	if (end_idx == child_idx) return 0;
@@ -1105,7 +1143,7 @@ static void computeFitContentHeights(Document& doc, Element& elem) {
 		computeFitContentHeights(doc, doc.m_elements[child_idx]);
 	}
 	
-	if (elem.height_unit.unit == Unit::FIT_CONTENT && elem.tag != Tag::SPAN) {
+	if (elem.height_unit.unit == Unit::FIT_CONTENT && !isInlineTag(elem.tag)) {
 		if (elem.direction == Direction::ROW) {
 			float max_height = 0;
 			for (u32 child_idx : elem.children) {
@@ -1118,10 +1156,11 @@ static void computeFitContentHeights(Document& doc, Element& elem) {
 			float sum_height = 0;
 			for (u32 i = 0, n = elem.children.size(); i < n; ++i) {
 				Element& child = doc.m_elements[elem.children[i]];
-				if (child.tag == Tag::SPAN) {
-					sum_height += computeSpansHeight(doc, elem, i);
-					i += 1; // skip the consecutive spans
-					while (i < n && doc.m_elements[elem.children[i]].tag == Tag::SPAN) ++i;
+				if (isInlineTag(child.tag)) {
+					sum_height += computeInlineRunHeight(doc, elem, i);
+					++i;
+					// skip inline run
+					while (i < n && isInlineTag(doc.m_elements[elem.children[i]].tag)) ++i;
 					--i;
 				} else {
 					sum_height += child.size.y + child.margins.top + child.margins.bottom;
@@ -1253,7 +1292,18 @@ static void computeBaseSizes(Document& doc, Element& elem, const ParentContext& 
 	// fit-content
 	bool is_row = elem.direction == Direction::ROW;
 	if (elem.width_unit.unit == Unit::FIT_CONTENT) {
-		if (is_row) {
+		if (elem.tag == Tag::IMAGE) {
+			if (doc.m_image_manager && elem.image_handle && doc.m_image_manager->isReady(elem.image_handle)) {
+				const Vec2 intrinsic_size = doc.m_image_manager->getIntrinsicSize(elem.image_handle);
+				if (elem.height_unit.unit != Unit::FIT_CONTENT && intrinsic_size.y > 0) {
+					elem.size.x = elem.size.y * intrinsic_size.x / intrinsic_size.y;
+				}
+				else {
+					elem.size.x = intrinsic_size.x;
+				}
+			}
+		}
+		else if (is_row) {
 			// In row direction, width is sum of child widths plus margins
 			float sum_width = 0;
 			for (u32 child_idx : elem.children) {
@@ -1268,9 +1318,10 @@ static void computeBaseSizes(Document& doc, Element& elem, const ParentContext& 
 				u32 child_idx = elem.children[i];
 				Element& child = doc.m_elements[child_idx];
 				float child_width;
-				if (child.tag == Tag::SPAN) {
+				if (isInlineTag(child.tag)) {
+					// TODO margins
 					child_width = 0;
-					while (i < n && doc.m_elements[elem.children[i]].tag == Tag::SPAN) {
+					while (i < n && isInlineTag(doc.m_elements[elem.children[i]].tag)) {
 						child_width += doc.m_elements[elem.children[i]].size.x;
 						++i;
 					}
@@ -1421,14 +1472,27 @@ static float layoutRowVertical(Document& doc, Element& parent, StackArray<RowLin
     // baseline align
     float max_ascender = 0, max_height = 0;
 	for (RowLine& rl : row_lines) {
-        float asc = doc.m_font_manager->getAscender(rl.child->font_handle);
-        float height = doc.m_font_manager->getHeight(rl.child->font_handle);
+        float asc;
+        float height;
+        if (rl.child->tag == Tag::IMAGE) {
+            height = rl.child->size.y;
+            asc = height;
+        }
+        else {
+            asc = doc.m_font_manager->getAscender(rl.child->font_handle);
+            height = doc.m_font_manager->getHeight(rl.child->font_handle);
+            rl.child->size.y += height;
+        }
         max_ascender = maximum(max_ascender, asc);
         max_height = maximum(max_height, height);
-        rl.child->size.y += height;
     }
     for (RowLine& rl : row_lines) {
-        rl.line->pos.y = row_y_pos + max_ascender;
+        if (rl.child->tag == Tag::IMAGE) {
+            rl.line->pos.y = row_y_pos + max_height - rl.child->size.y;
+        }
+        else {
+            rl.line->pos.y = row_y_pos + max_ascender;
+        }
     }
 
 	// horizontal align
@@ -1466,7 +1530,7 @@ static StringView trimLeadingWhitespace(StringView text) {
 }
 
 // word wrapping and line breaking based on the parent's width and wrap setting.
-static void wrapSpans(Document& doc, Element& parent, i32 start_span_idx, i32 end_span_idx) {
+static void wrapInlineRun(Document& doc, Element& parent, i32 start_span_idx, i32 end_span_idx) {
 	float x = 0;
 	const float content_width = parent.size.x - parent.paddings.left - parent.paddings.right;
 	if (content_width <= 0) return;
@@ -1474,8 +1538,25 @@ static void wrapSpans(Document& doc, Element& parent, i32 start_span_idx, i32 en
 	// First pass: wrap width
 	bool is_prev_space = false;
 	for (i32 child_idx = start_span_idx; child_idx < end_span_idx; ++child_idx) {
-		Element& span = doc.m_elements[parent.children[child_idx]];
-		span.lines.clear();
+		Element& child = doc.m_elements[parent.children[child_idx]];
+		child.lines.clear();
+		if (!child.visible) continue;
+
+		if (child.tag == Tag::IMAGE) {
+			if (wrap_enabled && x > 0 && child.size.x > content_width - x) {
+				x = 0;
+			}
+			SpanLine& line = child.lines.emplace();
+			line.text = StringView();
+			line.pos.x = x;
+			line.pos.y = 0;
+			line.width = child.size.x;
+			x += child.size.x;
+			is_prev_space = false;
+			continue;
+		}
+
+		Element& span = child;
 		if (!span.font_handle || span.text.empty()) continue;
 
 		StringView space(" ", 1);
@@ -1539,7 +1620,9 @@ static void wrapSpans(Document& doc, Element& parent, i32 start_span_idx, i32 en
 	float prev_x = -1;
 	for (i32 child_idx = start_span_idx; child_idx < end_span_idx; ++child_idx) {
 		Element& child = doc.m_elements[parent.children[child_idx]];
-		child.size.y = 0;
+		if (child.tag != Tag::IMAGE) {
+			child.size.y = 0;
+		}
 		for (SpanLine& line : child.lines) {
 			bool is_new_row = line.pos.x <= prev_x;
 			if (is_new_row) {
@@ -1555,7 +1638,14 @@ static void wrapSpans(Document& doc, Element& parent, i32 start_span_idx, i32 en
 	// 
 	for (i32 child_idx = start_span_idx; child_idx < end_span_idx; ++child_idx) {
 		Element& span = doc.m_elements[parent.children[child_idx]];
-		span.size.y = row_y;
+		if (span.tag == Tag::IMAGE) {
+			if (!span.lines.empty()) {
+				span.position = span.lines[0].pos;
+			}
+		}
+		else {
+			span.size.y = row_y;
+		}
 	}
 }
 
@@ -1578,12 +1668,12 @@ static void wrapText(Document& doc, Element& elem) {
 
 		i32 start_i = i; 
 		i32 end_i = i + 1;
-		while (end_i < elem.children.size() && doc.m_elements[elem.children[end_i]].tag == Tag::SPAN) {
+		while (end_i < elem.children.size() && isInlineTag(doc.m_elements[elem.children[end_i]].tag)) {
 			++end_i;
 		}
 		i = end_i - 1;
 
-		wrapSpans(doc, elem, start_i, end_i);
+		wrapInlineRun(doc, elem, start_i, end_i);
 	}
 }
 
@@ -1671,6 +1761,15 @@ static void renderElement(Draw2D& draw, const Document& doc, u32 element_idx, co
 	}
 
 	switch (element.tag) {
+		case Tag::IMAGE: {
+			if (doc.m_image_manager && element.image_handle && doc.m_image_manager->isReady(element.image_handle)) {
+				const u8 alpha = applyOpacityToAlpha(255, element.opacity);
+				if (alpha > 0) {
+					draw.addImage(static_cast<Texture*>(element.image_handle)->handle, pos, pos + size, Vec2(0, 0), Vec2(1, 1), Color(255, 255, 255, alpha));
+				}
+			}
+			break;
+		}
 		case Tag::BOX: {
 			if (element.bg_sprite) {
 				const u8 alpha = applyOpacityToAlpha(255, element.opacity);
@@ -1859,6 +1958,12 @@ static void loadResources(Document& doc, u32 element_index, const ParentContext&
 				elem.font_size = attr.font_size * doc.m_dpi_scale;
 				ctx.font_size = elem.font_size;
 				break;
+			case AttributeName::SRC: {
+				if (elem.tag == Tag::IMAGE && doc.m_image_manager && !attr.value.empty()) {
+					elem.image_handle = doc.m_image_manager->loadImage(attr.value);
+				}
+				break;
+			}
 			case AttributeName::BG_IMAGE: {
 				if (doc.m_resource_manager && !attr.value.empty()) {
 					elem.bg_sprite = doc.m_resource_manager->load<Sprite>(Path(attr.value));
@@ -2034,6 +2139,7 @@ void Document::injectEvent(const InputSystem::Event& event) {
 bool Document::areDependenciesReady() const {
 	for (const Element& elem : m_elements) {
 		if (elem.bg_sprite && !elem.bg_sprite->isReady()) return false;
+		if (m_image_manager && elem.image_handle && !m_image_manager->isReady(elem.image_handle)) return false;
 		if (elem.font_handle && !m_font_manager->isReady(elem.font_handle)) return false;
 	}
 	return true;

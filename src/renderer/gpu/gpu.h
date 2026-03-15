@@ -11,10 +11,14 @@ struct PageAllocator;
 
 namespace gpu {
 
-using BufferHandle = struct Buffer*;
-using ProgramHandle = struct Program*;
-using TextureHandle = struct Texture*;
-using QueryHandle = struct Query*;
+struct Buffer;
+struct Program;
+struct Texture;
+struct Query;
+using BufferHandle = Buffer*;
+using ProgramHandle = Program*;
+using TextureHandle = Texture*;
+using QueryHandle = Query*;
 const BufferHandle INVALID_BUFFER = nullptr;
 const ProgramHandle INVALID_PROGRAM = nullptr;
 const TextureHandle INVALID_TEXTURE = nullptr;

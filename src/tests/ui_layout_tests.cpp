@@ -2173,7 +2173,9 @@ bool testImageLayoutExplicitWidthHeight() {
 }
 
 bool testImageLayoutAspectRatioFromWidth() {
-	MockDocument doc;
+	MockFontManager font_manager;
+	MockImageManager image_manager;
+	ui::Document doc(&font_manager, getGlobalAllocator(), &image_manager);
 	ASSERT_PARSE(doc, "[image src=\"img.png\" width=80]");
 	doc.computeLayout(Vec2(800, 600));
 
@@ -2186,7 +2188,9 @@ bool testImageLayoutAspectRatioFromWidth() {
 }
 
 bool testImageLayoutAspectRatioFromHeight() {
-	MockDocument doc;
+	MockFontManager font_manager;
+	MockImageManager image_manager;
+	ui::Document doc(&font_manager, getGlobalAllocator(), &image_manager);
 	ASSERT_PARSE(doc, "[image src=\"img.png\" height=25]");
 	doc.computeLayout(Vec2(800, 600));
 

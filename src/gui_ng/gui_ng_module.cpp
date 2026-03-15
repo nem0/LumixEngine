@@ -28,7 +28,7 @@ struct UIModuleImpl : UIModule {
 		UI3DComponent(UIModuleImpl& module, EntityRef entity)
 			: module(module)
 			, entity(entity)
-			, document(&module.m_font_manager, module.m_allocator)
+			, document(&module.m_font_manager, module.m_allocator, &module.m_image_manager)
 		{
 			document.m_resource_manager = &module.m_system.getEngine().getResourceManager();
 		}
@@ -95,7 +95,8 @@ struct UIModuleImpl : UIModule {
 		, m_world(world)
 		, m_allocator(allocator)
 		, m_font_manager(m_system.getEngine())
-		, m_document(&m_font_manager, m_allocator)
+		, m_image_manager(m_system.getEngine())
+		, m_document(&m_font_manager, m_allocator, &m_image_manager)
 		, m_ui_3d_components(m_allocator)
 		, m_draw_2d(m_allocator)
 	{
@@ -307,6 +308,7 @@ struct UIModuleImpl : UIModule {
 	World& m_world;
 	IAllocator& m_allocator;
 	UIFontManager m_font_manager;
+	UIImageManager m_image_manager;
 	ui::Document m_document;
 	ui::DocumentResource* m_ui_resource = nullptr;
 	Vec2 m_canvas_size = Vec2(800, 600);
@@ -346,6 +348,23 @@ bool UIFontManager::isReady(FontHandle font) {
 
 SplitWord UIFontManager::splitFirstWord(FontHandle font, StringView text) {
 	return Lumix::splitFirstWord(*static_cast<Font*>(font), text);
+}
+
+ui::IImageManager::ImageHandle UIImageManager::loadImage(StringView path) {
+	if (!m_engine) return nullptr;
+	Texture* res = m_engine->getResourceManager().load<Texture>(Path(path));
+	return (ImageHandle)res;
+}
+
+bool UIImageManager::isReady(ImageHandle image) {
+	if (!image) return false;
+	return static_cast<Texture*>(image)->isReady();
+}
+
+Vec2 UIImageManager::getIntrinsicSize(ImageHandle image) {
+	if (!image) return Vec2(0);
+	Texture* texture = static_cast<Texture*>(image);
+	return Vec2((float)texture->width, (float)texture->height);
 }
 
 UniquePtr<UIModule> UIModule::createInstance(UISystem& system, World& world, IAllocator& allocator) {

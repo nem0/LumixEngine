@@ -74,9 +74,26 @@ struct MockFontManager : ui::IFontManager {
 	}
 };
 
+struct MockImageManager : ui::IImageManager {
+	ImageHandle loadImage(StringView path) override {
+		if (path == "img.png") return (ImageHandle)1;
+		return nullptr;
+	}
+
+	bool isReady(ImageHandle image) override {
+		return image != nullptr;
+	}
+
+	Vec2 getIntrinsicSize(ImageHandle image) override {
+		if (image == (ImageHandle)1) return Vec2(100, 50);
+		return Vec2(0);
+	}
+};
+
 struct MockDocument : ui::Document {
 	MockFontManager m_font_manager;
-	MockDocument() : ui::Document(&m_font_manager, getGlobalAllocator()) {}
+	MockImageManager m_image_manager;
+	MockDocument() : ui::Document(&m_font_manager, getGlobalAllocator(), &m_image_manager) {}
 };
 
 extern int test_count;
