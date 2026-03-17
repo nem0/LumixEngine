@@ -5,7 +5,7 @@ import "engine/particles/common.pai"
 global g_target : float3
 
 fn mix(a, b, t) {
-	return a + (b - a) * t;
+	result = a + (b - a) * t;
 }
 
 emitter ribbon {
