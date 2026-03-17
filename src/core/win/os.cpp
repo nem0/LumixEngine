@@ -982,10 +982,11 @@ bool isRelativeMouseMode()
 	return G.relative_mouse;
 }
 
-int getDPI()
-{
+i32 getDPI() {
 	const HDC hdc = GetDC(NULL);
-	return GetDeviceCaps(hdc, LOGPIXELSX);
+	i32 dpi = GetDeviceCaps(hdc, LOGPIXELSX);
+	ReleaseDC(NULL, hdc);
+	return dpi;
 }
 
 u32 getMemPageSize() {

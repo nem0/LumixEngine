@@ -254,7 +254,7 @@ LUMIX_CORE_API bool isAppForeground();
 
 LUMIX_CORE_API bool isKeyDown(Keycode keycode);
 LUMIX_CORE_API void getKeyName(Keycode keycode, Span<char> out);
-LUMIX_CORE_API int getDPI();
+LUMIX_CORE_API i32 getDPI();
 
 LUMIX_CORE_API [[nodiscard]] bool copyFile(StringView from, StringView to);
 LUMIX_CORE_API void getExecutablePath(Span<char> path);
