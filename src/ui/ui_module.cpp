@@ -11,10 +11,10 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
-#include "gui_ng/ui.h"
-#include "gui_ng/ui_resource.h"
-#include "gui_ng_module.h"
-#include "gui_ng_system.h"
+#include "ui.h"
+#include "ui_module.h"
+#include "ui_resource.h"
+#include "ui_system.h"
 #include "renderer/draw2d.h"
 #include "renderer/font.h"
 #include "renderer/pipeline.h"
@@ -364,7 +364,7 @@ UniquePtr<UIModule> UIModule::createInstance(UISystem& system, World& world, IAl
 }
 
 void UIModule::reflect() {
-	#include "gui_ng_module.gen.h"
+	#include "ui_module.gen.h"
 }
 
 } // namespace Lumix::ui

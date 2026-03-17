@@ -17,7 +17,6 @@ LUMIX_ENGINE_API extern const ComponentType gui_rect;
 LUMIX_ENGINE_API extern const ComponentType gui_button;
 LUMIX_ENGINE_API extern const ComponentType gui_image;
 LUMIX_ENGINE_API extern const ComponentType gui_text;
-LUMIX_ENGINE_API extern const ComponentType ui_3d;
 LUMIX_ENGINE_API extern const ComponentType lua_script;
 LUMIX_ENGINE_API extern const ComponentType lua_script_inline;
 LUMIX_ENGINE_API extern const ComponentType navmesh_zone;
@@ -46,4 +45,5 @@ LUMIX_ENGINE_API extern const ComponentType model_instance;
 LUMIX_ENGINE_API extern const ComponentType curve_decal;
 LUMIX_ENGINE_API extern const ComponentType terrain;
 LUMIX_ENGINE_API extern const ComponentType procedural_geom;
+LUMIX_ENGINE_API extern const ComponentType ui_3d;
 }

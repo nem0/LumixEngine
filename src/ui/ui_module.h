@@ -1,7 +1,7 @@
 #pragma once
 
 #include "engine/plugin.h"
-#include "gui_ng/ui.h"
+#include "ui.h"
 
 namespace Lumix {
 

@@ -104,11 +104,11 @@ export type World = {
 	audio: audio_module,
 	core: core_module,
 	gui: gui_module,
-	ui: ui_module,
 	lua_script: lua_script_module,
 	navigation: navigation_module,
 	physics: physics_module,
 	renderer: renderer_module,
+	ui: ui_module,
 }
 
 type Ray = {
@@ -132,16 +132,6 @@ type Viewport = {
 	near: number,
 	far: number,
 	pixel_offset: Vec2,
-}
-
-type Event = {
-	type: any,
-	position: Vec2,
-	element_index: number,
-	action: any,
-	key_code: number,
-	text_utf8: number,
-	wheel_y: number,
 }
 
 type RaycastHit = {
@@ -168,6 +158,16 @@ type RayCastModelHit = {
 	subindex: number,
 }
 
+type Event = {
+	type: any,
+	position: Vec2,
+	element_index: number,
+	action: any,
+	key_code: number,
+	text_utf8: number,
+	wheel_y: number,
+}
+
 type AssetBrowser = {
 	openEditor: (AssetBrowser, string) -> (),
 	resourceInput: (AssetBrowser, any, string, any, number) -> (boolean, string),
@@ -181,23 +181,6 @@ type StudioApp = {
 
 type GUISystem = {
 	enableCursor: (GUISystem, boolean) -> (),
-}
-
-type UISystem = {
-}
-
-type Element = {
-	getID: (Element) -> any,
-	setVisible: (Element, boolean) -> (),
-	setText: (Element, any) -> (),
-	setWidth: (Element, any) -> (),
-	setBGImage: (Element, string) -> (),
-}
-
-type Document = {
-	getElement: (Document, number) -> Element,
-	getElementByID: (Document, any) -> Element,
-	getEvents: (Document) -> any,
 }
 
 type GameView = {
@@ -227,6 +210,23 @@ type Pipeline = {
 type Renderer = {
 	getLODMultiplier: (Renderer) -> number,
 	setLODMultiplier: (Renderer, number) -> (),
+}
+
+type Element = {
+	getID: (Element) -> any,
+	setVisible: (Element, boolean) -> (),
+	setText: (Element, any) -> (),
+	setWidth: (Element, any) -> (),
+	setBGImage: (Element, string) -> (),
+}
+
+type Document = {
+	getElement: (Document, number) -> Element,
+	getElementByID: (Document, any) -> Element,
+	getEvents: (Document) -> any,
+}
+
+type UISystem = {
 }
 
 type animation_module = {
@@ -342,17 +342,6 @@ type gui_text_component =  {
 	horizontal_align: any,
 	vertical_align: any,
 	text: string,
-}
-
-type ui_module = {
-	getDocument: (ui_module) -> any,
-	isReady: (ui_module) -> boolean,
-}
-
-type ui_3d_component =  {
-	source: string,
-	virtual_size: Vec2,
-	orient_to_camera: boolean,
 }
 
 type lua_script_module = {
@@ -665,6 +654,17 @@ type procedural_geom_component =  {
 	material: string,
 }
 
+type ui_module = {
+	getDocument: (ui_module) -> any,
+	isReady: (ui_module) -> boolean,
+}
+
+type ui_3d_component =  {
+	source: string,
+	virtual_size: Vec2,
+	orient_to_camera: boolean,
+}
+
 
 export type Entity = {
 	NULL : Entity,
@@ -697,7 +697,6 @@ export type Entity = {
 	gui_button: gui_button_component,
 	gui_image: gui_image_component,
 	gui_text: gui_text_component,
-	ui_3d: ui_3d_component,
 	lua_script: lua_script_component,
 	lua_script_inline: lua_script_inline_component,
 	navmesh_zone: navmesh_zone_component,
@@ -726,6 +725,7 @@ export type Entity = {
 	curve_decal: curve_decal_component,
 	terrain: terrain_component,
 	procedural_geom: procedural_geom_component,
+	ui_3d: ui_3d_component,
 }
 
 
@@ -960,6 +960,11 @@ declare this : Entity
 			INVALID : number,
 			MAX : number,
 		},
+		GrassRotationMode : {
+			Y_UP : number,
+			ALL_RANDOM : number,
+			COUNT : number,
+		},
 		EventType : {
 			MOUSE_DOWN : number,
 			MOUSE_UP : number,
@@ -972,11 +977,6 @@ declare this : Entity
 			MOUSE_ENTER : number,
 			MOUSE_LEAVE : number,
 			INVALID : number,
-		},
-		GrassRotationMode : {
-			Y_UP : number,
-			ALL_RANDOM : number,
-			COUNT : number,
 		},
 		TextHAlign : {
 			LEFT : number,

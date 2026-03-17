@@ -6,13 +6,12 @@
 #include "engine/engine.h"
 #include "engine/plugin.h"
 #include "engine/world.h"
-#include "gui_ng/gui_ng_module.h"
-#include "gui_ng/ui_resource.h"
-#include "gui_ng_system.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_module.h"
 #include "renderer/renderer.h"
-#include <utility>
+#include "ui_module.h"
+#include "ui_resource.h"
+#include "ui_system.h"
 
 namespace Lumix {
 
@@ -49,7 +48,7 @@ struct UISystemImpl : UISystem {
 
 	void createModules(World& world) override {
 		UniquePtr<UIModule> module = UIModule::createInstance(*this, world, m_allocator);
-		world.addModule(std::move(module));
+		world.addModule(static_cast<UniquePtr<UIModule>&&>(module));
 	}
 
 	struct RenderPlugin : Lumix::RenderPlugin {
@@ -89,6 +88,6 @@ UniquePtr<ISystem> createUISystem(Engine& engine, IAllocator& allocator) {
 
 } // namespace Lumix
 
-LUMIX_PLUGIN_ENTRY(gui_ng) {
+LUMIX_PLUGIN_ENTRY(ui) {
 	return LUMIX_NEW(engine.getAllocator(), Lumix::UISystemImpl)(engine);
 }

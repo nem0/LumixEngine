@@ -20,9 +20,9 @@
 #include "engine/component_uid.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
-#include "gui_ng/gui_ng_module.h"
-#include "gui_ng/ui.h"
-#include "gui_ng/ui_resource.h"
+#include "ui/ui_module.h"
+#include "ui/ui.h"
+#include "ui/ui_resource.h"
 #include "gui/sprite.h"
 #include "renderer/draw2d.h"
 #include "renderer/font.h"
@@ -363,7 +363,7 @@ private:
 	UIAssetPlugin m_ui_plugin;
 };
 
-LUMIX_STUDIO_ENTRY(gui_ng) {
+LUMIX_STUDIO_ENTRY(ui) {
 	return LUMIX_NEW(app.getAllocator(), UIPlugin)(app);
 }
 

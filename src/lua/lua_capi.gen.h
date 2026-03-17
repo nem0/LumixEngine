@@ -3,25 +3,25 @@
 #include "editor/asset_browser.h"
 #include "editor/studio_app.h"
 #include "gui/gui_system.h"
-#include "gui_ng/gui_ng_system.h"
-#include "gui_ng/ui.h"
-#include "gui_ng/ui.h"
 #include "renderer/editor/game_view.h"
 #include "renderer/editor/scene_view.h"
 #include "renderer/model.h"
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"
+#include "ui/ui.h"
+#include "ui/ui.h"
+#include "ui/ui_system.h"
 #include "animation/animation_module.h"
 #include "audio/audio_module.h"
 #include "engine/core.h"
 #include "gui/gui_module.h"
-#include "gui_ng/gui_ng_module.h"
 #include "lua/lua_script_system.h"
 #include "navigation/navigation_module.h"
 #include "physics/physics_module.h"
 #include "core/geometry.h"
 #include "renderer/model.h"
 #include "renderer/render_module.h"
+#include "ui/ui_module.h"
 #define XXH_STATIC_LINKING_ONLY
 #include "xxhash/xxhash.h"
 
@@ -32,11 +32,11 @@ namespace Lumix::LuaWrapper {
 	void push(lua_State* L, os::Keycode value) { LuaWrapper::push(L, (i32)value); }
 	template <> os::Keycode checkArg<os::Keycode>(lua_State* L, int index) { return (os::Keycode)checkArg<i32>(L, index); }
 	
-	void push(lua_State* L, ui::EventType value) { LuaWrapper::push(L, (i32)value); }
-	template <> ui::EventType checkArg<ui::EventType>(lua_State* L, int index) { return (ui::EventType)checkArg<i32>(L, index); }
-	
 	void push(lua_State* L, GrassRotationMode value) { LuaWrapper::push(L, (i32)value); }
 	template <> GrassRotationMode checkArg<GrassRotationMode>(lua_State* L, int index) { return (GrassRotationMode)checkArg<i32>(L, index); }
+	
+	void push(lua_State* L, ui::EventType value) { LuaWrapper::push(L, (i32)value); }
+	template <> ui::EventType checkArg<ui::EventType>(lua_State* L, int index) { return (ui::EventType)checkArg<i32>(L, index); }
 	
 	void push(lua_State* L, const Ray& value) {
 		lua_newtable(L);
@@ -129,49 +129,6 @@ namespace Lumix::LuaWrapper {
 		lua_pop(L, 1);
 		lua_getfield(L, index, "pixel_offset");
 		res.pixel_offset = checkArg<Vec2>(L, -1);
-		lua_pop(L, 1);
-		return res;
-	}
-	void push(lua_State* L, const ui::Event& value) {
-		lua_newtable(L);
-		push(L, value.type);
-		lua_setfield(L, -2, "type");
-		push(L, value.position);
-		lua_setfield(L, -2, "position");
-		push(L, value.element_index);
-		lua_setfield(L, -2, "element_index");
-		push(L, value.action);
-		lua_setfield(L, -2, "action");
-		push(L, value.key_code);
-		lua_setfield(L, -2, "key_code");
-		push(L, value.text_utf8);
-		lua_setfield(L, -2, "text_utf8");
-		push(L, value.wheel_y);
-		lua_setfield(L, -2, "wheel_y");
-	}
-	template <> ui::Event checkArg<ui::Event>(lua_State* L, int index) {
-		ui::Event res;
-		if (!lua_istable(L, index)) luaL_argerror(L, index, "expected table");
-		lua_getfield(L, index, "type");
-		res.type = checkArg<ui::EventType>(L, -1);
-		lua_pop(L, 1);
-		lua_getfield(L, index, "position");
-		res.position = checkArg<Vec2>(L, -1);
-		lua_pop(L, 1);
-		lua_getfield(L, index, "element_index");
-		res.element_index = checkArg<u32>(L, -1);
-		lua_pop(L, 1);
-		lua_getfield(L, index, "action");
-		res.action = checkArg<StringView>(L, -1);
-		lua_pop(L, 1);
-		lua_getfield(L, index, "key_code");
-		res.key_code = checkArg<i32>(L, -1);
-		lua_pop(L, 1);
-		lua_getfield(L, index, "text_utf8");
-		res.text_utf8 = checkArg<u32>(L, -1);
-		lua_pop(L, 1);
-		lua_getfield(L, index, "wheel_y");
-		res.wheel_y = checkArg<float>(L, -1);
 		lua_pop(L, 1);
 		return res;
 	}
@@ -274,6 +231,49 @@ namespace Lumix::LuaWrapper {
 		lua_pop(L, 1);
 		return res;
 	}
+	void push(lua_State* L, const ui::Event& value) {
+		lua_newtable(L);
+		push(L, value.type);
+		lua_setfield(L, -2, "type");
+		push(L, value.position);
+		lua_setfield(L, -2, "position");
+		push(L, value.element_index);
+		lua_setfield(L, -2, "element_index");
+		push(L, value.action);
+		lua_setfield(L, -2, "action");
+		push(L, value.key_code);
+		lua_setfield(L, -2, "key_code");
+		push(L, value.text_utf8);
+		lua_setfield(L, -2, "text_utf8");
+		push(L, value.wheel_y);
+		lua_setfield(L, -2, "wheel_y");
+	}
+	template <> ui::Event checkArg<ui::Event>(lua_State* L, int index) {
+		ui::Event res;
+		if (!lua_istable(L, index)) luaL_argerror(L, index, "expected table");
+		lua_getfield(L, index, "type");
+		res.type = checkArg<ui::EventType>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "position");
+		res.position = checkArg<Vec2>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "element_index");
+		res.element_index = checkArg<u32>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "action");
+		res.action = checkArg<StringView>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "key_code");
+		res.key_code = checkArg<i32>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "text_utf8");
+		res.text_utf8 = checkArg<u32>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "wheel_y");
+		res.wheel_y = checkArg<float>(L, -1);
+		lua_pop(L, 1);
+		return res;
+	}
 	void push(lua_State* L, AssetBrowser* value) {
 		pushObject(L, (void*)value, "AssetBrowser");
 	}
@@ -282,15 +282,6 @@ namespace Lumix::LuaWrapper {
 	}
 	void push(lua_State* L, GUISystem* value) {
 		pushObject(L, (void*)value, "GUISystem");
-	}
-	void push(lua_State* L, UISystem* value) {
-		pushObject(L, (void*)value, "UISystem");
-	}
-	void push(lua_State* L, ui::Element* value) {
-		pushObject(L, (void*)value, "ui_Element");
-	}
-	void push(lua_State* L, ui::Document* value) {
-		pushObject(L, (void*)value, "ui_Document");
 	}
 	void push(lua_State* L, GameView* value) {
 		pushObject(L, (void*)value, "GameView");
@@ -306,6 +297,15 @@ namespace Lumix::LuaWrapper {
 	}
 	void push(lua_State* L, Renderer* value) {
 		pushObject(L, (void*)value, "Renderer");
+	}
+	void push(lua_State* L, ui::Element* value) {
+		pushObject(L, (void*)value, "ui_Element");
+	}
+	void push(lua_State* L, ui::Document* value) {
+		pushObject(L, (void*)value, "ui_Document");
+	}
+	void push(lua_State* L, UISystem* value) {
+		pushObject(L, (void*)value, "UISystem");
 	}
 }
 namespace Lumix {
@@ -941,55 +941,6 @@ namespace Lumix {
 			case /*horizontal_align*/17425989282954003833: module->setTextHAlign(entity, (TextHAlign)LuaWrapper::checkArg<i32>(L, 3)); break;
 			case /*vertical_align*/6391177055909864478: module->setTextVAlign(entity, (TextVAlign)LuaWrapper::checkArg<i32>(L, 3)); break;
 			case /*text*/5145922347574273553: module->setText(entity, LuaWrapper::checkArg<const char*>(L, 3)); break;
-			case 0:
-			default: luaL_error(L, "Unknown property %s", prop_name); break;
-		}
-		return 0;
-	}
-	
-}
-
-namespace Lumix {
-	int UIModule_getDocument(lua_State* L) {
-		LuaWrapper::checkTableArg(L, 1);
-		UIModule* module;
-		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
-		LuaWrapper::push(L, 	module->getDocument());
-		return 1;
-	}
-	
-	int UIModule_isReady(lua_State* L) {
-		LuaWrapper::checkTableArg(L, 1);
-		UIModule* module;
-		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
-		LuaWrapper::push(L, 	module->isReady());
-		return 1;
-	}
-	
-	int ui_3d_getter(lua_State* L) {
-		auto [imodule, entity] = checkComponent(L);
-		auto* module = (UIModule*)imodule;
-		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
-		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
-		switch (name_hash) {
-			case /*source*/17609862876178282011: LuaWrapper::push(L, module->getUI3DPath(entity)); break;
-			case /*virtual_size*/10008642934015139818: LuaWrapper::push(L, module->getUI3DVirtualSize(entity)); break;
-			case /*orient_to_camera*/8367939065059955720: LuaWrapper::push(L, module->getUI3DOrientToCamera(entity)); break;
-			case 0:
-			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
-		}
-		return 1;
-	}
-	
-	int ui_3d_setter(lua_State* L) {
-		auto [imodule, entity] = checkComponent(L);
-		auto* module = (UIModule*)imodule;
-		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
-		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
-		switch (name_hash) {
-			case /*source*/17609862876178282011: module->setUI3DPath(entity, LuaWrapper::checkArg<Path>(L, 3)); break;
-			case /*virtual_size*/10008642934015139818: module->setUI3DVirtualSize(entity, LuaWrapper::checkArg<Vec2>(L, 3)); break;
-			case /*orient_to_camera*/8367939065059955720: module->setUI3DOrientToCamera(entity, LuaWrapper::checkArg<bool>(L, 3)); break;
 			case 0:
 			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
@@ -2813,6 +2764,55 @@ namespace Lumix {
 }
 
 namespace Lumix {
+	int UIModule_getDocument(lua_State* L) {
+		LuaWrapper::checkTableArg(L, 1);
+		UIModule* module;
+		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+		LuaWrapper::push(L, 	module->getDocument());
+		return 1;
+	}
+	
+	int UIModule_isReady(lua_State* L) {
+		LuaWrapper::checkTableArg(L, 1);
+		UIModule* module;
+		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+		LuaWrapper::push(L, 	module->isReady());
+		return 1;
+	}
+	
+	int ui_3d_getter(lua_State* L) {
+		auto [imodule, entity] = checkComponent(L);
+		auto* module = (UIModule*)imodule;
+		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
+		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
+		switch (name_hash) {
+			case /*source*/17609862876178282011: LuaWrapper::push(L, module->getUI3DPath(entity)); break;
+			case /*virtual_size*/10008642934015139818: LuaWrapper::push(L, module->getUI3DVirtualSize(entity)); break;
+			case /*orient_to_camera*/8367939065059955720: LuaWrapper::push(L, module->getUI3DOrientToCamera(entity)); break;
+			case 0:
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
+		}
+		return 1;
+	}
+	
+	int ui_3d_setter(lua_State* L) {
+		auto [imodule, entity] = checkComponent(L);
+		auto* module = (UIModule*)imodule;
+		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
+		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
+		switch (name_hash) {
+			case /*source*/17609862876178282011: module->setUI3DPath(entity, LuaWrapper::checkArg<Path>(L, 3)); break;
+			case /*virtual_size*/10008642934015139818: module->setUI3DVirtualSize(entity, LuaWrapper::checkArg<Vec2>(L, 3)); break;
+			case /*orient_to_camera*/8367939065059955720: module->setUI3DOrientToCamera(entity, LuaWrapper::checkArg<bool>(L, 3)); break;
+			case 0:
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
+		}
+		return 0;
+	}
+	
+}
+
+namespace Lumix {
 	
 	void registerLuaAPI(lua_State* L) {
 		lua_newtable(L);
@@ -2865,22 +2865,6 @@ namespace Lumix {
 			lua_newtable(L);
 			lua_getglobal(L, "LumixModules");
 			lua_pushvalue(L, -2);
-			lua_setfield(L, -2, "ui");
-			lua_pop(L, 1);
-			lua_pushvalue(L, -1);
-			lua_setfield(L, -2, "__index");
-			lua_pushcfunction(L, lua_new_module, "new");
-			lua_setfield(L, -2, "new");
-			lua_pushcfunction(L, UIModule_getDocument, "getDocument");
-			lua_setfield(L, -2, "getDocument");
-			lua_pushcfunction(L, UIModule_isReady, "isReady");
-			lua_setfield(L, -2, "isReady");
-			lua_pop(L, 1);
-		}
-		{
-			lua_newtable(L);
-			lua_getglobal(L, "LumixModules");
-			lua_pushvalue(L, -2);
 			lua_setfield(L, -2, "physics");
 			lua_pop(L, 1);
 			lua_pushvalue(L, -1);
@@ -2923,6 +2907,22 @@ namespace Lumix {
 			lua_setfield(L, -2, "setActiveCamera");
 			lua_pushcfunction(L, RenderModule_setActiveEnvironment, "setActiveEnvironment");
 			lua_setfield(L, -2, "setActiveEnvironment");
+			lua_pop(L, 1);
+		}
+		{
+			lua_newtable(L);
+			lua_getglobal(L, "LumixModules");
+			lua_pushvalue(L, -2);
+			lua_setfield(L, -2, "ui");
+			lua_pop(L, 1);
+			lua_pushvalue(L, -1);
+			lua_setfield(L, -2, "__index");
+			lua_pushcfunction(L, lua_new_module, "new");
+			lua_setfield(L, -2, "new");
+			lua_pushcfunction(L, UIModule_getDocument, "getDocument");
+			lua_setfield(L, -2, "getDocument");
+			lua_pushcfunction(L, UIModule_isReady, "isReady");
+			lua_setfield(L, -2, "isReady");
 			lua_pop(L, 1);
 		}
 		{
@@ -3034,147 +3034,6 @@ namespace Lumix {
 					return 0;
 				};
 				const char* name = "enableCursor";
-				lua_pushcfunction(L, proxy, name);
-				lua_setfield(L, -2, name);
-			}
-			lua_pop(L, 2);
-		}
-		{
-			lua_getglobal(L, "LumixAPI");
-			lua_newtable(L);
-			lua_pushvalue(L, -1);
-			lua_setfield(L, -3, "UISystem");
-			lua_pushvalue(L, -1);
-			lua_setfield(L, -2, "__index");
-			lua_pop(L, 2);
-		}
-		{
-			lua_getglobal(L, "LumixAPI");
-			lua_newtable(L);
-			lua_pushvalue(L, -1);
-			lua_setfield(L, -3, "ui_Element");
-			lua_pushvalue(L, -1);
-			lua_setfield(L, -2, "__index");
-			{
-				auto proxy = [](lua_State* L) -> int {
-					LuaWrapper::checkTableArg(L, 1); // self
-					ui::Element* obj;
-					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
-					if (!obj) return 0;
-					auto res = obj->getID();
-					LuaWrapper::push(L, res);
-					return 1;
-				};
-				const char* name = "getID";
-				lua_pushcfunction(L, proxy, name);
-				lua_setfield(L, -2, name);
-			}
-			{
-				auto proxy = [](lua_State* L) -> int {
-					LuaWrapper::checkTableArg(L, 1); // self
-					ui::Element* obj;
-					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
-					if (!obj) return 0;
-					auto show = LuaWrapper::checkArg<bool>(L, 2);
-					obj->setVisible(show);
-					return 0;
-				};
-				const char* name = "setVisible";
-				lua_pushcfunction(L, proxy, name);
-				lua_setfield(L, -2, name);
-			}
-			{
-				auto proxy = [](lua_State* L) -> int {
-					LuaWrapper::checkTableArg(L, 1); // self
-					ui::Element* obj;
-					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
-					if (!obj) return 0;
-					auto value = LuaWrapper::checkArg<StringView>(L, 2);
-					obj->setText(value);
-					return 0;
-				};
-				const char* name = "setText";
-				lua_pushcfunction(L, proxy, name);
-				lua_setfield(L, -2, name);
-			}
-			{
-				auto proxy = [](lua_State* L) -> int {
-					LuaWrapper::checkTableArg(L, 1); // self
-					ui::Element* obj;
-					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
-					if (!obj) return 0;
-					auto value = LuaWrapper::checkArg<StringView>(L, 2);
-					obj->setWidth(value);
-					return 0;
-				};
-				const char* name = "setWidth";
-				lua_pushcfunction(L, proxy, name);
-				lua_setfield(L, -2, name);
-			}
-			{
-				auto proxy = [](lua_State* L) -> int {
-					LuaWrapper::checkTableArg(L, 1); // self
-					ui::Element* obj;
-					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
-					if (!obj) return 0;
-					auto path = LuaWrapper::checkArg<Path>(L, 2);
-					obj->setBGImage(path);
-					return 0;
-				};
-				const char* name = "setBGImage";
-				lua_pushcfunction(L, proxy, name);
-				lua_setfield(L, -2, name);
-			}
-			lua_pop(L, 2);
-		}
-		{
-			lua_getglobal(L, "LumixAPI");
-			lua_newtable(L);
-			lua_pushvalue(L, -1);
-			lua_setfield(L, -3, "ui_Document");
-			lua_pushvalue(L, -1);
-			lua_setfield(L, -2, "__index");
-			{
-				auto proxy = [](lua_State* L) -> int {
-					LuaWrapper::checkTableArg(L, 1); // self
-					ui::Document* obj;
-					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
-					if (!obj) return 0;
-					auto index = LuaWrapper::checkArg<u32>(L, 2);
-					auto res = obj->getElement(index);
-					LuaWrapper::push(L, res);
-					return 1;
-				};
-				const char* name = "getElement";
-				lua_pushcfunction(L, proxy, name);
-				lua_setfield(L, -2, name);
-			}
-			{
-				auto proxy = [](lua_State* L) -> int {
-					LuaWrapper::checkTableArg(L, 1); // self
-					ui::Document* obj;
-					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
-					if (!obj) return 0;
-					auto id = LuaWrapper::checkArg<const char*>(L, 2);
-					auto res = obj->getElementByID(id);
-					LuaWrapper::push(L, res);
-					return 1;
-				};
-				const char* name = "getElementByID";
-				lua_pushcfunction(L, proxy, name);
-				lua_setfield(L, -2, name);
-			}
-			{
-				auto proxy = [](lua_State* L) -> int {
-					LuaWrapper::checkTableArg(L, 1); // self
-					ui::Document* obj;
-					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
-					if (!obj) return 0;
-					auto res = obj->getEvents();
-					LuaWrapper::push(L, res);
-					return 1;
-				};
-				const char* name = "getEvents";
 				lua_pushcfunction(L, proxy, name);
 				lua_setfield(L, -2, name);
 			}
@@ -3423,6 +3282,147 @@ namespace Lumix {
 				lua_pushcfunction(L, proxy, name);
 				lua_setfield(L, -2, name);
 			}
+			lua_pop(L, 2);
+		}
+		{
+			lua_getglobal(L, "LumixAPI");
+			lua_newtable(L);
+			lua_pushvalue(L, -1);
+			lua_setfield(L, -3, "ui_Element");
+			lua_pushvalue(L, -1);
+			lua_setfield(L, -2, "__index");
+			{
+				auto proxy = [](lua_State* L) -> int {
+					LuaWrapper::checkTableArg(L, 1); // self
+					ui::Element* obj;
+					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
+					auto res = obj->getID();
+					LuaWrapper::push(L, res);
+					return 1;
+				};
+				const char* name = "getID";
+				lua_pushcfunction(L, proxy, name);
+				lua_setfield(L, -2, name);
+			}
+			{
+				auto proxy = [](lua_State* L) -> int {
+					LuaWrapper::checkTableArg(L, 1); // self
+					ui::Element* obj;
+					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
+					auto show = LuaWrapper::checkArg<bool>(L, 2);
+					obj->setVisible(show);
+					return 0;
+				};
+				const char* name = "setVisible";
+				lua_pushcfunction(L, proxy, name);
+				lua_setfield(L, -2, name);
+			}
+			{
+				auto proxy = [](lua_State* L) -> int {
+					LuaWrapper::checkTableArg(L, 1); // self
+					ui::Element* obj;
+					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
+					auto value = LuaWrapper::checkArg<StringView>(L, 2);
+					obj->setText(value);
+					return 0;
+				};
+				const char* name = "setText";
+				lua_pushcfunction(L, proxy, name);
+				lua_setfield(L, -2, name);
+			}
+			{
+				auto proxy = [](lua_State* L) -> int {
+					LuaWrapper::checkTableArg(L, 1); // self
+					ui::Element* obj;
+					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
+					auto value = LuaWrapper::checkArg<StringView>(L, 2);
+					obj->setWidth(value);
+					return 0;
+				};
+				const char* name = "setWidth";
+				lua_pushcfunction(L, proxy, name);
+				lua_setfield(L, -2, name);
+			}
+			{
+				auto proxy = [](lua_State* L) -> int {
+					LuaWrapper::checkTableArg(L, 1); // self
+					ui::Element* obj;
+					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
+					auto path = LuaWrapper::checkArg<Path>(L, 2);
+					obj->setBGImage(path);
+					return 0;
+				};
+				const char* name = "setBGImage";
+				lua_pushcfunction(L, proxy, name);
+				lua_setfield(L, -2, name);
+			}
+			lua_pop(L, 2);
+		}
+		{
+			lua_getglobal(L, "LumixAPI");
+			lua_newtable(L);
+			lua_pushvalue(L, -1);
+			lua_setfield(L, -3, "ui_Document");
+			lua_pushvalue(L, -1);
+			lua_setfield(L, -2, "__index");
+			{
+				auto proxy = [](lua_State* L) -> int {
+					LuaWrapper::checkTableArg(L, 1); // self
+					ui::Document* obj;
+					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
+					auto index = LuaWrapper::checkArg<u32>(L, 2);
+					auto res = obj->getElement(index);
+					LuaWrapper::push(L, res);
+					return 1;
+				};
+				const char* name = "getElement";
+				lua_pushcfunction(L, proxy, name);
+				lua_setfield(L, -2, name);
+			}
+			{
+				auto proxy = [](lua_State* L) -> int {
+					LuaWrapper::checkTableArg(L, 1); // self
+					ui::Document* obj;
+					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
+					auto id = LuaWrapper::checkArg<const char*>(L, 2);
+					auto res = obj->getElementByID(id);
+					LuaWrapper::push(L, res);
+					return 1;
+				};
+				const char* name = "getElementByID";
+				lua_pushcfunction(L, proxy, name);
+				lua_setfield(L, -2, name);
+			}
+			{
+				auto proxy = [](lua_State* L) -> int {
+					LuaWrapper::checkTableArg(L, 1); // self
+					ui::Document* obj;
+					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
+					auto res = obj->getEvents();
+					LuaWrapper::push(L, res);
+					return 1;
+				};
+				const char* name = "getEvents";
+				lua_pushcfunction(L, proxy, name);
+				lua_setfield(L, -2, name);
+			}
+			lua_pop(L, 2);
+		}
+		{
+			lua_getglobal(L, "LumixAPI");
+			lua_newtable(L);
+			lua_pushvalue(L, -1);
+			lua_setfield(L, -3, "UISystem");
+			lua_pushvalue(L, -1);
+			lua_setfield(L, -2, "__index");
 			lua_pop(L, 2);
 		}
 		{
@@ -3829,6 +3829,18 @@ namespace Lumix {
 			lua_getglobal(L, "LumixAPI");
 			lua_newtable(L);
 			LuaWrapper::push(L, 0);
+			lua_setfield(L, -2, "Y_UP");
+			LuaWrapper::push(L, 1);
+			lua_setfield(L, -2, "ALL_RANDOM");
+			LuaWrapper::push(L, 2);
+			lua_setfield(L, -2, "COUNT");
+			lua_setfield(L, -2, "GrassRotationMode");
+			lua_pop(L, 1);
+		}
+		{
+			lua_getglobal(L, "LumixAPI");
+			lua_newtable(L);
+			LuaWrapper::push(L, 0);
 			lua_setfield(L, -2, "MOUSE_DOWN");
 			LuaWrapper::push(L, 1);
 			lua_setfield(L, -2, "MOUSE_UP");
@@ -3851,18 +3863,6 @@ namespace Lumix {
 			LuaWrapper::push(L, 10);
 			lua_setfield(L, -2, "INVALID");
 			lua_setfield(L, -2, "EventType");
-			lua_pop(L, 1);
-		}
-		{
-			lua_getglobal(L, "LumixAPI");
-			lua_newtable(L);
-			LuaWrapper::push(L, 0);
-			lua_setfield(L, -2, "Y_UP");
-			LuaWrapper::push(L, 1);
-			lua_setfield(L, -2, "ALL_RANDOM");
-			LuaWrapper::push(L, 2);
-			lua_setfield(L, -2, "COUNT");
-			lua_setfield(L, -2, "GrassRotationMode");
 			lua_pop(L, 1);
 		}
 		registerLuaComponent(L, "property_animator", property_animator_getter, property_animator_setter);
@@ -3905,7 +3905,6 @@ namespace Lumix {
 		registerLuaComponent(L, "gui_button", gui_button_getter, gui_button_setter);
 		registerLuaComponent(L, "gui_image", gui_image_getter, gui_image_setter);
 		registerLuaComponent(L, "gui_text", gui_text_getter, gui_text_setter);
-		registerLuaComponent(L, "ui_3d", ui_3d_getter, ui_3d_setter);
 		registerLuaComponent(L, "lua_script", lua_script_getter, lua_script_setter);
 		registerLuaComponent(L, "lua_script_inline", lua_script_inline_getter, lua_script_inline_setter);
 		registerLuaComponent(L, "navmesh_zone", navmesh_zone_getter, navmesh_zone_setter);
@@ -3972,6 +3971,7 @@ namespace Lumix {
 		registerLuaComponent(L, "curve_decal", curve_decal_getter, curve_decal_setter);
 		registerLuaComponent(L, "terrain", terrain_getter, terrain_setter);
 		registerLuaComponent(L, "procedural_geom", procedural_geom_getter, procedural_geom_setter);
+		registerLuaComponent(L, "ui_3d", ui_3d_getter, ui_3d_setter);
 	}
 }
 

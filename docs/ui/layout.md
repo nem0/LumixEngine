@@ -191,7 +191,7 @@ Mix units freely, e.g., `width=50% height=2em`.
 
 ### DPI Scaling
 
-`gui_ng` supports DPI-aware sizing through document scale.
+`UI` supports DPI-aware sizing through document scale.
 
 - `Document::setDPIScale(scale)` sets the UI scale factor (`1.0` means baseline 96 DPI).
 - Pixel units are multiplied by DPI scale (`width=200` becomes `400` at scale `2.0`).
@@ -199,7 +199,7 @@ Mix units freely, e.g., `width=50% height=2em`.
 - `em` units follow the scaled font size, so they scale naturally.
 - Percentage units (`%`) are not directly multiplied by DPI; they remain relative to parent/canvas size.
 
-In runtime `gui_ng` module (screen-space UI), DPI scale is driven from OS DPI as `os::getDPI() / 96.0`.
+In runtime `UI` module (screen-space UI), DPI scale is driven from OS DPI as `os::getDPI() / 96.0`.
 
 ### Fit-Content
 

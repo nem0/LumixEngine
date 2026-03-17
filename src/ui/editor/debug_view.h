@@ -4,8 +4,8 @@
 #include "core/color.h"
 #include "core/math.h"
 #include "core/string.h"
-#include "gui_ng/ui.h"
 #include "renderer/draw2d.h"
+#include "ui/ui.h"
 #include <imgui/imgui.h>
 
 namespace Lumix::ui {

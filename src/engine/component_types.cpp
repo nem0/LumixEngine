@@ -18,7 +18,6 @@ extern const ComponentType gui_rect = reflection::getComponentType("gui_rect");
 extern const ComponentType gui_button = reflection::getComponentType("gui_button");
 extern const ComponentType gui_image = reflection::getComponentType("gui_image");
 extern const ComponentType gui_text = reflection::getComponentType("gui_text");
-extern const ComponentType ui_3d = reflection::getComponentType("ui_3d");
 extern const ComponentType lua_script = reflection::getComponentType("lua_script");
 extern const ComponentType lua_script_inline = reflection::getComponentType("lua_script_inline");
 extern const ComponentType navmesh_zone = reflection::getComponentType("navmesh_zone");
@@ -47,4 +46,5 @@ extern const ComponentType model_instance = reflection::getComponentType("model_
 extern const ComponentType curve_decal = reflection::getComponentType("curve_decal");
 extern const ComponentType terrain = reflection::getComponentType("terrain");
 extern const ComponentType procedural_geom = reflection::getComponentType("procedural_geom");
+extern const ComponentType ui_3d = reflection::getComponentType("ui_3d");
 }

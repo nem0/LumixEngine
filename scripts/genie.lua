@@ -67,7 +67,7 @@ if _OPTIONS["plugins"] then
 	plugins = string.explode( _OPTIONS["plugins"], ",")
 end
 
-for	_, v in ipairs { "physics", "renderer", "audio", "gui", "gui_ng", "animation", "navigation", "lua" } do
+for	_, v in ipairs { "physics", "renderer", "audio", "gui", "ui", "animation", "navigation", "lua" } do
 	if _OPTIONS["no-" .. v] == nil then
 		table.insert(plugins, v)
 		table.insert(base_plugins, v)
@@ -549,11 +549,11 @@ if plugin "gui" then
 		links { "winmm", "psapi" }
 end
 
-if plugin "gui_ng" then
-	files { "../src/gui_ng/**.h", "../src/gui_ng/**.cpp" }
-	includedirs { "../src", "../src/gui_ng" }
+if plugin "ui" then
+	files { "../src/ui/**.h", "../src/ui/**.cpp" }
+	includedirs { "../src", "../src/ui" }
 	dynamic_link_plugin { "core", "engine", "renderer" }
-	defines { "BUILDING_GUI_NG" }
+	defines { "BUILDING_UI" }
 	
 	configuration { "vs*" }
 		links { "winmm", "psapi" }

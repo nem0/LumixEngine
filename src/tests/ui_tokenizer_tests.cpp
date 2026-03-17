@@ -1,6 +1,6 @@
 #include "core/log.h"
 #include "core/string.h"
-#include "gui_ng/ui_tokenizer.h"
+#include "ui/ui_tokenizer.h"
 #include "tests/common.h"
 
 using namespace Lumix;

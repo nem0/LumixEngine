@@ -2,7 +2,7 @@
 
 #include "core/string.h"
 #include "renderer/font.h"
-#include "gui_ng/ui.h"
+#include "ui/ui.h"
 
 namespace Lumix {
 
