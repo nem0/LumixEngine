@@ -437,6 +437,22 @@ bool testSpanEmptyValue() {
 	return true;
 }
 
+bool testTopLevelSpanWithoutContainer() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[span text=\"hello\"]");
+	ASSERT_EQ(1, doc.m_roots.size());
+
+	doc.computeLayout(Vec2(800, 600));
+
+	ui::Element* span = doc.getElement(doc.m_roots[0]);
+	ASSERT_TAG(span, SPAN);
+	ASSERT_EQ("hello", span->text);
+	ASSERT_TRUE(!span->lines.empty());
+	ASSERT_TRUE(span->size.x > 0);
+	ASSERT_TRUE(span->size.y > 0);
+	return true;
+}
+
 bool testFontAttribute() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box font=\"arial.ttf\"] { [span text=\"hello\" font=\"times.ttf\"] }");
@@ -1187,6 +1203,7 @@ void runUITests() {
 	RUN_TEST(testDefaultValues);
 	RUN_TEST(testSpanAndQuotedStringEquivalence);
 	RUN_TEST(testSpanEmptyValue);
+	RUN_TEST(testTopLevelSpanWithoutContainer);
 	RUN_TEST(testFontAttribute);
 	RUN_TEST(testFontSizeAttribute);
 	RUN_TEST(testFontInheritance);
