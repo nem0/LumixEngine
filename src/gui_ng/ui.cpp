@@ -775,9 +775,10 @@ void Element::setBGImage(const Path& path) {
 }
 
 void Element::setText(StringView v) {
-	upsertAttribute<AttributeName::TEXT>(*this, v, AttributeSource::ELEMENT);
-
-	text = v;
+	InternString s = m_document.m_intern_table.intern(v);
+	StringView stable_text = m_document.m_intern_table.resolve(s);
+	upsertAttribute<AttributeName::TEXT>(*this, stable_text, AttributeSource::ELEMENT);
+	text = stable_text;
 	m_document.computeLayout(m_document.m_canvas_size);
 }
 
