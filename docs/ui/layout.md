@@ -87,7 +87,7 @@ Examples:
 For visual consistency, inline elements align to a baseline:
 - Text baselines are determined by font metrics.
 - Non-text elements (e.g., icons) align to their bottom edge.
-- The line's baseline is set by the tallest text element.
+- The line's baseline is the maximum of text ascenders and non-text element heights.
 
 ### Text Wrapping
 

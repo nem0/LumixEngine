@@ -2080,6 +2080,34 @@ bool testAlignCenter() {
 	return true;
 }
 
+bool testAlignCenterImageAndTextChildren() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+		[box width=200 align=center font="arial.ttf" font-size=16] {
+			[image width=20 height=10]
+			[span text="abc"]
+		}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+
+	ASSERT_EQ(1, doc.m_roots.size());
+	ui::Element* panel = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(2, panel->children.size());
+
+	ui::Element* image = doc.getElement(panel->children[0]);
+	ui::Element* text = doc.getElement(panel->children[1]);
+
+	ASSERT_TAG(image, IMAGE);
+	ASSERT_TAG(text, SPAN);
+	ASSERT_EQ(1, text->lines.size());
+
+	const float expected_start_x = (200.0f - image->size.x - text->size.x) * 0.5f;
+	ASSERT_FLOAT_EQ(expected_start_x, image->position.x);
+	ASSERT_FLOAT_EQ(expected_start_x + image->size.x, text->lines[0].pos.x);
+
+	return true;
+}
+
 bool testAlignRight() {
 	// Citation: layout.md - Text Alignment
 	// "Text alignment controls how text is positioned horizontally within its container. The `align` attribute can be set to `left`, `center`, or `right`, with `left` as the default."
@@ -2159,6 +2187,40 @@ bool testImageLayoutInlineFlow() {
 	return true;
 }
 
+bool testImageBaselineAlignmentInInlineFlow() {
+	// Citation: layout.md - Inline Flow and Spacing / Baseline Alignment
+	// "Non-text elements (e.g., icons) align to their bottom edge."
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+		[box direction=row width=200 font="arial.ttf" font-size=16] {
+			[span text="aa"]
+			[image width=20 height=10]
+			[span text="bb"]
+		}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+
+	ASSERT_EQ(1, doc.m_roots.size());
+	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(3, root->children.size());
+
+	ui::Element* span1 = doc.getElement(root->children[0]);
+	ui::Element* image = doc.getElement(root->children[1]);
+	ui::Element* span2 = doc.getElement(root->children[2]);
+
+	ASSERT_TAG(span1, SPAN);
+	ASSERT_TAG(image, IMAGE);
+	ASSERT_TAG(span2, SPAN);
+	ASSERT_EQ(1, span1->lines.size());
+	ASSERT_EQ(1, span2->lines.size());
+
+	const float text_baseline_y = span1->lines[0].pos.y;
+	ASSERT_FLOAT_EQ(text_baseline_y, span2->lines[0].pos.y);
+	ASSERT_FLOAT_EQ(text_baseline_y, image->position.y + image->size.y);
+
+	return true;
+}
+
 bool testImageLayoutExplicitWidthHeight() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[image width=64 height=32]");
@@ -2232,6 +2294,7 @@ void runUILayoutTests() {
 	logInfo("=== Running UI Layout Tests ===");
 	RUN_TEST(testAdvancedFitContent);
 	RUN_TEST(testAlignCenter);
+	RUN_TEST(testAlignCenterImageAndTextChildren);
 	RUN_TEST(testAlignCenterMultipleSpans);
 	RUN_TEST(testAlignItemsCenter);
 	RUN_TEST(testAlignItemsEnd);
@@ -2301,6 +2364,7 @@ void runUILayoutTests() {
 	RUN_TEST(testPercentHeightOnRoot);
 	RUN_TEST(testPanelWithInlineSpan);
 	RUN_TEST(testImageLayoutInlineFlow);
+	RUN_TEST(testImageBaselineAlignmentInInlineFlow);
 	RUN_TEST(testImageLayoutExplicitWidthHeight);
 	RUN_TEST(testImageLayoutAspectRatioFromWidth);
 	RUN_TEST(testImageLayoutAspectRatioFromHeight);

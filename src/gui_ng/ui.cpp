@@ -1335,6 +1335,18 @@ static void computeBaseSizes(Document& doc, Element& elem, const ParentContext& 
 			elem.size.x = max_width + elem.paddings.right + elem.paddings.left;
 		}
 	}
+
+	if (elem.height_unit.unit == Unit::FIT_CONTENT && elem.tag == Tag::IMAGE) {
+		if (doc.m_image_manager && elem.image_handle && doc.m_image_manager->isReady(elem.image_handle)) {
+			const Vec2 intrinsic_size = doc.m_image_manager->getIntrinsicSize(elem.image_handle);
+			if (elem.width_unit.unit != Unit::FIT_CONTENT && intrinsic_size.x > 0) {
+				elem.size.y = elem.size.x * intrinsic_size.y / intrinsic_size.x;
+			}
+			else {
+				elem.size.y = intrinsic_size.y;
+			}
+		}
+	}
 }
 
 void Stylesheet::buildIndex() {
@@ -1470,28 +1482,24 @@ static float layoutRowVertical(Document& doc, Element& parent, StackArray<RowLin
     if (row_lines.empty()) return 0;
 
     // baseline align
-    float max_ascender = 0, max_height = 0;
+    float baseline = 0, desc = 0;
 	for (RowLine& rl : row_lines) {
-        float asc;
-        float height;
         if (rl.child->tag == Tag::IMAGE) {
-            height = rl.child->size.y;
-            asc = height;
+            baseline = maximum(baseline, rl.child->size.y);
         }
         else {
-            asc = doc.m_font_manager->getAscender(rl.child->font_handle);
-            height = doc.m_font_manager->getHeight(rl.child->font_handle);
-            rl.child->size.y += height;
+            float asc = doc.m_font_manager->getAscender(rl.child->font_handle);
+            float height = doc.m_font_manager->getHeight(rl.child->font_handle);
+            baseline = maximum(baseline, asc);
+			desc = maximum(desc, height - asc);
         }
-        max_ascender = maximum(max_ascender, asc);
-        max_height = maximum(max_height, height);
     }
     for (RowLine& rl : row_lines) {
         if (rl.child->tag == Tag::IMAGE) {
-            rl.line->pos.y = row_y_pos + max_height - rl.child->size.y;
+            rl.line->pos.y = row_y_pos + baseline - rl.child->size.y;
         }
         else {
-            rl.line->pos.y = row_y_pos + max_ascender;
+            rl.line->pos.y = row_y_pos + baseline;
         }
     }
 
@@ -1519,7 +1527,7 @@ static float layoutRowVertical(Document& doc, Element& parent, StackArray<RowLin
         }
     }
 	row_lines.clear();
-    return max_height;
+    return baseline + desc;
 }
 
 static StringView trimLeadingWhitespace(StringView text) {
@@ -1661,7 +1669,7 @@ static void wrapText(Document& doc, Element& elem) {
 
 	for (u32 i = 0, n = elem.children.size(); i < n; ++i) {
 		Element& child = doc.m_elements[elem.children[i]];
-		if (child.tag != Tag::SPAN) {
+		if (!isInlineTag(child.tag)) {
 			wrapText(doc, doc.m_elements[elem.children[i]]);
 			continue;
 		}
