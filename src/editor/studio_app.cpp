@@ -118,7 +118,7 @@ struct StudioAppImpl final : StudioApp {
 			WorldEditor& editor = m_app.getWorldEditor();
 			World* world = editor.getWorld();
 			bool is_selected = selected_entities.indexOf(entity) >= 0;
-			ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_AllowItemOverlap;
+			ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_AllowOverlap;
 			bool has_child = world->getFirstChild(entity).isValid();
 			if (!has_child) flags = ImGuiTreeNodeFlags_Leaf;
 			if (is_selected) flags |= ImGuiTreeNodeFlags_Selected;
