@@ -1248,6 +1248,9 @@ void memoryBarrier(TextureHandle texture) {
 
 void Frame::end(ID3D12CommandQueue* cmd_queue, ID3D12GraphicsCommandList* cmd_list, ID3D12QueryHeap* timestamp_query_heap, ID3D12QueryHeap* stats_query_heap) {
 	PROFILE_FUNCTION();
+	#ifdef USE_PIX
+		bool pix_capture_started = false;
+	#endif
 	timestamp_query_buffer->Unmap(0, nullptr);
 	for (u32 i = 0, c = to_resolve.size(); i < c; ++i) {
 		QueryHandle q = to_resolve[i];
@@ -1272,14 +1275,18 @@ void Frame::end(ID3D12CommandQueue* cmd_queue, ID3D12GraphicsCommandList* cmd_li
 			d3d->rdoc_api->TriggerCapture();
 		}
 		#ifdef USE_PIX
-			if (PIXIsAttachedForGpuCapture()) PIXBeginCapture(PIX_CAPTURE_GPU, {});
+			if (PIXIsAttachedForGpuCapture()) {
+				pix_capture_started = SUCCEEDED(PIXBeginCapture(PIX_CAPTURE_GPU, {}));
+			}
 		#endif
 	}
 	cmd_queue->ExecuteCommandLists(1, (ID3D12CommandList* const*)&cmd_list);
 	if (capture_requested) {
 		capture_requested = false;
 		#ifdef USE_PIX
-			if (PIXIsAttachedForGpuCapture()) PIXEndCapture(FALSE);
+			if (pix_capture_started && (PIXGetCaptureState() & PIX_CAPTURE_GPU)) {
+				PIXEndCapture(FALSE);
+			}
 		#endif
 	}
 
@@ -1779,8 +1786,9 @@ void shutdown() {
 	#ifdef LUMIX_DEBUG
 		auto api_DXGIGetDebugInterface1 = (decltype(DXGIGetDebugInterface1)*)GetProcAddress(d3d->dxgi_dll, "DXGIGetDebugInterface1");
 		IDXGIDebug1* dxgi_debug;
-		if (DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgi_debug)) == S_OK) {
+		if (api_DXGIGetDebugInterface1 && api_DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgi_debug)) == S_OK) {
 			dxgi_debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_FLAGS(DXGI_DEBUG_RLO_DETAIL | DXGI_DEBUG_RLO_IGNORE_INTERNAL));
+			dxgi_debug->Release();
 		}
 	#endif
 
@@ -2351,6 +2359,8 @@ u32 present() {
 	for (auto& window : d3d->windows) {
 		if (!window.handle) continue;
 		if (window.last_used_frame + 2 < d3d->frame_number && &window != d3d->windows) {
+			// TODO do not wait here
+			for (Frame& f : d3d->frames) f.wait();
 			window.handle = nullptr;
 			for (ID3D12Resource* res : window.backbuffers) {
 				res->Release();
