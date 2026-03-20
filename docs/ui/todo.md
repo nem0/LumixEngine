@@ -7,6 +7,9 @@ high prio (feature parity with the old ui, before we can merge):
 
 * fixed leaks
 
+final:
+* remove the old UI
+
 low prio or optional:
 * text input
 * inline 3d ui component - ui source as property, not as a resource file
@@ -25,6 +28,3 @@ low prio or optional:
 * localization
 * data binding, templates
 * button element?
-
-final:
-* remove the old UI
