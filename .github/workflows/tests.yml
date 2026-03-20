@@ -19,8 +19,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       
-      - name: Run particle script + UI tests
+      - name: Run headless tests
         shell: cmd
         run: |
-          echo Running particle and UI tests because related files changed
+          echo Running headless tests because related files changed
           scripts\run_tests.bat

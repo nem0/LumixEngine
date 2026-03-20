@@ -21,19 +21,19 @@ Main suites registered in `src/tests/main.cpp`:
 
 ## Run All Headless Tests
 
-From the repository root:
+From the repository root, run:
 
 ```bat
 scripts\run_tests.bat
 ```
 
-The script:
+This script:
 
-1. Generates solution files with tests enabled (`genie.exe --with-tests vs2022`).
+1. Generates solution files with tests enabled (`genie.exe --with-tests vs2022`)
 2. Builds `tmp\vs2022\LumixEngine.sln` in `Debug|x64`
 3. Runs `tmp\vs2022\bin\Debug\tests.exe`
 
-Result handling:
+Exit codes:
 
 - Exit code `0`: all tests passed
 - Exit code `1`: one or more tests failed (`tests.exe` currently returns `1` for any failure, not the number of failed tests)
@@ -49,7 +49,7 @@ scripts\run_imgui_tests.bat
 
 This script:
 
-1. Generates/builds Studio with test support
+1. Generates and builds Studio with test support
 2. Launches `studio.exe` with ImGui Test Engine UI enabled
 
 Arguments:
@@ -66,16 +66,23 @@ scripts\run_imgui_tests.bat RelWithDebInfo -open "data/scripts/tests/sample.unv"
 scripts\run_imgui_tests.bat -open "data/scripts/tests/sample.unv"
 ```
 
-- `-imgui_test_ui` enables ImGui Test Engine windows in Studio, where editor UI tests can be browsed and executed.
+`-imgui_test_ui` enables ImGui Test Engine windows in Studio, where editor UI tests can be browsed and executed.
 
 Example launch form:
 
-- `studio.exe -imgui_test_ui -data_dir <repo>\data ...`
+```bat
+studio.exe -imgui_test_ui -data_dir <repo>\data ...
+```
 
 ## CI Behavior
 
-GitHub Actions workflow `.github/workflows/particle-tests.yml` runs:
+GitHub Actions workflow `.github/workflows/tests.yml` runs:
 
 - `scripts\run_tests.bat`
 
-It currently triggers on pushes and pull requests when files matching `**/particle_script*` change.
+Because `tests.exe` includes both particle script and UI test suites, this workflow currently triggers on pushes and pull requests when any of these paths change:
+
+- `**/particle_script*`
+- `src/ui/**`
+- `src/tests/ui_*`
+- `.github/workflows/tests.yml`
