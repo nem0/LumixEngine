@@ -1936,7 +1936,7 @@ struct CodeEditorImpl final : CodeEditor {
 			ImGui::FocusWindow(window);
 		}
 		if (ImGui::IsItemActive()) {
-			if (!io.MouseDown[0]) ImGui::SetItemAllowOverlap(); // because of search gui
+			if (!io.MouseDown[0]) ImGui::SetNextItemAllowOverlap(); // because of search gui
 			if (io.MouseClicked[0] && !clicked) ImGuiEx::ResetActiveID();
 			ImGui::SetShortcutRouting(ImGuiKey_Tab, 0, id);
 		}

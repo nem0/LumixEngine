@@ -760,7 +760,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0, 0, 0, 0));
 				ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0, 0, 0, 0));
 				bool is_node_open = ImGui::TreeNodeEx((const void*)(intptr_t)(i + 1),
-					ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_Framed,
+					ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_AllowOverlap | ImGuiTreeNodeFlags_Framed,
 					"%s",
 					"");
 				ImGui::PopStyleColor(4);
@@ -4912,8 +4912,8 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 
 	const char* getName() const override { return "editor_ui_render"; }
 
-	void shutdownImGui()
-	{
+	void shutdownImGui() {
+		ImGui::DestroyPlatformWindows();
 		ImGui::DestroyContext();
 	}
 

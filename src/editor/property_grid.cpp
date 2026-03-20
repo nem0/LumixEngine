@@ -433,7 +433,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 	void visit(const reflection::ArrayProperty& prop) override
 	{
 		ImGui::Unindent();
-		bool is_root_open = ImGui::TreeNodeEx(prop.name, ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_DefaultOpen);
+		bool is_root_open = ImGui::TreeNodeEx(prop.name, ImGuiTreeNodeFlags_AllowOverlap | ImGuiTreeNodeFlags_DefaultOpen);
 		if (m_entities.size() > 1)
 		{
 			ImGui::Text("Multi-object editing not supported.");
@@ -463,7 +463,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 			char tmp[10];
 			toCString(i, Span(tmp));
 			ImGui::PushID(i);
-			ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowItemOverlap;
+			ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlap;
 			bool is_open = ImGui::TreeNodeEx(tmp, flags);
 			ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - ImGui::CalcTextSize(ICON_FA_TRASH).x);
 			if (ImGuiEx::IconButton(ICON_FA_TRASH, "Remove"))
@@ -598,7 +598,7 @@ bool PropertyGrid::entityInput(const char* name, EntityPtr* entity) {
 
 static bool componentTreeNode(StudioApp& app, WorldEditor& editor, ComponentType cmp_type, const EntityRef* entities, int entities_count)
 {
-	ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowItemOverlap;
+	ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlap;
 	ImGui::Separator();
 	const char* cmp_type_name = app.getComponentTypeName(cmp_type);
 	const char* icon = app.getComponentIcon(cmp_type);

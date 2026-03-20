@@ -334,21 +334,6 @@ int Begin(lua_State* L)
 }
 
 
-int BeginChildFrame(lua_State* L)
-{
-	auto* label = LuaWrapper::checkArg<const char*>(L, 1);
-	ImVec2 size(0, 0);
-	if (lua_gettop(L) > 1)
-	{
-		size.x = LuaWrapper::checkArg<float>(L, 2);
-		size.y = LuaWrapper::checkArg<float>(L, 3);
-	}
-	bool res = ImGui::BeginChildFrame(ImGui::GetID(label), size);
-	lua_pushboolean(L, res);
-	return 1;
-}
-
-
 int BeginPopup(lua_State* L)
 {
 	auto* label = LuaWrapper::checkArg<const char*>(L, 1);
@@ -1047,7 +1032,6 @@ void registerEngineAPI(lua_State* L, Engine* engine) {
 	LuaWrapper::createSystemVariable(L, "ImGui", "Key_UpArrow", ImGuiKey_UpArrow);
 	LuaImGui::registerCFunction(L, "AlignTextToFramePadding", &LuaWrapper::wrap<ImGui::AlignTextToFramePadding>);
 	LuaImGui::registerCFunction(L, "Begin", &LuaImGui::Begin);
-	LuaImGui::registerCFunction(L, "BeginChildFrame", &LuaImGui::BeginChildFrame);
 	LuaImGui::registerCFunction(L, "BeginMenu", &LuaWrapper::wrap<ImGui::BeginMenu>);
 	LuaImGui::registerCFunction(L, "BeginPopup", LuaImGui::BeginPopup);
 	LuaImGui::registerCFunction(L, "Button", &LuaImGui::Button);
@@ -1061,7 +1045,6 @@ void registerEngineAPI(lua_State* L, Engine* engine) {
 	LuaImGui::registerCFunction(L, "InputInt", &LuaImGui::InputInt);
 	LuaImGui::registerCFunction(L, "Dummy", &LuaWrapper::wrap<&LuaImGui::Dummy>);
 	LuaImGui::registerCFunction(L, "End", &LuaWrapper::wrap<&ImGui::End>);
-	LuaImGui::registerCFunction(L, "EndChildFrame", &LuaWrapper::wrap<&ImGui::EndChildFrame>);
 	LuaImGui::registerCFunction(L, "EndCombo", &LuaWrapper::wrap<&ImGui::EndCombo>);
 	LuaImGui::registerCFunction(L, "EndMenu", &LuaWrapper::wrap<&ImGui::EndMenu>);
 	LuaImGui::registerCFunction(L, "EndPopup", &LuaWrapper::wrap<&ImGui::EndPopup>);

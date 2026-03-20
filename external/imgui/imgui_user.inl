@@ -655,9 +655,9 @@ namespace ImGuiEx {
 		ImGuiWindow* parent_window = GetCurrentWindow();
 		ImGuiID id = parent_window->GetID(label);
 		if (new_count) *new_count = points_count;
-		if (!BeginChildFrame(id, size, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
+		if (!BeginChild(id, size, ImGuiChildFlags_FrameStyle, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
 		{
-			EndChildFrame();
+			EndChild();
 			return -1;
 		}
 
@@ -666,7 +666,7 @@ namespace ImGuiEx {
 		ImGuiWindow* window = GetCurrentWindow();
 		if (window->SkipItems)
 		{
-			EndChildFrame();
+			EndChild();
 			return -1;
 		}
 		
@@ -705,7 +705,7 @@ namespace ImGuiEx {
 
 		const ImRect inner_bb = window->InnerClipRect;
 		if (inner_bb.GetWidth() == 0 || inner_bb.GetHeight() == 0) {
-			EndChildFrame();
+			EndChild();
 			return -1;
 		}
 		const ImRect frame_bb(inner_bb.Min - style.FramePadding, inner_bb.Max + style.FramePadding);
@@ -1064,7 +1064,7 @@ namespace ImGuiEx {
 
 		if (hovered_point) *hovered_point = hovered_idx;
 
-		EndChildFrame();
+		EndChild();
 		RenderText(ImVec2(frame_bb.Max.x + style.ItemInnerSpacing.x, inner_bb.Min.y), label);
 		return changed_idx;
 	}
@@ -1250,6 +1250,7 @@ namespace ImGuiEx {
 		bool changed = false;
 
 		SetCursorScreenPos(min);
+		SetNextItemAllowOverlap();
 		InvisibleButton("gradient", max - min, ImGuiButtonFlags_AllowOverlap);
 		if (IsItemActive() && IsMouseDoubleClicked(0) && *count < max_count) {
 			const float x = GetMousePos().x;
@@ -1278,7 +1279,6 @@ namespace ImGuiEx {
 			++*count;
 			changed = true;
 		}
-		SetItemAllowOverlap();
 		for (int i = 0; i < *count; ++i) {
 			const float t = keys[i];
 			ImVec2 p;
