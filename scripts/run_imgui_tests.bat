@@ -4,12 +4,6 @@ REM Build and run Studio with ImGui Test Engine enabled (if available).
 pushd %~dp0
 setlocal enabledelayedexpansion
 
-if not exist "..\external\imgui_test_engine\" (
-	echo Missing external\imgui_test_engine. Install it first, then rerun this script.
-	popd
-	exit /b 2
-)
-
 set CONFIG=Debug
 set APP_ARGS=
 if /I "%~1"=="Debug" (
@@ -78,9 +72,7 @@ for %%I in ("%~dp0..") do set REPO_ROOT=%%~fI
 set DATA_DIR=%REPO_ROOT%\data
 
 echo Running %STUDIO_EXE%
-echo Test registered: editor/basic_smoke
-echo Tip: pass -imgui_test_ui to show Dear ImGui Test Engine windows.
-"%STUDIO_EXE%" -data_dir "%DATA_DIR%" !APP_ARGS!
+"%STUDIO_EXE%" -imgui_test_ui -data_dir "%DATA_DIR%" !APP_ARGS!
 set rc=!ERRORLEVEL!
 
 popd
