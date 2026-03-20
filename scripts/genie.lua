@@ -288,6 +288,10 @@ solution "LumixEngine"
 		defines {"STATIC_PLUGINS"}
 	end
 
+	if build_tests then
+		defines {"LUMIX_TESTS"}
+	end
+
 	if not build_studio then
 		removefiles { "../src/**/editor/*" }
 	end
@@ -690,8 +694,8 @@ if build_studio then
 		if dynamic_plugins then	
 			configuration {"vs*"}
 				links { "imm32", "version" }
-			configuration {}
 		end
+		configuration {}
 
 	exe_project "studio"
 		kind "WindowedApp"
@@ -699,6 +703,15 @@ if build_studio then
 		dbgHelp()
 		includedirs { "../src" }
 		defaultConfigurations()
+
+		if build_tests then
+			includedirs { "../external/imgui_test_engine", "../external/imgui" }
+			files {
+				"../external/imgui_test_engine/**.h",
+				"../external/imgui_test_engine/**.cpp",
+				"../src/tests/imgui**",
+			}
+		end
 
 		if embed_resources then
 			files { "../src/studio/**.rc" }

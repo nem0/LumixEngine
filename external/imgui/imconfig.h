@@ -88,3 +88,7 @@ namespace ImGui
 */
 
 #define ImTextureID void*
+
+#ifdef LUMIX_TESTS
+    #include "../../external/imgui_test_engine/imgui_te_imconfig.h"
+#endif

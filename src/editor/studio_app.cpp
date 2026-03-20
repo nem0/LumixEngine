@@ -45,6 +45,7 @@
 	#include "renderer/renderer.h"
 	#include "renderer/shader.h"
 #endif
+#include "tests/imgui_tests.h"
 #include "settings.h"
 #include "studio_app.h"
 #include "utils.h"
@@ -572,6 +573,7 @@ struct StudioAppImpl final : StudioApp {
 		, m_events(m_allocator)
 		, m_windows(m_allocator)
 		, m_deferred_destroy_windows(m_allocator)
+		, m_imgui_font_data(m_allocator)
 		, m_file_selector(*this)
 		, m_dir_selector(*this)
 		, m_export(m_allocator)
@@ -754,6 +756,10 @@ struct StudioAppImpl final : StudioApp {
 	}
 
 	void onShutdown() {
+		#ifdef LUMIX_TESTS
+			shutdownImGuiTests();
+		#endif
+
 		while (m_engine->getFileSystem().hasWork()) {
 			m_engine->getFileSystem().processCallbacks();
 		}
@@ -806,6 +812,9 @@ struct StudioAppImpl final : StudioApp {
 
 		updateGizmoOffset();
 		processDeferredWindowDestroy();
+		#ifdef LUMIX_TESTS
+			postSwapImGuiTests();
+		#endif
 
 		if (m_watched_plugin.reload_request) tryReloadPlugin();
 
@@ -1028,6 +1037,9 @@ struct StudioAppImpl final : StudioApp {
 		m_asset_compiler = AssetCompiler::create(*this);
 		m_engine->init();
 		jobs::wait(&m_init_imgui_signal);
+		#ifdef LUMIX_TESTS
+			initImGuiTests();
+		#endif
 		
 		{
 			char current_dir[MAX_PATH] = "";
@@ -1307,6 +1319,10 @@ struct StudioAppImpl final : StudioApp {
 			m_settings.gui();
 			guiExportData();
 		}
+		#ifdef LUMIX_TESTS
+			static bool show_imgui_test_ui = CommandLineParser::isOn("-imgui_test_ui");
+			if (show_imgui_test_ui) showImGuiTestEngineWindows();
+		#endif
 		ImGui::PopFont();
 		ImGui::Render();
 		ImGui::UpdatePlatformWindows();
@@ -2056,7 +2072,7 @@ struct StudioAppImpl final : StudioApp {
 		PROFILE_FUNCTION();
 		size = maximum(size, 1.f);
 		FileSystem& fs = m_engine->getFileSystem();
-		OutputMemoryStream data(m_allocator);
+		OutputMemoryStream& data = m_imgui_font_data.emplace(m_allocator);
 		if (!fs.getContentSync(Path(path), data)) {
 			logError("Failed to load ", path);
 			return nullptr;
@@ -2073,15 +2089,15 @@ struct StudioAppImpl final : StudioApp {
 			config.FontDataOwnedByAtlas = false;
 			config.GlyphMinAdvanceX = size; // Use if you want to make the icon monospaced
 			static const ImWchar icon_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
-			OutputMemoryStream icons_data(m_allocator);
+			OutputMemoryStream& icons_data = m_imgui_font_data.emplace(m_allocator);
 			if (fs.getContentSync(Path("engine/editor/fonts/fa-regular-400.ttf"), icons_data)) {
 				ImFont* icons_font = io.Fonts->AddFontFromMemoryTTF((void*)icons_data.data(), (i32)icons_data.size(), size * 0.75f, &config, icon_ranges);
 				ASSERT(icons_font);
 			}
 			copyString(config.Name, "engine/editor/fonts/fa-solid-900.ttf");
-			icons_data.clear();
-			if (fs.getContentSync(Path("engine/editor/fonts/fa-solid-900.ttf"), icons_data)) {
-				ImFont* icons_font = io.Fonts->AddFontFromMemoryTTF((void*)icons_data.data(), (i32)icons_data.size(), size * 0.75f, &config, icon_ranges);
+			OutputMemoryStream& icons_data2 = m_imgui_font_data.emplace(m_allocator);
+			if (fs.getContentSync(Path("engine/editor/fonts/fa-solid-900.ttf"), icons_data2)) {
+				ImFont* icons_font = io.Fonts->AddFontFromMemoryTTF((void*)icons_data2.data(), (i32)icons_data2.size(), size * 0.75f, &config, icon_ranges);
 				ASSERT(icons_font);
 			}
 		}
@@ -2194,6 +2210,7 @@ struct StudioAppImpl final : StudioApp {
 
 	void beginInitIMGUI() {
 		PROFILE_FUNCTION();
+		m_imgui_font_data.clear();
 		ImGui::SetAllocatorFunctions(imguiAlloc, imguiFree, this);
 		ImGui::CreateContext();
 
@@ -2221,7 +2238,7 @@ struct StudioAppImpl final : StudioApp {
 			m_bold_font = addFontFromFile("engine/editor/fonts/Roboto-Bold.ttf", (float)m_font_size * font_scale, true);
 			m_monospace_font = addFontFromFile("engine/editor/fonts/JetBrainsMono-Regular.ttf", (float)m_font_size * font_scale, false);
 
-			OutputMemoryStream data(m_allocator);
+			OutputMemoryStream& data = m_imgui_font_data.emplace(m_allocator);
 			if (fs.getContentSync(Path("engine/editor/fonts/fa-solid-900.ttf"), data)) {
 				const float size = maximum(1.f, (float)m_font_size * font_scale * 1.25f);
 				ImFontConfig cfg;
@@ -2232,8 +2249,9 @@ struct StudioAppImpl final : StudioApp {
 				m_big_icon_font = io.Fonts->AddFontFromMemoryTTF((void*)data.data(), (i32)data.size(), size, &cfg, icon_ranges);
 				cfg.MergeMode = true;
 				copyString(cfg.Name, "engine/editor/fonts/fa-regular-400.ttf");
-				if (fs.getContentSync(Path("engine/editor/fonts/fa-regular-400.ttf"), data)) {
-					ImFont* icons_font = io.Fonts->AddFontFromMemoryTTF((void*)data.data(), (i32)data.size(), size, &cfg, icon_ranges);
+				OutputMemoryStream& regular_data = m_imgui_font_data.emplace(m_allocator);
+				if (fs.getContentSync(Path("engine/editor/fonts/fa-regular-400.ttf"), regular_data)) {
+					ImFont* icons_font = io.Fonts->AddFontFromMemoryTTF((void*)regular_data.data(), (i32)regular_data.size(), size, &cfg, icon_ranges);
 					ASSERT(icons_font);
 				}
 			}
@@ -3115,6 +3133,7 @@ struct StudioAppImpl final : StudioApp {
 	Array<MousePlugin*> m_mouse_plugins;
 	Array<IPlugin*> m_plugins;
 	Array<IAddComponentPlugin*> m_add_cmp_plugins;
+	Array<OutputMemoryStream> m_imgui_font_data;
 
 	AddCmpTreeNode m_add_cmp_root;
 	HashMap<ComponentType, String> m_component_labels;
