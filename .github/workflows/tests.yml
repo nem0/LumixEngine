@@ -1,0 +1,26 @@
+name: tests
+on:
+  push:
+    paths:
+      - '**/particle_script*'
+      - 'src/ui/**'
+      - 'src/tests/ui_*'
+      - '.github/workflows/tests.yml'
+  pull_request:
+    paths:
+      - '**/particle_script*'
+      - 'src/ui/**'
+      - 'src/tests/ui_*'
+      - '.github/workflows/tests.yml'
+
+jobs:
+  run-tests:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Run particle script + UI tests
+        shell: cmd
+        run: |
+          echo Running particle and UI tests because related files changed
+          scripts\run_tests.bat
