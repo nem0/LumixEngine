@@ -165,7 +165,7 @@ struct UIModuleImpl : UIModule {
 	}
 
 	void startGame() override {
-		Path ui_path = m_world.getPath();
+		Path ui_path { m_world.getPartitions()[0].name };
 		if (ui_path.isEmpty()) return;
 
 		m_previous_canvas_size = {-1, -1};

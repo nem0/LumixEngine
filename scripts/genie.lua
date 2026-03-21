@@ -1040,8 +1040,13 @@ if build_tests then
 	exe_project "tests"
 		kind "ConsoleApp"
 		defaultConfigurations()
-		includedirs { "../src", "../src/tests" }
-		files { "../src/tests/**.cpp", "../src/tests/**.h" }
+		includedirs { "../src", "../src/tests", "../external/imgui_test_engine", "../external/imgui" }
+		files {
+			"../src/tests/**.cpp",
+			"../src/tests/**.h",
+			"../external/imgui_test_engine/**.cpp",
+			"../external/imgui_test_engine/**.h"
+		}
 	
 		if split_projects then
 			links { "core", "engine" }
