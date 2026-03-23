@@ -6,6 +6,7 @@ function onInputEvent(event : InputEvent)
 			local demo = this.world:createPartition("demo")
 			this.world:setActivePartition(demo)
 			this.world:load("maps/demo/demo.unv", function() 
+				this.world.ui:load("maps/demo/demo.ui")
 				--this.world:destroyPartition(old_partition)
 			end)
 

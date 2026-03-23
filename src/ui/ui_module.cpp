@@ -164,24 +164,35 @@ struct UIModuleImpl : UIModule {
 		m_world.onComponentDestroyed(entity, types::ui_3d, this);
 	}
 
+	void load(const Path& path) override {
+		m_previous_canvas_size = {-1, -1};
+		m_is_ready = false;
+
+		if (path.isEmpty()) {
+			setUIResource(nullptr);
+			return;
+		}
+
+		auto* res = m_system.getEngine().getResourceManager().load<ui::DocumentResource>(path);
+		if (res && res->getState() == Resource::State::READY) {
+			m_is_ready = m_document.parse(res->getContent(), path.c_str());
+		}
+		setUIResource(res);
+	}
+
 	void startGame() override {
 		Path ui_path { m_world.getPartitions()[0].name };
 		if (ui_path.isEmpty()) return;
 
-		m_previous_canvas_size = {-1, -1};
 		char tmp[MAX_PATH];
 		copyString(tmp, ui_path.c_str());
 		Path::replaceExtension(tmp, "ui");
 		ui_path = tmp;
 		if (!m_system.getEngine().getFileSystem().fileExists(ui_path)) {
-			setUIResource(nullptr);
+			load(Path());
 			return;
 		}
-		auto* res = m_system.getEngine().getResourceManager().load<ui::DocumentResource>(ui_path);
-		if (res && res->getState() == Resource::State::READY) {
-			m_is_ready = m_document.parse(res->getContent(), ui_path.c_str());
-		}
-		setUIResource(res);
+		load(ui_path);
 	}
 
 	bool isReady() const override { return m_is_ready; }

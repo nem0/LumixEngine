@@ -2772,6 +2772,15 @@ namespace Lumix {
 		return 1;
 	}
 	
+	int UIModule_load(lua_State* L) {
+		LuaWrapper::checkTableArg(L, 1);
+		UIModule* module;
+		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+		auto path = LuaWrapper::checkArg<Path>(L, 2);
+		module->load(path);
+		return 0;
+	}
+	
 	int UIModule_isReady(lua_State* L) {
 		LuaWrapper::checkTableArg(L, 1);
 		UIModule* module;
@@ -2921,6 +2930,8 @@ namespace Lumix {
 			lua_setfield(L, -2, "new");
 			lua_pushcfunction(L, UIModule_getDocument, "getDocument");
 			lua_setfield(L, -2, "getDocument");
+			lua_pushcfunction(L, UIModule_load, "load");
+			lua_setfield(L, -2, "load");
 			lua_pushcfunction(L, UIModule_isReady, "isReady");
 			lua_setfield(L, -2, "isReady");
 			lua_pop(L, 1);

@@ -656,6 +656,7 @@ type procedural_geom_component =  {
 
 type ui_module = {
 	getDocument: (ui_module) -> any,
+	load: (ui_module, string) -> (),
 	isReady: (ui_module) -> boolean,
 }
 

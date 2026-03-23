@@ -2,6 +2,7 @@
 
 reflection::build_module("ui")
 	.function<(ui::Document* (UIModule::*)())&UIModule::getDocument>("getDocument")
+	.function<(void (UIModule::*)(const Path& path))&UIModule::load>("load")
 	.function<(bool (UIModule::*)())&UIModule::isReady>("isReady")
 	.cmp<&UIModule::createUI3D, &UIModule::destroyUI3D>("ui_3d", "UI / 3D")
 		.prop<&UIModule::getUI3DPath, &UIModule::setUI3DPath>("Source")
