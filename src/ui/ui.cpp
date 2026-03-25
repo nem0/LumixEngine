@@ -332,6 +332,25 @@ static bool parseTypedAttributeValue(Document& doc, AttributeName name, StringVi
 	}
 }
 
+Document::Document(IFontManager* font_manager, IAllocator& allocator, IImageManager* image_manager)
+	: m_elements(allocator)
+	, m_stylesheet(allocator)
+	, m_intern_table(allocator)
+	, m_suppress_logging(false)
+	, m_tokenizer()
+	, m_font_manager(font_manager)
+	, m_image_manager(image_manager)
+	, m_resource_manager(nullptr)
+	, m_allocator(allocator)
+	, m_canvas_size(0, 0)
+	, m_content(allocator)
+	, m_hovered_elements(allocator)
+	, m_events(allocator)
+	, m_root(Tag::BOX, allocator, *this)
+{
+	m_root.tag = Tag::BOX;
+}
+
 bool Document::parseAttributeValue(Element& elem, AttributeName name, StringView value) {
 	if (name == AttributeName::ON_CLICK && elem.tag != Tag::BOX) {
 		error(m_tokenizer.m_current_token.value, m_tokenizer, "attribute 'on-click' is allowed only on [box]");
@@ -578,7 +597,7 @@ bool Document::parseElements(u32 parent_index) {
 				if (parent_index != 0xFFFF'FFFF) {
 					m_elements[parent_index].children.push(elem_idx);
 				} else {
-					m_roots.push(elem_idx);
+					m_root.children.push(elem_idx);
 				}
 				elem.text = token.value;
 				
@@ -643,7 +662,7 @@ bool Document::parseElements(u32 parent_index) {
 				if (parent_index != 0xFFFF'FFFF) {
 					m_elements[parent_index].children.push(elem_idx);
 				} else {
-					m_roots.push(elem_idx);
+					m_root.children.push(elem_idx);
 				}
 
 				// Parse element attributes: key="value" pairs enclosed in []
@@ -709,7 +728,7 @@ bool Document::parseElements(u32 parent_index) {
 				if (parent_index != 0xFFFF'FFFF) {
 					m_elements[parent_index].children.push(elem_idx);
 				} else {
-					m_roots.push(elem_idx);
+					m_root.children.push(elem_idx);
 				}
 				if (token.type == Token::STRING) {
 					elem.text = StringView{token.value.begin - 1, token.value.end + 1};
@@ -1659,30 +1678,27 @@ static void wrapInlineRun(Document& doc, Element& parent, i32 start_span_idx, i3
 }
 
 // compute wrapping on word boundaries, fill Element::lines
-static void wrapText(Document& doc, Element& elem) {
-	elem.lines.clear();
-	if (!elem.visible) return;
+static void wrapText(Document& doc, Element& container) {
+	container.lines.clear();
+	if (!container.visible) return;
 
-	if (elem.tag == Tag::SPAN) {
-		// TODO top level span without container
-		ASSERT(false);
-	}
+	ASSERT(!isInlineTag(container.tag));
 
-	for (u32 i = 0, n = elem.children.size(); i < n; ++i) {
-		Element& child = doc.m_elements[elem.children[i]];
+	for (u32 i = 0, n = container.children.size(); i < n; ++i) {
+		Element& child = doc.m_elements[container.children[i]];
 		if (!isInlineTag(child.tag)) {
-			wrapText(doc, doc.m_elements[elem.children[i]]);
+			wrapText(doc, doc.m_elements[container.children[i]]);
 			continue;
 		}
 
 		i32 start_i = i; 
 		i32 end_i = i + 1;
-		while (end_i < elem.children.size() && isInlineTag(doc.m_elements[elem.children[end_i]].tag)) {
+		while (end_i < container.children.size() && isInlineTag(doc.m_elements[container.children[end_i]].tag)) {
 			++end_i;
 		}
 		i = end_i - 1;
 
-		wrapInlineRun(doc, elem, start_i, end_i);
+		wrapInlineRun(doc, container, start_i, end_i);
 	}
 }
 
@@ -1713,20 +1729,23 @@ void Document::computeLayout(Vec2 canvas_size) {
 	ParentContext root_inherit;
 	root_inherit.size = canvas_size;
 	root_inherit.content_size = canvas_size;
-	for (u32 root_idx : m_roots) {
-		Element& elem = m_elements[root_idx];
-		computeBaseSizes(*this, elem, root_inherit);
-		computeParentRelativeWidth(*this, elem);
-		wrapText(*this, elem);
-		computeFitContentHeights(*this, elem);		
-		computeParentRelativeHeights(*this, elem);
-	}
+	m_root.size = canvas_size;
+	m_root.position = {0, 0};
+	m_root.width_unit.unit = Unit::PERCENT;
+	m_root.width_unit.value = 100;
+	m_root.height_unit.unit = Unit::PERCENT;
+	m_root.height_unit.value = 100;
+	computeBaseSizes(*this, m_root, root_inherit);
+	computeParentRelativeWidth(*this, m_root);
+	wrapText(*this, m_root);
+	computeFitContentHeights(*this, m_root);		
+	computeParentRelativeHeights(*this, m_root);
 
 	// Layout root elements as if in a panel with direction=column
 	float y_offset = 0;
 	float prev_bottom_margin = 0;
-	for (u32 root_idx : m_roots) {
-		Element& root = m_elements[root_idx];
+	for (u32 idx : m_root.children) {
+		Element& root = m_elements[idx];
 		if (!root.visible) continue;
 		if (root.height_unit.unit == Unit::PERCENT) {
 			root.size.y = computeAbsoluteSize(root.height_unit, canvas_size.y, root.font_size, m_dpi_scale);
@@ -1747,8 +1766,8 @@ void Document::computeLayout(Vec2 canvas_size) {
 	}
 	
 	// Layout children recursively
-	for (u32 root_idx : m_roots) {
-		layoutChildren(*this, m_elements[root_idx]);
+	for (u32 idx : m_root.children) {
+		layoutChildren(*this, m_elements[idx]);
 	}
 	
 	m_layout_duration = timer.getTimeSinceStart();
@@ -1829,8 +1848,8 @@ void Document::render(Draw2D& draw) {
 	PROFILE_FUNCTION();
 	os::Timer timer;
 	m_render_duration = 0;
-	for (u32 root_idx : m_roots) {
-		renderElement(draw, *this, root_idx, nullptr);
+	for (u32 idx : m_root.children) {
+		renderElement(draw, *this, idx, nullptr);
 	}
 	m_render_duration = timer.getTimeSinceStart();
 }
@@ -1853,12 +1872,12 @@ static StringView getAttributeValue(const Element& elem, AttributeName name) {
 }
 
 static Element* getActionTargetAt(Document& doc, Vec2 pos) {
-	for (u32 root_id : doc.m_roots) {
-		Element* root = &doc.m_elements[root_id];
+	for (u32 idx : doc.m_root.children) {
+		Element* root = &doc.m_elements[idx];
 		if (!contains(*root, pos, doc.m_font_manager)) continue;
 
 		StackArray<u32, 16> path(doc.m_allocator);
-		path.push(root_id);
+		path.push(idx);
 
 		Element* elem = root;
 		for (;;) {
@@ -1933,8 +1952,8 @@ void Document::removeClassRaw(u32 element_index, StringView classname) {
 }
 
 Element* Document::getElementAt(Vec2 pos) {
-	for (u32 root_id : m_roots) {
-		Element* root = &m_elements[root_id]; 
+	for (u32 idx : m_root.children) {
+		Element* root = &m_elements[idx]; 
 		if (!contains(*root, pos, m_font_manager)) continue;
 
 		Element* elem = root;
@@ -1997,7 +2016,7 @@ bool Document::parse(StringView content, const char* filename) {
 	os::Timer timer;
 	m_parse_duration = 0;
 	m_elements.clear();
-	m_roots.clear();
+	m_root.children.clear();
 	m_stylesheet.m_rules.clear();
 	m_content = content;
 	m_tokenizer.m_filename = filename;
@@ -2059,11 +2078,11 @@ void Document::injectEvent(const InputSystem::Event& event) {
 			if (event.device->type == InputSystem::Device::MOUSE) {
 				Vec2 pos(event.data.axis.x_abs, event.data.axis.y_abs);
 				StackArray<u32, 16> new_hovered_path(m_allocator);
-				for (u32 root_id : m_roots) {
-					Element* root = &m_elements[root_id];
+				for (u32 idx : m_root.children) {
+					Element* root = &m_elements[idx];
 					if (!contains(*root, pos, m_font_manager)) continue;
 
-					new_hovered_path.push(root_id);
+					new_hovered_path.push(idx);
 					Element* elem = root;
 					for (;;) {
 						bool found_child = false;
@@ -2174,11 +2193,11 @@ void Document::recomputeStyles() {
 	ParentContext ctx;
 	ctx.font_size = 12.0f * m_dpi_scale;
 	ctx.font = "/engine/editor/fonts/JetBrainsMono-Regular.ttf";
-	for (u32 root_idx : m_roots) {
-		applyStylesheet(*this, root_idx, ctx);
+	for (u32 idx : m_root.children) {
+		applyStylesheet(*this, idx, ctx);
 	}
-	for (u32 root_idx : m_roots) {
-		loadResources(*this, root_idx, ctx);
+	for (u32 idx : m_root.children) {
+		loadResources(*this, idx, ctx);
 	}
 }
 

@@ -13,10 +13,9 @@ bool testTwoPanelsLayout() {
 	[box width=100% height=100]
 	[box width=150 height=80]
 	)");
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(2, root_indices.size());
-	ui::Element* panel1 = doc.getElement(root_indices[0]);
-	ui::Element* panel2 = doc.getElement(root_indices[1]);
+	ASSERT_EQ(2, doc.m_root.children.size());
+	ui::Element* panel1 = doc.getElement(doc.m_root.children[0]);
+	ui::Element* panel2 = doc.getElement(doc.m_root.children[1]);
 	
 	doc.computeLayout(Vec2(800, 600));
 	
@@ -41,9 +40,9 @@ bool testPercentHeightOnRoot() {
 	ASSERT_PARSE(doc, R"(
 	[box width=100 height=50%]
 	)");
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(1, root_indices.size());
-	ui::Element* panel = doc.getElement(root_indices[0]);
+	Span<u32> indices = doc.m_root.children;
+	ASSERT_EQ(1, indices.size());
+	ui::Element* panel = doc.getElement(indices[0]);
 	
 	doc.computeLayout(Vec2(800, 600));
 	
@@ -373,10 +372,10 @@ bool testSideSpecificShorthandPrecedence() {
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
-	ASSERT_EQ(2, doc.m_roots.size());
+	ASSERT_EQ(2, doc.m_root.children.size());
 
-	ui::Element* parent1 = doc.getElement(doc.m_roots[0]);
-	ui::Element* parent2 = doc.getElement(doc.m_roots[1]);
+	ui::Element* parent1 = doc.getElement(doc.m_root.children[0]);
+	ui::Element* parent2 = doc.getElement(doc.m_root.children[1]);
 	ASSERT_EQ(1, parent1->children.size());
 	ASSERT_EQ(1, parent2->children.size());
 	ui::Element* child1 = doc.getElement(parent1->children[0]);
@@ -685,10 +684,9 @@ bool testLayoutWithMargins() {
 	[box width=200 height=100 margin=10] {}
 	[box width=150 height=80 margin=5] {}
 	)");
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(2, root_indices.size());
-	ui::Element* panel1 = doc.getElement(root_indices[0]);
-	ui::Element* panel2 = doc.getElement(root_indices[1]);
+	ASSERT_EQ(2, doc.m_root.children.size());
+	ui::Element* panel1 = doc.getElement(doc.m_root.children[0]);
+	ui::Element* panel2 = doc.getElement(doc.m_root.children[1]);
 	
 	doc.computeLayout(Vec2(800, 600));
 	
@@ -710,9 +708,8 @@ bool testNestedPanelsWithMargins() {
 		[box width=150 height=80 margin=10] {}
 	}
 	)");
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(1, root_indices.size());
-	ui::Element* parent = doc.getElement(root_indices[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* parent = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(2, parent->children.size());
 	ui::Element* child1 = doc.getElement(parent->children[0]);
 	ui::Element* child2 = doc.getElement(parent->children[1]);
@@ -911,9 +908,8 @@ bool testDirectionRow() {
 		[box width=150 height=50 margin=0] {}
 	}
 	)");
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(1, root_indices.size());
-	ui::Element* parent = doc.getElement(root_indices[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* parent = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(2, parent->children.size());
 	ui::Element* child1 = doc.getElement(parent->children[0]);
 	ui::Element* child2 = doc.getElement(parent->children[1]);
@@ -943,9 +939,8 @@ bool testDirectionColumn() {
 		[box width=100 height=80 margin=5] {}
 	}
 	)");
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(1, root_indices.size());
-	ui::Element* parent = doc.getElement(root_indices[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* parent = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(2, parent->children.size());
 	ui::Element* child1 = doc.getElement(parent->children[0]);
 	ui::Element* child2 = doc.getElement(parent->children[1]);
@@ -975,9 +970,8 @@ bool testDirectionDefault() {
 		[box width=100 height=80] {}
 	}
 	)");
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(1, root_indices.size());
-	ui::Element* parent = doc.getElement(root_indices[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* parent = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(2, parent->children.size());
 	ui::Element* child1 = doc.getElement(parent->children[0]);
 	ui::Element* child2 = doc.getElement(parent->children[1]);
@@ -1015,9 +1009,8 @@ bool testNestedPanelsDifferentDirections() {
 		}
 	}
 	)");
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(1, root_indices.size());
-	ui::Element* parent = doc.getElement(root_indices[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* parent = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(2, parent->children.size());
 	ui::Element* column1 = doc.getElement(parent->children[0]);
 	ui::Element* column2 = doc.getElement(parent->children[1]);
@@ -1079,9 +1072,8 @@ bool testAdvancedFitContent() {
 	)");
 	doc.computeLayout(Vec2(800, 600));
 
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(1, root_indices.size());
-	ui::Element* parent = doc.getElement(root_indices[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* parent = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(2, parent->children.size());
 	ui::Element* child1 = doc.getElement(parent->children[0]);
 	ui::Element* child2 = doc.getElement(parent->children[1]);
@@ -1133,9 +1125,8 @@ bool testDefaultFitContentSimple() {
 		[box width=70 height=40] {}
 	}
 	)");
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(1, root_indices.size());
-	ui::Element* parent = doc.getElement(root_indices[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* parent = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(2, parent->children.size());
 	ui::Element* child1 = doc.getElement(parent->children[0]);
 	ui::Element* child2 = doc.getElement(parent->children[1]);
@@ -1157,9 +1148,8 @@ bool testDefaultFitContentLeaf() {
 		[box] {}
 	}
 	)");
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(1, root_indices.size());
-	ui::Element* parent = doc.getElement(root_indices[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* parent = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(1, parent->children.size());
 	ui::Element* child = doc.getElement(parent->children[0]);
 	
@@ -1185,9 +1175,8 @@ bool testVerticalMarginCollapse() {
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(1, root_indices.size());
-	ui::Element* root = doc.getElement(root_indices[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(2, root->children.size());
 	ui::Element* child1 = doc.getElement(root->children[0]);
 	ui::Element* child2 = doc.getElement(root->children[1]);
@@ -1209,9 +1198,8 @@ bool testHorizontalMarginCollapse() {
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(1, root_indices.size());
-	ui::Element* root = doc.getElement(root_indices[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(2, root->children.size());
 	ui::Element* child1 = doc.getElement(root->children[0]);
 	ui::Element* child2 = doc.getElement(root->children[1]);
@@ -1234,9 +1222,8 @@ bool testWrap() {
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(1, root_indices.size());
-	ui::Element* root = doc.getElement(root_indices[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(3, root->children.size());
 	ui::Element* child1 = doc.getElement(root->children[0]);
 	ui::Element* child2 = doc.getElement(root->children[1]);
@@ -1264,9 +1251,8 @@ bool testNoWrap() {
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(1, root_indices.size());
-	ui::Element* root = doc.getElement(root_indices[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(3, root->children.size());
 	ui::Element* child1 = doc.getElement(root->children[0]);
 	ui::Element* child2 = doc.getElement(root->children[1]);
@@ -1411,9 +1397,8 @@ bool testAlignItemsStretchWithText() {
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(1, root_indices.size());
-	ui::Element* parent = doc.getElement(root_indices[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* parent = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(1, parent->children.size());
 	ui::Element* child_panel = doc.getElement(parent->children[0]);
 
@@ -1696,9 +1681,8 @@ bool testTextNoWrapping() {
 		}
 	)");
 	doc.computeLayout(Vec2(800, 600));
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(1, root_indices.size());
-	ui::Element* panel = doc.getElement(root_indices[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* panel = doc.getElement(doc.m_root.children[0]);
 
 	ASSERT_EQ(1, panel->children.size());
 	ui::Element* textElem = doc.getElement(panel->children[0]);
@@ -1724,9 +1708,8 @@ bool testSpanCenteringWithTrailingWhitespace() {\
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(1, root_indices.size());
-	ui::Element* panel = doc.getElement(root_indices[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* panel = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(1, panel->children.size());
 	ui::Element* span = doc.getElement(panel->children[0]);
 	ASSERT_EQ(1, span->lines.size());
@@ -1746,9 +1729,8 @@ bool testTextWrapping() {
 		}
 	)");
 	doc.computeLayout(Vec2(800, 600));
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(1, root_indices.size());
-	ui::Element* panel = doc.getElement(root_indices[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* panel = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(1, panel->children.size());
 	ui::Element* textElem = doc.getElement(panel->children[0]);
 
@@ -1786,9 +1768,8 @@ bool testWrappingInheritance() {
 		}
 	)");
 	doc.computeLayout(Vec2(800, 600));
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(1, root_indices.size());
-	ui::Element* outer_panel = doc.getElement(root_indices[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* outer_panel = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(2, outer_panel->children.size());
 	ui::Element* child1 = doc.getElement(outer_panel->children[0]);
 	ui::Element* child2 = doc.getElement(outer_panel->children[1]);
@@ -1815,9 +1796,8 @@ bool testMultilineStringLayout() {
 		}
 	)");
 	doc.computeLayout(Vec2(800, 600));
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(1, root_indices.size());
-	ui::Element* panel = doc.getElement(root_indices[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* panel = doc.getElement(doc.m_root.children[0]);
 
 	ASSERT_EQ(1, panel->children.size());
 	ui::Element* textElem = doc.getElement(panel->children[0]);
@@ -1845,9 +1825,8 @@ bool testDoubleQuotesInText() {
 		}
 	)");
 	doc.computeLayout(Vec2(800, 600));
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(1, root_indices.size());
-	ui::Element* panel = doc.getElement(root_indices[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* panel = doc.getElement(doc.m_root.children[0]);
 
 	ASSERT_EQ(1, panel->children.size());
 	ui::Element* textElem = doc.getElement(panel->children[0]);
@@ -1877,9 +1856,8 @@ bool testTextHorizontalRendering() {
 		}
 	)");
 	doc.computeLayout(Vec2(800, 600));
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(1, root_indices.size());
-	ui::Element* panel = doc.getElement(root_indices[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* panel = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(2, panel->children.size());
 
 	ui::Element* text1 = doc.getElement(panel->children[0]);
@@ -1910,9 +1888,8 @@ bool testBaselineAlignment() {
 		}
 	)");
 	doc.computeLayout(Vec2(800, 600));
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(1, root_indices.size());
-	ui::Element* panel = doc.getElement(root_indices[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* panel = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(3, panel->children.size());
 
 	ui::Element* smallText = doc.getElement(panel->children[0]);
@@ -1958,9 +1935,8 @@ bool testBaselineAlignmentWithWrapping() {
 		}
 	)");
 	doc.computeLayout(Vec2(800, 600));
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(1, root_indices.size());
-	ui::Element* panel = doc.getElement(root_indices[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* panel = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(3, panel->children.size());
 
 	ui::Element* smallText = doc.getElement(panel->children[0]);
@@ -1991,9 +1967,8 @@ bool testAlignCenterMultipleSpans() {
 		}
 	)");
 	doc.computeLayout(Vec2(800, 600));
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(1, root_indices.size());
-	ui::Element* panel = doc.getElement(root_indices[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* panel = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(3, panel->children.size());
 
 	ui::Element* span1 = doc.getElement(panel->children[0]);
@@ -2033,9 +2008,8 @@ bool testAlignRightMultipleSpans() {
 		}
 	)");
 	doc.computeLayout(Vec2(800, 600));
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(1, root_indices.size());
-	ui::Element* panel = doc.getElement(root_indices[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* panel = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(3, panel->children.size());
 
 	ui::Element* span1 = doc.getElement(panel->children[0]);
@@ -2066,9 +2040,8 @@ bool testAlignCenter() {
 		}
 	)");
 	doc.computeLayout(Vec2(800, 600));
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(1, root_indices.size());
-	ui::Element* panel = doc.getElement(root_indices[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* panel = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(1, panel->children.size());
 
 	ui::Element* text = doc.getElement(panel->children[0]);
@@ -2090,8 +2063,8 @@ bool testAlignCenterImageAndTextChildren() {
 	)");
 	doc.computeLayout(Vec2(800, 600));
 
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* panel = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* panel = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(2, panel->children.size());
 
 	ui::Element* image = doc.getElement(panel->children[0]);
@@ -2119,9 +2092,8 @@ bool testAlignRight() {
 		}
 	)");
 	doc.computeLayout(Vec2(800, 600));
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(1, root_indices.size());
-	ui::Element* panel = doc.getElement(root_indices[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* panel = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(1, panel->children.size());
 
 	ui::Element* text = doc.getElement(panel->children[0]);
@@ -2146,9 +2118,8 @@ bool testPanelWithInlineSpan() {
 		}
 	)");
 	doc.computeLayout(Vec2(800, 600));
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(1, root_indices.size());
-	ui::Element* panel = doc.getElement(root_indices[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* panel = doc.getElement(doc.m_root.children[0]);
 
 	ASSERT_EQ(3, panel->children.size());
 	ui::Element* text1 = doc.getElement(panel->children[0]);
@@ -2167,8 +2138,8 @@ bool testImageLayoutInlineFlow() {
 	ASSERT_PARSE(doc, "[box direction=row width=200 height=40 font=\"arial.ttf\" font-size=16] { [span text=\"aa\"] [image width=20 height=10] [span text=\"bb\"] }");
 	doc.computeLayout(Vec2(800, 600));
 
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(3, root->children.size());
 
 	ui::Element* span1 = doc.getElement(root->children[0]);
@@ -2200,8 +2171,8 @@ bool testImageBaselineAlignmentInInlineFlow() {
 	)");
 	doc.computeLayout(Vec2(800, 600));
 
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(3, root->children.size());
 
 	ui::Element* span1 = doc.getElement(root->children[0]);
@@ -2226,8 +2197,8 @@ bool testImageLayoutExplicitWidthHeight() {
 	ASSERT_PARSE(doc, "[image width=64 height=32]");
 	doc.computeLayout(Vec2(800, 600));
 
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* image = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* image = doc.getElement(doc.m_root.children[0]);
 	ASSERT_TAG(image, IMAGE);
 	ASSERT_FLOAT_EQ(64.0f, image->size.x);
 	ASSERT_FLOAT_EQ(32.0f, image->size.y);
@@ -2241,8 +2212,8 @@ bool testImageLayoutAspectRatioFromWidth() {
 	ASSERT_PARSE(doc, "[image src=\"img.png\" width=80]");
 	doc.computeLayout(Vec2(800, 600));
 
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* image = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* image = doc.getElement(doc.m_root.children[0]);
 	ASSERT_TAG(image, IMAGE);
 	ASSERT_FLOAT_EQ(80.0f, image->size.x);
 	ASSERT_FLOAT_EQ(40.0f, image->size.y);
@@ -2256,8 +2227,8 @@ bool testImageLayoutAspectRatioFromHeight() {
 	ASSERT_PARSE(doc, "[image src=\"img.png\" height=25]");
 	doc.computeLayout(Vec2(800, 600));
 
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* image = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* image = doc.getElement(doc.m_root.children[0]);
 	ASSERT_TAG(image, IMAGE);
 	ASSERT_FLOAT_EQ(50.0f, image->size.x);
 	ASSERT_FLOAT_EQ(25.0f, image->size.y);
@@ -2274,9 +2245,8 @@ bool testHeaderContentFooter() {
 	}
 	)");
 	doc.computeLayout(Vec2(800, 600));
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(1, root_indices.size());
-	ui::Element* parent = doc.getElement(root_indices[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* parent = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(3, parent->children.size());
 	ui::Element* text1 = doc.getElement(parent->children[0]);
 	ui::Element* panel_child = doc.getElement(parent->children[1]);

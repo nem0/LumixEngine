@@ -238,8 +238,8 @@ struct Element {
 	Color color = Color::WHITE;
 	float opacity = 1.0f;
 	Color bg_color = Color::TRANSPARENT;
-	BoxSpacing margins;
-	BoxSpacing paddings;
+	BoxSpacing margins = {};
+	BoxSpacing paddings = {};
 	Direction direction = Direction::COLUMN;
 	JustifyContent justify_content = JustifyContent::START;
 	AlignItems align_items = AlignItems::START;
@@ -296,8 +296,8 @@ struct Event {
 struct Document {
 	using Token = UITokenizer::Token;
 
+	Element m_root;
 	Array<Element> m_elements;
-	Array<u32> m_roots;
 	Stylesheet m_stylesheet;
 	InternTable m_intern_table;
 	bool m_suppress_logging = false;
@@ -314,22 +314,7 @@ struct Document {
 	float m_render_duration = 0;
 	StackArray<u32, 16> m_hovered_elements;
 
-	Document(IFontManager* font_manager, IAllocator& allocator, IImageManager* image_manager = nullptr)
-		: m_elements(allocator)
-		, m_roots(allocator)
-		, m_stylesheet(allocator)
-		, m_intern_table(allocator)
-		, m_suppress_logging(false)
-		, m_tokenizer()
-		, m_font_manager(font_manager)
-		, m_image_manager(image_manager)
-		, m_resource_manager(nullptr)
-		, m_allocator(allocator)
-		, m_canvas_size(0, 0)
-		, m_content(allocator)
-		, m_hovered_elements(allocator)
-		, m_events(allocator)
-	{}
+	Document(IFontManager* font_manager, IAllocator& allocator, IImageManager* image_manager = nullptr);
 
 	bool parse(StringView content, const char* filename);
 	//@ function

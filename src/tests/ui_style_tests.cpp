@@ -48,8 +48,7 @@ static bool sameAttributeValue(const ui::Attribute& a, const ui::Attribute& b) {
 bool testEmptyStyleBlock() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[style] {}");
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(0, root_indices.size());
+	ASSERT_EQ(0, doc.m_root.children.size());
 
 	return true;
 }
@@ -64,8 +63,7 @@ bool testHoverPseudoclass() {
 			}
 		}
 	)");
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(0, root_indices.size());
+	ASSERT_EQ(0, doc.m_root.children.size());
 	Span<ui::StyleRule> rules = doc.m_stylesheet.getRules();
 	ASSERT_EQ(1, rules.size());
 	ASSERT_EQ(1, rules[0].attributes.size());
@@ -88,8 +86,7 @@ bool testStyleWithRules() {
 			}
 		}
 	)");
-	Span<u32> root_indices = doc.m_roots;
-	ASSERT_EQ(0, root_indices.size());
+	ASSERT_EQ(0, doc.m_root.children.size());
 	Span<ui::StyleRule> rules = doc.m_stylesheet.getRules();
 	ASSERT_EQ(1, rules.size());
 	ASSERT_EQ(2, rules[0].attributes.size());
@@ -138,8 +135,8 @@ bool testStylePositionPresetLayout() {
 		ASSERT_PARSE(doc, source);
 		doc.computeLayout(Vec2(800, 600));
 
-		ASSERT_EQ(1, doc.m_roots.size());
-		ui::Element* root = doc.getElement(doc.m_roots[0]);
+		ASSERT_EQ(1, doc.m_root.children.size());
+		ui::Element* root = doc.getElement(doc.m_root.children[0]);
 		ASSERT_EQ(1, root->children.size());
 		ui::Element* child = doc.getElement(root->children[0]);
 
@@ -162,9 +159,8 @@ bool testStyleApplication() {
 		[box .some_class] {
 		}
 	)");
-	Span<u32> roots = doc.m_roots;
-	ASSERT_EQ(1, (int)roots.size());
-	const ui::Element& elem = doc.m_elements[roots[0]];
+	ASSERT_EQ(1, doc.m_root.children.size());
+	const ui::Element& elem = doc.m_elements[doc.m_root.children[0]];
 
 	bool has_width = false;
 	for (const ui::Attribute& attr : elem.attributes) {
@@ -188,9 +184,9 @@ bool testInlineOverridesStylesheet() {
 		[box .some_class width=75%] {
 		}
 	)");
-	Span<u32> roots = doc.m_roots;
-	ASSERT_EQ(1, (int)roots.size());
-	const ui::Element& elem = doc.m_elements[roots[0]];
+	
+	ASSERT_EQ(1, doc.m_root.children.size());
+	const ui::Element& elem = doc.m_elements[doc.m_root.children[0]];
 
 	bool has_correct_width = false;
 	for (const ui::Attribute& attr : elem.attributes) {
@@ -214,9 +210,9 @@ bool testStyleOpacityApplication() {
 		[box .some_class] {
 		}
 	)");
-	Span<u32> roots = doc.m_roots;
-	ASSERT_EQ(1, (int)roots.size());
-	const ui::Element& elem = doc.m_elements[roots[0]];
+	
+	ASSERT_EQ(1, doc.m_root.children.size());
+	const ui::Element& elem = doc.m_elements[doc.m_root.children[0]];
 	ASSERT_FLOAT_EQ(0.4f, elem.opacity);
 	return true;
 }
@@ -233,10 +229,10 @@ bool testStyleColorAlphaApplication() {
 		[box .some_class] {
 		}
 	)");
-	Span<u32> roots = doc.m_roots;
-	ASSERT_EQ(1, (int)roots.size());
+	
+	ASSERT_EQ(1, doc.m_root.children.size());
 	doc.computeLayout(Vec2(800, 600));
-	const ui::Element& elem = doc.m_elements[roots[0]];
+	const ui::Element& elem = doc.m_elements[doc.m_root.children[0]];
 	ASSERT_EQ(0x11, (int)elem.color.r);
 	ASSERT_EQ(0x22, (int)elem.color.g);
 	ASSERT_EQ(0x33, (int)elem.color.b);
@@ -259,9 +255,9 @@ bool testInlineOpacityOverridesStylesheet() {
 		[box .some_class opacity=0.75] {
 		}
 	)");
-	Span<u32> roots = doc.m_roots;
-	ASSERT_EQ(1, (int)roots.size());
-	const ui::Element& elem = doc.m_elements[roots[0]];
+	
+	ASSERT_EQ(1, doc.m_root.children.size());
+	const ui::Element& elem = doc.m_elements[doc.m_root.children[0]];
 	ASSERT_FLOAT_EQ(0.75f, elem.opacity);
 	return true;
 }
@@ -277,9 +273,9 @@ bool testStyleClippingApplication() {
 		[box .some_class] {
 		}
 	)");
-	Span<u32> roots = doc.m_roots;
-	ASSERT_EQ(1, (int)roots.size());
-	const ui::Element& elem = doc.m_elements[roots[0]];
+	
+	ASSERT_EQ(1, doc.m_root.children.size());
+	const ui::Element& elem = doc.m_elements[doc.m_root.children[0]];
 	ASSERT_EQ(true, elem.clipping);
 	return true;
 }
@@ -295,9 +291,9 @@ bool testInlineClippingOverridesStylesheet() {
 		[box .some_class clipping=false] {
 		}
 	)");
-	Span<u32> roots = doc.m_roots;
-	ASSERT_EQ(1, (int)roots.size());
-	const ui::Element& elem = doc.m_elements[roots[0]];
+	
+	ASSERT_EQ(1, doc.m_root.children.size());
+	const ui::Element& elem = doc.m_elements[doc.m_root.children[0]];
 	ASSERT_EQ(false, elem.clipping);
 	return true;
 }
@@ -316,9 +312,9 @@ bool testMultipleClassesMatching() {
 		[box .class1 .class2] {
 		}
 	)");
-	Span<u32> roots = doc.m_roots;
-	ASSERT_EQ(1, (int)roots.size());
-	const ui::Element& elem = doc.m_elements[roots[0]];
+	
+	ASSERT_EQ(1, doc.m_root.children.size());
+	const ui::Element& elem = doc.m_elements[doc.m_root.children[0]];
 
 	bool has_width = false;
 	bool has_height = false;
@@ -346,9 +342,9 @@ bool testClassNotMatching() {
 		[box .present] {
 		}
 	)");
-	Span<u32> roots = doc.m_roots;
-	ASSERT_EQ(1, (int)roots.size());
-	const ui::Element& elem = doc.m_elements[roots[0]];
+	
+	ASSERT_EQ(1, doc.m_root.children.size());
+	const ui::Element& elem = doc.m_elements[doc.m_root.children[0]];
 	bool has_width = false;
 	for (const ui::Attribute& attr : elem.attributes) {
 		if (attr.type == ui::AttributeName::WIDTH) {
@@ -371,9 +367,9 @@ bool testRecomputeIdempotence() {
 		[box .some_class] {
 		}
 	)");
-	Span<u32> roots = doc.m_roots;
-	ASSERT_EQ(1, (int)roots.size());
-	const ui::Element& elem = doc.m_elements[roots[0]];
+	
+	ASSERT_EQ(1, doc.m_root.children.size());
+	const ui::Element& elem = doc.m_elements[doc.m_root.children[0]];
 	
 	Array<ui::Attribute> original_attrs(doc.m_allocator);
 	for (const ui::Attribute& attr : elem.attributes) {
@@ -405,11 +401,11 @@ bool testSetVisiblePersistsAcrossStyleRecompute() {
 		}
 	)");
 
-	Span<u32> roots = doc.m_roots;
-	ASSERT_EQ(2, (int)roots.size());
+	
+	ASSERT_EQ(2, doc.m_root.children.size());
 
-	ui::Element& first = doc.m_elements[roots[0]];
-	ui::Element& second = doc.m_elements[roots[1]];
+	ui::Element& first = doc.m_elements[doc.m_root.children[0]];
+	ui::Element& second = doc.m_elements[doc.m_root.children[1]];
 
 	ASSERT_EQ(true, first.visible);
 	ASSERT_EQ(true, second.visible);
@@ -426,7 +422,7 @@ bool testSetVisiblePersistsAcrossStyleRecompute() {
 	}
 	ASSERT_EQ(true, has_visible_false);
 
-	doc.addClass(roots[1], "hovered");
+	doc.addClass(doc.m_root.children[1], "hovered");
 
 	ASSERT_EQ(false, first.visible);
 	ASSERT_EQ(true, second.visible);
@@ -455,13 +451,12 @@ bool testAddClassWithFontAttribute() {
 		[box] {
 		}
 	)");
-	Span<u32> roots = doc.m_roots;
-	ASSERT_EQ(1, (int)roots.size());
-	ui::Element& elem = doc.m_elements[roots[0]];
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element& elem = doc.m_elements[doc.m_root.children[0]];
 	
 	float initial_font_size = elem.font_size;
 	
-	doc.addClass(roots[0], "large_font");
+	doc.addClass(doc.m_root.children[0], "large_font");
 	
 	ASSERT_FLOAT_EQ(28.0f, elem.font_size);
 	
@@ -480,13 +475,12 @@ bool testRemoveClassWithFontAttribute() {
 		[box .large_font] {
 		}
 	)");
-	Span<u32> roots = doc.m_roots;
-	ASSERT_EQ(1, (int)roots.size());
-	ui::Element& elem = doc.m_elements[roots[0]];
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element& elem = doc.m_elements[doc.m_root.children[0]];
 	
 	ASSERT_FLOAT_EQ(28.0f, elem.font_size);
 	
-	doc.removeClass(roots[0], "large_font");
+	doc.removeClass(doc.m_root.children[0], "large_font");
 	
 	ASSERT_TRUE(elem.font_size != 28.0f);
 	
@@ -504,9 +498,8 @@ bool testAddClassDuplicateNoOp() {
 		[box] {
 		}
 	)");
-	Span<u32> roots = doc.m_roots;
-	ASSERT_EQ(1, (int)roots.size());
-	ui::Element& elem = doc.m_elements[roots[0]];
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element& elem = doc.m_elements[doc.m_root.children[0]];
 	
 	bool has_width = false;
 	for (const ui::Attribute& attr : elem.attributes) {
@@ -516,7 +509,7 @@ bool testAddClassDuplicateNoOp() {
 	}
 	ASSERT_EQ(false, has_width);
 	
-	doc.addClass(roots[0], "test_class");
+	doc.addClass(doc.m_root.children[0], "test_class");
 	
 	has_width = false;
 	for (const ui::Attribute& attr : elem.attributes) {
@@ -526,7 +519,7 @@ bool testAddClassDuplicateNoOp() {
 	}
 	ASSERT_EQ(true, has_width);
 	
-	doc.addClass(roots[0], "test_class");
+	doc.addClass(doc.m_root.children[0], "test_class");
 	
 	has_width = false;
 	for (const ui::Attribute& attr : elem.attributes) {
@@ -550,9 +543,8 @@ bool testRemoveClassRemovesEffect() {
 		[box .test_class] {
 		}
 	)");
-	Span<u32> roots = doc.m_roots;
-	ASSERT_EQ(1, (int)roots.size());
-	ui::Element& elem = doc.m_elements[roots[0]];
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element& elem = doc.m_elements[doc.m_root.children[0]];
 	
 	bool has_width = false;
 	for (const ui::Attribute& attr : elem.attributes) {
@@ -562,7 +554,7 @@ bool testRemoveClassRemovesEffect() {
 	}
 	ASSERT_EQ(true, has_width);
 	
-	doc.removeClass(roots[0], "test_class");
+	doc.removeClass(doc.m_root.children[0], "test_class");
 	
 	has_width = false;
 	for (const ui::Attribute& attr : elem.attributes) {
@@ -586,9 +578,8 @@ bool testRemoveAbsentClassNoOp() {
 		[box .present] {
 		}
 	)");
-	Span<u32> roots = doc.m_roots;
-	ASSERT_EQ(1, (int)roots.size());
-	ui::Element& elem = doc.m_elements[roots[0]];
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element& elem = doc.m_elements[doc.m_root.children[0]];
 	
 	bool has_width = false;
 	for (const ui::Attribute& attr : elem.attributes) {
@@ -598,7 +589,7 @@ bool testRemoveAbsentClassNoOp() {
 	}
 	ASSERT_EQ(true, has_width);
 	
-	doc.removeClass(roots[0], "absent");
+	doc.removeClass(doc.m_root.children[0], "absent");
 	
 	has_width = false;
 	for (const ui::Attribute& attr : elem.attributes) {
@@ -625,9 +616,9 @@ bool testRemoveClassRetainsOthers() {
 		[box .class1 .class2] {
 		}
 	)");
-	Span<u32> roots = doc.m_roots;
-	ASSERT_EQ(1, (int)roots.size());
-	ui::Element& elem = doc.m_elements[roots[0]];
+	
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element& elem = doc.m_elements[doc.m_root.children[0]];
 	
 	bool has_width = false;
 	bool has_height = false;
@@ -642,7 +633,7 @@ bool testRemoveClassRetainsOthers() {
 	ASSERT_EQ(true, has_width);
 	ASSERT_EQ(true, has_height);
 	
-	doc.removeClass(roots[0], "class1");
+	doc.removeClass(doc.m_root.children[0], "class1");
 	
 	has_width = false;
 	has_height = false;
@@ -671,9 +662,9 @@ bool testInlineOverridesClass() {
 		[box .test_class width=75%] {
 		}
 	)");
-	Span<u32> roots = doc.m_roots;
-	ASSERT_EQ(1, (int)roots.size());
-	const ui::Element& elem = doc.m_elements[roots[0]];
+	
+	ASSERT_EQ(1, doc.m_root.children.size());
+	const ui::Element& elem = doc.m_elements[doc.m_root.children[0]];
 	
 	bool has_correct_width = false;
 	for (const ui::Attribute& attr : elem.attributes) {
@@ -699,9 +690,9 @@ bool testMultipleClassPrecedence() {
 		[box .class1 .class2] {
 		}
 	)");
-	Span<u32> roots = doc.m_roots;
-	ASSERT_EQ(1, (int)roots.size());
-	const ui::Element& elem = doc.m_elements[roots[0]];
+	
+	ASSERT_EQ(1, doc.m_root.children.size());
+	const ui::Element& elem = doc.m_elements[doc.m_root.children[0]];
 	
 	bool has_correct_width = false;
 	for (const ui::Attribute& attr : elem.attributes) {
@@ -727,13 +718,13 @@ bool testAddRemoveStability() {
 		[box] {
 		}
 	)");
-	Span<u32> roots = doc.m_roots;
-	ASSERT_EQ(1, (int)roots.size());
-	ui::Element& elem = doc.m_elements[roots[0]];
+	
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element& elem = doc.m_elements[doc.m_root.children[0]];
 	
 	int initial_attr_count = elem.attributes.size();
 
-	doc.addClass(roots[0], "class_a");
+	doc.addClass(doc.m_root.children[0], "class_a");
 	int attr_count_after_add_a = elem.attributes.size();
 	bool has_width_50 = false;
 	for (const ui::Attribute& attr : elem.attributes) {
@@ -743,7 +734,7 @@ bool testAddRemoveStability() {
 	}
 	ASSERT_EQ(true, has_width_50);
 	
-	doc.addClass(roots[0], "class_b");
+	doc.addClass(doc.m_root.children[0], "class_b");
 	int attr_count_after_add_b = elem.attributes.size();
 	bool has_height_100 = false;
 	for (const ui::Attribute& attr : elem.attributes) {
@@ -753,7 +744,7 @@ bool testAddRemoveStability() {
 	}
 	ASSERT_EQ(true, has_height_100);
 	
-	doc.removeClass(roots[0], "class_a");
+	doc.removeClass(doc.m_root.children[0], "class_a");
 	int attr_count_after_remove_a = elem.attributes.size();
 	has_width_50 = false;
 	for (const ui::Attribute& attr : elem.attributes) {
@@ -770,7 +761,7 @@ bool testAddRemoveStability() {
 	}
 	ASSERT_EQ(true, has_height_100);
 	
-	doc.addClass(roots[0], "class_a");
+	doc.addClass(doc.m_root.children[0], "class_a");
 	int attr_count_after_readd_a = elem.attributes.size();
 	has_width_50 = false;
 	for (const ui::Attribute& attr : elem.attributes) {
@@ -803,9 +794,9 @@ bool testCompoundClassSelectorMatchesAllClasses() {
 		[box .button .hovered] {
 		}
 	)");
-	Span<u32> roots = doc.m_roots;
-	ASSERT_EQ(1, (int)roots.size());
-	const ui::Element& elem = doc.m_elements[roots[0]];
+	
+	ASSERT_EQ(1, doc.m_root.children.size());
+	const ui::Element& elem = doc.m_elements[doc.m_root.children[0]];
 
 	bool has_width = false;
 	for (const ui::Attribute& attr : elem.attributes) {
@@ -828,9 +819,9 @@ bool testCompoundClassSelectorDoesNotMatchWhenMissingClass() {
 		[box .button] {
 		}
 	)");
-	Span<u32> roots = doc.m_roots;
-	ASSERT_EQ(1, (int)roots.size());
-	const ui::Element& elem = doc.m_elements[roots[0]];
+	
+	ASSERT_EQ(1, doc.m_root.children.size());
+	const ui::Element& elem = doc.m_elements[doc.m_root.children[0]];
 
 	bool has_width = false;
 	for (const ui::Attribute& attr : elem.attributes) {
@@ -856,9 +847,9 @@ bool testCompoundAndSingleClassRulesBothApply() {
 		[box .button .hovered] {
 		}
 	)");
-	Span<u32> roots = doc.m_roots;
-	ASSERT_EQ(1, (int)roots.size());
-	const ui::Element& elem = doc.m_elements[roots[0]];
+	
+	ASSERT_EQ(1, doc.m_root.children.size());
+	const ui::Element& elem = doc.m_elements[doc.m_root.children[0]];
 
 	bool has_width = false;
 	bool has_height = false;

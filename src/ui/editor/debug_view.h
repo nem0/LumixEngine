@@ -123,8 +123,8 @@ void debugViewGUI(Document& document, u32& hovered_element_idx) {
     ImGui::Checkbox("Show Padding", &g_show_padding);
     ImGui::Checkbox("Show All Elements", &g_show_all_visualizations);
 
-    for (u32 root_idx : document.m_roots) {
-        debugElementGUI(document, root_idx, 0, hovered_element_idx);
+    for (u32 idx : document.m_root.children) {
+        debugElementGUI(document, idx, 0, hovered_element_idx);
     }
 }
 

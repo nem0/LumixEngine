@@ -34,16 +34,16 @@ bool testInternTableSemantics() {
 bool testDocumentParseSimple() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box] {}");
-	ASSERT_EQ(1, doc.m_roots.size());
+	ASSERT_EQ(1, doc.m_root.children.size());
 
 	ASSERT_PARSE(doc, "[span]");
-	ASSERT_EQ(1, doc.m_roots.size());
+	ASSERT_EQ(1, doc.m_root.children.size());
 
 	ASSERT_PARSE(doc, "[image]");
-	ASSERT_EQ(1, doc.m_roots.size());
+	ASSERT_EQ(1, doc.m_root.children.size());
 
 	ASSERT_PARSE(doc, "text");
-	ASSERT_EQ(1, doc.m_roots.size());
+	ASSERT_EQ(1, doc.m_root.children.size());
 
 	return true;
 }
@@ -61,8 +61,8 @@ bool testDocumentParseInvalidClosingBrace() {
 bool testDocumentParseNested() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box] { [box] }");
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(1, root->children.size());
 	ASSERT_TAG(root, BOX);
 	ui::Element* child = doc.getElement(root->children[0]);
@@ -73,8 +73,8 @@ bool testDocumentParseNested() {
 bool testAttributes() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box width=800 height=640 id=\"someid\"] { [box] {} }");
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	ASSERT_TAG(root, BOX);
 	ASSERT_EQ(1, root->children.size());
 	Span<ui::Attribute> attrs = root->attributes;
@@ -88,9 +88,9 @@ bool testAttributes() {
 bool testDocumentParseComplexNesting() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box] { [box] { text } [box] { other box } }");
-	ASSERT_EQ(1, doc.m_roots.size());
+	ASSERT_EQ(1, doc.m_root.children.size());
 	
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	ASSERT_TAG(root, BOX);
 	ASSERT_EQ(2, root->children.size());
 	
@@ -114,8 +114,8 @@ bool testDocumentParseComplexNesting() {
 bool testEveryElementAttributes() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box id=\"testid\" .testclass visible=false opacity=0.75 font-size=14 font=\"arial.ttf\" color=#ffffff]");
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	Span<ui::Attribute> attrs = root->attributes;
 	ASSERT_EQ(6, attrs.size());
 	ASSERT_ATTRIBUTE(root, 0, ID);
@@ -139,8 +139,8 @@ bool testEveryElementAttributes() {
 bool testMultipleClasses() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box .class1 .class2 .class3]");
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(3, root->classes.size());
 	StringView class1 = doc.m_intern_table.resolve(root->classes[0]);
 	StringView class2 = doc.m_intern_table.resolve(root->classes[1]);
@@ -155,8 +155,8 @@ bool testMultipleClasses() {
 bool testSingleClass() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box .singleclass]");
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(1, root->classes.size());
 	StringView class_name = doc.m_intern_table.resolve(root->classes[0]);
 	ASSERT_EQ(".singleclass", class_name);
@@ -166,8 +166,8 @@ bool testSingleClass() {
 bool testDuplicateClasses() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box .dup .other .dup]");
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(2, root->classes.size());
 	StringView class1 = doc.m_intern_table.resolve(root->classes[0]);
 	StringView class2 = doc.m_intern_table.resolve(root->classes[1]);
@@ -179,8 +179,8 @@ bool testDuplicateClasses() {
 bool testBlockAttributes() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box width=50% height=200 margin=10 padding=5]");
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	Span<ui::Attribute> attrs = root->attributes;
 	ASSERT_EQ(4, attrs.size());
 	ASSERT_ATTRIBUTE(root, 0, WIDTH);
@@ -201,8 +201,8 @@ bool testBlockAttributes() {
 bool testTopLeftAttributesParse() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box top=12 left=34]");
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	Span<ui::Attribute> attrs = root->attributes;
 	ASSERT_EQ(2, attrs.size());
 	ASSERT_ATTRIBUTE(root, 0, TOP);
@@ -217,8 +217,8 @@ bool testTopLeftAttributesParse() {
 bool testPivotAttributesParse() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box pivot-x=50% pivot-y=2em]");
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	Span<ui::Attribute> attrs = root->attributes;
 	ASSERT_EQ(2, attrs.size());
 	ASSERT_ATTRIBUTE(root, 0, PIVOT_X);
@@ -234,8 +234,8 @@ bool testPositionAttributeParse() {
 	{
 		MockDocument doc;
 		ASSERT_PARSE(doc, "[box position=relative]");
-		ASSERT_EQ(1, doc.m_roots.size());
-		ui::Element* root = doc.getElement(doc.m_roots[0]);
+		ASSERT_EQ(1, doc.m_root.children.size());
+		ui::Element* root = doc.getElement(doc.m_root.children[0]);
 		Span<ui::Attribute> attrs = root->attributes;
 		ASSERT_EQ(1, attrs.size());
 		ASSERT_ATTRIBUTE(root, 0, POSITION);
@@ -244,8 +244,8 @@ bool testPositionAttributeParse() {
 	{
 		MockDocument doc;
 		ASSERT_PARSE(doc, "[box position=absolute]");
-		ASSERT_EQ(1, doc.m_roots.size());
-		ui::Element* root = doc.getElement(doc.m_roots[0]);
+		ASSERT_EQ(1, doc.m_root.children.size());
+		ui::Element* root = doc.getElement(doc.m_root.children[0]);
 		Span<ui::Attribute> attrs = root->attributes;
 		ASSERT_EQ(1, attrs.size());
 		ASSERT_ATTRIBUTE(root, 0, POSITION);
@@ -257,8 +257,8 @@ bool testPositionAttributeParse() {
 bool testPositionPresetAttributeParse() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box position=center]");
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	Span<ui::Attribute> attrs = root->attributes;
 	ASSERT_EQ(1, attrs.size());
 	ASSERT_ATTRIBUTE(root, 0, POSITION);
@@ -270,8 +270,8 @@ bool testClippingAttributeParse() {
 	{
 		MockDocument doc;
 		ASSERT_PARSE(doc, "[box clipping=true]");
-		ASSERT_EQ(1, doc.m_roots.size());
-		ui::Element* root = doc.getElement(doc.m_roots[0]);
+		ASSERT_EQ(1, doc.m_root.children.size());
+		ui::Element* root = doc.getElement(doc.m_root.children[0]);
 		Span<ui::Attribute> attrs = root->attributes;
 		ASSERT_EQ(1, attrs.size());
 		ASSERT_ATTRIBUTE(root, 0, CLIPPING);
@@ -280,8 +280,8 @@ bool testClippingAttributeParse() {
 	{
 		MockDocument doc;
 		ASSERT_PARSE(doc, "[box clipping=false]");
-		ASSERT_EQ(1, doc.m_roots.size());
-		ui::Element* root = doc.getElement(doc.m_roots[0]);
+		ASSERT_EQ(1, doc.m_root.children.size());
+		ui::Element* root = doc.getElement(doc.m_root.children[0]);
 		Span<ui::Attribute> attrs = root->attributes;
 		ASSERT_EQ(1, attrs.size());
 		ASSERT_ATTRIBUTE(root, 0, CLIPPING);
@@ -316,8 +316,8 @@ bool testPositionPresetsLayout() {
 		ASSERT_PARSE(doc, source);
 		doc.computeLayout(Vec2(800, 600));
 
-		ASSERT_EQ(1, doc.m_roots.size());
-		ui::Element* root = doc.getElement(doc.m_roots[0]);
+		ASSERT_EQ(1, doc.m_root.children.size());
+		ui::Element* root = doc.getElement(doc.m_root.children[0]);
 		ASSERT_EQ(1, root->children.size());
 		ui::Element* child = doc.getElement(root->children[0]);
 
@@ -332,8 +332,8 @@ bool testPositionPresetsLayout() {
 bool testPanelAttributes() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box bg-image=\"bg.png\" bg-fit=cover bg-color=#000000 direction=column wrap=true justify-content=center]");
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	Span<ui::Attribute> attrs = root->attributes;
 	ASSERT_EQ(6, attrs.size());
 	ASSERT_ATTRIBUTE(root, 0, BG_IMAGE);
@@ -357,8 +357,8 @@ bool testPanelAttributes() {
 bool testImageAttributes() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[image src=\"img.png\" width=64 height=32]");
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	Span<ui::Attribute> attrs = root->attributes;
 	ASSERT_EQ(3, attrs.size());
 	ASSERT_ATTRIBUTE(root, 0, SRC);
@@ -375,8 +375,8 @@ bool testImageAttributes() {
 bool testDefaultValues() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box] {}");
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* elem = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* elem = doc.getElement(doc.m_root.children[0]);
 	
 	doc.computeLayout(Vec2(800, 600));
 	
@@ -399,8 +399,8 @@ bool testDefaultValues() {
 bool testSpanAndQuotedStringEquivalence() {
 	MockDocument doc1;
 	ASSERT_PARSE(doc1, "[box] { [span text=\"hello\"] }");
-	ASSERT_EQ(1, doc1.m_roots.size());
-	ui::Element* root1 = doc1.getElement(doc1.m_roots[0]);
+	ASSERT_EQ(1, doc1.m_root.children.size());
+	ui::Element* root1 = doc1.getElement(doc1.m_root.children[0]);
 	ASSERT_EQ(1, root1->children.size());
 	ui::Element* child1 = doc1.getElement(root1->children[0]);
 	ASSERT_TAG(child1, SPAN);
@@ -410,8 +410,8 @@ bool testSpanAndQuotedStringEquivalence() {
 
 	MockDocument doc2;
 	ASSERT_PARSE(doc2, "[box] { hello }");
-	ASSERT_EQ(1, doc2.m_roots.size());
-	ui::Element* root2 = doc2.getElement(doc2.m_roots[0]);
+	ASSERT_EQ(1, doc2.m_root.children.size());
+	ui::Element* root2 = doc2.getElement(doc2.m_root.children[0]);
 	ASSERT_EQ(1, root2->children.size());
 	ui::Element* child2 = doc2.getElement(root2->children[0]);
 	ASSERT_TAG(child2, SPAN);
@@ -425,8 +425,8 @@ bool testSpanAndQuotedStringEquivalence() {
 bool testSpanEmptyValue() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box] { [span text=\"\"] }");
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(1, root->children.size());
 	ui::Element* child = doc.getElement(root->children[0]);
 	ASSERT_TAG(child, SPAN);
@@ -440,11 +440,11 @@ bool testSpanEmptyValue() {
 bool testTopLevelSpanWithoutContainer() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[span text=\"hello\"]");
-	ASSERT_EQ(1, doc.m_roots.size());
+	ASSERT_EQ(1, doc.m_root.children.size());
 
 	doc.computeLayout(Vec2(800, 600));
 
-	ui::Element* span = doc.getElement(doc.m_roots[0]);
+	ui::Element* span = doc.getElement(doc.m_root.children[0]);
 	ASSERT_TAG(span, SPAN);
 	ASSERT_EQ("hello", span->text);
 	ASSERT_TRUE(!span->lines.empty());
@@ -456,8 +456,8 @@ bool testTopLevelSpanWithoutContainer() {
 bool testFontAttribute() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box font=\"arial.ttf\"] { [span text=\"hello\" font=\"times.ttf\"] }");
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(1, root->children.size());
 	
 	Span<ui::Attribute> root_attrs = root->attributes;
@@ -479,8 +479,8 @@ bool testFontAttribute() {
 bool testFontSizeAttribute() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box font-size=16] { [span text=\"hello\" font-size=24] }");
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(1, root->children.size());
 
 	Span<ui::Attribute> root_attrs = root->attributes;
@@ -502,8 +502,8 @@ bool testFontSizeAttribute() {
 bool testFontInheritance() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box font=\"arial.ttf\"] { hello }");
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	doc.computeLayout(Vec2(800, 600));
 
 	ui::Element* span = doc.getElement(root->children[0]);
@@ -515,8 +515,8 @@ bool testFontInheritance() {
 bool testFontInheritanceDeep() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box font=\"arial.ttf\"] { [box] { hello } }");
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	doc.computeLayout(Vec2(800, 600));
 
 	ui::Element* child_panel = doc.getElement(root->children[0]);
@@ -529,8 +529,8 @@ bool testFontInheritanceDeep() {
 bool testColorInheritance() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box color=#ff0000] { \"hello\" }");
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	doc.computeLayout(Vec2(800, 600));
 
 	ASSERT_TRUE(root->color.r == 255 && root->color.g == 0 && root->color.b == 0 && root->color.a == 255);
@@ -543,8 +543,8 @@ bool testColorInheritance() {
 bool testColorInheritanceDeep() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box color=#00ff00] { [box] { \"hello\" } }");
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	doc.computeLayout(Vec2(800, 600));
 
 	ASSERT_TRUE(root->color.r == 0 && root->color.g == 255 && root->color.b == 0 && root->color.a == 255);
@@ -561,10 +561,10 @@ bool testColorInheritanceDeep() {
 bool testColorAlphaSupport() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box color=#11223344 bg-color=#55667788] { [box] { \"hello\" } }");
-	ASSERT_EQ(1, doc.m_roots.size());
+	ASSERT_EQ(1, doc.m_root.children.size());
 	doc.computeLayout(Vec2(800, 600));
 
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(0x11, (int)root->color.r);
 	ASSERT_EQ(0x22, (int)root->color.g);
 	ASSERT_EQ(0x33, (int)root->color.b);
@@ -592,8 +592,8 @@ bool testColorAlphaSupport() {
 bool testAlignInheritance() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box align=center] { [box] { \"hello\" } }");
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	doc.computeLayout(Vec2(800, 600));
 	ASSERT_EQ((i32)ui::Align::CENTER, (i32)root->text_align);
 
@@ -609,8 +609,8 @@ bool testAlignInheritance() {
 bool testOpacityInheritance() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box opacity=0.5] { [box] { \"hello\" } }");
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 
 	ASSERT_FLOAT_EQ(0.5f, root->opacity);
 
@@ -626,8 +626,8 @@ bool testOpacityInheritance() {
 bool testOpacityInheritanceAndOverride() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box opacity=0.5] { [box opacity=0.5] { [span opacity=0.2 text=\"hello\"] } }");
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 
 	ASSERT_FLOAT_EQ(0.5f, root->opacity);
 
@@ -650,8 +650,8 @@ bool testMultilineStringLayout() {
 		}
 	)");
 	doc.computeLayout(Vec2(800, 600));
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* panel = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* panel = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(1, panel->children.size());
 	ui::Element* textElem = doc.getElement(panel->children[0]);
 
@@ -693,8 +693,8 @@ bool testMultilineStringMeasurement() {
 bool testTextWithSpecialChars() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box] { ,-=()*&^@! }");
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	ASSERT_TAG(root, BOX);
 	ASSERT_EQ(1, root->children.size());
 	ui::Element* child = doc.getElement(root->children[0]);
@@ -707,8 +707,8 @@ bool testSpaceBetweenSpans() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box direction=row font=\"arial.ttf\" font-size=16] { [span text=\"hello\"] [span text=\"world\"] }");
 	doc.computeLayout(Vec2(800, 600));
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* panel = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* panel = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(2, panel->children.size());
 	ui::Element* span1 = doc.getElement(panel->children[0]);
 	ui::Element* span2 = doc.getElement(panel->children[1]);
@@ -733,9 +733,8 @@ bool testParseAndRuntimeMutation() {
 		[box .initial] {
 		}
 	)");
-	Span<u32> roots = doc.m_roots;
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	
 	bool has_width_100 = false;
 	bool has_color_red = false;
@@ -746,7 +745,7 @@ bool testParseAndRuntimeMutation() {
 	ASSERT_TRUE(has_width_100);
 	ASSERT_TRUE(has_color_red);
 	
-	doc.addClass(roots[0], "added");
+	doc.addClass(doc.m_root.children[0], "added");
 	
 	bool has_height_200 = false;
 	for (const ui::Attribute& attr : root->attributes) {
@@ -777,26 +776,25 @@ bool testComplexMutationSequence() {
 		[box .a .b] {
 		}
 	)");
-	Span<u32> roots = doc.m_roots;
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	
 	int initial_attrs = root->attributes.size();
 	
-	doc.addClass(roots[0], "c");
+	doc.addClass(doc.m_root.children[0], "c");
 	int after_add_c = root->attributes.size();
 	ASSERT_TRUE(after_add_c > initial_attrs);
 	
-	doc.addClass(roots[0], "d");
+	doc.addClass(doc.m_root.children[0], "d");
 	int after_add_d = root->attributes.size();
 	ASSERT_TRUE(after_add_d > after_add_c);
 	
-	doc.removeClass(roots[0], "b");
+	doc.removeClass(doc.m_root.children[0], "b");
 	int after_remove_b = root->attributes.size();
 	ASSERT_TRUE(after_remove_b < after_add_d);
 	
-	doc.removeClass(roots[0], "a");
-	doc.removeClass(roots[0], "c");
+	doc.removeClass(doc.m_root.children[0], "a");
+	doc.removeClass(doc.m_root.children[0], "c");
 	int final_attrs = root->attributes.size();
 	
 	bool has_padding = false;
@@ -818,8 +816,8 @@ bool testSetWidthUpdatesPixelsAndLayout() {
 		}
 	)");
 
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	doc.computeLayout(Vec2(800, 600));
 	ASSERT_FLOAT_EQ(100.0f, root->size.x);
 
@@ -838,8 +836,8 @@ bool testSetWidthUpdatesPercentAndLayout() {
 		}
 	)");
 
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	doc.computeLayout(Vec2(800, 600));
 	ASSERT_FLOAT_EQ(400.0f, root->size.x);
 
@@ -871,8 +869,8 @@ static void injectMouseButton(MockDocument& doc, MockMouseDevice& mouse, bool do
 bool testOnClickAttributeParseOnBox() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box on-click=foo]");
-	ASSERT_EQ(1, doc.m_roots.size());
-	ui::Element* root = doc.getElement(doc.m_roots[0]);
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	ASSERT_EQ(1, root->attributes.size());
 	ASSERT_ATTRIBUTE(root, 0, ON_CLICK);
 	ASSERT_EQ("foo", root->attributes[0].value);
@@ -1107,7 +1105,7 @@ bool testDPIScaling() {
 	ASSERT_PARSE(doc, "[box width=10 height=10] { [span font-size=10 text=\"abcd\"] }");
 	doc.computeLayout(Vec2(200, 200));
 
-	Element* root = doc.getElement(doc.m_roots[0]);
+	Element* root = doc.getElement(doc.m_root.children[0]);
 	ASSERT_FLOAT_EQ(10.0f, root->size.x);
 	ASSERT_FLOAT_EQ(10.0f, root->size.y);
 	ASSERT_EQ(1, root->children.size());
