@@ -358,11 +358,11 @@ void StackTree::printCallstack(StackNode* node)
 			if (SymGetLineFromAddr64(process, (DWORD64)(node->m_instruction), &offset, &line)) {
 				OutputDebugString("\t");
 				OutputDebugString(line.FileName);
-				OutputDebugString("(");
+				OutputDebugString(":");
 				char tmp[20];
 				toCString((u32)line.LineNumber, Span(tmp));
 				OutputDebugString(tmp);
-				OutputDebugString("):");
+				OutputDebugString(":1:");
 			}
 			OutputDebugString("\t");
 			OutputDebugString(symbol->Name);
