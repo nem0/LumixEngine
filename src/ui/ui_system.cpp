@@ -16,12 +16,10 @@
 namespace Lumix {
 
 struct UISystemImpl : UISystem {
-	ui::DocumentResourceManager m_ui_document_manager;
-
 	explicit UISystemImpl(Engine& engine)
-		: m_engine(engine)
-		, m_allocator(engine.getAllocator(), "ui")
+		: m_allocator(engine.getAllocator(), "ui")
 		, m_ui_document_manager(m_allocator)
+		, m_engine(engine)
 		, m_render_plugin(*this)
 	{
 		UIModule::reflect();
@@ -44,6 +42,10 @@ struct UISystemImpl : UISystem {
 	void shutdownStarted() override {
 		auto* renderer = (Renderer*)m_engine.getSystemManager().getSystem("renderer");
 		if (renderer) renderer->removePlugin(m_render_plugin);
+	}
+
+	~UISystemImpl() override {
+		m_ui_document_manager.destroy();
 	}
 
 	void createModules(World& world) override {
@@ -77,8 +79,9 @@ struct UISystemImpl : UISystem {
 	};
 
 private:
-	Engine& m_engine;
 	TagAllocator m_allocator;
+	ui::DocumentResourceManager m_ui_document_manager;
+	Engine& m_engine;
 	RenderPlugin m_render_plugin;
 };
 
