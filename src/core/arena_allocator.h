@@ -22,7 +22,7 @@ struct LUMIX_CORE_API ArenaAllocator : IAllocator {
 	void deallocate(void* ptr) override;
 	void* reallocate(void* ptr, size_t new_size, size_t old_size, size_t align) override;
 	#ifdef LUMIX_DEBUG
-		const debug::AllocationInfo& getAllocationInfo() const { return m_allocation_info; }
+		debug::AllocationInfo& getAllocationInfo() { return m_allocation_info; }
 	#endif
 
 private:

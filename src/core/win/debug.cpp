@@ -33,8 +33,6 @@
 
 #define LUMIX_ALLOC_GUARDS
 
-
-
 namespace Lumix {
 	
 static CrashReportFlags g_crash_report_flags = CrashReportFlags::ENABLED;
@@ -43,7 +41,7 @@ namespace sentry {
 
 struct SentryData {
 	IAllocator* s_allocator = nullptr;
-	StaticString<256*1024> envelope;
+	StaticString<256*1024>envelope;
 	char log_data[131072];
 };
 
@@ -276,6 +274,11 @@ StackTree::StackTree(IAllocator& allocator)
 		HANDLE process = GetCurrentProcess();
 		SymInitialize(process, nullptr, TRUE);
 	}
+	#ifdef LUMIX_DEBUG
+		// we can't deallocate the arena before the leak check because we might need it to print leak's callstack
+		// we mark it MISC so it's ignored by leak check
+		m_allocator.getAllocationInfo().flags = AllocationInfo::IS_MISC;
+	#endif
 }
 
 
@@ -577,6 +580,10 @@ void init(IAllocator& allocator) {
 	s_stack_tree.create(allocator);
 	sentry::s_sentry_data = LUMIX_NEW(allocator, sentry::SentryData)();
 	sentry::s_sentry_data->s_allocator = &allocator;
+	#ifdef LUMIX_DEBUG
+		// mark s_sentry_data as MISC so it's not reported as leaking
+		getAllocationInfoFromUser(sentry::s_sentry_data)->flags |= AllocationInfo::IS_MISC;
+	#endif
 }
 
 void shutdown() {
@@ -593,9 +600,7 @@ void checkLeaks() {
 			bool first = true;
 			AllocationInfo* info = s_allocation_debug.m_root;
 			while (info) {
-				 // s_stack_tree uses arena and we can't deallocate it because we might need it to print leak's callstack
-				 // so we ignore it "leaking"
-				if (info != &s_stack_tree->getAllocator().getAllocationInfo() && !info->is(AllocationInfo::IS_MISC)) {
+				if (!info->is(AllocationInfo::IS_MISC)) {
 					if (first) OutputDebugString("Memory leaks detected!\n");
 					first = false;
 					StaticString<2048> tmp("\nAllocation size : ", info->size, " , memory ", (u64)(info + sizeof(info)), "\n");
