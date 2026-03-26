@@ -12,6 +12,7 @@ struct UIFontManager : ui::IFontManager {
 
 	// TODO leaks fonts
 	ui::IFontManager::FontHandle loadFont(StringView path, int font_size) override;
+	void unloadFont(FontHandle font) override;
 	Vec2 measureTextA(FontHandle font, StringView text) override;
 	float getHeight(FontHandle font) override;
 	float getAscender(FontHandle font) override;
@@ -25,8 +26,19 @@ struct UIImageManager : ui::IImageManager {
 	UIImageManager(Engine& engine) : m_engine(&engine) {}
 
 	ImageHandle loadImage(StringView path) override;
+	void unloadImage(ImageHandle image) override;
 	bool isReady(ImageHandle image) override;
 	Vec2 getIntrinsicSize(ImageHandle image) override;
+	Engine* m_engine;
+};
+
+struct UISpriteManager : ui::ISpriteManager {
+	UISpriteManager(Engine& engine) : m_engine(&engine) {}
+
+	SpriteHandle loadSprite(StringView path) override;
+	void unloadSprite(SpriteHandle sprite) override;
+	bool isReady(SpriteHandle sprite) override;
+
 	Engine* m_engine;
 };
 

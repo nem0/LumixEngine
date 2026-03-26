@@ -12,7 +12,6 @@
 namespace Lumix {
 
 struct Draw2D;
-struct ResourceManagerHub;
 struct Sprite;
 struct Texture;
 struct SplitWord;
@@ -126,7 +125,9 @@ Tag parseTag(StringView str);
 
 struct IFontManager {
 	using FontHandle = void*;
+	virtual ~IFontManager() {}
 	virtual FontHandle loadFont(StringView path, int font_size) = 0;
+	virtual void unloadFont(FontHandle font) = 0;
 	virtual Vec2 measureTextA(FontHandle font, StringView text) = 0;
 	virtual float getHeight(FontHandle font) = 0;
 	virtual float getAscender(FontHandle font) = 0;
@@ -136,9 +137,19 @@ struct IFontManager {
 
 struct IImageManager {
 	using ImageHandle = void*;
+	virtual ~IImageManager() {}
 	virtual ImageHandle loadImage(StringView path) = 0;
+	virtual void unloadImage(ImageHandle image) = 0;
 	virtual bool isReady(ImageHandle image) = 0;
 	virtual Vec2 getIntrinsicSize(ImageHandle image) = 0;
+};
+
+struct ISpriteManager {
+	using SpriteHandle = void*;
+	virtual ~ISpriteManager() {}
+	virtual SpriteHandle loadSprite(StringView path) = 0;
+	virtual void unloadSprite(SpriteHandle sprite) = 0;
+	virtual bool isReady(SpriteHandle sprite) = 0;
 };
 
 enum class InternString : u16 { INVALID = 0 };
@@ -215,6 +226,11 @@ struct Element {
 		, lines(allocator)
 		, m_document(doc)
 	{}
+	Element(const Element&) = delete;
+	Element& operator=(const Element&) = delete;
+	Element(Element&& rhs);
+	Element& operator=(Element&& rhs) = delete;
+	~Element();
 		
 	Document& m_document;
 	Tag tag;
@@ -231,9 +247,6 @@ struct Element {
 	Vec2 size = {0, 0};
 	StringView text;
 	Array<SpanLine> lines;
-	Sprite* bg_sprite = nullptr;
-	IImageManager::ImageHandle image_handle = nullptr;
-	IFontManager::FontHandle font_handle = nullptr;
 	float font_size = 0;
 	Color color = Color::WHITE;
 	float opacity = 1.0f;
@@ -252,7 +265,7 @@ struct Element {
 	ParsedUnit height_unit = {0, Unit::FIT_CONTENT};
 	ParsedUnit pivot_x_unit = {0, Unit::PIXELS};
 	ParsedUnit pivot_y_unit = {0, Unit::PIXELS};
-
+	
 	//@ function
 	StringView getID() { return id; }
 	//@ function 
@@ -263,6 +276,18 @@ struct Element {
 	void setWidth(StringView value);
 	//@ function 
 	void setBGImage(const Path& path);
+
+	IFontManager::FontHandle getFontHandle() const { return font_handle; }
+	void setFontHandle(IFontManager::FontHandle font_handle);
+	ISpriteManager::SpriteHandle getSpriteHandle() const { return sprite_handle; }
+	void setSpriteHandle(ISpriteManager::SpriteHandle sprite_handle);
+	IImageManager::ImageHandle getImageHandle() const { return image_handle; }
+	void setImageHandle(IImageManager::ImageHandle image_handle);
+
+private:
+	ISpriteManager::SpriteHandle sprite_handle = nullptr;
+	IImageManager::ImageHandle image_handle = nullptr;
+	IFontManager::FontHandle font_handle = nullptr;
 };
 //@ end
 
@@ -283,9 +308,11 @@ enum class EventType {
 
 //@ struct full ui::Event
 struct Event {
+	static constexpr u32 INVALID_ELEMENT_INDEX = 0xFFFF'FFFF;
+
 	EventType type = EventType::INVALID;
 	Vec2 position;
-	u32 element_index = 0;
+	u32 element_index = INVALID_ELEMENT_INDEX;
 	StringView action;
 	i32 key_code = 0;
 	u32 text_utf8 = 0;
@@ -304,7 +331,7 @@ struct Document {
 	UITokenizer m_tokenizer;
 	IFontManager* m_font_manager;
 	IImageManager* m_image_manager;
-	ResourceManagerHub* m_resource_manager;
+	ISpriteManager* m_sprite_manager;
 	IAllocator& m_allocator;
 	Vec2 m_canvas_size;
 	String m_content;
@@ -314,7 +341,7 @@ struct Document {
 	float m_render_duration = 0;
 	StackArray<u32, 16> m_hovered_elements;
 
-	Document(IFontManager* font_manager, IAllocator& allocator, IImageManager* image_manager = nullptr);
+	Document(IFontManager* font_manager, IAllocator& allocator, IImageManager* image_manager = nullptr, ISpriteManager* sprite_manager = nullptr);
 
 	bool parse(StringView content, const char* filename);
 	//@ function

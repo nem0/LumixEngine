@@ -4,7 +4,6 @@
 #include "core/profiler.h"
 #include "core/stack_array.h"
 #include "core/string.h"
-#include "engine/resource_manager.h"
 #include "gui/sprite.h"
 #include "renderer/draw2d.h"
 #include "renderer/font.h"
@@ -332,7 +331,7 @@ static bool parseTypedAttributeValue(Document& doc, AttributeName name, StringVi
 	}
 }
 
-Document::Document(IFontManager* font_manager, IAllocator& allocator, IImageManager* image_manager)
+Document::Document(IFontManager* font_manager, IAllocator& allocator, IImageManager* image_manager, ISpriteManager* sprite_manager)
 	: m_elements(allocator)
 	, m_stylesheet(allocator)
 	, m_intern_table(allocator)
@@ -340,7 +339,7 @@ Document::Document(IFontManager* font_manager, IAllocator& allocator, IImageMana
 	, m_tokenizer()
 	, m_font_manager(font_manager)
 	, m_image_manager(image_manager)
-	, m_resource_manager(nullptr)
+	, m_sprite_manager(sprite_manager)
 	, m_allocator(allocator)
 	, m_canvas_size(0, 0)
 	, m_content(allocator)
@@ -774,6 +773,80 @@ bool Document::parseElements(u32 parent_index) {
 	}
 }
 
+Element::Element(Element&& rhs)
+	: m_document(rhs.m_document)
+	, tag(rhs.tag)
+	, children(rhs.children.move())
+	, attributes(rhs.attributes.move())
+	, classes(rhs.classes.move())
+	, id(rhs.id)
+	, position_mode(rhs.position_mode)
+	, left(rhs.left)
+	, top(rhs.top)
+	, position(rhs.position)
+	, size(rhs.size)
+	, text(rhs.text)
+	, lines(rhs.lines.move())
+	, sprite_handle(rhs.sprite_handle)
+	, image_handle(rhs.image_handle)
+	, font_size(rhs.font_size)
+	, color(rhs.color)
+	, opacity(rhs.opacity)
+	, bg_color(rhs.bg_color)
+	, margins(rhs.margins)
+	, paddings(rhs.paddings)
+	, direction(rhs.direction)
+	, justify_content(rhs.justify_content)
+	, align_items(rhs.align_items)
+	, text_align(rhs.text_align)
+	, grow(rhs.grow)
+	, wrap(rhs.wrap)
+	, visible(rhs.visible)
+	, clipping(rhs.clipping)
+	, width_unit(rhs.width_unit)
+	, height_unit(rhs.height_unit)
+	, pivot_x_unit(rhs.pivot_x_unit)
+	, pivot_y_unit(rhs.pivot_y_unit)
+	, font_handle(rhs.font_handle)
+{
+	rhs.font_handle = nullptr;
+	rhs.sprite_handle = nullptr;
+	rhs.image_handle = nullptr;
+}
+
+Element::~Element() {
+	if (font_handle) {
+		m_document.m_font_manager->unloadFont(font_handle);
+	}
+	if (m_document.m_image_manager && image_handle) {
+		m_document.m_image_manager->unloadImage(image_handle);
+	}
+	if (m_document.m_sprite_manager && sprite_handle) {
+		m_document.m_sprite_manager->unloadSprite(sprite_handle);
+	}
+}
+
+void Element::setFontHandle(IFontManager::FontHandle handle) {
+	if (font_handle) {
+		m_document.m_font_manager->unloadFont(font_handle);
+	}
+	font_handle = handle;
+}
+
+void Element::setImageHandle(IImageManager::ImageHandle image_handle) {
+	if (m_document.m_image_manager && this->image_handle) {
+		m_document.m_image_manager->unloadImage(this->image_handle);
+	}
+	this->image_handle = image_handle;
+}
+
+void Element::setSpriteHandle(ISpriteManager::SpriteHandle sprite_handle) {
+	if (m_document.m_sprite_manager && this->sprite_handle) {
+		m_document.m_sprite_manager->unloadSprite(this->sprite_handle);
+	}
+	this->sprite_handle = sprite_handle;
+}
+
 void Element::setVisible(bool show) {
 	upsertAttribute<AttributeName::VISIBLE>(*this, show, AttributeSource::ELEMENT);
 
@@ -787,8 +860,8 @@ void Element::setBGImage(const Path& path) {
 	InternString s = m_document.m_intern_table.intern(path);
 	StringView sv = m_document.m_intern_table.resolve(s);
 	upsertAttribute<AttributeName::BG_IMAGE>(*this, sv, AttributeSource::ELEMENT);
-	if (m_document.m_resource_manager) {
-		bg_sprite = m_document.m_resource_manager->load<Sprite>(path);
+	if (m_document.m_sprite_manager) {
+		setSpriteHandle(m_document.m_sprite_manager->loadSprite(sv));
 	}
 
 }
@@ -1146,12 +1219,12 @@ static float computeInlineRunHeight(Document& doc, Element& element, i32 child_i
 
 	const Element& last = doc.m_elements[element.children[end_idx - 1]];
 	if (last.lines.empty()) {
-		return doc.m_font_manager->getHeight(last.font_handle);
+		return doc.m_font_manager->getHeight(last.getFontHandle());
 	}
 	const SpanLine& last_line = last.lines.last();
 
-	float asc = doc.m_font_manager->getAscender(last.font_handle);
-	float height = doc.m_font_manager->getHeight(last.font_handle);
+	float asc = doc.m_font_manager->getAscender(last.getFontHandle());
+	float height = doc.m_font_manager->getHeight(last.getFontHandle());
 	return last_line.pos.y - asc + height;
 }
 
@@ -1279,8 +1352,8 @@ static void computeBaseSizes(Document& doc, Element& elem, const ParentContext& 
 	}
 
 	if (elem.tag == Tag::SPAN) {
-		if (doc.m_font_manager && elem.font_handle && !elem.text.empty()) {
-			elem.size = doc.m_font_manager->measureTextA(elem.font_handle, elem.text);
+		if (doc.m_font_manager && elem.getFontHandle() && !elem.text.empty()) {
+			elem.size = doc.m_font_manager->measureTextA(elem.getFontHandle(), elem.text);
 		}
 		return;
 	}
@@ -1313,8 +1386,9 @@ static void computeBaseSizes(Document& doc, Element& elem, const ParentContext& 
 	bool is_row = elem.direction == Direction::ROW;
 	if (elem.width_unit.unit == Unit::FIT_CONTENT) {
 		if (elem.tag == Tag::IMAGE) {
-			if (doc.m_image_manager && elem.image_handle && doc.m_image_manager->isReady(elem.image_handle)) {
-				const Vec2 intrinsic_size = doc.m_image_manager->getIntrinsicSize(elem.image_handle);
+			const auto image_handle = elem.getImageHandle();
+			if (doc.m_image_manager && image_handle && doc.m_image_manager->isReady(image_handle)) {
+				const Vec2 intrinsic_size = doc.m_image_manager->getIntrinsicSize(image_handle);
 				if (elem.height_unit.unit != Unit::FIT_CONTENT && intrinsic_size.y > 0) {
 					elem.size.x = elem.size.y * intrinsic_size.x / intrinsic_size.y;
 				}
@@ -1357,8 +1431,9 @@ static void computeBaseSizes(Document& doc, Element& elem, const ParentContext& 
 	}
 
 	if (elem.height_unit.unit == Unit::FIT_CONTENT && elem.tag == Tag::IMAGE) {
-		if (doc.m_image_manager && elem.image_handle && doc.m_image_manager->isReady(elem.image_handle)) {
-			const Vec2 intrinsic_size = doc.m_image_manager->getIntrinsicSize(elem.image_handle);
+		const auto image_handle = elem.getImageHandle();
+		if (doc.m_image_manager && image_handle && doc.m_image_manager->isReady(image_handle)) {
+			const Vec2 intrinsic_size = doc.m_image_manager->getIntrinsicSize(image_handle);
 			if (elem.width_unit.unit != Unit::FIT_CONTENT && intrinsic_size.x > 0) {
 				elem.size.y = elem.size.x * intrinsic_size.y / intrinsic_size.x;
 			}
@@ -1508,8 +1583,8 @@ static float layoutRowVertical(Document& doc, Element& parent, StackArray<RowLin
             baseline = maximum(baseline, rl.child->size.y);
         }
         else {
-            float asc = doc.m_font_manager->getAscender(rl.child->font_handle);
-            float height = doc.m_font_manager->getHeight(rl.child->font_handle);
+            float asc = doc.m_font_manager->getAscender(rl.child->getFontHandle());
+            float height = doc.m_font_manager->getHeight(rl.child->getFontHandle());
             baseline = maximum(baseline, asc);
 			desc = maximum(desc, height - asc);
         }
@@ -1585,17 +1660,17 @@ static void wrapInlineRun(Document& doc, Element& parent, i32 start_span_idx, i3
 		}
 
 		Element& span = child;
-		if (!span.font_handle || span.text.empty()) continue;
+		if (!span.getFontHandle() || span.text.empty()) continue;
 
 		StringView space(" ", 1);
-		const float space_w = doc.m_font_manager->measureTextA(span.font_handle, space).x;
+		const float space_w = doc.m_font_manager->measureTextA(span.getFontHandle(), space).x;
 
 		StringView text = span.text;
 		if (wrap_enabled) {
 			SpanLine* line = nullptr;
 			while (!text.empty()) {
 				is_prev_space = is_prev_space || isWhitespace(*text.begin);
-				SplitWord split = doc.m_font_manager->splitFirstWord(span.font_handle, text);
+				SplitWord split = doc.m_font_manager->splitFirstWord(span.getFontHandle(), text);
 				if (split.head.empty()) {
 					// this should only be possible if text ends with whitespaces
 					ASSERT(split.tail.empty());
@@ -1790,19 +1865,21 @@ static void renderElement(Draw2D& draw, const Document& doc, u32 element_idx, co
 
 	switch (element.tag) {
 		case Tag::IMAGE: {
-			if (doc.m_image_manager && element.image_handle && doc.m_image_manager->isReady(element.image_handle)) {
+			const auto image_handle = element.getImageHandle();
+			if (doc.m_image_manager && image_handle && doc.m_image_manager->isReady(image_handle)) {
 				const u8 alpha = applyOpacityToAlpha(255, element.opacity);
 				if (alpha > 0) {
-					draw.addImage(static_cast<Texture*>(element.image_handle)->handle, pos, pos + size, Vec2(0, 0), Vec2(1, 1), Color(255, 255, 255, alpha));
+					draw.addImage(static_cast<Texture*>(image_handle)->handle, pos, pos + size, Vec2(0, 0), Vec2(1, 1), Color(255, 255, 255, alpha));
 				}
 			}
 			break;
 		}
 		case Tag::BOX: {
-			if (element.bg_sprite) {
+			const auto sprite_handle = element.getSpriteHandle();
+			if (doc.m_sprite_manager && sprite_handle && doc.m_sprite_manager->isReady(sprite_handle)) {
 				const u8 alpha = applyOpacityToAlpha(255, element.opacity);
 				if (alpha > 0) {
-					element.bg_sprite->render(draw, pos.x, pos.y, pos.x + size.x, pos.y + size.y, Color(255, 255, 255, alpha));
+					static_cast<Sprite*>(sprite_handle)->render(draw, pos.x, pos.y, pos.x + size.x, pos.y + size.y, Color(255, 255, 255, alpha));
 				}
 			}
 			else if (element.bg_color.a > 0) {
@@ -1815,8 +1892,8 @@ static void renderElement(Draw2D& draw, const Document& doc, u32 element_idx, co
 			break;
 		}
 		case Tag::SPAN: {
-			if (element.font_handle && !element.text.empty()) {
-				const Font& font = *(const Font*)element.font_handle;
+			if (element.getFontHandle() && !element.text.empty()) {
+				const Font& font = *(const Font*)element.getFontHandle();
 				Color text_color = element.color;
 				text_color.a = applyOpacityToAlpha(text_color.a, element.opacity);
 				if (text_color.a == 0) break;
@@ -1856,8 +1933,8 @@ void Document::render(Draw2D& draw) {
 
 static bool contains(const Element& elem, Vec2 pos, IFontManager* font_manager) {
 	Vec2 elem_pos = elem.position;
-	if (elem.tag == Tag::SPAN && elem.font_handle && font_manager) {
-		float asc = font_manager->getAscender(elem.font_handle);
+	if (elem.tag == Tag::SPAN && elem.getFontHandle() && font_manager) {
+		float asc = font_manager->getAscender(elem.getFontHandle());
 		elem_pos.y -= asc;
 	}
 	return pos.x >= elem_pos.x && pos.x <= elem_pos.x + elem.size.x &&
@@ -1988,13 +2065,13 @@ static void loadResources(Document& doc, u32 element_index, const ParentContext&
 				break;
 			case AttributeName::SRC: {
 				if (elem.tag == Tag::IMAGE && doc.m_image_manager && !attr.value.empty()) {
-					elem.image_handle = doc.m_image_manager->loadImage(attr.value);
+					elem.setImageHandle(doc.m_image_manager->loadImage(attr.value));
 				}
 				break;
 			}
 			case AttributeName::BG_IMAGE: {
-				if (doc.m_resource_manager && !attr.value.empty()) {
-					elem.bg_sprite = doc.m_resource_manager->load<Sprite>(Path(attr.value));
+				if (doc.m_sprite_manager && !attr.value.empty()) {
+					elem.setSpriteHandle(doc.m_sprite_manager->loadSprite(attr.value));
 				}
 				break;
 			}
@@ -2003,7 +2080,7 @@ static void loadResources(Document& doc, u32 element_index, const ParentContext&
 	}
 
 	if (!ctx.font.empty() && doc.m_font_manager) {
-		elem.font_handle = doc.m_font_manager->loadFont(ctx.font, (i32)ctx.font_size);
+		elem.setFontHandle(doc.m_font_manager->loadFont(ctx.font, (i32)ctx.font_size));
 	}
 
 	for (u32 child_idx : elem.children) {
@@ -2049,7 +2126,7 @@ void Document::injectEvent(const InputSystem::Event& event) {
 				ui_event.position = Vec2(btn.x, btn.y);
 				ui_event.key_code = btn.key_id;
 				Element* elem = getElementAt(ui_event.position);
-				ui_event.element_index = elem ? u32(elem - m_elements.begin()) : 0;
+				ui_event.element_index = elem ? u32(elem - m_elements.begin()) : Event::INVALID_ELEMENT_INDEX;
 				m_events.push(ui_event);
 				if (!btn.down) {
 					Element* action_elem = getActionTargetAt(*this, ui_event.position);
@@ -2058,7 +2135,7 @@ void Document::injectEvent(const InputSystem::Event& event) {
 						Event action_event;
 						action_event.type = EventType::ACTION;
 						action_event.position = ui_event.position;
-						action_event.element_index = action_elem ? u32(action_elem - m_elements.begin()) : 0;
+						action_event.element_index = action_elem ? u32(action_elem - m_elements.begin()) : Event::INVALID_ELEMENT_INDEX;
 						action_event.key_code = ui_event.key_code;
 						action_event.action = action;
 						m_events.push(action_event);
@@ -2069,7 +2146,7 @@ void Document::injectEvent(const InputSystem::Event& event) {
 				ui_event.type = btn.down ? EventType::KEY_DOWN : EventType::KEY_UP;
 				ui_event.key_code = btn.key_id;
 				ui_event.position = Vec2(0, 0);
-				ui_event.element_index = 0; // TODO: focused element
+				ui_event.element_index = Event::INVALID_ELEMENT_INDEX; // TODO: focused element
 				m_events.push(ui_event);
 			}
 			break;
@@ -2131,12 +2208,12 @@ void Document::injectEvent(const InputSystem::Event& event) {
 					m_hovered_elements.push(hovered_idx);
 				}
 
-				u32 new_hovered_index = new_hovered_path.empty() ? 0xFFFF'FFFF : new_hovered_path.back();
+				u32 new_hovered_index = new_hovered_path.empty() ? Event::INVALID_ELEMENT_INDEX : new_hovered_path.back();
 
 				Event ui_event;
 				ui_event.type = EventType::MOUSE_MOVE;
 				ui_event.position = pos;
-				ui_event.element_index = new_hovered_index != 0xFFFF'FFFF ? new_hovered_index : 0;
+				ui_event.element_index = new_hovered_index;
 				m_events.push(ui_event);
 			}
 			break;
@@ -2147,7 +2224,7 @@ void Document::injectEvent(const InputSystem::Event& event) {
 			ui_event.position = Vec2(event.data.mouse_wheel.x, event.data.mouse_wheel.y);
 			ui_event.wheel_y = event.data.mouse_wheel.y;
 			Element* elem = getElementAt(ui_event.position);
-			ui_event.element_index = elem ? u32(elem - m_elements.begin()) : 0;
+			ui_event.element_index = elem ? u32(elem - m_elements.begin()) : Event::INVALID_ELEMENT_INDEX;
 			m_events.push(ui_event);
 			break;
 		}
@@ -2155,7 +2232,7 @@ void Document::injectEvent(const InputSystem::Event& event) {
 			Event ui_event;
 			ui_event.type = EventType::TEXT_INPUT;
 			ui_event.text_utf8 = event.data.text.utf8;
-			ui_event.element_index = 0; // TODO: focused element
+			ui_event.element_index = Event::INVALID_ELEMENT_INDEX; // TODO: focused element
 			m_events.push(ui_event);
 			break;
 		}
@@ -2166,9 +2243,11 @@ void Document::injectEvent(const InputSystem::Event& event) {
 
 bool Document::areDependenciesReady() const {
 	for (const Element& elem : m_elements) {
-		if (elem.bg_sprite && !elem.bg_sprite->isReady()) return false;
-		if (m_image_manager && elem.image_handle && !m_image_manager->isReady(elem.image_handle)) return false;
-		if (elem.font_handle && !m_font_manager->isReady(elem.font_handle)) return false;
+		const auto sprite_handle = elem.getSpriteHandle();
+		const auto image_handle = elem.getImageHandle();
+		if (m_sprite_manager && sprite_handle && !m_sprite_manager->isReady(sprite_handle)) return false;
+		if (m_image_manager && image_handle && !m_image_manager->isReady(image_handle)) return false;
+		if (elem.getFontHandle() && !m_font_manager->isReady(elem.getFontHandle())) return false;
 	}
 	return true;
 }

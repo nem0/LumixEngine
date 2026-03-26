@@ -134,9 +134,9 @@ void drawDebugVisualizations(Draw2D& draw2d, const Document& document, u32 hover
 		if (hovered_element) {
 			Color highlight_fill(255, 128, 0, 76);
 			Color highlight_border(255, 255, 0, 255);
-			if (hovered_element->tag == Tag::SPAN && !hovered_element->lines.empty() && hovered_element->font_handle && document.m_font_manager) {
-				float asc = document.m_font_manager->getAscender(hovered_element->font_handle);
-				float height = document.m_font_manager->getHeight(hovered_element->font_handle);
+			if (hovered_element->tag == Tag::SPAN && !hovered_element->lines.empty() && hovered_element->getFontHandle() && document.m_font_manager) {
+				float asc = document.m_font_manager->getAscender(hovered_element->getFontHandle());
+				float height = document.m_font_manager->getHeight(hovered_element->getFontHandle());
 				for (const SpanLine& line : hovered_element->lines) {
 					Vec2 line_pos = line.pos;
 					line_pos.y -= asc;
@@ -147,8 +147,8 @@ void drawDebugVisualizations(Draw2D& draw2d, const Document& document, u32 hover
 			} else {
 				Vec2 pos = hovered_element->position;
 				Vec2 size = hovered_element->size;
-				if (hovered_element->tag == Tag::SPAN && hovered_element->font_handle && document.m_font_manager) {
-					float asc = document.m_font_manager->getAscender(hovered_element->font_handle);
+				if (hovered_element->tag == Tag::SPAN && hovered_element->getFontHandle() && document.m_font_manager) {
+					float asc = document.m_font_manager->getAscender(hovered_element->getFontHandle());
 					pos.y -= asc;
 				}
 				draw2d.addRectFilled(pos, pos + size, highlight_fill);
@@ -165,8 +165,8 @@ void drawDebugVisualizations(Draw2D& draw2d, const Document& document, u32 hover
 			Vec2 size = element->size;
 
 			// For spans, position.y is the baseline, so adjust to top-left
-			if (element->tag == Tag::SPAN && element->font_handle && document.m_font_manager) {
-				float asc = document.m_font_manager->getAscender(element->font_handle);
+			if (element->tag == Tag::SPAN && element->getFontHandle() && document.m_font_manager) {
+				float asc = document.m_font_manager->getAscender(element->getFontHandle());
 				pos.y -= asc;
 			}
 
@@ -175,9 +175,9 @@ void drawDebugVisualizations(Draw2D& draw2d, const Document& document, u32 hover
 			// Element outline
 			if (g_show_element_outlines) {
 				Color outline_color = is_hovered ? Color(255, 0, 0, 255) : Color(0, 255, 0, 128); // Yellow for hovered, cyan for others
-				if (element->tag == Tag::SPAN && !element->lines.empty() && element->font_handle && document.m_font_manager) {
-					float asc = document.m_font_manager->getAscender(element->font_handle);
-					float height = document.m_font_manager->getHeight(element->font_handle);
+				if (element->tag == Tag::SPAN && !element->lines.empty() && element->getFontHandle() && document.m_font_manager) {
+					float asc = document.m_font_manager->getAscender(element->getFontHandle());
+					float height = document.m_font_manager->getHeight(element->getFontHandle());
 					for (const SpanLine& line : element->lines) {
 						Vec2 line_pos = line.pos;
 						line_pos.y -= asc;

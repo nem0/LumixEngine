@@ -6,7 +6,16 @@
 
 namespace Lumix {
 
-struct MockFontManager : ui::IFontManager {
+struct MockFontManager final : ui::IFontManager {
+	struct RefEntry {
+		FontHandle handle;
+		int refs;
+	};
+
+	MockFontManager()
+		: m_refs(getGlobalAllocator())
+	{}
+
 	bool isReady(FontHandle) override { return true; }
 
 	ui::IFontManager::FontHandle loadFont(StringView path, int font_size) override {
@@ -17,7 +26,25 @@ struct MockFontManager : ui::IFontManager {
 			hash = hash * 31 + (unsigned char)c;
 		}
 		size_t combined = (hash << 32) | (size_t)font_size;
-		return (ui::IFontManager::FontHandle)(uintptr)combined;
+		const FontHandle handle = (ui::IFontManager::FontHandle)(uintptr)combined;
+		for (RefEntry& entry : m_refs) {
+			if (entry.handle != handle) continue;
+			++entry.refs;
+			return handle;
+		}
+		RefEntry& entry = m_refs.emplace();
+		entry.handle = handle;
+		entry.refs = 1;
+		return handle;
+	}
+
+	void unloadFont(FontHandle font) override {
+		if (!font) return;
+		for (RefEntry& entry : m_refs) {
+			if (entry.handle != font) continue;
+			if (entry.refs > 0) --entry.refs;
+			return;
+		}
 	}
 
 	Vec2 measureTextA(FontHandle font, StringView text) override {
@@ -72,12 +99,77 @@ struct MockFontManager : ui::IFontManager {
 		res.head_width = head_width;
 		return res;
 	}
+
+	bool hasLeakedRefs(const ui::Document& doc) const {
+		for (const RefEntry& entry : m_refs) {
+			int live = 0;
+			for (const ui::Element& elem : doc.m_elements) {
+				if (elem.getFontHandle() == entry.handle) ++live;
+			}
+			if (entry.refs > live) return true;
+		}
+		return false;
+	}
+
+	bool hasAnyRefs() const {
+		for (const RefEntry& entry : m_refs) {
+			if (entry.refs > 0) return true;
+		}
+		return false;
+	}
+
+	Array<RefEntry> m_refs;
 };
 
 struct MockImageManager : ui::IImageManager {
+	struct RefEntry {
+		ImageHandle handle;
+		int refs;
+	};
+
+	MockImageManager()
+		: m_refs(getGlobalAllocator())
+	{}
+
 	ImageHandle loadImage(StringView path) override {
-		if (path == "img.png") return (ImageHandle)1;
-		return nullptr;
+		if (path != "img.png") return nullptr;
+		const ImageHandle handle = (ImageHandle)1;
+		for (RefEntry& entry : m_refs) {
+			if (entry.handle != handle) continue;
+			++entry.refs;
+			return handle;
+		}
+		RefEntry& entry = m_refs.emplace();
+		entry.handle = handle;
+		entry.refs = 1;
+		return handle;
+	}
+
+	void unloadImage(ImageHandle image) override {
+		if (!image) return;
+		for (RefEntry& entry : m_refs) {
+			if (entry.handle != image) continue;
+			if (entry.refs > 0) --entry.refs;
+			return;
+		}
+	}
+
+	bool hasLeakedRefs(const ui::Document& doc) const {
+		for (const RefEntry& entry : m_refs) {
+			int live = 0;
+			for (const ui::Element& elem : doc.m_elements) {
+				if (elem.getImageHandle() == entry.handle) ++live;
+			}
+			if (entry.refs > live) return true;
+		}
+		return false;
+	}
+
+	bool hasAnyRefs() const {
+		for (const RefEntry& entry : m_refs) {
+			if (entry.refs > 0) return true;
+		}
+		return false;
 	}
 
 	bool isReady(ImageHandle image) override {
@@ -88,12 +180,79 @@ struct MockImageManager : ui::IImageManager {
 		if (image == (ImageHandle)1) return Vec2(100, 50);
 		return Vec2(0);
 	}
+
+	Array<RefEntry> m_refs;
+};
+
+struct MockSpriteManager : ui::ISpriteManager {
+	struct RefEntry {
+		SpriteHandle handle;
+		int refs;
+	};
+
+	MockSpriteManager()
+		: m_refs(getGlobalAllocator())
+	{}
+
+	SpriteHandle loadSprite(StringView path) override {
+		if (path != "bg.spr") return nullptr;
+		const SpriteHandle handle = (SpriteHandle)1;
+		for (RefEntry& entry : m_refs) {
+			if (entry.handle != handle) continue;
+			++entry.refs;
+			return handle;
+		}
+		RefEntry& entry = m_refs.emplace();
+		entry.handle = handle;
+		entry.refs = 1;
+		return handle;
+	}
+
+	void unloadSprite(SpriteHandle sprite) override {
+		if (!sprite) return;
+		for (RefEntry& entry : m_refs) {
+			if (entry.handle != sprite) continue;
+			if (entry.refs > 0) --entry.refs;
+			return;
+		}
+	}
+
+	bool isReady(SpriteHandle sprite) override {
+		return sprite != nullptr;
+	}
+
+	bool hasLeakedRefs(const ui::Document& doc) const {
+		for (const RefEntry& entry : m_refs) {
+			int live = 0;
+			for (const ui::Element& elem : doc.m_elements) {
+				if (elem.getSpriteHandle() == entry.handle) ++live;
+			}
+			if (entry.refs > live) return true;
+		}
+		return false;
+	}
+
+	bool hasAnyRefs() const {
+		for (const RefEntry& entry : m_refs) {
+			if (entry.refs > 0) return true;
+		}
+		return false;
+	}
+
+	Array<RefEntry> m_refs;
 };
 
 struct MockDocument : ui::Document {
 	MockFontManager m_font_manager;
 	MockImageManager m_image_manager;
-	MockDocument() : ui::Document(&m_font_manager, getGlobalAllocator(), &m_image_manager) {}
+	MockSpriteManager m_sprite_manager;
+	MockDocument() : ui::Document(&m_font_manager, getGlobalAllocator(), &m_image_manager, &m_sprite_manager) {}
+	~MockDocument() {
+		// `ui::Element` destructor unloads resources via document managers.
+		// Clear elements before mock managers are destroyed.
+		m_elements.clear();
+		m_root.children.clear();
+	}
 };
 
 extern int test_count;

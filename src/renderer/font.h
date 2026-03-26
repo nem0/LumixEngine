@@ -40,6 +40,7 @@ LUMIX_RENDERER_API float getAscender(const Font& font);
 LUMIX_RENDERER_API float getHeight(const Font& font);
 LUMIX_RENDERER_API bool isBuilt(const Font& font);
 LUMIX_RENDERER_API SplitWord splitFirstWord(const Font& font, StringView text);
+LUMIX_RENDERER_API void release(Font& font);
 
 
 struct LUMIX_RENDERER_API FontResource final : Resource

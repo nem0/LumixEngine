@@ -35,6 +35,7 @@ float getDescender(const Font& font) { return font.descender; }
 float getAscender(const Font& font) { return font.ascender; }
 float getHeight(const Font& font) { return font.height; }
 bool isBuilt(const Font& font) { return font.is_built; }
+void release(Font& font) { font.resource->removeRef(font); }
 
 
 const Glyph* findGlyph(const Font& font, u32 codepoint) {

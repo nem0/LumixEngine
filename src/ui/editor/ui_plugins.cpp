@@ -63,8 +63,8 @@ struct UIEditorWindow : AssetEditorWindow {
 		m_pipeline = Pipeline::create(renderer, PipelineType::GUI_EDITOR);
 		m_font_manager = LUMIX_NEW(m_app.getAllocator(), UIFontManager)(engine);
 		m_image_manager = LUMIX_NEW(m_app.getAllocator(), UIImageManager)(engine);
-		m_document = LUMIX_NEW(m_app.getAllocator(), ui::Document)(m_font_manager, m_app.getAllocator(), m_image_manager);
-		m_document->m_resource_manager = &engine.getResourceManager();
+		m_sprite_manager = LUMIX_NEW(m_app.getAllocator(), UISpriteManager)(engine);
+		m_document = LUMIX_NEW(m_app.getAllocator(), ui::Document)(m_font_manager, m_app.getAllocator(), m_image_manager, m_sprite_manager);
 
 		m_editor = createGUICodeEditor(m_app);
 		m_editor->focus();
@@ -84,6 +84,7 @@ struct UIEditorWindow : AssetEditorWindow {
 	~UIEditorWindow() {
 		m_pipeline.reset();
 		if (m_document) LUMIX_DELETE(m_app.getAllocator(), m_document);
+		if (m_sprite_manager) LUMIX_DELETE(m_app.getAllocator(), m_sprite_manager);
 		if (m_image_manager) LUMIX_DELETE(m_app.getAllocator(), m_image_manager);
 		if (m_font_manager) LUMIX_DELETE(m_app.getAllocator(), m_font_manager);
 	}
@@ -297,6 +298,7 @@ struct UIEditorWindow : AssetEditorWindow {
 	TextFilter m_autocomplete_filter;
 	ui::IFontManager* m_font_manager = nullptr;
 	UIImageManager* m_image_manager = nullptr;
+	UISpriteManager* m_sprite_manager = nullptr;
 	ui::Document* m_document = nullptr;
 	Vec2 m_previous_canvas_size = Vec2(0, 0);
 	bool m_parse_success = false;

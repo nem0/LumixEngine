@@ -331,13 +331,13 @@ bool testPositionPresetsLayout() {
 
 bool testPanelAttributes() {
 	MockDocument doc;
-	ASSERT_PARSE(doc, "[box bg-image=\"bg.png\" bg-fit=cover bg-color=#000000 direction=column wrap=true justify-content=center]");
+	ASSERT_PARSE(doc, "[box bg-image=\"bg.spr\" bg-fit=cover bg-color=#000000 direction=column wrap=true justify-content=center]");
 	ASSERT_EQ(1, doc.m_root.children.size());
 	ui::Element* root = doc.getElement(doc.m_root.children[0]);
 	Span<ui::Attribute> attrs = root->attributes;
 	ASSERT_EQ(6, attrs.size());
 	ASSERT_ATTRIBUTE(root, 0, BG_IMAGE);
-	ASSERT_EQ("bg.png", attrs[0].value);
+	ASSERT_EQ("bg.spr", attrs[0].value);
 	ASSERT_ATTRIBUTE(root, 1, BG_FIT);
 	ASSERT_EQ("cover", attrs[1].value);
 	ASSERT_ATTRIBUTE(root, 2, BG_COLOR);
@@ -507,7 +507,7 @@ bool testFontInheritance() {
 	doc.computeLayout(Vec2(800, 600));
 
 	ui::Element* span = doc.getElement(root->children[0]);
-	ASSERT_TRUE(span->font_handle != nullptr);
+	ASSERT_TRUE(span->getFontHandle() != nullptr);
 
 	return true;
 }
@@ -521,8 +521,97 @@ bool testFontInheritanceDeep() {
 
 	ui::Element* child_panel = doc.getElement(root->children[0]);
 	ui::Element* grandchild_span = doc.getElement(child_panel->children[0]);
-	ASSERT_TRUE(grandchild_span->font_handle != nullptr);
+	ASSERT_TRUE(grandchild_span->getFontHandle() != nullptr);
 
+	return true;
+}
+
+bool testFontRefsDoNotLeakAcrossStyleRecompute() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[box font=\"arial.ttf\"] { [span text=\"hello\"] }");
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ASSERT_TRUE(!doc.m_font_manager.hasLeakedRefs(doc));
+
+	for (int i = 0; i < 5; ++i) {
+		doc.addClass(0, "tmp");
+		doc.removeClass(0, "tmp");
+	}
+
+	ASSERT_TRUE(!doc.m_font_manager.hasLeakedRefs(doc));
+	return true;
+}
+
+bool testImageRefsDoNotLeakAcrossStyleRecompute() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[box] { [image src=\"img.png\"] }");
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ASSERT_TRUE(!doc.m_image_manager.hasLeakedRefs(doc));
+
+	for (int i = 0; i < 5; ++i) {
+		doc.addClass(0, "tmp");
+		doc.removeClass(0, "tmp");
+	}
+
+	ASSERT_TRUE(!doc.m_image_manager.hasLeakedRefs(doc));
+	return true;
+}
+
+bool testSpriteRefsDoNotLeakAcrossStyleRecompute() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[box bg-image=\"bg.spr\"]");
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ASSERT_TRUE(!doc.m_sprite_manager.hasLeakedRefs(doc));
+
+	for (int i = 0; i < 5; ++i) {
+		doc.addClass(0, "tmp");
+		doc.removeClass(0, "tmp");
+	}
+
+	ASSERT_TRUE(!doc.m_sprite_manager.hasLeakedRefs(doc));
+	return true;
+}
+
+bool testDocumentDestructorReleasesFontRefs() {
+	MockFontManager font_manager;
+	MockImageManager image_manager;
+	{
+		ui::Document doc(&font_manager, getGlobalAllocator(), &image_manager);
+		ASSERT_PARSE(doc, "[box font=\"arial.ttf\"] { [span text=\"hello\"] [box font=\"times.ttf\"] { [span text=\"world\"] } }");
+		doc.computeLayout(Vec2(800, 600));
+		ASSERT_TRUE(!font_manager.hasLeakedRefs(doc));
+		ASSERT_TRUE(font_manager.hasAnyRefs());
+	}
+
+	ASSERT_TRUE(!font_manager.hasAnyRefs());
+	return true;
+}
+
+bool testDocumentDestructorReleasesImageRefs() {
+	MockFontManager font_manager;
+	MockImageManager image_manager;
+	{
+		ui::Document doc(&font_manager, getGlobalAllocator(), &image_manager);
+		ASSERT_PARSE(doc, "[box] { [image src=\"img.png\"] [image src=\"img.png\"] }");
+		ASSERT_TRUE(!image_manager.hasLeakedRefs(doc));
+		ASSERT_TRUE(image_manager.hasAnyRefs());
+	}
+
+	ASSERT_TRUE(!image_manager.hasAnyRefs());
+	return true;
+}
+
+bool testDocumentDestructorReleasesSpriteRefs() {
+	MockFontManager font_manager;
+	MockImageManager image_manager;
+	MockSpriteManager sprite_manager;
+	{
+		ui::Document doc(&font_manager, getGlobalAllocator(), &image_manager, &sprite_manager);
+		ASSERT_PARSE(doc, "[box bg-image=\"bg.spr\"] [box bg-image=\"bg.spr\"]");
+		ASSERT_TRUE(!sprite_manager.hasLeakedRefs(doc));
+		ASSERT_TRUE(sprite_manager.hasAnyRefs());
+	}
+
+	ASSERT_TRUE(!sprite_manager.hasAnyRefs());
 	return true;
 }
 
@@ -1206,6 +1295,12 @@ void runUITests() {
 	RUN_TEST(testFontSizeAttribute);
 	RUN_TEST(testFontInheritance);
 	RUN_TEST(testFontInheritanceDeep);
+	RUN_TEST(testFontRefsDoNotLeakAcrossStyleRecompute);
+	RUN_TEST(testImageRefsDoNotLeakAcrossStyleRecompute);
+	RUN_TEST(testSpriteRefsDoNotLeakAcrossStyleRecompute);
+	RUN_TEST(testDocumentDestructorReleasesFontRefs);
+	RUN_TEST(testDocumentDestructorReleasesImageRefs);
+	RUN_TEST(testDocumentDestructorReleasesSpriteRefs);
 	RUN_TEST(testColorInheritance);
 	RUN_TEST(testColorInheritanceDeep);
 	RUN_TEST(testColorAlphaSupport);

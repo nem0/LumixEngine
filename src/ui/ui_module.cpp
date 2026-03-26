@@ -11,6 +11,7 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
+#include "gui/sprite.h"
 #include "ui.h"
 #include "ui_module.h"
 #include "ui_resource.h"
@@ -28,10 +29,8 @@ struct UIModuleImpl : UIModule {
 		UI3DComponent(UIModuleImpl& module, EntityRef entity)
 			: module(module)
 			, entity(entity)
-			, document(&module.m_font_manager, module.m_allocator, &module.m_image_manager)
-		{
-			document.m_resource_manager = &module.m_system.getEngine().getResourceManager();
-		}
+			, document(&module.m_font_manager, module.m_allocator, &module.m_image_manager, &module.m_sprite_manager)
+		{}
 
 		~UI3DComponent() {
 			setUIResource(nullptr);
@@ -96,11 +95,11 @@ struct UIModuleImpl : UIModule {
 		, m_allocator(allocator)
 		, m_font_manager(m_system.getEngine())
 		, m_image_manager(m_system.getEngine())
-		, m_document(&m_font_manager, m_allocator, &m_image_manager)
+		, m_sprite_manager(m_system.getEngine())
+		, m_document(&m_font_manager, m_allocator, &m_image_manager, &m_sprite_manager)
 		, m_ui_3d_components(m_allocator)
 		, m_draw_2d(m_allocator)
 	{
-		m_document.m_resource_manager = &m_system.getEngine().getResourceManager();
 		float dpi_scale = os::getDPI() / 96.0f;
 		m_document.setDPIScale(dpi_scale);
 	}
@@ -313,6 +312,7 @@ struct UIModuleImpl : UIModule {
 	IAllocator& m_allocator;
 	UIFontManager m_font_manager;
 	UIImageManager m_image_manager;
+	UISpriteManager m_sprite_manager;
 	ui::Document m_document;
 	ui::DocumentResource* m_ui_resource = nullptr;
 	Vec2 m_canvas_size = Vec2(800, 600);
@@ -327,6 +327,11 @@ ui::IFontManager::FontHandle UIFontManager::loadFont(StringView path, int font_s
 	FontResource* res = m_engine.getResourceManager().load<FontResource>(p);
 	if (!res) return nullptr;
 	return res->addRef(font_size);
+}
+
+void UIFontManager::unloadFont(FontHandle font) {
+	if (!font) return;
+	Lumix::release(*static_cast<Font*>(font));
 }
 
 Vec2 UIFontManager::measureTextA(FontHandle font, StringView text) {
@@ -359,6 +364,11 @@ ui::IImageManager::ImageHandle UIImageManager::loadImage(StringView path) {
 	return (ImageHandle)res;
 }
 
+void UIImageManager::unloadImage(ImageHandle image) {
+	if (!image) return;
+	static_cast<Texture*>(image)->decRefCount();
+}
+
 bool UIImageManager::isReady(ImageHandle image) {
 	if (!image) return false;
 	return static_cast<Texture*>(image)->isReady();
@@ -368,6 +378,21 @@ Vec2 UIImageManager::getIntrinsicSize(ImageHandle image) {
 	if (!image) return Vec2(0);
 	Texture* texture = static_cast<Texture*>(image);
 	return Vec2((float)texture->width, (float)texture->height);
+}
+
+ui::ISpriteManager::SpriteHandle UISpriteManager::loadSprite(StringView path) {
+	if (!m_engine) return nullptr;
+	return m_engine->getResourceManager().load<Sprite>(Path(path));
+}
+
+void UISpriteManager::unloadSprite(SpriteHandle sprite) {
+	if (!sprite) return;
+	static_cast<Sprite*>(sprite)->decRefCount();
+}
+
+bool UISpriteManager::isReady(SpriteHandle sprite) {
+	if (!sprite) return false;
+	return static_cast<Sprite*>(sprite)->isReady();
 }
 
 UniquePtr<UIModule> UIModule::createInstance(UISystem& system, World& world, IAllocator& allocator) {
