@@ -19,10 +19,7 @@ struct StudioApp;
 
 //@ object
 struct LUMIX_RENDERER_API GameView : StudioApp::GUIPlugin {
-	friend struct GUIInterface;
-
 	explicit GameView(StudioApp& app);
-	~GameView();
 
 	bool isMouseCaptured() const { return m_is_mouse_captured; }
 	void captureMouse(bool capture);
@@ -54,7 +51,6 @@ private:
 	float m_time_multiplier;
 	Vec2 m_pos = Vec2(0);
 	Vec2 m_size = Vec2(0);
-	UniquePtr<struct GUIInterface> m_gui_interface;
 	bool m_is_mouse_captured;
 	bool m_is_ingame_cursor;
 	bool m_is_fullscreen;

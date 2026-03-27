@@ -767,46 +767,41 @@ void PropertyGrid::showCoreProperties(Span<const EntityRef> entities, WorldEdito
 	}
 
 
-	if (!world.hasComponent(entities[0], types::gui_rect) || world.hasComponent(entities[0], types::gui_canvas)) {
-		DVec3 pos = world.getPosition(entities[0]);
-		DVec3 old_pos = pos;
-		ImGuiEx::Label("Position");
-		if (ImGui::DragScalarN("##pos", ImGuiDataType_Double, &pos.x, 3, 1.f, 0, 0, "%.3f"))
-		{
-			WorldEditor::Coordinate coord = WorldEditor::Coordinate::NONE;
-			if (pos.x != old_pos.x) coord = WorldEditor::Coordinate::X;
-			if (pos.y != old_pos.y) coord = WorldEditor::Coordinate::Y;
-			if (pos.z != old_pos.z) coord = WorldEditor::Coordinate::Z;
-			if (coord != WorldEditor::Coordinate::NONE)
-			{
-				editor.setEntitiesCoordinate(&entities[0], entities.size(), (&pos.x)[(int)coord], coord);
-			}
+	DVec3 pos = world.getPosition(entities[0]);
+	DVec3 old_pos = pos;
+	ImGuiEx::Label("Position");
+	if (ImGui::DragScalarN("##pos", ImGuiDataType_Double, &pos.x, 3, 1.f, 0, 0, "%.3f")) {
+		WorldEditor::Coordinate coord = WorldEditor::Coordinate::NONE;
+		if (pos.x != old_pos.x) coord = WorldEditor::Coordinate::X;
+		if (pos.y != old_pos.y) coord = WorldEditor::Coordinate::Y;
+		if (pos.z != old_pos.z) coord = WorldEditor::Coordinate::Z;
+		if (coord != WorldEditor::Coordinate::NONE) {
+			editor.setEntitiesCoordinate(&entities[0], entities.size(), (&pos.x)[(int)coord], coord);
 		}
+	}
 
-		ImGuiEx::Label("Rotation");
+	ImGuiEx::Label("Rotation");
 		
-		Quat rot = world.getRotation(entities[0]);
-		const Vec3 old_euler = rot.toEuler();
-		Vec3 euler = old_euler;
-		if (ImGuiEx::InputRotation("##rot", &euler.x)) {
-			Array<Quat> rots(m_app.getAllocator());
-			for (EntityRef entity : entities) {
-				Vec3 tmp = world.getRotation(entity).toEuler();
+	Quat rot = world.getRotation(entities[0]);
+	const Vec3 old_euler = rot.toEuler();
+	Vec3 euler = old_euler;
+	if (ImGuiEx::InputRotation("##rot", &euler.x)) {
+		Array<Quat> rots(m_app.getAllocator());
+		for (EntityRef entity : entities) {
+			Vec3 tmp = world.getRotation(entity).toEuler();
 			
-				if (fabs(euler.x - old_euler.x) > 0.0001f) tmp.x = euler.x;
-				if (fabs(euler.y - old_euler.y) > 0.0001f) tmp.y = euler.y;
-				if (fabs(euler.z - old_euler.z) > 0.0001f) tmp.z = euler.z;
-				rots.emplace().fromEuler(tmp);
-			}
-			editor.setEntitiesRotations(&entities[0], &rots[0], entities.size());
+			if (fabs(euler.x - old_euler.x) > 0.0001f) tmp.x = euler.x;
+			if (fabs(euler.y - old_euler.y) > 0.0001f) tmp.y = euler.y;
+			if (fabs(euler.z - old_euler.z) > 0.0001f) tmp.z = euler.z;
+			rots.emplace().fromEuler(tmp);
 		}
+		editor.setEntitiesRotations(&entities[0], &rots[0], entities.size());
+	}
 
-		Vec3 scale = world.getScale(entities[0]);
-		ImGuiEx::Label("Scale");
-		if (ImGui::DragFloat3("##scale", &scale.x, 0.1f, 0, FLT_MAX))
-		{
-			editor.setEntitiesScale(&entities[0], scale, entities.size());
-		}
+	Vec3 scale = world.getScale(entities[0]);
+	ImGuiEx::Label("Scale");
+	if (ImGui::DragFloat3("##scale", &scale.x, 0.1f, 0, FLT_MAX)) {
+		editor.setEntitiesScale(&entities[0], scale, entities.size());
 	}
 	ImGui::TreePop();
 }

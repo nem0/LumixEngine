@@ -9,8 +9,7 @@ local simple_options = {
 	{ "no-renderer", "Do not build renderer plugin." },
 	{ "no-audio", "Do not build audio plugin." },
 	{ "no-lua", "Do not build lua plugin." },
-	{ "no-gui", "Do not build ingame GUI plugin." },
-	{ "no-gui-ng", "Do not build GUI NG plugin." },
+	{ "no-ui", "Do not build UI plugin." },
 	{ "with-app", "Do build app." },
 	{ "with-basis-universal", "Use basis universal compression." },
 	{ "with-game", "Build game plugin." },
@@ -67,7 +66,7 @@ if _OPTIONS["plugins"] then
 	plugins = string.explode( _OPTIONS["plugins"], ",")
 end
 
-for	_, v in ipairs { "physics", "renderer", "audio", "gui", "ui", "animation", "navigation", "lua" } do
+for	_, v in ipairs { "physics", "renderer", "audio", "ui", "animation", "navigation", "lua" } do
 	if _OPTIONS["no-" .. v] == nil then
 		table.insert(plugins, v)
 		table.insert(base_plugins, v)
@@ -541,16 +540,6 @@ if plugin "navigation" then
 
 	includedirs { "../src", "../src/navigation", "../external/recast/include" }
 	dynamic_link_plugin { "core", "engine", "renderer" }
-end
-
-if plugin "gui" then
-	files { "../src/gui/**.h", "../src/gui/**.cpp" }
-	includedirs { "../src", "../src/gui" }
-	dynamic_link_plugin { "core", "engine", "renderer" }
-	defines { "BUILDING_GUI" }
-	
-	configuration { "vs*" }
-		links { "winmm", "psapi" }
 end
 
 if plugin "ui" then

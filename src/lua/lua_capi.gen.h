@@ -2,7 +2,6 @@
 
 #include "editor/asset_browser.h"
 #include "editor/studio_app.h"
-#include "gui/gui_system.h"
 #include "renderer/editor/game_view.h"
 #include "renderer/editor/scene_view.h"
 #include "renderer/model.h"
@@ -14,7 +13,6 @@
 #include "animation/animation_module.h"
 #include "audio/audio_module.h"
 #include "engine/core.h"
-#include "gui/gui_module.h"
 #include "lua/lua_script_system.h"
 #include "navigation/navigation_module.h"
 #include "physics/physics_module.h"
@@ -279,9 +277,6 @@ namespace Lumix::LuaWrapper {
 	}
 	void push(lua_State* L, StudioApp* value) {
 		pushObject(L, (void*)value, "StudioApp");
-	}
-	void push(lua_State* L, GUISystem* value) {
-		pushObject(L, (void*)value, "GUISystem");
 	}
 	void push(lua_State* L, GameView* value) {
 		pushObject(L, (void*)value, "GameView");
@@ -686,261 +681,6 @@ namespace Lumix {
 		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
 		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
 		switch (name_hash) {
-			case 0:
-			default: luaL_error(L, "Unknown property %s", prop_name); break;
-		}
-		return 0;
-	}
-	
-}
-
-namespace Lumix {
-	int GUIModule_getRectAt(lua_State* L) {
-		LuaWrapper::checkTableArg(L, 1);
-		GUIModule* module;
-		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
-		auto pos = LuaWrapper::checkArg<Vec2>(L, 2);
-		LuaWrapper::push(L, 	module->getRectAt(pos));
-		return 1;
-	}
-	
-	int GUIModule_isOver(lua_State* L) {
-		LuaWrapper::checkTableArg(L, 1);
-		GUIModule* module;
-		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
-		auto pos = LuaWrapper::checkArg<Vec2>(L, 2);
-		auto e = LuaWrapper::checkArg<EntityRef>(L, 3);
-		LuaWrapper::push(L, 	module->isOver(pos, e));
-		return 1;
-	}
-	
-	int GUIModule_getSystemPtr(lua_State* L) {
-		LuaWrapper::checkTableArg(L, 1);
-		GUIModule* module;
-		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
-		LuaWrapper::push(L, 	module->getSystemPtr());
-		return 1;
-	}
-	
-	int gui_canvas_getter(lua_State* L) {
-		auto [imodule, entity] = checkComponent(L);
-		auto* module = (GUIModule*)imodule;
-		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
-		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
-		switch (name_hash) {
-			case /*is_3d*/7401995853317604073: LuaWrapper::push(L, module->getCanvas(entity).is_3d); break;
-			case /*orient_to_camera*/8367939065059955720: LuaWrapper::push(L, module->getCanvas(entity).orient_to_camera); break;
-			case /*virtual_size*/10008642934015139818: LuaWrapper::push(L, module->getCanvas(entity).virtual_size); break;
-			case 0:
-			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
-		}
-		return 1;
-	}
-	
-	int gui_canvas_setter(lua_State* L) {
-		auto [imodule, entity] = checkComponent(L);
-		auto* module = (GUIModule*)imodule;
-		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
-		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
-		switch (name_hash) {
-			case /*is_3d*/7401995853317604073: module->getCanvas(entity).is_3d = LuaWrapper::checkArg<bool>(L, 3); break;
-			case /*orient_to_camera*/8367939065059955720: module->getCanvas(entity).orient_to_camera = LuaWrapper::checkArg<bool>(L, 3); break;
-			case /*virtual_size*/10008642934015139818: module->getCanvas(entity).virtual_size = LuaWrapper::checkArg<Vec2>(L, 3); break;
-			case 0:
-			default: luaL_error(L, "Unknown property %s", prop_name); break;
-		}
-		return 0;
-	}
-	
-	int RenderTarget_setTexture(lua_State* L) {
-		auto [imodule, entity] = checkComponent(L);
-		auto* module = (GUIModule*)imodule;
-		auto texture_handle = LuaWrapper::checkArg<gpu::TextureHandle>(L, 2);
-		module->setRenderTargetTexture(entity, texture_handle);
-		return 0;
-	}
-	
-	int gui_render_target_getter(lua_State* L) {
-		auto [imodule, entity] = checkComponent(L);
-		auto* module = (GUIModule*)imodule;
-		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
-		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
-		switch (name_hash) {
-			case /*setTexture*/18321453185822703306: lua_pushcfunction(L, RenderTarget_setTexture, "RenderTarget_setTexture"); break;
-			case 0:
-			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
-		}
-		return 1;
-	}
-	
-	int gui_render_target_setter(lua_State* L) {
-		auto [imodule, entity] = checkComponent(L);
-		auto* module = (GUIModule*)imodule;
-		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
-		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
-		switch (name_hash) {
-			case 0:
-			default: luaL_error(L, "Unknown property %s", prop_name); break;
-		}
-		return 0;
-	}
-	
-	int gui_input_field_getter(lua_State* L) {
-		auto [imodule, entity] = checkComponent(L);
-		auto* module = (GUIModule*)imodule;
-		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
-		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
-		switch (name_hash) {
-			case 0:
-			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
-		}
-		return 1;
-	}
-	
-	int gui_input_field_setter(lua_State* L) {
-		auto [imodule, entity] = checkComponent(L);
-		auto* module = (GUIModule*)imodule;
-		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
-		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
-		switch (name_hash) {
-			case 0:
-			default: luaL_error(L, "Unknown property %s", prop_name); break;
-		}
-		return 0;
-	}
-	
-	int gui_rect_getter(lua_State* L) {
-		auto [imodule, entity] = checkComponent(L);
-		auto* module = (GUIModule*)imodule;
-		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
-		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
-		switch (name_hash) {
-			case /*enabled*/13840943435668507618: LuaWrapper::push(L, module->isRectEnabled(entity)); break;
-			case /*clip_content*/17423615441029062858: LuaWrapper::push(L, module->getRectClip(entity)); break;
-			case /*left_points*/18280568557834126485: LuaWrapper::push(L, module->getRectLeftPoints(entity)); break;
-			case /*left_relative*/3342820717099768220: LuaWrapper::push(L, module->getRectLeftRelative(entity)); break;
-			case /*right_points*/361145705378812951: LuaWrapper::push(L, module->getRectRightPoints(entity)); break;
-			case /*right_relative*/17276897033765672782: LuaWrapper::push(L, module->getRectRightRelative(entity)); break;
-			case /*top_points*/10091190592692352298: LuaWrapper::push(L, module->getRectTopPoints(entity)); break;
-			case /*top_relative*/10464521780222816712: LuaWrapper::push(L, module->getRectTopRelative(entity)); break;
-			case /*bottom_points*/3712023579548425612: LuaWrapper::push(L, module->getRectBottomPoints(entity)); break;
-			case /*bottom_relative*/7595909218576582928: LuaWrapper::push(L, module->getRectBottomRelative(entity)); break;
-			case 0:
-			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
-		}
-		return 1;
-	}
-	
-	int gui_rect_setter(lua_State* L) {
-		auto [imodule, entity] = checkComponent(L);
-		auto* module = (GUIModule*)imodule;
-		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
-		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
-		switch (name_hash) {
-			case /*enabled*/13840943435668507618: module->enableRect(entity, LuaWrapper::checkArg<bool>(L, 3)); break;
-			case /*clip_content*/17423615441029062858: module->setRectClip(entity, LuaWrapper::checkArg<bool>(L, 3)); break;
-			case /*left_points*/18280568557834126485: module->setRectLeftPoints(entity, LuaWrapper::checkArg<float>(L, 3)); break;
-			case /*left_relative*/3342820717099768220: module->setRectLeftRelative(entity, LuaWrapper::checkArg<float>(L, 3)); break;
-			case /*right_points*/361145705378812951: module->setRectRightPoints(entity, LuaWrapper::checkArg<float>(L, 3)); break;
-			case /*right_relative*/17276897033765672782: module->setRectRightRelative(entity, LuaWrapper::checkArg<float>(L, 3)); break;
-			case /*top_points*/10091190592692352298: module->setRectTopPoints(entity, LuaWrapper::checkArg<float>(L, 3)); break;
-			case /*top_relative*/10464521780222816712: module->setRectTopRelative(entity, LuaWrapper::checkArg<float>(L, 3)); break;
-			case /*bottom_points*/3712023579548425612: module->setRectBottomPoints(entity, LuaWrapper::checkArg<float>(L, 3)); break;
-			case /*bottom_relative*/7595909218576582928: module->setRectBottomRelative(entity, LuaWrapper::checkArg<float>(L, 3)); break;
-			case 0:
-			default: luaL_error(L, "Unknown property %s", prop_name); break;
-		}
-		return 0;
-	}
-	
-	int gui_button_getter(lua_State* L) {
-		auto [imodule, entity] = checkComponent(L);
-		auto* module = (GUIModule*)imodule;
-		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
-		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
-		switch (name_hash) {
-			case /*hovered_color*/1007138839029607122: LuaWrapper::push(L, module->getButtonHoveredColorRGBA(entity)); break;
-			case /*hovered_cursor*/18068079505236550740: LuaWrapper::push(L, (i32)module->getButtonHoveredCursor(entity)); break;
-			case 0:
-			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
-		}
-		return 1;
-	}
-	
-	int gui_button_setter(lua_State* L) {
-		auto [imodule, entity] = checkComponent(L);
-		auto* module = (GUIModule*)imodule;
-		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
-		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
-		switch (name_hash) {
-			case /*hovered_color*/1007138839029607122: module->setButtonHoveredColorRGBA(entity, LuaWrapper::checkArg<Vec4>(L, 3)); break;
-			case /*hovered_cursor*/18068079505236550740: module->setButtonHoveredCursor(entity, (os::CursorType)LuaWrapper::checkArg<i32>(L, 3)); break;
-			case 0:
-			default: luaL_error(L, "Unknown property %s", prop_name); break;
-		}
-		return 0;
-	}
-	
-	int gui_image_getter(lua_State* L) {
-		auto [imodule, entity] = checkComponent(L);
-		auto* module = (GUIModule*)imodule;
-		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
-		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
-		switch (name_hash) {
-			case /*enabled*/13840943435668507618: LuaWrapper::push(L, module->isImageEnabled(entity)); break;
-			case /*color*/880366885425937065: LuaWrapper::push(L, module->getImageColorRGBA(entity)); break;
-			case /*sprite*/11899351776270312423: LuaWrapper::push(L, module->getImageSprite(entity)); break;
-			case 0:
-			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
-		}
-		return 1;
-	}
-	
-	int gui_image_setter(lua_State* L) {
-		auto [imodule, entity] = checkComponent(L);
-		auto* module = (GUIModule*)imodule;
-		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
-		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
-		switch (name_hash) {
-			case /*enabled*/13840943435668507618: module->enableImage(entity, LuaWrapper::checkArg<bool>(L, 3)); break;
-			case /*color*/880366885425937065: module->setImageColorRGBA(entity, LuaWrapper::checkArg<Vec4>(L, 3)); break;
-			case /*sprite*/11899351776270312423: module->setImageSprite(entity, LuaWrapper::checkArg<Path>(L, 3)); break;
-			case 0:
-			default: luaL_error(L, "Unknown property %s", prop_name); break;
-		}
-		return 0;
-	}
-	
-	int gui_text_getter(lua_State* L) {
-		auto [imodule, entity] = checkComponent(L);
-		auto* module = (GUIModule*)imodule;
-		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
-		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
-		switch (name_hash) {
-			case /*font_size*/13102103059382391709: LuaWrapper::push(L, module->getTextFontSize(entity)); break;
-			case /*color*/880366885425937065: LuaWrapper::push(L, module->getTextColorRGBA(entity)); break;
-			case /*font*/12608998532173430232: LuaWrapper::push(L, module->getTextFontPath(entity)); break;
-			case /*horizontal_align*/17425989282954003833: LuaWrapper::push(L, (i32)module->getTextHAlign(entity)); break;
-			case /*vertical_align*/6391177055909864478: LuaWrapper::push(L, (i32)module->getTextVAlign(entity)); break;
-			case /*text*/5145922347574273553: LuaWrapper::push(L, module->getText(entity)); break;
-			case 0:
-			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
-		}
-		return 1;
-	}
-	
-	int gui_text_setter(lua_State* L) {
-		auto [imodule, entity] = checkComponent(L);
-		auto* module = (GUIModule*)imodule;
-		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
-		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
-		switch (name_hash) {
-			case /*font_size*/13102103059382391709: module->setTextFontSize(entity, LuaWrapper::checkArg<int>(L, 3)); break;
-			case /*color*/880366885425937065: module->setTextColorRGBA(entity, LuaWrapper::checkArg<Vec4>(L, 3)); break;
-			case /*font*/12608998532173430232: module->setTextFontPath(entity, LuaWrapper::checkArg<Path>(L, 3)); break;
-			case /*horizontal_align*/17425989282954003833: module->setTextHAlign(entity, (TextHAlign)LuaWrapper::checkArg<i32>(L, 3)); break;
-			case /*vertical_align*/6391177055909864478: module->setTextVAlign(entity, (TextVAlign)LuaWrapper::checkArg<i32>(L, 3)); break;
-			case /*text*/5145922347574273553: module->setText(entity, LuaWrapper::checkArg<const char*>(L, 3)); break;
 			case 0:
 			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
@@ -2856,24 +2596,6 @@ namespace Lumix {
 			lua_newtable(L);
 			lua_getglobal(L, "LumixModules");
 			lua_pushvalue(L, -2);
-			lua_setfield(L, -2, "gui");
-			lua_pop(L, 1);
-			lua_pushvalue(L, -1);
-			lua_setfield(L, -2, "__index");
-			lua_pushcfunction(L, lua_new_module, "new");
-			lua_setfield(L, -2, "new");
-			lua_pushcfunction(L, GUIModule_getRectAt, "getRectAt");
-			lua_setfield(L, -2, "getRectAt");
-			lua_pushcfunction(L, GUIModule_isOver, "isOver");
-			lua_setfield(L, -2, "isOver");
-			lua_pushcfunction(L, GUIModule_getSystemPtr, "getSystemPtr");
-			lua_setfield(L, -2, "getSystem");
-			lua_pop(L, 1);
-		}
-		{
-			lua_newtable(L);
-			lua_getglobal(L, "LumixModules");
-			lua_pushvalue(L, -2);
 			lua_setfield(L, -2, "physics");
 			lua_pop(L, 1);
 			lua_pushvalue(L, -1);
@@ -3022,29 +2744,6 @@ namespace Lumix {
 					return 0;
 				};
 				const char* name = "newWorld";
-				lua_pushcfunction(L, proxy, name);
-				lua_setfield(L, -2, name);
-			}
-			lua_pop(L, 2);
-		}
-		{
-			lua_getglobal(L, "LumixAPI");
-			lua_newtable(L);
-			lua_pushvalue(L, -1);
-			lua_setfield(L, -3, "GUISystem");
-			lua_pushvalue(L, -1);
-			lua_setfield(L, -2, "__index");
-			{
-				auto proxy = [](lua_State* L) -> int {
-					LuaWrapper::checkTableArg(L, 1); // self
-					GUISystem* obj;
-					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
-					if (!obj) return 0;
-					auto enable = LuaWrapper::checkArg<bool>(L, 2);
-					obj->enableCursor(enable);
-					return 0;
-				};
-				const char* name = "enableCursor";
 				lua_pushcfunction(L, proxy, name);
 				lua_setfield(L, -2, name);
 			}
@@ -3885,37 +3584,6 @@ namespace Lumix {
 		registerLuaComponent(L, "ambient_sound", ambient_sound_getter, ambient_sound_setter);
 		registerLuaComponent(L, "spline", spline_getter, spline_setter);
 		registerLuaComponent(L, "signal", signal_getter, signal_setter);
-		{
-			lua_getglobal(L, "LumixAPI");
-			lua_newtable(L);
-			LuaWrapper::push(L, 0);
-			lua_setfield(L, -2, "LEFT");
-			LuaWrapper::push(L, 1);
-			lua_setfield(L, -2, "CENTER");
-			LuaWrapper::push(L, 2);
-			lua_setfield(L, -2, "RIGHT");
-			lua_setfield(L, -2, "TextHAlign");
-			lua_pop(L, 1);
-		}
-		{
-			lua_getglobal(L, "LumixAPI");
-			lua_newtable(L);
-			LuaWrapper::push(L, 0);
-			lua_setfield(L, -2, "TOP");
-			LuaWrapper::push(L, 1);
-			lua_setfield(L, -2, "MIDDLE");
-			LuaWrapper::push(L, 2);
-			lua_setfield(L, -2, "BOTTOM");
-			lua_setfield(L, -2, "TextVAlign");
-			lua_pop(L, 1);
-		}
-		registerLuaComponent(L, "gui_canvas", gui_canvas_getter, gui_canvas_setter);
-		registerLuaComponent(L, "gui_render_target", gui_render_target_getter, gui_render_target_setter);
-		registerLuaComponent(L, "gui_input_field", gui_input_field_getter, gui_input_field_setter);
-		registerLuaComponent(L, "gui_rect", gui_rect_getter, gui_rect_setter);
-		registerLuaComponent(L, "gui_button", gui_button_getter, gui_button_setter);
-		registerLuaComponent(L, "gui_image", gui_image_getter, gui_image_setter);
-		registerLuaComponent(L, "gui_text", gui_text_getter, gui_text_setter);
 		registerLuaComponent(L, "lua_script", lua_script_getter, lua_script_setter);
 		registerLuaComponent(L, "lua_script_inline", lua_script_inline_getter, lua_script_inline_setter);
 		registerLuaComponent(L, "navmesh_zone", navmesh_zone_getter, navmesh_zone_setter);

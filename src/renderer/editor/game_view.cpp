@@ -12,7 +12,6 @@
 #include "engine/resource_manager.h"
 #include "engine/world.h"
 #include "game_view.h"
-#include "gui/gui_system.h"
 #include "renderer/gpu/gpu.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_module.h"
@@ -23,22 +22,6 @@
 namespace Lumix
 {
 
-
-struct GUIInterface : GUISystem::Interface
-{
-	explicit GUIInterface(GameView& game_view)
-		: m_game_view(game_view)
-	{
-	}
-
-	Pipeline* getPipeline() override { return m_game_view.m_pipeline.get(); }
-	Vec2 getPos() const override { return m_game_view.m_pos; }
-	Vec2 getSize() const override { return m_game_view.m_size; }
-	void setCursor(os::CursorType type) override { m_game_view.setCursor(type); }
-	void enableCursor(bool enable) override { m_game_view.enableIngameCursor(enable); }
-
-	GameView& m_game_view;
-};
 
 
 GameView::GameView(StudioApp& app)
@@ -60,21 +43,6 @@ void GameView::init() {
 	Engine& engine = m_app.getEngine();
 	auto* renderer = (Renderer*)engine.getSystemManager().getSystem("renderer");
 	m_pipeline = Pipeline::create(*renderer, PipelineType::GAME_VIEW);
-
-	auto* gui = static_cast<GUISystem*>(engine.getSystemManager().getSystem("gui"));
-	if (gui)
-	{
-		m_gui_interface = UniquePtr<GUIInterface>::create(engine.getAllocator(), *this);
-		gui->setInterface(m_gui_interface.get());
-	}
-}
-
-GameView::~GameView() {
-	Engine& engine = m_app.getEngine();
-	auto* gui = static_cast<GUISystem*>(engine.getSystemManager().getSystem("gui"));
-	if (gui) {
-		gui->setInterface(nullptr);
-	}
 }
 
 void GameView::setCursor(os::CursorType type)

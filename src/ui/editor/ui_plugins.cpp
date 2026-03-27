@@ -23,12 +23,12 @@
 #include "ui/ui_module.h"
 #include "ui/ui.h"
 #include "ui/ui_resource.h"
-#include "gui/sprite.h"
 #include "renderer/draw2d.h"
 #include "renderer/font.h"
 #include "renderer/gpu/gpu.h"
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"
+#include "renderer/sprite.h"
 
 namespace Lumix {
 

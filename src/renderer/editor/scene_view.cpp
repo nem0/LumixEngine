@@ -22,7 +22,6 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
-#include "gui/gui_module.h"
 #include "renderer/culling_system.h"
 #include "renderer/draw_stream.h"
 #include "renderer/draw2d.h"
@@ -168,7 +167,6 @@ struct WorldViewImpl final : WorldView {
 			else {
 				const Ray ray = m_viewport.getRay(m_mouse_pos);
 				const RayCastModelHit hit = m_module->castRay(ray, INVALID_ENTITY);
-				GUIModule* gui_module = (GUIModule*)m_module->getWorld().getModule("gui");
 
 				Span<const EntityRef> selected_entities = m_editor.getSelectedEntities();
 				if (m_snap_mode != SnapMode::NONE && selected_entities.size() != 0 && hit.is_hit) {
@@ -188,19 +186,20 @@ struct WorldViewImpl final : WorldView {
 						}
 					}
 					else {
-						GUIRayHit gui_hit; 
+						// TODO UI hit
+						/*GUIRayHit gui_hit; 
 						if (gui_module) {
 							gui_hit = gui_module->raycast(ray);
-						}
-						if (hit.is_hit && (gui_hit.entity == INVALID_ENTITY || gui_hit.t > hit.t)) {
+						}*/
+						if (hit.is_hit /*&& (gui_hit.entity == INVALID_ENTITY || gui_hit.t > hit.t)*/) {
 							if (hit.entity.isValid()) {
 								EntityRef entity = (EntityRef)hit.entity;
 								m_editor.selectEntities(Span(&entity, 1), ImGui::GetIO().KeyCtrl);
 							}
 						}
-						else if (gui_hit.entity.isValid()) {
+						/*else if (gui_hit.entity.isValid()) {
 							m_editor.selectEntities(Span((EntityRef*)&gui_hit.entity, 1), ImGui::GetIO().KeyCtrl);
-						}
+						}*/
 						else {
 							m_editor.selectEntities({}, false);
 						}

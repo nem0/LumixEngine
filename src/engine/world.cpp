@@ -779,9 +779,15 @@ Vec3 World::getLocalScale(EntityRef entity) const
 
 static void serializeModuleList(World& world, OutputMemoryStream& serializer) {
 	const Array<UniquePtr<IModule>>& modules = world.getModules();
-	serializer.write((i32)modules.size());
+	i32 num = 0;
 	for (UniquePtr<IModule>& module : modules) {
-		serializer.writeString(module->getName());
+		if (module->shouldSerialize()) ++num;
+	}
+	serializer.write(num);
+	for (UniquePtr<IModule>& module : modules) {
+		if (module->shouldSerialize()) {
+			serializer.writeString(module->getName());
+		}
 	}
 }
 

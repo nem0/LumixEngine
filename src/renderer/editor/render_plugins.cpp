@@ -57,6 +57,7 @@
 #include "renderer/render_module.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
+#include "renderer/sprite.h"
 #include "renderer/texture.h"
 #include "renderer/terrain.h"
 #include "scene_view.h"
@@ -5305,12 +5306,238 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin {
 	bool m_show_save_as = false;
 };
 
+struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
+	struct EditorWindow : AssetEditorWindow {
+		EditorWindow(const Path& path, StudioApp& app)
+			: AssetEditorWindow(app)
+			, m_app(app)
+		{
+			m_resource = app.getEngine().getResourceManager().load<Sprite>(path);
+		}
+
+		~EditorWindow() {
+			m_resource->decRefCount();
+		}
+
+		static void serialize(Sprite& sprite, OutputMemoryStream& out) {
+			ASSERT(sprite.isReady());
+			out << "type = " << (sprite.type == Sprite::PATCH9 ? "patch9\n" : "simple\n");
+			out << "top = " << sprite.top << "\n";
+			out << "bottom = " << sprite.bottom << "\n";
+			out << "left = " << sprite.left << "\n";
+			out << "right = " << sprite.right << "\n";
+			if (sprite.getTexture()) {
+				out << "texture = \"/" << sprite.getTexture()->getPath() << "\"";
+			} else {
+				out << "texture = \"\"";
+			}
+		}
+
+		void save() {
+			OutputMemoryStream blob(m_app.getAllocator());
+			serialize(*m_resource, blob);
+			m_app.getAssetBrowser().saveResource(*m_resource, blob);
+			m_dirty = false;
+		}
+		
+		bool patch9edit(Sprite* sprite) {
+			Texture* texture = sprite->getTexture();
+
+			if (sprite->type != Sprite::Type::PATCH9 || !texture || !texture->isReady()) return false;
+			ImVec2 size;
+			size.x = minimum(ImGui::GetContentRegionAvail().x, texture->width * 2.0f);
+			size.y = size.x / texture->width * texture->height;
+			float scale = size.x / texture->width;
+			const float SIZE = 5;
+			ImGui::Dummy(size + ImVec2(4 * SIZE, 4 * SIZE));
+
+			ImDrawList* draw = ImGui::GetWindowDrawList();
+			ImVec2 a = ImGui::GetItemRectMin() + ImVec2(2 * SIZE, 2 * SIZE);
+			ImVec2 b = ImGui::GetItemRectMax() - ImVec2(2 * SIZE, 2 * SIZE);
+			draw->AddImage(texture->handle, a, b);
+
+			auto drawHandle = [&](const char* id, const ImVec2& a, const ImVec2& b, int* value, bool vertical) {
+				ImVec2 rect_pos((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
+				if (vertical)
+				{
+					rect_pos.x = a.x + (sprite->left + sprite->right) * 0.5f * scale;
+				}
+				else
+				{
+					rect_pos.y = a.y + (sprite->top + sprite->bottom) * 0.5f * scale;
+				}
+
+				ImGui::SetCursorScreenPos({ rect_pos.x - SIZE, rect_pos.y - SIZE });
+				ImGui::InvisibleButton(id, { SIZE * 2, SIZE * 2 });
+				bool changed = false;
+				if (ImGui::IsItemActive())
+				{
+					static int start_drag_value;
+					if (ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+					{
+						ImVec2 drag = ImGui::GetMouseDragDelta();
+						if (vertical)
+						{
+							*value = int(start_drag_value + drag.y / scale);
+						}
+						else
+						{
+							*value = int(start_drag_value + drag.x / scale);
+						}
+					}
+					else if (ImGui::IsMouseClicked(0))
+					{
+						start_drag_value = *value;
+					}
+					changed = true;
+				}
+
+
+				bool is_hovered = ImGui::IsItemHovered();
+				draw->AddLine(a, b, 0xffff00ff);
+				draw->AddRectFilled(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), is_hovered ? 0xffffffff : 0x77ffFFff);
+				draw->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), 0xff777777);
+
+				return changed;
+			};
+
+			ImVec2 cp = ImGui::GetCursorScreenPos();
+			bool changed = drawHandle("left", { a.x + sprite->left * scale, a.y }, { a.x + sprite->left * scale, b.y }, &sprite->left, false);
+			changed = drawHandle("right", { a.x + sprite->right * scale, a.y }, { a.x + sprite->right * scale, b.y }, &sprite->right, false) || changed;
+			changed = drawHandle("top", { a.x, a.y + sprite->top * scale }, { b.x, a.y + sprite->top * scale }, &sprite->top, true) || changed;
+			changed = drawHandle("bottom", { a.x, a.y + sprite->bottom * scale }, { b.x, a.y + sprite->bottom * scale }, &sprite->bottom, true) || changed;
+			ImGui::SetCursorScreenPos(cp);
+			ImGui::Dummy({0, 0});
+			return changed;
+		}
+
+		void windowGUI() override {
+			CommonActions& actions = m_app.getCommonActions();
+
+			if (ImGui::BeginMenuBar()) {
+				if (actions.save.iconButton(m_dirty, &m_app)) save();
+				if (actions.open_externally.iconButton(true, &m_app)) m_app.getAssetBrowser().openInExternalEditor(m_resource);
+				if (actions.view_in_browser.iconButton(true, &m_app)) m_app.getAssetBrowser().locate(*m_resource);
+				ImGui::EndMenuBar();
+			}
+
+			if (m_resource->isEmpty()) {
+				ImGui::TextUnformatted("Loading...");
+				return;
+			}
+
+			if (!m_resource->isReady()) return;
+		
+			Texture* tex = m_resource->getTexture();
+			Path tmp = tex ? tex->getPath() : Path();
+			ImGuiEx::Label("Texture");
+			if (m_app.getAssetBrowser().resourceInput("texture", tmp, Texture::TYPE, -1)) {
+				m_resource->setTexture(tmp);
+				m_dirty = true;
+			}
+
+			static const char* TYPES_STR[] = { "9 patch", "Simple" };
+			ImGuiEx::Label("type");
+			if (ImGui::BeginCombo("##type", TYPES_STR[m_resource->type]))
+			{
+				if (ImGui::Selectable("9 patch")) {
+					m_dirty = true;
+					m_resource->type = Sprite::Type::PATCH9;
+				}
+				if (ImGui::Selectable("Simple")) {
+					m_dirty = true;
+					m_resource->type = Sprite::Type::SIMPLE;
+				}
+				ImGui::EndCombo();
+			}
+			switch (m_resource->type) {
+				case Sprite::Type::PATCH9:
+					ImGuiEx::Label("Top");
+					m_dirty = ImGui::InputInt("##top", &m_resource->top) || m_dirty;
+					ImGuiEx::Label("Right");
+					m_dirty = ImGui::InputInt("##right", &m_resource->right) || m_dirty;
+					ImGuiEx::Label("Bottom");
+					m_dirty = ImGui::InputInt("##bottom", &m_resource->bottom) || m_dirty;
+					ImGuiEx::Label("Left");
+					m_dirty = ImGui::InputInt("##left", &m_resource->left) || m_dirty;
+					m_dirty = patch9edit(m_resource) || m_dirty;
+					break;
+				case Sprite::Type::SIMPLE: break;
+			}
+		}
+	
+		const Path& getPath() override { return m_resource->getPath(); }
+		const char* getName() const override { return "sprite editor"; }
+
+		StudioApp& m_app;
+		Sprite* m_resource;
+	};
+
+	SpritePlugin(StudioApp& app) 
+		: m_app(app)
+	{
+		m_app.getAssetCompiler().registerExtension("spr", Sprite::TYPE);
+	}
+
+	bool compile(const Path& src) override {
+		// load
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		OutputMemoryStream src_data(m_app.getAllocator());
+		if (!fs.getContentSync(src, src_data)) return false;
+
+		// parse
+		StringView type_str, texture_str;
+		i32 top, bottom, left, right;
+		const ParseItemDesc descs[] = {
+			{"type", &type_str},
+			{"top", &top},
+			{"bottom", &bottom},
+			{"left", &left},
+			{"right", &right},
+			{"texture", &texture_str}
+		};
+		StringView sv((const char*)src_data.data(), (u32)src_data.size());
+		if (!parse(sv, src.c_str(), descs)) return false;
+
+		if (right < left || bottom < top) {
+			logError("Invalid sprite bounds in ", src, ": right < left or bottom < top");
+		}
+
+		// write compiled
+		OutputMemoryStream compiled(m_app.getAllocator());
+		Sprite::Header header;
+		compiled.write(header);
+		compiled.write(top);
+		compiled.write(bottom);
+		compiled.write(left);
+		compiled.write(right);
+		compiled.writeString(texture_str);
+		compiled.write(equalIStrings(type_str, "patch9") ? Sprite::PATCH9 : Sprite::SIMPLE);
+		return m_app.getAssetCompiler().writeCompiledResource(src, compiled);
+	}
+
+	bool canCreateResource() const override { return true; }
+	const char* getDefaultExtension() const override { return "spr"; }
+	void createResource(OutputMemoryStream& blob) override { blob << "type = simple"; }
+
+	void openEditor(const Path& path) override {
+		IAllocator& allocator = m_app.getAllocator();
+		UniquePtr<EditorWindow> win = UniquePtr<EditorWindow>::create(allocator, path, m_app);
+		m_app.getAssetBrowser().addWindow(win.move());
+	}
+
+	const char* getLabel() const override { return "Sprite"; }
+	ResourceType getResourceType() const override { return Sprite::TYPE; }
+
+	StudioApp& m_app;
+};
 
 struct StudioAppPlugin : StudioApp::IPlugin
 {
 	StudioAppPlugin(StudioApp& app)
 		: m_app(app)
 		, m_font_plugin(app)
+		, m_sprite_plugin(app)
 		, m_material_plugin(app)
 		, m_particle_emitter_property_plugin(app)
 		, m_shader_plugin(app)
@@ -5375,11 +5602,15 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		const char* fonts_exts[] = {"ttf"};
 		asset_compiler.addPlugin(m_font_plugin, Span(fonts_exts));
+
+		const char* sprites_exts[] = {"spr"};
+		asset_compiler.addPlugin(m_sprite_plugin, Span(sprites_exts));
 		
 		AssetBrowser& asset_browser = m_app.getAssetBrowser();
 		asset_browser.addPlugin(m_model_plugin, Span(model_exts));
 		asset_browser.addPlugin(m_material_plugin, Span(material_exts));
 		asset_browser.addPlugin(m_font_plugin, Span(fonts_exts));
+		asset_browser.addPlugin(m_sprite_plugin, Span(sprites_exts));
 		asset_browser.addPlugin(m_shader_plugin, Span(shader_exts));
 		asset_browser.addPlugin(m_shader_include_plugin, Span(inc_exts));
 		asset_browser.addPlugin(m_texture_plugin, Span(texture_exts));
@@ -5603,12 +5834,14 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_browser.removePlugin(m_model_plugin);
 		asset_browser.removePlugin(m_material_plugin);
 		asset_browser.removePlugin(m_font_plugin);
+		asset_browser.removePlugin(m_sprite_plugin);
 		asset_browser.removePlugin(m_texture_plugin);
 		asset_browser.removePlugin(m_shader_plugin);
 		asset_browser.removePlugin(m_shader_include_plugin);
 
 		AssetCompiler& asset_compiler = m_app.getAssetCompiler();
 		asset_compiler.removePlugin(m_font_plugin);
+		asset_compiler.removePlugin(m_sprite_plugin);
 		asset_compiler.removePlugin(m_shader_plugin);
 		asset_compiler.removePlugin(m_shader_include_plugin);
 		asset_compiler.removePlugin(m_texture_plugin);
@@ -5638,6 +5871,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	MaterialPlugin m_material_plugin;
 	ParticleSystemPropertyPlugin m_particle_emitter_property_plugin;
 	FontPlugin m_font_plugin;
+	SpritePlugin m_sprite_plugin;
 	ShaderIncludePlugin m_shader_include_plugin;
 	ShaderPlugin m_shader_plugin;
 	ModelPropertiesPlugin m_model_properties_plugin;

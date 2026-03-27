@@ -11,7 +11,6 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
-#include "gui/sprite.h"
 #include "ui.h"
 #include "ui_module.h"
 #include "ui_resource.h"
@@ -20,6 +19,7 @@
 #include "renderer/font.h"
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"
+#include "renderer/sprite.h"
 #include "renderer/texture.h"
 
 namespace Lumix {

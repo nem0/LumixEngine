@@ -103,7 +103,6 @@ export type World = {
 	animation: animation_module,
 	audio: audio_module,
 	core: core_module,
-	gui: gui_module,
 	lua_script: lua_script_module,
 	navigation: navigation_module,
 	physics: physics_module,
@@ -177,10 +176,6 @@ type StudioApp = {
 	exitWithCode: (StudioApp, number) -> (),
 	exitGameMode: (StudioApp) -> (),
 	newWorld: (StudioApp) -> (),
-}
-
-type GUISystem = {
-	enableCursor: (GUISystem, boolean) -> (),
 }
 
 type GameView = {
@@ -290,58 +285,6 @@ type spline_component =  {
 }
 
 type signal_component =  {
-}
-
-type gui_module = {
-	getRectAt: (gui_module, Vec2) -> Entity?,
-	isOver: (gui_module, Vec2, Entity) -> boolean,
-	getSystem: (gui_module) -> GUISystem,
-}
-
-type gui_canvas_component =  {
-	is_3d: boolean,
-	orient_to_camera: boolean,
-	virtual_size: Vec2,
-}
-
-type gui_render_target_component =  {
-	setTexture: (gui_render_target_component, any) -> (),
-}
-
-type gui_input_field_component =  {
-}
-
-type gui_rect_component =  {
-	enabled: boolean,
-	clip_content: boolean,
-	left_points: number,
-	left_relative: number,
-	right_points: number,
-	right_relative: number,
-	top_points: number,
-	top_relative: number,
-	bottom_points: number,
-	bottom_relative: number,
-}
-
-type gui_button_component =  {
-	hovered_color: any,
-	hovered_cursor: any,
-}
-
-type gui_image_component =  {
-	enabled: boolean,
-	color: any,
-	sprite: string,
-}
-
-type gui_text_component =  {
-	font_size: number,
-	color: any,
-	font: string,
-	horizontal_align: any,
-	vertical_align: any,
-	text: string,
 }
 
 type lua_script_module = {
@@ -691,13 +634,6 @@ export type Entity = {
 	ambient_sound: ambient_sound_component,
 	spline: spline_component,
 	signal: signal_component,
-	gui_canvas: gui_canvas_component,
-	gui_render_target: gui_render_target_component,
-	gui_input_field: gui_input_field_component,
-	gui_rect: gui_rect_component,
-	gui_button: gui_button_component,
-	gui_image: gui_image_component,
-	gui_text: gui_text_component,
 	lua_script: lua_script_component,
 	lua_script_inline: lua_script_inline_component,
 	navmesh_zone: navmesh_zone_component,
@@ -978,16 +914,6 @@ declare this : Entity
 			MOUSE_ENTER : number,
 			MOUSE_LEAVE : number,
 			INVALID : number,
-		},
-		TextHAlign : {
-			LEFT : number,
-			CENTER : number,
-			RIGHT : number,
-		},
-		TextVAlign : {
-			TOP : number,
-			MIDDLE : number,
-			BOTTOM : number,
 		},
 		D6Motion : {
 			LOCKED : number,

@@ -15,7 +15,6 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
-#include "gui/gui_module.h"
 #include "lua_script.h"
 #include "lua_script_system.h"
 #include "lua_wrapper.h"
@@ -1159,11 +1158,6 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 		lua_pop(instance.m_state, 1);
 	}
 
-
-	void onButtonClicked(EntityRef e) { onGUIEvent(e, "onButtonClicked"); }
-	void onRectHovered(EntityRef e) { onGUIEvent(e, "onRectHovered"); }
-	void onRectHoveredOut(EntityRef e) { onGUIEvent(e, "onRectHoveredOut"); }
-		
 	void onRectMouseDown(EntityRef e, float x, float y) { 
 		auto* inline_call = beginFunctionCallInlineScript(e, "onRectMouseDown");
 		if (inline_call) {
@@ -1185,48 +1179,16 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 		}
 	}
 
-	LUMIX_FORCE_INLINE void onGUIEvent(EntityRef e, const char* event)
-	{
-		auto* inline_call = beginFunctionCallInlineScript(e, event);
-		if (inline_call) {
-			endFunctionCall();
-		}
-
-		if (!m_world.hasComponent(e, types::lua_script)) return;
-
-		for (int i = 0, c = getScriptCount(e); i < c; ++i)
-		{
-			auto* call = beginFunctionCall(e, i, event);
-			if (call) endFunctionCall();
-		}
-	}
-
 	void startGame() override {
 		// the same script can be added multiple times to m_to_start (e.g. by enabling and disabling the script several time in editor)
 		// so we need to remove duplicates
 		m_to_start.removeDuplicates();
 
 		m_is_game_running = true;
-		m_gui_module = (GUIModule*)m_world.getModule("gui");
-		if (m_gui_module) {
-			m_gui_module->buttonClicked().bind<&LuaScriptModuleImpl::onButtonClicked>(this);
-			m_gui_module->rectHovered().bind<&LuaScriptModuleImpl::onRectHovered>(this);
-			m_gui_module->rectHoveredOut().bind<&LuaScriptModuleImpl::onRectHoveredOut>(this);
-			m_gui_module->rectMouseDown().bind<&LuaScriptModuleImpl::onRectMouseDown>(this);
-		}
 	}
 
 
-	void stopGame() override
-	{
-		if (m_gui_module)
-		{
-			m_gui_module->buttonClicked().unbind<&LuaScriptModuleImpl::onButtonClicked>(this);
-			m_gui_module->rectHovered().unbind<&LuaScriptModuleImpl::onRectHovered>(this);
-			m_gui_module->rectHoveredOut().unbind<&LuaScriptModuleImpl::onRectHoveredOut>(this);
-			m_gui_module->rectMouseDown().unbind<&LuaScriptModuleImpl::onRectMouseDown>(this);
-		}
-		m_gui_module = nullptr;
+	void stopGame() override {
 		m_is_game_running = false;
 		m_updates.clear();
 		m_input_handlers.clear();
@@ -1977,7 +1939,6 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 	ScriptInstance* m_current_script_instance;
 	bool m_is_api_registered = false;
 	bool m_is_game_running = false;
-	GUIModule* m_gui_module = nullptr;
 };
 
 void LuaScriptModuleImpl::ScriptInstance::onScriptUnloaded(LuaScriptModuleImpl& module, struct ScriptComponent& cmp, int scr_index) {
