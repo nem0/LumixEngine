@@ -4,7 +4,7 @@
 #include "core/profiler.h"
 #include "core/stack_array.h"
 #include "core/string.h"
-#include "gui/sprite.h"
+#include "renderer/sprite.h"
 #include "renderer/draw2d.h"
 #include "renderer/font.h"
 #include "renderer/texture.h"
