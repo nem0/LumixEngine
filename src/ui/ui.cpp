@@ -1981,6 +1981,7 @@ static StringView getAttributeValue(const Element& elem, AttributeName name) {
 static Element* getActionTargetAt(Document& doc, Vec2 pos) {
 	for (u32 idx : doc.m_root.children) {
 		Element* root = &doc.m_elements[idx];
+		if (!root->visible) continue;
 		if (!contains(*root, pos, doc.m_font_manager)) continue;
 
 		StackArray<u32, 16> path(doc.m_allocator);
@@ -1991,6 +1992,7 @@ static Element* getActionTargetAt(Document& doc, Vec2 pos) {
 			bool found_child = false;
 			for (u32 child_id : elem->children) {
 				Element* child = &doc.m_elements[child_id];
+				if (!child->visible) continue;
 				if (contains(*child, pos, doc.m_font_manager)) {
 					path.push(child_id);
 					elem = child;
@@ -2061,6 +2063,7 @@ void Document::removeClassRaw(u32 element_index, StringView classname) {
 Element* Document::getElementAt(Vec2 pos) {
 	for (u32 idx : m_root.children) {
 		Element* root = &m_elements[idx]; 
+		if (!root->visible) continue;
 		if (!contains(*root, pos, m_font_manager)) continue;
 
 		Element* elem = root;
@@ -2068,6 +2071,7 @@ Element* Document::getElementAt(Vec2 pos) {
 			bool found_child = false;
 			for (u32 child_id : elem->children) {
 				Element* child = &m_elements[child_id];
+				if (!child->visible) continue;
 				if (contains(*child, pos, m_font_manager)) {
 					elem = child;
 					found_child = true;
