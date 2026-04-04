@@ -122,6 +122,7 @@ struct ParsedUnit {
 
 AttributeName parseAttributeName(StringView str);
 Tag parseTag(StringView str);
+const char* attributeNameToString(AttributeName name);
 
 struct IFontManager {
 	using FontHandle = void*;

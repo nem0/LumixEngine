@@ -190,20 +190,50 @@ static bool parseOpacity(StringView value, float& out) {
 	return true;
 }
 
-static const char* attributeNameToString(AttributeName name) {
+const char* attributeNameToString(AttributeName name) {
 	switch (name) {
+		case AttributeName::ID: return "id";
+		case AttributeName::CLASS: return "class";
+		case AttributeName::FONT_SIZE: return "font-size";
+		case AttributeName::FONT: return "font";
+		case AttributeName::WIDTH: return "width";
+		case AttributeName::HEIGHT: return "height";
+		case AttributeName::TOP: return "top";
+		case AttributeName::LEFT: return "left";
+		case AttributeName::PIVOT_X: return "pivot-x";
+		case AttributeName::PIVOT_Y: return "pivot-y";
+		case AttributeName::POSITION: return "position";
+		case AttributeName::MARGIN: return "margin";
+		case AttributeName::PADDING: return "padding";
+		case AttributeName::BG_IMAGE: return "background-image";
+		case AttributeName::BG_FIT: return "background-fit";
 		case AttributeName::ALIGN: return "align";
 		case AttributeName::ALIGN_ITEMS: return "align-items";
 		case AttributeName::BG_COLOR: return "bg-color";
 		case AttributeName::CLIPPING: return "clipping";
 		case AttributeName::COLOR: return "color";
 		case AttributeName::DIRECTION: return "direction";
+		case AttributeName::TEXT: return "value";
+		case AttributeName::SRC: return "src";
+		case AttributeName::FIT: return "fit";
+		case AttributeName::GROW: return "grow";
+		case AttributeName::ON_CLICK: return "on-click";
+		case AttributeName::PLACEHOLDER: return "placeholder";
+		case AttributeName::MARGIN_TOP: return "margin-top";
+		case AttributeName::MARGIN_RIGHT: return "margin-right";
+		case AttributeName::MARGIN_BOTTOM: return "margin-bottom";
+		case AttributeName::MARGIN_LEFT: return "margin-left";
+		case AttributeName::PADDING_TOP: return "padding-top";
+		case AttributeName::PADDING_RIGHT: return "padding-right";
+		case AttributeName::PADDING_BOTTOM: return "padding-bottom";
+		case AttributeName::PADDING_LEFT: return "padding-left";
 		case AttributeName::JUSTIFY_CONTENT: return "justify-content";
 		case AttributeName::OPACITY: return "opacity";
 		case AttributeName::VISIBLE: return "visible";
 		case AttributeName::WRAP: return "wrap";
-		default: return "attribute";
+		case AttributeName::INVALID: return "invalid";
 	}
+	return "unknown";
 }
 
 static bool parseUnit(StringView str, ParsedUnit& out) {

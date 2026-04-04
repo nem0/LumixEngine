@@ -15,12 +15,100 @@ static bool g_show_margins = false;
 static bool g_show_padding = false;
 static bool g_show_all_visualizations = false; // If true, show for all elements; if false, only for hovered
 
+static const char* getTagName(Tag tag) {
+	switch (tag) {
+		case Tag::BOX: return "box";
+		case Tag::IMAGE: return "image";
+		case Tag::SPAN: return "span";
+		case Tag::INVALID: return "invalid";
+	}
+	return "unknown";
+}
+
+static const char* getUnitName(Unit unit) {
+	switch (unit) {
+		case Unit::PIXELS: return "px";
+		case Unit::PERCENT: return "%";
+		case Unit::EM: return "em";
+		case Unit::FIT_CONTENT: return "fit-content";
+	}
+	return "";
+}
+
+static StaticString<128> formatAttributeValue(const Attribute& attr) {
+	StaticString<128> out;
+	switch (attr.type) {
+		case AttributeName::VISIBLE: out.append(attr.visible ? "true" : "false"); break;
+		case AttributeName::WRAP: out.append(attr.wrap ? "true" : "false"); break;
+		case AttributeName::CLIPPING: out.append(attr.clip ? "true" : "false"); break;
+		case AttributeName::FONT_SIZE: out.append(attr.font_size); break;
+		case AttributeName::OPACITY: out.append(attr.opacity); break;
+		case AttributeName::GROW: out.append(attr.grow); break;
+		case AttributeName::COLOR:
+		case AttributeName::BG_COLOR:
+			out.append("#", attr.color.r, ", ", attr.color.g, ", ", attr.color.b, ", ", attr.color.a);
+			break;
+		case AttributeName::ALIGN:
+			switch (attr.align) {
+				case Align::LEFT: out.append("left"); break;
+				case Align::CENTER: out.append("center"); break;
+				case Align::RIGHT: out.append("right"); break;
+			}
+			break;
+		case AttributeName::ALIGN_ITEMS:
+			switch (attr.align_items) {
+				case AlignItems::START: out.append("start"); break;
+				case AlignItems::CENTER: out.append("center"); break;
+				case AlignItems::END: out.append("end"); break;
+				case AlignItems::STRETCH: out.append("stretch"); break;
+			}
+			break;
+		case AttributeName::DIRECTION:
+			switch (attr.direction) {
+				case Direction::ROW: out.append("row"); break;
+				case Direction::COLUMN: out.append("column"); break;
+			}
+			break;
+		case AttributeName::JUSTIFY_CONTENT:
+			switch (attr.justify) {
+				case JustifyContent::START: out.append("start"); break;
+				case JustifyContent::CENTER: out.append("center"); break;
+				case JustifyContent::END: out.append("end"); break;
+				case JustifyContent::SPACE_BETWEEN: out.append("space-between"); break;
+				case JustifyContent::SPACE_AROUND: out.append("space-around"); break;
+			}
+			break;
+		case AttributeName::WIDTH:
+		case AttributeName::HEIGHT:
+		case AttributeName::TOP:
+		case AttributeName::LEFT:
+		case AttributeName::PIVOT_X:
+		case AttributeName::PIVOT_Y:
+		case AttributeName::MARGIN:
+		case AttributeName::MARGIN_TOP:
+		case AttributeName::MARGIN_RIGHT:
+		case AttributeName::MARGIN_BOTTOM:
+		case AttributeName::MARGIN_LEFT:
+		case AttributeName::PADDING:
+		case AttributeName::PADDING_TOP:
+		case AttributeName::PADDING_RIGHT:
+		case AttributeName::PADDING_BOTTOM:
+		case AttributeName::PADDING_LEFT:
+			if (attr.parsed_unit.unit == Unit::FIT_CONTENT) out.append("fit-content");
+			else out.append(attr.parsed_unit.value, getUnitName(attr.parsed_unit.unit));
+			break;
+		default:
+			out.append("\"", attr.value, "\"");
+			break;
+	}
+	return out;
+}
+
 static void debugElementGUI(const Document& document, u32 element_idx, int depth, u32& hovered_element_idx) {
 	const Element* element = document.getElement(element_idx);
 	if (!element) return;
 
-	const char* tag_names[] = { "box", "image", "span", "invalid" };
-	const char* tag_name = element->tag < Tag::INVALID ? tag_names[(u8)element->tag] : "unknown";
+	const char* tag_name = getTagName(element->tag);
 
 	StaticString<512> label;
 	StaticString<64> size_str;
@@ -94,9 +182,9 @@ static void debugElementGUI(const Document& document, u32 element_idx, int depth
 			ImGui::Separator();
 			ImGui::Text("Attributes:");
 			for (const auto& attr : element->attributes) {
-				const char* attr_names[] = { "id", "class", "visible", "font-size", "font", "color", "width", "height", "margin", "padding", "background-image", "background-fit", "bg-color", "direction", "wrap", "justify-content", "align-items", "value", "align", "src", "fit", "grow", "placeholder" };
-				const char* attr_name = attr.type < AttributeName::PLACEHOLDER ? attr_names[(u8)attr.type] : "unknown";
-				ImGui::Text("  %s: \"%.*s\"", attr_name, (int)attr.value.size(), attr.value.begin);
+				const char* attr_name = attributeNameToString(attr.type);
+				const StaticString<128> value = formatAttributeValue(attr);
+				ImGui::Text("  %s: %s", attr_name, value.data);
 			}
 		}
 
