@@ -7,6 +7,6 @@ function buttonPressed()
 	local elem = doc:getElementByID("runtime_ui")
 	elem:setVisible(true)
 
-	this.world:getModule("gui"):getSystem():enableCursor(true)
+	this.world.ui:getSystem():enableCursor(true)
 	player.lua_script[1].handle_input = false
 end

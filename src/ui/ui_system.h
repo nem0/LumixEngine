@@ -7,7 +7,9 @@ namespace Lumix {
 //@ object
 struct UISystem : ISystem {
 	virtual Engine& getEngine() = 0;
-	// TODO: Add GUI NG system functions
+	//@ function
+	virtual void enableCursor(bool enable) = 0;
+	virtual bool isCursorEnabled() const = 0;
 };
 
 } // namespace Lumix

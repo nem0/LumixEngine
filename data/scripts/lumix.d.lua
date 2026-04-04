@@ -222,6 +222,7 @@ type Document = {
 }
 
 type UISystem = {
+	enableCursor: (UISystem, boolean) -> (),
 }
 
 type animation_module = {
@@ -601,6 +602,7 @@ type ui_module = {
 	getDocument: (ui_module) -> any,
 	load: (ui_module, string) -> (),
 	isReady: (ui_module) -> boolean,
+	getSystem: (ui_module) -> UISystem,
 }
 
 type ui_3d_component =  {

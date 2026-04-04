@@ -432,11 +432,11 @@ In this example only `enableCursor` is exposed to Lua.
 
 ## Accessing objects from Lua
 
-Objects are accessed through module functions or global tables. For example, `GUISystem` is obtained via `gui_module:getSystem()`:
+Objects are accessed through module functions or global tables. For example, `UISystem` is obtained via `ui_module:getSystem()`:
 
 ```lua
--- Get GUISystem through the gui module and enable the cursor
-this.world.gui:getSystem():enableCursor(true)
+-- Get UISystem through the UIModule and enable the cursor
+this.world.ui:getSystem():enableCursor(true)
 ```
 
 Editor objects like `SceneView` and `AssetBrowser` are accessed through the global `Editor` table:

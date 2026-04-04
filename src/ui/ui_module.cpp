@@ -116,6 +116,10 @@ struct UIModuleImpl : UIModule {
 		return UniquePtr<UIModuleImpl>::create(allocator, system, world, allocator);
 	}
 
+	UISystem* getSystemPtr() const override {
+		return &m_system;
+	}
+
 	ui::Document* getDocument() override {
 		return &m_document;
 	}

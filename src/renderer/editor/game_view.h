@@ -23,7 +23,6 @@ struct LUMIX_RENDERER_API GameView : StudioApp::GUIPlugin {
 
 	bool isMouseCaptured() const { return m_is_mouse_captured; }
 	void captureMouse(bool capture);
-	void enableIngameCursor(bool enable);
 	void setCursor(os::CursorType type);
 	//@ function
 	void forceViewport(bool enable, int w, int h);

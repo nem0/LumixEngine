@@ -17,6 +17,7 @@
 #include "renderer/render_module.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
+#include "ui/ui_system.h"
 
 
 namespace Lumix
@@ -49,15 +50,6 @@ void GameView::setCursor(os::CursorType type)
 {
 	m_cursor_type = type;
 }
-
-void GameView::enableIngameCursor(bool enable)
-{
-	m_is_ingame_cursor = enable;
-	if (!m_is_mouse_captured) return;
-
-	os::showCursor(m_is_ingame_cursor);
-}
-
 
 void GameView::captureMouse(bool capture) {
 	if (m_is_mouse_captured == capture) return;
@@ -213,6 +205,17 @@ void GameView::onGUI() {
 
 void GameView::windowUI(const char* window_name) {
 	PROFILE_FUNCTION();
+
+	Engine& engine = m_app.getEngine();
+	const UISystem* ui_system = (const UISystem*)engine.getSystemManager().getSystem("ui");
+	const bool enable = ui_system && ui_system->isCursorEnabled();
+	if (m_is_ingame_cursor != enable) {
+		m_is_ingame_cursor = enable;
+		if (m_is_mouse_captured) {
+			os::showCursor(m_is_ingame_cursor);
+		}
+	}
+
 	WorldEditor& editor = m_app.getWorldEditor();
 	m_pipeline->setWorld(editor.getWorld());
 

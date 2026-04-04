@@ -1,6 +1,7 @@
 #include "core/allocator.h"
 #include "core/geometry.h"
 #include "core/log.h"
+#include "core/os.h"
 #include "core/stream.h"
 #include "core/tag_allocator.h"
 #include "engine/engine.h"
@@ -33,6 +34,14 @@ struct UISystemImpl : UISystem {
 	void serialize(OutputMemoryStream& stream) const override {}
 
 	bool deserialize(i32 version, InputMemoryStream& stream) override { return version == 0; }
+
+	bool isCursorEnabled() const override {
+		return m_is_cursor_enabled;
+	}
+
+	void enableCursor(bool enable) override {
+		m_is_cursor_enabled = enable;
+	}
 
 	void initEnd() override {
 		auto* renderer = (Renderer*)m_engine.getSystemManager().getSystem("renderer");
@@ -83,6 +92,7 @@ private:
 	ui::DocumentResourceManager m_ui_document_manager;
 	Engine& m_engine;
 	RenderPlugin m_render_plugin;
+	bool m_is_cursor_enabled = false;
 };
 
 UniquePtr<ISystem> createUISystem(Engine& engine, IAllocator& allocator) {

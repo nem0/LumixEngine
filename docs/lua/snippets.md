@@ -49,7 +49,7 @@ end
 
 ```lua
 function start()
-	this.world.gui:getSystem():enableCursor(true)
+	this.world.ui:getSystem():enableCursor(true)
 end
 ```
 

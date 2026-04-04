@@ -19,7 +19,7 @@ By default, ImGui is not enabled in packaged game. To enable ImGui integration, 
 	end
 
 	function update(time_delta)
-		this.world:getModule("gui"):getSystem():enableCursor(show_imgui)
+		this.world.ui:getSystem():enableCursor(show_imgui)
 		if show_imgui then
 			ImGui.Begin("foo")
 			ImGui.Text("Hello World!")

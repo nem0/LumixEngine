@@ -2529,6 +2529,14 @@ namespace Lumix {
 		return 1;
 	}
 	
+	int UIModule_getSystemPtr(lua_State* L) {
+		LuaWrapper::checkTableArg(L, 1);
+		UIModule* module;
+		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+		LuaWrapper::push(L, 	module->getSystemPtr());
+		return 1;
+	}
+	
 	int ui_3d_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (UIModule*)imodule;
@@ -2656,6 +2664,8 @@ namespace Lumix {
 			lua_setfield(L, -2, "load");
 			lua_pushcfunction(L, UIModule_isReady, "isReady");
 			lua_setfield(L, -2, "isReady");
+			lua_pushcfunction(L, UIModule_getSystemPtr, "getSystemPtr");
+			lua_setfield(L, -2, "getSystem");
 			lua_pop(L, 1);
 		}
 		{
@@ -3133,6 +3143,20 @@ namespace Lumix {
 			lua_setfield(L, -3, "UISystem");
 			lua_pushvalue(L, -1);
 			lua_setfield(L, -2, "__index");
+			{
+				auto proxy = [](lua_State* L) -> int {
+					LuaWrapper::checkTableArg(L, 1); // self
+					UISystem* obj;
+					if (!LuaWrapper::checkField(L, 1, "_value", &obj)) luaL_error(L, "Invalid object");
+					if (!obj) return 0;
+					auto enable = LuaWrapper::checkArg<bool>(L, 2);
+					obj->enableCursor(enable);
+					return 0;
+				};
+				const char* name = "enableCursor";
+				lua_pushcfunction(L, proxy, name);
+				lua_setfield(L, -2, name);
+			}
 			lua_pop(L, 2);
 		}
 		{
