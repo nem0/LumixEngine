@@ -14,18 +14,18 @@
 [box width=100% height=100% font-size=30] {
 	[box .header] { Space removed }
 	[box padding=1em direction=column width=100%] {
-		[box .odd_row] { [span value="AAA"][span value="000"] }
-		[box .even_row] { [span value="AAA"]      [span value="000"] }
-		[box .odd_row] { [span value="AAA"] 000 }
+		[box .odd_row] { [span text="AAA"][span text="000"] }
+		[box .even_row] { [span text="AAA"]      [span text="000"] }
+		[box .odd_row] { [span text="AAA"] 000 }
 	}
 	
 	[box .header] { Space kept }
 	[box padding=1em direction=column width=100%] {
 		[box .odd_row] { AAA 000 }
-		[box .even_row] { [span value="AAA "][span value="000"] }
-		[box .odd_row] { [span value="AAA "][span value=" 000"] }
-		[box .even_row] { [span value="AAA"][span value=" 000"] }
-		[box .odd_row] { AAA [span value=" 000"] }
-		[box .even_row] { [span value="AAA "] 000 }
+		[box .even_row] { [span text="AAA "][span text="000"] }
+		[box .odd_row] { [span text="AAA "][span text=" 000"] }
+		[box .even_row] { [span text="AAA"][span text=" 000"] }
+		[box .odd_row] { AAA [span text=" 000"] }
+		[box .even_row] { [span text="AAA "] 000 }
 	}
 }
