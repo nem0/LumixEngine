@@ -51,6 +51,7 @@ struct LUMIX_RENDERER_API RenderPlugin {
 	
 	virtual void pipelineDestroyed(Pipeline& pipeline) {}
 	virtual void frame(struct Renderer& renderer) {}
+	virtual void shutdown(struct Renderer& renderer) {}
 };
 
 struct DrawStream;

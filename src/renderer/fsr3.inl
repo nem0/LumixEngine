@@ -82,6 +82,16 @@ struct FSR3Plugin : RenderPlugin {
 		}
 	}
 
+	void shutdown(Renderer&) override {
+		for (UniquePtr<Context>& ctx : m_contexts) {
+			const ffxReturnCode_t ret_code = api_ffxDestroyContext(&ctx->fsr, &m_alloc_callbacks);
+			if (ret_code != FFX_API_RETURN_OK) {
+				logError("Failed to destroy FSR3 context");
+			}
+		}
+		m_contexts.clear();
+	}
+
 	Context& getOrCreateContext(Pipeline& pipeline) {
 		const Viewport& vp = pipeline.getViewport();
 		IVec2 size = {vp.w, vp.h};

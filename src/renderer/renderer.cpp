@@ -40,6 +40,7 @@ bool RenderPlugin::debugOutput(RenderBufferHandle input, Pipeline& pipeline) { r
 RenderBufferHandle RenderPlugin::renderAA(const GBuffer& gbuffer, RenderBufferHandle input, Pipeline& pipeline) { return INVALID_RENDERBUFFER; }
 
 void initFSR3(Renderer& renderer, IAllocator& allocator);
+bool initDLSS(Renderer& renderer, IAllocator& allocator);
 
 struct Renderbuffer {
 	// The buffer is created in the ACTIVE state.
@@ -485,6 +486,11 @@ struct RendererImpl final : Renderer {
 		frame();
 		frame();
 		waitForRender();
+
+		for (RenderPlugin* plugin : m_plugins) {
+			plugin->shutdown(*this);
+		}
+		m_plugins.clear();
 		
 		m_frame_thread.finished = true;
 		m_frame_thread.semaphore.signal();
@@ -662,7 +668,9 @@ struct RendererImpl final : Renderer {
 		m_font_manager->create(FontResource::TYPE, manager);
 		m_layers.emplace("default");
 
-		initFSR3(*this, m_allocator);
+		if (!initDLSS(*this, m_allocator)) {
+			initFSR3(*this, m_allocator);
+		}
 	}
 
 

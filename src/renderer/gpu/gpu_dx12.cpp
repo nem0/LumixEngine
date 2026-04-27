@@ -3272,4 +3272,5 @@ void createProgram(ProgramHandle program
 
 } // namespace
 
+#include "renderer/dlss.inl"
 #include "renderer/fsr3.inl"

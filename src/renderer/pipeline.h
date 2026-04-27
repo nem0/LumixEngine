@@ -97,6 +97,8 @@ struct LUMIX_RENDERER_API Pipeline {
 	virtual void setViewport(const Viewport& viewport) = 0;
 	virtual const Viewport& getViewport() = 0;
 	virtual const IVec2& getDisplaySize() const = 0;
+	virtual float getRenderToDisplayRatio() const = 0;
+	virtual void setRenderToDisplayRatio(float scale) = 0;
 	virtual void setIndirectLightMultiplier(float value) = 0;
 	virtual void enablePixelJitter(bool enable) = 0;
 	//@ function

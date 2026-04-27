@@ -978,7 +978,7 @@ struct PipelineImpl final : Pipeline {
 			matrix.multiply3x3(tr.scale);
 		}
 		matrix = m_viewport.getProjectionWithJitter() * m_viewport.getViewRotation() * matrix * normalize;
-		renderUIHelper(drawdata, true, matrix);
+		renderUIHelper(drawdata, true, matrix, IVec2(m_viewport.w, m_viewport.h));
 	}
 
 	static Matrix computeReprojection(const Viewport& current, const Viewport& prev) {
@@ -1169,8 +1169,9 @@ struct PipelineImpl final : Pipeline {
 		}
 
 		beginBlock("tonemap");
+		const IVec2 display_size = getDisplaySize();
 		const RenderBufferHandle rb = m_renderer.createRenderbuffer({
-			.size = {m_viewport.w, m_viewport.h},
+			.size = display_size,
 			.format = gpu::TextureFormat::SRGBA,
 			.flags = gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE,
 			.debug_name = "tonemap"
@@ -1917,14 +1918,15 @@ struct PipelineImpl final : Pipeline {
 	}
 
 	void render2D(RenderBufferHandle input) {
+		const IVec2 display_size = getDisplaySize();
 		Matrix matrix;
-		matrix.setOrtho(0, (float)m_viewport.w, (float)m_viewport.h, 0, 0, 1, false);
+		matrix.setOrtho(0, (float)display_size.x, (float)display_size.y, 0, 0, 1, false);
 		m_renderer.setRenderTargets(Span(&input, 1));
-		renderUIHelper(m_draw2d, false, matrix);
+		renderUIHelper(m_draw2d, false, matrix, display_size);
 		m_draw2d.clear(getAtlasSize());
 	}
 
-	void renderUIHelper(const Draw2D& data, bool is_3d, const Matrix& matrix) {
+	void renderUIHelper(const Draw2D& data, bool is_3d, const Matrix& matrix, const IVec2& size) {
 		if (!m_draw2d_shader->isReady()) return;
 		if (data.getIndices().empty()) return;
 
@@ -1959,13 +1961,13 @@ struct PipelineImpl final : Pipeline {
 
 		for (Draw2D::Cmd& cmd : data.getCmds()) {
 			if(cmd.clip_size.x < 0) {
-				stream.scissor(0, 0, m_viewport.w, m_viewport.h);
+				stream.scissor(0, 0, size.x, size.y);
 			}
 			else {
 				const u32 h = u32(clamp(cmd.clip_size.y, 0.f, 65535.f));
 				if (gpu::isOriginBottomLeft()) {
 					stream.scissor(u32(maximum(cmd.clip_pos.x, 0.0f)),
-						m_viewport.h - u32(maximum(cmd.clip_pos.y, 0.0f)) - h,
+						size.y - u32(maximum(cmd.clip_pos.y, 0.0f)) - h,
 						u32(minimum(cmd.clip_size.x, 65535.0f)),
 						u32(minimum(cmd.clip_size.y, 65535.0f)));
 				}
@@ -4169,8 +4171,8 @@ struct PipelineImpl final : Pipeline {
 		return m_module->getEnvironmentCastShadows((EntityRef)env);
 	}
 
-	float getRenderToDisplayRatio() const { return m_render_to_display_scale; }
-	void setRenderToDisplayRatio(float scale) { m_render_to_display_scale = scale; }
+	float getRenderToDisplayRatio() const override { return m_render_to_display_scale; }
+	void setRenderToDisplayRatio(float scale) override { m_render_to_display_scale = maximum(scale, 1.f); }
 
 	void clearDraw2D() override { return m_draw2d.clear(getAtlasSize()); }
 	Draw2D& getDraw2D() override { return m_draw2d; }

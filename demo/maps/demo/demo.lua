@@ -15,6 +15,7 @@ function update(time_delta)
 				local elem = doc:getElementByID("runtime_ui")
 				player.lua_script[1].handle_input = true
 				elem:setVisible(false)
+				this.world.ui:getSystem():enableCursor(false)
 			elseif e.action == "start" then
 				player.lua_script[1].handle_input = true
 				doc:getElement(0):setVisible(false)
