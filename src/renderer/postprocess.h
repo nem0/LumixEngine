@@ -23,7 +23,7 @@ struct Atmo : public RenderPlugin {
 		: m_renderer(renderer)
 	{}
 	
-	void shutdown() {
+	void shutdown(Renderer& renderer) override {
 		if (m_optical_depth_precomputed != gpu::INVALID_TEXTURE) {
 			m_renderer.getEndFrameDrawStream().destroy(m_optical_depth_precomputed);
 			m_renderer.getEndFrameDrawStream().destroy(m_inscatter_precomputed);
@@ -142,7 +142,7 @@ struct FilmGrain : public RenderPlugin {
 
 	FilmGrain(Renderer& renderer) : m_renderer(renderer) {}
 
-	void shutdown() {
+	void shutdown(Renderer& renderer) override {
 		m_shader->decRefCount();
 	}
 
@@ -189,7 +189,7 @@ struct DOF : public RenderPlugin {
 
 	DOF(Renderer& renderer) : m_renderer(renderer) {}
 
-	void shutdown() {
+	void shutdown(Renderer& renderer) override {
 		m_shader->decRefCount();
 	}
 
@@ -254,7 +254,7 @@ struct CubemapSky : public RenderPlugin {
 
 	CubemapSky(Renderer& renderer) : m_renderer(renderer) {}
 
-	void shutdown() {
+	void shutdown(Renderer& renderer) override {
 		m_shader->decRefCount();
 	}
 
@@ -308,7 +308,7 @@ struct Bloom : public RenderPlugin {
 		: m_renderer(renderer)
 	{}
 
-	void shutdown() {
+	void shutdown(Renderer& renderer) override {
 		m_shader->decRefCount();
 		m_extract_shader->decRefCount();
 		m_downscale_shader->decRefCount();
@@ -611,7 +611,7 @@ struct SSS : public RenderPlugin {
 
 	SSS(Renderer& renderer) : m_renderer(renderer) {}
 
-	void shutdown() {
+	void shutdown(Renderer& renderer) override {
 		m_shader->decRefCount();
 		m_shader_blit->decRefCount();
 	}
@@ -733,7 +733,7 @@ struct SSAO : public RenderPlugin {
 
 	SSAO(Renderer& renderer) : m_renderer(renderer) {}
 	
-	void shutdown() {
+	void shutdown(Renderer& renderer) override {
 		m_shader->decRefCount();
 		m_blit_shader->decRefCount();
 		m_blur_shader->decRefCount();
@@ -949,7 +949,7 @@ struct TDAO : public RenderPlugin {
 
 	TDAO(Renderer& renderer) : m_renderer(renderer) {}
 
-	void shutdown() {
+	void shutdown(Renderer& renderer) override {
 		m_shader->decRefCount();
 	}
 
@@ -1092,7 +1092,7 @@ struct TAA : public RenderPlugin {
 		: m_renderer(renderer)
 	{}
 
-	void shutdown() {
+	void shutdown(Renderer& renderer) override {
 		m_shader->decRefCount();
 	}
 
