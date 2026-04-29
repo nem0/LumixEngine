@@ -4,26 +4,38 @@
 
 namespace Lumix {
 
-struct GamepadState {
-	struct {
-		float x, y;
-	} left_stick, right_stick;
+template <typename T> struct Span;
 
-	float left_trigger, right_trigger;
-	u16 buttons;
-	u32 packet_number;
-	bool connected;
+namespace gamepad {
+
+enum class UID : u32 {};
+
+struct Event {
+	enum class Axis {
+		LTHUMB,
+		RTHUMB,
+		LTRIGGER,
+		RTRIGGER	
+	};
+
+	enum Type {
+		CONNECTED,
+		DISCONNECTED,
+		AXIS,
+		BUTTON
+	};
+
+	UID uid;
+	Type type;
+	u32 button;
+	Axis axis;
+	bool down;
+	float x, y;
 };
 
-struct IGamepadBackend {
-	virtual ~IGamepadBackend() = default;
-	virtual bool init() = 0;
-	virtual void shutdown() = 0;
-	virtual int getMaxControllers() const = 0;
-	virtual bool updateController(int index, GamepadState& state) = 0;
-	virtual bool isControllerConnected(int index) = 0;
-};
+LUMIX_CORE_API bool init();
+LUMIX_CORE_API void shutdown();
+LUMIX_CORE_API Span<const Event> update();
 
-LUMIX_CORE_API IGamepadBackend* createGamepadBackend(struct IAllocator& allocator);
-
+} // namespace gamepad
 } // namespace Lumix

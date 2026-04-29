@@ -3,9 +3,11 @@
 #include "core/delegate.h"
 #include "core/delegate_list.h"
 #include "core/gamepad.h"
+#include "core/log.h"
 #include "core/math.h"
 #include "core/os.h"
 #include "core/profiler.h"
+#include "core/string.h"
 #include "engine/engine.h"
 
 
@@ -25,15 +27,14 @@ struct KeyboardDevice : InputSystem::Device {
 
 
 struct GamepadDevice : InputSystem::Device {
-	GamepadDevice(int controller_index)
-		: controller_index(controller_index) {}
+	GamepadDevice(gamepad::UID uid)
+		: uid(uid) {}
 
 	void update(float dt) override {}
 
 	const char* getName() const override { return "gamepad"; }
 
-	int controller_index;
-	GamepadState last_state = {};
+	gamepad::UID uid;
 };
 
 
@@ -45,7 +46,6 @@ struct InputSystemImpl final : InputSystem {
 		, m_devices(m_allocator)
 		, m_to_remove(m_allocator)
 		, m_down_keys(m_allocator)
-		, m_gamepad_states(m_allocator)
 		, m_gamepad_devices(m_allocator) {
 		m_mouse_device = LUMIX_NEW(m_allocator, MouseDevice);
 		m_mouse_device->type = Device::MOUSE;
@@ -54,36 +54,12 @@ struct InputSystemImpl final : InputSystem {
 		m_devices.push(m_keyboard_device);
 		m_devices.push(m_mouse_device);
 
-		// Initialize gamepad backend
-		m_gamepad_backend = createGamepadBackend(m_allocator);
-		if (m_gamepad_backend && m_gamepad_backend->init()) {
-			int max_controllers = m_gamepad_backend->getMaxControllers();
-			m_gamepad_states.resize(max_controllers);
-			m_gamepad_devices.resize(max_controllers);
-
-			// Initialize all states
-			for (int i = 0; i < max_controllers; ++i) {
-				m_gamepad_states[i] = {};
-				m_gamepad_devices[i] = nullptr;
-			}
-		} else {
-			// Cleanup if init failed
-			if (m_gamepad_backend) {
-				LUMIX_DELETE(m_allocator, m_gamepad_backend);
-				m_gamepad_backend = nullptr;
-			}
-		}
-
-		m_gamepad_last_checked = 0;
+		gamepad::init();
 	}
 
 
 	~InputSystemImpl() {
-		// Clean up gamepad backend
-		if (m_gamepad_backend) {
-			m_gamepad_backend->shutdown();
-			LUMIX_DELETE(m_allocator, m_gamepad_backend);
-		}
+		gamepad::shutdown();
 
 		for (Device* device : m_devices) {
 			LUMIX_DELETE(m_allocator, device);
@@ -128,7 +104,7 @@ struct InputSystemImpl final : InputSystem {
 
 		for (Device* device : m_devices) device->update(dt);
 
-		updateGamepads(dt);
+		updateGamepads();
 	}
 
 	void injectEvent(const os::Event& event, int mouse_base_x, int mouse_base_y) override {
@@ -227,130 +203,103 @@ private:
 	Array<Device*> m_devices;
 	Array<Device*> m_to_remove;
 	Array<ButtonEvent> m_down_keys;
-
-	IGamepadBackend* m_gamepad_backend = nullptr;
-	Array<GamepadState> m_gamepad_states;
 	Array<GamepadDevice*> m_gamepad_devices;
-	int m_gamepad_last_checked = 0;
 
-	void updateGamepads(float dt) {
-		if (!m_gamepad_backend) return;
-
+	void updateGamepads() {
 		PROFILE_FUNCTION();
 
-		int max_controllers = m_gamepad_backend->getMaxControllers();
+		Span<const gamepad::Event> events = gamepad::update();
 
-		// Check one controller per frame for connection changes (performance optimization)
-		for (int i = 0; i < max_controllers; ++i) {
-			bool should_check = (i == m_gamepad_last_checked) || (m_gamepad_devices[i] != nullptr); // Always check connected devices
-
-			if (should_check) {
-				GamepadState new_state;
-				bool success = m_gamepad_backend->updateController(i, new_state);
-				bool is_connected = success && new_state.connected;
-
-				// Handle connection changes
-				if (is_connected && !m_gamepad_devices[i]) {
-					// Controller connected
-					GamepadDevice* device = LUMIX_NEW(m_allocator, GamepadDevice)(i);
-					device->type = Device::GAMEPAD;
-					device->last_state = new_state;
-					m_gamepad_devices[i] = device;
-					addDevice(device);
-				} else if (!is_connected && m_gamepad_devices[i]) {
-					// Controller disconnected
-					removeDevice(m_gamepad_devices[i]);
-					m_gamepad_devices[i] = nullptr;
-				}
-
-				// Update state and generate events for connected controllers
-				if (is_connected && m_gamepad_devices[i]) {
-					updateGamepadEvents(i, new_state);
-					m_gamepad_states[i] = new_state;
-					m_gamepad_devices[i]->last_state = new_state;
+		for (const gamepad::Event& ev : events) {
+			GamepadDevice* device = nullptr;
+			for (GamepadDevice* d : m_gamepad_devices) {
+				if (d->uid == ev.uid) {
+					device = d;
+					break;
 				}
 			}
-		}
 
-		m_gamepad_last_checked = (m_gamepad_last_checked + 1) % max_controllers;
-	}
-
-	void updateGamepadEvents(int controller_index, const GamepadState& new_state) {
-		const GamepadState& old_state = m_gamepad_states[controller_index];
-		GamepadDevice* device = m_gamepad_devices[controller_index];
-
-		// Only process if packet changed
-		if (new_state.packet_number == old_state.packet_number) return;
-
-		// Handle button changes
-		if (new_state.buttons != old_state.buttons) {
-			for (int i = 0; i < 16; ++i) {
-				u16 mask = 1 << i;
-				bool new_pressed = (new_state.buttons & mask) != 0;
-				bool old_pressed = (old_state.buttons & mask) != 0;
-
-				if (new_pressed != old_pressed) {
+			switch (ev.type) {
+				case gamepad::Event::CONNECTED: {
+					if (device) {
+						logError("Gamepad: the same device uid connected twice.");
+						break;
+					}
+					GamepadDevice* new_device = LUMIX_NEW(m_allocator, GamepadDevice)(ev.uid);
+					new_device->type = Device::GAMEPAD;
+					m_gamepad_devices.push(new_device);
+					addDevice(new_device);
+					break;
+				}
+				case gamepad::Event::DISCONNECTED: {
+					if (!device) {
+						logError("Gamepad: unknown device disconnected.");
+						break;
+					}
+					removeDevice(device);
+					for (i32 i = 0, c = m_gamepad_devices.size(); i < c; ++i) {
+						if (m_gamepad_devices[i] == device) {
+							m_gamepad_devices.swapAndPop(i);
+							break;
+						}
+					}
+					break;
+				}
+				case gamepad::Event::BUTTON: {
+					if (!device) {
+						logError("Gamepad: received button event for unknown device ", u32(ev.uid), ".");
+						break;
+					}
 					Event event;
 					event.type = Event::BUTTON;
 					event.device = device;
-					event.data.button.key_id = i;
-					event.data.button.down = new_pressed;
+					event.data.button.key_id = ev.button;
+					event.data.button.down = ev.down;
 					event.data.button.is_repeat = false;
 					event.data.button.x = 0;
 					event.data.button.y = 0;
 					injectEvent(event);
+					break;
+				}
+				case gamepad::Event::AXIS: {
+					if (!device) {
+						logError("Gamepad: received axis event for unknown device ", u32(ev.uid), ".");
+						break;
+					}
+					Event event;
+					event.type = Event::AXIS;
+					event.device = device;
+					event.data.axis.x_abs = 0;
+					event.data.axis.y_abs = 0;
+					switch (ev.axis) {
+						case gamepad::Event::Axis::LTRIGGER:
+							event.data.axis.axis = AxisEvent::LTRIGGER;
+							event.data.axis.x = ev.x;
+							event.data.axis.y = 0;
+							injectEvent(event);
+							break;
+						case gamepad::Event::Axis::RTRIGGER:
+							event.data.axis.axis = AxisEvent::RTRIGGER;
+							event.data.axis.x = ev.x;
+							event.data.axis.y = 0;
+							injectEvent(event);
+							break;
+						case gamepad::Event::Axis::LTHUMB:
+							event.data.axis.axis = AxisEvent::LTHUMB;
+							event.data.axis.x = ev.x;
+							event.data.axis.y = ev.y;
+							injectEvent(event);
+							break;
+						case gamepad::Event::Axis::RTHUMB:
+							event.data.axis.axis = AxisEvent::RTHUMB;
+							event.data.axis.x = ev.x;
+							event.data.axis.y = ev.y;
+							injectEvent(event);
+							break;
+					}
+					break;
 				}
 			}
-		}
-
-		// Handle trigger changes
-		if (new_state.left_trigger != old_state.left_trigger) {
-			Event event;
-			event.type = Event::AXIS;
-			event.device = device;
-			event.data.axis.x = new_state.left_trigger;
-			event.data.axis.y = 0;
-			event.data.axis.x_abs = 0;
-			event.data.axis.y_abs = 0;
-			event.data.axis.axis = AxisEvent::LTRIGGER;
-			injectEvent(event);
-		}
-
-		if (new_state.right_trigger != old_state.right_trigger) {
-			Event event;
-			event.type = Event::AXIS;
-			event.device = device;
-			event.data.axis.x = new_state.right_trigger;
-			event.data.axis.y = 0;
-			event.data.axis.x_abs = 0;
-			event.data.axis.y_abs = 0;
-			event.data.axis.axis = AxisEvent::RTRIGGER;
-			injectEvent(event);
-		}
-
-		// Handle stick changes
-		if (new_state.left_stick.x != old_state.left_stick.x || new_state.left_stick.y != old_state.left_stick.y) {
-			Event event;
-			event.type = Event::AXIS;
-			event.device = device;
-			event.data.axis.x = new_state.left_stick.x;
-			event.data.axis.y = new_state.left_stick.y;
-			event.data.axis.x_abs = 0;
-			event.data.axis.y_abs = 0;
-			event.data.axis.axis = AxisEvent::LTHUMB;
-			injectEvent(event);
-		}
-
-		if (new_state.right_stick.x != old_state.right_stick.x || new_state.right_stick.y != old_state.right_stick.y) {
-			Event event;
-			event.type = Event::AXIS;
-			event.device = device;
-			event.data.axis.x = new_state.right_stick.x;
-			event.data.axis.y = new_state.right_stick.y;
-			event.data.axis.x_abs = 0;
-			event.data.axis.y_abs = 0;
-			event.data.axis.axis = AxisEvent::RTHUMB;
-			injectEvent(event);
 		}
 	}
 };
