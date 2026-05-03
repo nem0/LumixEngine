@@ -19,7 +19,6 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
-#include "gui/gui_system.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_module.h"
 #include "renderer/renderer.h"
@@ -31,18 +30,6 @@
 #endif
 
 using namespace Lumix;
-
-struct GUIInterface : GUISystem::Interface {
-	Pipeline* getPipeline() override { return pipeline; }
-	Vec2 getPos() const override { return Vec2(0); }
-	Vec2 getSize() const override { return size; }
-	void setCursor(os::CursorType type) override { os::setCursor(type); }
-	void enableCursor(bool enable) override { os::showCursor(enable); }
-
-	Vec2 size;
-	Pipeline* pipeline;
-};
-
 
 struct Runner final
 {
@@ -71,7 +58,6 @@ struct Runner final
 		const os::Point client_size = os::getWindowClientSize(m_engine->getMainWindow());
 		m_viewport.w = client_size.x;
 		m_viewport.h = client_size.y;
-		m_gui_interface.size = Vec2((float)client_size.x, (float)client_size.y);
 	}
 
 	void initRenderPipeline() {
@@ -114,7 +100,6 @@ struct Runner final
 		InputMemoryStream blob(data);
 		EntityMap entity_map(m_allocator);
 
-		m_world->setPath(Path(path));
 		WorldVersion editor_version;
 		if (!m_world->deserialize(blob, entity_map, editor_version)) {
 			logError("Failed to deserialize ", path);
@@ -124,16 +109,6 @@ struct Runner final
 	}
 
 	void loadProject() {
-		FileSystem& fs = m_engine->getFileSystem();
-		OutputMemoryStream data(m_allocator);
-		if (!fs.getContentSync(Path("lumix.prj"), data)) return;
-
-		InputMemoryStream tmp(data);
-		const DeserializeProjectResult res = m_engine->deserializeProject(tmp, m_startup_world);
-		if (DeserializeProjectResult::SUCCESS != res) {
-			logError("Failed to deserialize project file");
-		}
-
 		char cmd_line[4096];
 		if (os::getCommandLine(cmd_line)) {
 			CommandLineParser parser(cmd_line);
@@ -146,6 +121,16 @@ struct Runner final
 				m_startup_world = src;
 				break;
 			}
+		}
+
+		FileSystem& fs = m_engine->getFileSystem();
+		OutputMemoryStream data(m_allocator);
+		if (!fs.getContentSync(Path("lumix.prj"), data)) return;
+
+		InputMemoryStream tmp(data);
+		const DeserializeProjectResult res = m_engine->deserializeProject(tmp, m_startup_world);
+		if (DeserializeProjectResult::SUCCESS != res) {
+			logError("Failed to deserialize project file");
 		}
 	}
 
@@ -178,10 +163,6 @@ struct Runner final
 		m_world = &m_engine->createWorld();
 		initRenderPipeline();
 		
-		auto* gui = static_cast<GUISystem*>(m_engine->getSystemManager().getSystem("gui"));
-		m_gui_interface.pipeline = m_pipeline.get();
-		gui->setInterface(&m_gui_interface);
-
 		loadProject();
 
 		if (!loadWorld(m_startup_world.c_str())) {
@@ -204,8 +185,6 @@ struct Runner final
 
 	void shutdown() {
 		m_engine->destroyWorld(*m_world);
-		auto* gui = static_cast<GUISystem*>(m_engine->getSystemManager().getSystem("gui"));
-		gui->setInterface(nullptr);
 		m_pipeline.reset();
 		m_engine.reset();
 		m_world = nullptr;
@@ -291,7 +270,6 @@ struct Runner final
 	bool m_finished = false;
 	bool m_focused = true;
 	bool m_mouse_captured = false;
-	GUIInterface m_gui_interface;
 
 	ImGuiIntegration m_imgui;
 };
