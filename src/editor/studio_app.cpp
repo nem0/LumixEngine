@@ -1032,6 +1032,7 @@ struct StudioAppImpl final : StudioApp {
 		m_engine->setMainWindow(m_main_window);
 		
 		beginInitIMGUI();
+		os::showCursor(true);
 		// we need to create the asset compiler before plugins, since asset compiler installs a hook for asset loading
 		// and plugins can try to load stuf, e.g. renderer loads postprocess shaders
 		m_asset_compiler = AssetCompiler::create(*this);

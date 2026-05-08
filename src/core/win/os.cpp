@@ -67,6 +67,12 @@ struct EventQueue {
 	Rec* back = nullptr;
 };
 
+enum class CursorState {
+	DEFAULT,
+	HIDDEN,
+	SHOWN
+};
+
 static struct {
 	EventQueue event_queue;
 	Point relative_mode_pos = {};
@@ -75,7 +81,7 @@ static struct {
 	u16 surrogate = 0;
 	bool key_states[256] = {};
 	bool is_cursor_shown = true;
-	bool was_cursor_shown;
+	CursorState prev_cursor_state = CursorState::DEFAULT;
 	struct {
 		HCURSOR load;
 		HCURSOR size_ns;
@@ -589,7 +595,7 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 					return 0;
 				case WM_ACTIVATE: {
 					if (wParam == WA_INACTIVE) {
-						G.was_cursor_shown = G.is_cursor_shown;
+						G.prev_cursor_state = G.is_cursor_shown ? CursorState::SHOWN : CursorState::HIDDEN;
 						showCursor(true);
 						G.key_states[(u32)os::Keycode::SHIFT] = false;
 						G.key_states[(u32)os::Keycode::CTRL] = false;
@@ -599,7 +605,11 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 						G.key_states[(u32)os::Keycode::LALT] = false;
 					}
 					else {
-						showCursor(G.was_cursor_shown);
+						switch (G.prev_cursor_state) {
+							case CursorState::DEFAULT: break;
+							case CursorState::HIDDEN: showCursor(false); break;
+							case CursorState::SHOWN: showCursor(true); break;
+						}
 					}
 
 					e.type = Event::Type::FOCUS;
