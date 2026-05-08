@@ -75,6 +75,7 @@ static struct {
 	u16 surrogate = 0;
 	bool key_states[256] = {};
 	bool is_cursor_shown = true;
+	bool was_cursor_shown;
 	struct {
 		HCURSOR load;
 		HCURSOR size_ns;
@@ -588,6 +589,7 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 					return 0;
 				case WM_ACTIVATE: {
 					if (wParam == WA_INACTIVE) {
+						G.was_cursor_shown = G.is_cursor_shown;
 						showCursor(true);
 						G.key_states[(u32)os::Keycode::SHIFT] = false;
 						G.key_states[(u32)os::Keycode::CTRL] = false;
@@ -595,6 +597,9 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 						G.key_states[(u32)os::Keycode::LSHIFT] = false;
 						G.key_states[(u32)os::Keycode::LCTRL] = false;
 						G.key_states[(u32)os::Keycode::LALT] = false;
+					}
+					else {
+						showCursor(G.was_cursor_shown);
 					}
 
 					e.type = Event::Type::FOCUS;

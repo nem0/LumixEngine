@@ -2296,7 +2296,7 @@ public:
 			m_selected_entities.clear();
 			
 			InputMemoryStream blob(m_game_mode_file);
-			loadWorld(blob, path.c_str(), false, true);
+			loadWorld(blob, false, true);
 		}
 		m_game_mode_file.clear();
 		if(m_selected_entity_on_game_mode.isValid()) {
@@ -2488,7 +2488,7 @@ public:
 			copyString(m_world->getPartitions()[0].name, basename);
 		}
 
-		if (!loadWorld(blob, basename, additive, false)) {
+		if (!loadWorld(blob, additive, false)) {
 			newWorld();
 			return;
 		}
@@ -2498,7 +2498,7 @@ public:
 		m_entity_folders->selectFolder(root_folder);
 	}
 
-	bool loadWorld(InputMemoryStream& blob, const char* name, bool additive, bool is_game_mode_load) {
+	bool loadWorld(InputMemoryStream& blob, bool additive, bool is_game_mode_load) {
 		PROFILE_FUNCTION();
 		m_is_loading = true;
 

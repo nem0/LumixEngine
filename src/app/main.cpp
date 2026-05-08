@@ -22,6 +22,7 @@
 #include "renderer/pipeline.h"
 #include "renderer/render_module.h"
 #include "renderer/renderer.h"
+#include "ui/ui_system.h"
 #include "imgui_integration.h"
 
 #ifdef __linux__
@@ -92,46 +93,53 @@ struct Runner final
 		m_world->setRotation(env, rot);
 	}
 
-	bool loadWorld(const char* path) {
+	bool loadWorld() {
 		FileSystem& fs = m_engine->getFileSystem();
 		OutputMemoryStream data(m_allocator);
-		if (!fs.getContentSync(Path(path), data)) return false;
+		if (!fs.getContentSync(m_startup_world, data)) return false;
 
 		InputMemoryStream blob(data);
 		EntityMap entity_map(m_allocator);
 
 		WorldVersion editor_version;
 		if (!m_world->deserialize(blob, entity_map, editor_version)) {
-			logError("Failed to deserialize ", path);
+			logError("Failed to deserialize ", m_startup_world);
 			return false;
 		}
+		copyString(m_world->getPartitions()[0].name, m_startup_world); 
 		return true;
 	}
 
 	void loadProject() {
-		char cmd_line[4096];
-		if (os::getCommandLine(cmd_line)) {
-			CommandLineParser parser(cmd_line);
-			while (parser.next()) {
-				if (!parser.currentEquals("-world")) continue;
-				if (!parser.next()) break;
+		auto parse_world_cmd_line = [&](){
+			char cmd_line[4096];
+			if (os::getCommandLine(cmd_line)) {
+				CommandLineParser parser(cmd_line);
+				while (parser.next()) {
+					if (!parser.currentEquals("-world")) continue;
+					if (!parser.next()) break;
 
-				char src[MAX_PATH];
-				parser.getCurrent(src, lengthOf(src));
-				m_startup_world = src;
-				break;
+					char src[MAX_PATH];
+					parser.getCurrent(src, lengthOf(src));
+					m_startup_world = src;
+					break;
+				}
 			}
-		}
+		};
 
 		FileSystem& fs = m_engine->getFileSystem();
 		OutputMemoryStream data(m_allocator);
-		if (!fs.getContentSync(Path("lumix.prj"), data)) return;
+		if (!fs.getContentSync(Path("lumix.prj"), data)) {
+			parse_world_cmd_line();
+			return;
+		}
 
 		InputMemoryStream tmp(data);
 		const DeserializeProjectResult res = m_engine->deserializeProject(tmp, m_startup_world);
 		if (DeserializeProjectResult::SUCCESS != res) {
 			logError("Failed to deserialize project file");
 		}
+		parse_world_cmd_line();
 	}
 
 	void onInit() {
@@ -165,9 +173,10 @@ struct Runner final
 		
 		loadProject();
 
-		if (!loadWorld(m_startup_world.c_str())) {
+		if (!loadWorld()) {
 			initDemoScene();
 		}
+		
 		os::showCursor(false);
 		while (m_engine->getFileSystem().hasWork()) {
 			os::sleep(10);
@@ -175,7 +184,6 @@ struct Runner final
 		}
 		m_engine->getFileSystem().processCallbacks();
 
-		os::showCursor(false);
 		onResize();
 		m_engine->startGame(*m_world);
 
@@ -238,6 +246,13 @@ struct Runner final
 			os::clipCursor(m_engine->getMainWindow(), r);
 		}
 
+		const UISystem* ui_system = (const UISystem*)m_engine->getSystemManager().getSystem("ui");
+		const bool is_ingame_cursor = ui_system && ui_system->isCursorEnabled();
+		if (m_is_ingame_cursor != is_ingame_cursor) {
+			m_is_ingame_cursor = is_ingame_cursor;
+			os::showCursor(m_is_ingame_cursor);
+		}
+
 		m_imgui.beginFrame();
 		m_engine->update(*m_world);
 
@@ -270,6 +285,7 @@ struct Runner final
 	bool m_finished = false;
 	bool m_focused = true;
 	bool m_mouse_captured = false;
+	bool m_is_ingame_cursor = false;
 
 	ImGuiIntegration m_imgui;
 };
