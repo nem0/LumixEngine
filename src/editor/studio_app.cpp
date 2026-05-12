@@ -687,6 +687,12 @@ struct StudioAppImpl final : StudioApp {
 		const bool handle_input = m_frames_since_foreground == 0;
 		m_events.push(event);
 		switch (event.type) {
+			case os::Event::Type::GAMEPAD_AXIS: 
+			case os::Event::Type::GAMEPAD_BUTTON: 
+			case os::Event::Type::GAMEPAD_REMOVED: 
+			case os::Event::Type::GAMEPAD_ADDED: 
+				// TODO
+				break;
 			case os::Event::Type::MOUSE_MOVE: break;
 			case os::Event::Type::FOCUS: {
 				ImGuiIO& io = ImGui::GetIO();

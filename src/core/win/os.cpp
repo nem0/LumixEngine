@@ -12,10 +12,14 @@
 #include <windowsx.h>
 #include <shlobj_core.h>
 #include <Psapi.h>
+#include <hidsdi.h>
+#include <hidpi.h>
+#include <hidusage.h>
 #pragma warning(pop)
 #pragma warning(disable : 4996)
 
 #pragma comment(lib, "Ws2_32.lib")
+#pragma comment(lib, "hid.lib")
 
 //Request high performace profiles from mobile chipsets
 extern "C" {
@@ -73,8 +77,33 @@ enum class CursorState {
 	SHOWN
 };
 
+struct GamepadState {
+	u16 buttons;
+	float left_x;
+	float left_y;
+	float right_x;
+	float right_y;
+	float left_trigger;
+	float right_trigger;
+};
+
+struct GamepadDevice {
+	HANDLE handle;
+	GamepadUID uid;
+	alignas(void*) u8 ppd_buf[4096];
+	PHIDP_PREPARSED_DATA ppd = nullptr;
+	HIDP_BUTTON_CAPS btn_caps[32];
+	USHORT btn_caps_count = 0;
+	HIDP_VALUE_CAPS val_caps[64];
+	USHORT val_caps_count = 0;
+	GamepadState state = {};
+	GamepadDevice* next;
+};
+
 static struct {
 	EventQueue event_queue;
+	GamepadDevice* gamepads = nullptr;
+	u32 gamepad_uid_gen = 0;
 	Point relative_mode_pos = {};
 	bool relative_mouse = false;
 	bool raw_input_registered = false;
@@ -93,6 +122,272 @@ static struct {
 	} cursors;
 	CursorType current_cursor = CursorType::DEFAULT;
 } G;
+
+static GamepadDevice* createGamepad(HANDLE device_handle) {
+	RID_DEVICE_INFO info = {};
+	info.cbSize = sizeof(info);
+	UINT size = sizeof(info);
+	if (GetRawInputDeviceInfo(device_handle, RIDI_DEVICEINFO, &info, &size) == (UINT)-1) return nullptr;
+	if (info.dwType != RIM_TYPEHID) return nullptr;
+	if (info.hid.usUsagePage != HID_USAGE_PAGE_GENERIC) return nullptr;
+	if (info.hid.usUsage != HID_USAGE_GENERIC_JOYSTICK && info.hid.usUsage != HID_USAGE_GENERIC_GAMEPAD) return nullptr;
+
+	GamepadDevice* gp = LUMIX_NEW(getGlobalAllocator(), GamepadDevice);
+	gp->handle = device_handle;
+	gp->ppd = (PHIDP_PREPARSED_DATA)gp->ppd_buf;
+
+	UINT ppd_size = sizeof(gp->ppd_buf);
+	if (GetRawInputDeviceInfo(device_handle, RIDI_PREPARSEDDATA, gp->ppd_buf, &ppd_size) == (UINT)-1 || ppd_size == 0 || ppd_size > sizeof(gp->ppd_buf)) {
+		logError("Gamepad: GetRawInputDeviceInfo in createGamepad failed.");
+		LUMIX_DELETE(getGlobalAllocator(), gp);
+		return nullptr;
+	}
+
+	HIDP_CAPS caps = {};
+	if (HidP_GetCaps(gp->ppd, &caps) != HIDP_STATUS_SUCCESS) {
+		LUMIX_DELETE(getGlobalAllocator(), gp);
+		return nullptr;
+	}
+
+	if (caps.NumberInputButtonCaps > lengthOf(gp->btn_caps)) {
+		Lumix::logError("Gamepad has too many button caps: ", caps.NumberInputButtonCaps, ", using first ", lengthOf(gp->btn_caps));
+	}
+	gp->btn_caps_count = (USHORT)lengthOf(gp->btn_caps);
+	if (!caps.NumberInputButtonCaps || HidP_GetButtonCaps(HidP_Input, gp->btn_caps, &gp->btn_caps_count, gp->ppd) != HIDP_STATUS_SUCCESS) {
+		gp->btn_caps_count = 0;
+	}
+
+	if (caps.NumberInputValueCaps > lengthOf(gp->val_caps)) {
+		Lumix::logError("Gamepad has too many value caps: ", caps.NumberInputValueCaps, ", using first ", lengthOf(gp->val_caps));
+	}
+	gp->val_caps_count = (USHORT)lengthOf(gp->val_caps);
+	if (!caps.NumberInputValueCaps || HidP_GetValueCaps(HidP_Input, gp->val_caps, &gp->val_caps_count, gp->ppd) != HIDP_STATUS_SUCCESS) {
+		gp->val_caps_count = 0;
+	}
+
+	gp->uid = (GamepadUID)++G.gamepad_uid_gen;
+
+	Lumix::logInfo("Gamepad connected: (uid=", u32(gp->uid), ")");
+	Lumix::logInfo("  vid=", u32(info.hid.dwVendorId), ", pid=", u32(info.hid.dwProductId));
+	const u32 vid_pid = (u32(info.hid.dwVendorId) << 16) | u32(info.hid.dwProductId);
+	const char* controller = nullptr;
+	switch (vid_pid) {
+		case 0x045e0202: controller = "XboxControllerUsa_0202"; break;
+		case 0x045e0285: controller = "XboxControllerJapan"; break;
+		case 0x045e0287: controller = "XboxControllerS_0287"; break;
+		case 0x045e0288: controller = "XboxControllerS_0288"; break;
+		case 0x045e0289: controller = "XboxControllerUsa_0289"; break;
+		case 0x045e028e: controller = "Xbox360Controller"; break;
+		case 0x045e0291: controller = "UnlicensedXbox360WirelessReceiver"; break;
+		case 0x045e02a0: controller = "Xbox360BigButtonReceiver"; break;
+		case 0x045e02a1: controller = "Xbox360WirelessController"; break;
+		case 0x045e02d1: controller = "XboxOneController_02d1"; break;
+		case 0x045e02dd: controller = "XboxOneController_02dd"; break;
+		case 0x045e02e0: controller = "XboxOneSControllerBluetooth_02e0"; break;
+		case 0x045e02e3: controller = "XboxOneEliteController_02e3"; break;
+		case 0x045e02ea: controller = "XboxOneSControllerUsb"; break;
+		case 0x045e02fd: controller = "XboxOneSControllerBluetooth_02fd"; break;
+		case 0x045e02ff: controller = "XboxOneEliteController_02ff"; break;
+		case 0x045e0719: controller = "Xbox360WirelessReceiver"; break;
+		case 0x054c0268: controller = "Dualshock3Sixaxis"; break;
+		case 0x054c042f: controller = "SplitFishFragFx"; break;
+		case 0x054c05c4: controller = "Dualshock4_05c4"; break;
+		case 0x054c05c5: controller = "StrikePackFpsDominator"; break;
+		case 0x054c09cc: controller = "Dualshock4_09cc"; break;
+		case 0x054c0ba0: controller = "Dualshock4UsbReceiver"; break;
+		default: break;
+	}
+	if (controller) Lumix::logInfo("  controller=", controller);
+
+	gp->next = G.gamepads;
+	G.gamepads = gp;
+	return gp;
+}
+
+static GamepadDevice* findGamepad(HANDLE device_handle) {
+	for (GamepadDevice* gp = G.gamepads; gp; gp = gp->next) {
+		if (gp->handle == device_handle) return gp;
+	}
+	return nullptr;
+}
+
+static bool removeGamepadUID(HANDLE device_handle, GamepadUID* uid) {
+	GamepadDevice* prev = nullptr;
+	for (GamepadDevice* gp = G.gamepads; gp; prev = gp, gp = gp->next) {
+		if (gp->handle == device_handle) {
+			*uid = gp->uid;
+			if (prev) prev->next = gp->next;
+			else G.gamepads = gp->next;
+			LUMIX_DELETE(getGlobalAllocator(), gp);
+			return true;
+		}
+	}
+	return false;
+}
+
+static float normHIDValue(const HIDP_VALUE_CAPS& cap, ULONG value) {
+	if (cap.LogicalMax <= cap.LogicalMin) {
+		// Some devices report invalid logical ranges; treat the raw value as centered 16-bit data.
+		return float(i32(u16(value)) - 0x8000) / 32768.0f;
+	}
+
+	i64 signed_value = value;
+	if (cap.LogicalMin < 0 && cap.BitSize > 0) {
+		// HidP_GetUsageValue returns an unsigned field even for signed logical ranges.
+		if (cap.BitSize < 32) {
+			const ULONG sign_bit = 1u << (cap.BitSize - 1);
+			const ULONG mask = (1u << cap.BitSize) - 1;
+			if (value & sign_bit) signed_value = i64(value & mask) - (i64(1) << cap.BitSize);
+		}
+		else if (value & 0x80000000u) {
+			signed_value = i64(value) - (i64(1) << 32);
+		}
+	}
+	const float t = float(signed_value - i64(cap.LogicalMin)) / float(i64(cap.LogicalMax) - i64(cap.LogicalMin));
+	return t * 2.0f - 1.0f;
+}
+
+static bool nearlyEqual(float a, float b) {
+	const float d = a - b;
+	return d < 0.01f && d > -0.01f;
+}
+
+static void pushGamepadButtonEvents(GamepadDevice* gp, u16 buttons) {
+	const u16 changed = gp->state.buttons ^ buttons;
+	if (!changed) return;
+
+	gp->state.buttons = buttons;
+
+	for (u32 i = 0; i < 16; ++i) {
+		const u16 bit = u16(1u << i);
+		if (!(changed & bit)) continue;
+		Event e;
+		e.type = Event::Type::GAMEPAD_BUTTON;
+		e.gamepad_button.gamepad = gp->uid;
+		e.gamepad_button.button = (GamepadButton)i;
+		e.gamepad_button.down = (buttons & bit) != 0;
+		G.event_queue.pushBack(e);
+	}
+}
+
+static void pushGamepadAxisEvent(GamepadDevice* gp, GamepadAxis axis, float x, float y, float* old_x, float* old_y = nullptr) {
+	const bool same = old_y ? nearlyEqual(x, *old_x) && nearlyEqual(y, *old_y) : nearlyEqual(x, *old_x);
+	if (same) return;
+
+	*old_x = x;
+	if (old_y) *old_y = y;
+
+	Event e;
+	e.type = Event::Type::GAMEPAD_AXIS;
+	e.gamepad_axis.gamepad = gp->uid;
+	e.gamepad_axis.axis = axis;
+	e.gamepad_axis.x = x;
+	e.gamepad_axis.y = y;
+	G.event_queue.pushBack(e);
+}
+
+static void applyHIDValue(GamepadDevice* gp, const HIDP_VALUE_CAPS& cap, USAGE usage, PCHAR report, ULONG report_size, GamepadState* state) {
+	ULONG usage_value = 0;
+	if (HidP_GetUsageValue(HidP_Input, cap.UsagePage, cap.LinkCollection, usage, &usage_value, gp->ppd, report, report_size) != HIDP_STATUS_SUCCESS) {
+		return;
+	}
+
+	if (usage == HID_USAGE_GENERIC_HATSWITCH) {
+		if (cap.LogicalMax <= cap.LogicalMin) return;
+
+		const i64 hat_value = i64(usage_value);
+		if (hat_value < cap.LogicalMin || hat_value > cap.LogicalMax) return;
+
+		const u32 hat = u32(hat_value - cap.LogicalMin);
+		if (hat > 7) return;
+
+		static const u16 masks[] = {
+			u16(1u << u32(GamepadButton::DPAD_UP)),
+			u16((1u << u32(GamepadButton::DPAD_UP)) | (1u << u32(GamepadButton::DPAD_RIGHT))),
+			u16(1u << u32(GamepadButton::DPAD_RIGHT)),
+			u16((1u << u32(GamepadButton::DPAD_RIGHT)) | (1u << u32(GamepadButton::DPAD_DOWN))),
+			u16(1u << u32(GamepadButton::DPAD_DOWN)),
+			u16((1u << u32(GamepadButton::DPAD_DOWN)) | (1u << u32(GamepadButton::DPAD_LEFT))),
+			u16(1u << u32(GamepadButton::DPAD_LEFT)),
+			u16((1u << u32(GamepadButton::DPAD_LEFT)) | (1u << u32(GamepadButton::DPAD_UP)))
+		};
+		state->buttons |= masks[hat];
+		return;
+	}
+
+	const float v = normHIDValue(cap, usage_value);
+	switch (usage) {
+		case HID_USAGE_GENERIC_X: state->left_x = v; break;
+		case HID_USAGE_GENERIC_Y: state->left_y = -v; break; // up is positive
+		case HID_USAGE_GENERIC_Z:
+			state->left_trigger = v > 0 ? v : 0;
+			state->right_trigger = v < 0 ? -v : 0;
+			break;
+		case HID_USAGE_GENERIC_RX: state->right_x = v; break;
+		case HID_USAGE_GENERIC_RY: state->right_y = -v; break; // up is positive
+		case HID_USAGE_GENERIC_RZ: state->right_trigger = (v + 1.0f) * 0.5f; break;
+		default: break;
+	}
+}
+
+static void processRawInputGamepad(const RAWINPUT* raw) {
+	GamepadDevice* gp = findGamepad(raw->header.hDevice);
+	if (!gp) {
+		// Raw input can arrive before GIDC_ARRIVAL, so create the device and queue the add event first.
+		gp = createGamepad(raw->header.hDevice);
+		if (!gp) return;
+		Event e;
+		e.type = Event::Type::GAMEPAD_ADDED;
+		e.gamepad_added.gamepad = gp->uid;
+		G.event_queue.pushBack(e);
+	}
+
+	const ULONG report_size = raw->data.hid.dwSizeHid;
+	if (report_size == 0) return;
+	PCHAR report = (PCHAR)raw->data.hid.bRawData;
+
+	GamepadState state = gp->state;
+	state.buttons = 0;
+
+	// GamepadButton order matches HID button usages 1..16.
+	for (USHORT i = 0; i < gp->btn_caps_count; ++i) {
+		const HIDP_BUTTON_CAPS& cap = gp->btn_caps[i];
+		if (cap.UsagePage != HID_USAGE_PAGE_BUTTON) continue;
+
+		USAGE usages[64];
+		ULONG usage_length = lengthOf(usages);
+		if (HidP_GetUsages(HidP_Input, cap.UsagePage, cap.LinkCollection, usages, &usage_length, gp->ppd, report, report_size) != HIDP_STATUS_SUCCESS) {
+			continue;
+		}
+
+		for (ULONG j = 0; j < usage_length; ++j) {
+			const u32 usage = usages[j];
+			if (usage >= 1 && usage <= 16) state.buttons |= u16(1u << (usage - 1));
+		}
+	}
+
+	// Values carry sticks, triggers and the hat switch.
+	for (USHORT i = 0; i < gp->val_caps_count; ++i) {
+		const HIDP_VALUE_CAPS& cap = gp->val_caps[i];
+		if (cap.UsagePage != HID_USAGE_PAGE_GENERIC) continue;
+
+		if (cap.IsRange) {
+			for (USAGE usage = cap.Range.UsageMin; usage <= cap.Range.UsageMax; ++usage) {
+				applyHIDValue(gp, cap, usage, report, report_size, &state);
+			}
+		}
+		else {
+			applyHIDValue(gp, cap, cap.NotRange.Usage, report, report_size, &state);
+		}
+	}
+
+	// Emit only changes.
+	pushGamepadButtonEvents(gp, state.buttons);
+	pushGamepadAxisEvent(gp, GamepadAxis::LTHUMB, state.left_x, state.left_y, &gp->state.left_x, &gp->state.left_y);
+	pushGamepadAxisEvent(gp, GamepadAxis::RTHUMB, state.right_x, state.right_y, &gp->state.right_x, &gp->state.right_y);
+	pushGamepadAxisEvent(gp, GamepadAxis::LTRIGGER, state.left_trigger, 0, &gp->state.left_trigger);
+	pushGamepadAxisEvent(gp, GamepadAxis::RTRIGGER, state.right_trigger, 0, &gp->state.right_trigger);
+}
 
 
 InputFile::InputFile()
@@ -414,6 +709,12 @@ bool getEvent(Event& event) {
 			GetRawInputData(hRawInput, RID_INPUT, dataBuf, &dataSize, sizeof(RAWINPUTHEADER));
 
 			const RAWINPUT* raw = (const RAWINPUT*)dataBuf;
+			if (raw->header.dwType == RIM_TYPEHID) {
+				processRawInputGamepad(raw);
+				if (G.event_queue.empty()) goto retry;
+				event = G.event_queue.popFront();
+				break;
+			}
 			if (raw->header.dwType != RIM_TYPEMOUSE) break;
 
 			const RAWMOUSE& mouseData = raw->data.mouse;
@@ -510,6 +811,33 @@ bool getEvent(Event& event) {
 
 			event = G.event_queue.popFront();
 
+			break;
+		}
+		case WM_INPUT_DEVICE_CHANGE: {
+			const HANDLE device_handle = (HANDLE)msg.lParam;
+			switch (msg.wParam) {
+				case GIDC_ARRIVAL: {
+					GamepadDevice* gp = findGamepad(device_handle);
+					if (gp) goto retry; // we might receive an input event before the arrival/connect event
+
+					gp = createGamepad(device_handle);
+					if (!gp) goto retry;
+
+					event.type = Event::Type::GAMEPAD_ADDED;
+					event.gamepad_added.gamepad = gp->uid;
+					break;
+				}
+				case GIDC_REMOVAL: {
+					GamepadUID uid;
+					if (!removeGamepadUID(device_handle, &uid)) goto retry;
+
+					event.type = Event::Type::GAMEPAD_REMOVED;
+					event.gamepad_removed.gamepad = uid;
+					Lumix::logInfo("Gamepad removed (uid=", u32(uid), ")");
+					break;
+				}
+				default: goto retry;
+			}
 			break;
 		}
 		default:
@@ -746,12 +1074,12 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 	}
 
 	if (!G.raw_input_registered) {
-		RAWINPUTDEVICE device;
-		device.usUsagePage = 0x01;
-		device.usUsage = 0x02;
-		device.dwFlags = RIDEV_INPUTSINK;
-		device.hwndTarget = hwnd;
-		FATAL_CHECK(RegisterRawInputDevices(&device, 1, sizeof(device)));
+		RAWINPUTDEVICE devices[] = {
+			{HID_USAGE_PAGE_GENERIC, HID_USAGE_GENERIC_MOUSE, RIDEV_INPUTSINK | RIDEV_DEVNOTIFY, hwnd},
+			{HID_USAGE_PAGE_GENERIC, HID_USAGE_GENERIC_JOYSTICK, RIDEV_DEVNOTIFY, hwnd},
+			{HID_USAGE_PAGE_GENERIC, HID_USAGE_GENERIC_GAMEPAD, RIDEV_DEVNOTIFY, hwnd},
+		};
+		FATAL_CHECK(RegisterRawInputDevices(devices, lengthOf(devices), sizeof(devices[0])));
 		G.raw_input_registered = true;
 	}
 
@@ -773,7 +1101,6 @@ void showWindow(WindowHandle wnd) {
 bool isKeyDown(Keycode keycode) {
 	return G.key_states[(i32)keycode];
 }
-
 
 void getKeyName(Keycode keycode, Span<char> out)
 {

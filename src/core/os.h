@@ -59,6 +59,38 @@ struct Rect { i32 left, top, width, height; };
 using WindowHandle = void*;
 constexpr WindowHandle INVALID_WINDOW = nullptr;
 
+// Stable only for the lifetime of one connected OS gamepad device.
+enum class GamepadUID : u32 {};
+enum class GamepadAxis : u32 {
+	LTRIGGER,
+	RTRIGGER,
+	LTHUMB,
+	RTHUMB
+};
+enum class GamepadButton : u32 {
+	SOUTH = 0,
+	EAST,
+	WEST,
+	NORTH,
+	LEFT_SHOULDER,
+	RIGHT_SHOULDER,
+	BACK,
+	START,
+	LEFT_STICK,
+	RIGHT_STICK,
+	GUIDE,
+	MISC,
+	DPAD_UP,
+	DPAD_RIGHT,
+	DPAD_DOWN,
+	DPAD_LEFT,
+
+	A = SOUTH,
+	B = EAST,
+	X = WEST,
+	Y = NORTH
+};
+
 struct Event {
     enum class Type {
         QUIT,
@@ -71,6 +103,10 @@ struct Event {
         WINDOW_SIZE,
         WINDOW_MOVE,
         DROP_FILE,
+		GAMEPAD_ADDED,
+		GAMEPAD_REMOVED,
+		GAMEPAD_BUTTON,
+		GAMEPAD_AXIS,
 		FOCUS
     };
 
@@ -83,9 +119,13 @@ struct Event {
 		struct { bool down; MouseButton button; } mouse_button;
 		struct { int xrel, yrel; } mouse_move;
         struct { bool down; Keycode keycode; bool is_repeat; } key;
-        struct { void* handle; } file_drop;
+		struct { void* handle; } file_drop;
         struct { float amount; } mouse_wheel;
 		struct { bool gained; } focus;
+		struct { GamepadUID gamepad; } gamepad_added;
+		struct { GamepadUID gamepad; } gamepad_removed;
+		struct { GamepadUID gamepad; bool down; GamepadButton button; } gamepad_button;
+		struct { GamepadUID gamepad; GamepadAxis axis; float x; float y; } gamepad_axis;
     };
 };
 
