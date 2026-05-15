@@ -87,10 +87,16 @@ struct GamepadState {
 	float right_trigger;
 };
 
+enum class GamepadKind {
+	GENERIC,
+	DUALSHOCK4
+};
+
 struct GamepadDevice {
 	HANDLE handle;
 	GamepadUID uid;
-	alignas(void*) u8 ppd_buf[4096];
+	GamepadKind kind = GamepadKind::GENERIC;
+	alignas(void*) u8 ppd_buf[8192];
 	PHIDP_PREPARSED_DATA ppd = nullptr;
 	HIDP_BUTTON_CAPS btn_caps[32];
 	USHORT btn_caps_count = 0;
@@ -198,6 +204,16 @@ static GamepadDevice* createGamepad(HANDLE device_handle) {
 		default: break;
 	}
 	if (controller) Lumix::logInfo("  controller=", controller);
+	switch (vid_pid) {
+		case 0x054c05c4:
+		case 0x054c09cc:
+		case 0x054c0ba0:
+			gp->kind = GamepadKind::DUALSHOCK4;
+			break;
+		default:
+			gp->kind = GamepadKind::GENERIC;
+			break;
+	}
 
 	gp->next = G.gamepads;
 	G.gamepads = gp;
@@ -316,6 +332,19 @@ static void applyHIDValue(GamepadDevice* gp, const HIDP_VALUE_CAPS& cap, USAGE u
 	}
 
 	const float v = normHIDValue(cap, usage_value);
+	if (gp->kind == GamepadKind::DUALSHOCK4) {
+		switch (usage) {
+			case HID_USAGE_GENERIC_X: state->left_x = v; break;
+			case HID_USAGE_GENERIC_Y: state->left_y = -v; break; // up is positive
+			case HID_USAGE_GENERIC_Z: state->right_x = v; break;
+			case HID_USAGE_GENERIC_RZ: state->right_y = -v; break; // up is positive
+			case HID_USAGE_GENERIC_RX: state->left_trigger = (v + 1.0f) * 0.5f; break;
+			case HID_USAGE_GENERIC_RY: state->right_trigger = (v + 1.0f) * 0.5f; break;
+			default: break;
+		}
+		return;
+	}
+
 	switch (usage) {
 		case HID_USAGE_GENERIC_X: state->left_x = v; break;
 		case HID_USAGE_GENERIC_Y: state->left_y = -v; break; // up is positive
