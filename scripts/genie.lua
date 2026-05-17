@@ -9,6 +9,7 @@ local simple_options = {
 	{ "no-renderer", "Do not build renderer plugin." },
 	{ "no-audio", "Do not build audio plugin." },
 	{ "no-lua", "Do not build lua plugin." },
+	{ "no-lumscript", "Do not build lumscript plugin." },
 	{ "no-ui", "Do not build UI plugin." },
 	{ "with-app", "Do build app." },
 	{ "with-basis-universal", "Use basis universal compression." },
@@ -66,7 +67,7 @@ if _OPTIONS["plugins"] then
 	plugins = string.explode( _OPTIONS["plugins"], ",")
 end
 
-for	_, v in ipairs { "physics", "renderer", "audio", "ui", "animation", "navigation", "lua" } do
+for	_, v in ipairs { "physics", "renderer", "audio", "ui", "animation", "navigation", "lua", "lumscript" } do
 	if _OPTIONS["no-" .. v] == nil then
 		table.insert(plugins, v)
 		table.insert(base_plugins, v)
@@ -587,6 +588,13 @@ if plugin "lua" then
 		exe_project "app"
 			linkLib "Luau"
 	end
+end
+
+if plugin "lumscript" then
+	files { "../src/lumscript/**.h", "../src/lumscript/**.cpp" }
+	includedirs { "../src", "../src/lumscript" }
+	defines { "BUILDING_LUMSCRIPT" }
+	dynamic_link_plugin { "core", "engine" }
 end
 
 if _OPTIONS["with-game"] ~= nil then
