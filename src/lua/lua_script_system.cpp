@@ -23,24 +23,24 @@
 
 namespace Lumix {
 
-static const char* toString(InputSystem::Device::Type type) {
+static const char* toString(InputDeviceType type) {
 	switch (type) {
-		case InputSystem::Device::KEYBOARD: return "keyboard";
-		case InputSystem::Device::MOUSE: return "mouse";
-		case InputSystem::Device::GAMEPAD: return "gamepad";
+		case InputDeviceType::KEYBOARD: return "keyboard";
+		case InputDeviceType::MOUSE: return "mouse";
+		case InputDeviceType::GAMEPAD: return "gamepad";
 	}
 	ASSERT(false);
 	return "N/A";
 }
 
-static const char* toString(InputSystem::Event::Type type) {
+static const char* toString(InputEventType type) {
 	switch (type) {
-		case InputSystem::Event::MOUSE_WHEEL: return "mouse_wheel";
-		case InputSystem::Event::AXIS: return "axis";
-		case InputSystem::Event::BUTTON: return "button";
-		case InputSystem::Event::TEXT_INPUT: return "text_input";
-		case InputSystem::Event::DEVICE_ADDED: return "device_added";
-		case InputSystem::Event::DEVICE_REMOVED: return "device_removed";
+		case InputEventType::MOUSE_WHEEL: return "mouse_wheel";
+		case InputEventType::AXIS: return "axis";
+		case InputEventType::BUTTON: return "button";
+		case InputEventType::TEXT_INPUT: return "text_input";
+		case InputEventType::DEVICE_ADDED: return "device_added";
+		case InputEventType::DEVICE_REMOVED: return "device_removed";
 	}
 	ASSERT(false);
 	return "N/A";
@@ -1553,11 +1553,11 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 
 		switch(event.type)
 		{
-			case InputSystem::Event::DEVICE_ADDED:
+			case InputEventType::DEVICE_ADDED:
 				break;
-			case InputSystem::Event::DEVICE_REMOVED:
+			case InputEventType::DEVICE_REMOVED:
 				break;
-			case InputSystem::Event::BUTTON:
+			case InputEventType::BUTTON:
 				LuaWrapper::push(L, event.data.button.down); // [lua_event, button.down]
 				lua_setfield(L, -2, "down"); // [lua_event]
 				LuaWrapper::push(L, event.data.button.key_id); // [lua_event, button.key_id]
@@ -1569,13 +1569,13 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 				LuaWrapper::push(L, event.data.button.y); // [lua_event, button.y_abs]
 				lua_setfield(L, -2, "y"); // [lua_event]
 				break;
-			case InputSystem::Event::MOUSE_WHEEL:
+			case InputEventType::MOUSE_WHEEL:
 				LuaWrapper::push(L, event.data.mouse_wheel.x); // [lua_event, mouse_wheel.x]
 				lua_setfield(L, -2, "x"); // [lua_event]
 				LuaWrapper::push(L, event.data.mouse_wheel.y); // [lua_event, mouse_wheel.y]
 				lua_setfield(L, -2, "y"); // [lua_event]
 				break;
-			case InputSystem::Event::AXIS:
+			case InputEventType::AXIS:
 				LuaWrapper::push(L, event.data.axis.x); // [lua_event, axis.x]
 				lua_setfield(L, -2, "x"); // [lua_event]
 				LuaWrapper::push(L, event.data.axis.y); // [lua_event, axis.y]
@@ -1587,7 +1587,7 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 				LuaWrapper::push(L, (u32)event.data.axis.axis); // [lua_event, axis.axis]
 				lua_setfield(L, -2, "axis"); // [lua_event]
 				break;
-			case InputSystem::Event::TEXT_INPUT:
+			case InputEventType::TEXT_INPUT:
 				LuaWrapper::push(L, event.data.text.utf8); // [lua_event, utf8]
 				lua_setfield(L, -2, "text"); // [lua_event]
 				break;

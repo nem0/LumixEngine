@@ -30,6 +30,12 @@ namespace Lumix::LuaWrapper {
 	void push(lua_State* L, os::Keycode value) { LuaWrapper::push(L, (i32)value); }
 	template <> os::Keycode checkArg<os::Keycode>(lua_State* L, int index) { return (os::Keycode)checkArg<i32>(L, index); }
 	
+	void push(lua_State* L, InputDeviceType value) { LuaWrapper::push(L, (i32)value); }
+	template <> InputDeviceType checkArg<InputDeviceType>(lua_State* L, int index) { return (InputDeviceType)checkArg<i32>(L, index); }
+	
+	void push(lua_State* L, InputEventType value) { LuaWrapper::push(L, (i32)value); }
+	template <> InputEventType checkArg<InputEventType>(lua_State* L, int index) { return (InputEventType)checkArg<i32>(L, index); }
+	
 	void push(lua_State* L, GrassRotationMode value) { LuaWrapper::push(L, (i32)value); }
 	template <> GrassRotationMode checkArg<GrassRotationMode>(lua_State* L, int index) { return (GrassRotationMode)checkArg<i32>(L, index); }
 	
@@ -3557,6 +3563,36 @@ namespace Lumix {
 			LuaWrapper::push(L, 255);
 			lua_setfield(L, -2, "MAX");
 			lua_setfield(L, -2, "Keycode");
+			lua_pop(L, 1);
+		}
+		{
+			lua_getglobal(L, "LumixAPI");
+			lua_newtable(L);
+			LuaWrapper::push(L, 0);
+			lua_setfield(L, -2, "MOUSE");
+			LuaWrapper::push(L, 1);
+			lua_setfield(L, -2, "KEYBOARD");
+			LuaWrapper::push(L, 2);
+			lua_setfield(L, -2, "GAMEPAD");
+			lua_setfield(L, -2, "InputDeviceType");
+			lua_pop(L, 1);
+		}
+		{
+			lua_getglobal(L, "LumixAPI");
+			lua_newtable(L);
+			LuaWrapper::push(L, 0);
+			lua_setfield(L, -2, "BUTTON");
+			LuaWrapper::push(L, 1);
+			lua_setfield(L, -2, "AXIS");
+			LuaWrapper::push(L, 2);
+			lua_setfield(L, -2, "MOUSE_WHEEL");
+			LuaWrapper::push(L, 3);
+			lua_setfield(L, -2, "TEXT_INPUT");
+			LuaWrapper::push(L, 4);
+			lua_setfield(L, -2, "DEVICE_ADDED");
+			LuaWrapper::push(L, 5);
+			lua_setfield(L, -2, "DEVICE_REMOVED");
+			lua_setfield(L, -2, "InputEventType");
 			lua_pop(L, 1);
 		}
 		{

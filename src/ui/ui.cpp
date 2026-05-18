@@ -2152,9 +2152,9 @@ void Document::clearEvents() {
 
 void Document::injectEvent(const InputSystem::Event& event) {
 	switch (event.type) {
-		case InputSystem::Event::BUTTON: {
+		case InputEventType::BUTTON: {
 			const auto& btn = event.data.button;
-			if (event.device->type == InputSystem::Device::MOUSE) {
+			if (event.device->type == InputDeviceType::MOUSE) {
 				Event ui_event;
 				ui_event.type = btn.down ? EventType::MOUSE_DOWN : EventType::MOUSE_UP;
 				ui_event.position = Vec2(btn.x, btn.y);
@@ -2175,7 +2175,7 @@ void Document::injectEvent(const InputSystem::Event& event) {
 						m_events.push(action_event);
 					}
 				}
-			} else if (event.device->type == InputSystem::Device::KEYBOARD) {
+			} else if (event.device->type == InputDeviceType::KEYBOARD) {
 				Event ui_event;
 				ui_event.type = btn.down ? EventType::KEY_DOWN : EventType::KEY_UP;
 				ui_event.key_code = btn.key_id;
@@ -2185,8 +2185,8 @@ void Document::injectEvent(const InputSystem::Event& event) {
 			}
 			break;
 		}
-		case InputSystem::Event::AXIS: {
-			if (event.device->type == InputSystem::Device::MOUSE) {
+		case InputEventType::AXIS: {
+			if (event.device->type == InputDeviceType::MOUSE) {
 				Vec2 pos(event.data.axis.x_abs, event.data.axis.y_abs);
 				StackArray<u32, 16> new_hovered_path(m_allocator);
 				for (u32 idx : m_root.children) {
@@ -2252,7 +2252,7 @@ void Document::injectEvent(const InputSystem::Event& event) {
 			}
 			break;
 		}
-		case InputSystem::Event::MOUSE_WHEEL: {
+		case InputEventType::MOUSE_WHEEL: {
 			Event ui_event;
 			ui_event.type = EventType::MOUSE_WHEEL;
 			ui_event.position = Vec2(event.data.mouse_wheel.x, event.data.mouse_wheel.y);
@@ -2262,7 +2262,7 @@ void Document::injectEvent(const InputSystem::Event& event) {
 			m_events.push(ui_event);
 			break;
 		}
-		case InputSystem::Event::TEXT_INPUT: {
+		case InputEventType::TEXT_INPUT: {
 			Event ui_event;
 			ui_event.type = EventType::TEXT_INPUT;
 			ui_event.text_utf8 = event.data.text.utf8;

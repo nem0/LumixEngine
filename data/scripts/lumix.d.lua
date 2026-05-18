@@ -899,6 +899,19 @@ declare this : Entity
 			INVALID : number,
 			MAX : number,
 		},
+		InputDeviceType : {
+			MOUSE : number,
+			KEYBOARD : number,
+			GAMEPAD : number,
+		},
+		InputEventType : {
+			BUTTON : number,
+			AXIS : number,
+			MOUSE_WHEEL : number,
+			TEXT_INPUT : number,
+			DEVICE_ADDED : number,
+			DEVICE_REMOVED : number,
+		},
 		GrassRotationMode : {
 			Y_UP : number,
 			ALL_RANDOM : number,
