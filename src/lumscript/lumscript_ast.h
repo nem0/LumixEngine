@@ -99,6 +99,7 @@ struct Stmt {
 	StringView name;
 	TypeRef type;
 	bool is_const = false;
+	bool is_undefined_init = false;
 	i32 expr = -1;
 	i32 left = -1;
 	i32 right = -1;
@@ -182,6 +183,7 @@ struct GlobalDecl {
 	TypeRef type;
 	Token token;
 	bool is_const = false;
+	bool is_undefined_init = false;
 	i32 expr = -1;
 };
 

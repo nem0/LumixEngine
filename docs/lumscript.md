@@ -3,13 +3,11 @@
 # TODO
 
 * engine API
-* undefined
 
 ---
 
 * operators
 * for cycle
-* break/continue/named label
 * debugger
 * string interpolation
 * bytecode/vm
@@ -454,13 +452,13 @@ Function values can be stored, passed, returned, and called.
 Declaration syntax for fixed-size arrays uses postfix size:
 
 ```cpp
-var d : i32[16];
+var d : i32[16] = undefined;
 ```
 
 Usage syntax:
 
 ```cpp
-var d : i32[16];
+var d : i32[16] = undefined;
 d[0] = 42;
 const first : i32 = d[0];
 ```
@@ -482,7 +480,7 @@ Indexing behavior:
 Indexing examples:
 
 ```cpp
-var d : i32[16];
+var d : i32[16] = undefined;
 
 const idx = 3;
 d[idx] = 11; // allowed
@@ -523,6 +521,8 @@ Rules:
 - top-level variables are module globals
 - globals initialize once when runtime first runs the module
 - locals use same declaration syntax
+- all `var` and `const` declarations must have an initializer
+- to intentionally skip initialization, use explicit `undefined` (for example `var x : i32 = undefined`)
 - explicit type is optional if inference can resolve from initializer
 - `const` cannot be reassigned
 - variables are block scoped

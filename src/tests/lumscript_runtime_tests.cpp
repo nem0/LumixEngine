@@ -1191,7 +1191,7 @@ bool testImguiImportRuntime() {
 bool testStaticArrayRuntimeIndexing() {
 	const char* source = R"(
 		fn main() : i32 {
-			var d : i32[4];
+			var d : i32[4] = undefined;
 			var i : i32 = 2;
 			d[i] = 42;
 			return d[2];
@@ -1211,7 +1211,7 @@ bool testStaticArrayRuntimeIndexing() {
 bool testStaticArrayRuntimeOutOfBoundsFails() {
 	const char* source = R"(
 		fn main(i : i32) : i32 {
-			var d : i32[2];
+			var d : i32[2] = undefined;
 			d[0] = 7;
 			return d[i];
 		}

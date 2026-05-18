@@ -222,6 +222,53 @@ bool testGlobalVariablesTypecheck() {
 	return true;
 }
 
+bool testVariableAndConstRequireInitializer() {
+	const char* source = R"(
+		var g : i32;
+
+		fn main() : void {
+			var local : i32;
+			const c : i32;
+		}
+	)";
+	LumScript::Module module(getGlobalAllocator());
+	LumScript::Diagnostics diagnostics(getGlobalAllocator());
+	ASSERT_TRUE(!LumScript::compile(module, source, diagnostics));
+	ASSERT_TRUE(diagnostics.has_error);
+	return true;
+}
+
+bool testVariableCanBeExplicitlyUndefined() {
+	const char* source = R"(
+		var g : i32 = undefined;
+
+		fn main() : i32 {
+			var local : i32 = undefined;
+			local = 7;
+			return local + g;
+		}
+	)";
+	LumScript::Module module(getGlobalAllocator());
+	LumScript::Diagnostics diagnostics(getGlobalAllocator());
+	ASSERT_TRUE(LumScript::compile(module, source, diagnostics));
+	return true;
+}
+
+bool testConstCanNotBeUndefined() {
+	const char* source = R"(
+		const g : i32 = undefined;
+
+		fn main() : void {
+			const c : i32 = undefined;
+		}
+	)";
+	LumScript::Module module(getGlobalAllocator());
+	LumScript::Diagnostics diagnostics(getGlobalAllocator());
+	ASSERT_TRUE(!LumScript::compile(module, source, diagnostics));
+	ASSERT_TRUE(diagnostics.has_error);
+	return true;
+}
+
 bool testDiagnosticsHaveSourceLocation() {
 	const char* source = "fn main() : i32 {\n\treturn missing;\n}\n";
 	LumScript::Module module(getGlobalAllocator());
@@ -1453,7 +1500,7 @@ bool testGeneratedImguiImportTypechecks() {
 bool testStaticArrayTypecheckAndIndexing() {
 	const char* source = R"(
 		fn main() : i32 {
-			var d : i32[4];
+			var d : i32[4] = undefined;
 			d[0] = 40;
 			d[1] = 2;
 			return d[0] + d[1];
@@ -1468,7 +1515,7 @@ bool testStaticArrayTypecheckAndIndexing() {
 bool testStaticArrayConstantIndexOutOfRangeFails() {
 	const char* source = R"(
 		fn main() : void {
-			var d : i32[4];
+			var d : i32[4] = undefined;
 			d[99] = 1;
 		}
 	)";
@@ -1482,7 +1529,7 @@ bool testStaticArrayConstantIndexOutOfRangeFails() {
 bool testStaticArrayIndexMustBeInteger() {
 	const char* source = R"(
 		fn main() : void {
-			var d : i32[4];
+			var d : i32[4] = undefined;
 			d[1.5] = 1;
 		}
 	)";
@@ -1622,6 +1669,9 @@ void runLumScriptCompilerTests() {
 	RUN_TEST(testConstAssignmentFails);
 	RUN_TEST(testDuplicateDeclarationsFail);
 	RUN_TEST(testGlobalVariablesTypecheck);
+	RUN_TEST(testVariableAndConstRequireInitializer);
+	RUN_TEST(testVariableCanBeExplicitlyUndefined);
+	RUN_TEST(testConstCanNotBeUndefined);
 	RUN_TEST(testDiagnosticsHaveSourceLocation);
 	RUN_TEST(testExplicitCastRequired);
 	RUN_TEST(testBinaryNumericOperatorsRequireSameOperandType);

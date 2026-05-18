@@ -599,8 +599,15 @@ struct Checker {
 				if (type.kind == TypeRef::INVALID) type = expr_type;
 				else if (!canAssign(type, expr_type)) m_diagnostics.errorAt(global.token, "Initializer type mismatch");
 			}
+			else if (global.is_undefined_init) {
+				if (global.is_const) m_diagnostics.errorAt(global.token, "Const declaration can not use undefined initializer");
+				if (type.kind == TypeRef::INVALID) m_diagnostics.errorAt(global.token, "Undefined initializer requires explicit type");
+			}
 			else if (type.kind == TypeRef::INVALID) {
 				m_diagnostics.errorAt(global.token, "Global variable needs type or initializer");
+			}
+			else {
+				m_diagnostics.errorAt(global.token, "Variable declaration requires initializer");
 			}
 			if (type.kind != TypeRef::INVALID) resolveType(type);
 			global.type = type;
@@ -1045,6 +1052,13 @@ struct Checker {
 					TypeRef expr_type = checkExpr(stmt.expr, expected);
 					if (type.kind == TypeRef::INVALID) type = expr_type;
 					else if (!canAssign(type, expr_type)) m_diagnostics.errorAt(stmt.token, "Initializer type mismatch");
+				}
+				else if (stmt.is_undefined_init) {
+					if (stmt.is_const) m_diagnostics.errorAt(stmt.token, "Const declaration can not use undefined initializer");
+					if (type.kind == TypeRef::INVALID) m_diagnostics.errorAt(stmt.token, "Undefined initializer requires explicit type");
+				}
+				else {
+					m_diagnostics.errorAt(stmt.token, "Variable declaration requires initializer");
 				}
 				if (type.kind != TypeRef::INVALID) resolveType(type);
 				stmt.type = type;

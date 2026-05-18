@@ -238,7 +238,15 @@ struct Parser {
 		global.token = name;
 		global.is_const = is_const;
 		if (match(Token::COLON)) global.type = parseType();
-		if (match(Token::EQUAL)) global.expr = parseExpression();
+		if (match(Token::EQUAL)) {
+			if (peek().type == Token::IDENTIFIER && equalStrings(peek().value, "undefined")) {
+				consumeToken();
+				global.is_undefined_init = true;
+			}
+			else {
+				global.expr = parseExpression();
+			}
+		}
 		consume(Token::SEMICOLON);
 	}
 
@@ -318,7 +326,15 @@ struct Parser {
 			stmt.name = name.value;
 			stmt.is_const = is_const;
 			if (match(Token::COLON)) stmt.type = parseType();
-			if (match(Token::EQUAL)) stmt.expr = parseExpression();
+			if (match(Token::EQUAL)) {
+				if (peek().type == Token::IDENTIFIER && equalStrings(peek().value, "undefined")) {
+					consumeToken();
+					stmt.is_undefined_init = true;
+				}
+				else {
+					stmt.expr = parseExpression();
+				}
+			}
 			consume(Token::SEMICOLON);
 			return stmt_idx;
 		}
