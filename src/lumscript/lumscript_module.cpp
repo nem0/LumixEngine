@@ -5,6 +5,7 @@
 #include "engine/resource_manager.h"
 #include "engine/file_system.h"
 #include "core/allocator.h"
+#include "core/array.h"
 #include "core/stream.h"
 #include "core/log.h"
 #include "core/tag_allocator.h"
@@ -133,12 +134,41 @@ struct LumScriptModuleImpl : LumScriptModule {
 private:
 	struct ImportContext {
 		World* world;
+		FileSystem* filesystem;
+		IAllocator* allocator;
+		Array<OutputMemoryStream> sources;
+
+		ImportContext(World& world, FileSystem& filesystem, IAllocator& allocator)
+			: world(&world)
+			, filesystem(&filesystem)
+			, allocator(&allocator)
+			, sources(allocator)
+		{}
 	};
+
+	static bool isValidCoreImportPath(StringView path) {
+		if (!startsWith(path, "core:")) return false;
+		StringView name = path.withoutLeft(5);
+		if (name.empty() || name[0] == '/' || name[0] == '\\') return false;
+		return !find(name, "..") && !find(name, ':') && !find(name, '\\');
+	}
 
 	static bool resolveImport(Module& module, StringView path, StringView alias, StringView* source, void* userdata) {
 		ImportContext* ctx = (ImportContext*)userdata;
 		if (resolveEngineImport(module, ctx->world, path, alias)) {
 			*source = {};
+			return true;
+		}
+		if (isValidCoreImportPath(path)) {
+			StringView name = path.withoutLeft(5);
+			const bool has_lum_extension = endsWith(name, ".lum");
+			Path file_path = has_lum_extension ? Path("engine/scripts/core/", name) : Path("engine/scripts/core/", name, ".lum");
+			OutputMemoryStream& blob = ctx->sources.emplace(*ctx->allocator);
+			if (!ctx->filesystem->getContentSync(file_path, blob)) {
+				ctx->sources.pop();
+				return false;
+			}
+			*source = StringView((const char*)blob.data(), (u32)blob.size());
 			return true;
 		}
 		return false;
@@ -165,8 +195,9 @@ private:
 			}
 			m_script.module = LUMIX_NEW(m_allocator, Module)(m_allocator);
 			
-			ImportContext import_ctx = { &m_world };
-			if (!compileWithBuiltins(*m_script.module, m_script.resource->getSourceCode(), diagnostics, &resolveImport, &import_ctx)) {
+			LumScriptSystem* lumscript_system = static_cast<LumScriptSystem*>(&m_system);
+			ImportContext import_ctx(m_world, lumscript_system->getEngine().getFileSystem(), m_allocator);
+			if (!compileWithBuiltins(*m_script.module, m_script.resource->getSourceCode(), diagnostics, &resolveImport, &import_ctx, m_script.path.c_str())) {
 				logError("LumScript compilation failed: ", diagnostics.message);
 				return false;
 			}

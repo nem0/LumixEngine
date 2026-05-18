@@ -17,7 +17,37 @@ struct LumScriptImportFiles {
 	u32 count = 0;
 };
 
+static const char* CORE_VEC3_SOURCE = R"(
+	struct Vec3 {
+		x : f32;
+		y : f32;
+		z : f32;
+	};
+)";
+
+static const char* CORE_QUAT_SOURCE = R"(
+	struct Quat {
+		x : f32;
+		y : f32;
+		z : f32;
+		w : f32;
+	};
+)";
+
+bool resolveCoreTestImport(StringView path, StringView* source) {
+	if (equalStrings(path, "core:vec3") || equalStrings(path, "core:vec3.lum")) {
+		*source = CORE_VEC3_SOURCE;
+		return true;
+	}
+	if (equalStrings(path, "core:quat") || equalStrings(path, "core:quat.lum")) {
+		*source = CORE_QUAT_SOURCE;
+		return true;
+	}
+	return false;
+}
+
 bool resolveLumScriptImport(LumScript::Module&, StringView path, StringView, StringView* source, void* userdata) {
+	if (resolveCoreTestImport(path, source)) return true;
 	const LumScriptImportFiles* imports = (const LumScriptImportFiles*)userdata;
 	if (!imports) return false;
 	Span<const LumScriptImportFile> files(imports->files, imports->count);
@@ -31,6 +61,7 @@ bool resolveLumScriptImport(LumScript::Module&, StringView path, StringView, Str
 }
 
 bool resolveRealEngineImport(LumScript::Module& module, StringView path, StringView alias, StringView* source, void*) {
+	if (resolveCoreTestImport(path, source)) return true;
 	if (!LumScript::resolveEngineImport(module, nullptr, path, alias)) return false;
 	*source = {};
 	return true;
@@ -38,7 +69,7 @@ bool resolveRealEngineImport(LumScript::Module& module, StringView path, StringV
 
 struct FakeInputDevice final : InputSystem::Device {
 	FakeInputDevice() {
-		type = KEYBOARD;
+		type = InputDeviceType::KEYBOARD;
 		index = 2;
 	}
 
@@ -96,6 +127,7 @@ bool nativeUseWorld(Span<const LumScript::Value> args, LumScript::Value*, void* 
 }
 
 bool resolveTestEngineImport(LumScript::Module& module, StringView path, StringView alias, StringView* source, void* userdata) {
+	if (resolveCoreTestImport(path, source)) return true;
 	*source = {};
 	if (equalStrings(path, "engine:entity")) {
 		LumScript::NativeTypeDecl& type = module.native_types.emplace();
@@ -144,7 +176,7 @@ bool nativeAdd(Span<const LumScript::Value> args, LumScript::Value* result, void
 bool testRuntimeAddVec3() {
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, LumScriptTests::SAMPLE, diagnostics));
+	ASSERT_TRUE(LumScript::compile(module, LumScriptTests::SAMPLE, diagnostics, resolveLumScriptImport, nullptr));
 
 	LumScript::Value args[] = {
 		makeVec3(10, 20, 30),
@@ -190,7 +222,7 @@ bool testStringConcatenationRuntime() {
 	)";
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, source, diagnostics));
+	ASSERT_TRUE(LumScript::compile(module, source, diagnostics, resolveLumScriptImport, nullptr));
 
 	LumScript::Runtime runtime(module, getGlobalAllocator());
 	LumScript::Value arg = LumScript::Runtime::makeString("Lumix");
@@ -232,25 +264,71 @@ bool testRuntimeCasts() {
 	return true;
 }
 
-bool testBuiltinLogErrorString() {
+bool testIntegerToEnumCastAllowsAnyIntegerRuntime() {
 	const char* source = R"(
-		fn main() : void {
-			logError("Hello " + "Lumix");
+		enum State {
+			Idle,
+			Running
+		};
+
+		fn to_state(v : i32) : State {
+			return v as State;
+		}
+
+		fn to_i32(v : i32) : i32 {
+			const s : State = v as State;
+			return s as i32;
 		}
 	)";
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compileWithBuiltins(module, source, diagnostics));
+	ASSERT_TRUE(LumScript::compile(module, source, diagnostics));
+
+	LumScript::Runtime runtime(module, getGlobalAllocator());
+	LumScript::Value arg = LumScript::Runtime::makeI32(123);
+	LumScript::Value result;
+	ASSERT_TRUE(runtime.call("to_state", Span<const LumScript::Value>(&arg, 1), &result, diagnostics));
+	ASSERT_TRUE(runtime.call("to_i32", Span<const LumScript::Value>(&arg, 1), &result, diagnostics));
+	ASSERT_EQ(123, result.i);
+	return true;
+}
+
+bool testEngineLogImportString() {
+	const char* source = R"(
+		import "engine:log" as log
+
+		fn main() : void {
+			log.logError("Hello " + "Lumix");
+		}
+	)";
+	LumScript::Module module(getGlobalAllocator());
+	LumScript::Diagnostics diagnostics(getGlobalAllocator());
+	ASSERT_TRUE(LumScript::compileWithBuiltins(module, source, diagnostics, resolveRealEngineImport, nullptr));
 
 	LumScript::Runtime runtime(module, getGlobalAllocator());
 	ASSERT_TRUE(runtime.call("main", Span<const LumScript::Value>(), nullptr, diagnostics));
 	return true;
 }
 
-bool testBuiltinLogErrorRejectsNonString() {
+bool testEngineLogImportRejectsNonString() {
+	const char* source = R"(
+		import "engine:log" as log
+
+		fn main() : void {
+			log.logError(42);
+		}
+	)";
+	LumScript::Module module(getGlobalAllocator());
+	LumScript::Diagnostics diagnostics(getGlobalAllocator());
+	ASSERT_TRUE(!LumScript::compileWithBuiltins(module, source, diagnostics, resolveRealEngineImport, nullptr));
+	ASSERT_TRUE(diagnostics.has_error);
+	return true;
+}
+
+bool testLogErrorRequiresImport() {
 	const char* source = R"(
 		fn main() : void {
-			logError(42);
+			logError("Hello " + "Lumix");
 		}
 	)";
 	LumScript::Module module(getGlobalAllocator());
@@ -263,7 +341,7 @@ bool testBuiltinLogErrorRejectsNonString() {
 bool testRuntimeMainWithLoop() {
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, LumScriptTests::SAMPLE, diagnostics));
+	ASSERT_TRUE(LumScript::compile(module, LumScriptTests::SAMPLE, diagnostics, resolveLumScriptImport, nullptr));
 
 	LumScript::Runtime runtime(module, getGlobalAllocator());
 	LumScript::RuntimeOptions options;
@@ -281,7 +359,7 @@ bool testStepLimit() {
 	)";
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, source, diagnostics));
+	ASSERT_TRUE(LumScript::compile(module, source, diagnostics, resolveLumScriptImport, nullptr));
 
 	LumScript::Runtime runtime(module, getGlobalAllocator());
 	LumScript::RuntimeOptions options;
@@ -516,6 +594,54 @@ bool testAliasedImportRuntime() {
 	LumScript::Value result;
 	ASSERT_TRUE(runtime.call("main", Span<const LumScript::Value>(), &result, diagnostics));
 	ASSERT_EQ(42, result.i);
+	return true;
+}
+
+bool testFirstParameterNamespaceResolutionPrecedenceRuntime() {
+	const char* main_source = R"(
+		import "entity_mod" as entity
+		import "helper_mod" as e
+
+		fn destroy(x : entity.Entity) : i32 {
+			return 3;
+		}
+
+		fn main() : i32 {
+			const x : entity.Entity = entity.Entity { 1 };
+			return e.destroy() * 100 + x.destroy() * 10 + destroy(x);
+		}
+	)";
+
+	const char* entity_source = R"(
+		struct Entity {
+			id : i32;
+		};
+
+		fn destroy(x : Entity) : i32 {
+			return 1;
+		}
+	)";
+
+	const char* helper_source = R"(
+		fn destroy() : i32 {
+			return 2;
+		}
+	)";
+
+	LumScriptImportFile files_storage[] = {
+		{ "entity_mod", entity_source },
+		{ "helper_mod", helper_source }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+
+	LumScript::Module module(getGlobalAllocator());
+	LumScript::Diagnostics diagnostics(getGlobalAllocator());
+	ASSERT_TRUE(LumScript::compile(module, main_source, diagnostics, resolveLumScriptImport, &files));
+
+	LumScript::Runtime runtime(module, getGlobalAllocator());
+	LumScript::Value result;
+	ASSERT_TRUE(runtime.call("main", Span<const LumScript::Value>(), &result, diagnostics));
+	ASSERT_EQ(213, result.i);
 	return true;
 }
 
@@ -772,8 +898,92 @@ bool testIntegerOverflowWraparoundRuntime() {
 	return true;
 }
 
+bool testDivisionAndModuloSemanticsRuntime() {
+	const char* source = R"(
+		fn q_pos() : i32 {
+			return 5 / 2;
+		}
+
+		fn q_neg() : i32 {
+			return -5 / 2;
+		}
+
+		fn r_neg_left() : i32 {
+			return -5 % 2;
+		}
+
+		fn r_neg_right() : i32 {
+			return 5 % -2;
+		}
+
+		fn float_div() : f32 {
+			return 1.0 / 0.0;
+		}
+	)";
+
+	LumScript::Module module(getGlobalAllocator());
+	LumScript::Diagnostics diagnostics(getGlobalAllocator());
+	ASSERT_TRUE(LumScript::compile(module, source, diagnostics));
+
+	LumScript::Runtime runtime(module, getGlobalAllocator());
+	LumScript::Value result;
+	ASSERT_TRUE(runtime.call("q_pos", Span<const LumScript::Value>(), &result, diagnostics));
+	ASSERT_EQ(2, result.i);
+	ASSERT_TRUE(runtime.call("q_neg", Span<const LumScript::Value>(), &result, diagnostics));
+	ASSERT_EQ(-2, result.i);
+	ASSERT_TRUE(runtime.call("r_neg_left", Span<const LumScript::Value>(), &result, diagnostics));
+	ASSERT_EQ(-1, result.i);
+	ASSERT_TRUE(runtime.call("r_neg_right", Span<const LumScript::Value>(), &result, diagnostics));
+	ASSERT_EQ(1, result.i);
+	ASSERT_TRUE(runtime.call("float_div", Span<const LumScript::Value>(), &result, diagnostics));
+	ASSERT_TRUE(isinf((double)result.f));
+	return true;
+}
+
+bool testDivisionByZeroRuntimeError() {
+	const char* source = R"(
+		fn divide(v : i32, d : i32) : i32 {
+			return v / d;
+		}
+
+		fn modulo(v : i32, d : i32) : i32 {
+			return v % d;
+		}
+
+		fn divide_assign(d : i32) : i32 {
+			var x : i32 = 8;
+			x /= d;
+			return x;
+		}
+	)";
+
+	LumScript::Module module(getGlobalAllocator());
+	LumScript::Diagnostics diagnostics(getGlobalAllocator());
+	ASSERT_TRUE(LumScript::compile(module, source, diagnostics));
+
+	LumScript::Runtime runtime(module, getGlobalAllocator());
+	LumScript::Value args[] = {LumScript::Runtime::makeI32(10), LumScript::Runtime::makeI32(0)};
+	LumScript::Value result;
+	ASSERT_TRUE(!runtime.call("divide", Span<const LumScript::Value>(args), &result, diagnostics));
+	ASSERT_TRUE(diagnostics.has_error);
+
+	LumScript::Diagnostics diagnostics2(getGlobalAllocator());
+	LumScript::Runtime runtime2(module, getGlobalAllocator());
+	ASSERT_TRUE(!runtime2.call("modulo", Span<const LumScript::Value>(args), &result, diagnostics2));
+	ASSERT_TRUE(diagnostics2.has_error);
+
+	LumScript::Diagnostics diagnostics3(getGlobalAllocator());
+	LumScript::Runtime runtime3(module, getGlobalAllocator());
+	LumScript::Value assign_arg = LumScript::Runtime::makeI32(0);
+	ASSERT_TRUE(!runtime3.call("divide_assign", Span<const LumScript::Value>(&assign_arg, 1), &result, diagnostics3));
+	ASSERT_TRUE(diagnostics3.has_error);
+	return true;
+}
+
 bool testUntypedLiteralsRuntime() {
 	const char* source = R"(
+		import "core:vec3"
+
 		struct Pair {
 			x : u8;
 			y : f64;
@@ -801,7 +1011,7 @@ bool testUntypedLiteralsRuntime() {
 	)";
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, source, diagnostics));
+	ASSERT_TRUE(LumScript::compile(module, source, diagnostics, resolveLumScriptImport, nullptr));
 
 	LumScript::Runtime runtime(module, getGlobalAllocator());
 	LumScript::Value result;
@@ -817,6 +1027,7 @@ bool testUntypedLiteralsRuntime() {
 bool testInputEventIterationRuntime() {
 	const char* source = R"(
 		import "engine:input" as input
+		import "engine:Keycode"
 
 		fn read(inputs : input.InputSystem) : i32 {
 			const count = inputs.getEventCount();
@@ -824,7 +1035,7 @@ bool testInputEventIterationRuntime() {
 				return -1;
 			}
 			const e = inputs.getEvent(0);
-			if e.getType() == input.BUTTON() {
+			if e.getType() == InputEventType.BUTTON {
 				if e.isDown() {
 					return e.getKeyId() + e.getDeviceIndex();
 				}
@@ -833,7 +1044,7 @@ bool testInputEventIterationRuntime() {
 		}
 
 		fn key_w() : i32 {
-			return input.Keycode.W;
+			return Keycode.W as i32;
 		}
 	)";
 	LumScript::Module module(getGlobalAllocator());
@@ -845,7 +1056,7 @@ bool testInputEventIterationRuntime() {
 	FakeInputDevice device;
 	FakeInputSystem input(getGlobalAllocator());
 	InputSystem::Event event = {};
-	event.type = InputSystem::Event::BUTTON;
+	event.type = InputEventType::BUTTON;
 	event.device = &device;
 	event.data.button.key_id = 40;
 	event.data.button.down = true;
@@ -881,6 +1092,231 @@ bool testUpdateReceivesTimeDeltaRuntime() {
 	return true;
 }
 
+bool testFirstClassFunctionsRuntime() {
+	const char* source = R"(
+		fn add(a : i32, b : i32) : i32 {
+			return a + b;
+		}
+
+		fn mul(a : i32, b : i32) : i32 {
+			return a * b;
+		}
+
+		fn apply(f : fn(i32, i32) : i32, a : i32, b : i32) : i32 {
+			return f(a, b);
+		}
+
+		fn choose(use_mul : bool) : fn(i32, i32) : i32 {
+			if use_mul {
+				return mul;
+			}
+			return add;
+		}
+
+		fn main() : i32 {
+			const add_fn = choose(false);
+			const mul_fn = choose(true);
+			return apply(add_fn, 20, 2) + mul_fn(6, 7);
+		}
+	)";
+	LumScript::Module module(getGlobalAllocator());
+	LumScript::Diagnostics diagnostics(getGlobalAllocator());
+	const bool ok = LumScript::compile(module, source, diagnostics);
+	if (!ok) logError(diagnostics.message);
+	ASSERT_TRUE(ok);
+
+	LumScript::Runtime runtime(module, getGlobalAllocator());
+	LumScript::Value result;
+	ASSERT_TRUE(runtime.call("main", Span<const LumScript::Value>(), &result, diagnostics));
+	ASSERT_EQ(64, result.i);
+	return true;
+}
+
+bool testNestedFunctionsRuntime() {
+	const char* source = R"(
+		fn apply(f : fn(i32, i32) : i32, a : i32, b : i32) : i32 {
+			return f(a, b);
+		}
+
+		fn main() : i32 {
+			fn add(a : i32, b : i32) : i32 {
+				return a + b;
+			}
+
+			fn mul(a : i32, b : i32) : i32 {
+				return a * b;
+			}
+
+			const f = add;
+			return apply(f, 20, 2) + mul(5, 4);
+		}
+	)";
+	LumScript::Module module(getGlobalAllocator());
+	LumScript::Diagnostics diagnostics(getGlobalAllocator());
+	const bool ok = LumScript::compile(module, source, diagnostics);
+	if (!ok) logError(diagnostics.message);
+	ASSERT_TRUE(ok);
+
+	LumScript::Runtime runtime(module, getGlobalAllocator());
+	LumScript::Value result;
+	ASSERT_TRUE(runtime.call("main", Span<const LumScript::Value>(), &result, diagnostics));
+	ASSERT_EQ(42, result.i);
+	return true;
+}
+
+bool testImguiImportRuntime() {
+	const char* source = R"(
+		import "engine:imgui" as imgui
+
+		fn main() : bool {
+			const opened = imgui.beginWindow("Demo");
+			imgui.textUnformatted("Hello");
+			const clicked = imgui.button("Do Action");
+			if opened {
+				imgui.endWindow();
+			}
+			return clicked;
+		}
+	)";
+	LumScript::Module module(getGlobalAllocator());
+	LumScript::Diagnostics diagnostics(getGlobalAllocator());
+	ASSERT_TRUE(LumScript::compileWithBuiltins(module, source, diagnostics, resolveRealEngineImport, nullptr));
+
+	LumScript::Runtime runtime(module, getGlobalAllocator());
+	LumScript::Value result;
+	ASSERT_TRUE(runtime.call("main", Span<const LumScript::Value>(), &result, diagnostics));
+	return true;
+}
+
+bool testStaticArrayRuntimeIndexing() {
+	const char* source = R"(
+		fn main() : i32 {
+			var d : i32[4];
+			var i : i32 = 2;
+			d[i] = 42;
+			return d[2];
+		}
+	)";
+	LumScript::Module module(getGlobalAllocator());
+	LumScript::Diagnostics diagnostics(getGlobalAllocator());
+	ASSERT_TRUE(LumScript::compile(module, source, diagnostics));
+
+	LumScript::Runtime runtime(module, getGlobalAllocator());
+	LumScript::Value result;
+	ASSERT_TRUE(runtime.call("main", Span<const LumScript::Value>(), &result, diagnostics));
+	ASSERT_EQ(42, result.i);
+	return true;
+}
+
+bool testStaticArrayRuntimeOutOfBoundsFails() {
+	const char* source = R"(
+		fn main(i : i32) : i32 {
+			var d : i32[2];
+			d[0] = 7;
+			return d[i];
+		}
+	)";
+	LumScript::Module module(getGlobalAllocator());
+	LumScript::Diagnostics diagnostics(getGlobalAllocator());
+	ASSERT_TRUE(LumScript::compile(module, source, diagnostics));
+
+	LumScript::Runtime runtime(module, getGlobalAllocator());
+	LumScript::Value arg = LumScript::Runtime::makeI32(5);
+	LumScript::Value result;
+	ASSERT_TRUE(!runtime.call("main", Span<const LumScript::Value>(&arg, 1), &result, diagnostics));
+	ASSERT_TRUE(diagnostics.has_error);
+	return true;
+}
+
+bool testBreakContinueRuntime() {
+	const char* source = R"(
+		fn main() : i32 {
+			var i : i32 = 0;
+			var sum : i32 = 0;
+			while i < 10 {
+				i += 1;
+				if i == 3 {
+					continue;
+				}
+				if i == 8 {
+					break;
+				}
+				sum += i;
+			}
+			return sum;
+		}
+	)";
+	LumScript::Module module(getGlobalAllocator());
+	LumScript::Diagnostics diagnostics(getGlobalAllocator());
+	ASSERT_TRUE(LumScript::compile(module, source, diagnostics));
+	LumScript::Runtime runtime(module, getGlobalAllocator());
+	LumScript::Value result;
+	ASSERT_TRUE(runtime.call("main", Span<const LumScript::Value>(), &result, diagnostics));
+	ASSERT_EQ(25, result.i);
+	return true;
+}
+
+bool testNamedLabelBreakContinueRuntime() {
+	const char* source = R"(
+		fn main() : i32 {
+			var i : i32 = 0;
+			var hits : i32 = 0;
+			outer: while i < 5 {
+				i += 1;
+				var j : i32 = 0;
+				while j < 5 {
+					j += 1;
+					if i < 5 and j == 2 {
+						continue outer;
+					}
+					if i == 5 and j == 4 {
+						break outer;
+					}
+					hits += 1;
+				}
+			}
+			return i * 10 + hits;
+		}
+	)";
+	LumScript::Module module(getGlobalAllocator());
+	LumScript::Diagnostics diagnostics(getGlobalAllocator());
+	ASSERT_TRUE(LumScript::compile(module, source, diagnostics));
+	LumScript::Runtime runtime(module, getGlobalAllocator());
+	LumScript::Value result;
+	ASSERT_TRUE(runtime.call("main", Span<const LumScript::Value>(), &result, diagnostics));
+	ASSERT_EQ(57, result.i);
+	return true;
+}
+
+bool testMatchArmMultipleStatementsRuntime() {
+	const char* source = R"(
+		fn main(v : i32) : i32 {
+			var result : i32 = 0;
+			match v {
+				case 0:
+					result = 1;
+					result += 2;
+				case _:
+					result = 10;
+					result += 20;
+			}
+			return result;
+		}
+	)";
+	LumScript::Module module(getGlobalAllocator());
+	LumScript::Diagnostics diagnostics(getGlobalAllocator());
+	ASSERT_TRUE(LumScript::compile(module, source, diagnostics));
+	LumScript::Runtime runtime(module, getGlobalAllocator());
+	LumScript::Value arg = LumScript::Runtime::makeI32(0);
+	LumScript::Value result;
+	ASSERT_TRUE(runtime.call("main", Span<const LumScript::Value>(&arg, 1), &result, diagnostics));
+	ASSERT_EQ(3, result.i);
+	arg = LumScript::Runtime::makeI32(7);
+	ASSERT_TRUE(runtime.call("main", Span<const LumScript::Value>(&arg, 1), &result, diagnostics));
+	ASSERT_EQ(30, result.i);
+	return true;
+}
+
 } // anonymous namespace
 
 void runLumScriptRuntimeTests() {
@@ -888,8 +1324,11 @@ void runLumScriptRuntimeTests() {
 	RUN_TEST(testNativeFunctionCall);
 	RUN_TEST(testStringConcatenationRuntime);
 	RUN_TEST(testRuntimeCasts);
-	RUN_TEST(testBuiltinLogErrorString);
-	RUN_TEST(testBuiltinLogErrorRejectsNonString);
+	RUN_TEST(testIntegerToEnumCastAllowsAnyIntegerRuntime);
+	RUN_TEST(testEngineLogImportString);
+	RUN_TEST(testEngineLogImportRejectsNonString);
+	RUN_TEST(testImguiImportRuntime);
+	RUN_TEST(testLogErrorRequiresImport);
 	RUN_TEST(testRuntimeMainWithLoop);
 	RUN_TEST(testStepLimit);
 	RUN_TEST(testRuntimeBlockScope);
@@ -898,6 +1337,7 @@ void runLumScriptRuntimeTests() {
 	RUN_TEST(testMatchRuntime);
 	RUN_TEST(testShortCircuiting);
 	RUN_TEST(testAliasedImportRuntime);
+	RUN_TEST(testFirstParameterNamespaceResolutionPrecedenceRuntime);
 	RUN_TEST(testNativeEngineImportRuntime);
 	RUN_TEST(testNativeWorldImportRuntime);
 	RUN_TEST(testRefParameterMutatesCaller);
@@ -908,7 +1348,16 @@ void runLumScriptRuntimeTests() {
 	RUN_TEST(testNullableNonNullBranchRuntime);
 	RUN_TEST(testExtendedScalarTypesRuntime);
 	RUN_TEST(testIntegerOverflowWraparoundRuntime);
+	RUN_TEST(testDivisionAndModuloSemanticsRuntime);
+	RUN_TEST(testDivisionByZeroRuntimeError);
 	RUN_TEST(testUntypedLiteralsRuntime);
 	RUN_TEST(testInputEventIterationRuntime);
 	RUN_TEST(testUpdateReceivesTimeDeltaRuntime);
+	RUN_TEST(testFirstClassFunctionsRuntime);
+	RUN_TEST(testNestedFunctionsRuntime);
+	RUN_TEST(testStaticArrayRuntimeIndexing);
+	RUN_TEST(testStaticArrayRuntimeOutOfBoundsFails);
+	RUN_TEST(testBreakContinueRuntime);
+	RUN_TEST(testNamedLabelBreakContinueRuntime);
+	RUN_TEST(testMatchArmMultipleStatementsRuntime);
 }

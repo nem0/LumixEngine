@@ -6,6 +6,8 @@
 namespace Lumix::LumScriptTests {
 
 static const char* SAMPLE = R"(
+import "core:vec3"
+
 fn add(a : Vec3, b : Vec3) : Vec3 {
 	const x = a.x + b.x;
 	const y : f32 = a.y + b.y;

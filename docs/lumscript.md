@@ -3,11 +3,11 @@
 # TODO
 
 * engine API
-* arrays
-* first-class functions
+* undefined
 
 ---
 
+* operators
 * for cycle
 * break/continue/named label
 * debugger
@@ -39,66 +39,75 @@
 
 # LumScript
 
-LumScript is a small statically typed scripting language being built for Lumix Engine. The current implementation has a parser, checker, tree-walk runtime, `.lum` asset registration, and a basic Studio code editor. Bytecode is intentionally not part of the first version.
+LumScript is a small, statically typed scripting language for Lumix Engine.
 
-This page describes the language as implemented today.
+## Table of contents
 
-## Table of Contents
+- [Design goals](#design-goals)
+- [Quick example](#quick-example)
+- [Source files](#source-files)
+- [Declarations](#declarations)
+	- [Imports](#imports)
+	- [Structs](#structs)
+	- [Enums](#enums)
+	- [Functions](#functions)
+	- [Ref parameters](#ref-parameters)
+- [Types](#types)
+	- [Untyped literals](#untyped-literals)
+	- [Nullable values](#nullable-values)
+	- [Strings](#strings)
+	- [Function types](#function-types)
+- [Variables](#variables)
+- [Statements](#statements)
+	- [Blocks](#blocks)
+	- [Assignment](#assignment)
+	- [If / else](#if--else)
+	- [Match](#match)
+	- [While](#while)
+	- [Break / continue / labels](#break--continue--labels)
+	- [Defer](#defer)
+	- [Return](#return)
+- [Expressions](#expressions)
+	- [Literals](#literals)
+	- [Arithmetic](#arithmetic)
+	- [Integer overflow](#integer-overflow)
+	- [Casts](#casts)
+	- [Comparison and boolean operators](#comparison-and-boolean-operators)
+	- [Calls](#calls)
+	- [Namespace resolution by first parameter](#namespace-resolution-by-first-parameter)
+	- [Field access](#field-access)
+	- [Struct literals](#struct-literals)
+- [Runtime model](#runtime-model)
+	- [Native functions](#native-functions)
+- [Engine modules](#engine-modules)
+	- [Engine log](#engine-log)
+	- [Engine integration model](#engine-integration-model)
+	- [Entity and world API shape](#entity-and-world-api-shape)
+	- [Input API shape](#input-api-shape)
+- [Editor and diagnostics](#editor-and-diagnostics)
+- [Known limitations and pending spec decisions](#known-limitations-and-pending-spec-decisions)
 
-- Basics
-	- [A Small Program](#a-small-program)
-	- [Source Files](#source-files)
+Current implementation includes:
 
-- Language
-	- [Declarations](#declarations)
-		- [Imports](#imports)
-		- [Structs](#structs)
-		- [Enums](#enums)
-		- [Functions](#functions)
-		- [Ref Parameters](#ref-parameters)
-	- [Types](#types)
-		- [Untyped Values](#untyped-values)
-		- [Nullable Values](#nullable-values)
-		- [Strings](#strings)
-	- [Variables](#variables)
-	- [Statements](#statements)
-		- [Blocks](#blocks)
-		- [Assignment](#assignment)
-		- [If And Else](#if-and-else)
-		- [Match](#match)
-		- [While](#while)
-		- [Defer](#defer)
-		- [Return](#return)
-	- [Expressions](#expressions)
-		- [Literals](#literals)
-		- [Arithmetic](#arithmetic)
-		- [Integer Overflow](#integer-overflow)
-		- [Casts](#casts)
-		- [Comparison And Boolean Operators](#comparison-and-boolean-operators)
-		- [Calls](#calls)
-		- [Namespace Resolution By First Parameter](#namespace-resolution-by-first-parameter)
-		- [Field Access](#field-access)
-		- [Struct Literals](#struct-literals)
+- parser
+- type checker
+- AST interpreter runtime
+- `.lum` asset registration
+- basic Studio editor integration
 
-- Runtime And API
-	- [Runtime Model](#runtime-model)
-		- [Native Functions](#native-functions)
-	- [Built-Ins](#built-ins)
+Bytecode and JIT are intentionally out of scope for the first version.
 
-- Engine
-	- [Engine Integration](#engine-integration)
-		- [Engine API Design](#engine-api-design)
-		- [World Script Lifecycle](#world-script-lifecycle)
-		- [Asset Compilation](#asset-compilation)
+## Design goals
 
-- Tooling And Notes
-	- [Editor](#editor)
-	- [Diagnostics](#diagnostics)
-	- [Current Limitations](#current-limitations)
+- simple: readable high-level code with minimal boilerplate
+- safe: nullable values require explicit null checks
+- efficient: avoid unnecessary allocations and keep runtime overhead low
 
-## A Small Program
+## Quick example
 
 ```cpp
+import "core:vec3"
+
 fn add(a : Vec3, b : Vec3) : Vec3 {
 	const x = a.x + b.x;
 	const y : f32 = a.y + b.y;
@@ -119,13 +128,13 @@ fn main() : void {
 }
 ```
 
-At the top level, a LumScript module contains `import`, `struct`, `enum`, and `fn` declarations. Functions have explicit parameter and return types. Struct fields are stored in declaration order, which is also the order used by positional struct literals.
+A module contains top-level `import`, `struct`, `enum`, `fn`, and variable declarations.
 
-## Source Files
+## Source files
 
-LumScript source files use the `.lum` extension.
-
-Whitespace is ignored. Line comments start with `//` and continue to the end of the line.
+- LumScript files use the `.lum` extension.
+- Whitespace is ignored.
+- Line comments start with `//`.
 
 ```cpp
 // comment
@@ -136,21 +145,26 @@ var speed : f32 = 12.5;
 
 ### Imports
 
-Imports load declarations from another LumScript source file:
+Basic import:
 
 ```cpp
 import "math"
 ```
 
-Imported declarations can also be placed under an alias:
+Import with alias:
 
 ```cpp
 import "math" as math
 ```
 
-The quoted path is an import specifier, not a general string value.
+`core:` imports resolve under `data/scripts/core/`. The `.lum` suffix is optional:
 
-Import specifiers that start with `engine:` are reserved for built-in engine modules rather than project files:
+```cpp
+import "core:math"
+import "core:collections/list" as list
+```
+
+`engine:` imports resolve to built-in engine modules, not project files:
 
 ```cpp
 import "engine:entity" as entity
@@ -158,10 +172,11 @@ import "engine:animator" as animator
 import "engine:world" as world
 ```
 
-Declarations from an import without an alias are added to the current module and are accessed by their declared names:
+Without alias, imported declarations are added to the current module scope:
 
 ```cpp
 import "math"
+import "core:vec3"
 
 fn main() : f32 {
 	const v : Vec3 = Vec3 { 1, 2, 3 };
@@ -169,22 +184,41 @@ fn main() : f32 {
 }
 ```
 
-Declarations from an aliased import are accessed through the alias:
+With alias, declarations are accessed via namespace:
 
 ```cpp
-import "math" as math
+import "core:vec3" as vec
 
 fn main() : f32 {
-	const v : math.Vec3 = math.Vec3 { 1, 2, 3 };
-	return math.length(v);
+	const v : vec.Vec3 = vec.Vec3 { 1, 2, 3 };
+	return v.x;
 }
 ```
 
-This applies to imported structs, enums, and functions. For example, an enum imported as `game.State` is referenced as `game.State.Running`.
+Import rules:
+
+- resolution is deterministic and follows import order
+- duplicate import of the same path and alias is a no-op
+- `core:` duplicate checks normalize `.lum` suffix
+- alias collisions are compile-time errors
+- import cycles are compile-time errors
+
+```cpp
+import "core:vec3" as core
+import "core:quat" as core // compile-time error: alias collision
+```
+
+```cpp
+import "a"
+
+// a.lum
+import "b"
+
+// b.lum
+import "a" // compile-time error: import cycle
+```
 
 ### Structs
-
-Structs declare named fields:
 
 ```cpp
 struct Transform {
@@ -194,11 +228,12 @@ struct Transform {
 };
 ```
 
-Field names must be unique inside a struct. Field types can be primitive types or previously declared user structs.
+Rules:
+
+- field names must be unique within the struct
+- field types can be primitive, enum, function type, or previously declared struct
 
 ### Enums
-
-Enums define a set of named integer constants:
 
 ```cpp
 enum State {
@@ -209,7 +244,7 @@ enum State {
 };
 ```
 
-Enum members are automatically assigned values starting from 0, incrementing by 1. You can also explicitly assign values:
+Explicit values are allowed:
 
 ```cpp
 enum Priority {
@@ -219,28 +254,16 @@ enum Priority {
 };
 ```
 
-Enums can be used as types in function parameters, struct fields, and local variables:
+Enums are strongly typed:
+
+- no implicit conversion between enums and integers
+- use explicit `as` casts when needed
 
 ```cpp
-fn handle_state(state : State) : void {
-	if state == State.Running {
-		// handle running
-	}
-}
-
-struct Task {
-	name : i32;
-	priority : Priority;
-};
+const key_code : i32 = Keycode.W as i32;
 ```
 
-Enum values are internally `i32` and can be compared with `==`, `!=`, and relational operators. Conversion to and from `i32` is implicit when assigning to an enum-typed variable or passing as an argument expecting an `i32`.
-
-**TODO no implicit conversion**
-
-#### Shorthand Syntax
-
-When the enum type is known from context, you can use a dot prefix (`.Member`) instead of the full qualified name (`Enum.Member`):
+Shorthand member syntax works when enum type is unambiguous:
 
 ```cpp
 fn handle_state(state : State) : void {
@@ -249,14 +272,10 @@ fn handle_state(state : State) : void {
 	}
 }
 
-var priority : Priority = .High;  // equivalent to Priority.High
+var priority : Priority = .High;
 ```
 
-This shorthand works in comparisons, assignments, function arguments, and anywhere the target type is unambiguous.
-
 ### Functions
-
-Functions are declared with `fn`:
 
 ```cpp
 fn clamp_min(v : i32, min_value : i32) : i32 {
@@ -267,11 +286,16 @@ fn clamp_min(v : i32, min_value : i32) : i32 {
 }
 ```
 
-Parameter names must be unique. Functions are globally visible and are called by name. Overloading is not supported, so function names must be unique in a module. Parameters are immutable.
+Rules:
 
-### Ref Parameters
+- parameter names must be unique
+- top-level functions are globally visible in the module
+- overloading is not supported
+- parameters are immutable
 
-`ref` parameters pass an assignable local or field by alias instead of by value.
+### Ref parameters
+
+`ref` passes a writable location by alias instead of by value.
 
 ```cpp
 fn increment(v : ref i32) : void {
@@ -284,61 +308,85 @@ fn main() : void {
 }
 ```
 
-A `ref` argument must be written using `ref` at the call site and must be assignable (for example a local variable or struct field). `const` values can not be passed as `ref` arguments.
+`ref` constraints:
+
+- call-site argument must be prefixed with `ref`
+- argument must be writable and have stable storage
+- `const` values are not allowed
+- `ref` parameter types cannot be nullable
+- `ref` arguments cannot be nullable
+
+```cpp
+struct Stats {
+	hp : i32;
+};
+
+struct Player {
+	stats : Stats;
+};
+
+var global_counter : i32 = 0;
+
+fn bump(v : ref i32) : void {
+	v += 1;
+}
+
+fn main() : void {
+	var p = Player { Stats { 10 } };
+	bump(ref global_counter);
+	bump(ref p.stats.hp);
+}
+```
 
 ## Types
 
-LumScript currently supports:
+Built-in and user types:
 
 - `void`
 - `bool`
-- `i8`
-- `u8`
-- `i16`
-- `u16`
-- `i32`
-- `u32`
-- `i64`
-- `u64`
-- `f32`
-- `f64`
+- `i8`, `u8`, `i16`, `u16`, `i32`, `u32`, `i64`, `u64`
+- `f32`, `f64`
 - `string`
-- built-in `Vec3`
-- built-in `Quat`
 - user-defined `struct` types
 - user-defined `enum` types
+- function types
 
-There are no arrays, pointers, references, optionals, generics, or user-declared methods yet.
+Not implemented yet:
 
-`Vec3` and `Quat` are built-in value types used by engine APIs:
+- maps, pointers, references as first-class types
+- generics
+- closures
+- user-declared methods
+
+`Vec3` and `Quat` are core value types used heavily by engine APIs:
 
 ```cpp
+import "core:vec3"
+import "core:quat"
+
 const position = Vec3 { 1.0, 2.0, 3.0 };
 const rotation = Quat { 0.0, 0.0, 0.0, 1.0 };
 ```
 
-`Vec3` exposes `x`, `y`, and `z` fields. `Quat` exposes `x`, `y`, `z`, and `w` fields.
+### Untyped literals
 
-### Untyped Values
+Literals start untyped during checking:
 
-LumScript uses untyped literal values at type-check time.
+- integer literals start as untyped integer
+- decimal literals start as untyped float
 
-- Integer literals start as untyped integers.
-- Decimal literals start as untyped floating-point values.
-- Untyped values are compile-time only and are never runtime value kinds.
+Context (target type, argument type, return type, cast, expression expectation) concretizes them.
 
-An untyped literal is concretized by context (initializer target type, argument type, return type, explicit cast, or expected type in an expression).
+Defaults when context is insufficient:
 
-When there is no stronger context:
+- integer literals default to `i32`
+- decimal literals default to `f32`
 
-- Integer literals default to `i32`.
-- Decimal literals default to `f32`.
+There are still no implicit numeric casts between concrete types.
 
-LumScript still does not do implicit numeric casts between concrete numeric types. For example, an `i32` or `u32` value is not assigned to `f32` unless the expression uses an explicit cast such as `value as f32`.
+### Nullable values
 
-### Nullable Values
-
-Nullable values are written with a leading `?` before the base type. Using a nullable value without a null check is a compile-time error.
+Nullable syntax uses `?Type`.
 
 ```cpp
 fn find_entity() : ?entity.Entity {
@@ -348,16 +396,14 @@ fn find_entity() : ?entity.Entity {
 fn main() : void {
 	const e = find_entity();
 	if e != null {
-		// use e, it's promoted to entity.Entity
+		// e is promoted to entity.Entity in this branch
 	}
 }
 ```
 
-Inside `if value != null`, `value` is promoted to the non-nullable type in that branch.
+Using a nullable value without a required null check is a compile-time error.
 
 ### Strings
-
-String literals produce `string` values. Strings can be stored in locals, passed to functions, returned from functions, and concatenated with `+`.
 
 ```cpp
 fn greet(name : string) : string {
@@ -366,11 +412,101 @@ fn greet(name : string) : string {
 }
 ```
 
-String interpolation is not implemented yet.
+- string literals produce `string`
+- concatenation uses `+`
+- string interpolation is not implemented
+
+### Function types
+
+Function type syntax:
+
+```cpp
+fn(i32, i32) : i32
+```
+
+Example:
+
+```cpp
+fn add(a : i32, b : i32) : i32 {
+	return a + b;
+}
+
+fn multiply(a : i32, b : i32) : i32 {
+	return a * b;
+}
+
+fn apply(f : fn(i32, i32) : i32, a : i32, b : i32) : i32 {
+	return f(a, b);
+}
+
+fn choose(use_add : bool) : fn(i32, i32) : i32 {
+	if use_add {
+		return add;
+	}
+	return multiply;
+}
+```
+
+Function values can be stored, passed, returned, and called.
+
+### Static-sized arrays
+
+Declaration syntax for fixed-size arrays uses postfix size:
+
+```cpp
+var d : i32[16];
+```
+
+Usage syntax:
+
+```cpp
+var d : i32[16];
+d[0] = 42;
+const first : i32 = d[0];
+```
+
+Type rules:
+
+- size must be a compile-time positive integer literal
+- element type is fixed for all entries
+- assignment requires exact same element type and size
+- index expression must have an integer type
+
+Indexing behavior:
+
+- constant index out of range is a compile-time error
+- variable index is allowed
+- variable index is bounds-checked at runtime
+- out-of-bounds access is a runtime error
+
+Indexing examples:
+
+```cpp
+var d : i32[16];
+
+const idx = 3;
+d[idx] = 11; // allowed
+
+var i : i32 = 3;
+d[i] = 12; // allowed, runtime bounds check
+
+const bad = 99;
+d[bad] = 1; // compile-time error (constant index out of range)
+```
+
+Nested functions are supported and scoped to their containing block. They do not capture outer locals or parameters.
+
+```cpp
+fn main() : i32 {
+	fn add(a : i32, b : i32) : i32 {
+		return a + b;
+	}
+
+	return add(20, 22);
+}
+```
 
 ## Variables
-
-Variables are declared with `var` or `const`:
 
 ```cpp
 var counter : i32 = 0;
@@ -382,38 +518,19 @@ fn tick() : i32 {
 }
 ```
 
-Top-level variables are module globals. They are initialized once when the runtime first runs the module and keep their values across function calls.
+Rules:
 
-Local variables use the same syntax inside functions and blocks:
-
-```cpp
-var count : i32 = 4;
-var inferred = count + 1;
-const gravity : f32 = 9.8;
-```
-
-The type annotation is optional when an initializer is present and the checker can infer the type. `const` variables cannot be assigned after initialization.
-
-Variables are block scoped. A nested block can declare a local with the same name as an outer block:
-
-```cpp
-fn scoped() : i32 {
-	var value = 1;
-	{
-		var value = 5;
-		value += 1;
-	}
-	return value; // returns 1
-}
-```
-
-Local variables can shadow globals inside their scope.
+- top-level variables are module globals
+- globals initialize once when runtime first runs the module
+- locals use same declaration syntax
+- explicit type is optional if inference can resolve from initializer
+- `const` cannot be reassigned
+- variables are block scoped
+- locals can shadow globals
 
 ## Statements
 
 ### Blocks
-
-Blocks are surrounded by braces and introduce a local scope:
 
 ```cpp
 {
@@ -423,34 +540,24 @@ Blocks are surrounded by braces and introduce a local scope:
 
 ### Assignment
 
-Assignments update a local variable or a struct field:
-
 ```cpp
 value = 10;
 position.x = position.x + 1;
-```
 
-Compound assignments are supported:
-
-```cpp
 value += 1;
 value -= 1;
 value *= 2;
 value /= 2;
-```
 
-Postfix increment and decrement are accepted as statements:
-
-```cpp
 i++;
 i--;
 ```
 
-They are equivalent to `i += 1` and `i -= 1`.
+Postfix increment/decrement are statement forms equivalent to `+= 1` and `-= 1`.
 
-### If And Else
+### If / else
 
-Conditions must be `bool`:
+Conditions must be `bool`.
 
 ```cpp
 if health <= 0 {
@@ -464,41 +571,42 @@ if health <= 0 {
 
 ### Match
 
-`match` is a multi-way branch construct for enums and scalar values. It replaces C-style `switch`; arms do not fall through.
+`match` is a non-fallthrough multi-way branch for enum and scalar values. Each `case` can contain any number of statements; execution stops at the end of the selected case and does not fall through to the next case.
 
-`match` supports enum values, simple scalar literals, inclusive scalar ranges, comma-separated alternatives, and `_` fallback arms:
+Supported patterns:
+
+- enum members
+- scalar literals
+- inclusive ranges (`a..b`)
+- comma-separated alternatives
+- `_` fallback
 
 ```cpp
 match state {
 	case .Idle:
-		logError("idle");
+		log.logError("idle");
 	case .Running:
-		logError("running");
+		log.logError("running");
+		update_running_state();
 	case .Paused:
-		logError("paused");
+		log.logError("paused");
 	case _:
-		logError("unknown");
+		log.logError("unknown");
 }
 ```
-
-Range cases use `..` and include both endpoints:
 
 ```cpp
 match score {
 	case 0:
-		logError("none");
+		log.logError("none");
 	case 1..9:
-		logError("low");
+		log.logError("low");
 	case 10..99:
-		logError("high");
+		log.logError("high");
 	case _:
-		logError("overflow");
+		log.logError("overflow");
 }
 ```
-
-Range endpoints must be scalar constants compatible with the matched value type.
-
-Multiple patterns can share one arm by separating them with commas:
 
 ```cpp
 match key {
@@ -513,22 +621,9 @@ match key {
 }
 ```
 
-Literal, enum, and range patterns can be mixed in one arm when they are compatible with the matched value type:
-
-```cpp
-match count {
-	case 0, 10..19, 99:
-		logError("special");
-	case _:
-		logError("ordinary");
-}
-```
-
-For enum matches, arms must be exhaustive unless a `_` fallback arm is present. Duplicate enum cases are compile-time errors.
+Enum matches must be exhaustive unless `_` is present. Duplicate enum cases are compile-time errors.
 
 ### While
-
-`while` loops reevaluate their condition each iteration. Conditions must be `bool`.
 
 ```cpp
 var i = 10;
@@ -537,11 +632,57 @@ while i > 0 {
 }
 ```
 
-The runtime has a configurable step budget to stop accidental infinite loops.
+Conditions must be `bool`. Runtime enforces a configurable step budget to limit accidental infinite loops.
+
+### Break / continue / labels
+
+`break` exits a loop immediately. `continue` skips to the next loop iteration.
+
+Basic examples:
+
+```cpp
+var i : i32 = 0;
+while i < 10 {
+	i += 1;
+	if i == 3 {
+		continue;
+	}
+	if i == 8 {
+		break;
+	}
+}
+```
+
+Named labels allow targeting an outer loop:
+
+```cpp
+outer: while true {
+	var j : i32 = 0;
+	while j < 10 {
+		j += 1;
+		if j == 5 {
+			continue outer;
+		}
+		if j == 9 {
+			break outer;
+		}
+	}
+}
+```
+
+Rules:
+
+- unlabeled `break` / `continue` apply to the nearest enclosing loop
+- labeled `break label` / `continue label` require a visible loop label
+- duplicate labels in the same scope are compile-time errors
+- using unknown labels is a compile-time error
+- using `break` / `continue` outside a loop is a compile-time error
+
+Status: syntax and behavior are specified, but not implemented in parser/checker/runtime yet.
 
 ### Defer
 
-`defer` schedules a statement to run when leaving the current scope. Deferred statements run in reverse order (LIFO).
+`defer` runs when leaving the current scope. Deferred statements execute in LIFO order.
 
 ```cpp
 fn main() : void {
@@ -550,11 +691,9 @@ fn main() : void {
 }
 ```
 
-Deferred statements run when leaving the scope normally and also on early `return`.
+Deferred statements run on normal scope exit and on early `return`.
 
 ### Return
-
-Use `return` to leave the current function:
 
 ```cpp
 fn answer() : i32 {
@@ -566,7 +705,7 @@ fn done() : void {
 }
 ```
 
-The returned expression must match the function return type. Use an explicit cast when returning a different scalar type. A bare `return;` is only valid for `void`.
+Returned expression must match function return type. Use explicit cast when needed.
 
 ## Expressions
 
@@ -589,17 +728,25 @@ a / b
 a % b
 ```
 
-Arithmetic on `f32` produces `f32`. Integer arithmetic produces `i32`. `%` is currently integer modulo.
+Rules:
 
-### Integer Overflow
+- no implicit numeric casts
+- arithmetic operands must have the same concrete numeric type
+- `%` is integer modulo only
 
-Integer overflow follows wraparound semantics.
+Integer division/modulo behavior:
 
-- Integer arithmetic is performed in the destination integer type width.
-- Results wrap modulo $2^N$, where $N$ is the number of bits of the integer type.
-- Overflow does not trap and is not undefined behavior.
+- division truncates toward zero
+- `%` follows `a == (a / b) * b + (a % b)`
+- non-zero remainder has same sign as `a`
+- constant zero divisor is compile-time error
+- runtime zero divisor is runtime error
 
-Examples:
+Floating-point division follows IEEE-754 and may produce `Inf` or `NaN`.
+
+### Integer overflow
+
+Integer arithmetic wraps modulo $2^N$, where $N$ is destination bit width.
 
 ```cpp
 const a : u8 = 255 as u8;
@@ -609,18 +756,18 @@ const c : i8 = 127 as i8;
 const d : i8 = (c + 1 as i8) as i8; // d == -128
 ```
 
-Explicit casts between integer widths also wrap to the destination width using the same modulo rule.
+Width-changing integer casts follow the same wrap behavior.
 
 ### Casts
 
-Use `as` to explicitly convert a value to another type:
+Use explicit `as` casts:
 
 ```cpp
 const whole : i32 = 10;
 const decimal = whole as f32;
 ```
 
-The initial cast support is intended for primitive scalar conversions:
+Supported scalar cast targets:
 
 ```cpp
 x as bool
@@ -636,22 +783,20 @@ x as f32
 x as f64
 ```
 
-Struct casts are not supported.
-
-Assignments, function arguments, return values, and struct literal fields do not cast implicitly. Write the conversion at the expression site:
+Enums can cast to integers, and integers can cast to enums:
 
 ```cpp
-fn takes_f32(v : f32) : void {
-	return;
-}
-
-fn main() : void {
-	const x : i32 = 10;
-	takes_f32(x as f32);
-}
+const numeric : i32 = State.Running as i32;
+const state : State = numeric as State;
 ```
 
-### Comparison And Boolean Operators
+Integer-to-enum cast does not validate membership.
+
+Struct casts are not supported.
+
+No implicit casts occur in assignments, arguments, returns, struct fields, or binary arithmetic.
+
+### Comparison and boolean operators
 
 ```cpp
 a > b
@@ -666,7 +811,7 @@ ready or fallback
 not ready
 ```
 
-`and` and `or` short-circuit at runtime.
+`and` and `or` short-circuit.
 
 ### Calls
 
@@ -674,73 +819,79 @@ not ready
 const c = add(a, b);
 ```
 
-Calls are statically checked for function existence, argument count, and argument types.
+Calls are statically checked for:
 
-### Namespace Resolution By First Parameter
+- function existence
+- argument count
+- argument types
 
-Namespaced functions can be called through their first argument when that argument has a namespaced type. The compiler uses the namespace of the first argument type to resolve the function name.
+If callee expression is a function value, call is indirect.
 
-This:
+### Namespace resolution by first parameter
+
+Method-style syntax is syntactic sugar for namespaced function calls.
 
 ```cpp
 import "engine:world" as world
 import "engine:entity" as entity
 
 fn move_up(w : world.World, e : entity.Entity) : void {
-	const p = w.getPosition(e);
-	w.setPosition(e, { p.x, p.y + 1.0, p.z });
+	if w.hasEntity(e) {
+		e.destroy();
+	}
 }
 ```
 
-is equivalent to:
+Equivalent explicit form:
 
 ```cpp
 fn move_up(w : world.World, e : entity.Entity) : void {
-	const p = world.getPosition(w, e);
-	world.setPosition(w, e, { p.x, p.y + 1.0, p.z });
+	if world.hasEntity(w, e) {
+		entity.destroy(e);
+	}
 }
 ```
 
-In general, `value.func(arg1, arg2)` is resolved as `namespace.func(value, arg1, arg2)`, where `namespace` comes from the type of `value`. For example, `world.World` resolves to the `world` namespace, so `w.findByName("Player")` resolves to `world.findByName(w, "Player")`.
+Resolution order:
 
-### Field Access
+- first try written callee directly
+- if unresolved and callee is field-call syntax, try first-parameter namespace rewrite
+
+### Field access
 
 ```cpp
 position.x
 position.y = 4;
 ```
 
-The left side must be a struct value, and the field must exist on that struct.
+Left side must be a struct value, and field must exist.
 
-### Struct Literals
+### Struct literals
 
-Struct values are created positionally:
+Positional literals:
 
 ```cpp
+import "core:vec3"
+
 var a : Vec3 = { 1, 2, 3 };
 const b = Vec3 { 4, 5, 6 };
 ```
 
-`{ 1, 2, 3 }` uses the expected type from context, including variable declarations, returns, function arguments, and method-call arguments. `Vec3 { 1, 2, 3 }` names the target type directly and can be used when there is no expected type or when the explicit type is clearer. Field count and field types must match the struct declaration.
+- `{ ... }` uses expected type from context
+- `Type { ... }` sets type explicitly
+- field count and field types must match declaration
 
-```cpp
-entity.setPosition({ 0.0, 1.0, 0.0 });
-entity.setRotation({ 0.0, 0.0, 0.0, 1.0 });
-```
+Named-field struct literals are not implemented.
 
-Named-field literals are not supported yet.
+## Runtime model
 
-## Runtime Model
+Current runtime is a tree-walk interpreter over checked AST.
 
-The current runtime is a tree-walk interpreter over the checked AST.
-
-- Functions are called by name.
-- Each call creates a frame for parameters and locals.
-- Blocks create nested local scopes.
-- Struct values store their fields as runtime values in declaration order.
-- Runtime calls can pass arguments and optionally receive a result.
-- A `RuntimeOptions::max_steps` budget limits execution.
-- Native functions can be registered from C++ and called with normal function-call syntax.
+- calls create call frames
+- blocks create nested local scopes
+- struct values store fields in declaration order
+- function values reference existing script or native functions
+- execution is limited by `RuntimeOptions::max_steps`
 
 Example C++ shape:
 
@@ -755,9 +906,9 @@ if (LumScript::compile(module, source, diagnostics)) {
 }
 ```
 
-### Native Functions
+### Native functions
 
-Native functions are C++ callbacks with a LumScript signature. Register them on the module after parsing and before type checking:
+Register native functions after parsing and before type checking:
 
 ```cpp
 static bool native_add(Span<const LumScript::Value> args, LumScript::Value* result, void*) {
@@ -790,7 +941,7 @@ if (LumScript::parse(module, source, diagnostics)) {
 }
 ```
 
-Script code calls the native function like any other function:
+Script usage:
 
 ```cpp
 fn main() : i32 {
@@ -798,108 +949,50 @@ fn main() : i32 {
 }
 ```
 
-Native calls are checked for function existence, argument count, argument types, and return type.
+## Engine modules
 
-## Built-Ins
-
-**TODO - normal import**
-
-LumScript modules compiled through the engine builtin path can call:
+### Engine log
 
 ```cpp
-logError(value : string) : void
-```
+import "engine:log" as log
 
-Example:
-
-```cpp
 fn update(dt : f32) : void {
-	logError("Hello " + "Lumix");
+	log.logError("Hello " + "Lumix");
 }
 ```
 
-## Engine Integration
+`log.logError(value : string) : void`
 
-LumScript integrates into Lumix worlds as a **world-level script**. Each world can load one `.lum` script file that runs throughout the world's lifetime.
+### Engine integration model
 
-### Engine API Design
+LumScript integrates as a world-level script. A world loads one `.lum` file that runs for that world's lifetime.
 
-Engine APIs are exposed through virtual `engine:` imports. These imports behave like modules supplied by the engine instead of files on disk:
+Lifecycle:
 
-```cpp
-import "engine:entity" as entity
-import "engine:animator" as animator
-```
-
-The alias is used as a namespace for the imported engine declarations:
-
-```cpp
-fn update(e : entity.Entity, input_idx : i32, value : f32) : void {
-	const anim = e.animator();
-	if anim != null {
-		anim.setFloatInput(input_idx, value);
-	}
-}
-```
-
-Engine object types are opaque script types. For example, `entity.Entity` carries the entity id and the owning world context internally, but it remains a distinct LumScript type so it can not be accidentally mixed with an `i32`, animation input index, or another handle type.
-
-Component accessors are generated on `entity.Entity` for reflected engine components. They return nullable opaque component handles, because an entity may not have the requested component:
-
-```cpp
-const anim = e.animator(); // ?animator.Animator
-if anim != null {
-	const speed = anim.getInputIndex("speed_y");
-	anim.setFloatInput(speed, 1.0);
-}
-```
-
-The component handle also carries the entity id and owning world context internally, but its type is specific to the component module. This keeps component APIs from accepting unrelated entities or handles by accident.
-
-Engine systems are exposed as namespaced functions. When the first argument has a namespaced engine type, the same function can also be called through that value:
-
-**TODO getPosition and other are not on world, but enitity**
-
-```cpp
-import "engine:entity" as entity
-import "engine:world" as world
-
-fn move_up(w : world.World, e : entity.Entity) : void {
-	const p = w.getPosition(e);
-	w.setPosition(e, { p.x, p.y + 1.0, p.z });
-}
-```
-
-Here `w.getPosition(e)` resolves to `world.getPosition(w, e)` because `w` has type `world.World`. Likewise, `anim.setFloatInput(speed, 1.0)` resolves to `animator.setFloatInput(anim, speed, 1.0)` because `anim` has type `animator.Animator`. This keeps the scripting model explicit while still allowing short call syntax: handles are values, imported aliases are namespaces, and engine behavior is reached through native functions registered by the imported engine module. Component functions generated by Meta are available when all parameter and return types can be represented in LumScript. Currently this covers `void`, `bool`, `i32`, reflected `u32` values as `i32`, `f32`, `string`, `Vec3`, `Quat`, `entity.Entity`, `world.World`, and generated component handle types.
-
-### World Script Lifecycle
-
-When a `.lum` script file is assigned to a world:
-
-1. **Compilation**: The source code is parsed and type-checked
-2. **Initialization**: The `init(world, input_system)` function is called (if it exists)
-3. **Update**: The `update(dt)` function is called every frame with frame time in seconds
+1. parse and type-check
+2. call `init(world, input_system)` if present
+3. call `update(dt)` each frame
 
 ```cpp
 import "engine:world" as world
 import "engine:input" as input
 
 fn init(w : world.World, inputs : input.InputSystem) : void {
-	// Called once when the world script loads
-	// Use for world initialization and setup
+	// called once
 }
 
 fn update(dt : f32) : void {
-	// Called every frame while the world is running
-	// Update world state and logic
+	// called every frame
 }
 ```
 
-The `world.World` value is an opaque handle to the current Lumix world. The `input.InputSystem` value is an opaque handle to the current input system and exposes the input events collected for the current frame. Both are passed by the engine and should be used with engine API modules rather than constructed by script code.
+`world.World` and `input.InputSystem` are opaque handles provided by the engine.
 
-The `engine:world` module currently exposes basic entity lifecycle functions:
+### Entity and world API shape
 
 ```cpp
+import "core:vec3"
+import "core:quat"
 import "engine:world" as world
 import "engine:entity" as entity
 import "engine:input" as input
@@ -911,10 +1004,6 @@ fn init(w : world.World, inputs : input.InputSystem) : void {
 	e.setRotation({ 0.0, 0.0, 0.0, 1.0 });
 	e.setScale({ 2.0, 2.0, 2.0 });
 
-	const p = e.getPosition();
-	const r = e.getRotation();
-	const s = e.getScale();
-
 	if player != null {
 		player.setPosition({ 0.0, 1.0, 0.0 });
 	}
@@ -925,22 +1014,14 @@ fn init(w : world.World, inputs : input.InputSystem) : void {
 }
 ```
 
-**TODO get rid of getPosition and others on world**
-
-Available functions:
+Current world functions:
 
 - `world.createEntity(w : world.World) : entity.Entity`
 - `world.destroyEntity(w : world.World, e : entity.Entity) : void`
 - `world.hasEntity(w : world.World, e : entity.Entity) : bool`
 - `world.findByName(w : world.World, name : string) : ?entity.Entity`
-- `world.setPosition(w : world.World, e : entity.Entity, position : Vec3) : void`
-- `world.getPosition(w : world.World, e : entity.Entity) : Vec3`
-- `world.setRotation(w : world.World, e : entity.Entity, rotation : Quat) : void`
-- `world.getRotation(w : world.World, e : entity.Entity) : Quat`
-- `world.setScale(w : world.World, e : entity.Entity, scale : Vec3) : void`
-- `world.getScale(w : world.World, e : entity.Entity) : Vec3`
 
-The `engine:entity` module exposes the same common entity operations with the entity as the first parameter:
+Current entity functions:
 
 - `entity.destroy(e : entity.Entity) : void`
 - `entity.isValid(e : entity.Entity) : bool`
@@ -951,52 +1032,46 @@ The `engine:entity` module exposes the same common entity operations with the en
 - `entity.setScale(e : entity.Entity, scale : Vec3) : void`
 - `entity.getScale(e : entity.Entity) : Vec3`
 
-It also exposes generated component accessors for reflected components:
+Generated component accessors:
 
 - `entity.animator(e : entity.Entity) : ?animator.Animator`
 - `entity.<component_id>(e : entity.Entity) : ?<component_module>.<ComponentType>`
 
-These are usually called through first-parameter namespace resolution, for example `e.animator()`.
+### Input API shape
 
-The `engine:input` module exposes raw input event iteration. It does not currently expose action polling helpers such as `isDown`, `wasPressed`, or axis lookup by name.
-
-**TODO enum instead of input.BUTTON()**
-**TODO input.Keycode.W -> Keycode.W**
+The `engine:input` module currently exposes raw event iteration.
 
 ```cpp
 import "engine:world" as world
 import "engine:input" as input
+import "engine:InputEventType"
+import "engine:Keycode"
+import "engine:log" as log
 
 fn init(w : world.World, inputs : input.InputSystem) : void {
 	var i : i32 = 0;
 	const count = inputs.getEventCount();
-	while (i < count) {
+	while i < count {
 		const e = inputs.getEvent(i);
 		const t = e.getType();
 
-		if t == input.BUTTON() {
+		if t == InputEventType.BUTTON {
 			const key = e.getKeyId();
-			const down = e.isDown();
-			if key == input.Keycode.W {
-				logError("W");
+			if key == Keycode.W as i32 {
+				log.logError("W");
 			}
 		}
 
-		if t == input.AXIS() {
-			const axis = e.getAxis();
-			const value = e.getValue();
-		}
-
-		i = i + 1;
+		i += 1;
 	}
 }
 ```
 
-Input event functions:
+Input functions:
 
 - `input.getEventCount(inputs : input.InputSystem) : i32`
 - `input.getEvent(inputs : input.InputSystem, index : i32) : input.InputEvent`
-- `input.getType(e : input.InputEvent) : i32`
+- `input.getType(e : input.InputEvent) : InputEventType`
 - `input.getDeviceType(e : input.InputEvent) : i32`
 - `input.getDeviceIndex(e : input.InputEvent) : i32`
 - `input.getKeyId(e : input.InputEvent) : i32`
@@ -1008,38 +1083,60 @@ Input event functions:
 - `input.getAxis(e : input.InputEvent) : i32`
 - `input.getText(e : input.InputEvent) : i32`
 
-Input event type helpers return `i32` values: `input.BUTTON()`, `input.AXIS()`, `input.MOUSE_WHEEL()`, `input.TEXT_INPUT()`, `input.DEVICE_ADDED()`, and `input.DEVICE_REMOVED()`.
+Input event types are exposed through `InputEventType`:
 
-Meta enums are exposed under the engine import alias. For example, `import "engine:input" as input` exposes `input.Keycode.W`, `input.Keycode.SHIFT`, and the other reflected `Keycode` members as numeric enum constants.
+- `InputEventType.BUTTON`
+- `InputEventType.AXIS`
+- `InputEventType.MOUSE_WHEEL`
+- `InputEventType.TEXT_INPUT`
+- `InputEventType.DEVICE_ADDED`
+- `InputEventType.DEVICE_REMOVED`
 
-## Editor
+Meta enums are imported by enum name, for example `import "engine:Keycode"`.
 
-Studio can create and open `.lum` files from the asset browser. The LumScript editor uses the built-in code editor with keyword highlighting, save/open/locate actions, and a `Check` action that runs the standalone parser and type checker on the current text.
+## Editor and diagnostics
 
-## Diagnostics
+Studio support:
 
-Compilation stops after the first reported error. Parser, checker, and many runtime diagnostics include a line and column:
+- create/open `.lum` assets in asset browser
+- syntax highlighting
+- save/open/locate actions
+- `Check` action that runs parser + checker on current text
+
+Diagnostic behavior:
+
+- compilation currently stops after first reported error
+- parser/checker/runtime diagnostics include source, line, and column when the source name is known
+- top-level world/editor scripts report the asset path, for example `maps/demo/demo.lum`
+- imported source files report the import path, for example `core:vec3`
+- engine imports do not have source text, so errors in unresolved `engine:` imports are reported at the import statement in the importing file
+
+Examples:
 
 ```txt
-line 2, column 9: Unknown variable 'missing'
+maps/demo/demo.lum: line 50, column 4: Unexpected token near '_'
+core:vec3: line 28, column 14: Arithmetic operands must have the same type
 ```
 
-The checker currently reports errors such as:
+Common checker errors include duplicate declarations, unknown symbols, invalid assignment to `const`, type mismatches, and non-`bool` conditions.
 
-- duplicate structs, functions, fields, parameters, or locals
-- unknown types, variables, functions, or fields
-- assignment to `const`
-- type mismatch in initializers, assignments, arguments, returns, or struct literals
-- non-`bool` conditions for `if` and `while`
+## Known limitations and pending spec decisions
 
-## Current Limitations
+Not implemented yet:
 
-LumScript is intentionally small right now. These features are not implemented yet:
-
-- only a subset of native `engine:` function signatures are exposed right now
-- bytecode (currently interprets AST directly)
+- full `engine:` API coverage
+- bytecode VM
 - string interpolation
-- arrays or maps
+- maps
+- break/continue and named loop labels
+- lambdas and closures
 - named struct fields in literals
-- return-path analysis for every branch
+- complete return-path analysis for all branches
 
+Still being finalized:
+
+- nullable flow typing details after reassignment
+- `match` overlap rules for range/literal combinations
+- global initialization order across imports
+- string semantic guarantees (encoding/equality guarantees)
+- migration from numeric input event helpers to enum-based event types

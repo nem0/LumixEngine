@@ -107,6 +107,40 @@ bool testTokenizerExtendedScalarTypes() {
 	return true;
 }
 
+bool testTokenizerArrayBrackets() {
+	LumScript::Tokenizer tokenizer;
+	tokenizer.init("var d : i32[16]; d[0] = 1;");
+	using Token = LumScript::Token;
+
+	Token tok = tokenizer.consumeToken();
+	ASSERT_EQ(Token::VAR, tok.type);
+	tok = tokenizer.consumeToken();
+	ASSERT_EQ(Token::IDENTIFIER, tok.type);
+	tok = tokenizer.consumeToken();
+	ASSERT_EQ(Token::COLON, tok.type);
+	tok = tokenizer.consumeToken();
+	ASSERT_EQ(Token::I32, tok.type);
+	tok = tokenizer.consumeToken();
+	ASSERT_EQ(Token::LEFT_BRACKET, tok.type);
+	tok = tokenizer.consumeToken();
+	ASSERT_EQ(Token::NUMBER, tok.type);
+	tok = tokenizer.consumeToken();
+	ASSERT_EQ(Token::RIGHT_BRACKET, tok.type);
+	return true;
+}
+
+bool testTokenizerBreakContinueKeywords() {
+	LumScript::Tokenizer tokenizer;
+	tokenizer.init("break continue");
+	using Token = LumScript::Token;
+
+	Token tok = tokenizer.consumeToken();
+	ASSERT_EQ(Token::BREAK, tok.type);
+	tok = tokenizer.consumeToken();
+	ASSERT_EQ(Token::CONTINUE, tok.type);
+	return true;
+}
+
 bool testTokenizerLocations() {
 	LumScript::Tokenizer tokenizer;
 	tokenizer.init("// comment\n  fn main() : void {\n\treturn;\n}");
@@ -137,5 +171,7 @@ void runLumScriptTokenizerTests() {
 	RUN_TEST(testTokenizerDeferKeyword);
 	RUN_TEST(testTokenizerNullableTokens);
 	RUN_TEST(testTokenizerExtendedScalarTypes);
+	RUN_TEST(testTokenizerArrayBrackets);
+	RUN_TEST(testTokenizerBreakContinueKeywords);
 	RUN_TEST(testTokenizerLocations);
 }

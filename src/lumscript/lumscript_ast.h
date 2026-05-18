@@ -12,7 +12,7 @@ struct Value;
 struct Module;
 
 struct TypeRef {
-	enum Kind { INVALID, VOID, BOOL, I8, U8, I16, U16, I32, U32, I64, U64, F32, F64, STRING, UNTYPED_INT, UNTYPED_FLOAT, STRUCT, ENUM, NATIVE, NULL_VALUE } kind = INVALID;
+	enum Kind { INVALID, VOID, BOOL, I8, U8, I16, U16, I32, U32, I64, U64, F32, F64, STRING, UNTYPED_INT, UNTYPED_FLOAT, STRUCT, ENUM, NATIVE, FUNCTION, ARRAY, NULL_VALUE } kind = INVALID;
 
 	TypeRef() {}
 	TypeRef(Kind kind, StringView name = {}, i32 struct_index = -1, Token token = {}, bool nullable = false)
@@ -25,13 +25,18 @@ struct TypeRef {
 
 	StringView name;
 	i32 struct_index = -1;
+	Kind element_kind = INVALID;
+	StringView element_name;
+	i32 array_size = 0;
 	Token token;
 	bool nullable = false;
 };
 
 inline bool sameBaseType(const TypeRef& a, const TypeRef& b) {
 	if (a.kind != b.kind) return false;
-	return a.kind != TypeRef::STRUCT && a.kind != TypeRef::ENUM && a.kind != TypeRef::NATIVE
+	if (a.kind == TypeRef::FUNCTION) return a.struct_index == b.struct_index;
+	if (a.kind == TypeRef::ARRAY) return a.array_size == b.array_size && a.element_kind == b.element_kind && (a.element_kind != TypeRef::STRUCT && a.element_kind != TypeRef::ENUM && a.element_kind != TypeRef::NATIVE ? true : (a.struct_index == b.struct_index || equalStrings(a.element_name, b.element_name)));
+	return a.kind != TypeRef::STRUCT && a.kind != TypeRef::ENUM && a.kind != TypeRef::NATIVE && a.kind != TypeRef::FUNCTION
 		? true
 		: a.struct_index == b.struct_index || equalStrings(a.name, b.name);
 }
@@ -56,7 +61,10 @@ struct Expr {
 		CAST,
 		STRUCT_LITERAL,
 		CONSTRUCTOR,
-		ENUM_LITERAL
+		ENUM_LITERAL,
+		FUNCTION_REF
+		,
+		INDEX
 	};
 
 	explicit Expr(IAllocator& allocator)
@@ -79,7 +87,7 @@ struct Expr {
 };
 
 struct Stmt {
-	enum Kind { BLOCK, VAR_DECL, EXPR, ASSIGN, WHILE, RETURN, IF, DEFER, MATCH };
+	enum Kind { BLOCK, VAR_DECL, FN_DECL, EXPR, ASSIGN, WHILE, BREAK, CONTINUE, RETURN, IF, DEFER, MATCH };
 
 	explicit Stmt(IAllocator& allocator)
 		: children(allocator)
@@ -161,10 +169,12 @@ struct FunctionDecl {
 	{}
 
 	StringView name;
+	StringView local_name;
 	Array<Param> params;
 	TypeRef return_type;
 	i32 body = -1;
 	Token token;
+	bool is_nested = false;
 };
 
 struct GlobalDecl {
@@ -203,6 +213,15 @@ struct NativeFunctionDecl {
 	Token token;
 };
 
+struct FunctionTypeDecl {
+	explicit FunctionTypeDecl(IAllocator& allocator)
+		: params(allocator)
+	{}
+
+	Array<TypeRef> params;
+	TypeRef return_type;
+};
+
 struct Module {
 	explicit Module(IAllocator& allocator)
 		: allocator(allocator)
@@ -213,6 +232,7 @@ struct Module {
 		, globals(allocator)
 		, functions(allocator)
 		, native_functions(allocator)
+		, function_types(allocator)
 		, expressions(allocator)
 		, statements(allocator)
 		, match_patterns(allocator)
@@ -253,6 +273,7 @@ struct Module {
 	Array<GlobalDecl> globals;
 	Array<FunctionDecl> functions;
 	Array<NativeFunctionDecl> native_functions;
+	Array<FunctionTypeDecl> function_types;
 	Array<Expr> expressions;
 	Array<Stmt> statements;
 	Array<MatchPattern> match_patterns;

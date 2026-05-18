@@ -11,12 +11,23 @@ struct LocalInfo {
 	bool is_const = false;
 };
 
+struct LocalFunctionInfo {
+	StringView name;
+	i32 function_index = -1;
+};
+
 struct Checker {
 	Checker(Module& module, Diagnostics& diagnostics)
 		: m_module(module)
 		, m_diagnostics(diagnostics)
 		, m_locals(module.allocator)
 		, m_scope_starts(module.allocator)
+		, m_local_functions(module.allocator)
+		, m_function_scope_starts(module.allocator)
+		, m_loop_labels(module.allocator)
+		, m_loop_scope_starts(module.allocator)
+		, m_declared_labels(module.allocator)
+		, m_label_scope_starts(module.allocator)
 	{}
 
 	bool check() {
@@ -29,7 +40,9 @@ struct Checker {
 			}
 		}
 		for (i32 i = 0; i < m_module.functions.size(); ++i) {
+			if (m_module.functions[i].is_nested) continue;
 			for (i32 j = i + 1; j < m_module.functions.size(); ++j) {
+				if (m_module.functions[j].is_nested) continue;
 				if (equalStrings(m_module.functions[i].name, m_module.functions[j].name)) {
 					m_diagnostics.errorAt(m_module.functions[j].token, "Duplicate function '", m_module.functions[j].name, "'");
 					return false;
@@ -93,23 +106,17 @@ struct Checker {
 			}
 		}
 		for (FunctionDecl& fn : m_module.functions) {
-			for (i32 i = 0; i < fn.params.size(); ++i) {
-				for (i32 j = i + 1; j < fn.params.size(); ++j) {
-					if (equalStrings(fn.params[i].name, fn.params[j].name)) {
-						m_diagnostics.errorAt(fn.params[j].token, "Duplicate parameter '", fn.params[j].name, "'");
-						return false;
-					}
-				}
-				resolveType(fn.params[i].type);
-			}
-			resolveType(fn.return_type);
+			if (fn.is_nested) continue;
+			if (!checkFunctionSignature(fn)) return false;
 		}
 		for (NativeFunctionDecl& fn : m_module.native_functions) {
 			for (Param& p : fn.params) resolveType(p.type);
 			resolveType(fn.return_type);
 		}
 		checkGlobals();
-		for (FunctionDecl& fn : m_module.functions) checkFunction(fn);
+		for (FunctionDecl& fn : m_module.functions) {
+			if (!fn.is_nested) checkFunction(fn);
+		}
 		return !m_diagnostics.has_error;
 	}
 
@@ -119,7 +126,9 @@ struct Checker {
 	}
 
 	i32 findFunction(StringView name) const {
-		for (i32 i = 0; i < m_module.functions.size(); ++i) if (equalStrings(m_module.functions[i].name, name)) return i;
+		for (i32 i = 0; i < m_module.functions.size(); ++i) {
+			if (!m_module.functions[i].is_nested && equalStrings(m_module.functions[i].name, name)) return i;
+		}
 		return -1;
 	}
 
@@ -141,6 +150,49 @@ struct Checker {
 	i32 findNativeType(StringView name) const {
 		for (i32 i = 0; i < m_module.native_types.size(); ++i) if (equalStrings(m_module.native_types[i].name, name)) return i;
 		return -1;
+	}
+
+	bool sameResolvedType(TypeRef a, TypeRef b) const {
+		if (a.kind == TypeRef::FUNCTION || b.kind == TypeRef::FUNCTION) return functionTypesEqual(a, b);
+		return sameBaseType(a, b);
+	}
+
+	bool functionTypesEqual(TypeRef a, TypeRef b) const {
+		if (a.kind != TypeRef::FUNCTION || b.kind != TypeRef::FUNCTION) return false;
+		if (a.struct_index < 0 || a.struct_index >= m_module.function_types.size()) return false;
+		if (b.struct_index < 0 || b.struct_index >= m_module.function_types.size()) return false;
+		const FunctionTypeDecl& fa = m_module.function_types[a.struct_index];
+		const FunctionTypeDecl& fb = m_module.function_types[b.struct_index];
+		if (!sameResolvedType(fa.return_type, fb.return_type)) return false;
+		if (fa.params.size() != fb.params.size()) return false;
+		for (i32 i = 0; i < fa.params.size(); ++i) {
+			if (!sameResolvedType(fa.params[i], fb.params[i])) return false;
+		}
+		return true;
+	}
+
+	TypeRef functionTypeFromSignature(Span<const Param> params, TypeRef return_type, Token token) {
+		for (i32 i = 0; i < m_module.function_types.size(); ++i) {
+			FunctionTypeDecl& existing = m_module.function_types[i];
+			if (existing.params.size() != params.length()) continue;
+			bool same = sameResolvedType(existing.return_type, return_type);
+			for (u32 j = 0; same && j < params.length(); ++j) {
+				same = sameResolvedType(existing.params[j], params[j].type);
+			}
+			if (same) return {TypeRef::FUNCTION, {}, i, token};
+		}
+		FunctionTypeDecl& fn_type = m_module.function_types.emplace(m_module.allocator);
+		for (const Param& p : params) fn_type.params.push(p.type);
+		fn_type.return_type = return_type;
+		return {TypeRef::FUNCTION, {}, m_module.function_types.size() - 1, token};
+	}
+
+	TypeRef functionTypeFromFunction(FunctionDecl& fn) {
+		return functionTypeFromSignature(Span<const Param>(fn.params.begin(), fn.params.size()), fn.return_type, fn.token);
+	}
+
+	TypeRef functionTypeFromNativeFunction(NativeFunctionDecl& fn) {
+		return functionTypeFromSignature(Span<const Param>(fn.params.begin(), fn.params.size()), fn.return_type, fn.token);
 	}
 
 	i32 findEnumMember(const EnumDecl& e, StringView name) const {
@@ -233,11 +285,27 @@ struct Checker {
 		return -1;
 	}
 
+	i32 findLocalFunction(StringView name) const {
+		for (i32 i = m_local_functions.size() - 1; i >= 0; --i) {
+			if (equalStrings(m_local_functions[i].name, name)) return m_local_functions[i].function_index;
+		}
+		return -1;
+	}
+
+	bool localFunctionInCurrentScope(StringView name) const {
+		const i32 scope_start = m_function_scope_starts.empty() ? 0 : m_function_scope_starts.last();
+		for (i32 i = scope_start; i < m_local_functions.size(); ++i) {
+			if (equalStrings(m_local_functions[i].name, name)) return true;
+		}
+		return false;
+	}
+
 	bool isAssignableExpr(i32 expr_idx) {
 		if (expr_idx < 0) return false;
 		Expr& e = m_module.expressions[expr_idx];
 		if (e.kind == Expr::VAR) return true;
 		if (e.kind == Expr::FIELD) return isAssignableExpr(e.left);
+		if (e.kind == Expr::INDEX) return isAssignableExpr(e.left);
 		return false;
 	}
 
@@ -246,16 +314,25 @@ struct Checker {
 		Expr& e = m_module.expressions[expr_idx];
 		if (e.kind == Expr::VAR) {
 			const i32 idx = findLocal(e.name);
-			return idx >= 0 && m_locals[idx].is_const;
+			if (idx >= 0) return m_locals[idx].is_const;
+			const i32 global_idx = findGlobal(e.name);
+			if (global_idx >= 0) return m_module.globals[global_idx].is_const;
+			return false;
 		}
-		const i32 global_idx = e.kind == Expr::VAR ? findGlobal(e.name) : -1;
-		if (global_idx >= 0) return m_module.globals[global_idx].is_const;
 		if (e.kind == Expr::FIELD) return isConstExpr(e.left);
+		if (e.kind == Expr::INDEX) return isConstExpr(e.left);
 		return false;
 	}
 
 	void resolveType(TypeRef& type) {
-		if (type.kind == TypeRef::STRUCT) {
+		if (type.kind == TypeRef::ARRAY) {
+			TypeRef elem(type.element_kind, type.element_name, type.struct_index, type.token, false);
+			resolveType(elem);
+			type.element_kind = elem.kind;
+			type.element_name = elem.name;
+			type.struct_index = elem.struct_index;
+		}
+		else if (type.kind == TypeRef::STRUCT) {
 			// First try to find as a struct
 			type.struct_index = findStruct(type.name);
 			if (type.struct_index < 0) {
@@ -277,14 +354,22 @@ struct Checker {
 		} else if (type.kind == TypeRef::ENUM) {
 			type.struct_index = findEnum(type.name);
 			if (type.struct_index < 0) m_diagnostics.errorAt(type.token, "Unknown type '", type.name, "'");
+		} else if (type.kind == TypeRef::FUNCTION) {
+			if (type.struct_index < 0 || type.struct_index >= m_module.function_types.size()) {
+				m_diagnostics.errorAt(type.token, "Invalid function type");
+				return;
+			}
+			FunctionTypeDecl& fn_type = m_module.function_types[type.struct_index];
+			for (TypeRef& param : fn_type.params) resolveType(param);
+			resolveType(fn_type.return_type);
 		}
 	}
 
 	bool canAssign(TypeRef dst, TypeRef src) const {
 		if (src.kind == TypeRef::NULL_VALUE) return dst.nullable;
 		if (dst.kind == TypeRef::NULL_VALUE) return src.kind == TypeRef::NULL_VALUE;
+		if (dst.kind == TypeRef::ARRAY || src.kind == TypeRef::ARRAY) return sameBaseType(dst, src);
 		if (src.kind == TypeRef::STRING) return dst.kind == TypeRef::STRING;
-		if (src.kind == TypeRef::ENUM && isNumeric(dst)) return true;
 		if (src.kind == TypeRef::UNTYPED_INT) return isNumeric(dst);
 		if (src.kind == TypeRef::UNTYPED_FLOAT) return isFloat(dst);
 		if (dst.nullable) {
@@ -294,7 +379,16 @@ struct Checker {
 			return sameBaseType(nonnull_dst, src);
 		}
 		if (src.nullable) return false;
+		if (dst.kind == TypeRef::FUNCTION || src.kind == TypeRef::FUNCTION) return functionTypesEqual(dst, src);
 		return sameBaseType(dst, src);
+	}
+
+	bool canCompare(TypeRef left, TypeRef right) const {
+		if (left.kind == TypeRef::NULL_VALUE || right.kind == TypeRef::NULL_VALUE) return true;
+		if (left.kind == TypeRef::ENUM || right.kind == TypeRef::ENUM) return sameBaseType(left, right);
+		if (left.kind == TypeRef::STRING || right.kind == TypeRef::STRING) return left.kind == TypeRef::STRING && right.kind == TypeRef::STRING;
+		if (left.kind == TypeRef::BOOL || right.kind == TypeRef::BOOL) return left.kind == TypeRef::BOOL && right.kind == TypeRef::BOOL;
+		return isNumeric(left) && isNumeric(right) && sameBaseType(left, right);
 	}
 
 	bool getNullablePromotion(i32 expr_idx, StringView* var_name, TypeRef* promoted_type, bool* promote_true_branch) {
@@ -368,6 +462,45 @@ struct Checker {
 		return isIntegral(type) || isFloat(type);
 	}
 
+	bool isCompileTimeZero(i32 expr_idx) {
+		if (expr_idx < 0 || expr_idx >= m_module.expressions.size()) return false;
+		Expr& e = m_module.expressions[expr_idx];
+		switch (e.kind) {
+			case Expr::NUMBER: return e.number == 0.0;
+			case Expr::UNARY:
+				if (e.token.type != Token::MINUS && e.token.type != Token::PLUS) return false;
+				return isCompileTimeZero(e.right);
+			case Expr::CAST: return isCompileTimeZero(e.left);
+			case Expr::VAR: {
+				const i32 global_idx = findGlobal(e.name);
+				if (global_idx < 0) return false;
+				const GlobalDecl& global = m_module.globals[global_idx];
+				if (!global.is_const || global.expr < 0) return false;
+				return isCompileTimeZero(global.expr);
+			}
+			default: return false;
+		}
+	}
+
+	bool getCompileTimeInteger(i32 expr_idx, i64* value) {
+		if (expr_idx < 0 || expr_idx >= m_module.expressions.size()) return false;
+		Expr& e = m_module.expressions[expr_idx];
+		switch (e.kind) {
+			case Expr::NUMBER:
+				*value = (i64)e.number;
+				return true;
+			case Expr::UNARY:
+				if (e.token.type != Token::MINUS && e.token.type != Token::PLUS) return false;
+				if (!getCompileTimeInteger(e.right, value)) return false;
+				if (e.token.type == Token::MINUS) *value = -*value;
+				return true;
+			case Expr::CAST:
+				return getCompileTimeInteger(e.left, value);
+			default:
+				return false;
+		}
+	}
+
 	TypeRef concreteNumberType(TypeRef type, const TypeRef* expected) const {
 		if (type.kind == TypeRef::UNTYPED_INT) {
 			if (expected) {
@@ -389,6 +522,51 @@ struct Checker {
 	}
 
 	void checkFunction(FunctionDecl& fn) {
+		checkFunctionSignature(fn);
+		m_locals.clear();
+		m_scope_starts.clear();
+		m_function_scope_starts.clear();
+		m_loop_labels.clear();
+		m_loop_scope_starts.clear();
+		m_declared_labels.clear();
+		m_label_scope_starts.clear();
+		m_scope_starts.push(0);
+		m_function_scope_starts.push(m_local_functions.size());
+		for (Param& p : fn.params) {
+			LocalInfo& local = m_locals.emplace();
+			local.name = p.name;
+			local.type = p.type;
+			local.is_const = !p.is_ref;
+		}
+		checkStmt(fn.body, fn.return_type);
+		m_local_functions.shrink(m_function_scope_starts.last());
+		m_function_scope_starts.pop();
+	}
+
+	bool checkFunctionSignature(FunctionDecl& fn) {
+		for (i32 i = 0; i < fn.params.size(); ++i) {
+			for (i32 j = i + 1; j < fn.params.size(); ++j) {
+				if (equalStrings(fn.params[i].name, fn.params[j].name)) {
+					m_diagnostics.errorAt(fn.params[j].token, "Duplicate parameter '", fn.params[j].name, "'");
+					return false;
+				}
+			}
+			resolveType(fn.params[i].type);
+			if (fn.params[i].is_ref && fn.params[i].type.nullable) {
+				m_diagnostics.errorAt(fn.params[i].token, "Ref parameter type can not be nullable");
+				return false;
+			}
+		}
+		resolveType(fn.return_type);
+		return !m_diagnostics.has_error;
+	}
+
+	void checkNestedFunction(FunctionDecl& fn) {
+		checkFunctionSignature(fn);
+		Array<LocalInfo> old_locals(m_module.allocator);
+		Array<i32> old_scope_starts(m_module.allocator);
+		for (LocalInfo local : m_locals) old_locals.push(local);
+		for (i32 scope_start : m_scope_starts) old_scope_starts.push(scope_start);
 		m_locals.clear();
 		m_scope_starts.clear();
 		m_scope_starts.push(0);
@@ -399,12 +577,19 @@ struct Checker {
 			local.is_const = !p.is_ref;
 		}
 		checkStmt(fn.body, fn.return_type);
+		m_locals.clear();
+		m_scope_starts.clear();
+		for (LocalInfo local : old_locals) m_locals.push(local);
+		for (i32 scope_start : old_scope_starts) m_scope_starts.push(scope_start);
 	}
 
 	void checkGlobals() {
 		m_locals.clear();
 		m_scope_starts.clear();
+		m_local_functions.clear();
+		m_function_scope_starts.clear();
 		m_scope_starts.push(0);
+		m_function_scope_starts.push(0);
 		for (GlobalDecl& global : m_module.globals) {
 			TypeRef type = global.type;
 			if (type.kind != TypeRef::INVALID) resolveType(type);
@@ -449,12 +634,54 @@ struct Checker {
 					e.type = m_module.globals[global_idx].type;
 					return e.type;
 				}
-				if (findFunction(e.name) >= 0 || findNativeFunction(e.name) >= 0) return {};
+				const i32 local_fn_idx = findLocalFunction(e.name);
+				if (local_fn_idx >= 0) {
+					e.kind = Expr::FUNCTION_REF;
+					e.type = functionTypeFromFunction(m_module.functions[local_fn_idx]);
+					e.left = local_fn_idx;
+					e.boolean = false;
+					return e.type;
+				}
+				const i32 fn_idx = findFunction(e.name);
+				if (fn_idx >= 0) {
+					e.kind = Expr::FUNCTION_REF;
+					e.type = functionTypeFromFunction(m_module.functions[fn_idx]);
+					e.left = fn_idx;
+					e.boolean = false;
+					return e.type;
+				}
+				const i32 native_idx = findNativeFunction(e.name);
+				if (native_idx >= 0) {
+					e.kind = Expr::FUNCTION_REF;
+					e.type = functionTypeFromNativeFunction(m_module.native_functions[native_idx]);
+					e.left = native_idx;
+					e.boolean = true;
+					return e.type;
+				}
 				m_diagnostics.errorAt(e.token, "Unknown variable '", e.name, "'");
 				return {};
 			}
+			case Expr::FUNCTION_REF:
+				return e.type;
 			case Expr::FIELD: {
-				if (checkQualifiedEnumMember(e, getExpressionName(expr_idx))) return e.type;
+				const StringView qualified_name = getExpressionName(expr_idx);
+				const i32 fn_idx = findFunction(qualified_name);
+				if (fn_idx >= 0) {
+					e.kind = Expr::FUNCTION_REF;
+					e.type = functionTypeFromFunction(m_module.functions[fn_idx]);
+					e.left = fn_idx;
+					e.boolean = false;
+					return e.type;
+				}
+				const i32 native_idx = findNativeFunction(qualified_name);
+				if (native_idx >= 0) {
+					e.kind = Expr::FUNCTION_REF;
+					e.type = functionTypeFromNativeFunction(m_module.native_functions[native_idx]);
+					e.left = native_idx;
+					e.boolean = true;
+					return e.type;
+				}
+				if (checkQualifiedEnumMember(e, qualified_name)) return e.type;
 				TypeRef base = checkExpr(e.left);
 				if (base.nullable) {
 					m_diagnostics.errorAt(e.token, "Nullable value must be checked for null");
@@ -473,6 +700,29 @@ struct Checker {
 				}
 				m_diagnostics.errorAt(e.token, "Unknown field '", e.name, "'");
 				return {};
+			}
+			case Expr::INDEX: {
+				TypeRef base = checkExpr(e.left);
+				if (base.nullable) {
+					m_diagnostics.errorAt(e.token, "Nullable value must be checked for null");
+					return {};
+				}
+				if (base.kind != TypeRef::ARRAY) {
+					m_diagnostics.errorAt(e.token, "Indexing requires array type");
+					return {};
+				}
+				TypeRef idx_type = checkExpr(e.right);
+				if (!isIntegral(idx_type) && idx_type.kind != TypeRef::UNTYPED_INT) {
+					m_diagnostics.errorAt(e.token, "Array index must be integer");
+					return {};
+				}
+				i64 idx_value = 0;
+				if (getCompileTimeInteger(e.right, &idx_value) && (idx_value < 0 || idx_value >= base.array_size)) {
+					m_diagnostics.errorAt(e.token, "Array index out of range");
+					return {};
+				}
+				e.type = {base.element_kind, base.element_name, base.struct_index, e.token, false};
+				return e.type;
 			}
 			case Expr::UNARY: {
 				TypeRef right = checkExpr(e.right, expected);
@@ -516,13 +766,40 @@ struct Checker {
 				switch (e.token.type) {
 					case Token::GT: case Token::LT: case Token::GT_EQUAL: case Token::LT_EQUAL:
 					case Token::EQUAL_EQUAL: case Token::BANG_EQUAL:
+						if (!canCompare(left, right)) {
+							m_diagnostics.errorAt(e.token, "Comparison type mismatch");
+							return {};
+						}
+						e.type = {TypeRef::BOOL, {}, -1};
+						return e.type;
 					case Token::AND: case Token::OR:
+						if (left.kind != TypeRef::BOOL || right.kind != TypeRef::BOOL) {
+							m_diagnostics.errorAt(e.token, "Boolean operation requires bool operands");
+							return {};
+						}
 						e.type = {TypeRef::BOOL, {}, -1};
 						return e.type;
 					default:
-							e.type = left.kind == TypeRef::F64 || right.kind == TypeRef::F64
-								? TypeRef{TypeRef::F64, {}, -1}
-								: (isFloat(left) || isFloat(right) ? TypeRef{TypeRef::F32, {}, -1} : left);
+						if (!isNumeric(left) || !isNumeric(right)) {
+							m_diagnostics.errorAt(e.token, "Arithmetic operation requires numeric operands");
+							return {};
+						}
+							if (!sameBaseType(left, right)) {
+								m_diagnostics.errorAt(e.token, "Arithmetic operands must have the same type");
+								return {};
+							}
+							if (e.token.type == Token::PERCENT && (!isIntegral(left) || !isIntegral(right))) {
+								m_diagnostics.errorAt(e.token, "Modulo operation requires integer operands");
+								return {};
+							}
+							if ((e.token.type == Token::SLASH || e.token.type == Token::PERCENT)
+								&& isIntegral(left)
+								&& isIntegral(right)
+								&& isCompileTimeZero(e.right)) {
+								m_diagnostics.errorAt(m_module.expressions[e.right].token, "Division or modulo by zero");
+								return {};
+							}
+							e.type = left;
 						return e.type;
 				}
 			}
@@ -530,13 +807,29 @@ struct Checker {
 				i32 fn_idx = -1;
 				i32 native_idx = -1;
 				const StringView callee_name = resolveCallName(e, &fn_idx, &native_idx);
-				if (callee_name.empty()) {
-					m_diagnostics.errorAt(e.token, "Unsupported callee");
-					return {};
-				}
 				if (fn_idx < 0 && native_idx < 0) {
-					m_diagnostics.errorAt(m_module.expressions[e.left].token, "Unknown function '", callee_name, "'");
-					return {};
+					TypeRef callee_type = checkExpr(e.left);
+					if (callee_type.kind != TypeRef::FUNCTION || callee_type.struct_index < 0 || callee_type.struct_index >= m_module.function_types.size()) {
+						if (callee_name.empty()) m_diagnostics.errorAt(m_module.expressions[e.left].token, "Unsupported callee");
+						else m_diagnostics.errorAt(m_module.expressions[e.left].token, "Unknown function '", callee_name, "'");
+						return {};
+					}
+					FunctionTypeDecl& fn_type = m_module.function_types[callee_type.struct_index];
+					if (fn_type.params.size() != e.args.size()) {
+						m_diagnostics.errorAt(e.token, "Wrong number of arguments");
+						return {};
+					}
+					for (i32 i = 0; i < fn_type.params.size(); ++i) {
+						Expr& arg_expr = m_module.expressions[e.args[i]];
+						if (arg_expr.kind == Expr::REF) {
+							m_diagnostics.errorAt(arg_expr.token, "Unexpected ref argument");
+							continue;
+						}
+						TypeRef arg_type = checkExpr(e.args[i], &fn_type.params[i]);
+						if (!canAssign(fn_type.params[i], arg_type)) m_diagnostics.errorAt(arg_expr.token, "Argument type mismatch");
+					}
+					e.type = fn_type.return_type;
+					return e.type;
 				}
 				const bool is_native = native_idx >= 0;
 				const Array<Param>& params = is_native ? m_module.native_functions[native_idx].params : m_module.functions[fn_idx].params;
@@ -565,6 +858,10 @@ struct Checker {
 							continue;
 						}
 						TypeRef arg_type = checkExpr(target_expr, &params[i].type);
+						if (arg_type.nullable) {
+							m_diagnostics.errorAt(m_module.expressions[target_expr].token, "Ref argument can not be nullable");
+							continue;
+						}
 						if (!canAssign(params[i].type, arg_type)) m_diagnostics.errorAt(m_module.expressions[target_expr].token, "Argument type mismatch");
 					}
 					else {
@@ -583,7 +880,8 @@ struct Checker {
 			case Expr::CAST: {
 				TypeRef src = checkExpr(e.left);
 				resolveType(e.cast_type);
-				if (!isScalar(src) || !isScalar(e.cast_type)) {
+				const bool is_enum_integer_cast = (src.kind == TypeRef::ENUM && isIntegral(e.cast_type)) || (isIntegral(src) && e.cast_type.kind == TypeRef::ENUM);
+				if ((!isScalar(src) || !isScalar(e.cast_type)) && !is_enum_integer_cast) {
 					m_diagnostics.errorAt(e.token, "Invalid cast");
 					return {};
 				}
@@ -710,10 +1008,22 @@ struct Checker {
 		switch (stmt.kind) {
 			case Stmt::BLOCK: {
 				const i32 old_size = m_locals.size();
+				const i32 old_function_size = m_local_functions.size();
+				const i32 old_loop_size = m_loop_labels.size();
+				const i32 old_label_size = m_declared_labels.size();
 				m_scope_starts.push(old_size);
+				m_function_scope_starts.push(old_function_size);
+				m_loop_scope_starts.push(old_loop_size);
+				m_label_scope_starts.push(old_label_size);
 				for (i32 child : stmt.children) checkStmt(child, return_type);
 				m_locals.shrink(old_size);
+				m_local_functions.shrink(old_function_size);
+				m_loop_labels.shrink(old_loop_size);
+				m_declared_labels.shrink(old_label_size);
 				m_scope_starts.pop();
+				m_function_scope_starts.pop();
+				m_loop_scope_starts.pop();
+				m_label_scope_starts.pop();
 				break;
 			}
 			case Stmt::VAR_DECL: {
@@ -723,6 +1033,10 @@ struct Checker {
 						m_diagnostics.errorAt(stmt.token, "Duplicate local '", stmt.name, "'");
 						return;
 					}
+				}
+				if (localFunctionInCurrentScope(stmt.name)) {
+					m_diagnostics.errorAt(stmt.token, "Duplicate local '", stmt.name, "'");
+					return;
 				}
 				TypeRef type = stmt.type;
 				if (type.kind != TypeRef::INVALID) resolveType(type);
@@ -741,11 +1055,37 @@ struct Checker {
 				local.is_const = stmt.is_const;
 				break;
 			}
+			case Stmt::FN_DECL: {
+				if (stmt.left < 0 || stmt.left >= m_module.functions.size()) return;
+				FunctionDecl& fn = m_module.functions[stmt.left];
+				const i32 scope_start = m_scope_starts.empty() ? 0 : m_scope_starts.last();
+				for (i32 i = scope_start; i < m_locals.size(); ++i) {
+					if (equalStrings(m_locals[i].name, fn.local_name)) {
+						m_diagnostics.errorAt(fn.token, "Duplicate local '", fn.local_name, "'");
+						return;
+					}
+				}
+				if (localFunctionInCurrentScope(fn.local_name)) {
+					m_diagnostics.errorAt(fn.token, "Duplicate function '", fn.local_name, "'");
+					return;
+				}
+				LocalFunctionInfo& local_fn = m_local_functions.emplace();
+				local_fn.name = fn.local_name;
+				local_fn.function_index = stmt.left;
+				checkNestedFunction(fn);
+				break;
+			}
 			case Stmt::EXPR: checkExpr(stmt.expr); break;
 			case Stmt::ASSIGN: {
 				TypeRef left = checkExpr(stmt.left);
 				TypeRef right = checkExpr(stmt.right, &left);
 				if (!canAssign(left, right)) m_diagnostics.errorAt(stmt.token, "Assignment type mismatch");
+				if (stmt.assign_op == Token::SLASH_EQUAL
+					&& isIntegral(left)
+					&& isIntegral(right)
+					&& isCompileTimeZero(stmt.right)) {
+					m_diagnostics.errorAt(m_module.expressions[stmt.right].token, "Division or modulo by zero");
+				}
 				Expr& lhs = m_module.expressions[stmt.left];
 				if (lhs.kind == Expr::VAR) {
 					const i32 idx = findLocal(lhs.name);
@@ -756,9 +1096,40 @@ struct Checker {
 				break;
 			}
 			case Stmt::WHILE: {
+				if (!stmt.name.empty()) {
+					const i32 label_scope_start = m_label_scope_starts.empty() ? 0 : m_label_scope_starts.last();
+					for (i32 i = label_scope_start; i < m_declared_labels.size(); ++i) {
+						if (!equalStrings(m_declared_labels[i], stmt.name)) continue;
+						m_diagnostics.errorAt(stmt.token, "Duplicate loop label '", stmt.name, "'");
+						return;
+					}
+					m_declared_labels.push(stmt.name);
+				}
 				TypeRef cond = checkExpr(stmt.expr);
 				if (cond.kind != TypeRef::BOOL) m_diagnostics.errorAt(stmt.token, "While condition must be bool");
+				m_loop_labels.push(stmt.name);
 				checkStmt(stmt.right, return_type);
+				m_loop_labels.pop();
+				break;
+			}
+			case Stmt::BREAK:
+			case Stmt::CONTINUE: {
+				if (m_loop_labels.empty()) {
+					m_diagnostics.errorAt(stmt.token, stmt.kind == Stmt::BREAK ? "'break' used outside loop" : "'continue' used outside loop");
+					break;
+				}
+				if (!stmt.name.empty()) {
+					bool found = false;
+					for (i32 i = m_loop_labels.size() - 1; i >= 0; --i) {
+						if (equalStrings(m_loop_labels[i], stmt.name)) {
+							found = true;
+							break;
+						}
+					}
+					if (!found) {
+						m_diagnostics.errorAt(stmt.token, "Unknown loop label '", stmt.name, "'");
+					}
+				}
 				break;
 			}
 			case Stmt::IF: {
@@ -811,6 +1182,12 @@ struct Checker {
 	Diagnostics& m_diagnostics;
 	Array<LocalInfo> m_locals;
 	Array<i32> m_scope_starts;
+	Array<LocalFunctionInfo> m_local_functions;
+	Array<i32> m_function_scope_starts;
+	Array<StringView> m_loop_labels;
+	Array<i32> m_loop_scope_starts;
+	Array<StringView> m_declared_labels;
+	Array<i32> m_label_scope_starts;
 };
 
 inline bool typecheck(Module& module, Diagnostics& diagnostics) {

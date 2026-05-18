@@ -14,6 +14,7 @@
 #include "engine/engine.h"
 #include "engine/component_uid.h"
 #include "engine/file_system.h"
+#include "core/array.h"
 #include "core/stream.h"
 
 namespace Lumix {
@@ -173,14 +174,45 @@ struct LumScriptEditorWindow final : AssetEditorWindow {
 		m_editor->serializeText(blob);
 		LumScript::Module module(m_app.getAllocator());
 		LumScript::Diagnostics diagnostics(m_app.getAllocator());
-		auto import_resolver = [](LumScript::Module& module, StringView path, StringView alias, StringView* source, void*) -> bool {
+		struct ImportContext {
+			FileSystem* filesystem;
+			IAllocator* allocator;
+			Array<OutputMemoryStream> sources;
+
+			ImportContext(FileSystem& filesystem, IAllocator& allocator)
+				: filesystem(&filesystem)
+				, allocator(&allocator)
+				, sources(allocator)
+			{}
+		};
+		auto import_resolver = [](LumScript::Module& module, StringView path, StringView alias, StringView* source, void* userdata) -> bool {
 			if (LumScript::resolveEngineImport(module, nullptr, path, alias)) {
 				*source = {};
 				return true;
 			}
+			auto is_valid_core_import_path = [](StringView path) -> bool {
+				if (!startsWith(path, "core:")) return false;
+				StringView name = path.withoutLeft(5);
+				if (name.empty() || name[0] == '/' || name[0] == '\\') return false;
+				return !find(name, "..") && !find(name, ':') && !find(name, '\\');
+			};
+			if (is_valid_core_import_path(path)) {
+				ImportContext* ctx = (ImportContext*)userdata;
+				StringView name = path.withoutLeft(5);
+				const bool has_lum_extension = endsWith(name, ".lum");
+				Path file_path = has_lum_extension ? Path("engine/scripts/core/", name) : Path("engine/scripts/core/", name, ".lum");
+				OutputMemoryStream& import_blob = ctx->sources.emplace(*ctx->allocator);
+				if (!ctx->filesystem->getContentSync(file_path, import_blob)) {
+					ctx->sources.pop();
+					return false;
+				}
+				*source = StringView((const char*)import_blob.data(), (u32)import_blob.size());
+				return true;
+			}
 			return false;
 		};
-		if (LumScript::compileWithBuiltins(module, StringView((const char*)blob.data(), (u32)blob.size()), diagnostics, import_resolver, nullptr)) {
+		ImportContext import_ctx(m_app.getEngine().getFileSystem(), m_app.getAllocator());
+		if (LumScript::compileWithBuiltins(module, StringView((const char*)blob.data(), (u32)blob.size()), diagnostics, import_resolver, &import_ctx, m_path.c_str())) {
 			m_message = "OK";
 			logInfo("LumScript check OK: ", m_path);
 		}

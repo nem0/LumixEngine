@@ -1,10 +1,12 @@
 #include "lumscript/lumscript_engine_api.h"
+#include "core/log.h"
 #include "engine/input_system.h"
 #include "lumscript/lumscript_ast.h"
 #include "lumscript/lumscript_runtime.h"
 #include "engine/reflection.h"
 #include "engine/world.h"
 #include "lumscript/lumscript_capi.gen.h"
+#include "imgui/imgui.h"
 
 namespace Lumix::LumScript {
 
@@ -15,10 +17,6 @@ struct EngineFunctionContext {
 	ComponentType component_type = INVALID_COMPONENT_TYPE;
 	const reflection::FunctionBase* function = nullptr;
 	TypeRef return_type;
-};
-
-struct InputConstantContext {
-	i32 value;
 };
 
 StringView makeEngineName(Module& module, StringView alias, const char* name) {
@@ -147,19 +145,19 @@ bool inputGetDeviceIndex(Span<const Value> args, Value* result, void*) {
 
 bool inputGetKeyId(Span<const Value> args, Value* result, void*) {
 	const InputSystem::Event* event = getInputEvent(args[0]);
-	*result = Runtime::makeI32(event && event->type == InputSystem::Event::BUTTON ? (i32)event->data.button.key_id : -1);
+	*result = Runtime::makeI32(event && event->type == InputEventType::BUTTON ? (i32)event->data.button.key_id : -1);
 	return true;
 }
 
 bool inputIsDown(Span<const Value> args, Value* result, void*) {
 	const InputSystem::Event* event = getInputEvent(args[0]);
-	*result = Runtime::makeBool(event && event->type == InputSystem::Event::BUTTON && event->data.button.down);
+	*result = Runtime::makeBool(event && event->type == InputEventType::BUTTON && event->data.button.down);
 	return true;
 }
 
 bool inputIsRepeat(Span<const Value> args, Value* result, void*) {
 	const InputSystem::Event* event = getInputEvent(args[0]);
-	*result = Runtime::makeBool(event && event->type == InputSystem::Event::BUTTON && event->data.button.is_repeat);
+	*result = Runtime::makeBool(event && event->type == InputEventType::BUTTON && event->data.button.is_repeat);
 	return true;
 }
 
@@ -168,9 +166,9 @@ bool inputGetX(Span<const Value> args, Value* result, void*) {
 	float value = 0;
 	if (event) {
 		switch (event->type) {
-			case InputSystem::Event::BUTTON: value = event->data.button.x; break;
-			case InputSystem::Event::AXIS: value = event->data.axis.x; break;
-			case InputSystem::Event::MOUSE_WHEEL: value = event->data.mouse_wheel.x; break;
+			case InputEventType::BUTTON: value = event->data.button.x; break;
+			case InputEventType::AXIS: value = event->data.axis.x; break;
+			case InputEventType::MOUSE_WHEEL: value = event->data.mouse_wheel.x; break;
 			default: break;
 		}
 	}
@@ -183,9 +181,9 @@ bool inputGetY(Span<const Value> args, Value* result, void*) {
 	float value = 0;
 	if (event) {
 		switch (event->type) {
-			case InputSystem::Event::BUTTON: value = event->data.button.y; break;
-			case InputSystem::Event::AXIS: value = event->data.axis.y; break;
-			case InputSystem::Event::MOUSE_WHEEL: value = event->data.mouse_wheel.y; break;
+			case InputEventType::BUTTON: value = event->data.button.y; break;
+			case InputEventType::AXIS: value = event->data.axis.y; break;
+			case InputEventType::MOUSE_WHEEL: value = event->data.mouse_wheel.y; break;
 			default: break;
 		}
 	}
@@ -198,9 +196,9 @@ bool inputGetValue(Span<const Value> args, Value* result, void*) {
 	float value = 0;
 	if (event) {
 		switch (event->type) {
-			case InputSystem::Event::AXIS: value = event->data.axis.y; break;
-			case InputSystem::Event::MOUSE_WHEEL: value = event->data.mouse_wheel.y; break;
-			case InputSystem::Event::BUTTON: value = event->data.button.down ? 1.0f : 0.0f; break;
+			case InputEventType::AXIS: value = event->data.axis.y; break;
+			case InputEventType::MOUSE_WHEEL: value = event->data.mouse_wheel.y; break;
+			case InputEventType::BUTTON: value = event->data.button.down ? 1.0f : 0.0f; break;
 			default: break;
 		}
 	}
@@ -210,33 +208,26 @@ bool inputGetValue(Span<const Value> args, Value* result, void*) {
 
 bool inputGetAxis(Span<const Value> args, Value* result, void*) {
 	const InputSystem::Event* event = getInputEvent(args[0]);
-	*result = Runtime::makeI32(event && event->type == InputSystem::Event::AXIS ? (i32)event->data.axis.axis : -1);
+	*result = Runtime::makeI32(event && event->type == InputEventType::AXIS ? (i32)event->data.axis.axis : -1);
 	return true;
 }
 
 bool inputGetText(Span<const Value> args, Value* result, void*) {
 	const InputSystem::Event* event = getInputEvent(args[0]);
-	*result = Runtime::makeI32(event && event->type == InputSystem::Event::TEXT_INPUT ? (i32)event->data.text.utf8 : 0);
+	*result = Runtime::makeI32(event && event->type == InputEventType::TEXT_INPUT ? (i32)event->data.text.utf8 : 0);
 	return true;
 }
 
-bool inputConstant(Span<const Value>, Value* result, void* userdata) {
-	InputConstantContext* ctx = (InputConstantContext*)userdata;
-	*result = Runtime::makeI32(ctx->value);
+bool logLogError(Span<const Value> args, Value*, void*) {
+	logError(args[0].string);
 	return true;
-}
-
-void addInputConstant(Module& module, StringView alias, const char* name, i32 value) {
-	void* mem = module.allocator.allocate(sizeof(InputConstantContext), alignof(InputConstantContext));
-	module.allocated_native_data.push(mem);
-	InputConstantContext* ctx = new (NewPlaceholder(), mem) InputConstantContext;
-	ctx->value = value;
-	addNativeFunction(module, makeEngineName(module, alias, name), TypeRef(TypeRef::I32), Span<const TypeRef>(), &inputConstant, ctx);
 }
 
 bool registerInputModule(Module& module, StringView alias) {
+	generated::registerGeneratedEngineImport(module, nullptr, "engine:InputEventType", {});
 	TypeRef system_type = nativeType(module, makeEngineName(module, alias, "InputSystem"), "engine:input/InputSystem");
 	TypeRef event_type = nativeType(module, makeEngineName(module, alias, "InputEvent"), "engine:input/InputEvent");
+	TypeRef event_type_enum(TypeRef::ENUM, "InputEventType", -1);
 	{
 		TypeRef params[] = { system_type };
 		addNativeFunction(module, makeEngineName(module, alias, "getEventCount"), TypeRef(TypeRef::I32), Span<const TypeRef>(params), &inputGetEventCount);
@@ -247,7 +238,7 @@ bool registerInputModule(Module& module, StringView alias) {
 	}
 	{
 		TypeRef params[] = { event_type };
-		addNativeFunction(module, makeEngineName(module, alias, "getType"), TypeRef(TypeRef::I32), Span<const TypeRef>(params), &inputGetType);
+		addNativeFunction(module, makeEngineName(module, alias, "getType"), event_type_enum, Span<const TypeRef>(params), &inputGetType);
 		addNativeFunction(module, makeEngineName(module, alias, "getDeviceType"), TypeRef(TypeRef::I32), Span<const TypeRef>(params), &inputGetDeviceType);
 		addNativeFunction(module, makeEngineName(module, alias, "getDeviceIndex"), TypeRef(TypeRef::I32), Span<const TypeRef>(params), &inputGetDeviceIndex);
 		addNativeFunction(module, makeEngineName(module, alias, "getKeyId"), TypeRef(TypeRef::I32), Span<const TypeRef>(params), &inputGetKeyId);
@@ -259,12 +250,53 @@ bool registerInputModule(Module& module, StringView alias) {
 		addNativeFunction(module, makeEngineName(module, alias, "getAxis"), TypeRef(TypeRef::I32), Span<const TypeRef>(params), &inputGetAxis);
 		addNativeFunction(module, makeEngineName(module, alias, "getText"), TypeRef(TypeRef::I32), Span<const TypeRef>(params), &inputGetText);
 	}
-	addInputConstant(module, alias, "BUTTON", (i32)InputSystem::Event::BUTTON);
-	addInputConstant(module, alias, "AXIS", (i32)InputSystem::Event::AXIS);
-	addInputConstant(module, alias, "MOUSE_WHEEL", (i32)InputSystem::Event::MOUSE_WHEEL);
-	addInputConstant(module, alias, "TEXT_INPUT", (i32)InputSystem::Event::TEXT_INPUT);
-	addInputConstant(module, alias, "DEVICE_ADDED", (i32)InputSystem::Event::DEVICE_ADDED);
-	addInputConstant(module, alias, "DEVICE_REMOVED", (i32)InputSystem::Event::DEVICE_REMOVED);
+	return true;
+}
+
+bool registerLogModule(Module& module, StringView alias) {
+	TypeRef params[] = {TypeRef(TypeRef::STRING)};
+	addNativeFunction(module, makeEngineName(module, alias, "logError"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params), &logLogError);
+	return true;
+}
+
+bool imguiBeginWindow(Span<const Value> args, Value* result, void*) {
+	bool open = false;
+	if (ImGui::GetCurrentContext()) {
+		StaticString<256> title(args[0].string);
+		open = ImGui::Begin(title);
+	}
+	*result = Runtime::makeBool(open);
+	return true;
+}
+
+bool imguiEndWindow(Span<const Value>, Value*, void*) {
+	if (ImGui::GetCurrentContext()) ImGui::End();
+	return true;
+}
+
+bool imguiTextUnformatted(Span<const Value> args, Value*, void*) {
+	if (ImGui::GetCurrentContext()) ImGui::TextUnformatted(args[0].string.begin, args[0].string.end);
+	return true;
+}
+
+bool imguiButton(Span<const Value> args, Value* result, void*) {
+	bool clicked = false;
+	if (ImGui::GetCurrentContext()) {
+		StaticString<256> label(args[0].string);
+		clicked = ImGui::Button(label);
+	}
+	*result = Runtime::makeBool(clicked);
+	return true;
+}
+
+bool registerImguiModule(Module& module, StringView alias) {
+	{
+		TypeRef params[] = {TypeRef(TypeRef::STRING)};
+		addNativeFunction(module, makeEngineName(module, alias, "beginWindow"), TypeRef(TypeRef::BOOL), Span<const TypeRef>(params), &imguiBeginWindow);
+		addNativeFunction(module, makeEngineName(module, alias, "textUnformatted"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params), &imguiTextUnformatted);
+		addNativeFunction(module, makeEngineName(module, alias, "button"), TypeRef(TypeRef::BOOL), Span<const TypeRef>(params), &imguiButton);
+	}
+	addNativeFunction(module, makeEngineName(module, alias, "endWindow"), TypeRef(TypeRef::VOID), Span<const TypeRef>(), &imguiEndWindow);
 	return true;
 }
 
@@ -322,6 +354,8 @@ bool resolveEngineImport(Module& module, World* world, StringView path, StringVi
 		return true;
 	}
 	if (equalStrings(name, "input")) return registerInputModule(module, alias);
+	if (equalStrings(name, "log")) return registerLogModule(module, alias);
+	if (equalStrings(name, "imgui")) return registerImguiModule(module, alias);
 
 	for (const reflection::RegisteredComponent& registered : reflection::getComponents()) {
 		const reflection::ComponentBase* component = registered.cmp;

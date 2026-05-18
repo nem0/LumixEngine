@@ -42,6 +42,8 @@ struct RuntimeOptions {
 };
 
 struct Runtime {
+	enum class FlowSignal : u8 { NONE, RETURN, BREAK, CONTINUE };
+
 	Runtime(Module& module, IAllocator& allocator)
 		: m_module(module)
 		, m_allocator(allocator)
@@ -153,6 +155,14 @@ struct Runtime {
 		return v;
 	}
 
+	static Value makeFunction(TypeRef type, i32 index, bool is_native) {
+		Value v;
+		v.type = type;
+		v.i = index;
+		v.b = is_native;
+		return v;
+	}
+
 	static i64 truncateSigned(TypeRef::Kind kind, i64 value) {
 		switch (kind) {
 			case TypeRef::I8: return (i64)(i8)value;
@@ -260,7 +270,9 @@ struct Runtime {
 	}
 
 	i32 findFunction(StringView name) const {
-		for (i32 i = 0; i < m_module.functions.size(); ++i) if (equalStrings(m_module.functions[i].name, name)) return i;
+		for (i32 i = 0; i < m_module.functions.size(); ++i) {
+			if (!m_module.functions[i].is_nested && equalStrings(m_module.functions[i].name, name)) return i;
+		}
 		return -1;
 	}
 
@@ -350,8 +362,9 @@ struct Runtime {
 			}
 		}
 		Value ret;
-		bool did_return = false;
-		execStmt(fn.body, &ret, &did_return);
+		FlowSignal flow = FlowSignal::NONE;
+		StringView flow_label;
+		execStmt(fn.body, &ret, &flow, &flow_label);
 		m_frames.pop();
 		if (result) *result = ret;
 		return !m_diagnostics->has_error;
@@ -396,6 +409,13 @@ struct Runtime {
 			m_owned_arrays.push(v.fields);
 			StructDecl& s = m_module.structs[type.struct_index];
 			for (FieldDecl& field : s.fields) v.fields->push(makeDefault(field.type));
+		}
+		else if (type.kind == TypeRef::ARRAY) {
+			v.fields = LUMIX_NEW(m_allocator, Array<Value>)(m_allocator);
+			m_owned_arrays.push(v.fields);
+			v.fields->resize(type.array_size);
+			TypeRef elem(type.element_kind, type.element_name, type.struct_index, type.token, false);
+			for (i32 i = 0; i < type.array_size; ++i) (*v.fields)[i] = makeDefault(elem);
 		}
 		else if (type.kind == TypeRef::NATIVE) {
 			v.i = -1;
@@ -450,6 +470,8 @@ struct Runtime {
 				}
 				return bindingValue(*b);
 			}
+			case Expr::FUNCTION_REF:
+				return makeFunction(e.type, e.left, e.boolean);
 			case Expr::FIELD: {
 				Value enum_value;
 				if (evalQualifiedEnumMember(getExpressionName(expr_idx), &enum_value)) return enum_value;
@@ -464,6 +486,16 @@ struct Runtime {
 				for (i32 i = 0; i < s.fields.size(); ++i) if (equalStrings(s.fields[i].name, e.name)) return (*base.fields)[i];
 				m_diagnostics->errorAt(e.token, "Unknown field '", e.name, "'");
 				return {};
+			}
+			case Expr::INDEX: {
+				Value base = evalExpr(e.left);
+				Value index = evalExpr(e.right);
+				const i32 i = (i32)asI64(index);
+				if (!base.fields || i < 0 || i >= base.fields->size()) {
+					m_diagnostics->errorAt(e.token, "Array index out of range");
+					return {};
+				}
+				return (*base.fields)[i];
 			}
 			case Expr::UNARY: {
 				Value right = evalExpr(e.right);
@@ -497,6 +529,18 @@ struct Runtime {
 				const i32 native_idx = findNativeFunction(callee_name);
 				Array<Value> args(m_allocator);
 				Array<Value*> ref_args(m_allocator);
+				if (fn_idx < 0 && native_idx < 0) {
+					Value callee = evalExpr(e.left);
+					if (callee.type.kind != TypeRef::FUNCTION) {
+						m_diagnostics->errorAt(e.token, "Invalid function call");
+						return {};
+					}
+					for (i32 arg : e.args) args.push(evalExpr(arg));
+					Value res;
+					if (callee.b) callNativeFunction(m_module.native_functions[callee.i], args, &res);
+					else callFunction(m_module.functions[callee.i], args, Span<Value*>(), &res);
+					return res;
+				}
 				if (fn_idx >= 0) {
 					FunctionDecl& fn = m_module.functions[fn_idx];
 					const i32 receiver_arg_count = e.method_receiver >= 0 ? 1 : 0;
@@ -589,6 +633,13 @@ struct Runtime {
 		const i64 bi = asI64(b);
 		const u64 au = asU64(a);
 		const u64 bu = asU64(b);
+		if (!is_float && (e.token.type == Token::SLASH || e.token.type == Token::PERCENT)) {
+			const bool zero = isUnsignedIntegral(e.type.kind) ? bu == 0 : bi == 0;
+			if (zero) {
+				m_diagnostics->errorAt(e.token, "Division or modulo by zero");
+				return {};
+			}
+		}
 		switch (e.token.type) {
 			case Token::PLUS:
 				if (is_float) return makeFloatLike(e.type.kind, ad + bd);
@@ -602,7 +653,12 @@ struct Runtime {
 			case Token::SLASH:
 				if (is_float) return makeFloatLike(e.type.kind, ad / bd);
 				return isUnsignedIntegral(e.type.kind) ? makeUnsignedIntegral(e.type.kind, au / bu) : makeSignedIntegral(e.type.kind, ai / bi);
-			case Token::PERCENT: return isUnsignedIntegral(e.type.kind) ? makeUnsignedIntegral(e.type.kind, au % bu) : makeSignedIntegral(e.type.kind, ai % bi);
+			case Token::PERCENT:
+				if (is_float) {
+					m_diagnostics->errorAt(e.token, "Modulo operation requires integer operands");
+					return {};
+				}
+				return isUnsignedIntegral(e.type.kind) ? makeUnsignedIntegral(e.type.kind, au % bu) : makeSignedIntegral(e.type.kind, ai % bi);
 			case Token::GT: return makeBool(ad > bd);
 			case Token::LT: return makeBool(ad < bd);
 			case Token::GT_EQUAL: return makeBool(ad >= bd);
@@ -634,6 +690,11 @@ struct Runtime {
 	}
 
 	Value castValue(Value value, TypeRef type) {
+		if (type.kind == TypeRef::ENUM) {
+			Value v = makeI32((i32)asI64(value));
+			v.type = type;
+			return v;
+		}
 		switch (type.kind) {
 			case TypeRef::BOOL: return makeBool(asBool(value));
 			case TypeRef::I8:
@@ -700,6 +761,16 @@ struct Runtime {
 			StructDecl& s = m_module.structs[base->type.struct_index];
 			for (i32 i = 0; i < s.fields.size(); ++i) if (equalStrings(s.fields[i].name, e.name)) return &(*base->fields)[i];
 		}
+		if (e.kind == Expr::INDEX) {
+			Value* base = resolveLValue(e.left, is_const);
+			if (!base) return nullptr;
+			const i32 idx = (i32)asI64(evalExpr(e.right));
+			if (!base->fields || idx < 0 || idx >= base->fields->size()) {
+				m_diagnostics->errorAt(e.token, "Array index out of range");
+				return nullptr;
+			}
+			return &(*base->fields)[idx];
+		}
 		m_diagnostics->errorAt(e.token, "Invalid assignment target");
 		return nullptr;
 	}
@@ -723,6 +794,13 @@ struct Runtime {
 		const bool is_f64 = cur.type.kind == TypeRef::F64;
 		const double cv = is_f64 ? cur.d : is_float ? (double)cur.f : asF64(cur);
 		const double vv = asF64(value);
+		if (op == Token::SLASH_EQUAL && !is_float) {
+			const bool zero = isUnsignedIntegral(cur.type.kind) ? asU64(value) == 0 : asI64(value) == 0;
+			if (zero) {
+				m_diagnostics->error("Division or modulo by zero");
+				return;
+			}
+		}
 		switch (op) {
 			case Token::PLUS_EQUAL: *dst = is_float ? makeFloatLike(cur.type.kind, cv + vv) : (isUnsignedIntegral(cur.type.kind) ? makeUnsignedIntegral(cur.type.kind, asU64(cur) + asU64(value)) : makeSignedIntegral(cur.type.kind, asI64(cur) + asI64(value))); break;
 			case Token::MINUS_EQUAL: *dst = is_float ? makeFloatLike(cur.type.kind, cv - vv) : (isUnsignedIntegral(cur.type.kind) ? makeUnsignedIntegral(cur.type.kind, asU64(cur) - asU64(value)) : makeSignedIntegral(cur.type.kind, asI64(cur) - asI64(value))); break;
@@ -732,21 +810,21 @@ struct Runtime {
 		}
 	}
 
-	void execStmt(i32 stmt_idx, Value* ret, bool* did_return, bool allow_after_return = false) {
-		if ((!allow_after_return && *did_return) || m_diagnostics->has_error || !step()) return;
+	void execStmt(i32 stmt_idx, Value* ret, FlowSignal* flow, StringView* flow_label, bool allow_after_return = false) {
+		if ((!allow_after_return && *flow == FlowSignal::RETURN) || m_diagnostics->has_error || !step()) return;
 		Stmt& stmt = m_module.statements[stmt_idx];
 		switch (stmt.kind) {
 			case Stmt::BLOCK: {
 				const i32 old_size = m_frames.last().bindings.size();
 				const i32 old_deferred_size = m_deferred_statements.size();
 				for (i32 child : stmt.children) {
-					execStmt(child, ret, did_return);
-					if (*did_return || m_diagnostics->has_error) break;
+					execStmt(child, ret, flow, flow_label);
+					if (*flow != FlowSignal::NONE || m_diagnostics->has_error) break;
 				}
 				while (m_deferred_statements.size() > old_deferred_size && !m_diagnostics->has_error) {
 					const i32 deferred_stmt = m_deferred_statements.last();
 					m_deferred_statements.pop();
-					execStmt(deferred_stmt, ret, did_return, true);
+					execStmt(deferred_stmt, ret, flow, flow_label, true);
 				}
 				m_frames.last().bindings.shrink(old_size);
 				break;
@@ -758,20 +836,47 @@ struct Runtime {
 				b.value = stmt.expr >= 0 ? evalExpr(stmt.expr) : makeDefault(stmt.type);
 				break;
 			}
+			case Stmt::FN_DECL:
+				break;
 			case Stmt::EXPR: evalExpr(stmt.expr); break;
 			case Stmt::ASSIGN: assign(stmt.left, stmt.assign_op, evalExpr(stmt.right)); break;
+			case Stmt::BREAK:
+				*flow = FlowSignal::BREAK;
+				*flow_label = stmt.name;
+				break;
+			case Stmt::CONTINUE:
+				*flow = FlowSignal::CONTINUE;
+				*flow_label = stmt.name;
+				break;
 			case Stmt::WHILE:
 				while (asBool(evalExpr(stmt.expr)) && !m_diagnostics->has_error) {
-					execStmt(stmt.right, ret, did_return);
-					if (*did_return || m_diagnostics->has_error) return;
+					execStmt(stmt.right, ret, flow, flow_label);
+					if (m_diagnostics->has_error) return;
+					if (*flow == FlowSignal::RETURN) return;
+					if (*flow == FlowSignal::BREAK) {
+						if (flow_label->empty() || equalStrings(*flow_label, stmt.name)) {
+							*flow = FlowSignal::NONE;
+							*flow_label = {};
+							break;
+						}
+						return;
+					}
+					if (*flow == FlowSignal::CONTINUE) {
+						if (flow_label->empty() || equalStrings(*flow_label, stmt.name)) {
+							*flow = FlowSignal::NONE;
+							*flow_label = {};
+							continue;
+						}
+						return;
+					}
 				}
 				break;
 			case Stmt::IF:
 				if (asBool(evalExpr(stmt.expr))) {
-					execStmt(stmt.left, ret, did_return);
+					execStmt(stmt.left, ret, flow, flow_label);
 				}
 				else if (stmt.right >= 0) {
-					execStmt(stmt.right, ret, did_return);
+					execStmt(stmt.right, ret, flow, flow_label);
 				}
 				break;
 			case Stmt::MATCH: {
@@ -779,14 +884,14 @@ struct Runtime {
 				for (i32 arm_idx : stmt.children) {
 					MatchArm& arm = m_module.match_arms[arm_idx];
 					if (!matchArm(subject, arm)) continue;
-					execStmt(arm.stmt, ret, did_return);
+					execStmt(arm.stmt, ret, flow, flow_label);
 					break;
 				}
 				break;
 			}
 			case Stmt::RETURN:
 				*ret = stmt.expr >= 0 ? evalExpr(stmt.expr) : Value{};
-				*did_return = true;
+				*flow = FlowSignal::RETURN;
 				break;
 			case Stmt::DEFER:
 				m_deferred_statements.push(stmt.left);

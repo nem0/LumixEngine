@@ -19,6 +19,10 @@ struct Diagnostics {
 	template <typename... Args> void errorAt(Token token, Args&&... args) {
 		if (has_error) return;
 		char tmp[32];
+		if (!token.source_name.empty()) {
+			message.append(token.source_name);
+			message.append(": ");
+		}
 		message.append("line ");
 		toCString(token.line, Span(tmp));
 		message.append(tmp);

@@ -686,49 +686,76 @@ namespace Lumix::LumScript::generated {
 		return true;
 	}
 	
-	static bool lumscript_world_setPosition(Span<const Value> args, Value*, void*) {
-		World* world = (World*)args[0].ptr;
-		if (!world || args[1].i < 0 || !world->hasEntity(EntityRef(args[1].i))) return false;
-		world->setPosition(EntityRef(args[1].i), DVec3(toVec3(args[2])));
+	static bool lumscript_property_animator_isPropertyAnimatorEnabled_0(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<AnimationModule*>(ctx->world->getModule(reflection::getComponentType("property_animator")));
+		if (!module) return false;
+		auto ret = module->isPropertyAnimatorEnabled(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::BOOL);
+			result->b = ret;
+		}
 		return true;
 	}
 	
-	static bool lumscript_world_getPosition(Span<const Value> args, Value* result, void*) {
-		World* world = (World*)args[0].ptr;
-		if (!world || !result || args[1].i < 0 || !world->hasEntity(EntityRef(args[1].i))) return false;
-		*result = makeVec3Value(world->getPosition(EntityRef(args[1].i)));
+	static bool lumscript_property_animator_enablePropertyAnimator_1(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<AnimationModule*>(ctx->world->getModule(reflection::getComponentType("property_animator")));
+		if (!module) return false;
+		module->enablePropertyAnimator(EntityRef(args[0].i), args[1].b);
 		return true;
 	}
 	
-	static bool lumscript_world_setRotation(Span<const Value> args, Value*, void*) {
-		World* world = (World*)args[0].ptr;
-		if (!world || args[1].i < 0 || !world->hasEntity(EntityRef(args[1].i))) return false;
-		world->setRotation(EntityRef(args[1].i), toQuat(args[2]));
+	static bool lumscript_property_animator_getPropertyAnimatorLooped_2(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<AnimationModule*>(ctx->world->getModule(reflection::getComponentType("property_animator")));
+		if (!module) return false;
+		auto ret = module->getPropertyAnimatorLooped(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::BOOL);
+			result->b = ret;
+		}
 		return true;
 	}
 	
-	static bool lumscript_world_getRotation(Span<const Value> args, Value* result, void*) {
-		World* world = (World*)args[0].ptr;
-		if (!world || !result || args[1].i < 0 || !world->hasEntity(EntityRef(args[1].i))) return false;
-		*result = makeQuatValue(world->getRotation(EntityRef(args[1].i)));
+	static bool lumscript_property_animator_setPropertyAnimatorLooped_3(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<AnimationModule*>(ctx->world->getModule(reflection::getComponentType("property_animator")));
+		if (!module) return false;
+		module->setPropertyAnimatorLooped(EntityRef(args[0].i), args[1].b);
 		return true;
 	}
 	
-	static bool lumscript_world_setScale(Span<const Value> args, Value*, void*) {
-		World* world = (World*)args[0].ptr;
-		if (!world || args[1].i < 0 || !world->hasEntity(EntityRef(args[1].i))) return false;
-		world->setScale(EntityRef(args[1].i), toVec3(args[2]));
+	static bool lumscript_property_animator_getPropertyAnimatorAnimation_4(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<AnimationModule*>(ctx->world->getModule(reflection::getComponentType("property_animator")));
+		if (!module) return false;
+		auto ret = module->getPropertyAnimatorAnimation(EntityRef(args[0].i));
+		if (result) {
+			static thread_local char lumscript_path_result[512];
+			copyString(lumscript_path_result, ret.c_str());
+			*result = Runtime::makeString(lumscript_path_result);
+		}
 		return true;
 	}
 	
-	static bool lumscript_world_getScale(Span<const Value> args, Value* result, void*) {
-		World* world = (World*)args[0].ptr;
-		if (!world || !result || args[1].i < 0 || !world->hasEntity(EntityRef(args[1].i))) return false;
-		*result = makeVec3Value(world->getScale(EntityRef(args[1].i)));
+	static bool lumscript_property_animator_setPropertyAnimatorAnimation_5(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<AnimationModule*>(ctx->world->getModule(reflection::getComponentType("property_animator")));
+		if (!module) return false;
+		char lumscript_string_arg_1[128];
+		copyString(lumscript_string_arg_1, args[1].string);
+		module->setPropertyAnimatorAnimation(EntityRef(args[0].i), Path(lumscript_string_arg_1));
 		return true;
 	}
 	
-	static bool lumscript_animator_applySet_0(Span<const Value> args, Value* result, void* userdata) {
+	static bool lumscript_animator_applySet_6(Span<const Value> args, Value* result, void* userdata) {
 		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
 		if (!ctx->world) return false;
 		auto* module = static_cast<AnimationModule*>(ctx->world->getModule(reflection::getComponentType("animator")));
@@ -737,7 +764,7 @@ namespace Lumix::LumScript::generated {
 		return true;
 	}
 	
-	static bool lumscript_animator_setBoolInput_1(Span<const Value> args, Value* result, void* userdata) {
+	static bool lumscript_animator_setBoolInput_7(Span<const Value> args, Value* result, void* userdata) {
 		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
 		if (!ctx->world) return false;
 		auto* module = static_cast<AnimationModule*>(ctx->world->getModule(reflection::getComponentType("animator")));
@@ -746,7 +773,7 @@ namespace Lumix::LumScript::generated {
 		return true;
 	}
 	
-	static bool lumscript_animator_setFloatInput_2(Span<const Value> args, Value* result, void* userdata) {
+	static bool lumscript_animator_setFloatInput_8(Span<const Value> args, Value* result, void* userdata) {
 		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
 		if (!ctx->world) return false;
 		auto* module = static_cast<AnimationModule*>(ctx->world->getModule(reflection::getComponentType("animator")));
@@ -755,7 +782,7 @@ namespace Lumix::LumScript::generated {
 		return true;
 	}
 	
-	static bool lumscript_animator_setVec3Input_3(Span<const Value> args, Value* result, void* userdata) {
+	static bool lumscript_animator_setVec3Input_9(Span<const Value> args, Value* result, void* userdata) {
 		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
 		if (!ctx->world) return false;
 		auto* module = static_cast<AnimationModule*>(ctx->world->getModule(reflection::getComponentType("animator")));
@@ -764,7 +791,7 @@ namespace Lumix::LumScript::generated {
 		return true;
 	}
 	
-	static bool lumscript_animator_getInputIndex_4(Span<const Value> args, Value* result, void* userdata) {
+	static bool lumscript_animator_getInputIndex_10(Span<const Value> args, Value* result, void* userdata) {
 		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
 		if (!ctx->world) return false;
 		auto* module = static_cast<AnimationModule*>(ctx->world->getModule(reflection::getComponentType("animator")));
@@ -780,7 +807,102 @@ namespace Lumix::LumScript::generated {
 		return true;
 	}
 	
-	static bool lumscript_ambient_sound_pause_5(Span<const Value> args, Value* result, void* userdata) {
+	static bool lumscript_animator_getAnimatorSource_11(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<AnimationModule*>(ctx->world->getModule(reflection::getComponentType("animator")));
+		if (!module) return false;
+		auto ret = module->getAnimatorSource(EntityRef(args[0].i));
+		if (result) {
+			static thread_local char lumscript_path_result[512];
+			copyString(lumscript_path_result, ret.c_str());
+			*result = Runtime::makeString(lumscript_path_result);
+		}
+		return true;
+	}
+	
+	static bool lumscript_animator_setAnimatorSource_12(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<AnimationModule*>(ctx->world->getModule(reflection::getComponentType("animator")));
+		if (!module) return false;
+		char lumscript_string_arg_1[128];
+		copyString(lumscript_string_arg_1, args[1].string);
+		module->setAnimatorSource(EntityRef(args[0].i), Path(lumscript_string_arg_1));
+		return true;
+	}
+	
+	static bool lumscript_animator_getAnimatorUseRootMotion_13(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<AnimationModule*>(ctx->world->getModule(reflection::getComponentType("animator")));
+		if (!module) return false;
+		auto ret = module->getAnimatorUseRootMotion(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::BOOL);
+			result->b = ret;
+		}
+		return true;
+	}
+	
+	static bool lumscript_animator_setAnimatorUseRootMotion_14(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<AnimationModule*>(ctx->world->getModule(reflection::getComponentType("animator")));
+		if (!module) return false;
+		module->setAnimatorUseRootMotion(EntityRef(args[0].i), args[1].b);
+		return true;
+	}
+	
+	static bool lumscript_animator_getAnimatorDefaultSet_15(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<AnimationModule*>(ctx->world->getModule(reflection::getComponentType("animator")));
+		if (!module) return false;
+		auto ret = module->getAnimatorDefaultSet(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::I32);
+			result->i = (i32)ret;
+			result->f = (float)result->i;
+		}
+		return true;
+	}
+	
+	static bool lumscript_animator_setAnimatorDefaultSet_16(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<AnimationModule*>(ctx->world->getModule(reflection::getComponentType("animator")));
+		if (!module) return false;
+		module->setAnimatorDefaultSet(EntityRef(args[0].i), (u32)args[1].i);
+		return true;
+	}
+	
+	static bool lumscript_animable_getAnimableAnimation_17(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<AnimationModule*>(ctx->world->getModule(reflection::getComponentType("animable")));
+		if (!module) return false;
+		auto ret = module->getAnimableAnimation(EntityRef(args[0].i));
+		if (result) {
+			static thread_local char lumscript_path_result[512];
+			copyString(lumscript_path_result, ret.c_str());
+			*result = Runtime::makeString(lumscript_path_result);
+		}
+		return true;
+	}
+	
+	static bool lumscript_animable_setAnimableAnimation_18(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<AnimationModule*>(ctx->world->getModule(reflection::getComponentType("animable")));
+		if (!module) return false;
+		char lumscript_string_arg_1[128];
+		copyString(lumscript_string_arg_1, args[1].string);
+		module->setAnimableAnimation(EntityRef(args[0].i), Path(lumscript_string_arg_1));
+		return true;
+	}
+	
+	static bool lumscript_ambient_sound_pause_19(Span<const Value> args, Value* result, void* userdata) {
 		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
 		if (!ctx->world) return false;
 		auto* module = static_cast<AudioModule*>(ctx->world->getModule(reflection::getComponentType("ambient_sound")));
@@ -789,7 +911,7 @@ namespace Lumix::LumScript::generated {
 		return true;
 	}
 	
-	static bool lumscript_ambient_sound_resume_6(Span<const Value> args, Value* result, void* userdata) {
+	static bool lumscript_ambient_sound_resume_20(Span<const Value> args, Value* result, void* userdata) {
 		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
 		if (!ctx->world) return false;
 		auto* module = static_cast<AudioModule*>(ctx->world->getModule(reflection::getComponentType("ambient_sound")));
@@ -798,7 +920,141 @@ namespace Lumix::LumScript::generated {
 		return true;
 	}
 	
-	static bool lumscript_navmesh_zone_load_7(Span<const Value> args, Value* result, void* userdata) {
+	static bool lumscript_ambient_sound_getAmbientSoundClip_21(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<AudioModule*>(ctx->world->getModule(reflection::getComponentType("ambient_sound")));
+		if (!module) return false;
+		auto ret = module->getAmbientSoundClip(EntityRef(args[0].i));
+		if (result) {
+			static thread_local char lumscript_path_result[512];
+			copyString(lumscript_path_result, ret.c_str());
+			*result = Runtime::makeString(lumscript_path_result);
+		}
+		return true;
+	}
+	
+	static bool lumscript_ambient_sound_setAmbientSoundClip_22(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<AudioModule*>(ctx->world->getModule(reflection::getComponentType("ambient_sound")));
+		if (!module) return false;
+		char lumscript_string_arg_1[128];
+		copyString(lumscript_string_arg_1, args[1].string);
+		module->setAmbientSoundClip(EntityRef(args[0].i), Path(lumscript_string_arg_1));
+		return true;
+	}
+	
+	static bool lumscript_ambient_sound_isAmbientSound3D_23(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<AudioModule*>(ctx->world->getModule(reflection::getComponentType("ambient_sound")));
+		if (!module) return false;
+		auto ret = module->isAmbientSound3D(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::BOOL);
+			result->b = ret;
+		}
+		return true;
+	}
+	
+	static bool lumscript_ambient_sound_setAmbientSound3D_24(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<AudioModule*>(ctx->world->getModule(reflection::getComponentType("ambient_sound")));
+		if (!module) return false;
+		module->setAmbientSound3D(EntityRef(args[0].i), args[1].b);
+		return true;
+	}
+	
+	static bool lumscript_lua_script_scripts_count_25(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world || !result) return false;
+		auto* module = static_cast<LuaScriptModule*>(ctx->world->getModule(reflection::getComponentType("lua_script")));
+		if (!module) return false;
+		const i32 count = module->getScriptCount(EntityRef(args[0].i));
+		result->type = TypeRef(TypeRef::I32);
+		result->i = count;
+		result->f = (float)count;
+		return true;
+	}
+	
+	static bool lumscript_lua_script_scripts_item_26(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world || !result) return false;
+		auto* module = static_cast<LuaScriptModule*>(ctx->world->getModule(reflection::getComponentType("lua_script")));
+		if (!module) return false;
+		const i32 count = module->getScriptCount(EntityRef(args[0].i));
+		if (args[1].i < 0 || args[1].i >= count) {
+			*result = Runtime::makeNull();
+			return true;
+		}
+		result->type = TypeRef(TypeRef::NATIVE, "engine:lua_script/ScriptScriptArrayItem", -1);
+		result->i = args[0].i;
+		result->i64 = args[1].i;
+		result->ptr = ctx->world;
+		return true;
+	}
+	
+	static bool lumscript_lua_script_scripts_isScriptEnabled_27(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<LuaScriptModule*>(ctx->world->getModule(reflection::getComponentType("lua_script")));
+		if (!module) return false;
+		auto ret = module->isScriptEnabled(EntityRef(args[0].i), (i32)args[0].i64);
+		if (result) {
+			result->type = TypeRef(TypeRef::BOOL);
+			result->b = ret;
+		}
+		return true;
+	}
+	
+	static bool lumscript_lua_script_scripts_enableScript_28(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<LuaScriptModule*>(ctx->world->getModule(reflection::getComponentType("lua_script")));
+		if (!module) return false;
+		module->enableScript(EntityRef(args[0].i), (i32)args[0].i64, args[1].b);
+		return true;
+	}
+	
+	static bool lumscript_lua_script_scripts_getScriptPath_29(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<LuaScriptModule*>(ctx->world->getModule(reflection::getComponentType("lua_script")));
+		if (!module) return false;
+		auto ret = module->getScriptPath(EntityRef(args[0].i), (i32)args[0].i64);
+		if (result) {
+			static thread_local char lumscript_path_result[512];
+			copyString(lumscript_path_result, ret.c_str());
+			*result = Runtime::makeString(lumscript_path_result);
+		}
+		return true;
+	}
+	
+	static bool lumscript_lua_script_scripts_setScriptPath_30(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<LuaScriptModule*>(ctx->world->getModule(reflection::getComponentType("lua_script")));
+		if (!module) return false;
+		char lumscript_string_arg_1[128];
+		copyString(lumscript_string_arg_1, args[1].string);
+		module->setScriptPath(EntityRef(args[0].i), (i32)args[0].i64, Path(lumscript_string_arg_1));
+		return true;
+	}
+	
+	static bool lumscript_lua_script_inline_setInlineScriptCode_31(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<LuaScriptModule*>(ctx->world->getModule(reflection::getComponentType("lua_script_inline")));
+		if (!module) return false;
+		char lumscript_string_arg_1[128];
+		copyString(lumscript_string_arg_1, args[1].string);
+		module->setInlineScriptCode(EntityRef(args[0].i), lumscript_string_arg_1);
+		return true;
+	}
+	
+	static bool lumscript_navmesh_zone_load_32(Span<const Value> args, Value* result, void* userdata) {
 		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
 		if (!ctx->world) return false;
 		auto* module = static_cast<NavigationModule*>(ctx->world->getModule(reflection::getComponentType("navmesh_zone")));
@@ -811,7 +1067,7 @@ namespace Lumix::LumScript::generated {
 		return true;
 	}
 	
-	static bool lumscript_navmesh_zone_drawCompactHeightfield_8(Span<const Value> args, Value* result, void* userdata) {
+	static bool lumscript_navmesh_zone_drawCompactHeightfield_33(Span<const Value> args, Value* result, void* userdata) {
 		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
 		if (!ctx->world) return false;
 		auto* module = static_cast<NavigationModule*>(ctx->world->getModule(reflection::getComponentType("navmesh_zone")));
@@ -820,7 +1076,7 @@ namespace Lumix::LumScript::generated {
 		return true;
 	}
 	
-	static bool lumscript_navmesh_zone_drawHeightfield_9(Span<const Value> args, Value* result, void* userdata) {
+	static bool lumscript_navmesh_zone_drawHeightfield_34(Span<const Value> args, Value* result, void* userdata) {
 		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
 		if (!ctx->world) return false;
 		auto* module = static_cast<NavigationModule*>(ctx->world->getModule(reflection::getComponentType("navmesh_zone")));
@@ -829,7 +1085,7 @@ namespace Lumix::LumScript::generated {
 		return true;
 	}
 	
-	static bool lumscript_navmesh_zone_drawContours_10(Span<const Value> args, Value* result, void* userdata) {
+	static bool lumscript_navmesh_zone_drawContours_35(Span<const Value> args, Value* result, void* userdata) {
 		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
 		if (!ctx->world) return false;
 		auto* module = static_cast<NavigationModule*>(ctx->world->getModule(reflection::getComponentType("navmesh_zone")));
@@ -838,7 +1094,7 @@ namespace Lumix::LumScript::generated {
 		return true;
 	}
 	
-	static bool lumscript_navmesh_zone_saveZone_11(Span<const Value> args, Value* result, void* userdata) {
+	static bool lumscript_navmesh_zone_saveZone_36(Span<const Value> args, Value* result, void* userdata) {
 		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
 		if (!ctx->world) return false;
 		auto* module = static_cast<NavigationModule*>(ctx->world->getModule(reflection::getComponentType("navmesh_zone")));
@@ -851,7 +1107,51 @@ namespace Lumix::LumScript::generated {
 		return true;
 	}
 	
-	static bool lumscript_navmesh_agent_cancelNavigation_12(Span<const Value> args, Value* result, void* userdata) {
+	static bool lumscript_navmesh_zone_getZoneAutoload_37(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<NavigationModule*>(ctx->world->getModule(reflection::getComponentType("navmesh_zone")));
+		if (!module) return false;
+		auto ret = module->getZoneAutoload(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::BOOL);
+			result->b = ret;
+		}
+		return true;
+	}
+	
+	static bool lumscript_navmesh_zone_setZoneAutoload_38(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<NavigationModule*>(ctx->world->getModule(reflection::getComponentType("navmesh_zone")));
+		if (!module) return false;
+		module->setZoneAutoload(EntityRef(args[0].i), args[1].b);
+		return true;
+	}
+	
+	static bool lumscript_navmesh_zone_getZoneDetailed_39(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<NavigationModule*>(ctx->world->getModule(reflection::getComponentType("navmesh_zone")));
+		if (!module) return false;
+		auto ret = module->getZoneDetailed(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::BOOL);
+			result->b = ret;
+		}
+		return true;
+	}
+	
+	static bool lumscript_navmesh_zone_setZoneDetailed_40(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<NavigationModule*>(ctx->world->getModule(reflection::getComponentType("navmesh_zone")));
+		if (!module) return false;
+		module->setZoneDetailed(EntityRef(args[0].i), args[1].b);
+		return true;
+	}
+	
+	static bool lumscript_navmesh_agent_cancelNavigation_41(Span<const Value> args, Value* result, void* userdata) {
 		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
 		if (!ctx->world) return false;
 		auto* module = static_cast<NavigationModule*>(ctx->world->getModule(reflection::getComponentType("navmesh_agent")));
@@ -860,7 +1160,7 @@ namespace Lumix::LumScript::generated {
 		return true;
 	}
 	
-	static bool lumscript_navmesh_agent_drawPath_13(Span<const Value> args, Value* result, void* userdata) {
+	static bool lumscript_navmesh_agent_drawPath_42(Span<const Value> args, Value* result, void* userdata) {
 		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
 		if (!ctx->world) return false;
 		auto* module = static_cast<NavigationModule*>(ctx->world->getModule(reflection::getComponentType("navmesh_agent")));
@@ -869,7 +1169,819 @@ namespace Lumix::LumScript::generated {
 		return true;
 	}
 	
-	static bool lumscript_physical_controller_getGravitySpeed_14(Span<const Value> args, Value* result, void* userdata) {
+	static bool lumscript_navmesh_agent_getAgentRadius_43(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<NavigationModule*>(ctx->world->getModule(reflection::getComponentType("navmesh_agent")));
+		if (!module) return false;
+		auto ret = module->getAgentRadius(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_navmesh_agent_setAgentRadius_44(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<NavigationModule*>(ctx->world->getModule(reflection::getComponentType("navmesh_agent")));
+		if (!module) return false;
+		module->setAgentRadius(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_navmesh_agent_getAgentHeight_45(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<NavigationModule*>(ctx->world->getModule(reflection::getComponentType("navmesh_agent")));
+		if (!module) return false;
+		auto ret = module->getAgentHeight(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_navmesh_agent_setAgentHeight_46(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<NavigationModule*>(ctx->world->getModule(reflection::getComponentType("navmesh_agent")));
+		if (!module) return false;
+		module->setAgentHeight(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_navmesh_agent_getAgentMoveEntity_47(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<NavigationModule*>(ctx->world->getModule(reflection::getComponentType("navmesh_agent")));
+		if (!module) return false;
+		auto ret = module->getAgentMoveEntity(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::BOOL);
+			result->b = ret;
+		}
+		return true;
+	}
+	
+	static bool lumscript_navmesh_agent_setAgentMoveEntity_48(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<NavigationModule*>(ctx->world->getModule(reflection::getComponentType("navmesh_agent")));
+		if (!module) return false;
+		module->setAgentMoveEntity(EntityRef(args[0].i), args[1].b);
+		return true;
+	}
+	
+	static bool lumscript_navmesh_agent_getAgentSpeed_49(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<NavigationModule*>(ctx->world->getModule(reflection::getComponentType("navmesh_agent")));
+		if (!module) return false;
+		auto ret = module->getAgentSpeed(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_physical_heightfield_getHeightfieldSource_50(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("physical_heightfield")));
+		if (!module) return false;
+		auto ret = module->getHeightfieldSource(EntityRef(args[0].i));
+		if (result) {
+			static thread_local char lumscript_path_result[512];
+			copyString(lumscript_path_result, ret.c_str());
+			*result = Runtime::makeString(lumscript_path_result);
+		}
+		return true;
+	}
+	
+	static bool lumscript_physical_heightfield_setHeightfieldSource_51(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("physical_heightfield")));
+		if (!module) return false;
+		char lumscript_string_arg_1[128];
+		copyString(lumscript_string_arg_1, args[1].string);
+		module->setHeightfieldSource(EntityRef(args[0].i), Path(lumscript_string_arg_1));
+		return true;
+	}
+	
+	static bool lumscript_physical_heightfield_getHeightfieldXZScale_52(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("physical_heightfield")));
+		if (!module) return false;
+		auto ret = module->getHeightfieldXZScale(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_physical_heightfield_setHeightfieldXZScale_53(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("physical_heightfield")));
+		if (!module) return false;
+		module->setHeightfieldXZScale(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_physical_heightfield_getHeightfieldYScale_54(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("physical_heightfield")));
+		if (!module) return false;
+		auto ret = module->getHeightfieldYScale(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_physical_heightfield_setHeightfieldYScale_55(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("physical_heightfield")));
+		if (!module) return false;
+		module->setHeightfieldYScale(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_physical_heightfield_getHeightfieldLayer_56(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("physical_heightfield")));
+		if (!module) return false;
+		auto ret = module->getHeightfieldLayer(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::I32);
+			result->i = (i32)ret;
+			result->f = (float)result->i;
+		}
+		return true;
+	}
+	
+	static bool lumscript_physical_heightfield_setHeightfieldLayer_57(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("physical_heightfield")));
+		if (!module) return false;
+		module->setHeightfieldLayer(EntityRef(args[0].i), (u32)args[1].i);
+		return true;
+	}
+	
+	static bool lumscript_d6_joint_getD6JointXMotion_58(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("d6_joint")));
+		if (!module) return false;
+		auto ret = module->getD6JointXMotion(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::I32);
+			result->i = (i32)ret;
+			result->f = (float)result->i;
+		}
+		return true;
+	}
+	
+	static bool lumscript_d6_joint_setD6JointXMotion_59(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("d6_joint")));
+		if (!module) return false;
+		module->setD6JointXMotion(EntityRef(args[0].i), (PhysicsModule::D6Motion)args[1].i);
+		return true;
+	}
+	
+	static bool lumscript_d6_joint_getD6JointYMotion_60(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("d6_joint")));
+		if (!module) return false;
+		auto ret = module->getD6JointYMotion(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::I32);
+			result->i = (i32)ret;
+			result->f = (float)result->i;
+		}
+		return true;
+	}
+	
+	static bool lumscript_d6_joint_setD6JointYMotion_61(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("d6_joint")));
+		if (!module) return false;
+		module->setD6JointYMotion(EntityRef(args[0].i), (PhysicsModule::D6Motion)args[1].i);
+		return true;
+	}
+	
+	static bool lumscript_d6_joint_getD6JointZMotion_62(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("d6_joint")));
+		if (!module) return false;
+		auto ret = module->getD6JointZMotion(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::I32);
+			result->i = (i32)ret;
+			result->f = (float)result->i;
+		}
+		return true;
+	}
+	
+	static bool lumscript_d6_joint_setD6JointZMotion_63(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("d6_joint")));
+		if (!module) return false;
+		module->setD6JointZMotion(EntityRef(args[0].i), (PhysicsModule::D6Motion)args[1].i);
+		return true;
+	}
+	
+	static bool lumscript_d6_joint_getD6JointSwing1Motion_64(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("d6_joint")));
+		if (!module) return false;
+		auto ret = module->getD6JointSwing1Motion(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::I32);
+			result->i = (i32)ret;
+			result->f = (float)result->i;
+		}
+		return true;
+	}
+	
+	static bool lumscript_d6_joint_setD6JointSwing1Motion_65(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("d6_joint")));
+		if (!module) return false;
+		module->setD6JointSwing1Motion(EntityRef(args[0].i), (PhysicsModule::D6Motion)args[1].i);
+		return true;
+	}
+	
+	static bool lumscript_d6_joint_getD6JointSwing2Motion_66(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("d6_joint")));
+		if (!module) return false;
+		auto ret = module->getD6JointSwing2Motion(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::I32);
+			result->i = (i32)ret;
+			result->f = (float)result->i;
+		}
+		return true;
+	}
+	
+	static bool lumscript_d6_joint_setD6JointSwing2Motion_67(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("d6_joint")));
+		if (!module) return false;
+		module->setD6JointSwing2Motion(EntityRef(args[0].i), (PhysicsModule::D6Motion)args[1].i);
+		return true;
+	}
+	
+	static bool lumscript_d6_joint_getD6JointTwistMotion_68(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("d6_joint")));
+		if (!module) return false;
+		auto ret = module->getD6JointTwistMotion(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::I32);
+			result->i = (i32)ret;
+			result->f = (float)result->i;
+		}
+		return true;
+	}
+	
+	static bool lumscript_d6_joint_setD6JointTwistMotion_69(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("d6_joint")));
+		if (!module) return false;
+		module->setD6JointTwistMotion(EntityRef(args[0].i), (PhysicsModule::D6Motion)args[1].i);
+		return true;
+	}
+	
+	static bool lumscript_d6_joint_getD6JointLinearLimit_70(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("d6_joint")));
+		if (!module) return false;
+		auto ret = module->getD6JointLinearLimit(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_d6_joint_setD6JointLinearLimit_71(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("d6_joint")));
+		if (!module) return false;
+		module->setD6JointLinearLimit(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_d6_joint_getD6JointDamping_72(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("d6_joint")));
+		if (!module) return false;
+		auto ret = module->getD6JointDamping(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_d6_joint_setD6JointDamping_73(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("d6_joint")));
+		if (!module) return false;
+		module->setD6JointDamping(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_d6_joint_getD6JointStiffness_74(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("d6_joint")));
+		if (!module) return false;
+		auto ret = module->getD6JointStiffness(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_d6_joint_setD6JointStiffness_75(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("d6_joint")));
+		if (!module) return false;
+		module->setD6JointStiffness(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_d6_joint_getD6JointRestitution_76(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("d6_joint")));
+		if (!module) return false;
+		auto ret = module->getD6JointRestitution(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_d6_joint_setD6JointRestitution_77(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("d6_joint")));
+		if (!module) return false;
+		module->setD6JointRestitution(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_d6_joint_getD6JointConnectedBody_78(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("d6_joint")));
+		if (!module) return false;
+		auto ret = module->getD6JointConnectedBody(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::NATIVE, "engine:entity/Entity", -1);
+			result->i = ret.index;
+		}
+		return true;
+	}
+	
+	static bool lumscript_d6_joint_setD6JointConnectedBody_79(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("d6_joint")));
+		if (!module) return false;
+		module->setD6JointConnectedBody(EntityRef(args[0].i), EntityPtr(args[1].i));
+		return true;
+	}
+	
+	static bool lumscript_d6_joint_getD6JointAxisPosition_80(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("d6_joint")));
+		if (!module) return false;
+		auto ret = module->getD6JointAxisPosition(EntityRef(args[0].i));
+		if (result) {
+			*result = makeVec3Value(ret);
+		}
+		return true;
+	}
+	
+	static bool lumscript_d6_joint_setD6JointAxisPosition_81(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("d6_joint")));
+		if (!module) return false;
+		module->setD6JointAxisPosition(EntityRef(args[0].i), toVec3(args[1]));
+		return true;
+	}
+	
+	static bool lumscript_d6_joint_getD6JointAxisDirection_82(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("d6_joint")));
+		if (!module) return false;
+		auto ret = module->getD6JointAxisDirection(EntityRef(args[0].i));
+		if (result) {
+			*result = makeVec3Value(ret);
+		}
+		return true;
+	}
+	
+	static bool lumscript_d6_joint_setD6JointAxisDirection_83(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("d6_joint")));
+		if (!module) return false;
+		module->setD6JointAxisDirection(EntityRef(args[0].i), toVec3(args[1]));
+		return true;
+	}
+	
+	static bool lumscript_distance_joint_getDistanceJointConnectedBody_84(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("distance_joint")));
+		if (!module) return false;
+		auto ret = module->getDistanceJointConnectedBody(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::NATIVE, "engine:entity/Entity", -1);
+			result->i = ret.index;
+		}
+		return true;
+	}
+	
+	static bool lumscript_distance_joint_setDistanceJointConnectedBody_85(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("distance_joint")));
+		if (!module) return false;
+		module->setDistanceJointConnectedBody(EntityRef(args[0].i), EntityPtr(args[1].i));
+		return true;
+	}
+	
+	static bool lumscript_distance_joint_getDistanceJointAxisPosition_86(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("distance_joint")));
+		if (!module) return false;
+		auto ret = module->getDistanceJointAxisPosition(EntityRef(args[0].i));
+		if (result) {
+			*result = makeVec3Value(ret);
+		}
+		return true;
+	}
+	
+	static bool lumscript_distance_joint_setDistanceJointAxisPosition_87(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("distance_joint")));
+		if (!module) return false;
+		module->setDistanceJointAxisPosition(EntityRef(args[0].i), toVec3(args[1]));
+		return true;
+	}
+	
+	static bool lumscript_distance_joint_getDistanceJointDamping_88(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("distance_joint")));
+		if (!module) return false;
+		auto ret = module->getDistanceJointDamping(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_distance_joint_setDistanceJointDamping_89(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("distance_joint")));
+		if (!module) return false;
+		module->setDistanceJointDamping(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_distance_joint_getDistanceJointStiffness_90(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("distance_joint")));
+		if (!module) return false;
+		auto ret = module->getDistanceJointStiffness(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_distance_joint_setDistanceJointStiffness_91(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("distance_joint")));
+		if (!module) return false;
+		module->setDistanceJointStiffness(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_distance_joint_getDistanceJointTolerance_92(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("distance_joint")));
+		if (!module) return false;
+		auto ret = module->getDistanceJointTolerance(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_distance_joint_setDistanceJointTolerance_93(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("distance_joint")));
+		if (!module) return false;
+		module->setDistanceJointTolerance(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_distance_joint_getDistanceJointLinearForce_94(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("distance_joint")));
+		if (!module) return false;
+		auto ret = module->getDistanceJointLinearForce(EntityRef(args[0].i));
+		if (result) {
+			*result = makeVec3Value(ret);
+		}
+		return true;
+	}
+	
+	static bool lumscript_hinge_joint_getHingeJointConnectedBody_95(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("hinge_joint")));
+		if (!module) return false;
+		auto ret = module->getHingeJointConnectedBody(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::NATIVE, "engine:entity/Entity", -1);
+			result->i = ret.index;
+		}
+		return true;
+	}
+	
+	static bool lumscript_hinge_joint_setHingeJointConnectedBody_96(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("hinge_joint")));
+		if (!module) return false;
+		module->setHingeJointConnectedBody(EntityRef(args[0].i), EntityPtr(args[1].i));
+		return true;
+	}
+	
+	static bool lumscript_hinge_joint_getHingeJointAxisPosition_97(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("hinge_joint")));
+		if (!module) return false;
+		auto ret = module->getHingeJointAxisPosition(EntityRef(args[0].i));
+		if (result) {
+			*result = makeVec3Value(ret);
+		}
+		return true;
+	}
+	
+	static bool lumscript_hinge_joint_setHingeJointAxisPosition_98(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("hinge_joint")));
+		if (!module) return false;
+		module->setHingeJointAxisPosition(EntityRef(args[0].i), toVec3(args[1]));
+		return true;
+	}
+	
+	static bool lumscript_hinge_joint_getHingeJointAxisDirection_99(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("hinge_joint")));
+		if (!module) return false;
+		auto ret = module->getHingeJointAxisDirection(EntityRef(args[0].i));
+		if (result) {
+			*result = makeVec3Value(ret);
+		}
+		return true;
+	}
+	
+	static bool lumscript_hinge_joint_setHingeJointAxisDirection_100(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("hinge_joint")));
+		if (!module) return false;
+		module->setHingeJointAxisDirection(EntityRef(args[0].i), toVec3(args[1]));
+		return true;
+	}
+	
+	static bool lumscript_hinge_joint_getHingeJointDamping_101(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("hinge_joint")));
+		if (!module) return false;
+		auto ret = module->getHingeJointDamping(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_hinge_joint_setHingeJointDamping_102(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("hinge_joint")));
+		if (!module) return false;
+		module->setHingeJointDamping(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_hinge_joint_getHingeJointStiffness_103(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("hinge_joint")));
+		if (!module) return false;
+		auto ret = module->getHingeJointStiffness(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_hinge_joint_setHingeJointStiffness_104(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("hinge_joint")));
+		if (!module) return false;
+		module->setHingeJointStiffness(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_hinge_joint_getHingeJointUseLimit_105(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("hinge_joint")));
+		if (!module) return false;
+		auto ret = module->getHingeJointUseLimit(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::BOOL);
+			result->b = ret;
+		}
+		return true;
+	}
+	
+	static bool lumscript_hinge_joint_setHingeJointUseLimit_106(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("hinge_joint")));
+		if (!module) return false;
+		module->setHingeJointUseLimit(EntityRef(args[0].i), args[1].b);
+		return true;
+	}
+	
+	static bool lumscript_spherical_joint_getSphericalJointConnectedBody_107(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("spherical_joint")));
+		if (!module) return false;
+		auto ret = module->getSphericalJointConnectedBody(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::NATIVE, "engine:entity/Entity", -1);
+			result->i = ret.index;
+		}
+		return true;
+	}
+	
+	static bool lumscript_spherical_joint_setSphericalJointConnectedBody_108(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("spherical_joint")));
+		if (!module) return false;
+		module->setSphericalJointConnectedBody(EntityRef(args[0].i), EntityPtr(args[1].i));
+		return true;
+	}
+	
+	static bool lumscript_spherical_joint_getSphericalJointAxisPosition_109(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("spherical_joint")));
+		if (!module) return false;
+		auto ret = module->getSphericalJointAxisPosition(EntityRef(args[0].i));
+		if (result) {
+			*result = makeVec3Value(ret);
+		}
+		return true;
+	}
+	
+	static bool lumscript_spherical_joint_setSphericalJointAxisPosition_110(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("spherical_joint")));
+		if (!module) return false;
+		module->setSphericalJointAxisPosition(EntityRef(args[0].i), toVec3(args[1]));
+		return true;
+	}
+	
+	static bool lumscript_spherical_joint_getSphericalJointAxisDirection_111(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("spherical_joint")));
+		if (!module) return false;
+		auto ret = module->getSphericalJointAxisDirection(EntityRef(args[0].i));
+		if (result) {
+			*result = makeVec3Value(ret);
+		}
+		return true;
+	}
+	
+	static bool lumscript_spherical_joint_setSphericalJointAxisDirection_112(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("spherical_joint")));
+		if (!module) return false;
+		module->setSphericalJointAxisDirection(EntityRef(args[0].i), toVec3(args[1]));
+		return true;
+	}
+	
+	static bool lumscript_spherical_joint_getSphericalJointUseLimit_113(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("spherical_joint")));
+		if (!module) return false;
+		auto ret = module->getSphericalJointUseLimit(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::BOOL);
+			result->b = ret;
+		}
+		return true;
+	}
+	
+	static bool lumscript_spherical_joint_setSphericalJointUseLimit_114(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("spherical_joint")));
+		if (!module) return false;
+		module->setSphericalJointUseLimit(EntityRef(args[0].i), args[1].b);
+		return true;
+	}
+	
+	static bool lumscript_physical_controller_getGravitySpeed_115(Span<const Value> args, Value* result, void* userdata) {
 		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
 		if (!ctx->world) return false;
 		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("physical_controller")));
@@ -883,7 +1995,7 @@ namespace Lumix::LumScript::generated {
 		return true;
 	}
 	
-	static bool lumscript_physical_controller_move_15(Span<const Value> args, Value* result, void* userdata) {
+	static bool lumscript_physical_controller_move_116(Span<const Value> args, Value* result, void* userdata) {
 		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
 		if (!ctx->world) return false;
 		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("physical_controller")));
@@ -892,7 +2004,7 @@ namespace Lumix::LumScript::generated {
 		return true;
 	}
 	
-	static bool lumscript_physical_controller_isCollisionDown_16(Span<const Value> args, Value* result, void* userdata) {
+	static bool lumscript_physical_controller_isCollisionDown_117(Span<const Value> args, Value* result, void* userdata) {
 		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
 		if (!ctx->world) return false;
 		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("physical_controller")));
@@ -905,7 +2017,7 @@ namespace Lumix::LumScript::generated {
 		return true;
 	}
 	
-	static bool lumscript_physical_controller_resize_17(Span<const Value> args, Value* result, void* userdata) {
+	static bool lumscript_physical_controller_resize_118(Span<const Value> args, Value* result, void* userdata) {
 		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
 		if (!ctx->world) return false;
 		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("physical_controller")));
@@ -914,7 +2026,143 @@ namespace Lumix::LumScript::generated {
 		return true;
 	}
 	
-	static bool lumscript_rigid_actor_putToSleep_18(Span<const Value> args, Value* result, void* userdata) {
+	static bool lumscript_physical_controller_getControllerLayer_119(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("physical_controller")));
+		if (!module) return false;
+		auto ret = module->getControllerLayer(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::I32);
+			result->i = (i32)ret;
+			result->f = (float)result->i;
+		}
+		return true;
+	}
+	
+	static bool lumscript_physical_controller_setControllerLayer_120(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("physical_controller")));
+		if (!module) return false;
+		module->setControllerLayer(EntityRef(args[0].i), (u32)args[1].i);
+		return true;
+	}
+	
+	static bool lumscript_physical_controller_getControllerRadius_121(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("physical_controller")));
+		if (!module) return false;
+		auto ret = module->getControllerRadius(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_physical_controller_setControllerRadius_122(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("physical_controller")));
+		if (!module) return false;
+		module->setControllerRadius(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_physical_controller_getControllerHeight_123(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("physical_controller")));
+		if (!module) return false;
+		auto ret = module->getControllerHeight(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_physical_controller_setControllerHeight_124(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("physical_controller")));
+		if (!module) return false;
+		module->setControllerHeight(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_physical_controller_getControllerCustomGravity_125(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("physical_controller")));
+		if (!module) return false;
+		auto ret = module->getControllerCustomGravity(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::BOOL);
+			result->b = ret;
+		}
+		return true;
+	}
+	
+	static bool lumscript_physical_controller_setControllerCustomGravity_126(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("physical_controller")));
+		if (!module) return false;
+		module->setControllerCustomGravity(EntityRef(args[0].i), args[1].b);
+		return true;
+	}
+	
+	static bool lumscript_physical_controller_getControllerCustomGravityAcceleration_127(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("physical_controller")));
+		if (!module) return false;
+		auto ret = module->getControllerCustomGravityAcceleration(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_physical_controller_setControllerCustomGravityAcceleration_128(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("physical_controller")));
+		if (!module) return false;
+		module->setControllerCustomGravityAcceleration(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_physical_controller_getControllerUseRootMotion_129(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("physical_controller")));
+		if (!module) return false;
+		auto ret = module->getControllerUseRootMotion(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::BOOL);
+			result->b = ret;
+		}
+		return true;
+	}
+	
+	static bool lumscript_physical_controller_setControllerUseRootMotion_130(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("physical_controller")));
+		if (!module) return false;
+		module->setControllerUseRootMotion(EntityRef(args[0].i), args[1].b);
+		return true;
+	}
+	
+	static bool lumscript_rigid_actor_putToSleep_131(Span<const Value> args, Value* result, void* userdata) {
 		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
 		if (!ctx->world) return false;
 		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("rigid_actor")));
@@ -923,7 +2171,7 @@ namespace Lumix::LumScript::generated {
 		return true;
 	}
 	
-	static bool lumscript_rigid_actor_addForceAtPos_19(Span<const Value> args, Value* result, void* userdata) {
+	static bool lumscript_rigid_actor_addForceAtPos_132(Span<const Value> args, Value* result, void* userdata) {
 		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
 		if (!ctx->world) return false;
 		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("rigid_actor")));
@@ -932,7 +2180,7 @@ namespace Lumix::LumScript::generated {
 		return true;
 	}
 	
-	static bool lumscript_rigid_actor_applyForce_20(Span<const Value> args, Value* result, void* userdata) {
+	static bool lumscript_rigid_actor_applyForce_133(Span<const Value> args, Value* result, void* userdata) {
 		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
 		if (!ctx->world) return false;
 		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("rigid_actor")));
@@ -941,7 +2189,7 @@ namespace Lumix::LumScript::generated {
 		return true;
 	}
 	
-	static bool lumscript_rigid_actor_applyImpulse_21(Span<const Value> args, Value* result, void* userdata) {
+	static bool lumscript_rigid_actor_applyImpulse_134(Span<const Value> args, Value* result, void* userdata) {
 		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
 		if (!ctx->world) return false;
 		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("rigid_actor")));
@@ -950,7 +2198,1136 @@ namespace Lumix::LumScript::generated {
 		return true;
 	}
 	
-	static bool lumscript_bone_attachment_setRotation_22(Span<const Value> args, Value* result, void* userdata) {
+	static bool lumscript_rigid_actor_getActorVelocity_135(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("rigid_actor")));
+		if (!module) return false;
+		auto ret = module->getActorVelocity(EntityRef(args[0].i));
+		if (result) {
+			*result = makeVec3Value(ret);
+		}
+		return true;
+	}
+	
+	static bool lumscript_rigid_actor_getActorSpeed_136(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("rigid_actor")));
+		if (!module) return false;
+		auto ret = module->getActorSpeed(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_rigid_actor_getActorLayer_137(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("rigid_actor")));
+		if (!module) return false;
+		auto ret = module->getActorLayer(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::I32);
+			result->i = (i32)ret;
+			result->f = (float)result->i;
+		}
+		return true;
+	}
+	
+	static bool lumscript_rigid_actor_setActorLayer_138(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("rigid_actor")));
+		if (!module) return false;
+		module->setActorLayer(EntityRef(args[0].i), (u32)args[1].i);
+		return true;
+	}
+	
+	static bool lumscript_rigid_actor_getActorDynamicType_139(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("rigid_actor")));
+		if (!module) return false;
+		auto ret = module->getActorDynamicType(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::I32);
+			result->i = (i32)ret;
+			result->f = (float)result->i;
+		}
+		return true;
+	}
+	
+	static bool lumscript_rigid_actor_setActorDynamicType_140(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("rigid_actor")));
+		if (!module) return false;
+		module->setActorDynamicType(EntityRef(args[0].i), (PhysicsModule::DynamicType)args[1].i);
+		return true;
+	}
+	
+	static bool lumscript_rigid_actor_getActorIsTrigger_141(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("rigid_actor")));
+		if (!module) return false;
+		auto ret = module->getActorIsTrigger(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::BOOL);
+			result->b = ret;
+		}
+		return true;
+	}
+	
+	static bool lumscript_rigid_actor_setActorIsTrigger_142(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("rigid_actor")));
+		if (!module) return false;
+		module->setActorIsTrigger(EntityRef(args[0].i), args[1].b);
+		return true;
+	}
+	
+	static bool lumscript_rigid_actor_getActorMesh_143(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("rigid_actor")));
+		if (!module) return false;
+		auto ret = module->getActorMesh(EntityRef(args[0].i));
+		if (result) {
+			static thread_local char lumscript_path_result[512];
+			copyString(lumscript_path_result, ret.c_str());
+			*result = Runtime::makeString(lumscript_path_result);
+		}
+		return true;
+	}
+	
+	static bool lumscript_rigid_actor_setActorMesh_144(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("rigid_actor")));
+		if (!module) return false;
+		char lumscript_string_arg_1[128];
+		copyString(lumscript_string_arg_1, args[1].string);
+		module->setActorMesh(EntityRef(args[0].i), Path(lumscript_string_arg_1));
+		return true;
+	}
+	
+	static bool lumscript_rigid_actor_getActorMaterial_145(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("rigid_actor")));
+		if (!module) return false;
+		auto ret = module->getActorMaterial(EntityRef(args[0].i));
+		if (result) {
+			static thread_local char lumscript_path_result[512];
+			copyString(lumscript_path_result, ret.c_str());
+			*result = Runtime::makeString(lumscript_path_result);
+		}
+		return true;
+	}
+	
+	static bool lumscript_rigid_actor_setActorMaterial_146(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("rigid_actor")));
+		if (!module) return false;
+		char lumscript_string_arg_1[128];
+		copyString(lumscript_string_arg_1, args[1].string);
+		module->setActorMaterial(EntityRef(args[0].i), Path(lumscript_string_arg_1));
+		return true;
+	}
+	
+	static bool lumscript_rigid_actor_getActorCCD_147(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("rigid_actor")));
+		if (!module) return false;
+		auto ret = module->getActorCCD(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::BOOL);
+			result->b = ret;
+		}
+		return true;
+	}
+	
+	static bool lumscript_rigid_actor_setActorCCD_148(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("rigid_actor")));
+		if (!module) return false;
+		module->setActorCCD(EntityRef(args[0].i), args[1].b);
+		return true;
+	}
+	
+	static bool lumscript_rigid_actor_boxes_count_149(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world || !result) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("rigid_actor")));
+		if (!module) return false;
+		const i32 count = module->getBoxCount(EntityRef(args[0].i));
+		result->type = TypeRef(TypeRef::I32);
+		result->i = count;
+		result->f = (float)count;
+		return true;
+	}
+	
+	static bool lumscript_rigid_actor_boxes_item_150(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world || !result) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("rigid_actor")));
+		if (!module) return false;
+		const i32 count = module->getBoxCount(EntityRef(args[0].i));
+		if (args[1].i < 0 || args[1].i >= count) {
+			*result = Runtime::makeNull();
+			return true;
+		}
+		result->type = TypeRef(TypeRef::NATIVE, "engine:rigid_actor/ActorBoxArrayItem", -1);
+		result->i = args[0].i;
+		result->i64 = args[1].i;
+		result->ptr = ctx->world;
+		return true;
+	}
+	
+	static bool lumscript_rigid_actor_boxes_getBoxHalfExtents_151(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("rigid_actor")));
+		if (!module) return false;
+		auto ret = module->getBoxHalfExtents(EntityRef(args[0].i), (i32)args[0].i64);
+		if (result) {
+			*result = makeVec3Value(ret);
+		}
+		return true;
+	}
+	
+	static bool lumscript_rigid_actor_boxes_setBoxHalfExtents_152(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("rigid_actor")));
+		if (!module) return false;
+		module->setBoxHalfExtents(EntityRef(args[0].i), (i32)args[0].i64, toVec3(args[1]));
+		return true;
+	}
+	
+	static bool lumscript_rigid_actor_boxes_getBoxOffsetPosition_153(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("rigid_actor")));
+		if (!module) return false;
+		auto ret = module->getBoxOffsetPosition(EntityRef(args[0].i), (i32)args[0].i64);
+		if (result) {
+			*result = makeVec3Value(ret);
+		}
+		return true;
+	}
+	
+	static bool lumscript_rigid_actor_boxes_setBoxOffsetPosition_154(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("rigid_actor")));
+		if (!module) return false;
+		module->setBoxOffsetPosition(EntityRef(args[0].i), (i32)args[0].i64, toVec3(args[1]));
+		return true;
+	}
+	
+	static bool lumscript_rigid_actor_boxes_getBoxOffsetRotation_155(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("rigid_actor")));
+		if (!module) return false;
+		auto ret = module->getBoxOffsetRotation(EntityRef(args[0].i), (i32)args[0].i64);
+		if (result) {
+			*result = makeVec3Value(ret);
+		}
+		return true;
+	}
+	
+	static bool lumscript_rigid_actor_boxes_setBoxOffsetRotation_156(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("rigid_actor")));
+		if (!module) return false;
+		module->setBoxOffsetRotation(EntityRef(args[0].i), (i32)args[0].i64, toVec3(args[1]));
+		return true;
+	}
+	
+	static bool lumscript_rigid_actor_spheres_count_157(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world || !result) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("rigid_actor")));
+		if (!module) return false;
+		const i32 count = module->getSphereCount(EntityRef(args[0].i));
+		result->type = TypeRef(TypeRef::I32);
+		result->i = count;
+		result->f = (float)count;
+		return true;
+	}
+	
+	static bool lumscript_rigid_actor_spheres_item_158(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world || !result) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("rigid_actor")));
+		if (!module) return false;
+		const i32 count = module->getSphereCount(EntityRef(args[0].i));
+		if (args[1].i < 0 || args[1].i >= count) {
+			*result = Runtime::makeNull();
+			return true;
+		}
+		result->type = TypeRef(TypeRef::NATIVE, "engine:rigid_actor/ActorSphereArrayItem", -1);
+		result->i = args[0].i;
+		result->i64 = args[1].i;
+		result->ptr = ctx->world;
+		return true;
+	}
+	
+	static bool lumscript_rigid_actor_spheres_getSphereRadius_159(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("rigid_actor")));
+		if (!module) return false;
+		auto ret = module->getSphereRadius(EntityRef(args[0].i), (i32)args[0].i64);
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_rigid_actor_spheres_setSphereRadius_160(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("rigid_actor")));
+		if (!module) return false;
+		module->setSphereRadius(EntityRef(args[0].i), (i32)args[0].i64, args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_rigid_actor_spheres_getSphereOffsetPosition_161(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("rigid_actor")));
+		if (!module) return false;
+		auto ret = module->getSphereOffsetPosition(EntityRef(args[0].i), (i32)args[0].i64);
+		if (result) {
+			*result = makeVec3Value(ret);
+		}
+		return true;
+	}
+	
+	static bool lumscript_rigid_actor_spheres_setSphereOffsetPosition_162(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("rigid_actor")));
+		if (!module) return false;
+		module->setSphereOffsetPosition(EntityRef(args[0].i), (i32)args[0].i64, toVec3(args[1]));
+		return true;
+	}
+	
+	static bool lumscript_wheel_getWheelSpringStrength_163(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("wheel")));
+		if (!module) return false;
+		auto ret = module->getWheelSpringStrength(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_wheel_setWheelSpringStrength_164(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("wheel")));
+		if (!module) return false;
+		module->setWheelSpringStrength(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_wheel_getWheelSpringMaxCompression_165(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("wheel")));
+		if (!module) return false;
+		auto ret = module->getWheelSpringMaxCompression(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_wheel_setWheelSpringMaxCompression_166(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("wheel")));
+		if (!module) return false;
+		module->setWheelSpringMaxCompression(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_wheel_getWheelSpringMaxDroop_167(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("wheel")));
+		if (!module) return false;
+		auto ret = module->getWheelSpringMaxDroop(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_wheel_setWheelSpringMaxDroop_168(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("wheel")));
+		if (!module) return false;
+		module->setWheelSpringMaxDroop(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_wheel_getWheelSpringDamperRate_169(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("wheel")));
+		if (!module) return false;
+		auto ret = module->getWheelSpringDamperRate(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_wheel_setWheelSpringDamperRate_170(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("wheel")));
+		if (!module) return false;
+		module->setWheelSpringDamperRate(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_wheel_getWheelRadius_171(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("wheel")));
+		if (!module) return false;
+		auto ret = module->getWheelRadius(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_wheel_setWheelRadius_172(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("wheel")));
+		if (!module) return false;
+		module->setWheelRadius(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_wheel_getWheelWidth_173(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("wheel")));
+		if (!module) return false;
+		auto ret = module->getWheelWidth(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_wheel_setWheelWidth_174(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("wheel")));
+		if (!module) return false;
+		module->setWheelWidth(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_wheel_getWheelMass_175(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("wheel")));
+		if (!module) return false;
+		auto ret = module->getWheelMass(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_wheel_setWheelMass_176(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("wheel")));
+		if (!module) return false;
+		module->setWheelMass(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_wheel_getWheelMOI_177(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("wheel")));
+		if (!module) return false;
+		auto ret = module->getWheelMOI(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_wheel_setWheelMOI_178(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("wheel")));
+		if (!module) return false;
+		module->setWheelMOI(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_wheel_getWheelSlot_179(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("wheel")));
+		if (!module) return false;
+		auto ret = module->getWheelSlot(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::I32);
+			result->i = (i32)ret;
+			result->f = (float)result->i;
+		}
+		return true;
+	}
+	
+	static bool lumscript_wheel_setWheelSlot_180(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("wheel")));
+		if (!module) return false;
+		module->setWheelSlot(EntityRef(args[0].i), (PhysicsModule::WheelSlot)args[1].i);
+		return true;
+	}
+	
+	static bool lumscript_wheel_getWheelRPM_181(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("wheel")));
+		if (!module) return false;
+		auto ret = module->getWheelRPM(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_vehicle_getVehiclePeakTorque_182(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("vehicle")));
+		if (!module) return false;
+		auto ret = module->getVehiclePeakTorque(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_vehicle_setVehiclePeakTorque_183(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("vehicle")));
+		if (!module) return false;
+		module->setVehiclePeakTorque(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_vehicle_getVehicleMaxRPM_184(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("vehicle")));
+		if (!module) return false;
+		auto ret = module->getVehicleMaxRPM(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_vehicle_setVehicleMaxRPM_185(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("vehicle")));
+		if (!module) return false;
+		module->setVehicleMaxRPM(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_vehicle_getVehicleRPM_186(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("vehicle")));
+		if (!module) return false;
+		auto ret = module->getVehicleRPM(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_vehicle_getVehicleCurrentGear_187(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("vehicle")));
+		if (!module) return false;
+		auto ret = module->getVehicleCurrentGear(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::I32);
+			result->i = (i32)ret;
+			result->f = (float)result->i;
+		}
+		return true;
+	}
+	
+	static bool lumscript_vehicle_getVehicleSpeed_188(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("vehicle")));
+		if (!module) return false;
+		auto ret = module->getVehicleSpeed(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_vehicle_setVehicleAccel_189(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("vehicle")));
+		if (!module) return false;
+		module->setVehicleAccel(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_vehicle_setVehicleSteer_190(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("vehicle")));
+		if (!module) return false;
+		module->setVehicleSteer(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_vehicle_setVehicleBrake_191(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("vehicle")));
+		if (!module) return false;
+		module->setVehicleBrake(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_vehicle_getVehicleChassis_192(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("vehicle")));
+		if (!module) return false;
+		auto ret = module->getVehicleChassis(EntityRef(args[0].i));
+		if (result) {
+			static thread_local char lumscript_path_result[512];
+			copyString(lumscript_path_result, ret.c_str());
+			*result = Runtime::makeString(lumscript_path_result);
+		}
+		return true;
+	}
+	
+	static bool lumscript_vehicle_setVehicleChassis_193(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("vehicle")));
+		if (!module) return false;
+		char lumscript_string_arg_1[128];
+		copyString(lumscript_string_arg_1, args[1].string);
+		module->setVehicleChassis(EntityRef(args[0].i), Path(lumscript_string_arg_1));
+		return true;
+	}
+	
+	static bool lumscript_vehicle_getVehicleMass_194(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("vehicle")));
+		if (!module) return false;
+		auto ret = module->getVehicleMass(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_vehicle_setVehicleMass_195(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("vehicle")));
+		if (!module) return false;
+		module->setVehicleMass(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_vehicle_getVehicleMOIMultiplier_196(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("vehicle")));
+		if (!module) return false;
+		auto ret = module->getVehicleMOIMultiplier(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_vehicle_setVehicleMOIMultiplier_197(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("vehicle")));
+		if (!module) return false;
+		module->setVehicleMOIMultiplier(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_vehicle_getVehicleCenterOfMass_198(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("vehicle")));
+		if (!module) return false;
+		auto ret = module->getVehicleCenterOfMass(EntityRef(args[0].i));
+		if (result) {
+			*result = makeVec3Value(ret);
+		}
+		return true;
+	}
+	
+	static bool lumscript_vehicle_setVehicleCenterOfMass_199(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("vehicle")));
+		if (!module) return false;
+		module->setVehicleCenterOfMass(EntityRef(args[0].i), toVec3(args[1]));
+		return true;
+	}
+	
+	static bool lumscript_vehicle_getVehicleWheelsLayer_200(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("vehicle")));
+		if (!module) return false;
+		auto ret = module->getVehicleWheelsLayer(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::I32);
+			result->i = (i32)ret;
+			result->f = (float)result->i;
+		}
+		return true;
+	}
+	
+	static bool lumscript_vehicle_setVehicleWheelsLayer_201(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("vehicle")));
+		if (!module) return false;
+		module->setVehicleWheelsLayer(EntityRef(args[0].i), (u32)args[1].i);
+		return true;
+	}
+	
+	static bool lumscript_vehicle_getVehicleChassisLayer_202(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("vehicle")));
+		if (!module) return false;
+		auto ret = module->getVehicleChassisLayer(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::I32);
+			result->i = (i32)ret;
+			result->f = (float)result->i;
+		}
+		return true;
+	}
+	
+	static bool lumscript_vehicle_setVehicleChassisLayer_203(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("vehicle")));
+		if (!module) return false;
+		module->setVehicleChassisLayer(EntityRef(args[0].i), (u32)args[1].i);
+		return true;
+	}
+	
+	static bool lumscript_physical_instanced_cube_getInstancedCubeHalfExtents_204(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("physical_instanced_cube")));
+		if (!module) return false;
+		auto ret = module->getInstancedCubeHalfExtents(EntityRef(args[0].i));
+		if (result) {
+			*result = makeVec3Value(ret);
+		}
+		return true;
+	}
+	
+	static bool lumscript_physical_instanced_cube_setInstancedCubeHalfExtents_205(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("physical_instanced_cube")));
+		if (!module) return false;
+		module->setInstancedCubeHalfExtents(EntityRef(args[0].i), toVec3(args[1]));
+		return true;
+	}
+	
+	static bool lumscript_physical_instanced_cube_getInstancedCubeLayer_206(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("physical_instanced_cube")));
+		if (!module) return false;
+		auto ret = module->getInstancedCubeLayer(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::I32);
+			result->i = (i32)ret;
+			result->f = (float)result->i;
+		}
+		return true;
+	}
+	
+	static bool lumscript_physical_instanced_cube_setInstancedCubeLayer_207(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("physical_instanced_cube")));
+		if (!module) return false;
+		module->setInstancedCubeLayer(EntityRef(args[0].i), (u32)args[1].i);
+		return true;
+	}
+	
+	static bool lumscript_physical_instanced_mesh_getInstancedMeshLayer_208(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("physical_instanced_mesh")));
+		if (!module) return false;
+		auto ret = module->getInstancedMeshLayer(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::I32);
+			result->i = (i32)ret;
+			result->f = (float)result->i;
+		}
+		return true;
+	}
+	
+	static bool lumscript_physical_instanced_mesh_setInstancedMeshLayer_209(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("physical_instanced_mesh")));
+		if (!module) return false;
+		module->setInstancedMeshLayer(EntityRef(args[0].i), (u32)args[1].i);
+		return true;
+	}
+	
+	static bool lumscript_physical_instanced_mesh_getInstancedMeshGeomPath_210(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("physical_instanced_mesh")));
+		if (!module) return false;
+		auto ret = module->getInstancedMeshGeomPath(EntityRef(args[0].i));
+		if (result) {
+			static thread_local char lumscript_path_result[512];
+			copyString(lumscript_path_result, ret.c_str());
+			*result = Runtime::makeString(lumscript_path_result);
+		}
+		return true;
+	}
+	
+	static bool lumscript_physical_instanced_mesh_setInstancedMeshGeomPath_211(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<PhysicsModule*>(ctx->world->getModule(reflection::getComponentType("physical_instanced_mesh")));
+		if (!module) return false;
+		char lumscript_string_arg_1[128];
+		copyString(lumscript_string_arg_1, args[1].string);
+		module->setInstancedMeshGeomPath(EntityRef(args[0].i), Path(lumscript_string_arg_1));
+		return true;
+	}
+	
+	static bool lumscript_camera_getCameraScreenWidth_212(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("camera")));
+		if (!module) return false;
+		auto ret = module->getCameraScreenWidth(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_camera_getCameraScreenHeight_213(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("camera")));
+		if (!module) return false;
+		auto ret = module->getCameraScreenHeight(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_decal_getDecalMaterialPath_214(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("decal")));
+		if (!module) return false;
+		auto ret = module->getDecalMaterialPath(EntityRef(args[0].i));
+		if (result) {
+			static thread_local char lumscript_path_result[512];
+			copyString(lumscript_path_result, ret.c_str());
+			*result = Runtime::makeString(lumscript_path_result);
+		}
+		return true;
+	}
+	
+	static bool lumscript_decal_setDecalMaterialPath_215(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("decal")));
+		if (!module) return false;
+		char lumscript_string_arg_1[128];
+		copyString(lumscript_string_arg_1, args[1].string);
+		module->setDecalMaterialPath(EntityRef(args[0].i), Path(lumscript_string_arg_1));
+		return true;
+	}
+	
+	static bool lumscript_decal_getDecalHalfExtents_216(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("decal")));
+		if (!module) return false;
+		auto ret = module->getDecalHalfExtents(EntityRef(args[0].i));
+		if (result) {
+			*result = makeVec3Value(ret);
+		}
+		return true;
+	}
+	
+	static bool lumscript_decal_setDecalHalfExtents_217(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("decal")));
+		if (!module) return false;
+		module->setDecalHalfExtents(EntityRef(args[0].i), toVec3(args[1]));
+		return true;
+	}
+	
+	static bool lumscript_environment_getEnvironmentCastShadows_218(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("environment")));
+		if (!module) return false;
+		auto ret = module->getEnvironmentCastShadows(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::BOOL);
+			result->b = ret;
+		}
+		return true;
+	}
+	
+	static bool lumscript_environment_setEnvironmentCastShadows_219(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("environment")));
+		if (!module) return false;
+		module->setEnvironmentCastShadows(EntityRef(args[0].i), args[1].b);
+		return true;
+	}
+	
+	static bool lumscript_environment_getEnvironmentSkyTexture_220(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("environment")));
+		if (!module) return false;
+		auto ret = module->getEnvironmentSkyTexture(EntityRef(args[0].i));
+		if (result) {
+			static thread_local char lumscript_path_result[512];
+			copyString(lumscript_path_result, ret.c_str());
+			*result = Runtime::makeString(lumscript_path_result);
+		}
+		return true;
+	}
+	
+	static bool lumscript_environment_setEnvironmentSkyTexture_221(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("environment")));
+		if (!module) return false;
+		char lumscript_string_arg_1[128];
+		copyString(lumscript_string_arg_1, args[1].string);
+		module->setEnvironmentSkyTexture(EntityRef(args[0].i), Path(lumscript_string_arg_1));
+		return true;
+	}
+	
+	static bool lumscript_point_light_getPointLightRange_222(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("point_light")));
+		if (!module) return false;
+		auto ret = module->getPointLightRange(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_point_light_setPointLightRange_223(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("point_light")));
+		if (!module) return false;
+		module->setPointLightRange(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_point_light_getPointLightCastShadows_224(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("point_light")));
+		if (!module) return false;
+		auto ret = module->getPointLightCastShadows(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::BOOL);
+			result->b = ret;
+		}
+		return true;
+	}
+	
+	static bool lumscript_point_light_setPointLightCastShadows_225(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("point_light")));
+		if (!module) return false;
+		module->setPointLightCastShadows(EntityRef(args[0].i), args[1].b);
+		return true;
+	}
+	
+	static bool lumscript_point_light_getPointLightDynamic_226(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("point_light")));
+		if (!module) return false;
+		auto ret = module->getPointLightDynamic(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::BOOL);
+			result->b = ret;
+		}
+		return true;
+	}
+	
+	static bool lumscript_point_light_setPointLightDynamic_227(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("point_light")));
+		if (!module) return false;
+		module->setPointLightDynamic(EntityRef(args[0].i), args[1].b);
+		return true;
+	}
+	
+	static bool lumscript_reflection_probe_isReflectionProbeEnabled_228(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("reflection_probe")));
+		if (!module) return false;
+		auto ret = module->isReflectionProbeEnabled(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::BOOL);
+			result->b = ret;
+		}
+		return true;
+	}
+	
+	static bool lumscript_reflection_probe_enableReflectionProbe_229(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("reflection_probe")));
+		if (!module) return false;
+		module->enableReflectionProbe(EntityRef(args[0].i), args[1].b);
+		return true;
+	}
+	
+	static bool lumscript_environment_probe_isEnvironmentProbeEnabled_230(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("environment_probe")));
+		if (!module) return false;
+		auto ret = module->isEnvironmentProbeEnabled(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::BOOL);
+			result->b = ret;
+		}
+		return true;
+	}
+	
+	static bool lumscript_environment_probe_enableEnvironmentProbe_231(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("environment_probe")));
+		if (!module) return false;
+		module->enableEnvironmentProbe(EntityRef(args[0].i), args[1].b);
+		return true;
+	}
+	
+	static bool lumscript_bone_attachment_setRotation_232(Span<const Value> args, Value* result, void* userdata) {
 		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
 		if (!ctx->world) return false;
 		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("bone_attachment")));
@@ -959,7 +3336,94 @@ namespace Lumix::LumScript::generated {
 		return true;
 	}
 	
-	static bool lumscript_particle_emitter_getGlobalID_23(Span<const Value> args, Value* result, void* userdata) {
+	static bool lumscript_bone_attachment_getBoneAttachmentParent_233(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("bone_attachment")));
+		if (!module) return false;
+		auto ret = module->getBoneAttachmentParent(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::NATIVE, "engine:entity/Entity", -1);
+			result->i = ret.index;
+		}
+		return true;
+	}
+	
+	static bool lumscript_bone_attachment_setBoneAttachmentParent_234(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("bone_attachment")));
+		if (!module) return false;
+		module->setBoneAttachmentParent(EntityRef(args[0].i), EntityPtr(args[1].i));
+		return true;
+	}
+	
+	static bool lumscript_bone_attachment_getBoneAttachmentBone_235(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("bone_attachment")));
+		if (!module) return false;
+		auto ret = module->getBoneAttachmentBone(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::I32);
+			result->i = (i32)ret;
+			result->f = (float)result->i;
+		}
+		return true;
+	}
+	
+	static bool lumscript_bone_attachment_setBoneAttachmentBone_236(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("bone_attachment")));
+		if (!module) return false;
+		module->setBoneAttachmentBone(EntityRef(args[0].i), args[1].i);
+		return true;
+	}
+	
+	static bool lumscript_bone_attachment_getBoneAttachmentPosition_237(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("bone_attachment")));
+		if (!module) return false;
+		auto ret = module->getBoneAttachmentPosition(EntityRef(args[0].i));
+		if (result) {
+			*result = makeVec3Value(ret);
+		}
+		return true;
+	}
+	
+	static bool lumscript_bone_attachment_setBoneAttachmentPosition_238(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("bone_attachment")));
+		if (!module) return false;
+		module->setBoneAttachmentPosition(EntityRef(args[0].i), toVec3(args[1]));
+		return true;
+	}
+	
+	static bool lumscript_bone_attachment_getBoneAttachmentRotation_239(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("bone_attachment")));
+		if (!module) return false;
+		auto ret = module->getBoneAttachmentRotation(EntityRef(args[0].i));
+		if (result) {
+			*result = makeVec3Value(ret);
+		}
+		return true;
+	}
+	
+	static bool lumscript_bone_attachment_setBoneAttachmentRotation_240(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("bone_attachment")));
+		if (!module) return false;
+		module->setBoneAttachmentRotation(EntityRef(args[0].i), toVec3(args[1]));
+		return true;
+	}
+	
+	static bool lumscript_particle_emitter_getGlobalID_241(Span<const Value> args, Value* result, void* userdata) {
 		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
 		if (!ctx->world) return false;
 		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("particle_emitter")));
@@ -975,7 +3439,7 @@ namespace Lumix::LumScript::generated {
 		return true;
 	}
 	
-	static bool lumscript_particle_emitter_setFloatGlobal_24(Span<const Value> args, Value* result, void* userdata) {
+	static bool lumscript_particle_emitter_setFloatGlobal_242(Span<const Value> args, Value* result, void* userdata) {
 		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
 		if (!ctx->world) return false;
 		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("particle_emitter")));
@@ -984,7 +3448,7 @@ namespace Lumix::LumScript::generated {
 		return true;
 	}
 	
-	static bool lumscript_particle_emitter_setVec3Global_25(Span<const Value> args, Value* result, void* userdata) {
+	static bool lumscript_particle_emitter_setVec3Global_243(Span<const Value> args, Value* result, void* userdata) {
 		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
 		if (!ctx->world) return false;
 		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("particle_emitter")));
@@ -993,7 +3457,7 @@ namespace Lumix::LumScript::generated {
 		return true;
 	}
 	
-	static bool lumscript_particle_emitter_emitRibbons_26(Span<const Value> args, Value* result, void* userdata) {
+	static bool lumscript_particle_emitter_emitRibbons_244(Span<const Value> args, Value* result, void* userdata) {
 		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
 		if (!ctx->world) return false;
 		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("particle_emitter")));
@@ -1002,7 +3466,7 @@ namespace Lumix::LumScript::generated {
 		return true;
 	}
 	
-	static bool lumscript_particle_emitter_killRibbon_27(Span<const Value> args, Value* result, void* userdata) {
+	static bool lumscript_particle_emitter_killRibbon_245(Span<const Value> args, Value* result, void* userdata) {
 		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
 		if (!ctx->world) return false;
 		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("particle_emitter")));
@@ -1011,7 +3475,174 @@ namespace Lumix::LumScript::generated {
 		return true;
 	}
 	
-	static bool lumscript_terrain_getHeightAt_28(Span<const Value> args, Value* result, void* userdata) {
+	static bool lumscript_particle_emitter_getParticleEmitterPath_246(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("particle_emitter")));
+		if (!module) return false;
+		auto ret = module->getParticleEmitterPath(EntityRef(args[0].i));
+		if (result) {
+			static thread_local char lumscript_path_result[512];
+			copyString(lumscript_path_result, ret.c_str());
+			*result = Runtime::makeString(lumscript_path_result);
+		}
+		return true;
+	}
+	
+	static bool lumscript_particle_emitter_setParticleEmitterPath_247(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("particle_emitter")));
+		if (!module) return false;
+		char lumscript_string_arg_1[128];
+		copyString(lumscript_string_arg_1, args[1].string);
+		module->setParticleEmitterPath(EntityRef(args[0].i), Path(lumscript_string_arg_1));
+		return true;
+	}
+	
+	static bool lumscript_particle_emitter_getParticleEmitterAutodestroy_248(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("particle_emitter")));
+		if (!module) return false;
+		auto ret = module->getParticleEmitterAutodestroy(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::BOOL);
+			result->b = ret;
+		}
+		return true;
+	}
+	
+	static bool lumscript_particle_emitter_setParticleEmitterAutodestroy_249(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("particle_emitter")));
+		if (!module) return false;
+		module->setParticleEmitterAutodestroy(EntityRef(args[0].i), args[1].b);
+		return true;
+	}
+	
+	static bool lumscript_instanced_model_getInstancedModelPath_250(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("instanced_model")));
+		if (!module) return false;
+		auto ret = module->getInstancedModelPath(EntityRef(args[0].i));
+		if (result) {
+			static thread_local char lumscript_path_result[512];
+			copyString(lumscript_path_result, ret.c_str());
+			*result = Runtime::makeString(lumscript_path_result);
+		}
+		return true;
+	}
+	
+	static bool lumscript_instanced_model_setInstancedModelPath_251(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("instanced_model")));
+		if (!module) return false;
+		char lumscript_string_arg_1[128];
+		copyString(lumscript_string_arg_1, args[1].string);
+		module->setInstancedModelPath(EntityRef(args[0].i), Path(lumscript_string_arg_1));
+		return true;
+	}
+	
+	static bool lumscript_model_instance_isModelInstanceEnabled_252(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("model_instance")));
+		if (!module) return false;
+		auto ret = module->isModelInstanceEnabled(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::BOOL);
+			result->b = ret;
+		}
+		return true;
+	}
+	
+	static bool lumscript_model_instance_enableModelInstance_253(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("model_instance")));
+		if (!module) return false;
+		module->enableModelInstance(EntityRef(args[0].i), args[1].b);
+		return true;
+	}
+	
+	static bool lumscript_model_instance_getModelInstancePath_254(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("model_instance")));
+		if (!module) return false;
+		auto ret = module->getModelInstancePath(EntityRef(args[0].i));
+		if (result) {
+			static thread_local char lumscript_path_result[512];
+			copyString(lumscript_path_result, ret.c_str());
+			*result = Runtime::makeString(lumscript_path_result);
+		}
+		return true;
+	}
+	
+	static bool lumscript_model_instance_setModelInstancePath_255(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("model_instance")));
+		if (!module) return false;
+		char lumscript_string_arg_1[128];
+		copyString(lumscript_string_arg_1, args[1].string);
+		module->setModelInstancePath(EntityRef(args[0].i), Path(lumscript_string_arg_1));
+		return true;
+	}
+	
+	static bool lumscript_curve_decal_getCurveDecalMaterialPath_256(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("curve_decal")));
+		if (!module) return false;
+		auto ret = module->getCurveDecalMaterialPath(EntityRef(args[0].i));
+		if (result) {
+			static thread_local char lumscript_path_result[512];
+			copyString(lumscript_path_result, ret.c_str());
+			*result = Runtime::makeString(lumscript_path_result);
+		}
+		return true;
+	}
+	
+	static bool lumscript_curve_decal_setCurveDecalMaterialPath_257(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("curve_decal")));
+		if (!module) return false;
+		char lumscript_string_arg_1[128];
+		copyString(lumscript_string_arg_1, args[1].string);
+		module->setCurveDecalMaterialPath(EntityRef(args[0].i), Path(lumscript_string_arg_1));
+		return true;
+	}
+	
+	static bool lumscript_curve_decal_getCurveDecalHalfExtents_258(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("curve_decal")));
+		if (!module) return false;
+		auto ret = module->getCurveDecalHalfExtents(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_curve_decal_setCurveDecalHalfExtents_259(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("curve_decal")));
+		if (!module) return false;
+		module->setCurveDecalHalfExtents(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_terrain_getHeightAt_260(Span<const Value> args, Value* result, void* userdata) {
 		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
 		if (!ctx->world) return false;
 		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("terrain")));
@@ -1025,7 +3656,7 @@ namespace Lumix::LumScript::generated {
 		return true;
 	}
 	
-	static bool lumscript_terrain_getNormalAt_29(Span<const Value> args, Value* result, void* userdata) {
+	static bool lumscript_terrain_getNormalAt_261(Span<const Value> args, Value* result, void* userdata) {
 		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
 		if (!ctx->world) return false;
 		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("terrain")));
@@ -1037,285 +3668,649 @@ namespace Lumix::LumScript::generated {
 		return true;
 	}
 	
+	static bool lumscript_terrain_getTerrainMaterialPath_262(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("terrain")));
+		if (!module) return false;
+		auto ret = module->getTerrainMaterialPath(EntityRef(args[0].i));
+		if (result) {
+			static thread_local char lumscript_path_result[512];
+			copyString(lumscript_path_result, ret.c_str());
+			*result = Runtime::makeString(lumscript_path_result);
+		}
+		return true;
+	}
+	
+	static bool lumscript_terrain_setTerrainMaterialPath_263(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("terrain")));
+		if (!module) return false;
+		char lumscript_string_arg_1[128];
+		copyString(lumscript_string_arg_1, args[1].string);
+		module->setTerrainMaterialPath(EntityRef(args[0].i), Path(lumscript_string_arg_1));
+		return true;
+	}
+	
+	static bool lumscript_terrain_getTerrainXZScale_264(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("terrain")));
+		if (!module) return false;
+		auto ret = module->getTerrainXZScale(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_terrain_setTerrainXZScale_265(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("terrain")));
+		if (!module) return false;
+		module->setTerrainXZScale(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_terrain_getTerrainTesselation_266(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("terrain")));
+		if (!module) return false;
+		auto ret = module->getTerrainTesselation(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::I32);
+			result->i = (i32)ret;
+			result->f = (float)result->i;
+		}
+		return true;
+	}
+	
+	static bool lumscript_terrain_setTerrainTesselation_267(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("terrain")));
+		if (!module) return false;
+		module->setTerrainTesselation(EntityRef(args[0].i), (u32)args[1].i);
+		return true;
+	}
+	
+	static bool lumscript_terrain_getTerrainBaseGridResolution_268(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("terrain")));
+		if (!module) return false;
+		auto ret = module->getTerrainBaseGridResolution(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::I32);
+			result->i = (i32)ret;
+			result->f = (float)result->i;
+		}
+		return true;
+	}
+	
+	static bool lumscript_terrain_setTerrainBaseGridResolution_269(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("terrain")));
+		if (!module) return false;
+		module->setTerrainBaseGridResolution(EntityRef(args[0].i), (u32)args[1].i);
+		return true;
+	}
+	
+	static bool lumscript_terrain_getTerrainYScale_270(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("terrain")));
+		if (!module) return false;
+		auto ret = module->getTerrainYScale(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_terrain_setTerrainYScale_271(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("terrain")));
+		if (!module) return false;
+		module->setTerrainYScale(EntityRef(args[0].i), args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_terrain_grass_count_272(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world || !result) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("terrain")));
+		if (!module) return false;
+		const i32 count = module->getGrassCount(EntityRef(args[0].i));
+		result->type = TypeRef(TypeRef::I32);
+		result->i = count;
+		result->f = (float)count;
+		return true;
+	}
+	
+	static bool lumscript_terrain_grass_item_273(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world || !result) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("terrain")));
+		if (!module) return false;
+		const i32 count = module->getGrassCount(EntityRef(args[0].i));
+		if (args[1].i < 0 || args[1].i >= count) {
+			*result = Runtime::makeNull();
+			return true;
+		}
+		result->type = TypeRef(TypeRef::NATIVE, "engine:terrain/TerrainGrassArrayItem", -1);
+		result->i = args[0].i;
+		result->i64 = args[1].i;
+		result->ptr = ctx->world;
+		return true;
+	}
+	
+	static bool lumscript_terrain_grass_getGrassRotationMode_274(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("terrain")));
+		if (!module) return false;
+		auto ret = module->getGrassRotationMode(EntityRef(args[0].i), (i32)args[0].i64);
+		if (result) {
+			result->type = TypeRef(TypeRef::I32);
+			result->i = (i32)ret;
+			result->f = (float)result->i;
+		}
+		return true;
+	}
+	
+	static bool lumscript_terrain_grass_setGrassRotationMode_275(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("terrain")));
+		if (!module) return false;
+		module->setGrassRotationMode(EntityRef(args[0].i), (i32)args[0].i64, (GrassRotationMode)args[1].i);
+		return true;
+	}
+	
+	static bool lumscript_terrain_grass_getGrassDistance_276(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("terrain")));
+		if (!module) return false;
+		auto ret = module->getGrassDistance(EntityRef(args[0].i), (i32)args[0].i64);
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_terrain_grass_setGrassDistance_277(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("terrain")));
+		if (!module) return false;
+		module->setGrassDistance(EntityRef(args[0].i), (i32)args[0].i64, args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_terrain_grass_getGrassPath_278(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("terrain")));
+		if (!module) return false;
+		auto ret = module->getGrassPath(EntityRef(args[0].i), (i32)args[0].i64);
+		if (result) {
+			static thread_local char lumscript_path_result[512];
+			copyString(lumscript_path_result, ret.c_str());
+			*result = Runtime::makeString(lumscript_path_result);
+		}
+		return true;
+	}
+	
+	static bool lumscript_terrain_grass_setGrassPath_279(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("terrain")));
+		if (!module) return false;
+		char lumscript_string_arg_1[128];
+		copyString(lumscript_string_arg_1, args[1].string);
+		module->setGrassPath(EntityRef(args[0].i), (i32)args[0].i64, Path(lumscript_string_arg_1));
+		return true;
+	}
+	
+	static bool lumscript_terrain_grass_getGrassSpacing_280(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("terrain")));
+		if (!module) return false;
+		auto ret = module->getGrassSpacing(EntityRef(args[0].i), (i32)args[0].i64);
+		if (result) {
+			result->type = TypeRef(TypeRef::F32);
+			result->f = ret;
+			result->i = (i32)result->f;
+		}
+		return true;
+	}
+	
+	static bool lumscript_terrain_grass_setGrassSpacing_281(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("terrain")));
+		if (!module) return false;
+		module->setGrassSpacing(EntityRef(args[0].i), (i32)args[0].i64, args[1].f);
+		return true;
+	}
+	
+	static bool lumscript_procedural_geom_getProceduralGeometryMaterial_282(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("procedural_geom")));
+		if (!module) return false;
+		auto ret = module->getProceduralGeometryMaterial(EntityRef(args[0].i));
+		if (result) {
+			static thread_local char lumscript_path_result[512];
+			copyString(lumscript_path_result, ret.c_str());
+			*result = Runtime::makeString(lumscript_path_result);
+		}
+		return true;
+	}
+	
+	static bool lumscript_procedural_geom_setProceduralGeometryMaterial_283(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<RenderModule*>(ctx->world->getModule(reflection::getComponentType("procedural_geom")));
+		if (!module) return false;
+		char lumscript_string_arg_1[128];
+		copyString(lumscript_string_arg_1, args[1].string);
+		module->setProceduralGeometryMaterial(EntityRef(args[0].i), Path(lumscript_string_arg_1));
+		return true;
+	}
+	
+	static bool lumscript_ui_3d_getUI3DPath_284(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<UIModule*>(ctx->world->getModule(reflection::getComponentType("ui_3d")));
+		if (!module) return false;
+		auto ret = module->getUI3DPath(EntityRef(args[0].i));
+		if (result) {
+			static thread_local char lumscript_path_result[512];
+			copyString(lumscript_path_result, ret.c_str());
+			*result = Runtime::makeString(lumscript_path_result);
+		}
+		return true;
+	}
+	
+	static bool lumscript_ui_3d_setUI3DPath_285(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<UIModule*>(ctx->world->getModule(reflection::getComponentType("ui_3d")));
+		if (!module) return false;
+		char lumscript_string_arg_1[128];
+		copyString(lumscript_string_arg_1, args[1].string);
+		module->setUI3DPath(EntityRef(args[0].i), Path(lumscript_string_arg_1));
+		return true;
+	}
+	
+	static bool lumscript_ui_3d_getUI3DOrientToCamera_286(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<UIModule*>(ctx->world->getModule(reflection::getComponentType("ui_3d")));
+		if (!module) return false;
+		auto ret = module->getUI3DOrientToCamera(EntityRef(args[0].i));
+		if (result) {
+			result->type = TypeRef(TypeRef::BOOL);
+			result->b = ret;
+		}
+		return true;
+	}
+	
+	static bool lumscript_ui_3d_setUI3DOrientToCamera_287(Span<const Value> args, Value* result, void* userdata) {
+		GeneratedEngineContext* ctx = (GeneratedEngineContext*)userdata;
+		if (!ctx->world) return false;
+		auto* module = static_cast<UIModule*>(ctx->world->getModule(reflection::getComponentType("ui_3d")));
+		if (!module) return false;
+		module->setUI3DOrientToCamera(EntityRef(args[0].i), args[1].b);
+		return true;
+	}
+	
 	static bool hasEnum(Module& module, StringView name) {
 		for (EnumDecl& e : module.enums) if (equalStrings(e.name, name)) return true;
 		return false;
 	}
 	
-	static void registerGeneratedMetaEnums(Module& module, StringView alias) {
-		{
-			StringView enum_name = module.makeQualifiedName(alias, "CursorType");
-			if (!hasEnum(module, enum_name)) {
-				EnumDecl& e = module.enums.emplace(module.allocator);
-				e.name = enum_name;
-				{ EnumMember& member = e.members.emplace(); member.name = "DEFAULT"; member.value = 0; }
-				{ EnumMember& member = e.members.emplace(); member.name = "SIZE_NS"; member.value = 1; }
-				{ EnumMember& member = e.members.emplace(); member.name = "SIZE_WE"; member.value = 2; }
-				{ EnumMember& member = e.members.emplace(); member.name = "SIZE_NWSE"; member.value = 3; }
-				{ EnumMember& member = e.members.emplace(); member.name = "LOAD"; member.value = 4; }
-				{ EnumMember& member = e.members.emplace(); member.name = "TEXT_INPUT"; member.value = 5; }
-				{ EnumMember& member = e.members.emplace(); member.name = "HAND"; member.value = 6; }
-				{ EnumMember& member = e.members.emplace(); member.name = "UNDEFINED"; member.value = 7; }
+	static bool registerGeneratedMetaEnum(Module& module, StringView name, StringView alias) {
+		if (equalStrings(name, "CursorType")) {
+			{
+				StringView enum_name = module.makeQualifiedName(alias, "CursorType");
+				if (!hasEnum(module, enum_name)) {
+					EnumDecl& e = module.enums.emplace(module.allocator);
+					e.name = enum_name;
+					{ EnumMember& member = e.members.emplace(); member.name = "DEFAULT"; member.value = 0; }
+					{ EnumMember& member = e.members.emplace(); member.name = "SIZE_NS"; member.value = 1; }
+					{ EnumMember& member = e.members.emplace(); member.name = "SIZE_WE"; member.value = 2; }
+					{ EnumMember& member = e.members.emplace(); member.name = "SIZE_NWSE"; member.value = 3; }
+					{ EnumMember& member = e.members.emplace(); member.name = "LOAD"; member.value = 4; }
+					{ EnumMember& member = e.members.emplace(); member.name = "TEXT_INPUT"; member.value = 5; }
+					{ EnumMember& member = e.members.emplace(); member.name = "HAND"; member.value = 6; }
+					{ EnumMember& member = e.members.emplace(); member.name = "UNDEFINED"; member.value = 7; }
+				}
 			}
+			return true;
 		}
-		{
-			StringView enum_name = module.makeQualifiedName(alias, "Keycode");
-			if (!hasEnum(module, enum_name)) {
-				EnumDecl& e = module.enums.emplace(module.allocator);
-				e.name = enum_name;
-				{ EnumMember& member = e.members.emplace(); member.name = "LBUTTON"; member.value = 1; }
-				{ EnumMember& member = e.members.emplace(); member.name = "RBUTTON"; member.value = 2; }
-				{ EnumMember& member = e.members.emplace(); member.name = "CANCEL"; member.value = 3; }
-				{ EnumMember& member = e.members.emplace(); member.name = "MBUTTON"; member.value = 4; }
-				{ EnumMember& member = e.members.emplace(); member.name = "BACKSPACE"; member.value = 8; }
-				{ EnumMember& member = e.members.emplace(); member.name = "TAB"; member.value = 9; }
-				{ EnumMember& member = e.members.emplace(); member.name = "CLEAR"; member.value = 12; }
-				{ EnumMember& member = e.members.emplace(); member.name = "RETURN"; member.value = 13; }
-				{ EnumMember& member = e.members.emplace(); member.name = "SHIFT"; member.value = 16; }
-				{ EnumMember& member = e.members.emplace(); member.name = "CTRL"; member.value = 17; }
-				{ EnumMember& member = e.members.emplace(); member.name = "ALT"; member.value = 18; }
-				{ EnumMember& member = e.members.emplace(); member.name = "PAUSE"; member.value = 19; }
-				{ EnumMember& member = e.members.emplace(); member.name = "CAPITAL"; member.value = 20; }
-				{ EnumMember& member = e.members.emplace(); member.name = "KANA"; member.value = 21; }
-				{ EnumMember& member = e.members.emplace(); member.name = "HANGEUL"; member.value = 21; }
-				{ EnumMember& member = e.members.emplace(); member.name = "HANGUL"; member.value = 21; }
-				{ EnumMember& member = e.members.emplace(); member.name = "JUNJA"; member.value = 23; }
-				{ EnumMember& member = e.members.emplace(); member.name = "FINAL"; member.value = 24; }
-				{ EnumMember& member = e.members.emplace(); member.name = "HANJA"; member.value = 25; }
-				{ EnumMember& member = e.members.emplace(); member.name = "KANJI"; member.value = 25; }
-				{ EnumMember& member = e.members.emplace(); member.name = "ESCAPE"; member.value = 27; }
-				{ EnumMember& member = e.members.emplace(); member.name = "CONVERT"; member.value = 28; }
-				{ EnumMember& member = e.members.emplace(); member.name = "NONCONVERT"; member.value = 29; }
-				{ EnumMember& member = e.members.emplace(); member.name = "ACCEPT"; member.value = 30; }
-				{ EnumMember& member = e.members.emplace(); member.name = "MODECHANGE"; member.value = 31; }
-				{ EnumMember& member = e.members.emplace(); member.name = "SPACE"; member.value = 32; }
-				{ EnumMember& member = e.members.emplace(); member.name = "PAGEUP"; member.value = 33; }
-				{ EnumMember& member = e.members.emplace(); member.name = "PAGEDOWN"; member.value = 34; }
-				{ EnumMember& member = e.members.emplace(); member.name = "END"; member.value = 35; }
-				{ EnumMember& member = e.members.emplace(); member.name = "HOME"; member.value = 36; }
-				{ EnumMember& member = e.members.emplace(); member.name = "LEFT"; member.value = 37; }
-				{ EnumMember& member = e.members.emplace(); member.name = "UP"; member.value = 38; }
-				{ EnumMember& member = e.members.emplace(); member.name = "RIGHT"; member.value = 39; }
-				{ EnumMember& member = e.members.emplace(); member.name = "DOWN"; member.value = 40; }
-				{ EnumMember& member = e.members.emplace(); member.name = "SELECT"; member.value = 41; }
-				{ EnumMember& member = e.members.emplace(); member.name = "PRINT"; member.value = 42; }
-				{ EnumMember& member = e.members.emplace(); member.name = "EXECUTE"; member.value = 43; }
-				{ EnumMember& member = e.members.emplace(); member.name = "SNAPSHOT"; member.value = 44; }
-				{ EnumMember& member = e.members.emplace(); member.name = "INSERT"; member.value = 45; }
-				{ EnumMember& member = e.members.emplace(); member.name = "DEL"; member.value = 46; }
-				{ EnumMember& member = e.members.emplace(); member.name = "HELP"; member.value = 47; }
-				{ EnumMember& member = e.members.emplace(); member.name = "LWIN"; member.value = 91; }
-				{ EnumMember& member = e.members.emplace(); member.name = "RWIN"; member.value = 92; }
-				{ EnumMember& member = e.members.emplace(); member.name = "APPS"; member.value = 93; }
-				{ EnumMember& member = e.members.emplace(); member.name = "SLEEP"; member.value = 95; }
-				{ EnumMember& member = e.members.emplace(); member.name = "NUMPAD0"; member.value = 96; }
-				{ EnumMember& member = e.members.emplace(); member.name = "NUMPAD1"; member.value = 97; }
-				{ EnumMember& member = e.members.emplace(); member.name = "NUMPAD2"; member.value = 98; }
-				{ EnumMember& member = e.members.emplace(); member.name = "NUMPAD3"; member.value = 99; }
-				{ EnumMember& member = e.members.emplace(); member.name = "NUMPAD4"; member.value = 100; }
-				{ EnumMember& member = e.members.emplace(); member.name = "NUMPAD5"; member.value = 101; }
-				{ EnumMember& member = e.members.emplace(); member.name = "NUMPAD6"; member.value = 102; }
-				{ EnumMember& member = e.members.emplace(); member.name = "NUMPAD7"; member.value = 103; }
-				{ EnumMember& member = e.members.emplace(); member.name = "NUMPAD8"; member.value = 104; }
-				{ EnumMember& member = e.members.emplace(); member.name = "NUMPAD9"; member.value = 105; }
-				{ EnumMember& member = e.members.emplace(); member.name = "MULTIPLY"; member.value = 106; }
-				{ EnumMember& member = e.members.emplace(); member.name = "ADD"; member.value = 107; }
-				{ EnumMember& member = e.members.emplace(); member.name = "SEPARATOR"; member.value = 108; }
-				{ EnumMember& member = e.members.emplace(); member.name = "SUBTRACT"; member.value = 109; }
-				{ EnumMember& member = e.members.emplace(); member.name = "DECIMAL"; member.value = 110; }
-				{ EnumMember& member = e.members.emplace(); member.name = "DIVIDE"; member.value = 111; }
-				{ EnumMember& member = e.members.emplace(); member.name = "F1"; member.value = 112; }
-				{ EnumMember& member = e.members.emplace(); member.name = "F2"; member.value = 113; }
-				{ EnumMember& member = e.members.emplace(); member.name = "F3"; member.value = 114; }
-				{ EnumMember& member = e.members.emplace(); member.name = "F4"; member.value = 115; }
-				{ EnumMember& member = e.members.emplace(); member.name = "F5"; member.value = 116; }
-				{ EnumMember& member = e.members.emplace(); member.name = "F6"; member.value = 117; }
-				{ EnumMember& member = e.members.emplace(); member.name = "F7"; member.value = 118; }
-				{ EnumMember& member = e.members.emplace(); member.name = "F8"; member.value = 119; }
-				{ EnumMember& member = e.members.emplace(); member.name = "F9"; member.value = 120; }
-				{ EnumMember& member = e.members.emplace(); member.name = "F10"; member.value = 121; }
-				{ EnumMember& member = e.members.emplace(); member.name = "F11"; member.value = 122; }
-				{ EnumMember& member = e.members.emplace(); member.name = "F12"; member.value = 123; }
-				{ EnumMember& member = e.members.emplace(); member.name = "F13"; member.value = 124; }
-				{ EnumMember& member = e.members.emplace(); member.name = "F14"; member.value = 125; }
-				{ EnumMember& member = e.members.emplace(); member.name = "F15"; member.value = 126; }
-				{ EnumMember& member = e.members.emplace(); member.name = "F16"; member.value = 127; }
-				{ EnumMember& member = e.members.emplace(); member.name = "F17"; member.value = 128; }
-				{ EnumMember& member = e.members.emplace(); member.name = "F18"; member.value = 129; }
-				{ EnumMember& member = e.members.emplace(); member.name = "F19"; member.value = 130; }
-				{ EnumMember& member = e.members.emplace(); member.name = "F20"; member.value = 131; }
-				{ EnumMember& member = e.members.emplace(); member.name = "F21"; member.value = 132; }
-				{ EnumMember& member = e.members.emplace(); member.name = "F22"; member.value = 133; }
-				{ EnumMember& member = e.members.emplace(); member.name = "F23"; member.value = 134; }
-				{ EnumMember& member = e.members.emplace(); member.name = "F24"; member.value = 135; }
-				{ EnumMember& member = e.members.emplace(); member.name = "NUMLOCK"; member.value = 144; }
-				{ EnumMember& member = e.members.emplace(); member.name = "SCROLL"; member.value = 145; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_NEC_EQUAL"; member.value = 146; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_FJ_JISHO"; member.value = 146; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_FJ_MASSHOU"; member.value = 147; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_FJ_TOUROKU"; member.value = 148; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_FJ_LOYA"; member.value = 149; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_FJ_ROYA"; member.value = 150; }
-				{ EnumMember& member = e.members.emplace(); member.name = "LSHIFT"; member.value = 160; }
-				{ EnumMember& member = e.members.emplace(); member.name = "RSHIFT"; member.value = 161; }
-				{ EnumMember& member = e.members.emplace(); member.name = "LCTRL"; member.value = 162; }
-				{ EnumMember& member = e.members.emplace(); member.name = "RCTRL"; member.value = 163; }
-				{ EnumMember& member = e.members.emplace(); member.name = "LALT"; member.value = 164; }
-				{ EnumMember& member = e.members.emplace(); member.name = "RALT"; member.value = 165; }
-				{ EnumMember& member = e.members.emplace(); member.name = "BROWSER_BACK"; member.value = 166; }
-				{ EnumMember& member = e.members.emplace(); member.name = "BROWSER_FORWARD"; member.value = 167; }
-				{ EnumMember& member = e.members.emplace(); member.name = "BROWSER_REFRESH"; member.value = 168; }
-				{ EnumMember& member = e.members.emplace(); member.name = "BROWSER_STOP"; member.value = 169; }
-				{ EnumMember& member = e.members.emplace(); member.name = "BROWSER_SEARCH"; member.value = 170; }
-				{ EnumMember& member = e.members.emplace(); member.name = "BROWSER_FAVORITES"; member.value = 171; }
-				{ EnumMember& member = e.members.emplace(); member.name = "BROWSER_HOME"; member.value = 172; }
-				{ EnumMember& member = e.members.emplace(); member.name = "VOLUME_MUTE"; member.value = 173; }
-				{ EnumMember& member = e.members.emplace(); member.name = "VOLUME_DOWN"; member.value = 174; }
-				{ EnumMember& member = e.members.emplace(); member.name = "VOLUME_UP"; member.value = 175; }
-				{ EnumMember& member = e.members.emplace(); member.name = "MEDIA_NEXT_TRACK"; member.value = 176; }
-				{ EnumMember& member = e.members.emplace(); member.name = "MEDIA_PREV_TRACK"; member.value = 177; }
-				{ EnumMember& member = e.members.emplace(); member.name = "MEDIA_STOP"; member.value = 178; }
-				{ EnumMember& member = e.members.emplace(); member.name = "MEDIA_PLAY_PAUSE"; member.value = 179; }
-				{ EnumMember& member = e.members.emplace(); member.name = "LAUNCH_MAIL"; member.value = 180; }
-				{ EnumMember& member = e.members.emplace(); member.name = "LAUNCH_MEDIA_SELECT"; member.value = 181; }
-				{ EnumMember& member = e.members.emplace(); member.name = "LAUNCH_APP1"; member.value = 182; }
-				{ EnumMember& member = e.members.emplace(); member.name = "LAUNCH_APP2"; member.value = 183; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_1"; member.value = 186; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_PLUS"; member.value = 187; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_COMMA"; member.value = 188; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_MINUS"; member.value = 189; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_PERIOD"; member.value = 190; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_2"; member.value = 191; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_3"; member.value = 192; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_4"; member.value = 219; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_5"; member.value = 220; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_6"; member.value = 221; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_7"; member.value = 222; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_8"; member.value = 223; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_AX"; member.value = 225; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_102"; member.value = 226; }
-				{ EnumMember& member = e.members.emplace(); member.name = "ICO_HELP"; member.value = 227; }
-				{ EnumMember& member = e.members.emplace(); member.name = "ICO_00"; member.value = 228; }
-				{ EnumMember& member = e.members.emplace(); member.name = "PROCESSKEY"; member.value = 229; }
-				{ EnumMember& member = e.members.emplace(); member.name = "ICO_CLEAR"; member.value = 230; }
-				{ EnumMember& member = e.members.emplace(); member.name = "PACKET"; member.value = 231; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_RESET"; member.value = 233; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_JUMP"; member.value = 234; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_PA1"; member.value = 235; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_PA2"; member.value = 236; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_PA3"; member.value = 237; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_WSCTRL"; member.value = 238; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_CUSEL"; member.value = 239; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_ATTN"; member.value = 240; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_FINISH"; member.value = 241; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_COPY"; member.value = 242; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_AUTO"; member.value = 243; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_ENLW"; member.value = 244; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_BACKTAB"; member.value = 245; }
-				{ EnumMember& member = e.members.emplace(); member.name = "ATTN"; member.value = 246; }
-				{ EnumMember& member = e.members.emplace(); member.name = "CRSEL"; member.value = 247; }
-				{ EnumMember& member = e.members.emplace(); member.name = "EXSEL"; member.value = 248; }
-				{ EnumMember& member = e.members.emplace(); member.name = "EREOF"; member.value = 249; }
-				{ EnumMember& member = e.members.emplace(); member.name = "PLAY"; member.value = 250; }
-				{ EnumMember& member = e.members.emplace(); member.name = "ZOOM"; member.value = 251; }
-				{ EnumMember& member = e.members.emplace(); member.name = "NONAME"; member.value = 252; }
-				{ EnumMember& member = e.members.emplace(); member.name = "PA1"; member.value = 253; }
-				{ EnumMember& member = e.members.emplace(); member.name = "OEM_CLEAR"; member.value = 254; }
-				{ EnumMember& member = e.members.emplace(); member.name = "A"; member.value = 65; }
-				{ EnumMember& member = e.members.emplace(); member.name = "B"; member.value = 66; }
-				{ EnumMember& member = e.members.emplace(); member.name = "C"; member.value = 67; }
-				{ EnumMember& member = e.members.emplace(); member.name = "D"; member.value = 68; }
-				{ EnumMember& member = e.members.emplace(); member.name = "E"; member.value = 69; }
-				{ EnumMember& member = e.members.emplace(); member.name = "F"; member.value = 70; }
-				{ EnumMember& member = e.members.emplace(); member.name = "G"; member.value = 71; }
-				{ EnumMember& member = e.members.emplace(); member.name = "H"; member.value = 72; }
-				{ EnumMember& member = e.members.emplace(); member.name = "I"; member.value = 73; }
-				{ EnumMember& member = e.members.emplace(); member.name = "J"; member.value = 74; }
-				{ EnumMember& member = e.members.emplace(); member.name = "K"; member.value = 75; }
-				{ EnumMember& member = e.members.emplace(); member.name = "L"; member.value = 76; }
-				{ EnumMember& member = e.members.emplace(); member.name = "M"; member.value = 77; }
-				{ EnumMember& member = e.members.emplace(); member.name = "N"; member.value = 78; }
-				{ EnumMember& member = e.members.emplace(); member.name = "O"; member.value = 79; }
-				{ EnumMember& member = e.members.emplace(); member.name = "P"; member.value = 80; }
-				{ EnumMember& member = e.members.emplace(); member.name = "Q"; member.value = 81; }
-				{ EnumMember& member = e.members.emplace(); member.name = "R"; member.value = 82; }
-				{ EnumMember& member = e.members.emplace(); member.name = "S"; member.value = 83; }
-				{ EnumMember& member = e.members.emplace(); member.name = "T"; member.value = 84; }
-				{ EnumMember& member = e.members.emplace(); member.name = "U"; member.value = 85; }
-				{ EnumMember& member = e.members.emplace(); member.name = "V"; member.value = 86; }
-				{ EnumMember& member = e.members.emplace(); member.name = "W"; member.value = 87; }
-				{ EnumMember& member = e.members.emplace(); member.name = "X"; member.value = 88; }
-				{ EnumMember& member = e.members.emplace(); member.name = "Y"; member.value = 89; }
-				{ EnumMember& member = e.members.emplace(); member.name = "Z"; member.value = 90; }
-				{ EnumMember& member = e.members.emplace(); member.name = "INVALID"; member.value = 0; }
-				{ EnumMember& member = e.members.emplace(); member.name = "MAX"; member.value = 255; }
+		if (equalStrings(name, "Keycode")) {
+			{
+				StringView enum_name = module.makeQualifiedName(alias, "Keycode");
+				if (!hasEnum(module, enum_name)) {
+					EnumDecl& e = module.enums.emplace(module.allocator);
+					e.name = enum_name;
+					{ EnumMember& member = e.members.emplace(); member.name = "LBUTTON"; member.value = 1; }
+					{ EnumMember& member = e.members.emplace(); member.name = "RBUTTON"; member.value = 2; }
+					{ EnumMember& member = e.members.emplace(); member.name = "CANCEL"; member.value = 3; }
+					{ EnumMember& member = e.members.emplace(); member.name = "MBUTTON"; member.value = 4; }
+					{ EnumMember& member = e.members.emplace(); member.name = "BACKSPACE"; member.value = 8; }
+					{ EnumMember& member = e.members.emplace(); member.name = "TAB"; member.value = 9; }
+					{ EnumMember& member = e.members.emplace(); member.name = "CLEAR"; member.value = 12; }
+					{ EnumMember& member = e.members.emplace(); member.name = "RETURN"; member.value = 13; }
+					{ EnumMember& member = e.members.emplace(); member.name = "SHIFT"; member.value = 16; }
+					{ EnumMember& member = e.members.emplace(); member.name = "CTRL"; member.value = 17; }
+					{ EnumMember& member = e.members.emplace(); member.name = "ALT"; member.value = 18; }
+					{ EnumMember& member = e.members.emplace(); member.name = "PAUSE"; member.value = 19; }
+					{ EnumMember& member = e.members.emplace(); member.name = "CAPITAL"; member.value = 20; }
+					{ EnumMember& member = e.members.emplace(); member.name = "KANA"; member.value = 21; }
+					{ EnumMember& member = e.members.emplace(); member.name = "HANGEUL"; member.value = 21; }
+					{ EnumMember& member = e.members.emplace(); member.name = "HANGUL"; member.value = 21; }
+					{ EnumMember& member = e.members.emplace(); member.name = "JUNJA"; member.value = 23; }
+					{ EnumMember& member = e.members.emplace(); member.name = "FINAL"; member.value = 24; }
+					{ EnumMember& member = e.members.emplace(); member.name = "HANJA"; member.value = 25; }
+					{ EnumMember& member = e.members.emplace(); member.name = "KANJI"; member.value = 25; }
+					{ EnumMember& member = e.members.emplace(); member.name = "ESCAPE"; member.value = 27; }
+					{ EnumMember& member = e.members.emplace(); member.name = "CONVERT"; member.value = 28; }
+					{ EnumMember& member = e.members.emplace(); member.name = "NONCONVERT"; member.value = 29; }
+					{ EnumMember& member = e.members.emplace(); member.name = "ACCEPT"; member.value = 30; }
+					{ EnumMember& member = e.members.emplace(); member.name = "MODECHANGE"; member.value = 31; }
+					{ EnumMember& member = e.members.emplace(); member.name = "SPACE"; member.value = 32; }
+					{ EnumMember& member = e.members.emplace(); member.name = "PAGEUP"; member.value = 33; }
+					{ EnumMember& member = e.members.emplace(); member.name = "PAGEDOWN"; member.value = 34; }
+					{ EnumMember& member = e.members.emplace(); member.name = "END"; member.value = 35; }
+					{ EnumMember& member = e.members.emplace(); member.name = "HOME"; member.value = 36; }
+					{ EnumMember& member = e.members.emplace(); member.name = "LEFT"; member.value = 37; }
+					{ EnumMember& member = e.members.emplace(); member.name = "UP"; member.value = 38; }
+					{ EnumMember& member = e.members.emplace(); member.name = "RIGHT"; member.value = 39; }
+					{ EnumMember& member = e.members.emplace(); member.name = "DOWN"; member.value = 40; }
+					{ EnumMember& member = e.members.emplace(); member.name = "SELECT"; member.value = 41; }
+					{ EnumMember& member = e.members.emplace(); member.name = "PRINT"; member.value = 42; }
+					{ EnumMember& member = e.members.emplace(); member.name = "EXECUTE"; member.value = 43; }
+					{ EnumMember& member = e.members.emplace(); member.name = "SNAPSHOT"; member.value = 44; }
+					{ EnumMember& member = e.members.emplace(); member.name = "INSERT"; member.value = 45; }
+					{ EnumMember& member = e.members.emplace(); member.name = "DEL"; member.value = 46; }
+					{ EnumMember& member = e.members.emplace(); member.name = "HELP"; member.value = 47; }
+					{ EnumMember& member = e.members.emplace(); member.name = "LWIN"; member.value = 91; }
+					{ EnumMember& member = e.members.emplace(); member.name = "RWIN"; member.value = 92; }
+					{ EnumMember& member = e.members.emplace(); member.name = "APPS"; member.value = 93; }
+					{ EnumMember& member = e.members.emplace(); member.name = "SLEEP"; member.value = 95; }
+					{ EnumMember& member = e.members.emplace(); member.name = "NUMPAD0"; member.value = 96; }
+					{ EnumMember& member = e.members.emplace(); member.name = "NUMPAD1"; member.value = 97; }
+					{ EnumMember& member = e.members.emplace(); member.name = "NUMPAD2"; member.value = 98; }
+					{ EnumMember& member = e.members.emplace(); member.name = "NUMPAD3"; member.value = 99; }
+					{ EnumMember& member = e.members.emplace(); member.name = "NUMPAD4"; member.value = 100; }
+					{ EnumMember& member = e.members.emplace(); member.name = "NUMPAD5"; member.value = 101; }
+					{ EnumMember& member = e.members.emplace(); member.name = "NUMPAD6"; member.value = 102; }
+					{ EnumMember& member = e.members.emplace(); member.name = "NUMPAD7"; member.value = 103; }
+					{ EnumMember& member = e.members.emplace(); member.name = "NUMPAD8"; member.value = 104; }
+					{ EnumMember& member = e.members.emplace(); member.name = "NUMPAD9"; member.value = 105; }
+					{ EnumMember& member = e.members.emplace(); member.name = "MULTIPLY"; member.value = 106; }
+					{ EnumMember& member = e.members.emplace(); member.name = "ADD"; member.value = 107; }
+					{ EnumMember& member = e.members.emplace(); member.name = "SEPARATOR"; member.value = 108; }
+					{ EnumMember& member = e.members.emplace(); member.name = "SUBTRACT"; member.value = 109; }
+					{ EnumMember& member = e.members.emplace(); member.name = "DECIMAL"; member.value = 110; }
+					{ EnumMember& member = e.members.emplace(); member.name = "DIVIDE"; member.value = 111; }
+					{ EnumMember& member = e.members.emplace(); member.name = "F1"; member.value = 112; }
+					{ EnumMember& member = e.members.emplace(); member.name = "F2"; member.value = 113; }
+					{ EnumMember& member = e.members.emplace(); member.name = "F3"; member.value = 114; }
+					{ EnumMember& member = e.members.emplace(); member.name = "F4"; member.value = 115; }
+					{ EnumMember& member = e.members.emplace(); member.name = "F5"; member.value = 116; }
+					{ EnumMember& member = e.members.emplace(); member.name = "F6"; member.value = 117; }
+					{ EnumMember& member = e.members.emplace(); member.name = "F7"; member.value = 118; }
+					{ EnumMember& member = e.members.emplace(); member.name = "F8"; member.value = 119; }
+					{ EnumMember& member = e.members.emplace(); member.name = "F9"; member.value = 120; }
+					{ EnumMember& member = e.members.emplace(); member.name = "F10"; member.value = 121; }
+					{ EnumMember& member = e.members.emplace(); member.name = "F11"; member.value = 122; }
+					{ EnumMember& member = e.members.emplace(); member.name = "F12"; member.value = 123; }
+					{ EnumMember& member = e.members.emplace(); member.name = "F13"; member.value = 124; }
+					{ EnumMember& member = e.members.emplace(); member.name = "F14"; member.value = 125; }
+					{ EnumMember& member = e.members.emplace(); member.name = "F15"; member.value = 126; }
+					{ EnumMember& member = e.members.emplace(); member.name = "F16"; member.value = 127; }
+					{ EnumMember& member = e.members.emplace(); member.name = "F17"; member.value = 128; }
+					{ EnumMember& member = e.members.emplace(); member.name = "F18"; member.value = 129; }
+					{ EnumMember& member = e.members.emplace(); member.name = "F19"; member.value = 130; }
+					{ EnumMember& member = e.members.emplace(); member.name = "F20"; member.value = 131; }
+					{ EnumMember& member = e.members.emplace(); member.name = "F21"; member.value = 132; }
+					{ EnumMember& member = e.members.emplace(); member.name = "F22"; member.value = 133; }
+					{ EnumMember& member = e.members.emplace(); member.name = "F23"; member.value = 134; }
+					{ EnumMember& member = e.members.emplace(); member.name = "F24"; member.value = 135; }
+					{ EnumMember& member = e.members.emplace(); member.name = "NUMLOCK"; member.value = 144; }
+					{ EnumMember& member = e.members.emplace(); member.name = "SCROLL"; member.value = 145; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_NEC_EQUAL"; member.value = 146; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_FJ_JISHO"; member.value = 146; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_FJ_MASSHOU"; member.value = 147; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_FJ_TOUROKU"; member.value = 148; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_FJ_LOYA"; member.value = 149; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_FJ_ROYA"; member.value = 150; }
+					{ EnumMember& member = e.members.emplace(); member.name = "LSHIFT"; member.value = 160; }
+					{ EnumMember& member = e.members.emplace(); member.name = "RSHIFT"; member.value = 161; }
+					{ EnumMember& member = e.members.emplace(); member.name = "LCTRL"; member.value = 162; }
+					{ EnumMember& member = e.members.emplace(); member.name = "RCTRL"; member.value = 163; }
+					{ EnumMember& member = e.members.emplace(); member.name = "LALT"; member.value = 164; }
+					{ EnumMember& member = e.members.emplace(); member.name = "RALT"; member.value = 165; }
+					{ EnumMember& member = e.members.emplace(); member.name = "BROWSER_BACK"; member.value = 166; }
+					{ EnumMember& member = e.members.emplace(); member.name = "BROWSER_FORWARD"; member.value = 167; }
+					{ EnumMember& member = e.members.emplace(); member.name = "BROWSER_REFRESH"; member.value = 168; }
+					{ EnumMember& member = e.members.emplace(); member.name = "BROWSER_STOP"; member.value = 169; }
+					{ EnumMember& member = e.members.emplace(); member.name = "BROWSER_SEARCH"; member.value = 170; }
+					{ EnumMember& member = e.members.emplace(); member.name = "BROWSER_FAVORITES"; member.value = 171; }
+					{ EnumMember& member = e.members.emplace(); member.name = "BROWSER_HOME"; member.value = 172; }
+					{ EnumMember& member = e.members.emplace(); member.name = "VOLUME_MUTE"; member.value = 173; }
+					{ EnumMember& member = e.members.emplace(); member.name = "VOLUME_DOWN"; member.value = 174; }
+					{ EnumMember& member = e.members.emplace(); member.name = "VOLUME_UP"; member.value = 175; }
+					{ EnumMember& member = e.members.emplace(); member.name = "MEDIA_NEXT_TRACK"; member.value = 176; }
+					{ EnumMember& member = e.members.emplace(); member.name = "MEDIA_PREV_TRACK"; member.value = 177; }
+					{ EnumMember& member = e.members.emplace(); member.name = "MEDIA_STOP"; member.value = 178; }
+					{ EnumMember& member = e.members.emplace(); member.name = "MEDIA_PLAY_PAUSE"; member.value = 179; }
+					{ EnumMember& member = e.members.emplace(); member.name = "LAUNCH_MAIL"; member.value = 180; }
+					{ EnumMember& member = e.members.emplace(); member.name = "LAUNCH_MEDIA_SELECT"; member.value = 181; }
+					{ EnumMember& member = e.members.emplace(); member.name = "LAUNCH_APP1"; member.value = 182; }
+					{ EnumMember& member = e.members.emplace(); member.name = "LAUNCH_APP2"; member.value = 183; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_1"; member.value = 186; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_PLUS"; member.value = 187; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_COMMA"; member.value = 188; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_MINUS"; member.value = 189; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_PERIOD"; member.value = 190; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_2"; member.value = 191; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_3"; member.value = 192; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_4"; member.value = 219; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_5"; member.value = 220; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_6"; member.value = 221; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_7"; member.value = 222; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_8"; member.value = 223; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_AX"; member.value = 225; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_102"; member.value = 226; }
+					{ EnumMember& member = e.members.emplace(); member.name = "ICO_HELP"; member.value = 227; }
+					{ EnumMember& member = e.members.emplace(); member.name = "ICO_00"; member.value = 228; }
+					{ EnumMember& member = e.members.emplace(); member.name = "PROCESSKEY"; member.value = 229; }
+					{ EnumMember& member = e.members.emplace(); member.name = "ICO_CLEAR"; member.value = 230; }
+					{ EnumMember& member = e.members.emplace(); member.name = "PACKET"; member.value = 231; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_RESET"; member.value = 233; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_JUMP"; member.value = 234; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_PA1"; member.value = 235; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_PA2"; member.value = 236; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_PA3"; member.value = 237; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_WSCTRL"; member.value = 238; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_CUSEL"; member.value = 239; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_ATTN"; member.value = 240; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_FINISH"; member.value = 241; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_COPY"; member.value = 242; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_AUTO"; member.value = 243; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_ENLW"; member.value = 244; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_BACKTAB"; member.value = 245; }
+					{ EnumMember& member = e.members.emplace(); member.name = "ATTN"; member.value = 246; }
+					{ EnumMember& member = e.members.emplace(); member.name = "CRSEL"; member.value = 247; }
+					{ EnumMember& member = e.members.emplace(); member.name = "EXSEL"; member.value = 248; }
+					{ EnumMember& member = e.members.emplace(); member.name = "EREOF"; member.value = 249; }
+					{ EnumMember& member = e.members.emplace(); member.name = "PLAY"; member.value = 250; }
+					{ EnumMember& member = e.members.emplace(); member.name = "ZOOM"; member.value = 251; }
+					{ EnumMember& member = e.members.emplace(); member.name = "NONAME"; member.value = 252; }
+					{ EnumMember& member = e.members.emplace(); member.name = "PA1"; member.value = 253; }
+					{ EnumMember& member = e.members.emplace(); member.name = "OEM_CLEAR"; member.value = 254; }
+					{ EnumMember& member = e.members.emplace(); member.name = "A"; member.value = 65; }
+					{ EnumMember& member = e.members.emplace(); member.name = "B"; member.value = 66; }
+					{ EnumMember& member = e.members.emplace(); member.name = "C"; member.value = 67; }
+					{ EnumMember& member = e.members.emplace(); member.name = "D"; member.value = 68; }
+					{ EnumMember& member = e.members.emplace(); member.name = "E"; member.value = 69; }
+					{ EnumMember& member = e.members.emplace(); member.name = "F"; member.value = 70; }
+					{ EnumMember& member = e.members.emplace(); member.name = "G"; member.value = 71; }
+					{ EnumMember& member = e.members.emplace(); member.name = "H"; member.value = 72; }
+					{ EnumMember& member = e.members.emplace(); member.name = "I"; member.value = 73; }
+					{ EnumMember& member = e.members.emplace(); member.name = "J"; member.value = 74; }
+					{ EnumMember& member = e.members.emplace(); member.name = "K"; member.value = 75; }
+					{ EnumMember& member = e.members.emplace(); member.name = "L"; member.value = 76; }
+					{ EnumMember& member = e.members.emplace(); member.name = "M"; member.value = 77; }
+					{ EnumMember& member = e.members.emplace(); member.name = "N"; member.value = 78; }
+					{ EnumMember& member = e.members.emplace(); member.name = "O"; member.value = 79; }
+					{ EnumMember& member = e.members.emplace(); member.name = "P"; member.value = 80; }
+					{ EnumMember& member = e.members.emplace(); member.name = "Q"; member.value = 81; }
+					{ EnumMember& member = e.members.emplace(); member.name = "R"; member.value = 82; }
+					{ EnumMember& member = e.members.emplace(); member.name = "S"; member.value = 83; }
+					{ EnumMember& member = e.members.emplace(); member.name = "T"; member.value = 84; }
+					{ EnumMember& member = e.members.emplace(); member.name = "U"; member.value = 85; }
+					{ EnumMember& member = e.members.emplace(); member.name = "V"; member.value = 86; }
+					{ EnumMember& member = e.members.emplace(); member.name = "W"; member.value = 87; }
+					{ EnumMember& member = e.members.emplace(); member.name = "X"; member.value = 88; }
+					{ EnumMember& member = e.members.emplace(); member.name = "Y"; member.value = 89; }
+					{ EnumMember& member = e.members.emplace(); member.name = "Z"; member.value = 90; }
+					{ EnumMember& member = e.members.emplace(); member.name = "INVALID"; member.value = 0; }
+					{ EnumMember& member = e.members.emplace(); member.name = "MAX"; member.value = 255; }
+				}
 			}
+			return true;
 		}
-		{
-			StringView enum_name = module.makeQualifiedName(alias, "GrassRotationMode");
-			if (!hasEnum(module, enum_name)) {
-				EnumDecl& e = module.enums.emplace(module.allocator);
-				e.name = enum_name;
-				{ EnumMember& member = e.members.emplace(); member.name = "Y_UP"; member.value = 0; }
-				{ EnumMember& member = e.members.emplace(); member.name = "ALL_RANDOM"; member.value = 1; }
-				{ EnumMember& member = e.members.emplace(); member.name = "COUNT"; member.value = 2; }
+		if (equalStrings(name, "InputDeviceType")) {
+			{
+				StringView enum_name = module.makeQualifiedName(alias, "InputDeviceType");
+				if (!hasEnum(module, enum_name)) {
+					EnumDecl& e = module.enums.emplace(module.allocator);
+					e.name = enum_name;
+					{ EnumMember& member = e.members.emplace(); member.name = "MOUSE"; member.value = 0; }
+					{ EnumMember& member = e.members.emplace(); member.name = "KEYBOARD"; member.value = 1; }
+					{ EnumMember& member = e.members.emplace(); member.name = "GAMEPAD"; member.value = 2; }
+				}
 			}
+			return true;
 		}
-		{
-			StringView enum_name = module.makeQualifiedName(alias, "EventType");
-			if (!hasEnum(module, enum_name)) {
-				EnumDecl& e = module.enums.emplace(module.allocator);
-				e.name = enum_name;
-				{ EnumMember& member = e.members.emplace(); member.name = "MOUSE_DOWN"; member.value = 0; }
-				{ EnumMember& member = e.members.emplace(); member.name = "MOUSE_UP"; member.value = 1; }
-				{ EnumMember& member = e.members.emplace(); member.name = "MOUSE_MOVE"; member.value = 2; }
-				{ EnumMember& member = e.members.emplace(); member.name = "MOUSE_WHEEL"; member.value = 3; }
-				{ EnumMember& member = e.members.emplace(); member.name = "KEY_DOWN"; member.value = 4; }
-				{ EnumMember& member = e.members.emplace(); member.name = "KEY_UP"; member.value = 5; }
-				{ EnumMember& member = e.members.emplace(); member.name = "TEXT_INPUT"; member.value = 6; }
-				{ EnumMember& member = e.members.emplace(); member.name = "ACTION"; member.value = 7; }
-				{ EnumMember& member = e.members.emplace(); member.name = "MOUSE_ENTER"; member.value = 8; }
-				{ EnumMember& member = e.members.emplace(); member.name = "MOUSE_LEAVE"; member.value = 9; }
-				{ EnumMember& member = e.members.emplace(); member.name = "INVALID"; member.value = 10; }
+		if (equalStrings(name, "InputEventType")) {
+			{
+				StringView enum_name = module.makeQualifiedName(alias, "InputEventType");
+				if (!hasEnum(module, enum_name)) {
+					EnumDecl& e = module.enums.emplace(module.allocator);
+					e.name = enum_name;
+					{ EnumMember& member = e.members.emplace(); member.name = "BUTTON"; member.value = 0; }
+					{ EnumMember& member = e.members.emplace(); member.name = "AXIS"; member.value = 1; }
+					{ EnumMember& member = e.members.emplace(); member.name = "MOUSE_WHEEL"; member.value = 2; }
+					{ EnumMember& member = e.members.emplace(); member.name = "TEXT_INPUT"; member.value = 3; }
+					{ EnumMember& member = e.members.emplace(); member.name = "DEVICE_ADDED"; member.value = 4; }
+					{ EnumMember& member = e.members.emplace(); member.name = "DEVICE_REMOVED"; member.value = 5; }
+				}
 			}
+			return true;
 		}
-		{
-			StringView enum_name = module.makeQualifiedName(alias, "D6Motion");
-			if (!hasEnum(module, enum_name)) {
-				EnumDecl& e = module.enums.emplace(module.allocator);
-				e.name = enum_name;
-				{ EnumMember& member = e.members.emplace(); member.name = "LOCKED"; member.value = 0; }
-				{ EnumMember& member = e.members.emplace(); member.name = "LIMITED"; member.value = 1; }
-				{ EnumMember& member = e.members.emplace(); member.name = "FREE"; member.value = 2; }
+		if (equalStrings(name, "GrassRotationMode")) {
+			{
+				StringView enum_name = module.makeQualifiedName(alias, "GrassRotationMode");
+				if (!hasEnum(module, enum_name)) {
+					EnumDecl& e = module.enums.emplace(module.allocator);
+					e.name = enum_name;
+					{ EnumMember& member = e.members.emplace(); member.name = "Y_UP"; member.value = 0; }
+					{ EnumMember& member = e.members.emplace(); member.name = "ALL_RANDOM"; member.value = 1; }
+					{ EnumMember& member = e.members.emplace(); member.name = "COUNT"; member.value = 2; }
+				}
 			}
+			return true;
 		}
-		{
-			StringView enum_name = module.makeQualifiedName(alias, "WheelSlot");
-			if (!hasEnum(module, enum_name)) {
-				EnumDecl& e = module.enums.emplace(module.allocator);
-				e.name = enum_name;
-				{ EnumMember& member = e.members.emplace(); member.name = "FRONT_LEFT"; member.value = 0; }
-				{ EnumMember& member = e.members.emplace(); member.name = "FRONT_RIGHT"; member.value = 1; }
-				{ EnumMember& member = e.members.emplace(); member.name = "REAR_LEFT"; member.value = 2; }
-				{ EnumMember& member = e.members.emplace(); member.name = "REAR_RIGHT"; member.value = 3; }
+		if (equalStrings(name, "EventType")) {
+			{
+				StringView enum_name = module.makeQualifiedName(alias, "EventType");
+				if (!hasEnum(module, enum_name)) {
+					EnumDecl& e = module.enums.emplace(module.allocator);
+					e.name = enum_name;
+					{ EnumMember& member = e.members.emplace(); member.name = "MOUSE_DOWN"; member.value = 0; }
+					{ EnumMember& member = e.members.emplace(); member.name = "MOUSE_UP"; member.value = 1; }
+					{ EnumMember& member = e.members.emplace(); member.name = "MOUSE_MOVE"; member.value = 2; }
+					{ EnumMember& member = e.members.emplace(); member.name = "MOUSE_WHEEL"; member.value = 3; }
+					{ EnumMember& member = e.members.emplace(); member.name = "KEY_DOWN"; member.value = 4; }
+					{ EnumMember& member = e.members.emplace(); member.name = "KEY_UP"; member.value = 5; }
+					{ EnumMember& member = e.members.emplace(); member.name = "TEXT_INPUT"; member.value = 6; }
+					{ EnumMember& member = e.members.emplace(); member.name = "ACTION"; member.value = 7; }
+					{ EnumMember& member = e.members.emplace(); member.name = "MOUSE_ENTER"; member.value = 8; }
+					{ EnumMember& member = e.members.emplace(); member.name = "MOUSE_LEAVE"; member.value = 9; }
+					{ EnumMember& member = e.members.emplace(); member.name = "INVALID"; member.value = 10; }
+				}
 			}
+			return true;
 		}
-		{
-			StringView enum_name = module.makeQualifiedName(alias, "DynamicType");
-			if (!hasEnum(module, enum_name)) {
-				EnumDecl& e = module.enums.emplace(module.allocator);
-				e.name = enum_name;
-				{ EnumMember& member = e.members.emplace(); member.name = "STATIC"; member.value = 0; }
-				{ EnumMember& member = e.members.emplace(); member.name = "DYNAMIC"; member.value = 1; }
-				{ EnumMember& member = e.members.emplace(); member.name = "KINEMATIC"; member.value = 2; }
+		if (equalStrings(name, "D6Motion")) {
+			{
+				StringView enum_name = module.makeQualifiedName(alias, "D6Motion");
+				if (!hasEnum(module, enum_name)) {
+					EnumDecl& e = module.enums.emplace(module.allocator);
+					e.name = enum_name;
+					{ EnumMember& member = e.members.emplace(); member.name = "LOCKED"; member.value = 0; }
+					{ EnumMember& member = e.members.emplace(); member.name = "LIMITED"; member.value = 1; }
+					{ EnumMember& member = e.members.emplace(); member.name = "FREE"; member.value = 2; }
+				}
 			}
+			return true;
 		}
+		if (equalStrings(name, "WheelSlot")) {
+			{
+				StringView enum_name = module.makeQualifiedName(alias, "WheelSlot");
+				if (!hasEnum(module, enum_name)) {
+					EnumDecl& e = module.enums.emplace(module.allocator);
+					e.name = enum_name;
+					{ EnumMember& member = e.members.emplace(); member.name = "FRONT_LEFT"; member.value = 0; }
+					{ EnumMember& member = e.members.emplace(); member.name = "FRONT_RIGHT"; member.value = 1; }
+					{ EnumMember& member = e.members.emplace(); member.name = "REAR_LEFT"; member.value = 2; }
+					{ EnumMember& member = e.members.emplace(); member.name = "REAR_RIGHT"; member.value = 3; }
+				}
+			}
+			return true;
+		}
+		if (equalStrings(name, "DynamicType")) {
+			{
+				StringView enum_name = module.makeQualifiedName(alias, "DynamicType");
+				if (!hasEnum(module, enum_name)) {
+					EnumDecl& e = module.enums.emplace(module.allocator);
+					e.name = enum_name;
+					{ EnumMember& member = e.members.emplace(); member.name = "STATIC"; member.value = 0; }
+					{ EnumMember& member = e.members.emplace(); member.name = "DYNAMIC"; member.value = 1; }
+					{ EnumMember& member = e.members.emplace(); member.name = "KINEMATIC"; member.value = 2; }
+				}
+			}
+			return true;
+		}
+		return false;
 	}
 	
 	static bool registerGeneratedEngineImport(Module& module, World* world, StringView path, StringView alias) {
-		if (!startsWith(path, "engine:") || alias.empty()) return false;
+		if (!startsWith(path, "engine:")) return false;
 		StringView name = path.withoutLeft(7);
-		registerGeneratedMetaEnums(module, alias);
+		if (registerGeneratedMetaEnum(module, name, alias)) return true;
+		if (alias.empty()) return false;
 		if (equalStrings(name, "entity")) {
 			nativeType(module, makeEngineName(module, alias, "Entity"), "engine:entity/Entity");
 			{
@@ -1586,25 +4581,58 @@ namespace Lumix::LumScript::generated {
 				return_type.nullable = true;
 				addNativeFunction(module, module.makeQualifiedName(alias, "findByName"), return_type, Span<const TypeRef>(params, lengthOf(params)), &lumscript_world_findByName);
 			}
-			{
-				TypeRef params[] = { nativeType(module, makeEngineName(module, alias, "World"), "engine:world/World"), nativeType(module, makeEngineName(module, "entity", "Entity"), "engine:entity/Entity"), TypeRef(TypeRef::STRUCT, "Vec3", -1) };
-				addNativeFunction(module, module.makeQualifiedName(alias, "setPosition"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_world_setPosition);
-				addNativeFunction(module, module.makeQualifiedName(alias, "setScale"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_world_setScale);
-			}
-			{
-				TypeRef params[] = { nativeType(module, makeEngineName(module, alias, "World"), "engine:world/World"), nativeType(module, makeEngineName(module, "entity", "Entity"), "engine:entity/Entity") };
-				addNativeFunction(module, module.makeQualifiedName(alias, "getPosition"), TypeRef(TypeRef::STRUCT, "Vec3", -1), Span<const TypeRef>(params, lengthOf(params)), &lumscript_world_getPosition);
-				addNativeFunction(module, module.makeQualifiedName(alias, "getScale"), TypeRef(TypeRef::STRUCT, "Vec3", -1), Span<const TypeRef>(params, lengthOf(params)), &lumscript_world_getScale);
-			}
-			{
-				TypeRef params[] = { nativeType(module, makeEngineName(module, alias, "World"), "engine:world/World"), nativeType(module, makeEngineName(module, "entity", "Entity"), "engine:entity/Entity"), TypeRef(TypeRef::STRUCT, "Quat", -1) };
-				addNativeFunction(module, module.makeQualifiedName(alias, "setRotation"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_world_setRotation);
-			}
-			{
-				TypeRef params[] = { nativeType(module, makeEngineName(module, alias, "World"), "engine:world/World"), nativeType(module, makeEngineName(module, "entity", "Entity"), "engine:entity/Entity") };
-				addNativeFunction(module, module.makeQualifiedName(alias, "getRotation"), TypeRef(TypeRef::STRUCT, "Quat", -1), Span<const TypeRef>(params, lengthOf(params)), &lumscript_world_getRotation);
-			}
 			return true;
+		}
+		if (equalStrings(name, "property_animator")) {
+			nativeType(module, makeEngineName(module, "entity", "Entity"), "engine:entity/Entity");
+			nativeType(module, makeEngineName(module, alias, "PropertyAnimator"), "engine:property_animator/PropertyAnimator");
+			bool registered = false;
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "PropertyAnimator"), "engine:property_animator/PropertyAnimator"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "isPropertyAnimatorEnabled"), TypeRef(TypeRef::BOOL), Span<const TypeRef>(params, lengthOf(params)), &lumscript_property_animator_isPropertyAnimatorEnabled_0, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "PropertyAnimator"), "engine:property_animator/PropertyAnimator"),
+					TypeRef(TypeRef::BOOL),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "enablePropertyAnimator"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_property_animator_enablePropertyAnimator_1, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "PropertyAnimator"), "engine:property_animator/PropertyAnimator"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getPropertyAnimatorLooped"), TypeRef(TypeRef::BOOL), Span<const TypeRef>(params, lengthOf(params)), &lumscript_property_animator_getPropertyAnimatorLooped_2, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "PropertyAnimator"), "engine:property_animator/PropertyAnimator"),
+					TypeRef(TypeRef::BOOL),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setPropertyAnimatorLooped"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_property_animator_setPropertyAnimatorLooped_3, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "PropertyAnimator"), "engine:property_animator/PropertyAnimator"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getPropertyAnimatorAnimation"), TypeRef(TypeRef::STRING), Span<const TypeRef>(params, lengthOf(params)), &lumscript_property_animator_getPropertyAnimatorAnimation_4, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "PropertyAnimator"), "engine:property_animator/PropertyAnimator"),
+					TypeRef(TypeRef::STRING),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setPropertyAnimatorAnimation"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_property_animator_setPropertyAnimatorAnimation_5, makeContext(module, world));
+				registered = true;
+			}
+			return registered;
 		}
 		if (equalStrings(name, "animator")) {
 			nativeType(module, makeEngineName(module, "entity", "Entity"), "engine:entity/Entity");
@@ -1615,7 +4643,7 @@ namespace Lumix::LumScript::generated {
 					nativeType(module, module.makeQualifiedName(alias, "Animator"), "engine:animator/Animator"),
 					TypeRef(TypeRef::I32),
 				};
-				addNativeFunction(module, module.makeQualifiedName(alias, "applySet"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_animator_applySet_0, makeContext(module, world));
+				addNativeFunction(module, module.makeQualifiedName(alias, "applySet"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_animator_applySet_6, makeContext(module, world));
 				registered = true;
 			}
 			{
@@ -1624,7 +4652,7 @@ namespace Lumix::LumScript::generated {
 					TypeRef(TypeRef::I32),
 					TypeRef(TypeRef::BOOL),
 				};
-				addNativeFunction(module, module.makeQualifiedName(alias, "setBoolInput"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_animator_setBoolInput_1, makeContext(module, world));
+				addNativeFunction(module, module.makeQualifiedName(alias, "setBoolInput"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_animator_setBoolInput_7, makeContext(module, world));
 				registered = true;
 			}
 			{
@@ -1633,7 +4661,7 @@ namespace Lumix::LumScript::generated {
 					TypeRef(TypeRef::I32),
 					TypeRef(TypeRef::F32),
 				};
-				addNativeFunction(module, module.makeQualifiedName(alias, "setFloatInput"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_animator_setFloatInput_2, makeContext(module, world));
+				addNativeFunction(module, module.makeQualifiedName(alias, "setFloatInput"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_animator_setFloatInput_8, makeContext(module, world));
 				registered = true;
 			}
 			{
@@ -1642,7 +4670,7 @@ namespace Lumix::LumScript::generated {
 					TypeRef(TypeRef::I32),
 					TypeRef(TypeRef::STRUCT, "Vec3", -1),
 				};
-				addNativeFunction(module, module.makeQualifiedName(alias, "setVec3Input"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_animator_setVec3Input_3, makeContext(module, world));
+				addNativeFunction(module, module.makeQualifiedName(alias, "setVec3Input"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_animator_setVec3Input_9, makeContext(module, world));
 				registered = true;
 			}
 			{
@@ -1650,7 +4678,73 @@ namespace Lumix::LumScript::generated {
 					nativeType(module, module.makeQualifiedName(alias, "Animator"), "engine:animator/Animator"),
 					TypeRef(TypeRef::STRING),
 				};
-				addNativeFunction(module, module.makeQualifiedName(alias, "getInputIndex"), TypeRef(TypeRef::I32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_animator_getInputIndex_4, makeContext(module, world));
+				addNativeFunction(module, module.makeQualifiedName(alias, "getInputIndex"), TypeRef(TypeRef::I32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_animator_getInputIndex_10, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Animator"), "engine:animator/Animator"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getAnimatorSource"), TypeRef(TypeRef::STRING), Span<const TypeRef>(params, lengthOf(params)), &lumscript_animator_getAnimatorSource_11, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Animator"), "engine:animator/Animator"),
+					TypeRef(TypeRef::STRING),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setAnimatorSource"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_animator_setAnimatorSource_12, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Animator"), "engine:animator/Animator"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getAnimatorUseRootMotion"), TypeRef(TypeRef::BOOL), Span<const TypeRef>(params, lengthOf(params)), &lumscript_animator_getAnimatorUseRootMotion_13, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Animator"), "engine:animator/Animator"),
+					TypeRef(TypeRef::BOOL),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setAnimatorUseRootMotion"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_animator_setAnimatorUseRootMotion_14, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Animator"), "engine:animator/Animator"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getAnimatorDefaultSet"), TypeRef(TypeRef::I32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_animator_getAnimatorDefaultSet_15, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Animator"), "engine:animator/Animator"),
+					TypeRef(TypeRef::I32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setAnimatorDefaultSet"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_animator_setAnimatorDefaultSet_16, makeContext(module, world));
+				registered = true;
+			}
+			return registered;
+		}
+		if (equalStrings(name, "animable")) {
+			nativeType(module, makeEngineName(module, "entity", "Entity"), "engine:entity/Entity");
+			nativeType(module, makeEngineName(module, alias, "Animable"), "engine:animable/Animable");
+			bool registered = false;
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Animable"), "engine:animable/Animable"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getAnimableAnimation"), TypeRef(TypeRef::STRING), Span<const TypeRef>(params, lengthOf(params)), &lumscript_animable_getAnimableAnimation_17, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Animable"), "engine:animable/Animable"),
+					TypeRef(TypeRef::STRING),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setAnimableAnimation"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_animable_setAnimableAnimation_18, makeContext(module, world));
 				registered = true;
 			}
 			return registered;
@@ -1663,14 +4757,111 @@ namespace Lumix::LumScript::generated {
 				TypeRef params[] = {
 					nativeType(module, module.makeQualifiedName(alias, "AmbientSound"), "engine:ambient_sound/AmbientSound"),
 				};
-				addNativeFunction(module, module.makeQualifiedName(alias, "pause"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_ambient_sound_pause_5, makeContext(module, world));
+				addNativeFunction(module, module.makeQualifiedName(alias, "pause"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_ambient_sound_pause_19, makeContext(module, world));
 				registered = true;
 			}
 			{
 				TypeRef params[] = {
 					nativeType(module, module.makeQualifiedName(alias, "AmbientSound"), "engine:ambient_sound/AmbientSound"),
 				};
-				addNativeFunction(module, module.makeQualifiedName(alias, "resume"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_ambient_sound_resume_6, makeContext(module, world));
+				addNativeFunction(module, module.makeQualifiedName(alias, "resume"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_ambient_sound_resume_20, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "AmbientSound"), "engine:ambient_sound/AmbientSound"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getAmbientSoundClip"), TypeRef(TypeRef::STRING), Span<const TypeRef>(params, lengthOf(params)), &lumscript_ambient_sound_getAmbientSoundClip_21, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "AmbientSound"), "engine:ambient_sound/AmbientSound"),
+					TypeRef(TypeRef::STRING),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setAmbientSoundClip"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_ambient_sound_setAmbientSoundClip_22, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "AmbientSound"), "engine:ambient_sound/AmbientSound"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "isAmbientSound3D"), TypeRef(TypeRef::BOOL), Span<const TypeRef>(params, lengthOf(params)), &lumscript_ambient_sound_isAmbientSound3D_23, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "AmbientSound"), "engine:ambient_sound/AmbientSound"),
+					TypeRef(TypeRef::BOOL),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setAmbientSound3D"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_ambient_sound_setAmbientSound3D_24, makeContext(module, world));
+				registered = true;
+			}
+			return registered;
+		}
+		if (equalStrings(name, "lua_script")) {
+			nativeType(module, makeEngineName(module, "entity", "Entity"), "engine:entity/Entity");
+			nativeType(module, makeEngineName(module, alias, "Script"), "engine:lua_script/Script");
+			bool registered = false;
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Script"), "engine:lua_script/Script"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "scriptsCount"), TypeRef(TypeRef::I32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_lua_script_scripts_count_25, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Script"), "engine:lua_script/Script"),
+					TypeRef(TypeRef::I32),
+				};
+				TypeRef return_type = nativeType(module, module.makeQualifiedName(alias, "ScriptScriptArrayItem"), "engine:lua_script/ScriptScriptArrayItem");
+				return_type.nullable = true;
+				addNativeFunction(module, module.makeQualifiedName(alias, "scripts"), return_type, Span<const TypeRef>(params, lengthOf(params)), &lumscript_lua_script_scripts_item_26, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "ScriptScriptArrayItem"), "engine:lua_script/ScriptScriptArrayItem"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "isScriptEnabled"), TypeRef(TypeRef::BOOL), Span<const TypeRef>(params, lengthOf(params)), &lumscript_lua_script_scripts_isScriptEnabled_27, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "ScriptScriptArrayItem"), "engine:lua_script/ScriptScriptArrayItem"),
+					TypeRef(TypeRef::BOOL),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "enableScript"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_lua_script_scripts_enableScript_28, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "ScriptScriptArrayItem"), "engine:lua_script/ScriptScriptArrayItem"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getScriptPath"), TypeRef(TypeRef::STRING), Span<const TypeRef>(params, lengthOf(params)), &lumscript_lua_script_scripts_getScriptPath_29, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "ScriptScriptArrayItem"), "engine:lua_script/ScriptScriptArrayItem"),
+					TypeRef(TypeRef::STRING),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setScriptPath"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_lua_script_scripts_setScriptPath_30, makeContext(module, world));
+				registered = true;
+			}
+			return registered;
+		}
+		if (equalStrings(name, "lua_script_inline")) {
+			nativeType(module, makeEngineName(module, "entity", "Entity"), "engine:entity/Entity");
+			nativeType(module, makeEngineName(module, alias, "InlineScript"), "engine:lua_script_inline/InlineScript");
+			bool registered = false;
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "InlineScript"), "engine:lua_script_inline/InlineScript"),
+					TypeRef(TypeRef::STRING),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setInlineScriptCode"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_lua_script_inline_setInlineScriptCode_31, makeContext(module, world));
 				registered = true;
 			}
 			return registered;
@@ -1683,35 +4874,65 @@ namespace Lumix::LumScript::generated {
 				TypeRef params[] = {
 					nativeType(module, module.makeQualifiedName(alias, "Zone"), "engine:navmesh_zone/Zone"),
 				};
-				addNativeFunction(module, module.makeQualifiedName(alias, "load"), TypeRef(TypeRef::BOOL), Span<const TypeRef>(params, lengthOf(params)), &lumscript_navmesh_zone_load_7, makeContext(module, world));
+				addNativeFunction(module, module.makeQualifiedName(alias, "load"), TypeRef(TypeRef::BOOL), Span<const TypeRef>(params, lengthOf(params)), &lumscript_navmesh_zone_load_32, makeContext(module, world));
 				registered = true;
 			}
 			{
 				TypeRef params[] = {
 					nativeType(module, module.makeQualifiedName(alias, "Zone"), "engine:navmesh_zone/Zone"),
 				};
-				addNativeFunction(module, module.makeQualifiedName(alias, "drawCompactHeightfield"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_navmesh_zone_drawCompactHeightfield_8, makeContext(module, world));
+				addNativeFunction(module, module.makeQualifiedName(alias, "drawCompactHeightfield"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_navmesh_zone_drawCompactHeightfield_33, makeContext(module, world));
 				registered = true;
 			}
 			{
 				TypeRef params[] = {
 					nativeType(module, module.makeQualifiedName(alias, "Zone"), "engine:navmesh_zone/Zone"),
 				};
-				addNativeFunction(module, module.makeQualifiedName(alias, "drawHeightfield"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_navmesh_zone_drawHeightfield_9, makeContext(module, world));
+				addNativeFunction(module, module.makeQualifiedName(alias, "drawHeightfield"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_navmesh_zone_drawHeightfield_34, makeContext(module, world));
 				registered = true;
 			}
 			{
 				TypeRef params[] = {
 					nativeType(module, module.makeQualifiedName(alias, "Zone"), "engine:navmesh_zone/Zone"),
 				};
-				addNativeFunction(module, module.makeQualifiedName(alias, "drawContours"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_navmesh_zone_drawContours_10, makeContext(module, world));
+				addNativeFunction(module, module.makeQualifiedName(alias, "drawContours"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_navmesh_zone_drawContours_35, makeContext(module, world));
 				registered = true;
 			}
 			{
 				TypeRef params[] = {
 					nativeType(module, module.makeQualifiedName(alias, "Zone"), "engine:navmesh_zone/Zone"),
 				};
-				addNativeFunction(module, module.makeQualifiedName(alias, "saveZone"), TypeRef(TypeRef::BOOL), Span<const TypeRef>(params, lengthOf(params)), &lumscript_navmesh_zone_saveZone_11, makeContext(module, world));
+				addNativeFunction(module, module.makeQualifiedName(alias, "saveZone"), TypeRef(TypeRef::BOOL), Span<const TypeRef>(params, lengthOf(params)), &lumscript_navmesh_zone_saveZone_36, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Zone"), "engine:navmesh_zone/Zone"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getZoneAutoload"), TypeRef(TypeRef::BOOL), Span<const TypeRef>(params, lengthOf(params)), &lumscript_navmesh_zone_getZoneAutoload_37, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Zone"), "engine:navmesh_zone/Zone"),
+					TypeRef(TypeRef::BOOL),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setZoneAutoload"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_navmesh_zone_setZoneAutoload_38, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Zone"), "engine:navmesh_zone/Zone"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getZoneDetailed"), TypeRef(TypeRef::BOOL), Span<const TypeRef>(params, lengthOf(params)), &lumscript_navmesh_zone_getZoneDetailed_39, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Zone"), "engine:navmesh_zone/Zone"),
+					TypeRef(TypeRef::BOOL),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setZoneDetailed"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_navmesh_zone_setZoneDetailed_40, makeContext(module, world));
 				registered = true;
 			}
 			return registered;
@@ -1724,7 +4945,7 @@ namespace Lumix::LumScript::generated {
 				TypeRef params[] = {
 					nativeType(module, module.makeQualifiedName(alias, "Agent"), "engine:navmesh_agent/Agent"),
 				};
-				addNativeFunction(module, module.makeQualifiedName(alias, "cancelNavigation"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_navmesh_agent_cancelNavigation_12, makeContext(module, world));
+				addNativeFunction(module, module.makeQualifiedName(alias, "cancelNavigation"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_navmesh_agent_cancelNavigation_41, makeContext(module, world));
 				registered = true;
 			}
 			{
@@ -1732,7 +4953,576 @@ namespace Lumix::LumScript::generated {
 					nativeType(module, module.makeQualifiedName(alias, "Agent"), "engine:navmesh_agent/Agent"),
 					TypeRef(TypeRef::BOOL),
 				};
-				addNativeFunction(module, module.makeQualifiedName(alias, "drawPath"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_navmesh_agent_drawPath_13, makeContext(module, world));
+				addNativeFunction(module, module.makeQualifiedName(alias, "drawPath"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_navmesh_agent_drawPath_42, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Agent"), "engine:navmesh_agent/Agent"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getAgentRadius"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_navmesh_agent_getAgentRadius_43, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Agent"), "engine:navmesh_agent/Agent"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setAgentRadius"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_navmesh_agent_setAgentRadius_44, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Agent"), "engine:navmesh_agent/Agent"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getAgentHeight"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_navmesh_agent_getAgentHeight_45, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Agent"), "engine:navmesh_agent/Agent"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setAgentHeight"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_navmesh_agent_setAgentHeight_46, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Agent"), "engine:navmesh_agent/Agent"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getAgentMoveEntity"), TypeRef(TypeRef::BOOL), Span<const TypeRef>(params, lengthOf(params)), &lumscript_navmesh_agent_getAgentMoveEntity_47, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Agent"), "engine:navmesh_agent/Agent"),
+					TypeRef(TypeRef::BOOL),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setAgentMoveEntity"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_navmesh_agent_setAgentMoveEntity_48, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Agent"), "engine:navmesh_agent/Agent"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getAgentSpeed"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_navmesh_agent_getAgentSpeed_49, makeContext(module, world));
+				registered = true;
+			}
+			return registered;
+		}
+		if (equalStrings(name, "physical_heightfield")) {
+			nativeType(module, makeEngineName(module, "entity", "Entity"), "engine:entity/Entity");
+			nativeType(module, makeEngineName(module, alias, "Heightfield"), "engine:physical_heightfield/Heightfield");
+			bool registered = false;
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Heightfield"), "engine:physical_heightfield/Heightfield"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getHeightfieldSource"), TypeRef(TypeRef::STRING), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_heightfield_getHeightfieldSource_50, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Heightfield"), "engine:physical_heightfield/Heightfield"),
+					TypeRef(TypeRef::STRING),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setHeightfieldSource"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_heightfield_setHeightfieldSource_51, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Heightfield"), "engine:physical_heightfield/Heightfield"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getHeightfieldXZScale"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_heightfield_getHeightfieldXZScale_52, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Heightfield"), "engine:physical_heightfield/Heightfield"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setHeightfieldXZScale"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_heightfield_setHeightfieldXZScale_53, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Heightfield"), "engine:physical_heightfield/Heightfield"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getHeightfieldYScale"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_heightfield_getHeightfieldYScale_54, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Heightfield"), "engine:physical_heightfield/Heightfield"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setHeightfieldYScale"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_heightfield_setHeightfieldYScale_55, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Heightfield"), "engine:physical_heightfield/Heightfield"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getHeightfieldLayer"), TypeRef(TypeRef::I32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_heightfield_getHeightfieldLayer_56, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Heightfield"), "engine:physical_heightfield/Heightfield"),
+					TypeRef(TypeRef::I32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setHeightfieldLayer"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_heightfield_setHeightfieldLayer_57, makeContext(module, world));
+				registered = true;
+			}
+			return registered;
+		}
+		if (equalStrings(name, "d6_joint")) {
+			nativeType(module, makeEngineName(module, "entity", "Entity"), "engine:entity/Entity");
+			nativeType(module, makeEngineName(module, alias, "D6Joint"), "engine:d6_joint/D6Joint");
+			bool registered = false;
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "D6Joint"), "engine:d6_joint/D6Joint"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getD6JointXMotion"), TypeRef(TypeRef::I32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_d6_joint_getD6JointXMotion_58, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "D6Joint"), "engine:d6_joint/D6Joint"),
+					TypeRef(TypeRef::I32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setD6JointXMotion"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_d6_joint_setD6JointXMotion_59, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "D6Joint"), "engine:d6_joint/D6Joint"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getD6JointYMotion"), TypeRef(TypeRef::I32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_d6_joint_getD6JointYMotion_60, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "D6Joint"), "engine:d6_joint/D6Joint"),
+					TypeRef(TypeRef::I32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setD6JointYMotion"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_d6_joint_setD6JointYMotion_61, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "D6Joint"), "engine:d6_joint/D6Joint"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getD6JointZMotion"), TypeRef(TypeRef::I32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_d6_joint_getD6JointZMotion_62, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "D6Joint"), "engine:d6_joint/D6Joint"),
+					TypeRef(TypeRef::I32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setD6JointZMotion"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_d6_joint_setD6JointZMotion_63, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "D6Joint"), "engine:d6_joint/D6Joint"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getD6JointSwing1Motion"), TypeRef(TypeRef::I32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_d6_joint_getD6JointSwing1Motion_64, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "D6Joint"), "engine:d6_joint/D6Joint"),
+					TypeRef(TypeRef::I32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setD6JointSwing1Motion"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_d6_joint_setD6JointSwing1Motion_65, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "D6Joint"), "engine:d6_joint/D6Joint"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getD6JointSwing2Motion"), TypeRef(TypeRef::I32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_d6_joint_getD6JointSwing2Motion_66, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "D6Joint"), "engine:d6_joint/D6Joint"),
+					TypeRef(TypeRef::I32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setD6JointSwing2Motion"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_d6_joint_setD6JointSwing2Motion_67, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "D6Joint"), "engine:d6_joint/D6Joint"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getD6JointTwistMotion"), TypeRef(TypeRef::I32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_d6_joint_getD6JointTwistMotion_68, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "D6Joint"), "engine:d6_joint/D6Joint"),
+					TypeRef(TypeRef::I32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setD6JointTwistMotion"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_d6_joint_setD6JointTwistMotion_69, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "D6Joint"), "engine:d6_joint/D6Joint"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getD6JointLinearLimit"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_d6_joint_getD6JointLinearLimit_70, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "D6Joint"), "engine:d6_joint/D6Joint"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setD6JointLinearLimit"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_d6_joint_setD6JointLinearLimit_71, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "D6Joint"), "engine:d6_joint/D6Joint"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getD6JointDamping"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_d6_joint_getD6JointDamping_72, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "D6Joint"), "engine:d6_joint/D6Joint"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setD6JointDamping"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_d6_joint_setD6JointDamping_73, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "D6Joint"), "engine:d6_joint/D6Joint"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getD6JointStiffness"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_d6_joint_getD6JointStiffness_74, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "D6Joint"), "engine:d6_joint/D6Joint"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setD6JointStiffness"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_d6_joint_setD6JointStiffness_75, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "D6Joint"), "engine:d6_joint/D6Joint"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getD6JointRestitution"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_d6_joint_getD6JointRestitution_76, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "D6Joint"), "engine:d6_joint/D6Joint"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setD6JointRestitution"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_d6_joint_setD6JointRestitution_77, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "D6Joint"), "engine:d6_joint/D6Joint"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getD6JointConnectedBody"), nativeType(module, module.makeQualifiedName("entity", "Entity"), "engine:entity/Entity"), Span<const TypeRef>(params, lengthOf(params)), &lumscript_d6_joint_getD6JointConnectedBody_78, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "D6Joint"), "engine:d6_joint/D6Joint"),
+					nativeType(module, module.makeQualifiedName("entity", "Entity"), "engine:entity/Entity"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setD6JointConnectedBody"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_d6_joint_setD6JointConnectedBody_79, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "D6Joint"), "engine:d6_joint/D6Joint"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getD6JointAxisPosition"), TypeRef(TypeRef::STRUCT, "Vec3", -1), Span<const TypeRef>(params, lengthOf(params)), &lumscript_d6_joint_getD6JointAxisPosition_80, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "D6Joint"), "engine:d6_joint/D6Joint"),
+					TypeRef(TypeRef::STRUCT, "Vec3", -1),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setD6JointAxisPosition"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_d6_joint_setD6JointAxisPosition_81, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "D6Joint"), "engine:d6_joint/D6Joint"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getD6JointAxisDirection"), TypeRef(TypeRef::STRUCT, "Vec3", -1), Span<const TypeRef>(params, lengthOf(params)), &lumscript_d6_joint_getD6JointAxisDirection_82, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "D6Joint"), "engine:d6_joint/D6Joint"),
+					TypeRef(TypeRef::STRUCT, "Vec3", -1),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setD6JointAxisDirection"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_d6_joint_setD6JointAxisDirection_83, makeContext(module, world));
+				registered = true;
+			}
+			return registered;
+		}
+		if (equalStrings(name, "distance_joint")) {
+			nativeType(module, makeEngineName(module, "entity", "Entity"), "engine:entity/Entity");
+			nativeType(module, makeEngineName(module, alias, "DistanceJoint"), "engine:distance_joint/DistanceJoint");
+			bool registered = false;
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "DistanceJoint"), "engine:distance_joint/DistanceJoint"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getDistanceJointConnectedBody"), nativeType(module, module.makeQualifiedName("entity", "Entity"), "engine:entity/Entity"), Span<const TypeRef>(params, lengthOf(params)), &lumscript_distance_joint_getDistanceJointConnectedBody_84, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "DistanceJoint"), "engine:distance_joint/DistanceJoint"),
+					nativeType(module, module.makeQualifiedName("entity", "Entity"), "engine:entity/Entity"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setDistanceJointConnectedBody"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_distance_joint_setDistanceJointConnectedBody_85, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "DistanceJoint"), "engine:distance_joint/DistanceJoint"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getDistanceJointAxisPosition"), TypeRef(TypeRef::STRUCT, "Vec3", -1), Span<const TypeRef>(params, lengthOf(params)), &lumscript_distance_joint_getDistanceJointAxisPosition_86, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "DistanceJoint"), "engine:distance_joint/DistanceJoint"),
+					TypeRef(TypeRef::STRUCT, "Vec3", -1),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setDistanceJointAxisPosition"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_distance_joint_setDistanceJointAxisPosition_87, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "DistanceJoint"), "engine:distance_joint/DistanceJoint"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getDistanceJointDamping"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_distance_joint_getDistanceJointDamping_88, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "DistanceJoint"), "engine:distance_joint/DistanceJoint"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setDistanceJointDamping"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_distance_joint_setDistanceJointDamping_89, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "DistanceJoint"), "engine:distance_joint/DistanceJoint"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getDistanceJointStiffness"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_distance_joint_getDistanceJointStiffness_90, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "DistanceJoint"), "engine:distance_joint/DistanceJoint"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setDistanceJointStiffness"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_distance_joint_setDistanceJointStiffness_91, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "DistanceJoint"), "engine:distance_joint/DistanceJoint"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getDistanceJointTolerance"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_distance_joint_getDistanceJointTolerance_92, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "DistanceJoint"), "engine:distance_joint/DistanceJoint"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setDistanceJointTolerance"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_distance_joint_setDistanceJointTolerance_93, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "DistanceJoint"), "engine:distance_joint/DistanceJoint"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getDistanceJointLinearForce"), TypeRef(TypeRef::STRUCT, "Vec3", -1), Span<const TypeRef>(params, lengthOf(params)), &lumscript_distance_joint_getDistanceJointLinearForce_94, makeContext(module, world));
+				registered = true;
+			}
+			return registered;
+		}
+		if (equalStrings(name, "hinge_joint")) {
+			nativeType(module, makeEngineName(module, "entity", "Entity"), "engine:entity/Entity");
+			nativeType(module, makeEngineName(module, alias, "HingeJoint"), "engine:hinge_joint/HingeJoint");
+			bool registered = false;
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "HingeJoint"), "engine:hinge_joint/HingeJoint"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getHingeJointConnectedBody"), nativeType(module, module.makeQualifiedName("entity", "Entity"), "engine:entity/Entity"), Span<const TypeRef>(params, lengthOf(params)), &lumscript_hinge_joint_getHingeJointConnectedBody_95, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "HingeJoint"), "engine:hinge_joint/HingeJoint"),
+					nativeType(module, module.makeQualifiedName("entity", "Entity"), "engine:entity/Entity"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setHingeJointConnectedBody"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_hinge_joint_setHingeJointConnectedBody_96, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "HingeJoint"), "engine:hinge_joint/HingeJoint"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getHingeJointAxisPosition"), TypeRef(TypeRef::STRUCT, "Vec3", -1), Span<const TypeRef>(params, lengthOf(params)), &lumscript_hinge_joint_getHingeJointAxisPosition_97, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "HingeJoint"), "engine:hinge_joint/HingeJoint"),
+					TypeRef(TypeRef::STRUCT, "Vec3", -1),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setHingeJointAxisPosition"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_hinge_joint_setHingeJointAxisPosition_98, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "HingeJoint"), "engine:hinge_joint/HingeJoint"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getHingeJointAxisDirection"), TypeRef(TypeRef::STRUCT, "Vec3", -1), Span<const TypeRef>(params, lengthOf(params)), &lumscript_hinge_joint_getHingeJointAxisDirection_99, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "HingeJoint"), "engine:hinge_joint/HingeJoint"),
+					TypeRef(TypeRef::STRUCT, "Vec3", -1),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setHingeJointAxisDirection"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_hinge_joint_setHingeJointAxisDirection_100, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "HingeJoint"), "engine:hinge_joint/HingeJoint"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getHingeJointDamping"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_hinge_joint_getHingeJointDamping_101, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "HingeJoint"), "engine:hinge_joint/HingeJoint"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setHingeJointDamping"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_hinge_joint_setHingeJointDamping_102, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "HingeJoint"), "engine:hinge_joint/HingeJoint"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getHingeJointStiffness"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_hinge_joint_getHingeJointStiffness_103, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "HingeJoint"), "engine:hinge_joint/HingeJoint"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setHingeJointStiffness"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_hinge_joint_setHingeJointStiffness_104, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "HingeJoint"), "engine:hinge_joint/HingeJoint"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getHingeJointUseLimit"), TypeRef(TypeRef::BOOL), Span<const TypeRef>(params, lengthOf(params)), &lumscript_hinge_joint_getHingeJointUseLimit_105, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "HingeJoint"), "engine:hinge_joint/HingeJoint"),
+					TypeRef(TypeRef::BOOL),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setHingeJointUseLimit"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_hinge_joint_setHingeJointUseLimit_106, makeContext(module, world));
+				registered = true;
+			}
+			return registered;
+		}
+		if (equalStrings(name, "spherical_joint")) {
+			nativeType(module, makeEngineName(module, "entity", "Entity"), "engine:entity/Entity");
+			nativeType(module, makeEngineName(module, alias, "SphericalJoint"), "engine:spherical_joint/SphericalJoint");
+			bool registered = false;
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "SphericalJoint"), "engine:spherical_joint/SphericalJoint"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getSphericalJointConnectedBody"), nativeType(module, module.makeQualifiedName("entity", "Entity"), "engine:entity/Entity"), Span<const TypeRef>(params, lengthOf(params)), &lumscript_spherical_joint_getSphericalJointConnectedBody_107, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "SphericalJoint"), "engine:spherical_joint/SphericalJoint"),
+					nativeType(module, module.makeQualifiedName("entity", "Entity"), "engine:entity/Entity"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setSphericalJointConnectedBody"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_spherical_joint_setSphericalJointConnectedBody_108, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "SphericalJoint"), "engine:spherical_joint/SphericalJoint"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getSphericalJointAxisPosition"), TypeRef(TypeRef::STRUCT, "Vec3", -1), Span<const TypeRef>(params, lengthOf(params)), &lumscript_spherical_joint_getSphericalJointAxisPosition_109, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "SphericalJoint"), "engine:spherical_joint/SphericalJoint"),
+					TypeRef(TypeRef::STRUCT, "Vec3", -1),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setSphericalJointAxisPosition"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_spherical_joint_setSphericalJointAxisPosition_110, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "SphericalJoint"), "engine:spherical_joint/SphericalJoint"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getSphericalJointAxisDirection"), TypeRef(TypeRef::STRUCT, "Vec3", -1), Span<const TypeRef>(params, lengthOf(params)), &lumscript_spherical_joint_getSphericalJointAxisDirection_111, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "SphericalJoint"), "engine:spherical_joint/SphericalJoint"),
+					TypeRef(TypeRef::STRUCT, "Vec3", -1),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setSphericalJointAxisDirection"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_spherical_joint_setSphericalJointAxisDirection_112, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "SphericalJoint"), "engine:spherical_joint/SphericalJoint"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getSphericalJointUseLimit"), TypeRef(TypeRef::BOOL), Span<const TypeRef>(params, lengthOf(params)), &lumscript_spherical_joint_getSphericalJointUseLimit_113, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "SphericalJoint"), "engine:spherical_joint/SphericalJoint"),
+					TypeRef(TypeRef::BOOL),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setSphericalJointUseLimit"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_spherical_joint_setSphericalJointUseLimit_114, makeContext(module, world));
 				registered = true;
 			}
 			return registered;
@@ -1745,7 +5535,7 @@ namespace Lumix::LumScript::generated {
 				TypeRef params[] = {
 					nativeType(module, module.makeQualifiedName(alias, "Controller"), "engine:physical_controller/Controller"),
 				};
-				addNativeFunction(module, module.makeQualifiedName(alias, "getGravitySpeed"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_controller_getGravitySpeed_14, makeContext(module, world));
+				addNativeFunction(module, module.makeQualifiedName(alias, "getGravitySpeed"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_controller_getGravitySpeed_115, makeContext(module, world));
 				registered = true;
 			}
 			{
@@ -1753,14 +5543,14 @@ namespace Lumix::LumScript::generated {
 					nativeType(module, module.makeQualifiedName(alias, "Controller"), "engine:physical_controller/Controller"),
 					TypeRef(TypeRef::STRUCT, "Vec3", -1),
 				};
-				addNativeFunction(module, module.makeQualifiedName(alias, "move"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_controller_move_15, makeContext(module, world));
+				addNativeFunction(module, module.makeQualifiedName(alias, "move"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_controller_move_116, makeContext(module, world));
 				registered = true;
 			}
 			{
 				TypeRef params[] = {
 					nativeType(module, module.makeQualifiedName(alias, "Controller"), "engine:physical_controller/Controller"),
 				};
-				addNativeFunction(module, module.makeQualifiedName(alias, "isCollisionDown"), TypeRef(TypeRef::BOOL), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_controller_isCollisionDown_16, makeContext(module, world));
+				addNativeFunction(module, module.makeQualifiedName(alias, "isCollisionDown"), TypeRef(TypeRef::BOOL), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_controller_isCollisionDown_117, makeContext(module, world));
 				registered = true;
 			}
 			{
@@ -1768,7 +5558,97 @@ namespace Lumix::LumScript::generated {
 					nativeType(module, module.makeQualifiedName(alias, "Controller"), "engine:physical_controller/Controller"),
 					TypeRef(TypeRef::F32),
 				};
-				addNativeFunction(module, module.makeQualifiedName(alias, "resize"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_controller_resize_17, makeContext(module, world));
+				addNativeFunction(module, module.makeQualifiedName(alias, "resize"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_controller_resize_118, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Controller"), "engine:physical_controller/Controller"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getControllerLayer"), TypeRef(TypeRef::I32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_controller_getControllerLayer_119, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Controller"), "engine:physical_controller/Controller"),
+					TypeRef(TypeRef::I32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setControllerLayer"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_controller_setControllerLayer_120, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Controller"), "engine:physical_controller/Controller"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getControllerRadius"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_controller_getControllerRadius_121, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Controller"), "engine:physical_controller/Controller"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setControllerRadius"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_controller_setControllerRadius_122, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Controller"), "engine:physical_controller/Controller"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getControllerHeight"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_controller_getControllerHeight_123, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Controller"), "engine:physical_controller/Controller"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setControllerHeight"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_controller_setControllerHeight_124, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Controller"), "engine:physical_controller/Controller"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getControllerCustomGravity"), TypeRef(TypeRef::BOOL), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_controller_getControllerCustomGravity_125, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Controller"), "engine:physical_controller/Controller"),
+					TypeRef(TypeRef::BOOL),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setControllerCustomGravity"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_controller_setControllerCustomGravity_126, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Controller"), "engine:physical_controller/Controller"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getControllerCustomGravityAcceleration"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_controller_getControllerCustomGravityAcceleration_127, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Controller"), "engine:physical_controller/Controller"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setControllerCustomGravityAcceleration"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_controller_setControllerCustomGravityAcceleration_128, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Controller"), "engine:physical_controller/Controller"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getControllerUseRootMotion"), TypeRef(TypeRef::BOOL), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_controller_getControllerUseRootMotion_129, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Controller"), "engine:physical_controller/Controller"),
+					TypeRef(TypeRef::BOOL),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setControllerUseRootMotion"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_controller_setControllerUseRootMotion_130, makeContext(module, world));
 				registered = true;
 			}
 			return registered;
@@ -1781,7 +5661,7 @@ namespace Lumix::LumScript::generated {
 				TypeRef params[] = {
 					nativeType(module, module.makeQualifiedName(alias, "Actor"), "engine:rigid_actor/Actor"),
 				};
-				addNativeFunction(module, module.makeQualifiedName(alias, "putToSleep"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_putToSleep_18, makeContext(module, world));
+				addNativeFunction(module, module.makeQualifiedName(alias, "putToSleep"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_putToSleep_131, makeContext(module, world));
 				registered = true;
 			}
 			{
@@ -1790,7 +5670,7 @@ namespace Lumix::LumScript::generated {
 					TypeRef(TypeRef::STRUCT, "Vec3", -1),
 					TypeRef(TypeRef::STRUCT, "Vec3", -1),
 				};
-				addNativeFunction(module, module.makeQualifiedName(alias, "addForceAtPos"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_addForceAtPos_19, makeContext(module, world));
+				addNativeFunction(module, module.makeQualifiedName(alias, "addForceAtPos"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_addForceAtPos_132, makeContext(module, world));
 				registered = true;
 			}
 			{
@@ -1798,7 +5678,7 @@ namespace Lumix::LumScript::generated {
 					nativeType(module, module.makeQualifiedName(alias, "Actor"), "engine:rigid_actor/Actor"),
 					TypeRef(TypeRef::STRUCT, "Vec3", -1),
 				};
-				addNativeFunction(module, module.makeQualifiedName(alias, "applyForce"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_applyForce_20, makeContext(module, world));
+				addNativeFunction(module, module.makeQualifiedName(alias, "applyForce"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_applyForce_133, makeContext(module, world));
 				registered = true;
 			}
 			{
@@ -1806,7 +5686,796 @@ namespace Lumix::LumScript::generated {
 					nativeType(module, module.makeQualifiedName(alias, "Actor"), "engine:rigid_actor/Actor"),
 					TypeRef(TypeRef::STRUCT, "Vec3", -1),
 				};
-				addNativeFunction(module, module.makeQualifiedName(alias, "applyImpulse"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_applyImpulse_21, makeContext(module, world));
+				addNativeFunction(module, module.makeQualifiedName(alias, "applyImpulse"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_applyImpulse_134, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Actor"), "engine:rigid_actor/Actor"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getActorVelocity"), TypeRef(TypeRef::STRUCT, "Vec3", -1), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_getActorVelocity_135, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Actor"), "engine:rigid_actor/Actor"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getActorSpeed"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_getActorSpeed_136, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Actor"), "engine:rigid_actor/Actor"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getActorLayer"), TypeRef(TypeRef::I32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_getActorLayer_137, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Actor"), "engine:rigid_actor/Actor"),
+					TypeRef(TypeRef::I32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setActorLayer"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_setActorLayer_138, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Actor"), "engine:rigid_actor/Actor"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getActorDynamicType"), TypeRef(TypeRef::I32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_getActorDynamicType_139, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Actor"), "engine:rigid_actor/Actor"),
+					TypeRef(TypeRef::I32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setActorDynamicType"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_setActorDynamicType_140, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Actor"), "engine:rigid_actor/Actor"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getActorIsTrigger"), TypeRef(TypeRef::BOOL), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_getActorIsTrigger_141, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Actor"), "engine:rigid_actor/Actor"),
+					TypeRef(TypeRef::BOOL),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setActorIsTrigger"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_setActorIsTrigger_142, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Actor"), "engine:rigid_actor/Actor"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getActorMesh"), TypeRef(TypeRef::STRING), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_getActorMesh_143, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Actor"), "engine:rigid_actor/Actor"),
+					TypeRef(TypeRef::STRING),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setActorMesh"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_setActorMesh_144, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Actor"), "engine:rigid_actor/Actor"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getActorMaterial"), TypeRef(TypeRef::STRING), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_getActorMaterial_145, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Actor"), "engine:rigid_actor/Actor"),
+					TypeRef(TypeRef::STRING),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setActorMaterial"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_setActorMaterial_146, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Actor"), "engine:rigid_actor/Actor"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getActorCCD"), TypeRef(TypeRef::BOOL), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_getActorCCD_147, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Actor"), "engine:rigid_actor/Actor"),
+					TypeRef(TypeRef::BOOL),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setActorCCD"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_setActorCCD_148, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Actor"), "engine:rigid_actor/Actor"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "boxesCount"), TypeRef(TypeRef::I32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_boxes_count_149, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Actor"), "engine:rigid_actor/Actor"),
+					TypeRef(TypeRef::I32),
+				};
+				TypeRef return_type = nativeType(module, module.makeQualifiedName(alias, "ActorBoxArrayItem"), "engine:rigid_actor/ActorBoxArrayItem");
+				return_type.nullable = true;
+				addNativeFunction(module, module.makeQualifiedName(alias, "boxes"), return_type, Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_boxes_item_150, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "ActorBoxArrayItem"), "engine:rigid_actor/ActorBoxArrayItem"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getBoxHalfExtents"), TypeRef(TypeRef::STRUCT, "Vec3", -1), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_boxes_getBoxHalfExtents_151, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "ActorBoxArrayItem"), "engine:rigid_actor/ActorBoxArrayItem"),
+					TypeRef(TypeRef::STRUCT, "Vec3", -1),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setBoxHalfExtents"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_boxes_setBoxHalfExtents_152, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "ActorBoxArrayItem"), "engine:rigid_actor/ActorBoxArrayItem"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getBoxOffsetPosition"), TypeRef(TypeRef::STRUCT, "Vec3", -1), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_boxes_getBoxOffsetPosition_153, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "ActorBoxArrayItem"), "engine:rigid_actor/ActorBoxArrayItem"),
+					TypeRef(TypeRef::STRUCT, "Vec3", -1),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setBoxOffsetPosition"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_boxes_setBoxOffsetPosition_154, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "ActorBoxArrayItem"), "engine:rigid_actor/ActorBoxArrayItem"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getBoxOffsetRotation"), TypeRef(TypeRef::STRUCT, "Vec3", -1), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_boxes_getBoxOffsetRotation_155, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "ActorBoxArrayItem"), "engine:rigid_actor/ActorBoxArrayItem"),
+					TypeRef(TypeRef::STRUCT, "Vec3", -1),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setBoxOffsetRotation"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_boxes_setBoxOffsetRotation_156, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Actor"), "engine:rigid_actor/Actor"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "spheresCount"), TypeRef(TypeRef::I32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_spheres_count_157, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Actor"), "engine:rigid_actor/Actor"),
+					TypeRef(TypeRef::I32),
+				};
+				TypeRef return_type = nativeType(module, module.makeQualifiedName(alias, "ActorSphereArrayItem"), "engine:rigid_actor/ActorSphereArrayItem");
+				return_type.nullable = true;
+				addNativeFunction(module, module.makeQualifiedName(alias, "spheres"), return_type, Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_spheres_item_158, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "ActorSphereArrayItem"), "engine:rigid_actor/ActorSphereArrayItem"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getSphereRadius"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_spheres_getSphereRadius_159, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "ActorSphereArrayItem"), "engine:rigid_actor/ActorSphereArrayItem"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setSphereRadius"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_spheres_setSphereRadius_160, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "ActorSphereArrayItem"), "engine:rigid_actor/ActorSphereArrayItem"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getSphereOffsetPosition"), TypeRef(TypeRef::STRUCT, "Vec3", -1), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_spheres_getSphereOffsetPosition_161, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "ActorSphereArrayItem"), "engine:rigid_actor/ActorSphereArrayItem"),
+					TypeRef(TypeRef::STRUCT, "Vec3", -1),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setSphereOffsetPosition"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_rigid_actor_spheres_setSphereOffsetPosition_162, makeContext(module, world));
+				registered = true;
+			}
+			return registered;
+		}
+		if (equalStrings(name, "wheel")) {
+			nativeType(module, makeEngineName(module, "entity", "Entity"), "engine:entity/Entity");
+			nativeType(module, makeEngineName(module, alias, "Wheel"), "engine:wheel/Wheel");
+			bool registered = false;
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Wheel"), "engine:wheel/Wheel"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getWheelSpringStrength"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_wheel_getWheelSpringStrength_163, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Wheel"), "engine:wheel/Wheel"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setWheelSpringStrength"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_wheel_setWheelSpringStrength_164, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Wheel"), "engine:wheel/Wheel"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getWheelSpringMaxCompression"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_wheel_getWheelSpringMaxCompression_165, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Wheel"), "engine:wheel/Wheel"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setWheelSpringMaxCompression"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_wheel_setWheelSpringMaxCompression_166, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Wheel"), "engine:wheel/Wheel"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getWheelSpringMaxDroop"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_wheel_getWheelSpringMaxDroop_167, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Wheel"), "engine:wheel/Wheel"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setWheelSpringMaxDroop"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_wheel_setWheelSpringMaxDroop_168, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Wheel"), "engine:wheel/Wheel"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getWheelSpringDamperRate"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_wheel_getWheelSpringDamperRate_169, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Wheel"), "engine:wheel/Wheel"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setWheelSpringDamperRate"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_wheel_setWheelSpringDamperRate_170, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Wheel"), "engine:wheel/Wheel"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getWheelRadius"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_wheel_getWheelRadius_171, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Wheel"), "engine:wheel/Wheel"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setWheelRadius"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_wheel_setWheelRadius_172, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Wheel"), "engine:wheel/Wheel"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getWheelWidth"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_wheel_getWheelWidth_173, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Wheel"), "engine:wheel/Wheel"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setWheelWidth"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_wheel_setWheelWidth_174, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Wheel"), "engine:wheel/Wheel"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getWheelMass"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_wheel_getWheelMass_175, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Wheel"), "engine:wheel/Wheel"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setWheelMass"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_wheel_setWheelMass_176, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Wheel"), "engine:wheel/Wheel"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getWheelMOI"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_wheel_getWheelMOI_177, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Wheel"), "engine:wheel/Wheel"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setWheelMOI"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_wheel_setWheelMOI_178, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Wheel"), "engine:wheel/Wheel"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getWheelSlot"), TypeRef(TypeRef::I32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_wheel_getWheelSlot_179, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Wheel"), "engine:wheel/Wheel"),
+					TypeRef(TypeRef::I32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setWheelSlot"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_wheel_setWheelSlot_180, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Wheel"), "engine:wheel/Wheel"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getWheelRPM"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_wheel_getWheelRPM_181, makeContext(module, world));
+				registered = true;
+			}
+			return registered;
+		}
+		if (equalStrings(name, "vehicle")) {
+			nativeType(module, makeEngineName(module, "entity", "Entity"), "engine:entity/Entity");
+			nativeType(module, makeEngineName(module, alias, "Vehicle"), "engine:vehicle/Vehicle");
+			bool registered = false;
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Vehicle"), "engine:vehicle/Vehicle"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getVehiclePeakTorque"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_vehicle_getVehiclePeakTorque_182, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Vehicle"), "engine:vehicle/Vehicle"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setVehiclePeakTorque"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_vehicle_setVehiclePeakTorque_183, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Vehicle"), "engine:vehicle/Vehicle"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getVehicleMaxRPM"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_vehicle_getVehicleMaxRPM_184, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Vehicle"), "engine:vehicle/Vehicle"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setVehicleMaxRPM"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_vehicle_setVehicleMaxRPM_185, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Vehicle"), "engine:vehicle/Vehicle"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getVehicleRPM"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_vehicle_getVehicleRPM_186, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Vehicle"), "engine:vehicle/Vehicle"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getVehicleCurrentGear"), TypeRef(TypeRef::I32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_vehicle_getVehicleCurrentGear_187, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Vehicle"), "engine:vehicle/Vehicle"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getVehicleSpeed"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_vehicle_getVehicleSpeed_188, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Vehicle"), "engine:vehicle/Vehicle"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setVehicleAccel"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_vehicle_setVehicleAccel_189, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Vehicle"), "engine:vehicle/Vehicle"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setVehicleSteer"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_vehicle_setVehicleSteer_190, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Vehicle"), "engine:vehicle/Vehicle"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setVehicleBrake"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_vehicle_setVehicleBrake_191, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Vehicle"), "engine:vehicle/Vehicle"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getVehicleChassis"), TypeRef(TypeRef::STRING), Span<const TypeRef>(params, lengthOf(params)), &lumscript_vehicle_getVehicleChassis_192, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Vehicle"), "engine:vehicle/Vehicle"),
+					TypeRef(TypeRef::STRING),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setVehicleChassis"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_vehicle_setVehicleChassis_193, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Vehicle"), "engine:vehicle/Vehicle"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getVehicleMass"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_vehicle_getVehicleMass_194, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Vehicle"), "engine:vehicle/Vehicle"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setVehicleMass"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_vehicle_setVehicleMass_195, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Vehicle"), "engine:vehicle/Vehicle"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getVehicleMOIMultiplier"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_vehicle_getVehicleMOIMultiplier_196, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Vehicle"), "engine:vehicle/Vehicle"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setVehicleMOIMultiplier"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_vehicle_setVehicleMOIMultiplier_197, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Vehicle"), "engine:vehicle/Vehicle"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getVehicleCenterOfMass"), TypeRef(TypeRef::STRUCT, "Vec3", -1), Span<const TypeRef>(params, lengthOf(params)), &lumscript_vehicle_getVehicleCenterOfMass_198, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Vehicle"), "engine:vehicle/Vehicle"),
+					TypeRef(TypeRef::STRUCT, "Vec3", -1),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setVehicleCenterOfMass"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_vehicle_setVehicleCenterOfMass_199, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Vehicle"), "engine:vehicle/Vehicle"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getVehicleWheelsLayer"), TypeRef(TypeRef::I32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_vehicle_getVehicleWheelsLayer_200, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Vehicle"), "engine:vehicle/Vehicle"),
+					TypeRef(TypeRef::I32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setVehicleWheelsLayer"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_vehicle_setVehicleWheelsLayer_201, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Vehicle"), "engine:vehicle/Vehicle"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getVehicleChassisLayer"), TypeRef(TypeRef::I32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_vehicle_getVehicleChassisLayer_202, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Vehicle"), "engine:vehicle/Vehicle"),
+					TypeRef(TypeRef::I32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setVehicleChassisLayer"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_vehicle_setVehicleChassisLayer_203, makeContext(module, world));
+				registered = true;
+			}
+			return registered;
+		}
+		if (equalStrings(name, "physical_instanced_cube")) {
+			nativeType(module, makeEngineName(module, "entity", "Entity"), "engine:entity/Entity");
+			nativeType(module, makeEngineName(module, alias, "InstancedCube"), "engine:physical_instanced_cube/InstancedCube");
+			bool registered = false;
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "InstancedCube"), "engine:physical_instanced_cube/InstancedCube"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getInstancedCubeHalfExtents"), TypeRef(TypeRef::STRUCT, "Vec3", -1), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_instanced_cube_getInstancedCubeHalfExtents_204, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "InstancedCube"), "engine:physical_instanced_cube/InstancedCube"),
+					TypeRef(TypeRef::STRUCT, "Vec3", -1),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setInstancedCubeHalfExtents"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_instanced_cube_setInstancedCubeHalfExtents_205, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "InstancedCube"), "engine:physical_instanced_cube/InstancedCube"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getInstancedCubeLayer"), TypeRef(TypeRef::I32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_instanced_cube_getInstancedCubeLayer_206, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "InstancedCube"), "engine:physical_instanced_cube/InstancedCube"),
+					TypeRef(TypeRef::I32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setInstancedCubeLayer"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_instanced_cube_setInstancedCubeLayer_207, makeContext(module, world));
+				registered = true;
+			}
+			return registered;
+		}
+		if (equalStrings(name, "physical_instanced_mesh")) {
+			nativeType(module, makeEngineName(module, "entity", "Entity"), "engine:entity/Entity");
+			nativeType(module, makeEngineName(module, alias, "InstancedMesh"), "engine:physical_instanced_mesh/InstancedMesh");
+			bool registered = false;
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "InstancedMesh"), "engine:physical_instanced_mesh/InstancedMesh"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getInstancedMeshLayer"), TypeRef(TypeRef::I32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_instanced_mesh_getInstancedMeshLayer_208, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "InstancedMesh"), "engine:physical_instanced_mesh/InstancedMesh"),
+					TypeRef(TypeRef::I32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setInstancedMeshLayer"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_instanced_mesh_setInstancedMeshLayer_209, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "InstancedMesh"), "engine:physical_instanced_mesh/InstancedMesh"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getInstancedMeshGeomPath"), TypeRef(TypeRef::STRING), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_instanced_mesh_getInstancedMeshGeomPath_210, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "InstancedMesh"), "engine:physical_instanced_mesh/InstancedMesh"),
+					TypeRef(TypeRef::STRING),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setInstancedMeshGeomPath"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_physical_instanced_mesh_setInstancedMeshGeomPath_211, makeContext(module, world));
+				registered = true;
+			}
+			return registered;
+		}
+		if (equalStrings(name, "camera")) {
+			nativeType(module, makeEngineName(module, "entity", "Entity"), "engine:entity/Entity");
+			nativeType(module, makeEngineName(module, alias, "Camera"), "engine:camera/Camera");
+			bool registered = false;
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Camera"), "engine:camera/Camera"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getCameraScreenWidth"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_camera_getCameraScreenWidth_212, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Camera"), "engine:camera/Camera"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getCameraScreenHeight"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_camera_getCameraScreenHeight_213, makeContext(module, world));
+				registered = true;
+			}
+			return registered;
+		}
+		if (equalStrings(name, "decal")) {
+			nativeType(module, makeEngineName(module, "entity", "Entity"), "engine:entity/Entity");
+			nativeType(module, makeEngineName(module, alias, "Decal"), "engine:decal/Decal");
+			bool registered = false;
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Decal"), "engine:decal/Decal"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getDecalMaterialPath"), TypeRef(TypeRef::STRING), Span<const TypeRef>(params, lengthOf(params)), &lumscript_decal_getDecalMaterialPath_214, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Decal"), "engine:decal/Decal"),
+					TypeRef(TypeRef::STRING),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setDecalMaterialPath"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_decal_setDecalMaterialPath_215, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Decal"), "engine:decal/Decal"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getDecalHalfExtents"), TypeRef(TypeRef::STRUCT, "Vec3", -1), Span<const TypeRef>(params, lengthOf(params)), &lumscript_decal_getDecalHalfExtents_216, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Decal"), "engine:decal/Decal"),
+					TypeRef(TypeRef::STRUCT, "Vec3", -1),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setDecalHalfExtents"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_decal_setDecalHalfExtents_217, makeContext(module, world));
+				registered = true;
+			}
+			return registered;
+		}
+		if (equalStrings(name, "environment")) {
+			nativeType(module, makeEngineName(module, "entity", "Entity"), "engine:entity/Entity");
+			nativeType(module, makeEngineName(module, alias, "Environment"), "engine:environment/Environment");
+			bool registered = false;
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Environment"), "engine:environment/Environment"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getEnvironmentCastShadows"), TypeRef(TypeRef::BOOL), Span<const TypeRef>(params, lengthOf(params)), &lumscript_environment_getEnvironmentCastShadows_218, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Environment"), "engine:environment/Environment"),
+					TypeRef(TypeRef::BOOL),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setEnvironmentCastShadows"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_environment_setEnvironmentCastShadows_219, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Environment"), "engine:environment/Environment"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getEnvironmentSkyTexture"), TypeRef(TypeRef::STRING), Span<const TypeRef>(params, lengthOf(params)), &lumscript_environment_getEnvironmentSkyTexture_220, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Environment"), "engine:environment/Environment"),
+					TypeRef(TypeRef::STRING),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setEnvironmentSkyTexture"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_environment_setEnvironmentSkyTexture_221, makeContext(module, world));
+				registered = true;
+			}
+			return registered;
+		}
+		if (equalStrings(name, "point_light")) {
+			nativeType(module, makeEngineName(module, "entity", "Entity"), "engine:entity/Entity");
+			nativeType(module, makeEngineName(module, alias, "PointLight"), "engine:point_light/PointLight");
+			bool registered = false;
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "PointLight"), "engine:point_light/PointLight"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getPointLightRange"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_point_light_getPointLightRange_222, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "PointLight"), "engine:point_light/PointLight"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setPointLightRange"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_point_light_setPointLightRange_223, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "PointLight"), "engine:point_light/PointLight"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getPointLightCastShadows"), TypeRef(TypeRef::BOOL), Span<const TypeRef>(params, lengthOf(params)), &lumscript_point_light_getPointLightCastShadows_224, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "PointLight"), "engine:point_light/PointLight"),
+					TypeRef(TypeRef::BOOL),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setPointLightCastShadows"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_point_light_setPointLightCastShadows_225, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "PointLight"), "engine:point_light/PointLight"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getPointLightDynamic"), TypeRef(TypeRef::BOOL), Span<const TypeRef>(params, lengthOf(params)), &lumscript_point_light_getPointLightDynamic_226, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "PointLight"), "engine:point_light/PointLight"),
+					TypeRef(TypeRef::BOOL),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setPointLightDynamic"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_point_light_setPointLightDynamic_227, makeContext(module, world));
+				registered = true;
+			}
+			return registered;
+		}
+		if (equalStrings(name, "reflection_probe")) {
+			nativeType(module, makeEngineName(module, "entity", "Entity"), "engine:entity/Entity");
+			nativeType(module, makeEngineName(module, alias, "ReflectionProbe"), "engine:reflection_probe/ReflectionProbe");
+			bool registered = false;
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "ReflectionProbe"), "engine:reflection_probe/ReflectionProbe"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "isReflectionProbeEnabled"), TypeRef(TypeRef::BOOL), Span<const TypeRef>(params, lengthOf(params)), &lumscript_reflection_probe_isReflectionProbeEnabled_228, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "ReflectionProbe"), "engine:reflection_probe/ReflectionProbe"),
+					TypeRef(TypeRef::BOOL),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "enableReflectionProbe"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_reflection_probe_enableReflectionProbe_229, makeContext(module, world));
+				registered = true;
+			}
+			return registered;
+		}
+		if (equalStrings(name, "environment_probe")) {
+			nativeType(module, makeEngineName(module, "entity", "Entity"), "engine:entity/Entity");
+			nativeType(module, makeEngineName(module, alias, "EnvironmentProbe"), "engine:environment_probe/EnvironmentProbe");
+			bool registered = false;
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "EnvironmentProbe"), "engine:environment_probe/EnvironmentProbe"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "isEnvironmentProbeEnabled"), TypeRef(TypeRef::BOOL), Span<const TypeRef>(params, lengthOf(params)), &lumscript_environment_probe_isEnvironmentProbeEnabled_230, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "EnvironmentProbe"), "engine:environment_probe/EnvironmentProbe"),
+					TypeRef(TypeRef::BOOL),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "enableEnvironmentProbe"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_environment_probe_enableEnvironmentProbe_231, makeContext(module, world));
 				registered = true;
 			}
 			return registered;
@@ -1820,7 +6489,67 @@ namespace Lumix::LumScript::generated {
 					nativeType(module, module.makeQualifiedName(alias, "BoneAttachment"), "engine:bone_attachment/BoneAttachment"),
 					TypeRef(TypeRef::STRUCT, "Quat", -1),
 				};
-				addNativeFunction(module, module.makeQualifiedName(alias, "setRotation"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_bone_attachment_setRotation_22, makeContext(module, world));
+				addNativeFunction(module, module.makeQualifiedName(alias, "setRotation"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_bone_attachment_setRotation_232, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "BoneAttachment"), "engine:bone_attachment/BoneAttachment"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getBoneAttachmentParent"), nativeType(module, module.makeQualifiedName("entity", "Entity"), "engine:entity/Entity"), Span<const TypeRef>(params, lengthOf(params)), &lumscript_bone_attachment_getBoneAttachmentParent_233, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "BoneAttachment"), "engine:bone_attachment/BoneAttachment"),
+					nativeType(module, module.makeQualifiedName("entity", "Entity"), "engine:entity/Entity"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setBoneAttachmentParent"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_bone_attachment_setBoneAttachmentParent_234, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "BoneAttachment"), "engine:bone_attachment/BoneAttachment"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getBoneAttachmentBone"), TypeRef(TypeRef::I32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_bone_attachment_getBoneAttachmentBone_235, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "BoneAttachment"), "engine:bone_attachment/BoneAttachment"),
+					TypeRef(TypeRef::I32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setBoneAttachmentBone"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_bone_attachment_setBoneAttachmentBone_236, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "BoneAttachment"), "engine:bone_attachment/BoneAttachment"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getBoneAttachmentPosition"), TypeRef(TypeRef::STRUCT, "Vec3", -1), Span<const TypeRef>(params, lengthOf(params)), &lumscript_bone_attachment_getBoneAttachmentPosition_237, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "BoneAttachment"), "engine:bone_attachment/BoneAttachment"),
+					TypeRef(TypeRef::STRUCT, "Vec3", -1),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setBoneAttachmentPosition"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_bone_attachment_setBoneAttachmentPosition_238, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "BoneAttachment"), "engine:bone_attachment/BoneAttachment"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getBoneAttachmentRotation"), TypeRef(TypeRef::STRUCT, "Vec3", -1), Span<const TypeRef>(params, lengthOf(params)), &lumscript_bone_attachment_getBoneAttachmentRotation_239, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "BoneAttachment"), "engine:bone_attachment/BoneAttachment"),
+					TypeRef(TypeRef::STRUCT, "Vec3", -1),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setBoneAttachmentRotation"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_bone_attachment_setBoneAttachmentRotation_240, makeContext(module, world));
 				registered = true;
 			}
 			return registered;
@@ -1834,7 +6563,7 @@ namespace Lumix::LumScript::generated {
 					nativeType(module, module.makeQualifiedName(alias, "ParticleEmitter"), "engine:particle_emitter/ParticleEmitter"),
 					TypeRef(TypeRef::STRING),
 				};
-				addNativeFunction(module, module.makeQualifiedName(alias, "getGlobalID"), TypeRef(TypeRef::I32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_particle_emitter_getGlobalID_23, makeContext(module, world));
+				addNativeFunction(module, module.makeQualifiedName(alias, "getGlobalID"), TypeRef(TypeRef::I32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_particle_emitter_getGlobalID_241, makeContext(module, world));
 				registered = true;
 			}
 			{
@@ -1843,7 +6572,7 @@ namespace Lumix::LumScript::generated {
 					TypeRef(TypeRef::I32),
 					TypeRef(TypeRef::F32),
 				};
-				addNativeFunction(module, module.makeQualifiedName(alias, "setFloatGlobal"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_particle_emitter_setFloatGlobal_24, makeContext(module, world));
+				addNativeFunction(module, module.makeQualifiedName(alias, "setFloatGlobal"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_particle_emitter_setFloatGlobal_242, makeContext(module, world));
 				registered = true;
 			}
 			{
@@ -1852,7 +6581,7 @@ namespace Lumix::LumScript::generated {
 					TypeRef(TypeRef::I32),
 					TypeRef(TypeRef::STRUCT, "Vec3", -1),
 				};
-				addNativeFunction(module, module.makeQualifiedName(alias, "setVec3Global"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_particle_emitter_setVec3Global_25, makeContext(module, world));
+				addNativeFunction(module, module.makeQualifiedName(alias, "setVec3Global"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_particle_emitter_setVec3Global_243, makeContext(module, world));
 				registered = true;
 			}
 			{
@@ -1861,7 +6590,7 @@ namespace Lumix::LumScript::generated {
 					TypeRef(TypeRef::I32),
 					TypeRef(TypeRef::I32),
 				};
-				addNativeFunction(module, module.makeQualifiedName(alias, "emitRibbons"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_particle_emitter_emitRibbons_26, makeContext(module, world));
+				addNativeFunction(module, module.makeQualifiedName(alias, "emitRibbons"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_particle_emitter_emitRibbons_244, makeContext(module, world));
 				registered = true;
 			}
 			{
@@ -1870,7 +6599,130 @@ namespace Lumix::LumScript::generated {
 					TypeRef(TypeRef::I32),
 					TypeRef(TypeRef::I32),
 				};
-				addNativeFunction(module, module.makeQualifiedName(alias, "killRibbon"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_particle_emitter_killRibbon_27, makeContext(module, world));
+				addNativeFunction(module, module.makeQualifiedName(alias, "killRibbon"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_particle_emitter_killRibbon_245, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "ParticleEmitter"), "engine:particle_emitter/ParticleEmitter"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getParticleEmitterPath"), TypeRef(TypeRef::STRING), Span<const TypeRef>(params, lengthOf(params)), &lumscript_particle_emitter_getParticleEmitterPath_246, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "ParticleEmitter"), "engine:particle_emitter/ParticleEmitter"),
+					TypeRef(TypeRef::STRING),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setParticleEmitterPath"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_particle_emitter_setParticleEmitterPath_247, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "ParticleEmitter"), "engine:particle_emitter/ParticleEmitter"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getParticleEmitterAutodestroy"), TypeRef(TypeRef::BOOL), Span<const TypeRef>(params, lengthOf(params)), &lumscript_particle_emitter_getParticleEmitterAutodestroy_248, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "ParticleEmitter"), "engine:particle_emitter/ParticleEmitter"),
+					TypeRef(TypeRef::BOOL),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setParticleEmitterAutodestroy"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_particle_emitter_setParticleEmitterAutodestroy_249, makeContext(module, world));
+				registered = true;
+			}
+			return registered;
+		}
+		if (equalStrings(name, "instanced_model")) {
+			nativeType(module, makeEngineName(module, "entity", "Entity"), "engine:entity/Entity");
+			nativeType(module, makeEngineName(module, alias, "InstancedModel"), "engine:instanced_model/InstancedModel");
+			bool registered = false;
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "InstancedModel"), "engine:instanced_model/InstancedModel"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getInstancedModelPath"), TypeRef(TypeRef::STRING), Span<const TypeRef>(params, lengthOf(params)), &lumscript_instanced_model_getInstancedModelPath_250, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "InstancedModel"), "engine:instanced_model/InstancedModel"),
+					TypeRef(TypeRef::STRING),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setInstancedModelPath"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_instanced_model_setInstancedModelPath_251, makeContext(module, world));
+				registered = true;
+			}
+			return registered;
+		}
+		if (equalStrings(name, "model_instance")) {
+			nativeType(module, makeEngineName(module, "entity", "Entity"), "engine:entity/Entity");
+			nativeType(module, makeEngineName(module, alias, "ModelInstance"), "engine:model_instance/ModelInstance");
+			bool registered = false;
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "ModelInstance"), "engine:model_instance/ModelInstance"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "isModelInstanceEnabled"), TypeRef(TypeRef::BOOL), Span<const TypeRef>(params, lengthOf(params)), &lumscript_model_instance_isModelInstanceEnabled_252, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "ModelInstance"), "engine:model_instance/ModelInstance"),
+					TypeRef(TypeRef::BOOL),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "enableModelInstance"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_model_instance_enableModelInstance_253, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "ModelInstance"), "engine:model_instance/ModelInstance"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getModelInstancePath"), TypeRef(TypeRef::STRING), Span<const TypeRef>(params, lengthOf(params)), &lumscript_model_instance_getModelInstancePath_254, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "ModelInstance"), "engine:model_instance/ModelInstance"),
+					TypeRef(TypeRef::STRING),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setModelInstancePath"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_model_instance_setModelInstancePath_255, makeContext(module, world));
+				registered = true;
+			}
+			return registered;
+		}
+		if (equalStrings(name, "curve_decal")) {
+			nativeType(module, makeEngineName(module, "entity", "Entity"), "engine:entity/Entity");
+			nativeType(module, makeEngineName(module, alias, "CurveDecal"), "engine:curve_decal/CurveDecal");
+			bool registered = false;
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "CurveDecal"), "engine:curve_decal/CurveDecal"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getCurveDecalMaterialPath"), TypeRef(TypeRef::STRING), Span<const TypeRef>(params, lengthOf(params)), &lumscript_curve_decal_getCurveDecalMaterialPath_256, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "CurveDecal"), "engine:curve_decal/CurveDecal"),
+					TypeRef(TypeRef::STRING),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setCurveDecalMaterialPath"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_curve_decal_setCurveDecalMaterialPath_257, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "CurveDecal"), "engine:curve_decal/CurveDecal"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getCurveDecalHalfExtents"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_curve_decal_getCurveDecalHalfExtents_258, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "CurveDecal"), "engine:curve_decal/CurveDecal"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setCurveDecalHalfExtents"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_curve_decal_setCurveDecalHalfExtents_259, makeContext(module, world));
 				registered = true;
 			}
 			return registered;
@@ -1885,7 +6737,7 @@ namespace Lumix::LumScript::generated {
 					TypeRef(TypeRef::F32),
 					TypeRef(TypeRef::F32),
 				};
-				addNativeFunction(module, module.makeQualifiedName(alias, "getHeightAt"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_terrain_getHeightAt_28, makeContext(module, world));
+				addNativeFunction(module, module.makeQualifiedName(alias, "getHeightAt"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_terrain_getHeightAt_260, makeContext(module, world));
 				registered = true;
 			}
 			{
@@ -1894,7 +6746,216 @@ namespace Lumix::LumScript::generated {
 					TypeRef(TypeRef::F32),
 					TypeRef(TypeRef::F32),
 				};
-				addNativeFunction(module, module.makeQualifiedName(alias, "getNormalAt"), TypeRef(TypeRef::STRUCT, "Vec3", -1), Span<const TypeRef>(params, lengthOf(params)), &lumscript_terrain_getNormalAt_29, makeContext(module, world));
+				addNativeFunction(module, module.makeQualifiedName(alias, "getNormalAt"), TypeRef(TypeRef::STRUCT, "Vec3", -1), Span<const TypeRef>(params, lengthOf(params)), &lumscript_terrain_getNormalAt_261, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Terrain"), "engine:terrain/Terrain"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getTerrainMaterialPath"), TypeRef(TypeRef::STRING), Span<const TypeRef>(params, lengthOf(params)), &lumscript_terrain_getTerrainMaterialPath_262, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Terrain"), "engine:terrain/Terrain"),
+					TypeRef(TypeRef::STRING),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setTerrainMaterialPath"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_terrain_setTerrainMaterialPath_263, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Terrain"), "engine:terrain/Terrain"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getTerrainXZScale"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_terrain_getTerrainXZScale_264, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Terrain"), "engine:terrain/Terrain"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setTerrainXZScale"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_terrain_setTerrainXZScale_265, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Terrain"), "engine:terrain/Terrain"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getTerrainTesselation"), TypeRef(TypeRef::I32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_terrain_getTerrainTesselation_266, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Terrain"), "engine:terrain/Terrain"),
+					TypeRef(TypeRef::I32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setTerrainTesselation"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_terrain_setTerrainTesselation_267, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Terrain"), "engine:terrain/Terrain"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getTerrainBaseGridResolution"), TypeRef(TypeRef::I32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_terrain_getTerrainBaseGridResolution_268, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Terrain"), "engine:terrain/Terrain"),
+					TypeRef(TypeRef::I32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setTerrainBaseGridResolution"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_terrain_setTerrainBaseGridResolution_269, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Terrain"), "engine:terrain/Terrain"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getTerrainYScale"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_terrain_getTerrainYScale_270, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Terrain"), "engine:terrain/Terrain"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setTerrainYScale"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_terrain_setTerrainYScale_271, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Terrain"), "engine:terrain/Terrain"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "grassCount"), TypeRef(TypeRef::I32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_terrain_grass_count_272, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "Terrain"), "engine:terrain/Terrain"),
+					TypeRef(TypeRef::I32),
+				};
+				TypeRef return_type = nativeType(module, module.makeQualifiedName(alias, "TerrainGrassArrayItem"), "engine:terrain/TerrainGrassArrayItem");
+				return_type.nullable = true;
+				addNativeFunction(module, module.makeQualifiedName(alias, "grass"), return_type, Span<const TypeRef>(params, lengthOf(params)), &lumscript_terrain_grass_item_273, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "TerrainGrassArrayItem"), "engine:terrain/TerrainGrassArrayItem"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getGrassRotationMode"), TypeRef(TypeRef::I32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_terrain_grass_getGrassRotationMode_274, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "TerrainGrassArrayItem"), "engine:terrain/TerrainGrassArrayItem"),
+					TypeRef(TypeRef::I32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setGrassRotationMode"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_terrain_grass_setGrassRotationMode_275, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "TerrainGrassArrayItem"), "engine:terrain/TerrainGrassArrayItem"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getGrassDistance"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_terrain_grass_getGrassDistance_276, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "TerrainGrassArrayItem"), "engine:terrain/TerrainGrassArrayItem"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setGrassDistance"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_terrain_grass_setGrassDistance_277, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "TerrainGrassArrayItem"), "engine:terrain/TerrainGrassArrayItem"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getGrassPath"), TypeRef(TypeRef::STRING), Span<const TypeRef>(params, lengthOf(params)), &lumscript_terrain_grass_getGrassPath_278, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "TerrainGrassArrayItem"), "engine:terrain/TerrainGrassArrayItem"),
+					TypeRef(TypeRef::STRING),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setGrassPath"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_terrain_grass_setGrassPath_279, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "TerrainGrassArrayItem"), "engine:terrain/TerrainGrassArrayItem"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getGrassSpacing"), TypeRef(TypeRef::F32), Span<const TypeRef>(params, lengthOf(params)), &lumscript_terrain_grass_getGrassSpacing_280, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "TerrainGrassArrayItem"), "engine:terrain/TerrainGrassArrayItem"),
+					TypeRef(TypeRef::F32),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setGrassSpacing"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_terrain_grass_setGrassSpacing_281, makeContext(module, world));
+				registered = true;
+			}
+			return registered;
+		}
+		if (equalStrings(name, "procedural_geom")) {
+			nativeType(module, makeEngineName(module, "entity", "Entity"), "engine:entity/Entity");
+			nativeType(module, makeEngineName(module, alias, "ProceduralGeometry"), "engine:procedural_geom/ProceduralGeometry");
+			bool registered = false;
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "ProceduralGeometry"), "engine:procedural_geom/ProceduralGeometry"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getProceduralGeometryMaterial"), TypeRef(TypeRef::STRING), Span<const TypeRef>(params, lengthOf(params)), &lumscript_procedural_geom_getProceduralGeometryMaterial_282, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "ProceduralGeometry"), "engine:procedural_geom/ProceduralGeometry"),
+					TypeRef(TypeRef::STRING),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setProceduralGeometryMaterial"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_procedural_geom_setProceduralGeometryMaterial_283, makeContext(module, world));
+				registered = true;
+			}
+			return registered;
+		}
+		if (equalStrings(name, "ui_3d")) {
+			nativeType(module, makeEngineName(module, "entity", "Entity"), "engine:entity/Entity");
+			nativeType(module, makeEngineName(module, alias, "UI3D"), "engine:ui_3d/UI3D");
+			bool registered = false;
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "UI3D"), "engine:ui_3d/UI3D"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getUI3DPath"), TypeRef(TypeRef::STRING), Span<const TypeRef>(params, lengthOf(params)), &lumscript_ui_3d_getUI3DPath_284, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "UI3D"), "engine:ui_3d/UI3D"),
+					TypeRef(TypeRef::STRING),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setUI3DPath"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_ui_3d_setUI3DPath_285, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "UI3D"), "engine:ui_3d/UI3D"),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "getUI3DOrientToCamera"), TypeRef(TypeRef::BOOL), Span<const TypeRef>(params, lengthOf(params)), &lumscript_ui_3d_getUI3DOrientToCamera_286, makeContext(module, world));
+				registered = true;
+			}
+			{
+				TypeRef params[] = {
+					nativeType(module, module.makeQualifiedName(alias, "UI3D"), "engine:ui_3d/UI3D"),
+					TypeRef(TypeRef::BOOL),
+				};
+				addNativeFunction(module, module.makeQualifiedName(alias, "setUI3DOrientToCamera"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_ui_3d_setUI3DOrientToCamera_287, makeContext(module, world));
 				registered = true;
 			}
 			return registered;

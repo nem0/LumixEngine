@@ -16,6 +16,8 @@ struct Token {
 		RIGHT_PAREN,
 		LEFT_BRACE,
 		RIGHT_BRACE,
+		LEFT_BRACKET,
+		RIGHT_BRACKET,
 		SEMICOLON,
 		COLON,
 		COMMA,
@@ -56,6 +58,8 @@ struct Token {
 		IMPORT,
 		MATCH,
 		CASE,
+		BREAK,
+		CONTINUE,
 		AS,
 		TRUE,
 		FALSE,
@@ -79,6 +83,7 @@ struct Token {
 
 	Type type = EOF;
 	StringView value;
+	StringView source_name;
 	i32 line = 1;
 	i32 column = 1;
 };
@@ -93,10 +98,12 @@ struct Tokenizer {
 	i32 m_column = 1;
 	i32 m_start_line = 1;
 	i32 m_start_column = 1;
+	StringView m_source_name;
 	Token m_current_token;
 
-	void init(StringView document) {
+	void init(StringView document, StringView source_name = {}) {
 		m_document = document;
+		m_source_name = source_name;
 		m_current = document.begin;
 		m_line = 1;
 		m_column = 1;
@@ -121,6 +128,7 @@ struct Tokenizer {
 		Token res;
 		res.type = type;
 		res.value = StringView(m_start_token, m_current);
+		res.source_name = m_source_name;
 		res.line = m_start_line;
 		res.column = m_start_column;
 		return res;
@@ -181,6 +189,9 @@ struct Tokenizer {
 
 	Token identifierOrKeywordToken() {
 		while (isIdentifierChar(peekChar())) advance();
+		const StringView ident(m_start_token, m_current);
+		if (equalStrings(ident, "break")) return makeToken(Token::BREAK);
+		if (equalStrings(ident, "continue")) return makeToken(Token::CONTINUE);
 		switch (m_start_token[0]) {
 			case 'a': {
 				if (u32(m_current - m_start_token) < 2) return makeToken(Token::IDENTIFIER);
@@ -190,14 +201,21 @@ struct Tokenizer {
 				}
 				break;
 			}
-			case 'b': return checkKeyword("ool", 1, 3, Token::BOOL);
+			case 'b': {
+				if (u32(m_current - m_start_token) < 2) return makeToken(Token::IDENTIFIER);
+				switch (m_start_token[1]) {
+					case 'o': return checkKeyword("ol", 2, 2, Token::BOOL);
+					case 'r': return checkKeyword("eak", 2, 3, Token::BREAK);
+				}
+				break;
+			}
 			case 'c': {
 				if (u32(m_current - m_start_token) < 2) return makeToken(Token::IDENTIFIER);
 				switch (m_start_token[1]) {
 					case 'a': return checkKeyword("se", 2, 2, Token::CASE);
 					case 'o': return checkKeyword("nst", 2, 3, Token::CONST);
 				}
-				break;
+				return checkKeyword("ontinue", 1, 7, Token::CONTINUE);
 			}
 			case 'd': return checkKeyword("efer", 1, 4, Token::DEFER);
 			case 'e': {
@@ -287,6 +305,8 @@ struct Tokenizer {
 			case ')': return makeToken(Token::RIGHT_PAREN);
 			case '{': return makeToken(Token::LEFT_BRACE);
 			case '}': return makeToken(Token::RIGHT_BRACE);
+			case '[': return makeToken(Token::LEFT_BRACKET);
+			case ']': return makeToken(Token::RIGHT_BRACKET);
 			case ';': return makeToken(Token::SEMICOLON);
 			case ':': return makeToken(Token::COLON);
 			case ',': return makeToken(Token::COMMA);
