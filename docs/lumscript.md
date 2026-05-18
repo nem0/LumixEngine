@@ -356,13 +356,15 @@ Not implemented yet:
 - closures
 - user-declared methods
 
-`Vec3` and `Quat` are core value types used heavily by engine APIs:
+`Vec3`, `DVec3`, and `Quat` are core value types used heavily by engine APIs:
 
 ```cpp
 import "core:vec3"
+import "core:dvec3"
 import "core:quat"
 
 const position = Vec3 { 1.0, 2.0, 3.0 };
+const world_position = DVec3 { 1000.0, 2000.0, 3000.0 };
 const rotation = Quat { 0.0, 0.0, 0.0, 1.0 };
 ```
 
@@ -1000,6 +1002,7 @@ import "engine:input" as input
 fn init(w : world.World, inputs : input.InputSystem) : void {
 	var e : entity.Entity = world.createEntity(w);
 	const player = w.findByName("Player");
+	const renderer_module = w.renderer();
 	e.setPosition({ 1.0, 2.0, 3.0 });
 	e.setRotation({ 0.0, 0.0, 0.0, 1.0 });
 	e.setScale({ 2.0, 2.0, 2.0 });
@@ -1020,6 +1023,8 @@ Current world functions:
 - `world.destroyEntity(w : world.World, e : entity.Entity) : void`
 - `world.hasEntity(w : world.World, e : entity.Entity) : bool`
 - `world.findByName(w : world.World, name : string) : ?entity.Entity`
+- `world.<module_id>(w : world.World) : ?<module_id>.<ModuleType>`
+- example: `world.renderer(w : world.World) : ?renderer.RenderModule`
 
 Current entity functions:
 

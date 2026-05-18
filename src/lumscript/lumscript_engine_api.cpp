@@ -223,6 +223,11 @@ bool logLogError(Span<const Value> args, Value*, void*) {
 	return true;
 }
 
+bool logLogInfo(Span<const Value> args, Value*, void*) {
+	logInfo(args[0].string);
+	return true;
+}
+
 bool registerInputModule(Module& module, StringView alias) {
 	generated::registerGeneratedEngineImport(module, nullptr, "engine:InputEventType", {});
 	TypeRef system_type = nativeType(module, makeEngineName(module, alias, "InputSystem"), "engine:input/InputSystem");
@@ -256,6 +261,7 @@ bool registerInputModule(Module& module, StringView alias) {
 bool registerLogModule(Module& module, StringView alias) {
 	TypeRef params[] = {TypeRef(TypeRef::STRING)};
 	addNativeFunction(module, makeEngineName(module, alias, "logError"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params), &logLogError);
+	addNativeFunction(module, makeEngineName(module, alias, "logInfo"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params), &logLogInfo);
 	return true;
 }
 

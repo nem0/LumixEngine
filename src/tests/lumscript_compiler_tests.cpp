@@ -24,6 +24,14 @@ static const char* CORE_VEC3_SOURCE = R"(
 	};
 )";
 
+static const char* CORE_DVEC3_SOURCE = R"(
+	struct DVec3 {
+		x : f64;
+		y : f64;
+		z : f64;
+	};
+)";
+
 static const char* CORE_QUAT_SOURCE = R"(
 	struct Quat {
 		x : f32;
@@ -36,6 +44,10 @@ static const char* CORE_QUAT_SOURCE = R"(
 bool resolveCoreTestImport(StringView path, StringView* source) {
 	if (equalStrings(path, "core:vec3") || equalStrings(path, "core:vec3.lum")) {
 		*source = CORE_VEC3_SOURCE;
+		return true;
+	}
+	if (equalStrings(path, "core:dvec3") || equalStrings(path, "core:dvec3.lum")) {
+		*source = CORE_DVEC3_SOURCE;
 		return true;
 	}
 	if (equalStrings(path, "core:quat") || equalStrings(path, "core:quat.lum")) {
@@ -219,6 +231,33 @@ bool testGlobalVariablesTypecheck() {
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
 	ASSERT_TRUE(LumScript::compile(module, source, diagnostics));
 	ASSERT_TRUE(module.globals.size() == 3);
+	return true;
+}
+
+bool testCoreDVec3RequiresImport() {
+	const char* source = R"(
+		fn main() : void {
+			const v : DVec3 = { 1, 2, 3 };
+		}
+	)";
+	LumScript::Module module(getGlobalAllocator());
+	LumScript::Diagnostics diagnostics(getGlobalAllocator());
+	ASSERT_TRUE(!LumScript::compile(module, source, diagnostics));
+	ASSERT_TRUE(diagnostics.has_error);
+	return true;
+}
+
+bool testCoreDVec3TypechecksWithImport() {
+	const char* source = R"(
+		import "core:dvec3"
+		fn main() : f64 {
+			const v : DVec3 = DVec3 { 1.0, 2.0, 3.0 };
+			return v.x + v.y + v.z;
+		}
+	)";
+	LumScript::Module module(getGlobalAllocator());
+	LumScript::Diagnostics diagnostics(getGlobalAllocator());
+	ASSERT_TRUE(LumScript::compile(module, source, diagnostics, resolveLumScriptImport, nullptr));
 	return true;
 }
 
@@ -674,6 +713,24 @@ bool testGeneratedWorldFunctionsTypecheck() {
 		ASSERT_TRUE(fn.return_type.nullable);
 	}
 	ASSERT_TRUE(found_find_by_name);
+	return true;
+}
+
+bool testWorldRendererAccessorTypecheck() {
+	const char* source = R"(
+		import "engine:world" as world
+
+		fn init(w : world.World) : void {
+			const r = w.renderer();
+			if r != null {
+				return;
+			}
+		}
+	)";
+	LumScript::Module module(getGlobalAllocator());
+	LumScript::Diagnostics diagnostics(getGlobalAllocator());
+	const bool ok = LumScript::compile(module, source, diagnostics, resolveLumScriptEngineImport, nullptr);
+	ASSERT_TRUE(ok);
 	return true;
 }
 
@@ -1687,6 +1744,7 @@ void runLumScriptCompilerTests() {
 	RUN_TEST(testGeneratedInputImportTypechecks);
 	RUN_TEST(testGeneratedImguiImportTypechecks);
 	RUN_TEST(testGeneratedWorldFunctionsTypecheck);
+	RUN_TEST(testWorldRendererAccessorTypecheck);
 	RUN_TEST(testFirstParameterNamespaceResolutionPrecedenceTypecheck);
 	RUN_TEST(testWorldTransformFunctionsAreNotRegistered);
 	RUN_TEST(testDemoLumTypechecks);
@@ -1735,4 +1793,6 @@ void runLumScriptCompilerTests() {
 	RUN_TEST(testStringConcatenationTypechecks);
 	RUN_TEST(testStringConcatenationRejectsNonString);
 	RUN_TEST(testCoreVec3RequiresImport);
+	RUN_TEST(testCoreDVec3RequiresImport);
+	RUN_TEST(testCoreDVec3TypechecksWithImport);
 }

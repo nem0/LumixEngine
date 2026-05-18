@@ -256,14 +256,14 @@ enum DynamicType {
 };
 
 // import engine:entity as entity
-fn destroy(arg0 : Entity) : void;
-fn isValid(arg0 : Entity) : bool;
-fn getPosition(arg0 : Entity) : Vec3;
-fn getRotation(arg0 : Entity) : Quat;
-fn getScale(arg0 : Entity) : Vec3;
-fn setPosition(arg0 : Entity, arg1 : Vec3) : void;
-fn setScale(arg0 : Entity, arg1 : Vec3) : void;
-fn setRotation(arg0 : Entity, arg1 : Quat) : void;
+fn destroy(e : Entity) : void;
+fn isValid(e : Entity) : bool;
+fn getPosition(e : Entity) : DVec3;
+fn getRotation(e : Entity) : Quat;
+fn getScale(e : Entity) : Vec3;
+fn setPosition(e : Entity, position : DVec3) : void;
+fn setScale(e : Entity, scale : Vec3) : void;
+fn setRotation(e : Entity, rotation : Quat) : void;
 fn property_animator(arg0 : Entity) : ?PropertyAnimator;
 fn animator(arg0 : Entity) : ?Animator;
 fn animable(arg0 : Entity) : ?Animable;
@@ -304,362 +304,384 @@ fn procedural_geom(arg0 : Entity) : ?ProceduralGeometry;
 fn ui_3d(arg0 : Entity) : ?UI3D;
 
 // import engine:world as world
-fn createEntity(arg0 : World) : Entity;
-fn destroyEntity(arg0 : World, arg1 : Entity) : void;
-fn hasEntity(arg0 : World, arg1 : Entity) : bool;
-fn findByName(arg0 : World, arg1 : string) : ?Entity;
+fn createEntity(w : World) : Entity;
+fn destroyEntity(w : World, e : Entity) : void;
+fn hasEntity(w : World, e : Entity) : bool;
+fn findByName(w : World, name : string) : ?Entity;
+fn animation(w : World) : ?animation.AnimationModule;
+fn audio(w : World) : ?audio.AudioModule;
+fn core(w : World) : ?core.CoreModule;
+fn lua_script(w : World) : ?lua_script.LuaScriptModule;
+fn navigation(w : World) : ?navigation.NavigationModule;
+fn physics(w : World) : ?physics.PhysicsModule;
+fn renderer(w : World) : ?renderer.RenderModule;
+fn ui(w : World) : ?ui.UIModule;
+
+// import engine:audio as audio
+fn setMasterVolume(module : AudioModule, volume : f32) : void;
+
+// import engine:physics as physics
+fn raycast(module : PhysicsModule, origin : Vec3, dir : Vec3, distance : f32, ignore_entity : Entity) : Entity;
+fn setGravity(module : PhysicsModule, gravity : Vec3) : void;
+
+// import engine:renderer as renderer
+fn setActiveCamera(module : RenderModule, camera : Entity) : void;
+fn setActiveEnvironment(module : RenderModule, entity : Entity) : void;
+
+// import engine:ui as ui
+fn isReady(module : UIModule) : bool;
 
 // import engine:property_animator as property_animator
-fn isPropertyAnimatorEnabled(arg0 : PropertyAnimator) : bool;
-fn enablePropertyAnimator(arg0 : PropertyAnimator, arg1 : bool) : void;
-fn getPropertyAnimatorLooped(arg0 : PropertyAnimator) : bool;
-fn setPropertyAnimatorLooped(arg0 : PropertyAnimator, arg1 : bool) : void;
-fn getPropertyAnimatorAnimation(arg0 : PropertyAnimator) : string;
-fn setPropertyAnimatorAnimation(arg0 : PropertyAnimator, arg1 : string) : void;
+fn isPropertyAnimatorEnabled(entity : PropertyAnimator) : bool;
+fn enablePropertyAnimator(entity : PropertyAnimator, enabled : bool) : void;
+fn getPropertyAnimatorLooped(entity : PropertyAnimator) : bool;
+fn setPropertyAnimatorLooped(entity : PropertyAnimator, looped : bool) : void;
+fn getPropertyAnimatorAnimation(entity : PropertyAnimator) : string;
+fn setPropertyAnimatorAnimation(entity : PropertyAnimator, path : string) : void;
 
 // import engine:animator as animator
-fn applySet(arg0 : Animator, arg1 : i32) : void;
-fn setBoolInput(arg0 : Animator, arg1 : i32, arg2 : bool) : void;
-fn setFloatInput(arg0 : Animator, arg1 : i32, arg2 : f32) : void;
-fn setVec3Input(arg0 : Animator, arg1 : i32, arg2 : Vec3) : void;
-fn getInputIndex(arg0 : Animator, arg1 : string) : i32;
-fn getAnimatorSource(arg0 : Animator) : string;
-fn setAnimatorSource(arg0 : Animator, arg1 : string) : void;
-fn getAnimatorUseRootMotion(arg0 : Animator) : bool;
-fn setAnimatorUseRootMotion(arg0 : Animator, arg1 : bool) : void;
-fn getAnimatorDefaultSet(arg0 : Animator) : i32;
-fn setAnimatorDefaultSet(arg0 : Animator, arg1 : i32) : void;
+fn applySet(entity : Animator, idx : i32) : void;
+fn setBoolInput(entity : Animator, input_idx : i32, value : bool) : void;
+fn setFloatInput(entity : Animator, input_idx : i32, value : f32) : void;
+fn setVec3Input(entity : Animator, input_idx : i32, value : Vec3) : void;
+fn getInputIndex(entity : Animator, name : string) : i32;
+fn getAnimatorSource(entity : Animator) : string;
+fn setAnimatorSource(entity : Animator, path : string) : void;
+fn getAnimatorUseRootMotion(entity : Animator) : bool;
+fn setAnimatorUseRootMotion(entity : Animator, value : bool) : void;
+fn getAnimatorDefaultSet(entity : Animator) : i32;
+fn setAnimatorDefaultSet(entity : Animator, idx : i32) : void;
 
 // import engine:animable as animable
-fn getAnimableAnimation(arg0 : Animable) : string;
-fn setAnimableAnimation(arg0 : Animable, arg1 : string) : void;
+fn getAnimableAnimation(entity : Animable) : string;
+fn setAnimableAnimation(entity : Animable, path : string) : void;
 
 // import engine:ambient_sound as ambient_sound
-fn pause(arg0 : AmbientSound) : void;
-fn resume(arg0 : AmbientSound) : void;
-fn getAmbientSoundClip(arg0 : AmbientSound) : string;
-fn setAmbientSoundClip(arg0 : AmbientSound, arg1 : string) : void;
-fn isAmbientSound3D(arg0 : AmbientSound) : bool;
-fn setAmbientSound3D(arg0 : AmbientSound, arg1 : bool) : void;
+fn pause(entity : AmbientSound) : void;
+fn resume(entity : AmbientSound) : void;
+fn getAmbientSoundClip(entity : AmbientSound) : string;
+fn setAmbientSoundClip(entity : AmbientSound, clip : string) : void;
+fn isAmbientSound3D(entity : AmbientSound) : bool;
+fn setAmbientSound3D(entity : AmbientSound, is_3d : bool) : void;
 
 // import engine:lua_script as lua_script
-fn scriptsCount(arg0 : Script) : i32;
-fn scripts(arg0 : Script, idx : i32) : ?ScriptScriptArrayItem;
-fn isScriptEnabled(arg0 : ScriptScriptArrayItem) : bool;
-fn enableScript(arg0 : ScriptScriptArrayItem, arg1 : bool) : void;
-fn getScriptPath(arg0 : ScriptScriptArrayItem) : string;
-fn setScriptPath(arg0 : ScriptScriptArrayItem, arg1 : string) : void;
+fn scriptsCount(component : Script) : i32;
+fn scripts(component : Script, idx : i32) : ?ScriptScriptArrayItem;
+fn isScriptEnabled(item : ScriptScriptArrayItem) : bool;
+fn enableScript(item : ScriptScriptArrayItem, enable : bool) : void;
+fn getScriptPath(item : ScriptScriptArrayItem) : string;
+fn setScriptPath(item : ScriptScriptArrayItem, path : string) : void;
 
 // import engine:lua_script_inline as lua_script_inline
-fn setInlineScriptCode(arg0 : InlineScript, arg1 : string) : void;
+fn setInlineScriptCode(entity : InlineScript, value : string) : void;
 
 // import engine:navmesh_zone as navmesh_zone
-fn load(arg0 : Zone) : bool;
-fn drawCompactHeightfield(arg0 : Zone) : void;
-fn drawHeightfield(arg0 : Zone) : void;
-fn drawContours(arg0 : Zone) : void;
-fn saveZone(arg0 : Zone) : bool;
-fn getZoneAutoload(arg0 : Zone) : bool;
-fn setZoneAutoload(arg0 : Zone, arg1 : bool) : void;
-fn getZoneDetailed(arg0 : Zone) : bool;
-fn setZoneDetailed(arg0 : Zone, arg1 : bool) : void;
+fn load(zone_entity : Zone) : bool;
+fn drawCompactHeightfield(zone : Zone) : void;
+fn drawHeightfield(zone : Zone) : void;
+fn drawContours(zone : Zone) : void;
+fn saveZone(zone_entity : Zone) : bool;
+fn getZoneAutoload(entity : Zone) : bool;
+fn setZoneAutoload(entity : Zone, value : bool) : void;
+fn getZoneDetailed(entity : Zone) : bool;
+fn setZoneDetailed(entity : Zone, value : bool) : void;
 
 // import engine:navmesh_agent as navmesh_agent
-fn cancelNavigation(arg0 : Agent) : void;
-fn drawPath(arg0 : Agent, arg1 : bool) : void;
-fn getAgentRadius(arg0 : Agent) : f32;
-fn setAgentRadius(arg0 : Agent, arg1 : f32) : void;
-fn getAgentHeight(arg0 : Agent) : f32;
-fn setAgentHeight(arg0 : Agent, arg1 : f32) : void;
-fn getAgentMoveEntity(arg0 : Agent) : bool;
-fn setAgentMoveEntity(arg0 : Agent, arg1 : bool) : void;
-fn getAgentSpeed(arg0 : Agent) : f32;
+fn cancelNavigation(entity : Agent) : void;
+fn drawPath(agent_entity : Agent, include_polygons : bool) : void;
+fn getAgentRadius(entity : Agent) : f32;
+fn setAgentRadius(entity : Agent, radius : f32) : void;
+fn getAgentHeight(entity : Agent) : f32;
+fn setAgentHeight(entity : Agent, height : f32) : void;
+fn getAgentMoveEntity(entity : Agent) : bool;
+fn setAgentMoveEntity(entity : Agent, value : bool) : void;
+fn getAgentSpeed(entity : Agent) : f32;
 
 // import engine:physical_heightfield as physical_heightfield
-fn getHeightfieldSource(arg0 : Heightfield) : string;
-fn setHeightfieldSource(arg0 : Heightfield, arg1 : string) : void;
-fn getHeightfieldXZScale(arg0 : Heightfield) : f32;
-fn setHeightfieldXZScale(arg0 : Heightfield, arg1 : f32) : void;
-fn getHeightfieldYScale(arg0 : Heightfield) : f32;
-fn setHeightfieldYScale(arg0 : Heightfield, arg1 : f32) : void;
-fn getHeightfieldLayer(arg0 : Heightfield) : i32;
-fn setHeightfieldLayer(arg0 : Heightfield, arg1 : i32) : void;
+fn getHeightfieldSource(entity : Heightfield) : string;
+fn setHeightfieldSource(entity : Heightfield, path : string) : void;
+fn getHeightfieldXZScale(entity : Heightfield) : f32;
+fn setHeightfieldXZScale(entity : Heightfield, scale : f32) : void;
+fn getHeightfieldYScale(entity : Heightfield) : f32;
+fn setHeightfieldYScale(entity : Heightfield, scale : f32) : void;
+fn getHeightfieldLayer(entity : Heightfield) : i32;
+fn setHeightfieldLayer(entity : Heightfield, layer : i32) : void;
 
 // import engine:d6_joint as d6_joint
-fn getD6JointXMotion(arg0 : D6Joint) : D6Motion;
-fn setD6JointXMotion(arg0 : D6Joint, arg1 : D6Motion) : void;
-fn getD6JointYMotion(arg0 : D6Joint) : D6Motion;
-fn setD6JointYMotion(arg0 : D6Joint, arg1 : D6Motion) : void;
-fn getD6JointZMotion(arg0 : D6Joint) : D6Motion;
-fn setD6JointZMotion(arg0 : D6Joint, arg1 : D6Motion) : void;
-fn getD6JointSwing1Motion(arg0 : D6Joint) : D6Motion;
-fn setD6JointSwing1Motion(arg0 : D6Joint, arg1 : D6Motion) : void;
-fn getD6JointSwing2Motion(arg0 : D6Joint) : D6Motion;
-fn setD6JointSwing2Motion(arg0 : D6Joint, arg1 : D6Motion) : void;
-fn getD6JointTwistMotion(arg0 : D6Joint) : D6Motion;
-fn setD6JointTwistMotion(arg0 : D6Joint, arg1 : D6Motion) : void;
-fn getD6JointLinearLimit(arg0 : D6Joint) : f32;
-fn setD6JointLinearLimit(arg0 : D6Joint, arg1 : f32) : void;
-fn getD6JointDamping(arg0 : D6Joint) : f32;
-fn setD6JointDamping(arg0 : D6Joint, arg1 : f32) : void;
-fn getD6JointStiffness(arg0 : D6Joint) : f32;
-fn setD6JointStiffness(arg0 : D6Joint, arg1 : f32) : void;
-fn getD6JointRestitution(arg0 : D6Joint) : f32;
-fn setD6JointRestitution(arg0 : D6Joint, arg1 : f32) : void;
-fn getD6JointConnectedBody(arg0 : D6Joint) : Entity;
-fn setD6JointConnectedBody(arg0 : D6Joint, arg1 : Entity) : void;
-fn getD6JointAxisPosition(arg0 : D6Joint) : Vec3;
-fn setD6JointAxisPosition(arg0 : D6Joint, arg1 : Vec3) : void;
-fn getD6JointAxisDirection(arg0 : D6Joint) : Vec3;
-fn setD6JointAxisDirection(arg0 : D6Joint, arg1 : Vec3) : void;
+fn getD6JointXMotion(entity : D6Joint) : D6Motion;
+fn setD6JointXMotion(entity : D6Joint, motion : D6Motion) : void;
+fn getD6JointYMotion(entity : D6Joint) : D6Motion;
+fn setD6JointYMotion(entity : D6Joint, motion : D6Motion) : void;
+fn getD6JointZMotion(entity : D6Joint) : D6Motion;
+fn setD6JointZMotion(entity : D6Joint, motion : D6Motion) : void;
+fn getD6JointSwing1Motion(entity : D6Joint) : D6Motion;
+fn setD6JointSwing1Motion(entity : D6Joint, motion : D6Motion) : void;
+fn getD6JointSwing2Motion(entity : D6Joint) : D6Motion;
+fn setD6JointSwing2Motion(entity : D6Joint, motion : D6Motion) : void;
+fn getD6JointTwistMotion(entity : D6Joint) : D6Motion;
+fn setD6JointTwistMotion(entity : D6Joint, motion : D6Motion) : void;
+fn getD6JointLinearLimit(entity : D6Joint) : f32;
+fn setD6JointLinearLimit(entity : D6Joint, limit : f32) : void;
+fn getD6JointDamping(entity : D6Joint) : f32;
+fn setD6JointDamping(entity : D6Joint, value : f32) : void;
+fn getD6JointStiffness(entity : D6Joint) : f32;
+fn setD6JointStiffness(entity : D6Joint, value : f32) : void;
+fn getD6JointRestitution(entity : D6Joint) : f32;
+fn setD6JointRestitution(entity : D6Joint, value : f32) : void;
+fn getD6JointConnectedBody(entity : D6Joint) : Entity;
+fn setD6JointConnectedBody(entity : D6Joint, connected_body : Entity) : void;
+fn getD6JointAxisPosition(entity : D6Joint) : Vec3;
+fn setD6JointAxisPosition(entity : D6Joint, value : Vec3) : void;
+fn getD6JointAxisDirection(entity : D6Joint) : Vec3;
+fn setD6JointAxisDirection(entity : D6Joint, value : Vec3) : void;
 
 // import engine:distance_joint as distance_joint
-fn getDistanceJointConnectedBody(arg0 : DistanceJoint) : Entity;
-fn setDistanceJointConnectedBody(arg0 : DistanceJoint, arg1 : Entity) : void;
-fn getDistanceJointAxisPosition(arg0 : DistanceJoint) : Vec3;
-fn setDistanceJointAxisPosition(arg0 : DistanceJoint, arg1 : Vec3) : void;
-fn getDistanceJointDamping(arg0 : DistanceJoint) : f32;
-fn setDistanceJointDamping(arg0 : DistanceJoint, arg1 : f32) : void;
-fn getDistanceJointStiffness(arg0 : DistanceJoint) : f32;
-fn setDistanceJointStiffness(arg0 : DistanceJoint, arg1 : f32) : void;
-fn getDistanceJointTolerance(arg0 : DistanceJoint) : f32;
-fn setDistanceJointTolerance(arg0 : DistanceJoint, arg1 : f32) : void;
-fn getDistanceJointLinearForce(arg0 : DistanceJoint) : Vec3;
+fn getDistanceJointConnectedBody(entity : DistanceJoint) : Entity;
+fn setDistanceJointConnectedBody(entity : DistanceJoint, connected_body : Entity) : void;
+fn getDistanceJointAxisPosition(entity : DistanceJoint) : Vec3;
+fn setDistanceJointAxisPosition(entity : DistanceJoint, value : Vec3) : void;
+fn getDistanceJointDamping(entity : DistanceJoint) : f32;
+fn setDistanceJointDamping(entity : DistanceJoint, value : f32) : void;
+fn getDistanceJointStiffness(entity : DistanceJoint) : f32;
+fn setDistanceJointStiffness(entity : DistanceJoint, value : f32) : void;
+fn getDistanceJointTolerance(entity : DistanceJoint) : f32;
+fn setDistanceJointTolerance(entity : DistanceJoint, value : f32) : void;
+fn getDistanceJointLinearForce(entity : DistanceJoint) : Vec3;
 
 // import engine:hinge_joint as hinge_joint
-fn getHingeJointConnectedBody(arg0 : HingeJoint) : Entity;
-fn setHingeJointConnectedBody(arg0 : HingeJoint, arg1 : Entity) : void;
-fn getHingeJointAxisPosition(arg0 : HingeJoint) : Vec3;
-fn setHingeJointAxisPosition(arg0 : HingeJoint, arg1 : Vec3) : void;
-fn getHingeJointAxisDirection(arg0 : HingeJoint) : Vec3;
-fn setHingeJointAxisDirection(arg0 : HingeJoint, arg1 : Vec3) : void;
-fn getHingeJointDamping(arg0 : HingeJoint) : f32;
-fn setHingeJointDamping(arg0 : HingeJoint, arg1 : f32) : void;
-fn getHingeJointStiffness(arg0 : HingeJoint) : f32;
-fn setHingeJointStiffness(arg0 : HingeJoint, arg1 : f32) : void;
-fn getHingeJointUseLimit(arg0 : HingeJoint) : bool;
-fn setHingeJointUseLimit(arg0 : HingeJoint, arg1 : bool) : void;
+fn getHingeJointConnectedBody(entity : HingeJoint) : Entity;
+fn setHingeJointConnectedBody(entity : HingeJoint, connected_body : Entity) : void;
+fn getHingeJointAxisPosition(entity : HingeJoint) : Vec3;
+fn setHingeJointAxisPosition(entity : HingeJoint, value : Vec3) : void;
+fn getHingeJointAxisDirection(entity : HingeJoint) : Vec3;
+fn setHingeJointAxisDirection(entity : HingeJoint, value : Vec3) : void;
+fn getHingeJointDamping(entity : HingeJoint) : f32;
+fn setHingeJointDamping(entity : HingeJoint, value : f32) : void;
+fn getHingeJointStiffness(entity : HingeJoint) : f32;
+fn setHingeJointStiffness(entity : HingeJoint, value : f32) : void;
+fn getHingeJointUseLimit(entity : HingeJoint) : bool;
+fn setHingeJointUseLimit(entity : HingeJoint, use_limit : bool) : void;
 
 // import engine:spherical_joint as spherical_joint
-fn getSphericalJointConnectedBody(arg0 : SphericalJoint) : Entity;
-fn setSphericalJointConnectedBody(arg0 : SphericalJoint, arg1 : Entity) : void;
-fn getSphericalJointAxisPosition(arg0 : SphericalJoint) : Vec3;
-fn setSphericalJointAxisPosition(arg0 : SphericalJoint, arg1 : Vec3) : void;
-fn getSphericalJointAxisDirection(arg0 : SphericalJoint) : Vec3;
-fn setSphericalJointAxisDirection(arg0 : SphericalJoint, arg1 : Vec3) : void;
-fn getSphericalJointUseLimit(arg0 : SphericalJoint) : bool;
-fn setSphericalJointUseLimit(arg0 : SphericalJoint, arg1 : bool) : void;
+fn getSphericalJointConnectedBody(entity : SphericalJoint) : Entity;
+fn setSphericalJointConnectedBody(entity : SphericalJoint, connected_body : Entity) : void;
+fn getSphericalJointAxisPosition(entity : SphericalJoint) : Vec3;
+fn setSphericalJointAxisPosition(entity : SphericalJoint, value : Vec3) : void;
+fn getSphericalJointAxisDirection(entity : SphericalJoint) : Vec3;
+fn setSphericalJointAxisDirection(entity : SphericalJoint, value : Vec3) : void;
+fn getSphericalJointUseLimit(entity : SphericalJoint) : bool;
+fn setSphericalJointUseLimit(entity : SphericalJoint, use_limit : bool) : void;
 
 // import engine:physical_controller as physical_controller
-fn getGravitySpeed(arg0 : Controller) : f32;
-fn move(arg0 : Controller, arg1 : Vec3) : void;
-fn isCollisionDown(arg0 : Controller) : bool;
-fn resize(arg0 : Controller, arg1 : f32) : void;
-fn getControllerLayer(arg0 : Controller) : i32;
-fn setControllerLayer(arg0 : Controller, arg1 : i32) : void;
-fn getControllerRadius(arg0 : Controller) : f32;
-fn setControllerRadius(arg0 : Controller, arg1 : f32) : void;
-fn getControllerHeight(arg0 : Controller) : f32;
-fn setControllerHeight(arg0 : Controller, arg1 : f32) : void;
-fn getControllerCustomGravity(arg0 : Controller) : bool;
-fn setControllerCustomGravity(arg0 : Controller, arg1 : bool) : void;
-fn getControllerCustomGravityAcceleration(arg0 : Controller) : f32;
-fn setControllerCustomGravityAcceleration(arg0 : Controller, arg1 : f32) : void;
-fn getControllerUseRootMotion(arg0 : Controller) : bool;
-fn setControllerUseRootMotion(arg0 : Controller, arg1 : bool) : void;
+fn getGravitySpeed(entity : Controller) : f32;
+fn move(entity : Controller, v : Vec3) : void;
+fn isCollisionDown(entity : Controller) : bool;
+fn resize(entity : Controller, height : f32) : void;
+fn getControllerLayer(entity : Controller) : i32;
+fn setControllerLayer(entity : Controller, layer : i32) : void;
+fn getControllerRadius(entity : Controller) : f32;
+fn setControllerRadius(entity : Controller, radius : f32) : void;
+fn getControllerHeight(entity : Controller) : f32;
+fn setControllerHeight(entity : Controller, height : f32) : void;
+fn getControllerCustomGravity(entity : Controller) : bool;
+fn setControllerCustomGravity(entity : Controller, gravity : bool) : void;
+fn getControllerCustomGravityAcceleration(entity : Controller) : f32;
+fn setControllerCustomGravityAcceleration(entity : Controller, gravityacceleration : f32) : void;
+fn getControllerUseRootMotion(entity : Controller) : bool;
+fn setControllerUseRootMotion(entity : Controller, enable : bool) : void;
 
 // import engine:rigid_actor as rigid_actor
-fn putToSleep(arg0 : Actor) : void;
-fn addForceAtPos(arg0 : Actor, arg1 : Vec3, arg2 : Vec3) : void;
-fn applyForce(arg0 : Actor, arg1 : Vec3) : void;
-fn applyImpulse(arg0 : Actor, arg1 : Vec3) : void;
-fn getActorVelocity(arg0 : Actor) : Vec3;
-fn getActorSpeed(arg0 : Actor) : f32;
-fn getActorLayer(arg0 : Actor) : i32;
-fn setActorLayer(arg0 : Actor, arg1 : i32) : void;
-fn getActorDynamicType(arg0 : Actor) : DynamicType;
-fn setActorDynamicType(arg0 : Actor, arg1 : DynamicType) : void;
-fn getActorIsTrigger(arg0 : Actor) : bool;
-fn setActorIsTrigger(arg0 : Actor, arg1 : bool) : void;
-fn getActorMesh(arg0 : Actor) : string;
-fn setActorMesh(arg0 : Actor, arg1 : string) : void;
-fn getActorMaterial(arg0 : Actor) : string;
-fn setActorMaterial(arg0 : Actor, arg1 : string) : void;
-fn getActorCCD(arg0 : Actor) : bool;
-fn setActorCCD(arg0 : Actor, arg1 : bool) : void;
-fn boxesCount(arg0 : Actor) : i32;
-fn boxes(arg0 : Actor, idx : i32) : ?ActorBoxArrayItem;
-fn getBoxHalfExtents(arg0 : ActorBoxArrayItem) : Vec3;
-fn setBoxHalfExtents(arg0 : ActorBoxArrayItem, arg1 : Vec3) : void;
-fn getBoxOffsetPosition(arg0 : ActorBoxArrayItem) : Vec3;
-fn setBoxOffsetPosition(arg0 : ActorBoxArrayItem, arg1 : Vec3) : void;
-fn getBoxOffsetRotation(arg0 : ActorBoxArrayItem) : Vec3;
-fn setBoxOffsetRotation(arg0 : ActorBoxArrayItem, arg1 : Vec3) : void;
-fn spheresCount(arg0 : Actor) : i32;
-fn spheres(arg0 : Actor, idx : i32) : ?ActorSphereArrayItem;
-fn getSphereRadius(arg0 : ActorSphereArrayItem) : f32;
-fn setSphereRadius(arg0 : ActorSphereArrayItem, arg1 : f32) : void;
-fn getSphereOffsetPosition(arg0 : ActorSphereArrayItem) : Vec3;
-fn setSphereOffsetPosition(arg0 : ActorSphereArrayItem, arg1 : Vec3) : void;
+fn putToSleep(entity : Actor) : void;
+fn addForceAtPos(entity : Actor, force : Vec3, pos : Vec3) : void;
+fn applyForce(entity : Actor, force : Vec3) : void;
+fn applyImpulse(entity : Actor, force : Vec3) : void;
+fn getActorVelocity(entity : Actor) : Vec3;
+fn getActorSpeed(entity : Actor) : f32;
+fn getActorLayer(entity : Actor) : i32;
+fn setActorLayer(entity : Actor, layer : i32) : void;
+fn getActorDynamicType(entity : Actor) : DynamicType;
+fn setActorDynamicType(entity : Actor,  : DynamicType) : void;
+fn getActorIsTrigger(entity : Actor) : bool;
+fn setActorIsTrigger(entity : Actor, is_trigger : bool) : void;
+fn getActorMesh(entity : Actor) : string;
+fn setActorMesh(entity : Actor, path : string) : void;
+fn getActorMaterial(entity : Actor) : string;
+fn setActorMaterial(entity : Actor, path : string) : void;
+fn getActorCCD(e : Actor) : bool;
+fn setActorCCD(e : Actor, is_ccd : bool) : void;
+fn boxesCount(component : Actor) : i32;
+fn boxes(component : Actor, idx : i32) : ?ActorBoxArrayItem;
+fn getBoxHalfExtents(item : ActorBoxArrayItem) : Vec3;
+fn setBoxHalfExtents(item : ActorBoxArrayItem, size : Vec3) : void;
+fn getBoxOffsetPosition(item : ActorBoxArrayItem) : Vec3;
+fn setBoxOffsetPosition(item : ActorBoxArrayItem, pos : Vec3) : void;
+fn getBoxOffsetRotation(item : ActorBoxArrayItem) : Vec3;
+fn setBoxOffsetRotation(item : ActorBoxArrayItem, euler_angles : Vec3) : void;
+fn spheresCount(component : Actor) : i32;
+fn spheres(component : Actor, idx : i32) : ?ActorSphereArrayItem;
+fn getSphereRadius(item : ActorSphereArrayItem) : f32;
+fn setSphereRadius(item : ActorSphereArrayItem, size : f32) : void;
+fn getSphereOffsetPosition(item : ActorSphereArrayItem) : Vec3;
+fn setSphereOffsetPosition(item : ActorSphereArrayItem, pos : Vec3) : void;
 
 // import engine:wheel as wheel
-fn getWheelSpringStrength(arg0 : Wheel) : f32;
-fn setWheelSpringStrength(arg0 : Wheel, arg1 : f32) : void;
-fn getWheelSpringMaxCompression(arg0 : Wheel) : f32;
-fn setWheelSpringMaxCompression(arg0 : Wheel, arg1 : f32) : void;
-fn getWheelSpringMaxDroop(arg0 : Wheel) : f32;
-fn setWheelSpringMaxDroop(arg0 : Wheel, arg1 : f32) : void;
-fn getWheelSpringDamperRate(arg0 : Wheel) : f32;
-fn setWheelSpringDamperRate(arg0 : Wheel, arg1 : f32) : void;
-fn getWheelRadius(arg0 : Wheel) : f32;
-fn setWheelRadius(arg0 : Wheel, arg1 : f32) : void;
-fn getWheelWidth(arg0 : Wheel) : f32;
-fn setWheelWidth(arg0 : Wheel, arg1 : f32) : void;
-fn getWheelMass(arg0 : Wheel) : f32;
-fn setWheelMass(arg0 : Wheel, arg1 : f32) : void;
-fn getWheelMOI(arg0 : Wheel) : f32;
-fn setWheelMOI(arg0 : Wheel, arg1 : f32) : void;
-fn getWheelSlot(arg0 : Wheel) : WheelSlot;
-fn setWheelSlot(arg0 : Wheel, arg1 : WheelSlot) : void;
-fn getWheelRPM(arg0 : Wheel) : f32;
+fn getWheelSpringStrength(entity : Wheel) : f32;
+fn setWheelSpringStrength(entity : Wheel, str : f32) : void;
+fn getWheelSpringMaxCompression(entity : Wheel) : f32;
+fn setWheelSpringMaxCompression(entity : Wheel, str : f32) : void;
+fn getWheelSpringMaxDroop(entity : Wheel) : f32;
+fn setWheelSpringMaxDroop(entity : Wheel, str : f32) : void;
+fn getWheelSpringDamperRate(entity : Wheel) : f32;
+fn setWheelSpringDamperRate(entity : Wheel, rate : f32) : void;
+fn getWheelRadius(entity : Wheel) : f32;
+fn setWheelRadius(entity : Wheel, r : f32) : void;
+fn getWheelWidth(entity : Wheel) : f32;
+fn setWheelWidth(entity : Wheel, w : f32) : void;
+fn getWheelMass(entity : Wheel) : f32;
+fn setWheelMass(entity : Wheel, w : f32) : void;
+fn getWheelMOI(entity : Wheel) : f32;
+fn setWheelMOI(entity : Wheel, moi : f32) : void;
+fn getWheelSlot(entity : Wheel) : WheelSlot;
+fn setWheelSlot(entity : Wheel, s : WheelSlot) : void;
+fn getWheelRPM(entity : Wheel) : f32;
 
 // import engine:vehicle as vehicle
-fn getVehiclePeakTorque(arg0 : Vehicle) : f32;
-fn setVehiclePeakTorque(arg0 : Vehicle, arg1 : f32) : void;
-fn getVehicleMaxRPM(arg0 : Vehicle) : f32;
-fn setVehicleMaxRPM(arg0 : Vehicle, arg1 : f32) : void;
-fn getVehicleRPM(arg0 : Vehicle) : f32;
-fn getVehicleCurrentGear(arg0 : Vehicle) : i32;
-fn getVehicleSpeed(arg0 : Vehicle) : f32;
-fn setVehicleAccel(arg0 : Vehicle, arg1 : f32) : void;
-fn setVehicleSteer(arg0 : Vehicle, arg1 : f32) : void;
-fn setVehicleBrake(arg0 : Vehicle, arg1 : f32) : void;
-fn getVehicleChassis(arg0 : Vehicle) : string;
-fn setVehicleChassis(arg0 : Vehicle, arg1 : string) : void;
-fn getVehicleMass(arg0 : Vehicle) : f32;
-fn setVehicleMass(arg0 : Vehicle, arg1 : f32) : void;
-fn getVehicleMOIMultiplier(arg0 : Vehicle) : f32;
-fn setVehicleMOIMultiplier(arg0 : Vehicle, arg1 : f32) : void;
-fn getVehicleCenterOfMass(arg0 : Vehicle) : Vec3;
-fn setVehicleCenterOfMass(arg0 : Vehicle, arg1 : Vec3) : void;
-fn getVehicleWheelsLayer(arg0 : Vehicle) : i32;
-fn setVehicleWheelsLayer(arg0 : Vehicle, arg1 : i32) : void;
-fn getVehicleChassisLayer(arg0 : Vehicle) : i32;
-fn setVehicleChassisLayer(arg0 : Vehicle, arg1 : i32) : void;
+fn getVehiclePeakTorque(entity : Vehicle) : f32;
+fn setVehiclePeakTorque(entity : Vehicle, value : f32) : void;
+fn getVehicleMaxRPM(entity : Vehicle) : f32;
+fn setVehicleMaxRPM(entity : Vehicle, value : f32) : void;
+fn getVehicleRPM(entity : Vehicle) : f32;
+fn getVehicleCurrentGear(entity : Vehicle) : i32;
+fn getVehicleSpeed(entity : Vehicle) : f32;
+fn setVehicleAccel(entity : Vehicle, accel : f32) : void;
+fn setVehicleSteer(entity : Vehicle, value : f32) : void;
+fn setVehicleBrake(entity : Vehicle, value : f32) : void;
+fn getVehicleChassis(entity : Vehicle) : string;
+fn setVehicleChassis(entity : Vehicle, path : string) : void;
+fn getVehicleMass(entity : Vehicle) : f32;
+fn setVehicleMass(entity : Vehicle, mass : f32) : void;
+fn getVehicleMOIMultiplier(entity : Vehicle) : f32;
+fn setVehicleMOIMultiplier(entity : Vehicle, m : f32) : void;
+fn getVehicleCenterOfMass(entity : Vehicle) : Vec3;
+fn setVehicleCenterOfMass(entity : Vehicle, center : Vec3) : void;
+fn getVehicleWheelsLayer(entity : Vehicle) : i32;
+fn setVehicleWheelsLayer(entity : Vehicle, layer : i32) : void;
+fn getVehicleChassisLayer(entity : Vehicle) : i32;
+fn setVehicleChassisLayer(entity : Vehicle, layer : i32) : void;
 
 // import engine:physical_instanced_cube as physical_instanced_cube
-fn getInstancedCubeHalfExtents(arg0 : InstancedCube) : Vec3;
-fn setInstancedCubeHalfExtents(arg0 : InstancedCube, arg1 : Vec3) : void;
-fn getInstancedCubeLayer(arg0 : InstancedCube) : i32;
-fn setInstancedCubeLayer(arg0 : InstancedCube, arg1 : i32) : void;
+fn getInstancedCubeHalfExtents(entity : InstancedCube) : Vec3;
+fn setInstancedCubeHalfExtents(entity : InstancedCube, half_extents : Vec3) : void;
+fn getInstancedCubeLayer(entity : InstancedCube) : i32;
+fn setInstancedCubeLayer(entity : InstancedCube, layer : i32) : void;
 
 // import engine:physical_instanced_mesh as physical_instanced_mesh
-fn getInstancedMeshLayer(arg0 : InstancedMesh) : i32;
-fn setInstancedMeshLayer(arg0 : InstancedMesh, arg1 : i32) : void;
-fn getInstancedMeshGeomPath(arg0 : InstancedMesh) : string;
-fn setInstancedMeshGeomPath(arg0 : InstancedMesh, arg1 : string) : void;
+fn getInstancedMeshLayer(entity : InstancedMesh) : i32;
+fn setInstancedMeshLayer(entity : InstancedMesh, layer : i32) : void;
+fn getInstancedMeshGeomPath(entity : InstancedMesh) : string;
+fn setInstancedMeshGeomPath(entity : InstancedMesh, path : string) : void;
 
 // import engine:camera as camera
-fn getCameraScreenWidth(arg0 : Camera) : f32;
-fn getCameraScreenHeight(arg0 : Camera) : f32;
+fn getCameraScreenWidth(entity : Camera) : f32;
+fn getCameraScreenHeight(entity : Camera) : f32;
 
 // import engine:decal as decal
-fn getDecalMaterialPath(arg0 : Decal) : string;
-fn setDecalMaterialPath(arg0 : Decal, arg1 : string) : void;
-fn getDecalHalfExtents(arg0 : Decal) : Vec3;
-fn setDecalHalfExtents(arg0 : Decal, arg1 : Vec3) : void;
+fn getDecalMaterialPath(entity : Decal) : string;
+fn setDecalMaterialPath(entity : Decal, path : string) : void;
+fn getDecalHalfExtents(entity : Decal) : Vec3;
+fn setDecalHalfExtents(entity : Decal, value : Vec3) : void;
 
 // import engine:environment as environment
-fn getEnvironmentCastShadows(arg0 : Environment) : bool;
-fn setEnvironmentCastShadows(arg0 : Environment, arg1 : bool) : void;
-fn getEnvironmentSkyTexture(arg0 : Environment) : string;
-fn setEnvironmentSkyTexture(arg0 : Environment, arg1 : string) : void;
+fn getEnvironmentCastShadows(entity : Environment) : bool;
+fn setEnvironmentCastShadows(entity : Environment, enable : bool) : void;
+fn getEnvironmentSkyTexture(entity : Environment) : string;
+fn setEnvironmentSkyTexture(entity : Environment, path : string) : void;
 
 // import engine:point_light as point_light
-fn getPointLightRange(arg0 : PointLight) : f32;
-fn setPointLightRange(arg0 : PointLight, arg1 : f32) : void;
-fn getPointLightCastShadows(arg0 : PointLight) : bool;
-fn setPointLightCastShadows(arg0 : PointLight, arg1 : bool) : void;
-fn getPointLightDynamic(arg0 : PointLight) : bool;
-fn setPointLightDynamic(arg0 : PointLight, arg1 : bool) : void;
+fn getPointLightRange(entity : PointLight) : f32;
+fn setPointLightRange(entity : PointLight, value : f32) : void;
+fn getPointLightCastShadows(entity : PointLight) : bool;
+fn setPointLightCastShadows(entity : PointLight, value : bool) : void;
+fn getPointLightDynamic(entity : PointLight) : bool;
+fn setPointLightDynamic(entity : PointLight, value : bool) : void;
 
 // import engine:reflection_probe as reflection_probe
-fn isReflectionProbeEnabled(arg0 : ReflectionProbe) : bool;
-fn enableReflectionProbe(arg0 : ReflectionProbe, arg1 : bool) : void;
+fn isReflectionProbeEnabled(entity : ReflectionProbe) : bool;
+fn enableReflectionProbe(entity : ReflectionProbe, enable : bool) : void;
 
 // import engine:environment_probe as environment_probe
-fn isEnvironmentProbeEnabled(arg0 : EnvironmentProbe) : bool;
-fn enableEnvironmentProbe(arg0 : EnvironmentProbe, arg1 : bool) : void;
+fn isEnvironmentProbeEnabled(entity : EnvironmentProbe) : bool;
+fn enableEnvironmentProbe(entity : EnvironmentProbe, enable : bool) : void;
 
 // import engine:bone_attachment as bone_attachment
-fn setRotation(arg0 : BoneAttachment, arg1 : Quat) : void;
-fn getBoneAttachmentParent(arg0 : BoneAttachment) : Entity;
-fn setBoneAttachmentParent(arg0 : BoneAttachment, arg1 : Entity) : void;
-fn getBoneAttachmentBone(arg0 : BoneAttachment) : i32;
-fn setBoneAttachmentBone(arg0 : BoneAttachment, arg1 : i32) : void;
-fn getBoneAttachmentPosition(arg0 : BoneAttachment) : Vec3;
-fn setBoneAttachmentPosition(arg0 : BoneAttachment, arg1 : Vec3) : void;
-fn getBoneAttachmentRotation(arg0 : BoneAttachment) : Vec3;
-fn setBoneAttachmentRotation(arg0 : BoneAttachment, arg1 : Vec3) : void;
+fn setRotation(entity : BoneAttachment, rot : Quat) : void;
+fn getBoneAttachmentParent(entity : BoneAttachment) : Entity;
+fn setBoneAttachmentParent(entity : BoneAttachment, parent : Entity) : void;
+fn getBoneAttachmentBone(entity : BoneAttachment) : i32;
+fn setBoneAttachmentBone(entity : BoneAttachment, value : i32) : void;
+fn getBoneAttachmentPosition(entity : BoneAttachment) : Vec3;
+fn setBoneAttachmentPosition(entity : BoneAttachment, pos : Vec3) : void;
+fn getBoneAttachmentRotation(entity : BoneAttachment) : Vec3;
+fn setBoneAttachmentRotation(entity : BoneAttachment, rot : Vec3) : void;
 
 // import engine:particle_emitter as particle_emitter
-fn getGlobalID(arg0 : ParticleEmitter, arg1 : string) : i32;
-fn setFloatGlobal(arg0 : ParticleEmitter, arg1 : i32, arg2 : f32) : void;
-fn setVec3Global(arg0 : ParticleEmitter, arg1 : i32, arg2 : Vec3) : void;
-fn emitRibbons(arg0 : ParticleEmitter, arg1 : i32, arg2 : i32) : void;
-fn killRibbon(arg0 : ParticleEmitter, arg1 : i32, arg2 : i32) : void;
-fn getParticleEmitterPath(arg0 : ParticleEmitter) : string;
-fn setParticleEmitterPath(arg0 : ParticleEmitter, arg1 : string) : void;
-fn getParticleEmitterAutodestroy(arg0 : ParticleEmitter) : bool;
-fn setParticleEmitterAutodestroy(arg0 : ParticleEmitter, arg1 : bool) : void;
+fn getGlobalID(entity : ParticleEmitter, name : string) : i32;
+fn setFloatGlobal(entity : ParticleEmitter, id : i32, value : f32) : void;
+fn setVec3Global(entity : ParticleEmitter, id : i32, value : Vec3) : void;
+fn emitRibbons(entity : ParticleEmitter, emitter_index : i32, num_ribbons : i32) : void;
+fn killRibbon(entity : ParticleEmitter, emitter_index : i32, ribbon_index : i32) : void;
+fn getParticleEmitterPath(entity : ParticleEmitter) : string;
+fn setParticleEmitterPath(entity : ParticleEmitter, path : string) : void;
+fn getParticleEmitterAutodestroy(entity : ParticleEmitter) : bool;
+fn setParticleEmitterAutodestroy(entity : ParticleEmitter, enable : bool) : void;
 
 // import engine:instanced_model as instanced_model
-fn getInstancedModelPath(arg0 : InstancedModel) : string;
-fn setInstancedModelPath(arg0 : InstancedModel, arg1 : string) : void;
+fn getInstancedModelPath(entity : InstancedModel) : string;
+fn setInstancedModelPath(entity : InstancedModel, path : string) : void;
 
 // import engine:model_instance as model_instance
-fn isModelInstanceEnabled(arg0 : ModelInstance) : bool;
-fn enableModelInstance(arg0 : ModelInstance, arg1 : bool) : void;
-fn getModelInstancePath(arg0 : ModelInstance) : string;
-fn setModelInstancePath(arg0 : ModelInstance, arg1 : string) : void;
+fn isModelInstanceEnabled(entity : ModelInstance) : bool;
+fn enableModelInstance(entity : ModelInstance, enable : bool) : void;
+fn getModelInstancePath(entity : ModelInstance) : string;
+fn setModelInstancePath(entity : ModelInstance, path : string) : void;
 
 // import engine:curve_decal as curve_decal
-fn getCurveDecalMaterialPath(arg0 : CurveDecal) : string;
-fn setCurveDecalMaterialPath(arg0 : CurveDecal, arg1 : string) : void;
-fn getCurveDecalHalfExtents(arg0 : CurveDecal) : f32;
-fn setCurveDecalHalfExtents(arg0 : CurveDecal, arg1 : f32) : void;
+fn getCurveDecalMaterialPath(entity : CurveDecal) : string;
+fn setCurveDecalMaterialPath(entity : CurveDecal, path : string) : void;
+fn getCurveDecalHalfExtents(entity : CurveDecal) : f32;
+fn setCurveDecalHalfExtents(entity : CurveDecal, value : f32) : void;
 
 // import engine:terrain as terrain
-fn getHeightAt(arg0 : Terrain, arg1 : f32, arg2 : f32) : f32;
-fn getNormalAt(arg0 : Terrain, arg1 : f32, arg2 : f32) : Vec3;
-fn getTerrainMaterialPath(arg0 : Terrain) : string;
-fn setTerrainMaterialPath(arg0 : Terrain, arg1 : string) : void;
-fn getTerrainXZScale(arg0 : Terrain) : f32;
-fn setTerrainXZScale(arg0 : Terrain, arg1 : f32) : void;
-fn getTerrainTesselation(arg0 : Terrain) : i32;
-fn setTerrainTesselation(arg0 : Terrain, arg1 : i32) : void;
-fn getTerrainBaseGridResolution(arg0 : Terrain) : i32;
-fn setTerrainBaseGridResolution(arg0 : Terrain, arg1 : i32) : void;
-fn getTerrainYScale(arg0 : Terrain) : f32;
-fn setTerrainYScale(arg0 : Terrain, arg1 : f32) : void;
-fn grassCount(arg0 : Terrain) : i32;
-fn grass(arg0 : Terrain, idx : i32) : ?TerrainGrassArrayItem;
-fn getGrassRotationMode(arg0 : TerrainGrassArrayItem) : GrassRotationMode;
-fn setGrassRotationMode(arg0 : TerrainGrassArrayItem, arg1 : GrassRotationMode) : void;
-fn getGrassDistance(arg0 : TerrainGrassArrayItem) : f32;
-fn setGrassDistance(arg0 : TerrainGrassArrayItem, arg1 : f32) : void;
-fn getGrassPath(arg0 : TerrainGrassArrayItem) : string;
-fn setGrassPath(arg0 : TerrainGrassArrayItem, arg1 : string) : void;
-fn getGrassSpacing(arg0 : TerrainGrassArrayItem) : f32;
-fn setGrassSpacing(arg0 : TerrainGrassArrayItem, arg1 : f32) : void;
+fn getHeightAt(entity : Terrain, x : f32, z : f32) : f32;
+fn getNormalAt(entity : Terrain, x : f32, z : f32) : Vec3;
+fn getTerrainMaterialPath(entity : Terrain) : string;
+fn setTerrainMaterialPath(entity : Terrain, path : string) : void;
+fn getTerrainXZScale(entity : Terrain) : f32;
+fn setTerrainXZScale(entity : Terrain, scale : f32) : void;
+fn getTerrainTesselation(entity : Terrain) : i32;
+fn setTerrainTesselation(entity : Terrain, value : i32) : void;
+fn getTerrainBaseGridResolution(entity : Terrain) : i32;
+fn setTerrainBaseGridResolution(entity : Terrain, value : i32) : void;
+fn getTerrainYScale(entity : Terrain) : f32;
+fn setTerrainYScale(entity : Terrain, scale : f32) : void;
+fn grassCount(component : Terrain) : i32;
+fn grass(component : Terrain, idx : i32) : ?TerrainGrassArrayItem;
+fn getGrassRotationMode(item : TerrainGrassArrayItem) : GrassRotationMode;
+fn setGrassRotationMode(item : TerrainGrassArrayItem, value : GrassRotationMode) : void;
+fn getGrassDistance(item : TerrainGrassArrayItem) : f32;
+fn setGrassDistance(item : TerrainGrassArrayItem, value : f32) : void;
+fn getGrassPath(item : TerrainGrassArrayItem) : string;
+fn setGrassPath(item : TerrainGrassArrayItem, path : string) : void;
+fn getGrassSpacing(item : TerrainGrassArrayItem) : f32;
+fn setGrassSpacing(item : TerrainGrassArrayItem, spacing : f32) : void;
 
 // import engine:procedural_geom as procedural_geom
-fn getProceduralGeometryMaterial(arg0 : ProceduralGeometry) : string;
-fn setProceduralGeometryMaterial(arg0 : ProceduralGeometry, arg1 : string) : void;
+fn getProceduralGeometryMaterial(entity : ProceduralGeometry) : string;
+fn setProceduralGeometryMaterial(entity : ProceduralGeometry, path : string) : void;
 
 // import engine:ui_3d as ui_3d
-fn getUI3DPath(arg0 : UI3D) : string;
-fn setUI3DPath(arg0 : UI3D, arg1 : string) : void;
-fn getUI3DOrientToCamera(arg0 : UI3D) : bool;
-fn setUI3DOrientToCamera(arg0 : UI3D, arg1 : bool) : void;
+fn getUI3DPath(entity : UI3D) : string;
+fn setUI3DPath(entity : UI3D, path : string) : void;
+fn getUI3DOrientToCamera(entity : UI3D) : bool;
+fn setUI3DOrientToCamera(entity : UI3D, value : bool) : void;
 

@@ -12,6 +12,7 @@ enum class LumScriptType {
 	I32_T,
 	F32_T,
 	VEC3_T,
+	DVEC3_T,
 	QUAT_T,
 	ENTITY_T,
 	ENUM_T,
@@ -48,6 +49,7 @@ LumScriptType getLumScriptType(StringView type) {
 	if (equal(type, "i32") || equal(type, "int") || equal(type, "u32")) return LumScriptType::I32_T;
 	if (equal(type, "float")) return LumScriptType::F32_T;
 	if (equal(type, "Vec3")) return LumScriptType::VEC3_T;
+	if (equal(type, "DVec3")) return LumScriptType::DVEC3_T;
 	if (equal(type, "Quat")) return LumScriptType::QUAT_T;
 	if (equal(type, "EntityRef") || equal(type, "EntityPtr")) return LumScriptType::ENTITY_T;
 	if (equal(type, "Path")) return LumScriptType::PATH_T;
@@ -103,6 +105,7 @@ void appendLumScriptType(OutputStream& out, StringView type) {
 		case LumScriptType::I32_T: out.add("TypeRef(TypeRef::I32)"); break;
 		case LumScriptType::F32_T: out.add("TypeRef(TypeRef::F32)"); break;
 		case LumScriptType::VEC3_T: out.add("TypeRef(TypeRef::STRUCT, \"Vec3\", -1)"); break;
+		case LumScriptType::DVEC3_T: out.add("TypeRef(TypeRef::STRUCT, \"DVec3\", -1)"); break;
 			case LumScriptType::QUAT_T: out.add("TypeRef(TypeRef::STRUCT, \"Quat\", -1)"); break;
 			case LumScriptType::ENTITY_T: out.add("nativeType(module, module.makeQualifiedName(\"entity\", \"Entity\"), \"engine:entity/Entity\")"); break;
 			case LumScriptType::ENUM_T: out.add("TypeRef(TypeRef::I32)"); break;
@@ -145,6 +148,7 @@ void appendArgValue(OutputStream& out, const Arg& arg, i32 idx) {
 			break;
 		case LumScriptType::F32_T: out.add("args[", idx, "].f"); break;
 		case LumScriptType::VEC3_T: out.add("toVec3(args[", idx, "])"); break;
+		case LumScriptType::DVEC3_T: out.add("toDVec3(args[", idx, "])"); break;
 		case LumScriptType::QUAT_T: out.add("toQuat(args[", idx, "])"); break;
 		case LumScriptType::ENTITY_T:
 			if (equal(arg.type, "EntityRef")) out.add("EntityRef(args[", idx, "].i)");
@@ -183,6 +187,9 @@ void appendReturnValue(OutputStream& out, StringView type, const char* value) {
 			break;
 		case LumScriptType::VEC3_T:
 			L("*result = makeVec3Value(", value, ");");
+			break;
+		case LumScriptType::DVEC3_T:
+			L("*result = makeDVec3Value(", value, ");");
 			break;
 		case LumScriptType::QUAT_T:
 			L("*result = makeQuatValue(", value, ");");
@@ -428,6 +435,72 @@ void appendArrayChildWrapperName(OutputStream& out, Component& c, ArrayProperty&
 	out.add("lumscript_", c.id, "_", a.id, "_", is_setter ? p.setter_name : p.getter_name, "_", idx);
 }
 
+// Emits a stable generated wrapper symbol name for module function wrappers.
+void appendModuleWrapperName(OutputStream& out, Module& m, Function& f, i32 idx) {
+	out.add("lumscript_", m.id, "_", functionScriptName(f), "_", idx);
+}
+
+// Emits a native module handle TypeRef expression.
+void appendModuleHandleType(OutputStream& out, Module& m, const char* visible_namespace_expr) {
+	out.add("nativeType(module, module.makeQualifiedName(", visible_namespace_expr, ", \"", m.name, "\"), \"engine:", m.id, "/", m.name, "\")");
+}
+
+// Emits the native wrapper function body for one reflected module method.
+void serializeLumScriptModuleWrapper(OutputStream& out, Module& m, Function& f, i32 idx) {
+	out.add("static bool ");
+	appendModuleWrapperName(out, m, f, idx);
+	L("(Span<const Value> args, Value* result, void*) {");
+	L("auto* module = static_cast<", m.name, "*>(args[0].ptr);");
+	L("if (!module) return false;");
+
+	i32 src_idx = 0;
+	forEachArg(f.args, [&](const Arg& arg, bool) {
+		const i32 arg_idx = src_idx + 1;
+		if (isLumScriptStringArg(arg)) {
+			L("char lumscript_string_arg_", arg_idx, "[128];");
+			L("copyString(lumscript_string_arg_", arg_idx, ", args[", arg_idx, "].string);");
+		}
+		++src_idx;
+	});
+
+	if (!equal(f.return_type, "void")) out.add("auto ret = ");
+	out.add("module->", f.name, "(");
+	src_idx = 0;
+	forEachArg(f.args, [&](const Arg& arg, bool is_first) {
+		if (!is_first) out.add(", ");
+		const i32 arg_idx = src_idx + 1;
+		if (isLumScriptStringArg(arg)) out.add("lumscript_string_arg_", arg_idx);
+		else appendArgValue(out, arg, arg_idx);
+		++src_idx;
+	});
+	L(");");
+	appendReturnValue(out, f.return_type, "ret");
+	L("return true;");
+	L("}" OUT_ENDL);
+}
+
+// Emits registration code that exposes one reflected module method to LumScript.
+void serializeLumScriptModuleFunctionRegistration(OutputStream& out, Module& m, Function& f, i32 idx) {
+	L("{");
+	L("TypeRef params[] = {");
+	out.add("\t");
+	appendModuleHandleType(out, m, "alias");
+	out.add("," OUT_ENDL);
+	forEachArg(f.args, [&](const Arg& arg, bool) {
+		out.add("\t");
+		appendLumScriptArgType(out, arg);
+		out.add("," OUT_ENDL);
+	});
+	L("};");
+	out.add("addNativeFunction(module, module.makeQualifiedName(alias, \"", functionScriptName(f), "\"), ");
+	appendLumScriptType(out, f.return_type);
+	out.add(", Span<const TypeRef>(params, lengthOf(params)), &");
+	appendModuleWrapperName(out, m, f, idx);
+	L(");");
+	L("registered = true;");
+	L("}");
+}
+
 // Emits wrapper that returns array element count.
 void serializeLumScriptArrayCountWrapper(OutputStream& out, Module& m, Component& c, ArrayProperty& a, i32 idx) {
 	out.add("static bool ");
@@ -623,14 +696,17 @@ void emitGeneratedRuntimeHelpers(OutputStream& out) {
 	out.add("static Vec3 toVec3(const Value& value) {" OUT_ENDL);
 	out.add("return Vec3(value.composite[0], value.composite[1], value.composite[2]);" OUT_ENDL);
 	out.add("}" OUT_ENDL);
+	out.add("static DVec3 toDVec3(const Value& value) {" OUT_ENDL);
+	out.add("return DVec3((double)value.composite[0], (double)value.composite[1], (double)value.composite[2]);" OUT_ENDL);
+	out.add("}" OUT_ENDL);
 	out.add("static Quat toQuat(const Value& value) {" OUT_ENDL);
 	out.add("return Quat(value.composite[0], value.composite[1], value.composite[2], value.composite[3]);" OUT_ENDL);
 	out.add("}" OUT_ENDL);
 	out.add("static Value makeVec3Value(const Vec3& value) {" OUT_ENDL);
 	out.add("return Runtime::makeVec3(TypeRef(TypeRef::STRUCT, \"Vec3\", -1), value.x, value.y, value.z);" OUT_ENDL);
 	out.add("}" OUT_ENDL);
-	out.add("static Value makeVec3Value(const DVec3& value) {" OUT_ENDL);
-	out.add("return Runtime::makeVec3(TypeRef(TypeRef::STRUCT, \"Vec3\", -1), (float)value.x, (float)value.y, (float)value.z);" OUT_ENDL);
+	out.add("static Value makeDVec3Value(const DVec3& value) {" OUT_ENDL);
+	out.add("return Runtime::makeVec3(TypeRef(TypeRef::STRUCT, \"DVec3\", -1), (float)value.x, (float)value.y, (float)value.z);" OUT_ENDL);
 	out.add("}" OUT_ENDL);
 	out.add("static Value makeQuatValue(const Quat& value) {" OUT_ENDL);
 	out.add("return Runtime::makeQuat(TypeRef(TypeRef::STRUCT, \"Quat\", -1), value.x, value.y, value.z, value.w);" OUT_ENDL);
@@ -692,13 +768,13 @@ void emitGeneratedCoreEntityWorldBindings(OutputStream& out) {
 	out.add("static bool lumscript_entity_setPosition(Span<const Value> args, Value*, void*) {" OUT_ENDL);
 	out.add("World* world = (World*)args[0].ptr;" OUT_ENDL);
 	out.add("if (!world || args[0].i < 0 || !world->hasEntity(EntityRef(args[0].i))) return false;" OUT_ENDL);
-	out.add("world->setPosition(EntityRef(args[0].i), DVec3(toVec3(args[1])));" OUT_ENDL);
+	out.add("world->setPosition(EntityRef(args[0].i), toDVec3(args[1]));" OUT_ENDL);
 	out.add("return true;" OUT_ENDL);
 	out.add("}" OUT_ENDL OUT_ENDL);
 	out.add("static bool lumscript_entity_getPosition(Span<const Value> args, Value* result, void*) {" OUT_ENDL);
 	out.add("World* world = (World*)args[0].ptr;" OUT_ENDL);
 	out.add("if (!world || !result || args[0].i < 0 || !world->hasEntity(EntityRef(args[0].i))) return false;" OUT_ENDL);
-	out.add("*result = makeVec3Value(world->getPosition(EntityRef(args[0].i)));" OUT_ENDL);
+	out.add("*result = makeDVec3Value(world->getPosition(EntityRef(args[0].i)));" OUT_ENDL);
 	out.add("return true;" OUT_ENDL);
 	out.add("}" OUT_ENDL OUT_ENDL);
 	out.add("static bool lumscript_entity_setRotation(Span<const Value> args, Value*, void*) {" OUT_ENDL);
@@ -722,9 +798,35 @@ void emitGeneratedCoreEntityWorldBindings(OutputStream& out) {
 	out.add("static bool lumscript_entity_getScale(Span<const Value> args, Value* result, void*) {" OUT_ENDL);
 	out.add("World* world = (World*)args[0].ptr;" OUT_ENDL);
 	out.add("if (!world || !result || args[0].i < 0 || !world->hasEntity(EntityRef(args[0].i))) return false;" OUT_ENDL);
-	out.add("*result = makeVec3Value(world->getScale(EntityRef(args[0].i)));" OUT_ENDL);
+	out.add("*result = makeVec3Value(Vec3(world->getScale(EntityRef(args[0].i))));" OUT_ENDL);
 	out.add("return true;" OUT_ENDL);
 	out.add("}" OUT_ENDL OUT_ENDL);
+}
+
+// Emits stable wrapper symbol name for world->module accessors.
+void appendWorldModuleWrapperName(OutputStream& out, Module& m) {
+	out.add("lumscript_world_", m.id);
+}
+
+// Emits wrappers that expose world-level module handles, one per reflected module.
+void emitGeneratedWorldModuleAccessors(OutputStream& out, MetaData& data) {
+	for (Module& m : data.modules) {
+		if (m.components.size == 0) continue;
+		Component& first_component = m.components[0];
+		out.add("static bool ");
+		appendWorldModuleWrapperName(out, m);
+		L("(Span<const Value> args, Value* result, void*) {");
+		out.add("World* world = (World*)args[0].ptr;" OUT_ENDL);
+		out.add("if (!result) return false;" OUT_ENDL);
+		out.add("if (!world) { *result = Runtime::makeNull(); return true; }" OUT_ENDL);
+		out.add("IModule* module = world->getModule(reflection::getComponentType(\"", first_component.id, "\"));" OUT_ENDL);
+		out.add("if (!module) { *result = Runtime::makeNull(); return true; }" OUT_ENDL);
+		out.add("result->type = TypeRef(TypeRef::NATIVE, \"engine:", m.id, "/", m.name, "\", -1);" OUT_ENDL);
+		out.add("result->ptr = module;" OUT_ENDL);
+		out.add("result->i = 0;" OUT_ENDL);
+		out.add("return true;" OUT_ENDL);
+		out.add("}" OUT_ENDL OUT_ENDL);
+	}
 }
 
 // Emits per-component entity-to-component accessor wrappers.
@@ -748,39 +850,49 @@ void emitGeneratedComponentEntityAccessors(OutputStream& out, MetaData& data) {
 	}
 }
 
+// Emits wrappers for all supported reflected module methods.
+void emitGeneratedModuleWrappers(OutputStream& out, MetaData& data, i32* wrapper_idx) {
+	for (Module& m : data.modules) {
+		for (Function& f : m.functions) {
+			if (!isSupportedLumScriptFunction(f)) continue;
+			serializeLumScriptModuleWrapper(out, m, f, *wrapper_idx);
+			++*wrapper_idx;
+		}
+	}
+}
+
 // Emits wrappers for all supported reflected component functions.
-void emitGeneratedComponentWrappers(OutputStream& out, MetaData& data) {
-	i32 wrapper_idx = 0;
+void emitGeneratedComponentWrappers(OutputStream& out, MetaData& data, i32* wrapper_idx) {
 	for (Module& m : data.modules) {
 		for (Component& c : m.components) {
 			for (Function& f : c.functions) {
 				if (!isSupportedLumScriptFunction(f)) continue;
-				serializeLumScriptWrapper(out, m, c, f, wrapper_idx);
-				++wrapper_idx;
+				serializeLumScriptWrapper(out, m, c, f, *wrapper_idx);
+				++*wrapper_idx;
 			}
 			for (Property& p : c.properties) {
 				if (isSupportedLumScriptPropertyGetter(p)) {
-					serializeLumScriptPropertyWrapper(out, m, c, p, false, wrapper_idx);
-					++wrapper_idx;
+					serializeLumScriptPropertyWrapper(out, m, c, p, false, *wrapper_idx);
+					++*wrapper_idx;
 				}
 				if (isSupportedLumScriptPropertySetter(p)) {
-					serializeLumScriptPropertyWrapper(out, m, c, p, true, wrapper_idx);
-					++wrapper_idx;
+					serializeLumScriptPropertyWrapper(out, m, c, p, true, *wrapper_idx);
+					++*wrapper_idx;
 				}
 			}
 			for (ArrayProperty& a : c.arrays) {
-				serializeLumScriptArrayCountWrapper(out, m, c, a, wrapper_idx);
-				++wrapper_idx;
-				serializeLumScriptArrayItemWrapper(out, m, c, a, wrapper_idx);
-				++wrapper_idx;
+				serializeLumScriptArrayCountWrapper(out, m, c, a, *wrapper_idx);
+				++*wrapper_idx;
+				serializeLumScriptArrayItemWrapper(out, m, c, a, *wrapper_idx);
+				++*wrapper_idx;
 				for (Property& p : a.children) {
 					if (isSupportedLumScriptArrayChildGetter(p)) {
-						serializeLumScriptArrayChildWrapper(out, m, c, a, p, false, wrapper_idx);
-						++wrapper_idx;
+						serializeLumScriptArrayChildWrapper(out, m, c, a, p, false, *wrapper_idx);
+						++*wrapper_idx;
 					}
 					if (isSupportedLumScriptArrayChildSetter(p)) {
-						serializeLumScriptArrayChildWrapper(out, m, c, a, p, true, wrapper_idx);
-						++wrapper_idx;
+						serializeLumScriptArrayChildWrapper(out, m, c, a, p, true, *wrapper_idx);
+						++*wrapper_idx;
 					}
 				}
 			}
@@ -832,12 +944,12 @@ void emitGeneratedEntityImportRegistration(OutputStream& out, MetaData& data) {
 	out.add("TypeRef params[] = { nativeType(module, makeEngineName(module, alias, \"Entity\"), \"engine:entity/Entity\") };" OUT_ENDL);
 	out.add("addNativeFunction(module, module.makeQualifiedName(alias, \"destroy\"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_entity_destroy);" OUT_ENDL);
 	out.add("addNativeFunction(module, module.makeQualifiedName(alias, \"isValid\"), TypeRef(TypeRef::BOOL), Span<const TypeRef>(params, lengthOf(params)), &lumscript_entity_isValid);" OUT_ENDL);
-	out.add("addNativeFunction(module, module.makeQualifiedName(alias, \"getPosition\"), TypeRef(TypeRef::STRUCT, \"Vec3\", -1), Span<const TypeRef>(params, lengthOf(params)), &lumscript_entity_getPosition);" OUT_ENDL);
+	out.add("addNativeFunction(module, module.makeQualifiedName(alias, \"getPosition\"), TypeRef(TypeRef::STRUCT, \"DVec3\", -1), Span<const TypeRef>(params, lengthOf(params)), &lumscript_entity_getPosition);" OUT_ENDL);
 	out.add("addNativeFunction(module, module.makeQualifiedName(alias, \"getRotation\"), TypeRef(TypeRef::STRUCT, \"Quat\", -1), Span<const TypeRef>(params, lengthOf(params)), &lumscript_entity_getRotation);" OUT_ENDL);
 	out.add("addNativeFunction(module, module.makeQualifiedName(alias, \"getScale\"), TypeRef(TypeRef::STRUCT, \"Vec3\", -1), Span<const TypeRef>(params, lengthOf(params)), &lumscript_entity_getScale);" OUT_ENDL);
 	out.add("}" OUT_ENDL);
 	out.add("{" OUT_ENDL);
-	out.add("TypeRef params[] = { nativeType(module, makeEngineName(module, alias, \"Entity\"), \"engine:entity/Entity\"), TypeRef(TypeRef::STRUCT, \"Vec3\", -1) };" OUT_ENDL);
+	out.add("TypeRef params[] = { nativeType(module, makeEngineName(module, alias, \"Entity\"), \"engine:entity/Entity\"), TypeRef(TypeRef::STRUCT, \"DVec3\", -1) };" OUT_ENDL);
 	out.add("addNativeFunction(module, module.makeQualifiedName(alias, \"setPosition\"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_entity_setPosition);" OUT_ENDL);
 	out.add("addNativeFunction(module, module.makeQualifiedName(alias, \"setScale\"), TypeRef(TypeRef::VOID), Span<const TypeRef>(params, lengthOf(params)), &lumscript_entity_setScale);" OUT_ENDL);
 	out.add("}" OUT_ENDL);
@@ -860,7 +972,7 @@ void emitGeneratedEntityImportRegistration(OutputStream& out, MetaData& data) {
 }
 
 // Emits registration branch for `engine:world` import.
-void emitGeneratedWorldImportRegistration(OutputStream& out) {
+void emitGeneratedWorldImportRegistration(OutputStream& out, MetaData& data) {
 	// engine:world import depends on entity handle type for return/argument types.
 	out.add("if (equalStrings(name, \"world\")) {" OUT_ENDL);
 	out.add("nativeType(module, makeEngineName(module, alias, \"World\"), \"engine:world/World\");" OUT_ENDL);
@@ -883,13 +995,47 @@ void emitGeneratedWorldImportRegistration(OutputStream& out) {
 	out.add("return_type.nullable = true;" OUT_ENDL);
 	out.add("addNativeFunction(module, module.makeQualifiedName(alias, \"findByName\"), return_type, Span<const TypeRef>(params, lengthOf(params)), &lumscript_world_findByName);" OUT_ENDL);
 	out.add("}" OUT_ENDL);
+	for (Module& m : data.modules) {
+		if (m.components.size == 0) continue;
+		out.add("{" OUT_ENDL);
+		out.add("TypeRef params[] = { nativeType(module, makeEngineName(module, alias, \"World\"), \"engine:world/World\") };" OUT_ENDL);
+		out.add("TypeRef return_type = nativeType(module, module.makeQualifiedName(\"", m.id, "\", \"", m.name, "\"), \"engine:", m.id, "/", m.name, "\");" OUT_ENDL);
+		out.add("return_type.nullable = true;" OUT_ENDL);
+		out.add("addNativeFunction(module, module.makeQualifiedName(alias, \"", m.id, "\"), return_type, Span<const TypeRef>(params, lengthOf(params)), &");
+		appendWorldModuleWrapperName(out, m);
+		out.add(");" OUT_ENDL);
+		out.add("}" OUT_ENDL);
+	}
 	out.add("return true;" OUT_ENDL);
 	out.add("}" OUT_ENDL);
 }
 
+// Emits registration branches for reflected module imports.
+void emitGeneratedModuleImportRegistrations(OutputStream& out, MetaData& data, i32* wrapper_idx) {
+	for (Module& m : data.modules) {
+		bool has_supported_function = false;
+		for (Function& f : m.functions) {
+			if (isSupportedLumScriptFunction(f)) {
+				has_supported_function = true;
+				break;
+			}
+		}
+		if (!has_supported_function) continue;
+		L("if (equalStrings(name, \"", m.id, "\")) {");
+		out.add("nativeType(module, makeEngineName(module, alias, \"", m.name, "\"), \"engine:", m.id, "/", m.name, "\");" OUT_ENDL);
+		L("bool registered = false;");
+		for (Function& f : m.functions) {
+			if (!isSupportedLumScriptFunction(f)) continue;
+			serializeLumScriptModuleFunctionRegistration(out, m, f, *wrapper_idx);
+			++*wrapper_idx;
+		}
+		L("return registered;");
+		L("}");
+	}
+}
+
 // Emits registration branches for reflected component imports.
-void emitGeneratedComponentImportRegistrations(OutputStream& out, MetaData& data) {
-	i32 wrapper_idx = 0;
+void emitGeneratedComponentImportRegistrations(OutputStream& out, MetaData& data, i32* wrapper_idx) {
 	for (Module& m : data.modules) {
 		for (Component& c : m.components) {
 			bool has_supported_function = false;
@@ -928,30 +1074,30 @@ void emitGeneratedComponentImportRegistrations(OutputStream& out, MetaData& data
 			L("bool registered = false;");
 			for (Function& f : c.functions) {
 				if (!isSupportedLumScriptFunction(f)) continue;
-				serializeLumScriptFunctionRegistration(out, c, f, wrapper_idx);
-				++wrapper_idx;
+				serializeLumScriptFunctionRegistration(out, c, f, *wrapper_idx);
+				++*wrapper_idx;
 			}
 			for (Property& p : c.properties) {
 				if (isSupportedLumScriptPropertyGetter(p)) {
-					serializeLumScriptPropertyRegistration(out, c, p, false, wrapper_idx);
-					++wrapper_idx;
+					serializeLumScriptPropertyRegistration(out, c, p, false, *wrapper_idx);
+					++*wrapper_idx;
 				}
 				if (isSupportedLumScriptPropertySetter(p)) {
-					serializeLumScriptPropertyRegistration(out, c, p, true, wrapper_idx);
-					++wrapper_idx;
+					serializeLumScriptPropertyRegistration(out, c, p, true, *wrapper_idx);
+					++*wrapper_idx;
 				}
 			}
 			for (ArrayProperty& a : c.arrays) {
-				serializeLumScriptArrayRegistration(out, c, a, wrapper_idx, wrapper_idx + 1);
-				wrapper_idx += 2;
+				serializeLumScriptArrayRegistration(out, c, a, *wrapper_idx, *wrapper_idx + 1);
+				*wrapper_idx += 2;
 				for (Property& p : a.children) {
 					if (isSupportedLumScriptArrayChildGetter(p)) {
-						serializeLumScriptArrayChildRegistration(out, c, a, p, false, wrapper_idx);
-						++wrapper_idx;
+						serializeLumScriptArrayChildRegistration(out, c, a, p, false, *wrapper_idx);
+						++*wrapper_idx;
 					}
 					if (isSupportedLumScriptArrayChildSetter(p)) {
-						serializeLumScriptArrayChildRegistration(out, c, a, p, true, wrapper_idx);
-						++wrapper_idx;
+						serializeLumScriptArrayChildRegistration(out, c, a, p, true, *wrapper_idx);
+						++*wrapper_idx;
 					}
 				}
 			}
@@ -969,6 +1115,7 @@ void appendLumScriptDeclType(OutputStream& out, StringView type) {
 		case LumScriptType::I32_T: out.add("i32"); break;
 		case LumScriptType::F32_T: out.add("f32"); break;
 		case LumScriptType::VEC3_T: out.add("Vec3"); break;
+		case LumScriptType::DVEC3_T: out.add("DVec3"); break;
 		case LumScriptType::QUAT_T: out.add("Quat"); break;
 		case LumScriptType::ENTITY_T: out.add("Entity"); break;
 		case LumScriptType::ENUM_T: {
@@ -996,7 +1143,7 @@ void emitComponentFunctionDecl(OutputStream& out, Component& c, Function& f) {
 	i32 arg_idx = 0;
 	forEachArg(f.args, [&](const Arg& arg, bool is_first) {
 		if (!is_first) out.add(", ");
-		out.add("arg", arg_idx, " : ");
+		out.add(arg.name, " : ");
 		if (is_first && isLumScriptEntityType(arg.type)) out.add(c.name);
 		else appendLumScriptDeclArgType(out, arg);
 		++arg_idx;
@@ -1014,7 +1161,7 @@ void emitComponentPropertyDecl(OutputStream& out, Component& c, Property& p, boo
 	i32 arg_idx = 0;
 	forEachArg(accessor_args, [&](const Arg& arg, bool is_first) {
 		if (!is_first) out.add(", ");
-		out.add("arg", arg_idx, " : ");
+		out.add(arg.name, " : ");
 		if (is_first && isLumScriptEntityType(arg.type)) out.add(c.name);
 		else appendLumScriptDeclArgType(out, arg);
 		++arg_idx;
@@ -1029,11 +1176,11 @@ void emitComponentPropertyDecl(OutputStream& out, Component& c, Property& p, boo
 void emitArrayChildPropertyDecl(OutputStream& out, Component& c, ArrayProperty& a, Property& p, bool is_setter) {
 	StringView script_name = is_setter ? p.setter_name : p.getter_name;
 	out.add("fn ", script_name, "(");
-	out.add("arg0 : ", c.name, a.name, "ArrayItem");
+	out.add("item : ", c.name, a.name, "ArrayItem");
 	i32 arg_idx = 0;
 	forEachArg(is_setter ? p.setter_args : p.getter_args, [&](const Arg& arg, bool) {
 		if (arg_idx >= 2) {
-			out.add(", arg", arg_idx - 1, " : ");
+			out.add(", ", arg.name, " : ");
 			appendLumScriptDeclArgType(out, arg);
 		}
 		++arg_idx;
@@ -1073,14 +1220,14 @@ void serializeLumScriptReference(MetaData& data) {
 	emitLumScriptReferenceEnums(out, data);
 
 	out.add("// import engine:entity as entity" OUT_ENDL);
-	out.add("fn destroy(arg0 : Entity) : void;" OUT_ENDL);
-	out.add("fn isValid(arg0 : Entity) : bool;" OUT_ENDL);
-	out.add("fn getPosition(arg0 : Entity) : Vec3;" OUT_ENDL);
-	out.add("fn getRotation(arg0 : Entity) : Quat;" OUT_ENDL);
-	out.add("fn getScale(arg0 : Entity) : Vec3;" OUT_ENDL);
-	out.add("fn setPosition(arg0 : Entity, arg1 : Vec3) : void;" OUT_ENDL);
-	out.add("fn setScale(arg0 : Entity, arg1 : Vec3) : void;" OUT_ENDL);
-	out.add("fn setRotation(arg0 : Entity, arg1 : Quat) : void;" OUT_ENDL);
+	out.add("fn destroy(e : Entity) : void;" OUT_ENDL);
+	out.add("fn isValid(e : Entity) : bool;" OUT_ENDL);
+	out.add("fn getPosition(e : Entity) : DVec3;" OUT_ENDL);
+	out.add("fn getRotation(e : Entity) : Quat;" OUT_ENDL);
+	out.add("fn getScale(e : Entity) : Vec3;" OUT_ENDL);
+	out.add("fn setPosition(e : Entity, position : DVec3) : void;" OUT_ENDL);
+	out.add("fn setScale(e : Entity, scale : Vec3) : void;" OUT_ENDL);
+	out.add("fn setRotation(e : Entity, rotation : Quat) : void;" OUT_ENDL);
 	for (Module& m : data.modules) {
 		for (Component& c : m.components) {
 			out.add("fn ", c.id, "(arg0 : Entity) : ?", c.name, ";" OUT_ENDL);
@@ -1089,10 +1236,38 @@ void serializeLumScriptReference(MetaData& data) {
 	out.add(OUT_ENDL);
 
 	out.add("// import engine:world as world" OUT_ENDL);
-	out.add("fn createEntity(arg0 : World) : Entity;" OUT_ENDL);
-	out.add("fn destroyEntity(arg0 : World, arg1 : Entity) : void;" OUT_ENDL);
-	out.add("fn hasEntity(arg0 : World, arg1 : Entity) : bool;" OUT_ENDL);
-	out.add("fn findByName(arg0 : World, arg1 : string) : ?Entity;" OUT_ENDL OUT_ENDL);
+	out.add("fn createEntity(w : World) : Entity;" OUT_ENDL);
+	out.add("fn destroyEntity(w : World, e : Entity) : void;" OUT_ENDL);
+	out.add("fn hasEntity(w : World, e : Entity) : bool;" OUT_ENDL);
+	out.add("fn findByName(w : World, name : string) : ?Entity;" OUT_ENDL);
+	for (Module& m : data.modules) {
+		if (m.components.size == 0) continue;
+		out.add("fn ", m.id, "(w : World) : ?", m.id, ".", m.name, ";" OUT_ENDL);
+	}
+	out.add(OUT_ENDL);
+	for (Module& m : data.modules) {
+		bool has_supported_function = false;
+		for (Function& f : m.functions) {
+			if (isSupportedLumScriptFunction(f)) {
+				has_supported_function = true;
+				break;
+			}
+		}
+		if (!has_supported_function) continue;
+		out.add("// import engine:", m.id, " as ", m.id, OUT_ENDL);
+		for (Function& f : m.functions) {
+			if (!isSupportedLumScriptFunction(f)) continue;
+			out.add("fn ", functionScriptName(f), "(module : ", m.name);
+			forEachArg(f.args, [&](const Arg& arg, bool) {
+				out.add(", ", arg.name, " : ");
+				appendLumScriptDeclArgType(out, arg);
+			});
+			out.add(") : ");
+			appendLumScriptDeclType(out, f.return_type);
+			out.add(";" OUT_ENDL);
+		}
+		out.add(OUT_ENDL);
+	}
 
 	for (Module& m : data.modules) {
 		for (Component& c : m.components) {
@@ -1138,8 +1313,8 @@ void serializeLumScriptReference(MetaData& data) {
 					}
 				}
 				if (!has_array_child) continue;
-				out.add("fn ", a.id, "Count(arg0 : ", c.name, ") : i32;" OUT_ENDL);
-				out.add("fn ", a.id, "(arg0 : ", c.name, ", idx : i32) : ?", c.name, a.name, "ArrayItem;" OUT_ENDL);
+				out.add("fn ", a.id, "Count(component : ", c.name, ") : i32;" OUT_ENDL);
+				out.add("fn ", a.id, "(component : ", c.name, ", idx : i32) : ?", c.name, a.name, "ArrayItem;" OUT_ENDL);
 				for (Property& p : a.children) {
 					if (isSupportedLumScriptArrayChildGetter(p)) emitArrayChildPropertyDecl(out, c, a, p, false);
 					if (isSupportedLumScriptArrayChildSetter(p)) emitArrayChildPropertyDecl(out, c, a, p, true);
@@ -1159,8 +1334,11 @@ void serializeLumScriptMeta(MetaData& data) {
 	emitGeneratedHeader(out, data);
 	emitGeneratedRuntimeHelpers(out);
 	emitGeneratedCoreEntityWorldBindings(out);
+	emitGeneratedWorldModuleAccessors(out, data);
 	emitGeneratedComponentEntityAccessors(out, data);
-	emitGeneratedComponentWrappers(out, data);
+	i32 wrapper_idx = 0;
+	emitGeneratedModuleWrappers(out, data, &wrapper_idx);
+	emitGeneratedComponentWrappers(out, data, &wrapper_idx);
 	emitGeneratedMetaEnumRegistration(out, data);
 
 	out.add("static bool registerGeneratedEngineImport(Module& module, World* world, StringView path, StringView alias) {" OUT_ENDL);
@@ -1169,8 +1347,10 @@ void serializeLumScriptMeta(MetaData& data) {
 	out.add("if (registerGeneratedMetaEnum(module, name, alias)) return true;" OUT_ENDL);
 	out.add("if (alias.empty()) return false;" OUT_ENDL);
 	emitGeneratedEntityImportRegistration(out, data);
-	emitGeneratedWorldImportRegistration(out);
-	emitGeneratedComponentImportRegistrations(out, data);
+	emitGeneratedWorldImportRegistration(out, data);
+	wrapper_idx = 0;
+	emitGeneratedModuleImportRegistrations(out, data, &wrapper_idx);
+	emitGeneratedComponentImportRegistrations(out, data, &wrapper_idx);
 
 	out.add("return false;" OUT_ENDL);
 	out.add("}" OUT_ENDL OUT_ENDL);

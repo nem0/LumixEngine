@@ -246,6 +246,14 @@ struct Runtime {
 		return type.kind == TypeRef::STRUCT && equalStrings(type.name, "Vec3");
 	}
 
+	static bool isBuiltinDVec3(TypeRef type) {
+		return type.kind == TypeRef::STRUCT && equalStrings(type.name, "DVec3");
+	}
+
+	static bool isBuiltinAnyVec3(TypeRef type) {
+		return isBuiltinVec3(type) || isBuiltinDVec3(type);
+	}
+
 	static bool isBuiltinQuat(TypeRef type) {
 		return type.kind == TypeRef::STRUCT && equalStrings(type.name, "Quat");
 	}
@@ -403,7 +411,7 @@ struct Runtime {
 			v.composite[3] = 1;
 			return v;
 		}
-		if (isBuiltinVec3(type)) return v;
+		if (isBuiltinAnyVec3(type)) return v;
 		if (type.kind == TypeRef::STRUCT) {
 			v.fields = LUMIX_NEW(m_allocator, Array<Value>)(m_allocator);
 			m_owned_arrays.push(v.fields);
@@ -425,7 +433,7 @@ struct Runtime {
 	}
 
 	Value makeStruct(TypeRef type, Expr& e) {
-		if (isBuiltinVec3(type)) {
+		if (isBuiltinAnyVec3(type)) {
 			Value x = evalExpr(e.args[0]);
 			Value y = evalExpr(e.args[1]);
 			Value z = evalExpr(e.args[2]);
@@ -476,10 +484,10 @@ struct Runtime {
 				Value enum_value;
 				if (evalQualifiedEnumMember(getExpressionName(expr_idx), &enum_value)) return enum_value;
 				Value base = evalExpr(e.left);
-				if (isBuiltinVec3(base.type) || isBuiltinQuat(base.type)) {
-					if (equalStrings(e.name, "x")) return makeF32(base.composite[0]);
-					if (equalStrings(e.name, "y")) return makeF32(base.composite[1]);
-					if (equalStrings(e.name, "z")) return makeF32(base.composite[2]);
+				if (isBuiltinAnyVec3(base.type) || isBuiltinQuat(base.type)) {
+					if (equalStrings(e.name, "x")) return isBuiltinDVec3(base.type) ? makeF64(base.composite[0]) : makeF32(base.composite[0]);
+					if (equalStrings(e.name, "y")) return isBuiltinDVec3(base.type) ? makeF64(base.composite[1]) : makeF32(base.composite[1]);
+					if (equalStrings(e.name, "z")) return isBuiltinDVec3(base.type) ? makeF64(base.composite[2]) : makeF32(base.composite[2]);
 					if (isBuiltinQuat(base.type) && equalStrings(e.name, "w")) return makeF32(base.composite[3]);
 				}
 				StructDecl& s = m_module.structs[base.type.struct_index];

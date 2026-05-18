@@ -25,6 +25,14 @@ static const char* CORE_VEC3_SOURCE = R"(
 	};
 )";
 
+static const char* CORE_DVEC3_SOURCE = R"(
+	struct DVec3 {
+		x : f64;
+		y : f64;
+		z : f64;
+	};
+)";
+
 static const char* CORE_QUAT_SOURCE = R"(
 	struct Quat {
 		x : f32;
@@ -37,6 +45,10 @@ static const char* CORE_QUAT_SOURCE = R"(
 bool resolveCoreTestImport(StringView path, StringView* source) {
 	if (equalStrings(path, "core:vec3") || equalStrings(path, "core:vec3.lum")) {
 		*source = CORE_VEC3_SOURCE;
+		return true;
+	}
+	if (equalStrings(path, "core:dvec3") || equalStrings(path, "core:dvec3.lum")) {
+		*source = CORE_DVEC3_SOURCE;
 		return true;
 	}
 	if (equalStrings(path, "core:quat") || equalStrings(path, "core:quat.lum")) {
@@ -1024,6 +1036,26 @@ bool testUntypedLiteralsRuntime() {
 	return true;
 }
 
+bool testDVec3Runtime() {
+	const char* source = R"(
+		import "core:dvec3"
+
+		fn sum() : f64 {
+			const v : DVec3 = DVec3 { 1.0, 2.0, 3.5 };
+			return v.x + v.y + v.z;
+		}
+	)";
+	LumScript::Module module(getGlobalAllocator());
+	LumScript::Diagnostics diagnostics(getGlobalAllocator());
+	ASSERT_TRUE(LumScript::compile(module, source, diagnostics, resolveLumScriptImport, nullptr));
+
+	LumScript::Runtime runtime(module, getGlobalAllocator());
+	LumScript::Value result;
+	ASSERT_TRUE(runtime.call("sum", Span<const LumScript::Value>(), &result, diagnostics));
+	ASSERT_FLOAT_EQ(6.5f, (float)result.d);
+	return true;
+}
+
 bool testInputEventIterationRuntime() {
 	const char* source = R"(
 		import "engine:input" as input
@@ -1351,6 +1383,7 @@ void runLumScriptRuntimeTests() {
 	RUN_TEST(testDivisionAndModuloSemanticsRuntime);
 	RUN_TEST(testDivisionByZeroRuntimeError);
 	RUN_TEST(testUntypedLiteralsRuntime);
+	RUN_TEST(testDVec3Runtime);
 	RUN_TEST(testInputEventIterationRuntime);
 	RUN_TEST(testUpdateReceivesTimeDeltaRuntime);
 	RUN_TEST(testFirstClassFunctionsRuntime);
