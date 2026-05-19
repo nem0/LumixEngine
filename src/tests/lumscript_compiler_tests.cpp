@@ -2,6 +2,12 @@
 #include "lumscript/lumscript_engine_api.h"
 #include "tests/lumscript_test_common.h"
 
+#define ASSERT_COMPILE(CALL) do { \
+		bool ok = CALL; \
+		if (!ok) logError(diagnostics.message); \
+		ASSERT_TRUE(ok); \
+	} while (false)
+
 using namespace Lumix;
 
 namespace {
@@ -81,7 +87,7 @@ bool resolveLumScriptEngineImport(LumScript::Module& module, StringView path, St
 bool testParseAndTypecheckSample() {
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, LumScriptTests::SAMPLE, diagnostics, resolveLumScriptImport, nullptr));
+	ASSERT_COMPILE(LumScript::compile(module, LumScriptTests::SAMPLE, diagnostics, resolveLumScriptImport, nullptr));
 	ASSERT_TRUE(module.structs.size() == 1);
 	ASSERT_TRUE(module.functions.size() == 2);
 	ASSERT_TRUE(module.expressions.size() > 0);
@@ -103,7 +109,7 @@ bool testStringConcatenationTypechecks() {
 	)";
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, source, diagnostics));
+	ASSERT_COMPILE(LumScript::compile(module, source, diagnostics));
 	return true;
 }
 
@@ -229,7 +235,7 @@ bool testGlobalVariablesTypecheck() {
 	)";
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, source, diagnostics));
+	ASSERT_COMPILE(LumScript::compile(module, source, diagnostics));
 	ASSERT_TRUE(module.globals.size() == 3);
 	return true;
 }
@@ -257,7 +263,7 @@ bool testCoreDVec3TypechecksWithImport() {
 	)";
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, source, diagnostics, resolveLumScriptImport, nullptr));
+	ASSERT_COMPILE(LumScript::compile(module, source, diagnostics, resolveLumScriptImport, nullptr));
 	return true;
 }
 
@@ -289,7 +295,7 @@ bool testVariableCanBeExplicitlyUndefined() {
 	)";
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, source, diagnostics));
+	ASSERT_COMPILE(LumScript::compile(module, source, diagnostics));
 	return true;
 }
 
@@ -339,7 +345,7 @@ bool testExplicitCastRequired() {
 	)";
 	LumScript::Module module2(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics2(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module2, valid, diagnostics2));
+	ASSERT_COMPILE(LumScript::compile(module2, valid, diagnostics2));
 	return true;
 }
 
@@ -377,7 +383,7 @@ bool testBinaryNumericOperatorsRequireSameOperandType() {
 	)";
 	LumScript::Module module3(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics3(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module3, explicit_cast_ok, diagnostics3));
+	ASSERT_COMPILE(LumScript::compile(module3, explicit_cast_ok, diagnostics3));
 	return true;
 }
 
@@ -436,7 +442,7 @@ bool testImportAddsDeclarationsToCurrentModule() {
 	LumScriptImportFiles files = { &file, 1 };
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, main_source, diagnostics, resolveLumScriptImport, &files));
+	ASSERT_COMPILE(LumScript::compile(module, main_source, diagnostics, resolveLumScriptImport, &files));
 	ASSERT_TRUE(module.structs.size() == 1);
 	ASSERT_TRUE(module.functions.size() == 2);
 	return true;
@@ -481,7 +487,7 @@ bool testDuplicateUnaliasedImportIsNoOp() {
 	LumScriptImportFiles files = { &file, 1 };
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, main_source, diagnostics, resolveLumScriptImport, &files));
+	ASSERT_COMPILE(LumScript::compile(module, main_source, diagnostics, resolveLumScriptImport, &files));
 	ASSERT_EQ(1, module.structs.size());
 	ASSERT_EQ(2, module.functions.size());
 	return true;
@@ -511,7 +517,7 @@ bool testDuplicateAliasedImportOfSamePathIsNoOp() {
 	LumScriptImportFiles files = { &file, 1 };
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, main_source, diagnostics, resolveLumScriptImport, &files));
+	ASSERT_COMPILE(LumScript::compile(module, main_source, diagnostics, resolveLumScriptImport, &files));
 	ASSERT_EQ(1, module.structs.size());
 	ASSERT_EQ(2, module.functions.size());
 	return true;
@@ -677,6 +683,7 @@ bool testGeneratedInputImportTypechecks() {
 
 bool testTransitiveNativeImport() {
 	const char* source = R"(
+		import "core:dvec3"
 		import "engine:world" as world
 		import "engine:entity" as entity
 
@@ -695,6 +702,8 @@ bool testTransitiveNativeImport() {
 
 bool testGeneratedWorldFunctionsTypecheck() {
 	const char* source = R"(
+		import "core:vec3"
+		import "core:dvec3"
 		import "core:quat"
 		import "engine:world" as world
 		import "engine:entity" as entity
@@ -705,10 +714,10 @@ bool testGeneratedWorldFunctionsTypecheck() {
 			e.setPosition({ 1.0, 2.0, 3.0 });
 			e.setRotation({ 0.0, 0.0, 0.0, 1.0 });
 			e.setScale({ 2.0, 2.0, 2.0 });
-			var p : Vec3 = e.getPosition();
+			var p : DVec3 = e.getPosition();
 			var r : Quat = e.getRotation();
 			var s : Vec3 = e.getScale();
-			var px : f32 = p.x;
+			var px : f64 = p.x;
 			var rw : f32 = r.w;
 			var sy : f32 = s.y;
 			if named != null {
@@ -721,7 +730,7 @@ bool testGeneratedWorldFunctionsTypecheck() {
 	)";
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, source, diagnostics, resolveLumScriptEngineImport, nullptr));
+	ASSERT_COMPILE(LumScript::compile(module, source, diagnostics, resolveLumScriptEngineImport, nullptr));
 	bool found_find_by_name = false;
 	for (const LumScript::NativeFunctionDecl& fn : module.native_functions) {
 		if (!equalStrings(fn.name, "world.findByName")) continue;
@@ -790,7 +799,7 @@ bool testFirstParameterNamespaceResolutionPrecedenceTypecheck() {
 
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, main_source, diagnostics, resolveLumScriptImport, &files));
+	ASSERT_COMPILE(LumScript::compile(module, main_source, diagnostics, resolveLumScriptImport, &files));
 	return true;
 }
 
@@ -814,7 +823,7 @@ bool testWorldTransformFunctionsAreNotRegistered() {
 
 bool testDemoLumTypechecks() {
 	const char* source = R"(
-		import "core:vec3"
+		import "core:dvec3"
 		import "core:quat"
 		import "engine:world" as world
 		import "engine:entity" as entity
@@ -842,7 +851,7 @@ bool testDemoLumTypechecks() {
 	)";
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compileWithBuiltins(module, source, diagnostics, resolveLumScriptEngineImport, nullptr));
+	ASSERT_COMPILE(LumScript::compileWithBuiltins(module, source, diagnostics, resolveLumScriptEngineImport, nullptr));
 	return true;
 }
 
@@ -864,7 +873,7 @@ bool testEnumShorthandInComparison() {
 	)";
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, source, diagnostics));
+	ASSERT_COMPILE(LumScript::compile(module, source, diagnostics));
 	return true;
 }
 
@@ -883,7 +892,7 @@ bool testEnumShorthandInAssignment() {
 	)";
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, source, diagnostics));
+	ASSERT_COMPILE(LumScript::compile(module, source, diagnostics));
 	return true;
 }
 
@@ -903,7 +912,7 @@ bool testEnumShorthandInFunctionArg() {
 	)";
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, source, diagnostics));
+	ASSERT_COMPILE(LumScript::compile(module, source, diagnostics));
 	return true;
 }
 
@@ -1005,7 +1014,7 @@ bool testEnumCanBeExplicitlyCastToInteger() {
 	)";
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, source, diagnostics, resolveLumScriptImport, nullptr));
+	ASSERT_COMPILE(LumScript::compile(module, source, diagnostics, resolveLumScriptImport, nullptr));
 	return true;
 }
 
@@ -1023,7 +1032,7 @@ bool testIntegerToEnumCastAllowsAnyIntegerValue() {
 	)";
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, source, diagnostics));
+	ASSERT_COMPILE(LumScript::compile(module, source, diagnostics));
 	return true;
 }
 
@@ -1058,7 +1067,7 @@ bool testMatchTypechecks() {
 	)";
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, source, diagnostics));
+	ASSERT_COMPILE(LumScript::compile(module, source, diagnostics));
 	return true;
 }
 
@@ -1079,7 +1088,7 @@ bool testMatchArmAllowsMultipleStatements() {
 	)";
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, source, diagnostics));
+	ASSERT_COMPILE(LumScript::compile(module, source, diagnostics));
 	return true;
 }
 
@@ -1160,7 +1169,7 @@ bool testRefParameterTypechecks() {
 	)";
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, source, diagnostics));
+	ASSERT_COMPILE(LumScript::compile(module, source, diagnostics));
 	return true;
 }
 
@@ -1232,7 +1241,7 @@ bool testRefArgumentAllowsMutableGlobal() {
 	)";
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, source, diagnostics));
+	ASSERT_COMPILE(LumScript::compile(module, source, diagnostics));
 	return true;
 }
 
@@ -1276,7 +1285,7 @@ bool testRefArgumentAllowsNestedMutableField() {
 	)";
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, source, diagnostics));
+	ASSERT_COMPILE(LumScript::compile(module, source, diagnostics));
 	return true;
 }
 
@@ -1313,7 +1322,7 @@ bool testDeferTypechecks() {
 	)";
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, source, diagnostics));
+	ASSERT_COMPILE(LumScript::compile(module, source, diagnostics));
 	return true;
 }
 
@@ -1344,7 +1353,7 @@ bool testNullablePromotionTypechecks() {
 	)";
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, source, diagnostics, resolveLumScriptImport, nullptr));
+	ASSERT_COMPILE(LumScript::compile(module, source, diagnostics, resolveLumScriptImport, nullptr));
 	return true;
 }
 
@@ -1405,7 +1414,7 @@ bool testExtendedScalarTypesTypecheck() {
 	)";
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, source, diagnostics));
+	ASSERT_COMPILE(LumScript::compile(module, source, diagnostics));
 	return true;
 }
 
@@ -1441,7 +1450,7 @@ bool testUntypedLiteralsUseExpectedTypes() {
 	)";
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, source, diagnostics, resolveLumScriptImport, nullptr));
+	ASSERT_COMPILE(LumScript::compile(module, source, diagnostics, resolveLumScriptImport, nullptr));
 	return true;
 }
 
@@ -1477,7 +1486,7 @@ bool testFirstClassFunctionsTypecheck() {
 	)";
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, source, diagnostics));
+	ASSERT_COMPILE(LumScript::compile(module, source, diagnostics));
 	return true;
 }
 
@@ -1509,7 +1518,7 @@ bool testNestedFunctionsTypecheck() {
 	)";
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, source, diagnostics, resolveLumScriptImport, nullptr));
+	ASSERT_COMPILE(LumScript::compile(module, source, diagnostics, resolveLumScriptImport, nullptr));
 	return true;
 }
 
@@ -1582,7 +1591,7 @@ bool testStaticArrayTypecheckAndIndexing() {
 	)";
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, source, diagnostics));
+	ASSERT_COMPILE(LumScript::compile(module, source, diagnostics));
 	return true;
 }
 
@@ -1632,7 +1641,7 @@ bool testBreakContinueTypecheck() {
 	)";
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, source, diagnostics));
+	ASSERT_COMPILE(LumScript::compile(module, source, diagnostics));
 	return true;
 }
 
@@ -1668,7 +1677,7 @@ bool testNamedLabelTypecheck() {
 	)";
 	LumScript::Module module(getGlobalAllocator());
 	LumScript::Diagnostics diagnostics(getGlobalAllocator());
-	ASSERT_TRUE(LumScript::compile(module, source, diagnostics));
+	ASSERT_COMPILE(LumScript::compile(module, source, diagnostics));
 	return true;
 }
 
