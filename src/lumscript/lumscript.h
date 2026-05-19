@@ -1,14 +1,31 @@
 #pragma once
 
 #include "lumscript/ast.h"
-#include "lumscript/checker.h"
 #include "lumscript/diagnostics.h"
 #include "lumscript/parser.h"
 #include "lumscript/runtime.h"
 
 namespace Lumix::LumScript {
 
+bool typecheck(Module& module, Diagnostics& diagnostics);
+
 inline void registerBuiltinTypes(Module& module) {
+	// Register core math types as native types for the scripting module
+	// These must match the names/IDs used in engine bindings and generated code
+	// See also: generated::nativeType in lumscript_capi.gen.h
+	using namespace Lumix::LumScript;
+	// Vec3
+	module.native_types.emplace();
+	module.native_types.back().name = module.copyName("Vec3");
+	module.native_types.back().id = module.copyName("core:Vec3");
+	// DVec3
+	module.native_types.emplace();
+	module.native_types.back().name = module.copyName("DVec3");
+	module.native_types.back().id = module.copyName("core:DVec3");
+	// Quat
+	module.native_types.emplace();
+	module.native_types.back().name = module.copyName("Quat");
+	module.native_types.back().id = module.copyName("core:Quat");
 }
 
 inline StringView normalizeImportPathForPolicy(StringView path) {

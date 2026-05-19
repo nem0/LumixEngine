@@ -1204,7 +1204,7 @@ struct Checker {
 	Array<i32> m_label_scope_starts;
 };
 
-inline bool typecheck(Module& module, Diagnostics& diagnostics) {
+bool typecheck(Module& module, Diagnostics& diagnostics) {
 	Checker checker(module, diagnostics);
 	return checker.check();
 }

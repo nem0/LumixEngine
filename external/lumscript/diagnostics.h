@@ -1,7 +1,6 @@
 #pragma once
 
 #include "core/string.h"
-#include "tokenizer.h"
 
 namespace Lumix::LumScript {
 

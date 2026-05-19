@@ -675,9 +675,26 @@ bool testGeneratedInputImportTypechecks() {
 	return true;
 }
 
+bool testTransitiveNativeImport() {
+	const char* source = R"(
+		import "engine:world" as world
+		import "engine:entity" as entity
+
+		fn init(w : world.World) : void {
+			var e = world.createEntity(w);
+			e.setPosition({ 1.0, 2.0, 3.0 });
+		}
+	)";
+	LumScript::Module module(getGlobalAllocator());
+	LumScript::Diagnostics diagnostics(getGlobalAllocator());
+	bool ok = LumScript::compile(module, source, diagnostics, resolveLumScriptEngineImport, nullptr);
+	if (!ok) logError(diagnostics.message);
+	ASSERT_TRUE(ok);
+	return true;
+}
+
 bool testGeneratedWorldFunctionsTypecheck() {
 	const char* source = R"(
-		import "core:vec3"
 		import "core:quat"
 		import "engine:world" as world
 		import "engine:entity" as entity
@@ -1743,6 +1760,7 @@ void runLumScriptCompilerTests() {
 	RUN_TEST(testGeneratedWorldImportTypechecks);
 	RUN_TEST(testGeneratedInputImportTypechecks);
 	RUN_TEST(testGeneratedImguiImportTypechecks);
+	RUN_TEST(testTransitiveNativeImport);
 	RUN_TEST(testGeneratedWorldFunctionsTypecheck);
 	RUN_TEST(testWorldRendererAccessorTypecheck);
 	RUN_TEST(testFirstParameterNamespaceResolutionPrecedenceTypecheck);
