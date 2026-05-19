@@ -1,7 +1,7 @@
 #pragma once
 
-#include "lumscript/lumscript_ast.h"
-#include "lumscript/lumscript_diagnostics.h"
+#include "ast.h"
+#include "diagnostics.h"
 
 namespace Lumix::LumScript {
 

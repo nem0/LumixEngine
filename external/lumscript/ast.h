@@ -4,7 +4,7 @@
 #include "core/array.h"
 #include "core/span.h"
 #include "core/string.h"
-#include "lumscript/lumscript_tokenizer.h"
+#include "tokenizer.h"
 
 namespace Lumix::LumScript {
 

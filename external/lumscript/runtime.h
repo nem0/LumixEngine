@@ -1,10 +1,10 @@
 #pragma once
 
+#include "ast.h"
 #include "core/allocator.h"
 #include "core/array.h"
 #include "core/span.h"
-#include "lumscript/lumscript_ast.h"
-#include "lumscript/lumscript_diagnostics.h"
+#include "diagnostics.h"
 
 namespace Lumix::LumScript {
 

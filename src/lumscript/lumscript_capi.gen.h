@@ -2,8 +2,8 @@
 
 #pragma once
 
-#include "lumscript/lumscript_ast.h"
-#include "lumscript/lumscript_runtime.h"
+#include "lumscript/ast.h"
+#include "lumscript/runtime.h"
 #include "core/stream.h"
 #include "engine/reflection.h"
 #include "engine/world.h"

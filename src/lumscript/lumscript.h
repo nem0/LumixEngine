@@ -1,10 +1,10 @@
 #pragma once
 
-#include "lumscript/lumscript_ast.h"
-#include "lumscript/lumscript_checker.h"
-#include "lumscript/lumscript_diagnostics.h"
-#include "lumscript/lumscript_parser.h"
-#include "lumscript/lumscript_runtime.h"
+#include "lumscript/ast.h"
+#include "lumscript/checker.h"
+#include "lumscript/diagnostics.h"
+#include "lumscript/parser.h"
+#include "lumscript/runtime.h"
 
 namespace Lumix::LumScript {
 
