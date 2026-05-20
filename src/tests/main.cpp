@@ -12,7 +12,6 @@ void runUITokenizerTests();
 void runUITests();
 void runUIStyleTests();
 void runUILayoutTests();
-void runLumScriptTests();
 
 namespace Lumix {
 	int test_count = 0;
@@ -44,7 +43,6 @@ int main(int argc, char* argv[]) {
 	runUITests();
 	runUIStyleTests();
 	runUILayoutTests();
-	runLumScriptTests();
 	Lumix::logInfo("=== Test Results: ", Lumix::passed_count, "/", Lumix::test_count, " passed ===");
 
 	Lumix::profiler::shutdown();

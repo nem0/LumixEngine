@@ -1,16 +1,17 @@
 #pragma once
 
-#include "core/string.h"
+struct ls_module;
 
 namespace Lumix {
 
+struct StringView;
 struct World;
 
 namespace LumScript {
 
 struct Module;
 
-bool resolveEngineImport(Module& module, World* world, StringView path, StringView alias);
+bool resolveEngineImport(ls_module& module, World* world, StringView path, StringView alias);
 
 } // namespace LumScript
 

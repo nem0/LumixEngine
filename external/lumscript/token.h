@@ -1,0 +1,91 @@
+#pragma once
+
+#include "core/string.h"
+
+namespace Lumix::LumScript {
+
+struct Token {
+	enum Type {
+		EOF,
+		ERROR,
+		IDENTIFIER,
+		NUMBER,
+		STRING,
+
+		LEFT_PAREN,
+		RIGHT_PAREN,
+		LEFT_BRACE,
+		RIGHT_BRACE,
+		LEFT_BRACKET,
+		RIGHT_BRACKET,
+		SEMICOLON,
+		COLON,
+		COMMA,
+		DOT,
+		RANGE,
+		QUESTION,
+
+		PLUS,
+		MINUS,
+		STAR,
+		SLASH,
+		PERCENT,
+		EQUAL,
+		PLUS_EQUAL,
+		MINUS_EQUAL,
+		STAR_EQUAL,
+		SLASH_EQUAL,
+		PLUS_PLUS,
+		MINUS_MINUS,
+		EQUAL_EQUAL,
+		BANG_EQUAL,
+		GT,
+		LT,
+		GT_EQUAL,
+		LT_EQUAL,
+
+		STRUCT,
+		ENUM,
+		FN,
+		VAR,
+		CONST,
+		DEFER,
+		RETURN,
+		REF,
+		WHILE,
+		IF,
+		ELSE,
+		IMPORT,
+		MATCH,
+		CASE,
+		BREAK,
+		CONTINUE,
+		AS,
+		TRUE,
+		FALSE,
+		NULL_KW,
+		AND,
+		OR,
+		NOT,
+		VOID,
+		I8,
+		BOOL,
+		I16,
+		I32,
+		I64,
+		U8,
+		U16,
+		U32,
+		U64,
+		F32,
+		F64
+	};
+
+	Type type = EOF;
+	StringView value;
+	StringView source_name;
+	i32 line = 1;
+	i32 column = 1;
+};
+
+}

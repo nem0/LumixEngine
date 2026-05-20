@@ -1,7 +1,7 @@
 #pragma once
 
 #include "ast.h"
-#include "diagnostics.h"
+#include "lumscript.h"
 
 namespace Lumix::LumScript {
 
@@ -17,9 +17,9 @@ struct LocalFunctionInfo {
 };
 
 struct Checker {
-	Checker(Module& module, Diagnostics& diagnostics)
+	Checker(Module& module, Callbacks& diagnostics)
 		: m_module(module)
-		, m_diagnostics(diagnostics)
+		, m_callbacks(diagnostics)
 		, m_locals(module.allocator)
 		, m_scope_starts(module.allocator)
 		, m_local_functions(module.allocator)
@@ -34,7 +34,7 @@ struct Checker {
 		for (i32 i = 0; i < m_module.structs.size(); ++i) {
 			for (i32 j = i + 1; j < m_module.structs.size(); ++j) {
 				if (equalStrings(m_module.structs[i].name, m_module.structs[j].name)) {
-					m_diagnostics.errorAt(m_module.structs[j].token, "Duplicate struct '", m_module.structs[j].name, "'");
+					m_callbacks.errorAt(m_module.structs[j].token, "Duplicate struct '", m_module.structs[j].name, "'");
 					return false;
 				}
 			}
@@ -44,35 +44,35 @@ struct Checker {
 			for (i32 j = i + 1; j < m_module.functions.size(); ++j) {
 				if (m_module.functions[j].is_nested) continue;
 				if (equalStrings(m_module.functions[i].name, m_module.functions[j].name)) {
-					m_diagnostics.errorAt(m_module.functions[j].token, "Duplicate function '", m_module.functions[j].name, "'");
+					m_callbacks.errorAt(m_module.functions[j].token, "Duplicate function '", m_module.functions[j].name, "'");
 					return false;
 				}
 			}
 			if (findNativeFunction(m_module.functions[i].name) >= 0) {
-				m_diagnostics.errorAt(m_module.functions[i].token, "Duplicate function '", m_module.functions[i].name, "'");
+				m_callbacks.errorAt(m_module.functions[i].token, "Duplicate function '", m_module.functions[i].name, "'");
 				return false;
 			}
 			if (findGlobal(m_module.functions[i].name) >= 0) {
-				m_diagnostics.errorAt(m_module.functions[i].token, "Duplicate declaration '", m_module.functions[i].name, "'");
+				m_callbacks.errorAt(m_module.functions[i].token, "Duplicate declaration '", m_module.functions[i].name, "'");
 				return false;
 			}
 		}
 		for (i32 i = 0; i < m_module.globals.size(); ++i) {
 			for (i32 j = i + 1; j < m_module.globals.size(); ++j) {
 				if (equalStrings(m_module.globals[i].name, m_module.globals[j].name)) {
-					m_diagnostics.errorAt(m_module.globals[j].token, "Duplicate global '", m_module.globals[j].name, "'");
+					m_callbacks.errorAt(m_module.globals[j].token, "Duplicate global '", m_module.globals[j].name, "'");
 					return false;
 				}
 			}
 			if (findFunction(m_module.globals[i].name) >= 0 || findNativeFunction(m_module.globals[i].name) >= 0) {
-				m_diagnostics.errorAt(m_module.globals[i].token, "Duplicate declaration '", m_module.globals[i].name, "'");
+				m_callbacks.errorAt(m_module.globals[i].token, "Duplicate declaration '", m_module.globals[i].name, "'");
 				return false;
 			}
 		}
 		for (i32 i = 0; i < m_module.native_functions.size(); ++i) {
 			for (i32 j = i + 1; j < m_module.native_functions.size(); ++j) {
 				if (equalStrings(m_module.native_functions[i].name, m_module.native_functions[j].name)) {
-					m_diagnostics.errorAt(m_module.native_functions[j].token, "Duplicate function '", m_module.native_functions[j].name, "'");
+					m_callbacks.errorAt(m_module.native_functions[j].token, "Duplicate function '", m_module.native_functions[j].name, "'");
 					return false;
 				}
 			}
@@ -82,7 +82,7 @@ struct Checker {
 			for (i32 j = 0; j < s.fields.size(); ++j) {
 				for (i32 k = j + 1; k < s.fields.size(); ++k) {
 					if (equalStrings(s.fields[j].name, s.fields[k].name)) {
-						m_diagnostics.errorAt(s.fields[k].token, "Duplicate field '", s.fields[k].name, "'");
+						m_callbacks.errorAt(s.fields[k].token, "Duplicate field '", s.fields[k].name, "'");
 						return false;
 					}
 				}
@@ -92,14 +92,14 @@ struct Checker {
 		for (i32 i = 0; i < m_module.enums.size(); ++i) {
 			for (i32 j = i + 1; j < m_module.enums.size(); ++j) {
 				if (equalStrings(m_module.enums[i].name, m_module.enums[j].name)) {
-					m_diagnostics.errorAt(m_module.enums[j].token, "Duplicate enum '", m_module.enums[j].name, "'");
+					m_callbacks.errorAt(m_module.enums[j].token, "Duplicate enum '", m_module.enums[j].name, "'");
 					return false;
 				}
 			}
 			for (i32 j = 0; j < m_module.enums[i].members.size(); ++j) {
 				for (i32 k = j + 1; k < m_module.enums[i].members.size(); ++k) {
 					if (equalStrings(m_module.enums[i].members[j].name, m_module.enums[i].members[k].name)) {
-						m_diagnostics.errorAt(m_module.enums[i].members[k].token, "Duplicate enum member '", m_module.enums[i].members[k].name, "'");
+						m_callbacks.errorAt(m_module.enums[i].members[k].token, "Duplicate enum member '", m_module.enums[i].members[k].name, "'");
 						return false;
 					}
 				}
@@ -117,7 +117,7 @@ struct Checker {
 		for (FunctionDecl& fn : m_module.functions) {
 			if (!fn.is_nested) checkFunction(fn);
 		}
-		return !m_diagnostics.has_error;
+		return !m_callbacks.has_error;
 	}
 
 	i32 findStruct(StringView name) const {
@@ -271,7 +271,7 @@ struct Checker {
 		EnumDecl& en = m_module.enums[enum_idx];
 		const i32 member_idx = findEnumMember(en, member_name);
 		if (member_idx < 0) {
-			m_diagnostics.errorAt(e.token, "Unknown enum member '", member_name, "'");
+			m_callbacks.errorAt(e.token, "Unknown enum member '", member_name, "'");
 			return true;
 		}
 		e.kind = Expr::ENUM_LITERAL;
@@ -347,16 +347,16 @@ struct Checker {
 						type.name = m_module.native_types[type.struct_index].id;
 					}
 					else {
-						m_diagnostics.errorAt(type.token, "Unknown type '", type.name, "'");
+						m_callbacks.errorAt(type.token, "Unknown type '", type.name, "'");
 					}
 				}
 			}
 		} else if (type.kind == TypeRef::ENUM) {
 			type.struct_index = findEnum(type.name);
-			if (type.struct_index < 0) m_diagnostics.errorAt(type.token, "Unknown type '", type.name, "'");
+			if (type.struct_index < 0) m_callbacks.errorAt(type.token, "Unknown type '", type.name, "'");
 		} else if (type.kind == TypeRef::FUNCTION) {
 			if (type.struct_index < 0 || type.struct_index >= m_module.function_types.size()) {
-				m_diagnostics.errorAt(type.token, "Invalid function type");
+				m_callbacks.errorAt(type.token, "Invalid function type");
 				return;
 			}
 			FunctionTypeDecl& fn_type = m_module.function_types[type.struct_index];
@@ -547,18 +547,18 @@ struct Checker {
 		for (i32 i = 0; i < fn.params.size(); ++i) {
 			for (i32 j = i + 1; j < fn.params.size(); ++j) {
 				if (equalStrings(fn.params[i].name, fn.params[j].name)) {
-					m_diagnostics.errorAt(fn.params[j].token, "Duplicate parameter '", fn.params[j].name, "'");
+					m_callbacks.errorAt(fn.params[j].token, "Duplicate parameter '", fn.params[j].name, "'");
 					return false;
 				}
 			}
 			resolveType(fn.params[i].type);
 			if (fn.params[i].is_ref && fn.params[i].type.nullable) {
-				m_diagnostics.errorAt(fn.params[i].token, "Ref parameter type can not be nullable");
+				m_callbacks.errorAt(fn.params[i].token, "Ref parameter type can not be nullable");
 				return false;
 			}
 		}
 		resolveType(fn.return_type);
-		return !m_diagnostics.has_error;
+		return !m_callbacks.has_error;
 	}
 
 	void checkNestedFunction(FunctionDecl& fn) {
@@ -597,17 +597,17 @@ struct Checker {
 				TypeRef* expected = type.kind == TypeRef::INVALID ? nullptr : &type;
 				TypeRef expr_type = checkExpr(global.expr, expected);
 				if (type.kind == TypeRef::INVALID) type = expr_type;
-				else if (!canAssign(type, expr_type)) m_diagnostics.errorAt(global.token, "Initializer type mismatch");
+				else if (!canAssign(type, expr_type)) m_callbacks.errorAt(global.token, "Initializer type mismatch");
 			}
 			else if (global.is_undefined_init) {
-				if (global.is_const) m_diagnostics.errorAt(global.token, "Const declaration can not use undefined initializer");
-				if (type.kind == TypeRef::INVALID) m_diagnostics.errorAt(global.token, "Undefined initializer requires explicit type");
+				if (global.is_const) m_callbacks.errorAt(global.token, "Const declaration can not use undefined initializer");
+				if (type.kind == TypeRef::INVALID) m_callbacks.errorAt(global.token, "Undefined initializer requires explicit type");
 			}
 			else if (type.kind == TypeRef::INVALID) {
-				m_diagnostics.errorAt(global.token, "Global variable needs type or initializer");
+				m_callbacks.errorAt(global.token, "Global variable needs type or initializer");
 			}
 			else {
-				m_diagnostics.errorAt(global.token, "Variable declaration requires initializer");
+				m_callbacks.errorAt(global.token, "Variable declaration requires initializer");
 			}
 			if (type.kind != TypeRef::INVALID) resolveType(type);
 			global.type = type;
@@ -665,7 +665,7 @@ struct Checker {
 					e.boolean = true;
 					return e.type;
 				}
-				m_diagnostics.errorAt(e.token, "Unknown variable '", e.name, "'");
+				m_callbacks.errorAt(e.token, "Unknown variable '", e.name, "'");
 				return {};
 			}
 			case Expr::FUNCTION_REF:
@@ -691,11 +691,11 @@ struct Checker {
 				if (checkQualifiedEnumMember(e, qualified_name)) return e.type;
 				TypeRef base = checkExpr(e.left);
 				if (base.nullable) {
-					m_diagnostics.errorAt(e.token, "Nullable value must be checked for null");
+					m_callbacks.errorAt(e.token, "Nullable value must be checked for null");
 					return {};
 				}
 				if (base.kind != TypeRef::STRUCT || base.struct_index < 0) {
-					m_diagnostics.errorAt(e.token, "Field access on non-struct");
+					m_callbacks.errorAt(e.token, "Field access on non-struct");
 					return {};
 				}
 				StructDecl& s = m_module.structs[base.struct_index];
@@ -705,27 +705,27 @@ struct Checker {
 						return e.type;
 					}
 				}
-				m_diagnostics.errorAt(e.token, "Unknown field '", e.name, "'");
+				m_callbacks.errorAt(e.token, "Unknown field '", e.name, "'");
 				return {};
 			}
 			case Expr::INDEX: {
 				TypeRef base = checkExpr(e.left);
 				if (base.nullable) {
-					m_diagnostics.errorAt(e.token, "Nullable value must be checked for null");
+					m_callbacks.errorAt(e.token, "Nullable value must be checked for null");
 					return {};
 				}
 				if (base.kind != TypeRef::ARRAY) {
-					m_diagnostics.errorAt(e.token, "Indexing requires array type");
+					m_callbacks.errorAt(e.token, "Indexing requires array type");
 					return {};
 				}
 				TypeRef idx_type = checkExpr(e.right);
 				if (!isIntegral(idx_type) && idx_type.kind != TypeRef::UNTYPED_INT) {
-					m_diagnostics.errorAt(e.token, "Array index must be integer");
+					m_callbacks.errorAt(e.token, "Array index must be integer");
 					return {};
 				}
 				i64 idx_value = 0;
 				if (getCompileTimeInteger(e.right, &idx_value) && (idx_value < 0 || idx_value >= base.array_size)) {
-					m_diagnostics.errorAt(e.token, "Array index out of range");
+					m_callbacks.errorAt(e.token, "Array index out of range");
 					return {};
 				}
 				e.type = {base.element_kind, base.element_name, base.struct_index, e.token, false};
@@ -734,7 +734,7 @@ struct Checker {
 			case Expr::UNARY: {
 				TypeRef right = checkExpr(e.right, expected);
 				if (right.nullable) {
-					m_diagnostics.errorAt(e.token, "Nullable value must be checked for null");
+					m_callbacks.errorAt(e.token, "Nullable value must be checked for null");
 					return {};
 				}
 				if (e.token.type == Token::NOT) e.type = {TypeRef::BOOL, {}, -1};
@@ -742,7 +742,7 @@ struct Checker {
 				return e.type;
 			}
 			case Expr::REF: {
-				m_diagnostics.errorAt(e.token, "'ref' can be only used for ref arguments");
+				m_callbacks.errorAt(e.token, "'ref' can be only used for ref arguments");
 				return {};
 			}
 			case Expr::BINARY: {
@@ -754,7 +754,7 @@ struct Checker {
 				TypeRef right = checkExpr(e.right, &left);
 				if (left.kind == TypeRef::STRING || right.kind == TypeRef::STRING) {
 					if (e.token.type != Token::PLUS || left.kind != TypeRef::STRING || right.kind != TypeRef::STRING) {
-						m_diagnostics.errorAt(e.token, "String operation requires string operands");
+						m_callbacks.errorAt(e.token, "String operation requires string operands");
 						return {};
 					}
 					e.type = {TypeRef::STRING, {}, -1};
@@ -763,47 +763,47 @@ struct Checker {
 				const bool is_eq = e.token.type == Token::EQUAL_EQUAL || e.token.type == Token::BANG_EQUAL;
 				const bool null_cmp = left.kind == TypeRef::NULL_VALUE || right.kind == TypeRef::NULL_VALUE;
 				if (!is_eq && (left.nullable || right.nullable)) {
-					m_diagnostics.errorAt(e.token, "Nullable value must be checked for null");
+					m_callbacks.errorAt(e.token, "Nullable value must be checked for null");
 					return {};
 				}
 				if (is_eq && !null_cmp && (left.nullable || right.nullable)) {
-					m_diagnostics.errorAt(e.token, "Nullable value must be checked for null");
+					m_callbacks.errorAt(e.token, "Nullable value must be checked for null");
 					return {};
 				}
 				switch (e.token.type) {
 					case Token::GT: case Token::LT: case Token::GT_EQUAL: case Token::LT_EQUAL:
 					case Token::EQUAL_EQUAL: case Token::BANG_EQUAL:
 						if (!canCompare(left, right)) {
-							m_diagnostics.errorAt(e.token, "Comparison type mismatch");
+							m_callbacks.errorAt(e.token, "Comparison type mismatch");
 							return {};
 						}
 						e.type = {TypeRef::BOOL, {}, -1};
 						return e.type;
 					case Token::AND: case Token::OR:
 						if (left.kind != TypeRef::BOOL || right.kind != TypeRef::BOOL) {
-							m_diagnostics.errorAt(e.token, "Boolean operation requires bool operands");
+							m_callbacks.errorAt(e.token, "Boolean operation requires bool operands");
 							return {};
 						}
 						e.type = {TypeRef::BOOL, {}, -1};
 						return e.type;
 					default:
 						if (!isNumeric(left) || !isNumeric(right)) {
-							m_diagnostics.errorAt(e.token, "Arithmetic operation requires numeric operands");
+							m_callbacks.errorAt(e.token, "Arithmetic operation requires numeric operands");
 							return {};
 						}
 							if (!sameBaseType(left, right)) {
-								m_diagnostics.errorAt(e.token, "Arithmetic operands must have the same type");
+								m_callbacks.errorAt(e.token, "Arithmetic operands must have the same type");
 								return {};
 							}
 							if (e.token.type == Token::PERCENT && (!isIntegral(left) || !isIntegral(right))) {
-								m_diagnostics.errorAt(e.token, "Modulo operation requires integer operands");
+								m_callbacks.errorAt(e.token, "Modulo operation requires integer operands");
 								return {};
 							}
 							if ((e.token.type == Token::SLASH || e.token.type == Token::PERCENT)
 								&& isIntegral(left)
 								&& isIntegral(right)
 								&& isCompileTimeZero(e.right)) {
-								m_diagnostics.errorAt(m_module.expressions[e.right].token, "Division or modulo by zero");
+								m_callbacks.errorAt(m_module.expressions[e.right].token, "Division or modulo by zero");
 								return {};
 							}
 							e.type = left;
@@ -817,23 +817,23 @@ struct Checker {
 				if (fn_idx < 0 && native_idx < 0) {
 					TypeRef callee_type = checkExpr(e.left);
 					if (callee_type.kind != TypeRef::FUNCTION || callee_type.struct_index < 0 || callee_type.struct_index >= m_module.function_types.size()) {
-						if (callee_name.empty()) m_diagnostics.errorAt(m_module.expressions[e.left].token, "Unsupported callee");
-						else m_diagnostics.errorAt(m_module.expressions[e.left].token, "Unknown function '", callee_name, "'");
+						if (callee_name.empty()) m_callbacks.errorAt(m_module.expressions[e.left].token, "Unsupported callee");
+						else m_callbacks.errorAt(m_module.expressions[e.left].token, "Unknown function '", callee_name, "'");
 						return {};
 					}
 					FunctionTypeDecl& fn_type = m_module.function_types[callee_type.struct_index];
 					if (fn_type.params.size() != e.args.size()) {
-						m_diagnostics.errorAt(e.token, "Wrong number of arguments");
+						m_callbacks.errorAt(e.token, "Wrong number of arguments");
 						return {};
 					}
 					for (i32 i = 0; i < fn_type.params.size(); ++i) {
 						Expr& arg_expr = m_module.expressions[e.args[i]];
 						if (arg_expr.kind == Expr::REF) {
-							m_diagnostics.errorAt(arg_expr.token, "Unexpected ref argument");
+							m_callbacks.errorAt(arg_expr.token, "Unexpected ref argument");
 							continue;
 						}
 						TypeRef arg_type = checkExpr(e.args[i], &fn_type.params[i]);
-						if (!canAssign(fn_type.params[i], arg_type)) m_diagnostics.errorAt(arg_expr.token, "Argument type mismatch");
+						if (!canAssign(fn_type.params[i], arg_type)) m_callbacks.errorAt(arg_expr.token, "Argument type mismatch");
 					}
 					e.type = fn_type.return_type;
 					return e.type;
@@ -843,7 +843,7 @@ struct Checker {
 				const TypeRef return_type = is_native ? m_module.native_functions[native_idx].return_type : m_module.functions[fn_idx].return_type;
 				const i32 receiver_arg_count = e.method_receiver >= 0 ? 1 : 0;
 				if (params.size() != e.args.size() + receiver_arg_count) {
-					m_diagnostics.errorAt(e.token, "Wrong number of arguments");
+					m_callbacks.errorAt(e.token, "Wrong number of arguments");
 					return {};
 				}
 				for (i32 i = 0; i < params.size(); ++i) {
@@ -852,33 +852,33 @@ struct Checker {
 					if (params[i].is_ref) {
 						Expr& arg_expr = m_module.expressions[expr_idx];
 						if (arg_expr.kind != Expr::REF) {
-							m_diagnostics.errorAt(arg_expr.token, "Expected ref argument");
+							m_callbacks.errorAt(arg_expr.token, "Expected ref argument");
 							continue;
 						}
 						const i32 target_expr = arg_expr.right;
 						if (!isAssignableExpr(target_expr)) {
-							m_diagnostics.errorAt(arg_expr.token, "Ref argument must be assignable");
+							m_callbacks.errorAt(arg_expr.token, "Ref argument must be assignable");
 							continue;
 						}
 						if (isConstExpr(target_expr)) {
-							m_diagnostics.errorAt(arg_expr.token, "Can not pass const as ref argument");
+							m_callbacks.errorAt(arg_expr.token, "Can not pass const as ref argument");
 							continue;
 						}
 						TypeRef arg_type = checkExpr(target_expr, &params[i].type);
 						if (arg_type.nullable) {
-							m_diagnostics.errorAt(m_module.expressions[target_expr].token, "Ref argument can not be nullable");
+							m_callbacks.errorAt(m_module.expressions[target_expr].token, "Ref argument can not be nullable");
 							continue;
 						}
-						if (!canAssign(params[i].type, arg_type)) m_diagnostics.errorAt(m_module.expressions[target_expr].token, "Argument type mismatch");
+						if (!canAssign(params[i].type, arg_type)) m_callbacks.errorAt(m_module.expressions[target_expr].token, "Argument type mismatch");
 					}
 					else {
 						Expr& arg_expr = m_module.expressions[expr_idx];
 						if (arg_expr.kind == Expr::REF) {
-							m_diagnostics.errorAt(arg_expr.token, "Unexpected ref argument");
+							m_callbacks.errorAt(arg_expr.token, "Unexpected ref argument");
 							continue;
 						}
 						TypeRef arg_type = checkExpr(expr_idx, &params[i].type);
-						if (!canAssign(params[i].type, arg_type)) m_diagnostics.errorAt(m_module.expressions[expr_idx].token, "Argument type mismatch");
+						if (!canAssign(params[i].type, arg_type)) m_callbacks.errorAt(m_module.expressions[expr_idx].token, "Argument type mismatch");
 					}
 				}
 				e.type = return_type;
@@ -889,7 +889,7 @@ struct Checker {
 				resolveType(e.cast_type);
 				const bool is_enum_integer_cast = (src.kind == TypeRef::ENUM && isIntegral(e.cast_type)) || (isIntegral(src) && e.cast_type.kind == TypeRef::ENUM);
 				if ((!isScalar(src) || !isScalar(e.cast_type)) && !is_enum_integer_cast) {
-					m_diagnostics.errorAt(e.token, "Invalid cast");
+					m_callbacks.errorAt(e.token, "Invalid cast");
 					return {};
 				}
 				e.type = e.cast_type;
@@ -902,35 +902,35 @@ struct Checker {
 					target = {TypeRef::STRUCT, e.name, findStruct(e.name)};
 				}
 				if (target.kind != TypeRef::STRUCT || target.struct_index < 0) {
-					m_diagnostics.errorAt(e.token, "Can not infer struct literal type");
+					m_callbacks.errorAt(e.token, "Can not infer struct literal type");
 					return {};
 				}
 				StructDecl& s = m_module.structs[target.struct_index];
 				if (s.fields.size() != e.args.size()) {
-					m_diagnostics.errorAt(e.token, "Struct literal field count mismatch");
+					m_callbacks.errorAt(e.token, "Struct literal field count mismatch");
 					return {};
 				}
 				for (i32 i = 0; i < e.args.size(); ++i) {
 					TypeRef arg_type = checkExpr(e.args[i], &s.fields[i].type);
-					if (!canAssign(s.fields[i].type, arg_type)) m_diagnostics.errorAt(m_module.expressions[e.args[i]].token, "Struct literal type mismatch");
+					if (!canAssign(s.fields[i].type, arg_type)) m_callbacks.errorAt(m_module.expressions[e.args[i]].token, "Struct literal type mismatch");
 				}
 				e.type = target;
 				return e.type;
 			}
 			case Expr::ENUM_LITERAL: {
 				if (!expected || expected->kind != TypeRef::ENUM) {
-					m_diagnostics.errorAt(e.token, "Can not infer enum literal type");
+					m_callbacks.errorAt(e.token, "Can not infer enum literal type");
 					return {};
 				}
 				const i32 enum_idx = expected->struct_index;
 				if (enum_idx < 0 || enum_idx >= m_module.enums.size()) {
-					m_diagnostics.errorAt(e.token, "Invalid enum type");
+					m_callbacks.errorAt(e.token, "Invalid enum type");
 					return {};
 				}
 				EnumDecl& en = m_module.enums[enum_idx];
 				const i32 member_idx = findEnumMember(en, e.name);
 				if (member_idx < 0) {
-					m_diagnostics.errorAt(e.token, "Unknown enum member '", e.name, "'");
+					m_callbacks.errorAt(e.token, "Unknown enum member '", e.name, "'");
 					return {};
 				}
 				e.type = *expected;
@@ -950,29 +950,29 @@ struct Checker {
 
 	void checkMatchPattern(MatchPattern& pattern, TypeRef subject_type, bool* has_default) {
 		if (pattern.kind == MatchPattern::DEFAULT) {
-			if (*has_default) m_diagnostics.errorAt(pattern.token, "Duplicate match fallback");
+			if (*has_default) m_callbacks.errorAt(pattern.token, "Duplicate match fallback");
 			*has_default = true;
 			return;
 		}
 		TypeRef start_type = checkExpr(pattern.start_expr, &subject_type);
 		if (!canAssign(subject_type, start_type)) {
-			m_diagnostics.errorAt(pattern.token, "Match pattern type mismatch");
+			m_callbacks.errorAt(pattern.token, "Match pattern type mismatch");
 			return;
 		}
 		if (pattern.kind == MatchPattern::RANGE) {
 			if (!isNumeric(subject_type)) {
-				m_diagnostics.errorAt(pattern.token, "Match range requires numeric type");
+				m_callbacks.errorAt(pattern.token, "Match range requires numeric type");
 				return;
 			}
 			TypeRef end_type = checkExpr(pattern.end_expr, &subject_type);
-			if (!canAssign(subject_type, end_type)) m_diagnostics.errorAt(pattern.token, "Match range type mismatch");
+			if (!canAssign(subject_type, end_type)) m_callbacks.errorAt(pattern.token, "Match range type mismatch");
 		}
 	}
 
 	void checkMatchStmt(Stmt& stmt, TypeRef return_type) {
 		TypeRef subject_type = checkExpr(stmt.expr);
 		if (!isScalar(subject_type) && subject_type.kind != TypeRef::ENUM && subject_type.kind != TypeRef::STRING) {
-			m_diagnostics.errorAt(stmt.token, "Match requires scalar, enum or string value");
+			m_callbacks.errorAt(stmt.token, "Match requires scalar, enum or string value");
 			return;
 		}
 
@@ -991,7 +991,7 @@ struct Checker {
 				const i32 enum_member = enumPatternMember(pattern, subject_type);
 				if (enum_member >= 0) {
 					if (covered_enum_members[enum_member]) {
-						m_diagnostics.errorAt(pattern.token, "Duplicate enum match case");
+						m_callbacks.errorAt(pattern.token, "Duplicate enum match case");
 						return;
 					}
 					covered_enum_members[enum_member] = 1;
@@ -1003,14 +1003,14 @@ struct Checker {
 		if (subject_type.kind == TypeRef::ENUM && !has_default) {
 			for (u8 covered : covered_enum_members) {
 				if (covered) continue;
-				m_diagnostics.errorAt(stmt.token, "Enum match must be exhaustive or have fallback");
+				m_callbacks.errorAt(stmt.token, "Enum match must be exhaustive or have fallback");
 				return;
 			}
 		}
 	}
 
 	void checkStmt(i32 stmt_idx, TypeRef return_type) {
-		if (stmt_idx < 0 || m_diagnostics.has_error) return;
+		if (stmt_idx < 0 || m_callbacks.has_error) return;
 		Stmt& stmt = m_module.statements[stmt_idx];
 		switch (stmt.kind) {
 			case Stmt::BLOCK: {
@@ -1037,12 +1037,12 @@ struct Checker {
 				const i32 scope_start = m_scope_starts.empty() ? 0 : m_scope_starts.last();
 				for (i32 i = scope_start; i < m_locals.size(); ++i) {
 					if (equalStrings(m_locals[i].name, stmt.name)) {
-						m_diagnostics.errorAt(stmt.token, "Duplicate local '", stmt.name, "'");
+						m_callbacks.errorAt(stmt.token, "Duplicate local '", stmt.name, "'");
 						return;
 					}
 				}
 				if (localFunctionInCurrentScope(stmt.name)) {
-					m_diagnostics.errorAt(stmt.token, "Duplicate local '", stmt.name, "'");
+					m_callbacks.errorAt(stmt.token, "Duplicate local '", stmt.name, "'");
 					return;
 				}
 				TypeRef type = stmt.type;
@@ -1051,14 +1051,14 @@ struct Checker {
 					TypeRef* expected = type.kind == TypeRef::INVALID ? nullptr : &type;
 					TypeRef expr_type = checkExpr(stmt.expr, expected);
 					if (type.kind == TypeRef::INVALID) type = expr_type;
-					else if (!canAssign(type, expr_type)) m_diagnostics.errorAt(stmt.token, "Initializer type mismatch");
+					else if (!canAssign(type, expr_type)) m_callbacks.errorAt(stmt.token, "Initializer type mismatch");
 				}
 				else if (stmt.is_undefined_init) {
-					if (stmt.is_const) m_diagnostics.errorAt(stmt.token, "Const declaration can not use undefined initializer");
-					if (type.kind == TypeRef::INVALID) m_diagnostics.errorAt(stmt.token, "Undefined initializer requires explicit type");
+					if (stmt.is_const) m_callbacks.errorAt(stmt.token, "Const declaration can not use undefined initializer");
+					if (type.kind == TypeRef::INVALID) m_callbacks.errorAt(stmt.token, "Undefined initializer requires explicit type");
 				}
 				else {
-					m_diagnostics.errorAt(stmt.token, "Variable declaration requires initializer");
+					m_callbacks.errorAt(stmt.token, "Variable declaration requires initializer");
 				}
 				if (type.kind != TypeRef::INVALID) resolveType(type);
 				stmt.type = type;
@@ -1075,12 +1075,12 @@ struct Checker {
 				const i32 scope_start = m_scope_starts.empty() ? 0 : m_scope_starts.last();
 				for (i32 i = scope_start; i < m_locals.size(); ++i) {
 					if (equalStrings(m_locals[i].name, fn.local_name)) {
-						m_diagnostics.errorAt(fn.token, "Duplicate local '", fn.local_name, "'");
+						m_callbacks.errorAt(fn.token, "Duplicate local '", fn.local_name, "'");
 						return;
 					}
 				}
 				if (localFunctionInCurrentScope(fn.local_name)) {
-					m_diagnostics.errorAt(fn.token, "Duplicate function '", fn.local_name, "'");
+					m_callbacks.errorAt(fn.token, "Duplicate function '", fn.local_name, "'");
 					return;
 				}
 				LocalFunctionInfo& local_fn = m_local_functions.emplace();
@@ -1093,19 +1093,19 @@ struct Checker {
 			case Stmt::ASSIGN: {
 				TypeRef left = checkExpr(stmt.left);
 				TypeRef right = checkExpr(stmt.right, &left);
-				if (!canAssign(left, right)) m_diagnostics.errorAt(stmt.token, "Assignment type mismatch");
+				if (!canAssign(left, right)) m_callbacks.errorAt(stmt.token, "Assignment type mismatch");
 				if (stmt.assign_op == Token::SLASH_EQUAL
 					&& isIntegral(left)
 					&& isIntegral(right)
 					&& isCompileTimeZero(stmt.right)) {
-					m_diagnostics.errorAt(m_module.expressions[stmt.right].token, "Division or modulo by zero");
+					m_callbacks.errorAt(m_module.expressions[stmt.right].token, "Division or modulo by zero");
 				}
 				Expr& lhs = m_module.expressions[stmt.left];
 				if (lhs.kind == Expr::VAR) {
 					const i32 idx = findLocal(lhs.name);
-					if (idx >= 0 && m_locals[idx].is_const) m_diagnostics.errorAt(lhs.token, "Can not assign to const '", lhs.name, "'");
+					if (idx >= 0 && m_locals[idx].is_const) m_callbacks.errorAt(lhs.token, "Can not assign to const '", lhs.name, "'");
 					const i32 global_idx = findGlobal(lhs.name);
-					if (global_idx >= 0 && m_module.globals[global_idx].is_const) m_diagnostics.errorAt(lhs.token, "Can not assign to const '", lhs.name, "'");
+					if (global_idx >= 0 && m_module.globals[global_idx].is_const) m_callbacks.errorAt(lhs.token, "Can not assign to const '", lhs.name, "'");
 				}
 				break;
 			}
@@ -1114,13 +1114,13 @@ struct Checker {
 					const i32 label_scope_start = m_label_scope_starts.empty() ? 0 : m_label_scope_starts.last();
 					for (i32 i = label_scope_start; i < m_declared_labels.size(); ++i) {
 						if (!equalStrings(m_declared_labels[i], stmt.name)) continue;
-						m_diagnostics.errorAt(stmt.token, "Duplicate loop label '", stmt.name, "'");
+						m_callbacks.errorAt(stmt.token, "Duplicate loop label '", stmt.name, "'");
 						return;
 					}
 					m_declared_labels.push(stmt.name);
 				}
 				TypeRef cond = checkExpr(stmt.expr);
-				if (cond.kind != TypeRef::BOOL) m_diagnostics.errorAt(stmt.token, "While condition must be bool");
+				if (cond.kind != TypeRef::BOOL) m_callbacks.errorAt(stmt.token, "While condition must be bool");
 				m_loop_labels.push(stmt.name);
 				checkStmt(stmt.right, return_type);
 				m_loop_labels.pop();
@@ -1129,7 +1129,7 @@ struct Checker {
 			case Stmt::BREAK:
 			case Stmt::CONTINUE: {
 				if (m_loop_labels.empty()) {
-					m_diagnostics.errorAt(stmt.token, stmt.kind == Stmt::BREAK ? "'break' used outside loop" : "'continue' used outside loop");
+					m_callbacks.errorAt(stmt.token, stmt.kind == Stmt::BREAK ? "'break' used outside loop" : "'continue' used outside loop");
 					break;
 				}
 				if (!stmt.name.empty()) {
@@ -1141,14 +1141,14 @@ struct Checker {
 						}
 					}
 					if (!found) {
-						m_diagnostics.errorAt(stmt.token, "Unknown loop label '", stmt.name, "'");
+						m_callbacks.errorAt(stmt.token, "Unknown loop label '", stmt.name, "'");
 					}
 				}
 				break;
 			}
 			case Stmt::IF: {
 				TypeRef cond = checkExpr(stmt.expr);
-				if (cond.kind != TypeRef::BOOL) m_diagnostics.errorAt(stmt.token, "If condition must be bool");
+				if (cond.kind != TypeRef::BOOL) m_callbacks.errorAt(stmt.token, "If condition must be bool");
 				StringView promoted_name;
 				TypeRef promoted_type;
 				bool promote_true_branch = false;
@@ -1170,17 +1170,17 @@ struct Checker {
 			}
 			case Stmt::RETURN: {
 				TypeRef actual = stmt.expr >= 0 ? checkExpr(stmt.expr, &return_type) : TypeRef{TypeRef::VOID, {}, -1};
-				if (!canAssign(return_type, actual)) m_diagnostics.errorAt(stmt.token, "Return type mismatch");
+				if (!canAssign(return_type, actual)) m_callbacks.errorAt(stmt.token, "Return type mismatch");
 				break;
 			}
 			case Stmt::DEFER: {
 				if (stmt.left < 0) {
-					m_diagnostics.errorAt(stmt.token, "Expected statement after defer");
+					m_callbacks.errorAt(stmt.token, "Expected statement after defer");
 					break;
 				}
 				Stmt& deferred = m_module.statements[stmt.left];
 				if (deferred.kind == Stmt::RETURN) {
-					m_diagnostics.errorAt(deferred.token, "Can not defer return");
+					m_callbacks.errorAt(deferred.token, "Can not defer return");
 					break;
 				}
 				checkStmt(stmt.left, return_type);
@@ -1193,7 +1193,7 @@ struct Checker {
 	}
 
 	Module& m_module;
-	Diagnostics& m_diagnostics;
+	Callbacks& m_callbacks;
 	Array<LocalInfo> m_locals;
 	Array<i32> m_scope_starts;
 	Array<LocalFunctionInfo> m_local_functions;
@@ -1204,7 +1204,7 @@ struct Checker {
 	Array<i32> m_label_scope_starts;
 };
 
-bool typecheck(Module& module, Diagnostics& diagnostics) {
+bool typecheck(Module& module, Callbacks& diagnostics) {
 	Checker checker(module, diagnostics);
 	return checker.check();
 }

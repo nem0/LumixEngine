@@ -1,6 +1,6 @@
 #include <imgui/imgui.h>
 #include <imgui/imgui_user.h>
-#include "lumscript/lumscript.h"
+#include "lumscript/capi.h"
 #include "lumscript/lumscript_engine_api.h"
 #include "lumscript/lumscript_resource.h"
 #include "core/log.h"
@@ -16,6 +16,7 @@
 #include "engine/file_system.h"
 #include "core/array.h"
 #include "core/stream.h"
+#include "../../external/lumscript/capi.h"
 
 namespace Lumix {
 
@@ -172,8 +173,7 @@ struct LumScriptEditorWindow final : AssetEditorWindow {
 	void check() {
 		OutputMemoryStream blob(m_app.getAllocator());
 		m_editor->serializeText(blob);
-		LumScript::Module module(m_app.getAllocator());
-		LumScript::Diagnostics diagnostics(m_app.getAllocator());
+		String diagnostics_message(m_app.getAllocator());
 		struct ImportContext {
 			FileSystem* filesystem;
 			IAllocator* allocator;
@@ -185,10 +185,18 @@ struct LumScriptEditorWindow final : AssetEditorWindow {
 				, sources(allocator)
 			{}
 		};
-		auto import_resolver = [](LumScript::Module& module, StringView path, StringView alias, StringView* source, void* userdata) -> bool {
-			if (LumScript::resolveEngineImport(module, nullptr, path, alias)) {
+		struct ImportResolverContext {
+			ls_module* module = nullptr;
+			ImportContext* import_ctx = nullptr;
+		};
+		auto import_resolver = [](void* userdata, ls_string_view path, ls_string_view alias, ls_string_view* source) -> int {
+			ImportResolverContext* ctx = (ImportResolverContext*)userdata;
+			if (!ctx || !ctx->module || !ctx->import_ctx) return 0;
+			StringView path_view(path.begin, path.end);
+			StringView alias_view(alias.begin, alias.end);
+			if (LumScript::resolveEngineImport(*ctx->module, nullptr, path_view, alias_view)) {
 				*source = {};
-				return true;
+				return 1;
 			}
 			auto is_valid_core_import_path = [](StringView path) -> bool {
 				if (!startsWith(path, "core:")) return false;
@@ -196,29 +204,51 @@ struct LumScriptEditorWindow final : AssetEditorWindow {
 				if (name.empty() || name[0] == '/' || name[0] == '\\') return false;
 				return !find(name, "..") && !find(name, ':') && !find(name, '\\');
 			};
-			if (is_valid_core_import_path(path)) {
-				ImportContext* ctx = (ImportContext*)userdata;
-				StringView name = path.withoutLeft(5);
+			if (is_valid_core_import_path(path_view)) {
+				StringView name = path_view.withoutLeft(5);
 				const bool has_lum_extension = endsWith(name, ".lum");
 				Path file_path = has_lum_extension ? Path("engine/scripts/core/", name) : Path("engine/scripts/core/", name, ".lum");
-				OutputMemoryStream& import_blob = ctx->sources.emplace(*ctx->allocator);
-				if (!ctx->filesystem->getContentSync(file_path, import_blob)) {
-					ctx->sources.pop();
-					return false;
+				OutputMemoryStream& import_blob = ctx->import_ctx->sources.emplace(*ctx->import_ctx->allocator);
+				if (!ctx->import_ctx->filesystem->getContentSync(file_path, import_blob)) {
+					ctx->import_ctx->sources.pop();
+					return 0;
 				}
-				*source = StringView((const char*)import_blob.data(), (u32)import_blob.size());
-				return true;
+				*source = ls_string_view{(const char*)import_blob.data(), (const char*)import_blob.data() + import_blob.size()};
+				return 1;
 			}
-			return false;
+			return 0;
 		};
 		ImportContext import_ctx(m_app.getEngine().getFileSystem(), m_app.getAllocator());
-		if (LumScript::compileWithBuiltins(module, StringView((const char*)blob.data(), (u32)blob.size()), diagnostics, import_resolver, &import_ctx, m_path.c_str())) {
-			m_message = "OK";
-			logInfo("LumScript check OK: ", m_path);
+		ImportResolverContext resolver_ctx = {};
+		ls_host host = {};
+		host.diagnostics_userdata = &diagnostics_message;
+		host.print = [](void* userdata, ls_string_view msg) {
+			((String*)userdata)->append(StringView(msg.begin, msg.end));
+		};
+		host.has_error = 0;
+		ls_module* module = ls_module_create(&host);
+		if (module) {
+			resolver_ctx.module = module;
+			resolver_ctx.import_ctx = &import_ctx;
+			if (ls_module_compile(module,
+				ls_string_view{(const char*)blob.data(), (const char*)blob.data() + blob.size()},
+				ls_string_view{m_path.c_str(), m_path.c_str() + stringLength(m_path.c_str())},
+				&host,
+				import_resolver,
+				&resolver_ctx))
+			{
+				m_message = "OK";
+				logInfo("LumScript check OK: ", m_path);
+			}
+			else {
+				m_message = diagnostics_message;
+				logError("LumScript check failed: ", m_path, ": ", diagnostics_message);
+			}
+			ls_module_destroy(module);
 		}
 		else {
-			m_message = diagnostics.message;
-			logError("LumScript check failed: ", m_path, ": ", diagnostics.message);
+			m_message = "Failed to allocate LumScript module";
+			logError("LumScript check failed: ", m_path, ": Failed to allocate LumScript module");
 		}
 	}
 

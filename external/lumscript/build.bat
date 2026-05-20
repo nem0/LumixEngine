@@ -8,12 +8,14 @@ REM
 REM Usage:
 REM   build.bat          - Build Release configuration
 REM   build.bat debug    - Build Debug configuration
+REM   build.bat tests    - Build Tests
 
 setlocal
 
 REM Determine build configuration
 set CONFIG=Release
 if /i "%1"=="debug" set CONFIG=Debug
+if /i "%1"=="tests" set CONFIG=Tests
 
 REM Set up paths
 set SCRIPT_DIR=%~dp0
@@ -49,18 +51,30 @@ set CFLAGS=%CFLAGS% /DSTATIC_PLUGINS
 
 if /i "%CONFIG%"=="Debug" (
     set CFLAGS=%CFLAGS% /Od /MDd /DLUMIX_DEBUG
+) else if /i "%CONFIG%"=="Tests" (
+    set CFLAGS=%CFLAGS% /Od /MDd /DLUMIX_DEBUG
 ) else (
     set CFLAGS=%CFLAGS% /O2 /MD
 )
 
 REM Linker flags
-set LDFLAGS=/nologo /DEBUG /INCREMENTAL:NO /OUT:"%OUT_DIR%\lumc.exe"
 
-echo Building lumc [%CONFIG%]...
+if /i "%CONFIG%"=="Tests" (
+    set LDFLAGS=/nologo /DEBUG /INCREMENTAL:NO /OUT:"%OUT_DIR%\tests.exe"
+    echo Building tests...
+) else (
+    set LDFLAGS=/nologo /DEBUG /INCREMENTAL:NO /OUT:"%OUT_DIR%\lumc.exe"
+    echo Building lumc [%CONFIG%]...
+)
+
 echo.
 
 REM Compile
-cl %CFLAGS% "%SCRIPT_DIR%lumc.cpp" /link %LDFLAGS%
+if /i "%CONFIG%"=="Tests" (
+    cl %CFLAGS% "%SRC_DIR%\core\string.cpp" "%SCRIPT_DIR%tests/main.cpp" "%SCRIPT_DIR%parser.cpp" "%SCRIPT_DIR%checker.cpp" "%SCRIPT_DIR%runtime.cpp" "%SCRIPT_DIR%lumscript.cpp" "%SCRIPT_DIR%capi.cpp" /link %LDFLAGS%
+) else (
+    cl %CFLAGS% "%SRC_DIR%\core\string.cpp" "%SCRIPT_DIR%lumc.c" "%SCRIPT_DIR%parser.cpp" "%SCRIPT_DIR%checker.cpp" "%SCRIPT_DIR%runtime.cpp" "%SCRIPT_DIR%lumscript.cpp" "%SCRIPT_DIR%capi.cpp" /link %LDFLAGS%
+)
 
 if %ERRORLEVEL% NEQ 0 (
     echo.
@@ -69,11 +83,11 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo.
-echo Build succeeded: %OUT_DIR%\lumc.exe
+echo Build succeeded.
 echo.
 
 REM Clean up intermediate files
-if exist "lumc.obj" del "lumc.obj"
+del "*.obj"
 if exist "vc*.pdb" del "vc*.pdb"
 if exist "vc*.idb" del "vc*.idb"
 

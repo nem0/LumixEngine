@@ -6,23 +6,66 @@
 #include "engine/file_system.h"
 #include "core/allocator.h"
 #include "core/array.h"
+#include "core/crt.h"
 #include "core/stream.h"
 #include "core/log.h"
 #include "core/tag_allocator.h"
 #include "core/path.h"
+#include "lumscript/capi.h"
 #include "lumscript/lumscript_resource.h"
-#include "lumscript/lumscript.h"
 #include "lumscript/lumscript_engine_api.h"
 
 namespace Lumix {
 
 using namespace LumScript;
 
+struct LumScriptDiagnosticsContext {
+	String* message = nullptr;
+	ls_host* host = nullptr;
+};
+
+static void printLumScriptMessage(void* userdata, ls_string_view msg) {
+	LumScriptDiagnosticsContext* ctx = (LumScriptDiagnosticsContext*)userdata;
+	if (ctx->message) ctx->message->append(StringView(msg.begin, msg.end));
+	if (ctx->host) ctx->host->has_error = 1;
+}
+
+static ls_string_view toLs(StringView value) {
+	return {value.begin, value.end};
+}
+
+static ls_string_view toLs(const char* value) {
+	return {value, value + stringLength(value)};
+}
+
+static ls_value makeNativeValue(void* ptr, const char* type_name) {
+	ls_value value = ls_value_make_null();
+	value.type = ls_type_make_native(toLs(type_name), -1, 0);
+	value.ptr = ptr;
+	return value;
+}
+
+static ls_host makeAllocatorHost(IAllocator& allocator) {
+	ls_host host = {};
+	host.allocator_userdata = &allocator;
+	host.allocate = [](void* userdata, size_t size, size_t align) -> void* {
+		return ((IAllocator*)userdata)->allocate(size, align);
+	};
+	host.deallocate = [](void* userdata, void* ptr) {
+		if (!ptr) return;
+		((IAllocator*)userdata)->deallocate(ptr);
+	};
+	host.reallocate = [](void* userdata, void* ptr, size_t new_size, size_t old_size, size_t align) -> void* {
+		return ((IAllocator*)userdata)->reallocate(ptr, new_size, old_size, align);
+	};
+	return host;
+}
+
 struct LumScriptModuleImpl : LumScriptModule {
 	struct Script {
 		Path path;
-		Module* module = nullptr;
-		Runtime* runtime = nullptr;
+		ls_module* module = nullptr;
+		ls_runtime* runtime = nullptr;
 		LumScriptResource* resource = nullptr;
 		bool is_ready = false;
 	};
@@ -36,11 +79,11 @@ struct LumScriptModuleImpl : LumScriptModule {
 
 	~LumScriptModuleImpl() {
 		if (m_script.runtime) {
-			LUMIX_DELETE(m_allocator, m_script.runtime);
+			ls_runtime_destroy(m_script.runtime);
 			m_script.runtime = nullptr;
 		}
 		if (m_script.module) {
-			LUMIX_DELETE(m_allocator, m_script.module);
+			ls_module_destroy(m_script.module);
 			m_script.module = nullptr;
 		}
 		if (m_script.resource) {
@@ -71,13 +114,20 @@ struct LumScriptModuleImpl : LumScriptModule {
 		if (!m_script.is_ready || !m_script.runtime) return;
 		
 		// Call update function for world-level script
-		Value result;
-		Diagnostics diag(m_allocator);
-		Value dt_value = Runtime::makeF32(time_delta);
-		m_script.runtime->call("update", Span<const Value>(&dt_value, 1), &result, diag);
-		
-		if (diag.has_error) {
-			logError("LumScript update: ", diag.message);
+		// TODO host as member?
+		String diagnostics(m_allocator);
+		ls_host host = makeAllocatorHost(m_allocator);
+		LumScriptDiagnosticsContext diag_ctx = { &diagnostics, &host };
+		host.diagnostics_userdata = &diag_ctx;
+		host.print = &printLumScriptMessage;
+		host.has_error = 0;
+
+		ls_value dt_value = ls_value_make_f32(time_delta);
+		if (!ls_runtime_call(m_script.runtime, toLs("update"), &dt_value, 1, nullptr, &host)) {
+			logError("LumScript update: ", diagnostics);
+		}
+		else if (host.has_error) {
+			logError("LumScript update: ", diagnostics);
 		}
 	}
 
@@ -89,11 +139,11 @@ struct LumScriptModuleImpl : LumScriptModule {
 			m_script.resource = nullptr;
 		}
 		if (m_script.runtime) {
-			LUMIX_DELETE(m_allocator, m_script.runtime);
+			ls_runtime_destroy(m_script.runtime);
 			m_script.runtime = nullptr;
 		}
 		if (m_script.module) {
-			LUMIX_DELETE(m_allocator, m_script.module);
+			ls_module_destroy(m_script.module);
 			m_script.module = nullptr;
 		}
 
@@ -133,13 +183,15 @@ struct LumScriptModuleImpl : LumScriptModule {
 
 private:
 	struct ImportContext {
+		ls_module* module;
 		World* world;
 		FileSystem* filesystem;
 		IAllocator* allocator;
 		Array<OutputMemoryStream> sources;
 
-		ImportContext(World& world, FileSystem& filesystem, IAllocator& allocator)
-			: world(&world)
+		ImportContext(ls_module* module, World& world, FileSystem& filesystem, IAllocator& allocator)
+			: module(module)
+			, world(&world)
 			, filesystem(&filesystem)
 			, allocator(&allocator)
 			, sources(allocator)
@@ -153,25 +205,29 @@ private:
 		return !find(name, "..") && !find(name, ':') && !find(name, '\\');
 	}
 
-	static bool resolveImport(Module& module, StringView path, StringView alias, StringView* source, void* userdata) {
+	static int resolveImport(void* userdata, ls_string_view path, ls_string_view alias, ls_string_view* source) {
 		ImportContext* ctx = (ImportContext*)userdata;
-		if (resolveEngineImport(module, ctx->world, path, alias)) {
+		if (!ctx || !ctx->module) return 0;
+
+		StringView path_view(path.begin, path.end);
+		StringView alias_view(alias.begin, alias.end);
+		if (resolveEngineImport(*ctx->module, ctx->world, path_view, alias_view)) {
 			*source = {};
-			return true;
+			return 1;
 		}
-		if (isValidCoreImportPath(path)) {
-			StringView name = path.withoutLeft(5);
+		if (isValidCoreImportPath(path_view)) {
+			StringView name = path_view.withoutLeft(5);
 			const bool has_lum_extension = endsWith(name, ".lum");
 			Path file_path = has_lum_extension ? Path("engine/scripts/core/", name) : Path("engine/scripts/core/", name, ".lum");
 			OutputMemoryStream& blob = ctx->sources.emplace(*ctx->allocator);
 			if (!ctx->filesystem->getContentSync(file_path, blob)) {
 				ctx->sources.pop();
-				return false;
+				return 0;
 			}
-			*source = StringView((const char*)blob.data(), (u32)blob.size());
-			return true;
+			*source = { (const char*)blob.data(), (const char*)blob.data() + blob.size() };
+			return 1;
 		}
-		return false;
+		return 0;
 	}
 
 	void onResourceChanged(Resource::State, Resource::State new_state, Resource& resource) {
@@ -187,40 +243,53 @@ private:
 	bool compileAndRun() {
 		if (!m_script.resource) return false;
 
-		Diagnostics diagnostics(m_allocator);
+		String diagnostics(m_allocator);
+		ls_host host = makeAllocatorHost(m_allocator);
+		LumScriptDiagnosticsContext diag_ctx = { &diagnostics, &host };
+		host.diagnostics_userdata = &diag_ctx;
+		host.print = &printLumScriptMessage;
+		host.has_error = 0;
 		
 		// Parse and compile the world script
-			if (m_script.module) {
-				LUMIX_DELETE(m_allocator, m_script.module);
-			}
-			m_script.module = LUMIX_NEW(m_allocator, Module)(m_allocator);
-			
-			LumScriptSystem* lumscript_system = static_cast<LumScriptSystem*>(&m_system);
-			ImportContext import_ctx(m_world, lumscript_system->getEngine().getFileSystem(), m_allocator);
-			if (!compileWithBuiltins(*m_script.module, m_script.resource->getSourceCode(), diagnostics, &resolveImport, &import_ctx, m_script.path.c_str())) {
-				logError("LumScript compilation failed: ", diagnostics.message);
-				return false;
-			}
+		if (m_script.module) {
+			ls_module_destroy(m_script.module);
+			m_script.module = nullptr;
+		}
+		m_script.module = ls_module_create(&host);
+		if (!m_script.module) return false;
+		
+		LumScriptSystem* lumscript_system = static_cast<LumScriptSystem*>(&m_system);
+		ImportContext import_ctx(m_script.module, m_world, lumscript_system->getEngine().getFileSystem(), m_allocator);
+		if (!ls_module_compile(m_script.module, toLs(m_script.resource->getSourceCode()), toLs(m_script.path.c_str()), &host, &resolveImport, &import_ctx)) {
+			logError("LumScript compilation failed: ", diagnostics);
+			return false;
+		}
 
-			// Create runtime
-			if (m_script.runtime) {
-				LUMIX_DELETE(m_allocator, m_script.runtime);
-			}
-			m_script.runtime = LUMIX_NEW(m_allocator, Runtime)(*m_script.module, m_allocator);
-			if (m_script.runtime->findFunction("init") >= 0) {
-				Value world_value;
-				world_value.type = TypeRef(TypeRef::NATIVE, "engine:world/World", -1);
-				world_value.ptr = &m_world;
-				Value input_value;
-				input_value.type = TypeRef(TypeRef::NATIVE, "engine:input/InputSystem", -1);
-				input_value.ptr = &static_cast<LumScriptSystem&>(m_system).getEngine().getInputSystem();
-				Value args[] = { world_value, input_value };
-				if (!m_script.runtime->call("init", Span<const Value>(args), nullptr, diagnostics)) {
-					logError("LumScript init failed: ", diagnostics.message);
-					return false;
-				}
-			}
+		// Create runtime
+		if (m_script.runtime) {
+			ls_runtime_destroy(m_script.runtime);
+			m_script.runtime = nullptr;
+		}
+		m_script.runtime = ls_runtime_create(m_script.module);
+		if (!m_script.runtime) return false;
+
+		ls_value args[] = {
+			makeNativeValue(&m_world, "engine:world/World"),
+			makeNativeValue(&static_cast<LumScriptSystem&>(m_system).getEngine().getInputSystem(), "engine:input/InputSystem")
+		};
+		if (ls_runtime_call(
+			m_script.runtime,
+			toLs("init"),
+			args,
+			2,
+			nullptr,
+			&host
+		)) {
 			return true;
+		}
+
+		logError("LumScript init failed: ", diagnostics);
+		return false;
 	}
 
 	World& m_world;

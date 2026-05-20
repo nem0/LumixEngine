@@ -1,32 +1,10 @@
 #pragma once
 
 #include "lumscript/ast.h"
-#include "lumscript/diagnostics.h"
-#include "lumscript/parser.h"
+#include "lumscript/lumscript.h"
 #include "lumscript/runtime.h"
 
 namespace Lumix::LumScript {
-
-bool typecheck(Module& module, Diagnostics& diagnostics);
-
-inline void registerBuiltinTypes(Module& module) {
-	// Register core math types as native types for the scripting module
-	// These must match the names/IDs used in engine bindings and generated code
-	// See also: generated::nativeType in lumscript_capi.gen.h
-	using namespace Lumix::LumScript;
-	// Vec3
-	module.native_types.emplace();
-	module.native_types.back().name = module.copyName("Vec3");
-	module.native_types.back().id = module.copyName("core:Vec3");
-	// DVec3
-	module.native_types.emplace();
-	module.native_types.back().name = module.copyName("DVec3");
-	module.native_types.back().id = module.copyName("core:DVec3");
-	// Quat
-	module.native_types.emplace();
-	module.native_types.back().name = module.copyName("Quat");
-	module.native_types.back().id = module.copyName("core:Quat");
-}
 
 inline StringView normalizeImportPathForPolicy(StringView path) {
 	if (!startsWith(path, "core:")) return path;
@@ -39,12 +17,12 @@ inline bool sameImportPathForPolicy(StringView lhs, StringView rhs) {
 	return equalStrings(normalizeImportPathForPolicy(lhs), normalizeImportPathForPolicy(rhs));
 }
 
-inline bool resolveImports(Module& module, Diagnostics& diagnostics, ImportResolver import_resolver, void* import_resolver_userdata) {
+inline bool resolveImports(Module& module, Callbacks& diagnostics, ImportResolver import_resolver, void* import_resolver_userdata) {
 	Array<u8> state(module.allocator);
 
 	struct Context {
 		Module& module;
-		Diagnostics& diagnostics;
+		Callbacks& diagnostics;
 		ImportResolver import_resolver;
 		void* import_resolver_userdata;
 		Array<u8>& state;
@@ -134,16 +112,18 @@ inline bool resolveImports(Module& module, Diagnostics& diagnostics, ImportResol
 	return !diagnostics.has_error;
 }
 
-inline bool compile(Module& module, StringView source, Diagnostics& diagnostics, ImportResolver import_resolver = nullptr, void* import_resolver_userdata = nullptr, StringView source_name = {}) {
-	registerBuiltinTypes(module);
-	return parse(module, source, diagnostics, {}, source_name) && resolveImports(module, diagnostics, import_resolver, import_resolver_userdata) && typecheck(module, diagnostics);
+bool compile(Module& module, StringView source, Callbacks& diagnostics, ImportResolver import_resolver, void* import_resolver_userdata, StringView source_name) {
+	return parse(module, source, diagnostics, {}, source_name) 
+		&& resolveImports(module, diagnostics, import_resolver, import_resolver_userdata)
+		&& typecheck(module, diagnostics);
 }
 
-inline bool compileWithBuiltins(Module& module, StringView source, Diagnostics& diagnostics, ImportResolver import_resolver = nullptr, void* import_resolver_userdata = nullptr, StringView source_name = {}) {
-	registerBuiltinTypes(module);
-	if (!parse(module, source, diagnostics, {}, source_name)) return false;
-	if (!resolveImports(module, diagnostics, import_resolver, import_resolver_userdata)) return false;
-	return typecheck(module, diagnostics);
+void Callbacks::print(int v) {
+	char tmp[32];
+	if (toCString(v, Span(tmp))) {
+		print(tmp);
+	}
 }
+
 
 } // namespace Lumix::LumScript

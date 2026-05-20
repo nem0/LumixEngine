@@ -2,21 +2,22 @@
 
 #include "core/string.h"
 #include "ast.h"
-#include "diagnostics.h"
+#include "lumscript.h"
+#include "tokenizer.h"
 
 namespace Lumix::LumScript {
 
 struct Parser {
-	Parser(Module& module, Diagnostics& diagnostics, StringView declaration_prefix = {})
+	Parser(Module& module, Callbacks& diagnostics, StringView declaration_prefix, StringView source, StringView source_name = {})
 		: m_module(module)
-		, m_diagnostics(diagnostics)
+		, m_callbacks(diagnostics)
 		, m_declaration_prefix(declaration_prefix)
-	{}
-
-	void init(StringView source, StringView source_name = {}) { m_tokenizer.init(source, source_name); }
+	{
+		m_tokenizer.init(source, source_name);
+	}
 
 	bool parse() {
-		while (peek().type != Token::EOF && !m_diagnostics.has_error) {
+		while (peek().type != Token::EOF && !m_callbacks.has_error) {
 			if (match(Token::IMPORT)) parseImport();
 			else if (match(Token::STRUCT)) parseStruct();
 			else if (match(Token::ENUM)) parseEnum();
@@ -24,7 +25,7 @@ struct Parser {
 			else if (peek().type == Token::VAR || peek().type == Token::CONST) parseGlobal();
 			else error(peek(), "Expected declaration");
 		}
-		return !m_diagnostics.has_error;
+		return !m_callbacks.has_error;
 	}
 
 	Token peek() const { return m_tokenizer.peekToken(); }
@@ -51,7 +52,7 @@ struct Parser {
 	}
 
 	void error(Token token, const char* msg) {
-		m_diagnostics.errorAt(token, msg, " near '", token.value, "'");
+		m_callbacks.errorAt(token, msg, " near '", token.value, "'");
 	}
 
 	StringView parseQualifiedIdentifier(Token first) {
@@ -87,7 +88,7 @@ struct Parser {
 				FunctionTypeDecl& fn_type = m_module.function_types.emplace(m_module.allocator);
 				const i32 fn_type_idx = m_module.function_types.size() - 1;
 				if (!consume(Token::LEFT_PAREN)) return {};
-				while (peek().type != Token::RIGHT_PAREN && peek().type != Token::EOF && !m_diagnostics.has_error) {
+				while (peek().type != Token::RIGHT_PAREN && peek().type != Token::EOF && !m_callbacks.has_error) {
 					if (!fn_type.params.empty()) consume(Token::COMMA);
 					fn_type.params.push(parseType());
 				}
@@ -147,7 +148,7 @@ struct Parser {
 		s.name = m_module.makeQualifiedName(m_declaration_prefix, name.value);
 		s.token = name;
 		if (!consume(Token::LEFT_BRACE)) return;
-		while (peek().type != Token::RIGHT_BRACE && peek().type != Token::EOF && !m_diagnostics.has_error) {
+		while (peek().type != Token::RIGHT_BRACE && peek().type != Token::EOF && !m_callbacks.has_error) {
 			Token field_name;
 			if (!consume(Token::IDENTIFIER, &field_name)) return;
 			if (!consume(Token::COLON)) return;
@@ -169,7 +170,7 @@ struct Parser {
 		e.token = name;
 		if (!consume(Token::LEFT_BRACE)) return;
 		i32 auto_value = 0;
-		while (peek().type != Token::RIGHT_BRACE && peek().type != Token::EOF && !m_diagnostics.has_error) {
+		while (peek().type != Token::RIGHT_BRACE && peek().type != Token::EOF && !m_callbacks.has_error) {
 			Token member_name;
 			if (!consume(Token::IDENTIFIER, &member_name)) return;
 			EnumMember& member = e.members.emplace();
@@ -210,7 +211,7 @@ struct Parser {
 		fn.token = name;
 		const i32 fn_idx = m_module.functions.size() - 1;
 		if (!consume(Token::LEFT_PAREN)) return fn_idx;
-		while (peek().type != Token::RIGHT_PAREN && peek().type != Token::EOF && !m_diagnostics.has_error) {
+		while (peek().type != Token::RIGHT_PAREN && peek().type != Token::EOF && !m_callbacks.has_error) {
 			if (!fn.params.empty()) consume(Token::COMMA);
 			Token param_name;
 			if (!consume(Token::IDENTIFIER, &param_name)) return fn_idx;
@@ -284,7 +285,7 @@ struct Parser {
 			return -1;
 		}
 		const i32 block = addStmt(Stmt::BLOCK, t);
-		while (peek().type != Token::RIGHT_BRACE && peek().type != Token::EOF && !m_diagnostics.has_error) {
+		while (peek().type != Token::RIGHT_BRACE && peek().type != Token::EOF && !m_callbacks.has_error) {
 			const i32 child = parseStatement();
 			m_module.statements[block].children.push(child);
 		}
@@ -428,7 +429,7 @@ struct Parser {
 		m_module.statements[stmt_idx].expr = parseExpression();
 		m_allow_constructor = true;
 		if (!consume(Token::LEFT_BRACE)) return stmt_idx;
-		while (peek().type != Token::RIGHT_BRACE && peek().type != Token::EOF && !m_diagnostics.has_error) {
+		while (peek().type != Token::RIGHT_BRACE && peek().type != Token::EOF && !m_callbacks.has_error) {
 			Token case_token;
 			if (!consume(Token::CASE, &case_token)) return stmt_idx;
 			const i32 arm_idx = addMatchArm(case_token);
@@ -454,7 +455,7 @@ struct Parser {
 			}
 			consume(Token::COLON);
 			const i32 block = addStmt(Stmt::BLOCK, case_token);
-			while (peek().type != Token::CASE && peek().type != Token::RIGHT_BRACE && peek().type != Token::EOF && !m_diagnostics.has_error) {
+			while (peek().type != Token::CASE && peek().type != Token::RIGHT_BRACE && peek().type != Token::EOF && !m_callbacks.has_error) {
 				const i32 child = parseStatement();
 				if (child >= 0) m_module.statements[block].children.push(child);
 			}
@@ -547,7 +548,7 @@ struct Parser {
 			else if (match(Token::LEFT_PAREN)) {
 				const i32 idx = addExpr(Expr::CALL, t);
 				m_module.expressions[idx].left = expr_idx;
-				while (peek().type != Token::RIGHT_PAREN && peek().type != Token::EOF && !m_diagnostics.has_error) {
+				while (peek().type != Token::RIGHT_PAREN && peek().type != Token::EOF && !m_callbacks.has_error) {
 					if (!m_module.expressions[idx].args.empty()) consume(Token::COMMA);
 					const i32 arg = parseExpression();
 					m_module.expressions[idx].args.push(arg);
@@ -567,7 +568,7 @@ struct Parser {
 				StringView name = getExpressionName(expr_idx);
 				const i32 idx = addExpr(Expr::CONSTRUCTOR, t);
 				m_module.expressions[idx].name = name;
-				while (peek().type != Token::RIGHT_BRACE && peek().type != Token::EOF && !m_diagnostics.has_error) {
+				while (peek().type != Token::RIGHT_BRACE && peek().type != Token::EOF && !m_callbacks.has_error) {
 					if (!m_module.expressions[idx].args.empty()) consume(Token::COMMA);
 					const i32 arg = parseExpression();
 					m_module.expressions[idx].args.push(arg);
@@ -616,7 +617,7 @@ struct Parser {
 					consumeToken();
 					const i32 idx = addExpr(Expr::CONSTRUCTOR, t);
 					m_module.expressions[idx].name = t.value;
-					while (peek().type != Token::RIGHT_BRACE && peek().type != Token::EOF && !m_diagnostics.has_error) {
+					while (peek().type != Token::RIGHT_BRACE && peek().type != Token::EOF && !m_callbacks.has_error) {
 						if (!m_module.expressions[idx].args.empty()) consume(Token::COMMA);
 						const i32 arg = parseExpression();
 						m_module.expressions[idx].args.push(arg);
@@ -642,7 +643,7 @@ struct Parser {
 			}
 			case Token::LEFT_BRACE: {
 				const i32 idx = addExpr(Expr::STRUCT_LITERAL, t);
-				while (peek().type != Token::RIGHT_BRACE && peek().type != Token::EOF && !m_diagnostics.has_error) {
+				while (peek().type != Token::RIGHT_BRACE && peek().type != Token::EOF && !m_callbacks.has_error) {
 					if (!m_module.expressions[idx].args.empty()) consume(Token::COMMA);
 					const i32 arg = parseExpression();
 					m_module.expressions[idx].args.push(arg);
@@ -656,15 +657,14 @@ struct Parser {
 
 	Tokenizer m_tokenizer;
 	Module& m_module;
-	Diagnostics& m_diagnostics;
+	Callbacks& m_callbacks;
 	StringView m_declaration_prefix;
 	bool m_allow_constructor = true;
 	i32 m_nested_function_counter = 0;
 };
 
-inline bool parse(Module& module, StringView source, Diagnostics& diagnostics, StringView declaration_prefix = {}, StringView source_name = {}) {
-	Parser parser(module, diagnostics, declaration_prefix);
-	parser.init(source, source_name);
+bool parse(Module& module, StringView source, Callbacks& diagnostics, StringView declaration_prefix, StringView source_name) {
+	Parser parser(module, diagnostics, declaration_prefix, source, source_name);
 	return parser.parse();
 }
 

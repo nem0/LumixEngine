@@ -3,7 +3,6 @@
 #include "engine/plugin.h"
 #include "engine/resource.h"
 #include "core/path.h"
-#include "lumscript/lumscript.h"
 
 namespace Lumix {
 

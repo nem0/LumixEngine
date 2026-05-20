@@ -4,33 +4,13 @@
 #include "core/array.h"
 #include "core/span.h"
 #include "core/string.h"
-#include "tokenizer.h"
+#include "token.h"
+#include "typeref.h"
 
 namespace Lumix::LumScript {
 
 struct Value;
 struct Module;
-
-struct TypeRef {
-	enum Kind { INVALID, VOID, BOOL, I8, U8, I16, U16, I32, U32, I64, U64, F32, F64, STRING, UNTYPED_INT, UNTYPED_FLOAT, STRUCT, ENUM, NATIVE, FUNCTION, ARRAY, NULL_VALUE } kind = INVALID;
-
-	TypeRef() {}
-	TypeRef(Kind kind, StringView name = {}, i32 struct_index = -1, Token token = {}, bool nullable = false)
-		: kind(kind)
-		, name(name)
-		, struct_index(struct_index)
-		, token(token)
-		, nullable(nullable)
-	{}
-
-	StringView name;
-	i32 struct_index = -1;
-	Kind element_kind = INVALID;
-	StringView element_name;
-	i32 array_size = 0;
-	Token token;
-	bool nullable = false;
-};
 
 inline bool sameBaseType(const TypeRef& a, const TypeRef& b) {
 	if (a.kind != b.kind) return false;
@@ -54,7 +34,7 @@ struct Expr {
 		NULL_LITERAL,
 		VAR,
 		FIELD,
-			REF,
+		REF,
 		UNARY,
 		BINARY,
 		CALL,
@@ -62,8 +42,7 @@ struct Expr {
 		STRUCT_LITERAL,
 		CONSTRUCTOR,
 		ENUM_LITERAL,
-		FUNCTION_REF
-		,
+		FUNCTION_REF,
 		INDEX
 	};
 
@@ -269,12 +248,12 @@ struct Module {
 
 	IAllocator& allocator;
 	Array<ImportDecl> imports;
-	Array<NativeTypeDecl> native_types;
-	Array<StructDecl> structs;
-	Array<EnumDecl> enums;
-	Array<GlobalDecl> globals;
-	Array<FunctionDecl> functions;
 	Array<NativeFunctionDecl> native_functions;
+	Array<FunctionDecl> functions;
+	Array<GlobalDecl> globals;
+	Array<StructDecl> structs;
+	Array<NativeTypeDecl> native_types;
+	Array<EnumDecl> enums;
 	Array<FunctionTypeDecl> function_types;
 	Array<Expr> expressions;
 	Array<Stmt> statements;
@@ -284,6 +263,7 @@ struct Module {
 	Array<void*> allocated_native_data;
 };
 
+// TODO get rid of userdata, it's only used in generated engine API, and it's used in a wrong way there
 inline NativeFunctionDecl& addNativeFunction(Module& module, StringView name, TypeRef return_type, Span<const TypeRef> param_types, NativeCallback callback, void* userdata = nullptr) {
 	NativeFunctionDecl& fn = module.native_functions.emplace(module.allocator);
 	fn.name = name;
