@@ -25,7 +25,6 @@ static int logLogInfo(const ls_value* args, size_t arg_count, ls_value*, void*) 
 	return 1;
 }
 
-
 static ls_string_view toC(StringView value) {
 	return {value.begin, value.end};
 }
@@ -58,28 +57,6 @@ static Value fromC(ls_value value) {
 	return result;
 }
 
-static ls_value toC(const Value& value) {
-	ls_value result = {};
-	result.type.kind = (ls_type_kind)value.type.kind;
-	result.type.name = toC(value.type.name);
-	result.type.struct_index = value.type.struct_index;
-	result.type.element_kind = (ls_type_kind)value.type.element_kind;
-	result.type.element_name = toC(value.type.element_name);
-	result.type.array_size = value.type.array_size;
-	result.type.nullable = value.type.nullable ? 1 : 0;
-	result.b = value.b ? 1 : 0;
-	result.i = value.i;
-	result.u = value.u;
-	result.i64 = value.i64;
-	result.u64 = value.u64;
-	result.f = value.f;
-	result.d = value.d;
-	result.string = toC(value.string);
-	for (i32 i = 0; i < 4; ++i) result.composite[i] = value.composite[i];
-	result.ptr = value.ptr;
-	return result;
-}
-
 static ls_string_view makeEngineName(ls_module* module, StringView alias, const char* name) {
 	return ls_make_qualified_name(module, toC(alias), ls_string_view{name, name + strlen(name)});
 }
@@ -92,6 +69,7 @@ static ls_type nativeType(ls_module* module, ls_string_view visible_name, ls_str
 static const InputSystem::Event* getInputEvent(const Value& value) {
 	InputSystem* input = (InputSystem*)value.ptr;
 	if (!input || value.i < 0) return nullptr;
+	// TODO this should not go through input->, `value` should point directly to the event
 	const Span<const InputSystem::Event> events = input->getEvents();
 	if ((u32)value.i >= events.length()) return nullptr;
 	return &events[value.i];
@@ -270,6 +248,7 @@ bool registerLogModule(ls_module* module, StringView alias) {
 	ls_module_add_native_function(module, makeEngineName(module, alias, "logInfo"), ls_type_make(LS_TYPE_VOID), params, lengthOf(params), &logLogInfo, nullptr);
 	return true;
 }
+
 static int imguiBeginWindow(const ls_value* args, size_t arg_count, ls_value* result, void*) {
 	if (arg_count < 1) return 0;
 	bool open = false;
