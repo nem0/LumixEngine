@@ -83,7 +83,7 @@ struct Token {
 	ls_string_view value;
 	
 	// TODO remove
-	ls_string_view source_name;
+	ls_string_view source_name = {};
 	i32 line = 1;
 	i32 column = 1;
 };

@@ -691,38 +691,16 @@ L("static ls_type nativeType(ls_module* module, ls_string_view visible_name, con
 L("return nativeType(module, visible_name, lsStringView(id));");
 L("}");
 	L("static Vec3 toVec3(const ls_value& value) {");
-	L("return Vec3(value.composite[0], value.composite[1], value.composite[2]);");
 	L("}");
 	L("static DVec3 toDVec3(const ls_value& value) {");
-	L("return DVec3((double)value.composite[0], (double)value.composite[1], (double)value.composite[2]);");
 	L("}");
 	L("static Quat toQuat(const ls_value& value) {");
-	L("return Quat(value.composite[0], value.composite[1], value.composite[2], value.composite[3]);");
 	L("}");
 	L("static ls_value makeVec3Value(const Vec3& value) {");
-	L("ls_value res = ls_value_make_void();");
-	L("res.type = ls_type_make_struct(lsStringView(\"Vec3\"), -1, 0);");
-	L("res.composite[0] = value.x;");
-	L("res.composite[1] = value.y;");
-	L("res.composite[2] = value.z;");
-	L("return res;");
 	L("}");
 	L("static ls_value makeDVec3Value(const DVec3& value) {");
-	L("ls_value res = ls_value_make_void();");
-	L("res.type = ls_type_make_struct(lsStringView(\"DVec3\"), -1, 0);");
-	L("res.composite[0] = (float)value.x;");
-	L("res.composite[1] = (float)value.y;");
-	L("res.composite[2] = (float)value.z;");
-	L("return res;");
 	L("}");
 	L("static ls_value makeQuatValue(const Quat& value) {");
-	L("ls_value res = ls_value_make_void();");
-	L("res.type = ls_type_make_struct(lsStringView(\"Quat\"), -1, 0);");
-	L("res.composite[0] = value.x;");
-	L("res.composite[1] = value.y;");
-	L("res.composite[2] = value.z;");
-	L("res.composite[3] = value.w;");
-	L("return res;");
 	L("}" OUT_ENDL);
 }
 
