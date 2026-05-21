@@ -1,27 +1,25 @@
 #pragma once
 
-#include "core/string.h"
 #include "token.h"
-
-namespace Lumix::LumScript {
+#include "string_utils.h"
 
 struct Tokenizer {
 	using TokenType = Token::Type;
 
-	StringView m_document;
+	ls_string_view m_document;
 	const char* m_start_token = nullptr;
 	const char* m_current = nullptr;
 	i32 m_line = 1;
 	i32 m_column = 1;
 	i32 m_start_line = 1;
 	i32 m_start_column = 1;
-	StringView m_source_name;
+	ls_string_view m_source_name;
 	Token m_current_token;
 
-	void init(StringView document, StringView source_name = {}) {
+	void init(ls_string_view document, ls_string_view source_name = {}) {
 		m_document = document;
 		m_source_name = source_name;
-		m_current = document.begin;
+		m_current = data(document);
 		m_line = 1;
 		m_column = 1;
 		m_current_token = nextToken();
@@ -33,18 +31,19 @@ struct Tokenizer {
 
 	void skipWhitespaces() {
 		for (;;) {
-			while (m_current != m_document.end && isWhitespace(*m_current)) advance();
-			if (m_current >= m_document.end - 1 || m_current[0] != '/' || m_current[1] != '/') return;
+			const char* end = data(m_document) + size(m_document);
+			while (m_current != end && isWhitespace(*m_current)) advance();
+			if (m_current == end || m_current + 1 >= end || m_current[0] != '/' || m_current[1] != '/') return;
 			advance();
 			advance();
-			while (m_current != m_document.end && *m_current != '\n') advance();
+			while (m_current != end && *m_current != '\n') advance();
 		}
 	}
 
 	Token makeToken(TokenType type) const {
 		Token res;
 		res.type = type;
-		res.value = StringView(m_start_token, m_current);
+		res.value = ls_string_view{m_start_token, m_current};
 		res.source_name = m_source_name;
 		res.line = m_start_line;
 		res.column = m_start_column;
@@ -52,7 +51,7 @@ struct Tokenizer {
 	}
 
 	char advance() {
-		ASSERT(m_current < m_document.end);
+		ASSERT(m_current < data(m_document) + size(m_document));
 		const char c = *m_current;
 		++m_current;
 		if (c == '\n') {
@@ -65,11 +64,11 @@ struct Tokenizer {
 		return c;
 	}
 
-	char peekChar() const { return m_current == m_document.end ? 0 : *m_current; }
-	char peekNextChar() const { return m_current + 1 >= m_document.end ? 0 : m_current[1]; }
+	char peekChar() const { return m_current == data(m_document) + size(m_document) ? 0 : *m_current; }
+	char peekNextChar() const { return m_current + 1 >= data(m_document) + size(m_document) ? 0 : m_current[1]; }
 
 	bool match(char c) {
-		if (m_current == m_document.end || *m_current != c) return false;
+		if (m_current == data(m_document) + size(m_document) || *m_current != c) return false;
 		advance();
 		return true;
 	}
@@ -86,15 +85,15 @@ struct Tokenizer {
 
 	Token stringToken() {
 		const char* value_begin = m_current;
-		while (m_current != m_document.end && peekChar() != '"') {
+		while (m_current != data(m_document) + size(m_document) && peekChar() != '"') {
 			if (peekChar() == '\n') return makeToken(Token::ERROR);
 			advance();
 		}
-		if (m_current == m_document.end) return makeToken(Token::ERROR);
+		if (m_current == data(m_document) + size(m_document)) return makeToken(Token::ERROR);
 		const char* value_end = m_current;
 		advance();
 		Token res = makeToken(Token::STRING);
-		res.value = StringView(value_begin, value_end);
+		res.value = ls_string_view{value_begin, value_end};
 		return res;
 	}
 
@@ -106,7 +105,7 @@ struct Tokenizer {
 
 	Token identifierOrKeywordToken() {
 		while (isIdentifierChar(peekChar())) advance();
-		const StringView ident(m_start_token, m_current);
+		const ls_string_view ident{m_start_token, m_current};
 		if (equalStrings(ident, "break")) return makeToken(Token::BREAK);
 		if (equalStrings(ident, "continue")) return makeToken(Token::CONTINUE);
 		switch (m_start_token[0]) {
@@ -210,7 +209,7 @@ struct Tokenizer {
 		m_start_token = m_current;
 		m_start_line = m_line;
 		m_start_column = m_column;
-		if (m_current == m_document.end) return makeToken(Token::EOF);
+		if (m_current == data(m_document) + size(m_document)) return makeToken(Token::END_OF_FILE);
 
 		const char c = advance();
 		if (isDigit(c)) return numberToken();
@@ -259,5 +258,3 @@ struct Tokenizer {
 
 	Token peekToken() const { return m_current_token; }
 };
-
-} // namespace Lumix::LumScript

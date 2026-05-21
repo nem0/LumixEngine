@@ -50,9 +50,9 @@ set CFLAGS=%CFLAGS% /D_CRT_NONSTDC_NO_DEPRECATE
 set CFLAGS=%CFLAGS% /DSTATIC_PLUGINS
 
 if /i "%CONFIG%"=="Debug" (
-    set CFLAGS=%CFLAGS% /Od /MDd /DLUMIX_DEBUG
+    set CFLAGS=%CFLAGS% /Od /MDd
 ) else if /i "%CONFIG%"=="Tests" (
-    set CFLAGS=%CFLAGS% /Od /MDd /DLUMIX_DEBUG
+    set CFLAGS=%CFLAGS% /Od /MDd
 ) else (
     set CFLAGS=%CFLAGS% /O2 /MD
 )
@@ -71,9 +71,9 @@ echo.
 
 REM Compile
 if /i "%CONFIG%"=="Tests" (
-    cl %CFLAGS% "%SRC_DIR%\core\string.cpp" "%SCRIPT_DIR%tests/main.cpp" "%SCRIPT_DIR%parser.cpp" "%SCRIPT_DIR%checker.cpp" "%SCRIPT_DIR%runtime.cpp" "%SCRIPT_DIR%lumscript.cpp" "%SCRIPT_DIR%capi.cpp" /link %LDFLAGS%
+    cl %CFLAGS% "%SRC_DIR%\core\string.cpp" "%SCRIPT_DIR%tests/main.cpp" "%SCRIPT_DIR%parser.cpp" "%SCRIPT_DIR%runtime.cpp" "%SCRIPT_DIR%compiler.cpp" "%SCRIPT_DIR%capi.cpp" /link %LDFLAGS%
 ) else (
-    cl %CFLAGS% "%SRC_DIR%\core\string.cpp" "%SCRIPT_DIR%lumc.c" "%SCRIPT_DIR%parser.cpp" "%SCRIPT_DIR%checker.cpp" "%SCRIPT_DIR%runtime.cpp" "%SCRIPT_DIR%lumscript.cpp" "%SCRIPT_DIR%capi.cpp" /link %LDFLAGS%
+    cl %CFLAGS% "%SRC_DIR%\core\string.cpp" "%SCRIPT_DIR%lumc.c" "%SCRIPT_DIR%parser.cpp" "%SCRIPT_DIR%runtime.cpp" "%SCRIPT_DIR%compiler.cpp" "%SCRIPT_DIR%capi.cpp" /link %LDFLAGS%
 )
 
 if %ERRORLEVEL% NEQ 0 (

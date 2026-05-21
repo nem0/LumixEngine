@@ -1,35 +1,28 @@
 #include "runtime.h"
 
-namespace Lumix::LumScript {
-
-Runtime::Runtime(Module& module, IAllocator& allocator)
+Runtime::Runtime(Module& module)
 	: m_module(module)
-	, m_allocator(allocator)
-	, m_frames(allocator)
-	, m_globals(allocator)
-	, m_deferred_statements(allocator)
-	, m_owned_arrays(allocator)
-	, m_owned_strings(allocator)
-{}
-
-Runtime::~Runtime() {
-	for (Array<Value>* arr : m_owned_arrays) LUMIX_DELETE(m_allocator, arr);
-	for (char* str : m_owned_strings) m_allocator.deallocate(str);
+{
+	m_output.host = module.host;
 }
 
-bool Runtime::call(StringView function_name, Span<const Value> args, Value* result, Callbacks& diagnostics) {
-	m_callbacks = &diagnostics;
+Runtime::~Runtime() {
+	for (std::vector<Value>* arr : m_owned_arrays) deleteObject(m_module.host, arr);
+	for (char* str : m_owned_strings) deallocateMemory(m_module.host, str);
+}
+
+bool Runtime::call(ls_string_view function_name, std::span<const Value> args, Value* result) {
 	const i32 fn_idx = findFunction(function_name);
 	const i32 native_idx = findNativeFunction(function_name);
 	if (fn_idx < 0 && native_idx < 0) {
-		diagnostics.error("Unknown function '", function_name, "'");
+		m_output.error("Unknown function '", function_name, "'");
 		return false;
 	}
 	if (!initializeGlobals()) return false;
 	Value out;
-	const bool ok = fn_idx >= 0 ? callFunction(m_module.functions[fn_idx], args, Span<Value*>(), &out) : callNativeFunction(m_module.native_functions[native_idx], args, &out);
+	const bool ok = fn_idx >= 0 ? callFunction(m_module.functions[fn_idx], args, {}, &out) : callNativeFunction(m_module.native_functions[native_idx], args, &out);
 	if (ok && result) *result = out;
-	return ok && !diagnostics.has_error;
+	return ok;
 }
 
 Value makeI32(i32 value) {
@@ -104,7 +97,7 @@ Value makeF64(double value) {
 	return v;
 }
 
-Value makeString(StringView value) {
+Value makeString(ls_string_view value) {
 	Value v;
 	v.type = {TypeRef::STRING, {}, -1};
 	v.string = value;
@@ -198,46 +191,46 @@ Value makeNull() {
 	return v;
 }
 
-i32 Runtime::findFunction(StringView name) const {
+i32 Runtime::findFunction(ls_string_view name) const {
 	for (i32 i = 0; i < m_module.functions.size(); ++i) {
 		if (!m_module.functions[i].is_nested && equalStrings(m_module.functions[i].name, name)) return i;
 	}
 	return -1;
 }
 
-i32 Runtime::findNativeFunction(StringView name) const {
+i32 Runtime::findNativeFunction(ls_string_view name) const {
 	for (i32 i = 0; i < m_module.native_functions.size(); ++i) if (equalStrings(m_module.native_functions[i].name, name)) return i;
 	return -1;
 }
 
-i32 Runtime::findEnum(StringView name) const {
+i32 Runtime::findEnum(ls_string_view name) const {
 	for (i32 i = 0; i < m_module.enums.size(); ++i) if (equalStrings(m_module.enums[i].name, name)) return i;
 	return -1;
 }
 
-StringView Runtime::getExpressionName(i32 expr_idx) {
+ls_string_view Runtime::getExpressionName(i32 expr_idx) {
 	Expr& e = m_module.expressions[expr_idx];
 	if (e.kind == Expr::VAR) return e.name;
 	if (e.kind == Expr::FIELD) {
-		if (e.qualified_name.empty()) e.qualified_name = m_module.makeQualifiedName(getExpressionName(e.left), e.name);
+		if (empty(e.qualified_name)) e.qualified_name = m_module.makeQualifiedName(getExpressionName(e.left), e.name);
 		return e.qualified_name;
 	}
 	return {};
 }
 
-bool Runtime::splitMemberName(StringView name, StringView* owner, StringView* member) const {
-	for (const char* c = name.end; c != name.begin; --c) {
+bool Runtime::splitMemberName(ls_string_view name, ls_string_view* owner, ls_string_view* member) const {
+	for (const char* c = data(name) + size(name); c != data(name); --c) {
 		if (*(c - 1) != '.') continue;
-		*owner = StringView(name.begin, c - 1);
-		*member = StringView(c, name.end);
+		*owner = ls_string_view{data(name), c - 1};
+		*member = ls_string_view{c, data(name) + size(name)};
 		return true;
 	}
 	return false;
 }
 
-bool Runtime::evalQualifiedEnumMember(StringView name, Value* value) {
-	StringView enum_name;
-	StringView member_name;
+bool Runtime::evalQualifiedEnumMember(ls_string_view name, Value* value) {
+	ls_string_view enum_name;
+	ls_string_view member_name;
 	if (!splitMemberName(name, &enum_name, &member_name)) return false;
 	const i32 enum_idx = findEnum(enum_name);
 	if (enum_idx < 0) return false;
@@ -247,11 +240,11 @@ bool Runtime::evalQualifiedEnumMember(StringView name, Value* value) {
 		*value = makeI32(en.members[i].value);
 		return true;
 	}
-	m_callbacks->error("Unknown enum member '", member_name, "'");
+	m_output.error("Unknown enum member '", member_name, "'");
 	return true;
 }
 
-Runtime::Binding* Runtime::findBinding(StringView name) {
+Runtime::Binding* Runtime::findBinding(ls_string_view name) {
 	for (i32 f = m_frames.size() - 1; f >= 0; --f) {
 		Frame& frame = m_frames[f];
 		for (i32 i = frame.bindings.size() - 1; i >= 0; --i) {
@@ -272,34 +265,35 @@ const Value& Runtime::bindingValue(const Binding& binding) const {
 	return binding.alias ? *binding.alias : binding.value;
 }
 
-bool Runtime::callFunction(FunctionDecl& fn, Span<const Value> args, Span<Value*> ref_args, Value* result) {
-	Frame& frame = m_frames.emplace(m_allocator);
+bool Runtime::callFunction(FunctionDecl& fn, std::span<const Value> args, std::span<Value*> ref_args, Value* result) {
+	m_frames.emplace_back();
+	Frame& frame = m_frames.back();
 	for (i32 i = 0; i < fn.params.size(); ++i) {
-		Binding& b = frame.bindings.emplace();
+		Binding& b = frame.bindings.emplace_back();
 		b.name = fn.params[i].name;
-		if (fn.params[i].is_ref && u32(i) < ref_args.length() && ref_args[i]) {
+		if (fn.params[i].is_ref && u32(i) < ref_args.size() && ref_args[i]) {
 			b.alias = ref_args[i];
 		}
 		else {
-			b.value = u32(i) < args.length() ? args[i] : Value{};
+			b.value = u32(i) < args.size() ? args[i] : Value{};
 		}
 	}
 	Value ret;
 	FlowSignal flow = FlowSignal::NONE;
-	StringView flow_label;
+	ls_string_view flow_label;
 	execStmt(fn.body, &ret, &flow, &flow_label);
-	m_frames.pop();
+	m_frames.pop_back();
 	if (result) *result = ret;
-	return !m_callbacks->has_error;
+	return !m_output.has_error;
 }
 
-bool Runtime::callNativeFunction(NativeFunctionDecl& fn, Span<const Value> args, Value* result) {
+bool Runtime::callNativeFunction(NativeFunctionDecl& fn, std::span<const Value> args, Value* result) {
 	if (!fn.callback) {
-		m_callbacks->error("Native function '", fn.name, "' has no callback");
+		m_output.error("Native function '", fn.name, "' has no callback");
 		return false;
 	}
 	if (!fn.callback(args, result, fn.userdata)) {
-		m_callbacks->error("Native function '", fn.name, "' failed");
+		m_output.error("Native function '", fn.name, "' failed");
 		return false;
 	}
 	return true;
@@ -309,11 +303,11 @@ bool Runtime::initializeGlobals() {
 	if (m_globals_initialized) return true;
 	m_globals_initialized = true;
 	for (GlobalDecl& global : m_module.globals) {
-		Binding& binding = m_globals.emplace();
+		Binding& binding = m_globals.emplace_back();
 		binding.name = global.name;
 		binding.is_const = global.is_const;
 		binding.value = global.expr >= 0 ? evalExpr(global.expr) : makeDefault(global.type);
-		if (m_callbacks->has_error) return false;
+		if (m_output.has_error) return false;
 	}
 	return true;
 }
@@ -323,14 +317,14 @@ Value Runtime::makeDefault(TypeRef type) {
 	Value v;
 	v.type = type;
 	if (type.kind == TypeRef::STRUCT) {
-		v.fields = LUMIX_NEW(m_allocator, Array<Value>)(m_allocator);
-		m_owned_arrays.push(v.fields);
+		v.fields = allocateObject<std::vector<Value>>(m_module.host);
+		m_owned_arrays.push_back(v.fields);
 		StructDecl& s = m_module.structs[type.struct_index];
-		for (FieldDecl& field : s.fields) v.fields->push(makeDefault(field.type));
+		for (FieldDecl& field : s.fields) v.fields->push_back(makeDefault(field.type));
 	}
 	else if (type.kind == TypeRef::ARRAY) {
-		v.fields = LUMIX_NEW(m_allocator, Array<Value>)(m_allocator);
-		m_owned_arrays.push(v.fields);
+		v.fields = allocateObject<std::vector<Value>>(m_module.host);
+		m_owned_arrays.push_back(v.fields);
 		v.fields->resize(type.array_size);
 		TypeRef elem(type.element_kind, type.element_name, type.struct_index, type.token, false);
 		for (i32 i = 0; i < type.array_size; ++i) (*v.fields)[i] = makeDefault(elem);
@@ -386,7 +380,7 @@ Value Runtime::evalExpr(i32 expr_idx) {
 		case Expr::VAR: {
 			Binding* b = findBinding(e.name);
 			if (!b) {
-				m_callbacks->errorAt(e.token, "Unknown variable '", e.name, "'");
+				m_output.errorAt(e.token, "Unknown variable '", e.name, "'");
 				return {};
 			}
 			return bindingValue(*b);
@@ -399,7 +393,7 @@ Value Runtime::evalExpr(i32 expr_idx) {
 			Value base = evalExpr(e.left);
 			StructDecl& s = m_module.structs[base.type.struct_index];
 			for (i32 i = 0; i < s.fields.size(); ++i) if (equalStrings(s.fields[i].name, e.name)) return (*base.fields)[i];
-			m_callbacks->errorAt(e.token, "Unknown field '", e.name, "'");
+			m_output.errorAt(e.token, "Unknown field '", e.name, "'");
 			return {};
 		}
 		case Expr::INDEX: {
@@ -407,7 +401,7 @@ Value Runtime::evalExpr(i32 expr_idx) {
 			Value index = evalExpr(e.right);
 			const i32 i = (i32)asI64(index);
 			if (!base.fields || i < 0 || i >= base.fields->size()) {
-				m_callbacks->errorAt(e.token, "Array index out of range");
+				m_output.errorAt(e.token, "Array index out of range");
 				return {};
 			}
 			return (*base.fields)[i];
@@ -439,21 +433,21 @@ Value Runtime::evalExpr(i32 expr_idx) {
 			return evalBinary(e);
 		}
 		case Expr::CALL: {
-			const StringView callee_name = e.qualified_name.empty() ? getExpressionName(e.left) : e.qualified_name;
+			const ls_string_view callee_name = empty(e.qualified_name) ? getExpressionName(e.left) : e.qualified_name;
 			const i32 fn_idx = findFunction(callee_name);
 			const i32 native_idx = findNativeFunction(callee_name);
-			Array<Value> args(m_allocator);
-			Array<Value*> ref_args(m_allocator);
+			std::vector<Value> args;
+			std::vector<Value*> ref_args;
 			if (fn_idx < 0 && native_idx < 0) {
 				Value callee = evalExpr(e.left);
 				if (callee.type.kind != TypeRef::FUNCTION) {
-					m_callbacks->errorAt(e.token, "Invalid function call");
+					m_output.errorAt(e.token, "Invalid function call");
 					return {};
 				}
-				for (i32 arg : e.args) args.push(evalExpr(arg));
+				for (i32 arg : e.args) args.push_back(evalExpr(arg));
 				Value res;
 				if (callee.b) callNativeFunction(m_module.native_functions[callee.i], args, &res);
-				else callFunction(m_module.functions[callee.i], args, Span<Value*>(), &res);
+				else callFunction(m_module.functions[callee.i], args, std::span<Value*>(), &res);
 				return res;
 			}
 			if (fn_idx >= 0) {
@@ -468,18 +462,18 @@ Value Runtime::evalExpr(i32 expr_idx) {
 						bool is_const = false;
 						Value* target = resolveLValue(target_expr, &is_const);
 						if (!target) return {};
-						args.push(*target);
-						ref_args.push(target);
+						args.push_back(*target);
+						ref_args.push_back(target);
 					}
 					else {
-						args.push(evalExpr(expr_idx));
-						ref_args.push(nullptr);
+						args.push_back(evalExpr(expr_idx));
+						ref_args.push_back(nullptr);
 					}
 				}
 			}
 			else {
-				if (e.method_receiver >= 0) args.push(evalExpr(e.method_receiver));
-				for (i32 arg : e.args) args.push(evalExpr(arg));
+				if (e.method_receiver >= 0) args.push_back(evalExpr(e.method_receiver));
+				for (i32 arg : e.args) args.push_back(evalExpr(arg));
 			}
 			Value res;
 			if (fn_idx >= 0) callFunction(m_module.functions[fn_idx], args, ref_args, &res);
@@ -492,7 +486,7 @@ Value Runtime::evalExpr(i32 expr_idx) {
 		case Expr::CONSTRUCTOR: return makeStruct(e.type, e);		case Expr::ENUM_LITERAL: {
 		const i32 enum_idx = e.type.struct_index;
 		if (enum_idx < 0 || enum_idx >= m_module.enums.size()) {
-			m_callbacks->errorAt(e.token, "Invalid enum value");
+			m_output.errorAt(e.token, "Invalid enum value");
 			return {};
 		}
 		EnumDecl& en = m_module.enums[enum_idx];
@@ -501,7 +495,7 @@ Value Runtime::evalExpr(i32 expr_idx) {
 				return makeI32(en.members[i].value);
 			}
 		}
-		m_callbacks->errorAt(e.token, "Unknown enum member '", e.name, "'");
+		m_output.errorAt(e.token, "Unknown enum member '", e.name, "'");
 		return {};
 	}		}
 	ASSERT(false);
@@ -534,7 +528,7 @@ Value Runtime::evalBinary(Expr& e) {
 	if (!is_float && (e.token.type == Token::SLASH || e.token.type == Token::PERCENT)) {
 		const bool zero = isUnsignedIntegral(e.type.kind) ? bu == 0 : bi == 0;
 		if (zero) {
-			m_callbacks->errorAt(e.token, "Division or modulo by zero");
+			m_output.errorAt(e.token, "Division or modulo by zero");
 			return {};
 		}
 	}
@@ -553,7 +547,7 @@ Value Runtime::evalBinary(Expr& e) {
 			return isUnsignedIntegral(e.type.kind) ? makeUnsignedIntegral(e.type.kind, au / bu) : makeSignedIntegral(e.type.kind, ai / bi);
 		case Token::PERCENT:
 			if (is_float) {
-				m_callbacks->errorAt(e.token, "Modulo operation requires integer operands");
+				m_output.errorAt(e.token, "Modulo operation requires integer operands");
 				return {};
 			}
 			return isUnsignedIntegral(e.type.kind) ? makeUnsignedIntegral(e.type.kind, au % bu) : makeSignedIntegral(e.type.kind, ai % bi);
@@ -576,15 +570,15 @@ Value makeBool(bool value) {
 	return v;
 }
 
-Value Runtime::concatStrings(StringView a, StringView b) {
-	const u32 size = a.size() + b.size();
-	char* data = (char*)m_allocator.allocate(size + 1, alignof(char));
-	char* out = data;
-	for (const char* c = a.begin; c != a.end; ++c) *out++ = *c;
-	for (const char* c = b.begin; c != b.end; ++c) *out++ = *c;
+Value Runtime::concatStrings(ls_string_view a, ls_string_view b) {
+	const u32 total_size = (u32)(size(a) + size(b));
+	char* buffer = (char*)allocateMemory(m_module.host, total_size + 1, alignof(char));
+	char* out = buffer;
+	for (const char* c = data(a); c != data(a) + size(a); ++c) *out++ = *c;
+	for (const char* c = data(b); c != data(b) + size(b); ++c) *out++ = *c;
 	*out = '\0';
-	m_owned_strings.push(data);
-	return makeString(StringView(data, data + size));
+	m_owned_strings.push_back(buffer);
+	return makeString(ls_string_view{buffer, buffer + total_size});
 }
 
 Value Runtime::castValue(Value value, TypeRef type) {
@@ -647,7 +641,7 @@ Value* Runtime::resolveLValue(i32 expr_idx, bool* is_const) {
 	if (e.kind == Expr::VAR) {
 		Binding* b = findBinding(e.name);
 		if (!b) {
-			m_callbacks->errorAt(e.token, "Unknown variable '", e.name, "'");
+			m_output.errorAt(e.token, "Unknown variable '", e.name, "'");
 			return nullptr;
 		}
 		if (is_const) *is_const = b->is_const;
@@ -664,12 +658,12 @@ Value* Runtime::resolveLValue(i32 expr_idx, bool* is_const) {
 		if (!base) return nullptr;
 		const i32 idx = (i32)asI64(evalExpr(e.right));
 		if (!base->fields || idx < 0 || idx >= base->fields->size()) {
-			m_callbacks->errorAt(e.token, "Array index out of range");
+			m_output.errorAt(e.token, "Array index out of range");
 			return nullptr;
 		}
 		return &(*base->fields)[idx];
 	}
-	m_callbacks->errorAt(e.token, "Invalid assignment target");
+	m_output.errorAt(e.token, "Invalid assignment target");
 	return nullptr;
 }
 
@@ -678,7 +672,7 @@ void Runtime::assign(i32 left_expr, Token::Type op, Value value) {
 	Value* dst = resolveLValue(left_expr, &is_const);
 	if (!dst) return;
 	if (is_const) {
-		m_callbacks->error("Can not assign to const"); // TODO token location
+		m_output.error("Can not assign to const"); // TODO token location
 		return;
 	}
 	if (op == Token::EQUAL) {
@@ -686,7 +680,7 @@ void Runtime::assign(i32 left_expr, Token::Type op, Value value) {
 		return;
 	}
 	Value cur = *dst;
-	Expr fake(m_allocator);
+	Expr fake;
 	fake.left = -1;
 	const bool is_float = isFloat(cur.type.kind);
 	const bool is_f64 = cur.type.kind == TypeRef::F64;
@@ -695,7 +689,7 @@ void Runtime::assign(i32 left_expr, Token::Type op, Value value) {
 	if (op == Token::SLASH_EQUAL && !is_float) {
 		const bool zero = isUnsignedIntegral(cur.type.kind) ? asU64(value) == 0 : asI64(value) == 0;
 		if (zero) {
-			m_callbacks->error("Division or modulo by zero");
+			m_output.error("Division or modulo by zero");
 			return;
 		}
 	}
@@ -708,27 +702,29 @@ void Runtime::assign(i32 left_expr, Token::Type op, Value value) {
 	}
 }
 
-void Runtime::execStmt(i32 stmt_idx, Value* ret, FlowSignal* flow, StringView* flow_label, bool allow_after_return) {
-	if ((!allow_after_return && *flow == FlowSignal::RETURN) || m_callbacks->has_error) return;
+void Runtime::execStmt(i32 stmt_idx, Value* ret, FlowSignal* flow, ls_string_view* flow_label, bool allow_after_return) {
+	if (stmt_idx < 0) return;
+	if ((!allow_after_return && *flow == FlowSignal::RETURN) || m_output.has_error) return;
 	Stmt& stmt = m_module.statements[stmt_idx];
 	switch (stmt.kind) {
 		case Stmt::BLOCK: {
-			const i32 old_size = m_frames.last().bindings.size();
+			const i32 old_size = m_frames.back().bindings.size();
 			const i32 old_deferred_size = m_deferred_statements.size();
 			for (i32 child : stmt.children) {
+				if (child < 0) continue;
 				execStmt(child, ret, flow, flow_label);
-				if (*flow != FlowSignal::NONE || m_callbacks->has_error) break;
+				if (*flow != FlowSignal::NONE || m_output.has_error) break;
 			}
-			while (m_deferred_statements.size() > old_deferred_size && !m_callbacks->has_error) {
-				const i32 deferred_stmt = m_deferred_statements.last();
-				m_deferred_statements.pop();
+			while (m_deferred_statements.size() > old_deferred_size && !m_output.has_error) {
+				const i32 deferred_stmt = m_deferred_statements.back();
+				m_deferred_statements.pop_back();
 				execStmt(deferred_stmt, ret, flow, flow_label, true);
 			}
-			m_frames.last().bindings.shrink(old_size);
+			m_frames.back().bindings.resize(old_size);
 			break;
 		}
 		case Stmt::VAR_DECL: {
-			Binding& b = m_frames.last().bindings.emplace();
+			Binding& b = m_frames.back().bindings.emplace_back();
 			b.name = stmt.name;
 			b.is_const = stmt.is_const;
 			b.value = stmt.expr >= 0 ? evalExpr(stmt.expr) : makeDefault(stmt.type);
@@ -747,12 +743,12 @@ void Runtime::execStmt(i32 stmt_idx, Value* ret, FlowSignal* flow, StringView* f
 			*flow_label = stmt.name;
 			break;
 		case Stmt::WHILE:
-			while (asBool(evalExpr(stmt.expr)) && !m_callbacks->has_error) {
-				execStmt(stmt.right, ret, flow, flow_label);
-				if (m_callbacks->has_error) return;
+			while (asBool(evalExpr(stmt.expr)) && !m_output.has_error) {
+				if (stmt.right >= 0) execStmt(stmt.right, ret, flow, flow_label);
+				if (m_output.has_error) return;
 				if (*flow == FlowSignal::RETURN) return;
 				if (*flow == FlowSignal::BREAK) {
-					if (flow_label->empty() || equalStrings(*flow_label, stmt.name)) {
+					if (empty(*flow_label) || equalStrings(*flow_label, stmt.name)) {
 						*flow = FlowSignal::NONE;
 						*flow_label = {};
 						break;
@@ -760,7 +756,7 @@ void Runtime::execStmt(i32 stmt_idx, Value* ret, FlowSignal* flow, StringView* f
 					return;
 				}
 				if (*flow == FlowSignal::CONTINUE) {
-					if (flow_label->empty() || equalStrings(*flow_label, stmt.name)) {
+					if (empty(*flow_label) || equalStrings(*flow_label, stmt.name)) {
 						*flow = FlowSignal::NONE;
 						*flow_label = {};
 						continue;
@@ -771,7 +767,7 @@ void Runtime::execStmt(i32 stmt_idx, Value* ret, FlowSignal* flow, StringView* f
 			break;
 		case Stmt::IF:
 			if (asBool(evalExpr(stmt.expr))) {
-				execStmt(stmt.left, ret, flow, flow_label);
+				if (stmt.left >= 0) execStmt(stmt.left, ret, flow, flow_label);
 			}
 			else if (stmt.right >= 0) {
 				execStmt(stmt.right, ret, flow, flow_label);
@@ -780,9 +776,10 @@ void Runtime::execStmt(i32 stmt_idx, Value* ret, FlowSignal* flow, StringView* f
 		case Stmt::MATCH: {
 			Value subject = evalExpr(stmt.expr);
 			for (i32 arm_idx : stmt.children) {
+				if (arm_idx < 0) continue;
 				MatchArm& arm = m_module.match_arms[arm_idx];
 				if (!matchArm(subject, arm)) continue;
-				execStmt(arm.stmt, ret, flow, flow_label);
+				if (arm.stmt >= 0) execStmt(arm.stmt, ret, flow, flow_label);
 				break;
 			}
 			break;
@@ -792,9 +789,7 @@ void Runtime::execStmt(i32 stmt_idx, Value* ret, FlowSignal* flow, StringView* f
 			*flow = FlowSignal::RETURN;
 			break;
 		case Stmt::DEFER:
-			m_deferred_statements.push(stmt.left);
+			m_deferred_statements.push_back(stmt.left);
 			break;
 	}
 }
-
-} // namespace Lumix::LumScript

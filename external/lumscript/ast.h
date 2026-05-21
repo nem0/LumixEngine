@@ -1,13 +1,94 @@
 #pragma once
 
-#include "core/allocator.h"
-#include "core/array.h"
-#include "core/span.h"
-#include "core/string.h"
-#include "token.h"
-#include "typeref.h"
+#include <new>
+#include <span>
+#include <vector>
 
-namespace Lumix::LumScript {
+#include "capi.h"
+#include "token.h"
+#include "string_utils.h"
+
+struct TypeRef {
+	enum Kind { INVALID, VOID, BOOL, I8, U8, I16, U16, I32, U32, I64, U64, F32, F64, STRING, UNTYPED_INT, UNTYPED_FLOAT, STRUCT, ENUM, NATIVE, FUNCTION, ARRAY, NULL_VALUE };
+
+	TypeRef() {}
+	TypeRef(Kind kind, ls_string_view name = {}, i32 struct_index = -1, Token token = {}, bool nullable = false)
+		: kind(kind)
+		, name(name)
+		, struct_index(struct_index)
+		, token(token)
+		, nullable(nullable)
+	{}
+
+	Kind kind = INVALID;
+	ls_string_view name;
+	i32 struct_index = -1;
+	Kind element_kind = INVALID;
+	ls_string_view element_name;
+	i32 array_size = 0;
+	Token token;
+	bool nullable = false;
+};
+
+struct Value {
+	friend struct Runtime;
+	
+	TypeRef type;
+	bool b = false;
+	i32 i = 0;
+	u32 u = 0;
+	i64 i64 = 0;
+	u64 u64 = 0;
+	float f = 0;
+	double d = 0;
+	ls_string_view string;
+	float composite[4] = {};
+	void* ptr = nullptr;
+private:
+	std::vector<Value>* fields = nullptr;
+};
+
+Value makeI32(i32 value);
+Value makeU32(u32 value);
+Value makeI64(i64 value);
+Value makeU64(u64 value);
+Value makeF32(float value);
+Value makeF64(double value);
+	Value makeString(ls_string_view value);
+Value makeFunction(TypeRef type, i32 index, bool is_native);
+Value makeNull();
+Value makeBool(bool value);
+
+struct LumScriptNewPlaceholder {};
+inline void* operator new(size_t, LumScriptNewPlaceholder, void* where) { return where; }
+inline void operator delete(void*, LumScriptNewPlaceholder, void*) {}
+
+template <typename T, typename... Args>
+T* allocateObject(const ls_host* host, Args&&... args) {
+	void* mem = host && host->allocate ? host->allocate(host->allocator_userdata, sizeof(T), alignof(T)) : ::operator new(sizeof(T), std::nothrow);
+	return mem ? new (LumScriptNewPlaceholder(), mem) T(static_cast<Args&&>(args)...) : nullptr;
+}
+
+inline void* allocateMemory(const ls_host* host, size_t size, size_t align) {
+	return host && host->allocate ? host->allocate(host->allocator_userdata, size, align) : ::operator new(size, std::nothrow);
+}
+
+inline void deallocateMemory(const ls_host* host, void* ptr) {
+	if (!ptr) return;
+	if (host && host->deallocate) {
+		host->deallocate(host->allocator_userdata, ptr);
+	}
+	else {
+		::operator delete(ptr);
+	}
+}
+
+template <typename T>
+void deleteObject(const ls_host* host, T* ptr) {
+	if (!ptr) return;
+	ptr->~T();
+	deallocateMemory(host, ptr);
+}
 
 struct Value;
 struct Module;
@@ -46,21 +127,17 @@ struct Expr {
 		INDEX
 	};
 
-	explicit Expr(IAllocator& allocator)
-		: args(allocator)
-	{}
-
 	Kind kind = NUMBER;
 	Token token;
-	StringView name;
-	StringView qualified_name;
-	StringView string;
+	ls_string_view name;
+	ls_string_view qualified_name;
+	ls_string_view string;
 	double number = 0;
 	bool boolean = false;
 	i32 left = -1;
 	i32 right = -1;
 	i32 method_receiver = -1;
-	Array<i32> args;
+	std::vector<i32> args;
 	TypeRef type;
 	TypeRef cast_type;
 };
@@ -68,14 +145,10 @@ struct Expr {
 struct Stmt {
 	enum Kind { BLOCK, VAR_DECL, FN_DECL, EXPR, ASSIGN, WHILE, BREAK, CONTINUE, RETURN, IF, DEFER, MATCH };
 
-	explicit Stmt(IAllocator& allocator)
-		: children(allocator)
-	{}
-
 	Kind kind = BLOCK;
 	Token token;
-	Array<i32> children;
-	StringView name;
+	std::vector<i32> children;
+	ls_string_view name;
 	TypeRef type;
 	bool is_const = false;
 	bool is_undefined_init = false;
@@ -95,62 +168,46 @@ struct MatchPattern {
 };
 
 struct MatchArm {
-	explicit MatchArm(IAllocator& allocator)
-		: patterns(allocator)
-	{}
-
 	Token token;
-	Array<i32> patterns;
+	std::vector<i32> patterns;
 	i32 stmt = -1;
 };
 
 struct FieldDecl {
-	StringView name;
+	ls_string_view name;
 	TypeRef type;
 	Token token;
 };
 
 struct EnumMember {
-	StringView name;
+	ls_string_view name;
 	i32 value = -1;  // -1 means auto-assign
 	Token token;
 };
 
 struct EnumDecl {
-	explicit EnumDecl(IAllocator& allocator)
-		: members(allocator)
-	{}
-
-	StringView name;
-	Array<EnumMember> members;
+	ls_string_view name;
+	std::vector<EnumMember> members;
 	Token token;
 };
 
 struct StructDecl {
-	explicit StructDecl(IAllocator& allocator)
-		: fields(allocator)
-	{}
-
-	StringView name;
-	Array<FieldDecl> fields;
+	ls_string_view name;
+	std::vector<FieldDecl> fields;
 	Token token;
 };
 
 struct Param {
-	StringView name;
+	ls_string_view name;
 	TypeRef type;
 	Token token;
 	bool is_ref = false;
 };
 
 struct FunctionDecl {
-	explicit FunctionDecl(IAllocator& allocator)
-		: params(allocator)
-	{}
-
-	StringView name;
-	StringView local_name;
-	Array<Param> params;
+	ls_string_view name;
+	ls_string_view local_name;
+	std::vector<Param> params;
 	TypeRef return_type;
 	i32 body = -1;
 	Token token;
@@ -158,7 +215,7 @@ struct FunctionDecl {
 };
 
 struct GlobalDecl {
-	StringView name;
+	ls_string_view name;
 	TypeRef type;
 	Token token;
 	bool is_const = false;
@@ -167,27 +224,23 @@ struct GlobalDecl {
 };
 
 struct ImportDecl {
-	StringView path;
-	StringView alias;
+	ls_string_view path;
+	ls_string_view alias;
 	Token token;
 	bool processed = false;
 };
 
-using NativeCallback = bool (*)(Span<const Value> args, Value* result, void* userdata);
-using ImportResolver = bool (*)(Module& module, StringView path, StringView alias, StringView* source, void* userdata);
+using NativeCallback = bool (*)(std::span<const Value> args, Value* result, void* userdata);
+using ImportResolver = bool (*)(Module& module, ls_string_view path, ls_string_view alias, ls_string_view* source, void* userdata);
 
 struct NativeTypeDecl {
-	StringView name;
-	StringView id;
+	ls_string_view name;
+	ls_string_view id;
 };
 
 struct NativeFunctionDecl {
-	explicit NativeFunctionDecl(IAllocator& allocator)
-		: params(allocator)
-	{}
-
-	StringView name;
-	Array<Param> params;
+	ls_string_view name;
+	std::vector<Param> params;
 	TypeRef return_type;
 	NativeCallback callback = nullptr;
 	void* userdata = nullptr;
@@ -195,86 +248,68 @@ struct NativeFunctionDecl {
 };
 
 struct FunctionTypeDecl {
-	explicit FunctionTypeDecl(IAllocator& allocator)
-		: params(allocator)
-	{}
-
-	Array<TypeRef> params;
+	std::vector<TypeRef> params;
 	TypeRef return_type;
 };
 
 struct Module {
-	explicit Module(IAllocator& allocator)
-		: allocator(allocator)
-		, imports(allocator)
-		, native_types(allocator)
-		, structs(allocator)
-		, enums(allocator)
-		, globals(allocator)
-		, functions(allocator)
-		, native_functions(allocator)
-		, function_types(allocator)
-		, expressions(allocator)
-		, statements(allocator)
-		, match_patterns(allocator)
-		, match_arms(allocator)
-		, allocated_names(allocator)
-		, allocated_native_data(allocator)
+	explicit Module(const ls_host* host)
+		: host(host)
 	{}
 
 	~Module() {
-		for (char* name : allocated_names) allocator.deallocate(name);
-		for (void* data : allocated_native_data) allocator.deallocate(data);
+		for (char* name : allocated_names) deallocateMemory(host, name);
+		for (void* data : allocated_native_data) deallocateMemory(host, data);
 	}
 
-	StringView copyName(StringView name) {
-		char* data = (char*)allocator.allocate(name.size() + 1, alignof(char));
-		copyString(Span(data, name.size() + 1), name);
-		allocated_names.push(data);
-		return StringView(data, data + name.size());
+	ls_string_view copyName(ls_string_view name) {
+		char* buffer = (char*)allocateMemory(host, size(name) + 1, alignof(char));
+		if (!buffer) return {};
+		copyString(std::span<char>(buffer, size(name) + 1), name);
+		allocated_names.push_back(buffer);
+		return ls_string_view{buffer, buffer + size(name)};
 	}
 
-	StringView makeQualifiedName(StringView prefix, StringView name) {
-		if (prefix.empty()) return name;
-		char* data = (char*)allocator.allocate(prefix.size() + name.size() + 2, alignof(char));
-		char* out = data;
-		for (const char* c = prefix.begin; c != prefix.end; ++c) *out++ = *c;
+	ls_string_view makeQualifiedName(ls_string_view prefix, ls_string_view name) {
+		if (empty(prefix)) return name;
+		char* buffer = (char*)allocateMemory(host, size(prefix) + size(name) + 2, alignof(char));
+		if (!buffer) return {};
+		char* out = buffer;
+		for (const char* c = data(prefix); c != data(prefix) + size(prefix); ++c) *out++ = *c;
 		*out++ = '.';
-		for (const char* c = name.begin; c != name.end; ++c) *out++ = *c;
+		for (const char* c = data(name); c != data(name) + size(name); ++c) *out++ = *c;
 		*out = '\0';
-		allocated_names.push(data);
-		return StringView(data, data + prefix.size() + name.size() + 1);
+		allocated_names.push_back(buffer);
+		return ls_string_view{buffer, buffer + size(prefix) + size(name) + 1};
 	}
 
-	IAllocator& allocator;
-	Array<ImportDecl> imports;
-	Array<NativeFunctionDecl> native_functions;
-	Array<FunctionDecl> functions;
-	Array<GlobalDecl> globals;
-	Array<StructDecl> structs;
-	Array<NativeTypeDecl> native_types;
-	Array<EnumDecl> enums;
-	Array<FunctionTypeDecl> function_types;
-	Array<Expr> expressions;
-	Array<Stmt> statements;
-	Array<MatchPattern> match_patterns;
-	Array<MatchArm> match_arms;
-	Array<char*> allocated_names;
-	Array<void*> allocated_native_data;
+	const ls_host* host = nullptr;
+	std::vector<ImportDecl> imports;
+	std::vector<NativeFunctionDecl> native_functions;
+	std::vector<FunctionDecl> functions;
+	std::vector<GlobalDecl> globals;
+	std::vector<StructDecl> structs;
+	std::vector<NativeTypeDecl> native_types;
+	std::vector<EnumDecl> enums;
+	std::vector<FunctionTypeDecl> function_types;
+	std::vector<Expr> expressions;
+	std::vector<Stmt> statements;
+	std::vector<MatchPattern> match_patterns;
+	std::vector<MatchArm> match_arms;
+	std::vector<char*> allocated_names;
+	std::vector<void*> allocated_native_data;
 };
 
 // TODO get rid of userdata, it's only used in generated engine API, and it's used in a wrong way there
-inline NativeFunctionDecl& addNativeFunction(Module& module, StringView name, TypeRef return_type, Span<const TypeRef> param_types, NativeCallback callback, void* userdata = nullptr) {
-	NativeFunctionDecl& fn = module.native_functions.emplace(module.allocator);
+inline NativeFunctionDecl& addNativeFunction(Module& module, ls_string_view name, TypeRef return_type, std::span<const TypeRef> param_types, NativeCallback callback, void* userdata = nullptr) {
+	NativeFunctionDecl& fn = module.native_functions.emplace_back();
 	fn.name = name;
 	fn.return_type = return_type;
 	fn.callback = callback;
 	fn.userdata = userdata;
 	for (TypeRef type : param_types) {
-		Param& param = fn.params.emplace();
+		Param& param = fn.params.emplace_back();
 		param.type = type;
 	}
 	return fn;
 }
-
-} // namespace Lumix::LumScript

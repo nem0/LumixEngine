@@ -1,12 +1,10 @@
 #pragma once
 
-#include "core/string.h"
-
-namespace Lumix::LumScript {
+#include "capi.h"
 
 struct Token {
 	enum Type {
-		EOF,
+		END_OF_FILE,
 		ERROR,
 		IDENTIFIER,
 		NUMBER,
@@ -81,11 +79,12 @@ struct Token {
 		F64
 	};
 
-	Type type = EOF;
-	StringView value;
-	StringView source_name;
+	Type type = END_OF_FILE;
+	ls_string_view value;
+	
+	// TODO remove
+	ls_string_view source_name;
 	i32 line = 1;
 	i32 column = 1;
 };
 
-}

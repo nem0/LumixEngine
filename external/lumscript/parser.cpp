@@ -1,23 +1,21 @@
 #pragma once
 
-#include "core/string.h"
+#include <string>
+
 #include "ast.h"
-#include "lumscript.h"
 #include "tokenizer.h"
 
-namespace Lumix::LumScript {
-
 struct Parser {
-	Parser(Module& module, Callbacks& diagnostics, StringView declaration_prefix, StringView source, StringView source_name = {})
+	Parser(Module& module, ls_string_view declaration_prefix, ls_string_view source, ls_string_view source_name = {})
 		: m_module(module)
-		, m_callbacks(diagnostics)
 		, m_declaration_prefix(declaration_prefix)
 	{
+		m_output.host = module.host;
 		m_tokenizer.init(source, source_name);
 	}
 
 	bool parse() {
-		while (peek().type != Token::EOF && !m_callbacks.has_error) {
+		while (peek().type != Token::END_OF_FILE && !m_output.has_error) {
 			if (match(Token::IMPORT)) parseImport();
 			else if (match(Token::STRUCT)) parseStruct();
 			else if (match(Token::ENUM)) parseEnum();
@@ -25,7 +23,7 @@ struct Parser {
 			else if (peek().type == Token::VAR || peek().type == Token::CONST) parseGlobal();
 			else error(peek(), "Expected declaration");
 		}
-		return !m_callbacks.has_error;
+		return !m_output.has_error;
 	}
 
 	Token peek() const { return m_tokenizer.peekToken(); }
@@ -52,11 +50,11 @@ struct Parser {
 	}
 
 	void error(Token token, const char* msg) {
-		m_callbacks.errorAt(token, msg, " near '", token.value, "'");
+		m_output.errorAt(token, msg, " near '", token.value, "'");
 	}
 
-	StringView parseQualifiedIdentifier(Token first) {
-		StringView name = first.value;
+	ls_string_view parseQualifiedIdentifier(Token first) {
+		ls_string_view name = first.value;
 		while (match(Token::DOT)) {
 			Token part;
 			if (!consume(Token::IDENTIFIER, &part)) return name;
@@ -68,7 +66,7 @@ struct Parser {
 	void parseImport() {
 		Token path;
 		if (!consume(Token::STRING, &path)) return;
-		ImportDecl& import = m_module.imports.emplace();
+		ImportDecl& import = m_module.imports.emplace_back();
 		import.path = path.value;
 		import.token = path;
 		if (match(Token::AS)) {
@@ -85,16 +83,17 @@ struct Parser {
 		TypeRef base;
 		switch (t.type) {
 			case Token::FN: {
-				FunctionTypeDecl& fn_type = m_module.function_types.emplace(m_module.allocator);
+				m_module.function_types.emplace_back();
 				const i32 fn_type_idx = m_module.function_types.size() - 1;
 				if (!consume(Token::LEFT_PAREN)) return {};
-				while (peek().type != Token::RIGHT_PAREN && peek().type != Token::EOF && !m_callbacks.has_error) {
+				while (peek().type != Token::RIGHT_PAREN && peek().type != Token::END_OF_FILE && !m_output.has_error) {
+					FunctionTypeDecl& fn_type = m_module.function_types[fn_type_idx];
 					if (!fn_type.params.empty()) consume(Token::COMMA);
-					fn_type.params.push(parseType());
+					fn_type.params.push_back(parseType());
 				}
 				consume(Token::RIGHT_PAREN);
 				consume(Token::COLON);
-				fn_type.return_type = parseType();
+				m_module.function_types[fn_type_idx].return_type = parseType();
 				base = {TypeRef::FUNCTION, {}, fn_type_idx, t, is_nullable};
 				break;
 			}
@@ -144,15 +143,15 @@ struct Parser {
 	void parseStruct() {
 		Token name;
 		if (!consume(Token::IDENTIFIER, &name)) return;
-		StructDecl& s = m_module.structs.emplace(m_module.allocator);
+		StructDecl& s = m_module.structs.emplace_back();
 		s.name = m_module.makeQualifiedName(m_declaration_prefix, name.value);
 		s.token = name;
 		if (!consume(Token::LEFT_BRACE)) return;
-		while (peek().type != Token::RIGHT_BRACE && peek().type != Token::EOF && !m_callbacks.has_error) {
+		while (peek().type != Token::RIGHT_BRACE && peek().type != Token::END_OF_FILE && !m_output.has_error) {
 			Token field_name;
 			if (!consume(Token::IDENTIFIER, &field_name)) return;
 			if (!consume(Token::COLON)) return;
-			FieldDecl& field = s.fields.emplace();
+			FieldDecl& field = s.fields.emplace_back();
 			field.name = field_name.value;
 			field.token = field_name;
 			field.type = parseType();
@@ -165,15 +164,15 @@ struct Parser {
 	void parseEnum() {
 		Token name;
 		if (!consume(Token::IDENTIFIER, &name)) return;
-		EnumDecl& e = m_module.enums.emplace(m_module.allocator);
+		EnumDecl& e = m_module.enums.emplace_back();
 		e.name = m_module.makeQualifiedName(m_declaration_prefix, name.value);
 		e.token = name;
 		if (!consume(Token::LEFT_BRACE)) return;
 		i32 auto_value = 0;
-		while (peek().type != Token::RIGHT_BRACE && peek().type != Token::EOF && !m_callbacks.has_error) {
+		while (peek().type != Token::RIGHT_BRACE && peek().type != Token::END_OF_FILE && !m_output.has_error) {
 			Token member_name;
 			if (!consume(Token::IDENTIFIER, &member_name)) return;
-			EnumMember& member = e.members.emplace();
+			EnumMember& member = e.members.emplace_back();
 			member.name = member_name.value;
 			member.token = member_name;
 			if (match(Token::EQUAL)) {
@@ -198,25 +197,25 @@ struct Parser {
 	i32 parseFunction(bool is_nested) {
 		Token name;
 		if (!consume(Token::IDENTIFIER, &name)) return -1;
-		FunctionDecl& fn = m_module.functions.emplace(m_module.allocator);
-		fn.local_name = name.value;
-		fn.is_nested = is_nested;
+		m_module.functions.emplace_back();
+		const i32 fn_idx = m_module.functions.size() - 1;
+		m_module.functions[fn_idx].local_name = name.value;
+		m_module.functions[fn_idx].is_nested = is_nested;
 		if (is_nested) {
-			StaticString<256> unique_name("__nested_fn.", m_nested_function_counter++, ".", name.value);
-			fn.name = m_module.copyName(unique_name);
+			std::string unique_name = "__nested_fn." + std::to_string(m_nested_function_counter++) + "." + std::string(data(name.value), size(name.value));
+			m_module.functions[fn_idx].name = m_module.copyName(ls_string_view{unique_name.c_str(), unique_name.c_str() + unique_name.size()});
 		}
 		else {
-			fn.name = m_module.makeQualifiedName(m_declaration_prefix, name.value);
+			m_module.functions[fn_idx].name = m_module.makeQualifiedName(m_declaration_prefix, name.value);
 		}
-		fn.token = name;
-		const i32 fn_idx = m_module.functions.size() - 1;
+		m_module.functions[fn_idx].token = name;
 		if (!consume(Token::LEFT_PAREN)) return fn_idx;
-		while (peek().type != Token::RIGHT_PAREN && peek().type != Token::EOF && !m_callbacks.has_error) {
-			if (!fn.params.empty()) consume(Token::COMMA);
+		while (peek().type != Token::RIGHT_PAREN && peek().type != Token::END_OF_FILE && !m_output.has_error) {
+			if (!m_module.functions[fn_idx].params.empty()) consume(Token::COMMA);
 			Token param_name;
 			if (!consume(Token::IDENTIFIER, &param_name)) return fn_idx;
 			consume(Token::COLON);
-			Param& p = fn.params.emplace();
+			Param& p = m_module.functions[fn_idx].params.emplace_back();
 			p.name = param_name.value;
 			p.token = param_name;
 			p.is_ref = match(Token::REF);
@@ -224,8 +223,8 @@ struct Parser {
 		}
 		consume(Token::RIGHT_PAREN);
 		consume(Token::COLON);
-		fn.return_type = parseType();
-		fn.body = parseBlock();
+		m_module.functions[fn_idx].return_type = parseType();
+		m_module.functions[fn_idx].body = parseBlock();
 		return fn_idx;
 	}
 
@@ -234,7 +233,7 @@ struct Parser {
 		const bool is_const = t.type == Token::CONST;
 		Token name;
 		if (!consume(Token::IDENTIFIER, &name)) return;
-		GlobalDecl& global = m_module.globals.emplace();
+		GlobalDecl& global = m_module.globals.emplace_back();
 		global.name = m_module.makeQualifiedName(m_declaration_prefix, name.value);
 		global.token = name;
 		global.is_const = is_const;
@@ -252,28 +251,28 @@ struct Parser {
 	}
 
 	i32 addStmt(Stmt::Kind kind, Token token) {
-		Stmt& stmt = m_module.statements.emplace(m_module.allocator);
+		Stmt& stmt = m_module.statements.emplace_back();
 		stmt.kind = kind;
 		stmt.token = token;
 		return m_module.statements.size() - 1;
 	}
 
 	i32 addExpr(Expr::Kind kind, Token token) {
-		Expr& expr = m_module.expressions.emplace(m_module.allocator);
+		Expr& expr = m_module.expressions.emplace_back();
 		expr.kind = kind;
 		expr.token = token;
 		return m_module.expressions.size() - 1;
 	}
 
 	i32 addMatchPattern(MatchPattern::Kind kind, Token token) {
-		MatchPattern& pattern = m_module.match_patterns.emplace();
+		MatchPattern& pattern = m_module.match_patterns.emplace_back();
 		pattern.kind = kind;
 		pattern.token = token;
 		return m_module.match_patterns.size() - 1;
 	}
 
 	i32 addMatchArm(Token token) {
-		MatchArm& arm = m_module.match_arms.emplace(m_module.allocator);
+		MatchArm& arm = m_module.match_arms.emplace_back();
 		arm.token = token;
 		return m_module.match_arms.size() - 1;
 	}
@@ -285,9 +284,9 @@ struct Parser {
 			return -1;
 		}
 		const i32 block = addStmt(Stmt::BLOCK, t);
-		while (peek().type != Token::RIGHT_BRACE && peek().type != Token::EOF && !m_callbacks.has_error) {
+		while (peek().type != Token::RIGHT_BRACE && peek().type != Token::END_OF_FILE && !m_output.has_error) {
 			const i32 child = parseStatement();
-			m_module.statements[block].children.push(child);
+			m_module.statements[block].children.push_back(child);
 		}
 		consume(Token::RIGHT_BRACE);
 		return block;
@@ -429,7 +428,7 @@ struct Parser {
 		m_module.statements[stmt_idx].expr = parseExpression();
 		m_allow_constructor = true;
 		if (!consume(Token::LEFT_BRACE)) return stmt_idx;
-		while (peek().type != Token::RIGHT_BRACE && peek().type != Token::EOF && !m_callbacks.has_error) {
+		while (peek().type != Token::RIGHT_BRACE && peek().type != Token::END_OF_FILE && !m_output.has_error) {
 			Token case_token;
 			if (!consume(Token::CASE, &case_token)) return stmt_idx;
 			const i32 arm_idx = addMatchArm(case_token);
@@ -438,7 +437,7 @@ struct Parser {
 				Token pattern_token = peek();
 				if (pattern_token.type == Token::IDENTIFIER && equalStrings(pattern_token.value, "_")) {
 					consumeToken();
-					arm.patterns.push(addMatchPattern(MatchPattern::DEFAULT, pattern_token));
+					arm.patterns.push_back(addMatchPattern(MatchPattern::DEFAULT, pattern_token));
 				}
 				else {
 					const i32 start_expr = parseExpression();
@@ -449,18 +448,18 @@ struct Parser {
 						pattern.kind = MatchPattern::RANGE;
 						pattern.end_expr = parseExpression();
 					}
-					arm.patterns.push(pattern_idx);
+					arm.patterns.push_back(pattern_idx);
 				}
 				if (!match(Token::COMMA)) break;
 			}
 			consume(Token::COLON);
 			const i32 block = addStmt(Stmt::BLOCK, case_token);
-			while (peek().type != Token::CASE && peek().type != Token::RIGHT_BRACE && peek().type != Token::EOF && !m_callbacks.has_error) {
+			while (peek().type != Token::CASE && peek().type != Token::RIGHT_BRACE && peek().type != Token::END_OF_FILE && !m_output.has_error) {
 				const i32 child = parseStatement();
-				if (child >= 0) m_module.statements[block].children.push(child);
+				if (child >= 0) m_module.statements[block].children.push_back(child);
 			}
 			arm.stmt = block;
-			m_module.statements[stmt_idx].children.push(arm_idx);
+			m_module.statements[stmt_idx].children.push_back(arm_idx);
 		}
 		consume(Token::RIGHT_BRACE);
 		return stmt_idx;
@@ -523,11 +522,11 @@ struct Parser {
 		return expr_idx;
 	}
 
-	StringView getExpressionName(i32 expr_idx) {
+	ls_string_view getExpressionName(i32 expr_idx) {
 		Expr& e = m_module.expressions[expr_idx];
 		if (e.kind == Expr::VAR) return e.name;
 		if (e.kind == Expr::FIELD) {
-			if (e.qualified_name.empty()) e.qualified_name = m_module.makeQualifiedName(getExpressionName(e.left), e.name);
+			if (empty(e.qualified_name)) e.qualified_name = m_module.makeQualifiedName(getExpressionName(e.left), e.name);
 			return e.qualified_name;
 		}
 		return {};
@@ -548,10 +547,10 @@ struct Parser {
 			else if (match(Token::LEFT_PAREN)) {
 				const i32 idx = addExpr(Expr::CALL, t);
 				m_module.expressions[idx].left = expr_idx;
-				while (peek().type != Token::RIGHT_PAREN && peek().type != Token::EOF && !m_callbacks.has_error) {
+				while (peek().type != Token::RIGHT_PAREN && peek().type != Token::END_OF_FILE && !m_output.has_error) {
 					if (!m_module.expressions[idx].args.empty()) consume(Token::COMMA);
 					const i32 arg = parseExpression();
-					m_module.expressions[idx].args.push(arg);
+					m_module.expressions[idx].args.push_back(arg);
 				}
 				consume(Token::RIGHT_PAREN);
 				expr_idx = idx;
@@ -563,15 +562,15 @@ struct Parser {
 				consume(Token::RIGHT_BRACKET);
 				expr_idx = idx;
 			}
-			else if (m_allow_constructor && peek().type == Token::LEFT_BRACE && !getExpressionName(expr_idx).empty()) {
+			else if (m_allow_constructor && peek().type == Token::LEFT_BRACE && !empty(getExpressionName(expr_idx))) {
 				consumeToken();
-				StringView name = getExpressionName(expr_idx);
+				ls_string_view name = getExpressionName(expr_idx);
 				const i32 idx = addExpr(Expr::CONSTRUCTOR, t);
 				m_module.expressions[idx].name = name;
-				while (peek().type != Token::RIGHT_BRACE && peek().type != Token::EOF && !m_callbacks.has_error) {
+				while (peek().type != Token::RIGHT_BRACE && peek().type != Token::END_OF_FILE && !m_output.has_error) {
 					if (!m_module.expressions[idx].args.empty()) consume(Token::COMMA);
 					const i32 arg = parseExpression();
-					m_module.expressions[idx].args.push(arg);
+					m_module.expressions[idx].args.push_back(arg);
 				}
 				consume(Token::RIGHT_BRACE);
 				expr_idx = idx;
@@ -617,10 +616,10 @@ struct Parser {
 					consumeToken();
 					const i32 idx = addExpr(Expr::CONSTRUCTOR, t);
 					m_module.expressions[idx].name = t.value;
-					while (peek().type != Token::RIGHT_BRACE && peek().type != Token::EOF && !m_callbacks.has_error) {
+					while (peek().type != Token::RIGHT_BRACE && peek().type != Token::END_OF_FILE && !m_output.has_error) {
 						if (!m_module.expressions[idx].args.empty()) consume(Token::COMMA);
 						const i32 arg = parseExpression();
-						m_module.expressions[idx].args.push(arg);
+						m_module.expressions[idx].args.push_back(arg);
 					}
 					consume(Token::RIGHT_BRACE);
 					return idx;
@@ -643,10 +642,10 @@ struct Parser {
 			}
 			case Token::LEFT_BRACE: {
 				const i32 idx = addExpr(Expr::STRUCT_LITERAL, t);
-				while (peek().type != Token::RIGHT_BRACE && peek().type != Token::EOF && !m_callbacks.has_error) {
+				while (peek().type != Token::RIGHT_BRACE && peek().type != Token::END_OF_FILE && !m_output.has_error) {
 					if (!m_module.expressions[idx].args.empty()) consume(Token::COMMA);
 					const i32 arg = parseExpression();
-					m_module.expressions[idx].args.push(arg);
+					m_module.expressions[idx].args.push_back(arg);
 				}
 				consume(Token::RIGHT_BRACE);
 				return idx;
@@ -657,15 +656,13 @@ struct Parser {
 
 	Tokenizer m_tokenizer;
 	Module& m_module;
-	Callbacks& m_callbacks;
-	StringView m_declaration_prefix;
+	OutputFormatter m_output;
+	ls_string_view m_declaration_prefix;
 	bool m_allow_constructor = true;
 	i32 m_nested_function_counter = 0;
 };
 
-bool parse(Module& module, StringView source, Callbacks& diagnostics, StringView declaration_prefix, StringView source_name) {
-	Parser parser(module, diagnostics, declaration_prefix, source, source_name);
+bool parse(Module& module, ls_string_view source, ls_string_view declaration_prefix, ls_string_view source_name) {
+	Parser parser(module, declaration_prefix, source, source_name);
 	return parser.parse();
 }
-
-} // namespace Lumix::LumScript

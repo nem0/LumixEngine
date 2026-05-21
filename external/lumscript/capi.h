@@ -18,8 +18,23 @@
 //   underlying bytes alive for the duration of the call.
 // - The ABI is intentionally plain C: no templates, references, or exceptions.
 
-#include <stddef.h>
-#include <stdint.h>
+#include <assert.h>
+
+#ifndef ASSERT
+	#define ASSERT(x) assert(x)
+#endif
+
+typedef char i8;
+typedef unsigned char u8;
+typedef short i16;
+typedef unsigned short u16;
+typedef int i32;
+typedef unsigned int u32;
+typedef long long i64;
+typedef unsigned long long u64;
+typedef u64 uintptr;
+
+static_assert(sizeof(uintptr) == sizeof(void*));
 
 #ifdef __cplusplus
 extern "C" {
@@ -67,17 +82,17 @@ typedef enum ls_type_kind {
 typedef struct ls_type {
 	ls_type_kind kind;
 	ls_string_view name;
-	int32_t struct_index;
+	i32 struct_index;
 	ls_type_kind element_kind;
 	ls_string_view element_name;
-	int32_t array_size;
+	i32 array_size;
 	int nullable;
 } ls_type;
 
 // Enum member descriptor used by `ls_module_add_enum`.
 typedef struct ls_enum_member {
 	ls_string_view name;
-	int32_t value;
+	i32 value;
 } ls_enum_member;
 
 // Generic runtime value.
@@ -93,10 +108,10 @@ typedef struct ls_enum_member {
 typedef struct ls_value {
 	ls_type type;
 	int b;
-	int32_t i;
-	uint32_t u;
-	int64_t i64;
-	uint64_t u64;
+	i32 i;
+	u32 u;
+	i64 i64;
+	u64 u64;
 	float f;
 	double d;
 	ls_string_view string;
@@ -131,7 +146,6 @@ typedef struct ls_host {
 	void* (*reallocate)(void* userdata, void* ptr, size_t new_size, size_t old_size, size_t align);
 	void* diagnostics_userdata;
 	ls_print_fn print;
-	int has_error;
 } ls_host;
 
 // Opaque module/runtime handles.
@@ -224,14 +238,14 @@ int ls_runtime_call(
 // internally.
 ls_string_view ls_make_qualified_name(ls_module* module, ls_string_view prefix, ls_string_view name);
 ls_type ls_type_make(ls_type_kind kind);
-ls_type ls_type_make_struct(ls_string_view name, int32_t struct_index, int nullable);
-ls_type ls_type_make_enum(ls_string_view name, int32_t struct_index, int nullable);
-ls_type ls_type_make_native(ls_string_view name, int32_t struct_index, int nullable);
+ls_type ls_type_make_struct(ls_string_view name, i32 struct_index, int nullable);
+ls_type ls_type_make_enum(ls_string_view name, i32 struct_index, int nullable);
+ls_type ls_type_make_native(ls_string_view name, i32 struct_index, int nullable);
 ls_type ls_type_make_array(
 	ls_type_kind element_kind,
 	ls_string_view element_name,
-	int32_t struct_index,
-	int32_t array_size,
+	i32 struct_index,
+	i32 array_size,
 	int nullable
 );
 
@@ -241,10 +255,10 @@ ls_type ls_type_make_array(
 // single canonical `ls_value` without manually duplicating every field.
 ls_value ls_value_make_void(void);
 ls_value ls_value_make_bool(int value);
-ls_value ls_value_make_i32(int32_t value);
-ls_value ls_value_make_u32(uint32_t value);
-ls_value ls_value_make_i64(int64_t value);
-ls_value ls_value_make_u64(uint64_t value);
+ls_value ls_value_make_i32(i32 value);
+ls_value ls_value_make_u32(u32 value);
+ls_value ls_value_make_i64(i64 value);
+ls_value ls_value_make_u64(u64 value);
 ls_value ls_value_make_f32(float value);
 ls_value ls_value_make_f64(double value);
 ls_value ls_value_make_string(ls_string_view value);

@@ -1,20 +1,16 @@
 #include "capi.h"
 
 #include <new>
-#include <string.h>
 
-#include "lumscript.h"
-#include "lumscript/lumscript_engine_api.h"
+#include "compiler.h"
 #include "runtime.h"
 
-namespace Lumix::LumScript {
-
-static ls_string_view toC(StringView value) {
-	return {value.begin, value.end};
+static ls_string_view toC(ls_string_view value) {
+	return value;
 }
 
-static StringView fromC(ls_string_view value) {
-	return {value.begin, value.end};
+static ls_string_view fromC(ls_string_view value) {
+	return value;
 }
 
 static TypeRef fromC(ls_type value) {
@@ -73,114 +69,59 @@ static ls_value toC(const Value& value) {
 	return result;
 }
 
-struct CAllocator final : IAllocator {
-	explicit CAllocator(const ls_host* host)
-		: m_host(host ? *host : ls_host{})
-	{}
-
-	void* allocate(size_t size, size_t align) override {
-		if (m_host.allocate) return m_host.allocate(m_host.allocator_userdata, size, align);
-		(void)align;
-		return ::operator new(size, std::nothrow);
-	}
-
-	void deallocate(void* ptr) override {
-		if (!ptr) return;
-		if (m_host.deallocate) {
-			m_host.deallocate(m_host.allocator_userdata, ptr);
-			return;
-		}
-		::operator delete(ptr);
-	}
-
-	void* reallocate(void* ptr, size_t new_size, size_t old_size, size_t align) override {
-		if (m_host.reallocate) return m_host.reallocate(m_host.allocator_userdata, ptr, new_size, old_size, align);
-		void* mem = allocate(new_size, align);
-		if (ptr && mem) memcpy(mem, ptr, old_size < new_size ? old_size : new_size);
-		if (ptr) {
-			if (m_host.deallocate) m_host.deallocate(m_host.allocator_userdata, ptr);
-			else ::operator delete(ptr);
-		}
-		return mem;
-	}
-
-	ls_host m_host;
-};
-
-struct CCallbacks final : Callbacks {
-	explicit CCallbacks(ls_host* host)
-		: m_host(host)
-	{
-		if (m_host) has_error = m_host->has_error != 0;
-	}
-
-	void print(StringView msg) override {
-		has_error = true;
-		if (!m_host) return;
-		if (m_host->print) m_host->print(m_host->diagnostics_userdata, toC(msg));
-	}
-
-	ls_host* m_host = nullptr;
-};
-
 struct NativeFunctionContext {
 	ls_native_fn callback = nullptr;
 	void* userdata = nullptr;
 	Module* module = nullptr;
 };
 
-static i32 addNativeType(Module& module, StringView name, StringView id) {
+static i32 addNativeType(Module& module, ls_string_view name, ls_string_view id) {
 	for (i32 i = 0; i < module.native_types.size(); ++i) {
 		if (equalStrings(module.native_types[i].name, name)) return i;
 	}
-	NativeTypeDecl& type = module.native_types.emplace();
+	NativeTypeDecl& type = module.native_types.emplace_back();
 	type.name = module.copyName(name);
 	type.id = module.copyName(id);
 	return module.native_types.size() - 1;
 }
 
-static TypeRef nativeType(Module& module, StringView visible_name, StringView id) {
+static TypeRef nativeType(Module& module, ls_string_view visible_name, ls_string_view id) {
 	const i32 idx = addNativeType(module, visible_name, id);
 	return TypeRef(TypeRef::NATIVE, module.native_types[idx].id, idx);
 }
 
-static bool nativeCallback(Span<const Value> args, Value* result, void* userdata) {
+static bool nativeCallback(std::span<const Value> args, Value* result, void* userdata) {
 	NativeFunctionContext* ctx = (NativeFunctionContext*)userdata;
 	if (!ctx || !ctx->callback) return false;
 
-	Array<ls_value> c_args(ctx->module->allocator);
-	for (const Value& arg : args) c_args.push(toC(arg));
+	std::vector<ls_value> c_args;
+	for (const Value& arg : args) c_args.push_back(toC(arg));
 
 	ls_value c_result = {};
-	const int ok = ctx->callback(c_args.begin(), c_args.size(), result ? &c_result : nullptr, ctx->userdata);
+	const int ok = ctx->callback(c_args.data(), c_args.size(), result ? &c_result : nullptr, ctx->userdata);
 	if (ok && result) *result = fromC(c_result);
 	return ok != 0;
 }
 
 struct ModuleHandle {
-	explicit ModuleHandle(const ls_host* host)
-		: mem(host)
-		, module(mem)
+	explicit ModuleHandle(const ls_host* host_)
+		: host(host_ ? *host_ : ls_host{})
+		, module(&host)
 	{}
 
-	CAllocator mem;
+	ls_host host;
 	Module module;
 };
 
 struct RuntimeHandle {
 	explicit RuntimeHandle(ModuleHandle* module)
 		: module(module)
-		, runtime(module->module, module->module.allocator)
+		, runtime(module->module)
 	{}
 
 	ModuleHandle* module = nullptr;
 	Runtime runtime;
 };
-
-} // namespace Lumix::LumScript
-
-using namespace Lumix;
-using namespace Lumix::LumScript;
 
 ls_module* ls_module_create(const ls_host* host) {
 	return reinterpret_cast<ls_module*>(new (std::nothrow) ModuleHandle(host));
@@ -200,7 +141,7 @@ int ls_module_add_native_type(ls_module* module, ls_string_view name, ls_string_
 	for (i32 i = 0; i < handle->module.native_types.size(); ++i) {
 		if (equalStrings(handle->module.native_types[i].name, fromC(name))) return i;
 	}
-	NativeTypeDecl& type = handle->module.native_types.emplace();
+	NativeTypeDecl& type = handle->module.native_types.emplace_back();
 	type.name = handle->module.copyName(fromC(name));
 	type.id = handle->module.copyName(fromC(id));
 	return handle->module.native_types.size() - 1;
@@ -213,10 +154,10 @@ int ls_module_add_enum(ls_module* module, ls_string_view name, const ls_enum_mem
 	for (i32 i = 0; i < handle->module.enums.size(); ++i) {
 		if (equalStrings(handle->module.enums[i].name, fromC(name))) return i;
 	}
-	EnumDecl& e = handle->module.enums.emplace(handle->module.allocator);
+	EnumDecl& e = handle->module.enums.emplace_back();
 	e.name = handle->module.copyName(fromC(name));
 	for (size_t i = 0; i < member_count; ++i) {
-		EnumMember& member = e.members.emplace();
+		EnumMember& member = e.members.emplace_back();
 		member.name = handle->module.copyName(fromC(members[i].name));
 		member.value = members[i].value;
 	}
@@ -236,23 +177,23 @@ int ls_module_add_native_function(
 	if (!param_types && param_count > 0) return -1;
 	ModuleHandle* handle = reinterpret_cast<ModuleHandle*>(module);
 
-	void* ctx_mem = handle->module.allocator.allocate(sizeof(NativeFunctionContext), alignof(NativeFunctionContext));
+	void* ctx_mem = allocateMemory(handle->module.host, sizeof(NativeFunctionContext), alignof(NativeFunctionContext));
 	if (!ctx_mem) return -1;
 
 	NativeFunctionContext* ctx = new (ctx_mem) NativeFunctionContext();
 	ctx->callback = callback;
 	ctx->userdata = userdata;
 	ctx->module = &handle->module;
-	handle->module.allocated_native_data.push(ctx);
+	handle->module.allocated_native_data.push_back(ctx);
 
-	NativeFunctionDecl& fn = handle->module.native_functions.emplace(handle->module.allocator);
+	NativeFunctionDecl& fn = handle->module.native_functions.emplace_back();
 	fn.name = handle->module.copyName(fromC(name));
 	fn.return_type = fromC(return_type);
 	fn.callback = &nativeCallback;
 	fn.userdata = ctx;
 
 	for (size_t i = 0; i < param_count; ++i) {
-		Param& p = fn.params.emplace();
+		Param& p = fn.params.emplace_back();
 		p.type = fromC(param_types[i]);
 	}
 	return handle->module.native_functions.size() - 1;
@@ -266,10 +207,7 @@ int ls_module_parse(
 ) {
 	if (!module) return 0;
 	ModuleHandle* handle = reinterpret_cast<ModuleHandle*>(module);
-	CCallbacks cb(host);
-	const int ok = parse(handle->module, fromC(source), cb, {}, fromC(source_name)) ? 1 : 0;
-	if (host) host->has_error = cb.has_error ? 1 : 0;
-	return ok;
+	return parse(handle->module, fromC(source), {}, fromC(source_name)) ? 1 : 0;
 }
 
 int ls_module_typecheck(
@@ -278,10 +216,7 @@ int ls_module_typecheck(
 ) {
 	if (!module) return 0;
 	ModuleHandle* handle = reinterpret_cast<ModuleHandle*>(module);
-	CCallbacks cb(host);
-	const int ok = typecheck(handle->module, cb) ? 1 : 0;
-	if (host) host->has_error = cb.has_error ? 1 : 0;
-	return ok;
+	return typecheck(handle->module) ? 1 : 0;
 }
 
 struct ImportResolverContext {
@@ -289,7 +224,7 @@ struct ImportResolverContext {
 	void* userdata = nullptr;
 };
 
-static bool importResolverAdapter(Module&, StringView path, StringView alias, StringView* source, void* userdata) {
+	static bool importResolverAdapter(Module&, ls_string_view path, ls_string_view alias, ls_string_view* source, void* userdata) {
 	ImportResolverContext* ctx = (ImportResolverContext*)userdata;
 	if (!ctx || !ctx->resolver) return false;
 	ls_string_view c_source = {};
@@ -308,15 +243,12 @@ int ls_module_compile(
 ) {
 	if (!module) return 0;
 	ModuleHandle* handle = reinterpret_cast<ModuleHandle*>(module);
-	CCallbacks cb(host);
 
 	ImportResolverContext resolver;
 	resolver.resolver = import_resolver;
 	resolver.userdata = import_resolver_userdata;
 
-	const int ok = compile(handle->module, fromC(source), cb, import_resolver ? importResolverAdapter : nullptr, import_resolver ? &resolver : nullptr, fromC(source_name)) ? 1 : 0;
-	if (host) host->has_error = cb.has_error ? 1 : 0;
-	return ok;
+	return compile(handle->module, fromC(source), import_resolver ? importResolverAdapter : nullptr, import_resolver ? &resolver : nullptr, fromC(source_name)) ? 1 : 0;
 }
 
 int ls_module_get_struct_count(ls_module* module) {
@@ -355,14 +287,12 @@ int ls_runtime_call(
 	if (!runtime) return 0;
 	if (!args && arg_count > 0) return 0;
 	RuntimeHandle* handle = reinterpret_cast<RuntimeHandle*>(runtime);
-	CCallbacks cb(host);
-	Array<Value> c_args(handle->module->module.allocator);
-	for (size_t i = 0; i < arg_count; ++i) c_args.push(fromC(args[i]));
+	std::vector<Value> c_args;
+	for (size_t i = 0; i < arg_count; ++i) c_args.push_back(fromC(args[i]));
 
 	Value c_result;
-	const bool ok = handle->runtime.call(fromC(function_name), Span<const Value>(c_args.begin(), c_args.size()), result ? &c_result : nullptr, cb);
+	const bool ok = handle->runtime.call(fromC(function_name), std::span<const Value>(c_args.begin(), c_args.size()), result ? &c_result : nullptr);
 	if (ok && result) *result = toC(c_result);
-	if (host) host->has_error = cb.has_error ? 1 : 0;
 	return ok ? 1 : 0;
 }
 

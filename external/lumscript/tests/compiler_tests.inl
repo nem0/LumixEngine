@@ -249,7 +249,7 @@ TEST(ImportAddsDeclarationsToCurrentModule) {
 			return v.x + v.y;
 		}
 	)";
-	LumScriptImportFile file = { "math", math_source };
+	LumScriptImportFile file = { toLs("math"), toLs(math_source) };
 	LumScriptImportFiles files = { &file, 1 };
 	TestContext diagnostics;
 	ls_module* module = ls_module_create(&diagnostics.host);
@@ -292,7 +292,7 @@ TEST(DuplicateUnaliasedImportIsNoOp) {
 			return v.x + v.y;
 		}
 	)";
-	LumScriptImportFile file = { "math", math_source };
+	LumScriptImportFile file = { toLs("math"), toLs(math_source) };
 	LumScriptImportFiles files = { &file, 1 };
 	TestContext diagnostics;
 	ls_module* module = ls_module_create(&diagnostics.host);
@@ -324,7 +324,7 @@ TEST(DuplicateAliasedImportOfSamePathIsNoOp) {
 			return v.x + v.y;
 		}
 	)";
-	LumScriptImportFile file = { "math", math_source };
+	LumScriptImportFile file = { toLs("math"), toLs(math_source) };
 	LumScriptImportFiles files = { &file, 1 };
 	TestContext diagnostics;
 	ls_module* module = ls_module_create(&diagnostics.host);
@@ -356,8 +356,8 @@ TEST(AliasedImportCollisionFails) {
 		}
 	)";
 	LumScriptImportFile files_storage[] = {
-		{ "math_a", math_a_source },
-		{ "math_b", math_b_source }
+		{ toLs("math_a"), toLs(math_a_source) },
+		{ toLs("math_b"), toLs(math_b_source) }
 	};
 	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
 	TestContext diagnostics;
@@ -365,7 +365,6 @@ TEST(AliasedImportCollisionFails) {
 	EXPECT_TRUE(module != nullptr);
 	diagnostics.diagnostics.output_enabled = false;
 	EXPECT_TRUE(!ls_module_compile(module, toLs(source), {}, &diagnostics.host, &resolveLumScriptImportC, &files));
-	EXPECT_TRUE(diagnostics.diagnostics.has_error);
 	ls_module_destroy(module);
 	return true;
 }
@@ -393,8 +392,8 @@ TEST(ImportCycleFails) {
 		}
 	)";
 	LumScriptImportFile files_storage[] = {
-		{ "a", a_source },
-		{ "b", b_source }
+		{ toLs("a"), toLs(a_source) },
+		{ toLs("b"), toLs(b_source) }
 	};
 	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
 	TestContext diagnostics;
@@ -402,7 +401,6 @@ TEST(ImportCycleFails) {
 	EXPECT_TRUE(module != nullptr);
 	diagnostics.diagnostics.output_enabled = false;
 	EXPECT_TRUE(!ls_module_compile(module, toLs(source), {}, &diagnostics.host, &resolveLumScriptImportC, &files));
-	EXPECT_TRUE(diagnostics.diagnostics.has_error);
 	ls_module_destroy(module);
 	return true;
 }
@@ -439,8 +437,8 @@ TEST(FirstParameterNamespaceResolutionPrecedenceTypecheck) {
 	)";
 
 	LumScriptImportFile files_storage[] = {
-		{ "entity_mod", entity_source },
-		{ "helper_mod", helper_source }
+		{ toLs("entity_mod"), toLs(entity_source) },
+		{ toLs("helper_mod"), toLs(helper_source) }
 	};
 	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
 

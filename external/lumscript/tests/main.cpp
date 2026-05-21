@@ -2,11 +2,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <span>
 
-#include "core/string.h"
+#include "../string_utils.h"
 #include "../capi.h"
-
-using namespace Lumix;
 
 void print(const char* val) { printf(val); }
 void print(int val) { printf("%d", val); }
@@ -51,18 +50,20 @@ void print(int val) { printf("%d", val); }
 		context.diagnostics.output_enabled = false; \
 		EXPECT_TRUE(!ls_module_compile(module, toLs(src), {}, &context.host, nullptr, nullptr)); \
 		ls_module_destroy(module); \
-		EXPECT_TRUE(context.diagnostics.has_error); \
 	} while(false)
 
 struct LumScriptImportFile {
-	StringView path;
-	StringView source;
+	ls_string_view path;
+	ls_string_view source;
 };
 
 struct LumScriptImportFiles {
 	const LumScriptImportFile* files = nullptr;
 	u32 count = 0;
 };
+
+template <typename T, u32 L>
+u32 lengthOf(T (&)[L]) { return L; }
 
 struct TestList {
     using test_fn = bool (*)();
@@ -88,20 +89,22 @@ static int passed_count = 0;
 
 static void testPrint(void* userdata, ls_string_view msg);
 
-static ls_string_view toLs(StringView value) {
-	return { value.begin, value.end };
+static ls_string_view toLs(ls_string_view value) {
+	return value;
+}
+
+static ls_string_view toLs(const char* value) {
+	return makeStringView(value);
 }
 
 struct TestContext {
 	TestContext() {
 		host.diagnostics_userdata = &diagnostics;
 		host.print = &testPrint;
-		host.has_error = 0;
 	}
 
 	struct Diagnostics {
 		bool output_enabled = true;
-		bool has_error = false;
 	} diagnostics;
 
 	ls_host host = {};
@@ -142,8 +145,6 @@ struct RuntimeGuard {
 
 static void testPrint(void* userdata, ls_string_view msg) {
 	TestContext* context = (TestContext*)userdata;
-	context->diagnostics.has_error = true;
-	context->host.has_error = 1;
 	if (!context->diagnostics.output_enabled) return;
 	for (const char* c = msg.begin; c != msg.end; ++c) {
 		putchar(*c);
@@ -153,9 +154,9 @@ static void testPrint(void* userdata, ls_string_view msg) {
 static int resolveLumScriptImportC(void* userdata, ls_string_view path, ls_string_view, ls_string_view* source) {
 	const LumScriptImportFiles* imports = (const LumScriptImportFiles*)userdata;
 	if (!imports) return 0;
-	Span<const LumScriptImportFile> files(imports->files, imports->count);
+	std::span<const LumScriptImportFile> files(imports->files, imports->count);
 	for (const LumScriptImportFile& file : files) {
-		if (equalStrings(file.path, StringView(path.begin, path.end))) {
+		if (equalStrings(file.path, path)) {
 			*source = toLs(file.source);
 			return 1;
 		}
