@@ -225,7 +225,6 @@ struct LumScriptEditorWindow final : AssetEditorWindow {
 		host.print = [](void* userdata, ls_string_view msg) {
 			((String*)userdata)->append(StringView(msg.begin, msg.end));
 		};
-		host.has_error = 0;
 		ls_module* module = ls_module_create(&host);
 		if (module) {
 			resolver_ctx.module = module;

@@ -84,7 +84,7 @@ struct Parser {
 		switch (t.type) {
 			case Token::FN: {
 				m_module.function_types.emplace_back();
-				const i32 fn_type_idx = m_module.function_types.size() - 1;
+				const i32 fn_type_idx = (i32)m_module.function_types.size() - 1;
 				if (!consume(Token::LEFT_PAREN)) return {};
 				while (peek().type != Token::RIGHT_PAREN && peek().type != Token::END_OF_FILE && !m_output.has_error) {
 					FunctionTypeDecl& fn_type = m_module.function_types[fn_type_idx];
@@ -198,7 +198,7 @@ struct Parser {
 		Token name;
 		if (!consume(Token::IDENTIFIER, &name)) return -1;
 		m_module.functions.emplace_back();
-		const i32 fn_idx = m_module.functions.size() - 1;
+		const i32 fn_idx = (i32)m_module.functions.size() - 1;
 		m_module.functions[fn_idx].local_name = name.value;
 		m_module.functions[fn_idx].is_nested = is_nested;
 		if (is_nested) {
@@ -254,27 +254,27 @@ struct Parser {
 		Stmt& stmt = m_module.statements.emplace_back();
 		stmt.kind = kind;
 		stmt.token = token;
-		return m_module.statements.size() - 1;
+		return (i32)m_module.statements.size() - 1;
 	}
 
 	i32 addExpr(Expr::Kind kind, Token token) {
 		Expr& expr = m_module.expressions.emplace_back();
 		expr.kind = kind;
 		expr.token = token;
-		return m_module.expressions.size() - 1;
+		return (i32)m_module.expressions.size() - 1;
 	}
 
 	i32 addMatchPattern(MatchPattern::Kind kind, Token token) {
 		MatchPattern& pattern = m_module.match_patterns.emplace_back();
 		pattern.kind = kind;
 		pattern.token = token;
-		return m_module.match_patterns.size() - 1;
+		return (i32)m_module.match_patterns.size() - 1;
 	}
 
 	i32 addMatchArm(Token token) {
 		MatchArm& arm = m_module.match_arms.emplace_back();
 		arm.token = token;
-		return m_module.match_arms.size() - 1;
+		return (i32)m_module.match_arms.size() - 1;
 	}
 
 	i32 parseBlock() {

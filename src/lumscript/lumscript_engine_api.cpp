@@ -3,7 +3,6 @@
 #include "engine/input_system.h"
 #include "engine/reflection.h"
 #include "engine/world.h"
-#include "lumscript/value.h"
 #include "lumscript/lumscript_capi.gen.h"
 #include "lumscript/capi.h"
 #include "imgui/imgui.h"
@@ -37,26 +36,6 @@ static StringView fromC(ls_string_view value) {
 	return {value.begin, value.end};
 }
 
-static Value fromC(ls_value value) {
-	Value result;
-	result.type = TypeRef((TypeRef::Kind)value.type.kind, fromC(value.type.name), value.type.struct_index);
-	result.type.element_kind = (TypeRef::Kind)value.type.element_kind;
-	result.type.element_name = fromC(value.type.element_name);
-	result.type.array_size = value.type.array_size;
-	result.type.nullable = value.type.nullable != 0;
-	result.b = value.b != 0;
-	result.i = value.i;
-	result.u = value.u;
-	result.i64 = value.i64;
-	result.u64 = value.u64;
-	result.f = value.f;
-	result.d = value.d;
-	result.string = fromC(value.string);
-	for (i32 i = 0; i < 4; ++i) result.composite[i] = value.composite[i];
-	result.ptr = value.ptr;
-	return result;
-}
-
 static ls_string_view makeEngineName(ls_module* module, StringView alias, const char* name) {
 	return ls_make_qualified_name(module, toC(alias), ls_string_view{name, name + strlen(name)});
 }
@@ -66,7 +45,7 @@ static ls_type nativeType(ls_module* module, ls_string_view visible_name, ls_str
 	return ls_type_make_native(visible_name, idx, 0);
 }
 
-static const InputSystem::Event* getInputEvent(const Value& value) {
+static const InputSystem::Event* getInputEvent(const ls_value& value) {
 	InputSystem* input = (InputSystem*)value.ptr;
 	if (!input || value.i < 0) return nullptr;
 	// TODO this should not go through input->, `value` should point directly to the event
@@ -77,15 +56,15 @@ static const InputSystem::Event* getInputEvent(const Value& value) {
 
 static int inputGetEventCount(const ls_value* args, size_t arg_count, ls_value* result, void*) {
 	if (arg_count < 1) return 0;
-	InputSystem* input = (InputSystem*)fromC(args[0]).ptr;
+	InputSystem* input = (InputSystem*)args[0].ptr;
 	if (result) *result = ls_value_make_i32(input ? input->getEvents().length() : 0);
 	return 1;
 }
 
 static int inputGetEvent(const ls_value* args, size_t arg_count, ls_value* result, void*) {
 	if (arg_count < 2) return 0;
-	InputSystem* input = (InputSystem*)fromC(args[0]).ptr;
-	const int idx = fromC(args[1]).i;
+	InputSystem* input = (InputSystem*)args[0].ptr;
+	const int idx = args[1].i;
 	if (!input || idx < 0) return 0;
 	const Span<const InputSystem::Event> events = input->getEvents();
 	if ((u32)idx >= events.length()) return 0;
@@ -98,49 +77,49 @@ static int inputGetEvent(const ls_value* args, size_t arg_count, ls_value* resul
 
 static int inputGetType(const ls_value* args, size_t arg_count, ls_value* result, void*) {
 	if (arg_count < 1) return 0;
-	const InputSystem::Event* event = getInputEvent(fromC(args[0]));
+	const InputSystem::Event* event = getInputEvent(args[0]);
 	if (result) *result = ls_value_make_i32(event ? (i32)event->type : -1);
 	return 1;
 }
 
 static int inputGetDeviceType(const ls_value* args, size_t arg_count, ls_value* result, void*) {
 	if (arg_count < 1) return 0;
-	const InputSystem::Event* event = getInputEvent(fromC(args[0]));
+	const InputSystem::Event* event = getInputEvent(args[0]);
 	if (result) *result = ls_value_make_i32(event && event->device ? (i32)event->device->type : -1);
 	return 1;
 }
 
 static int inputGetDeviceIndex(const ls_value* args, size_t arg_count, ls_value* result, void*) {
 	if (arg_count < 1) return 0;
-	const InputSystem::Event* event = getInputEvent(fromC(args[0]));
+	const InputSystem::Event* event = getInputEvent(args[0]);
 	if (result) *result = ls_value_make_i32(event && event->device ? (i32)event->device->index : -1);
 	return 1;
 }
 
 static int inputGetKeyId(const ls_value* args, size_t arg_count, ls_value* result, void*) {
 	if (arg_count < 1) return 0;
-	const InputSystem::Event* event = getInputEvent(fromC(args[0]));
+	const InputSystem::Event* event = getInputEvent(args[0]);
 	if (result) *result = ls_value_make_i32(event && event->type == InputEventType::BUTTON ? (i32)event->data.button.key_id : -1);
 	return 1;
 }
 
 static int inputIsDown(const ls_value* args, size_t arg_count, ls_value* result, void*) {
 	if (arg_count < 1) return 0;
-	const InputSystem::Event* event = getInputEvent(fromC(args[0]));
+	const InputSystem::Event* event = getInputEvent(args[0]);
 	if (result) *result = ls_value_make_bool(event && event->type == InputEventType::BUTTON && event->data.button.down);
 	return 1;
 }
 
 static int inputIsRepeat(const ls_value* args, size_t arg_count, ls_value* result, void*) {
 	if (arg_count < 1) return 0;
-	const InputSystem::Event* event = getInputEvent(fromC(args[0]));
+	const InputSystem::Event* event = getInputEvent(args[0]);
 	if (result) *result = ls_value_make_bool(event && event->type == InputEventType::BUTTON && event->data.button.is_repeat);
 	return 1;
 }
 
 static int inputGetX(const ls_value* args, size_t arg_count, ls_value* result, void*) {
 	if (arg_count < 1) return 0;
-	const InputSystem::Event* event = getInputEvent(fromC(args[0]));
+	const InputSystem::Event* event = getInputEvent(args[0]);
 	float value = 0;
 	if (event) {
 		switch (event->type) {
@@ -156,7 +135,7 @@ static int inputGetX(const ls_value* args, size_t arg_count, ls_value* result, v
 
 static int inputGetY(const ls_value* args, size_t arg_count, ls_value* result, void*) {
 	if (arg_count < 1) return 0;
-	const InputSystem::Event* event = getInputEvent(fromC(args[0]));
+	const InputSystem::Event* event = getInputEvent(args[0]);
 	float value = 0;
 	if (event) {
 		switch (event->type) {
@@ -172,7 +151,7 @@ static int inputGetY(const ls_value* args, size_t arg_count, ls_value* result, v
 
 static int inputGetValue(const ls_value* args, size_t arg_count, ls_value* result, void*) {
 	if (arg_count < 1) return 0;
-	const InputSystem::Event* event = getInputEvent(fromC(args[0]));
+	const InputSystem::Event* event = getInputEvent(args[0]);
 	float value = 0;
 	if (event) {
 		switch (event->type) {
@@ -188,14 +167,14 @@ static int inputGetValue(const ls_value* args, size_t arg_count, ls_value* resul
 
 static int inputGetAxis(const ls_value* args, size_t arg_count, ls_value* result, void*) {
 	if (arg_count < 1) return 0;
-	const InputSystem::Event* event = getInputEvent(fromC(args[0]));
+	const InputSystem::Event* event = getInputEvent(args[0]);
 	if (result) *result = ls_value_make_i32(event && event->type == InputEventType::AXIS ? (i32)event->data.axis.axis : -1);
 	return 1;
 }
 
 static int inputGetText(const ls_value* args, size_t arg_count, ls_value* result, void*) {
 	if (arg_count < 1) return 0;
-	const InputSystem::Event* event = getInputEvent(fromC(args[0]));
+	const InputSystem::Event* event = getInputEvent(args[0]);
 	if (result) *result = ls_value_make_i32(event && event->type == InputEventType::TEXT_INPUT ? (i32)event->data.text.utf8 : 0);
 	return 1;
 }
@@ -253,7 +232,8 @@ static int imguiBeginWindow(const ls_value* args, size_t arg_count, ls_value* re
 	if (arg_count < 1) return 0;
 	bool open = false;
 	if (ImGui::GetCurrentContext()) {
-		StaticString<256> title(fromC(args[0]).string);
+		StringView sv = {args[0].string.begin, args[0].string.end};
+		StaticString<256> title(sv);
 		open = ImGui::Begin(title);
 	}
 	if (result) *result = ls_value_make_bool(open);
@@ -268,7 +248,7 @@ static int imguiEndWindow(const ls_value*, size_t, ls_value*, void*) {
 static int imguiTextUnformatted(const ls_value* args, size_t arg_count, ls_value*, void*) {
 	if (arg_count < 1) return 0;
 	if (ImGui::GetCurrentContext()) {
-		const StringView text = fromC(args[0]).string;
+		const ls_string_view text = args[0].string;
 		ImGui::TextUnformatted(text.begin, text.end);
 	}
 	return 1;
@@ -278,7 +258,8 @@ static int imguiButton(const ls_value* args, size_t arg_count, ls_value* result,
 	if (arg_count < 1) return 0;
 	bool clicked = false;
 	if (ImGui::GetCurrentContext()) {
-		StaticString<256> label(fromC(args[0]).string);
+		StringView sv = {args[0].string.begin, args[0].string.end};
+		StaticString<256> label(sv);
 		clicked = ImGui::Button(label);
 	}
 	if (result) *result = ls_value_make_bool(clicked);

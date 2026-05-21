@@ -27,7 +27,6 @@ struct LumScriptDiagnosticsContext {
 static void printLumScriptMessage(void* userdata, ls_string_view msg) {
 	LumScriptDiagnosticsContext* ctx = (LumScriptDiagnosticsContext*)userdata;
 	if (ctx->message) ctx->message->append(StringView(msg.begin, msg.end));
-	if (ctx->host) ctx->host->has_error = 1;
 }
 
 static ls_string_view toLs(StringView value) {
@@ -120,13 +119,9 @@ struct LumScriptModuleImpl : LumScriptModule {
 		LumScriptDiagnosticsContext diag_ctx = { &diagnostics, &host };
 		host.diagnostics_userdata = &diag_ctx;
 		host.print = &printLumScriptMessage;
-		host.has_error = 0;
 
 		ls_value dt_value = ls_value_make_f32(time_delta);
 		if (!ls_runtime_call(m_script.runtime, toLs("update"), &dt_value, 1, nullptr, &host)) {
-			logError("LumScript update: ", diagnostics);
-		}
-		else if (host.has_error) {
 			logError("LumScript update: ", diagnostics);
 		}
 	}
@@ -248,7 +243,6 @@ private:
 		LumScriptDiagnosticsContext diag_ctx = { &diagnostics, &host };
 		host.diagnostics_userdata = &diag_ctx;
 		host.print = &printLumScriptMessage;
-		host.has_error = 0;
 		
 		// Parse and compile the world script
 		if (m_script.module) {

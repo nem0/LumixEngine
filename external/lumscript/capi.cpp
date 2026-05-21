@@ -82,7 +82,7 @@ static i32 addNativeType(Module& module, ls_string_view name, ls_string_view id)
 	NativeTypeDecl& type = module.native_types.emplace_back();
 	type.name = module.copyName(name);
 	type.id = module.copyName(id);
-	return module.native_types.size() - 1;
+	return (int)module.native_types.size() - 1;
 }
 
 static TypeRef nativeType(Module& module, ls_string_view visible_name, ls_string_view id) {
@@ -144,7 +144,7 @@ int ls_module_add_native_type(ls_module* module, ls_string_view name, ls_string_
 	NativeTypeDecl& type = handle->module.native_types.emplace_back();
 	type.name = handle->module.copyName(fromC(name));
 	type.id = handle->module.copyName(fromC(id));
-	return handle->module.native_types.size() - 1;
+	return (int)handle->module.native_types.size() - 1;
 }
 
 int ls_module_add_enum(ls_module* module, ls_string_view name, const ls_enum_member* members, size_t member_count) {
@@ -161,7 +161,7 @@ int ls_module_add_enum(ls_module* module, ls_string_view name, const ls_enum_mem
 		member.name = handle->module.copyName(fromC(members[i].name));
 		member.value = members[i].value;
 	}
-	return handle->module.enums.size() - 1;
+	return (int)handle->module.enums.size() - 1;
 }
 
 int ls_module_add_native_function(
@@ -196,7 +196,7 @@ int ls_module_add_native_function(
 		Param& p = fn.params.emplace_back();
 		p.type = fromC(param_types[i]);
 	}
-	return handle->module.native_functions.size() - 1;
+	return (int)handle->module.native_functions.size() - 1;
 }
 
 int ls_module_parse(
@@ -253,17 +253,17 @@ int ls_module_compile(
 
 int ls_module_get_struct_count(ls_module* module) {
 	if (!module) return 0;
-	return reinterpret_cast<ModuleHandle*>(module)->module.structs.size();
+	return (int)reinterpret_cast<ModuleHandle*>(module)->module.structs.size();
 }
 
 int ls_module_get_function_count(ls_module* module) {
 	if (!module) return 0;
-	return reinterpret_cast<ModuleHandle*>(module)->module.functions.size();
+	return (int)reinterpret_cast<ModuleHandle*>(module)->module.functions.size();
 }
 
 int ls_module_get_global_count(ls_module* module) {
 	if (!module) return 0;
-	return reinterpret_cast<ModuleHandle*>(module)->module.globals.size();
+	return (int)reinterpret_cast<ModuleHandle*>(module)->module.globals.size();
 }
 
 ls_runtime* ls_runtime_create(ls_module* module) {

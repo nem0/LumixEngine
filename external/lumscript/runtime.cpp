@@ -245,13 +245,13 @@ bool Runtime::evalQualifiedEnumMember(ls_string_view name, Value* value) {
 }
 
 Runtime::Binding* Runtime::findBinding(ls_string_view name) {
-	for (i32 f = m_frames.size() - 1; f >= 0; --f) {
+	for (i32 f = (i32)m_frames.size() - 1; f >= 0; --f) {
 		Frame& frame = m_frames[f];
-		for (i32 i = frame.bindings.size() - 1; i >= 0; --i) {
+		for (i32 i = (i32)frame.bindings.size() - 1; i >= 0; --i) {
 			if (equalStrings(frame.bindings[i].name, name)) return &frame.bindings[i];
 		}
 	}
-	for (i32 i = m_globals.size() - 1; i >= 0; --i) {
+	for (i32 i = (i32)m_globals.size() - 1; i >= 0; --i) {
 		if (equalStrings(m_globals[i].name, name)) return &m_globals[i];
 	}
 	return nullptr;
@@ -708,8 +708,8 @@ void Runtime::execStmt(i32 stmt_idx, Value* ret, FlowSignal* flow, ls_string_vie
 	Stmt& stmt = m_module.statements[stmt_idx];
 	switch (stmt.kind) {
 		case Stmt::BLOCK: {
-			const i32 old_size = m_frames.back().bindings.size();
-			const i32 old_deferred_size = m_deferred_statements.size();
+			const i32 old_size = (i32)m_frames.back().bindings.size();
+			const i32 old_deferred_size = (i32)m_deferred_statements.size();
 			for (i32 child : stmt.children) {
 				if (child < 0) continue;
 				execStmt(child, ret, flow, flow_label);

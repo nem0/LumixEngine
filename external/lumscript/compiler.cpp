@@ -273,12 +273,12 @@ struct Checker {
 	}
 
 	i32 findLocal(ls_string_view name) const {
-		for (i32 i = m_locals.size() - 1; i >= 0; --i) if (equalStrings(m_locals[i].name, name)) return i;
+		for (i32 i = (i32)m_locals.size() - 1; i >= 0; --i) if (equalStrings(m_locals[i].name, name)) return i;
 		return -1;
 	}
 
 	i32 findLocalFunction(ls_string_view name) const {
-		for (i32 i = m_local_functions.size() - 1; i >= 0; --i) {
+		for (i32 i = (i32)m_local_functions.size() - 1; i >= 0; --i) {
 			if (equalStrings(m_local_functions[i].name, name)) return m_local_functions[i].function_index;
 		}
 		return -1;
@@ -417,7 +417,7 @@ struct Checker {
 
 	void checkStmtWithPromotion(i32 stmt_idx, TypeRef return_type, ls_string_view var_name, TypeRef promoted_type) {
 		if (stmt_idx < 0) return;
-		const i32 old_size = m_locals.size();
+		const i32 old_size = (i32)m_locals.size();
 		m_scope_starts.push_back(old_size);
 		const i32 existing = findLocal(var_name);
 		LocalInfo& promoted = m_locals.emplace_back();
@@ -523,7 +523,7 @@ struct Checker {
 		m_declared_labels.clear();
 		m_label_scope_starts.clear();
 		m_scope_starts.push_back(0);
-		m_function_scope_starts.push_back(m_local_functions.size());
+		m_function_scope_starts.push_back((i32)m_local_functions.size());
 		for (Param& p : fn.params) {
 			LocalInfo& local = m_locals.emplace_back();
 			local.name = p.name;
@@ -1006,10 +1006,10 @@ struct Checker {
 		Stmt& stmt = m_module.statements[stmt_idx];
 		switch (stmt.kind) {
 			case Stmt::BLOCK: {
-				const i32 old_size = m_locals.size();
-				const i32 old_function_size = m_local_functions.size();
-				const i32 old_loop_size = m_loop_labels.size();
-				const i32 old_label_size = m_declared_labels.size();
+				const i32 old_size = (i32)m_locals.size();
+				const i32 old_function_size = (i32)m_local_functions.size();
+				const i32 old_loop_size = (i32)m_loop_labels.size();
+				const i32 old_label_size = (i32)m_declared_labels.size();
 				m_scope_starts.push_back(old_size);
 				m_function_scope_starts.push_back(old_function_size);
 				m_loop_scope_starts.push_back(old_loop_size);
@@ -1054,7 +1054,7 @@ struct Checker {
 				}
 				if (type.kind != TypeRef::INVALID) resolveType(type);
 				stmt.type = type;
-				stmt.local_index = m_locals.size();
+				stmt.local_index = (i32)m_locals.size();
 				LocalInfo& local = m_locals.emplace_back();
 				local.name = stmt.name;
 				local.type = type;
@@ -1126,7 +1126,7 @@ struct Checker {
 				}
 				if (!empty(stmt.name)) {
 					bool found = false;
-					for (i32 i = m_loop_labels.size() - 1; i >= 0; --i) {
+					for (i32 i = (i32)m_loop_labels.size() - 1; i >= 0; --i) {
 						if (equalStrings(m_loop_labels[i], stmt.name)) {
 							found = true;
 							break;
@@ -1338,7 +1338,7 @@ inline bool resolveImports(Module& module, ImportResolver import_resolver, void*
 			}
 
 			state[idx] = 1;
-			const i32 old_import_count = module.imports.size();
+			const i32 old_import_count = (i32)module.imports.size();
 			ls_string_view source;
 			if (!import_resolver(module, import.path, import.alias, &source, import_resolver_userdata)) {
 				output.errorAt(import.token, "Can not import '", import.path, "'");
