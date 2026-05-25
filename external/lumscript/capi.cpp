@@ -2,6 +2,7 @@
 
 #include <new>
 
+#include "bytecode.h"
 #include "compiler.h"
 #include "runtime.h"
 
@@ -293,6 +294,91 @@ int ls_runtime_call(
 	Value c_result;
 	const bool ok = handle->runtime.call(fromC(function_name), std::span<const Value>(c_args.begin(), c_args.size()), result ? &c_result : nullptr);
 	if (ok && result) *result = toC(c_result);
+	return ok ? 1 : 0;
+}
+
+ls_bytecode* ls_bytecode_compile(
+	ls_module* module,
+	ls_host* host
+) {
+	if (!module) return nullptr;
+	ModuleHandle* handle = reinterpret_cast<ModuleHandle*>(module);
+	return compileBytecode(handle->module, host);
+}
+
+void ls_bytecode_destroy(ls_bytecode* bytecode) {
+	destroyBytecode(bytecode);
+}
+
+ls_bytecode_runtime* ls_bytecode_runtime_create(ls_bytecode* bytecode) {
+	return createBytecodeRuntime(bytecode);
+}
+
+void ls_bytecode_runtime_destroy(ls_bytecode_runtime* runtime) {
+	destroyBytecodeRuntime(runtime);
+}
+
+void pushBytecodeValue(ls_bytecode_runtime* runtime, BytecodeValue value);
+
+void ls_bytecode_runtime_push_bool(ls_bytecode_runtime* runtime, int value) {
+	pushBytecodeValue(runtime, BytecodeValue(value));
+}
+
+void ls_bytecode_runtime_push_i32(ls_bytecode_runtime* runtime, i32 value) {
+	pushBytecodeValue(runtime, BytecodeValue(value));
+}
+
+i32 ls_to_i32(ls_bytecode_runtime* runtime, i32 index) {
+	if (index < 0) {
+		return i32(runtime->stack[runtime->stack.size() + index]);
+	}
+	return i32(runtime->stack[index]);
+}
+
+void ls_bytecode_runtime_push_u32(ls_bytecode_runtime* runtime, u32 value) {
+	pushBytecodeValue(runtime, BytecodeValue(value));
+}
+
+void ls_bytecode_runtime_push_i64(ls_bytecode_runtime* runtime, i64 value) {
+	//pushBytecodeValue(runtime, BytecodeValue(value));
+	// TODO
+	ASSERT(false);
+}
+
+void ls_bytecode_runtime_push_u64(ls_bytecode_runtime* runtime, u64 value) {
+	//pushBytecodeValue(runtime, BytecodeValue(value));
+	// TODO
+	ASSERT(false);
+}
+
+void ls_bytecode_runtime_push_f32(ls_bytecode_runtime* runtime, float value) {
+	pushBytecodeValue(runtime, BytecodeValue(value));
+}
+
+void ls_bytecode_runtime_push_f64(ls_bytecode_runtime* runtime, double value) {
+	// pushBytecodeValue(runtime, BytecodeValue(value));
+	ASSERT(false);
+	// TODO
+}
+
+void ls_bytecode_runtime_push_string(ls_bytecode_runtime* runtime, ls_string_view value) {
+	// pushBytecodeValue(runtime, makeBytecodeString(value));
+	ASSERT(false);
+	// TODO
+}
+
+void ls_bytecode_runtime_push_null(ls_bytecode_runtime* runtime) {
+	//pushBytecodeValue(runtime, makeBytecodeNull());
+	ASSERT(false);
+	// TODO
+}
+
+int ls_bytecode_runtime_call(
+	ls_bytecode_runtime* runtime,
+	ls_string_view function_name,
+	ls_host* host
+) {
+	const bool ok = callBytecodeRuntime(runtime, fromC(function_name));
 	return ok ? 1 : 0;
 }
 

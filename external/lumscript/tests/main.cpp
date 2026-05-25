@@ -172,6 +172,7 @@ static int nativeAddC(const ls_value* args, size_t arg_count, ls_value* result, 
 
 #include "compiler_tests.inl"
 #include "runtime_tests.inl"
+#include "bytecode_tests.inl"
 
 int main() {
     printf("Running LumScript tests...\n");

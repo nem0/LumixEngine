@@ -10,6 +10,9 @@
 // - `ls_module` owns parsed declarations, registered native functions, and the
 //   string storage needed to keep copied names alive.
 // - `ls_runtime` is a lightweight execution context bound to one module.
+// - `ls_bytecode` and `ls_bytecode_runtime` are the planned bytecode pipeline
+//   equivalents. They are declared here before their implementation exists so
+//   embedders can target the future ABI shape.
 // - `ls_value` is the generic runtime value container used for inputs and
 //   outputs.
 // - `ls_host` bundles allocator hooks and diagnostics callbacks into one
@@ -154,6 +157,8 @@ typedef struct ls_host {
 // around; all ownership and implementation details remain inside LumScript.
 typedef struct ls_module ls_module;
 typedef struct ls_runtime ls_runtime;
+typedef struct ls_bytecode ls_bytecode;
+typedef struct ls_bytecode_runtime ls_bytecode_runtime;
 
 // Module lifetime.
 //
@@ -228,6 +233,48 @@ int ls_runtime_call(
 	const ls_value* args,
 	size_t arg_count,
 	ls_value* result,
+	ls_host* host
+);
+
+// Compile the prepared module into bytecode.
+//
+// Returns a bytecode handle on success, or null on failure. Destroy the
+// returned bytecode after all runtimes using it have been destroyed.
+ls_bytecode* ls_bytecode_compile(
+	ls_module* module,
+	ls_host* host
+);
+void ls_bytecode_destroy(ls_bytecode* bytecode);
+
+// Bytecode runtime lifetime.
+//
+// Bind a runtime to compiled bytecode to call script functions repeatedly.
+// Destroy it when execution is finished.
+ls_bytecode_runtime* ls_bytecode_runtime_create(ls_bytecode* bytecode);
+void ls_bytecode_runtime_destroy(ls_bytecode_runtime* runtime);
+
+// Push values onto the bytecode runtime stack.
+//
+// These are used to pass arguments before calling a function.
+void ls_bytecode_runtime_push_bool(ls_bytecode_runtime* runtime, int value);
+void ls_bytecode_runtime_push_i32(ls_bytecode_runtime* runtime, i32 value);
+void ls_bytecode_runtime_push_u32(ls_bytecode_runtime* runtime, u32 value);
+void ls_bytecode_runtime_push_i64(ls_bytecode_runtime* runtime, i64 value);
+void ls_bytecode_runtime_push_u64(ls_bytecode_runtime* runtime, u64 value);
+void ls_bytecode_runtime_push_f32(ls_bytecode_runtime* runtime, float value);
+void ls_bytecode_runtime_push_f64(ls_bytecode_runtime* runtime, double value);
+void ls_bytecode_runtime_push_string(ls_bytecode_runtime* runtime, ls_string_view value);
+void ls_bytecode_runtime_push_null(ls_bytecode_runtime* runtime);
+
+i32 ls_to_i32(ls_bytecode_runtime* runtime, i32 index);
+
+// Execute a bytecode function by name.
+//
+// The runtime stack is used for arguments. The result pointer may be null if
+// the caller does not care about a return value.
+int ls_bytecode_runtime_call(
+	ls_bytecode_runtime* runtime,
+	ls_string_view function_name,
 	ls_host* host
 );
 
