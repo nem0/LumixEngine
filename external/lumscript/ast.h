@@ -6,56 +6,8 @@
 
 #include "capi.h"
 #include "token.h"
+#include "type_ref.h"
 #include "string_utils.h"
-
-struct TypeRef {
-	enum Kind { INVALID, VOID, BOOL, I8, U8, I16, U16, I32, U32, I64, U64, F32, F64, STRING, UNTYPED_INT, UNTYPED_FLOAT, STRUCT, ENUM, NATIVE, FUNCTION, ARRAY, NULL_VALUE };
-
-	TypeRef() {}
-	TypeRef(Kind kind, ls_string_view name = {}, i32 struct_index = -1, Token token = {}, bool nullable = false)
-		: kind(kind)
-		, name(name)
-		, struct_index(struct_index)
-		, token(token)
-		, nullable(nullable)
-	{}
-
-	Kind kind = INVALID;
-	ls_string_view name;
-	i32 struct_index = -1;
-	Kind element_kind = INVALID;
-	ls_string_view element_name;
-	i32 array_size = 0;
-	Token token;
-	bool nullable = false;
-};
-
-struct Value {
-	TypeRef type;
-	bool b = false;
-	i32 i = 0;
-	u32 u = 0;
-	i64 i64 = 0;
-	u64 u64 = 0;
-	float f = 0;
-	double d = 0;
-	ls_string_view string;
-	float composite[4] = {};
-	void* ptr = nullptr;
-private:
-	std::vector<Value>* fields = nullptr;
-};
-
-Value makeI32(i32 value);
-Value makeU32(u32 value);
-Value makeI64(i64 value);
-Value makeU64(u64 value);
-Value makeF32(float value);
-Value makeF64(double value);
-	Value makeString(ls_string_view value);
-Value makeFunction(TypeRef type, i32 index, bool is_native);
-Value makeNull();
-Value makeBool(bool value);
 
 struct LumScriptNewPlaceholder {};
 inline void* operator new(size_t, LumScriptNewPlaceholder, void* where) { return where; }
@@ -88,21 +40,15 @@ void deleteObject(const ls_host* host, T* ptr) {
 	deallocateMemory(host, ptr);
 }
 
-struct Value;
 struct Module;
 
 inline bool sameBaseType(const TypeRef& a, const TypeRef& b) {
 	if (a.kind != b.kind) return false;
-	if (a.kind == TypeRef::FUNCTION) return a.struct_index == b.struct_index;
-	if (a.kind == TypeRef::ARRAY) return a.array_size == b.array_size && a.element_kind == b.element_kind && (a.element_kind != TypeRef::STRUCT && a.element_kind != TypeRef::ENUM && a.element_kind != TypeRef::NATIVE ? true : (a.struct_index == b.struct_index || equalStrings(a.element_name, b.element_name)));
-	return a.kind != TypeRef::STRUCT && a.kind != TypeRef::ENUM && a.kind != TypeRef::NATIVE && a.kind != TypeRef::FUNCTION
+	if (a.kind == LS_TYPE_FUNCTION) return a.struct_index == b.struct_index;
+	if (a.kind == LS_TYPE_ARRAY) return a.array_size == b.array_size && a.element_kind == b.element_kind && (a.element_kind != LS_TYPE_STRUCT && a.element_kind != LS_TYPE_ENUM && a.element_kind != LS_TYPE_NATIVE ? true : (a.struct_index == b.struct_index || equalStrings(a.element_name, b.element_name)));
+	return a.kind != LS_TYPE_STRUCT && a.kind != LS_TYPE_ENUM && a.kind != LS_TYPE_NATIVE && a.kind != LS_TYPE_FUNCTION
 		? true
 		: a.struct_index == b.struct_index || equalStrings(a.name, b.name);
-}
-
-inline bool sameType(const TypeRef& a, const TypeRef& b) {
-	if (a.nullable != b.nullable) return false;
-	return sameBaseType(a, b);
 }
 
 struct Expr {
@@ -298,16 +244,3 @@ struct Module {
 	std::vector<char*> allocated_names;
 };
 
-// TODO get rid of userdata, it's only used in generated engine API, and it's used in a wrong way there
-inline NativeFunctionDecl& addNativeFunction(Module& module, ls_string_view name, TypeRef return_type, std::span<const TypeRef> param_types, NativeCallback callback, void* userdata = nullptr) {
-	NativeFunctionDecl& fn = module.native_functions.emplace_back();
-	fn.name = name;
-	fn.return_type = return_type;
-	fn.callback = callback;
-	fn.userdata = userdata;
-	for (TypeRef type : param_types) {
-		Param& param = fn.params.emplace_back();
-		param.type = type;
-	}
-	return fn;
-}

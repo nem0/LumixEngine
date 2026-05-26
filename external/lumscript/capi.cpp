@@ -7,142 +7,16 @@
 #include "bytecode.h"
 #include "compiler.h"
 
-static ls_string_view toC(ls_string_view value) {
-	return value;
-}
-
-static ls_string_view fromC(ls_string_view value) {
-	return value;
-}
-
-static TypeRef fromC(ls_type value) {
+static TypeRef toTypeRef(ls_type value) {
 	TypeRef type;
-	type.kind = (TypeRef::Kind)value.kind;
-	type.name = fromC(value.name);
+	type.kind = value.kind;
+	type.name = value.name;
 	type.struct_index = value.struct_index;
-	type.element_kind = (TypeRef::Kind)value.element_kind;
-	type.element_name = fromC(value.element_name);
+	type.element_kind = value.element_kind;
+	type.element_name = value.element_name;
 	type.array_size = value.array_size;
 	type.nullable = value.nullable != 0;
 	return type;
-}
-
-static ls_type toC(TypeRef value) {
-	ls_type type = {};
-	type.kind = (ls_type_kind)value.kind;
-	type.name = toC(value.name);
-	type.struct_index = value.struct_index;
-	type.element_kind = (ls_type_kind)value.element_kind;
-	type.element_name = toC(value.element_name);
-	type.array_size = value.array_size;
-	type.nullable = value.nullable ? 1 : 0;
-	return type;
-}
-
-Value makeI32(i32 value) {
-	Value v;
-	v.type = {TypeRef::I32, {}, -1};
-	v.i = value;
-	v.u = (u32)value;
-	v.i64 = (i64)value;
-	v.u64 = (u64)value;
-	v.f = (float)value;
-	v.d = (double)value;
-	return v;
-}
-
-Value makeU32(u32 value) {
-	Value v;
-	v.type = TypeRef(TypeRef::U32);
-	v.u = value;
-	v.i = (i32)value;
-	v.i64 = (i64)value;
-	v.u64 = (u64)value;
-	v.f = (float)value;
-	v.d = (double)value;
-	return v;
-}
-
-Value makeI64(i64 value) {
-	Value v;
-	v.type = TypeRef(TypeRef::I64);
-	v.i64 = value;
-	v.u64 = (u64)value;
-	v.i = (i32)value;
-	v.u = (u32)value;
-	v.f = (float)value;
-	v.d = (double)value;
-	return v;
-}
-
-Value makeU64(u64 value) {
-	Value v;
-	v.type = TypeRef(TypeRef::U64);
-	v.u64 = value;
-	v.i64 = (i64)value;
-	v.u = (u32)value;
-	v.i = (i32)value;
-	v.f = (float)value;
-	v.d = (double)value;
-	return v;
-}
-
-Value makeF32(float value) {
-	Value v;
-	v.type = {TypeRef::F32, {}, -1};
-	v.f = value;
-	v.i = (i32)value;
-	v.u = (u32)value;
-	v.i64 = (i64)value;
-	v.u64 = (u64)value;
-	v.d = (double)value;
-	return v;
-}
-
-Value makeF64(double value) {
-	Value v;
-	v.type = {TypeRef::F64, {}, -1};
-	v.d = value;
-	v.f = (float)value;
-	v.i = (i32)value;
-	v.u = (u32)value;
-	v.i64 = (i64)value;
-	v.u64 = (u64)value;
-	return v;
-}
-
-Value makeString(ls_string_view value) {
-	Value v;
-	v.type = {TypeRef::STRING, {}, -1};
-	v.string = value;
-	return v;
-}
-
-Value makeFunction(TypeRef type, i32 index, bool is_native) {
-	Value v;
-	v.type = type;
-	v.i = index;
-	v.b = is_native;
-	return v;
-}
-
-Value makeNull() {
-	Value v;
-	v.type = {TypeRef::NULL_VALUE, {}, -1};
-	return v;
-}
-
-Value makeBool(bool value) {
-	Value v;
-	v.type = {TypeRef::BOOL, {}, -1};
-	v.b = value;
-	v.i = value ? 1 : 0;
-	v.u = value ? 1u : 0u;
-	v.i64 = value ? 1 : 0;
-	v.u64 = value ? 1u : 0u;
-	v.f = value ? 1.0f : 0.0f;
-	v.d = value ? 1.0 : 0.0;
-	return v;
 }
 
 static i32 addNativeType(Module& module, ls_string_view name, ls_string_view id) {
@@ -157,7 +31,7 @@ static i32 addNativeType(Module& module, ls_string_view name, ls_string_view id)
 
 static TypeRef nativeType(Module& module, ls_string_view visible_name, ls_string_view id) {
 	const i32 idx = addNativeType(module, visible_name, id);
-	return TypeRef(TypeRef::NATIVE, module.native_types[idx].id, idx);
+	return TypeRef(LS_TYPE_NATIVE, module.native_types[idx].id, idx);
 }
 
 struct ModuleHandle {
@@ -184,11 +58,11 @@ int ls_module_add_native_type(ls_module* module, ls_string_view name, ls_string_
 	if (!module) return -1;
 	ModuleHandle* handle = reinterpret_cast<ModuleHandle*>(module);
 	for (i32 i = 0; i < handle->module.native_types.size(); ++i) {
-		if (equalStrings(handle->module.native_types[i].name, fromC(name))) return i;
+		if (equalStrings(handle->module.native_types[i].name, name)) return i;
 	}
 	NativeTypeDecl& type = handle->module.native_types.emplace_back();
-	type.name = handle->module.copyName(fromC(name));
-	type.id = handle->module.copyName(fromC(id));
+	type.name = handle->module.copyName(name);
+	type.id = handle->module.copyName(id);
 	return (int)handle->module.native_types.size() - 1;
 }
 
@@ -197,13 +71,13 @@ int ls_module_add_enum(ls_module* module, ls_string_view name, const ls_enum_mem
 	if (!members && member_count > 0) return -1;
 	ModuleHandle* handle = reinterpret_cast<ModuleHandle*>(module);
 	for (i32 i = 0; i < handle->module.enums.size(); ++i) {
-		if (equalStrings(handle->module.enums[i].name, fromC(name))) return i;
+		if (equalStrings(handle->module.enums[i].name, name)) return i;
 	}
 	EnumDecl& e = handle->module.enums.emplace_back();
-	e.name = handle->module.copyName(fromC(name));
+	e.name = handle->module.copyName(name);
 	for (size_t i = 0; i < member_count; ++i) {
 		EnumMember& member = e.members.emplace_back();
-		member.name = handle->module.copyName(fromC(members[i].name));
+		member.name = handle->module.copyName(members[i].name);
 		member.value = members[i].value;
 	}
 	return (int)handle->module.enums.size() - 1;
@@ -223,14 +97,14 @@ int ls_module_add_native_function(
 	ModuleHandle* handle = reinterpret_cast<ModuleHandle*>(module);
 
 	NativeFunctionDecl& fn = handle->module.native_functions.emplace_back();
-	fn.name = handle->module.copyName(fromC(name));
-	fn.return_type = fromC(return_type);
+	fn.name = handle->module.copyName(name);
+	fn.return_type = toTypeRef(return_type);
 	fn.callback = reinterpret_cast<NativeCallback>(callback);
 	fn.userdata = userdata;
 
 	for (size_t i = 0; i < param_count; ++i) {
 		Param& p = fn.params.emplace_back();
-		p.type = fromC(param_types[i]);
+		p.type = toTypeRef(param_types[i]);
 	}
 	return (int)handle->module.native_functions.size() - 1;
 }
@@ -243,7 +117,7 @@ int ls_module_parse(
 ) {
 	if (!module) return 0;
 	ModuleHandle* handle = reinterpret_cast<ModuleHandle*>(module);
-	return parse(handle->module, fromC(source), {}, fromC(source_name)) ? 1 : 0;
+	return parse(handle->module, source, {}, source_name) ? 1 : 0;
 }
 
 int ls_module_typecheck(
@@ -260,14 +134,12 @@ struct ImportResolverContext {
 	void* userdata = nullptr;
 };
 
-static i32 bytecodeFindFunction(const ls_bytecode* bytecode, ls_string_view name);
-
-	static bool importResolverAdapter(Module&, ls_string_view path, ls_string_view alias, ls_string_view* source, void* userdata) {
+static bool importResolverAdapter(Module&, ls_string_view path, ls_string_view alias, ls_string_view* source, void* userdata) {
 	ImportResolverContext* ctx = (ImportResolverContext*)userdata;
 	if (!ctx || !ctx->resolver) return false;
 	ls_string_view c_source = {};
-	if (!ctx->resolver(ctx->userdata, toC(path), toC(alias), &c_source)) return false;
-	*source = fromC(c_source);
+	if (!ctx->resolver(ctx->userdata, path, alias, &c_source)) return false;
+	*source = c_source;
 	return true;
 }
 
@@ -286,7 +158,7 @@ int ls_module_compile(
 	resolver.resolver = import_resolver;
 	resolver.userdata = import_resolver_userdata;
 
-	return compile(handle->module, fromC(source), import_resolver ? importResolverAdapter : nullptr, import_resolver ? &resolver : nullptr, fromC(source_name)) ? 1 : 0;
+	return compile(handle->module, source, import_resolver ? importResolverAdapter : nullptr, import_resolver ? &resolver : nullptr, source_name) ? 1 : 0;
 }
 
 int ls_module_get_struct_count(ls_module* module) {
@@ -459,14 +331,14 @@ int ls_bytecode_runtime_call(
 	size_t arg_count,
 	size_t result_count
 ) {
-	const i32 function_index = runtime && runtime->bytecode ? bytecodeFindFunction(runtime->bytecode, fromC(function_name)) : -1;
+	const i32 function_index = runtime && runtime->bytecode ? bytecodeFindFunction(runtime->bytecode, function_name) : -1;
 	if (function_index < 0) return 0;
 	return ls_bytecode_runtime_call_index(runtime, function_index, arg_count, result_count);
 }
 
 ls_type_kind ls_bytecode_runtime_result_kind(ls_runtime* runtime, ls_string_view function_name) {
 	if (!runtime || !runtime->bytecode) return LS_TYPE_VOID;
-	const i32 function_index = bytecodeFindFunction(runtime->bytecode, fromC(function_name));
+	const i32 function_index = bytecodeFindFunction(runtime->bytecode, function_name);
 	if (function_index < 0) return LS_TYPE_VOID;
 	return runtime->bytecode->functions[(size_t)function_index].return_type.kind;
 }
@@ -474,7 +346,7 @@ ls_type_kind ls_bytecode_runtime_result_kind(ls_runtime* runtime, ls_string_view
 ls_string_view ls_make_qualified_name(ls_module* module, ls_string_view prefix, ls_string_view name) {
 	if (!module) return {};
 	ModuleHandle* handle = reinterpret_cast<ModuleHandle*>(module);
-	return toC(handle->module.makeQualifiedName(fromC(prefix), fromC(name)));
+	return handle->module.makeQualifiedName(prefix, name);
 }
 
 ls_type ls_type_make(ls_type_kind kind) {

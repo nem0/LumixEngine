@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "../string_utils.h"
-#include "../bytecode.h"
 #include "../capi.h"
 
 void print(const char* val) { printf(val); }

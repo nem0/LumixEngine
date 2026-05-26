@@ -1,7 +1,6 @@
 #include "bytecode.h"
 
 #include "ast.h"
-#include <utility>
 
 ls_bytecode::ls_bytecode(const ls_host* host_)
 	: host(host_ ? *host_ : ls_host{})
@@ -21,92 +20,92 @@ void pushCode(ls_bytecode& bytecode, const T& value) {
 	pushCode(bytecode.code, value);
 }
 
-static bool isBytecodeIntegralType(TypeRef::Kind kind) {
+static bool isBytecodeIntegralType(ls_type_kind kind) {
 	// Only integer-like types participate in the arithmetic opcodes below.
-	return kind == TypeRef::I8 || kind == TypeRef::U8
-		|| kind == TypeRef::I16 || kind == TypeRef::U16
-		|| kind == TypeRef::I32 || kind == TypeRef::U32
-		|| kind == TypeRef::I64 || kind == TypeRef::U64
-		|| kind == TypeRef::UNTYPED_INT;
+	return kind == LS_TYPE_I8 || kind == LS_TYPE_U8
+		|| kind == LS_TYPE_I16 || kind == LS_TYPE_U16
+		|| kind == LS_TYPE_I32 || kind == LS_TYPE_U32
+		|| kind == LS_TYPE_I64 || kind == LS_TYPE_U64
+		|| kind == LS_TYPE_UNTYPED_INT;
 }
 
-static bool isBytecodeFloatType(TypeRef::Kind kind) {
-	return kind == TypeRef::F32 || kind == TypeRef::F64 || kind == TypeRef::UNTYPED_FLOAT;
+static bool isBytecodeFloatType(ls_type_kind kind) {
+	return kind == LS_TYPE_F32 || kind == LS_TYPE_F64 || kind == LS_TYPE_UNTYPED_FLOAT;
 }
 
 static ls_type toC(TypeRef type) {
 	ls_type result = {};
-	result.kind = (ls_type_kind)type.kind;
+	result.kind = type.kind;
 	result.name = type.name;
 	result.struct_index = type.struct_index;
-	result.element_kind = (ls_type_kind)type.element_kind;
+	result.element_kind = type.element_kind;
 	result.element_name = type.element_name;
 	result.array_size = type.array_size;
 	result.nullable = type.nullable ? 1 : 0;
 	return result;
 }
 
-static u64 encodeIntegerLiteral(double value, TypeRef::Kind kind) {
+static u64 encodeIntegerLiteral(double value, ls_type_kind kind) {
 	// Literals are parsed as floating point first, then narrowed to the target
 	// integer type so the bytecode sees the same value the language expects.
 	switch (kind) {
-		case TypeRef::I8: return (u64)(i64)(i8)value;
-		case TypeRef::U8: return (u64)(u8)value;
-		case TypeRef::I16: return (u64)(i64)(i16)value;
-		case TypeRef::U16: return (u64)(u16)value;
-		case TypeRef::I32: return (u64)(i64)(i32)value;
-		case TypeRef::U32: return (u64)(u32)value;
-		case TypeRef::I64: return (u64)(i64)value;
-		case TypeRef::U64: return (u64)(u64)value;
-		case TypeRef::UNTYPED_INT: return (u64)(i64)(i32)value;
+		case LS_TYPE_I8: return (u64)(i64)(i8)value;
+		case LS_TYPE_U8: return (u64)(u8)value;
+		case LS_TYPE_I16: return (u64)(i64)(i16)value;
+		case LS_TYPE_U16: return (u64)(u16)value;
+		case LS_TYPE_I32: return (u64)(i64)(i32)value;
+		case LS_TYPE_U32: return (u64)(u32)value;
+		case LS_TYPE_I64: return (u64)(i64)value;
+		case LS_TYPE_U64: return (u64)(u64)value;
+		case LS_TYPE_UNTYPED_INT: return (u64)(i64)(i32)value;
 		default: ASSERT(false); return 0;
 	}
 }
 
-static size_t integerByteSize(TypeRef::Kind kind) {
+static size_t integerByteSize(ls_type_kind kind) {
 	// The emitted operand width must match the VM opcode that will consume it.
-	switch (kind == TypeRef::UNTYPED_INT ? TypeRef::I32 : kind) {
-		case TypeRef::I8:
-		case TypeRef::U8: return 1;
-		case TypeRef::I16:
-		case TypeRef::U16: return 2;
-		case TypeRef::I32:
-		case TypeRef::U32: return 4;
-		case TypeRef::I64:
-		case TypeRef::U64: return 8;
+	switch (kind == LS_TYPE_UNTYPED_INT ? LS_TYPE_I32 : kind) {
+		case LS_TYPE_I8:
+		case LS_TYPE_U8: return 1;
+		case LS_TYPE_I16:
+		case LS_TYPE_U16: return 2;
+		case LS_TYPE_I32:
+		case LS_TYPE_U32: return 4;
+		case LS_TYPE_I64:
+		case LS_TYPE_U64: return 8;
 		default: ASSERT(false); return 0;
 	}
 }
 
-static BytecodeOp floatAddOp(TypeRef::Kind kind) {
-	switch (kind == TypeRef::UNTYPED_FLOAT ? TypeRef::F32 : kind) {
-		case TypeRef::F32: return BytecodeOp::ADD_F32;
-		case TypeRef::F64: return BytecodeOp::ADD_F64;
+static BytecodeOp floatAddOp(ls_type_kind kind) {
+	switch (kind == LS_TYPE_UNTYPED_FLOAT ? LS_TYPE_F32 : kind) {
+		case LS_TYPE_F32: return BytecodeOp::ADD_F32;
+		case LS_TYPE_F64: return BytecodeOp::ADD_F64;
 		default: ASSERT(false); return BytecodeOp::ADD_F32;
 	}
 }
 
-static BytecodeOp floatSubOp(TypeRef::Kind kind) {
-	switch (kind == TypeRef::UNTYPED_FLOAT ? TypeRef::F32 : kind) {
-		case TypeRef::F32: return BytecodeOp::SUB_F32;
-		case TypeRef::F64: return BytecodeOp::SUB_F64;
+static BytecodeOp floatSubOp(ls_type_kind kind) {
+	switch (kind == LS_TYPE_UNTYPED_FLOAT ? LS_TYPE_F32 : kind) {
+		case LS_TYPE_F32: return BytecodeOp::SUB_F32;
+		case LS_TYPE_F64: return BytecodeOp::SUB_F64;
 		default: ASSERT(false); return BytecodeOp::SUB_F32;
 	}
 }
 
-static BytecodeOp floatLoadConstOp(TypeRef::Kind kind) {
-	switch (kind == TypeRef::UNTYPED_FLOAT ? TypeRef::F32 : kind) {
-		case TypeRef::F32: return BytecodeOp::LOAD_CONST32;
-		case TypeRef::F64: return BytecodeOp::LOAD_CONST64;
+static BytecodeOp floatLoadConstOp(ls_type_kind kind) {
+	switch (kind == LS_TYPE_UNTYPED_FLOAT ? LS_TYPE_F32 : kind) {
+		case LS_TYPE_F32: return BytecodeOp::LOAD_CONST32;
+		case LS_TYPE_F64: return BytecodeOp::LOAD_CONST64;
 		default: ASSERT(false); return BytecodeOp::LOAD_CONST32;
 	}
 }
 
-static TypeRef::Kind bytecodeCastKind(TypeRef::Kind kind) {
+static ls_type_kind bytecodeCastKind(ls_type_kind kind) {
 	switch (kind) {
-		case TypeRef::ENUM:
-		case TypeRef::UNTYPED_INT: return TypeRef::I32;
-		case TypeRef::UNTYPED_FLOAT: return TypeRef::F32;
+		case LS_TYPE_ENUM:
+		case LS_TYPE_UNTYPED_INT: return LS_TYPE_I32;
+		case LS_TYPE_UNTYPED_FLOAT: return LS_TYPE_F32;
 		default: return kind;
 	}
 }
@@ -133,10 +132,10 @@ static bool bytecodeSplitMemberName(ls_string_view name, ls_string_view* owner, 
 
 static ls_string_view bytecodeGetTypeNamespace(Module& module, TypeRef type) {
 	ls_string_view type_name = type.name;
-	if (type.kind == TypeRef::NATIVE && type.struct_index >= 0 && type.struct_index < module.native_types.size()) {
+	if (type.kind == LS_TYPE_NATIVE && type.struct_index >= 0 && type.struct_index < module.native_types.size()) {
 		type_name = module.native_types[type.struct_index].name;
 	}
-	else if (type.kind == TypeRef::NATIVE) {
+	else if (type.kind == LS_TYPE_NATIVE) {
 		for (const NativeTypeDecl& native_type : module.native_types) {
 			if (!equalStrings(native_type.id, type.name)) continue;
 			type_name = native_type.name;
@@ -152,7 +151,7 @@ static ls_string_view bytecodeGetTypeNamespace(Module& module, TypeRef type) {
 // The bytecode VM still uses a flat `u64` stack, so aggregate values are
 // represented as consecutive scalar slots rather than boxed objects.
 static bool bytecodeStructFieldOffset(Module& module, const TypeRef& type, ls_string_view field_name, i32* offset, TypeRef* field_type) {
-	if (type.kind != TypeRef::STRUCT || type.struct_index < 0 || type.struct_index >= module.structs.size()) return false;
+	if (type.kind != LS_TYPE_STRUCT || type.struct_index < 0 || type.struct_index >= module.structs.size()) return false;
 	const StructDecl& s = module.structs[type.struct_index];
 	i32 current_offset = 0;
 	for (const FieldDecl& field : s.fields) {
@@ -169,26 +168,26 @@ static bool bytecodeStructFieldOffset(Module& module, const TypeRef& type, ls_st
 
 static i32 bytecodeTypeSlotCount(Module& module, TypeRef type) {
 	if (type.nullable) return 1 + bytecodeTypeSlotCount(module, bytecodeNonNullableType(type));
-	switch (type.kind == TypeRef::UNTYPED_INT ? TypeRef::I32 : type.kind) {
-		case TypeRef::BOOL:
-		case TypeRef::I8:
-		case TypeRef::U8:
-		case TypeRef::I16:
-		case TypeRef::U16:
-		case TypeRef::I32:
-		case TypeRef::U32:
-		case TypeRef::I64:
-		case TypeRef::U64:
-		case TypeRef::F32:
-		case TypeRef::F64:
-		case TypeRef::STRING:
-		case TypeRef::ENUM:
-		case TypeRef::NATIVE:
-		case TypeRef::FUNCTION:
-		case TypeRef::NULL_VALUE:
-		case TypeRef::UNTYPED_FLOAT:
+	switch (type.kind == LS_TYPE_UNTYPED_INT ? LS_TYPE_I32 : type.kind) {
+		case LS_TYPE_BOOL:
+		case LS_TYPE_I8:
+		case LS_TYPE_U8:
+		case LS_TYPE_I16:
+		case LS_TYPE_U16:
+		case LS_TYPE_I32:
+		case LS_TYPE_U32:
+		case LS_TYPE_I64:
+		case LS_TYPE_U64:
+		case LS_TYPE_F32:
+		case LS_TYPE_F64:
+		case LS_TYPE_STRING:
+		case LS_TYPE_ENUM:
+		case LS_TYPE_NATIVE:
+		case LS_TYPE_FUNCTION:
+		case LS_TYPE_NULL_VALUE:
+		case LS_TYPE_UNTYPED_FLOAT:
 			return 1;
-		case TypeRef::STRUCT: {
+		case LS_TYPE_STRUCT: {
 			if (type.struct_index < 0 || type.struct_index >= module.structs.size()) return 0;
 			i32 count = 0;
 			for (const FieldDecl& field : module.structs[type.struct_index].fields) {
@@ -198,7 +197,7 @@ static i32 bytecodeTypeSlotCount(Module& module, TypeRef type) {
 			}
 			return count;
 		}
-		case TypeRef::ARRAY: {
+		case LS_TYPE_ARRAY: {
 			TypeRef elem(type.element_kind, type.element_name, type.struct_index, type.token, false);
 			const i32 elem_slots = bytecodeTypeSlotCount(module, elem);
 			if (elem_slots <= 0 || type.array_size <= 0) return 0;
@@ -238,103 +237,103 @@ static bool bytecodeEmitPopValue(Module& module, ls_bytecode& bytecode, const Ty
 static bool bytecodeGetCompileTimeInteger(Module& module, i32 expr_idx, i64* value);
 static bool bytecodeEmitFunctionValue(ls_bytecode& bytecode, i32 index);
 
-static BytecodeOp integerAddOp(TypeRef::Kind kind) {
+static BytecodeOp integerAddOp(ls_type_kind kind) {
 	// Signedness matters for wraparound behavior, so each width gets its own op.
-	switch (kind == TypeRef::UNTYPED_INT ? TypeRef::I32 : kind) {
-		case TypeRef::I8: return BytecodeOp::ADD_I8;
-		case TypeRef::U8: return BytecodeOp::ADD_U8;
-		case TypeRef::I16: return BytecodeOp::ADD_I16;
-		case TypeRef::U16: return BytecodeOp::ADD_U16;
-		case TypeRef::I32: return BytecodeOp::ADD_I32;
-		case TypeRef::U32: return BytecodeOp::ADD_U32;
-		case TypeRef::I64: return BytecodeOp::ADD_I64;
-		case TypeRef::U64: return BytecodeOp::ADD_U64;
+	switch (kind == LS_TYPE_UNTYPED_INT ? LS_TYPE_I32 : kind) {
+		case LS_TYPE_I8: return BytecodeOp::ADD_I8;
+		case LS_TYPE_U8: return BytecodeOp::ADD_U8;
+		case LS_TYPE_I16: return BytecodeOp::ADD_I16;
+		case LS_TYPE_U16: return BytecodeOp::ADD_U16;
+		case LS_TYPE_I32: return BytecodeOp::ADD_I32;
+		case LS_TYPE_U32: return BytecodeOp::ADD_U32;
+		case LS_TYPE_I64: return BytecodeOp::ADD_I64;
+		case LS_TYPE_U64: return BytecodeOp::ADD_U64;
 		default: ASSERT(false); return BytecodeOp::ADD_I32;
 	}
 }
 
-static BytecodeOp integerSubOp(TypeRef::Kind kind) {
+static BytecodeOp integerSubOp(ls_type_kind kind) {
 	// Subtraction follows the same width/sign mapping as addition.
-	switch (kind == TypeRef::UNTYPED_INT ? TypeRef::I32 : kind) {
-		case TypeRef::I8: return BytecodeOp::SUB_I8;
-		case TypeRef::U8: return BytecodeOp::SUB_U8;
-		case TypeRef::I16: return BytecodeOp::SUB_I16;
-		case TypeRef::U16: return BytecodeOp::SUB_U16;
-		case TypeRef::I32: return BytecodeOp::SUB_I32;
-		case TypeRef::U32: return BytecodeOp::SUB_U32;
-		case TypeRef::I64: return BytecodeOp::SUB_I64;
-		case TypeRef::U64: return BytecodeOp::SUB_U64;
+	switch (kind == LS_TYPE_UNTYPED_INT ? LS_TYPE_I32 : kind) {
+		case LS_TYPE_I8: return BytecodeOp::SUB_I8;
+		case LS_TYPE_U8: return BytecodeOp::SUB_U8;
+		case LS_TYPE_I16: return BytecodeOp::SUB_I16;
+		case LS_TYPE_U16: return BytecodeOp::SUB_U16;
+		case LS_TYPE_I32: return BytecodeOp::SUB_I32;
+		case LS_TYPE_U32: return BytecodeOp::SUB_U32;
+		case LS_TYPE_I64: return BytecodeOp::SUB_I64;
+		case LS_TYPE_U64: return BytecodeOp::SUB_U64;
 		default: ASSERT(false); return BytecodeOp::SUB_I32;
 	}
 }
 
-static BytecodeOp integerMulOp(TypeRef::Kind kind) {
+static BytecodeOp integerMulOp(ls_type_kind kind) {
 	// Integer multiplication needs one opcode per storage width to preserve
 	// overflow behavior exactly as the source type would see it.
-	switch (kind == TypeRef::UNTYPED_INT ? TypeRef::I32 : kind) {
-		case TypeRef::I8: return BytecodeOp::MUL_I8;
-		case TypeRef::U8: return BytecodeOp::MUL_U8;
-		case TypeRef::I16: return BytecodeOp::MUL_I16;
-		case TypeRef::U16: return BytecodeOp::MUL_U16;
-		case TypeRef::I32: return BytecodeOp::MUL_I32;
-		case TypeRef::U32: return BytecodeOp::MUL_U32;
-		case TypeRef::I64: return BytecodeOp::MUL_I64;
-		case TypeRef::U64: return BytecodeOp::MUL_U64;
+	switch (kind == LS_TYPE_UNTYPED_INT ? LS_TYPE_I32 : kind) {
+		case LS_TYPE_I8: return BytecodeOp::MUL_I8;
+		case LS_TYPE_U8: return BytecodeOp::MUL_U8;
+		case LS_TYPE_I16: return BytecodeOp::MUL_I16;
+		case LS_TYPE_U16: return BytecodeOp::MUL_U16;
+		case LS_TYPE_I32: return BytecodeOp::MUL_I32;
+		case LS_TYPE_U32: return BytecodeOp::MUL_U32;
+		case LS_TYPE_I64: return BytecodeOp::MUL_I64;
+		case LS_TYPE_U64: return BytecodeOp::MUL_U64;
 		default: ASSERT(false); return BytecodeOp::MUL_I32;
 	}
 }
 
-static BytecodeOp integerDivOp(TypeRef::Kind kind) {
+static BytecodeOp integerDivOp(ls_type_kind kind) {
 	// Division mirrors the integer width of the expression so signed and
 	// unsigned values keep their expected quotient semantics.
-	switch (kind == TypeRef::UNTYPED_INT ? TypeRef::I32 : kind) {
-		case TypeRef::I8: return BytecodeOp::DIV_I8;
-		case TypeRef::U8: return BytecodeOp::DIV_U8;
-		case TypeRef::I16: return BytecodeOp::DIV_I16;
-		case TypeRef::U16: return BytecodeOp::DIV_U16;
-		case TypeRef::I32: return BytecodeOp::DIV_I32;
-		case TypeRef::U32: return BytecodeOp::DIV_U32;
-		case TypeRef::I64: return BytecodeOp::DIV_I64;
-		case TypeRef::U64: return BytecodeOp::DIV_U64;
+	switch (kind == LS_TYPE_UNTYPED_INT ? LS_TYPE_I32 : kind) {
+		case LS_TYPE_I8: return BytecodeOp::DIV_I8;
+		case LS_TYPE_U8: return BytecodeOp::DIV_U8;
+		case LS_TYPE_I16: return BytecodeOp::DIV_I16;
+		case LS_TYPE_U16: return BytecodeOp::DIV_U16;
+		case LS_TYPE_I32: return BytecodeOp::DIV_I32;
+		case LS_TYPE_U32: return BytecodeOp::DIV_U32;
+		case LS_TYPE_I64: return BytecodeOp::DIV_I64;
+		case LS_TYPE_U64: return BytecodeOp::DIV_U64;
 		default: ASSERT(false); return BytecodeOp::DIV_I32;
 	}
 }
 
-static BytecodeOp integerModOp(TypeRef::Kind kind) {
+static BytecodeOp integerModOp(ls_type_kind kind) {
 	// Modulo is only emitted for integral expressions, but still needs width
 	// specialization so the runtime can use the correct signedness.
-	switch (kind == TypeRef::UNTYPED_INT ? TypeRef::I32 : kind) {
-		case TypeRef::I8: return BytecodeOp::MOD_I8;
-		case TypeRef::U8: return BytecodeOp::MOD_U8;
-		case TypeRef::I16: return BytecodeOp::MOD_I16;
-		case TypeRef::U16: return BytecodeOp::MOD_U16;
-		case TypeRef::I32: return BytecodeOp::MOD_I32;
-		case TypeRef::U32: return BytecodeOp::MOD_U32;
-		case TypeRef::I64: return BytecodeOp::MOD_I64;
-		case TypeRef::U64: return BytecodeOp::MOD_U64;
+	switch (kind == LS_TYPE_UNTYPED_INT ? LS_TYPE_I32 : kind) {
+		case LS_TYPE_I8: return BytecodeOp::MOD_I8;
+		case LS_TYPE_U8: return BytecodeOp::MOD_U8;
+		case LS_TYPE_I16: return BytecodeOp::MOD_I16;
+		case LS_TYPE_U16: return BytecodeOp::MOD_U16;
+		case LS_TYPE_I32: return BytecodeOp::MOD_I32;
+		case LS_TYPE_U32: return BytecodeOp::MOD_U32;
+		case LS_TYPE_I64: return BytecodeOp::MOD_I64;
+		case LS_TYPE_U64: return BytecodeOp::MOD_U64;
 		default: ASSERT(false); return BytecodeOp::MOD_I32;
 	}
 }
 
-static BytecodeOp floatMulOp(TypeRef::Kind kind) {
+static BytecodeOp floatMulOp(ls_type_kind kind) {
 	// Floating-point ops use the same width split so f32 and f64 stay distinct.
-	switch (kind == TypeRef::UNTYPED_FLOAT ? TypeRef::F32 : kind) {
-		case TypeRef::F32: return BytecodeOp::MUL_F32;
-		case TypeRef::F64: return BytecodeOp::MUL_F64;
+	switch (kind == LS_TYPE_UNTYPED_FLOAT ? LS_TYPE_F32 : kind) {
+		case LS_TYPE_F32: return BytecodeOp::MUL_F32;
+		case LS_TYPE_F64: return BytecodeOp::MUL_F64;
 		default: ASSERT(false); return BytecodeOp::MUL_F32;
 	}
 }
 
-static BytecodeOp floatDivOp(TypeRef::Kind kind) {
+static BytecodeOp floatDivOp(ls_type_kind kind) {
 	// Float division is the direct runtime `/` operator on the concrete type.
-	switch (kind == TypeRef::UNTYPED_FLOAT ? TypeRef::F32 : kind) {
-		case TypeRef::F32: return BytecodeOp::DIV_F32;
-		case TypeRef::F64: return BytecodeOp::DIV_F64;
+	switch (kind == LS_TYPE_UNTYPED_FLOAT ? LS_TYPE_F32 : kind) {
+		case LS_TYPE_F32: return BytecodeOp::DIV_F32;
+		case LS_TYPE_F64: return BytecodeOp::DIV_F64;
 		default: ASSERT(false); return BytecodeOp::DIV_F32;
 	}
 }
 
-static BytecodeOp bytecodeCompoundArithmeticOp(Token::Type op, TypeRef::Kind kind) {
+static BytecodeOp bytecodeCompoundArithmeticOp(Token::Type op, ls_type_kind kind) {
 	// Compound assignment shares the same operator mapping as the plain binary
 	// expression form; the only difference is that the caller arranges the load
 	// and store around the arithmetic opcode returned here.
@@ -360,37 +359,37 @@ static BytecodeOp bytecodeCompoundArithmeticOp(Token::Type op, TypeRef::Kind kin
 	return BytecodeOp::ADD_I32;
 }
 
-static BytecodeOp integerLoadConstOp(TypeRef::Kind kind) {
+static BytecodeOp integerLoadConstOp(ls_type_kind kind) {
 	// Constants are specialized by width so the VM knows how many bytes to read.
-	switch (kind == TypeRef::UNTYPED_INT ? TypeRef::I32 : kind) {
-		case TypeRef::I8:
-		case TypeRef::U8: return BytecodeOp::LOAD_CONST8;
-		case TypeRef::I16:
-		case TypeRef::U16: return BytecodeOp::LOAD_CONST16;
-		case TypeRef::I32:
-		case TypeRef::U32: return BytecodeOp::LOAD_CONST32;
-		case TypeRef::I64:
-		case TypeRef::U64: return BytecodeOp::LOAD_CONST64;
+	switch (kind == LS_TYPE_UNTYPED_INT ? LS_TYPE_I32 : kind) {
+		case LS_TYPE_I8:
+		case LS_TYPE_U8: return BytecodeOp::LOAD_CONST8;
+		case LS_TYPE_I16:
+		case LS_TYPE_U16: return BytecodeOp::LOAD_CONST16;
+		case LS_TYPE_I32:
+		case LS_TYPE_U32: return BytecodeOp::LOAD_CONST32;
+		case LS_TYPE_I64:
+		case LS_TYPE_U64: return BytecodeOp::LOAD_CONST64;
 		default: ASSERT(false); return BytecodeOp::LOAD_CONST32;
 	}
 }
 
-static bool isBytecodeBooleanType(TypeRef::Kind kind) {
-	return kind == TypeRef::BOOL;
+static bool isBytecodeBooleanType(ls_type_kind kind) {
+	return kind == LS_TYPE_BOOL;
 }
 
-static bool isBytecodeComparisonType(TypeRef::Kind kind) {
+static bool isBytecodeComparisonType(ls_type_kind kind) {
 	// Comparisons are allowed on booleans and integer-like values.
-	return kind == TypeRef::UNTYPED_INT || kind == TypeRef::ENUM || isBytecodeIntegralType(kind) || isBytecodeFloatType(kind) || isBytecodeBooleanType(kind);
+	return kind == LS_TYPE_UNTYPED_INT || kind == LS_TYPE_ENUM || isBytecodeIntegralType(kind) || isBytecodeFloatType(kind) || isBytecodeBooleanType(kind);
 }
 
-static TypeRef::Kind bytecodeComparisonKind(TypeRef::Kind kind) {
+static ls_type_kind bytecodeComparisonKind(ls_type_kind kind) {
 	switch (kind) {
-		case TypeRef::UNTYPED_INT:
-		case TypeRef::ENUM:
-			return TypeRef::I32;
-		case TypeRef::UNTYPED_FLOAT:
-			return TypeRef::F32;
+		case LS_TYPE_UNTYPED_INT:
+		case LS_TYPE_ENUM:
+			return LS_TYPE_I32;
+		case LS_TYPE_UNTYPED_FLOAT:
+			return LS_TYPE_F32;
 		default:
 			return kind;
 	}
@@ -471,7 +470,7 @@ static bool bytecodeCompileStmt(Module& module, ls_bytecode& bytecode, BytecodeC
 static bool bytecodeCompileComparisonExpr(Module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, Expr& expr) {
 	// The left operand decides the compare width. We emit both values first, then
 	// append the comparison opcode and a one-byte type tag for the VM.
-	const TypeRef::Kind left_kind = expr.left >= 0 ? module.expressions[expr.left].type.kind : TypeRef::INVALID;
+	const ls_type_kind left_kind = expr.left >= 0 ? module.expressions[expr.left].type.kind : LS_TYPE_INVALID;
 	if ((expr.token.type == Token::EQUAL_EQUAL || expr.token.type == Token::BANG_EQUAL)
 		&& ((expr.left >= 0 && module.expressions[expr.left].kind == Expr::NULL_LITERAL)
 			|| (expr.right >= 0 && module.expressions[expr.right].kind == Expr::NULL_LITERAL))) {
@@ -496,13 +495,13 @@ static bool bytecodeCompileComparisonExpr(Module& module, ls_bytecode& bytecode,
 		pushCode(bytecode, BytecodeOp::LOAD_CONST8);
 		pushCode(bytecode, (u8)0);
 		pushCode(bytecode, expr.token.type == Token::EQUAL_EQUAL ? BytecodeOp::CMP_EQ : BytecodeOp::CMP_NE);
-		pushCode(bytecode, (u8)TypeRef::BOOL);
+		pushCode(bytecode, (u8)LS_TYPE_BOOL);
 		return true;
 	}
 	if (!isBytecodeComparisonType(left_kind)) return false;
 	if (!bytecodeCompileExpr(module, bytecode, ctx, expr.left)) return false;
 	if (!bytecodeCompileExpr(module, bytecode, ctx, expr.right)) return false;
-	const TypeRef::Kind compare_kind = bytecodeComparisonKind(left_kind);
+	const ls_type_kind compare_kind = bytecodeComparisonKind(left_kind);
 	if (expr.token.type == Token::GT) pushCode(bytecode, BytecodeOp::CMP_GT);
 	else if (expr.token.type == Token::LT) pushCode(bytecode, BytecodeOp::CMP_LT);
 	else if (expr.token.type == Token::GT_EQUAL) pushCode(bytecode, BytecodeOp::CMP_GE);
@@ -743,7 +742,7 @@ static bool bytecodeResolveValueAccessByExpr(Module& module, BytecodeCompileCont
 		// actual load/store will happen indirectly later.
 		BytecodeValueAccess base = {};
 		if (!bytecodeResolveValueAccess(module, ctx, expr.left, &base)) return false;
-		if (base.type.kind != TypeRef::STRUCT) return false;
+		if (base.type.kind != LS_TYPE_STRUCT) return false;
 		i32 field_offset = 0;
 		TypeRef field_type;
 		if (!bytecodeStructFieldOffset(module, base.type, expr.name, &field_offset, &field_type)) return false;
@@ -759,7 +758,7 @@ static bool bytecodeResolveValueAccessByExpr(Module& module, BytecodeCompileCont
 	if (expr.kind == Expr::INDEX) {
 		BytecodeValueAccess base = {};
 		if (!bytecodeResolveValueAccess(module, ctx, expr.left, &base)) return false;
-		if (base.type.kind != TypeRef::ARRAY) return false;
+		if (base.type.kind != LS_TYPE_ARRAY) return false;
 		i64 index_value = 0;
 		if (!bytecodeGetCompileTimeInteger(module, expr.right, &index_value)) return false;
 		if (index_value < 0 || index_value >= base.type.array_size) return false;
@@ -819,7 +818,7 @@ static bool bytecodeEmitRuntimeIndexedAccess(
 	// eventual load/store that follows.
 	BytecodeValueAccess base = {};
 	if (!bytecodeResolveValueAccess(module, ctx, expr.left, &base)) return false;
-	if (base.type.kind != TypeRef::ARRAY) return false;
+	if (base.type.kind != LS_TYPE_ARRAY) return false;
 	TypeRef element_type(base.type.element_kind, base.type.element_name, base.type.struct_index, base.type.token, false);
 	const i32 element_slot_count = bytecodeTypeSlotCount(module, element_type);
 	if (element_slot_count <= 0) return false;
@@ -1000,42 +999,42 @@ static bool bytecodeEmitFunctionValue(ls_bytecode& bytecode, i32 index) {
 	return true;
 }
 
-static bool bytecodeEmitZeroValue(ls_bytecode& bytecode, TypeRef::Kind kind) {
+static bool bytecodeEmitZeroValue(ls_bytecode& bytecode, ls_type_kind kind) {
 	// Unary minus is lowered as `0 - value`, so we need a typed zero literal
 	// that matches the expression width before the existing arithmetic opcodes
 	// can do the rest.
 	switch (kind) {
-		case TypeRef::BOOL:
-		case TypeRef::I8:
-		case TypeRef::U8:
-		case TypeRef::ENUM:
+		case LS_TYPE_BOOL:
+		case LS_TYPE_I8:
+		case LS_TYPE_U8:
+		case LS_TYPE_ENUM:
 			pushCode(bytecode, BytecodeOp::LOAD_CONST8);
 			pushCode(bytecode, (u8)0);
 			return true;
-		case TypeRef::I16:
-		case TypeRef::U16:
+		case LS_TYPE_I16:
+		case LS_TYPE_U16:
 			pushCode(bytecode, BytecodeOp::LOAD_CONST16);
 			pushCode(bytecode, (u16)0);
 			return true;
-		case TypeRef::I32:
-		case TypeRef::U32:
-		case TypeRef::UNTYPED_INT:
+		case LS_TYPE_I32:
+		case LS_TYPE_U32:
+		case LS_TYPE_UNTYPED_INT:
 			pushCode(bytecode, BytecodeOp::LOAD_CONST32);
 			pushCode(bytecode, (u32)0);
 			return true;
-		case TypeRef::I64:
-		case TypeRef::U64:
+		case LS_TYPE_I64:
+		case LS_TYPE_U64:
 			pushCode(bytecode, BytecodeOp::LOAD_CONST64);
 			pushCode(bytecode, (u64)0);
 			return true;
-		case TypeRef::F32:
-		case TypeRef::UNTYPED_FLOAT: {
+		case LS_TYPE_F32:
+		case LS_TYPE_UNTYPED_FLOAT: {
 			float zero = 0.0f;
 			pushCode(bytecode, BytecodeOp::LOAD_CONST32);
 			pushCode(bytecode, zero);
 			return true;
 		}
-		case TypeRef::F64: {
+		case LS_TYPE_F64: {
 			double zero = 0.0;
 			pushCode(bytecode, BytecodeOp::LOAD_CONST64);
 			pushCode(bytecode, zero);
@@ -1046,7 +1045,7 @@ static bool bytecodeEmitZeroValue(ls_bytecode& bytecode, TypeRef::Kind kind) {
 	}
 }
 
-static bool bytecodeEmitCastValue(ls_bytecode& bytecode, TypeRef::Kind src_kind, TypeRef::Kind dst_kind) {
+static bool bytecodeEmitCastValue(ls_bytecode& bytecode, ls_type_kind src_kind, ls_type_kind dst_kind) {
 	pushCode(bytecode, BytecodeOp::CAST);
 	pushCode(bytecode, (u8)bytecodeCastKind(src_kind));
 	pushCode(bytecode, (u8)bytecodeCastKind(dst_kind));
@@ -1143,7 +1142,7 @@ static bool bytecodeCompileMatchStmt(Module& module, ls_bytecode& bytecode, Byte
 			pushCode(bytecode, BytecodeOp::LOAD_LOCAL);
 			pushCode(bytecode, (u8)subject_slot);
 			if (!bytecodeCompileExpr(module, bytecode, ctx, pattern.start_expr)) return false;
-			const TypeRef::Kind compare_kind = bytecodeComparisonKind(subject_type.kind);
+			const ls_type_kind compare_kind = bytecodeComparisonKind(subject_type.kind);
 			pushCode(bytecode, pattern.kind == MatchPattern::RANGE ? BytecodeOp::CMP_GE : BytecodeOp::CMP_EQ);
 			pushCode(bytecode, (u8)compare_kind);
 			size_t false_jump = 0;
@@ -1205,7 +1204,7 @@ static bool bytecodeCompileExpr(Module& module, ls_bytecode& bytecode, BytecodeC
 		case Expr::NUMBER: {
 			// Numeric literals are lowered as typed loads with the narrowest
 			// runtime operand that preserves the compile-time type.
-			const TypeRef::Kind kind = expr.type.kind == TypeRef::UNTYPED_INT ? TypeRef::I32 : expr.type.kind;
+			const ls_type_kind kind = expr.type.kind == LS_TYPE_UNTYPED_INT ? LS_TYPE_I32 : expr.type.kind;
 			if (isBytecodeIntegralType(kind)) {
 				pushCode(bytecode, integerLoadConstOp(kind));
 				const u64 raw = encodeIntegerLiteral(expr.number, kind);
@@ -1218,7 +1217,7 @@ static bool bytecodeCompileExpr(Module& module, ls_bytecode& bytecode, BytecodeC
 			if (isBytecodeFloatType(kind)) {
 				pushCode(bytecode, floatLoadConstOp(kind));
 				const size_t s = bytecode.code.size();
-				if ((kind == TypeRef::UNTYPED_FLOAT ? TypeRef::F32 : kind) == TypeRef::F32) {
+				if ((kind == LS_TYPE_UNTYPED_FLOAT ? LS_TYPE_F32 : kind) == LS_TYPE_F32) {
 					const float value = (float)expr.number;
 					bytecode.code.resize(s + sizeof(value));
 					memcpy(&bytecode.code[s], &value, sizeof(value));
@@ -1243,7 +1242,7 @@ static bool bytecodeCompileExpr(Module& module, ls_bytecode& bytecode, BytecodeC
 		case Expr::NULL_LITERAL:
 			return expected && expected->nullable ? bytecodeEmitNullValue(module, bytecode, *expected) : false;
 		case Expr::ENUM_LITERAL: {
-			if (expr.type.kind != TypeRef::ENUM) return false;
+			if (expr.type.kind != LS_TYPE_ENUM) return false;
 			i32 enum_idx = expr.type.struct_index;
 			if (enum_idx < 0 || enum_idx >= module.enums.size()) {
 				enum_idx = -1;
@@ -1501,7 +1500,7 @@ static bool bytecodeCompileExpr(Module& module, ls_bytecode& bytecode, BytecodeC
 			}
 
 			TypeRef callee_type = module.expressions[expr.left].type;
-			if (callee_type.kind != TypeRef::FUNCTION || callee_type.struct_index < 0 || callee_type.struct_index >= module.function_types.size()) return false;
+			if (callee_type.kind != LS_TYPE_FUNCTION || callee_type.struct_index < 0 || callee_type.struct_index >= module.function_types.size()) return false;
 			FunctionTypeDecl& fn_type = module.function_types[callee_type.struct_index];
 			if (fn_type.params.size() != expr.args.size()) return false;
 			if (!bytecodeCompileExpr(module, bytecode, ctx, expr.left, &callee_type)) return false;
@@ -1548,7 +1547,7 @@ static bool bytecodeCompileStmt(Module& module, ls_bytecode& bytecode, BytecodeC
 			// Declarations evaluate the initializer first, then store the result in
 			// the newly allocated local slot range.
 			TypeRef type = stmt.type;
-			if (type.kind == TypeRef::INVALID) return false;
+			if (type.kind == LS_TYPE_INVALID) return false;
 			const i32 slot_count = bytecodeTypeSlotCount(module, type);
 			if (slot_count <= 0) return false;
 			const i32 local_slot = ctx.local_count;

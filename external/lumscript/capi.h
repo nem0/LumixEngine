@@ -131,7 +131,6 @@ typedef struct ls_host {
 // around; all ownership and implementation details remain inside LumScript.
 typedef struct ls_module ls_module;
 typedef struct ls_bytecode ls_bytecode;
-typedef struct ls_runtime ls_runtime;
 
 // Module lifetime.
 //
@@ -243,7 +242,7 @@ int ls_bytecode_runtime_call_index(
 	size_t result_count
 );
 
-// Query the declared return type of the most recent call to `function_name`.
+// Query the declared return type of the function named `function_name`.
 // Callers can then read the value from the runtime stack using the `ls_to_*`
 // helpers with index `-1`.
 ls_type_kind ls_bytecode_runtime_result_kind(ls_runtime* runtime, ls_string_view function_name);

@@ -2,8 +2,6 @@
 
 #include <new>
 #include <type_traits>
-
-#include "ast.h"
 #include "string_utils.h"
 
 ls_runtime::ls_runtime(ls_bytecode* bytecode_)
@@ -118,46 +116,46 @@ static inline bool bytecodeMod(ls_runtime& runtime) {
 }
 
 template <typename Src>
-static inline bool bytecodeCastFrom(ls_runtime& runtime, TypeRef::Kind dst_kind) {
+static inline bool bytecodeCastFrom(ls_runtime& runtime, ls_type_kind dst_kind) {
 	const Src src = popStack<Src>(runtime);
 	switch (dst_kind) {
-		case TypeRef::BOOL: pushStack(runtime, (u8)(src != Src{})); return true;
-		case TypeRef::I8: pushStack(runtime, (i8)src); return true;
-		case TypeRef::U8: pushStack(runtime, (u8)src); return true;
-		case TypeRef::I16: pushStack(runtime, (i16)src); return true;
-		case TypeRef::U16: pushStack(runtime, (u16)src); return true;
-		case TypeRef::I32: case TypeRef::ENUM: pushStack(runtime, (i32)src); return true;
-		case TypeRef::U32: pushStack(runtime, (u32)src); return true;
-		case TypeRef::I64: pushStack(runtime, (i64)src); return true;
-		case TypeRef::U64: pushStack(runtime, (u64)src); return true;
-		case TypeRef::F32: pushStack(runtime, (float)src); return true;
-		case TypeRef::F64: pushStack(runtime, (double)src); return true;
+		case LS_TYPE_BOOL: pushStack(runtime, (u8)(src != Src{})); return true;
+		case LS_TYPE_I8: pushStack(runtime, (i8)src); return true;
+		case LS_TYPE_U8: pushStack(runtime, (u8)src); return true;
+		case LS_TYPE_I16: pushStack(runtime, (i16)src); return true;
+		case LS_TYPE_U16: pushStack(runtime, (u16)src); return true;
+		case LS_TYPE_I32: case LS_TYPE_ENUM: pushStack(runtime, (i32)src); return true;
+		case LS_TYPE_U32: pushStack(runtime, (u32)src); return true;
+		case LS_TYPE_I64: pushStack(runtime, (i64)src); return true;
+		case LS_TYPE_U64: pushStack(runtime, (u64)src); return true;
+		case LS_TYPE_F32: pushStack(runtime, (float)src); return true;
+		case LS_TYPE_F64: pushStack(runtime, (double)src); return true;
 		default: return false;
 	}
 }
 
-static inline TypeRef::Kind bytecodeCastKind(TypeRef::Kind kind) {
+static inline ls_type_kind bytecodeCastKind(ls_type_kind kind) {
 	switch (kind) {
-		case TypeRef::ENUM:
-		case TypeRef::UNTYPED_INT: return TypeRef::I32;
-		case TypeRef::UNTYPED_FLOAT: return TypeRef::F32;
+		case LS_TYPE_ENUM:
+		case LS_TYPE_UNTYPED_INT: return LS_TYPE_I32;
+		case LS_TYPE_UNTYPED_FLOAT: return LS_TYPE_F32;
 		default: return kind;
 	}
 }
 
-static bool bytecodeCastByType(ls_runtime& runtime, u8 src_kind, u8 dst_kind) {
-	switch (bytecodeCastKind(TypeRef::Kind(src_kind))) {
-		case TypeRef::BOOL: return bytecodeCastFrom<u8>(runtime, bytecodeCastKind(TypeRef::Kind(dst_kind)));
-		case TypeRef::I8: return bytecodeCastFrom<i8>(runtime, bytecodeCastKind(TypeRef::Kind(dst_kind)));
-		case TypeRef::U8: return bytecodeCastFrom<u8>(runtime, bytecodeCastKind(TypeRef::Kind(dst_kind)));
-		case TypeRef::I16: return bytecodeCastFrom<i16>(runtime, bytecodeCastKind(TypeRef::Kind(dst_kind)));
-		case TypeRef::U16: return bytecodeCastFrom<u16>(runtime, bytecodeCastKind(TypeRef::Kind(dst_kind)));
-		case TypeRef::I32: return bytecodeCastFrom<i32>(runtime, bytecodeCastKind(TypeRef::Kind(dst_kind)));
-		case TypeRef::U32: return bytecodeCastFrom<u32>(runtime, bytecodeCastKind(TypeRef::Kind(dst_kind)));
-		case TypeRef::I64: return bytecodeCastFrom<i64>(runtime, bytecodeCastKind(TypeRef::Kind(dst_kind)));
-		case TypeRef::U64: return bytecodeCastFrom<u64>(runtime, bytecodeCastKind(TypeRef::Kind(dst_kind)));
-		case TypeRef::F32: return bytecodeCastFrom<float>(runtime, bytecodeCastKind(TypeRef::Kind(dst_kind)));
-		case TypeRef::F64: return bytecodeCastFrom<double>(runtime, bytecodeCastKind(TypeRef::Kind(dst_kind)));
+static bool bytecodeCastByType(ls_runtime& runtime, ls_type_kind src_kind, ls_type_kind dst_kind) {
+	switch (bytecodeCastKind(src_kind)) {
+		case LS_TYPE_BOOL: return bytecodeCastFrom<u8>(runtime, bytecodeCastKind(dst_kind));
+		case LS_TYPE_I8: return bytecodeCastFrom<i8>(runtime, bytecodeCastKind(dst_kind));
+		case LS_TYPE_U8: return bytecodeCastFrom<u8>(runtime, bytecodeCastKind(dst_kind));
+		case LS_TYPE_I16: return bytecodeCastFrom<i16>(runtime, bytecodeCastKind(dst_kind));
+		case LS_TYPE_U16: return bytecodeCastFrom<u16>(runtime, bytecodeCastKind(dst_kind));
+		case LS_TYPE_I32: return bytecodeCastFrom<i32>(runtime, bytecodeCastKind(dst_kind));
+		case LS_TYPE_U32: return bytecodeCastFrom<u32>(runtime, bytecodeCastKind(dst_kind));
+		case LS_TYPE_I64: return bytecodeCastFrom<i64>(runtime, bytecodeCastKind(dst_kind));
+		case LS_TYPE_U64: return bytecodeCastFrom<u64>(runtime, bytecodeCastKind(dst_kind));
+		case LS_TYPE_F32: return bytecodeCastFrom<float>(runtime, bytecodeCastKind(dst_kind));
+		case LS_TYPE_F64: return bytecodeCastFrom<double>(runtime, bytecodeCastKind(dst_kind));
 		default: return false;
 	}
 }
@@ -170,21 +168,21 @@ static inline void bytecodeCompare(ls_runtime& runtime, Compare cmp) {
 }
 
 template <typename Compare>
-static bool bytecodeCompareByType(ls_runtime& runtime, u8 kind, Compare cmp) {
-	switch (TypeRef::Kind(kind)) {
-		case TypeRef::BOOL:
-		case TypeRef::U8: bytecodeCompare<u8>(runtime, cmp); return true;
-		case TypeRef::I8: bytecodeCompare<i8>(runtime, cmp); return true;
-		case TypeRef::U16: bytecodeCompare<u16>(runtime, cmp); return true;
-		case TypeRef::I16: bytecodeCompare<i16>(runtime, cmp); return true;
-		case TypeRef::U32: bytecodeCompare<u32>(runtime, cmp); return true;
-		case TypeRef::I32:
-		case TypeRef::ENUM:
-		case TypeRef::UNTYPED_INT: bytecodeCompare<i32>(runtime, cmp); return true;
-		case TypeRef::U64: bytecodeCompare<u64>(runtime, cmp); return true;
-		case TypeRef::I64: bytecodeCompare<i64>(runtime, cmp); return true;
-		case TypeRef::F32: bytecodeCompare<float>(runtime, cmp); return true;
-		case TypeRef::F64: bytecodeCompare<double>(runtime, cmp); return true;
+static bool bytecodeCompareByType(ls_runtime& runtime, ls_type_kind kind, Compare cmp) {
+	switch (kind) {
+		case LS_TYPE_BOOL:
+		case LS_TYPE_U8: bytecodeCompare<u8>(runtime, cmp); return true;
+		case LS_TYPE_I8: bytecodeCompare<i8>(runtime, cmp); return true;
+		case LS_TYPE_U16: bytecodeCompare<u16>(runtime, cmp); return true;
+		case LS_TYPE_I16: bytecodeCompare<i16>(runtime, cmp); return true;
+		case LS_TYPE_U32: bytecodeCompare<u32>(runtime, cmp); return true;
+		case LS_TYPE_I32:
+		case LS_TYPE_ENUM:
+		case LS_TYPE_UNTYPED_INT: bytecodeCompare<i32>(runtime, cmp); return true;
+		case LS_TYPE_U64: bytecodeCompare<u64>(runtime, cmp); return true;
+		case LS_TYPE_I64: bytecodeCompare<i64>(runtime, cmp); return true;
+		case LS_TYPE_F32: bytecodeCompare<float>(runtime, cmp); return true;
+		case LS_TYPE_F64: bytecodeCompare<double>(runtime, cmp); return true;
 		default: return false;
 	}
 }
@@ -516,43 +514,43 @@ static bool callBytecodeCode(
 				++ip;
 				const u8 dst_kind = *ip;
 				++ip;
-				if (!bytecodeCastByType(*runtime, src_kind, dst_kind)) return false;
+				if (!bytecodeCastByType(*runtime, (ls_type_kind)src_kind, (ls_type_kind)dst_kind)) return false;
 				break;
 			}
 			case BytecodeOp::CMP_EQ: {
 				const u8 kind = *ip;
 				++ip;
-				if (!bytecodeCompareByType(*runtime, kind, [](auto lhs, auto rhs) { return lhs == rhs; })) return false;
+				if (!bytecodeCompareByType(*runtime, (ls_type_kind)kind, [](auto lhs, auto rhs) { return lhs == rhs; })) return false;
 				break;
 			}
 			case BytecodeOp::CMP_NE: {
 				const u8 kind = *ip;
 				++ip;
-				if (!bytecodeCompareByType(*runtime, kind, [](auto lhs, auto rhs) { return lhs != rhs; })) return false;
+				if (!bytecodeCompareByType(*runtime, (ls_type_kind)kind, [](auto lhs, auto rhs) { return lhs != rhs; })) return false;
 				break;
 			}
 			case BytecodeOp::CMP_GT: {
 				const u8 kind = *ip;
 				++ip;
-				if (!bytecodeCompareByType(*runtime, kind, [](auto lhs, auto rhs) { return lhs > rhs; })) return false;
+				if (!bytecodeCompareByType(*runtime, (ls_type_kind)kind, [](auto lhs, auto rhs) { return lhs > rhs; })) return false;
 				break;
 			}
 			case BytecodeOp::CMP_GE: {
 				const u8 kind = *ip;
 				++ip;
-				if (!bytecodeCompareByType(*runtime, kind, [](auto lhs, auto rhs) { return lhs >= rhs; })) return false;
+				if (!bytecodeCompareByType(*runtime, (ls_type_kind)kind, [](auto lhs, auto rhs) { return lhs >= rhs; })) return false;
 				break;
 			}
 			case BytecodeOp::CMP_LT: {
 				const u8 kind = *ip;
 				++ip;
-				if (!bytecodeCompareByType(*runtime, kind, [](auto lhs, auto rhs) { return lhs < rhs; })) return false;
+				if (!bytecodeCompareByType(*runtime, (ls_type_kind)kind, [](auto lhs, auto rhs) { return lhs < rhs; })) return false;
 				break;
 			}
 			case BytecodeOp::CMP_LE: {
 				const u8 kind = *ip;
 				++ip;
-				if (!bytecodeCompareByType(*runtime, kind, [](auto lhs, auto rhs) { return lhs <= rhs; })) return false;
+				if (!bytecodeCompareByType(*runtime, (ls_type_kind)kind, [](auto lhs, auto rhs) { return lhs <= rhs; })) return false;
 				break;
 			}
 			case BytecodeOp::RETURN:

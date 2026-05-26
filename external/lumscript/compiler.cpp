@@ -5,6 +5,26 @@
 #include "ast.h"
 #include "compiler.h"
 
+static NativeFunctionDecl& addNativeFunction(
+	Module& module,
+	ls_string_view name,
+	TypeRef return_type,
+	std::span<const TypeRef> param_types,
+	NativeCallback callback,
+	void* userdata = nullptr
+) {
+	NativeFunctionDecl& fn = module.native_functions.emplace_back();
+	fn.name = name;
+	fn.return_type = return_type;
+	fn.callback = callback;
+	fn.userdata = userdata;
+	for (TypeRef type : param_types) {
+		Param& param = fn.params.emplace_back();
+		param.type = type;
+	}
+	return fn;
+}
+
 struct LocalInfo {
 	ls_string_view name;
 	TypeRef type;
@@ -145,12 +165,12 @@ struct Checker {
 	}
 
 	bool sameResolvedType(TypeRef a, TypeRef b) const {
-		if (a.kind == TypeRef::FUNCTION || b.kind == TypeRef::FUNCTION) return functionTypesEqual(a, b);
+		if (a.kind == LS_TYPE_FUNCTION || b.kind == LS_TYPE_FUNCTION) return functionTypesEqual(a, b);
 		return sameBaseType(a, b);
 	}
 
 	bool functionTypesEqual(TypeRef a, TypeRef b) const {
-		if (a.kind != TypeRef::FUNCTION || b.kind != TypeRef::FUNCTION) return false;
+		if (a.kind != LS_TYPE_FUNCTION || b.kind != LS_TYPE_FUNCTION) return false;
 		if (a.struct_index < 0 || a.struct_index >= m_module.function_types.size()) return false;
 		if (b.struct_index < 0 || b.struct_index >= m_module.function_types.size()) return false;
 		const FunctionTypeDecl& fa = m_module.function_types[a.struct_index];
@@ -171,12 +191,12 @@ struct Checker {
 			for (u32 j = 0; same && j < params.size(); ++j) {
 				same = sameResolvedType(existing.params[j], params[j].type);
 			}
-			if (same) return {TypeRef::FUNCTION, {}, i, token};
+			if (same) return {LS_TYPE_FUNCTION, {}, i, token};
 		}
 		FunctionTypeDecl& fn_type = m_module.function_types.emplace_back();
 		for (const Param& p : params) fn_type.params.push_back(p.type);
 		fn_type.return_type = return_type;
-		return {TypeRef::FUNCTION, {}, (i32)m_module.function_types.size() - 1, token};
+		return {LS_TYPE_FUNCTION, {}, (i32)m_module.function_types.size() - 1, token};
 	}
 
 	TypeRef functionTypeFromFunction(FunctionDecl& fn) {
@@ -214,8 +234,8 @@ struct Checker {
 
 	ls_string_view getTypeNamespace(TypeRef type) const {
 		ls_string_view type_name = type.name;
-		if (type.kind == TypeRef::NATIVE && type.struct_index >= 0) type_name = m_module.native_types[type.struct_index].name;
-		else if (type.kind == TypeRef::NATIVE) {
+		if (type.kind == LS_TYPE_NATIVE && type.struct_index >= 0) type_name = m_module.native_types[type.struct_index].name;
+		else if (type.kind == LS_TYPE_NATIVE) {
 			for (const NativeTypeDecl& native_type : m_module.native_types) {
 				if (!equalStrings(native_type.id, type.name)) continue;
 				type_name = native_type.name;
@@ -283,7 +303,7 @@ struct Checker {
 		}
 		e.kind = Expr::ENUM_LITERAL;
 		e.name = member_name;
-		e.type = {TypeRef::ENUM, enum_name, enum_idx};
+		e.type = {LS_TYPE_ENUM, enum_name, enum_idx};
 		return true;
 	}
 
@@ -332,25 +352,25 @@ struct Checker {
 	}
 
 	void resolveType(TypeRef& type) {
-		if (type.kind == TypeRef::ARRAY) {
+		if (type.kind == LS_TYPE_ARRAY) {
 			TypeRef elem(type.element_kind, type.element_name, type.struct_index, type.token, false);
 			resolveType(elem);
 			type.element_kind = elem.kind;
 			type.element_name = elem.name;
 			type.struct_index = elem.struct_index;
 		}
-		else if (type.kind == TypeRef::STRUCT) {
+		else if (type.kind == LS_TYPE_STRUCT) {
 			// First try to find as a struct
 			type.struct_index = findStruct(type.name);
 			if (type.struct_index < 0) {
 				// If not a struct, try to find as an enum
 				type.struct_index = findEnum(type.name);
 				if (type.struct_index >= 0) {
-					type.kind = TypeRef::ENUM;
+					type.kind = LS_TYPE_ENUM;
 				} else {
 					type.struct_index = findNativeType(type.name);
 					if (type.struct_index >= 0) {
-						type.kind = TypeRef::NATIVE;
+						type.kind = LS_TYPE_NATIVE;
 						type.name = m_module.native_types[type.struct_index].id;
 					}
 					else {
@@ -358,10 +378,10 @@ struct Checker {
 					}
 				}
 			}
-		} else if (type.kind == TypeRef::ENUM) {
+		} else if (type.kind == LS_TYPE_ENUM) {
 			type.struct_index = findEnum(type.name);
 			if (type.struct_index < 0) m_output.errorAt(type.token, "Unknown type '", type.name, "'");
-		} else if (type.kind == TypeRef::FUNCTION) {
+		} else if (type.kind == LS_TYPE_FUNCTION) {
 			if (type.struct_index < 0 || type.struct_index >= m_module.function_types.size()) {
 				m_output.errorAt(type.token, "Invalid function type");
 				return;
@@ -373,12 +393,12 @@ struct Checker {
 	}
 
 	bool canAssign(TypeRef dst, TypeRef src) const {
-		if (src.kind == TypeRef::NULL_VALUE) return dst.nullable;
-		if (dst.kind == TypeRef::NULL_VALUE) return src.kind == TypeRef::NULL_VALUE;
-		if (dst.kind == TypeRef::ARRAY || src.kind == TypeRef::ARRAY) return sameBaseType(dst, src);
-		if (src.kind == TypeRef::STRING) return dst.kind == TypeRef::STRING;
-		if (src.kind == TypeRef::UNTYPED_INT) return isNumeric(dst);
-		if (src.kind == TypeRef::UNTYPED_FLOAT) return isFloat(dst);
+		if (src.kind == LS_TYPE_NULL_VALUE) return dst.nullable;
+		if (dst.kind == LS_TYPE_NULL_VALUE) return src.kind == LS_TYPE_NULL_VALUE;
+		if (dst.kind == LS_TYPE_ARRAY || src.kind == LS_TYPE_ARRAY) return sameBaseType(dst, src);
+		if (src.kind == LS_TYPE_STRING) return dst.kind == LS_TYPE_STRING;
+		if (src.kind == LS_TYPE_UNTYPED_INT) return isNumeric(dst);
+		if (src.kind == LS_TYPE_UNTYPED_FLOAT) return isFloat(dst);
 		if (dst.nullable) {
 			if (src.nullable) return sameBaseType(dst, src);
 			TypeRef nonnull_dst = dst;
@@ -386,15 +406,15 @@ struct Checker {
 			return sameBaseType(nonnull_dst, src);
 		}
 		if (src.nullable) return false;
-		if (dst.kind == TypeRef::FUNCTION || src.kind == TypeRef::FUNCTION) return functionTypesEqual(dst, src);
+		if (dst.kind == LS_TYPE_FUNCTION || src.kind == LS_TYPE_FUNCTION) return functionTypesEqual(dst, src);
 		return sameBaseType(dst, src);
 	}
 
 	bool canCompare(TypeRef left, TypeRef right) const {
-		if (left.kind == TypeRef::NULL_VALUE || right.kind == TypeRef::NULL_VALUE) return true;
-		if (left.kind == TypeRef::ENUM || right.kind == TypeRef::ENUM) return sameBaseType(left, right);
-		if (left.kind == TypeRef::STRING || right.kind == TypeRef::STRING) return left.kind == TypeRef::STRING && right.kind == TypeRef::STRING;
-		if (left.kind == TypeRef::BOOL || right.kind == TypeRef::BOOL) return left.kind == TypeRef::BOOL && right.kind == TypeRef::BOOL;
+		if (left.kind == LS_TYPE_NULL_VALUE || right.kind == LS_TYPE_NULL_VALUE) return true;
+		if (left.kind == LS_TYPE_ENUM || right.kind == LS_TYPE_ENUM) return sameBaseType(left, right);
+		if (left.kind == LS_TYPE_STRING || right.kind == LS_TYPE_STRING) return left.kind == LS_TYPE_STRING && right.kind == LS_TYPE_STRING;
+		if (left.kind == LS_TYPE_BOOL || right.kind == LS_TYPE_BOOL) return left.kind == LS_TYPE_BOOL && right.kind == LS_TYPE_BOOL;
 		return isNumeric(left) && isNumeric(right) && sameBaseType(left, right);
 	}
 
@@ -445,24 +465,24 @@ struct Checker {
 	}
 
 	bool isScalar(TypeRef type) const {
-		return type.kind == TypeRef::BOOL
-			|| type.kind == TypeRef::I8 || type.kind == TypeRef::U8
-			|| type.kind == TypeRef::I16 || type.kind == TypeRef::U16
-			|| type.kind == TypeRef::I32 || type.kind == TypeRef::U32
-			|| type.kind == TypeRef::I64 || type.kind == TypeRef::U64
-			|| type.kind == TypeRef::F32 || type.kind == TypeRef::F64
-			|| type.kind == TypeRef::UNTYPED_INT || type.kind == TypeRef::UNTYPED_FLOAT;
+		return type.kind == LS_TYPE_BOOL
+			|| type.kind == LS_TYPE_I8 || type.kind == LS_TYPE_U8
+			|| type.kind == LS_TYPE_I16 || type.kind == LS_TYPE_U16
+			|| type.kind == LS_TYPE_I32 || type.kind == LS_TYPE_U32
+			|| type.kind == LS_TYPE_I64 || type.kind == LS_TYPE_U64
+			|| type.kind == LS_TYPE_F32 || type.kind == LS_TYPE_F64
+			|| type.kind == LS_TYPE_UNTYPED_INT || type.kind == LS_TYPE_UNTYPED_FLOAT;
 	}
 
 	bool isIntegral(TypeRef type) const {
-		return type.kind == TypeRef::I8 || type.kind == TypeRef::U8
-			|| type.kind == TypeRef::I16 || type.kind == TypeRef::U16
-			|| type.kind == TypeRef::I32 || type.kind == TypeRef::U32
-			|| type.kind == TypeRef::I64 || type.kind == TypeRef::U64;
+		return type.kind == LS_TYPE_I8 || type.kind == LS_TYPE_U8
+			|| type.kind == LS_TYPE_I16 || type.kind == LS_TYPE_U16
+			|| type.kind == LS_TYPE_I32 || type.kind == LS_TYPE_U32
+			|| type.kind == LS_TYPE_I64 || type.kind == LS_TYPE_U64;
 	}
 
 	bool isFloat(TypeRef type) const {
-		return type.kind == TypeRef::F32 || type.kind == TypeRef::F64;
+		return type.kind == LS_TYPE_F32 || type.kind == LS_TYPE_F64;
 	}
 
 	bool isNumeric(TypeRef type) const {
@@ -509,21 +529,21 @@ struct Checker {
 	}
 
 	TypeRef concreteNumberType(TypeRef type, const TypeRef* expected) const {
-		if (type.kind == TypeRef::UNTYPED_INT) {
+		if (type.kind == LS_TYPE_UNTYPED_INT) {
 			if (expected) {
 				TypeRef target = *expected;
 				target.nullable = false;
 				if (isNumeric(target)) return target;
 			}
-			return {TypeRef::I32, {}, -1};
+			return {LS_TYPE_I32, {}, -1};
 		}
-		if (type.kind == TypeRef::UNTYPED_FLOAT) {
+		if (type.kind == LS_TYPE_UNTYPED_FLOAT) {
 			if (expected) {
 				TypeRef target = *expected;
 				target.nullable = false;
 				if (isFloat(target)) return target;
 			}
-			return {TypeRef::F32, {}, -1};
+			return {LS_TYPE_F32, {}, -1};
 		}
 		return type;
 	}
@@ -599,24 +619,24 @@ struct Checker {
 		m_function_scope_starts.push_back(0);
 		for (GlobalDecl& global : m_module.globals) {
 			TypeRef type = global.type;
-			if (type.kind != TypeRef::INVALID) resolveType(type);
+			if (type.kind != LS_TYPE_INVALID) resolveType(type);
 			if (global.expr >= 0) {
-				TypeRef* expected = type.kind == TypeRef::INVALID ? nullptr : &type;
+				TypeRef* expected = type.kind == LS_TYPE_INVALID ? nullptr : &type;
 				TypeRef expr_type = checkExpr(global.expr, expected);
-				if (type.kind == TypeRef::INVALID) type = expr_type;
+				if (type.kind == LS_TYPE_INVALID) type = expr_type;
 				else if (!canAssign(type, expr_type)) m_output.errorAt(global.token, "Initializer type mismatch");
 			}
 			else if (global.is_undefined_init) {
 				if (global.is_const) m_output.errorAt(global.token, "Const declaration can not use undefined initializer");
-				if (type.kind == TypeRef::INVALID) m_output.errorAt(global.token, "Undefined initializer requires explicit type");
+				if (type.kind == LS_TYPE_INVALID) m_output.errorAt(global.token, "Undefined initializer requires explicit type");
 			}
-			else if (type.kind == TypeRef::INVALID) {
+			else if (type.kind == LS_TYPE_INVALID) {
 				m_output.errorAt(global.token, "Global variable needs type or initializer");
 			}
 			else {
 				m_output.errorAt(global.token, "Variable declaration requires initializer");
 			}
-			if (type.kind != TypeRef::INVALID) resolveType(type);
+			if (type.kind != LS_TYPE_INVALID) resolveType(type);
 			global.type = type;
 			LocalInfo& local = m_locals.emplace_back();
 			local.name = global.name;
@@ -633,7 +653,7 @@ struct Checker {
 				e.type = concreteNumberType(e.type, expected);
 				return e.type;
 			case Expr::STRING_LITERAL:
-				e.type = {TypeRef::STRING, {}, -1};
+				e.type = {LS_TYPE_STRING, {}, -1};
 				return e.type;
 			case Expr::BOOL_LITERAL: return e.type;
 			case Expr::NULL_LITERAL: return e.type;
@@ -701,7 +721,7 @@ struct Checker {
 					m_output.errorAt(e.token, "Nullable value must be checked for null");
 					return {};
 				}
-				if (base.kind != TypeRef::STRUCT || base.struct_index < 0) {
+				if (base.kind != LS_TYPE_STRUCT || base.struct_index < 0) {
 					m_output.errorAt(e.token, "Field access on non-struct");
 					return {};
 				}
@@ -721,12 +741,12 @@ struct Checker {
 					m_output.errorAt(e.token, "Nullable value must be checked for null");
 					return {};
 				}
-				if (base.kind != TypeRef::ARRAY) {
+				if (base.kind != LS_TYPE_ARRAY) {
 					m_output.errorAt(e.token, "Indexing requires array type");
 					return {};
 				}
 				TypeRef idx_type = checkExpr(e.right);
-				if (!isIntegral(idx_type) && idx_type.kind != TypeRef::UNTYPED_INT) {
+				if (!isIntegral(idx_type) && idx_type.kind != LS_TYPE_UNTYPED_INT) {
 					m_output.errorAt(e.token, "Array index must be integer");
 					return {};
 				}
@@ -744,7 +764,7 @@ struct Checker {
 					m_output.errorAt(e.token, "Nullable value must be checked for null");
 					return {};
 				}
-				if (e.token.type == Token::NOT) e.type = {TypeRef::BOOL, {}, -1};
+				if (e.token.type == Token::NOT) e.type = {LS_TYPE_BOOL, {}, -1};
 				else e.type = right;
 				return e.type;
 			}
@@ -759,16 +779,16 @@ struct Checker {
 				TypeRef left = checkExpr(e.left, operand_expected);
 				// For comparisons, pass the left operand's type as expected type to the right
 				TypeRef right = checkExpr(e.right, &left);
-				if (left.kind == TypeRef::STRING || right.kind == TypeRef::STRING) {
-					if (e.token.type != Token::PLUS || left.kind != TypeRef::STRING || right.kind != TypeRef::STRING) {
+				if (left.kind == LS_TYPE_STRING || right.kind == LS_TYPE_STRING) {
+					if (e.token.type != Token::PLUS || left.kind != LS_TYPE_STRING || right.kind != LS_TYPE_STRING) {
 						m_output.errorAt(e.token, "String operation requires string operands");
 						return {};
 					}
-					e.type = {TypeRef::STRING, {}, -1};
+					e.type = {LS_TYPE_STRING, {}, -1};
 					return e.type;
 				}
 				const bool is_eq = e.token.type == Token::EQUAL_EQUAL || e.token.type == Token::BANG_EQUAL;
-				const bool null_cmp = left.kind == TypeRef::NULL_VALUE || right.kind == TypeRef::NULL_VALUE;
+				const bool null_cmp = left.kind == LS_TYPE_NULL_VALUE || right.kind == LS_TYPE_NULL_VALUE;
 				if (!is_eq && (left.nullable || right.nullable)) {
 					m_output.errorAt(e.token, "Nullable value must be checked for null");
 					return {};
@@ -784,14 +804,14 @@ struct Checker {
 							m_output.errorAt(e.token, "Comparison type mismatch");
 							return {};
 						}
-						e.type = {TypeRef::BOOL, {}, -1};
+						e.type = {LS_TYPE_BOOL, {}, -1};
 						return e.type;
 					case Token::AND: case Token::OR:
-						if (left.kind != TypeRef::BOOL || right.kind != TypeRef::BOOL) {
+						if (left.kind != LS_TYPE_BOOL || right.kind != LS_TYPE_BOOL) {
 							m_output.errorAt(e.token, "Boolean operation requires bool operands");
 							return {};
 						}
-						e.type = {TypeRef::BOOL, {}, -1};
+						e.type = {LS_TYPE_BOOL, {}, -1};
 						return e.type;
 					default:
 						if (!isNumeric(left) || !isNumeric(right)) {
@@ -823,7 +843,7 @@ struct Checker {
 				const ls_string_view callee_name = resolveCallName(e, &fn_idx, &native_idx);
 				if (fn_idx < 0 && native_idx < 0) {
 					TypeRef callee_type = checkExpr(e.left);
-					if (callee_type.kind != TypeRef::FUNCTION || callee_type.struct_index < 0 || callee_type.struct_index >= m_module.function_types.size()) {
+					if (callee_type.kind != LS_TYPE_FUNCTION || callee_type.struct_index < 0 || callee_type.struct_index >= m_module.function_types.size()) {
 						if (empty(callee_name)) m_output.errorAt(m_module.expressions[e.left].token, "Unsupported callee");
 						else m_output.errorAt(m_module.expressions[e.left].token, "Unknown function '", callee_name, "'");
 						return {};
@@ -894,7 +914,7 @@ struct Checker {
 			case Expr::CAST: {
 				TypeRef src = checkExpr(e.left);
 				resolveType(e.cast_type);
-				const bool is_enum_integer_cast = (src.kind == TypeRef::ENUM && isIntegral(e.cast_type)) || (isIntegral(src) && e.cast_type.kind == TypeRef::ENUM);
+				const bool is_enum_integer_cast = (src.kind == LS_TYPE_ENUM && isIntegral(e.cast_type)) || (isIntegral(src) && e.cast_type.kind == LS_TYPE_ENUM);
 				if ((!isScalar(src) || !isScalar(e.cast_type)) && !is_enum_integer_cast) {
 					m_output.errorAt(e.token, "Invalid cast");
 					return {};
@@ -906,9 +926,9 @@ struct Checker {
 			case Expr::CONSTRUCTOR: {
 				TypeRef target = expected ? *expected : TypeRef{};
 				if (e.kind == Expr::CONSTRUCTOR) {
-					target = {TypeRef::STRUCT, e.name, findStruct(e.name)};
+					target = {LS_TYPE_STRUCT, e.name, findStruct(e.name)};
 				}
-				if (target.kind != TypeRef::STRUCT || target.struct_index < 0) {
+				if (target.kind != LS_TYPE_STRUCT || target.struct_index < 0) {
 					m_output.errorAt(e.token, "Can not infer struct literal type");
 					return {};
 				}
@@ -925,7 +945,7 @@ struct Checker {
 				return e.type;
 			}
 			case Expr::ENUM_LITERAL: {
-				if (!expected || expected->kind != TypeRef::ENUM) {
+				if (!expected || expected->kind != LS_TYPE_ENUM) {
 					m_output.errorAt(e.token, "Can not infer enum literal type");
 					return {};
 				}
@@ -949,7 +969,7 @@ struct Checker {
 	}
 
 	i32 enumPatternMember(MatchPattern& pattern, TypeRef subject_type) {
-		if (subject_type.kind != TypeRef::ENUM || pattern.kind != MatchPattern::VALUE || pattern.start_expr < 0) return -1;
+		if (subject_type.kind != LS_TYPE_ENUM || pattern.kind != MatchPattern::VALUE || pattern.start_expr < 0) return -1;
 		Expr& e = m_module.expressions[pattern.start_expr];
 		if (e.kind != Expr::ENUM_LITERAL) return -1;
 		return findEnumMember(m_module.enums[subject_type.struct_index], e.name);
@@ -978,14 +998,14 @@ struct Checker {
 
 	void checkMatchStmt(Stmt& stmt, TypeRef return_type) {
 		TypeRef subject_type = checkExpr(stmt.expr);
-		if (!isScalar(subject_type) && subject_type.kind != TypeRef::ENUM && subject_type.kind != TypeRef::STRING) {
+		if (!isScalar(subject_type) && subject_type.kind != LS_TYPE_ENUM && subject_type.kind != LS_TYPE_STRING) {
 			m_output.errorAt(stmt.token, "Match requires scalar, enum or string value");
 			return;
 		}
 
 		bool has_default = false;
 		std::vector<u8> covered_enum_members;
-		if (subject_type.kind == TypeRef::ENUM && subject_type.struct_index >= 0) {
+		if (subject_type.kind == LS_TYPE_ENUM && subject_type.struct_index >= 0) {
 			covered_enum_members.resize(m_module.enums[subject_type.struct_index].members.size());
 			for (u8& covered : covered_enum_members) covered = 0;
 		}
@@ -1007,7 +1027,7 @@ struct Checker {
 			checkStmt(arm.stmt, return_type);
 		}
 
-		if (subject_type.kind == TypeRef::ENUM && !has_default) {
+		if (subject_type.kind == LS_TYPE_ENUM && !has_default) {
 			for (u8 covered : covered_enum_members) {
 				if (covered) continue;
 				m_output.errorAt(stmt.token, "Enum match must be exhaustive or have fallback");
@@ -1053,21 +1073,21 @@ struct Checker {
 					return;
 				}
 				TypeRef type = stmt.type;
-				if (type.kind != TypeRef::INVALID) resolveType(type);
+				if (type.kind != LS_TYPE_INVALID) resolveType(type);
 				if (stmt.expr >= 0) {
-					TypeRef* expected = type.kind == TypeRef::INVALID ? nullptr : &type;
+					TypeRef* expected = type.kind == LS_TYPE_INVALID ? nullptr : &type;
 					TypeRef expr_type = checkExpr(stmt.expr, expected);
-					if (type.kind == TypeRef::INVALID) type = expr_type;
+					if (type.kind == LS_TYPE_INVALID) type = expr_type;
 					else if (!canAssign(type, expr_type)) m_output.errorAt(stmt.token, "Initializer type mismatch");
 				}
 				else if (stmt.is_undefined_init) {
 					if (stmt.is_const) m_output.errorAt(stmt.token, "Const declaration can not use undefined initializer");
-					if (type.kind == TypeRef::INVALID) m_output.errorAt(stmt.token, "Undefined initializer requires explicit type");
+					if (type.kind == LS_TYPE_INVALID) m_output.errorAt(stmt.token, "Undefined initializer requires explicit type");
 				}
 				else {
 					m_output.errorAt(stmt.token, "Variable declaration requires initializer");
 				}
-				if (type.kind != TypeRef::INVALID) resolveType(type);
+				if (type.kind != LS_TYPE_INVALID) resolveType(type);
 				stmt.type = type;
 				stmt.local_index = (i32)m_locals.size();
 				LocalInfo& local = m_locals.emplace_back();
@@ -1127,7 +1147,7 @@ struct Checker {
 					m_declared_labels.push_back(stmt.name);
 				}
 				TypeRef cond = checkExpr(stmt.expr);
-				if (cond.kind != TypeRef::BOOL) m_output.errorAt(stmt.token, "While condition must be bool");
+				if (cond.kind != LS_TYPE_BOOL) m_output.errorAt(stmt.token, "While condition must be bool");
 				m_loop_labels.push_back(stmt.name);
 				checkStmt(stmt.right, return_type);
 				m_loop_labels.pop_back();
@@ -1155,7 +1175,7 @@ struct Checker {
 			}
 			case Stmt::IF: {
 				TypeRef cond = checkExpr(stmt.expr);
-				if (cond.kind != TypeRef::BOOL) m_output.errorAt(stmt.token, "If condition must be bool");
+				if (cond.kind != LS_TYPE_BOOL) m_output.errorAt(stmt.token, "If condition must be bool");
 				ls_string_view promoted_name;
 				TypeRef promoted_type;
 				bool promote_true_branch = false;
@@ -1176,7 +1196,7 @@ struct Checker {
 				break;
 			}
 			case Stmt::RETURN: {
-				TypeRef actual = stmt.expr >= 0 ? checkExpr(stmt.expr, &return_type) : TypeRef{TypeRef::VOID, {}, -1};
+				TypeRef actual = stmt.expr >= 0 ? checkExpr(stmt.expr, &return_type) : TypeRef{LS_TYPE_VOID, {}, -1};
 				if (!canAssign(return_type, actual)) m_output.errorAt(stmt.token, "Return type mismatch");
 				break;
 			}
@@ -1266,8 +1286,8 @@ static bool mathSqrtF64(ls_runtime* runtime, size_t arg_count, size_t result_cou
 }
 
 static void registerCoreMath(Module& module, ls_string_view prefix) {
-	const TypeRef f32_type(TypeRef::F32);
-	const TypeRef f64_type(TypeRef::F64);
+	const TypeRef f32_type(LS_TYPE_F32);
+	const TypeRef f64_type(LS_TYPE_F64);
 	const TypeRef f32_params[] = {f32_type};
 	const TypeRef f64_params[] = {f64_type};
 	const ls_string_view sin_name = makeStringView("sin");

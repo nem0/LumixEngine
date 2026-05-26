@@ -94,24 +94,24 @@ struct Parser {
 				consume(Token::RIGHT_PAREN);
 				consume(Token::COLON);
 				m_module.function_types[fn_type_idx].return_type = parseType();
-				base = {TypeRef::FUNCTION, {}, fn_type_idx, t, is_nullable};
+				base = {LS_TYPE_FUNCTION, {}, fn_type_idx, t, is_nullable};
 				break;
 			}
-			case Token::VOID: base = {TypeRef::VOID, t.value, -1, t, is_nullable}; break;
-			case Token::BOOL: base = {TypeRef::BOOL, t.value, -1, t, is_nullable}; break;
-			case Token::I8: base = {TypeRef::I8, t.value, -1, t, is_nullable}; break;
-			case Token::U8: base = {TypeRef::U8, t.value, -1, t, is_nullable}; break;
-			case Token::I16: base = {TypeRef::I16, t.value, -1, t, is_nullable}; break;
-			case Token::U16: base = {TypeRef::U16, t.value, -1, t, is_nullable}; break;
-			case Token::I32: base = {TypeRef::I32, t.value, -1, t, is_nullable}; break;
-			case Token::U32: base = {TypeRef::U32, t.value, -1, t, is_nullable}; break;
-			case Token::I64: base = {TypeRef::I64, t.value, -1, t, is_nullable}; break;
-			case Token::U64: base = {TypeRef::U64, t.value, -1, t, is_nullable}; break;
-			case Token::F32: base = {TypeRef::F32, t.value, -1, t, is_nullable}; break;
-			case Token::F64: base = {TypeRef::F64, t.value, -1, t, is_nullable}; break;
+			case Token::VOID: base = {LS_TYPE_VOID, t.value, -1, t, is_nullable}; break;
+			case Token::BOOL: base = {LS_TYPE_BOOL, t.value, -1, t, is_nullable}; break;
+			case Token::I8: base = {LS_TYPE_I8, t.value, -1, t, is_nullable}; break;
+			case Token::U8: base = {LS_TYPE_U8, t.value, -1, t, is_nullable}; break;
+			case Token::I16: base = {LS_TYPE_I16, t.value, -1, t, is_nullable}; break;
+			case Token::U16: base = {LS_TYPE_U16, t.value, -1, t, is_nullable}; break;
+			case Token::I32: base = {LS_TYPE_I32, t.value, -1, t, is_nullable}; break;
+			case Token::U32: base = {LS_TYPE_U32, t.value, -1, t, is_nullable}; break;
+			case Token::I64: base = {LS_TYPE_I64, t.value, -1, t, is_nullable}; break;
+			case Token::U64: base = {LS_TYPE_U64, t.value, -1, t, is_nullable}; break;
+			case Token::F32: base = {LS_TYPE_F32, t.value, -1, t, is_nullable}; break;
+			case Token::F64: base = {LS_TYPE_F64, t.value, -1, t, is_nullable}; break;
 			case Token::IDENTIFIER:
-				if (equalStrings(t.value, "string")) base = {TypeRef::STRING, t.value, -1, t, is_nullable};
-				else base = {TypeRef::STRUCT, m_module.makeQualifiedName(m_declaration_prefix, parseQualifiedIdentifier(t)), -1, t, is_nullable};
+				if (equalStrings(t.value, "string")) base = {LS_TYPE_STRING, t.value, -1, t, is_nullable};
+				else base = {LS_TYPE_STRUCT, m_module.makeQualifiedName(m_declaration_prefix, parseQualifiedIdentifier(t)), -1, t, is_nullable};
 				break;
 			default: error(t, "Expected type"); return {};
 		}
@@ -124,7 +124,7 @@ struct Parser {
 				return {};
 			}
 			TypeRef array_type;
-			array_type.kind = TypeRef::ARRAY;
+			array_type.kind = LS_TYPE_ARRAY;
 			array_type.token = t;
 			array_type.nullable = is_nullable;
 			array_type.element_kind = base.kind;
@@ -409,7 +409,7 @@ struct Parser {
 			const i32 stmt_idx = addStmt(Stmt::ASSIGN, op);
 			const i32 one = addExpr(Expr::NUMBER, op);
 			m_module.expressions[one].number = 1;
-			m_module.expressions[one].type = {TypeRef::UNTYPED_INT, {}, -1};
+			m_module.expressions[one].type = {LS_TYPE_UNTYPED_INT, {}, -1};
 			m_module.statements[stmt_idx].left = left;
 			m_module.statements[stmt_idx].right = one;
 			m_module.statements[stmt_idx].assign_op = op.type == Token::PLUS_PLUS ? Token::PLUS_EQUAL : Token::MINUS_EQUAL;
@@ -588,25 +588,25 @@ struct Parser {
 				double parsed = 0;
 				fromCString(t.value, parsed);
 				m_module.expressions[idx].number = parsed;
-				m_module.expressions[idx].type = contains(t.value, '.') ? TypeRef{TypeRef::UNTYPED_FLOAT, {}, -1} : TypeRef{TypeRef::UNTYPED_INT, {}, -1};
+				m_module.expressions[idx].type = contains(t.value, '.') ? TypeRef{LS_TYPE_UNTYPED_FLOAT, {}, -1} : TypeRef{LS_TYPE_UNTYPED_INT, {}, -1};
 				return idx;
 			}
 			case Token::STRING: {
 				const i32 idx = addExpr(Expr::STRING_LITERAL, t);
 				m_module.expressions[idx].string = t.value;
-				m_module.expressions[idx].type = {TypeRef::STRING, {}, -1};
+				m_module.expressions[idx].type = {LS_TYPE_STRING, {}, -1};
 				return idx;
 			}
 			case Token::TRUE:
 			case Token::FALSE: {
 				const i32 idx = addExpr(Expr::BOOL_LITERAL, t);
 				m_module.expressions[idx].boolean = t.type == Token::TRUE;
-				m_module.expressions[idx].type = {TypeRef::BOOL, {}, -1};
+				m_module.expressions[idx].type = {LS_TYPE_BOOL, {}, -1};
 				return idx;
 			}
 			case Token::NULL_KW: {
 				const i32 idx = addExpr(Expr::NULL_LITERAL, t);
-				m_module.expressions[idx].type = {TypeRef::NULL_VALUE, {}, -1};
+				m_module.expressions[idx].type = {LS_TYPE_NULL_VALUE, {}, -1};
 				return idx;
 			}
 			case Token::IDENTIFIER: {
@@ -632,7 +632,7 @@ struct Parser {
 				if (!consume(Token::IDENTIFIER, &member_name)) return -1;
 				const i32 idx = addExpr(Expr::ENUM_LITERAL, member_name);
 				m_module.expressions[idx].name = member_name.value;
-				m_module.expressions[idx].type = {TypeRef::ENUM, {}, -1};  // Type will be resolved by checker
+				m_module.expressions[idx].type = {LS_TYPE_ENUM, {}, -1};  // Type will be resolved by checker
 				return idx;
 			}
 			case Token::LEFT_PAREN: {
