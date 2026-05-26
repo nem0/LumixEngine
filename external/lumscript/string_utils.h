@@ -193,6 +193,13 @@ inline const char* fromCString(ls_string_view input, float& value) {
     return data(input) + (end - tmp.c_str());
 }
 
+inline const char* fromCString(ls_string_view input, double& value) {
+    std::string tmp(data(input), size(input));
+    char* end = nullptr;
+    value = std::strtod(tmp.c_str(), &end);
+    return data(input) + (end - tmp.c_str());
+}
+
 inline const char* fromCString(ls_string_view input, bool& value) {
     if (equalStrings(input, "true")) {
         value = true;

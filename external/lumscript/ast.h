@@ -31,8 +31,6 @@ struct TypeRef {
 };
 
 struct Value {
-	friend struct Runtime;
-	
 	TypeRef type;
 	bool b = false;
 	i32 i = 0;
@@ -217,6 +215,8 @@ struct FunctionDecl {
 struct GlobalDecl {
 	ls_string_view name;
 	TypeRef type;
+	i32 slot = -1;
+	i32 slot_count = 1;
 	Token token;
 	bool is_const = false;
 	bool is_undefined_init = false;
@@ -230,7 +230,7 @@ struct ImportDecl {
 	bool processed = false;
 };
 
-using NativeCallback = bool (*)(std::span<const Value> args, Value* result, void* userdata);
+using NativeCallback = bool (*)(ls_runtime* runtime, size_t arg_count, size_t result_count, void* userdata);
 using ImportResolver = bool (*)(Module& module, ls_string_view path, ls_string_view alias, ls_string_view* source, void* userdata);
 
 struct NativeTypeDecl {
@@ -259,7 +259,6 @@ struct Module {
 
 	~Module() {
 		for (char* name : allocated_names) deallocateMemory(host, name);
-		for (void* data : allocated_native_data) deallocateMemory(host, data);
 	}
 
 	ls_string_view copyName(ls_string_view name) {
@@ -297,7 +296,6 @@ struct Module {
 	std::vector<MatchPattern> match_patterns;
 	std::vector<MatchArm> match_arms;
 	std::vector<char*> allocated_names;
-	std::vector<void*> allocated_native_data;
 };
 
 // TODO get rid of userdata, it's only used in generated engine API, and it's used in a wrong way there

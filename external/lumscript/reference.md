@@ -10,7 +10,6 @@
 * for cycle
 * debugger
 * string interpolation
-* bytecode/vm
 * jit/llvm
 
 ---
@@ -89,11 +88,11 @@ Current implementation includes:
 
 - parser
 - type checker
-- AST interpreter runtime
+- bytecode runtime
 - `.lum` asset registration
 - basic Studio editor integration
 
-Bytecode and JIT are intentionally out of scope for the first version.
+JIT is intentionally out of scope for the first version.
 
 ## Design goals
 
@@ -690,7 +689,7 @@ Rules:
 - using unknown labels is a compile-time error
 - using `break` / `continue` outside a loop is a compile-time error
 
-Status: syntax and behavior are specified, but not implemented in parser/checker/runtime yet.
+Status: implemented in parser, checker, runtime, and bytecode backend.
 
 ### Defer
 
@@ -897,24 +896,28 @@ Named-field struct literals are not implemented.
 
 ## Runtime model
 
-Current runtime is a tree-walk interpreter over checked AST.
+Current runtime executes compiled bytecode through the public `ls_runtime` API.
 
 - calls create call frames
 - blocks create nested local scopes
 - struct values store fields in declaration order
 - function values reference existing script or native functions
-- execution is limited by `RuntimeOptions::max_steps`
+- bytecode functions consume arguments from the runtime stack
 
 Example C++ shape:
 
 ```cpp
-LumScript::Module module(allocator);
-LumScript::Diagnostics diagnostics(allocator);
+ls_module* module = ls_module_create(&host);
+ls_module_compile(module, source, source_name, &host, nullptr, nullptr);
 
-if (LumScript::compile(module, source, diagnostics)) {
-	LumScript::Runtime runtime(module, allocator);
-	LumScript::Value result;
-	runtime.call("main", Span<const LumScript::Value>(), &result, diagnostics);
+ls_bytecode* bytecode = ls_bytecode_compile(module, &host);
+ls_runtime* runtime = bytecode ? ls_runtime_create(bytecode) : nullptr;
+if (runtime) {
+	ls_string_view main_name = { "main", "main" + 4 };
+	ls_bytecode_runtime_call(runtime, main_name, 0, 1);
+	if (ls_bytecode_runtime_result_kind(runtime, main_name) != LS_TYPE_VOID) {
+		i32 result = ls_to_i32(runtime, -1);
+	}
 }
 ```
 
@@ -923,33 +926,27 @@ if (LumScript::compile(module, source, diagnostics)) {
 Register native functions after parsing and before type checking:
 
 ```cpp
-static bool native_add(Span<const LumScript::Value> args, LumScript::Value* result, void*) {
-	*result = LumScript::Runtime::makeI32(args[0].i + args[1].i);
+static bool native_add(ls_runtime* runtime, size_t arg_count, size_t result_count, void*) {
+	if (arg_count < 2 || result_count < 1) return false;
+	ls_push_i32(runtime, ls_to_i32(runtime, -2) + ls_to_i32(runtime, -1));
 	return true;
 }
 
-LumScript::Module module(allocator);
-LumScript::Diagnostics diagnostics(allocator);
-
-if (LumScript::parse(module, source, diagnostics)) {
-	LumScript::TypeRef params[] = {
-		LumScript::TypeRef(LumScript::TypeRef::I32),
-		LumScript::TypeRef(LumScript::TypeRef::I32)
+ls_module* module = ls_module_create(&host);
+if (ls_module_parse(module, source, source_name, &host)) {
+	ls_type params[] = {
+		ls_type_make(LS_TYPE_I32),
+		ls_type_make(LS_TYPE_I32)
 	};
 
-	LumScript::addNativeFunction(
+	ls_module_add_native_function(
 		module,
 		"native_add",
-		LumScript::TypeRef(LumScript::TypeRef::I32),
-		Span<const LumScript::TypeRef>(params),
+		ls_type_make(LS_TYPE_I32),
+		params,
+		2,
 		&native_add
 	);
-
-	if (LumScript::typecheck(module, diagnostics)) {
-		LumScript::Runtime runtime(module, allocator);
-		LumScript::Value result;
-		runtime.call("main", Span<const LumScript::Value>(), &result, diagnostics);
-	}
 }
 ```
 
@@ -1140,10 +1137,8 @@ Common checker errors include duplicate declarations, unknown symbols, invalid a
 Not implemented yet:
 
 - full `engine:` API coverage
-- bytecode VM
 - string interpolation
 - maps
-- break/continue and named loop labels
 - lambdas and closures
 - named struct fields in literals
 - complete return-path analysis for all branches

@@ -9,12 +9,7 @@
 // Design notes:
 // - `ls_module` owns parsed declarations, registered native functions, and the
 //   string storage needed to keep copied names alive.
-// - `ls_runtime` is a lightweight execution context bound to one module.
-// - `ls_bytecode` and `ls_bytecode_runtime` are the planned bytecode pipeline
-//   equivalents. They are declared here before their implementation exists so
-//   embedders can target the future ABI shape.
-// - `ls_value` is the generic runtime value container used for inputs and
-//   outputs.
+// - `ls_bytecode` and `ls_runtime` are the public execution pipeline.
 // - `ls_host` bundles allocator hooks and diagnostics callbacks into one
 //   object. It is the main bridge between host code and LumScript.
 // - Strings are passed as non-owning `[begin, end)` spans. The caller keeps the
@@ -98,30 +93,6 @@ typedef struct ls_enum_member {
 	i32 value;
 } ls_enum_member;
 
-// Generic runtime value.
-//
-// The layout mirrors the internal runtime representation closely so values can
-// move across the ABI with minimal translation. Only a subset of fields is
-// meaningful for a given type:
-// - integers use `i` / `u` / `i64` / `u64`
-// - floats use `f` / `d`
-// - strings use `string`
-// - native objects use `ptr`
-// - structured values may use `composite`
-typedef struct ls_value {
-	ls_type type;
-	int b;
-	i32 i;
-	u32 u;
-	i64 i64;
-	u64 u64;
-	float f;
-	double d;
-	ls_string_view string;
-	float composite[4];
-	void* ptr;
-} ls_value;
-
 // Native print callback used by `ls_host`.
 typedef void (*ls_print_fn)(void* userdata, ls_string_view msg);
 
@@ -130,11 +101,14 @@ typedef void (*ls_print_fn)(void* userdata, ls_string_view msg);
 // Return non-zero on success and write the imported source into `*source`.
 typedef int (*ls_import_resolver_fn)(void* userdata, ls_string_view path, ls_string_view alias, ls_string_view* source);
 
+typedef struct ls_runtime ls_runtime;
+
 // Native function callback used by `ls_module_add_native_function`.
 //
-// Return non-zero on success. `result` may be null if the caller does not care
-// about a return value.
-typedef int (*ls_native_fn)(const ls_value* args, size_t arg_count, ls_value* result, void* userdata);
+// Native callbacks receive the live runtime stack. Arguments are already
+// pushed when the callback is entered, so callbacks read them with the
+// `ls_to_*` helpers and append any results with the `ls_push_*` helpers.
+typedef int (*ls_native_fn)(ls_runtime* runtime, size_t arg_count, size_t result_count, void* userdata);
 
 // Host bridge shared by module creation, parsing, compilation, and runtime.
 //
@@ -156,9 +130,8 @@ typedef struct ls_host {
 // These are deliberately incomplete in the C ABI. Callers only pass pointers
 // around; all ownership and implementation details remain inside LumScript.
 typedef struct ls_module ls_module;
-typedef struct ls_runtime ls_runtime;
 typedef struct ls_bytecode ls_bytecode;
-typedef struct ls_bytecode_runtime ls_bytecode_runtime;
+typedef struct ls_runtime ls_runtime;
 
 // Module lifetime.
 //
@@ -166,7 +139,6 @@ typedef struct ls_bytecode_runtime ls_bytecode_runtime;
 // compiled declarations and any runtime state are no longer needed.
 ls_module* ls_module_create(const ls_host* host);
 void ls_module_destroy(ls_module* module);
-void* ls_to_cpp_module(ls_module* module); // returns c++ Module as void*
 
 // Native registration.
 //
@@ -216,26 +188,6 @@ int ls_module_get_struct_count(ls_module* module);
 int ls_module_get_function_count(ls_module* module);
 int ls_module_get_global_count(ls_module* module);
 
-// Runtime lifetime.
-//
-// Bind a runtime to a prepared module to call script functions repeatedly.
-// Destroy it when execution is finished.
-ls_runtime* ls_runtime_create(ls_module* module);
-void ls_runtime_destroy(ls_runtime* runtime);
-
-// Execute a function by name.
-//
-// Arguments are passed as a flat array of `ls_value`. The result pointer may be
-// null if the caller only cares about success/failure.
-int ls_runtime_call(
-	ls_runtime* runtime,
-	ls_string_view function_name,
-	const ls_value* args,
-	size_t arg_count,
-	ls_value* result,
-	ls_host* host
-);
-
 // Compile the prepared module into bytecode.
 //
 // Returns a bytecode handle on success, or null on failure. Destroy the
@@ -250,33 +202,51 @@ void ls_bytecode_destroy(ls_bytecode* bytecode);
 //
 // Bind a runtime to compiled bytecode to call script functions repeatedly.
 // Destroy it when execution is finished.
-ls_bytecode_runtime* ls_bytecode_runtime_create(ls_bytecode* bytecode);
-void ls_bytecode_runtime_destroy(ls_bytecode_runtime* runtime);
+ls_runtime* ls_runtime_create(ls_bytecode* bytecode);
+void ls_runtime_destroy(ls_runtime* runtime);
 
-// Push values onto the bytecode runtime stack.
-//
-// These are used to pass arguments before calling a function.
-void ls_bytecode_runtime_push_bool(ls_bytecode_runtime* runtime, int value);
-void ls_bytecode_runtime_push_i32(ls_bytecode_runtime* runtime, i32 value);
-void ls_bytecode_runtime_push_u32(ls_bytecode_runtime* runtime, u32 value);
-void ls_bytecode_runtime_push_i64(ls_bytecode_runtime* runtime, i64 value);
-void ls_bytecode_runtime_push_u64(ls_bytecode_runtime* runtime, u64 value);
-void ls_bytecode_runtime_push_f32(ls_bytecode_runtime* runtime, float value);
-void ls_bytecode_runtime_push_f64(ls_bytecode_runtime* runtime, double value);
-void ls_bytecode_runtime_push_string(ls_bytecode_runtime* runtime, ls_string_view value);
-void ls_bytecode_runtime_push_null(ls_bytecode_runtime* runtime);
+void ls_push_bool(ls_runtime* runtime, int value);
+void ls_push_i32(ls_runtime* runtime, i32 value);
+void ls_push_u32(ls_runtime* runtime, u32 value);
+void ls_push_i64(ls_runtime* runtime, i64 value);
+void ls_push_u64(ls_runtime* runtime, u64 value);
+void ls_push_f32(ls_runtime* runtime, float value);
+void ls_push_f64(ls_runtime* runtime, double value);
+void ls_push_string(ls_runtime* runtime, ls_string_view value);
+void ls_push_null(ls_runtime* runtime);
 
-i32 ls_to_i32(ls_bytecode_runtime* runtime, i32 index);
+i32 ls_to_bool(ls_runtime* runtime, i32 index);
+i32 ls_to_i32(ls_runtime* runtime, i32 index);
+u32 ls_to_u32(ls_runtime* runtime, i32 index);
+i64 ls_to_i64(ls_runtime* runtime, i32 index);
+u64 ls_to_u64(ls_runtime* runtime, i32 index);
+float ls_to_f32(ls_runtime* runtime, i32 index);
+double ls_to_f64(ls_runtime* runtime, i32 index);
+ls_string_view ls_to_string(ls_runtime* runtime, i32 index);
 
 // Execute a bytecode function by name.
 //
-// The runtime stack is used for arguments. The result pointer may be null if
-// the caller does not care about a return value.
+// Push arguments onto the runtime stack with the `ls_push_*` helpers first.
+// After the call, the return value is left on top of the runtime stack.
 int ls_bytecode_runtime_call(
-	ls_bytecode_runtime* runtime,
+	ls_runtime* runtime,
 	ls_string_view function_name,
-	ls_host* host
+	size_t arg_count,
+	size_t result_count
 );
+
+// Execute a bytecode function by index.
+int ls_bytecode_runtime_call_index(
+	ls_runtime* runtime,
+	i32 function_index,
+	size_t arg_count,
+	size_t result_count
+);
+
+// Query the declared return type of the most recent call to `function_name`.
+// Callers can then read the value from the runtime stack using the `ls_to_*`
+// helpers with index `-1`.
+ls_type_kind ls_bytecode_runtime_result_kind(ls_runtime* runtime, ls_string_view function_name);
 
 // Helper constructors for type descriptors.
 //
@@ -295,21 +265,6 @@ ls_type ls_type_make_array(
 	i32 array_size,
 	int nullable
 );
-
-// Helper constructors for runtime values.
-//
-// The helpers fill in the usual numeric aliases so native code can populate a
-// single canonical `ls_value` without manually duplicating every field.
-ls_value ls_value_make_void(void);
-ls_value ls_value_make_bool(int value);
-ls_value ls_value_make_i32(i32 value);
-ls_value ls_value_make_u32(u32 value);
-ls_value ls_value_make_i64(i64 value);
-ls_value ls_value_make_u64(u64 value);
-ls_value ls_value_make_f32(float value);
-ls_value ls_value_make_f64(double value);
-ls_value ls_value_make_string(ls_string_view value);
-ls_value ls_value_make_null(void);
 
 #ifdef __cplusplus
 }

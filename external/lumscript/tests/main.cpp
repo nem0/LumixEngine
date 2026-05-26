@@ -3,8 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <span>
+#include <vector>
 
 #include "../string_utils.h"
+#include "../bytecode.h"
 #include "../capi.h"
 
 void print(const char* val) { printf(val); }
@@ -111,27 +113,36 @@ struct TestContext {
 };
 
 struct RuntimeGuard {
-	explicit RuntimeGuard(ls_module* module)
-		: runtime(ls_runtime_create(module))
+	// The tests run through the bytecode runtime, so this guard owns both the
+	// compiled bytecode and the runtime bound to it.
+	explicit RuntimeGuard(ls_module* module, ls_host* host)
+		: bytecode(ls_bytecode_compile(module, host))
+		, runtime(bytecode ? ls_runtime_create(bytecode) : nullptr)
 	{}
 
 	~RuntimeGuard() {
 		if (runtime) ls_runtime_destroy(runtime);
+		if (bytecode) ls_bytecode_destroy(bytecode);
 	}
 
 	RuntimeGuard(const RuntimeGuard&) = delete;
 	RuntimeGuard& operator=(const RuntimeGuard&) = delete;
 
 	RuntimeGuard(RuntimeGuard&& rhs) noexcept
-		: runtime(rhs.runtime)
+		: bytecode(rhs.bytecode)
+		, runtime(rhs.runtime)
 	{
+		rhs.bytecode = nullptr;
 		rhs.runtime = nullptr;
 	}
 
 	RuntimeGuard& operator=(RuntimeGuard&& rhs) noexcept {
 		if (this == &rhs) return *this;
 		if (runtime) ls_runtime_destroy(runtime);
+		if (bytecode) ls_bytecode_destroy(bytecode);
+		bytecode = rhs.bytecode;
 		runtime = rhs.runtime;
+		rhs.bytecode = nullptr;
 		rhs.runtime = nullptr;
 		return *this;
 	}
@@ -140,6 +151,7 @@ struct RuntimeGuard {
 	operator ls_runtime*() const { return runtime; }
 	ls_runtime* get() const { return runtime; }
 
+	ls_bytecode* bytecode = nullptr;
 	ls_runtime* runtime = nullptr;
 };
 
@@ -164,14 +176,13 @@ static int resolveLumScriptImportC(void* userdata, ls_string_view path, ls_strin
 	return 0;
 }
 
-static int nativeAddC(const ls_value* args, size_t arg_count, ls_value* result, void*) {
-	if (arg_count < 2) return 0;
-	if (result) *result = ls_value_make_i32(args[0].i + args[1].i);
+static int nativeAddC(ls_runtime* runtime, size_t arg_count, size_t result_count, void*) {
+	if (arg_count < 2 || result_count < 1) return 0;
+	ls_push_i32(runtime, ls_to_i32(runtime, -2) + ls_to_i32(runtime, -1));
 	return 1;
 }
 
 #include "compiler_tests.inl"
-#include "runtime_tests.inl"
 #include "bytecode_tests.inl"
 
 int main() {

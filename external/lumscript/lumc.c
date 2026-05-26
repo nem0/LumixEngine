@@ -20,8 +20,8 @@ typedef struct lumc_context {
 	ls_host host;
 	char* source;
 	ls_module* module;
+	ls_bytecode* bytecode;
 	ls_runtime* runtime;
-	ls_value* call_args;
 } lumc_context;
 
 static void* lumc_allocate(void* userdata, size_t size, size_t align) {
@@ -58,40 +58,42 @@ static void lumc_print_string(FILE* out, ls_string_view value) {
 	fwrite(value.begin, 1, (size_t)(value.end - value.begin), out);
 }
 
-static void lumc_write_value(FILE* out, ls_value value) {
-	switch (value.type.kind) {
+static void lumc_write_result(FILE* out, ls_runtime* runtime, ls_type_kind kind) {
+	switch (kind) {
 		case LS_TYPE_VOID:
 			break;
 		case LS_TYPE_BOOL:
-			fputs(value.b ? "true" : "false", out);
+			fputs(ls_to_bool(runtime, -1) ? "true" : "false", out);
 			break;
 		case LS_TYPE_I8:
 		case LS_TYPE_I16:
 		case LS_TYPE_I32:
-			fprintf(out, "%d", value.i);
+		case LS_TYPE_ENUM:
+		case LS_TYPE_UNTYPED_INT:
+			fprintf(out, "%d", ls_to_i32(runtime, -1));
 			break;
 		case LS_TYPE_U8:
 		case LS_TYPE_U16:
 		case LS_TYPE_U32:
-			fprintf(out, "%u", value.u);
+			fprintf(out, "%u", ls_to_u32(runtime, -1));
 			break;
 		case LS_TYPE_I64:
-			fprintf(out, "%lld", (long long)value.i64);
+			fprintf(out, "%lld", (long long)ls_to_i64(runtime, -1));
 			break;
 		case LS_TYPE_U64:
-			fprintf(out, "%llu", (unsigned long long)value.u64);
+			fprintf(out, "%llu", (unsigned long long)ls_to_u64(runtime, -1));
 			break;
 		case LS_TYPE_F32:
-			fprintf(out, "%f", value.f);
+			fprintf(out, "%f", ls_to_f32(runtime, -1));
 			break;
 		case LS_TYPE_F64:
-			fprintf(out, "%lf", value.d);
+			fprintf(out, "%lf", ls_to_f64(runtime, -1));
 			break;
 		case LS_TYPE_STRING:
-			lumc_print_string(out, value.string);
+			lumc_print_string(out, ls_to_string(runtime, -1));
 			break;
 		default:
-			fprintf(out, "<%d>", (int)value.type.kind);
+			fprintf(out, "<%d>", (int)kind);
 			break;
 	}
 }
@@ -101,14 +103,13 @@ static void lumc_diagnostics_print(void* userdata, ls_string_view msg) {
 	lumc_print_string(stderr, msg);
 }
 
-static int lumc_native_print(const ls_value* args, size_t arg_count, ls_value* result, void* userdata) {
+static int lumc_native_print(ls_runtime* runtime, size_t arg_count, size_t result_count, void* userdata) {
 	(void)userdata;
 
-	if (arg_count != 1 || args[0].type.kind != LS_TYPE_STRING) return 0;
+	if (arg_count != 1 || result_count != 0) return 0;
 
-	lumc_print_string(stdout, args[0].string);
+	lumc_print_string(stdout, ls_to_string(runtime, -1));
 	putchar('\n');
-	if (result) *result = ls_value_make_void();
 	return 1;
 }
 
@@ -189,64 +190,57 @@ int main(int argc, char** argv) {
 		goto cleanup;
 	}
 
-	ctx.runtime = ls_runtime_create(ctx.module);
+	ctx.bytecode = ls_bytecode_compile(ctx.module, &ctx.host);
+	if (!ctx.bytecode) {
+		fprintf(stderr, "Error: Failed to compile bytecode\n");
+		goto cleanup;
+	}
+
+	ctx.runtime = ls_runtime_create(ctx.bytecode);
 	if (!ctx.runtime) {
-		fprintf(stderr, "Error: Failed to create LumScript runtime\n");
+		fprintf(stderr, "Error: Failed to create bytecode runtime\n");
 		goto cleanup;
 	}
 
 	size_t call_arg_count = argc > 3 ? (size_t)(argc - 3) : 0;
-	if (call_arg_count > 0) {
-		ctx.call_args = (ls_value*)ctx.host.allocate(ctx.host.allocator_userdata, sizeof(ls_value) * call_arg_count, 16);
-		if (!ctx.call_args) {
-			fprintf(stderr, "Error: Out of memory\n");
-			goto cleanup;
-		}
+	{
 		for (size_t i = 0; i < call_arg_count; ++i) {
 			char* end = NULL;
 			const char* arg = argv[i + 3];
 			double d = strtod(arg, &end);
 			if (end != arg && *end == '\0') {
 				if (strpbrk(arg, ".eE")) {
-					ctx.call_args[i] = ls_value_make_f64(d);
+					ls_push_f64(ctx.runtime, d);
 				} else {
-					ctx.call_args[i] = ls_value_make_i64((i64)d);
+					ls_push_i64(ctx.runtime, (i64)d);
 				}
 			} else if (strcmp(arg, "true") == 0) {
-				ctx.call_args[i] = ls_value_make_bool(1);
+				ls_push_bool(ctx.runtime, 1);
 			} else if (strcmp(arg, "false") == 0) {
-				ctx.call_args[i] = ls_value_make_bool(0);
+				ls_push_bool(ctx.runtime, 0);
 			} else {
-				ctx.call_args[i] = ls_value_make_string(ls_from_cstr(arg));
+				ls_push_string(ctx.runtime, ls_from_cstr(arg));
 			}
 		}
-	}
-
-	{
-		ls_value result = ls_value_make_void();
-		if (!ls_runtime_call(
-			ctx.runtime,
-			ls_from_cstr(function_name),
-			ctx.call_args,
-			call_arg_count,
-			&result,
-			&ctx.host
-		)) {
+		if (!ls_bytecode_runtime_call(ctx.runtime, ls_from_cstr(function_name), call_arg_count, 1)) {
 			fprintf(stderr, "Runtime error\n");
 			goto cleanup;
 		}
 
-		if (result.type.kind != LS_TYPE_VOID) {
-			lumc_write_value(stdout, result);
-			putchar('\n');
+		{
+			ls_type_kind result_kind = ls_bytecode_runtime_result_kind(ctx.runtime, ls_from_cstr(function_name));
+			if (result_kind != LS_TYPE_VOID) {
+				lumc_write_result(stdout, ctx.runtime, result_kind);
+				putchar('\n');
+			}
 		}
 	}
 
 	rc = 0;
 
 cleanup:
-	if (ctx.call_args) ctx.host.deallocate(ctx.host.allocator_userdata, ctx.call_args);
 	if (ctx.runtime) ls_runtime_destroy(ctx.runtime);
+	if (ctx.bytecode) ls_bytecode_destroy(ctx.bytecode);
 	if (ctx.module) ls_module_destroy(ctx.module);
 	if (ctx.source) ctx.host.deallocate(ctx.host.allocator_userdata, ctx.source);
 	return rc;

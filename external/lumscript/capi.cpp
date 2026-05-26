@@ -1,10 +1,11 @@
 #include "capi.h"
 
+#include <cstring>
 #include <new>
 
+#include "ast.h"
 #include "bytecode.h"
 #include "compiler.h"
-#include "runtime.h"
 
 static ls_string_view toC(ls_string_view value) {
 	return value;
@@ -38,43 +39,111 @@ static ls_type toC(TypeRef value) {
 	return type;
 }
 
-static Value fromC(ls_value value) {
-	Value result;
-	result.type = fromC(value.type);
-	result.b = value.b != 0;
-	result.i = value.i;
-	result.u = value.u;
-	result.i64 = value.i64;
-	result.u64 = value.u64;
-	result.f = value.f;
-	result.d = value.d;
-	result.string = fromC(value.string);
-	for (i32 i = 0; i < 4; ++i) result.composite[i] = value.composite[i];
-	result.ptr = value.ptr;
-	return result;
+Value makeI32(i32 value) {
+	Value v;
+	v.type = {TypeRef::I32, {}, -1};
+	v.i = value;
+	v.u = (u32)value;
+	v.i64 = (i64)value;
+	v.u64 = (u64)value;
+	v.f = (float)value;
+	v.d = (double)value;
+	return v;
 }
 
-static ls_value toC(const Value& value) {
-	ls_value result = {};
-	result.type = toC(value.type);
-	result.b = value.b ? 1 : 0;
-	result.i = value.i;
-	result.u = value.u;
-	result.i64 = value.i64;
-	result.u64 = value.u64;
-	result.f = value.f;
-	result.d = value.d;
-	result.string = toC(value.string);
-	for (i32 i = 0; i < 4; ++i) result.composite[i] = value.composite[i];
-	result.ptr = value.ptr;
-	return result;
+Value makeU32(u32 value) {
+	Value v;
+	v.type = TypeRef(TypeRef::U32);
+	v.u = value;
+	v.i = (i32)value;
+	v.i64 = (i64)value;
+	v.u64 = (u64)value;
+	v.f = (float)value;
+	v.d = (double)value;
+	return v;
 }
 
-struct NativeFunctionContext {
-	ls_native_fn callback = nullptr;
-	void* userdata = nullptr;
-	Module* module = nullptr;
-};
+Value makeI64(i64 value) {
+	Value v;
+	v.type = TypeRef(TypeRef::I64);
+	v.i64 = value;
+	v.u64 = (u64)value;
+	v.i = (i32)value;
+	v.u = (u32)value;
+	v.f = (float)value;
+	v.d = (double)value;
+	return v;
+}
+
+Value makeU64(u64 value) {
+	Value v;
+	v.type = TypeRef(TypeRef::U64);
+	v.u64 = value;
+	v.i64 = (i64)value;
+	v.u = (u32)value;
+	v.i = (i32)value;
+	v.f = (float)value;
+	v.d = (double)value;
+	return v;
+}
+
+Value makeF32(float value) {
+	Value v;
+	v.type = {TypeRef::F32, {}, -1};
+	v.f = value;
+	v.i = (i32)value;
+	v.u = (u32)value;
+	v.i64 = (i64)value;
+	v.u64 = (u64)value;
+	v.d = (double)value;
+	return v;
+}
+
+Value makeF64(double value) {
+	Value v;
+	v.type = {TypeRef::F64, {}, -1};
+	v.d = value;
+	v.f = (float)value;
+	v.i = (i32)value;
+	v.u = (u32)value;
+	v.i64 = (i64)value;
+	v.u64 = (u64)value;
+	return v;
+}
+
+Value makeString(ls_string_view value) {
+	Value v;
+	v.type = {TypeRef::STRING, {}, -1};
+	v.string = value;
+	return v;
+}
+
+Value makeFunction(TypeRef type, i32 index, bool is_native) {
+	Value v;
+	v.type = type;
+	v.i = index;
+	v.b = is_native;
+	return v;
+}
+
+Value makeNull() {
+	Value v;
+	v.type = {TypeRef::NULL_VALUE, {}, -1};
+	return v;
+}
+
+Value makeBool(bool value) {
+	Value v;
+	v.type = {TypeRef::BOOL, {}, -1};
+	v.b = value;
+	v.i = value ? 1 : 0;
+	v.u = value ? 1u : 0u;
+	v.i64 = value ? 1 : 0;
+	v.u64 = value ? 1u : 0u;
+	v.f = value ? 1.0f : 0.0f;
+	v.d = value ? 1.0 : 0.0;
+	return v;
+}
 
 static i32 addNativeType(Module& module, ls_string_view name, ls_string_view id) {
 	for (i32 i = 0; i < module.native_types.size(); ++i) {
@@ -91,19 +160,6 @@ static TypeRef nativeType(Module& module, ls_string_view visible_name, ls_string
 	return TypeRef(TypeRef::NATIVE, module.native_types[idx].id, idx);
 }
 
-static bool nativeCallback(std::span<const Value> args, Value* result, void* userdata) {
-	NativeFunctionContext* ctx = (NativeFunctionContext*)userdata;
-	if (!ctx || !ctx->callback) return false;
-
-	std::vector<ls_value> c_args;
-	for (const Value& arg : args) c_args.push_back(toC(arg));
-
-	ls_value c_result = {};
-	const int ok = ctx->callback(c_args.data(), c_args.size(), result ? &c_result : nullptr, ctx->userdata);
-	if (ok && result) *result = fromC(c_result);
-	return ok != 0;
-}
-
 struct ModuleHandle {
 	explicit ModuleHandle(const ls_host* host_)
 		: host(host_ ? *host_ : ls_host{})
@@ -114,22 +170,10 @@ struct ModuleHandle {
 	Module module;
 };
 
-struct RuntimeHandle {
-	explicit RuntimeHandle(ModuleHandle* module)
-		: module(module)
-		, runtime(module->module)
-	{}
-
-	ModuleHandle* module = nullptr;
-	Runtime runtime;
-};
+static i32 bytecodeFindFunction(const ls_bytecode* bytecode, ls_string_view name);
 
 ls_module* ls_module_create(const ls_host* host) {
 	return reinterpret_cast<ls_module*>(new (std::nothrow) ModuleHandle(host));
-}
-
-void* ls_to_cpp_module(ls_module* module) {
-	return &reinterpret_cast<ModuleHandle*>(module)->module;
 }
 
 void ls_module_destroy(ls_module* module) {
@@ -178,20 +222,11 @@ int ls_module_add_native_function(
 	if (!param_types && param_count > 0) return -1;
 	ModuleHandle* handle = reinterpret_cast<ModuleHandle*>(module);
 
-	void* ctx_mem = allocateMemory(handle->module.host, sizeof(NativeFunctionContext), alignof(NativeFunctionContext));
-	if (!ctx_mem) return -1;
-
-	NativeFunctionContext* ctx = new (ctx_mem) NativeFunctionContext();
-	ctx->callback = callback;
-	ctx->userdata = userdata;
-	ctx->module = &handle->module;
-	handle->module.allocated_native_data.push_back(ctx);
-
 	NativeFunctionDecl& fn = handle->module.native_functions.emplace_back();
 	fn.name = handle->module.copyName(fromC(name));
 	fn.return_type = fromC(return_type);
-	fn.callback = &nativeCallback;
-	fn.userdata = ctx;
+	fn.callback = reinterpret_cast<NativeCallback>(callback);
+	fn.userdata = userdata;
 
 	for (size_t i = 0; i < param_count; ++i) {
 		Param& p = fn.params.emplace_back();
@@ -224,6 +259,8 @@ struct ImportResolverContext {
 	ls_import_resolver_fn resolver = nullptr;
 	void* userdata = nullptr;
 };
+
+static i32 bytecodeFindFunction(const ls_bytecode* bytecode, ls_string_view name);
 
 	static bool importResolverAdapter(Module&, ls_string_view path, ls_string_view alias, ls_string_view* source, void* userdata) {
 	ImportResolverContext* ctx = (ImportResolverContext*)userdata;
@@ -267,36 +304,6 @@ int ls_module_get_global_count(ls_module* module) {
 	return (int)reinterpret_cast<ModuleHandle*>(module)->module.globals.size();
 }
 
-ls_runtime* ls_runtime_create(ls_module* module) {
-	if (!module) return nullptr;
-	ModuleHandle* handle = reinterpret_cast<ModuleHandle*>(module);
-	return reinterpret_cast<ls_runtime*>(new (std::nothrow) RuntimeHandle(handle));
-}
-
-void ls_runtime_destroy(ls_runtime* runtime) {
-	delete reinterpret_cast<RuntimeHandle*>(runtime);
-}
-
-int ls_runtime_call(
-	ls_runtime* runtime,
-	ls_string_view function_name,
-	const ls_value* args,
-	size_t arg_count,
-	ls_value* result,
-	ls_host* host
-) {
-	if (!runtime) return 0;
-	if (!args && arg_count > 0) return 0;
-	RuntimeHandle* handle = reinterpret_cast<RuntimeHandle*>(runtime);
-	std::vector<Value> c_args;
-	for (size_t i = 0; i < arg_count; ++i) c_args.push_back(fromC(args[i]));
-
-	Value c_result;
-	const bool ok = handle->runtime.call(fromC(function_name), std::span<const Value>(c_args.begin(), c_args.size()), result ? &c_result : nullptr);
-	if (ok && result) *result = toC(c_result);
-	return ok ? 1 : 0;
-}
-
 ls_bytecode* ls_bytecode_compile(
 	ls_module* module,
 	ls_host* host
@@ -310,76 +317,158 @@ void ls_bytecode_destroy(ls_bytecode* bytecode) {
 	destroyBytecode(bytecode);
 }
 
-ls_bytecode_runtime* ls_bytecode_runtime_create(ls_bytecode* bytecode) {
+ls_runtime* ls_runtime_create(ls_bytecode* bytecode) {
 	return createBytecodeRuntime(bytecode);
 }
 
-void ls_bytecode_runtime_destroy(ls_bytecode_runtime* runtime) {
+void ls_runtime_destroy(ls_runtime* runtime) {
 	destroyBytecodeRuntime(runtime);
 }
 
-void pushBytecodeValue(ls_bytecode_runtime* runtime, BytecodeValue value);
-
-void ls_bytecode_runtime_push_bool(ls_bytecode_runtime* runtime, int value) {
-	pushBytecodeValue(runtime, BytecodeValue(value));
+static i32 runtimeStackIndex(ls_runtime* runtime, i32 index) {
+	return index < 0 ? i32(runtime->stack.size()) + index : index;
 }
 
-void ls_bytecode_runtime_push_i32(ls_bytecode_runtime* runtime, i32 value) {
-	pushBytecodeValue(runtime, BytecodeValue(value));
+i32 ls_to_i32(ls_runtime* runtime, i32 index) {
+	if (!runtime) return 0;
+	return i32(runtime->stack[runtimeStackIndex(runtime, index)]);
 }
 
-i32 ls_to_i32(ls_bytecode_runtime* runtime, i32 index) {
-	if (index < 0) {
-		return i32(runtime->stack[runtime->stack.size() + index]);
+i32 ls_to_bool(ls_runtime* runtime, i32 index) {
+	return ls_to_i32(runtime, index) != 0;
+}
+
+u32 ls_to_u32(ls_runtime* runtime, i32 index) {
+	if (!runtime) return 0;
+	return u32(runtime->stack[runtimeStackIndex(runtime, index)]);
+}
+
+i64 ls_to_i64(ls_runtime* runtime, i32 index) {
+	if (!runtime) return 0;
+	return (i64)runtime->stack[runtimeStackIndex(runtime, index)];
+}
+
+u64 ls_to_u64(ls_runtime* runtime, i32 index) {
+	if (!runtime) return 0;
+	return runtime->stack[runtimeStackIndex(runtime, index)];
+}
+
+float ls_to_f32(ls_runtime* runtime, i32 index) {
+	if (!runtime) return 0.0f;
+	float value = 0.0f;
+	memcpy(&value, &runtime->stack[runtimeStackIndex(runtime, index)], sizeof(value));
+	return value;
+}
+
+double ls_to_f64(ls_runtime* runtime, i32 index) {
+	if (!runtime) return 0.0;
+	double value = 0.0;
+	memcpy(&value, &runtime->stack[runtimeStackIndex(runtime, index)], sizeof(value));
+	return value;
+}
+
+ls_string_view ls_to_string(ls_runtime* runtime, i32 index) {
+	ls_string_view result = {};
+	if (!runtime) return result;
+	const char* begin = (const char*)(uintptr)runtime->stack[runtimeStackIndex(runtime, index)];
+	if (!begin) return result;
+	result.begin = begin;
+	result.end = begin + strlen(begin);
+	return result;
+}
+
+void ls_push_bool(ls_runtime* runtime, int value) {
+	runtime->stack.push_back(value ? 1u : 0u);
+}
+
+void ls_push_i32(ls_runtime* runtime, i32 value) {
+	runtime->stack.push_back((u64)value);
+}
+
+void ls_push_u32(ls_runtime* runtime, u32 value) {
+	runtime->stack.push_back((u64)value);
+}
+
+void ls_push_i64(ls_runtime* runtime, i64 value) {
+	runtime->stack.push_back((u64)value);
+}
+
+void ls_push_u64(ls_runtime* runtime, u64 value) {
+	runtime->stack.push_back(value);
+}
+
+void ls_push_f32(ls_runtime* runtime, float value) {
+	u64 raw = 0;
+	memcpy(&raw, &value, sizeof(value));
+	runtime->stack.push_back(raw);
+}
+
+void ls_push_f64(ls_runtime* runtime, double value) {
+	u64 raw = 0;
+	memcpy(&raw, &value, sizeof(value));
+	runtime->stack.push_back(raw);
+}
+
+void ls_push_string(ls_runtime* runtime, ls_string_view value) {
+	(void)value;
+	runtime->stack.push_back(0);
+}
+
+void ls_push_null(ls_runtime* runtime) {
+	runtime->stack.push_back(0);
+}
+
+static i32 bytecodeFindFunction(const ls_bytecode* bytecode, ls_string_view name) {
+	if (!bytecode) return -1;
+	for (i32 i = 0; i < bytecode->functions.size(); ++i) {
+		if (equalStrings(bytecode->functions[i].name, name)) return i;
 	}
-	return i32(runtime->stack[index]);
+	return -1;
 }
 
-void ls_bytecode_runtime_push_u32(ls_bytecode_runtime* runtime, u32 value) {
-	pushBytecodeValue(runtime, BytecodeValue(value));
-}
-
-void ls_bytecode_runtime_push_i64(ls_bytecode_runtime* runtime, i64 value) {
-	//pushBytecodeValue(runtime, BytecodeValue(value));
-	// TODO
-	ASSERT(false);
-}
-
-void ls_bytecode_runtime_push_u64(ls_bytecode_runtime* runtime, u64 value) {
-	//pushBytecodeValue(runtime, BytecodeValue(value));
-	// TODO
-	ASSERT(false);
-}
-
-void ls_bytecode_runtime_push_f32(ls_bytecode_runtime* runtime, float value) {
-	pushBytecodeValue(runtime, BytecodeValue(value));
-}
-
-void ls_bytecode_runtime_push_f64(ls_bytecode_runtime* runtime, double value) {
-	// pushBytecodeValue(runtime, BytecodeValue(value));
-	ASSERT(false);
-	// TODO
-}
-
-void ls_bytecode_runtime_push_string(ls_bytecode_runtime* runtime, ls_string_view value) {
-	// pushBytecodeValue(runtime, makeBytecodeString(value));
-	ASSERT(false);
-	// TODO
-}
-
-void ls_bytecode_runtime_push_null(ls_bytecode_runtime* runtime) {
-	//pushBytecodeValue(runtime, makeBytecodeNull());
-	ASSERT(false);
-	// TODO
+int ls_bytecode_runtime_call_index(
+	ls_runtime* runtime,
+	i32 function_index,
+	size_t arg_count,
+	size_t result_count
+) {
+	if (!runtime || !runtime->bytecode) return 0;
+	if (function_index < 0 || function_index >= (i32)runtime->bytecode->functions.size()) return 0;
+	BytecodeFunction& fn = runtime->bytecode->functions[function_index];
+	if (fn.param_count != (i32)fn.params.size()) return 0;
+	if (arg_count > fn.params.size()) return 0;
+	const size_t global_count = (size_t)runtime->bytecode->global_count;
+	if (runtime->stack.size() < global_count + arg_count) return 0;
+	const size_t arg_base = runtime->stack.size() - arg_count;
+	std::vector<u64> args;
+	args.reserve(arg_count);
+	for (size_t i = 0; i < arg_count; ++i) args.push_back(runtime->stack[arg_base + i]);
+	runtime->stack.resize(global_count);
+	for (size_t i = 0; i < arg_count; ++i) runtime->stack.push_back(args[i]);
+	for (size_t i = arg_count; i < fn.params.size(); ++i) runtime->stack.push_back(0);
+	if (!callBytecodeRuntime(runtime, function_index)) return 0;
+	if (result_count > 0 && fn.return_count == 0) {
+		runtime->stack.push_back(0);
+	}
+	return 1;
 }
 
 int ls_bytecode_runtime_call(
-	ls_bytecode_runtime* runtime,
+	ls_runtime* runtime,
 	ls_string_view function_name,
-	ls_host* host
+	size_t arg_count,
+	size_t result_count
 ) {
-	const bool ok = callBytecodeRuntime(runtime, fromC(function_name));
-	return ok ? 1 : 0;
+	const i32 function_index = runtime && runtime->bytecode ? bytecodeFindFunction(runtime->bytecode, fromC(function_name)) : -1;
+	if (function_index < 0) return 0;
+	return ls_bytecode_runtime_call_index(runtime, function_index, arg_count, result_count);
+}
+
+ls_type_kind ls_bytecode_runtime_result_kind(ls_runtime* runtime, ls_string_view function_name) {
+	if (!runtime || !runtime->bytecode) return LS_TYPE_VOID;
+	const i32 function_index = bytecodeFindFunction(runtime->bytecode, fromC(function_name));
+	if (function_index < 0) return LS_TYPE_VOID;
+	return runtime->bytecode->functions[(size_t)function_index].return_type.kind;
 }
 
 ls_string_view ls_make_qualified_name(ls_module* module, ls_string_view prefix, ls_string_view name) {
@@ -434,100 +523,3 @@ ls_type ls_type_make_array(
 	return res;
 }
 
-ls_value ls_value_make_void(void) {
-	ls_value value = {};
-	value.type = ls_type_make(LS_TYPE_VOID);
-	return value;
-}
-
-ls_value ls_value_make_bool(int value) {
-	ls_value result = {};
-	result.type = ls_type_make(LS_TYPE_BOOL);
-	result.b = value != 0;
-	return result;
-}
-
-ls_value ls_value_make_i32(int32_t value) {
-	ls_value result = {};
-	result.type = ls_type_make(LS_TYPE_I32);
-	result.i = value;
-	result.u = (uint32_t)value;
-	result.i64 = (int64_t)value;
-	result.u64 = (uint64_t)value;
-	result.f = (float)value;
-	result.d = (double)value;
-	return result;
-}
-
-ls_value ls_value_make_u32(uint32_t value) {
-	ls_value result = {};
-	result.type = ls_type_make(LS_TYPE_U32);
-	result.u = value;
-	result.i = (int32_t)value;
-	result.i64 = (int64_t)value;
-	result.u64 = (uint64_t)value;
-	result.f = (float)value;
-	result.d = (double)value;
-	return result;
-}
-
-ls_value ls_value_make_i64(int64_t value) {
-	ls_value result = {};
-	result.type = ls_type_make(LS_TYPE_I64);
-	result.i64 = value;
-	result.u64 = (uint64_t)value;
-	result.i = (int32_t)value;
-	result.u = (uint32_t)value;
-	result.f = (float)value;
-	result.d = (double)value;
-	return result;
-}
-
-ls_value ls_value_make_u64(uint64_t value) {
-	ls_value result = {};
-	result.type = ls_type_make(LS_TYPE_U64);
-	result.u64 = value;
-	result.i64 = (int64_t)value;
-	result.i = (int32_t)value;
-	result.u = (uint32_t)value;
-	result.f = (float)value;
-	result.d = (double)value;
-	return result;
-}
-
-ls_value ls_value_make_f32(float value) {
-	ls_value result = {};
-	result.type = ls_type_make(LS_TYPE_F32);
-	result.f = value;
-	result.d = (double)value;
-	result.i = (int32_t)value;
-	result.u = (uint32_t)value;
-	result.i64 = (int64_t)value;
-	result.u64 = (uint64_t)value;
-	return result;
-}
-
-ls_value ls_value_make_f64(double value) {
-	ls_value result = {};
-	result.type = ls_type_make(LS_TYPE_F64);
-	result.d = value;
-	result.f = (float)value;
-	result.i = (int32_t)value;
-	result.u = (uint32_t)value;
-	result.i64 = (int64_t)value;
-	result.u64 = (uint64_t)value;
-	return result;
-}
-
-ls_value ls_value_make_string(ls_string_view value) {
-	ls_value result = {};
-	result.type = ls_type_make(LS_TYPE_STRING);
-	result.string = value;
-	return result;
-}
-
-ls_value ls_value_make_null(void) {
-	ls_value result = {};
-	result.type = ls_type_make(LS_TYPE_NULL_VALUE);
-	return result;
-}

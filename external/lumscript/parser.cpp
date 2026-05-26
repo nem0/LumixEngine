@@ -585,7 +585,7 @@ struct Parser {
 		switch (t.type) {
 			case Token::NUMBER: {
 				const i32 idx = addExpr(Expr::NUMBER, t);
-				float parsed = 0;
+				double parsed = 0;
 				fromCString(t.value, parsed);
 				m_module.expressions[idx].number = parsed;
 				m_module.expressions[idx].type = contains(t.value, '.') ? TypeRef{TypeRef::UNTYPED_FLOAT, {}, -1} : TypeRef{TypeRef::UNTYPED_INT, {}, -1};

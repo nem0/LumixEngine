@@ -238,20 +238,35 @@ struct Checker {
 		}
 
 		Expr& callee = m_module.expressions[call.left];
-		if (callee.kind != Expr::FIELD) return callee_name;
+		if (callee.kind == Expr::FIELD) {
+			TypeRef receiver_type = checkExpr(callee.left);
+			const ls_string_view namespace_name = getTypeNamespace(receiver_type);
+			if (!empty(namespace_name)) {
+				ls_string_view method_name = m_module.makeQualifiedName(namespace_name, callee.name);
+				*fn_idx = findFunction(method_name);
+				*native_idx = findNativeFunction(method_name);
+				if (*fn_idx >= 0 || *native_idx >= 0) {
+					call.qualified_name = method_name;
+					call.method_receiver = callee.left;
+					return method_name;
+				}
+			}
+		}
 
-		TypeRef receiver_type = checkExpr(callee.left);
-		const ls_string_view namespace_name = getTypeNamespace(receiver_type);
-		if (empty(namespace_name)) return callee_name;
-
-		ls_string_view method_name = m_module.makeQualifiedName(namespace_name, callee.name);
-		*fn_idx = findFunction(method_name);
-		*native_idx = findNativeFunction(method_name);
-		if (*fn_idx < 0 && *native_idx < 0) return callee_name;
-
-		call.qualified_name = method_name;
-		call.method_receiver = callee.left;
-		return method_name;
+		if (callee.kind != Expr::FIELD && !empty(callee_name) && !call.args.empty()) {
+			TypeRef first_arg_type = checkExpr(call.args[0]);
+			const ls_string_view namespace_name = getTypeNamespace(first_arg_type);
+			if (!empty(namespace_name)) {
+				ls_string_view method_name = m_module.makeQualifiedName(namespace_name, callee_name);
+				*fn_idx = findFunction(method_name);
+				*native_idx = findNativeFunction(method_name);
+				if (*fn_idx >= 0 || *native_idx >= 0) {
+					call.qualified_name = method_name;
+					return method_name;
+				}
+			}
+		}
+		return callee_name;
 	}
 
 	bool checkQualifiedEnumMember(Expr& e, ls_string_view name) {
@@ -1213,33 +1228,40 @@ inline bool sameImportPathForPolicy(ls_string_view lhs, ls_string_view rhs) {
 	return equalStrings(normalizeImportPathForPolicy(lhs), normalizeImportPathForPolicy(rhs));
 }
 
-static bool mathSinF32(std::span<const Value> args, Value* result, void*) {
-	*result = makeF32(std::sin(args[0].f));
+static bool mathSinF32(ls_runtime* runtime, size_t arg_count, size_t result_count, void*) {
+	// TODO remove defensive if? (should be handled by typechecking)
+	if (arg_count < 1 || result_count < 1) return false;
+	ls_push_f32(runtime, std::sin(ls_to_f32(runtime, -1)));
 	return true;
 }
 
-static bool mathCosF32(std::span<const Value> args, Value* result, void*) {
-	*result = makeF32(std::cos(args[0].f));
+static bool mathCosF32(ls_runtime* runtime, size_t arg_count, size_t result_count, void*) {
+	if (arg_count < 1 || result_count < 1) return false;
+	ls_push_f32(runtime, std::cos(ls_to_f32(runtime, -1)));
 	return true;
 }
 
-static bool mathSinF64(std::span<const Value> args, Value* result, void*) {
-	*result = makeF64(std::sin(args[0].d));
+static bool mathSinF64(ls_runtime* runtime, size_t arg_count, size_t result_count, void*) {
+	if (arg_count < 1 || result_count < 1) return false;
+	ls_push_f64(runtime, std::sin(ls_to_f64(runtime, -1)));
 	return true;
 }
 
-static bool mathCosF64(std::span<const Value> args, Value* result, void*) {
-	*result = makeF64(std::cos(args[0].d));
+static bool mathCosF64(ls_runtime* runtime, size_t arg_count, size_t result_count, void*) {
+	if (arg_count < 1 || result_count < 1) return false;
+	ls_push_f64(runtime, std::cos(ls_to_f64(runtime, -1)));
 	return true;
 }
 
-static bool mathSqrtF32(std::span<const Value> args, Value* result, void*) {
-	*result = makeF32(std::sqrt(args[0].f));
+static bool mathSqrtF32(ls_runtime* runtime, size_t arg_count, size_t result_count, void*) {
+	if (arg_count < 1 || result_count < 1) return false;
+	ls_push_f32(runtime, std::sqrt(ls_to_f32(runtime, -1)));
 	return true;
 }
 
-static bool mathSqrtF64(std::span<const Value> args, Value* result, void*) {
-	*result = makeF64(std::sqrt(args[0].d));
+static bool mathSqrtF64(ls_runtime* runtime, size_t arg_count, size_t result_count, void*) {
+	if (arg_count < 1 || result_count < 1) return false;
+	ls_push_f64(runtime, std::sqrt(ls_to_f64(runtime, -1)));
 	return true;
 }
 
