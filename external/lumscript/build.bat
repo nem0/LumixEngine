@@ -71,9 +71,9 @@ echo.
 
 REM Compile
 if /i "%CONFIG%"=="Tests" (
-    cl %CFLAGS% "%SRC_DIR%\core\string.cpp" "%SCRIPT_DIR%tests/main.cpp" "%SCRIPT_DIR%parser.cpp" "%SCRIPT_DIR%compiler.cpp" "%SCRIPT_DIR%bytecode_compiler.cpp" "%SCRIPT_DIR%bytecode_runtime.cpp" "%SCRIPT_DIR%capi.cpp" /link %LDFLAGS%
+	cl %CFLAGS% "%SRC_DIR%\core\string.cpp" "%SCRIPT_DIR%tests/main.cpp" "%SCRIPT_DIR%parser.cpp" "%SCRIPT_DIR%compiler.cpp" "%SCRIPT_DIR%bytecode_compiler.cpp" "%SCRIPT_DIR%runtime.cpp" "%SCRIPT_DIR%capi.cpp" /link %LDFLAGS%
 ) else (
-    cl %CFLAGS% "%SRC_DIR%\core\string.cpp" "%SCRIPT_DIR%lumc.c" "%SCRIPT_DIR%parser.cpp" "%SCRIPT_DIR%compiler.cpp" "%SCRIPT_DIR%bytecode_compiler.cpp" "%SCRIPT_DIR%bytecode_runtime.cpp" "%SCRIPT_DIR%capi.cpp" /link %LDFLAGS%
+	cl %CFLAGS% "%SRC_DIR%\core\string.cpp" "%SCRIPT_DIR%lumc.c" "%SCRIPT_DIR%parser.cpp" "%SCRIPT_DIR%compiler.cpp" "%SCRIPT_DIR%bytecode_compiler.cpp" "%SCRIPT_DIR%runtime.cpp" "%SCRIPT_DIR%capi.cpp" /link %LDFLAGS%
 )
 
 if %ERRORLEVEL% NEQ 0 (
