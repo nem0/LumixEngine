@@ -1120,6 +1120,29 @@ TEST(BreakContinueTypecheck) {
 	return true;
 }
 
+TEST(ForLoopCompiles) {
+	const char* source = R"(
+		fn main() : void {
+			for i = 0..9 {
+			}
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ForLoopVariableIsImmutable) {
+	const char* source = R"(
+		fn main() : void {
+			for i = 0..9 {
+				i = 1;
+			}
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(BreakContinueOutsideLoopFail) {
 	const char* source = R"(
 		fn main() : void {

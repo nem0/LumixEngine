@@ -87,12 +87,13 @@ struct Expr {
 };
 
 struct Stmt {
-	enum Kind { BLOCK, VAR_DECL, FN_DECL, EXPR, ASSIGN, WHILE, BREAK, CONTINUE, RETURN, IF, DEFER, MATCH };
+	enum Kind { BLOCK, VAR_DECL, FN_DECL, EXPR, ASSIGN, WHILE, FOR, BREAK, CONTINUE, RETURN, IF, DEFER, MATCH };
 
 	Kind kind = BLOCK;
 	Token token;
 	std::vector<i32> children;
 	ls_string_view name;
+	ls_string_view label_name;
 	TypeRef type;
 	bool is_const = false;
 	bool is_undefined_init = false;

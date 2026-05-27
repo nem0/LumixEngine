@@ -2644,6 +2644,68 @@ TEST(BreakContinueRuntime) {
 	return true;
 }
 
+TEST(ForLoopRuntime) {
+	const char* source = R"(
+		var bound_hits : i32 = 0;
+
+		fn lower() : i32 {
+			bound_hits += 1;
+			return 0;
+		}
+
+		fn upper() : i32 {
+			bound_hits += 1;
+			return 3;
+		}
+
+		fn main() : i32 {
+			var sum : i32 = 0;
+			for i = lower()..upper() {
+				sum += i;
+			}
+			return bound_hits * 100 + sum;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_EQ(206, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ForLoopRangeEvaluatedOnce) {
+	const char* source = R"(
+		var range_hits : i32 = 0;
+
+		fn lower() : i32 {
+			range_hits += 1;
+			return 0;
+		}
+
+		fn upper() : i32 {
+			range_hits += 1;
+			return 2;
+		}
+
+		fn main() : i32 {
+			var sum : i32 = 0;
+			for i = lower()..upper() {
+				sum += i;
+			}
+			return range_hits * 100 + sum;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_EQ(203, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(NamedLabelBreakContinueRuntime) {
 	const char* source = R"(
 		fn main() : i32 {

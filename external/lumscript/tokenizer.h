@@ -148,6 +148,7 @@ struct Tokenizer {
 					case '3': return checkKeyword("2", 2, 1, Token::F32);
 					case '6': return checkKeyword("4", 2, 1, Token::F64);
 					case 'a': return checkKeyword("lse", 2, 3, Token::FALSE);
+					case 'o': return checkKeyword("r", 2, 1, Token::FOR);
 					case 'n': return checkKeyword("", 2, 0, Token::FN);
 				}
 				break;

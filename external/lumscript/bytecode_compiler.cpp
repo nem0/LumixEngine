@@ -1045,6 +1045,50 @@ static bool bytecodeEmitZeroValue(ls_bytecode& bytecode, ls_type_kind kind) {
 	}
 }
 
+static bool bytecodeEmitOneValue(ls_bytecode& bytecode, ls_type_kind kind) {
+	// Loop increments need a typed literal that matches the counter width.
+	switch (kind) {
+		case LS_TYPE_BOOL:
+		case LS_TYPE_I8:
+		case LS_TYPE_U8:
+		case LS_TYPE_ENUM:
+			pushCode(bytecode, BytecodeOp::LOAD_CONST8);
+			pushCode(bytecode, (u8)1);
+			return true;
+		case LS_TYPE_I16:
+		case LS_TYPE_U16:
+			pushCode(bytecode, BytecodeOp::LOAD_CONST16);
+			pushCode(bytecode, (u16)1);
+			return true;
+		case LS_TYPE_I32:
+		case LS_TYPE_U32:
+		case LS_TYPE_UNTYPED_INT:
+			pushCode(bytecode, BytecodeOp::LOAD_CONST32);
+			pushCode(bytecode, (u32)1);
+			return true;
+		case LS_TYPE_I64:
+		case LS_TYPE_U64:
+			pushCode(bytecode, BytecodeOp::LOAD_CONST64);
+			pushCode(bytecode, (u64)1);
+			return true;
+		case LS_TYPE_F32:
+		case LS_TYPE_UNTYPED_FLOAT: {
+			float one = 1.0f;
+			pushCode(bytecode, BytecodeOp::LOAD_CONST32);
+			pushCode(bytecode, one);
+			return true;
+		}
+		case LS_TYPE_F64: {
+			double one = 1.0;
+			pushCode(bytecode, BytecodeOp::LOAD_CONST64);
+			pushCode(bytecode, one);
+			return true;
+		}
+		default:
+			return false;
+	}
+}
+
 static bool bytecodeEmitCastValue(ls_bytecode& bytecode, ls_type_kind src_kind, ls_type_kind dst_kind) {
 	pushCode(bytecode, BytecodeOp::CAST);
 	pushCode(bytecode, (u8)bytecodeCastKind(src_kind));
@@ -1809,9 +1853,89 @@ static bool bytecodeCompileStmt(Module& module, ls_bytecode& bytecode, BytecodeC
 			const size_t end_pos = bytecode.code.size();
 			BytecodeCompileContext::LoopTarget& loop = ctx.loop_targets.back();
 			for (size_t break_jump : loop.break_jumps) patchJump(bytecode, break_jump, end_pos);
-			for (size_t continue_jump : loop.continue_jumps) patchJump(bytecode, continue_jump, cond_pos);
+			for (size_t continue_jump : loop.continue_jumps) patchJump(bytecode, continue_jump, loop.continue_target);
 			patchJump(bytecode, end_jump, end_pos);
 			ctx.loop_targets.pop_back();
+			return true;
+		}
+		case Stmt::FOR: {
+			// `for` lowers to a single-evaluation header, a loop-local counter, and
+			// a separate increment step that `continue` branches to.
+			if (stmt.expr < 0 || stmt.left < 0 || stmt.right < 0) return false;
+			const TypeRef start_type = module.expressions[stmt.expr].type;
+			const TypeRef end_type = module.expressions[stmt.left].type;
+			if (!isBytecodeComparisonType(start_type.kind) || !isBytecodeComparisonType(end_type.kind) || !sameBaseType(start_type, end_type)) return false;
+
+			const i32 loop_slot = ctx.local_count;
+			const i32 end_slot = loop_slot + 1;
+			if (loop_slot < 0 || end_slot >= 256) return false;
+
+			ctx.pushScope();
+			ctx.addLocal(stmt.label_name, loop_slot, 1, start_type);
+			ctx.addLocal({}, end_slot, 1, end_type);
+			ctx.local_count += 2;
+
+			if (!bytecodeCompileExpr(module, bytecode, ctx, stmt.expr, &start_type)) {
+				ctx.popScope();
+				return false;
+			}
+			if (!bytecodeEmitStoreValue(module, bytecode, loop_slot, start_type)) {
+				ctx.popScope();
+				return false;
+			}
+			if (!bytecodeCompileExpr(module, bytecode, ctx, stmt.left, &end_type)) {
+				ctx.popScope();
+				return false;
+			}
+			if (!bytecodeEmitStoreValue(module, bytecode, end_slot, end_type)) {
+				ctx.popScope();
+				return false;
+			}
+
+			const size_t cond_pos = bytecode.code.size();
+			pushCode(bytecode, BytecodeOp::LOAD_LOCAL);
+			pushCode(bytecode, (u8)loop_slot);
+			pushCode(bytecode, BytecodeOp::LOAD_LOCAL);
+			pushCode(bytecode, (u8)end_slot);
+			pushCode(bytecode, BytecodeOp::CMP_LE);
+			pushCode(bytecode, (u8)bytecodeComparisonKind(start_type.kind));
+
+			size_t end_jump = 0;
+			emitJumpPlaceholder(bytecode, BytecodeOp::JUMP_IF_FALSE, &end_jump);
+
+			BytecodeCompileContext::LoopTarget loop_target{stmt.name, 0, ctx.scopeDepth()};
+			ctx.loop_targets.push_back(loop_target);
+			if (stmt.right >= 0 && !bytecodeCompileStmt(module, bytecode, ctx, stmt.right)) {
+				ctx.loop_targets.pop_back();
+				ctx.popScope();
+				return false;
+			}
+
+			const size_t continue_pos = bytecode.code.size();
+			pushCode(bytecode, BytecodeOp::LOAD_LOCAL);
+			pushCode(bytecode, (u8)loop_slot);
+			if (!bytecodeEmitOneValue(bytecode, start_type.kind)) {
+				ctx.loop_targets.pop_back();
+				ctx.popScope();
+				return false;
+			}
+			pushCode(bytecode, bytecodeCompoundArithmeticOp(Token::PLUS_EQUAL, start_type.kind));
+			pushCode(bytecode, BytecodeOp::STORE_LOCAL);
+			pushCode(bytecode, (u8)loop_slot);
+
+			pushCode(bytecode, BytecodeOp::JUMP);
+			const size_t back_jump_pos = bytecode.code.size();
+			const i32 back_offset = (i32)(cond_pos - (back_jump_pos + sizeof(i32)));
+			pushCode(bytecode, back_offset);
+
+			const size_t end_pos = bytecode.code.size();
+			BytecodeCompileContext::LoopTarget& loop = ctx.loop_targets.back();
+			loop.continue_target = continue_pos;
+			for (size_t break_jump : loop.break_jumps) patchJump(bytecode, break_jump, end_pos);
+			for (size_t continue_jump : loop.continue_jumps) patchJump(bytecode, continue_jump, loop.continue_target);
+			patchJump(bytecode, end_jump, end_pos);
+			ctx.loop_targets.pop_back();
+			ctx.popScope();
 			return true;
 		}
 		case Stmt::BREAK:

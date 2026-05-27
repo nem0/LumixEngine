@@ -7,7 +7,6 @@
 ---
 
 * operators
-* for cycle
 * debugger
 * string interpolation
 * jit/llvm
@@ -61,6 +60,7 @@ LumScript is a small, statically typed scripting language for Lumix Engine.
 	- [If / else](#if--else)
 	- [Match](#match)
 	- [While](#while)
+	- [For](#for)
 	- [Break / continue / labels](#break--continue--labels)
 	- [Defer](#defer)
 	- [Return](#return)
@@ -639,6 +639,31 @@ while i > 0 {
 ```
 
 Conditions must be `bool`. Runtime enforces a configurable step budget to limit accidental infinite loops.
+
+### For
+
+```cpp
+for i = 0..9 {
+	log.logError(i);
+}
+```
+
+The `a..b` range is inclusive. The range expressions are evaluated once before the loop starts. The loop variable is introduced by the `for` statement and is immutable inside the loop body.
+
+If the lower bound is greater than the upper bound, the loop body does not execute.
+
+This is equivalent to evaluating the bounds once, then iterating upward with an internal counter:
+
+```cpp
+const from = 0;
+const to = 9;
+var current = from;
+while current <= to {
+	const i = from;
+	log.logError(i);
+	++current;
+}
+```
 
 ### Break / continue / labels
 

@@ -51,6 +51,7 @@ struct Token {
 		RETURN,
 		REF,
 		WHILE,
+		FOR,
 		IF,
 		ELSE,
 		IMPORT,

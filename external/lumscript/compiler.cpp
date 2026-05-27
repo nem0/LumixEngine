@@ -1153,6 +1153,37 @@ struct Checker {
 				m_loop_labels.pop_back();
 				break;
 			}
+			case Stmt::FOR: {
+				if (!empty(stmt.name)) {
+					const i32 label_scope_start = m_label_scope_starts.empty() ? 0 : m_label_scope_starts.back();
+					for (i32 i = label_scope_start; i < m_declared_labels.size(); ++i) {
+						if (!equalStrings(m_declared_labels[i], stmt.name)) continue;
+						m_output.errorAt(stmt.token, "Duplicate loop label '", stmt.name, "'");
+						return;
+					}
+					m_declared_labels.push_back(stmt.name);
+				}
+				TypeRef end_type = checkExpr(stmt.left);
+				if (!isNumeric(end_type)) {
+					m_output.errorAt(stmt.token, "For range requires numeric bounds");
+					return;
+				}
+				TypeRef start_type = checkExpr(stmt.expr, &end_type);
+				if (!isNumeric(start_type) || !sameBaseType(start_type, end_type)) {
+					m_output.errorAt(stmt.token, "For range bounds must have the same numeric type");
+					return;
+				}
+				const i32 old_size = m_locals.size();
+				LocalInfo& local = m_locals.emplace_back();
+				local.name = stmt.label_name;
+				local.type = start_type;
+				local.is_const = true;
+				m_loop_labels.push_back(stmt.name);
+				checkStmt(stmt.right, return_type);
+				m_loop_labels.pop_back();
+				m_locals.resize(old_size);
+				break;
+			}
 			case Stmt::BREAK:
 			case Stmt::CONTINUE: {
 				if (m_loop_labels.empty()) {

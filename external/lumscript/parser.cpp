@@ -297,18 +297,37 @@ struct Parser {
 		if (t.type == Token::IDENTIFIER && peekNext().type == Token::COLON) {
 			Token label = consumeToken();
 			consume(Token::COLON);
-			if (!match(Token::WHILE)) {
-				error(peek(), "Only while can be labeled");
-				return -1;
+			if (match(Token::WHILE)) {
+				const i32 stmt_idx = addStmt(Stmt::WHILE, t);
+				m_module.statements[stmt_idx].name = label.value;
+				const bool old_allow_constructor = m_allow_constructor;
+				m_allow_constructor = false;
+				m_module.statements[stmt_idx].expr = parseExpression();
+				m_allow_constructor = old_allow_constructor;
+				m_module.statements[stmt_idx].right = parseBlock();
+				return stmt_idx;
 			}
-			const i32 stmt_idx = addStmt(Stmt::WHILE, t);
-			m_module.statements[stmt_idx].name = label.value;
-			const bool old_allow_constructor = m_allow_constructor;
-			m_allow_constructor = false;
-			m_module.statements[stmt_idx].expr = parseExpression();
-			m_allow_constructor = old_allow_constructor;
-			m_module.statements[stmt_idx].right = parseBlock();
-			return stmt_idx;
+			if (match(Token::FOR)) {
+				const i32 stmt_idx = addStmt(Stmt::FOR, t);
+				m_module.statements[stmt_idx].name = label.value;
+				Token name;
+				if (!consume(Token::IDENTIFIER, &name)) return stmt_idx;
+				m_module.statements[stmt_idx].label_name = name.value;
+				if (!consume(Token::EQUAL)) return stmt_idx;
+				const bool old_allow_constructor = m_allow_constructor;
+				m_allow_constructor = false;
+				m_module.statements[stmt_idx].expr = parseExpression();
+				if (!consume(Token::RANGE)) {
+					m_allow_constructor = old_allow_constructor;
+					return stmt_idx;
+				}
+				m_module.statements[stmt_idx].left = parseExpression();
+				m_allow_constructor = old_allow_constructor;
+				m_module.statements[stmt_idx].right = parseBlock();
+				return stmt_idx;
+			}
+			error(peek(), "Only while and for can be labeled");
+			return -1;
 		}
 		if (t.type == Token::LEFT_BRACE) return parseBlock();
 		if (match(Token::FN)) {
@@ -343,6 +362,24 @@ struct Parser {
 			const bool old_allow_constructor = m_allow_constructor;
 			m_allow_constructor = false;
 			m_module.statements[stmt_idx].expr = parseExpression();
+			m_allow_constructor = old_allow_constructor;
+			m_module.statements[stmt_idx].right = parseBlock();
+			return stmt_idx;
+		}
+		if (match(Token::FOR)) {
+			const i32 stmt_idx = addStmt(Stmt::FOR, t);
+			Token name;
+			if (!consume(Token::IDENTIFIER, &name)) return stmt_idx;
+			m_module.statements[stmt_idx].label_name = name.value;
+			if (!consume(Token::EQUAL)) return stmt_idx;
+			const bool old_allow_constructor = m_allow_constructor;
+			m_allow_constructor = false;
+			m_module.statements[stmt_idx].expr = parseExpression();
+			if (!consume(Token::RANGE)) {
+				m_allow_constructor = old_allow_constructor;
+				return stmt_idx;
+			}
+			m_module.statements[stmt_idx].left = parseExpression();
 			m_allow_constructor = old_allow_constructor;
 			m_module.statements[stmt_idx].right = parseBlock();
 			return stmt_idx;
