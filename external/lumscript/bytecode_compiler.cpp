@@ -114,7 +114,7 @@ static u64 bytecodeEncodeFunctionHandle(i32 index) {
 	return (u64)(u32)(index + 1);
 }
 
-static i32 bytecodeTypeSlotCount(Module& module, TypeRef type);
+static i32 bytecodeTypeSlotCount(ls_module& module, TypeRef type);
 static TypeRef bytecodeNonNullableType(TypeRef type) {
 	type.nullable = false;
 	return type;
@@ -130,7 +130,7 @@ static bool bytecodeSplitMemberName(ls_string_view name, ls_string_view* owner, 
 	return false;
 }
 
-static ls_string_view bytecodeGetTypeNamespace(Module& module, TypeRef type) {
+static ls_string_view bytecodeGetTypeNamespace(ls_module& module, TypeRef type) {
 	ls_string_view type_name = type.name;
 	if (type.kind == LS_TYPE_NATIVE && type.struct_index >= 0 && type.struct_index < module.native_types.size()) {
 		type_name = module.native_types[type.struct_index].name;
@@ -150,7 +150,7 @@ static ls_string_view bytecodeGetTypeNamespace(Module& module, TypeRef type) {
 
 // The bytecode VM still uses a flat `u64` stack, so aggregate values are
 // represented as consecutive scalar slots rather than boxed objects.
-static bool bytecodeStructFieldOffset(Module& module, const TypeRef& type, ls_string_view field_name, i32* offset, TypeRef* field_type) {
+static bool bytecodeStructFieldOffset(ls_module& module, const TypeRef& type, ls_string_view field_name, i32* offset, TypeRef* field_type) {
 	if (type.kind != LS_TYPE_STRUCT || type.struct_index < 0 || type.struct_index >= module.structs.size()) return false;
 	const StructDecl& s = module.structs[type.struct_index];
 	i32 current_offset = 0;
@@ -166,7 +166,7 @@ static bool bytecodeStructFieldOffset(Module& module, const TypeRef& type, ls_st
 	return false;
 }
 
-static i32 bytecodeTypeSlotCount(Module& module, TypeRef type) {
+static i32 bytecodeTypeSlotCount(ls_module& module, TypeRef type) {
 	if (type.nullable) return 1 + bytecodeTypeSlotCount(module, bytecodeNonNullableType(type));
 	switch (type.kind == LS_TYPE_UNTYPED_INT ? LS_TYPE_I32 : type.kind) {
 		case LS_TYPE_BOOL:
@@ -227,14 +227,14 @@ struct BytecodeValueAccess {
 };
 
 struct BytecodeCompileContext;
-static bool bytecodeResolveValueAccess(Module& module, BytecodeCompileContext& ctx, i32 expr_idx, BytecodeValueAccess* out);
-static bool bytecodeResolveValueAccessByExpr(Module& module, BytecodeCompileContext& ctx, Expr& expr, BytecodeValueAccess* out);
-static bool bytecodeEmitLoadValueRange(Module& module, ls_bytecode& bytecode, const BytecodeValueAccess& access, i32 start_offset, i32 slot_count);
-static bool bytecodeEmitLoadValue(Module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, const BytecodeValueAccess& access);
-static bool bytecodeEmitAddressOfValue(Module& module, ls_bytecode& bytecode, const BytecodeCompileContext& ctx, const BytecodeValueAccess& access);
-static bool bytecodeEmitStoreValue(Module& module, ls_bytecode& bytecode, i32 slot, const TypeRef& type);
-static bool bytecodeEmitPopValue(Module& module, ls_bytecode& bytecode, const TypeRef& type);
-static bool bytecodeGetCompileTimeInteger(Module& module, i32 expr_idx, i64* value);
+static bool bytecodeResolveValueAccess(ls_module& module, BytecodeCompileContext& ctx, i32 expr_idx, BytecodeValueAccess* out);
+static bool bytecodeResolveValueAccessByExpr(ls_module& module, BytecodeCompileContext& ctx, Expr& expr, BytecodeValueAccess* out);
+static bool bytecodeEmitLoadValueRange(ls_module& module, ls_bytecode& bytecode, const BytecodeValueAccess& access, i32 start_offset, i32 slot_count);
+static bool bytecodeEmitLoadValue(ls_module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, const BytecodeValueAccess& access);
+static bool bytecodeEmitAddressOfValue(ls_module& module, ls_bytecode& bytecode, const BytecodeCompileContext& ctx, const BytecodeValueAccess& access);
+static bool bytecodeEmitStoreValue(ls_module& module, ls_bytecode& bytecode, i32 slot, const TypeRef& type);
+static bool bytecodeEmitPopValue(ls_module& module, ls_bytecode& bytecode, const TypeRef& type);
+static bool bytecodeGetCompileTimeInteger(ls_module& module, i32 expr_idx, i64* value);
 static bool bytecodeEmitFunctionValue(ls_bytecode& bytecode, i32 index);
 
 static BytecodeOp integerAddOp(ls_type_kind kind) {
@@ -417,39 +417,7 @@ static void patchJump(ls_bytecode& bytecode, size_t operand_pos, size_t target_p
 	patchJump(bytecode.code, operand_pos, target_pos);
 }
 
-static i32 bytecodeFindFunction(const Module& module, ls_string_view name) {
-	// Compile-time lookup is simple enough that a linear scan is sufficient.
-	for (i32 i = 0; i < module.functions.size(); ++i) {
-		if (equalStrings(module.functions[i].name, name)) return i;
-	}
-	return -1;
-}
-
-static i32 bytecodeFindNativeFunction(const Module& module, ls_string_view name) {
-	// Native functions participate in the same compile-time name lookup as
-	// scripted functions, but they are lowered to a separate VM opcode.
-	for (i32 i = 0; i < module.native_functions.size(); ++i) {
-		if (equalStrings(module.native_functions[i].name, name)) return i;
-	}
-	return -1;
-}
-
-static i32 bytecodeFindGlobal(const Module& module, ls_string_view name) {
-	// Globals are also resolved by name during compilation.
-	for (i32 i = 0; i < module.globals.size(); ++i) {
-		if (equalStrings(module.globals[i].name, name)) return i;
-	}
-	return -1;
-}
-
-static i32 bytecodeFindEnumMember(const EnumDecl& e, ls_string_view name) {
-	for (i32 i = 0; i < e.members.size(); ++i) {
-		if (equalStrings(e.members[i].name, name)) return i;
-	}
-	return -1;
-}
-
-static ls_string_view bytecodeGetExpressionName(Module& module, i32 expr_idx) {
+static ls_string_view bytecodeGetExpressionName(ls_module& module, i32 expr_idx) {
 	// Call sites may point to expression trees, so we reconstruct the qualified
 	// name lazily when needed.
 	if (expr_idx < 0 || expr_idx >= module.expressions.size()) return {};
@@ -463,11 +431,11 @@ static ls_string_view bytecodeGetExpressionName(Module& module, i32 expr_idx) {
 }
 
 struct BytecodeCompileContext;
-static bool bytecodeCompileExpr(Module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, i32 expr_idx, const TypeRef* expected = nullptr);
-static bool bytecodeCompileMatchStmt(Module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, Stmt& stmt);
-static bool bytecodeCompileStmt(Module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, i32 stmt_idx);
+static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, i32 expr_idx, const TypeRef* expected = nullptr);
+static bool bytecodeCompileMatchStmt(ls_module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, Stmt& stmt);
+static bool bytecodeCompileStmt(ls_module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, i32 stmt_idx);
 
-static bool bytecodeCompileComparisonExpr(Module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, Expr& expr) {
+static bool bytecodeCompileComparisonExpr(ls_module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, Expr& expr) {
 	// The left operand decides the compare width. We emit both values first, then
 	// append the comparison opcode and a one-byte type tag for the VM.
 	const ls_type_kind left_kind = expr.left >= 0 ? module.expressions[expr.left].type.kind : LS_TYPE_INVALID;
@@ -536,7 +504,7 @@ static void bytecodePushBool(ls_bytecode& bytecode, bool value) {
 	reserved permanently and a small hidden init program seeds them before the
 	first user call.
 */
-static bool bytecodeCompileLogicalAndExpr(Module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, Expr& expr) {
+static bool bytecodeCompileLogicalAndExpr(ls_module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, Expr& expr) {
 	if (!bytecodeCompileExpr(module, bytecode, ctx, expr.left)) return false;
 	size_t false_jump = 0;
 	emitJumpPlaceholder(bytecode, BytecodeOp::JUMP_IF_FALSE, &false_jump);
@@ -555,7 +523,7 @@ static bool bytecodeCompileLogicalAndExpr(Module& module, ls_bytecode& bytecode,
 	return true;
 }
 
-static bool bytecodeCompileLogicalOrExpr(Module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, Expr& expr) {
+static bool bytecodeCompileLogicalOrExpr(ls_module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, Expr& expr) {
 	if (!bytecodeCompileExpr(module, bytecode, ctx, expr.left)) return false;
 	size_t rhs_jump = 0;
 	emitJumpPlaceholder(bytecode, BytecodeOp::JUMP_IF_FALSE, &rhs_jump);
@@ -694,7 +662,7 @@ struct BytecodeCompileContext {
 
 };
 
-static bool bytecodeResolveValueAccessByExpr(Module& module, BytecodeCompileContext& ctx, Expr& expr, BytecodeValueAccess* out) {
+static bool bytecodeResolveValueAccessByExpr(ls_module& module, BytecodeCompileContext& ctx, Expr& expr, BytecodeValueAccess* out) {
 	// Resolve an expression to a stack-accessible value view.
 	//
 	// The bytecode backend does not materialize a separate aggregate value
@@ -724,7 +692,7 @@ static bool bytecodeResolveValueAccessByExpr(Module& module, BytecodeCompileCont
 			out->is_ref = binding->is_ref;
 			return true;
 		}
-		const i32 global_idx = bytecodeFindGlobal(module, expr.name);
+		const i32 global_idx = module.findGlobal(expr.name);
 		if (global_idx >= 0) {
 			out->kind = BytecodeValueKind::GLOBAL;
 			out->slot = module.globals[global_idx].slot;
@@ -778,7 +746,7 @@ static bool bytecodeResolveValueAccessByExpr(Module& module, BytecodeCompileCont
 	return false;
 }
 
-static bool bytecodeGetCompileTimeInteger(Module& module, i32 expr_idx, i64* value) {
+static bool bytecodeGetCompileTimeInteger(ls_module& module, i32 expr_idx, i64* value) {
 	if (expr_idx < 0 || expr_idx >= module.expressions.size()) return false;
 	Expr& e = module.expressions[expr_idx];
 	switch (e.kind) {
@@ -797,13 +765,13 @@ static bool bytecodeGetCompileTimeInteger(Module& module, i32 expr_idx, i64* val
 	}
 }
 
-static bool bytecodeResolveValueAccess(Module& module, BytecodeCompileContext& ctx, i32 expr_idx, BytecodeValueAccess* out) {
+static bool bytecodeResolveValueAccess(ls_module& module, BytecodeCompileContext& ctx, i32 expr_idx, BytecodeValueAccess* out) {
 	if (expr_idx < 0 || expr_idx >= module.expressions.size()) return false;
 	return bytecodeResolveValueAccessByExpr(module, ctx, module.expressions[expr_idx], out);
 }
 
 static bool bytecodeEmitRuntimeIndexedAccess(
-	Module& module,
+	ls_module& module,
 	ls_bytecode& bytecode,
 	BytecodeCompileContext& ctx,
 	Expr& expr,
@@ -844,7 +812,7 @@ static bool bytecodeEmitRuntimeIndexedAccess(
 	return true;
 }
 
-static bool bytecodeEmitLoadValue(Module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, const BytecodeValueAccess& access) {
+static bool bytecodeEmitLoadValue(ls_module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, const BytecodeValueAccess& access) {
 	const i32 slot_count = bytecodeTypeSlotCount(module, access.type);
 	if (slot_count <= 0) return false;
 	// Non-ref values are loaded directly from their flattened storage. Ref
@@ -856,7 +824,7 @@ static bool bytecodeEmitLoadValue(Module& module, ls_bytecode& bytecode, Bytecod
 	return true;
 }
 
-static bool bytecodeEmitAddressOfValue(Module& module, ls_bytecode& bytecode, const BytecodeCompileContext& ctx, const BytecodeValueAccess& access) {
+static bool bytecodeEmitAddressOfValue(ls_module& module, ls_bytecode& bytecode, const BytecodeCompileContext& ctx, const BytecodeValueAccess& access) {
 	const i32 physical_slot = access.slot + access.value_slot_offset;
 	if (!access.is_ref) {
 		// For non-ref values we do not have a runtime address object, so the
@@ -902,7 +870,7 @@ static bool bytecodeEmitAddressOfValue(Module& module, ls_bytecode& bytecode, co
 	return true;
 }
 
-static bool bytecodeEmitLoadValueRange(Module& module, ls_bytecode& bytecode, const BytecodeValueAccess& access, i32 start_offset, i32 slot_count) {
+static bool bytecodeEmitLoadValueRange(ls_module& module, ls_bytecode& bytecode, const BytecodeValueAccess& access, i32 start_offset, i32 slot_count) {
 	if (slot_count <= 0) return false;
 	const i32 physical_slot = access.slot + start_offset;
 	switch (access.kind) {
@@ -928,7 +896,7 @@ static bool bytecodeEmitLoadValueRange(Module& module, ls_bytecode& bytecode, co
 
 // Stores and pops mirror load behavior: one opcode per flattened slot keeps
 // the existing runtime stack model intact while structs flow through it.
-static bool bytecodeEmitStoreValue(Module& module, ls_bytecode& bytecode, i32 slot, const TypeRef& type) {
+static bool bytecodeEmitStoreValue(ls_module& module, ls_bytecode& bytecode, i32 slot, const TypeRef& type) {
 	const i32 slot_count = bytecodeTypeSlotCount(module, type);
 	if (slot_count <= 0) return false;
 	// Stores walk backward so the last pushed value slot ends up at the highest
@@ -942,7 +910,7 @@ static bool bytecodeEmitStoreValue(Module& module, ls_bytecode& bytecode, i32 sl
 	return true;
 }
 
-static bool bytecodeEmitNullValue(Module& module, ls_bytecode& bytecode, const TypeRef& type) {
+static bool bytecodeEmitNullValue(ls_module& module, ls_bytecode& bytecode, const TypeRef& type) {
 	if (!type.nullable) return false;
 	// Nullable values are encoded as a leading presence tag followed by the
 	// underlying payload slots. A null literal therefore emits tag=0 and zeros
@@ -959,7 +927,7 @@ static bool bytecodeEmitNullValue(Module& module, ls_bytecode& bytecode, const T
 	return true;
 }
 
-static bool bytecodeCompileNullablePromotion(Module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, i32 expr_idx, ls_string_view* var_name, TypeRef* promoted_type, bool* promote_true_branch) {
+static bool bytecodeCompileNullablePromotion(ls_module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, i32 expr_idx, ls_string_view* var_name, TypeRef* promoted_type, bool* promote_true_branch) {
 	if (expr_idx < 0) return false;
 	Expr& cond = module.expressions[expr_idx];
 	if (cond.kind != Expr::BINARY) return false;
@@ -981,7 +949,7 @@ static bool bytecodeCompileNullablePromotion(Module& module, ls_bytecode& byteco
 	return true;
 }
 
-static bool bytecodeEmitWrapNullable(Module& module, ls_bytecode& bytecode, const TypeRef& nullable_type, const TypeRef& value_type) {
+static bool bytecodeEmitWrapNullable(ls_module& module, ls_bytecode& bytecode, const TypeRef& nullable_type, const TypeRef& value_type) {
 	if (!nullable_type.nullable) return false;
 	TypeRef nonnull = nullable_type;
 	nonnull.nullable = false;
@@ -1096,7 +1064,7 @@ static bool bytecodeEmitCastValue(ls_bytecode& bytecode, ls_type_kind src_kind, 
 	return true;
 }
 
-static bool bytecodeEmitStoreGlobalValue(Module& module, ls_bytecode& bytecode, i32 slot, const TypeRef& type) {
+static bool bytecodeEmitStoreGlobalValue(ls_module& module, ls_bytecode& bytecode, i32 slot, const TypeRef& type) {
 	const i32 slot_count = bytecodeTypeSlotCount(module, type);
 	if (slot_count <= 0) return false;
 	// Store globals back-to-front so the top of the stack always contains the
@@ -1109,14 +1077,14 @@ static bool bytecodeEmitStoreGlobalValue(Module& module, ls_bytecode& bytecode, 
 	return true;
 }
 
-static bool bytecodeEmitPopValue(Module& module, ls_bytecode& bytecode, const TypeRef& type) {
+static bool bytecodeEmitPopValue(ls_module& module, ls_bytecode& bytecode, const TypeRef& type) {
 	const i32 slot_count = bytecodeTypeSlotCount(module, type);
 	if (slot_count <= 0) return true;
 	for (i32 i = 0; i < slot_count; ++i) pushCode(bytecode, BytecodeOp::POP);
 	return true;
 }
 
-static bool bytecodeEmitDeferredScope(Module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, i32 scope_depth) {
+static bool bytecodeEmitDeferredScope(ls_module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, i32 scope_depth) {
 	if (scope_depth < 0 || scope_depth >= ctx.deferred_scopes.size()) return false;
 	const std::vector<i32> deferreds = ctx.deferred_scopes[scope_depth];
 	// Defers run last-in, first-out within a scope.
@@ -1126,7 +1094,7 @@ static bool bytecodeEmitDeferredScope(Module& module, ls_bytecode& bytecode, Byt
 	return true;
 }
 
-static bool bytecodeEmitDeferredScopes(Module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, i32 scope_depth) {
+static bool bytecodeEmitDeferredScopes(ls_module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, i32 scope_depth) {
 	if (scope_depth < 0) return false;
 	const i32 current_depth = ctx.scopeDepth();
 	if (scope_depth >= current_depth) return true;
@@ -1140,7 +1108,7 @@ struct BytecodeMatchArmInfo {
 	std::vector<size_t> body_jumps;
 };
 
-static bool bytecodeCompileMatchStmt(Module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, Stmt& stmt) {
+static bool bytecodeCompileMatchStmt(ls_module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, Stmt& stmt) {
 	if (stmt.expr < 0) return false;
 	const TypeRef subject_type = module.expressions[stmt.expr].type;
 	if (!isBytecodeComparisonType(subject_type.kind)) return false;
@@ -1232,7 +1200,7 @@ static bool bytecodeCompileMatchStmt(Module& module, ls_bytecode& bytecode, Byte
 	return true;
 }
 
-static bool bytecodeCompileExpr(Module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, i32 expr_idx, const TypeRef* expected) {
+static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, i32 expr_idx, const TypeRef* expected) {
 	if (expr_idx < 0 || expr_idx >= module.expressions.size()) return false;
 	Expr& expr = module.expressions[expr_idx];
 	TypeRef wrapped_expected = {};
@@ -1291,7 +1259,7 @@ static bool bytecodeCompileExpr(Module& module, ls_bytecode& bytecode, BytecodeC
 			if (enum_idx < 0 || enum_idx >= module.enums.size()) {
 				enum_idx = -1;
 				for (i32 i = 0; i < module.enums.size(); ++i) {
-					if (bytecodeFindEnumMember(module.enums[i], expr.name) >= 0) {
+					if (module.findEnumMember(module.enums[i], expr.name) >= 0) {
 						if (enum_idx >= 0) return false;
 						enum_idx = i;
 					}
@@ -1299,7 +1267,7 @@ static bool bytecodeCompileExpr(Module& module, ls_bytecode& bytecode, BytecodeC
 				if (enum_idx < 0) return false;
 			}
 			const EnumDecl& e = module.enums[enum_idx];
-			const i32 member_idx = bytecodeFindEnumMember(e, expr.name);
+			const i32 member_idx = module.findEnumMember(e, expr.name);
 			if (member_idx < 0) return false;
 			pushCode(bytecode, BytecodeOp::LOAD_CONST32);
 			const i32 value = e.members[member_idx].value;
@@ -1443,13 +1411,13 @@ static bool bytecodeCompileExpr(Module& module, ls_bytecode& bytecode, BytecodeC
 			const ls_string_view callee_name = empty(expr.qualified_name) ? bytecodeGetExpressionName(module, expr.left) : expr.qualified_name;
 			i32 fn_idx = -1;
 			if (!empty(callee_name)) {
-				fn_idx = bytecodeFindFunction(module, callee_name);
+				fn_idx = module.findFunction(callee_name);
 				if (fn_idx < 0 && expr.method_receiver < 0 && !expr.args.empty()) {
 					TypeRef first_arg_type = module.expressions[expr.args[0]].type;
 					const ls_string_view namespace_name = bytecodeGetTypeNamespace(module, first_arg_type);
 					if (!empty(namespace_name)) {
 						const ls_string_view namespaced_name = module.makeQualifiedName(namespace_name, callee_name);
-						fn_idx = bytecodeFindFunction(module, namespaced_name);
+						fn_idx = module.findFunction(namespaced_name);
 						if (fn_idx >= 0) expr.qualified_name = namespaced_name;
 					}
 				}
@@ -1497,13 +1465,13 @@ static bool bytecodeCompileExpr(Module& module, ls_bytecode& bytecode, BytecodeC
 
 			i32 native_idx = -1;
 			if (!empty(callee_name)) {
-				native_idx = bytecodeFindNativeFunction(module, callee_name);
+				native_idx = module.findNativeFunction(callee_name);
 				if (native_idx < 0 && expr.method_receiver < 0 && !expr.args.empty()) {
 					TypeRef first_arg_type = module.expressions[expr.args[0]].type;
 					const ls_string_view namespace_name = bytecodeGetTypeNamespace(module, first_arg_type);
 					if (!empty(namespace_name)) {
 						const ls_string_view namespaced_name = module.makeQualifiedName(namespace_name, callee_name);
-						native_idx = bytecodeFindNativeFunction(module, namespaced_name);
+						native_idx = module.findNativeFunction(namespaced_name);
 						if (native_idx >= 0) expr.qualified_name = namespaced_name;
 					}
 				}
@@ -1560,7 +1528,7 @@ static bool bytecodeCompileExpr(Module& module, ls_bytecode& bytecode, BytecodeC
 	}
 }
 
-static bool bytecodeCompileStmt(Module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, i32 stmt_idx) {
+static bool bytecodeCompileStmt(ls_module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, i32 stmt_idx) {
 	if (stmt_idx < 0 || stmt_idx >= module.statements.size()) return false;
 	Stmt& stmt = module.statements[stmt_idx];
 	switch (stmt.kind) {
@@ -1796,7 +1764,7 @@ static bool bytecodeCompileStmt(Module& module, ls_bytecode& bytecode, BytecodeC
 						return false;
 				}
 			}
-			const i32 global_idx = bytecodeFindGlobal(module, lhs.name);
+			const i32 global_idx = module.findGlobal(lhs.name);
 			if (global_idx < 0) return false;
 			// Global writes target the reserved module-state prefix.
 			switch (stmt.assign_op) {
@@ -2010,7 +1978,7 @@ static bool bytecodeCompileStmt(Module& module, ls_bytecode& bytecode, BytecodeC
 	}
 }
 
-static bool bytecodeCompileFunction(Module& module, ls_bytecode& bytecode, FunctionDecl& fn) {
+static bool bytecodeCompileFunction(ls_module& module, ls_bytecode& bytecode, FunctionDecl& fn) {
 	BytecodeFunction out;
 	out.name = fn.name;
 	out.code_offset = (i32)bytecode.code.size();
@@ -2037,7 +2005,7 @@ static bool bytecodeCompileFunction(Module& module, ls_bytecode& bytecode, Funct
 	return true;
 }
 
-static bool bytecodeCompileGlobals(Module& module, ls_bytecode& bytecode, const ls_host* host) {
+static bool bytecodeCompileGlobals(ls_module& module, ls_bytecode& bytecode, const ls_host* host) {
 	// Global storage is counted up front because it reserves the runtime stack
 	// prefix even before initialization runs.
 	i32 global_slot = 0;
@@ -2085,11 +2053,14 @@ static bool bytecodeCompileGlobals(Module& module, ls_bytecode& bytecode, const 
 	return true;
 }
 
-ls_bytecode* compileBytecode(Module& module, const ls_host* host) {
+ls_bytecode* compileBytecode(ls_module& module, const ls_host* host) {
 	// Lay out globals first so function lowering can resolve their flattened
 	// stack slots, then emit functions and the hidden global initializer program.
 	const ls_host* bytecode_host = host ? host : module.host;
-	ls_bytecode* bytecode = allocateObject<ls_bytecode>(bytecode_host, bytecode_host);
+	void* bytecode_mem = bytecode_host && bytecode_host->allocate
+		? bytecode_host->allocate(bytecode_host->allocator_userdata, sizeof(ls_bytecode), alignof(ls_bytecode))
+		: ::operator new(sizeof(ls_bytecode), std::nothrow);
+	ls_bytecode* bytecode = bytecode_mem ? ::new (bytecode_mem) ls_bytecode(bytecode_host) : nullptr;
 	if (!bytecode) return nullptr;
 	bytecode->native_functions.reserve(module.native_functions.size());
 	for (const NativeFunctionDecl& fn : module.native_functions) {
@@ -2097,26 +2068,37 @@ ls_bytecode* compileBytecode(Module& module, const ls_host* host) {
 		out.name = fn.name;
 		for (const Param& param : fn.params) out.params.push_back(toC(param.type));
 		out.return_type = toC(fn.return_type);
-		out.callback = reinterpret_cast<ls_native_fn>(fn.callback);
-		out.userdata = fn.userdata;
 		bytecode->native_functions.push_back(std::move(out));
 	}
 	
 	if (!bytecodeCompileGlobals(module, *bytecode, bytecode_host)) {
-		destroyBytecode(bytecode);
+		ls_bytecode_destroy(bytecode);
 		return nullptr;
 	}
 	for (FunctionDecl& fn : module.functions) {
 		if (!bytecodeCompileFunction(module, *bytecode, fn)) {
-			destroyBytecode(bytecode);
+			ls_bytecode_destroy(bytecode);
 			return nullptr;
 		}
 	}
 	return bytecode;
 }
 
-void destroyBytecode(ls_bytecode* bytecode) {
+extern "C" {
+
+void ls_bytecode_destroy(ls_bytecode* bytecode) {
 	if (!bytecode) return;
 	ls_host host = bytecode->host;
-	deleteObject(&host, bytecode);
+	bytecode->~ls_bytecode();
+	deallocateMemory(&host, bytecode);
+}
+
+ls_bytecode* ls_bytecode_compile(
+	ls_module* module,
+	ls_host* host
+) {
+	if (!module) return nullptr;
+	return compileBytecode(*module, host);
+}
+
 }

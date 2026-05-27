@@ -38,7 +38,7 @@ void print(int val) { printf("%d", val); }
 		TestContext context; \
 		ls_module* module = ls_module_create(&context.host); \
 		EXPECT_TRUE(module != nullptr); \
-		bool compiled = ls_module_compile(module, toLs(src), {}, &context.host, nullptr, nullptr); \
+		bool compiled = ls_module_compile(module, toLs(src), {}, nullptr, nullptr); \
 		ls_module_destroy(module); \
 		EXPECT_TRUE(compiled); \
 	} while(false)
@@ -49,7 +49,7 @@ void print(int val) { printf("%d", val); }
 		ls_module* module = ls_module_create(&context.host); \
 		EXPECT_TRUE(module != nullptr); \
 		context.diagnostics.output_enabled = false; \
-		EXPECT_TRUE(!ls_module_compile(module, toLs(src), {}, &context.host, nullptr, nullptr)); \
+		EXPECT_TRUE(!ls_module_compile(module, toLs(src), {}, nullptr, nullptr)); \
 		ls_module_destroy(module); \
 	} while(false)
 

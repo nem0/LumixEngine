@@ -1,23 +1,18 @@
 #pragma once
 
-#include <cmath>
-
 #include "ast.h"
-#include "compiler.h"
+
+bool parse(ls_module& module, ls_string_view source, ls_string_view declaration_prefix = {}, ls_string_view source_name = {});
 
 static NativeFunctionDecl& addNativeFunction(
-	Module& module,
+	ls_module& module,
 	ls_string_view name,
 	TypeRef return_type,
-	std::span<const TypeRef> param_types,
-	NativeCallback callback,
-	void* userdata = nullptr
+	std::span<const TypeRef> param_types
 ) {
 	NativeFunctionDecl& fn = module.native_functions.emplace_back();
 	fn.name = name;
 	fn.return_type = return_type;
-	fn.callback = callback;
-	fn.userdata = userdata;
 	for (TypeRef type : param_types) {
 		Param& param = fn.params.emplace_back();
 		param.type = type;
@@ -37,7 +32,7 @@ struct LocalFunctionInfo {
 };
 
 struct Checker {
-	Checker(Module& module)
+	Checker(ls_module& module)
 		: m_module(module)
 		, m_output(module.host)
 	{}
@@ -60,11 +55,11 @@ struct Checker {
 					return false;
 				}
 			}
-			if (findNativeFunction(m_module.functions[i].name) >= 0) {
+			if (m_module.findNativeFunction(m_module.functions[i].name) >= 0) {
 				m_output.errorAt(m_module.functions[i].token, "Duplicate function '", m_module.functions[i].name, "'");
 				return false;
 			}
-			if (findGlobal(m_module.functions[i].name) >= 0) {
+			if (m_module.findGlobal(m_module.functions[i].name) >= 0) {
 				m_output.errorAt(m_module.functions[i].token, "Duplicate declaration '", m_module.functions[i].name, "'");
 				return false;
 			}
@@ -76,7 +71,7 @@ struct Checker {
 					return false;
 				}
 			}
-			if (findFunction(m_module.globals[i].name) >= 0 || findNativeFunction(m_module.globals[i].name) >= 0) {
+			if (m_module.findFunction(m_module.globals[i].name) >= 0 || m_module.findNativeFunction(m_module.globals[i].name) >= 0) {
 				m_output.errorAt(m_module.globals[i].token, "Duplicate declaration '", m_module.globals[i].name, "'");
 				return false;
 			}
@@ -132,38 +127,6 @@ struct Checker {
 		return !m_output.has_error;
 	}
 
-	i32 findStruct(ls_string_view name) const {
-		for (i32 i = 0; i < m_module.structs.size(); ++i) if (equalStrings(m_module.structs[i].name, name)) return i;
-		return -1;
-	}
-
-	i32 findFunction(ls_string_view name) const {
-		for (i32 i = 0; i < m_module.functions.size(); ++i) {
-			if (!m_module.functions[i].is_nested && equalStrings(m_module.functions[i].name, name)) return i;
-		}
-		return -1;
-	}
-
-	i32 findNativeFunction(ls_string_view name) const {
-		for (i32 i = 0; i < m_module.native_functions.size(); ++i) if (equalStrings(m_module.native_functions[i].name, name)) return i;
-		return -1;
-	}
-
-	i32 findGlobal(ls_string_view name) const {
-		for (i32 i = 0; i < m_module.globals.size(); ++i) if (equalStrings(m_module.globals[i].name, name)) return i;
-		return -1;
-	}
-
-	i32 findEnum(ls_string_view name) const {
-		for (i32 i = 0; i < m_module.enums.size(); ++i) if (equalStrings(m_module.enums[i].name, name)) return i;
-		return -1;
-	}
-
-	i32 findNativeType(ls_string_view name) const {
-		for (i32 i = 0; i < m_module.native_types.size(); ++i) if (equalStrings(m_module.native_types[i].name, name)) return i;
-		return -1;
-	}
-
 	bool sameResolvedType(TypeRef a, TypeRef b) const {
 		if (a.kind == LS_TYPE_FUNCTION || b.kind == LS_TYPE_FUNCTION) return functionTypesEqual(a, b);
 		return sameBaseType(a, b);
@@ -207,11 +170,6 @@ struct Checker {
 		return functionTypeFromSignature(std::span<const Param>(fn.params.begin(), fn.params.size()), fn.return_type, fn.token);
 	}
 
-	i32 findEnumMember(const EnumDecl& e, ls_string_view name) const {
-		for (i32 i = 0; i < e.members.size(); ++i) if (equalStrings(e.members[i].name, name)) return i;
-		return -1;
-	}
-
 	ls_string_view getExpressionName(i32 expr_idx) {
 		Expr& e = m_module.expressions[expr_idx];
 		if (e.kind == Expr::VAR) return e.name;
@@ -250,8 +208,8 @@ struct Checker {
 
 	ls_string_view resolveCallName(Expr& call, i32* fn_idx, i32* native_idx) {
 		ls_string_view callee_name = empty(call.qualified_name) ? getExpressionName(call.left) : call.qualified_name;
-		*fn_idx = findFunction(callee_name);
-		*native_idx = findNativeFunction(callee_name);
+		*fn_idx = m_module.findFunction(callee_name);
+		*native_idx = m_module.findNativeFunction(callee_name);
 		if (*fn_idx >= 0 || *native_idx >= 0) {
 			call.qualified_name = callee_name;
 			return callee_name;
@@ -263,8 +221,8 @@ struct Checker {
 			const ls_string_view namespace_name = getTypeNamespace(receiver_type);
 			if (!empty(namespace_name)) {
 				ls_string_view method_name = m_module.makeQualifiedName(namespace_name, callee.name);
-				*fn_idx = findFunction(method_name);
-				*native_idx = findNativeFunction(method_name);
+				*fn_idx = m_module.findFunction(method_name);
+				*native_idx = m_module.findNativeFunction(method_name);
 				if (*fn_idx >= 0 || *native_idx >= 0) {
 					call.qualified_name = method_name;
 					call.method_receiver = callee.left;
@@ -278,8 +236,8 @@ struct Checker {
 			const ls_string_view namespace_name = getTypeNamespace(first_arg_type);
 			if (!empty(namespace_name)) {
 				ls_string_view method_name = m_module.makeQualifiedName(namespace_name, callee_name);
-				*fn_idx = findFunction(method_name);
-				*native_idx = findNativeFunction(method_name);
+				*fn_idx = m_module.findFunction(method_name);
+				*native_idx = m_module.findNativeFunction(method_name);
 				if (*fn_idx >= 0 || *native_idx >= 0) {
 					call.qualified_name = method_name;
 					return method_name;
@@ -293,10 +251,10 @@ struct Checker {
 		ls_string_view enum_name;
 		ls_string_view member_name;
 		if (!splitMemberName(name, &enum_name, &member_name)) return false;
-		const i32 enum_idx = findEnum(enum_name);
+		const i32 enum_idx = m_module.findEnum(enum_name);
 		if (enum_idx < 0) return false;
 		EnumDecl& en = m_module.enums[enum_idx];
-		const i32 member_idx = findEnumMember(en, member_name);
+		const i32 member_idx = m_module.findEnumMember(en, member_name);
 		if (member_idx < 0) {
 			m_output.errorAt(e.token, "Unknown enum member '", member_name, "'");
 			return true;
@@ -342,7 +300,7 @@ struct Checker {
 		if (e.kind == Expr::VAR) {
 			const i32 idx = findLocal(e.name);
 			if (idx >= 0) return m_locals[idx].is_const;
-			const i32 global_idx = findGlobal(e.name);
+			const i32 global_idx = m_module.findGlobal(e.name);
 			if (global_idx >= 0) return m_module.globals[global_idx].is_const;
 			return false;
 		}
@@ -361,14 +319,14 @@ struct Checker {
 		}
 		else if (type.kind == LS_TYPE_STRUCT) {
 			// First try to find as a struct
-			type.struct_index = findStruct(type.name);
+			type.struct_index = m_module.findStruct(type.name);
 			if (type.struct_index < 0) {
 				// If not a struct, try to find as an enum
-				type.struct_index = findEnum(type.name);
+				type.struct_index = m_module.findEnum(type.name);
 				if (type.struct_index >= 0) {
 					type.kind = LS_TYPE_ENUM;
 				} else {
-					type.struct_index = findNativeType(type.name);
+					type.struct_index = m_module.findNativeType(type.name);
 					if (type.struct_index >= 0) {
 						type.kind = LS_TYPE_NATIVE;
 						type.name = m_module.native_types[type.struct_index].id;
@@ -379,7 +337,7 @@ struct Checker {
 				}
 			}
 		} else if (type.kind == LS_TYPE_ENUM) {
-			type.struct_index = findEnum(type.name);
+			type.struct_index = m_module.findEnum(type.name);
 			if (type.struct_index < 0) m_output.errorAt(type.token, "Unknown type '", type.name, "'");
 		} else if (type.kind == LS_TYPE_FUNCTION) {
 			if (type.struct_index < 0 || type.struct_index >= m_module.function_types.size()) {
@@ -499,7 +457,7 @@ struct Checker {
 				return isCompileTimeZero(e.right);
 			case Expr::CAST: return isCompileTimeZero(e.left);
 			case Expr::VAR: {
-				const i32 global_idx = findGlobal(e.name);
+				const i32 global_idx = m_module.findGlobal(e.name);
 				if (global_idx < 0) return false;
 				const GlobalDecl& global = m_module.globals[global_idx];
 				if (!global.is_const || global.expr < 0) return false;
@@ -663,7 +621,7 @@ struct Checker {
 					e.type = m_locals[local_idx].type;
 					return e.type;
 				}
-				const i32 global_idx = findGlobal(e.name);
+				const i32 global_idx = m_module.findGlobal(e.name);
 				if (global_idx >= 0) {
 					e.type = m_module.globals[global_idx].type;
 					return e.type;
@@ -676,7 +634,7 @@ struct Checker {
 					e.boolean = false;
 					return e.type;
 				}
-				const i32 fn_idx = findFunction(e.name);
+				const i32 fn_idx = m_module.findFunction(e.name);
 				if (fn_idx >= 0) {
 					e.kind = Expr::FUNCTION_REF;
 					e.type = functionTypeFromFunction(m_module.functions[fn_idx]);
@@ -684,7 +642,7 @@ struct Checker {
 					e.boolean = false;
 					return e.type;
 				}
-				const i32 native_idx = findNativeFunction(e.name);
+				const i32 native_idx = m_module.findNativeFunction(e.name);
 				if (native_idx >= 0) {
 					e.kind = Expr::FUNCTION_REF;
 					e.type = functionTypeFromNativeFunction(m_module.native_functions[native_idx]);
@@ -699,7 +657,7 @@ struct Checker {
 				return e.type;
 			case Expr::FIELD: {
 				const ls_string_view qualified_name = getExpressionName(expr_idx);
-				const i32 fn_idx = findFunction(qualified_name);
+				const i32 fn_idx = m_module.findFunction(qualified_name);
 				if (fn_idx >= 0) {
 					e.kind = Expr::FUNCTION_REF;
 					e.type = functionTypeFromFunction(m_module.functions[fn_idx]);
@@ -707,7 +665,7 @@ struct Checker {
 					e.boolean = false;
 					return e.type;
 				}
-				const i32 native_idx = findNativeFunction(qualified_name);
+				const i32 native_idx = m_module.findNativeFunction(qualified_name);
 				if (native_idx >= 0) {
 					e.kind = Expr::FUNCTION_REF;
 					e.type = functionTypeFromNativeFunction(m_module.native_functions[native_idx]);
@@ -926,7 +884,7 @@ struct Checker {
 			case Expr::CONSTRUCTOR: {
 				TypeRef target = expected ? *expected : TypeRef{};
 				if (e.kind == Expr::CONSTRUCTOR) {
-					target = {LS_TYPE_STRUCT, e.name, findStruct(e.name)};
+					target = {LS_TYPE_STRUCT, e.name, m_module.findStruct(e.name)};
 				}
 				if (target.kind != LS_TYPE_STRUCT || target.struct_index < 0) {
 					m_output.errorAt(e.token, "Can not infer struct literal type");
@@ -955,7 +913,7 @@ struct Checker {
 					return {};
 				}
 				EnumDecl& en = m_module.enums[enum_idx];
-				const i32 member_idx = findEnumMember(en, e.name);
+				const i32 member_idx = m_module.findEnumMember(en, e.name);
 				if (member_idx < 0) {
 					m_output.errorAt(e.token, "Unknown enum member '", e.name, "'");
 					return {};
@@ -972,7 +930,7 @@ struct Checker {
 		if (subject_type.kind != LS_TYPE_ENUM || pattern.kind != MatchPattern::VALUE || pattern.start_expr < 0) return -1;
 		Expr& e = m_module.expressions[pattern.start_expr];
 		if (e.kind != Expr::ENUM_LITERAL) return -1;
-		return findEnumMember(m_module.enums[subject_type.struct_index], e.name);
+		return m_module.findEnumMember(m_module.enums[subject_type.struct_index], e.name);
 	}
 
 	void checkMatchPattern(MatchPattern& pattern, TypeRef subject_type, bool* has_default) {
@@ -1131,7 +1089,7 @@ struct Checker {
 				if (lhs.kind == Expr::VAR) {
 					const i32 idx = findLocal(lhs.name);
 					if (idx >= 0 && m_locals[idx].is_const) m_output.errorAt(lhs.token, "Can not assign to const '", lhs.name, "'");
-					const i32 global_idx = findGlobal(lhs.name);
+					const i32 global_idx = m_module.findGlobal(lhs.name);
 					if (global_idx >= 0 && m_module.globals[global_idx].is_const) m_output.errorAt(lhs.token, "Can not assign to const '", lhs.name, "'");
 				}
 				break;
@@ -1250,7 +1208,7 @@ struct Checker {
 		}
 	}
 
-	Module& m_module;
+	ls_module& m_module;
 	OutputFormatter m_output;
 	std::vector<LocalInfo> m_locals;
 	std::vector<i32> m_scope_starts;
@@ -1261,12 +1219,6 @@ struct Checker {
 	std::vector<ls_string_view> m_declared_labels;
 	std::vector<i32> m_label_scope_starts;
 };
-
-bool typecheck(Module& module) {
-	Checker checker(module);
-	return checker.check();
-}
-
 
 inline ls_string_view normalizeImportPathForPolicy(ls_string_view path) {
 	if (!startsWith(path, "core:")) return path;
@@ -1279,44 +1231,7 @@ inline bool sameImportPathForPolicy(ls_string_view lhs, ls_string_view rhs) {
 	return equalStrings(normalizeImportPathForPolicy(lhs), normalizeImportPathForPolicy(rhs));
 }
 
-static bool mathSinF32(ls_runtime* runtime, size_t arg_count, size_t result_count, void*) {
-	// TODO remove defensive if? (should be handled by typechecking)
-	if (arg_count < 1 || result_count < 1) return false;
-	ls_push_f32(runtime, std::sin(ls_to_f32(runtime, -1)));
-	return true;
-}
-
-static bool mathCosF32(ls_runtime* runtime, size_t arg_count, size_t result_count, void*) {
-	if (arg_count < 1 || result_count < 1) return false;
-	ls_push_f32(runtime, std::cos(ls_to_f32(runtime, -1)));
-	return true;
-}
-
-static bool mathSinF64(ls_runtime* runtime, size_t arg_count, size_t result_count, void*) {
-	if (arg_count < 1 || result_count < 1) return false;
-	ls_push_f64(runtime, std::sin(ls_to_f64(runtime, -1)));
-	return true;
-}
-
-static bool mathCosF64(ls_runtime* runtime, size_t arg_count, size_t result_count, void*) {
-	if (arg_count < 1 || result_count < 1) return false;
-	ls_push_f64(runtime, std::cos(ls_to_f64(runtime, -1)));
-	return true;
-}
-
-static bool mathSqrtF32(ls_runtime* runtime, size_t arg_count, size_t result_count, void*) {
-	if (arg_count < 1 || result_count < 1) return false;
-	ls_push_f32(runtime, std::sqrt(ls_to_f32(runtime, -1)));
-	return true;
-}
-
-static bool mathSqrtF64(ls_runtime* runtime, size_t arg_count, size_t result_count, void*) {
-	if (arg_count < 1 || result_count < 1) return false;
-	ls_push_f64(runtime, std::sqrt(ls_to_f64(runtime, -1)));
-	return true;
-}
-
-static void registerCoreMath(Module& module, ls_string_view prefix) {
+static void registerCoreMath(ls_module& module, ls_string_view prefix) {
 	const TypeRef f32_type(LS_TYPE_F32);
 	const TypeRef f64_type(LS_TYPE_F64);
 	const TypeRef f32_params[] = {f32_type};
@@ -1328,20 +1243,20 @@ static void registerCoreMath(Module& module, ls_string_view prefix) {
 	const ls_string_view cos_f64_name = makeStringView("cos_f64");
 	const ls_string_view sqrt_f64_name = makeStringView("sqrt_f64");
 
-	addNativeFunction(module, module.makeQualifiedName(prefix, sin_name), f32_type, std::span<const TypeRef>(f32_params, 1), &mathSinF32);
-	addNativeFunction(module, module.makeQualifiedName(prefix, cos_name), f32_type, std::span<const TypeRef>(f32_params, 1), &mathCosF32);
-	addNativeFunction(module, module.makeQualifiedName(prefix, sqrt_name), f32_type, std::span<const TypeRef>(f32_params, 1), &mathSqrtF32);
-	addNativeFunction(module, module.makeQualifiedName(prefix, sin_f64_name), f64_type, std::span<const TypeRef>(f64_params, 1), &mathSinF64);
-	addNativeFunction(module, module.makeQualifiedName(prefix, cos_f64_name), f64_type, std::span<const TypeRef>(f64_params, 1), &mathCosF64);
-	addNativeFunction(module, module.makeQualifiedName(prefix, sqrt_f64_name), f64_type, std::span<const TypeRef>(f64_params, 1), &mathSqrtF64);
+	addNativeFunction(module, module.makeQualifiedName(prefix, sin_name), f32_type, std::span<const TypeRef>(f32_params, 1));
+	addNativeFunction(module, module.makeQualifiedName(prefix, cos_name), f32_type, std::span<const TypeRef>(f32_params, 1));
+	addNativeFunction(module, module.makeQualifiedName(prefix, sqrt_name), f32_type, std::span<const TypeRef>(f32_params, 1));
+	addNativeFunction(module, module.makeQualifiedName(prefix, sin_f64_name), f64_type, std::span<const TypeRef>(f64_params, 1));
+	addNativeFunction(module, module.makeQualifiedName(prefix, cos_f64_name), f64_type, std::span<const TypeRef>(f64_params, 1));
+	addNativeFunction(module, module.makeQualifiedName(prefix, sqrt_f64_name), f64_type, std::span<const TypeRef>(f64_params, 1));
 }
 
-inline bool resolveImports(Module& module, ImportResolver import_resolver, void* import_resolver_userdata) {
+inline bool resolveImports(ls_module& module, ls_import_resolver_fn import_resolver, void* import_resolver_userdata) {
 	std::vector<u8> state;
 
 	struct Context {
-		Module& module;
-		ImportResolver import_resolver;
+		ls_module& module;
+		ls_import_resolver_fn import_resolver;
 		void* import_resolver_userdata;
 		std::vector<u8>& state;
 		OutputFormatter output;
@@ -1413,7 +1328,7 @@ inline bool resolveImports(Module& module, ImportResolver import_resolver, void*
 			state[idx] = 1;
 			const i32 old_import_count = (i32)module.imports.size();
 			ls_string_view source;
-			if (!import_resolver(module, import.path, import.alias, &source, import_resolver_userdata)) {
+			if (!import_resolver(import_resolver_userdata, import.path, import.alias, &source)) {
 				output.errorAt(import.token, "Can not import '", import.path, "'");
 				return false;
 			}
@@ -1439,10 +1354,10 @@ inline bool resolveImports(Module& module, ImportResolver import_resolver, void*
 	return true;
 }
 
-bool compile(Module& module, ls_string_view source, ImportResolver import_resolver, void* import_resolver_userdata, ls_string_view source_name) {
-	return parse(module, source, {}, source_name) 
+bool compile(ls_module& module, ls_string_view source, ls_import_resolver_fn import_resolver, void* import_resolver_userdata, ls_string_view source_name) {
+	return ls_module_parse(&module, source, source_name) 
 		&& resolveImports(module, import_resolver, import_resolver_userdata)
-		&& typecheck(module);
+		&& ls_module_typecheck(&module);
 }
 
 void OutputFormatter::print(int v) {
@@ -1451,4 +1366,22 @@ void OutputFormatter::print(int v) {
 		print(tmp);
 	}
 }
+extern "C" {
 
+ls_result ls_module_typecheck(ls_module* module) {
+	Checker checker(*module);
+	return checker.check() ? LS_RESULT_OK : LS_RESULT_FAILURE;
+}
+
+ls_result ls_module_compile(
+	ls_module* module,
+	ls_string_view source,
+	ls_string_view source_name,
+	ls_import_resolver_fn import_resolver,
+	void* import_resolver_userdata
+) {
+	if (!module) return LS_RESULT_FAILURE;
+	return compile(*module, source, import_resolver, import_resolver_userdata, source_name) ? LS_RESULT_OK : LS_RESULT_FAILURE;
+}
+
+}

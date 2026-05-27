@@ -70,6 +70,12 @@ typedef enum ls_type_kind {
 	LS_TYPE_NULL_VALUE
 } ls_type_kind;
 
+// Generic status used by C API operations that only report success or failure.
+typedef enum ls_result {
+	LS_RESULT_FAILURE = 0,
+	LS_RESULT_OK = 1
+} ls_result;
+
 // Type descriptor used by native functions and value constructors.
 //
 // For scalar kinds, only `kind` matters. For compound kinds:
@@ -103,7 +109,7 @@ typedef int (*ls_import_resolver_fn)(void* userdata, ls_string_view path, ls_str
 
 typedef struct ls_runtime ls_runtime;
 
-// Native function callback used by `ls_module_add_native_function`.
+// Native function callback used by `ls_runtime_set_native_function_callback`.
 //
 // Native callbacks receive the live runtime stack. Arguments are already
 // pushed when the callback is entered, so callbacks read them with the
@@ -151,9 +157,7 @@ int ls_module_add_native_function(
 	ls_string_view name,
 	ls_type return_type,
 	const ls_type* param_types,
-	size_t param_count,
-	ls_native_fn callback,
-	void* userdata
+	size_t param_count
 );
 
 // Front-end pipeline helpers.
@@ -162,23 +166,20 @@ int ls_module_add_native_function(
 // `ls_module_typecheck` resolves and validates the current module contents.
 // `ls_module_compile` performs parse + import resolution + typecheck in one
 // call.
-int ls_module_parse(
+ls_result ls_module_parse(
+	ls_module* module,
+	ls_string_view source,
+	ls_string_view source_name
+);
+
+ls_result ls_module_typecheck(
+	ls_module* module
+);
+
+ls_result ls_module_compile(
 	ls_module* module,
 	ls_string_view source,
 	ls_string_view source_name,
-	ls_host* host
-);
-
-int ls_module_typecheck(
-	ls_module* module,
-	ls_host* host
-);
-
-int ls_module_compile(
-	ls_module* module,
-	ls_string_view source,
-	ls_string_view source_name,
-	ls_host* host,
 	ls_import_resolver_fn import_resolver,
 	void* import_resolver_userdata
 );
@@ -203,6 +204,12 @@ void ls_bytecode_destroy(ls_bytecode* bytecode);
 // Destroy it when execution is finished.
 ls_runtime* ls_runtime_create(ls_bytecode* bytecode);
 void ls_runtime_destroy(ls_runtime* runtime);
+ls_result ls_runtime_set_native_function_callback(
+	ls_runtime* runtime,
+	int function_index,
+	ls_native_fn callback,
+	void* userdata
+);
 
 void ls_push_bool(ls_runtime* runtime, int value);
 void ls_push_i32(ls_runtime* runtime, i32 value);
@@ -227,7 +234,7 @@ ls_string_view ls_to_string(ls_runtime* runtime, i32 index);
 //
 // Push arguments onto the runtime stack with the `ls_push_*` helpers first.
 // After the call, the return value is left on top of the runtime stack.
-int ls_bytecode_runtime_call(
+ls_result ls_call(
 	ls_runtime* runtime,
 	ls_string_view function_name,
 	size_t arg_count,
@@ -235,7 +242,7 @@ int ls_bytecode_runtime_call(
 );
 
 // Execute a bytecode function by index.
-int ls_bytecode_runtime_call_index(
+ls_result ls_call_index(
 	ls_runtime* runtime,
 	i32 function_index,
 	size_t arg_count,

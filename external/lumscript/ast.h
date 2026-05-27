@@ -6,18 +6,7 @@
 
 #include "capi.h"
 #include "token.h"
-#include "type_ref.h"
 #include "string_utils.h"
-
-struct LumScriptNewPlaceholder {};
-inline void* operator new(size_t, LumScriptNewPlaceholder, void* where) { return where; }
-inline void operator delete(void*, LumScriptNewPlaceholder, void*) {}
-
-template <typename T, typename... Args>
-T* allocateObject(const ls_host* host, Args&&... args) {
-	void* mem = host && host->allocate ? host->allocate(host->allocator_userdata, sizeof(T), alignof(T)) : ::operator new(sizeof(T), std::nothrow);
-	return mem ? new (LumScriptNewPlaceholder(), mem) T(static_cast<Args&&>(args)...) : nullptr;
-}
 
 inline void* allocateMemory(const ls_host* host, size_t size, size_t align) {
 	return host && host->allocate ? host->allocate(host->allocator_userdata, size, align) : ::operator new(size, std::nothrow);
@@ -33,14 +22,27 @@ inline void deallocateMemory(const ls_host* host, void* ptr) {
 	}
 }
 
-template <typename T>
-void deleteObject(const ls_host* host, T* ptr) {
-	if (!ptr) return;
-	ptr->~T();
-	deallocateMemory(host, ptr);
-}
+struct TypeRef {
+	TypeRef() {}
+	TypeRef(ls_type_kind kind, ls_string_view name = {}, i32 struct_index = -1, Token token = {}, bool nullable = false)
+		: kind(kind)
+		, name(name)
+		, struct_index(struct_index)
+		, token(token)
+		, nullable(nullable)
+	{}
 
-struct Module;
+	ls_type_kind kind = LS_TYPE_INVALID;
+	ls_string_view name;
+	i32 struct_index = -1;
+	ls_type_kind element_kind = LS_TYPE_INVALID;
+	ls_string_view element_name;
+	i32 array_size = 0;
+	Token token;
+	bool nullable = false;
+};
+
+struct ls_module;
 
 inline bool sameBaseType(const TypeRef& a, const TypeRef& b) {
 	if (a.kind != b.kind) return false;
@@ -177,9 +179,6 @@ struct ImportDecl {
 	bool processed = false;
 };
 
-using NativeCallback = bool (*)(ls_runtime* runtime, size_t arg_count, size_t result_count, void* userdata);
-using ImportResolver = bool (*)(Module& module, ls_string_view path, ls_string_view alias, ls_string_view* source, void* userdata);
-
 struct NativeTypeDecl {
 	ls_string_view name;
 	ls_string_view id;
@@ -189,8 +188,6 @@ struct NativeFunctionDecl {
 	ls_string_view name;
 	std::vector<Param> params;
 	TypeRef return_type;
-	NativeCallback callback = nullptr;
-	void* userdata = nullptr;
 	Token token;
 };
 
@@ -199,13 +196,62 @@ struct FunctionTypeDecl {
 	TypeRef return_type;
 };
 
-struct Module {
-	explicit Module(const ls_host* host)
+struct ls_module {
+	explicit ls_module(const ls_host* host)
 		: host(host)
 	{}
 
-	~Module() {
+	~ls_module() {
 		for (char* name : allocated_names) deallocateMemory(host, name);
+	}
+
+	i32 findGlobal(ls_string_view name) const {
+		for (i32 i = 0; i < globals.size(); ++i) {
+			if (equalStrings(globals[i].name, name)) return i;
+		}
+		return -1;
+	}
+
+	i32 findStruct(ls_string_view name) const {
+		for (i32 i = 0; i < structs.size(); ++i) {
+			if (equalStrings(structs[i].name, name)) return i;
+		}
+		return -1;
+	}
+
+	i32 findFunction(ls_string_view name) const {
+		for (i32 i = 0; i < functions.size(); ++i) {
+			if (!functions[i].is_nested && equalStrings(functions[i].name, name)) return i;
+		}
+		return -1;
+	}
+
+	i32 findNativeFunction(ls_string_view name) const {
+		for (i32 i = 0; i < native_functions.size(); ++i) {
+			if (equalStrings(native_functions[i].name, name)) return i;
+		}
+		return -1;
+	}
+
+	i32 findEnum(ls_string_view name) const {
+		for (i32 i = 0; i < enums.size(); ++i) {
+			if (equalStrings(enums[i].name, name)) return i;
+		}
+		return -1;
+	}
+
+	i32 findNativeType(ls_string_view name) const {
+		for (i32 i = 0; i < native_types.size(); ++i) {
+			if (equalStrings(native_types[i].name, name)) return i;
+		}
+		return -1;
+	}
+
+	i32 findEnumMember(const EnumDecl& e, ls_string_view name) const {
+		for (i32 i = 0; i < e.members.size(); ++i) {
+			if (equalStrings(e.members[i].name, name)) return i;
+		}
+		return -1;
 	}
 
 	ls_string_view copyName(ls_string_view name) {

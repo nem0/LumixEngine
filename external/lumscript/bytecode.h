@@ -1,10 +1,7 @@
 #pragma once
 
 #include <vector>
-
 #include "capi.h"
-
-struct Module;
 
 enum class BytecodeOp : u8 {
 	LOAD_CONST8,
@@ -98,11 +95,7 @@ struct BytecodeNativeFunction {
 	ls_string_view name;
 	std::vector<ls_type> params;
 	ls_type return_type = {};
-	ls_native_fn callback = nullptr;
-	void* userdata = nullptr;
 };
-
-enum class BytecodeValue : u64 {};
 
 struct ls_bytecode {
 	explicit ls_bytecode(const ls_host* host);
@@ -114,18 +107,3 @@ struct ls_bytecode {
 	std::vector<u8> global_init_code;
 	std::vector<u8> code;
 };
-
-struct ls_runtime {
-	explicit ls_runtime(ls_bytecode* bytecode);
-
-	ls_bytecode* bytecode = nullptr;
-	std::vector<u64> stack;
-	bool globals_initialized = false;
-};
-
-ls_bytecode* compileBytecode(Module& module, const ls_host* host);
-void destroyBytecode(ls_bytecode* bytecode);
-ls_runtime* createBytecodeRuntime(ls_bytecode* bytecode);
-void destroyBytecodeRuntime(ls_runtime* runtime);
-
-bool callBytecodeRuntime(ls_runtime* runtime, i32 function_index);

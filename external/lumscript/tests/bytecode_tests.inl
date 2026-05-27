@@ -20,14 +20,14 @@ TEST(BytecodeCompileAndRunMain) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -46,12 +46,14 @@ TEST(testNativeFunctionCall) {
 	CAPI_BEGIN(module, diagnostics);
 
 	ls_type params[] = {ls_type_make(LS_TYPE_I32), ls_type_make(LS_TYPE_I32)};
-	EXPECT_TRUE(ls_module_add_native_function(module, toLs("native_add"), ls_type_make(LS_TYPE_I32), params, 2, &nativeAddC, nullptr) >= 0);
+	const int native_add = ls_module_add_native_function(module, toLs("native_add"), ls_type_make(LS_TYPE_I32), params, 2);
+	EXPECT_TRUE(native_add >= 0);
 
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_runtime_set_native_function_callback(runtime, native_add, &nativeAddC, nullptr) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -87,20 +89,20 @@ TEST(CoreMathImportRuntime) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("sin32"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("sin32"), 0, 1));
 	EXPECT_FLOAT_EQ(0.0f, ls_to_f32(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("cos32"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("cos32"), 0, 1));
 	EXPECT_FLOAT_EQ(1.0f, ls_to_f32(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("sin64"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("sin64"), 0, 1));
 	EXPECT_FLOAT_EQ(0.0f, (float)ls_to_f64(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("cos64"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("cos64"), 0, 1));
 	EXPECT_FLOAT_EQ(1.0f, (float)ls_to_f64(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("sqrt32"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("sqrt32"), 0, 1));
 	EXPECT_FLOAT_EQ(3.0f, ls_to_f32(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("sqrt64"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("sqrt64"), 0, 1));
 	EXPECT_FLOAT_EQ(4.0f, (float)ls_to_f64(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -114,14 +116,14 @@ TEST(BytecodeAddTwoConstants) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(3, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -138,14 +140,14 @@ TEST(BytecodeFloatArithmetic) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_FLOAT_EQ(3.75f, ls_to_f32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -162,14 +164,14 @@ TEST(BytecodeF64Arithmetic) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_FLOAT_EQ(3.75f, (float)ls_to_f64(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -186,14 +188,14 @@ TEST(BytecodeExplicitCastNumeric) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_FLOAT_EQ(1.0f, ls_to_f32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -216,14 +218,14 @@ TEST(BytecodeExplicitCastEnumToInteger) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(1, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -245,14 +247,14 @@ TEST(BytecodeFunctionValueLocal) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -278,14 +280,14 @@ TEST(BytecodeIndirectFunctionCall) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -303,14 +305,14 @@ TEST(BytecodeMultiplyExpression) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -327,14 +329,14 @@ TEST(BytecodeDivideExpression) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(21, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -351,14 +353,14 @@ TEST(BytecodeModuloExpression) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(2, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -377,14 +379,14 @@ TEST(BytecodeMultiplyAssignment) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -403,14 +405,14 @@ TEST(BytecodeDivideAssignment) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(21, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -428,7 +430,7 @@ TEST(BytecodeStaticSizedArrayLocal) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -448,7 +450,7 @@ TEST(BytecodeStaticSizedArrayIndexing) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -475,14 +477,14 @@ TEST(BytecodeCompoundAssignArrayIndexEvaluatedOnce) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(142, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -502,7 +504,7 @@ TEST(BytecodeDeferRunsOnReturn) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -510,7 +512,7 @@ TEST(BytecodeDeferRunsOnReturn) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(7, ls_to_i32(runtime, -1));
 	EXPECT_EQ(2, ls_to_i32(runtime, 0));
 
@@ -537,7 +539,7 @@ TEST(BytecodeDeferLifoAcrossScopes) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -545,7 +547,7 @@ TEST(BytecodeDeferLifoAcrossScopes) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(0, ls_to_i32(runtime, -1));
 	EXPECT_EQ(1, ls_to_i32(runtime, 0));
 	EXPECT_EQ(0, ls_to_i32(runtime, 1));
@@ -568,7 +570,7 @@ TEST(BytecodeNullableLocalNullCheck) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -576,7 +578,7 @@ TEST(BytecodeNullableLocalNullCheck) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -602,7 +604,7 @@ TEST(BytecodeNullableStructComparison) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -610,7 +612,7 @@ TEST(BytecodeNullableStructComparison) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -627,14 +629,14 @@ TEST(BytecodeNullableReturnNull) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(0, ls_to_bool(runtime, -2));
 	EXPECT_EQ(0, ls_to_i32(runtime, -1));
 	ls_runtime_destroy(runtime);
@@ -652,14 +654,14 @@ TEST(BytecodeNullableReturnValue) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(1, ls_to_bool(runtime, -2));
 	EXPECT_EQ(7, ls_to_i32(runtime, -1));
 	ls_runtime_destroy(runtime);
@@ -683,7 +685,7 @@ TEST(BytecodeRefParameterCall) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -691,7 +693,7 @@ TEST(BytecodeRefParameterCall) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -722,7 +724,7 @@ TEST(BytecodeRefParameterNestedFieldCall) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -730,7 +732,7 @@ TEST(BytecodeRefParameterNestedFieldCall) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(11, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -755,7 +757,7 @@ TEST(BytecodeRefParameterArrayCall) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -763,7 +765,7 @@ TEST(BytecodeRefParameterArrayCall) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -780,7 +782,7 @@ TEST(BytecodeRunFunctionWithF64ParameterFromStack) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -789,7 +791,7 @@ TEST(BytecodeRunFunctionWithF64ParameterFromStack) {
 	EXPECT_TRUE(runtime != nullptr);
 
 	ls_push_f64(runtime, 41.5);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 1, 1));
 	EXPECT_FLOAT_EQ(42.0f, (float)ls_to_f64(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -814,7 +816,7 @@ TEST(BytecodeF64Comparisons) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -822,11 +824,11 @@ TEST(BytecodeF64Comparisons) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("is_gt"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("is_gt"), 0, 1));
 	EXPECT_TRUE(ls_to_bool(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("is_lt"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("is_lt"), 0, 1));
 	EXPECT_TRUE(ls_to_bool(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("is_eq"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("is_eq"), 0, 1));
 	EXPECT_TRUE(ls_to_bool(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -863,7 +865,7 @@ TEST(BytecodeNamespaceResolutionByFirstParameter) {
 	TestContext diagnostics;
 	ls_module* module = ls_module_create(&diagnostics.host);
 	EXPECT_TRUE(module != nullptr);
-	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &diagnostics.host, &resolveLumScriptImportC, &files));
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &diagnostics.host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -871,7 +873,7 @@ TEST(BytecodeNamespaceResolutionByFirstParameter) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -921,7 +923,7 @@ TEST(BytecodeNamespaceResolutionByFirstParameterChoosesNamespace) {
 	TestContext diagnostics;
 	ls_module* module = ls_module_create(&diagnostics.host);
 	EXPECT_TRUE(module != nullptr);
-	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &diagnostics.host, &resolveLumScriptImportC, &files));
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &diagnostics.host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -929,7 +931,7 @@ TEST(BytecodeNamespaceResolutionByFirstParameterChoosesNamespace) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(85, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -952,7 +954,7 @@ TEST(BytecodeStructsBasic) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -960,7 +962,7 @@ TEST(BytecodeStructsBasic) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -988,7 +990,7 @@ TEST(BytecodeNestedStructs) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -996,7 +998,7 @@ TEST(BytecodeNestedStructs) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(49, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1023,7 +1025,7 @@ TEST(BytecodeStructParameterPassing) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -1031,7 +1033,7 @@ TEST(BytecodeStructParameterPassing) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1055,7 +1057,7 @@ TEST(BytecodeStructFieldAssignment) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -1063,7 +1065,7 @@ TEST(BytecodeStructFieldAssignment) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(22, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1087,7 +1089,7 @@ TEST(BytecodeStructFieldCompoundAssignment) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -1095,7 +1097,7 @@ TEST(BytecodeStructFieldCompoundAssignment) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(8, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1120,7 +1122,7 @@ TEST(BytecodeStructFieldAssignmentGlobal) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -1128,7 +1130,7 @@ TEST(BytecodeStructFieldAssignmentGlobal) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(22, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1157,7 +1159,7 @@ TEST(BytecodeStructFieldAssignmentParameterLocalCopy) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -1165,7 +1167,7 @@ TEST(BytecodeStructFieldAssignmentParameterLocalCopy) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(22, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1191,7 +1193,7 @@ TEST(BytecodeEnumBasicUsage) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -1199,7 +1201,7 @@ TEST(BytecodeEnumBasicUsage) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1228,7 +1230,7 @@ TEST(BytecodeEnumMatch) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -1236,7 +1238,7 @@ TEST(BytecodeEnumMatch) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(2, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1267,7 +1269,7 @@ TEST(BytecodeIntegerOverflowWraps) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -1275,11 +1277,11 @@ TEST(BytecodeIntegerOverflowWraps) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("add_i8_wrap"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("add_i8_wrap"), 0, 1));
 	EXPECT_EQ(-128, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("add_u8_wrap"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("add_u8_wrap"), 0, 1));
 	EXPECT_EQ(0, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("sub_i8_wrap"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("sub_i8_wrap"), 0, 1));
 	EXPECT_EQ(-1, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1296,7 +1298,7 @@ TEST(BytecodeCompileFunctionWithParameter) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -1314,7 +1316,7 @@ TEST(BytecodeRunFunctionWithParameterFromStack) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -1323,7 +1325,7 @@ TEST(BytecodeRunFunctionWithParameterFromStack) {
 	EXPECT_TRUE(runtime != nullptr);
 
 	ls_push_i32(runtime, 41);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 1, 1));
 
 	i32 result = ls_to_i32(runtime, -1);
 	EXPECT_EQ(42, result);
@@ -1346,7 +1348,7 @@ TEST(BytecodeFunctionCallWorks) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -1354,7 +1356,7 @@ TEST(BytecodeFunctionCallWorks) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1386,7 +1388,7 @@ TEST(BytecodeWhileBreakContinue) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -1394,7 +1396,7 @@ TEST(BytecodeWhileBreakContinue) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(18, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1431,7 +1433,7 @@ TEST(BytecodeNamedLabelBreakContinue) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -1439,7 +1441,7 @@ TEST(BytecodeNamedLabelBreakContinue) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(12, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1457,7 +1459,7 @@ TEST(BytecodeLocalVariable) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -1465,7 +1467,7 @@ TEST(BytecodeLocalVariable) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	i32 result = ls_to_i32(runtime, -1);
 	EXPECT_EQ(42, result);
 
@@ -1486,7 +1488,7 @@ TEST(BytecodeGlobalVariable) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -1494,9 +1496,9 @@ TEST(BytecodeGlobalVariable) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(43, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1516,7 +1518,7 @@ TEST(BytecodeGlobalInitializationOrder) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -1524,7 +1526,7 @@ TEST(BytecodeGlobalInitializationOrder) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(4, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1556,7 +1558,7 @@ TEST(BytecodeShortCircuitingWithGlobals) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -1564,14 +1566,14 @@ TEST(BytecodeShortCircuitingWithGlobals) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("false_and_touch"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("false_and_touch"), 0, 1));
 	EXPECT_TRUE(!ls_to_bool(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("get_hits"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("get_hits"), 0, 1));
 	EXPECT_EQ(0, ls_to_i32(runtime, -1));
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("true_or_touch"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("true_or_touch"), 0, 1));
 	EXPECT_TRUE(ls_to_bool(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("get_hits"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("get_hits"), 0, 1));
 	EXPECT_EQ(0, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1603,7 +1605,7 @@ TEST(BytecodeNestedShortCircuitingWithGlobals) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -1611,14 +1613,14 @@ TEST(BytecodeNestedShortCircuitingWithGlobals) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("false_and_nested"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("false_and_nested"), 0, 1));
 	EXPECT_TRUE(!ls_to_bool(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("get_hits"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("get_hits"), 0, 1));
 	EXPECT_EQ(0, ls_to_i32(runtime, -1));
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("true_or_nested"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("true_or_nested"), 0, 1));
 	EXPECT_TRUE(ls_to_bool(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("get_hits"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("get_hits"), 0, 1));
 	EXPECT_EQ(0, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1637,7 +1639,7 @@ TEST(BytecodeAssignLocalVariable) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -1645,7 +1647,7 @@ TEST(BytecodeAssignLocalVariable) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	i32 result = ls_to_i32(runtime, -1);
 	EXPECT_EQ(42, result);
 
@@ -1665,7 +1667,7 @@ TEST(BytecodeCompoundAssignLocalPlusEqual) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -1673,7 +1675,7 @@ TEST(BytecodeCompoundAssignLocalPlusEqual) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	i32 result = ls_to_i32(runtime, -1);
 	EXPECT_EQ(42, result);
 
@@ -1693,7 +1695,7 @@ TEST(BytecodeCompoundAssignLocalMinusEqual) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -1701,7 +1703,7 @@ TEST(BytecodeCompoundAssignLocalMinusEqual) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	i32 result = ls_to_i32(runtime, -1);
 	EXPECT_EQ(40, result);
 
@@ -1739,7 +1741,7 @@ TEST(BytecodeExtendedIntegerReturnWidths) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -1747,17 +1749,17 @@ TEST(BytecodeExtendedIntegerReturnWidths) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("ret_i8"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("ret_i8"), 0, 1));
 	EXPECT_EQ(10, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("ret_u8"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("ret_u8"), 0, 1));
 	EXPECT_EQ(20, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("ret_i16"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("ret_i16"), 0, 1));
 	EXPECT_EQ(30, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("ret_u16"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("ret_u16"), 0, 1));
 	EXPECT_EQ(40, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("ret_i64"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("ret_i64"), 0, 1));
 	EXPECT_EQ(50, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("ret_u64"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("ret_u64"), 0, 1));
 	EXPECT_EQ(60, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1778,7 +1780,7 @@ TEST(BytecodeIfElse) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -1787,11 +1789,11 @@ TEST(BytecodeIfElse) {
 	EXPECT_TRUE(runtime != nullptr);
 
 	ls_push_bool(runtime, 1);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("choose"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("choose"), 1, 1));
 	EXPECT_EQ(11, ls_to_i32(runtime, -1));
 
 	ls_push_bool(runtime, 0);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("choose"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("choose"), 1, 1));
 	EXPECT_EQ(22, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1814,7 +1816,7 @@ TEST(BytecodeIfElseIf) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -1823,15 +1825,15 @@ TEST(BytecodeIfElseIf) {
 	EXPECT_TRUE(runtime != nullptr);
 
 	ls_push_i32(runtime, -1);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("classify"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("classify"), 1, 1));
 	EXPECT_EQ(0, ls_to_i32(runtime, -1));
 
 	ls_push_i32(runtime, 4);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("classify"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("classify"), 1, 1));
 	EXPECT_EQ(1, ls_to_i32(runtime, -1));
 
 	ls_push_i32(runtime, 11);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("classify"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("classify"), 1, 1));
 	EXPECT_EQ(2, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1861,14 +1863,14 @@ TEST(NestedFunctionsRuntime) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1901,7 +1903,7 @@ TEST(DivisionAndModuloSemanticsRuntime) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -1909,15 +1911,15 @@ TEST(DivisionAndModuloSemanticsRuntime) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("q_pos"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("q_pos"), 0, 1));
 	EXPECT_EQ(2, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("q_neg"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("q_neg"), 0, 1));
 	EXPECT_EQ(-2, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("r_neg_left"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("r_neg_left"), 0, 1));
 	EXPECT_EQ(-1, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("r_neg_right"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("r_neg_right"), 0, 1));
 	EXPECT_EQ(1, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("float_div"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("float_div"), 0, 1));
 	EXPECT_TRUE(isinf((double)ls_to_f32(runtime, -1)));
 
 	ls_runtime_destroy(runtime);
@@ -1944,14 +1946,14 @@ TEST(RuntimeCasts) {
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("to_f32"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("to_f32"), 0, 1));
 	EXPECT_FLOAT_EQ(10, ls_to_f32(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("to_i32"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("to_i32"), 0, 1));
 	EXPECT_EQ(12, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("to_bool"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("to_bool"), 0, 1));
 	EXPECT_TRUE(ls_to_bool(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -1974,12 +1976,12 @@ TEST(IntegerToEnumCastAllowsAnyIntegerRuntime) {
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
 	ls_push_i32(runtime, 123);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("to_state"), 1, 1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("to_i32"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("to_state"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("to_i32"), 1, 1));
 	EXPECT_EQ(123, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2015,20 +2017,20 @@ TEST(MatchRuntime) {
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
 	ls_push_i32(runtime, 0);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("enum_match"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("enum_match"), 1, 1));
 	EXPECT_EQ(1, ls_to_i32(runtime, -1));
 	ls_push_i32(runtime, 2);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("enum_match"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("enum_match"), 1, 1));
 	EXPECT_EQ(2, ls_to_i32(runtime, -1));
 	ls_push_i32(runtime, 5);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("range_match"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("range_match"), 1, 1));
 	EXPECT_EQ(1, ls_to_i32(runtime, -1));
 	ls_push_i32(runtime, 42);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("range_match"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("range_match"), 1, 1));
 	EXPECT_EQ(2, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2073,10 +2075,10 @@ TEST(AliasedImportRuntime) {
 	};
 	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &module_host, &resolveLumScriptImportC, &files));
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2120,10 +2122,10 @@ TEST(FirstParameterNamespaceResolutionPrecedenceRuntime) {
 	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &module_host, &resolveLumScriptImportC, &files));
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(213, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2146,16 +2148,16 @@ TEST(ShortCircuiting) {
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("left_false"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("left_false"), 0, 1));
 	EXPECT_TRUE(!ls_to_bool(runtime, -1));
 
 	TestContext diagnostics2;
 	RuntimeGuard runtime2(module, &diagnostics2.host);
 	EXPECT_TRUE(runtime2);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime2, toLs("left_true"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime2, toLs("left_true"), 0, 1));
 	EXPECT_TRUE(ls_to_bool(runtime2, -1));
 	CAPI_END(module);
 	return true;
@@ -2174,19 +2176,19 @@ TEST(IfElse) {
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
 	ls_push_i32(runtime, 4);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("classify"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("classify"), 1, 1));
 	EXPECT_EQ(1, ls_to_i32(runtime, -1));
 
 	ls_push_i32(runtime, 11);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("classify"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("classify"), 1, 1));
 	EXPECT_EQ(2, ls_to_i32(runtime, -1));
 
 	ls_push_i32(runtime, -1);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("classify"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("classify"), 1, 1));
 	EXPECT_EQ(0, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2213,20 +2215,20 @@ TEST(GlobalVariablesRuntime) {
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("read_counter"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("read_counter"), 0, 1));
 	EXPECT_EQ(1, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("increment"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("increment"), 0, 1));
 	EXPECT_EQ(3, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("increment"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("increment"), 0, 1));
 	EXPECT_EQ(5, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("read_counter"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("read_counter"), 0, 1));
 	EXPECT_EQ(5, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("shadow_counter"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("shadow_counter"), 0, 1));
 	EXPECT_EQ(101, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("read_counter"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("read_counter"), 0, 1));
 	EXPECT_EQ(5, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2244,10 +2246,10 @@ TEST(RuntimeBlockScope) {
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("scoped"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("scoped"), 0, 1));
 	EXPECT_EQ(1, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2266,10 +2268,10 @@ TEST(RefParameterMutatesCaller) {
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(11, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2287,10 +2289,10 @@ TEST(DeferRunsAtScopeExit) {
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(5, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2308,10 +2310,10 @@ TEST(DeferRunsInLifoOrder) {
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(3, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2331,10 +2333,10 @@ TEST(DeferRunsOnEarlyReturn) {
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(11, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2351,10 +2353,10 @@ TEST(NullableNullBranchRuntime) {
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2371,10 +2373,10 @@ TEST(NullableNonNullBranchRuntime) {
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(7, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2394,10 +2396,10 @@ TEST(ExtendedScalarTypesRuntime) {
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(211, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2435,18 +2437,18 @@ TEST(IntegerOverflowWraparoundRuntime) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("u8_add_wrap"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("u8_add_wrap"), 0, 1));
 	EXPECT_EQ(0, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("i8_add_wrap"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("i8_add_wrap"), 0, 1));
 	EXPECT_EQ(-128, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("u8_add_assign_wrap"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("u8_add_assign_wrap"), 0, 1));
 	EXPECT_EQ(0, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("cast_i8_wrap"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("cast_i8_wrap"), 0, 1));
 	EXPECT_EQ(-1, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("cast_u8_wrap"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("cast_u8_wrap"), 0, 1));
 	EXPECT_EQ(0, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2470,13 +2472,13 @@ TEST(DivisionByZeroRuntimeError) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
 	test_diagnostics.output_enabled = false;
 	ls_push_i32(runtime, 10);
 	ls_push_i32(runtime, 0);
-	EXPECT_TRUE(!ls_bytecode_runtime_call(runtime, toLs("divide"), 2, 1));
+	EXPECT_TRUE(!ls_call(runtime, toLs("divide"), 2, 1));
 
 	TestContext diagnostics2;
 	RuntimeGuard runtime2(module, &diagnostics2.host);
@@ -2484,14 +2486,14 @@ TEST(DivisionByZeroRuntimeError) {
 	diagnostics2.diagnostics.output_enabled = false;
 	ls_push_i32(runtime2, 10);
 	ls_push_i32(runtime2, 0);
-	EXPECT_TRUE(!ls_bytecode_runtime_call(runtime2, toLs("modulo"), 2, 1));
+	EXPECT_TRUE(!ls_call(runtime2, toLs("modulo"), 2, 1));
 
 	TestContext diagnostics3;
 	RuntimeGuard runtime3(module, &diagnostics3.host);
 	EXPECT_TRUE(runtime3);
 	diagnostics3.diagnostics.output_enabled = false;
 	ls_push_i32(runtime3, 0);
-	EXPECT_TRUE(!ls_bytecode_runtime_call(runtime3, toLs("divide_assign"), 1, 1));
+	EXPECT_TRUE(!ls_call(runtime3, toLs("divide_assign"), 1, 1));
 	CAPI_END(module);
 	return true;
 }
@@ -2528,15 +2530,15 @@ TEST(UntypedLiteralsRuntime) {
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
-	bool compiled = ls_module_compile(module, toLs(source), {}, &module_host, &resolveLumScriptImportC, nullptr);
+	bool compiled = ls_module_compile(module, toLs(source), {}, nullptr, nullptr);
 	EXPECT_TRUE(compiled);
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("vec3_sum"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("vec3_sum"), 0, 1));
 	EXPECT_FLOAT_EQ(6, ls_to_f32(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("integer_widths"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("integer_widths"), 0, 1));
 	EXPECT_EQ(467, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("return_f64"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("return_f64"), 0, 1));
 	EXPECT_FLOAT_EQ(1.5f, (float)ls_to_f64(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2570,11 +2572,11 @@ TEST(FirstClassFunctionsRuntime) {
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
-	const bool ok = ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr);
+	const bool ok = ls_module_compile(module, toLs(source), {}, nullptr, nullptr);
 	EXPECT_TRUE(ok);
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(64, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2590,10 +2592,10 @@ TEST(StaticArrayRuntimeIndexing) {
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2608,12 +2610,12 @@ TEST(StaticArrayRuntimeOutOfBoundsFails) {
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
 	test_diagnostics.output_enabled = false;
 	ls_push_i32(runtime, 5);
-	EXPECT_TRUE(!ls_bytecode_runtime_call(runtime, toLs("main"), 1, 1));
+	EXPECT_TRUE(!ls_call(runtime, toLs("main"), 1, 1));
 	return true;
 }
 
@@ -2636,9 +2638,9 @@ TEST(BreakContinueRuntime) {
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(25, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2667,9 +2669,9 @@ TEST(ForLoopRuntime) {
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(206, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2698,9 +2700,9 @@ TEST(ForLoopRangeEvaluatedOnce) {
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(203, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2729,9 +2731,9 @@ TEST(NamedLabelBreakContinueRuntime) {
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(57, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2753,13 +2755,13 @@ TEST(MatchArmMultipleStatementsRuntime) {
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &module_host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
 	ls_push_i32(runtime, 0);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 1, 1));
 	EXPECT_EQ(3, ls_to_i32(runtime, -1));
 	ls_push_i32(runtime, 7);
-	EXPECT_TRUE(ls_bytecode_runtime_call(runtime, toLs("main"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 1, 1));
 	EXPECT_EQ(30, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;

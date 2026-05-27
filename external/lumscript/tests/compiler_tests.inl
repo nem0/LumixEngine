@@ -104,7 +104,7 @@ TEST(GlobalVariablesTypecheck) {
 	TestContext diagnostics;
 	ls_module* module = ls_module_create(&diagnostics.host);
 	EXPECT_TRUE(module != nullptr);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, &diagnostics.host, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	EXPECT_TRUE(ls_module_get_global_count(module) == 3);
 	ls_module_destroy(module);
 	return true;
@@ -254,7 +254,7 @@ TEST(ImportAddsDeclarationsToCurrentModule) {
 	TestContext diagnostics;
 	ls_module* module = ls_module_create(&diagnostics.host);
 	EXPECT_TRUE(module != nullptr);
-	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &diagnostics.host, &resolveLumScriptImportC, &files));
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
 	EXPECT_TRUE(ls_module_get_struct_count(module) == 1);
 	EXPECT_TRUE(ls_module_get_function_count(module) == 2);
 	ls_module_destroy(module);
@@ -297,7 +297,7 @@ TEST(DuplicateUnaliasedImportIsNoOp) {
 	TestContext diagnostics;
 	ls_module* module = ls_module_create(&diagnostics.host);
 	EXPECT_TRUE(module != nullptr);
-	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &diagnostics.host, &resolveLumScriptImportC, &files));
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
 	EXPECT_EQ(1, ls_module_get_struct_count(module));
 	EXPECT_EQ(2, ls_module_get_function_count(module));
 	ls_module_destroy(module);
@@ -329,7 +329,7 @@ TEST(DuplicateAliasedImportOfSamePathIsNoOp) {
 	TestContext diagnostics;
 	ls_module* module = ls_module_create(&diagnostics.host);
 	EXPECT_TRUE(module != nullptr);
-	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &diagnostics.host, &resolveLumScriptImportC, &files));
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
 	EXPECT_EQ(1, ls_module_get_struct_count(module));
 	EXPECT_EQ(2, ls_module_get_function_count(module));
 	ls_module_destroy(module);
@@ -364,7 +364,7 @@ TEST(AliasedImportCollisionFails) {
 	ls_module* module = ls_module_create(&diagnostics.host);
 	EXPECT_TRUE(module != nullptr);
 	diagnostics.diagnostics.output_enabled = false;
-	EXPECT_TRUE(!ls_module_compile(module, toLs(source), {}, &diagnostics.host, &resolveLumScriptImportC, &files));
+	EXPECT_TRUE(!ls_module_compile(module, toLs(source), {}, &resolveLumScriptImportC, &files));
 	ls_module_destroy(module);
 	return true;
 }
@@ -400,7 +400,7 @@ TEST(ImportCycleFails) {
 	ls_module* module = ls_module_create(&diagnostics.host);
 	EXPECT_TRUE(module != nullptr);
 	diagnostics.diagnostics.output_enabled = false;
-	EXPECT_TRUE(!ls_module_compile(module, toLs(source), {}, &diagnostics.host, &resolveLumScriptImportC, &files));
+	EXPECT_TRUE(!ls_module_compile(module, toLs(source), {}, &resolveLumScriptImportC, &files));
 	ls_module_destroy(module);
 	return true;
 }
@@ -445,7 +445,7 @@ TEST(FirstParameterNamespaceResolutionPrecedenceTypecheck) {
 	TestContext diagnostics;
 	ls_module* module = ls_module_create(&diagnostics.host);
 	EXPECT_TRUE(module != nullptr);
-	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &diagnostics.host, &resolveLumScriptImportC, &files));
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
 	ls_module_destroy(module);
 	return true;
 }

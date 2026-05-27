@@ -934,7 +934,7 @@ ls_bytecode* bytecode = ls_bytecode_compile(module, &host);
 ls_runtime* runtime = bytecode ? ls_runtime_create(bytecode) : nullptr;
 if (runtime) {
 	ls_string_view main_name = { "main", "main" + 4 };
-	ls_bytecode_runtime_call(runtime, main_name, 0, 1);
+	ls_call(runtime, main_name, 0, 1);
 	if (ls_bytecode_runtime_result_kind(runtime, main_name) != LS_TYPE_VOID) {
 		i32 result = ls_to_i32(runtime, -1);
 	}
@@ -959,14 +959,17 @@ if (ls_module_parse(module, source, source_name, &host)) {
 		ls_type_make(LS_TYPE_I32)
 	};
 
-	ls_module_add_native_function(
+	const int native_add_index = ls_module_add_native_function(
 		module,
 		"native_add",
 		ls_type_make(LS_TYPE_I32),
 		params,
-		2,
-		&native_add
+		2
 	);
+
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &host);
+	ls_runtime* runtime = ls_runtime_create(bytecode);
+	ls_runtime_set_native_function_callback(runtime, native_add_index, &native_add, nullptr);
 }
 ```
 

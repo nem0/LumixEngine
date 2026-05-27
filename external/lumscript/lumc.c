@@ -162,17 +162,17 @@ int main(int argc, char** argv) {
 		goto cleanup;
 	}
 
+	int native_print = -1;
 	{
 		const ls_type params[1] = {ls_type_make(LS_TYPE_STRING)};
-		if (ls_module_add_native_function(
+		native_print = ls_module_add_native_function(
 			ctx.module,
 			ls_from_cstr("print"),
 			ls_type_make(LS_TYPE_VOID),
 			params,
-			1,
-			&lumc_native_print,
-			NULL
-		) < 0) {
+			1
+		);
+		if (native_print < 0) {
 			fprintf(stderr, "Error: Failed to register native print\n");
 			goto cleanup;
 		}
@@ -182,7 +182,6 @@ int main(int argc, char** argv) {
 		ctx.module,
 		ls_from_cstr(ctx.source),
 		ls_from_cstr(script_path),
-		&ctx.host,
 		NULL,
 		NULL
 	)) {
@@ -199,6 +198,10 @@ int main(int argc, char** argv) {
 	ctx.runtime = ls_runtime_create(ctx.bytecode);
 	if (!ctx.runtime) {
 		fprintf(stderr, "Error: Failed to create bytecode runtime\n");
+		goto cleanup;
+	}
+	if (!ls_runtime_set_native_function_callback(ctx.runtime, native_print, &lumc_native_print, NULL)) {
+		fprintf(stderr, "Error: Failed to bind native print\n");
 		goto cleanup;
 	}
 
@@ -222,7 +225,7 @@ int main(int argc, char** argv) {
 				ls_push_string(ctx.runtime, ls_from_cstr(arg));
 			}
 		}
-		if (!ls_bytecode_runtime_call(ctx.runtime, ls_from_cstr(function_name), call_arg_count, 1)) {
+		if (!ls_call(ctx.runtime, ls_from_cstr(function_name), call_arg_count, 1)) {
 			fprintf(stderr, "Runtime error\n");
 			goto cleanup;
 		}

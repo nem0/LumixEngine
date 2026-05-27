@@ -6,7 +6,7 @@
 #include "tokenizer.h"
 
 struct Parser {
-	Parser(Module& module, ls_string_view declaration_prefix, ls_string_view source, ls_string_view source_name = {})
+	Parser(ls_module& module, ls_string_view declaration_prefix, ls_string_view source, ls_string_view source_name = {})
 		: m_module(module)
 		, m_declaration_prefix(declaration_prefix)
 	{
@@ -692,14 +692,27 @@ struct Parser {
 	}
 
 	Tokenizer m_tokenizer;
-	Module& m_module;
+	ls_module& m_module;
 	OutputFormatter m_output;
 	ls_string_view m_declaration_prefix;
 	bool m_allow_constructor = true;
 	i32 m_nested_function_counter = 0;
 };
 
-bool parse(Module& module, ls_string_view source, ls_string_view declaration_prefix, ls_string_view source_name) {
+bool parse(ls_module& module, ls_string_view source, ls_string_view declaration_prefix, ls_string_view source_name) {
 	Parser parser(module, declaration_prefix, source, source_name);
 	return parser.parse();
+}
+
+extern "C" {
+
+ls_result ls_module_parse(
+	ls_module* module,
+	ls_string_view source,
+	ls_string_view source_name
+) {
+	if (!module) return LS_RESULT_FAILURE;
+	return parse(*module, source, {}, source_name) ? LS_RESULT_OK : LS_RESULT_FAILURE;
+}
+
 }
