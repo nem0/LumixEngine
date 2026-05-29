@@ -51,6 +51,11 @@ int ls_module_add_enum(ls_module* module, ls_string_view name, const ls_enum_mem
 	return (int)module->enums.size() - 1;
 }
 
+int ls_module_get_native_function_index(ls_module* module, ls_string_view name) {
+	if (!module) return -1;
+	return module->findNativeFunction(name);
+}
+
 int ls_module_add_native_function(
 	ls_module* module,
 	ls_string_view name,
@@ -62,6 +67,7 @@ int ls_module_add_native_function(
 	if (!param_types && param_count > 0) return -1;
 	NativeFunctionDecl& fn = module->native_functions.emplace_back();
 	fn.name = module->copyName(name);
+	fn.canonical_name = fn.name;
 	fn.return_type = toTypeRef(return_type);
 
 	for (size_t i = 0; i < param_count; ++i) {

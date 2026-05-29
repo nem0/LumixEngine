@@ -13,11 +13,8 @@
 #include "core/path.h"
 #include "lumscript/capi.h"
 #include "lumscript/lumscript_resource.h"
-#include "lumscript/lumscript_engine_api.h"
 
 namespace Lumix {
-
-using namespace LumScript;
 
 struct LumScriptDiagnosticsContext {
 	String* message = nullptr;
@@ -35,13 +32,6 @@ static ls_string_view toLs(StringView value) {
 
 static ls_string_view toLs(const char* value) {
 	return {value, value + stringLength(value)};
-}
-
-static ls_value makeNativeValue(void* ptr, const char* type_name) {
-	ls_value value = ls_value_make_null();
-	value.type = ls_type_make_native(toLs(type_name), -1, 0);
-	value.ptr = ptr;
-	return value;
 }
 
 static ls_host makeAllocatorHost(IAllocator& allocator) {
@@ -120,8 +110,8 @@ struct LumScriptModuleImpl : LumScriptModule {
 		host.diagnostics_userdata = &diag_ctx;
 		host.print = &printLumScriptMessage;
 
-		ls_value dt_value = ls_value_make_f32(time_delta);
-		if (!ls_runtime_call(m_script.runtime, toLs("update"), &dt_value, 1, nullptr, &host)) {
+		ls_push_f32(m_script.runtime, time_delta);
+		if (!ls_call(m_script.runtime, toLs("update"), 1, 0)) {
 			logError("LumScript update: ", diagnostics);
 		}
 	}
@@ -193,25 +183,14 @@ private:
 		{}
 	};
 
-	static bool isValidCoreImportPath(StringView path) {
-		if (!startsWith(path, "core:")) return false;
-		StringView name = path.withoutLeft(5);
-		if (name.empty() || name[0] == '/' || name[0] == '\\') return false;
-		return !find(name, "..") && !find(name, ':') && !find(name, '\\');
-	}
-
 	static int resolveImport(void* userdata, ls_string_view path, ls_string_view alias, ls_string_view* source) {
 		ImportContext* ctx = (ImportContext*)userdata;
 		if (!ctx || !ctx->module) return 0;
 
 		StringView path_view(path.begin, path.end);
-		StringView alias_view(alias.begin, alias.end);
-		if (resolveEngineImport(*ctx->module, ctx->world, path_view, alias_view)) {
-			*source = {};
-			return 1;
-		}
-		if (isValidCoreImportPath(path_view)) {
+		if (startsWith(path_view, "core:")) {
 			StringView name = path_view.withoutLeft(5);
+			// TODO no .lum allowed
 			const bool has_lum_extension = endsWith(name, ".lum");
 			Path file_path = has_lum_extension ? Path("engine/scripts/core/", name) : Path("engine/scripts/core/", name, ".lum");
 			OutputMemoryStream& blob = ctx->sources.emplace(*ctx->allocator);
@@ -254,7 +233,7 @@ private:
 		
 		LumScriptSystem* lumscript_system = static_cast<LumScriptSystem*>(&m_system);
 		ImportContext import_ctx(m_script.module, m_world, lumscript_system->getEngine().getFileSystem(), m_allocator);
-		if (!ls_module_compile(m_script.module, toLs(m_script.resource->getSourceCode()), toLs(m_script.path.c_str()), &host, &resolveImport, &import_ctx)) {
+		if (!ls_module_compile(m_script.module, toLs(m_script.resource->getSourceCode()), toLs(m_script.path.c_str()), &resolveImport, &import_ctx)) {
 			logError("LumScript compilation failed: ", diagnostics);
 			return false;
 		}
@@ -264,26 +243,28 @@ private:
 			ls_runtime_destroy(m_script.runtime);
 			m_script.runtime = nullptr;
 		}
-		m_script.runtime = ls_runtime_create(m_script.module);
-		if (!m_script.runtime) return false;
 
-		ls_value args[] = {
-			makeNativeValue(&m_world, "engine:world/World"),
-			makeNativeValue(&static_cast<LumScriptSystem&>(m_system).getEngine().getInputSystem(), "engine:input/InputSystem")
-		};
-		if (ls_runtime_call(
-			m_script.runtime,
-			toLs("init"),
-			args,
-			2,
-			nullptr,
-			&host
-		)) {
-			return true;
+		ls_bytecode* bytecode = ls_bytecode_compile(m_script.module, &host);
+		if (!bytecode) {
+			logError("LumScript bytecode compilation failed: ", diagnostics);
+			return false;
 		}
 
-		logError("LumScript init failed: ", diagnostics);
-		return false;
+		m_script.runtime = ls_runtime_create(bytecode);
+		if (!m_script.runtime) return false;
+
+		// TODO args
+		/*ls_value args[] = {
+			makeNativeValue(&m_world, "engine:world/World"),
+			makeNativeValue(&static_cast<LumScriptSystem&>(m_system).getEngine().getInputSystem(), "engine:input/InputSystem")
+		};*/
+		ASSERT(false);
+		if (!ls_call(m_script.runtime, toLs("init"), 2, 0)) {
+			logError("LumScript init failed: ", diagnostics);
+			return false;
+		}
+
+		return true;
 	}
 
 	World& m_world;

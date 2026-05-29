@@ -175,10 +175,8 @@ static int resolveLumScriptImportC(void* userdata, ls_string_view path, ls_strin
 	return 0;
 }
 
-static int nativeAddC(ls_runtime* runtime, size_t arg_count, size_t result_count, void*) {
-	if (arg_count < 2 || result_count < 1) return 0;
+static void nativeAddC(ls_runtime* runtime) {
 	ls_push_i32(runtime, ls_to_i32(runtime, -2) + ls_to_i32(runtime, -1));
-	return 1;
 }
 
 #include "compiler_tests.inl"

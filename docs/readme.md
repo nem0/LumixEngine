@@ -20,7 +20,7 @@
 * [Editor plugin](lua/editor_plugin.md)
 
 # LumScript
-* [Language](lumscript.md)
+* [Language](../external/lumscript/reference.md)
 
 # Ingame UI
 * [Text-based markup](ui/markup.md)

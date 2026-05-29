@@ -149,7 +149,7 @@ Import with alias:
 import "math" as math
 ```
 
-`core:` imports resolve under `data/scripts/core/`. The `.lum` suffix is optional:
+The `.lum` suffix is omitted.
 
 ```cpp
 import "core:math"
@@ -980,6 +980,17 @@ fn main() : i32 {
 	return native_add(20, 22);
 }
 ```
+
+### Extern declarations
+
+Declare host-implemented functions in script using `extern fn` without a body:
+
+```cpp
+extern fn native_add(a : i32, b : i32) : i32;
+```
+
+`extern` declarations inform the compiler about a function's name and signature but do not provide an implementation. The host must register and bind a native function with the same qualified name (using `ls_runtime_set_native_function_callback`) before calling into script.
+
 
 ## Editor and diagnostics
 

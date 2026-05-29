@@ -186,6 +186,7 @@ struct NativeTypeDecl {
 
 struct NativeFunctionDecl {
 	ls_string_view name;
+	ls_string_view canonical_name;
 	std::vector<Param> params;
 	TypeRef return_type;
 	Token token;
@@ -229,6 +230,7 @@ struct ls_module {
 	i32 findNativeFunction(ls_string_view name) const {
 		for (i32 i = 0; i < native_functions.size(); ++i) {
 			if (equalStrings(native_functions[i].name, name)) return i;
+			if (!empty(native_functions[i].canonical_name) && equalStrings(native_functions[i].canonical_name, name)) return i;
 		}
 		return -1;
 	}

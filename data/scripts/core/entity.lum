@@ -1,0 +1,17 @@
+// import core:entity as entity
+
+import "core:dvec3"
+import "core:vec3"
+import "core:quat"
+
+struct Entity { index : i32; world : cptr; }
+
+extern fn destroy(e : Entity) : void;
+extern fn isValid(e : Entity) : bool;
+extern fn getPosition(e : Entity) : DVec3;
+extern fn getRotation(e : Entity) : Quat;
+extern fn getScale(e : Entity) : Vec3;
+extern fn setPosition(e : Entity, position : DVec3) : void;
+extern fn setScale(e : Entity, scale : Vec3) : void;
+extern fn setRotation(e : Entity, rotation : Quat) : void;
+

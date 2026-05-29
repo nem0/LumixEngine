@@ -67,7 +67,8 @@ typedef enum ls_type_kind {
 	LS_TYPE_NATIVE,
 	LS_TYPE_FUNCTION,
 	LS_TYPE_ARRAY,
-	LS_TYPE_NULL_VALUE
+	LS_TYPE_NULL_VALUE,
+	LS_TYPE_CPTR
 } ls_type_kind;
 
 // Generic status used by C API operations that only report success or failure.
@@ -114,7 +115,7 @@ typedef struct ls_runtime ls_runtime;
 // Native callbacks receive the live runtime stack. Arguments are already
 // pushed when the callback is entered, so callbacks read them with the
 // `ls_to_*` helpers and append any results with the `ls_push_*` helpers.
-typedef int (*ls_native_fn)(ls_runtime* runtime, size_t arg_count, size_t result_count, void* userdata);
+typedef void (*ls_native_fn)(ls_runtime* runtime);
 
 // Host bridge shared by module creation, parsing, compilation, and runtime.
 //
@@ -159,6 +160,7 @@ int ls_module_add_native_function(
 	const ls_type* param_types,
 	size_t param_count
 );
+int ls_module_get_native_function_index(ls_module* module, ls_string_view name);
 
 // Front-end pipeline helpers.
 //
@@ -207,8 +209,7 @@ void ls_runtime_destroy(ls_runtime* runtime);
 ls_result ls_runtime_set_native_function_callback(
 	ls_runtime* runtime,
 	int function_index,
-	ls_native_fn callback,
-	void* userdata
+	ls_native_fn callback
 );
 
 void ls_push_bool(ls_runtime* runtime, int value);
@@ -220,6 +221,7 @@ void ls_push_f32(ls_runtime* runtime, float value);
 void ls_push_f64(ls_runtime* runtime, double value);
 void ls_push_string(ls_runtime* runtime, ls_string_view value);
 void ls_push_null(ls_runtime* runtime);
+void ls_push_ptr(ls_runtime* runtime, void* value);
 
 i32 ls_to_bool(ls_runtime* runtime, i32 index);
 i32 ls_to_i32(ls_runtime* runtime, i32 index);
@@ -229,6 +231,7 @@ u64 ls_to_u64(ls_runtime* runtime, i32 index);
 float ls_to_f32(ls_runtime* runtime, i32 index);
 double ls_to_f64(ls_runtime* runtime, i32 index);
 ls_string_view ls_to_string(ls_runtime* runtime, i32 index);
+void* ls_to_ptr(ls_runtime* runtime, i32 index);
 
 // Execute a bytecode function by name.
 //

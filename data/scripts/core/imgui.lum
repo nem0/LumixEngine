@@ -1,0 +1,4 @@
+extern fn begin(name : string) : bool;
+extern fn textUnformatted(text : string) : void;
+extern fn button(label : string) : bool;
+extern fn end() : void;

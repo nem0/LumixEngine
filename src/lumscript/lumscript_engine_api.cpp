@@ -1,4 +1,3 @@
-#include "lumscript/lumscript_engine_api.h"
 #include "core/log.h"
 #include "engine/input_system.h"
 #include "engine/reflection.h"
@@ -12,114 +11,64 @@ namespace Lumix::LumScript {
 
 namespace {
 
-static int logLogError(const ls_value* args, size_t arg_count, ls_value*, void*) {
-	if (arg_count < 1) return 0;
-	logError(StringView(args[0].string.begin, args[0].string.end));
-	return 1;
+static void logLogError(ls_runtime* runtime) {
+	ls_string_view v = ls_to_string(runtime, -1);
+	logError(StringView(v.begin, v.end));
 }
 
-static int logLogInfo(const ls_value* args, size_t arg_count, ls_value*, void*) {
-	if (arg_count < 1) return 0;
-	logInfo(StringView(args[0].string.begin, args[0].string.end));
-	return 1;
+static void logLogInfo(ls_runtime* runtime) {
+	ls_string_view v = ls_to_string(runtime, -1);
+	logInfo(StringView(v.begin, v.end));
 }
 
-static ls_string_view toC(StringView value) {
-	return {value.begin, value.end};
+static const InputSystem::Event* getInputEvent(ls_runtime* runtime) {
+	return (const InputSystem::Event*)ls_to_ptr(runtime, -1);
 }
 
-static ls_string_view lsStringView(const char* value) {
-	return {value, value + strlen(value)};
+static void inputGetEventCount(ls_runtime* runtime) {
+	InputSystem* input = (InputSystem*)ls_to_ptr(runtime, -1);
+	ls_push_i32(runtime, input ? input->getEvents().length() : 0);
 }
 
-static StringView fromC(ls_string_view value) {
-	return {value.begin, value.end};
-}
-
-static ls_string_view makeEngineName(ls_module* module, StringView alias, const char* name) {
-	return ls_make_qualified_name(module, toC(alias), ls_string_view{name, name + strlen(name)});
-}
-
-static ls_type nativeType(ls_module* module, ls_string_view visible_name, ls_string_view id) {
-	const int idx = ls_module_add_native_type(module, visible_name, id);
-	return ls_type_make_native(visible_name, idx, 0);
-}
-
-static const InputSystem::Event* getInputEvent(const ls_value& value) {
-	InputSystem* input = (InputSystem*)value.ptr;
-	if (!input || value.i < 0) return nullptr;
-	// TODO this should not go through input->, `value` should point directly to the event
+static void inputGetEvent(ls_runtime* runtime) {
+	InputSystem* input = (InputSystem*)ls_to_ptr(runtime, -1);
+	const int idx = ls_to_i32(runtime, -2);
 	const Span<const InputSystem::Event> events = input->getEvents();
-	if ((u32)value.i >= events.length()) return nullptr;
-	return &events[value.i];
+	ls_push_ptr(runtime, (void*)&events[idx]);
 }
 
-static int inputGetEventCount(const ls_value* args, size_t arg_count, ls_value* result, void*) {
-	if (arg_count < 1) return 0;
-	InputSystem* input = (InputSystem*)args[0].ptr;
-	if (result) *result = ls_value_make_i32(input ? input->getEvents().length() : 0);
-	return 1;
+static void inputGetType(ls_runtime* runtime) {
+	const InputSystem::Event* event = getInputEvent(runtime);
+	ls_push_i32(runtime, event ? (i32)event->type : -1);
 }
 
-static int inputGetEvent(const ls_value* args, size_t arg_count, ls_value* result, void*) {
-	if (arg_count < 2) return 0;
-	InputSystem* input = (InputSystem*)args[0].ptr;
-	const int idx = args[1].i;
-	if (!input || idx < 0) return 0;
-	const Span<const InputSystem::Event> events = input->getEvents();
-	if ((u32)idx >= events.length()) return 0;
-	if (!result) return 1;
-	result->type = ls_type_make_native(lsStringView("engine:input/InputEvent"), -1, 0);
-	result->ptr = input;
-	result->i = idx;
-	return 1;
+static void inputGetDeviceType(ls_runtime* runtime) {
+	const InputSystem::Event* event = getInputEvent(runtime);
+	ls_push_i32(runtime, event && event->device ? (i32)event->device->type : -1);
 }
 
-static int inputGetType(const ls_value* args, size_t arg_count, ls_value* result, void*) {
-	if (arg_count < 1) return 0;
-	const InputSystem::Event* event = getInputEvent(args[0]);
-	if (result) *result = ls_value_make_i32(event ? (i32)event->type : -1);
-	return 1;
+static void inputGetDeviceIndex(ls_runtime* runtime) {
+	const InputSystem::Event* event = getInputEvent(runtime);
+	ls_push_i32(runtime, event && event->device ? (i32)event->device->index : -1);
 }
 
-static int inputGetDeviceType(const ls_value* args, size_t arg_count, ls_value* result, void*) {
-	if (arg_count < 1) return 0;
-	const InputSystem::Event* event = getInputEvent(args[0]);
-	if (result) *result = ls_value_make_i32(event && event->device ? (i32)event->device->type : -1);
-	return 1;
+static void inputGetKeyId(ls_runtime* runtime) {
+	const InputSystem::Event* event = getInputEvent(runtime);
+	ls_push_i32(runtime, event && event->type == InputEventType::BUTTON ? (i32)event->data.button.key_id : -1);
 }
 
-static int inputGetDeviceIndex(const ls_value* args, size_t arg_count, ls_value* result, void*) {
-	if (arg_count < 1) return 0;
-	const InputSystem::Event* event = getInputEvent(args[0]);
-	if (result) *result = ls_value_make_i32(event && event->device ? (i32)event->device->index : -1);
-	return 1;
+static void inputIsDown(ls_runtime* runtime) {
+	const InputSystem::Event* event = getInputEvent(runtime);
+	ls_push_bool(runtime, event && event->type == InputEventType::BUTTON && event->data.button.down);
 }
 
-static int inputGetKeyId(const ls_value* args, size_t arg_count, ls_value* result, void*) {
-	if (arg_count < 1) return 0;
-	const InputSystem::Event* event = getInputEvent(args[0]);
-	if (result) *result = ls_value_make_i32(event && event->type == InputEventType::BUTTON ? (i32)event->data.button.key_id : -1);
-	return 1;
+static void inputIsRepeat(ls_runtime* runtime) {
+	const InputSystem::Event* event = getInputEvent(runtime);
+	ls_push_bool(runtime, event && event->type == InputEventType::BUTTON && event->data.button.is_repeat);
 }
 
-static int inputIsDown(const ls_value* args, size_t arg_count, ls_value* result, void*) {
-	if (arg_count < 1) return 0;
-	const InputSystem::Event* event = getInputEvent(args[0]);
-	if (result) *result = ls_value_make_bool(event && event->type == InputEventType::BUTTON && event->data.button.down);
-	return 1;
-}
-
-static int inputIsRepeat(const ls_value* args, size_t arg_count, ls_value* result, void*) {
-	if (arg_count < 1) return 0;
-	const InputSystem::Event* event = getInputEvent(args[0]);
-	if (result) *result = ls_value_make_bool(event && event->type == InputEventType::BUTTON && event->data.button.is_repeat);
-	return 1;
-}
-
-static int inputGetX(const ls_value* args, size_t arg_count, ls_value* result, void*) {
-	if (arg_count < 1) return 0;
-	const InputSystem::Event* event = getInputEvent(args[0]);
+static void inputGetX(ls_runtime* runtime) {
+	const InputSystem::Event* event = getInputEvent(runtime);
 	float value = 0;
 	if (event) {
 		switch (event->type) {
@@ -129,13 +78,11 @@ static int inputGetX(const ls_value* args, size_t arg_count, ls_value* result, v
 			default: break;
 		}
 	}
-	if (result) *result = ls_value_make_f32(value);
-	return 1;
+	ls_push_f32(runtime, value);
 }
 
-static int inputGetY(const ls_value* args, size_t arg_count, ls_value* result, void*) {
-	if (arg_count < 1) return 0;
-	const InputSystem::Event* event = getInputEvent(args[0]);
+static void inputGetY(ls_runtime* runtime) {
+	const InputSystem::Event* event = getInputEvent(runtime);
 	float value = 0;
 	if (event) {
 		switch (event->type) {
@@ -145,13 +92,11 @@ static int inputGetY(const ls_value* args, size_t arg_count, ls_value* result, v
 			default: break;
 		}
 	}
-	if (result) *result = ls_value_make_f32(value);
-	return 1;
+	ls_push_f32(runtime, value);
 }
 
-static int inputGetValue(const ls_value* args, size_t arg_count, ls_value* result, void*) {
-	if (arg_count < 1) return 0;
-	const InputSystem::Event* event = getInputEvent(args[0]);
+static void inputGetValue(ls_runtime* runtime) {
+	const InputSystem::Event* event = getInputEvent(runtime);
 	float value = 0;
 	if (event) {
 		switch (event->type) {
@@ -161,138 +106,165 @@ static int inputGetValue(const ls_value* args, size_t arg_count, ls_value* resul
 			default: break;
 		}
 	}
-	if (result) *result = ls_value_make_f32(value);
-	return 1;
+	ls_push_f32(runtime, value);
 }
 
-static int inputGetAxis(const ls_value* args, size_t arg_count, ls_value* result, void*) {
-	if (arg_count < 1) return 0;
-	const InputSystem::Event* event = getInputEvent(args[0]);
-	if (result) *result = ls_value_make_i32(event && event->type == InputEventType::AXIS ? (i32)event->data.axis.axis : -1);
-	return 1;
+static void inputGetAxis(ls_runtime* runtime) {
+	const InputSystem::Event* event = getInputEvent(runtime);
+	ls_push_i32(runtime, event && event->type == InputEventType::AXIS ? (i32)event->data.axis.axis : -1);
 }
 
-static int inputGetText(const ls_value* args, size_t arg_count, ls_value* result, void*) {
-	if (arg_count < 1) return 0;
-	const InputSystem::Event* event = getInputEvent(args[0]);
-	if (result) *result = ls_value_make_i32(event && event->type == InputEventType::TEXT_INPUT ? (i32)event->data.text.utf8 : 0);
-	return 1;
+static void inputGetText(ls_runtime* runtime) {
+	const InputSystem::Event* event = getInputEvent(runtime);
+	ls_push_i32(runtime, event && event->type == InputEventType::TEXT_INPUT ? (i32)event->data.text.utf8 : 0);
 }
 
-bool registerInputModule(ls_module* module, StringView alias) {
-	if (!module) return false;
+static void imguiBegin(ls_runtime* runtime) {
+	ls_string_view sv = ls_to_string(runtime, -1);
+	StaticString<256> title(StringView{sv.begin, sv.end});
+	bool open = ImGui::Begin(title);
+	ls_push_bool(runtime, open);
+}
 
-	const ls_type system_type = nativeType(module, makeEngineName(module, alias, "InputSystem"), lsStringView("engine:input/InputSystem"));
-	const ls_type event_type = nativeType(module, makeEngineName(module, alias, "InputEvent"), lsStringView("engine:input/InputEvent"));
-	// TODO this is generated by meta in lumscript_capi.gen.h
-	const ls_enum_member event_type_enum[] = {
-		{lsStringView("BUTTON"), 0},
-		{lsStringView("AXIS"), 1},
-		{lsStringView("MOUSE_WHEEL"), 2},
-		{lsStringView("TEXT_INPUT"), 3},
-		{lsStringView("DEVICE_ADDED"), 4},
-		{lsStringView("DEVICE_REMOVED"), 5},
-	};
-	const int event_type_enum_idx = ls_module_add_enum(module, lsStringView("InputEventType"), event_type_enum, lengthOf(event_type_enum));
-	const ls_type event_type_enum_type = ls_type_make_enum(lsStringView("InputEventType"), event_type_enum_idx, 0);
+static void imguiEnd(ls_runtime* runtime) {
+	ImGui::End();
+}
 
-	{
-		const ls_type params[] = { system_type };
-		ls_module_add_native_function(module, makeEngineName(module, alias, "getEventCount"), ls_type_make(LS_TYPE_I32), params, lengthOf(params), &inputGetEventCount, nullptr);
+static void imguiTextUnformatted(ls_runtime* runtime) {
+	ls_string_view sv = ls_to_string(runtime, -1);
+	ImGui::TextUnformatted(sv.begin, sv.end);
+}
+
+static void imguiButton(ls_runtime* runtime) {
+	ls_string_view sv = ls_to_string(runtime, -1);
+	StaticString<256> label(StringView{sv.begin, sv.end});
+	bool clicked = ImGui::Button(label);
+	ls_push_bool(runtime, clicked);
+}
+
+static void lumscript_world_createEntity(ls_runtime* runtime) {
+	World* world = (World*)ls_to_ptr(runtime, -1);
+	EntityRef entity = world->createEntity({0, 0, 0}, Quat::IDENTITY);
+	ls_push_ptr(runtime, world);
+	ls_push_i32(runtime, entity.index);
+}
+
+static void lumscript_world_destroyEntity(ls_runtime* runtime) {
+	World* world = (World*)ls_to_ptr(runtime, -1);
+	i32 entity_idx = ls_to_i32(runtime, -2);
+	world->destroyEntity(EntityRef(entity_idx));
+}
+
+static void lumscript_world_hasEntity(ls_runtime* runtime) {
+	World* world = (World*)ls_to_ptr(runtime, -1);
+	i32 entity_idx = ls_to_i32(runtime, -2);
+	ls_push_bool(runtime, entity_idx >= 0 && world->hasEntity(EntityRef(entity_idx)));
+}
+
+static void lumscript_world_findByName(ls_runtime* runtime) {
+	/*World* world = (World*)ls_to_ptr(runtime, -1);
+	char name[128];
+	copyString(name, ls_to_string(runtime, -2));
+	const EntityPtr entity = world->findByName(INVALID_ENTITY, name);
+	if (!entity.isValid()) {
+		ls_push_null(runtime);
+		return true;
 	}
-	{
-		const ls_type params[] = { system_type, ls_type_make(LS_TYPE_I32) };
-		ls_module_add_native_function(module, makeEngineName(module, alias, "getEvent"), event_type, params, lengthOf(params), &inputGetEvent, nullptr);
-	}
-	{
-		const ls_type params[] = { event_type };
-		ls_module_add_native_function(module, makeEngineName(module, alias, "getType"), event_type_enum_type, params, lengthOf(params), &inputGetType, nullptr);
-		ls_module_add_native_function(module, makeEngineName(module, alias, "getDeviceType"), ls_type_make(LS_TYPE_I32), params, lengthOf(params), &inputGetDeviceType, nullptr);
-		ls_module_add_native_function(module, makeEngineName(module, alias, "getDeviceIndex"), ls_type_make(LS_TYPE_I32), params, lengthOf(params), &inputGetDeviceIndex, nullptr);
-		ls_module_add_native_function(module, makeEngineName(module, alias, "getKeyId"), ls_type_make(LS_TYPE_I32), params, lengthOf(params), &inputGetKeyId, nullptr);
-		ls_module_add_native_function(module, makeEngineName(module, alias, "isDown"), ls_type_make(LS_TYPE_BOOL), params, lengthOf(params), &inputIsDown, nullptr);
-		ls_module_add_native_function(module, makeEngineName(module, alias, "isRepeat"), ls_type_make(LS_TYPE_BOOL), params, lengthOf(params), &inputIsRepeat, nullptr);
-		ls_module_add_native_function(module, makeEngineName(module, alias, "getX"), ls_type_make(LS_TYPE_F32), params, lengthOf(params), &inputGetX, nullptr);
-		ls_module_add_native_function(module, makeEngineName(module, alias, "getY"), ls_type_make(LS_TYPE_F32), params, lengthOf(params), &inputGetY, nullptr);
-		ls_module_add_native_function(module, makeEngineName(module, alias, "getValue"), ls_type_make(LS_TYPE_F32), params, lengthOf(params), &inputGetValue, nullptr);
-		ls_module_add_native_function(module, makeEngineName(module, alias, "getAxis"), ls_type_make(LS_TYPE_I32), params, lengthOf(params), &inputGetAxis, nullptr);
-		ls_module_add_native_function(module, makeEngineName(module, alias, "getText"), ls_type_make(LS_TYPE_I32), params, lengthOf(params), &inputGetText, nullptr);
-	}
-	return true;
+	ls_push_ptr(runtime, world);
+	ls_push_i32(runtime, entity.index);*/
 }
 
-bool registerLogModule(ls_module* module, StringView alias) {
-	const ls_type params[] = {ls_type_make(LS_TYPE_STRING)};
-	ls_module_add_native_function(module, makeEngineName(module, alias, "logError"), ls_type_make(LS_TYPE_VOID), params, lengthOf(params), &logLogError, nullptr);
-	ls_module_add_native_function(module, makeEngineName(module, alias, "logInfo"), ls_type_make(LS_TYPE_VOID), params, lengthOf(params), &logLogInfo, nullptr);
-	return true;
+static void lumscript_entity_destroy(ls_runtime* runtime) {
+	World* world = (World*)ls_to_ptr(runtime, -1);
+	i32 entity_idx = ls_to_i32(runtime, -2);
+	world->destroyEntity(EntityRef(entity_idx));
 }
 
-static int imguiBeginWindow(const ls_value* args, size_t arg_count, ls_value* result, void*) {
-	if (arg_count < 1) return 0;
-	bool open = false;
-	if (ImGui::GetCurrentContext()) {
-		StringView sv = {args[0].string.begin, args[0].string.end};
-		StaticString<256> title(sv);
-		open = ImGui::Begin(title);
-	}
-	if (result) *result = ls_value_make_bool(open);
-	return 1;
+static void lumscript_entity_isValid(ls_runtime* runtime) {
+	World* world = (World*)ls_to_ptr(runtime, -1);
+	i32 entity_idx = ls_to_i32(runtime, -2);
+	ls_push_bool(runtime, world && entity_idx >= 0 && world->hasEntity(EntityRef(entity_idx)));
 }
 
-static int imguiEndWindow(const ls_value*, size_t, ls_value*, void*) {
-	if (ImGui::GetCurrentContext()) ImGui::End();
-	return 1;
+static void lumscript_entity_setPosition(ls_runtime* runtime) {
+	World* world = (World*)ls_to_ptr(runtime, -1);
+	i32 entity_idx = ls_to_i32(runtime, -2);
+	//world->setPosition(EntityRef(entity_idx), toDVec3(args[1]));
 }
 
-static int imguiTextUnformatted(const ls_value* args, size_t arg_count, ls_value*, void*) {
-	if (arg_count < 1) return 0;
-	if (ImGui::GetCurrentContext()) {
-		const ls_string_view text = args[0].string;
-		ImGui::TextUnformatted(text.begin, text.end);
-	}
-	return 1;
+static void lumscript_entity_getPosition(ls_runtime* runtime) {
+	World* world = (World*)ls_to_ptr(runtime, -1);
+	i32 entity_idx = ls_to_i32(runtime, -2);
+	//*result = makeDVec3Value(world->getPosition(EntityRef(entity_idx)));
 }
 
-static int imguiButton(const ls_value* args, size_t arg_count, ls_value* result, void*) {
-	if (arg_count < 1) return 0;
-	bool clicked = false;
-	if (ImGui::GetCurrentContext()) {
-		StringView sv = {args[0].string.begin, args[0].string.end};
-		StaticString<256> label(sv);
-		clicked = ImGui::Button(label);
-	}
-	if (result) *result = ls_value_make_bool(clicked);
-	return 1;
+static void lumscript_entity_setRotation(ls_runtime* runtime) {
+	World* world = (World*)ls_to_ptr(runtime, -1);
+	i32 entity_idx = ls_to_i32(runtime, -2);
+	//world->setRotation(EntityRef(entity_idx), toQuat(args[1]));
 }
 
-bool registerImguiModule(ls_module* module, StringView alias) {
-	if (!module) return false;
-	const ls_type params[] = {ls_type_make(LS_TYPE_STRING)};
-	ls_module_add_native_function(module, makeEngineName(module, alias, "beginWindow"), ls_type_make(LS_TYPE_BOOL), params, lengthOf(params), &imguiBeginWindow, nullptr);
-	ls_module_add_native_function(module, makeEngineName(module, alias, "textUnformatted"), ls_type_make(LS_TYPE_VOID), params, lengthOf(params), &imguiTextUnformatted, nullptr);
-	ls_module_add_native_function(module, makeEngineName(module, alias, "button"), ls_type_make(LS_TYPE_BOOL), params, lengthOf(params), &imguiButton, nullptr);
-	ls_module_add_native_function(module, makeEngineName(module, alias, "endWindow"), ls_type_make(LS_TYPE_VOID), nullptr, 0, &imguiEndWindow, nullptr);
-	return true;
+static void lumscript_entity_getRotation(ls_runtime* runtime) {
+	World* world = (World*)ls_to_ptr(runtime, -1);
+	i32 entity_idx = ls_to_i32(runtime, -2);
+	//*result = makeQuatValue(world->getRotation(EntityRef(entity_idx)));
+}
+
+static void lumscript_entity_setScale(ls_runtime* runtime) {
+	World* world = (World*)ls_to_ptr(runtime, -1);
+	i32 entity_idx = ls_to_i32(runtime, -2);
+	//world->setScale(EntityRef(entity_idx), toVec3(args[1]));
+}
+
+static void lumscript_entity_getScale(ls_runtime* runtime) {
+	World* world = (World*)ls_to_ptr(runtime, -1);
+	i32 entity_idx = ls_to_i32(runtime, -2);
+	//*result = makeVec3Value(Vec3(world->getScale(EntityRef(entity_idx))));
+}
+
+void registerImguiModule(HashMap<StringView, ls_native_fn>& functions) {
+	functions.insert(StringView("core:imgui.begin"), &imguiBegin);
+	functions.insert(StringView("core:imgui.textUnformatted"), &imguiTextUnformatted);
+	functions.insert(StringView("core:imgui.button"), &imguiButton);
+	functions.insert(StringView("core:imgui.end"), &imguiEnd);
 }
 
 } // namespace
 
-bool resolveEngineImport(ls_module& c_module, World* world, StringView path, StringView alias) {
-	if (generated::registerGeneratedEngineImport(&c_module, world, toC(path), toC(alias))) return true;
-	if (!startsWith(path, "engine:")) return false;
-	if (alias.empty()) return false;
-
-	const StringView name = path.withoutLeft(7);
-	if (equalStrings(name, "entity")) {
-		nativeType(&c_module, makeEngineName(&c_module, alias, "Entity"), lsStringView("engine:entity/Entity"));
-		return true;
-	}
-	if (equalStrings(name, "input")) return registerInputModule(&c_module, alias);
-	if (equalStrings(name, "log")) return registerLogModule(&c_module, alias);
-	if (equalStrings(name, "imgui")) return registerImguiModule(&c_module, alias);
-
-	return false;
+void resolveEngineImport(HashMap<StringView, ls_native_fn>& functions) {
+	generated::registerGeneratedEngineImport(functions);
+	registerImguiModule(functions);
+	// input
+	functions.insert(StringView("core:input.getEventCount"), &inputGetEventCount);
+	functions.insert(StringView("core:input.getEvent"), &inputGetEvent);
+	functions.insert(StringView("core:input.getType"), &inputGetType);
+	functions.insert(StringView("core:input.getDeviceType"), &inputGetDeviceType);
+	functions.insert(StringView("core:input.getDeviceIndex"), &inputGetDeviceIndex);
+	functions.insert(StringView("core:input.getKeyId"), &inputGetKeyId);
+	functions.insert(StringView("core:input.isDown"), &inputIsDown);
+	functions.insert(StringView("core:input.isRepeat"), &inputIsRepeat);
+	functions.insert(StringView("core:input.getX"), &inputGetX);
+	functions.insert(StringView("core:input.getY"), &inputGetY);
+	functions.insert(StringView("core:input.getValue"), &inputGetValue);
+	functions.insert(StringView("core:input.getAxis"), &inputGetAxis);
+	functions.insert(StringView("core:input.getText"), &inputGetText);
+	// log
+	functions.insert(StringView("core:log.logError"), &logLogError);
+	functions.insert(StringView("core:log.logInfo"), &logLogInfo);
+	// entity
+	functions.insert(StringView("core:entity.destroy"), &lumscript_entity_destroy);
+	functions.insert(StringView("core:entity.isValid"), &lumscript_entity_isValid);
+	functions.insert(StringView("core:entity.getPosition"), &lumscript_entity_getPosition);
+	functions.insert(StringView("core:entity.getRotation"), &lumscript_entity_getRotation);
+	functions.insert(StringView("core:entity.getScale"), &lumscript_entity_getScale);
+	functions.insert(StringView("core:entity.setPosition"), &lumscript_entity_setPosition);
+	functions.insert(StringView("core:entity.setScale"), &lumscript_entity_setScale);
+	functions.insert(StringView("core:entity.setRotation"), &lumscript_entity_setRotation);
+	// world
+	functions.insert(StringView("core:world.createEntity"), &lumscript_world_createEntity);
+	functions.insert(StringView("core:world.destroyEntity"), &lumscript_world_destroyEntity);
+	functions.insert(StringView("core:world.findByName"), &lumscript_world_findByName);
+	functions.insert(StringView("core:world.hasEntity"), &lumscript_world_hasEntity);
 }
 
 } // namespace Lumix::LumScript

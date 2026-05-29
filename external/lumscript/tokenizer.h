@@ -130,6 +130,7 @@ struct Tokenizer {
 				switch (m_start_token[1]) {
 					case 'a': return checkKeyword("se", 2, 2, Token::CASE);
 					case 'o': return checkKeyword("nst", 2, 3, Token::CONST);
+					case 'p': return checkKeyword("tr", 2, 2, Token::CPTR);
 				}
 				return checkKeyword("ontinue", 1, 7, Token::CONTINUE);
 			}
@@ -139,6 +140,7 @@ struct Tokenizer {
 				switch (m_start_token[1]) {
 					case 'l': return checkKeyword("se", 2, 2, Token::ELSE);
 					case 'n': return checkKeyword("um", 2, 2, Token::ENUM);
+					case 'x': return checkKeyword("tern", 2, 4, Token::EXTERN);
 				}
 				break;
 			}

@@ -31,6 +31,10 @@ struct LocalFunctionInfo {
 	i32 function_index = -1;
 };
 
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
+
 struct Checker {
 	Checker(ls_module& module)
 		: m_module(module)
@@ -38,77 +42,91 @@ struct Checker {
 	{}
 
 	bool check() {
-		for (i32 i = 0; i < m_module.structs.size(); ++i) {
-			for (i32 j = i + 1; j < m_module.structs.size(); ++j) {
-				if (equalStrings(m_module.structs[i].name, m_module.structs[j].name)) {
-					m_output.errorAt(m_module.structs[j].token, "Duplicate struct '", m_module.structs[j].name, "'");
-					return false;
-				}
-			}
-		}
-		for (i32 i = 0; i < m_module.functions.size(); ++i) {
-			if (m_module.functions[i].is_nested) continue;
-			for (i32 j = i + 1; j < m_module.functions.size(); ++j) {
-				if (m_module.functions[j].is_nested) continue;
-				if (equalStrings(m_module.functions[i].name, m_module.functions[j].name)) {
-					m_output.errorAt(m_module.functions[j].token, "Duplicate function '", m_module.functions[j].name, "'");
-					return false;
-				}
-			}
-			if (m_module.findNativeFunction(m_module.functions[i].name) >= 0) {
-				m_output.errorAt(m_module.functions[i].token, "Duplicate function '", m_module.functions[i].name, "'");
-				return false;
-			}
-			if (m_module.findGlobal(m_module.functions[i].name) >= 0) {
-				m_output.errorAt(m_module.functions[i].token, "Duplicate declaration '", m_module.functions[i].name, "'");
+		// Use hash tables to detect duplicates in linear time.
+		std::unordered_set<std::string> struct_names;
+		struct_names.reserve(m_module.structs.size() * 2 + 16);
+		for (const StructDecl& s : m_module.structs) {
+			std::string key(data(s.name), size(s.name));
+			if (!struct_names.insert(key).second) {
+				m_output.errorAt(s.token, "Duplicate struct '", s.name, "'");
 				return false;
 			}
 		}
-		for (i32 i = 0; i < m_module.globals.size(); ++i) {
-			for (i32 j = i + 1; j < m_module.globals.size(); ++j) {
-				if (equalStrings(m_module.globals[i].name, m_module.globals[j].name)) {
-					m_output.errorAt(m_module.globals[j].token, "Duplicate global '", m_module.globals[j].name, "'");
-					return false;
-				}
-			}
-			if (m_module.findFunction(m_module.globals[i].name) >= 0 || m_module.findNativeFunction(m_module.globals[i].name) >= 0) {
-				m_output.errorAt(m_module.globals[i].token, "Duplicate declaration '", m_module.globals[i].name, "'");
+
+		// Collect native function names for quick lookup
+		std::unordered_set<std::string> native_names;
+		native_names.reserve(m_module.native_functions.size() * 2 + 16);
+		for (const NativeFunctionDecl& nf : m_module.native_functions) {
+			std::string key(data(nf.name), size(nf.name));
+			if (!native_names.insert(key).second) {
+				m_output.errorAt(nf.token, "Duplicate function '", nf.name, "'");
 				return false;
 			}
 		}
-		for (i32 i = 0; i < m_module.native_functions.size(); ++i) {
-			for (i32 j = i + 1; j < m_module.native_functions.size(); ++j) {
-				if (equalStrings(m_module.native_functions[i].name, m_module.native_functions[j].name)) {
-					m_output.errorAt(m_module.native_functions[j].token, "Duplicate function '", m_module.native_functions[j].name, "'");
-					return false;
-				}
+
+		// Functions: check duplicates and collisions with natives/globals
+		std::unordered_map<std::string, Token> function_map;
+		function_map.reserve(m_module.functions.size() * 2 + 16);
+		for (const FunctionDecl& fn : m_module.functions) {
+			if (fn.is_nested) continue;
+			std::string key(data(fn.name), size(fn.name));
+			auto it = function_map.find(key);
+			if (it != function_map.end()) {
+				m_output.errorAt(fn.token, "Duplicate function '", fn.name, "'");
+				return false;
+			}
+			if (native_names.find(key) != native_names.end()) {
+				m_output.errorAt(fn.token, "Duplicate function '", fn.name, "'");
+				return false;
+			}
+			function_map.emplace(std::move(key), fn.token);
+		}
+
+		// Globals: check duplicates and collisions with functions/natives
+		std::unordered_map<std::string, Token> global_map;
+		global_map.reserve(m_module.globals.size() * 2 + 16);
+		for (const GlobalDecl& g : m_module.globals) {
+			std::string key(data(g.name), size(g.name));
+			if (!global_map.insert({key, g.token}).second) {
+				m_output.errorAt(g.token, "Duplicate global '", g.name, "'");
+				return false;
+			}
+			if (function_map.find(key) != function_map.end() || native_names.find(key) != native_names.end()) {
+				m_output.errorAt(g.token, "Duplicate declaration '", g.name, "'");
+				return false;
 			}
 		}
-		for (i32 i = 0; i < m_module.structs.size(); ++i) {
-			StructDecl& s = m_module.structs[i];
-			for (i32 j = 0; j < s.fields.size(); ++j) {
-				for (i32 k = j + 1; k < s.fields.size(); ++k) {
-					if (equalStrings(s.fields[j].name, s.fields[k].name)) {
-						m_output.errorAt(s.fields[k].token, "Duplicate field '", s.fields[k].name, "'");
-						return false;
-					}
-				}
-				resolveType(s.fields[j].type);
-			}
-		}
-		for (i32 i = 0; i < m_module.enums.size(); ++i) {
-			for (i32 j = i + 1; j < m_module.enums.size(); ++j) {
-				if (equalStrings(m_module.enums[i].name, m_module.enums[j].name)) {
-					m_output.errorAt(m_module.enums[j].token, "Duplicate enum '", m_module.enums[j].name, "'");
+
+		// Struct fields: detect duplicates per-struct and resolve field types
+		for (StructDecl& s : m_module.structs) {
+			std::unordered_set<std::string> field_names;
+			field_names.reserve(s.fields.size() * 2 + 4);
+			for (FieldDecl& f : s.fields) {
+				std::string key(data(f.name), size(f.name));
+				if (!field_names.insert(key).second) {
+					m_output.errorAt(f.token, "Duplicate field '", f.name, "'");
 					return false;
 				}
+				resolveType(f.type);
 			}
-			for (i32 j = 0; j < m_module.enums[i].members.size(); ++j) {
-				for (i32 k = j + 1; k < m_module.enums[i].members.size(); ++k) {
-					if (equalStrings(m_module.enums[i].members[j].name, m_module.enums[i].members[k].name)) {
-						m_output.errorAt(m_module.enums[i].members[k].token, "Duplicate enum member '", m_module.enums[i].members[k].name, "'");
-						return false;
-					}
+		}
+
+		// Enums and enum members
+		std::unordered_set<std::string> enum_names;
+		enum_names.reserve(m_module.enums.size() * 2 + 16);
+		for (const EnumDecl& e : m_module.enums) {
+			std::string key(data(e.name), size(e.name));
+			if (!enum_names.insert(key).second) {
+				m_output.errorAt(e.token, "Duplicate enum '", e.name, "'");
+				return false;
+			}
+			std::unordered_set<std::string> member_names;
+			member_names.reserve(e.members.size() * 2 + 4);
+			for (const EnumMember& m : e.members) {
+				std::string mkey(data(m.name), size(m.name));
+				if (!member_names.insert(mkey).second) {
+					m_output.errorAt(m.token, "Duplicate enum member '", m.name, "'");
+					return false;
 				}
 			}
 		}
@@ -1131,7 +1149,7 @@ struct Checker {
 					m_output.errorAt(stmt.token, "For range bounds must have the same numeric type");
 					return;
 				}
-				const i32 old_size = m_locals.size();
+				const i32 old_size = (i32)m_locals.size();
 				LocalInfo& local = m_locals.emplace_back();
 				local.name = stmt.label_name;
 				local.type = start_type;
@@ -1326,6 +1344,9 @@ inline bool resolveImports(ls_module& module, ls_import_resolver_fn import_resol
 			}
 
 			state[idx] = 1;
+			// remember native function and import counts so we can mark newly added
+			// functions and continue resolving newly discovered imports
+			const i32 old_native_count = (i32)module.native_functions.size();
 			const i32 old_import_count = (i32)module.imports.size();
 			ls_string_view source;
 			if (!import_resolver(import_resolver_userdata, import.path, import.alias, &source)) {
@@ -1333,6 +1354,25 @@ inline bool resolveImports(ls_module& module, ls_import_resolver_fn import_resol
 				return false;
 			}
 			if (!empty(source) && !parse(module, source, import.alias, import.path)) return false;
+			// For any native functions that were added by parsing this import, set
+			// their canonical name to the normalized import path + member name so
+			// external code can register callbacks by canonical identity.
+			for (i32 n = old_native_count; n < (i32)module.native_functions.size(); ++n) {
+				NativeFunctionDecl& fn = module.native_functions[n];
+				ls_string_view owner = {};
+				ls_string_view member = {};
+				// fn.name is alias-qualified (alias.member). Extract the member.
+				for (const char* c = data(fn.name) + size(fn.name); c != data(fn.name); --c) {
+					if (*(c - 1) != '.') continue;
+					owner = ls_string_view{data(fn.name), c - 1};
+					member = ls_string_view{c, data(fn.name) + size(fn.name)};
+					break;
+				}
+				if (empty(member)) member = fn.name;
+				ls_string_view norm_path = normalizeImportPathForPolicy(import.path);
+				ls_string_view canonical = module.makeQualifiedName(norm_path, member);
+				fn.canonical_name = canonical;
+			}
 
 			ensureStateSize();
 			for (i32 i = old_import_count; i < module.imports.size(); ++i) {

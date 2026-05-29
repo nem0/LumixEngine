@@ -42,6 +42,7 @@ struct Token {
 		GT_EQUAL,
 		LT_EQUAL,
 
+		EXTERN,
 		STRUCT,
 		ENUM,
 		FN,
@@ -77,7 +78,8 @@ struct Token {
 		U32,
 		U64,
 		F32,
-		F64
+		F64,
+		CPTR,
 	};
 
 	Type type = END_OF_FILE;

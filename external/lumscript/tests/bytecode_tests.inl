@@ -36,6 +36,176 @@ TEST(BytecodeCompileAndRunMain) {
 	return true;
 }
 
+TEST(ExternImport) {
+	const char* main_source = R"(
+		import "math" as m
+
+		fn main() : i32 {
+			const v1 : m.Vec2 = m.Vec2 { 10, 11 };
+			const s1 : i32 = m.sum(v1); // with namespace
+			const v2 : m.Vec2 = m.Vec2 { 9, 12 };
+			const s2 : i32 = sum(v2); // inferred namespaced
+			return s1 + s2;
+		}
+	)";
+	
+	const char* math_source = R"(
+		struct Vec2 {
+			x : i32;
+			y : i32;
+		};
+
+		extern fn sum(v : Vec2) : i32;
+	)";
+
+	LumScriptImportFile files_storage[] = {
+		{ toLs("math"), toLs(math_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+
+	TestContext diagnostics;
+	ls_module* module = ls_module_create(&diagnostics.host);
+	EXPECT_TRUE(module != nullptr);
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
+
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &diagnostics.host);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	const i32 sum_fn_idx = ls_module_get_native_function_index(module, toLs("math.sum"));
+
+	auto sumfn = [](ls_runtime* runtime) -> void {
+		const i32 s = ls_to_i32(runtime, -1) + ls_to_i32(runtime, -2);
+		ls_push_i32(runtime, s);
+	};
+
+	ls_runtime* runtime = ls_runtime_create(bytecode);
+	EXPECT_TRUE(runtime != nullptr);
+	ls_runtime_set_native_function_callback(runtime, sum_fn_idx, sumfn);
+
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(StructExtern) {
+	const char* source = R"(
+		struct Entity {
+			index : i32;
+			world : cptr;
+		};
+
+		extern fn create() : Entity;
+
+		fn main() : Entity {
+			var v : Entity = create();
+			return v;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+
+	static int ptr;
+
+	auto create_fn = [](ls_runtime* runtime) -> void {
+		ls_push_i32(runtime, 42);
+		ls_push_ptr(runtime, &ptr);
+	};
+
+	CAPI_RUNTIME(module, runtime);
+	const i32 fn_idx = ls_module_get_native_function_index(module, toLs("create"));
+	
+	EXPECT_TRUE(ls_runtime_set_native_function_callback(runtime, fn_idx, create_fn) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_EQ(42, ls_to_i32(runtime, -2));
+	EXPECT_TRUE(&ptr == ls_to_ptr(runtime, -1));
+	CAPI_END(module);
+	
+	return true;
+}
+
+TEST(Extern) {
+	const char* source = R"(
+		extern fn nativefn() : i32;
+		extern fn nativefn2(v : i32) : i32;
+
+		fn main() : i32 {
+			var v : i32 = nativefn();
+			v = nativefn2(v);
+			return v;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+
+	auto nativefn = [](ls_runtime* runtime) -> void {
+		ls_push_i32(runtime, 41);
+	};
+
+	auto nativefn2 = [](ls_runtime* runtime) -> void {
+		i32 v = ls_to_i32(runtime, -1);
+		ls_push_i32(runtime, v + 1);
+	};
+
+	CAPI_RUNTIME(module, runtime);
+	const i32 fn_idx = ls_module_get_native_function_index(module, toLs("nativefn"));
+	const i32 fn2_idx = ls_module_get_native_function_index(module, toLs("nativefn2"));
+	
+	EXPECT_TRUE(ls_runtime_set_native_function_callback(runtime, fn_idx, nativefn) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_runtime_set_native_function_callback(runtime, fn2_idx, nativefn2) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	
+	return true;
+}
+
+TEST(NativePtr) {
+	const char* source = R"(
+		fn main() : void {
+			var x = create();
+			test(x);
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+
+	const int idx = ls_module_add_native_type(module, toLs("Entity"), toLs("engine:entity/Entity"));
+	const ls_type entity_type = ls_type_make_native(toLs("Entity"), idx, 0);
+	
+	const i32 create_fn_idx = ls_module_add_native_function(module, ls_make_qualified_name(module, toLs(""), toLs("create")), entity_type, nullptr, 0);
+	const ls_type params[] = { entity_type };
+	const i32 test_fn_idx = ls_module_add_native_function(module, ls_make_qualified_name(module, toLs(""), toLs("test")), ls_type_make(LS_TYPE_VOID), params, 1);
+	
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+
+	static int ptr;
+	static bool matches = false;
+
+	auto createfn = [](ls_runtime* runtime) -> void {
+		ls_push_ptr(runtime, &ptr);
+	};
+
+	auto testfn = [](ls_runtime* runtime) -> void {
+		void* t = ls_to_ptr(runtime, -1);
+		matches = t == &ptr;
+	};
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_runtime_set_native_function_callback(runtime, create_fn_idx, createfn) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_runtime_set_native_function_callback(runtime, test_fn_idx, testfn) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(matches);
+	CAPI_END(module);
+	
+	return true;
+}
+
 TEST(testNativeFunctionCall) {
 	const char* source = R"(
 		fn main() : i32 {
@@ -52,7 +222,7 @@ TEST(testNativeFunctionCall) {
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_runtime_set_native_function_callback(runtime, native_add, &nativeAddC, nullptr) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_runtime_set_native_function_callback(runtime, native_add, &nativeAddC) == LS_RESULT_OK);
 	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 	CAPI_END(module);

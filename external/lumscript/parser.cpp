@@ -17,6 +17,7 @@ struct Parser {
 	bool parse() {
 		while (peek().type != Token::END_OF_FILE && !m_output.has_error) {
 			if (match(Token::IMPORT)) parseImport();
+			else if (match(Token::EXTERN)) parseExtern();
 			else if (match(Token::STRUCT)) parseStruct();
 			else if (match(Token::ENUM)) parseEnum();
 			else if (match(Token::FN)) parseFunction(false);
@@ -99,6 +100,7 @@ struct Parser {
 			}
 			case Token::VOID: base = {LS_TYPE_VOID, t.value, -1, t, is_nullable}; break;
 			case Token::BOOL: base = {LS_TYPE_BOOL, t.value, -1, t, is_nullable}; break;
+			case Token::CPTR: base = {LS_TYPE_CPTR, t.value, -1, t, is_nullable}; break;
 			case Token::I8: base = {LS_TYPE_I8, t.value, -1, t, is_nullable}; break;
 			case Token::U8: base = {LS_TYPE_U8, t.value, -1, t, is_nullable}; break;
 			case Token::I16: base = {LS_TYPE_I16, t.value, -1, t, is_nullable}; break;
@@ -138,6 +140,33 @@ struct Parser {
 			return array_type;
 		}
 		return base;
+	}
+
+	void parseExtern() {
+		if (!consume(Token::FN)) return;
+		Token name;
+		if (!consume(Token::IDENTIFIER, &name)) return;
+		NativeFunctionDecl& fn = m_module.native_functions.emplace_back();
+		fn.name = m_module.makeQualifiedName(m_declaration_prefix, name.value);
+		if (!consume(Token::LEFT_PAREN)) return;
+		
+		while (peek().type != Token::RIGHT_PAREN && peek().type != Token::END_OF_FILE && !m_output.has_error) {
+			if (!fn.params.empty() && !consume(Token::COMMA)) return;
+			Token param_name;
+			if (!consume(Token::IDENTIFIER, &param_name)) return;
+			consume(Token::COLON);
+			Param& p = fn.params.emplace_back();
+			p.name = param_name.value;
+			p.token = param_name;
+			p.is_ref = match(Token::REF);
+			p.type = parseType();
+		}
+		
+		if (!consume(Token::RIGHT_PAREN)) return;
+		if (!consume(Token::COLON)) return;
+		fn.token = name;
+		fn.return_type = parseType();
+		consume(Token::SEMICOLON);
 	}
 
 	void parseStruct() {

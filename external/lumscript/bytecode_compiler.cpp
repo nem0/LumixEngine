@@ -170,6 +170,7 @@ static i32 bytecodeTypeSlotCount(ls_module& module, TypeRef type) {
 	if (type.nullable) return 1 + bytecodeTypeSlotCount(module, bytecodeNonNullableType(type));
 	switch (type.kind == LS_TYPE_UNTYPED_INT ? LS_TYPE_I32 : type.kind) {
 		case LS_TYPE_BOOL:
+		case LS_TYPE_CPTR:
 		case LS_TYPE_I8:
 		case LS_TYPE_U8:
 		case LS_TYPE_I16:
@@ -203,8 +204,8 @@ static i32 bytecodeTypeSlotCount(ls_module& module, TypeRef type) {
 			if (elem_slots <= 0 || type.array_size <= 0) return 0;
 			return elem_slots * type.array_size;
 		}
-		default:
-			return 0;
+		case LS_TYPE_VOID: return 0;
+		default: ASSERT(false); return 0;
 	}
 }
 
@@ -2068,6 +2069,7 @@ ls_bytecode* compileBytecode(ls_module& module, const ls_host* host) {
 		out.name = fn.name;
 		for (const Param& param : fn.params) out.params.push_back(toC(param.type));
 		out.return_type = toC(fn.return_type);
+		out.return_count = bytecodeTypeSlotCount(module, fn.return_type);
 		bytecode->native_functions.push_back(std::move(out));
 	}
 	

@@ -1,0 +1,17 @@
+struct InputSystem { system : cptr; }
+struct InputEvent { event : cptr; }
+
+extern fn getEventCount(system : InputSystem) : i32;
+extern fn getEvent(system: InputSystem, index : i32) : InputEvent;
+
+extern fn getType(event : InputEvent) : void;
+extern fn getDeviceType(event : InputEvent) : i32;
+extern fn getDeviceIndex(event : InputEvent) : i32;
+extern fn getKeyId(event : InputEvent) : i32;
+extern fn isDown(event : InputEvent) : bool;
+extern fn isRepeat(event : InputEvent) : bool;
+extern fn getX(event : InputEvent) : f32;
+extern fn getY(event : InputEvent) : f32;
+extern fn getValue(event : InputEvent) : f32;
+extern fn getAxis(event : InputEvent) : i32;
+extern fn getText(event : InputEvent) : i32;

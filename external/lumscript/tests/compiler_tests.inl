@@ -1,3 +1,42 @@
+TEST(DiamondImportTypechecks) {
+	const char* main_source = R"(
+		import "a" as a
+		import "b" as b
+
+		fn main() : i32 {
+			return a.get_value() + b.get_value();
+		}
+	)";
+	const char* a_source = R"(
+		import "base"
+		fn get_value() : i32 {
+			return value;
+		}
+	)";
+	const char* b_source = R"(
+		import "base"
+		fn get_value() : i32 {
+			return value;
+		}
+	)";
+	const char* base_source = R"(
+		const value : i32 = 42;
+
+		fn foo() : void {}
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("a"), toLs(a_source) },
+		{ toLs("b"), toLs(b_source) },
+		{ toLs("base"), toLs(base_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	TestContext diagnostics;
+	ls_module* module = ls_module_create(&diagnostics.host);
+	EXPECT_TRUE(module != nullptr);
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
+	ls_module_destroy(module);
+	return true;
+}
 TEST(ConstAssignmentFails) {
 	const char* source = R"(
 		fn main() : void {
@@ -203,6 +242,34 @@ TEST(BinaryNumericOperatorsRequireSameOperandType) {
 		)";
 		EXPECT_COMPILE(explicit_cast_ok);
 	}
+	return true;
+}
+
+TEST(ImportSymbolCollisionFails) {
+	const char* main_source = R"(
+		import "a"
+		import "b"
+		fn main() : i32 {
+			return foo();
+		}
+	)";
+	const char* a_source = R"(
+		fn foo() : i32 { return 1; }
+	)";
+	const char* b_source = R"(
+		fn foo() : i32 { return 2; }
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("a"), toLs(a_source) },
+		{ toLs("b"), toLs(b_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	TestContext diagnostics;
+	diagnostics.diagnostics.output_enabled = false;
+	ls_module* module = ls_module_create(&diagnostics.host);
+	EXPECT_TRUE(module != nullptr);
+	EXPECT_TRUE(!ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
+	ls_module_destroy(module);
 	return true;
 }
 
@@ -740,6 +807,42 @@ TEST(RefParameterRequiresRefArgument) {
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ImportAliasEntityResolution) {
+	const char* main_source = R"(
+		import "world" as world
+		import "entity" as entity
+
+		fn main() : i32 {
+			var w : world.World = world.World { 0 };
+			var e : entity.Entity = world.createEntity(w);
+			return 0;
+		}
+	)";
+
+	const char* entity_source = R"(
+		struct Entity { index : i32; };
+	)";
+
+	const char* world_source = R"(
+		import "entity"
+		struct World { world : i32; }
+		extern fn createEntity(w : World) : Entity;
+	)";
+
+	LumScriptImportFile files_storage[] = {
+		{ toLs("world"), toLs(world_source) },
+		{ toLs("entity"), toLs(entity_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	TestContext diagnostics;
+	ls_module* module = ls_module_create(&diagnostics.host);
+	EXPECT_TRUE(module != nullptr);
+	diagnostics.diagnostics.output_enabled = false;
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
+	ls_module_destroy(module);
 	return true;
 }
 

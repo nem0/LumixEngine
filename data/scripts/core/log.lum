@@ -1,0 +1,2 @@
+extern fn logError(v : string) : void;
+extern fn logInfo(v : string) : void;

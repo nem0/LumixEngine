@@ -1,7 +1,6 @@
 #include <imgui/imgui.h>
 #include <imgui/imgui_user.h>
 #include "lumscript/capi.h"
-#include "lumscript/lumscript_engine_api.h"
 #include "lumscript/lumscript_resource.h"
 #include "core/log.h"
 #include "core/path.h"
@@ -193,18 +192,7 @@ struct LumScriptEditorWindow final : AssetEditorWindow {
 			ImportResolverContext* ctx = (ImportResolverContext*)userdata;
 			if (!ctx || !ctx->module || !ctx->import_ctx) return 0;
 			StringView path_view(path.begin, path.end);
-			StringView alias_view(alias.begin, alias.end);
-			if (LumScript::resolveEngineImport(*ctx->module, nullptr, path_view, alias_view)) {
-				*source = {};
-				return 1;
-			}
-			auto is_valid_core_import_path = [](StringView path) -> bool {
-				if (!startsWith(path, "core:")) return false;
-				StringView name = path.withoutLeft(5);
-				if (name.empty() || name[0] == '/' || name[0] == '\\') return false;
-				return !find(name, "..") && !find(name, ':') && !find(name, '\\');
-			};
-			if (is_valid_core_import_path(path_view)) {
+			if (startsWith(path_view, "core:")) {
 				StringView name = path_view.withoutLeft(5);
 				const bool has_lum_extension = endsWith(name, ".lum");
 				Path file_path = has_lum_extension ? Path("engine/scripts/core/", name) : Path("engine/scripts/core/", name, ".lum");
@@ -232,7 +220,6 @@ struct LumScriptEditorWindow final : AssetEditorWindow {
 			if (ls_module_compile(module,
 				ls_string_view{(const char*)blob.data(), (const char*)blob.data() + blob.size()},
 				ls_string_view{m_path.c_str(), m_path.c_str() + stringLength(m_path.c_str())},
-				&host,
 				import_resolver,
 				&resolver_ctx))
 			{

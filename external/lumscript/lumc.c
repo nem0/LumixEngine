@@ -103,14 +103,9 @@ static void lumc_diagnostics_print(void* userdata, ls_string_view msg) {
 	lumc_print_string(stderr, msg);
 }
 
-static int lumc_native_print(ls_runtime* runtime, size_t arg_count, size_t result_count, void* userdata) {
-	(void)userdata;
-
-	if (arg_count != 1 || result_count != 0) return 0;
-
+static void lumc_native_print(ls_runtime* runtime) {
 	lumc_print_string(stdout, ls_to_string(runtime, -1));
 	putchar('\n');
-	return 1;
 }
 
 int main(int argc, char** argv) {
@@ -200,7 +195,7 @@ int main(int argc, char** argv) {
 		fprintf(stderr, "Error: Failed to create bytecode runtime\n");
 		goto cleanup;
 	}
-	if (!ls_runtime_set_native_function_callback(ctx.runtime, native_print, &lumc_native_print, NULL)) {
+	if (!ls_runtime_set_native_function_callback(ctx.runtime, native_print, &lumc_native_print)) {
 		fprintf(stderr, "Error: Failed to bind native print\n");
 		goto cleanup;
 	}
