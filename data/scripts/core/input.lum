@@ -1,10 +1,12 @@
+import "core:InputEventType"
+
 struct InputSystem { system : cptr; }
 struct InputEvent { event : cptr; }
 
 extern fn getEventCount(system : InputSystem) : i32;
 extern fn getEvent(system: InputSystem, index : i32) : InputEvent;
 
-extern fn getType(event : InputEvent) : void;
+extern fn getType(event : InputEvent) : InputEventType;
 extern fn getDeviceType(event : InputEvent) : i32;
 extern fn getDeviceIndex(event : InputEvent) : i32;
 extern fn getKeyId(event : InputEvent) : i32;

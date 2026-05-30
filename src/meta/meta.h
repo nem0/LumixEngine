@@ -56,6 +56,16 @@ struct ExpArray {
 		return chunks[chunk][offset];                  // Return reference to the element within the chunk.
 	}
 
+	const T& operator[](i32 idx) const {
+		unsigned long m = (idx + 4) >> 2;
+		unsigned long chunk = 0;
+		_BitScanReverse(&chunk, (unsigned long)m);
+		i32 chunk_elems = (i32(4) << chunk);
+		i32 start_idx = chunk_elems - 4;
+		i32 offset = idx - start_idx;
+		return chunks[chunk][offset];
+	}
+
 	T& last() { return (*this)[size - 1]; }
 
 	void grow() {
@@ -88,8 +98,27 @@ struct ExpArray {
 		}
 	};
 
+	struct ConstIterator {
+		const ExpArray* array;
+		i32 idx;
+
+		bool operator ==(const ConstIterator& rhs) const {
+			return array == rhs.array && idx == rhs.idx;
+		}
+
+		void operator++() {
+			++idx;
+		}
+
+		const T& operator*() const {
+			return (*array)[idx];
+		}
+	};
+
 	Iterator begin() { return { this, 0 }; }
 	Iterator end() { return { this, size }; }
+	ConstIterator begin() const { return { this, 0 }; }
+	ConstIterator end() const { return { this, size }; }
 
 	IAllocator& allocator;
 	T* chunks[20] = {};

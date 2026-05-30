@@ -2,10 +2,7 @@
 
 # TODO
 
-* engine API
-
----
-
+* dynamic arrays/memory
 * operators
 * debugger
 * string interpolation
@@ -137,44 +134,22 @@ var speed : f32 = 12.5;
 
 ### Imports
 
-Basic import:
+Imports load another module by path.
 
 ```cpp
 import "math"
 ```
 
-Import with alias:
-
-```cpp
-import "math" as math
-```
-
-The `.lum` suffix is omitted.
+The `.lum` suffix is omitted:
 
 ```cpp
 import "core:math"
 import "core:collections/list" as list
 ```
 
-`core:math` is a built-in module exposed by the runtime:
+Imports map source names to declarations in imported modules. They are lookup sources, not scope injection.
 
-```cpp
-import "core:math" as math
-
-fn main() : f32 {
-	return math.sin(0.0) + math.cos(0.0) + math.sqrt(4.0);
-}
-```
-
-`engine:` imports resolve to built-in engine modules, not project files:
-
-```cpp
-import "engine:entity" as entity
-import "engine:animator" as animator
-import "engine:world" as world
-```
-
-Without alias, imported declarations are added to the current module scope:
+Import forms:
 
 ```cpp
 import "math"
@@ -186,8 +161,6 @@ fn main() : f32 {
 }
 ```
 
-With alias, declarations are accessed via namespace:
-
 ```cpp
 import "core:vec3" as vec
 
@@ -197,13 +170,25 @@ fn main() : f32 {
 }
 ```
 
-Import rules:
+```cpp
+import "core:math" as math
 
-- resolution is deterministic and follows import order
-- duplicate import of the same path and alias is a no-op
-- `core:` duplicate checks normalize `.lum` suffix
+fn main() : f32 {
+	return math.sin(0.0) + math.cos(0.0) + math.sqrt(4.0);
+}
+```
+
+Rules:
+
+- importing the same path with the same alias in the same file is a compile-time error
 - alias collisions are compile-time errors
 - import cycles are compile-time errors
+- imports are not transitive for symbol visibility
+- an alias-qualified name resolves only through that alias
+- a bare name resolves against the current module and then unaliased imports
+- if a bare name matches more than one declaration, using it is a compile-time error
+- if a bare name matches both a local declaration and an unaliased import, using it is a compile-time error
+- unaliased imports are not a separate namespace and do not override local declarations
 
 ```cpp
 import "core:vec3" as core
@@ -227,13 +212,14 @@ struct Transform {
 	x : f32;
 	y : f32;
 	visible : bool;
-};
+}
 ```
 
 Rules:
 
 - field names must be unique within the struct
 - field types can be primitive, enum, function type, or previously declared struct
+- a trailing semicolon after the closing `}` is a compile-time error
 
 ### Enums
 
@@ -243,7 +229,7 @@ enum State {
 	Running,
 	Paused,
 	Done
-};
+}
 ```
 
 Explicit values are allowed:
@@ -253,13 +239,14 @@ enum Priority {
 	Low = 0,
 	Medium = 5,
 	High = 10
-};
+}
 ```
 
 Enums are strongly typed:
 
 - no implicit conversion between enums and integers
 - use explicit `as` casts when needed
+- a trailing semicolon after the closing `}` is a compile-time error
 
 ```cpp
 const key_code : i32 = Keycode.W as i32;

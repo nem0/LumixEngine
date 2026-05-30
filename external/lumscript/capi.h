@@ -161,6 +161,11 @@ int ls_module_add_native_function(
 	size_t param_count
 );
 int ls_module_get_native_function_index(ls_module* module, ls_string_view name);
+int ls_module_get_native_function_count(ls_module* module);
+ls_string_view ls_module_get_native_function_name(ls_module* module, int index);
+ls_type ls_module_get_native_function_return_type(ls_module* module, int index);
+int ls_module_get_native_function_param_count(ls_module* module, int index);
+ls_type ls_module_get_native_function_param_type(ls_module* module, int index, int param_index);
 
 // Front-end pipeline helpers.
 //

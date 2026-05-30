@@ -16,4 +16,4 @@ if not exist "%TEST_EXE%" (
 )
 
 echo Running tests.exe...
-"%TEST_EXE%"
+"%TEST_EXE%" %*

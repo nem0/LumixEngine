@@ -4,71 +4,74 @@
 #include "engine/world.h"
 #include "lumscript/lumscript_capi.gen.h"
 #include "lumscript/capi.h"
+#include "lumscript/lumscript_wrapper.h"
 #include "imgui/imgui.h"
 #include <string.h>
 
 namespace Lumix::LumScript {
 
+struct LumScriptEntity {
+	World* world;
+	EntityRef entity;
+};
+
+template <> struct StackSlots<LumScriptEntity> {
+	static constexpr int value = 2;
+};
+
+template <> inline LumScriptEntity checkArg<LumScriptEntity>(ls_runtime* runtime, int index) {
+	return { (World*)ls_to_ptr(runtime, index), EntityRef(ls_to_i32(runtime, index - 1)) };
+}
+
+inline void push(ls_runtime* runtime, const LumScriptEntity& value) {
+	ls_push_i32(runtime, value.entity.index);
+	ls_push_ptr(runtime, value.world);
+}
+
 namespace {
 
-static void logLogError(ls_runtime* runtime) {
-	ls_string_view v = ls_to_string(runtime, -1);
+static void logLogError(ls_string_view v) {
 	logError(StringView(v.begin, v.end));
 }
 
-static void logLogInfo(ls_runtime* runtime) {
-	ls_string_view v = ls_to_string(runtime, -1);
+static void logLogInfo(ls_string_view v) {
 	logInfo(StringView(v.begin, v.end));
 }
 
-static const InputSystem::Event* getInputEvent(ls_runtime* runtime) {
-	return (const InputSystem::Event*)ls_to_ptr(runtime, -1);
+static i32 inputGetEventCount(InputSystem* input) {
+	return input ? input->getEvents().length() : 0;
 }
 
-static void inputGetEventCount(ls_runtime* runtime) {
-	InputSystem* input = (InputSystem*)ls_to_ptr(runtime, -1);
-	ls_push_i32(runtime, input ? input->getEvents().length() : 0);
-}
-
-static void inputGetEvent(ls_runtime* runtime) {
-	InputSystem* input = (InputSystem*)ls_to_ptr(runtime, -1);
-	const int idx = ls_to_i32(runtime, -2);
+static const InputSystem::Event* inputGetEvent(InputSystem* input, i32 idx) {
 	const Span<const InputSystem::Event> events = input->getEvents();
-	ls_push_ptr(runtime, (void*)&events[idx]);
+	return &events[idx];
 }
 
-static void inputGetType(ls_runtime* runtime) {
-	const InputSystem::Event* event = getInputEvent(runtime);
-	ls_push_i32(runtime, event ? (i32)event->type : -1);
+static i32 inputGetType(const InputSystem::Event* event) {
+	return event ? (i32)event->type : -1;
 }
 
-static void inputGetDeviceType(ls_runtime* runtime) {
-	const InputSystem::Event* event = getInputEvent(runtime);
-	ls_push_i32(runtime, event && event->device ? (i32)event->device->type : -1);
+static i32 inputGetDeviceType(const InputSystem::Event* event) {
+	return event && event->device ? (i32)event->device->type : -1;
 }
 
-static void inputGetDeviceIndex(ls_runtime* runtime) {
-	const InputSystem::Event* event = getInputEvent(runtime);
-	ls_push_i32(runtime, event && event->device ? (i32)event->device->index : -1);
+static i32 inputGetDeviceIndex(const InputSystem::Event* event) {
+	return event && event->device ? (i32)event->device->index : -1;
 }
 
-static void inputGetKeyId(ls_runtime* runtime) {
-	const InputSystem::Event* event = getInputEvent(runtime);
-	ls_push_i32(runtime, event && event->type == InputEventType::BUTTON ? (i32)event->data.button.key_id : -1);
+static i32 inputGetKeyId(const InputSystem::Event* event) {
+	return event && event->type == InputEventType::BUTTON ? (i32)event->data.button.key_id : -1;
 }
 
-static void inputIsDown(ls_runtime* runtime) {
-	const InputSystem::Event* event = getInputEvent(runtime);
-	ls_push_bool(runtime, event && event->type == InputEventType::BUTTON && event->data.button.down);
+static bool inputIsDown(const InputSystem::Event* event) {
+	return event && event->type == InputEventType::BUTTON && event->data.button.down;
 }
 
-static void inputIsRepeat(ls_runtime* runtime) {
-	const InputSystem::Event* event = getInputEvent(runtime);
-	ls_push_bool(runtime, event && event->type == InputEventType::BUTTON && event->data.button.is_repeat);
+static bool inputIsRepeat(const InputSystem::Event* event) {
+	return event && event->type == InputEventType::BUTTON && event->data.button.is_repeat;
 }
 
-static void inputGetX(ls_runtime* runtime) {
-	const InputSystem::Event* event = getInputEvent(runtime);
+static float inputGetX(const InputSystem::Event* event) {
 	float value = 0;
 	if (event) {
 		switch (event->type) {
@@ -78,11 +81,10 @@ static void inputGetX(ls_runtime* runtime) {
 			default: break;
 		}
 	}
-	ls_push_f32(runtime, value);
+	return value;
 }
 
-static void inputGetY(ls_runtime* runtime) {
-	const InputSystem::Event* event = getInputEvent(runtime);
+static float inputGetY(const InputSystem::Event* event) {
 	float value = 0;
 	if (event) {
 		switch (event->type) {
@@ -92,11 +94,10 @@ static void inputGetY(ls_runtime* runtime) {
 			default: break;
 		}
 	}
-	ls_push_f32(runtime, value);
+	return value;
 }
 
-static void inputGetValue(ls_runtime* runtime) {
-	const InputSystem::Event* event = getInputEvent(runtime);
+static float inputGetValue(const InputSystem::Event* event) {
 	float value = 0;
 	if (event) {
 		switch (event->type) {
@@ -106,165 +107,147 @@ static void inputGetValue(ls_runtime* runtime) {
 			default: break;
 		}
 	}
-	ls_push_f32(runtime, value);
+	return value;
 }
 
-static void inputGetAxis(ls_runtime* runtime) {
-	const InputSystem::Event* event = getInputEvent(runtime);
-	ls_push_i32(runtime, event && event->type == InputEventType::AXIS ? (i32)event->data.axis.axis : -1);
+static i32 inputGetAxis(const InputSystem::Event* event) {
+	return event && event->type == InputEventType::AXIS ? (i32)event->data.axis.axis : -1;
 }
 
-static void inputGetText(ls_runtime* runtime) {
-	const InputSystem::Event* event = getInputEvent(runtime);
-	ls_push_i32(runtime, event && event->type == InputEventType::TEXT_INPUT ? (i32)event->data.text.utf8 : 0);
+static i32 inputGetText(const InputSystem::Event* event) {
+	return event && event->type == InputEventType::TEXT_INPUT ? (i32)event->data.text.utf8 : 0;
 }
 
-static void imguiBegin(ls_runtime* runtime) {
-	ls_string_view sv = ls_to_string(runtime, -1);
+static bool imguiBegin(ls_string_view sv) {
 	StaticString<256> title(StringView{sv.begin, sv.end});
-	bool open = ImGui::Begin(title);
-	ls_push_bool(runtime, open);
+	return ImGui::Begin(title);
 }
 
-static void imguiEnd(ls_runtime* runtime) {
+static void imguiEnd() {
 	ImGui::End();
 }
 
-static void imguiTextUnformatted(ls_runtime* runtime) {
-	ls_string_view sv = ls_to_string(runtime, -1);
+static void imguiTextUnformatted(ls_string_view sv) {
 	ImGui::TextUnformatted(sv.begin, sv.end);
 }
 
-static void imguiButton(ls_runtime* runtime) {
-	ls_string_view sv = ls_to_string(runtime, -1);
+static bool imguiButton(ls_string_view sv) {
 	StaticString<256> label(StringView{sv.begin, sv.end});
-	bool clicked = ImGui::Button(label);
-	ls_push_bool(runtime, clicked);
+	return ImGui::Button(label);
 }
 
-static void lumscript_world_createEntity(ls_runtime* runtime) {
-	World* world = (World*)ls_to_ptr(runtime, -1);
-	EntityRef entity = world->createEntity({0, 0, 0}, Quat::IDENTITY);
-	ls_push_ptr(runtime, world);
-	ls_push_i32(runtime, entity.index);
+static LumScriptEntity lumscript_world_createEntity(World* world) {
+	return {world, world->createEntity({0, 0, 0}, Quat::IDENTITY)};
 }
 
-static void lumscript_world_destroyEntity(ls_runtime* runtime) {
-	World* world = (World*)ls_to_ptr(runtime, -1);
-	i32 entity_idx = ls_to_i32(runtime, -2);
-	world->destroyEntity(EntityRef(entity_idx));
+static void lumscript_world_destroyEntity(LumScriptEntity entity) {
+	entity.world->destroyEntity(entity.entity);
 }
 
-static void lumscript_world_hasEntity(ls_runtime* runtime) {
-	World* world = (World*)ls_to_ptr(runtime, -1);
-	i32 entity_idx = ls_to_i32(runtime, -2);
-	ls_push_bool(runtime, entity_idx >= 0 && world->hasEntity(EntityRef(entity_idx)));
+static bool lumscript_world_hasEntity(LumScriptEntity entity) {
+	return entity.entity.index >= 0 && entity.world->hasEntity(entity.entity);
 }
 
 static void lumscript_world_findByName(ls_runtime* runtime) {
-	/*World* world = (World*)ls_to_ptr(runtime, -1);
+	World* world = (World*)ls_to_ptr(runtime, -2);
 	char name[128];
-	copyString(name, ls_to_string(runtime, -2));
+	ls_string_view name_sv = ls_to_string(runtime, -1);
+	const i32 name_len = (i32)(name_sv.end - name_sv.begin);
+	if (name_len >= (i32)sizeof(name)) {
+		ls_push_bool(runtime, false);
+		ls_push_i32(runtime, 0);
+		ls_push_ptr(runtime, nullptr);
+		return;
+	}
+	if (name_len > 0) memcpy(name, name_sv.begin, (size_t)name_len);
+	name[name_len] = '\0';
 	const EntityPtr entity = world->findByName(INVALID_ENTITY, name);
 	if (!entity.isValid()) {
-		ls_push_null(runtime);
-		return true;
+		ls_push_bool(runtime, false);
+		ls_push_i32(runtime, 0);
+		ls_push_ptr(runtime, nullptr);
+		return;
 	}
+	ls_push_bool(runtime, true);
+	ls_push_i32(runtime, entity.index);
 	ls_push_ptr(runtime, world);
-	ls_push_i32(runtime, entity.index);*/
 }
 
-static void lumscript_entity_destroy(ls_runtime* runtime) {
-	World* world = (World*)ls_to_ptr(runtime, -1);
-	i32 entity_idx = ls_to_i32(runtime, -2);
-	world->destroyEntity(EntityRef(entity_idx));
+static void lumscript_entity_destroy(LumScriptEntity entity) {
+	entity.world->destroyEntity(entity.entity);
 }
 
-static void lumscript_entity_isValid(ls_runtime* runtime) {
-	World* world = (World*)ls_to_ptr(runtime, -1);
-	i32 entity_idx = ls_to_i32(runtime, -2);
-	ls_push_bool(runtime, world && entity_idx >= 0 && world->hasEntity(EntityRef(entity_idx)));
+static bool lumscript_entity_isValid(LumScriptEntity entity) {
+	return entity.world && entity.entity.index >= 0 && entity.world->hasEntity(entity.entity);
 }
 
-static void lumscript_entity_setPosition(ls_runtime* runtime) {
-	World* world = (World*)ls_to_ptr(runtime, -1);
-	i32 entity_idx = ls_to_i32(runtime, -2);
-	//world->setPosition(EntityRef(entity_idx), toDVec3(args[1]));
+static void lumscript_entity_setPosition(LumScriptEntity entity, double x, double y, double z) {
+	entity.world->setPosition(entity.entity, DVec3(x, y, z));
 }
 
-static void lumscript_entity_getPosition(ls_runtime* runtime) {
-	World* world = (World*)ls_to_ptr(runtime, -1);
-	i32 entity_idx = ls_to_i32(runtime, -2);
-	//*result = makeDVec3Value(world->getPosition(EntityRef(entity_idx)));
+static DVec3 lumscript_entity_getPosition(LumScriptEntity entity) {
+	return entity.world->getPosition(entity.entity);
 }
 
-static void lumscript_entity_setRotation(ls_runtime* runtime) {
-	World* world = (World*)ls_to_ptr(runtime, -1);
-	i32 entity_idx = ls_to_i32(runtime, -2);
-	//world->setRotation(EntityRef(entity_idx), toQuat(args[1]));
+static void lumscript_entity_setRotation(LumScriptEntity entity, float x, float y, float z, float w) {
+	entity.world->setRotation(entity.entity, Quat(x, y, z, w));
 }
 
-static void lumscript_entity_getRotation(ls_runtime* runtime) {
-	World* world = (World*)ls_to_ptr(runtime, -1);
-	i32 entity_idx = ls_to_i32(runtime, -2);
-	//*result = makeQuatValue(world->getRotation(EntityRef(entity_idx)));
+static Quat lumscript_entity_getRotation(LumScriptEntity entity) {
+	return entity.world->getRotation(entity.entity);
 }
 
-static void lumscript_entity_setScale(ls_runtime* runtime) {
-	World* world = (World*)ls_to_ptr(runtime, -1);
-	i32 entity_idx = ls_to_i32(runtime, -2);
-	//world->setScale(EntityRef(entity_idx), toVec3(args[1]));
+static void lumscript_entity_setScale(LumScriptEntity entity, float x, float y, float z) {
+	entity.world->setScale(entity.entity, Vec3(x, y, z));
 }
 
-static void lumscript_entity_getScale(ls_runtime* runtime) {
-	World* world = (World*)ls_to_ptr(runtime, -1);
-	i32 entity_idx = ls_to_i32(runtime, -2);
-	//*result = makeVec3Value(Vec3(world->getScale(EntityRef(entity_idx))));
+static Vec3 lumscript_entity_getScale(LumScriptEntity entity) {
+	return entity.world->getScale(entity.entity);
 }
 
 void registerImguiModule(HashMap<StringView, ls_native_fn>& functions) {
-	functions.insert(StringView("core:imgui.begin"), &imguiBegin);
-	functions.insert(StringView("core:imgui.textUnformatted"), &imguiTextUnformatted);
-	functions.insert(StringView("core:imgui.button"), &imguiButton);
-	functions.insert(StringView("core:imgui.end"), &imguiEnd);
+	functions.insert(StringView("core:imgui.begin"), &wrap<imguiBegin>);
+	functions.insert(StringView("core:imgui.textUnformatted"), &wrap<imguiTextUnformatted>);
+	functions.insert(StringView("core:imgui.button"), &wrap<imguiButton>);
+	functions.insert(StringView("core:imgui.end"), &wrap<imguiEnd>);
 }
 
 } // namespace
 
-void resolveEngineImport(HashMap<StringView, ls_native_fn>& functions) {
+void gatherCoreFunctions(HashMap<StringView, ls_native_fn>& functions) {
 	generated::registerGeneratedEngineImport(functions);
 	registerImguiModule(functions);
 	// input
-	functions.insert(StringView("core:input.getEventCount"), &inputGetEventCount);
-	functions.insert(StringView("core:input.getEvent"), &inputGetEvent);
-	functions.insert(StringView("core:input.getType"), &inputGetType);
-	functions.insert(StringView("core:input.getDeviceType"), &inputGetDeviceType);
-	functions.insert(StringView("core:input.getDeviceIndex"), &inputGetDeviceIndex);
-	functions.insert(StringView("core:input.getKeyId"), &inputGetKeyId);
-	functions.insert(StringView("core:input.isDown"), &inputIsDown);
-	functions.insert(StringView("core:input.isRepeat"), &inputIsRepeat);
-	functions.insert(StringView("core:input.getX"), &inputGetX);
-	functions.insert(StringView("core:input.getY"), &inputGetY);
-	functions.insert(StringView("core:input.getValue"), &inputGetValue);
-	functions.insert(StringView("core:input.getAxis"), &inputGetAxis);
-	functions.insert(StringView("core:input.getText"), &inputGetText);
+	functions.insert(StringView("core:input.getEventCount"), &wrap<inputGetEventCount>);
+	functions.insert(StringView("core:input.getEvent"), &wrap<inputGetEvent>);
+	functions.insert(StringView("core:input.getType"), &wrap<inputGetType>);
+	functions.insert(StringView("core:input.getDeviceType"), &wrap<inputGetDeviceType>);
+	functions.insert(StringView("core:input.getDeviceIndex"), &wrap<inputGetDeviceIndex>);
+	functions.insert(StringView("core:input.getKeyId"), &wrap<inputGetKeyId>);
+	functions.insert(StringView("core:input.isDown"), &wrap<inputIsDown>);
+	functions.insert(StringView("core:input.isRepeat"), &wrap<inputIsRepeat>);
+	functions.insert(StringView("core:input.getX"), &wrap<inputGetX>);
+	functions.insert(StringView("core:input.getY"), &wrap<inputGetY>);
+	functions.insert(StringView("core:input.getValue"), &wrap<inputGetValue>);
+	functions.insert(StringView("core:input.getAxis"), &wrap<inputGetAxis>);
+	functions.insert(StringView("core:input.getText"), &wrap<inputGetText>);
 	// log
-	functions.insert(StringView("core:log.logError"), &logLogError);
-	functions.insert(StringView("core:log.logInfo"), &logLogInfo);
+	functions.insert(StringView("core:log.logError"), &wrap<logLogError>);
+	functions.insert(StringView("core:log.logInfo"), &wrap<logLogInfo>);
 	// entity
-	functions.insert(StringView("core:entity.destroy"), &lumscript_entity_destroy);
-	functions.insert(StringView("core:entity.isValid"), &lumscript_entity_isValid);
-	functions.insert(StringView("core:entity.getPosition"), &lumscript_entity_getPosition);
-	functions.insert(StringView("core:entity.getRotation"), &lumscript_entity_getRotation);
-	functions.insert(StringView("core:entity.getScale"), &lumscript_entity_getScale);
-	functions.insert(StringView("core:entity.setPosition"), &lumscript_entity_setPosition);
-	functions.insert(StringView("core:entity.setScale"), &lumscript_entity_setScale);
-	functions.insert(StringView("core:entity.setRotation"), &lumscript_entity_setRotation);
+	functions.insert(StringView("core:entity.destroy"), &wrap<lumscript_entity_destroy>);
+	functions.insert(StringView("core:entity.isValid"), &wrap<lumscript_entity_isValid>);
+	functions.insert(StringView("core:entity.getPosition"), &wrap<lumscript_entity_getPosition>);
+	functions.insert(StringView("core:entity.getRotation"), &wrap<lumscript_entity_getRotation>);
+	functions.insert(StringView("core:entity.getScale"), &wrap<lumscript_entity_getScale>);
+	functions.insert(StringView("core:entity.setPosition"), &wrap<lumscript_entity_setPosition>);
+	functions.insert(StringView("core:entity.setScale"), &wrap<lumscript_entity_setScale>);
+	functions.insert(StringView("core:entity.setRotation"), &wrap<lumscript_entity_setRotation>);
 	// world
-	functions.insert(StringView("core:world.createEntity"), &lumscript_world_createEntity);
-	functions.insert(StringView("core:world.destroyEntity"), &lumscript_world_destroyEntity);
+	functions.insert(StringView("core:world.createEntity"), &wrap<lumscript_world_createEntity>);
+	functions.insert(StringView("core:world.destroyEntity"), &wrap<lumscript_world_destroyEntity>);
 	functions.insert(StringView("core:world.findByName"), &lumscript_world_findByName);
-	functions.insert(StringView("core:world.hasEntity"), &lumscript_world_hasEntity);
+	functions.insert(StringView("core:world.hasEntity"), &wrap<lumscript_world_hasEntity>);
 }
 
 } // namespace Lumix::LumScript

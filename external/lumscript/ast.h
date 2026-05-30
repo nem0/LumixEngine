@@ -199,11 +199,11 @@ struct FunctionTypeDecl {
 
 struct ls_module {
 	explicit ls_module(const ls_host* host)
-		: host(host)
+		: host(host ? *host : ls_host{})
 	{}
 
 	~ls_module() {
-		for (char* name : allocated_names) deallocateMemory(host, name);
+		for (char* name : allocated_names) deallocateMemory(&host, name);
 	}
 
 	i32 findGlobal(ls_string_view name) const {
@@ -257,7 +257,7 @@ struct ls_module {
 	}
 
 	ls_string_view copyName(ls_string_view name) {
-		char* buffer = (char*)allocateMemory(host, size(name) + 1, alignof(char));
+		char* buffer = (char*)allocateMemory(&host, size(name) + 1, alignof(char));
 		if (!buffer) return {};
 		copyString(std::span<char>(buffer, size(name) + 1), name);
 		allocated_names.push_back(buffer);
@@ -266,7 +266,7 @@ struct ls_module {
 
 	ls_string_view makeQualifiedName(ls_string_view prefix, ls_string_view name) {
 		if (empty(prefix)) return name;
-		char* buffer = (char*)allocateMemory(host, size(prefix) + size(name) + 2, alignof(char));
+		char* buffer = (char*)allocateMemory(&host, size(prefix) + size(name) + 2, alignof(char));
 		if (!buffer) return {};
 		char* out = buffer;
 		for (const char* c = data(prefix); c != data(prefix) + size(prefix); ++c) *out++ = *c;
@@ -277,7 +277,7 @@ struct ls_module {
 		return ls_string_view{buffer, buffer + size(prefix) + size(name) + 1};
 	}
 
-	const ls_host* host = nullptr;
+	ls_host host;
 	std::vector<ImportDecl> imports;
 	std::vector<NativeFunctionDecl> native_functions;
 	std::vector<FunctionDecl> functions;

@@ -7,6 +7,7 @@
 #include "core/allocator.h"
 #include "core/array.h"
 #include "core/crt.h"
+#include "core/hash_map.h"
 #include "core/stream.h"
 #include "core/log.h"
 #include "core/tag_allocator.h"
@@ -15,6 +16,10 @@
 #include "lumscript/lumscript_resource.h"
 
 namespace Lumix {
+
+namespace LumScript {
+	void gatherCoreFunctions(HashMap<StringView, ls_native_fn>& functions);
+}
 
 struct LumScriptDiagnosticsContext {
 	String* message = nullptr;
@@ -32,6 +37,22 @@ static ls_string_view toLs(StringView value) {
 
 static ls_string_view toLs(const char* value) {
 	return {value, value + stringLength(value)};
+}
+
+static void bindCoreFunctions(ls_module* module, ls_runtime* runtime, IAllocator& allocator) {
+	HashMap<StringView, ls_native_fn> functions(allocator);
+	Lumix::LumScript::gatherCoreFunctions(functions);
+	const i32 count = ls_module_get_native_function_count(module);
+	for (i32 i = 0; i < count; ++i) {
+		const ls_string_view name = ls_module_get_native_function_name(module, i);
+		const StringView lname = StringView(name.begin, name.end);
+		const auto iter = functions.find(lname);
+		if (!iter.isValid()) {
+			logError("LumScript : failed to bind native function ", lname);
+			continue;
+		}
+		ls_runtime_set_native_function_callback(runtime, i, iter.value());
+	}
 }
 
 static ls_host makeAllocatorHost(IAllocator& allocator) {
@@ -252,13 +273,10 @@ private:
 
 		m_script.runtime = ls_runtime_create(bytecode);
 		if (!m_script.runtime) return false;
+		bindCoreFunctions(m_script.module, m_script.runtime, m_allocator);
 
-		// TODO args
-		/*ls_value args[] = {
-			makeNativeValue(&m_world, "engine:world/World"),
-			makeNativeValue(&static_cast<LumScriptSystem&>(m_system).getEngine().getInputSystem(), "engine:input/InputSystem")
-		};*/
-		ASSERT(false);
+		ls_push_ptr(m_script.runtime, &m_world);
+		ls_push_ptr(m_script.runtime, &static_cast<LumScriptSystem&>(m_system).getEngine().getInputSystem());
 		if (!ls_call(m_script.runtime, toLs("init"), 2, 0)) {
 			logError("LumScript init failed: ", diagnostics);
 			return false;

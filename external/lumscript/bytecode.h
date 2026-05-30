@@ -8,6 +8,7 @@ enum class BytecodeOp : u8 {
 	LOAD_CONST16,
 	LOAD_CONST32,
 	LOAD_CONST64,
+	LOAD_STRING,
 	LOAD_PARAM,
 	LOAD_GLOBAL,
 	LOAD_LOCAL,
@@ -98,8 +99,16 @@ struct BytecodeNativeFunction {
 	i32 return_count = 0;
 };
 
+struct ls_string {
+	ls_host host;
+	u32 ref_count = 1;
+	u32 length = 0;
+	char chars[1];
+};
+
 struct ls_bytecode {
 	explicit ls_bytecode(const ls_host* host);
+	~ls_bytecode();
 
 	ls_host host;
 	std::vector<BytecodeFunction> functions;
@@ -107,4 +116,5 @@ struct ls_bytecode {
 	i32 global_count = 0;
 	std::vector<u8> global_init_code;
 	std::vector<u8> code;
+	std::vector<ls_string*> string_literals;
 };

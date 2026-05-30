@@ -3,6 +3,8 @@
 
 import "core:world"
 
+import "core:entity"
+import "core:vec3"
 struct PhysicsModule { module : cptr; }
 
 extern fn physics(w : World) : ?PhysicsModule;

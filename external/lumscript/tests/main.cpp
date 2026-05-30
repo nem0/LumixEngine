@@ -182,9 +182,34 @@ static void nativeAddC(ls_runtime* runtime) {
 #include "compiler_tests.inl"
 #include "bytecode_tests.inl"
 
-int main() {
+int main(int argc, char** argv) {
+    const char* test_name = nullptr;
+    if (argc >= 2) {
+        if (strcmp(argv[1], "--test") == 0) {
+            if (argc < 3) {
+                printf("Usage: %s [--test <name>]\n", argv[0]);
+                return -1;
+            }
+            test_name = argv[2];
+        }
+        else if (argv[1][0] != '-') {
+            test_name = argv[1];
+        }
+        else {
+            printf("Usage: %s [--test <name>]\n", argv[0]);
+            return -1;
+        }
+    }
+
     printf("Running LumScript tests...\n");
+    if (test_name) {
+        printf("Filtering to test: %s\n", test_name);
+    }
+
+    bool found = false;
     for (TestList* test = TestList::first; test; test = test->next) {
+        if (test_name && strcmp(test->name, test_name) != 0) continue;
+        found = true;
         ++test_count;
 
 		if (test->fn()) {
@@ -194,6 +219,12 @@ int main() {
 			printf("FAILED: %s\n", test->name);
 		}
 	}
+
+    if (test_name && !found) {
+        printf("No test named '%s' found.\n", test_name);
+        return -1;
+    }
+
     printf("%d/%d tests passed\n", passed_count, test_count);
     return passed_count == test_count ? 0 : -1;
 }

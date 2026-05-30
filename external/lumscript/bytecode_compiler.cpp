@@ -6,6 +6,12 @@ ls_bytecode::ls_bytecode(const ls_host* host_)
 	: host(host_ ? *host_ : ls_host{})
 {}
 
+ls_bytecode::~ls_bytecode() {
+	for (ls_string* s : string_literals) {
+		if (s && --s->ref_count == 0) deallocateMemory(&s->host, s);
+	}
+}
+
 template <typename T>
 void pushCode(std::vector<u8>& code, const T& value) {
 	// Bytecode is emitted into a flat byte buffer. We append raw bytes for
@@ -968,6 +974,21 @@ static bool bytecodeEmitFunctionValue(ls_bytecode& bytecode, i32 index) {
 	return true;
 }
 
+static bool bytecodeEmitStringLiteral(ls_bytecode& bytecode, ls_string_view value) {
+	const size_t len = size(value);
+	ls_string* storage = (ls_string*)allocateMemory(&bytecode.host, sizeof(ls_string) + len, alignof(ls_string));
+	if (!storage) return false;
+	storage->host = bytecode.host;
+	storage->ref_count = 1;
+	storage->length = (u32)len;
+	if (len > 0) memcpy(storage->chars, data(value), len);
+	storage->chars[len] = '\0';
+	bytecode.string_literals.push_back(storage);
+	pushCode(bytecode, BytecodeOp::LOAD_STRING);
+	pushCode(bytecode, (u32)(bytecode.string_literals.size() - 1));
+	return true;
+}
+
 static bool bytecodeEmitZeroValue(ls_bytecode& bytecode, ls_type_kind kind) {
 	// Unary minus is lowered as `0 - value`, so we need a typed zero literal
 	// that matches the expression width before the existing arithmetic opcodes
@@ -1252,6 +1273,8 @@ static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, Byteco
 			pushCode(bytecode, value);
 			return true;
 		}
+		case Expr::STRING_LITERAL:
+			return bytecodeEmitStringLiteral(bytecode, expr.string);
 		case Expr::NULL_LITERAL:
 			return expected && expected->nullable ? bytecodeEmitNullValue(module, bytecode, *expected) : false;
 		case Expr::ENUM_LITERAL: {
@@ -1525,6 +1548,7 @@ static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, Byteco
 			return true;
 		}
 		default:
+			ASSERT(false);
 			return false;
 	}
 }
@@ -2057,7 +2081,7 @@ static bool bytecodeCompileGlobals(ls_module& module, ls_bytecode& bytecode, con
 ls_bytecode* compileBytecode(ls_module& module, const ls_host* host) {
 	// Lay out globals first so function lowering can resolve their flattened
 	// stack slots, then emit functions and the hidden global initializer program.
-	const ls_host* bytecode_host = host ? host : module.host;
+	const ls_host* bytecode_host = host ? host : &module.host;
 	void* bytecode_mem = bytecode_host && bytecode_host->allocate
 		? bytecode_host->allocate(bytecode_host->allocator_userdata, sizeof(ls_bytecode), alignof(ls_bytecode))
 		: ::operator new(sizeof(ls_bytecode), std::nothrow);

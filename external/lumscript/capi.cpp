@@ -4,6 +4,18 @@
 
 #include "ast.h"
 
+static ls_type toC(const TypeRef& type) {
+	ls_type result = {};
+	result.kind = type.kind;
+	result.name = type.name;
+	result.struct_index = type.struct_index;
+	result.element_kind = type.element_kind;
+	result.element_name = type.element_name;
+	result.array_size = type.array_size;
+	result.nullable = type.nullable ? 1 : 0;
+	return result;
+}
+
 static TypeRef toTypeRef(ls_type value) {
 	TypeRef type;
 	type.kind = value.kind;
@@ -54,6 +66,33 @@ int ls_module_add_enum(ls_module* module, ls_string_view name, const ls_enum_mem
 int ls_module_get_native_function_index(ls_module* module, ls_string_view name) {
 	if (!module) return -1;
 	return module->findNativeFunction(name);
+}
+
+int ls_module_get_native_function_count(ls_module* module) {
+	if (!module) return 0;
+	return (int)module->native_functions.size();
+}
+
+ls_string_view ls_module_get_native_function_name(ls_module* module, int index) {
+	if (!module || index < 0 || index >= (int)module->native_functions.size()) return {};
+	return module->native_functions[(size_t)index].name;
+}
+
+ls_type ls_module_get_native_function_return_type(ls_module* module, int index) {
+	if (!module || index < 0 || index >= (int)module->native_functions.size()) return ls_type_make(LS_TYPE_INVALID);
+	return toC(module->native_functions[(size_t)index].return_type);
+}
+
+int ls_module_get_native_function_param_count(ls_module* module, int index) {
+	if (!module || index < 0 || index >= (int)module->native_functions.size()) return 0;
+	return (int)module->native_functions[(size_t)index].params.size();
+}
+
+ls_type ls_module_get_native_function_param_type(ls_module* module, int index, int param_index) {
+	if (!module || index < 0 || index >= (int)module->native_functions.size()) return ls_type_make(LS_TYPE_INVALID);
+	const NativeFunctionDecl& fn = module->native_functions[(size_t)index];
+	if (param_index < 0 || param_index >= (int)fn.params.size()) return ls_type_make(LS_TYPE_INVALID);
+	return toC(fn.params[(size_t)param_index].type);
 }
 
 int ls_module_add_native_function(

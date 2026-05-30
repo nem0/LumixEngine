@@ -53,7 +53,7 @@ TEST(ExternImport) {
 		struct Vec2 {
 			x : i32;
 			y : i32;
-		};
+		}
 
 		extern fn sum(v : Vec2) : i32;
 	)";
@@ -96,8 +96,7 @@ TEST(StructExtern) {
 		struct Entity {
 			index : i32;
 			world : cptr;
-		};
-
+		}
 		extern fn create() : Entity;
 
 		fn main() : Entity {
@@ -162,6 +161,27 @@ TEST(Extern) {
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	
+	return true;
+}
+
+TEST(BytecodeStringLiteralArgumentShouldCompile) {
+	const char* source = R"(
+		extern fn findByName(name : string) : void;
+
+		fn main() : void {
+			findByName("testor");
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ls_bytecode_destroy(bytecode);
+	CAPI_END(module);
 	return true;
 }
 
@@ -379,8 +399,7 @@ TEST(BytecodeExplicitCastEnumToInteger) {
 		enum State {
 			Idle,
 			Running
-		};
-
+		}
 		fn main() : i32 {
 			const s : State = .Running;
 			return s as i32;
@@ -762,8 +781,7 @@ TEST(BytecodeNullableStructComparison) {
 		struct Vec2 {
 			x : i32;
 			y : i32;
-		};
-
+		}
 		fn main() : i32 {
 			var v : ?Vec2 = null;
 			if v != null {
@@ -876,12 +894,10 @@ TEST(BytecodeRefParameterNestedFieldCall) {
 	const char* source = R"(
 		struct Stats {
 			hp : i32;
-		};
-
+		}
 		struct Player {
 			stats : Stats;
-		};
-
+		}
 		fn bump(v : ref i32) : void {
 			v += 1;
 		}
@@ -1020,8 +1036,7 @@ TEST(BytecodeNamespaceResolutionByFirstParameter) {
 		struct Vec2 {
 			x : i32;
 			y : i32;
-		};
-
+		}
 		fn sum(v : Vec2) : i32 {
 			return v.x + v.y;
 		}
@@ -1067,8 +1082,7 @@ TEST(BytecodeNamespaceResolutionByFirstParameterChoosesNamespace) {
 		struct Vec2 {
 			x : i32;
 			y : i32;
-		};
-
+		}
 		fn sum(v : Vec2) : i32 {
 			return v.x + v.y;
 		}
@@ -1077,8 +1091,7 @@ TEST(BytecodeNamespaceResolutionByFirstParameterChoosesNamespace) {
 		struct Vec2 {
 			x : i32;
 			y : i32;
-		};
-
+		}
 		fn sum(v : Vec2) : i32 {
 			return v.x + v.y + 1;
 		}
@@ -1115,8 +1128,7 @@ TEST(BytecodeStructsBasic) {
 		struct Vec2 {
 			x : i32;
 			y : i32;
-		};
-
+		}
 		fn main() : i32 {
 			const v : Vec2 = Vec2 { 20, 22 };
 			return v.x + v.y;
@@ -1146,13 +1158,11 @@ TEST(BytecodeNestedStructs) {
 		struct Vec2 {
 			x : i32;
 			y : i32;
-		};
-
+		}
 		struct Outer {
 			pos : Vec2;
 			z : i32;
-		};
-
+		}
 		fn main() : i32 {
 			const v : Outer = Outer { Vec2 { 20, 22 }, 7 };
 			return v.pos.x + v.pos.y + v.z;
@@ -1182,8 +1192,7 @@ TEST(BytecodeStructParameterPassing) {
 		struct Vec2 {
 			x : i32;
 			y : i32;
-		};
-
+		}
 		fn sum(v : Vec2) : i32 {
 			return v.x + v.y;
 		}
@@ -1217,8 +1226,7 @@ TEST(BytecodeStructFieldAssignment) {
 		struct Vec2 {
 			x : i32;
 			y : i32;
-		};
-
+		}
 		fn main() : i32 {
 			var v : Vec2 = Vec2 { 1, 2 };
 			v.x = 20;
@@ -1249,8 +1257,7 @@ TEST(BytecodeStructFieldCompoundAssignment) {
 		struct Vec2 {
 			x : i32;
 			y : i32;
-		};
-
+		}
 		fn main() : i32 {
 			var v : Vec2 = Vec2 { 1, 2 };
 			v.x += 5;
@@ -1281,8 +1288,7 @@ TEST(BytecodeStructFieldAssignmentGlobal) {
 		struct Vec2 {
 			x : i32;
 			y : i32;
-		};
-
+		}
 		var g : Vec2 = Vec2 { 1, 2 };
 
 		fn main() : i32 {
@@ -1314,8 +1320,7 @@ TEST(BytecodeStructFieldAssignmentParameterLocalCopy) {
 		struct Vec2 {
 			x : i32;
 			y : i32;
-		};
-
+		}
 		fn bump(v : Vec2) : i32 {
 			var tmp : Vec2 = v;
 			tmp.x = 20;
@@ -1351,8 +1356,7 @@ TEST(BytecodeEnumBasicUsage) {
 		enum State {
 			Idle,
 			Running
-		};
-
+		}
 		fn main() : i32 {
 			const s : State = .Running;
 			if s == .Running {
@@ -1385,8 +1389,7 @@ TEST(BytecodeEnumMatch) {
 		enum State {
 			Idle,
 			Running
-		};
-
+		}
 		fn main() : i32 {
 			const s : State = .Running;
 			match s {
@@ -2134,8 +2137,7 @@ TEST(IntegerToEnumCastAllowsAnyIntegerRuntime) {
 		enum State {
 			Idle,
 			Running
-		};
-
+		}
 		fn to_state(v : i32) : State {
 			return v as State;
 		}
@@ -2163,8 +2165,7 @@ TEST(MatchRuntime) {
 			Idle,
 			Running,
 			Paused
-		};
-
+		}
 		fn enum_match(state : State) : i32 {
 			match state {
 				case .Idle:
@@ -2223,8 +2224,7 @@ TEST(AliasedImportRuntime) {
 		struct Vec2 {
 			x : i32;
 			y : i32;
-		};
-
+		}
 		fn sum(v : Vec2) : i32 {
 			return v.x + v.y;
 		}
@@ -2233,8 +2233,7 @@ TEST(AliasedImportRuntime) {
 		enum State {
 			Idle,
 			Running
-		};
-
+		}
 		fn is_running(state : State) : bool {
 			return state == .Running;
 		}
@@ -2272,8 +2271,7 @@ TEST(FirstParameterNamespaceResolutionPrecedenceRuntime) {
 	const char* entity_source = R"(
 		struct Entity {
 			id : i32;
-		};
-
+		}
 		fn destroy(x : Entity) : i32 {
 			return 1;
 		}

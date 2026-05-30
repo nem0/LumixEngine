@@ -182,7 +182,15 @@ struct Tokenizer {
 				if (u32(m_current - m_start_token) == 3) return checkKeyword("ef", 1, 2, Token::REF);
 				return checkKeyword("eturn", 1, 5, Token::RETURN);
 			}
-			case 's': return checkKeyword("truct", 1, 5, Token::STRUCT);
+			case 's': {
+				if (u32(m_current - m_start_token) < 4) return makeToken(Token::IDENTIFIER);
+				if (m_start_token[1] != 't' || m_start_token[2] != 'r') return makeToken(Token::IDENTIFIER);
+				switch (m_start_token[3]) {
+					case 'u': return checkKeyword("ct", 4, 2, Token::STRUCT);
+					case 'i': return checkKeyword("ng", 4, 2, Token::STRING_KW);
+				}
+				break;
+			}
 			case 't': return checkKeyword("rue", 1, 3, Token::TRUE);
 			case 'u': {
 				if (u32(m_current - m_start_token) < 2) return makeToken(Token::IDENTIFIER);

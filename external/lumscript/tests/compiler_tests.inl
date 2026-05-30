@@ -1,3 +1,12 @@
+struct DiagnosticCapture {
+	std::string text;
+};
+
+static void captureDiagnostic(void* userdata, ls_string_view msg) {
+	DiagnosticCapture* capture = (DiagnosticCapture*)userdata;
+	capture->text.append(data(msg), size(msg));
+}
+
 TEST(DiamondImportTypechecks) {
 	const char* main_source = R"(
 		import "a" as a
@@ -34,6 +43,61 @@ TEST(DiamondImportTypechecks) {
 	ls_module* module = ls_module_create(&diagnostics.host);
 	EXPECT_TRUE(module != nullptr);
 	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(ImportAliasMissingMemberReportsMemberName) {
+	const char* main_source = R"(
+		import "core:imgui" as imgui
+
+		fn main() : void {
+			imgui.beginWindow("LumScript demo");
+		}
+	)";
+	const char* imgui_source = R"(
+		fn textUnformatted(text : string) : void {}
+		fn button(label : string) : bool { return false; }
+		fn endWindow() : void {}
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("core:imgui"), toLs(imgui_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	DiagnosticCapture capture;
+	ls_host host = {};
+	host.diagnostics_userdata = &capture;
+	host.print = &captureDiagnostic;
+	ls_module* module = ls_module_create(&host);
+	EXPECT_TRUE(module != nullptr);
+	EXPECT_TRUE(!ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
+	EXPECT_TRUE(capture.text.find("Unknown variable 'beginWindow'") != std::string::npos);
+	EXPECT_TRUE(capture.text.find("Unknown variable 'imgui'") == std::string::npos);
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(ImportEnumMemberWithoutAliasCompiles) {
+	const char* main_source = R"(
+		import "core:Keycode"
+
+		fn main() : i32 {
+			return Keycode.W as i32;
+		}
+	)";
+	const char* keycode_source = R"(
+		enum Keycode {
+			W = 87
+		}
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("core:Keycode"), toLs(keycode_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	TestContext diagnostics;
+	ls_module* module = ls_module_create(&diagnostics.host);
+	EXPECT_TRUE(module != nullptr);
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), toLs("maps/demo/demo.lum"), &resolveLumScriptImportC, &files));
 	ls_module_destroy(module);
 	return true;
 }
@@ -83,15 +147,24 @@ TEST(StringConcatenationRejectsNonString) {
 	return true;
 }
 
+TEST(StringIsReservedKeyword) {
+	const char* source = R"(
+		fn string() : void {
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(DuplicateDeclarationsFail) {
 	const char* duplicate_struct = R"(
-		struct A { x : i32; };
-		struct A { y : i32; };
+		struct A { x : i32; }
+		struct A { y : i32; }
 	)";
 	EXPECT_COMPILE_FAIL(duplicate_struct);
 
 	const char* duplicate_field = R"(
-		struct A { x : i32; x : i32; };
+		struct A { x : i32; x : i32; }
 	)";
 	EXPECT_COMPILE_FAIL(duplicate_field);
 
@@ -125,6 +198,14 @@ TEST(DuplicateDeclarationsFail) {
 	return true;
 }
 
+TEST(StructDeclarationTrailingSemicolonFails) {
+	const char* source = R"(
+		struct A { x : i32; };
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(GlobalVariablesTypecheck) {
 	const char* source = R"(
 		var counter : i32 = 1;
@@ -145,6 +226,22 @@ TEST(GlobalVariablesTypecheck) {
 	EXPECT_TRUE(module != nullptr);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	EXPECT_TRUE(ls_module_get_global_count(module) == 3);
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(ModuleGlobalsAreVisibleInFunctions) {
+	const char* source = R"(
+		var g_inputs : i32 = undefined;
+
+		fn init(inputs : i32) : void {
+			g_inputs = inputs;
+		}
+	)";
+	TestContext diagnostics;
+	ls_module* module = ls_module_create(&diagnostics.host);
+	EXPECT_TRUE(module != nullptr);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), toLs("maps/demo/demo.lum"), nullptr, nullptr));
 	ls_module_destroy(module);
 	return true;
 }
@@ -310,7 +407,7 @@ TEST(ImportAddsDeclarationsToCurrentModule) {
 		struct Vec2 {
 			x : i32;
 			y : i32;
-		};
+		}
 
 		fn sum(v : Vec2) : i32 {
 			return v.x + v.y;
@@ -328,6 +425,71 @@ TEST(ImportAddsDeclarationsToCurrentModule) {
 	return true;
 }
 
+TEST(ImportVisibilityIsNotTransitive) {
+	const char* main_source = R"(
+		import "a"
+
+		fn main() : void {
+			const value : C = undefined;
+		}
+	)";
+	const char* a_source = R"(
+		import "b"
+
+		fn use_a() : void {
+		}
+	)";
+	const char* b_source = R"(
+		import "c"
+	)";
+	const char* c_source = R"(
+		struct C {
+			x : i32;
+		}
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("a"), toLs(a_source) },
+		{ toLs("b"), toLs(b_source) },
+		{ toLs("c"), toLs(c_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	TestContext diagnostics;
+	diagnostics.diagnostics.output_enabled = false;
+	ls_module* module = ls_module_create(&diagnostics.host);
+	EXPECT_TRUE(module != nullptr);
+	EXPECT_TRUE(!ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(UnaliasedImportCollidesWithLocalDeclaration) {
+	const char* main_source = R"(
+		import "math"
+
+		fn foo() : i32 {
+			return 1;
+		}
+
+		fn main() : i32 {
+			return foo();
+		}
+	)";
+	const char* math_source = R"(
+		fn foo() : i32 {
+			return 2;
+		}
+	)";
+	LumScriptImportFile file = { toLs("math"), toLs(math_source) };
+	LumScriptImportFiles files = { &file, 1 };
+	TestContext diagnostics;
+	diagnostics.diagnostics.output_enabled = false;
+	ls_module* module = ls_module_create(&diagnostics.host);
+	EXPECT_TRUE(module != nullptr);
+	EXPECT_TRUE(!ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
+	ls_module_destroy(module);
+	return true;
+}
+
 TEST(MissingImportFails) {
 	const char* source = R"(
 		import "missing"
@@ -339,7 +501,7 @@ TEST(MissingImportFails) {
 	return true;
 }
 
-TEST(DuplicateUnaliasedImportIsNoOp) {
+TEST(DuplicateUnaliasedImportFails) {
 	const char* main_source = R"(
 		import "math"
 		import "math"
@@ -353,7 +515,7 @@ TEST(DuplicateUnaliasedImportIsNoOp) {
 		struct Vec2 {
 			x : i32;
 			y : i32;
-		};
+		}
 
 		fn sum(v : Vec2) : i32 {
 			return v.x + v.y;
@@ -362,16 +524,15 @@ TEST(DuplicateUnaliasedImportIsNoOp) {
 	LumScriptImportFile file = { toLs("math"), toLs(math_source) };
 	LumScriptImportFiles files = { &file, 1 };
 	TestContext diagnostics;
+	diagnostics.diagnostics.output_enabled = false;
 	ls_module* module = ls_module_create(&diagnostics.host);
 	EXPECT_TRUE(module != nullptr);
-	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
-	EXPECT_EQ(1, ls_module_get_struct_count(module));
-	EXPECT_EQ(2, ls_module_get_function_count(module));
+	EXPECT_TRUE(!ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
 	ls_module_destroy(module);
 	return true;
 }
 
-TEST(DuplicateAliasedImportOfSamePathIsNoOp) {
+TEST(DuplicateAliasedImportOfSamePathFails) {
 	const char* main_source = R"(
 		import "math" as m
 		import "math" as m
@@ -385,7 +546,7 @@ TEST(DuplicateAliasedImportOfSamePathIsNoOp) {
 		struct Vec2 {
 			x : i32;
 			y : i32;
-		};
+		}
 
 		fn sum(v : Vec2) : i32 {
 			return v.x + v.y;
@@ -394,11 +555,10 @@ TEST(DuplicateAliasedImportOfSamePathIsNoOp) {
 	LumScriptImportFile file = { toLs("math"), toLs(math_source) };
 	LumScriptImportFiles files = { &file, 1 };
 	TestContext diagnostics;
+	diagnostics.diagnostics.output_enabled = false;
 	ls_module* module = ls_module_create(&diagnostics.host);
 	EXPECT_TRUE(module != nullptr);
-	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
-	EXPECT_EQ(1, ls_module_get_struct_count(module));
-	EXPECT_EQ(2, ls_module_get_function_count(module));
+	EXPECT_TRUE(!ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
 	ls_module_destroy(module);
 	return true;
 }
@@ -490,7 +650,7 @@ TEST(FirstParameterNamespaceResolutionPrecedenceTypecheck) {
 	const char* entity_source = R"(
 		struct Entity {
 			id : i32;
-		};
+		}
 
 		fn destroy(x : Entity) : i32 {
 			return x.id;
@@ -523,8 +683,7 @@ TEST(EnumShorthandInComparison) {
 			Idle,
 			Running,
 			Paused
-		};
-
+		}
 		fn check(state : State) : bool {
 			return state == .Running;
 		}
@@ -543,8 +702,7 @@ TEST(EnumShorthandInAssignment) {
 			Low = 0,
 			Medium = 5,
 			High = 10
-		};
-
+		}
 		fn main() : void {
 			var p : Priority = .High;
 			p = .Low;
@@ -559,8 +717,7 @@ TEST(EnumShorthandInFunctionArg) {
 		enum State {
 			Idle,
 			Running
-		};
-
+		}
 		fn set_state(s : State) : void {
 		}
 
@@ -582,13 +739,23 @@ TEST(EnumShorthandAmbiguousFails) {
 	return true;
 }
 
+TEST(EnumDeclarationTrailingSemicolonFails) {
+	const char* source = R"(
+		enum State {
+			Idle,
+			Running
+		};
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(EnumDoesNotConvertImplicitlyToInteger) {
 	const char* assignment = R"(
 		enum State {
 			Idle,
 			Running
-		};
-
+		}
 		fn main() : void {
 			const value : i32 = State.Running;
 		}
@@ -599,8 +766,7 @@ TEST(EnumDoesNotConvertImplicitlyToInteger) {
 		enum State {
 			Idle,
 			Running
-		};
-
+		}
 		fn takes_i32(value : i32) : void {
 		}
 
@@ -614,8 +780,7 @@ TEST(EnumDoesNotConvertImplicitlyToInteger) {
 		enum State {
 			Idle,
 			Running
-		};
-
+		}
 		fn main(value : i32) : bool {
 			return value == State.Running;
 		}
@@ -626,8 +791,7 @@ TEST(EnumDoesNotConvertImplicitlyToInteger) {
 		enum State {
 			Idle,
 			Running
-		};
-
+		}
 		fn main(value : i32) : void {
 			const state : State = value;
 		}
@@ -641,8 +805,7 @@ TEST(EnumCanBeExplicitlyCastToInteger) {
 		enum State {
 			Idle,
 			Running
-		};
-
+		}
 		fn takes_i32(value : i32) : void {
 		}
 
@@ -662,8 +825,7 @@ TEST(IntegerToEnumCastAllowsAnyIntegerValue) {
 		enum State {
 			Idle,
 			Running
-		};
-
+		}
 		fn main() : State {
 			const raw : i32 = 123;
 			return raw as State;
@@ -679,8 +841,7 @@ TEST(MatchTypechecks) {
 			Idle,
 			Running,
 			Paused
-		};
-
+		}
 		fn enum_match(state : State) : i32 {
 			match state {
 				case .Idle:
@@ -745,8 +906,7 @@ TEST(MatchRequiresExhaustiveEnumOrFallback) {
 		enum State {
 			Idle,
 			Running
-		};
-
+		}
 		fn main(state : State) : void {
 			match state {
 				case .Idle:
@@ -763,8 +923,7 @@ TEST(MatchRejectsDuplicateEnumCase) {
 		enum State {
 			Idle,
 			Running
-		};
-
+		}
 		fn main(state : State) : void {
 			match state {
 				case .Idle:
@@ -823,7 +982,7 @@ TEST(ImportAliasEntityResolution) {
 	)";
 
 	const char* entity_source = R"(
-		struct Entity { index : i32; };
+		struct Entity { index : i32; }
 	)";
 
 	const char* world_source = R"(
@@ -840,7 +999,7 @@ TEST(ImportAliasEntityResolution) {
 	TestContext diagnostics;
 	ls_module* module = ls_module_create(&diagnostics.host);
 	EXPECT_TRUE(module != nullptr);
-	diagnostics.diagnostics.output_enabled = false;
+	//diagnostics.diagnostics.output_enabled = false;
 	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
 	ls_module_destroy(module);
 	return true;
@@ -912,11 +1071,11 @@ TEST(RefArgumentAllowsNestedMutableField) {
 	const char* source = R"(
 		struct Stats {
 			hp : i32;
-		};
+		}
 
 		struct Player {
 			stats : Stats;
-		};
+		}
 
 		fn bump(v : ref i32) : void {
 			v += 1;
@@ -980,7 +1139,7 @@ TEST(NullablePromotionTypechecks) {
 			x : f32;
 			y : f32;
 			z : f32;
-		};
+		}
 
 		fn length_if_present(v : ?Vec3) : f32 {
 			if v != null {
@@ -999,7 +1158,7 @@ TEST(NullableUseWithoutCheckFails) {
 			x : f32;
 			y : f32;
 			z : f32;
-		};
+		}
 
 		fn bad(v : ?Vec3) : f32 {
 			return v.x;
@@ -1053,7 +1212,7 @@ TEST(UntypedLiteralsUseExpectedTypes) {
 		struct Pair {
 			x : u8;
 			y : f64;
-		};
+		}
 
 		fn takes_f32(v : f32) : f32 {
 			return v;

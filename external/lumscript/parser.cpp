@@ -10,7 +10,7 @@ struct Parser {
 		: m_module(module)
 		, m_declaration_prefix(declaration_prefix)
 	{
-		m_output.host = module.host;
+		m_output.host = &module.host;
 		m_tokenizer.init(source, source_name);
 	}
 
@@ -111,10 +111,12 @@ struct Parser {
 			case Token::U64: base = {LS_TYPE_U64, t.value, -1, t, is_nullable}; break;
 			case Token::F32: base = {LS_TYPE_F32, t.value, -1, t, is_nullable}; break;
 			case Token::F64: base = {LS_TYPE_F64, t.value, -1, t, is_nullable}; break;
-			case Token::IDENTIFIER:
-				if (equalStrings(t.value, "string")) base = {LS_TYPE_STRING, t.value, -1, t, is_nullable};
-				else base = {LS_TYPE_STRUCT, m_module.makeQualifiedName(m_declaration_prefix, parseQualifiedIdentifier(t)), -1, t, is_nullable};
-				break;
+			case Token::STRING_KW: base = {LS_TYPE_STRING, t.value, -1, t, is_nullable}; break;
+			// Keep the type name exactly as written here.
+			// Declarations are qualified when they are created, but type references
+			// must stay source-level names so the checker can resolve them against
+			// local declarations, unaliased imports, or alias-qualified imports.
+			case Token::IDENTIFIER: base = {LS_TYPE_STRUCT, parseQualifiedIdentifier(t), -1, t, is_nullable}; break;
 			default: error(t, "Expected type"); return {};
 		}
 		if (match(Token::LEFT_BRACKET)) {
@@ -173,6 +175,9 @@ struct Parser {
 		Token name;
 		if (!consume(Token::IDENTIFIER, &name)) return;
 		StructDecl& s = m_module.structs.emplace_back();
+		// The declaration itself is canonicalized to the current module namespace.
+		// Imported files are parsed with their normalized path as the prefix, so
+		// this becomes the stable identity used by the checker and later imports.
 		s.name = m_module.makeQualifiedName(m_declaration_prefix, name.value);
 		s.token = name;
 		if (!consume(Token::LEFT_BRACE)) return;
@@ -187,13 +192,14 @@ struct Parser {
 			consume(Token::SEMICOLON);
 		}
 		consume(Token::RIGHT_BRACE);
-		match(Token::SEMICOLON);
 	}
 
 	void parseEnum() {
 		Token name;
 		if (!consume(Token::IDENTIFIER, &name)) return;
 		EnumDecl& e = m_module.enums.emplace_back();
+		// Same rule as structs: store the declaration under the module's canonical
+		// namespace, not under any source-level alias that happened to load it.
 		e.name = m_module.makeQualifiedName(m_declaration_prefix, name.value);
 		e.token = name;
 		if (!consume(Token::LEFT_BRACE)) return;
@@ -220,7 +226,6 @@ struct Parser {
 			if (peek().type != Token::RIGHT_BRACE) consume(Token::COMMA);
 		}
 		consume(Token::RIGHT_BRACE);
-		match(Token::SEMICOLON);
 	}
 
 	i32 parseFunction(bool is_nested) {
@@ -235,6 +240,8 @@ struct Parser {
 			m_module.functions[fn_idx].name = m_module.copyName(ls_string_view{unique_name.c_str(), unique_name.c_str() + unique_name.size()});
 		}
 		else {
+			// Top-level functions follow the same canonical module naming rule as
+			// structs/enums/globals so imported modules remain addressable by path.
 			m_module.functions[fn_idx].name = m_module.makeQualifiedName(m_declaration_prefix, name.value);
 		}
 		m_module.functions[fn_idx].token = name;
@@ -263,6 +270,8 @@ struct Parser {
 		Token name;
 		if (!consume(Token::IDENTIFIER, &name)) return;
 		GlobalDecl& global = m_module.globals.emplace_back();
+		// Globals also live in the module namespace. This keeps raw symbol names
+		// stable regardless of whether the file was imported with an alias.
 		global.name = m_module.makeQualifiedName(m_declaration_prefix, name.value);
 		global.token = name;
 		global.is_const = is_const;
