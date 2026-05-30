@@ -87,7 +87,9 @@ struct BytecodeFunction {
 	ls_type return_type = {};
 	i32 code_offset = 0;
 	i32 code_size = 0;
-	i32 param_count = 0;
+	// Number of stack slots reserved by the declared parameters. This can differ
+	// from `params.size()` because a single parameter may occupy multiple slots.
+	i32 param_slot_count = 0;
 	i32 local_count = 0;
 	i32 return_count = 0;
 };

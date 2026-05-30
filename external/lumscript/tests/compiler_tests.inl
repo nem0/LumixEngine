@@ -47,6 +47,97 @@ TEST(DiamondImportTypechecks) {
 	return true;
 }
 
+TEST(ImportPathCanMatchPreviousAlias) {
+	const char* main_source = R"(
+		import "a" as b
+		import "b" as c
+
+		fn main() : i32 {
+			return b.one() + c.two();
+		}
+	)";
+	const char* a_source = R"(
+		fn one() : i32 {
+			return 1;
+		}
+	)";
+	const char* b_source = R"(
+		fn two() : i32 {
+			return 2;
+		}
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("a"), toLs(a_source) },
+		{ toLs("b"), toLs(b_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	TestContext diagnostics;
+	ls_module* module = ls_module_create(&diagnostics.host);
+	EXPECT_TRUE(module != nullptr);
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(QualifiedDeclarationCanNotUseImportedPath) {
+	const char* main_source = R"(
+		import "lib"
+
+		fn main() : i32 {
+			return lib.get_value();
+		}
+	)";
+	const char* lib_source = R"(
+		fn get_value() : i32 {
+			return 42;
+		}
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("lib"), toLs(lib_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	TestContext diagnostics;
+	diagnostics.diagnostics.output_enabled = false;
+	ls_module* module = ls_module_create(&diagnostics.host);
+	EXPECT_TRUE(module != nullptr);
+	EXPECT_TRUE(!ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(QualifiedDeclarationRequiresDirectImport) {
+	const char* main_source = R"(
+		import "a"
+
+		fn main() : i32 {
+			return b.get_value();
+		}
+	)";
+	const char* a_source = R"(
+		import "b"
+
+		fn use_a() : void {
+		}
+	)";
+	const char* b_source = R"(
+		fn get_value() : i32 {
+			return 42;
+		}
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("a"), toLs(a_source) },
+		{ toLs("b"), toLs(b_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	TestContext diagnostics;
+	diagnostics.diagnostics.output_enabled = false;
+	ls_module* module = ls_module_create(&diagnostics.host);
+	EXPECT_TRUE(module != nullptr);
+	EXPECT_TRUE(!ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
+	ls_module_destroy(module);
+	return true;
+}
+
 TEST(ImportAliasMissingMemberReportsMemberName) {
 	const char* main_source = R"(
 		import "core:imgui" as imgui
@@ -101,6 +192,40 @@ TEST(ImportEnumMemberWithoutAliasCompiles) {
 	ls_module_destroy(module);
 	return true;
 }
+
+TEST(ImportsAreNotTransitiveAcrossModules) {
+	const char* a_source = R"(
+		import "b" as b
+		import "c" as c
+
+		fn main() : i32 {
+			return b.get_value();
+		}
+	)";
+	const char* b_source = R"(
+		fn get_value() : i32 {
+			return value;
+		}
+	)";
+	const char* c_source = R"(
+		const value : i32 = 42;
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("b"), toLs(b_source) },
+		{ toLs("c"), toLs(c_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	DiagnosticCapture capture;
+	ls_host host = {};
+	host.diagnostics_userdata = &capture;
+	host.print = &captureDiagnostic;
+	ls_module* module = ls_module_create(&host);
+	EXPECT_TRUE(module != nullptr);
+	EXPECT_TRUE(!ls_module_compile(module, toLs(a_source), {}, &resolveLumScriptImportC, &files));
+	EXPECT_TRUE(capture.text.find("Unknown variable 'value'") != std::string::npos);
+	ls_module_destroy(module);
+	return true;
+}
 TEST(ConstAssignmentFails) {
 	const char* source = R"(
 		fn main() : void {
@@ -109,6 +234,32 @@ TEST(ConstAssignmentFails) {
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(FunctionCallAssignmentFails) {
+	const char* source = R"(
+		fn foo() : i32 {
+			return 0;
+		}
+
+		fn main() : void {
+			foo() = 42;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+
+	const char* indexed_source = R"(
+		fn foo() : i32[4] {
+			var d : i32[4] = undefined;
+			return d;
+		}
+
+		fn main() : void {
+			foo()[1] = 1;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(indexed_source);
 	return true;
 }
 
@@ -167,6 +318,11 @@ TEST(DuplicateDeclarationsFail) {
 		struct A { x : i32; x : i32; }
 	)";
 	EXPECT_COMPILE_FAIL(duplicate_field);
+
+	const char* duplicate_enum_member = R"(
+		enum A { X, X }
+	)";
+	EXPECT_COMPILE_FAIL(duplicate_enum_member);
 
 	const char* duplicate_local = R"(
 		fn main() : void {
@@ -696,20 +852,20 @@ TEST(ImportSymbolCollisionFails) {
 	return true;
 }
 
-TEST(DivisionAndModuloByConstantZeroFail) {
+TEST(DivisionAndModuloByConstantZeroCompile) {
 	const char* divide_source = R"(
 		fn main(v : i32) : i32 {
 			return v / 0;
 		}
 	)";
-	EXPECT_COMPILE_FAIL(divide_source);
+	EXPECT_COMPILE(divide_source);
 
 	const char* modulo_source = R"(
 		fn main(v : i32) : i32 {
 			return v % 0;
 		}
 	)";
-	EXPECT_COMPILE_FAIL(modulo_source);
+	EXPECT_COMPILE(modulo_source);
 
 	const char* float_source = R"(
 		fn main() : f32 {
@@ -1327,6 +1483,139 @@ TEST(ImportAliasEntityResolution) {
 	EXPECT_TRUE(module != nullptr);
 	//diagnostics.diagnostics.output_enabled = false;
 	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(ImportExternFnDuplicateNotUsed) {
+	const char* main_source = R"(
+		import "a"
+		import "b"
+
+		fn main() : i32 {}
+	)";
+
+	const char* a_source = R"(
+		extern fn foo() : i32;
+	)";
+
+	const char* b_source = R"(
+		extern fn foo() : i32;
+	)";
+
+	LumScriptImportFile files_storage[] = {
+		{ toLs("a"), toLs(a_source) },
+		{ toLs("b"), toLs(b_source) },
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	TestContext diagnostics;
+	ls_module* module = ls_module_create(&diagnostics.host);
+	EXPECT_TRUE(module != nullptr);
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(ExternFnDuplicateSameFile) {
+	const char* source = R"(
+		extern fn foo() : i32;	
+		extern fn foo() : i32;	
+		fn main() : void {
+			foo();
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ExternGlobalCollision) {
+	const char* source = R"(
+		extern fn foo() : i32;	
+		const foo = 1;
+		fn main() : void {
+			foo();
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ExternFnCollision) {
+	const char* source = R"(
+		extern fn foo() : i32;	
+		fn foo() : void {}
+		fn main() : void {
+			foo();
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ImportExternFnDuplicateUsed) {
+	const char* main_source = R"(
+		import "a"
+		import "b"
+
+		fn main() : i32 {
+			foo(); // error - duplicate
+		}
+	)";
+
+	const char* a_source = R"(
+		extern fn foo() : i32;
+	)";
+
+	const char* b_source = R"(
+		extern fn foo() : i32;
+	)";
+
+	LumScriptImportFile files_storage[] = {
+		{ toLs("a"), toLs(a_source) },
+		{ toLs("b"), toLs(b_source) },
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	TestContext diagnostics;
+	diagnostics.diagnostics.output_enabled = false;
+	ls_module* module = ls_module_create(&diagnostics.host);
+	EXPECT_TRUE(module != nullptr);
+	EXPECT_TRUE(!ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(ImportAliasExternFnReturnTypeRequiresDirectImport) {
+	const char* main_source = R"(
+		import "entity" as entity
+		import "world" as world
+
+		fn main() : i32 {
+			var e : entity.Entity = world.createEntity();
+			return e.index;
+		}
+	)";
+
+	const char* entity_source = R"(
+		struct Entity { index : i32; }
+	)";
+
+	const char* world_source = R"(
+		extern fn createEntity() : Entity;
+	)";
+
+	LumScriptImportFile files_storage[] = {
+		{ toLs("world"), toLs(world_source) },
+		{ toLs("entity"), toLs(entity_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	DiagnosticCapture capture;
+	ls_host host = {};
+	host.diagnostics_userdata = &capture;
+	host.print = &captureDiagnostic;
+	ls_module* module = ls_module_create(&host);
+	EXPECT_TRUE(module != nullptr);
+	EXPECT_TRUE(!ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
+	EXPECT_TRUE(capture.text.find("Unknown type 'Entity'") != std::string::npos);
 	ls_module_destroy(module);
 	return true;
 }

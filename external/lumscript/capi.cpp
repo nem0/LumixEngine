@@ -7,7 +7,7 @@
 static ls_type toC(const TypeRef& type) {
 	ls_type result = {};
 	result.kind = type.kind;
-	result.name = type.name;
+	result.name = type.unresolved_name;
 	result.struct_index = type.struct_index;
 	result.element_kind = type.element_kind;
 	result.element_name = type.element_name;
@@ -19,7 +19,7 @@ static ls_type toC(const TypeRef& type) {
 static TypeRef toTypeRef(ls_type value) {
 	TypeRef type;
 	type.kind = value.kind;
-	type.name = value.name;
+	type.unresolved_name = value.name;
 	type.struct_index = value.struct_index;
 	type.element_kind = value.element_kind;
 	type.element_name = value.element_name;
@@ -36,33 +36,6 @@ void ls_module_destroy(ls_module* module) {
 	delete module;
 }
 
-int ls_module_add_native_type(ls_module* module, ls_string_view name, ls_string_view id) {
-	if (!module) return -1;
-	for (i32 i = 0; i < module->native_types.size(); ++i) {
-		if (equalStrings(module->native_types[i].name, name)) return i;
-	}
-	NativeTypeDecl& type = module->native_types.emplace_back();
-	type.name = module->copyName(name);
-	type.id = module->copyName(id);
-	return (int)module->native_types.size() - 1;
-}
-
-int ls_module_add_enum(ls_module* module, ls_string_view name, const ls_enum_member* members, size_t member_count) {
-	if (!module) return -1;
-	if (!members && member_count > 0) return -1;
-	for (i32 i = 0; i < module->enums.size(); ++i) {
-		if (equalStrings(module->enums[i].name, name)) return i;
-	}
-	EnumDecl& e = module->enums.emplace_back();
-	e.name = module->copyName(name);
-	for (size_t i = 0; i < member_count; ++i) {
-		EnumMember& member = e.members.emplace_back();
-		member.name = module->copyName(members[i].name);
-		member.value = members[i].value;
-	}
-	return (int)module->enums.size() - 1;
-}
-
 int ls_module_get_native_function_index(ls_module* module, ls_string_view name) {
 	if (!module) return -1;
 	return module->findNativeFunction(name);
@@ -70,29 +43,50 @@ int ls_module_get_native_function_index(ls_module* module, ls_string_view name) 
 
 int ls_module_get_native_function_count(ls_module* module) {
 	if (!module) return 0;
-	return (int)module->native_functions.size();
+	i32 count = 0;
+	for (const Unit& unit : module->units) count += (i32)unit.native_functions.size();
+	return count;
 }
 
 ls_string_view ls_module_get_native_function_name(ls_module* module, int index) {
-	if (!module || index < 0 || index >= (int)module->native_functions.size()) return {};
-	return module->native_functions[(size_t)index].name;
+	if (!module || index < 0) return {};
+	for (const Unit& unit : module->units) {
+		if (index < (i32)unit.native_functions.size()) return unit.native_functions[(size_t)index].canonical_name;
+		index -= (i32)unit.native_functions.size();
+	}
+	return {};
 }
 
 ls_type ls_module_get_native_function_return_type(ls_module* module, int index) {
-	if (!module || index < 0 || index >= (int)module->native_functions.size()) return ls_type_make(LS_TYPE_INVALID);
-	return toC(module->native_functions[(size_t)index].return_type);
+	if (!module || index < 0) return ls_type_make(LS_TYPE_INVALID);
+	for (const Unit& unit : module->units) {
+		if (index < (i32)unit.native_functions.size()) return toC(unit.native_functions[(size_t)index].return_type);
+		index -= (i32)unit.native_functions.size();
+	}
+	return ls_type_make(LS_TYPE_INVALID);
 }
 
 int ls_module_get_native_function_param_count(ls_module* module, int index) {
-	if (!module || index < 0 || index >= (int)module->native_functions.size()) return 0;
-	return (int)module->native_functions[(size_t)index].params.size();
+	if (!module || index < 0) return 0;
+	for (const Unit& unit : module->units) {
+		if (index < (i32)unit.native_functions.size()) return (int)unit.native_functions[(size_t)index].params.size();
+		index -= (i32)unit.native_functions.size();
+	}
+	return 0;
 }
 
 ls_type ls_module_get_native_function_param_type(ls_module* module, int index, int param_index) {
-	if (!module || index < 0 || index >= (int)module->native_functions.size()) return ls_type_make(LS_TYPE_INVALID);
-	const NativeFunctionDecl& fn = module->native_functions[(size_t)index];
-	if (param_index < 0 || param_index >= (int)fn.params.size()) return ls_type_make(LS_TYPE_INVALID);
-	return toC(fn.params[(size_t)param_index].type);
+	if (!module || index < 0) return ls_type_make(LS_TYPE_INVALID);
+	for (const Unit& unit : module->units) {
+		if (index >= (i32)unit.native_functions.size()) {
+			index -= (i32)unit.native_functions.size();
+			continue;
+		}
+		const NativeFunctionDecl& fn = unit.native_functions[(size_t)index];
+		if (param_index < 0 || param_index >= (int)fn.params.size()) return ls_type_make(LS_TYPE_INVALID);
+		return toC(fn.params[(size_t)param_index].type);
+	}
+	return ls_type_make(LS_TYPE_INVALID);
 }
 
 int ls_module_add_native_function(
@@ -104,31 +98,39 @@ int ls_module_add_native_function(
 ) {
 	if (!module) return -1;
 	if (!param_types && param_count > 0) return -1;
-	NativeFunctionDecl& fn = module->native_functions.emplace_back();
-	fn.name = module->copyName(name);
-	fn.canonical_name = fn.name;
+	Unit& unit = module->addUnit();
+	NativeFunctionDecl& fn = unit.native_functions.emplace_back();
+	fn.canonical_name = module->copyName(name);
 	fn.return_type = toTypeRef(return_type);
 
 	for (size_t i = 0; i < param_count; ++i) {
 		Param& p = fn.params.emplace_back();
 		p.type = toTypeRef(param_types[i]);
 	}
-	return (int)module->native_functions.size() - 1;
+	i32 count = 0;
+	for (const Unit& unit : module->units) count += (i32)unit.native_functions.size();
+	return count - 1;
 }
 
 int ls_module_get_struct_count(ls_module* module) {
 	if (!module) return 0;
-	return (int)module->structs.size();
+	i32 count = 0;
+	for (const Unit& unit : module->units) count += (i32)unit.structs.size();
+	return count;
 }
 
 int ls_module_get_function_count(ls_module* module) {
 	if (!module) return 0;
-	return (int)module->functions.size();
+	i32 count = 0;
+	for (const Unit& unit : module->units) count += (i32)unit.functions.size();
+	return count;
 }
 
 int ls_module_get_global_count(ls_module* module) {
 	if (!module) return 0;
-	return (int)module->globals.size();
+	i32 count = 0;
+	for (const Unit& unit : module->units) count += (i32)unit.globals.size();
+	return count;
 }
 
 ls_string_view ls_make_qualified_name(ls_module* module, ls_string_view prefix, ls_string_view name) {
@@ -142,43 +144,4 @@ ls_type ls_type_make(ls_type_kind kind) {
 	return type;
 }
 
-ls_type ls_type_make_struct(ls_string_view name, int32_t struct_index, int nullable) {
-	ls_type res = ls_type_make(LS_TYPE_STRUCT);
-	res.name = name;
-	res.struct_index = struct_index;
-	res.nullable = nullable;
-	return res;
-}
-
-ls_type ls_type_make_enum(ls_string_view name, int32_t struct_index, int nullable) {
-	ls_type res = ls_type_make(LS_TYPE_ENUM);
-	res.name = name;
-	res.struct_index = struct_index;
-	res.nullable = nullable;
-	return res;
-}
-
-ls_type ls_type_make_native(ls_string_view name, int32_t struct_index, int nullable) {
-	ls_type res = ls_type_make(LS_TYPE_NATIVE);
-	res.name = name;
-	res.struct_index = struct_index;
-	res.nullable = nullable;
-	return res;
-}
-
-ls_type ls_type_make_array(
-	ls_type_kind element_kind,
-	ls_string_view element_name,
-	int32_t struct_index,
-	int32_t array_size,
-	int nullable
-) {
-	ls_type res = ls_type_make(LS_TYPE_ARRAY);
-	res.element_kind = element_kind;
-	res.element_name = element_name;
-	res.struct_index = struct_index;
-	res.array_size = array_size;
-	res.nullable = nullable;
-	return res;
-}
 

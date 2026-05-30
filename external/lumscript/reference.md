@@ -806,10 +806,10 @@ Integer division/modulo behavior:
 - division truncates toward zero
 - `%` follows `a == (a / b) * b + (a % b)`
 - non-zero remainder has same sign as `a`
-- constant zero divisor is compile-time error
-- runtime zero divisor is runtime error
+- zero divisor is runtime error, including constant zero divisors
 
-Floating-point division follows IEEE-754 and may produce `Inf` or `NaN`.
+Floating-point division by a non-zero divisor follows IEEE-754 and may produce `Inf` or `NaN`.
+Division by zero is runtime error, including constant zero divisors.
 
 ### Integer overflow
 

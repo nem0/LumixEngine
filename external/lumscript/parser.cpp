@@ -6,8 +6,9 @@
 #include "tokenizer.h"
 
 struct Parser {
-	Parser(ls_module& module, ls_string_view declaration_prefix, ls_string_view source, ls_string_view source_name = {})
+	Parser(ls_module& module, Unit& unit, ls_string_view declaration_prefix, ls_string_view source, ls_string_view source_name = {})
 		: m_module(module)
+		, m_unit(unit)
 		, m_declaration_prefix(declaration_prefix)
 	{
 		m_output.host = &module.host;
@@ -55,6 +56,18 @@ struct Parser {
 		m_output.errorAt(token, msg, " near '", token.value, "'");
 	}
 
+	// track all symbols (functions, enum, structs, externs, globals) to detect duplicates
+	bool addSymbol(Token token, Unit& unit, CanonicalName name, Symbol::Kind kind) {
+		for (const Symbol& symbol : unit.symbols) {
+			if (equal(symbol.name, name)) {
+				error(token, "Duplicate symbol");
+				return false;
+			}
+		}
+		unit.symbols.push_back(Symbol{kind, name});
+		return true;
+	}
+
 	ls_string_view parseQualifiedIdentifier(Token first) {
 		ls_string_view name = first.value;
 		while (match(Token::DOT)) {
@@ -68,7 +81,7 @@ struct Parser {
 	void parseImport() {
 		Token path;
 		if (!consume(Token::STRING, &path)) return;
-		ImportDecl& import = m_module.imports.emplace_back();
+		ImportDecl& import = m_unit.imports.emplace_back();
 		import.path = path.value;
 		import.token = path;
 		if (match(Token::AS)) {
@@ -133,7 +146,7 @@ struct Parser {
 			array_type.token = t;
 			array_type.nullable = is_nullable;
 			array_type.element_kind = base.kind;
-			array_type.element_name = base.name;
+			array_type.element_name = base.unresolved_name;
 			array_type.struct_index = base.struct_index;
 			fromCString(size_token.value, array_type.array_size);
 			if (array_type.array_size <= 0) {
@@ -149,9 +162,10 @@ struct Parser {
 		if (!consume(Token::FN)) return;
 		Token name;
 		if (!consume(Token::IDENTIFIER, &name)) return;
-		NativeFunctionDecl& fn = m_module.native_functions.emplace_back();
-		fn.name = m_module.makeQualifiedName(m_declaration_prefix, name.value);
+		NativeFunctionDecl& fn = m_unit.native_functions.emplace_back();
+		fn.canonical_name = m_module.makeQualifiedName(m_declaration_prefix, name.value);
 		if (!consume(Token::LEFT_PAREN)) return;
+		if (!addSymbol(name, m_unit, {m_declaration_prefix, name.value}, Symbol::EXTERN_FN)) return;
 		
 		while (peek().type != Token::RIGHT_PAREN && peek().type != Token::END_OF_FILE && !m_output.has_error) {
 			if (!fn.params.empty() && !consume(Token::COMMA)) return;
@@ -175,12 +189,13 @@ struct Parser {
 	void parseStruct() {
 		Token name;
 		if (!consume(Token::IDENTIFIER, &name)) return;
-		StructDecl& s = m_module.structs.emplace_back();
+		StructDecl& s = m_unit.structs.emplace_back();
 		// The declaration itself is canonicalized to the current module namespace.
 		// Imported files are parsed with their normalized path as the prefix, so
 		// this becomes the stable identity used by the checker and later imports.
-		s.name = m_module.makeQualifiedName(m_declaration_prefix, name.value);
+		s.name = { m_declaration_prefix, name.value };
 		s.token = name;
+		if (!addSymbol(name, m_unit, s.name, Symbol::STRUCT)) return;
 		if (!consume(Token::LEFT_BRACE)) return;
 		while (peek().type != Token::RIGHT_BRACE && peek().type != Token::END_OF_FILE && !m_output.has_error) {
 			Token field_name;
@@ -198,12 +213,14 @@ struct Parser {
 	void parseEnum() {
 		Token name;
 		if (!consume(Token::IDENTIFIER, &name)) return;
-		EnumDecl& e = m_module.enums.emplace_back();
+		EnumDecl& e = m_unit.enums.emplace_back();
 		// Same rule as structs: store the declaration under the module's canonical
 		// namespace, not under any source-level alias that happened to load it.
-		e.name = m_module.makeQualifiedName(m_declaration_prefix, name.value);
+		e.name = { m_declaration_prefix, name.value };
 		e.token = name;
 		if (!consume(Token::LEFT_BRACE)) return;
+		if (!addSymbol(name, m_unit, e.name, Symbol::ENUM)) return;
+
 		i32 auto_value = 0;
 		while (peek().type != Token::RIGHT_BRACE && peek().type != Token::END_OF_FILE && !m_output.has_error) {
 			Token member_name;
@@ -232,27 +249,29 @@ struct Parser {
 	i32 parseFunction(bool is_nested) {
 		Token name;
 		if (!consume(Token::IDENTIFIER, &name)) return -1;
-		m_module.functions.emplace_back();
-		const i32 fn_idx = (i32)m_module.functions.size() - 1;
-		m_module.functions[fn_idx].local_name = name.value;
-		m_module.functions[fn_idx].is_nested = is_nested;
+		m_unit.functions.emplace_back();
+		const i32 fn_idx = (i32)m_unit.functions.size() - 1;
+		m_unit.functions[fn_idx].local_name = name.value;
+		m_unit.functions[fn_idx].is_nested = is_nested;
 		if (is_nested) {
 			std::string unique_name = "__nested_fn." + std::to_string(m_nested_function_counter++) + "." + std::string(data(name.value), size(name.value));
-			m_module.functions[fn_idx].name = m_module.copyName(ls_string_view{unique_name.c_str(), unique_name.c_str() + unique_name.size()});
+			m_unit.functions[fn_idx].name = m_module.copyName(ls_string_view{unique_name.c_str(), unique_name.c_str() + unique_name.size()});
 		}
 		else {
 			// Top-level functions follow the same canonical module naming rule as
 			// structs/enums/globals so imported modules remain addressable by path.
-			m_module.functions[fn_idx].name = m_module.makeQualifiedName(m_declaration_prefix, name.value);
+			m_unit.functions[fn_idx].name = m_module.makeQualifiedName(m_declaration_prefix, name.value);
+			if (!addSymbol(name, m_unit, {m_declaration_prefix, name.value}, Symbol::FN)) return -1;
 		}
-		m_module.functions[fn_idx].token = name;
+		m_unit.functions[fn_idx].token = name;
+
 		if (!consume(Token::LEFT_PAREN)) return fn_idx;
 		while (peek().type != Token::RIGHT_PAREN && peek().type != Token::END_OF_FILE && !m_output.has_error) {
-			if (!m_module.functions[fn_idx].params.empty()) consume(Token::COMMA);
+			if (!m_unit.functions[fn_idx].params.empty()) consume(Token::COMMA);
 			Token param_name;
 			if (!consume(Token::IDENTIFIER, &param_name)) return fn_idx;
 			consume(Token::COLON);
-			Param& p = m_module.functions[fn_idx].params.emplace_back();
+			Param& p = m_unit.functions[fn_idx].params.emplace_back();
 			p.name = param_name.value;
 			p.token = param_name;
 			p.is_ref = match(Token::REF);
@@ -260,8 +279,8 @@ struct Parser {
 		}
 		consume(Token::RIGHT_PAREN);
 		consume(Token::COLON);
-		m_module.functions[fn_idx].return_type = parseType();
-		m_module.functions[fn_idx].body = parseBlock();
+		m_unit.functions[fn_idx].return_type = parseType();
+		m_unit.functions[fn_idx].body = parseBlock();
 		return fn_idx;
 	}
 
@@ -284,9 +303,9 @@ struct Parser {
 			error(op, "Expected operator");
 			return -1;
 		}
-		m_module.functions.emplace_back();
-		const i32 fn_idx = (i32)m_module.functions.size() - 1;
-		FunctionDecl& fn = m_module.functions[fn_idx];
+		m_unit.functions.emplace_back();
+		const i32 fn_idx = (i32)m_unit.functions.size() - 1;
+		FunctionDecl& fn = m_unit.functions[fn_idx];
 		fn.is_operator = true;
 		fn.operator_token = op.type;
 		std::string unique_name = std::string(data(m_declaration_prefix), size(m_declaration_prefix));
@@ -320,12 +339,13 @@ struct Parser {
 		const bool is_const = t.type == Token::CONST;
 		Token name;
 		if (!consume(Token::IDENTIFIER, &name)) return;
-		GlobalDecl& global = m_module.globals.emplace_back();
+		GlobalDecl& global = m_unit.globals.emplace_back();
 		// Globals also live in the module namespace. This keeps raw symbol names
 		// stable regardless of whether the file was imported with an alias.
-		global.name = m_module.makeQualifiedName(m_declaration_prefix, name.value);
+		global.canonical_name = {m_declaration_prefix, name.value};
 		global.token = name;
 		global.is_const = is_const;
+		if (!addSymbol(name, m_unit, {m_declaration_prefix, name.value}, Symbol::GLOBAL_VAR)) return;
 		if (match(Token::COLON)) global.type = parseType();
 		if (match(Token::EQUAL)) {
 			if (peek().type == Token::IDENTIFIER && equalStrings(peek().value, "undefined")) {
@@ -782,6 +802,7 @@ struct Parser {
 
 	Tokenizer m_tokenizer;
 	ls_module& m_module;
+	Unit& m_unit;
 	OutputFormatter m_output;
 	ls_string_view m_declaration_prefix;
 	bool m_allow_constructor = true;
@@ -790,7 +811,8 @@ struct Parser {
 };
 
 bool parse(ls_module& module, ls_string_view source, ls_string_view declaration_prefix, ls_string_view source_name) {
-	Parser parser(module, declaration_prefix, source, source_name);
+	Unit& unit = module.addUnit(source_name);
+	Parser parser(module, unit, declaration_prefix, source, source_name);
 	return parser.parse();
 }
 

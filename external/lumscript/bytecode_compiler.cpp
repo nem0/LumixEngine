@@ -42,7 +42,7 @@ static bool isBytecodeFloatType(ls_type_kind kind) {
 static ls_type toC(TypeRef type) {
 	ls_type result = {};
 	result.kind = type.kind;
-	result.name = type.name;
+	result.name = type.unresolved_name;
 	result.struct_index = type.struct_index;
 	result.element_kind = type.element_kind;
 	result.element_name = type.element_name;
@@ -137,30 +137,28 @@ static bool bytecodeSplitMemberName(ls_string_view name, ls_string_view* owner, 
 }
 
 static ls_string_view bytecodeGetTypeNamespace(ls_module& module, TypeRef type) {
-	ls_string_view type_name = type.name;
-	if (type.kind == LS_TYPE_NATIVE && type.struct_index >= 0 && type.struct_index < module.native_types.size()) {
-		type_name = module.native_types[type.struct_index].name;
-	}
-	else if (type.kind == LS_TYPE_NATIVE) {
-		for (const NativeTypeDecl& native_type : module.native_types) {
-			if (!equalStrings(native_type.id, type.name)) continue;
-			type_name = native_type.name;
-			break;
-		}
-	}
 	ls_string_view namespace_name;
 	ls_string_view member_name;
-	if (!bytecodeSplitMemberName(type_name, &namespace_name, &member_name)) return {};
+	if (!bytecodeSplitMemberName(type.unresolved_name, &namespace_name, &member_name)) return {};
 	return namespace_name;
 }
 
 // The bytecode VM still uses a flat `u64` stack, so aggregate values are
 // represented as consecutive scalar slots rather than boxed objects.
 static bool bytecodeStructFieldOffset(ls_module& module, const TypeRef& type, ls_string_view field_name, i32* offset, TypeRef* field_type) {
-	if (type.kind != LS_TYPE_STRUCT || type.struct_index < 0 || type.struct_index >= module.structs.size()) return false;
-	const StructDecl& s = module.structs[type.struct_index];
+	if (type.kind != LS_TYPE_STRUCT || type.struct_index < 0) return false;
+	i32 struct_idx = type.struct_index;
+	const StructDecl* s = nullptr;
+	for (const Unit& unit : module.units) {
+		if (struct_idx < (i32)unit.structs.size()) {
+			s = &unit.structs[(size_t)struct_idx];
+			break;
+		}
+		struct_idx -= (i32)unit.structs.size();
+	}
+	if (!s) return false;
 	i32 current_offset = 0;
-	for (const FieldDecl& field : s.fields) {
+	for (const FieldDecl& field : s->fields) {
 		const i32 field_slots = bytecodeTypeSlotCount(module, field.type);
 		if (equalStrings(field.name, field_name)) {
 			if (offset) *offset = current_offset;
@@ -189,15 +187,24 @@ static i32 bytecodeTypeSlotCount(ls_module& module, TypeRef type) {
 		case LS_TYPE_F64:
 		case LS_TYPE_STRING:
 		case LS_TYPE_ENUM:
-		case LS_TYPE_NATIVE:
 		case LS_TYPE_FUNCTION:
 		case LS_TYPE_NULL_VALUE:
 		case LS_TYPE_UNTYPED_FLOAT:
 			return 1;
 		case LS_TYPE_STRUCT: {
-			if (type.struct_index < 0 || type.struct_index >= module.structs.size()) return 0;
+			if (type.struct_index < 0) return 0;
+			i32 struct_idx = type.struct_index;
+			const StructDecl* s = nullptr;
+			for (const Unit& unit : module.units) {
+				if (struct_idx < (i32)unit.structs.size()) {
+					s = &unit.structs[(size_t)struct_idx];
+					break;
+				}
+				struct_idx -= (i32)unit.structs.size();
+			}
+			if (!s) return 0;
 			i32 count = 0;
-			for (const FieldDecl& field : module.structs[type.struct_index].fields) {
+			for (const FieldDecl& field : s->fields) {
 				const i32 field_slots = bytecodeTypeSlotCount(module, field.type);
 				if (field_slots <= 0) return 0;
 				count += field_slots;
@@ -433,6 +440,22 @@ static ls_string_view bytecodeGetExpressionName(ls_module& module, i32 expr_idx)
 	if (expr.kind == Expr::FIELD) {
 		if (empty(expr.qualified_name)) expr.qualified_name = module.makeQualifiedName(bytecodeGetExpressionName(module, expr.left), expr.name);
 		return expr.qualified_name;
+	}
+	if (expr.kind == Expr::FUNCTION_REF) {
+		if (expr.boolean) {
+			i32 idx = expr.left;
+			for (const Unit& unit : module.units) {
+				if (idx < (i32)unit.native_functions.size()) return unit.native_functions[(size_t)idx].canonical_name;
+				idx -= (i32)unit.native_functions.size();
+			}
+		}
+		else {
+			i32 idx = expr.left;
+			for (const Unit& unit : module.units) {
+				if (idx < (i32)unit.functions.size()) return unit.functions[(size_t)idx].name;
+				idx -= (i32)unit.functions.size();
+			}
+		}
 	}
 	return {};
 }
@@ -702,9 +725,19 @@ static bool bytecodeResolveValueAccessByExpr(ls_module& module, BytecodeCompileC
 		const i32 global_idx = module.findGlobal(expr.name);
 		if (global_idx >= 0) {
 			out->kind = BytecodeValueKind::GLOBAL;
-			out->slot = module.globals[global_idx].slot;
+			i32 idx = global_idx;
+			GlobalDecl* global = nullptr;
+			for (Unit& unit : module.units) {
+				if (idx < (i32)unit.globals.size()) {
+					global = &unit.globals[(size_t)idx];
+					break;
+				}
+				idx -= (i32)unit.globals.size();
+			}
+			if (!global) return false;
+			out->slot = global->slot;
 			out->value_slot_offset = 0;
-			out->type = module.globals[global_idx].type;
+			out->type = global->type;
 			out->is_ref = false;
 			return true;
 		}
@@ -1281,21 +1314,34 @@ static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, Byteco
 		case Expr::ENUM_LITERAL: {
 			if (expr.type.kind != LS_TYPE_ENUM) return false;
 			i32 enum_idx = expr.type.struct_index;
-			if (enum_idx < 0 || enum_idx >= module.enums.size()) {
+			if (enum_idx < 0) {
 				enum_idx = -1;
-				for (i32 i = 0; i < module.enums.size(); ++i) {
-					if (module.findEnumMember(module.enums[i], expr.name) >= 0) {
-						if (enum_idx >= 0) return false;
-						enum_idx = i;
+				i32 running_enum_idx = 0;
+				for (const Unit& unit : module.units) {
+					for (const EnumDecl& e : unit.enums) {
+						if (module.findEnumMember(e, expr.name) >= 0) {
+							if (enum_idx >= 0) return false;
+							enum_idx = running_enum_idx;
+						}
+						++running_enum_idx;
 					}
 				}
 				if (enum_idx < 0) return false;
 			}
-			const EnumDecl& e = module.enums[enum_idx];
-			const i32 member_idx = module.findEnumMember(e, expr.name);
+			i32 idx = enum_idx;
+			const EnumDecl* e = nullptr;
+			for (const Unit& unit : module.units) {
+				if (idx < (i32)unit.enums.size()) {
+					e = &unit.enums[(size_t)idx];
+					break;
+				}
+				idx -= (i32)unit.enums.size();
+			}
+			if (!e) return false;
+			const i32 member_idx = module.findEnumMember(*e, expr.name);
 			if (member_idx < 0) return false;
 			pushCode(bytecode, BytecodeOp::LOAD_CONST32);
-			const i32 value = e.members[member_idx].value;
+			const i32 value = e->members[member_idx].value;
 			pushCode(bytecode, (u32)value);
 			return true;
 		}
@@ -1464,45 +1510,56 @@ static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, Byteco
 					}
 				}
 			}
-			if (fn_idx >= 0 && !module.functions[fn_idx].is_nested) {
-				const FunctionDecl& callee = module.functions[fn_idx];
-				i32 param_idx = 0;
-				if (expr.method_receiver >= 0) {
-					if (callee.params.empty()) return false;
-					const TypeRef* expected = !callee.params.empty() ? &callee.params[0].type : nullptr;
-					if (!callee.params.empty() && callee.params[0].is_ref) {
-						// Method-style calls still obey the same ref rules as normal calls.
-						// The receiver expression must be an explicit `ref ...` node, and
-						// we forward the underlying address instead of copying the value.
-						Expr& receiver_expr = module.expressions[expr.method_receiver];
-						if (receiver_expr.kind != Expr::REF) return false;
-						BytecodeValueAccess access = {};
-						if (!bytecodeResolveValueAccess(module, ctx, receiver_expr.right, &access)) return false;
-						if (!bytecodeEmitAddressOfValue(module, bytecode, ctx, access)) return false;
+			if (fn_idx >= 0) {
+				i32 idx = fn_idx;
+				FunctionDecl* callee_ptr = nullptr;
+				for (Unit& unit : module.units) {
+					if (idx < (i32)unit.functions.size()) {
+						callee_ptr = &unit.functions[(size_t)idx];
+						break;
 					}
-					else if (!bytecodeCompileExpr(module, bytecode, ctx, expr.method_receiver, expected)) return false;
-					param_idx = 1;
+					idx -= (i32)unit.functions.size();
 				}
-				if ((i32)callee.params.size() != (i32)expr.args.size() + (expr.method_receiver >= 0 ? 1 : 0)) return false;
-				for (i32 i = 0; i < expr.args.size(); ++i, ++param_idx) {
-					const TypeRef* expected = param_idx < callee.params.size() ? &callee.params[param_idx].type : nullptr;
-					if (param_idx < callee.params.size() && callee.params[param_idx].is_ref) {
-						// Ref parameters are not value arguments. The AST represents them
-						// explicitly as `Expr::REF`, so we resolve the pointed-to lvalue
-						// and pass its address to the VM.
-						Expr& arg_expr = module.expressions[expr.args[i]];
-						if (arg_expr.kind != Expr::REF) return false;
-						BytecodeValueAccess access = {};
-						if (!bytecodeResolveValueAccess(module, ctx, arg_expr.right, &access)) return false;
-						if (!bytecodeEmitAddressOfValue(module, bytecode, ctx, access)) return false;
+				if (callee_ptr && !callee_ptr->is_nested) {
+					const FunctionDecl& callee = *callee_ptr;
+					i32 param_idx = 0;
+					if (expr.method_receiver >= 0) {
+						if (callee.params.empty()) return false;
+						const TypeRef* expected = !callee.params.empty() ? &callee.params[0].type : nullptr;
+						if (!callee.params.empty() && callee.params[0].is_ref) {
+							// Method-style calls still obey the same ref rules as normal calls.
+							// The receiver expression must be an explicit `ref ...` node, and
+							// we forward the underlying address instead of copying the value.
+							Expr& receiver_expr = module.expressions[expr.method_receiver];
+							if (receiver_expr.kind != Expr::REF) return false;
+							BytecodeValueAccess access = {};
+							if (!bytecodeResolveValueAccess(module, ctx, receiver_expr.right, &access)) return false;
+							if (!bytecodeEmitAddressOfValue(module, bytecode, ctx, access)) return false;
+						}
+						else if (!bytecodeCompileExpr(module, bytecode, ctx, expr.method_receiver, expected)) return false;
+						param_idx = 1;
 					}
-					else {
-						if (!bytecodeCompileExpr(module, bytecode, ctx, expr.args[i], expected)) return false;
+					if ((i32)callee.params.size() != (i32)expr.args.size() + (expr.method_receiver >= 0 ? 1 : 0)) return false;
+					for (i32 i = 0; i < expr.args.size(); ++i, ++param_idx) {
+						const TypeRef* expected = param_idx < callee.params.size() ? &callee.params[param_idx].type : nullptr;
+						if (param_idx < callee.params.size() && callee.params[param_idx].is_ref) {
+							// Ref parameters are not value arguments. The AST represents them
+							// explicitly as `Expr::REF`, so we resolve the pointed-to lvalue
+							// and pass its address to the VM.
+							Expr& arg_expr = module.expressions[expr.args[i]];
+							if (arg_expr.kind != Expr::REF) return false;
+							BytecodeValueAccess access = {};
+							if (!bytecodeResolveValueAccess(module, ctx, arg_expr.right, &access)) return false;
+							if (!bytecodeEmitAddressOfValue(module, bytecode, ctx, access)) return false;
+						}
+						else {
+							if (!bytecodeCompileExpr(module, bytecode, ctx, expr.args[i], expected)) return false;
+						}
 					}
+					pushCode(bytecode, BytecodeOp::CALL);
+					pushCode(bytecode, (u32)fn_idx);
+					return true;
 				}
-				pushCode(bytecode, BytecodeOp::CALL);
-				pushCode(bytecode, (u32)fn_idx);
-				return true;
 			}
 
 			i32 native_idx = -1;
@@ -1519,7 +1576,17 @@ static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, Byteco
 				}
 			}
 			if (native_idx >= 0) {
-				const NativeFunctionDecl& callee = module.native_functions[native_idx];
+				i32 idx = native_idx;
+				NativeFunctionDecl* callee_ptr = nullptr;
+				for (Unit& unit : module.units) {
+					if (idx < (i32)unit.native_functions.size()) {
+						callee_ptr = &unit.native_functions[(size_t)idx];
+						break;
+					}
+					idx -= (i32)unit.native_functions.size();
+				}
+				if (!callee_ptr) return false;
+				const NativeFunctionDecl& callee = *callee_ptr;
 				i32 param_idx = 0;
 				if (expr.method_receiver >= 0) {
 					if (callee.params.empty()) return false;
@@ -1733,9 +1800,19 @@ static bool bytecodeCompileStmt(ls_module& module, ls_bytecode& bytecode, Byteco
 				}
 				if (access.kind == BytecodeValueKind::GLOBAL) {
 					if (slot_count != 1 || access.slot < 0) return false;
+					const GlobalDecl* global_ptr = nullptr;
+					i32 global_idx = access.slot;
+					for (const Unit& unit : module.units) {
+						if (global_idx < (i32)unit.globals.size()) {
+							global_ptr = &unit.globals[(size_t)global_idx];
+							break;
+						}
+						global_idx -= (i32)unit.globals.size();
+					}
+					if (!global_ptr) return false;
 					switch (stmt.assign_op) {
 						case Token::EQUAL:
-							if (stmt.right >= 0 && !bytecodeCompileExpr(module, bytecode, ctx, stmt.right, &module.globals[access.slot].type)) return false;
+							if (stmt.right >= 0 && !bytecodeCompileExpr(module, bytecode, ctx, stmt.right, &global_ptr->type)) return false;
 							// Ordinary global assignment writes directly into the reserved
 							// module-state prefix. This path stays separate from operator
 							// lowering so a plain `=` never depends on overload resolution.
@@ -1748,8 +1825,8 @@ static bool bytecodeCompileStmt(ls_module& module, ls_bytecode& bytecode, Byteco
 						case Token::SLASH_EQUAL:
 							pushCode(bytecode, BytecodeOp::LOAD_GLOBAL);
 							pushCode(bytecode, (u32)access.slot);
-							if (stmt.right >= 0 && !bytecodeCompileExpr(module, bytecode, ctx, stmt.right, &access.type)) return false;
-							pushCode(bytecode, bytecodeCompoundArithmeticOp(stmt.assign_op, access.type.kind));
+							if (stmt.right >= 0 && !bytecodeCompileExpr(module, bytecode, ctx, stmt.right, &global_ptr->type)) return false;
+							pushCode(bytecode, bytecodeCompoundArithmeticOp(stmt.assign_op, global_ptr->type.kind));
 							pushCode(bytecode, BytecodeOp::STORE_GLOBAL);
 							pushCode(bytecode, (u32)access.slot);
 							return true;
@@ -1851,36 +1928,46 @@ static bool bytecodeCompileStmt(ls_module& module, ls_bytecode& bytecode, Byteco
 			const i32 global_idx = module.findGlobal(lhs.name);
 			if (global_idx < 0) return false;
 			// Global writes target the reserved module-state prefix.
+			const GlobalDecl* global_ptr = nullptr;
+			i32 remaining_global_idx = global_idx;
+			for (const Unit& unit : module.units) {
+				if (remaining_global_idx < (i32)unit.globals.size()) {
+					global_ptr = &unit.globals[(size_t)remaining_global_idx];
+					break;
+				}
+				remaining_global_idx -= (i32)unit.globals.size();
+			}
+			if (!global_ptr) return false;
 			switch (stmt.assign_op) {
 				case Token::EQUAL:
-					if (stmt.right >= 0 && !bytecodeCompileExpr(module, bytecode, ctx, stmt.right, &module.globals[global_idx].type)) return false;
-					return bytecodeEmitStoreGlobalValue(module, bytecode, global_idx, module.globals[global_idx].type);
+					if (stmt.right >= 0 && !bytecodeCompileExpr(module, bytecode, ctx, stmt.right, &global_ptr->type)) return false;
+					return bytecodeEmitStoreGlobalValue(module, bytecode, global_idx, global_ptr->type);
 				case Token::PLUS_EQUAL:
 				case Token::MINUS_EQUAL:
 				case Token::STAR_EQUAL:
-						case Token::SLASH_EQUAL:
-							if (stmt.resolved_function >= 0) {
-								// When compound assignment resolves to a user operator, we route
-								// through the same load/call/store shape used for locals. The only
-								// difference is that the final write targets the global prefix.
-								BytecodeValueAccess access = {};
-								access.kind = BytecodeValueKind::GLOBAL;
-								access.slot = global_idx;
-								access.type = module.globals[global_idx].type;
+				case Token::SLASH_EQUAL:
+					if (stmt.resolved_function >= 0) {
+						// When compound assignment resolves to a user operator, we route
+						// through the same load/call/store shape used for locals. The only
+						// difference is that the final write targets the global prefix.
+						BytecodeValueAccess access = {};
+						access.kind = BytecodeValueKind::GLOBAL;
+						access.slot = global_idx;
+						access.type = global_ptr->type;
 						if (!bytecodeEmitLoadValue(module, bytecode, ctx, access)) return false;
-						if (stmt.right >= 0 && !bytecodeCompileExpr(module, bytecode, ctx, stmt.right, &module.globals[global_idx].type)) return false;
+						if (stmt.right >= 0 && !bytecodeCompileExpr(module, bytecode, ctx, stmt.right, &global_ptr->type)) return false;
 						pushCode(bytecode, BytecodeOp::CALL);
 						pushCode(bytecode, (u32)stmt.resolved_function);
-						return bytecodeEmitStoreGlobalValue(module, bytecode, global_idx, module.globals[global_idx].type);
+						return bytecodeEmitStoreGlobalValue(module, bytecode, global_idx, global_ptr->type);
 					}
-					if (!isBytecodeIntegralType(module.globals[global_idx].type.kind) && !isBytecodeFloatType(module.globals[global_idx].type.kind)) return false;
+					if (!isBytecodeIntegralType(global_ptr->type.kind) && !isBytecodeFloatType(global_ptr->type.kind)) return false;
 					// Globals reuse the same arithmetic lowering as locals; the only
 					// difference is that the final write is indexed into the module's
 					// global prefix rather than a function frame.
 					pushCode(bytecode, BytecodeOp::LOAD_GLOBAL);
 					pushCode(bytecode, (u32)global_idx);
-					if (stmt.right >= 0 && !bytecodeCompileExpr(module, bytecode, ctx, stmt.right, &module.globals[global_idx].type)) return false;
-					pushCode(bytecode, bytecodeCompoundArithmeticOp(stmt.assign_op, module.globals[global_idx].type.kind));
+					if (stmt.right >= 0 && !bytecodeCompileExpr(module, bytecode, ctx, stmt.right, &global_ptr->type)) return false;
+					pushCode(bytecode, bytecodeCompoundArithmeticOp(stmt.assign_op, global_ptr->type.kind));
 					pushCode(bytecode, BytecodeOp::STORE_GLOBAL);
 					pushCode(bytecode, (u32)global_idx);
 					return true;
@@ -2090,7 +2177,7 @@ static bool bytecodeCompileFunction(ls_module& module, ls_bytecode& bytecode, Fu
 		ctx.addLocal(p.name, param_slot, slot_count, p.type, true, p.is_ref);
 		param_slot += slot_count;
 	}
-	out.param_count = param_slot;
+	out.param_slot_count = param_slot;
 	if (!bytecodeCompileStmt(module, bytecode, ctx, fn.body)) return false;
 
 	// Frame size and code span are finalized after the body is emitted.
@@ -2107,7 +2194,14 @@ static bool bytecodeCompileGlobals(ls_module& module, ls_bytecode& bytecode, con
 	// prefix even before initialization runs.
 	i32 global_slot = 0;
 	bytecode.global_init_code.clear();
-	if (module.globals.empty()) return true;
+	bool has_globals = false;
+	for (const Unit& unit : module.units) {
+		if (!unit.globals.empty()) {
+			has_globals = true;
+			break;
+		}
+	}
+	if (!has_globals) return true;
 
 	/*
 		Globals are stored in the same `stack` vector as call frames, but the first
@@ -2129,20 +2223,21 @@ static bool bytecodeCompileGlobals(ls_module& module, ls_bytecode& bytecode, con
 	BytecodeCompileContext ctx(init_fn);
 	ctx.pushScope();
 
-	for (i32 i = 0; i < module.globals.size(); ++i) {
-		GlobalDecl& global = module.globals[i];
-		const i32 slot_count = bytecodeTypeSlotCount(module, global.type);
-		if (slot_count <= 0) return false;
-		// Assign slot ranges before compiling any function bodies so reads and
-		// writes to globals can resolve the flattened offset immediately.
-		global.slot = global_slot;
-		global.slot_count = slot_count;
-		global_slot += slot_count;
-		if (global.expr < 0) continue;
-		// Global initializers are evaluated in declaration order, so later
-		// globals can read earlier ones.
-		if (!bytecodeCompileExpr(module, init_bytecode, ctx, global.expr, &global.type)) return false;
-		if (!bytecodeEmitStoreGlobalValue(module, init_bytecode, global.slot, global.type)) return false;
+	for (Unit& unit : module.units) {
+		for (GlobalDecl& global : unit.globals) {
+			const i32 slot_count = bytecodeTypeSlotCount(module, global.type);
+			if (slot_count <= 0) return false;
+			// Assign slot ranges before compiling any function bodies so reads and
+			// writes to globals can resolve the flattened offset immediately.
+			global.slot = global_slot;
+			global.slot_count = slot_count;
+			global_slot += slot_count;
+			if (global.expr < 0) continue;
+			// Global initializers are evaluated in declaration order, so later
+			// globals can read earlier ones.
+			if (!bytecodeCompileExpr(module, init_bytecode, ctx, global.expr, &global.type)) return false;
+			if (!bytecodeEmitStoreGlobalValue(module, init_bytecode, global.slot, global.type)) return false;
+		}
 	}
 
 	bytecode.global_count = global_slot;
@@ -2159,24 +2254,30 @@ ls_bytecode* compileBytecode(ls_module& module, const ls_host* host) {
 		: ::operator new(sizeof(ls_bytecode), std::nothrow);
 	ls_bytecode* bytecode = bytecode_mem ? ::new (bytecode_mem) ls_bytecode(bytecode_host) : nullptr;
 	if (!bytecode) return nullptr;
-	bytecode->native_functions.reserve(module.native_functions.size());
-	for (const NativeFunctionDecl& fn : module.native_functions) {
-		BytecodeNativeFunction out;
-		out.canonical_name = fn.canonical_name;
-		for (const Param& param : fn.params) out.params.push_back(toC(param.type));
-		out.return_type = toC(fn.return_type);
-		out.return_count = bytecodeTypeSlotCount(module, fn.return_type);
-		bytecode->native_functions.push_back(std::move(out));
+	i32 native_function_count = 0;
+	for (const Unit& unit : module.units) native_function_count += (i32)unit.native_functions.size();
+	bytecode->native_functions.reserve(native_function_count);
+	for (const Unit& unit : module.units) {
+		for (const NativeFunctionDecl& fn : unit.native_functions) {
+			BytecodeNativeFunction out;
+			out.canonical_name = fn.canonical_name;
+			for (const Param& param : fn.params) out.params.push_back(toC(param.type));
+			out.return_type = toC(fn.return_type);
+			out.return_count = bytecodeTypeSlotCount(module, fn.return_type);
+			bytecode->native_functions.push_back(std::move(out));
+		}
 	}
 	
 	if (!bytecodeCompileGlobals(module, *bytecode, bytecode_host)) {
 		ls_bytecode_destroy(bytecode);
 		return nullptr;
 	}
-	for (FunctionDecl& fn : module.functions) {
-		if (!bytecodeCompileFunction(module, *bytecode, fn)) {
-			ls_bytecode_destroy(bytecode);
-			return nullptr;
+	for (Unit& unit : module.units) {
+		for (FunctionDecl& fn : unit.functions) {
+			if (!bytecodeCompileFunction(module, *bytecode, fn)) {
+				ls_bytecode_destroy(bytecode);
+				return nullptr;
+			}
 		}
 	}
 	return bytecode;

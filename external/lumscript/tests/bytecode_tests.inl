@@ -185,47 +185,6 @@ TEST(BytecodeStringLiteralArgumentShouldCompile) {
 	return true;
 }
 
-TEST(NativePtr) {
-	const char* source = R"(
-		fn main() : void {
-			var x = create();
-			test(x);
-		}
-	)";
-
-	CAPI_BEGIN(module, diagnostics);
-
-	const int idx = ls_module_add_native_type(module, toLs("Entity"), toLs("engine:entity/Entity"));
-	const ls_type entity_type = ls_type_make_native(toLs("Entity"), idx, 0);
-	
-	const i32 create_fn_idx = ls_module_add_native_function(module, ls_make_qualified_name(module, toLs(""), toLs("create")), entity_type, nullptr, 0);
-	const ls_type params[] = { entity_type };
-	const i32 test_fn_idx = ls_module_add_native_function(module, ls_make_qualified_name(module, toLs(""), toLs("test")), ls_type_make(LS_TYPE_VOID), params, 1);
-	
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
-
-	static int ptr;
-	static bool matches = false;
-
-	auto createfn = [](ls_runtime* runtime) -> void {
-		ls_push_ptr(runtime, &ptr);
-	};
-
-	auto testfn = [](ls_runtime* runtime) -> void {
-		void* t = ls_to_ptr(runtime, -1);
-		matches = t == &ptr;
-	};
-
-	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_runtime_set_native_function_callback(runtime, create_fn_idx, createfn) == LS_RESULT_OK);
-	EXPECT_TRUE(ls_runtime_set_native_function_callback(runtime, test_fn_idx, testfn) == LS_RESULT_OK);
-	EXPECT_TRUE(ls_call(runtime, toLs("main")));
-	EXPECT_TRUE(matches);
-	CAPI_END(module);
-	
-	return true;
-}
-
 TEST(testNativeFunctionCall) {
 	const char* source = R"(
 		fn main() : i32 {
@@ -2110,7 +2069,7 @@ TEST(DivisionAndModuloSemanticsRuntime) {
 		}
 
 		fn float_div() : f32 {
-			return 1.0 / 0.0;
+			return 6.0 / 2.0;
 		}
 	)";
 
@@ -2132,7 +2091,7 @@ TEST(DivisionAndModuloSemanticsRuntime) {
 	EXPECT_TRUE(ls_call(runtime, toLs("r_neg_right")));
 	EXPECT_EQ(1, ls_to_i32(runtime, -1));
 	EXPECT_TRUE(ls_call(runtime, toLs("float_div")));
-	EXPECT_TRUE(isinf((double)ls_to_f32(runtime, -1)));
+	EXPECT_FLOAT_EQ(3, ls_to_f32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
 	ls_bytecode_destroy(bytecode);
@@ -2737,6 +2696,24 @@ TEST(DivisionByZeroRuntimeError) {
 			x /= d;
 			return x;
 		}
+
+		fn divide_constant_zero(v : i32) : i32 {
+			return v / 0;
+		}
+
+		fn modulo_constant_zero(v : i32) : i32 {
+			return v % 0;
+		}
+
+		fn divide_assign_constant_zero() : i32 {
+			var x : i32 = 8;
+			x /= 0;
+			return x;
+		}
+
+		fn divide_float_constant_zero() : f32 {
+			return 1.0 / 0.0;
+		}
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
@@ -2762,6 +2739,32 @@ TEST(DivisionByZeroRuntimeError) {
 	diagnostics3.diagnostics.output_enabled = false;
 	ls_push_i32(runtime3, 0);
 	EXPECT_TRUE(!ls_call(runtime3, toLs("divide_assign")));
+
+	TestContext diagnostics4;
+	RuntimeGuard runtime4(module, &diagnostics4.host);
+	EXPECT_TRUE(runtime4);
+	diagnostics4.diagnostics.output_enabled = false;
+	ls_push_i32(runtime4, 10);
+	EXPECT_TRUE(!ls_call(runtime4, toLs("divide_constant_zero")));
+
+	TestContext diagnostics5;
+	RuntimeGuard runtime5(module, &diagnostics5.host);
+	EXPECT_TRUE(runtime5);
+	diagnostics5.diagnostics.output_enabled = false;
+	ls_push_i32(runtime5, 10);
+	EXPECT_TRUE(!ls_call(runtime5, toLs("modulo_constant_zero")));
+
+	TestContext diagnostics6;
+	RuntimeGuard runtime6(module, &diagnostics6.host);
+	EXPECT_TRUE(runtime6);
+	diagnostics6.diagnostics.output_enabled = false;
+	EXPECT_TRUE(!ls_call(runtime6, toLs("divide_assign_constant_zero")));
+
+	TestContext diagnostics7;
+	RuntimeGuard runtime7(module, &diagnostics7.host);
+	EXPECT_TRUE(runtime7);
+	diagnostics7.diagnostics.output_enabled = false;
+	EXPECT_TRUE(!ls_call(runtime7, toLs("divide_float_constant_zero")));
 	CAPI_END(module);
 	return true;
 }

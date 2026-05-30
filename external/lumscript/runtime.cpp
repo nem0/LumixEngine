@@ -265,6 +265,7 @@ template <typename T>
 static inline bool bytecodeDivFloat(ls_runtime& runtime) {
 	const T rhs = popStack<T>(runtime);
 	const T lhs = popStack<T>(runtime);
+	if (rhs == T{}) return false;
 	pushStack(runtime, lhs / rhs);
 	return true;
 }
@@ -403,7 +404,7 @@ static bool callBytecodeFunctionValue(
 	if (!runtime || !runtime->bytecode) return false;
 	if ((size_t)fn_idx >= runtime->bytecode->functions.size()) return false;
 	BytecodeFunction& fn = runtime->bytecode->functions[fn_idx];
-	return callBytecodeCode(runtime, &runtime->bytecode->code[fn.code_offset], (size_t)fn.code_size, fn.param_count, fn.local_count, fn.return_count);
+	return callBytecodeCode(runtime, &runtime->bytecode->code[fn.code_offset], (size_t)fn.code_size, fn.param_slot_count, fn.local_count, fn.return_count);
 }
 
 static bool finishCall(ls_runtime& runtime, size_t frame_base, size_t result_stack_base, size_t result_count) {
@@ -595,7 +596,7 @@ static bool callBytecodeCode(
 				ip += sizeof(callee_idx);
 				if (callee_idx >= bytecode.functions.size()) return false;
 				BytecodeFunction& fn = bytecode.functions[callee_idx];
-				if (!callBytecodeCode(runtime, &bytecode.code[fn.code_offset], (size_t)fn.code_size, fn.param_count, fn.local_count, fn.return_count)) return false;
+				if (!callBytecodeCode(runtime, &bytecode.code[fn.code_offset], (size_t)fn.code_size, fn.param_slot_count, fn.local_count, fn.return_count)) return false;
 				break;
 			}
 			case BytecodeOp::CALL_NATIVE: {
@@ -876,10 +877,12 @@ void ls_push_null(ls_runtime* runtime) {
 
 ls_result ls_call_index(ls_runtime* runtime, i32 function_index) {
 	BytecodeFunction& fn = runtime->bytecode->functions[function_index];
-	if (fn.param_count != (i32)fn.params.size()) return LS_RESULT_FAILURE; // TODO why is there param_count when there's params?
+	// The VM frames are sized in stack slots, not source-level parameters.
+	// This keeps multi-slot values and `ref` parameters aligned with runtime layout.
+	if (fn.param_slot_count <= 0 && !fn.params.empty()) return LS_RESULT_FAILURE;
 
 	const size_t global_count = (size_t)runtime->bytecode->global_count;
-	if (runtime->stack.size() < global_count + fn.params.size()) return LS_RESULT_FAILURE;
+	if (runtime->stack.size() < global_count + (size_t)fn.param_slot_count) return LS_RESULT_FAILURE;
 
 	if (!runtime->globals_initialized) {
 		runtime->globals_initialized = true;
@@ -890,7 +893,7 @@ ls_result ls_call_index(ls_runtime* runtime, i32 function_index) {
 		}
 	}
 
-	return callBytecodeCode(runtime, &runtime->bytecode->code[fn.code_offset], (size_t)fn.code_size, fn.param_count, fn.local_count, fn.return_count) ? LS_RESULT_OK : LS_RESULT_FAILURE;
+	return callBytecodeCode(runtime, &runtime->bytecode->code[fn.code_offset], (size_t)fn.code_size, fn.param_slot_count, fn.local_count, fn.return_count) ? LS_RESULT_OK : LS_RESULT_FAILURE;
 }
 
 ls_result ls_call(ls_runtime* runtime, ls_string_view function_name) {

@@ -64,7 +64,6 @@ typedef enum ls_type_kind {
 	LS_TYPE_UNTYPED_FLOAT,
 	LS_TYPE_STRUCT,
 	LS_TYPE_ENUM,
-	LS_TYPE_NATIVE,
 	LS_TYPE_FUNCTION,
 	LS_TYPE_ARRAY,
 	LS_TYPE_NULL_VALUE,
@@ -93,12 +92,6 @@ typedef struct ls_type {
 	i32 array_size;
 	int nullable;
 } ls_type;
-
-// Enum member descriptor used by `ls_module_add_enum`.
-typedef struct ls_enum_member {
-	ls_string_view name;
-	i32 value;
-} ls_enum_member;
 
 // Native print callback used by `ls_host`.
 typedef void (*ls_print_fn)(void* userdata, ls_string_view msg);
@@ -152,7 +145,6 @@ void ls_module_destroy(ls_module* module);
 // Native types let scripts talk about engine objects by name, while native
 // functions expose host behavior to scripts.
 int ls_module_add_native_type(ls_module* module, ls_string_view name, ls_string_view id);
-int ls_module_add_enum(ls_module* module, ls_string_view name, const ls_enum_member* members, size_t member_count);
 int ls_module_add_native_function(
 	ls_module* module,
 	ls_string_view name,
@@ -259,16 +251,6 @@ ls_type_kind ls_bytecode_runtime_result_kind(ls_runtime* runtime, ls_string_view
 // internally.
 ls_string_view ls_make_qualified_name(ls_module* module, ls_string_view prefix, ls_string_view name);
 ls_type ls_type_make(ls_type_kind kind);
-ls_type ls_type_make_struct(ls_string_view name, i32 struct_index, int nullable);
-ls_type ls_type_make_enum(ls_string_view name, i32 struct_index, int nullable);
-ls_type ls_type_make_native(ls_string_view name, i32 struct_index, int nullable);
-ls_type ls_type_make_array(
-	ls_type_kind element_kind,
-	ls_string_view element_name,
-	i32 struct_index,
-	i32 array_size,
-	int nullable
-);
 
 #ifdef __cplusplus
 }

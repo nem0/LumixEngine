@@ -22,18 +22,28 @@ inline void deallocateMemory(const ls_host* host, void* ptr) {
 	}
 }
 
+struct CanonicalName {
+	ls_string_view path;
+	ls_string_view name;
+};
+
+inline bool equal(const CanonicalName& a, const CanonicalName& b) {
+	return equalStrings(a.name, b.name) && equalStrings(a.path, b.path);
+}
+
 struct TypeRef {
 	TypeRef() {}
-	TypeRef(ls_type_kind kind, ls_string_view name = {}, i32 struct_index = -1, Token token = {}, bool nullable = false)
+	TypeRef(ls_type_kind kind, ls_string_view unresolved_name = {}, i32 struct_index = -1, Token token = {}, bool nullable = false)
 		: kind(kind)
-		, name(name)
+		, unresolved_name(unresolved_name)
 		, struct_index(struct_index)
 		, token(token)
 		, nullable(nullable)
 	{}
 
 	ls_type_kind kind = LS_TYPE_INVALID;
-	ls_string_view name;
+	ls_string_view unresolved_name;
+	CanonicalName canonical_name = {};
 	i32 struct_index = -1;
 	ls_type_kind element_kind = LS_TYPE_INVALID;
 	ls_string_view element_name;
@@ -44,13 +54,14 @@ struct TypeRef {
 
 struct ls_module;
 
+// TODO make sure canonical names are resolved
 inline bool sameBaseType(const TypeRef& a, const TypeRef& b) {
 	if (a.kind != b.kind) return false;
 	if (a.kind == LS_TYPE_FUNCTION) return a.struct_index == b.struct_index;
-	if (a.kind == LS_TYPE_ARRAY) return a.array_size == b.array_size && a.element_kind == b.element_kind && (a.element_kind != LS_TYPE_STRUCT && a.element_kind != LS_TYPE_ENUM && a.element_kind != LS_TYPE_NATIVE ? true : (a.struct_index == b.struct_index || equalStrings(a.element_name, b.element_name)));
-	return a.kind != LS_TYPE_STRUCT && a.kind != LS_TYPE_ENUM && a.kind != LS_TYPE_NATIVE && a.kind != LS_TYPE_FUNCTION
+	if (a.kind == LS_TYPE_ARRAY) return a.array_size == b.array_size && a.element_kind == b.element_kind && (a.element_kind != LS_TYPE_STRUCT && a.element_kind != LS_TYPE_ENUM ? true : (a.struct_index == b.struct_index || equalStrings(a.element_name, b.element_name)));
+	return a.kind != LS_TYPE_STRUCT && a.kind != LS_TYPE_ENUM && a.kind != LS_TYPE_FUNCTION
 		? true
-		: a.struct_index == b.struct_index || equalStrings(a.name, b.name);
+		: a.struct_index == b.struct_index || equal(a.canonical_name, b.canonical_name);
 }
 
 struct Expr {
@@ -135,13 +146,13 @@ struct EnumMember {
 };
 
 struct EnumDecl {
-	ls_string_view name;
+	CanonicalName name;
 	std::vector<EnumMember> members;
 	Token token;
 };
 
 struct StructDecl {
-	ls_string_view name;
+	CanonicalName name;
 	std::vector<FieldDecl> fields;
 	Token token;
 };
@@ -166,7 +177,7 @@ struct FunctionDecl {
 };
 
 struct GlobalDecl {
-	ls_string_view name;
+	CanonicalName canonical_name;
 	TypeRef type;
 	i32 slot = -1;
 	i32 slot_count = 1;
@@ -183,13 +194,7 @@ struct ImportDecl {
 	bool processed = false;
 };
 
-struct NativeTypeDecl {
-	ls_string_view name;
-	ls_string_view id;
-};
-
 struct NativeFunctionDecl {
-	ls_string_view name;
 	ls_string_view canonical_name;
 	std::vector<Param> params;
 	TypeRef return_type;
@@ -201,6 +206,31 @@ struct FunctionTypeDecl {
 	TypeRef return_type;
 };
 
+struct Symbol {
+	enum Kind {
+		INVALID,
+
+		ENUM,
+		FN,
+		EXTERN_FN,
+		GLOBAL_VAR,
+		STRUCT
+	};
+	Kind kind = INVALID;
+	CanonicalName name;
+};
+
+struct Unit {
+	ls_string_view source_name;
+	std::vector<ImportDecl> imports;
+	std::vector<NativeFunctionDecl> native_functions;
+	std::vector<FunctionDecl> functions;
+	std::vector<GlobalDecl> globals;
+	std::vector<StructDecl> structs;
+	std::vector<EnumDecl> enums;
+	std::vector<Symbol> symbols;
+};
+
 struct ls_module {
 	explicit ls_module(const ls_host* host)
 		: host(host ? *host : ls_host{})
@@ -210,52 +240,145 @@ struct ls_module {
 		for (char* name : allocated_names) deallocateMemory(&host, name);
 	}
 
+	Unit& addUnit(ls_string_view source_name = {}) {
+		Unit& unit = units.emplace_back();
+		unit.source_name = source_name;
+		return unit;
+	}
+
+	i32 findGlobal(CanonicalName name) const {
+		i32 index = 0;
+		for (const Unit& unit : units) {
+			for (const GlobalDecl& global : unit.globals) {
+				if (equal(global.canonical_name, name)) return index;
+				++index;
+			}
+		}
+		return -1;
+	}
+
 	i32 findGlobal(ls_string_view name) const {
-		for (i32 i = 0; i < globals.size(); ++i) {
-			if (equalStrings(globals[i].name, name)) return i;
+		i32 index = 0;
+		for (const Unit& unit : units) {
+			for (const GlobalDecl& global : unit.globals) {
+				if (equalQualifiedName(global.canonical_name, name)) return index;
+				++index;
+			}
+		}
+		return -1;
+	}
+
+	i32 findStruct(CanonicalName name) const {
+		i32 index = 0;
+		for (const Unit& unit : units) {
+			for (const StructDecl& s : unit.structs) {
+				if (equalStrings(s.name.path, name.path) && equalStrings(s.name.name, name.name)) return index;
+				++index;
+			}
 		}
 		return -1;
 	}
 
 	i32 findStruct(ls_string_view name) const {
-		for (i32 i = 0; i < structs.size(); ++i) {
-			if (equalStrings(structs[i].name, name)) return i;
+		i32 index = 0;
+		ls_string_view a, b;
+		if (splitMemberName(name, &a, &b)) {
+			for (const Unit& unit : units) {
+				for (const StructDecl& s : unit.structs) {
+					if (equalStrings(s.name.path, a) && equalStrings(s.name.name, b )) return index;
+					++index;
+				}
+			}
+		}
+		else {
+			for (const Unit& unit : units) {
+				for (const StructDecl& s : unit.structs) {
+					if (equalStrings(s.name.name, name) && s.name.path.begin == s.name.path.end) return index;
+					++index;
+				}
+			}
 		}
 		return -1;
 	}
 
 	i32 findFunction(ls_string_view name) const {
-		for (i32 i = 0; i < functions.size(); ++i) {
-			if (!functions[i].is_nested && equalStrings(functions[i].name, name)) return i;
+		i32 index = 0;
+		for (const Unit& unit : units) {
+			for (const FunctionDecl& fn : unit.functions) {
+				if (!fn.is_nested && equalStrings(fn.name, name)) return index;
+				++index;
+			}
 		}
 		return -1;
 	}
 
 	i32 findNativeFunction(ls_string_view name) const {
-		for (i32 i = 0; i < native_functions.size(); ++i) {
-			if (equalStrings(native_functions[i].name, name)) return i;
-			if (!empty(native_functions[i].canonical_name) && equalStrings(native_functions[i].canonical_name, name)) return i;
+		i32 index = 0;
+		for (const Unit& unit : units) {
+			for (const NativeFunctionDecl& fn : unit.native_functions) {
+				if (equalStrings(fn.canonical_name, name)) return index;
+				++index;
+			}
 		}
 		return -1;
 	}
 
+	i32 findEnum(CanonicalName name) const {
+		i32 index = 0;
+		for (const Unit& unit : units) {
+			for (const EnumDecl& e : unit.enums) {
+				if (equalStrings(e.name.path, name.path) && equalStrings(e.name.name, name.name)) return index;
+				++index;
+			}
+		}
+		return -1;
+	}
+
+	bool splitMemberName(ls_string_view name, ls_string_view* owner, ls_string_view* member) const {
+		for (const char* c = data(name) + size(name); c != data(name); --c) {
+			if (*(c - 1) != '.') continue;
+			*owner = ls_string_view{data(name), c - 1};
+			*member = ls_string_view{c, data(name) + size(name)};
+			return true;
+		}
+		return false;
+	}
+
+	bool equalQualifiedName(CanonicalName canonical_name, ls_string_view name) const {
+		ls_string_view owner;
+		ls_string_view member;
+		if (splitMemberName(name, &owner, &member)) {
+			return equalStrings(canonical_name.path, owner) && equalStrings(canonical_name.name, member);
+		}
+		return empty(canonical_name.path) && equalStrings(canonical_name.name, name);
+	}
+
+	// TODO
 	i32 findEnum(ls_string_view name) const {
-		for (i32 i = 0; i < enums.size(); ++i) {
-			if (equalStrings(enums[i].name, name)) return i;
+		i32 index = 0;
+		ls_string_view a, b;
+		if (splitMemberName(name, &a, &b)) {
+			for (const Unit& unit : units) {
+				for (const EnumDecl& e : unit.enums) {
+					if (equalStrings(e.name.path, a) && equalStrings(e.name.name, b )) return index;
+					++index;
+				}
+			}
 		}
-		return -1;
-	}
-
-	i32 findNativeType(ls_string_view name) const {
-		for (i32 i = 0; i < native_types.size(); ++i) {
-			if (equalStrings(native_types[i].name, name)) return i;
+		else {
+			for (const Unit& unit : units) {
+				for (const EnumDecl& e : unit.enums) {
+					if (equalStrings(e.name.name, name) && e.name.path.begin == e.name.path.end) return index;
+					++index;
+				}
+			}
 		}
 		return -1;
 	}
 
 	i32 findEnumMember(const EnumDecl& e, ls_string_view name) const {
-		for (i32 i = 0; i < e.members.size(); ++i) {
-			if (equalStrings(e.members[i].name, name)) return i;
+		for (i32 i = 0; i < (i32)e.members.size(); ++i) {
+			if (equalStrings(e.members[(size_t)i].name, name)) return i;
 		}
 		return -1;
 	}
@@ -282,13 +405,7 @@ struct ls_module {
 	}
 
 	ls_host host;
-	std::vector<ImportDecl> imports;
-	std::vector<NativeFunctionDecl> native_functions;
-	std::vector<FunctionDecl> functions;
-	std::vector<GlobalDecl> globals;
-	std::vector<StructDecl> structs;
-	std::vector<NativeTypeDecl> native_types;
-	std::vector<EnumDecl> enums;
+	std::vector<Unit> units;
 	std::vector<FunctionTypeDecl> function_types;
 	std::vector<Expr> expressions;
 	std::vector<Stmt> statements;
