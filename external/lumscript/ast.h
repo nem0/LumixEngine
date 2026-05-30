@@ -83,6 +83,7 @@ struct Expr {
 	i32 left = -1;
 	i32 right = -1;
 	i32 method_receiver = -1;
+	i32 resolved_function = -1;
 	std::vector<i32> args;
 	TypeRef type;
 	TypeRef cast_type;
@@ -103,6 +104,7 @@ struct Stmt {
 	i32 left = -1;
 	i32 right = -1;
 	i32 local_index = -1;
+	i32 resolved_function = -1;
 	Token::Type assign_op = Token::EQUAL;
 };
 
@@ -159,6 +161,8 @@ struct FunctionDecl {
 	i32 body = -1;
 	Token token;
 	bool is_nested = false;
+	bool is_operator = false;
+	Token::Type operator_token = Token::END_OF_FILE;
 };
 
 struct GlobalDecl {

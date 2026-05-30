@@ -21,6 +21,7 @@ struct Parser {
 			else if (match(Token::STRUCT)) parseStruct();
 			else if (match(Token::ENUM)) parseEnum();
 			else if (match(Token::FN)) parseFunction(false);
+			else if (match(Token::OPERATOR)) parseOperator();
 			else if (peek().type == Token::VAR || peek().type == Token::CONST) parseGlobal();
 			else error(peek(), "Expected declaration");
 		}
@@ -261,6 +262,56 @@ struct Parser {
 		consume(Token::COLON);
 		m_module.functions[fn_idx].return_type = parseType();
 		m_module.functions[fn_idx].body = parseBlock();
+		return fn_idx;
+	}
+
+	i32 parseOperator() {
+		Token op = consumeToken();
+		if (op.type != Token::PLUS
+			&& op.type != Token::MINUS
+			&& op.type != Token::STAR
+			&& op.type != Token::SLASH
+			&& op.type != Token::PERCENT
+			&& op.type != Token::EQUAL_EQUAL
+			&& op.type != Token::BANG_EQUAL
+			&& op.type != Token::GT
+			&& op.type != Token::LT
+			&& op.type != Token::GT_EQUAL
+			&& op.type != Token::LT_EQUAL
+			&& op.type != Token::AND
+			&& op.type != Token::OR
+			&& op.type != Token::NOT) {
+			error(op, "Expected operator");
+			return -1;
+		}
+		m_module.functions.emplace_back();
+		const i32 fn_idx = (i32)m_module.functions.size() - 1;
+		FunctionDecl& fn = m_module.functions[fn_idx];
+		fn.is_operator = true;
+		fn.operator_token = op.type;
+		std::string unique_name = std::string(data(m_declaration_prefix), size(m_declaration_prefix));
+		if (!unique_name.empty()) unique_name.push_back('.');
+		unique_name += "__operator.";
+		unique_name += std::to_string(m_operator_counter++);
+		fn.name = m_module.copyName(ls_string_view{unique_name.c_str(), unique_name.c_str() + unique_name.size()});
+		fn.local_name = op.value;
+		fn.token = op;
+		if (!consume(Token::LEFT_PAREN)) return fn_idx;
+		while (peek().type != Token::RIGHT_PAREN && peek().type != Token::END_OF_FILE && !m_output.has_error) {
+			if (!fn.params.empty()) consume(Token::COMMA);
+			Token param_name;
+			if (!consume(Token::IDENTIFIER, &param_name)) return fn_idx;
+			consume(Token::COLON);
+			Param& p = fn.params.emplace_back();
+			p.name = param_name.value;
+			p.token = param_name;
+			p.is_ref = match(Token::REF);
+			p.type = parseType();
+		}
+		consume(Token::RIGHT_PAREN);
+		consume(Token::COLON);
+		fn.return_type = parseType();
+		fn.body = parseBlock();
 		return fn_idx;
 	}
 
@@ -735,6 +786,7 @@ struct Parser {
 	ls_string_view m_declaration_prefix;
 	bool m_allow_constructor = true;
 	i32 m_nested_function_counter = 0;
+	i32 m_operator_counter = 0;
 };
 
 bool parse(ls_module& module, ls_string_view source, ls_string_view declaration_prefix, ls_string_view source_name) {

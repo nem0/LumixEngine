@@ -917,6 +917,20 @@ static bool bytecodeEmitStoreValue(ls_module& module, ls_bytecode& bytecode, i32
 	return true;
 }
 
+static bool bytecodeEmitStoreGlobalValue(ls_module& module, ls_bytecode& bytecode, i32 slot, const TypeRef& type) {
+	const i32 slot_count = bytecodeTypeSlotCount(module, type);
+	if (slot_count <= 0) return false;
+	if (slot < 0) return false;
+	// `STORE_GLOBAL` consumes one flattened slot at a time, so multi-slot globals
+	// are written back-to-front to preserve the same slot ordering used by local
+	// struct stores and by the runtime's stack layout.
+	for (i32 i = slot_count - 1; i >= 0; --i) {
+		pushCode(bytecode, BytecodeOp::STORE_GLOBAL);
+		pushCode(bytecode, (u32)(slot + i));
+	}
+	return true;
+}
+
 static bool bytecodeEmitNullValue(ls_module& module, ls_bytecode& bytecode, const TypeRef& type) {
 	if (!type.nullable) return false;
 	// Nullable values are encoded as a leading presence tag followed by the
@@ -1083,19 +1097,6 @@ static bool bytecodeEmitCastValue(ls_bytecode& bytecode, ls_type_kind src_kind, 
 	pushCode(bytecode, BytecodeOp::CAST);
 	pushCode(bytecode, (u8)bytecodeCastKind(src_kind));
 	pushCode(bytecode, (u8)bytecodeCastKind(dst_kind));
-	return true;
-}
-
-static bool bytecodeEmitStoreGlobalValue(ls_module& module, ls_bytecode& bytecode, i32 slot, const TypeRef& type) {
-	const i32 slot_count = bytecodeTypeSlotCount(module, type);
-	if (slot_count <= 0) return false;
-	// Store globals back-to-front so the top of the stack always contains the
-	// first field/slot when the helper returns.
-	for (i32 i = slot_count - 1; i >= 0; --i) {
-		if (slot + i < 0) return false;
-		pushCode(bytecode, BytecodeOp::STORE_GLOBAL);
-		pushCode(bytecode, (u32)(slot + i));
-	}
 	return true;
 }
 
@@ -1318,6 +1319,14 @@ static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, Byteco
 			return true;
 		}
 		case Expr::UNARY: {
+			if (expr.resolved_function >= 0) {
+				// Overloaded unary operators are ordinary function calls once type
+				// checking has resolved the exact target function.
+				if (!bytecodeCompileExpr(module, bytecode, ctx, expr.right)) return false;
+				pushCode(bytecode, BytecodeOp::CALL);
+				pushCode(bytecode, (u32)expr.resolved_function);
+				return true;
+			}
 			// Unary plus is a no-op. Unary minus becomes `0 - value` so the backend
 			// can reuse the same typed arithmetic opcodes as normal subtraction.
 			if (expr.token.type == Token::PLUS) return bytecodeCompileExpr(module, bytecode, ctx, expr.right);
@@ -1335,6 +1344,15 @@ static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, Byteco
 			return true;
 		}
 		case Expr::BINARY: {
+			if (expr.resolved_function >= 0) {
+				// Binary operator overloads follow the same lowering pattern: evaluate
+				// both operands, then call the resolved declaration directly.
+				if (!bytecodeCompileExpr(module, bytecode, ctx, expr.left)) return false;
+				if (!bytecodeCompileExpr(module, bytecode, ctx, expr.right)) return false;
+				pushCode(bytecode, BytecodeOp::CALL);
+				pushCode(bytecode, (u32)expr.resolved_function);
+				return true;
+			}
 			// Binary expressions are split by operator family to preserve operand
 			// order and the correct runtime opcode shape. Arithmetic lowering is
 			// intentionally direct: evaluate both sides, then emit the width-specific
@@ -1648,6 +1666,16 @@ static bool bytecodeCompileStmt(ls_module& module, ls_bytecode& bytecode, Byteco
 					// Ref-backed field assignments use the same value shape as ordinary
 					// stores, but the destination is reached through an address instead
 					// of direct frame-relative slots.
+					if (stmt.resolved_function >= 0) {
+						if (!bytecodeEmitLoadValue(module, bytecode, ctx, access)) return false;
+						if (stmt.right >= 0 && !bytecodeCompileExpr(module, bytecode, ctx, stmt.right, &access.type)) return false;
+						pushCode(bytecode, BytecodeOp::CALL);
+						pushCode(bytecode, (u32)stmt.resolved_function);
+						if (!bytecodeEmitAddressOfValue(module, bytecode, ctx, access)) return false;
+						pushCode(bytecode, BytecodeOp::STORE_INDIRECT);
+						pushCode(bytecode, (u8)slot_count);
+						return true;
+					}
 					switch (stmt.assign_op) {
 						case Token::EQUAL:
 							if (stmt.right >= 0 && !bytecodeCompileExpr(module, bytecode, ctx, stmt.right, &access.type)) return false;
@@ -1673,6 +1701,14 @@ static bool bytecodeCompileStmt(ls_module& module, ls_bytecode& bytecode, Byteco
 				}
 				if (access.kind == BytecodeValueKind::LOCAL) {
 					if (access.slot < 0 || access.slot + slot_count > 256) return false;
+					if (stmt.resolved_function >= 0) {
+						if (!bytecodeEmitLoadValue(module, bytecode, ctx, access)) return false;
+						if (stmt.right >= 0 && !bytecodeCompileExpr(module, bytecode, ctx, stmt.right, &access.type)) return false;
+						pushCode(bytecode, BytecodeOp::CALL);
+						pushCode(bytecode, (u32)stmt.resolved_function);
+						if (!bytecodeEmitStoreValue(module, bytecode, access.slot, access.type)) return false;
+						return true;
+					}
 					switch (stmt.assign_op) {
 						case Token::EQUAL:
 							if (stmt.right >= 0 && !bytecodeCompileExpr(module, bytecode, ctx, stmt.right, &access.type)) return false;
@@ -1700,6 +1736,9 @@ static bool bytecodeCompileStmt(ls_module& module, ls_bytecode& bytecode, Byteco
 					switch (stmt.assign_op) {
 						case Token::EQUAL:
 							if (stmt.right >= 0 && !bytecodeCompileExpr(module, bytecode, ctx, stmt.right, &module.globals[access.slot].type)) return false;
+							// Ordinary global assignment writes directly into the reserved
+							// module-state prefix. This path stays separate from operator
+							// lowering so a plain `=` never depends on overload resolution.
 							pushCode(bytecode, BytecodeOp::STORE_GLOBAL);
 							pushCode(bytecode, (u32)access.slot);
 							return true;
@@ -1727,6 +1766,16 @@ static bool bytecodeCompileStmt(ls_module& module, ls_bytecode& bytecode, Byteco
 				// Local stores use frame-relative slot ranges, so structs can be
 				// assigned without changing the stack representation.
 				if (local_slot < 0 || local_slot + slot_count > 256) return false;
+				BytecodeValueAccess access = {};
+				if (!bytecodeResolveValueAccess(module, ctx, stmt.left, &access)) return false;
+				if (stmt.resolved_function >= 0) {
+					if (!bytecodeEmitLoadValue(module, bytecode, ctx, access)) return false;
+					if (stmt.right >= 0 && !bytecodeCompileExpr(module, bytecode, ctx, stmt.right, &local_binding->type)) return false;
+					pushCode(bytecode, BytecodeOp::CALL);
+					pushCode(bytecode, (u32)stmt.resolved_function);
+					if (!bytecodeEmitStoreValue(module, bytecode, access.slot, access.type)) return false;
+					return true;
+				}
 				switch (stmt.assign_op) {
 					case Token::EQUAL:
 						if (stmt.right >= 0 && !bytecodeCompileExpr(module, bytecode, ctx, stmt.right, &local_binding->type)) return false;
@@ -1766,6 +1815,16 @@ static bool bytecodeCompileStmt(ls_module& module, ls_bytecode& bytecode, Byteco
 				// A ref parameter is itself just one slot holding an address. The
 				// actual write still uses the pointed-to target, so the assignment is
 				// lowered with the same indirect helpers as `Expr::REF` calls.
+				if (stmt.resolved_function >= 0) {
+					if (!bytecodeEmitLoadValue(module, bytecode, ctx, access)) return false;
+					if (stmt.right >= 0 && !bytecodeCompileExpr(module, bytecode, ctx, stmt.right, &access.type)) return false;
+					pushCode(bytecode, BytecodeOp::CALL);
+					pushCode(bytecode, (u32)stmt.resolved_function);
+					if (!bytecodeEmitAddressOfValue(module, bytecode, ctx, access)) return false;
+					pushCode(bytecode, BytecodeOp::STORE_INDIRECT);
+					pushCode(bytecode, (u8)slot_count);
+					return true;
+				}
 				switch (stmt.assign_op) {
 					case Token::EQUAL:
 						if (stmt.right >= 0 && !bytecodeCompileExpr(module, bytecode, ctx, stmt.right, &access.type)) return false;
@@ -1795,13 +1854,26 @@ static bool bytecodeCompileStmt(ls_module& module, ls_bytecode& bytecode, Byteco
 			switch (stmt.assign_op) {
 				case Token::EQUAL:
 					if (stmt.right >= 0 && !bytecodeCompileExpr(module, bytecode, ctx, stmt.right, &module.globals[global_idx].type)) return false;
-					pushCode(bytecode, BytecodeOp::STORE_GLOBAL);
-					pushCode(bytecode, (u32)global_idx);
-					return true;
+					return bytecodeEmitStoreGlobalValue(module, bytecode, global_idx, module.globals[global_idx].type);
 				case Token::PLUS_EQUAL:
 				case Token::MINUS_EQUAL:
 				case Token::STAR_EQUAL:
-				case Token::SLASH_EQUAL:
+						case Token::SLASH_EQUAL:
+							if (stmt.resolved_function >= 0) {
+								// When compound assignment resolves to a user operator, we route
+								// through the same load/call/store shape used for locals. The only
+								// difference is that the final write targets the global prefix.
+								BytecodeValueAccess access = {};
+								access.kind = BytecodeValueKind::GLOBAL;
+								access.slot = global_idx;
+								access.type = module.globals[global_idx].type;
+						if (!bytecodeEmitLoadValue(module, bytecode, ctx, access)) return false;
+						if (stmt.right >= 0 && !bytecodeCompileExpr(module, bytecode, ctx, stmt.right, &module.globals[global_idx].type)) return false;
+						pushCode(bytecode, BytecodeOp::CALL);
+						pushCode(bytecode, (u32)stmt.resolved_function);
+						return bytecodeEmitStoreGlobalValue(module, bytecode, global_idx, module.globals[global_idx].type);
+					}
+					if (!isBytecodeIntegralType(module.globals[global_idx].type.kind) && !isBytecodeFloatType(module.globals[global_idx].type.kind)) return false;
 					// Globals reuse the same arithmetic lowering as locals; the only
 					// difference is that the final write is indexed into the module's
 					// global prefix rather than a function frame.

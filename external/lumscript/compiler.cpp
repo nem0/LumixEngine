@@ -49,6 +49,51 @@ static ls_string_view stringView(const std::string& value) {
 	return ls_string_view{value.c_str(), value.c_str() + value.size()};
 }
 
+static bool isOverloadableOperatorToken(Token::Type type) {
+	// Keep this list explicit so the language surface stays easy to audit.
+	// Anything not listed here is either a fixed built-in token or a boolean
+	// short-circuit operator that intentionally keeps its special semantics.
+	switch (type) {
+		case Token::PLUS:
+		case Token::MINUS:
+		case Token::STAR:
+		case Token::SLASH:
+		case Token::PERCENT:
+		case Token::EQUAL_EQUAL:
+		case Token::BANG_EQUAL:
+		case Token::GT:
+		case Token::LT:
+		case Token::GT_EQUAL:
+		case Token::LT_EQUAL:
+			return true;
+		default:
+			return false;
+	}
+}
+
+static bool isBuiltinOperatorType(ls_type_kind kind) {
+	switch (kind) {
+		case LS_TYPE_BOOL:
+		case LS_TYPE_ENUM:
+		case LS_TYPE_STRING:
+		case LS_TYPE_I8:
+		case LS_TYPE_U8:
+		case LS_TYPE_I16:
+		case LS_TYPE_U16:
+		case LS_TYPE_I32:
+		case LS_TYPE_U32:
+		case LS_TYPE_I64:
+		case LS_TYPE_U64:
+		case LS_TYPE_F32:
+		case LS_TYPE_F64:
+		case LS_TYPE_UNTYPED_INT:
+		case LS_TYPE_UNTYPED_FLOAT:
+			return true;
+		default:
+			return false;
+	}
+}
+
 struct Checker {
 	Checker(ls_module& module)
 		: m_module(module)
@@ -151,6 +196,56 @@ struct Checker {
 		for (NativeFunctionDecl& fn : m_module.native_functions) {
 			for (Param& p : fn.params) resolveType(p.type);
 			resolveType(fn.return_type);
+		}
+		for (FunctionDecl& fn : m_module.functions) {
+			if (fn.is_nested || !fn.is_operator) continue;
+			// Operator declarations are validated in a separate pass so normal
+			// functions keep their existing rules and operator-specific policy stays
+			// centralized in one place.
+			if (!isOverloadableOperatorToken(fn.operator_token)) {
+				m_output.errorAt(fn.token, "Operator is not overloadable");
+				return false;
+			}
+			if (fn.operator_token == Token::MINUS && fn.params.size() != 1 && fn.params.size() != 2) {
+				m_output.errorAt(fn.token, "Invalid operator declaration");
+				return false;
+			}
+			if (fn.operator_token != Token::MINUS && fn.params.size() != 2) {
+				m_output.errorAt(fn.token, "Invalid operator declaration");
+				return false;
+			}
+			for (Param& p : fn.params) resolveType(p.type);
+			resolveType(fn.return_type);
+			const bool unary_minus = fn.operator_token == Token::MINUS && fn.params.size() == 1;
+			// Built-in primitive operators are reserved: the overload system only
+			// applies to user-defined types. This keeps numeric and boolean behavior
+			// stable even when modules import extra operator declarations.
+			const bool primitive_signature = unary_minus
+				? isBuiltinOperatorType(fn.params[0].type.kind)
+				: isBuiltinOperatorType(fn.params[0].type.kind) && isBuiltinOperatorType(fn.params[1].type.kind);
+			if (primitive_signature) {
+				m_output.errorAt(fn.token, "Can not overload built-in primitive operator");
+				return false;
+			}
+			// Duplicate detection is based on the resolved signature, not the source
+			// spelling. That means imported aliases or equivalent canonical names do
+			// not create distinct operator identities.
+			for (const FunctionDecl& prev : m_module.functions) {
+				if (&prev == &fn) break;
+				if (prev.is_nested || !prev.is_operator) continue;
+				if (prev.operator_token != fn.operator_token) continue;
+				if (prev.params.size() != fn.params.size()) continue;
+				bool same = true;
+				for (i32 i = 0; i < fn.params.size(); ++i) {
+					if (!sameResolvedType(prev.params[i].type, fn.params[i].type)) {
+						same = false;
+						break;
+					}
+				}
+				if (!same) continue;
+				m_output.errorAt(fn.token, "Duplicate operator declaration");
+				return false;
+			}
 		}
 		checkGlobals();
 		for (FunctionDecl& fn : m_module.functions) {
@@ -649,6 +744,34 @@ struct Checker {
 		return isNumeric(left) && isNumeric(right) && sameBaseType(left, right);
 	}
 
+		bool resolveOperatorOverload(Token::Type op, std::span<const TypeRef> operands, Token token, i32* fn_idx) {
+			*fn_idx = -1;
+			// Overload lookup is deliberately strict: if the operand types do not
+			// already match a declared signature exactly, we fall back to the built-in
+			// operator path instead of inventing implicit conversions.
+			for (i32 i = 0; i < m_module.functions.size(); ++i) {
+				FunctionDecl& fn = m_module.functions[i];
+			if (fn.is_nested || !fn.is_operator || fn.operator_token != op) continue;
+			if (fn.params.size() != operands.size()) continue;
+			bool same = true;
+			for (i32 j = 0; j < fn.params.size(); ++j) {
+				if (!sameResolvedType(fn.params[j].type, operands[j])) {
+					same = false;
+					break;
+				}
+				}
+				if (!same) continue;
+				if (*fn_idx >= 0) {
+					// Two equal matches would make the expression depend on declaration
+					// order, so we reject it instead of guessing.
+					m_output.errorAt(token, "Operator overload is ambiguous");
+					return false;
+				}
+			*fn_idx = i;
+		}
+		return true;
+	}
+
 	bool getNullablePromotion(i32 expr_idx, ls_string_view* var_name, TypeRef* promoted_type, bool* promote_true_branch) {
 		if (expr_idx < 0) return false;
 		Expr& cond = m_module.expressions[expr_idx];
@@ -1032,8 +1155,29 @@ struct Checker {
 					m_output.errorAt(e.token, "Nullable value must be checked for null");
 					return {};
 				}
+				if (e.token.type == Token::MINUS) {
+					i32 fn_idx = -1;
+					// Unary minus can be overloaded for user types, but primitives still
+					// use the built-in numeric lowering. That keeps `-i32` and `-f32`
+					// predictable even when a module defines custom operator overloads.
+					if (!isBuiltinOperatorType(right.kind)
+						&& resolveOperatorOverload(Token::MINUS, std::span<const TypeRef>(&right, 1), e.token, &fn_idx)
+						&& fn_idx >= 0) {
+						e.resolved_function = fn_idx;
+						e.type = m_module.functions[fn_idx].return_type;
+						return e.type;
+					}
+					if (!isNumeric(right)) {
+						m_output.errorAt(e.token, "Unary minus requires numeric operand");
+						return {};
+					}
+				}
 				if (e.token.type == Token::NOT) e.type = {LS_TYPE_BOOL, {}, -1};
 				else e.type = right;
+				if (e.token.type == Token::NOT && right.kind != LS_TYPE_BOOL) {
+					m_output.errorAt(e.token, "Boolean operation requires bool operand");
+					return {};
+				}
 				return e.type;
 			}
 			case Expr::REF: {
@@ -1047,11 +1191,7 @@ struct Checker {
 				TypeRef left = checkExpr(e.left, operand_expected);
 				// For comparisons, pass the left operand's type as expected type to the right
 				TypeRef right = checkExpr(e.right, &left);
-				if (left.kind == LS_TYPE_STRING || right.kind == LS_TYPE_STRING) {
-					if (e.token.type != Token::PLUS || left.kind != LS_TYPE_STRING || right.kind != LS_TYPE_STRING) {
-						m_output.errorAt(e.token, "String operation requires string operands");
-						return {};
-					}
+				if (e.token.type == Token::PLUS && left.kind == LS_TYPE_STRING && right.kind == LS_TYPE_STRING) {
 					e.type = {LS_TYPE_STRING, {}, -1};
 					return e.type;
 				}
@@ -1064,6 +1204,19 @@ struct Checker {
 				if (is_eq && !null_cmp && (left.nullable || right.nullable)) {
 					m_output.errorAt(e.token, "Nullable value must be checked for null");
 					return {};
+				}
+				if (isOverloadableOperatorToken(e.token.type)) {
+					TypeRef operands[] = {left, right};
+					i32 fn_idx = -1;
+					// Operator expressions lower to a direct function call when an exact
+					// match exists. If no overload matches, the checker continues into the
+					// legacy built-in rules below.
+					if (!resolveOperatorOverload(e.token.type, std::span<const TypeRef>(operands, 2), e.token, &fn_idx)) return {};
+					if (fn_idx >= 0) {
+						e.resolved_function = fn_idx;
+						e.type = m_module.functions[fn_idx].return_type;
+						return e.type;
+					}
 				}
 				switch (e.token.type) {
 					case Token::GT: case Token::LT: case Token::GT_EQUAL: case Token::LT_EQUAL:
@@ -1390,10 +1543,37 @@ struct Checker {
 			}
 			case Stmt::EXPR: checkExpr(stmt.expr); break;
 			case Stmt::ASSIGN: {
+				stmt.resolved_function = -1;
 				TypeRef left = checkExpr(stmt.left);
 				TypeRef right = checkExpr(stmt.right, &left);
-				if (!canAssign(left, right)) m_output.errorAt(stmt.token, "Assignment type mismatch");
-				if (stmt.assign_op == Token::SLASH_EQUAL
+				if (stmt.assign_op != Token::EQUAL
+					&& !isBuiltinOperatorType(left.kind)) {
+					Token::Type op = Token::END_OF_FILE;
+					switch (stmt.assign_op) {
+						case Token::PLUS_EQUAL: op = Token::PLUS; break;
+						case Token::MINUS_EQUAL: op = Token::MINUS; break;
+						case Token::STAR_EQUAL: op = Token::STAR; break;
+						case Token::SLASH_EQUAL: op = Token::SLASH; break;
+						default: break;
+					}
+					if (op != Token::END_OF_FILE) {
+						TypeRef operands[] = {left, right};
+						i32 fn_idx = -1;
+						// Compound assignment on user types is normalized to the matching
+						// binary operator, then the result is written back through the same
+						// assignment rules used for ordinary stores.
+						if (!resolveOperatorOverload(op, std::span<const TypeRef>(operands, 2), stmt.token, &fn_idx)) return;
+						if (fn_idx >= 0) {
+							stmt.resolved_function = fn_idx;
+							if (!canAssign(left, m_module.functions[fn_idx].return_type)) {
+								m_output.errorAt(stmt.token, "Assignment type mismatch");
+							}
+						}
+					}
+				}
+				if (stmt.resolved_function < 0 && !canAssign(left, right)) m_output.errorAt(stmt.token, "Assignment type mismatch");
+				if (stmt.resolved_function < 0
+					&& stmt.assign_op == Token::SLASH_EQUAL
 					&& isIntegral(left)
 					&& isIntegral(right)
 					&& isCompileTimeZero(stmt.right)) {

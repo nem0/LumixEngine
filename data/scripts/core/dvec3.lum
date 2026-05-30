@@ -3,3 +3,51 @@ struct DVec3 {
 	y : f64;
 	z : f64;
 };
+
+operator +(a : DVec3, b : DVec3) : DVec3 {
+	return DVec3 {
+		a.x + b.x,
+		a.y + b.y,
+		a.z + b.z
+	};
+}
+
+operator -(a : DVec3, b : DVec3) : DVec3 {
+	return DVec3 {
+		a.x - b.x,
+		a.y - b.y,
+		a.z - b.z
+	};
+}
+
+operator -(a : DVec3) : DVec3 {
+	return DVec3 {
+		-a.x,
+		-a.y,
+		-a.z
+	};
+}
+
+operator *(a : DVec3, b : f64) : DVec3 {
+	return DVec3 {
+		a.x * b,
+		a.y * b,
+		a.z * b
+	};
+}
+
+operator *(a : f64, b : DVec3) : DVec3 {
+	return DVec3 {
+		a * b.x,
+		a * b.y,
+		a * b.z
+	};
+}
+
+operator /(a : DVec3, b : f64) : DVec3 {
+	return DVec3 {
+		a.x / b,
+		a.y / b,
+		a.z / b
+	};
+}

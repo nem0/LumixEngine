@@ -2402,6 +2402,67 @@ TEST(GlobalVariablesRuntime) {
 	return true;
 }
 
+TEST(CustomOperatorGlobalCompoundAssignmentRuntime) {
+	const char* main_source = R"(
+		import "math"
+
+		var total = Meters { 1.0 };
+
+		fn main() : f32 {
+			total += Meters { 2.0 };
+			return total.value;
+		}
+	)";
+	const char* math_source = R"(
+		struct Meters {
+			value : f32;
+		}
+
+		operator +(a : Meters, b : Meters) : Meters {
+			return Meters { a.value + b.value };
+		}
+	)";
+	LumScriptImportFile file = { toLs("math"), toLs(math_source) };
+	LumScriptImportFiles files = { &file, 1 };
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_FLOAT_EQ(3.0f, ls_to_f32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(CustomOperatorBinaryRuntime) {
+	const char* main_source = R"(
+		import "math"
+
+		fn main() : Meters {
+			const a = Meters { 1.0 };
+			const b = Meters { 2.0 };
+			return a + b;
+		}
+	)";
+	const char* math_source = R"(
+		struct Meters {
+			value : f32;
+		}
+
+		operator +(a : Meters, b : Meters) : Meters {
+			return Meters { a.value + b.value };
+		}
+	)";
+	LumScriptImportFile file = { toLs("math"), toLs(math_source) };
+	LumScriptImportFiles files = { &file, 1 };
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_FLOAT_EQ(3.0f, ls_to_f32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(RuntimeBlockScope) {
 	const char* source = R"(
 		fn scoped() : i32 {

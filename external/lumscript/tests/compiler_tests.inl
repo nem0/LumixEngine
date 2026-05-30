@@ -342,6 +342,330 @@ TEST(BinaryNumericOperatorsRequireSameOperandType) {
 	return true;
 }
 
+TEST(OperatorOverloadsTypecheck) {
+	const char* source = R"(
+		struct Vec2 {
+			x : f32;
+			y : f32;
+		}
+
+		operator +(a : Vec2, b : Vec2) : Vec2 {
+			return Vec2 { a.x + b.x, a.y + b.y };
+		}
+
+		operator -(a : Vec2) : Vec2 {
+			return Vec2 { -a.x, -a.y };
+		}
+
+		fn main() : Vec2 {
+			const a = Vec2 { 1.0, 2.0 };
+			const b = Vec2 { 3.0, 4.0 };
+			return -(a + b);
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ImportedOperatorOverloadsTypecheck) {
+	const char* main_source = R"(
+		import "math"
+
+		fn main() : Meters {
+			const a = Meters { 1.0 };
+			const b = Meters { 2.0 };
+			return a + b;
+		}
+	)";
+	const char* math_source = R"(
+		struct Meters {
+			value : f32;
+		}
+
+		operator +(a : Meters, b : Meters) : Meters {
+			return Meters { a.value + b.value };
+		}
+	)";
+	LumScriptImportFile file = { toLs("math"), toLs(math_source) };
+	LumScriptImportFiles files = { &file, 1 };
+	TestContext diagnostics;
+	ls_module* module = ls_module_create(&diagnostics.host);
+	EXPECT_TRUE(module != nullptr);
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(ImportedOperatorOverloadsWithAliasTypecheck) {
+	const char* main_source = R"(
+		import "math" as math
+
+		fn main() : math.Meters {
+			const a = math.Meters { 1.0 };
+			const b = math.Meters { 2.0 };
+			return a + b;
+		}
+	)";
+	const char* math_source = R"(
+		struct Meters {
+			value : f32;
+		}
+
+		operator +(a : Meters, b : Meters) : Meters {
+			return Meters { a.value + b.value };
+		}
+	)";
+	LumScriptImportFile file = { toLs("math"), toLs(math_source) };
+	LumScriptImportFiles files = { &file, 1 };
+	TestContext diagnostics;
+	ls_module* module = ls_module_create(&diagnostics.host);
+	EXPECT_TRUE(module != nullptr);
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(ImportedOperatorPlusEqualTypecheck) {
+	const char* main_source = R"(
+		import "math"
+
+		fn main() : void {
+			var value = Meters { 1.0 };
+			value += Meters { 2.0 };
+		}
+	)";
+	const char* math_source = R"(
+		struct Meters {
+			value : f32;
+		}
+
+		operator +(a : Meters, b : Meters) : Meters {
+			return Meters { a.value + b.value };
+		}
+	)";
+	LumScriptImportFile file = { toLs("math"), toLs(math_source) };
+	LumScriptImportFiles files = { &file, 1 };
+	TestContext diagnostics;
+	ls_module* module = ls_module_create(&diagnostics.host);
+	EXPECT_TRUE(module != nullptr);
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(NonOverloadableOperatorFails) {
+	const char* source = R"(
+		fn main() : void {
+		}
+
+		operator and(a : bool, b : bool) : bool {
+			return a and b;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(PrimitiveOperatorOverloadFails) {
+	const char* source = R"(
+		operator +(a : f32, b : f32) : f32 {
+			return a + b;
+		}
+
+		fn main() : void {
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(OperatorDoesNotAllowImplicitCastFails) {
+	const char* main_source = R"(
+		import "math"
+
+		fn main() : Vec2 {
+			const a = Vec2 { 1.0, 2.0 };
+			return a + 1.0;
+		}
+	)";
+	const char* math_source = R"(
+		struct Vec2 {
+			x : f32;
+			y : f32;
+		}
+
+		operator +(a : Vec2, b : Vec2) : Vec2 {
+			return Vec2 { a.x + b.x, a.y + b.y };
+		}
+	)";
+	LumScriptImportFile file = { toLs("math"), toLs(math_source) };
+	LumScriptImportFiles files = { &file, 1 };
+	TestContext diagnostics;
+	ls_module* module = ls_module_create(&diagnostics.host);
+	EXPECT_TRUE(module != nullptr);
+	EXPECT_TRUE(!ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(OperatorOverloadAmbiguityFails) {
+	const char* main_source = R"(
+		import "math_a"
+		import "math_b"
+
+		fn main() : Vec2 {
+			const a = Vec2 { 1.0, 2.0 };
+			const b = Vec2 { 3.0, 4.0 };
+			return a + b;
+		}
+	)";
+	const char* math_a_source = R"(
+		struct Vec2 {
+			x : f32;
+			y : f32;
+		}
+
+		operator +(a : Vec2, b : Vec2) : Vec2 {
+			return Vec2 { a.x + b.x, a.y + b.y };
+		}
+	)";
+	const char* math_b_source = R"(
+		struct Vec2 {
+			x : f32;
+			y : f32;
+		}
+
+		operator +(a : Vec2, b : Vec2) : Vec2 {
+			return Vec2 { a.x + b.x, a.y + b.y };
+		}
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("math_a"), toLs(math_a_source) },
+		{ toLs("math_b"), toLs(math_b_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	TestContext diagnostics;
+	ls_module* module = ls_module_create(&diagnostics.host);
+	EXPECT_TRUE(module != nullptr);
+	EXPECT_TRUE(!ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(PrimitiveCompoundAssignmentIgnoresOperatorOverloadCompiles) {
+	const char* main_source = R"(
+		import "math"
+
+		fn main() : void {
+			var v : f32 = 1.0;
+			v += 2.0;
+		}
+	)";
+	const char* math_source = R"(
+		struct Vec2 {
+			x : f32;
+			y : f32;
+		}
+
+		operator +(a : Vec2, b : Vec2) : Vec2 {
+			return Vec2 { a.x + b.x, a.y + b.y };
+		}
+	)";
+	LumScriptImportFile file = { toLs("math"), toLs(math_source) };
+	LumScriptImportFiles files = { &file, 1 };
+	TestContext diagnostics;
+	ls_module* module = ls_module_create(&diagnostics.host);
+	EXPECT_TRUE(module != nullptr);
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(AllOverloadableOperatorsTypecheck) {
+	const char* main_source = R"(
+		import "math"
+
+		fn main() : bool {
+			const a = Box { 1.0 };
+			const b = Box { 2.0 };
+			const add = a + b;
+			const sub = a - b;
+			const mul = a * b;
+			const div = a / b;
+			const mod = a % b;
+			const eq = a == b;
+			const ne = a != b;
+			const lt = a < b;
+			const le = a <= b;
+			const gt = a > b;
+			const ge = a >= b;
+			const neg = -a;
+			return eq or ne or lt or le or gt or ge or (add == sub) or (mul == div) or (mod == neg);
+		}
+	)";
+	const char* math_source = R"(
+		struct Box {
+			value : f32;
+		}
+
+		operator +(a : Box, b : Box) : Box {
+			return Box { a.value + b.value };
+		}
+
+		operator -(a : Box, b : Box) : Box {
+			return Box { a.value - b.value };
+		}
+
+		operator *(a : Box, b : Box) : Box {
+			return Box { a.value * b.value };
+		}
+
+		operator /(a : Box, b : Box) : Box {
+			return Box { a.value / b.value };
+		}
+
+		operator %(a : Box, b : Box) : Box {
+			return a;
+		}
+
+		operator ==(a : Box, b : Box) : bool {
+			return a.value == b.value;
+		}
+
+		operator !=(a : Box, b : Box) : bool {
+			return a.value != b.value;
+		}
+
+		operator <(a : Box, b : Box) : bool {
+			return a.value < b.value;
+		}
+
+		operator <=(a : Box, b : Box) : bool {
+			return a.value <= b.value;
+		}
+
+		operator >(a : Box, b : Box) : bool {
+			return a.value > b.value;
+		}
+
+		operator >=(a : Box, b : Box) : bool {
+			return a.value >= b.value;
+		}
+
+		operator -(a : Box) : Box {
+			return Box { -a.value };
+		}
+	)";
+	LumScriptImportFile file = { toLs("math"), toLs(math_source) };
+	LumScriptImportFiles files = { &file, 1 };
+	TestContext diagnostics;
+	ls_module* module = ls_module_create(&diagnostics.host);
+	EXPECT_TRUE(module != nullptr);
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
+	ls_module_destroy(module);
+	return true;
+}
+
 TEST(ImportSymbolCollisionFails) {
 	const char* main_source = R"(
 		import "a"

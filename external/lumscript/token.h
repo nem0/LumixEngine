@@ -43,6 +43,7 @@ struct Token {
 		LT_EQUAL,
 
 		EXTERN,
+		OPERATOR,
 		STRUCT,
 		ENUM,
 		FN,

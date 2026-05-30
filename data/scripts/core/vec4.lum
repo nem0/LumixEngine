@@ -4,3 +4,57 @@ struct Vec4 {
 	z : f32;
 	w : f32;
 };
+
+operator +(a : Vec4, b : Vec4) : Vec4 {
+	return Vec4 {
+		a.x + b.x,
+		a.y + b.y,
+		a.z + b.z,
+		a.w + b.w
+	};
+}
+
+operator -(a : Vec4, b : Vec4) : Vec4 {
+	return Vec4 {
+		a.x - b.x,
+		a.y - b.y,
+		a.z - b.z,
+		a.w - b.w
+	};
+}
+
+operator -(a : Vec4) : Vec4 {
+	return Vec4 {
+		-a.x,
+		-a.y,
+		-a.z,
+		-a.w
+	};
+}
+
+operator *(a : Vec4, b : f32) : Vec4 {
+	return Vec4 {
+		a.x * b,
+		a.y * b,
+		a.z * b,
+		a.w * b
+	};
+}
+
+operator *(a : f32, b : Vec4) : Vec4 {
+	return Vec4 {
+		a * b.x,
+		a * b.y,
+		a * b.z,
+		a * b.w
+	};
+}
+
+operator /(a : Vec4, b : f32) : Vec4 {
+	return Vec4 {
+		a.x / b,
+		a.y / b,
+		a.z / b,
+		a.w / b
+	};
+}

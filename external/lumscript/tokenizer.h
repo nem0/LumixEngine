@@ -176,7 +176,10 @@ struct Tokenizer {
 				}
 				break;
 			}
-			case 'o': return checkKeyword("r", 1, 1, Token::OR);
+			case 'o':
+				if (u32(m_current - m_start_token) < 2) return makeToken(Token::IDENTIFIER);
+				if (m_start_token[1] == 'r') return checkKeyword("r", 1, 1, Token::OR);
+				return checkKeyword("perator", 1, 7, Token::OPERATOR);
 			case 'r': {
 				if (u32(m_current - m_start_token) < 2) return makeToken(Token::IDENTIFIER);
 				if (u32(m_current - m_start_token) == 3) return checkKeyword("ef", 1, 2, Token::REF);

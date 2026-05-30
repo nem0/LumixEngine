@@ -3,7 +3,7 @@
 # TODO
 
 * dynamic arrays/memory
-* operators
+* operator overloading
 * debugger
 * string interpolation
 * jit/llvm
@@ -44,6 +44,7 @@ LumScript is a small, statically typed scripting language for Lumix Engine.
 	- [Structs](#structs)
 	- [Enums](#enums)
 	- [Functions](#functions)
+	- [Operators](#operators)
 	- [Ref parameters](#ref-parameters)
 - [Types](#types)
 	- [Untyped literals](#untyped-literals)
@@ -148,6 +149,9 @@ import "core:collections/list" as list
 ```
 
 Imports map source names to declarations in imported modules. They are lookup sources, not scope injection.
+
+Imported modules also contribute operator declarations to overload resolution.
+Alias-qualified names are not used for operator syntax; aliasing only affects ordinary name lookup.
 
 Import forms:
 
@@ -281,6 +285,49 @@ Rules:
 - top-level functions are globally visible in the module
 - overloading is not supported
 - parameters are immutable
+- this does not include operator declarations; operators are a separate declaration form
+
+### Operators
+
+Operator overloads are declared as top-level functions with the `operator` keyword:
+
+```cpp
+operator +(a : Vec3, b : Vec3) : Vec3 {
+	return Vec3 { a.x + b.x, a.y + b.y, a.z + b.z };
+}
+
+operator -(a : Vec3) : Vec3 {
+	return Vec3 { -a.x, -a.y, -a.z };
+}
+```
+
+Rules:
+
+- operators are declared at top level
+- operator names are fixed tokens, not identifiers
+- overloadable operators are:
+  - `+`
+  - `-`
+  - `*`
+  - `/`
+  - `%`
+  - `==`
+  - `!=`
+  - `<`
+  - `<=`
+  - `>`
+  - `>=`
+  - unary `-`
+- `and` and `or` remain built-in short-circuit operators and are not overloaded
+- declaring an operator overload for a built-in primitive signature, such as `operator +(f32, f32)`, is a compile-time error
+- overload resolution uses exact type matching
+- no implicit casts are performed to make an operator applicable
+- imported modules participate in operator lookup
+- if multiple declarations match equally well, the expression is ambiguous and is a compile-time error
+- primitive built-in operator behavior still applies when no overload is involved
+- compound assignment on a non-primitive type uses the corresponding binary operator, for example `x += y` behaves like `x = x + y`
+- compound assignment evaluates the left-hand side once // TODO test
+- primitive compound assignment keeps its built-in behavior and cannot be overridden
 
 ### Ref parameters
 
@@ -831,6 +878,11 @@ not ready
 
 `and` and `or` short-circuit.
 
+If an operator is used with non-builtin value types, the compiler may resolve it to a matching `operator` declaration instead of a built-in primitive rule.
+Primitive operands keep their built-in semantics and cannot be overridden by `operator` declarations.
+`and` and `or` keep their built-in short-circuit semantics and are not candidates for operator declarations.
+Compound assignment follows the same rule: custom types use the corresponding binary operator, while primitive compound assignment stays built in.
+
 ### Calls
 
 ```cpp
@@ -1018,6 +1070,7 @@ Not implemented yet:
 Still being finalized:
 
 - nullable flow typing details after reassignment
+- exact operator lookup rules for mixed imported declarations
 - `match` overlap rules for range/literal combinations
 - global initialization order across imports
 - string semantic guarantees (encoding/equality guarantees)
