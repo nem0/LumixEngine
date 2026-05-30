@@ -6,31 +6,12 @@
 
 namespace {
 
-enum class LumScriptType {
-	UNKNOWN,
-	VOID_T,
-	BOOL_T,
-	I32_T,
-	F32_T,
-	VEC2_T,
-	VEC3_T,
-	DVEC3_T,
-	VEC4_T,
-	COLOR_T,
-	QUAT_T,
-	ENTITY_T,
-	ENUM_T,
-	STRUCT_T,
-	PATH_T
-};
+enum class LumScriptType { UNKNOWN, VOID_T, BOOL_T, I32_T, F32_T, VEC2_T, VEC3_T, DVEC3_T, VEC4_T, COLOR_T, QUAT_T, ENTITY_T, ENUM_T, STRUCT_T, PATH_T };
 
-template <int CAPACITY>
-struct StaticString {
+template <int CAPACITY> struct StaticString {
 	template <typename... Args> StaticString(Args&&... args) {
 		buffer[0] = 0;
-		int dummy[] = {
-			(append(args),0)...
-		};
+		int dummy[] = {(append(args), 0)...};
 	}
 
 	static size_t strlen(const char* v) {
@@ -60,7 +41,7 @@ struct StaticString {
 		buffer[length] = 0;
 	}
 
-	operator const char* () const { return buffer; }
+	operator const char*() const { return buffer; }
 
 	char buffer[CAPACITY];
 	int length = 0;
@@ -71,8 +52,7 @@ char toLowerAscii(char c) {
 	return c;
 }
 
-template <int CAPACITY>
-void appendLowercase(StaticString<CAPACITY>& out, StringView value) {
+template <int CAPACITY> void appendLowercase(StaticString<CAPACITY>& out, StringView value) {
 	for (const char* c = value.begin; c != value.end; ++c) {
 		const char lower = toLowerAscii(*c);
 		out.append(StringView{&lower, &lower + 1});
@@ -81,8 +61,7 @@ void appendLowercase(StaticString<CAPACITY>& out, StringView value) {
 
 static MetaData* g_meta_data = nullptr;
 
-template <typename... Args>
-void logInfo(Args... args) {
+template <typename... Args> void logInfo(Args... args) {
 	StaticString<4096> str(args...);
 	fputs(str.buffer, stdout);
 	fputc('\n', stdout);
@@ -263,43 +242,33 @@ void appendArgValue(OutputStream& out, const Arg& arg, i32 idx) {
 	switch (getLumScriptType(arg.type)) {
 		case LumScriptType::BOOL_T: out.add("bool(ls_to_bool(runtime, ", -idx, "))"); break;
 		case LumScriptType::I32_T:
-			if (equal(arg.type, "u32")) out.add("ls_to_u32(runtime, ", -idx, ")");
-			else out.add("ls_to_i32(runtime, ", -idx, ")");
+			if (equal(arg.type, "u32"))
+				out.add("ls_to_u32(runtime, ", -idx, ")");
+			else
+				out.add("ls_to_i32(runtime, ", -idx, ")");
 			break;
 		case LumScriptType::F32_T: out.add("ls_to_f32(runtime, ", -idx, ")"); break;
-		case LumScriptType::VEC2_T:
-			out.add("Vec2(ls_to_f32(runtime, ", -idx - 1, "), ls_to_f32(runtime, ", -idx, "))");
-			break;
-		case LumScriptType::VEC3_T:
-			out.add("Vec3(ls_to_f32(runtime, ", -idx - 2, "), ls_to_f32(runtime, ", -idx - 1, "), ls_to_f32(runtime, ", -idx, "))");
-			break;
-		case LumScriptType::DVEC3_T:
-			out.add("DVec3(ls_to_f64(runtime, ", -idx - 2, "), ls_to_f64(runtime, ", -idx - 1, "), ls_to_f64(runtime, ", -idx, "))");
-			break;
-		case LumScriptType::VEC4_T:
-			out.add("Vec4(ls_to_f32(runtime, ", -idx - 3, "), ls_to_f32(runtime, ", -idx - 2, "), ls_to_f32(runtime, ", -idx - 1, "), ls_to_f32(runtime, ", -idx, "))");
-			break;
+		case LumScriptType::VEC2_T: out.add("Vec2(ls_to_f32(runtime, ", -idx - 1, "), ls_to_f32(runtime, ", -idx, "))"); break;
+		case LumScriptType::VEC3_T: out.add("Vec3(ls_to_f32(runtime, ", -idx - 2, "), ls_to_f32(runtime, ", -idx - 1, "), ls_to_f32(runtime, ", -idx, "))"); break;
+		case LumScriptType::DVEC3_T: out.add("DVec3(ls_to_f64(runtime, ", -idx - 2, "), ls_to_f64(runtime, ", -idx - 1, "), ls_to_f64(runtime, ", -idx, "))"); break;
+		case LumScriptType::VEC4_T: out.add("Vec4(ls_to_f32(runtime, ", -idx - 3, "), ls_to_f32(runtime, ", -idx - 2, "), ls_to_f32(runtime, ", -idx - 1, "), ls_to_f32(runtime, ", -idx, "))"); break;
 		case LumScriptType::COLOR_T:
 			out.add("Color(u8(ls_to_i32(runtime, ", -idx - 3, ")), u8(ls_to_i32(runtime, ", -idx - 2, ")), u8(ls_to_i32(runtime, ", -idx - 1, ")), u8(ls_to_i32(runtime, ", -idx, ")))");
 			break;
-		case LumScriptType::QUAT_T:
-			out.add("Quat(ls_to_f32(runtime, ", -idx - 3, "), ls_to_f32(runtime, ", -idx - 2, "), ls_to_f32(runtime, ", -idx - 1, "), ls_to_f32(runtime, ", -idx, "))");
-			break;
+		case LumScriptType::QUAT_T: out.add("Quat(ls_to_f32(runtime, ", -idx - 3, "), ls_to_f32(runtime, ", -idx - 2, "), ls_to_f32(runtime, ", -idx - 1, "), ls_to_f32(runtime, ", -idx, "))"); break;
 		case LumScriptType::ENTITY_T:
-			if (equal(arg.type, "EntityRef")) out.add("EntityRef(ls_to_i32(runtime, ", -idx - 1, "))");
-			else out.add("EntityPtr(ls_to_i32(runtime, ", -idx - 1, "))");
-		break;
+			if (equal(arg.type, "EntityRef"))
+				out.add("EntityRef(ls_to_i32(runtime, ", -idx - 1, "))");
+			else
+				out.add("EntityPtr(ls_to_i32(runtime, ", -idx - 1, "))");
+			break;
 		case LumScriptType::ENUM_T:
 			out.add("(");
 			appendEnumCPPType(out, arg.type);
 			out.add(")ls_to_i32(runtime, ", -idx, ")");
 			break;
-		case LumScriptType::PATH_T:
-			out.add("Path()");
-			break;
-		case LumScriptType::STRUCT_T:
-			appendStructArgValue(out, arg.type, idx);
-			break;
+		case LumScriptType::PATH_T: out.add("Path()"); break;
+		case LumScriptType::STRUCT_T: appendStructArgValue(out, arg.type, idx); break;
 		default: break;
 	}
 }
@@ -339,15 +308,9 @@ void emitStringArgTemp(OutputStream& out, i32 idx, i32 stack_idx) {
 void appendReturnValue(OutputStream& out, StringView type, const char* value, const char* world_expr = nullptr) {
 	if (getLumScriptType(type) == LumScriptType::VOID_T) return;
 	switch (getLumScriptType(type)) {
-		case LumScriptType::BOOL_T:
-			L("ls_push_bool(runtime, ", value, ");");
-			break;
-		case LumScriptType::I32_T:
-			L("ls_push_i32(runtime, (i32)", value, ");");
-			break;
-		case LumScriptType::F32_T:
-			L("ls_push_f32(runtime, ", value, ");");
-			break;
+		case LumScriptType::BOOL_T: L("ls_push_bool(runtime, ", value, ");"); break;
+		case LumScriptType::I32_T: L("ls_push_i32(runtime, (i32)", value, ");"); break;
+		case LumScriptType::F32_T: L("ls_push_f32(runtime, ", value, ");"); break;
 		case LumScriptType::VEC2_T:
 			L("ls_push_f32(runtime, ", value, ".x);");
 			L("ls_push_f32(runtime, ", value, ".y);");
@@ -384,12 +347,8 @@ void appendReturnValue(OutputStream& out, StringView type, const char* value, co
 			L("ls_push_i32(runtime, ", value, ".index);");
 			if (world_expr) L("ls_push_ptr(runtime, ", world_expr, ");");
 			break;
-		case LumScriptType::ENUM_T:
-			L("ls_push_i32(runtime, (i32)", value, ");");
-			break;
-		case LumScriptType::PATH_T:
-			L("ls_push_string(runtime, ls_string_view{", value, ".c_str(), ", value, ".c_str() + ", value, ".length()});");
-			break;
+		case LumScriptType::ENUM_T: L("ls_push_i32(runtime, (i32)", value, ");"); break;
+		case LumScriptType::PATH_T: L("ls_push_string(runtime, ls_string_view{", value, ".c_str(), ", value, ".c_str() + ", value, ".length()});"); break;
 		case LumScriptType::STRUCT_T: {
 			const Struct* s = findStructByTypeName(type);
 			if (!s) break;
@@ -498,9 +457,7 @@ void serializeLumScriptWrapper(OutputStream& out, Module& m, Component& c, Funct
 	L("auto* module = static_cast<", m.name, "*>(ls_to_ptr(runtime, -1));");
 
 	i32 total_slots = 0;
-	forEachArg(f.args, [&](const Arg& arg, bool) {
-		total_slots += getLumScriptArgStackSlots(arg);
-	});
+	forEachArg(f.args, [&](const Arg& arg, bool) { total_slots += getLumScriptArgStackSlots(arg); });
 	i32 slot_idx = 0;
 	i32 string_arg_idx = 0;
 	forEachArg(f.args, [&](const Arg& arg, bool) {
@@ -518,8 +475,10 @@ void serializeLumScriptWrapper(OutputStream& out, Module& m, Component& c, Funct
 	forEachArg(f.args, [&](const Arg& arg, bool is_first) {
 		if (!is_first) out.add(", ");
 		const i32 stack_idx = total_slots - slot_idx - getLumScriptArgStackSlots(arg) + 1;
-		if (isLumScriptStringArg(arg) || isLumScriptPathArg(arg)) appendArgValue(out, arg, string_arg_idx + 1);
-		else appendArgValue(out, arg, stack_idx);
+		if (isLumScriptStringArg(arg) || isLumScriptPathArg(arg))
+			appendArgValue(out, arg, string_arg_idx + 1);
+		else
+			appendArgValue(out, arg, stack_idx);
 		slot_idx += getLumScriptArgStackSlots(arg);
 		if (isLumScriptStringArg(arg) || isLumScriptPathArg(arg)) ++string_arg_idx;
 	});
@@ -537,9 +496,7 @@ void serializeLumScriptPropertyWrapper(OutputStream& out, Module& m, Component& 
 	L("auto* module = static_cast<", m.name, "*>(ls_to_ptr(runtime, -1));");
 
 	i32 total_slots = 0;
-	forEachArg(accessor_args, [&](const Arg& arg, bool) {
-		total_slots += getLumScriptArgStackSlots(arg);
-	});
+	forEachArg(accessor_args, [&](const Arg& arg, bool) { total_slots += getLumScriptArgStackSlots(arg); });
 	i32 slot_idx = 0;
 	i32 string_arg_idx = 0;
 	forEachArg(accessor_args, [&](const Arg& arg, bool) {
@@ -557,8 +514,10 @@ void serializeLumScriptPropertyWrapper(OutputStream& out, Module& m, Component& 
 	forEachArg(accessor_args, [&](const Arg& arg, bool is_first) {
 		if (!is_first) out.add(", ");
 		const i32 stack_idx = total_slots - slot_idx - getLumScriptArgStackSlots(arg) + 1;
-		if (isLumScriptStringArg(arg) || isLumScriptPathArg(arg)) appendArgValue(out, arg, string_arg_idx + 1);
-		else appendArgValue(out, arg, stack_idx);
+		if (isLumScriptStringArg(arg) || isLumScriptPathArg(arg))
+			appendArgValue(out, arg, string_arg_idx + 1);
+		else
+			appendArgValue(out, arg, stack_idx);
 		slot_idx += getLumScriptArgStackSlots(arg);
 		if (isLumScriptStringArg(arg) || isLumScriptPathArg(arg)) ++string_arg_idx;
 	});
@@ -595,9 +554,7 @@ void serializeLumScriptModuleWrapper(OutputStream& out, Module& m, Function& f, 
 	L("auto* module = static_cast<", m.name, "*>(ls_to_ptr(runtime, -1));");
 
 	i32 total_slots = 0;
-	forEachArg(f.args, [&](const Arg& arg, bool) {
-		total_slots += getLumScriptArgStackSlots(arg);
-	});
+	forEachArg(f.args, [&](const Arg& arg, bool) { total_slots += getLumScriptArgStackSlots(arg); });
 	i32 string_arg_idx = 0;
 	i32 src_idx = 0;
 	forEachArg(f.args, [&](const Arg& arg, bool) {
@@ -617,8 +574,10 @@ void serializeLumScriptModuleWrapper(OutputStream& out, Module& m, Function& f, 
 	forEachArg(f.args, [&](const Arg& arg, bool is_first) {
 		if (!is_first) out.add(", ");
 		const i32 stack_idx = total_slots - slot_idx - getLumScriptArgStackSlots(arg) + 1;
-		if (isLumScriptStringArg(arg) || isLumScriptPathArg(arg)) appendArgValue(out, arg, string_arg_idx + 1);
-		else appendArgValue(out, arg, stack_idx);
+		if (isLumScriptStringArg(arg) || isLumScriptPathArg(arg))
+			appendArgValue(out, arg, string_arg_idx + 1);
+		else
+			appendArgValue(out, arg, stack_idx);
 		slot_idx += getLumScriptArgStackSlots(arg);
 		++src_idx;
 		if (isLumScriptStringArg(arg) || isLumScriptPathArg(arg)) ++string_arg_idx;
@@ -663,9 +622,7 @@ void serializeLumScriptArrayChildWrapper(OutputStream& out, Module& m, Component
 	appendArrayChildWrapperName(out, c, a, p, is_setter, idx);
 	L("(ls_runtime* runtime) {");
 	i32 total_slots = 3;
-	forEachArg(accessor_args, [&](const Arg& arg, bool) {
-		total_slots += getLumScriptArgStackSlots(arg);
-	});
+	forEachArg(accessor_args, [&](const Arg& arg, bool) { total_slots += getLumScriptArgStackSlots(arg); });
 	L("auto* module = static_cast<", m.name, "*>(ls_to_ptr(runtime, ", -total_slots + 2, "));");
 
 	i32 string_arg_idx = 0;
@@ -693,8 +650,10 @@ void serializeLumScriptArrayChildWrapper(OutputStream& out, Module& m, Component
 		if (src_idx >= 2) {
 			out.add(", ");
 			const i32 stack_idx = total_slots - slot_idx - getLumScriptArgStackSlots(arg) + 1;
-			if (isLumScriptStringArg(arg) || isLumScriptPathArg(arg)) appendArgValue(out, arg, string_arg_idx + 1);
-			else appendArgValue(out, arg, stack_idx);
+			if (isLumScriptStringArg(arg) || isLumScriptPathArg(arg))
+				appendArgValue(out, arg, string_arg_idx + 1);
+			else
+				appendArgValue(out, arg, stack_idx);
 			slot_idx += getLumScriptArgStackSlots(arg);
 			if (isLumScriptStringArg(arg) || isLumScriptPathArg(arg)) ++string_arg_idx;
 		}
@@ -719,8 +678,7 @@ void emitGeneratedHeader(OutputStream& out, MetaData& data) {
 		// Generated header lives under src/lumscript, so plugin includes need one extra "..".
 		if (startsWith(include_path, "plugins/")) {
 			out.add("#include \"../", include_path, "\"" OUT_ENDL);
-		}
-		else {
+		} else {
 			if (startsWith(include_path, "src/")) include_path = withoutPrefix(include_path, 4);
 			out.add("#include \"", include_path, "\"" OUT_ENDL);
 		}
@@ -747,19 +705,19 @@ void emitGeneratedWorldModuleAccessors(OutputStream& out, MetaData& data) {
 void emitGeneratedComponentEntityAccessors(OutputStream& out, MetaData& data) {
 	for (Module& m : data.modules) {
 		for (Component& c : m.components) {
-	L("static void lumscript_entity_", c.id, "(ls_runtime* runtime) {");
-	L("World* world = (World*)ls_to_ptr(runtime, -1);");
-	L("i32 entity_idx = ls_to_i32(runtime, -2);");
-	L("const ComponentType component_type = reflection::getComponentType(\"", c.id, "\");");
-	L("IModule* module = world->getModule(component_type);");
-	L("if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {");
-	L("ls_push_null(runtime);");
-	L("return;");
-	L("}");
-	L("ls_push_i32(runtime, entity_idx);");
-	L("ls_push_ptr(runtime, module);");
-	L("}" OUT_ENDL);
-}
+			L("static void lumscript_entity_", c.id, "(ls_runtime* runtime) {");
+			L("World* world = (World*)ls_to_ptr(runtime, -1);");
+			L("i32 entity_idx = ls_to_i32(runtime, -2);");
+			L("const ComponentType component_type = reflection::getComponentType(\"", c.id, "\");");
+			L("IModule* module = world->getModule(component_type);");
+			L("if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {");
+			L("ls_push_null(runtime);");
+			L("return;");
+			L("}");
+			L("ls_push_i32(runtime, entity_idx);");
+			L("ls_push_ptr(runtime, module);");
+			L("}" OUT_ENDL);
+		}
 	}
 }
 
@@ -979,8 +937,10 @@ void emitComponentFunctionDecl(OutputStream& out, Component& c, Function& f) {
 		if (!is_first) out.add(", ");
 		appendLumScriptDeclArgName(out, arg.name, arg_idx);
 		out.add(" : ");
-		if (is_first && isLumScriptEntityType(arg.type)) out.add(c.name);
-		else appendLumScriptDeclArgType(out, arg);
+		if (is_first && isLumScriptEntityType(arg.type))
+			out.add(c.name);
+		else
+			appendLumScriptDeclArgType(out, arg);
 		++arg_idx;
 	});
 	out.add(") : ");
@@ -998,13 +958,17 @@ void emitComponentPropertyDecl(OutputStream& out, Component& c, Property& p, boo
 		if (!is_first) out.add(", ");
 		appendLumScriptDeclArgName(out, arg.name, arg_idx);
 		out.add(" : ");
-		if (is_first && isLumScriptEntityType(arg.type)) out.add(c.name);
-		else appendLumScriptDeclArgType(out, arg);
+		if (is_first && isLumScriptEntityType(arg.type))
+			out.add(c.name);
+		else
+			appendLumScriptDeclArgType(out, arg);
 		++arg_idx;
 	});
 	out.add(") : ");
-	if (is_setter) out.add("void");
-	else appendLumScriptDeclType(out, p.type);
+	if (is_setter)
+		out.add("void");
+	else
+		appendLumScriptDeclType(out, p.type);
 	out.add(";" OUT_ENDL);
 }
 
@@ -1024,8 +988,10 @@ void emitArrayChildPropertyDecl(OutputStream& out, Component& c, ArrayProperty& 
 		++arg_idx;
 	});
 	out.add(") : ");
-	if (is_setter) out.add("void");
-	else appendLumScriptDeclType(out, p.type);
+	if (is_setter)
+		out.add("void");
+	else
+		appendLumScriptDeclType(out, p.type);
 	out.add(";" OUT_ENDL);
 }
 
@@ -1045,9 +1011,9 @@ void emitLumScriptReferenceEnum(OutputStream& out, Enum& e) {
 // create /data/scripts/core/* files
 void serializeCoreImports(MetaData& data) {
 	OutputStream out;
-	
+
 	// enums
-	auto output_enum = [&](Enum& e){
+	auto output_enum = [&](Enum& e) {
 		if (e.values.size == 0) return;
 
 		out.length = 0;
@@ -1072,7 +1038,7 @@ void serializeCoreImports(MetaData& data) {
 	}
 
 	// structs
-	auto output_struct = [&](Struct& s){
+	auto output_struct = [&](Struct& s) {
 		if (s.vars.size == 0) return;
 
 		out.length = 0;
@@ -1080,15 +1046,8 @@ void serializeCoreImports(MetaData& data) {
 		for (i32 i = 0; i < s.vars.size; ++i) {
 			const StructVar& v = s.vars[i];
 			const LumScriptType type = getLumScriptType(v.type);
-			if (type != LumScriptType::VEC2_T
-				&& type != LumScriptType::VEC3_T
-				&& type != LumScriptType::DVEC3_T
-				&& type != LumScriptType::VEC4_T
-				&& type != LumScriptType::COLOR_T
-				&& type != LumScriptType::QUAT_T
-				&& type != LumScriptType::ENTITY_T
-				&& type != LumScriptType::ENUM_T
-				&& type != LumScriptType::STRUCT_T) {
+			if (type != LumScriptType::VEC2_T && type != LumScriptType::VEC3_T && type != LumScriptType::DVEC3_T && type != LumScriptType::VEC4_T && type != LumScriptType::COLOR_T &&
+				type != LumScriptType::QUAT_T && type != LumScriptType::ENTITY_T && type != LumScriptType::ENUM_T && type != LumScriptType::STRUCT_T) {
 				continue;
 			}
 			if (equal(v.type, s.name)) continue;
@@ -1129,7 +1088,7 @@ void serializeCoreImports(MetaData& data) {
 			}
 		}
 		if (!has_supported_function) continue;
-		
+
 		out.length = 0;
 		L("// Generated by meta.cpp");
 		L("// import core:", m.id, " as ", m.id, OUT_ENDL);
@@ -1139,18 +1098,11 @@ void serializeCoreImports(MetaData& data) {
 		i32 imported_types_count = 0;
 		auto emitImportForType = [&](StringView type) {
 			if (type.size() == 0) return;
-			if (type.begin[0] == '?') type = { type.begin + 1, type.end };
+			if (type.begin[0] == '?') type = {type.begin + 1, type.end};
 			const LumScriptType import_type = getLumScriptType(type);
-			if (import_type != LumScriptType::VEC2_T
-				&& import_type != LumScriptType::VEC3_T
-				&& import_type != LumScriptType::DVEC3_T
-				&& import_type != LumScriptType::VEC4_T
-				&& import_type != LumScriptType::COLOR_T
-				&& import_type != LumScriptType::QUAT_T
-				&& import_type != LumScriptType::ENTITY_T
-				&& import_type != LumScriptType::ENUM_T
-				&& import_type != LumScriptType::STRUCT_T
-				&& !equal(type, "World")) {
+			if (import_type != LumScriptType::VEC2_T && import_type != LumScriptType::VEC3_T && import_type != LumScriptType::DVEC3_T && import_type != LumScriptType::VEC4_T &&
+				import_type != LumScriptType::COLOR_T && import_type != LumScriptType::QUAT_T && import_type != LumScriptType::ENTITY_T && import_type != LumScriptType::ENUM_T &&
+				import_type != LumScriptType::STRUCT_T && !equal(type, "World")) {
 				return;
 			}
 			if (equal(type, m.name)) return;
@@ -1166,9 +1118,7 @@ void serializeCoreImports(MetaData& data) {
 		for (Function& f : m.functions) {
 			if (!isSupportedLumScriptFunction(f)) continue;
 			emitImportForType(f.return_type);
-			forEachArg(f.args, [&](const Arg& arg, bool) {
-				emitImportForType(arg.type);
-			});
+			forEachArg(f.args, [&](const Arg& arg, bool) { emitImportForType(arg.type); });
 		}
 
 		L("struct ", m.name, " { module : cptr; }" OUT_ENDL);
@@ -1228,17 +1178,12 @@ void serializeCoreImports(MetaData& data) {
 			i32 imported_types_count = 0;
 			auto emitImportForType = [&](StringView type) {
 				if (type.size() == 0) return;
-				if (type.begin[0] == '?') type = { type.begin + 1, type.end };
+				if (type.begin[0] == '?') type = {type.begin + 1, type.end};
 				const LumScriptType import_type = getLumScriptType(type);
-				if (import_type != LumScriptType::VEC2_T
-					&& import_type != LumScriptType::VEC3_T
-					&& import_type != LumScriptType::DVEC3_T
-					&& import_type != LumScriptType::VEC4_T
-					&& import_type != LumScriptType::COLOR_T
-					&& import_type != LumScriptType::QUAT_T
-					&& import_type != LumScriptType::ENTITY_T
-					&& import_type != LumScriptType::ENUM_T
-					&& import_type != LumScriptType::STRUCT_T) return;
+				if (import_type != LumScriptType::VEC2_T && import_type != LumScriptType::VEC3_T && import_type != LumScriptType::DVEC3_T && import_type != LumScriptType::VEC4_T &&
+					import_type != LumScriptType::COLOR_T && import_type != LumScriptType::QUAT_T && import_type != LumScriptType::ENTITY_T && import_type != LumScriptType::ENUM_T &&
+					import_type != LumScriptType::STRUCT_T)
+					return;
 				if (equal(type, c.name)) return;
 				for (i32 i = 0; i < imported_types_count; ++i) {
 					if (equal(imported_types[i], type)) return;
@@ -1252,9 +1197,7 @@ void serializeCoreImports(MetaData& data) {
 			for (Function& f : c.functions) {
 				if (!isSupportedLumScriptFunction(f)) continue;
 				emitImportForType(f.return_type);
-				forEachArg(f.args, [&](const Arg& arg, bool) {
-					emitImportForType(arg.type);
-				});
+				forEachArg(f.args, [&](const Arg& arg, bool) { emitImportForType(arg.type); });
 			}
 			for (Property& p : c.properties) {
 				emitImportForType(p.type);
@@ -1281,9 +1224,9 @@ void serializeCoreImports(MetaData& data) {
 				if (!has_array_child) continue;
 				L("struct ", c.name, a.name, "ArrayItem { entity : i32; idx : i32; module : cptr; }" OUT_ENDL);
 			}
-			
+
 			L("extern fn ", c.id, "(e : Entity) : ?", c.name, ";");
-			
+
 			for (Function& f : c.functions) {
 				if (!isSupportedLumScriptFunction(f)) continue;
 				emitComponentFunctionDecl(out, c, f);
@@ -1336,7 +1279,7 @@ void serializeLumScriptMeta(MetaData& data) {
 	}
 	OutputStream out;
 	emitGeneratedHeader(out, data);
-	
+
 	L("namespace Lumix::LumScript::generated {" OUT_ENDL);
 
 	emitGeneratedWorldModuleAccessors(out, data);
@@ -1375,7 +1318,7 @@ void serializeLumScriptMeta(MetaData& data) {
 	L("} // namespace Lumix::LumScript::generated");
 	formatCPP(out);
 	writeFile("src/lumscript/lumscript_capi.gen.h", out);
-	
+
 	serializeCoreImports(data);
 	g_meta_data = nullptr;
 }

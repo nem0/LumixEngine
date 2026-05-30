@@ -1,24 +1,24 @@
 #include "lumscript/lumscript_module.h"
-#include "engine/world.h"
-#include "engine/engine.h"
-#include "engine/input_system.h"
-#include "engine/resource_manager.h"
-#include "engine/file_system.h"
 #include "core/allocator.h"
 #include "core/array.h"
 #include "core/crt.h"
 #include "core/hash_map.h"
-#include "core/stream.h"
 #include "core/log.h"
-#include "core/tag_allocator.h"
 #include "core/path.h"
+#include "core/stream.h"
+#include "core/tag_allocator.h"
+#include "engine/engine.h"
+#include "engine/file_system.h"
+#include "engine/input_system.h"
+#include "engine/resource_manager.h"
+#include "engine/world.h"
 #include "lumscript/capi.h"
 #include "lumscript/lumscript_resource.h"
 
 namespace Lumix {
 
 namespace LumScript {
-	void gatherCoreFunctions(HashMap<StringView, ls_native_fn>& functions);
+void gatherCoreFunctions(HashMap<StringView, ls_native_fn>& functions);
 }
 
 struct LumScriptDiagnosticsContext {
@@ -58,16 +58,12 @@ static void bindCoreFunctions(ls_module* module, ls_runtime* runtime, IAllocator
 static ls_host makeAllocatorHost(IAllocator& allocator) {
 	ls_host host = {};
 	host.allocator_userdata = &allocator;
-	host.allocate = [](void* userdata, size_t size, size_t align) -> void* {
-		return ((IAllocator*)userdata)->allocate(size, align);
-	};
+	host.allocate = [](void* userdata, size_t size, size_t align) -> void* { return ((IAllocator*)userdata)->allocate(size, align); };
 	host.deallocate = [](void* userdata, void* ptr) {
 		if (!ptr) return;
 		((IAllocator*)userdata)->deallocate(ptr);
 	};
-	host.reallocate = [](void* userdata, void* ptr, size_t new_size, size_t old_size, size_t align) -> void* {
-		return ((IAllocator*)userdata)->reallocate(ptr, new_size, old_size, align);
-	};
+	host.reallocate = [](void* userdata, void* ptr, size_t new_size, size_t old_size, size_t align) -> void* { return ((IAllocator*)userdata)->reallocate(ptr, new_size, old_size, align); };
 	return host;
 }
 
@@ -83,9 +79,7 @@ struct LumScriptModuleImpl : LumScriptModule {
 	LumScriptModuleImpl(World& world, ISystem& system)
 		: m_world(world)
 		, m_system(system)
-		, m_allocator(world.getAllocator())
-	{
-	}
+		, m_allocator(world.getAllocator()) {}
 
 	~LumScriptModuleImpl() {
 		if (m_script.runtime) {
@@ -122,12 +116,12 @@ struct LumScriptModuleImpl : LumScriptModule {
 
 	void update(float time_delta) override {
 		if (!m_script.is_ready || !m_script.runtime) return;
-		
+
 		// Call update function for world-level script
 		// TODO host as member?
 		String diagnostics(m_allocator);
 		ls_host host = makeAllocatorHost(m_allocator);
-		LumScriptDiagnosticsContext diag_ctx = { &diagnostics, &host };
+		LumScriptDiagnosticsContext diag_ctx = {&diagnostics, &host};
 		host.diagnostics_userdata = &diag_ctx;
 		host.print = &printLumScriptMessage;
 
@@ -165,20 +159,18 @@ struct LumScriptModuleImpl : LumScriptModule {
 		}
 	}
 
-	bool isReady() const override {
-		return m_script.is_ready;
-	}
+	bool isReady() const override { return m_script.is_ready; }
 
 	void startGame() override {
 		// Auto-load {world_name}.lum
-		Path lum_path { m_world.getPartitions()[0].name };
+		Path lum_path{m_world.getPartitions()[0].name};
 		if (lum_path.isEmpty()) return;
 
 		char tmp[MAX_PATH];
 		copyString(tmp, lum_path.c_str());
 		Path::replaceExtension(tmp, "lum");
 		lum_path = tmp;
-		
+
 		LumScriptSystem* lua_system = static_cast<LumScriptSystem*>(&m_system);
 		if (!lua_system->getEngine().getFileSystem().fileExists(lum_path)) {
 			load(Path());
@@ -200,8 +192,7 @@ private:
 			, world(&world)
 			, filesystem(&filesystem)
 			, allocator(&allocator)
-			, sources(allocator)
-		{}
+			, sources(allocator) {}
 	};
 
 	static int resolveImport(void* userdata, ls_string_view path, ls_string_view alias, ls_string_view* source) {
@@ -219,7 +210,7 @@ private:
 				ctx->sources.pop();
 				return 0;
 			}
-			*source = { (const char*)blob.data(), (const char*)blob.data() + blob.size() };
+			*source = {(const char*)blob.data(), (const char*)blob.data() + blob.size()};
 			return 1;
 		}
 		return 0;
@@ -229,8 +220,7 @@ private:
 		if (&resource != m_script.resource) return;
 		if (new_state == Resource::State::READY) {
 			m_script.is_ready = compileAndRun();
-		}
-		else {
+		} else {
 			m_script.is_ready = false;
 		}
 	}
@@ -240,10 +230,10 @@ private:
 
 		String diagnostics(m_allocator);
 		ls_host host = makeAllocatorHost(m_allocator);
-		LumScriptDiagnosticsContext diag_ctx = { &diagnostics, &host };
+		LumScriptDiagnosticsContext diag_ctx = {&diagnostics, &host};
 		host.diagnostics_userdata = &diag_ctx;
 		host.print = &printLumScriptMessage;
-		
+
 		// Parse and compile the world script
 		if (m_script.module) {
 			ls_module_destroy(m_script.module);
@@ -251,7 +241,7 @@ private:
 		}
 		m_script.module = ls_module_create(&host);
 		if (!m_script.module) return false;
-		
+
 		LumScriptSystem* lumscript_system = static_cast<LumScriptSystem*>(&m_system);
 		ImportContext import_ctx(m_script.module, m_world, lumscript_system->getEngine().getFileSystem(), m_allocator);
 		if (!ls_module_compile(m_script.module, toLs(m_script.resource->getSourceCode()), toLs(m_script.path.c_str()), &resolveImport, &import_ctx)) {
@@ -295,15 +285,14 @@ struct LumScriptSystemImpl : LumScriptSystem {
 	explicit LumScriptSystemImpl(Engine& engine)
 		: m_engine(engine)
 		, m_allocator(engine.getAllocator(), "lumscript")
-		, m_lumscript_resource_manager(m_allocator)
-	{
+		, m_lumscript_resource_manager(m_allocator) {
 		// Register the LumScript resource type
 		m_lumscript_resource_manager.create(LumScriptResource::TYPE, m_engine.getResourceManager());
 	}
 
 	const char* getName() const override { return "lumscript_system"; }
 	Engine& getEngine() override { return m_engine; }
-	
+
 	void serialize(OutputMemoryStream& serializer) const override {}
 	bool deserialize(i32 version, InputMemoryStream& serializer) override { return true; }
 

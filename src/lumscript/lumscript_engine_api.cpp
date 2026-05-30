@@ -2,10 +2,10 @@
 #include "engine/input_system.h"
 #include "engine/reflection.h"
 #include "engine/world.h"
-#include "lumscript/lumscript_capi.gen.h"
-#include "lumscript/capi.h"
-#include "lumscript/lumscript_wrapper.h"
 #include "imgui/imgui.h"
+#include "lumscript/capi.h"
+#include "lumscript/lumscript_capi.gen.h"
+#include "lumscript/lumscript_wrapper.h"
 #include <string.h>
 
 namespace Lumix::LumScript {
@@ -20,7 +20,7 @@ template <> struct StackSlots<LumScriptEntity> {
 };
 
 template <> inline LumScriptEntity checkArg<LumScriptEntity>(ls_runtime* runtime, int index) {
-	return { (World*)ls_to_ptr(runtime, index), EntityRef(ls_to_i32(runtime, index - 1)) };
+	return {(World*)ls_to_ptr(runtime, index), EntityRef(ls_to_i32(runtime, index - 1))};
 }
 
 inline void push(ls_runtime* runtime, const LumScriptEntity& value) {
