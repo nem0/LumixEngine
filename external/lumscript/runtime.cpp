@@ -26,18 +26,6 @@ ls_runtime::ls_runtime(ls_bytecode* bytecode_)
 	: bytecode(bytecode_)
 {}
 
-template <typename T>
-void pushStack(ls_runtime& runtime, const T& value);
-
-template <typename T>
-T popStack(ls_runtime& runtime);
-
-static void bytecodeDeallocate(const ls_host* host, void* ptr);
-
-static bool isStringValue(ls_runtime* runtime, size_t index) {
-	return runtime && index < runtime->stack_kinds.size() && runtime->stack_kinds[index] == (u8)StackValueKind::STRING;
-}
-
 static ls_string* toStringObject(u64 value) {
 	return (ls_string*)(uintptr)value;
 }
@@ -46,18 +34,18 @@ static void retainString(ls_string* value) {
 	if (value) ++value->ref_count;
 }
 
-static void releaseString(ls_string* value) {
-	if (!value) return;
-	if (--value->ref_count != 0) return;
-	bytecodeDeallocate(&value->host, value);
+static void* bytecodeAllocate(const ls_host* host, size_t size, size_t align) {
+	return host && host->allocate ? host->allocate(host->allocator_userdata, size, align) : ::operator new(size, std::nothrow);
 }
 
-static void retainStackValue(ls_runtime* runtime, u64 value, u8 kind) {
-	if (kind == (u8)StackValueKind::STRING) retainString(toStringObject(value));
-}
-
-static void releaseStackValue(ls_runtime* runtime, u64 value, u8 kind) {
-	if (kind == (u8)StackValueKind::STRING) releaseString(toStringObject(value));
+static void bytecodeDeallocate(const ls_host* host, void* ptr) {
+	if (!ptr) return;
+	if (host && host->deallocate) {
+		host->deallocate(host->allocator_userdata, ptr);
+	}
+	else {
+		::operator delete(ptr);
+	}
 }
 
 static void stackPushRaw(ls_runtime* runtime, u64 value, u8 kind = (u8)StackValueKind::RAW) {
@@ -65,9 +53,14 @@ static void stackPushRaw(ls_runtime* runtime, u64 value, u8 kind = (u8)StackValu
 	runtime->stack_kinds.push_back(kind);
 }
 
-static void stackPushCopy(ls_runtime* runtime, u64 value, u8 kind) {
-	retainStackValue(runtime, value, kind);
-	stackPushRaw(runtime, value, kind);
+static void releaseString(ls_string* value) {
+	if (!value) return;
+	if (--value->ref_count != 0) return;
+	bytecodeDeallocate(&value->host, value);
+}
+
+static void releaseStackValue(ls_runtime* runtime, u64 value, u8 kind) {
+	if (kind == (u8)StackValueKind::STRING) releaseString(toStringObject(value));
 }
 
 static void stackPop(ls_runtime* runtime) {
@@ -75,6 +68,48 @@ static void stackPop(ls_runtime* runtime) {
 	releaseStackValue(runtime, runtime->stack.back(), runtime->stack_kinds.back());
 	runtime->stack.pop_back();
 	runtime->stack_kinds.pop_back();
+}
+
+template <typename T>
+void pushStack(ls_runtime& runtime, const T& value) {
+	u64 v = 0;
+	static_assert(sizeof(value) <= sizeof(v));
+	memcpy(&v, &value, sizeof(value));
+	if constexpr (std::is_signed_v<T> && sizeof(T) < sizeof(v)) {
+		// Keep narrow signed values sign-extended so later wider reads preserve
+		// the original negative value.
+		// Example: pushing i8(-1) stores 0xFFFFFFFFFFFFFFFF, so reading it back
+		// as i64 still yields -1 instead of 255.
+		if (value < 0) {
+			const u64 sign_mask = ~((u64(1) << (sizeof(T) * 8)) - 1);
+			v |= sign_mask;
+		}
+	}
+	stackPushRaw(&runtime, v);
+}
+
+template <typename T>
+T popStack(ls_runtime& runtime) {
+	T value;
+	static_assert(sizeof(value) <= sizeof(runtime.stack.back()));
+	memcpy(&value, &runtime.stack.back(), sizeof(value));
+	stackPop(&runtime);
+	return value;
+}
+
+static void bytecodeDeallocate(const ls_host* host, void* ptr);
+
+static bool isStringValue(ls_runtime* runtime, size_t index) {
+	return runtime && index < runtime->stack_kinds.size() && runtime->stack_kinds[index] == (u8)StackValueKind::STRING;
+}
+
+static void retainStackValue(ls_runtime* runtime, u64 value, u8 kind) {
+	if (kind == (u8)StackValueKind::STRING) retainString(toStringObject(value));
+}
+
+static void stackPushCopy(ls_runtime* runtime, u64 value, u8 kind) {
+	retainStackValue(runtime, value, kind);
+	stackPushRaw(runtime, value, kind);
 }
 
 static void stackResize(ls_runtime* runtime, size_t size) {
@@ -95,20 +130,6 @@ static void stackErase(ls_runtime* runtime, size_t idx) {
 	releaseStackValue(runtime, runtime->stack[idx], runtime->stack_kinds[idx]);
 	runtime->stack.erase(runtime->stack.begin() + (std::ptrdiff_t)idx);
 	runtime->stack_kinds.erase(runtime->stack_kinds.begin() + (std::ptrdiff_t)idx);
-}
-
-static void* bytecodeAllocate(const ls_host* host, size_t size, size_t align) {
-	return host && host->allocate ? host->allocate(host->allocator_userdata, size, align) : ::operator new(size, std::nothrow);
-}
-
-static void bytecodeDeallocate(const ls_host* host, void* ptr) {
-	if (!ptr) return;
-	if (host && host->deallocate) {
-		host->deallocate(host->allocator_userdata, ptr);
-	}
-	else {
-		::operator delete(ptr);
-	}
 }
 
 static i32 runtimeStackIndex(ls_runtime* runtime, i32 index) {
@@ -151,28 +172,23 @@ static void bindBuiltinNativeFunctions(ls_runtime* runtime) {
 	if (!runtime || !runtime->bytecode) return;
 	for (size_t i = 0; i < runtime->bytecode->native_functions.size(); ++i) {
 		const BytecodeNativeFunction& fn = runtime->bytecode->native_functions[i];
-		const char* dot = nullptr;
-		for (const char* c = fn.name.begin; c != fn.name.end; ++c) {
-			if (*c == '.') dot = c;
-		}
-		const ls_string_view suffix = dot ? ls_string_view{dot + 1, fn.name.end} : fn.name;
 		ls_native_fn& binding = runtime->native_functions[i];
-		if (equalStrings(suffix, makeStringView("sin")) && fn.return_type.kind == LS_TYPE_F32 && fn.params.size() == 1 && fn.params[0].kind == LS_TYPE_F32) {
+		if (equalStrings(fn.canonical_name, makeStringView("std:math.sin")) && fn.return_type.kind == LS_TYPE_F32 && fn.params.size() == 1 && fn.params[0].kind == LS_TYPE_F32) {
 			binding = &mathSinF32;
 		}
-		else if (equalStrings(suffix, makeStringView("cos")) && fn.return_type.kind == LS_TYPE_F32 && fn.params.size() == 1 && fn.params[0].kind == LS_TYPE_F32) {
+		else if (equalStrings(fn.canonical_name, makeStringView("std:math.cos")) && fn.return_type.kind == LS_TYPE_F32 && fn.params.size() == 1 && fn.params[0].kind == LS_TYPE_F32) {
 			binding = &mathCosF32;
 		}
-		else if (equalStrings(suffix, makeStringView("sqrt")) && fn.return_type.kind == LS_TYPE_F32 && fn.params.size() == 1 && fn.params[0].kind == LS_TYPE_F32) {
+		else if (equalStrings(fn.canonical_name, makeStringView("std:math.sqrt")) && fn.return_type.kind == LS_TYPE_F32 && fn.params.size() == 1 && fn.params[0].kind == LS_TYPE_F32) {
 			binding = &mathSqrtF32;
 		}
-		else if (equalStrings(suffix, makeStringView("sin_f64")) && fn.return_type.kind == LS_TYPE_F64 && fn.params.size() == 1 && fn.params[0].kind == LS_TYPE_F64) {
+		else if (equalStrings(fn.canonical_name, makeStringView("std:math.sin_f64")) && fn.return_type.kind == LS_TYPE_F64 && fn.params.size() == 1 && fn.params[0].kind == LS_TYPE_F64) {
 			binding = &mathSinF64;
 		}
-		else if (equalStrings(suffix, makeStringView("cos_f64")) && fn.return_type.kind == LS_TYPE_F64 && fn.params.size() == 1 && fn.params[0].kind == LS_TYPE_F64) {
+		else if (equalStrings(fn.canonical_name, makeStringView("std:math.cos_f64")) && fn.return_type.kind == LS_TYPE_F64 && fn.params.size() == 1 && fn.params[0].kind == LS_TYPE_F64) {
 			binding = &mathCosF64;
 		}
-		else if (equalStrings(suffix, makeStringView("sqrt_f64")) && fn.return_type.kind == LS_TYPE_F64 && fn.params.size() == 1 && fn.params[0].kind == LS_TYPE_F64) {
+		else if (equalStrings(fn.canonical_name, makeStringView("std:math.sqrt_f64")) && fn.return_type.kind == LS_TYPE_F64 && fn.params.size() == 1 && fn.params[0].kind == LS_TYPE_F64) {
 			binding = &mathSqrtF64;
 		}
 	}
@@ -180,7 +196,6 @@ static void bindBuiltinNativeFunctions(ls_runtime* runtime) {
 
 ls_runtime* createBytecodeRuntime(ls_bytecode* bytecode);
 void destroyBytecodeRuntime(ls_runtime* runtime);
-bool callBytecodeRuntime(ls_runtime* runtime, i32 function_index);
 
 ls_runtime* createBytecodeRuntime(ls_bytecode* bytecode) {
 	if (!bytecode) return nullptr;
@@ -202,197 +217,6 @@ void destroyBytecodeRuntime(ls_runtime* runtime) {
 	bytecodeDeallocate(&host, runtime);
 }
 
-extern "C" {
-
-ls_runtime* ls_runtime_create(ls_bytecode* bytecode) {
-	return createBytecodeRuntime(bytecode);
-}
-
-void ls_runtime_destroy(ls_runtime* runtime) {
-	destroyBytecodeRuntime(runtime);
-}
-
-ls_result ls_runtime_set_native_function_callback(
-	ls_runtime* runtime,
-	int function_index,
-	ls_native_fn callback
-) {
-	if (!runtime || !runtime->bytecode) return LS_RESULT_FAILURE;
-	if (function_index < 0 || function_index >= (i32)runtime->native_functions.size()) return LS_RESULT_FAILURE;
-	runtime->native_functions[(size_t)function_index] = callback;
-	return LS_RESULT_OK;
-}
-
-i32 ls_to_i32(ls_runtime* runtime, i32 index) {
-	if (!runtime) return 0;
-	return i32(runtime->stack[runtimeStackIndex(runtime, index)]);
-}
-
-i32 ls_to_bool(ls_runtime* runtime, i32 index) {
-	return ls_to_i32(runtime, index) != 0;
-}
-
-u32 ls_to_u32(ls_runtime* runtime, i32 index) {
-	return u32(runtime->stack[runtimeStackIndex(runtime, index)]);
-}
-
-i64 ls_to_i64(ls_runtime* runtime, i32 index) {
-	return (i64)runtime->stack[runtimeStackIndex(runtime, index)];
-}
-
-void* ls_to_ptr(ls_runtime* runtime, i32 index) {
-	return (void*)(uintptr)runtime->stack[runtimeStackIndex(runtime, index)];
-}
-
-u64 ls_to_u64(ls_runtime* runtime, i32 index) {
-	return runtime->stack[runtimeStackIndex(runtime, index)];
-}
-
-float ls_to_f32(ls_runtime* runtime, i32 index) {
-	float value = 0.0f;
-	memcpy(&value, &runtime->stack[runtimeStackIndex(runtime, index)], sizeof(value));
-	return value;
-}
-
-double ls_to_f64(ls_runtime* runtime, i32 index) {
-	double value = 0.0;
-	memcpy(&value, &runtime->stack[runtimeStackIndex(runtime, index)], sizeof(value));
-	return value;
-}
-
-ls_string_view ls_to_string(ls_runtime* runtime, i32 index) {
-	ls_string_view result = {};
-	if (!runtime) return result;
-	const i32 stack_index = runtimeStackIndex(runtime, index);
-	if (stack_index < 0 || stack_index >= (i32)runtime->stack.size()) return result;
-	const u64 value = runtime->stack[(size_t)stack_index];
-	if (isStringValue(runtime, (size_t)stack_index)) {
-		const ls_string* str = toStringObject(value);
-		result.begin = str->chars;
-		result.end = str->chars + str->length;
-		return result;
-	}
-	const char* begin = (const char*)(uintptr)value;
-	if (!begin) return result;
-	result.begin = begin;
-	result.end = begin + strlen(begin);
-	return result;
-}
-
-void ls_push_bool(ls_runtime* runtime, int value) {
-	stackPushRaw(runtime, value ? 1u : 0u);
-}
-
-void ls_push_i32(ls_runtime* runtime, i32 value) {
-	stackPushRaw(runtime, (u64)value);
-}
-
-void ls_push_u32(ls_runtime* runtime, u32 value) {
-	stackPushRaw(runtime, (u64)value);
-}
-
-void ls_push_i64(ls_runtime* runtime, i64 value) {
-	stackPushRaw(runtime, (u64)value);
-}
-
-void ls_push_ptr(ls_runtime* runtime, void* value) {
-	stackPushRaw(runtime, (u64)(uintptr)value);
-}
-
-void ls_push_u64(ls_runtime* runtime, u64 value) {
-	stackPushRaw(runtime, value);
-}
-
-void ls_push_f32(ls_runtime* runtime, float value) {
-	u64 raw = 0;
-	memcpy(&raw, &value, sizeof(value));
-	stackPushRaw(runtime, raw);
-}
-
-void ls_push_f64(ls_runtime* runtime, double value) {
-	u64 raw = 0;
-	memcpy(&raw, &value, sizeof(value));
-	stackPushRaw(runtime, raw);
-}
-
-void ls_push_string(ls_runtime* runtime, ls_string_view value) {
-	if (!runtime) return;
-	if (!runtime->bytecode) {
-		stackPushRaw(runtime, 0);
-		return;
-	}
-	const size_t len = (size_t)(value.end - value.begin);
-	ls_string* storage = (ls_string*)bytecodeAllocate(&runtime->bytecode->host, sizeof(ls_string) + len, alignof(ls_string));
-	if (!storage) {
-		stackPushRaw(runtime, 0);
-		return;
-	}
-	storage->host = runtime->bytecode->host;
-	storage->ref_count = 1;
-	storage->length = (u32)len;
-	if (len > 0) memcpy(storage->chars, value.begin, len);
-	storage->chars[len] = '\0';
-	stackPushRaw(runtime, (u64)(uintptr)storage, (u8)StackValueKind::STRING);
-}
-
-void ls_push_null(ls_runtime* runtime) {
-	stackPushRaw(runtime, 0);
-}
-
-ls_result ls_call_index(
-	ls_runtime* runtime,
-	i32 function_index,
-	size_t arg_count,
-	size_t result_count
-) {
-	if (!runtime || !runtime->bytecode) return LS_RESULT_FAILURE;
-	if (function_index < 0 || function_index >= (i32)runtime->bytecode->functions.size()) return LS_RESULT_FAILURE;
-	BytecodeFunction& fn = runtime->bytecode->functions[function_index];
-	if (fn.param_count != (i32)fn.params.size()) return LS_RESULT_FAILURE;
-	if (arg_count > fn.params.size()) return LS_RESULT_FAILURE;
-	const size_t global_count = (size_t)runtime->bytecode->global_count;
-	if (runtime->stack.size() < global_count + arg_count) return LS_RESULT_FAILURE;
-	const size_t arg_base = runtime->stack.size() - arg_count;
-	struct ArgValue {
-		u64 value;
-		u8 kind;
-	};
-	std::vector<ArgValue> args;
-	args.reserve(arg_count);
-	for (size_t i = 0; i < arg_count; ++i) {
-		const size_t idx = arg_base + i;
-		args.push_back({runtime->stack[idx], runtime->stack_kinds[idx]});
-		retainStackValue(runtime, runtime->stack[idx], runtime->stack_kinds[idx]);
-	}
-	stackResize(runtime, global_count);
-	for (size_t i = 0; i < arg_count; ++i) stackPushRaw(runtime, args[i].value, args[i].kind);
-	for (size_t i = arg_count; i < fn.params.size(); ++i) stackPushRaw(runtime, 0);
-	if (!callBytecodeRuntime(runtime, function_index)) return LS_RESULT_FAILURE;
-	if (result_count > 0 && fn.return_count == 0) {
-		stackPushRaw(runtime, 0);
-	}
-	return LS_RESULT_OK;
-}
-
-ls_result ls_call(
-	ls_runtime* runtime,
-	ls_string_view function_name,
-	size_t arg_count,
-	size_t result_count
-) {
-	const i32 function_index = runtime && runtime->bytecode ? bytecodeFindFunction(runtime->bytecode, function_name) : -1;
-	if (function_index < 0) return LS_RESULT_FAILURE;
-	return ls_call_index(runtime, function_index, arg_count, result_count);
-}
-
-ls_type_kind ls_bytecode_runtime_result_kind(ls_runtime* runtime, ls_string_view function_name) {
-	if (!runtime || !runtime->bytecode) return LS_TYPE_VOID;
-	const i32 function_index = bytecodeFindFunction(runtime->bytecode, function_name);
-	if (function_index < 0) return LS_TYPE_VOID;
-	return runtime->bytecode->functions[(size_t)function_index].return_type.kind;
-}
-
-}
 
 template <typename T>
 static inline void bytecodeAdd(ls_runtime& runtime) {
@@ -553,7 +377,13 @@ static bool bytecodeCompareByType(ls_runtime& runtime, ls_type_kind kind, Compar
 	}
 }
 
-static bool callBytecodeCode(
+static bool decodeFunctionHandle(u64 raw, i32* fn_idx) {
+	if (raw == 0) return false;
+	*fn_idx = (i32)(raw - 1);
+	return *fn_idx >= 0;
+}
+
+bool callBytecodeCode(
 	ls_runtime* runtime,
 	const u8* code,
 	size_t code_size,
@@ -561,12 +391,6 @@ static bool callBytecodeCode(
 	i32 local_count,
 	i32 result_count
 );
-
-static bool decodeFunctionHandle(u64 raw, i32* fn_idx) {
-	if (raw == 0) return false;
-	*fn_idx = (i32)(raw - 1);
-	return *fn_idx >= 0;
-}
 
 static bool callBytecodeFunctionValue(
 	ls_runtime* runtime,
@@ -580,33 +404,6 @@ static bool callBytecodeFunctionValue(
 	if ((size_t)fn_idx >= runtime->bytecode->functions.size()) return false;
 	BytecodeFunction& fn = runtime->bytecode->functions[fn_idx];
 	return callBytecodeCode(runtime, &runtime->bytecode->code[fn.code_offset], (size_t)fn.code_size, fn.param_count, fn.local_count, fn.return_count);
-}
-
-template <typename T>
-void pushStack(ls_runtime& runtime, const T& value) {
-	u64 v = 0;
-	static_assert(sizeof(value) <= sizeof(v));
-	memcpy(&v, &value, sizeof(value));
-	if constexpr (std::is_signed_v<T> && sizeof(T) < sizeof(v)) {
-		if (value < 0) {
-			const u64 sign_mask = ~((u64(1) << (sizeof(T) * 8)) - 1);
-			v |= sign_mask;
-		}
-	}
-	stackPushRaw(&runtime, v);
-}
-
-static inline void pushStack(ls_runtime& runtime, u64 value, u8 kind) {
-	stackPushCopy(&runtime, value, kind);
-}
-
-template <typename T>
-T popStack(ls_runtime& runtime) {
-	T value;
-	static_assert(sizeof(value) <= sizeof(runtime.stack.back()));
-	memcpy(&value, &runtime.stack.back(), sizeof(value));
-	stackPop(&runtime);
-	return value;
 }
 
 static bool finishCall(ls_runtime& runtime, size_t frame_base, size_t result_stack_base, size_t result_count) {
@@ -692,7 +489,7 @@ static bool callBytecodeCode(
 				const u8 param_idx = *ip;
 				++ip;
 				if (param_idx >= param_count) return false;
-				pushStack(*runtime, runtime->stack[stack_base + param_idx], runtime->stack_kinds[stack_base + param_idx]);
+				stackPushCopy(runtime, runtime->stack[stack_base + param_idx], runtime->stack_kinds[stack_base + param_idx]);
 				break;
 			}
 			case BytecodeOp::LOAD_GLOBAL: {
@@ -700,14 +497,14 @@ static bool callBytecodeCode(
 				memcpy(&global_idx, ip, sizeof(global_idx));
 				ip += sizeof(global_idx);
 				if (!runtime->bytecode || global_idx >= (u32)runtime->bytecode->global_count) return false;
-				pushStack(*runtime, runtime->stack[global_idx], runtime->stack_kinds[global_idx]);
+				stackPushCopy(runtime, runtime->stack[global_idx], runtime->stack_kinds[global_idx]);
 				break;
 			}
 			case BytecodeOp::LOAD_LOCAL: {
 				const u8 local_idx = *ip;
 				++ip;
 				if (local_idx >= local_count) return false;
-				pushStack(*runtime, runtime->stack[local_base + local_idx], runtime->stack_kinds[local_base + local_idx]);
+				stackPushCopy(runtime, runtime->stack[local_base + local_idx], runtime->stack_kinds[local_base + local_idx]);
 				break;
 			}
 			case BytecodeOp::STORE_GLOBAL: {
@@ -739,7 +536,7 @@ static bool callBytecodeCode(
 				const size_t address = (size_t)runtime->stack.back();
 				stackPop(runtime);
 				if (address + slot_count > runtime->stack.size()) return false;
-				for (u8 i = 0; i < slot_count; ++i) pushStack(*runtime, runtime->stack[address + i], runtime->stack_kinds[address + i]);
+				for (u8 i = 0; i < slot_count; ++i) stackPushCopy(runtime, runtime->stack[address + i], runtime->stack_kinds[address + i]);
 				break;
 			}
 			case BytecodeOp::STORE_INDIRECT: {
@@ -940,18 +737,173 @@ static bool callBytecodeCode(
 	return finishCall(*runtime, frame_base, result_stack_base, (size_t)result_count);
 }
 
-static bool initializeGlobals(ls_runtime* runtime) {
-	if (!runtime || !runtime->bytecode) return false;
-	if (runtime->globals_initialized) return true;
-	runtime->globals_initialized = true;
-	if (runtime->bytecode->global_init_code.empty()) return true;
-	return callBytecodeCode(runtime, runtime->bytecode->global_init_code.data(), runtime->bytecode->global_init_code.size(), 0, 0, 0);
+extern "C" {
+
+ls_runtime* ls_runtime_create(ls_bytecode* bytecode) {
+	return createBytecodeRuntime(bytecode);
 }
 
-bool callBytecodeRuntime(ls_runtime* runtime, i32 function_index) {
-	if (!runtime || !runtime->bytecode) return false;
-	if (!initializeGlobals(runtime)) return false;
-	if (function_index < 0 || function_index >= runtime->bytecode->functions.size()) return false;
+void ls_runtime_destroy(ls_runtime* runtime) {
+	destroyBytecodeRuntime(runtime);
+}
+
+ls_result ls_runtime_set_native_function_callback(
+	ls_runtime* runtime,
+	int function_index,
+	ls_native_fn callback
+) {
+	if (!runtime || !runtime->bytecode) return LS_RESULT_FAILURE;
+	if (function_index < 0 || function_index >= (i32)runtime->native_functions.size()) return LS_RESULT_FAILURE;
+	runtime->native_functions[(size_t)function_index] = callback;
+	return LS_RESULT_OK;
+}
+
+i32 ls_to_i32(ls_runtime* runtime, i32 index) {
+	if (!runtime) return 0;
+	return i32(runtime->stack[runtimeStackIndex(runtime, index)]);
+}
+
+i32 ls_to_bool(ls_runtime* runtime, i32 index) {
+	return ls_to_i32(runtime, index) != 0;
+}
+
+u32 ls_to_u32(ls_runtime* runtime, i32 index) {
+	return u32(runtime->stack[runtimeStackIndex(runtime, index)]);
+}
+
+i64 ls_to_i64(ls_runtime* runtime, i32 index) {
+	return (i64)runtime->stack[runtimeStackIndex(runtime, index)];
+}
+
+void* ls_to_ptr(ls_runtime* runtime, i32 index) {
+	return (void*)(uintptr)runtime->stack[runtimeStackIndex(runtime, index)];
+}
+
+u64 ls_to_u64(ls_runtime* runtime, i32 index) {
+	return runtime->stack[runtimeStackIndex(runtime, index)];
+}
+
+float ls_to_f32(ls_runtime* runtime, i32 index) {
+	float value = 0.0f;
+	memcpy(&value, &runtime->stack[runtimeStackIndex(runtime, index)], sizeof(value));
+	return value;
+}
+
+double ls_to_f64(ls_runtime* runtime, i32 index) {
+	double value = 0.0;
+	memcpy(&value, &runtime->stack[runtimeStackIndex(runtime, index)], sizeof(value));
+	return value;
+}
+
+ls_string_view ls_to_string(ls_runtime* runtime, i32 index) {
+	ls_string_view result = {};
+	if (!runtime) return result;
+	const i32 stack_index = runtimeStackIndex(runtime, index);
+	if (stack_index < 0 || stack_index >= (i32)runtime->stack.size()) return result;
+	const u64 value = runtime->stack[(size_t)stack_index];
+	if (isStringValue(runtime, (size_t)stack_index)) {
+		const ls_string* str = toStringObject(value);
+		result.begin = str->chars;
+		result.end = str->chars + str->length;
+		return result;
+	}
+	const char* begin = (const char*)(uintptr)value;
+	if (!begin) return result;
+	result.begin = begin;
+	result.end = begin + strlen(begin);
+	return result;
+}
+
+void ls_push_bool(ls_runtime* runtime, int value) {
+	stackPushRaw(runtime, value ? 1u : 0u);
+}
+
+void ls_push_i32(ls_runtime* runtime, i32 value) {
+	stackPushRaw(runtime, (u64)value);
+}
+
+void ls_push_u32(ls_runtime* runtime, u32 value) {
+	stackPushRaw(runtime, (u64)value);
+}
+
+void ls_push_i64(ls_runtime* runtime, i64 value) {
+	stackPushRaw(runtime, (u64)value);
+}
+
+void ls_push_ptr(ls_runtime* runtime, void* value) {
+	stackPushRaw(runtime, (u64)(uintptr)value);
+}
+
+void ls_push_u64(ls_runtime* runtime, u64 value) {
+	stackPushRaw(runtime, value);
+}
+
+void ls_push_f32(ls_runtime* runtime, float value) {
+	u64 raw = 0;
+	memcpy(&raw, &value, sizeof(value));
+	stackPushRaw(runtime, raw);
+}
+
+void ls_push_f64(ls_runtime* runtime, double value) {
+	u64 raw = 0;
+	memcpy(&raw, &value, sizeof(value));
+	stackPushRaw(runtime, raw);
+}
+
+void ls_push_string(ls_runtime* runtime, ls_string_view value) {
+	if (!runtime) return;
+	if (!runtime->bytecode) {
+		stackPushRaw(runtime, 0);
+		return;
+	}
+	const size_t len = (size_t)(value.end - value.begin);
+	ls_string* storage = (ls_string*)bytecodeAllocate(&runtime->bytecode->host, sizeof(ls_string) + len, alignof(ls_string));
+	if (!storage) {
+		stackPushRaw(runtime, 0);
+		return;
+	}
+	storage->host = runtime->bytecode->host;
+	storage->ref_count = 1;
+	storage->length = (u32)len;
+	if (len > 0) memcpy(storage->chars, value.begin, len);
+	storage->chars[len] = '\0';
+	stackPushRaw(runtime, (u64)(uintptr)storage, (u8)StackValueKind::STRING);
+}
+
+void ls_push_null(ls_runtime* runtime) {
+	stackPushRaw(runtime, 0);
+}
+
+ls_result ls_call_index(ls_runtime* runtime, i32 function_index) {
 	BytecodeFunction& fn = runtime->bytecode->functions[function_index];
-	return callBytecodeCode(runtime, &runtime->bytecode->code[fn.code_offset], (size_t)fn.code_size, fn.param_count, fn.local_count, fn.return_count);
+	if (fn.param_count != (i32)fn.params.size()) return LS_RESULT_FAILURE; // TODO why is there param_count when there's params?
+
+	const size_t global_count = (size_t)runtime->bytecode->global_count;
+	if (runtime->stack.size() < global_count + fn.params.size()) return LS_RESULT_FAILURE;
+
+	if (!runtime->globals_initialized) {
+		runtime->globals_initialized = true;
+		if (!runtime->bytecode->global_init_code.empty()) {
+			if (!callBytecodeCode(runtime, runtime->bytecode->global_init_code.data(), runtime->bytecode->global_init_code.size(), 0, 0, 0)) {
+				return LS_RESULT_FAILURE;
+			}
+		}
+	}
+
+	return callBytecodeCode(runtime, &runtime->bytecode->code[fn.code_offset], (size_t)fn.code_size, fn.param_count, fn.local_count, fn.return_count) ? LS_RESULT_OK : LS_RESULT_FAILURE;
+}
+
+ls_result ls_call(ls_runtime* runtime, ls_string_view function_name) {
+	const i32 function_index = runtime && runtime->bytecode ? bytecodeFindFunction(runtime->bytecode, function_name) : -1;
+	if (function_index < 0) return LS_RESULT_FAILURE;
+	return ls_call_index(runtime, function_index);
+}
+
+ls_type_kind ls_bytecode_runtime_result_kind(ls_runtime* runtime, ls_string_view function_name) {
+	if (!runtime || !runtime->bytecode) return LS_TYPE_VOID;
+	const i32 function_index = bytecodeFindFunction(runtime->bytecode, function_name);
+	if (function_index < 0) return LS_TYPE_VOID;
+	return runtime->bytecode->functions[(size_t)function_index].return_type.kind;
+}
+
 }

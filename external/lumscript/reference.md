@@ -3,7 +3,6 @@
 # TODO
 
 * dynamic arrays/memory
-* operator overloading
 * debugger
 * string interpolation
 * jit/llvm
@@ -144,7 +143,7 @@ import "math"
 The `.lum` suffix is omitted:
 
 ```cpp
-import "core:math"
+import "std:math"
 import "core:collections/list" as list
 ```
 
@@ -175,12 +174,15 @@ fn main() : f32 {
 ```
 
 ```cpp
-import "core:math" as math
+import "std:math" as math
 
 fn main() : f32 {
 	return math.sin(0.0) + math.cos(0.0) + math.sqrt(4.0);
 }
 ```
+
+Builtin math functions live under `std:`. Use `std:math` for `sin`, `cos`, and `sqrt`.
+The `std:` prefix is reserved for builtin modules and should not be used for user-defined imports.
 
 Rules:
 
@@ -973,7 +975,7 @@ ls_bytecode* bytecode = ls_bytecode_compile(module, &host);
 ls_runtime* runtime = bytecode ? ls_runtime_create(bytecode) : nullptr;
 if (runtime) {
 	ls_string_view main_name = { "main", "main" + 4 };
-	ls_call(runtime, main_name, 0, 1);
+	ls_call(runtime, main_name);
 	if (ls_bytecode_runtime_result_kind(runtime, main_name) != LS_TYPE_VOID) {
 		i32 result = ls_to_i32(runtime, -1);
 	}
@@ -1031,20 +1033,10 @@ extern fn native_add(a : i32, b : i32) : i32;
 `extern` declarations inform the compiler about a function's name and signature but do not provide an implementation. The host must register and bind a native function with the same qualified name (using `ls_runtime_set_native_function_callback`) before calling into script.
 
 
-## Editor and diagnostics
-
-Studio support:
-
-- create/open `.lum` assets in asset browser
-- syntax highlighting
-- save/open/locate actions
-- `Check` action that runs parser + checker on current text
-
-Diagnostic behavior:
+## Diagnostic
 
 - compilation currently stops after first reported error
 - parser/checker/runtime diagnostics include source, line, and column when the source name is known
-- top-level world/editor scripts report the asset path, for example `maps/demo/demo.lum`
 - imported source files report the import path, for example `core:vec3`
 
 Examples:
@@ -1053,25 +1045,3 @@ Examples:
 maps/demo/demo.lum: line 50, column 4: Unexpected token near '_'
 core:vec3: line 28, column 14: Arithmetic operands must have the same type
 ```
-
-Common checker errors include duplicate declarations, unknown symbols, invalid assignment to `const`, type mismatches, and non-`bool` conditions.
-
-## Known limitations and pending spec decisions
-
-Not implemented yet:
-
-- full `engine:` API coverage
-- string interpolation
-- maps
-- lambdas and closures
-- named struct fields in literals
-- complete return-path analysis for all branches
-
-Still being finalized:
-
-- nullable flow typing details after reassignment
-- exact operator lookup rules for mixed imported declarations
-- `match` overlap rules for range/literal combinations
-- global initialization order across imports
-- string semantic guarantees (encoding/equality guarantees)
-- migration from numeric input event helpers to enum-based event types

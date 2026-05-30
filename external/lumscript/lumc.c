@@ -220,7 +220,7 @@ int main(int argc, char** argv) {
 				ls_push_string(ctx.runtime, ls_from_cstr(arg));
 			}
 		}
-		if (!ls_call(ctx.runtime, ls_from_cstr(function_name), call_arg_count, 1)) {
+		if (!ls_call(ctx.runtime, ls_from_cstr(function_name))) {
 			fprintf(stderr, "Runtime error\n");
 			goto cleanup;
 		}

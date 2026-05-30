@@ -503,6 +503,7 @@ TEST(OperatorDoesNotAllowImplicitCastFails) {
 	TestContext diagnostics;
 	ls_module* module = ls_module_create(&diagnostics.host);
 	EXPECT_TRUE(module != nullptr);
+	diagnostics.diagnostics.output_enabled = false;
 	EXPECT_TRUE(!ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
 	ls_module_destroy(module);
 	return true;
@@ -547,6 +548,7 @@ TEST(OperatorOverloadAmbiguityFails) {
 	TestContext diagnostics;
 	ls_module* module = ls_module_create(&diagnostics.host);
 	EXPECT_TRUE(module != nullptr);
+	diagnostics.diagnostics.output_enabled = false;
 	EXPECT_TRUE(!ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
 	ls_module_destroy(module);
 	return true;

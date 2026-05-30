@@ -93,7 +93,7 @@ struct BytecodeFunction {
 };
 
 struct BytecodeNativeFunction {
-	ls_string_view name;
+	ls_string_view canonical_name;
 	std::vector<ls_type> params;
 	ls_type return_type = {};
 	i32 return_count = 0;

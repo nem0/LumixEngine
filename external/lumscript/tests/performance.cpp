@@ -15,7 +15,7 @@ int main() {
     src.reserve((size_t)LINES * 32);
 
     // Add imports and a small main so the module has an entry point
-    src += "import \"core:math\" as math;\n";
+    src += "import \"std:math\" as math;\n";
     src += "fn main() : void { var _ = math.sin(0.5); }\n";
 
     for (int i = 0; i < LINES; ++i) {

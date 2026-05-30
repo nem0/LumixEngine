@@ -126,7 +126,7 @@ struct LumScriptModuleImpl : LumScriptModule {
 		host.print = &printLumScriptMessage;
 
 		ls_push_f32(m_script.runtime, time_delta);
-		if (!ls_call(m_script.runtime, toLs("update"), 1, 0)) {
+		if (!ls_call(m_script.runtime, toLs("update"))) {
 			logError("LumScript update: ", diagnostics);
 		}
 	}
@@ -267,7 +267,7 @@ private:
 
 		ls_push_ptr(m_script.runtime, &m_world);
 		ls_push_ptr(m_script.runtime, &static_cast<LumScriptSystem&>(m_system).getEngine().getInputSystem());
-		if (!ls_call(m_script.runtime, toLs("init"), 2, 0)) {
+		if (!ls_call(m_script.runtime, toLs("init"))) {
 			logError("LumScript init failed: ", diagnostics);
 			return false;
 		}

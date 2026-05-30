@@ -27,7 +27,7 @@ TEST(BytecodeCompileAndRunMain) {
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -82,7 +82,7 @@ TEST(ExternImport) {
 	EXPECT_TRUE(runtime != nullptr);
 	ls_runtime_set_native_function_callback(runtime, sum_fn_idx, sumfn);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -119,7 +119,7 @@ TEST(StructExtern) {
 	const i32 fn_idx = ls_module_get_native_function_index(module, toLs("create"));
 	
 	EXPECT_TRUE(ls_runtime_set_native_function_callback(runtime, fn_idx, create_fn) == LS_RESULT_OK);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -2));
 	EXPECT_TRUE(&ptr == ls_to_ptr(runtime, -1));
 	CAPI_END(module);
@@ -157,7 +157,7 @@ TEST(Extern) {
 	
 	EXPECT_TRUE(ls_runtime_set_native_function_callback(runtime, fn_idx, nativefn) == LS_RESULT_OK);
 	EXPECT_TRUE(ls_runtime_set_native_function_callback(runtime, fn2_idx, nativefn2) == LS_RESULT_OK);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	
@@ -219,7 +219,7 @@ TEST(NativePtr) {
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(ls_runtime_set_native_function_callback(runtime, create_fn_idx, createfn) == LS_RESULT_OK);
 	EXPECT_TRUE(ls_runtime_set_native_function_callback(runtime, test_fn_idx, testfn) == LS_RESULT_OK);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_TRUE(matches);
 	CAPI_END(module);
 	
@@ -243,7 +243,7 @@ TEST(testNativeFunctionCall) {
 
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(ls_runtime_set_native_function_callback(runtime, native_add, &nativeAddC) == LS_RESULT_OK);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -251,7 +251,7 @@ TEST(testNativeFunctionCall) {
 
 TEST(CoreMathImportRuntime) {
 	const char* source = R"(
-		import "core:math" as math
+		import "std:math" as math
 
 		fn sin32() : f32 {
 			return math.sin(0.0);
@@ -282,18 +282,57 @@ TEST(CoreMathImportRuntime) {
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_call(runtime, toLs("sin32"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("sin32")));
 	EXPECT_FLOAT_EQ(0.0f, ls_to_f32(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("cos32"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("cos32")));
 	EXPECT_FLOAT_EQ(1.0f, ls_to_f32(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("sin64"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("sin64")));
 	EXPECT_FLOAT_EQ(0.0f, (float)ls_to_f64(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("cos64"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("cos64")));
 	EXPECT_FLOAT_EQ(1.0f, (float)ls_to_f64(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("sqrt32"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("sqrt32")));
 	EXPECT_FLOAT_EQ(3.0f, ls_to_f32(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("sqrt64"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("sqrt64")));
 	EXPECT_FLOAT_EQ(4.0f, (float)ls_to_f64(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(FunctionNamedSinCompilesAndRuns) {
+	const char* source = R"(
+		fn sin() : i32 {
+			return 41;
+		}
+
+		fn main() : i32 {
+			return sin() + 1;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ExternSinDoesNotAutoBindBuiltin) {
+	const char* source = R"(
+		extern fn sin(v : f32) : f32;
+
+		fn main() : f32 {
+			return sin(0.5);
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(!ls_call(runtime, toLs("main")));
 	CAPI_END(module);
 	return true;
 }
@@ -313,7 +352,7 @@ TEST(BytecodeAddTwoConstants) {
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(3, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -337,7 +376,7 @@ TEST(BytecodeFloatArithmetic) {
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_FLOAT_EQ(3.75f, ls_to_f32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -361,7 +400,7 @@ TEST(BytecodeF64Arithmetic) {
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_FLOAT_EQ(3.75f, (float)ls_to_f64(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -385,7 +424,7 @@ TEST(BytecodeExplicitCastNumeric) {
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_FLOAT_EQ(1.0f, ls_to_f32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -414,7 +453,7 @@ TEST(BytecodeExplicitCastEnumToInteger) {
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(1, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -443,7 +482,7 @@ TEST(BytecodeFunctionValueLocal) {
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -476,7 +515,7 @@ TEST(BytecodeIndirectFunctionCall) {
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -501,7 +540,7 @@ TEST(BytecodeMultiplyExpression) {
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -525,7 +564,7 @@ TEST(BytecodeDivideExpression) {
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(21, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -549,7 +588,7 @@ TEST(BytecodeModuloExpression) {
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(2, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -575,7 +614,7 @@ TEST(BytecodeMultiplyAssignment) {
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -601,7 +640,7 @@ TEST(BytecodeDivideAssignment) {
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(21, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -673,7 +712,7 @@ TEST(BytecodeCompoundAssignArrayIndexEvaluatedOnce) {
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(142, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -701,7 +740,7 @@ TEST(BytecodeDeferRunsOnReturn) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(7, ls_to_i32(runtime, -1));
 	EXPECT_EQ(2, ls_to_i32(runtime, 0));
 
@@ -736,7 +775,7 @@ TEST(BytecodeDeferLifoAcrossScopes) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(0, ls_to_i32(runtime, -1));
 	EXPECT_EQ(1, ls_to_i32(runtime, 0));
 	EXPECT_EQ(0, ls_to_i32(runtime, 1));
@@ -767,7 +806,7 @@ TEST(BytecodeNullableLocalNullCheck) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -800,7 +839,7 @@ TEST(BytecodeNullableStructComparison) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -824,7 +863,7 @@ TEST(BytecodeNullableReturnNull) {
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(0, ls_to_bool(runtime, -2));
 	EXPECT_EQ(0, ls_to_i32(runtime, -1));
 	ls_runtime_destroy(runtime);
@@ -849,7 +888,7 @@ TEST(BytecodeNullableReturnValue) {
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(1, ls_to_bool(runtime, -2));
 	EXPECT_EQ(7, ls_to_i32(runtime, -1));
 	ls_runtime_destroy(runtime);
@@ -881,7 +920,7 @@ TEST(BytecodeRefParameterCall) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -918,7 +957,7 @@ TEST(BytecodeRefParameterNestedFieldCall) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(11, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -951,7 +990,7 @@ TEST(BytecodeRefParameterArrayCall) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -977,7 +1016,7 @@ TEST(BytecodeRunFunctionWithF64ParameterFromStack) {
 	EXPECT_TRUE(runtime != nullptr);
 
 	ls_push_f64(runtime, 41.5);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_FLOAT_EQ(42.0f, (float)ls_to_f64(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1010,11 +1049,11 @@ TEST(BytecodeF64Comparisons) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("is_gt"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("is_gt")));
 	EXPECT_TRUE(ls_to_bool(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("is_lt"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("is_lt")));
 	EXPECT_TRUE(ls_to_bool(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("is_eq"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("is_eq")));
 	EXPECT_TRUE(ls_to_bool(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1058,7 +1097,7 @@ TEST(BytecodeNamespaceResolutionByFirstParameter) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1114,7 +1153,7 @@ TEST(BytecodeNamespaceResolutionByFirstParameterChoosesNamespace) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(85, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1144,7 +1183,7 @@ TEST(BytecodeStructsBasic) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1178,7 +1217,7 @@ TEST(BytecodeNestedStructs) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(49, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1212,7 +1251,7 @@ TEST(BytecodeStructParameterPassing) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1243,7 +1282,7 @@ TEST(BytecodeStructFieldAssignment) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(22, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1274,7 +1313,7 @@ TEST(BytecodeStructFieldCompoundAssignment) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(8, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1306,7 +1345,7 @@ TEST(BytecodeStructFieldAssignmentGlobal) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(22, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1342,7 +1381,7 @@ TEST(BytecodeStructFieldAssignmentParameterLocalCopy) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(22, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1375,7 +1414,7 @@ TEST(BytecodeEnumBasicUsage) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1411,7 +1450,7 @@ TEST(BytecodeEnumMatch) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(2, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1450,11 +1489,11 @@ TEST(BytecodeIntegerOverflowWraps) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("add_i8_wrap"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("add_i8_wrap")));
 	EXPECT_EQ(-128, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("add_u8_wrap"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("add_u8_wrap")));
 	EXPECT_EQ(0, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("sub_i8_wrap"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("sub_i8_wrap")));
 	EXPECT_EQ(-1, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1498,7 +1537,7 @@ TEST(BytecodeRunFunctionWithParameterFromStack) {
 	EXPECT_TRUE(runtime != nullptr);
 
 	ls_push_i32(runtime, 41);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 
 	i32 result = ls_to_i32(runtime, -1);
 	EXPECT_EQ(42, result);
@@ -1529,7 +1568,7 @@ TEST(BytecodeFunctionCallWorks) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1569,7 +1608,7 @@ TEST(BytecodeWhileBreakContinue) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(18, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1614,7 +1653,7 @@ TEST(BytecodeNamedLabelBreakContinue) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(12, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1640,7 +1679,7 @@ TEST(BytecodeLocalVariable) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	i32 result = ls_to_i32(runtime, -1);
 	EXPECT_EQ(42, result);
 
@@ -1669,9 +1708,9 @@ TEST(BytecodeGlobalVariable) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(43, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1699,7 +1738,7 @@ TEST(BytecodeGlobalInitializationOrder) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(4, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1739,14 +1778,14 @@ TEST(BytecodeShortCircuitingWithGlobals) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("false_and_touch"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("false_and_touch")));
 	EXPECT_TRUE(!ls_to_bool(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("get_hits"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("get_hits")));
 	EXPECT_EQ(0, ls_to_i32(runtime, -1));
 
-	EXPECT_TRUE(ls_call(runtime, toLs("true_or_touch"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("true_or_touch")));
 	EXPECT_TRUE(ls_to_bool(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("get_hits"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("get_hits")));
 	EXPECT_EQ(0, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1786,14 +1825,14 @@ TEST(BytecodeNestedShortCircuitingWithGlobals) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("false_and_nested"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("false_and_nested")));
 	EXPECT_TRUE(!ls_to_bool(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("get_hits"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("get_hits")));
 	EXPECT_EQ(0, ls_to_i32(runtime, -1));
 
-	EXPECT_TRUE(ls_call(runtime, toLs("true_or_nested"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("true_or_nested")));
 	EXPECT_TRUE(ls_to_bool(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("get_hits"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("get_hits")));
 	EXPECT_EQ(0, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1820,7 +1859,7 @@ TEST(BytecodeAssignLocalVariable) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	i32 result = ls_to_i32(runtime, -1);
 	EXPECT_EQ(42, result);
 
@@ -1848,7 +1887,7 @@ TEST(BytecodeCompoundAssignLocalPlusEqual) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	i32 result = ls_to_i32(runtime, -1);
 	EXPECT_EQ(42, result);
 
@@ -1876,7 +1915,7 @@ TEST(BytecodeCompoundAssignLocalMinusEqual) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	i32 result = ls_to_i32(runtime, -1);
 	EXPECT_EQ(40, result);
 
@@ -1922,17 +1961,17 @@ TEST(BytecodeExtendedIntegerReturnWidths) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("ret_i8"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("ret_i8")));
 	EXPECT_EQ(10, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("ret_u8"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("ret_u8")));
 	EXPECT_EQ(20, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("ret_i16"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("ret_i16")));
 	EXPECT_EQ(30, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("ret_u16"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("ret_u16")));
 	EXPECT_EQ(40, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("ret_i64"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("ret_i64")));
 	EXPECT_EQ(50, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("ret_u64"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("ret_u64")));
 	EXPECT_EQ(60, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1962,11 +2001,11 @@ TEST(BytecodeIfElse) {
 	EXPECT_TRUE(runtime != nullptr);
 
 	ls_push_bool(runtime, 1);
-	EXPECT_TRUE(ls_call(runtime, toLs("choose"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("choose")));
 	EXPECT_EQ(11, ls_to_i32(runtime, -1));
 
 	ls_push_bool(runtime, 0);
-	EXPECT_TRUE(ls_call(runtime, toLs("choose"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("choose")));
 	EXPECT_EQ(22, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -1998,15 +2037,15 @@ TEST(BytecodeIfElseIf) {
 	EXPECT_TRUE(runtime != nullptr);
 
 	ls_push_i32(runtime, -1);
-	EXPECT_TRUE(ls_call(runtime, toLs("classify"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("classify")));
 	EXPECT_EQ(0, ls_to_i32(runtime, -1));
 
 	ls_push_i32(runtime, 4);
-	EXPECT_TRUE(ls_call(runtime, toLs("classify"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("classify")));
 	EXPECT_EQ(1, ls_to_i32(runtime, -1));
 
 	ls_push_i32(runtime, 11);
-	EXPECT_TRUE(ls_call(runtime, toLs("classify"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("classify")));
 	EXPECT_EQ(2, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -2043,7 +2082,7 @@ TEST(NestedFunctionsRuntime) {
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
@@ -2084,15 +2123,15 @@ TEST(DivisionAndModuloSemanticsRuntime) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ls_call(runtime, toLs("q_pos"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("q_pos")));
 	EXPECT_EQ(2, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("q_neg"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("q_neg")));
 	EXPECT_EQ(-2, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("r_neg_left"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("r_neg_left")));
 	EXPECT_EQ(-1, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("r_neg_right"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("r_neg_right")));
 	EXPECT_EQ(1, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("float_div"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("float_div")));
 	EXPECT_TRUE(isinf((double)ls_to_f32(runtime, -1)));
 
 	ls_runtime_destroy(runtime);
@@ -2122,11 +2161,11 @@ TEST(RuntimeCasts) {
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_call(runtime, toLs("to_f32"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("to_f32")));
 	EXPECT_FLOAT_EQ(10, ls_to_f32(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("to_i32"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("to_i32")));
 	EXPECT_EQ(12, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("to_bool"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("to_bool")));
 	EXPECT_TRUE(ls_to_bool(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2152,8 +2191,8 @@ TEST(IntegerToEnumCastAllowsAnyIntegerRuntime) {
 
 	CAPI_RUNTIME(module, runtime);
 	ls_push_i32(runtime, 123);
-	EXPECT_TRUE(ls_call(runtime, toLs("to_state"), 1, 1));
-	EXPECT_TRUE(ls_call(runtime, toLs("to_i32"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("to_state")));
+	EXPECT_TRUE(ls_call(runtime, toLs("to_i32")));
 	EXPECT_EQ(123, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2192,16 +2231,16 @@ TEST(MatchRuntime) {
 
 	CAPI_RUNTIME(module, runtime);
 	ls_push_i32(runtime, 0);
-	EXPECT_TRUE(ls_call(runtime, toLs("enum_match"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("enum_match")));
 	EXPECT_EQ(1, ls_to_i32(runtime, -1));
 	ls_push_i32(runtime, 2);
-	EXPECT_TRUE(ls_call(runtime, toLs("enum_match"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("enum_match")));
 	EXPECT_EQ(2, ls_to_i32(runtime, -1));
 	ls_push_i32(runtime, 5);
-	EXPECT_TRUE(ls_call(runtime, toLs("range_match"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("range_match")));
 	EXPECT_EQ(1, ls_to_i32(runtime, -1));
 	ls_push_i32(runtime, 42);
-	EXPECT_TRUE(ls_call(runtime, toLs("range_match"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("range_match")));
 	EXPECT_EQ(2, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2247,7 +2286,7 @@ TEST(AliasedImportRuntime) {
 	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2293,7 +2332,7 @@ TEST(FirstParameterNamespaceResolutionPrecedenceRuntime) {
 	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(213, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2319,13 +2358,13 @@ TEST(ShortCircuiting) {
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_call(runtime, toLs("left_false"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("left_false")));
 	EXPECT_TRUE(!ls_to_bool(runtime, -1));
 
 	TestContext diagnostics2;
 	RuntimeGuard runtime2(module, &diagnostics2.host);
 	EXPECT_TRUE(runtime2);
-	EXPECT_TRUE(ls_call(runtime2, toLs("left_true"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime2, toLs("left_true")));
 	EXPECT_TRUE(ls_to_bool(runtime2, -1));
 	CAPI_END(module);
 	return true;
@@ -2348,15 +2387,15 @@ TEST(IfElse) {
 
 	CAPI_RUNTIME(module, runtime);
 	ls_push_i32(runtime, 4);
-	EXPECT_TRUE(ls_call(runtime, toLs("classify"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("classify")));
 	EXPECT_EQ(1, ls_to_i32(runtime, -1));
 
 	ls_push_i32(runtime, 11);
-	EXPECT_TRUE(ls_call(runtime, toLs("classify"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("classify")));
 	EXPECT_EQ(2, ls_to_i32(runtime, -1));
 
 	ls_push_i32(runtime, -1);
-	EXPECT_TRUE(ls_call(runtime, toLs("classify"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("classify")));
 	EXPECT_EQ(0, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2386,17 +2425,17 @@ TEST(GlobalVariablesRuntime) {
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_call(runtime, toLs("read_counter"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("read_counter")));
 	EXPECT_EQ(1, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("increment"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("increment")));
 	EXPECT_EQ(3, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("increment"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("increment")));
 	EXPECT_EQ(5, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("read_counter"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("read_counter")));
 	EXPECT_EQ(5, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("shadow_counter"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("shadow_counter")));
 	EXPECT_EQ(101, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("read_counter"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("read_counter")));
 	EXPECT_EQ(5, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2427,7 +2466,7 @@ TEST(CustomOperatorGlobalCompoundAssignmentRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_FLOAT_EQ(3.0f, ls_to_f32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2457,7 +2496,7 @@ TEST(CustomOperatorBinaryRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_FLOAT_EQ(3.0f, ls_to_f32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2478,7 +2517,7 @@ TEST(RuntimeBlockScope) {
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_call(runtime, toLs("scoped"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("scoped")));
 	EXPECT_EQ(1, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2500,7 +2539,7 @@ TEST(RefParameterMutatesCaller) {
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(11, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2521,7 +2560,7 @@ TEST(DeferRunsAtScopeExit) {
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(5, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2542,7 +2581,7 @@ TEST(DeferRunsInLifoOrder) {
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(3, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2565,7 +2604,7 @@ TEST(DeferRunsOnEarlyReturn) {
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(11, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2585,7 +2624,7 @@ TEST(NullableNullBranchRuntime) {
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2605,7 +2644,7 @@ TEST(NullableNonNullBranchRuntime) {
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(7, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2628,7 +2667,7 @@ TEST(ExtendedScalarTypesRuntime) {
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(211, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2669,15 +2708,15 @@ TEST(IntegerOverflowWraparoundRuntime) {
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_call(runtime, toLs("u8_add_wrap"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("u8_add_wrap")));
 	EXPECT_EQ(0, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("i8_add_wrap"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("i8_add_wrap")));
 	EXPECT_EQ(-128, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("u8_add_assign_wrap"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("u8_add_assign_wrap")));
 	EXPECT_EQ(0, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("cast_i8_wrap"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("cast_i8_wrap")));
 	EXPECT_EQ(-1, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("cast_u8_wrap"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("cast_u8_wrap")));
 	EXPECT_EQ(0, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2707,7 +2746,7 @@ TEST(DivisionByZeroRuntimeError) {
 	test_diagnostics.output_enabled = false;
 	ls_push_i32(runtime, 10);
 	ls_push_i32(runtime, 0);
-	EXPECT_TRUE(!ls_call(runtime, toLs("divide"), 2, 1));
+	EXPECT_TRUE(!ls_call(runtime, toLs("divide")));
 
 	TestContext diagnostics2;
 	RuntimeGuard runtime2(module, &diagnostics2.host);
@@ -2715,14 +2754,14 @@ TEST(DivisionByZeroRuntimeError) {
 	diagnostics2.diagnostics.output_enabled = false;
 	ls_push_i32(runtime2, 10);
 	ls_push_i32(runtime2, 0);
-	EXPECT_TRUE(!ls_call(runtime2, toLs("modulo"), 2, 1));
+	EXPECT_TRUE(!ls_call(runtime2, toLs("modulo")));
 
 	TestContext diagnostics3;
 	RuntimeGuard runtime3(module, &diagnostics3.host);
 	EXPECT_TRUE(runtime3);
 	diagnostics3.diagnostics.output_enabled = false;
 	ls_push_i32(runtime3, 0);
-	EXPECT_TRUE(!ls_call(runtime3, toLs("divide_assign"), 1, 1));
+	EXPECT_TRUE(!ls_call(runtime3, toLs("divide_assign")));
 	CAPI_END(module);
 	return true;
 }
@@ -2763,11 +2802,11 @@ TEST(UntypedLiteralsRuntime) {
 	EXPECT_TRUE(compiled);
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_call(runtime, toLs("vec3_sum"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("vec3_sum")));
 	EXPECT_FLOAT_EQ(6, ls_to_f32(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("integer_widths"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("integer_widths")));
 	EXPECT_EQ(467, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("return_f64"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("return_f64")));
 	EXPECT_FLOAT_EQ(1.5f, (float)ls_to_f64(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2805,7 +2844,7 @@ TEST(FirstClassFunctionsRuntime) {
 	EXPECT_TRUE(ok);
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(64, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2824,7 +2863,7 @@ TEST(StaticArrayRuntimeIndexing) {
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2844,7 +2883,7 @@ TEST(StaticArrayRuntimeOutOfBoundsFails) {
 	CAPI_RUNTIME(module, runtime);
 	test_diagnostics.output_enabled = false;
 	ls_push_i32(runtime, 5);
-	EXPECT_TRUE(!ls_call(runtime, toLs("main"), 1, 1));
+	EXPECT_TRUE(!ls_call(runtime, toLs("main")));
 	return true;
 }
 
@@ -2869,7 +2908,7 @@ TEST(BreakContinueRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(25, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2900,7 +2939,7 @@ TEST(ForLoopRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(206, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2931,7 +2970,7 @@ TEST(ForLoopRangeEvaluatedOnce) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(203, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2962,7 +3001,7 @@ TEST(NamedLabelBreakContinueRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 0, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(57, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2987,11 +3026,12 @@ TEST(MatchArmMultipleStatementsRuntime) {
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
 	ls_push_i32(runtime, 0);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(3, ls_to_i32(runtime, -1));
 	ls_push_i32(runtime, 7);
-	EXPECT_TRUE(ls_call(runtime, toLs("main"), 1, 1));
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(30, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
+

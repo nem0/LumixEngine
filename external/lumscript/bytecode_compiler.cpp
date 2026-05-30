@@ -2162,7 +2162,7 @@ ls_bytecode* compileBytecode(ls_module& module, const ls_host* host) {
 	bytecode->native_functions.reserve(module.native_functions.size());
 	for (const NativeFunctionDecl& fn : module.native_functions) {
 		BytecodeNativeFunction out;
-		out.name = fn.name;
+		out.canonical_name = fn.canonical_name;
 		for (const Param& param : fn.params) out.params.push_back(toC(param.type));
 		out.return_type = toC(fn.return_type);
 		out.return_count = bytecodeTypeSlotCount(module, fn.return_type);

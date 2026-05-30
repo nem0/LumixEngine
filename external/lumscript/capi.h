@@ -242,20 +242,10 @@ void* ls_to_ptr(ls_runtime* runtime, i32 index);
 //
 // Push arguments onto the runtime stack with the `ls_push_*` helpers first.
 // After the call, the return value is left on top of the runtime stack.
-ls_result ls_call(
-	ls_runtime* runtime,
-	ls_string_view function_name,
-	size_t arg_count,
-	size_t result_count
-);
+ls_result ls_call(ls_runtime* runtime, ls_string_view function_name);
 
 // Execute a bytecode function by index.
-ls_result ls_call_index(
-	ls_runtime* runtime,
-	i32 function_index,
-	size_t arg_count,
-	size_t result_count
-);
+ls_result ls_call_index(ls_runtime* runtime, i32 function_index);
 
 // Query the declared return type of the function named `function_name`.
 // Callers can then read the value from the runtime stack using the `ls_to_*`
