@@ -170,8 +170,10 @@ struct Checker {
 				}*/
 			}
 			checkGlobals(unit);
-			for (FunctionDecl& fn : unit.functions) {
-				checkFunction(unit, fn);
+		}
+		for (Unit* unit : m_module.units) {
+			for (FunctionDecl& fn : unit->functions) {
+				checkFunction(*unit, fn);
 			}
 		}
 		return !m_output.has_error;
@@ -388,6 +390,7 @@ struct Checker {
 			if (!empty(namespace_name)) {
 				// Method syntax is sugar for a namespace function whose first
 				// parameter is the receiver, e.g. `v.len()` -> `Vec.len(v)`.
+				// TODO handle global var
 				*fn_idx = m_module.findFunction({namespace_name, callee.name});
 				if (*fn_idx < 0) *native_idx = m_module.findNativeFunction({namespace_name, callee.name});
 				if (*fn_idx >= 0 || *native_idx >= 0) {
@@ -744,15 +747,128 @@ struct Checker {
 		}
 	}
 
+	TypeRef checkCall(Unit& unit, Expr& e) {
+		// Possible function calls:
+		// foo(*); - foo being extern fn foo()
+		// foo(*); - foo being fn foo()
+		// foo(*); - foo being const foo = fn()
+		// foo(*); - foo being var foo = fn()
+		// v.foo(*); - v being alias
+		// v.foo(*); - v being a variable/const, syntax sugar for foo(v)
+		// v.foo(*); - v being a variable/const imported through alias, syntax sugar for alias.foo(v),
+
+		// Calls are resolved in two passes. Named and method-style calls use
+		// `resolveCallName`, which can bind directly to script/native functions.
+		// If that fails without producing an error, the callee expression itself
+		// may still evaluate to a function value and is checked below.
+		i32 fn_idx = -1;
+		i32 native_idx = -1;
+		const CanonicalName callee_name = resolveCallName(unit, e, &fn_idx, &native_idx);
+		if (m_output.has_error) return {};
+
+		if (fn_idx < 0 && native_idx < 0) {
+			TypeRef callee_type = checkExpr(unit, e.left);
+			if (callee_type.kind != LS_TYPE_FUNCTION || callee_type.struct_index < 0) {
+				if (empty(callee_name.name))
+					m_output.errorAt(m_module.expressions[e.left].token, "Unsupported callee");
+				else
+					m_output.errorAt(m_module.expressions[e.left].token, "Unknown function '", callee_name.name, "'");
+				return {};
+			}
+			// foo().bar()
+			FunctionTypeDecl& fn_type = m_module.function_types[callee_type.struct_index];
+			if (fn_type.params.size() != e.args.size()) {
+				m_output.errorAt(e.token, "Wrong number of arguments");
+				return {};
+			}
+			for (i32 i = 0; i < fn_type.params.size(); ++i) {
+				Expr& arg_expr = m_module.expressions[e.args[i]];
+				if (arg_expr.kind == Expr::REF) {
+					m_output.errorAt(arg_expr.token, "Unexpected ref argument");
+					continue;
+				}
+				TypeRef arg_type = checkExpr(unit, e.args[i], &fn_type.params[i]);
+				if (!canAssign(fn_type.params[i], arg_type)) m_output.errorAt(arg_expr.token, "Argument type mismatch");
+			}
+			e.type = fn_type.return_type;
+			return e.type;
+		}
+
+		const bool is_native = native_idx >= 0;
+		const std::vector<Param>& params = is_native ? m_native_functions[native_idx]->params : m_functions[fn_idx]->params;
+		const TypeRef return_type = is_native ? m_native_functions[native_idx]->return_type : m_functions[fn_idx]->return_type;
+		const i32 receiver_arg_count = e.method_receiver >= 0 ? 1 : 0;
+		// Method-call syntax stores the receiver separately, but declared
+		// functions still see it as their first parameter. `receiver_arg_count`
+		// keeps argument indexing aligned without rewriting the parsed argument
+		// list.
+		if (params.size() != e.args.size() + receiver_arg_count) {
+			m_output.errorAt(e.token, "Wrong number of arguments");
+			return {};
+		}
+		for (i32 i = 0; i < params.size(); ++i) {
+			const i32 arg_idx = i - receiver_arg_count;
+			const i32 expr_idx = i == 0 && e.method_receiver >= 0 ? e.method_receiver : e.args[arg_idx];
+			if (params[i].is_ref) {
+				// `ref` is syntax at the call site, not a type constructor. Peel it
+				// away before checking assignability so diagnostics point at the
+				// thing being passed by reference, while still rejecting temporaries,
+				// const expressions, and nullable values.
+				Expr& arg_expr = m_module.expressions[expr_idx];
+				if (arg_expr.kind != Expr::REF) {
+					m_output.errorAt(arg_expr.token, "Expected ref argument");
+					continue;
+				}
+				const i32 target_expr = arg_expr.right;
+				if (!isAssignableExpr(target_expr)) {
+					m_output.errorAt(arg_expr.token, "Ref argument must be assignable");
+					continue;
+				}
+				if (isConstExpr(unit, target_expr)) {
+					m_output.errorAt(arg_expr.token, "Can not pass const as ref argument");
+					continue;
+				}
+				TypeRef arg_type = checkExpr(unit, target_expr, &params[i].type);
+				if (arg_type.nullable) {
+					m_output.errorAt(m_module.expressions[target_expr].token, "Ref argument can not be nullable");
+					continue;
+				}
+				if (!canAssign(params[i].type, arg_type)) m_output.errorAt(m_module.expressions[target_expr].token, "Argument type mismatch");
+			} else {
+				Expr& arg_expr = m_module.expressions[expr_idx];
+				if (arg_expr.kind == Expr::REF) {
+					m_output.errorAt(arg_expr.token, "Unexpected ref argument");
+					continue;
+				}
+				TypeRef arg_type = checkExpr(unit, expr_idx, &params[i].type);
+				if (!canAssign(params[i].type, arg_type)) m_output.errorAt(m_module.expressions[expr_idx].token, "Argument type mismatch");
+			}
+		}
+		e.type = return_type;
+		return e.type;
+	}
+
 	TypeRef checkExpr(Unit& unit, i32 expr_idx, const TypeRef* expected = nullptr) {
 		if (expr_idx < 0) return {};
 		Expr& e = m_module.expressions[expr_idx];
 		switch (e.kind) {
-			case Expr::NUMBER: e.type = concreteNumberType(e.type, expected); return e.type;
+			case Expr::NUMBER:
+				// Numeric literals start out as untyped integers/floats so the
+				// surrounding expression can choose the smallest amount of explicit
+				// syntax. `expected` is the contextual type from an assignment, call
+				// argument, struct field, etc.; when it is numeric we commit the
+				// literal to that type here. Without that context, default to the
+				// language's normal concrete literal types.
+				e.type = concreteNumberType(e.type, expected);
+				return e.type;
 			case Expr::STRING_LITERAL: e.type = {LS_TYPE_STRING, {}, -1}; return e.type;
 			case Expr::BOOL_LITERAL: return e.type;
 			case Expr::NULL_LITERAL: return e.type;
 			case Expr::VAR: {
+				// Locals are deliberately resolved before module symbols. Nullable
+				// promotion also injects a shadow local with the non-null type, so this
+				// lookup is what makes `if x != null { x.field }` type-check without
+				// mutating the original variable declaration.
 				const i32 local_idx = findLocal(e.name);
 				if (local_idx >= 0) {
 					e.type = m_locals[local_idx].type;
@@ -770,6 +886,10 @@ struct Checker {
 				} else if (symbol.kind == Symbol::FN) {
 					const i32 fn_idx = m_module.findFunction(symbol.name);
 					if (fn_idx >= 0) {
+						// A bare function name is normalized into FUNCTION_REF so later
+						// passes do not have to repeat lexical/module lookup. The original
+						// spelling is no longer important once `left` points at the
+						// canonical function table index.
 						e.kind = Expr::FUNCTION_REF;
 						e.type = functionTypeFromFunction(*m_functions[fn_idx]);
 						e.left = fn_idx;
@@ -779,6 +899,9 @@ struct Checker {
 				} else if (symbol.kind == Symbol::EXTERN_FN) {
 					const i32 native_idx = m_module.findNativeFunction(symbol.name);
 					if (native_idx >= 0) {
+						// Native functions share the same AST representation as script
+						// functions; `boolean` is used as the discriminator because this
+						// node already stores the target index in `left`.
 						e.kind = Expr::FUNCTION_REF;
 						e.type = functionTypeFromNativeFunction(*m_native_functions[native_idx]);
 						e.left = native_idx;
@@ -805,32 +928,40 @@ struct Checker {
 				m_output.errorAt(e.token, "Unknown variable '", e.name, "'");
 				return {};
 			}
-                    case Expr::FUNCTION_REF: {
-                            // Function references are produced from two
-                            // different paths:
-                            // - ordinary named function lookups during
-                            //   semantic analysis
-                            // - synthesized anonymous function literals
-                            //
-                            // The checker generally fills in `e.type` when it
-                            // resolves the expression, but we keep this fallback
-                            // so later passes can still recover the signature if
-                            // the expression was created earlier or copied in a
-                            // partially-resolved form.
-                            if (e.type.kind != LS_TYPE_INVALID) return e.type;
-                            if (e.boolean) {
-                                    if (e.left < 0 || e.left >= m_native_functions.size()) return {};
-                                    e.type = functionTypeFromNativeFunction(*m_native_functions[e.left]);
-                            }
-                            else {
-                                    if (e.left < 0 || e.left >= m_functions.size()) return {};
-                                    e.type = functionTypeFromFunction(*m_functions[e.left]);
-                            }
-                            return e.type;
-                    }
+			case Expr::FUNCTION_REF: {
+				// Function references are produced from two
+				// different paths:
+				// - ordinary named function lookups during
+				//   semantic analysis
+				// - synthesized anonymous function literals
+				//
+				// The checker generally fills in `e.type` when it
+				// resolves the expression, but we keep this fallback
+				// so later passes can still recover the signature if
+				// the expression was created earlier or copied in a
+				// partially-resolved form.
+				if (e.type.kind != LS_TYPE_INVALID) return e.type;
+				if (e.boolean) {
+						if (e.left < 0 || e.left >= m_native_functions.size()) return {};
+						e.type = functionTypeFromNativeFunction(*m_native_functions[e.left]);
+				}
+				else {
+						if (e.left < 0 || e.left >= m_functions.size()) return {};
+						e.type = functionTypeFromFunction(*m_functions[e.left]);
+				}
+				return e.type;
+			}
 			case Expr::FIELD: {
+				// `a.b` is overloaded syntax in LumScript: it can be a namespace/member
+				// lookup, an enum member, a struct field access, or method-style sugar.
+				// The order below is intentional. We first try the interpretations that
+				// do not require type-checking `a`, then fall back to real field access
+				// once it is clear that `a` is an expression receiver.
 				if (empty(e.qualified_name)) e.qualified_name = {getExpressionName(e.left), e.name};
 				const CanonicalName& qualified_name = e.qualified_name;
+				// Qualified functions are resolved before struct fields so `module.fn`
+				// and imported aliases become function references instead of forcing
+				// the left side to be a value expression.
 				const i32 fn_idx = m_module.findFunction(qualified_name);
 				if (fn_idx >= 0) {
 					e.kind = Expr::FUNCTION_REF;
@@ -849,6 +980,10 @@ struct Checker {
 				}
 				const ls_string_view qualified_name_str = m_module.makeQualifiedName(qualified_name.path, qualified_name.name);
 				if (e.left >= 0 && m_module.expressions[e.left].kind == Expr::VAR) {
+					// For `import foo`, `foo.bar` is a namespace-style lookup. If the
+					// qualified function/native/enum paths above did not resolve it,
+					// reporting "Unknown variable 'bar'" is more useful than saying
+					// "Field access on non-struct" for the import name `foo`.
 					for (const ImportDecl& import : unit.imports) {
 						if (!empty(import.alias)) continue;
 						if (!equalStrings(m_module.expressions[e.left].name, import.path)) continue;
@@ -858,6 +993,9 @@ struct Checker {
 				}
 				if (checkQualifiedEnumMember(unit, e, qualified_name_str)) return e.type;
 				if (e.left >= 0 && m_module.expressions[e.left].kind == Expr::VAR && importAliasExists(unit, m_module.expressions[e.left].name)) {
+					// Same diagnostic shape for aliased imports. At this point the alias
+					// existed, but the requested member did not resolve as a known module
+					// symbol or enum member.
 					m_output.errorAt(e.token, "Unknown variable '", e.name, "'");
 					return {};
 				}
@@ -878,10 +1016,42 @@ struct Checker {
 					}
 				}
 				if (e.left >= 0 && m_module.expressions[e.left].kind == Expr::VAR) {
+					// If the left side is a value whose type belongs to a module namespace,
+					// allow `value.fn` / `value.global` to resolve through that namespace
+					// after ordinary fields have been considered. This preserves field
+					// priority while still enabling extension-like method syntax for types
+					// declared in named modules.
 					const i32 local_idx = findLocal(qualified_name.path);
 					if (local_idx >= 0) {
-						// TODO method syntax sugar `v.foo()` -> `foo(v)` with possibly inferred namespace
-						
+						const TypeRef& receiver_type = m_locals[local_idx].type;
+						ls_string_view namespace_name = receiver_type.canonical_name.path;
+						if (!empty(namespace_name)) {
+							const CanonicalName fn_name = { namespace_name, e.name };
+							const i32 fn_idx = m_module.findFunction(fn_name);
+							if (fn_idx >= 0) {
+								e.kind = Expr::FUNCTION_REF;
+								e.left = fn_idx;
+								e.boolean = false;
+								e.type = functionTypeFromFunction(*m_functions[fn_idx]);
+								return e.type;
+							}
+							const i32 native_idx = m_module.findNativeFunction(fn_name);
+							if (native_idx >= 0) {
+								e.kind = Expr::FUNCTION_REF;
+								e.left = native_idx;
+								e.boolean = true;
+								e.type = functionTypeFromNativeFunction(*m_native_functions[native_idx]);
+								return e.type;
+							}
+							const i32 global_idx = m_module.findGlobal(fn_name);
+							if (global_idx >= 0) {
+								e.kind = Expr::VAR;
+								e.name = m_module.makeQualifiedName(fn_name.path, fn_name.name);
+								e.qualified_name = fn_name;
+								e.type = m_globals[global_idx]->type;
+								return e.type;
+							}
+						}
 					}
 				}
 
@@ -903,6 +1073,9 @@ struct Checker {
 					m_output.errorAt(e.token, "Array index must be integer");
 					return {};
 				}
+				// Bounds checking here is intentionally opportunistic. Only expressions
+				// that fold to an integer without running user code are rejected at
+				// compile time; dynamic indices stay the runtime's responsibility.
 				i64 idx_value = 0;
 				if (getCompileTimeInteger(e.right, &idx_value) && (idx_value < 0 || idx_value >= base.array_size)) {
 					m_output.errorAt(e.token, "Array index out of range");
@@ -947,11 +1120,18 @@ struct Checker {
 				return {};
 			}
 			case Expr::BINARY: {
+				// Contextual numeric typing flows into arithmetic operands, but not
+				// comparisons. For `let x: f32 = 1 + 2`, both literals should become
+				// f32. For `1 == 1.0`, the right operand should be checked against the
+				// already-deduced left operand so mixed numeric comparisons are rejected
+				// instead of being silently widened.
 				const bool is_comparison = e.token.type == Token::GT || e.token.type == Token::LT || e.token.type == Token::GT_EQUAL || e.token.type == Token::LT_EQUAL ||
 										   e.token.type == Token::EQUAL_EQUAL || e.token.type == Token::BANG_EQUAL || e.token.type == Token::AND || e.token.type == Token::OR;
 				const TypeRef* operand_expected = !is_comparison && expected && isNumeric(*expected) ? expected : nullptr;
 				TypeRef left = checkExpr(unit, e.left, operand_expected);
-				// For comparisons, pass the left operand's type as expected type to the right
+				// The right side uses the left side as context even for arithmetic. This
+				// is what makes `1 + 2` settle on a single type while still catching
+				// `i32 + f32` as a same-base-type error below.
 				TypeRef right = checkExpr(unit, e.right, &left);
 				if (e.token.type == Token::PLUS && left.kind == LS_TYPE_STRING && right.kind == LS_TYPE_STRING) {
 					e.type = {LS_TYPE_STRING, {}, -1};
@@ -959,6 +1139,10 @@ struct Checker {
 				}
 				const bool is_eq = e.token.type == Token::EQUAL_EQUAL || e.token.type == Token::BANG_EQUAL;
 				const bool null_cmp = left.kind == LS_TYPE_NULL_VALUE || right.kind == LS_TYPE_NULL_VALUE;
+				// Nullable values may only participate directly in equality checks with
+				// the null literal. Other uses require an explicit control-flow check
+				// first, which lets statement checking introduce a non-null shadow local
+				// for the guarded branch.
 				if (!is_eq && (left.nullable || right.nullable)) {
 					m_output.errorAt(e.token, "Nullable value must be checked for null");
 					return {};
@@ -1018,88 +1202,13 @@ struct Checker {
 						return e.type;
 				}
 			}
-			case Expr::CALL: {
-				i32 fn_idx = -1;
-				i32 native_idx = -1;
-				const CanonicalName callee_name = resolveCallName(unit, e, &fn_idx, &native_idx);
-				if (m_output.has_error) return {};
-
-				if (fn_idx < 0 && native_idx < 0) {
-					TypeRef callee_type = checkExpr(unit, e.left);
-					if (callee_type.kind != LS_TYPE_FUNCTION || callee_type.struct_index < 0) {
-						if (empty(callee_name.name))
-							m_output.errorAt(m_module.expressions[e.left].token, "Unsupported callee");
-						else
-							m_output.errorAt(m_module.expressions[e.left].token, "Unknown function '", callee_name.name, "'");
-						return {};
-					}
-					// foo().bar()
-					FunctionTypeDecl& fn_type = m_module.function_types[callee_type.struct_index];
-					if (fn_type.params.size() != e.args.size()) {
-						m_output.errorAt(e.token, "Wrong number of arguments");
-						return {};
-					}
-					for (i32 i = 0; i < fn_type.params.size(); ++i) {
-						Expr& arg_expr = m_module.expressions[e.args[i]];
-						if (arg_expr.kind == Expr::REF) {
-							m_output.errorAt(arg_expr.token, "Unexpected ref argument");
-							continue;
-						}
-						TypeRef arg_type = checkExpr(unit, e.args[i], &fn_type.params[i]);
-						if (!canAssign(fn_type.params[i], arg_type)) m_output.errorAt(arg_expr.token, "Argument type mismatch");
-					}
-					e.type = fn_type.return_type;
-					return e.type;
-				}
-
-				const bool is_native = native_idx >= 0;
-				const std::vector<Param>& params = is_native ? m_native_functions[native_idx]->params : m_functions[fn_idx]->params;
-				const TypeRef return_type = is_native ? m_native_functions[native_idx]->return_type : m_functions[fn_idx]->return_type;
-				const i32 receiver_arg_count = e.method_receiver >= 0 ? 1 : 0;
-				if (params.size() != e.args.size() + receiver_arg_count) {
-					m_output.errorAt(e.token, "Wrong number of arguments");
-					return {};
-				}
-				for (i32 i = 0; i < params.size(); ++i) {
-					const i32 arg_idx = i - receiver_arg_count;
-					const i32 expr_idx = i == 0 && e.method_receiver >= 0 ? e.method_receiver : e.args[arg_idx];
-					if (params[i].is_ref) {
-						Expr& arg_expr = m_module.expressions[expr_idx];
-						if (arg_expr.kind != Expr::REF) {
-							m_output.errorAt(arg_expr.token, "Expected ref argument");
-							continue;
-						}
-						const i32 target_expr = arg_expr.right;
-						if (!isAssignableExpr(target_expr)) {
-							m_output.errorAt(arg_expr.token, "Ref argument must be assignable");
-							continue;
-						}
-						if (isConstExpr(unit, target_expr)) {
-							m_output.errorAt(arg_expr.token, "Can not pass const as ref argument");
-							continue;
-						}
-						TypeRef arg_type = checkExpr(unit, target_expr, &params[i].type);
-						if (arg_type.nullable) {
-							m_output.errorAt(m_module.expressions[target_expr].token, "Ref argument can not be nullable");
-							continue;
-						}
-						if (!canAssign(params[i].type, arg_type)) m_output.errorAt(m_module.expressions[target_expr].token, "Argument type mismatch");
-					} else {
-						Expr& arg_expr = m_module.expressions[expr_idx];
-						if (arg_expr.kind == Expr::REF) {
-							m_output.errorAt(arg_expr.token, "Unexpected ref argument");
-							continue;
-						}
-						TypeRef arg_type = checkExpr(unit, expr_idx, &params[i].type);
-						if (!canAssign(params[i].type, arg_type)) m_output.errorAt(m_module.expressions[expr_idx].token, "Argument type mismatch");
-					}
-				}
-				e.type = return_type;
-				return e.type;
-			}
+			case Expr::CALL: return checkCall(unit, e);
 			case Expr::CAST: {
 				TypeRef src = checkExpr(unit, e.left);
 				resolveType(unit, e.cast_type);
+				// Casts are kept narrow: scalar-to-scalar plus enum/integer bridges.
+				// Structs, arrays, functions, strings, and nullable wrappers must use
+				// explicit language constructs instead of being bitcast through here.
 				const bool is_enum_integer_cast = (src.kind == LS_TYPE_ENUM && isIntegral(e.cast_type)) || (isIntegral(src) && e.cast_type.kind == LS_TYPE_ENUM);
 				if ((!isScalar(src) || !isScalar(e.cast_type)) && !is_enum_integer_cast) {
 					m_output.errorAt(e.token, "Invalid cast");
@@ -1134,6 +1243,9 @@ struct Checker {
 				return e.type;
 			}
 			case Expr::ENUM_LITERAL: {
+				// Short enum literals are intentionally context-dependent. `.Red` has
+				// no unique type until an assignment target, parameter type, match
+				// subject, or similar caller provides the expected enum.
 				if (!expected || expected->kind != LS_TYPE_ENUM) {
 					m_output.errorAt(e.token, "Can not infer enum literal type");
 					return {};
