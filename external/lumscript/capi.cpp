@@ -52,7 +52,10 @@ ls_string_view ls_module_get_native_function_name(ls_module* module, int index) 
 	if (!module || index < 0) return {};
 	for (const Unit* unit_ptr : module->units) {
 		const Unit& unit = *unit_ptr;
-		if (index < (i32)unit.native_functions.size()) return unit.native_functions[(size_t)index].canonical_name;
+		if (index < (i32)unit.native_functions.size()) {
+			CanonicalName cn = unit.native_functions[(size_t)index].canonical_name;
+			return module->makeQualifiedName(cn.path, cn.name);
+		}
 		index -= (i32)unit.native_functions.size();
 	}
 	return {};
@@ -105,7 +108,10 @@ int ls_module_add_native_function(
 	// TODO this is shit
 	Unit& unit = module->addUnit();
 	NativeFunctionDecl& fn = unit.native_functions.emplace_back();
-	fn.canonical_name = module->copyName(name);
+	ls_string_view tmp = module->copyName(name);
+	fn.canonical_name.path = {};
+	fn.canonical_name.name = tmp;
+	splitMemberName(tmp, &fn.canonical_name.path, &fn.canonical_name.name);
 	fn.return_type = toTypeRef(return_type);
 	ls_string_view symbol_name = name;
 	ls_string_view owner;

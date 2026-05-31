@@ -1,7 +1,3 @@
-#pragma once
-
-#include <string>
-
 #include "ast.h"
 #include "tokenizer.h"
 
@@ -21,7 +17,7 @@ struct Parser {
 			else if (match(Token::EXTERN)) parseExtern();
 			else if (match(Token::STRUCT)) parseStruct();
 			else if (match(Token::ENUM)) parseEnum();
-			else if (match(Token::FN)) parseFunction(false);
+			else if (match(Token::FN)) parseFunction();
 			else if (match(Token::OPERATOR)) parseOperator();
 			else if (peek().type == Token::VAR || peek().type == Token::CONST) parseGlobal();
 			else error(peek(), "Expected declaration");
@@ -163,7 +159,7 @@ struct Parser {
 		Token name;
 		if (!consume(Token::IDENTIFIER, &name)) return;
 		NativeFunctionDecl& fn = m_unit.native_functions.emplace_back();
-		fn.canonical_name = m_module.makeQualifiedName(m_declaration_prefix, name.value);
+		fn.canonical_name = {m_declaration_prefix, name.value};
 		if (!consume(Token::LEFT_PAREN)) return;
 		if (!addSymbol(name, m_unit, {m_declaration_prefix, name.value}, Symbol::EXTERN_FN, m_unit.native_functions.size() - 1)) return;
 		
@@ -246,23 +242,16 @@ struct Parser {
 		consume(Token::RIGHT_BRACE);
 	}
 
-	i32 parseFunction(bool is_nested) {
+	i32 parseFunction() {
 		Token name;
 		if (!consume(Token::IDENTIFIER, &name)) return -1;
 		m_unit.functions.emplace_back();
 		const i32 fn_idx = (i32)m_unit.functions.size() - 1;
 		m_unit.functions[fn_idx].local_name = name.value;
-		m_unit.functions[fn_idx].is_nested = is_nested;
-		if (is_nested) {
-			std::string unique_name = "__nested_fn." + std::to_string(m_nested_function_counter++) + "." + std::string(data(name.value), size(name.value));
-			m_unit.functions[fn_idx].name = m_module.copyName(ls_string_view{unique_name.c_str(), unique_name.c_str() + unique_name.size()});
-		}
-		else {
-			// Top-level functions follow the same canonical module naming rule as
-			// structs/enums/globals so imported modules remain addressable by path.
-			m_unit.functions[fn_idx].name = m_module.makeQualifiedName(m_declaration_prefix, name.value);
-			if (!addSymbol(name, m_unit, {m_declaration_prefix, name.value}, Symbol::FN, fn_idx)) return -1;
-		}
+		// Top-level functions follow the same canonical module naming rule as
+		// structs/enums/globals so imported modules remain addressable by path.
+		m_unit.functions[fn_idx].canonical_name = {m_declaration_prefix, name.value};
+		if (!addSymbol(name, m_unit, {m_declaration_prefix, name.value}, Symbol::FN, fn_idx)) return -1;
 		m_unit.functions[fn_idx].token = name;
 
 		if (!consume(Token::LEFT_PAREN)) return fn_idx;
@@ -312,7 +301,8 @@ struct Parser {
 		if (!unique_name.empty()) unique_name.push_back('.');
 		unique_name += "__operator.";
 		unique_name += std::to_string(m_operator_counter++);
-		fn.name = m_module.copyName(ls_string_view{unique_name.c_str(), unique_name.c_str() + unique_name.size()});
+		fn.canonical_name.path = m_declaration_prefix;
+		fn.canonical_name.name = m_module.copyName(ls_string_view{unique_name.c_str(), unique_name.c_str() + unique_name.size()});
 		fn.local_name = op.value;
 		fn.token = op;
 		if (!consume(Token::LEFT_PAREN)) return fn_idx;
@@ -440,10 +430,8 @@ struct Parser {
 		}
 		if (t.type == Token::LEFT_BRACE) return parseBlock();
 		if (match(Token::FN)) {
-			const i32 fn_idx = parseFunction(true);
-			const i32 stmt_idx = addStmt(Stmt::FN_DECL, t);
-			m_module.statements[stmt_idx].left = fn_idx;
-			return stmt_idx;
+			error(t, "Nested functions are not supported");
+			return -1;
 		}
 		if (match(Token::VAR) || match(Token::CONST)) {
 			const bool is_const = t.type == Token::CONST;
@@ -672,8 +660,8 @@ struct Parser {
 		Expr& e = m_module.expressions[expr_idx];
 		if (e.kind == Expr::VAR) return e.name;
 		if (e.kind == Expr::FIELD) {
-			if (empty(e.qualified_name)) e.qualified_name = m_module.makeQualifiedName(getExpressionName(e.left), e.name);
-			return e.qualified_name;
+			if (empty(e.qualified_name)) e.qualified_name = {getExpressionName(e.left), e.name};
+			return m_module.makeQualifiedName(e.qualified_name.path, e.qualified_name.name);
 		}
 		return {};
 	}
@@ -806,7 +794,6 @@ struct Parser {
 	OutputFormatter m_output;
 	ls_string_view m_declaration_prefix;
 	bool m_allow_constructor = true;
-	i32 m_nested_function_counter = 0;
 	i32 m_operator_counter = 0;
 };
 

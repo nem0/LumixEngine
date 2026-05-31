@@ -32,7 +32,7 @@ typedef long long i64;
 typedef unsigned long long u64;
 typedef u64 uintptr;
 
-static_assert(sizeof(uintptr) == sizeof(void*));
+static_assert(sizeof(uintptr) == sizeof(void*), "fix this");
 
 #ifdef __cplusplus
 extern "C" {

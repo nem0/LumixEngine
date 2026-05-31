@@ -441,15 +441,17 @@ static ls_string_view bytecodeGetExpressionName(ls_module& module, i32 expr_idx)
 	Expr& expr = module.expressions[expr_idx];
 	if (expr.kind == Expr::VAR) return expr.name;
 	if (expr.kind == Expr::FIELD) {
-		if (empty(expr.qualified_name)) expr.qualified_name = module.makeQualifiedName(bytecodeGetExpressionName(module, expr.left), expr.name);
-		return expr.qualified_name;
+		if (empty(expr.qualified_name)) expr.qualified_name = {bytecodeGetExpressionName(module, expr.left), expr.name};
+		return module.makeQualifiedName(expr.qualified_name.path, expr.qualified_name.name);
 	}
 	if (expr.kind == Expr::FUNCTION_REF) {
 		if (expr.boolean) {
 			i32 idx = expr.left;
 			for (const Unit* unit_ptr : module.units) {
 				const Unit& unit = *unit_ptr;
-				if (idx < (i32)unit.native_functions.size()) return unit.native_functions[(size_t)idx].canonical_name;
+				if (idx < (i32)unit.native_functions.size()) {
+					return module.makeQualifiedName(unit.native_functions[(size_t)idx].canonical_name.path, unit.native_functions[(size_t)idx].canonical_name.name);
+				}
 				idx -= (i32)unit.native_functions.size();
 			}
 		}
@@ -457,7 +459,10 @@ static ls_string_view bytecodeGetExpressionName(ls_module& module, i32 expr_idx)
 			i32 idx = expr.left;
 			for (const Unit* unit_ptr : module.units) {
 				const Unit& unit = *unit_ptr;
-				if (idx < (i32)unit.functions.size()) return unit.functions[(size_t)idx].name;
+				if (idx < (i32)unit.functions.size()) {
+					const CanonicalName& name = unit.functions[(size_t)idx].canonical_name;
+					return module.makeQualifiedName(name.path, name.name);
+				}
 				idx -= (i32)unit.functions.size();
 			}
 		}
@@ -856,6 +861,40 @@ static bool bytecodeEmitRuntimeIndexedAccess(
 	if (element_slot_count_out) *element_slot_count_out = element_slot_count;
 	if (temp_slot_out) *temp_slot_out = temp_slot;
 	return true;
+}
+
+static bool bytecodeEmitRuntimeFieldAccess(
+	ls_module& module,
+	ls_bytecode& bytecode,
+	BytecodeCompileContext& ctx,
+	Expr& expr
+) {
+	if (expr.left < 0) return false;
+	TypeRef base_type = module.expressions[expr.left].type;
+	if (base_type.nullable || base_type.kind != LS_TYPE_STRUCT || base_type.struct_index < 0) return false;
+
+	i32 field_offset = 0;
+	TypeRef field_type;
+	if (!bytecodeStructFieldOffset(module, base_type, expr.name, &field_offset, &field_type)) return false;
+
+	const i32 base_slot_count = bytecodeTypeSlotCount(module, base_type);
+	if (base_slot_count <= 0) return false;
+
+	// Temporaries produced by calls are not addressable, so we spill the base
+	// value into a scratch local before loading the requested field.
+	const i32 temp_slot = ctx.local_count;
+	if (temp_slot < 0 || temp_slot + base_slot_count > 256) return false;
+	ctx.local_count += base_slot_count;
+
+	if (!bytecodeCompileExpr(module, bytecode, ctx, expr.left, &base_type)) return false;
+	if (!bytecodeEmitStoreValue(module, bytecode, temp_slot, base_type)) return false;
+
+	BytecodeValueAccess access = {};
+	access.kind = BytecodeValueKind::LOCAL;
+	access.slot = temp_slot;
+	access.value_slot_offset = field_offset;
+	access.type = field_type;
+	return bytecodeEmitLoadValue(module, bytecode, ctx, access);
 }
 
 static bool bytecodeEmitLoadValue(ls_module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, const BytecodeValueAccess& access) {
@@ -1472,7 +1511,9 @@ static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, Byteco
 			// Field reads resolve to a slot offset inside the flattened aggregate,
 			// then reuse the normal load path.
 			BytecodeValueAccess access = {};
-			if (!bytecodeResolveValueAccess(module, ctx, expr_idx, &access)) return false;
+			if (!bytecodeResolveValueAccess(module, ctx, expr_idx, &access)) {
+				return bytecodeEmitRuntimeFieldAccess(module, bytecode, ctx, expr);
+			}
 			return bytecodeEmitLoadValue(module, bytecode, ctx, access);
 		}
 		case Expr::INDEX: {
@@ -1504,17 +1545,17 @@ static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, Byteco
 		case Expr::CALL: {
 			// Calls are compiled to a resolved function index and a left-to-right
 			// evaluation of receiver and arguments.
-			const ls_string_view callee_name = empty(expr.qualified_name) ? bytecodeGetExpressionName(module, expr.left) : expr.qualified_name;
+			const ls_string_view callee_name = empty(expr.qualified_name) ? bytecodeGetExpressionName(module, expr.left) : module.makeQualifiedName(expr.qualified_name.path, expr.qualified_name.name);
 			i32 fn_idx = -1;
-			if (!empty(callee_name)) {
+			const bool shadowed_by_local = expr.left >= 0 && module.expressions[expr.left].kind == Expr::VAR && ctx.findLocal(module.expressions[expr.left].name) >= 0;
+			if (!shadowed_by_local && !empty(callee_name)) {
 				fn_idx = module.findFunction(callee_name);
 				if (fn_idx < 0 && expr.method_receiver < 0 && !expr.args.empty()) {
 					TypeRef first_arg_type = module.expressions[expr.args[0]].type;
 					const ls_string_view namespace_name = bytecodeGetTypeNamespace(module, first_arg_type);
 					if (!empty(namespace_name)) {
-						const ls_string_view namespaced_name = module.makeQualifiedName(namespace_name, callee_name);
-						fn_idx = module.findFunction(namespaced_name);
-						if (fn_idx >= 0) expr.qualified_name = namespaced_name;
+						fn_idx = module.findFunction({namespace_name, callee_name});
+						if (fn_idx >= 0) expr.qualified_name = {namespace_name, callee_name};
 					}
 				}
 			}
@@ -1529,7 +1570,7 @@ static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, Byteco
 					}
 					idx -= (i32)unit.functions.size();
 				}
-				if (callee_ptr && !callee_ptr->is_nested) {
+				if (callee_ptr) {
 					const FunctionDecl& callee = *callee_ptr;
 					i32 param_idx = 0;
 					if (expr.method_receiver >= 0) {
@@ -1572,15 +1613,14 @@ static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, Byteco
 			}
 
 			i32 native_idx = -1;
-			if (!empty(callee_name)) {
+			if (!shadowed_by_local && !empty(callee_name)) {
 				native_idx = module.findNativeFunction(callee_name);
 				if (native_idx < 0 && expr.method_receiver < 0 && !expr.args.empty()) {
 					TypeRef first_arg_type = module.expressions[expr.args[0]].type;
 					const ls_string_view namespace_name = bytecodeGetTypeNamespace(module, first_arg_type);
 					if (!empty(namespace_name)) {
-						const ls_string_view namespaced_name = module.makeQualifiedName(namespace_name, callee_name);
-						native_idx = module.findNativeFunction(namespaced_name);
-						if (native_idx >= 0) expr.qualified_name = namespaced_name;
+						native_idx = module.findNativeFunction({namespace_name, callee_name});
+						if (native_idx >= 0) expr.qualified_name = {namespace_name, callee_name};
 					}
 				}
 			}
@@ -2163,10 +2203,6 @@ static bool bytecodeCompileStmt(ls_module& module, ls_bytecode& bytecode, Byteco
 		case Stmt::DEFER:
 			ctx.addDeferred(stmt.left);
 			return true;
-		case Stmt::FN_DECL:
-			// Nested functions are emitted as regular bytecode functions elsewhere;
-			// this statement only exists to reserve the local binding in scope.
-			return true;
 		case Stmt::MATCH:
 			return bytecodeCompileMatchStmt(module, bytecode, ctx, stmt);
 		default:
@@ -2176,7 +2212,7 @@ static bool bytecodeCompileStmt(ls_module& module, ls_bytecode& bytecode, Byteco
 
 static bool bytecodeCompileFunction(ls_module& module, ls_bytecode& bytecode, FunctionDecl& fn) {
 	BytecodeFunction out;
-	out.name = fn.name;
+	out.name = module.makeQualifiedName(fn.canonical_name.path, fn.canonical_name.name);
 	out.code_offset = (i32)bytecode.code.size();
 	BytecodeCompileContext ctx(fn);
 	ctx.pushScope();
@@ -2275,7 +2311,7 @@ ls_bytecode* compileBytecode(ls_module& module, const ls_host* host) {
 		const Unit& unit = *unit_ptr;
 		for (const NativeFunctionDecl& fn : unit.native_functions) {
 			BytecodeNativeFunction out;
-			out.canonical_name = fn.canonical_name;
+			out.canonical_name = module.makeQualifiedName(fn.canonical_name.path, fn.canonical_name.name);
 			for (const Param& param : fn.params) out.params.push_back(toC(param.type));
 			out.return_type = toC(fn.return_type);
 			out.return_count = bytecodeTypeSlotCount(module, fn.return_type);

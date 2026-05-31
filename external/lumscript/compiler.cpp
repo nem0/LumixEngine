@@ -1,10 +1,6 @@
-#pragma once
-
 #include "ast.h"
 #include <string>
-#include <unordered_map>
 #include <unordered_set>
-#include <algorithm>
 
 bool parse(ls_module& module, ls_string_view source, ls_string_view declaration_prefix = {}, ls_string_view source_name = {});
 
@@ -12,11 +8,6 @@ struct LocalInfo {
 	ls_string_view name;
 	TypeRef type;
 	bool is_const = false;
-};
-
-struct LocalFunctionInfo {
-	ls_string_view name;
-	i32 function_index = -1;
 };
 
 static ls_string_view stringView(const std::string& value) {
@@ -117,7 +108,6 @@ struct Checker {
 			}
 			
 			for (FunctionDecl& fn : unit.functions) {
-				if (fn.is_nested) continue;
 				if (!checkFunctionSignature(unit, fn)) return false;
 			}
 
@@ -130,7 +120,7 @@ struct Checker {
 		for (Unit* unit_ptr : m_module.units) {
 			Unit& unit = *unit_ptr;
 			for (FunctionDecl& fn : unit.functions) {
-				if (fn.is_nested || !fn.is_operator) continue;
+				if (!fn.is_operator) continue;
 				// Operator declarations are validated in a separate pass so normal
 				// functions keep their existing rules and operator-specific policy stays
 				// centralized in one place.
@@ -164,7 +154,7 @@ struct Checker {
 				// not create distinct operator identities.
 				/*for (const FunctionDecl* prev : m_functions) {
 					if (prev == fn) break;
-					if (prev->is_nested || !prev->is_operator) continue;
+					if (!prev->is_operator) continue;
 					if (prev->operator_token != fn.operator_token) continue;
 					if (prev->params.size() != fn.params.size()) continue;
 					bool same = true;
@@ -181,7 +171,7 @@ struct Checker {
 			}
 			checkGlobals(unit);
 			for (FunctionDecl& fn : unit.functions) {
-				if (!fn.is_nested) checkFunction(unit, fn);
+				checkFunction(unit, fn);
 			}
 		}
 		return !m_output.has_error;
@@ -332,45 +322,24 @@ struct Checker {
 		Expr& e = m_module.expressions[expr_idx];
 		if (e.kind == Expr::VAR) return e.name;
 		if (e.kind == Expr::FIELD) {
-			if (empty(e.qualified_name)) e.qualified_name = m_module.makeQualifiedName(getExpressionName(e.left), e.name);
-			return e.qualified_name;
+			if (empty(e.qualified_name)) e.qualified_name = {getExpressionName(e.left), e.name};
+			return m_module.makeQualifiedName(e.qualified_name.path, e.qualified_name.name);
 		}
 		return {};
 	}
 
-
-	bool bareDeclarationCollidesWithImport(Unit& unit, ls_string_view name, Token token) {
-		ls_string_view local_candidate = empty(unit.source_name) ? name : m_module.makeQualifiedName(unit.source_name, name);
-		bool declaration_exists = m_module.findStruct(local_candidate) >= 0 
-			|| m_module.findEnum(local_candidate) >= 0 
-			|| m_module.findGlobal(local_candidate) >= 0
-			|| m_module.findFunction(local_candidate) >= 0
-			|| m_module.findNativeFunction(local_candidate) >= 0;
-		if (!declaration_exists) return false;
-
-		for (const ImportDecl& import : unit.imports) {
-			if (!empty(import.alias)) continue;
-
-			ls_string_view candidate = m_module.makeQualifiedName(import.path, name);
-			Symbol symbol = findSymbol(import, name);
-			if (symbol.kind != Symbol::NOT_FOUND) {
-				m_output.errorAt(token, "Import symbol collision for '", name, "': '", local_candidate, "' and '", candidate, "'");
-				return true;
-			}
-		}
-
-		return false;
-	}
-
-
-	ls_string_view resolveCallName(Unit& unit, Expr& call, i32* fn_idx, i32* native_idx) {
+	CanonicalName resolveCallName(Unit& unit, Expr& call, i32* fn_idx, i32* native_idx) {
 		// `Expr::CALL` can wrap several source forms:
 		// - bare calls: `foo()`
 		// - imported calls: `mod.foo()` or `alias.foo()`
 		// - method calls: `obj.foo()`
 		// - extension-style calls: `foo(arg0, ...)` where `arg0` selects the namespace
 		// This helper normalizes the callee name, then resolves it against functions and natives.
-		ls_string_view callee_name = empty(call.qualified_name) ? getExpressionName(call.left) : call.qualified_name;
+		ls_string_view callee_name = empty(call.qualified_name) ? getExpressionName(call.left) : m_module.makeQualifiedName(call.qualified_name.path, call.qualified_name.name);
+		const Expr& callee_expr = m_module.expressions[call.left];
+		if (callee_expr.kind == Expr::VAR && findLocal(callee_name) >= 0) {
+			return {};
+		}
 
 		Symbol resolved_symbol = resolveSymbol(unit, callee_name, call.token);
 		switch (resolved_symbol.kind) {
@@ -379,27 +348,28 @@ struct Checker {
 				*native_idx = -2;
 				return {};
 			case Symbol::FN: {
-				ls_string_view resolved_name = m_module.makeQualifiedName(resolved_symbol.name.path, resolved_symbol.name.name);
-				*fn_idx = m_module.findFunction(resolved_name);
-				call.qualified_name = resolved_name;
-				return callee_name;
+				*fn_idx = m_module.findFunction(resolved_symbol.name);
+				if (*fn_idx >= 0) call.qualified_name = resolved_symbol.name;
+				return resolved_symbol.name;
 			}
 			case Symbol::EXTERN_FN: {
-				ls_string_view resolved_name = m_module.makeQualifiedName(resolved_symbol.name.path, resolved_symbol.name.name);
-				*native_idx = m_module.findNativeFunction(resolved_name);
-				call.qualified_name = resolved_name;
-				return callee_name;
+				*native_idx = m_module.findNativeFunction({resolved_symbol.name.path, resolved_symbol.name.name});
+				if (*native_idx >= 0) call.qualified_name = resolved_symbol.name;
+				return resolved_symbol.name;
 			}
+			default: break;
 		}
 
-		const Expr& callee_expr = m_module.expressions[call.left];
 		if (callee_expr.kind == Expr::VAR) {
+			if (findLocal(callee_name) >= 0) return {};
 			// TODO this is hit because of ls_module_add_native_function
 			*fn_idx = m_module.findFunction(callee_name);
 			*native_idx = m_module.findNativeFunction(callee_name);
 			if (*fn_idx >= 0 || *native_idx >= 0) {
-				call.qualified_name = callee_name;
-				return callee_name;
+				call.qualified_name = { {}, callee_name };
+				CanonicalName res;
+				splitMemberName(callee_name, &res.path, &res.name);
+				return res;
 			}
 		}
 		
@@ -418,13 +388,12 @@ struct Checker {
 			if (!empty(namespace_name)) {
 				// Method syntax is sugar for a namespace function whose first
 				// parameter is the receiver, e.g. `v.len()` -> `Vec.len(v)`.
-				ls_string_view method_name = m_module.makeQualifiedName(namespace_name, callee.name);
-				*fn_idx = m_module.findFunction(method_name);
-				if (*fn_idx < 0) *native_idx = m_module.findNativeFunction(method_name);
+				*fn_idx = m_module.findFunction({namespace_name, callee.name});
+				if (*fn_idx < 0) *native_idx = m_module.findNativeFunction({namespace_name, callee.name});
 				if (*fn_idx >= 0 || *native_idx >= 0) {
-					call.qualified_name = method_name;
+					call.qualified_name = {namespace_name, callee.name};
 					call.method_receiver = callee.left;
-					return method_name;
+					return call.qualified_name;
 				}
 			}
 			return {};
@@ -436,16 +405,16 @@ struct Checker {
 			TypeRef first_arg_type = checkExpr(unit, call.args[0]);
 			const ls_string_view namespace_name = first_arg_type.canonical_name.path;
 			if (!empty(namespace_name)) {
-				ls_string_view method_name = m_module.makeQualifiedName(namespace_name, callee_name);
-				*fn_idx = m_module.findFunction(method_name);
-				*native_idx = m_module.findNativeFunction(method_name);
+				CanonicalName cn{namespace_name, callee_name};
+				*fn_idx = m_module.findFunction(cn);
+				*native_idx = m_module.findNativeFunction(cn);
 				if (*fn_idx >= 0 || *native_idx >= 0) {
-					call.qualified_name = method_name;
-					return method_name;
+					call.qualified_name = cn;
+					return cn;
 				}
 			}
 		}
-		return callee_name;
+		return {};
 	}
 
 	bool checkQualifiedEnumMember(Unit& unit, Expr& e, ls_string_view name) {
@@ -487,21 +456,6 @@ struct Checker {
 		return -1;
 	}
 
-	i32 findLocalFunction(ls_string_view name) const {
-		for (i32 i = (i32)m_local_functions.size() - 1; i >= 0; --i) {
-			if (equalStrings(m_local_functions[i].name, name)) return m_local_functions[i].function_index;
-		}
-		return -1;
-	}
-
-	bool localFunctionInCurrentScope(ls_string_view name) const {
-		const i32 scope_start = m_function_scope_starts.empty() ? 0 : m_function_scope_starts.back();
-		for (i32 i = scope_start; i < m_local_functions.size(); ++i) {
-			if (equalStrings(m_local_functions[i].name, name)) return true;
-		}
-		return false;
-	}
-
 	bool isAssignableExpr(i32 expr_idx) {
 		if (expr_idx < 0) return false;
 		Expr& e = m_module.expressions[expr_idx];
@@ -524,9 +478,8 @@ struct Checker {
 
 			Symbol global_symbol = resolveSymbol(unit, e.name, e.token);
 			if (global_symbol.kind == Symbol::GLOBAL_VAR) {
-				CanonicalName global_name = {global_symbol.name.path, global_symbol.name.name};
-				const i32 global_idx = m_module.findGlobal(global_name);
-				if (global_idx >= 0) return m_globals[global_idx]->is_const;
+				const GlobalDecl& g = global_symbol.unit->globals[global_symbol.index];
+				return g.is_const;
 			}
 			return false;
 		}
@@ -607,7 +560,7 @@ struct Checker {
 		// operator path instead of inventing implicit conversions.
 		for (i32 i = 0; i < m_functions.size(); ++i) {
 			FunctionDecl& fn = *m_functions[i];
-			if (fn.is_nested || !fn.is_operator || fn.operator_token != op) continue;
+			if (!fn.is_operator || fn.operator_token != op) continue;
 			if (fn.params.size() != operands.size()) continue;
 			bool same = true;
 			for (i32 j = 0; j < fn.params.size(); ++j) {
@@ -727,13 +680,11 @@ struct Checker {
 		checkFunctionSignature(unit, fn);
 		const i32 locals_start = (i32)m_locals.size();
 		m_scope_starts.clear();
-		m_function_scope_starts.clear();
 		m_loop_labels.clear();
 		m_loop_scope_starts.clear();
 		m_declared_labels.clear();
 		m_label_scope_starts.clear();
 		m_scope_starts.push_back(0);
-		m_function_scope_starts.push_back((i32)m_local_functions.size());
 		for (Param& p : fn.params) {
 			LocalInfo& local = m_locals.emplace_back();
 			local.name = p.name;
@@ -741,8 +692,6 @@ struct Checker {
 			local.is_const = !p.is_ref;
 		}
 		checkStmt(unit, fn.body, fn.return_type);
-		m_local_functions.resize(m_function_scope_starts.back());
-		m_function_scope_starts.pop_back();
 		m_locals.resize(locals_start);
 	}
 
@@ -764,35 +713,10 @@ struct Checker {
 		return !m_output.has_error;
 	}
 
-	void checkNestedFunction(Unit& unit, FunctionDecl& fn) {
-		checkFunctionSignature(unit, fn);
-		std::vector<LocalInfo> old_locals;
-		std::vector<i32> old_scope_starts;
-		for (LocalInfo local : m_locals) old_locals.push_back(local);
-		for (i32 scope_start : m_scope_starts) old_scope_starts.push_back(scope_start);
-		m_locals.clear();
-		m_scope_starts.clear();
-		m_scope_starts.push_back(0);
-		for (Param& p : fn.params) {
-			LocalInfo& local = m_locals.emplace_back();
-			local.name = p.name;
-			local.type = p.type;
-			local.is_const = !p.is_ref;
-		}
-		checkStmt(unit, fn.body, fn.return_type);
-		m_locals.clear();
-		m_scope_starts.clear();
-		for (LocalInfo local : old_locals) m_locals.push_back(local);
-		for (i32 scope_start : old_scope_starts) m_scope_starts.push_back(scope_start);
-	}
-
 	void checkGlobals(Unit& unit) {
 		m_locals.clear();
 		m_scope_starts.clear();
-		m_local_functions.clear();
-		m_function_scope_starts.clear();
 		m_scope_starts.push_back(0);
-		m_function_scope_starts.push_back(0);
 		for (GlobalDecl& global : unit.globals) {
 			TypeRef type = global.type;
 			if (type.kind != LS_TYPE_INVALID) resolveType(unit, type);
@@ -840,13 +764,11 @@ struct Checker {
 				// before giving up.
 				Symbol symbol = resolveSymbol(unit, e.name, e.token);
 				if (symbol.kind == Symbol::GLOBAL_VAR) {
-					CanonicalName global_name {symbol.name.path, symbol.name.name};
 					e.name = m_module.makeQualifiedName(symbol.name.path, symbol.name.name);
 					e.type = symbol.unit->globals[symbol.index].type;
 					return e.type;
 				} else if (symbol.kind == Symbol::FN) {
-					ls_string_view fn_name = m_module.makeQualifiedName(symbol.name.path, symbol.name.name);
-					const i32 fn_idx = m_module.findFunction(fn_name);
+					const i32 fn_idx = m_module.findFunction(symbol.name);
 					if (fn_idx >= 0) {
 						e.kind = Expr::FUNCTION_REF;
 						e.type = functionTypeFromFunction(*m_functions[fn_idx]);
@@ -855,8 +777,7 @@ struct Checker {
 						return e.type;
 					}
 				} else if (symbol.kind == Symbol::EXTERN_FN) {
-					ls_string_view fn_name = m_module.makeQualifiedName(symbol.name.path, symbol.name.name);
-					const i32 native_idx = m_module.findNativeFunction(fn_name);
+					const i32 native_idx = m_module.findNativeFunction(symbol.name);
 					if (native_idx >= 0) {
 						e.kind = Expr::FUNCTION_REF;
 						e.type = functionTypeFromNativeFunction(*m_native_functions[native_idx]);
@@ -864,14 +785,6 @@ struct Checker {
 						e.boolean = true;
 						return e.type;
 					}
-				}
-				const i32 local_fn_idx = findLocalFunction(e.name);
-				if (local_fn_idx >= 0) {
-					e.kind = Expr::FUNCTION_REF;
-					e.type = functionTypeFromFunction(*m_functions[local_fn_idx]);
-					e.left = local_fn_idx;
-					e.boolean = false;
-					return e.type;
 				}
 				const i32 fn_idx = m_module.findFunction(e.name);
 				if (fn_idx >= 0) {
@@ -894,7 +807,8 @@ struct Checker {
 			}
 			case Expr::FUNCTION_REF: return e.type;
 			case Expr::FIELD: {
-				const ls_string_view qualified_name = getExpressionName(expr_idx);
+				if (empty(e.qualified_name)) e.qualified_name = {getExpressionName(e.left), e.name};
+				const CanonicalName& qualified_name = e.qualified_name;
 				const i32 fn_idx = m_module.findFunction(qualified_name);
 				if (fn_idx >= 0) {
 					e.kind = Expr::FUNCTION_REF;
@@ -911,6 +825,7 @@ struct Checker {
 					e.boolean = true;
 					return e.type;
 				}
+				const ls_string_view qualified_name_str = m_module.makeQualifiedName(qualified_name.path, qualified_name.name);
 				if (e.left >= 0 && m_module.expressions[e.left].kind == Expr::VAR) {
 					for (const ImportDecl& import : unit.imports) {
 						if (!empty(import.alias)) continue;
@@ -919,7 +834,7 @@ struct Checker {
 						return {};
 					}
 				}
-				if (checkQualifiedEnumMember(unit, e, qualified_name)) return e.type;
+				if (checkQualifiedEnumMember(unit, e, qualified_name_str)) return e.type;
 				if (e.left >= 0 && m_module.expressions[e.left].kind == Expr::VAR && importAliasExists(unit, m_module.expressions[e.left].name)) {
 					m_output.errorAt(e.token, "Unknown variable '", e.name, "'");
 					return {};
@@ -1076,17 +991,19 @@ struct Checker {
 			case Expr::CALL: {
 				i32 fn_idx = -1;
 				i32 native_idx = -1;
-				const ls_string_view callee_name = resolveCallName(unit, e, &fn_idx, &native_idx);
+				const CanonicalName callee_name = resolveCallName(unit, e, &fn_idx, &native_idx);
 				if (m_output.has_error) return {};
+
 				if (fn_idx < 0 && native_idx < 0) {
 					TypeRef callee_type = checkExpr(unit, e.left);
-					if (callee_type.kind != LS_TYPE_FUNCTION || callee_type.struct_index < 0 || callee_type.struct_index >= m_module.function_types.size()) {
-						if (empty(callee_name))
+					if (callee_type.kind != LS_TYPE_FUNCTION || callee_type.struct_index < 0) {
+						if (empty(callee_name.name))
 							m_output.errorAt(m_module.expressions[e.left].token, "Unsupported callee");
 						else
-							m_output.errorAt(m_module.expressions[e.left].token, "Unknown function '", callee_name, "'");
+							m_output.errorAt(m_module.expressions[e.left].token, "Unknown function '", callee_name.name, "'");
 						return {};
 					}
+					// foo().bar()
 					FunctionTypeDecl& fn_type = m_module.function_types[callee_type.struct_index];
 					if (fn_type.params.size() != e.args.size()) {
 						m_output.errorAt(e.token, "Wrong number of arguments");
@@ -1104,6 +1021,7 @@ struct Checker {
 					e.type = fn_type.return_type;
 					return e.type;
 				}
+
 				const bool is_native = native_idx >= 0;
 				const std::vector<Param>& params = is_native ? m_native_functions[native_idx]->params : m_functions[fn_idx]->params;
 				const TypeRef return_type = is_native ? m_native_functions[native_idx]->return_type : m_functions[fn_idx]->return_type;
@@ -1283,20 +1201,16 @@ struct Checker {
 		switch (stmt.kind) {
 			case Stmt::BLOCK: {
 				const i32 old_size = (i32)m_locals.size();
-				const i32 old_function_size = (i32)m_local_functions.size();
 				const i32 old_loop_size = (i32)m_loop_labels.size();
 				const i32 old_label_size = (i32)m_declared_labels.size();
 				m_scope_starts.push_back(old_size);
-				m_function_scope_starts.push_back(old_function_size);
 				m_loop_scope_starts.push_back(old_loop_size);
 				m_label_scope_starts.push_back(old_label_size);
 				for (i32 child : stmt.children) checkStmt(unit, child, return_type);
 				m_locals.resize(old_size);
-				m_local_functions.resize(old_function_size);
 				m_loop_labels.resize(old_loop_size);
 				m_declared_labels.resize(old_label_size);
 				m_scope_starts.pop_back();
-				m_function_scope_starts.pop_back();
 				m_loop_scope_starts.pop_back();
 				m_label_scope_starts.pop_back();
 				break;
@@ -1308,10 +1222,6 @@ struct Checker {
 						m_output.errorAt(stmt.token, "Duplicate local '", stmt.name, "'");
 						return;
 					}
-				}
-				if (localFunctionInCurrentScope(stmt.name)) {
-					m_output.errorAt(stmt.token, "Duplicate local '", stmt.name, "'");
-					return;
 				}
 				TypeRef type = stmt.type;
 				if (type.kind != LS_TYPE_INVALID) resolveType(unit, type);
@@ -1335,26 +1245,6 @@ struct Checker {
 				local.name = stmt.name;
 				local.type = type;
 				local.is_const = stmt.is_const;
-				break;
-			}
-			case Stmt::FN_DECL: {
-				if (stmt.left < 0 || stmt.left >= m_functions.size()) return;
-				FunctionDecl& fn = *m_functions[stmt.left];
-				const i32 scope_start = m_scope_starts.empty() ? 0 : m_scope_starts.back();
-				for (i32 i = scope_start; i < m_locals.size(); ++i) {
-					if (equalStrings(m_locals[i].name, fn.local_name)) {
-						m_output.errorAt(fn.token, "Duplicate local '", fn.local_name, "'");
-						return;
-					}
-				}
-				if (localFunctionInCurrentScope(fn.local_name)) {
-					m_output.errorAt(fn.token, "Duplicate function '", fn.local_name, "'");
-					return;
-				}
-				LocalFunctionInfo& local_fn = m_local_functions.emplace_back();
-				local_fn.name = fn.local_name;
-				local_fn.function_index = stmt.left;
-				checkNestedFunction(unit, fn);
 				break;
 			}
 			case Stmt::EXPR: checkExpr(unit, stmt.expr); break;
@@ -1528,8 +1418,6 @@ struct Checker {
 	std::vector<EnumDecl*> m_enums;
 	std::vector<LocalInfo> m_locals;
 	std::vector<i32> m_scope_starts;
-	std::vector<LocalFunctionInfo> m_local_functions;
-	std::vector<i32> m_function_scope_starts;
 	std::vector<ls_string_view> m_loop_labels;
 	std::vector<i32> m_loop_scope_starts;
 	std::vector<ls_string_view> m_declared_labels;
@@ -1542,7 +1430,7 @@ inline bool sameImportPathForPolicy(ls_string_view lhs, ls_string_view rhs) {
 
 static NativeFunctionDecl& addNativeFunction(Unit& unit, ls_string_view canonical_name, ls_string_view symbol_name, TypeRef return_type, std::span<const TypeRef> param_types) {
 	NativeFunctionDecl& fn = unit.native_functions.emplace_back();
-	fn.canonical_name = canonical_name;
+	splitMemberName(canonical_name, &fn.canonical_name.path, &fn.canonical_name.name);
 	fn.return_type = return_type;
 	for (TypeRef type : param_types) {
 		Param& param = fn.params.emplace_back();

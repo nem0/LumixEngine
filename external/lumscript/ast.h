@@ -31,6 +31,10 @@ inline bool equal(const CanonicalName& a, const CanonicalName& b) {
 	return equalStrings(a.name, b.name) && equalStrings(a.path, b.path);
 }
 
+inline bool empty(CanonicalName name) {
+	return empty(name.path) && empty(name.name);
+}
+
 inline bool splitMemberName(ls_string_view name, ls_string_view* owner, ls_string_view* member) {
 	for (const char* c = data(name) + size(name); c != data(name); --c) {
 		if (*(c - 1) != '.') continue;
@@ -97,7 +101,7 @@ struct Expr {
 	Kind kind = NUMBER;
 	Token token;
 	ls_string_view name;
-	ls_string_view qualified_name;
+	CanonicalName qualified_name = {};
 	ls_string_view string;
 	double number = 0;
 	bool boolean = false;
@@ -111,7 +115,7 @@ struct Expr {
 };
 
 struct Stmt {
-	enum Kind { BLOCK, VAR_DECL, FN_DECL, EXPR, ASSIGN, WHILE, FOR, BREAK, CONTINUE, RETURN, IF, DEFER, MATCH };
+	enum Kind { BLOCK, VAR_DECL, EXPR, ASSIGN, WHILE, FOR, BREAK, CONTINUE, RETURN, IF, DEFER, MATCH };
 
 	Kind kind = BLOCK;
 	Token token;
@@ -175,13 +179,12 @@ struct Param {
 };
 
 struct FunctionDecl {
-	ls_string_view name;
+	CanonicalName canonical_name;
 	ls_string_view local_name;
 	std::vector<Param> params;
 	TypeRef return_type;
 	i32 body = -1;
 	Token token;
-	bool is_nested = false;
 	bool is_operator = false;
 	Token::Type operator_token = Token::END_OF_FILE;
 };
@@ -205,7 +208,7 @@ struct ImportDecl {
 };
 
 struct NativeFunctionDecl {
-	ls_string_view canonical_name;
+	CanonicalName canonical_name;
 	std::vector<Param> params;
 	TypeRef return_type;
 	Token token;
@@ -276,10 +279,18 @@ struct ls_module {
 
 	i32 findGlobal(ls_string_view name) const {
 		i32 index = 0;
+		ls_string_view owner;
+		ls_string_view member = name;
+		const bool qualified = splitMemberName(name, &owner, &member);
 		for (const Unit* unit_ptr : units) {
 			const Unit& unit = *unit_ptr;
 			for (const GlobalDecl& global : unit.globals) {
-				if (equalQualifiedName(global.canonical_name, name)) return index;
+				if (qualified) {
+					if (equalStrings(global.canonical_name.path, owner) && equalStrings(global.canonical_name.name, member)) return index;
+				}
+				else if (empty(global.canonical_name.path) && equalStrings(global.canonical_name.name, name)) {
+					return index;
+				}
 				++index;
 			}
 		}
@@ -298,36 +309,31 @@ struct ls_module {
 		return -1;
 	}
 
-	i32 findStruct(ls_string_view name) const {
-		i32 index = 0;
-		ls_string_view a, b;
-		if (splitMemberName(name, &a, &b)) {
-			for (const Unit* unit_ptr : units) {
-				const Unit& unit = *unit_ptr;
-				for (const StructDecl& s : unit.structs) {
-					if (equalStrings(s.name.path, a) && equalStrings(s.name.name, b )) return index;
-					++index;
-				}
-			}
-		}
-		else {
-			for (const Unit* unit_ptr : units) {
-				const Unit& unit = *unit_ptr;
-				for (const StructDecl& s : unit.structs) {
-					if (equalStrings(s.name.name, name) && s.name.path.begin == s.name.path.end) return index;
-					++index;
-				}
-			}
-		}
-		return -1;
-	}
-
 	i32 findFunction(ls_string_view name) const {
 		i32 index = 0;
 		for (const Unit* unit_ptr : units) {
 			const Unit& unit = *unit_ptr;
 			for (const FunctionDecl& fn : unit.functions) {
-				if (!fn.is_nested && equalStrings(fn.name, name)) return index;
+				ls_string_view owner;
+				ls_string_view member;
+				if (splitMemberName(name, &owner, &member)) {
+					if (equalStrings(fn.canonical_name.path, owner) && equalStrings(fn.canonical_name.name, member)) return index;
+				}
+				else if (empty(fn.canonical_name.path) && equalStrings(fn.canonical_name.name, name)) {
+					return index;
+				}
+				++index;
+			}
+		}
+		return -1;
+	}
+
+	i32 findFunction(CanonicalName name) const {
+		i32 index = 0;
+		for (const Unit* unit_ptr : units) {
+			const Unit& unit = *unit_ptr;
+			for (const FunctionDecl& fn : unit.functions) {
+				if (equal(fn.canonical_name, name)) return index;
 				++index;
 			}
 		}
@@ -336,11 +342,29 @@ struct ls_module {
 
 	i32 findNativeFunction(ls_string_view name) const {
 		i32 index = 0;
+		ls_string_view owner = {};
+		ls_string_view member = name;
+		splitMemberName(name, &owner, &member);
 		for (const Unit* unit_ptr : units) {
 			const Unit& unit = *unit_ptr;
 			for (const NativeFunctionDecl& fn : unit.native_functions) {
-				if (equalStrings(fn.canonical_name, name)) return index;
+				if (equalStrings(fn.canonical_name.name, member) && equalStrings(fn.canonical_name.path, owner)) return index;
 				++index;
+			}
+		}
+		return -1;
+	}
+
+	i32 findNativeFunction(CanonicalName name) const {
+		i32 index = 0;
+		for (const Unit* unit_ptr : units) {
+			const Unit& unit = *unit_ptr;
+			if (equalStrings(unit.source_name, name.path)) {
+				for (const NativeFunctionDecl& fn : unit.native_functions) {
+					if (equalStrings(fn.canonical_name.name, name.name)) return index;
+					++index;
+				}
+				return -1;
 			}
 		}
 		return -1;
@@ -356,15 +380,6 @@ struct ls_module {
 			}
 		}
 		return -1;
-	}
-
-	bool equalQualifiedName(CanonicalName canonical_name, ls_string_view name) const {
-		ls_string_view owner;
-		ls_string_view member;
-		if (splitMemberName(name, &owner, &member)) {
-			return equalStrings(canonical_name.path, owner) && equalStrings(canonical_name.name, member);
-		}
-		return empty(canonical_name.path) && equalStrings(canonical_name.name, name);
 	}
 
 	// TODO

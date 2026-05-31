@@ -284,9 +284,10 @@ fn clamp_min(v : i32, min_value : i32) : i32 {
 Rules:
 
 - parameter names must be unique
-- top-level functions are globally visible in the module
+- top-level `fn foo() : T { ... }` is syntax sugar for a module-level `const foo = fn() : T { ... }` declaration
 - overloading is not supported
 - parameters are immutable
+- nested functions are not supported
 - this does not include operator declarations; operators are a separate declaration form
 
 ### Operators
@@ -532,18 +533,6 @@ d[i] = 12; // allowed, runtime bounds check
 
 const bad = 99;
 d[bad] = 1; // compile-time error (constant index out of range)
-```
-
-Nested functions are supported and scoped to their containing block. They do not capture outer locals or parameters.
-
-```cpp
-fn main() : i32 {
-	fn add(a : i32, b : i32) : i32 {
-		return a + b;
-	}
-
-	return add(20, 22);
-}
 ```
 
 ## Variables
@@ -1024,7 +1013,7 @@ fn main() : i32 {
 
 ### Extern declarations
 
-Declare host-implemented functions in script using `extern fn` without a body:
+`extern fn foo() : T;` is syntax sugar for a module-level `var foo = fn() : T = undefined;` declaration without a body.
 
 ```cpp
 extern fn native_add(a : i32, b : i32) : i32;

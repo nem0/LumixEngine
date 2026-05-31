@@ -888,6 +888,88 @@ TEST(BytecodeRefParameterCall) {
 	return true;
 }
 
+TEST(BytecodeRefParameterRejectsLiteral) {
+	const char* source = R"(
+		fn increment(v : ref i32) : void {
+			v += 1;
+		}
+
+		fn main() : void {
+			increment(ref 1);
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	test_diagnostics.output_enabled = false;
+	EXPECT_TRUE(!ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeLocalVariableShadowsFunctionName) {
+	const char* source = R"(
+		fn foo() : i32 {
+			return 7;
+		}
+
+		fn main() : i32 {
+			var foo : i32 = 42;
+			return foo;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ls_runtime* runtime = ls_runtime_create(bytecode);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeFunctionTypedLocalCanBeCalled) {
+	const char* source = R"(
+		fn foo(v : bool) : i32 {
+			return 7;
+		}
+
+		fn bar(v : i32) : i32 {
+			return v + 1;
+		}
+
+		fn main() : i32 {
+			const foo : fn(i32) : i32 = bar;
+			return foo(41);
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ls_runtime* runtime = ls_runtime_create(bytecode);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
 TEST(BytecodeRefParameterNestedFieldCall) {
 	const char* source = R"(
 		struct Stats {
@@ -1198,6 +1280,77 @@ TEST(BytecodeStructParameterPassing) {
 		fn main() : i32 {
 			const v : Vec2 = Vec2 { 20, 22 };
 			return sum(v);
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ls_runtime* runtime = ls_runtime_create(bytecode);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeChainedFieldAccess) {
+	const char* source = R"(
+		struct C {
+			d : i32;
+		}
+		struct B {
+			c : C;
+		}
+		struct A {
+			b : B;
+		}
+		fn main() : i32 {
+			const a : A = A { B { C { 42 } } };
+			return a.b.c.d;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ls_runtime* runtime = ls_runtime_create(bytecode);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeChainedFieldAssignment) {
+	const char* source = R"(
+		struct C {
+			d : i32;
+		}
+		struct B {
+			c : C;
+		}
+		struct A {
+			b : B;
+		}
+		fn main() : i32 {
+			var a : A = A { B { C { 1 } } };
+			a.b.c.d = 42;
+			return a.b.c.d;
 		}
 	)";
 
@@ -2034,18 +2187,8 @@ TEST(NestedFunctionsRuntime) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
-
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
-	EXPECT_TRUE(bytecode != nullptr);
-
-	ls_runtime* runtime = ls_runtime_create(bytecode);
-	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ls_to_i32(runtime, -1));
-
-	ls_runtime_destroy(runtime);
-	ls_bytecode_destroy(bytecode);
+	test_diagnostics.output_enabled = false;
+	EXPECT_TRUE(!ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_END(module);
 	return true;
 }
@@ -2886,6 +3029,58 @@ TEST(FirstClassFunctionsNoArgsRuntime) {
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(12, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(FirstClassFunctionsImmediateCallRuntime) {
+	const char* source = R"(
+		fn inner() : i32 {
+			return 42;
+		}
+
+		fn make_fn() : fn() : i32 {
+			return inner;
+		}
+
+		fn main() : i32 {
+			return make_fn()();
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(FirstClassFunctionsStructFieldImmediateCallRuntime) {
+	const char* source = R"(
+		struct Holder {
+			bar : fn() : i32;
+		}
+
+		fn inner() : i32 {
+			return 42;
+		}
+
+		fn make_holder() : Holder {
+			return Holder { inner };
+		}
+
+		fn main() : i32 {
+			return make_holder().bar();
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }

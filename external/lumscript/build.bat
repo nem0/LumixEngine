@@ -1,94 +1,96 @@
 @echo off
-REM build.bat - Build lumc.exe standalone LumScript runner using cl.exe
-REM
-REM Requirements:
-REM   - Visual Studio Developer Command Prompt (or vcvarsall.bat sourced)
-REM   - cl.exe must be in PATH
+setlocal enabledelayedexpansion
+
+REM build.bat - Build lumc.exe standalone LumScript runner using cl.exe or clang-cl
 REM
 REM Usage:
-REM   build.bat          - Build Release configuration
-REM   build.bat debug    - Build Debug configuration
-REM   build.bat tests    - Build Tests
+REM   build.bat
+REM   build.bat tests
+REM   build.bat clang
+REM   build.bat tests clang
 
-setlocal
-
-REM Determine build configuration
-set CONFIG=Release
-if /i "%1"=="debug" set CONFIG=Debug
-if /i "%1"=="tests" set CONFIG=Tests
-
-REM Set up paths
 set SCRIPT_DIR=%~dp0
-set ROOT_DIR=%SCRIPT_DIR%..\..
-set SRC_DIR=%ROOT_DIR%\src
-set EXT_DIR=%ROOT_DIR%\external
+set SRC_DIR=%SCRIPT_DIR%..\..\src
+set EXT_DIR=%SCRIPT_DIR%.
 set OUT_DIR=%SCRIPT_DIR%build
+set TARGET=lumc
+set COMPILER=cl
+set USE_CLANG=0
 
-REM Create output directory
+if /I "%~1"=="tests" set TARGET=tests
+if /I "%~2"=="tests" set TARGET=tests
+
+if /I "%~1"=="clang" set COMPILER=clang-cl
+if /I "%~1"=="clang-cl" set COMPILER=clang-cl
+if /I "%~1"=="/clang" set COMPILER=clang-cl
+if /I "%~2"=="clang" set COMPILER=clang-cl
+if /I "%~2"=="clang-cl" set COMPILER=clang-cl
+if /I "%~2"=="/clang" set COMPILER=clang-cl
+
+if /I "%COMPILER%"=="clang-cl" set USE_CLANG=1
+
 if not exist "%OUT_DIR%" mkdir "%OUT_DIR%"
 
-REM Set up x64 build environment using vcvarsall.bat
-set "VCVARSALL="
-if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat" set "VCVARSALL=%ProgramFiles%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat"
-if exist "%ProgramFiles(x86)%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat" set "VCVARSALL=%ProgramFiles(x86)%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat"
-if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvarsall.bat" set "VCVARSALL=%ProgramFiles%\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvarsall.bat"
-if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" set "VCVARSALL=%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat"
-
-if defined VCVARSALL call "%VCVARSALL%" x64 >nul 2>&1
-
-REM Verify x64 cl.exe is available
-cl.exe 2>&1 | findstr /C:"for x64" >nul 2>&1
-if %ERRORLEVEL% NEQ 0 (
-    echo Warning: cl.exe is not targeting x64.
-    echo Please run from x64 Native Tools Command Prompt for VS 2022.
-    echo Trying to continue anyway...
-)
-
-REM Compiler flags
-set CFLAGS=/nologo /std:c++20 /EHsc /Zi /I"%SRC_DIR%" /I"%EXT_DIR%"
-set CFLAGS=%CFLAGS% /D_CRT_NONSTDC_NO_DEPRECATE
-set CFLAGS=%CFLAGS% /DSTATIC_PLUGINS
-
-if /i "%CONFIG%"=="Debug" (
-    set CFLAGS=%CFLAGS% /Od /MDd
-) else if /i "%CONFIG%"=="Tests" (
-    set CFLAGS=%CFLAGS% /Od /MDd
+if "%USE_CLANG%"=="0" (
+    REM Verify x64 cl.exe is available
+    cl.exe 2>&1 | findstr /C:"for x64" >nul 2>&1
+    if errorlevel 1 (
+        echo Warning: cl.exe is not targeting x64.
+    )
 ) else (
-    set CFLAGS=%CFLAGS% /O2 /MD
+    where clang-cl >nul 2>&1
+    if errorlevel 1 (
+        echo Error: clang-cl is not available in PATH.
+        exit /b 1
+    )
 )
 
-REM Linker flags
+set COMMON_FLAGS=/nologo /EHsc /Zi /I"%SRC_DIR%" /I"%EXT_DIR%"
+set CFLAGS=%COMMON_FLAGS% /D_CRT_NONSTDC_NO_DEPRECATE /DSTATIC_PLUGINS
+set CXXFLAGS=%COMMON_FLAGS% /std:c++20 /D_CRT_NONSTDC_NO_DEPRECATE /DSTATIC_PLUGINS
+if /I "%TARGET%"=="tests" (
+    set CFLAGS=%CFLAGS% /Od /MDd
+    set CXXFLAGS=%CXXFLAGS% /Od /MDd
+) else (
+    if /I "%~2"=="release" (
+        set CFLAGS=%CFLAGS% /O2 /MD
+        set CXXFLAGS=%CXXFLAGS% /O2 /MD
+    ) else (
+        set CFLAGS=%CFLAGS% /Od /MDd
+        set CXXFLAGS=%CXXFLAGS% /Od /MDd
+    )
+)
 
-if /i "%CONFIG%"=="Tests" (
+if /I "%TARGET%"=="tests" (
     set LDFLAGS=/nologo /DEBUG /INCREMENTAL:NO /OUT:"%OUT_DIR%\tests.exe"
-    echo Building tests...
 ) else (
     set LDFLAGS=/nologo /DEBUG /INCREMENTAL:NO /OUT:"%OUT_DIR%\lumc.exe"
-    echo Building lumc [%CONFIG%]...
 )
 
-echo.
+REM Clean up stale objects from previous runs.
+del /q /f "%SCRIPT_DIR%*.obj" >nul 2>&1
+del /q /f "%SCRIPT_DIR%..\*.obj" >nul 2>&1
 
-REM Compile
-if /i "%CONFIG%"=="Tests" (
-	cl %CFLAGS% "%SRC_DIR%\core\string.cpp" "%SCRIPT_DIR%tests/main.cpp" "%SCRIPT_DIR%parser.cpp" "%SCRIPT_DIR%compiler.cpp" "%SCRIPT_DIR%bytecode_compiler.cpp" "%SCRIPT_DIR%runtime.cpp" "%SCRIPT_DIR%capi.cpp" /link %LDFLAGS%
+if /I "%TARGET%"=="tests" (
+	%COMPILER% %CXXFLAGS% "%SCRIPT_DIR%tests/main.cpp" "%SCRIPT_DIR%parser.cpp" "%SCRIPT_DIR%compiler.cpp" "%SCRIPT_DIR%bytecode_compiler.cpp" "%SCRIPT_DIR%runtime.cpp" "%SCRIPT_DIR%capi.cpp" /link %LDFLAGS%
 ) else (
-	cl %CFLAGS% "%SRC_DIR%\core\string.cpp" "%SCRIPT_DIR%lumc.c" "%SCRIPT_DIR%parser.cpp" "%SCRIPT_DIR%compiler.cpp" "%SCRIPT_DIR%bytecode_compiler.cpp" "%SCRIPT_DIR%runtime.cpp" "%SCRIPT_DIR%capi.cpp" /link %LDFLAGS%
+	if /I "%USE_CLANG%"=="1" (
+		%COMPILER% %CFLAGS% /c "%SCRIPT_DIR%lumc.c"
+		if errorlevel 1 exit /b !errorlevel!
+		%COMPILER% %CXXFLAGS% /c "%SCRIPT_DIR%parser.cpp" "%SCRIPT_DIR%compiler.cpp" "%SCRIPT_DIR%bytecode_compiler.cpp" "%SCRIPT_DIR%runtime.cpp" "%SCRIPT_DIR%capi.cpp"
+		if errorlevel 1 exit /b !errorlevel!
+		%COMPILER% "%SCRIPT_DIR%lumc.obj" "%SCRIPT_DIR%parser.obj" "%SCRIPT_DIR%compiler.obj" "%SCRIPT_DIR%bytecode_compiler.obj" "%SCRIPT_DIR%runtime.obj" "%SCRIPT_DIR%capi.obj" /link %LDFLAGS%
+	) else (
+		%COMPILER% %CXXFLAGS%  "%SCRIPT_DIR%lumc.c" "%SCRIPT_DIR%parser.cpp" "%SCRIPT_DIR%compiler.cpp" "%SCRIPT_DIR%bytecode_compiler.cpp" "%SCRIPT_DIR%runtime.cpp" "%SCRIPT_DIR%capi.cpp" /link %LDFLAGS%
+	)
 )
 
-if %ERRORLEVEL% NEQ 0 (
-    echo.
-    echo Build FAILED.
-    exit /b 1
-)
+set RESULT=%errorlevel%
 
-echo.
-echo Build succeeded.
-echo.
+REM Clean up intermediate files created by cl/cland-cl.
+del /q /f "%SCRIPT_DIR%*.obj" >nul 2>&1
+del /q /f "%SCRIPT_DIR%..\*.obj" >nul 2>&1
+del /q /f "%SCRIPT_DIR%vc*.pdb" >nul 2>&1
+del /q /f "%SCRIPT_DIR%..\vc*.pdb" >nul 2>&1
 
-REM Clean up intermediate files
-del "*.obj"
-if exist "vc*.pdb" del "vc*.pdb"
-if exist "vc*.idb" del "vc*.idb"
-
-endlocal
+exit /b %RESULT%

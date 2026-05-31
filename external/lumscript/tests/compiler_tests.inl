@@ -1592,6 +1592,40 @@ TEST(ExternFnCollision) {
 	return true;
 }
 
+TEST(LocalVariableShadowsFunctionName) {
+	const char* source = R"(
+		fn foo() : i32 {
+			return 7;
+		}
+
+		fn main() : i32 {
+			var foo : i32 = 42;
+			return foo;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(LocalFunctionTypedVariableShadowsFunctionName) {
+	const char* source = R"(
+		fn foo(v : bool) : i32 {
+			return 7;
+		}
+
+		fn bar(v : i32) : i32 {
+			return v + 1;
+		}
+
+		fn main() : i32 {
+			const foo : fn(i32) : i32 = bar;
+			return foo(41);
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
 TEST(ImportExternFnDuplicateUsed) {
 	const char* main_source = R"(
 		import "a"
@@ -1669,6 +1703,20 @@ TEST(RefArgumentMustBeAssignable) {
 		fn main() : void {
 			var x : i32 = 10;
 			increment(ref (x + 1));
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(RefArgumentRejectsLiteral) {
+	const char* source = R"(
+		fn increment(v : ref i32) : void {
+			v += 1;
+		}
+
+		fn main() : void {
+			increment(ref 1);
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
@@ -1947,7 +1995,7 @@ TEST(NestedFunctionsTypecheck) {
 			return add(20, 22);
 		}
 	)";
-	EXPECT_COMPILE(source);
+	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
 
