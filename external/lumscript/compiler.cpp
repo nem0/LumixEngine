@@ -805,7 +805,29 @@ struct Checker {
 				m_output.errorAt(e.token, "Unknown variable '", e.name, "'");
 				return {};
 			}
-			case Expr::FUNCTION_REF: return e.type;
+                    case Expr::FUNCTION_REF: {
+                            // Function references are produced from two
+                            // different paths:
+                            // - ordinary named function lookups during
+                            //   semantic analysis
+                            // - synthesized anonymous function literals
+                            //
+                            // The checker generally fills in `e.type` when it
+                            // resolves the expression, but we keep this fallback
+                            // so later passes can still recover the signature if
+                            // the expression was created earlier or copied in a
+                            // partially-resolved form.
+                            if (e.type.kind != LS_TYPE_INVALID) return e.type;
+                            if (e.boolean) {
+                                    if (e.left < 0 || e.left >= m_native_functions.size()) return {};
+                                    e.type = functionTypeFromNativeFunction(*m_native_functions[e.left]);
+                            }
+                            else {
+                                    if (e.left < 0 || e.left >= m_functions.size()) return {};
+                                    e.type = functionTypeFromFunction(*m_functions[e.left]);
+                            }
+                            return e.type;
+                    }
 			case Expr::FIELD: {
 				if (empty(e.qualified_name)) e.qualified_name = {getExpressionName(e.left), e.name};
 				const CanonicalName& qualified_name = e.qualified_name;
@@ -855,6 +877,14 @@ struct Checker {
 						return e.type;
 					}
 				}
+				if (e.left >= 0 && m_module.expressions[e.left].kind == Expr::VAR) {
+					const i32 local_idx = findLocal(qualified_name.path);
+					if (local_idx >= 0) {
+						// TODO method syntax sugar `v.foo()` -> `foo(v)` with possibly inferred namespace
+						
+					}
+				}
+
 				m_output.errorAt(e.token, "Unknown field '", e.name, "'");
 				return {};
 			}

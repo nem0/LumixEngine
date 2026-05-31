@@ -162,7 +162,7 @@ struct Parser {
 		fn.canonical_name = {m_declaration_prefix, name.value};
 		if (!consume(Token::LEFT_PAREN)) return;
 		if (!addSymbol(name, m_unit, {m_declaration_prefix, name.value}, Symbol::EXTERN_FN, m_unit.native_functions.size() - 1)) return;
-		
+
 		while (peek().type != Token::RIGHT_PAREN && peek().type != Token::END_OF_FILE && !m_output.has_error) {
 			if (!fn.params.empty() && !consume(Token::COMMA)) return;
 			Token param_name;
@@ -174,7 +174,7 @@ struct Parser {
 			p.is_ref = match(Token::REF);
 			p.type = parseType();
 		}
-		
+
 		if (!consume(Token::RIGHT_PAREN)) return;
 		if (!consume(Token::COLON)) return;
 		fn.token = name;
@@ -189,7 +189,7 @@ struct Parser {
 		// The declaration itself is canonicalized to the current module namespace.
 		// Imported files are parsed with their normalized path as the prefix, so
 		// this becomes the stable identity used by the checker and later imports.
-		s.name = { m_declaration_prefix, name.value };
+		s.name = {m_declaration_prefix, name.value};
 		s.token = name;
 		if (!addSymbol(name, m_unit, s.name, Symbol::STRUCT, m_unit.structs.size() - 1)) return;
 		if (!consume(Token::LEFT_BRACE)) return;
@@ -212,7 +212,7 @@ struct Parser {
 		EnumDecl& e = m_unit.enums.emplace_back();
 		// Same rule as structs: store the declaration under the module's canonical
 		// namespace, not under any source-level alias that happened to load it.
-		e.name = { m_declaration_prefix, name.value };
+		e.name = {m_declaration_prefix, name.value};
 		e.token = name;
 		if (!consume(Token::LEFT_BRACE)) return;
 		if (!addSymbol(name, m_unit, e.name, Symbol::ENUM, m_unit.enums.size() - 1)) return;
@@ -271,6 +271,57 @@ struct Parser {
 		m_unit.functions[fn_idx].return_type = parseType();
 		m_unit.functions[fn_idx].body = parseBlock();
 		return fn_idx;
+	}
+
+	i32 parseFunctionLiteral(Token fn_token) {
+		// Anonymous function literals are lowered into ordinary top-level
+		// FunctionDecl records instead of inventing a separate AST node.
+		//
+		// That keeps the rest of the pipeline simple: the checker already
+		// knows how to resolve function declarations, the bytecode backend
+		// already knows how to encode a function handle, and callers keep
+		// seeing a normal `FUNCTION_REF` expression. The only special part
+		// is that the declaration gets a synthesized name so it can live in
+		// the same flat module-wide function table as named functions.
+		m_unit.functions.emplace_back();
+		const i32 fn_idx = (i32)m_unit.functions.size() - 1;
+		FunctionDecl& fn = m_unit.functions[fn_idx];
+		// The generated name only needs to be unique inside this module.
+		// It is not user-facing and never participates in lookup; it exists
+		// purely so the synthesized declaration can be stored and later
+		// referenced like any other function.
+		std::string unique_name = std::string(data(m_declaration_prefix), size(m_declaration_prefix));
+		if (!unique_name.empty()) unique_name.push_back('.');
+		unique_name += "__fn_literal.";
+		unique_name += std::to_string(m_function_literal_counter++);
+		fn.canonical_name.path = m_declaration_prefix;
+		fn.canonical_name.name = m_module.copyName(ls_string_view{unique_name.c_str(), unique_name.c_str() + unique_name.size()});
+		fn.local_name = fn.canonical_name.name;
+		fn.token = fn_token;
+
+		if (!consume(Token::LEFT_PAREN)) return fn_idx;
+		while (peek().type != Token::RIGHT_PAREN && peek().type != Token::END_OF_FILE && !m_output.has_error) {
+			if (!fn.params.empty()) consume(Token::COMMA);
+			Token param_name;
+			if (!consume(Token::IDENTIFIER, &param_name)) return fn_idx;
+			consume(Token::COLON);
+			Param& p = fn.params.emplace_back();
+			p.name = param_name.value;
+			p.token = param_name;
+			p.is_ref = match(Token::REF);
+			p.type = parseType();
+		}
+		consume(Token::RIGHT_PAREN);
+		consume(Token::COLON);
+		fn.return_type = parseType();
+		fn.body = parseBlock();
+		// `findFunction()` returns the flat module index that the runtime
+		// and bytecode layer expect. For synthesized declarations this is
+		// usually the same as `fn_idx`, but looking it up the same way as
+		// named declarations keeps the parser agnostic to future changes in
+		// how units are merged into the module table.
+		const i32 flat_idx = m_module.findFunction(fn.canonical_name);
+		return flat_idx >= 0 ? flat_idx : fn_idx;
 	}
 
 	i32 parseOperator() {
@@ -341,8 +392,7 @@ struct Parser {
 			if (peek().type == Token::IDENTIFIER && equalStrings(peek().value, "undefined")) {
 				consumeToken();
 				global.is_undefined_init = true;
-			}
-			else {
+			} else {
 				global.expr = parseExpression();
 			}
 		}
@@ -429,7 +479,8 @@ struct Parser {
 			return -1;
 		}
 		if (t.type == Token::LEFT_BRACE) return parseBlock();
-		if (match(Token::FN)) {
+		if (t.type == Token::FN && peekNext().type == Token::IDENTIFIER) {
+			consumeToken();
 			error(t, "Nested functions are not supported");
 			return -1;
 		}
@@ -446,8 +497,7 @@ struct Parser {
 				if (peek().type == Token::IDENTIFIER && equalStrings(peek().value, "undefined")) {
 					consumeToken();
 					stmt.is_undefined_init = true;
-				}
-				else {
+				} else {
 					stmt.expr = parseExpression();
 				}
 			}
@@ -491,8 +541,7 @@ struct Parser {
 			if (match(Token::ELSE)) {
 				if (peek().type == Token::IF) {
 					m_module.statements[stmt_idx].right = parseStatement();
-				}
-				else {
+				} else {
 					m_module.statements[stmt_idx].right = parseBlock();
 				}
 			}
@@ -572,8 +621,7 @@ struct Parser {
 				if (pattern_token.type == Token::IDENTIFIER && equalStrings(pattern_token.value, "_")) {
 					consumeToken();
 					arm.patterns.push_back(addMatchPattern(MatchPattern::DEFAULT, pattern_token));
-				}
-				else {
+				} else {
 					const i32 start_expr = parseExpression();
 					const i32 pattern_idx = addMatchPattern(MatchPattern::VALUE, pattern_token);
 					MatchPattern& pattern = m_module.match_patterns[pattern_idx];
@@ -605,10 +653,17 @@ struct Parser {
 		switch (type) {
 			case Token::OR: return 1;
 			case Token::AND: return 2;
-			case Token::EQUAL_EQUAL: case Token::BANG_EQUAL: return 3;
-			case Token::GT: case Token::LT: case Token::GT_EQUAL: case Token::LT_EQUAL: return 4;
-			case Token::PLUS: case Token::MINUS: return 5;
-			case Token::STAR: case Token::SLASH: case Token::PERCENT: return 6;
+			case Token::EQUAL_EQUAL:
+			case Token::BANG_EQUAL: return 3;
+			case Token::GT:
+			case Token::LT:
+			case Token::GT_EQUAL:
+			case Token::LT_EQUAL: return 4;
+			case Token::PLUS:
+			case Token::MINUS: return 5;
+			case Token::STAR:
+			case Token::SLASH:
+			case Token::PERCENT: return 6;
 			default: return 0;
 		}
 	}
@@ -677,8 +732,7 @@ struct Parser {
 				m_module.expressions[idx].left = expr_idx;
 				m_module.expressions[idx].name = field.value;
 				expr_idx = idx;
-			}
-			else if (match(Token::LEFT_PAREN)) {
+			} else if (match(Token::LEFT_PAREN)) {
 				const i32 idx = addExpr(Expr::CALL, t);
 				m_module.expressions[idx].left = expr_idx;
 				while (peek().type != Token::RIGHT_PAREN && peek().type != Token::END_OF_FILE && !m_output.has_error) {
@@ -688,15 +742,13 @@ struct Parser {
 				}
 				consume(Token::RIGHT_PAREN);
 				expr_idx = idx;
-			}
-			else if (match(Token::LEFT_BRACKET)) {
+			} else if (match(Token::LEFT_BRACKET)) {
 				const i32 idx = addExpr(Expr::INDEX, t);
 				m_module.expressions[idx].left = expr_idx;
 				m_module.expressions[idx].right = parseExpression();
 				consume(Token::RIGHT_BRACKET);
 				expr_idx = idx;
-			}
-			else if (m_allow_constructor && peek().type == Token::LEFT_BRACE && !empty(getExpressionName(expr_idx))) {
+			} else if (m_allow_constructor && peek().type == Token::LEFT_BRACE && !empty(getExpressionName(expr_idx))) {
 				consumeToken();
 				ls_string_view name = getExpressionName(expr_idx);
 				const i32 idx = addExpr(Expr::CONSTRUCTOR, t);
@@ -708,8 +760,8 @@ struct Parser {
 				}
 				consume(Token::RIGHT_BRACE);
 				expr_idx = idx;
-			}
-			else break;
+			} else
+				break;
 		}
 		return expr_idx;
 	}
@@ -766,13 +818,27 @@ struct Parser {
 				if (!consume(Token::IDENTIFIER, &member_name)) return -1;
 				const i32 idx = addExpr(Expr::ENUM_LITERAL, member_name);
 				m_module.expressions[idx].name = member_name.value;
-				m_module.expressions[idx].type = {LS_TYPE_ENUM, {}, -1};  // Type will be resolved by checker
+				m_module.expressions[idx].type = {LS_TYPE_ENUM, {}, -1}; // Type will be resolved by checker
 				return idx;
 			}
 			case Token::LEFT_PAREN: {
 				const i32 res = parseExpression();
 				consume(Token::RIGHT_PAREN);
 				return res;
+			}
+			case Token::FN: {
+				// `fn` is overloaded here: at declaration level
+				// it starts a named function, but inside an
+				// expression it introduces an anonymous function
+				// literal. This branch is what lets the parser
+				// accept `var foo = fn() : i32 { ... }` without
+				// needing a dedicated syntax token.
+				const i32 fn_idx = parseFunctionLiteral(t);
+				if (fn_idx < 0) return -1;
+				const i32 idx = addExpr(Expr::FUNCTION_REF, t);
+				m_module.expressions[idx].left = fn_idx;
+				m_module.expressions[idx].boolean = false;
+				return idx;
 			}
 			case Token::LEFT_BRACE: {
 				const i32 idx = addExpr(Expr::STRUCT_LITERAL, t);
@@ -795,6 +861,7 @@ struct Parser {
 	ls_string_view m_declaration_prefix;
 	bool m_allow_constructor = true;
 	i32 m_operator_counter = 0;
+	i32 m_function_literal_counter = 0;
 };
 
 bool parse(ls_module& module, ls_string_view source, ls_string_view declaration_prefix, ls_string_view source_name) {
@@ -805,13 +872,8 @@ bool parse(ls_module& module, ls_string_view source, ls_string_view declaration_
 
 extern "C" {
 
-ls_result ls_module_parse(
-	ls_module* module,
-	ls_string_view source,
-	ls_string_view source_name
-) {
+ls_result ls_module_parse(ls_module* module, ls_string_view source, ls_string_view source_name) {
 	if (!module) return LS_RESULT_FAILURE;
 	return parse(*module, source, {}, source_name) ? LS_RESULT_OK : LS_RESULT_FAILURE;
 }
-
 }

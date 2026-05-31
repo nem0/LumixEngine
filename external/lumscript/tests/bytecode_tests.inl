@@ -1147,6 +1147,55 @@ TEST(BytecodeNamespaceResolutionByFirstParameter) {
 	return true;
 }
 
+TEST(BytecodeNamespaceResolutionByInferredFunctionLiteralParameter) {
+	const char* main_source = R"(
+		import "math" as math
+
+		const foo = fn(v : math.Vec2) : i32 {
+			return v.foo() + foo(v);
+		};
+
+		fn main() : i32 {
+			const v : math.Vec2 = math.Vec2 { 20, 22 };
+			return foo(v);
+		}
+	)";
+	const char* math_source = R"(
+		struct Vec2 {
+			x : i32;
+			y : i32;
+		}
+
+		const foo = fn(v : Vec2) : i32 {
+			return v.x + v.y;
+		};
+	)";
+
+	LumScriptImportFile files_storage[] = {
+		{ toLs("math"), toLs(math_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+
+	TestContext diagnostics;
+	ls_module* module = ls_module_create(&diagnostics.host);
+	EXPECT_TRUE(module != nullptr);
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
+
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &diagnostics.host);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ls_runtime* runtime = ls_runtime_create(bytecode);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(84, ls_to_i32(runtime, -1));
+
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	ls_module_destroy(module);
+	return true;
+}
+
 TEST(BytecodeNamespaceResolutionByFirstParameterChoosesNamespace) {
 	const char* main_source = R"(
 		import "math" as math
@@ -1824,6 +1873,64 @@ TEST(BytecodeGlobalVariable) {
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(43, ls_to_i32(runtime, -1));
+
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeGlobalFunctionVariable) {
+   const char* source = R"(
+           var foo = fn() : i32 {
+                   return 1;
+           };
+
+           fn main() : i32 {
+                   return foo();
+           }
+   )";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ls_runtime* runtime = ls_runtime_create(bytecode);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(1, ls_to_i32(runtime, -1));
+
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeGlobalFunctionLiteral) {
+   const char* source = R"(
+           const foo = fn() : i32 {
+                   return 1;
+           };
+
+           fn main() : i32 {
+                   return foo();
+           }
+   )";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ls_runtime* runtime = ls_runtime_create(bytecode);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(1, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
 	ls_bytecode_destroy(bytecode);
@@ -3042,6 +3149,30 @@ TEST(FirstClassFunctionsImmediateCallRuntime) {
 		fn make_fn() : fn() : i32 {
 			return inner;
 		}
+
+		fn main() : i32 {
+			return make_fn()();
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(FirstClassFunctionLiteralImmediateCallRuntime) {
+	const char* source = R"(
+		fn inner() : i32 {
+			return 42;
+		}
+
+		const make_fn = fn() : fn() : i32 {
+			return inner;
+		};
 
 		fn main() : i32 {
 			return make_fn()();

@@ -302,7 +302,9 @@ struct ls_module {
 		for (const Unit* unit_ptr : units) {
 			const Unit& unit = *unit_ptr;
 			for (const StructDecl& s : unit.structs) {
-				if (equalStrings(s.name.path, name.path) && equalStrings(s.name.name, name.name)) return index;
+				if (equalStrings(s.name.path, name.path) && equalStrings(s.name.name, name.name)) {
+					 return index;
+				}
 				++index;
 			}
 		}
@@ -317,7 +319,9 @@ struct ls_module {
 				ls_string_view owner;
 				ls_string_view member;
 				if (splitMemberName(name, &owner, &member)) {
-					if (equalStrings(fn.canonical_name.path, owner) && equalStrings(fn.canonical_name.name, member)) return index;
+					if (equalStrings(fn.canonical_name.path, owner) && equalStrings(fn.canonical_name.name, member)) {
+						 return index;
+					}
 				}
 				else if (empty(fn.canonical_name.path) && equalStrings(fn.canonical_name.name, name)) {
 					return index;
@@ -333,7 +337,9 @@ struct ls_module {
 		for (const Unit* unit_ptr : units) {
 			const Unit& unit = *unit_ptr;
 			for (const FunctionDecl& fn : unit.functions) {
-				if (equal(fn.canonical_name, name)) return index;
+				if (equal(fn.canonical_name, name)) {
+					return index;
+				}
 				++index;
 			}
 		}

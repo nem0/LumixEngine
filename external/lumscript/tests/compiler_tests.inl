@@ -1626,6 +1626,24 @@ TEST(LocalFunctionTypedVariableShadowsFunctionName) {
 	return true;
 }
 
+TEST(FirstClassFunctionLiteralShadowsFunctionName) {
+	const char* source = R"(
+		fn foo() : i32 {
+			return 7;
+		}
+
+		const foo = fn() : i32 {
+			return 1;
+		};
+
+		fn main() : i32 {
+			return foo();
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(ImportExternFnDuplicateUsed) {
 	const char* main_source = R"(
 		import "a"
@@ -1969,6 +1987,81 @@ TEST(FirstClassFunctionsTypecheck) {
 		}
 	)";
 	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(FirstClassFunctionLiteralInfersTypedVariable) {
+	const char* source = R"(
+		const foo = fn() : i32 {
+			return 1;
+		};
+
+		fn main() : i32 {
+			const bar : fn() : i32 = foo;
+			return bar();
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(FirstClassFunctionLiteralCanBePassedAsArgument) {
+	const char* source = R"(
+		fn call(f : fn() : i32) : i32 {
+			return f();
+		}
+
+		const foo = fn() : i32 {
+			return 1;
+		};
+
+		fn main() : i32 {
+			return call(foo);
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(FirstClassFunctionLiteralArityMismatchFails) {
+	const char* source = R"(
+		const foo = fn() : i32 {
+			return 1;
+		};
+
+		fn main() : void {
+			const bar : fn(i32) : i32 = foo;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(FirstClassFunctionLiteralCanNotBeReassigned) {
+	const char* source = R"(
+		fn main() : void {
+			const foo = fn() : i32 {
+				return 1;
+			};
+			foo = fn() : i32 {
+				return 2;
+			};
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(FirstClassFunctionLiteralSignatureMismatchFails) {
+	const char* source = R"(
+		fn main() : void {
+			const foo = fn() : i32 {
+				return 1;
+			};
+			const bar : fn() : void = foo;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
 
