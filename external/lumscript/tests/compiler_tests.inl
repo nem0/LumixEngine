@@ -972,6 +972,46 @@ TEST(UnaliasedImportCollidesWithLocalDeclaration) {
 	return true;
 }
 
+TEST(LocalDeclarationCollidesWithMultipleUnaliasedImports) {
+	const char* main_source = R"(
+		import "a"
+		import "b"
+
+		fn foo() : i32 {
+			return 0;
+		}
+
+		fn main() : i32 {
+			return foo();
+		}
+	)";
+	const char* a_source = R"(
+		fn foo() : i32 {
+			return 1;
+		}
+	)";
+	const char* b_source = R"(
+		fn foo() : i32 {
+			return 2;
+		}
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("a"), toLs(a_source) },
+		{ toLs("b"), toLs(b_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	DiagnosticCapture capture;
+	ls_host host = {};
+	host.diagnostics_userdata = &capture;
+	host.print = &captureDiagnostic;
+	ls_module* module = ls_module_create(&host);
+	EXPECT_TRUE(module != nullptr);
+	EXPECT_TRUE(!ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
+	EXPECT_TRUE(capture.text.find("Import symbol collision for 'foo'") != std::string::npos);
+	ls_module_destroy(module);
+	return true;
+}
+
 TEST(MissingImportFails) {
 	const char* source = R"(
 		import "missing"

@@ -141,10 +141,9 @@ void ls_module_destroy(ls_module* module);
 
 // Native registration.
 //
-// Register custom native types and functions before typechecking or execution.
+// Register custom native functions before typechecking or execution.
 // Native types let scripts talk about engine objects by name, while native
 // functions expose host behavior to scripts.
-int ls_module_add_native_type(ls_module* module, ls_string_view name, ls_string_view id);
 int ls_module_add_native_function(
 	ls_module* module,
 	ls_string_view name,

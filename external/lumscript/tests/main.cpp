@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <chrono>
 #include <span>
 #include <vector>
 
@@ -206,6 +207,7 @@ int main(int argc, char** argv) {
         printf("Filtering to test: %s\n", test_name);
     }
 
+    const auto start_time = std::chrono::steady_clock::now();
     bool found = false;
     for (TestList* test = TestList::first; test; test = test->next) {
         if (test_name && strcmp(test->name, test_name) != 0) continue;
@@ -225,6 +227,8 @@ int main(int argc, char** argv) {
         return -1;
     }
 
-    printf("%d/%d tests passed\n", passed_count, test_count);
+    const auto end_time = std::chrono::steady_clock::now();
+    const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+    printf("%d/%d tests passed in %lld ms\n", passed_count, test_count, (long long)elapsed_ms);
     return passed_count == test_count ? 0 : -1;
 }

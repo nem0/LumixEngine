@@ -57,14 +57,14 @@ struct Parser {
 	}
 
 	// track all symbols (functions, enum, structs, externs, globals) to detect duplicates
-	bool addSymbol(Token token, Unit& unit, CanonicalName name, Symbol::Kind kind) {
+	bool addSymbol(Token token, Unit& unit, CanonicalName name, Symbol::Kind kind, i32 index) {
 		for (const Symbol& symbol : unit.symbols) {
 			if (equal(symbol.name, name)) {
 				error(token, "Duplicate symbol");
 				return false;
 			}
 		}
-		unit.symbols.push_back(Symbol{kind, name});
+		unit.symbols.push_back(Symbol{kind, name, &unit, index});
 		return true;
 	}
 
@@ -165,7 +165,7 @@ struct Parser {
 		NativeFunctionDecl& fn = m_unit.native_functions.emplace_back();
 		fn.canonical_name = m_module.makeQualifiedName(m_declaration_prefix, name.value);
 		if (!consume(Token::LEFT_PAREN)) return;
-		if (!addSymbol(name, m_unit, {m_declaration_prefix, name.value}, Symbol::EXTERN_FN)) return;
+		if (!addSymbol(name, m_unit, {m_declaration_prefix, name.value}, Symbol::EXTERN_FN, m_unit.native_functions.size() - 1)) return;
 		
 		while (peek().type != Token::RIGHT_PAREN && peek().type != Token::END_OF_FILE && !m_output.has_error) {
 			if (!fn.params.empty() && !consume(Token::COMMA)) return;
@@ -195,7 +195,7 @@ struct Parser {
 		// this becomes the stable identity used by the checker and later imports.
 		s.name = { m_declaration_prefix, name.value };
 		s.token = name;
-		if (!addSymbol(name, m_unit, s.name, Symbol::STRUCT)) return;
+		if (!addSymbol(name, m_unit, s.name, Symbol::STRUCT, m_unit.structs.size() - 1)) return;
 		if (!consume(Token::LEFT_BRACE)) return;
 		while (peek().type != Token::RIGHT_BRACE && peek().type != Token::END_OF_FILE && !m_output.has_error) {
 			Token field_name;
@@ -219,7 +219,7 @@ struct Parser {
 		e.name = { m_declaration_prefix, name.value };
 		e.token = name;
 		if (!consume(Token::LEFT_BRACE)) return;
-		if (!addSymbol(name, m_unit, e.name, Symbol::ENUM)) return;
+		if (!addSymbol(name, m_unit, e.name, Symbol::ENUM, m_unit.enums.size() - 1)) return;
 
 		i32 auto_value = 0;
 		while (peek().type != Token::RIGHT_BRACE && peek().type != Token::END_OF_FILE && !m_output.has_error) {
@@ -261,7 +261,7 @@ struct Parser {
 			// Top-level functions follow the same canonical module naming rule as
 			// structs/enums/globals so imported modules remain addressable by path.
 			m_unit.functions[fn_idx].name = m_module.makeQualifiedName(m_declaration_prefix, name.value);
-			if (!addSymbol(name, m_unit, {m_declaration_prefix, name.value}, Symbol::FN)) return -1;
+			if (!addSymbol(name, m_unit, {m_declaration_prefix, name.value}, Symbol::FN, fn_idx)) return -1;
 		}
 		m_unit.functions[fn_idx].token = name;
 
@@ -345,7 +345,7 @@ struct Parser {
 		global.canonical_name = {m_declaration_prefix, name.value};
 		global.token = name;
 		global.is_const = is_const;
-		if (!addSymbol(name, m_unit, {m_declaration_prefix, name.value}, Symbol::GLOBAL_VAR)) return;
+		if (!addSymbol(name, m_unit, {m_declaration_prefix, name.value}, Symbol::GLOBAL_VAR, m_unit.globals.size() - 1)) return;
 		if (match(Token::COLON)) global.type = parseType();
 		if (match(Token::EQUAL)) {
 			if (peek().type == Token::IDENTIFIER && equalStrings(peek().value, "undefined")) {

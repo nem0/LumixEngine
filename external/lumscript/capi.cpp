@@ -44,13 +44,14 @@ int ls_module_get_native_function_index(ls_module* module, ls_string_view name) 
 int ls_module_get_native_function_count(ls_module* module) {
 	if (!module) return 0;
 	i32 count = 0;
-	for (const Unit& unit : module->units) count += (i32)unit.native_functions.size();
+	for (const Unit* unit_ptr : module->units) count += (i32)unit_ptr->native_functions.size();
 	return count;
 }
 
 ls_string_view ls_module_get_native_function_name(ls_module* module, int index) {
 	if (!module || index < 0) return {};
-	for (const Unit& unit : module->units) {
+	for (const Unit* unit_ptr : module->units) {
+		const Unit& unit = *unit_ptr;
 		if (index < (i32)unit.native_functions.size()) return unit.native_functions[(size_t)index].canonical_name;
 		index -= (i32)unit.native_functions.size();
 	}
@@ -59,7 +60,8 @@ ls_string_view ls_module_get_native_function_name(ls_module* module, int index) 
 
 ls_type ls_module_get_native_function_return_type(ls_module* module, int index) {
 	if (!module || index < 0) return ls_type_make(LS_TYPE_INVALID);
-	for (const Unit& unit : module->units) {
+	for (const Unit* unit_ptr : module->units) {
+		const Unit& unit = *unit_ptr;
 		if (index < (i32)unit.native_functions.size()) return toC(unit.native_functions[(size_t)index].return_type);
 		index -= (i32)unit.native_functions.size();
 	}
@@ -68,7 +70,8 @@ ls_type ls_module_get_native_function_return_type(ls_module* module, int index) 
 
 int ls_module_get_native_function_param_count(ls_module* module, int index) {
 	if (!module || index < 0) return 0;
-	for (const Unit& unit : module->units) {
+	for (const Unit* unit_ptr : module->units) {
+		const Unit& unit = *unit_ptr;
 		if (index < (i32)unit.native_functions.size()) return (int)unit.native_functions[(size_t)index].params.size();
 		index -= (i32)unit.native_functions.size();
 	}
@@ -77,7 +80,8 @@ int ls_module_get_native_function_param_count(ls_module* module, int index) {
 
 ls_type ls_module_get_native_function_param_type(ls_module* module, int index, int param_index) {
 	if (!module || index < 0) return ls_type_make(LS_TYPE_INVALID);
-	for (const Unit& unit : module->units) {
+	for (const Unit* unit_ptr : module->units) {
+		const Unit& unit = *unit_ptr;
 		if (index >= (i32)unit.native_functions.size()) {
 			index -= (i32)unit.native_functions.size();
 			continue;
@@ -98,38 +102,44 @@ int ls_module_add_native_function(
 ) {
 	if (!module) return -1;
 	if (!param_types && param_count > 0) return -1;
+	// TODO this is shit
 	Unit& unit = module->addUnit();
 	NativeFunctionDecl& fn = unit.native_functions.emplace_back();
 	fn.canonical_name = module->copyName(name);
 	fn.return_type = toTypeRef(return_type);
+	ls_string_view symbol_name = name;
+	ls_string_view owner;
+	ls_string_view member;
+	if (splitMemberName(name, &owner, &member)) symbol_name = member;
+	unit.symbols.push_back(Symbol{Symbol::EXTERN_FN, {unit.source_name, symbol_name}});
 
 	for (size_t i = 0; i < param_count; ++i) {
 		Param& p = fn.params.emplace_back();
 		p.type = toTypeRef(param_types[i]);
 	}
 	i32 count = 0;
-	for (const Unit& unit : module->units) count += (i32)unit.native_functions.size();
+	for (const Unit* unit_ptr : module->units) count += (i32)unit_ptr->native_functions.size();
 	return count - 1;
 }
 
 int ls_module_get_struct_count(ls_module* module) {
 	if (!module) return 0;
 	i32 count = 0;
-	for (const Unit& unit : module->units) count += (i32)unit.structs.size();
+	for (const Unit* unit_ptr : module->units) count += (i32)unit_ptr->structs.size();
 	return count;
 }
 
 int ls_module_get_function_count(ls_module* module) {
 	if (!module) return 0;
 	i32 count = 0;
-	for (const Unit& unit : module->units) count += (i32)unit.functions.size();
+	for (const Unit* unit_ptr : module->units) count += (i32)unit_ptr->functions.size();
 	return count;
 }
 
 int ls_module_get_global_count(ls_module* module) {
 	if (!module) return 0;
 	i32 count = 0;
-	for (const Unit& unit : module->units) count += (i32)unit.globals.size();
+	for (const Unit* unit_ptr : module->units) count += (i32)unit_ptr->globals.size();
 	return count;
 }
 

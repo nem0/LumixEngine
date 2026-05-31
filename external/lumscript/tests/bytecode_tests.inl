@@ -2853,6 +2853,43 @@ TEST(FirstClassFunctionsRuntime) {
 	return true;
 }
 
+TEST(FirstClassFunctionsNoArgsRuntime) {
+	const char* source = R"(
+		fn make_one() : i32 {
+			return 1;
+		}
+
+		fn make_two() : i32 {
+			return 2;
+		}
+
+		fn choose(use_two : bool) : fn() : i32 {
+			if use_two {
+				return make_two;
+			}
+			return make_one;
+		}
+
+		fn call(f : fn() : i32) : i32 {
+			return f();
+		}
+
+		fn main() : i32 {
+			const one_fn = choose(false);
+			const two_fn = choose(true);
+			return call(one_fn) * 10 + two_fn();
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(12, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(StaticArrayRuntimeIndexing) {
 	const char* source = R"(
 		fn main() : i32 {

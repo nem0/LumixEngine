@@ -137,6 +137,7 @@ static bool bytecodeSplitMemberName(ls_string_view name, ls_string_view* owner, 
 }
 
 static ls_string_view bytecodeGetTypeNamespace(ls_module& module, TypeRef type) {
+	if (!empty(type.canonical_name.path)) return type.canonical_name.path;
 	ls_string_view namespace_name;
 	ls_string_view member_name;
 	if (!bytecodeSplitMemberName(type.unresolved_name, &namespace_name, &member_name)) return {};
@@ -149,7 +150,8 @@ static bool bytecodeStructFieldOffset(ls_module& module, const TypeRef& type, ls
 	if (type.kind != LS_TYPE_STRUCT || type.struct_index < 0) return false;
 	i32 struct_idx = type.struct_index;
 	const StructDecl* s = nullptr;
-	for (const Unit& unit : module.units) {
+	for (const Unit* unit_ptr : module.units) {
+		const Unit& unit = *unit_ptr;
 		if (struct_idx < (i32)unit.structs.size()) {
 			s = &unit.structs[(size_t)struct_idx];
 			break;
@@ -195,7 +197,8 @@ static i32 bytecodeTypeSlotCount(ls_module& module, TypeRef type) {
 			if (type.struct_index < 0) return 0;
 			i32 struct_idx = type.struct_index;
 			const StructDecl* s = nullptr;
-			for (const Unit& unit : module.units) {
+			for (const Unit* unit_ptr : module.units) {
+				const Unit& unit = *unit_ptr;
 				if (struct_idx < (i32)unit.structs.size()) {
 					s = &unit.structs[(size_t)struct_idx];
 					break;
@@ -444,14 +447,16 @@ static ls_string_view bytecodeGetExpressionName(ls_module& module, i32 expr_idx)
 	if (expr.kind == Expr::FUNCTION_REF) {
 		if (expr.boolean) {
 			i32 idx = expr.left;
-			for (const Unit& unit : module.units) {
+			for (const Unit* unit_ptr : module.units) {
+				const Unit& unit = *unit_ptr;
 				if (idx < (i32)unit.native_functions.size()) return unit.native_functions[(size_t)idx].canonical_name;
 				idx -= (i32)unit.native_functions.size();
 			}
 		}
 		else {
 			i32 idx = expr.left;
-			for (const Unit& unit : module.units) {
+			for (const Unit* unit_ptr : module.units) {
+				const Unit& unit = *unit_ptr;
 				if (idx < (i32)unit.functions.size()) return unit.functions[(size_t)idx].name;
 				idx -= (i32)unit.functions.size();
 			}
@@ -727,7 +732,8 @@ static bool bytecodeResolveValueAccessByExpr(ls_module& module, BytecodeCompileC
 			out->kind = BytecodeValueKind::GLOBAL;
 			i32 idx = global_idx;
 			GlobalDecl* global = nullptr;
-			for (Unit& unit : module.units) {
+			for (Unit* unit_ptr : module.units) {
+				Unit& unit = *unit_ptr;
 				if (idx < (i32)unit.globals.size()) {
 					global = &unit.globals[(size_t)idx];
 					break;
@@ -1317,7 +1323,8 @@ static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, Byteco
 			if (enum_idx < 0) {
 				enum_idx = -1;
 				i32 running_enum_idx = 0;
-				for (const Unit& unit : module.units) {
+				for (const Unit* unit_ptr : module.units) {
+					const Unit& unit = *unit_ptr;
 					for (const EnumDecl& e : unit.enums) {
 						if (module.findEnumMember(e, expr.name) >= 0) {
 							if (enum_idx >= 0) return false;
@@ -1330,7 +1337,8 @@ static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, Byteco
 			}
 			i32 idx = enum_idx;
 			const EnumDecl* e = nullptr;
-			for (const Unit& unit : module.units) {
+			for (const Unit* unit_ptr : module.units) {
+				const Unit& unit = *unit_ptr;
 				if (idx < (i32)unit.enums.size()) {
 					e = &unit.enums[(size_t)idx];
 					break;
@@ -1513,7 +1521,8 @@ static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, Byteco
 			if (fn_idx >= 0) {
 				i32 idx = fn_idx;
 				FunctionDecl* callee_ptr = nullptr;
-				for (Unit& unit : module.units) {
+				for (Unit* unit_ptr : module.units) {
+					Unit& unit = *unit_ptr;
 					if (idx < (i32)unit.functions.size()) {
 						callee_ptr = &unit.functions[(size_t)idx];
 						break;
@@ -1578,7 +1587,8 @@ static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, Byteco
 			if (native_idx >= 0) {
 				i32 idx = native_idx;
 				NativeFunctionDecl* callee_ptr = nullptr;
-				for (Unit& unit : module.units) {
+				for (Unit* unit_ptr : module.units) {
+					Unit& unit = *unit_ptr;
 					if (idx < (i32)unit.native_functions.size()) {
 						callee_ptr = &unit.native_functions[(size_t)idx];
 						break;
@@ -1802,7 +1812,8 @@ static bool bytecodeCompileStmt(ls_module& module, ls_bytecode& bytecode, Byteco
 					if (slot_count != 1 || access.slot < 0) return false;
 					const GlobalDecl* global_ptr = nullptr;
 					i32 global_idx = access.slot;
-					for (const Unit& unit : module.units) {
+					for (const Unit* unit_ptr : module.units) {
+						const Unit& unit = *unit_ptr;
 						if (global_idx < (i32)unit.globals.size()) {
 							global_ptr = &unit.globals[(size_t)global_idx];
 							break;
@@ -1930,7 +1941,8 @@ static bool bytecodeCompileStmt(ls_module& module, ls_bytecode& bytecode, Byteco
 			// Global writes target the reserved module-state prefix.
 			const GlobalDecl* global_ptr = nullptr;
 			i32 remaining_global_idx = global_idx;
-			for (const Unit& unit : module.units) {
+			for (const Unit* unit_ptr : module.units) {
+				const Unit& unit = *unit_ptr;
 				if (remaining_global_idx < (i32)unit.globals.size()) {
 					global_ptr = &unit.globals[(size_t)remaining_global_idx];
 					break;
@@ -2195,7 +2207,8 @@ static bool bytecodeCompileGlobals(ls_module& module, ls_bytecode& bytecode, con
 	i32 global_slot = 0;
 	bytecode.global_init_code.clear();
 	bool has_globals = false;
-	for (const Unit& unit : module.units) {
+	for (const Unit* unit_ptr : module.units) {
+		const Unit& unit = *unit_ptr;
 		if (!unit.globals.empty()) {
 			has_globals = true;
 			break;
@@ -2223,7 +2236,8 @@ static bool bytecodeCompileGlobals(ls_module& module, ls_bytecode& bytecode, con
 	BytecodeCompileContext ctx(init_fn);
 	ctx.pushScope();
 
-	for (Unit& unit : module.units) {
+	for (Unit* unit_ptr : module.units) {
+		Unit& unit = *unit_ptr;
 		for (GlobalDecl& global : unit.globals) {
 			const i32 slot_count = bytecodeTypeSlotCount(module, global.type);
 			if (slot_count <= 0) return false;
@@ -2255,9 +2269,10 @@ ls_bytecode* compileBytecode(ls_module& module, const ls_host* host) {
 	ls_bytecode* bytecode = bytecode_mem ? ::new (bytecode_mem) ls_bytecode(bytecode_host) : nullptr;
 	if (!bytecode) return nullptr;
 	i32 native_function_count = 0;
-	for (const Unit& unit : module.units) native_function_count += (i32)unit.native_functions.size();
+	for (const Unit* unit_ptr : module.units) native_function_count += (i32)unit_ptr->native_functions.size();
 	bytecode->native_functions.reserve(native_function_count);
-	for (const Unit& unit : module.units) {
+	for (const Unit* unit_ptr : module.units) {
+		const Unit& unit = *unit_ptr;
 		for (const NativeFunctionDecl& fn : unit.native_functions) {
 			BytecodeNativeFunction out;
 			out.canonical_name = fn.canonical_name;
@@ -2272,7 +2287,8 @@ ls_bytecode* compileBytecode(ls_module& module, const ls_host* host) {
 		ls_bytecode_destroy(bytecode);
 		return nullptr;
 	}
-	for (Unit& unit : module.units) {
+	for (Unit* unit_ptr : module.units) {
+		Unit& unit = *unit_ptr;
 		for (FunctionDecl& fn : unit.functions) {
 			if (!bytecodeCompileFunction(module, *bytecode, fn)) {
 				ls_bytecode_destroy(bytecode);
