@@ -10,10 +10,6 @@ struct LocalInfo {
 	bool is_const = false;
 };
 
-static ls_string_view stringView(const std::string& value) {
-	return ls_string_view{value.c_str(), value.c_str() + value.size()};
-}
-
 static bool isOverloadableOperatorToken(Token::Type type) {
 	// Keep this list explicit so the language surface stays easy to audit.
 	// Anything not listed here is either a fixed built-in token or a boolean
@@ -182,29 +178,6 @@ struct Checker {
 	bool sameResolvedType(TypeRef a, TypeRef b) const {
 		if (a.kind == LS_TYPE_FUNCTION || b.kind == LS_TYPE_FUNCTION) return functionTypesEqual(a, b);
 		return sameBaseType(a, b);
-	}
-
-	bool importAliasExists(Unit& unit, ls_string_view alias) const {
-		for (const ImportDecl& import : unit.imports) {
-			if (empty(import.alias) || !equalStrings(import.alias, alias)) continue;
-			return true;
-		}
-		return false;
-	}
-
-	bool importsDeclaration(const ImportDecl& import, ls_string_view type) const {
-		for (const Unit* unit_ptr : m_module.units) {
-			const Unit& unit = *unit_ptr;
-			if (equalStrings(import.path, unit.source_name)) {
-				for (const Symbol& s : unit.symbols) {
-					if (equalStrings(s.name.name, type)) {
-						return s.kind == Symbol::EXTERN_FN || s.kind == Symbol::FN || s.kind == Symbol::GLOBAL_VAR;
-					}
-				}
-				return false;
-			}
-		}
-		return false;
 	}
 
 	Symbol findSymbol(const ImportDecl& import, ls_string_view type) const {
