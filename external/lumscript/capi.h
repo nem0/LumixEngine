@@ -67,7 +67,8 @@ typedef enum ls_type_kind {
 	LS_TYPE_FUNCTION,
 	LS_TYPE_ARRAY,
 	LS_TYPE_NULL_VALUE,
-	LS_TYPE_CPTR
+	LS_TYPE_CPTR,
+	LS_TYPE_NAMESPACE
 } ls_type_kind;
 
 // Generic status used by C API operations that only report success or failure.

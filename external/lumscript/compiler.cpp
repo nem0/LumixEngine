@@ -295,6 +295,7 @@ struct Checker {
 		if (!sameResolvedType(fa.return_type, fb.return_type)) return false;
 		if (fa.params.size() != fb.params.size()) return false;
 		for (i32 i = 0; i < fa.params.size(); ++i) {
+			if (fa.params[i].is_ref != fb.params[i].is_ref) return false;
 			if (!sameResolvedType(fa.params[i], fb.params[i])) return false;
 		}
 		return true;
@@ -306,12 +307,16 @@ struct Checker {
 			if (existing.params.size() != params.size()) continue;
 			bool same = sameResolvedType(existing.return_type, return_type);
 			for (u32 j = 0; same && j < params.size(); ++j) {
-				same = sameResolvedType(existing.params[j], params[j].type);
+				same = existing.params[j].is_ref == params[j].is_ref && sameResolvedType(existing.params[j], params[j].type);
 			}
 			if (same) return {LS_TYPE_FUNCTION, {}, i, token};
 		}
 		FunctionTypeDecl& fn_type = m_module.function_types.emplace_back();
-		for (const Param& p : params) fn_type.params.push_back(p.type);
+		for (const Param& p : params) {
+			TypeRef param_type = p.type;
+			param_type.is_ref = p.is_ref;
+			fn_type.params.push_back(param_type);
+		}
 		fn_type.return_type = return_type;
 		return {LS_TYPE_FUNCTION, {}, (i32)m_module.function_types.size() - 1, token};
 	}
@@ -326,96 +331,6 @@ struct Checker {
 		if (e.kind == Expr::FIELD) {
 			if (empty(e.qualified_name)) e.qualified_name = {getExpressionName(e.left), e.name};
 			return m_module.makeQualifiedName(e.qualified_name.path, e.qualified_name.name);
-		}
-		return {};
-	}
-
-	CanonicalName resolveCallName(Unit& unit, Expr& call, i32* fn_idx, i32* native_idx) {
-		// `Expr::CALL` can wrap several source forms:
-		// - bare calls: `foo()`
-		// - imported calls: `mod.foo()` or `alias.foo()`
-		// - method calls: `obj.foo()`
-		// - extension-style calls: `foo(arg0, ...)` where `arg0` selects the namespace
-		// This helper normalizes the callee name, then resolves it against functions and natives.
-		ls_string_view callee_name = empty(call.qualified_name) ? getExpressionName(call.left) : m_module.makeQualifiedName(call.qualified_name.path, call.qualified_name.name);
-		const Expr& callee_expr = m_module.expressions[call.left];
-		if (callee_expr.kind == Expr::VAR && findLocal(callee_name) >= 0) {
-			return {};
-		}
-
-		Symbol resolved_symbol = resolveSymbol(unit, callee_name, call.token);
-		switch (resolved_symbol.kind) {
-			case Symbol::COLLISION: 
-				*fn_idx = -2;
-				*native_idx = -2;
-				return {};
-			case Symbol::FN: {
-				*fn_idx = m_module.findFunction(resolved_symbol.name);
-				if (*fn_idx >= 0) call.qualified_name = resolved_symbol.name;
-				return resolved_symbol.name;
-			}
-			case Symbol::EXTERN_FN: {
-				*native_idx = m_module.findNativeFunction({resolved_symbol.name.path, resolved_symbol.name.name});
-				if (*native_idx >= 0) call.qualified_name = resolved_symbol.name;
-				return resolved_symbol.name;
-			}
-			default: break;
-		}
-
-		if (callee_expr.kind == Expr::VAR) {
-			if (findLocal(callee_name) >= 0) return {};
-			// TODO this is hit because of ls_module_add_native_function
-			*fn_idx = m_module.findFunction(callee_name);
-			*native_idx = m_module.findNativeFunction(callee_name);
-			if (*fn_idx >= 0 || *native_idx >= 0) {
-				call.qualified_name = { {}, callee_name };
-				CanonicalName res;
-				splitMemberName(callee_name, &res.path, &res.name);
-				return res;
-			}
-		}
-		
-		Expr& callee = m_module.expressions[call.left];
-		if (callee.kind == Expr::FIELD) {
-			// `alias.missing()` should fail as an import lookup instead of falling
-			// through to field access on a nonexistent variable named `alias`.
-			if (m_module.expressions[callee.left].kind == Expr::VAR && importAliasExists(unit, m_module.expressions[callee.left].name)) {
-				m_output.errorAt(callee.token, "Unknown variable '", callee.name, "'");
-				*fn_idx = -2;
-				*native_idx = -2;
-				return {};
-			}
-			TypeRef receiver_type = checkExpr(unit, callee.left);
-			const ls_string_view namespace_name = receiver_type.canonical_name.path;
-			if (!empty(namespace_name)) {
-				// Method syntax is sugar for a namespace function whose first
-				// parameter is the receiver, e.g. `v.len()` -> `Vec.len(v)`.
-				// TODO handle global var
-				*fn_idx = m_module.findFunction({namespace_name, callee.name});
-				if (*fn_idx < 0) *native_idx = m_module.findNativeFunction({namespace_name, callee.name});
-				if (*fn_idx >= 0 || *native_idx >= 0) {
-					call.qualified_name = {namespace_name, callee.name};
-					call.method_receiver = callee.left;
-					return call.qualified_name;
-				}
-			}
-			return {};
-		}
-
-		if (!empty(callee_name) && !call.args.empty()) {
-			// For function-style calls, allow the first argument's namespace to
-			// provide an extension method before treating the callee as unknown.
-			TypeRef first_arg_type = checkExpr(unit, call.args[0]);
-			const ls_string_view namespace_name = first_arg_type.canonical_name.path;
-			if (!empty(namespace_name)) {
-				CanonicalName cn{namespace_name, callee_name};
-				*fn_idx = m_module.findFunction(cn);
-				*native_idx = m_module.findNativeFunction(cn);
-				if (*fn_idx >= 0 || *native_idx >= 0) {
-					call.qualified_name = cn;
-					return cn;
-				}
-			}
 		}
 		return {};
 	}
@@ -747,6 +662,394 @@ struct Checker {
 		}
 	}
 
+	TypeRef checkField(Unit& unit, Expr& e, Expr* call_expr = nullptr) {
+		// alias.*
+		// struct.field
+		// enum.enum_member
+		// .enum_member
+		// variable.function, sugar for function(variable)
+		// variable1.variable2, sugar for variable2(variable1) if variable2 is a function
+		// foo().bar, foo returns enum
+		// foo().bar, foo returns struct
+		// foo().bar(), foo returns function
+
+		Expr& left_expr = m_module.expressions[e.left];
+		switch (left_expr.kind) {
+			case Expr::CALL: // foo().*
+			case Expr::VAR: { // v.*
+				// TODO check for expressions first, they can potentionally shadow alias
+				if (left_expr.kind == Expr::VAR) {
+					Symbol s = resolveSymbol(unit, left_expr.name, left_expr.token);
+
+					// Enum.*
+					if (s.kind == Symbol::ENUM) {
+						const i32 enum_idx = m_module.findEnum(s.name);
+						if (enum_idx < 0) {
+							m_output.errorAt(e.token, "Unknown enum '", left_expr.name, "'");
+							return {};
+						}
+						const EnumDecl& en = *m_enums[enum_idx];
+						const i32 member_idx = m_module.findEnumMember(en, e.name);
+						if (member_idx < 0) {
+							m_output.errorAt(e.token, "Unknown enum member '", e.name, "'");
+							return {};
+						}
+						e.kind = Expr::ENUM_LITERAL;
+						e.type.kind = LS_TYPE_ENUM;
+						e.type.canonical_name = s.name;
+						e.type.struct_index = enum_idx;
+						return e.type;
+					}			
+				}
+
+				TypeRef left_type = checkExpr(unit, e.left);
+				switch (left_type.kind) {
+					case LS_TYPE_INVALID: {
+						m_output.errorAt(left_expr.token, "Unknown identifier ", left_expr.name);
+						return {};
+					}
+					case LS_TYPE_NAMESPACE: {
+						Symbol s = findSymbol(unit.imports[left_type.import_index], e.name);
+						switch (s.kind) {
+							case Symbol::EXTERN_FN:
+								e.kind = Expr::FUNCTION_REF;
+								e.boolean = true;
+								e.left = m_module.findNativeFunction(s.name);
+								if (e.left < 0) return {};
+								e.type = functionTypeFromNativeFunction(*m_native_functions[e.left]);
+								return e.type;
+							case Symbol::FN:
+								e.kind = Expr::FUNCTION_REF;
+								e.boolean = false;
+								e.left = m_module.findFunction(s.name);
+								if (e.left < 0) return {};
+								e.type = functionTypeFromFunction(*m_functions[e.left]);
+								return e.type;
+							case Symbol::GLOBAL_VAR:
+								e.kind = Expr::VAR;
+								e.name = m_module.makeQualifiedName(s.name.path, s.name.name);
+								e.qualified_name = s.name;
+								e.type = s.unit->globals[s.index].type;
+								return e.type;
+							case Symbol::NOT_FOUND: 
+								m_output.errorAt(e.token, "Unknown identifier ", e.name);
+								return {};
+							case Symbol::STRUCT:
+								// TODO proper error msg
+								m_output.errorAt(e.token, "", e.name); 
+								return {};
+							case Symbol::ENUM: {
+								const i32 enum_idx = m_module.findEnum(s.name);
+								if (enum_idx < 0) {
+									m_output.errorAt(e.token, "Unknown enum '", left_expr.name, "'");
+									return {};
+								}
+								e.type.kind = LS_TYPE_ENUM;
+								e.type.canonical_name = s.name;
+								e.type.struct_index = enum_idx;
+								return e.type;
+							}
+						}
+					}
+					case LS_TYPE_STRUCT: {
+						// field access - s.f
+						// or namespace resolution based on first arg - v.foo() -> foo(v)
+						if (left_type.nullable) {
+							m_output.errorAt(e.token, "Nullable value must be checked for null");
+							return {};
+						}
+						StructDecl& s = *m_structs[left_type.struct_index];
+						for (const FieldDecl& f : s.fields) {
+							if (!equalStrings(f.name, e.name)) continue;
+							if (empty(e.qualified_name)) e.qualified_name = {getExpressionName(e.left), e.name};
+							// field access
+							e.type = f.type;
+							return e.type;
+						}
+
+						// namespace resolution
+						ls_string_view path = left_type.canonical_name.path;
+						for (const ImportDecl& import : unit.imports) {
+							if (equalStrings(import.path, path)) {
+								Symbol s = findSymbol(import, e.name);
+								switch (s.kind) {
+									case Symbol::NOT_FOUND:
+										m_output.errorAt(e.token, "Unknown identifier ", e.name);
+										return {};
+									case Symbol::GLOBAL_VAR:
+										e.kind = Expr::VAR;
+										e.name = m_module.makeQualifiedName(s.name.path, s.name.name);
+										e.qualified_name = s.name;
+										e.type = s.unit->globals[s.index].type;
+										if (call_expr && e.type.kind == LS_TYPE_FUNCTION) {
+											const i32 receiver_expr = e.left;
+											call_expr->args.insert(call_expr->args.begin(), receiver_expr);
+										}
+										return e.type;
+									case Symbol::FN: {
+										const i32 receiver_expr = e.left;
+										e.kind = Expr::FUNCTION_REF;
+										e.boolean = false;
+										e.left = m_module.findFunction(s.name);
+										if (e.left < 0) return {};
+										e.type = functionTypeFromFunction(*m_functions[e.left]);
+
+										if (call_expr) {
+											call_expr->args.insert(call_expr->args.begin(), receiver_expr);
+										}
+
+										return e.type;
+									}
+									case Symbol::EXTERN_FN: {
+										e.kind = Expr::FUNCTION_REF;
+										e.boolean = true;
+										e.left = m_module.findNativeFunction(s.name);
+										if (e.left < 0) return {};
+										e.type = functionTypeFromNativeFunction(*m_native_functions[e.left]);
+										return e.type;
+									}
+									default:
+										break;
+								}
+							}
+						}
+						
+						m_output.errorAt(e.token, "Struct ", s.token.value, " has no field ", e.name);
+						return {};
+					}
+					case LS_TYPE_ENUM: {
+						if (left_type.nullable) {
+							m_output.errorAt(e.token, "Nullable value must be checked for null");
+							return {};
+						}
+						const i32 receiver_expr = e.left;
+						for (i32 i = 0; i < (i32)m_functions.size(); ++i) {
+							FunctionDecl& fn = *m_functions[i];
+							if (!equalStrings(fn.canonical_name.name, e.name)) continue;
+							if (fn.params.empty() || !sameResolvedType(fn.params[0].type, left_type)) continue;
+							e.kind = Expr::FUNCTION_REF;
+							e.boolean = false;
+							e.left = i;
+							e.type = functionTypeFromFunction(fn);
+							if (call_expr) call_expr->args.insert(call_expr->args.begin(), receiver_expr);
+							return e.type;
+						}
+						for (i32 i = 0; i < (i32)m_native_functions.size(); ++i) {
+							NativeFunctionDecl& fn = *m_native_functions[i];
+							if (!equalStrings(fn.canonical_name.name, e.name)) continue;
+							if (fn.params.empty() || !sameResolvedType(fn.params[0].type, left_type)) continue;
+							e.kind = Expr::FUNCTION_REF;
+							e.boolean = true;
+							e.left = i;
+							e.type = functionTypeFromNativeFunction(fn);
+							if (call_expr) call_expr->args.insert(call_expr->args.begin(), receiver_expr);
+							return e.type;
+						}
+						m_output.errorAt(e.token, "Enum ", left_expr.token.value, " has no member ", e.name);
+						return {};
+					}
+					default: {
+						m_output.errorAt(left_expr.token, "Unexpected identifier ", left_expr.token.value);
+						return {};
+					}
+				} // switch (left_type.kind)
+				ASSERT(false);
+			}
+			case Expr::FIELD: {
+				TypeRef left_type = checkField(unit, left_expr, nullptr);
+				switch (left_type.kind) {
+					case LS_TYPE_STRUCT: {
+						if (left_type.nullable) {
+							m_output.errorAt(e.token, "Nullable value must be checked for null");
+							return {};
+						}
+						StructDecl& s = *m_structs[left_type.struct_index];
+						for (const FieldDecl& f : s.fields) {
+							if (!equalStrings(f.name, e.name)) continue;
+							if (empty(e.qualified_name)) e.qualified_name = {getExpressionName(e.left), e.name};
+							e.type = f.type;
+							return e.type;
+						}
+						m_output.errorAt(e.token, "Struct ", s.token.value, " has no field ", e.name);
+						return {};
+					}
+					case LS_TYPE_ENUM: {
+						if (left_type.nullable) {
+							m_output.errorAt(e.token, "Nullable value must be checked for null");
+							return {};
+						}
+						const i32 enum_idx = left_type.struct_index;
+						if (enum_idx >= 0 && enum_idx < (i32)m_enums.size() && m_module.findEnumMember(*m_enums[enum_idx], e.name) >= 0) {
+							e.kind = Expr::ENUM_LITERAL;
+							e.type = left_type;
+							return e.type;
+						}
+						m_output.errorAt(e.token, "Unknown enum member '", e.name, "'");
+						return {};
+					}
+					default: {
+						m_output.errorAt(left_expr.token, "Unexpected identifier ", left_expr.token.value);
+						return {};
+					}
+				}
+			}
+			default: {
+				// should not be possible
+				volatile int k = 2;
+				return {};
+			}
+		}
+	}
+
+	TypeRef checkVar(Unit& unit, Expr& e, Expr* call_expr) {
+		// Locals are deliberately resolved before module symbols. Nullable
+		// promotion also injects a shadow local with the non-null type, so this
+		// lookup is what makes `if x != null { x.field }` type-check without
+		// mutating the original variable declaration.
+		const i32 local_idx = findLocal(e.name);
+		if (local_idx >= 0) {
+			e.type = m_locals[local_idx].type;
+			return e.type;
+		}
+		// Variable, function, and native function names all share the same
+		// canonical resolution logic. If a bare source name doesn't match the
+		// current scope, rewrite it through the import/module namespace rules
+		// before giving up.
+		Symbol symbol = resolveSymbol(unit, e.name, e.token);
+		switch (symbol.kind) {
+			case Symbol::GLOBAL_VAR: {
+				e.name = m_module.makeQualifiedName(symbol.name.path, symbol.name.name);
+				e.type = symbol.unit->globals[symbol.index].type;
+				if (call_expr && call_expr->args.size() > 0 && e.type.kind == LS_TYPE_FUNCTION) {
+					ls_string_view possible_namespace;
+					TypeRef first_arg_type = checkExpr(unit, call_expr->args[0], nullptr);
+					possible_namespace = first_arg_type.canonical_name.path;
+
+					for (const ImportDecl& import : unit.imports) {
+						if (!equalStrings(import.path, possible_namespace)) continue;
+						Symbol s = findSymbol(import, symbol.name.name);
+						switch (s.kind) {
+							case Symbol::GLOBAL_VAR:
+								e.name = m_module.makeQualifiedName(s.name.path, s.name.name);
+								e.qualified_name = s.name;
+								e.type = s.unit->globals[s.index].type;
+								return e.type;
+							case Symbol::FN:
+								e.kind = Expr::FUNCTION_REF;
+								e.type = functionTypeFromFunction(*m_functions[m_module.findFunction(s.name)]);
+								e.left = m_module.findFunction(s.name);
+								e.boolean = false;
+								return e.type;
+							case Symbol::EXTERN_FN:
+								e.kind = Expr::FUNCTION_REF;
+								e.type = functionTypeFromNativeFunction(*m_native_functions[m_module.findNativeFunction(s.name)]);
+								e.left = m_module.findNativeFunction(s.name);
+								e.boolean = true;
+								return e.type;
+							default:
+								break;
+						}
+					}
+				}
+				return e.type;
+			}
+			case Symbol::FN: {
+				const i32 fn_idx = m_module.findFunction(symbol.name);
+				if (fn_idx >= 0) {
+					// A bare function name is normalized into FUNCTION_REF so later
+					// passes do not have to repeat lexical/module lookup. The original
+					// spelling is no longer important once `left` points at the
+					// canonical function table index.
+					e.kind = Expr::FUNCTION_REF;
+					e.type = functionTypeFromFunction(*m_functions[fn_idx]);
+					e.left = fn_idx;
+					e.boolean = false;
+					return e.type;
+				}
+				break;
+			}
+			case Symbol::EXTERN_FN: {
+				const i32 native_idx = m_module.findNativeFunction(symbol.name);
+				if (native_idx >= 0) {
+					// Native functions share the same AST representation as script
+					// functions; `boolean` is used as the discriminator because this
+					// node already stores the target index in `left`.
+					e.kind = Expr::FUNCTION_REF;
+					e.type = functionTypeFromNativeFunction(*m_native_functions[native_idx]);
+					e.left = native_idx;
+					e.boolean = true;
+					return e.type;
+				}
+				break;
+			}
+			default: break;
+		}
+
+		if (call_expr && call_expr->args.size() > 0) {
+			ls_string_view possible_namespace;
+			TypeRef first_arg_type = checkExpr(unit, call_expr->args[0], nullptr);
+			possible_namespace = first_arg_type.canonical_name.path;
+
+			for (const ImportDecl& import : unit.imports) {
+				if (equalStrings(import.path, possible_namespace)) {
+					Symbol s = findSymbol(import, e.name);
+					switch (s.kind) {
+						case Symbol::EXTERN_FN: {
+							e.kind = Expr::FUNCTION_REF;
+							const i32 native_idx = m_module.findNativeFunction({possible_namespace, e.name});
+							e.type = functionTypeFromNativeFunction(*m_native_functions[native_idx]);
+							e.left = native_idx;
+							e.boolean = true;
+							return e.type;
+						}
+						case Symbol::FN: {
+							e.kind = Expr::FUNCTION_REF;
+							const i32 fn_idx = m_module.findFunction({possible_namespace, e.name});
+							e.type = functionTypeFromFunction(*m_functions[fn_idx]);
+							e.left = fn_idx;
+							e.boolean = false;
+							return e.type;
+						}
+						case Symbol::GLOBAL_VAR:
+							e.name = m_module.makeQualifiedName(possible_namespace, e.name);
+							e.type = s.unit->globals[s.index].type;
+							return e.type;
+						default: break;
+					}
+				}
+			}
+			volatile int i = 0;
+		}
+
+		const i32 fn_idx = m_module.findFunction(e.name);
+		if (fn_idx >= 0) {
+			e.kind = Expr::FUNCTION_REF;
+			e.type = functionTypeFromFunction(*m_functions[fn_idx]);
+			e.left = fn_idx;
+			e.boolean = false;
+			return e.type;
+		}
+		const i32 native_idx = m_module.findNativeFunction(e.name);
+		if (native_idx >= 0) {
+			e.kind = Expr::FUNCTION_REF;
+			e.type = functionTypeFromNativeFunction(*m_native_functions[native_idx]);
+			e.left = native_idx;
+			e.boolean = true;
+			return e.type;
+		}
+
+		for (const ImportDecl& import : unit.imports) {
+			if (equalStrings(import.alias, e.name)) {
+				e.type.kind = LS_TYPE_NAMESPACE;
+				e.type.import_index = i32(&import - unit.imports.data());
+				return e.type;
+			}
+		}
+
+		m_output.errorAt(e.token, "Unknown variable '", e.name, "'");
+		return {};
+	}
+
 	TypeRef checkCall(Unit& unit, Expr& e) {
 		// Possible function calls:
 		// foo(*); - foo being extern fn foo()
@@ -757,98 +1060,57 @@ struct Checker {
 		// v.foo(*); - v being a variable/const, syntax sugar for foo(v)
 		// v.foo(*); - v being a variable/const imported through alias, syntax sugar for alias.foo(v),
 
-		// Calls are resolved in two passes. Named and method-style calls use
-		// `resolveCallName`, which can bind directly to script/native functions.
-		// If that fails without producing an error, the callee expression itself
-		// may still evaluate to a function value and is checked below.
-		i32 fn_idx = -1;
-		i32 native_idx = -1;
-		const CanonicalName callee_name = resolveCallName(unit, e, &fn_idx, &native_idx);
-		if (m_output.has_error) return {};
-
-		if (fn_idx < 0 && native_idx < 0) {
-			TypeRef callee_type = checkExpr(unit, e.left);
-			if (callee_type.kind != LS_TYPE_FUNCTION || callee_type.struct_index < 0) {
-				if (empty(callee_name.name))
-					m_output.errorAt(m_module.expressions[e.left].token, "Unsupported callee");
-				else
-					m_output.errorAt(m_module.expressions[e.left].token, "Unknown function '", callee_name.name, "'");
-				return {};
-			}
-			// foo().bar()
-			FunctionTypeDecl& fn_type = m_module.function_types[callee_type.struct_index];
-			if (fn_type.params.size() != e.args.size()) {
-				m_output.errorAt(e.token, "Wrong number of arguments");
-				return {};
-			}
-			for (i32 i = 0; i < fn_type.params.size(); ++i) {
-				Expr& arg_expr = m_module.expressions[e.args[i]];
-				if (arg_expr.kind == Expr::REF) {
-					m_output.errorAt(arg_expr.token, "Unexpected ref argument");
-					continue;
-				}
-				TypeRef arg_type = checkExpr(unit, e.args[i], &fn_type.params[i]);
-				if (!canAssign(fn_type.params[i], arg_type)) m_output.errorAt(arg_expr.token, "Argument type mismatch");
-			}
-			e.type = fn_type.return_type;
-			return e.type;
+		TypeRef left_type = checkExpr(unit, e.left, nullptr, &e);
+		Expr& left_expr = m_module.expressions[e.left];
+		if (left_type.kind != LS_TYPE_FUNCTION) {
+			m_output.errorAt(left_expr.token, left_expr.name, " must be a function");
+			return {};
 		}
 
-		const bool is_native = native_idx >= 0;
-		const std::vector<Param>& params = is_native ? m_native_functions[native_idx]->params : m_functions[fn_idx]->params;
-		const TypeRef return_type = is_native ? m_native_functions[native_idx]->return_type : m_functions[fn_idx]->return_type;
-		const i32 receiver_arg_count = e.method_receiver >= 0 ? 1 : 0;
-		// Method-call syntax stores the receiver separately, but declared
-		// functions still see it as their first parameter. `receiver_arg_count`
-		// keeps argument indexing aligned without rewriting the parsed argument
-		// list.
-		if (params.size() != e.args.size() + receiver_arg_count) {
+		FunctionTypeDecl& fn_type = m_module.function_types[left_type.struct_index];
+
+		if (fn_type.params.size() != e.args.size()) {
 			m_output.errorAt(e.token, "Wrong number of arguments");
 			return {};
 		}
-		for (i32 i = 0; i < params.size(); ++i) {
-			const i32 arg_idx = i - receiver_arg_count;
-			const i32 expr_idx = i == 0 && e.method_receiver >= 0 ? e.method_receiver : e.args[arg_idx];
-			if (params[i].is_ref) {
-				// `ref` is syntax at the call site, not a type constructor. Peel it
-				// away before checking assignability so diagnostics point at the
-				// thing being passed by reference, while still rejecting temporaries,
-				// const expressions, and nullable values.
-				Expr& arg_expr = m_module.expressions[expr_idx];
+
+		// typecheck args
+		for (i32 i = 0; i < fn_type.params.size(); ++i) {
+			Expr& arg_expr = m_module.expressions[e.args[i]];
+			if (fn_type.params[i].is_ref) {
 				if (arg_expr.kind != Expr::REF) {
-					m_output.errorAt(arg_expr.token, "Expected ref argument");
-					continue;
+					m_output.errorAt(arg_expr.token, "Argument type mismatch");
+					return {};
 				}
-				const i32 target_expr = arg_expr.right;
-				if (!isAssignableExpr(target_expr)) {
-					m_output.errorAt(arg_expr.token, "Ref argument must be assignable");
-					continue;
+				// check foo(ref x)
+				if (!isAssignableExpr(arg_expr.right)) {
+					m_output.errorAt(m_module.expressions[arg_expr.right].token, "Argument must be assignable");
+					return {};
 				}
-				if (isConstExpr(unit, target_expr)) {
+				if (isConstExpr(unit, arg_expr.right)) {
 					m_output.errorAt(arg_expr.token, "Can not pass const as ref argument");
-					continue;
+					return {};
 				}
-				TypeRef arg_type = checkExpr(unit, target_expr, &params[i].type);
-				if (arg_type.nullable) {
-					m_output.errorAt(m_module.expressions[target_expr].token, "Ref argument can not be nullable");
-					continue;
+				TypeRef arg_type = checkExpr(unit, arg_expr.right, &fn_type.params[i]);
+				if (!canAssign(fn_type.params[i], arg_type)) {
+					m_output.errorAt(m_module.expressions[arg_expr.right].token, "Argument type mismatch");
+					return {};
 				}
-				if (!canAssign(params[i].type, arg_type)) m_output.errorAt(m_module.expressions[target_expr].token, "Argument type mismatch");
-			} else {
-				Expr& arg_expr = m_module.expressions[expr_idx];
-				if (arg_expr.kind == Expr::REF) {
-					m_output.errorAt(arg_expr.token, "Unexpected ref argument");
-					continue;
-				}
-				TypeRef arg_type = checkExpr(unit, expr_idx, &params[i].type);
-				if (!canAssign(params[i].type, arg_type)) m_output.errorAt(m_module.expressions[expr_idx].token, "Argument type mismatch");
+				continue;
+			}
+			
+			TypeRef arg_type = checkExpr(unit, e.args[i], &fn_type.params[i]);
+			if (!canAssign(fn_type.params[i], arg_type)) {
+				m_output.errorAt(arg_expr.token, "Argument type mismatch");
+				return {};
 			}
 		}
-		e.type = return_type;
-		return e.type;
+
+		e.type = fn_type.return_type;
+		return fn_type.return_type;
 	}
 
-	TypeRef checkExpr(Unit& unit, i32 expr_idx, const TypeRef* expected = nullptr) {
+	TypeRef checkExpr(Unit& unit, i32 expr_idx, const TypeRef* expected = nullptr, Expr* call_expr = nullptr) {
 		if (expr_idx < 0) return {};
 		Expr& e = m_module.expressions[expr_idx];
 		switch (e.kind) {
@@ -864,70 +1126,7 @@ struct Checker {
 			case Expr::STRING_LITERAL: e.type = {LS_TYPE_STRING, {}, -1}; return e.type;
 			case Expr::BOOL_LITERAL: return e.type;
 			case Expr::NULL_LITERAL: return e.type;
-			case Expr::VAR: {
-				// Locals are deliberately resolved before module symbols. Nullable
-				// promotion also injects a shadow local with the non-null type, so this
-				// lookup is what makes `if x != null { x.field }` type-check without
-				// mutating the original variable declaration.
-				const i32 local_idx = findLocal(e.name);
-				if (local_idx >= 0) {
-					e.type = m_locals[local_idx].type;
-					return e.type;
-				}
-				// Variable, function, and native function names all share the same
-				// canonical resolution logic. If a bare source name doesn't match the
-				// current scope, rewrite it through the import/module namespace rules
-				// before giving up.
-				Symbol symbol = resolveSymbol(unit, e.name, e.token);
-				if (symbol.kind == Symbol::GLOBAL_VAR) {
-					e.name = m_module.makeQualifiedName(symbol.name.path, symbol.name.name);
-					e.type = symbol.unit->globals[symbol.index].type;
-					return e.type;
-				} else if (symbol.kind == Symbol::FN) {
-					const i32 fn_idx = m_module.findFunction(symbol.name);
-					if (fn_idx >= 0) {
-						// A bare function name is normalized into FUNCTION_REF so later
-						// passes do not have to repeat lexical/module lookup. The original
-						// spelling is no longer important once `left` points at the
-						// canonical function table index.
-						e.kind = Expr::FUNCTION_REF;
-						e.type = functionTypeFromFunction(*m_functions[fn_idx]);
-						e.left = fn_idx;
-						e.boolean = false;
-						return e.type;
-					}
-				} else if (symbol.kind == Symbol::EXTERN_FN) {
-					const i32 native_idx = m_module.findNativeFunction(symbol.name);
-					if (native_idx >= 0) {
-						// Native functions share the same AST representation as script
-						// functions; `boolean` is used as the discriminator because this
-						// node already stores the target index in `left`.
-						e.kind = Expr::FUNCTION_REF;
-						e.type = functionTypeFromNativeFunction(*m_native_functions[native_idx]);
-						e.left = native_idx;
-						e.boolean = true;
-						return e.type;
-					}
-				}
-				const i32 fn_idx = m_module.findFunction(e.name);
-				if (fn_idx >= 0) {
-					e.kind = Expr::FUNCTION_REF;
-					e.type = functionTypeFromFunction(*m_functions[fn_idx]);
-					e.left = fn_idx;
-					e.boolean = false;
-					return e.type;
-				}
-				const i32 native_idx = m_module.findNativeFunction(e.name);
-				if (native_idx >= 0) {
-					e.kind = Expr::FUNCTION_REF;
-					e.type = functionTypeFromNativeFunction(*m_native_functions[native_idx]);
-					e.left = native_idx;
-					e.boolean = true;
-					return e.type;
-				}
-				m_output.errorAt(e.token, "Unknown variable '", e.name, "'");
-				return {};
-			}
+			case Expr::VAR: return checkVar(unit, e, call_expr);
 			case Expr::FUNCTION_REF: {
 				// Function references are produced from two
 				// different paths:
@@ -951,113 +1150,7 @@ struct Checker {
 				}
 				return e.type;
 			}
-			case Expr::FIELD: {
-				// `a.b` is overloaded syntax in LumScript: it can be a namespace/member
-				// lookup, an enum member, a struct field access, or method-style sugar.
-				// The order below is intentional. We first try the interpretations that
-				// do not require type-checking `a`, then fall back to real field access
-				// once it is clear that `a` is an expression receiver.
-				if (empty(e.qualified_name)) e.qualified_name = {getExpressionName(e.left), e.name};
-				const CanonicalName& qualified_name = e.qualified_name;
-				// Qualified functions are resolved before struct fields so `module.fn`
-				// and imported aliases become function references instead of forcing
-				// the left side to be a value expression.
-				const i32 fn_idx = m_module.findFunction(qualified_name);
-				if (fn_idx >= 0) {
-					e.kind = Expr::FUNCTION_REF;
-					e.type = functionTypeFromFunction(*m_functions[fn_idx]);
-					e.left = fn_idx;
-					e.boolean = false;
-					return e.type;
-				}
-				const i32 native_idx = m_module.findNativeFunction(qualified_name);
-				if (native_idx >= 0) {
-					e.kind = Expr::FUNCTION_REF;
-					e.type = functionTypeFromNativeFunction(*m_native_functions[native_idx]);
-					e.left = native_idx;
-					e.boolean = true;
-					return e.type;
-				}
-				const ls_string_view qualified_name_str = m_module.makeQualifiedName(qualified_name.path, qualified_name.name);
-				if (e.left >= 0 && m_module.expressions[e.left].kind == Expr::VAR) {
-					// For `import foo`, `foo.bar` is a namespace-style lookup. If the
-					// qualified function/native/enum paths above did not resolve it,
-					// reporting "Unknown variable 'bar'" is more useful than saying
-					// "Field access on non-struct" for the import name `foo`.
-					for (const ImportDecl& import : unit.imports) {
-						if (!empty(import.alias)) continue;
-						if (!equalStrings(m_module.expressions[e.left].name, import.path)) continue;
-						m_output.errorAt(e.token, "Unknown variable '", e.name, "'");
-						return {};
-					}
-				}
-				if (checkQualifiedEnumMember(unit, e, qualified_name_str)) return e.type;
-				if (e.left >= 0 && m_module.expressions[e.left].kind == Expr::VAR && importAliasExists(unit, m_module.expressions[e.left].name)) {
-					// Same diagnostic shape for aliased imports. At this point the alias
-					// existed, but the requested member did not resolve as a known module
-					// symbol or enum member.
-					m_output.errorAt(e.token, "Unknown variable '", e.name, "'");
-					return {};
-				}
-				TypeRef base = checkExpr(unit, e.left);
-				if (base.nullable) {
-					m_output.errorAt(e.token, "Nullable value must be checked for null");
-					return {};
-				}
-				if (base.kind != LS_TYPE_STRUCT || base.struct_index < 0) {
-					m_output.errorAt(e.token, "Field access on non-struct");
-					return {};
-				}
-				StructDecl& s = *m_structs[base.struct_index];
-				for (FieldDecl& f : s.fields) {
-					if (equalStrings(f.name, e.name)) {
-						e.type = f.type;
-						return e.type;
-					}
-				}
-				if (e.left >= 0 && m_module.expressions[e.left].kind == Expr::VAR) {
-					// If the left side is a value whose type belongs to a module namespace,
-					// allow `value.fn` / `value.global` to resolve through that namespace
-					// after ordinary fields have been considered. This preserves field
-					// priority while still enabling extension-like method syntax for types
-					// declared in named modules.
-					const i32 local_idx = findLocal(qualified_name.path);
-					if (local_idx >= 0) {
-						const TypeRef& receiver_type = m_locals[local_idx].type;
-						ls_string_view namespace_name = receiver_type.canonical_name.path;
-						if (!empty(namespace_name)) {
-							const CanonicalName fn_name = { namespace_name, e.name };
-							const i32 fn_idx = m_module.findFunction(fn_name);
-							if (fn_idx >= 0) {
-								e.kind = Expr::FUNCTION_REF;
-								e.left = fn_idx;
-								e.boolean = false;
-								e.type = functionTypeFromFunction(*m_functions[fn_idx]);
-								return e.type;
-							}
-							const i32 native_idx = m_module.findNativeFunction(fn_name);
-							if (native_idx >= 0) {
-								e.kind = Expr::FUNCTION_REF;
-								e.left = native_idx;
-								e.boolean = true;
-								e.type = functionTypeFromNativeFunction(*m_native_functions[native_idx]);
-								return e.type;
-							}
-							const i32 global_idx = m_module.findGlobal(fn_name);
-							if (global_idx >= 0) {
-								e.kind = Expr::VAR;
-								e.name = m_module.makeQualifiedName(fn_name.path, fn_name.name);
-								e.qualified_name = fn_name;
-								e.type = m_globals[global_idx]->type;
-								return e.type;
-							}
-						}
-					}
-				}
-
-				m_output.errorAt(e.token, "Unknown field '", e.name, "'");
-				return {};
-			}
+			case Expr::FIELD: return checkField(unit, e, call_expr);
 			case Expr::INDEX: {
 				TypeRef base = checkExpr(unit, e.left);
 				if (base.nullable) {

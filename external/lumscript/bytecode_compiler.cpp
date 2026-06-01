@@ -2282,9 +2282,13 @@ static bool bytecodeCompileGlobals(ls_module& module, ls_bytecode& bytecode, con
 			global.slot = global_slot;
 			global.slot_count = slot_count;
 			global_slot += slot_count;
+		}
+	}
+
+	for (Unit* unit_ptr : module.units) {
+		Unit& unit = *unit_ptr;
+		for (GlobalDecl& global : unit.globals) {
 			if (global.expr < 0) continue;
-			// Global initializers are evaluated in declaration order, so later
-			// globals can read earlier ones.
 			if (!bytecodeCompileExpr(module, init_bytecode, ctx, global.expr, &global.type)) return false;
 			if (!bytecodeEmitStoreGlobalValue(module, init_bytecode, global.slot, global.type)) return false;
 		}

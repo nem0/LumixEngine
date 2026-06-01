@@ -53,17 +53,23 @@ struct TypeRef {
 		, struct_index(struct_index)
 		, token(token)
 		, nullable(nullable)
-	{}
+	{
+		struct_index = -1;
+	}
 
 	ls_type_kind kind = LS_TYPE_INVALID;
 	ls_string_view unresolved_name;
 	CanonicalName canonical_name = {};
-	i32 struct_index = -1;
+	union {
+		i32 struct_index;
+		i32 import_index;
+	};
 	ls_type_kind element_kind = LS_TYPE_INVALID;
 	ls_string_view element_name;
 	i32 array_size = 0;
 	Token token;
 	bool nullable = false;
+	bool is_ref = false;
 };
 
 struct ls_module;

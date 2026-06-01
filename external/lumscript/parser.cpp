@@ -88,7 +88,17 @@ struct Parser {
 		match(Token::SEMICOLON);
 	}
 
-	TypeRef parseType() {
+	enum class CanBeRef {
+		YES,
+		NO
+	};
+
+	TypeRef parseType(CanBeRef can_be_ref = CanBeRef::NO) {
+		const bool is_ref = match(Token::REF);
+		if (is_ref && can_be_ref == CanBeRef::NO) {
+			error(peek(), "Unexpected ref");
+			return {};
+		}
 		const bool is_nullable = match(Token::QUESTION);
 		Token t = consumeToken();
 		TypeRef base;
@@ -100,7 +110,7 @@ struct Parser {
 				while (peek().type != Token::RIGHT_PAREN && peek().type != Token::END_OF_FILE && !m_output.has_error) {
 					FunctionTypeDecl& fn_type = m_module.function_types[fn_type_idx];
 					if (!fn_type.params.empty()) consume(Token::COMMA);
-					fn_type.params.push_back(parseType());
+					fn_type.params.push_back(parseType(CanBeRef::YES));
 				}
 				consume(Token::RIGHT_PAREN);
 				consume(Token::COLON);
@@ -151,6 +161,7 @@ struct Parser {
 			}
 			return array_type;
 		}
+		base.is_ref = is_ref;
 		return base;
 	}
 
@@ -263,8 +274,8 @@ struct Parser {
 			Param& p = m_unit.functions[fn_idx].params.emplace_back();
 			p.name = param_name.value;
 			p.token = param_name;
-			p.is_ref = match(Token::REF);
-			p.type = parseType();
+			p.type = parseType(CanBeRef::YES);
+			p.is_ref = p.type.is_ref;
 		}
 		consume(Token::RIGHT_PAREN);
 		consume(Token::COLON);
@@ -309,7 +320,7 @@ struct Parser {
 			p.name = param_name.value;
 			p.token = param_name;
 			p.is_ref = match(Token::REF);
-			p.type = parseType();
+			p.type = parseType(CanBeRef::YES);
 		}
 		consume(Token::RIGHT_PAREN);
 		consume(Token::COLON);
