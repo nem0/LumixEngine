@@ -445,7 +445,7 @@ static ls_string_view bytecodeGetExpressionName(ls_module& module, i32 expr_idx)
 		return module.makeQualifiedName(expr.qualified_name.path, expr.qualified_name.name);
 	}
 	if (expr.kind == Expr::FUNCTION_REF) {
-		if (expr.boolean) {
+		if (expr.is_native_fn) {
 			i32 idx = expr.left;
 			for (const Unit* unit_ptr : module.units) {
 				const Unit& unit = *unit_ptr;
@@ -1348,7 +1348,7 @@ static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, Byteco
 			// Booleans are emitted as normal constants so the stack always carries
 			// concrete values instead of source-level truthiness markers.
 			pushCode(bytecode, BytecodeOp::LOAD_CONST8);
-			const u8 value = expr.boolean ? 1 : 0;
+			const u8 value = expr.is_true_literal ? 1 : 0;
 			pushCode(bytecode, value);
 			return true;
 		}
@@ -1398,7 +1398,7 @@ static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, Byteco
 			return bytecodeEmitLoadValue(module, bytecode, ctx, access);
 		}
 		case Expr::FUNCTION_REF:
-			if (expr.boolean) return false;
+			if (expr.is_native_fn) return false;
 			return bytecodeEmitFunctionValue(bytecode, expr.left);
 		case Expr::REF: {
 			BytecodeValueAccess access = {};
@@ -1451,6 +1451,12 @@ static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, Byteco
 			// intentionally direct: evaluate both sides, then emit the width-specific
 			// opcode that matches the result type.
 			if (expr.token.type == Token::PLUS) {
+				if (expr.type.kind == LS_TYPE_STRING) {
+					if (!bytecodeCompileExpr(module, bytecode, ctx, expr.left)) return false;
+					if (!bytecodeCompileExpr(module, bytecode, ctx, expr.right)) return false;
+					pushCode(bytecode, BytecodeOp::ADD_STRING);
+					return true;
+				}
 				if (!isBytecodeIntegralType(expr.type.kind) && !isBytecodeFloatType(expr.type.kind)) return false;
 				if (!bytecodeCompileExpr(module, bytecode, ctx, expr.left)) return false;
 				if (!bytecodeCompileExpr(module, bytecode, ctx, expr.right)) return false;
@@ -1674,12 +1680,21 @@ static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, Byteco
 			if (callee_type.kind != LS_TYPE_FUNCTION || callee_type.struct_index < 0 || callee_type.struct_index >= module.function_types.size()) return false;
 			FunctionTypeDecl& fn_type = module.function_types[callee_type.struct_index];
 			if (fn_type.params.size() != expr.args.size()) return false;
+			// CALL_INDIRECT locates the function handle below the flattened
+			// argument payload, so it needs stack slots rather than arity.
+			i32 param_slot_count = 0;
+			for (const TypeRef& param_type : fn_type.params) {
+				const i32 slot_count = bytecodeTypeSlotCount(module, param_type);
+				if (slot_count <= 0) return false;
+				param_slot_count += slot_count;
+			}
+			if (param_slot_count > 255) return false;
 			if (!bytecodeCompileExpr(module, bytecode, ctx, expr.left, &callee_type)) return false;
 			for (i32 i = 0; i < expr.args.size(); ++i) {
 				if (!bytecodeCompileExpr(module, bytecode, ctx, expr.args[i], &fn_type.params[i])) return false;
 			}
 			pushCode(bytecode, BytecodeOp::CALL_INDIRECT);
-			pushCode(bytecode, (u8)fn_type.params.size());
+			pushCode(bytecode, (u8)param_slot_count);
 			return true;
 		}
 		default:

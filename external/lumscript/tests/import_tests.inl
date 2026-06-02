@@ -1,0 +1,758 @@
+TEST(ImportConst) {
+	const char* main_source = R"(
+		import "a" as x
+
+		fn main() : i32 {
+			return x.value;
+		}
+	)";
+	const char* a_source = R"(
+		const value : i32 = 42; 
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("a"), toLs(a_source) },
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_COMPILE_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
+TEST(DiamondImportTypechecks) {
+	const char* main_source = R"(
+		import "a" as a
+		import "b" as b
+
+		fn main() : i32 {
+			return a.get_value() + b.get_value();
+		}
+	)";
+	const char* a_source = R"(
+		import "base"
+		fn get_value() : i32 {
+			return value;
+		}
+	)";
+	const char* b_source = R"(
+		import "base"
+		fn get_value() : i32 {
+			return value;
+		}
+	)";
+	const char* base_source = R"(
+		const value : i32 = 42;
+
+		fn foo() : void {}
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("a"), toLs(a_source) },
+		{ toLs("b"), toLs(b_source) },
+		{ toLs("base"), toLs(base_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_COMPILE_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
+TEST(ImportPathCanMatchPreviousAlias) {
+	const char* main_source = R"(
+		import "a" as b
+		import "b" as c
+
+		fn main() : i32 {
+			return b.one() + c.two();
+		}
+	)";
+	const char* a_source = R"(
+		fn one() : i32 {
+			return 1;
+		}
+	)";
+	const char* b_source = R"(
+		fn two() : i32 {
+			return 2;
+		}
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("a"), toLs(a_source) },
+		{ toLs("b"), toLs(b_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_COMPILE_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
+TEST(QualifiedDeclarationCanNotUseImportedPath) {
+	const char* main_source = R"(
+		import "lib"
+
+		fn main() : i32 {
+			return lib.get_value();
+		}
+	)";
+	const char* lib_source = R"(
+		fn get_value() : i32 {
+			return 42;
+		}
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("lib"), toLs(lib_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_COMPILE_FAIL_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
+TEST(QualifiedDeclarationRequiresDirectImport) {
+	const char* main_source = R"(
+		import "a"
+
+		fn main() : i32 {
+			return b.get_value();
+		}
+	)";
+	const char* a_source = R"(
+		import "b"
+
+		fn use_a() : void {
+		}
+	)";
+	const char* b_source = R"(
+		fn get_value() : i32 {
+			return 42;
+		}
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("a"), toLs(a_source) },
+		{ toLs("b"), toLs(b_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_COMPILE_FAIL_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
+TEST(ImportAliasMissingMemberReportsMemberName) {
+	const char* main_source = R"(
+		import "core:imgui" as imgui
+
+		fn main() : void {
+			imgui.beginWindow("LumScript demo");
+		}
+	)";
+	const char* imgui_source = R"(
+		fn textUnformatted(text : string) : void {}
+		fn button(label : string) : bool { return false; }
+		fn endWindow() : void {}
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("core:imgui"), toLs(imgui_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_COMPILE_FAIL_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
+TEST(ImportsAreNotTransitiveAcrossModules) {
+	const char* a_source = R"(
+		import "b" as b
+		import "c" as c
+
+		fn main() : i32 {
+			return b.get_value();
+		}
+	)";
+	const char* b_source = R"(
+		fn get_value() : i32 {
+			return value;
+		}
+	)";
+	const char* c_source = R"(
+		const value : i32 = 42;
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("b"), toLs(b_source) },
+		{ toLs("c"), toLs(c_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_COMPILE_FAIL_WITH_IMPORTS(a_source, files);
+	return true;
+}
+
+TEST(ImportSymbolCollisionFails) {
+	const char* main_source = R"(
+		import "a"
+		import "b"
+		fn main() : i32 {
+			return foo();
+		}
+	)";
+	const char* a_source = R"(
+		fn foo() : i32 { return 1; }
+	)";
+	const char* b_source = R"(
+		fn foo() : i32 { return 2; }
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("a"), toLs(a_source) },
+		{ toLs("b"), toLs(b_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_COMPILE_FAIL_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
+TEST(ImportAddsDeclarationsToCurrentModule) {
+	const char* main_source = R"(
+		import "math"
+
+		fn main() : i32 {
+			const v : Vec2 = Vec2 { 20, 22 };
+			return sum(v);
+		}
+	)";
+	const char* math_source = R"(
+		struct Vec2 {
+			x : i32;
+			y : i32;
+		}
+
+		fn sum(v : Vec2) : i32 {
+			return v.x + v.y;
+		}
+	)";
+	LumScriptImportFile file = { toLs("math"), toLs(math_source) };
+	LumScriptImportFiles files = { &file, 1 };
+	EXPECT_COMPILE_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
+TEST(ImportVisibilityIsNotTransitive) {
+	const char* main_source = R"(
+		import "a"
+
+		fn main() : void {
+			const value : C = undefined;
+		}
+	)";
+	const char* a_source = R"(
+		import "b"
+
+		fn use_a() : void {
+		}
+	)";
+	const char* b_source = R"(
+		import "c"
+	)";
+	const char* c_source = R"(
+		struct C {
+			x : i32;
+		}
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("a"), toLs(a_source) },
+		{ toLs("b"), toLs(b_source) },
+		{ toLs("c"), toLs(c_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_COMPILE_FAIL_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
+TEST(UnaliasedImportCollidesWithLocalDeclaration) {
+	const char* main_source = R"(
+		import "math"
+
+		fn foo() : i32 {
+			return 1;
+		}
+
+		fn main() : i32 {
+			return foo();
+		}
+	)";
+	const char* math_source = R"(
+		fn foo() : i32 {
+			return 2;
+		}
+	)";
+	LumScriptImportFile file = { toLs("math"), toLs(math_source) };
+	LumScriptImportFiles files = { &file, 1 };
+	EXPECT_COMPILE_FAIL_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
+TEST(LocalDeclarationCollidesWithMultipleUnaliasedImports) {
+	const char* main_source = R"(
+		import "a"
+		import "b"
+
+		fn foo() : i32 {
+			return 0;
+		}
+
+		fn main() : i32 {
+			return foo();
+		}
+	)";
+	const char* a_source = R"(
+		fn foo() : i32 {
+			return 1;
+		}
+	)";
+	const char* b_source = R"(
+		fn foo() : i32 {
+			return 2;
+		}
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("a"), toLs(a_source) },
+		{ toLs("b"), toLs(b_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_COMPILE_FAIL_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
+TEST(MissingImportFails) {
+	const char* source = R"(
+		import "missing"
+
+		fn main() : void {
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ImportResolverRejectsImportFails) {
+	const char* source = R"(
+		import "blocked"
+
+		fn main() : void {
+		}
+	)";
+	TestContext diagnostics;
+	diagnostics.diagnostics.output_enabled = false;
+	ls_module* module = ls_module_create(&diagnostics.host);
+	EXPECT_TRUE(module != nullptr);
+	EXPECT_TRUE(!ls_module_compile(module, toLs(source), {}, [](void*, ls_string_view, ls_string_view, ls_string_view*) {
+		return 0;
+	}, nullptr));
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(DuplicateUnaliasedImportFails) {
+	const char* main_source = R"(
+		import "math"
+		import "math"
+
+		fn main() : i32 {
+			const v : Vec2 = Vec2 { 20, 22 };
+			return sum(v);
+		}
+	)";
+	const char* math_source = R"(
+		struct Vec2 {
+			x : i32;
+			y : i32;
+		}
+
+		fn sum(v : Vec2) : i32 {
+			return v.x + v.y;
+		}
+	)";
+	LumScriptImportFile file = { toLs("math"), toLs(math_source) };
+	LumScriptImportFiles files = { &file, 1 };
+	EXPECT_COMPILE_FAIL_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
+TEST(DuplicateAliasedImportOfSamePathFails) {
+	const char* main_source = R"(
+		import "math" as m
+		import "math" as m
+
+		fn main() : i32 {
+			const v : m.Vec2 = m.Vec2 { 20, 22 };
+			return m.sum(v);
+		}
+	)";
+	const char* math_source = R"(
+		struct Vec2 {
+			x : i32;
+			y : i32;
+		}
+
+		fn sum(v : Vec2) : i32 {
+			return v.x + v.y;
+		}
+	)";
+	LumScriptImportFile file = { toLs("math"), toLs(math_source) };
+	LumScriptImportFiles files = { &file, 1 };
+	EXPECT_COMPILE_FAIL_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
+TEST(AliasedImportCollisionFails) {
+	const char* source = R"(
+		import "math_a" as m
+		import "math_b" as m
+
+		fn main() : i32 {
+			return 0;
+		}
+	)";
+	const char* math_a_source = R"(
+		fn one() : i32 {
+			return 1;
+		}
+	)";
+	const char* math_b_source = R"(
+		fn two() : i32 {
+			return 2;
+		}
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("math_a"), toLs(math_a_source) },
+		{ toLs("math_b"), toLs(math_b_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_COMPILE_FAIL_WITH_IMPORTS(source, files);
+	return true;
+}
+
+TEST(ImportCycleFails) {
+	const char* source = R"(
+		import "a"
+
+		fn main() : i32 {
+			return 0;
+		}
+	)";
+	const char* a_source = R"(
+		import "b"
+
+		fn in_a() : i32 {
+			return 1;
+		}
+	)";
+	const char* b_source = R"(
+		import "a"
+
+		fn in_b() : i32 {
+			return 2;
+		}
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("a"), toLs(a_source) },
+		{ toLs("b"), toLs(b_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_COMPILE_FAIL_WITH_IMPORTS(source, files);
+	return true;
+}
+
+TEST(FirstParameterNamespaceResolutionPrecedenceTypecheck) {
+	const char* main_source = R"(
+		import "entity_mod" as entity
+		import "helper_mod" as e
+
+		fn destroy(x : entity.Entity) : i32 {
+			return 3;
+		}
+
+		fn main() : i32 {
+			const x : entity.Entity = entity.Entity { 7 };
+			return e.destroy() + x.destroy() + destroy(x);
+		}
+	)";
+
+	const char* entity_source = R"(
+		struct Entity {
+			id : i32;
+		}
+
+		fn destroy(x : Entity) : i32 {
+			return x.id;
+		}
+	)";
+
+	const char* helper_source = R"(
+		fn destroy() : i32 {
+			return 2;
+		}
+	)";
+
+	LumScriptImportFile files_storage[] = {
+		{ toLs("entity_mod"), toLs(entity_source) },
+		{ toLs("helper_mod"), toLs(helper_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+
+	EXPECT_COMPILE_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
+TEST(ImportAliasEntityResolution) {
+	const char* main_source = R"(
+		import "world" as world
+		import "entity" as entity
+
+		fn main() : i32 {
+			var w : world.World = world.World { 0 };
+			var e : entity.Entity = world.createEntity(w);
+			return 0;
+		}
+	)";
+
+	const char* entity_source = R"(
+		struct Entity { index : i32; }
+	)";
+
+	const char* world_source = R"(
+		import "entity"
+		struct World { world : i32; }
+		extern fn createEntity(w : World) : Entity;
+	)";
+
+	LumScriptImportFile files_storage[] = {
+		{ toLs("world"), toLs(world_source) },
+		{ toLs("entity"), toLs(entity_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_COMPILE_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
+TEST(ImportExternFnDuplicateUsed) {
+	const char* main_source = R"(
+		import "a"
+		import "b"
+
+		fn main() : i32 {
+			foo(); // error - duplicate
+		}
+	)";
+
+	const char* a_source = R"(
+		extern fn foo() : i32;
+	)";
+
+	const char* b_source = R"(
+		extern fn foo() : i32;
+	)";
+
+	LumScriptImportFile files_storage[] = {
+		{ toLs("a"), toLs(a_source) },
+		{ toLs("b"), toLs(b_source) },
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_COMPILE_FAIL_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
+TEST(ImportExternFnDuplicateNotUsed) {
+	const char* main_source = R"(
+		import "a"
+		import "b"
+
+		fn main() : i32 {}
+	)";
+
+	const char* a_source = R"(
+		extern fn foo() : i32;
+	)";
+
+	const char* b_source = R"(
+		extern fn foo() : i32;
+	)";
+
+	LumScriptImportFile files_storage[] = {
+		{ toLs("a"), toLs(a_source) },
+		{ toLs("b"), toLs(b_source) },
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_COMPILE_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
+TEST(ImportAliasExternFnReturnTypeRequiresDirectImport) {
+	const char* main_source = R"(
+		import "entity" as entity
+		import "world" as world
+
+		fn main() : i32 {
+			var e : entity.Entity = world.createEntity();
+			return e.index;
+		}
+	)";
+
+	const char* entity_source = R"(
+		struct Entity { index : i32; }
+	)";
+
+	const char* world_source = R"(
+		extern fn createEntity() : Entity;
+	)";
+
+	LumScriptImportFile files_storage[] = {
+		{ toLs("world"), toLs(world_source) },
+		{ toLs("entity"), toLs(entity_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_COMPILE_FAIL_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
+TEST(ExternImport) {
+	const char* main_source = R"(
+		import "math" as m
+
+		fn main() : i32 {
+			const v1 : m.Vec2 = m.Vec2 { 10, 11 };
+			const s1 : i32 = m.sum(v1); // with namespace
+			const v2 : m.Vec2 = m.Vec2 { 9, 12 };
+			const s2 : i32 = sum(v2); // inferred namespaced
+			return s1 + s2;
+		}
+	)";
+	
+	const char* math_source = R"(
+		struct Vec2 {
+			x : i32;
+			y : i32;
+		}
+
+		extern fn sum(v : Vec2) : i32;
+	)";
+
+	LumScriptImportFile files_storage[] = {
+		{ toLs("math"), toLs(math_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+
+	TestContext diagnostics;
+	ls_module* module = ls_module_create(&diagnostics.host);
+	EXPECT_TRUE(module != nullptr);
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
+
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &diagnostics.host);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	const i32 sum_fn_idx = ls_module_get_native_function_index(module, toLs("math.sum"));
+
+	auto sumfn = [](ls_runtime* runtime) -> void {
+		const i32 s = ls_to_i32(runtime, -1) + ls_to_i32(runtime, -2);
+		ls_push_i32(runtime, s);
+	};
+
+	ls_runtime* runtime = ls_runtime_create(bytecode);
+	EXPECT_TRUE(runtime != nullptr);
+	ls_runtime_set_native_function_callback(runtime, sum_fn_idx, sumfn);
+
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(CoreMathImportRuntime) {
+	const char* source = R"(
+		import "std:math" as math
+
+		fn sin32() : f32 {
+			return math.sin(0.0);
+		}
+
+		fn cos32() : f32 {
+			return math.cos(0.0);
+		}
+
+		fn sin64() : f64 {
+			return math.sin_f64(0.0);
+		}
+
+		fn cos64() : f64 {
+			return math.cos_f64(0.0);
+		}
+
+		fn sqrt32() : f32 {
+			return math.sqrt(9.0);
+		}
+
+		fn sqrt64() : f64 {
+			return math.sqrt_f64(16.0);
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("sin32")));
+	EXPECT_FLOAT_EQ(0.0f, ls_to_f32(runtime, -1));
+	EXPECT_TRUE(ls_call(runtime, toLs("cos32")));
+	EXPECT_FLOAT_EQ(1.0f, ls_to_f32(runtime, -1));
+	EXPECT_TRUE(ls_call(runtime, toLs("sin64")));
+	EXPECT_FLOAT_EQ(0.0f, (float)ls_to_f64(runtime, -1));
+	EXPECT_TRUE(ls_call(runtime, toLs("cos64")));
+	EXPECT_FLOAT_EQ(1.0f, (float)ls_to_f64(runtime, -1));
+	EXPECT_TRUE(ls_call(runtime, toLs("sqrt32")));
+	EXPECT_FLOAT_EQ(3.0f, ls_to_f32(runtime, -1));
+	EXPECT_TRUE(ls_call(runtime, toLs("sqrt64")));
+	EXPECT_FLOAT_EQ(4.0f, (float)ls_to_f64(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(AliasedImportRuntime) {
+	const char* main_source = R"(
+		import "math" as math
+		import "state" as state
+
+		fn main() : i32 {
+			const v : math.Vec2 = math.Vec2 { 20, 22 };
+			if state.is_running(state.State.Running) {
+				return math.sum(v);
+			}
+			return 0;
+		}
+	)";
+	const char* math_source = R"(
+		struct Vec2 {
+			x : i32;
+			y : i32;
+		}
+		fn sum(v : Vec2) : i32 {
+			return v.x + v.y;
+		}
+	)";
+	const char* state_source = R"(
+		enum State {
+			Idle,
+			Running
+		}
+		fn is_running(state : State) : bool {
+			return state == .Running;
+		}
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("math"), toLs(math_source) },
+		{ toLs("state"), toLs(state_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+
+

@@ -797,7 +797,7 @@ struct Parser {
 			case Token::TRUE:
 			case Token::FALSE: {
 				const i32 idx = addExpr(Expr::BOOL_LITERAL, t);
-				m_module.expressions[idx].boolean = t.type == Token::TRUE;
+				m_module.expressions[idx].is_true_literal = t.type == Token::TRUE;
 				m_module.expressions[idx].type = {LS_TYPE_BOOL, {}, -1};
 				return idx;
 			}
@@ -848,7 +848,7 @@ struct Parser {
 				if (fn_idx < 0) return -1;
 				const i32 idx = addExpr(Expr::FUNCTION_REF, t);
 				m_module.expressions[idx].left = fn_idx;
-				m_module.expressions[idx].boolean = false;
+				m_module.expressions[idx].is_native_fn = false;
 				return idx;
 			}
 			case Token::LEFT_BRACE: {

@@ -145,19 +145,9 @@ void ls_module_destroy(ls_module* module);
 // Register custom native functions before typechecking or execution.
 // Native types let scripts talk about engine objects by name, while native
 // functions expose host behavior to scripts.
-int ls_module_add_native_function(
-	ls_module* module,
-	ls_string_view name,
-	ls_type return_type,
-	const ls_type* param_types,
-	size_t param_count
-);
 int ls_module_get_native_function_index(ls_module* module, ls_string_view name);
 int ls_module_get_native_function_count(ls_module* module);
 ls_string_view ls_module_get_native_function_name(ls_module* module, int index);
-ls_type ls_module_get_native_function_return_type(ls_module* module, int index);
-int ls_module_get_native_function_param_count(ls_module* module, int index);
-ls_type ls_module_get_native_function_param_type(ls_module* module, int index, int param_index);
 
 // Front-end pipeline helpers.
 //
@@ -165,15 +155,9 @@ ls_type ls_module_get_native_function_param_type(ls_module* module, int index, i
 // `ls_module_typecheck` resolves and validates the current module contents.
 // `ls_module_compile` performs parse + import resolution + typecheck in one
 // call.
-ls_result ls_module_parse(
-	ls_module* module,
-	ls_string_view source,
-	ls_string_view source_name
-);
+ls_result ls_module_parse(ls_module* module, ls_string_view source, ls_string_view source_name);
 
-ls_result ls_module_typecheck(
-	ls_module* module
-);
+ls_result ls_module_typecheck(ls_module* module);
 
 ls_result ls_module_compile(
 	ls_module* module,

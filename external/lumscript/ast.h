@@ -61,8 +61,10 @@ struct TypeRef {
 	ls_string_view unresolved_name;
 	CanonicalName canonical_name = {};
 	union {
+		i32 function_index;
 		i32 struct_index;
 		i32 import_index;
+		i32 enum_index;
 	};
 	ls_type_kind element_kind = LS_TYPE_INVALID;
 	ls_string_view element_name;
@@ -110,7 +112,10 @@ struct Expr {
 	CanonicalName qualified_name = {};
 	ls_string_view string;
 	double number = 0;
-	bool boolean = false;
+	union {
+		bool is_native_fn = false;
+		bool is_true_literal;
+	};
 	i32 left = -1;
 	i32 right = -1;
 	i32 method_receiver = -1;
@@ -318,21 +323,26 @@ struct ls_module {
 	}
 
 	i32 findFunction(ls_string_view name) const {
+		ls_string_view owner;
+		ls_string_view member = name;
+		const bool qualified = splitMemberName(name, &owner, &member);
 		i32 index = 0;
-		for (const Unit* unit_ptr : units) {
-			const Unit& unit = *unit_ptr;
-			for (const FunctionDecl& fn : unit.functions) {
-				ls_string_view owner;
-				ls_string_view member;
-				if (splitMemberName(name, &owner, &member)) {
-					if (equalStrings(fn.canonical_name.path, owner) && equalStrings(fn.canonical_name.name, member)) {
-						 return index;
-					}
+		if (qualified) {
+			for (const Unit* unit_ptr : units) {
+				const Unit& unit = *unit_ptr;
+				for (const FunctionDecl& fn : unit.functions) {
+					if (equalStrings(fn.canonical_name.path, owner) && equalStrings(fn.canonical_name.name, member)) return index;
+					++index;
 				}
-				else if (empty(fn.canonical_name.path) && equalStrings(fn.canonical_name.name, name)) {
-					return index;
+			}
+		}
+		else {
+			for (const Unit* unit_ptr : units) {
+				const Unit& unit = *unit_ptr;
+				for (const FunctionDecl& fn : unit.functions) {
+					if (empty(fn.canonical_name.path) && equalStrings(fn.canonical_name.name, name)) return index;
+					++index;
 				}
-				++index;
 			}
 		}
 		return -1;

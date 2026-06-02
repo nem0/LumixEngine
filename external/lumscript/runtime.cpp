@@ -247,6 +247,22 @@ static inline void bytecodeAddFloat(ls_runtime& runtime) {
 	pushStack(runtime, lhs + rhs);
 }
 
+static inline bool bytecodeAddString(ls_runtime& runtime) {
+	if (runtime.stack.size() < 2) return false;
+	ls_string_view rhs = ls_to_string(&runtime, -1);
+	ls_string_view lhs = ls_to_string(&runtime, -2);
+	const size_t lhs_len = (size_t)(lhs.end - lhs.begin);
+	const size_t rhs_len = (size_t)(rhs.end - rhs.begin);
+	std::vector<char> buffer(lhs_len + rhs_len);
+	if (lhs_len > 0) memcpy(buffer.data(), lhs.begin, lhs_len);
+	if (rhs_len > 0) memcpy(buffer.data() + lhs_len, rhs.begin, rhs_len);
+	stackPop(&runtime);
+	stackPop(&runtime);
+	const char* data = buffer.empty() ? "" : buffer.data();
+	ls_push_string(&runtime, {data, data + buffer.size()});
+	return true;
+}
+
 template <typename T>
 static inline void bytecodeSubFloat(ls_runtime& runtime) {
 	const T rhs = popStack<T>(runtime);
@@ -396,14 +412,16 @@ bool callBytecodeCode(
 static bool callBytecodeFunctionValue(
 	ls_runtime* runtime,
 	u64 handle,
-	size_t param_count
+	size_t param_slot_count
 ) {
-	(void)param_count;
 	i32 fn_idx = -1;
 	if (!decodeFunctionHandle(handle, &fn_idx)) return false;
 	if (!runtime || !runtime->bytecode) return false;
 	if ((size_t)fn_idx >= runtime->bytecode->functions.size()) return false;
 	BytecodeFunction& fn = runtime->bytecode->functions[fn_idx];
+	// Indirect calls carry flattened VM slots, not source parameter count.
+	// A single struct argument may occupy multiple stack entries.
+	if ((size_t)fn.param_slot_count != param_slot_count) return false;
 	return callBytecodeCode(runtime, &runtime->bytecode->code[fn.code_offset], (size_t)fn.code_size, fn.param_slot_count, fn.local_count, fn.return_count);
 }
 
@@ -627,13 +645,14 @@ static bool callBytecodeCode(
 				break;
 			}
 			case BytecodeOp::CALL_INDIRECT: {
-				u8 param_count = *ip;
+				u8 param_slot_count = *ip;
 				++ip;
-				if (runtime->stack.size() < (size_t)param_count + 1) return false;
-				const size_t handle_pos = runtime->stack.size() - (size_t)param_count - 1;
+				if (runtime->stack.size() < (size_t)param_slot_count + 1) return false;
+				// Layout is: function handle, then the flattened argument slots.
+				const size_t handle_pos = runtime->stack.size() - (size_t)param_slot_count - 1;
 				const u64 handle = runtime->stack[handle_pos];
 				stackErase(runtime, handle_pos);
-				if (!callBytecodeFunctionValue(runtime, handle, param_count)) return false;
+				if (!callBytecodeFunctionValue(runtime, handle, param_slot_count)) return false;
 				break;
 			}
 			case BytecodeOp::ADD_I8: bytecodeAdd<i8>(*runtime); break;
@@ -646,6 +665,7 @@ static bool callBytecodeCode(
 			case BytecodeOp::ADD_U64: bytecodeAdd<u64>(*runtime); break;
 			case BytecodeOp::ADD_F32: bytecodeAddFloat<float>(*runtime); break;
 			case BytecodeOp::ADD_F64: bytecodeAddFloat<double>(*runtime); break;
+			case BytecodeOp::ADD_STRING: if (!bytecodeAddString(*runtime)) return false; break;
 			case BytecodeOp::SUB_I8: bytecodeSub<i8>(*runtime); break;
 			case BytecodeOp::SUB_U8: bytecodeSub<u8>(*runtime); break;
 			case BytecodeOp::SUB_I16: bytecodeSub<i16>(*runtime); break;

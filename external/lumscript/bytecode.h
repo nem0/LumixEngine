@@ -33,6 +33,7 @@ enum class BytecodeOp : u8 {
 	ADD_U64,
 	ADD_F32,
 	ADD_F64,
+	ADD_STRING,
 	SUB_I32,
 	SUB_U32,
 	SUB_I16,

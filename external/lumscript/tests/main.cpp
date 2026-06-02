@@ -40,8 +40,11 @@ void print(int val) { printf("%d", val); }
 		ls_module* module = ls_module_create(&context.host); \
 		EXPECT_TRUE(module != nullptr); \
 		bool compiled = ls_module_compile(module, toLs(src), {}, nullptr, nullptr); \
+		ls_bytecode* bytecode = compiled ? ls_bytecode_compile(module, &context.host) : nullptr; \
+		if (bytecode) ls_bytecode_destroy(bytecode); \
 		ls_module_destroy(module); \
 		EXPECT_TRUE(compiled); \
+		EXPECT_TRUE(bytecode != nullptr); \
 	} while(false)
 
 #define EXPECT_COMPILE_FAIL(src) \
@@ -52,6 +55,38 @@ void print(int val) { printf("%d", val); }
 		context.diagnostics.output_enabled = false; \
 		EXPECT_TRUE(!ls_module_compile(module, toLs(src), {}, nullptr, nullptr)); \
 		ls_module_destroy(module); \
+	} while(false)
+
+#define EXPECT_COMPILE_WITH_IMPORTS(src, files) \
+	do { \
+		TestContext context; \
+		ls_module* module = ls_module_create(&context.host); \
+		EXPECT_TRUE(module != nullptr); \
+		bool compiled = ls_module_compile(module, toLs(src), {}, &resolveLumScriptImportC, &(files)); \
+		ls_bytecode* bytecode = compiled ? ls_bytecode_compile(module, &context.host) : nullptr; \
+		if (bytecode) ls_bytecode_destroy(bytecode); \
+		ls_module_destroy(module); \
+		EXPECT_TRUE(compiled); \
+		EXPECT_TRUE(bytecode != nullptr); \
+	} while(false)
+
+#define EXPECT_COMPILE_FAIL_WITH_IMPORTS(src, files) \
+	do { \
+		TestContext context; \
+		ls_module* module = ls_module_create(&context.host); \
+		EXPECT_TRUE(module != nullptr); \
+		context.diagnostics.output_enabled = false; \
+		EXPECT_TRUE(!ls_module_compile(module, toLs(src), {}, &resolveLumScriptImportC, &(files))); \
+		ls_module_destroy(module); \
+	} while(false)
+
+#define EXPECT_RUNTIME_WITH_IMPORTS(src, files, runtime_name, body) \
+	do { \
+		CAPI_BEGIN(module, diagnostics); \
+		EXPECT_TRUE(ls_module_compile(module, toLs(src), {}, &resolveLumScriptImportC, &(files))); \
+		CAPI_RUNTIME(module, runtime_name); \
+		body; \
+		CAPI_END(module); \
 	} while(false)
 
 struct LumScriptImportFile {
@@ -180,8 +215,19 @@ static void nativeAddC(ls_runtime* runtime) {
 	ls_push_i32(runtime, ls_to_i32(runtime, -2) + ls_to_i32(runtime, -1));
 }
 
-#include "compiler_tests.inl"
 #include "bytecode_tests.inl"
+#include "operator_tests.inl"
+#include "loop_tests.inl"
+#include "import_tests.inl"
+#include "array_tests.inl"
+#include "string_tests.inl"
+#include "function_tests.inl"
+#include "declaration_tests.inl"
+#include "control_flow_tests.inl"
+#include "enum_tests.inl"
+#include "nullable_tests.inl"
+#include "ref_tests.inl"
+#include "match_tests.inl"
 
 int main(int argc, char** argv) {
     const char* test_name = nullptr;

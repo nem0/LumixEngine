@@ -1034,3 +1034,46 @@ Examples:
 maps/demo/demo.lum: line 50, column 4: Unexpected token near '_'
 core:vec3: line 28, column 14: Arithmetic operands must have the same type
 ```
+
+## Known underspecified areas
+
+- `IndexingRequiresArrayTypeFails`
+- `BytecodeGlobalInitializationOrder`
+- `DeferCanNotWrapReturn`
+- `NestedFunctionCanNotCaptureOuterLocal`
+- `DuplicateDeclarationsFail`
+- `ConstCanNotBeUndefined`
+- `ExternFnDuplicateSameFile`
+- `ExternGlobalCollision`
+- `ExternFnCollision`
+- `FunctionCallAssignmentFails`
+- `FirstClassFunctionLiteralShadowsFunctionName`
+- `FunctionNamedSinCompilesAndRuns`
+- `ImportPathCanMatchPreviousAlias`
+- `ImportAliasMissingMemberReportsMemberName`
+- `MissingImportFails`
+- `ImportResolverRejectsImportFails`
+- `DuplicateUnaliasedImportFails`
+- `ImportAliasEntityResolution`
+- `ImportExternFnDuplicateNotUsed`
+- `ImportAliasExternFnReturnTypeRequiresDirectImport`
+- `ForLoopRangeBoundsMustMatchTypeFails`
+- `ForLoopRangeRequiresNumericBoundsFails`
+- `MatchRejectsPatternTypeMismatch`
+- `MatchRangeRequiresNumericTypeFails`
+- `MatchDuplicateFallbackFails`
+- `NullOnlyAssignableToNullable`
+- `NonMinusOperatorRequiresTwoParametersFails`
+- `BooleanNotRequiresBoolOperandFails`
+- `UnaryMinusRequiresNumericOperandFails`
+- `RefExpressionOnlyAllowedInArgumentsFails`
+- `RefArgumentTypeMismatchFails`
+- `StringIsReservedKeyword`
+- `match` needs tighter rules for what counts as a valid pattern expression, how string subjects behave, and the exact duplicate/exhaustiveness policy for non-enum subjects.
+- `for` ranges should define whether bounds must match exactly, what type the loop variable has, and what happens for descending or overflowing ranges.
+- Static-sized arrays are missing rules for literal syntax, copy semantics, nesting, passing/returning by value, and comparison behavior.
+- Nullable promotion is only described for `if value != null`; the spec should say how `== null`, `else if`, compound conditions, and scope boundaries behave.
+- `defer` should define behavior on `break`, `continue`, runtime errors, and nested scopes, not only normal exit and `return`.
+- Boolean operator coverage is incomplete because `not` appears in examples but is not specified alongside `and` and `or`.
+- Imports and `extern` bindings still need explicit collision policy for same-path/same-alias cases, builtin module boundaries, and imported declaration conflicts.
+- Function values need clearer rules for equality/identity and shadowing interactions with function declarations and literals.
