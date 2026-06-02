@@ -11,9 +11,6 @@ struct LocalInfo {
 };
 
 static bool isOverloadableOperatorToken(Token::Type type) {
-	// Keep this list explicit so the language surface stays easy to audit.
-	// Anything not listed here is either a fixed built-in token or a boolean
-	// short-circuit operator that intentionally keeps its special semantics.
 	switch (type) {
 		case Token::PLUS:
 		case Token::MINUS:
