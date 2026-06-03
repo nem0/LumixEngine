@@ -2,6 +2,8 @@
 #include "compiler.h"
 #include "utils.h"
 
+#include <new>
+#include <vector>
 #include <string.h>
 
 
@@ -19,23 +21,41 @@ inline void deallocateMemory(const ls_host* host, void* ptr) {
 	}
 }
 
-ls_bytecode::ls_bytecode(const ls_host* host_)
-	: host(host_ ? *host_ : ls_host{})
-{}
+static bool ls_bytecode_init(ls_bytecode* bytecode, const ls_host* host_) {
+	if (!bytecode || !host_ || !host_->create_arena || !host_->destroy_arena) return false;
+	bytecode->host = *host_;
+	bytecode->arena = host_->create_arena();
+	if (!bytecode->arena) return false;
+	if (!ls_bytecode_function_array_init(&bytecode->functions, bytecode->arena)) goto fail;
+	if (!ls_bytecode_native_function_array_init(&bytecode->native_functions, bytecode->arena)) goto fail;
+	if (!ls_u8_array_init(&bytecode->global_init_code, bytecode->arena)) goto fail;
+	if (!ls_u8_array_init(&bytecode->code, bytecode->arena)) goto fail;
+	if (!ls_string_ptr_array_init(&bytecode->string_literals, bytecode->arena)) goto fail;
+	bytecode->global_count = 0;
+	return true;
+fail:
+	if (bytecode->host.destroy_arena && bytecode->arena) bytecode->host.destroy_arena(bytecode->arena);
+	bytecode->arena = nullptr;
+	return false;
+}
 
-ls_bytecode::~ls_bytecode() {
-	for (ls_string* s : string_literals) {
+static void bytecodeDestroyContents(ls_bytecode* bytecode) {
+	if (!bytecode) return;
+	for (i32 i = 0; i < bytecode->string_literals.size; ++i) {
+		ls_string* s = bytecode->string_literals.data[i];
 		if (s && --s->ref_count == 0) deallocateMemory(&s->host, s);
 	}
+	if (bytecode->host.destroy_arena && bytecode->arena) bytecode->host.destroy_arena(bytecode->arena);
+	bytecode->arena = nullptr;
 }
 
 template <typename T>
-void pushCode(std::vector<u8>& code, const T& value) {
+void pushCode(ls_u8_array& code, const T& value) {
 	// Bytecode is emitted into a flat byte buffer. We append raw bytes for
 	// opcodes and immediates here because the compiler controls the exact layout.
-	size_t s = code.size();
-	code.resize(s + sizeof(value));
-	memcpy(&code[s], &value, sizeof(value));
+	const size_t s = (size_t)code.size;
+	ASSERT(ls_u8_array_resize(&code, code.size + (i32)sizeof(value)));
+	memcpy(&code.data[s], &value, sizeof(value));
 }
 
 template <typename T>
@@ -409,10 +429,10 @@ static ls_type_kind bytecodeComparisonKind(ls_type_kind kind) {
 	}
 }
 
-static void emitJumpPlaceholder(std::vector<u8>& code, BytecodeOp op, size_t* operand_pos) {
+static void emitJumpPlaceholder(ls_u8_array& code, BytecodeOp op, size_t* operand_pos) {
 	// Forward branches are emitted with a dummy offset and patched later.
 	pushCode(code, op);
-	*operand_pos = code.size();
+	*operand_pos = (size_t)code.size;
 	i32 placeholder = 0;
 	pushCode(code, placeholder);
 }
@@ -421,10 +441,10 @@ static void emitJumpPlaceholder(ls_bytecode& bytecode, BytecodeOp op, size_t* op
 	emitJumpPlaceholder(bytecode.code, op, operand_pos);
 }
 
-static void patchJump(std::vector<u8>& code, size_t operand_pos, size_t target_pos) {
+static void patchJump(ls_u8_array& code, size_t operand_pos, size_t target_pos) {
 	// Jump offsets are relative to the first byte after the operand itself.
-	const i32 offset = (i32)(target_pos - (operand_pos + sizeof(i32)));
-	memcpy(&code[operand_pos], &offset, sizeof(offset));
+	const i32 offset = (i32)(target_pos - (i32)(operand_pos + sizeof(i32)));
+	memcpy(&code.data[operand_pos], &offset, sizeof(offset));
 }
 
 static void patchJump(ls_bytecode& bytecode, size_t operand_pos, size_t target_pos) {
@@ -511,9 +531,9 @@ static bool bytecodeCompileLogicalAndExpr(ls_module& module, Unit& unit, ls_byte
 	bytecodePushBool(bytecode, true);
 	size_t end_jump = 0;
 	emitJumpPlaceholder(bytecode, BytecodeOp::JUMP, &end_jump);
-	const size_t false_pos = bytecode.code.size();
+	const i32 false_pos = bytecode.code.size;
 	bytecodePushBool(bytecode, false);
-	const size_t end_pos = bytecode.code.size();
+	const i32 end_pos = bytecode.code.size;
 	patchJump(bytecode, false_jump, false_pos);
 	patchJump(bytecode, false_jump_rhs, false_pos);
 	patchJump(bytecode, end_jump, end_pos);
@@ -527,16 +547,16 @@ static bool bytecodeCompileLogicalOrExpr(ls_module& module, Unit& unit, ls_bytec
 	bytecodePushBool(bytecode, true);
 	size_t end_jump = 0;
 	emitJumpPlaceholder(bytecode, BytecodeOp::JUMP, &end_jump);
-	const size_t rhs_pos = bytecode.code.size();
+	const i32 rhs_pos = bytecode.code.size;
 	if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.right)) return false;
 	size_t false_jump = 0;
 	emitJumpPlaceholder(bytecode, BytecodeOp::JUMP_IF_FALSE, &false_jump);
 	bytecodePushBool(bytecode, true);
 	size_t end_jump_rhs = 0;
 	emitJumpPlaceholder(bytecode, BytecodeOp::JUMP, &end_jump_rhs);
-	const size_t false_pos = bytecode.code.size();
+	const i32 false_pos = bytecode.code.size;
 	bytecodePushBool(bytecode, false);
-	const size_t end_pos = bytecode.code.size();
+	const i32 end_pos = bytecode.code.size;
 	patchJump(bytecode, rhs_jump, rhs_pos);
 	patchJump(bytecode, false_jump, false_pos);
 	patchJump(bytecode, end_jump, end_pos);
@@ -567,7 +587,7 @@ struct BytecodeCompileContext {
 	struct LoopTarget {
 		// Break and continue jump sites are patched after the loop body emits.
 		ls_string_view name;
-		size_t continue_target = 0;
+		i32 continue_target = 0;
 		i32 cleanup_scope_depth = 0;
 		std::vector<size_t> break_jumps;
 		std::vector<size_t> continue_jumps;
@@ -1087,9 +1107,9 @@ static bool bytecodeEmitStringLiteral(ls_bytecode& bytecode, ls_string_view valu
 	storage->length = (u32)len;
 	if (len > 0) memcpy(storage->chars, data(value), len);
 	storage->chars[len] = '\0';
-	bytecode.string_literals.push_back(storage);
+	if (!ls_string_ptr_array_push_back(&bytecode.string_literals, storage)) return false;
 	pushCode(bytecode, BytecodeOp::LOAD_STRING);
-	pushCode(bytecode, (u32)(bytecode.string_literals.size() - 1));
+	pushCode(bytecode, (u32)(bytecode.string_literals.size - 1));
 	return true;
 }
 
@@ -1246,17 +1266,17 @@ static bool bytecodeCompileMatchStmt(ls_module& module, Unit& unit, ls_bytecode&
 		BytecodeMatchArmInfo info;
 		bool has_default = false;
 
-		for (size_t jump_pos : pending_false_jumps) patchJump(bytecode, jump_pos, bytecode.code.size());
+		for (size_t jump_pos : pending_false_jumps) patchJump(bytecode, jump_pos, bytecode.code.size);
 		pending_false_jumps.clear();
 
 		for (MatchPattern& pattern : arm.patterns) {
 			if (pattern.kind == MatchPattern::DEFAULT) {
 				has_default = true;
-				for (size_t jump_pos : pending_false_jumps) patchJump(bytecode, jump_pos, bytecode.code.size());
+				for (size_t jump_pos : pending_false_jumps) patchJump(bytecode, jump_pos, bytecode.code.size);
 				pending_false_jumps.clear();
 				break;
 			}
-			for (size_t jump_pos : pending_false_jumps) patchJump(bytecode, jump_pos, bytecode.code.size());
+			for (size_t jump_pos : pending_false_jumps) patchJump(bytecode, jump_pos, bytecode.code.size);
 			pending_false_jumps.clear();
 
 			pushCode(bytecode, BytecodeOp::LOAD_LOCAL);
@@ -1293,7 +1313,7 @@ static bool bytecodeCompileMatchStmt(ls_module& module, Unit& unit, ls_bytecode&
 	}
 
 	for (size_t arm_i = 0; arm_i < arm_infos.size(); ++arm_i) {
-		for (size_t jump_pos : arm_infos[arm_i].body_jumps) patchJump(bytecode, jump_pos, bytecode.code.size());
+		for (size_t jump_pos : arm_infos[arm_i].body_jumps) patchJump(bytecode, jump_pos, bytecode.code.size);
 		MatchArm& arm = unit.match_arms[stmt.children[(i32)arm_i]];
 		if (arm.stmt >= 0 && !bytecodeCompileStmt(module, unit, bytecode, ctx, arm.stmt)) return false;
 		size_t end_jump = 0;
@@ -1301,7 +1321,7 @@ static bool bytecodeCompileMatchStmt(ls_module& module, Unit& unit, ls_bytecode&
 		end_jumps.push_back(end_jump);
 	}
 
-	const size_t end_pos = bytecode.code.size();
+	const i32 end_pos = bytecode.code.size;
 	for (size_t jump_pos : pending_false_jumps) patchJump(bytecode, jump_pos, end_pos);
 	for (size_t jump_pos : end_jumps) patchJump(bytecode, jump_pos, end_pos);
 	return true;
@@ -1326,23 +1346,23 @@ static bool bytecodeCompileExpr(ls_module& module, Unit& unit, ls_bytecode& byte
 			if (isBytecodeIntegralType(kind)) {
 				pushCode(bytecode, integerLoadConstOp(kind));
 				const u64 raw = encodeIntegerLiteral(expr.number, kind);
-				const size_t s = bytecode.code.size();
+				const i32 s = bytecode.code.size;
 				const size_t size = integerByteSize(kind);
-				bytecode.code.resize(s + size);
-				memcpy(&bytecode.code[s], &raw, size);
+				ASSERT(ls_u8_array_resize(&bytecode.code, s + (i32)size));
+				memcpy(&bytecode.code.data[s], &raw, size);
 				return true;
 			}
 			pushCode(bytecode, floatLoadConstOp(kind));
-			const size_t s = bytecode.code.size();
+			const i32 s = bytecode.code.size;
 			if ((kind == LS_TYPE_UNTYPED_FLOAT ? LS_TYPE_F32 : kind) == LS_TYPE_F32) {
 				const float value = (float)expr.number;
-				bytecode.code.resize(s + sizeof(value));
-				memcpy(&bytecode.code[s], &value, sizeof(value));
+				ASSERT(ls_u8_array_resize(&bytecode.code, s + (i32)sizeof(value)));
+				memcpy(&bytecode.code.data[s], &value, sizeof(value));
 			}
 			else {
 				const double value = expr.number;
-				bytecode.code.resize(s + sizeof(value));
-				memcpy(&bytecode.code[s], &value, sizeof(value));
+				ASSERT(ls_u8_array_resize(&bytecode.code, s + (i32)sizeof(value)));
+				memcpy(&bytecode.code.data[s], &value, sizeof(value));
 			}
 			return true;
 		}
@@ -1673,7 +1693,7 @@ static bool bytecodeCompileStmt(ls_module& module, Unit& unit, ls_bytecode& byte
 		case Stmt::WHILE: {
 			// While loops lower to: condition, conditional exit, body, backward
 			// jump. Break/continue branches are patched once the loop end is known.
-			const size_t cond_pos = bytecode.code.size();
+			const i32 cond_pos = bytecode.code.size;
 			if (!bytecodeCompileExpr(module, unit, bytecode, ctx, stmt.expr)) return false;
 			size_t end_jump = 0;
 			emitJumpPlaceholder(bytecode, BytecodeOp::JUMP_IF_FALSE, &end_jump);
@@ -1686,11 +1706,11 @@ static bool bytecodeCompileStmt(ls_module& module, Unit& unit, ls_bytecode& byte
 			}
 
 			pushCode(bytecode, BytecodeOp::JUMP);
-			const size_t back_jump_pos = bytecode.code.size();
-			const i32 back_offset = (i32)(cond_pos - (back_jump_pos + sizeof(i32)));
+			const i32 back_jump_pos = bytecode.code.size;
+			const i32 back_offset = cond_pos - (back_jump_pos + (i32)sizeof(i32));
 			pushCode(bytecode, back_offset);
 
-			const size_t end_pos = bytecode.code.size();
+			const i32 end_pos = bytecode.code.size;
 			BytecodeCompileContext::LoopTarget& loop = ctx.loop_targets.back();
 			for (size_t break_jump : loop.break_jumps) patchJump(bytecode, break_jump, end_pos);
 			for (size_t continue_jump : loop.continue_jumps) patchJump(bytecode, continue_jump, loop.continue_target);
@@ -1730,7 +1750,7 @@ static bool bytecodeCompileStmt(ls_module& module, Unit& unit, ls_bytecode& byte
 				return false;
 			}
 
-			const size_t cond_pos = bytecode.code.size();
+			const i32 cond_pos = bytecode.code.size;
 			pushCode(bytecode, BytecodeOp::LOAD_LOCAL);
 			pushCode(bytecode, (u8)loop_slot);
 			pushCode(bytecode, BytecodeOp::LOAD_LOCAL);
@@ -1749,7 +1769,7 @@ static bool bytecodeCompileStmt(ls_module& module, Unit& unit, ls_bytecode& byte
 				return false;
 			}
 
-			const size_t continue_pos = bytecode.code.size();
+			const i32 continue_pos = bytecode.code.size;
 			pushCode(bytecode, BytecodeOp::LOAD_LOCAL);
 			pushCode(bytecode, (u8)loop_slot);
 			if (!bytecodeEmitOneValue(bytecode, start_type.kind)) {
@@ -1762,11 +1782,11 @@ static bool bytecodeCompileStmt(ls_module& module, Unit& unit, ls_bytecode& byte
 			pushCode(bytecode, (u8)loop_slot);
 
 			pushCode(bytecode, BytecodeOp::JUMP);
-			const size_t back_jump_pos = bytecode.code.size();
-			const i32 back_offset = (i32)(cond_pos - (back_jump_pos + sizeof(i32)));
+			const i32 back_jump_pos = bytecode.code.size;
+			const i32 back_offset = cond_pos - (back_jump_pos + (i32)sizeof(i32));
 			pushCode(bytecode, back_offset);
 
-			const size_t end_pos = bytecode.code.size();
+			const i32 end_pos = bytecode.code.size;
 			BytecodeCompileContext::LoopTarget& loop = ctx.loop_targets.back();
 			loop.continue_target = continue_pos;
 			for (size_t break_jump : loop.break_jumps) patchJump(bytecode, break_jump, end_pos);
@@ -1821,14 +1841,14 @@ static bool bytecodeCompileStmt(ls_module& module, Unit& unit, ls_bytecode& byte
 			if (stmt.right >= 0) {
 				emitJumpPlaceholder(bytecode, BytecodeOp::JUMP, &end_jump);
 			}
-			const size_t else_pos = bytecode.code.size();
+			const i32 else_pos = bytecode.code.size;
 			patchJump(bytecode, else_jump, else_pos);
 			if (stmt.right >= 0) {
 				const bool promote_else_branch = has_promotion && !promote_true_branch;
 				if (!compileBranch(stmt.right, promote_else_branch)) return false;
 			}
 			if (stmt.right >= 0) {
-				const size_t end_pos = bytecode.code.size();
+				const i32 end_pos = bytecode.code.size;
 				patchJump(bytecode, end_jump, end_pos);
 			}
 			return true;
@@ -1844,9 +1864,10 @@ static bool bytecodeCompileStmt(ls_module& module, Unit& unit, ls_bytecode& byte
 }
 
 static bool bytecodeCompileFunction(ls_module& module, Unit& unit, ls_bytecode& bytecode, FunctionDecl& fn) {
-	BytecodeFunction out;
+	BytecodeFunction out = {};
+	if (!ls_type_array_init(&out.params, bytecode.arena)) return false;
 	out.name = module.makeQualifiedName(fn.canonical_name.path, fn.canonical_name.name);
-	out.code_offset = (i32)bytecode.code.size();
+	out.code_offset = (i32)bytecode.code.size;
 	BytecodeCompileContext ctx(fn);
 	ctx.pushScope();
 	i32 param_slot = 0;
@@ -1854,7 +1875,7 @@ static bool bytecodeCompileFunction(ls_module& module, Unit& unit, ls_bytecode& 
 		// Parameters are predeclared bindings in the function frame.
 		const i32 slot_count = p.is_ref ? 1 : bytecodeTypeSlotCount(module, p.type);
 		if (slot_count <= 0) return false;
-		out.params.push_back(toC(p.type));
+		if (!ls_type_array_push_back(&out.params, toC(p.type))) return false;
 		ctx.addLocal(p.name, param_slot, slot_count, p.type, true, p.is_ref);
 		param_slot += slot_count;
 	}
@@ -1862,11 +1883,11 @@ static bool bytecodeCompileFunction(ls_module& module, Unit& unit, ls_bytecode& 
 	if (!bytecodeCompileStmt(module, unit, bytecode, ctx, fn.body)) return false;
 
 	// Frame size and code span are finalized after the body is emitted.
-	out.code_size = (i32)bytecode.code.size() - out.code_offset;
+	out.code_size = (i32)bytecode.code.size - out.code_offset;
 	out.local_count = ctx.local_count;
 	out.return_count = bytecodeTypeSlotCount(module, fn.return_type);
 	out.return_type = toC(fn.return_type);
-	bytecode.functions.push_back(out);
+	if (!ls_bytecode_function_array_push_back(&bytecode.functions, out)) return false;
 	return true;
 }
 
@@ -1874,7 +1895,7 @@ static bool bytecodeCompileGlobals(ls_module& module, ls_bytecode& bytecode, con
 	// Global storage is counted up front because it reserves the runtime stack
 	// prefix even before initialization runs.
 	i32 global_slot = 0;
-	bytecode.global_init_code.clear();
+	ls_u8_array_clear(&bytecode.global_init_code);
 	bool has_globals = false;
 	for (const Unit& unit : module.units) {
 		if (!unit.globals.empty()) {
@@ -1899,7 +1920,8 @@ static bool bytecodeCompileGlobals(ls_module& module, ls_bytecode& bytecode, con
 		Keeping this separate from normal function bytecode makes the startup path
 		explicit and avoids mixing module initialization with user-visible code.
 	*/
-	ls_bytecode init_bytecode(host);
+	ls_bytecode init_bytecode = {};
+	if (!ls_bytecode_init(&init_bytecode, host)) return false;
 	struct ArenaOwner {
 		const ls_host& host;
 		ls_arena* arena;
@@ -1936,7 +1958,9 @@ static bool bytecodeCompileGlobals(ls_module& module, ls_bytecode& bytecode, con
 	}
 
 	bytecode.global_count = global_slot;
-	bytecode.global_init_code = std::move(init_bytecode.code);
+	if (!ls_u8_array_resize(&bytecode.global_init_code, init_bytecode.code.size)) return false;
+	memcpy(bytecode.global_init_code.data, init_bytecode.code.data, (size_t)init_bytecode.code.size);
+	bytecodeDestroyContents(&init_bytecode);
 	return true;
 }
 
@@ -1948,19 +1972,38 @@ ls_bytecode* compileBytecode(ls_module& module, const ls_host* host) {
 	void* bytecode_mem = bytecode_host && bytecode_host->allocate
 		? bytecode_host->allocate(bytecode_host->allocator_userdata, sizeof(ls_bytecode), alignof(ls_bytecode))
 		: ::operator new(sizeof(ls_bytecode), std::nothrow);
-	ls_bytecode* bytecode = bytecode_mem ? ::new (bytecode_mem) ls_bytecode(bytecode_host) : nullptr;
+	ls_bytecode* bytecode = bytecode_mem ? (ls_bytecode*)bytecode_mem : nullptr;
+	if (bytecode && !ls_bytecode_init(bytecode, bytecode_host)) {
+		deallocateMemory(bytecode_host, bytecode);
+		return nullptr;
+	}
 	if (!bytecode) return nullptr;
 	i32 native_function_count = 0;
 	for (const Unit& unit : module.units) native_function_count += (i32)unit.native_functions.size();
-	bytecode->native_functions.reserve(native_function_count);
+	if (!ls_bytecode_native_function_array_reserve(&bytecode->native_functions, native_function_count)) {
+		ls_bytecode_destroy(bytecode);
+		return nullptr;
+	}
 	for (const Unit& unit : module.units) {
 		for (const NativeFunctionDecl& fn : unit.native_functions) {
-			BytecodeNativeFunction out;
+			BytecodeNativeFunction out = {};
+			if (!ls_type_array_init(&out.params, bytecode->arena)) {
+				ls_bytecode_destroy(bytecode);
+				return nullptr;
+			}
 			out.canonical_name = module.makeQualifiedName(fn.canonical_name.path, fn.canonical_name.name);
-			for (const Param& param : fn.params) out.params.push_back(toC(param.type));
+			for (const Param& param : fn.params) {
+				if (!ls_type_array_push_back(&out.params, toC(param.type))) {
+					ls_bytecode_destroy(bytecode);
+					return nullptr;
+				}
+			}
 			out.return_type = toC(fn.return_type);
 			out.return_count = bytecodeTypeSlotCount(module, fn.return_type);
-			bytecode->native_functions.push_back(std::move(out));
+			if (!ls_bytecode_native_function_array_push_back(&bytecode->native_functions, out)) {
+				ls_bytecode_destroy(bytecode);
+				return nullptr;
+			}
 		}
 	}
 	
@@ -1984,7 +2027,7 @@ extern "C" {
 void ls_bytecode_destroy(ls_bytecode* bytecode) {
 	if (!bytecode) return;
 	ls_host host = bytecode->host;
-	bytecode->~ls_bytecode();
+	bytecodeDestroyContents(bytecode);
 	deallocateMemory(&host, bytecode);
 }
 

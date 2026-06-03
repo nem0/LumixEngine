@@ -136,8 +136,8 @@ static i32 runtimeStackIndex(ls_runtime* runtime, i32 index) {
 
 static i32 bytecodeFindFunction(const ls_bytecode* bytecode, ls_string_view name) {
 	if (!bytecode) return -1;
-	for (i32 i = 0; i < bytecode->functions.size(); ++i) {
-		if (equalStrings(bytecode->functions[i].name, name)) return i;
+	for (i32 i = 0; i < bytecode->functions.size; ++i) {
+		if (equalStrings(bytecode->functions.data[i].name, name)) return i;
 	}
 	return -1;
 }
@@ -168,25 +168,25 @@ static void mathSqrtF64(ls_runtime* runtime) {
 
 static void bindBuiltinNativeFunctions(ls_runtime* runtime) {
 	if (!runtime || !runtime->bytecode) return;
-	for (size_t i = 0; i < runtime->bytecode->native_functions.size(); ++i) {
-		const BytecodeNativeFunction& fn = runtime->bytecode->native_functions[i];
+	for (size_t i = 0; i < (size_t)runtime->bytecode->native_functions.size; ++i) {
+		const BytecodeNativeFunction& fn = runtime->bytecode->native_functions.data[i];
 		ls_native_fn& binding = runtime->native_functions[i];
-		if (equalStrings(fn.canonical_name, makeStringView("std:math.sin")) && fn.return_type.kind == LS_TYPE_F32 && fn.params.size() == 1 && fn.params[0].kind == LS_TYPE_F32) {
+		if (equalStrings(fn.canonical_name, makeStringView("std:math.sin")) && fn.return_type.kind == LS_TYPE_F32 && fn.params.size == 1 && fn.params.data[0].kind == LS_TYPE_F32) {
 			binding = &mathSinF32;
 		}
-		else if (equalStrings(fn.canonical_name, makeStringView("std:math.cos")) && fn.return_type.kind == LS_TYPE_F32 && fn.params.size() == 1 && fn.params[0].kind == LS_TYPE_F32) {
+		else if (equalStrings(fn.canonical_name, makeStringView("std:math.cos")) && fn.return_type.kind == LS_TYPE_F32 && fn.params.size == 1 && fn.params.data[0].kind == LS_TYPE_F32) {
 			binding = &mathCosF32;
 		}
-		else if (equalStrings(fn.canonical_name, makeStringView("std:math.sqrt")) && fn.return_type.kind == LS_TYPE_F32 && fn.params.size() == 1 && fn.params[0].kind == LS_TYPE_F32) {
+		else if (equalStrings(fn.canonical_name, makeStringView("std:math.sqrt")) && fn.return_type.kind == LS_TYPE_F32 && fn.params.size == 1 && fn.params.data[0].kind == LS_TYPE_F32) {
 			binding = &mathSqrtF32;
 		}
-		else if (equalStrings(fn.canonical_name, makeStringView("std:math.sin_f64")) && fn.return_type.kind == LS_TYPE_F64 && fn.params.size() == 1 && fn.params[0].kind == LS_TYPE_F64) {
+		else if (equalStrings(fn.canonical_name, makeStringView("std:math.sin_f64")) && fn.return_type.kind == LS_TYPE_F64 && fn.params.size == 1 && fn.params.data[0].kind == LS_TYPE_F64) {
 			binding = &mathSinF64;
 		}
-		else if (equalStrings(fn.canonical_name, makeStringView("std:math.cos_f64")) && fn.return_type.kind == LS_TYPE_F64 && fn.params.size() == 1 && fn.params[0].kind == LS_TYPE_F64) {
+		else if (equalStrings(fn.canonical_name, makeStringView("std:math.cos_f64")) && fn.return_type.kind == LS_TYPE_F64 && fn.params.size == 1 && fn.params.data[0].kind == LS_TYPE_F64) {
 			binding = &mathCosF64;
 		}
-		else if (equalStrings(fn.canonical_name, makeStringView("std:math.sqrt_f64")) && fn.return_type.kind == LS_TYPE_F64 && fn.params.size() == 1 && fn.params[0].kind == LS_TYPE_F64) {
+		else if (equalStrings(fn.canonical_name, makeStringView("std:math.sqrt_f64")) && fn.return_type.kind == LS_TYPE_F64 && fn.params.size == 1 && fn.params.data[0].kind == LS_TYPE_F64) {
 			binding = &mathSqrtF64;
 		}
 	}
@@ -203,7 +203,7 @@ ls_runtime* createBytecodeRuntime(ls_bytecode* bytecode) {
 	ls_runtime* runtime = new (mem) ls_runtime(bytecode);
 	runtime->stack.resize((size_t)bytecode->global_count);
 	runtime->stack_kinds.resize((size_t)bytecode->global_count, (u8)StackValueKind::RAW);
-	runtime->native_functions.resize(bytecode->native_functions.size());
+	runtime->native_functions.resize((size_t)bytecode->native_functions.size);
 	bindBuiltinNativeFunctions(runtime);
 	return runtime;
 }
@@ -416,12 +416,12 @@ static bool callBytecodeFunctionValue(
 	i32 fn_idx = -1;
 	if (!decodeFunctionHandle(handle, &fn_idx)) return false;
 	if (!runtime || !runtime->bytecode) return false;
-	if ((size_t)fn_idx >= runtime->bytecode->functions.size()) return false;
-	BytecodeFunction& fn = runtime->bytecode->functions[fn_idx];
+	if ((size_t)fn_idx >= (size_t)runtime->bytecode->functions.size) return false;
+	BytecodeFunction& fn = runtime->bytecode->functions.data[fn_idx];
 	// Indirect calls carry flattened VM slots, not source parameter count.
 	// A single struct argument may occupy multiple stack entries.
 	if ((size_t)fn.param_slot_count != param_slot_count) return false;
-	return callBytecodeCode(runtime, &runtime->bytecode->code[fn.code_offset], (size_t)fn.code_size, fn.param_slot_count, fn.local_count, fn.return_count);
+	return callBytecodeCode(runtime, &runtime->bytecode->code.data[fn.code_offset], (size_t)fn.code_size, fn.param_slot_count, fn.local_count, fn.return_count);
 }
 
 static bool finishCall(ls_runtime& runtime, size_t frame_base, size_t result_stack_base, size_t result_count) {
@@ -497,8 +497,8 @@ static bool callBytecodeCode(
 				u32 idx = 0;
 				memcpy(&idx, ip, sizeof(idx));
 				ip += sizeof(idx);
-				if (idx >= bytecode.string_literals.size()) return false;
-				ls_string* str = bytecode.string_literals[idx];
+				if (idx >= (u32)bytecode.string_literals.size) return false;
+				ls_string* str = bytecode.string_literals.data[idx];
 				retainString(str);
 				stackPushRaw(runtime, (u64)(uintptr)str, (u8)StackValueKind::STRING);
 				break;
@@ -611,20 +611,20 @@ static bool callBytecodeCode(
 				u32 callee_idx = 0;
 				memcpy(&callee_idx, ip, sizeof(callee_idx));
 				ip += sizeof(callee_idx);
-				if (callee_idx >= bytecode.functions.size()) return false;
-				BytecodeFunction& fn = bytecode.functions[callee_idx];
-				if (!callBytecodeCode(runtime, &bytecode.code[fn.code_offset], (size_t)fn.code_size, fn.param_slot_count, fn.local_count, fn.return_count)) return false;
+				if (callee_idx >= (u32)bytecode.functions.size) return false;
+				BytecodeFunction& fn = bytecode.functions.data[callee_idx];
+				if (!callBytecodeCode(runtime, &bytecode.code.data[fn.code_offset], (size_t)fn.code_size, fn.param_slot_count, fn.local_count, fn.return_count)) return false;
 				break;
 			}
 			case BytecodeOp::CALL_NATIVE: {
 				u32 callee_idx = 0;
 				memcpy(&callee_idx, ip, sizeof(callee_idx));
 				ip += sizeof(callee_idx);
-				if (callee_idx >= bytecode.native_functions.size()) return false;
-				BytecodeNativeFunction& fn = bytecode.native_functions[callee_idx];
+				if (callee_idx >= (u32)bytecode.native_functions.size) return false;
+				BytecodeNativeFunction& fn = bytecode.native_functions.data[callee_idx];
 				if (callee_idx >= runtime->native_functions.size()) return false;
 				ls_native_fn& binding = runtime->native_functions[callee_idx];
-				const size_t arg_count = (size_t)fn.params.size();
+				const size_t arg_count = (size_t)fn.params.size;
 				if (runtime->stack.size() < arg_count) return false;
 				const size_t arg_base = runtime->stack.size() - arg_count;
 				const size_t result_count = fn.return_count;
@@ -895,24 +895,24 @@ void ls_push_null(ls_runtime* runtime) {
 }
 
 ls_result ls_call_index(ls_runtime* runtime, i32 function_index) {
-	BytecodeFunction& fn = runtime->bytecode->functions[function_index];
+	BytecodeFunction& fn = runtime->bytecode->functions.data[function_index];
 	// The VM frames are sized in stack slots, not source-level parameters.
 	// This keeps multi-slot values and `ref` parameters aligned with runtime layout.
-	if (fn.param_slot_count <= 0 && !fn.params.empty()) return LS_RESULT_FAILURE;
+	if (fn.param_slot_count <= 0 && fn.params.size > 0) return LS_RESULT_FAILURE;
 
 	const size_t global_count = (size_t)runtime->bytecode->global_count;
 	if (runtime->stack.size() < global_count + (size_t)fn.param_slot_count) return LS_RESULT_FAILURE;
 
 	if (!runtime->globals_initialized) {
 		runtime->globals_initialized = true;
-		if (!runtime->bytecode->global_init_code.empty()) {
-			if (!callBytecodeCode(runtime, runtime->bytecode->global_init_code.data(), runtime->bytecode->global_init_code.size(), 0, 0, 0)) {
+		if (runtime->bytecode->global_init_code.size > 0) {
+			if (!callBytecodeCode(runtime, runtime->bytecode->global_init_code.data, (size_t)runtime->bytecode->global_init_code.size, 0, 0, 0)) {
 				return LS_RESULT_FAILURE;
 			}
 		}
 	}
 
-	return callBytecodeCode(runtime, &runtime->bytecode->code[fn.code_offset], (size_t)fn.code_size, fn.param_slot_count, fn.local_count, fn.return_count) ? LS_RESULT_OK : LS_RESULT_FAILURE;
+	return callBytecodeCode(runtime, &runtime->bytecode->code.data[fn.code_offset], (size_t)fn.code_size, fn.param_slot_count, fn.local_count, fn.return_count) ? LS_RESULT_OK : LS_RESULT_FAILURE;
 }
 
 ls_result ls_call(ls_runtime* runtime, ls_string_view function_name) {
@@ -925,7 +925,7 @@ ls_type_kind ls_bytecode_runtime_result_kind(ls_runtime* runtime, ls_string_view
 	if (!runtime || !runtime->bytecode) return LS_TYPE_VOID;
 	const i32 function_index = bytecodeFindFunction(runtime->bytecode, function_name);
 	if (function_index < 0) return LS_TYPE_VOID;
-	return runtime->bytecode->functions[(size_t)function_index].return_type.kind;
+	return runtime->bytecode->functions.data[(size_t)function_index].return_type.kind;
 }
 
 }
