@@ -1,7 +1,7 @@
 #pragma once
 
 #include "token.h"
-#include "string_utils.h"
+#include "utils.h"
 
 struct Tokenizer {
 	using TokenType = Token::Type;
@@ -99,7 +99,7 @@ struct Tokenizer {
 
 	Token checkKeyword(const char* rest, u32 start, u32 len, TokenType type) {
 		if (u32(m_current - m_start_token) != start + len) return makeToken(Token::IDENTIFIER);
-		if (memcmp(m_start_token + start, rest, len) != 0) return makeToken(Token::IDENTIFIER);
+		if (compareMemory(m_start_token + start, rest, len) != 0) return makeToken(Token::IDENTIFIER);
 		return makeToken(type);
 	}
 

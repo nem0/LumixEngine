@@ -1,6 +1,23 @@
 #include "bytecode.h"
+#include "compiler.h"
+#include "utils.h"
 
-#include "ast.h"
+#include <string.h>
+
+
+inline void* allocateMemory(const ls_host* host, size_t size, size_t align) {
+	return host && host->allocate ? host->allocate(host->allocator_userdata, size, align) : ::operator new(size, std::nothrow);
+}
+
+inline void deallocateMemory(const ls_host* host, void* ptr) {
+	if (!ptr) return;
+	if (host && host->deallocate) {
+		host->deallocate(host->allocator_userdata, ptr);
+	}
+	else {
+		::operator delete(ptr);
+	}
+}
 
 ls_bytecode::ls_bytecode(const ls_host* host_)
 	: host(host_ ? *host_ : ls_host{})
@@ -132,8 +149,7 @@ static bool bytecodeStructFieldOffset(ls_module& module, const TypeRef& type, ls
 	if (type.kind != LS_TYPE_STRUCT || type.struct_index < 0) return false;
 	i32 struct_idx = type.struct_index;
 	const StructDecl* s = nullptr;
-	for (const Unit* unit_ptr : module.units) {
-		const Unit& unit = *unit_ptr;
+	for (const Unit& unit : module.units) {
 		if (struct_idx < (i32)unit.structs.size()) {
 			s = &unit.structs[(size_t)struct_idx];
 			break;
@@ -179,8 +195,7 @@ static i32 bytecodeTypeSlotCount(ls_module& module, TypeRef type) {
 			if (type.struct_index < 0) return 0;
 			i32 struct_idx = type.struct_index;
 			const StructDecl* s = nullptr;
-			for (const Unit* unit_ptr : module.units) {
-				const Unit& unit = *unit_ptr;
+			for (const Unit& unit : module.units) {
 				if (struct_idx < (i32)unit.structs.size()) {
 					s = &unit.structs[(size_t)struct_idx];
 					break;
@@ -226,14 +241,14 @@ struct BytecodeValueAccess {
 };
 
 struct BytecodeCompileContext;
-static bool bytecodeResolveValueAccess(ls_module& module, BytecodeCompileContext& ctx, i32 expr_idx, BytecodeValueAccess* out);
-static bool bytecodeResolveValueAccessByExpr(ls_module& module, BytecodeCompileContext& ctx, Expr& expr, BytecodeValueAccess* out);
+static bool bytecodeResolveValueAccess(ls_module& module, Unit& unit, BytecodeCompileContext& ctx, i32 expr_idx, BytecodeValueAccess* out);
+static bool bytecodeResolveValueAccessByExpr(ls_module& module, Unit& unit, BytecodeCompileContext& ctx, Expr& expr, BytecodeValueAccess* out);
 static bool bytecodeEmitLoadValueRange(ls_module& module, ls_bytecode& bytecode, const BytecodeValueAccess& access, i32 start_offset, i32 slot_count);
 static bool bytecodeEmitLoadValue(ls_module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, const BytecodeValueAccess& access);
 static bool bytecodeEmitAddressOfValue(ls_module& module, ls_bytecode& bytecode, const BytecodeCompileContext& ctx, const BytecodeValueAccess& access);
 static bool bytecodeEmitStoreValue(ls_module& module, ls_bytecode& bytecode, i32 slot, const TypeRef& type);
 static bool bytecodeEmitPopValue(ls_module& module, ls_bytecode& bytecode, const TypeRef& type);
-static bool bytecodeGetCompileTimeInteger(ls_module& module, i32 expr_idx, i64* value);
+static bool bytecodeGetCompileTimeInteger(ls_module& module, Unit& unit, i32 expr_idx, i64* value);
 static bool bytecodeEmitFunctionValue(ls_bytecode& bytecode, i32 index);
 
 static BytecodeOp integerAddOp(ls_type_kind kind) {
@@ -417,19 +432,19 @@ static void patchJump(ls_bytecode& bytecode, size_t operand_pos, size_t target_p
 }
 
 struct BytecodeCompileContext;
-static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, i32 expr_idx, const TypeRef* expected = nullptr);
-static bool bytecodeCompileMatchStmt(ls_module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, Stmt& stmt);
-static bool bytecodeCompileStmt(ls_module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, i32 stmt_idx);
+static bool bytecodeCompileExpr(ls_module& module, Unit& unit, ls_bytecode& bytecode, BytecodeCompileContext& ctx, i32 expr_idx, const TypeRef* expected = nullptr);
+static bool bytecodeCompileMatchStmt(ls_module& module, Unit& unit, ls_bytecode& bytecode, BytecodeCompileContext& ctx, Stmt& stmt);
+static bool bytecodeCompileStmt(ls_module& module, Unit& unit, ls_bytecode& bytecode, BytecodeCompileContext& ctx, i32 stmt_idx);
 
-static bool bytecodeCompileComparisonExpr(ls_module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, Expr& expr) {
+static bool bytecodeCompileComparisonExpr(ls_module& module, Unit& unit, ls_bytecode& bytecode, BytecodeCompileContext& ctx, Expr& expr) {
 	// The left operand decides the compare width. We emit both values first, then
 	// append the comparison opcode and a one-byte type tag for the VM.
-	const ls_type_kind left_kind = module.expressions[expr.left].type.kind;
+	const ls_type_kind left_kind = unit.expressions[expr.left].type.kind;
 	if ((expr.token.type == Token::EQUAL_EQUAL || expr.token.type == Token::BANG_EQUAL)
-		&& (module.expressions[expr.left].kind == Expr::NULL_LITERAL || module.expressions[expr.right].kind == Expr::NULL_LITERAL)) {
-		i32 value_expr_idx = module.expressions[expr.left].kind != Expr::NULL_LITERAL ? expr.left : expr.right;
+		&& (unit.expressions[expr.left].kind == Expr::NULL_LITERAL || unit.expressions[expr.right].kind == Expr::NULL_LITERAL)) {
+		i32 value_expr_idx = unit.expressions[expr.left].kind != Expr::NULL_LITERAL ? expr.left : expr.right;
 		BytecodeValueAccess access = {};
-		if (!bytecodeResolveValueAccess(module, ctx, value_expr_idx, &access)) return false;
+		if (!bytecodeResolveValueAccess(module, unit, ctx, value_expr_idx, &access)) return false;
 		const i32 tag_slot = access.slot;
 		if (access.kind == BytecodeValueKind::LOCAL) {
 			pushCode(bytecode, BytecodeOp::LOAD_LOCAL);
@@ -449,8 +464,8 @@ static bool bytecodeCompileComparisonExpr(ls_module& module, ls_bytecode& byteco
 		pushCode(bytecode, (u8)LS_TYPE_BOOL);
 		return true;
 	}
-	if (!bytecodeCompileExpr(module, bytecode, ctx, expr.left)) return false;
-	if (!bytecodeCompileExpr(module, bytecode, ctx, expr.right)) return false;
+	if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.left)) return false;
+	if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.right)) return false;
 	const ls_type_kind compare_kind = bytecodeComparisonKind(left_kind);
 	if (expr.token.type == Token::GT) pushCode(bytecode, BytecodeOp::CMP_GT);
 	else if (expr.token.type == Token::LT) pushCode(bytecode, BytecodeOp::CMP_LT);
@@ -486,11 +501,11 @@ static void bytecodePushBool(ls_bytecode& bytecode, bool value) {
 	reserved permanently and a small hidden init program seeds them before the
 	first user call.
 */
-static bool bytecodeCompileLogicalAndExpr(ls_module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, Expr& expr) {
-	if (!bytecodeCompileExpr(module, bytecode, ctx, expr.left)) return false;
+static bool bytecodeCompileLogicalAndExpr(ls_module& module, Unit& unit, ls_bytecode& bytecode, BytecodeCompileContext& ctx, Expr& expr) {
+	if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.left)) return false;
 	size_t false_jump = 0;
 	emitJumpPlaceholder(bytecode, BytecodeOp::JUMP_IF_FALSE, &false_jump);
-	if (!bytecodeCompileExpr(module, bytecode, ctx, expr.right)) return false;
+	if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.right)) return false;
 	size_t false_jump_rhs = 0;
 	emitJumpPlaceholder(bytecode, BytecodeOp::JUMP_IF_FALSE, &false_jump_rhs);
 	bytecodePushBool(bytecode, true);
@@ -505,15 +520,15 @@ static bool bytecodeCompileLogicalAndExpr(ls_module& module, ls_bytecode& byteco
 	return true;
 }
 
-static bool bytecodeCompileLogicalOrExpr(ls_module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, Expr& expr) {
-	if (!bytecodeCompileExpr(module, bytecode, ctx, expr.left)) return false;
+static bool bytecodeCompileLogicalOrExpr(ls_module& module, Unit& unit, ls_bytecode& bytecode, BytecodeCompileContext& ctx, Expr& expr) {
+	if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.left)) return false;
 	size_t rhs_jump = 0;
 	emitJumpPlaceholder(bytecode, BytecodeOp::JUMP_IF_FALSE, &rhs_jump);
 	bytecodePushBool(bytecode, true);
 	size_t end_jump = 0;
 	emitJumpPlaceholder(bytecode, BytecodeOp::JUMP, &end_jump);
 	const size_t rhs_pos = bytecode.code.size();
-	if (!bytecodeCompileExpr(module, bytecode, ctx, expr.right)) return false;
+	if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.right)) return false;
 	size_t false_jump = 0;
 	emitJumpPlaceholder(bytecode, BytecodeOp::JUMP_IF_FALSE, &false_jump);
 	bytecodePushBool(bytecode, true);
@@ -623,7 +638,30 @@ struct BytecodeCompileContext {
 
 };
 
-static bool bytecodeResolveValueAccessByExpr(ls_module& module, BytecodeCompileContext& ctx, Expr& expr, BytecodeValueAccess* out) {
+static i32 findGlobal(const ls_module& module, ls_string_view name) {
+	i32 index = 0;
+	ls_string_view owner;
+	ls_string_view member = name;
+	const bool qualified = splitMemberName(name, &owner, &member);
+	if (qualified) {
+		for (const Unit& unit : module.units) {
+			for (const GlobalDecl& global : unit.globals) {
+				if (equalStrings(global.canonical_name.path, owner) && equalStrings(global.canonical_name.name, member)) return index;
+				++index;
+			}
+		}
+	} else {
+		for (const Unit& unit : module.units) {
+			for (const GlobalDecl& global : unit.globals) {
+				if (empty(global.canonical_name.path) && equalStrings(global.canonical_name.name, name)) return index;
+				++index;
+			}
+		}
+	}
+	return -1;
+}
+
+static bool bytecodeResolveValueAccessByExpr(ls_module& module, Unit& unit, BytecodeCompileContext& ctx, Expr& expr, BytecodeValueAccess* out) {
 	// Resolve an expression to a stack-accessible value view.
 	//
 	// The bytecode backend does not materialize a separate aggregate value
@@ -653,20 +691,18 @@ static bool bytecodeResolveValueAccessByExpr(ls_module& module, BytecodeCompileC
 			out->is_ref = binding->is_ref;
 			return true;
 		}
-		const i32 global_idx = module.findGlobal(expr.name);
+		const i32 global_idx = findGlobal(module, expr.name);
 		if (global_idx >= 0) {
 			out->kind = BytecodeValueKind::GLOBAL;
 			i32 idx = global_idx;
 			GlobalDecl* global = nullptr;
-			for (Unit* unit_ptr : module.units) {
-				Unit& unit = *unit_ptr;
+			for (Unit& unit : module.units) {
 				if (idx < (i32)unit.globals.size()) {
 					global = &unit.globals[(size_t)idx];
 					break;
 				}
 				idx -= (i32)unit.globals.size();
 			}
-			if (!global) return false;
 			out->slot = global->slot;
 			out->value_slot_offset = 0;
 			out->type = global->type;
@@ -681,7 +717,7 @@ static bool bytecodeResolveValueAccessByExpr(ls_module& module, BytecodeCompileC
 		// value we keep the base address and only record the offset, because the
 		// actual load/store will happen indirectly later.
 		BytecodeValueAccess base = {};
-		if (!bytecodeResolveValueAccess(module, ctx, expr.left, &base)) return false;
+		if (!bytecodeResolveValueAccess(module, unit, ctx, expr.left, &base)) return false;
 		if (base.type.kind != LS_TYPE_STRUCT) return false;
 		i32 field_offset = 0;
 		TypeRef field_type;
@@ -697,10 +733,10 @@ static bool bytecodeResolveValueAccessByExpr(ls_module& module, BytecodeCompileC
 	}
 	if (expr.kind == Expr::INDEX) {
 		BytecodeValueAccess base = {};
-		if (!bytecodeResolveValueAccess(module, ctx, expr.left, &base)) return false;
+		if (!bytecodeResolveValueAccess(module, unit, ctx, expr.left, &base)) return false;
 		if (base.type.kind != LS_TYPE_ARRAY) return false;
 		i64 index_value = 0;
-		if (!bytecodeGetCompileTimeInteger(module, expr.right, &index_value)) return false;
+		if (!bytecodeGetCompileTimeInteger(module, unit, expr.right, &index_value)) return false;
 		if (index_value < 0 || index_value >= base.type.array_size) return false;
 		TypeRef elem(base.type.element_kind, base.type.element_name, base.type.struct_index, base.type.token, false);
 		const i32 elem_slots = bytecodeTypeSlotCount(module, elem);
@@ -718,32 +754,33 @@ static bool bytecodeResolveValueAccessByExpr(ls_module& module, BytecodeCompileC
 	return false;
 }
 
-static bool bytecodeGetCompileTimeInteger(ls_module& module, i32 expr_idx, i64* value) {
-	if (expr_idx < 0 || expr_idx >= module.expressions.size()) return false;
-	Expr& e = module.expressions[expr_idx];
+static bool bytecodeGetCompileTimeInteger(ls_module& module, Unit& unit, i32 expr_idx, i64* value) {
+	if (expr_idx < 0 || expr_idx >= unit.expressions.size()) return false;
+	Expr& e = unit.expressions[expr_idx];
 	switch (e.kind) {
 		case Expr::NUMBER:
 			*value = (i64)e.number;
 			return true;
 		case Expr::UNARY:
 			if (e.token.type != Token::MINUS && e.token.type != Token::PLUS) return false;
-			if (!bytecodeGetCompileTimeInteger(module, e.right, value)) return false;
+			if (!bytecodeGetCompileTimeInteger(module, unit, e.right, value)) return false;
 			if (e.token.type == Token::MINUS) *value = -*value;
 			return true;
 		case Expr::CAST:
-			return bytecodeGetCompileTimeInteger(module, e.left, value);
+			return bytecodeGetCompileTimeInteger(module, unit, e.left, value);
 		default:
 			return false;
 	}
 }
 
-static bool bytecodeResolveValueAccess(ls_module& module, BytecodeCompileContext& ctx, i32 expr_idx, BytecodeValueAccess* out) {
-	if (expr_idx < 0 || expr_idx >= module.expressions.size()) return false;
-	return bytecodeResolveValueAccessByExpr(module, ctx, module.expressions[expr_idx], out);
+static bool bytecodeResolveValueAccess(ls_module& module, Unit& unit, BytecodeCompileContext& ctx, i32 expr_idx, BytecodeValueAccess* out) {
+	if (expr_idx < 0 || expr_idx >= unit.expressions.size()) return false;
+	return bytecodeResolveValueAccessByExpr(module, unit, ctx, unit.expressions[expr_idx], out);
 }
 
 static bool bytecodeEmitRuntimeIndexedAccess(
 	ls_module& module,
+	Unit& unit,
 	ls_bytecode& bytecode,
 	BytecodeCompileContext& ctx,
 	Expr& expr,
@@ -757,7 +794,7 @@ static bool bytecodeEmitRuntimeIndexedAccess(
 	// index once, and then keep the computed element address around for the
 	// eventual load/store that follows.
 	BytecodeValueAccess base = {};
-	if (!bytecodeResolveValueAccess(module, ctx, expr.left, &base)) return false;
+	if (!bytecodeResolveValueAccess(module, unit, ctx, expr.left, &base)) return false;
 	if (base.type.kind != LS_TYPE_ARRAY) return false;
 	TypeRef element_type(base.type.element_kind, base.type.element_name, base.type.struct_index, base.type.token, false);
 	const i32 element_slot_count = bytecodeTypeSlotCount(module, element_type);
@@ -768,7 +805,7 @@ static bool bytecodeEmitRuntimeIndexedAccess(
 	if (temp_slot < 0 || temp_slot + 1 > 256) return false;
 	ctx.local_count += 1;
 	if (!bytecodeEmitAddressOfValue(module, bytecode, ctx, base)) return false;
-	if (!bytecodeCompileExpr(module, bytecode, ctx, expr.right)) return false;
+	if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.right)) return false;
 	if (element_slot_count != 1) {
 		pushCode(bytecode, BytecodeOp::LOAD_CONST32);
 		pushCode(bytecode, (u32)element_slot_count);
@@ -786,12 +823,13 @@ static bool bytecodeEmitRuntimeIndexedAccess(
 
 static bool bytecodeEmitRuntimeFieldAccess(
 	ls_module& module,
+	Unit& unit,
 	ls_bytecode& bytecode,
 	BytecodeCompileContext& ctx,
 	Expr& expr
 ) {
 	if (expr.left < 0) return false;
-	TypeRef base_type = module.expressions[expr.left].type;
+	TypeRef base_type = unit.expressions[expr.left].type;
 	if (base_type.nullable || base_type.kind != LS_TYPE_STRUCT || base_type.struct_index < 0) return false;
 
 	i32 field_offset = 0;
@@ -807,7 +845,7 @@ static bool bytecodeEmitRuntimeFieldAccess(
 	if (temp_slot < 0 || temp_slot + base_slot_count > 256) return false;
 	ctx.local_count += base_slot_count;
 
-	if (!bytecodeCompileExpr(module, bytecode, ctx, expr.left, &base_type)) return false;
+	if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.left, &base_type)) return false;
 	if (!bytecodeEmitStoreValue(module, bytecode, temp_slot, base_type)) return false;
 
 	BytecodeValueAccess access = {};
@@ -953,6 +991,7 @@ static bool bytecodeEmitStoreAccess(ls_module& module, ls_bytecode& bytecode, By
 
 static bool bytecodeCompileAssignmentToAccess(
 	ls_module& module,
+	Unit& unit,
 	ls_bytecode& bytecode,
 	BytecodeCompileContext& ctx,
 	const Stmt& stmt,
@@ -962,14 +1001,14 @@ static bool bytecodeCompileAssignmentToAccess(
 	if (slot_count <= 0) return false;
 	if (stmt.resolved_function >= 0) {
 		if (!bytecodeEmitLoadValue(module, bytecode, ctx, access)) return false;
-		if (stmt.right >= 0 && !bytecodeCompileExpr(module, bytecode, ctx, stmt.right, &access.type)) return false;
+		if (stmt.right >= 0 && !bytecodeCompileExpr(module, unit, bytecode, ctx, stmt.right, &access.type)) return false;
 		pushCode(bytecode, BytecodeOp::CALL);
 		pushCode(bytecode, (u32)stmt.resolved_function);
 		return bytecodeEmitStoreAccess(module, bytecode, ctx, access);
 	}
 	switch (stmt.assign_op) {
 		case Token::EQUAL:
-			if (stmt.right >= 0 && !bytecodeCompileExpr(module, bytecode, ctx, stmt.right, &access.type)) return false;
+			if (stmt.right >= 0 && !bytecodeCompileExpr(module, unit, bytecode, ctx, stmt.right, &access.type)) return false;
 			return bytecodeEmitStoreAccess(module, bytecode, ctx, access);
 		case Token::PLUS_EQUAL:
 		case Token::MINUS_EQUAL:
@@ -977,7 +1016,7 @@ static bool bytecodeCompileAssignmentToAccess(
 		case Token::SLASH_EQUAL:
 			if (slot_count != 1) return false;
 			if (!bytecodeEmitLoadValue(module, bytecode, ctx, access)) return false;
-			if (stmt.right >= 0 && !bytecodeCompileExpr(module, bytecode, ctx, stmt.right, &access.type)) return false;
+			if (stmt.right >= 0 && !bytecodeCompileExpr(module, unit, bytecode, ctx, stmt.right, &access.type)) return false;
 			pushCode(bytecode, bytecodeCompoundArithmeticOp(stmt.assign_op, access.type.kind));
 			return bytecodeEmitStoreAccess(module, bytecode, ctx, access);
 		default:
@@ -1002,18 +1041,18 @@ static bool bytecodeEmitNullValue(ls_module& module, ls_bytecode& bytecode, cons
 	return true;
 }
 
-static bool bytecodeCompileNullablePromotion(ls_module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, i32 expr_idx, ls_string_view* var_name, TypeRef* promoted_type, bool* promote_true_branch) {
+static bool bytecodeCompileNullablePromotion(ls_module& module, Unit& unit, ls_bytecode& bytecode, BytecodeCompileContext& ctx, i32 expr_idx, ls_string_view* var_name, TypeRef* promoted_type, bool* promote_true_branch) {
 	if (expr_idx < 0) return false;
-	Expr& cond = module.expressions[expr_idx];
+	Expr& cond = unit.expressions[expr_idx];
 	if (cond.kind != Expr::BINARY) return false;
 	if (cond.token.type != Token::BANG_EQUAL && cond.token.type != Token::EQUAL_EQUAL) return false;
 	i32 var_expr_idx = -1;
-	Expr& left = module.expressions[cond.left];
-	Expr& right = module.expressions[cond.right];
+	Expr& left = unit.expressions[cond.left];
+	Expr& right = unit.expressions[cond.right];
 	if (left.kind == Expr::VAR && right.kind == Expr::NULL_LITERAL) var_expr_idx = cond.left;
 	else if (right.kind == Expr::VAR && left.kind == Expr::NULL_LITERAL) var_expr_idx = cond.right;
 	else return false;
-	Expr& var_expr = module.expressions[var_expr_idx];
+	Expr& var_expr = unit.expressions[var_expr_idx];
 	const BytecodeCompileContext::LocalBinding* binding = ctx.findLocalBinding(var_expr.name);
 	if (!binding) return false;
 	if (!binding->type.nullable) return false;
@@ -1026,9 +1065,6 @@ static bool bytecodeCompileNullablePromotion(ls_module& module, ls_bytecode& byt
 
 static bool bytecodeEmitWrapNullable(ls_module& module, ls_bytecode& bytecode, const TypeRef& nullable_type, const TypeRef& value_type) {
 	if (!nullable_type.nullable) return false;
-	TypeRef nonnull = nullable_type;
-	nonnull.nullable = false;
-	if (!sameBaseType(nonnull, value_type)) return false;
 	// When the compiler widens a plain value into a nullable one, the payload is
 	// already on the stack and only the presence tag needs to be synthesized.
 	pushCode(bytecode, BytecodeOp::LOAD_CONST8);
@@ -1161,22 +1197,22 @@ static bool bytecodeEmitPopValue(ls_module& module, ls_bytecode& bytecode, const
 	return true;
 }
 
-static bool bytecodeEmitDeferredScope(ls_module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, i32 scope_depth) {
+static bool bytecodeEmitDeferredScope(ls_module& module, Unit& unit, ls_bytecode& bytecode, BytecodeCompileContext& ctx, i32 scope_depth) {
 	if (scope_depth < 0 || scope_depth >= ctx.deferred_scopes.size()) return false;
 	const std::vector<i32> deferreds = ctx.deferred_scopes[scope_depth];
 	// Defers run last-in, first-out within a scope.
 	for (i32 i = (i32)deferreds.size() - 1; i >= 0; --i) {
-		if (!bytecodeCompileStmt(module, bytecode, ctx, deferreds[i])) return false;
+		if (!bytecodeCompileStmt(module, unit, bytecode, ctx, deferreds[i])) return false;
 	}
 	return true;
 }
 
-static bool bytecodeEmitDeferredScopes(ls_module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, i32 scope_depth) {
+static bool bytecodeEmitDeferredScopes(ls_module& module, Unit& unit, ls_bytecode& bytecode, BytecodeCompileContext& ctx, i32 scope_depth) {
 	if (scope_depth < 0) return false;
 	const i32 current_depth = ctx.scopeDepth();
 	if (scope_depth >= current_depth) return true;
 	for (i32 i = current_depth - 1; i >= scope_depth; --i) {
-		if (!bytecodeEmitDeferredScope(module, bytecode, ctx, i)) return false;
+		if (!bytecodeEmitDeferredScope(module, unit, bytecode, ctx, i)) return false;
 	}
 	return true;
 }
@@ -1185,8 +1221,8 @@ struct BytecodeMatchArmInfo {
 	std::vector<size_t> body_jumps;
 };
 
-static bool bytecodeCompileMatchStmt(ls_module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, Stmt& stmt) {
-	const TypeRef subject_type = module.expressions[stmt.expr].type;
+static bool bytecodeCompileMatchStmt(ls_module& module, Unit& unit, ls_bytecode& bytecode, BytecodeCompileContext& ctx, Stmt& stmt) {
+	const TypeRef subject_type = unit.expressions[stmt.expr].type;
 	if (!isBytecodeComparisonType(subject_type.kind)) return false;
 	const i32 subject_slot_count = bytecodeTypeSlotCount(module, subject_type);
 	if (subject_slot_count != 1) return false;
@@ -1197,7 +1233,7 @@ static bool bytecodeCompileMatchStmt(ls_module& module, ls_bytecode& bytecode, B
 	if (subject_slot < 0 || subject_slot + subject_slot_count > 256) return false;
 	ctx.local_count += subject_slot_count;
 
-	if (!bytecodeCompileExpr(module, bytecode, ctx, stmt.expr, &stmt.type)) return false;
+	if (!bytecodeCompileExpr(module, unit, bytecode, ctx, stmt.expr, &stmt.type)) return false;
 	if (!bytecodeEmitStoreValue(module, bytecode, subject_slot, subject_type)) return false;
 
 	std::vector<BytecodeMatchArmInfo> arm_infos;
@@ -1206,15 +1242,14 @@ static bool bytecodeCompileMatchStmt(ls_module& module, ls_bytecode& bytecode, B
 	std::vector<size_t> end_jumps;
 
 	for (i32 arm_idx : stmt.children) {
-		MatchArm& arm = module.match_arms[arm_idx];
+		MatchArm& arm = unit.match_arms[arm_idx];
 		BytecodeMatchArmInfo info;
 		bool has_default = false;
 
 		for (size_t jump_pos : pending_false_jumps) patchJump(bytecode, jump_pos, bytecode.code.size());
 		pending_false_jumps.clear();
 
-		for (i32 pattern_idx : arm.patterns) {
-			MatchPattern& pattern = module.match_patterns[pattern_idx];
+		for (MatchPattern& pattern : arm.patterns) {
 			if (pattern.kind == MatchPattern::DEFAULT) {
 				has_default = true;
 				for (size_t jump_pos : pending_false_jumps) patchJump(bytecode, jump_pos, bytecode.code.size());
@@ -1226,7 +1261,7 @@ static bool bytecodeCompileMatchStmt(ls_module& module, ls_bytecode& bytecode, B
 
 			pushCode(bytecode, BytecodeOp::LOAD_LOCAL);
 			pushCode(bytecode, (u8)subject_slot);
-			if (!bytecodeCompileExpr(module, bytecode, ctx, pattern.start_expr)) return false;
+			if (!bytecodeCompileExpr(module, unit, bytecode, ctx, pattern.start_expr)) return false;
 			const ls_type_kind compare_kind = bytecodeComparisonKind(subject_type.kind);
 			pushCode(bytecode, pattern.kind == MatchPattern::RANGE ? BytecodeOp::CMP_GE : BytecodeOp::CMP_EQ);
 			pushCode(bytecode, (u8)compare_kind);
@@ -1237,7 +1272,7 @@ static bool bytecodeCompileMatchStmt(ls_module& module, ls_bytecode& bytecode, B
 			if (pattern.kind == MatchPattern::RANGE) {
 				pushCode(bytecode, BytecodeOp::LOAD_LOCAL);
 				pushCode(bytecode, (u8)subject_slot);
-				if (!bytecodeCompileExpr(module, bytecode, ctx, pattern.end_expr)) return false;
+				if (!bytecodeCompileExpr(module, unit, bytecode, ctx, pattern.end_expr)) return false;
 				pushCode(bytecode, BytecodeOp::CMP_LE);
 				pushCode(bytecode, (u8)compare_kind);
 				false_jump = 0;
@@ -1259,8 +1294,8 @@ static bool bytecodeCompileMatchStmt(ls_module& module, ls_bytecode& bytecode, B
 
 	for (size_t arm_i = 0; arm_i < arm_infos.size(); ++arm_i) {
 		for (size_t jump_pos : arm_infos[arm_i].body_jumps) patchJump(bytecode, jump_pos, bytecode.code.size());
-		MatchArm& arm = module.match_arms[stmt.children[arm_i]];
-		if (arm.stmt >= 0 && !bytecodeCompileStmt(module, bytecode, ctx, arm.stmt)) return false;
+		MatchArm& arm = unit.match_arms[stmt.children[(i32)arm_i]];
+		if (arm.stmt >= 0 && !bytecodeCompileStmt(module, unit, bytecode, ctx, arm.stmt)) return false;
 		size_t end_jump = 0;
 		emitJumpPlaceholder(bytecode, BytecodeOp::JUMP, &end_jump);
 		end_jumps.push_back(end_jump);
@@ -1272,8 +1307,8 @@ static bool bytecodeCompileMatchStmt(ls_module& module, ls_bytecode& bytecode, B
 	return true;
 }
 
-static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, i32 expr_idx, const TypeRef* expected) {
-	Expr& expr = module.expressions[expr_idx];
+static bool bytecodeCompileExpr(ls_module& module, Unit& unit, ls_bytecode& bytecode, BytecodeCompileContext& ctx, i32 expr_idx, const TypeRef* expected) {
+	Expr& expr = unit.expressions[expr_idx];
 	TypeRef wrapped_expected = {};
 	if (expected && expected->nullable && !expr.type.nullable) {
 		wrapped_expected = *expected;
@@ -1327,8 +1362,7 @@ static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, Byteco
 			i32 enum_idx = expr.type.struct_index;
 			i32 idx = enum_idx;
 			const EnumDecl* e = nullptr;
-			for (const Unit* unit_ptr : module.units) {
-				const Unit& unit = *unit_ptr;
+		for (const Unit& unit : module.units) {
 				if (idx < (i32)unit.enums.size()) {
 					e = &unit.enums[(size_t)idx];
 					break;
@@ -1343,7 +1377,7 @@ static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, Byteco
 		}
 		case Expr::VAR: {
 			BytecodeValueAccess access = {};
-			if (!bytecodeResolveValueAccess(module, ctx, expr_idx, &access)) return false;
+			if (!bytecodeResolveValueAccess(module, unit, ctx, expr_idx, &access)) return false;
 			return bytecodeEmitLoadValue(module, bytecode, ctx, access);
 		}
 		case Expr::FUNCTION_REF:
@@ -1351,35 +1385,35 @@ static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, Byteco
 			return bytecodeEmitFunctionValue(bytecode, expr.left);
 		case Expr::REF: {
 			BytecodeValueAccess access = {};
-			if (!bytecodeResolveValueAccess(module, ctx, expr.right, &access)) return false;
+			if (!bytecodeResolveValueAccess(module, unit, ctx, expr.right, &access)) return false;
 			if (!bytecodeEmitAddressOfValue(module, bytecode, ctx, access)) return false;
 			return true;
 		}
 		case Expr::CAST: {
-			if (!bytecodeCompileExpr(module, bytecode, ctx, expr.left)) return false;
-			if (!bytecodeEmitCastValue(bytecode, module.expressions[expr.left].type.kind, expr.cast_type.kind)) return false;
+			if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.left)) return false;
+			if (!bytecodeEmitCastValue(bytecode, unit.expressions[expr.left].type.kind, expr.cast_type.kind)) return false;
 			return true;
 		}
 		case Expr::UNARY: {
 			if (expr.resolved_function >= 0) {
 				// Overloaded unary operators are ordinary function calls once type
 				// checking has resolved the exact target function.
-				if (!bytecodeCompileExpr(module, bytecode, ctx, expr.right)) return false;
+				if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.right)) return false;
 				pushCode(bytecode, BytecodeOp::CALL);
 				pushCode(bytecode, (u32)expr.resolved_function);
 				return true;
 			}
 			// Unary plus is a no-op. Unary minus becomes `0 - value` so the backend
 			// can reuse the same typed arithmetic opcodes as normal subtraction.
-			if (expr.token.type == Token::PLUS) return bytecodeCompileExpr(module, bytecode, ctx, expr.right);
+			if (expr.token.type == Token::PLUS) return bytecodeCompileExpr(module, unit, bytecode, ctx, expr.right);
 			if (expr.token.type == Token::MINUS) {
 				if (!bytecodeEmitZeroValue(bytecode, expr.type.kind)) return false;
-				if (!bytecodeCompileExpr(module, bytecode, ctx, expr.right)) return false;
+				if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.right)) return false;
 				if (isBytecodeIntegralType(expr.type.kind)) pushCode(bytecode, integerSubOp(expr.type.kind));
 				else pushCode(bytecode, floatSubOp(expr.type.kind));
 				return true;
 			}
-			if (!bytecodeCompileExpr(module, bytecode, ctx, expr.right)) return false;
+			if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.right)) return false;
 			pushCode(bytecode, BytecodeOp::NOT_BOOL);
 			return true;
 		}
@@ -1387,8 +1421,8 @@ static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, Byteco
 			if (expr.resolved_function >= 0) {
 				// Binary operator overloads follow the same lowering pattern: evaluate
 				// both operands, then call the resolved declaration directly.
-				if (!bytecodeCompileExpr(module, bytecode, ctx, expr.left)) return false;
-				if (!bytecodeCompileExpr(module, bytecode, ctx, expr.right)) return false;
+				if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.left)) return false;
+				if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.right)) return false;
 				pushCode(bytecode, BytecodeOp::CALL);
 				pushCode(bytecode, (u32)expr.resolved_function);
 				return true;
@@ -1399,41 +1433,41 @@ static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, Byteco
 			// opcode that matches the result type.
 			if (expr.token.type == Token::PLUS) {
 				if (expr.type.kind == LS_TYPE_STRING) {
-					if (!bytecodeCompileExpr(module, bytecode, ctx, expr.left)) return false;
-					if (!bytecodeCompileExpr(module, bytecode, ctx, expr.right)) return false;
+					if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.left)) return false;
+					if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.right)) return false;
 					pushCode(bytecode, BytecodeOp::ADD_STRING);
 					return true;
 				}
-				if (!bytecodeCompileExpr(module, bytecode, ctx, expr.left)) return false;
-				if (!bytecodeCompileExpr(module, bytecode, ctx, expr.right)) return false;
+				if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.left)) return false;
+				if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.right)) return false;
 				if (isBytecodeIntegralType(expr.type.kind)) pushCode(bytecode, integerAddOp(expr.type.kind));
 				else pushCode(bytecode, floatAddOp(expr.type.kind));
 				return true;
 			}
 			if (expr.token.type == Token::MINUS) {
-				if (!bytecodeCompileExpr(module, bytecode, ctx, expr.left)) return false;
-				if (!bytecodeCompileExpr(module, bytecode, ctx, expr.right)) return false;
+				if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.left)) return false;
+				if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.right)) return false;
 				if (isBytecodeIntegralType(expr.type.kind)) pushCode(bytecode, integerSubOp(expr.type.kind));
 				else pushCode(bytecode, floatSubOp(expr.type.kind));
 				return true;
 			}
 			if (expr.token.type == Token::STAR) {
-				if (!bytecodeCompileExpr(module, bytecode, ctx, expr.left)) return false;
-				if (!bytecodeCompileExpr(module, bytecode, ctx, expr.right)) return false;
+				if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.left)) return false;
+				if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.right)) return false;
 				if (isBytecodeIntegralType(expr.type.kind)) pushCode(bytecode, integerMulOp(expr.type.kind));
 				else pushCode(bytecode, floatMulOp(expr.type.kind));
 				return true;
 			}
 			if (expr.token.type == Token::SLASH) {
-				if (!bytecodeCompileExpr(module, bytecode, ctx, expr.left)) return false;
-				if (!bytecodeCompileExpr(module, bytecode, ctx, expr.right)) return false;
+				if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.left)) return false;
+				if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.right)) return false;
 				if (isBytecodeIntegralType(expr.type.kind)) pushCode(bytecode, integerDivOp(expr.type.kind));
 				else pushCode(bytecode, floatDivOp(expr.type.kind));
 				return true;
 			}
 			if (expr.token.type == Token::PERCENT) {
-				if (!bytecodeCompileExpr(module, bytecode, ctx, expr.left)) return false;
-				if (!bytecodeCompileExpr(module, bytecode, ctx, expr.right)) return false;
+				if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.left)) return false;
+				if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.right)) return false;
 				pushCode(bytecode, integerModOp(expr.type.kind));
 				return true;
 			}
@@ -1443,13 +1477,13 @@ static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, Byteco
 				|| expr.token.type == Token::LT_EQUAL
 				|| expr.token.type == Token::EQUAL_EQUAL
 				|| expr.token.type == Token::BANG_EQUAL) {
-				return bytecodeCompileComparisonExpr(module, bytecode, ctx, expr);
+				return bytecodeCompileComparisonExpr(module, unit, bytecode, ctx, expr);
 			}
 			if (expr.token.type == Token::AND) {
-				return bytecodeCompileLogicalAndExpr(module, bytecode, ctx, expr);
+				return bytecodeCompileLogicalAndExpr(module, unit, bytecode, ctx, expr);
 			}
 			if (expr.token.type == Token::OR) {
-				return bytecodeCompileLogicalOrExpr(module, bytecode, ctx, expr);
+				return bytecodeCompileLogicalOrExpr(module, unit, bytecode, ctx, expr);
 			}
 			return false;
 		}
@@ -1457,20 +1491,20 @@ static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, Byteco
 			// Field reads resolve to a slot offset inside the flattened aggregate,
 			// then reuse the normal load path.
 			BytecodeValueAccess access = {};
-			if (!bytecodeResolveValueAccess(module, ctx, expr_idx, &access)) {
-				return bytecodeEmitRuntimeFieldAccess(module, bytecode, ctx, expr);
+			if (!bytecodeResolveValueAccess(module, unit, ctx, expr_idx, &access)) {
+				return bytecodeEmitRuntimeFieldAccess(module, unit, bytecode, ctx, expr);
 			}
 			return bytecodeEmitLoadValue(module, bytecode, ctx, access);
 		}
 		case Expr::INDEX: {
 			BytecodeValueAccess access = {};
-			if (!bytecodeResolveValueAccess(module, ctx, expr_idx, &access)) {
+			if (!bytecodeResolveValueAccess(module, unit, ctx, expr_idx, &access)) {
 				// Dynamic array indices can not be folded into a direct slot offset.
 				// We fall back to the runtime helper above, which computes the final
 				// element address into a temp slot and then reads it back here.
 				i32 temp_slot = -1;
 				i32 slot_count = 0;
-				if (!bytecodeEmitRuntimeIndexedAccess(module, bytecode, ctx, expr, &access, nullptr, &slot_count, &temp_slot)) return false;
+				if (!bytecodeEmitRuntimeIndexedAccess(module, unit, bytecode, ctx, expr, &access, nullptr, &slot_count, &temp_slot)) return false;
 				pushCode(bytecode, BytecodeOp::LOAD_LOCAL);
 				pushCode(bytecode, (u8)temp_slot);
 				pushCode(bytecode, BytecodeOp::LOAD_INDIRECT);
@@ -1484,18 +1518,17 @@ static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, Byteco
 			// Constructor arguments are already evaluated left-to-right, so the
 			// resulting struct value is just the sequence of pushed field slots.
 			for (i32 arg_idx : expr.args) {
-				if (!bytecodeCompileExpr(module, bytecode, ctx, arg_idx)) return false;
+				if (!bytecodeCompileExpr(module, unit, bytecode, ctx, arg_idx)) return false;
 			}
 			return true;
 		}
 		case Expr::CALL: {
-			Expr& callee_expr = module.expressions[expr.left];
+			Expr& callee_expr = unit.expressions[expr.left];
 			if (callee_expr.kind == Expr::FUNCTION_REF) {
 				if (callee_expr.is_native_fn) {
-					i32 idx = callee_expr.left;
+					i32 idx = callee_expr.native_function;
 					NativeFunctionDecl* callee_ptr = nullptr;
-					for (Unit* unit_ptr : module.units) {
-						Unit& unit = *unit_ptr;
+					for (Unit& unit : module.units) {
 						if (idx < (i32)unit.native_functions.size()) {
 							callee_ptr = &unit.native_functions[(size_t)idx];
 							break;
@@ -1506,23 +1539,22 @@ static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, Byteco
 					for (i32 i = 0; i < expr.args.size(); ++i) {
 						const TypeRef* expected = &callee.params[i].type;
 						if (callee.params[i].is_ref) {
-							Expr& arg_expr = module.expressions[expr.args[i]];
+							Expr& arg_expr = unit.expressions[expr.args[i]];
 							BytecodeValueAccess access = {};
-							if (!bytecodeResolveValueAccess(module, ctx, arg_expr.right, &access)) return false;
+							if (!bytecodeResolveValueAccess(module, unit, ctx, arg_expr.right, &access)) return false;
 							if (!bytecodeEmitAddressOfValue(module, bytecode, ctx, access)) return false;
 						}
 						else {
-							if (!bytecodeCompileExpr(module, bytecode, ctx, expr.args[i], expected)) return false;
+							if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.args[i], expected)) return false;
 						}
 					}
 					pushCode(bytecode, BytecodeOp::CALL_NATIVE);
-					pushCode(bytecode, (u32)callee_expr.left);
+					pushCode(bytecode, (u32)callee_expr.native_function);
 					return true;
 				}
 				i32 idx = callee_expr.left;
 				FunctionDecl* callee_ptr = nullptr;
-				for (Unit* unit_ptr : module.units) {
-					Unit& unit = *unit_ptr;
+				for (Unit& unit : module.units) {
 					if (idx < (i32)unit.functions.size()) {
 						callee_ptr = &unit.functions[(size_t)idx];
 						break;
@@ -1536,13 +1568,13 @@ static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, Byteco
 						// Ref parameters are not value arguments. The AST represents them
 						// explicitly as `Expr::REF`, so we resolve the pointed-to lvalue
 						// and pass its address to the VM.
-						Expr& arg_expr = module.expressions[expr.args[i]];
+						Expr& arg_expr = unit.expressions[expr.args[i]];
 						BytecodeValueAccess access = {};
-						if (!bytecodeResolveValueAccess(module, ctx, arg_expr.right, &access)) return false;
+						if (!bytecodeResolveValueAccess(module, unit, ctx, arg_expr.right, &access)) return false;
 						if (!bytecodeEmitAddressOfValue(module, bytecode, ctx, access)) return false;
 					}
 					else {
-						if (!bytecodeCompileExpr(module, bytecode, ctx, expr.args[i], expected)) return false;
+						if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.args[i], expected)) return false;
 					}
 				}
 				pushCode(bytecode, BytecodeOp::CALL);
@@ -1550,7 +1582,7 @@ static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, Byteco
 				return true;
 			}
 
-			TypeRef callee_type = module.expressions[expr.left].type;
+			TypeRef callee_type = unit.expressions[expr.left].type;
 			FunctionTypeDecl& fn_type = module.function_types[callee_type.struct_index];
 			// CALL_INDIRECT locates the function handle below the flattened
 			// argument payload, so it needs stack slots rather than arity.
@@ -1561,9 +1593,9 @@ static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, Byteco
 				param_slot_count += slot_count;
 			}
 			if (param_slot_count > 255) return false;
-			if (!bytecodeCompileExpr(module, bytecode, ctx, expr.left, &callee_type)) return false;
+			if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.left, &callee_type)) return false;
 			for (i32 i = 0; i < expr.args.size(); ++i) {
-				if (!bytecodeCompileExpr(module, bytecode, ctx, expr.args[i], &fn_type.params[i])) return false;
+				if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.args[i], &fn_type.params[i])) return false;
 			}
 			pushCode(bytecode, BytecodeOp::CALL_INDIRECT);
 			pushCode(bytecode, (u8)param_slot_count);
@@ -1575,19 +1607,19 @@ static bool bytecodeCompileExpr(ls_module& module, ls_bytecode& bytecode, Byteco
 	}
 }
 
-static bool bytecodeCompileStmt(ls_module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, i32 stmt_idx) {
-	Stmt& stmt = module.statements[stmt_idx];
+static bool bytecodeCompileStmt(ls_module& module, Unit& unit, ls_bytecode& bytecode, BytecodeCompileContext& ctx, i32 stmt_idx) {
+	Stmt& stmt = unit.statements[stmt_idx];
 	switch (stmt.kind) {
 		case Stmt::BLOCK: {
 			// Blocks create a temporary lexical scope.
 			ctx.pushScope();
 			for (i32 child : stmt.children) {
-				if (!bytecodeCompileStmt(module, bytecode, ctx, child)) {
+				if (!bytecodeCompileStmt(module, unit, bytecode, ctx, child)) {
 					ctx.popScope();
 					return false;
 				}
 			}
-			if (!bytecodeEmitDeferredScope(module, bytecode, ctx, ctx.scopeDepth() - 1)) {
+			if (!bytecodeEmitDeferredScope(module, unit, bytecode, ctx, ctx.scopeDepth() - 1)) {
 				ctx.popScope();
 				return false;
 			}
@@ -1597,8 +1629,8 @@ static bool bytecodeCompileStmt(ls_module& module, ls_bytecode& bytecode, Byteco
 		case Stmt::EXPR: {
 			// Expression statements must leave the stack balanced, so the value is
 			// immediately discarded.
-			if (stmt.expr >= 0 && !bytecodeCompileExpr(module, bytecode, ctx, stmt.expr, &module.expressions[stmt.expr].type)) return false;
-			if (stmt.expr >= 0 && !bytecodeEmitPopValue(module, bytecode, module.expressions[stmt.expr].type)) return false;
+			if (stmt.expr >= 0 && !bytecodeCompileExpr(module, unit, bytecode, ctx, stmt.expr, &unit.expressions[stmt.expr].type)) return false;
+			if (stmt.expr >= 0 && !bytecodeEmitPopValue(module, bytecode, unit.expressions[stmt.expr].type)) return false;
 			return true;
 		}
 		case Stmt::VAR_DECL: {
@@ -1610,7 +1642,7 @@ static bool bytecodeCompileStmt(ls_module& module, ls_bytecode& bytecode, Byteco
 			const i32 local_slot = ctx.local_count;
 			if (local_slot < 0 || local_slot + slot_count > 256) return false;
 			if (stmt.expr >= 0) {
-				if (!bytecodeCompileExpr(module, bytecode, ctx, stmt.expr, &stmt.type)) return false;
+				if (!bytecodeCompileExpr(module, unit, bytecode, ctx, stmt.expr, &stmt.type)) return false;
 				if (!bytecodeEmitStoreValue(module, bytecode, local_slot, type)) return false;
 			}
 			ctx.addLocal(stmt.name, local_slot, slot_count, type);
@@ -1618,37 +1650,37 @@ static bool bytecodeCompileStmt(ls_module& module, ls_bytecode& bytecode, Byteco
 			return true;
 		}
 		case Stmt::ASSIGN: {
-			Expr& lhs = module.expressions[stmt.left];
+			Expr& lhs = unit.expressions[stmt.left];
 			BytecodeValueAccess access = {};
-			if (!bytecodeResolveValueAccess(module, ctx, stmt.left, &access)) {
+			if (!bytecodeResolveValueAccess(module, unit, ctx, stmt.left, &access)) {
 				if (lhs.kind != Expr::INDEX) return false;
 				i32 temp_slot = -1;
 				i32 slot_count = 0;
-				if (!bytecodeEmitRuntimeIndexedAccess(module, bytecode, ctx, lhs, nullptr, nullptr, &slot_count, &temp_slot)) return false;
+				if (!bytecodeEmitRuntimeIndexedAccess(module, unit, bytecode, ctx, lhs, nullptr, nullptr, &slot_count, &temp_slot)) return false;
 				access.kind = BytecodeValueKind::LOCAL;
 				access.slot = temp_slot;
 				access.type = lhs.type;
 				access.is_ref = true;
 			}
-			return bytecodeCompileAssignmentToAccess(module, bytecode, ctx, stmt, access);
+			return bytecodeCompileAssignmentToAccess(module, unit, bytecode, ctx, stmt, access);
 		}
 		case Stmt::RETURN:
 			// Return statements optionally emit a value before the RETURN opcode.
-			if (stmt.expr >= 0 && !bytecodeCompileExpr(module, bytecode, ctx, stmt.expr, &ctx.fn.return_type)) return false;
-			if (!bytecodeEmitDeferredScopes(module, bytecode, ctx, 0)) return false;
+			if (stmt.expr >= 0 && !bytecodeCompileExpr(module, unit, bytecode, ctx, stmt.expr, &ctx.fn.return_type)) return false;
+			if (!bytecodeEmitDeferredScopes(module, unit, bytecode, ctx, 0)) return false;
 			pushCode(bytecode, BytecodeOp::RETURN);
 			return true;
 		case Stmt::WHILE: {
 			// While loops lower to: condition, conditional exit, body, backward
 			// jump. Break/continue branches are patched once the loop end is known.
 			const size_t cond_pos = bytecode.code.size();
-			if (!bytecodeCompileExpr(module, bytecode, ctx, stmt.expr)) return false;
+			if (!bytecodeCompileExpr(module, unit, bytecode, ctx, stmt.expr)) return false;
 			size_t end_jump = 0;
 			emitJumpPlaceholder(bytecode, BytecodeOp::JUMP_IF_FALSE, &end_jump);
 
 			BytecodeCompileContext::LoopTarget loop_target{stmt.name, cond_pos, ctx.scopeDepth()};
 			ctx.loop_targets.push_back(loop_target);
-			if (stmt.right >= 0 && !bytecodeCompileStmt(module, bytecode, ctx, stmt.right)) {
+			if (stmt.right >= 0 && !bytecodeCompileStmt(module, unit, bytecode, ctx, stmt.right)) {
 				ctx.loop_targets.pop_back();
 				return false;
 			}
@@ -1669,8 +1701,8 @@ static bool bytecodeCompileStmt(ls_module& module, ls_bytecode& bytecode, Byteco
 		case Stmt::FOR: {
 			// `for` lowers to a single-evaluation header, a loop-local counter, and
 			// a separate increment step that `continue` branches to.
-			const TypeRef start_type = module.expressions[stmt.expr].type;
-			const TypeRef end_type = module.expressions[stmt.left].type;
+			const TypeRef start_type = unit.expressions[stmt.expr].type;
+			const TypeRef end_type = unit.expressions[stmt.left].type;
 
 			const i32 loop_slot = ctx.local_count;
 			const i32 end_slot = loop_slot + 1;
@@ -1681,7 +1713,7 @@ static bool bytecodeCompileStmt(ls_module& module, ls_bytecode& bytecode, Byteco
 			ctx.addLocal({}, end_slot, 1, end_type);
 			ctx.local_count += 2;
 
-			if (!bytecodeCompileExpr(module, bytecode, ctx, stmt.expr, &start_type)) {
+			if (!bytecodeCompileExpr(module, unit, bytecode, ctx, stmt.expr, &start_type)) {
 				ctx.popScope();
 				return false;
 			}
@@ -1689,7 +1721,7 @@ static bool bytecodeCompileStmt(ls_module& module, ls_bytecode& bytecode, Byteco
 				ctx.popScope();
 				return false;
 			}
-			if (!bytecodeCompileExpr(module, bytecode, ctx, stmt.left, &end_type)) {
+			if (!bytecodeCompileExpr(module, unit, bytecode, ctx, stmt.left, &end_type)) {
 				ctx.popScope();
 				return false;
 			}
@@ -1711,7 +1743,7 @@ static bool bytecodeCompileStmt(ls_module& module, ls_bytecode& bytecode, Byteco
 
 			BytecodeCompileContext::LoopTarget loop_target{stmt.name, 0, ctx.scopeDepth()};
 			ctx.loop_targets.push_back(loop_target);
-			if (stmt.right >= 0 && !bytecodeCompileStmt(module, bytecode, ctx, stmt.right)) {
+			if (stmt.right >= 0 && !bytecodeCompileStmt(module, unit, bytecode, ctx, stmt.right)) {
 				ctx.loop_targets.pop_back();
 				ctx.popScope();
 				return false;
@@ -1749,7 +1781,7 @@ static bool bytecodeCompileStmt(ls_module& module, ls_bytecode& bytecode, Byteco
 			// Loop exits are emitted as placeholders and patched later.
 			const i32 loop_idx = ctx.findLoopIndex(stmt.name);
 			if (loop_idx < 0) return false;
-			if (!bytecodeEmitDeferredScopes(module, bytecode, ctx, ctx.loop_targets[loop_idx].cleanup_scope_depth)) return false;
+			if (!bytecodeEmitDeferredScopes(module, unit, bytecode, ctx, ctx.loop_targets[loop_idx].cleanup_scope_depth)) return false;
 			size_t jump_pos = 0;
 			emitJumpPlaceholder(bytecode, BytecodeOp::JUMP, &jump_pos);
 			if (stmt.kind == Stmt::BREAK) ctx.loop_targets[loop_idx].break_jumps.push_back(jump_pos);
@@ -1762,8 +1794,8 @@ static bool bytecodeCompileStmt(ls_module& module, ls_bytecode& bytecode, Byteco
 			ls_string_view promoted_name;
 			TypeRef promoted_type;
 			bool promote_true_branch = false;
-			const bool has_promotion = bytecodeCompileNullablePromotion(module, bytecode, ctx, stmt.expr, &promoted_name, &promoted_type, &promote_true_branch);
-			if (!bytecodeCompileExpr(module, bytecode, ctx, stmt.expr)) return false;
+			const bool has_promotion = bytecodeCompileNullablePromotion(module, unit, bytecode, ctx, stmt.expr, &promoted_name, &promoted_type, &promote_true_branch);
+			if (!bytecodeCompileExpr(module, unit, bytecode, ctx, stmt.expr)) return false;
 			size_t else_jump = 0;
 			emitJumpPlaceholder(bytecode, BytecodeOp::JUMP_IF_FALSE, &else_jump);
 			auto compileBranch = [&](i32 stmt_idx, bool promote) -> bool {
@@ -1777,7 +1809,7 @@ static bool bytecodeCompileStmt(ls_module& module, ls_bytecode& bytecode, Byteco
 					}
 					ctx.addLocal(promoted_name, binding->slot, binding->slot_count, promoted_type, false, false, 1);
 				}
-				const bool ok = bytecodeCompileStmt(module, bytecode, ctx, stmt_idx);
+				const bool ok = bytecodeCompileStmt(module, unit, bytecode, ctx, stmt_idx);
 				ctx.popScope();
 				return ok;
 			};
@@ -1805,13 +1837,13 @@ static bool bytecodeCompileStmt(ls_module& module, ls_bytecode& bytecode, Byteco
 			ctx.addDeferred(stmt.left);
 			return true;
 		case Stmt::MATCH:
-			return bytecodeCompileMatchStmt(module, bytecode, ctx, stmt);
+			return bytecodeCompileMatchStmt(module, unit, bytecode, ctx, stmt);
 		default:
 			return false;
 	}
 }
 
-static bool bytecodeCompileFunction(ls_module& module, ls_bytecode& bytecode, FunctionDecl& fn) {
+static bool bytecodeCompileFunction(ls_module& module, Unit& unit, ls_bytecode& bytecode, FunctionDecl& fn) {
 	BytecodeFunction out;
 	out.name = module.makeQualifiedName(fn.canonical_name.path, fn.canonical_name.name);
 	out.code_offset = (i32)bytecode.code.size();
@@ -1827,7 +1859,7 @@ static bool bytecodeCompileFunction(ls_module& module, ls_bytecode& bytecode, Fu
 		param_slot += slot_count;
 	}
 	out.param_slot_count = param_slot;
-	if (!bytecodeCompileStmt(module, bytecode, ctx, fn.body)) return false;
+	if (!bytecodeCompileStmt(module, unit, bytecode, ctx, fn.body)) return false;
 
 	// Frame size and code span are finalized after the body is emitted.
 	out.code_size = (i32)bytecode.code.size() - out.code_offset;
@@ -1844,8 +1876,7 @@ static bool bytecodeCompileGlobals(ls_module& module, ls_bytecode& bytecode, con
 	i32 global_slot = 0;
 	bytecode.global_init_code.clear();
 	bool has_globals = false;
-	for (const Unit* unit_ptr : module.units) {
-		const Unit& unit = *unit_ptr;
+	for (const Unit& unit : module.units) {
 		if (!unit.globals.empty()) {
 			has_globals = true;
 			break;
@@ -1869,12 +1900,22 @@ static bool bytecodeCompileGlobals(ls_module& module, ls_bytecode& bytecode, con
 		explicit and avoids mixing module initialization with user-visible code.
 	*/
 	ls_bytecode init_bytecode(host);
-	FunctionDecl init_fn;
+	struct ArenaOwner {
+		const ls_host& host;
+		ls_arena* arena;
+
+		ArenaOwner(const ls_host& host) : host(host) { arena = host.create_arena(); }
+		ArenaOwner(const ArenaOwner&) = delete;
+		ArenaOwner& operator=(const ArenaOwner&) = delete;
+		~ArenaOwner() { host.destroy_arena(arena); }
+	};
+	const ls_host& arena_host = host ? *host : module.host;
+	ArenaOwner arena_owner(arena_host);
+	FunctionDecl init_fn(*arena_owner.arena);
 	BytecodeCompileContext ctx(init_fn);
 	ctx.pushScope();
 
-	for (Unit* unit_ptr : module.units) {
-		Unit& unit = *unit_ptr;
+	for (Unit& unit : module.units) {
 		for (GlobalDecl& global : unit.globals) {
 			const i32 slot_count = bytecodeTypeSlotCount(module, global.type);
 			if (slot_count <= 0) return false;
@@ -1886,11 +1927,10 @@ static bool bytecodeCompileGlobals(ls_module& module, ls_bytecode& bytecode, con
 		}
 	}
 
-	for (Unit* unit_ptr : module.units) {
-		Unit& unit = *unit_ptr;
+	for (Unit& unit : module.units) {
 		for (GlobalDecl& global : unit.globals) {
 			if (global.expr < 0) continue;
-			if (!bytecodeCompileExpr(module, init_bytecode, ctx, global.expr, &global.type)) return false;
+			if (!bytecodeCompileExpr(module, unit, init_bytecode, ctx, global.expr, &global.type)) return false;
 			if (!bytecodeEmitStoreGlobalValue(module, init_bytecode, global.slot, global.type)) return false;
 		}
 	}
@@ -1904,16 +1944,16 @@ ls_bytecode* compileBytecode(ls_module& module, const ls_host* host) {
 	// Lay out globals first so function lowering can resolve their flattened
 	// stack slots, then emit functions and the hidden global initializer program.
 	const ls_host* bytecode_host = host ? host : &module.host;
+	if (!bytecode_host || !bytecode_host->create_arena || !bytecode_host->destroy_arena) return nullptr;
 	void* bytecode_mem = bytecode_host && bytecode_host->allocate
 		? bytecode_host->allocate(bytecode_host->allocator_userdata, sizeof(ls_bytecode), alignof(ls_bytecode))
 		: ::operator new(sizeof(ls_bytecode), std::nothrow);
 	ls_bytecode* bytecode = bytecode_mem ? ::new (bytecode_mem) ls_bytecode(bytecode_host) : nullptr;
 	if (!bytecode) return nullptr;
 	i32 native_function_count = 0;
-	for (const Unit* unit_ptr : module.units) native_function_count += (i32)unit_ptr->native_functions.size();
+	for (const Unit& unit : module.units) native_function_count += (i32)unit.native_functions.size();
 	bytecode->native_functions.reserve(native_function_count);
-	for (const Unit* unit_ptr : module.units) {
-		const Unit& unit = *unit_ptr;
+	for (const Unit& unit : module.units) {
 		for (const NativeFunctionDecl& fn : unit.native_functions) {
 			BytecodeNativeFunction out;
 			out.canonical_name = module.makeQualifiedName(fn.canonical_name.path, fn.canonical_name.name);
@@ -1928,10 +1968,9 @@ ls_bytecode* compileBytecode(ls_module& module, const ls_host* host) {
 		ls_bytecode_destroy(bytecode);
 		return nullptr;
 	}
-	for (Unit* unit_ptr : module.units) {
-		Unit& unit = *unit_ptr;
+	for (Unit& unit : module.units) {
 		for (FunctionDecl& fn : unit.functions) {
-			if (!bytecodeCompileFunction(module, *bytecode, fn)) {
+			if (!bytecodeCompileFunction(module, unit, *bytecode, fn)) {
 				ls_bytecode_destroy(bytecode);
 				return nullptr;
 			}

@@ -4,9 +4,10 @@
 #include <cstdlib>
 #include <iostream>
 
-#include "../ast.h"
+#include "../arena.h"
+#include "../compiler.h"
 #include "../capi.h"
-#include "../string_utils.h"
+#include "../utils.h"
 
 int main() {
     const char* env_lines = std::getenv("PERFT_LINES");
@@ -27,6 +28,8 @@ int main() {
     }
 
     ls_host host = {};
+    host.create_arena = &ls_default_arena_create;
+    host.destroy_arena = &ls_default_arena_destroy;
     auto perfPrint = [](void* /*userdata*/, ls_string_view msg) {
         for (const char* c = msg.begin; c != msg.end; ++c) putchar(*c);
     };

@@ -21,7 +21,7 @@ TEST(MatchTypechecks) {
 					return 0;
 				case 1..9, 99:
 					return 1;
-				case _:
+				else:
 					return 2;
 			}
 		}
@@ -38,7 +38,7 @@ TEST(MatchArmAllowsMultipleStatements) {
 				case 0:
 					result = 1;
 					result += 2;
-				case _:
+				else:
 					result = 10;
 					result += 20;
 			}
@@ -55,7 +55,7 @@ TEST(MatchRejectsPatternTypeMismatch) {
 			match v {
 				case "bad":
 					return;
-				case _:
+				else:
 					return;
 			}
 		}
@@ -70,7 +70,7 @@ TEST(MatchRangeRequiresNumericTypeFails) {
 			match v {
 				case "a".."z":
 					return;
-				case _:
+				else:
 					return;
 			}
 		}
@@ -85,7 +85,7 @@ TEST(MatchRangeTypeMismatchFails) {
 			match v {
 				case 1.."bad":
 					return;
-				case _:
+				else:
 					return;
 			}
 		}
@@ -104,7 +104,7 @@ TEST(MatchRequiresScalarEnumOrStringFails) {
 		fn main() : void {
 			var v : Vec2 = Vec2 { 1, 2 };
 			match v {
-				case _:
+				else:
 					return;
 			}
 		}
@@ -117,11 +117,11 @@ TEST(MatchDuplicateFallbackFails) {
 	const char* source = R"(
 		fn main(v : i32) : void {
 			match v {
-				case _:
+				else:
 					return;
 				case 1:
 					return;
-				case _:
+				else:
 					return;
 			}
 		}
@@ -227,7 +227,7 @@ TEST(MatchRuntime) {
 					return 0;
 				case 1..9, 99:
 					return 1;
-				case _:
+				else:
 					return 2;
 			}
 		}
@@ -260,7 +260,7 @@ TEST(MatchArmMultipleStatementsRuntime) {
 				case 0:
 					result = 1;
 					result += 2;
-				case _:
+				else:
 					result = 10;
 					result += 20;
 			}

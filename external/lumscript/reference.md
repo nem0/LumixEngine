@@ -610,7 +610,7 @@ Supported patterns:
 - scalar literals
 - inclusive ranges (`a..b`)
 - comma-separated alternatives
-- `_` fallback
+- `else` fallback
 
 ```cpp
 match state {
@@ -621,7 +621,7 @@ match state {
 		update_running_state();
 	case .Paused:
 		log.logError("paused");
-	case _:
+	else:
 		log.logError("unknown");
 }
 ```
@@ -634,7 +634,7 @@ match score {
 		log.logError("low");
 	case 10..99:
 		log.logError("high");
-	case _:
+	else:
 		log.logError("overflow");
 }
 ```
@@ -652,7 +652,7 @@ match key {
 }
 ```
 
-Enum matches must be exhaustive unless `_` is present. Duplicate enum cases are compile-time errors.
+Enum matches must be exhaustive unless `else` is present. Duplicate enum cases are compile-time errors.
 
 ### While
 
@@ -913,10 +913,26 @@ fn move_up(w : world.World, e : entity.Entity) : void {
 }
 ```
 
-Resolution order:
+Resolution order for field-call syntax:
 
-- first try written callee directly
-- if unresolved and callee is field-call syntax, try first-parameter namespace rewrite
+- first resolve real field or enum-member access on the receiver type
+- if the access is called and no field/member exists, collect callable candidates from the written callee and the receiver type's declaring namespace
+- if exactly one callable candidate exists, insert the receiver as the first argument and call it
+- if both candidates exist and refer to different functions, the call is ambiguous and must be written explicitly
+
+Ambiguous example:
+
+```cpp
+import "engine:entity" as entity
+
+fn destroy(e : entity.Entity) : void {}
+
+fn example(e : entity.Entity) : void {
+	e.destroy();      // error: ambiguous
+	destroy(e);       // direct visible function
+	entity.destroy(e); // receiver namespace function
+}
+```
 
 ### Field access
 

@@ -83,7 +83,7 @@ TEST(GlobalVariablesTypecheck) {
 	ls_module* module = ls_module_create(&diagnostics.host);
 	EXPECT_TRUE(module != nullptr);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
-	EXPECT_TRUE(ls_module_get_global_count(module) == 3);
+	EXPECT_TRUE(ls_module_get_global_count(module) == 5);
 	ls_module_destroy(module);
 	return true;
 }
@@ -155,6 +155,17 @@ TEST(UndefinedInitializerRequiresExplicitTypeFails) {
 	const char* source = R"(
 		fn main() : void {
 			var x = undefined;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(MemberAccessOnPrimitiveFails) {
+	const char* source = R"(
+		fn main() : i32 {
+			const value = 1;
+			return value.field;
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
@@ -271,6 +282,19 @@ TEST(CompoundAssignmentTypeMismatchFails) {
 	return true;
 }
 
+TEST(PrimitiveOperatorDeclarationFailsEvenUnused) {
+	const char* source = R"(
+		operator +(a : i32, b : i32) : i32 {
+			return a + b;
+		}
+
+		fn main() : void {
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(DivisionAndModuloByConstantZeroCompile) {
 	const char* divide_source = R"(
 		fn main(v : i32) : i32 {
@@ -363,3 +387,32 @@ TEST(UnknownStructField) {
 	return true;
 }
 
+TEST(UFCSNativeType) {
+	const char* source = R"(
+		fn foo(i : i32) : void {}
+		fn main() : void {
+			4.foo();
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(StructMethodCallOnReturnValue) {
+	const char* source = R"(
+		struct State {
+			v : i32;
+		}
+        
+        fn bar(s : State) : bool  { return s.v == 1; }
+
+        fn foo() : State { return State { 1 }; }
+
+		fn main() : bool {
+            var b = foo().bar();
+            return b;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}

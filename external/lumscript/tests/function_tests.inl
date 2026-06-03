@@ -90,6 +90,46 @@ TEST(FirstClassFunctionLiteralInfersTypedVariable) {
 	return true;
 }
 
+TEST(GlobalFunctionLiteralCanRecursivelyCallItself) {
+	const char* source = R"(
+		const sum_to = fn(n : i32) : i32 {
+			if n == 0 {
+				return 0;
+			}
+			return n + sum_to(n - 1);
+		};
+
+		fn main() : i32 {
+			return sum_to(6);
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(21, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ForwardFunctionDeclarationCanNotInitializeFunctionTypedGlobal) {
+	const char* source = R"(
+		const f : fn() : i32 = foo;
+
+		fn foo() : i32 {
+			return 1;
+		}
+
+		fn main() : i32 {
+			return f();
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(FirstClassFunctionLiteralCanBePassedAsArgument) {
 	const char* source = R"(
 		fn call(f : fn() : i32) : i32 {

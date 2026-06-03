@@ -596,40 +596,6 @@ TEST(BytecodeNamespaceResolutionByFirstParameter) {
 	return true;
 }
 
-TEST(BytecodeNamespaceResolutionByInferredFunctionLiteralParameter) {
-	const char* main_source = R"(
-		import "math" as math
-
-		const foo = fn(v : math.Vec2) : i32 {
-			return v.foo() + foo(v);
-		};
-
-		fn main() : i32 {
-			const v : math.Vec2 = math.Vec2 { 20, 22 };
-			return foo(v);
-		}
-	)";
-	const char* math_source = R"(
-		struct Vec2 {
-			x : i32;
-			y : i32;
-		}
-
-		const foo = fn(v : Vec2) : i32 {
-			return v.x + v.y;
-		};
-	)";
-
-	LumScriptImportFile files_storage[] = {
-		{ toLs("math"), toLs(math_source) }
-	};
-	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
-	EXPECT_RUNTIME_WITH_IMPORTS(main_source, files, runtime, {
-		EXPECT_TRUE(ls_call(runtime, toLs("main")));
-		EXPECT_EQ(84, ls_to_i32(runtime, -1));
-	});
-	return true;
-}
 
 TEST(BytecodeNamespaceResolutionByFirstParameterChoosesNamespace) {
 	const char* main_source = R"(
@@ -1708,50 +1674,6 @@ TEST(IntegerToEnumCastAllowsAnyIntegerRuntime) {
 	EXPECT_TRUE(ls_call(runtime, toLs("to_i32")));
 	EXPECT_EQ(123, ls_to_i32(runtime, -1));
 	CAPI_END(module);
-	return true;
-}
-
-
-
-TEST(FirstParameterNamespaceResolutionPrecedenceRuntime) {
-	const char* main_source = R"(
-		import "entity_mod" as entity
-		import "helper_mod" as e
-
-		fn destroy(x : entity.Entity) : i32 {
-			return 3;
-		}
-
-		fn main() : i32 {
-			const x : entity.Entity = entity.Entity { 1 };
-			return e.destroy() * 100 + x.destroy() * 10 + destroy(x);
-		}
-	)";
-
-	const char* entity_source = R"(
-		struct Entity {
-			id : i32;
-		}
-		fn destroy(x : Entity) : i32 {
-			return 1;
-		}
-	)";
-
-	const char* helper_source = R"(
-		fn destroy() : i32 {
-			return 2;
-		}
-	)";
-
-	LumScriptImportFile files_storage[] = {
-		{ toLs("entity_mod"), toLs(entity_source) },
-		{ toLs("helper_mod"), toLs(helper_source) }
-	};
-	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
-	EXPECT_RUNTIME_WITH_IMPORTS(main_source, files, runtime, {
-		EXPECT_TRUE(ls_call(runtime, toLs("main")));
-		EXPECT_EQ(213, ls_to_i32(runtime, -1));
-	});
 	return true;
 }
 

@@ -1,11 +1,9 @@
 #include "bytecode.h"
 
-#include <cmath>
-#include <cstring>
-#include <new>
+#include <math.h>
+#include <string.h>
 #include <vector>
-#include <type_traits>
-#include "string_utils.h"
+#include "utils.h"
 
 struct ls_runtime {
 	explicit ls_runtime(ls_bytecode* bytecode);
@@ -75,7 +73,7 @@ void pushStack(ls_runtime& runtime, const T& value) {
 	u64 v = 0;
 	static_assert(sizeof(value) <= sizeof(v));
 	memcpy(&v, &value, sizeof(value));
-	if constexpr (std::is_signed_v<T> && sizeof(T) < sizeof(v)) {
+	if constexpr (isSigned<T>() && sizeof(T) < sizeof(v)) {
 		// Keep narrow signed values sign-extended so later wider reads preserve
 		// the original negative value.
 		// Example: pushing i8(-1) stores 0xFFFFFFFFFFFFFFFF, so reading it back
@@ -145,27 +143,27 @@ static i32 bytecodeFindFunction(const ls_bytecode* bytecode, ls_string_view name
 }
 
 static void mathSinF32(ls_runtime* runtime) {
-	ls_push_f32(runtime, std::sin(ls_to_f32(runtime, -1)));
+	ls_push_f32(runtime, sinf(ls_to_f32(runtime, -1)));
 }
 
 static void mathCosF32(ls_runtime* runtime) {
-	ls_push_f32(runtime, std::cos(ls_to_f32(runtime, -1)));
+	ls_push_f32(runtime, cosf(ls_to_f32(runtime, -1)));
 }
 
 static void mathSinF64(ls_runtime* runtime) {
-	ls_push_f64(runtime, std::sin(ls_to_f64(runtime, -1)));
+	ls_push_f64(runtime, sin(ls_to_f64(runtime, -1)));
 }
 
 static void mathCosF64(ls_runtime* runtime) {
-	ls_push_f64(runtime, std::cos(ls_to_f64(runtime, -1)));
+	ls_push_f64(runtime, cos(ls_to_f64(runtime, -1)));
 }
 
 static void mathSqrtF32(ls_runtime* runtime) {
-	ls_push_f32(runtime, std::sqrt(ls_to_f32(runtime, -1)));
+	ls_push_f32(runtime, sqrtf(ls_to_f32(runtime, -1)));
 }
 
 static void mathSqrtF64(ls_runtime* runtime) {
-	ls_push_f64(runtime, std::sqrt(ls_to_f64(runtime, -1)));
+	ls_push_f64(runtime, sqrt(ls_to_f64(runtime, -1)));
 }
 
 static void bindBuiltinNativeFunctions(ls_runtime* runtime) {
@@ -199,6 +197,7 @@ void destroyBytecodeRuntime(ls_runtime* runtime);
 
 ls_runtime* createBytecodeRuntime(ls_bytecode* bytecode) {
 	if (!bytecode) return nullptr;
+	if (!bytecode->host.create_arena || !bytecode->host.destroy_arena) return nullptr;
 	void* mem = bytecodeAllocate(&bytecode->host, sizeof(ls_runtime), alignof(ls_runtime));
 	if (!mem) return nullptr;
 	ls_runtime* runtime = new (mem) ls_runtime(bytecode);

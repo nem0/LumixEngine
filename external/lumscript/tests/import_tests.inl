@@ -151,6 +151,26 @@ TEST(ImportAliasMissingMemberReportsMemberName) {
 	return true;
 }
 
+TEST(ImportedStructTypeIsNotAValue) {
+	const char* main_source = R"(
+		import "math" as math
+
+		fn main() : i32 {
+			return math.Vec2;
+		}
+	)";
+	const char* math_source = R"(
+		struct Vec2 {
+			x : i32;
+			y : i32;
+		}
+	)";
+	LumScriptImportFile file = { toLs("math"), toLs(math_source) };
+	LumScriptImportFiles files = { &file, 1 };
+	EXPECT_COMPILE_FAIL_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
 TEST(ImportsAreNotTransitiveAcrossModules) {
 	const char* a_source = R"(
 		import "b" as b
@@ -452,7 +472,7 @@ TEST(ImportCycleFails) {
 	return true;
 }
 
-TEST(FirstParameterNamespaceResolutionPrecedenceTypecheck) {
+TEST(FirstParameterNamespaceResolutionAmbiguousTypecheck) {
 	const char* main_source = R"(
 		import "entity_mod" as entity
 		import "helper_mod" as e
@@ -489,7 +509,7 @@ TEST(FirstParameterNamespaceResolutionPrecedenceTypecheck) {
 	};
 	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
 
-	EXPECT_COMPILE_WITH_IMPORTS(main_source, files);
+	EXPECT_COMPILE_FAIL_WITH_IMPORTS(main_source, files);
 	return true;
 }
 
@@ -611,9 +631,10 @@ TEST(ExternImport) {
 		fn main() : i32 {
 			const v1 : m.Vec2 = m.Vec2 { 10, 11 };
 			const s1 : i32 = m.sum(v1); // with namespace
+			const s3 : i32 = v1.sum(); // method-style namespace lookup
 			const v2 : m.Vec2 = m.Vec2 { 9, 12 };
 			const s2 : i32 = sum(v2); // inferred namespaced
-			return s1 + s2;
+			return s1 + s2 + s3;
 		}
 	)";
 	
@@ -651,11 +672,79 @@ TEST(ExternImport) {
 	ls_runtime_set_native_function_callback(runtime, sum_fn_idx, sumfn);
 
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	EXPECT_EQ(63, ls_to_i32(runtime, -1));
 
 	ls_runtime_destroy(runtime);
 	ls_bytecode_destroy(bytecode);
 	ls_module_destroy(module);
+	return true;
+}
+
+TEST(GlobalFunctionLiteralInitializerNamespaceCollisionFails2) {
+	const char* main_source = R"(
+		import "math" as m
+
+		const sum = fn(v : m.Vec2) : i32 {
+			return sum(v);
+		};
+
+		fn main() : i32 {
+			const v : m.Vec2 = m.Vec2 { 20, 21 };
+			return sum(v);
+		}
+	)";
+
+	const char* math_source = R"(
+		struct Vec2 {
+			x : i32;
+			y : i32;
+		}
+
+		fn sum(v : Vec2) : i32 {
+			return v.x + v.y;
+		}
+	)";
+
+	LumScriptImportFile files_storage[] = {
+		{ toLs("math"), toLs(math_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+
+	EXPECT_COMPILE_FAIL_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
+TEST(GlobalFunctionLiteralInitializerNamespaceCollisionFails) {
+	const char* main_source = R"(
+		import "math" as m
+
+		const sum = fn(v : m.Vec2) : i32 {
+			return sum(v, 1);
+		};
+
+		fn main() : i32 {
+			const v : m.Vec2 = m.Vec2 { 20, 21 };
+			return sum(v);
+		}
+	)";
+
+	const char* math_source = R"(
+		struct Vec2 {
+			x : i32;
+			y : i32;
+		}
+
+		fn sum(v : Vec2, offset : i32) : i32 {
+			return v.x + v.y + offset;
+		}
+	)";
+
+	LumScriptImportFile files_storage[] = {
+		{ toLs("math"), toLs(math_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+
+	EXPECT_COMPILE_FAIL_WITH_IMPORTS(main_source, files);
 	return true;
 }
 

@@ -1,12 +1,11 @@
-#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <chrono>
-#include <span>
-#include <vector>
 
-#include "../string_utils.h"
+#include "../arena.h"
+#include "../utils.h"
+#include "../utils.h"
 #include "../capi.h"
 
 void print(const char* val) { printf(val); }
@@ -136,6 +135,8 @@ static ls_string_view toLs(const char* value) {
 
 struct TestContext {
 	TestContext() {
+		host.create_arena = &ls_default_arena_create;
+		host.destroy_arena = &ls_default_arena_destroy;
 		host.diagnostics_userdata = &diagnostics;
 		host.print = &testPrint;
 	}
@@ -201,7 +202,7 @@ static void testPrint(void* userdata, ls_string_view msg) {
 static int resolveLumScriptImportC(void* userdata, ls_string_view path, ls_string_view, ls_string_view* source) {
 	const LumScriptImportFiles* imports = (const LumScriptImportFiles*)userdata;
 	if (!imports) return 0;
-	std::span<const LumScriptImportFile> files(imports->files, imports->count);
+	span<const LumScriptImportFile> files(imports->files, imports->count);
 	for (const LumScriptImportFile& file : files) {
 		if (equalStrings(file.path, path)) {
 			*source = toLs(file.source);

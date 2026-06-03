@@ -1,6 +1,189 @@
-#include "ast.h"
-#include <string>
+#include "compiler.h"
+#include "utils.h"
 #include <unordered_set>
+
+bool equal(const CanonicalName& a, const CanonicalName& b) {
+	return equalStrings(a.name, b.name) && equalStrings(a.path, b.path);
+}
+
+bool empty(CanonicalName name) {
+	return empty(name.path) && empty(name.name);
+}
+
+bool splitMemberName(ls_string_view name, ls_string_view* owner, ls_string_view* member) {
+	for (const char* c = data(name) + size(name); c != data(name); --c) {
+		if (*(c - 1) != '.') continue;
+		*owner = ls_string_view{data(name), c - 1};
+		*member = ls_string_view{c, data(name) + size(name)};
+		return true;
+	}
+	return false;
+}
+
+struct StringViewHash {
+	size_t operator()(ls_string_view value) const noexcept {
+		size_t hash = 1469598103934665603ull;
+		for (const char* c = data(value); c != data(value) + size(value); ++c) {
+			hash ^= (unsigned char)*c;
+			hash *= 1099511628211ull;
+		}
+		return hash;
+	}
+};
+
+struct StringViewEq {
+	bool operator()(ls_string_view a, ls_string_view b) const noexcept { return equalStrings(a, b); }
+};
+
+TypeRef::TypeRef() {}
+
+TypeRef::TypeRef(ls_type_kind kind, ls_string_view unresolved_name, i32 struct_index, Token token, bool nullable)
+	: kind(kind)
+	, unresolved_name(unresolved_name)
+	, struct_index(struct_index)
+	, token(token)
+	, nullable(nullable) {
+	struct_index = -1;
+}
+
+bool sameBaseType(const TypeRef& a, const TypeRef& b) {
+	if (a.kind != b.kind) return false;
+	if (a.kind == LS_TYPE_FUNCTION) return a.struct_index == b.struct_index;
+	if (a.kind == LS_TYPE_ARRAY)
+		return a.array_size == b.array_size && a.element_kind == b.element_kind &&
+			   (a.element_kind != LS_TYPE_STRUCT && a.element_kind != LS_TYPE_ENUM ? true : (a.struct_index == b.struct_index || equalStrings(a.element_name, b.element_name)));
+	return a.kind != LS_TYPE_STRUCT && a.kind != LS_TYPE_ENUM && a.kind != LS_TYPE_FUNCTION ? true : a.struct_index == b.struct_index || equal(a.canonical_name, b.canonical_name);
+}
+
+Unit::ArenaOwner::ArenaOwner(const ls_host& host)
+	: host(host) {
+	arena = host.create_arena();
+}
+
+Unit::ArenaOwner::~ArenaOwner() {
+	host.destroy_arena(arena);
+}
+
+Unit::Unit(const ls_host& host)
+	: arena_owner(host)
+	, imports(*arena_owner.arena)
+	, native_functions(*arena_owner.arena)
+	, functions(*arena_owner.arena)
+	, globals(*arena_owner.arena)
+	, structs(*arena_owner.arena)
+	, enums(*arena_owner.arena)
+	, symbols(*arena_owner.arena)
+	, expressions(*arena_owner.arena)
+	, statements(*arena_owner.arena)
+	, match_arms(*arena_owner.arena) {}
+
+ls_module::ArenaOwner::ArenaOwner(const ls_host& host)
+	: host(host) {
+	arena = host.create_arena();
+}
+
+ls_module::ArenaOwner::~ArenaOwner() {
+	host.destroy_arena(arena);
+}
+
+ls_module::ls_module(const ls_host* host)
+	: host(host ? *host : ls_host{})
+	, arena_owner(this->host)
+	, units(*arena_owner.arena)
+	, function_types(*arena_owner.arena) {}
+
+ls_module::~ls_module() {}
+
+Unit& ls_module::addUnit(ls_string_view source_name) {
+	Unit& unit = units.emplace_back(host);
+	unit.source_name = source_name;
+	return unit;
+}
+
+i32 findStruct(const ls_module& module, CanonicalName name) {
+	i32 index = 0;
+	for (const Unit& unit : module.units) {
+		for (const StructDecl& s : unit.structs) {
+			if (equalStrings(s.name.path, name.path) && equalStrings(s.name.name, name.name)) {
+				return index;
+			}
+			++index;
+		}
+	}
+	return -1;
+}
+
+i32 ls_module::findFunction(CanonicalName name) const {
+	i32 index = 0;
+	for (const Unit& unit : units) {
+		for (const FunctionDecl& fn : unit.functions) {
+			if (equal(fn.canonical_name, name)) {
+				return index;
+			}
+			++index;
+		}
+	}
+	return -1;
+}
+
+i32 ls_module::findNativeFunction(ls_string_view name) const {
+	i32 index = 0;
+	ls_string_view owner = {};
+	ls_string_view member = name;
+	splitMemberName(name, &owner, &member);
+	for (const Unit& unit : units) {
+		for (const NativeFunctionDecl& fn : unit.native_functions) {
+			if (equalStrings(fn.canonical_name.name, member) && equalStrings(fn.canonical_name.path, owner)) return index;
+			++index;
+		}
+	}
+	return -1;
+}
+
+i32 ls_module::findNativeFunction(CanonicalName name) const {
+	i32 index = 0;
+	for (const Unit& unit : units) {
+		if (equalStrings(unit.source_name, name.path)) {
+			for (const NativeFunctionDecl& fn : unit.native_functions) {
+				if (equalStrings(fn.canonical_name.name, name.name)) return index;
+				++index;
+			}
+			return -1;
+		}
+	}
+	return -1;
+}
+
+i32 ls_module::findEnum(CanonicalName name) const {
+	i32 index = 0;
+	for (const Unit& unit : units) {
+		for (const EnumDecl& e : unit.enums) {
+			if (equalStrings(e.name.path, name.path) && equalStrings(e.name.name, name.name)) return index;
+			++index;
+		}
+	}
+	return -1;
+}
+
+i32 ls_module::findEnumMember(const EnumDecl& e, ls_string_view name) const {
+	for (i32 i = 0; i < (i32)e.members.size(); ++i) {
+		if (equalStrings(e.members[(size_t)i].name, name)) return i;
+	}
+	return -1;
+}
+
+ls_string_view ls_module::makeQualifiedName(ls_string_view prefix, ls_string_view name) {
+	if (empty(prefix)) return name;
+	ls_arena* arena = arena_owner.arena;
+	char* buffer = (char*)arena->allocate(arena->user_data, size(prefix) + size(name) + 2, alignof(char));
+	if (!buffer) return {};
+	char* out = buffer;
+	for (const char* c = data(prefix); c != data(prefix) + size(prefix); ++c) *out++ = *c;
+	*out++ = '.';
+	for (const char* c = data(name); c != data(name) + size(name); ++c) *out++ = *c;
+	*out = '\0';
+	return ls_string_view{buffer, buffer + size(prefix) + size(name) + 1};
+}
 
 bool parse(ls_module& module, ls_string_view source, ls_string_view declaration_prefix = {}, ls_string_view source_name = {});
 
@@ -51,55 +234,54 @@ static bool isBuiltinOperatorType(ls_type_kind kind) {
 struct Checker {
 	Checker(ls_module& module)
 		: m_module(module)
-		, m_output(&module.host) {}
+		, m_output(&module.host)
+		, m_arena_owner(module.host)
+		, m_native_functions(*m_arena_owner.arena)
+		, m_functions(*m_arena_owner.arena)
+		, m_structs(*m_arena_owner.arena)
+		, m_enums(*m_arena_owner.arena) {}
 
 	bool check() {
 		m_native_functions.clear();
 		m_functions.clear();
-		m_globals.clear();
 		m_structs.clear();
 		m_enums.clear();
 
-		for (Unit* unit_ptr : m_module.units) {
-			Unit& unit = *unit_ptr;
+		for (Unit& unit : m_module.units) {
 			for (NativeFunctionDecl& fn : unit.native_functions) m_native_functions.push_back(&fn);
 			for (FunctionDecl& fn : unit.functions) m_functions.push_back(&fn);
-			for (GlobalDecl& global : unit.globals) m_globals.push_back(&global);
 			for (StructDecl& s : unit.structs) m_structs.push_back(&s);
 			for (EnumDecl& e : unit.enums) m_enums.push_back(&e);
 		}
 
-		for (Unit* unit_ptr : m_module.units) {
-			Unit& unit = *unit_ptr;
+		for (Unit& unit : m_module.units) {
 			// Struct fields: detect duplicates per-struct and resolve field types
-			std::unordered_set<std::string> tmp_names;
+			std::unordered_set<ls_string_view, StringViewHash, StringViewEq> tmp_names;
 			for (StructDecl& s : unit.structs) {
 				tmp_names.clear();
 				tmp_names.reserve(s.fields.size() * 2 + 4);
-				
+
 				for (FieldDecl& f : s.fields) {
-					std::string key(data(f.name), size(f.name));
-					if (!tmp_names.insert(key).second) {
+					if (!tmp_names.insert(f.name).second) {
 						m_output.errorAt(f.token, "Duplicate field '", f.name, "'");
 						return false;
 					}
 					resolveType(unit, f.type);
 				}
 			}
-			
+
 			// Enums and enum members
 			for (const EnumDecl& e : unit.enums) {
 				tmp_names.clear();
 				tmp_names.reserve(e.members.size() * 2 + 4);
 				for (const EnumMember& m : e.members) {
-					std::string mkey(data(m.name), size(m.name));
-					if (!tmp_names.insert(mkey).second) {
+					if (!tmp_names.insert(m.name).second) {
 						m_output.errorAt(m.token, "Duplicate enum member '", m.name, "'");
 						return false;
 					}
 				}
 			}
-			
+
 			for (FunctionDecl& fn : unit.functions) {
 				if (!checkFunctionSignature(unit, fn)) return false;
 			}
@@ -110,8 +292,7 @@ struct Checker {
 			}
 		}
 
-		for (Unit* unit_ptr : m_module.units) {
-			Unit& unit = *unit_ptr;
+		for (Unit& unit : m_module.units) {
 			for (FunctionDecl& fn : unit.functions) {
 				if (!fn.is_operator) continue;
 				// Operator declarations are validated in a separate pass so normal
@@ -164,9 +345,9 @@ struct Checker {
 			}
 			checkGlobals(unit);
 		}
-		for (Unit* unit : m_module.units) {
-			for (FunctionDecl& fn : unit->functions) {
-				checkFunction(*unit, fn);
+		for (Unit& unit : m_module.units) {
+			for (FunctionDecl& fn : unit.functions) {
+				checkFunction(unit, fn);
 			}
 		}
 		return !m_output.has_error;
@@ -178,8 +359,7 @@ struct Checker {
 	}
 
 	Symbol findSymbol(const ImportDecl& import, ls_string_view type) const {
-		for (const Unit* unit_ptr : m_module.units) {
-			const Unit& unit = *unit_ptr;
+		for (const Unit& unit : m_module.units) {
 			if (equalStrings(import.path, unit.source_name)) {
 				for (const Symbol& s : unit.symbols) {
 					if (equalStrings(s.name.name, type)) {
@@ -194,19 +374,12 @@ struct Checker {
 
 	TypeRef resolveSymbolExpr(Expr& e, const Symbol& s) {
 		switch (s.kind) {
-			case Symbol::GLOBAL_VAR:
+			case Symbol::GLOBAL_VAR: {
+				GlobalDecl& global = s.unit->globals[s.index];
 				e.kind = Expr::VAR;
 				e.name = m_module.makeQualifiedName(s.name.path, s.name.name);
 				e.qualified_name = s.name;
-				e.type = s.unit->globals[s.index].type;
-				return e.type;
-			case Symbol::FN: {
-				const i32 fn_idx = m_module.findFunction(s.name);
-				if (fn_idx < 0) return {};
-				e.kind = Expr::FUNCTION_REF;
-				e.is_native_fn = false;
-				e.left = fn_idx;
-				e.type = functionTypeFromFunction(*m_functions[fn_idx]);
+				e.type = global.type;
 				return e.type;
 			}
 			case Symbol::EXTERN_FN: {
@@ -214,12 +387,19 @@ struct Checker {
 				if (native_idx < 0) return {};
 				e.kind = Expr::FUNCTION_REF;
 				e.is_native_fn = true;
-				e.left = native_idx;
+				e.native_function = native_idx;
 				e.type = functionTypeFromNativeFunction(*m_native_functions[native_idx]);
 				return e.type;
 			}
-			default:
-				return {};
+			default: return {};
+		}
+	}
+
+	bool isCallableSymbol(const Symbol& s) const {
+		switch (s.kind) {
+			case Symbol::EXTERN_FN: return true;
+			case Symbol::GLOBAL_VAR: return s.unit->globals[s.index].type.kind == LS_TYPE_FUNCTION;
+			default: return false;
 		}
 	}
 
@@ -278,7 +458,7 @@ struct Checker {
 				return s;
 			}
 		}
-		
+
 		if (found) {
 			res.name = {resolved_path, unresolved_name};
 			return res;
@@ -302,17 +482,17 @@ struct Checker {
 		return true;
 	}
 
-	TypeRef functionTypeFromSignature(std::span<const Param> params, TypeRef return_type, Token token) {
+	TypeRef functionTypeFromSignature(const ExpArray<Param>& params, TypeRef return_type, Token token) {
 		for (i32 i = 0; i < m_module.function_types.size(); ++i) {
 			FunctionTypeDecl& existing = m_module.function_types[i];
 			if (existing.params.size() != params.size()) continue;
 			bool same = sameResolvedType(existing.return_type, return_type);
-			for (u32 j = 0; same && j < params.size(); ++j) {
+			for (u32 j = 0; same && j < (u32)params.size(); ++j) {
 				same = existing.params[j].is_ref == params[j].is_ref && sameResolvedType(existing.params[j], params[j].type);
 			}
 			if (same) return {LS_TYPE_FUNCTION, {}, i, token};
 		}
-		FunctionTypeDecl& fn_type = m_module.function_types.emplace_back();
+		FunctionTypeDecl& fn_type = m_module.function_types.emplace_back(*m_module.arena_owner.arena);
 		for (const Param& p : params) {
 			TypeRef param_type = p.type;
 			param_type.is_ref = p.is_ref;
@@ -322,15 +502,15 @@ struct Checker {
 		return {LS_TYPE_FUNCTION, {}, (i32)m_module.function_types.size() - 1, token};
 	}
 
-	TypeRef functionTypeFromFunction(FunctionDecl& fn) { return functionTypeFromSignature(std::span<const Param>(fn.params.begin(), fn.params.size()), fn.return_type, fn.token); }
+	TypeRef functionTypeFromFunction(FunctionDecl& fn) { return functionTypeFromSignature(fn.params, fn.return_type, fn.token); }
 
-	TypeRef functionTypeFromNativeFunction(NativeFunctionDecl& fn) { return functionTypeFromSignature(std::span<const Param>(fn.params.begin(), fn.params.size()), fn.return_type, fn.token); }
+	TypeRef functionTypeFromNativeFunction(NativeFunctionDecl& fn) { return functionTypeFromSignature(fn.params, fn.return_type, fn.token); }
 
-	ls_string_view getExpressionName(i32 expr_idx) {
-		Expr& e = m_module.expressions[expr_idx];
+	ls_string_view getExpressionName(Unit& unit, i32 expr_idx) {
+		Expr& e = unit.expressions[expr_idx];
 		if (e.kind == Expr::VAR) return e.name;
 		if (e.kind == Expr::FIELD) {
-			if (empty(e.qualified_name)) e.qualified_name = {getExpressionName(e.left), e.name};
+			if (empty(e.qualified_name)) e.qualified_name = {getExpressionName(unit, e.left), e.name};
 			return m_module.makeQualifiedName(e.qualified_name.path, e.qualified_name.name);
 		}
 		return {};
@@ -342,19 +522,19 @@ struct Checker {
 		return -1;
 	}
 
-	bool isAssignableExpr(i32 expr_idx) {
+	bool isAssignableExpr(Unit& unit, i32 expr_idx) {
 		if (expr_idx < 0) return false;
-		Expr& e = m_module.expressions[expr_idx];
+		Expr& e = unit.expressions[expr_idx];
 		if (e.kind == Expr::VAR) return true;
-		if (e.kind == Expr::FIELD) return isAssignableExpr(e.left);
-		if (e.kind == Expr::INDEX) return isAssignableExpr(e.left);
+		if (e.kind == Expr::FIELD) return isAssignableExpr(unit, e.left);
+		if (e.kind == Expr::INDEX) return isAssignableExpr(unit, e.left);
 		return false;
 	}
 
 	bool isConstExpr(Unit& unit, i32 expr_idx) {
 		if (expr_idx < 0) return false;
 
-		Expr& e = m_module.expressions[expr_idx];
+		Expr& e = unit.expressions[expr_idx];
 		if (e.kind == Expr::VAR) {
 			// Constness can apply to either a local or a canonically resolved
 			// imported/global declaration, so we resolve the symbol before asking
@@ -375,48 +555,50 @@ struct Checker {
 	}
 
 	void resolveType(Unit& unit, TypeRef& type) {
-		if (type.kind == LS_TYPE_ARRAY) {
-			TypeRef elem(type.element_kind, type.element_name, type.struct_index, type.token, false);
-			resolveType(unit, elem);
-			type.element_kind = elem.kind;
-			type.element_name = elem.unresolved_name;
-			type.struct_index = elem.struct_index;
-		} else if (type.kind == LS_TYPE_STRUCT) {
-			if (empty(type.canonical_name.name)) {
+		switch (type.kind) {
+			case LS_TYPE_ARRAY: {
+				TypeRef elem(type.element_kind, type.element_name, type.struct_index, type.token, false);
+				resolveType(unit, elem);
+				type.element_kind = elem.kind;
+				type.element_name = elem.unresolved_name;
+				type.struct_index = elem.struct_index;
+				break;
+			}
+			case LS_TYPE_STRUCT: {
 				Symbol s = resolveSymbol(unit, type.unresolved_name, type.token);
-				if (s.kind == Symbol::ENUM){
+				if (s.kind == Symbol::ENUM) {
 					type.canonical_name = s.name;
-					type.struct_index = m_module.findEnum(type.canonical_name);
+					type.enum_index = m_module.findEnum(type.canonical_name);
 					type.kind = LS_TYPE_ENUM;
-				}
-				else if (s.kind == Symbol::STRUCT) {
+				} else if (s.kind == Symbol::STRUCT) {
 					type.canonical_name = s.name;
-					type.struct_index = m_module.findStruct(type.canonical_name);
-				}
-				else {
+					type.struct_index = findStruct(m_module, type.canonical_name);
+				} else {
 					m_output.errorAt(type.token, "Unknown type '", type.unresolved_name, "'");
 				}
+				break;
 			}
-		} else if (type.kind == LS_TYPE_ENUM) {
-			// Array element types can be reconstructed from resolved metadata. In
-			// that case the enum index is authoritative and there is no name to
-			// resolve again.
-			if (type.enum_index >= 0) return;
-			type.enum_index = m_module.findEnum(type.canonical_name);
-			if (type.enum_index < 0) {
-				// TODO can this be hit? remove it
-				m_output.errorAt(type.token, "Unknown type '", type.unresolved_name, "'");
-				return;
+			case LS_TYPE_ENUM: {
+				// Array element types can be reconstructed from resolved metadata. In
+				// that case the enum index is authoritative and there is no name to
+				// resolve again.
+				if (type.enum_index < 0) {
+					type.enum_index = m_module.findEnum(type.canonical_name);
+				}
+				break;
 			}
-		} else if (type.kind == LS_TYPE_FUNCTION) {
-			if (type.function_index < 0 || type.function_index >= m_module.function_types.size()) {
-				// TODO can this be hit? remove it
-				m_output.errorAt(type.token, "Invalid function type");
-				return;
+			case LS_TYPE_FUNCTION: {
+				if (type.function_index < 0 || type.function_index >= m_module.function_types.size()) {
+					// TODO can this be hit? remove it if it can't be hit, otherwise create a test
+					m_output.errorAt(type.token, "Invalid function type");
+					return;
+				}
+				FunctionTypeDecl& fn_type = m_module.function_types[type.function_index];
+				for (TypeRef& param : fn_type.params) resolveType(unit, param);
+				resolveType(unit, fn_type.return_type);
+				break;
 			}
-			FunctionTypeDecl& fn_type = m_module.function_types[type.function_index];
-			for (TypeRef& param : fn_type.params) resolveType(unit, param);
-			resolveType(unit, fn_type.return_type);
+			default: break;
 		}
 	}
 
@@ -446,7 +628,7 @@ struct Checker {
 		return isNumeric(left) && isNumeric(right) && sameBaseType(left, right);
 	}
 
-	bool resolveOperatorOverload(Token::Type op, std::span<const TypeRef> operands, Token token, i32* fn_idx) {
+	bool resolveOperatorOverload(Token::Type op, span<const TypeRef> operands, Token token, i32* fn_idx) {
 		*fn_idx = -1;
 		// Overload lookup is deliberately strict: if the operand types do not
 		// already match a declared signature exactly, we fall back to the built-in
@@ -474,16 +656,16 @@ struct Checker {
 		return true;
 	}
 
-	bool getNullablePromotion(i32 expr_idx, ls_string_view* var_name, TypeRef* promoted_type, bool* promote_true_branch) {
+	bool getNullablePromotion(Unit& unit, i32 expr_idx, ls_string_view* var_name, TypeRef* promoted_type, bool* promote_true_branch) {
 		if (expr_idx < 0) return false;
-		Expr& cond = m_module.expressions[expr_idx];
+		Expr& cond = unit.expressions[expr_idx];
 		if (cond.kind != Expr::BINARY) return false;
 		if (cond.token.type != Token::BANG_EQUAL && cond.token.type != Token::EQUAL_EQUAL) return false;
 
 		i32 var_expr_idx = -1;
 		i32 null_expr_idx = -1;
-		Expr& left = m_module.expressions[cond.left];
-		Expr& right = m_module.expressions[cond.right];
+		Expr& left = unit.expressions[cond.left];
+		Expr& right = unit.expressions[cond.right];
 		if (left.kind == Expr::VAR && right.kind == Expr::NULL_LITERAL) {
 			var_expr_idx = cond.left;
 			null_expr_idx = cond.right;
@@ -493,7 +675,7 @@ struct Checker {
 		}
 		if (var_expr_idx < 0 || null_expr_idx < 0) return false;
 
-		Expr& var_expr = m_module.expressions[var_expr_idx];
+		Expr& var_expr = unit.expressions[var_expr_idx];
 		const i32 local_idx = findLocal(var_expr.name);
 		if (local_idx < 0) return false;
 		if (!m_locals[local_idx].type.nullable) return false;
@@ -534,17 +716,17 @@ struct Checker {
 
 	bool isNumeric(TypeRef type) const { return isIntegral(type) || isFloat(type); }
 
-	bool getCompileTimeInteger(i32 expr_idx, i64* value) {
-		if (expr_idx < 0 || expr_idx >= m_module.expressions.size()) return false;
-		Expr& e = m_module.expressions[expr_idx];
+	bool getCompileTimeInteger(Unit& unit, i32 expr_idx, i64* value) {
+		if (expr_idx < 0 || expr_idx >= unit.expressions.size()) return false;
+		Expr& e = unit.expressions[expr_idx];
 		switch (e.kind) {
 			case Expr::NUMBER: *value = (i64)e.number; return true;
 			case Expr::UNARY:
 				if (e.token.type != Token::MINUS && e.token.type != Token::PLUS) return false;
-				if (!getCompileTimeInteger(e.right, value)) return false;
+				if (!getCompileTimeInteger(unit, e.right, value)) return false;
 				if (e.token.type == Token::MINUS) *value = -*value;
 				return true;
-			case Expr::CAST: return getCompileTimeInteger(e.left, value);
+			case Expr::CAST: return getCompileTimeInteger(unit, e.left, value);
 			default: return false;
 		}
 	}
@@ -603,10 +785,12 @@ struct Checker {
 			}
 		}
 		if (fn_idx < 0) return nullptr;
-		for (const GlobalDecl* global : m_globals) {
-			if (global->expr < 0 || global->expr >= m_module.expressions.size()) continue;
-			const Expr& expr = m_module.expressions[global->expr];
-			if (expr.kind == Expr::FUNCTION_REF && !expr.is_native_fn && expr.left == fn_idx) return global;
+		for (const Unit& unit : m_module.units) {
+			for (const GlobalDecl& global : unit.globals) {
+				if (global.expr < 0 || global.expr >= unit.expressions.size()) continue;
+				const Expr& expr = unit.expressions[global.expr];
+				if (expr.kind == Expr::FUNCTION_REF && !expr.is_native_fn && expr.left == fn_idx) return &global;
+			}
 		}
 		return nullptr;
 	}
@@ -666,8 +850,45 @@ struct Checker {
 		}
 	}
 
+	TypeRef checkMethodStyleCall(Unit& unit, Expr& callee, const TypeRef& receiver_type, i32 receiver_expr, Expr& call_expr) {
+		Symbol direct_symbol;
+		for (const Symbol& s : unit.symbols) {
+			if (equalStrings(s.name.name, callee.name)) {
+				direct_symbol = s;
+				break;
+			}
+		}
+
+		Symbol receiver_symbol = {.kind = Symbol::NOT_FOUND};
+		ls_string_view path = receiver_type.canonical_name.path;
+		for (const ImportDecl& import : unit.imports) {
+			if (!equalStrings(import.path, path)) continue;
+			receiver_symbol = findSymbol(import, callee.name);
+			break;
+		}
+
+		const bool direct_callable = isCallableSymbol(direct_symbol);
+		const bool receiver_callable = isCallableSymbol(receiver_symbol);
+		if (direct_callable && receiver_callable) {
+			m_output.errorAt(callee.token, "Ambiguous method-style call '", callee.name, "'");
+			return {};
+		}
+		if (!direct_callable && !receiver_callable) return {};
+
+		const Symbol& resolved = receiver_callable ? receiver_symbol : direct_symbol;
+		TypeRef resolved_type = resolveSymbolExpr(callee, resolved);
+
+		// TODO
+		std::vector<i32> args;
+		args.push_back(receiver_expr);
+		for (i32 arg : call_expr.args) args.push_back(arg);
+		call_expr.args.clear();
+		for (i32 arg : args) call_expr.args.push_back(arg);
+		return resolved_type;
+	}
+
 	TypeRef checkField(Unit& unit, Expr& e, Expr* call_expr = nullptr) {
-		Expr& left_expr = m_module.expressions[e.left];
+		Expr& left_expr = unit.expressions[e.left];
 		switch (left_expr.kind) {
 			case Expr::CALL:
 			case Expr::VAR:
@@ -676,7 +897,7 @@ struct Checker {
 				if (left_type.nullable) {
 					m_output.errorAt(e.token, "Nullable value must be checked for null");
 					return {};
-				}		
+				}
 				switch (left_type.kind) {
 					case LS_TYPE_INVALID: {
 						m_output.errorAt(left_expr.token, "Unknown identifier ", left_expr.name);
@@ -686,50 +907,31 @@ struct Checker {
 						Symbol s = findSymbol(unit.imports[left_type.import_index], e.name);
 						TypeRef resolved = resolveSymbolExpr(e, s);
 						switch (s.kind) {
-							case Symbol::NOT_FOUND:
-								m_output.errorAt(e.token, "Unknown identifier ", e.name);
-								return {};
-							case Symbol::STRUCT:
-								m_output.errorAt(e.token, "", e.name); // TODO can we even get here?
-								return {};
+							case Symbol::NOT_FOUND: m_output.errorAt(e.token, "Unknown identifier ", e.name); return {};
+							case Symbol::STRUCT: m_output.errorAt(e.token, "Struct type '", e.name, "' is not a value"); return {};
 							case Symbol::ENUM: {
 								const i32 enum_idx = m_module.findEnum(s.name);
-								if (enum_idx < 0) {
-									m_output.errorAt(e.token, "Unknown enum '", left_expr.name, "'");
-									return {};
-								}
 								e.type.kind = LS_TYPE_ENUM;
 								e.type.canonical_name = s.name;
-								e.type.struct_index = enum_idx;
+								e.type.enum_index = enum_idx;
 								return e.type;
 							}
-							default:
-								return resolved;
+							default: return resolved;
 						}
 					}
 					case LS_TYPE_STRUCT: {
 						StructDecl& s = *m_structs[left_type.struct_index];
 						for (const FieldDecl& f : s.fields) {
 							if (!equalStrings(f.name, e.name)) continue;
-							if (empty(e.qualified_name)) e.qualified_name = {getExpressionName(e.left), e.name};
+							if (empty(e.qualified_name)) e.qualified_name = {getExpressionName(unit, e.left), e.name};
 							e.type = f.type;
 							return e.type;
 						}
 
-						ls_string_view path = left_type.canonical_name.path;
-						const i32 receiver_expr = e.left;
-						for (const ImportDecl& import : unit.imports) {
-							if (!equalStrings(import.path, path)) continue;
-							Symbol s = findSymbol(import, e.name);
-							TypeRef resolved = resolveSymbolExpr(e, s);
-							if (resolved.kind == LS_TYPE_INVALID) continue;
-							if (call_expr && e.kind == Expr::VAR && e.type.kind == LS_TYPE_FUNCTION) {
-								call_expr->args.insert(call_expr->args.begin(), receiver_expr);
-							}
-							if (call_expr && e.kind == Expr::FUNCTION_REF && !e.is_native_fn) {
-								call_expr->args.insert(call_expr->args.begin(), receiver_expr);
-							}
-							return resolved;
+						if (call_expr) {
+							TypeRef resolved = checkMethodStyleCall(unit, e, left_type, e.left, *call_expr);
+							if (resolved.kind == LS_TYPE_FUNCTION) return resolved;
+							if (m_output.has_error) return {};
 						}
 
 						m_output.errorAt(e.token, "Struct ", s.token.value, " has no field ", e.name);
@@ -743,38 +945,22 @@ struct Checker {
 							e.type = left_type;
 							return e.type;
 						}
-						for (i32 i = 0; i < (i32)m_functions.size(); ++i) {
-							FunctionDecl& fn = *m_functions[i];
-							if (!equalStrings(fn.canonical_name.name, e.name)) continue;
-							if (fn.params.empty() || !sameResolvedType(fn.params[0].type, left_type)) continue;
-							e.kind = Expr::FUNCTION_REF;
-							e.is_native_fn = false;
-							e.left = i;
-							e.type = functionTypeFromFunction(fn);
-							if (call_expr) call_expr->args.insert(call_expr->args.begin(), receiver_expr); // TODO can we get here if call_expr == null?
-							return e.type;
-						}
-						for (i32 i = 0; i < (i32)m_native_functions.size(); ++i) {
-							NativeFunctionDecl& fn = *m_native_functions[i];
-							if (!equalStrings(fn.canonical_name.name, e.name)) continue;
-							if (fn.params.empty() || !sameResolvedType(fn.params[0].type, left_type)) continue;
-							e.kind = Expr::FUNCTION_REF;
-							e.is_native_fn = true;
-							e.left = i;
-							e.type = functionTypeFromNativeFunction(fn);
-							if (call_expr) call_expr->args.insert(call_expr->args.begin(), receiver_expr);
-							return e.type;
+
+						if (call_expr) {
+							TypeRef resolved = checkMethodStyleCall(unit, e, left_type, receiver_expr, *call_expr);
+							if (resolved.kind == LS_TYPE_FUNCTION) return resolved;
+							if (m_output.has_error) return {};
 						}
 						m_output.errorAt(e.token, "Unknown identifier ", e.name);
 						return {};
 					}
 					default: {
-						m_output.errorAt(left_expr.token, "Unexpected identifier ", left_expr.token.value); // TODO can we even get here?
+						m_output.errorAt(e.token, "Member access requires struct, enum or namespace value");
 						return {};
 					}
 				}
 			}
-			default: ASSERT(false); return {};
+			default: m_output.errorAt(e.token, "Member access requires struct, enum or namespace value"); return {};
 		}
 	}
 
@@ -791,21 +977,23 @@ struct Checker {
 
 		Symbol symbol = resolveSymbol(unit, e.name, e.token);
 		if (call_expr && call_expr->args.size() > 0 && symbol.kind == Symbol::GLOBAL_VAR && m_current_global_initializer && equal(symbol.name, m_current_global_initializer->canonical_name)) {
-			// Prefer first-parameter namespace lookup over accidental recursion
-			// through the global currently receiving this function literal.
+			// A function literal assigned to a global can recursively refer to
+			// that global. If the same bare call also matches first-parameter
+			// namespace lookup, require the caller to write the target explicitly.
 			TypeRef first_arg_type = checkExpr(unit, call_expr->args[0], nullptr);
 			ls_string_view possible_namespace = first_arg_type.canonical_name.path;
 			for (const ImportDecl& import : unit.imports) {
 				if (!equalStrings(import.path, possible_namespace)) continue;
 				Symbol s = findSymbol(import, e.name);
-				TypeRef resolved = resolveSymbolExpr(e, s);
-				if (resolved.kind != LS_TYPE_INVALID) return resolved;
+				if (isCallableSymbol(s)) {
+					m_output.errorAt(e.token, "Ambiguous call '", e.name, "'");
+					return {};
+				}
 			}
 		}
 		switch (symbol.kind) {
 			case Symbol::COLLISION: return {};
 			case Symbol::GLOBAL_VAR:
-			case Symbol::FN:
 			case Symbol::EXTERN_FN: return resolveSymbolExpr(e, symbol);
 			case Symbol::ENUM: {
 				const i32 enum_idx = m_module.findEnum(symbol.name);
@@ -835,7 +1023,7 @@ struct Checker {
 		for (const ImportDecl& import : unit.imports) {
 			if (equalStrings(import.alias, e.name)) {
 				e.type.kind = LS_TYPE_NAMESPACE;
-				e.type.import_index = i32(&import - unit.imports.data());
+				e.type.import_index = unit.imports.indexOf(&import);
 				return e.type;
 			}
 		}
@@ -846,7 +1034,7 @@ struct Checker {
 
 	TypeRef checkCall(Unit& unit, Expr& e) {
 		TypeRef left_type = checkExpr(unit, e.left, nullptr, &e);
-		Expr& left_expr = m_module.expressions[e.left];
+		Expr& left_expr = unit.expressions[e.left];
 		if (left_type.kind != LS_TYPE_FUNCTION) {
 			m_output.errorAt(left_expr.token, left_expr.name, " must be a function");
 			return {};
@@ -861,14 +1049,14 @@ struct Checker {
 
 		// typecheck args
 		for (i32 i = 0; i < fn_type.params.size(); ++i) {
-			Expr& arg_expr = m_module.expressions[e.args[i]];
+			Expr& arg_expr = unit.expressions[e.args[i]];
 			if (fn_type.params[i].is_ref) {
 				if (arg_expr.kind != Expr::REF) {
 					m_output.errorAt(arg_expr.token, "Argument must be passed by ref");
 					return {};
 				}
-				if (!isAssignableExpr(arg_expr.right)) {
-					m_output.errorAt(m_module.expressions[arg_expr.right].token, "Argument must be assignable because it is passed by ref");
+				if (!isAssignableExpr(unit, arg_expr.right)) {
+					m_output.errorAt(unit.expressions[arg_expr.right].token, "Argument must be assignable because it is passed by ref");
 					return {};
 				}
 				if (isConstExpr(unit, arg_expr.right)) {
@@ -877,12 +1065,12 @@ struct Checker {
 				}
 				TypeRef arg_type = checkExpr(unit, arg_expr.right, &fn_type.params[i]);
 				if (!canAssign(fn_type.params[i], arg_type)) {
-					m_output.errorAt(m_module.expressions[arg_expr.right].token, "Argument type mismatch");
+					m_output.errorAt(unit.expressions[arg_expr.right].token, "Argument type mismatch");
 					return {};
 				}
 				continue;
 			}
-			
+
 			TypeRef arg_type = checkExpr(unit, e.args[i], &fn_type.params[i]);
 			if (!canAssign(fn_type.params[i], arg_type)) {
 				m_output.errorAt(arg_expr.token, "Argument type mismatch");
@@ -896,15 +1084,9 @@ struct Checker {
 
 	TypeRef checkExpr(Unit& unit, i32 expr_idx, const TypeRef* expected = nullptr, Expr* call_expr = nullptr) {
 		if (expr_idx < 0) return {};
-		Expr& e = m_module.expressions[expr_idx];
+		Expr& e = unit.expressions[expr_idx];
 		switch (e.kind) {
 			case Expr::NUMBER:
-				// Numeric literals start out as untyped integers/floats so the
-				// surrounding expression can choose the smallest amount of explicit
-				// syntax. `expected` is the contextual type from an assignment, call
-				// argument, struct field, etc.; when it is numeric we commit the
-				// literal to that type here. Without that context, default to the
-				// language's normal concrete literal types.
 				e.type = concreteNumberType(e.type, expected);
 				return e.type;
 			case Expr::STRING_LITERAL: e.type = {LS_TYPE_STRING, {}, -1}; return e.type;
@@ -912,26 +1094,7 @@ struct Checker {
 			case Expr::NULL_LITERAL: return e.type;
 			case Expr::VAR: return checkVar(unit, e, call_expr);
 			case Expr::FUNCTION_REF: {
-				// Function references are produced from two
-				// different paths:
-				// - ordinary named function lookups during
-				//   semantic analysis
-				// - synthesized anonymous function literals
-				//
-				// The checker generally fills in `e.type` when it
-				// resolves the expression, but we keep this fallback
-				// so later passes can still recover the signature if
-				// the expression was created earlier or copied in a
-				// partially-resolved form.
-				if (e.type.kind != LS_TYPE_INVALID) return e.type;
-				if (e.is_native_fn) {
-						if (e.left < 0 || e.left >= m_native_functions.size()) return {};
-						e.type = functionTypeFromNativeFunction(*m_native_functions[e.left]);
-				}
-				else {
-						if (e.left < 0 || e.left >= m_functions.size()) return {};
-						e.type = functionTypeFromFunction(*m_functions[e.left]);
-				}
+				e.type = functionTypeFromFunction(*m_functions[e.left]);
 				return e.type;
 			}
 			case Expr::FIELD: return checkField(unit, e, call_expr);
@@ -954,7 +1117,7 @@ struct Checker {
 				// that fold to an integer without running user code are rejected at
 				// compile time; dynamic indices stay the runtime's responsibility.
 				i64 idx_value = 0;
-				if (getCompileTimeInteger(e.right, &idx_value) && (idx_value < 0 || idx_value >= base.array_size)) {
+				if (getCompileTimeInteger(unit, e.right, &idx_value) && (idx_value < 0 || idx_value >= base.array_size)) {
 					m_output.errorAt(e.token, "Array index out of range");
 					return {};
 				}
@@ -972,7 +1135,7 @@ struct Checker {
 					// Unary minus can be overloaded for user types, but primitives still
 					// use the built-in numeric lowering. That keeps `-i32` and `-f32`
 					// predictable even when a module defines custom operator overloads.
-					if (!isBuiltinOperatorType(right.kind) && resolveOperatorOverload(Token::MINUS, std::span<const TypeRef>(&right, 1), e.token, &fn_idx) && fn_idx >= 0) {
+					if (!isBuiltinOperatorType(right.kind) && resolveOperatorOverload(Token::MINUS, span<const TypeRef>(&right, 1), e.token, &fn_idx) && fn_idx >= 0) {
 						e.resolved_function = fn_idx;
 						e.type = m_functions[fn_idx]->return_type;
 						return e.type;
@@ -1005,7 +1168,7 @@ struct Checker {
 				const bool is_comparison = e.token.type == Token::GT || e.token.type == Token::LT || e.token.type == Token::GT_EQUAL || e.token.type == Token::LT_EQUAL ||
 										   e.token.type == Token::EQUAL_EQUAL || e.token.type == Token::BANG_EQUAL || e.token.type == Token::AND || e.token.type == Token::OR;
 				const TypeRef* operand_expected = !is_comparison && expected && isNumeric(*expected) ? expected : nullptr;
-				Expr& left_expr = m_module.expressions[e.left];
+				Expr& left_expr = unit.expressions[e.left];
 				TypeRef left;
 				TypeRef right;
 				// Reversed enum comparisons like `.Idle == state` need the concrete
@@ -1013,8 +1176,7 @@ struct Checker {
 				if (is_comparison && left_expr.kind == Expr::ENUM_LITERAL) {
 					right = checkExpr(unit, e.right);
 					left = checkExpr(unit, e.left, &right);
-				}
-				else {
+				} else {
 					left = checkExpr(unit, e.left, operand_expected);
 					// The right side uses the left side as context even for arithmetic. This
 					// is what makes `1 + 2` settle on a single type while still catching
@@ -1045,7 +1207,7 @@ struct Checker {
 					// Operator expressions lower to a direct function call when an exact
 					// match exists. If no overload matches, the checker continues into the
 					// legacy built-in rules below.
-					if (!resolveOperatorOverload(e.token.type, std::span<const TypeRef>(operands, 2), e.token, &fn_idx)) return {};
+					if (!resolveOperatorOverload(e.token.type, span<const TypeRef>(operands, 2), e.token, &fn_idx)) return {};
 					if (fn_idx >= 0) {
 						e.resolved_function = fn_idx;
 						e.type = m_functions[fn_idx]->return_type;
@@ -1126,7 +1288,7 @@ struct Checker {
 				for (i32 i = 0; i < e.args.size(); ++i) {
 					TypeRef arg_type = checkExpr(unit, e.args[i], &s.fields[i].type);
 					if (!canAssign(s.fields[i].type, arg_type)) {
-						m_output.errorAt(m_module.expressions[e.args[i]].token, "Struct literal type mismatch");
+						m_output.errorAt(unit.expressions[e.args[i]].token, "Struct literal type mismatch");
 						return {};
 					}
 				}
@@ -1156,9 +1318,9 @@ struct Checker {
 		return {};
 	}
 
-	i32 enumPatternMember(MatchPattern& pattern, TypeRef subject_type) {
+	i32 enumPatternMember(Unit& unit, MatchPattern& pattern, TypeRef subject_type) {
 		if (subject_type.kind != LS_TYPE_ENUM || pattern.kind != MatchPattern::VALUE || pattern.start_expr < 0) return -1;
-		Expr& e = m_module.expressions[pattern.start_expr];
+		Expr& e = unit.expressions[pattern.start_expr];
 		if (e.kind != Expr::ENUM_LITERAL) return -1;
 		return m_module.findEnumMember(*m_enums[subject_type.enum_index], e.name);
 	}
@@ -1205,11 +1367,10 @@ struct Checker {
 		}
 
 		for (i32 arm_idx : stmt.children) {
-			MatchArm& arm = m_module.match_arms[arm_idx];
-			for (i32 pattern_idx : arm.patterns) {
-				MatchPattern& pattern = m_module.match_patterns[pattern_idx];
+			MatchArm& arm = unit.match_arms[arm_idx];
+			for (MatchPattern& pattern : arm.patterns) {
 				checkMatchPattern(unit, pattern, subject_type, &has_default);
-				const i32 enum_member = enumPatternMember(pattern, subject_type);
+				const i32 enum_member = enumPatternMember(unit, pattern, subject_type);
 				if (enum_member >= 0) {
 					if (covered_enum_members[enum_member]) {
 						m_output.errorAt(pattern.token, "Duplicate enum match case");
@@ -1232,7 +1393,7 @@ struct Checker {
 
 	void checkStmt(Unit& unit, i32 stmt_idx, TypeRef return_type) {
 		if (stmt_idx < 0 || m_output.has_error) return;
-		Stmt& stmt = m_module.statements[stmt_idx];
+		Stmt& stmt = unit.statements[stmt_idx];
 		switch (stmt.kind) {
 			case Stmt::BLOCK: {
 				const i32 old_size = (i32)m_locals.size();
@@ -1291,9 +1452,9 @@ struct Checker {
 				stmt.resolved_function = -1;
 				TypeRef left = checkExpr(unit, stmt.left);
 				TypeRef right = checkExpr(unit, stmt.right, &left);
-				Expr& lhs = m_module.expressions[stmt.left];
-				if (!isAssignableExpr(stmt.left)) {
-					m_output.errorAt(m_module.expressions[stmt.left].token, "Assignment target must be assignable");
+				Expr& lhs = unit.expressions[stmt.left];
+				if (!isAssignableExpr(unit, stmt.left)) {
+					m_output.errorAt(unit.expressions[stmt.left].token, "Assignment target must be assignable");
 				}
 				if (stmt.assign_op != Token::EQUAL && !isBuiltinOperatorType(left.kind)) {
 					Token::Type op = Token::END_OF_FILE;
@@ -1310,7 +1471,7 @@ struct Checker {
 						// Compound assignment on user types is normalized to the matching
 						// binary operator, then the result is written back through the same
 						// assignment rules used for ordinary stores.
-						if (!resolveOperatorOverload(op, std::span<const TypeRef>(operands, 2), stmt.token, &fn_idx)) return;
+						if (!resolveOperatorOverload(op, span<const TypeRef>(operands, 2), stmt.token, &fn_idx)) return;
 						if (fn_idx >= 0) {
 							stmt.resolved_function = fn_idx;
 							if (!canAssign(left, m_functions[fn_idx]->return_type)) {
@@ -1332,8 +1493,7 @@ struct Checker {
 						if (m_locals[idx].is_const) {
 							m_output.errorAt(lhs.token, "Can not assign to const '", lhs.name, "'");
 						}
-					}
-					else {
+					} else {
 						Symbol global_symbol = resolveSymbol(unit, lhs.name, lhs.token); // TODO can we even get here?
 						if (global_symbol.kind == Symbol::GLOBAL_VAR) {
 							const GlobalDecl& g = global_symbol.unit->globals[global_symbol.index];
@@ -1426,7 +1586,7 @@ struct Checker {
 				ls_string_view promoted_name;
 				TypeRef promoted_type;
 				bool promote_true_branch = false;
-				if (getNullablePromotion(stmt.expr, &promoted_name, &promoted_type, &promote_true_branch)) {
+				if (getNullablePromotion(unit, stmt.expr, &promoted_name, &promoted_type, &promote_true_branch)) {
 					if (promote_true_branch) {
 						checkStmtWithPromotion(unit, stmt.left, return_type, promoted_name, promoted_type);
 						if (stmt.right >= 0) checkStmt(unit, stmt.right, return_type);
@@ -1449,7 +1609,7 @@ struct Checker {
 				break;
 			}
 			case Stmt::DEFER: {
-				Stmt& deferred = m_module.statements[stmt.left];
+				Stmt& deferred = unit.statements[stmt.left];
 				if (deferred.kind == Stmt::RETURN) {
 					m_output.errorAt(deferred.token, "Can not defer return");
 					break;
@@ -1461,13 +1621,29 @@ struct Checker {
 		}
 	}
 
+	struct ArenaOwner {
+		const ls_host& host;
+		ls_arena* arena;
+
+		ArenaOwner(const ls_host& host)
+			: host(host) {
+			ASSERT(host.create_arena && host.destroy_arena);
+			arena = host.create_arena();
+		}
+		ArenaOwner(const ArenaOwner&) = delete;
+		ArenaOwner& operator=(const ArenaOwner&) = delete;
+		~ArenaOwner() {
+			if (arena) host.destroy_arena(arena);
+		}
+	};
+
 	ls_module& m_module;
 	OutputFormatter m_output;
-	std::vector<NativeFunctionDecl*> m_native_functions;
-	std::vector<FunctionDecl*> m_functions;
-	std::vector<GlobalDecl*> m_globals;
-	std::vector<StructDecl*> m_structs;
-	std::vector<EnumDecl*> m_enums;
+	ArenaOwner m_arena_owner;
+	ExpArray<NativeFunctionDecl*> m_native_functions;
+	ExpArray<FunctionDecl*> m_functions;
+	ExpArray<StructDecl*> m_structs;
+	ExpArray<EnumDecl*> m_enums;
 	std::vector<LocalInfo> m_locals;
 	std::vector<i32> m_scope_starts;
 	std::vector<ls_string_view> m_loop_labels;
@@ -1481,8 +1657,8 @@ inline bool sameImportPathForPolicy(ls_string_view lhs, ls_string_view rhs) {
 	return equalStrings(lhs, rhs);
 }
 
-static NativeFunctionDecl& addNativeFunction(Unit& unit, ls_string_view canonical_name, TypeRef return_type, std::span<const TypeRef> param_types) {
-	NativeFunctionDecl& fn = unit.native_functions.emplace_back();
+static NativeFunctionDecl& addNativeFunction(Unit& unit, ls_string_view canonical_name, TypeRef return_type, span<const TypeRef> param_types) {
+	NativeFunctionDecl& fn = unit.native_functions.emplace_back(*unit.arena_owner.arena);
 	splitMemberName(canonical_name, &fn.canonical_name.path, &fn.canonical_name.name);
 	fn.return_type = return_type;
 	for (TypeRef type : param_types) {
@@ -1501,12 +1677,12 @@ static void registerStdMath(ls_module& module, ls_string_view prefix) {
 	const TypeRef f32_params[] = {f32_type};
 	const TypeRef f64_params[] = {f64_type};
 
-	addNativeFunction(unit, makeStringView("std:math.sin"), f32_type, std::span<const TypeRef>(f32_params, 1));
-	addNativeFunction(unit, makeStringView("std:math.cos"), f32_type, std::span<const TypeRef>(f32_params, 1));
-	addNativeFunction(unit, makeStringView("std:math.sqrt"), f32_type, std::span<const TypeRef>(f32_params, 1));
-	addNativeFunction(unit, makeStringView("std:math.sin_f64"), f64_type, std::span<const TypeRef>(f64_params, 1));
-	addNativeFunction(unit, makeStringView("std:math.cos_f64"), f64_type, std::span<const TypeRef>(f64_params, 1));
-	addNativeFunction(unit, makeStringView("std:math.sqrt_f64"), f64_type, std::span<const TypeRef>(f64_params, 1));
+	addNativeFunction(unit, makeStringView("std:math.sin"), f32_type, span<const TypeRef>(f32_params, 1));
+	addNativeFunction(unit, makeStringView("std:math.cos"), f32_type, span<const TypeRef>(f32_params, 1));
+	addNativeFunction(unit, makeStringView("std:math.sqrt"), f32_type, span<const TypeRef>(f32_params, 1));
+	addNativeFunction(unit, makeStringView("std:math.sin_f64"), f64_type, span<const TypeRef>(f64_params, 1));
+	addNativeFunction(unit, makeStringView("std:math.cos_f64"), f64_type, span<const TypeRef>(f64_params, 1));
+	addNativeFunction(unit, makeStringView("std:math.sqrt_f64"), f64_type, span<const TypeRef>(f64_params, 1));
 }
 
 inline bool resolveImports(ls_module& module, ls_import_resolver_fn import_resolver, void* import_resolver_userdata) {
@@ -1592,8 +1768,8 @@ inline bool resolveImports(ls_module& module, ls_import_resolver_fn import_resol
 			}
 
 			state[idx] = 1;
-			const i32 old_native_count = native_functions.size();
-			const i32 old_import_count = imports.size();
+			const i32 old_native_count = (i32)native_functions.size();
+			const i32 old_import_count = (i32)imports.size();
 			ls_string_view source;
 			if (!import_resolver(import_resolver_userdata, import.path, import.alias, &source)) {
 				output.errorAt(import.token, "Can not import '", import.path, "'");
@@ -1602,8 +1778,7 @@ inline bool resolveImports(ls_module& module, ls_import_resolver_fn import_resol
 			if (!empty(source) && !parse(module, source, import.path, import.path)) return false;
 			imports.clear();
 			native_functions.clear();
-			for (Unit* unit_ptr : module.units) {
-				Unit& unit = *unit_ptr;
+			for (Unit& unit : module.units) {
 				for (ImportDecl& unit_import : unit.imports) imports.push_back(&unit_import);
 				for (NativeFunctionDecl& fn : unit.native_functions) native_functions.push_back(&fn);
 			}
@@ -1623,8 +1798,7 @@ inline bool resolveImports(ls_module& module, ls_import_resolver_fn import_resol
 	ctx.output.host = &module.host;
 	imports.clear();
 	native_functions.clear();
-	for (Unit* unit_ptr : module.units) {
-		Unit& unit = *unit_ptr;
+	for (Unit& unit : module.units) {
 		for (ImportDecl& import : unit.imports) imports.push_back(&import);
 		for (NativeFunctionDecl& fn : unit.native_functions) native_functions.push_back(&fn);
 	}
@@ -1644,7 +1818,7 @@ bool compile(ls_module& module, ls_string_view source, ls_import_resolver_fn imp
 
 void OutputFormatter::print(int v) {
 	char tmp[32];
-	if (toCString(v, std::span<char>(tmp))) {
+	if (toCString(v, tmp, sizeof(tmp))) {
 		print(tmp);
 	}
 }
@@ -1659,5 +1833,4 @@ ls_result ls_module_compile(ls_module* module, ls_string_view source, ls_string_
 	if (!module) return LS_RESULT_FAILURE;
 	return compile(*module, source, import_resolver, import_resolver_userdata, source_name) ? LS_RESULT_OK : LS_RESULT_FAILURE;
 }
-
 }

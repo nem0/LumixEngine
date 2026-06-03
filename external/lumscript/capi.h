@@ -111,17 +111,30 @@ typedef struct ls_runtime ls_runtime;
 // `ls_to_*` helpers and append any results with the `ls_push_*` helpers.
 typedef void (*ls_native_fn)(ls_runtime* runtime);
 
+typedef struct ls_arena {
+	void* (*allocate)(void* user_data, size_t size, size_t align);
+	void (*restore)(void* user_data, void* ptr);
+
+	void* user_data;
+} ls_arena;
+
 // Host bridge shared by module creation, parsing, compilation, and runtime.
 //
 // - allocator hooks are used for module/runtime-owned memory
 // - diagnostics hooks are used for error output
 // - the two userdata pointers are kept separate so a host can route memory and
 //   diagnostics through different objects
+// - arena hooks are required; module/bytecode/runtime creation fails without
+//   them
 typedef struct ls_host {
 	void* allocator_userdata;
 	void* (*allocate)(void* userdata, size_t size, size_t align);
 	void (*deallocate)(void* userdata, void* ptr);
 	void* (*reallocate)(void* userdata, void* ptr, size_t new_size, size_t old_size, size_t align);
+	
+	ls_arena* (*create_arena)();
+	void (*destroy_arena)(ls_arena* arena);
+
 	void* diagnostics_userdata;
 	ls_print_fn print;
 } ls_host;

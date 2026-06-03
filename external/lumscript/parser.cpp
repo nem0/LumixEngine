@@ -1,5 +1,6 @@
-#include "ast.h"
+#include "compiler.h"
 #include "tokenizer.h"
+#include "utils.h"
 
 struct Parser {
 	Parser(ls_module& module, Unit& unit, ls_string_view declaration_prefix, ls_string_view source, ls_string_view source_name = {})
@@ -74,6 +75,50 @@ struct Parser {
 		return name;
 	}
 
+	static usize decimalDigits(i32 value) {
+		usize digits = 1;
+		while (value >= 10) {
+			value /= 10;
+			++digits;
+		}
+		return digits;
+	}
+
+	static void writeDecimal(char* dst, i32 value) {
+		char tmp[16];
+		usize count = 0;
+		do {
+			tmp[count++] = char('0' + (value % 10));
+			value /= 10;
+		} while (value > 0);
+		for (usize i = 0; i < count; ++i) {
+			dst[i] = tmp[count - 1 - i];
+		}
+	}
+
+	static ls_string_view makeSynthesizedName(ls_arena& arena, ls_string_view prefix, ls_string_view infix, i32 value) {
+		const usize prefix_size = size(prefix);
+		const usize infix_size = size(infix);
+		const usize digits = decimalDigits(value);
+		const usize separator = empty(prefix) ? 0 : 1;
+		char* buffer = (char*)arena.allocate(arena.user_data, prefix_size + separator + infix_size + digits + 1, alignof(char));
+		if (!buffer) return {};
+		char* out = buffer;
+		if (prefix_size > 0) {
+			copyMemory(out, data(prefix), prefix_size);
+			out += prefix_size;
+			*out++ = '.';
+		}
+		if (infix_size > 0) {
+			copyMemory(out, data(infix), infix_size);
+			out += infix_size;
+		}
+		writeDecimal(out, value);
+		out += digits;
+		*out = '\0';
+		return ls_string_view{buffer, out};
+	}
+
 	void parseImport() {
 		Token path;
 		if (!consume(Token::STRING, &path)) return;
@@ -104,7 +149,7 @@ struct Parser {
 		TypeRef base;
 		switch (t.type) {
 			case Token::FN: {
-				m_module.function_types.emplace_back();
+				m_module.function_types.emplace_back(*m_module.arena_owner.arena);
 				const i32 fn_type_idx = (i32)m_module.function_types.size() - 1;
 				if (!consume(Token::LEFT_PAREN)) return {};
 				while (peek().type != Token::RIGHT_PAREN && peek().type != Token::END_OF_FILE && !m_output.has_error) {
@@ -169,7 +214,7 @@ struct Parser {
 		if (!consume(Token::FN)) return;
 		Token name;
 		if (!consume(Token::IDENTIFIER, &name)) return;
-		NativeFunctionDecl& fn = m_unit.native_functions.emplace_back();
+		NativeFunctionDecl& fn = m_unit.native_functions.emplace_back(*m_unit.arena_owner.arena);
 		fn.canonical_name = {m_declaration_prefix, name.value};
 		if (!consume(Token::LEFT_PAREN)) return;
 		if (!addSymbol(name, m_unit, {m_declaration_prefix, name.value}, Symbol::EXTERN_FN, m_unit.native_functions.size() - 1)) return;
@@ -196,7 +241,7 @@ struct Parser {
 	void parseStruct() {
 		Token name;
 		if (!consume(Token::IDENTIFIER, &name)) return;
-		StructDecl& s = m_unit.structs.emplace_back();
+		StructDecl& s = m_unit.structs.emplace_back(*m_unit.arena_owner.arena);
 		// The declaration itself is canonicalized to the current module namespace.
 		// Imported files are parsed with their normalized path as the prefix, so
 		// this becomes the stable identity used by the checker and later imports.
@@ -220,7 +265,7 @@ struct Parser {
 	void parseEnum() {
 		Token name;
 		if (!consume(Token::IDENTIFIER, &name)) return;
-		EnumDecl& e = m_unit.enums.emplace_back();
+		EnumDecl& e = m_unit.enums.emplace_back(*m_unit.arena_owner.arena);
 		// Same rule as structs: store the declaration under the module's canonical
 		// namespace, not under any source-level alias that happened to load it.
 		e.name = {m_declaration_prefix, name.value};
@@ -256,22 +301,27 @@ struct Parser {
 	i32 parseFunction() {
 		Token name;
 		if (!consume(Token::IDENTIFIER, &name)) return -1;
-		m_unit.functions.emplace_back();
+		m_unit.functions.emplace_back(*m_unit.arena_owner.arena);
 		const i32 fn_idx = (i32)m_unit.functions.size() - 1;
-		m_unit.functions[fn_idx].local_name = name.value;
+		FunctionDecl& fn = m_unit.functions[fn_idx];
 		// Top-level functions follow the same canonical module naming rule as
 		// structs/enums/globals so imported modules remain addressable by path.
-		m_unit.functions[fn_idx].canonical_name = {m_declaration_prefix, name.value};
-		if (!addSymbol(name, m_unit, {m_declaration_prefix, name.value}, Symbol::FN, fn_idx)) return -1;
-		m_unit.functions[fn_idx].token = name;
+		fn.canonical_name = {m_declaration_prefix, name.value};
+		fn.token = name;
+
+		GlobalDecl& global = m_unit.globals.emplace_back();
+		global.canonical_name = fn.canonical_name;
+		global.token = name;
+		global.is_const = true;
+		if (!addSymbol(name, m_unit, global.canonical_name, Symbol::GLOBAL_VAR, (i32)m_unit.globals.size() - 1)) return -1;
 
 		if (!consume(Token::LEFT_PAREN)) return fn_idx;
 		while (peek().type != Token::RIGHT_PAREN && peek().type != Token::END_OF_FILE && !m_output.has_error) {
-			if (!m_unit.functions[fn_idx].params.empty()) consume(Token::COMMA);
+			if (!fn.params.empty()) consume(Token::COMMA);
 			Token param_name;
 			if (!consume(Token::IDENTIFIER, &param_name)) return fn_idx;
 			consume(Token::COLON);
-			Param& p = m_unit.functions[fn_idx].params.emplace_back();
+			Param& p = fn.params.emplace_back();
 			p.name = param_name.value;
 			p.token = param_name;
 			p.type = parseType(CanBeRef::YES);
@@ -279,8 +329,16 @@ struct Parser {
 		}
 		consume(Token::RIGHT_PAREN);
 		consume(Token::COLON);
-		m_unit.functions[fn_idx].return_type = parseType();
-		m_unit.functions[fn_idx].body = parseBlock();
+		fn.return_type = parseType();
+		const i32 body = parseBlock();
+
+		FunctionDecl& parsed_fn = m_unit.functions[fn_idx];
+		parsed_fn.body = body;
+		const i32 flat_idx = m_module.findFunction(parsed_fn.canonical_name);
+		const i32 expr_idx = addExpr(Expr::FUNCTION_REF, name);
+		m_unit.expressions[expr_idx].left = flat_idx >= 0 ? flat_idx : fn_idx;
+		m_unit.expressions[expr_idx].is_native_fn = false;
+		global.expr = expr_idx;
 		return fn_idx;
 	}
 
@@ -294,20 +352,15 @@ struct Parser {
 		// seeing a normal `FUNCTION_REF` expression. The only special part
 		// is that the declaration gets a synthesized name so it can live in
 		// the same flat module-wide function table as named functions.
-		m_unit.functions.emplace_back();
+		m_unit.functions.emplace_back(*m_unit.arena_owner.arena);
 		const i32 fn_idx = (i32)m_unit.functions.size() - 1;
 		FunctionDecl& fn = m_unit.functions[fn_idx];
 		// The generated name only needs to be unique inside this module.
 		// It is not user-facing and never participates in lookup; it exists
 		// purely so the synthesized declaration can be stored and later
 		// referenced like any other function.
-		std::string unique_name = std::string(data(m_declaration_prefix), size(m_declaration_prefix));
-		if (!unique_name.empty()) unique_name.push_back('.');
-		unique_name += "__fn_literal.";
-		unique_name += std::to_string(m_function_literal_counter++);
 		fn.canonical_name.path = m_declaration_prefix;
-		fn.canonical_name.name = m_module.copyName(ls_string_view{unique_name.c_str(), unique_name.c_str() + unique_name.size()});
-		fn.local_name = fn.canonical_name.name;
+		fn.canonical_name.name = makeSynthesizedName(*m_unit.arena_owner.arena, m_declaration_prefix, makeStringView("__fn_literal"), m_function_literal_counter++);
 		fn.token = fn_token;
 
 		if (!consume(Token::LEFT_PAREN)) return fn_idx;
@@ -325,13 +378,15 @@ struct Parser {
 		consume(Token::RIGHT_PAREN);
 		consume(Token::COLON);
 		fn.return_type = parseType();
-		fn.body = parseBlock();
+		const i32 body = parseBlock();
+		FunctionDecl& parsed_fn = m_unit.functions[fn_idx];
+		parsed_fn.body = body;
 		// `findFunction()` returns the flat module index that the runtime
 		// and bytecode layer expect. For synthesized declarations this is
 		// usually the same as `fn_idx`, but looking it up the same way as
 		// named declarations keeps the parser agnostic to future changes in
 		// how units are merged into the module table.
-		const i32 flat_idx = m_module.findFunction(fn.canonical_name);
+		const i32 flat_idx = m_module.findFunction(parsed_fn.canonical_name);
 		return flat_idx >= 0 ? flat_idx : fn_idx;
 	}
 
@@ -354,18 +409,13 @@ struct Parser {
 			error(op, "Expected operator");
 			return -1;
 		}
-		m_unit.functions.emplace_back();
+		m_unit.functions.emplace_back(*m_unit.arena_owner.arena);
 		const i32 fn_idx = (i32)m_unit.functions.size() - 1;
 		FunctionDecl& fn = m_unit.functions[fn_idx];
 		fn.is_operator = true;
 		fn.operator_token = op.type;
-		std::string unique_name = std::string(data(m_declaration_prefix), size(m_declaration_prefix));
-		if (!unique_name.empty()) unique_name.push_back('.');
-		unique_name += "__operator.";
-		unique_name += std::to_string(m_operator_counter++);
 		fn.canonical_name.path = m_declaration_prefix;
-		fn.canonical_name.name = m_module.copyName(ls_string_view{unique_name.c_str(), unique_name.c_str() + unique_name.size()});
-		fn.local_name = op.value;
+		fn.canonical_name.name = makeSynthesizedName(*m_unit.arena_owner.arena, m_declaration_prefix, makeStringView("__operator"), m_operator_counter++);
 		fn.token = op;
 		if (!consume(Token::LEFT_PAREN)) return fn_idx;
 		while (peek().type != Token::RIGHT_PAREN && peek().type != Token::END_OF_FILE && !m_output.has_error) {
@@ -382,7 +432,8 @@ struct Parser {
 		consume(Token::RIGHT_PAREN);
 		consume(Token::COLON);
 		fn.return_type = parseType();
-		fn.body = parseBlock();
+		const i32 body = parseBlock();
+		m_unit.functions[fn_idx].body = body;
 		return fn_idx;
 	}
 
@@ -411,30 +462,23 @@ struct Parser {
 	}
 
 	i32 addStmt(Stmt::Kind kind, Token token) {
-		Stmt& stmt = m_module.statements.emplace_back();
+		Stmt& stmt = m_unit.statements.emplace_back(*m_unit.arena_owner.arena);
 		stmt.kind = kind;
 		stmt.token = token;
-		return (i32)m_module.statements.size() - 1;
+		return (i32)m_unit.statements.size() - 1;
 	}
 
 	i32 addExpr(Expr::Kind kind, Token token) {
-		Expr& expr = m_module.expressions.emplace_back();
+		Expr& expr = m_unit.expressions.emplace_back(*m_unit.arena_owner.arena);
 		expr.kind = kind;
 		expr.token = token;
-		return (i32)m_module.expressions.size() - 1;
-	}
-
-	i32 addMatchPattern(MatchPattern::Kind kind, Token token) {
-		MatchPattern& pattern = m_module.match_patterns.emplace_back();
-		pattern.kind = kind;
-		pattern.token = token;
-		return (i32)m_module.match_patterns.size() - 1;
+		return (i32)m_unit.expressions.size() - 1;
 	}
 
 	i32 addMatchArm(Token token) {
-		MatchArm& arm = m_module.match_arms.emplace_back();
+		MatchArm& arm = m_unit.match_arms.emplace_back(*m_unit.arena_owner.arena);
 		arm.token = token;
-		return (i32)m_module.match_arms.size() - 1;
+		return (i32)m_unit.match_arms.size() - 1;
 	}
 
 	i32 parseBlock() {
@@ -446,7 +490,7 @@ struct Parser {
 		const i32 block = addStmt(Stmt::BLOCK, t);
 		while (peek().type != Token::RIGHT_BRACE && peek().type != Token::END_OF_FILE && !m_output.has_error) {
 			const i32 child = parseStatement();
-			m_module.statements[block].children.push_back(child);
+			m_unit.statements[block].children.push_back(child);
 		}
 		consume(Token::RIGHT_BRACE);
 		return block;
@@ -459,31 +503,31 @@ struct Parser {
 			consume(Token::COLON);
 			if (match(Token::WHILE)) {
 				const i32 stmt_idx = addStmt(Stmt::WHILE, t);
-				m_module.statements[stmt_idx].name = label.value;
+				m_unit.statements[stmt_idx].name = label.value;
 				const bool old_allow_constructor = m_allow_constructor;
 				m_allow_constructor = false;
-				m_module.statements[stmt_idx].expr = parseExpression();
+				m_unit.statements[stmt_idx].expr = parseExpression();
 				m_allow_constructor = old_allow_constructor;
-				m_module.statements[stmt_idx].right = parseBlock();
+				m_unit.statements[stmt_idx].right = parseBlock();
 				return stmt_idx;
 			}
 			if (match(Token::FOR)) {
 				const i32 stmt_idx = addStmt(Stmt::FOR, t);
-				m_module.statements[stmt_idx].name = label.value;
+				m_unit.statements[stmt_idx].name = label.value;
 				Token name;
 				if (!consume(Token::IDENTIFIER, &name)) return stmt_idx;
-				m_module.statements[stmt_idx].label_name = name.value;
+				m_unit.statements[stmt_idx].label_name = name.value;
 				if (!consume(Token::EQUAL)) return stmt_idx;
 				const bool old_allow_constructor = m_allow_constructor;
 				m_allow_constructor = false;
-				m_module.statements[stmt_idx].expr = parseExpression();
+				m_unit.statements[stmt_idx].expr = parseExpression();
 				if (!consume(Token::RANGE)) {
 					m_allow_constructor = old_allow_constructor;
 					return stmt_idx;
 				}
-				m_module.statements[stmt_idx].left = parseExpression();
+				m_unit.statements[stmt_idx].left = parseExpression();
 				m_allow_constructor = old_allow_constructor;
-				m_module.statements[stmt_idx].right = parseBlock();
+				m_unit.statements[stmt_idx].right = parseBlock();
 				return stmt_idx;
 			}
 			error(peek(), "Only while and for can be labeled");
@@ -500,16 +544,16 @@ struct Parser {
 			Token name;
 			if (!consume(Token::IDENTIFIER, &name)) return -1;
 			const i32 stmt_idx = addStmt(Stmt::VAR_DECL, t);
-			Stmt& stmt = m_module.statements[stmt_idx];
-			stmt.name = name.value;
-			stmt.is_const = is_const;
-			if (match(Token::COLON)) stmt.type = parseType();
+			m_unit.statements[stmt_idx].name = name.value;
+			m_unit.statements[stmt_idx].is_const = is_const;
+			if (match(Token::COLON)) m_unit.statements[stmt_idx].type = parseType();
 			if (match(Token::EQUAL)) {
 				if (peek().type == Token::IDENTIFIER && equalStrings(peek().value, "undefined")) {
 					consumeToken();
-					stmt.is_undefined_init = true;
+					m_unit.statements[stmt_idx].is_undefined_init = true;
 				} else {
-					stmt.expr = parseExpression();
+					const i32 expr = parseExpression();
+					m_unit.statements[stmt_idx].expr = expr;
 				}
 			}
 			consume(Token::SEMICOLON);
@@ -519,41 +563,41 @@ struct Parser {
 			const i32 stmt_idx = addStmt(Stmt::WHILE, t);
 			const bool old_allow_constructor = m_allow_constructor;
 			m_allow_constructor = false;
-			m_module.statements[stmt_idx].expr = parseExpression();
+			m_unit.statements[stmt_idx].expr = parseExpression();
 			m_allow_constructor = old_allow_constructor;
-			m_module.statements[stmt_idx].right = parseBlock();
+			m_unit.statements[stmt_idx].right = parseBlock();
 			return stmt_idx;
 		}
 		if (match(Token::FOR)) {
 			const i32 stmt_idx = addStmt(Stmt::FOR, t);
 			Token name;
 			if (!consume(Token::IDENTIFIER, &name)) return stmt_idx;
-			m_module.statements[stmt_idx].label_name = name.value;
+			m_unit.statements[stmt_idx].label_name = name.value;
 			if (!consume(Token::EQUAL)) return stmt_idx;
 			const bool old_allow_constructor = m_allow_constructor;
 			m_allow_constructor = false;
-			m_module.statements[stmt_idx].expr = parseExpression();
+			m_unit.statements[stmt_idx].expr = parseExpression();
 			if (!consume(Token::RANGE)) {
 				m_allow_constructor = old_allow_constructor;
 				return stmt_idx;
 			}
-			m_module.statements[stmt_idx].left = parseExpression();
+			m_unit.statements[stmt_idx].left = parseExpression();
 			m_allow_constructor = old_allow_constructor;
-			m_module.statements[stmt_idx].right = parseBlock();
+			m_unit.statements[stmt_idx].right = parseBlock();
 			return stmt_idx;
 		}
 		if (match(Token::IF)) {
 			const i32 stmt_idx = addStmt(Stmt::IF, t);
 			const bool old_allow_constructor = m_allow_constructor;
 			m_allow_constructor = false;
-			m_module.statements[stmt_idx].expr = parseExpression();
+			m_unit.statements[stmt_idx].expr = parseExpression();
 			m_allow_constructor = old_allow_constructor;
-			m_module.statements[stmt_idx].left = parseBlock();
+			m_unit.statements[stmt_idx].left = parseBlock();
 			if (match(Token::ELSE)) {
 				if (peek().type == Token::IF) {
-					m_module.statements[stmt_idx].right = parseStatement();
+					m_unit.statements[stmt_idx].right = parseStatement();
 				} else {
-					m_module.statements[stmt_idx].right = parseBlock();
+					m_unit.statements[stmt_idx].right = parseBlock();
 				}
 			}
 			return stmt_idx;
@@ -562,7 +606,7 @@ struct Parser {
 		if (match(Token::BREAK)) {
 			const i32 stmt_idx = addStmt(Stmt::BREAK, t);
 			if (peek().type == Token::IDENTIFIER) {
-				m_module.statements[stmt_idx].name = consumeToken().value;
+				m_unit.statements[stmt_idx].name = consumeToken().value;
 			}
 			consume(Token::SEMICOLON);
 			return stmt_idx;
@@ -570,20 +614,20 @@ struct Parser {
 		if (match(Token::CONTINUE)) {
 			const i32 stmt_idx = addStmt(Stmt::CONTINUE, t);
 			if (peek().type == Token::IDENTIFIER) {
-				m_module.statements[stmt_idx].name = consumeToken().value;
+				m_unit.statements[stmt_idx].name = consumeToken().value;
 			}
 			consume(Token::SEMICOLON);
 			return stmt_idx;
 		}
 		if (match(Token::RETURN)) {
 			const i32 stmt_idx = addStmt(Stmt::RETURN, t);
-			if (peek().type != Token::SEMICOLON) m_module.statements[stmt_idx].expr = parseExpression();
+			if (peek().type != Token::SEMICOLON) m_unit.statements[stmt_idx].expr = parseExpression();
 			consume(Token::SEMICOLON);
 			return stmt_idx;
 		}
 		if (match(Token::DEFER)) {
 			const i32 stmt_idx = addStmt(Stmt::DEFER, t);
-			m_module.statements[stmt_idx].left = parseStatement();
+			m_unit.statements[stmt_idx].left = parseStatement();
 			return stmt_idx;
 		}
 
@@ -592,9 +636,9 @@ struct Parser {
 		if (op.type == Token::EQUAL || op.type == Token::PLUS_EQUAL || op.type == Token::MINUS_EQUAL || op.type == Token::STAR_EQUAL || op.type == Token::SLASH_EQUAL) {
 			consumeToken();
 			const i32 stmt_idx = addStmt(Stmt::ASSIGN, op);
-			m_module.statements[stmt_idx].left = left;
-			m_module.statements[stmt_idx].right = parseExpression();
-			m_module.statements[stmt_idx].assign_op = op.type;
+			m_unit.statements[stmt_idx].left = left;
+			m_unit.statements[stmt_idx].right = parseExpression();
+			m_unit.statements[stmt_idx].assign_op = op.type;
 			consume(Token::SEMICOLON);
 			return stmt_idx;
 		}
@@ -602,16 +646,16 @@ struct Parser {
 			consumeToken();
 			const i32 stmt_idx = addStmt(Stmt::ASSIGN, op);
 			const i32 one = addExpr(Expr::NUMBER, op);
-			m_module.expressions[one].number = 1;
-			m_module.expressions[one].type = {LS_TYPE_UNTYPED_INT, {}, -1};
-			m_module.statements[stmt_idx].left = left;
-			m_module.statements[stmt_idx].right = one;
-			m_module.statements[stmt_idx].assign_op = op.type == Token::PLUS_PLUS ? Token::PLUS_EQUAL : Token::MINUS_EQUAL;
+			m_unit.expressions[one].number = 1;
+			m_unit.expressions[one].type = {LS_TYPE_UNTYPED_INT, {}, -1};
+			m_unit.statements[stmt_idx].left = left;
+			m_unit.statements[stmt_idx].right = one;
+			m_unit.statements[stmt_idx].assign_op = op.type == Token::PLUS_PLUS ? Token::PLUS_EQUAL : Token::MINUS_EQUAL;
 			consume(Token::SEMICOLON);
 			return stmt_idx;
 		}
 		const i32 stmt_idx = addStmt(Stmt::EXPR, t);
-		m_module.statements[stmt_idx].expr = left;
+		m_unit.statements[stmt_idx].expr = left;
 		consume(Token::SEMICOLON);
 		return stmt_idx;
 	}
@@ -619,40 +663,46 @@ struct Parser {
 	i32 parseMatch(Token token) {
 		const i32 stmt_idx = addStmt(Stmt::MATCH, token);
 		m_allow_constructor = false;
-		m_module.statements[stmt_idx].expr = parseExpression();
+		m_unit.statements[stmt_idx].expr = parseExpression();
 		m_allow_constructor = true;
 		if (!consume(Token::LEFT_BRACE)) return stmt_idx;
 		while (peek().type != Token::RIGHT_BRACE && peek().type != Token::END_OF_FILE && !m_output.has_error) {
 			Token case_token;
-			if (!consume(Token::CASE, &case_token)) return stmt_idx;
+			const bool is_else = peek().type == Token::ELSE;
+			if (is_else) {
+				consume(Token::ELSE, &case_token);
+			} else if (!consume(Token::CASE, &case_token)) {
+				return stmt_idx;
+			}
 			const i32 arm_idx = addMatchArm(case_token);
-			MatchArm& arm = m_module.match_arms[arm_idx];
-			for (;;) {
-				Token pattern_token = peek();
-				if (pattern_token.type == Token::IDENTIFIER && equalStrings(pattern_token.value, "_")) {
-					consumeToken();
-					arm.patterns.push_back(addMatchPattern(MatchPattern::DEFAULT, pattern_token));
-				} else {
+			MatchArm& arm = m_unit.match_arms[arm_idx];
+			if (is_else) {
+				MatchPattern& pattern = arm.patterns.emplace_back();
+				pattern.kind = MatchPattern::DEFAULT;
+				pattern.token = case_token;
+			} else {
+				for (;;) {
+					Token pattern_token = peek();
 					const i32 start_expr = parseExpression();
-					const i32 pattern_idx = addMatchPattern(MatchPattern::VALUE, pattern_token);
-					MatchPattern& pattern = m_module.match_patterns[pattern_idx];
+					MatchPattern& pattern = arm.patterns.emplace_back();
+					pattern.kind = MatchPattern::VALUE;
+					pattern.token = pattern_token;
 					pattern.start_expr = start_expr;
 					if (match(Token::RANGE)) {
 						pattern.kind = MatchPattern::RANGE;
 						pattern.end_expr = parseExpression();
 					}
-					arm.patterns.push_back(pattern_idx);
+					if (!match(Token::COMMA)) break;
 				}
-				if (!match(Token::COMMA)) break;
 			}
 			consume(Token::COLON);
 			const i32 block = addStmt(Stmt::BLOCK, case_token);
-			while (peek().type != Token::CASE && peek().type != Token::RIGHT_BRACE && peek().type != Token::END_OF_FILE && !m_output.has_error) {
+			while (peek().type != Token::CASE && peek().type != Token::ELSE && peek().type != Token::RIGHT_BRACE && peek().type != Token::END_OF_FILE && !m_output.has_error) {
 				const i32 child = parseStatement();
-				if (child >= 0) m_module.statements[block].children.push_back(child);
+				if (child >= 0) m_unit.statements[block].children.push_back(child);
 			}
 			arm.stmt = block;
-			m_module.statements[stmt_idx].children.push_back(arm_idx);
+			m_unit.statements[stmt_idx].children.push_back(arm_idx);
 		}
 		consume(Token::RIGHT_BRACE);
 		return stmt_idx;
@@ -688,8 +738,8 @@ struct Parser {
 			consumeToken();
 			const i32 right = parseBinary(prec + 1);
 			const i32 expr_idx = addExpr(Expr::BINARY, op);
-			m_module.expressions[expr_idx].left = left;
-			m_module.expressions[expr_idx].right = right;
+			m_unit.expressions[expr_idx].left = left;
+			m_unit.expressions[expr_idx].right = right;
 			left = expr_idx;
 		}
 		return left;
@@ -699,12 +749,12 @@ struct Parser {
 		Token t = peek();
 		if (match(Token::REF)) {
 			const i32 idx = addExpr(Expr::REF, t);
-			m_module.expressions[idx].right = parseUnary();
+			m_unit.expressions[idx].right = parseUnary();
 			return idx;
 		}
 		if (match(Token::MINUS) || match(Token::NOT)) {
 			const i32 idx = addExpr(Expr::UNARY, t);
-			m_module.expressions[idx].right = parseUnary();
+			m_unit.expressions[idx].right = parseUnary();
 			return idx;
 		}
 		return parsePostfix();
@@ -715,15 +765,15 @@ struct Parser {
 		while (peek().type == Token::AS) {
 			Token t = consumeToken();
 			const i32 idx = addExpr(Expr::CAST, t);
-			m_module.expressions[idx].left = expr_idx;
-			m_module.expressions[idx].cast_type = parseType();
+			m_unit.expressions[idx].left = expr_idx;
+			m_unit.expressions[idx].cast_type = parseType();
 			expr_idx = idx;
 		}
 		return expr_idx;
 	}
 
 	ls_string_view getExpressionName(i32 expr_idx) {
-		Expr& e = m_module.expressions[expr_idx];
+		Expr& e = m_unit.expressions[expr_idx];
 		if (e.kind == Expr::VAR) return e.name;
 		if (e.kind == Expr::FIELD) {
 			if (empty(e.qualified_name)) e.qualified_name = {getExpressionName(e.left), e.name};
@@ -740,34 +790,34 @@ struct Parser {
 				Token field;
 				consume(Token::IDENTIFIER, &field);
 				const i32 idx = addExpr(Expr::FIELD, field);
-				m_module.expressions[idx].left = expr_idx;
-				m_module.expressions[idx].name = field.value;
+				m_unit.expressions[idx].left = expr_idx;
+				m_unit.expressions[idx].name = field.value;
 				expr_idx = idx;
 			} else if (match(Token::LEFT_PAREN)) {
 				const i32 idx = addExpr(Expr::CALL, t);
-				m_module.expressions[idx].left = expr_idx;
+				m_unit.expressions[idx].left = expr_idx;
 				while (peek().type != Token::RIGHT_PAREN && peek().type != Token::END_OF_FILE && !m_output.has_error) {
-					if (!m_module.expressions[idx].args.empty()) consume(Token::COMMA);
+					if (!m_unit.expressions[idx].args.empty()) consume(Token::COMMA);
 					const i32 arg = parseExpression();
-					m_module.expressions[idx].args.push_back(arg);
+					m_unit.expressions[idx].args.push_back(arg);
 				}
 				consume(Token::RIGHT_PAREN);
 				expr_idx = idx;
 			} else if (match(Token::LEFT_BRACKET)) {
 				const i32 idx = addExpr(Expr::INDEX, t);
-				m_module.expressions[idx].left = expr_idx;
-				m_module.expressions[idx].right = parseExpression();
+				m_unit.expressions[idx].left = expr_idx;
+				m_unit.expressions[idx].right = parseExpression();
 				consume(Token::RIGHT_BRACKET);
 				expr_idx = idx;
 			} else if (m_allow_constructor && peek().type == Token::LEFT_BRACE && !empty(getExpressionName(expr_idx))) {
 				consumeToken();
 				ls_string_view name = getExpressionName(expr_idx);
 				const i32 idx = addExpr(Expr::CONSTRUCTOR, t);
-				m_module.expressions[idx].name = name;
+				m_unit.expressions[idx].name = name;
 				while (peek().type != Token::RIGHT_BRACE && peek().type != Token::END_OF_FILE && !m_output.has_error) {
-					if (!m_module.expressions[idx].args.empty()) consume(Token::COMMA);
+					if (!m_unit.expressions[idx].args.empty()) consume(Token::COMMA);
 					const i32 arg = parseExpression();
-					m_module.expressions[idx].args.push_back(arg);
+					m_unit.expressions[idx].args.push_back(arg);
 				}
 				consume(Token::RIGHT_BRACE);
 				expr_idx = idx;
@@ -784,39 +834,39 @@ struct Parser {
 				const i32 idx = addExpr(Expr::NUMBER, t);
 				double parsed = 0;
 				fromCString(t.value, parsed);
-				m_module.expressions[idx].number = parsed;
-				m_module.expressions[idx].type = contains(t.value, '.') ? TypeRef{LS_TYPE_UNTYPED_FLOAT, {}, -1} : TypeRef{LS_TYPE_UNTYPED_INT, {}, -1};
+				m_unit.expressions[idx].number = parsed;
+				m_unit.expressions[idx].type = contains(t.value, '.') ? TypeRef{LS_TYPE_UNTYPED_FLOAT, {}, -1} : TypeRef{LS_TYPE_UNTYPED_INT, {}, -1};
 				return idx;
 			}
 			case Token::STRING: {
 				const i32 idx = addExpr(Expr::STRING_LITERAL, t);
-				m_module.expressions[idx].string = t.value;
-				m_module.expressions[idx].type = {LS_TYPE_STRING, {}, -1};
+				m_unit.expressions[idx].string = t.value;
+				m_unit.expressions[idx].type = {LS_TYPE_STRING, {}, -1};
 				return idx;
 			}
 			case Token::TRUE:
 			case Token::FALSE: {
 				const i32 idx = addExpr(Expr::BOOL_LITERAL, t);
-				m_module.expressions[idx].is_true_literal = t.type == Token::TRUE;
-				m_module.expressions[idx].type = {LS_TYPE_BOOL, {}, -1};
+				m_unit.expressions[idx].is_true_literal = t.type == Token::TRUE;
+				m_unit.expressions[idx].type = {LS_TYPE_BOOL, {}, -1};
 				return idx;
 			}
 			case Token::NULL_KW: {
 				const i32 idx = addExpr(Expr::NULL_LITERAL, t);
-				m_module.expressions[idx].type = {LS_TYPE_NULL_VALUE, {}, -1};
+				m_unit.expressions[idx].type = {LS_TYPE_NULL_VALUE, {}, -1};
 				return idx;
 			}
 			case Token::IDENTIFIER: {
 				const i32 var_idx = addExpr(Expr::VAR, t);
-				m_module.expressions[var_idx].name = t.value;
+				m_unit.expressions[var_idx].name = t.value;
 				if (m_allow_constructor && peek().type == Token::LEFT_BRACE) {
 					consumeToken();
 					const i32 idx = addExpr(Expr::CONSTRUCTOR, t);
-					m_module.expressions[idx].name = t.value;
+					m_unit.expressions[idx].name = t.value;
 					while (peek().type != Token::RIGHT_BRACE && peek().type != Token::END_OF_FILE && !m_output.has_error) {
-						if (!m_module.expressions[idx].args.empty()) consume(Token::COMMA);
+						if (!m_unit.expressions[idx].args.empty()) consume(Token::COMMA);
 						const i32 arg = parseExpression();
-						m_module.expressions[idx].args.push_back(arg);
+						m_unit.expressions[idx].args.push_back(arg);
 					}
 					consume(Token::RIGHT_BRACE);
 					return idx;
@@ -828,8 +878,8 @@ struct Parser {
 				Token member_name;
 				if (!consume(Token::IDENTIFIER, &member_name)) return -1;
 				const i32 idx = addExpr(Expr::ENUM_LITERAL, member_name);
-				m_module.expressions[idx].name = member_name.value;
-				m_module.expressions[idx].type = {LS_TYPE_ENUM, {}, -1}; // Type will be resolved by checker
+				m_unit.expressions[idx].name = member_name.value;
+				m_unit.expressions[idx].type = {LS_TYPE_ENUM, {}, -1}; // Type will be resolved by checker
 				return idx;
 			}
 			case Token::LEFT_PAREN: {
@@ -847,16 +897,16 @@ struct Parser {
 				const i32 fn_idx = parseFunctionLiteral(t);
 				if (fn_idx < 0) return -1;
 				const i32 idx = addExpr(Expr::FUNCTION_REF, t);
-				m_module.expressions[idx].left = fn_idx;
-				m_module.expressions[idx].is_native_fn = false;
+				m_unit.expressions[idx].left = fn_idx;
+				m_unit.expressions[idx].is_native_fn = false;
 				return idx;
 			}
 			case Token::LEFT_BRACE: {
 				const i32 idx = addExpr(Expr::STRUCT_LITERAL, t);
 				while (peek().type != Token::RIGHT_BRACE && peek().type != Token::END_OF_FILE && !m_output.has_error) {
-					if (!m_module.expressions[idx].args.empty()) consume(Token::COMMA);
+					if (!m_unit.expressions[idx].args.empty()) consume(Token::COMMA);
 					const i32 arg = parseExpression();
-					m_module.expressions[idx].args.push_back(arg);
+					m_unit.expressions[idx].args.push_back(arg);
 				}
 				consume(Token::RIGHT_BRACE);
 				return idx;

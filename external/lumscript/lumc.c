@@ -14,6 +14,7 @@
 
 #include <malloc.h>
 
+#include "arena.h"
 #include "capi.h"
 
 typedef struct lumc_context {
@@ -45,8 +46,8 @@ static const ls_host g_host_template = {
 	&lumc_allocate,
 	&lumc_deallocate,
 	&lumc_reallocate,
-	NULL,
-	NULL
+	&ls_default_arena_create,
+	&ls_default_arena_destroy
 };
 
 static ls_string_view ls_from_cstr(const char* str) {
