@@ -62,11 +62,14 @@ struct ExpArray {
 			return;
 		}
 		ensureCapacity(new_size);
-		for (i32 i = m_size; i < new_size; ++i) {
-			T& value = (*this)[i];
-			::new ((void*)&value) T();
+		while (m_size < new_size) {
+			const i32 outter_index = binIndex(m_size);
+			const i32 inner_index = innerIndex(m_size);
+			T* bin = bins[outter_index];
+			ASSERT(bin);
+			::new ((void*)(bin + inner_index)) T();
+			++m_size;
 		}
-		m_size = new_size;
 	}
 
 	void resize(i32 new_size, const T& value) {
@@ -78,15 +81,33 @@ struct ExpArray {
 			return;
 		}
 		ensureCapacity(new_size);
-		for (i32 i = m_size; i < new_size; ++i) {
-			T& dst = (*this)[i];
-			::new ((void*)&dst) T(value);
+		while (m_size < new_size) {
+			const i32 outter_index = binIndex(m_size);
+			const i32 inner_index = innerIndex(m_size);
+			T* bin = bins[outter_index];
+			ASSERT(bin);
+			::new ((void*)(bin + inner_index)) T(value);
+			++m_size;
 		}
-		m_size = new_size;
 	}
 
 	void clear() {
 		resize(0);
+	}
+
+	void pop_back() {
+		ASSERT(m_size > 0);
+		resize(m_size - 1);
+	}
+
+	T& back() {
+		ASSERT(m_size > 0);
+		return (*this)[m_size - 1];
+	}
+
+	const T& back() const {
+		ASSERT(m_size > 0);
+		return (*this)[m_size - 1];
 	}
 
 	struct iterator {

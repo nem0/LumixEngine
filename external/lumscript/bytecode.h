@@ -89,6 +89,7 @@ enum class BytecodeOp : u8 {
 	CMP_GE,
 	CMP_LT,
 	CMP_LE,
+	ABORT,
 	RETURN
 };
 

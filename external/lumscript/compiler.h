@@ -53,7 +53,9 @@ struct Expr {
 		CONSTRUCTOR,
 		ENUM_LITERAL,
 		FUNCTION_REF,
-		INDEX
+		INDEX,
+		SLICE,
+		SLICE_LENGTH
 	};
 
 	Expr(ls_arena& arena) : args(arena) {};
@@ -205,17 +207,17 @@ struct Symbol {
 	i32 index = -1;
 };
 
+struct ArenaOwner {
+	const ls_host& host;
+	ls_arena* arena;
+
+	ArenaOwner(const ls_host& host);
+	ArenaOwner(const ArenaOwner&) = delete;
+	ArenaOwner& operator=(const ArenaOwner&) = delete;
+	~ArenaOwner();
+};
+
 struct Unit {
-	struct ArenaOwner {
-		const ls_host& host;
-		ls_arena* arena;
-
-		ArenaOwner(const ls_host& host);
-		ArenaOwner(const ArenaOwner&) = delete;
-		ArenaOwner& operator=(const ArenaOwner&) = delete;
-		~ArenaOwner();
-	};
-
 	explicit Unit(const ls_host& host);
 
 	ls_string_view source_name;
@@ -245,16 +247,6 @@ struct ls_module {
 	ls_string_view makeQualifiedName(ls_string_view prefix, ls_string_view name);
 
 	ls_host host;
-	struct ArenaOwner {
-		const ls_host& host;
-		ls_arena* arena;
-
-		ArenaOwner(const ls_host& host);
-		ArenaOwner(const ArenaOwner&) = delete;
-		ArenaOwner& operator=(const ArenaOwner&) = delete;
-		~ArenaOwner();
-	};
-
 	ArenaOwner arena_owner;
 	ExpArray<Unit> units;
 	ExpArray<FunctionTypeDecl> function_types;

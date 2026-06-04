@@ -50,6 +50,8 @@ LumScript is a small, statically typed scripting language for Lumix Engine.
 	- [Nullable values](#nullable-values)
 	- [Strings](#strings)
 	- [Function types](#function-types)
+	- [Static-sized arrays](#static-sized-arrays)
+	- [Slices](#slices)
 - [Variables](#variables)
 - [Statements](#statements)
 	- [Blocks](#blocks)
@@ -513,26 +515,62 @@ Type rules:
 - assignment requires exact same element type and size
 - index expression must have an integer type
 
-Indexing behavior:
+### Slices
 
-- constant index out of range is a compile-time error
-- variable index is allowed
-- variable index is bounds-checked at runtime
-- out-of-bounds access is a runtime error
-
-Indexing examples:
+Slices are lightweight views over contiguous storage. A slice does not own its elements; it stores a pointer to the first element plus a length.
 
 ```cpp
-var d : i32[16] = undefined;
+var arr : i32[4] = foo();
+var slice : i32[] = arr[1:2];
+```
 
-const idx = 3;
-d[idx] = 11; // allowed
+Slice syntax uses `T[]`, where `T` is the element type.
 
-var i : i32 = 3;
-d[i] = 12; // allowed, runtime bounds check
+Slice creation forms:
 
-const bad = 99;
-d[bad] = 1; // compile-time error (constant index out of range)
+- `arr[start:end]` creates a slice from a static array or another slice
+- `arr[start:]` uses the remainder of the storage to the end
+- `arr[:end]` starts at the beginning
+- `arr[:]` creates a slice over the whole range
+- slicing uses half-open bounds: `start` is inclusive and `end` is exclusive
+- omitted bounds default to the beginning or end of the source range
+- slicing never copies elements
+- slicing a slice produces another slice over the same backing storage
+- an array can be passed to a parameter of slice type implicitly
+
+```cpp
+var x : i32[] = arr[1:2];
+var y : i32[] = arr[1:];
+var z : i32[] = arr[:7];
+var z2 : i32[] = z[2:4];
+var w : i32[] = arr[:];
+var sub : i32[] = slice[1:3];
+var q = arr[3:4];
+
+fn foo(slice : i32[]) : void {}
+var arr : i32[16] = bar();
+foo(arr); // automatic conversion
+```
+
+Slice operations:
+
+- slices can be indexed with `slice[i]`
+- indexing is bounds-checked at runtime
+- `length(slice)` returns the number of elements in the slice
+- slices can be stored in variables, passed to functions, and returned from functions
+- assigning one slice to another copies only the pointer and length
+- a slice remains valid only while the backing storage remains alive and stable
+
+```cpp
+fn sum(values : i32[]) : i32 {
+	var total : i32 = 0;
+	var i : i32 = 0;
+	while i < length(values) {
+		total += values[i];
+		i += 1;
+	}
+	return total;
+}
 ```
 
 ## Variables

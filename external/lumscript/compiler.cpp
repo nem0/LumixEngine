@@ -43,24 +43,29 @@ TypeRef::TypeRef(ls_type_kind kind, ls_string_view unresolved_name, i32 struct_i
 	, struct_index(struct_index)
 	, token(token)
 	, nullable(nullable) {
-	struct_index = -1;
+}
+
+static bool sameElementType(const TypeRef& a, const TypeRef& b) {
+	return a.element_kind == b.element_kind &&
+		(a.element_kind != LS_TYPE_STRUCT && a.element_kind != LS_TYPE_ENUM ? true :
+		 a.struct_index == b.struct_index || equalStrings(a.element_name, b.element_name));
 }
 
 bool sameBaseType(const TypeRef& a, const TypeRef& b) {
 	if (a.kind != b.kind) return false;
 	if (a.kind == LS_TYPE_FUNCTION) return a.struct_index == b.struct_index;
 	if (a.kind == LS_TYPE_ARRAY)
-		return a.array_size == b.array_size && a.element_kind == b.element_kind &&
-			   (a.element_kind != LS_TYPE_STRUCT && a.element_kind != LS_TYPE_ENUM ? true : (a.struct_index == b.struct_index || equalStrings(a.element_name, b.element_name)));
+		return a.array_size == b.array_size && sameElementType(a, b);
+	if (a.kind == LS_TYPE_SLICE) return sameElementType(a, b);
 	return a.kind != LS_TYPE_STRUCT && a.kind != LS_TYPE_ENUM && a.kind != LS_TYPE_FUNCTION ? true : a.struct_index == b.struct_index || equal(a.canonical_name, b.canonical_name);
 }
 
-Unit::ArenaOwner::ArenaOwner(const ls_host& host)
+ArenaOwner::ArenaOwner(const ls_host& host)
 	: host(host) {
 	arena = host.create_arena();
 }
 
-Unit::ArenaOwner::~ArenaOwner() {
+ArenaOwner::~ArenaOwner() {
 	host.destroy_arena(arena);
 }
 
@@ -77,14 +82,6 @@ Unit::Unit(const ls_host& host)
 	, statements(*arena_owner.arena)
 	, match_arms(*arena_owner.arena) {}
 
-ls_module::ArenaOwner::ArenaOwner(const ls_host& host)
-	: host(host) {
-	arena = host.create_arena();
-}
-
-ls_module::ArenaOwner::~ArenaOwner() {
-	host.destroy_arena(arena);
-}
 
 ls_module::ls_module(const ls_host* host)
 	: host(host ? *host : ls_host{})
@@ -143,12 +140,9 @@ i32 ls_module::findNativeFunction(ls_string_view name) const {
 i32 ls_module::findNativeFunction(CanonicalName name) const {
 	i32 index = 0;
 	for (const Unit& unit : units) {
-		if (equalStrings(unit.source_name, name.path)) {
-			for (const NativeFunctionDecl& fn : unit.native_functions) {
-				if (equalStrings(fn.canonical_name.name, name.name)) return index;
-				++index;
-			}
-			return -1;
+		for (const NativeFunctionDecl& fn : unit.native_functions) {
+			if (equalStrings(unit.source_name, name.path) && equalStrings(fn.canonical_name.name, name.name)) return index;
+			++index;
 		}
 	}
 	return -1;
@@ -239,7 +233,12 @@ struct Checker {
 		, m_native_functions(*m_arena_owner.arena)
 		, m_functions(*m_arena_owner.arena)
 		, m_structs(*m_arena_owner.arena)
-		, m_enums(*m_arena_owner.arena) {}
+		, m_enums(*m_arena_owner.arena)
+		, m_locals(*m_arena_owner.arena)
+		, m_scope_starts(*m_arena_owner.arena)
+		, m_loop_labels(*m_arena_owner.arena)
+		, m_declared_labels(*m_arena_owner.arena)
+		, m_label_scope_starts(*m_arena_owner.arena) {}
 
 	bool check() {
 		m_native_functions.clear();
@@ -322,26 +321,6 @@ struct Checker {
 					m_output.errorAt(fn.token, "Can not overload built-in primitive operator");
 					return false;
 				}
-				// TODO
-				// Duplicate detection is based on the resolved signature, not the source
-				// spelling. That means imported aliases or equivalent canonical names do
-				// not create distinct operator identities.
-				/*for (const FunctionDecl* prev : m_functions) {
-					if (prev == fn) break;
-					if (!prev->is_operator) continue;
-					if (prev->operator_token != fn.operator_token) continue;
-					if (prev->params.size() != fn.params.size()) continue;
-					bool same = true;
-					for (i32 i = 0; i < fn.params.size(); ++i) {
-						if (!sameResolvedType(prev->params[i].type, fn.params[i].type)) {
-							same = false;
-							break;
-						}
-					}
-					if (!same) continue;
-					m_output.errorAt(fn.token, "Duplicate operator declaration");
-					return false;
-				}*/
 			}
 			checkGlobals(unit);
 		}
@@ -556,6 +535,7 @@ struct Checker {
 
 	void resolveType(Unit& unit, TypeRef& type) {
 		switch (type.kind) {
+			case LS_TYPE_SLICE:
 			case LS_TYPE_ARRAY: {
 				TypeRef elem(type.element_kind, type.element_name, type.struct_index, type.token, false);
 				resolveType(unit, elem);
@@ -605,6 +585,8 @@ struct Checker {
 	bool canAssign(TypeRef dst, TypeRef src) const {
 		if (src.kind == LS_TYPE_NULL_VALUE) return dst.nullable;
 		if (dst.kind == LS_TYPE_NULL_VALUE) return src.kind == LS_TYPE_NULL_VALUE;
+		if (dst.kind == LS_TYPE_SLICE && src.kind == LS_TYPE_ARRAY) return sameElementType(dst, src);
+		if (dst.kind == LS_TYPE_SLICE || src.kind == LS_TYPE_SLICE) return sameBaseType(dst, src);
 		if (dst.kind == LS_TYPE_ARRAY || src.kind == LS_TYPE_ARRAY) return sameBaseType(dst, src);
 		if (src.kind == LS_TYPE_STRING) return dst.kind == LS_TYPE_STRING;
 		if (src.kind == LS_TYPE_UNTYPED_INT) return isNumeric(dst);
@@ -752,11 +734,9 @@ struct Checker {
 	}
 
 	void checkFunction(Unit& unit, FunctionDecl& fn) {
-		checkFunctionSignature(unit, fn);
 		const i32 locals_start = (i32)m_locals.size();
 		m_scope_starts.clear();
 		m_loop_labels.clear();
-		m_loop_scope_starts.clear();
 		m_declared_labels.clear();
 		m_label_scope_starts.clear();
 		m_scope_starts.push_back(0);
@@ -878,12 +858,12 @@ struct Checker {
 		const Symbol& resolved = receiver_callable ? receiver_symbol : direct_symbol;
 		TypeRef resolved_type = resolveSymbolExpr(callee, resolved);
 
-		// TODO
-		std::vector<i32> args;
-		args.push_back(receiver_expr);
-		for (i32 arg : call_expr.args) args.push_back(arg);
-		call_expr.args.clear();
-		for (i32 arg : args) call_expr.args.push_back(arg);
+		// Prepend receiver: shift existing args up by one, then write receiver at [0].
+		// ExpArray never moves existing elements (arena bins), so index references stay valid.
+		const i32 old_count = (i32)call_expr.args.size();
+		call_expr.args.push_back(0);
+		for (i32 i = old_count; i > 0; --i) call_expr.args[i] = call_expr.args[i - 1];
+		call_expr.args[0] = receiver_expr;
 		return resolved_type;
 	}
 
@@ -1033,6 +1013,22 @@ struct Checker {
 	}
 
 	TypeRef checkCall(Unit& unit, Expr& e) {
+		Expr& maybe_length = unit.expressions[e.left];
+		if (maybe_length.kind == Expr::VAR && equalStrings(maybe_length.name, makeStringView("length"))) {
+			if (e.args.size() != 1) {
+				m_output.errorAt(e.token, "length() requires exactly one slice argument");
+				return {};
+			}
+			TypeRef arg_type = checkExpr(unit, e.args[0]);
+			if (arg_type.kind != LS_TYPE_SLICE) {
+				m_output.errorAt(unit.expressions[e.args[0]].token, "length() requires a slice argument");
+				return {};
+			}
+			e.kind = Expr::SLICE_LENGTH;
+			e.left = e.args[0];
+			e.type = {LS_TYPE_I32, {}, -1};
+			return e.type;
+		}
 		TypeRef left_type = checkExpr(unit, e.left, nullptr, &e);
 		Expr& left_expr = unit.expressions[e.left];
 		if (left_type.kind != LS_TYPE_FUNCTION) {
@@ -1104,8 +1100,17 @@ struct Checker {
 					m_output.errorAt(e.token, "Nullable value must be checked for null");
 					return {};
 				}
+				if (base.kind == LS_TYPE_SLICE) {
+					TypeRef idx_type = checkExpr(unit, e.right);
+					if (!isIntegral(idx_type) && idx_type.kind != LS_TYPE_UNTYPED_INT) {
+						m_output.errorAt(e.token, "Slice index must be integer");
+						return {};
+					}
+					e.type = {base.element_kind, base.element_name, base.struct_index, e.token, false};
+					return e.type;
+				}
 				if (base.kind != LS_TYPE_ARRAY) {
-					m_output.errorAt(e.token, "Indexing requires array type");
+					m_output.errorAt(e.token, "Indexing requires array or slice type");
 					return {};
 				}
 				TypeRef idx_type = checkExpr(unit, e.right);
@@ -1113,15 +1118,70 @@ struct Checker {
 					m_output.errorAt(e.token, "Array index must be integer");
 					return {};
 				}
-				// Bounds checking here is intentionally opportunistic. Only expressions
-				// that fold to an integer without running user code are rejected at
-				// compile time; dynamic indices stay the runtime's responsibility.
 				i64 idx_value = 0;
 				if (getCompileTimeInteger(unit, e.right, &idx_value) && (idx_value < 0 || idx_value >= base.array_size)) {
 					m_output.errorAt(e.token, "Array index out of range");
 					return {};
 				}
 				e.type = {base.element_kind, base.element_name, base.struct_index, e.token, false};
+				return e.type;
+			}
+			case Expr::SLICE: {
+				TypeRef base = checkExpr(unit, e.left);
+				if (base.nullable) {
+					m_output.errorAt(e.token, "Nullable value must be checked for null");
+					return {};
+				}
+				if (base.kind != LS_TYPE_ARRAY && base.kind != LS_TYPE_SLICE) {
+					m_output.errorAt(e.token, "Slicing requires array or slice type");
+					return {};
+				}
+				// e.right = start expr (-1 = 0), e.method_receiver = end expr (-1 = base length)
+				i64 start_val = 0;
+				bool start_is_const = false;
+				if (e.right >= 0) {
+					TypeRef st = checkExpr(unit, e.right);
+					if (!isIntegral(st) && st.kind != LS_TYPE_UNTYPED_INT) {
+						m_output.errorAt(e.token, "Slice start must be integer");
+						return {};
+					}
+					start_is_const = getCompileTimeInteger(unit, e.right, &start_val);
+					if (start_is_const && start_val < 0) {
+						m_output.errorAt(e.token, "Slice start must be non-negative");
+						return {};
+					}
+				}
+				if (e.method_receiver >= 0) {
+					TypeRef et = checkExpr(unit, e.method_receiver);
+					if (!isIntegral(et) && et.kind != LS_TYPE_UNTYPED_INT) {
+						m_output.errorAt(e.token, "Slice end must be integer");
+						return {};
+					}
+					i64 end_val = 0;
+					if (getCompileTimeInteger(unit, e.method_receiver, &end_val)) {
+						if (start_is_const && end_val < start_val) {
+							m_output.errorAt(e.token, "Slice start must be <= end");
+							return {};
+						}
+						if (base.kind == LS_TYPE_ARRAY && end_val > base.array_size) {
+							m_output.errorAt(e.token, "Slice end out of range");
+							return {};
+						}
+					}
+				}
+				if (start_is_const && base.kind == LS_TYPE_ARRAY && start_val > base.array_size) {
+					m_output.errorAt(e.token, "Slice start out of range");
+					return {};
+				}
+				e.type.kind = LS_TYPE_SLICE;
+				e.type.element_kind = base.element_kind;
+				e.type.element_name = base.element_name;
+				e.type.struct_index = base.struct_index;
+				e.type.token = e.token;
+				return e.type;
+			}
+			case Expr::SLICE_LENGTH: {
+				// Rewritten by checkCall; should not be checked again
 				return e.type;
 			}
 			case Expr::UNARY: {
@@ -1360,7 +1420,7 @@ struct Checker {
 		}
 
 		bool has_default = false;
-		std::vector<u8> covered_enum_members;
+		ExpArray<u8> covered_enum_members(*m_arena_owner.arena);
 		if (subject_type.kind == LS_TYPE_ENUM && subject_type.enum_index >= 0) {
 			covered_enum_members.resize(m_enums[subject_type.enum_index]->members.size());
 			for (u8& covered : covered_enum_members) covered = 0;
@@ -1400,14 +1460,12 @@ struct Checker {
 				const i32 old_loop_size = (i32)m_loop_labels.size();
 				const i32 old_label_size = (i32)m_declared_labels.size();
 				m_scope_starts.push_back(old_size);
-				m_loop_scope_starts.push_back(old_loop_size);
 				m_label_scope_starts.push_back(old_label_size);
 				for (i32 child : stmt.children) checkStmt(unit, child, return_type);
 				m_locals.resize(old_size);
 				m_loop_labels.resize(old_loop_size);
 				m_declared_labels.resize(old_label_size);
 				m_scope_starts.pop_back();
-				m_loop_scope_starts.pop_back();
 				m_label_scope_starts.pop_back();
 				break;
 			}
@@ -1621,22 +1679,6 @@ struct Checker {
 		}
 	}
 
-	struct ArenaOwner {
-		const ls_host& host;
-		ls_arena* arena;
-
-		ArenaOwner(const ls_host& host)
-			: host(host) {
-			ASSERT(host.create_arena && host.destroy_arena);
-			arena = host.create_arena();
-		}
-		ArenaOwner(const ArenaOwner&) = delete;
-		ArenaOwner& operator=(const ArenaOwner&) = delete;
-		~ArenaOwner() {
-			if (arena) host.destroy_arena(arena);
-		}
-	};
-
 	ls_module& m_module;
 	OutputFormatter m_output;
 	ArenaOwner m_arena_owner;
@@ -1644,18 +1686,13 @@ struct Checker {
 	ExpArray<FunctionDecl*> m_functions;
 	ExpArray<StructDecl*> m_structs;
 	ExpArray<EnumDecl*> m_enums;
-	std::vector<LocalInfo> m_locals;
-	std::vector<i32> m_scope_starts;
-	std::vector<ls_string_view> m_loop_labels;
-	std::vector<i32> m_loop_scope_starts;
-	std::vector<ls_string_view> m_declared_labels;
-	std::vector<i32> m_label_scope_starts;
+	ExpArray<LocalInfo> m_locals;
+	ExpArray<i32> m_scope_starts;
+	ExpArray<ls_string_view> m_loop_labels;
+	ExpArray<ls_string_view> m_declared_labels;
+	ExpArray<i32> m_label_scope_starts;
 	const GlobalDecl* m_current_global_initializer = nullptr;
 };
-
-inline bool sameImportPathForPolicy(ls_string_view lhs, ls_string_view rhs) {
-	return equalStrings(lhs, rhs);
-}
 
 static NativeFunctionDecl& addNativeFunction(Unit& unit, ls_string_view canonical_name, TypeRef return_type, span<const TypeRef> param_types) {
 	NativeFunctionDecl& fn = unit.native_functions.emplace_back(*unit.arena_owner.arena);
@@ -1685,22 +1722,23 @@ static void registerStdMath(ls_module& module, ls_string_view prefix) {
 	addNativeFunction(unit, makeStringView("std:math.sqrt_f64"), f64_type, span<const TypeRef>(f64_params, 1));
 }
 
-inline bool resolveImports(ls_module& module, ls_import_resolver_fn import_resolver, void* import_resolver_userdata) {
-	std::vector<u8> state;
-	std::vector<ImportDecl*> imports;
-	std::vector<NativeFunctionDecl*> native_functions;
+static bool resolveImports(ls_module& module, ls_import_resolver_fn import_resolver, void* import_resolver_userdata) {
+	ArenaOwner arena_owner(module.host);
+	ExpArray<u8> state(*arena_owner.arena);
+	ExpArray<ImportDecl*> imports(*arena_owner.arena);
+	ExpArray<NativeFunctionDecl*> native_functions(*arena_owner.arena);
 
 	struct Context {
 		ls_module& module;
 		ls_import_resolver_fn import_resolver;
 		void* import_resolver_userdata;
-		std::vector<u8>& state;
-		std::vector<ImportDecl*>& imports;
-		std::vector<NativeFunctionDecl*>& native_functions;
+		ExpArray<u8>& state;
+		ExpArray<ImportDecl*>& imports;
+		ExpArray<NativeFunctionDecl*>& native_functions;
 		OutputFormatter output;
 
 		void ensureStateSize() {
-			while (state.size() < imports.size()) state.push_back(0);
+			if (state.size() < imports.size()) state.resize(imports.size(), 0);
 		}
 
 		bool hasAliasCollision(i32 idx) {
@@ -1709,7 +1747,7 @@ inline bool resolveImports(ls_module& module, ls_import_resolver_fn import_resol
 			for (i32 i = 0; i < idx; ++i) {
 				ImportDecl& previous = *imports[i];
 				if (!equalStrings(import.alias, previous.alias)) continue;
-				if (!sameImportPathForPolicy(import.path, previous.path)) return true;
+				if (!equalStrings(import.path, previous.path)) return true;
 			}
 			return false;
 		}
@@ -1725,7 +1763,7 @@ inline bool resolveImports(ls_module& module, ls_import_resolver_fn import_resol
 			for (i32 i = 0; i < idx; ++i) {
 				ImportDecl& previous = *imports[i];
 				if (!equalStrings(import.alias, previous.alias)) continue;
-				if (!sameImportPathForPolicy(import.path, previous.path)) continue;
+				if (!equalStrings(import.path, previous.path)) continue;
 				if (state[i] == 1) {
 					output.errorAt(import.token, "Import cycle detected at '", import.path, "'");
 					return false;
@@ -1734,7 +1772,7 @@ inline bool resolveImports(ls_module& module, ls_import_resolver_fn import_resol
 			for (i32 i = 0; i < idx; ++i) {
 				ImportDecl& previous = *imports[i];
 				if (!equalStrings(import.alias, previous.alias)) continue;
-				if (!sameImportPathForPolicy(import.path, previous.path)) continue;
+				if (!equalStrings(import.path, previous.path)) continue;
 				if (equalStrings(import.token.source_name, previous.token.source_name)) {
 					output.errorAt(import.token, "Duplicate import of '", import.path, "'");
 					return false;
@@ -1745,7 +1783,7 @@ inline bool resolveImports(ls_module& module, ls_import_resolver_fn import_resol
 			}
 			for (i32 i = 0; i < idx; ++i) {
 				ImportDecl& previous = *imports[i];
-				if (!sameImportPathForPolicy(import.path, previous.path)) continue;
+				if (!equalStrings(import.path, previous.path)) continue;
 				state[idx] = 2;
 				import.processed = true;
 				return true;
@@ -1755,7 +1793,7 @@ inline bool resolveImports(ls_module& module, ls_import_resolver_fn import_resol
 				return false;
 			}
 
-			if (sameImportPathForPolicy(import.path, makeStringView("std:math"))) {
+			if (equalStrings(import.path, makeStringView("std:math"))) {
 				registerStdMath(module, import.alias);
 				state[idx] = 2;
 				import.processed = true;

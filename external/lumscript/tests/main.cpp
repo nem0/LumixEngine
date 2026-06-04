@@ -221,6 +221,7 @@ static void nativeAddC(ls_runtime* runtime) {
 #include "loop_tests.inl"
 #include "import_tests.inl"
 #include "array_tests.inl"
+#include "slices_tests.inl"
 #include "string_tests.inl"
 #include "function_tests.inl"
 #include "declaration_tests.inl"

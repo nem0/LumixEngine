@@ -749,6 +749,8 @@ static bool callBytecodeCode(
 				if (!bytecodeCompareByType(*runtime, (ls_type_kind)kind, [](auto lhs, auto rhs) { return lhs <= rhs; })) return false;
 				break;
 			}
+			case BytecodeOp::ABORT:
+				return false;
 			case BytecodeOp::RETURN:
 				return finishCall(*runtime, frame_base, result_stack_base, (size_t)result_count);
 		}

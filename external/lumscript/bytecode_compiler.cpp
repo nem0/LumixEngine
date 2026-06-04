@@ -192,6 +192,7 @@ static bool bytecodeStructFieldOffset(ls_module& module, const TypeRef& type, ls
 
 static i32 bytecodeTypeSlotCount(ls_module& module, TypeRef type) {
 	if (type.nullable) return 1 + bytecodeTypeSlotCount(module, bytecodeNonNullableType(type));
+	if (type.kind == LS_TYPE_SLICE) return 2;
 	switch (type.kind == LS_TYPE_UNTYPED_INT ? LS_TYPE_I32 : type.kind) {
 		case LS_TYPE_BOOL:
 		case LS_TYPE_CPTR:
@@ -657,6 +658,65 @@ struct BytecodeCompileContext {
 	}
 
 };
+
+static bool bytecodeEmitArrayAsSlice(ls_module& module, ls_bytecode& bytecode, BytecodeCompileContext& ctx, Unit& unit, i32 expr_idx, TypeRef array_type) {
+	BytecodeValueAccess base = {};
+	if (!bytecodeResolveValueAccess(module, unit, ctx, expr_idx, &base)) return false;
+	if (!bytecodeEmitAddressOfValue(module, bytecode, ctx, base)) return false;
+	pushCode(bytecode, BytecodeOp::LOAD_CONST32);
+	pushCode(bytecode, (u32)array_type.array_size);
+	return true;
+}
+
+static bool bytecodeEmitSliceIndexedAccess(
+	ls_module& module, Unit& unit, ls_bytecode& bytecode, BytecodeCompileContext& ctx,
+	Expr& expr, TypeRef* element_type_out, i32* element_slot_count_out, i32* addr_temp_out
+) {
+	TypeRef base_type = unit.expressions[expr.left].type;
+	TypeRef elem(base_type.element_kind, base_type.element_name, base_type.struct_index, base_type.token, false);
+	const i32 elem_slots = bytecodeTypeSlotCount(module, elem);
+	if (elem_slots <= 0) return false;
+
+	BytecodeValueAccess slice_access = {};
+	if (!bytecodeResolveValueAccess(module, unit, ctx, expr.left, &slice_access)) return false;
+
+	const i32 index_temp = ctx.local_count++;
+	if (index_temp >= 256) return false;
+	if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.right)) return false;
+	pushCode(bytecode, BytecodeOp::STORE_LOCAL);
+	pushCode(bytecode, (u8)index_temp);
+
+	// Bounds check: abort if index >= length
+	pushCode(bytecode, BytecodeOp::LOAD_LOCAL);
+	pushCode(bytecode, (u8)index_temp);
+	if (!bytecodeEmitLoadValueRange(module, bytecode, slice_access, 1, 1)) return false;
+	pushCode(bytecode, BytecodeOp::CMP_GE);
+	pushCode(bytecode, (u8)LS_TYPE_I32);
+	size_t ok_jump = 0;
+	emitJumpPlaceholder(bytecode, BytecodeOp::JUMP_IF_FALSE, &ok_jump);
+	pushCode(bytecode, BytecodeOp::ABORT);
+	patchJump(bytecode, ok_jump, bytecode.code.size);
+
+	// address = ptr + index * elem_slots
+	const i32 addr_temp = ctx.local_count++;
+	if (addr_temp >= 256) return false;
+	if (!bytecodeEmitLoadValueRange(module, bytecode, slice_access, 0, 1)) return false;
+	pushCode(bytecode, BytecodeOp::LOAD_LOCAL);
+	pushCode(bytecode, (u8)index_temp);
+	if (elem_slots != 1) {
+		pushCode(bytecode, BytecodeOp::LOAD_CONST32);
+		pushCode(bytecode, (u32)elem_slots);
+		pushCode(bytecode, BytecodeOp::MUL_U32);
+	}
+	pushCode(bytecode, BytecodeOp::ADD_U32);
+	pushCode(bytecode, BytecodeOp::STORE_LOCAL);
+	pushCode(bytecode, (u8)addr_temp);
+
+	if (element_type_out) *element_type_out = elem;
+	if (element_slot_count_out) *element_slot_count_out = elem_slots;
+	if (addr_temp_out) *addr_temp_out = addr_temp;
+	return true;
+}
 
 static i32 findGlobal(const ls_module& module, ls_string_view name) {
 	i32 index = 0;
@@ -1517,11 +1577,18 @@ static bool bytecodeCompileExpr(ls_module& module, Unit& unit, ls_bytecode& byte
 			return bytecodeEmitLoadValue(module, bytecode, ctx, access);
 		}
 		case Expr::INDEX: {
+			TypeRef base_type = unit.expressions[expr.left].type;
+			if (base_type.kind == LS_TYPE_SLICE) {
+				i32 addr_temp = -1, slot_count = 0;
+				if (!bytecodeEmitSliceIndexedAccess(module, unit, bytecode, ctx, expr, nullptr, &slot_count, &addr_temp)) return false;
+				pushCode(bytecode, BytecodeOp::LOAD_LOCAL);
+				pushCode(bytecode, (u8)addr_temp);
+				pushCode(bytecode, BytecodeOp::LOAD_INDIRECT);
+				pushCode(bytecode, (u8)slot_count);
+				return true;
+			}
 			BytecodeValueAccess access = {};
 			if (!bytecodeResolveValueAccess(module, unit, ctx, expr_idx, &access)) {
-				// Dynamic array indices can not be folded into a direct slot offset.
-				// We fall back to the runtime helper above, which computes the final
-				// element address into a temp slot and then reads it back here.
 				i32 temp_slot = -1;
 				i32 slot_count = 0;
 				if (!bytecodeEmitRuntimeIndexedAccess(module, unit, bytecode, ctx, expr, &access, nullptr, &slot_count, &temp_slot)) return false;
@@ -1532,6 +1599,72 @@ static bool bytecodeCompileExpr(ls_module& module, Unit& unit, ls_bytecode& byte
 				return true;
 			}
 			return bytecodeEmitLoadValue(module, bytecode, ctx, access);
+		}
+		case Expr::SLICE: {
+			// left = base (array or slice), right = start (-1=0), method_receiver = end (-1=default)
+			TypeRef base_type = unit.expressions[expr.left].type;
+			TypeRef elem(base_type.element_kind, base_type.element_name, base_type.struct_index, base_type.token, false);
+			const i32 elem_slots = bytecodeTypeSlotCount(module, elem);
+			if (elem_slots <= 0) return false;
+
+			i64 start_val = 0;
+			if (expr.right >= 0 && !bytecodeGetCompileTimeInteger(module, unit, expr.right, &start_val)) return false;
+
+			if (base_type.kind == LS_TYPE_ARRAY) {
+				i64 end_val = base_type.array_size;
+				if (expr.method_receiver >= 0 && !bytecodeGetCompileTimeInteger(module, unit, expr.method_receiver, &end_val)) return false;
+
+				BytecodeValueAccess base = {};
+				if (!bytecodeResolveValueAccess(module, unit, ctx, expr.left, &base)) return false;
+
+				// Compute absolute stack address of element[start]
+				i32 param_slot_count = 0;
+				for (const Param& p : ctx.fn.params) param_slot_count += p.is_ref ? 1 : bytecodeTypeSlotCount(module, p.type);
+				const i32 physical = base.slot + base.value_slot_offset + (i32)start_val * elem_slots;
+				const i32 abs_slot = base.kind == BytecodeValueKind::LOCAL ? (i32)bytecode.global_count + param_slot_count + physical
+					: base.kind == BytecodeValueKind::PARAM ? (i32)bytecode.global_count + physical
+					: physical;
+				pushCode(bytecode, BytecodeOp::LOAD_CONST32);
+				pushCode(bytecode, (u32)abs_slot);
+				// length
+				pushCode(bytecode, BytecodeOp::LOAD_CONST32);
+				pushCode(bytecode, (u32)(end_val - start_val));
+				return true;
+			} else { // LS_TYPE_SLICE
+				BytecodeValueAccess base = {};
+				if (!bytecodeResolveValueAccess(module, unit, ctx, expr.left, &base)) return false;
+
+				// new_ptr = base.ptr + start * elem_slots
+				if (!bytecodeEmitLoadValueRange(module, bytecode, base, 0, 1)) return false;
+				if (start_val > 0) {
+					pushCode(bytecode, BytecodeOp::LOAD_CONST32);
+					pushCode(bytecode, (u32)((i32)start_val * elem_slots));
+					pushCode(bytecode, BytecodeOp::ADD_U32);
+				}
+
+				// new_len
+				if (expr.method_receiver >= 0) {
+					i64 end_val = 0;
+					if (!bytecodeGetCompileTimeInteger(module, unit, expr.method_receiver, &end_val)) return false;
+					pushCode(bytecode, BytecodeOp::LOAD_CONST32);
+					pushCode(bytecode, (u32)(end_val - start_val));
+				} else {
+					// base.len - start
+					if (!bytecodeEmitLoadValueRange(module, bytecode, base, 1, 1)) return false;
+					if (start_val > 0) {
+						pushCode(bytecode, BytecodeOp::LOAD_CONST32);
+						pushCode(bytecode, (u32)start_val);
+						pushCode(bytecode, BytecodeOp::SUB_I32);
+					}
+				}
+				return true;
+			}
+		}
+		case Expr::SLICE_LENGTH: {
+			// left = slice expression
+			BytecodeValueAccess access = {};
+			if (!bytecodeResolveValueAccess(module, unit, ctx, expr.left, &access)) return false;
+			return bytecodeEmitLoadValueRange(module, bytecode, access, 1, 1);
 		}
 		case Expr::STRUCT_LITERAL:
 		case Expr::CONSTRUCTOR: {
@@ -1583,18 +1716,16 @@ static bool bytecodeCompileExpr(ls_module& module, Unit& unit, ls_bytecode& byte
 				}
 				const FunctionDecl& callee = *callee_ptr;
 				for (i32 i = 0; i < expr.args.size(); ++i) {
-					const TypeRef* expected = &callee.params[i].type;
+					const TypeRef& param_type = callee.params[i].type;
 					if (callee.params[i].is_ref) {
-						// Ref parameters are not value arguments. The AST represents them
-						// explicitly as `Expr::REF`, so we resolve the pointed-to lvalue
-						// and pass its address to the VM.
 						Expr& arg_expr = unit.expressions[expr.args[i]];
 						BytecodeValueAccess access = {};
 						if (!bytecodeResolveValueAccess(module, unit, ctx, arg_expr.right, &access)) return false;
 						if (!bytecodeEmitAddressOfValue(module, bytecode, ctx, access)) return false;
-					}
-					else {
-						if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.args[i], expected)) return false;
+					} else if (param_type.kind == LS_TYPE_SLICE && unit.expressions[expr.args[i]].type.kind == LS_TYPE_ARRAY) {
+						if (!bytecodeEmitArrayAsSlice(module, bytecode, ctx, unit, expr.args[i], unit.expressions[expr.args[i]].type)) return false;
+					} else {
+						if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.args[i], &param_type)) return false;
 					}
 				}
 				pushCode(bytecode, BytecodeOp::CALL);
@@ -1615,7 +1746,12 @@ static bool bytecodeCompileExpr(ls_module& module, Unit& unit, ls_bytecode& byte
 			if (param_slot_count > 255) return false;
 			if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.left, &callee_type)) return false;
 			for (i32 i = 0; i < expr.args.size(); ++i) {
-				if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.args[i], &fn_type.params[i])) return false;
+				const TypeRef& param_type = fn_type.params[i];
+				if (param_type.kind == LS_TYPE_SLICE && unit.expressions[expr.args[i]].type.kind == LS_TYPE_ARRAY) {
+					if (!bytecodeEmitArrayAsSlice(module, bytecode, ctx, unit, expr.args[i], unit.expressions[expr.args[i]].type)) return false;
+				} else {
+					if (!bytecodeCompileExpr(module, unit, bytecode, ctx, expr.args[i], &param_type)) return false;
+				}
 			}
 			pushCode(bytecode, BytecodeOp::CALL_INDIRECT);
 			pushCode(bytecode, (u8)param_slot_count);
@@ -1674,6 +1810,17 @@ static bool bytecodeCompileStmt(ls_module& module, Unit& unit, ls_bytecode& byte
 			BytecodeValueAccess access = {};
 			if (!bytecodeResolveValueAccess(module, unit, ctx, stmt.left, &access)) {
 				if (lhs.kind != Expr::INDEX) return false;
+				TypeRef lhs_base_type = unit.expressions[lhs.left].type;
+				if (lhs_base_type.kind == LS_TYPE_SLICE) {
+					i32 addr_temp = -1, slot_count = 0;
+					TypeRef elem_type;
+					if (!bytecodeEmitSliceIndexedAccess(module, unit, bytecode, ctx, lhs, &elem_type, &slot_count, &addr_temp)) return false;
+					access.kind = BytecodeValueKind::LOCAL;
+					access.slot = addr_temp;
+					access.type = elem_type;
+					access.is_ref = true;
+					return bytecodeCompileAssignmentToAccess(module, unit, bytecode, ctx, stmt, access);
+				}
 				i32 temp_slot = -1;
 				i32 slot_count = 0;
 				if (!bytecodeEmitRuntimeIndexedAccess(module, unit, bytecode, ctx, lhs, nullptr, nullptr, &slot_count, &temp_slot)) return false;

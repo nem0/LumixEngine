@@ -843,5 +843,58 @@ TEST(AliasedImportRuntime) {
 	return true;
 }
 
+// Two imports each contribute one extern fn. The flat native-function index must
+// account for all units, so lib_b's fn is at index 1, not 0. If findNativeFunction
+// (CanonicalName) forgets to count previous units, the wrong callback fires.
+TEST(ExternFnSecondImportCorrectIndex) {
+	const char* main_source = R"(
+		import "lib_a" as a
+		import "lib_b" as b
 
+		fn main() : i32 {
+			return b.mul(3, 7);
+		}
+	)";
+	const char* lib_a_source = R"(
+		extern fn add(x : i32, y : i32) : i32;
+	)";
+	const char* lib_b_source = R"(
+		extern fn mul(x : i32, y : i32) : i32;
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("lib_a"), toLs(lib_a_source) },
+		{ toLs("lib_b"), toLs(lib_b_source) },
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+
+	TestContext diagnostics;
+	ls_module* module = ls_module_create(&diagnostics.host);
+	EXPECT_TRUE(module != nullptr);
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
+
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &diagnostics.host);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	const i32 add_idx = ls_module_get_native_function_index(module, toLs("lib_a.add"));
+	const i32 mul_idx = ls_module_get_native_function_index(module, toLs("lib_b.mul"));
+	EXPECT_EQ(0, add_idx);
+	EXPECT_EQ(1, mul_idx);
+
+	ls_runtime* runtime = ls_runtime_create(bytecode);
+	EXPECT_TRUE(runtime != nullptr);
+	ls_runtime_set_native_function_callback(runtime, add_idx, [](ls_runtime* rt) {
+		ls_push_i32(rt, ls_to_i32(rt, -2) + ls_to_i32(rt, -1));
+	});
+	ls_runtime_set_native_function_callback(runtime, mul_idx, [](ls_runtime* rt) {
+		ls_push_i32(rt, ls_to_i32(rt, -2) * ls_to_i32(rt, -1));
+	});
+
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(21, ls_to_i32(runtime, -1)); // 3 * 7 = 21, not 3 + 7 = 10
+
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	ls_module_destroy(module);
+	return true;
+}
 

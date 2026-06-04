@@ -75,33 +75,16 @@ struct Parser {
 		return name;
 	}
 
-	static usize decimalDigits(i32 value) {
-		usize digits = 1;
-		while (value >= 10) {
-			value /= 10;
-			++digits;
-		}
-		return digits;
-	}
-
-	static void writeDecimal(char* dst, i32 value) {
-		char tmp[16];
-		usize count = 0;
-		do {
-			tmp[count++] = char('0' + (value % 10));
-			value /= 10;
-		} while (value > 0);
-		for (usize i = 0; i < count; ++i) {
-			dst[i] = tmp[count - 1 - i];
-		}
-	}
-
 	static ls_string_view makeSynthesizedName(ls_arena& arena, ls_string_view prefix, ls_string_view infix, i32 value) {
+		char num_buf[16];
+		char* num_end = toCString(value, num_buf, sizeof(num_buf));
+		if (!num_end) return {};
+		const usize num_len = (usize)(num_end - num_buf);
 		const usize prefix_size = size(prefix);
 		const usize infix_size = size(infix);
-		const usize digits = decimalDigits(value);
 		const usize separator = empty(prefix) ? 0 : 1;
-		char* buffer = (char*)arena.allocate(arena.user_data, prefix_size + separator + infix_size + digits + 1, alignof(char));
+		const usize total = prefix_size + separator + infix_size + num_len + 1;
+		char* buffer = (char*)arena.allocate(arena.user_data, total, alignof(char));
 		if (!buffer) return {};
 		char* out = buffer;
 		if (prefix_size > 0) {
@@ -113,8 +96,8 @@ struct Parser {
 			copyMemory(out, data(infix), infix_size);
 			out += infix_size;
 		}
-		writeDecimal(out, value);
-		out += digits;
+		copyMemory(out, num_buf, num_len);
+		out += num_len;
 		*out = '\0';
 		return ls_string_view{buffer, out};
 	}
@@ -185,6 +168,16 @@ struct Parser {
 			default: error(t, "Expected type"); return {};
 		}
 		if (match(Token::LEFT_BRACKET)) {
+			if (match(Token::RIGHT_BRACKET)) {
+				TypeRef slice_type;
+				slice_type.kind = LS_TYPE_SLICE;
+				slice_type.token = t;
+				slice_type.nullable = is_nullable;
+				slice_type.element_kind = base.kind;
+				slice_type.element_name = base.unresolved_name;
+				slice_type.struct_index = base.struct_index;
+				return slice_type;
+			}
 			Token size_token;
 			if (!consume(Token::NUMBER, &size_token)) return {};
 			if (!consume(Token::RIGHT_BRACKET)) return {};
@@ -298,6 +291,20 @@ struct Parser {
 		consume(Token::RIGHT_BRACE);
 	}
 
+	void parseParams(FunctionDecl& fn) {
+		while (peek().type != Token::RIGHT_PAREN && peek().type != Token::END_OF_FILE && !m_output.has_error) {
+			if (!fn.params.empty()) consume(Token::COMMA);
+			Token param_name;
+			if (!consume(Token::IDENTIFIER, &param_name)) return;
+			consume(Token::COLON);
+			Param& p = fn.params.emplace_back();
+			p.name = param_name.value;
+			p.token = param_name;
+			p.is_ref = match(Token::REF);
+			p.type = parseType();
+		}
+	}
+
 	i32 parseFunction() {
 		Token name;
 		if (!consume(Token::IDENTIFIER, &name)) return -1;
@@ -316,17 +323,7 @@ struct Parser {
 		if (!addSymbol(name, m_unit, global.canonical_name, Symbol::GLOBAL_VAR, (i32)m_unit.globals.size() - 1)) return -1;
 
 		if (!consume(Token::LEFT_PAREN)) return fn_idx;
-		while (peek().type != Token::RIGHT_PAREN && peek().type != Token::END_OF_FILE && !m_output.has_error) {
-			if (!fn.params.empty()) consume(Token::COMMA);
-			Token param_name;
-			if (!consume(Token::IDENTIFIER, &param_name)) return fn_idx;
-			consume(Token::COLON);
-			Param& p = fn.params.emplace_back();
-			p.name = param_name.value;
-			p.token = param_name;
-			p.type = parseType(CanBeRef::YES);
-			p.is_ref = p.type.is_ref;
-		}
+		parseParams(fn);
 		consume(Token::RIGHT_PAREN);
 		consume(Token::COLON);
 		fn.return_type = parseType();
@@ -343,49 +340,21 @@ struct Parser {
 	}
 
 	i32 parseFunctionLiteral(Token fn_token) {
-		// Anonymous function literals are lowered into ordinary top-level
-		// FunctionDecl records instead of inventing a separate AST node.
-		//
-		// That keeps the rest of the pipeline simple: the checker already
-		// knows how to resolve function declarations, the bytecode backend
-		// already knows how to encode a function handle, and callers keep
-		// seeing a normal `FUNCTION_REF` expression. The only special part
-		// is that the declaration gets a synthesized name so it can live in
-		// the same flat module-wide function table as named functions.
 		m_unit.functions.emplace_back(*m_unit.arena_owner.arena);
 		const i32 fn_idx = (i32)m_unit.functions.size() - 1;
 		FunctionDecl& fn = m_unit.functions[fn_idx];
-		// The generated name only needs to be unique inside this module.
-		// It is not user-facing and never participates in lookup; it exists
-		// purely so the synthesized declaration can be stored and later
-		// referenced like any other function.
 		fn.canonical_name.path = m_declaration_prefix;
 		fn.canonical_name.name = makeSynthesizedName(*m_unit.arena_owner.arena, m_declaration_prefix, makeStringView("__fn_literal"), m_function_literal_counter++);
 		fn.token = fn_token;
 
 		if (!consume(Token::LEFT_PAREN)) return fn_idx;
-		while (peek().type != Token::RIGHT_PAREN && peek().type != Token::END_OF_FILE && !m_output.has_error) {
-			if (!fn.params.empty()) consume(Token::COMMA);
-			Token param_name;
-			if (!consume(Token::IDENTIFIER, &param_name)) return fn_idx;
-			consume(Token::COLON);
-			Param& p = fn.params.emplace_back();
-			p.name = param_name.value;
-			p.token = param_name;
-			p.is_ref = match(Token::REF);
-			p.type = parseType(CanBeRef::YES);
-		}
+		parseParams(fn);
 		consume(Token::RIGHT_PAREN);
 		consume(Token::COLON);
 		fn.return_type = parseType();
 		const i32 body = parseBlock();
 		FunctionDecl& parsed_fn = m_unit.functions[fn_idx];
 		parsed_fn.body = body;
-		// `findFunction()` returns the flat module index that the runtime
-		// and bytecode layer expect. For synthesized declarations this is
-		// usually the same as `fn_idx`, but looking it up the same way as
-		// named declarations keeps the parser agnostic to future changes in
-		// how units are merged into the module table.
 		const i32 flat_idx = m_module.findFunction(parsed_fn.canonical_name);
 		return flat_idx >= 0 ? flat_idx : fn_idx;
 	}
@@ -418,17 +387,7 @@ struct Parser {
 		fn.canonical_name.name = makeSynthesizedName(*m_unit.arena_owner.arena, m_declaration_prefix, makeStringView("__operator"), m_operator_counter++);
 		fn.token = op;
 		if (!consume(Token::LEFT_PAREN)) return fn_idx;
-		while (peek().type != Token::RIGHT_PAREN && peek().type != Token::END_OF_FILE && !m_output.has_error) {
-			if (!fn.params.empty()) consume(Token::COMMA);
-			Token param_name;
-			if (!consume(Token::IDENTIFIER, &param_name)) return fn_idx;
-			consume(Token::COLON);
-			Param& p = fn.params.emplace_back();
-			p.name = param_name.value;
-			p.token = param_name;
-			p.is_ref = match(Token::REF);
-			p.type = parseType();
-		}
+		parseParams(fn);
 		consume(Token::RIGHT_PAREN);
 		consume(Token::COLON);
 		fn.return_type = parseType();
@@ -460,6 +419,13 @@ struct Parser {
 		}
 		consume(Token::SEMICOLON);
 	}
+
+	struct DisableConstructor {
+		Parser& parser;
+		bool saved;
+		DisableConstructor(Parser& p) : parser(p), saved(p.m_allow_constructor) { p.m_allow_constructor = false; }
+		~DisableConstructor() { parser.m_allow_constructor = saved; }
+	};
 
 	i32 addStmt(Stmt::Kind kind, Token token) {
 		Stmt& stmt = m_unit.statements.emplace_back(*m_unit.arena_owner.arena);
@@ -496,6 +462,22 @@ struct Parser {
 		return block;
 	}
 
+	void parseWhileBody(i32 stmt_idx) {
+		DisableConstructor guard(*this);
+		m_unit.statements[stmt_idx].expr = parseExpression();
+	}
+
+	void parseForBody(i32 stmt_idx) {
+		Token name;
+		if (!consume(Token::IDENTIFIER, &name)) return;
+		m_unit.statements[stmt_idx].label_name = name.value;
+		if (!consume(Token::EQUAL)) return;
+		DisableConstructor guard(*this);
+		m_unit.statements[stmt_idx].expr = parseExpression();
+		if (!consume(Token::RANGE)) return;
+		m_unit.statements[stmt_idx].left = parseExpression();
+	}
+
 	i32 parseStatement() {
 		Token t = peek();
 		if (t.type == Token::IDENTIFIER && peekNext().type == Token::COLON) {
@@ -504,29 +486,14 @@ struct Parser {
 			if (match(Token::WHILE)) {
 				const i32 stmt_idx = addStmt(Stmt::WHILE, t);
 				m_unit.statements[stmt_idx].name = label.value;
-				const bool old_allow_constructor = m_allow_constructor;
-				m_allow_constructor = false;
-				m_unit.statements[stmt_idx].expr = parseExpression();
-				m_allow_constructor = old_allow_constructor;
+				parseWhileBody(stmt_idx);
 				m_unit.statements[stmt_idx].right = parseBlock();
 				return stmt_idx;
 			}
 			if (match(Token::FOR)) {
 				const i32 stmt_idx = addStmt(Stmt::FOR, t);
 				m_unit.statements[stmt_idx].name = label.value;
-				Token name;
-				if (!consume(Token::IDENTIFIER, &name)) return stmt_idx;
-				m_unit.statements[stmt_idx].label_name = name.value;
-				if (!consume(Token::EQUAL)) return stmt_idx;
-				const bool old_allow_constructor = m_allow_constructor;
-				m_allow_constructor = false;
-				m_unit.statements[stmt_idx].expr = parseExpression();
-				if (!consume(Token::RANGE)) {
-					m_allow_constructor = old_allow_constructor;
-					return stmt_idx;
-				}
-				m_unit.statements[stmt_idx].left = parseExpression();
-				m_allow_constructor = old_allow_constructor;
+				parseForBody(stmt_idx);
 				m_unit.statements[stmt_idx].right = parseBlock();
 				return stmt_idx;
 			}
@@ -561,37 +528,22 @@ struct Parser {
 		}
 		if (match(Token::WHILE)) {
 			const i32 stmt_idx = addStmt(Stmt::WHILE, t);
-			const bool old_allow_constructor = m_allow_constructor;
-			m_allow_constructor = false;
-			m_unit.statements[stmt_idx].expr = parseExpression();
-			m_allow_constructor = old_allow_constructor;
+			parseWhileBody(stmt_idx);
 			m_unit.statements[stmt_idx].right = parseBlock();
 			return stmt_idx;
 		}
 		if (match(Token::FOR)) {
 			const i32 stmt_idx = addStmt(Stmt::FOR, t);
-			Token name;
-			if (!consume(Token::IDENTIFIER, &name)) return stmt_idx;
-			m_unit.statements[stmt_idx].label_name = name.value;
-			if (!consume(Token::EQUAL)) return stmt_idx;
-			const bool old_allow_constructor = m_allow_constructor;
-			m_allow_constructor = false;
-			m_unit.statements[stmt_idx].expr = parseExpression();
-			if (!consume(Token::RANGE)) {
-				m_allow_constructor = old_allow_constructor;
-				return stmt_idx;
-			}
-			m_unit.statements[stmt_idx].left = parseExpression();
-			m_allow_constructor = old_allow_constructor;
+			parseForBody(stmt_idx);
 			m_unit.statements[stmt_idx].right = parseBlock();
 			return stmt_idx;
 		}
 		if (match(Token::IF)) {
 			const i32 stmt_idx = addStmt(Stmt::IF, t);
-			const bool old_allow_constructor = m_allow_constructor;
-			m_allow_constructor = false;
-			m_unit.statements[stmt_idx].expr = parseExpression();
-			m_allow_constructor = old_allow_constructor;
+			{
+				DisableConstructor guard(*this);
+				m_unit.statements[stmt_idx].expr = parseExpression();
+			}
 			m_unit.statements[stmt_idx].left = parseBlock();
 			if (match(Token::ELSE)) {
 				if (peek().type == Token::IF) {
@@ -662,9 +614,10 @@ struct Parser {
 
 	i32 parseMatch(Token token) {
 		const i32 stmt_idx = addStmt(Stmt::MATCH, token);
-		m_allow_constructor = false;
-		m_unit.statements[stmt_idx].expr = parseExpression();
-		m_allow_constructor = true;
+		{
+			DisableConstructor guard(*this);
+			m_unit.statements[stmt_idx].expr = parseExpression();
+		}
 		if (!consume(Token::LEFT_BRACE)) return stmt_idx;
 		while (peek().type != Token::RIGHT_BRACE && peek().type != Token::END_OF_FILE && !m_output.has_error) {
 			Token case_token;
@@ -804,11 +757,32 @@ struct Parser {
 				consume(Token::RIGHT_PAREN);
 				expr_idx = idx;
 			} else if (match(Token::LEFT_BRACKET)) {
-				const i32 idx = addExpr(Expr::INDEX, t);
-				m_unit.expressions[idx].left = expr_idx;
-				m_unit.expressions[idx].right = parseExpression();
-				consume(Token::RIGHT_BRACKET);
-				expr_idx = idx;
+				if (peek().type == Token::COLON) {
+					consumeToken();
+					const i32 idx = addExpr(Expr::SLICE, t);
+					m_unit.expressions[idx].left = expr_idx;
+					m_unit.expressions[idx].right = -1;
+					m_unit.expressions[idx].method_receiver = peek().type != Token::RIGHT_BRACKET ? parseExpression() : -1;
+					consume(Token::RIGHT_BRACKET);
+					expr_idx = idx;
+				} else {
+					const i32 start_expr = parseExpression();
+					if (peek().type == Token::COLON) {
+						consumeToken();
+						const i32 idx = addExpr(Expr::SLICE, t);
+						m_unit.expressions[idx].left = expr_idx;
+						m_unit.expressions[idx].right = start_expr;
+						m_unit.expressions[idx].method_receiver = peek().type != Token::RIGHT_BRACKET ? parseExpression() : -1;
+						consume(Token::RIGHT_BRACKET);
+						expr_idx = idx;
+					} else {
+						const i32 idx = addExpr(Expr::INDEX, t);
+						m_unit.expressions[idx].left = expr_idx;
+						m_unit.expressions[idx].right = start_expr;
+						consume(Token::RIGHT_BRACKET);
+						expr_idx = idx;
+					}
+				}
 			} else if (m_allow_constructor && peek().type == Token::LEFT_BRACE && !empty(getExpressionName(expr_idx))) {
 				consumeToken();
 				ls_string_view name = getExpressionName(expr_idx);
@@ -859,18 +833,6 @@ struct Parser {
 			case Token::IDENTIFIER: {
 				const i32 var_idx = addExpr(Expr::VAR, t);
 				m_unit.expressions[var_idx].name = t.value;
-				if (m_allow_constructor && peek().type == Token::LEFT_BRACE) {
-					consumeToken();
-					const i32 idx = addExpr(Expr::CONSTRUCTOR, t);
-					m_unit.expressions[idx].name = t.value;
-					while (peek().type != Token::RIGHT_BRACE && peek().type != Token::END_OF_FILE && !m_output.has_error) {
-						if (!m_unit.expressions[idx].args.empty()) consume(Token::COMMA);
-						const i32 arg = parseExpression();
-						m_unit.expressions[idx].args.push_back(arg);
-					}
-					consume(Token::RIGHT_BRACE);
-					return idx;
-				}
 				return var_idx;
 			}
 			case Token::DOT: {
