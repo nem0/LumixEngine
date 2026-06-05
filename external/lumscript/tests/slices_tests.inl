@@ -279,6 +279,23 @@ TEST(SliceZeroLengthRuntime) {
 	return true;
 }
 
+TEST(SliceNullInitializationRuntime) {
+	const char* source = R"(
+		fn main() : i32 {
+			var slice : i32[] = null;
+			return length(slice);
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(0, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(SliceIterationRuntime) {
 	const char* source = R"(
 		fn sum(values : i32[]) : i32 {

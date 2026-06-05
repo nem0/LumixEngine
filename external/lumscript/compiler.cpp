@@ -583,7 +583,7 @@ struct Checker {
 	}
 
 	bool canAssign(TypeRef dst, TypeRef src) const {
-		if (src.kind == LS_TYPE_NULL_VALUE) return dst.nullable;
+		if (src.kind == LS_TYPE_NULL_VALUE) return dst.nullable || dst.kind == LS_TYPE_SLICE;
 		if (dst.kind == LS_TYPE_NULL_VALUE) return src.kind == LS_TYPE_NULL_VALUE;
 		if (dst.kind == LS_TYPE_SLICE && src.kind == LS_TYPE_ARRAY) return sameElementType(dst, src);
 		if (dst.kind == LS_TYPE_SLICE || src.kind == LS_TYPE_SLICE) return sameBaseType(dst, src);

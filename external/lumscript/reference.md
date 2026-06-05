@@ -557,6 +557,7 @@ Slice operations:
 - slices can be indexed with `slice[i]`
 - indexing is bounds-checked at runtime
 - `length(slice)` returns the number of elements in the slice
+- a slice can be initialized with `null`, which creates an empty slice
 - slices can be stored in variables, passed to functions, and returned from functions
 - assigning one slice to another copies only the pointer and length
 - a slice remains valid only while the backing storage remains alive and stable

@@ -1105,6 +1105,13 @@ static bool bytecodeCompileAssignmentToAccess(
 }
 
 static bool bytecodeEmitNullValue(ls_module& module, ls_bytecode& bytecode, const TypeRef& type) {
+	if (type.kind == LS_TYPE_SLICE) {
+		pushCode(bytecode, BytecodeOp::LOAD_CONST32);
+		pushCode(bytecode, (u32)0);
+		pushCode(bytecode, BytecodeOp::LOAD_CONST32);
+		pushCode(bytecode, (u32)0);
+		return true;
+	}
 	if (!type.nullable) return false;
 	// Nullable values are encoded as a leading presence tag followed by the
 	// underlying payload slots. A null literal therefore emits tag=0 and zeros
@@ -1437,7 +1444,7 @@ static bool bytecodeCompileExpr(ls_module& module, Unit& unit, ls_bytecode& byte
 		case Expr::STRING_LITERAL:
 			return bytecodeEmitStringLiteral(bytecode, expr.string);
 		case Expr::NULL_LITERAL:
-			return expected && expected->nullable ? bytecodeEmitNullValue(module, bytecode, *expected) : false;
+			return expected ? bytecodeEmitNullValue(module, bytecode, *expected) : false;
 		case Expr::ENUM_LITERAL: {
 			i32 enum_idx = expr.type.struct_index;
 			i32 idx = enum_idx;
