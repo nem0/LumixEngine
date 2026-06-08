@@ -22,7 +22,6 @@
 * attributes?
 * fibers/coroutines?
 * closures?
-* generics?
 
 # Goals
  * **simple** - string concatenation: `"Hello " + "World!"`. Avoid verbose low level code.
@@ -36,6 +35,7 @@ LumScript is a small, statically typed scripting language for Lumix Engine.
 ## Table of contents
 
 - [Design goals](#design-goals)
+- [Design decisions](#design-decisions)
 - [Quick example](#quick-example)
 - [Source files](#source-files)
 - [Declarations](#declarations)
@@ -43,6 +43,7 @@ LumScript is a small, statically typed scripting language for Lumix Engine.
 	- [Structs](#structs)
 	- [Enums](#enums)
 	- [Functions](#functions)
+	- [Templates](#templates)
 	- [Operators](#operators)
 	- [Ref parameters](#ref-parameters)
 - [Types](#types)
@@ -93,6 +94,51 @@ JIT is intentionally out of scope for the first version.
 - simple: readable high-level code with minimal boilerplate
 - safe: nullable values require explicit null checks
 - efficient: avoid unnecessary allocations and keep runtime overhead low
+
+## Design decisions
+
+- templates use []
+	- main reason we have templates at all are user-defined containers
+	- we want a pair of enclosing characters, single character is hard to read when nested: `Array@Array@i32`
+	- different begin and end, reads easier, especially when nested, e.g. if we used `"` - `Box"Pair"i32, string""`
+	- so our options are `[]`, `<>`, `()`, `{}`
+	- there are already languages using `[]` and `<>` for templates
+	- `<>` is harder to parse thana `[]`
+	- **open questions**: should we make the syntax unambigous with something like `.[]`
+
+- raw memory api
+	- we want raw memory api so users can implement their own containers, arenas and other features
+	- TODO
+
+- memory safety
+	- options: borrow checker, gc, limit features only to memory safe ones, not memory safe, runtime safety like Fil-C
+	- borrow checker makes the language and compiler more complicated 
+	- limiting features would make the language way too limited
+	- forced null checks
+	- bound-checked slice as primitive type in the language - while not guaranteed, it makes memory safety errors a bit less probably
+	- **open questions**: gc, not memory safe, like Fil-C
+
+- ufcs
+	- method like syntax without actual methods
+	- easy autocomplete
+	- easy to "extend" the type, unlike normal methods
+
+- import
+	- solving namespace issues with aliasing at import site
+	- without all the issues caused by includes in C or C++ 
+
+- ADL
+	- less noise `lib.foo(val)` -> `foo(val)`
+	- a way to have overloads without actual overloads
+
+- operators
+	- operators are clearly useful, why would we have them for primitive types otherwise
+	- very noisy and hard to read without it `add(add(mul(a.x, b.x), mul(a.y, b.y)), mul(a.z, b.z))` vs `a.x * b.x + a.y * b.y + a.z * b.z`
+
+- undefined behavior
+	- compared to C or C++, try to define as much behavior as possible
+	- defined signed integer overflow
+	- **open questions**: should we have any undefined behavior?
 
 ## Quick example
 
@@ -292,6 +338,96 @@ Rules:
 - nested functions are not supported
 - this does not include operator declarations; operators are a separate declaration form
 
+### Templates
+
+Templates allow structs and functions to be parameterized over one or more type parameters. Type parameters are written inside square brackets immediately after the name.
+
+**Struct templates:**
+
+```cpp
+struct Pair[T] {
+	first  : T;
+	second : T;
+}
+
+struct Optional[T] {
+	value   : T;
+	present : bool;
+}
+```
+
+Instantiation supplies concrete types in square brackets:
+
+```cpp
+fn main() : void {
+	var p : Pair[i32] = Pair[i32] { 1, 2 };
+	var s : Pair[f32] = Pair[f32] { 1.0, 2.0 };
+}
+```
+
+**Function templates:**
+
+```cpp
+fn identity[T](a : T) : T {
+	return a;
+}
+
+fn swap[T](a : ref T, b : ref T) : void {
+	const tmp = a;
+	a = b;
+	b = tmp;
+}
+```
+
+The compiler infers type parameters from argument types when possible. Type arguments can also be supplied explicitly at the call site:
+
+```cpp
+fn default_value[T](fallback : T) : T {
+	return fallback;
+}
+
+fn main() : void {
+	const x = identity(42);                      // T inferred as i32
+	const y = identity(3.14);                    // T inferred as f32
+	const z = identity[i32](42);                 // explicit, equivalent to inferred
+
+	var a : i32 = 1;
+	var b : i32 = 2;
+	swap(ref a, ref b);                          // T inferred as i32
+	swap[i32](ref a, ref b);                     // explicit, equivalent to inferred
+
+	const v = default_value[i32](0);             // explicit; T also inferred from 0
+}
+```
+
+**Multiple type parameters:**
+
+```cpp
+fn first[A, B](a : A, b : B) : A {
+	return a;
+}
+
+struct Map[K, V] {
+	key   : K;
+	value : V;
+}
+```
+
+Rules:
+
+- a fully instantiated template type such as `Pair[i32]` or `Box[Pair[i32]]` is a concrete type and can be used anywhere a concrete type is valid: variable declarations, function parameters, return types, struct fields, and as type arguments to other templates
+- type parameter names must be unique within the template parameter list
+- template parameters are resolved at compile time; no runtime overhead is incurred
+- type arguments must satisfy the structural requirements of the template body (field access, arithmetic, etc.); mismatches are compile-time errors
+- recursive struct templates are not supported
+- explicit type arguments are all-or-nothing: either omit them and let all type parameters be inferred from value arguments, or supply all of them explicitly; a subset is a compile-time error
+- when any type parameter cannot be inferred from the value arguments, all must be supplied explicitly; `identity[f32](42)` is valid and treats `42` as `f32`
+- explicit type arguments drive the expected type of value arguments, the same way a concrete parameter type does
+- the count of explicit type arguments must equal the count of type parameters in both function calls and struct instantiations
+- template functions and structs from imported modules can be instantiated in the importing module; alias-qualified syntax applies as normal: `lib.identity[i32](42)`, `lib.Pair[i32] { 1, 2 }`
+- a fully instantiated function template such as `identity[i32]` is a concrete function value of type `fn(i32) : i32` and can be used anywhere a concrete function value is valid: assignment, passing as an argument, returning, storing in a variable
+- operator overloads cannot be templated; use a concrete instantiation instead
+
 ### Operators
 
 Operator overloads are declared as top-level functions with the `operator` keyword:
@@ -395,7 +531,6 @@ Built-in and user types:
 Not implemented yet:
 
 - maps, pointers, references as first-class types
-- generics
 - closures
 - user-declared methods
 
