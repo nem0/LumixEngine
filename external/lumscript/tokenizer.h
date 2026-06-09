@@ -129,7 +129,14 @@ struct Tokenizer {
 				if (u32(m_current - m_start_token) < 2) return makeToken(Token::IDENTIFIER);
 				switch (m_start_token[1]) {
 					case 'a': return checkKeyword("se", 2, 2, Token::CASE);
-					case 'o': return checkKeyword("nst", 2, 3, Token::CONST);
+					case 'o': {
+						if (u32(m_current - m_start_token) < 3) return makeToken(Token::IDENTIFIER);
+						switch (m_start_token[2]) {
+							case 'm': return checkKeyword("ptime", 3, 5, Token::COMPTIME);
+							case 'n': return checkKeyword("st", 3, 2, Token::CONST);
+						}
+						break;
+					}
 					case 'p': return checkKeyword("tr", 2, 2, Token::CPTR);
 				}
 				return checkKeyword("ontinue", 1, 7, Token::CONTINUE);

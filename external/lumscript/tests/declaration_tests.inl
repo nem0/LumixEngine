@@ -1,3 +1,44 @@
+TEST(BasicFunction) {
+	EXPECT_COMPILE("fn main() : void {}");
+	return true;
+}
+
+TEST(BasicLocalVar) {
+	EXPECT_COMPILE("fn main() : void { var i : i32 = 42; }");
+	return true;
+}
+
+TEST(BasicLocalConst) {
+	EXPECT_COMPILE("fn main() : void { const i : i32 = 42; }");
+	return true;
+}
+
+TEST(BasicGlobalVar) {
+	EXPECT_COMPILE("var x = 42;");
+	return true;
+}
+
+TEST(BasicGlobalConst) {
+	EXPECT_COMPILE("const enabled = true;");
+	return true;
+}
+
+TEST(BasicReturn) {
+	EXPECT_COMPILE("fn main() : i32 { return 42; }");
+	return true;
+}
+
+TEST(BasicAssign) {
+	EXPECT_COMPILE("fn main() : void { var i = 42; i = 32; }");
+	return true;
+}
+
+TEST(AssignBinaryOp) {
+	EXPECT_COMPILE("fn main() : void { var i = 42; i = 32 * 46; }");
+	return true;
+}
+
+
 TEST(ConstAssignmentFails) {
 	const char* source = R"(
 		fn main() : void {

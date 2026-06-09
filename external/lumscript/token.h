@@ -82,6 +82,7 @@ struct Token {
 		F32,
 		F64,
 		CPTR,
+		COMPTIME,
 	};
 
 	Type type = END_OF_FILE;

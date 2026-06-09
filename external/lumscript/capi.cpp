@@ -11,53 +11,59 @@ void ls_module_destroy(ls_module* module) {
 }
 
 int ls_module_get_native_function_index(ls_module* module, ls_string_view name) {
-	if (!module) return -1;
-	return module->findNativeFunction(name);
+//	if (!module) return -1;
+	//return module->findNativeFunction(name);
+	return -1;
 }
 
 int ls_module_get_native_function_count(ls_module* module) {
-	if (!module) return 0;
-	i32 count = 0;
-	for (const Unit& unit : module->units) count += (i32)unit.native_functions.size();
-	return count;
+	// if (!module) return 0;
+	// i32 count = 0;
+	// for (const Unit& unit : module->units) count += (i32)unit.native_functions.size();
+	// return count;
+	return 0;
 }
 
 ls_string_view ls_module_get_native_function_name(ls_module* module, int index) {
-	if (!module || index < 0) return {};
-	for (const Unit& unit : module->units) {
-		if (index < (i32)unit.native_functions.size()) {
-			CanonicalName cn = unit.native_functions[(size_t)index].canonical_name;
-			return module->makeQualifiedName(cn.path, cn.name);
-		}
-		index -= (i32)unit.native_functions.size();
-	}
+	//if (!module || index < 0) return {};
+	//for (const Unit& unit : module->units) {
+	//	if (index < (i32)unit.native_functions.size()) {
+	//		CanonicalName cn = unit.native_functions[(size_t)index].canonical_name;
+	//		return module->makeQualifiedName(cn.path, cn.name);
+	//	}
+	//	index -= (i32)unit.native_functions.size();
+	//}
 	return {};
 }
 
 int ls_module_get_struct_count(ls_module* module) {
-	if (!module) return 0;
-	i32 count = 0;
-	for (const Unit& unit : module->units) count += (i32)unit.structs.size();
-	return count;
+	//if (!module) return 0;
+	//i32 count = 0;
+	//for (const Unit& unit : module->units) count += (i32)unit.structs.size();
+	//return count;
+	return 0;
 }
 
 int ls_module_get_function_count(ls_module* module) {
-	if (!module) return 0;
-	i32 count = 0;
-	for (const Unit& unit : module->units) count += (i32)unit.functions.size();
-	return count;
+	//if (!module) return 0;
+	//i32 count = 0;
+	//for (const Unit& unit : module->units) count += (i32)unit.functions.size();
+	//return count;
+	return 0;
 }
 
 int ls_module_get_global_count(ls_module* module) {
-	if (!module) return 0;
-	i32 count = 0;
-	for (const Unit& unit : module->units) count += (i32)unit.globals.size();
-	return count;
+	//if (!module) return 0;
+	//i32 count = 0;
+	//for (const Unit& unit : module->units) count += (i32)unit.globals.size();
+	//return count;
+	 return 0;
 }
 
 ls_string_view ls_make_qualified_name(ls_module* module, ls_string_view prefix, ls_string_view name) {
-	if (!module) return {};
-	return module->makeQualifiedName(prefix, name);
+	//if (!module) return {};
+	//return module->makeQualifiedName(prefix, name);
+	return {};
 }
 
 ls_type ls_type_make(ls_type_kind kind) {
@@ -65,5 +71,4 @@ ls_type ls_type_make(ls_type_kind kind) {
 	type.kind = kind;
 	return type;
 }
-
 

@@ -15,7 +15,7 @@
 * with/when/where?
 * context object?
 * multiple returns?
-* compil-time stuff?
+* comptime reflection/introspection?
 * reflection?
 * first-class types at compile time?
 * gc?
@@ -43,6 +43,7 @@ LumScript is a small, statically typed scripting language for Lumix Engine.
 	- [Structs](#structs)
 	- [Enums](#enums)
 	- [Functions](#functions)
+	- [Comptime](#comptime)
 	- [Templates](#templates)
 	- [Operators](#operators)
 	- [Ref parameters](#ref-parameters)
@@ -99,6 +100,7 @@ JIT is intentionally out of scope for the first version.
 
 - templates use []
 	- main reason we have templates at all are user-defined containers
+	- `[]` means compile-time application; `()` remains runtime application
 	- we want a pair of enclosing characters, single character is hard to read when nested: `Array@Array@i32`
 	- different begin and end, reads easier, especially when nested, e.g. if we used `"` - `Box"Pair"i32, string""`
 	- so our options are `[]`, `<>`, `()`, `{}`
@@ -165,7 +167,7 @@ fn main() : void {
 }
 ```
 
-A module contains top-level `import`, `struct`, `enum`, `fn`, and variable declarations.
+A module contains top-level `import`, `comptime`, `struct`, `enum`, `fn`, and variable declarations.
 
 ## Source files
 
@@ -332,15 +334,148 @@ fn clamp_min(v : i32, min_value : i32) : i32 {
 Rules:
 
 - parameter names must be unique
-- top-level `fn foo() : T { ... }` is syntax sugar for a module-level `const foo = fn() : T { ... }` declaration
+- top-level `fn foo() : T { ... }` is syntax sugar for a module-level `comptime foo = fn() : T { ... }` binding
 - overloading is not supported
 - parameters are immutable
 - nested functions are not supported
 - this does not include operator declarations; operators are a separate declaration form
 
+### Comptime
+
+`comptime` declares a module-level binding whose initializer is evaluated during compilation. It is used for values that must be known before runtime code is checked or generated.
+
+Primitive values can be bound at compile time:
+
+```cpp
+comptime N = 32;
+comptime enabled = true;
+comptime scale = 1.5;
+```
+
+These values can be used where the language requires a compile-time value, such as template arguments, static array sizes, template instantiations, and other comptime expressions.
+
+Types are compile-time values. Structs, enums, and functions can therefore be written as expressions and bound to names:
+
+```cpp
+comptime Vec2 = struct {
+	x : f32;
+	y : f32;
+}
+
+comptime State = enum {
+	Idle,
+	Running
+}
+
+comptime add = fn(a : i32, b : i32) : i32 {
+	return a + b;
+}
+```
+
+Declaration syntax is sugar over these bindings:
+
+```cpp
+struct Vec2 {
+	x : f32;
+	y : f32;
+}
+
+enum State {
+	Idle,
+	Running
+}
+
+fn add(a : i32, b : i32) : i32 {
+	return a + b;
+}
+```
+
+is equivalent to:
+
+```cpp
+comptime Vec2 = struct {
+	x : f32;
+	y : f32;
+}
+
+comptime State = enum {
+	Idle,
+	Running
+}
+
+comptime add = fn(a : i32, b : i32) : i32 {
+	return a + b;
+}
+```
+
+Compile-time application uses square brackets. Runtime calls use parentheses:
+
+```cpp
+const value = max[i32](10, 20); // [i32] is compile-time, (10, 20) is runtime
+```
+
+Comptime initializers may call functions that are known at compile time. Top-level functions are compile-time bindings to function values, so they can be evaluated during compilation when all arguments and all operations are compile-time-valid:
+
+```cpp
+fn double(v : i32) : i32 {
+	return v * 2;
+}
+
+comptime N = double(16); // N == 32
+```
+
+Comptime calls do not create new type declarations. Type construction is intentionally limited to `struct[...]` and `enum[...]` template expressions, so arbitrary compile-time functions cannot return freshly declared struct or enum types:
+
+```cpp
+fn make_vec2(T : type) : type {
+	return struct {
+		x : T;
+		y : T;
+	};
+}
+
+comptime Vec2 = make_vec2(f32); // compile-time error
+```
+
+Use a struct template instead:
+
+```cpp
+comptime Vec2 = struct[T] {
+	x : T;
+	y : T;
+}
+
+fn main() : void {
+	var v : Vec2[f32] = Vec2[f32] { 1.0, 2.0 };
+}
+```
+
+Comptime evaluation cannot depend on runtime storage:
+
+```cpp
+var runtime_value : i32 = 16;
+comptime N = double(runtime_value); // compile-time error
+```
+
+Rules:
+
+- `comptime` bindings are immutable
+- a `comptime` binding can produce a type, function, integer, float, bool, or other compile-time value
+- a value used as a type must resolve to a compile-time type value
+- compile-time evaluation happens before concrete runtime code is lowered
+- compile-time application uses `[]`; runtime application uses `()`
+- primitive types such as `i32`, `f32`, `bool`, and `string` are built-in type values and cannot be shadowed
+- using a runtime-only value where a compile-time value is required is a compile-time error
+- a comptime call may call only compile-time-known function values
+- functions cannot return `type`
+- functions cannot create new struct or enum types from their body
+- new generic types are declared with `struct[...]` or `enum[...]`, not by returning `type` from a function
+- native/extern functions are runtime-only unless explicitly marked otherwise by a future extension
+- comptime evaluation has an implementation-defined recursion/step limit to prevent non-terminating compilation
+
 ### Templates
 
-Templates allow structs and functions to be parameterized over one or more type parameters. Type parameters are written inside square brackets immediately after the name.
+Templates are compile-time functions or type constructors. Type parameters are compile-time parameters, written inside square brackets.
 
 **Struct templates:**
 
@@ -353,6 +488,15 @@ struct Pair[T] {
 struct Optional[T] {
 	value   : T;
 	present : bool;
+}
+```
+
+Struct template declaration syntax is sugar for a `comptime` binding to a generic struct expression:
+
+```cpp
+comptime Pair = struct[T] {
+	first  : T;
+	second : T;
 }
 ```
 
@@ -376,6 +520,14 @@ fn swap[T](a : ref T, b : ref T) : void {
 	const tmp = a;
 	a = b;
 	b = tmp;
+}
+```
+
+Function template declaration syntax is sugar for a `comptime` binding to a generic function expression:
+
+```cpp
+comptime identity = fn[T](a : T) : T {
+	return a;
 }
 ```
 
@@ -413,11 +565,23 @@ struct Map[K, V] {
 }
 ```
 
+Template parameters can also have explicit compile-time value types:
+
+```cpp
+struct StaticArray[T, N : i32] {
+	values : T[N];
+}
+
+fn get[T, N : i32](values : StaticArray[T, N], index : i32) : T {
+	return values[index];
+}
+```
+
 Rules:
 
 - a fully instantiated template type such as `Pair[i32]` or `Box[Pair[i32]]` is a concrete type and can be used anywhere a concrete type is valid: variable declarations, function parameters, return types, struct fields, and as type arguments to other templates
 - type parameter names must be unique within the template parameter list
-- template parameters are resolved at compile time; no runtime overhead is incurred
+- template parameters and explicit compile-time value parameters are resolved at compile time; no runtime overhead is incurred
 - type arguments must satisfy the structural requirements of the template body (field access, arithmetic, etc.); mismatches are compile-time errors
 - recursive struct templates are not supported
 - explicit type arguments are all-or-nothing: either omit them and let all type parameters be inferred from value arguments, or supply all of them explicitly; a subset is a compile-time error
@@ -524,6 +688,7 @@ Built-in and user types:
 - `i8`, `u8`, `i16`, `u16`, `i32`, `u32`, `i64`, `u64`
 - `f32`, `f64`
 - `string`
+- `type` (compile-time only)
 - user-defined `struct` types
 - user-defined `enum` types
 - function types
@@ -714,6 +879,7 @@ fn sum(values : i32[]) : i32 {
 ```cpp
 var counter : i32 = 0;
 const step = 1;
+comptime max_entities = 1024;
 
 fn tick() : i32 {
 	counter += step;
@@ -724,6 +890,7 @@ fn tick() : i32 {
 Rules:
 
 - top-level variables are module globals
+- `comptime` bindings exist only during compilation unless they produce runtime-callable values such as functions
 - globals initialize once when runtime first runs the module
 - locals use same declaration syntax
 - all `var` and `const` declarations must have an initializer
