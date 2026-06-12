@@ -30,6 +30,8 @@ typedef int i32;
 typedef unsigned int u32;
 typedef long long i64;
 typedef unsigned long long u64;
+typedef float f32;
+typedef double f64;
 typedef u64 uintptr;
 
 static_assert(sizeof(uintptr) == sizeof(void*), "fix this");
@@ -77,23 +79,6 @@ typedef enum ls_result {
 	LS_RESULT_FAILURE = 0,
 	LS_RESULT_OK = 1
 } ls_result;
-
-// Type descriptor used by native functions and value constructors.
-//
-// For scalar kinds, only `kind` matters. For compound kinds:
-// - `name` identifies structs, enums, or native types by visible name
-// - `struct_index` refers to the resolved declaration inside the module
-// - `element_*` and `array_size` describe array metadata
-// - `nullable` marks values that may legally be null
-typedef struct ls_type {
-	ls_type_kind kind;
-	ls_string_view name;
-	i32 struct_index;
-	ls_type_kind element_kind;
-	ls_string_view element_name;
-	i32 array_size;
-	int nullable;
-} ls_type;
 
 // Native print callback used by `ls_host`.
 typedef void (*ls_print_fn)(void* userdata, ls_string_view msg);
@@ -219,6 +204,10 @@ void ls_push_null(ls_runtime* runtime);
 void ls_push_ptr(ls_runtime* runtime, void* value);
 
 i32 ls_to_bool(ls_runtime* runtime, i32 index);
+i8  ls_to_i8 (ls_runtime* runtime, i32 index);
+u8  ls_to_u8 (ls_runtime* runtime, i32 index);
+i16 ls_to_i16(ls_runtime* runtime, i32 index);
+u16 ls_to_u16(ls_runtime* runtime, i32 index);
 i32 ls_to_i32(ls_runtime* runtime, i32 index);
 u32 ls_to_u32(ls_runtime* runtime, i32 index);
 i64 ls_to_i64(ls_runtime* runtime, i32 index);
@@ -248,7 +237,6 @@ ls_type_kind ls_bytecode_runtime_result_kind(ls_runtime* runtime, ls_string_view
 // values, parameters, or array metadata in the same shape LumScript expects
 // internally.
 ls_string_view ls_make_qualified_name(ls_module* module, ls_string_view prefix, ls_string_view name);
-ls_type ls_type_make(ls_type_kind kind);
 
 #ifdef __cplusplus
 }

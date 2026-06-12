@@ -1,0 +1,88 @@
+import "core:vec3"
+import "core:dvec3"
+import "core:quat"
+import "core:world" as world
+import "core:entity" as entity
+import "core:input" as input
+import "core:imgui" as imgui
+import "core:log" as log
+import "core:Keycode"
+
+var g_inputs : input.InputSystem = undefined;
+var g_time : f32 = 0.0;
+var g_clicks : i32 = 0;
+
+fn init(w : world.World, inputs : input.InputSystem) : void {
+	g_inputs = inputs;
+
+	var demo_entity = world.createEntity(w);
+	var testor = w.findByName("testor");
+	if testor != null {
+		testor.setPosition({ 1.0, 2.0, 3.0 });
+	}
+
+	demo_entity.setPosition({ 0.0, 1.0, 0.0 });
+	demo_entity.setRotation({ 0.0, 0.0, 0.0, 1.0 });
+	demo_entity.setScale({ 1.0, 1.0, 1.0 });
+
+	const position = demo_entity.getPosition();
+	log.logError("Hello world!");
+}
+
+fn update(dt : f32) : void {
+	g_time = g_time + dt;
+
+	if imgui.begin("LumScript demo") {
+		imgui.textUnformatted("Hello from LumScript + ImGui");
+		imgui.textUnformatted("Press the button to write to the log.");
+		if imgui.button("Log click") {
+			g_clicks = g_clicks + 1;
+			log.logError("LumScript ImGui button clicked");
+		}
+		match g_clicks {
+			case 0:
+				imgui.textUnformatted("0 clicks");
+			case 1:
+				imgui.textUnformatted("1 click");
+			case 2:
+				imgui.textUnformatted("2 clicks");
+			case 3:
+				imgui.textUnformatted("3 clicks");
+			case _:
+				imgui.textUnformatted("many clicks");
+		}
+
+		imgui.end();
+	}
+
+	var i : i32 = 0;
+	const count = g_inputs.getEventCount();
+	while i < count {
+		const e = g_inputs.getEvent(i);
+		const t = e.getType();
+
+		match t {
+			case .BUTTON:
+				if (e.getKeyId() == Keycode.W as i32) {
+					log.logError("input W");
+				}
+				if e.isDown() {
+					log.logError("input button down");
+				} else {
+					log.logError("input button up");
+				}
+			case .AXIS:
+				log.logError("input axis");
+			case .MOUSE_WHEEL:
+				log.logError("input mouse wheel");
+			case .TEXT_INPUT:
+				log.logError("input text");
+			case .DEVICE_ADDED:
+				log.logError("input device added");
+			case .DEVICE_REMOVED:
+				log.logError("input device removed");
+		}
+
+		i = i + 1;
+	}
+}

@@ -286,7 +286,7 @@ TEST(BinaryNumericOperatorsRequireSameOperandType) {
 		const char* mixed_add = R"(
 			fn main() : i32 {
 				const a : i32 = 1;
-				const b : i64 = 2 as i64;
+				const b : i64 = 2;
 				return a + b;
 			}
 		)";
@@ -295,7 +295,7 @@ TEST(BinaryNumericOperatorsRequireSameOperandType) {
 		const char* mixed_compare = R"(
 			fn main() : bool {
 				const a : i32 = 1;
-				const b : f32 = 1 as f32;
+				const b : f32 = 1;
 				return a < b;
 			}
 		)";
@@ -306,7 +306,7 @@ TEST(BinaryNumericOperatorsRequireSameOperandType) {
 		const char* explicit_cast_ok = R"(
 			fn main() : i64 {
 				const a : i32 = 1;
-				const b : i64 = 2 as i64;
+				const b : i64 = 2;
 				return (a as i64) + b;
 			}
 		)";
@@ -397,5 +397,18 @@ TEST(CustomOperatorBinaryRuntime) {
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_FLOAT_EQ(3.0f, ls_to_f32(runtime, -1));
 	CAPI_END(module);
+	return true;
+}
+
+TEST(PrimitiveOperatorDeclarationFailsEvenUnused) {
+	const char* source = R"(
+		operator +(a : i32, b : i32) : i32 {
+			return a + b;
+		}
+
+		fn main() : void {
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
 	return true;
 }

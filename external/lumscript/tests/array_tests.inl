@@ -54,6 +54,18 @@ TEST(StaticArrayIndexMustBeInteger) {
 	return true;
 }
 
+TEST(StaticArrayDifferentSizesDoNotTypecheck) {
+	const char* source = R"(
+		fn main() : void {
+			var a : i32[4] = undefined;
+			var b : i32[8] = undefined;
+			a = b;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(IndexingRequiresArrayTypeFails) {
 	const char* source = R"(
 		fn main() : void {

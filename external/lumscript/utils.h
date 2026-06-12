@@ -68,13 +68,13 @@ struct OutputFormatter {
 	void print(int v);
 	void print(const char* s) { print(makeStringView(s)); }
 	void print(ls_string_view s) {
-		has_error = true;
 		if (!host->print) return;
 		host->print(host->diagnostics_userdata, s);
 	}
 
 	template <typename... Args> void errorAt(const Token& token, Args&&... args) {
 		if (has_error) return;
+		has_error = true;
 
 		if (!empty(token.source_name)) {
 			print(token.source_name);
@@ -83,12 +83,16 @@ struct OutputFormatter {
 		print("line ");
 		print(token.line);
 		print(": ");
-		error(static_cast<Args&&>(args)...);
+		int dummy[] = {
+			(print(static_cast<Args&&>(args)), 0)...,
+		};
+		(void)dummy;
 		print("\n");
 	}
 
 	template <typename... Args> void error(Args&&... args) {
 		if (has_error) return;
+		has_error = true;
 		int dummy[] = {
 			(print(static_cast<Args&&>(args)), 0)...,
 		};
@@ -150,6 +154,23 @@ inline const char* parseInteger(ls_string_view input, i32& value) {
 
 inline const char* fromCString(ls_string_view input, i32& value) {
 	return parseInteger(input, value);
+}
+
+inline const char* fromCString(ls_string_view input, i64& value) {
+	const char* p = data(input);
+	const char* const end = p + size(input);
+	bool negative = false;
+	if (p != end && (*p == '-' || *p == '+')) {
+		negative = *p == '-';
+		++p;
+	}
+	i64 result = 0;
+	while (p != end && *p >= '0' && *p <= '9') {
+		result = result * 10 + (*p - '0');
+		++p;
+	}
+	value = negative ? -result : result;
+	return p;
 }
 
 inline const char* parseDouble(ls_string_view input, double& value) {

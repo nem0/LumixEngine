@@ -46,7 +46,7 @@ if "%USE_CLANG%"=="0" (
 )
 
 set COMMON_FLAGS=/nologo /EHsc /Zi /I"%SRC_DIR%" /I"%EXT_DIR%"
-set CFLAGS=%COMMON_FLAGS% /D_CRT_NONSTDC_NO_DEPRECATE /DSTATIC_PLUGINS
+set CFLAGS=%COMMON_FLAGS% /TC /D_CRT_NONSTDC_NO_DEPRECATE /DSTATIC_PLUGINS
 set CXXFLAGS=%COMMON_FLAGS% /std:c++20 /D_CRT_NONSTDC_NO_DEPRECATE /DSTATIC_PLUGINS
 if /I "%TARGET%"=="tests" (
     set CFLAGS=%CFLAGS% /Od /MDd
@@ -72,16 +72,28 @@ del /q /f "%SCRIPT_DIR%*.obj" >nul 2>&1
 del /q /f "%SCRIPT_DIR%..\*.obj" >nul 2>&1
 
 if /I "%TARGET%"=="tests" (
-	%COMPILER% %CXXFLAGS% "%SCRIPT_DIR%tests/main.cpp" "%SCRIPT_DIR%parser.cpp" "%SCRIPT_DIR%compiler.cpp" "%SCRIPT_DIR%bytecode_compiler.cpp" "%SCRIPT_DIR%runtime.cpp" "%SCRIPT_DIR%capi.cpp" /link %LDFLAGS%
+	%COMPILER% %CXXFLAGS% /c "%SCRIPT_DIR%tests/main.cpp" "%SCRIPT_DIR%parser.cpp" "%SCRIPT_DIR%compiler.cpp" "%SCRIPT_DIR%bytecode_compiler.cpp" "%SCRIPT_DIR%capi.cpp"
+	if errorlevel 1 exit /b !errorlevel!
+	%COMPILER% %CFLAGS% /c "%SCRIPT_DIR%runtime.c"
+	if errorlevel 1 exit /b !errorlevel!
+	%COMPILER% "main.obj" "parser.obj" "compiler.obj" "bytecode_compiler.obj" "runtime.obj" "capi.obj" /link %LDFLAGS%
 ) else (
 	if /I "%USE_CLANG%"=="1" (
 		%COMPILER% %CFLAGS% /c "%SCRIPT_DIR%lumc.c"
 		if errorlevel 1 exit /b !errorlevel!
-		%COMPILER% %CXXFLAGS% /c "%SCRIPT_DIR%parser.cpp" "%SCRIPT_DIR%compiler.cpp" "%SCRIPT_DIR%bytecode_compiler.cpp" "%SCRIPT_DIR%runtime.cpp" "%SCRIPT_DIR%capi.cpp"
+		%COMPILER% %CXXFLAGS% /c "%SCRIPT_DIR%parser.cpp" "%SCRIPT_DIR%compiler.cpp" "%SCRIPT_DIR%bytecode_compiler.cpp" "%SCRIPT_DIR%capi.cpp"
 		if errorlevel 1 exit /b !errorlevel!
-		%COMPILER% "%SCRIPT_DIR%lumc.obj" "%SCRIPT_DIR%parser.obj" "%SCRIPT_DIR%compiler.obj" "%SCRIPT_DIR%bytecode_compiler.obj" "%SCRIPT_DIR%runtime.obj" "%SCRIPT_DIR%capi.obj" /link %LDFLAGS%
+		%COMPILER% %CFLAGS% /c "%SCRIPT_DIR%runtime.c"
+		if errorlevel 1 exit /b !errorlevel!
+		%COMPILER% "lumc.obj" "parser.obj" "compiler.obj" "bytecode_compiler.obj" "runtime.obj" "capi.obj" /link %LDFLAGS%
 	) else (
-		%COMPILER% %CXXFLAGS%  "%SCRIPT_DIR%lumc.c" "%SCRIPT_DIR%parser.cpp" "%SCRIPT_DIR%compiler.cpp" "%SCRIPT_DIR%bytecode_compiler.cpp" "%SCRIPT_DIR%runtime.cpp" "%SCRIPT_DIR%capi.cpp" /link %LDFLAGS%
+		%COMPILER% %CFLAGS% /c "%SCRIPT_DIR%lumc.c"
+		if errorlevel 1 exit /b !errorlevel!
+		%COMPILER% %CXXFLAGS% /c "%SCRIPT_DIR%parser.cpp" "%SCRIPT_DIR%compiler.cpp" "%SCRIPT_DIR%bytecode_compiler.cpp" "%SCRIPT_DIR%capi.cpp"
+		if errorlevel 1 exit /b !errorlevel!
+		%COMPILER% %CFLAGS% /c "%SCRIPT_DIR%runtime.c"
+		if errorlevel 1 exit /b !errorlevel!
+		%COMPILER% "lumc.obj" "parser.obj" "compiler.obj" "bytecode_compiler.obj" "runtime.obj" "capi.obj" /link %LDFLAGS%
 	)
 )
 

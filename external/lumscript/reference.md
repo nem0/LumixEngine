@@ -713,17 +713,29 @@ const rotation = Quat { 0.0, 0.0, 0.0, 1.0 };
 
 ### Untyped literals
 
-Literals start untyped during checking:
+Numeric literals and expressions composed only from untyped numeric constants remain untyped during checking:
 
 - integer literals start as untyped integer
 - decimal literals start as untyped float
+- arithmetic on untyped constants produces another untyped constant; for example, `12 + 13` is an untyped integer constant with value `25`
 
 Context (target type, argument type, return type, cast, expression expectation) concretizes them.
+
+```cpp
+fn takes_f32(value : f32) : void {}
+
+const a = 12 + 13;       // defaults to i32
+const b : f32 = 12 + 13; // the expression is concretized as f32
+const c = 12.5;          // defaults to f64
+takes_f32(12);           // 12 is concretized as f32
+```
+
+An untyped constant can be concretized as a numeric type only when its value is representable by that type. This contextual concretization is not an implicit cast between concrete numeric types.
 
 Defaults when context is insufficient:
 
 - integer literals default to `i32`
-- decimal literals default to `f32`
+- decimal literals default to `f64`
 
 There are still no implicit numeric casts between concrete types.
 

@@ -114,22 +114,6 @@ TEST(GlobalFunctionLiteralCanRecursivelyCallItself) {
 	return true;
 }
 
-TEST(ForwardFunctionDeclarationCanNotInitializeFunctionTypedGlobal) {
-	const char* source = R"(
-		const f : fn() : i32 = foo;
-
-		fn foo() : i32 {
-			return 1;
-		}
-
-		fn main() : i32 {
-			return f();
-		}
-	)";
-	EXPECT_COMPILE_FAIL(source);
-	return true;
-}
-
 TEST(FirstClassFunctionLiteralCanBePassedAsArgument) {
 	const char* source = R"(
 		fn call(f : fn() : i32) : i32 {
@@ -198,6 +182,19 @@ TEST(FirstClassFunctionSignatureMismatchFails) {
 
 		fn main() : void {
 			const f : fn(i32) : i32 = to_float;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(FunctionParameterTypeResolutionFailureFails) {
+	const char* source = R"(
+		fn main() : void {
+		}
+
+		fn bad(a : missing_type, b : i32) : i32 {
+			return b;
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);

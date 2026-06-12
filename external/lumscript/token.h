@@ -65,6 +65,7 @@ struct Token {
 		TRUE,
 		FALSE,
 		NULL_KW,
+		UNDEFINED,
 		AND,
 		OR,
 		NOT,

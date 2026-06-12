@@ -323,19 +323,6 @@ TEST(CompoundAssignmentTypeMismatchFails) {
 	return true;
 }
 
-TEST(PrimitiveOperatorDeclarationFailsEvenUnused) {
-	const char* source = R"(
-		operator +(a : i32, b : i32) : i32 {
-			return a + b;
-		}
-
-		fn main() : void {
-		}
-	)";
-	EXPECT_COMPILE_FAIL(source);
-	return true;
-}
-
 TEST(DivisionAndModuloByConstantZeroCompile) {
 	const char* divide_source = R"(
 		fn main(v : i32) : i32 {

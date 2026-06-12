@@ -235,6 +235,80 @@ TEST(BytecodeRefParameterNestedFieldCall) {
 	return true;
 }
 
+TEST(BytecodeRefParameterForwarding) {
+	const char* source = R"(
+		fn increment(v : ref i32) : void {
+			v += 1;
+		}
+
+		fn forward(v : ref i32) : void {
+			increment(ref v);
+		}
+
+		fn main() : i32 {
+			var x : i32 = 40;
+			forward(ref x);
+			return x;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(41, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeRefParameterAssignment) {
+	const char* source = R"(
+		fn assign(value : ref i32) : void {
+			value = 42;
+		}
+
+		fn main() : i32 {
+			var value : i32 = 0;
+			assign(ref value);
+			return value;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeRefParameterGlobal) {
+	const char* source = R"(
+		var value : i32 = 10;
+
+		fn increment(v : ref i32) : void {
+			v += 1;
+		}
+
+		fn main() : i32 {
+			increment(ref value);
+			return value;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(11, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 
 
 TEST(RefParameterMutatesCaller) {

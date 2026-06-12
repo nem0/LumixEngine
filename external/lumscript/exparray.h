@@ -5,6 +5,12 @@
 void* operator new(decltype(sizeof(0)), void* ptr) noexcept;
 void operator delete(void*, void*) noexcept;
 
+inline void* operator new(decltype(sizeof(0)), void* ptr) noexcept {
+	return ptr;
+}
+
+inline void operator delete(void*, void*) noexcept {}
+
 // allocates using arena
 // never deallocates on its own, so deallocation should be done in layer above
 // Arena-backed exponential array. Bins grow by powers of two:
@@ -144,6 +150,14 @@ struct ExpArray {
 	const_iterator end() const { return const_iterator{this, m_size}; }
 	const_iterator cbegin() const { return begin(); }
 	const_iterator cend() const { return end(); }
+
+	T* data() {
+		return m_size > 0 ? &(*this)[0] : nullptr;
+	}
+
+	const T* data() const {
+		return m_size > 0 ? &(*this)[0] : nullptr;
+	}
 
 	i32 size() const { return m_size; }
 	bool empty() const { return m_size == 0; }

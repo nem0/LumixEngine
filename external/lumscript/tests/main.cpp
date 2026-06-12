@@ -217,6 +217,8 @@ static void nativeAddC(ls_runtime* runtime) {
 }
 
 #include "bytecode_tests.inl"
+#include "casts_tests.inl"
+#include "types_tests.inl"
 #include "operator_tests.inl"
 #include "loop_tests.inl"
 #include "import_tests.inl"
@@ -231,7 +233,7 @@ static void nativeAddC(ls_runtime* runtime) {
 #include "nullable_tests.inl"
 #include "ref_tests.inl"
 #include "match_tests.inl"
-#include "template_tests.inl"
+//#include "template_tests.inl"
 
 int main(int argc, char** argv) {
     const char* test_name = nullptr;

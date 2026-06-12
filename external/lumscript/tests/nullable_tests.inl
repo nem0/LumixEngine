@@ -10,7 +10,7 @@ TEST(NullablePromotionTypechecks) {
 			if v != null {
 				return v.x;
 			}
-			return 0 as f32;
+			return 0;
 		}
 	)";
 	EXPECT_COMPILE(source);
@@ -51,6 +51,22 @@ TEST(NullableEqualityRequiresNullCheckFails) {
 			var x : ?i32 = 1;
 			if x == 1 {
 			}
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(NullableQualifiedTypeRetainsNullableWrapperFails) {
+	const char* source = R"(
+		struct Vec2 {
+			x : f32;
+			y : f32;
+		}
+
+		fn main() : void {
+			var x : ?Vec2 = null;
+			var y : Vec2 = x;
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);

@@ -123,6 +123,20 @@ TEST(DuplicateNamedLabelFails) {
 	const char* source = R"(
 		fn main() : void {
 			outer: while true {
+				outer: while true {
+					break;
+				}
+			}
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(SequentialNamedLabelReuseCompiles) {
+	const char* source = R"(
+		fn main() : void {
+			outer: while true {
 				break;
 			}
 			outer: while true {
@@ -130,7 +144,7 @@ TEST(DuplicateNamedLabelFails) {
 			}
 		}
 	)";
-	EXPECT_COMPILE_FAIL(source);
+	EXPECT_COMPILE(source);
 	return true;
 }
 

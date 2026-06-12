@@ -207,59 +207,6 @@ TEST(BytecodeF64Arithmetic) {
 	return true;
 }
 
-TEST(BytecodeExplicitCastNumeric) {
-	const char* source = R"(
-		fn main() : f32 {
-			return 1 as f32;
-		}
-	)";
-
-	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
-
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
-	EXPECT_TRUE(bytecode != nullptr);
-
-	ls_runtime* runtime = ls_runtime_create(bytecode);
-	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_call(runtime, toLs("main")));
-	EXPECT_FLOAT_EQ(1.0f, ls_to_f32(runtime, -1));
-
-	ls_runtime_destroy(runtime);
-	ls_bytecode_destroy(bytecode);
-	CAPI_END(module);
-	return true;
-}
-
-TEST(BytecodeExplicitCastEnumToInteger) {
-	const char* source = R"(
-		enum State {
-			Idle,
-			Running
-		}
-		fn main() : i32 {
-			const s : State = .Running;
-			return s as i32;
-		}
-	)";
-
-	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
-
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
-	EXPECT_TRUE(bytecode != nullptr);
-
-	ls_runtime* runtime = ls_runtime_create(bytecode);
-	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ls_call(runtime, toLs("main")));
-	EXPECT_EQ(1, ls_to_i32(runtime, -1));
-
-	ls_runtime_destroy(runtime);
-	ls_bytecode_destroy(bytecode);
-	CAPI_END(module);
-	return true;
-}
-
 TEST(BytecodeMultiplyExpression) {
 	const char* source = R"(
 		fn main() : i32 {
@@ -1002,31 +949,13 @@ TEST(BytecodeIntegerOverflowWraps) {
 	EXPECT_TRUE(runtime != nullptr);
 
 	EXPECT_TRUE(ls_call(runtime, toLs("add_i8_wrap")));
-	EXPECT_EQ(-128, ls_to_i32(runtime, -1));
+	EXPECT_EQ(-128, ls_to_i8(runtime, -1));
 	EXPECT_TRUE(ls_call(runtime, toLs("add_u8_wrap")));
-	EXPECT_EQ(0, ls_to_i32(runtime, -1));
+	EXPECT_EQ(0, ls_to_u8(runtime, -1));
 	EXPECT_TRUE(ls_call(runtime, toLs("sub_i8_wrap")));
-	EXPECT_EQ(-1, ls_to_i32(runtime, -1));
+	EXPECT_EQ(-1, ls_to_i8(runtime, -1));
 
 	ls_runtime_destroy(runtime);
-	ls_bytecode_destroy(bytecode);
-	CAPI_END(module);
-	return true;
-}
-
-TEST(BytecodeCompileFunctionWithParameter) {
-	const char* source = R"(
-		fn main(x : i32) : i32 {
-			return x + 1;
-		}
-	)";
-
-	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
-
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
-	EXPECT_TRUE(bytecode != nullptr);
-
 	ls_bytecode_destroy(bytecode);
 	CAPI_END(module);
 	return true;
@@ -1619,64 +1548,6 @@ TEST(DivisionAndModuloSemanticsRuntime) {
 	return true;
 }
 
-TEST(RuntimeCasts) {
-	const char* source = R"(
-		fn to_f32() : f32 {
-			const x : i32 = 10;
-			return x as f32;
-		}
-
-		fn to_i32() : i32 {
-			const x : f32 = 12.75;
-			return x as i32;
-		}
-
-	fn to_bool() : bool {
-			const x : i32 = 1;
-			return x as bool;
-		}
-	)";
-	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
-
-	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_call(runtime, toLs("to_f32")));
-	EXPECT_FLOAT_EQ(10, ls_to_f32(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("to_i32")));
-	EXPECT_EQ(12, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("to_bool")));
-	EXPECT_TRUE(ls_to_bool(runtime, -1));
-	CAPI_END(module);
-	return true;
-}
-
-TEST(IntegerToEnumCastAllowsAnyIntegerRuntime) {
-	const char* source = R"(
-		enum State {
-			Idle,
-			Running
-		}
-		fn to_state(v : i32) : State {
-			return v as State;
-		}
-
-		fn to_i32(v : i32) : i32 {
-			const s : State = v as State;
-			return s as i32;
-		}
-	)";
-	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
-
-	CAPI_RUNTIME(module, runtime);
-	ls_push_i32(runtime, 123);
-	EXPECT_TRUE(ls_call(runtime, toLs("to_state")));
-	EXPECT_TRUE(ls_call(runtime, toLs("to_i32")));
-	EXPECT_EQ(123, ls_to_i32(runtime, -1));
-	CAPI_END(module);
-	return true;
-}
-
 TEST(ShortCircuiting) {
 	const char* source = R"(
 		fn spin() : bool {
@@ -1886,13 +1757,13 @@ TEST(NullableNonNullBranchRuntime) {
 TEST(ExtendedScalarTypesRuntime) {
 	const char* source = R"(
 		fn main() : i32 {
-			const a : i8 = 10 as i8;
-			const b : u8 = 20 as u8;
-			const c : i16 = 30 as i16;
-			const d : u16 = 40 as u16;
-			const e : i64 = 50 as i64;
-			const f : u64 = 60 as u64;
-			const g : f64 = 1 as f64;
+			const a : i8 = 10;
+			const b : u8 = 20;
+			const c : i16 = 30;
+			const d : u16 = 40;
+			const e : i64 = 50;
+			const f : u64 = 60;
+			const g : f64 = 1;
 			return a as i32 + b as i32 + c as i32 + d as i32 + e as i32 + f as i32 + g as i32;
 		}
 	)";

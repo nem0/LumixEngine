@@ -71,11 +71,20 @@ TEST(ComptimeFloatValueTypechecks) {
 	const char* source = R"(
 		comptime Scale = 1.5;
 
-		fn main() : f32 {
+		fn main() : f64 {
 			return Scale;
 		}
 	)";
 	EXPECT_COMPILE(source);
+
+	const char* does_not_implicitly_convert = R"(
+		comptime Scale = 1.5;
+
+		fn main() : f32 {
+			return Scale;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(does_not_implicitly_convert);
 	return true;
 }
 
@@ -503,7 +512,7 @@ TEST(ComptimeImportedValueVisibleWithAlias) {
 
 TEST(ComptimeImportedTypeVisibleWithAlias) {
 	const char* main_source = R"(
-		import "types" as types;
+		import "types" as types
 
 		fn main() : types.Int {
 			return 42;
