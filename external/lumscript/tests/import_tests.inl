@@ -544,6 +544,36 @@ TEST(ImportAliasEntityResolution) {
 	return true;
 }
 
+TEST(ImportedMethodCallResolvesCallerGlobalArgument) {
+	const char* main_source = R"(
+		import "entity" as entity
+
+		const offset : i32 = 35;
+
+		fn main() : i32 {
+			const value : entity.Entity = entity.Entity { 7 };
+			return value.add(offset);
+		}
+	)";
+
+	const char* entity_source = R"(
+		struct Entity {
+			value : i32;
+		}
+
+		fn add(entity : Entity, amount : i32) : i32 {
+			return entity.value + amount;
+		}
+	)";
+
+	LumScriptImportFile files_storage[] = {
+		{ toLs("entity"), toLs(entity_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_COMPILE_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
 TEST(ImportExternFnDuplicateUsed) {
 	const char* main_source = R"(
 		import "a"

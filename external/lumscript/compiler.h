@@ -7,6 +7,8 @@
 #include "statements.h"
 #include "utils.h"
 
+struct Unit;
+
 struct Symbol {
 	enum Storage {
 		// Runtime storage. The initializer expression is evaluated at runtime unless
@@ -76,11 +78,35 @@ struct OperatorDecl {
 	FunctionExpression* function = nullptr;
 };
 
+struct FunctionInstance {
+	enum CheckState {
+		CREATING,
+		CHECKING,
+		READY,
+		FAILED,
+	};
+
+	explicit FunctionInstance(ls_arena& arena)
+		: type_args(arena) {}
+
+	Unit* unit = nullptr;
+	Symbol* symbol = nullptr;
+	FunctionExpression* declaration = nullptr;
+	// Template bodies are cloned before checking because every expression and
+	// local declaration stores semantic results directly on its AST node.
+	FunctionExpression* function = nullptr;
+	FunctionResolvedType* type = nullptr;
+	ExpArray<ResolvedType*> type_args;
+	CheckState check_state = CREATING;
+};
+
 struct Unit {
 	Unit(ls_string_view path, const ls_host* host)
 		: arena(host)
 		, symbols(arena)
 		, types(arena)
+		, struct_instances(arena)
+		, function_instances(arena)
 		, imports(arena)
 		, operators(arena)
 		, path(path) {}
@@ -96,6 +122,8 @@ struct Unit {
 	ExpArray<Symbol> symbols; // top level symbols
 	// Canonical semantic types allocated during resolution/instantiation.
 	ExpArray<ResolvedType> types;
+	ExpArray<StructResolvedType*> struct_instances;
+	ExpArray<FunctionInstance*> function_instances;
 	ExpArray<Import> imports;
 	ExpArray<OperatorDecl> operators;
 };

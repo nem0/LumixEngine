@@ -209,6 +209,7 @@ static double runtime_numeric_to_double(ls_value value, ls_type_kind kind) {
 		case LS_TYPE_U64:  return (double)value.u64val;
 		case LS_TYPE_F32:  return (double)value.f32val;
 		case LS_TYPE_F64:  return value.f64val;
+		case LS_TYPE_ENUM: return (double)value.i32val;
 		default:           return 0.0;
 	}
 }
@@ -226,6 +227,7 @@ static i64 runtime_numeric_to_i64(ls_value value, ls_type_kind kind) {
 		case LS_TYPE_U64:  return (i64)value.u64val;
 		case LS_TYPE_F32:  return (i64)value.f32val;
 		case LS_TYPE_F64:  return (i64)value.f64val;
+		case LS_TYPE_ENUM: return (i64)value.i32val;
 		default:           return 0;
 	}
 }
@@ -243,6 +245,7 @@ static u64 runtime_numeric_to_u64(ls_value value, ls_type_kind kind) {
 		case LS_TYPE_U64:  return value.u64val;
 		case LS_TYPE_F32:  return (u64)value.f32val;
 		case LS_TYPE_F64:  return (u64)value.f64val;
+		case LS_TYPE_ENUM: return (u64)value.i32val;
 		default:           return 0u;
 	}
 }
@@ -341,6 +344,7 @@ static ls_value runtime_cast_value(ls_value value, ls_type_kind src_kind, ls_typ
 		case LS_TYPE_U64: result.u64val = runtime_numeric_to_u64(value, src_kind); return result;
 		case LS_TYPE_F32: result.f32val = (float)runtime_numeric_to_double(value, src_kind); return result;
 		case LS_TYPE_F64: result.f64val = runtime_numeric_to_double(value, src_kind); return result;
+		case LS_TYPE_ENUM: result.i32val = (i32)runtime_numeric_to_i64(value, src_kind); return result;
 		case LS_TYPE_CPTR:
 			result.cptr = value.cptr;
 			return result;

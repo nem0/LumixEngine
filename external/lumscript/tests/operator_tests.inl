@@ -185,6 +185,46 @@ TEST(OperatorOverloadAmbiguityFails) {
 	return true;
 }
 
+TEST(RejectedOperatorCandidateDoesNotRetypeOperands) {
+	const char* source = R"(
+		enum First {
+			Value
+		}
+
+		enum Second {
+			Value
+		}
+
+		struct FirstBox {
+			value : i32;
+		}
+
+		struct SecondBox {
+			value : i32;
+		}
+
+		operator +(value : First, box : FirstBox) : i32 {
+			return 77;
+		}
+
+		operator +(value : Second, box : SecondBox) : i32 {
+			return box.value + 1;
+		}
+
+		fn main() : i32 {
+			return .Value + FirstBox { 42 };
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(77, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(PrimitiveCompoundAssignmentIgnoresOperatorOverloadCompiles) {
 	const char* source = R"(
 		struct Vec2 {

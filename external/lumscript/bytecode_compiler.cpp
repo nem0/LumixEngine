@@ -70,6 +70,12 @@ static ls_type_kind parsedTypeToKind(const ParsedType* type) {
 	}
 }
 
+static ls_type_kind semanticTypeToKind(const ResolvedType* type) {
+	if (!type) return LS_TYPE_INVALID;
+	if (type->kind == ResolvedType::ENUM) return LS_TYPE_ENUM;
+	return toTypeKind(type);
+}
+
 static bool isIntegerKind(ls_type_kind kind) {
 	switch (kind) {
 		case LS_TYPE_I8:
@@ -209,6 +215,11 @@ struct LoopBinding {
 struct FunctionInfo {
 	ls_string_view name = {};
 	FunctionExpression* fn = nullptr;
+	FunctionResolvedType* type = nullptr;
+	FunctionInstance* instance = nullptr;
+	Unit* unit = nullptr;
+	Symbol* symbol = nullptr;
+	Token::Type operator_op = Token::ERROR;
 	u32 index = 0;
 };
 
@@ -379,7 +390,12 @@ static u32 typeSlotCount(ResolvedType* type) {
 			StructResolvedType* st = static_cast<StructResolvedType*>(type);
 			if (!st->decl) return 1u;
 			u32 count = 0u;
-			for (NamedDecl& field : st->decl->fields) count += typeSlotCount(field.resolved_type);
+			for (u32 i = 0; i < st->decl->fields.size(); ++i) {
+				ResolvedType* field_type = i < st->field_types.size()
+					? st->field_types[i]
+					: st->decl->fields[i].resolved_type;
+				count += typeSlotCount(field_type);
+			}
 			return count ? count : 1u;
 		}
 		default:
@@ -407,13 +423,15 @@ static bool enumMemberIndex(EnumResolvedType* en, ls_string_view name, u32& out_
 static bool structFieldSlotOffset(StructResolvedType* st, ls_string_view name, u32& out_offset, ResolvedType*& out_type) {
 	if (!st || !st->decl) return false;
 	u32 offset = 0u;
-	for (NamedDecl& field : st->decl->fields) {
+	for (u32 i = 0; i < st->decl->fields.size(); ++i) {
+		NamedDecl& field = st->decl->fields[i];
+		ResolvedType* field_type = i < st->field_types.size() ? st->field_types[i] : field.resolved_type;
 		if (equalStrings(field.name, name)) {
 			out_offset = offset;
-			out_type = field.resolved_type;
+			out_type = field_type;
 			return true;
 		}
-		offset += typeSlotCount(field.resolved_type);
+		offset += typeSlotCount(field_type);
 	}
 	return false;
 }
@@ -440,6 +458,14 @@ static const FunctionInfo* findFunctionForSymbol(const ExpArray<FunctionInfo>& f
 	return nullptr;
 }
 
+static const FunctionInfo* findFunctionForInstance(const ExpArray<FunctionInfo>& functions, FunctionInstance* instance) {
+	if (!instance) return nullptr;
+	for (const FunctionInfo& info : functions) {
+		if (info.instance == instance) return &info;
+	}
+	return nullptr;
+}
+
 static const FunctionInfo* findMemberFunction(
 	const ExpArray<FunctionInfo>& functions,
 	ls_string_view name,
@@ -449,12 +475,105 @@ static const FunctionInfo* findMemberFunction(
 	if (!receiver_type) return nullptr;
 	for (const FunctionInfo& info : functions) {
 		if (!equalStrings(info.name, name)) continue;
-		FunctionResolvedType* fn_type = info.fn && info.fn->function_type ? static_cast<FunctionResolvedType*>(info.fn->function_type) : nullptr;
+		FunctionResolvedType* fn_type = info.type;
 		if (!fn_type || fn_type->param_types.size() != arg_count + 1u) continue;
 		if (fn_type->param_types.empty() || fn_type->param_types[0] != receiver_type) continue;
 		return &info;
 	}
 	return nullptr;
+}
+
+static bool typesEqual(const ResolvedType* a, const ResolvedType* b) {
+	if (a == b) return true;
+	if (!a || !b) return false;
+	if (a->kind != b->kind) return false;
+	switch (a->kind) {
+		case ResolvedType::FUNCTION: {
+			const auto* fa = static_cast<const FunctionResolvedType*>(a);
+			const auto* fb = static_cast<const FunctionResolvedType*>(b);
+			if (fa->param_types.size() != fb->param_types.size()) return false;
+			if (!typesEqual(fa->return_type, fb->return_type)) return false;
+			for (i32 i = 0; i < fa->param_types.size(); ++i)
+				if (!typesEqual(fa->param_types[i], fb->param_types[i])) return false;
+			return true;
+		}
+		case ResolvedType::ARRAY: {
+			const auto* aa = static_cast<const ArrayResolvedType*>(a);
+			const auto* ab = static_cast<const ArrayResolvedType*>(b);
+			return aa->size == ab->size && typesEqual(aa->element_type, ab->element_type);
+		}
+		case ResolvedType::SLICE: {
+			const auto* sa = static_cast<const SliceResolvedType*>(a);
+			const auto* sb = static_cast<const SliceResolvedType*>(b);
+			return typesEqual(sa->element_type, sb->element_type);
+		}
+		case ResolvedType::NULLABLE: {
+			const auto* na = static_cast<const NullableResolvedType*>(a);
+			const auto* nb = static_cast<const NullableResolvedType*>(b);
+			return typesEqual(na->inner, nb->inner);
+		}
+		default:
+			return false;
+	}
+}
+
+static bool operatorLookupArityMatches(u32 arity, u32 expected_arity) {
+	return arity == expected_arity;
+}
+
+static const FunctionInfo* findOperatorFunction(
+	const ExpArray<FunctionInfo>& functions,
+	Token::Type op,
+	ResolvedType* lhs_type,
+	ResolvedType* rhs_type,
+	u32 expected_arity
+) {
+	const FunctionInfo* found = nullptr;
+	for (const FunctionInfo& info : functions) {
+		if (info.operator_op != op) continue;
+		const FunctionResolvedType* fn_type = info.type;
+		if (!fn_type || !operatorLookupArityMatches((u32)fn_type->param_types.size(), expected_arity)) continue;
+		if (fn_type->decl) {
+			bool ref_param = false;
+			for (const FunctionParam& param : fn_type->decl->runtime_params) {
+				if (param.is_ref) {
+					ref_param = true;
+					break;
+				}
+			}
+			if (ref_param) continue;
+		}
+		if (!lhs_type || !typesEqual(lhs_type, fn_type->param_types[0])) continue;
+		if (op != Token::MINUS && (!rhs_type || !typesEqual(rhs_type, fn_type->param_types[1]))) continue;
+		if (found) return nullptr;
+		found = &info;
+	}
+	return found;
+}
+
+static ls_type_kind compileValueAsType(FunctionCompiler& ctx, Expression* expr, ResolvedType* expected_type);
+
+static ls_type_kind emitOperatorCall(
+	FunctionCompiler& ctx,
+	const FunctionInfo* fn,
+	Expression* lhs,
+	Expression* rhs,
+	Token::Type op,
+	ls_type_kind hint
+) {
+	if (!fn || !fn->fn || !fn->type) return LS_TYPE_INVALID;
+	const FunctionResolvedType* fn_type = fn->type;
+	if (op == Token::MINUS) {
+		if (compileValueAsType(ctx, lhs, fn_type->param_types[0]) == LS_TYPE_INVALID) return LS_TYPE_INVALID;
+	}
+	else {
+		if (compileValueAsType(ctx, lhs, fn_type->param_types[0]) == LS_TYPE_INVALID) return LS_TYPE_INVALID;
+		if (compileValueAsType(ctx, rhs, fn_type->param_types[1]) == LS_TYPE_INVALID) return LS_TYPE_INVALID;
+	}
+	emitOp(ctx.code, LS_OP_CALL_DIRECT);
+	emitU32(ctx.code, fn->index);
+	const ls_type_kind return_hint = hint != LS_TYPE_INVALID ? hint : LS_TYPE_I32;
+	return fn_type->return_type ? valueKindForType(fn_type->return_type, return_hint) : return_hint;
 }
 
 static void appendStringLiteral(ls_bytecode* bytecode, const ls_string_view& value, u32& out_index) {
@@ -542,6 +661,18 @@ static bool emitReference(FunctionCompiler& ctx, Expression* expr) {
 		}
 		case Expression::MEMBER: {
 			MemberExpression* member = static_cast<MemberExpression*>(expr);
+			if (member->expression && member->expression->kind == Expression::IDENTIFIER
+				&& ctx.module && ctx.unit && ctx.globals) {
+				IdentifierExpression* qualifier = static_cast<IdentifierExpression*>(member->expression);
+				Symbol* symbol = findImportedQualifiedSymbol(*ctx.module, *ctx.unit, qualifier->name, member->name);
+				if (symbol) {
+					if (const GlobalBinding* global = findGlobalBinding(*ctx.globals, symbol)) {
+						emitOp(ctx.code, LS_OP_GLOBAL_REF);
+						emitU32(ctx.code, global->slot);
+						return true;
+					}
+				}
+			}
 			if (!member->expression || !member->expression->resolved_type) return false;
 			if (member->expression->resolved_type->kind != ResolvedType::STRUCT) return false;
 			StructResolvedType* st = static_cast<StructResolvedType*>(member->expression->resolved_type);
@@ -847,6 +978,10 @@ static ls_type_kind compileBinary(FunctionCompiler& ctx, BinaryExpression* expr,
 		return LS_TYPE_BOOL;
 	}
 
+	if (const FunctionInfo* fn = findOperatorFunction(*ctx.functions, expr->op, expr->lhs ? expr->lhs->resolved_type : nullptr, expr->rhs ? expr->rhs->resolved_type : nullptr, 2u)) {
+		return emitOperatorCall(ctx, fn, expr->lhs, expr->rhs, expr->op, hint);
+	}
+
 	// Null check: `nullable == null` or `nullable != null` — only check has_value slot.
 	if (expr->op == Token::EQUAL_EQUAL || expr->op == Token::BANG_EQUAL) {
 		Expression* nullable_side = nullptr;
@@ -862,6 +997,10 @@ static ls_type_kind compileBinary(FunctionCompiler& ctx, BinaryExpression* expr,
 			emitU8(ctx.code, (u8)LS_TYPE_U64);
 			return LS_TYPE_BOOL;
 		}
+	}
+
+	if (const FunctionInfo* fn = findOperatorFunction(*ctx.functions, expr->op, expr->lhs ? expr->lhs->resolved_type : nullptr, expr->rhs ? expr->rhs->resolved_type : nullptr, 2u)) {
+		return emitOperatorCall(ctx, fn, expr->lhs, expr->rhs, expr->op, hint);
 	}
 
 	const ls_type_kind lhs_hint = numericKindForOp(defaultLiteralKind(expr->lhs, hint), hint);
@@ -1031,6 +1170,14 @@ static ls_type_kind compileCall(FunctionCompiler& ctx, CallExpression* expr, ls_
 		return true;
 	};
 
+	if (expr->function_instance) {
+		const FunctionInfo* fn = findFunctionForInstance(*ctx.functions, expr->function_instance);
+		if (!fn || !compileArgs(fn->type, 0u)) return LS_TYPE_INVALID;
+		emitOp(ctx.code, LS_OP_CALL_DIRECT);
+		emitU32(ctx.code, fn->index);
+		return valueKindForType(fn->type->return_type, hint != LS_TYPE_INVALID ? hint : LS_TYPE_I32);
+	}
+
 	if (expr->callee && expr->callee->kind == Expression::IDENTIFIER) {
 		IdentifierExpression* id = static_cast<IdentifierExpression*>(expr->callee);
 		if (equalStrings(id->name, makeStringView("length"))) {
@@ -1057,7 +1204,7 @@ static ls_type_kind compileCall(FunctionCompiler& ctx, CallExpression* expr, ls_
 				? findFunctionForSymbol(*ctx.functions, id->symbol)
 				: ctx.findFunction(id->name);
 			if (!fn) return LS_TYPE_INVALID;
-			const FunctionResolvedType* fn_type = fn->fn && fn->fn->function_type ? static_cast<FunctionResolvedType*>(fn->fn->function_type) : nullptr;
+			const FunctionResolvedType* fn_type = fn->type;
 			if (!compileArgs(fn_type, 0u)) return LS_TYPE_INVALID;
 			emitOp(ctx.code, LS_OP_CALL_DIRECT);
 			emitU32(ctx.code, fn->index);
@@ -1073,7 +1220,7 @@ static ls_type_kind compileCall(FunctionCompiler& ctx, CallExpression* expr, ls_
 			Symbol* sym = findImportedQualifiedSymbol(*ctx.module, *ctx.unit, base->name, member->name);
 			if (sym && sym->expression && sym->expression->kind == Expression::FUNCTION) {
 				const FunctionInfo* fn = findFunctionForSymbol(*ctx.functions, sym);
-				const FunctionResolvedType* fn_type = fn && fn->fn && fn->fn->function_type ? static_cast<FunctionResolvedType*>(fn->fn->function_type) : nullptr;
+				const FunctionResolvedType* fn_type = fn ? fn->type : nullptr;
 				if (fn && fn_type) {
 					if (!compileArgs(fn_type, 0u)) return LS_TYPE_INVALID;
 					emitOp(ctx.code, LS_OP_CALL_DIRECT);
@@ -1086,7 +1233,7 @@ static ls_type_kind compileCall(FunctionCompiler& ctx, CallExpression* expr, ls_
 		if (member->expression && member->expression->resolved_type && ctx.functions) {
 			const FunctionInfo* fn = findMemberFunction(*ctx.functions, member->name, member->expression->resolved_type, (u32)expr->args.size());
 			if (fn) {
-				const FunctionResolvedType* fn_type = fn->fn && fn->fn->function_type ? static_cast<FunctionResolvedType*>(fn->fn->function_type) : nullptr;
+				const FunctionResolvedType* fn_type = fn->type;
 				if (compileExpression(ctx, member->expression, fn_type && !fn_type->param_types.empty() ? valueKindForType(fn_type->param_types[0], LS_TYPE_INVALID) : LS_TYPE_INVALID) == LS_TYPE_INVALID) return LS_TYPE_INVALID;
 				if (!compileArgs(fn_type, 1u)) return LS_TYPE_INVALID;
 				emitOp(ctx.code, LS_OP_CALL_DIRECT);
@@ -1164,6 +1311,11 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression* expr, l
 			emitU64(ctx.code, 0);
 			return hint == LS_TYPE_INVALID ? LS_TYPE_VOID : hint;
 		}
+		case Expression::TYPE_LITERAL: {
+			emitOp(ctx.code, LS_OP_LOAD_CONST_8);
+			emitU64(ctx.code, (u64)static_cast<TypeLiteralExpression*>(expr)->type);
+			return LS_TYPE_I32;
+		}
 		case Expression::IDENTIFIER: {
 			IdentifierExpression* id = static_cast<IdentifierExpression*>(expr);
 			if (BytecodeLocalBinding* local = ctx.findLocal(id->name)) {
@@ -1186,6 +1338,13 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression* expr, l
 					return valueKindForType(global_sym->instance_type ? global_sym->instance_type : global_sym->resolved_type);
 				}
 			}
+			if (expr->function_instance) {
+				const FunctionInfo* fn = findFunctionForInstance(*ctx.functions, expr->function_instance);
+				if (!fn) return LS_TYPE_INVALID;
+				emitOp(ctx.code, LS_OP_LOAD_CONST_8);
+				emitU64(ctx.code, fn->index);
+				return LS_TYPE_FUNCTION;
+			}
 			if (const FunctionInfo* fn = ctx.findFunction(id->name)) {
 				emitOp(ctx.code, LS_OP_LOAD_CONST_8);
 				emitU64(ctx.code, fn->index);
@@ -1197,8 +1356,8 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression* expr, l
 			return compileBinary(ctx, static_cast<BinaryExpression*>(expr), hint);
 		case Expression::CAST: {
 			CastExpression* cast = static_cast<CastExpression*>(expr);
-			const ls_type_kind dst_kind = parsedTypeToKind(cast->parsed_type);
-			const ls_type_kind src_kind = compileExpression(ctx, cast->expression, dst_kind);
+			const ls_type_kind dst_kind = semanticTypeToKind(expr->resolved_type ? expr->resolved_type : cast->expression ? cast->expression->resolved_type : nullptr);
+			const ls_type_kind src_kind = compileExpression(ctx, cast->expression, semanticTypeToKind(cast->expression ? cast->expression->resolved_type : nullptr));
 			emitOp(ctx.code, LS_OP_CAST);
 			emitU8(ctx.code, (u8)src_kind);
 			emitU8(ctx.code, (u8)dst_kind);
@@ -1206,6 +1365,11 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression* expr, l
 		}
 		case Expression::UNARY: {
 			UnaryExpression* un = static_cast<UnaryExpression*>(expr);
+			if (un->op == Token::MINUS) {
+				if (const FunctionInfo* fn = findOperatorFunction(*ctx.functions, un->op, un->expression ? un->expression->resolved_type : nullptr, nullptr, 1u)) {
+					return emitOperatorCall(ctx, fn, un->expression, nullptr, un->op, hint);
+				}
+			}
 			const ls_type_kind kind = compileExpression(ctx, un->expression, hint);
 			switch (un->op) {
 				case Token::MINUS:
@@ -1391,6 +1555,13 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression* expr, l
 		}
 		case Expression::BRACKET: {
 			BracketExpression* br = static_cast<BracketExpression*>(expr);
+			if (expr->function_instance) {
+				const FunctionInfo* fn = findFunctionForInstance(*ctx.functions, expr->function_instance);
+				if (!fn) return LS_TYPE_INVALID;
+				emitOp(ctx.code, LS_OP_LOAD_CONST_8);
+				emitU64(ctx.code, fn->index);
+				return LS_TYPE_FUNCTION;
+			}
 			if (br->has_colon) {
 				if (!emitSlice(ctx, br)) return LS_TYPE_INVALID;
 				return LS_TYPE_SLICE;
@@ -1402,8 +1573,21 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression* expr, l
 		}
 		case Expression::STRUCT_LITERAL: {
 			StructLiteralExpression* lit = static_cast<StructLiteralExpression*>(expr);
-			for (Expression* value : lit->values) {
-				if (compileExpression(ctx, value, LS_TYPE_INVALID) == LS_TYPE_INVALID) return LS_TYPE_INVALID;
+			ResolvedType* type = lit->type ? lit->type->resolved_type : expr->resolved_type;
+			if (type && type->kind == ResolvedType::STRUCT) {
+				StructResolvedType* st = static_cast<StructResolvedType*>(type);
+				if (!st->decl || st->decl->fields.size() != lit->values.size()) return LS_TYPE_INVALID;
+				for (i32 i = 0; i < lit->values.size(); ++i) {
+					ResolvedType* field_type = (u32)i < st->field_types.size()
+						? st->field_types[(u32)i]
+						: st->decl->fields[(u32)i].resolved_type;
+					if (compileValueAsType(ctx, lit->values[i], field_type) == LS_TYPE_INVALID) return LS_TYPE_INVALID;
+				}
+			}
+			else {
+				for (Expression* value : lit->values) {
+					if (compileExpression(ctx, value, LS_TYPE_INVALID) == LS_TYPE_INVALID) return LS_TYPE_INVALID;
+				}
 			}
 			return hint != LS_TYPE_INVALID ? hint : LS_TYPE_I32;
 		}
@@ -1481,6 +1665,29 @@ static bool compileStatement(FunctionCompiler& ctx, Statement* st, ls_type_kind 
 						case Token::MINUS_EQUAL:
 						case Token::STAR_EQUAL:
 						case Token::SLASH_EQUAL:
+						{
+							const Token::Type binary_op = assign->op == Token::PLUS_EQUAL ? Token::PLUS :
+								assign->op == Token::MINUS_EQUAL ? Token::MINUS :
+								assign->op == Token::STAR_EQUAL ? Token::STAR : Token::SLASH;
+							const FunctionInfo* op_fn = findOperatorFunction(*ctx.functions, binary_op, value_type, assign->rhs ? assign->rhs->resolved_type : nullptr, 2u);
+							if (op_fn && op_fn->fn && op_fn->fn->function_type) {
+								const FunctionResolvedType* fn_type = static_cast<FunctionResolvedType*>(op_fn->fn->function_type);
+								emitLoadLocalSlots(ctx, local->slot, 1u);
+								emitZeroIndex(ctx);
+								emitLoadLocalSlots(ctx, local->slot, 1u);
+								emitZeroIndex(ctx);
+								emitOp(ctx.code, LS_OP_LOAD_AT);
+								emitU32(ctx.code, 1u);
+								emitI32(ctx.code, 0);
+								if (compileValueAsType(ctx, assign->rhs, fn_type->param_types[1]) == LS_TYPE_INVALID) return false;
+								emitOp(ctx.code, LS_OP_CALL_DIRECT);
+								emitU32(ctx.code, op_fn->index);
+								emitOp(ctx.code, LS_OP_STORE_AT);
+								emitU32(ctx.code, 1u);
+								emitI32(ctx.code, 0);
+								return true;
+							}
+						}
 							emitLoadLocalSlots(ctx, local->slot, 1u);
 							emitZeroIndex(ctx);
 							emitLoadLocalSlots(ctx, local->slot, 1u);
@@ -1513,6 +1720,29 @@ static bool compileStatement(FunctionCompiler& ctx, Statement* st, ls_type_kind 
 					case Token::MINUS_EQUAL:
 					case Token::STAR_EQUAL:
 					case Token::SLASH_EQUAL: {
+						const Token::Type binary_op = assign->op == Token::PLUS_EQUAL ? Token::PLUS :
+							assign->op == Token::MINUS_EQUAL ? Token::MINUS :
+							assign->op == Token::STAR_EQUAL ? Token::STAR : Token::SLASH;
+						const FunctionInfo* op_fn = findOperatorFunction(*ctx.functions, binary_op, value_type, assign->rhs ? assign->rhs->resolved_type : nullptr, 2u);
+						if (op_fn && op_fn->fn && op_fn->fn->function_type) {
+							const FunctionResolvedType* fn_type = static_cast<FunctionResolvedType*>(op_fn->fn->function_type);
+							if (local) {
+								emitLoadLocalSlots(ctx, local->slot, local->slot_count);
+							}
+							else {
+								emitLoadGlobalSlots(ctx, global->slot, global->slot_count);
+							}
+							if (compileValueAsType(ctx, assign->rhs, fn_type->param_types[1]) == LS_TYPE_INVALID) return false;
+							emitOp(ctx.code, LS_OP_CALL_DIRECT);
+							emitU32(ctx.code, op_fn->index);
+							if (local) {
+								emitStoreLocalSlots(ctx, local->slot, local->slot_count);
+							}
+							else {
+								emitStoreGlobalSlots(ctx, global->slot, global->slot_count);
+							}
+							return true;
+						}
 						if (local) {
 							emitOp(ctx.code, LS_OP_LOAD_LOCAL);
 							emitU32(ctx.code, local->slot);
@@ -1966,9 +2196,41 @@ ls_bytecode* ls_bytecode_compile(
 	for (Unit& unit : module->units) {
 		for (Symbol& sym : unit.symbols) {
 			if (!sym.expression || sym.expression->kind != Expression::FUNCTION) continue;
+			FunctionExpression* fn = static_cast<FunctionExpression*>(sym.expression);
+			if (!fn->comptime_params.empty()) continue;
 			FunctionInfo& info = functions.emplace_back();
 			info.name = sym.name;
-			info.fn = static_cast<FunctionExpression*>(sym.expression);
+			info.fn = fn;
+			info.type = fn->function_type ? static_cast<FunctionResolvedType*>(fn->function_type) : nullptr;
+			info.unit = &unit;
+			info.symbol = &sym;
+			info.operator_op = Token::ERROR;
+			info.index = (u32)functions.size() - 1;
+		}
+	}
+	for (Unit& unit : module->units) {
+		for (FunctionInstance* instance : unit.function_instances) {
+			if (!instance || instance->check_state != FunctionInstance::READY) continue;
+			FunctionInfo& info = functions.emplace_back();
+			info.name = {};
+			info.fn = instance->function;
+			info.type = instance->type;
+			info.instance = instance;
+			info.unit = instance->unit;
+			info.symbol = instance->symbol;
+			info.operator_op = Token::ERROR;
+			info.index = (u32)functions.size() - 1;
+		}
+	}
+	for (Unit& unit : module->units) {
+		for (OperatorDecl& decl : unit.operators) {
+			if (!decl.function) continue;
+			FunctionInfo& info = functions.emplace_back();
+			info.name = {};
+			info.fn = decl.function;
+			info.type = decl.function->function_type ? static_cast<FunctionResolvedType*>(decl.function->function_type) : nullptr;
+			info.unit = &unit;
+			info.operator_op = decl.op;
 			info.index = (u32)functions.size() - 1;
 		}
 	}
@@ -1978,6 +2240,7 @@ ls_bytecode* ls_bytecode_compile(
 			if (!sym.expression || sym.expression->kind != Expression::FUNCTION) continue;
 
 			FunctionExpression* fn = static_cast<FunctionExpression*>(sym.expression);
+			if (!fn->comptime_params.empty()) continue;
 			ls_function_bc* out = appendFunction(bytecode);
 			if (!out) {
 				ls_bytecode_destroy(bytecode);
@@ -2014,6 +2277,190 @@ ls_bytecode* ls_bytecode_compile(
 			Expression* literal = nullptr;
 			if (function.return_slot_count == 1u && isSimpleReturnLiteral(body, literal)) {
 				// Build the tiny literal function directly to keep the old fast path.
+				ExpArray<u8> temp(*arena);
+				switch (literal->kind) {
+					case Expression::INT_LITERAL:
+						emitOp(temp, LS_OP_LOAD_CONST_8);
+						emitU64(temp, bitcastI64ToU64(static_cast<IntLiteralExpression*>(literal)->value));
+						break;
+					case Expression::FLOAT_LITERAL:
+						if (function.return_kind == LS_TYPE_F32) {
+							emitOp(temp, LS_OP_LOAD_CONST_4);
+							const float value = static_cast<float>(static_cast<FloatLiteralExpression*>(literal)->value);
+							emitU32(temp, bitcastF32ToU32(value));
+						}
+						else {
+							emitOp(temp, LS_OP_LOAD_CONST_8);
+							emitU64(temp, bitcastF64ToU64(static_cast<FloatLiteralExpression*>(literal)->value));
+						}
+						break;
+					case Expression::BOOL_LITERAL:
+						emitOp(temp, LS_OP_LOAD_CONST_8);
+						emitU64(temp, static_cast<BoolLiteralExpression*>(literal)->value ? 1u : 0u);
+						break;
+					default:
+						ls_bytecode_destroy(bytecode);
+						return nullptr;
+				}
+				emitOp(temp, LS_OP_RETURN);
+				function.code_size = (u32)temp.size();
+				function.code_capacity = function.code_size;
+				function.code = static_cast<u8*>(arena->allocate(arena->user_data, function.code_size, alignof(u8)));
+				if (!function.code) {
+					ls_bytecode_destroy(bytecode);
+					return nullptr;
+				}
+				for (i32 i = 0; i < temp.size(); ++i) function.code[i] = temp[i];
+				continue;
+			}
+
+			FunctionCompiler ctx(bytecode, function);
+			ctx.module = module;
+			ctx.unit = &unit;
+			ctx.return_type = return_type;
+			ctx.functions = &functions;
+			ctx.globals = &globals;
+			for (FunctionParam& param : fn->runtime_params) {
+				const ls_type_kind kind = valueKindForType(param.resolved_type, parsedTypeToKind(param.parsed_type));
+				BytecodeLocalBinding& binding = ctx.locals.emplace_back();
+				binding.name = param.name;
+				binding.type = param.resolved_type;
+				binding.kind = kind;
+				binding.slot_count = param.is_ref ? 1u : typeSlotCount(param.resolved_type);
+				if (binding.slot_count == 0u) binding.slot_count = 1u;
+				binding.slot = function.param_slot_count;
+				if (param.is_ref) ctx.ref_local_slots.push(binding.slot);
+				function.param_slot_count += binding.slot_count;
+				ctx.next_local_slot = function.param_slot_count;
+				if (function.param_slot_count > ctx.max_local_count) ctx.max_local_count = function.param_slot_count;
+			}
+			for (Statement* st : body->statements) {
+				if (!compileStatement(ctx, st, function.return_kind, {})) {
+					ls_bytecode_destroy(bytecode);
+					return nullptr;
+				}
+			}
+			function.local_slot_count = ctx.max_local_count > function.param_slot_count ? ctx.max_local_count - function.param_slot_count : 0u;
+			function.max_stack = function.return_slot_count + function.param_slot_count + function.local_slot_count + 8;
+			function.code_size = (u32)ctx.code.size();
+			function.code_capacity = function.code_size;
+			if (function.code_size > 0) {
+				function.code = static_cast<u8*>(arena->allocate(arena->user_data, function.code_size, alignof(u8)));
+				if (!function.code) {
+					ls_bytecode_destroy(bytecode);
+					return nullptr;
+				}
+				for (u32 i = 0; i < function.code_size; ++i) function.code[i] = ctx.code[i];
+			}
+		}
+	}
+
+	// Template declarations do not have executable signatures. Only the concrete
+	// instances discovered by semantic analysis are emitted, and their position
+	// here matches the FunctionInfo ordering used by direct-call instructions.
+	for (Unit& unit : module->units) {
+		for (FunctionInstance* instance : unit.function_instances) {
+			if (!instance || instance->check_state != FunctionInstance::READY
+				|| !instance->function || !instance->type) continue;
+			FunctionExpression* fn = instance->function;
+			if (!fn->body || fn->body->kind != Statement::BLOCK) {
+				ls_bytecode_destroy(bytecode);
+				return nullptr;
+			}
+
+			ls_function_bc* out = appendFunction(bytecode);
+			if (!out) {
+				ls_bytecode_destroy(bytecode);
+				return nullptr;
+			}
+			ls_function_bc& function = *out;
+			function.name = {};
+			function.kind = LS_FUNCTION_SCRIPT;
+			function.is_builtin_native = false;
+			function.index = (u32)(bytecode->function_count - 1);
+			function.param_count = (u32)fn->runtime_params.size();
+			function.param_slot_count = 0;
+			function.return_kind = toTypeKind(instance->type->return_type);
+			function.return_slot_count = typeSlotCount(instance->type->return_type);
+			function.local_slot_count = 0;
+			function.max_stack = function.return_slot_count;
+
+			FunctionCompiler ctx(bytecode, function);
+			ctx.module = module;
+			ctx.unit = instance->unit;
+			ctx.return_type = instance->type->return_type;
+			ctx.functions = &functions;
+			ctx.globals = &globals;
+			for (FunctionParam& param : fn->runtime_params) {
+				const ls_type_kind kind = valueKindForType(param.resolved_type, parsedTypeToKind(param.parsed_type));
+				BytecodeLocalBinding& binding = ctx.locals.emplace_back();
+				binding.name = param.name;
+				binding.type = param.resolved_type;
+				binding.kind = kind;
+				binding.slot_count = param.is_ref ? 1u : typeSlotCount(param.resolved_type);
+				if (binding.slot_count == 0u) binding.slot_count = 1u;
+				binding.slot = function.param_slot_count;
+				if (param.is_ref) ctx.ref_local_slots.push(binding.slot);
+				function.param_slot_count += binding.slot_count;
+				ctx.next_local_slot = function.param_slot_count;
+				if (function.param_slot_count > ctx.max_local_count) ctx.max_local_count = function.param_slot_count;
+			}
+
+			BlockStatement* body = static_cast<BlockStatement*>(fn->body);
+			for (Statement* statement : body->statements) {
+				if (!compileStatement(ctx, statement, function.return_kind, {})) {
+					ls_bytecode_destroy(bytecode);
+					return nullptr;
+				}
+			}
+			function.local_slot_count = ctx.max_local_count > function.param_slot_count
+				? ctx.max_local_count - function.param_slot_count
+				: 0u;
+			function.max_stack = function.return_slot_count + function.param_slot_count + function.local_slot_count + 8u;
+			function.code_size = (u32)ctx.code.size();
+			function.code_capacity = function.code_size;
+			if (function.code_size > 0) {
+				function.code = static_cast<u8*>(arena->allocate(arena->user_data, function.code_size, alignof(u8)));
+				if (!function.code) {
+					ls_bytecode_destroy(bytecode);
+					return nullptr;
+				}
+				for (u32 i = 0; i < function.code_size; ++i) function.code[i] = ctx.code[i];
+			}
+		}
+	}
+
+	for (Unit& unit : module->units) {
+		for (OperatorDecl& decl : unit.operators) {
+			FunctionExpression* fn = decl.function;
+			if (!fn) continue;
+
+			ls_function_bc* out = appendFunction(bytecode);
+			if (!out) {
+				ls_bytecode_destroy(bytecode);
+				return nullptr;
+			}
+			ls_function_bc& function = *out;
+			function.name = {};
+			function.kind = LS_FUNCTION_SCRIPT;
+			function.is_builtin_native = false;
+			function.index = (u32)(bytecode->function_count - 1);
+			function.param_count = (u32)fn->runtime_params.size();
+			function.param_slot_count = 0;
+			ResolvedType* return_type = fn->function_type ? static_cast<FunctionResolvedType*>(fn->function_type)->return_type : nullptr;
+			function.return_kind = toTypeKind(return_type);
+			function.return_slot_count = typeSlotCount(return_type);
+			function.local_slot_count = 0;
+			function.max_stack = function.return_slot_count;
+
+			if (!fn->body || fn->body->kind != Statement::BLOCK) {
+				ls_bytecode_destroy(bytecode);
+				return nullptr;
+			}
+
+			BlockStatement* body = static_cast<BlockStatement*>(fn->body);
+			Expression* literal = nullptr;
+			if (function.return_slot_count == 1u && isSimpleReturnLiteral(body, literal)) {
 				ExpArray<u8> temp(*arena);
 				switch (literal->kind) {
 					case Expression::INT_LITERAL:

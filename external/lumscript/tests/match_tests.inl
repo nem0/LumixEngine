@@ -168,6 +168,35 @@ TEST(MatchRejectsDuplicateEnumCase) {
 	return true;
 }
 
+TEST(MatchExhaustiveEnumWithMoreThan32Members) {
+	const char* source = R"(
+		enum Value {
+			V00, V01, V02, V03, V04, V05, V06, V07,
+			V08, V09, V10, V11, V12, V13, V14, V15,
+			V16, V17, V18, V19, V20, V21, V22, V23,
+			V24, V25, V26, V27, V28, V29, V30, V31,
+			V32
+		}
+
+		fn main(value : Value) : void {
+			match value {
+				case .V00, .V01, .V02, .V03, .V04, .V05, .V06, .V07:
+					return;
+				case .V08, .V09, .V10, .V11, .V12, .V13, .V14, .V15:
+					return;
+				case .V16, .V17, .V18, .V19, .V20, .V21, .V22, .V23:
+					return;
+				case .V24, .V25, .V26, .V27, .V28, .V29, .V30, .V31:
+					return;
+				case .V32:
+					return;
+			}
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
 TEST(BytecodeEnumMatch) {
 	const char* source = R"(
 		enum State {

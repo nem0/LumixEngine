@@ -16,6 +16,7 @@ set OUT_DIR=%SCRIPT_DIR%build
 set TARGET=lumc
 set COMPILER=cl
 set USE_CLANG=0
+set VSDEV_CMD=
 
 if /I "%~1"=="tests" set TARGET=tests
 if /I "%~2"=="tests" set TARGET=tests
@@ -32,6 +33,18 @@ if /I "%COMPILER%"=="clang-cl" set USE_CLANG=1
 if not exist "%OUT_DIR%" mkdir "%OUT_DIR%"
 
 if "%USE_CLANG%"=="0" (
+    where cl.exe >nul 2>&1
+    if errorlevel 1 (
+        for /f "usebackq delims=" %%I in (`where vswhere.exe 2^>nul`) do (
+            for /f "usebackq delims=" %%J in (`"%%I" -latest -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath 2^>nul`) do set "VSDEV_CMD=%%J\Common7\Tools\VsDevCmd.bat"
+        )
+        if not defined VSDEV_CMD if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat" set "VSDEV_CMD=%ProgramFiles%\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat"
+        if not defined VSDEV_CMD if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Insiders\Common7\Tools\VsDevCmd.bat" set "VSDEV_CMD=%ProgramFiles%\Microsoft Visual Studio\2022\Insiders\Common7\Tools\VsDevCmd.bat"
+        if defined VSDEV_CMD (
+            call "!VSDEV_CMD!" -no_logo -arch=x64 -host_arch=x64
+            if errorlevel 1 exit /b !errorlevel!
+        )
+    )
     REM Verify x64 cl.exe is available
     cl.exe 2>&1 | findstr /C:"for x64" >nul 2>&1
     if errorlevel 1 (

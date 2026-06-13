@@ -47,10 +47,19 @@ struct EnumResolvedType : ResolvedType {
 };
 
 struct StructResolvedType : ResolvedType {
-	StructResolvedType(ls_arena& arena) : ResolvedType(STRUCT), type_args(arena) {}
+	StructResolvedType(ls_arena& arena)
+		: ResolvedType(STRUCT)
+		, type_args(arena)
+		, value_args(arena)
+		, field_types(arena) {}
 
 	StructExpression* decl = nullptr;
 	ExpArray<ResolvedType*> type_args;
+	ExpArray<i64> value_args;
+	// A generic declaration is shared by every specialization, therefore its
+	// NamedDecl::resolved_type cannot describe the fields of a concrete value.
+	// Keep the substituted field types on the canonical struct instance instead.
+	ExpArray<ResolvedType*> field_types;
 };
 
 struct FunctionResolvedType : ResolvedType {
