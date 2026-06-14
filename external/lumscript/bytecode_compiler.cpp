@@ -208,6 +208,7 @@ struct LoopBinding {
 	ls_string_view label = {};
 	u32 condition_pos = 0;
 	u32 continue_pos = 0;
+	u32 defer_mark = 0;
 	ExpArray<u32>* break_jumps = nullptr;
 	ExpArray<u32>* continue_jumps = nullptr;
 };
@@ -544,7 +545,7 @@ static const FunctionInfo* findOperatorFunction(
 			if (ref_param) continue;
 		}
 		if (!lhs_type || !typesEqual(lhs_type, fn_type->param_types[0])) continue;
-		if (op != Token::MINUS && (!rhs_type || !typesEqual(rhs_type, fn_type->param_types[1]))) continue;
+		if (expected_arity == 2u && (!rhs_type || !typesEqual(rhs_type, fn_type->param_types[1]))) continue;
 		if (found) return nullptr;
 		found = &info;
 	}
@@ -563,7 +564,7 @@ static ls_type_kind emitOperatorCall(
 ) {
 	if (!fn || !fn->fn || !fn->type) return LS_TYPE_INVALID;
 	const FunctionResolvedType* fn_type = fn->type;
-	if (op == Token::MINUS) {
+	if (fn_type->param_types.size() == 1u) {
 		if (compileValueAsType(ctx, lhs, fn_type->param_types[0]) == LS_TYPE_INVALID) return LS_TYPE_INVALID;
 	}
 	else {
@@ -1246,12 +1247,24 @@ static ls_type_kind compileCall(FunctionCompiler& ctx, CallExpression* expr, ls_
 
 	// Indirect call: callee value sits below the argument list.
 	if (compileExpression(ctx, expr->callee, LS_TYPE_FUNCTION) == LS_TYPE_INVALID) return LS_TYPE_INVALID;
-	for (Expression* arg : expr->args) {
-		if (compileExpression(ctx, arg, LS_TYPE_INVALID) == LS_TYPE_INVALID) return LS_TYPE_INVALID;
+	const FunctionResolvedType* fn_type = expr->callee && expr->callee->resolved_type
+		&& expr->callee->resolved_type->kind == ResolvedType::FUNCTION
+		? static_cast<FunctionResolvedType*>(expr->callee->resolved_type)
+		: nullptr;
+	if (!fn_type || !compileArgs(fn_type, 0u)) return LS_TYPE_INVALID;
+	u32 arg_slot_count = 0;
+	for (u32 i = 0; i < fn_type->param_types.size(); ++i) {
+		const bool is_ref = fn_type->decl
+			&& i < fn_type->decl->runtime_params.size()
+			&& fn_type->decl->runtime_params[i].is_ref;
+		const u32 slot_count = is_ref ? 1u : typeSlotCount(fn_type->param_types[i]);
+		arg_slot_count += slot_count == 0u ? 1u : slot_count;
 	}
 	emitOp(ctx.code, LS_OP_CALL_INDIRECT);
-	emitU32(ctx.code, (u32)expr->args.size());
-	return hint;
+	emitU32(ctx.code, arg_slot_count);
+	return fn_type->return_type
+		? valueKindForType(fn_type->return_type, hint != LS_TYPE_INVALID ? hint : LS_TYPE_I32)
+		: hint;
 }
 
 static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression* expr, ls_type_kind hint) {
@@ -1468,8 +1481,16 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression* expr, l
 						}
 					}
 					if (BytecodeLocalBinding* local = ctx.findLocal(base->name)) {
-						if (!local->type || local->type->kind != ResolvedType::STRUCT) return LS_TYPE_INVALID;
-						StructResolvedType* st = static_cast<StructResolvedType*>(local->type);
+						ResolvedType* value_type = local->type;
+						u32 value_offset = 0u;
+						if (value_type && value_type->kind == ResolvedType::NULLABLE
+							&& member->expression->resolved_type
+							&& member->expression->resolved_type->kind == ResolvedType::STRUCT) {
+							value_type = member->expression->resolved_type;
+							value_offset = 1u;
+						}
+						if (!value_type || value_type->kind != ResolvedType::STRUCT) return LS_TYPE_INVALID;
+						StructResolvedType* st = static_cast<StructResolvedType*>(value_type);
 						u32 offset = 0u;
 						ResolvedType* field_type = nullptr;
 						if (!structFieldSlotOffset(st, member->name, offset, field_type)) return LS_TYPE_INVALID;
@@ -1478,7 +1499,7 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression* expr, l
 							return valueKindForType(field_type);
 						}
 						emitOp(ctx.code, LS_OP_LOAD_LOCAL);
-						emitU32(ctx.code, local->slot + offset);
+						emitU32(ctx.code, local->slot + value_offset + offset);
 						return valueKindForType(field_type);
 					}
 				}
@@ -1850,6 +1871,7 @@ static bool compileStatement(FunctionCompiler& ctx, Statement* st, ls_type_kind 
 			loop.label = current_label;
 			loop.condition_pos = condition_pos;
 			loop.continue_pos = condition_pos;
+			loop.defer_mark = (u32)ctx.deferreds.size();
 			void* break_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
 			if (!break_storage) {
 				ctx.loops.pop_back();
@@ -1913,6 +1935,7 @@ static bool compileStatement(FunctionCompiler& ctx, Statement* st, ls_type_kind 
 			loop.label = current_label;
 			loop.condition_pos = condition_pos;
 			loop.continue_pos = 0u;
+			loop.defer_mark = (u32)ctx.deferreds.size();
 			void* break_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
 			if (!break_storage) {
 				ctx.loops.pop_back();
@@ -2068,6 +2091,7 @@ static bool compileStatement(FunctionCompiler& ctx, Statement* st, ls_type_kind 
 			const ls_string_view label = is_break ? static_cast<BreakStatement*>(st)->label : static_cast<ContinueStatement*>(st)->label;
 			LoopBinding* loop = ctx.findLoop(label);
 			if (!loop) return false;
+			emitDeferredStatements(ctx, loop->defer_mark, return_kind, current_label);
 			if (is_break) {
 				const u32 jump_pos = (u32)ctx.code.size();
 				emitOp(ctx.code, LS_OP_JUMP);

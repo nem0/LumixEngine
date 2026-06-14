@@ -39,11 +39,11 @@ void print(int val) { printf("%d", val); }
 		ls_module* module = ls_module_create(&context.host); \
 		EXPECT_TRUE(module != nullptr); \
 		bool compiled = ls_module_compile(module, toLs(src), {}, nullptr, nullptr); \
-		/*ls_bytecode* bytecode = compiled ? ls_bytecode_compile(module, &context.host) : nullptr; \
+		ls_bytecode* bytecode = compiled ? ls_bytecode_compile(module, &context.host) : nullptr; \
 		if (bytecode) ls_bytecode_destroy(bytecode); \
-		ls_module_destroy(module);*/ \
+		ls_module_destroy(module); \
 		EXPECT_TRUE(compiled); \
-		/*EXPECT_TRUE(bytecode != nullptr);*/ \
+		EXPECT_TRUE(bytecode != nullptr); \
 	} while(false)
 
 #define EXPECT_COMPILE_FAIL(src) \

@@ -440,6 +440,31 @@ TEST(CustomOperatorBinaryRuntime) {
 	return true;
 }
 
+TEST(CustomOperatorBinarySubtractionRuntime) {
+	const char* main_source = R"(
+		struct Meters {
+			value : i32;
+		}
+
+		operator -(a : Meters, b : Meters) : Meters {
+			return Meters { a.value - b.value };
+		}
+
+		fn main() : i32 {
+			const a = Meters { 10 };
+			const b = Meters { 3 };
+			return (a - b).value;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(7, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(PrimitiveOperatorDeclarationFailsEvenUnused) {
 	const char* source = R"(
 		operator +(a : i32, b : i32) : i32 {

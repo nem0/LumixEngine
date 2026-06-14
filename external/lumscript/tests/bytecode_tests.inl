@@ -402,6 +402,52 @@ TEST(BytecodeDeferLifoAcrossScopes) {
 	return true;
 }
 
+TEST(BytecodeDeferRunsOnBreak) {
+	const char* source = R"(
+		var g : i32 = 0;
+
+		fn main() : i32 {
+			while true {
+				defer g = g + 1;
+				break;
+			}
+			return g;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(1, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeDeferRunsOnContinue) {
+	const char* source = R"(
+		var g : i32 = 0;
+
+		fn main() : i32 {
+			var i : i32 = 0;
+			while i < 2 {
+				i += 1;
+				defer g = g + 1;
+				continue;
+			}
+			return g;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(2, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(BytecodeFunctionTypedLocalCanBeCalled) {
 	const char* source = R"(
 		fn foo(v : bool) : i32 {

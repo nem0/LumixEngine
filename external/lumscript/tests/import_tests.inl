@@ -300,35 +300,26 @@ TEST(UnaliasedImportCollidesWithLocalDeclaration) {
 	return true;
 }
 
-TEST(LocalDeclarationCollidesWithMultipleUnaliasedImports) {
+TEST(UnusedUnaliasedImportCollisionIsAllowed) {
 	const char* main_source = R"(
-		import "a"
-		import "b"
+		import "math"
 
-		fn foo() : i32 {
-			return 0;
-		}
-
-		fn main() : i32 {
-			return foo();
-		}
-	)";
-	const char* a_source = R"(
 		fn foo() : i32 {
 			return 1;
 		}
+
+		fn main() : i32 {
+			return 0;
+		}
 	)";
-	const char* b_source = R"(
+	const char* math_source = R"(
 		fn foo() : i32 {
 			return 2;
 		}
 	)";
-	LumScriptImportFile files_storage[] = {
-		{ toLs("a"), toLs(a_source) },
-		{ toLs("b"), toLs(b_source) }
-	};
-	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
-	EXPECT_COMPILE_FAIL_WITH_IMPORTS(main_source, files);
+	LumScriptImportFile file = { toLs("math"), toLs(math_source) };
+	LumScriptImportFiles files = { &file, 1 };
+	EXPECT_COMPILE_WITH_IMPORTS(main_source, files);
 	return true;
 }
 

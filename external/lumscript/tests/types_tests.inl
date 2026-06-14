@@ -151,3 +151,17 @@ TEST(DecimalLiteralDoesNotConcretizeToInteger) {
 	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
+
+// A struct field whose type is a function returning a nullable of that same
+// struct is a valid reference cycle (the function holds a pointer-sized ref,
+// not an inline layout cycle). resolveSignature must not treat this as a
+// definition cycle.
+TEST(SelfReferentialStructFunctionFieldCompiles) {
+	const char* source = R"(
+		struct Node {
+			next : fn() : ?Node;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
