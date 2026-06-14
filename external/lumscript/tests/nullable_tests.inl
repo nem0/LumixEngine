@@ -17,6 +17,19 @@ TEST(NullablePromotionTypechecks) {
 	return true;
 }
 
+TEST(NullableNarrowingPreservesConst) {
+	const char* source = R"(
+		fn main() : void {
+			const value : ?i32 = 1;
+			if value != null {
+				value = 2;
+			}
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(NullableUseWithoutCheckFails) {
 	const char* source = R"(
 		struct Vec3 {

@@ -1,3 +1,13 @@
+TEST(ParameterAssignmentFails) {
+	const char* source = R"(
+		fn foo(a : i32) : void {
+			a = 2;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(FunctionCallAssignmentFails) {
 	const char* source = R"(
 		fn foo() : i32 {

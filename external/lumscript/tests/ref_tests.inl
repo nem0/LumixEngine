@@ -83,6 +83,20 @@ TEST(RefArgumentTypeMismatchFails) {
 	return true;
 }
 
+TEST(RefArgumentRejectsArrayToSliceConversion) {
+	const char* source = R"(
+		fn consume(values : ref i32[]) : void {
+		}
+
+		fn main() : void {
+			var values : i32[4] = undefined;
+			consume(ref values);
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(RefArgumentCanNotBeConst) {
 	const char* source = R"(
 		fn increment(v : ref i32) : void {

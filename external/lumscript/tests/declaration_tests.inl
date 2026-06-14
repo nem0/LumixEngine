@@ -33,6 +33,22 @@ TEST(BasicAssign) {
 	return true;
 }
 
+TEST(StructLiteralFieldsAllowImplicitConversions) {
+	const char* source = R"(
+		struct Values {
+			optional : ?i32;
+			items : i32[];
+		}
+
+		fn main() : void {
+			var items : i32[2] = undefined;
+			const values = Values { 1, items };
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
 TEST(AssignBinaryOp) {
 	EXPECT_COMPILE("fn main() : void { var i = 42; i = 32 * 46; }");
 	return true;
@@ -344,6 +360,33 @@ TEST(DivisionAndModuloByConstantZeroCompile) {
 		}
 	)";
 	EXPECT_COMPILE(float_source);
+	return true;
+}
+
+TEST(MixedNumericEqualityRequiresExplicitCastFails) {
+	const char* source = R"(
+		fn main(a : i32, b : f64) : bool {
+			return a == b;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(FailedFunctionTypecheckRemainsFailed) {
+	const char* source = R"(
+		fn bad() : i32 {
+			return true;
+		}
+	)";
+	TestContext context;
+	ls_module* module = ls_module_create(&context.host);
+	EXPECT_TRUE(module != nullptr);
+	context.diagnostics.output_enabled = false;
+	EXPECT_TRUE(ls_module_parse(module, toLs(source), {}) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_module_typecheck(module) == LS_RESULT_FAILURE);
+	EXPECT_TRUE(ls_module_typecheck(module) == LS_RESULT_FAILURE);
+	ls_module_destroy(module);
 	return true;
 }
 

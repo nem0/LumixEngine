@@ -17,6 +17,42 @@ TEST(ImportConst) {
 	return true;
 }
 
+TEST(QualifiedNonFunctionCallFails) {
+	const char* main_source = R"(
+		import "a" as a
+
+		fn main() : i32 {
+			return a.value();
+		}
+	)";
+	const char* a_source = R"(
+		const value : i32 = 42;
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("a"), toLs(a_source) },
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_COMPILE_FAIL_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
+TEST(UnaliasedImportedVariableIsAssignable) {
+	const char* main_source = R"(
+		import "a"
+
+		fn main() : void {
+			value = 42;
+		}
+	)";
+	const char* a_source = R"(
+		var value : i32 = 0;
+	)";
+	LumScriptImportFile file = { toLs("a"), toLs(a_source) };
+	LumScriptImportFiles files = { &file, 1 };
+	EXPECT_COMPILE_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
 TEST(DiamondImportTypechecks) {
 	const char* main_source = R"(
 		import "a" as a
@@ -562,6 +598,50 @@ TEST(ImportedMethodCallResolvesCallerGlobalArgument) {
 	};
 	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
 	EXPECT_COMPILE_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
+TEST(OverloadProbeDoesNotMutateWinningCallArguments) {
+	const char* main_source = R"(
+		import "first" as first
+		import "second" as second
+		import "entity" as entity
+
+		fn main() : i32 {
+			const value = entity.Entity { 0 };
+			return value.choose(42, true);
+		}
+	)";
+	const char* first_source = R"(
+		import "entity"
+
+		fn choose(value : Entity, amount : i32, enabled : bool) : i32 {
+			return amount;
+		}
+	)";
+	const char* second_source = R"(
+		import "entity"
+
+		fn choose(value : Entity, amount : f32, code : i32) : i32 {
+			return code;
+		}
+	)";
+	const char* entity_source = R"(
+		struct Entity {
+			value : i32;
+		}
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("first"), toLs(first_source) },
+		{ toLs("second"), toLs(second_source) },
+		{ toLs("entity"), toLs(entity_source) },
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+
+	EXPECT_RUNTIME_WITH_IMPORTS(main_source, files, runtime,
+		EXPECT_TRUE(ls_call(runtime, toLs("main")));
+		EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	);
 	return true;
 }
 

@@ -24,6 +24,7 @@ struct Symbol {
 	enum CheckState {
 		UNCHECKED,
 		CHECKING, // re-entry here means a definition cycle
+		FAILED,
 		CHECKED,
 	};
 

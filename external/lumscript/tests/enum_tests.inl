@@ -19,6 +19,27 @@ TEST(ImportEnumMemberWithoutAliasCompiles) {
 	return true;
 }
 
+TEST(ImportedEnumShorthandWithoutHintCompiles) {
+	const char* main_source = R"(
+		import "state"
+
+		fn main() : bool {
+			const state : State = State.Running;
+			return .Running == state;
+		}
+	)";
+	const char* state_source = R"(
+		enum State {
+			Idle,
+			Running
+		}
+	)";
+	LumScriptImportFile file = { toLs("state"), toLs(state_source) };
+	LumScriptImportFiles files = { &file, 1 };
+	EXPECT_COMPILE_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
 TEST(EnumShorthandInComparison) {
 	const char* source = R"(
 		enum State {

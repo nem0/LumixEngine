@@ -1691,8 +1691,8 @@ static bool compileStatement(FunctionCompiler& ctx, Statement* st, ls_type_kind 
 								assign->op == Token::MINUS_EQUAL ? Token::MINUS :
 								assign->op == Token::STAR_EQUAL ? Token::STAR : Token::SLASH;
 							const FunctionInfo* op_fn = findOperatorFunction(*ctx.functions, binary_op, value_type, assign->rhs ? assign->rhs->resolved_type : nullptr, 2u);
-							if (op_fn && op_fn->fn && op_fn->fn->function_type) {
-								const FunctionResolvedType* fn_type = static_cast<FunctionResolvedType*>(op_fn->fn->function_type);
+							if (op_fn && op_fn->fn && op_fn->fn->resolved_type) {
+								const FunctionResolvedType* fn_type = static_cast<FunctionResolvedType*>(op_fn->fn->resolved_type);
 								emitLoadLocalSlots(ctx, local->slot, 1u);
 								emitZeroIndex(ctx);
 								emitLoadLocalSlots(ctx, local->slot, 1u);
@@ -1745,8 +1745,8 @@ static bool compileStatement(FunctionCompiler& ctx, Statement* st, ls_type_kind 
 							assign->op == Token::MINUS_EQUAL ? Token::MINUS :
 							assign->op == Token::STAR_EQUAL ? Token::STAR : Token::SLASH;
 						const FunctionInfo* op_fn = findOperatorFunction(*ctx.functions, binary_op, value_type, assign->rhs ? assign->rhs->resolved_type : nullptr, 2u);
-						if (op_fn && op_fn->fn && op_fn->fn->function_type) {
-							const FunctionResolvedType* fn_type = static_cast<FunctionResolvedType*>(op_fn->fn->function_type);
+						if (op_fn && op_fn->fn && op_fn->fn->resolved_type) {
+							const FunctionResolvedType* fn_type = static_cast<FunctionResolvedType*>(op_fn->fn->resolved_type);
 							if (local) {
 								emitLoadLocalSlots(ctx, local->slot, local->slot_count);
 							}
@@ -2225,7 +2225,7 @@ ls_bytecode* ls_bytecode_compile(
 			FunctionInfo& info = functions.emplace_back();
 			info.name = sym.name;
 			info.fn = fn;
-			info.type = fn->function_type ? static_cast<FunctionResolvedType*>(fn->function_type) : nullptr;
+			info.type = fn->resolved_type ? static_cast<FunctionResolvedType*>(fn->resolved_type) : nullptr;
 			info.unit = &unit;
 			info.symbol = &sym;
 			info.operator_op = Token::ERROR;
@@ -2252,7 +2252,7 @@ ls_bytecode* ls_bytecode_compile(
 			FunctionInfo& info = functions.emplace_back();
 			info.name = {};
 			info.fn = decl.function;
-			info.type = decl.function->function_type ? static_cast<FunctionResolvedType*>(decl.function->function_type) : nullptr;
+			info.type = decl.function->resolved_type ? static_cast<FunctionResolvedType*>(decl.function->resolved_type) : nullptr;
 			info.unit = &unit;
 			info.operator_op = decl.op;
 			info.index = (u32)functions.size() - 1;
@@ -2277,7 +2277,7 @@ ls_bytecode* ls_bytecode_compile(
 			function.index = (u32)(bytecode->function_count - 1);
 			function.param_count = (u32)fn->runtime_params.size();
 			function.param_slot_count = 0;
-			ResolvedType* return_type = fn->function_type ? static_cast<FunctionResolvedType*>(fn->function_type)->return_type : nullptr;
+			ResolvedType* return_type = fn->resolved_type ? static_cast<FunctionResolvedType*>(fn->resolved_type)->return_type : nullptr;
 			function.return_kind = toTypeKind(return_type);
 			// Calls move raw slots, so aggregate return metadata must describe the
 			// representation width rather than assuming every value is one slot.
@@ -2471,7 +2471,7 @@ ls_bytecode* ls_bytecode_compile(
 			function.index = (u32)(bytecode->function_count - 1);
 			function.param_count = (u32)fn->runtime_params.size();
 			function.param_slot_count = 0;
-			ResolvedType* return_type = fn->function_type ? static_cast<FunctionResolvedType*>(fn->function_type)->return_type : nullptr;
+			ResolvedType* return_type = fn->resolved_type ? static_cast<FunctionResolvedType*>(fn->resolved_type)->return_type : nullptr;
 			function.return_kind = toTypeKind(return_type);
 			function.return_slot_count = typeSlotCount(return_type);
 			function.local_slot_count = 0;

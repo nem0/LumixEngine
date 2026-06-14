@@ -185,6 +185,29 @@ TEST(OperatorOverloadAmbiguityFails) {
 	return true;
 }
 
+TEST(EqualityOperatorOverloadAmbiguityFails) {
+	const char* source = R"(
+		struct Box {
+			value : i32;
+		}
+
+		operator ==(a : Box, b : Box) : bool {
+			return a.value == b.value;
+		}
+
+		operator ==(a : Box, b : Box) : bool {
+			return a.value == b.value;
+		}
+
+		fn main() : bool {
+			const value = Box { 1 };
+			return value == value;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(RejectedOperatorCandidateDoesNotRetypeOperands) {
 	const char* source = R"(
 		enum First {
@@ -239,6 +262,25 @@ TEST(PrimitiveCompoundAssignmentIgnoresOperatorOverloadCompiles) {
 		fn main() : void {
 			var v : f32 = 1.0;
 			v += 2.0;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(CustomCompoundAssignmentAcceptsDifferentRhsType) {
+	const char* source = R"(
+		struct Box {
+			value : i32;
+		}
+
+		operator +(box : Box, amount : i32) : Box {
+			return Box { box.value + amount };
+		}
+
+		fn main() : void {
+			var box = Box { 1 };
+			box += 2;
 		}
 	)";
 	EXPECT_COMPILE(source);

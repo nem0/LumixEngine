@@ -177,7 +177,6 @@ struct FunctionExpression : Expression {
 	// Return type remains source syntax until semantic resolution so aliases and
 	// generated comptime types can be resolved after symbol registration.
 	ParsedType* return_type = nullptr;
-	ResolvedType* function_type = nullptr;
 	// Null for `extern fn` declarations; the host binds the implementation at runtime.
 	Statement* body = nullptr;
 	bool is_extern = false;
@@ -190,7 +189,6 @@ struct StructExpression : Expression {
 	// Fields keep parsed type syntax so generic structs can be instantiated with
 	// different comptime arguments before producing concrete resolved field types.
 	ExpArray<NamedDecl> fields;
-	ResolvedType* produced_type = nullptr;
 };
 
 struct EnumMember {
@@ -202,5 +200,4 @@ struct EnumExpression : Expression {
 	EnumExpression(ls_arena& arena) : Expression(ENUM), members(arena) {}
 
 	ExpArray<EnumMember> members;
-	ResolvedType* produced_type = nullptr;
 };

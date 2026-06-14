@@ -26,6 +26,20 @@ TEST(TemplateFunctionIdentityF32) {
 	return true;
 }
 
+TEST(TemplateFunctionNullableReturnContextCompiles) {
+	const char* source = R"(
+		fn identity[T](a : T) : T {
+			return a;
+		}
+
+		fn main() : ?i32 {
+			return identity(42);
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
 TEST(TemplateFunctionTypeMismatchFails) {
 	const char* source = R"(
 		fn identity[T](a : T) : T {
@@ -376,6 +390,48 @@ TEST(TemplateRecursiveStructFails) {
 		fn main() : void {}
 	)";
 	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(TemplateStructRecursionThroughSliceCompiles) {
+	const char* source = R"(
+		struct Node[T] {
+			value : T;
+			children : Node[T][];
+		}
+
+		fn main() : void {}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(FailedTemplateStructInstanceRemainsInvalid) {
+	const char* first_source = R"(
+		struct Invalid[N : f32] {
+			value : i32;
+		}
+
+		fn first() : void {
+			var value : Invalid[1] = undefined;
+		}
+	)";
+	const char* second_source = R"(
+		import "lib"
+
+		fn second() : void {
+			var value : Invalid[1] = undefined;
+		}
+	)";
+	TestContext context;
+	ls_module* module = ls_module_create(&context.host);
+	EXPECT_TRUE(module != nullptr);
+	context.diagnostics.output_enabled = false;
+	EXPECT_TRUE(ls_module_parse(module, toLs(first_source), toLs("lib")) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_module_typecheck(module) == LS_RESULT_FAILURE);
+	EXPECT_TRUE(ls_module_parse(module, toLs(second_source), toLs("main")) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_module_typecheck(module) == LS_RESULT_FAILURE);
+	ls_module_destroy(module);
 	return true;
 }
 
