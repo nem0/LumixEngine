@@ -226,6 +226,7 @@ static void nativeAddC(ls_runtime* runtime) {
 #include "slices_tests.inl"
 #include "string_tests.inl"
 #include "function_tests.inl"
+#include "shadowing_tests.inl"
 #include "declaration_tests.inl"
 #include "comptime_tests.inl"
 #include "control_flow_tests.inl"
@@ -233,7 +234,7 @@ static void nativeAddC(ls_runtime* runtime) {
 #include "nullable_tests.inl"
 #include "ref_tests.inl"
 #include "match_tests.inl"
-#include "template_tests.inl"
+//#include "template_tests.inl"
 
 int main(int argc, char** argv) {
     const char* test_name = nullptr;

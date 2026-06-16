@@ -910,7 +910,8 @@ Rules:
 - explicit type is optional if inference can resolve from initializer
 - `const` cannot be reassigned
 - variables are block scoped
-- locals can shadow globals
+- shadowing is a compile-time error: a new declaration in the same scope or an inner scope cannot re-use a name that is already visible
+- a **name** is any identifier introduced by `var`, `const`, `comptime`, `fn`, `struct`, `enum`, or `import` alias; the same rules apply to all of them
 
 ## Statements
 
@@ -1412,11 +1413,8 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 - `NestedFunctionCanNotCaptureOuterLocal`
 - `DuplicateDeclarationsFail`
 - `ConstCanNotBeUndefined`
-- `ExternFnDuplicateSameFile`
-- `ExternGlobalCollision`
-- `ExternFnCollision`
+- `DuplicateUnaliasedImportFails`
 - `FunctionCallAssignmentFails`
-- `FirstClassFunctionLiteralShadowsFunctionName`
 - `FunctionNamedSinCompilesAndRuns`
 - `ImportPathCanMatchPreviousAlias`
 - `ImportAliasMissingMemberReportsMemberName`
@@ -1445,4 +1443,4 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 - `defer` should define behavior on `break`, `continue`, runtime errors, and nested scopes, not only normal exit and `return`.
 - Boolean operator coverage is incomplete because `not` appears in examples but is not specified alongside `and` and `or`.
 - Imports and `extern` bindings still need explicit collision policy for same-path/same-alias cases, builtin module boundaries, and imported declaration conflicts.
-- Function values need clearer rules for equality/identity and shadowing interactions with function declarations and literals.
+- Function values need clearer rules for equality/identity interactions with function declarations and literals.

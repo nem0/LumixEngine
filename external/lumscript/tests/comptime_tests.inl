@@ -387,18 +387,6 @@ TEST(ComptimeDuplicateNameFails) {
 	return true;
 }
 
-TEST(ComptimeShadowsPrimitiveTypeFails) {
-	const char* source = R"(
-		comptime i32 = 1;
-
-		fn main() : i32 {
-			return 0;
-		}
-	)";
-	EXPECT_COMPILE_FAIL(source);
-	return true;
-}
-
 TEST(ComptimeCanNotBeReassignedFails) {
 	const char* source = R"(
 		comptime N = 1;
@@ -449,32 +437,6 @@ TEST(ComptimeRuntimeValueAsTypeFails) {
 		fn main() : void {
 			var T = i32;
 			var value : T = 42;
-		}
-	)";
-	EXPECT_COMPILE_FAIL(source);
-	return true;
-}
-
-TEST(ComptimeBindingCanNotBeShadowedByLocalFails) {
-	const char* source = R"(
-		comptime N = 32;
-
-		fn main() : i32 {
-			var N : i32 = 1;
-			return N;
-		}
-	)";
-	EXPECT_COMPILE_FAIL(source);
-	return true;
-}
-
-TEST(ComptimeBindingCanNotShadowGlobalFails) {
-	const char* source = R"(
-		var N : i32 = 1;
-		comptime N = 32;
-
-		fn main() : i32 {
-			return N;
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);

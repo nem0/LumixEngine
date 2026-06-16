@@ -336,6 +336,25 @@ TEST(UnaliasedImportCollidesWithLocalDeclaration) {
 	return true;
 }
 
+TEST(UnaliasedImportCollidesWithLocalVariableUse) {
+	const char* main_source = R"(
+		import "math"
+
+		const value : i32 = 1;
+
+		fn main() : i32 {
+			return value;
+		}
+	)";
+	const char* math_source = R"(
+		const value : i32 = 2;
+	)";
+	LumScriptImportFile file = { toLs("math"), toLs(math_source) };
+	LumScriptImportFiles files = { &file, 1 };
+	EXPECT_COMPILE_FAIL_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
 TEST(UnusedUnaliasedImportCollisionIsAllowed) {
 	const char* main_source = R"(
 		import "math"
@@ -533,6 +552,39 @@ TEST(FirstParameterNamespaceResolutionAmbiguousTypecheck) {
 	LumScriptImportFile files_storage[] = {
 		{ toLs("entity_mod"), toLs(entity_source) },
 		{ toLs("helper_mod"), toLs(helper_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+
+	EXPECT_COMPILE_FAIL_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
+TEST(FirstParameterNamespaceResolutionLocalFunctionAmbiguityFails) {
+	const char* main_source = R"(
+		import "entity_mod" as entity
+
+		fn destroy(x : entity.Entity) : i32 {
+			return 3;
+		}
+
+		fn main() : i32 {
+			const x : entity.Entity = entity.Entity { 7 };
+			return x.destroy();
+		}
+	)";
+
+	const char* entity_source = R"(
+		struct Entity {
+			id : i32;
+		}
+
+		fn destroy(x : Entity) : i32 {
+			return x.id;
+		}
+	)";
+
+	LumScriptImportFile files_storage[] = {
+		{ toLs("entity_mod"), toLs(entity_source) }
 	};
 	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
 

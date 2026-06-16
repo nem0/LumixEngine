@@ -18,7 +18,11 @@ struct Symbol {
 		CONST,
 		// Compile-time binding. Functions, structs and enums are represented
 		// as values bound here instead of as separate declaration categories.
-		COMPTIME
+		COMPTIME,
+		// Aliased import (`import "path" as name`). Reserves the alias name in the
+		// symbol table so that collision detection covers it like any other name.
+		// The actual unit linkage is still stored in Unit::imports.
+		IMPORT,
 	};
 
 	enum CheckState {
@@ -72,44 +76,62 @@ struct Import {
 	ls_string_view alias = {}; // empty when imported without `as`
 };
 
-// Operators are a separate declaration form: their names are fixed tokens, not
-// identifiers, so they live outside the symbol table and feed overload resolution.
-struct OperatorDecl {
-	Token::Type op = Token::ERROR;
-	FunctionExpression* function = nullptr;
-};
+// Returns the symbol name used to store an operator overload, e.g. Token::PLUS → "+".
+// Operator names are non-identifier strings, so they cannot collide with user symbols.
+// Returns nullptr for non-overloadable tokens.
+inline const char* operatorSymbolName(Token::Type op) {
+	switch (op) {
+		case Token::PLUS:         return "+";
+		case Token::MINUS:        return "-";
+		case Token::STAR:         return "*";
+		case Token::SLASH:        return "/";
+		case Token::PERCENT:      return "%";
+		case Token::EQUAL_EQUAL:  return "==";
+		case Token::BANG_EQUAL:   return "!=";
+		case Token::LT:           return "<";
+		case Token::LT_EQUAL:     return "<=";
+		case Token::GT:           return ">";
+		case Token::GT_EQUAL:     return ">=";
+		default:                  return nullptr;
+	}
+}
 
-struct FunctionInstance {
-	enum CheckState {
-		CREATING,
-		CHECKING,
-		READY,
-		FAILED,
+// Returns the operator token for a symbol named by operatorSymbolName, or
+// Token::ERROR if the name does not match any operator overload.
+inline Token::Type tokenFromOperatorName(ls_string_view name) {
+	struct Entry { const char* name; Token::Type token; };
+	static constexpr Entry table[] = {
+		{ "+",  Token::PLUS },
+		{ "-",  Token::MINUS },
+		{ "*",  Token::STAR },
+		{ "/",  Token::SLASH },
+		{ "%",  Token::PERCENT },
+		{ "==", Token::EQUAL_EQUAL },
+		{ "!=", Token::BANG_EQUAL },
+		{ "<",  Token::LT },
+		{ "<=", Token::LT_EQUAL },
+		{ ">",  Token::GT },
+		{ ">=", Token::GT_EQUAL },
 	};
+	for (const Entry& e : table) {
+		const char* p = name.begin;
+		const char* q = e.name;
+		while (p != name.end && *q && *p == *q) { ++p; ++q; }
+		if (p == name.end && *q == '\0') return e.token;
+	}
+	return Token::ERROR;
+}
 
-	explicit FunctionInstance(ls_arena& arena)
-		: type_args(arena) {}
-
-	Unit* unit = nullptr;
-	Symbol* symbol = nullptr;
-	FunctionExpression* declaration = nullptr;
-	// Template bodies are cloned before checking because every expression and
-	// local declaration stores semantic results directly on its AST node.
-	FunctionExpression* function = nullptr;
-	FunctionResolvedType* type = nullptr;
-	ExpArray<ResolvedType*> type_args;
-	CheckState check_state = CREATING;
-};
+inline bool isOperatorSymbol(ls_string_view name) {
+	return tokenFromOperatorName(name) != Token::ERROR;
+}
 
 struct Unit {
 	Unit(ls_string_view path, const ls_host* host)
 		: arena(host)
 		, symbols(arena)
 		, types(arena)
-		, struct_instances(arena)
-		, function_instances(arena)
 		, imports(arena)
-		, operators(arena)
 		, path(path) {}
 
 	enum ImportState { IMPORT_PENDING, IMPORT_RESOLVING, IMPORT_DONE };
@@ -118,15 +140,9 @@ struct Unit {
 	ls_string_view path;
 	ArenaOwner arena;
 
-	// Parsed top-level bindings. Function/type declarations are represented as
-	// symbols bound to AST expressions instead of separate declaration objects.
-	ExpArray<Symbol> symbols; // top level symbols
-	// Canonical semantic types allocated during resolution/instantiation.
+	ExpArray<Symbol> symbols;
 	ExpArray<ResolvedType> types;
-	ExpArray<StructResolvedType*> struct_instances;
-	ExpArray<FunctionInstance*> function_instances;
 	ExpArray<Import> imports;
-	ExpArray<OperatorDecl> operators;
 };
 
 struct ls_module {
@@ -142,6 +158,6 @@ struct ls_module {
 	ArenaOwner arena;
 	ExpArray<Unit> units;
 	// One canonical instance per primitive kind, indexed by ResolvedType::Kind.
-	// Pointer equality suffices for primitives; use typesEqual() for type constructors.
+	// Pointer equality suffices for primitives; use typesEqual() for compound types.
 	ResolvedType primitives[ResolvedType::TYPE + 1];
 };

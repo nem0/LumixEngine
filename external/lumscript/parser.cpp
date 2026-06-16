@@ -147,12 +147,15 @@ struct Parser {
 		return true;
 	}
 
-	// Push a top-level symbol, rejecting redeclarations of the same name.
+	// Push a top-level symbol. Operator overloads may share a name with other
+	// overloads of the same operator; all other symbols reject redeclarations.
 	bool addSymbol(const Symbol& sym) {
-		for (const Symbol& other : m_unit.symbols) {
-			if (!equalStrings(other.name, sym.name)) continue;
-			m_output.error("Duplicate declaration: ", sym.name);
-			return false;
+		if (!isOperatorSymbol(sym.name)) {
+			for (const Symbol& other : m_unit.symbols) {
+				if (!equalStrings(other.name, sym.name)) continue;
+				m_output.error("Duplicate declaration: ", sym.name);
+				return false;
+			}
 		}
 		m_unit.symbols.push_back(sym);
 		return true;
@@ -592,7 +595,7 @@ struct Parser {
 
 			// Only a qualified name can be a template, so for any other base the
 			// bracket must be a static array size, e.g. `i32[4]`. `Foo[4]` stays a
-			// COMPTIME_CALL until semantic analysis can tell array from instantiation.
+			// BRACKET_TYPE until semantic analysis can tell array from instantiation.
 			if (res->kind != ParsedType::QUALIFIED) {
 				ArrayParsedType* array = make<ArrayParsedType>();
 				array->element_type = res;
@@ -603,7 +606,7 @@ struct Parser {
 				continue;
 			}
 
-			ComptimeCallParsedType* call = make<ComptimeCallParsedType>(m_unit.arena);
+			BracketTypeParsedType* call = make<BracketTypeParsedType>(m_unit.arena);
 			call->callee = res;
 			while (peekToken().type != Token::RIGHT_BRACKET) {
 				if (peekToken().type == Token::END_OF_FILE) {
@@ -1109,12 +1112,13 @@ struct Parser {
 			if (!consume(Token::IDENTIFIER, import.alias, "Expected import alias")) return false;
 		}
 
-		for (const Import& other : m_unit.imports) {
-			if (!equalStrings(other.path, import.path)) continue;
-			if (!equalStrings(other.alias, import.alias)) continue;
-			m_output.error("Duplicate import: ", import.path);
-			return false;
+		if (!empty(import.alias)) {
+			Symbol sym;
+			sym.storage = Symbol::IMPORT;
+			sym.name = import.alias;
+			if (!addSymbol(sym)) return false;
 		}
+
 		m_unit.imports.push_back(import);
 		if (peekToken().type == Token::SEMICOLON) consumeToken();
 		return true;
@@ -1143,22 +1147,10 @@ struct Parser {
 	// Parse an operator declaration, e.g. `operator +(a : Vec3, b : Vec3) : Vec3 { }`.
 	bool operatorDecl() {
 		Token op = consumeToken();
-		switch (op.type) {
-			case Token::PLUS:
-			case Token::MINUS:
-			case Token::STAR:
-			case Token::SLASH:
-			case Token::PERCENT:
-			case Token::EQUAL_EQUAL:
-			case Token::BANG_EQUAL:
-			case Token::LT:
-			case Token::LT_EQUAL:
-			case Token::GT:
-			case Token::GT_EQUAL:
-				break;
-			default:
-				m_output.errorAt(op, "Operator ", toString(op.type), " can not be overloaded");
-				return false;
+		const char* sym_name = operatorSymbolName(op.type);
+		if (!sym_name) {
+			m_output.errorAt(op, "Operator ", toString(op.type), " can not be overloaded");
+			return false;
 		}
 
 		if (peekToken().type == Token::LEFT_BRACKET) {
@@ -1171,10 +1163,11 @@ struct Parser {
 		fn->body = blockStatement();
 		if (!fn->body) return false;
 
-		OperatorDecl& decl = m_unit.operators.emplace_back();
-		decl.op = op.type;
-		decl.function = fn;
-		return true;
+		Symbol sym;
+		sym.name = makeStringView(sym_name);
+		sym.expression = fn;
+		sym.storage = Symbol::COMPTIME;
+		return addSymbol(sym);
 	}
 
 	// Parse a function declaration, e.g. `fn foo(a) { }`.

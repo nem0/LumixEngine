@@ -48,43 +48,6 @@ TEST(FunctionCallWrongArityFails) {
 	return true;
 }
 
-TEST(LocalFunctionTypedVariableShadowsFunctionName) {
-	const char* source = R"(
-		fn foo(v : bool) : i32 {
-			return 7;
-		}
-
-		fn bar(v : i32) : i32 {
-			return v + 1;
-		}
-
-		fn main() : i32 {
-			const foo : fn(i32) : i32 = bar;
-			return foo(41);
-		}
-	)";
-	EXPECT_COMPILE(source);
-	return true;
-}
-
-TEST(FirstClassFunctionLiteralShadowsFunctionName) {
-	const char* source = R"(
-		fn foo() : i32 {
-			return 7;
-		}
-
-		const foo = fn() : i32 {
-			return 1;
-		};
-
-		fn main() : i32 {
-			return foo();
-		}
-	)";
-	EXPECT_COMPILE_FAIL(source);
-	return true;
-}
-
 TEST(FirstClassFunctionLiteralInfersTypedVariable) {
 	const char* source = R"(
 		const foo = fn() : i32 {
@@ -332,35 +295,7 @@ TEST(BytecodeIndirectFunctionCallWithAggregateArgument) {
 	return true;
 }
 
-TEST(BytecodeLocalVariableShadowsFunctionName) {
-	const char* source = R"(
-		fn foo() : i32 {
-			return 7;
-		}
 
-		fn main() : i32 {
-			var foo : i32 = 42;
-			return foo;
-		}
-	)";
-
-	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
-
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
-	EXPECT_TRUE(bytecode != nullptr);
-
-	ls_runtime* runtime = ls_runtime_create(bytecode);
-	EXPECT_TRUE(runtime != nullptr);
-
-	EXPECT_TRUE(ls_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ls_to_i32(runtime, -1));
-
-	ls_runtime_destroy(runtime);
-	ls_bytecode_destroy(bytecode);
-	CAPI_END(module);
-	return true;
-}
 
 TEST(BytecodeGlobalFunctionLiteral) {
    const char* source = R"(

@@ -217,11 +217,13 @@ struct FunctionInfo {
 	ls_string_view name = {};
 	FunctionExpression* fn = nullptr;
 	FunctionResolvedType* type = nullptr;
-	FunctionInstance* instance = nullptr;
 	Unit* unit = nullptr;
 	Symbol* symbol = nullptr;
-	Token::Type operator_op = Token::ERROR;
 	u32 index = 0;
+
+	Token::Type operatorToken() const {
+		return symbol ? tokenFromOperatorName(symbol->name) : Token::ERROR;
+	}
 };
 
 struct GlobalBinding {
@@ -459,14 +461,6 @@ static const FunctionInfo* findFunctionForSymbol(const ExpArray<FunctionInfo>& f
 	return nullptr;
 }
 
-static const FunctionInfo* findFunctionForInstance(const ExpArray<FunctionInfo>& functions, FunctionInstance* instance) {
-	if (!instance) return nullptr;
-	for (const FunctionInfo& info : functions) {
-		if (info.instance == instance) return &info;
-	}
-	return nullptr;
-}
-
 static const FunctionInfo* findMemberFunction(
 	const ExpArray<FunctionInfo>& functions,
 	ls_string_view name,
@@ -531,7 +525,7 @@ static const FunctionInfo* findOperatorFunction(
 ) {
 	const FunctionInfo* found = nullptr;
 	for (const FunctionInfo& info : functions) {
-		if (info.operator_op != op) continue;
+		if (info.operatorToken() != op) continue;
 		const FunctionResolvedType* fn_type = info.type;
 		if (!fn_type || !operatorLookupArityMatches((u32)fn_type->param_types.size(), expected_arity)) continue;
 		if (fn_type->decl) {
@@ -1171,14 +1165,6 @@ static ls_type_kind compileCall(FunctionCompiler& ctx, CallExpression* expr, ls_
 		return true;
 	};
 
-	if (expr->function_instance) {
-		const FunctionInfo* fn = findFunctionForInstance(*ctx.functions, expr->function_instance);
-		if (!fn || !compileArgs(fn->type, 0u)) return LS_TYPE_INVALID;
-		emitOp(ctx.code, LS_OP_CALL_DIRECT);
-		emitU32(ctx.code, fn->index);
-		return valueKindForType(fn->type->return_type, hint != LS_TYPE_INVALID ? hint : LS_TYPE_I32);
-	}
-
 	if (expr->callee && expr->callee->kind == Expression::IDENTIFIER) {
 		IdentifierExpression* id = static_cast<IdentifierExpression*>(expr->callee);
 		if (equalStrings(id->name, makeStringView("length"))) {
@@ -1350,13 +1336,6 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression* expr, l
 					emitLoadGlobalSlots(ctx, global->slot, global->slot_count);
 					return valueKindForType(global_sym->instance_type ? global_sym->instance_type : global_sym->resolved_type);
 				}
-			}
-			if (expr->function_instance) {
-				const FunctionInfo* fn = findFunctionForInstance(*ctx.functions, expr->function_instance);
-				if (!fn) return LS_TYPE_INVALID;
-				emitOp(ctx.code, LS_OP_LOAD_CONST_8);
-				emitU64(ctx.code, fn->index);
-				return LS_TYPE_FUNCTION;
 			}
 			if (const FunctionInfo* fn = ctx.findFunction(id->name)) {
 				emitOp(ctx.code, LS_OP_LOAD_CONST_8);
@@ -1576,13 +1555,6 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression* expr, l
 		}
 		case Expression::BRACKET: {
 			BracketExpression* br = static_cast<BracketExpression*>(expr);
-			if (expr->function_instance) {
-				const FunctionInfo* fn = findFunctionForInstance(*ctx.functions, expr->function_instance);
-				if (!fn) return LS_TYPE_INVALID;
-				emitOp(ctx.code, LS_OP_LOAD_CONST_8);
-				emitU64(ctx.code, fn->index);
-				return LS_TYPE_FUNCTION;
-			}
 			if (br->has_colon) {
 				if (!emitSlice(ctx, br)) return LS_TYPE_INVALID;
 				return LS_TYPE_SLICE;
@@ -2221,50 +2193,20 @@ ls_bytecode* ls_bytecode_compile(
 		for (Symbol& sym : unit.symbols) {
 			if (!sym.expression || sym.expression->kind != Expression::FUNCTION) continue;
 			FunctionExpression* fn = static_cast<FunctionExpression*>(sym.expression);
-			if (!fn->comptime_params.empty()) continue;
 			FunctionInfo& info = functions.emplace_back();
 			info.name = sym.name;
 			info.fn = fn;
 			info.type = fn->resolved_type ? static_cast<FunctionResolvedType*>(fn->resolved_type) : nullptr;
 			info.unit = &unit;
 			info.symbol = &sym;
-			info.operator_op = Token::ERROR;
 			info.index = (u32)functions.size() - 1;
 		}
 	}
-	for (Unit& unit : module->units) {
-		for (FunctionInstance* instance : unit.function_instances) {
-			if (!instance || instance->check_state != FunctionInstance::READY) continue;
-			FunctionInfo& info = functions.emplace_back();
-			info.name = {};
-			info.fn = instance->function;
-			info.type = instance->type;
-			info.instance = instance;
-			info.unit = instance->unit;
-			info.symbol = instance->symbol;
-			info.operator_op = Token::ERROR;
-			info.index = (u32)functions.size() - 1;
-		}
-	}
-	for (Unit& unit : module->units) {
-		for (OperatorDecl& decl : unit.operators) {
-			if (!decl.function) continue;
-			FunctionInfo& info = functions.emplace_back();
-			info.name = {};
-			info.fn = decl.function;
-			info.type = decl.function->resolved_type ? static_cast<FunctionResolvedType*>(decl.function->resolved_type) : nullptr;
-			info.unit = &unit;
-			info.operator_op = decl.op;
-			info.index = (u32)functions.size() - 1;
-		}
-	}
-
 	for (Unit& unit : module->units) {
 		for (Symbol& sym : unit.symbols) {
 			if (!sym.expression || sym.expression->kind != Expression::FUNCTION) continue;
 
 			FunctionExpression* fn = static_cast<FunctionExpression*>(sym.expression);
-			if (!fn->comptime_params.empty()) continue;
 			ls_function_bc* out = appendFunction(bytecode);
 			if (!out) {
 				ls_bytecode_destroy(bytecode);
@@ -2301,190 +2243,6 @@ ls_bytecode* ls_bytecode_compile(
 			Expression* literal = nullptr;
 			if (function.return_slot_count == 1u && isSimpleReturnLiteral(body, literal)) {
 				// Build the tiny literal function directly to keep the old fast path.
-				ExpArray<u8> temp(*arena);
-				switch (literal->kind) {
-					case Expression::INT_LITERAL:
-						emitOp(temp, LS_OP_LOAD_CONST_8);
-						emitU64(temp, bitcastI64ToU64(static_cast<IntLiteralExpression*>(literal)->value));
-						break;
-					case Expression::FLOAT_LITERAL:
-						if (function.return_kind == LS_TYPE_F32) {
-							emitOp(temp, LS_OP_LOAD_CONST_4);
-							const float value = static_cast<float>(static_cast<FloatLiteralExpression*>(literal)->value);
-							emitU32(temp, bitcastF32ToU32(value));
-						}
-						else {
-							emitOp(temp, LS_OP_LOAD_CONST_8);
-							emitU64(temp, bitcastF64ToU64(static_cast<FloatLiteralExpression*>(literal)->value));
-						}
-						break;
-					case Expression::BOOL_LITERAL:
-						emitOp(temp, LS_OP_LOAD_CONST_8);
-						emitU64(temp, static_cast<BoolLiteralExpression*>(literal)->value ? 1u : 0u);
-						break;
-					default:
-						ls_bytecode_destroy(bytecode);
-						return nullptr;
-				}
-				emitOp(temp, LS_OP_RETURN);
-				function.code_size = (u32)temp.size();
-				function.code_capacity = function.code_size;
-				function.code = static_cast<u8*>(arena->allocate(arena->user_data, function.code_size, alignof(u8)));
-				if (!function.code) {
-					ls_bytecode_destroy(bytecode);
-					return nullptr;
-				}
-				for (i32 i = 0; i < temp.size(); ++i) function.code[i] = temp[i];
-				continue;
-			}
-
-			FunctionCompiler ctx(bytecode, function);
-			ctx.module = module;
-			ctx.unit = &unit;
-			ctx.return_type = return_type;
-			ctx.functions = &functions;
-			ctx.globals = &globals;
-			for (FunctionParam& param : fn->runtime_params) {
-				const ls_type_kind kind = valueKindForType(param.resolved_type, parsedTypeToKind(param.parsed_type));
-				BytecodeLocalBinding& binding = ctx.locals.emplace_back();
-				binding.name = param.name;
-				binding.type = param.resolved_type;
-				binding.kind = kind;
-				binding.slot_count = param.is_ref ? 1u : typeSlotCount(param.resolved_type);
-				if (binding.slot_count == 0u) binding.slot_count = 1u;
-				binding.slot = function.param_slot_count;
-				if (param.is_ref) ctx.ref_local_slots.push(binding.slot);
-				function.param_slot_count += binding.slot_count;
-				ctx.next_local_slot = function.param_slot_count;
-				if (function.param_slot_count > ctx.max_local_count) ctx.max_local_count = function.param_slot_count;
-			}
-			for (Statement* st : body->statements) {
-				if (!compileStatement(ctx, st, function.return_kind, {})) {
-					ls_bytecode_destroy(bytecode);
-					return nullptr;
-				}
-			}
-			function.local_slot_count = ctx.max_local_count > function.param_slot_count ? ctx.max_local_count - function.param_slot_count : 0u;
-			function.max_stack = function.return_slot_count + function.param_slot_count + function.local_slot_count + 8;
-			function.code_size = (u32)ctx.code.size();
-			function.code_capacity = function.code_size;
-			if (function.code_size > 0) {
-				function.code = static_cast<u8*>(arena->allocate(arena->user_data, function.code_size, alignof(u8)));
-				if (!function.code) {
-					ls_bytecode_destroy(bytecode);
-					return nullptr;
-				}
-				for (u32 i = 0; i < function.code_size; ++i) function.code[i] = ctx.code[i];
-			}
-		}
-	}
-
-	// Template declarations do not have executable signatures. Only the concrete
-	// instances discovered by semantic analysis are emitted, and their position
-	// here matches the FunctionInfo ordering used by direct-call instructions.
-	for (Unit& unit : module->units) {
-		for (FunctionInstance* instance : unit.function_instances) {
-			if (!instance || instance->check_state != FunctionInstance::READY
-				|| !instance->function || !instance->type) continue;
-			FunctionExpression* fn = instance->function;
-			if (!fn->body || fn->body->kind != Statement::BLOCK) {
-				ls_bytecode_destroy(bytecode);
-				return nullptr;
-			}
-
-			ls_function_bc* out = appendFunction(bytecode);
-			if (!out) {
-				ls_bytecode_destroy(bytecode);
-				return nullptr;
-			}
-			ls_function_bc& function = *out;
-			function.name = {};
-			function.kind = LS_FUNCTION_SCRIPT;
-			function.is_builtin_native = false;
-			function.index = (u32)(bytecode->function_count - 1);
-			function.param_count = (u32)fn->runtime_params.size();
-			function.param_slot_count = 0;
-			function.return_kind = toTypeKind(instance->type->return_type);
-			function.return_slot_count = typeSlotCount(instance->type->return_type);
-			function.local_slot_count = 0;
-			function.max_stack = function.return_slot_count;
-
-			FunctionCompiler ctx(bytecode, function);
-			ctx.module = module;
-			ctx.unit = instance->unit;
-			ctx.return_type = instance->type->return_type;
-			ctx.functions = &functions;
-			ctx.globals = &globals;
-			for (FunctionParam& param : fn->runtime_params) {
-				const ls_type_kind kind = valueKindForType(param.resolved_type, parsedTypeToKind(param.parsed_type));
-				BytecodeLocalBinding& binding = ctx.locals.emplace_back();
-				binding.name = param.name;
-				binding.type = param.resolved_type;
-				binding.kind = kind;
-				binding.slot_count = param.is_ref ? 1u : typeSlotCount(param.resolved_type);
-				if (binding.slot_count == 0u) binding.slot_count = 1u;
-				binding.slot = function.param_slot_count;
-				if (param.is_ref) ctx.ref_local_slots.push(binding.slot);
-				function.param_slot_count += binding.slot_count;
-				ctx.next_local_slot = function.param_slot_count;
-				if (function.param_slot_count > ctx.max_local_count) ctx.max_local_count = function.param_slot_count;
-			}
-
-			BlockStatement* body = static_cast<BlockStatement*>(fn->body);
-			for (Statement* statement : body->statements) {
-				if (!compileStatement(ctx, statement, function.return_kind, {})) {
-					ls_bytecode_destroy(bytecode);
-					return nullptr;
-				}
-			}
-			function.local_slot_count = ctx.max_local_count > function.param_slot_count
-				? ctx.max_local_count - function.param_slot_count
-				: 0u;
-			function.max_stack = function.return_slot_count + function.param_slot_count + function.local_slot_count + 8u;
-			function.code_size = (u32)ctx.code.size();
-			function.code_capacity = function.code_size;
-			if (function.code_size > 0) {
-				function.code = static_cast<u8*>(arena->allocate(arena->user_data, function.code_size, alignof(u8)));
-				if (!function.code) {
-					ls_bytecode_destroy(bytecode);
-					return nullptr;
-				}
-				for (u32 i = 0; i < function.code_size; ++i) function.code[i] = ctx.code[i];
-			}
-		}
-	}
-
-	for (Unit& unit : module->units) {
-		for (OperatorDecl& decl : unit.operators) {
-			FunctionExpression* fn = decl.function;
-			if (!fn) continue;
-
-			ls_function_bc* out = appendFunction(bytecode);
-			if (!out) {
-				ls_bytecode_destroy(bytecode);
-				return nullptr;
-			}
-			ls_function_bc& function = *out;
-			function.name = {};
-			function.kind = LS_FUNCTION_SCRIPT;
-			function.is_builtin_native = false;
-			function.index = (u32)(bytecode->function_count - 1);
-			function.param_count = (u32)fn->runtime_params.size();
-			function.param_slot_count = 0;
-			ResolvedType* return_type = fn->resolved_type ? static_cast<FunctionResolvedType*>(fn->resolved_type)->return_type : nullptr;
-			function.return_kind = toTypeKind(return_type);
-			function.return_slot_count = typeSlotCount(return_type);
-			function.local_slot_count = 0;
-			function.max_stack = function.return_slot_count;
-
-			if (!fn->body || fn->body->kind != Statement::BLOCK) {
-				ls_bytecode_destroy(bytecode);
-				return nullptr;
-			}
-
-			BlockStatement* body = static_cast<BlockStatement*>(fn->body);
-			Expression* literal = nullptr;
-			if (function.return_slot_count == 1u && isSimpleReturnLiteral(body, literal)) {
 				ExpArray<u8> temp(*arena);
 				switch (literal->kind) {
 					case Expression::INT_LITERAL:

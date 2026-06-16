@@ -390,57 +390,6 @@ TEST(FailedFunctionTypecheckRemainsFailed) {
 	return true;
 }
 
-TEST(ExternFnDuplicateSameFile) {
-	const char* source = R"(
-		extern fn foo() : i32;	
-		extern fn foo() : i32;	
-		fn main() : void {
-			foo();
-		}
-	)";
-	EXPECT_COMPILE_FAIL(source);
-	return true;
-}
-
-TEST(ExternGlobalCollision) {
-	const char* source = R"(
-		extern fn foo() : i32;	
-		const foo = 1;
-		fn main() : void {
-			foo();
-		}
-	)";
-	EXPECT_COMPILE_FAIL(source);
-	return true;
-}
-
-TEST(ExternFnCollision) {
-	const char* source = R"(
-		extern fn foo() : i32;	
-		fn foo() : void {}
-		fn main() : void {
-			foo();
-		}
-	)";
-	EXPECT_COMPILE_FAIL(source);
-	return true;
-}
-
-TEST(LocalVariableShadowsFunctionName) {
-	const char* source = R"(
-		fn foo() : i32 {
-			return 7;
-		}
-
-		fn main() : i32 {
-			var foo : i32 = 42;
-			return foo;
-		}
-	)";
-	EXPECT_COMPILE(source);
-	return true;
-}
-
 
 TEST(UnknownStructField) {
 	const char* source = R"(

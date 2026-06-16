@@ -30,7 +30,7 @@ struct ResolvedType {
 		ARRAY,
 		SLICE,
 		NULLABLE,
-		COMPTIME_CALL,
+		BRACKET_TYPE,
 	};
 
 	explicit ResolvedType(Kind kind) : kind(kind) {}
@@ -89,8 +89,8 @@ struct NullableResolvedType : ResolvedType {
 	ResolvedType* inner = nullptr;
 };
 
-struct ComptimeCallResolvedType : ResolvedType {
-	ComptimeCallResolvedType(ls_arena& arena) : ResolvedType(COMPTIME_CALL), args(arena) {}
+struct BracketTypeResolvedType : ResolvedType {
+	BracketTypeResolvedType(ls_arena& arena) : ResolvedType(BRACKET_TYPE), args(arena) {}
 
 	ResolvedType* callee = nullptr;
 	ExpArray<ResolvedType*> args;

@@ -459,8 +459,8 @@ TEST(BytecodeFunctionTypedLocalCanBeCalled) {
 		}
 
 		fn main() : i32 {
-			const foo : fn(i32) : i32 = bar;
-			return foo(41);
+			const f : fn(i32) : i32 = bar;
+			return f(41);
 		}
 	)";
 
@@ -1672,9 +1672,9 @@ TEST(GlobalVariablesRuntime) {
 		}
 
 		fn shadow_counter() : i32 {
-			var counter : i32 = 100;
-			counter += 1;
-			return counter;
+			var c : i32 = 100;
+			c += 1;
+			return c;
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);

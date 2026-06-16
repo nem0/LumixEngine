@@ -39,7 +39,7 @@ struct ParsedType {
 		SLICE,
 		// Compile-time application in type syntax, e.g. `Array[i32]` or
 		// `StaticArray[f32, 16]`.
-		COMPTIME_CALL
+		BRACKET_TYPE
 	};
 
 	explicit ParsedType(Kind kind) : kind(kind) {}
@@ -86,8 +86,8 @@ struct ComptimeArg {
 	Expression* expression = nullptr;
 };
 
-struct ComptimeCallParsedType : ParsedType {
-	ComptimeCallParsedType(ls_arena& arena) : ParsedType(COMPTIME_CALL), args(arena) {}
+struct BracketTypeParsedType : ParsedType {
+	BracketTypeParsedType(ls_arena& arena) : ParsedType(BRACKET_TYPE), args(arena) {}
 
 	ParsedType* callee = nullptr;
 	ExpArray<ComptimeArg> args;

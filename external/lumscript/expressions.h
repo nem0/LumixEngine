@@ -8,7 +8,6 @@
 
 struct Statement;
 struct Symbol;
-struct FunctionInstance;
 
 struct NamedDecl {
 	ls_string_view name;
@@ -66,10 +65,6 @@ struct Expression {
 
 	Kind kind = INVALID;
 	ResolvedType* resolved_type = nullptr;
-	// Set only when semantic analysis selected a concrete direct-call target or
-	// a concrete first-class function value. Bytecode generation consumes this
-	// decision and deliberately knows nothing about template deduction.
-	FunctionInstance* function_instance = nullptr;
 };
 
 struct IdentifierExpression : Expression {
