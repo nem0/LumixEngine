@@ -180,7 +180,7 @@ TEST(BytecodeRefParameterCall) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -232,7 +232,7 @@ TEST(BytecodeRefParameterNestedFieldCall) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -267,7 +267,7 @@ TEST(BytecodeRefParameterForwarding) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
@@ -290,7 +290,7 @@ TEST(BytecodeRefParameterAssignment) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
@@ -314,7 +314,7 @@ TEST(BytecodeRefParameterGlobal) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
@@ -338,7 +338,7 @@ TEST(RefParameterMutatesCaller) {
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
@@ -361,7 +361,7 @@ TEST(DeferRunsOnEarlyReturn) {
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));

@@ -6,7 +6,7 @@ TEST(BytecodeExplicitCastNumeric) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -35,7 +35,7 @@ TEST(BytecodeExplicitCastEnumToInteger) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -69,7 +69,7 @@ TEST(RuntimeCasts) {
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(ls_call(runtime, toLs("to_f32")));
@@ -98,7 +98,7 @@ TEST(IntegerToEnumCastAllowsAnyIntegerRuntime) {
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
 	ls_push_i32(runtime, 123);
@@ -118,7 +118,7 @@ TEST(IntegerSignExtensionRuntime) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
@@ -152,7 +152,7 @@ TEST(RuntimeCastOverflowBoundaries) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(ls_call(runtime, toLs("i8_from_127")));
@@ -193,5 +193,41 @@ TEST(RuntimeCastOverflowBoundaries) {
 	EXPECT_TRUE(ls_call(runtime, toLs("u32_from_4294967295")));
 	EXPECT_TRUE(ls_to_u64(runtime, -1) == 4294967295ull);
 	CAPI_END(module);
+	return true;
+}
+
+TEST(CastToUndefinedTypeFails) {
+	const char* source = R"(
+		fn main() : void {
+			var i : i32 = 4;
+			const x = i as foo;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(CastToValueFails) {
+	const char* source = R"(
+		fn foo() : void {}
+
+		fn main() : void {
+			var i : i32 = 4;
+			const x = i as foo;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+
+	const char* source2 = R"(
+		fn foo() : void {}
+
+		fn main() : void {
+			var i : i32 = 4;
+			var j : i32 = 5;
+			const x = i as j;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source2);
+
 	return true;
 }

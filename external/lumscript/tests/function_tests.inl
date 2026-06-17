@@ -78,7 +78,7 @@ TEST(GlobalFunctionLiteralCanRecursivelyCallItself) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
@@ -210,7 +210,7 @@ TEST(BytecodeFunctionValueLocal) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -243,7 +243,7 @@ TEST(BytecodeIndirectFunctionCall) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -278,7 +278,7 @@ TEST(BytecodeIndirectFunctionCallWithAggregateArgument) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -309,7 +309,7 @@ TEST(BytecodeGlobalFunctionLiteral) {
    )";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -338,7 +338,7 @@ TEST(BytecodeGlobalFunctionVariable) {
    )";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -366,7 +366,7 @@ TEST(testNativeFunctionCall) {
 
 	CAPI_BEGIN(module, diagnostics);
 
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
 	const i32 native_add = ls_module_get_native_function_index(module, toLs("native_add"));
@@ -389,7 +389,7 @@ TEST(FunctionNamedSinCompilesAndRuns) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
@@ -408,7 +408,7 @@ TEST(ExternSinDoesNotAutoBindBuiltin) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(!ls_call(runtime, toLs("main")));

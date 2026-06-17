@@ -2,6 +2,7 @@
 
 #include "capi.h"
 #include "exparray.h"
+#include "token.h"
 
 struct Expression;
 
@@ -47,6 +48,7 @@ struct ParsedType {
 
 	bool is_nullable = false;
 	Kind kind = INVALID;
+	Token token = {};
 };
 
 struct QualifiedParsedType : ParsedType {

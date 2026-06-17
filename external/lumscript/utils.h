@@ -96,6 +96,7 @@ struct OutputFormatter {
 		int dummy[] = {
 			(print(static_cast<Args&&>(args)), 0)...,
 		};
+		print("\n");
 		(void)dummy;
 	}
 };

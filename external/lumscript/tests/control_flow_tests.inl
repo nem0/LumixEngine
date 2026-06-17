@@ -15,10 +15,37 @@ TEST(DeferTypechecks) {
 	return true;
 }
 
+
+TEST(DeferCanNotWrapReturnInBlock) {
+	const char* source = R"(
+		fn main() : i32 {
+			defer { return 1; }
+			return 2;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+
 TEST(DeferCanNotWrapReturn) {
 	const char* source = R"(
 		fn main() : i32 {
 			defer return 1;
+			return 2;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(NestedDeferCanNotWrapReturn) {
+	const char* source = R"(
+		fn main() : i32 {
+			defer {
+				defer {}
+				return 1;
+			}
 			return 2;
 		}
 	)";

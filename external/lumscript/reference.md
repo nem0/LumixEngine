@@ -72,7 +72,8 @@ LumScript is a small, statically typed scripting language for Lumix Engine.
 	- [Casts](#casts)
 	- [Comparison and boolean operators](#comparison-and-boolean-operators)
 	- [Calls](#calls)
-	- [Namespace resolution by first parameter](#namespace-resolution-by-first-parameter)
+	- [Argument-dependent lookup](#argument-dependent-lookup)
+	- [UFCS](#ufcs)
 	- [Field access](#field-access)
 	- [Struct literals](#struct-literals)
 - [Runtime model](#runtime-model)
@@ -132,6 +133,7 @@ JIT is intentionally out of scope for the first version.
 - ADL
 	- less noise `lib.foo(val)` -> `foo(val)`
 	- a way to have overloads without actual overloads
+	- only try ADL if no local function matches, i.e. prefer local - simpler/faster compiler
 
 - operators
 	- operators are clearly useful, why would we have them for primitive types otherwise
@@ -242,6 +244,7 @@ Rules:
 - imports are not transitive for symbol visibility
 - an alias-qualified name resolves only through that alias
 - a bare name resolves against the current module and then unaliased imports
+- if no match is found and the call has at least one argument, the first argument's type namespace is also searched (see [Argument-dependent lookup](#argument-dependent-lookup))
 - if a bare name matches more than one declaration, using it is a compile-time error
 - if a bare name matches both a local declaration and an unaliased import, using it is a compile-time error
 - unaliased imports are not a separate namespace and do not override local declarations
@@ -1242,9 +1245,29 @@ Calls are statically checked for:
 
 If callee expression is a function value, call is indirect.
 
-### Namespace resolution by first parameter
+### Argument-dependent lookup
 
-Method-style syntax is syntactic sugar for namespaced function calls.
+When a bare function name cannot be resolved through the current module or unaliased imports, the compiler also searches the declaring namespace of the first argument's type.
+
+```cpp
+import "engine:entity" as entity
+
+fn example(e : entity.Entity) : void {
+	destroy(e);        // resolves to entity.destroy
+	entity.destroy(e); // equivalent explicit form
+}
+```
+
+Rules:
+
+- only applies when the name has no match in the current module or unaliased imports
+- only the declaring namespace of the first argument's type is searched
+- if the name matches both a local/unaliased-import declaration and the first argument's namespace, the local declaration is preferred
+- alias-qualified calls (`entity.destroy(e)`) are always unambiguous and bypass ADL
+
+### UFCS
+
+Method-style syntax `x.foo(a, b)` is syntactic sugar for a free function call with the receiver inserted as the first argument. The function is looked up in the declaring namespace of the receiver's type.
 
 ```cpp
 import "engine:world" as world
@@ -1267,14 +1290,14 @@ fn move_up(w : world.World, e : entity.Entity) : void {
 }
 ```
 
-Resolution order for field-call syntax:
+Rules:
 
-- first resolve real field or enum-member access on the receiver type
-- if the access is called and no field/member exists, collect callable candidates from the written callee and the receiver type's declaring namespace
-- if exactly one callable candidate exists, insert the receiver as the first argument and call it
-- if both candidates exist and refer to different functions, the call is ambiguous and must be written explicitly
+- if `x.foo(a, b)` is not resolved by other language features (enum, struct field, namespace), it's retried as `foo(x, a, b)`
+- ADL is tried with the transformed form
+- does not apply to primitive receiver types, e.g. `4.foo(a, b)` is invalid
+- alias-qualified calls (`entity.destroy(e)`) are always unambiguous
 
-Ambiguous example:
+Example:
 
 ```cpp
 import "engine:entity" as entity
@@ -1282,9 +1305,9 @@ import "engine:entity" as entity
 fn destroy(e : entity.Entity) : void {}
 
 fn example(e : entity.Entity) : void {
-	e.destroy();      // error: ambiguous
-	destroy(e);       // direct visible function
-	entity.destroy(e); // receiver namespace function
+	e.destroy();       // calls local destroy — local is preferred over namespace
+	destroy(e);        // calls local destroy — local is preferred over ADL
+	entity.destroy(e); // calls entity.destroy — explicit namespace, always unambiguous
 }
 ```
 

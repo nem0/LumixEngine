@@ -46,6 +46,25 @@ TEST(NullableUseWithoutCheckFails) {
 	return true;
 }
 
+TEST(NullableStructUseWithCheck) {
+	const char* source = R"(
+		struct Vec3 {
+			x : f32;
+			y : f32;
+			z : f32;
+		}
+
+		fn bad(v : ?Vec3) : f32 {
+			if v != null {
+				return v.x;
+			}
+			return 0;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
 TEST(NullableComparisonRequiresNullCheckFails) {
 	const char* source = R"(
 		fn main() : void {
@@ -93,9 +112,11 @@ TEST(NullableEnumMemberAccessRequiresNullCheckFails) {
 			Running
 		}
 
+		fn use(s : State) : void {}
+
 		fn main() : void {
 			var state : ?State = .Idle;
-			const value = state.Idle;
+			use(state);
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
@@ -164,7 +185,7 @@ TEST(BytecodeNullableLocalNullCheck) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -197,7 +218,7 @@ TEST(BytecodeNullableStructComparison) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -222,7 +243,7 @@ TEST(BytecodeNullableReturnNull) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -247,7 +268,7 @@ TEST(BytecodeNullableReturnValue) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);

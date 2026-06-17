@@ -22,6 +22,27 @@ struct Parser {
 		return res;
 	}
 
+	template <typename T, typename... Args>
+	T* makeExpr(Token token, Args&&... args) {
+		T* res = make<T>(static_cast<Args&&>(args)...);
+		res->token = token;
+		return res;
+	}
+
+	template <typename T, typename... Args>
+	T* makeParsedType(Token token, Args&&... args) {
+		T* res = make<T>(static_cast<Args&&>(args)...);
+		res->token = token;
+		return res;
+	}
+
+	template <typename T, typename... Args>
+	T* makeStmt(Token token, Args&&... args) {
+		T* res = make<T>(static_cast<Args&&>(args)...);
+		res->token = token;
+		return res;
+	}
+
 	static int precedence(Token::Type type) {
 		switch (type) {
 			case Token::OR: return 1;
@@ -153,7 +174,7 @@ struct Parser {
 		if (!isOperatorSymbol(sym.name)) {
 			for (const Symbol& other : m_unit.symbols) {
 				if (!equalStrings(other.name, sym.name)) continue;
-				m_output.error("Duplicate declaration: ", sym.name);
+				m_output.errorAt(sym.token, "Duplicate declaration: ", sym.name);
 				return false;
 			}
 		}
@@ -165,13 +186,13 @@ struct Parser {
 		if (contains(token.value, '.') || contains(token.value, 'e') || contains(token.value, 'E')) {
 			double value = 0.0;
 			fromCString(token.value, value);
-			FloatLiteralExpression* expr = make<FloatLiteralExpression>();
+			FloatLiteralExpression* expr = makeExpr<FloatLiteralExpression>(token);
 			expr->value = value;
 			return expr;
 		}
 		i64 value = 0;
 		fromCString(token.value, value);
-		IntLiteralExpression* expr = make<IntLiteralExpression>();
+		IntLiteralExpression* expr = makeExpr<IntLiteralExpression>(token);
 		expr->value = value;
 		return expr;
 	}
@@ -180,7 +201,13 @@ struct Parser {
 		Symbol sym;
 		sym.storage = storage;
 
-		if (!consume(Token::IDENTIFIER, sym.name, "Expected identifier")) return false;
+		Token name_token = consumeToken();
+		if (name_token.type != Token::IDENTIFIER) {
+			m_output.errorAt(name_token, "Expected identifier");
+			return false;
+		}
+		sym.name = name_token.value;
+		sym.token = name_token;
 
 		if (peekToken().type == Token::COLON) {
 			consumeToken();
@@ -202,9 +229,10 @@ struct Parser {
 		return addSymbol(sym);
 	}
 
-	bool namedComptimeDecl(ls_string_view name, Expression* expression) {
+	bool namedComptimeDecl(Token name_token, Expression* expression) {
 		Symbol sym;
-		sym.name = name;
+		sym.name = name_token.value;
+		sym.token = name_token;
 		sym.expression = expression;
 		sym.storage = Symbol::COMPTIME;
 		return addSymbol(sym);
@@ -223,15 +251,27 @@ struct Parser {
 					m_output.errorAt(name, "Expected identifier");
 					return nullptr;
 				}
-				MemberExpression* expr = make<MemberExpression>();
+				MemberExpression* expr = makeExpr<MemberExpression>(token);
 				expr->name = name.value;
 				return expr;
 			}
-			case Token::FN: return functionExpression();
-			case Token::STRUCT: return structExpression();
-			case Token::ENUM: return enumExpression();
-			case Token::NULL_KW: return make<NullLiteralExpression>();
-			case Token::UNDEFINED: return make<UndefinedExpression>();
+			case Token::FN: {
+				FunctionExpression* expr = functionExpression();
+				if (expr) expr->token = token;
+				return expr;
+			}
+			case Token::STRUCT: {
+				StructExpression* expr = structExpression();
+				if (expr) expr->token = token;
+				return expr;
+			}
+			case Token::ENUM: {
+				EnumExpression* expr = enumExpression();
+				if (expr) expr->token = token;
+				return expr;
+			}
+			case Token::NULL_KW: return makeExpr<NullLiteralExpression>(token);
+			case Token::UNDEFINED: return makeExpr<UndefinedExpression>(token);
 			case Token::VOID:
 			case Token::BOOL:
 			case Token::I8:
@@ -246,9 +286,9 @@ struct Parser {
 			case Token::F64:
 			case Token::STRING_KW:
 			case Token::CPTR:
-				return make<TypeLiteralExpression>(typeFromToken(token)->kind);
+				return makeExpr<TypeLiteralExpression>(token, typeFromToken(token)->kind);
 			case Token::IDENTIFIER: {
-				IdentifierExpression* expr = make<IdentifierExpression>();
+				IdentifierExpression* expr = makeExpr<IdentifierExpression>(token);
 				expr->name = token.value;
 				return expr;
 			}
@@ -257,7 +297,7 @@ struct Parser {
 					m_output.errorAt(token, "Expected expression");
 					return nullptr;
 				}
-				return structLiteralBody(nullptr);
+				return structLiteralBody(nullptr, token);
 			case Token::LEFT_PAREN: {
 				Expression* expr = expression();
 				if (!expr) return nullptr;
@@ -269,9 +309,9 @@ struct Parser {
 			}
 			case Token::TRUE:
 			case Token::FALSE:
-				return make<BoolLiteralExpression>(token.type == Token::TRUE);
+				return makeExpr<BoolLiteralExpression>(token, token.type == Token::TRUE);
 			case Token::STRING: {
-				StringLiteralExpression* expr = make<StringLiteralExpression>();
+				StringLiteralExpression* expr = makeExpr<StringLiteralExpression>(token);
 				expr->value = token.value;
 				return expr;
 			}
@@ -284,22 +324,22 @@ struct Parser {
 		for (;;) {
 			switch (peekToken().type) {
 				case Token::DOT: {
-					consumeToken();
+					Token dot = consumeToken();
 					Token name = consumeToken();
 					if (name.type != Token::IDENTIFIER) {
 						m_output.errorAt(name, "Expected identifier");
 						return nullptr;
 					}
 
-					MemberExpression* member = make<MemberExpression>();
+					MemberExpression* member = makeExpr<MemberExpression>(dot);
 					member->expression = expr;
 					member->name = name.value;
 					expr = member;
 					break;
 				}
 				case Token::LEFT_BRACKET: {
-					consumeToken();
-					BracketExpression* br = make<BracketExpression>(m_unit.arena);
+					Token bracket = consumeToken();
+					BracketExpression* br = makeExpr<BracketExpression>(bracket, m_unit.arena);
 					br->base = expr;
 
 					if (peekToken().type == Token::COLON) {
@@ -337,8 +377,8 @@ struct Parser {
 					break;
 				}
 				case Token::LEFT_PAREN: {
-					consumeToken();
-					CallExpression* call = make<CallExpression>(m_unit.arena);
+					Token paren = consumeToken();
+					CallExpression* call = makeExpr<CallExpression>(paren, m_unit.arena);
 					call->callee = expr;
 					while (peekToken().type != Token::RIGHT_PAREN) {
 						if (peekToken().type == Token::END_OF_FILE) {
@@ -367,8 +407,8 @@ struct Parser {
 		}
 	}
 
-	StructLiteralExpression* structLiteralBody(Expression* type) {
-		StructLiteralExpression* res = make<StructLiteralExpression>(m_unit.arena);
+	StructLiteralExpression* structLiteralBody(Expression* type, Token start_token = {}) {
+		StructLiteralExpression* res = makeExpr<StructLiteralExpression>(start_token, m_unit.arena);
 		res->type = type;
 		while (peekToken().type != Token::RIGHT_BRACE) {
 			if (peekToken().type == Token::END_OF_FILE) {
@@ -387,8 +427,8 @@ struct Parser {
 	}
 
 	StructLiteralExpression* structLiteral(Expression* type) {
-		if (!consume(Token::LEFT_BRACE)) return nullptr;
-		return structLiteralBody(type);
+		Token brace = consumeToken();
+		return structLiteralBody(type, brace);
 	}
 
 	Expression* unaryExpression(ExprMode mode) {
@@ -398,7 +438,7 @@ struct Parser {
 			case Token::NOT:
 			case Token::REF: {
 				consumeToken();
-				UnaryExpression* expr = make<UnaryExpression>();
+				UnaryExpression* expr = makeExpr<UnaryExpression>(token);
 				expr->op = token.type;
 				expr->expression = unaryExpression(mode);
 				if (!expr->expression) return nullptr;
@@ -416,8 +456,8 @@ struct Parser {
 		if (!expr) return nullptr;
 
 		while (peekToken().type == Token::AS) {
-			consumeToken();
-			CastExpression* cast = make<CastExpression>();
+			Token as_token = consumeToken();
+			CastExpression* cast = makeExpr<CastExpression>(as_token);
 			cast->expression = expr;
 			cast->parsed_type = type();
 			if (!cast->parsed_type) return nullptr;
@@ -494,7 +534,7 @@ struct Parser {
 				}
 				arg.kind = ComptimeArg::EXPRESSION;
 				{
-					IdentifierExpression* expr = make<IdentifierExpression>();
+					IdentifierExpression* expr = makeExpr<IdentifierExpression>(token);
 					expr->name = token.value;
 					arg.expression = expr;
 				}
@@ -506,12 +546,12 @@ struct Parser {
 			case Token::TRUE:
 			case Token::FALSE:
 				arg.kind = ComptimeArg::EXPRESSION;
-				arg.expression = make<BoolLiteralExpression>(token.type == Token::TRUE);
+				arg.expression = makeExpr<BoolLiteralExpression>(token, token.type == Token::TRUE);
 				return true;
 			case Token::STRING:
 				arg.kind = ComptimeArg::EXPRESSION;
 				{
-					StringLiteralExpression* expr = make<StringLiteralExpression>();
+					StringLiteralExpression* expr = makeExpr<StringLiteralExpression>(token);
 					expr->value = token.value;
 					arg.expression = expr;
 				}
@@ -525,22 +565,22 @@ struct Parser {
 	ParsedType* typeFromToken(Token token) {
 		ParsedType* res = nullptr;
 		switch (token.type) {
-			case Token::STRING_KW: res = make<ParsedType>(ParsedType::STRING); break;
-			case Token::VOID: res = make<ParsedType>(ParsedType::VOID); break;
-			case Token::BOOL: res = make<ParsedType>(ParsedType::BOOL); break;
-			case Token::I8: res = make<ParsedType>(ParsedType::I8); break;
-			case Token::I16: res = make<ParsedType>(ParsedType::I16); break;
-			case Token::I32: res = make<ParsedType>(ParsedType::I32); break;
-			case Token::I64: res = make<ParsedType>(ParsedType::I64); break;
-			case Token::U8: res = make<ParsedType>(ParsedType::U8); break;
-			case Token::U16: res = make<ParsedType>(ParsedType::U16); break;
-			case Token::U32: res = make<ParsedType>(ParsedType::U32); break;
-			case Token::U64: res = make<ParsedType>(ParsedType::U64); break;
-			case Token::F32: res = make<ParsedType>(ParsedType::F32); break;
-			case Token::F64: res = make<ParsedType>(ParsedType::F64); break;
-			case Token::CPTR: res = make<ParsedType>(ParsedType::CPTR); break;
+			case Token::STRING_KW: res = makeParsedType<ParsedType>(token, ParsedType::STRING); break;
+			case Token::VOID: res = makeParsedType<ParsedType>(token, ParsedType::VOID); break;
+			case Token::BOOL: res = makeParsedType<ParsedType>(token, ParsedType::BOOL); break;
+			case Token::I8: res = makeParsedType<ParsedType>(token, ParsedType::I8); break;
+			case Token::I16: res = makeParsedType<ParsedType>(token, ParsedType::I16); break;
+			case Token::I32: res = makeParsedType<ParsedType>(token, ParsedType::I32); break;
+			case Token::I64: res = makeParsedType<ParsedType>(token, ParsedType::I64); break;
+			case Token::U8: res = makeParsedType<ParsedType>(token, ParsedType::U8); break;
+			case Token::U16: res = makeParsedType<ParsedType>(token, ParsedType::U16); break;
+			case Token::U32: res = makeParsedType<ParsedType>(token, ParsedType::U32); break;
+			case Token::U64: res = makeParsedType<ParsedType>(token, ParsedType::U64); break;
+			case Token::F32: res = makeParsedType<ParsedType>(token, ParsedType::F32); break;
+			case Token::F64: res = makeParsedType<ParsedType>(token, ParsedType::F64); break;
+			case Token::CPTR: res = makeParsedType<ParsedType>(token, ParsedType::CPTR); break;
 			case Token::IDENTIFIER: {
-				QualifiedParsedType* qualified = make<QualifiedParsedType>();
+				QualifiedParsedType* qualified = makeParsedType<QualifiedParsedType>(token);
 				qualified->name = token.value;
 				res = qualified;
 				if (peekToken().type == Token::DOT) {
@@ -556,7 +596,7 @@ struct Parser {
 				break;
 			}
 			case Token::FN: {
-				FunctionParsedType* fn = make<FunctionParsedType>(m_unit.arena);
+				FunctionParsedType* fn = makeParsedType<FunctionParsedType>(token, m_unit.arena);
 				if (!consume(Token::LEFT_PAREN)) return nullptr;
 				while (peekToken().type != Token::RIGHT_PAREN) {
 					ParsedType* param = type();
@@ -584,10 +624,10 @@ struct Parser {
 
 		for (;;) {
 			if (peekToken().type != Token::LEFT_BRACKET) break;
-			consumeToken();
+			Token bracket = consumeToken();
 			if (peekToken().type == Token::RIGHT_BRACKET) {
 				consumeToken();
-				SliceParsedType* slice = make<SliceParsedType>();
+				SliceParsedType* slice = makeParsedType<SliceParsedType>(bracket);
 				slice->element_type = res;
 				res = slice;
 				continue;
@@ -597,7 +637,7 @@ struct Parser {
 			// bracket must be a static array size, e.g. `i32[4]`. `Foo[4]` stays a
 			// BRACKET_TYPE until semantic analysis can tell array from instantiation.
 			if (res->kind != ParsedType::QUALIFIED) {
-				ArrayParsedType* array = make<ArrayParsedType>();
+				ArrayParsedType* array = makeParsedType<ArrayParsedType>(bracket);
 				array->element_type = res;
 				array->size = expression();
 				if (!array->size) return nullptr;
@@ -606,7 +646,7 @@ struct Parser {
 				continue;
 			}
 
-			BracketTypeParsedType* call = make<BracketTypeParsedType>(m_unit.arena);
+			BracketTypeParsedType* call = makeParsedType<BracketTypeParsedType>(bracket, m_unit.arena);
 			call->callee = res;
 			while (peekToken().type != Token::RIGHT_BRACKET) {
 				if (peekToken().type == Token::END_OF_FILE) {
@@ -627,19 +667,21 @@ struct Parser {
 	}
 
 	ParsedType* type() {
-		Token token = consumeToken();
+		Token first = consumeToken();
 		bool is_nullable = false;
-		if (token.type == Token::QUESTION) {
+		Token base_token = first;
+		if (first.type == Token::QUESTION) {
 			is_nullable = true;
-			token = consumeToken();
+			base_token = consumeToken();
 		}
 
-		ParsedType* res = typeFromToken(token);
+		ParsedType* res = typeFromToken(base_token);
 		if (!res) {
-			m_output.errorAt(token, "Expected type");
+			m_output.errorAt(base_token, "Expected type");
 			return nullptr;
 		}
 		res->is_nullable = is_nullable;
+		if (is_nullable) res->token = first;
 		return res;
 	}
 
@@ -658,7 +700,7 @@ struct Parser {
 			Expression* rhs = binaryExpression(prec + 1, mode);
 			if (!rhs) return nullptr;
 
-			BinaryExpression* bin = make<BinaryExpression>();
+			BinaryExpression* bin = makeExpr<BinaryExpression>(op);
 			bin->lhs = lhs;
 			bin->rhs = rhs;
 			bin->op = op.type;
@@ -679,8 +721,8 @@ struct Parser {
 	VarDeclStatement* varDecl() {
 		Token type_token = consumeToken();
 		if (type_token.type != Token::CONST && type_token.type != Token::VAR) return nullptr;
-	
-		VarDeclStatement* res = make<VarDeclStatement>();
+
+		VarDeclStatement* res = makeStmt<VarDeclStatement>(type_token);
 		res->is_immutable = type_token.type == Token::CONST;
 		if (!consume(Token::IDENTIFIER, res->name, "Expected identifier")) return nullptr;
 		if (peekToken().type == Token::COLON) {
@@ -696,9 +738,10 @@ struct Parser {
 	}
 
 	ForStatement* forStatement() {
-		if (!consume(Token::FOR)) return nullptr;
+		Token for_token = consumeToken();
+		if (for_token.type != Token::FOR) return nullptr;
 
-		ForStatement* res = make<ForStatement>();
+		ForStatement* res = makeStmt<ForStatement>(for_token);
 		if (!consume(Token::IDENTIFIER, res->loop_var, "Expected identifier")) return nullptr;
 		if (!consume(Token::EQUAL)) return nullptr;
 
@@ -715,8 +758,9 @@ struct Parser {
 	}
 
 	WhileStatement* whileStatement() {
-		if (!consume(Token::WHILE)) return nullptr;
-		WhileStatement* res = make<WhileStatement>();
+		Token while_token = consumeToken();
+		if (while_token.type != Token::WHILE) return nullptr;
+		WhileStatement* res = makeStmt<WhileStatement>(while_token);
 		res->condition = expression(ExprMode::HEAD);
 		if (!res->condition) return nullptr;
 		res->body = blockStatement();
@@ -725,16 +769,18 @@ struct Parser {
 	}
 
 	DeferStatement* deferStatement() {
-		if (!consume(Token::DEFER)) return nullptr;
-		DeferStatement* res = make<DeferStatement>();
+		Token defer_token = consumeToken();
+		if (defer_token.type != Token::DEFER) return nullptr;
+		DeferStatement* res = makeStmt<DeferStatement>(defer_token);
 		res->statement = statement();
 		if (!res->statement) return nullptr;
 		return res;
 	}
 
 	IfStatement* ifStatement() {
-		if (!consume(Token::IF)) return nullptr;
-		IfStatement* res = make<IfStatement>();
+		Token if_token = consumeToken();
+		if (if_token.type != Token::IF) return nullptr;
+		IfStatement* res = makeStmt<IfStatement>(if_token);
 		res->condition = expression(ExprMode::HEAD);
 		if (!res->condition) return nullptr;
 		res->body = blockStatement();
@@ -748,8 +794,9 @@ struct Parser {
 	}
 
 	ReturnStatement* returnStatement() {
-		if (!consume(Token::RETURN)) return nullptr;
-		ReturnStatement* res = make<ReturnStatement>();
+		Token return_token = consumeToken();
+		if (return_token.type != Token::RETURN) return nullptr;
+		ReturnStatement* res = makeStmt<ReturnStatement>(return_token);
 		if (peekToken().type != Token::SEMICOLON) {
 			res->expression = expression();
 			if (!res->expression) return nullptr;
@@ -771,8 +818,9 @@ struct Parser {
 	}
 
 	ContinueStatement* continueStatement() {
-		if (!consume(Token::CONTINUE)) return nullptr;
-		ContinueStatement* res = make<ContinueStatement>();
+		Token continue_token = consumeToken();
+		if (continue_token.type != Token::CONTINUE) return nullptr;
+		ContinueStatement* res = makeStmt<ContinueStatement>(continue_token);
 		if (peekToken().type == Token::IDENTIFIER) {
 			res->label = consumeToken().value;
 		}
@@ -781,8 +829,9 @@ struct Parser {
 	}
 
 	BreakStatement* breakStatement() {
-		if (!consume(Token::BREAK)) return nullptr;
-		BreakStatement* res = make<BreakStatement>();
+		Token break_token = consumeToken();
+		if (break_token.type != Token::BREAK) return nullptr;
+		BreakStatement* res = makeStmt<BreakStatement>(break_token);
 		if (peekToken().type == Token::IDENTIFIER) {
 			res->label = consumeToken().value;
 		}
@@ -792,13 +841,13 @@ struct Parser {
 
 	Expression* matchPatternExpression() {
 		if (peekToken().type == Token::DOT) {
-			consumeToken();
+			Token dot = consumeToken();
 			Token name = consumeToken();
 			if (name.type != Token::IDENTIFIER) {
 				m_output.errorAt(name, "Expected identifier");
 				return nullptr;
 			}
-			MemberExpression* expr = make<MemberExpression>();
+			MemberExpression* expr = makeExpr<MemberExpression>(dot);
 			expr->name = name.value;
 			return expr;
 		}
@@ -818,7 +867,7 @@ struct Parser {
 	}
 
 	BlockStatement* matchArmBody() {
-		BlockStatement* body = make<BlockStatement>(m_unit.arena);
+		BlockStatement* body = makeStmt<BlockStatement>(peekToken(), m_unit.arena);
 		for (;;) {
 			switch (peekToken().type) {
 				case Token::END_OF_FILE:
@@ -839,9 +888,10 @@ struct Parser {
 	}
 
 	MatchStatement* matchStatement() {
-		if (!consume(Token::MATCH)) return nullptr;
+		Token match_token = consumeToken();
+		if (match_token.type != Token::MATCH) return nullptr;
 
-		MatchStatement* res = make<MatchStatement>(m_unit.arena);
+		MatchStatement* res = makeStmt<MatchStatement>(match_token, m_unit.arena);
 		res->subject = expression(ExprMode::HEAD);
 		if (!res->subject) return nullptr;
 		if (!consume(Token::LEFT_BRACE)) return nullptr;
@@ -906,14 +956,14 @@ struct Parser {
 				Token token = consumeToken();
 				if (peekToken().type == Token::COLON) {
 					consumeToken();
-					LabelStatement* res = make<LabelStatement>();
+					LabelStatement* res = makeStmt<LabelStatement>(token);
 					res->name = token.value;
 					res->statement = statement();
 					if (!res->statement) return nullptr;
 					return res;
 				}
 
-				IdentifierExpression* lhs_id = make<IdentifierExpression>();
+				IdentifierExpression* lhs_id = makeExpr<IdentifierExpression>(token);
 				lhs_id->name = token.value;
 				Expression* lhs = postfixSuffixes(lhs_id, ExprMode::FULL);
 				if (!lhs) return nullptr;
@@ -927,7 +977,7 @@ struct Parser {
 					case Token::SLASH_EQUAL:
 					{
 						consumeToken();
-						AssignStatement* res = make<AssignStatement>();
+						AssignStatement* res = makeStmt<AssignStatement>(op);
 						res->lhs = lhs;
 						res->op = op.type;
 						res->rhs = expression();
@@ -940,7 +990,7 @@ struct Parser {
 					case Token::PLUS_PLUS:
 					case Token::MINUS_MINUS: {
 						consumeToken();
-						AssignStatement* res = make<AssignStatement>();
+						AssignStatement* res = makeStmt<AssignStatement>(op);
 						res->lhs = lhs;
 						res->op = op.type == Token::PLUS_PLUS ? Token::PLUS_EQUAL : Token::MINUS_EQUAL;
 						IntLiteralExpression* one = make<IntLiteralExpression>();
@@ -950,8 +1000,8 @@ struct Parser {
 						return res;
 					}
 					case Token::SEMICOLON: {
-						consumeToken();
-						ExpressionStatement* res = make<ExpressionStatement>();
+						Token semi = consumeToken();
+						ExpressionStatement* res = makeStmt<ExpressionStatement>(semi);
 						res->expression = lhs;
 						return res;
 					}
@@ -964,7 +1014,7 @@ struct Parser {
 				Expression* expr = expression();
 				if (!expr) return nullptr;
 				if (!consume(Token::SEMICOLON)) return nullptr;
-				ExpressionStatement* res = make<ExpressionStatement>();
+				ExpressionStatement* res = makeStmt<ExpressionStatement>(expr->token);
 				res->expression = expr;
 				return res;
 			}
@@ -973,8 +1023,9 @@ struct Parser {
 	}
 
 	BlockStatement* blockStatement() {
-		if (!consume(Token::LEFT_BRACE)) return nullptr;
-		BlockStatement* res = make<BlockStatement>(m_unit.arena);
+		Token brace = consumeToken();
+		if (brace.type != Token::LEFT_BRACE) { m_output.errorAt(brace, "Expected {"); return nullptr; }
+		BlockStatement* res = makeStmt<BlockStatement>(brace, m_unit.arena);
 		for (;;) {
 			switch (peekToken().type) {
 				case Token::END_OF_FILE:
@@ -1082,19 +1133,19 @@ struct Parser {
 	}
 
 	bool enumDecl() {
-		ls_string_view name;
-		if (!consume(Token::IDENTIFIER, name, "Expected enum name")) return false;
+		Token name_token = consumeToken();
+		if (name_token.type != Token::IDENTIFIER) { m_output.errorAt(name_token, "Expected enum name"); return false; }
 		EnumExpression* en = enumExpression();
 		if (!en) return false;
-		return namedComptimeDecl(name, en);
+		return namedComptimeDecl(name_token, en);
 	}
 
 	bool structDecl() {
-		ls_string_view name;
-		if (!consume(Token::IDENTIFIER, name, "Expected struct name")) return false;
+		Token name_token = consumeToken();
+		if (name_token.type != Token::IDENTIFIER) { m_output.errorAt(name_token, "Expected struct name"); return false; }
 		StructExpression* st = structExpression();
 		if (!st) return false;
-		return namedComptimeDecl(name, st);
+		return namedComptimeDecl(name_token, st);
 	}
 
 	// Parse an import declaration, e.g. `import "core:vec3" as vec`.
@@ -1107,15 +1158,19 @@ struct Parser {
 
 		Import import;
 		import.path = path.value;
+		Token alias_token = {};
 		if (peekToken().type == Token::AS) {
 			consumeToken();
-			if (!consume(Token::IDENTIFIER, import.alias, "Expected import alias")) return false;
+			alias_token = consumeToken();
+			if (alias_token.type != Token::IDENTIFIER) { m_output.errorAt(alias_token, "Expected import alias"); return false; }
+			import.alias = alias_token.value;
 		}
 
 		if (!empty(import.alias)) {
 			Symbol sym;
 			sym.storage = Symbol::IMPORT;
 			sym.name = import.alias;
+			sym.token = alias_token;
 			if (!addSymbol(sym)) return false;
 		}
 
@@ -1127,8 +1182,8 @@ struct Parser {
 	// Parse an extern function declaration, e.g. `extern fn foo(a : i32) : i32;`.
 	bool externDecl() {
 		if (!consume(Token::FN)) return false;
-		ls_string_view name;
-		if (!consume(Token::IDENTIFIER, name, "Expected function name")) return false;
+		Token name_token = consumeToken();
+		if (name_token.type != Token::IDENTIFIER) { m_output.errorAt(name_token, "Expected function name"); return false; }
 
 		FunctionExpression* fn = make<FunctionExpression>(m_unit.arena);
 		fn->is_extern = true;
@@ -1138,7 +1193,8 @@ struct Parser {
 		// Per the language reference, `extern fn foo() : T;` is sugar for a
 		// module-level `var` bound to a body-less function value.
 		Symbol s;
-		s.name = name;
+		s.name = name_token.value;
+		s.token = name_token;
 		s.expression = fn;
 		s.storage = Symbol::VARIABLE;
 		return addSymbol(s);
@@ -1165,6 +1221,7 @@ struct Parser {
 
 		Symbol sym;
 		sym.name = makeStringView(sym_name);
+		sym.token = op;
 		sym.expression = fn;
 		sym.storage = Symbol::COMPTIME;
 		return addSymbol(sym);
@@ -1172,12 +1229,12 @@ struct Parser {
 
 	// Parse a function declaration, e.g. `fn foo(a) { }`.
 	bool functionDecl() {
-		ls_string_view name;
-		if (!consume(Token::IDENTIFIER, name, "Expected function name")) return false;
-		
+		Token name_token = consumeToken();
+		if (name_token.type != Token::IDENTIFIER) { m_output.errorAt(name_token, "Expected function name"); return false; }
+
 		FunctionExpression* fn = functionExpression();
 		if (!fn) return false;
-		return namedComptimeDecl(name, fn);
+		return namedComptimeDecl(name_token, fn);
 	}
 
 	// Parse a source file, e.g. a whole `.ls` script.

@@ -27,6 +27,7 @@ struct Statement {
 		: kind(kind) {}
 
 	Kind kind = INVALID;
+	Token token = {};
 };
 
 struct BlockStatement : Statement {

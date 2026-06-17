@@ -8,6 +8,7 @@
 
 struct Statement;
 struct Symbol;
+struct FunctionExpression;
 
 struct NamedDecl {
 	ls_string_view name;
@@ -65,6 +66,7 @@ struct Expression {
 
 	Kind kind = INVALID;
 	ResolvedType* resolved_type = nullptr;
+	Token token = {};
 };
 
 struct IdentifierExpression : Expression {
@@ -117,6 +119,9 @@ struct CallExpression : Expression {
 
 	Expression* callee = nullptr;
 	ExpArray<Expression*> args;
+	// Set by the type checker when UFCS resolves to a specific function declaration,
+	// so the bytecode compiler doesn't re-resolve and pick the wrong overload.
+	FunctionExpression* ufcs_fn = nullptr;
 };
 
 struct UnaryExpression : Expression {

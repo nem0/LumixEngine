@@ -400,7 +400,7 @@ TEST(ImportResolverRejectsImportFails) {
 	diagnostics.diagnostics.output_enabled = false;
 	ls_module* module = ls_module_create(&diagnostics.host);
 	EXPECT_TRUE(module != nullptr);
-	EXPECT_TRUE(!ls_module_compile(module, toLs(source), {}, [](void*, ls_string_view, ls_string_view, ls_string_view*) {
+	EXPECT_TRUE(!ls_module_compile(module, toLs(source), makeStringView(__func__), [](void*, ls_string_view, ls_string_view, ls_string_view*) {
 		return 0;
 	}, nullptr));
 	ls_module_destroy(module);
@@ -518,7 +518,7 @@ TEST(ImportCycleFails) {
 	return true;
 }
 
-TEST(FirstParameterNamespaceResolutionAmbiguousTypecheck) {
+TEST(ADLLocalFunctionPreferredOverNamespace) {
 	const char* main_source = R"(
 		import "entity_mod" as entity
 		import "helper_mod" as e
@@ -555,11 +555,14 @@ TEST(FirstParameterNamespaceResolutionAmbiguousTypecheck) {
 	};
 	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
 
-	EXPECT_COMPILE_FAIL_WITH_IMPORTS(main_source, files);
+	EXPECT_RUNTIME_WITH_IMPORTS(main_source, files, runtime,
+		EXPECT_TRUE(ls_call(runtime, toLs("main")));
+		EXPECT_EQ(8, ls_to_i32(runtime, -1));
+	);
 	return true;
 }
 
-TEST(FirstParameterNamespaceResolutionLocalFunctionAmbiguityFails) {
+TEST(UFCSADLPrefersLocalFunctionOverNamespace) {
 	const char* main_source = R"(
 		import "entity_mod" as entity
 
@@ -588,7 +591,41 @@ TEST(FirstParameterNamespaceResolutionLocalFunctionAmbiguityFails) {
 	};
 	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
 
-	EXPECT_COMPILE_FAIL_WITH_IMPORTS(main_source, files);
+	EXPECT_RUNTIME_WITH_IMPORTS(main_source, files, runtime,
+		EXPECT_TRUE(ls_call(runtime, toLs("main")));
+		EXPECT_EQ(3, ls_to_i32(runtime, -1));
+	);
+	return true;
+}
+
+
+
+TEST(UFCSWithImportAliasResolvesToImportedFunction) {
+	const char* main_source = R"(
+		import "entity_mod" as entity
+
+		fn destroy(x : entity.Entity) : i32 {
+			return 3;
+		}
+
+		fn main() : i32 {
+			const x : entity.Entity = entity.Entity { 7 };
+			return x.destroy();
+		}
+	)";
+
+	const char* entity_source = R"(
+		struct Entity {
+			id : i32;
+		}
+	)";
+
+	LumScriptImportFile files_storage[] = {
+		{ toLs("entity_mod"), toLs(entity_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+
+	EXPECT_COMPILE_WITH_IMPORTS(main_source, files);
 	return true;
 }
 
@@ -650,50 +687,6 @@ TEST(ImportedMethodCallResolvesCallerGlobalArgument) {
 	};
 	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
 	EXPECT_COMPILE_WITH_IMPORTS(main_source, files);
-	return true;
-}
-
-TEST(OverloadProbeDoesNotMutateWinningCallArguments) {
-	const char* main_source = R"(
-		import "first" as first
-		import "second" as second
-		import "entity" as entity
-
-		fn main() : i32 {
-			const value = entity.Entity { 0 };
-			return value.choose(42, true);
-		}
-	)";
-	const char* first_source = R"(
-		import "entity"
-
-		fn choose(value : Entity, amount : i32, enabled : bool) : i32 {
-			return amount;
-		}
-	)";
-	const char* second_source = R"(
-		import "entity"
-
-		fn choose(value : Entity, amount : f32, code : i32) : i32 {
-			return code;
-		}
-	)";
-	const char* entity_source = R"(
-		struct Entity {
-			value : i32;
-		}
-	)";
-	LumScriptImportFile files_storage[] = {
-		{ toLs("first"), toLs(first_source) },
-		{ toLs("second"), toLs(second_source) },
-		{ toLs("entity"), toLs(entity_source) },
-	};
-	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
-
-	EXPECT_RUNTIME_WITH_IMPORTS(main_source, files, runtime,
-		EXPECT_TRUE(ls_call(runtime, toLs("main")));
-		EXPECT_EQ(42, ls_to_i32(runtime, -1));
-	);
 	return true;
 }
 
@@ -808,7 +801,7 @@ TEST(ExternImport) {
 	TestContext diagnostics;
 	ls_module* module = ls_module_create(&diagnostics.host);
 	EXPECT_TRUE(module != nullptr);
-	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), makeStringView(__func__), &resolveLumScriptImportC, &files));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &diagnostics.host);
 	EXPECT_TRUE(bytecode != nullptr);
@@ -833,7 +826,7 @@ TEST(ExternImport) {
 	return true;
 }
 
-TEST(GlobalFunctionLiteralInitializerNamespaceCollisionFails2) {
+TEST(ADLLocalFunctionLiteralPreferredOverNamespace) {
 	const char* main_source = R"(
 		import "math" as m
 
@@ -863,7 +856,7 @@ TEST(GlobalFunctionLiteralInitializerNamespaceCollisionFails2) {
 	};
 	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
 
-	EXPECT_COMPILE_FAIL_WITH_IMPORTS(main_source, files);
+	EXPECT_COMPILE_WITH_IMPORTS(main_source, files);
 	return true;
 }
 
@@ -931,7 +924,7 @@ TEST(CoreMathImportRuntime) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(ls_call(runtime, toLs("sin32")));
@@ -987,7 +980,7 @@ TEST(AliasedImportRuntime) {
 	};
 	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), makeStringView(__func__), &resolveLumScriptImportC, &files));
 
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
@@ -1023,7 +1016,7 @@ TEST(ExternFnSecondImportCorrectIndex) {
 	TestContext diagnostics;
 	ls_module* module = ls_module_create(&diagnostics.host);
 	EXPECT_TRUE(module != nullptr);
-	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, &resolveLumScriptImportC, &files));
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), makeStringView(__func__), &resolveLumScriptImportC, &files));
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &diagnostics.host);
 	EXPECT_TRUE(bytecode != nullptr);

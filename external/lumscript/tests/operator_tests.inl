@@ -240,7 +240,7 @@ TEST(RejectedOperatorCandidateDoesNotRetypeOperands) {
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(77, ls_to_i32(runtime, -1));
@@ -449,7 +449,7 @@ TEST(CustomOperatorGlobalCompoundAssignmentRuntime) {
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_FLOAT_EQ(3.0f, ls_to_f32(runtime, -1));
@@ -474,7 +474,7 @@ TEST(CustomOperatorBinaryRuntime) {
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_FLOAT_EQ(3.0f, ls_to_f32(runtime, -1));
@@ -499,7 +499,7 @@ TEST(CustomOperatorBinarySubtractionRuntime) {
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), {}, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(7, ls_to_i32(runtime, -1));
@@ -519,3 +519,20 @@ TEST(PrimitiveOperatorDeclarationFailsEvenUnused) {
 	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
+
+TEST(CompoundAssignOnStructWithNoOverloadFails) {
+	const char* source = R"(
+		struct Vec2 {
+			x : f32;
+			y : f32;
+		}
+
+		fn main() : void {
+			var v = Vec2 { 1.0, 2.0 };
+			v += Vec2 { 3.0, 4.0 };
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+

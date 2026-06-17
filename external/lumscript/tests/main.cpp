@@ -38,7 +38,7 @@ void print(int val) { printf("%d", val); }
 		TestContext context; \
 		ls_module* module = ls_module_create(&context.host); \
 		EXPECT_TRUE(module != nullptr); \
-		bool compiled = ls_module_compile(module, toLs(src), {}, nullptr, nullptr); \
+		bool compiled = ls_module_compile(module, toLs(src), makeStringView(__func__), nullptr, nullptr); \
 		ls_bytecode* bytecode = compiled ? ls_bytecode_compile(module, &context.host) : nullptr; \
 		if (bytecode) ls_bytecode_destroy(bytecode); \
 		ls_module_destroy(module); \
@@ -52,7 +52,7 @@ void print(int val) { printf("%d", val); }
 		ls_module* module = ls_module_create(&context.host); \
 		EXPECT_TRUE(module != nullptr); \
 		context.diagnostics.output_enabled = false; \
-		EXPECT_TRUE(!ls_module_compile(module, toLs(src), {}, nullptr, nullptr)); \
+		EXPECT_TRUE(!ls_module_compile(module, toLs(src), makeStringView(__func__), nullptr, nullptr)); \
 		ls_module_destroy(module); \
 	} while(false)
 
@@ -61,7 +61,7 @@ void print(int val) { printf("%d", val); }
 		TestContext context; \
 		ls_module* module = ls_module_create(&context.host); \
 		EXPECT_TRUE(module != nullptr); \
-		bool compiled = ls_module_compile(module, toLs(src), {}, &resolveLumScriptImportC, &(files)); \
+		bool compiled = ls_module_compile(module, toLs(src), makeStringView(__func__), &resolveLumScriptImportC, &(files)); \
 		ls_bytecode* bytecode = compiled ? ls_bytecode_compile(module, &context.host) : nullptr; \
 		if (bytecode) ls_bytecode_destroy(bytecode); \
 		ls_module_destroy(module); \
@@ -75,14 +75,14 @@ void print(int val) { printf("%d", val); }
 		ls_module* module = ls_module_create(&context.host); \
 		EXPECT_TRUE(module != nullptr); \
 		context.diagnostics.output_enabled = false; \
-		EXPECT_TRUE(!ls_module_compile(module, toLs(src), {}, &resolveLumScriptImportC, &(files))); \
+		EXPECT_TRUE(!ls_module_compile(module, toLs(src), makeStringView(__func__), &resolveLumScriptImportC, &(files))); \
 		ls_module_destroy(module); \
 	} while(false)
 
 #define EXPECT_RUNTIME_WITH_IMPORTS(src, files, runtime_name, body) \
 	do { \
 		CAPI_BEGIN(module, diagnostics); \
-		EXPECT_TRUE(ls_module_compile(module, toLs(src), {}, &resolveLumScriptImportC, &(files))); \
+		EXPECT_TRUE(ls_module_compile(module, toLs(src), makeStringView(__func__), &resolveLumScriptImportC, &(files))); \
 		CAPI_RUNTIME(module, runtime_name); \
 		body; \
 		CAPI_END(module); \

@@ -23,7 +23,7 @@ struct ResolvedType {
 		F64,
 		STRING,
 		CPTR,
-		TYPE,
+		META, // the type of a type: resolved_type of enum/struct/fn declarations
 		ENUM,
 		STRUCT,
 		FUNCTION,
@@ -38,6 +38,11 @@ struct ResolvedType {
 	virtual ~ResolvedType() = default;
 
 	Kind kind = INVALID;
+};
+
+struct MetaType : ResolvedType {
+	MetaType() : ResolvedType(META) {}
+	ResolvedType* inner = nullptr; // the actual type (EnumResolvedType*, StructResolvedType*, etc.)
 };
 
 struct EnumResolvedType : ResolvedType {

@@ -35,17 +35,14 @@ struct Symbol {
 	Storage storage;
 	CheckState check_state = UNCHECKED;
 	ls_string_view name; // as written in unit
+	Token token = {};
 	// Syntax-level type annotation. This preserves aliases and unresolved names
 	// exactly as written; semantic resolution converts to resolved_type later.
 	ParsedType* parsed_type = nullptr;
-	// Canonical semantic type — the type of the symbol as an expression value.
-	// For struct/enum declarations this is TYPE (a comptime type value); for
-	// functions it is the FunctionResolvedType.
+	// Canonical semantic type of the symbol.
+	// For struct/enum/fn type declarations this is MetaType { inner = actual type }.
+	// For value symbols this is the value's type directly.
 	ResolvedType* resolved_type = nullptr;
-	// For type-producing declarations (struct, enum): the type of a variable of
-	// that type, distinct from resolved_type which describes the declaration value.
-	// Null for non-type symbols.
-	ResolvedType* instance_type = nullptr;
 	// Symbols bind names to expressions. Top-level `fn`, `struct`, and `enum`
 	// syntax should eventually desugar to COMPTIME symbols with expression values.
 	Expression* expression = nullptr; // expression used to initialize the symbol
@@ -150,7 +147,7 @@ struct ls_module {
 		: host(host)
 		, arena(host)
 		, units(arena) {
-		for (i32 i = 0; i <= ResolvedType::TYPE; ++i)
+		for (i32 i = 0; i < ResolvedType::META; ++i)
 			primitives[i].kind = static_cast<ResolvedType::Kind>(i);
 	}
 
@@ -159,5 +156,5 @@ struct ls_module {
 	ExpArray<Unit> units;
 	// One canonical instance per primitive kind, indexed by ResolvedType::Kind.
 	// Pointer equality suffices for primitives; use typesEqual() for compound types.
-	ResolvedType primitives[ResolvedType::TYPE + 1];
+	ResolvedType primitives[ResolvedType::META];
 };

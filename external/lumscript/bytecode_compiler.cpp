@@ -234,7 +234,7 @@ struct GlobalBinding {
 
 static u32 typeSlotCount(ResolvedType* type);
 struct FunctionCompiler;
-static bool compileStatement(FunctionCompiler& ctx, Statement* st, ls_type_kind return_kind, ls_string_view current_label, bool allow_defer = true);
+static bool compileStatement(FunctionCompiler& ctx, Statement* st, ls_type_kind return_kind, ls_string_view current_label);
 static void emitDeferredStatements(FunctionCompiler& ctx, u32 defer_mark, ls_type_kind return_kind, ls_string_view current_label);
 
 struct FunctionCompiler {
@@ -455,6 +455,13 @@ static Symbol* findImportedQualifiedSymbol(ls_module& module, Unit& unit, ls_str
 static const FunctionInfo* findFunctionForSymbol(const ExpArray<FunctionInfo>& functions, Symbol* sym) {
 	if (!sym || !sym->expression || sym->expression->kind != Expression::FUNCTION) return nullptr;
 	FunctionExpression* fn = static_cast<FunctionExpression*>(sym->expression);
+	for (const FunctionInfo& info : functions) {
+		if (info.fn == fn) return &info;
+	}
+	return nullptr;
+}
+
+static const FunctionInfo* findFunctionForExpression(const ExpArray<FunctionInfo>& functions, FunctionExpression* fn) {
 	for (const FunctionInfo& info : functions) {
 		if (info.fn == fn) return &info;
 	}
@@ -943,7 +950,7 @@ static u32 emitJumpPlaceholder(FunctionCompiler& ctx, ls_op op) {
 
 static void emitDeferredStatements(FunctionCompiler& ctx, u32 defer_mark, ls_type_kind return_kind, ls_string_view current_label) {
 	for (i32 i = (i32)ctx.deferreds.size() - 1; i >= (i32)defer_mark; --i) {
-		(void)compileStatement(ctx, ctx.deferreds[(u32)i], return_kind, current_label, false);
+		(void)compileStatement(ctx, ctx.deferreds[(u32)i], return_kind, current_label);
 	}
 }
 
@@ -1218,7 +1225,11 @@ static ls_type_kind compileCall(FunctionCompiler& ctx, CallExpression* expr, ls_
 			}
 		}
 		if (member->expression && member->expression->resolved_type && ctx.functions) {
-			const FunctionInfo* fn = findMemberFunction(*ctx.functions, member->name, member->expression->resolved_type, (u32)expr->args.size());
+			// Use the specific function chosen by the type checker when available (avoids
+			// picking the wrong overload when a local function shadows a namespace function).
+			const FunctionInfo* fn = expr->ufcs_fn
+				? findFunctionForExpression(*ctx.functions, expr->ufcs_fn)
+				: findMemberFunction(*ctx.functions, member->name, member->expression->resolved_type, (u32)expr->args.size());
 			if (fn) {
 				const FunctionResolvedType* fn_type = fn->type;
 				if (compileExpression(ctx, member->expression, fn_type && !fn_type->param_types.empty() ? valueKindForType(fn_type->param_types[0], LS_TYPE_INVALID) : LS_TYPE_INVALID) == LS_TYPE_INVALID) return LS_TYPE_INVALID;
@@ -1334,7 +1345,9 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression* expr, l
 			if (global_sym && ctx.globals) {
 				if (const GlobalBinding* global = findGlobalBinding(*ctx.globals, global_sym)) {
 					emitLoadGlobalSlots(ctx, global->slot, global->slot_count);
-					return valueKindForType(global_sym->instance_type ? global_sym->instance_type : global_sym->resolved_type);
+					ResolvedType* sym_type = global_sym->resolved_type;
+					if (sym_type && sym_type->kind == ResolvedType::META) sym_type = static_cast<MetaType*>(sym_type)->inner;
+					return valueKindForType(sym_type);
 				}
 			}
 			if (const FunctionInfo* fn = ctx.findFunction(id->name)) {
@@ -1399,10 +1412,12 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression* expr, l
 				return LS_TYPE_I32;
 			}
 			if (member->expression) {
-				if (member->expression->resolved_type && member->expression->resolved_type->kind == ResolvedType::ENUM) {
-					EnumResolvedType* en = static_cast<EnumResolvedType*>(member->expression->resolved_type);
+				ResolvedType* base_rt = member->expression->resolved_type;
+				EnumResolvedType* enum_via_meta = (base_rt && base_rt->kind == ResolvedType::META && static_cast<MetaType*>(base_rt)->inner->kind == ResolvedType::ENUM)
+					? static_cast<EnumResolvedType*>(static_cast<MetaType*>(base_rt)->inner) : nullptr;
+				if (enum_via_meta) {
 					u32 enum_index = 0;
-					if (!enumMemberIndex(en, member->name, enum_index)) return LS_TYPE_INVALID;
+					if (!enumMemberIndex(enum_via_meta, member->name, enum_index)) return LS_TYPE_INVALID;
 					emitOp(ctx.code, LS_OP_LOAD_CONST_8);
 					emitU64(ctx.code, enum_index);
 					return LS_TYPE_I32;
@@ -1589,7 +1604,7 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression* expr, l
 	}
 }
 
-static bool compileStatement(FunctionCompiler& ctx, Statement* st, ls_type_kind return_kind, ls_string_view current_label, bool allow_defer) {
+static bool compileStatement(FunctionCompiler& ctx, Statement* st, ls_type_kind return_kind, ls_string_view current_label) {
 	if (!st) return true;
 	switch (st->kind) {
 		case Statement::VAR_DECL: {
@@ -1641,7 +1656,9 @@ static bool compileStatement(FunctionCompiler& ctx, Statement* st, ls_type_kind 
 				}
 				if (!local && !global) return false;
 
-				ResolvedType* value_type = local ? local->type : (global_sym->instance_type ? global_sym->instance_type : global_sym->resolved_type);
+				ResolvedType* raw_type = global_sym ? global_sym->resolved_type : nullptr;
+				if (raw_type && raw_type->kind == ResolvedType::META) raw_type = static_cast<MetaType*>(raw_type)->inner;
+				ResolvedType* value_type = local ? local->type : raw_type;
 				const ls_type_kind value_kind = local ? local->kind : valueKindForType(value_type);
 
 				if (local && ctx.isRefLocal(*local)) {
@@ -1814,13 +1831,13 @@ static bool compileStatement(FunctionCompiler& ctx, Statement* st, ls_type_kind 
 			const u32 jump_false_pos = (u32)ctx.code.size();
 			emitOp(ctx.code, LS_OP_JUMP_IF_FALSE);
 			emitI32(ctx.code, 0);
-			if (!compileStatement(ctx, ifst->body, return_kind, current_label, allow_defer)) return false;
+			if (!compileStatement(ctx, ifst->body, return_kind, current_label)) return false;
 			if (ifst->else_branch) {
 				const u32 jump_end_pos = (u32)ctx.code.size();
 				emitOp(ctx.code, LS_OP_JUMP);
 				emitI32(ctx.code, 0);
 				patchI32(ctx.code, jump_false_pos + 1u, (i32)((i32)ctx.code.size() - (i32)(jump_false_pos + 5u)));
-				if (!compileStatement(ctx, ifst->else_branch, return_kind, current_label, allow_defer)) return false;
+				if (!compileStatement(ctx, ifst->else_branch, return_kind, current_label)) return false;
 				patchI32(ctx.code, jump_end_pos + 1u, (i32)((i32)ctx.code.size() - (i32)(jump_end_pos + 5u)));
 			}
 			else {
@@ -1857,7 +1874,7 @@ static bool compileStatement(FunctionCompiler& ctx, Statement* st, ls_type_kind 
 			}
 			loop.continue_jumps = ::new (continue_storage) ExpArray<u32>(*ctx.bytecode->arena);
 
-			if (!compileStatement(ctx, ws->body, return_kind, {}, allow_defer)) {
+			if (!compileStatement(ctx, ws->body, return_kind, {})) {
 				ctx.loops.pop_back();
 				return false;
 			}
@@ -1923,7 +1940,7 @@ static bool compileStatement(FunctionCompiler& ctx, Statement* st, ls_type_kind 
 			}
 			loop.continue_jumps = ::new (continue_storage) ExpArray<u32>(*ctx.bytecode->arena);
 
-			if (!compileStatement(ctx, fs->body, return_kind, {}, allow_defer)) {
+			if (!compileStatement(ctx, fs->body, return_kind, {})) {
 				ctx.loops.pop_back();
 				ctx.popScope(return_kind, current_label);
 				return false;
@@ -1988,7 +2005,7 @@ static bool compileStatement(FunctionCompiler& ctx, Statement* st, ls_type_kind 
 				if (arm.is_fallback) {
 					for (u32 false_jump : pending_false_jumps) patchJumpRelative(ctx.code, false_jump, (u32)ctx.code.size());
 					pending_false_jumps.clear();
-					if (!compileStatement(ctx, arm.body, return_kind, current_label, allow_defer)) return false;
+					if (!compileStatement(ctx, arm.body, return_kind, current_label)) return false;
 					match_end_jumps.push(emitJumpPlaceholder(ctx, LS_OP_JUMP));
 					continue;
 				}
@@ -2040,7 +2057,7 @@ static bool compileStatement(FunctionCompiler& ctx, Statement* st, ls_type_kind 
 				for (u32 jump_pos : arm_body_jumps) patchJumpRelative(ctx.code, jump_pos, body_start);
 				for (u32 false_jump : pending_false_jumps) patchJumpRelative(ctx.code, false_jump, skip_jump_pos - 1u);
 				pending_false_jumps.clear();
-				if (!compileStatement(ctx, arm.body, return_kind, current_label, allow_defer)) return false;
+				if (!compileStatement(ctx, arm.body, return_kind, current_label)) return false;
 				match_end_jumps.push(emitJumpPlaceholder(ctx, LS_OP_JUMP));
 				const u32 arm_end_pos = (u32)ctx.code.size();
 				patchJumpRelative(ctx.code, skip_jump_pos, arm_end_pos);
@@ -2051,7 +2068,7 @@ static bool compileStatement(FunctionCompiler& ctx, Statement* st, ls_type_kind 
 			return true;
 		}
 		case Statement::DEFER: {
-			if (!allow_defer) return false;
+
 			DeferStatement* df = static_cast<DeferStatement*>(st);
 			if (!df->statement || df->statement->kind == Statement::RETURN) return false;
 			ctx.deferreds.push(df->statement);
@@ -2085,7 +2102,7 @@ static bool compileStatement(FunctionCompiler& ctx, Statement* st, ls_type_kind 
 			const ls_string_view next_label = label->statement->kind == Statement::WHILE || label->statement->kind == Statement::FOR
 				? label->name
 				: current_label;
-			return compileStatement(ctx, label->statement, return_kind, next_label, allow_defer);
+			return compileStatement(ctx, label->statement, return_kind, next_label);
 		}
 	case Statement::RETURN: {
 		ReturnStatement* ret = static_cast<ReturnStatement*>(st);
@@ -2125,7 +2142,7 @@ static bool compileStatement(FunctionCompiler& ctx, Statement* st, ls_type_kind 
 			BlockStatement* block = static_cast<BlockStatement*>(st);
 			ctx.pushScope();
 			for (Statement* child : block->statements) {
-				if (!compileStatement(ctx, child, return_kind, current_label, allow_defer)) {
+				if (!compileStatement(ctx, child, return_kind, current_label)) {
 					ctx.popScope(return_kind, current_label);
 					return false;
 				}
@@ -2243,6 +2260,10 @@ ls_bytecode* ls_bytecode_compile(
 			Expression* literal = nullptr;
 			if (function.return_slot_count == 1u && isSimpleReturnLiteral(body, literal)) {
 				// Build the tiny literal function directly to keep the old fast path.
+				for (FunctionParam& param : fn->runtime_params) {
+					const u32 slot_count = param.is_ref ? 1u : typeSlotCount(param.resolved_type);
+					function.param_slot_count += slot_count == 0u ? 1u : slot_count;
+				}
 				ExpArray<u8> temp(*arena);
 				switch (literal->kind) {
 					case Expression::INT_LITERAL:
@@ -2277,6 +2298,7 @@ ls_bytecode* ls_bytecode_compile(
 					return nullptr;
 				}
 				for (i32 i = 0; i < temp.size(); ++i) function.code[i] = temp[i];
+				function.max_stack = function.param_slot_count + function.return_slot_count;
 				continue;
 			}
 

@@ -139,7 +139,7 @@ TEST(GlobalVariablesTypecheck) {
 	TestContext diagnostics;
 	ls_module* module = ls_module_create(&diagnostics.host);
 	EXPECT_TRUE(module != nullptr);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	EXPECT_TRUE(ls_module_get_global_count(module) == 5);
 	ls_module_destroy(module);
 	return true;
@@ -208,6 +208,24 @@ TEST(VariableCanBeExplicitlyUndefined) {
 	return true;
 }
 
+TEST(ValueMustBeInitializedIfNotUndefinedFails) {
+	const char* source = R"(
+		fn main() : void {
+			var x;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+
+	const char* source2 = R"(
+		fn main() : void {
+			var x : i32;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source2);
+
+	return true;
+}
+
 TEST(UndefinedInitializerRequiresExplicitTypeFails) {
 	const char* source = R"(
 		fn main() : void {
@@ -229,10 +247,16 @@ TEST(MemberAccessOnPrimitiveFails) {
 	return true;
 }
 
-TEST(ConstCanNotBeUndefined) {
+TEST(ConstGlobalCanNotBeUndefined) {
 	const char* source = R"(
 		const g : i32 = undefined;
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
 
+TEST(ConstLocalCanNotBeUndefined) {
+	const char* source = R"(
 		fn main() : void {
 			const c : i32 = undefined;
 		}
@@ -415,6 +439,28 @@ TEST(UFCSNativeType) {
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+
+TEST(UFCSWithExtraArguments) {
+	const char* source = R"(
+		struct Vec2 {
+			x : i32;
+			y : i32;
+		}
+
+		fn scale(v : Vec2, factor : i32) : i32 {
+			return (v.x + v.y) * factor;
+		}
+
+		fn main() : i32 {
+			const v : Vec2 = Vec2 { 3, 4 };
+			return v.scale(10);
+		}
+	)";
+
+	EXPECT_COMPILE(source);
 	return true;
 }
 

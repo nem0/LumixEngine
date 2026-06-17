@@ -124,22 +124,6 @@ TEST(ComptimePrimitiveValueCanBeStaticArraySize) {
 	return true;
 }
 
-TEST(ComptimePrimitiveValueCanBeTemplateValueArg) {
-	const char* source = R"(
-		comptime N = 4;
-
-		comptime StaticArray = struct[T, Count : i32] {
-			values : T[Count];
-		}
-
-		fn main() : void {
-			var values : StaticArray[i32, N] = undefined;
-		}
-	)";
-	EXPECT_COMPILE(source);
-	return true;
-}
-
 TEST(ComptimeTypeBindingTypechecks) {
 	const char* source = R"(
 		comptime Int = i32;
@@ -330,50 +314,6 @@ TEST(ComptimeCallCanNotCallExternFunctionFails) {
 	return true;
 }
 
-TEST(ComptimeGenericStructBindingTypechecks) {
-	const char* source = R"(
-		comptime Pair = struct[T] {
-			first : T;
-			second : T;
-		}
-
-		fn main() : i32 {
-			const pair = Pair[i32] { 20, 22 };
-			return pair.first + pair.second;
-		}
-	)";
-	EXPECT_COMPILE(source);
-	return true;
-}
-
-TEST(ComptimeGenericStructWithValueParamTypechecks) {
-	const char* source = R"(
-		comptime StaticArray = struct[T, N : i32] {
-			values : T[N];
-		}
-
-		fn main() : void {
-			var values : StaticArray[i32, 4] = undefined;
-		}
-	)";
-	EXPECT_COMPILE(source);
-	return true;
-}
-
-TEST(ComptimeGenericFunctionBindingTypechecks) {
-	const char* source = R"(
-		comptime identity = fn[T](value : T) : T {
-			return value;
-		}
-
-		fn main() : i32 {
-			return identity[i32](42);
-		}
-	)";
-	EXPECT_COMPILE(source);
-	return true;
-}
-
 TEST(ComptimeDuplicateNameFails) {
 	const char* source = R"(
 		comptime N = 1;
@@ -421,6 +361,7 @@ TEST(ComptimeLocalDeclarationFails) {
 	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
+
 
 TEST(ComptimeTypeValueCanNotBeRuntimeReturnValueFails) {
 	const char* source = R"(

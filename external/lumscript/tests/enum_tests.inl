@@ -270,9 +270,40 @@ TEST(EnumUnknownMemberMethod) {
 	return true;
 }
 
+TEST(EnumMemberAccessThroughValueFails) {
+	const char* source = R"(
+		enum State {
+			Idle,
+			Running
+		}
+
+		fn main() : void {
+			var s : State = State.Idle;
+			const v = State.Idle; // Both State. and s. are resolved to enumresolvedtype, which is not correct
+			const v2 = s.Idle;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
 
 
+TEST(EnumValueInitializedFromOtherEnumFails) {
+	const char* source = R"(
+		enum State {
+			Idle,
+			Running
+		}
 
+		enum State2 {
+			Idle,
+			Running
+		}
 
-
-
+		fn main() : void {
+			var s : State = State2.Idle;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
