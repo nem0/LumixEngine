@@ -265,29 +265,6 @@ TEST(ConstLocalCanNotBeUndefined) {
 	return true;
 }
 
-TEST(ExplicitCastRequired) {
-	{
-		const char* invalid = R"(
-			fn main() : f32 {
-				const x : i32 = 10;
-				return x;
-			}
-		)";
-		EXPECT_COMPILE_FAIL(invalid);
-	}
-
-	{
-		const char* valid = R"(
-			fn main() : f32 {
-				const x : i32 = 10;
-				return x as f32;
-			}
-		)";
-		EXPECT_COMPILE(valid);
-	}
-	return true;
-}
-
 TEST(StructLiteralFieldCountMismatchFails) {
 	const char* source = R"(
 		struct Vec2 {
@@ -322,22 +299,6 @@ TEST(StructLiteralWithoutExpectedTypeFails) {
 	const char* source = R"(
 		fn main() : void {
 			const v = { 1, 2 };
-		}
-	)";
-	EXPECT_COMPILE_FAIL(source);
-	return true;
-}
-
-TEST(InvalidCastFails) {
-	const char* source = R"(
-		struct Vec2 {
-			x : i32;
-			y : i32;
-		}
-
-		fn main() : void {
-			const v : Vec2 = Vec2 { 1, 2 };
-			const x : i32 = v as i32;
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
@@ -442,6 +403,15 @@ TEST(UFCSNativeType) {
 	return true;
 }
 
+TEST(ValueAsTypeFails) {
+	const char* source = R"(
+		fn main() : void {
+			var x : type = 42;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
 
 TEST(UFCSWithExtraArguments) {
 	const char* source = R"(

@@ -64,6 +64,10 @@ struct Checker {
 	static bool canImplicitlyConvert(const ResolvedType* src, const ResolvedType* dst) {
 		if (typesEqual(src, dst)) return true;
 		if (!src || !dst) return false;
+		// An untyped literal converts to any concrete numeric type (its width is chosen at the
+		// materialization point). This is only a safety net; callers materialize first.
+		if (isUntypedInt(src))   return isNumericType(dst);
+		if (isUntypedFloat(src)) return isFloatType(dst);
 		if (src->kind == ResolvedType::ARRAY && dst->kind == ResolvedType::SLICE) {
 			const auto* arr = static_cast<const ArrayResolvedType*>(src);
 			const auto* slice = static_cast<const SliceResolvedType*>(dst);
@@ -129,7 +133,7 @@ struct Checker {
 	};
 
 	// TODO
-	void printI64(i64 value) {
+	void error(i64 value) {
 		char buffer[32];
 		char* end = buffer + sizeof(buffer);
 		char* cursor = end;
@@ -180,6 +184,8 @@ struct Checker {
 			case ResolvedType::F64: error("f64"); return;
 			case ResolvedType::STRING: error("string"); return;
 			case ResolvedType::CPTR: error("cptr"); return;
+			case ResolvedType::UNTYPED_INT:   error("{integer}"); return;
+			case ResolvedType::UNTYPED_FLOAT: error("{float}"); return;
 			case ResolvedType::META: error("type"); return;
 			case ResolvedType::ENUM:
 			case ResolvedType::STRUCT: {
@@ -194,7 +200,7 @@ struct Checker {
 					if (st->type_args[i])
 						error(st->type_args[i]);
 					else
-						printI64(st->value_args[i]);
+						error(st->value_args[i]);
 				}
 				error("]");
 				return;
@@ -214,7 +220,7 @@ struct Checker {
 				const ArrayResolvedType* array = static_cast<const ArrayResolvedType*>(type);
 				error(array->element_type);
 				error("[");
-				printI64(array->size);
+				error(array->size);
 				error("]");
 				return;
 			}
@@ -287,22 +293,6 @@ struct Checker {
 		}
 	}
 
-	// Name-only scan of unaliased imports. Preserve ambiguity instead of choosing a
-	// match based on import order.
-	SymbolRef findInUnaliasedImports(Unit& unit, ls_string_view name) {
-		SymbolRef found;
-		for (const Import& import : unit.imports) {
-			if (!empty(import.alias)) continue;
-			Unit* imported = findUnitByPath(import.path);
-			if (!imported) continue;
-			if (Symbol* candidate = findSymbol(*imported, name)) {
-				if (found.symbol) return {nullptr, nullptr, true};
-				found = {imported, candidate};
-			}
-		}
-		return found;
-	}
-
 	// Unified symbol resolution. A bare name is ambiguous when it matches multiple
 	// declarations across the current module and unaliased imports. A qualified
 	// lookup is confined to the aliased unit.
@@ -323,7 +313,19 @@ struct Checker {
 			}
 
 			Symbol* local = findSymbol(unit, name);
-			SymbolRef imported = findInUnaliasedImports(unit, name);
+			SymbolRef imported;
+			for (const Import& imp : unit.imports) {
+				if (!empty(imp.alias)) continue;
+				ASSERT(imp.unit);
+				Unit* imported_unit = imp.unit;
+				if (Symbol* candidate = findSymbol(*imported_unit, name)) {
+					if (imported.symbol) {
+						imported = {nullptr, nullptr, true};
+						break;
+					}
+					imported = {imported_unit, candidate};
+				}
+			}
 			bool ambiguous = imported.ambiguous || (local && imported.symbol);
 			// ADL: namespaced is only used when no local or unaliased-import match exists
 			if (local) {
@@ -447,6 +449,35 @@ struct Checker {
 		}
 	}
 
+	// `isNumericType` and `isIntegerType` deliberately report concrete types only, so the
+	// existing hint/conversion logic keeps treating UNTYPED_INT as "not pinned yet". The
+	// operator code that wants to accept an untyped operand uses these *OrUntyped helpers.
+	static bool isUntypedInt(const ResolvedType* t)   { return t && t->kind == ResolvedType::UNTYPED_INT; }
+	static bool isUntypedFloat(const ResolvedType* t) { return t && t->kind == ResolvedType::UNTYPED_FLOAT; }
+	static bool isUntypedNumeric(const ResolvedType* t) { return isUntypedInt(t) || isUntypedFloat(t); }
+	static bool isNumericOrUntyped(const ResolvedType* t) { return isNumericType(t) || isUntypedNumeric(t); }
+	static bool isIntegerOrUntyped(const ResolvedType* t) { return isIntegerType(t) || isUntypedInt(t); }
+
+	ResolvedType* untypedInt()   { return primitiveType(ResolvedType::UNTYPED_INT); }
+	ResolvedType* untypedFloat() { return primitiveType(ResolvedType::UNTYPED_FLOAT); }
+
+	// The common numeric type two operands must share, or null if they are not numerically
+	// compatible. UNTYPED_INT adopts any concrete numeric partner; two untyped ints stay
+	// untyped (resolved to a default later). Callers materialize the operands afterwards.
+	ResolvedType* unifyNumeric(ResolvedType* a, ResolvedType* b) {
+		if (!a || !b) return nullptr;
+		const bool ui_a = isUntypedInt(a),   ui_b = isUntypedInt(b);
+		const bool uf_a = isUntypedFloat(a), uf_b = isUntypedFloat(b);
+		// Two untyped operands: float wins over int (1 + 1.5 → untyped float).
+		if ((ui_a || uf_a) && (ui_b || uf_b)) return (uf_a || uf_b) ? untypedFloat() : untypedInt();
+		// One untyped, one concrete: untyped adopts the concrete type if compatible.
+		if (ui_a) return isNumericType(b) ? b : nullptr;
+		if (ui_b) return isNumericType(a) ? a : nullptr;
+		if (uf_a) return isFloatType(b)   ? b : nullptr;
+		if (uf_b) return isFloatType(a)   ? a : nullptr;
+		return (isNumericType(a) && typesEqual(a, b)) ? a : nullptr;
+	}
+
 	static bool intLiteralFitsType(i64 value, ResolvedType::Kind kind) {
 		switch (kind) {
 			case ResolvedType::I8: return value >= -128 && value <= 127;
@@ -495,8 +526,6 @@ struct Checker {
 
 	static bool isOverloadableBinaryOperator(Token::Type op) { return operatorSymbolName(op) != nullptr; }
 
-	static bool isOverloadableUnaryOperator(Token::Type op) { return op == Token::MINUS; }
-
 	FunctionResolvedType* buildFunctionType(Unit& unit, FunctionExpression& fn, bool reject_nullable_refs) {
 		// The AST owns the canonical signature. Besides avoiding duplicate arena
 		// allocations, publishing it here gives recursive checking a stable identity.
@@ -534,59 +563,57 @@ struct Checker {
 		return true;
 	}
 
-	static bool operatorDeclArityMatches(Token::Type op, i32 arity) {
-		if (op == Token::MINUS) return arity == 1 || arity == 2;
-		return arity == 2;
-	}
-
 	// Probe-and-commit overload resolution for n-ary operators.
-	// Clones each operand expression to type-check without mutating the originals,
-	// then re-checks the winners in-place once a unique match is confirmed.
-	// Searches the current unit and its direct unaliased imports (imports of imports
-	// are deliberately not re-exported).
+	// Probes each candidate by type-checking the operands in place under suppressed
+	// errors: stale resolved_type/symbol annotations from a losing candidate are
+	// overwritten by the commit pass once a unique match is confirmed, and a candidate
+	// that fails must not emit diagnostics. A function-literal operand checked during a
+	// probe is safe because checkExpr clears its cached resolved_type when its body
+	// fails, so a later non-suppressed check re-runs the body.
+	// Looks up only the operator list of the first struct operand (host). Operators are
+	// indexed there when their symbol is checked, so this is O(overloads-on-type).
 	enum class OverloadResult { NOT_FOUND, FOUND, AMBIGUOUS };
 
 	OverloadResult resolveOperatorOverload(Unit& unit,
 		FunctionCheckContext* ctx,
 		Token::Type op,
 		i32 arity,
-		Expression** operands, // array of `arity` expression pointers (in/out)
-		ResolvedType*& result_type
-	) {
+		Expression** operands, // array of `arity` expression pointers
+		ResolvedType*& result_type) {
+
+		// Find the host: first operand whose resolved type is a struct.
+		// Primitives and untyped literals are skipped; they cannot host operator lists.
+		StructExpression* host = nullptr;
+		for (i32 i = 0; i < arity && !host; ++i) {
+			++suppress_errors;
+			ResolvedType* t = checkExpr(unit, ctx, *operands[i], nullptr);
+			--suppress_errors;
+			if (t && t->kind == ResolvedType::STRUCT)
+				host = static_cast<StructResolvedType*>(t)->decl;
+		}
+		if (!host) return OverloadResult::NOT_FOUND;
+
+
 		FunctionResolvedType* found_type = nullptr;
 		bool found = false;
 
-		auto searchUnit = [&](Unit& search_unit) -> bool {
-			for (Symbol& sym : search_unit.symbols) {
-				if (tokenFromOperatorName(sym.name) != op) continue;
-				if (!sym.expression || sym.expression->kind != Expression::FUNCTION) continue;
-				FunctionResolvedType* fn_type = buildFunctionType(search_unit, *static_cast<FunctionExpression*>(sym.expression), false);
-				if (!fn_type || (i32)fn_type->param_types.size() != arity) continue;
+		for (StructOperator& cand : host->operators) {
+			if (cand.op != op) continue;
+			FunctionResolvedType* fn_type = static_cast<FunctionResolvedType*>(cand.fn->resolved_type);
+			if (!fn_type || (i32)fn_type->param_types.size() != arity) continue;
 
-				bool match = true;
-				for (i32 i = 0; i < arity && match; ++i) {
-					Expression* probe = cloneExpression(unit, operands[i]);
-					if (!probe) {
-						match = false;
-						break;
-					}
-					ResolvedType* t = checkExpr(unit, ctx, *probe, fn_type->param_types[(u32)i]);
-					if (!t || !typesEqual(t, fn_type->param_types[(u32)i])) match = false;
-				}
-				if (!match) continue;
-
-				if (found) return false; // ambiguous
-				found = true;
-				found_type = fn_type;
+			bool match = true;
+			++suppress_errors;
+			for (i32 i = 0; i < arity && match; ++i) {
+				ResolvedType* t = checkExpr(unit, ctx, *operands[i], fn_type->param_types[(u32)i]);
+				if (!t || !typesEqual(t, fn_type->param_types[(u32)i])) match = false;
 			}
-			return true;
-		};
+			--suppress_errors;
+			if (!match) continue;
 
-		if (!searchUnit(unit)) return OverloadResult::AMBIGUOUS;
-		for (const Import& import : unit.imports) {
-			if (Unit* imported = findUnitByPath(import.path)) {
-				if (!searchUnit(*imported)) return OverloadResult::AMBIGUOUS;
-			}
+			if (found) return OverloadResult::AMBIGUOUS;
+			found = true;
+			found_type = fn_type;
 		}
 
 		if (!found) return OverloadResult::NOT_FOUND;
@@ -598,23 +625,10 @@ struct Checker {
 		return OverloadResult::FOUND;
 	}
 
-	OverloadResult resolveBinaryOperator(Unit& unit, FunctionCheckContext* ctx, Token::Type op, Expression*& lhs_expr, Expression*& rhs_expr, ResolvedType*& result_type) {
-		if (!isOverloadableBinaryOperator(op)) return OverloadResult::NOT_FOUND;
-		Expression* operands[2] = {lhs_expr, rhs_expr};
-		OverloadResult r = resolveOperatorOverload(unit, ctx, op, 2, operands, result_type);
-		if (r == OverloadResult::FOUND) {
-			lhs_expr = operands[0];
-			rhs_expr = operands[1];
-		}
-		return r;
-	}
-
-	OverloadResult resolveUnaryOperator(Unit& unit, FunctionCheckContext* ctx, Token::Type op, Expression*& expr, ResolvedType*& result_type) {
-		if (!isOverloadableUnaryOperator(op)) return OverloadResult::NOT_FOUND;
+	OverloadResult resolveUnaryOperator(Unit& unit, FunctionCheckContext* ctx, Token::Type op, Expression* expr, ResolvedType*& result_type) {
+		if (op != Token::MINUS) return OverloadResult::NOT_FOUND;
 		Expression* operands[1] = {expr};
-		OverloadResult r = resolveOperatorOverload(unit, ctx, op, 1, operands, result_type);
-		if (r == OverloadResult::FOUND) expr = operands[0];
-		return r;
+		return resolveOperatorOverload(unit, ctx, op, 1, operands, result_type);
 	}
 
 	static Symbol* findSymbol(Unit& unit, ls_string_view name) {
@@ -650,197 +664,6 @@ struct Checker {
 	}
 
 	static bool isFunctionLikeType(const ResolvedType* type) { return type && type->kind == ResolvedType::FUNCTION; }
-
-	static BlockStatement* cloneBlock(Unit& unit, BlockStatement* block) {
-		if (!block) return nullptr;
-		BlockStatement* copy = makeType<BlockStatement>(unit, *unit.arena.arena);
-		for (Statement* statement : block->statements) copy->statements.push(cloneStatement(unit, statement));
-		return copy;
-	}
-
-	static Expression* cloneExpression(Unit& unit, Expression* expr) {
-		if (!expr) return nullptr;
-		switch (expr->kind) {
-			case Expression::IDENTIFIER: {
-				IdentifierExpression* src = static_cast<IdentifierExpression*>(expr);
-				IdentifierExpression* dst = makeType<IdentifierExpression>(unit);
-				dst->name = src->name;
-				return dst;
-			}
-			case Expression::INT_LITERAL: {
-				IntLiteralExpression* dst = makeType<IntLiteralExpression>(unit);
-				dst->value = static_cast<IntLiteralExpression*>(expr)->value;
-				return dst;
-			}
-			case Expression::FLOAT_LITERAL: {
-				FloatLiteralExpression* dst = makeType<FloatLiteralExpression>(unit);
-				dst->value = static_cast<FloatLiteralExpression*>(expr)->value;
-				return dst;
-			}
-			case Expression::BOOL_LITERAL: return makeType<BoolLiteralExpression>(unit, static_cast<BoolLiteralExpression*>(expr)->value);
-			case Expression::STRING_LITERAL: {
-				StringLiteralExpression* dst = makeType<StringLiteralExpression>(unit);
-				dst->value = static_cast<StringLiteralExpression*>(expr)->value;
-				return dst;
-			}
-			case Expression::NULL_LITERAL: return makeType<NullLiteralExpression>(unit);
-			case Expression::UNDEFINED: return makeType<UndefinedExpression>(unit);
-			case Expression::TYPE_LITERAL: return makeType<TypeLiteralExpression>(unit, static_cast<TypeLiteralExpression*>(expr)->type);
-			case Expression::CALL: {
-				CallExpression* src = static_cast<CallExpression*>(expr);
-				CallExpression* dst = makeType<CallExpression>(unit, *unit.arena.arena);
-				dst->callee = cloneExpression(unit, src->callee);
-				for (Expression* arg : src->args) dst->args.push(cloneExpression(unit, arg));
-				return dst;
-			}
-			case Expression::UNARY: {
-				UnaryExpression* src = static_cast<UnaryExpression*>(expr);
-				UnaryExpression* dst = makeType<UnaryExpression>(unit);
-				dst->op = src->op;
-				dst->expression = cloneExpression(unit, src->expression);
-				return dst;
-			}
-			case Expression::BINARY: {
-				BinaryExpression* src = static_cast<BinaryExpression*>(expr);
-				BinaryExpression* dst = makeType<BinaryExpression>(unit);
-				dst->op = src->op;
-				dst->lhs = cloneExpression(unit, src->lhs);
-				dst->rhs = cloneExpression(unit, src->rhs);
-				return dst;
-			}
-			case Expression::CAST: {
-				CastExpression* src = static_cast<CastExpression*>(expr);
-				CastExpression* dst = makeType<CastExpression>(unit);
-				dst->parsed_type = src->parsed_type;
-				dst->expression = cloneExpression(unit, src->expression);
-				return dst;
-			}
-			case Expression::MEMBER: {
-				MemberExpression* src = static_cast<MemberExpression*>(expr);
-				MemberExpression* dst = makeType<MemberExpression>(unit);
-				dst->name = src->name;
-				dst->expression = cloneExpression(unit, src->expression);
-				return dst;
-			}
-			case Expression::BRACKET: {
-				BracketExpression* src = static_cast<BracketExpression*>(expr);
-				BracketExpression* dst = makeType<BracketExpression>(unit, *unit.arena.arena);
-				dst->base = cloneExpression(unit, src->base);
-				dst->has_colon = src->has_colon;
-				dst->end = cloneExpression(unit, src->end);
-				for (Expression* arg : src->args) dst->args.push(cloneExpression(unit, arg));
-				return dst;
-			}
-			case Expression::STRUCT_LITERAL: {
-				StructLiteralExpression* src = static_cast<StructLiteralExpression*>(expr);
-				StructLiteralExpression* dst = makeType<StructLiteralExpression>(unit, *unit.arena.arena);
-				dst->type = cloneExpression(unit, src->type);
-				for (Expression* value : src->values) dst->values.push(cloneExpression(unit, value));
-				return dst;
-			}
-			case Expression::FUNCTION:
-			case Expression::ENUM:
-			case Expression::STRUCT:
-			default: return nullptr;
-		}
-	}
-
-	static Statement* cloneStatement(Unit& unit, Statement* statement) {
-		if (!statement) return nullptr;
-		switch (statement->kind) {
-			case Statement::BLOCK: return cloneBlock(unit, static_cast<BlockStatement*>(statement));
-			case Statement::EXPRESSION: {
-				ExpressionStatement* dst = makeType<ExpressionStatement>(unit);
-				dst->expression = cloneExpression(unit, static_cast<ExpressionStatement*>(statement)->expression);
-				return dst;
-			}
-			case Statement::RETURN: {
-				ReturnStatement* dst = makeType<ReturnStatement>(unit);
-				dst->expression = cloneExpression(unit, static_cast<ReturnStatement*>(statement)->expression);
-				return dst;
-			}
-			case Statement::VAR_DECL: {
-				VarDeclStatement* src = static_cast<VarDeclStatement*>(statement);
-				VarDeclStatement* dst = makeType<VarDeclStatement>(unit);
-				dst->name = src->name;
-				dst->parsed_type = src->parsed_type;
-				dst->expression = cloneExpression(unit, src->expression);
-				dst->is_immutable = src->is_immutable;
-				return dst;
-			}
-			case Statement::ASSIGN: {
-				AssignStatement* src = static_cast<AssignStatement*>(statement);
-				AssignStatement* dst = makeType<AssignStatement>(unit);
-				dst->lhs = cloneExpression(unit, src->lhs);
-				dst->rhs = cloneExpression(unit, src->rhs);
-				dst->op = src->op;
-				return dst;
-			}
-			case Statement::IF: {
-				IfStatement* src = static_cast<IfStatement*>(statement);
-				IfStatement* dst = makeType<IfStatement>(unit);
-				dst->condition = cloneExpression(unit, src->condition);
-				dst->body = cloneBlock(unit, src->body);
-				dst->else_branch = cloneStatement(unit, src->else_branch);
-				return dst;
-			}
-			case Statement::MATCH: {
-				MatchStatement* src = static_cast<MatchStatement*>(statement);
-				MatchStatement* dst = makeType<MatchStatement>(unit, *unit.arena.arena);
-				dst->subject = cloneExpression(unit, src->subject);
-				for (MatchArm& src_arm : src->arms) {
-					MatchArm& dst_arm = dst->arms.emplace_back(*unit.arena.arena);
-					dst_arm.is_fallback = src_arm.is_fallback;
-					dst_arm.body = cloneBlock(unit, src_arm.body);
-					for (MatchPattern& src_pattern : src_arm.patterns) {
-						MatchPattern& dst_pattern = dst_arm.patterns.emplace_back();
-						dst_pattern.begin = cloneExpression(unit, src_pattern.begin);
-						dst_pattern.end = cloneExpression(unit, src_pattern.end);
-					}
-				}
-				return dst;
-			}
-			case Statement::WHILE: {
-				WhileStatement* src = static_cast<WhileStatement*>(statement);
-				WhileStatement* dst = makeType<WhileStatement>(unit);
-				dst->condition = cloneExpression(unit, src->condition);
-				dst->body = cloneBlock(unit, src->body);
-				return dst;
-			}
-			case Statement::FOR: {
-				ForStatement* src = static_cast<ForStatement*>(statement);
-				ForStatement* dst = makeType<ForStatement>(unit);
-				dst->loop_var = src->loop_var;
-				dst->begin = cloneExpression(unit, src->begin);
-				dst->end = cloneExpression(unit, src->end);
-				dst->body = cloneBlock(unit, src->body);
-				return dst;
-			}
-			case Statement::BREAK: {
-				BreakStatement* dst = makeType<BreakStatement>(unit);
-				dst->label = static_cast<BreakStatement*>(statement)->label;
-				return dst;
-			}
-			case Statement::CONTINUE: {
-				ContinueStatement* dst = makeType<ContinueStatement>(unit);
-				dst->label = static_cast<ContinueStatement*>(statement)->label;
-				return dst;
-			}
-			case Statement::DEFER: {
-				DeferStatement* dst = makeType<DeferStatement>(unit);
-				dst->statement = cloneStatement(unit, static_cast<DeferStatement*>(statement)->statement);
-				return dst;
-			}
-			case Statement::LABEL: {
-				LabelStatement* src = static_cast<LabelStatement*>(statement);
-				LabelStatement* dst = makeType<LabelStatement>(unit);
-				dst->name = src->name;
-				dst->statement = cloneStatement(unit, src->statement);
-				return dst;
-			}
-			default: return nullptr;
-		}
-	}
 
 	bool findSymbolForNameExpression(Unit& unit, const Expression& expression, Unit*& owner, Symbol*& symbol) {
 		ls_string_view qualifier = {};
@@ -1005,6 +828,10 @@ struct Checker {
 				// check non-ref arg
 				ResolvedType* arg_type = checkExpr(unit, ctx, *arg, param_type);
 				if (!arg_type) return nullptr;
+				if (isUntypedNumeric(arg_type)) {
+					arg_type = materializeUntyped(*arg, param_type);
+					if (!arg_type) return nullptr;
+				}
 				if (!canImplicitlyConvert(arg_type, param_type)) {
 					errorLine(call.args[i]->token, "Cannot convert ", arg_type, " to ", param_type, " for argument ", i + 1, " of function call");
 					return nullptr;
@@ -1014,12 +841,76 @@ struct Checker {
 			return fn_type->return_type;
 		}
 
-		if (callee_type) {
-			errorLine(expr.token, "Cannot call non-function type ", callee_type);
-			return nullptr;
-		}
-		// TODO error msg, can we even get here?
+		errorLine(expr.token, "Cannot call non-function type ", callee_type);
 		return nullptr;
+	}
+
+	// Pin an UNTYPED_INT expression (and the untyped literals inside it) to a concrete type.
+	// This is the materialization boundary: once a literal value is stored, returned, passed,
+	// or compared it can no longer stay untyped. A null/non-numeric `concrete` means "use the
+	// default", i.e. i32 without a range check (preserving the historical behaviour of a
+	// hint-less literal). A concrete numeric `concrete` range-checks each leaf literal.
+	ResolvedType* materializeUntyped(Expression& expr, ResolvedType* concrete) {
+		if (isUntypedInt(expr.resolved_type)) {
+			if (isNumericType(concrete)) return materializeUntyped(expr, concrete, true);
+			return materializeUntyped(expr, primitiveType(ResolvedType::I32), false);
+		}
+		if (isUntypedFloat(expr.resolved_type)) {
+			if (isFloatType(concrete)) return materializeUntyped(expr, concrete, true);
+			return materializeUntyped(expr, primitiveType(ResolvedType::F64), false);
+		}
+		return expr.resolved_type;
+	}
+
+	ResolvedType* materializeUntyped(Expression& expr, ResolvedType* concrete, bool check_fit) {
+		if (!isUntypedNumeric(expr.resolved_type)) return expr.resolved_type;
+		switch (expr.kind) {
+			case Expression::INT_LITERAL: {
+				const i64 value = static_cast<IntLiteralExpression&>(expr).value;
+				if (check_fit && !intLiteralFitsType(value, concrete->kind)) {
+					errorLine(expr.token, "Integer literal does not fit in ", concrete);
+					return nullptr;
+				}
+				expr.resolved_type = concrete;
+				return concrete;
+			}
+			case Expression::FLOAT_LITERAL: {
+				const double value = static_cast<FloatLiteralExpression&>(expr).value;
+				if (check_fit && concrete->kind == ResolvedType::F32) {
+					if (value > (double)FLT_MAX || value < -(double)FLT_MAX) {
+						errorLine(expr.token, "Float literal does not fit in f32");
+						return nullptr;
+					}
+				}
+				expr.resolved_type = concrete;
+				return concrete;
+			}
+			case Expression::UNARY: {
+				UnaryExpression& un = static_cast<UnaryExpression&>(expr);
+				// A negated integer literal range-checks against the negated value (e.g. -128 fits i8).
+				if (un.op == Token::MINUS && un.expression && un.expression->kind == Expression::INT_LITERAL) {
+					const i64 negated = -static_cast<IntLiteralExpression*>(un.expression)->value;
+					if (check_fit && !intLiteralFitsType(negated, concrete->kind)) {
+						errorLine(expr.token, "Integer literal ", negated, " does not fit in type ", concrete);
+						return nullptr;
+					}
+					un.expression->resolved_type = concrete;
+					expr.resolved_type = concrete;
+					return concrete;
+				}
+				if (un.expression && !materializeUntyped(*un.expression, concrete, check_fit)) return nullptr;
+				expr.resolved_type = concrete;
+				return concrete;
+			}
+			case Expression::BINARY: {
+				BinaryExpression& bin = static_cast<BinaryExpression&>(expr);
+				if (bin.lhs && !materializeUntyped(*bin.lhs, concrete, check_fit)) return nullptr;
+				if (bin.rhs && !materializeUntyped(*bin.rhs, concrete, check_fit)) return nullptr;
+				expr.resolved_type = concrete;
+				return concrete;
+			}
+			default: expr.resolved_type = concrete; return concrete;
+		}
 	}
 
 	ResolvedType* checkUnaryExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr, ResolvedType* hint) {
@@ -1038,7 +929,9 @@ struct Checker {
 				expr.resolved_type = int_hint;
 				return int_hint;
 			}
-			lit->resolved_type = primitiveType(ResolvedType::I32);
+			// No concrete target: stay untyped; the negated value is range-checked when this
+			// node is materialized (see materializeUntyped).
+			lit->resolved_type = untypedInt();
 			expr.resolved_type = lit->resolved_type;
 			return expr.resolved_type;
 		}
@@ -1052,7 +945,7 @@ struct Checker {
 		if (!inner) return nullptr;
 		switch (un.op) {
 			case Token::MINUS: {
-				if (!isNumericType(inner)) {
+				if (!isNumericOrUntyped(inner)) {
 					errorLine(expr.token, "Cannot apply negation operator to ", inner);
 					return nullptr;
 				}
@@ -1083,25 +976,41 @@ struct Checker {
 	ResolvedType* checkBinaryExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr, ResolvedType* hint) {
 		BinaryExpression& bin = static_cast<BinaryExpression&>(expr);
 		ResolvedType* overload_result = nullptr;
-		switch (resolveBinaryOperator(unit, ctx, bin.op, bin.lhs, bin.rhs, overload_result)) {
+		Expression* bin_operands[2] = {bin.lhs, bin.rhs};
+		const OverloadResult bin_overload = isOverloadableBinaryOperator(bin.op) ? resolveOperatorOverload(unit, ctx, bin.op, 2, bin_operands, overload_result) : OverloadResult::NOT_FOUND;
+		switch (bin_overload) {
 			case OverloadResult::FOUND: expr.resolved_type = overload_result; return overload_result;
 			case OverloadResult::AMBIGUOUS: errorLine(expr.token, "Ambiguous operator ", operatorSymbolName(bin.op), " overload"); return nullptr;
 			case OverloadResult::NOT_FOUND: break;
 		}
-		// TODO passing hint might not be correct `var b: bool = 1 > 2;` passed bool hint to 1
+		// The hint describes the result of the whole expression, not the operands, so we do not
+		// forward it blindly. lhs is checked first; rhs then takes lhs as its hint so a literal
+		// operand can adopt the other side's type. Operands that stay untyped are unified
+		// below (which makes operand inference symmetric, e.g. `3 == x` / `1.5 == x`).
 		++suppress_errors;
 		ResolvedType* lhs = checkExpr(unit, ctx, *bin.lhs, hint);
 		--suppress_errors;
 		ResolvedType* rhs = checkExpr(unit, ctx, *bin.rhs, lhs ? lhs : hint);
 		// If lhs failed but rhs resolved (e.g. `.Idle == state`), retry lhs with rhs type as hint.
 		if (!lhs && rhs) lhs = checkExpr(unit, ctx, *bin.lhs, rhs);
-		if (!lhs || !rhs) {
-			// TODO error msg?
-			return nullptr;
-		}
+		if (!lhs || !rhs) return nullptr;
+
 		auto invalidOperands = [&]() -> ResolvedType* {
 			errorLine(expr.token, "Cannot apply operator ", operatorSymbolName(bin.op), " to ", lhs, " and ", rhs);
 			return nullptr;
+		};
+		// Resolve a numeric operator: unify the operands and pin both to the result type.
+		// int_default/float_default control what a fully-untyped pair materializes to:
+		// for arithmetic they stay untyped so an outer context still picks the width;
+		// for comparisons they pin to a concrete default (the result is bool, not numeric).
+		auto resolveNumeric = [&](bool integer_only, ResolvedType* int_default, ResolvedType* float_default) -> ResolvedType* {
+			ResolvedType* unified = unifyNumeric(lhs, rhs);
+			if (!unified || (integer_only && !isIntegerOrUntyped(unified))) return invalidOperands();
+			ResolvedType* concrete = isUntypedInt(unified) ? int_default
+			                       : isUntypedFloat(unified) ? float_default
+			                       : unified;
+			if (!materializeUntyped(*bin.lhs, concrete) || !materializeUntyped(*bin.rhs, concrete)) return nullptr;
+			return concrete;
 		};
 		switch (bin.op) {
 			case Token::PLUS:
@@ -1112,24 +1021,34 @@ struct Checker {
 				[[fallthrough]];
 			case Token::MINUS:
 			case Token::STAR:
-			case Token::SLASH:
-				if (!isNumericType(lhs) || !isNumericType(rhs) || !typesEqual(lhs, rhs)) return invalidOperands();
-				expr.resolved_type = lhs;
-				return lhs;
-			case Token::PERCENT:
-				if (!isIntegerType(lhs) || !isIntegerType(rhs) || !typesEqual(lhs, rhs)) return invalidOperands();
-				expr.resolved_type = lhs;
-				return lhs;
+			case Token::SLASH: {
+				// Arithmetic keeps the result untyped when both operands are untyped.
+				ResolvedType* result = resolveNumeric(false, untypedInt(), untypedFloat());
+				if (!result) return nullptr;
+				expr.resolved_type = result;
+				return result;
+			}
+			case Token::PERCENT: {
+				ResolvedType* result = resolveNumeric(true, untypedInt(), nullptr);
+				if (!result) return nullptr;
+				expr.resolved_type = result;
+				return result;
+			}
 			case Token::EQUAL_EQUAL:
-			case Token::BANG_EQUAL:
-				if (!typesEqual(lhs, rhs)) return invalidOperands();
+			case Token::BANG_EQUAL: {
+				// Equality also works on non-numerics (enums, strings); only unify when numeric.
+				if (isNumericOrUntyped(lhs) || isNumericOrUntyped(rhs)) {
+					if (!resolveNumeric(false, primitiveType(ResolvedType::I32), primitiveType(ResolvedType::F64))) return nullptr;
+				} else if (!typesEqual(lhs, rhs))
+					return invalidOperands();
 				expr.resolved_type = primitiveType(ResolvedType::BOOL);
 				return expr.resolved_type;
+			}
 			case Token::LT:
 			case Token::LT_EQUAL:
 			case Token::GT:
 			case Token::GT_EQUAL:
-				if (!isNumericType(lhs) || !isNumericType(rhs) || !typesEqual(lhs, rhs)) return invalidOperands();
+				if (!resolveNumeric(false, primitiveType(ResolvedType::I32), primitiveType(ResolvedType::F64))) return nullptr;
 				expr.resolved_type = primitiveType(ResolvedType::BOOL);
 				return expr.resolved_type;
 			case Token::AND:
@@ -1154,10 +1073,16 @@ struct Checker {
 		// the operand resolves independently (e.g. `-1 as u8` should work).
 		ResolvedType* src_type = checkExpr(unit, ctx, *cast.expression, nullptr);
 		if (!src_type) return nullptr;
+		// The source is consumed as a value here; pin an untyped literal to its i32 default
+		// (an explicit cast then converts it, so no range check against the destination).
+		if (isUntypedNumeric(src_type)) {
+			src_type = materializeUntyped(*cast.expression, nullptr);
+			if (!src_type) return nullptr;
+		}
 		const bool src_numeric = isNumericType(src_type);
 		const bool dst_numeric = isNumericType(dst_type);
-		const bool src_bool = typesEqual(src_type, primitiveType(ResolvedType::BOOL));
-		const bool dst_bool = typesEqual(dst_type, primitiveType(ResolvedType::BOOL));
+		const bool src_bool = src_type->kind == ResolvedType::BOOL;
+		const bool dst_bool = dst_type->kind == ResolvedType::BOOL;
 		const bool src_enum = src_type->kind == ResolvedType::ENUM;
 		const bool dst_enum = dst_type->kind == ResolvedType::ENUM;
 		const bool valid_cast = (src_numeric && dst_numeric) || (src_bool && dst_bool) || (src_enum && dst_numeric) || (src_numeric && dst_enum) || (src_bool && dst_numeric) ||
@@ -1183,10 +1108,6 @@ struct Checker {
 			hint = unwrapNullable(hint);
 			if (hint->kind == ResolvedType::ENUM) {
 				EnumResolvedType* en = static_cast<EnumResolvedType*>(hint);
-				if (!canImplicitlyConvert(en, hint)) {
-					errorLine(expr.token, "Cannot convert .", member.name, " to ", hint);
-					return nullptr;
-				}
 				for (const EnumMember& m : en->decl->members) {
 					if (equalStrings(m.name, member.name)) {
 						expr.resolved_type = en;
@@ -1208,10 +1129,8 @@ struct Checker {
 			if (imported_unit) {
 				SymbolRef sym = resolveSymbol(*imported_unit, {}, member.name, LookupPolicy::NameOnly);
 				if (sym) {
-					if (checkSymbol(*sym.owner, *sym.symbol) == LS_RESULT_FAILURE) {
-						// TODO error msg?
-						return nullptr;
-					}
+					if (checkSymbol(*sym.owner, *sym.symbol) == LS_RESULT_FAILURE) return nullptr;
+
 					expr.resolved_type = sym.symbol->resolved_type;
 					return expr.resolved_type;
 				}
@@ -1391,6 +1310,8 @@ struct Checker {
 		for (i32 i = 0; i < lit.values.size(); ++i) {
 			ResolvedType* field_type = (u32)i < st->field_types.size() ? st->field_types[(u32)i] : st->decl->fields[(u32)i].resolved_type;
 			ResolvedType* value_type = checkExpr(unit, ctx, *lit.values[i], field_type);
+			if (!value_type) return nullptr;
+			if (isUntypedNumeric(value_type)) value_type = materializeUntyped(*lit.values[i], field_type);
 			if (!value_type || !canImplicitlyConvert(value_type, field_type)) {
 				errorLine(lit.values[i]->token, "Cannot convert ", value_type, " to ", field_type, " for field ", st->decl->fields[(u32)i].name, " of struct literal");
 				return nullptr;
@@ -1412,7 +1333,9 @@ struct Checker {
 					}
 					expr.resolved_type = int_hint;
 				} else {
-					expr.resolved_type = primitiveType(ResolvedType::I32);
+					// No concrete numeric target yet: stay untyped and let unification with the
+					// surrounding operand (or a later materialization point) pin the width.
+					expr.resolved_type = untypedInt();
 				}
 				return expr.resolved_type;
 			}
@@ -1427,7 +1350,7 @@ struct Checker {
 					}
 					expr.resolved_type = float_hint;
 				} else {
-					expr.resolved_type = (float_hint && isFloatType(float_hint)) ? float_hint : primitiveType(ResolvedType::F64);
+					expr.resolved_type = (float_hint && isFloatType(float_hint)) ? float_hint : untypedFloat();
 				}
 				return expr.resolved_type;
 			}
@@ -1486,9 +1409,16 @@ struct Checker {
 					// TODO error msg
 					return nullptr;
 				}
+				// resolved_type must be set before checkFunctionBody (it reads the return
+				// type from it), but a body checked under suppressed errors that fails must
+				// not stay cached: clearing it lets a later non-suppressed check re-run the
+				// body and surface the real diagnostic.
 				expr.resolved_type = fn_type;
 				if (fn.body) {
-					if (!checkFunctionBody(unit, fn)) return nullptr;
+					if (!checkFunctionBody(unit, fn)) {
+						expr.resolved_type = nullptr;
+						return nullptr;
+					}
 				}
 				return fn_type;
 			}
@@ -1570,17 +1500,11 @@ struct Checker {
 		return false;
 	}
 
-	Unit* findUnitByPath(ls_string_view path) {
-		for (Unit& unit : module.units) {
-			if (equalStrings(unit.path, path)) return &unit;
-		}
-		return nullptr;
-	}
-
 	Unit* findImportedUnitByAlias(Unit& unit, ls_string_view alias) {
 		for (const Import& import : unit.imports) {
 			if (!equalStrings(import.alias, alias)) continue;
-			return findUnitByPath(import.path);
+			ASSERT(import.unit);
+			return import.unit;
 		}
 		return nullptr;
 	}
@@ -1665,6 +1589,12 @@ struct Checker {
 
 		ResolvedType* expr_type = checkExpr(unit, &ctx, *var->expression, annotation);
 		if (!expr_type) return false;
+		// Storing into a variable pins the value: an untyped initializer adopts the annotation
+		// (or i32 when inferred). `var x = 5` is i32, not an untyped constant that leaks onward.
+		if (isUntypedNumeric(expr_type)) {
+			expr_type = materializeUntyped(*var->expression, annotation);
+			if (!expr_type) return false;
+		}
 
 		if (annotation && !canImplicitlyConvert(expr_type, annotation)) {
 			errorLine(var->token, "Cannot convert ", expr_type, " to ", annotation, " for variable ", var->name);
@@ -1690,6 +1620,10 @@ struct Checker {
 		}
 		ResolvedType* rhs_type = checkExpr(unit, &ctx, *assign->rhs, lhs_type);
 		if (!rhs_type) return false;
+		if (isUntypedNumeric(rhs_type)) {
+			rhs_type = materializeUntyped(*assign->rhs, lhs_type);
+			if (!rhs_type) return false;
+		}
 		ResolvedType* op_result = nullptr;
 		switch (assign->op) {
 			case Token::EQUAL:
@@ -1765,7 +1699,6 @@ struct Checker {
 		}
 
 		auto checkBranchWithNarrowing = [&](Statement* branch, bool apply_narrowing) -> bool {
-			if (!branch) return true;
 			if (apply_narrowing && narrowed_type) {
 				pushScope(ctx);
 				SemanticLocalBinding& nb = ctx.locals.emplace_back();
@@ -1845,6 +1778,12 @@ struct Checker {
 	bool checkMatchStatement(Unit& unit, FunctionCheckContext& ctx, MatchStatement* ms, ResolvedType* return_type) {
 		ResolvedType* subject = checkExpr(unit, &ctx, *ms->subject, nullptr);
 		if (!subject) return false;
+		// Pin an untyped subject (e.g. `match 5 { ... }`) so the arm patterns get a concrete
+		// type to match against.
+		if (isUntypedNumeric(subject)) {
+			subject = materializeUntyped(*ms->subject, nullptr);
+			if (!subject) return false;
+		}
 
 		// Subject must be a scalar numeric type, enum, or string.
 		const bool subject_is_numeric = isNumericType(subject);
@@ -1930,6 +1869,8 @@ struct Checker {
 			case Statement::EXPRESSION: {
 				ExpressionStatement* expr = static_cast<ExpressionStatement*>(st);
 				if (!checkExpr(unit, &ctx, *expr->expression, nullptr)) return false;
+				// A discarded expression has no context to pin its width; default it to i32.
+				materializeUntyped(*expr->expression, nullptr);
 				return true;
 			}
 			case Statement::RETURN: {
@@ -1945,10 +1886,9 @@ struct Checker {
 				if (return_type->kind == ResolvedType::VOID) {
 					if (ret->expression) {
 						// TODO error msg
-						// TODO return?
 						return false;
 					}
-					return ret->expression == nullptr;
+					return true;
 				}
 				if (!ret->expression) {
 					// TODO error msg
@@ -1956,6 +1896,10 @@ struct Checker {
 				}
 				ResolvedType* expr_type = checkExpr(unit, &ctx, *ret->expression, return_type);
 				if (!expr_type) return false;
+				if (isUntypedInt(expr_type)) {
+					expr_type = materializeUntyped(*ret->expression, return_type);
+					if (!expr_type) return false;
+				}
 				if (!canImplicitlyConvert(expr_type, return_type)) {
 					errorLine(ret->token, "Return expression type ", expr_type, " does not match function return type ", return_type);
 					return false;
@@ -2039,8 +1983,16 @@ struct Checker {
 		}
 
 		for (i32 i = 0; i < unit.imports.size(); ++i) {
-			const Import& import = unit.imports[i];
-			Unit* imported = findUnitByPath(import.path);
+			Import& import = unit.imports[i];
+			Unit* imported = import.unit;
+			if (!imported) {
+				for (Unit& u : module.units) {
+					if (equalStrings(u.path, import.path)) {
+						imported = &u;
+						break;
+					}
+				}
+			}
 			if (!imported) {
 				ls_string_view source = {};
 				if (equalStrings(import.path, makeStringView("std:math"))) {
@@ -2057,7 +2009,9 @@ struct Checker {
 				}
 				if (ls_module_parse(&module, source, import.path) == LS_RESULT_FAILURE) return false;
 				imported = &module.units.back();
+				import.unit = imported;
 			}
+			if (imported) import.unit = imported;
 			if (imported && !resolveImportsForUnit(*imported, import_resolver, import_resolver_userdata, out)) return false;
 		}
 
@@ -2073,6 +2027,35 @@ struct Checker {
 			if (!resolveImportsForUnit(unit, import_resolver, import_resolver_userdata, out)) return false;
 		}
 		return true;
+	}
+
+	ls_result typecheck() {
+		// Phase 1: resolve operator signatures and attach to host structs without checking
+		// bodies. Operator bodies may call other operators, so all attachments must be
+		// complete before any body is checked.
+		for (Unit& unit : module.units) {
+			for (Symbol& sym : unit.symbols) {
+				const Token::Type op = tokenFromOperatorName(sym.name);
+				if (op == Token::ERROR) continue;
+				if (!sym.expression || sym.expression->kind != Expression::FUNCTION) continue;
+				FunctionExpression& fn = static_cast<FunctionExpression&>(*sym.expression);
+				if (!fn.comptime_params.empty()) continue;
+				FunctionResolvedType* fn_type = buildFunctionType(unit, fn, false);
+				if (!fn_type) return LS_RESULT_FAILURE;
+				for (ResolvedType* param : fn_type->param_types) {
+					if (param->kind != ResolvedType::STRUCT) continue;
+					static_cast<StructResolvedType*>(param)->decl->operators.push({op, &fn});
+					break;
+				}
+			}
+		}
+		// Phase 2: check all symbols including operator bodies.
+		for (Unit& unit : module.units) {
+			for (Symbol& sym : unit.symbols) {
+				if (checkSymbol(unit, sym) == LS_RESULT_FAILURE) return LS_RESULT_FAILURE;
+			}
+		}
+		return LS_RESULT_OK;
 	}
 
 	ls_result checkSymbol(Unit& unit, Symbol& sym) {
@@ -2127,13 +2110,20 @@ struct Checker {
 					if (!fn_type) return fail();
 					sym.resolved_type = fn_type;
 					if (const Token::Type op_token = tokenFromOperatorName(sym.name); op_token != Token::ERROR) {
-						if (!operatorDeclArityMatches(op_token, (i32)fn_type->param_types.size())) {
+						const i32 arity = (i32)fn_type->param_types.size();
+						if ((op_token == Token::MINUS ? (arity != 1 && arity != 2) : arity != 2)) {
 							errorLine(sym.token, "Invalid operator arity");
 							return fail();
 						}
 						if (operatorHasPrimitiveSignature(*fn_type)) {
 							errorLine(sym.token, "Operator overloads for primitive signatures are not allowed");
 							return fail();
+						}
+						for (ResolvedType* param : fn_type->param_types) {
+							if (param->kind == ResolvedType::ENUM) {
+								errorLine(sym.token, "Operator overloads with enum parameters are not allowed; use a wrapper struct instead");
+								return fail();
+							}
 						}
 					}
 					if (fn.body && checkFunctionBody(unit, fn) == false) return fail();
@@ -2183,6 +2173,10 @@ struct Checker {
 						errorLine(sym.token, "Unresolved initializer for: ", sym.name);
 						return fail();
 					}
+					if (isUntypedNumeric(expr_type)) {
+						expr_type = materializeUntyped(*sym.expression, annotation);
+						if (!expr_type) return fail();
+					}
 					if (annotation && expr_type && !canImplicitlyConvert(expr_type, annotation)) {
 						errorLine(sym.token, "Type mismatch in comptime declaration: ", sym.name);
 						return fail();
@@ -2230,6 +2224,12 @@ struct Checker {
 					errorLine(sym.token, "Unresolved initializer for: ", sym.name);
 					return fail();
 				}
+				// A global initializer is a storage point too: pin an untyped value (to the
+				// annotation, or i32/f64 when inferred) so nothing untyped reaches the backend.
+				if (isUntypedNumeric(expr_type)) {
+					expr_type = materializeUntyped(*sym.expression, annotation);
+					if (!expr_type) return fail();
+				}
 			}
 
 			if (annotation && expr_type && !canImplicitlyConvert(expr_type, annotation)) {
@@ -2248,13 +2248,7 @@ struct Checker {
 
 ls_result ls_module_typecheck(ls_module* module) {
 	if (!module) return LS_RESULT_FAILURE;
-	Checker checker(*module);
-	for (Unit& unit : module->units) {
-		for (Symbol& sym : unit.symbols) {
-			if (checker.checkSymbol(unit, sym) == LS_RESULT_FAILURE) return LS_RESULT_FAILURE;
-		}
-	}
-	return LS_RESULT_OK;
+	return Checker(*module).typecheck();
 }
 
 ls_result ls_module_compile(ls_module* module, ls_string_view source, ls_string_view source_name, ls_import_resolver_fn import_resolver, void* import_resolver_userdata) {

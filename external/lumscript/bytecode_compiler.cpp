@@ -330,13 +330,6 @@ struct FunctionCompiler {
 	}
 };
 
-static Unit* findUnitByPath(ls_module& module, ls_string_view path) {
-	for (Unit& unit : module.units) {
-		if (equalStrings(unit.path, path)) return &unit;
-	}
-	return nullptr;
-}
-
 static Symbol* findSymbolInUnit(ls_module& module, Unit& unit, ls_string_view name) {
 	for (Symbol& sym : unit.symbols) {
 		if (!equalStrings(sym.name, name)) continue;
@@ -349,8 +342,8 @@ static Symbol* findImportedSymbol(ls_module& module, Unit& unit, ls_string_view 
 	Symbol* found = nullptr;
 	for (const Import& import : unit.imports) {
 		if (!empty(import.alias)) continue;
-		Unit* imported = findUnitByPath(module, import.path);
-		if (!imported) continue;
+		ASSERT(import.unit);
+		Unit* imported = import.unit;
 		for (Symbol& sym : imported->symbols) {
 			if (!equalStrings(sym.name, name)) continue;
 			if (found && found != &sym) return nullptr;
@@ -442,8 +435,8 @@ static bool structFieldSlotOffset(StructResolvedType* st, ls_string_view name, u
 static Symbol* findImportedQualifiedSymbol(ls_module& module, Unit& unit, ls_string_view qualifier, ls_string_view name) {
 	for (const Import& import : unit.imports) {
 		if (!equalStrings(import.alias, qualifier)) continue;
-		Unit* imported = findUnitByPath(module, import.path);
-		if (!imported) return nullptr;
+		ASSERT(import.unit);
+		Unit* imported = import.unit;
 		for (Symbol& sym : imported->symbols) {
 			if (!equalStrings(sym.name, name)) continue;
 			return &sym;

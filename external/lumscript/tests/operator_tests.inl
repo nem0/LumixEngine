@@ -209,15 +209,9 @@ TEST(EqualityOperatorOverloadAmbiguityFails) {
 }
 
 TEST(RejectedOperatorCandidateDoesNotRetypeOperands) {
+	// When a candidate is rejected during probing, the commit pass of the winning
+	// candidate must correctly retype all operands regardless of stale probe state.
 	const char* source = R"(
-		enum First {
-			Value
-		}
-
-		enum Second {
-			Value
-		}
-
 		struct FirstBox {
 			value : i32;
 		}
@@ -226,16 +220,16 @@ TEST(RejectedOperatorCandidateDoesNotRetypeOperands) {
 			value : i32;
 		}
 
-		operator +(value : First, box : FirstBox) : i32 {
+		operator +(a : FirstBox, b : i32) : i32 {
 			return 77;
 		}
 
-		operator +(value : Second, box : SecondBox) : i32 {
-			return box.value + 1;
+		operator +(a : SecondBox, b : i32) : i32 {
+			return b + 1;
 		}
 
 		fn main() : i32 {
-			return .Value + FirstBox { 42 };
+			return FirstBox { 42 } + 5;
 		}
 	)";
 
@@ -397,6 +391,32 @@ TEST(BinaryNumericOperatorsRequireSameOperandType) {
 	return true;
 }
 
+TEST(ComparisonInfersLiteralOperandTypeBidirectionally) {
+	// `x == 3` already compiles because the i64 lhs flows as the hint into the
+	// literal. The flipped form must behave the same: a literal on the left
+	// should infer its type from the non-literal operand on the right instead of
+	// eagerly defaulting to i32. Currently red - operand inference is one-way.
+	const char* source = R"(
+		fn main() : bool {
+			const x : i64 = 5;
+			return 3 == x;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ComparisonInfersFloatLiteralOperandTypeBidirectionally) {
+	const char* source = R"(
+		fn main() : bool {
+			const x : f32 = 1.5;
+			return 1.5 == x;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
 TEST(ModuloRequiresIntegerOperandsFails) {
 	const char* source = R"(
 		fn main() : void {
@@ -530,6 +550,309 @@ TEST(CompoundAssignOnStructWithNoOverloadFails) {
 		fn main() : void {
 			var v = Vec2 { 1.0, 2.0 };
 			v += Vec2 { 3.0, 4.0 };
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(EnumOperatorDeclarationFails) {
+	// Operators with enum parameters are not allowed; use a wrapper struct instead.
+	const char* source = R"(
+		enum Direction { Up, Down }
+
+		operator +(a : Direction, b : Direction) : Direction { return a; }
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(MixedStructPrimitiveOperatorF32LiteralTypecheck) {
+	const char* source = R"(
+		struct Vec2 {
+			x : f32;
+			y : f32;
+		}
+
+		operator *(a : Vec2, b : f32) : Vec2 {
+			return Vec2 { a.x * b, a.y * b };
+		}
+
+		fn main() : Vec2 {
+			const v = Vec2 { 1.0, 2.0 };
+			return v * 3.0;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(MixedStructPrimitiveOperatorI64LiteralTypecheck) {
+	// 2 defaults to i32 without a hint; the i64 parameter hint must flip it to i64.
+	const char* source = R"(
+		struct Counter {
+			value : i64;
+		}
+
+		operator +(a : Counter, b : i64) : Counter {
+			return Counter { a.value + b };
+		}
+
+		fn main() : Counter {
+			const c = Counter { 10 };
+			return c + 5;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(MixedStructPrimitiveOperatorRuntime) {
+	const char* source = R"(
+		struct Vec2 {
+			x : f32;
+			y : f32;
+		}
+
+		operator *(a : Vec2, b : f32) : Vec2 {
+			return Vec2 { a.x * b, a.y * b };
+		}
+
+		fn main() : f32 {
+			const v = Vec2 { 1.0, 2.0 };
+			const scaled = v * 3.0;
+			return scaled.y;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_FLOAT_EQ(6.0f, ls_to_f32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(MixedStructPrimitiveOperatorWrongLiteralTypeFails) {
+	// f64 literal used where the only overload expects f32 on the left — no match.
+	const char* source = R"(
+		struct Vec2 {
+			x : f32;
+			y : f32;
+		}
+
+		operator *(a : Vec2, b : f32) : Vec2 {
+			return Vec2 { a.x * b, a.y * b };
+		}
+
+		fn main() : Vec2 {
+			const v = Vec2 { 1.0, 2.0 };
+			const scale : f64 = 3.0;
+			return v * scale;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(EnumOperatorMixedDeclarationFails) {
+	// Enum parameter is disallowed even when the other parameter is a struct.
+	const char* source = R"(
+		struct Box { value : i32; }
+		enum Direction { Up, Down }
+
+		operator +(a : Direction, b : Box) : i32 { return 1; }
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(EnumOperatorRhsDeclarationFails) {
+	// Enum parameter on the right side is also disallowed.
+	const char* source = R"(
+		struct Box { value : i32; }
+		enum Direction { Up, Down }
+
+		operator +(a : Box, b : Direction) : i32 { return 1; }
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(EnumUnaryOperatorDeclarationFails) {
+	// Unary operators with an enum parameter are disallowed.
+	const char* source = R"(
+		enum Direction { Up, Down }
+
+		operator -(a : Direction) : Direction { return a; }
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(FunctionLiteralOperatorOperandFails) {
+	// A function value can never match a struct operator parameter; resolution
+	// must reject it cleanly. The literal's body is probed under suppressed errors,
+	// so this also guards that a function operand doesn't crash or hang resolution.
+	const char* source = R"(
+		struct Box { value : i32; }
+
+		operator +(a : Box, b : Box) : Box {
+			return a;
+		}
+
+		fn main() : void {
+			const b = Box { 1 };
+			const r = b + fn() : i32 { return 0; };
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(PrimitiveLhsUserTypeRhsOperatorTypecheck) {
+	const char* source = R"(
+		struct Vec2 {
+			x : f32;
+			y : f32;
+		}
+
+		operator *(a : f32, b : Vec2) : Vec2 {
+			return Vec2 { a * b.x, a * b.y };
+		}
+
+		fn main() : Vec2 {
+			return 3.0 * Vec2 { 1.0, 2.0 };
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(PrimitiveLhsUserTypeRhsOperatorRuntime) {
+	const char* source = R"(
+		struct Vec2 {
+			x : f32;
+			y : f32;
+		}
+
+		operator *(a : f32, b : Vec2) : Vec2 {
+			return Vec2 { a * b.x, a * b.y };
+		}
+
+		fn main() : f32 {
+			const v = 3.0 * Vec2 { 1.0, 2.0 };
+			return v.y;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_FLOAT_EQ(6.0f, ls_to_f32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(MultiplePrimitiveLhsOverloadsOnSameTypeRuntime) {
+	// Two primitive-side overloads on the same type; concrete typed variables must
+	// select the right one via exact matching.
+	const char* source = R"(
+		struct Vec2 {
+			x : f32;
+			y : f32;
+		}
+
+		operator *(a : f32, b : Vec2) : Vec2 {
+			return Vec2 { a * b.x, a * b.y };
+		}
+
+		operator *(a : i32, b : Vec2) : Vec2 {
+			return Vec2 { a as f32 * b.x, a as f32 * b.y };
+		}
+
+		fn main() : f32 {
+			const v = Vec2 { 1.0, 2.0 };
+			const sf : f32 = 3.0;
+			const si : i32 = 3;
+			const by_float = sf * v;
+			const by_int = si * v;
+			return by_float.y + by_int.y;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_FLOAT_EQ(12.0f, ls_to_f32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+
+TEST(ImportedPrimitiveLhsUserTypeRhsOperatorTypecheck) {
+	const char* main_source = R"(
+		import "math"
+
+		fn main() : Vec2 {
+			return 3.0 * Vec2 { 1.0, 2.0 };
+		}
+	)";
+	const char* math_source = R"(
+		struct Vec2 {
+			x : f32;
+			y : f32;
+		}
+
+		operator *(a : f32, b : Vec2) : Vec2 {
+			return Vec2 { a * b.x, a * b.y };
+		}
+	)";
+	LumScriptImportFile file = { toLs("math"), toLs(math_source) };
+	LumScriptImportFiles files = { &file, 1 };
+	EXPECT_COMPILE_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
+TEST(OperatorUsingAnotherOperator) {
+	const char* source = R"(
+		struct Vec2 {
+			x : f32;
+			y : f32;
+		}
+
+		operator -(a : Vec2, b : Vec2) : Vec2 {
+			return a + Vec2 { -b.x, -b.y };
+		}
+
+		operator +(a : Vec2, b : Vec2) : Vec2 {
+			return Vec2 { a.x + b.x, a.y + b.y };
+		}
+
+		fn main() : Vec2 {
+			const a = Vec2 { 3.0, 5.0 };
+			const b = Vec2 { 1.0, 2.0 };
+			return a - b;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(FunctionLiteralOperandBodyErrorIsReported) {
+	// The function literal's body has a real type error (string returned as i32).
+	// It is checked under suppressed errors during the failed operator probe; the
+	// fix clears its cached resolved_type on failure so the error still surfaces.
+	const char* source = R"(
+		struct Box { value : i32; }
+
+		operator +(a : Box, b : Box) : Box {
+			return a;
+		}
+
+		fn main() : void {
+			const b = Box { 1 };
+			const r = b + fn() : i32 { return "oops"; };
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);

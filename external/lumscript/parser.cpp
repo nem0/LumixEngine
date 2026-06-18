@@ -286,6 +286,7 @@ struct Parser {
 			case Token::F64:
 			case Token::STRING_KW:
 			case Token::CPTR:
+			case Token::TYPE_KW:
 				return makeExpr<TypeLiteralExpression>(token, typeFromToken(token)->kind);
 			case Token::IDENTIFIER: {
 				IdentifierExpression* expr = makeExpr<IdentifierExpression>(token);
@@ -579,6 +580,7 @@ struct Parser {
 			case Token::F32: res = makeParsedType<ParsedType>(token, ParsedType::F32); break;
 			case Token::F64: res = makeParsedType<ParsedType>(token, ParsedType::F64); break;
 			case Token::CPTR: res = makeParsedType<ParsedType>(token, ParsedType::CPTR); break;
+			case Token::TYPE_KW: res = makeParsedType<ParsedType>(token, ParsedType::TYPE); break;
 			case Token::IDENTIFIER: {
 				QualifiedParsedType* qualified = makeParsedType<QualifiedParsedType>(token);
 				qualified->name = token.value;

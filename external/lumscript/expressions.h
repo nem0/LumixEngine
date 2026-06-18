@@ -182,13 +182,21 @@ struct FunctionExpression : Expression {
 	bool is_extern = false;
 };
 
+struct StructOperator {
+	Token::Type op;
+	struct FunctionExpression* fn;
+};
+
 struct StructExpression : Expression {
-	StructExpression(ls_arena& arena) : Expression(STRUCT), comptime_params(arena), fields(arena) {}
+	StructExpression(ls_arena& arena) : Expression(STRUCT), comptime_params(arena), fields(arena), operators(arena) {}
 
 	ExpArray<NamedDecl> comptime_params; // [...]
 	// Fields keep parsed type syntax so generic structs can be instantiated with
 	// different comptime arguments before producing concrete resolved field types.
 	ExpArray<NamedDecl> fields;
+	// Operator overloads hosted on this type (first struct operand).
+	// Populated during symbol checking; used for O(1)-ish operator lookup.
+	ExpArray<StructOperator> operators;
 };
 
 struct EnumMember {

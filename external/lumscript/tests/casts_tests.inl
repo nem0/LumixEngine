@@ -229,5 +229,62 @@ TEST(CastToValueFails) {
 	)";
 	EXPECT_COMPILE_FAIL(source2);
 
+	const char* source3 = R"(
+		fn foo() : void {}
+
+		fn main() : void {
+			var j : i32 = 5;
+			const x = 4 as j;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source3);
+
+	const char* source4 = R"(
+		fn foo() : void {}
+
+		fn main() : void {
+			var j : i32 = 5;
+			const x = j as 4;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source4);
+
+	return true;
+
+	const char* source5 = R"(
+		struct Vec2 {
+			x : i32;
+			y : i32;
+		}
+
+		fn main() : void {
+			const v : Vec2 = Vec2 { 1, 2 };
+			const x : i32 = v as i32;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source5);
+	return true;
+}
+
+TEST(ExplicitCastRequired) {
+	{
+		const char* invalid = R"(
+			fn main() : f32 {
+				const x : i32 = 10;
+				return x;
+			}
+		)";
+		EXPECT_COMPILE_FAIL(invalid);
+	}
+
+	{
+		const char* valid = R"(
+			fn main() : f32 {
+				const x : i32 = 10;
+				return x as f32;
+			}
+		)";
+		EXPECT_COMPILE(valid);
+	}
 	return true;
 }

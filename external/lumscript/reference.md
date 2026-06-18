@@ -138,6 +138,11 @@ JIT is intentionally out of scope for the first version.
 - operators
 	- operators are clearly useful, why would we have them for primitive types otherwise
 	- very noisy and hard to read without it `add(add(mul(a.x, b.x), mul(a.y, b.y)), mul(a.z, b.z))` vs `a.x * b.x + a.y * b.y + a.z * b.z`
+	- enum parameters are disallowed in operator overloads
+		- enums are labels, not values to compute with; arithmetic on them is semantically odd
+		- every modern language that designed enums carefully (Rust, Swift, Kotlin, Zig) keeps arithmetic off enums and handles bit-flag patterns through a separate mechanism (wrapper struct, macro, or protocol)
+		- bit-flag use cases are served by wrapping the integer in a struct
+		- allowing enum operators creates resolution complexity (shorthand `.Foo` in probe-and-commit overload resolution) for no practical gain
 
 - undefined behavior
 	- compared to C or C++, try to define as much behavior as possible
@@ -628,6 +633,7 @@ Rules:
   - unary `-`
 - `and` and `or` remain built-in short-circuit operators and are not overloaded
 - declaring an operator overload for a built-in primitive signature, such as `operator +(f32, f32)`, is a compile-time error
+- declaring an operator overload where any parameter is an enum type is a compile-time error; use a wrapper struct for bit-flag patterns instead
 - overload resolution uses exact type matching
 - no implicit casts are performed to make an operator applicable
 - imported modules participate in operator lookup
@@ -695,12 +701,6 @@ Built-in and user types:
 - user-defined `struct` types
 - user-defined `enum` types
 - function types
-
-Not implemented yet:
-
-- maps, pointers, references as first-class types
-- closures
-- user-declared methods
 
 `Vec3`, `DVec3`, and `Quat` are core value types used heavily by engine APIs:
 

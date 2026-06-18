@@ -71,6 +71,7 @@ struct ArenaOwner {
 struct Import {
 	ls_string_view path = {};
 	ls_string_view alias = {}; // empty when imported without `as`
+	Unit* unit = nullptr; // cached resolved unit pointer, set during import resolution
 };
 
 // Returns the symbol name used to store an operator overload, e.g. Token::PLUS → "+".

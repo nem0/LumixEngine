@@ -23,6 +23,8 @@ struct ResolvedType {
 		F64,
 		STRING,
 		CPTR,
+		UNTYPED_INT,
+		UNTYPED_FLOAT,
 		META, // the type of a type: resolved_type of enum/struct/fn declarations
 		ENUM,
 		STRUCT,
