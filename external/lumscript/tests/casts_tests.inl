@@ -22,6 +22,65 @@ TEST(BytecodeExplicitCastNumeric) {
 	return true;
 }
 
+TEST(BytecodeExplicitCastLargeIntegerToI64) {
+	const char* source = R"(
+		fn main() : i64 {
+			return 2147483648 as i64;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ls_runtime* runtime = ls_runtime_create(bytecode);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_TRUE(ls_to_i64(runtime, -1) == 2147483648ll);
+
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeExplicitCastLargeIntegerToI64LocalAndArg) {
+	const char* source = R"(
+		fn take_i64(v : i64) : i64 {
+			return v;
+		}
+
+		fn local() : i64 {
+			const x : i64 = 2147483648 as i64;
+			return x;
+		}
+
+		fn arg() : i64 {
+			return take_i64(2147483648 as i64);
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ls_runtime* runtime = ls_runtime_create(bytecode);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_TRUE(ls_call(runtime, toLs("local")));
+	EXPECT_TRUE(ls_to_i64(runtime, -1) == 2147483648ll);
+	EXPECT_TRUE(ls_call(runtime, toLs("arg")));
+	EXPECT_TRUE(ls_to_i64(runtime, -1) == 2147483648ll);
+
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
 TEST(BytecodeExplicitCastEnumToInteger) {
 	const char* source = R"(
 		enum State {
@@ -51,6 +110,21 @@ TEST(BytecodeExplicitCastEnumToInteger) {
 	return true;
 }
 
+TEST(BytecodeExplicitCastEnumToFloatFails) {
+	const char* source = R"(
+		enum State {
+			Idle,
+			Running
+		}
+		fn main() : f64 {
+			const s : State = .Running;
+			return s as f64;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(RuntimeCasts) {
 	const char* source = R"(
 		fn to_f32() : f32 {
@@ -62,11 +136,6 @@ TEST(RuntimeCasts) {
 			const x : f32 = 12.75;
 			return x as i32;
 		}
-
-		fn to_bool() : bool {
-			const x : i32 = 1;
-			return x as bool;
-		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
@@ -76,9 +145,58 @@ TEST(RuntimeCasts) {
 	EXPECT_FLOAT_EQ(10, ls_to_f32(runtime, -1));
 	EXPECT_TRUE(ls_call(runtime, toLs("to_i32")));
 	EXPECT_EQ(12, ls_to_i32(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("to_bool")));
-	EXPECT_TRUE(ls_to_bool(runtime, -1));
 	CAPI_END(module);
+	return true;
+}
+
+TEST(BoolToIntCastFails) {
+	const char* source = R"(
+		fn main() : i32 {
+			const x : bool = true;
+			return x as i32;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(IntToBoolCastFails) {
+	const char* source = R"(
+		fn main() : bool {
+			const x : i32 = 1;
+			return x as bool;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(FloatToEnumCastFails) {
+	const char* return_source = R"(
+		enum State {
+			Idle,
+			Running
+		}
+
+		fn to_state(v : f32) : State {
+			return v as State;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(return_source);
+
+	const char* local_source = R"(
+		enum State {
+			Idle,
+			Running
+		}
+
+		fn main() : void {
+			const x : f64 = 12.75;
+			const s : State = x as State;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(local_source);
+
 	return true;
 }
 

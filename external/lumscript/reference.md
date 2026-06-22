@@ -731,13 +731,16 @@ const a = 12 + 13;       // defaults to i32
 const b : f32 = 12 + 13; // the expression is concretized as f32
 const c = 12.5;          // defaults to f64
 takes_f32(12);           // 12 is concretized as f32
+const big = 2147483648;  // infers i64
+const huge = 18446744073709551615; // infers u64
 ```
 
 An untyped constant can be concretized as a numeric type only when its value is representable by that type. This contextual concretization is not an implicit cast between concrete numeric types.
 
 Defaults when context is insufficient:
 
-- integer literals default to `i32`
+- integer literals infer `i32` when they fit, otherwise `i64`, otherwise `u64`
+- integer literals that do not fit `u64` are compile errors
 - decimal literals default to `f64`
 
 There are still no implicit numeric casts between concrete types.
@@ -1183,7 +1186,6 @@ const decimal = whole as f32;
 Supported scalar cast targets:
 
 ```cpp
-x as bool
 x as i8
 x as u8
 x as i16
@@ -1196,7 +1198,17 @@ x as f32
 x as f64
 ```
 
-Enums can cast to integers, and integers can cast to enums:
+Boolean casts are not supported.
+
+Untyped integer literals inside an explicit cast are materialized to the destination
+numeric width when possible, so large values can be cast directly to wider integer
+types:
+
+```cpp
+const value : i64 = 2147483648 as i64;
+```
+
+Enums can cast to integers, and integers can cast to enums. Enum and floating-point casts are invalid:
 
 ```cpp
 const numeric : i32 = State.Running as i32;

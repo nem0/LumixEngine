@@ -101,6 +101,76 @@ TEST(UntypedNumericExpressionsUseDefaultTypes) {
 	return true;
 }
 
+TEST(UntypedIntegerLiteralsInferI64ForLargeValues) {
+	const char* source = R"(
+		fn takes_i64(v : i64) : void {
+		}
+
+		fn main() : void {
+			const value = 2147483648;
+			const negative = -2147483649;
+			takes_i64(value);
+			takes_i64(negative);
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(UntypedIntegerLiteralI64MinCompiles) {
+	const char* source = R"(
+		fn takes_i64(v : i64) : void {
+		}
+
+		fn main() : void {
+			const value = -9223372036854775808;
+			takes_i64(value);
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(UntypedIntegerLiteralU64MaxComparisonRejectsNegativeLiteral) {
+	const char* source = R"(
+		fn main() : bool {
+			return 18446744073709551615 == -1;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(UntypedIntegerLiteralU64MaxComparisonWithExplicitCast) {
+	const char* source = R"(
+		fn main() : bool {
+			return 18446744073709551615 == (-1 as u64);
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(UntypedIntegerLiteralU64MaxCompiles) {
+	const char* source = R"(
+		fn main() : void {
+			const x = 18446744073709551615;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(UntypedIntegerLiteralTooLargeForU64Fails) {
+	const char* source = R"(
+		fn main() : void {
+			const x = 18446744073709551616;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(UntypedIntegerConstantMustFitSignedType) {
 	const char* source = R"(
 		fn main() : i8 {
@@ -125,6 +195,36 @@ TEST(UntypedIntegerMustBeExactlyRepresentableAsFloat) {
 	const char* source = R"(
 		fn main() : f32 {
 			return 16777217;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(UntypedNegativeIntegerMustBeExactlyRepresentableAsFloat) {
+	const char* source = R"(
+		fn main() : f32 {
+			return -16777217;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(UntypedIntegerMustBeExactlyRepresentableAsDouble) {
+	const char* source = R"(
+		fn main() : f64 {
+			return 9007199254740993;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(UntypedNegativeIntegerMustBeExactlyRepresentableAsDouble) {
+	const char* source = R"(
+		fn main() : f64 {
+			return -9007199254740993;
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);

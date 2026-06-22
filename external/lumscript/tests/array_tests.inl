@@ -43,6 +43,26 @@ TEST(StaticArrayConstantIndexOutOfRangeFails) {
 	return true;
 }
 
+TEST(StaticArrayNegativeSizeFails) {
+	const char* source = R"(
+		fn main() : void {
+			var d : i32[-1] = undefined;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(StaticArrayZeroSizeFails) {
+	const char* source = R"(
+		fn main() : void {
+			var d : i32[0] = undefined;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(StaticArrayIndexMustBeInteger) {
 	const char* source = R"(
 		fn main() : void {

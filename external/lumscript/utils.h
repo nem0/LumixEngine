@@ -174,6 +174,20 @@ inline const char* fromCString(ls_string_view input, i64& value) {
 	return p;
 }
 
+inline const char* fromCString(ls_string_view input, u64& value) {
+	const char* p = data(input);
+	const char* const end = p + size(input);
+	u64 result = 0;
+	while (p != end && *p >= '0' && *p <= '9') {
+		const u64 digit = (u64)(*p - '0');
+		if (result > (~0ull - digit) / 10u) return nullptr;
+		result = result * 10u + digit;
+		++p;
+	}
+	value = result;
+	return p;
+}
+
 inline const char* parseDouble(ls_string_view input, double& value) {
 	const char* p = data(input);
 	const char* const end = p + size(input);

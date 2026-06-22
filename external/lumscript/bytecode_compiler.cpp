@@ -17,12 +17,6 @@ static u32 bitcastF32ToU32(float value) {
 	return raw;
 }
 
-static u64 bitcastI64ToU64(i64 value) {
-	u64 raw = 0;
-	copyMemory(&raw, &value, sizeof(raw));
-	return raw;
-}
-
 static ls_type_kind toTypeKind(const ResolvedType* type) {
 	if (!type) return LS_TYPE_VOID;
 	switch (type->kind) {
@@ -1262,7 +1256,7 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression* expr, l
 	switch (expr->kind) {
 		case Expression::INT_LITERAL: {
 			const ls_type_kind kind = expr->resolved_type ? toTypeKind(expr->resolved_type) : defaultLiteralKind(expr, hint);
-			const i64 int_value = static_cast<IntLiteralExpression*>(expr)->value;
+			const u64 int_value = static_cast<IntLiteralExpression*>(expr)->value;
 			if (kind == LS_TYPE_F32) {
 				emitOp(ctx.code, LS_OP_LOAD_CONST_4);
 				emitU32(ctx.code, bitcastF32ToU32((float)int_value));
@@ -1271,7 +1265,7 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression* expr, l
 				emitU64(ctx.code, bitcastF64ToU64((double)int_value));
 			} else {
 				emitOp(ctx.code, LS_OP_LOAD_CONST_8);
-				emitU64(ctx.code, bitcastI64ToU64(int_value));
+				emitU64(ctx.code, int_value);
 			}
 			return kind;
 		}
@@ -1430,7 +1424,7 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression* expr, l
 									return LS_TYPE_INVALID;
 								case Expression::INT_LITERAL:
 									emitOp(ctx.code, LS_OP_LOAD_CONST_8);
-									emitU64(ctx.code, bitcastI64ToU64(static_cast<IntLiteralExpression*>(sym->expression)->value));
+									emitU64(ctx.code, static_cast<IntLiteralExpression*>(sym->expression)->value);
 									return valueKindForType(sym->resolved_type);
 								case Expression::FLOAT_LITERAL: {
 									FloatLiteralExpression* fl = static_cast<FloatLiteralExpression*>(sym->expression);
@@ -1505,7 +1499,7 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression* expr, l
 							return LS_TYPE_INVALID;
 						case Expression::INT_LITERAL:
 							emitOp(ctx.code, LS_OP_LOAD_CONST_8);
-							emitU64(ctx.code, bitcastI64ToU64(static_cast<IntLiteralExpression*>(sym->expression)->value));
+							emitU64(ctx.code, static_cast<IntLiteralExpression*>(sym->expression)->value);
 							return valueKindForType(sym->resolved_type);
 						case Expression::FLOAT_LITERAL: {
 							FloatLiteralExpression* fl = static_cast<FloatLiteralExpression*>(sym->expression);
@@ -2261,7 +2255,7 @@ ls_bytecode* ls_bytecode_compile(
 				switch (literal->kind) {
 					case Expression::INT_LITERAL:
 						emitOp(temp, LS_OP_LOAD_CONST_8);
-						emitU64(temp, bitcastI64ToU64(static_cast<IntLiteralExpression*>(literal)->value));
+						emitU64(temp, static_cast<IntLiteralExpression*>(literal)->value);
 						break;
 					case Expression::FLOAT_LITERAL:
 						if (function.return_kind == LS_TYPE_F32) {

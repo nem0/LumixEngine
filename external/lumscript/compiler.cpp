@@ -274,7 +274,12 @@ struct Checker {
 	bool resolveComptimeIntValue(Unit& unit, Expression* expr, i64& out) {
 		if (!expr) return false;
 		switch (expr->kind) {
-			case Expression::INT_LITERAL: out = static_cast<IntLiteralExpression*>(expr)->value; return true;
+			case Expression::INT_LITERAL: {
+				const u64 value = static_cast<IntLiteralExpression*>(expr)->value;
+				if (value > 9223372036854775807ull) return false;
+				out = (i64)value;
+				return true;
+			}
 			case Expression::IDENTIFIER: {
 				IdentifierExpression* id = static_cast<IdentifierExpression*>(expr);
 				SymbolRef ref = resolveSymbol(unit, {}, id->name, LookupPolicy::NameOnly);
@@ -478,27 +483,43 @@ struct Checker {
 		return (isNumericType(a) && typesEqual(a, b)) ? a : nullptr;
 	}
 
-	static bool intLiteralFitsType(i64 value, ResolvedType::Kind kind) {
+	static bool intLiteralFitsType(u64 value, ResolvedType::Kind kind) {
 		switch (kind) {
-			case ResolvedType::I8: return value >= -128 && value <= 127;
-			case ResolvedType::U8: return value >= 0 && value <= 255;
-			case ResolvedType::I16: return value >= -32768 && value <= 32767;
-			case ResolvedType::U16: return value >= 0 && value <= 65535;
-			case ResolvedType::I32: return value >= (i64)-2147483648LL && value <= (i64)2147483647LL;
-			case ResolvedType::U32: return value >= 0 && value <= (i64)4294967295LL;
-			case ResolvedType::I64: return true;
-			case ResolvedType::U64: return value >= 0;
+			case ResolvedType::I8: return value <= 127u;
+			case ResolvedType::U8: return value <= 255u;
+			case ResolvedType::I16: return value <= 32767u;
+			case ResolvedType::U16: return value <= 65535u;
+			case ResolvedType::I32: return value <= 2147483647u;
+			case ResolvedType::U32: return value <= 4294967295u;
+			case ResolvedType::I64: return value <= 9223372036854775807ull;
+			case ResolvedType::U64: return true;
 			case ResolvedType::F32: {
 				// Value must be exactly representable as f32.
-				if (value < -(1LL << 24) || value > (1LL << 24)) return false;
+				if (value > (1ULL << 24)) return false;
 				float as_f32 = (float)value;
-				return (i64)as_f32 == value;
+				return (u64)as_f32 == value;
 			}
 			case ResolvedType::F64: {
 				// Value must be exactly representable as f64.
 				double as_f64 = (double)value;
-				return (i64)as_f64 == value;
+				return (u64)as_f64 == value;
 			}
+			default: return false;
+		}
+	}
+
+	static bool negatedIntLiteralFitsType(u64 magnitude, ResolvedType::Kind kind) {
+		switch (kind) {
+			case ResolvedType::I8: return magnitude <= 128u;
+			case ResolvedType::U8: return false;
+			case ResolvedType::I16: return magnitude <= 32768u;
+			case ResolvedType::U16: return false;
+			case ResolvedType::I32: return magnitude <= 2147483648u;
+			case ResolvedType::U32: return false;
+			case ResolvedType::I64: return magnitude <= 9223372036854775808ull;
+			case ResolvedType::U64: return false;
+			case ResolvedType::F32: return intLiteralFitsType(magnitude, ResolvedType::F32);
+			case ResolvedType::F64: return intLiteralFitsType(magnitude, ResolvedType::F64);
 			default: return false;
 		}
 	}
@@ -845,15 +866,31 @@ struct Checker {
 		return nullptr;
 	}
 
-	// Pin an UNTYPED_INT expression (and the untyped literals inside it) to a concrete type.
-	// This is the materialization boundary: once a literal value is stored, returned, passed,
-	// or compared it can no longer stay untyped. A null/non-numeric `concrete` means "use the
-	// default", i.e. i32 without a range check (preserving the historical behaviour of a
-	// hint-less literal). A concrete numeric `concrete` range-checks each leaf literal.
+	// Pin an untyped numeric expression to a concrete type.
+	// A concrete `concrete` range-checks leaf literals; a null/non-numeric `concrete`
+	// uses the literal's default inferred width.
 	ResolvedType* materializeUntyped(Expression& expr, ResolvedType* concrete) {
 		if (isUntypedInt(expr.resolved_type)) {
 			if (isNumericType(concrete)) return materializeUntyped(expr, concrete, true);
-			return materializeUntyped(expr, primitiveType(ResolvedType::I32), false);
+			// No target: pin to the narrowest default integer width that holds the value.
+			ResolvedType::Kind kind = ResolvedType::I32;
+			if (expr.kind == Expression::INT_LITERAL) {
+				const u64 value = static_cast<IntLiteralExpression&>(expr).value;
+				if (value > 9223372036854775807ull) kind = ResolvedType::U64;
+				else if (value > 2147483647u) kind = ResolvedType::I64;
+			}
+			else if (expr.kind == Expression::UNARY) {
+				UnaryExpression& un = static_cast<UnaryExpression&>(expr);
+				if (un.op == Token::MINUS && un.expression && un.expression->kind == Expression::INT_LITERAL) {
+					const u64 magnitude = static_cast<IntLiteralExpression*>(un.expression)->value;
+					if (magnitude > 9223372036854775808ull) {
+						errorLine(expr.token, "Integer literal does not fit in any integer type");
+						return nullptr;
+					}
+					if (magnitude > 2147483648u) kind = ResolvedType::I64;
+				}
+			}
+			return materializeUntyped(expr, primitiveType(kind), false);
 		}
 		if (isUntypedFloat(expr.resolved_type)) {
 			if (isFloatType(concrete)) return materializeUntyped(expr, concrete, true);
@@ -866,7 +903,7 @@ struct Checker {
 		if (!isUntypedNumeric(expr.resolved_type)) return expr.resolved_type;
 		switch (expr.kind) {
 			case Expression::INT_LITERAL: {
-				const i64 value = static_cast<IntLiteralExpression&>(expr).value;
+				const u64 value = static_cast<IntLiteralExpression&>(expr).value;
 				if (check_fit && !intLiteralFitsType(value, concrete->kind)) {
 					errorLine(expr.token, "Integer literal does not fit in ", concrete);
 					return nullptr;
@@ -887,11 +924,11 @@ struct Checker {
 			}
 			case Expression::UNARY: {
 				UnaryExpression& un = static_cast<UnaryExpression&>(expr);
-				// A negated integer literal range-checks against the negated value (e.g. -128 fits i8).
+				// A negated integer literal range-checks against the target width.
 				if (un.op == Token::MINUS && un.expression && un.expression->kind == Expression::INT_LITERAL) {
-					const i64 negated = -static_cast<IntLiteralExpression*>(un.expression)->value;
-					if (check_fit && !intLiteralFitsType(negated, concrete->kind)) {
-						errorLine(expr.token, "Integer literal ", negated, " does not fit in type ", concrete);
+					const u64 magnitude = static_cast<IntLiteralExpression*>(un.expression)->value;
+					if (check_fit && !negatedIntLiteralFitsType(magnitude, concrete->kind)) {
+						errorLine(expr.token, "Integer literal does not fit in type ", concrete);
 						return nullptr;
 					}
 					un.expression->resolved_type = concrete;
@@ -916,21 +953,19 @@ struct Checker {
 	ResolvedType* checkUnaryExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr, ResolvedType* hint) {
 		UnaryExpression& un = static_cast<UnaryExpression&>(expr);
 		if (un.op == Token::MINUS && un.expression && un.expression->kind == Expression::INT_LITERAL) {
-			// Range-check the negated value against the expected type.
+			// Range-check the negated integer literal against the expected type.
 			IntLiteralExpression* lit = static_cast<IntLiteralExpression*>(un.expression);
 			ResolvedType* int_hint = unwrapNullable(hint);
-			const i64 negated = -lit->value;
 			if (int_hint && isNumericType(int_hint)) {
-				if (!intLiteralFitsType(negated, int_hint->kind)) {
-					errorLine(expr.token, "Integer literal ", negated, " does not fit in type ", int_hint);
+				if (!negatedIntLiteralFitsType(lit->value, int_hint->kind)) {
+					errorLine(expr.token, "Integer literal does not fit in type ", int_hint);
 					return nullptr;
 				}
 				lit->resolved_type = int_hint;
 				expr.resolved_type = int_hint;
 				return int_hint;
 			}
-			// No concrete target: stay untyped; the negated value is range-checked when this
-			// node is materialized (see materializeUntyped).
+			// No concrete target: stay untyped until materialization chooses a width.
 			lit->resolved_type = untypedInt();
 			expr.resolved_type = lit->resolved_type;
 			return expr.resolved_type;
@@ -1081,12 +1116,12 @@ struct Checker {
 		}
 		const bool src_numeric = isNumericType(src_type);
 		const bool dst_numeric = isNumericType(dst_type);
-		const bool src_bool = src_type->kind == ResolvedType::BOOL;
-		const bool dst_bool = dst_type->kind == ResolvedType::BOOL;
+		const bool src_integer = isIntegerType(src_type);
+		const bool dst_integer = isIntegerType(dst_type);
 		const bool src_enum = src_type->kind == ResolvedType::ENUM;
 		const bool dst_enum = dst_type->kind == ResolvedType::ENUM;
-		const bool valid_cast = (src_numeric && dst_numeric) || (src_bool && dst_bool) || (src_enum && dst_numeric) || (src_numeric && dst_enum) || (src_bool && dst_numeric) ||
-								(src_numeric && dst_bool) || typesEqual(src_type, dst_type);
+		// bool->bool (and any other same-type cast) is covered by the trailing typesEqual.
+		const bool valid_cast = (src_numeric && dst_numeric) || (src_enum && dst_integer) || (src_integer && dst_enum) || typesEqual(src_type, dst_type);
 		if (!valid_cast) {
 			errorLine(expr.token, "Cannot cast ", src_type, " to ", dst_type);
 			return nullptr;
@@ -1326,7 +1361,7 @@ struct Checker {
 			case Expression::INT_LITERAL: {
 				ResolvedType* int_hint = unwrapNullable(hint);
 				if (int_hint && isNumericType(int_hint)) {
-					const i64 value = static_cast<IntLiteralExpression&>(expr).value;
+					const u64 value = static_cast<IntLiteralExpression&>(expr).value;
 					if (!intLiteralFitsType(value, int_hint->kind)) {
 						errorLine(expr.token, "Integer literal does not fit in ", int_hint);
 						return nullptr;
@@ -2224,8 +2259,8 @@ struct Checker {
 					errorLine(sym.token, "Unresolved initializer for: ", sym.name);
 					return fail();
 				}
-				// A global initializer is a storage point too: pin an untyped value (to the
-				// annotation, or i32/f64 when inferred) so nothing untyped reaches the backend.
+				// A global initializer is a storage point too: pin any untyped value before
+				// codegen so nothing untyped reaches the backend.
 				if (isUntypedNumeric(expr_type)) {
 					expr_type = materializeUntyped(*sym.expression, annotation);
 					if (!expr_type) return fail();

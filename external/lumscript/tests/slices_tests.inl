@@ -114,6 +114,66 @@ TEST(SliceOutOfRangeEndFail) {
 	return true;
 }
 
+TEST(SliceNegativeBeginFail) {
+	const char* source = R"(
+		fn main() : void {
+			var values : i32[4] = undefined;
+			var slice : i32[] = values[-1:4];
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(SliceMustHaveColon) {
+	const char* source = R"(
+		fn main() : void {
+			var values : i32[4] = undefined;
+			var slice : i32[] = values[4];
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(SliceNegativeEndFail) {
+	const char* prerequisite = R"(
+		fn main() : void {
+			var values : i32[4] = undefined;
+			var slice : i32[] = values[0:4];
+		}
+	)";
+	EXPECT_COMPILE(prerequisite);
+
+	const char* source = R"(
+		fn main() : void {
+			var values : i32[4] = undefined;
+			var slice : i32[] = values[1:-1];
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(SliceNonIntegerBeginFail) {
+	const char* prerequisite = R"(
+		fn main() : void {
+			var values : i32[4] = undefined;
+			var slice : i32[] = values[0:4];
+		}
+	)";
+	EXPECT_COMPILE(prerequisite);
+
+	const char* source = R"(
+		fn main() : void {
+			var values : i32[4] = undefined;
+			var slice : i32[] = values["abc":4];
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(SliceImplicitConversionLengthRuntime) {
 	const char* source = R"(
 		fn get_length(s : i32[]) : i32 {

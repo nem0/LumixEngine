@@ -79,7 +79,7 @@ struct IdentifierExpression : Expression {
 struct IntLiteralExpression : Expression {
 	IntLiteralExpression() : Expression(INT_LITERAL) {}
 
-	i64 value = 0;
+	u64 value = 0;
 };
 
 struct FloatLiteralExpression : Expression {

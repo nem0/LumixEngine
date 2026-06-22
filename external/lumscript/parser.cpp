@@ -190,8 +190,11 @@ struct Parser {
 			expr->value = value;
 			return expr;
 		}
-		i64 value = 0;
-		fromCString(token.value, value);
+		u64 value = 0;
+		if (!fromCString(token.value, value)) {
+			m_output.errorAt(token, "Integer literal does not fit in u64");
+			return nullptr;
+		}
 		IntLiteralExpression* expr = makeExpr<IntLiteralExpression>(token);
 		expr->value = value;
 		return expr;
