@@ -536,6 +536,17 @@ struct Parser {
 					arg.type = typeFromToken(token);
 					return arg.type != nullptr;
 				}
+				if (m_comptime_params) {
+					for (const NamedDecl& param : *m_comptime_params) {
+						if (equalStrings(param.name, token.value) && !param.parsed_type) {
+							arg.kind = ComptimeArg::TYPE;
+							QualifiedParsedType* q = makeParsedType<QualifiedParsedType>(token);
+							q->name = token.value;
+							arg.type = q;
+							return true;
+						}
+					}
+				}
 				arg.kind = ComptimeArg::EXPRESSION;
 				{
 					IdentifierExpression* expr = makeExpr<IdentifierExpression>(token);
@@ -1076,7 +1087,10 @@ struct Parser {
 	FunctionExpression* functionExpression() {
 		FunctionExpression* fn = make<FunctionExpression>(m_unit.arena);
 		if (!templateParams(fn->comptime_params)) return nullptr;
-		if (!functionSignature(fn)) return nullptr;
+		m_comptime_params = fn->comptime_params.empty() ? nullptr : &fn->comptime_params;
+		bool ok = functionSignature(fn);
+		m_comptime_params = nullptr;
+		if (!ok) return nullptr;
 		fn->body = blockStatement();
 		if (!fn->body) return nullptr;
 		return fn;
@@ -1085,7 +1099,8 @@ struct Parser {
 	StructExpression* structExpression() {
 		StructExpression* st = make<StructExpression>(m_unit.arena);
 		if (!templateParams(st->comptime_params)) return nullptr;
-		if (!consume(Token::LEFT_BRACE)) return nullptr;
+		m_comptime_params = st->comptime_params.empty() ? nullptr : &st->comptime_params;
+		if (!consume(Token::LEFT_BRACE)) { m_comptime_params = nullptr; return nullptr; }
 		while (peekToken().type != Token::RIGHT_BRACE) {
 			if (peekToken().type == Token::END_OF_FILE) {
 				m_output.error("Unexpected end of file");
@@ -1104,6 +1119,7 @@ struct Parser {
 			if (!field.parsed_type) return nullptr;
 			if (!consume(Token::SEMICOLON)) return nullptr;
 		}
+		m_comptime_params = nullptr;
 		if (!consume(Token::RIGHT_BRACE)) return nullptr;
 		return st;
 	}
@@ -1272,6 +1288,7 @@ struct Parser {
 	Unit& m_unit;
 	Tokenizer m_tokenizer;
 	OutputFormatter m_output;
+	const ExpArray<NamedDecl>* m_comptime_params = nullptr;
 };
 
 // Parse a module, e.g. `ls_module_parse(module, source, name)`.

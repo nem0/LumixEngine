@@ -74,6 +74,14 @@ struct Import {
 	Unit* unit = nullptr; // cached resolved unit pointer, set during import resolution
 };
 
+struct TemplateFunctionInstance {
+	ls_string_view name = {};
+	Symbol* source_symbol = nullptr;
+	FunctionExpression* source = nullptr;
+	FunctionExpression* instance = nullptr;
+	FunctionResolvedType* type = nullptr;
+};
+
 // Returns the symbol name used to store an operator overload, e.g. Token::PLUS → "+".
 // Operator names are non-identifier strings, so they cannot collide with user symbols.
 // Returns nullptr for non-overloadable tokens.
@@ -130,6 +138,8 @@ struct Unit {
 		, symbols(arena)
 		, types(arena)
 		, imports(arena)
+		, template_struct_instances(arena)
+		, template_function_instances(arena)
 		, path(path) {}
 
 	enum ImportState { IMPORT_PENDING, IMPORT_RESOLVING, IMPORT_DONE };
@@ -141,6 +151,8 @@ struct Unit {
 	ExpArray<Symbol> symbols;
 	ExpArray<ResolvedType> types;
 	ExpArray<Import> imports;
+	ExpArray<StructResolvedType*> template_struct_instances;
+	ExpArray<TemplateFunctionInstance> template_function_instances;
 };
 
 struct ls_module {

@@ -859,3 +859,16 @@ TEST(FunctionLiteralOperandBodyErrorIsReported) {
 	return true;
 }
 
+TEST(CompoundAssignmentNonNumericRhsFails) {
+	// `i32 += string` must be rejected: the numeric LHS fast-path in compound
+	// assignment must still verify the rhs is convertible to the target type.
+	const char* source = R"(
+		fn main() : void {
+			var x : i32 = 0;
+			x += "hello";
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+

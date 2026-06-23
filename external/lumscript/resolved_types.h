@@ -70,8 +70,9 @@ struct StructResolvedType : ResolvedType {
 };
 
 struct FunctionResolvedType : ResolvedType {
-	FunctionResolvedType(ls_arena& arena) : ResolvedType(FUNCTION), param_types(arena) {}
+	FunctionResolvedType(ls_arena& arena) : ResolvedType(FUNCTION), type_args(arena), param_types(arena) {}
 
+	ExpArray<ResolvedType*> type_args;
 	ExpArray<ResolvedType*> param_types;
 	ResolvedType* return_type = nullptr;
 	FunctionExpression* decl = nullptr;

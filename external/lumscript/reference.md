@@ -107,7 +107,6 @@ JIT is intentionally out of scope for the first version.
 	- so our options are `[]`, `<>`, `()`, `{}`
 	- there are already languages using `[]` and `<>` for templates
 	- `<>` is harder to parse thana `[]`
-	- **open questions**: should we make the syntax unambigous with something like `.[]`
 
 - raw memory api
 	- we want raw memory api so users can implement their own containers, arenas and other features
@@ -432,7 +431,7 @@ fn double(v : i32) : i32 {
 comptime N = double(16); // N == 32
 ```
 
-Comptime calls do not create new type declarations. Type construction is intentionally limited to `struct[...]` and `enum[...]` template expressions, so arbitrary compile-time functions cannot return freshly declared struct or enum types:
+Comptime calls do not create new type declarations. Type construction is intentionally limited to `struct[...]` template expressions, so arbitrary compile-time functions cannot return freshly declared struct or enum types:
 
 ```cpp
 fn make_vec2(T : type) : type {
@@ -477,13 +476,13 @@ Rules:
 - a comptime call may call only compile-time-known function values
 - functions cannot return `type`
 - functions cannot create new struct or enum types from their body
-- new generic types are declared with `struct[...]` or `enum[...]`, not by returning `type` from a function
+- new generic types are declared with `struct[...]` not by returning `type` from a function
 - native/extern functions are runtime-only unless explicitly marked otherwise by a future extension
 - comptime evaluation has an implementation-defined recursion/step limit to prevent non-terminating compilation
 
 ### Templates
 
-Templates are compile-time functions or type constructors. Type parameters are compile-time parameters, written inside square brackets.
+Templates are compile-time functions or type constructors. Template parameters are written inside square brackets. A bare parameter name is a type parameter; a parameter with an explicit type annotation, such as `N : i32`, is a compile-time value parameter.
 
 **Struct templates:**
 
@@ -573,7 +572,7 @@ struct Map[K, V] {
 }
 ```
 
-Template parameters can also have explicit compile-time value types:
+Template parameters can also have explicit compile-time value types. In other words, if a parameter has a type annotation, it is treated as a value parameter:
 
 ```cpp
 struct StaticArray[T, N : i32] {

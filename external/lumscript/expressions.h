@@ -119,9 +119,10 @@ struct CallExpression : Expression {
 
 	Expression* callee = nullptr;
 	ExpArray<Expression*> args;
-	// Set by the type checker when UFCS resolves to a specific function declaration,
-	// so the bytecode compiler doesn't re-resolve and pick the wrong overload.
-	FunctionExpression* ufcs_fn = nullptr;
+	// Set by the type checker when this call has a pre-resolved direct target —
+	// either a template instantiation or a UFCS-selected free function. The bytecode
+	// compiler uses this instead of re-deriving resolution per callee shape.
+	FunctionExpression* resolved_fn = nullptr;
 };
 
 struct UnaryExpression : Expression {

@@ -26,6 +26,75 @@ TEST(TemplateFunctionIdentityF32) {
 	return true;
 }
 
+TEST(TemplateFunctionBodyCanUseTemplateParam) {
+	const char* source = R"(
+		fn identity[T](a : T) : T {
+			var values : T[1] = undefined;
+			values[0] = a;
+			return values[0];
+		}
+
+		fn main() : i32 {
+			return identity(42);
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(TemplateFunctionRecursiveInstantiationCompiles) {
+	const char* source = R"(
+		fn wrap[T](a : T) : T {
+			return wrap(a);
+		}
+
+		fn main() : i32 {
+			return wrap(42);
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(TemplateFunctionLoopBodyIsClonedPerInstantiation) {
+	const char* source = R"(
+		struct Number {
+			low : i32;
+			high : i32;
+		}
+
+		operator +(a : Number, b : Number) : Number {
+			return Number { a.low + b.low, a.high + b.high };
+		}
+
+		fn twice[T](value : T) : T {
+			var result : T = value;
+			var i : i32 = 0;
+			while i < 1 {
+				var copy : T = value;
+				result = result + copy;
+				i += 1;
+			}
+			return result;
+		}
+
+		fn main() : i32 {
+			// The later i32 instantiation must not overwrite semantic annotations in
+			// the loop body of the earlier, two-slot Number instantiation.
+			const number_result = twice(Number { 20, 1 });
+			const integer_result = twice(1);
+			return number_result.low + number_result.high;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(TemplateFunctionNullableReturnContextCompiles) {
 	const char* source = R"(
 		fn identity[T](a : T) : T {
@@ -34,6 +103,22 @@ TEST(TemplateFunctionNullableReturnContextCompiles) {
 
 		fn main() : ?i32 {
 			return identity(42);
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(TemplateFunctionNullableReturnInfersFromContext) {
+	const char* source = R"(
+		fn maybe[T](value : T) : ?T {
+			return value;
+		}
+
+		fn main() : ?i32 {
+			// The expected ?i32 return type should infer T as i32, while preserving
+			// the nullable wrapper when matching the template's ?T return type.
+			return maybe(42);
 		}
 	)";
 	EXPECT_COMPILE(source);
@@ -585,7 +670,7 @@ TEST(TemplateFunctionImportedTwoInstantiations) {
 
 		fn main() : f32 {
 			const a = lib.identity(42);
-			const b = lib.identity(1.5);
+			const b : f32 = lib.identity(1.5);
 			return b;
 		}
 	)";
@@ -695,6 +780,35 @@ TEST(TemplateStructImportedAndInstantiatedRuntime) {
 		EXPECT_TRUE(ls_call(runtime, toLs("main")));
 		EXPECT_EQ(42, ls_to_i32(runtime, -1));
 	);
+	return true;
+}
+
+TEST(TemplateStructImportedFieldUsesDeclarationUnit) {
+	const char* main_source = R"(
+		import "lib" as lib
+
+		fn main() : i32 {
+			var box : lib.Box[i32] = lib.Box[i32] { lib.Tag { 40 }, 2 };
+			return box.tag.value + box.value;
+		}
+	)";
+	const char* lib_source = R"(
+		struct Tag {
+			value : i32;
+		}
+
+		struct Box[T] {
+			// Tag is declared in this imported unit. Instantiating Box from the
+			// caller must resolve non-template field names in the declaration unit.
+			tag : Tag;
+			value : T;
+		}
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("lib"), toLs(lib_source) },
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_COMPILE_WITH_IMPORTS(main_source, files);
 	return true;
 }
 
@@ -878,9 +992,9 @@ TEST(TemplateFunctionImportBracketCallDisambiguatesAtCheckTime) {
 		}
 
 		fn main() : i32 {
-			const x = 0;
-			liba.a[x] = liba.add_one;
-			return liba.a[x](40) + libb.a[x](x { 1 }).value;
+			const index = 0;
+			liba.a[index] = liba.add_one;
+			return liba.a[index](40) + libb.a[i32](1);
 		}
 	)";
 	const char* liba_source = R"(
@@ -958,8 +1072,7 @@ TEST(TemplateImportedBracketCallUserTypeName) {
 		}
 
 		fn main() : i32 {
-			const x = 0;
-			return libb.a[x](x { 42 }).value;
+			return libb.a[i32](42);
 		}
 	)";
 	const char* libb_source = R"(
@@ -1859,5 +1972,104 @@ TEST(ComptimePrimitiveValueCanBeTemplateValueArg) {
 		}
 	)";
 	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(TemplateStructWithValueParamTypechecks) {
+	const char* source = R"(
+		struct StaticArray[T, N : i32] {
+			values : T[N];
+		}
+
+		fn main() : void {
+			var values : StaticArray[i32, 4] = undefined;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(TemplateStructValueParamWrongTypeFails) {
+	const char* source = R"(
+		struct StaticArray[T, N : i32] {
+			values : T[N];
+		}
+
+		fn main() : void {
+			var values : StaticArray[i32, true] = undefined;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(TemplateStructValueParamMissingArgFails) {
+	const char* source = R"(
+		struct StaticArray[T, N : i32] {
+			values : T[N];
+		}
+
+		fn main() : void {
+			var values : StaticArray[i32] = undefined;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(TemplateStructValueParamNonComptimeExprFails) {
+	const char* source = R"(
+		struct StaticArray[T, N : i32] {
+			values : T[N];
+		}
+
+		fn main() : void {
+			var n : i32 = 4;
+			var values : StaticArray[i32, n] = undefined;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(TemplateStructValueParamWrongCountFails) {
+	const char* source = R"(
+		struct StaticArray[T, N : i32] {
+			values : T[N];
+		}
+
+		fn main() : void {
+			var values : StaticArray[i32, 4, 8] = undefined;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(TemplateStructValueParamNegativeSizeFails) {
+	const char* source = R"(
+		struct StaticArray[T, N : i32] {
+			values : T[N];
+		}
+
+		fn main() : void {
+			var values : StaticArray[i32, -1] = undefined;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(TemplateFunctionValueParamFails) {
+	const char* source = R"(
+		fn choose[T, N : i32](value : T) : i32 {
+			return N;
+		}
+
+		fn main() : i32 {
+			return choose[i32, 7](42);
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
 	return true;
 }

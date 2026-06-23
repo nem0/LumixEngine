@@ -265,3 +265,17 @@ TEST(SelfReferentialStructFunctionFieldCompiles) {
 	EXPECT_COMPILE(source);
 	return true;
 }
+
+TEST(IndirectByValueStructRecursionFails) {
+	const char* source = R"(
+		struct A {
+			b : B;
+		}
+
+		struct B {
+			a : A;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}

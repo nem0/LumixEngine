@@ -9,7 +9,8 @@ struct Checker {
 	i32 suppress_errors = 0;
 
 	Checker(ls_module& module)
-		: module(module) {
+		: module(module)
+		, templates(*this) {
 		error_stream.host = module.host;
 	}
 
@@ -131,6 +132,360 @@ struct Checker {
 		bool comptime_only = false;
 		i32 in_defer = 0;
 	};
+
+	struct TemplateBinding {
+		ls_string_view name = {};
+		ResolvedType* type = nullptr;
+		bool has_value = false;
+		i64 value = 0;
+	};
+
+	struct TemplateArgs {
+		TemplateArgs(ls_arena& arena)
+			: bindings(arena)
+			, type_args(arena)
+			, value_args(arena) {}
+
+		ExpArray<TemplateBinding> bindings;
+		ExpArray<ResolvedType*> type_args;
+		ExpArray<i64> value_args;
+	};
+
+	struct TemplateEnvironment {
+		Checker& checker;
+		const ExpArray<TemplateBinding>* active_bindings = nullptr;
+
+		struct Scope {
+			TemplateEnvironment& env;
+			const ExpArray<TemplateBinding>* previous;
+
+			Scope(TemplateEnvironment& e, const ExpArray<TemplateBinding>& bindings)
+				: env(e), previous(e.active_bindings) {
+				e.active_bindings = &bindings;
+			}
+
+			~Scope() { env.active_bindings = previous; }
+		};
+
+		TemplateEnvironment(Checker& checker) : checker(checker) {}
+
+		const TemplateBinding* findBinding(ls_string_view name) const {
+			if (!active_bindings) return nullptr;
+			for (const TemplateBinding& binding : *active_bindings) {
+				if (equalStrings(binding.name, name)) return &binding;
+			}
+			return nullptr;
+		}
+
+		ResolvedType* findType(ls_string_view name) const {
+			const TemplateBinding* b = findBinding(name);
+			return b ? b->type : nullptr;
+		}
+
+		bool findIntValue(ls_string_view name, i64& out) const {
+			const TemplateBinding* b = findBinding(name);
+			if (!b || !b->has_value) return false;
+			out = b->value;
+			return true;
+		}
+
+		static bool hasValueComptimeParams(const ExpArray<NamedDecl>& params) {
+			for (const NamedDecl& param : params) {
+				if (param.parsed_type) return true;
+			}
+			return false;
+		}
+
+		ResolvedType* resolveTemplateComptimeArgType(Unit& unit, const ComptimeArg& arg) {
+			if (arg.kind == ComptimeArg::TYPE) {
+				return checker.resolveParsedType(unit, arg.type);
+			}
+			return nullptr;
+		}
+
+		bool collectTemplateArgs(Unit& unit, const ExpArray<NamedDecl>& params, const ExpArray<ComptimeArg>& args, TemplateArgs& out, bool allow_value_args) {
+			if (params.size() != args.size()) return false;
+			for (i32 i = 0; i < params.size(); ++i) {
+				const NamedDecl& param = params[i];
+				const ComptimeArg& arg = args[i];
+				TemplateBinding& binding = out.bindings.emplace_back();
+				binding.name = param.name;
+				if (!param.parsed_type) {
+					ResolvedType* type = resolveTemplateComptimeArgType(unit, arg);
+					if (!type) return false;
+					binding.type = type;
+					out.type_args.push(type);
+				}
+				else {
+					if (!allow_value_args) return false;
+					ResolvedType* param_type = checker.resolveParsedType(unit, param.parsed_type);
+					if (!param_type || param_type->kind != ResolvedType::I32) return false;
+					if (arg.kind != ComptimeArg::EXPRESSION) return false;
+					i64 value = 0;
+					if (!checker.resolveComptimeIntValue(unit, arg.expression, value)) return false;
+					binding.has_value = true;
+					binding.value = value;
+					out.value_args.push(value);
+				}
+			}
+			return true;
+		}
+
+		bool collectTemplateArgs(Unit& unit, const ExpArray<NamedDecl>& params, const ExpArray<Expression*>& args, TemplateArgs& out) {
+			if (params.size() != args.size()) return false;
+			for (i32 i = 0; i < params.size(); ++i) {
+				const NamedDecl& param = params[i];
+				if (param.parsed_type) return false;
+				ResolvedType* type = checker.resolveExpressionAsType(unit, *args[i]);
+				if (!type) return false;
+				TemplateBinding& binding = out.bindings.emplace_back();
+				binding.name = param.name;
+				binding.type = type;
+				out.type_args.push(type);
+			}
+			return true;
+		}
+
+		bool typeArgListsEqual(const ExpArray<ResolvedType*>& a, const ExpArray<ResolvedType*>& b) {
+			if (a.size() != b.size()) return false;
+			for (i32 i = 0; i < a.size(); ++i) {
+				if (!checker.typesEqual(a[i], b[i])) return false;
+			}
+			return true;
+		}
+
+		bool valueArgListsEqual(const ExpArray<i64>& a, const ExpArray<i64>& b) {
+			if (a.size() != b.size()) return false;
+			for (i32 i = 0; i < a.size(); ++i) {
+				if (a[i] != b[i]) return false;
+			}
+			return true;
+		}
+
+		StructResolvedType* instantiateStructTemplateWithArgs(Unit& unit, StructExpression& st, ExpArray<TemplateBinding>& bindings, ExpArray<ResolvedType*>& type_args, ExpArray<i64>& value_args) {
+			for (StructResolvedType* instance : unit.template_struct_instances) {
+				if (instance->decl == &st && typeArgListsEqual(instance->type_args, type_args) && valueArgListsEqual(instance->value_args, value_args)) return instance;
+			}
+
+			StructResolvedType* st_type = checker.makeType<StructResolvedType>(unit, *unit.arena.arena);
+			st_type->decl = &st;
+			for (ResolvedType* arg : type_args) st_type->type_args.push(arg);
+			for (i64 arg : value_args) st_type->value_args.push(arg);
+			// Publish the half-built instance before resolving fields so `Node[T]`
+			// inside `Node[T]` fields resolves to this exact specialization. That lets
+			// the direct by-value recursion check catch the cycle instead of allocating
+			// an endless chain of equivalent instances.
+			unit.template_struct_instances.push(st_type);
+
+			bool ok = true;
+			{
+				Scope scope(*this, bindings);
+				for (NamedDecl& field : st.fields) {
+					ResolvedType* field_type = checker.resolveParsedType(unit, field.parsed_type);
+					if (!field_type || field_type == st_type) { ok = false; break; }
+					st_type->field_types.push(field_type);
+				}
+			}
+			if (!ok) {
+				unit.template_struct_instances.pop_back();
+				return nullptr;
+			}
+
+			return st_type;
+		}
+
+		StructResolvedType* instantiateStructTemplate(Unit& unit, StructExpression& st, const ExpArray<ComptimeArg>& args) {
+			TemplateArgs template_args(*unit.arena.arena);
+			if (!collectTemplateArgs(unit, st.comptime_params, args, template_args, true)) return nullptr;
+			return instantiateStructTemplateWithArgs(unit, st, template_args.bindings, template_args.type_args, template_args.value_args);
+		}
+
+		StructResolvedType* instantiateStructTemplate(Unit& unit, StructExpression& st, const ExpArray<Expression*>& args) {
+			TemplateArgs template_args(*unit.arena.arena);
+			if (!collectTemplateArgs(unit, st.comptime_params, args, template_args)) return nullptr;
+			return instantiateStructTemplateWithArgs(unit, st, template_args.bindings, template_args.type_args, template_args.value_args);
+		}
+
+		FunctionExpression* cloneFunctionInstance(Unit& unit, FunctionExpression& source) {
+			FunctionExpression* fn = checker.makeType<FunctionExpression>(unit, *unit.arena.arena);
+			fn->token = source.token;
+			fn->return_type = checker.cloneParsedType(unit, source.return_type);
+			fn->body = checker.cloneStatement(unit, source.body);
+			fn->is_extern = source.is_extern;
+			for (FunctionParam& src_param : source.runtime_params) {
+				FunctionParam& dst = fn->runtime_params.emplace_back();
+				dst.name = src_param.name;
+				dst.is_ref = src_param.is_ref;
+				dst.parsed_type = checker.cloneParsedType(unit, src_param.parsed_type);
+			}
+			return fn;
+		}
+
+		FunctionResolvedType* buildFunctionTypeWithBindings(Unit& unit, FunctionExpression& fn, const ExpArray<TemplateBinding>& bindings, bool reject_nullable_refs) {
+			Scope scope(*this, bindings);
+			return checker.buildFunctionType(unit, fn, reject_nullable_refs);
+		}
+
+		FunctionExpression* instantiateFunctionTemplateWithArgs(Unit& unit, Symbol& sym, FunctionExpression& source, ExpArray<TemplateBinding>& bindings, ExpArray<ResolvedType*>& type_args) {
+			for (TemplateFunctionInstance& instance : unit.template_function_instances) {
+				if (instance.source == &source && typeArgListsEqual(instance.type->type_args, type_args)) return instance.instance;
+			}
+
+			FunctionExpression* fn = cloneFunctionInstance(unit, source);
+			FunctionResolvedType* fn_type = buildFunctionTypeWithBindings(unit, *fn, bindings, true);
+			if (!fn_type) return nullptr;
+			for (ResolvedType* arg : type_args) fn_type->type_args.push(arg);
+			fn->resolved_type = fn_type;
+			TemplateFunctionInstance& instance = unit.template_function_instances.emplace_back();
+			instance.name = sym.name;
+			instance.source_symbol = &sym;
+			instance.source = &source;
+			instance.instance = fn;
+			instance.type = fn_type;
+			if (fn->body) {
+				Scope scope(*this, bindings);
+				if (!checker.checkFunctionBody(unit, *fn)) {
+					unit.template_function_instances.pop_back();
+					return nullptr;
+				}
+			}
+			return fn;
+		}
+
+		FunctionExpression* instantiateFunctionTemplate(Unit& unit, Symbol& sym, FunctionExpression& source, const ExpArray<ComptimeArg>& args) {
+			if (hasValueComptimeParams(source.comptime_params)) return nullptr;
+			TemplateArgs template_args(*unit.arena.arena);
+			if (!collectTemplateArgs(unit, source.comptime_params, args, template_args, false)) return nullptr;
+			return instantiateFunctionTemplateWithArgs(unit, sym, source, template_args.bindings, template_args.type_args);
+		}
+
+		FunctionExpression* instantiateFunctionTemplate(Unit& unit, Symbol& sym, FunctionExpression& source, const ExpArray<Expression*>& args) {
+			if (hasValueComptimeParams(source.comptime_params)) return nullptr;
+			TemplateArgs template_args(*unit.arena.arena);
+			if (!collectTemplateArgs(unit, source.comptime_params, args, template_args)) return nullptr;
+			return instantiateFunctionTemplateWithArgs(unit, sym, source, template_args.bindings, template_args.type_args);
+		}
+
+		bool isTemplateParam(const ExpArray<NamedDecl>& params, ls_string_view name) {
+			for (const NamedDecl& param : params) {
+				if (equalStrings(param.name, name) && !param.parsed_type) return true;
+			}
+			return false;
+		}
+
+		bool bindInferredType(ExpArray<TemplateBinding>& bindings, ls_string_view name, ResolvedType* type) {
+			if (!type) return false;
+			for (TemplateBinding& binding : bindings) {
+				if (!equalStrings(binding.name, name)) continue;
+				return checker.typesEqual(binding.type, type);
+			}
+			TemplateBinding& binding = bindings.emplace_back();
+			binding.name = name;
+			binding.type = type;
+			return true;
+		}
+
+		bool inferTemplateType(Unit& unit, const ExpArray<NamedDecl>& params, ParsedType* pattern, ResolvedType* actual, ExpArray<TemplateBinding>& bindings) {
+			if (!pattern || !actual) return false;
+			if (pattern->is_nullable) {
+				if (actual->kind != ResolvedType::NULLABLE) return false;
+				actual = static_cast<NullableResolvedType*>(actual)->inner;
+			}
+			switch (pattern->kind) {
+				case ParsedType::QUALIFIED: {
+					QualifiedParsedType* q = static_cast<QualifiedParsedType*>(pattern);
+					if (empty(q->qualifier) && isTemplateParam(params, q->name)) return bindInferredType(bindings, q->name, actual);
+					ResolvedType* resolved = checker.resolveParsedType(unit, pattern);
+					return resolved && checker.typesEqual(resolved, actual);
+				}
+				case ParsedType::ARRAY: {
+					if (actual->kind != ResolvedType::ARRAY) return false;
+					ArrayParsedType* p = static_cast<ArrayParsedType*>(pattern);
+					ArrayResolvedType* a = static_cast<ArrayResolvedType*>(actual);
+					i64 size = 0;
+					if (!checker.resolveComptimeIntValue(unit, p->size, size) || size != a->size) return false;
+					return inferTemplateType(unit, params, p->element_type, a->element_type, bindings);
+				}
+				case ParsedType::SLICE: {
+					if (actual->kind != ResolvedType::SLICE) return false;
+					return inferTemplateType(unit, params, static_cast<SliceParsedType*>(pattern)->element_type, static_cast<SliceResolvedType*>(actual)->element_type, bindings);
+				}
+				case ParsedType::BRACKET_TYPE: {
+					if (actual->kind != ResolvedType::STRUCT) return false;
+					BracketTypeParsedType* br = static_cast<BracketTypeParsedType*>(pattern);
+					ResolvedType* callee = checker.resolveParsedType(unit, br->callee);
+					if (!callee || callee->kind != ResolvedType::STRUCT) return false;
+					StructResolvedType* pattern_base = static_cast<StructResolvedType*>(callee);
+					StructResolvedType* actual_struct = static_cast<StructResolvedType*>(actual);
+					if (pattern_base->decl != actual_struct->decl) return false;
+					if (br->args.size() != actual_struct->type_args.size()) return false;
+					for (i32 i = 0; i < br->args.size(); ++i) {
+						const ComptimeArg& arg = br->args[i];
+						if (arg.kind != ComptimeArg::TYPE) return false;
+						if (!inferTemplateType(unit, params, arg.type, actual_struct->type_args[i], bindings)) return false;
+					}
+					return true;
+				}
+				default: {
+					ResolvedType* resolved = checker.resolveParsedType(unit, pattern);
+					return resolved && checker.typesEqual(resolved, actual);
+				}
+			}
+		}
+
+		FunctionExpression* inferAndInstantiateFunctionTemplate(Unit& decl_unit, Unit& call_unit, FunctionCheckContext* ctx, Symbol& sym, FunctionExpression& source, CallExpression& call, ResolvedType* hint) {
+			if (hasValueComptimeParams(source.comptime_params)) return nullptr;
+			ExpArray<TemplateBinding> bindings(*decl_unit.arena.arena);
+			ResolvedType* return_hint = hint && hint->kind == ResolvedType::NULLABLE ? static_cast<NullableResolvedType*>(hint)->inner : hint;
+			if (!call.args.empty() && return_hint && !inferTemplateType(decl_unit, source.comptime_params, source.return_type, return_hint, bindings)) {
+				return nullptr;
+			}
+			if (source.runtime_params.size() != call.args.size()) return nullptr;
+			Scope scope(*this, bindings);
+			for (i32 i = 0; i < source.runtime_params.size(); ++i) {
+				FunctionParam& param = source.runtime_params[i];
+				ResolvedType* param_hint = checker.resolveParsedType(decl_unit, param.parsed_type);
+				ResolvedType* arg_type = nullptr;
+				if (param.is_ref) {
+					Expression* arg = call.args[i];
+					if (!arg || arg->kind != Expression::UNARY || static_cast<UnaryExpression*>(arg)->op != Token::REF) return nullptr;
+					bool writable = false;
+					arg_type = checker.checkAssignableExpr(call_unit, ctx, static_cast<UnaryExpression*>(arg)->expression, writable);
+					if (!writable) return nullptr;
+				}
+				else {
+					// Imported templates are inferred against the declaration's signature,
+					// but their arguments live in the caller's scope. Keeping those units
+					// separate avoids resolving caller locals/imports as if they belonged
+					// to the library that declared the template.
+					arg_type = checker.checkExpr(call_unit, ctx, *call.args[i], param_hint);
+				}
+				if (!arg_type) return nullptr;
+				if (checker.isUntypedNumeric(arg_type)) {
+					arg_type = checker.materializeUntyped(*call.args[i], param_hint);
+					if (!arg_type) return nullptr;
+				}
+				if (!inferTemplateType(decl_unit, source.comptime_params, param.parsed_type, arg_type, bindings)) return nullptr;
+			}
+			ExpArray<ResolvedType*> type_args(*decl_unit.arena.arena);
+			for (const NamedDecl& param : source.comptime_params) {
+				ResolvedType* type = nullptr;
+				for (TemplateBinding& binding : bindings) {
+					if (!equalStrings(binding.name, param.name)) continue;
+					type = binding.type;
+					break;
+				}
+				if (!type) return nullptr;
+				type_args.push(type);
+			}
+			return instantiateFunctionTemplateWithArgs(decl_unit, sym, source, bindings, type_args);
+		}
+	};
+
+	TemplateEnvironment templates;
+
+	ResolvedType* findTemplateType(ls_string_view name) const { return templates.findType(name); }
+	bool findTemplateIntValue(ls_string_view name, i64& out) const { return templates.findIntValue(name, out); }
 
 	// TODO
 	void error(i64 value) {
@@ -282,6 +637,7 @@ struct Checker {
 			}
 			case Expression::IDENTIFIER: {
 				IdentifierExpression* id = static_cast<IdentifierExpression*>(expr);
+				if (findTemplateIntValue(id->name, out)) return true;
 				SymbolRef ref = resolveSymbol(unit, {}, id->name, LookupPolicy::NameOnly);
 				if (!ref.symbol || ref.symbol->storage != Symbol::COMPTIME) return false;
 				if (checkSymbol(*ref.owner, *ref.symbol) == LS_RESULT_FAILURE) return false;
@@ -352,6 +708,230 @@ struct Checker {
 		return ref;
 	}
 
+	ParsedType* cloneParsedType(Unit& unit, ParsedType* src) {
+		if (!src) return nullptr;
+		ParsedType* out = nullptr;
+		switch (src->kind) {
+			case ParsedType::QUALIFIED: {
+				QualifiedParsedType* s = static_cast<QualifiedParsedType*>(src);
+				QualifiedParsedType* q = makeType<QualifiedParsedType>(unit);
+				q->qualifier = s->qualifier;
+				q->name = s->name;
+				out = q;
+				break;
+			}
+			case ParsedType::FUNCTION: {
+				FunctionParsedType* s = static_cast<FunctionParsedType*>(src);
+				FunctionParsedType* fn = makeType<FunctionParsedType>(unit, *unit.arena.arena);
+				for (ParsedType* param : s->params) fn->params.push(cloneParsedType(unit, param));
+				fn->return_type = cloneParsedType(unit, s->return_type);
+				out = fn;
+				break;
+			}
+			case ParsedType::ARRAY: {
+				ArrayParsedType* s = static_cast<ArrayParsedType*>(src);
+				ArrayParsedType* arr = makeType<ArrayParsedType>(unit);
+				arr->element_type = cloneParsedType(unit, s->element_type);
+				arr->size = s->size;
+				out = arr;
+				break;
+			}
+			case ParsedType::SLICE: {
+				SliceParsedType* s = static_cast<SliceParsedType*>(src);
+				SliceParsedType* sl = makeType<SliceParsedType>(unit);
+				sl->element_type = cloneParsedType(unit, s->element_type);
+				out = sl;
+				break;
+			}
+			case ParsedType::BRACKET_TYPE: {
+				BracketTypeParsedType* s = static_cast<BracketTypeParsedType*>(src);
+				BracketTypeParsedType* br = makeType<BracketTypeParsedType>(unit, *unit.arena.arena);
+				br->callee = cloneParsedType(unit, s->callee);
+				for (const ComptimeArg& arg : s->args) {
+					ComptimeArg& dst = br->args.emplace_back();
+					dst.kind = arg.kind;
+					dst.type = cloneParsedType(unit, arg.type);
+					dst.expression = arg.expression;
+				}
+				out = br;
+				break;
+			}
+			default:
+				out = makeType<ParsedType>(unit, src->kind);
+				break;
+		}
+		out->is_nullable = src->is_nullable;
+		out->token = src->token;
+		return out;
+	}
+
+	Expression* cloneExpression(Unit& unit, Expression* src) {
+		if (!src) return nullptr;
+		Expression* out = nullptr;
+		switch (src->kind) {
+			case Expression::IDENTIFIER: {
+				IdentifierExpression* s = static_cast<IdentifierExpression*>(src);
+				IdentifierExpression* id = makeType<IdentifierExpression>(unit);
+				id->name = s->name;
+				out = id;
+				break;
+			}
+			case Expression::INT_LITERAL: {
+				IntLiteralExpression* s = static_cast<IntLiteralExpression*>(src);
+				IntLiteralExpression* lit = makeType<IntLiteralExpression>(unit);
+				lit->value = s->value;
+				out = lit;
+				break;
+			}
+			case Expression::FLOAT_LITERAL: {
+				FloatLiteralExpression* s = static_cast<FloatLiteralExpression*>(src);
+				FloatLiteralExpression* lit = makeType<FloatLiteralExpression>(unit);
+				lit->value = s->value;
+				out = lit;
+				break;
+			}
+			case Expression::BOOL_LITERAL:
+				out = makeType<BoolLiteralExpression>(unit, static_cast<BoolLiteralExpression*>(src)->value);
+				break;
+			case Expression::STRING_LITERAL: {
+				StringLiteralExpression* s = static_cast<StringLiteralExpression*>(src);
+				StringLiteralExpression* lit = makeType<StringLiteralExpression>(unit);
+				lit->value = s->value;
+				out = lit;
+				break;
+			}
+			case Expression::NULL_LITERAL: out = makeType<NullLiteralExpression>(unit); break;
+			case Expression::UNDEFINED: out = makeType<UndefinedExpression>(unit); break;
+			case Expression::TYPE_LITERAL:
+				out = makeType<TypeLiteralExpression>(unit, static_cast<TypeLiteralExpression*>(src)->type);
+				break;
+			case Expression::CALL: {
+				CallExpression* s = static_cast<CallExpression*>(src);
+				CallExpression* call = makeType<CallExpression>(unit, *unit.arena.arena);
+				call->callee = cloneExpression(unit, s->callee);
+				for (Expression* arg : s->args) call->args.push(cloneExpression(unit, arg));
+				out = call;
+				break;
+			}
+			case Expression::UNARY: {
+				UnaryExpression* s = static_cast<UnaryExpression*>(src);
+				UnaryExpression* un = makeType<UnaryExpression>(unit);
+				un->op = s->op;
+				un->expression = cloneExpression(unit, s->expression);
+				out = un;
+				break;
+			}
+			case Expression::BINARY: {
+				BinaryExpression* s = static_cast<BinaryExpression*>(src);
+				BinaryExpression* bin = makeType<BinaryExpression>(unit);
+				bin->op = s->op;
+				bin->lhs = cloneExpression(unit, s->lhs);
+				bin->rhs = cloneExpression(unit, s->rhs);
+				out = bin;
+				break;
+			}
+			case Expression::CAST: {
+				CastExpression* s = static_cast<CastExpression*>(src);
+				CastExpression* cast = makeType<CastExpression>(unit);
+				cast->expression = cloneExpression(unit, s->expression);
+				cast->parsed_type = cloneParsedType(unit, s->parsed_type);
+				out = cast;
+				break;
+			}
+			case Expression::MEMBER: {
+				MemberExpression* s = static_cast<MemberExpression*>(src);
+				MemberExpression* mem = makeType<MemberExpression>(unit);
+				mem->expression = cloneExpression(unit, s->expression);
+				mem->name = s->name;
+				out = mem;
+				break;
+			}
+			case Expression::BRACKET: {
+				BracketExpression* s = static_cast<BracketExpression*>(src);
+				BracketExpression* br = makeType<BracketExpression>(unit, *unit.arena.arena);
+				br->base = cloneExpression(unit, s->base);
+				for (Expression* arg : s->args) br->args.push(cloneExpression(unit, arg));
+				br->has_colon = s->has_colon;
+				br->end = cloneExpression(unit, s->end);
+				out = br;
+				break;
+			}
+			case Expression::STRUCT_LITERAL: {
+				StructLiteralExpression* s = static_cast<StructLiteralExpression*>(src);
+				StructLiteralExpression* lit = makeType<StructLiteralExpression>(unit, *unit.arena.arena);
+				lit->type = cloneExpression(unit, s->type);
+				for (Expression* value : s->values) lit->values.push(cloneExpression(unit, value));
+				out = lit;
+				break;
+			}
+			default:
+				out = makeType<Expression>(unit, src->kind);
+				break;
+		}
+		out->token = src->token;
+		return out;
+	}
+
+	Statement* cloneStatement(Unit& unit, Statement* src) {
+		if (!src) return nullptr;
+		Statement* out = nullptr;
+		switch (src->kind) {
+			case Statement::BLOCK: {
+				BlockStatement* s = static_cast<BlockStatement*>(src);
+				BlockStatement* block = makeType<BlockStatement>(unit, *unit.arena.arena);
+				for (Statement* st : s->statements) block->statements.push(cloneStatement(unit, st));
+				out = block;
+				break;
+			}
+			case Statement::EXPRESSION: {
+				ExpressionStatement* s = static_cast<ExpressionStatement*>(src);
+				ExpressionStatement* st = makeType<ExpressionStatement>(unit);
+				st->expression = cloneExpression(unit, s->expression);
+				out = st;
+				break;
+			}
+			case Statement::RETURN: {
+				ReturnStatement* s = static_cast<ReturnStatement*>(src);
+				ReturnStatement* st = makeType<ReturnStatement>(unit);
+				st->expression = cloneExpression(unit, s->expression);
+				out = st;
+				break;
+			}
+			case Statement::VAR_DECL: {
+				VarDeclStatement* s = static_cast<VarDeclStatement*>(src);
+				VarDeclStatement* st = makeType<VarDeclStatement>(unit);
+				st->name = s->name;
+				st->parsed_type = cloneParsedType(unit, s->parsed_type);
+				st->expression = cloneExpression(unit, s->expression);
+				st->is_immutable = s->is_immutable;
+				out = st;
+				break;
+			}
+			case Statement::ASSIGN: {
+				AssignStatement* s = static_cast<AssignStatement*>(src);
+				AssignStatement* st = makeType<AssignStatement>(unit);
+				st->lhs = cloneExpression(unit, s->lhs);
+				st->rhs = cloneExpression(unit, s->rhs);
+				st->op = s->op;
+				out = st;
+				break;
+			}
+			case Statement::IF: {
+				IfStatement* s = static_cast<IfStatement*>(src);
+				IfStatement* st = makeType<IfStatement>(unit);
+				st->condition = cloneExpression(unit, s->condition);
+				st->body = static_cast<BlockStatement*>(cloneStatement(unit, s->body));
+				st->else_branch = cloneStatement(unit, s->else_branch);
+				out = st;
+				break;
+			}
+			default:
+				return src;
+		}
+		out->token = src->token;
+		return out;
+	}
+
 	ResolvedType* resolveParsedType(Unit& unit, ParsedType* parsed) {
 		if (!parsed) return nullptr;
 		ResolvedType* result = nullptr;
@@ -406,6 +986,12 @@ struct Checker {
 			}
 			case ParsedType::QUALIFIED: {
 				QualifiedParsedType* q = static_cast<QualifiedParsedType*>(parsed);
+				if (empty(q->qualifier)) {
+					if (ResolvedType* template_type = findTemplateType(q->name)) {
+						result = template_type;
+						break;
+					}
+				}
 				SymbolRef ref = resolveSymbol(unit, q->qualifier, q->name, LookupPolicy::Checked);
 				result = ref ? unwrapMeta(ref.symbol->resolved_type) : nullptr;
 				break;
@@ -414,6 +1000,12 @@ struct Checker {
 				BracketTypeParsedType* call = static_cast<BracketTypeParsedType*>(parsed);
 				ResolvedType* callee = resolveParsedType(unit, call->callee);
 				if (!callee) return nullptr;
+				if (callee->kind == ResolvedType::STRUCT) {
+					StructResolvedType* st = static_cast<StructResolvedType*>(callee);
+					if (!st->decl || st->decl->comptime_params.empty()) return nullptr;
+					result = templates.instantiateStructTemplate(unit, *st->decl, call->args);
+					break;
+				}
 				if (call->args.size() == 1 && call->args[0].kind == ComptimeArg::EXPRESSION) {
 					ArrayResolvedType* resolved = makeType<ArrayResolvedType>(unit);
 					resolved->element_type = callee;
@@ -595,6 +1187,96 @@ struct Checker {
 	// indexed there when their symbol is checked, so this is O(overloads-on-type).
 	enum class OverloadResult { NOT_FOUND, FOUND, AMBIGUOUS };
 
+	struct CallResolutionCandidate {
+		FunctionResolvedType* type = nullptr;
+		FunctionExpression* resolved_fn = nullptr;
+		u32 ufcs_param_offset = 0;
+	};
+
+	bool matchCallCandidate(Unit& unit, FunctionCheckContext* ctx, CallExpression& call, Expression& expr, const CallResolutionCandidate& candidate, ResolvedType*& result_type) {
+		FunctionResolvedType* fn_type = candidate.type;
+		if (!fn_type) return false;
+
+		if (fn_type->param_types.size() != call.args.size() + candidate.ufcs_param_offset) {
+			if (!suppress_errors) {
+				errorLine(expr.token, "Function call argument count mismatch: expected ", fn_type->param_types.size() - candidate.ufcs_param_offset, ", got ", call.args.size());
+			}
+			return false;
+		}
+
+		if (candidate.ufcs_param_offset) {
+			MemberExpression& mem = static_cast<MemberExpression&>(*call.callee);
+			ResolvedType* receiver_type = mem.expression ? mem.expression->resolved_type : nullptr;
+			if (!receiver_type || !canImplicitlyConvert(receiver_type, fn_type->param_types[0])) {
+				return false;
+			}
+		}
+
+		for (u32 i = 0; i < call.args.size(); ++i) {
+			const u32 param_index = candidate.ufcs_param_offset + i;
+			ResolvedType* param_type = fn_type->param_types[param_index];
+			Expression* arg = call.args[i];
+
+			if (fn_type->decl && fn_type->decl->runtime_params.size() > param_index && fn_type->decl->runtime_params[param_index].is_ref) {
+				if (arg->kind != Expression::UNARY) {
+					if (!suppress_errors) {
+						errorLine(call.args[i]->token, "Cannot pass non-ref expression as ref argument ", i + 1, " of function call");
+					}
+					return false;
+				}
+				UnaryExpression* un = static_cast<UnaryExpression*>(arg);
+				if (un->op != Token::REF) {
+					return false;
+				}
+				bool writable = false;
+				ResolvedType* arg_type = checkAssignableExpr(unit, ctx, un->expression, writable);
+				if (!arg_type) return false;
+				if (!writable) {
+					if (!suppress_errors) {
+						errorLine(call.args[i]->token, "Cannot pass non-writable expression as ref argument ", i + 1, " of function call");
+					}
+					return false;
+				}
+				if (!typesEqual(arg_type, param_type)) {
+					if (!suppress_errors) {
+						errorLine(call.args[i]->token, "Cannot convert ", arg_type, " to ", param_type, " for ref argument ", i + 1, " of function call");
+					}
+					return false;
+				}
+				continue;
+			}
+
+			ResolvedType* arg_type = checkExpr(unit, ctx, *arg, param_type);
+			if (!arg_type) return false;
+			if (isUntypedNumeric(arg_type)) {
+				arg_type = materializeUntyped(*arg, param_type);
+				if (!arg_type) return false;
+			}
+			if (!canImplicitlyConvert(arg_type, param_type)) {
+				if (!suppress_errors) {
+					errorLine(call.args[i]->token, "Cannot convert ", arg_type, " to ", param_type, " for argument ", i + 1, " of function call");
+				}
+				return false;
+			}
+		}
+
+		result_type = fn_type->return_type;
+		return true;
+	}
+
+	bool matchOperatorCandidate(Unit& unit, FunctionCheckContext* ctx, Expression** operands, i32 arity, FunctionResolvedType* fn_type, ResolvedType*& result_type) {
+		if (!fn_type) return false;
+		if ((i32)fn_type->param_types.size() != arity) return false;
+
+		for (i32 i = 0; i < arity; ++i) {
+			ResolvedType* t = checkExpr(unit, ctx, *operands[i], fn_type->param_types[(u32)i]);
+			if (!t || !typesEqual(t, fn_type->param_types[(u32)i])) return false;
+		}
+
+		result_type = fn_type->return_type;
+		return true;
+	}
+
 	OverloadResult resolveOperatorOverload(Unit& unit,
 		FunctionCheckContext* ctx,
 		Token::Type op,
@@ -615,34 +1297,29 @@ struct Checker {
 		if (!host) return OverloadResult::NOT_FOUND;
 
 
-		FunctionResolvedType* found_type = nullptr;
-		bool found = false;
-
+		ExpArray<FunctionResolvedType*> candidates(unit.arena);
 		for (StructOperator& cand : host->operators) {
 			if (cand.op != op) continue;
 			FunctionResolvedType* fn_type = static_cast<FunctionResolvedType*>(cand.fn->resolved_type);
 			if (!fn_type || (i32)fn_type->param_types.size() != arity) continue;
+			candidates.push(fn_type);
+		}
 
-			bool match = true;
+		i32 match_index = -1;
+		ResolvedType* matched_type = nullptr;
+		for (i32 i = 0; i < (i32)candidates.size(); ++i) {
 			++suppress_errors;
-			for (i32 i = 0; i < arity && match; ++i) {
-				ResolvedType* t = checkExpr(unit, ctx, *operands[i], fn_type->param_types[(u32)i]);
-				if (!t || !typesEqual(t, fn_type->param_types[(u32)i])) match = false;
-			}
+			ResolvedType* candidate_type = nullptr;
+			const bool match = matchOperatorCandidate(unit, ctx, operands, arity, candidates[i], candidate_type);
 			--suppress_errors;
 			if (!match) continue;
-
-			if (found) return OverloadResult::AMBIGUOUS;
-			found = true;
-			found_type = fn_type;
+			if (match_index >= 0) return OverloadResult::AMBIGUOUS;
+			match_index = i;
+			matched_type = candidate_type;
 		}
 
-		if (!found) return OverloadResult::NOT_FOUND;
-		for (i32 i = 0; i < arity; ++i) {
-			ResolvedType* t = checkExpr(unit, ctx, *operands[i], found_type->param_types[(u32)i]);
-			if (!t || !typesEqual(t, found_type->param_types[(u32)i])) return OverloadResult::NOT_FOUND;
-		}
-		result_type = found_type->return_type;
+		if (match_index < 0) return OverloadResult::NOT_FOUND;
+		result_type = matched_type;
 		return OverloadResult::FOUND;
 	}
 
@@ -684,7 +1361,13 @@ struct Checker {
 		while (ctx.locals.size() > mark) ctx.locals.pop_back();
 	}
 
-	static bool isFunctionLikeType(const ResolvedType* type) { return type && type->kind == ResolvedType::FUNCTION; }
+	static bool isProvisionalSymbolVisible(const Symbol& sym) {
+		// Recursive functions publish a provisional type while their bodies are being checked.
+		if (sym.expression && sym.expression->kind == Expression::FUNCTION && sym.resolved_type) return true;
+		// Struct declarations publish a provisional meta-type before field resolution.
+		if (sym.expression && sym.expression->kind == Expression::STRUCT && sym.resolved_type && sym.resolved_type->kind == ResolvedType::META) return true;
+		return false;
+	}
 
 	bool findSymbolForNameExpression(Unit& unit, const Expression& expression, Unit*& owner, Symbol*& symbol) {
 		ls_string_view qualifier = {};
@@ -705,7 +1388,7 @@ struct Checker {
 		return ref.symbol != nullptr;
 	}
 
-	ResolvedType* resolveExpressionAsType(Unit& unit, FunctionCheckContext* ctx, Expression& expression) {
+	ResolvedType* resolveExpressionAsType(Unit& unit, Expression& expression) {
 		if (expression.kind == Expression::TYPE_LITERAL) {
 			ParsedType::Kind parsed_kind = static_cast<TypeLiteralExpression&>(expression).type;
 			if (parsed_kind < ParsedType::VOID || parsed_kind > ParsedType::TYPE) return nullptr;
@@ -722,6 +1405,30 @@ struct Checker {
 			if (expression.kind == Expression::IDENTIFIER) static_cast<IdentifierExpression&>(expression).symbol = symbol;
 			return unwrapMeta(symbol->resolved_type);
 		}
+		if (expression.kind == Expression::BRACKET) {
+			BracketExpression& br = static_cast<BracketExpression&>(expression);
+			if (br.has_colon) return nullptr;
+			Unit* owner = nullptr;
+			Symbol* symbol = nullptr;
+			if (!br.base || !findSymbolForNameExpression(unit, *br.base, owner, symbol)) return nullptr;
+			if (checkSymbol(*owner, *symbol) == LS_RESULT_FAILURE) return nullptr;
+			if (!symbol->expression) return nullptr;
+			if (symbol->expression->kind == Expression::STRUCT) {
+				StructExpression& st = static_cast<StructExpression&>(*symbol->expression);
+				if (st.comptime_params.empty()) return nullptr;
+				StructResolvedType* instance = templates.instantiateStructTemplate(unit, st, br.args);
+				expression.resolved_type = instance;
+				return instance;
+			}
+			if (symbol->expression->kind == Expression::FUNCTION) {
+				FunctionExpression& fn = static_cast<FunctionExpression&>(*symbol->expression);
+				if (fn.comptime_params.empty()) return nullptr;
+				FunctionExpression* instance = templates.instantiateFunctionTemplate(*owner, *symbol, fn, br.args);
+				if (!instance) return nullptr;
+				expression.resolved_type = instance->resolved_type;
+				return expression.resolved_type;
+			}
+		}
 		return nullptr;
 	}
 
@@ -731,6 +1438,170 @@ struct Checker {
 	SymbolRef resolveQualifiedMember(Unit& unit, Expression& base, ls_string_view name) {
 		if (base.kind != Expression::IDENTIFIER) return {};
 		return resolveSymbol(unit, static_cast<IdentifierExpression&>(base).name, name, LookupPolicy::Checked);
+	}
+
+	ls_result checkComptimeFunctionSymbol(Unit& unit, Symbol& sym) {
+		FunctionExpression& fn = static_cast<FunctionExpression&>(*sym.expression);
+		if (!fn.comptime_params.empty()) {
+			if (templates.hasValueComptimeParams(fn.comptime_params)) {
+				errorLine(sym.token, "Function templates only support type comptime parameters");
+				return LS_RESULT_FAILURE;
+			}
+			sym.resolved_type = nullptr;
+			return LS_RESULT_OK;
+		}
+		FunctionResolvedType* fn_type = buildFunctionType(unit, fn, true);
+		if (!fn_type) return LS_RESULT_FAILURE;
+		sym.resolved_type = fn_type;
+		if (const Token::Type op_token = tokenFromOperatorName(sym.name); op_token != Token::ERROR) {
+			const i32 arity = (i32)fn_type->param_types.size();
+			if ((op_token == Token::MINUS ? (arity != 1 && arity != 2) : arity != 2)) {
+				errorLine(sym.token, "Invalid operator arity");
+				return LS_RESULT_FAILURE;
+			}
+			if (operatorHasPrimitiveSignature(*fn_type)) {
+				errorLine(sym.token, "Operator overloads for primitive signatures are not allowed");
+				return LS_RESULT_FAILURE;
+			}
+			for (ResolvedType* param : fn_type->param_types) {
+				if (param->kind == ResolvedType::ENUM) {
+					errorLine(sym.token, "Operator overloads with enum parameters are not allowed; use a wrapper struct instead");
+					return LS_RESULT_FAILURE;
+				}
+			}
+		}
+		if (!checkFunctionBody(unit, fn)) return LS_RESULT_FAILURE;
+		return LS_RESULT_OK;
+	}
+
+	ls_result checkComptimeStructSymbol(Unit& unit, Symbol& sym) {
+		StructExpression& st = static_cast<StructExpression&>(*sym.expression);
+		StructResolvedType* st_type = makeType<StructResolvedType>(unit, *unit.arena.arena);
+		st_type->decl = &st;
+		MetaType* meta = makeType<MetaType>(unit);
+		meta->inner = st_type;
+		sym.resolved_type = meta;
+		if (!st.comptime_params.empty()) {
+			for (NamedDecl& field : st.fields) {
+				if (parsedTypeIsDirectSelfReference(field.parsed_type, sym.name)) {
+					errorLine(sym.token, "Recursive by-value field '", field.name, "' in struct: ", sym.name);
+					return LS_RESULT_FAILURE;
+				}
+			}
+			return LS_RESULT_OK;
+		}
+		for (NamedDecl& field : st.fields) {
+			field.resolved_type = resolveParsedType(unit, field.parsed_type);
+			if (!field.resolved_type) {
+				errorLine(sym.token, "Could not resolve type of field '", field.name, "' in struct: ", sym.name);
+				return LS_RESULT_FAILURE;
+			}
+			if (field.resolved_type == st_type) {
+				errorLine(sym.token, "Recursive by-value field '", field.name, "' in struct: ", sym.name);
+				return LS_RESULT_FAILURE;
+			}
+			st_type->field_types.push(field.resolved_type);
+		}
+		return LS_RESULT_OK;
+	}
+
+	ls_result checkComptimeEnumSymbol(Unit& unit, Symbol& sym) {
+		EnumExpression& en = static_cast<EnumExpression&>(*sym.expression);
+		EnumResolvedType* en_type = makeType<EnumResolvedType>(unit);
+		en_type->decl = &en;
+		MetaType* meta = makeType<MetaType>(unit);
+		meta->inner = en_type;
+		sym.resolved_type = meta;
+		return LS_RESULT_OK;
+	}
+
+	ls_result checkComptimeValueSymbol(Unit& unit, Symbol& sym) {
+		// Plain comptime value: comptime N = expr;
+		ResolvedType* annotation = resolveParsedType(unit, sym.parsed_type);
+		FunctionCheckContext comptime_ctx(unit.arena);
+		comptime_ctx.comptime_only = true;
+		ResolvedType* expr_type = checkExpr(unit, &comptime_ctx, *sym.expression, annotation);
+		if (!expr_type) {
+			errorLine(sym.token, "Unresolved initializer for: ", sym.name);
+			return LS_RESULT_FAILURE;
+		}
+		if (isUntypedNumeric(expr_type)) {
+			expr_type = materializeUntyped(*sym.expression, annotation);
+			if (!expr_type) return LS_RESULT_FAILURE;
+		}
+		if (annotation && expr_type && !canImplicitlyConvert(expr_type, annotation)) {
+			errorLine(sym.token, "Type mismatch in comptime declaration: ", sym.name);
+			return LS_RESULT_FAILURE;
+		}
+		if (sym.expression && sym.expression->kind == Expression::TYPE_LITERAL) {
+			MetaType* meta = makeType<MetaType>(unit);
+			meta->inner = expr_type;
+			sym.resolved_type = meta;
+		} else {
+			sym.resolved_type = annotation ? annotation : expr_type;
+		}
+		return LS_RESULT_OK;
+	}
+
+	ls_result checkRuntimeFunctionSymbol(Unit& unit, Symbol& sym, ResolvedType* annotation) {
+		FunctionExpression& fn = static_cast<FunctionExpression&>(*sym.expression);
+		FunctionResolvedType* fn_type = buildFunctionType(unit, fn, true);
+		if (!fn_type) return LS_RESULT_FAILURE;
+		sym.resolved_type = fn_type;
+		if (annotation && !canImplicitlyConvert(fn_type, annotation)) {
+			errorLine(sym.token, "Type mismatch in initializer for: ", sym.name);
+			return LS_RESULT_FAILURE;
+		}
+		if (!checkFunctionBody(unit, fn)) return LS_RESULT_FAILURE;
+		return LS_RESULT_OK;
+	}
+
+	ls_result checkRuntimeValueSymbol(Unit& unit, Symbol& sym, ResolvedType* annotation) {
+		ResolvedType* expr_type = sym.expression ? checkExpr(unit, nullptr, *sym.expression, annotation) : nullptr;
+		if (sym.expression && !expr_type) {
+			errorLine(sym.token, "Unresolved initializer for: ", sym.name);
+			return LS_RESULT_FAILURE;
+		}
+		// A global initializer is a storage point too: pin any untyped value before
+		// codegen so nothing untyped reaches the backend.
+		if (isUntypedNumeric(expr_type)) {
+			expr_type = materializeUntyped(*sym.expression, annotation);
+			if (!expr_type) return LS_RESULT_FAILURE;
+		}
+		if (annotation && expr_type && !canImplicitlyConvert(expr_type, annotation)) {
+			errorLine(sym.token, "Type mismatch in initializer for: ", sym.name);
+			return LS_RESULT_FAILURE;
+		}
+		sym.resolved_type = annotation ? annotation : expr_type;
+		return LS_RESULT_OK;
+	}
+
+	ls_result checkComptimeSymbol(Unit& unit, Symbol& sym) {
+		switch (sym.expression->kind) {
+			case Expression::FUNCTION: return checkComptimeFunctionSymbol(unit, sym);
+			case Expression::STRUCT: return checkComptimeStructSymbol(unit, sym);
+			case Expression::ENUM: return checkComptimeEnumSymbol(unit, sym);
+			default: return checkComptimeValueSymbol(unit, sym);
+		}
+	}
+
+	ls_result checkRuntimeSymbol(Unit& unit, Symbol& sym) {
+		ResolvedType* annotation = resolveParsedType(unit, sym.parsed_type);
+
+		if (sym.expression && sym.expression->kind == Expression::UNDEFINED) {
+			if (!annotation) {
+				errorLine(sym.token, "'undefined' initializer requires an explicit type annotation: ", sym.name);
+				return LS_RESULT_FAILURE;
+			}
+			if (sym.storage == Symbol::CONST) {
+				errorLine(sym.token, "const cannot be initialized with 'undefined': ", sym.name);
+				return LS_RESULT_FAILURE;
+			}
+		}
+
+		return sym.expression && sym.expression->kind == Expression::FUNCTION
+			? checkRuntimeFunctionSymbol(unit, sym, annotation)
+			: checkRuntimeValueSymbol(unit, sym, annotation);
 	}
 
 	ResolvedType* checkCallExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr, ResolvedType* hint) {
@@ -749,25 +1620,49 @@ struct Checker {
 			}
 		}
 
+		// Collect explicit call candidates first, then validate them in order. This keeps
+		// the resolution flow readable while preserving the current suppressed-error behavior
+		// for losing candidates.
+		// Slots: direct callee type, template instantiation, UFCS.
+		CallResolutionCandidate candidates[3];
+		i32 candidate_count = 0;
+
 		// suppress errors because callee can be checked twice - one normal and one for ufcs
 		// and because first arg can be checked twice - one normal and one for ADL
 		++suppress_errors;
 		ResolvedType* first_arg_type = nullptr;
-		// try to resolve first arg for ADL
 		if (!call.args.empty()) {
 			first_arg_type = checkExpr(unit, ctx, *call.args[0], nullptr, nullptr);
 		}
-
-		// check callee
 		ResolvedType* callee_type = checkExpr(unit, ctx, *call.callee, nullptr, first_arg_type);
 		--suppress_errors;
+
+		if (callee_type && callee_type->kind == ResolvedType::FUNCTION) {
+			candidates[candidate_count++].type = static_cast<FunctionResolvedType*>(callee_type);
+		}
+
+		if (!callee_type && (call.callee->kind == Expression::IDENTIFIER || call.callee->kind == Expression::MEMBER)) {
+			Unit* owner = nullptr;
+			Symbol* symbol = nullptr;
+			if (findSymbolForNameExpression(unit, *call.callee, owner, symbol) && symbol->expression && symbol->expression->kind == Expression::FUNCTION) {
+				FunctionExpression& fn = static_cast<FunctionExpression&>(*symbol->expression);
+				if (!fn.comptime_params.empty()) {
+					FunctionExpression* instance = templates.inferAndInstantiateFunctionTemplate(*owner, unit, ctx, *symbol, fn, call, hint);
+					if (!instance) return nullptr;
+					if (call.callee->kind == Expression::IDENTIFIER) static_cast<IdentifierExpression*>(call.callee)->symbol = symbol;
+					CallResolutionCandidate& candidate = candidates[candidate_count++];
+					candidate.type = static_cast<FunctionResolvedType*>(instance->resolved_type);
+					candidate.resolved_fn = instance;
+					candidate.ufcs_param_offset = 0;
+				}
+			}
+		}
 
 		// UFCS: x.foo(a, b) -> foo(x, a, b)
 		// When the callee is a member expression that didn't resolve as a field or namespace
 		// member, try looking up the member name as a free function in the receiver type's
 		// namespace unit. Restricted to struct/enum receivers to avoid UFCS on primitives.
 		// Codegen's existing findMemberFunction path handles emission (receiver + args).
-		u32 ufcs_param_offset = 0;
 		if (!callee_type && call.callee->kind == Expression::MEMBER) {
 			MemberExpression& mem = static_cast<MemberExpression&>(*call.callee);
 			if (mem.expression) {
@@ -776,94 +1671,65 @@ struct Checker {
 					Unit* ns = findTypeNamespaceUnit(*receiver_type);
 					Symbol* ns_sym = ns ? findSymbol(*ns, mem.name) : nullptr;
 					if (ns_sym && checkSymbol(*ns, *ns_sym) == LS_RESULT_FAILURE) ns_sym = nullptr;
-					// Local preferred over namespace for struct/enum receivers
 					const bool is_struct_or_enum = receiver_type->kind == ResolvedType::STRUCT || receiver_type->kind == ResolvedType::ENUM;
 					Symbol* local_sym = is_struct_or_enum ? findSymbol(unit, mem.name) : nullptr;
 					if (local_sym && checkSymbol(unit, *local_sym) == LS_RESULT_FAILURE) local_sym = nullptr;
 					Symbol* resolved = local_sym ? local_sym : ns_sym;
 					if (resolved) {
-						callee_type = unwrapMeta(resolved->resolved_type);
-						ufcs_param_offset = 1;
-						if (resolved->expression && resolved->expression->kind == Expression::FUNCTION) {
-							static_cast<CallExpression&>(expr).ufcs_fn = static_cast<FunctionExpression*>(resolved->expression);
-						}
+						CallResolutionCandidate& candidate = candidates[candidate_count++];
+						candidate.type = static_cast<FunctionResolvedType*>(unwrapMeta(resolved->resolved_type));
+						candidate.resolved_fn = resolved->expression && resolved->expression->kind == Expression::FUNCTION ? static_cast<FunctionExpression*>(resolved->expression) : nullptr;
+						candidate.ufcs_param_offset = 1;
 					}
 				}
 			}
 		}
 
-		if (!callee_type) return nullptr;
+		if (!candidate_count) {
+			if (callee_type) {
+				errorLine(expr.token, "Cannot call non-function type ", callee_type);
+			}
+			return nullptr;
+		}
 
-		if (callee_type->kind == ResolvedType::FUNCTION) {
-			FunctionResolvedType* fn_type = static_cast<FunctionResolvedType*>(callee_type);
+		auto commit = [&](const CallResolutionCandidate& winner, ResolvedType* result_type) {
+			if (winner.resolved_fn) call.resolved_fn = winner.resolved_fn;
+			expr.resolved_type = result_type;
+		};
 
-			if (fn_type->param_types.size() != call.args.size() + ufcs_param_offset) {
-				errorLine(expr.token, "Function call argument count mismatch: expected ", fn_type->param_types.size() - ufcs_param_offset, ", got ", call.args.size());
+		if (candidate_count == 1) {
+			ResolvedType* result_type = nullptr;
+			if (!matchCallCandidate(unit, ctx, call, expr, candidates[0], result_type)) return nullptr;
+			commit(candidates[0], result_type);
+			return result_type;
+		}
+
+		i32 match_index = -1;
+		ResolvedType* matched_result = nullptr;
+		for (i32 i = 0; i < candidate_count; ++i) {
+			++suppress_errors;
+			ResolvedType* candidate_type = nullptr;
+			const bool match = matchCallCandidate(unit, ctx, call, expr, candidates[i], candidate_type);
+			--suppress_errors;
+			if (!match) continue;
+			ASSERT(candidate_type);
+			if (match_index >= 0) {
+				errorLine(expr.token, "Ambiguous function call");
 				return nullptr;
 			}
-
-			// check receiver as param[0] for UFCS calls
-			if (ufcs_param_offset) {
-				MemberExpression& mem = static_cast<MemberExpression&>(*call.callee);
-				// resolved_type is set by checkExpr called in the UFCS probe above
-				ResolvedType* receiver_type = mem.expression ? mem.expression->resolved_type : nullptr;
-				if (!receiver_type || !canImplicitlyConvert(receiver_type, fn_type->param_types[0])) {
-					return nullptr;
-				}
-			}
-
-			// check args
-			for (u32 i = 0; i < call.args.size(); ++i) {
-				const u32 param_index = ufcs_param_offset + i;
-				ResolvedType* param_type = fn_type->param_types[param_index];
-				Expression* arg = call.args[i];
-
-				// check ref arg
-				if (fn_type->decl && fn_type->decl->runtime_params.size() > param_index && fn_type->decl->runtime_params[param_index].is_ref) {
-					// TODO review ref and runtime_params for simplification
-					if (arg->kind != Expression::UNARY) {
-						errorLine(call.args[i]->token, "Cannot pass non-ref expression as ref argument ", i + 1, " of function call");
-						return nullptr;
-					}
-					UnaryExpression* un = static_cast<UnaryExpression*>(arg);
-					if (un->op != Token::REF) {
-						return nullptr;
-					}
-					bool writable = false;
-					ResolvedType* arg_type = checkAssignableExpr(unit, ctx, un->expression, writable);
-					if (!arg_type) {
-						// TODO error msg
-						return nullptr;
-					}
-					if (!writable) {
-						errorLine(call.args[i]->token, "Cannot pass non-writable expression as ref argument ", i + 1, " of function call");
-						return nullptr;
-					}
-					if (!typesEqual(arg_type, param_type)) {
-						errorLine(call.args[i]->token, "Cannot convert ", arg_type, " to ", param_type, " for ref argument ", i + 1, " of function call");
-						return nullptr;
-					}
-					continue;
-				}
-
-				// check non-ref arg
-				ResolvedType* arg_type = checkExpr(unit, ctx, *arg, param_type);
-				if (!arg_type) return nullptr;
-				if (isUntypedNumeric(arg_type)) {
-					arg_type = materializeUntyped(*arg, param_type);
-					if (!arg_type) return nullptr;
-				}
-				if (!canImplicitlyConvert(arg_type, param_type)) {
-					errorLine(call.args[i]->token, "Cannot convert ", arg_type, " to ", param_type, " for argument ", i + 1, " of function call");
-					return nullptr;
-				}
-			}
-			expr.resolved_type = fn_type->return_type;
-			return fn_type->return_type;
+			match_index = i;
+			matched_result = candidate_type;
 		}
 
-		errorLine(expr.token, "Cannot call non-function type ", callee_type);
-		return nullptr;
+		if (match_index < 0) {
+			if (callee_type) {
+				errorLine(expr.token, "Cannot call non-function type ", callee_type);
+			}
+			return nullptr;
+		}
+
+		commit(candidates[match_index], matched_result);
+		return matched_result;
 	}
 
 	// Pin an untyped numeric expression to a concrete type.
@@ -1097,7 +1963,7 @@ struct Checker {
 		}
 	}
 
-	ResolvedType* checkCastExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr, ResolvedType* hint) {
+	ResolvedType* checkCastExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr) {
 		CastExpression& cast = static_cast<CastExpression&>(expr);
 		ResolvedType* dst_type = resolveParsedType(unit, cast.parsed_type);
 		if (!dst_type) {
@@ -1180,10 +2046,12 @@ struct Checker {
 			case ResolvedType::STRUCT: {
 				// struct.field
 				StructResolvedType* st = static_cast<StructResolvedType*>(base_type);
-				for (const NamedDecl& field : st->decl->fields) {
+				for (i32 i = 0; i < st->decl->fields.size(); ++i) {
+					const NamedDecl& field = st->decl->fields[i];
 					if (equalStrings(field.name, member.name)) {
-						expr.resolved_type = field.resolved_type;
-						return field.resolved_type;
+						ResolvedType* field_type = (u32)i < st->field_types.size() ? st->field_types[(u32)i] : field.resolved_type;
+						expr.resolved_type = field_type;
+						return field_type;
 					}
 				}
 				errorLine(expr.token, member.name, " not found in ", base_type);
@@ -1231,7 +2099,7 @@ struct Checker {
 
 	ResolvedType* checkBracketExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr, ResolvedType* hint) {
 		BracketExpression& br = static_cast<BracketExpression&>(expr);
-		if (ResolvedType* template_type = resolveExpressionAsType(unit, ctx, expr)) {
+		if (ResolvedType* template_type = resolveExpressionAsType(unit, expr)) {
 			expr.resolved_type = template_type;
 			return template_type;
 		}
@@ -1320,7 +2188,7 @@ struct Checker {
 		// use `x` as a type argument and as an ordinary local index nearby.
 		ResolvedType* type = nullptr;
 		if (lit.type) {
-			type = resolveExpressionAsType(unit, ctx, *lit.type);
+			type = resolveExpressionAsType(unit, *lit.type);
 			if (!type) {
 				// Happens when lit.type is a bracket expression (e.g. a template instantiation like Foo[T]).
 				// resolveExpressionAsType only handles TYPE_LITERAL, IDENTIFIER, and MEMBER.
@@ -1460,7 +2328,7 @@ struct Checker {
 			case Expression::CALL: return checkCallExpr(unit, ctx, expr, hint);
 			case Expression::UNARY: return checkUnaryExpr(unit, ctx, expr, hint);
 			case Expression::BINARY: return checkBinaryExpr(unit, ctx, expr, hint);
-			case Expression::CAST: return checkCastExpr(unit, ctx, expr, hint);
+			case Expression::CAST: return checkCastExpr(unit, ctx, expr);
 			case Expression::MEMBER: return checkMemberExpr(unit, ctx, expr, hint);
 			case Expression::BRACKET: return checkBracketExpr(unit, ctx, expr, hint);
 			case Expression::STRUCT_LITERAL: return checkStructLiteralExpr(unit, ctx, expr, hint);
@@ -1531,6 +2399,19 @@ struct Checker {
 		static const char* names[] = {"void", "bool", "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "f32", "f64", "string", "cptr", "type"};
 		for (const char* primitive : names) {
 			if (equalStrings(name, makeStringView(primitive))) return true;
+		}
+		return false;
+	}
+
+	bool parsedTypeIsDirectSelfReference(ParsedType* type, ls_string_view name) {
+		if (!type) return false;
+		if (type->kind == ParsedType::QUALIFIED) {
+			QualifiedParsedType* q = static_cast<QualifiedParsedType*>(type);
+			return empty(q->qualifier) && equalStrings(q->name, name);
+		}
+		if (type->kind == ParsedType::BRACKET_TYPE) {
+			BracketTypeParsedType* br = static_cast<BracketTypeParsedType*>(type);
+			return parsedTypeIsDirectSelfReference(br->callee, name);
 		}
 		return false;
 	}
@@ -1611,6 +2492,10 @@ struct Checker {
 		}
 
 		ResolvedType* annotation = resolveParsedType(unit, var->parsed_type);
+		// The parser always attaches an initializer (`var x = ...;`); there is no
+		// uninitialized local form. Unlike global symbols, this path may dereference
+		// it unconditionally.
+		ASSERT(var->expression);
 		if (var->expression->kind == Expression::UNDEFINED) {
 			if (!annotation) {
 				errorLine(var->token, "Variable ", var->name, " must have a type annotation if initialized with undefined");
@@ -1991,8 +2876,8 @@ struct Checker {
 		extern fn sqrt_f64(v : f64) : f64;
 	)";
 
-	bool resolveImportsForUnit(Unit& unit, ls_import_resolver_fn import_resolver, void* import_resolver_userdata, OutputFormatter& out) {
-		if (unit.import_state == Unit::IMPORT_DONE) return LS_RESULT_OK;
+	bool resolveImportsForUnit(Unit& unit, ls_import_resolver_fn import_resolver, void* import_resolver_userdata) {
+		if (unit.import_state == Unit::IMPORT_DONE) return true;
 		if (unit.import_state == Unit::IMPORT_RESOLVING) {
 			errorLine({}, "Import cycle detected: ", unit.path);
 			return false;
@@ -2044,22 +2929,19 @@ struct Checker {
 				}
 				if (ls_module_parse(&module, source, import.path) == LS_RESULT_FAILURE) return false;
 				imported = &module.units.back();
-				import.unit = imported;
 			}
-			if (imported) import.unit = imported;
-			if (imported && !resolveImportsForUnit(*imported, import_resolver, import_resolver_userdata, out)) return false;
+			import.unit = imported;
+			if (!resolveImportsForUnit(*imported, import_resolver, import_resolver_userdata)) return false;
 		}
 
 		unit.import_state = Unit::IMPORT_DONE;
-		return LS_RESULT_OK;
+		return true;
 	}
 
 	bool resolveImports(ls_import_resolver_fn import_resolver, void* import_resolver_userdata) {
-		OutputFormatter out = {};
-		if (!module.units.empty()) out.host = module.units[0].arena.host;
 		for (u32 unit_index = 0; unit_index < module.units.size(); ++unit_index) {
 			Unit& unit = module.units[unit_index];
-			if (!resolveImportsForUnit(unit, import_resolver, import_resolver_userdata, out)) return false;
+			if (!resolveImportsForUnit(unit, import_resolver, import_resolver_userdata)) return false;
 		}
 		return true;
 	}
@@ -2090,15 +2972,25 @@ struct Checker {
 				if (checkSymbol(unit, sym) == LS_RESULT_FAILURE) return LS_RESULT_FAILURE;
 			}
 		}
+		// Phase 3: promote template function instances into unit.symbols so the
+		// bytecode compiler can iterate a single list. ExpArray bins are stable, so
+		// pointers into the array remain valid after appending new entries.
+		for (Unit& unit : module.units) {
+			for (TemplateFunctionInstance& instance : unit.template_function_instances) {
+				Symbol& sym = unit.symbols.emplace_back();
+				sym.name = instance.name;
+				sym.storage = Symbol::COMPTIME;
+				sym.check_state = Symbol::CHECKED;
+				sym.expression = instance.instance;
+				sym.resolved_type = instance.type;
+			}
+		}
 		return LS_RESULT_OK;
 	}
 
 	ls_result checkSymbol(Unit& unit, Symbol& sym) {
 		if (sym.check_state == Symbol::CHECKED) return LS_RESULT_OK;
 		if (sym.check_state == Symbol::FAILED) return LS_RESULT_FAILURE;
-
-		OutputFormatter out = {};
-		out.host = unit.arena.host;
 		auto fail = [&]() -> ls_result {
 			sym.check_state = Symbol::FAILED;
 			return LS_RESULT_FAILURE;
@@ -2115,18 +3007,7 @@ struct Checker {
 		}
 
 		if (sym.check_state == Symbol::CHECKING) {
-			// Function literals need to be visible while their own body is being
-			// checked so recursive calls can resolve to the provisional function type.
-			if (sym.expression && sym.expression->kind == Expression::FUNCTION && sym.resolved_type) {
-				return LS_RESULT_OK;
-			}
-			// Struct declarations publish their provisional instance before resolving
-			// fields. This permits references through function signatures and other
-			// non-inline wrappers; direct by-value recursion is rejected by the field
-			// layout check after resolution.
-			if (sym.expression && sym.expression->kind == Expression::STRUCT && sym.resolved_type && sym.resolved_type->kind == ResolvedType::META) {
-				return LS_RESULT_OK;
-			}
+			if (isProvisionalSymbolVisible(sym)) return LS_RESULT_OK;
 			errorLine(sym.token, "Cyclic definition: ", sym.name);
 			return fail();
 		}
@@ -2134,145 +3015,9 @@ struct Checker {
 		sym.check_state = Symbol::CHECKING;
 
 		if (sym.storage == Symbol::COMPTIME && sym.expression) {
-			switch (sym.expression->kind) {
-				case Expression::FUNCTION: {
-					FunctionExpression& fn = static_cast<FunctionExpression&>(*sym.expression);
-					if (!fn.comptime_params.empty()) {
-						errorLine(sym.token, "Templates are not supported: ", sym.name);
-						return fail();
-					}
-					FunctionResolvedType* fn_type = buildFunctionType(unit, fn, true);
-					if (!fn_type) return fail();
-					sym.resolved_type = fn_type;
-					if (const Token::Type op_token = tokenFromOperatorName(sym.name); op_token != Token::ERROR) {
-						const i32 arity = (i32)fn_type->param_types.size();
-						if ((op_token == Token::MINUS ? (arity != 1 && arity != 2) : arity != 2)) {
-							errorLine(sym.token, "Invalid operator arity");
-							return fail();
-						}
-						if (operatorHasPrimitiveSignature(*fn_type)) {
-							errorLine(sym.token, "Operator overloads for primitive signatures are not allowed");
-							return fail();
-						}
-						for (ResolvedType* param : fn_type->param_types) {
-							if (param->kind == ResolvedType::ENUM) {
-								errorLine(sym.token, "Operator overloads with enum parameters are not allowed; use a wrapper struct instead");
-								return fail();
-							}
-						}
-					}
-					if (fn.body && checkFunctionBody(unit, fn) == false) return fail();
-					break;
-				}
-				case Expression::STRUCT: {
-					StructExpression& st = static_cast<StructExpression&>(*sym.expression);
-					if (!st.comptime_params.empty()) {
-						errorLine(sym.token, "Templates are not supported: ", sym.name);
-						return fail();
-					}
-					StructResolvedType* st_type = makeType<StructResolvedType>(unit, *unit.arena.arena);
-					st_type->decl = &st;
-					MetaType* meta = makeType<MetaType>(unit);
-					meta->inner = st_type;
-					sym.resolved_type = meta;
-					for (NamedDecl& field : st.fields) {
-						field.resolved_type = resolveParsedType(unit, field.parsed_type);
-						if (!field.resolved_type) {
-							errorLine(sym.token, "Could not resolve type of field '", field.name, "' in struct: ", sym.name);
-							return fail();
-						}
-						if (field.resolved_type == st_type) {
-							errorLine(sym.token, "Recursive by-value field '", field.name, "' in struct: ", sym.name);
-							return fail();
-						}
-						st_type->field_types.push(field.resolved_type);
-					}
-					break;
-				}
-				case Expression::ENUM: {
-					EnumExpression& en = static_cast<EnumExpression&>(*sym.expression);
-					EnumResolvedType* en_type = makeType<EnumResolvedType>(unit);
-					en_type->decl = &en;
-					MetaType* meta = makeType<MetaType>(unit);
-					meta->inner = en_type;
-					sym.resolved_type = meta;
-					break;
-				}
-				default: {
-					// Plain comptime value: comptime N = expr;
-					ResolvedType* annotation = resolveParsedType(unit, sym.parsed_type);
-					FunctionCheckContext comptime_ctx(unit.arena);
-					comptime_ctx.comptime_only = true;
-					ResolvedType* expr_type = checkExpr(unit, &comptime_ctx, *sym.expression, annotation);
-					if (!expr_type) {
-						errorLine(sym.token, "Unresolved initializer for: ", sym.name);
-						return fail();
-					}
-					if (isUntypedNumeric(expr_type)) {
-						expr_type = materializeUntyped(*sym.expression, annotation);
-						if (!expr_type) return fail();
-					}
-					if (annotation && expr_type && !canImplicitlyConvert(expr_type, annotation)) {
-						errorLine(sym.token, "Type mismatch in comptime declaration: ", sym.name);
-						return fail();
-					}
-					if (sym.expression && sym.expression->kind == Expression::TYPE_LITERAL) {
-						MetaType* meta = makeType<MetaType>(unit);
-						meta->inner = expr_type;
-						sym.resolved_type = meta;
-					} else {
-						sym.resolved_type = annotation ? annotation : expr_type;
-					}
-					break;
-				}
-			}
+			if (checkComptimeSymbol(unit, sym) == LS_RESULT_FAILURE) return fail();
 		} else {
-			// VAR or CONST global (includes extern fn, which is VARIABLE + FunctionExpression).
-			ResolvedType* annotation = resolveParsedType(unit, sym.parsed_type);
-
-			if (sym.expression && sym.expression->kind == Expression::UNDEFINED) {
-				if (!annotation) {
-					errorLine(sym.token, "'undefined' initializer requires an explicit type annotation: ", sym.name);
-					return fail();
-				}
-				if (sym.storage == Symbol::CONST) {
-					errorLine(sym.token, "const cannot be initialized with 'undefined': ", sym.name);
-					return fail();
-				}
-			}
-
-			ResolvedType* expr_type = nullptr;
-			if (sym.expression && sym.expression->kind == Expression::FUNCTION) {
-				FunctionExpression& fn = static_cast<FunctionExpression&>(*sym.expression);
-				FunctionResolvedType* fn_type = buildFunctionType(unit, fn, true);
-				if (!fn_type) return fail();
-				sym.resolved_type = fn_type;
-				expr_type = fn_type;
-				if (annotation && !canImplicitlyConvert(expr_type, annotation)) {
-					errorLine(sym.token, "Type mismatch in initializer for: ", sym.name);
-					return fail();
-				}
-				if (fn.body && checkFunctionBody(unit, fn) == false) return fail();
-			} else {
-				expr_type = sym.expression ? checkExpr(unit, nullptr, *sym.expression, annotation) : nullptr;
-				if (sym.expression && !expr_type) {
-					errorLine(sym.token, "Unresolved initializer for: ", sym.name);
-					return fail();
-				}
-				// A global initializer is a storage point too: pin any untyped value before
-				// codegen so nothing untyped reaches the backend.
-				if (isUntypedNumeric(expr_type)) {
-					expr_type = materializeUntyped(*sym.expression, annotation);
-					if (!expr_type) return fail();
-				}
-			}
-
-			if (annotation && expr_type && !canImplicitlyConvert(expr_type, annotation)) {
-				errorLine(sym.token, "Type mismatch in initializer for: ", sym.name);
-				return fail();
-			}
-
-			sym.resolved_type = annotation ? annotation : expr_type;
+			if (checkRuntimeSymbol(unit, sym) == LS_RESULT_FAILURE) return fail();
 		}
 
 		sym.check_state = Symbol::CHECKED;
@@ -2290,7 +3035,7 @@ ls_result ls_module_compile(ls_module* module, ls_string_view source, ls_string_
 	if (!module) return LS_RESULT_FAILURE;
 	Checker checker(*module);
 	if (ls_module_parse(module, source, source_name) == LS_RESULT_FAILURE) return LS_RESULT_FAILURE;
-	if (checker.resolveImports(import_resolver, import_resolver_userdata) == LS_RESULT_FAILURE) return LS_RESULT_FAILURE;
+	if (!checker.resolveImports(import_resolver, import_resolver_userdata)) return LS_RESULT_FAILURE;
 	if (ls_module_typecheck(module) == LS_RESULT_FAILURE) return LS_RESULT_FAILURE;
 	return LS_RESULT_OK;
 }
