@@ -171,6 +171,7 @@ struct Parser {
 	// Push a top-level symbol. Operator overloads may share a name with other
 	// overloads of the same operator; all other symbols reject redeclarations.
 	bool addSymbol(const Symbol& sym) {
+		ASSERT(sym.expression || sym.storage == Symbol::IMPORT);
 		if (!isOperatorSymbol(sym.name)) {
 			for (const Symbol& other : m_unit.symbols) {
 				if (!equalStrings(other.name, sym.name)) continue;
@@ -474,6 +475,10 @@ struct Parser {
 	bool templateParams(ExpArray<NamedDecl>& params) {
 		if (peekToken().type != Token::LEFT_BRACKET) return true;
 		consumeToken();
+		if (peekToken().type == Token::RIGHT_BRACKET) {
+			m_output.error("Template parameter list can not be empty");
+			return false;
+		}
 		while (peekToken().type != Token::RIGHT_BRACKET) {
 			if (peekToken().type == Token::END_OF_FILE) {
 				m_output.error("Unexpected end of file");
@@ -497,84 +502,6 @@ struct Parser {
 		}
 		if (!consume(Token::RIGHT_BRACKET)) return false;
 		return true;
-	}
-
-	bool typeArg(ComptimeArg& arg) {
-		Token token = consumeToken();
-		switch (token.type) {
-			case Token::QUESTION:
-				arg.kind = ComptimeArg::TYPE;
-				arg.type = type();
-				return arg.type != nullptr;
-			case Token::VOID:
-			case Token::BOOL:
-			case Token::I8:
-			case Token::I16:
-			case Token::I32:
-			case Token::I64:
-			case Token::U8:
-			case Token::U16:
-			case Token::U32:
-			case Token::U64:
-			case Token::F32:
-			case Token::F64:
-			case Token::STRING_KW:
-			case Token::CPTR:
-			case Token::FN: {
-				arg.kind = ComptimeArg::TYPE;
-				arg.type = typeFromToken(token);
-				return arg.type != nullptr;
-			}
-			case Token::LEFT_PAREN:
-				arg.kind = ComptimeArg::TYPE;
-				arg.type = type();
-				if (!arg.type) return false;
-				return consume(Token::RIGHT_PAREN);
-			case Token::IDENTIFIER:
-				if (peekToken().type == Token::DOT || peekToken().type == Token::LEFT_BRACKET) {
-					arg.kind = ComptimeArg::TYPE;
-					arg.type = typeFromToken(token);
-					return arg.type != nullptr;
-				}
-				if (m_comptime_params) {
-					for (const NamedDecl& param : *m_comptime_params) {
-						if (equalStrings(param.name, token.value) && !param.parsed_type) {
-							arg.kind = ComptimeArg::TYPE;
-							QualifiedParsedType* q = makeParsedType<QualifiedParsedType>(token);
-							q->name = token.value;
-							arg.type = q;
-							return true;
-						}
-					}
-				}
-				arg.kind = ComptimeArg::EXPRESSION;
-				{
-					IdentifierExpression* expr = makeExpr<IdentifierExpression>(token);
-					expr->name = token.value;
-					arg.expression = expr;
-				}
-				return true;
-			case Token::NUMBER:
-				arg.kind = ComptimeArg::EXPRESSION;
-				arg.expression = numberLiteral(token);
-				return true;
-			case Token::TRUE:
-			case Token::FALSE:
-				arg.kind = ComptimeArg::EXPRESSION;
-				arg.expression = makeExpr<BoolLiteralExpression>(token, token.type == Token::TRUE);
-				return true;
-			case Token::STRING:
-				arg.kind = ComptimeArg::EXPRESSION;
-				{
-					StringLiteralExpression* expr = makeExpr<StringLiteralExpression>(token);
-					expr->value = token.value;
-					arg.expression = expr;
-				}
-				return true;
-			default:
-				m_output.errorAt(token, "Expected type or expression");
-				return false;
-		}
 	}
 
 	ParsedType* typeFromToken(Token token) {
@@ -670,8 +597,9 @@ struct Parser {
 					return nullptr;
 				}
 
-				ComptimeArg& arg = call->args.emplace_back();
-				if (!typeArg(arg)) return nullptr;
+				Expression* arg = expression(ExprMode::HEAD);
+				if (!arg) return nullptr;
+				call->args.push(arg);
 				if (peekToken().type != Token::COMMA) break;
 				consumeToken();
 			}
@@ -1104,20 +1032,22 @@ struct Parser {
 		while (peekToken().type != Token::RIGHT_BRACE) {
 			if (peekToken().type == Token::END_OF_FILE) {
 				m_output.error("Unexpected end of file");
+				m_comptime_params = nullptr;
 				return nullptr;
 			}
 
 			NamedDecl& field = st->fields.emplace_back();
-			if (!consume(Token::IDENTIFIER, field.name, "Expected field name")) return nullptr;
+			if (!consume(Token::IDENTIFIER, field.name, "Expected field name")) { m_comptime_params = nullptr; return nullptr; }
 			for (i32 i = 0; i < st->fields.size() - 1; ++i) {
 				if (!equalStrings(st->fields[i].name, field.name)) continue;
 				m_output.error("Duplicate field: ", field.name);
+				m_comptime_params = nullptr;
 				return nullptr;
 			}
-			if (!consume(Token::COLON)) return nullptr;
+			if (!consume(Token::COLON)) { m_comptime_params = nullptr; return nullptr; }
 			field.parsed_type = type();
-			if (!field.parsed_type) return nullptr;
-			if (!consume(Token::SEMICOLON)) return nullptr;
+			if (!field.parsed_type) { m_comptime_params = nullptr; return nullptr; }
+			if (!consume(Token::SEMICOLON)) { m_comptime_params = nullptr; return nullptr; }
 		}
 		m_comptime_params = nullptr;
 		if (!consume(Token::RIGHT_BRACE)) return nullptr;

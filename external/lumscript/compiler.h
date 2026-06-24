@@ -76,7 +76,6 @@ struct Import {
 
 struct TemplateFunctionInstance {
 	ls_string_view name = {};
-	Symbol* source_symbol = nullptr;
 	FunctionExpression* source = nullptr;
 	FunctionExpression* instance = nullptr;
 	FunctionResolvedType* type = nullptr;

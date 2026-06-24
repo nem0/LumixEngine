@@ -174,6 +174,25 @@ TEST(SliceNonIntegerBeginFail) {
 	return true;
 }
 
+TEST(SliceNonIntegerEndFail) {
+	const char* prerequisite = R"(
+		fn main() : void {
+			var values : i32[4] = undefined;
+			var slice : i32[] = values[0:4];
+		}
+	)";
+	EXPECT_COMPILE(prerequisite);
+
+	const char* source = R"(
+		fn main() : void {
+			var values : i32[4] = undefined;
+			var slice : i32[] = values[0:"abc"];
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(SliceImplicitConversionLengthRuntime) {
 	const char* source = R"(
 		fn get_length(s : i32[]) : i32 {

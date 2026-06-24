@@ -97,6 +97,17 @@ TEST(IndexingRequiresArrayTypeFails) {
 	return true;
 }
 
+TEST(IndexingWithMultipleArgumentsFails) {
+	const char* source = R"(
+		fn main() : void {
+			var values : i32[4] = undefined;
+			const x = values[0, 1];
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(MethodCallOnArrayElement) {
 	const char* source = R"(
 		struct Vec2 {

@@ -36,6 +36,7 @@ struct Expression {
 		STRING_LITERAL,
 		NULL_LITERAL,
 		TYPE_LITERAL,
+		PARSED_TYPE,
 		// Runtime call: `foo(a, b)`.
 		CALL,
 		// Unary operator expression such as `-x`, `not x`, or `ref x` at a call site.
@@ -112,6 +113,12 @@ struct TypeLiteralExpression : Expression {
 	TypeLiteralExpression(ParsedType::Kind kind) : Expression(TYPE_LITERAL), type(kind) {}
 
 	ParsedType::Kind type = ParsedType::INVALID;
+};
+
+struct ParsedTypeExpression : Expression {
+	ParsedTypeExpression() : Expression(PARSED_TYPE) {}
+
+	ParsedType* type = nullptr;
 };
 
 struct CallExpression : Expression {

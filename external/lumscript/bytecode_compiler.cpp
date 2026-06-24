@@ -2196,6 +2196,15 @@ static bool isSimpleReturnLiteral(BlockStatement* body, Expression*& out_expr) {
 	}
 }
 
+static u32 computeParamSlotCount(const ExpArray<FunctionParam>& params) {
+	u32 count = 0;
+	for (const FunctionParam& param : params) {
+		const u32 slot_count = param.is_ref ? 1u : typeSlotCount(param.resolved_type);
+		count += slot_count == 0u ? 1u : slot_count;
+	}
+	return count;
+}
+
 static bool compileFunctionBytecode(
 	ls_bytecode* bytecode,
 	ls_module* module,
@@ -2227,10 +2236,7 @@ static bool compileFunctionBytecode(
 	function.max_stack = function.return_slot_count;
 
 	if (fn->is_extern) {
-		for (FunctionParam& param : fn->runtime_params) {
-			const u32 slot_count = param.is_ref ? 1u : typeSlotCount(param.resolved_type);
-			function.param_slot_count += slot_count == 0u ? 1u : slot_count;
-		}
+		function.param_slot_count = computeParamSlotCount(fn->runtime_params);
 		return true;
 	}
 	if (!fn->body || fn->body->kind != Statement::BLOCK) return false;
@@ -2239,10 +2245,7 @@ static bool compileFunctionBytecode(
 	Expression* literal = nullptr;
 	if (function.return_slot_count == 1u && isSimpleReturnLiteral(body, literal)) {
 		// Build the tiny literal function directly to keep the old fast path.
-		for (FunctionParam& param : fn->runtime_params) {
-			const u32 slot_count = param.is_ref ? 1u : typeSlotCount(param.resolved_type);
-			function.param_slot_count += slot_count == 0u ? 1u : slot_count;
-		}
+		function.param_slot_count = computeParamSlotCount(fn->runtime_params);
 		ByteArray temp(*arena);
 		switch (literal->kind) {
 			case Expression::INT_LITERAL:

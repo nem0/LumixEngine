@@ -12,6 +12,26 @@ TEST(TemplateFunctionIdentityI32) {
 	return true;
 }
 
+TEST(TemplateFunctionInferredThroughUFCS) {
+	const char* source = R"(
+		struct Value {
+			data : i32;
+		}
+
+		fn identity[T](a : T) : T {
+			return a;
+		}
+
+		fn main() : i32 {
+			const value = Value { 42 };
+			const result : Value = value.identity();
+			return result.data;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
 TEST(TemplateFunctionIdentityF32) {
 	const char* source = R"(
 		fn identity[T](a : T) : T {
@@ -1507,6 +1527,20 @@ TEST(TemplateFunctionExplicitInstantiationNoArgs) {
 		}
 	)";
 	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(TemplateFunctionEmptyTemplateParamListFails) {
+	const char* source = R"(
+		fn identity[]() : i32 {
+			return 42;
+		}
+
+		fn main() : i32 {
+			return identity();
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
 

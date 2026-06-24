@@ -147,6 +147,34 @@ TEST(FirstClassFunctionLiteralSignatureMismatchFails) {
 	return true;
 }
 
+TEST(NullableFirstClassFunctionGlobalCannotBeCalledDirectly) {
+	const char* source = R"(
+		var maybe_add : ?fn(i32) : i32 = fn(v : i32) : i32 {
+			return v + 1;
+		};
+
+		fn main() : i32 {
+			return maybe_add(41);
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(FirstClassFunctionLiteralMemberAccessFails) {
+	const char* source = R"(
+		const foo = fn() : i32 {
+			return 1;
+		};
+
+		fn main() : void {
+			const value = foo.bar;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(FirstClassFunctionSignatureMismatchFails) {
 	const char* source = R"(
 		fn to_float(a : i32) : f32 {

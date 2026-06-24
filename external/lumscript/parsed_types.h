@@ -78,19 +78,9 @@ struct SliceParsedType : ParsedType {
 	ParsedType* element_type = nullptr;
 };
 
-struct ComptimeArg {
-	// Template arguments can be either types or values. This keeps `Array[i32]`
-	// and `StaticArray[f32, 16]` in the same representation.
-	enum Kind { INVALID, TYPE, EXPRESSION };
-
-	Kind kind = INVALID;
-	ParsedType* type = nullptr;
-	Expression* expression = nullptr;
-};
-
 struct BracketTypeParsedType : ParsedType {
 	BracketTypeParsedType(ls_arena& arena) : ParsedType(BRACKET_TYPE), args(arena) {}
 
 	ParsedType* callee = nullptr;
-	ExpArray<ComptimeArg> args;
+	ExpArray<Expression*> args;
 };
