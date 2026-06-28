@@ -612,10 +612,8 @@ struct Parser {
 
 	ParsedType* type() {
 		Token first = consumeToken();
-		bool is_nullable = false;
 		Token base_token = first;
 		if (first.type == Token::QUESTION) {
-			is_nullable = true;
 			base_token = consumeToken();
 		}
 
@@ -624,8 +622,11 @@ struct Parser {
 			m_output.errorAt(base_token, "Expected type");
 			return nullptr;
 		}
-		res->is_nullable = is_nullable;
-		if (is_nullable) res->token = first;
+		if (first.type == Token::QUESTION) {
+			NullableParsedType* nullable = makeParsedType<NullableParsedType>(first);
+			nullable->inner = res;
+			res = nullable;
+		}
 		return res;
 	}
 

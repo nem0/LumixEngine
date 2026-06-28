@@ -178,7 +178,7 @@ struct StructLiteralExpression : Expression {
 };
 
 struct FunctionExpression : Expression {
-	FunctionExpression(ls_arena& arena) : Expression(FUNCTION), comptime_params(arena), runtime_params(arena) {}
+	FunctionExpression(ls_arena& arena) : Expression(FUNCTION), comptime_params(arena), runtime_params(arena), template_function_instances(arena) {}
 
 	ExpArray<NamedDecl> comptime_params; // [...]
 	ExpArray<FunctionParam> runtime_params; // (...)
@@ -188,6 +188,8 @@ struct FunctionExpression : Expression {
 	// Null for `extern fn` declarations; the host binds the implementation at runtime.
 	Statement* body = nullptr;
 	bool is_extern = false;
+	// Canonical template specializations for this function declaration.
+	ExpArray<TemplateFunctionInstance> template_function_instances;
 };
 
 struct StructOperator {
@@ -196,7 +198,7 @@ struct StructOperator {
 };
 
 struct StructExpression : Expression {
-	StructExpression(ls_arena& arena) : Expression(STRUCT), comptime_params(arena), fields(arena), operators(arena) {}
+	StructExpression(ls_arena& arena) : Expression(STRUCT), comptime_params(arena), fields(arena), operators(arena), template_struct_instances(arena) {}
 
 	ExpArray<NamedDecl> comptime_params; // [...]
 	// Fields keep parsed type syntax so generic structs can be instantiated with
@@ -205,6 +207,8 @@ struct StructExpression : Expression {
 	// Operator overloads hosted on this type (first struct operand).
 	// Populated during symbol checking; used for O(1)-ish operator lookup.
 	ExpArray<StructOperator> operators;
+	// Canonical template specializations for this struct declaration.
+	ExpArray<StructResolvedType*> template_struct_instances;
 };
 
 struct EnumMember {

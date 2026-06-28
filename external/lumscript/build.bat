@@ -39,6 +39,7 @@ if "%USE_CLANG%"=="0" (
             for /f "usebackq delims=" %%J in (`"%%I" -latest -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath 2^>nul`) do set "VSDEV_CMD=%%J\Common7\Tools\VsDevCmd.bat"
         )
         if not defined VSDEV_CMD if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat" set "VSDEV_CMD=%ProgramFiles%\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat"
+        if not defined VSDEV_CMD if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Professional\Common7\Tools\VsDevCmd.bat" set "VSDEV_CMD=%ProgramFiles%\Microsoft Visual Studio\2022\Professional\Common7\Tools\VsDevCmd.bat"
         if not defined VSDEV_CMD if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Insiders\Common7\Tools\VsDevCmd.bat" set "VSDEV_CMD=%ProgramFiles%\Microsoft Visual Studio\2022\Insiders\Common7\Tools\VsDevCmd.bat"
         if defined VSDEV_CMD (
             call "!VSDEV_CMD!" -no_logo -arch=x64 -host_arch=x64

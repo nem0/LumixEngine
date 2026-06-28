@@ -38,6 +38,8 @@ struct ParsedType {
 		ARRAY,
 		// Slice syntax such as `T[]`.
 		SLICE,
+		// Nullable type syntax such as `?T`.
+		NULLABLE,
 		// Compile-time application in type syntax, e.g. `Array[i32]` or
 		// `StaticArray[f32, 16]`.
 		BRACKET_TYPE
@@ -46,7 +48,6 @@ struct ParsedType {
 	explicit ParsedType(Kind kind) : kind(kind) {}
 	ParsedType() = default;
 
-	bool is_nullable = false;
 	Kind kind = INVALID;
 	Token token = {};
 };
@@ -76,6 +77,12 @@ struct SliceParsedType : ParsedType {
 	SliceParsedType() : ParsedType(SLICE) {}
 
 	ParsedType* element_type = nullptr;
+};
+
+struct NullableParsedType : ParsedType {
+	NullableParsedType() : ParsedType(NULLABLE) {}
+
+	ParsedType* inner = nullptr;
 };
 
 struct BracketTypeParsedType : ParsedType {

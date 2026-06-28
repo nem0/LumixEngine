@@ -13,6 +13,22 @@ TEST(RefParameterTypechecks) {
 	return true;
 }
 
+
+TEST(NonRefUnaryNotAcceptedAsRefArgument) {
+	const char* source = R"(
+		fn increment(v : ref i32) : void {
+			v += 1;
+		}
+
+		fn main() : void {
+			var x : i32 = 10;
+			increment(-x);
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(RefParameterRequiresRefArgument) {
 	const char* source = R"(
 		fn increment(v : ref i32) : void {
@@ -197,7 +213,7 @@ TEST(BytecodeRefParameterCall) {
 	return true;
 }
 
-TEST(BytecodeRefParameterRejectsLiteral) {
+TEST(RefParameterRejectsLiteral) {
 	const char* source = R"(
 		fn increment(v : ref i32) : void {
 			v += 1;

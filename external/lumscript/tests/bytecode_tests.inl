@@ -1848,6 +1848,23 @@ TEST(ExtendedScalarTypesRuntime) {
 	return true;
 }
 
+TEST(LargeUntypedIntegerArithmeticRetainsWidthRuntime) {
+	const char* source = R"(
+		fn main() : i64 {
+			return 2147483648 + 1;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_TRUE(2147483649ll == ls_to_i64(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(IntegerOverflowWraparoundRuntime) {
 	const char* source = R"(
 		fn u8_add_wrap() : i32 {

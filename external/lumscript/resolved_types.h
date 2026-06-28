@@ -5,6 +5,7 @@
 struct EnumExpression;
 struct StructExpression;
 struct FunctionExpression;
+struct Expression;
 
 struct ResolvedType {
 	enum Kind {
@@ -53,16 +54,40 @@ struct EnumResolvedType : ResolvedType {
 	EnumExpression* decl = nullptr;
 };
 
+struct TemplateArgument {
+	enum Kind {
+		UNBOUND,
+		TYPE,
+		VALUE
+	};
+
+	TemplateArgument()
+		: kind(UNBOUND)
+		, type(nullptr) {}
+
+	explicit TemplateArgument(ResolvedType* type)
+		: kind(TYPE)
+		, type(type) {}
+
+	explicit TemplateArgument(Expression* value)
+		: kind(VALUE)
+		, value(value) {}
+
+	Kind kind;
+	union {
+		ResolvedType* type;
+		Expression* value;
+	};
+};
+
 struct StructResolvedType : ResolvedType {
 	StructResolvedType(ls_arena& arena)
 		: ResolvedType(STRUCT)
-		, type_args(arena)
-		, value_args(arena)
+		, template_args(arena)
 		, field_types(arena) {}
 
 	StructExpression* decl = nullptr;
-	ExpArray<ResolvedType*> type_args;
-	ExpArray<i64> value_args;
+	ExpArray<TemplateArgument> template_args;
 	// A generic declaration is shared by every specialization, therefore its
 	// NamedDecl::resolved_type cannot describe the fields of a concrete value.
 	// Keep the substituted field types on the canonical struct instance instead.
@@ -70,9 +95,9 @@ struct StructResolvedType : ResolvedType {
 };
 
 struct FunctionResolvedType : ResolvedType {
-	FunctionResolvedType(ls_arena& arena) : ResolvedType(FUNCTION), type_args(arena), param_types(arena) {}
+	FunctionResolvedType(ls_arena& arena) : ResolvedType(FUNCTION), template_args(arena), param_types(arena) {}
 
-	ExpArray<ResolvedType*> type_args;
+	ExpArray<TemplateArgument> template_args;
 	ExpArray<ResolvedType*> param_types;
 	ResolvedType* return_type = nullptr;
 	FunctionExpression* decl = nullptr;
@@ -102,4 +127,10 @@ struct BracketTypeResolvedType : ResolvedType {
 
 	ResolvedType* callee = nullptr;
 	ExpArray<ResolvedType*> args;
+};
+
+struct TemplateFunctionInstance {
+	ls_string_view name = {};
+	FunctionExpression* instance = nullptr;
+	FunctionResolvedType* type = nullptr;
 };

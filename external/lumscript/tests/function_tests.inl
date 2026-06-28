@@ -175,6 +175,16 @@ TEST(FirstClassFunctionLiteralMemberAccessFails) {
 	return true;
 }
 
+TEST(MemberAccessOnFailedCallBaseDoesNotCrash) {
+	const char* source = R"(
+		fn main() : void {
+			foo().bar;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(FirstClassFunctionSignatureMismatchFails) {
 	const char* source = R"(
 		fn to_float(a : i32) : f32 {

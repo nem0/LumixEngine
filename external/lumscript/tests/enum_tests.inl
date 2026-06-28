@@ -237,6 +237,25 @@ TEST(EnumMethodCallOnReturnValue) {
 	return true;
 }
 
+
+TEST(EnumShorthandMethodCallFail) {
+	const char* source = R"(
+		enum State {
+			Idle,
+			Running
+		}
+
+		fn foo(s : State) : void {}
+
+		fn main() : void {
+            .Idle.foo();
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+
 TEST(EnumUnknownShorthand) {
 	const char* source = R"(
 		enum State {
