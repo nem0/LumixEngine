@@ -137,9 +137,13 @@ struct Parser {
 			case Token::U16: return "u16";
 			case Token::U32: return "u32";
 			case Token::U64: return "u64";
+			case Token::ISIZE: return "isize";
 			case Token::F32: return "f32";
 			case Token::F64: return "f64";
 			case Token::CPTR: return "cptr";
+			case Token::BYTE: return "byte";
+			case Token::SIZEOF: return "sizeof";
+			case Token::ALIGNOF: return "alignof";
 			case Token::COMPTIME: return "comptime";
 			default: ASSERT(false); return "Unknown";
 		}
@@ -286,12 +290,24 @@ struct Parser {
 			case Token::U16:
 			case Token::U32:
 			case Token::U64:
+			case Token::ISIZE:
 			case Token::F32:
 			case Token::F64:
 			case Token::STRING_KW:
 			case Token::CPTR:
+			case Token::BYTE:
 			case Token::TYPE_KW:
 				return makeExpr<TypeLiteralExpression>(token, typeFromToken(token)->kind);
+			case Token::SIZEOF:
+			case Token::ALIGNOF: {
+				SizeofExpression* expr = makeExpr<SizeofExpression>(token);
+				expr->is_align = token.type == Token::ALIGNOF;
+				if (!consume(Token::LEFT_PAREN)) return nullptr;
+				expr->type = type();
+				if (!expr->type) return nullptr;
+				if (!consume(Token::RIGHT_PAREN)) return nullptr;
+				return expr;
+			}
 			case Token::IDENTIFIER: {
 				IdentifierExpression* expr = makeExpr<IdentifierExpression>(token);
 				expr->name = token.value;
@@ -518,9 +534,11 @@ struct Parser {
 			case Token::U16: res = makeParsedType<ParsedType>(token, ParsedType::U16); break;
 			case Token::U32: res = makeParsedType<ParsedType>(token, ParsedType::U32); break;
 			case Token::U64: res = makeParsedType<ParsedType>(token, ParsedType::U64); break;
+			case Token::ISIZE: res = makeParsedType<ParsedType>(token, ParsedType::ISIZE); break;
 			case Token::F32: res = makeParsedType<ParsedType>(token, ParsedType::F32); break;
 			case Token::F64: res = makeParsedType<ParsedType>(token, ParsedType::F64); break;
 			case Token::CPTR: res = makeParsedType<ParsedType>(token, ParsedType::CPTR); break;
+			case Token::BYTE: res = makeParsedType<ParsedType>(token, ParsedType::BYTE); break;
 			case Token::TYPE_KW: res = makeParsedType<ParsedType>(token, ParsedType::TYPE); break;
 			case Token::IDENTIFIER: {
 				QualifiedParsedType* qualified = makeParsedType<QualifiedParsedType>(token);

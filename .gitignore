@@ -20,4 +20,5 @@ src/engine/plugins.inl
 .shader_cache_dx11
 scripts/itch_io/
 !data/editor/scripts/plugins/
+external/lumscript/build/
 *.dmp

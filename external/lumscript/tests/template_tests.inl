@@ -86,7 +86,7 @@ TEST(TemplateFunctionLoopBodyIsClonedPerInstantiation) {
 
 		fn main() : i32 {
 			// The later i32 instantiation must not overwrite semantic annotations in
-			// the loop body of the earlier, two-slot Number instantiation.
+			// the loop body of the earlier, wider Number instantiation.
 			const number_result = twice(Number { 20, 1 });
 			const integer_result = twice(1);
 			return number_result.low + number_result.high;
@@ -405,6 +405,24 @@ TEST(TemplateRecursiveStructFails) {
 		}
 
 		fn main() : void {}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(TemplateIndirectRecursiveStructFails) {
+	const char* source = R"(
+		struct A[T] {
+			b : B[T];
+		}
+
+		struct B[T] {
+			a : A[T];
+		}
+
+		fn main() : void {
+			var value : A[i32] = undefined;
+		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
 	return true;

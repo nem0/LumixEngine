@@ -193,6 +193,35 @@ TEST(BytecodeCompoundAssignArrayIndexEvaluatedOnce) {
 	return true;
 }
 
+TEST(BytecodeUndefinedArrayArgumentUsesFullByteSize) {
+	const char* source = R"(
+		fn consume(values : i32[3]) : void {}
+
+		fn main() : i32 {
+			var poison : i32 = 123;
+			consume(undefined);
+			return poison;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ls_runtime* runtime = ls_runtime_create(bytecode);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(123, ls_to_i32(runtime, -1));
+
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
 TEST(BytecodeRefParameterArrayCall) {
 	const char* source = R"(
 		fn bump(value : ref i32) : void {
@@ -234,5 +263,21 @@ TEST(NullableIndexingRequiresNullCheckFails) {
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(StructStaticArrayTypechecks) {
+	const char* source = R"(
+		struct Pair {
+			a : i32;
+			b : i32;
+		}
+
+		fn main() : void {
+			var pairs : Pair[3] = undefined;
+			pairs[0] = Pair { 1, 2 };
+		}
+	)";
+	EXPECT_COMPILE(source);
 	return true;
 }

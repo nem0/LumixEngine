@@ -114,6 +114,7 @@ struct Tokenizer {
 				switch (m_start_token[1]) {
 					case 'n': return checkKeyword("d", 2, 1, Token::AND);
 					case 's': return checkKeyword("", 2, 0, Token::AS);
+					case 'l': return checkKeyword("ignof", 2, 5, Token::ALIGNOF);
 				}
 				break;
 			}
@@ -122,6 +123,7 @@ struct Tokenizer {
 				switch (m_start_token[1]) {
 					case 'o': return checkKeyword("ol", 2, 2, Token::BOOL);
 					case 'r': return checkKeyword("eak", 2, 3, Token::BREAK);
+					case 'y': return checkKeyword("te", 2, 2, Token::BYTE);
 				}
 				break;
 			}
@@ -171,6 +173,7 @@ struct Tokenizer {
 					case '6': return checkKeyword("4", 2, 1, Token::I64);
 					case 'f': return checkKeyword("", 2, 0, Token::IF);
 					case 'm': return checkKeyword("port", 2, 4, Token::IMPORT);
+					case 's': return checkKeyword("ize", 2, 3, Token::ISIZE);
 				}
 				break;
 			}
@@ -193,6 +196,8 @@ struct Tokenizer {
 				return checkKeyword("eturn", 1, 5, Token::RETURN);
 			}
 			case 's': {
+				if (u32(m_current - m_start_token) < 2) return makeToken(Token::IDENTIFIER);
+				if (m_start_token[1] == 'i') return checkKeyword("zeof", 2, 4, Token::SIZEOF);
 				if (u32(m_current - m_start_token) < 4) return makeToken(Token::IDENTIFIER);
 				if (m_start_token[1] != 't' || m_start_token[2] != 'r') return makeToken(Token::IDENTIFIER);
 				switch (m_start_token[3]) {

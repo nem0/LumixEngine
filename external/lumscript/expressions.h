@@ -59,6 +59,8 @@ struct Expression {
 		// `struct { ... }` creates a comptime type value.
 		STRUCT,
 		UNDEFINED, // var a : i32 = undefined;
+		// `sizeof(T)` / `alignof(T)` — produces an untyped integer constant.
+		SIZEOF,
 	};
 
 	Expression() = default;
@@ -119,6 +121,15 @@ struct ParsedTypeExpression : Expression {
 	ParsedTypeExpression() : Expression(PARSED_TYPE) {}
 
 	ParsedType* type = nullptr;
+};
+
+struct SizeofExpression : Expression {
+	SizeofExpression() : Expression(SIZEOF) {}
+
+	ParsedType* type = nullptr;
+	bool is_align = false;
+	// Filled in during checking; behaves like an untyped integer literal afterwards.
+	u64 value = 0;
 };
 
 struct CallExpression : Expression {

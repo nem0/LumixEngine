@@ -20,10 +20,12 @@ struct ResolvedType {
 		U16,
 		U32,
 		U64,
+		ISIZE,
 		F32,
 		F64,
 		STRING,
 		CPTR,
+		BYTE,
 		UNTYPED_INT,
 		UNTYPED_FLOAT,
 		META, // the type of a type: resolved_type of enum/struct/fn declarations

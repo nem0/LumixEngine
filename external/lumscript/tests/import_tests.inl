@@ -629,6 +629,41 @@ TEST(UFCSWithImportAliasResolvesToImportedFunction) {
 	return true;
 }
 
+TEST(UFCSWithUnaliasedImportResolvesToImportedFunction) {
+	const char* main_source = R"(
+		import "entity_mod" as entity
+		import "helper_mod"
+
+		fn main() : i32 {
+			const x : entity.Entity = entity.Entity { 7 };
+			return x.destroy();
+		}
+	)";
+
+	const char* entity_source = R"(
+		struct Entity {
+			id : i32;
+		}
+	)";
+
+	const char* helper_source = R"(
+		import "entity_mod" as entity
+
+		fn destroy(x : entity.Entity) : i32 {
+			return x.id;
+		}
+	)";
+
+	LumScriptImportFile files_storage[] = {
+		{ toLs("entity_mod"), toLs(entity_source) },
+		{ toLs("helper_mod"), toLs(helper_source) }
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+
+	EXPECT_COMPILE_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
 TEST(ImportAliasEntityResolution) {
 	const char* main_source = R"(
 		import "world" as world

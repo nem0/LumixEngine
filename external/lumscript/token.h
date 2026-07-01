@@ -80,9 +80,13 @@ struct Token {
 		U16,
 		U32,
 		U64,
+		ISIZE,
 		F32,
 		F64,
 		CPTR,
+		BYTE,
+		SIZEOF,
+		ALIGNOF,
 		COMPTIME,
 		TYPE_KW,
 	};

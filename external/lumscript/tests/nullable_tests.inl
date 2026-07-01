@@ -285,3 +285,44 @@ TEST(BytecodeNullableReturnValue) {
 	return true;
 }
 
+TEST(BytecodeNullableThreeBytePayloadNullReturnHasFullSize) {
+	const char* source = R"(
+		struct Packed {
+			a : bool;
+			b : u16;
+		}
+
+		fn none() : ?Packed {
+			return null;
+		}
+
+		fn main() : i32 {
+			var poison : bool = true;
+			var pad0 : bool = false;
+			var pad1 : bool = false;
+			if none() == null {
+				return 42;
+			}
+			if poison or pad0 or pad1 {
+				return 1;
+			}
+			return 0;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ls_runtime* runtime = ls_runtime_create(bytecode);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}

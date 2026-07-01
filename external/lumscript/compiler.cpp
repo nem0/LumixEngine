@@ -17,7 +17,7 @@ struct Checker {
 	// `isNumericType` and `isIntegerType` deliberately report concrete types only, so the
 	// existing hint/conversion logic keeps treating UNTYPED_INT as "not pinned yet". The
 	// operator code that wants to accept an untyped operand uses these *OrUntyped helpers.
-	static bool isIntegerType(const ResolvedType& t) { return t.kind >= ResolvedType::I8 && t.kind <= ResolvedType::U64; }
+	static bool isIntegerType(const ResolvedType& t) { return t.kind >= ResolvedType::I8 && t.kind <= ResolvedType::ISIZE; }
 	static bool isFloatType(const ResolvedType& t) { return t.kind >= ResolvedType::F32 && t.kind <= ResolvedType::F64; }
 	static bool isNumericType(const ResolvedType& type) { return type.kind >= ResolvedType::I8 && type.kind <= ResolvedType::F64; }
 	static bool isUntypedNumeric(const ResolvedType& t) { return t.kind == ResolvedType::UNTYPED_INT || t.kind == ResolvedType::UNTYPED_FLOAT; }
@@ -39,8 +39,8 @@ struct Checker {
 	}
 
 	static const char* primitiveTypeName(ResolvedType::Kind kind) {
-		static const char* names[] = {"void", "bool", "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "f32", "f64", "string", "cptr"};
-		ASSERT(kind >= ResolvedType::VOID && kind <= ResolvedType::CPTR);
+		static const char* names[] = {"void", "bool", "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "isize", "f32", "f64", "string", "cptr", "byte"};
+		ASSERT(kind >= ResolvedType::VOID && kind <= ResolvedType::BYTE);
 		return names[kind - ResolvedType::VOID];
 	}
 
@@ -263,16 +263,35 @@ struct Checker {
 			st.template_struct_instances.push(st_type);
 
 			bool ok = true;
+			bool recursive_by_value = false;
 			Scope scope(*this, st.comptime_params, template_args);
 			for (NamedDecl& field : st.fields) {
 				ResolvedType* field_type = checker.resolveParsedType(decl_unit, field.parsed_type);
-				if (!field_type || field_type == st_type) {
+				if (!field_type) {
 					ok = false;
+					break;
+				}
+				if (field_type == st_type) {
+					ok = false;
+					recursive_by_value = true;
 					break;
 				}
 				st_type->field_types.push(field_type);
 			}
+			if (ok) {
+				ExpArray<ResolvedType*> visited(*decl_unit.arena.arena);
+				for (ResolvedType* field_type : st_type->field_types) {
+					if (checker.containsStructByValue(field_type, *st_type, visited)) {
+						ok = false;
+						recursive_by_value = true;
+						break;
+					}
+				}
+			}
 			if (!ok) {
+				if (recursive_by_value) {
+					checker.errorLine(token, "Recursive by-value field in struct template");
+				}
 				auto& arr = st.template_struct_instances;
 				for (i32 i = 0; i < arr.size(); ++i) {
 					if (arr[i] == st_type) {
@@ -752,9 +771,86 @@ struct Checker {
 		explicit operator bool() const { return symbol && !ambiguous && !check_failed; }
 	};
 
+	static ResolvedType* structFieldType(const StructResolvedType* st, i32 i) {
+		return (u32)i < st->field_types.size() ? st->field_types[(u32)i] : st->decl->fields[(u32)i].resolved_type;
+	}
+
+	// `sizeof` is measured in raw runtime bytes, matching bytecode_compiler.cpp's
+	// byte layout.
+	static i64 typeByteSize(const ResolvedType* t) {
+		if (!t) return 1;
+		switch (t->kind) {
+			case ResolvedType::VOID: return 0;
+			case ResolvedType::BOOL:
+			case ResolvedType::I8:
+			case ResolvedType::U8:
+			case ResolvedType::BYTE:
+				return 1;
+			case ResolvedType::I16:
+			case ResolvedType::U16:
+				return 2;
+			case ResolvedType::I32:
+			case ResolvedType::U32:
+			case ResolvedType::F32:
+			case ResolvedType::ENUM:
+			case ResolvedType::FUNCTION:
+				return 4;
+			case ResolvedType::I64:
+			case ResolvedType::U64:
+			case ResolvedType::ISIZE:
+			case ResolvedType::F64:
+			case ResolvedType::STRING:
+			case ResolvedType::CPTR:
+				return 8;
+			case ResolvedType::NULLABLE: return 1 + typeByteSize(static_cast<const NullableResolvedType*>(t)->inner);
+			case ResolvedType::SLICE: return 16;
+			case ResolvedType::ARRAY: {
+				const ArrayResolvedType* arr = static_cast<const ArrayResolvedType*>(t);
+				return arr->size > 0 ? arr->size * typeByteSize(arr->element_type) : 1;
+			}
+			case ResolvedType::STRUCT: {
+				const StructResolvedType* st = static_cast<const StructResolvedType*>(t);
+				if (!st->decl) return 1;
+				i64 count = 0;
+				for (i32 i = 0; i < st->decl->fields.size(); ++i) count += typeByteSize(structFieldType(st, i));
+				return count ? count : 1;
+			}
+			default: return 1;
+		}
+	}
+
+	static i64 typeByteAlign(const ResolvedType* t) {
+		const i64 size = typeByteSize(t);
+		return size >= 8 ? 8 : size >= 4 ? 4 : size >= 2 ? 2 : 1;
+	}
+
+	// `sizeof(T)` / `alignof(T)`. Rejects a value-denoting name (the operand must be a type).
+	bool resolveSizeofValue(Unit& unit, SizeofExpression& sz, i64& out) {
+		if (sz.type && sz.type->kind == ParsedType::QUALIFIED) {
+			QualifiedParsedType* q = static_cast<QualifiedParsedType*>(sz.type);
+			const bool is_template_type = empty(q->qualifier) && templates.findType(q->name);
+			if (!is_template_type) {
+				SymbolRef ref = resolveSymbol(unit, q->qualifier, q->name, LookupPolicy::Checked);
+				if (!ref || !ref.symbol->resolved_type || ref.symbol->resolved_type->kind != ResolvedType::META) {
+					errorLine(sz.token, sz.is_align ? "alignof operand must be a type" : "sizeof operand must be a type");
+					return false;
+				}
+			}
+		}
+		ResolvedType* measured = resolveParsedType(unit, sz.type);
+		if (!measured) {
+			errorLine(sz.token, "Cannot resolve type for ", sz.is_align ? "alignof" : "sizeof");
+			return false;
+		}
+		out = sz.is_align ? typeByteAlign(measured) : typeByteSize(measured);
+		sz.value = (u64)out;
+		return true;
+	}
+
 	bool resolveComptimeIntValue(Unit& unit, Expression* expr, i64& out) {
 		if (!expr) return false;
 		switch (expr->kind) {
+			case Expression::SIZEOF: return resolveSizeofValue(unit, static_cast<SizeofExpression&>(*expr), out);
 			case Expression::INT_LITERAL: {
 				const u64 value = static_cast<IntLiteralExpression*>(expr)->value;
 				if (value > 9223372036854775807ull) return false;
@@ -968,6 +1064,14 @@ struct Checker {
 				out = type;
 				break;
 			}
+			case Expression::SIZEOF: {
+				SizeofExpression* s = static_cast<SizeofExpression*>(src);
+				SizeofExpression* sz = makeType<SizeofExpression>(unit);
+				sz->type = cloneParsedType(unit, s->type);
+				sz->is_align = s->is_align;
+				out = sz;
+				break;
+			}
 			case Expression::CALL: {
 				CallExpression* s = static_cast<CallExpression*>(src);
 				CallExpression* call = makeType<CallExpression>(unit, *unit.arena.arena);
@@ -1159,7 +1263,7 @@ struct Checker {
 	ResolvedType* resolveParsedType(Unit& unit, ParsedType* parsed) {
 		if (!parsed) return nullptr;
 		ResolvedType* result = nullptr;
-		if (parsed->kind >= ParsedType::VOID && parsed->kind <= ParsedType::CPTR) {
+		if (parsed->kind >= ParsedType::VOID && parsed->kind <= ParsedType::BYTE) {
 			result = primitiveType(static_cast<ResolvedType::Kind>(parsed->kind));
 		} else
 			switch (parsed->kind) {
@@ -1223,11 +1327,13 @@ struct Checker {
 					if (!callee) return nullptr;
 					if (callee->kind == ResolvedType::STRUCT) {
 						StructResolvedType* st = static_cast<StructResolvedType*>(callee);
-						if (!st->decl || st->decl->comptime_params.empty()) return nullptr;
-						Unit* owner = findTypeNamespaceUnit(*st);
-						if (!owner) return nullptr;
-						result = templates.instantiateStructTemplate(*owner, unit, call->token, *st->decl, call->args);
-						break;
+						if (!st->decl) return nullptr;
+						if (!st->decl->comptime_params.empty()) {
+							Unit* owner = findTypeNamespaceUnit(*st);
+							if (!owner) return nullptr;
+							result = templates.instantiateStructTemplate(*owner, unit, call->token, *st->decl, call->args);
+							break;
+						}
 					}
 					if (call->args.size() == 1) {
 						ArrayResolvedType* resolved = makeType<ArrayResolvedType>(unit);
@@ -1273,6 +1379,7 @@ struct Checker {
 			case ResolvedType::I32: return value <= 2147483647u;
 			case ResolvedType::U32: return value <= 4294967295u;
 			case ResolvedType::I64: return value <= 9223372036854775807ull;
+			case ResolvedType::ISIZE: return value <= 9223372036854775807ull;
 			case ResolvedType::U64: return true;
 			case ResolvedType::F32: {
 				// Value must be exactly representable as f32.
@@ -1298,6 +1405,7 @@ struct Checker {
 			case ResolvedType::I32: return magnitude <= 2147483648u;
 			case ResolvedType::U32: return false;
 			case ResolvedType::I64: return magnitude <= 9223372036854775808ull;
+			case ResolvedType::ISIZE: return magnitude <= 9223372036854775808ull;
 			case ResolvedType::U64: return false;
 			case ResolvedType::F32: return intLiteralFitsType(magnitude, ResolvedType::F32);
 			case ResolvedType::F64: return intLiteralFitsType(magnitude, ResolvedType::F64);
@@ -1789,7 +1897,7 @@ struct Checker {
 			if (equalStrings(name, makeStringView("length"))) {
 				ResolvedType* arg = checkExpr(unit, ctx, *call.args[0], nullptr, nullptr);
 				if (arg && (arg->kind == ResolvedType::ARRAY || arg->kind == ResolvedType::SLICE)) {
-					expr.resolved_type = primitiveType(ResolvedType::I32);
+					expr.resolved_type = primitiveType(ResolvedType::ISIZE);
 					return expr.resolved_type;
 				}
 				return nullptr;
@@ -1857,16 +1965,7 @@ struct Checker {
 			return nullptr;
 		}
 
-		SymbolRef ref;
-		if (Unit* owner = findTypeNamespaceUnit(receiver_type)) {
-			// ADL
-			if (Symbol* symbol = findSymbol(*owner, mem.name)) {
-				if (checkSymbol(*owner, *symbol) == LS_RESULT_OK) ref = {owner, symbol};
-			}
-		}
-		if (Symbol* local = findSymbol(unit, mem.name)) {
-			if (checkSymbol(unit, *local) == LS_RESULT_OK) ref = {&unit, local};
-		}
+		SymbolRef ref = resolveSymbol(unit, {}, mem.name, LookupPolicy::Checked, &receiver_type);
 		
 		if (!ref) {
 			errorLine(expr.token, "Could not resolve member function: ", mem.name);
@@ -1927,6 +2026,15 @@ struct Checker {
 				const u64 value = static_cast<IntLiteralExpression&>(expr).value;
 				if (check_fit && !intLiteralFitsType(value, concrete->kind)) {
 					errorLine(expr.token, "Integer literal does not fit in ", concrete);
+					return nullptr;
+				}
+				expr.resolved_type = concrete;
+				return concrete;
+			}
+			case Expression::SIZEOF: {
+				const u64 value = static_cast<SizeofExpression&>(expr).value;
+				if (check_fit && !intLiteralFitsType(value, concrete->kind)) {
+					errorLine(expr.token, "Constant does not fit in ", concrete);
 					return nullptr;
 				}
 				expr.resolved_type = concrete;
@@ -2168,8 +2276,18 @@ struct Checker {
 		const bool dst_integer = isIntegerType(*dst_type);
 		const bool src_enum = src_type->kind == ResolvedType::ENUM;
 		const bool dst_enum = dst_type->kind == ResolvedType::ENUM;
+		// Slice reinterpret cast: `byte[] as T[]` / `T[] as byte[]`. Exactly one side must
+		// have `byte` elements; reinterpreting between two unrelated typed slices is rejected.
+		bool slice_reinterpret = false;
+		if (src_type->kind == ResolvedType::SLICE && dst_type->kind == ResolvedType::SLICE) {
+			ResolvedType* src_elem = static_cast<SliceResolvedType*>(src_type)->element_type;
+			ResolvedType* dst_elem = static_cast<SliceResolvedType*>(dst_type)->element_type;
+			const bool src_byte = src_elem && src_elem->kind == ResolvedType::BYTE;
+			const bool dst_byte = dst_elem && dst_elem->kind == ResolvedType::BYTE;
+			slice_reinterpret = src_byte != dst_byte;
+		}
 		// bool->bool (and any other same-type cast) is covered by the trailing typesEqual.
-		const bool valid_cast = (src_numeric && dst_numeric) || (src_enum && dst_integer) || (src_integer && dst_enum) || typesEqual(src_type, dst_type);
+		const bool valid_cast = (src_numeric && dst_numeric) || (src_enum && dst_integer) || (src_integer && dst_enum) || slice_reinterpret || typesEqual(src_type, dst_type);
 		if (!valid_cast) {
 			errorLine(expr.token, "Cannot cast ", src_type, " to ", dst_type);
 			return nullptr;
@@ -2460,6 +2578,22 @@ struct Checker {
 					expr.resolved_type = float_hint;
 				} else {
 					expr.resolved_type = (float_hint && isFloatType(*float_hint)) ? float_hint : primitiveType(ResolvedType::UNTYPED_FLOAT);
+				}
+				return expr.resolved_type;
+			}
+			case Expression::SIZEOF: {
+				SizeofExpression& sz = static_cast<SizeofExpression&>(expr);
+				i64 v = 0;
+				if (!resolveSizeofValue(unit, sz, v)) return nullptr;
+				ResolvedType* int_hint = unwrapNullable(hint);
+				if (int_hint && isNumericType(*int_hint)) {
+					if (!intLiteralFitsType(sz.value, int_hint->kind)) {
+						errorLine(expr.token, "Constant does not fit in ", int_hint);
+						return nullptr;
+					}
+					expr.resolved_type = int_hint;
+				} else {
+					expr.resolved_type = primitiveType(ResolvedType::UNTYPED_INT);
 				}
 				return expr.resolved_type;
 			}
@@ -3099,6 +3233,11 @@ struct Checker {
 		extern fn sqrt_f64(v : f64) : f64;
 	)";
 
+	static inline const char builtin_mem_source[] = R"(
+		extern fn alloc(size : isize, align : isize) : byte[];
+		extern fn free(memory : byte[]) : void;
+	)";
+
 	bool resolveImportsForUnit(Unit& unit, ls_import_resolver_fn import_resolver, void* import_resolver_userdata) {
 		if (unit.import_state == Unit::IMPORT_DONE) return true;
 		if (unit.import_state == Unit::IMPORT_RESOLVING) {
@@ -3140,6 +3279,8 @@ struct Checker {
 				ls_string_view source = {};
 				if (equalStrings(import.path, makeStringView("std:math"))) {
 					source = makeStringView(builtin_math_source);
+				} else if (equalStrings(import.path, makeStringView("std:mem"))) {
+					source = makeStringView(builtin_mem_source);
 				} else {
 					if (!import_resolver) {
 						errorLine({}, "No import resolver for: ", import.path);

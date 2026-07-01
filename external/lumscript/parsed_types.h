@@ -21,10 +21,12 @@ struct ParsedType {
 		U16,
 		U32,
 		U64,
+		ISIZE,
 		F32,
 		F64,
 		STRING,
 		CPTR,
+		BYTE,
 		// Type of values that exist only at compile time and describe runtime values.
 		// Example: `comptime Color = enum { Red, Green };` gives Color this type.
 		TYPE,

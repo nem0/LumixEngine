@@ -5,8 +5,9 @@
 
 #include "capi.h"
 
-// Bytecode is intentionally simple: a stack VM with linear instruction streams
-// and a flat function table. Constants are embedded directly in the stream.
+// Bytecode is intentionally simple: a byte-register VM with linear instruction
+// streams and a flat function table. Constants are embedded directly in the
+// stream.
 //
 // Encoding:
 // - every instruction starts with one opcode byte (`ls_op`)
@@ -18,48 +19,53 @@
 // - the compiler chooses `N` from the literal width/type
 // - runtime interpretation of the payload depends on the opcode and expected type
 //
-// Call stack contract:
-// - ordinary calls evaluate arguments onto the stack in source order
-// - `CALL_DIRECT` uses a function-table index and consumes the arguments on the
-//   stack
-// - `CALL_INDIRECT` consumes a callee function value that sits below its
-//   arguments on the stack
-// - both call forms leave the return value(s) on the stack in place of the
-//   call frame's argument window
-// - the callee determines argument/result slot widths via its function metadata
+// Register contract:
+// - register operands are byte offsets relative to the current frame base
+// - parameter bytes occupy the first `param_size` frame bytes
+// - local bytes follow parameters, and compiler temporaries follow locals
+// - globals live at absolute byte offsets in the runtime memory buffer
+// - aggregate values are copied as raw byte ranges
+//
+// Call contract:
+// - calls copy a contiguous argument register window into the callee frame
+// - both call forms copy the callee result bytes into an explicit destination
+//   register window
+// - native callbacks still see arguments/results through the public runtime
+//   stack helpers
 //
 // Addressing contract:
-// - `LOAD_AT` and `STORE_AT` operate on one slot only
-// - they consume a base reference and an index from the stack
-// - stack order is `... base index`; `LOAD_AT` leaves `... value`
-// - stack order for stores is `... base index value`; `STORE_AT` leaves `...`
-// - they compute `base + index * scale + offset`, then load/store one slot
+// - `LOAD_AT` and `STORE_AT` copy an explicit byte width
+// - they read explicit base reference, index, and value/result registers
+// - they compute `base + index * scale + offset`, then load/store bytes
 // - `scale` and `offset` are encoded as immediates
 // - this is intended to cover nested field access and array indexing through
 //   one generic form
-// - aggregate values spanning multiple slots are handled by repeated slot access
+// - `BOUNDS_CHECK` validates an explicit index register against a static length
 //
 // Slice contract:
-// - a slice occupies two stack slots in `base, length` order
-// - `base` is an absolute runtime stack slot, so slices can alias caller locals
+// - a slice occupies `base, length` in stack memory
+// - `base` is an absolute runtime memory address, so slices can alias caller locals
 //   while passed to and returned from nested calls
-// - `SLICE` consumes `base, length, begin, end` and produces a subslice
-// - `SLICE_LOAD` consumes `base, length, index`
-// - `SLICE_STORE` consumes `base, length, index, value`
+// - `SLICE` reads `base, length, begin, end` registers and writes a subslice
+// - `SLICE_LOAD` reads `base, length, index` registers
+// - `SLICE_STORE` reads `base, length, index, value` registers
 // - all slice bounds are checked by the runtime
 //
 // Opcode layout summary:
-// - no operand: NOP, NOT, AND, OR, EQ, NE, LT, LE, GT, GE, CALL_INDIRECT,
-//   RETURN, POP, ABORT
-// - u32 operand: LOAD_LOCAL, STORE_LOCAL, LOAD_GLOBAL, STORE_GLOBAL,
-//   LOCAL_REF, GLOBAL_REF, CALL_DIRECT
-// - two u8 type operands: CAST (`from`, `to`)
-// - embedded constant payload: LOAD_CONST_1, LOAD_CONST_2, LOAD_CONST_4,
-//   LOAD_CONST_8
-// - string constant payload: LOAD_CONST_STRING
-// - scaled address operand: LOAD_AT, STORE_AT, REF_AT (`u32 scale`, `i32 offset`)
-// - slice operand: SLICE, SLICE_LOAD, SLICE_STORE (`u32 element slot count`)
-// - i32 operand: JUMP, JUMP_IF_FALSE, JUMP_IF_TRUE
+// - constants: LOAD_CONST_N (`dst`, inline payload), LOAD_CONST_STRING
+//   (`dst`, string index)
+// - frame copies: COPY (`dst`, `src`, `byte size`)
+// - global access: GLOBAL_LOAD/GLOBAL_STORE carry destination/source register,
+//   global byte offset, and byte size
+// - refs: LOCAL_REF/GLOBAL_REF (`dst`, byte offset)
+// - arithmetic/logical/comparison ops carry explicit destination and source
+//   register operands; comparisons also carry a type byte
+// - address/slice ops carry explicit register operands plus existing scale,
+//   offset, and byte-size immediates
+// - calls carry explicit destination, callee/argument registers, argument size,
+//   and result size
+// - jumps store signed 32-bit relative byte offsets; conditional jumps also
+//   carry a condition register
 //
 // `ABORT` is a hard stop: the VM terminates execution immediately.
 
@@ -75,16 +81,16 @@ typedef enum ls_op {
 	LS_OP_LOAD_CONST_4,
 	LS_OP_LOAD_CONST_8,
 	LS_OP_LOAD_CONST_STRING,
-	LS_OP_LOAD_LOCAL,
-	LS_OP_STORE_LOCAL,
-	LS_OP_LOAD_GLOBAL,
-	LS_OP_STORE_GLOBAL,
+	LS_OP_COPY,
+	LS_OP_GLOBAL_LOAD,
+	LS_OP_GLOBAL_STORE,
 	LS_OP_LOCAL_REF,
 	LS_OP_GLOBAL_REF,
 
 	LS_OP_LOAD_AT,
 	LS_OP_STORE_AT,
 	LS_OP_REF_AT,
+	LS_OP_BOUNDS_CHECK,
 	LS_OP_SLICE,
 	LS_OP_SLICE_LOAD,
 	LS_OP_SLICE_STORE,
@@ -155,8 +161,6 @@ typedef enum ls_op {
 	LS_OP_NEG_F64,
 
 	LS_OP_NOT,
-	LS_OP_AND,
-	LS_OP_OR,
 
 	LS_OP_EQ,
 	LS_OP_NE,
@@ -173,23 +177,8 @@ typedef enum ls_op {
 	LS_OP_CALL_INDIRECT,
 	LS_OP_CAST,
 	LS_OP_RETURN,
-	LS_OP_POP,
 	LS_OP_ABORT,
 } ls_op;
-
-typedef union ls_value {
-	i8 i8val;
-	u8 u8val;
-	i16 i16val;
-	u16 u16val;
-	i32 i32val;
-	u32 u32val;
-	i64 i64val;
-	u64 u64val;
-	float f32val;
-	double f64val;
-	void* cptr;
-} ls_value;
 
 typedef enum ls_function_kind {
 	LS_FUNCTION_SCRIPT = 0,
@@ -204,12 +193,12 @@ typedef struct ls_function_bc {
 	// Function values are addressed by table index.
 	u32 index;
 
-	// Parameter/result counts are in value slots, not source-level arity.
+	// Parameter/result/local sizes are measured in raw bytes.
 	u32 param_count;
-	u32 param_slot_count;
-	u32 return_slot_count;
-	u32 local_slot_count;
-	u32 max_stack;
+	u32 param_size;
+	u32 return_size;
+	u32 local_size;
+	u32 frame_size;
 
 	ls_type_kind return_kind;
 	u8* code;
@@ -225,7 +214,7 @@ typedef struct ls_bytecode {
 	u32 function_count;
 	u32 function_capacity;
 
-	u32 global_slot_count;
+	u32 global_size;
 	ls_function_bc global_init;
 	bool has_global_init;
 
@@ -241,10 +230,10 @@ typedef struct ls_call_frame {
 	u32 return_offset;
 	// Saved frame base for the caller.
 	u32 saved_frame_base;
-	// Stack base for the callee's argument/result window.
+	// Stack base byte offset for the callee's argument/result window.
 	u32 stack_base;
-	// Number of result slots the caller expects.
-	u32 result_slot_count;
+	// Number of result bytes the caller expects.
+	u32 result_size;
 } ls_call_frame;
 
 typedef struct ls_runtime {
@@ -252,15 +241,19 @@ typedef struct ls_runtime {
 	const ls_bytecode* bytecode;
 	ls_arena* arena;
 
-	// Stack top: index one past the topmost live value.
+	// Stack top: byte offset one past the topmost live value.
 	u32 stack_top;
-	// Base index for the current call frame.
+	// Base byte offset for the current call frame.
 	u32 frame_base;
 	// Byte offset into the current function body.
 	u32 instruction_offset;
 
-	ls_value* stack;
+	u8* stack;
 	u32 stack_capacity;
+
+	u32* value_offsets;
+	u32 value_count;
+	u32 value_capacity;
 
 	ls_call_frame* frames;
 	u32 frame_count;

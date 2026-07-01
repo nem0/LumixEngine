@@ -2,7 +2,7 @@
 
 # TODO
 
-* dynamic arrays/memory
+* tagged unions
 * debugger
 * string interpolation
 * jit/llvm
@@ -11,7 +11,6 @@
 
 * getter/setter?
 * traits/interfaces?
-* tagged unions?
 * with/when/where?
 * context object?
 * multiple returns?
@@ -54,6 +53,7 @@ LumScript is a small, statically typed scripting language for Lumix Engine.
 	- [Function types](#function-types)
 	- [Static-sized arrays](#static-sized-arrays)
 	- [Slices](#slices)
+- [Memory](#memory)
 - [Variables](#variables)
 - [Statements](#statements)
 	- [Blocks](#blocks)
@@ -70,6 +70,7 @@ LumScript is a small, statically typed scripting language for Lumix Engine.
 	- [Arithmetic](#arithmetic)
 	- [Integer overflow](#integer-overflow)
 	- [Casts](#casts)
+	- [Sizeof and alignof](#sizeof-and-alignof)
 	- [Comparison and boolean operators](#comparison-and-boolean-operators)
 	- [Calls](#calls)
 	- [Argument-dependent lookup](#argument-dependent-lookup)
@@ -110,7 +111,18 @@ JIT is intentionally out of scope for the first version.
 
 - raw memory api
 	- we want raw memory api so users can implement their own containers, arenas and other features
-	- TODO
+	- the primitive currency is the byte slice `byte[]`; `alloc` returns one and `free` takes one back (Zig-style allocator interface)
+	- `byte` is a distinct type from `u8` (untyped storage vs a numeric type); its bit width is implementation-defined, so `sizeof`/`alignof` are measured in `byte` units
+	- `sizeof`/`alignof` produce untyped integer constants rather than a fixed type, so they concretize to context (array size, template argument, or `isize` in a size expression)
+	- `byte[] as T[]` / `T[] as byte[]` reinterpret the same storage without copying so containers can expose a typed view over a raw allocation
+
+- signed sizes
+	- `isize` (sizes, lengths, indices) is signed, not unsigned
+	- fixed 64 bits on all targets (not pointer-width) so size/index arithmetic is portable; 63 bits of range exceeds any realistic allocation
+	- modern language-level precedent leans signed: Go `int` for `len`, Swift `Int` for `count`; C++ leadership (Stroustrup, Carruth, Google style) treats unsigned sizes as a mistake
+	- a lot have been writen about advantages about both signed and unsigned size, there's no clear winner
+		- https://graphitemaster.github.io/aau/
+		- https://c3-lang.org/blog/unsigned-sizes-a-five-year-mistake/
 
 - memory safety
 	- options: borrow checker, gc, limit features only to memory safe ones, not memory safe, runtime safety like Fil-C
@@ -694,12 +706,23 @@ Built-in and user types:
 - `void`
 - `bool`
 - `i8`, `u8`, `i16`, `u16`, `i32`, `u32`, `i64`, `u64`
+- `isize`
+- `byte`
 - `f32`, `f64`
 - `string`
 - `type` (compile-time only)
 - user-defined `struct` types
 - user-defined `enum` types
 - function types
+
+`isize` is the signed integer type used for memory sizes, slice lengths, and indices. It is signed and a fixed 64 bits on all targets (not platform/pointer-width dependent).
+
+- it is the parameter type of the raw-memory allocator's size/alignment arguments, the return type of `length`, the type of a slice's length, and the type used for indexing
+- indexing is bounds-checked against `0 <= i < length`, so a negative index is a runtime error
+
+See [Design decisions](#design-decisions) for why sizes are signed.
+
+`byte` is the smallest addressable unit of raw memory. It is distinct from `u8`: `u8` is a numeric type with a fixed width, while `byte` represents untyped storage. `sizeof` and `alignof` are measured in bytes. The raw-memory allocator works in terms of `byte[]` (a byte slice), and `byte[]` can be reinterpreted as a typed slice (see [Casts](#casts)).
 
 `Vec3`, `DVec3`, and `Quat` are core value types used heavily by engine APIs:
 
@@ -890,6 +913,34 @@ fn sum(values : i32[]) : i32 {
 	return total;
 }
 ```
+
+## Memory
+
+Raw memory is allocated and released through the builtin `std:mem` module. Like other `std:` modules it is imported by path:
+
+```cpp
+import "std:mem" as mem
+
+fn main() : void {
+	var raw : byte[] = mem.alloc(4 * sizeof(i32), alignof(i32));
+	var ints : i32[] = raw as i32[];
+	ints[0] = 42;
+	mem.free(raw);
+}
+```
+
+The module exposes two functions:
+
+```cpp
+fn alloc(size : isize, align : isize) : byte[]
+fn free(memory : byte[]) : void
+```
+
+- `alloc(size, align)` returns a `byte[]` of `size` `byte` units (see [`sizeof`](#sizeof-and-alignof)). The contents are zero-initialized. `size` and `align` are `isize`; a non-positive `size` yields an empty slice.
+- `align` is accepted for source compatibility but currently has no effect on allocation placement.
+- `free(memory)` releases an allocation. Pass the exact slice `alloc` returned (same base and length).
+- accessing a slice over freed memory traps at runtime (use-after-free detection): `free` marks the allocation's units dead, and any later `byte[]`/reinterpreted-slice read or write over them aborts execution.
+- the returned `byte[]` can be reinterpreted as a typed slice with `as` (see [Casts](#casts)); the length rescales by the element's `sizeof`.
 
 ## Variables
 
@@ -1218,7 +1269,44 @@ Integer-to-enum cast does not validate membership.
 
 Struct casts are not supported.
 
+Slice reinterpret casts convert between a byte slice and a typed slice:
+
+```cpp
+import "std:mem" as mem
+
+fn main() : void {
+	var raw : byte[] = mem.alloc(4 * sizeof(i32), alignof(i32));
+	var ints : i32[] = raw as i32[]; // view the same storage as i32
+	ints[0] = 42;
+	var back : byte[] = ints as byte[]; // view it as raw bytes again
+}
+```
+
+- `byte[] as T[]` reinterprets a byte slice as a slice of `T` over the same storage; no copy occurs
+- `T[] as byte[]` reinterprets any typed slice as a byte slice over the same storage; no copy occurs
+- the resulting length is recomputed for the destination element size: a `byte[]` of `n` bytes becomes a `T[]` of `n / sizeof(T)` elements, and a `T[]` of `m` elements becomes a `byte[]` of `m * sizeof(T)` bytes
+- `byte[] as T[]` requires the byte length to be a multiple of `sizeof(T)` and the storage to be suitably aligned for `T`; violations are runtime errors
+- only `byte[]` participates as the untyped side; reinterpreting between two unrelated typed slices (`f32[] as i32[]`) is not supported and is a compile-time error
+
 No implicit casts occur in assignments, arguments, returns, struct fields, or binary arithmetic.
+
+### Sizeof and alignof
+
+`sizeof` and `alignof` are compile-time operators that take a type and produce an untyped integer constant:
+
+```cpp
+const a = sizeof(i32);   // 4 bytes
+const b = alignof(i32);  // 4-byte alignment
+const c = sizeof(Vec3);  // number of bytes the struct occupies
+```
+
+Rules:
+
+- the operand is a type, not a value
+- both produce an untyped integer constant, usable wherever a compile-time integer is required (array sizes, template value arguments, other comptime expressions)
+- `sizeof(T)` is the size of `T` measured in `byte` units: `byte`, `bool`, `i8`, and `u8` are 1 byte; `i16`/`u16` are 2; `i32`/`u32`/`f32`/enums/function values are 4; `i64`/`u64`/`isize`/`f64`/strings/pointers are 8; a slice is a pointer plus an `i64` length; an array is `size * sizeof(element)`; and a struct is the sum of its field sizes
+- `alignof(T)` is derived from the byte size and capped at pointer alignment
+- they are most commonly used with the raw-memory allocator and slice reinterpret casts, for example `alloc(n * sizeof(i32), alignof(i32))`
 
 ### Comparison and boolean operators
 

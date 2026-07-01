@@ -195,13 +195,13 @@ TEST(SliceNonIntegerEndFail) {
 
 TEST(SliceImplicitConversionLengthRuntime) {
 	const char* source = R"(
-		fn get_length(s : i32[]) : i32 {
+		fn get_length(s : i32[]) : isize {
 			return length(s);
 		}
 
 		fn main() : i32 {
 			var values : i32[4] = undefined;
-			return get_length(values);
+			return get_length(values) as i32;
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
@@ -263,7 +263,7 @@ TEST(SliceLengthAndIndexRuntime) {
 			values[2] = 7;
 			values[3] = 11;
 			const slice : i32[] = values[1:3];
-			return length(slice) * 100 + slice[0] * 10 + slice[1];
+			return (length(slice) as i32) * 100 + slice[0] * 10 + slice[1];
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
@@ -308,7 +308,7 @@ TEST(SliceFromSliceRuntime) {
 			values[3] = 11;
 			const slice : i32[] = values[1:4];
 			const sub : i32[] = slice[1:];
-			return length(sub) * 100 + sub[0] * 10 + sub[1];
+			return (length(sub) as i32) * 100 + sub[0] * 10 + sub[1];
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
@@ -345,7 +345,7 @@ TEST(SliceZeroLengthRuntime) {
 		fn main() : i32 {
 			var values : i32[4] = undefined;
 			const slice : i32[] = values[2:2];
-			return length(slice);
+			return length(slice) as i32;
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
@@ -362,7 +362,7 @@ TEST(SliceNullInitializationRuntime) {
 	const char* source = R"(
 		fn main() : i32 {
 			var slice : i32[] = null;
-			return length(slice);
+			return length(slice) as i32;
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
@@ -379,7 +379,7 @@ TEST(SliceIterationRuntime) {
 	const char* source = R"(
 		fn sum(values : i32[]) : i32 {
 			var total : i32 = 0;
-			var i : i32 = 0;
+			var i : isize = 0;
 			while i < length(values) {
 				total += values[i];
 				i += 1;
