@@ -92,9 +92,10 @@ TEST(StructExtern) {
 
 	static int ptr;
 
-	auto create_fn = [](ls_runtime* runtime) -> void {
-		ls_push_i32(runtime, 42);
-		ls_push_ptr(runtime, &ptr);
+	auto create_fn = [](ls_runtime* runtime, ls_call_frame frame) -> void {
+		i32 idx = 42; void* world = &ptr;
+		memcpy(frame.result, &idx, sizeof(idx));
+		memcpy(frame.result + sizeof(idx), &world, sizeof(world));
 	};
 
 	CAPI_RUNTIME(module, runtime);
@@ -102,10 +103,76 @@ TEST(StructExtern) {
 	
 	EXPECT_TRUE(ls_runtime_set_native_function_callback(runtime, fn_idx, create_fn) == LS_RESULT_OK);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ls_to_i32(runtime, -2));
-	EXPECT_TRUE(&ptr == ls_to_ptr(runtime, -1));
+	// Struct fields are packed in declaration order: index at 0, world at 4.
+	u32 result_size = 0;
+	const u8* result = (const u8*)ls_call_result(runtime, &result_size);
+	EXPECT_TRUE(result != nullptr);
+	EXPECT_EQ(12u, result_size);
+	i32 index_value = 0;
+	void* world_value = nullptr;
+	memcpy(&index_value, result, sizeof(index_value));
+	memcpy(&world_value, result + 4, sizeof(world_value));
+	EXPECT_EQ(42, index_value);
+	EXPECT_TRUE(&ptr == world_value);
 	CAPI_END(module);
 	
+	return true;
+}
+
+TEST(RawResultAccess) {
+	const char* source = R"(
+		struct Entity {
+			index : i32;
+			world : cptr;
+		}
+		extern fn create() : Entity;
+
+		fn main() : Entity {
+			var v : Entity = create();
+			return v;
+		}
+
+		fn nothing() : void {
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	static int ptr;
+
+	auto create_fn = [](ls_runtime* runtime, ls_call_frame frame) -> void {
+		i32 idx = 42; void* world = &ptr;
+		memcpy(frame.result, &idx, sizeof(idx));
+		memcpy(frame.result + sizeof(idx), &world, sizeof(world));
+	};
+
+	CAPI_RUNTIME(module, runtime);
+	const i32 fn_idx = ls_module_get_native_function_index(module, toLs("create"));
+
+	EXPECT_TRUE(ls_runtime_set_native_function_callback(runtime, fn_idx, create_fn) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+
+	// Struct fields are packed in declaration order: index at 0, world at 4.
+	u32 size = 0;
+	const u8* result = (const u8*)ls_call_result(runtime, &size);
+	EXPECT_TRUE(result != nullptr);
+	EXPECT_EQ(12u, size);
+	i32 index_value = 0;
+	void* world_value = nullptr;
+	memcpy(&index_value, result, sizeof(index_value));
+	memcpy(&world_value, result + 4, sizeof(world_value));
+	EXPECT_EQ(42, index_value);
+	EXPECT_TRUE(&ptr == world_value);
+
+	// A void call leaves no result.
+	EXPECT_TRUE(ls_call(runtime, toLs("nothing")));
+	size = 99;
+	EXPECT_TRUE(ls_call_result(runtime, &size) == nullptr);
+	EXPECT_EQ(0u, size);
+
+	CAPI_END(module);
+
 	return true;
 }
 
@@ -124,13 +191,13 @@ TEST(Extern) {
 
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	auto nativefn = [](ls_runtime* runtime) -> void {
-		ls_push_i32(runtime, 41);
+	auto nativefn = [](ls_runtime* runtime, ls_call_frame frame) -> void {
+		LS_RESULT(frame, i32, 41);
 	};
 
-	auto nativefn2 = [](ls_runtime* runtime) -> void {
-		i32 v = ls_to_i32(runtime, -1);
-		ls_push_i32(runtime, v + 1);
+	auto nativefn2 = [](ls_runtime* runtime, ls_call_frame frame) -> void {
+		LS_ARG(frame, i32, v); v += 1;
+		LS_RESULT(frame, i32, v);
 	};
 
 	CAPI_RUNTIME(module, runtime);
@@ -1513,17 +1580,17 @@ TEST(BytecodeExtendedIntegerReturnWidths) {
 	EXPECT_TRUE(runtime != nullptr);
 
 	EXPECT_TRUE(ls_call(runtime, toLs("ret_i8")));
-	EXPECT_EQ(10, ls_to_i32(runtime, -1));
+	EXPECT_EQ(10, ls_to_i8(runtime, -1));
 	EXPECT_TRUE(ls_call(runtime, toLs("ret_u8")));
-	EXPECT_EQ(20, ls_to_i32(runtime, -1));
+	EXPECT_EQ(20, ls_to_u8(runtime, -1));
 	EXPECT_TRUE(ls_call(runtime, toLs("ret_i16")));
-	EXPECT_EQ(30, ls_to_i32(runtime, -1));
+	EXPECT_EQ(30, ls_to_i16(runtime, -1));
 	EXPECT_TRUE(ls_call(runtime, toLs("ret_u16")));
-	EXPECT_EQ(40, ls_to_i32(runtime, -1));
+	EXPECT_EQ(40, ls_to_u16(runtime, -1));
 	EXPECT_TRUE(ls_call(runtime, toLs("ret_i64")));
-	EXPECT_EQ(50, ls_to_i32(runtime, -1));
+	EXPECT_TRUE(50 == ls_to_i64(runtime, -1));
 	EXPECT_TRUE(ls_call(runtime, toLs("ret_u64")));
-	EXPECT_EQ(60, ls_to_i32(runtime, -1));
+	EXPECT_TRUE(60 == ls_to_u64(runtime, -1));
 
 	ls_runtime_destroy(runtime);
 	ls_bytecode_destroy(bytecode);

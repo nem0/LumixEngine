@@ -88,10 +88,3 @@ int ls_module_get_global_count(ls_module* module) {
 	}
 	return count;
 }
-
-ls_string_view ls_make_qualified_name(ls_module* module, ls_string_view prefix, ls_string_view name) {
-	(void)module;
-	(void)prefix;
-	(void)name;
-	return {};
-}

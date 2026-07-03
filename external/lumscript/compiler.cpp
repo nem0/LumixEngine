@@ -1548,7 +1548,8 @@ struct Checker {
 		Token::Type op,
 		i32 arity,
 		Expression** operands, // array of `arity` expression pointers
-		ResolvedType*& result_type) {
+		ResolvedType*& result_type,
+		FunctionExpression*& result_fn) {
 
 		// Find the host: first operand whose resolved type is a struct.
 		// Primitives and untyped literals are skipped; they cannot host operator lists.
@@ -1564,6 +1565,7 @@ struct Checker {
 
 		bool matched = false;
 		ResolvedType* matched_type = nullptr;
+		FunctionExpression* matched_fn = nullptr;
 		for (StructOperator& cand : host->operators) {
 			if (cand.op != op) continue;
 			FunctionResolvedType* fn_type = static_cast<FunctionResolvedType*>(cand.fn->resolved_type);
@@ -1580,10 +1582,12 @@ struct Checker {
 			if (matched) return OverloadResult::AMBIGUOUS;
 			matched = true;
 			matched_type = fn_type->return_type;
+			matched_fn = cand.fn;
 		}
 
 		if (!matched) return OverloadResult::NOT_FOUND;
 		result_type = matched_type;
+		result_fn = matched_fn;
 		return OverloadResult::FOUND;
 	}
 
@@ -2100,13 +2104,14 @@ struct Checker {
 			return expr.resolved_type;
 		}
 		ResolvedType* overload_result = nullptr;
+		FunctionExpression* overload_fn = nullptr;
 		OverloadResult unary_result = OverloadResult::NOT_FOUND;
 		if (un.op == Token::MINUS) {
 			Expression* un_operands[1] = {un.expression};
-			unary_result = resolveOperatorOverload(unit, ctx, un.op, 1, un_operands, overload_result);
+			unary_result = resolveOperatorOverload(unit, ctx, un.op, 1, un_operands, overload_result, overload_fn);
 		}
 		switch (unary_result) {
-			case OverloadResult::FOUND: expr.resolved_type = overload_result; return overload_result;
+			case OverloadResult::FOUND: un.resolved_fn = overload_fn; expr.resolved_type = overload_result; return overload_result;
 			case OverloadResult::AMBIGUOUS: errorLine(expr.token, "Ambiguous operator ", operatorSymbolName(un.op), " overload"); return nullptr;
 			case OverloadResult::NOT_FOUND: break;
 		}
@@ -2145,10 +2150,11 @@ struct Checker {
 	ResolvedType* checkBinaryExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr, ResolvedType* hint) {
 		BinaryExpression& bin = static_cast<BinaryExpression&>(expr);
 		ResolvedType* overload_result = nullptr;
+		FunctionExpression* overload_fn = nullptr;
 		Expression* bin_operands[2] = {bin.lhs, bin.rhs};
-		const OverloadResult bin_overload = operatorSymbolName(bin.op) ? resolveOperatorOverload(unit, ctx, bin.op, 2, bin_operands, overload_result) : OverloadResult::NOT_FOUND;
+		const OverloadResult bin_overload = operatorSymbolName(bin.op) ? resolveOperatorOverload(unit, ctx, bin.op, 2, bin_operands, overload_result, overload_fn) : OverloadResult::NOT_FOUND;
 		switch (bin_overload) {
-			case OverloadResult::FOUND: expr.resolved_type = overload_result; return overload_result;
+			case OverloadResult::FOUND: bin.resolved_fn = overload_fn; expr.resolved_type = overload_result; return overload_result;
 			case OverloadResult::AMBIGUOUS: errorLine(expr.token, "Ambiguous operator ", operatorSymbolName(bin.op), " overload"); return nullptr;
 			case OverloadResult::NOT_FOUND: break;
 		}
@@ -2340,6 +2346,10 @@ struct Checker {
 				if (sym.check_failed) return nullptr;
 
 				expr.resolved_type = sym.symbol->resolved_type;
+				member.resolved_symbol = sym.symbol;
+				if (sym.symbol->expression && sym.symbol->expression->kind == Expression::FUNCTION) {
+					member.resolved_fn = static_cast<FunctionExpression*>(sym.symbol->expression);
+				}
 				return expr.resolved_type;
 			}
 			errorLine(expr.token, member.name, " not found in ", id->name);
@@ -2789,6 +2799,47 @@ struct Checker {
 		return nullptr;
 	}
 
+	// Conservative reachability check: true only if every path through `st`
+	// is guaranteed to hit a `return`. Loops are never credited (the body may
+	// run zero times) and `match` is only credited when it has a fallback arm
+	// (exhaustiveness for enum-only matches is intentionally not special-cased
+	// here to keep this analysis simple).
+	static bool statementAlwaysReturns(Statement* st) {
+		if (!st) return false;
+		switch (st->kind) {
+			case Statement::RETURN:
+				return true;
+			case Statement::BLOCK:
+				return blockAlwaysReturns(static_cast<BlockStatement*>(st));
+			case Statement::IF: {
+				IfStatement* ifst = static_cast<IfStatement*>(st);
+				if (!ifst->else_branch) return false;
+				return blockAlwaysReturns(ifst->body) && statementAlwaysReturns(ifst->else_branch);
+			}
+			case Statement::MATCH: {
+				MatchStatement* ms = static_cast<MatchStatement*>(st);
+				bool has_fallback = false;
+				for (MatchArm& arm : ms->arms) {
+					if (arm.is_fallback) has_fallback = true;
+					if (!blockAlwaysReturns(arm.body)) return false;
+				}
+				return has_fallback;
+			}
+			case Statement::LABEL:
+				return statementAlwaysReturns(static_cast<LabelStatement*>(st)->statement);
+			default:
+				return false;
+		}
+	}
+
+	static bool blockAlwaysReturns(BlockStatement* block) {
+		if (!block) return false;
+		for (Statement* st : block->statements) {
+			if (statementAlwaysReturns(st)) return true;
+		}
+		return false;
+	}
+
 	bool checkFunctionBody(Unit& unit, FunctionExpression& fn) {
 		if (!fn.body) return true;
 		if (fn.body->kind != Statement::BLOCK) {
@@ -2813,6 +2864,11 @@ struct Checker {
 		BlockStatement* body = static_cast<BlockStatement*>(fn.body);
 		for (Statement* st : body->statements) {
 			if (!checkStatement(unit, ctx, st, return_type, {})) return false;
+		}
+
+		if (return_type && return_type->kind != ResolvedType::VOID && !blockAlwaysReturns(body)) {
+			errorLine(fn.token, "Function must return a value on all code paths");
+			return false;
 		}
 		return true;
 	}
@@ -2917,8 +2973,9 @@ struct Checker {
 											: assign.op == Token::STAR_EQUAL  ? Token::STAR
 																			   : Token::SLASH;
 				Expression* operands[2] = {assign.lhs, assign.rhs};
-				switch (resolveOperatorOverload(unit, &ctx, base_op, 2, operands, op_result)) {
-					case OverloadResult::FOUND: break;
+				FunctionExpression* op_fn = nullptr;
+				switch (resolveOperatorOverload(unit, &ctx, base_op, 2, operands, op_result, op_fn)) {
+					case OverloadResult::FOUND: assign.resolved_op_fn = op_fn; break;
 					case OverloadResult::AMBIGUOUS: errorLine(assign.token, "Ambiguous operator overload for compound assignment on type ", lhs_type); return false;
 					case OverloadResult::NOT_FOUND: errorLine(assign.token, "No matching operator overload for compound assignment on type ", lhs_type); return false;
 				}

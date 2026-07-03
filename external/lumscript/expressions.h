@@ -148,6 +148,7 @@ struct UnaryExpression : Expression {
 
 	Expression* expression = nullptr;
 	Token::Type op = Token::ERROR;
+	FunctionExpression* resolved_fn = nullptr;
 };
 
 struct BinaryExpression : Expression {
@@ -156,6 +157,7 @@ struct BinaryExpression : Expression {
 	Expression* lhs = nullptr;
 	Expression* rhs = nullptr;
 	Token::Type op = Token::ERROR;
+	FunctionExpression* resolved_fn = nullptr;
 };
 
 struct CastExpression : Expression {
@@ -170,6 +172,8 @@ struct MemberExpression : Expression {
 
 	Expression* expression = nullptr;
 	ls_string_view name = {};
+	FunctionExpression* resolved_fn = nullptr;
+	struct Symbol* resolved_symbol = nullptr;
 };
 
 struct BracketExpression : Expression {
@@ -201,6 +205,8 @@ struct FunctionExpression : Expression {
 	bool is_extern = false;
 	// Canonical template specializations for this function declaration.
 	ExpArray<TemplateFunctionInstance> template_function_instances;
+	// Bytecode function index; assigned during bytecode compilation.
+	u32 bytecode_index = ~0u;
 };
 
 struct StructOperator {

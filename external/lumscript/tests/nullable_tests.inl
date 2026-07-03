@@ -251,8 +251,15 @@ TEST(BytecodeNullableReturnNull) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
-	EXPECT_EQ(0, ls_to_bool(runtime, -2));
-	EXPECT_EQ(0, ls_to_i32(runtime, -1));
+	// A nullable is a flag byte followed by the packed payload.
+	u32 result_size = 0;
+	const u8* result = (const u8*)ls_call_result(runtime, &result_size);
+	EXPECT_TRUE(result != nullptr);
+	EXPECT_EQ(5u, result_size);
+	EXPECT_EQ(0, result[0]);
+	i32 payload = -1;
+	memcpy(&payload, result + 1, sizeof(payload));
+	EXPECT_EQ(0, payload);
 	ls_runtime_destroy(runtime);
 
 	ls_bytecode_destroy(bytecode);
@@ -276,8 +283,15 @@ TEST(BytecodeNullableReturnValue) {
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
-	EXPECT_EQ(1, ls_to_bool(runtime, -2));
-	EXPECT_EQ(7, ls_to_i32(runtime, -1));
+	// A nullable is a flag byte followed by the packed payload.
+	u32 result_size = 0;
+	const u8* result = (const u8*)ls_call_result(runtime, &result_size);
+	EXPECT_TRUE(result != nullptr);
+	EXPECT_EQ(5u, result_size);
+	EXPECT_EQ(1, result[0]);
+	i32 payload = 0;
+	memcpy(&payload, result + 1, sizeof(payload));
+	EXPECT_EQ(7, payload);
 	ls_runtime_destroy(runtime);
 
 	ls_bytecode_destroy(bytecode);

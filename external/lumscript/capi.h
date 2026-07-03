@@ -90,12 +90,30 @@ typedef int (*ls_import_resolver_fn)(void* userdata, ls_string_view path, ls_str
 
 typedef struct ls_runtime ls_runtime;
 
+typedef struct ls_call_frame {
+	const u8* args;
+	u8* result;
+} ls_call_frame;
+
+static inline const u8* ls_arg_read(ls_call_frame* frame, size_t size) {
+	const u8* val = frame->args;
+	frame->args += size;
+	return val;
+}
+
+#define LS_ARG(frame, type, name) type name; \
+	do { \
+		const u8* _ls_ptr = ls_arg_read(&(frame), sizeof(type)); \
+		memcpy(&(name), _ls_ptr, sizeof(type)); \
+	} while(0)
+
+#define LS_RESULT(frame, type, value) do { \
+	type _ls_val = (value); \
+	memcpy((frame).result, &_ls_val, sizeof(type)); \
+} while(0)
+
 // Native function callback used by `ls_runtime_set_native_function_callback`.
-//
-// Native callbacks receive the live runtime stack. Arguments are already
-// pushed when the callback is entered, so callbacks read them with the
-// `ls_to_*` helpers and append any results with the `ls_push_*` helpers.
-typedef void (*ls_native_fn)(ls_runtime* runtime);
+typedef void (*ls_native_fn)(ls_runtime* runtime, ls_call_frame frame);
 
 typedef struct ls_arena {
 	void* (*allocate)(void* user_data, size_t size, size_t align);
@@ -203,6 +221,16 @@ void ls_push_string(ls_runtime* runtime, ls_string_view value);
 void ls_push_null(ls_runtime* runtime);
 void ls_push_ptr(ls_runtime* runtime, void* value);
 
+// Raw access to the most recent call result.
+//
+// Returns a pointer to the raw bytes of the value returned by the last
+// executed function and writes their count to `*size`, or returns null (and
+// writes 0) when there is no result. Struct fields are packed with no padding,
+// in declaration order, so hosts can read components at explicit offsets
+// instead of relying on the positional `ls_to_*` helpers. The pointer is
+// invalidated by the next push or call.
+const void* ls_call_result(ls_runtime* runtime, u32* size);
+
 i32 ls_to_bool(ls_runtime* runtime, i32 index);
 i8  ls_to_i8 (ls_runtime* runtime, i32 index);
 u8  ls_to_u8 (ls_runtime* runtime, i32 index);
@@ -230,13 +258,6 @@ ls_result ls_call_index(ls_runtime* runtime, i32 function_index);
 // Callers can then read the value from the runtime stack using the `ls_to_*`
 // helpers with index `-1`.
 ls_type_kind ls_bytecode_runtime_result_kind(ls_runtime* runtime, ls_string_view function_name);
-
-// Helper constructors for type descriptors.
-//
-// These are convenience functions for native code that needs to describe
-// values, parameters, or array metadata in the same shape LumScript expects
-// internally.
-ls_string_view ls_make_qualified_name(ls_module* module, ls_string_view prefix, ls_string_view name);
 
 #ifdef __cplusplus
 }

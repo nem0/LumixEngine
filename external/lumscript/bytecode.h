@@ -27,9 +27,16 @@
 // - aggregate values are copied as raw byte ranges
 //
 // Call contract:
-// - calls copy a contiguous argument register window into the callee frame
-// - both call forms copy the callee result bytes into an explicit destination
-//   register window
+// - the callee frame overlaps the caller frame: it starts at the caller's
+//   argument register window, so the staged args are the callee's params in
+//   place and no copy is made in either direction
+// - consequently everything at or above the argument window must be dead in
+//   the caller; the callee clobbers it with its locals and temps. Codegen
+//   guarantees this by always staging args at the top of the live temp
+//   stack. Hand-written bytecode must uphold the same invariant.
+// - RETURN deposits the result at the callee frame base, which is already
+//   the caller's result location for direct calls; indirect calls relocate
+//   the result down into the consumed function-value slot
 // - native callbacks still see arguments/results through the public runtime
 //   stack helpers
 //
@@ -74,9 +81,7 @@ extern "C" {
 #endif
 
 typedef enum ls_op {
-	LS_OP_NOP = 0,
-
-	LS_OP_LOAD_CONST_1,
+	LS_OP_LOAD_CONST_1 = 1,
 	LS_OP_LOAD_CONST_2,
 	LS_OP_LOAD_CONST_4,
 	LS_OP_LOAD_CONST_8,
@@ -177,7 +182,6 @@ typedef enum ls_op {
 	LS_OP_CALL_INDIRECT,
 	LS_OP_CAST,
 	LS_OP_RETURN,
-	LS_OP_ABORT,
 } ls_op;
 
 typedef enum ls_function_kind {
@@ -223,19 +227,6 @@ typedef struct ls_bytecode {
 	u32 string_capacity;
 } ls_bytecode;
 
-typedef struct ls_call_frame {
-	// Function being returned to.
-	u32 function_index;
-	// Saved byte offset to resume at after return.
-	u32 return_offset;
-	// Saved frame base for the caller.
-	u32 saved_frame_base;
-	// Stack base byte offset for the callee's argument/result window.
-	u32 stack_base;
-	// Number of result bytes the caller expects.
-	u32 result_size;
-} ls_call_frame;
-
 typedef struct ls_runtime {
 	const ls_host* host;
 	const ls_bytecode* bytecode;
@@ -245,24 +236,18 @@ typedef struct ls_runtime {
 	u32 stack_top;
 	// Base byte offset for the current call frame.
 	u32 frame_base;
-	// Byte offset into the current function body.
-	u32 instruction_offset;
 
 	u8* stack;
 	u32 stack_capacity;
 
-	u32* value_offsets;
-	u32 value_count;
-	u32 value_capacity;
-
-	ls_call_frame* frames;
-	u32 frame_count;
-	u32 frame_capacity;
+	// Index of the function whose return value sits on top of the stack, or -1.
+	// `ls_call_result` uses it to locate the raw result bytes. Host pushes
+	// invalidate it.
+	i32 result_function;
 
 	// Indexed by module/native-function index.
 	ls_native_fn* native_callbacks;
 	u32 native_callback_count;
-	u32 native_callback_capacity;
 } ls_runtime;
 
 #ifdef __cplusplus

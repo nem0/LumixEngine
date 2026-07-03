@@ -415,6 +415,35 @@ TEST(testNativeFunctionCall) {
 	return true;
 }
 
+// Indirect call whose return (8 bytes) is wider than the consumed 4-byte
+// function-value slot it is delivered into, nested inside an expression with
+// live temps below the arg window. Exercises the overlapping result
+// relocation in the indirect-call runtime path.
+TEST(IndirectCallWideReturnInNestedExpression) {
+	const char* source = R"(
+		fn big(a : i64, b : i64) : i64 {
+			return a * 1000 + b;
+		}
+
+		fn apply(f : fn(i64, i64) : i64, a : i64, b : i64) : i64 {
+			return 1 + f(a, b);
+		}
+
+		fn main() : i64 {
+			return apply(big, 4, 2);
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_TRUE(4003 == ls_to_i64(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(FunctionNamedSinCompilesAndRuns) {
 	const char* source = R"(
 		fn sin() : i32 {

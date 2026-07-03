@@ -212,8 +212,10 @@ static int resolveLumScriptImportC(void* userdata, ls_string_view path, ls_strin
 	return 0;
 }
 
-static void nativeAddC(ls_runtime* runtime) {
-	ls_push_i32(runtime, ls_to_i32(runtime, -2) + ls_to_i32(runtime, -1));
+static void nativeAddC(ls_runtime* runtime, ls_call_frame frame) {
+	LS_ARG(frame, i32, a);
+	LS_ARG(frame, i32, b);
+	LS_RESULT(frame, i32, a + b);
 }
 
 #include "bytecode_tests.inl"

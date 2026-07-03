@@ -757,7 +757,7 @@ TEST(ImportExternFnDuplicateNotUsed) {
 		import "a"
 		import "b"
 
-		fn main() : i32 {}
+		fn main() : i32 { return 0; }
 	)";
 
 	const char* a_source = R"(
@@ -843,9 +843,10 @@ TEST(ExternImport) {
 
 	const i32 sum_fn_idx = ls_module_get_native_function_index(module, toLs("math.sum"));
 
-	auto sumfn = [](ls_runtime* runtime) -> void {
-		const i32 s = ls_to_i32(runtime, -1) + ls_to_i32(runtime, -2);
-		ls_push_i32(runtime, s);
+	auto sumfn = [](ls_runtime* runtime, ls_call_frame frame) -> void {
+		LS_ARG(frame, i32, a);
+		LS_ARG(frame, i32, b);
+		LS_RESULT(frame, i32, a + b);
 	};
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
@@ -1063,11 +1064,13 @@ TEST(ExternFnSecondImportCorrectIndex) {
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
 	EXPECT_TRUE(runtime != nullptr);
-	ls_runtime_set_native_function_callback(runtime, add_idx, [](ls_runtime* rt) {
-		ls_push_i32(rt, ls_to_i32(rt, -2) + ls_to_i32(rt, -1));
+	ls_runtime_set_native_function_callback(runtime, add_idx, [](ls_runtime* rt, ls_call_frame frame) {
+		LS_ARG(frame, i32, a); LS_ARG(frame, i32, b);
+		LS_RESULT(frame, i32, a + b);
 	});
-	ls_runtime_set_native_function_callback(runtime, mul_idx, [](ls_runtime* rt) {
-		ls_push_i32(rt, ls_to_i32(rt, -2) * ls_to_i32(rt, -1));
+	ls_runtime_set_native_function_callback(runtime, mul_idx, [](ls_runtime* rt, ls_call_frame frame) {
+		LS_ARG(frame, i32, a); LS_ARG(frame, i32, b);
+		LS_RESULT(frame, i32, a * b);
 	});
 
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));

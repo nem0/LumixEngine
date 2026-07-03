@@ -64,6 +64,7 @@ struct AssignStatement : Statement {
 	Expression* lhs = nullptr;
 	Expression* rhs = nullptr;
 	Token::Type op = Token::EQUAL;
+	FunctionExpression* resolved_op_fn = nullptr;
 };
 
 struct IfStatement : Statement {

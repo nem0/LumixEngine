@@ -104,7 +104,7 @@ static void lumc_diagnostics_print(void* userdata, ls_string_view msg) {
 	lumc_print_string(stderr, msg);
 }
 
-static void lumc_native_print(ls_runtime* runtime) {
+static void lumc_native_print(ls_runtime* runtime, ls_call_frame frame) {
 	lumc_print_string(stdout, ls_to_string(runtime, -1));
 	putchar('\n');
 }
