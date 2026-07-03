@@ -2697,6 +2697,7 @@ struct Checker {
 				if (ctx) {
 					if (SemanticLocalBinding* local = findLocal(*ctx, id->name)) {
 						is_writable = !local->is_immutable;
+						expr->resolved_type = local->type;
 						return local->type;
 					}
 				}
@@ -2707,7 +2708,8 @@ struct Checker {
 				}
 				id->symbol = ref.symbol;
 				is_writable = ref.symbol->storage == Symbol::VARIABLE;
-				return unwrapMeta(ref.symbol->resolved_type);
+				expr->resolved_type = unwrapMeta(ref.symbol->resolved_type);
+				return expr->resolved_type;
 			}
 			case Expression::MEMBER: {
 				MemberExpression* member = static_cast<MemberExpression*>(expr);
@@ -2721,7 +2723,8 @@ struct Checker {
 				}
 				if (ref) {
 					is_writable = ref.symbol->storage == Symbol::VARIABLE;
-					return unwrapMeta(ref.symbol->resolved_type);
+					expr->resolved_type = unwrapMeta(ref.symbol->resolved_type);
+					return expr->resolved_type;
 				}
 				bool base_writable = false;
 				ResolvedType* base_type = checkAssignableExpr(unit, ctx, member->expression, base_writable);
@@ -2731,6 +2734,7 @@ struct Checker {
 				}
 				ResolvedType* field_type = checkExpr(unit, ctx, *expr, nullptr);
 				is_writable = field_type != nullptr;
+				expr->resolved_type = field_type;
 				return field_type;
 			}
 			case Expression::BRACKET: {
@@ -2743,6 +2747,7 @@ struct Checker {
 				}
 				ResolvedType* value_type = checkExpr(unit, ctx, *expr, nullptr);
 				is_writable = value_type != nullptr;
+				expr->resolved_type = value_type;
 				return value_type;
 			}
 			default: is_writable = false; return nullptr;
@@ -2939,6 +2944,7 @@ struct Checker {
 		bool writable = false;
 		ResolvedType* lhs_type = checkAssignableExpr(unit, &ctx, assign.lhs, writable);
 		if (!lhs_type) return false;
+		assign.lhs->resolved_type = lhs_type;
 		if (!writable) {
 			errorLine(assign.token, "Epression is immutable and cannot be assigned to");
 			return false;
