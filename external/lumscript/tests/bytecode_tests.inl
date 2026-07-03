@@ -1333,6 +1333,142 @@ TEST(BytecodeGlobalVariable) {
 	return true;
 }
 
+TEST(BinaryExpressionEvaluatesLeftOperandBeforeRightOperand) {
+	const char* source = R"(
+		var x : i32 = 1;
+
+		fn foo() : i32 {
+			x = 10;
+			return 2;
+		}
+
+		fn main() : i32 {
+			return x + foo();
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(3, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(FunctionCallArgumentsEvaluateLeftToRight) {
+	const char* source = R"(
+		var order : i32 = 0;
+
+		fn first() : i32 {
+			order = order * 10 + 1;
+			return 1;
+		}
+
+		fn second() : i32 {
+			order = order * 10 + 2;
+			return 2;
+		}
+
+		fn third() : i32 {
+			order = order * 10 + 3;
+			return 3;
+		}
+
+		fn pack(a : i32, b : i32, c : i32) : i32 {
+			return order * 1000 + a * 100 + b * 10 + c;
+		}
+
+		fn main() : i32 {
+			return pack(first(), second(), third());
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(123123, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(StructLiteralFieldsEvaluateLeftToRight) {
+	const char* source = R"(
+		struct Triple {
+			a : i32;
+			b : i32;
+			c : i32;
+		}
+
+		var order : i32 = 0;
+
+		fn first() : i32 {
+			order = order * 10 + 1;
+			return 1;
+		}
+
+		fn second() : i32 {
+			order = order * 10 + 2;
+			return 2;
+		}
+
+		fn third() : i32 {
+			order = order * 10 + 3;
+			return 3;
+		}
+
+		fn main() : i32 {
+			const value = Triple { first(), second(), third() };
+			return order * 1000 + value.a * 100 + value.b * 10 + value.c;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(123123, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(OverloadedBinaryExpressionEvaluatesLeftOperandBeforeRightOperand) {
+	const char* source = R"(
+		struct Box {
+			value : i32;
+		}
+
+		var x : Box = Box { 1 };
+
+		fn foo() : Box {
+			x = Box { 10 };
+			return Box { 2 };
+		}
+
+		operator +(a : Box, b : Box) : Box {
+			return Box { a.value + b.value };
+		}
+
+		fn main() : i32 {
+			const result = x + foo();
+			return result.value;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(3, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 
 
 
