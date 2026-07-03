@@ -281,3 +281,91 @@ TEST(StructStaticArrayTypechecks) {
 	EXPECT_COMPILE(source);
 	return true;
 }
+
+TEST(MultiDimensionalStaticArrayDeclaration) {
+	const char* source = R"(
+		fn main() : void {
+			var matrix : i32[2][3] = undefined;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(MultiDimensionalStaticArrayIndexing) {
+	const char* source = R"(
+		fn main() : i32 {
+			var matrix : i32[2][3] = undefined;
+			matrix[0][0] = 10;
+			matrix[0][1] = 20;
+			matrix[1][2] = 30;
+			return matrix[0][0] + matrix[0][1] + matrix[1][2];
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(BytecodeMultiDimensionalStaticArrayIndexing) {
+	const char* source = R"(
+		fn main() : i32 {
+			var matrix : i32[2][3] = undefined;
+			matrix[0][0] = 10;
+			matrix[0][1] = 20;
+			matrix[1][2] = 30;
+			return matrix[0][0] + matrix[0][1] + matrix[1][2];
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ls_runtime* runtime = ls_runtime_create(bytecode);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(60, ls_to_i32(runtime, -1));
+
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ThreeDimensionalStaticArray) {
+	const char* source = R"(
+		fn main() : i32 {
+			var cube : i32[2][2][2] = undefined;
+			cube[0][0][0] = 1;
+			cube[1][1][1] = 8;
+			return cube[0][0][0] + cube[1][1][1];
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(MultiDimensionalArrayOutOfBoundsInnerDimensionFails) {
+	const char* source = R"(
+		fn main() : void {
+			var matrix : i32[2][3] = undefined;
+			matrix[0][5] = 1;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(MultiDimensionalArrayOutOfBoundsOuterDimensionFails) {
+	const char* source = R"(
+		fn main() : void {
+			var matrix : i32[2][3] = undefined;
+			matrix[3][0] = 1;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}

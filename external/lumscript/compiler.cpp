@@ -2,8 +2,51 @@
 #include "utils.h"
 #include <float.h>
 
-struct Checker {
+i64 typeByteSize(const ResolvedType& t) {
+	switch (t.kind) {
+		case ResolvedType::VOID: return 0;
+		case ResolvedType::BOOL:
+		case ResolvedType::I8:
+		case ResolvedType::U8:
+		case ResolvedType::BYTE:
+			return 1;
+		case ResolvedType::I16:
+		case ResolvedType::U16:
+			return 2;
+		case ResolvedType::I32:
+		case ResolvedType::U32:
+		case ResolvedType::F32:
+		case ResolvedType::ENUM:
+		case ResolvedType::FUNCTION:
+			return 4;
+		case ResolvedType::I64:
+		case ResolvedType::U64:
+		case ResolvedType::ISIZE:
+		case ResolvedType::F64:
+		case ResolvedType::STRING:
+		case ResolvedType::CPTR:
+			return 8;
+		case ResolvedType::NULLABLE: return 1 + typeByteSize(*static_cast<const NullableResolvedType&>(t).inner);
+		case ResolvedType::SLICE: return 16;
+		case ResolvedType::ARRAY: {
+			const ArrayResolvedType& arr = static_cast<const ArrayResolvedType&>(t);
+			ASSERT(arr.size > 0);
+			return arr.size * typeByteSize(*arr.element_type);
+		}
+		case ResolvedType::STRUCT: {
+			const StructResolvedType& st = static_cast<const StructResolvedType&>(t);
+			i64 count = 0;
+			for (i32 i = 0; i < st.decl->fields.size(); ++i) {
+				ResolvedType* field_type = (u32)i < st.field_types.size() ? st.field_types[(u32)i] : st.decl->fields[(u32)i].resolved_type;
+				count += typeByteSize(*field_type);
+			}
+			return count ? count : 1;
+		}
+		default: return 1;
+	}
+}
 
+struct Checker {
 	ls_module& module;
 	OutputFormatter error_stream;
 	i32 suppress_errors = 0;
@@ -771,56 +814,8 @@ struct Checker {
 		explicit operator bool() const { return symbol && !ambiguous && !check_failed; }
 	};
 
-	static ResolvedType* structFieldType(const StructResolvedType* st, i32 i) {
-		return (u32)i < st->field_types.size() ? st->field_types[(u32)i] : st->decl->fields[(u32)i].resolved_type;
-	}
-
-	// `sizeof` is measured in raw runtime bytes, matching bytecode_compiler.cpp's
-	// byte layout.
-	static i64 typeByteSize(const ResolvedType* t) {
-		if (!t) return 1;
-		switch (t->kind) {
-			case ResolvedType::VOID: return 0;
-			case ResolvedType::BOOL:
-			case ResolvedType::I8:
-			case ResolvedType::U8:
-			case ResolvedType::BYTE:
-				return 1;
-			case ResolvedType::I16:
-			case ResolvedType::U16:
-				return 2;
-			case ResolvedType::I32:
-			case ResolvedType::U32:
-			case ResolvedType::F32:
-			case ResolvedType::ENUM:
-			case ResolvedType::FUNCTION:
-				return 4;
-			case ResolvedType::I64:
-			case ResolvedType::U64:
-			case ResolvedType::ISIZE:
-			case ResolvedType::F64:
-			case ResolvedType::STRING:
-			case ResolvedType::CPTR:
-				return 8;
-			case ResolvedType::NULLABLE: return 1 + typeByteSize(static_cast<const NullableResolvedType*>(t)->inner);
-			case ResolvedType::SLICE: return 16;
-			case ResolvedType::ARRAY: {
-				const ArrayResolvedType* arr = static_cast<const ArrayResolvedType*>(t);
-				return arr->size > 0 ? arr->size * typeByteSize(arr->element_type) : 1;
-			}
-			case ResolvedType::STRUCT: {
-				const StructResolvedType* st = static_cast<const StructResolvedType*>(t);
-				if (!st->decl) return 1;
-				i64 count = 0;
-				for (i32 i = 0; i < st->decl->fields.size(); ++i) count += typeByteSize(structFieldType(st, i));
-				return count ? count : 1;
-			}
-			default: return 1;
-		}
-	}
-
 	static i64 typeByteAlign(const ResolvedType* t) {
-		const i64 size = typeByteSize(t);
+		const i64 size = typeByteSize(*t);
 		return size >= 8 ? 8 : size >= 4 ? 4 : size >= 2 ? 2 : 1;
 	}
 
@@ -842,7 +837,7 @@ struct Checker {
 			errorLine(sz.token, "Cannot resolve type for ", sz.is_align ? "alignof" : "sizeof");
 			return false;
 		}
-		out = sz.is_align ? typeByteAlign(measured) : typeByteSize(measured);
+		out = sz.is_align ? typeByteAlign(measured) : typeByteSize(*measured);
 		sz.value = (u64)out;
 		return true;
 	}

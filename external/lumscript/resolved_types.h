@@ -136,3 +136,6 @@ struct TemplateFunctionInstance {
 	FunctionExpression* instance = nullptr;
 	FunctionResolvedType* type = nullptr;
 };
+
+
+i64 typeByteSize(const ResolvedType& t);
