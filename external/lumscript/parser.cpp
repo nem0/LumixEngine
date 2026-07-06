@@ -360,36 +360,37 @@ struct Parser {
 				}
 				case Token::LEFT_BRACKET: {
 					Token bracket = consumeToken();
+					Expression* first = nullptr;
+					if (peekToken().type != Token::COLON && peekToken().type != Token::RIGHT_BRACKET) {
+						first = expression();
+						if (!first) return nullptr;
+					}
+
+					// A colon makes it a slice; either bound may be omitted.
+					if (peekToken().type == Token::COLON) {
+						consumeToken();
+						SliceExpression* slice = makeExpr<SliceExpression>(bracket);
+						slice->base = expr;
+						slice->begin = first;
+						if (peekToken().type != Token::RIGHT_BRACKET) {
+							slice->end = expression();
+							if (!slice->end) return nullptr;
+						}
+						if (!consume(Token::RIGHT_BRACKET)) return nullptr;
+						expr = slice;
+						break;
+					}
+
+					// Indexing or template instantiation; disambiguated at check time.
 					BracketExpression* br = makeExpr<BracketExpression>(bracket, m_unit.arena);
 					br->base = expr;
-
-					if (peekToken().type == Token::COLON) {
-						br->has_colon = true;
-						consumeToken();
-						if (peekToken().type != Token::RIGHT_BRACKET) {
-							br->end = expression();
-							if (!br->end) return nullptr;
-						}
-					}
-					else if (peekToken().type != Token::RIGHT_BRACKET) {
-						Expression* arg = expression();
-						if (!arg) return nullptr;
-						br->args.push(arg);
-
+					if (first) {
+						br->args.push(first);
 						while (peekToken().type == Token::COMMA) {
 							consumeToken();
-							arg = expression();
+							Expression* arg = expression();
 							if (!arg) return nullptr;
 							br->args.push(arg);
-						}
-
-						if (peekToken().type == Token::COLON) {
-							br->has_colon = true;
-							consumeToken();
-							if (peekToken().type != Token::RIGHT_BRACKET) {
-								br->end = expression();
-								if (!br->end) return nullptr;
-							}
 						}
 					}
 
@@ -583,67 +584,74 @@ struct Parser {
 				return nullptr;
 		}
 
-		for (;;) {
-			if (peekToken().type != Token::LEFT_BRACKET) break;
-			Token bracket = consumeToken();
-			if (peekToken().type == Token::RIGHT_BRACKET) {
-				consumeToken();
-				SliceParsedType* slice = makeParsedType<SliceParsedType>(bracket);
-				slice->element_type = res;
-				res = slice;
-				continue;
-			}
+		// Brackets after a qualified name in type position are template instantiation;
+		// array/slice syntax is prefix ([N]T, []T), so there is no ambiguity.
+		if (res->kind == ParsedType::QUALIFIED) {
+			if (peekToken().type == Token::LEFT_BRACKET) {
+				Token bracket = consumeToken();
+				TemplateInstantiationParsedType* call = makeParsedType<TemplateInstantiationParsedType>(bracket, m_unit.arena);
+				call->callee = static_cast<QualifiedParsedType*>(res);
+				while (peekToken().type != Token::RIGHT_BRACKET) {
+					if (peekToken().type == Token::END_OF_FILE) {
+						m_output.error("Unexpected end of file");
+						return nullptr;
+					}
 
-			// Only a qualified name can be a template, so for any other base the
-			// bracket must be a static array size, e.g. `i32[4]`. `Foo[4]` stays a
-			// BRACKET_TYPE until semantic analysis can tell array from instantiation.
-			if (res->kind != ParsedType::QUALIFIED) {
-				ArrayParsedType* array = makeParsedType<ArrayParsedType>(bracket);
-				array->element_type = res;
-				array->size = expression();
-				if (!array->size) return nullptr;
-				if (!consume(Token::RIGHT_BRACKET)) return nullptr;
-				res = array;
-				continue;
-			}
-
-			BracketTypeParsedType* call = makeParsedType<BracketTypeParsedType>(bracket, m_unit.arena);
-			call->callee = res;
-			while (peekToken().type != Token::RIGHT_BRACKET) {
-				if (peekToken().type == Token::END_OF_FILE) {
-					m_output.error("Unexpected end of file");
-					return nullptr;
+					Expression* arg = expression(ExprMode::HEAD);
+					if (!arg) return nullptr;
+					call->args.push(arg);
+					if (peekToken().type != Token::COMMA) break;
+					consumeToken();
 				}
-
-				Expression* arg = expression(ExprMode::HEAD);
-				if (!arg) return nullptr;
-				call->args.push(arg);
-				if (peekToken().type != Token::COMMA) break;
-				consumeToken();
+				if (!consume(Token::RIGHT_BRACKET)) return nullptr;
+				res = call;
 			}
-			if (!consume(Token::RIGHT_BRACKET)) return nullptr;
-			res = call;
 		}
 
 		return res;
 	}
 
 	ParsedType* type() {
-		Token first = consumeToken();
-		Token base_token = first;
-		if (first.type == Token::QUESTION) {
-			base_token = consumeToken();
+		// Parse prefix brackets and nullable syntax recursively.
+		// Examples:
+		// - [4]i32: array of 4 ints
+		// - []i32: slice of ints
+		// - [4]?i32: array of 4 nullable ints
+		// - ?[4]i32: nullable array of 4 ints
+		// - [2][3]i32: array of 2 arrays of 3 ints
+		if (peekToken().type == Token::LEFT_BRACKET) {
+			Token bracket = consumeToken();
+			if (peekToken().type == Token::RIGHT_BRACKET) {
+				consumeToken();
+				SliceParsedType* slice = makeParsedType<SliceParsedType>(bracket);
+				slice->element_type = type();
+				return slice;
+			} else {
+				Expression* size = expression();
+				if (!size) return nullptr;
+				if (!consume(Token::RIGHT_BRACKET)) return nullptr;
+				ArrayParsedType* array = makeParsedType<ArrayParsedType>(bracket);
+				array->size = size;
+				array->element_type = type();
+				return array;
+			}
 		}
 
+		// Handle nullable
+		Token first = peekToken();
+		if (first.type == Token::QUESTION) {
+			consumeToken();
+			ParsedType* inner = type();
+			if (!inner) return nullptr;
+			NullableParsedType* nullable = makeParsedType<NullableParsedType>(first);
+			nullable->inner = inner;
+			return nullable;
+		}
+
+		Token base_token = consumeToken();
 		ParsedType* res = typeFromToken(base_token);
 		if (!res) {
 			m_output.errorAt(base_token, "Expected type");
-			return nullptr;
-		}
-		if (first.type == Token::QUESTION) {
-			NullableParsedType* nullable = makeParsedType<NullableParsedType>(first);
-			nullable->inner = res;
-			res = nullable;
 		}
 		return res;
 	}

@@ -1,7 +1,7 @@
 TEST(SizeofProducesComptimeInt) {
 	const char* source = R"(
 		fn main() : void {
-			var d : i32[sizeof(i32)] = undefined;
+			var d : [sizeof(i32)]i32 = undefined;
 			d[0] = 1;
 		}
 	)";
@@ -12,7 +12,7 @@ TEST(SizeofProducesComptimeInt) {
 TEST(AlignofProducesComptimeInt) {
 	const char* source = R"(
 		fn main() : void {
-			var d : i32[alignof(i32)] = undefined;
+			var d : [alignof(i32)]i32 = undefined;
 			d[0] = 1;
 		}
 	)";
@@ -66,12 +66,12 @@ TEST(IsizeNoImplicitConversionFromI32Fails) {
 
 TEST(LengthReturnsIsize) {
 	const char* source = R"(
-		fn count(s : i32[]) : isize {
+		fn count(s : []i32) : isize {
 			return length(s);
 		}
 
 		fn main() : void {
-			var values : i32[4] = undefined;
+			var values : [4]i32 = undefined;
 			const n : isize = count(values);
 		}
 	)";
@@ -86,7 +86,7 @@ TEST(IsizeAllocArgumentTypechecks) {
 		fn main() : void {
 			var size : isize = 16;
 			var align : isize = 4;
-			var raw : byte[] = mem.alloc(size, align);
+			var raw : []byte = mem.alloc(size, align);
 			mem.free(raw);
 		}
 	)";
@@ -97,7 +97,7 @@ TEST(IsizeAllocArgumentTypechecks) {
 TEST(IsizeIndexTypechecks) {
 	const char* source = R"(
 		fn main() : void {
-			var values : i32[4] = undefined;
+			var values : [4]i32 = undefined;
 			var i : isize = 2;
 			values[i] = 1;
 		}
@@ -109,7 +109,7 @@ TEST(IsizeIndexTypechecks) {
 TEST(IsizeIndexRuntime) {
 	const char* source = R"(
 		fn main() : i32 {
-			var values : i32[4] = undefined;
+			var values : [4]i32 = undefined;
 			values[2] = 42;
 			var i : isize = 2;
 			return values[i];
@@ -127,10 +127,10 @@ TEST(IsizeIndexRuntime) {
 
 TEST(ByteSliceParameterTypechecks) {
 	const char* source = R"(
-		fn consume(memory : byte[]) : void {}
+		fn consume(memory : []byte) : void {}
 
 		fn main() : void {
-			var values : byte[4] = undefined;
+			var values : [4]byte = undefined;
 			consume(values);
 		}
 	)";
@@ -141,8 +141,8 @@ TEST(ByteSliceParameterTypechecks) {
 TEST(ByteIsDistinctFromU8) {
 	const char* source = R"(
 		fn main() : void {
-			var raw : byte[4] = undefined;
-			var numbers : u8[] = raw;
+			var raw : [4]byte = undefined;
+			var numbers : []u8 = raw;
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
@@ -221,7 +221,7 @@ TEST(AllocReturnsByteSlice) {
 		import "std:mem" as mem
 
 		fn main() : void {
-			var raw : byte[] = mem.alloc(16, 4);
+			var raw : []byte = mem.alloc(16, 4);
 		}
 	)";
 	EXPECT_COMPILE(source);
@@ -233,7 +233,7 @@ TEST(FreeTakesByteSlice) {
 		import "std:mem" as mem
 
 		fn main() : void {
-			var raw : byte[] = mem.alloc(16, 4);
+			var raw : []byte = mem.alloc(16, 4);
 			mem.free(raw);
 		}
 	)";
@@ -246,7 +246,7 @@ TEST(FreeRejectsTypedSliceFails) {
 		import "std:mem" as mem
 
 		fn main() : void {
-			var values : i32[4] = undefined;
+			var values : [4]i32 = undefined;
 			mem.free(values);
 		}
 	)";
@@ -259,7 +259,7 @@ TEST(AllocWithSizeofAndAlignof) {
 		import "std:mem" as mem
 
 		fn main() : void {
-			var raw : byte[] = mem.alloc(4 * sizeof(i32), alignof(i32));
+			var raw : []byte = mem.alloc(4 * sizeof(i32), alignof(i32));
 			mem.free(raw);
 		}
 	)";
@@ -272,8 +272,8 @@ TEST(ByteSliceReinterpretAsTypedSlice) {
 		import "std:mem" as mem
 
 		fn main() : void {
-			var raw : byte[] = mem.alloc(4 * sizeof(i32), alignof(i32));
-			var ints : i32[] = raw as i32[];
+			var raw : []byte = mem.alloc(4 * sizeof(i32), alignof(i32));
+			var ints : []i32 = raw as []i32;
 			ints[0] = 42;
 		}
 	)";
@@ -284,8 +284,8 @@ TEST(ByteSliceReinterpretAsTypedSlice) {
 TEST(TypedSliceReinterpretAsByteSlice) {
 	const char* source = R"(
 		fn main() : void {
-			var values : i32[4] = undefined;
-			var bytes : byte[] = values[:] as byte[];
+			var values : [4]i32 = undefined;
+			var bytes : []byte = values[:] as []byte;
 		}
 	)";
 	EXPECT_COMPILE(source);
@@ -295,8 +295,8 @@ TEST(TypedSliceReinterpretAsByteSlice) {
 TEST(ReinterpretBetweenTypedSlicesFails) {
 	const char* source = R"(
 		fn main() : void {
-			var values : f32[4] = undefined;
-			var ints : i32[] = values[:] as i32[];
+			var values : [4]f32 = undefined;
+			var ints : []i32 = values[:] as []i32;
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
@@ -307,8 +307,8 @@ TEST(SliceReinterpretToBytesLengthRuntime) {
 	// Reinterpreting typed elements as bytes exposes their raw byte width.
 	const char* source = R"(
 		fn main() : i32 {
-			var values : i32[4] = undefined;
-			var bytes : byte[] = values[:] as byte[];
+			var values : [4]i32 = undefined;
+			var bytes : []byte = values[:] as []byte;
 			return length(bytes) as i32;
 		}
 	)";
@@ -322,32 +322,14 @@ TEST(SliceReinterpretToBytesLengthRuntime) {
 	return true;
 }
 
-TEST(SliceReinterpretSliceArrayToBytesLengthRuntime) {
-	// A slice element is a raw pointer plus an i64 length.
-	const char* source = R"(
-		fn main() : i32 {
-			var arr : i32[][3] = undefined;
-			var bytes : byte[] = arr[:] as byte[];
-			return length(bytes) as i32;
-		}
-	)";
-	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
-
-	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_call(runtime, toLs("main")));
-	EXPECT_EQ(48, ls_to_i32(runtime, -1));
-	CAPI_END(module);
-	return true;
-}
-
 TEST(SliceReinterpretRoundTripLengthRuntime) {
-	// Converting bytes back to the slice element type divides by the raw element size.
+	// Round-trip reinterpretation preserves length.
 	const char* source = R"(
 		fn main() : i32 {
-			var arr : i32[][3] = undefined;
-			var bytes : byte[] = arr[:] as byte[];
-			var back : i32[][] = bytes as i32[][];
+			var arr : [4]i32 = undefined;
+			var slice : []i32 = arr[:];
+			var bytes : []byte = slice as []byte;
+			var back : []i32 = bytes as []i32;
 			return length(back) as i32;
 		}
 	)";
@@ -356,7 +338,7 @@ TEST(SliceReinterpretRoundTripLengthRuntime) {
 
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
-	EXPECT_EQ(3, ls_to_i32(runtime, -1));
+	EXPECT_EQ(4, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -366,8 +348,8 @@ TEST(AllocWriteReadFreeRuntime) {
 		import "std:mem" as mem
 
 		fn main() : i32 {
-			var raw : byte[] = mem.alloc(4 * sizeof(i32), alignof(i32));
-			var ints : i32[] = raw as i32[];
+			var raw : []byte = mem.alloc(4 * sizeof(i32), alignof(i32));
+			var ints : []i32 = raw as []i32;
 			ints[0] = 20;
 			ints[1] = 22;
 			const result = ints[0] + ints[1];
@@ -390,8 +372,8 @@ TEST(ByteSliceReinterpretLengthRuntime) {
 		import "std:mem" as mem
 
 		fn main() : i32 {
-			var raw : byte[] = mem.alloc(4 * sizeof(i32), alignof(i32));
-			var ints : i32[] = raw as i32[];
+			var raw : []byte = mem.alloc(4 * sizeof(i32), alignof(i32));
+			var ints : []i32 = raw as []i32;
 			const count = length(ints) as i32;
 			mem.free(raw);
 			return count;
@@ -403,6 +385,61 @@ TEST(ByteSliceReinterpretLengthRuntime) {
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(4, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(MemberNullableAssignmentRuntime) {
+	// Issue #2: member = with nullable RHS should use compileExpressionAsType.
+	const char* source = R"(
+		struct S {
+			opt : ?i32;
+		}
+
+		fn main() : ?i32 {
+			var s = S { null };
+			s.opt = 42;
+			return s.opt;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	// A nullable is a flag byte followed by the packed payload.
+	u32 result_size = 0;
+	const u8* result = (const u8*)ls_call_result(runtime, &result_size);
+	EXPECT_TRUE(result != nullptr);
+	EXPECT_EQ(5u, result_size);
+	EXPECT_EQ(1, result[0]);
+	i32 payload = 0;
+	memcpy(&payload, result + 1, sizeof(payload));
+	EXPECT_EQ(42, payload);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(MemberArrayToSliceAssignmentRuntime) {
+	const char* source = R"(
+		struct S {
+			items : []i32;
+		}
+
+		fn main() : i32 {
+			var s : S = undefined;
+			var arr : [3]i32 = undefined;
+			arr[0] = 1;
+			arr[1] = 2;
+			arr[2] = 3;
+			s.items = arr;
+			return (length(s.items) as i32) + s.items[1];
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(5, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }

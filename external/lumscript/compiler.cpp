@@ -117,7 +117,6 @@ struct Checker {
 				return typesEqual(na->inner, nb->inner);
 			}
 			// STRUCT/ENUM: one instance per declaration; a==b above is definitive.
-			// BRACKET_TYPE: resolved away before comparison.
 			default: return false;
 		}
 	}
@@ -447,6 +446,25 @@ struct Checker {
 			return false;
 		}
 
+		// Match a template instantiation pattern (resolved callee + bracket args)
+		// against a concrete struct instance and bind template parameters from the
+		// args. Shared by the parsed-type (`Vec[T]` in type syntax) and expression
+		// (`Vec[T]` as a bracket expression) forms of the pattern.
+		bool inferTemplateFromInstantiation(Unit& unit,
+			const ExpArray<NamedDecl>& params,
+			ResolvedType* callee,
+			const ExpArray<Expression*>& args,
+			ResolvedType* actual,
+			ExpArray<TemplateArgument>& template_args)
+		{
+			if (!callee || callee->kind != ResolvedType::STRUCT) return false;
+			if (!actual || actual->kind != ResolvedType::STRUCT) return false;
+			StructResolvedType* pattern_base = static_cast<StructResolvedType*>(callee);
+			StructResolvedType* actual_struct = static_cast<StructResolvedType*>(actual);
+			if (!pattern_base->decl || pattern_base->decl != actual_struct->decl) return false;
+			return inferTemplateFromBracketArgs(unit, params, pattern_base->decl->comptime_params, args, actual_struct, template_args);
+		}
+
 		bool inferTemplateFromBracketArgs(Unit& unit,
 			const ExpArray<NamedDecl>& params,
 			const ExpArray<NamedDecl>& comptime_params,
@@ -477,13 +495,8 @@ struct Checker {
 						}
 						case Expression::BRACKET: {
 							BracketExpression* br = static_cast<BracketExpression*>(arg);
-							if (br->has_colon) return false;
 							ResolvedType* callee = checker.resolveExpressionAsType(unit, *br->base);
-							if (!callee || callee->kind != ResolvedType::STRUCT || actual_arg.type->kind != ResolvedType::STRUCT) return false;
-							StructResolvedType* pattern_base = static_cast<StructResolvedType*>(callee);
-							StructResolvedType* actual_struct_arg = static_cast<StructResolvedType*>(actual_arg.type);
-							if (!pattern_base->decl || pattern_base->decl != actual_struct_arg->decl) return false;
-							if (!inferTemplateFromBracketArgs(unit, params, pattern_base->decl->comptime_params, br->args, actual_struct_arg, template_args)) return false;
+							if (!inferTemplateFromInstantiation(unit, params, callee, br->args, actual_arg.type, template_args)) return false;
 							break;
 						}
 						default: {
@@ -553,22 +566,11 @@ struct Checker {
 					}
 					return inferTemplateFromType(unit, params, static_cast<SliceParsedType*>(pattern)->element_type, static_cast<SliceResolvedType*>(actual)->element_type, template_args);
 				}
-				case ParsedType::BRACKET_TYPE: {
-					if (actual->kind != ResolvedType::STRUCT) {
-						return false;
-					}
-					BracketTypeParsedType* br = static_cast<BracketTypeParsedType*>(pattern);
+				case ParsedType::TEMPLATE_INSTANTIATION: {
+					TemplateInstantiationParsedType* br = static_cast<TemplateInstantiationParsedType*>(pattern);
 					ResolvedType* callee = checker.resolveParsedType(unit, br->callee);
-					if (!callee || callee->kind != ResolvedType::STRUCT) {
-						return false;
-					}
-					StructResolvedType* pattern_base = static_cast<StructResolvedType*>(callee);
-					StructResolvedType* actual_struct = static_cast<StructResolvedType*>(actual);
-					if (!pattern_base->decl || pattern_base->decl != actual_struct->decl) {
-						return false;
-					}
 					// TODO possible erorr msg
-					return inferTemplateFromBracketArgs(unit, params, pattern_base->decl->comptime_params, br->args, actual_struct, template_args);
+					return inferTemplateFromInstantiation(unit, params, callee, br->args, actual, template_args);
 				}
 				default: {
 					ResolvedType* resolved = checker.resolveParsedType(unit, pattern);
@@ -999,10 +1001,10 @@ struct Checker {
 				out = nullable;
 				break;
 			}
-			case ParsedType::BRACKET_TYPE: {
-				BracketTypeParsedType* s = static_cast<BracketTypeParsedType*>(src);
-				BracketTypeParsedType* br = makeType<BracketTypeParsedType>(unit, *unit.arena.arena);
-				br->callee = cloneParsedType(unit, s->callee);
+			case ParsedType::TEMPLATE_INSTANTIATION: {
+				TemplateInstantiationParsedType* s = static_cast<TemplateInstantiationParsedType*>(src);
+				TemplateInstantiationParsedType* br = makeType<TemplateInstantiationParsedType>(unit, *unit.arena.arena);
+				br->callee = static_cast<QualifiedParsedType*>(cloneParsedType(unit, s->callee));
 				for (Expression* arg : s->args) br->args.push(cloneExpression(unit, arg));
 				out = br;
 				break;
@@ -1113,9 +1115,16 @@ struct Checker {
 				BracketExpression* br = makeType<BracketExpression>(unit, *unit.arena.arena);
 				br->base = cloneExpression(unit, s->base);
 				for (Expression* arg : s->args) br->args.push(cloneExpression(unit, arg));
-				br->has_colon = s->has_colon;
-				br->end = cloneExpression(unit, s->end);
 				out = br;
+				break;
+			}
+			case Expression::SLICE: {
+				SliceExpression* s = static_cast<SliceExpression*>(src);
+				SliceExpression* sl = makeType<SliceExpression>(unit);
+				sl->base = cloneExpression(unit, s->base);
+				sl->begin = cloneExpression(unit, s->begin);
+				sl->end = cloneExpression(unit, s->end);
+				out = sl;
 				break;
 			}
 			case Expression::STRUCT_LITERAL: {
@@ -1316,31 +1325,18 @@ struct Checker {
 					result = ref ? unwrapMeta(ref.symbol->resolved_type) : nullptr;
 					break;
 				}
-				case ParsedType::BRACKET_TYPE: {
-					BracketTypeParsedType* call = static_cast<BracketTypeParsedType*>(parsed);
+				case ParsedType::TEMPLATE_INSTANTIATION: {
+					// Arrays use prefix syntax ([N]T), so brackets after a type can only be
+					// template instantiation.
+					TemplateInstantiationParsedType* call = static_cast<TemplateInstantiationParsedType*>(parsed);
 					ResolvedType* callee = resolveParsedType(unit, call->callee);
 					if (!callee) return nullptr;
-					if (callee->kind == ResolvedType::STRUCT) {
-						StructResolvedType* st = static_cast<StructResolvedType*>(callee);
-						if (!st->decl) return nullptr;
-						if (!st->decl->comptime_params.empty()) {
-							Unit* owner = findTypeNamespaceUnit(*st);
-							if (!owner) return nullptr;
-							result = templates.instantiateStructTemplate(*owner, unit, call->token, *st->decl, call->args);
-							break;
-						}
-					}
-					if (call->args.size() == 1) {
-						ArrayResolvedType* resolved = makeType<ArrayResolvedType>(unit);
-						resolved->element_type = callee;
-						i64 size = 0;
-						if (!resolveComptimeIntValue(unit, call->args[0], size)) return nullptr;
-						if (size <= 0) return nullptr;
-						resolved->size = size;
-						result = resolved;
-						break;
-					}
-					result = nullptr;
+					if (callee->kind != ResolvedType::STRUCT) return nullptr;
+					StructResolvedType* st = static_cast<StructResolvedType*>(callee);
+					if (!st->decl || st->decl->comptime_params.empty()) return nullptr;
+					Unit* owner = findTypeNamespaceUnit(*st);
+					if (!owner) return nullptr;
+					result = templates.instantiateStructTemplate(*owner, unit, call->token, *st->decl, call->args);
 					break;
 				}
 				default: return nullptr;
@@ -1650,7 +1646,6 @@ struct Checker {
 		}
 		if (expression.kind == Expression::BRACKET) {
 			BracketExpression& br = static_cast<BracketExpression&>(expression);
-			if (br.has_colon) return nullptr;
 			if (!br.base) return nullptr;
 
 			SymbolRef sym = resolveSymbol(unit, *br.base);
@@ -2277,7 +2272,7 @@ struct Checker {
 		const bool dst_integer = isIntegerType(*dst_type);
 		const bool src_enum = src_type->kind == ResolvedType::ENUM;
 		const bool dst_enum = dst_type->kind == ResolvedType::ENUM;
-		// Slice reinterpret cast: `byte[] as T[]` / `T[] as byte[]`. Exactly one side must
+		// Slice reinterpret cast: `[]byte as []T` / `[]T as []byte`. Exactly one side must
 		// have `byte` elements; reinterpreting between two unrelated typed slices is rejected.
 		bool slice_reinterpret = false;
 		if (src_type->kind == ResolvedType::SLICE && dst_type->kind == ResolvedType::SLICE) {
@@ -2433,54 +2428,6 @@ struct Checker {
 			return nullptr;
 		}
 
-		if (br.has_colon) {
-			// slices
-			for (Expression* arg : br.args) {
-				ResolvedType* arg_type = checkExpr(unit, ctx, *arg, primitiveType(ResolvedType::I32));
-				if (!arg_type) return nullptr;
-
-				if (!isIntegerType(*arg_type)) {
-					errorLine(expr.token, "Cannot slice with type ", arg_type, ", expected integer type");
-					return nullptr;
-				}
-			}
-
-			if (br.end) {
-				ResolvedType* end_type = checkExpr(unit, ctx, *br.end, primitiveType(ResolvedType::I32));
-				if (!end_type) return nullptr;
-
-				if (!isIntegerType(*end_type)) {
-					errorLine(expr.token, "Cannot slice with type ", end_type, ", expected integer type");
-					return nullptr;
-				}
-			}
-
-			const ArrayResolvedType* arr = base_type->kind == ResolvedType::ARRAY ? static_cast<const ArrayResolvedType*>(base_type) : nullptr;
-			if (arr) {
-				i64 begin = 0;
-				i64 end = arr->size;
-				const bool has_begin = !br.args.empty() && resolveComptimeIntValue(unit, br.args[0], begin);
-				const bool has_end = br.end ? resolveComptimeIntValue(unit, br.end, end) : true;
-				if (has_begin && (begin < 0 || begin > arr->size)) {
-					errorLine(expr.token, "Array slice begin index out of bounds: ", begin, " (array size: ", arr->size, ")");
-					return nullptr;
-				}
-				if (has_end && (end < 0 || end > arr->size)) {
-					errorLine(expr.token, "Array slice end index out of bounds: ", end, " (array size: ", arr->size, ")");
-					return nullptr;
-				}
-				if (has_begin && has_end && begin > end) {
-					errorLine(expr.token, "Array slice begin index ", begin, " is greater than end index ", end);
-					return nullptr;
-				}
-			}
-
-			SliceResolvedType* slice = makeType<SliceResolvedType>(unit);
-			slice->element_type = arr ? arr->element_type : static_cast<SliceResolvedType*>(base_type)->element_type;
-			expr.resolved_type = slice;
-			return slice;
-		}
-
 		if (br.args.size() != 1) {
 			errorLine(expr.token, "Indexing expects exactly one argument");
 			return nullptr;
@@ -2510,6 +2457,59 @@ struct Checker {
 		return expr.resolved_type;
 	}
 
+	ResolvedType* checkSliceExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr) {
+		SliceExpression& sl = static_cast<SliceExpression&>(expr);
+		ResolvedType* base_type = checkExpr(unit, ctx, *sl.base, nullptr);
+		if (!base_type) return nullptr;
+
+		if (base_type->kind == ResolvedType::NULLABLE) {
+			errorLine(expr.token, "Cannot index nullable type without a null check");
+			return nullptr;
+		}
+
+		if (base_type->kind != ResolvedType::ARRAY && base_type->kind != ResolvedType::SLICE) {
+			errorLine(expr.token, "Cannot index type ", base_type);
+			return nullptr;
+		}
+
+		Expression* bounds[] = {sl.begin, sl.end};
+		for (Expression* bound : bounds) {
+			if (!bound) continue;
+			ResolvedType* bound_type = checkExpr(unit, ctx, *bound, primitiveType(ResolvedType::I32));
+			if (!bound_type) return nullptr;
+
+			if (!isIntegerType(*bound_type)) {
+				errorLine(expr.token, "Cannot slice with type ", bound_type, ", expected integer type");
+				return nullptr;
+			}
+		}
+
+		const ArrayResolvedType* arr = base_type->kind == ResolvedType::ARRAY ? static_cast<const ArrayResolvedType*>(base_type) : nullptr;
+		if (arr) {
+			i64 begin = 0;
+			i64 end = arr->size;
+			const bool has_begin = sl.begin && resolveComptimeIntValue(unit, sl.begin, begin);
+			const bool has_end = sl.end ? resolveComptimeIntValue(unit, sl.end, end) : true;
+			if (has_begin && (begin < 0 || begin > arr->size)) {
+				errorLine(expr.token, "Array slice begin index out of bounds: ", begin, " (array size: ", arr->size, ")");
+				return nullptr;
+			}
+			if (has_end && (end < 0 || end > arr->size)) {
+				errorLine(expr.token, "Array slice end index out of bounds: ", end, " (array size: ", arr->size, ")");
+				return nullptr;
+			}
+			if (has_begin && has_end && begin > end) {
+				errorLine(expr.token, "Array slice begin index ", begin, " is greater than end index ", end);
+				return nullptr;
+			}
+		}
+
+		SliceResolvedType* slice = makeType<SliceResolvedType>(unit);
+		slice->element_type = arr ? arr->element_type : static_cast<SliceResolvedType*>(base_type)->element_type;
+		expr.resolved_type = slice;
+		return slice;
+	}
+
 	ResolvedType* checkStructLiteralExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr, ResolvedType* hint) {
 		StructLiteralExpression& lit = static_cast<StructLiteralExpression&>(expr);
 		// In the type position of a literal, a top-level type name wins over a
@@ -2519,8 +2519,8 @@ struct Checker {
 		if (lit.type) {
 			type = resolveExpressionAsType(unit, *lit.type);
 			if (!type) {
-				// Happens when lit.type is a bracket expression (e.g. a template instantiation like Foo[T]).
-				// resolveExpressionAsType only handles TYPE_LITERAL, IDENTIFIER, and MEMBER.
+				// Covers type-valued expressions resolveExpressionAsType does not,
+				// e.g. a call to a comptime function returning a type.
 				type = checkExpr(unit, ctx, *lit.type, hint);
 			}
 		}
@@ -2676,6 +2676,7 @@ struct Checker {
 			case Expression::CAST: return checkCastExpr(unit, ctx, expr);
 			case Expression::MEMBER: return checkMemberExpr(unit, ctx, expr, hint);
 			case Expression::BRACKET: return checkBracketExpr(unit, ctx, expr, hint);
+			case Expression::SLICE: return checkSliceExpr(unit, ctx, expr);
 			case Expression::STRUCT_LITERAL: return checkStructLiteralExpr(unit, ctx, expr, hint);
 			default: return nullptr;
 		}
@@ -2765,9 +2766,9 @@ struct Checker {
 			QualifiedParsedType* q = static_cast<QualifiedParsedType*>(type);
 			return empty(q->qualifier) && equalStrings(q->name, name);
 		}
-		if (type->kind == ParsedType::BRACKET_TYPE) {
-			BracketTypeParsedType* br = static_cast<BracketTypeParsedType*>(type);
-			return parsedTypeIsDirectSelfReference(br->callee, name);
+		if (type->kind == ParsedType::TEMPLATE_INSTANTIATION) {
+			QualifiedParsedType* callee = static_cast<TemplateInstantiationParsedType*>(type)->callee;
+			return empty(callee->qualifier) && equalStrings(callee->name, name);
 		}
 		return false;
 	}
@@ -3292,8 +3293,8 @@ struct Checker {
 	)";
 
 	static inline const char builtin_mem_source[] = R"(
-		extern fn alloc(size : isize, align : isize) : byte[];
-		extern fn free(memory : byte[]) : void;
+		extern fn alloc(size : isize, align : isize) : []byte;
+		extern fn free(memory : []byte) : void;
 	)";
 
 	bool resolveImportsForUnit(Unit& unit, ls_import_resolver_fn import_resolver, void* import_resolver_userdata) {

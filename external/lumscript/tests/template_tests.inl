@@ -35,7 +35,7 @@ TEST(TemplateFunctionIdentityF32) {
 TEST(TemplateFunctionBodyCanUseTemplateParam) {
 	const char* source = R"(
 		fn identity[T](a : T) : T {
-			var values : T[1] = undefined;
+			var values : [1]T = undefined;
 			values[0] = a;
 			return values[0];
 		}
@@ -432,7 +432,7 @@ TEST(TemplateStructRecursionThroughSliceCompiles) {
 	const char* source = R"(
 		struct Node[T] {
 			value : T;
-			children : Node[T][];
+			children : []Node[T];
 		}
 
 		fn main() : void {}
@@ -459,7 +459,7 @@ TEST(TemplateStructRecursionThroughNullableFails) {
 TEST(FailedImportedTemplateStructInstanceRemainsInvalid) {
 	const char* first_source = R"(
 		struct Invalid[N : i32] {
-			values : i32[N];
+			values : [N]i32;
 		}
 
 		fn first() : void {
@@ -826,7 +826,7 @@ TEST(TemplateFunctionImportBracketCallDisambiguatesAtCheckTime) {
 			return v + 1;
 		}
 
-		var a : (fn(i32) : i32)[1] = undefined;
+		var a : [1](fn(i32) : i32) = undefined;
 	)";
 	const char* libb_source = R"(
 		fn a[T](v : T) : T {
@@ -852,7 +852,7 @@ TEST(TemplateFunctionArrayElementCall) {
 		}
 
 		fn main() : i32 {
-			var a : (fn(i32) : i32)[1] = undefined;
+			var a : [1](fn(i32) : i32) = undefined;
 			const x = 0;
 			a[x] = add_one;
 			return a[x](41);
@@ -877,7 +877,7 @@ TEST(TemplateImportedFunctionArrayElementCall) {
 			return v + 1;
 		}
 
-		var a : (fn(i32) : i32)[1] = undefined;
+		var a : [1](fn(i32) : i32) = undefined;
 	)";
 	LumScriptImportFile files_storage[] = {
 		{ toLs("liba"), toLs(liba_source) },
@@ -1519,7 +1519,7 @@ TEST(TemplateFunctionWithNestedGenericParamRuntime) {
 TEST(ComptimeGenericStructWithValueParamTypechecks) {
 	const char* source = R"(
 		comptime StaticArray = struct[T, N : i32] {
-			values : T[N];
+			values : [N]T;
 		}
 
 		fn main() : void {
@@ -1535,7 +1535,7 @@ TEST(ComptimePrimitiveValueCanBeTemplateValueArg) {
 		comptime N = 4;
 
 		comptime StaticArray = struct[T, Count : i32] {
-			values : T[Count];
+			values : [Count]T;
 		}
 
 		fn main() : void {
@@ -1549,7 +1549,7 @@ TEST(ComptimePrimitiveValueCanBeTemplateValueArg) {
 TEST(TemplateStructWithValueParamTypechecks) {
 	const char* source = R"(
 		struct StaticArray[T, N : i32] {
-			values : T[N];
+			values : [N]T;
 		}
 
 		fn main() : void {
@@ -1563,8 +1563,8 @@ TEST(TemplateStructWithValueParamTypechecks) {
 TEST(TemplateStructMixedTypeAndValueParams) {
 	const char* source = R"(
 		struct Mixed[A, N : i32, B, M : i32] {
-			first : A[N];
-			second : B[M];
+			first : [N]A;
+			second : [M]B;
 		}
 
 		fn main() : void {
@@ -1579,7 +1579,7 @@ TEST(TemplateStructMixedTypeAndValueParams) {
 TEST(TemplateStructValueParamWrongTypeFails) {
 	const char* source = R"(
 		struct StaticArray[T, N : i32] {
-			values : T[N];
+			values : [N]T;
 		}
 
 		fn main() : void {
@@ -1593,7 +1593,7 @@ TEST(TemplateStructValueParamWrongTypeFails) {
 TEST(TemplateStructValueParamMissingArgFails) {
 	const char* source = R"(
 		struct StaticArray[T, N : i32] {
-			values : T[N];
+			values : [N]T;
 		}
 
 		fn main() : void {
@@ -1607,7 +1607,7 @@ TEST(TemplateStructValueParamMissingArgFails) {
 TEST(TemplateStructValueParamNonComptimeExprFails) {
 	const char* source = R"(
 		struct StaticArray[T, N : i32] {
-			values : T[N];
+			values : [N]T;
 		}
 
 		fn main() : void {
@@ -1622,7 +1622,7 @@ TEST(TemplateStructValueParamNonComptimeExprFails) {
 TEST(TemplateStructValueParamWrongCountFails) {
 	const char* source = R"(
 		struct StaticArray[T, N : i32] {
-			values : T[N];
+			values : [N]T;
 		}
 
 		fn main() : void {
@@ -1636,7 +1636,7 @@ TEST(TemplateStructValueParamWrongCountFails) {
 TEST(TemplateStructValueParamNegativeSizeFails) {
 	const char* source = R"(
 		struct StaticArray[T, N : i32] {
-			values : T[N];
+			values : [N]T;
 		}
 
 		fn main() : void {
@@ -1689,7 +1689,7 @@ TEST(TemplateFunctionMixedTypeAndValueParams) {
 TEST(TemplateFunctionValueParamInferred) {
 	const char* source = R"(
 		struct StaticArray[T, N : i32] {
-			values : T[N];
+			values : [N]T;
 		}
 
 		fn size[T, N : i32](values : StaticArray[T, N]) : i32 {
@@ -1985,12 +1985,12 @@ TEST(NullableTemplateStructInstantiationRuntime) {
 // Template function taking T[] (slice of T) as a parameter.
 TEST(TemplateFunctionSliceOfTParamRuntime) {
 	const char* source = R"(
-		fn first[T](values : T[]) : T {
+		fn first[T](values : []T) : T {
 			return values[0];
 		}
 
 		fn main() : i32 {
-			var arr : i32[3] = undefined;
+			var arr : [3]i32 = undefined;
 			arr[0] = 42;
 			arr[1] = 1;
 			arr[2] = 2;
@@ -2050,7 +2050,7 @@ TEST(ComptimeGenericFunctionBindingRuntime) {
 TEST(ComptimeGenericStructWithValueParamRuntime) {
 	const char* source = R"(
 		comptime StaticArray = struct[T, N : i32] {
-			values : T[N];
+			values : [N]T;
 		}
 
 		fn main() : i32 {

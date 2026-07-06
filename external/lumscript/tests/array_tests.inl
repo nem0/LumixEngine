@@ -4,9 +4,9 @@ TEST(ArrayOfEnums) {
 			Idle,
 			Running
 		}
-        
+
 		fn main() : i32 {
-            var b : State[4] = undefined;
+            var b : [4]State = undefined;
 			var c = State.Running;
 			b[0] = .Idle;
 			b[1] = State.Running;
@@ -22,7 +22,7 @@ TEST(ArrayOfEnums) {
 TEST(StaticArrayTypecheckAndIndexing) {
 	const char* source = R"(
 		fn main() : i32 {
-			var d : i32[4] = undefined;
+			var d : [4]i32 = undefined;
 			d[0] = 40;
 			d[1] = 2;
 			return d[0] + d[1];
@@ -35,7 +35,7 @@ TEST(StaticArrayTypecheckAndIndexing) {
 TEST(StaticArrayConstantIndexOutOfRangeFails) {
 	const char* source = R"(
 		fn main() : void {
-			var d : i32[4] = undefined;
+			var d : [4]i32 = undefined;
 			d[99] = 1;
 		}
 	)";
@@ -46,7 +46,7 @@ TEST(StaticArrayConstantIndexOutOfRangeFails) {
 TEST(StaticArrayNegativeSizeFails) {
 	const char* source = R"(
 		fn main() : void {
-			var d : i32[-1] = undefined;
+			var d : [-1]i32 = undefined;
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
@@ -56,17 +56,27 @@ TEST(StaticArrayNegativeSizeFails) {
 TEST(StaticArrayZeroSizeFails) {
 	const char* source = R"(
 		fn main() : void {
-			var d : i32[0] = undefined;
+			var d : [0]i32 = undefined;
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
 
-TEST(StaticArrayIndexMustBeInteger) {
+TEST(PostfixArraySyntaxFails) {
 	const char* source = R"(
 		fn main() : void {
 			var d : i32[4] = undefined;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(IndexMustBeInteger) {
+	const char* source = R"(
+		fn main() : void {
+			var d : [4]i32 = undefined;
 			d[1.5] = 1;
 		}
 	)";
@@ -77,8 +87,8 @@ TEST(StaticArrayIndexMustBeInteger) {
 TEST(StaticArrayDifferentSizesDoNotTypecheck) {
 	const char* source = R"(
 		fn main() : void {
-			var a : i32[4] = undefined;
-			var b : i32[8] = undefined;
+			var a : [4]i32 = undefined;
+			var b : [8]i32 = undefined;
 			a = b;
 		}
 	)";
@@ -100,7 +110,7 @@ TEST(IndexingRequiresArrayTypeFails) {
 TEST(IndexingWithMultipleArgumentsFails) {
 	const char* source = R"(
 		fn main() : void {
-			var values : i32[4] = undefined;
+			var values : [4]i32 = undefined;
 			const x = values[0, 1];
 		}
 	)";
@@ -118,7 +128,7 @@ TEST(MethodCallOnArrayElement) {
 		fn foo(v : Vec2) : void {}
 
 		fn main(v : i32) : f32 {
-			var a : Vec2[4] = undefined;
+			var a : [4]Vec2 = undefined;
 			a[0] = Vec2 { 0, 0 };
 			a[0].foo();
 			return a[0].x;
@@ -131,7 +141,7 @@ TEST(MethodCallOnArrayElement) {
 TEST(BytecodeStaticSizedArrayLocal) {
 	const char* source = R"(
 		fn main() : i32 {
-			var values : i32[3] = undefined;
+			var values : [3]i32 = undefined;
 			return 42;
 		}
 	)";
@@ -149,7 +159,7 @@ TEST(BytecodeStaticSizedArrayLocal) {
 TEST(BytecodeStaticSizedArrayIndexing) {
 	const char* source = R"(
 		fn main() : i32 {
-			var values : i32[3] = undefined;
+			var values : [3]i32 = undefined;
 			values[0] = 20;
 			values[1] = 22;
 			return values[0] + values[1];
@@ -176,7 +186,7 @@ TEST(BytecodeCompoundAssignArrayIndexEvaluatedOnce) {
 		}
 
 		fn main() : i32 {
-			var values : i32[3] = undefined;
+			var values : [3]i32 = undefined;
 			values[1] = 41;
 			values[idx()] += 1;
 			return hits * 100 + values[1];
@@ -195,7 +205,7 @@ TEST(BytecodeCompoundAssignArrayIndexEvaluatedOnce) {
 
 TEST(BytecodeUndefinedArrayArgumentUsesFullByteSize) {
 	const char* source = R"(
-		fn consume(values : i32[3]) : void {}
+		fn consume(values : [3]i32) : void {}
 
 		fn main() : i32 {
 			var poison : i32 = 123;
@@ -229,7 +239,7 @@ TEST(BytecodeRefParameterArrayCall) {
 		}
 
 		fn main() : i32 {
-			var values : i32[3] = undefined;
+			var values : [3]i32 = undefined;
 			values[0] = 20;
 			values[1] = 20;
 			bump(ref values[1]);
@@ -258,7 +268,7 @@ TEST(BytecodeRefParameterArrayCall) {
 TEST(NullableIndexingRequiresNullCheckFails) {
 	const char* source = R"(
 		fn main() : void {
-			var values : ?i32[4] = undefined;
+			var values : ?[4]i32 = undefined;
 			const x = values[0];
 		}
 	)";
@@ -274,7 +284,7 @@ TEST(StructStaticArrayTypechecks) {
 		}
 
 		fn main() : void {
-			var pairs : Pair[3] = undefined;
+			var pairs : [3]Pair = undefined;
 			pairs[0] = Pair { 1, 2 };
 		}
 	)";
@@ -285,7 +295,7 @@ TEST(StructStaticArrayTypechecks) {
 TEST(MultiDimensionalStaticArrayDeclaration) {
 	const char* source = R"(
 		fn main() : void {
-			var matrix : i32[2][3] = undefined;
+			var matrix : [2][3]i32 = undefined;
 		}
 	)";
 	EXPECT_COMPILE(source);
@@ -295,7 +305,7 @@ TEST(MultiDimensionalStaticArrayDeclaration) {
 TEST(MultiDimensionalStaticArrayIndexing) {
 	const char* source = R"(
 		fn main() : i32 {
-			var matrix : i32[2][3] = undefined;
+			var matrix : [2][3]i32 = undefined;
 			matrix[0][0] = 10;
 			matrix[0][1] = 20;
 			matrix[1][2] = 30;
@@ -309,7 +319,7 @@ TEST(MultiDimensionalStaticArrayIndexing) {
 TEST(BytecodeMultiDimensionalStaticArrayIndexing) {
 	const char* source = R"(
 		fn main() : i32 {
-			var matrix : i32[2][3] = undefined;
+			var matrix : [2][3]i32 = undefined;
 			matrix[0][0] = 10;
 			matrix[0][1] = 20;
 			matrix[1][2] = 30;
@@ -338,7 +348,7 @@ TEST(BytecodeMultiDimensionalStaticArrayIndexing) {
 TEST(ThreeDimensionalStaticArray) {
 	const char* source = R"(
 		fn main() : i32 {
-			var cube : i32[2][2][2] = undefined;
+			var cube : [2][2][2]i32 = undefined;
 			cube[0][0][0] = 1;
 			cube[1][1][1] = 8;
 			return cube[0][0][0] + cube[1][1][1];
@@ -351,7 +361,7 @@ TEST(ThreeDimensionalStaticArray) {
 TEST(MultiDimensionalArrayOutOfBoundsInnerDimensionFails) {
 	const char* source = R"(
 		fn main() : void {
-			var matrix : i32[2][3] = undefined;
+			var matrix : [2][3]i32 = undefined;
 			matrix[0][5] = 1;
 		}
 	)";
@@ -362,10 +372,87 @@ TEST(MultiDimensionalArrayOutOfBoundsInnerDimensionFails) {
 TEST(MultiDimensionalArrayOutOfBoundsOuterDimensionFails) {
 	const char* source = R"(
 		fn main() : void {
-			var matrix : i32[2][3] = undefined;
+			var matrix : [2][3]i32 = undefined;
 			matrix[3][0] = 1;
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ArrayOfNullableInt) {
+	const char* source = R"(
+		fn main() : void {
+			var values : [4]?i32 = undefined;
+			values[0] = 42;
+			values[1] = null;
+			if values[0] != null {
+				const x = values[0];
+			}
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(SliceOfNullableArray) {
+	const char* source = R"(
+		fn main() : void {
+			var arrays : []?[3]i32 = undefined;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(SliceOfNullableArrayOfNullableInt) {
+	const char* source = R"(
+		fn main() : void {
+			var values : []?[3]?i32 = undefined;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(NullableSliceOfArray) {
+	const char* source = R"(
+		fn main() : void {
+			var arrays : ?[][3]i32 = undefined;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ArrayOfSliceOfNullableInt) {
+	const char* source = R"(
+		fn main() : void {
+			var values : [4][]?i32 = undefined;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(MultiDimensionalArrayOfNullableInt) {
+	const char* source = R"(
+		fn main() : void {
+			var matrix : [2][3]?i32 = undefined;
+			matrix[0][1] = 42;
+			matrix[1][2] = null;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ArrayOfNullableArrays) {
+	const char* source = R"(
+		fn main() : void {
+			var arrays : [3]?[2]i32 = undefined;
+		}
+	)";
+	EXPECT_COMPILE(source);
 	return true;
 }

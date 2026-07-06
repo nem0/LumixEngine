@@ -21,8 +21,8 @@ TEST(FunctionCallAssignmentFails) {
 	EXPECT_COMPILE_FAIL(source);
 
 	const char* indexed_source = R"(
-		fn foo() : i32[4] {
-			var d : i32[4] = undefined;
+		fn foo() : [4]i32 {
+			var d : [4]i32 = undefined;
 			return d;
 		}
 

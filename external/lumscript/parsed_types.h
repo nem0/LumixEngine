@@ -35,16 +35,16 @@ struct ParsedType {
 		FUNCTION,
 		// Qualified type name such as `alias.Type`.
 		QUALIFIED,
-		// Suffix array syntax, e.g. `T[]`. Nested arrays are represented by nested
+		// Prefix array syntax, e.g. `[N]T`. Nested arrays are represented by nested
 		// ArrayParsedType nodes rather than by a lossy array-depth counter.
 		ARRAY,
-		// Slice syntax such as `T[]`.
+		// Prefix slice syntax such as `[]T`.
 		SLICE,
 		// Nullable type syntax such as `?T`.
 		NULLABLE,
-		// Compile-time application in type syntax, e.g. `Array[i32]` or
+		// Template instantiation in type syntax, e.g. `Array[i32]` or
 		// `StaticArray[f32, 16]`.
-		BRACKET_TYPE
+		TEMPLATE_INSTANTIATION
 	};
 
 	explicit ParsedType(Kind kind) : kind(kind) {}
@@ -87,9 +87,10 @@ struct NullableParsedType : ParsedType {
 	ParsedType* inner = nullptr;
 };
 
-struct BracketTypeParsedType : ParsedType {
-	BracketTypeParsedType(ls_arena& arena) : ParsedType(BRACKET_TYPE), args(arena) {}
+struct TemplateInstantiationParsedType : ParsedType {
+	TemplateInstantiationParsedType(ls_arena& arena) : ParsedType(TEMPLATE_INSTANTIATION), args(arena) {}
 
-	ParsedType* callee = nullptr;
+	// Always a qualified name; the parser only forms instantiations after one.
+	QualifiedParsedType* callee = nullptr;
 	ExpArray<Expression*> args;
 };

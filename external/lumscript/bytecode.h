@@ -194,20 +194,14 @@ typedef struct ls_function_bc {
 	ls_function_kind kind;
 	bool is_builtin_native;
 
-	// Function values are addressed by table index.
-	u32 index;
-
-	// Parameter/result/local sizes are measured in raw bytes.
-	u32 param_count;
+	// Parameter/result/frame sizes are measured in raw bytes.
 	u32 param_size;
 	u32 return_size;
-	u32 local_size;
 	u32 frame_size;
 
 	ls_type_kind return_kind;
 	u8* code;
 	u32 code_size;
-	u32 code_capacity;
 } ls_function_bc;
 
 typedef struct ls_bytecode {
@@ -219,7 +213,6 @@ typedef struct ls_bytecode {
 	u32 function_capacity;
 
 	u32 global_size;
-	ls_function_bc global_init;
 	bool has_global_init;
 
 	ls_string_view* strings;

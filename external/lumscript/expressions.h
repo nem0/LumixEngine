@@ -47,8 +47,11 @@ struct Expression {
 		CAST,
 		// Field or namespace access such as `a.x` or `.Running`.
 		MEMBER,
-		// Generic bracket postfix used before semantic disambiguation.
+		// Generic bracket postfix used before semantic disambiguation
+		// (indexing vs. template instantiation).
 		BRACKET,
+		// Slice of an array or slice such as `a[b:e]`; either bound may be omitted.
+		SLICE,
 		// Struct literal such as `Vec3 { 1, 2, 3 }`.
 		STRUCT_LITERAL,
 		// `fn (...) ... { ... }` creates a function value. A named function is just a
@@ -181,8 +184,14 @@ struct BracketExpression : Expression {
 
 	Expression* base = nullptr;
 	ExpArray<Expression*> args;
-	bool has_colon = false;
-	Expression* end = nullptr;
+};
+
+struct SliceExpression : Expression {
+	SliceExpression() : Expression(SLICE) {}
+
+	Expression* base = nullptr;
+	Expression* begin = nullptr; // null means 0
+	Expression* end = nullptr; // null means base length
 };
 
 struct StructLiteralExpression : Expression {

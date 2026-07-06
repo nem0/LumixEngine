@@ -101,11 +101,11 @@ TEST(RefArgumentTypeMismatchFails) {
 
 TEST(RefArgumentRejectsArrayToSliceConversion) {
 	const char* source = R"(
-		fn consume(values : ref i32[]) : void {
+		fn consume(values : ref []i32) : void {
 		}
 
 		fn main() : void {
-			var values : i32[4] = undefined;
+			var values : [4]i32 = undefined;
 			consume(ref values);
 		}
 	)";

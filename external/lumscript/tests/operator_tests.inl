@@ -872,3 +872,61 @@ TEST(CompoundAssignmentNonNumericRhsFails) {
 	return true;
 }
 
+TEST(MemberCompoundAssignmentWithOperatorRuntime) {
+	// Issue #1: member compound assignment should use resolved_op_fn for operator overloads.
+	const char* source = R"(
+		struct Vec2 {
+			x : f32;
+			y : f32;
+		}
+
+		operator +(a : Vec2, b : Vec2) : Vec2 {
+			return Vec2 { a.x + b.x, a.y + b.y };
+		}
+
+		struct Container {
+			v : Vec2;
+		}
+
+		fn main() : f32 {
+			var obj = Container { Vec2 { 1.0, 2.0 } };
+			obj.v += Vec2 { 3.0, 4.0 };
+			return obj.v.x;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_FLOAT_EQ(4.0f, ls_to_f32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BracketCompoundAssignmentWithOperatorRuntime) {
+	// Issue #1: bracket compound assignment should use resolved_op_fn for operator overloads.
+	const char* source = R"(
+		struct Meters {
+			value : f32;
+		}
+
+		operator +(a : Meters, b : Meters) : Meters {
+			return Meters { a.value + b.value };
+		}
+
+		fn main() : f32 {
+			var boxes : [3]Meters = undefined;
+			boxes[0] = Meters { 1.0 };
+			boxes[0] += Meters { 10.0 };
+			return boxes[0].value;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_FLOAT_EQ(11.0f, ls_to_f32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+

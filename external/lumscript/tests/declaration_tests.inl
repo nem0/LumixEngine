@@ -37,11 +37,11 @@ TEST(StructLiteralFieldsAllowImplicitConversions) {
 	const char* source = R"(
 		struct Values {
 			optional : ?i32;
-			items : i32[];
+			items : []i32;
 		}
 
 		fn main() : void {
-			var items : i32[2] = undefined;
+			var items : [2]i32 = undefined;
 			const values = Values { 1, items };
 		}
 	)";

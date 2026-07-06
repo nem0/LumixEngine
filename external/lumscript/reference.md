@@ -109,12 +109,19 @@ JIT is intentionally out of scope for the first version.
 	- there are already languages using `[]` and `<>` for templates
 	- `<>` is harder to parse thana `[]`
 
+- static-sized arrays and slices use prefix notation
+	- arrays are `[N]T` and slices are `[]T`, not postfix `T[N]` or `T[]`
+	- avoids grammar ambiguity: `Identifier[...]` in type position could be array type, template instantiation, or comptime variable indexing; prefix `[` resolves this
+	- consistent with prefix nullable `?T`: types read outside-in rather than inside-out
+	- consistent direction with slices: `[]T` reads left-to-right like `?T`, unlike C-style postfix where nesting order is confusing (`T[4][8]`)
+	- runtime operations (indexing `arr[i]`, slicing `arr[start:end]`) remain postfix on values, creating clear distinction: postfix `[` = runtime value operation, prefix `[` = compile-time type constructor
+
 - raw memory api
 	- we want raw memory api so users can implement their own containers, arenas and other features
-	- the primitive currency is the byte slice `byte[]`; `alloc` returns one and `free` takes one back (Zig-style allocator interface)
+	- the primitive currency is the byte slice `[]byte`; `alloc` returns one and `free` takes one back (Zig-style allocator interface)
 	- `byte` is a distinct type from `u8` (untyped storage vs a numeric type); its bit width is implementation-defined, so `sizeof`/`alignof` are measured in `byte` units
 	- `sizeof`/`alignof` produce untyped integer constants rather than a fixed type, so they concretize to context (array size, template argument, or `isize` in a size expression)
-	- `byte[] as T[]` / `T[] as byte[]` reinterpret the same storage without copying so containers can expose a typed view over a raw allocation
+	- `[]byte as []T` / `[]T as []byte` reinterpret the same storage without copying so containers can expose a typed view over a raw allocation
 
 - signed sizes
 	- `isize` (sizes, lengths, indices) is signed, not unsigned
@@ -588,7 +595,7 @@ Template parameters can also have explicit compile-time value types. In other wo
 
 ```cpp
 struct StaticArray[T, N : i32] {
-	values : T[N];
+	values : [N]T;
 }
 
 fn get[T, N : i32](values : StaticArray[T, N], index : i32) : T {
@@ -674,8 +681,8 @@ fn main() : void {
 - call-site argument must be prefixed with `ref`
 - argument must be writable and have stable storage
 - `const` values are not allowed
-- `ref` parameter types cannot be nullable
-- `ref` arguments cannot be nullable
+- `ref` parameter types cannot be nullable -- TODO why?
+- `ref` arguments cannot be nullable -- TODO why?
 
 ```cpp
 struct Stats {
@@ -722,7 +729,7 @@ Built-in and user types:
 
 See [Design decisions](#design-decisions) for why sizes are signed.
 
-`byte` is the smallest addressable unit of raw memory. It is distinct from `u8`: `u8` is a numeric type with a fixed width, while `byte` represents untyped storage. `sizeof` and `alignof` are measured in bytes. The raw-memory allocator works in terms of `byte[]` (a byte slice), and `byte[]` can be reinterpreted as a typed slice (see [Casts](#casts)).
+`byte` is the smallest addressable unit of raw memory. It is distinct from `u8`: `u8` is a numeric type with a fixed width, while `byte` represents untyped storage. `sizeof` and `alignof` are measured in bytes. The raw-memory allocator works in terms of `[]byte` (a byte slice), and `[]byte` can be reinterpreted as a typed slice (see [Casts](#casts)).
 
 `Vec3`, `DVec3`, and `Quat` are core value types used heavily by engine APIs:
 
@@ -834,16 +841,16 @@ Function values can be stored, passed, returned, and called.
 
 ### Static-sized arrays
 
-Declaration syntax for fixed-size arrays uses postfix size:
+Declaration syntax for fixed-size arrays uses prefix size:
 
 ```cpp
-var d : i32[16] = undefined;
+var d : [16]i32 = undefined;
 ```
 
 Usage syntax:
 
 ```cpp
-var d : i32[16] = undefined;
+var d : [16]i32 = undefined;
 d[0] = 42;
 const first : i32 = d[0];
 ```
@@ -854,17 +861,18 @@ Type rules:
 - element type is fixed for all entries
 - assignment requires exact same element type and size
 - index expression must have an integer type
+- postfix `[` in type position (after a type constructor like size and element) means indexing or slicing on runtime values; array types always use prefix `[N]T` notation
 
 ### Slices
 
 Slices are lightweight views over contiguous storage. A slice does not own its elements; it stores a pointer to the first element plus a length.
 
 ```cpp
-var arr : i32[4] = foo();
-var slice : i32[] = arr[1:2];
+var arr : [4]i32 = foo();
+var slice : []i32 = arr[1:2];
 ```
 
-Slice syntax uses `T[]`, where `T` is the element type.
+Slice syntax uses `[]T`, where `T` is the element type.
 
 Slice creation forms:
 
@@ -879,16 +887,16 @@ Slice creation forms:
 - an array can be passed to a parameter of slice type implicitly
 
 ```cpp
-var x : i32[] = arr[1:2];
-var y : i32[] = arr[1:];
-var z : i32[] = arr[:7];
-var z2 : i32[] = z[2:4];
-var w : i32[] = arr[:];
-var sub : i32[] = slice[1:3];
+var x : []i32 = arr[1:2];
+var y : []i32 = arr[1:];
+var z : []i32 = arr[:7];
+var z2 : []i32 = z[2:4];
+var w : []i32 = arr[:];
+var sub : []i32 = slice[1:3];
 var q = arr[3:4];
 
-fn foo(slice : i32[]) : void {}
-var arr : i32[16] = bar();
+fn foo(slice : []i32) : void {}
+var arr : [16]i32 = bar();
 foo(arr); // automatic conversion
 ```
 
@@ -903,7 +911,7 @@ Slice operations:
 - a slice remains valid only while the backing storage remains alive and stable
 
 ```cpp
-fn sum(values : i32[]) : i32 {
+fn sum(values : []i32) : i32 {
 	var total : i32 = 0;
 	var i : i32 = 0;
 	while i < length(values) {
@@ -922,8 +930,8 @@ Raw memory is allocated and released through the builtin `std:mem` module. Like 
 import "std:mem" as mem
 
 fn main() : void {
-	var raw : byte[] = mem.alloc(4 * sizeof(i32), alignof(i32));
-	var ints : i32[] = raw as i32[];
+	var raw : []byte = mem.alloc(4 * sizeof(i32), alignof(i32));
+	var ints : []i32 = raw as []i32;
 	ints[0] = 42;
 	mem.free(raw);
 }
@@ -932,15 +940,15 @@ fn main() : void {
 The module exposes two functions:
 
 ```cpp
-fn alloc(size : isize, align : isize) : byte[]
-fn free(memory : byte[]) : void
+fn alloc(size : isize, align : isize) : []byte
+fn free(memory : []byte) : void
 ```
 
-- `alloc(size, align)` returns a `byte[]` of `size` `byte` units (see [`sizeof`](#sizeof-and-alignof)). The contents are zero-initialized. `size` and `align` are `isize`; a non-positive `size` yields an empty slice.
+- `alloc(size, align)` returns a `[]byte` of `size` `byte` units (see [`sizeof`](#sizeof-and-alignof)). The contents are zero-initialized. `size` and `align` are `isize`; a non-positive `size` yields an empty slice.
 - `align` is accepted for source compatibility but currently has no effect on allocation placement.
 - `free(memory)` releases an allocation. Pass the exact slice `alloc` returned (same base and length).
-- accessing a slice over freed memory traps at runtime (use-after-free detection): `free` marks the allocation's units dead, and any later `byte[]`/reinterpreted-slice read or write over them aborts execution.
-- the returned `byte[]` can be reinterpreted as a typed slice with `as` (see [Casts](#casts)); the length rescales by the element's `sizeof`.
+- accessing a slice over freed memory traps at runtime (use-after-free detection): `free` marks the allocation's units dead, and any later `[]byte`/reinterpreted-slice read or write over them aborts execution.
+- the returned `[]byte` can be reinterpreted as a typed slice with `as` (see [Casts](#casts)); the length rescales by the element's `sizeof`.
 
 ## Variables
 
@@ -1275,18 +1283,18 @@ Slice reinterpret casts convert between a byte slice and a typed slice:
 import "std:mem" as mem
 
 fn main() : void {
-	var raw : byte[] = mem.alloc(4 * sizeof(i32), alignof(i32));
-	var ints : i32[] = raw as i32[]; // view the same storage as i32
+	var raw : []byte = mem.alloc(4 * sizeof(i32), alignof(i32));
+	var ints : []i32 = raw as []i32; // view the same storage as i32
 	ints[0] = 42;
-	var back : byte[] = ints as byte[]; // view it as raw bytes again
+	var back : []byte = ints as []byte; // view it as raw bytes again
 }
 ```
 
-- `byte[] as T[]` reinterprets a byte slice as a slice of `T` over the same storage; no copy occurs
-- `T[] as byte[]` reinterprets any typed slice as a byte slice over the same storage; no copy occurs
-- the resulting length is recomputed for the destination element size: a `byte[]` of `n` bytes becomes a `T[]` of `n / sizeof(T)` elements, and a `T[]` of `m` elements becomes a `byte[]` of `m * sizeof(T)` bytes
-- `byte[] as T[]` requires the byte length to be a multiple of `sizeof(T)` and the storage to be suitably aligned for `T`; violations are runtime errors
-- only `byte[]` participates as the untyped side; reinterpreting between two unrelated typed slices (`f32[] as i32[]`) is not supported and is a compile-time error
+- `[]byte as []T` reinterprets a byte slice as a slice of `T` over the same storage; no copy occurs
+- `[]T as []byte` reinterprets any typed slice as a byte slice over the same storage; no copy occurs
+- the resulting length is recomputed for the destination element size: a `[]byte` of `n` bytes becomes a `[]T` of `n / sizeof(T)` elements, and a `[]T` of `m` elements becomes a `[]byte` of `m * sizeof(T)` bytes
+- `[]byte as []T` requires the byte length to be a multiple of `sizeof(T)` and the storage to be suitably aligned for `T`; violations are runtime errors
+- only `[]byte` participates as the untyped side; reinterpreting between two unrelated typed slices (`[]f32 as []i32`) is not supported and is a compile-time error
 
 No implicit casts occur in assignments, arguments, returns, struct fields, or binary arithmetic.
 
@@ -1560,7 +1568,7 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 - `StringIsReservedKeyword`
 - `match` needs tighter rules for what counts as a valid pattern expression, how string subjects behave, and the exact duplicate/exhaustiveness policy for non-enum subjects.
 - `for` ranges should define whether bounds must match exactly, what type the loop variable has, and what happens for descending or overflowing ranges.
-- Static-sized arrays are missing rules for literal syntax, copy semantics, nesting, passing/returning by value, and comparison behavior.
+- Static-sized arrays are missing rules for literal syntax, copy semantics, passing/returning by value, and comparison behavior. Nesting now reads left-to-right: `[4][8]i32` is an array of 4 arrays of 8 ints; `[][4]i32` is a slice of arrays of 4 ints.
 - Nullable promotion is only described for `if value != null`; the spec should say how `== null`, `else if`, compound conditions, and scope boundaries behave.
 - `defer` should define behavior on `break`, `continue`, runtime errors, and nested scopes, not only normal exit and `return`.
 - Boolean operator coverage is incomplete because `not` appears in examples but is not specified alongside `and` and `or`.

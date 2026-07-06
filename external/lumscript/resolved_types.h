@@ -35,7 +35,6 @@ struct ResolvedType {
 		ARRAY,
 		SLICE,
 		NULLABLE,
-		BRACKET_TYPE,
 	};
 
 	explicit ResolvedType(Kind kind) : kind(kind) {}
@@ -122,13 +121,6 @@ struct NullableResolvedType : ResolvedType {
 	NullableResolvedType() : ResolvedType(NULLABLE) {}
 
 	ResolvedType* inner = nullptr;
-};
-
-struct BracketTypeResolvedType : ResolvedType {
-	BracketTypeResolvedType(ls_arena& arena) : ResolvedType(BRACKET_TYPE), args(arena) {}
-
-	ResolvedType* callee = nullptr;
-	ExpArray<ResolvedType*> args;
 };
 
 struct TemplateFunctionInstance {

@@ -117,7 +117,7 @@ TEST(ComptimePrimitiveValueCanBeStaticArraySize) {
 		comptime N = 4;
 
 		fn main() : void {
-			var values : i32[N] = undefined;
+			var values : [N]i32 = undefined;
 		}
 	)";
 	EXPECT_COMPILE(source);
