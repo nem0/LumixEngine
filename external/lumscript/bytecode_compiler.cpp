@@ -185,14 +185,6 @@ static T* appendArenaArray(ls_arena& arena, T*& data, u32& count, u32& capacity)
 	return &data[count++];
 }
 
-struct BytecodeLocalBinding {
-	ls_string_view name = {};
-	ResolvedType* type = nullptr;
-	ls_type_kind kind = LS_TYPE_INVALID;
-	u32 offset = 0;
-	u32 byte_size = 1;
-};
-
 struct LoopBinding {
 	ls_string_view label = {};
 	u32 defer_mark = 0;
@@ -207,12 +199,6 @@ struct FunctionInfo {
 	Unit* unit = nullptr;
 };
 
-struct GlobalBinding {
-	Symbol* sym = nullptr;
-	u32 offset = 0;
-	u32 byte_size = 0;
-};
-
 struct FunctionCompiler;
 static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind return_kind, ls_string_view current_label);
 static void emitDeferredStatements(FunctionCompiler& ctx, u32 defer_mark, ls_type_kind return_kind, ls_string_view current_label);
@@ -220,31 +206,24 @@ static void compileExpressionAsType(FunctionCompiler& ctx, Expression& expr, Res
 static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, ls_type_kind hint);
 static bool tryEmitReference(FunctionCompiler& ctx, Expression& expr);
 static void emitCallDirect(FunctionCompiler& ctx, u32 callee_index, u32 arg_size, u32 return_size);
-static const GlobalBinding* findGlobalBinding(const ExpArray<GlobalBinding>& globals, Symbol& sym);
+static ls_type_kind compileMember(FunctionCompiler& ctx, MemberExpression& expr);
 
 struct FunctionCompiler {
 	explicit FunctionCompiler(ls_bytecode* bytecode, ls_function_bc& out)
 		: bytecode(bytecode)
 		, out(out)
 		, code(*bytecode->arena)
-		, locals(*bytecode->arena)
-		, scope_marks(*bytecode->arena)
 		, deferreds(*bytecode->arena)
 		, defer_marks(*bytecode->arena)
-		, loops(*bytecode->arena)
-		, ref_local_offsets(*bytecode->arena) {}
+		, loops(*bytecode->arena) {}
 
 	ls_bytecode* bytecode = nullptr;
 	ResolvedType* return_type = nullptr;
 	ls_function_bc& out;
 	ByteArray code;
-	ExpArray<BytecodeLocalBinding> locals;
-	ExpArray<u32> scope_marks;
 	ExpArray<Statement*> deferreds;
 	ExpArray<u32> defer_marks;
-	ExpArray<GlobalBinding>* globals = nullptr;
 	ExpArray<LoopBinding> loops;
-	ExpArray<u32> ref_local_offsets;
 	// Locals and temporaries share one absolute frame offset space. `next_local_offset`
 	// is the floor below which temporaries must not be rewound, while `temp_top`
 	// is the next free byte for expression temporaries.
@@ -252,60 +231,47 @@ struct FunctionCompiler {
 	u32 frame_high_water = 0;
 	u32 next_local_offset = 0;
 
-	bool isRefLocal(const BytecodeLocalBinding& local) const {
-		for (u32 offset : ref_local_offsets) {
-			if (offset == local.offset) return true;
-		}
-		return false;
-	}
-
-	BytecodeLocalBinding* findLocal(ls_string_view name) {
-		for (i32 i = (i32)locals.size() - 1; i >= 0; --i) {
-			BytecodeLocalBinding& binding = locals[(u32)i];
-			if (equalStrings(binding.name, name)) return &binding;
-		}
-		return nullptr;
-	}
-
-	u32 addLocal(ls_string_view name, ResolvedType* type, ls_type_kind kind, bool preserve_temp_top = false) {
-		BytecodeLocalBinding& binding = locals.emplace_back();
-		binding.name = name;
-		binding.type = type;
-		binding.kind = kind;
-		binding.byte_size = type ? typeByteSize(*type) : typeKindByteSize(kind);
-		if (binding.byte_size == 0u) binding.byte_size = 1u;
+	// Allocates frame space. Named locals pass their declaration's slot so that
+	// identifier expressions can read the location back without a lookup;
+	// temporaries pass no slot.
+	u32 addLocal(ResolvedType* type, ls_type_kind kind, bool preserve_temp_top = false, StorageSlot* slot = nullptr) {
+		u32 byte_size = type ? typeByteSize(*type) : typeKindByteSize(kind);
+		if (byte_size == 0u) byte_size = 1u;
 		const bool has_live_temps = temp_top > next_local_offset;
-		binding.offset = has_live_temps ? temp_top : next_local_offset;
-		next_local_offset = binding.offset + binding.byte_size;
+		const u32 offset = has_live_temps ? temp_top : next_local_offset;
+		next_local_offset = offset + byte_size;
 		if (!preserve_temp_top) temp_top = next_local_offset;
-		const u32 local_end = binding.offset + binding.byte_size;
+		const u32 local_end = offset + byte_size;
 		if (local_end > frame_high_water) frame_high_water = local_end;
-		return binding.offset;
+		if (slot) {
+			slot->offset = offset;
+			slot->byte_size = byte_size;
+			slot->kind = kind;
+			slot->type = type;
+			slot->storage = StorageSlot::LOCAL;
+		}
+		return offset;
 	}
 
 	void pushScope() {
-		scope_marks.push((u32)locals.size());
 		defer_marks.push((u32)deferreds.size());
 	}
 
 	void popScope(ls_type_kind return_kind, ls_string_view current_label) {
-		if (scope_marks.empty()) return;
-		const u32 mark = scope_marks.back();
+		if (defer_marks.empty()) return;
 		const u32 defer_mark = defer_marks.back();
 		emitDeferredStatements(*this, defer_mark, return_kind, current_label);
 		while (deferreds.size() > defer_mark) deferreds.pop_back();
 		defer_marks.pop_back();
-		scope_marks.pop_back();
-		while (locals.size() > mark) locals.pop_back();
 	}
 
 	LoopBinding* findLoop(ls_string_view label) {
-		if (loops.empty()) return nullptr;
 		if (label.begin == label.end) return &loops.back();
 		for (i32 i = (i32)loops.size() - 1; i >= 0; --i) {
 			LoopBinding& loop = loops[(u32)i];
 			if (equalStrings(loop.label, label)) return &loop;
 		}
+		ASSERT(false);
 		return nullptr;
 	}
 };
@@ -316,13 +282,25 @@ static ls_type_kind valueKindForType(ResolvedType& type) {
 	return toTypeKind(type);
 }
 
-static u32 enumMemberIndex(EnumResolvedType& en, ls_string_view name) {
+static u64 enumMemberValue(EnumResolvedType& en, ls_string_view name) {
+	u64 implicit_value = 0;
 	for (u32 i = 0; i < en.decl->members.size(); ++i) {
-		if (!equalStrings(en.decl->members[i].name, name)) continue;
-		return i;
+		if (equalStrings(en.decl->members[i].name, name)) {
+			if (en.decl->members[i].value) {
+				ASSERT(en.decl->members[i].value->kind == Expression::INT_LITERAL);
+				return static_cast<IntLiteralExpression*>(en.decl->members[i].value)->value;
+			}
+			return implicit_value;
+		}
+		if (en.decl->members[i].value) {
+			ASSERT(en.decl->members[i].value->kind == Expression::INT_LITERAL);
+			implicit_value = static_cast<IntLiteralExpression*>(en.decl->members[i].value)->value + 1;
+		} else {
+			implicit_value = implicit_value + 1;
+		}
 	}
 	ASSERT(false);
-	return 0xffFFffFF;
+	return 0xffFFffFFffFFffFFull;
 }
 
 static u32 structFieldByteOffset(StructResolvedType& st, ls_string_view name, ResolvedType*& out_type) {
@@ -343,9 +321,8 @@ static u32 structFieldByteOffset(StructResolvedType& st, ls_string_view name, Re
 static void compileCallArgs(FunctionCompiler& ctx, CallExpression& expr, const FunctionResolvedType& fn_type, u32 arg_offset) {
 	for (u32 i = 0; i < expr.args.size(); ++i) {
 		const u32 param_index = arg_offset + i;
-		ResolvedType* param_type = param_index < fn_type.param_types.size()
-			? fn_type.param_types[param_index]
-			: nullptr;
+		ResolvedType* param_type = fn_type.param_types[param_index];
+		// TODO how can fn_type.decl be null?
 		const bool is_ref = fn_type.decl
 			&& param_index < fn_type.decl->runtime_params.size()
 			&& fn_type.decl->runtime_params[param_index].is_ref;
@@ -375,16 +352,16 @@ static u32 callArgWindowSize(const FunctionResolvedType& fn_type) {
 }
 
 static ls_type_kind emitDirectCall(FunctionCompiler& ctx, CallExpression& expr, FunctionExpression& fn, Expression* receiver, u32 arg_offset, ls_type_kind hint) {
-	FunctionResolvedType* fn_type = static_cast<FunctionResolvedType*>(fn.resolved_type);
+	FunctionResolvedType& fn_type = *static_cast<FunctionResolvedType*>(fn.resolved_type);
 	if (receiver) {
-		const ls_type_kind receiver_kind = fn_type && !fn_type->param_types.empty()
-			? valueKindForType(*fn_type->param_types[0])
+		const ls_type_kind receiver_kind = !fn_type.param_types.empty()
+			? valueKindForType(*fn_type.param_types[0])
 			: LS_TYPE_INVALID;
 		compileExpression(ctx, *receiver, receiver_kind);
 	}
-	compileCallArgs(ctx, expr, *fn_type, arg_offset);
-	emitCallDirect(ctx, fn.bytecode_index, callArgWindowSize(*fn_type), typeByteSize(*fn_type->return_type));
-	return valueKindForType(*fn_type->return_type);
+	compileCallArgs(ctx, expr, fn_type, arg_offset);
+	emitCallDirect(ctx, fn.bytecode_index, callArgWindowSize(fn_type), typeByteSize(*fn_type.return_type));
+	return valueKindForType(*fn_type.return_type);
 }
 
 static void appendStringLiteral(ls_bytecode& bytecode, const ls_string_view& value, u32& out_index) {
@@ -647,6 +624,45 @@ static void emitRefAt(FunctionCompiler& ctx, u32 scale, i32 offset) {
 	setTempTop(ctx, base + typeKindByteSize(LS_TYPE_CPTR));
 }
 
+// Load from storage slot (LOCAL, LOCAL_REF, or GLOBAL) onto temp stack.
+static void emitLoadSlot(FunctionCompiler& ctx, const StorageSlot& slot) {
+	switch (slot.storage) {
+		case StorageSlot::LOCAL_REF: {
+			const u32 ref_size = typeKindByteSize(LS_TYPE_CPTR);
+			emitLoadLocalBytes(ctx, slot.offset, ref_size);
+			emitConst8(ctx, 0u);
+			emitLoadAt(ctx, 1u, 0, slot.byte_size);
+			break;
+		}
+		case StorageSlot::LOCAL: emitLoadLocalBytes(ctx, slot.offset, slot.byte_size); break;
+		case StorageSlot::GLOBAL: emitLoadGlobalBytes(ctx, slot.offset, slot.byte_size); break;
+	}
+}
+
+// Store from temp stack to storage slot (LOCAL, LOCAL_REF, or GLOBAL).
+static void emitStoreSlot(FunctionCompiler& ctx, const StorageSlot& slot) {
+	switch (slot.storage) {
+		case StorageSlot::LOCAL_REF: {
+			const u32 ref_size = typeKindByteSize(LS_TYPE_CPTR);
+			emitLoadLocalBytes(ctx, slot.offset, ref_size);
+			emitConst8(ctx, 0u);
+			emitStoreAt(ctx, 1u, 0, slot.byte_size);
+			break;
+		}
+		case StorageSlot::LOCAL: emitStoreLocalBytes(ctx, slot.offset, slot.byte_size); break;
+		case StorageSlot::GLOBAL: emitStoreGlobalBytes(ctx, slot.offset, slot.byte_size); break;
+	}
+}
+
+// Emit a reference to storage slot (LOCAL, LOCAL_REF, or GLOBAL).
+static void emitSlotRef(FunctionCompiler& ctx, const StorageSlot& slot) {
+	switch (slot.storage) {
+		case StorageSlot::LOCAL_REF: emitLoadLocalBytes(ctx, slot.offset, typeKindByteSize(LS_TYPE_CPTR)); break;
+		case StorageSlot::LOCAL: emitLocalRef(ctx, slot.offset); break;
+		case StorageSlot::GLOBAL: emitGlobalRef(ctx, slot.offset); break;
+	}
+}
+
 static void emitSliceLoad(FunctionCompiler& ctx, u32 element_size) {
 	const u32 index = ctx.temp_top - typeKindByteSize(LS_TYPE_I64);
 	const u32 slice = index - typeKindByteSize(LS_TYPE_SLICE);
@@ -744,31 +760,18 @@ static bool tryEmitReference(FunctionCompiler& ctx, Expression& expr) {
 	switch (expr.kind) {
 		case Expression::IDENTIFIER: {
 			IdentifierExpression* id = static_cast<IdentifierExpression*>(&expr);
-			if (BytecodeLocalBinding* local = ctx.findLocal(id->name)) {
-				if (ctx.isRefLocal(*local)) {
-					emitLoadLocalBytes(ctx, local->offset, typeKindByteSize(LS_TYPE_CPTR));
-				}
-				else {
-					emitLocalRef(ctx, local->offset);
-				}
-				return true;
-			}
-
-			if (const GlobalBinding* global = findGlobalBinding(*ctx.globals, *id->symbol)) {
-				emitGlobalRef(ctx, global->offset);
-				return true;
-			}
-			return false;
+			StorageSlot* slot = id->slot;
+			emitSlotRef(ctx, *slot);
+			return true;
 		}
 		case Expression::MEMBER: {
 			MemberExpression* member = static_cast<MemberExpression*>(&expr);
-			if (member->expression && member->expression->kind == Expression::IDENTIFIER && member->resolved_symbol) {
-				if (const GlobalBinding* global = findGlobalBinding(*ctx.globals, *member->resolved_symbol)) {
-					emitGlobalRef(ctx, global->offset);
+			if (member->expression->kind == Expression::IDENTIFIER && member->resolved_symbol) {
+				if (member->resolved_symbol->slot.storage == StorageSlot::GLOBAL) {
+					emitGlobalRef(ctx, member->resolved_symbol->slot.offset);
 					return true;
 				}
 			}
-			if (!member->expression || !member->expression->resolved_type) return false;
 			if (member->expression->resolved_type->kind != ResolvedType::STRUCT) return false;
 			StructResolvedType* st = static_cast<StructResolvedType*>(member->expression->resolved_type);
 			ResolvedType* field_type = nullptr;
@@ -791,10 +794,33 @@ static bool tryEmitReference(FunctionCompiler& ctx, Expression& expr) {
 	}
 }
 
+// Some expressions are not directly addressable, but later code still needs a
+// stable pointer to their value (for slices, indexing, compound stores, etc.).
+// Example: `foo().items[0]` needs a pointer even though `foo()` is a temporary
+// value. If the expression can already be referenced, use that; otherwise
+// materialize it into a temporary and reference the temporary instead.
+static bool emitAddressableReference(FunctionCompiler& ctx, Expression& expr, u32 reserved_prefix_bytes = 0) {
+	if (tryEmitReference(ctx, expr)) return true;
+	compileExpression(ctx, expr, LS_TYPE_INVALID);
+	const u32 byte_size = typeByteSize(*expr.resolved_type);
+	const u32 value_offset = ctx.temp_top - byte_size;
+	if (reserved_prefix_bytes > 0u) {
+		ctx.temp_top = value_offset + reserved_prefix_bytes;
+	}
+	const u32 temp = ctx.addLocal(expr.resolved_type, valueKindForType(*expr.resolved_type), true);
+	emitOp(ctx.code, LS_OP_COPY);
+	emitFixedReg(ctx, temp);
+	emitFixedReg(ctx, value_offset);
+	emitU32(ctx.code, byte_size);
+	ctx.temp_top = value_offset;
+	emitLocalRef(ctx, temp);
+	return true;
+}
+
 static bool tryEmitReferenceLoad(FunctionCompiler& ctx, Expression& expr, u32 byte_size) {
 	ASSERT(byte_size > 0);
 	const u32 result_offset = ctx.temp_top;
-	const u32 ref_offset = ctx.addLocal({}, nullptr, LS_TYPE_I64, true);
+	const u32 ref_offset = ctx.addLocal(nullptr, LS_TYPE_I64, true);
 	ctx.temp_top = ctx.next_local_offset;
 	if (!tryEmitReference(ctx, expr)) return false;
 	emitStoreLocalBytes(ctx, ref_offset, typeKindByteSize(LS_TYPE_CPTR));
@@ -836,7 +862,10 @@ static void compileExpressionAsType(FunctionCompiler& ctx, Expression& expr, Res
 		}
 		if (expr.resolved_type && expr.resolved_type->kind == ResolvedType::ARRAY) {
 			ArrayResolvedType* array = static_cast<ArrayResolvedType*>(expr.resolved_type);
-			tryEmitReference(ctx, expr);
+			if (!tryEmitReference(ctx, expr)) {
+				compileExpression(ctx, expr, LS_TYPE_INVALID);
+				emitLocalRef(ctx, ctx.temp_top - typeByteSize(*expr.resolved_type));
+			}
 			emitConst8(ctx, (u64)array->size);
 			return;
 		}
@@ -902,17 +931,18 @@ static void emitBracketStore(FunctionCompiler& ctx, BracketExpression& br, Expre
 	if (op == Token::EQUAL) {
 		if (is_slice) {
 			compileExpression(ctx, *br.base, LS_TYPE_SLICE);
-		}
-		else {
-			tryEmitReference(ctx, *br.base);
-		}
-		compileIndexExpression(ctx, *br.args[0]);
-		if (!is_slice) emitStaticBoundsCheck(ctx, *br.base->resolved_type);
-		compileExpressionAsType(ctx, rhs, *br.resolved_type);
-		if (is_slice) {
+			compileIndexExpression(ctx, *br.args[0]);
+			compileExpressionAsType(ctx, rhs, *br.resolved_type);
 			emitSliceStore(ctx, element_size);
 		}
 		else {
+			if (!tryEmitReference(ctx, *br.base)) {
+				compileExpression(ctx, *br.base, LS_TYPE_INVALID);
+				emitLocalRef(ctx, ctx.temp_top - typeByteSize(*br.base->resolved_type));
+			}
+			compileIndexExpression(ctx, *br.args[0]);
+			emitStaticBoundsCheck(ctx, *br.base->resolved_type);
+			compileExpressionAsType(ctx, rhs, *br.resolved_type);
 			emitStoreAt(ctx, element_size, 0, element_size);
 		}
 		return;
@@ -921,9 +951,9 @@ static void emitBracketStore(FunctionCompiler& ctx, BracketExpression& br, Expre
 	if (is_slice) {
 		// Evaluate the base and index once. Compound assignment needs them for both
 		// the checked load and checked store, and either expression may have effects.
-		const u32 slice_offset = ctx.addLocal({}, br.base->resolved_type, LS_TYPE_SLICE);
-		const u32 index_offset = ctx.addLocal({}, nullptr, LS_TYPE_I64);
-		const u32 value_offset = ctx.addLocal({}, br.resolved_type, value_kind);
+		const u32 slice_offset = ctx.addLocal(br.base->resolved_type, LS_TYPE_SLICE);
+		const u32 index_offset = ctx.addLocal(nullptr, LS_TYPE_I64);
+		const u32 value_offset = ctx.addLocal(br.resolved_type, value_kind);
 		const u32 slice_size = typeByteSize(*br.base->resolved_type);
 		const u32 index_size = typeKindByteSize(LS_TYPE_I64);
 		const u32 value_size = typeByteSize(*br.resolved_type);
@@ -943,14 +973,17 @@ static void emitBracketStore(FunctionCompiler& ctx, BracketExpression& br, Expre
 		return;
 	}
 
-	const u32 ref_offset = ctx.addLocal({}, nullptr, LS_TYPE_I64);
-	const u32 index_offset = ctx.addLocal({}, nullptr, LS_TYPE_I64);
-	const u32 value_offset = ctx.addLocal({}, br.resolved_type, value_kind);
 	const u32 ref_size = typeKindByteSize(LS_TYPE_CPTR);
 	const u32 index_size = typeKindByteSize(LS_TYPE_I64);
-
-	tryEmitReference(ctx, *br.base);
+	const u32 ref_offset = ctx.addLocal(nullptr, LS_TYPE_I64, true);
+	if (!tryEmitReference(ctx, *br.base)) {
+		compileExpression(ctx, *br.base, LS_TYPE_INVALID);
+		emitLocalRef(ctx, ctx.temp_top - typeByteSize(*br.base->resolved_type));
+	}
 	emitStoreLocalBytes(ctx, ref_offset, ref_size);
+	const u32 index_offset = ctx.addLocal(nullptr, LS_TYPE_I64);
+	const u32 value_offset = ctx.addLocal(br.resolved_type, value_kind);
+
 	compileIndexExpression(ctx, *br.args[0]);
 	emitStoreLocalBytes(ctx, index_offset, index_size);
 
@@ -975,7 +1008,10 @@ static void emitSlice(FunctionCompiler& ctx, SliceExpression& br) {
 	if (base_type->kind == ResolvedType::ARRAY) {
 		ArrayResolvedType* array = static_cast<ArrayResolvedType*>(base_type);
 		element_type = array->element_type;
-		tryEmitReference(ctx, *br.base);
+		if (!tryEmitReference(ctx, *br.base)) {
+			compileExpression(ctx, *br.base, LS_TYPE_INVALID);
+			emitLocalRef(ctx, ctx.temp_top - typeByteSize(*base_type));
+		}
 		emitConst8(ctx, (u64)array->size);
 	}
 	else if (base_type->kind == ResolvedType::SLICE) {
@@ -985,7 +1021,7 @@ static void emitSlice(FunctionCompiler& ctx, SliceExpression& br) {
 
 	// Save the source pair because an omitted end bound reuses its dynamic length,
 	// while explicit bounds may themselves evaluate arbitrary expressions.
-	const u32 source_offset = ctx.addLocal({}, br.resolved_type, LS_TYPE_SLICE, true);
+	const u32 source_offset = ctx.addLocal(br.resolved_type, LS_TYPE_SLICE, true);
 	const u32 slice_size = typeByteSize(*br.resolved_type);
 	emitStoreLocalBytes(ctx, source_offset, slice_size);
 	emitLoadLocalBytes(ctx, source_offset, slice_size);
@@ -1027,16 +1063,6 @@ static void emitDeferredStatements(FunctionCompiler& ctx, u32 defer_mark, ls_typ
 		compileStatement(ctx, *ctx.deferreds[(u32)i], return_kind, current_label);
 	}
 }
-
-static const GlobalBinding* findGlobalBinding(const ExpArray<GlobalBinding>& globals, Symbol& sym) {
-	for (const GlobalBinding& binding : globals) {
-		if (binding.sym == &sym) return &binding;
-	}
-	return nullptr;
-}
-
-static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, ls_type_kind hint);
-static ls_type_kind compileMember(FunctionCompiler& ctx, MemberExpression& expr);
 
 static ls_type_kind compileBinary(FunctionCompiler& ctx, BinaryExpression& expr, ls_type_kind hint) {
 	if (expr.op == Token::AND || expr.op == Token::OR) {
@@ -1188,16 +1214,16 @@ static ls_type_kind compileMember(FunctionCompiler& ctx, MemberExpression& membe
 		// .enum_member
 		ASSERT(member.resolved_type && member.resolved_type->kind == ResolvedType::ENUM);
 		EnumResolvedType* en = static_cast<EnumResolvedType*>(member.resolved_type);
-		u32 enum_index = enumMemberIndex(*en, member.name);
-		emitIntegerConstant(ctx, LS_TYPE_I32, enum_index);
+		u64 enum_value = enumMemberValue(*en, member.name);
+		emitIntegerConstant(ctx, LS_TYPE_I32, enum_value);
 		return LS_TYPE_I32;
 	}
 	ResolvedType* base_rt = member.expression->resolved_type;
 	EnumResolvedType* enum_via_meta = (base_rt && base_rt->kind == ResolvedType::META && static_cast<MetaType*>(base_rt)->inner->kind == ResolvedType::ENUM)
 		? static_cast<EnumResolvedType*>(static_cast<MetaType*>(base_rt)->inner) : nullptr;
 	if (enum_via_meta) {
-		u32 enum_index = enumMemberIndex(*enum_via_meta, member.name);
-		emitIntegerConstant(ctx, LS_TYPE_I32, enum_index);
+		u64 enum_value = enumMemberValue(*enum_via_meta, member.name);
+		emitIntegerConstant(ctx, LS_TYPE_I32, enum_value);
 		return LS_TYPE_I32;
 	}
 	if (member.expression->kind == Expression::IDENTIFIER) {
@@ -1238,23 +1264,25 @@ static ls_type_kind compileMember(FunctionCompiler& ctx, MemberExpression& membe
 					break;
 			}
 		}
-		if (BytecodeLocalBinding* local = ctx.findLocal(base->name)) {
-			ResolvedType* value_type = local->type;
+		// Direct frame access only applies to locals; global bases go through the
+		// generic reference-based path below.
+		StorageSlot* slot = base->slot;
+		if (slot && slot->storage != StorageSlot::GLOBAL) {
+			ResolvedType* value_type = slot->type;
 			u32 value_offset = 0u;
-			if (value_type && value_type->kind == ResolvedType::NULLABLE
-				&& member.expression->resolved_type
-				&& member.expression->resolved_type->kind == ResolvedType::STRUCT) {
+			if (value_type->kind == ResolvedType::NULLABLE) {
 				value_type = member.expression->resolved_type;
 				value_offset = 1u;
 			}
+			ASSERT(value_type->kind == ResolvedType::STRUCT);
 			StructResolvedType* st = static_cast<StructResolvedType*>(value_type);
 			ResolvedType* field_type = nullptr;
 			u32 offset = structFieldByteOffset(*st, member.name, field_type);
-			if (ctx.isRefLocal(*local)) {
+			if (slot->storage == StorageSlot::LOCAL_REF) {
 				tryEmitReferenceLoad(ctx, member, typeByteSize(*field_type));
 				return valueKindForType(*field_type);
 			}
-			emitLoadLocalBytes(ctx, local->offset + value_offset + offset, typeByteSize(*field_type));
+			emitLoadLocalBytes(ctx, slot->offset + value_offset + offset, typeByteSize(*field_type));
 			return valueKindForType(*field_type);
 		}
 	}
@@ -1265,12 +1293,13 @@ static ls_type_kind compileMember(FunctionCompiler& ctx, MemberExpression& membe
 	u32 offset = structFieldByteOffset(*st, member.name, field_type);
 	// Try reference-based load first (works for addressable lvalues).
 	if (tryEmitReferenceLoad(ctx, member, typeByteSize(*member.resolved_type))) return valueKindForType(*member.resolved_type);
+	
 	// For temporaries (e.g. call results), compile the base onto the stack,
 	// store it in a temp local, then load the desired field offset.
 	const u32 struct_byte_size = typeByteSize(*member.expression->resolved_type);
 	compileExpression(ctx, *member.expression, LS_TYPE_INVALID);
 	const u32 result_offset = ctx.temp_top - struct_byte_size;
-	const u32 temp = ctx.addLocal({}, member.expression->resolved_type, valueKindForType(*member.expression->resolved_type), true);
+	const u32 temp = ctx.addLocal(member.expression->resolved_type, valueKindForType(*member.expression->resolved_type), true);
 	emitStoreLocalBytes(ctx, temp, struct_byte_size, false);
 	ctx.temp_top = ctx.next_local_offset;
 	emitLoadLocalBytes(ctx, temp + offset, typeByteSize(*field_type));
@@ -1340,20 +1369,13 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 		}
 		case Expression::IDENTIFIER: {
 			IdentifierExpression& id = static_cast<IdentifierExpression&>(expr);
-			if (BytecodeLocalBinding* local = ctx.findLocal(id.name)) {
-				if (ctx.isRefLocal(*local)) {
-					tryEmitReferenceLoad(ctx, expr, typeByteSize(*local->type));
-					return valueKindForType(*local->type);
+			if (StorageSlot* slot = id.slot) {
+				if (slot->storage == StorageSlot::LOCAL_REF) {
+					tryEmitReferenceLoad(ctx, expr, typeByteSize(*slot->type));
+					return valueKindForType(*slot->type);
 				}
-				const u32 byte_size = typeByteSize(*local->type);
-				emitLoadLocalBytes(ctx, local->offset, byte_size == 0u ? 1u : byte_size);
-				return local->kind != LS_TYPE_INVALID ? local->kind : LS_TYPE_I32;
-			}
-			if (const GlobalBinding* global = findGlobalBinding(*ctx.globals, *id.symbol)) {
-				emitLoadGlobalBytes(ctx, global->offset, global->byte_size);
-				ResolvedType* sym_type = id.symbol->resolved_type;
-				if (sym_type->kind == ResolvedType::META) sym_type = static_cast<MetaType*>(sym_type)->inner;
-				return valueKindForType(*sym_type);
+				emitLoadSlot(ctx, *slot);
+				return slot->kind != LS_TYPE_INVALID ? slot->kind : LS_TYPE_I32;
 			}
 			// function template instance
 			FunctionExpression* fn = static_cast<FunctionExpression*>(id.symbol->expression);
@@ -1441,7 +1463,10 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 				compileIndexExpression(ctx, *br.args[0]);
 				emitSliceLoad(ctx, element_size);
 			} else {
-				tryEmitReference(ctx, *br.base);
+				if (!tryEmitReference(ctx, *br.base)) {
+					compileExpression(ctx, *br.base, LS_TYPE_INVALID);
+					emitLocalRef(ctx, ctx.temp_top - typeByteSize(*br.base->resolved_type));
+				}
 				compileIndexExpression(ctx, *br.args[0]);
 				emitStaticBoundsCheck(ctx, *br.base->resolved_type);
 				emitLoadAt(ctx, element_size, 0, element_size);
@@ -1511,101 +1536,64 @@ static bool emitLocalLiteralInitializer(FunctionCompiler& ctx, u32 offset, Expre
 static void compileAssign(FunctionCompiler& ctx, AssignStatement& assign) {
 	if (assign.lhs->kind == Expression::IDENTIFIER) {
 		IdentifierExpression* id = static_cast<IdentifierExpression*>(assign.lhs);
-		BytecodeLocalBinding* local = ctx.findLocal(id->name);
-		const GlobalBinding* global = nullptr;
-		if (!local) {
-			global = findGlobalBinding(*ctx.globals, *id->symbol);
-		}
+		StorageSlot* slot = id->slot;
 
-		ResolvedType* value_type = local ? local->type : id->symbol->resolved_type;
+		ResolvedType* value_type = slot ? slot->type : id->symbol->resolved_type;
 		if (value_type && value_type->kind == ResolvedType::META) value_type = static_cast<MetaType*>(value_type)->inner;
-		const ls_type_kind value_kind = local ? local->kind : valueKindForType(*value_type);
+		const ls_type_kind value_kind = slot ? slot->kind : valueKindForType(*value_type);
 
-		if (local && ctx.isRefLocal(*local)) {
+		if (slot && slot->storage == StorageSlot::LOCAL_REF) {
 			const u32 ref_size = typeKindByteSize(LS_TYPE_CPTR);
 			const u32 value_size = typeByteSize(*value_type);
-			switch (assign.op) {
-				case Token::EQUAL:
-					emitLoadLocalBytes(ctx, local->offset, ref_size);
-					emitConst8(ctx, 0u);
-					compileExpression(ctx, *assign.rhs, value_kind);
-					emitStoreAt(ctx, 1u, 0, value_size);
-					return;
-				case Token::PLUS_EQUAL:
-				case Token::MINUS_EQUAL:
-				case Token::STAR_EQUAL:
-				case Token::SLASH_EQUAL:
-					if (assign.resolved_op_fn) {
-						const FunctionResolvedType* fn_type = static_cast<FunctionResolvedType*>(assign.resolved_op_fn->resolved_type);
-						emitLoadLocalBytes(ctx, local->offset, ref_size);
-						emitConst8(ctx, 0u);
-						emitLoadLocalBytes(ctx, local->offset, ref_size);
-						emitConst8(ctx, 0u);
-						emitLoadAt(ctx, 1u, 0, value_size);
-						compileExpressionAsType(ctx, *assign.rhs, *fn_type->param_types[1]);
-						emitCallDirect(ctx, assign.resolved_op_fn->bytecode_index, callArgWindowSize(*fn_type), typeByteSize(*fn_type->return_type));
-						emitStoreAt(ctx, 1u, 0, value_size);
-						return;
-					}
-					emitLoadLocalBytes(ctx, local->offset, ref_size);
-					emitConst8(ctx, 0u);
-					emitLoadLocalBytes(ctx, local->offset, ref_size);
-					emitConst8(ctx, 0u);
-					emitLoadAt(ctx, 1u, 0, value_size);
-					compileExpression(ctx, *assign.rhs, value_kind);
-					emitNumericStoreOp(ctx, value_kind, assign.op);
-					emitStoreAt(ctx, 1u, 0, value_size);
-					return;
-				default: ASSERT(false); return;
+			if (assign.op == Token::EQUAL) {
+				emitLoadLocalBytes(ctx, slot->offset, ref_size);
+				emitConst8(ctx, 0u);
+				compileExpression(ctx, *assign.rhs, value_kind);
+				emitStoreAt(ctx, 1u, 0, value_size);
+				return;
 			}
+			if (assign.resolved_op_fn) {
+				const FunctionResolvedType* fn_type = static_cast<FunctionResolvedType*>(assign.resolved_op_fn->resolved_type);
+				emitLoadLocalBytes(ctx, slot->offset, ref_size);
+				emitConst8(ctx, 0u);
+				emitLoadLocalBytes(ctx, slot->offset, ref_size);
+				emitConst8(ctx, 0u);
+				emitLoadAt(ctx, 1u, 0, value_size);
+				compileExpressionAsType(ctx, *assign.rhs, *fn_type->param_types[1]);
+				emitCallDirect(ctx, assign.resolved_op_fn->bytecode_index, callArgWindowSize(*fn_type), typeByteSize(*fn_type->return_type));
+				emitStoreAt(ctx, 1u, 0, value_size);
+				return;
+			}
+			emitLoadLocalBytes(ctx, slot->offset, ref_size);
+			emitConst8(ctx, 0u);
+			emitLoadLocalBytes(ctx, slot->offset, ref_size);
+			emitConst8(ctx, 0u);
+			emitLoadAt(ctx, 1u, 0, value_size);
+			compileExpression(ctx, *assign.rhs, value_kind);
+			emitNumericStoreOp(ctx, value_kind, assign.op);
+			emitStoreAt(ctx, 1u, 0, value_size);
+			return;
 		}
 
-		switch (assign.op) {
-			case Token::EQUAL:
-				compileExpressionAsType(ctx, *assign.rhs, *value_type);
-				if (local) {
-					emitStoreLocalBytes(ctx, local->offset, local->byte_size);
-				}
-				else {
-					emitStoreGlobalBytes(ctx, global->offset, global->byte_size);
-				}
-				return;
-			case Token::PLUS_EQUAL:
-			case Token::MINUS_EQUAL:
-			case Token::STAR_EQUAL:
-			case Token::SLASH_EQUAL: {
-				if (assign.resolved_op_fn) {
-					const FunctionResolvedType* fn_type = static_cast<FunctionResolvedType*>(assign.resolved_op_fn->resolved_type);
-					if (local) {
-						emitLoadLocalBytes(ctx, local->offset, local->byte_size);
-					} else {
-						emitLoadGlobalBytes(ctx, global->offset, global->byte_size);
-					}
-					compileExpressionAsType(ctx, *assign.rhs, *fn_type->param_types[1]);
-					emitCallDirect(ctx, assign.resolved_op_fn->bytecode_index, callArgWindowSize(*fn_type), typeByteSize(*fn_type->return_type));
-					if (local) {
-						emitStoreLocalBytes(ctx, local->offset, local->byte_size);
-					} else {
-						emitStoreGlobalBytes(ctx, global->offset, global->byte_size);
-					}
-					return;
-				}
-				if (local) {
-					emitLoadLocalBytes(ctx, local->offset, local->byte_size);
-				} else {
-					emitLoadGlobalBytes(ctx, global->offset, global->byte_size);
-				}
-				compileExpression(ctx, *assign.rhs, value_kind);
-				emitNumericStoreOp(ctx, value_kind, assign.op);
-				if (local) {
-					emitStoreLocalBytes(ctx, local->offset, local->byte_size);
-				} else {
-					emitStoreGlobalBytes(ctx, global->offset, global->byte_size);
-				}
-				return;
-			}
-			default: ASSERT(false); return;
+		if (assign.op == Token::EQUAL) {
+			compileExpressionAsType(ctx, *assign.rhs, *value_type);
+			emitStoreSlot(ctx, *slot);
+			return;
 		}
+	
+		emitLoadSlot(ctx, *slot);
+
+		if (assign.resolved_op_fn) {
+			const FunctionResolvedType* fn_type = static_cast<FunctionResolvedType*>(assign.resolved_op_fn->resolved_type);
+			compileExpressionAsType(ctx, *assign.rhs, *fn_type->param_types[1]);
+			emitCallDirect(ctx, assign.resolved_op_fn->bytecode_index, callArgWindowSize(*fn_type), typeByteSize(*fn_type->return_type));
+		}
+		else {
+			compileExpression(ctx, *assign.rhs, value_kind);
+			emitNumericStoreOp(ctx, value_kind, assign.op);
+		}
+		emitStoreSlot(ctx, *slot);
+		return;
 	}
 	if (assign.lhs->kind == Expression::BRACKET) {
 		BracketExpression* br = static_cast<BracketExpression*>(assign.lhs);
@@ -1620,8 +1608,9 @@ static void compileAssign(FunctionCompiler& ctx, AssignStatement& assign) {
 		u32 field_offset = structFieldByteOffset(*st, member->name, field_type);
 		const u32 field_size = typeByteSize(*field_type);
 		const ls_type_kind value_kind = valueKindForType(*field_type);
+		emitAddressableReference(ctx, *member->expression);
+		
 		if (assign.op == Token::EQUAL) {
-			tryEmitReference(ctx, *member->expression);
 			emitConst8(ctx, 0u);
 			compileExpressionAsType(ctx, *assign.rhs, *field_type);
 			emitStoreAt(ctx, field_size, (i32)field_offset, field_size);
@@ -1629,21 +1618,19 @@ static void compileAssign(FunctionCompiler& ctx, AssignStatement& assign) {
 		}
 		// Compound assignment: load existing value, apply op, store back.
 		// Stack order for STORE_AT is: base, index, value.
-		const u32 ref_offset = ctx.addLocal({}, nullptr, LS_TYPE_I64);
-		const u32 val_offset = ctx.addLocal({}, field_type, value_kind);
 		const u32 ref_size = typeKindByteSize(LS_TYPE_CPTR);
-		const u32 value_size = field_size;
-		tryEmitReference(ctx, *member->expression);
+		const u32 ref_offset = ctx.addLocal(nullptr, LS_TYPE_I64, true);
 		emitStoreLocalBytes(ctx, ref_offset, ref_size);
+		const u32 val_offset = ctx.addLocal(field_type, value_kind);
 		emitLoadLocalBytes(ctx, ref_offset, ref_size);
 		emitConst8(ctx, 0u);
-		emitLoadAt(ctx, 1u, (i32)field_offset, value_size);
+		emitLoadAt(ctx, 1u, (i32)field_offset, field_size);
 		emitCompoundValue(ctx, *assign.rhs, value_kind, assign.op, assign.resolved_op_fn);
-		emitStoreLocalBytes(ctx, val_offset, value_size);
+		emitStoreLocalBytes(ctx, val_offset, field_size);
 		emitLoadLocalBytes(ctx, ref_offset, ref_size);
 		emitConst8(ctx, 0u);
-		emitLoadLocalBytes(ctx, val_offset, value_size);
-		emitStoreAt(ctx, 1u, (i32)field_offset, value_size);
+		emitLoadLocalBytes(ctx, val_offset, field_size);
+		emitStoreAt(ctx, 1u, (i32)field_offset, field_size);
 		return;
 	}
 	ASSERT(false);
@@ -1655,8 +1642,8 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 			VarDeclStatement& var = static_cast<VarDeclStatement&>(st);
 			ResolvedType* value_type = var.resolved_type;
 			const ls_type_kind kind = valueKindForType(*value_type);
-			const u32 offset = ctx.addLocal(var.name, value_type, kind);
-			const u32 byte_size = ctx.findLocal(var.name)->byte_size;
+			const u32 offset = ctx.addLocal(value_type, kind, false, &var.slot);
+			const u32 byte_size = var.slot.byte_size;
 			if (emitLocalLiteralInitializer(ctx, offset, *var.expression, kind)) return;
 			if (var.expression->kind == Expression::UNDEFINED) return;
 
@@ -1697,16 +1684,8 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 			loop.label = current_label;
 			loop.defer_mark = (u32)ctx.deferreds.size();
 			void* break_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
-			if (!break_storage) {
-				ctx.loops.pop_back();
-				return;
-			}
 			loop.break_jumps = ::new (break_storage) ExpArray<u32>(*ctx.bytecode->arena);
 			void* continue_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
-			if (!continue_storage) {
-				ctx.loops.pop_back();
-				return;
-			}
 			loop.continue_jumps = ::new (continue_storage) ExpArray<u32>(*ctx.bytecode->arena);
 
 			compileStatement(ctx, *ws.body, return_kind, {});
@@ -1735,8 +1714,8 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 			const u32 range_value_top = ctx.temp_top;
 
 			ctx.pushScope();
-			const u32 loop_offset = ctx.addLocal(fs.loop_var, value_type, value_kind, true);
-			const u32 end_offset = ctx.addLocal({}, value_type, value_kind, true);
+			const u32 loop_offset = ctx.addLocal(value_type, value_kind, true, &fs.slot);
+			const u32 end_offset = ctx.addLocal(value_type, value_kind, true);
 			ctx.temp_top = range_value_top;
 			emitStoreLocalBytes(ctx, end_offset, byte_size, false);
 			emitStoreLocalBytes(ctx, loop_offset, byte_size, false);
@@ -1785,14 +1764,15 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 			const ls_type_kind subject_kind = valueKindForType(*subject_type);
 			const u32 subject_byte_size = typeByteSize(*subject_type) == 0u ? 1u : typeByteSize(*subject_type);
 			compileExpression(ctx, *ms.subject, subject_kind);
-			const u32 subject_offset = ctx.addLocal({}, subject_type, subject_kind, true);
+			const u32 subject_offset = ctx.addLocal(subject_type, subject_kind, true);
 			emitStoreLocalBytes(ctx, subject_offset, subject_byte_size);
 
 			ExpArray<u32> match_end_jumps(*ctx.bytecode->arena);
 			ExpArray<u32> pending_false_jumps(*ctx.bytecode->arena);
+			ExpArray<u32> arm_body_jumps(*ctx.bytecode->arena);
 
 			for (MatchArm& arm : ms.arms) {
-				ExpArray<u32> arm_body_jumps(*ctx.bytecode->arena);
+				arm_body_jumps.clear();
 
 				if (arm.is_fallback) {
 					for (u32 false_jump : pending_false_jumps) patchJumpRelative(ctx.code, false_jump, (u32)ctx.code.size());
@@ -1892,7 +1872,7 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 		}
 		case Statement::EXPRESSION: {
 			ExpressionStatement& expr = static_cast<ExpressionStatement&>(st);
-			const ls_type_kind kind = compileExpression(ctx, *expr.expression, LS_TYPE_INVALID);
+			compileExpression(ctx, *expr.expression, LS_TYPE_INVALID);
 			const u32 byte_size = typeByteSize(*expr.expression->resolved_type);
 			if (byte_size > 0u) {
 				emitPop(ctx, byte_size);
@@ -1940,7 +1920,6 @@ static u32 computeParamSize(const ExpArray<FunctionParam>& params) {
 
 static bool compileFunctionBytecode(
 	ls_bytecode* bytecode,
-	ExpArray<GlobalBinding>& globals,
 	FunctionExpression* fn,
 	FunctionResolvedType* fn_type,
 	ls_string_view name,
@@ -1996,18 +1975,15 @@ static bool compileFunctionBytecode(
 
 	FunctionCompiler ctx(bytecode, function);
 	ctx.return_type = return_type;
-	ctx.globals = &globals;
 	for (FunctionParam& param : fn->runtime_params) {
-		const ls_type_kind kind = valueKindForType(*param.resolved_type);
-		BytecodeLocalBinding& binding = ctx.locals.emplace_back();
-		binding.name = param.name;
-		binding.type = param.resolved_type;
-		binding.kind = kind;
-		binding.byte_size = param.is_ref ? typeKindByteSize(LS_TYPE_CPTR) : typeByteSize(*param.resolved_type);
-		if (binding.byte_size == 0u) binding.byte_size = 1u;
-		binding.offset = function.param_size;
-		if (param.is_ref) ctx.ref_local_offsets.push(binding.offset);
-		function.param_size += binding.byte_size;
+		StorageSlot& slot = param.slot;
+		slot.type = param.resolved_type;
+		slot.kind = valueKindForType(*param.resolved_type);
+		slot.byte_size = param.is_ref ? typeKindByteSize(LS_TYPE_CPTR) : typeByteSize(*param.resolved_type);
+		if (slot.byte_size == 0u) slot.byte_size = 1u;
+		slot.offset = function.param_size;
+		slot.storage = param.is_ref ? StorageSlot::LOCAL_REF : StorageSlot::LOCAL;
+		function.param_size += slot.byte_size;
 		ctx.next_local_offset = function.param_size;
 	}
 	ctx.temp_top = function.param_size;
@@ -2043,18 +2019,17 @@ ls_bytecode* ls_bytecode_compile(
 	ASSERT(bytecode->arena);
 	ls_arena* arena = bytecode->arena;
 
-	ExpArray<GlobalBinding> globals(*arena);
 	bytecode->global_size = 0u;
 	for (Unit& unit : module->units) {
 		for (Symbol& sym : unit.symbols) {
-			if (!sym.expression) continue;
-			if (sym.expression->kind == Expression::FUNCTION || sym.expression->kind == Expression::STRUCT || sym.expression->kind == Expression::ENUM) continue;
-			GlobalBinding& binding = globals.emplace_back();
-			binding.sym = &sym;
-			binding.offset = bytecode->global_size;
-			binding.byte_size = typeByteSize(*sym.resolved_type);
-			if (binding.byte_size == 0u) binding.byte_size = 1u;
-			bytecode->global_size += binding.byte_size;
+			if (!symbolHasGlobalStorage(sym)) continue;
+			sym.slot.storage = StorageSlot::GLOBAL;
+			sym.slot.offset = bytecode->global_size;
+			sym.slot.byte_size = typeByteSize(*sym.resolved_type);
+			if (sym.slot.byte_size == 0u) sym.slot.byte_size = 1u;
+			sym.slot.type = sym.resolved_type;
+			sym.slot.kind = valueKindForType(*sym.resolved_type);
+			bytecode->global_size += sym.slot.byte_size;
 		}
 	}
 
@@ -2076,7 +2051,6 @@ ls_bytecode* ls_bytecode_compile(
 	for (const FunctionInfo& info : functions) {
 		if (!compileFunctionBytecode(
 			bytecode,
-			globals,
 			info.fn,
 			info.type,
 			info.name,
@@ -2103,16 +2077,12 @@ ls_bytecode* ls_bytecode_compile(
 		function.frame_size = 0u;
 
 		FunctionCompiler ctx(bytecode, function);
-		ctx.globals = &globals;
 		for (Unit& unit : module->units) {
 			for (Symbol& sym : unit.symbols) {
-				if (!sym.expression) continue;
-				if (sym.expression->kind == Expression::FUNCTION || sym.expression->kind == Expression::STRUCT || sym.expression->kind == Expression::ENUM) continue;
-				const GlobalBinding* binding = findGlobalBinding(globals, sym);
-				if (!binding) continue;
+				if (sym.slot.storage != StorageSlot::GLOBAL) continue;
 				if (sym.expression->kind == Expression::UNDEFINED) continue;
 				compileExpressionAsType(ctx, *sym.expression, *sym.resolved_type);
-				emitStoreGlobalBytes(ctx, binding->offset, binding->byte_size);
+				emitStoreGlobalBytes(ctx, sym.slot.offset, sym.slot.byte_size);
 			}
 		}
 		emitReturn(ctx);

@@ -326,3 +326,61 @@ TEST(EnumValueInitializedFromOtherEnumFails) {
 	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
+
+TEST(EnumMemberWithExplicitValueReturnsValue) {
+	const char* source = R"(
+		enum Priority {
+			Low = 0,
+			Medium = 5,
+			High = 10
+		}
+		fn main() : i32 {
+			return Priority.Medium as i32;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(5, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(EnumMemberWithImplicitValueReturnsIndex) {
+	const char* source = R"(
+		enum State {
+			Idle,
+			Running,
+			Paused
+		}
+		fn main() : i32 {
+			return State.Running as i32;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(1, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(EnumValueExceedsInt32Max) {
+	const char* source = R"(
+		enum LargeValue {
+			Big = 2147483648
+		}
+		fn main() : i64 {
+			return LargeValue.Big as i64;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(2147483648LL, ls_to_i64(runtime, -1));
+	CAPI_END(module);
+	return true;
+}

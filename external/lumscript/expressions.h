@@ -18,12 +18,33 @@ struct NamedDecl {
 	ResolvedType* resolved_type = nullptr;
 };
 
+// Storage location assigned by the bytecode compiler to runtime declarations
+// (var, function parameter, loop variable, or global). Identifier expressions and
+// global symbols point at a StorageSlot for O(1) lookups. Frame slot values are only
+// meaningful during function compilation; the checker guarantees a declaration is
+// compiled before any identifier that reads it. Global slot values are stable across
+// the entire compilation.
+struct StorageSlot {
+	enum Storage : u8 {
+		LOCAL,      // Frame-local storage (typical locals and loop variables).
+		LOCAL_REF,  // Frame-local storage passed by reference (function parameters only).
+		GLOBAL,     // Global data segment storage.
+	};
+
+	u32 offset = 0;
+	u32 byte_size = 0;
+	ls_type_kind kind = LS_TYPE_INVALID;
+	ResolvedType* type = nullptr;
+	Storage storage = LOCAL;
+};
+
 struct FunctionParam {
 	ls_string_view name;
 	// Runtime parameters can be passed by reference with `ref`.
 	bool is_ref = false;
 	ParsedType* parsed_type = nullptr;
 	ResolvedType* resolved_type = nullptr;
+	StorageSlot slot;
 };
 
 struct Expression {
@@ -80,6 +101,9 @@ struct IdentifierExpression : Expression {
 
 	ls_string_view name = {};
 	Symbol* symbol = nullptr;
+	// Set by the checker when this identifier resolves to runtime storage (local,
+	// parameter, or global); null for compile-time symbols (functions, types, etc.).
+	StorageSlot* slot = nullptr;
 };
 
 struct IntLiteralExpression : Expression {

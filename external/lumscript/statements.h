@@ -56,6 +56,7 @@ struct VarDeclStatement : Statement {
 	ResolvedType* resolved_type = nullptr;
 	Expression* expression = nullptr;
 	bool is_immutable = false;
+	StorageSlot slot;
 };
 
 struct AssignStatement : Statement {
@@ -109,6 +110,7 @@ struct ForStatement : Statement {
 	Expression* begin = nullptr;
 	Expression* end = nullptr;
 	BlockStatement* body = nullptr;
+	StorageSlot slot;
 };
 
 struct BreakStatement : Statement {

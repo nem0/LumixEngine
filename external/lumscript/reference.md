@@ -2,6 +2,7 @@
 
 # TODO
 
+* immutable temporaries - foo().values[0]  += 4 should be invalid
 * tagged unions
 * debugger
 * string interpolation

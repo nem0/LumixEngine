@@ -196,6 +196,9 @@ struct Checker {
 		ls_string_view name = {};
 		ResolvedType* type = nullptr;
 		bool is_immutable = false;
+		// Slot of the underlying declaration (frame slot for locals, the symbol's
+		// global slot when the binding narrows a global).
+		StorageSlot* slot = nullptr;
 	};
 
 	struct FunctionCheckContext {
@@ -2632,6 +2635,7 @@ struct Checker {
 				if (ctx) {
 					if (SemanticLocalBinding* local = findLocal(*ctx, id.name)) {
 						id.symbol = nullptr;
+						id.slot = local->slot;
 						expr.resolved_type = local->type;
 						return expr.resolved_type;
 					}
@@ -2646,6 +2650,7 @@ struct Checker {
 					return nullptr;
 				}
 				id.symbol = ref.symbol;
+				if (symbolHasGlobalStorage(*ref.symbol)) id.slot = &ref.symbol->slot;
 				expr.resolved_type = ref.symbol->resolved_type;
 				return expr.resolved_type;
 			}
@@ -2693,6 +2698,7 @@ struct Checker {
 				if (ctx) {
 					if (SemanticLocalBinding* local = findLocal(*ctx, id->name)) {
 						is_writable = !local->is_immutable;
+						id->slot = local->slot;
 						expr->resolved_type = local->type;
 						return local->type;
 					}
@@ -2703,6 +2709,8 @@ struct Checker {
 					return nullptr;
 				}
 				id->symbol = ref.symbol;
+				// TODO why is this here?
+				if (symbolHasGlobalStorage(*ref.symbol)) id->slot = &ref.symbol->slot;
 				is_writable = ref.symbol->storage == Symbol::VARIABLE;
 				expr->resolved_type = unwrapMeta(ref.symbol->resolved_type);
 				return expr->resolved_type;
@@ -2860,6 +2868,7 @@ struct Checker {
 			binding.name = param.name;
 			binding.type = param.resolved_type;
 			binding.is_immutable = !param.is_ref;
+			binding.slot = &param.slot;
 		}
 
 		BlockStatement* body = static_cast<BlockStatement*>(fn.body);
@@ -2933,6 +2942,7 @@ struct Checker {
 		binding.name = var.name;
 		binding.type = final_type;
 		binding.is_immutable = var.is_immutable;
+		binding.slot = &var.slot;
 		return true;
 	}
 
@@ -3007,6 +3017,7 @@ struct Checker {
 		ResolvedType* narrowed_type = nullptr;
 		bool narrowed_is_immutable = false;
 		bool narrow_in_true = false;
+		StorageSlot* narrowed_slot = nullptr;
 		if (ifst.condition && ifst.condition->kind == Expression::BINARY) {
 			BinaryExpression* bin = static_cast<BinaryExpression*>(ifst.condition);
 			if (bin->op == Token::BANG_EQUAL || bin->op == Token::EQUAL_EQUAL) {
@@ -3023,8 +3034,10 @@ struct Checker {
 						narrowed_type = static_cast<NullableResolvedType*>(id_type)->inner;
 						if (SemanticLocalBinding* local = findLocal(ctx, id->name)) {
 							narrowed_is_immutable = local->is_immutable;
+							narrowed_slot = local->slot;
 						} else if (id->symbol) {
 							narrowed_is_immutable = id->symbol->storage != Symbol::VARIABLE;
+							narrowed_slot = id->slot;
 						}
 						narrow_in_true = (bin->op == Token::BANG_EQUAL);
 					}
@@ -3039,6 +3052,7 @@ struct Checker {
 				nb.name = narrowed_name;
 				nb.type = narrowed_type;
 				nb.is_immutable = narrowed_is_immutable;
+				nb.slot = narrowed_slot;
 				bool ok = checkStatement(unit, ctx, branch, return_type, {});
 				popScope(ctx);
 				return ok;
@@ -3072,6 +3086,7 @@ struct Checker {
 		binding.name = fs.loop_var;
 		binding.type = begin_type;
 		binding.is_immutable = true;
+		binding.slot = &fs.slot;
 		ctx.loop_labels.push(pending_label);
 		bool ok = checkStatement(unit, ctx, fs.body, return_type, {});
 		ctx.loop_labels.pop_back();

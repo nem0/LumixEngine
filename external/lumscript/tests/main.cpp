@@ -6,6 +6,7 @@
 #include "../arena.h"
 #include "../utils.h"
 #include "../utils.h"
+#include "../bytecode.h"
 #include "../capi.h"
 
 void print(const char* val) { printf(val); }
@@ -13,7 +14,11 @@ void print(int val) { printf("%d", val); }
 
 #define EXPECT_EQ(expected, actual) \
 	if ((expected) != (actual)) { \
-		printf("TEST FAILED at %s:%d: Expected: %d, Actual: %d\n", __FILE__, __LINE__, expected, actual); \
+		if constexpr (sizeof(expected) == 8) { \
+			printf("TEST FAILED at %s:%d: Expected: %lld, Actual: %lld\n", __FILE__, __LINE__, (long long)(expected), (long long)(actual)); \
+		} else { \
+			printf("TEST FAILED at %s:%d: Expected: %d, Actual: %d\n", __FILE__, __LINE__, (int)(expected), (int)(actual)); \
+		} \
 		return false; \
 	}
 

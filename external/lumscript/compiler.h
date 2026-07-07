@@ -46,7 +46,21 @@ struct Symbol {
 	// Symbols bind names to expressions. Top-level `fn`, `struct`, and `enum`
 	// syntax should eventually desugar to COMPTIME symbols with expression values.
 	Expression* expression = nullptr; // expression used to initialize the symbol
+	// Storage location in the global data segment. The checker points identifier
+	// expressions at this slot (see symbolHasGlobalStorage); its values are filled
+	// in by ls_bytecode_compile's global layout pass before function bodies compile.
+	StorageSlot slot;
 };
+
+// True when the symbol occupies runtime storage in the global data segment.
+// The checker uses this to decide whether an identifier gets a slot pointer;
+// ls_bytecode_compile's global layout pass must lay out exactly these symbols.
+inline bool symbolHasGlobalStorage(const Symbol& sym) {
+	return sym.expression
+		&& sym.expression->kind != Expression::FUNCTION
+		&& sym.expression->kind != Expression::STRUCT
+		&& sym.expression->kind != Expression::ENUM;
+}
 
 // so we can pass arenas to ExpArrays defined in the same struct as the arena
 struct ArenaOwner {
