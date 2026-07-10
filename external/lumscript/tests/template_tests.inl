@@ -4,7 +4,7 @@ TEST(TemplateFunctionInferredThroughUFCS) {
 			data : i32;
 		}
 
-		fn identity[T](a : T) : T {
+		fn identity(a : $T) : T {
 			return a;
 		}
 
@@ -20,7 +20,7 @@ TEST(TemplateFunctionInferredThroughUFCS) {
 
 TEST(TemplateFunctionIdentityF32) {
 	const char* source = R"(
-		fn identity[T](a : T) : T {
+		fn identity(a : $T) : T {
 			return a;
 		}
 
@@ -34,7 +34,7 @@ TEST(TemplateFunctionIdentityF32) {
 
 TEST(TemplateFunctionBodyCanUseTemplateParam) {
 	const char* source = R"(
-		fn identity[T](a : T) : T {
+		fn identity(a : $T) : T {
 			var values : [1]T = undefined;
 			values[0] = a;
 			return values[0];
@@ -50,7 +50,7 @@ TEST(TemplateFunctionBodyCanUseTemplateParam) {
 
 TEST(TemplateFunctionRecursiveInstantiationCompiles) {
 	const char* source = R"(
-		fn wrap[T](a : T) : T {
+		fn wrap(a : $T) : T {
 			return wrap(a);
 		}
 
@@ -73,7 +73,7 @@ TEST(TemplateFunctionLoopBodyIsClonedPerInstantiation) {
 			return Number { a.low + b.low, a.high + b.high };
 		}
 
-		fn twice[T](value : T) : T {
+		fn twice(value : $T) : T {
 			var result : T = value;
 			var i : i32 = 0;
 			while i < 1 {
@@ -103,7 +103,7 @@ TEST(TemplateFunctionLoopBodyIsClonedPerInstantiation) {
 
 TEST(TemplateFunctionNullableReturnContextCompiles) {
 	const char* source = R"(
-		fn identity[T](a : T) : T {
+		fn identity(a : $T) : T {
 			return a;
 		}
 
@@ -117,7 +117,7 @@ TEST(TemplateFunctionNullableReturnContextCompiles) {
 
 TEST(TemplateFunctionNullableReturnInfersFromContext) {
 	const char* source = R"(
-		fn maybe[T](value : T) : ?T {
+		fn maybe(value : $T) : ?T {
 			return value;
 		}
 
@@ -133,7 +133,7 @@ TEST(TemplateFunctionNullableReturnInfersFromContext) {
 
 TEST(TemplateFunctionTypeMismatchFails) {
 	const char* source = R"(
-		fn identity[T](a : T) : T {
+		fn identity(a : $T) : T {
 			return a;
 		}
 
@@ -147,7 +147,7 @@ TEST(TemplateFunctionTypeMismatchFails) {
 
 TEST(TemplateFunctionMultipleParams) {
 	const char* source = R"(
-		fn first[A, B](a : A, b : B) : A {
+		fn first(a : $A, b : $B) : A {
 			return a;
 		}
 
@@ -161,7 +161,7 @@ TEST(TemplateFunctionMultipleParams) {
 
 TEST(TemplateFunctionMultipleParamsMismatchFails) {
 	const char* source = R"(
-		fn first[A, B](a : A, b : B) : A {
+		fn first(a : $A, b : $B) : A {
 			return a;
 		}
 
@@ -175,7 +175,7 @@ TEST(TemplateFunctionMultipleParamsMismatchFails) {
 
 TEST(TemplateFunctionSwapMismatchedTypesFails) {
 	const char* source = R"(
-		fn swap[T](a : ref T, b : ref T) : void {
+		fn swap(a : ref $T, b : ref T) : void {
 			const tmp = a;
 			a = b;
 			b = tmp;
@@ -193,7 +193,7 @@ TEST(TemplateFunctionSwapMismatchedTypesFails) {
 
 TEST(TemplateFunctionRefArgumentRequiresRefSyntaxFails) {
 	const char* source = R"(
-		fn swap[T](a : ref T, b : ref T) : void {
+		fn swap(a : ref $T, b : ref T) : void {
 		}
 
 		fn main() : void {
@@ -208,7 +208,7 @@ TEST(TemplateFunctionRefArgumentRequiresRefSyntaxFails) {
 
 TEST(TemplateFunctionRefArgumentMustBeWritableFails) {
 	const char* source = R"(
-		fn swap[T](a : ref T, b : ref T) : void {
+		fn swap(a : ref $T, b : ref T) : void {
 		}
 
 		fn main() : void {
@@ -289,7 +289,7 @@ TEST(TemplateStructPassedToFunctionMismatchFails) {
 
 TEST(TemplateDuplicateTypeParamNameFails) {
 	const char* source = R"(
-		fn bad[T, T](a : T) : T {
+		fn bad(a : $T, b : $T) : T {
 			return a;
 		}
 
@@ -313,7 +313,7 @@ TEST(TemplateStructDuplicateTypeParamNameFails) {
 
 TEST(TemplateFunctionUnresolvedTypeParamFails) {
 	const char* source = R"(
-		fn make[T]() : T {
+		fn make(T : comptime type) : T {
 			return undefined;
 		}
 
@@ -328,12 +328,12 @@ TEST(TemplateFunctionUnresolvedTypeParamFails) {
 // Uninstantiated template used as a function value — T is unknown, not allowed.
 TEST(TemplateFunctionUninstantiatedAsFirstClassValueFails) {
 	const char* source = R"(
-		fn identity[T](a : T) : T {
+		fn identity(a : $T) : T {
 			return a;
 		}
 
 		fn main() : void {
-			const f : fn(i32) : i32 = identity;
+			const f = identity;
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
@@ -342,12 +342,12 @@ TEST(TemplateFunctionUninstantiatedAsFirstClassValueFails) {
 
 TEST(TemplateFunctionInstantiatedAsFirstClassValueRuntime) {
 	const char* source = R"(
-		fn identity[T](a : T) : T {
+		fn identity(a : $T) : T {
 			return a;
 		}
 
 		fn main() : i32 {
-			const f : fn(i32) : i32 = identity[i32];
+			const f : fn(i32) : i32 = identity;
 			return f(42);
 		}
 	)";
@@ -362,7 +362,7 @@ TEST(TemplateFunctionInstantiatedAsFirstClassValueRuntime) {
 
 TEST(TemplateFunctionInstantiatedPassedAsArgumentRuntime) {
 	const char* source = R"(
-		fn identity[T](a : T) : T {
+		fn identity(a : $T) : T {
 			return a;
 		}
 
@@ -371,7 +371,7 @@ TEST(TemplateFunctionInstantiatedPassedAsArgumentRuntime) {
 		}
 
 		fn main() : i32 {
-			return apply(identity[i32], 42);
+			return apply(identity, 42);
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
@@ -385,12 +385,12 @@ TEST(TemplateFunctionInstantiatedPassedAsArgumentRuntime) {
 
 TEST(TemplateFunctionInstantiatedTypeMismatchFails) {
 	const char* source = R"(
-		fn identity[T](a : T) : T {
-			return a;
+		fn add_one(a : $T) : i32 {
+			return a + 1;
 		}
 
 		fn main() : void {
-			const f : fn(f32) : f32 = identity[i32];
+			const f : fn(f32) : f32 = add_one;
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
@@ -491,7 +491,7 @@ TEST(TemplateOperatorOverloadFails) {
 			value : T;
 		}
 
-		operator +[T](a : Box[T], b : Box[T]) : Box[T] {
+		operator +(a : Box[$T], b : Box[T]) : Box[T] {
 			return Box[T] { a.value + b.value };
 		}
 
@@ -578,7 +578,7 @@ TEST(TemplateFunctionImportedTwoInstantiations) {
 		}
 	)";
 	const char* lib_source = R"(
-		fn identity[T](a : T) : T {
+		fn identity(a : $T) : T {
 			return a;
 		}
 	)";
@@ -599,7 +599,7 @@ TEST(TemplateImportedFunctionTypeMismatchFails) {
 		}
 	)";
 	const char* lib_source = R"(
-		fn identity[T](a : T) : T {
+		fn identity(a : $T) : T {
 			return a;
 		}
 	)";
@@ -622,7 +622,7 @@ TEST(TemplateImportedFunctionTwoInstantiationsRuntime) {
 		}
 	)";
 	const char* lib_source = R"(
-		fn identity[T](a : T) : T {
+		fn identity(a : $T) : T {
 			return a;
 		}
 	)";
@@ -726,12 +726,12 @@ TEST(TemplateFunctionTwoLibsEachWithTemplateRuntime) {
 		}
 	)";
 	const char* liba_source = R"(
-		fn double_it[T](a : T) : T {
+		fn double_it(a : $T) : T {
 			return a + a;
 		}
 	)";
 	const char* libb_source = R"(
-		fn negate[T](a : T) : T {
+		fn negate(a : $T) : T {
 			return -a;
 		}
 	)";
@@ -757,12 +757,12 @@ TEST(TemplateFunctionTwoLibsSameTemplateNameRuntime) {
 		}
 	)";
 	const char* liba_source = R"(
-		fn identity[T](a : T) : T {
+		fn identity(a : $T) : T {
 			return a;
 		}
 	)";
 	const char* libb_source = R"(
-		fn identity[T](a : T) : T {
+		fn identity(a : $T) : T {
 			return a;
 		}
 	)";
@@ -788,12 +788,12 @@ TEST(TemplateFunctionTwoUnaliasedLibsSameTemplateNameFails) {
 		}
 	)";
 	const char* liba_source = R"(
-		fn identity[T](a : T) : T {
+		fn identity(a : $T) : T {
 			return a;
 		}
 	)";
 	const char* libb_source = R"(
-		fn identity[T](a : T) : T {
+		fn identity(a : $T) : T {
 			return a;
 		}
 	)";
@@ -806,7 +806,7 @@ TEST(TemplateFunctionTwoUnaliasedLibsSameTemplateNameFails) {
 	return true;
 }
 
-TEST(TemplateFunctionImportBracketCallDisambiguatesAtCheckTime) {
+TEST(TemplateFunctionImportCallDisambiguatesAtCheckTime) {
 	const char* main_source = R"(
 		import "liba" as liba
 		import "libb" as libb
@@ -818,7 +818,7 @@ TEST(TemplateFunctionImportBracketCallDisambiguatesAtCheckTime) {
 		fn main() : i32 {
 			const index = 0;
 			liba.a[index] = liba.add_one;
-			return liba.a[index](40) + libb.a[i32](1);
+			return liba.a[index](40) + libb.a(1);
 		}
 	)";
 	const char* liba_source = R"(
@@ -829,7 +829,7 @@ TEST(TemplateFunctionImportBracketCallDisambiguatesAtCheckTime) {
 		var a : [1](fn(i32) : i32) = undefined;
 	)";
 	const char* libb_source = R"(
-		fn a[T](v : T) : T {
+		fn a(v : $T) : T {
 			return v;
 		}
 	)";
@@ -887,7 +887,7 @@ TEST(TemplateImportedFunctionArrayElementCall) {
 	return true;
 }
 
-TEST(TemplateImportedBracketCallUserTypeName) {
+TEST(TemplateImportedFunctionCallUserTypeName) {
 	const char* main_source = R"(
 		import "libb" as libb
 
@@ -896,11 +896,11 @@ TEST(TemplateImportedBracketCallUserTypeName) {
 		}
 
 		fn main() : i32 {
-			return libb.a[i32](42);
+			return libb.a(42);
 		}
 	)";
 	const char* libb_source = R"(
-		fn a[T](v : T) : T {
+		fn a(v : $T) : T {
 			return v;
 		}
 	)";
@@ -922,11 +922,11 @@ TEST(TemplateImportedChainedTemplateCallsRuntime) {
 		}
 	)";
 	const char* lib_source = R"(
-		fn double_it[T](a : T) : T {
+		fn double_it(a : $T) : T {
 			return a + a;
 		}
 
-		fn quad[T](a : T) : T {
+		fn quad(a : $T) : T {
 			return double_it(double_it(a));
 		}
 	)";
@@ -957,7 +957,7 @@ TEST(TemplateFunctionInSecondUnitWithLeadingFunctionsRuntime) {
 		}
 	)";
 	const char* lib_source = R"(
-		fn wrap[T](a : T) : T {
+		fn wrap(a : $T) : T {
 			return a;
 		}
 	)";
@@ -975,7 +975,7 @@ TEST(TemplateFunctionInSecondUnitWithLeadingFunctionsRuntime) {
 
 TEST(TemplateFunctionIdentityI32Runtime) {
 	const char* source = R"(
-		fn identity[T](a : T) : T {
+		fn identity(a : $T) : T {
 			return a;
 		}
 
@@ -994,7 +994,7 @@ TEST(TemplateFunctionIdentityI32Runtime) {
 
 TEST(TemplateFunctionSwapRuntime) {
 	const char* source = R"(
-		fn swap[T](a : ref T, b : ref T) : void {
+		fn swap(a : ref $T, b : ref T) : void {
 			const tmp = a;
 			a = b;
 			b = tmp;
@@ -1064,11 +1064,11 @@ TEST(TemplateNestedGenericRuntime) {
 
 TEST(TemplateFunctionCallingTemplateFunctionRuntime) {
 	const char* source = R"(
-		fn double_it[T](a : T) : T {
+		fn double_it(a : $T) : T {
 			return a + a;
 		}
 
-		fn quad[T](a : T) : T {
+		fn quad(a : $T) : T {
 			return double_it(double_it(a));
 		}
 
@@ -1087,7 +1087,7 @@ TEST(TemplateFunctionCallingTemplateFunctionRuntime) {
 
 TEST(TemplateFunctionTwoInstantiationsSameCallSite) {
 	const char* source = R"(
-		fn identity[T](a : T) : T {
+		fn identity(a : $T) : T {
 			return a;
 		}
 
@@ -1161,7 +1161,7 @@ TEST(TemplateImportedFunctionRuntime) {
 		}
 	)";
 	const char* lib_source = R"(
-		fn identity[T](a : T) : T {
+		fn identity(a : $T) : T {
 			return a;
 		}
 	)";
@@ -1176,14 +1176,14 @@ TEST(TemplateImportedFunctionRuntime) {
 	return true;
 }
 
-TEST(TemplateFunctionExplicitInstantiationRuntime) {
+TEST(TemplateFunctionInferredInstantiationRuntime) {
 	const char* source = R"(
-		fn identity[T](a : T) : T {
+		fn identity(a : $T) : T {
 			return a;
 		}
 
 		fn main() : i32 {
-			return identity[i32](42);
+			return identity(42);
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
@@ -1195,18 +1195,18 @@ TEST(TemplateFunctionExplicitInstantiationRuntime) {
 	return true;
 }
 
-TEST(TemplateFunctionExplicitInstantiationUserTypeName) {
+TEST(TemplateFunctionComptimeTypeParamUserTypeName) {
 	const char* source = R"(
 		struct Box {
 			value : i32;
 		}
 
-		fn make[T]() : T {
+		fn make(T : comptime type) : T {
 			return undefined;
 		}
 
 		fn main() : i32 {
-			const b = make[Box]();
+			const b = make(Box);
 			return b.value;
 		}
 	)";
@@ -1214,14 +1214,14 @@ TEST(TemplateFunctionExplicitInstantiationUserTypeName) {
 	return true;
 }
 
-TEST(TemplateFunctionExplicitInstantiationMultipleParamsRuntime) {
+TEST(TemplateFunctionInferredInstantiationMultipleParamsRuntime) {
 	const char* source = R"(
-		fn first[A, B](a : A, b : B) : A {
+		fn first(a : $A, b : $B) : A {
 			return a;
 		}
 
 		fn main() : i32 {
-			return first[i32, bool](42, true);
+			return first(42, true);
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
@@ -1233,30 +1233,30 @@ TEST(TemplateFunctionExplicitInstantiationMultipleParamsRuntime) {
 	return true;
 }
 
-// Partial explicit type args (one of two supplied) — must be all-or-nothing.
-TEST(TemplateFunctionPartialExplicitTypeArgsFails) {
+// Missing value argument: the second type parameter cannot be inferred.
+TEST(TemplateFunctionMissingArgumentFails) {
 	const char* source = R"(
-		fn first[A, B](a : A, b : B) : A {
+		fn first(a : $A, b : $B) : A {
 			return a;
 		}
 
 		fn main() : i32 {
-			return first[i32](42, true);
+			return first(42);
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
 
-// Explicit instantiation required: no value arguments to infer from.
-TEST(TemplateFunctionExplicitInstantiationNoArgs) {
+// Explicit comptime type parameter required: no value arguments to infer from.
+TEST(TemplateFunctionComptimeTypeParamNoArgs) {
 	const char* source = R"(
-		fn zero[T]() : T {
+		fn zero(T : comptime type) : T {
 			return undefined;
 		}
 
 		fn main() : i32 {
-			return zero[i32]();
+			return zero(i32);
 		}
 	)";
 	EXPECT_COMPILE(source);
@@ -1265,22 +1265,34 @@ TEST(TemplateFunctionExplicitInstantiationNoArgs) {
 
 TEST(TemplateFunctionEmptyTemplateParamListFails) {
 	const char* source = R"(
-		fn identity[]() : i32 {
+		fn identity(a : $) : i32 {
 			return 42;
 		}
 
 		fn main() : i32 {
-			return identity();
+			return identity(0);
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
 
-// Without explicit args and no value args to infer from, inference fails.
+TEST(TemplateFunctionBracketSyntaxFails) {
+	const char* source = R"(
+		fn identity[T](a : T) : T {
+			return a;
+		}
+
+		fn main() : void {}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+// Without a comptime type argument and no value args to infer from, inference fails.
 TEST(TemplateFunctionNoArgsUnresolvedFails) {
 	const char* source = R"(
-		fn zero[T]() : T {
+		fn zero(T : comptime type) : T {
 			return undefined;
 		}
 
@@ -1292,15 +1304,15 @@ TEST(TemplateFunctionNoArgsUnresolvedFails) {
 	return true;
 }
 
-// Explicit type arg drives the untyped literal, same as passing to fn identity(v : f32).
-TEST(TemplateFunctionExplicitInstantiationDrivesLiteralTypeRuntime) {
+// Explicit comptime type parameter drives the untyped literal, same as passing to fn identity(v : f32).
+TEST(TemplateFunctionComptimeTypeParamDrivesLiteralTypeRuntime) {
 	const char* source = R"(
-		fn identity[T](a : T) : T {
+		fn identity(T : comptime type, a : T) : T {
 			return a;
 		}
 
 		fn main() : f32 {
-			return identity[f32](42);
+			return identity(f32, 42);
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
@@ -1312,15 +1324,15 @@ TEST(TemplateFunctionExplicitInstantiationDrivesLiteralTypeRuntime) {
 	return true;
 }
 
-// Too many explicit type args.
-TEST(TemplateFunctionWrongNumberOfTypeArgsFails) {
+// Too many function arguments.
+TEST(TemplateFunctionWrongNumberOfArgsFails) {
 	const char* source = R"(
-		fn identity[T](a : T) : T {
+		fn identity(T : comptime type, a : T) : T {
 			return a;
 		}
 
 		fn main() : i32 {
-			return identity[i32, f32](42);
+			return identity(i32, f32, 42);
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
@@ -1328,16 +1340,16 @@ TEST(TemplateFunctionWrongNumberOfTypeArgsFails) {
 }
 
 
-TEST(TemplateFunctionExplicitInstantiationImportedRuntime) {
+TEST(TemplateFunctionComptimeTypeParamImportedRuntime) {
 	const char* main_source = R"(
 		import "lib" as lib
 
 		fn main() : i32 {
-			return lib.identity[i32](42);
+			return lib.identity(i32, 42);
 		}
 	)";
 	const char* lib_source = R"(
-		fn identity[T](a : T) : T {
+		fn identity(T : comptime type, a : T) : T {
 			return a;
 		}
 	)";
@@ -1498,7 +1510,7 @@ TEST(TemplateFunctionWithNestedGenericParamRuntime) {
 			value : T;
 		}
 
-		fn unwrap[T](b : Box[Pair[T]]) : T {
+		fn unwrap(b : Box[Pair[$T]]) : T {
 			return b.value.first;
 		}
 
@@ -1647,14 +1659,14 @@ TEST(TemplateStructValueParamNegativeSizeFails) {
 	return true;
 }
 
-TEST(TemplateFunctionValueParamRuntime) {
+TEST(ComptimeFunctionParameterBasicRuntime) {
 	const char* source = R"(
-		fn choose[T, N : i32](value : T) : i32 {
-			return N;
+		fn choose(value : i32, n : comptime i32) : i32 {
+			return n;
 		}
 
 		fn main() : i32 {
-			return choose[i32, 7](42) + choose[i32, 8](42);
+			return choose(0, 7) + choose(0, 8);
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
@@ -1666,15 +1678,14 @@ TEST(TemplateFunctionValueParamRuntime) {
 	return true;
 }
 
-TEST(TemplateFunctionMixedTypeAndValueParams) {
+TEST(ComptimeFunctionParameterMultipleTypesRuntime) {
 	const char* source = R"(
-		fn mixed[A, N : i32, B, M : i32](a : A, b : B) : i32 {
-			return N + M;
+		fn mixed(a : i32, n : comptime i32, b : f32, m : comptime i32) : i32 {
+			return n + m;
 		}
 
 		fn main() : i32 {
-			return mixed[i32, 2, f32, 3](1, 1.0)
-				+ mixed[f32, 4, i32, 5](1.0, 1);
+			return mixed(1, 2, 1.0, 3) + mixed(1, 4, 1.0, 5);
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
@@ -1686,38 +1697,14 @@ TEST(TemplateFunctionMixedTypeAndValueParams) {
 	return true;
 }
 
-TEST(TemplateFunctionValueParamInferred) {
+TEST(ComptimeFunctionParameterBoolRuntime) {
 	const char* source = R"(
-		struct StaticArray[T, N : i32] {
-			values : [N]T;
-		}
-
-		fn size[T, N : i32](values : StaticArray[T, N]) : i32 {
-			return N;
-		}
-
-		fn main() : i32 {
-			var values : StaticArray[i32, 4] = undefined;
-			return size(values);
-		}
-	)";
-	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
-	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_call(runtime, toLs("main")));
-	EXPECT_EQ(4, ls_to_i32(runtime, -1));
-	CAPI_END(module);
-	return true;
-}
-
-TEST(TemplateFunctionBoolValueArg) {
-	const char* source = R"(
-		fn choose[N : bool]() : bool {
-			return N;
+		fn choose(n : comptime bool) : bool {
+			return n;
 		}
 
 		fn main() : bool {
-			return choose[true]();
+			return choose(true);
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
@@ -1729,14 +1716,14 @@ TEST(TemplateFunctionBoolValueArg) {
 	return true;
 }
 
-TEST(TemplateFunctionFloatValueArg) {
+TEST(ComptimeFunctionParameterF32Runtime) {
 	const char* source = R"(
-		fn choose[N : f32]() : f32 {
-			return N;
+		fn choose(n : comptime f32) : f32 {
+			return n;
 		}
 
 		fn main() : f32 {
-			return choose[1.5]();
+			return choose(1.5);
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
@@ -1748,14 +1735,14 @@ TEST(TemplateFunctionFloatValueArg) {
 	return true;
 }
 
-TEST(TemplateFunctionI64ValueArg) {
+TEST(ComptimeFunctionParameterI64Runtime) {
 	const char* source = R"(
-		fn choose[N : i64]() : i64 {
-			return N;
+		fn choose(n : comptime i64) : i64 {
+			return n;
 		}
 
 		fn main() : i64 {
-			return choose[2147483648]();
+			return choose(2147483648);
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
@@ -1767,14 +1754,14 @@ TEST(TemplateFunctionI64ValueArg) {
 	return true;
 }
 
-TEST(TemplateFunctionF64ValueArg) {
+TEST(ComptimeFunctionParameterF64Runtime) {
 	const char* source = R"(
-		fn choose[N : f64]() : f64 {
-			return N;
+		fn choose(n : comptime f64) : f64 {
+			return n;
 		}
 
 		fn main() : f64 {
-			return choose[1.5]();
+			return choose(1.5);
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
@@ -1786,14 +1773,14 @@ TEST(TemplateFunctionF64ValueArg) {
 	return true;
 }
 
-TEST(TemplateFunctionStringValueArg) {
+TEST(ComptimeFunctionParameterStringRuntime) {
 	const char* source = R"(
-		fn choose[S : string]() : string {
-			return S;
+		fn choose(s : comptime string) : string {
+			return s;
 		}
 
 		fn main() : string {
-			return choose["hello"]();
+			return choose("hello");
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
@@ -1805,17 +1792,17 @@ TEST(TemplateFunctionStringValueArg) {
 	return true;
 }
 
-TEST(TemplateFunctionValueParamImportedRuntime) {
+TEST(ComptimeFunctionParameterImportedRuntime) {
 	const char* main_source = R"(
 		import "lib" as lib
 
 		fn main() : i32 {
-			return lib.choose[i32, 7](42);
+			return lib.choose(42, 7);
 		}
 	)";
 	const char* lib_source = R"(
-		fn choose[T, N : i32](value : T) : i32 {
-			return N;
+		fn choose(value : i32, n : comptime i32) : i32 {
+			return n;
 		}
 	)";
 	LumScriptImportFile files_storage[] = {
@@ -1862,7 +1849,7 @@ TEST(TemplateFunctionReturnsDerivedTemplateStructRuntime) {
 			value : T;
 		}
 
-		fn wrap[T](v : T) : Box[T] {
+		fn wrap(v : $T) : Box[T] {
 			return Box[T] { v };
 		}
 
@@ -1910,12 +1897,12 @@ TEST(NonTemplateStructWithTemplateStructFieldRuntime) {
 // Returning a fully-instantiated template function value from a function.
 TEST(TemplateFunctionReturnedAsFirstClassValueRuntime) {
 	const char* source = R"(
-		fn identity[T](a : T) : T {
+		fn identity(a : $T) : T {
 			return a;
 		}
 
 		fn get_identity() : fn(i32) : i32 {
-			return identity[i32];
+			return identity;
 		}
 
 		fn main() : i32 {
@@ -1932,10 +1919,10 @@ TEST(TemplateFunctionReturnedAsFirstClassValueRuntime) {
 	return true;
 }
 
-// Explicit type argument on a ref-parameter template function.
-TEST(TemplateFunctionExplicitInstantiationRefParamsRuntime) {
+// Inferred type argument on a ref-parameter template function.
+TEST(TemplateFunctionInferredInstantiationRefParamsRuntime) {
 	const char* source = R"(
-		fn swap[T](a : ref T, b : ref T) : void {
+		fn swap(a : ref $T, b : ref T) : void {
 			const tmp = a;
 			a = b;
 			b = tmp;
@@ -1944,7 +1931,7 @@ TEST(TemplateFunctionExplicitInstantiationRefParamsRuntime) {
 		fn main() : i32 {
 			var x : i32 = 1;
 			var y : i32 = 41;
-			swap[i32](ref x, ref y);
+			swap(ref x, ref y);
 			return x + y;
 		}
 	)";
@@ -1985,7 +1972,7 @@ TEST(NullableTemplateStructInstantiationRuntime) {
 // Template function taking T[] (slice of T) as a parameter.
 TEST(TemplateFunctionSliceOfTParamRuntime) {
 	const char* source = R"(
-		fn first[T](values : []T) : T {
+		fn first(values : []$T) : T {
 			return values[0];
 		}
 
@@ -2030,12 +2017,12 @@ TEST(ComptimeGenericStructBindingRuntime) {
 
 TEST(ComptimeGenericFunctionBindingRuntime) {
 	const char* source = R"(
-		comptime identity = fn[T](value : T) : T {
+		comptime identity = fn(value : $T) : T {
 			return value;
 		}
 
 		fn main() : i32 {
-			return identity[i32](42);
+			return identity(42);
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
@@ -2067,3 +2054,62 @@ TEST(ComptimeGenericStructWithValueParamRuntime) {
 	CAPI_END(module);
 	return true;
 }
+
+TEST(ComptimeFunctionParameterRuntime) {
+	const char* source = R"(
+		fn repeat(text : string, count : comptime i32) : i32 {
+			return count;
+		}
+
+		fn main() : i32 {
+			return repeat("hi", 5);
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(5, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ComptimeFunctionParameterDependentArraySizeRuntime) {
+	const char* source = R"(
+		fn splat(value : f32, n : comptime i32) : [n]f32 {
+			var result : [n]f32;
+			for i in range(n) {
+				result[i] = value;
+			}
+			return result;
+		}
+
+		fn main() : i32 {
+			const arr = splat(1.0, 4);
+			return 42;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ComptimeFunctionParameterNonConstantArgumentFails) {
+	const char* source = R"(
+		fn repeat(text : string, count : comptime i32) : void {}
+
+		fn main() : void {
+			var n : i32 = 5;
+			repeat("hi", n);
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+
+

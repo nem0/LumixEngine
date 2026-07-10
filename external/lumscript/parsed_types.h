@@ -35,6 +35,8 @@ struct ParsedType {
 		FUNCTION,
 		// Qualified type name such as `alias.Type`.
 		QUALIFIED,
+		// Generic type parameter introduced in a function signature, e.g. `$T`.
+		GENERIC,
 		// Prefix array syntax, e.g. `[N]T`. Nested arrays are represented by nested
 		// ArrayParsedType nodes rather than by a lossy array-depth counter.
 		ARRAY,
@@ -58,6 +60,12 @@ struct QualifiedParsedType : ParsedType {
 	QualifiedParsedType() : ParsedType(QUALIFIED) {}
 
 	ls_string_view qualifier = {};
+	ls_string_view name = {};
+};
+
+struct GenericParsedType : ParsedType {
+	GenericParsedType() : ParsedType(GENERIC) {}
+
 	ls_string_view name = {};
 };
 
@@ -91,6 +99,6 @@ struct TemplateInstantiationParsedType : ParsedType {
 	TemplateInstantiationParsedType(ls_arena& arena) : ParsedType(TEMPLATE_INSTANTIATION), args(arena) {}
 
 	// Always a qualified name; the parser only forms instantiations after one.
-	QualifiedParsedType* callee = nullptr;
+	QualifiedParsedType* base = nullptr;
 	ExpArray<Expression*> args;
 };

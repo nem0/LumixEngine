@@ -42,6 +42,9 @@ struct FunctionParam {
 	ls_string_view name;
 	// Runtime parameters can be passed by reference with `ref`.
 	bool is_ref = false;
+	// Compile-time value parameters require constant arguments.
+	bool is_comptime = false;
+	bool is_generic = false;
 	ParsedType* parsed_type = nullptr;
 	ResolvedType* resolved_type = nullptr;
 	StorageSlot slot;
@@ -85,6 +88,8 @@ struct Expression {
 		UNDEFINED, // var a : i32 = undefined;
 		// `sizeof(T)` / `alignof(T)` — produces an untyped integer constant.
 		SIZEOF,
+		// $T
+		GENERIC_IDENTIFIER,
 	};
 
 	Expression() = default;
@@ -104,6 +109,12 @@ struct IdentifierExpression : Expression {
 	// Set by the checker when this identifier resolves to runtime storage (local,
 	// parameter, or global); null for compile-time symbols (functions, types, etc.).
 	StorageSlot* slot = nullptr;
+};
+
+struct GenericIdentifierExpression : Expression {
+	GenericIdentifierExpression() : Expression(GENERIC_IDENTIFIER) {}
+
+	ls_string_view name = {};
 };
 
 struct IntLiteralExpression : Expression {
@@ -226,16 +237,14 @@ struct StructLiteralExpression : Expression {
 };
 
 struct FunctionExpression : Expression {
-	FunctionExpression(ls_arena& arena) : Expression(FUNCTION), comptime_params(arena), runtime_params(arena), template_function_instances(arena) {}
+	FunctionExpression(ls_arena& arena) : Expression(FUNCTION), params(arena), template_function_instances(arena) {}
 
-	ExpArray<NamedDecl> comptime_params; // [...]
-	ExpArray<FunctionParam> runtime_params; // (...)
-	// Return type remains source syntax until semantic resolution so aliases and
-	// generated comptime types can be resolved after symbol registration.
+	ExpArray<FunctionParam> params;
 	ParsedType* return_type = nullptr;
 	// Null for `extern fn` declarations; the host binds the implementation at runtime.
 	Statement* body = nullptr;
 	bool is_extern = false;
+	bool is_template = false;
 	// Canonical template specializations for this function declaration.
 	ExpArray<TemplateFunctionInstance> template_function_instances;
 	// Bytecode function index; assigned during bytecode compilation.

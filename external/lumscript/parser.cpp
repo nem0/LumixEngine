@@ -81,6 +81,7 @@ struct Parser {
 			case Token::DOT: return ".";
 			case Token::RANGE: return "..";
 			case Token::QUESTION: return "?";
+			case Token::DOLLAR: return "$";
 			case Token::PLUS: return "+";
 			case Token::MINUS: return "-";
 			case Token::STAR: return "*";
@@ -306,6 +307,11 @@ struct Parser {
 				expr->type = type();
 				if (!expr->type) return nullptr;
 				if (!consume(Token::RIGHT_PAREN)) return nullptr;
+				return expr;
+			}
+			case Token::DOLLAR: {
+				GenericIdentifierExpression* expr = makeExpr<GenericIdentifierExpression>(token);
+				if (!consume(Token::IDENTIFIER, expr->name, "Expected identifier")) return nullptr;;
 				return expr;
 			}
 			case Token::IDENTIFIER: {
@@ -590,7 +596,7 @@ struct Parser {
 			if (peekToken().type == Token::LEFT_BRACKET) {
 				Token bracket = consumeToken();
 				TemplateInstantiationParsedType* call = makeParsedType<TemplateInstantiationParsedType>(bracket, m_unit.arena);
-				call->callee = static_cast<QualifiedParsedType*>(res);
+				call->base = static_cast<QualifiedParsedType*>(res);
 				while (peekToken().type != Token::RIGHT_BRACKET) {
 					if (peekToken().type == Token::END_OF_FILE) {
 						m_output.error("Unexpected end of file");
@@ -646,6 +652,18 @@ struct Parser {
 			NullableParsedType* nullable = makeParsedType<NullableParsedType>(first);
 			nullable->inner = inner;
 			return nullable;
+		}
+
+		if (first.type == Token::DOLLAR) {
+			consumeToken();
+			Token name = consumeToken();
+			if (name.type != Token::IDENTIFIER) {
+				m_output.errorAt(name, "Expected inferred generic type name");
+				return nullptr;
+			}
+			GenericParsedType* generic = makeParsedType<GenericParsedType>(first);
+			generic->name = name.value;
+			return generic;
 		}
 
 		Token base_token = consumeToken();
@@ -779,6 +797,10 @@ struct Parser {
 	bool functionParam(FunctionParam& param) {
 		if (!consume(Token::IDENTIFIER, param.name, "Expected parameter name")) return false;
 		if (!consume(Token::COLON)) return false;
+		if (peekToken().type == Token::COMPTIME) {
+			consumeToken();
+			param.is_comptime = true;
+		}
 		if (peekToken().type == Token::REF) {
 			consumeToken();
 			param.is_ref = true;
@@ -1018,15 +1040,10 @@ struct Parser {
 	bool functionSignature(FunctionExpression* fn) {
 		if (!consume(Token::LEFT_PAREN)) return false;
 		while (peekToken().type != Token::RIGHT_PAREN) {
-			FunctionParam& arg = fn->runtime_params.emplace_back();
+			FunctionParam& arg = fn->params.emplace_back();
 			if (!functionParam(arg)) return false;
-			for (i32 i = 0; i < fn->runtime_params.size() - 1; ++i) {
-				if (!equalStrings(fn->runtime_params[i].name, arg.name)) continue;
-				m_output.error("Duplicate parameter: ", arg.name);
-				return false;
-			}
-			for (const NamedDecl& comptime_param : fn->comptime_params) {
-				if (!equalStrings(comptime_param.name, arg.name)) continue;
+			for (i32 i = 0; i < fn->params.size() - 1; ++i) {
+				if (!equalStrings(fn->params[i].name, arg.name)) continue;
 				m_output.error("Duplicate parameter: ", arg.name);
 				return false;
 			}
@@ -1039,13 +1056,90 @@ struct Parser {
 		return fn->return_type != nullptr;
 	}
 
+	static bool isGeneric(const Expression& expr) {
+		switch (expr.kind) {
+			case Expression::GENERIC_IDENTIFIER: return true;
+			case Expression::BRACKET: {
+				const auto& br = static_cast<const BracketExpression&>(expr);
+				if (isGeneric(*br.base)) return true;
+				for (Expression* arg : br.args) {
+					if (isGeneric(*arg)) return true;
+				}
+				return false;
+			}
+			case Expression::CALL: {
+				const auto& call = static_cast<const CallExpression&>(expr);
+				if (isGeneric(*call.callee)) return true;
+				for (Expression* arg : call.args) {
+					if (isGeneric(*arg)) return true;
+				}
+				return false;
+			}
+			case Expression::BINARY: {
+				const auto& bin = static_cast<const BinaryExpression&>(expr);
+				return isGeneric(*bin.lhs) || isGeneric(*bin.rhs);
+			}
+			case Expression::UNARY: return isGeneric(*static_cast<const UnaryExpression&>(expr).expression);
+			case Expression::CAST: return isGeneric(*static_cast<const CastExpression&>(expr).expression);
+			case Expression::MEMBER: return isGeneric(*static_cast<const MemberExpression&>(expr).expression);
+			case Expression::SLICE: {
+				const auto& slice = static_cast<const SliceExpression&>(expr);
+				if (isGeneric(*slice.base)) return true;
+				if (slice.begin && isGeneric(*slice.begin)) return true;
+				if (slice.end && isGeneric(*slice.end)) return true;
+				return false;
+			}
+			case Expression::STRUCT_LITERAL: {
+				const auto& lit = static_cast<const StructLiteralExpression&>(expr);
+				if (lit.type && isGeneric(*lit.type)) return true;
+				for (Expression* val : lit.values) {
+					if (isGeneric(*val)) return true;
+				}
+				return false;
+			}
+			default: return false;
+		}
+	}
+
+	static bool isGeneric(const ParsedType& type) {
+		switch (type.kind) {
+			case ParsedType::GENERIC: return true;
+			case ParsedType::ARRAY: return isGeneric(*static_cast<const ArrayParsedType&>(type).element_type);
+			case ParsedType::NULLABLE: return isGeneric(*static_cast<const NullableParsedType&>(type).inner);
+			case ParsedType::SLICE: return isGeneric(*static_cast<const SliceParsedType&>(type).element_type);
+			case ParsedType::TEMPLATE_INSTANTIATION: {
+				const TemplateInstantiationParsedType& tpl = static_cast<const TemplateInstantiationParsedType&>(type);
+				if (isGeneric(*tpl.base)) return true;
+				for (Expression* arg : tpl.args) {
+					if (isGeneric(*arg)) return true;
+				}
+				return false;
+			}
+			case ParsedType::FUNCTION: {
+				const FunctionParsedType& fn = static_cast<const FunctionParsedType&>(type);
+				for (const auto param : fn.params) {
+					if (isGeneric(*param)) return true;
+				}
+				return isGeneric(*fn.return_type);
+			}
+
+			default: return false;
+		}
+	}
+
 	FunctionExpression* functionExpression() {
 		FunctionExpression* fn = make<FunctionExpression>(m_unit.arena);
-		if (!templateParams(fn->comptime_params)) return nullptr;
-		m_comptime_params = fn->comptime_params.empty() ? nullptr : &fn->comptime_params;
 		bool ok = functionSignature(fn);
-		m_comptime_params = nullptr;
 		if (!ok) return nullptr;
+
+		fn->is_template = false;
+		for (FunctionParam& param : fn->params) {
+			if (param.is_comptime || isGeneric(*param.parsed_type)) {
+				param.is_generic = true;
+				fn->is_template = true;
+			}
+		}
+
 		fn->body = blockStatement();
 		if (!fn->body) return nullptr;
 		return fn;

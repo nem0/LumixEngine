@@ -46,6 +46,10 @@ i64 typeByteSize(const ResolvedType& t) {
 	}
 }
 
+struct TemplateBindings {
+	// TODO
+};
+
 struct Checker {
 	ls_module& module;
 	OutputFormatter error_stream;
@@ -53,7 +57,7 @@ struct Checker {
 
 	Checker(ls_module& module)
 		: module(module)
-		, templates(*this) {
+	{
 		error_stream.host = module.host;
 	}
 
@@ -220,454 +224,6 @@ struct Checker {
 		i32 in_defer = 0;
 	};
 
-	struct TemplateEnvironment {
-		Checker& checker;
-		const ExpArray<NamedDecl>* active_params = nullptr;
-		const ExpArray<TemplateArgument>* active_args = nullptr;
-
-		struct Scope {
-			TemplateEnvironment& env;
-			const ExpArray<NamedDecl>* previous_params;
-			const ExpArray<TemplateArgument>* previous_args;
-
-			Scope(TemplateEnvironment& e, const ExpArray<NamedDecl>& params, const ExpArray<TemplateArgument>& args)
-				: env(e)
-				, previous_params(e.active_params)
-				, previous_args(e.active_args) {
-				ASSERT(params.size() == args.size());
-				e.active_params = &params;
-				e.active_args = &args;
-			}
-
-			~Scope() {
-				env.active_params = previous_params;
-				env.active_args = previous_args;
-			}
-		};
-
-		TemplateEnvironment(Checker& checker)
-			: checker(checker) {}
-
-		const TemplateArgument* findArgument(ls_string_view name) const {
-			if (!active_params || !active_args) return nullptr;
-			for (i32 i = 0; i < active_params->size(); ++i) {
-				if (equalStrings((*active_params)[i].name, name)) return &(*active_args)[i];
-			}
-			return nullptr;
-		}
-
-		ResolvedType* findType(ls_string_view name) const {
-			const TemplateArgument* arg = findArgument(name);
-			return arg && arg->kind == TemplateArgument::TYPE ? arg->type : nullptr;
-		}
-
-		bool findIntValue(ls_string_view name, i64& out) const {
-			const TemplateArgument* arg = findArgument(name);
-			if (!arg || arg->kind != TemplateArgument::VALUE) return false;
-			return comptimeIntValue(arg->value, out);
-		}
-
-		StructResolvedType* instantiateStructTemplate(Unit& decl_unit, Unit& call_unit, Token token, StructExpression& st, const ExpArray<Expression*>& args) {
-			if (st.comptime_params.size() != args.size()) {
-				checker.errorLine(token, "wrong number of template arguments for struct");
-				return nullptr;
-			}
-
-			// check and gather args
-			ExpArray<TemplateArgument> template_args(*call_unit.arena.arena);
-			for (i32 i = 0; i < st.comptime_params.size(); ++i) {
-				const NamedDecl& param = st.comptime_params[i];
-				Expression* arg = args[i];
-				if (!param.resolved_type) {
-					ResolvedType* type = checker.resolveExpressionAsType(call_unit, *arg);
-					if (!type) return nullptr;
-					template_args.emplace_back(type);
-				} else {
-					Expression* value = checker.resolveComptimeValue(call_unit, arg, param.resolved_type);
-					if (!value) return nullptr;
-					template_args.emplace_back(value);
-				}
-			}
-
-			// check cache
-			for (StructResolvedType* instance : st.template_struct_instances) {
-				if (templateArgsEqual(instance->template_args, template_args)) return instance;
-			}
-
-			// create struct template instance
-			StructResolvedType* st_type = checker.makeType<StructResolvedType>(decl_unit, *decl_unit.arena.arena);
-			st_type->decl = &st;
-			for (const TemplateArgument& arg : template_args) {
-				ASSERT(arg.kind != TemplateArgument::UNBOUND);
-				st_type->template_args.push(arg);
-			}
-			// Publish the half-built instance before resolving fields so `Node[T]`
-			// inside `Node[T]` fields resolves to this exact specialization. That lets
-			// the direct by-value recursion check catch the cycle instead of allocating
-			// an endless chain of equivalent instances.
-			st.template_struct_instances.push(st_type);
-
-			bool ok = true;
-			bool recursive_by_value = false;
-			Scope scope(*this, st.comptime_params, template_args);
-			for (NamedDecl& field : st.fields) {
-				ResolvedType* field_type = checker.resolveParsedType(decl_unit, field.parsed_type);
-				if (!field_type) {
-					ok = false;
-					break;
-				}
-				if (field_type == st_type) {
-					ok = false;
-					recursive_by_value = true;
-					break;
-				}
-				st_type->field_types.push(field_type);
-			}
-			if (ok) {
-				ExpArray<ResolvedType*> visited(*decl_unit.arena.arena);
-				for (ResolvedType* field_type : st_type->field_types) {
-					if (checker.containsStructByValue(field_type, *st_type, visited)) {
-						ok = false;
-						recursive_by_value = true;
-						break;
-					}
-				}
-			}
-			if (!ok) {
-				if (recursive_by_value) {
-					checker.errorLine(token, "Recursive by-value field in struct template");
-				}
-				auto& arr = st.template_struct_instances;
-				for (i32 i = 0; i < arr.size(); ++i) {
-					if (arr[i] == st_type) {
-						arr[i] = arr.back();
-						arr.pop_back();
-						break;
-					}
-				}
-				return nullptr;
-			}
-
-			return st_type;
-		}
-
-		FunctionExpression* cloneFunctionInstance(Unit& unit, FunctionExpression& source, const ExpArray<TemplateArgument>& args) {
-			FunctionExpression* fn = checker.makeType<FunctionExpression>(unit, *unit.arena.arena);
-			fn->token = source.token;
-			fn->return_type = checker.cloneParsedType(unit, source.return_type);
-			{
-				Scope scope(*this, source.comptime_params, args);
-				fn->body = checker.cloneStatement(unit, source.body);
-			}
-			fn->is_extern = source.is_extern;
-			for (FunctionParam& src_param : source.runtime_params) {
-				FunctionParam& dst = fn->runtime_params.emplace_back();
-				dst.name = src_param.name;
-				dst.is_ref = src_param.is_ref;
-				dst.parsed_type = checker.cloneParsedType(unit, src_param.parsed_type);
-			}
-			return fn;
-		}
-
-		FunctionExpression* instantiateFunctionTemplateWithArgs(Unit& unit, Symbol& sym, FunctionExpression& source, const ExpArray<TemplateArgument>& args) {
-			// search cache
-			for (TemplateFunctionInstance& instance : source.template_function_instances) {
-				if (templateArgsEqual(instance.type->template_args, args)) return instance.instance;
-			}
-
-			// instantiate function template instance
-			FunctionExpression* fn = cloneFunctionInstance(unit, source, args);
-			FunctionResolvedType* fn_type;
-			{
-				Scope scope(*this, source.comptime_params, args);
-				fn_type = checker.buildFunctionType(unit, *fn, true);
-			}
-			if (!fn_type) return nullptr;
-
-			for (const TemplateArgument& arg : args) {
-				ASSERT(arg.kind != TemplateArgument::UNBOUND);
-				fn_type->template_args.push(arg);
-			}
-			fn->resolved_type = fn_type;
-			TemplateFunctionInstance& instance = source.template_function_instances.emplace_back();
-			instance.name = sym.name;
-			instance.instance = fn;
-			instance.type = fn_type;
-			if (fn->body) {
-				Scope scope(*this, source.comptime_params, args);
-				if (!checker.checkFunctionBody(unit, *fn)) {
-					source.template_function_instances.pop_back();
-					return nullptr;
-				}
-			}
-			return fn;
-		}
-
-		FunctionExpression* instantiateFunctionTemplate(Unit& unit, Symbol& sym, FunctionExpression& source, const ExpArray<Expression*>& args) {
-			if (source.comptime_params.size() != args.size()) return nullptr;
-			
-			ExpArray<TemplateArgument> template_args(*unit.arena.arena);
-			for (i32 i = 0; i < source.comptime_params.size(); ++i) {
-				const NamedDecl& param = source.comptime_params[i];
-				if (param.parsed_type) {
-					ResolvedType* value_type = checker.resolveParsedType(unit, param.parsed_type);
-					Expression* value = checker.resolveComptimeValue(unit, args[i], value_type);
-					if (!value) return nullptr;
-					template_args.emplace_back(value);
-				} else {
-					ResolvedType* type = checker.resolveExpressionAsType(unit, *args[i]);
-					if (!type) return nullptr;
-					template_args.emplace_back(type);
-				}
-			}
-			return instantiateFunctionTemplateWithArgs(unit, sym, source, template_args);
-		}
-
-		bool bindTemplateParam(const ExpArray<NamedDecl>& params, ExpArray<TemplateArgument>& args, ls_string_view name, ResolvedType& type) {
-			for (i32 i = 0; i < params.size(); ++i) {
-				if (!equalStrings(params[i].name, name) || params[i].parsed_type) continue;
-				TemplateArgument& arg = args[i];
-				if (arg.kind == TemplateArgument::TYPE) return checker.typesEqual(arg.type, &type);
-				if (arg.kind != TemplateArgument::UNBOUND) return false;
-				arg = TemplateArgument(&type);
-				return true;
-			}
-			return false;
-		}
-
-		bool bindTemplateValue(const ExpArray<NamedDecl>& params, ExpArray<TemplateArgument>& args, Expression* expr, Expression& value) {
-			if (!expr || expr->kind != Expression::IDENTIFIER) return false;
-			const ls_string_view name = static_cast<IdentifierExpression*>(expr)->name;
-			for (i32 i = 0; i < params.size(); ++i) {
-				if (!params[i].parsed_type || !equalStrings(params[i].name, name)) continue;
-				TemplateArgument& arg = args[i];
-				if (arg.kind == TemplateArgument::VALUE) return checker.templateValuesEqual(arg.value, &value);
-				if (arg.kind != TemplateArgument::UNBOUND) return false;
-				arg = TemplateArgument(&value);
-				return true;
-			}
-			return false;
-		}
-
-		// Match a template instantiation pattern (resolved callee + bracket args)
-		// against a concrete struct instance and bind template parameters from the
-		// args. Shared by the parsed-type (`Vec[T]` in type syntax) and expression
-		// (`Vec[T]` as a bracket expression) forms of the pattern.
-		bool inferTemplateFromInstantiation(Unit& unit,
-			const ExpArray<NamedDecl>& params,
-			ResolvedType* callee,
-			const ExpArray<Expression*>& args,
-			ResolvedType* actual,
-			ExpArray<TemplateArgument>& template_args)
-		{
-			if (!callee || callee->kind != ResolvedType::STRUCT) return false;
-			if (!actual || actual->kind != ResolvedType::STRUCT) return false;
-			StructResolvedType* pattern_base = static_cast<StructResolvedType*>(callee);
-			StructResolvedType* actual_struct = static_cast<StructResolvedType*>(actual);
-			if (!pattern_base->decl || pattern_base->decl != actual_struct->decl) return false;
-			return inferTemplateFromBracketArgs(unit, params, pattern_base->decl->comptime_params, args, actual_struct, template_args);
-		}
-
-		bool inferTemplateFromBracketArgs(Unit& unit,
-			const ExpArray<NamedDecl>& params,
-			const ExpArray<NamedDecl>& comptime_params,
-			const ExpArray<Expression*>& args,
-			StructResolvedType* actual_struct,
-			ExpArray<TemplateArgument>& template_args)
-		{
-			if (args.size() != comptime_params.size()) return false;
-			if (actual_struct->template_args.size() != args.size()) return false;
-			for (i32 i = 0; i < comptime_params.size(); ++i) {
-				const NamedDecl& param = comptime_params[i];
-				Expression* arg = args[i];
-				const TemplateArgument& actual_arg = actual_struct->template_args[i];
-				if (!param.resolved_type) {
-					if (actual_arg.kind != TemplateArgument::TYPE) return false;
-					if (!arg || !actual_arg.type) return false;
-					switch (arg->kind) {
-						case Expression::IDENTIFIER: {
-							IdentifierExpression* id = static_cast<IdentifierExpression*>(arg);
-							if (bindTemplateParam(params, template_args, id->name, *actual_arg.type)) break;
-							ResolvedType* resolved = checker.resolveExpressionAsType(unit, *arg);
-							if (!resolved || !checker.typesEqual(resolved, actual_arg.type)) return false;
-							break;
-						}
-						case Expression::PARSED_TYPE: {
-							if (!inferTemplateFromType(unit, params, static_cast<ParsedTypeExpression*>(arg)->type, actual_arg.type, template_args)) return false;
-							break;
-						}
-						case Expression::BRACKET: {
-							BracketExpression* br = static_cast<BracketExpression*>(arg);
-							ResolvedType* callee = checker.resolveExpressionAsType(unit, *br->base);
-							if (!inferTemplateFromInstantiation(unit, params, callee, br->args, actual_arg.type, template_args)) return false;
-							break;
-						}
-						default: {
-							ResolvedType* resolved = checker.resolveExpressionAsType(unit, *arg);
-							if (!resolved || !checker.typesEqual(resolved, actual_arg.type)) return false;
-							break;
-						}
-					}
-				} else {
-					if (actual_arg.kind != TemplateArgument::VALUE) return false;
-					Expression* value = actual_arg.value;
-					if (!bindTemplateValue(params, template_args, arg, *value)) {
-						Expression* resolved = checker.resolveComptimeValue(unit, arg, value->resolved_type);
-						if (!resolved || !checker.templateValuesEqual(resolved, value)) return false;
-					}
-				}
-			}
-			return true;
-		}
-
-		// Match a parsed template type pattern against a concrete resolved type and
-		// bind any template parameters that appear in the pattern.
-		// example decl: fn foo[T](v : Vec[T]) : void {}
-		// example call: foo(Vec[i32] {});
-		// pattern : Vec[T]
-		// actual: Vec[i32]
-		// bind i32 -> T
-		// TODO error msg
-		bool inferTemplateFromType(Unit& unit, const ExpArray<NamedDecl>& params, ParsedType* pattern, ResolvedType* actual, ExpArray<TemplateArgument>& template_args) {
-			if (!pattern || !actual) return false;
-			switch (pattern->kind) {
-				case ParsedType::NULLABLE: {
-					if (actual->kind != ResolvedType::NULLABLE) {
-						return false;
-					}
-					NullableParsedType* nullable = static_cast<NullableParsedType*>(pattern);
-					NullableResolvedType* resolved = static_cast<NullableResolvedType*>(actual);
-					return inferTemplateFromType(unit, params, nullable->inner, resolved->inner, template_args);
-				}
-				case ParsedType::QUALIFIED: {
-					QualifiedParsedType* q = static_cast<QualifiedParsedType*>(pattern);
-					if (empty(q->qualifier) && bindTemplateParam(params, template_args, q->name, *actual)) return true;
-					ResolvedType* resolved = checker.resolveParsedType(unit, pattern);
-					// TODO possible error msg
-					return resolved && checker.typesEqual(resolved, actual);
-				}
-				case ParsedType::ARRAY: {
-					if (actual->kind != ResolvedType::ARRAY) {
-						return false;
-					}
-					ArrayParsedType* p = static_cast<ArrayParsedType*>(pattern);
-					ArrayResolvedType* a = static_cast<ArrayResolvedType*>(actual);
-					IntLiteralExpression* size_value = checker.makeType<IntLiteralExpression>(unit);
-					size_value->value = (u64)a->size;
-					size_value->resolved_type = checker.primitiveType(ResolvedType::I32);
-					if (!bindTemplateValue(params, template_args, p->size, *size_value)) {
-						i64 size = 0;
-						if (!checker.resolveComptimeIntValue(unit, p->size, size) || size != a->size) {
-							return false;
-						}
-					}
-					return inferTemplateFromType(unit, params, p->element_type, a->element_type, template_args);
-				}
-				case ParsedType::SLICE: {
-					if (actual->kind != ResolvedType::SLICE) {
-						return false;
-					}
-					return inferTemplateFromType(unit, params, static_cast<SliceParsedType*>(pattern)->element_type, static_cast<SliceResolvedType*>(actual)->element_type, template_args);
-				}
-				case ParsedType::TEMPLATE_INSTANTIATION: {
-					TemplateInstantiationParsedType* br = static_cast<TemplateInstantiationParsedType*>(pattern);
-					ResolvedType* callee = checker.resolveParsedType(unit, br->callee);
-					// TODO possible erorr msg
-					return inferTemplateFromInstantiation(unit, params, callee, br->args, actual, template_args);
-				}
-				default: {
-					ResolvedType* resolved = checker.resolveParsedType(unit, pattern);
-					// TODO possible erorr msg
-					return resolved && checker.typesEqual(resolved, actual);
-				}
-			}
-		}
-
-		FunctionExpression* inferAndInstantiateFunctionTemplate(Unit& decl_unit,
-			Unit& call_unit,
-			FunctionCheckContext* ctx,
-			Symbol& sym,
-			FunctionExpression& source,
-			CallExpression& call,
-			ResolvedType* hint,
-			Expression* ufcs_receiver = nullptr)
-		{
-			ExpArray<TemplateArgument> template_args(*decl_unit.arena.arena);
-			template_args.resize(source.comptime_params.size());
-			ResolvedType* return_hint = source.return_type && source.return_type->kind == ParsedType::NULLABLE ? hint : checker.unwrapNullable(hint);
-			if ((ufcs_receiver || !call.args.empty()) && return_hint && !inferTemplateFromType(decl_unit, source.comptime_params, source.return_type, return_hint, template_args)) {
-				// TODO can we even get here?
-				return nullptr;
-			}
-			// A UFCS receiver fills the first runtime parameter, mirroring how checkCallCandidate
-			// treats the receiver via ufcs_param_offset; the explicit call args fill the rest.
-			const u32 param_offset = ufcs_receiver ? 1 : 0;
-			if (source.runtime_params.size() != call.args.size() + param_offset) {
-				// TODO can we even get here?
-				return nullptr;
-			}
-			Scope scope(*this, source.comptime_params, template_args);
-
-			// Infer one runtime parameter from one argument. The receiver is already checked at
-			// the call site (reuse its type, and it binds a ref param directly); explicit args are
-			// checked here in the caller's scope, and a ref arg must be spelled `&expr`.
-			for (i32 i = 0; i < source.runtime_params.size(); ++i) {
-				const bool is_receiver = ufcs_receiver && i == 0;
-				FunctionParam& param = source.runtime_params[i];
-				Expression* arg = is_receiver ? ufcs_receiver : call.args[i - param_offset];
-				ResolvedType* param_hint = checker.resolveParsedType(decl_unit, param.parsed_type);
-				ResolvedType* arg_type = nullptr;
-				if (param.is_ref) {
-					Expression* target = arg;
-					if (!is_receiver) {
-						if (!arg) {
-							return nullptr;
-						}
-						if (arg->kind != Expression::UNARY) {
-							checker.errorLine(arg->token, "missing ref for reference parameter");
-							return nullptr;
-						}
-						if (static_cast<UnaryExpression*>(arg)->op != Token::REF) {
-							return nullptr;
-						}
-						target = static_cast<UnaryExpression*>(arg)->expression;
-					}
-					bool writable = false;
-					arg_type = checker.checkAssignableExpr(call_unit, ctx, target, writable);
-					if (!arg_type) {
-						return nullptr;
-					}
-					if (!writable) {
-						checker.errorLine(arg->token, "cannot bind non-writable value to a reference parameter");
-						return nullptr;
-					}
-				} else if (is_receiver) {
-					arg_type = arg->resolved_type;
-				} else {
-					arg_type = checker.checkExpr(call_unit, ctx, *arg, param_hint);
-					if (!arg_type) return nullptr;
-				}
-				if (checker.isUntypedNumeric(*arg_type)) {
-					arg_type = checker.materializeUntyped(*arg, param_hint);
-					if (!arg_type) {
-						return nullptr;
-					}
-				}
-				if (!inferTemplateFromType(decl_unit, source.comptime_params, param.parsed_type, arg_type, template_args)) return nullptr;
-			}
-
-			for (const TemplateArgument& targ : template_args) {
-				if (targ.kind == TemplateArgument::UNBOUND) {
-					checker.errorLine(call.token, "could not infer template argument");
-					return nullptr;
-				}
-			}
-			return instantiateFunctionTemplateWithArgs(decl_unit, sym, source, template_args);
-		}
-	};
-
-	TemplateEnvironment templates;
-
 	void error(i64 value) {
 		char buffer[32];
 		char* end = buffer + sizeof(buffer);
@@ -826,17 +382,6 @@ struct Checker {
 
 	// `sizeof(T)` / `alignof(T)`. Rejects a value-denoting name (the operand must be a type).
 	bool resolveSizeofValue(Unit& unit, SizeofExpression& sz, i64& out) {
-		if (sz.type && sz.type->kind == ParsedType::QUALIFIED) {
-			QualifiedParsedType* q = static_cast<QualifiedParsedType*>(sz.type);
-			const bool is_template_type = empty(q->qualifier) && templates.findType(q->name);
-			if (!is_template_type) {
-				SymbolRef ref = resolveSymbol(unit, q->qualifier, q->name, LookupPolicy::Checked);
-				if (!ref || !ref.symbol->resolved_type || ref.symbol->resolved_type->kind != ResolvedType::META) {
-					errorLine(sz.token, sz.is_align ? "alignof operand must be a type" : "sizeof operand must be a type");
-					return false;
-				}
-			}
-		}
 		ResolvedType* measured = resolveParsedType(unit, sz.type);
 		if (!measured) {
 			errorLine(sz.token, "Cannot resolve type for ", sz.is_align ? "alignof" : "sizeof");
@@ -859,7 +404,7 @@ struct Checker {
 			}
 			case Expression::IDENTIFIER: {
 				IdentifierExpression* id = static_cast<IdentifierExpression*>(expr);
-				if (templates.findIntValue(id->name, out)) return true;
+				// TODO templates
 				SymbolRef ref = resolveSymbol(unit, {}, id->name, LookupPolicy::Checked);
 				if (!ref.symbol || ref.check_failed || ref.symbol->storage != Symbol::COMPTIME) return false;
 				return resolveComptimeIntValue(unit, ref.symbol->expression, out);
@@ -879,10 +424,7 @@ struct Checker {
 		if (!expr || !expected) return nullptr;
 		if (expr->kind == Expression::IDENTIFIER) {
 			IdentifierExpression* id = static_cast<IdentifierExpression*>(expr);
-			if (const TemplateArgument* arg = templates.findArgument(id->name)) {
-				if (arg->kind != TemplateArgument::VALUE || !typesEqual(arg->value->resolved_type, expected)) return nullptr;
-				return arg->value;
-			}
+			// TODO templates
 			SymbolRef ref = resolveSymbol(unit, {}, id->name, LookupPolicy::Checked);
 			if (!ref || ref.symbol->storage != Symbol::COMPTIME) return nullptr;
 			return resolveComptimeValue(*ref.owner, ref.symbol->expression, expected);
@@ -1007,8 +549,9 @@ struct Checker {
 			case ParsedType::TEMPLATE_INSTANTIATION: {
 				TemplateInstantiationParsedType* s = static_cast<TemplateInstantiationParsedType*>(src);
 				TemplateInstantiationParsedType* br = makeType<TemplateInstantiationParsedType>(unit, *unit.arena.arena);
-				br->callee = static_cast<QualifiedParsedType*>(cloneParsedType(unit, s->callee));
-				for (Expression* arg : s->args) br->args.push(cloneExpression(unit, arg));
+				br->base = static_cast<QualifiedParsedType*>(cloneParsedType(unit, s->base));
+				// TODO template bindings
+				//for (Expression* arg : s->args) br->args.push(cloneExpression(unit, arg, bindings));
 				out = br;
 				break;
 			}
@@ -1018,16 +561,13 @@ struct Checker {
 		return out;
 	}
 
-	Expression* cloneExpression(Unit& unit, Expression* src) {
+	Expression* cloneExpression(Unit& unit, Expression* src, const TemplateBindings& bindings) {
 		if (!src) return nullptr;
 		Expression* out = nullptr;
 		switch (src->kind) {
 			case Expression::IDENTIFIER: {
 				IdentifierExpression* s = static_cast<IdentifierExpression*>(src);
-				if (const TemplateArgument* arg = templates.findArgument(s->name); arg && arg->kind == TemplateArgument::VALUE) {
-					out = cloneExpression(unit, arg->value);
-					break;
-				}
+				// TODO templates
 				IdentifierExpression* id = makeType<IdentifierExpression>(unit);
 				id->name = s->name;
 				out = id;
@@ -1075,8 +615,8 @@ struct Checker {
 			case Expression::CALL: {
 				CallExpression* s = static_cast<CallExpression*>(src);
 				CallExpression* call = makeType<CallExpression>(unit, *unit.arena.arena);
-				call->callee = cloneExpression(unit, s->callee);
-				for (Expression* arg : s->args) call->args.push(cloneExpression(unit, arg));
+				call->callee = cloneExpression(unit, s->callee, bindings);
+				for (Expression* arg : s->args) call->args.push(cloneExpression(unit, arg, bindings));
 				out = call;
 				break;
 			}
@@ -1084,7 +624,7 @@ struct Checker {
 				UnaryExpression* s = static_cast<UnaryExpression*>(src);
 				UnaryExpression* un = makeType<UnaryExpression>(unit);
 				un->op = s->op;
-				un->expression = cloneExpression(unit, s->expression);
+				un->expression = cloneExpression(unit, s->expression, bindings);
 				out = un;
 				break;
 			}
@@ -1092,15 +632,15 @@ struct Checker {
 				BinaryExpression* s = static_cast<BinaryExpression*>(src);
 				BinaryExpression* bin = makeType<BinaryExpression>(unit);
 				bin->op = s->op;
-				bin->lhs = cloneExpression(unit, s->lhs);
-				bin->rhs = cloneExpression(unit, s->rhs);
+				bin->lhs = cloneExpression(unit, s->lhs, bindings);
+				bin->rhs = cloneExpression(unit, s->rhs, bindings);
 				out = bin;
 				break;
 			}
 			case Expression::CAST: {
 				CastExpression* s = static_cast<CastExpression*>(src);
 				CastExpression* cast = makeType<CastExpression>(unit);
-				cast->expression = cloneExpression(unit, s->expression);
+				cast->expression = cloneExpression(unit, s->expression, bindings);
 				cast->parsed_type = cloneParsedType(unit, s->parsed_type);
 				out = cast;
 				break;
@@ -1108,7 +648,7 @@ struct Checker {
 			case Expression::MEMBER: {
 				MemberExpression* s = static_cast<MemberExpression*>(src);
 				MemberExpression* mem = makeType<MemberExpression>(unit);
-				mem->expression = cloneExpression(unit, s->expression);
+				mem->expression = cloneExpression(unit, s->expression, bindings);
 				mem->name = s->name;
 				out = mem;
 				break;
@@ -1116,25 +656,25 @@ struct Checker {
 			case Expression::BRACKET: {
 				BracketExpression* s = static_cast<BracketExpression*>(src);
 				BracketExpression* br = makeType<BracketExpression>(unit, *unit.arena.arena);
-				br->base = cloneExpression(unit, s->base);
-				for (Expression* arg : s->args) br->args.push(cloneExpression(unit, arg));
+				br->base = cloneExpression(unit, s->base, bindings);
+				for (Expression* arg : s->args) br->args.push(cloneExpression(unit, arg, bindings));
 				out = br;
 				break;
 			}
 			case Expression::SLICE: {
 				SliceExpression* s = static_cast<SliceExpression*>(src);
 				SliceExpression* sl = makeType<SliceExpression>(unit);
-				sl->base = cloneExpression(unit, s->base);
-				sl->begin = cloneExpression(unit, s->begin);
-				sl->end = cloneExpression(unit, s->end);
+				sl->base = cloneExpression(unit, s->base, bindings);
+				sl->begin = cloneExpression(unit, s->begin, bindings);
+				sl->end = cloneExpression(unit, s->end, bindings);
 				out = sl;
 				break;
 			}
 			case Expression::STRUCT_LITERAL: {
 				StructLiteralExpression* s = static_cast<StructLiteralExpression*>(src);
 				StructLiteralExpression* lit = makeType<StructLiteralExpression>(unit, *unit.arena.arena);
-				lit->type = cloneExpression(unit, s->type);
-				for (Expression* value : s->values) lit->values.push(cloneExpression(unit, value));
+				lit->type = cloneExpression(unit, s->type, bindings);
+				for (Expression* value : s->values) lit->values.push(cloneExpression(unit, value, bindings));
 				out = lit;
 				break;
 			}
@@ -1144,28 +684,28 @@ struct Checker {
 		return out;
 	}
 
-	Statement* cloneStatement(Unit& unit, Statement* src) {
+	Statement* cloneStatement(Unit& unit, Statement* src, const TemplateBindings& bindings) {
 		if (!src) return nullptr;
 		Statement* out = nullptr;
 		switch (src->kind) {
 			case Statement::BLOCK: {
 				BlockStatement* s = static_cast<BlockStatement*>(src);
 				BlockStatement* block = makeType<BlockStatement>(unit, *unit.arena.arena);
-				for (Statement* st : s->statements) block->statements.push(cloneStatement(unit, st));
+				for (Statement* st : s->statements) block->statements.push(cloneStatement(unit, st, bindings));
 				out = block;
 				break;
 			}
 			case Statement::EXPRESSION: {
 				ExpressionStatement* s = static_cast<ExpressionStatement*>(src);
 				ExpressionStatement* st = makeType<ExpressionStatement>(unit);
-				st->expression = cloneExpression(unit, s->expression);
+				st->expression = cloneExpression(unit, s->expression, bindings);
 				out = st;
 				break;
 			}
 			case Statement::RETURN: {
 				ReturnStatement* s = static_cast<ReturnStatement*>(src);
 				ReturnStatement* st = makeType<ReturnStatement>(unit);
-				st->expression = cloneExpression(unit, s->expression);
+				st->expression = cloneExpression(unit, s->expression, bindings);
 				out = st;
 				break;
 			}
@@ -1174,7 +714,7 @@ struct Checker {
 				VarDeclStatement* st = makeType<VarDeclStatement>(unit);
 				st->name = s->name;
 				st->parsed_type = cloneParsedType(unit, s->parsed_type);
-				st->expression = cloneExpression(unit, s->expression);
+				st->expression = cloneExpression(unit, s->expression, bindings);
 				st->is_immutable = s->is_immutable;
 				out = st;
 				break;
@@ -1182,8 +722,8 @@ struct Checker {
 			case Statement::ASSIGN: {
 				AssignStatement* s = static_cast<AssignStatement*>(src);
 				AssignStatement* st = makeType<AssignStatement>(unit);
-				st->lhs = cloneExpression(unit, s->lhs);
-				st->rhs = cloneExpression(unit, s->rhs);
+				st->lhs = cloneExpression(unit, s->lhs, bindings);
+				st->rhs = cloneExpression(unit, s->rhs, bindings);
 				st->op = s->op;
 				out = st;
 				break;
@@ -1191,25 +731,25 @@ struct Checker {
 			case Statement::IF: {
 				IfStatement* s = static_cast<IfStatement*>(src);
 				IfStatement* st = makeType<IfStatement>(unit);
-				st->condition = cloneExpression(unit, s->condition);
-				st->body = static_cast<BlockStatement*>(cloneStatement(unit, s->body));
-				st->else_branch = cloneStatement(unit, s->else_branch);
+				st->condition = cloneExpression(unit, s->condition, bindings);
+				st->body = static_cast<BlockStatement*>(cloneStatement(unit, s->body, bindings));
+				st->else_branch = cloneStatement(unit, s->else_branch, bindings);
 				out = st;
 				break;
 			}
 			case Statement::MATCH: {
 				MatchStatement* s = static_cast<MatchStatement*>(src);
 				MatchStatement* st = makeType<MatchStatement>(unit, *unit.arena.arena);
-				st->subject = cloneExpression(unit, s->subject);
+				st->subject = cloneExpression(unit, s->subject, bindings);
 				for (MatchArm& src_arm : s->arms) {
 					MatchArm& dst_arm = st->arms.emplace_back(*unit.arena.arena);
 					dst_arm.is_fallback = src_arm.is_fallback;
 					for (MatchPattern& src_pattern : src_arm.patterns) {
 						MatchPattern& dst_pattern = dst_arm.patterns.emplace_back();
-						dst_pattern.begin = cloneExpression(unit, src_pattern.begin);
-						dst_pattern.end = cloneExpression(unit, src_pattern.end);
+						dst_pattern.begin = cloneExpression(unit, src_pattern.begin, bindings);
+						dst_pattern.end = cloneExpression(unit, src_pattern.end, bindings);
 					}
-					dst_arm.body = static_cast<BlockStatement*>(cloneStatement(unit, src_arm.body));
+					dst_arm.body = static_cast<BlockStatement*>(cloneStatement(unit, src_arm.body, bindings));
 				}
 				out = st;
 				break;
@@ -1217,8 +757,8 @@ struct Checker {
 			case Statement::WHILE: {
 				WhileStatement* s = static_cast<WhileStatement*>(src);
 				WhileStatement* st = makeType<WhileStatement>(unit);
-				st->condition = cloneExpression(unit, s->condition);
-				st->body = static_cast<BlockStatement*>(cloneStatement(unit, s->body));
+				st->condition = cloneExpression(unit, s->condition, bindings);
+				st->body = static_cast<BlockStatement*>(cloneStatement(unit, s->body, bindings));
 				out = st;
 				break;
 			}
@@ -1226,9 +766,9 @@ struct Checker {
 				ForStatement* s = static_cast<ForStatement*>(src);
 				ForStatement* st = makeType<ForStatement>(unit);
 				st->loop_var = s->loop_var;
-				st->begin = cloneExpression(unit, s->begin);
-				st->end = cloneExpression(unit, s->end);
-				st->body = static_cast<BlockStatement*>(cloneStatement(unit, s->body));
+				st->begin = cloneExpression(unit, s->begin, bindings);
+				st->end = cloneExpression(unit, s->end, bindings);
+				st->body = static_cast<BlockStatement*>(cloneStatement(unit, s->body, bindings));
 				out = st;
 				break;
 			}
@@ -1249,7 +789,7 @@ struct Checker {
 			case Statement::DEFER: {
 				DeferStatement* s = static_cast<DeferStatement*>(src);
 				DeferStatement* st = makeType<DeferStatement>(unit);
-				st->statement = cloneStatement(unit, s->statement);
+				st->statement = cloneStatement(unit, s->statement, bindings);
 				out = st;
 				break;
 			}
@@ -1257,7 +797,7 @@ struct Checker {
 				LabelStatement* s = static_cast<LabelStatement*>(src);
 				LabelStatement* st = makeType<LabelStatement>(unit);
 				st->name = s->name;
-				st->statement = cloneStatement(unit, s->statement);
+				st->statement = cloneStatement(unit, s->statement, bindings);
 				out = st;
 				break;
 			}
@@ -1318,12 +858,7 @@ struct Checker {
 				}
 				case ParsedType::QUALIFIED: {
 					QualifiedParsedType* q = static_cast<QualifiedParsedType*>(parsed);
-					if (empty(q->qualifier)) {
-						if (ResolvedType* template_type = templates.findType(q->name)) {
-							result = template_type;
-							break;
-						}
-					}
+					// TODO templates
 					SymbolRef ref = resolveSymbol(unit, q->qualifier, q->name, LookupPolicy::Checked);
 					result = ref ? unwrapMeta(ref.symbol->resolved_type) : nullptr;
 					break;
@@ -1332,14 +867,15 @@ struct Checker {
 					// Arrays use prefix syntax ([N]T), so brackets after a type can only be
 					// template instantiation.
 					TemplateInstantiationParsedType* call = static_cast<TemplateInstantiationParsedType*>(parsed);
-					ResolvedType* callee = resolveParsedType(unit, call->callee);
-					if (!callee) return nullptr;
-					if (callee->kind != ResolvedType::STRUCT) return nullptr;
-					StructResolvedType* st = static_cast<StructResolvedType*>(callee);
+					ResolvedType* resolved_base = resolveParsedType(unit, call->base);
+					if (!resolved_base) return nullptr;
+					if (resolved_base->kind != ResolvedType::STRUCT) return nullptr;
+					StructResolvedType* st = static_cast<StructResolvedType*>(resolved_base);
 					if (!st->decl || st->decl->comptime_params.empty()) return nullptr;
 					Unit* owner = findTypeNamespaceUnit(*st);
 					if (!owner) return nullptr;
-					result = templates.instantiateStructTemplate(*owner, unit, call->token, *st->decl, call->args);
+					// TODO templates
+					//result = ...;
 					break;
 				}
 				default: return nullptr;
@@ -1411,11 +947,11 @@ struct Checker {
 		// The AST owns the canonical signature. Besides avoiding duplicate arena
 		// allocations, publishing it here gives recursive checking a stable identity.
 		if (fn.resolved_type) return static_cast<FunctionResolvedType*>(fn.resolved_type);
-		if (!fn.comptime_params.empty()) return nullptr;
+		if (fn.is_template) return nullptr;
 
 		FunctionResolvedType* fn_type = makeType<FunctionResolvedType>(unit, *unit.arena.arena);
 		fn_type->decl = &fn;
-		for (FunctionParam& param : fn.runtime_params) {
+		for (FunctionParam& param : fn.params) {
 			param.resolved_type = resolveParsedType(unit, param.parsed_type);
 			if (!param.resolved_type) {
 				// TODO error msg
@@ -1492,7 +1028,7 @@ struct Checker {
 			Expression* arg = call.args[i];
 
 			// check ref arg
-			if (fn_type.decl && fn_type.decl->runtime_params.size() > param_index && fn_type.decl->runtime_params[param_index].is_ref) {
+			if (fn_type.decl && fn_type.decl->params.size() > param_index && fn_type.decl->params[param_index].is_ref) {
 				if (arg->kind != Expression::UNARY) {
 					errorLine(call.args[i]->token, "Cannot pass non-ref expression as ref argument ", i + 1, " of function call");
 					return nullptr;
@@ -1636,10 +1172,7 @@ struct Checker {
 		}
 		if (expression.kind == Expression::PARSED_TYPE) return resolveParsedType(unit, static_cast<ParsedTypeExpression&>(expression).type);
 		if (expression.kind == Expression::IDENTIFIER || expression.kind == Expression::MEMBER) {
-			if (expression.kind == Expression::IDENTIFIER) {
-				IdentifierExpression& id = static_cast<IdentifierExpression&>(expression);
-				if (ResolvedType* template_type = templates.findType(id.name)) return template_type;
-			}
+			// TODO templates
 			SymbolRef sym_ref = resolveSymbol(unit, expression);
 			if (!sym_ref) return nullptr;
 			if (checkSymbol(*sym_ref.owner, *sym_ref.symbol) == LS_RESULT_FAILURE) return nullptr;
@@ -1659,17 +1192,19 @@ struct Checker {
 			if (sym.symbol->expression->kind == Expression::STRUCT) {
 				StructExpression& st = static_cast<StructExpression&>(*sym.symbol->expression);
 				if (st.comptime_params.empty()) return nullptr;
-				StructResolvedType* instance = templates.instantiateStructTemplate(*sym.owner, unit, br.token, st, br.args);
-				expression.resolved_type = instance;
-				return instance;
+				// TODO templates
+				// StructResolvedType* instance = ...;
+				// expression.resolved_type = instance;
+				// return instance;
 			}
 			if (sym.symbol->expression->kind == Expression::FUNCTION) {
 				FunctionExpression& fn = static_cast<FunctionExpression&>(*sym.symbol->expression);
-				if (fn.comptime_params.empty()) return nullptr;
-				FunctionExpression* instance = templates.instantiateFunctionTemplate(*sym.owner, *sym.symbol, fn, br.args);
-				if (!instance) return nullptr;
-				expression.resolved_type = instance->resolved_type;
-				return expression.resolved_type;
+				if (!fn.is_template) return nullptr;
+				// TODO templates
+				//FunctionExpression* instance = ...;
+				//if (!instance) return nullptr;
+				//expression.resolved_type = instance->resolved_type;
+				//return expression.resolved_type;
 			}
 		}
 		return nullptr;
@@ -1677,18 +1212,10 @@ struct Checker {
 
 	ls_result checkComptimeFunctionSymbol(Unit& unit, Symbol& sym) {
 		FunctionExpression& fn = static_cast<FunctionExpression&>(*sym.expression);
-		if (!fn.comptime_params.empty()) {
+		if (fn.is_template) {
 			if (isOperatorSymbol(sym.name)) {
 				errorLine(sym.token, "Operator overloads cannot be templated");
 				return LS_RESULT_FAILURE;
-			}
-			for (NamedDecl& param : fn.comptime_params) {
-				if (!param.parsed_type) continue;
-				param.resolved_type = resolveParsedType(unit, param.parsed_type);
-				if (!isTemplateValueType(param.resolved_type)) {
-					errorLine(sym.token, "Function template value comptime parameters must be primitive values");
-					return LS_RESULT_FAILURE;
-				}
 			}
 			sym.resolved_type = nullptr;
 			return LS_RESULT_OK;
@@ -1931,12 +1458,13 @@ struct Checker {
 				// TODO can we even get here?
 				return nullptr;
 			}
-			if (fn->comptime_params.size() > 0) {
-				FunctionExpression* instance = templates.inferAndInstantiateFunctionTemplate(*sym.owner, unit, ctx, *sym.symbol, *fn, call, hint);
-				if (!instance) return nullptr;
-				if (call.callee->kind == Expression::IDENTIFIER) static_cast<IdentifierExpression*>(call.callee)->symbol = sym.symbol;
-				FunctionResolvedType* fn_type = asFunctionType(instance->resolved_type);
-				return checkCallCandidate(unit, ctx, call, *fn_type, instance);
+			if (fn->is_template) {
+				// TODO templates
+				//FunctionExpression* instance = ...;
+				//if (!instance) return nullptr;
+				//if (call.callee->kind == Expression::IDENTIFIER) static_cast<IdentifierExpression*>(call.callee)->symbol = sym.symbol;
+				//FunctionResolvedType* fn_type = asFunctionType(instance->resolved_type);
+				//return checkCallCandidate(unit, ctx, call, *fn_type, instance);
 			}
 
 			errorLine(expr.token, "Cannot call non-function symbol ", sym.symbol->name);
@@ -1970,9 +1498,10 @@ struct Checker {
 		}
 
 		FunctionExpression* fn = asFunctionExpression(*ref.symbol);
-		if (fn && !fn->comptime_params.empty()) {
+		if (fn && fn->is_template) {
 			// ufcs template with inferred parameters
-			fn = templates.inferAndInstantiateFunctionTemplate(*ref.owner, unit, ctx, *ref.symbol, *fn, call, hint, mem.expression);
+			// TODO templates
+			//fn = ...;
 			if (!fn) return nullptr;
 		}
 		// non-template ufcs
@@ -2775,8 +2304,8 @@ struct Checker {
 			return empty(q->qualifier) && equalStrings(q->name, name);
 		}
 		if (type->kind == ParsedType::TEMPLATE_INSTANTIATION) {
-			QualifiedParsedType* callee = static_cast<TemplateInstantiationParsedType*>(type)->callee;
-			return empty(callee->qualifier) && equalStrings(callee->name, name);
+			QualifiedParsedType* base = static_cast<TemplateInstantiationParsedType*>(type)->base;
+			return empty(base->qualifier) && equalStrings(base->name, name);
 		}
 		return false;
 	}
@@ -2859,7 +2388,7 @@ struct Checker {
 		ResolvedType* return_type = fn.resolved_type ? static_cast<FunctionResolvedType*>(fn.resolved_type)->return_type : nullptr;
 		FunctionCheckContext ctx(*unit.arena.arena);
 		pushScope(ctx);
-		for (FunctionParam& param : fn.runtime_params) {
+		for (FunctionParam& param : fn.params) {
 			if (findSymbol(unit, param.name)) {
 				errorLine(fn.token, "Parameter ", param.name, " shadows a global symbol");
 				return false;
@@ -2892,10 +2421,7 @@ struct Checker {
 	}
 
 	bool checkVarDeclStatement(Unit& unit, FunctionCheckContext& ctx, VarDeclStatement& var) {
-		if (templates.findArgument(var.name)) {
-			errorLine(var.token, "Variable ", var.name, " shadows a template parameter");
-			return false;
-		}
+		// TODO collision with templates
 		if (findLocal(ctx, var.name)) {
 			errorLine(var.token, "Variable ", var.name, " shadows an existing local or parameter");
 			return false;
@@ -3066,10 +2592,7 @@ struct Checker {
 	}
 
 	bool checkForStatement(Unit& unit, FunctionCheckContext& ctx, ForStatement& fs, ResolvedType* return_type, ls_string_view pending_label) {
-		if (templates.findArgument(fs.loop_var)) {
-			errorLine(fs.token, "Loop variable ", fs.loop_var, " shadows a template parameter");
-			return false;
-		}
+		// TODO collision with templates
 		ResolvedType* begin_type = checkExpr(unit, &ctx, *fs.begin, primitiveType(ResolvedType::I32));
 		ResolvedType* end_type = checkExpr(unit, &ctx, *fs.end, begin_type ? begin_type : primitiveType(ResolvedType::I32));
 		if (!begin_type || !end_type || !isIntegerType(*begin_type) || !isIntegerType(*end_type)) {
@@ -3386,7 +2909,7 @@ struct Checker {
 				if (op == Token::ERROR) continue;
 				if (!sym.expression || sym.expression->kind != Expression::FUNCTION) continue;
 				FunctionExpression& fn = static_cast<FunctionExpression&>(*sym.expression);
-				if (!fn.comptime_params.empty()) continue;
+				if (fn.is_template) continue;
 				FunctionResolvedType* fn_type = buildFunctionType(unit, fn, false);
 				if (!fn_type) return LS_RESULT_FAILURE;
 				for (ResolvedType* param : fn_type->param_types) {
@@ -3411,7 +2934,7 @@ struct Checker {
 				Symbol& sym = unit.symbols[i];
 				if (!sym.expression || sym.expression->kind != Expression::FUNCTION) continue;
 				FunctionExpression& fn = static_cast<FunctionExpression&>(*sym.expression);
-				if (fn.comptime_params.empty()) continue;
+				if (!fn.is_template) continue;
 				for (TemplateFunctionInstance& instance : fn.template_function_instances) {
 					Symbol& new_sym = unit.symbols.emplace_back();
 					new_sym.name = instance.name;

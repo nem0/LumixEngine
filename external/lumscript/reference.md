@@ -2,7 +2,17 @@
 
 # TODO
 
-* immutable temporaries - foo().values[0]  += 4 should be invalid
+* use case - comptime string hash
+* comptime parameters `fn repeat(count : comptime i32) : void` 
+* how should user implement print-s?
+	fn print(v : varargs) : void {
+		for x in v {
+			match typeof(x) {
+				case string: { print_string(x); }
+				case i32: { print_i32(x); }
+			}
+		}
+	}
 * tagged unions
 * debugger
 * string interpolation
@@ -22,6 +32,9 @@
 * attributes?
 * fibers/coroutines?
 * closures?
+* iterators/yield 
+	fn each(a : arr) : yield i32 { ...
+	for x in each(a) { ... }
 
 # Goals
  * **simple** - string concatenation: `"Hello " + "World!"`. Avoid verbose low level code.
@@ -101,18 +114,18 @@ JIT is intentionally out of scope for the first version.
 
 ## Design decisions
 
-- templates use []
-	- main reason we have templates at all are user-defined containers
-	- `[]` means compile-time application; `()` remains runtime application
+- struct templates use []
+	- main reason we have struct templates at all are user-defined containers
+	- function templates do not use a separate bracketed parameter list; generic type parameters are introduced in the function signature with `$T`, and compile-time value parameters use `comptime`
 	- we want a pair of enclosing characters, single character is hard to read when nested: `Array@Array@i32`
 	- different begin and end, reads easier, especially when nested, e.g. if we used `"` - `Box"Pair"i32, string""`
 	- so our options are `[]`, `<>`, `()`, `{}`
-	- there are already languages using `[]` and `<>` for templates
+	- there are already languages using `[]` and `<>` for type templates
 	- `<>` is harder to parse thana `[]`
 
 - static-sized arrays and slices use prefix notation
 	- arrays are `[N]T` and slices are `[]T`, not postfix `T[N]` or `T[]`
-	- avoids grammar ambiguity: `Identifier[...]` in type position could be array type, template instantiation, or comptime variable indexing; prefix `[` resolves this
+	- avoids grammar ambiguity: `Identifier[...]` in type position could be array type, struct template instantiation, or comptime variable indexing; prefix `[` resolves this
 	- consistent with prefix nullable `?T`: types read outside-in rather than inside-out
 	- consistent direction with slices: `[]T` reads left-to-right like `?T`, unlike C-style postfix where nesting order is confusing (`T[4][8]`)
 	- runtime operations (indexing `arr[i]`, slicing `arr[start:end]`) remain postfix on values, creating clear distinction: postfix `[` = runtime value operation, prefix `[` = compile-time type constructor
@@ -121,7 +134,7 @@ JIT is intentionally out of scope for the first version.
 	- we want raw memory api so users can implement their own containers, arenas and other features
 	- the primitive currency is the byte slice `[]byte`; `alloc` returns one and `free` takes one back (Zig-style allocator interface)
 	- `byte` is a distinct type from `u8` (untyped storage vs a numeric type); its bit width is implementation-defined, so `sizeof`/`alignof` are measured in `byte` units
-	- `sizeof`/`alignof` produce untyped integer constants rather than a fixed type, so they concretize to context (array size, template argument, or `isize` in a size expression)
+	- `sizeof`/`alignof` produce untyped integer constants rather than a fixed type, so they concretize to context (array size, struct template argument, `comptime` parameter, or `isize` in a size expression)
 	- `[]byte as []T` / `[]T as []byte` reinterpret the same storage without copying so containers can expose a typed view over a raw allocation
 
 - signed sizes
@@ -136,7 +149,7 @@ JIT is intentionally out of scope for the first version.
 	- options: borrow checker, gc, limit features only to memory safe ones, not memory safe, runtime safety like Fil-C
 	- borrow checker makes the language and compiler more complicated 
 	- limiting features would make the language way too limited
-	- forced null checks
+	- forced null checks - can still be unsafe (see [Nullable values](#nullable-values)). Not possible to solve while keepking the language and compiler simple.
 	- bound-checked slice as primitive type in the language - while not guaranteed, it makes memory safety errors a bit less probably
 	- **open questions**: gc, not memory safe, like Fil-C
 
@@ -379,7 +392,7 @@ comptime enabled = true;
 comptime scale = 1.5;
 ```
 
-These values can be used where the language requires a compile-time value, such as template arguments, static array sizes, template instantiations, and other comptime expressions.
+These values can be used where the language requires a compile-time value, such as struct template arguments, static array sizes, `comptime` parameters, and other comptime expressions.
 
 Types are compile-time values. Structs, enums, and functions can therefore be written as expressions and bound to names:
 
@@ -435,10 +448,10 @@ comptime add = fn(a : i32, b : i32) : i32 {
 }
 ```
 
-Compile-time application uses square brackets. Runtime calls use parentheses:
+Struct template application uses square brackets. Runtime function calls use parentheses:
 
 ```cpp
-const value = max[i32](10, 20); // [i32] is compile-time, (10, 20) is runtime
+var v : Vec2[f32] = Vec2[f32] { 1.0, 2.0 }; // [f32] applies the struct template
 ```
 
 Comptime initializers may call functions that are known at compile time. Top-level functions are compile-time bindings to function values, so they can be evaluated during compilation when all arguments and all operations are compile-time-valid:
@@ -539,50 +552,50 @@ fn main() : void {
 **Function templates:**
 
 ```cpp
-fn identity[T](a : T) : T {
+fn identity(a : $T) : T {
 	return a;
 }
 
-fn swap[T](a : ref T, b : ref T) : void {
+fn swap(a : ref $T, b : ref T) : void {
 	const tmp = a;
 	a = b;
 	b = tmp;
 }
 ```
 
+`$T` in a parameter type introduces an inferred compile-time type parameter named `T`. Later uses of `T` in the same signature or body refer to that type.
+
 Function template declaration syntax is sugar for a `comptime` binding to a generic function expression:
 
 ```cpp
-comptime identity = fn[T](a : T) : T {
+comptime identity = fn(a : $T) : T {
 	return a;
 }
 ```
 
-The compiler infers type parameters from argument types when possible. Type arguments can also be supplied explicitly at the call site:
+The compiler infers type parameters from argument types:
 
 ```cpp
-fn default_value[T](fallback : T) : T {
+fn default_value(fallback : $T) : T {
 	return fallback;
 }
 
 fn main() : void {
 	const x = identity(42);                      // T inferred as i32
 	const y = identity(3.14);                    // T inferred as f32
-	const z = identity[i32](42);                 // explicit, equivalent to inferred
 
 	var a : i32 = 1;
 	var b : i32 = 2;
 	swap(ref a, ref b);                          // T inferred as i32
-	swap[i32](ref a, ref b);                     // explicit, equivalent to inferred
 
-	const v = default_value[i32](0);             // explicit; T also inferred from 0
+	const v = default_value(0);                  // T inferred as i32
 }
 ```
 
 **Multiple type parameters:**
 
 ```cpp
-fn first[A, B](a : A, b : B) : A {
+fn first(a : $A, b : $B) : A {
 	return a;
 }
 
@@ -592,31 +605,54 @@ struct Map[K, V] {
 }
 ```
 
-Template parameters can also have explicit compile-time value types. In other words, if a parameter has a type annotation, it is treated as a value parameter:
+
+**Compile-time value parameters:**
+
+Function parameters can also be marked `comptime` to require compile-time constant values. These are useful for values that must be known at compile time but do not require template bracket syntax:
 
 ```cpp
-struct StaticArray[T, N : i32] {
-	values : [N]T;
+fn repeat(text : string, count : comptime i32) : void {
+	for i in 0..count-1 {
+		print(text);
+	}
 }
 
-fn get[T, N : i32](values : StaticArray[T, N], index : i32) : T {
-	return values[index];
+fn splat(value : f32, n : comptime i32) : [n]f32 {
+	var result : [n]f32;
+	for i in range(n) {
+		result[i] = value;
+	}
+	return result;
+}
+
+fn main() : void {
+	repeat("hi", 3);           // valid: 3 is a compile-time constant
+	repeat("hi", some_var);    // error: some_var is not a compile-time constant
+	
+	const arr = splat(1.0, 4); // arr has type [4]f32
 }
 ```
 
+Comptime parameters:
+- must be initialized with a compile-time constant value at the call site
+- allow dependent function signatures where return types or array sizes depend on the parameter value
+- are checked at compile time but do not require explicit bracket syntax at the call site
+- compose with inferred type parameters in the same function signature, for example `fn foo(a : $T, i : comptime i32) : void`
+- struct templates continue to support value parameters via bracket syntax: `struct[T, N : i32]`
+
 Rules:
 
-- a fully instantiated template type such as `Pair[i32]` or `Box[Pair[i32]]` is a concrete type and can be used anywhere a concrete type is valid: variable declarations, function parameters, return types, struct fields, and as type arguments to other templates
-- type parameter names must be unique within the template parameter list
-- template parameters and explicit compile-time value parameters are resolved at compile time; no runtime overhead is incurred
-- type arguments must satisfy the structural requirements of the template body (field access, arithmetic, etc.); mismatches are compile-time errors
+- a fully instantiated template type such as `Pair[i32]` or `Box[Pair[i32]]` is a concrete type and can be used anywhere a concrete type is valid: variable declarations, function parameters, return types, struct fields, and as type arguments to other struct templates
+- `$T` introduces a function type parameter once; later uses must be written as `T`, and repeating `$T` for the same name in a signature is a compile-time error
+- type parameter names must be unique within a function signature or struct template parameter list
+- template parameters are resolved at compile time; no runtime overhead is incurred
+- inferred function type parameters and explicit struct template arguments must satisfy the structural requirements of the template body (field access, arithmetic, etc.); mismatches are compile-time errors
 - recursive struct templates are not supported
-- explicit type arguments are all-or-nothing: either omit them and let all type parameters be inferred from value arguments, or supply all of them explicitly; a subset is a compile-time error
-- when any type parameter cannot be inferred from the value arguments, all must be supplied explicitly; `identity[f32](42)` is valid and treats `42` as `f32`
-- explicit type arguments drive the expected type of value arguments, the same way a concrete parameter type does
-- the count of explicit type arguments must equal the count of type parameters in both function calls and struct instantiations
-- template functions and structs from imported modules can be instantiated in the importing module; alias-qualified syntax applies as normal: `lib.identity[i32](42)`, `lib.Pair[i32] { 1, 2 }`
-- a fully instantiated function template such as `identity[i32]` is a concrete function value of type `fn(i32) : i32` and can be used anywhere a concrete function value is valid: assignment, passing as an argument, returning, storing in a variable
+- function type parameters are inferred from value arguments; a function type parameter that cannot be inferred must be passed as a regular compile-time type parameter, for example `fn make(T : comptime type) : T`
+- type arguments in struct instantiations drive the expected type of value arguments, the same way a concrete parameter type does
+- the count of explicit struct template arguments must equal the count of struct template parameters
+- template functions and structs from imported modules can be instantiated in the importing module; alias-qualified syntax applies as normal: `lib.identity(42)`, `lib.Pair[i32] { 1, 2 }`
+- a function template becomes a concrete function value after its type parameters and `comptime` parameters are known; that concrete value can be used anywhere a function value of that signature is valid: assignment, passing as an argument, returning, storing in a variable
 - operator overloads cannot be templated; use a concrete instantiation instead
 
 ### Operators
@@ -793,6 +829,23 @@ fn main() : void {
 ```
 
 Using a nullable value without a required null check is a compile-time error.
+
+**Nullable values are not fully safe**
+
+The null check only applies to the value as it exists at that point in the control flow; if the variable is reassigned or otherwise mutated afterward, the earlier check does not keep later uses safe.
+
+```cpp
+if a != null {
+	foo(a);
+	a = bar();
+	foo(a); // unsafe unless `bar()` is guaranteed to return a non-null value
+}
+
+if a != null {
+	bar(); // `bar` may mutate `a`
+	foo(a); // unsafe if `bar` can clear or replace `a`
+}
+```
 
 ### Strings
 
@@ -977,6 +1030,31 @@ Rules:
 - variables are block scoped
 - shadowing is a compile-time error: a new declaration in the same scope or an inner scope cannot re-use a name that is already visible
 - a **name** is any identifier introduced by `var`, `const`, `comptime`, `fn`, `struct`, `enum`, or `import` alias; the same rules apply to all of them
+
+### Temporaries
+
+Temporaries produced by expressions are immutable. Attempting to modify a temporary is a compile-time error.
+
+```cpp
+fn get_data() : MyStruct {
+	return MyStruct { 1, 2, 3 };
+}
+
+fn main() : void {
+	get_data().field = 5;  // compile-time error: cannot assign to temporary
+	get_data().values[0] += 4;  // compile-time error: cannot assign to temporary
+}
+```
+
+To modify a value, first assign it to a mutable variable:
+
+```cpp
+fn main() : void {
+	var data = get_data();
+	data.field = 5;  // OK
+	data.values[0] += 4;  // OK
+}
+```
 
 ## Statements
 
@@ -1312,7 +1390,7 @@ const c = sizeof(Vec3);  // number of bytes the struct occupies
 Rules:
 
 - the operand is a type, not a value
-- both produce an untyped integer constant, usable wherever a compile-time integer is required (array sizes, template value arguments, other comptime expressions)
+- both produce an untyped integer constant, usable wherever a compile-time integer is required (array sizes, struct template value arguments, `comptime` parameters, other comptime expressions)
 - `sizeof(T)` is the size of `T` measured in `byte` units: `byte`, `bool`, `i8`, and `u8` are 1 byte; `i16`/`u16` are 2; `i32`/`u32`/`f32`/enums/function values are 4; `i64`/`u64`/`isize`/`f64`/strings/pointers are 8; a slice is a pointer plus an `i64` length; an array is `size * sizeof(element)`; and a struct is the sum of its field sizes
 - `alignof(T)` is derived from the byte size and capped at pointer alignment
 - they are most commonly used with the raw-memory allocator and slice reinterpret casts, for example `alloc(n * sizeof(i32), alignof(i32))`

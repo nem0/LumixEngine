@@ -22,6 +22,7 @@ struct Token {
 		DOT,
 		RANGE,
 		QUESTION,
+		DOLLAR,
 
 		PLUS,
 		MINUS,

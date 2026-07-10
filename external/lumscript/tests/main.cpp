@@ -243,6 +243,7 @@ static void nativeAddC(ls_runtime* runtime, ls_call_frame frame) {
 #include "match_tests.inl"
 #include "template_tests.inl"
 #include "memory_tests.inl"
+#include "temporaries_tests.inl"
 
 int main(int argc, char** argv) {
     const char* test_name = nullptr;

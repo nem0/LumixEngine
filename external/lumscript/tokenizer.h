@@ -262,6 +262,7 @@ struct Tokenizer {
 			case ',': return makeToken(Token::COMMA);
 			case '.': return makeToken(match('.') ? Token::RANGE : Token::DOT);
 			case '?': return makeToken(Token::QUESTION);
+			case '$': return makeToken(Token::DOLLAR);
 			case '+': {
 				if (match('=')) return makeToken(Token::PLUS_EQUAL);
 				if (match('+')) return makeToken(Token::PLUS_PLUS);

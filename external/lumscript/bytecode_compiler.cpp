@@ -192,13 +192,6 @@ struct LoopBinding {
 	ExpArray<u32>* continue_jumps = nullptr;
 };
 
-struct FunctionInfo {
-	ls_string_view name = {};
-	FunctionExpression* fn = nullptr;
-	FunctionResolvedType* type = nullptr;
-	Unit* unit = nullptr;
-};
-
 struct FunctionCompiler;
 static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind return_kind, ls_string_view current_label);
 static void emitDeferredStatements(FunctionCompiler& ctx, u32 defer_mark, ls_type_kind return_kind, ls_string_view current_label);
@@ -324,8 +317,8 @@ static void compileCallArgs(FunctionCompiler& ctx, CallExpression& expr, const F
 		ResolvedType* param_type = fn_type.param_types[param_index];
 		// TODO how can fn_type.decl be null?
 		const bool is_ref = fn_type.decl
-			&& param_index < fn_type.decl->runtime_params.size()
-			&& fn_type.decl->runtime_params[param_index].is_ref;
+			&& param_index < fn_type.decl->params.size()
+			&& fn_type.decl->params[param_index].is_ref;
 		if (is_ref) {
 			Expression* arg = expr.args[i];
 			UnaryExpression* un = static_cast<UnaryExpression*>(arg);
@@ -343,8 +336,8 @@ static u32 callArgWindowSize(const FunctionResolvedType& fn_type) {
 	u32 total = 0u;
 	for (u32 i = 0; i < fn_type.param_types.size(); ++i) {
 		const bool is_ref = fn_type.decl
-			&& i < fn_type.decl->runtime_params.size()
-			&& fn_type.decl->runtime_params[i].is_ref;
+			&& i < fn_type.decl->params.size()
+			&& fn_type.decl->params[i].is_ref;
 		const u32 byte_size = is_ref ? typeKindByteSize(LS_TYPE_CPTR) : typeByteSize(*fn_type.param_types[i]);
 		total += byte_size == 0u ? 1u : byte_size;
 	}
@@ -820,9 +813,16 @@ static bool emitAddressableReference(FunctionCompiler& ctx, Expression& expr, u3
 static bool tryEmitReferenceLoad(FunctionCompiler& ctx, Expression& expr, u32 byte_size) {
 	ASSERT(byte_size > 0);
 	const u32 result_offset = ctx.temp_top;
+	const u32 saved_next_local_offset = ctx.next_local_offset;
 	const u32 ref_offset = ctx.addLocal(nullptr, LS_TYPE_I64, true);
 	ctx.temp_top = ctx.next_local_offset;
-	if (!tryEmitReference(ctx, expr)) return false;
+	if (!tryEmitReference(ctx, expr)) {
+		// Nothing was emitted; release the ref slot so the failed attempt
+		// does not inflate the frame.
+		ctx.next_local_offset = saved_next_local_offset;
+		ctx.temp_top = result_offset;
+		return false;
+	}
 	emitStoreLocalBytes(ctx, ref_offset, typeKindByteSize(LS_TYPE_CPTR));
 	emitLoadLocalBytes(ctx, ref_offset, typeKindByteSize(LS_TYPE_CPTR));
 	emitConst8(ctx, 0u);
@@ -1215,16 +1215,18 @@ static ls_type_kind compileMember(FunctionCompiler& ctx, MemberExpression& membe
 		ASSERT(member.resolved_type && member.resolved_type->kind == ResolvedType::ENUM);
 		EnumResolvedType* en = static_cast<EnumResolvedType*>(member.resolved_type);
 		u64 enum_value = enumMemberValue(*en, member.name);
-		emitIntegerConstant(ctx, LS_TYPE_I32, enum_value);
-		return LS_TYPE_I32;
+		ls_type_kind kind = (i64)enum_value >= -2147483648LL && (i64)enum_value <= 2147483647LL ? LS_TYPE_I32 : LS_TYPE_I64;
+		emitIntegerConstant(ctx, kind, enum_value);
+		return kind;
 	}
 	ResolvedType* base_rt = member.expression->resolved_type;
 	EnumResolvedType* enum_via_meta = (base_rt && base_rt->kind == ResolvedType::META && static_cast<MetaType*>(base_rt)->inner->kind == ResolvedType::ENUM)
 		? static_cast<EnumResolvedType*>(static_cast<MetaType*>(base_rt)->inner) : nullptr;
 	if (enum_via_meta) {
 		u64 enum_value = enumMemberValue(*enum_via_meta, member.name);
-		emitIntegerConstant(ctx, LS_TYPE_I32, enum_value);
-		return LS_TYPE_I32;
+		ls_type_kind kind = (i64)enum_value >= -2147483648LL && (i64)enum_value <= 2147483647LL ? LS_TYPE_I32 : LS_TYPE_I64;
+		emitIntegerConstant(ctx, kind, enum_value);
+		return kind;
 	}
 	if (member.expression->kind == Expression::IDENTIFIER) {
 		IdentifierExpression* base = static_cast<IdentifierExpression*>(member.expression);
@@ -1299,6 +1301,7 @@ static ls_type_kind compileMember(FunctionCompiler& ctx, MemberExpression& membe
 	const u32 struct_byte_size = typeByteSize(*member.expression->resolved_type);
 	compileExpression(ctx, *member.expression, LS_TYPE_INVALID);
 	const u32 result_offset = ctx.temp_top - struct_byte_size;
+	const u32 saved_next_local_offset = ctx.next_local_offset;
 	const u32 temp = ctx.addLocal(member.expression->resolved_type, valueKindForType(*member.expression->resolved_type), true);
 	emitStoreLocalBytes(ctx, temp, struct_byte_size, false);
 	ctx.temp_top = ctx.next_local_offset;
@@ -1312,6 +1315,7 @@ static ls_type_kind compileMember(FunctionCompiler& ctx, MemberExpression& membe
 		emitU32(ctx.code, field_size);
 		ctx.temp_top = result_offset + field_size;
 	}
+	ctx.next_local_offset = saved_next_local_offset;
 	return valueKindForType(*field_type);
 }
 
@@ -1934,7 +1938,7 @@ static bool compileFunctionBytecode(
 	function.kind = fn->is_extern ? LS_FUNCTION_NATIVE : LS_FUNCTION_SCRIPT;
 	function.is_builtin_native = is_builtin_native;
 	function.param_size = 0;
-	ResolvedType* return_type = fn_type ? fn_type->return_type : nullptr;
+	ResolvedType* return_type = fn_type->return_type;
 	function.return_kind = toTypeKind(*return_type);
 	// Calls move raw offsets, so aggregate return metadata must describe the
 	// representation width rather than assuming every value is one offset.
@@ -1942,7 +1946,7 @@ static bool compileFunctionBytecode(
 	function.frame_size = 0;
 
 	if (fn->is_extern) {
-		function.param_size = computeParamSize(fn->runtime_params);
+		function.param_size = computeParamSize(fn->params);
 		return true;
 	}
 	if (!fn->body || fn->body->kind != Statement::BLOCK) return false;
@@ -1952,7 +1956,7 @@ static bool compileFunctionBytecode(
 	if (function.return_size == 1u && isSimpleReturnLiteral(*body, literal)) {
 		// Tiny literal function: emit the constant and return without setting up
 		// parameter locals (the literal references none).
-		function.param_size = computeParamSize(fn->runtime_params);
+		function.param_size = computeParamSize(fn->params);
 		FunctionCompiler ctx(bytecode, function);
 		ctx.next_local_offset = function.param_size;
 		ctx.temp_top = function.param_size;
@@ -1975,7 +1979,7 @@ static bool compileFunctionBytecode(
 
 	FunctionCompiler ctx(bytecode, function);
 	ctx.return_type = return_type;
-	for (FunctionParam& param : fn->runtime_params) {
+	for (FunctionParam& param : fn->params) {
 		StorageSlot& slot = param.slot;
 		slot.type = param.resolved_type;
 		slot.kind = valueKindForType(*param.resolved_type);
@@ -2033,31 +2037,23 @@ ls_bytecode* ls_bytecode_compile(
 		}
 	}
 
-	ExpArray<FunctionInfo> functions(*arena);
+	u32 function_count = 0;
 	for (Unit& unit : module->units) {
 		for (Symbol& sym : unit.symbols) {
 			if (!sym.expression || sym.expression->kind != Expression::FUNCTION) continue;
 			FunctionExpression* fn = static_cast<FunctionExpression*>(sym.expression);
-			if (!fn->comptime_params.empty()) continue;
-			FunctionInfo& info = functions.emplace_back();
-			info.name = sym.name;
-			info.fn = fn;
-			info.type = fn->resolved_type ? static_cast<FunctionResolvedType*>(fn->resolved_type) : nullptr;
-			info.unit = &unit;
-			fn->bytecode_index = (u32)functions.size() - 1;
-		}
-	}
-
-	for (const FunctionInfo& info : functions) {
-		if (!compileFunctionBytecode(
-			bytecode,
-			info.fn,
-			info.type,
-			info.name,
-			info.fn->is_extern && (equalStrings(info.unit->path, makeStringView("std:math")) || equalStrings(info.unit->path, makeStringView("std:mem")))
-		)) {
-			ls_bytecode_destroy(bytecode);
-			return nullptr;
+			if (fn->is_template) continue;
+			fn->bytecode_index = function_count++;
+			if (!compileFunctionBytecode(
+				bytecode,
+				fn,
+				static_cast<FunctionResolvedType*>(fn->resolved_type),
+				sym.name,
+				fn->is_extern && (equalStrings(unit.path, makeStringView("std:math")) || equalStrings(unit.path, makeStringView("std:mem")))
+			)) {
+				ls_bytecode_destroy(bytecode);
+				return nullptr;
+			}
 		}
 	}
 
