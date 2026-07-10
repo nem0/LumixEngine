@@ -106,6 +106,7 @@ struct IdentifierExpression : Expression {
 
 	ls_string_view name = {};
 	Symbol* symbol = nullptr;
+	FunctionExpression* resolved_fn = nullptr;
 	// Set by the checker when this identifier resolves to runtime storage (local,
 	// parameter, or global); null for compile-time symbols (functions, types, etc.).
 	StorageSlot* slot = nullptr;
@@ -267,7 +268,7 @@ struct StructExpression : Expression {
 	// Populated during symbol checking; used for O(1)-ish operator lookup.
 	ExpArray<StructOperator> operators;
 	// Canonical template specializations for this struct declaration.
-	ExpArray<StructResolvedType*> template_struct_instances;
+	ExpArray<TemplateStructInstance> template_struct_instances;
 };
 
 struct EnumMember {

@@ -5,6 +5,7 @@
 #include "token.h"
 
 struct Expression;
+struct ResolvedType;
 
 struct ParsedType {
 	enum Kind {
@@ -46,7 +47,9 @@ struct ParsedType {
 		NULLABLE,
 		// Template instantiation in type syntax, e.g. `Array[i32]` or
 		// `StaticArray[f32, 16]`.
-		TEMPLATE_INSTANTIATION
+		TEMPLATE_INSTANTIATION,
+		// Pre-resolved type from template substitution during cloning.
+		PRE_RESOLVED
 	};
 
 	explicit ParsedType(Kind kind) : kind(kind) {}
@@ -101,4 +104,11 @@ struct TemplateInstantiationParsedType : ParsedType {
 	// Always a qualified name; the parser only forms instantiations after one.
 	QualifiedParsedType* base = nullptr;
 	ExpArray<Expression*> args;
+};
+
+struct PreResolvedParsedType : ParsedType {
+	PreResolvedParsedType() : ParsedType(PRE_RESOLVED) {}
+
+	// A fully resolved type from template substitution.
+	ResolvedType* type = nullptr;
 };

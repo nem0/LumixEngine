@@ -1127,17 +1127,49 @@ struct Parser {
 		}
 	}
 
+	bool collectGenericParams(const ParsedType& type, ExpArray<ls_string_view>& names) {
+		switch (type.kind) {
+			case ParsedType::GENERIC: {
+				ls_string_view name = static_cast<const GenericParsedType&>(type).name;
+				for (ls_string_view existing : names) {
+					if (!equalStrings(existing, name)) continue;
+					m_output.error("Duplicate template parameter: ", name);
+					return false;
+				}
+				names.push(name);
+				return true;
+			}
+			case ParsedType::ARRAY: return collectGenericParams(*static_cast<const ArrayParsedType&>(type).element_type, names);
+			case ParsedType::NULLABLE: return collectGenericParams(*static_cast<const NullableParsedType&>(type).inner, names);
+			case ParsedType::SLICE: return collectGenericParams(*static_cast<const SliceParsedType&>(type).element_type, names);
+			case ParsedType::TEMPLATE_INSTANTIATION: {
+				const TemplateInstantiationParsedType& tpl = static_cast<const TemplateInstantiationParsedType&>(type);
+				return collectGenericParams(*tpl.base, names);
+			}
+			case ParsedType::FUNCTION: {
+				const FunctionParsedType& fn = static_cast<const FunctionParsedType&>(type);
+				for (ParsedType* param : fn.params) {
+					if (!collectGenericParams(*param, names)) return false;
+				}
+				return collectGenericParams(*fn.return_type, names);
+			}
+			default: return true;
+		}
+	}
+
 	FunctionExpression* functionExpression() {
 		FunctionExpression* fn = make<FunctionExpression>(m_unit.arena);
 		bool ok = functionSignature(fn);
 		if (!ok) return nullptr;
 
 		fn->is_template = false;
+		ExpArray<ls_string_view> generic_names(m_unit.arena);
 		for (FunctionParam& param : fn->params) {
 			if (param.is_comptime || isGeneric(*param.parsed_type)) {
 				param.is_generic = true;
 				fn->is_template = true;
 			}
+			if (!collectGenericParams(*param.parsed_type, generic_names)) return nullptr;
 		}
 
 		fn->body = blockStatement();

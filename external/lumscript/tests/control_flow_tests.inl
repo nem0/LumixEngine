@@ -236,7 +236,7 @@ TEST(NonVoidFunctionReturnOnlyInsideWhileLoopFails) {
 TEST(NonVoidFunctionReturnOnlyInsideForLoopFails) {
 	const char* source = R"(
 		fn first() : i32 {
-			for i in 0..10 {
+			for i = 0..10 {
 				return i;
 			}
 		}

@@ -612,14 +612,14 @@ Function parameters can also be marked `comptime` to require compile-time consta
 
 ```cpp
 fn repeat(text : string, count : comptime i32) : void {
-	for i in 0..count-1 {
+	for i = 0..count {
 		print(text);
 	}
 }
 
 fn splat(value : f32, n : comptime i32) : [n]f32 {
-	var result : [n]f32;
-	for i in range(n) {
+	var result : [n]f32 = undefined;
+	for i = 0..n {
 		result[i] = value;
 	}
 	return result;

@@ -311,15 +311,20 @@ static u32 structFieldByteOffset(StructResolvedType& st, ls_string_view name, Re
 	return 0xffFFffFF;
 }
 
+static bool paramIsRef(const FunctionResolvedType& fn_type, u32 param_index) {
+	return fn_type.decl && param_index < fn_type.decl->params.size() && fn_type.decl->params[param_index].is_ref;
+}
+
+static bool paramIsComptime(const FunctionResolvedType& fn_type, u32 param_index) {
+	return fn_type.decl && param_index < fn_type.decl->params.size() && fn_type.decl->params[param_index].is_comptime;
+}
+
 static void compileCallArgs(FunctionCompiler& ctx, CallExpression& expr, const FunctionResolvedType& fn_type, u32 arg_offset) {
 	for (u32 i = 0; i < expr.args.size(); ++i) {
 		const u32 param_index = arg_offset + i;
 		ResolvedType* param_type = fn_type.param_types[param_index];
-		// TODO how can fn_type.decl be null?
-		const bool is_ref = fn_type.decl
-			&& param_index < fn_type.decl->params.size()
-			&& fn_type.decl->params[param_index].is_ref;
-		if (is_ref) {
+		if (paramIsComptime(fn_type, param_index)) continue;
+		if (paramIsRef(fn_type, param_index)) {
 			Expression* arg = expr.args[i];
 			UnaryExpression* un = static_cast<UnaryExpression*>(arg);
 			tryEmitReference(ctx, *un->expression);
@@ -335,10 +340,8 @@ static void compileCallArgs(FunctionCompiler& ctx, CallExpression& expr, const F
 static u32 callArgWindowSize(const FunctionResolvedType& fn_type) {
 	u32 total = 0u;
 	for (u32 i = 0; i < fn_type.param_types.size(); ++i) {
-		const bool is_ref = fn_type.decl
-			&& i < fn_type.decl->params.size()
-			&& fn_type.decl->params[i].is_ref;
-		const u32 byte_size = is_ref ? typeKindByteSize(LS_TYPE_CPTR) : typeByteSize(*fn_type.param_types[i]);
+		if (paramIsComptime(fn_type, i)) continue;
+		const u32 byte_size = paramIsRef(fn_type, i) ? typeKindByteSize(LS_TYPE_CPTR) : typeByteSize(*fn_type.param_types[i]);
 		total += byte_size == 0u ? 1u : byte_size;
 	}
 	return total;
@@ -1382,7 +1385,7 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 				return slot->kind != LS_TYPE_INVALID ? slot->kind : LS_TYPE_I32;
 			}
 			// function template instance
-			FunctionExpression* fn = static_cast<FunctionExpression*>(id.symbol->expression);
+			FunctionExpression* fn = id.resolved_fn ? id.resolved_fn : static_cast<FunctionExpression*>(id.symbol->expression);
 			emitIntegerConstant(ctx, LS_TYPE_FUNCTION, fn->bytecode_index);
 			return LS_TYPE_FUNCTION;
 		}
@@ -1980,6 +1983,7 @@ static bool compileFunctionBytecode(
 	FunctionCompiler ctx(bytecode, function);
 	ctx.return_type = return_type;
 	for (FunctionParam& param : fn->params) {
+		if (param.is_comptime) continue;
 		StorageSlot& slot = param.slot;
 		slot.type = param.resolved_type;
 		slot.kind = valueKindForType(*param.resolved_type);
@@ -2044,6 +2048,13 @@ ls_bytecode* ls_bytecode_compile(
 			FunctionExpression* fn = static_cast<FunctionExpression*>(sym.expression);
 			if (fn->is_template) continue;
 			fn->bytecode_index = function_count++;
+		}
+	}
+	for (Unit& unit : module->units) {
+		for (Symbol& sym : unit.symbols) {
+			if (!sym.expression || sym.expression->kind != Expression::FUNCTION) continue;
+			FunctionExpression* fn = static_cast<FunctionExpression*>(sym.expression);
+			if (fn->is_template) continue;
 			if (!compileFunctionBytecode(
 				bytecode,
 				fn,

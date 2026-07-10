@@ -55,40 +55,12 @@ struct EnumResolvedType : ResolvedType {
 	EnumExpression* decl = nullptr;
 };
 
-struct TemplateArgument {
-	enum Kind {
-		UNBOUND,
-		TYPE,
-		VALUE
-	};
-
-	TemplateArgument()
-		: kind(UNBOUND)
-		, type(nullptr) {}
-
-	explicit TemplateArgument(ResolvedType* type)
-		: kind(TYPE)
-		, type(type) {}
-
-	explicit TemplateArgument(Expression* value)
-		: kind(VALUE)
-		, value(value) {}
-
-	Kind kind;
-	union {
-		ResolvedType* type;
-		Expression* value;
-	};
-};
-
 struct StructResolvedType : ResolvedType {
 	StructResolvedType(ls_arena& arena)
 		: ResolvedType(STRUCT)
-		, template_args(arena)
 		, field_types(arena) {}
 
 	StructExpression* decl = nullptr;
-	ExpArray<TemplateArgument> template_args;
 	// A generic declaration is shared by every specialization, therefore its
 	// NamedDecl::resolved_type cannot describe the fields of a concrete value.
 	// Keep the substituted field types on the canonical struct instance instead.
@@ -96,9 +68,8 @@ struct StructResolvedType : ResolvedType {
 };
 
 struct FunctionResolvedType : ResolvedType {
-	FunctionResolvedType(ls_arena& arena) : ResolvedType(FUNCTION), template_args(arena), param_types(arena) {}
+	FunctionResolvedType(ls_arena& arena) : ResolvedType(FUNCTION), param_types(arena) {}
 
-	ExpArray<TemplateArgument> template_args;
 	ExpArray<ResolvedType*> param_types;
 	ResolvedType* return_type = nullptr;
 	FunctionExpression* decl = nullptr;
@@ -123,10 +94,38 @@ struct NullableResolvedType : ResolvedType {
 	ResolvedType* inner = nullptr;
 };
 
+struct TemplateArg {
+	enum Kind {
+		TYPE,
+		INT,
+		FLOAT,
+		BOOL,
+		STRING,
+	};
+
+	Kind kind = TYPE;
+	ResolvedType* type = nullptr;
+	i64 int_value = 0;
+	double float_value = 0;
+	bool bool_value = false;
+	ls_string_view string_value = {};
+};
+
+struct TemplateStructInstance {
+	TemplateStructInstance(ls_arena& arena) : args(arena) {}
+
+	ExpArray<TemplateArg> args;
+	StructResolvedType* type = nullptr;
+	bool check_failed = false;
+};
+
 struct TemplateFunctionInstance {
-	ls_string_view name = {};
+	TemplateFunctionInstance(ls_arena& arena) : args(arena) {}
+
+	ExpArray<TemplateArg> args;
 	FunctionExpression* instance = nullptr;
 	FunctionResolvedType* type = nullptr;
+	bool check_failed = false;
 };
 
 
