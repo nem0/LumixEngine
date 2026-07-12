@@ -269,6 +269,9 @@ struct StructExpression : Expression {
 	ExpArray<StructOperator> operators;
 	// Canonical template specializations for this struct declaration.
 	ExpArray<TemplateStructInstance> template_struct_instances;
+	// Cached by symbol checking: name and owner unit for fast type printing.
+	ls_string_view cached_name = {};
+	struct Unit* cached_owner = nullptr;
 };
 
 struct EnumMember {
@@ -280,4 +283,7 @@ struct EnumExpression : Expression {
 	EnumExpression(ls_arena& arena) : Expression(ENUM), members(arena) {}
 
 	ExpArray<EnumMember> members;
+	// Cached by symbol checking: name and owner unit for fast type printing.
+	ls_string_view cached_name = {};
+	struct Unit* cached_owner = nullptr;
 };
