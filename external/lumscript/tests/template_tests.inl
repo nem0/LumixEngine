@@ -2111,5 +2111,77 @@ TEST(ComptimeFunctionParameterNonConstantArgumentFails) {
 	return true;
 }
 
+// Instantiation clones the body; an if without else has a null else_branch.
+TEST(TemplateFunctionBodyIfWithoutElse) {
+	const char* source = R"(
+		fn clamp_negative(a : $T) : T {
+			var result : T = a;
+			if a < 0 {
+				result = 0;
+			}
+			return result;
+		}
+
+		fn main() : i32 {
+			return clamp_negative(42);
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+// Instantiation clones the body; a bare return has a null expression.
+TEST(TemplateFunctionBodyBareReturn) {
+	const char* source = R"(
+		fn touch(a : $T) : void {
+			return;
+		}
+
+		fn main() : void {
+			touch(42);
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+// Instantiation clones the body; a slice with default bounds has null begin/end.
+TEST(TemplateFunctionBodySliceDefaultBounds) {
+	const char* source = R"(
+		fn first(values : []$T) : T {
+			const all = values[:];
+			return all[0];
+		}
+
+		fn main() : i32 {
+			var arr : [1]i32 = undefined;
+			arr[0] = 42;
+			return first(arr[:]);
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+// Instantiation clones the body; a single-value match pattern has a null range end.
+TEST(TemplateFunctionBodyMatchSingleValuePattern) {
+	const char* source = R"(
+		fn classify(v : $T) : i32 {
+			match v {
+				case 0:
+					return 1;
+				else:
+					return 2;
+			}
+		}
+
+		fn main() : i32 {
+			return classify(42);
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
 
 

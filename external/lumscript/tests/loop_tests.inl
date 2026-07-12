@@ -29,6 +29,21 @@ TEST(ForLoopCompiles) {
 	return true;
 }
 
+// The i32 passed to bound checking is a hint for untyped literals, not a
+// requirement: matching concrete integer bounds of any width are valid.
+TEST(ForLoopI64Bounds) {
+	const char* source = R"(
+		fn main() : void {
+			var from : i64 = 0;
+			var to : i64 = 9;
+			for i = from..to {
+			}
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
 TEST(ForLoopRangeBoundsMustMatchTypeFails) {
 	const char* source = R"(
 		fn main() : void {

@@ -721,8 +721,8 @@ struct Checker {
 				SliceExpression* s = static_cast<SliceExpression*>(src);
 				SliceExpression* sl = makeType<SliceExpression>(unit);
 				sl->base = cloneExpression(unit, s->base, bindings);
-				sl->begin = cloneExpression(unit, s->begin, bindings);
-				sl->end = cloneExpression(unit, s->end, bindings);
+				sl->begin = s->begin ? cloneExpression(unit, s->begin, bindings) : nullptr;
+				sl->end = s->end ? cloneExpression(unit, s->end, bindings) : nullptr;
 				out = sl;
 				break;
 			}
@@ -761,7 +761,7 @@ struct Checker {
 			case Statement::RETURN: {
 				ReturnStatement* s = static_cast<ReturnStatement*>(src);
 				ReturnStatement* st = makeType<ReturnStatement>(unit);
-				st->expression = cloneExpression(unit, s->expression, bindings);
+				st->expression = s->expression ? cloneExpression(unit, s->expression, bindings) : nullptr;
 				out = st;
 				break;
 			}
@@ -789,7 +789,7 @@ struct Checker {
 				IfStatement* st = makeType<IfStatement>(unit);
 				st->condition = cloneExpression(unit, s->condition, bindings);
 				st->body = static_cast<BlockStatement*>(cloneStatement(unit, s->body, bindings));
-				st->else_branch = cloneStatement(unit, s->else_branch, bindings);
+				st->else_branch = s->else_branch ? cloneStatement(unit, s->else_branch, bindings) : nullptr;
 				out = st;
 				break;
 			}
@@ -803,7 +803,7 @@ struct Checker {
 					for (MatchPattern& src_pattern : src_arm.patterns) {
 						MatchPattern& dst_pattern = dst_arm.patterns.emplace_back();
 						dst_pattern.begin = cloneExpression(unit, src_pattern.begin, bindings);
-						dst_pattern.end = cloneExpression(unit, src_pattern.end, bindings);
+						dst_pattern.end = src_pattern.end ? cloneExpression(unit, src_pattern.end, bindings) : nullptr;
 					}
 					dst_arm.body = static_cast<BlockStatement*>(cloneStatement(unit, src_arm.body, bindings));
 				}
@@ -3038,8 +3038,12 @@ struct Checker {
 
 	bool checkForStatement(Unit& unit, FunctionCheckContext& ctx, ForStatement& fs, ResolvedType* return_type, ls_string_view pending_label) {
 		// TODO collision with templates
-		ResolvedType* begin_type = checkExprAndPin(unit, &ctx, *fs.begin, primitiveType(ResolvedType::I32));
-		ResolvedType* end_type = checkExprAndPin(unit, &ctx, *fs.end, begin_type ? begin_type : primitiveType(ResolvedType::I32));
+		// i32 is only a default for untyped bounds; concrete bounds can be any integer type
+		// as long as they match each other.
+		ResolvedType* begin_type = checkExpr(unit, &ctx, *fs.begin, primitiveType(ResolvedType::I32));
+		if (begin_type && isUntypedNumeric(*begin_type)) begin_type = materializeUntyped(*fs.begin, primitiveType(ResolvedType::I32));
+		ResolvedType* end_type = checkExpr(unit, &ctx, *fs.end, begin_type ? begin_type : primitiveType(ResolvedType::I32));
+		if (end_type && isUntypedNumeric(*end_type)) end_type = materializeUntyped(*fs.end, begin_type ? begin_type : primitiveType(ResolvedType::I32));
 		if (!begin_type || !end_type || !isIntegerType(*begin_type) || !isIntegerType(*end_type)) {
 			errorLine(fs.token, "For loop bounds must be of integer type, got ", begin_type, " and ", end_type);
 			return false;
