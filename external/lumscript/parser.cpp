@@ -30,13 +30,6 @@ struct Parser {
 	}
 
 	template <typename T, typename... Args>
-	T* makeParsedType(Token token, Args&&... args) {
-		T* res = make<T>(static_cast<Args&&>(args)...);
-		res->token = token;
-		return res;
-	}
-
-	template <typename T, typename... Args>
 	T* makeStmt(Token token, Args&&... args) {
 		T* res = make<T>(static_cast<Args&&>(args)...);
 		res->token = token;
@@ -220,8 +213,8 @@ struct Parser {
 
 		if (peekToken().type == Token::COLON) {
 			consumeToken();
-			sym.parsed_type = type();
-			if (!sym.parsed_type) return false;
+			sym.type_expr = type();
+			if (!sym.type_expr) return false;
 		}
 
 		if (!consume(Token::EQUAL)) return false;
@@ -298,14 +291,14 @@ struct Parser {
 			case Token::CPTR:
 			case Token::BYTE:
 			case Token::TYPE_KW:
-				return makeExpr<TypeLiteralExpression>(token, typeFromToken(token)->kind);
+				return makeExpr<TypeLiteralExpression>(token, primitiveKindFromToken(token.type));
 			case Token::SIZEOF:
 			case Token::ALIGNOF: {
 				SizeofExpression* expr = makeExpr<SizeofExpression>(token);
 				expr->is_align = token.type == Token::ALIGNOF;
 				if (!consume(Token::LEFT_PAREN)) return nullptr;
-				expr->type = type();
-				if (!expr->type) return nullptr;
+				expr->type_expr = type();
+				if (!expr->type_expr) return nullptr;
 				if (!consume(Token::RIGHT_PAREN)) return nullptr;
 				return expr;
 			}
@@ -487,8 +480,8 @@ struct Parser {
 			Token as_token = consumeToken();
 			CastExpression* cast = makeExpr<CastExpression>(as_token);
 			cast->expression = expr;
-			cast->parsed_type = type();
-			if (!cast->parsed_type) return nullptr;
+			cast->type_expr = type();
+			if (!cast->type_expr) return nullptr;
 			expr = cast;
 		}
 
@@ -517,8 +510,8 @@ struct Parser {
 			}
 			if (peekToken().type == Token::COLON) {
 				consumeToken();
-				param.parsed_type = type();
-				if (!param.parsed_type) return false;
+				param.type_expr = type();
+				if (!param.type_expr) return false;
 			}
 			if (peekToken().type != Token::COMMA) break;
 			consumeToken();
@@ -527,47 +520,56 @@ struct Parser {
 		return true;
 	}
 
-	ParsedType* typeFromToken(Token token) {
-		ParsedType* res = nullptr;
+	static ResolvedType::Kind primitiveKindFromToken(Token::Type type) {
+		switch (type) {
+			case Token::STRING_KW: return ResolvedType::STRING;
+			case Token::VOID: return ResolvedType::VOID;
+			case Token::BOOL: return ResolvedType::BOOL;
+			case Token::I8: return ResolvedType::I8;
+			case Token::I16: return ResolvedType::I16;
+			case Token::I32: return ResolvedType::I32;
+			case Token::I64: return ResolvedType::I64;
+			case Token::U8: return ResolvedType::U8;
+			case Token::U16: return ResolvedType::U16;
+			case Token::U32: return ResolvedType::U32;
+			case Token::U64: return ResolvedType::U64;
+			case Token::ISIZE: return ResolvedType::ISIZE;
+			case Token::F32: return ResolvedType::F32;
+			case Token::F64: return ResolvedType::F64;
+			case Token::CPTR: return ResolvedType::CPTR;
+			case Token::BYTE: return ResolvedType::BYTE;
+			// META stands for the `type` keyword.
+			case Token::TYPE_KW: return ResolvedType::META;
+			default: return ResolvedType::INVALID;
+		}
+	}
+
+	Expression* typeFromToken(Token token) {
+		Expression* res = nullptr;
 		switch (token.type) {
-			case Token::STRING_KW: res = makeParsedType<ParsedType>(token, ParsedType::STRING); break;
-			case Token::VOID: res = makeParsedType<ParsedType>(token, ParsedType::VOID); break;
-			case Token::BOOL: res = makeParsedType<ParsedType>(token, ParsedType::BOOL); break;
-			case Token::I8: res = makeParsedType<ParsedType>(token, ParsedType::I8); break;
-			case Token::I16: res = makeParsedType<ParsedType>(token, ParsedType::I16); break;
-			case Token::I32: res = makeParsedType<ParsedType>(token, ParsedType::I32); break;
-			case Token::I64: res = makeParsedType<ParsedType>(token, ParsedType::I64); break;
-			case Token::U8: res = makeParsedType<ParsedType>(token, ParsedType::U8); break;
-			case Token::U16: res = makeParsedType<ParsedType>(token, ParsedType::U16); break;
-			case Token::U32: res = makeParsedType<ParsedType>(token, ParsedType::U32); break;
-			case Token::U64: res = makeParsedType<ParsedType>(token, ParsedType::U64); break;
-			case Token::ISIZE: res = makeParsedType<ParsedType>(token, ParsedType::ISIZE); break;
-			case Token::F32: res = makeParsedType<ParsedType>(token, ParsedType::F32); break;
-			case Token::F64: res = makeParsedType<ParsedType>(token, ParsedType::F64); break;
-			case Token::CPTR: res = makeParsedType<ParsedType>(token, ParsedType::CPTR); break;
-			case Token::BYTE: res = makeParsedType<ParsedType>(token, ParsedType::BYTE); break;
-			case Token::TYPE_KW: res = makeParsedType<ParsedType>(token, ParsedType::TYPE); break;
 			case Token::IDENTIFIER: {
-				QualifiedParsedType* qualified = makeParsedType<QualifiedParsedType>(token);
-				qualified->name = token.value;
-				res = qualified;
+				IdentifierExpression* id = makeExpr<IdentifierExpression>(token);
+				id->name = token.value;
+				res = id;
 				if (peekToken().type == Token::DOT) {
-					consumeToken();
+					Token dot = consumeToken();
 					Token name = consumeToken();
 					if (name.type != Token::IDENTIFIER) {
 						m_output.errorAt(name, "Expected identifier");
 						return nullptr;
 					}
-					qualified->qualifier = qualified->name;
-					qualified->name = name.value;
+					MemberExpression* member = makeExpr<MemberExpression>(dot);
+					member->expression = id;
+					member->name = name.value;
+					res = member;
 				}
 				break;
 			}
 			case Token::FN: {
-				FunctionParsedType* fn = makeParsedType<FunctionParsedType>(token, m_unit.arena);
+				FunctionTypeExpression* fn = makeExpr<FunctionTypeExpression>(token, m_unit.arena);
 				if (!consume(Token::LEFT_PAREN)) return nullptr;
 				while (peekToken().type != Token::RIGHT_PAREN) {
-					ParsedType* param = type();
+					Expression* param = type();
 					if (!param) return nullptr;
 					fn->params.push(param);
 					if (peekToken().type != Token::COMMA) break;
@@ -586,17 +588,21 @@ struct Parser {
 				if (!consume(Token::RIGHT_PAREN)) return nullptr;
 				break;
 			}
-			default:
-				return nullptr;
+			default: {
+				const ResolvedType::Kind kind = primitiveKindFromToken(token.type);
+				if (kind == ResolvedType::INVALID) return nullptr;
+				res = makeExpr<TypeLiteralExpression>(token, kind);
+				break;
+			}
 		}
 
-		// Brackets after a qualified name in type position are template instantiation;
-		// array/slice syntax is prefix ([N]T, []T), so there is no ambiguity.
-		if (res->kind == ParsedType::QUALIFIED) {
+		// Brackets after a (possibly qualified) name in type position are template
+		// instantiation; array/slice syntax is prefix ([N]T, []T), so there is no ambiguity.
+		if (res->kind == Expression::IDENTIFIER || res->kind == Expression::MEMBER) {
 			if (peekToken().type == Token::LEFT_BRACKET) {
 				Token bracket = consumeToken();
-				TemplateInstantiationParsedType* call = makeParsedType<TemplateInstantiationParsedType>(bracket, m_unit.arena);
-				call->base = static_cast<QualifiedParsedType*>(res);
+				BracketExpression* call = makeExpr<BracketExpression>(bracket, m_unit.arena);
+				call->base = res;
 				while (peekToken().type != Token::RIGHT_BRACKET) {
 					if (peekToken().type == Token::END_OF_FILE) {
 						m_output.error("Unexpected end of file");
@@ -617,7 +623,7 @@ struct Parser {
 		return res;
 	}
 
-	ParsedType* type() {
+	Expression* type() {
 		// Parse prefix brackets and nullable syntax recursively.
 		// Examples:
 		// - [4]i32: array of 4 ints
@@ -629,16 +635,18 @@ struct Parser {
 			Token bracket = consumeToken();
 			if (peekToken().type == Token::RIGHT_BRACKET) {
 				consumeToken();
-				SliceParsedType* slice = makeParsedType<SliceParsedType>(bracket);
+				SliceTypeExpression* slice = makeExpr<SliceTypeExpression>(bracket);
 				slice->element_type = type();
+				if (!slice->element_type) return nullptr;
 				return slice;
 			} else {
 				Expression* size = expression();
 				if (!size) return nullptr;
 				if (!consume(Token::RIGHT_BRACKET)) return nullptr;
-				ArrayParsedType* array = makeParsedType<ArrayParsedType>(bracket);
+				ArrayTypeExpression* array = makeExpr<ArrayTypeExpression>(bracket);
 				array->size = size;
 				array->element_type = type();
+				if (!array->element_type) return nullptr;
 				return array;
 			}
 		}
@@ -647,9 +655,9 @@ struct Parser {
 		Token first = peekToken();
 		if (first.type == Token::QUESTION) {
 			consumeToken();
-			ParsedType* inner = type();
+			Expression* inner = type();
 			if (!inner) return nullptr;
-			NullableParsedType* nullable = makeParsedType<NullableParsedType>(first);
+			NullableTypeExpression* nullable = makeExpr<NullableTypeExpression>(first);
 			nullable->inner = inner;
 			return nullable;
 		}
@@ -661,13 +669,13 @@ struct Parser {
 				m_output.errorAt(name, "Expected inferred generic type name");
 				return nullptr;
 			}
-			GenericParsedType* generic = makeParsedType<GenericParsedType>(first);
+			GenericIdentifierExpression* generic = makeExpr<GenericIdentifierExpression>(first);
 			generic->name = name.value;
 			return generic;
 		}
 
 		Token base_token = consumeToken();
-		ParsedType* res = typeFromToken(base_token);
+		Expression* res = typeFromToken(base_token);
 		if (!res) {
 			m_output.errorAt(base_token, "Expected type");
 		}
@@ -716,8 +724,8 @@ struct Parser {
 		if (!consume(Token::IDENTIFIER, res->name, "Expected identifier")) return nullptr;
 		if (peekToken().type == Token::COLON) {
 			consumeToken();
-			res->parsed_type = type();
-			if (!res->parsed_type) return nullptr;
+			res->type_expr = type();
+			if (!res->type_expr) return nullptr;
 		}
 		if (!consume(Token::EQUAL)) return nullptr;
 		res->expression = expression();
@@ -805,8 +813,8 @@ struct Parser {
 			consumeToken();
 			param.is_ref = true;
 		}
-		param.parsed_type = type();
-		if (!param.parsed_type) return false;
+		param.type_expr = type();
+		if (!param.type_expr) return false;
 		return true;
 	}
 
@@ -1097,40 +1105,25 @@ struct Parser {
 				}
 				return false;
 			}
-			default: return false;
-		}
-	}
-
-	static bool isGeneric(const ParsedType& type) {
-		switch (type.kind) {
-			case ParsedType::GENERIC: return true;
-			case ParsedType::ARRAY: return isGeneric(*static_cast<const ArrayParsedType&>(type).element_type);
-			case ParsedType::NULLABLE: return isGeneric(*static_cast<const NullableParsedType&>(type).inner);
-			case ParsedType::SLICE: return isGeneric(*static_cast<const SliceParsedType&>(type).element_type);
-			case ParsedType::TEMPLATE_INSTANTIATION: {
-				const TemplateInstantiationParsedType& tpl = static_cast<const TemplateInstantiationParsedType&>(type);
-				if (isGeneric(*tpl.base)) return true;
-				for (Expression* arg : tpl.args) {
-					if (isGeneric(*arg)) return true;
-				}
-				return false;
-			}
-			case ParsedType::FUNCTION: {
-				const FunctionParsedType& fn = static_cast<const FunctionParsedType&>(type);
-				for (const auto param : fn.params) {
+			// $ introduces inferred type parameters only, so an array size cannot be generic.
+			case Expression::ARRAY_TYPE: return isGeneric(*static_cast<const ArrayTypeExpression&>(expr).element_type);
+			case Expression::SLICE_TYPE: return isGeneric(*static_cast<const SliceTypeExpression&>(expr).element_type);
+			case Expression::NULLABLE_TYPE: return isGeneric(*static_cast<const NullableTypeExpression&>(expr).inner);
+			case Expression::FUNCTION_TYPE: {
+				const auto& fn = static_cast<const FunctionTypeExpression&>(expr);
+				for (const Expression* param : fn.params) {
 					if (isGeneric(*param)) return true;
 				}
 				return isGeneric(*fn.return_type);
 			}
-
 			default: return false;
 		}
 	}
 
-	bool collectGenericParams(const ParsedType& type, ExpArray<ls_string_view>& names) {
-		switch (type.kind) {
-			case ParsedType::GENERIC: {
-				ls_string_view name = static_cast<const GenericParsedType&>(type).name;
+	bool collectGenericParams(const Expression& expr, ExpArray<ls_string_view>& names) {
+		switch (expr.kind) {
+			case Expression::GENERIC_IDENTIFIER: {
+				ls_string_view name = static_cast<const GenericIdentifierExpression&>(expr).name;
 				for (ls_string_view existing : names) {
 					if (!equalStrings(existing, name)) continue;
 					m_output.error("Duplicate template parameter: ", name);
@@ -1139,16 +1132,16 @@ struct Parser {
 				names.push(name);
 				return true;
 			}
-			case ParsedType::ARRAY: return collectGenericParams(*static_cast<const ArrayParsedType&>(type).element_type, names);
-			case ParsedType::NULLABLE: return collectGenericParams(*static_cast<const NullableParsedType&>(type).inner, names);
-			case ParsedType::SLICE: return collectGenericParams(*static_cast<const SliceParsedType&>(type).element_type, names);
-			case ParsedType::TEMPLATE_INSTANTIATION: {
-				const TemplateInstantiationParsedType& tpl = static_cast<const TemplateInstantiationParsedType&>(type);
-				return collectGenericParams(*tpl.base, names);
+			case Expression::ARRAY_TYPE: return collectGenericParams(*static_cast<const ArrayTypeExpression&>(expr).element_type, names);
+			case Expression::NULLABLE_TYPE: return collectGenericParams(*static_cast<const NullableTypeExpression&>(expr).inner, names);
+			case Expression::SLICE_TYPE: return collectGenericParams(*static_cast<const SliceTypeExpression&>(expr).element_type, names);
+			case Expression::BRACKET: {
+				const auto& br = static_cast<const BracketExpression&>(expr);
+				return collectGenericParams(*br.base, names);
 			}
-			case ParsedType::FUNCTION: {
-				const FunctionParsedType& fn = static_cast<const FunctionParsedType&>(type);
-				for (ParsedType* param : fn.params) {
+			case Expression::FUNCTION_TYPE: {
+				const auto& fn = static_cast<const FunctionTypeExpression&>(expr);
+				for (const Expression* param : fn.params) {
 					if (!collectGenericParams(*param, names)) return false;
 				}
 				return collectGenericParams(*fn.return_type, names);
@@ -1165,11 +1158,11 @@ struct Parser {
 		fn->is_template = false;
 		ExpArray<ls_string_view> generic_names(m_unit.arena);
 		for (FunctionParam& param : fn->params) {
-			if (param.is_comptime || isGeneric(*param.parsed_type)) {
+			if (param.is_comptime || isGeneric(*param.type_expr)) {
 				param.is_generic = true;
 				fn->is_template = true;
 			}
-			if (!collectGenericParams(*param.parsed_type, generic_names)) return nullptr;
+			if (!collectGenericParams(*param.type_expr, generic_names)) return nullptr;
 		}
 
 		fn->body = blockStatement();
@@ -1198,8 +1191,8 @@ struct Parser {
 				return nullptr;
 			}
 			if (!consume(Token::COLON)) { m_comptime_params = nullptr; return nullptr; }
-			field.parsed_type = type();
-			if (!field.parsed_type) { m_comptime_params = nullptr; return nullptr; }
+			field.type_expr = type();
+			if (!field.type_expr) { m_comptime_params = nullptr; return nullptr; }
 			if (!consume(Token::SEMICOLON)) { m_comptime_params = nullptr; return nullptr; }
 		}
 		m_comptime_params = nullptr;

@@ -159,6 +159,33 @@ TEST(TemplateFunctionMultipleParams) {
 	return true;
 }
 
+// The specialization key must follow declared generic-parameter order, not the
+// order in which argument and return-context inference discovered each binding.
+TEST(TemplateFunctionSpecializationKeyIsCanonical) {
+	const char* source = R"(
+		fn second(a : $A, b : $B) : B {
+			return b;
+		}
+
+		fn main() : i32 {
+			var first_a : i32 = 1;
+			var first_b : f32 = 2.0;
+			const warmup = second(first_a, first_b);
+
+			var second_a : f32 = warmup;
+			var second_b : i32 = 42;
+			return second(second_a, second_b);
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(TemplateFunctionMultipleParamsMismatchFails) {
 	const char* source = R"(
 		fn first(a : $A, b : $B) : A {
@@ -660,6 +687,63 @@ TEST(TemplateStructImportedAndInstantiatedRuntime) {
 		EXPECT_TRUE(ls_call(runtime, toLs("main")));
 		EXPECT_EQ(42, ls_to_i32(runtime, -1));
 	);
+	return true;
+}
+
+// Explicit arguments are written in the importing module and must be resolved
+// there, while the instantiated template's field declarations use the owner unit.
+TEST(TemplateStructImportedAcceptsCallerTypeArgument) {
+	const char* main_source = R"(
+		import "lib" as lib
+
+		struct LocalValue {
+			value : i32;
+		}
+
+		fn main() : i32 {
+			var box = lib.Box[LocalValue] { LocalValue { 42 } };
+			return box.value.value;
+		}
+	)";
+	const char* lib_source = R"(
+		struct Box[T] {
+			value : T;
+		}
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("lib"), toLs(lib_source) },
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_RUNTIME_WITH_IMPORTS(main_source, files, runtime,
+		EXPECT_TRUE(ls_call(runtime, toLs("main")));
+		EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	);
+	return true;
+}
+
+// Caller-owned comptime values follow the same lookup rule as caller-owned type
+// arguments when applying a struct template imported from another module.
+TEST(TemplateStructImportedAcceptsCallerValueArgument) {
+	const char* main_source = R"(
+		import "lib" as lib
+
+		comptime LOCAL_COUNT = 4;
+
+		fn main() : i32 {
+			var value : lib.Fixed[LOCAL_COUNT] = undefined;
+			return 42;
+		}
+	)";
+	const char* lib_source = R"(
+		struct Fixed[N : i32] {
+			values : [N]i32;
+		}
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("lib"), toLs(lib_source) },
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_COMPILE_WITH_IMPORTS(main_source, files);
 	return true;
 }
 
@@ -1289,6 +1373,66 @@ TEST(TemplateFunctionBracketSyntaxFails) {
 	return true;
 }
 
+// Indexing a value of a template struct type must not be mistaken for template
+// instantiation; only the struct declaration name can be an instantiation base.
+TEST(TemplateStructValueIndexingFails) {
+	const char* source = R"(
+		struct Foo[N : i32] {
+			a : i32;
+		}
+
+		var v : Foo[2] = { 1 };
+
+		fn main() : i32 {
+			var x = v[0];
+			return 0;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+// A generic parameter name must not rewrite an import qualifier in a separate
+// type annotation when the function specialization is cloned.
+TEST(TemplateFunctionGenericNameDoesNotShadowTypeImportQualifier) {
+	const char* main_source = R"(
+		import "lib" as lib
+
+		fn read(value : $lib, box : lib.Box) : i32 {
+			return box.value;
+		}
+
+		fn main() : i32 {
+			return read(42, lib.Box { 7 });
+		}
+	)";
+	const char* lib_source = R"(
+		struct Box {
+			value : i32;
+		}
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("lib"), toLs(lib_source) },
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_COMPILE_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
+// A specialization is a concrete type, not another template declaration.
+// The second bracket list must be rejected instead of replacing the first one.
+TEST(TemplateStructNestedSpecializationFails) {
+	const char* source = R"(
+		struct Foo[N : i32] {
+			a : i32;
+		}
+
+		comptime invalid = Foo[2][3];
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 // Without a comptime type argument and no value args to infer from, inference fails.
 TEST(TemplateFunctionNoArgsUnresolvedFails) {
 	const char* source = R"(
@@ -1536,6 +1680,34 @@ TEST(ComptimeGenericStructWithValueParamTypechecks) {
 
 		fn main() : void {
 			var values : StaticArray[i32, 4] = undefined;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(TemplateStructValueArgumentCanUseSizeof) {
+	const char* source = R"(
+		struct StaticArray[T, N : i32] {
+			values : [N]T;
+		}
+
+		fn main() : void {
+			var values : StaticArray[byte, sizeof(i64)] = undefined;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(TemplateStructSizeofUsesTypeBinding) {
+	const char* source = R"(
+		struct Storage[T] {
+			bytes : [sizeof(T)]byte;
+		}
+
+		fn main() : void {
+			var storage : Storage[i64] = undefined;
 		}
 	)";
 	EXPECT_COMPILE(source);

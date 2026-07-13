@@ -52,7 +52,7 @@ struct VarDeclStatement : Statement {
 	VarDeclStatement() : Statement(VAR_DECL) {}
 
 	ls_string_view name;
-	ParsedType* parsed_type = nullptr;
+	Expression* type_expr = nullptr;
 	ResolvedType* resolved_type = nullptr;
 	Expression* expression = nullptr;
 	bool is_immutable = false;

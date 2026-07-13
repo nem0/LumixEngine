@@ -2,19 +2,20 @@
 
 #include "capi.h"
 #include "exparray.h"
-#include "parsed_types.h"
 #include "resolved_types.h"
 #include "token.h"
 
 struct Statement;
 struct Symbol;
 struct FunctionExpression;
+struct Expression;
 
 struct NamedDecl {
 	ls_string_view name;
 	// Shared by compile-time template parameters and runtime function parameters;
 	// the owning expression determines which phase the parameter belongs to.
-	ParsedType* parsed_type = nullptr;
+	// Type annotations are ordinary expressions resolved in a comptime context.
+	Expression* type_expr = nullptr;
 	ResolvedType* resolved_type = nullptr;
 };
 
@@ -45,7 +46,7 @@ struct FunctionParam {
 	// Compile-time value parameters require constant arguments.
 	bool is_comptime = false;
 	bool is_generic = false;
-	ParsedType* parsed_type = nullptr;
+	Expression* type_expr = nullptr;
 	ResolvedType* resolved_type = nullptr;
 	StorageSlot slot;
 };
@@ -60,7 +61,6 @@ struct Expression {
 		STRING_LITERAL,
 		NULL_LITERAL,
 		TYPE_LITERAL,
-		PARSED_TYPE,
 		// Runtime call: `foo(a, b)`.
 		CALL,
 		// Unary operator expression such as `-x`, `not x`, or `ref x` at a call site.
@@ -90,6 +90,14 @@ struct Expression {
 		SIZEOF,
 		// $T
 		GENERIC_IDENTIFIER,
+		// Type-constructor syntax; these appear in type positions (annotations,
+		// casts, sizeof) and resolve to types in a comptime context.
+		ARRAY_TYPE,    // [N]T
+		SLICE_TYPE,    // []T
+		NULLABLE_TYPE, // ?T
+		FUNCTION_TYPE, // fn(A, B) : R used as a type
+		// A fully resolved type injected by template substitution during cloning.
+		RESOLVED_TYPE,
 	};
 
 	Expression() = default;
@@ -151,21 +159,48 @@ struct UndefinedExpression : Expression {
 };
 
 struct TypeLiteralExpression : Expression {
-	TypeLiteralExpression(ParsedType::Kind kind) : Expression(TYPE_LITERAL), type(kind) {}
+	// VOID..BYTE name a primitive type; META is the `type` keyword.
+	TypeLiteralExpression(ResolvedType::Kind kind) : Expression(TYPE_LITERAL), type(kind) {}
 
-	ParsedType::Kind type = ParsedType::INVALID;
+	ResolvedType::Kind type = ResolvedType::INVALID;
 };
 
-struct ParsedTypeExpression : Expression {
-	ParsedTypeExpression() : Expression(PARSED_TYPE) {}
+struct ArrayTypeExpression : Expression {
+	ArrayTypeExpression() : Expression(ARRAY_TYPE) {}
 
-	ParsedType* type = nullptr;
+	Expression* size = nullptr;
+	Expression* element_type = nullptr;
+};
+
+struct SliceTypeExpression : Expression {
+	SliceTypeExpression() : Expression(SLICE_TYPE) {}
+
+	Expression* element_type = nullptr;
+};
+
+struct NullableTypeExpression : Expression {
+	NullableTypeExpression() : Expression(NULLABLE_TYPE) {}
+
+	Expression* inner = nullptr;
+};
+
+struct FunctionTypeExpression : Expression {
+	FunctionTypeExpression(ls_arena& arena) : Expression(FUNCTION_TYPE), params(arena) {}
+
+	ExpArray<Expression*> params;
+	Expression* return_type = nullptr;
+};
+
+struct ResolvedTypeExpression : Expression {
+	ResolvedTypeExpression() : Expression(RESOLVED_TYPE) {}
+
+	ResolvedType* type = nullptr;
 };
 
 struct SizeofExpression : Expression {
 	SizeofExpression() : Expression(SIZEOF) {}
 
-	ParsedType* type = nullptr;
+	Expression* type_expr = nullptr;
 	bool is_align = false;
 	// Filled in during checking; behaves like an untyped integer literal afterwards.
 	u64 value = 0;
@@ -203,7 +238,7 @@ struct CastExpression : Expression {
 	CastExpression() : Expression(CAST) {}
 
 	Expression* expression = nullptr;
-	ParsedType* parsed_type = nullptr;
+	Expression* type_expr = nullptr;
 };
 
 struct MemberExpression : Expression {
@@ -241,7 +276,7 @@ struct FunctionExpression : Expression {
 	FunctionExpression(ls_arena& arena) : Expression(FUNCTION), params(arena), template_function_instances(arena) {}
 
 	ExpArray<FunctionParam> params;
-	ParsedType* return_type = nullptr;
+	Expression* return_type = nullptr;
 	// Null for `extern fn` declarations; the host binds the implementation at runtime.
 	Statement* body = nullptr;
 	bool is_extern = false;
@@ -261,7 +296,7 @@ struct StructExpression : Expression {
 	StructExpression(ls_arena& arena) : Expression(STRUCT), comptime_params(arena), fields(arena), operators(arena), template_struct_instances(arena) {}
 
 	ExpArray<NamedDecl> comptime_params; // [...]
-	// Fields keep parsed type syntax so generic structs can be instantiated with
+	// Fields keep type annotation syntax so generic structs can be instantiated with
 	// different comptime arguments before producing concrete resolved field types.
 	ExpArray<NamedDecl> fields;
 	// Operator overloads hosted on this type (first struct operand).

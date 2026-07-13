@@ -2,7 +2,6 @@
 
 #include "capi.h"
 #include "expressions.h"
-#include "parsed_types.h"
 #include "resolved_types.h"
 #include "statements.h"
 #include "utils.h"
@@ -38,7 +37,7 @@ struct Symbol {
 	Token token = {};
 	// Syntax-level type annotation. This preserves aliases and unresolved names
 	// exactly as written; semantic resolution converts to resolved_type later.
-	ParsedType* parsed_type = nullptr;
+	Expression* type_expr = nullptr;
 	// Canonical semantic type of the symbol.
 	// For struct/enum/fn type declarations this is MetaType { inner = actual type }.
 	// For value symbols this is the value's type directly.
