@@ -171,6 +171,16 @@ TEST(NullOnlyAssignableToNullable) {
 	return true;
 }
 
+TEST(NullWithoutTypeAnnotationFails) {
+	const char* source = R"(
+		fn main() : void {
+			var a = null;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 
 
 TEST(BytecodeNullableLocalNullCheck) {

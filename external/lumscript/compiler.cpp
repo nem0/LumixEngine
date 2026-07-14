@@ -88,7 +88,6 @@ struct Checker {
 	static bool isUntypedNumeric(const ResolvedType& t) { return t.kind == ResolvedType::UNTYPED_INT || t.kind == ResolvedType::UNTYPED_FLOAT; }
 	static bool isNumericOrUntyped(const ResolvedType& t) { return isNumericType(t) || isUntypedNumeric(t); }
 	static bool isIntegerOrUntyped(const ResolvedType& t) { return isIntegerType(t) || t.kind == ResolvedType::UNTYPED_INT; }
-	static bool isTemplateValueType(const ResolvedType* type) { return type && type->kind >= ResolvedType::BOOL && type->kind <= ResolvedType::STRING; }
 
 	template <typename T, typename... Args> static T* makeType(Unit& unit, Args&&... args) {
 		// Semantic nodes live as long as their owning unit. Allocating them from the
@@ -320,7 +319,7 @@ struct Checker {
 				error(static_cast<const NullableResolvedType*>(type)->inner);
 				return;
 			default:
-				if (type->kind >= ResolvedType::VOID && type->kind <= ResolvedType::CPTR) {
+				if (type->kind >= ResolvedType::VOID && type->kind <= ResolvedType::BYTE) {
 					error(primitiveTypeName(type->kind));
 					return;
 				}
@@ -364,56 +363,143 @@ struct Checker {
 		explicit operator bool() const { return symbol && !ambiguous && !check_failed; }
 	};
 
-	// TODO inline and remove
-	static i64 typeByteAlign(const ResolvedType* t) {
-		const i64 size = typeByteSize(*t);
-		return size >= 8 ? 8 : size >= 4 ? 4 : size >= 2 ? 2 : 1;
-	}
+	struct ComptimeValue {
+		enum Kind { INVALID, INT, FLOAT, BOOL, STRING } kind;
+		union {
+			i64 int_value;
+			double float_value;
+			bool bool_value;
+		};
+		ls_string_view string_value;
+		ComptimeValue() : kind(INVALID) {}
+		ComptimeValue(i64 i) : kind(INT), int_value(i) {}
+		ComptimeValue(double f) : kind(FLOAT), float_value(f) {}
+		ComptimeValue(bool b) : kind(BOOL), bool_value(b) {}
+		ComptimeValue(ls_string_view s) : kind(STRING), string_value(s) {}
+		double asFloat() const { return kind == FLOAT ? float_value : (double)int_value; }
+		i64 asInt() const { return kind == INT ? int_value : (i64)float_value; }
+		bool asBool() const { return kind == BOOL ? bool_value : (bool)int_value; }
+	};
 
 	// `sizeof(T)` / `alignof(T)`. Rejects a value-denoting name (the operand must be a type).
-	bool resolveSizeofValue(Unit& unit, SizeofExpression& sz, i64& out) {
-		ResolvedType* measured = resolveTypeExpr(unit, sz.type_expr);
+	bool resolveSizeofValue(Unit& unit, SizeofExpression& sz, ComptimeValue& out, TemplateBindings* bindings = nullptr) {
+		ResolvedType* measured = resolveTypeExpr(unit, sz.type_expr, bindings);
 		if (!measured) {
 			errorLine(sz.token, "Cannot resolve type for ", sz.is_align ? "alignof" : "sizeof");
 			return false;
 		}
-		out = sz.is_align ? typeByteAlign(measured) : typeByteSize(*measured);
-		sz.value = (u64)out;
+		const i64 size = typeByteSize(*measured);
+		out = ComptimeValue(sz.is_align ? (size >= 8 ? 8 : size >= 4 ? 4 : size >= 2 ? 2 : 1) : size);
+		sz.value = (u64)out.int_value;
 		return true;
 	}
 
-	bool resolveComptimeIntValue(Unit& unit, Expression* expr, i64& out, TemplateBindings* bindings = nullptr) {
-		if (!expr) return false;
+	// TODO full comptime eval 
+	// TODO error msgs
+	ComptimeValue resolveComptimeValue(Unit& unit, Expression* expr, TemplateBindings* bindings = nullptr) {
+		if (!expr) return {};
 		switch (expr->kind) {
-			case Expression::SIZEOF: return resolveSizeofValue(unit, static_cast<SizeofExpression&>(*expr), out);
+			case Expression::SIZEOF: {
+				ComptimeValue out;
+				if (!resolveSizeofValue(unit, static_cast<SizeofExpression&>(*expr), out, bindings)) return {};
+				return out;
+			}
 			case Expression::INT_LITERAL: {
 				const u64 value = static_cast<IntLiteralExpression*>(expr)->value;
-				if (value > 9223372036854775807ull) return false;
-				out = (i64)value;
-				return true;
+				if (value > 9223372036854775807ull) return {};
+				return ComptimeValue((i64)value);
+			}
+			case Expression::FLOAT_LITERAL: {
+				return ComptimeValue(static_cast<FloatLiteralExpression*>(expr)->value);
+			}
+			case Expression::BOOL_LITERAL: {
+				return ComptimeValue(static_cast<BoolLiteralExpression*>(expr)->value);
+			}
+			case Expression::STRING_LITERAL: {
+				return ComptimeValue(static_cast<StringLiteralExpression*>(expr)->value);
 			}
 			case Expression::IDENTIFIER: {
 				IdentifierExpression* id = static_cast<IdentifierExpression*>(expr);
 				if (TemplateBinding* binding = findTemplateBinding(bindings, id->name)) {
 					if (binding->arg.kind == TemplateArg::INT) {
-						out = binding->arg.int_value;
-						return true;
+						return ComptimeValue(binding->arg.int_value);
 					}
-					return false;
+					if (binding->arg.kind == TemplateArg::FLOAT) {
+						return ComptimeValue(binding->arg.float_value);
+					}
+					if (binding->arg.kind == TemplateArg::BOOL) {
+						return ComptimeValue(binding->arg.bool_value);
+					}
+					if (binding->arg.kind == TemplateArg::STRING) {
+						return ComptimeValue(binding->arg.string_value);
+					}
+					return {};
 				}
 				SymbolRef ref = resolveSymbol(unit, {}, id->name, LookupPolicy::Checked);
-				if (!ref.symbol || ref.check_failed || ref.symbol->storage != Symbol::COMPTIME) return false;
-				return resolveComptimeIntValue(unit, ref.symbol->expression, out);
+				if (!ref.symbol || ref.check_failed || ref.symbol->storage != Symbol::COMPTIME) return {};
+				return resolveComptimeValue(unit, ref.symbol->expression, bindings);
+			}
+			case Expression::BINARY: {
+				BinaryExpression* bin = static_cast<BinaryExpression*>(expr);
+				ComptimeValue lhs = resolveComptimeValue(unit, bin->lhs, bindings);
+				ComptimeValue rhs = resolveComptimeValue(unit, bin->rhs, bindings);
+				if (lhs.kind == ComptimeValue::INVALID || rhs.kind == ComptimeValue::INVALID) return {};
+
+				bool lhs_float = lhs.kind == ComptimeValue::FLOAT;
+				bool rhs_float = rhs.kind == ComptimeValue::FLOAT;
+				bool result_float = lhs_float || rhs_float;
+
+				double lhs_f = lhs.asFloat();
+				double rhs_f = rhs.asFloat();
+				double result_f = 0;
+				i64 result_i = 0;
+
+				switch (bin->op) {
+					case Token::PLUS:
+						result_float ? (result_f = lhs_f + rhs_f) : (result_i = lhs.int_value + rhs.int_value);
+						break;
+					case Token::MINUS:
+						result_float ? (result_f = lhs_f - rhs_f) : (result_i = lhs.int_value - rhs.int_value);
+						break;
+					case Token::STAR:
+						result_float ? (result_f = lhs_f * rhs_f) : (result_i = lhs.int_value * rhs.int_value);
+						break;
+					case Token::SLASH: {
+						if (result_float ? (rhs_f == 0) : (rhs.int_value == 0)) return {};
+						result_float ? (result_f = lhs_f / rhs_f) : (result_i = lhs.int_value / rhs.int_value);
+						break;
+					}
+					case Token::PERCENT:
+						if (!result_float && rhs.int_value == 0) return {};
+						if (result_float) return {};
+						result_i = lhs.int_value % rhs.int_value;
+						break;
+					default: return {};
+				}
+				return result_float ? ComptimeValue(result_f) : ComptimeValue(result_i);
 			}
 			case Expression::UNARY: {
 				UnaryExpression* un = static_cast<UnaryExpression*>(expr);
-				if (un->op != Token::MINUS) return false;
-				if (!resolveComptimeIntValue(unit, un->expression, out, bindings)) return false;
-				out = -out;
-				return true;
+				if (un->op != Token::MINUS) return {};
+				ComptimeValue out = resolveComptimeValue(unit, un->expression, bindings);
+				if (out.kind == ComptimeValue::INVALID) return {};
+				if (out.kind == ComptimeValue::FLOAT) {
+					out.float_value = -out.float_value;
+				} else {
+					out.int_value = -out.int_value;
+				}
+				return out;
 			}
-			default: return false;
+			default: return {};
 		}
+	}
+
+	// TODO Legacy wrappers for backwards compatibility, inline and remove
+	bool resolveComptimeIntValue(Unit& unit, Expression* expr, i64& out, TemplateBindings* bindings = nullptr) {
+		ComptimeValue val = resolveComptimeValue(unit, expr, bindings);
+		if (val.kind == ComptimeValue::INVALID) return false;
+		out = val.asInt();
+		return true;
 	}
 
 	// Check expression and pin untyped literals to a target type, returning nullptr if the
@@ -859,6 +945,7 @@ struct Checker {
 				SliceTypeExpression* sl = static_cast<SliceTypeExpression*>(expr);
 				SliceResolvedType* resolved = makeType<SliceResolvedType>(unit);
 				resolved->element_type = resolveTypeExpr(unit, sl->element_type, bindings);
+				if (!resolved->element_type) return nullptr;
 				return resolved;
 			}
 			case Expression::NULLABLE_TYPE: {
@@ -915,7 +1002,7 @@ struct Checker {
 				if (!st->decl || st->decl->comptime_params.empty()) return nullptr; // TODO silent fail
 				Unit* owner = findTypeNamespaceUnit(*st);
 				if (!owner) return nullptr; // TODO silent fail
-				ResolvedType* result = instantiateStructTemplate(*owner, *st->decl, br->args);
+				ResolvedType* result = instantiateStructTemplate(*owner, *st->decl, br->args, &unit);
 				if (result) expr->resolved_type = result;
 				return result;
 			}
@@ -929,7 +1016,7 @@ struct Checker {
 	ResolvedType* unifyNumeric(ResolvedType& a, ResolvedType& b) {
 		const bool ui_a = a.kind == ResolvedType::UNTYPED_INT, ui_b = b.kind == ResolvedType::UNTYPED_INT;
 		const bool uf_a = a.kind == ResolvedType::UNTYPED_FLOAT, uf_b = b.kind == ResolvedType::UNTYPED_FLOAT;
-		// Two untyped operands: float wins over int (1 + 1.5 → untyped float).
+		// Two untyped operands: float wins over int (1 + 1.5 -> untyped float).
 		if ((ui_a || uf_a) && (ui_b || uf_b)) return (uf_a || uf_b) ? primitiveType(ResolvedType::UNTYPED_FLOAT) : primitiveType(ResolvedType::UNTYPED_INT);
 		// One untyped, one concrete: untyped adopts the concrete type if compatible.
 		if (ui_a) return isNumericType(b) ? &b : nullptr;
@@ -982,11 +1069,40 @@ struct Checker {
 		}
 	}
 
-	FunctionResolvedType* buildFunctionType(Unit& unit, FunctionExpression& fn, bool reject_nullable_refs) {
-		// The AST owns the canonical signature. Besides avoiding duplicate arena
-		// allocations, publishing it here gives recursive checking a stable identity.
+	// Check whether an expression that has already resolved as untyped numeric can
+	// be pinned to `concrete`, without changing the AST. This is shared by normal
+	// materialization and overload matching so a candidate never matches only to
+	// fail during the commit pass.
+	static bool canMaterializeUntyped(const Expression& expr, const ResolvedType& concrete) {
+		switch (expr.kind) {
+			case Expression::INT_LITERAL:
+				return isNumericType(concrete) && intLiteralFitsType(static_cast<const IntLiteralExpression&>(expr).value, concrete.kind);
+			case Expression::SIZEOF:
+				return isNumericType(concrete) && intLiteralFitsType(static_cast<const SizeofExpression&>(expr).value, concrete.kind);
+			case Expression::FLOAT_LITERAL: {
+				if (!isFloatType(concrete)) return false;
+				const double value = static_cast<const FloatLiteralExpression&>(expr).value;
+				return concrete.kind != ResolvedType::F32 || (value <= (double)FLT_MAX && value >= -(double)FLT_MAX);
+			}
+			case Expression::UNARY: {
+				const UnaryExpression& un = static_cast<const UnaryExpression&>(expr);
+				if (!un.expression) return true;
+				if (un.op == Token::MINUS && un.expression->kind == Expression::INT_LITERAL)
+					return isNumericType(concrete) && negatedIntLiteralFitsType(static_cast<const IntLiteralExpression*>(un.expression)->value, concrete.kind);
+				return canMaterializeUntyped(*un.expression, concrete);
+			}
+			case Expression::BINARY: {
+				const BinaryExpression& bin = static_cast<const BinaryExpression&>(expr);
+				return (!bin.lhs || canMaterializeUntyped(*bin.lhs, concrete))
+					&& (!bin.rhs || canMaterializeUntyped(*bin.rhs, concrete));
+			}
+			default: return true;
+		}
+	}
+
+	FunctionResolvedType* buildFunctionType(Unit& unit, FunctionExpression& fn) {
+		ASSERT(!fn.is_template);
 		if (fn.resolved_type) return static_cast<FunctionResolvedType*>(fn.resolved_type);
-		if (fn.is_template) return nullptr;
 
 		FunctionResolvedType* fn_type = makeType<FunctionResolvedType>(unit, *unit.arena.arena);
 		fn_type->decl = &fn;
@@ -996,7 +1112,8 @@ struct Checker {
 				errorLine(fn.token, "Could not resolve function parameter type: ", param.name);
 				return nullptr;
 			}
-			if (reject_nullable_refs && param.is_ref && param.resolved_type->kind == ResolvedType::NULLABLE) {
+			if (param.is_ref && param.resolved_type->kind == ResolvedType::NULLABLE) {
+				// not supported by the language
 				errorLine(fn.token, "Function parameter ", param.name, " cannot be a nullable reference");
 				return nullptr;
 			}
@@ -1019,16 +1136,23 @@ struct Checker {
 		return true;
 	}
 
-	// Probe-and-commit overload resolution for n-ary operators.
-	// Probes each candidate by type-checking the operands in place under suppressed
-	// errors: stale resolved_type/symbol annotations from a losing candidate are
-	// overwritten by the commit pass once a unique match is confirmed, and a candidate
-	// that fails must not emit diagnostics. A function-literal operand checked during a
-	// probe is safe because checkExpr clears its cached resolved_type when its body
-	// fails, so a later non-suppressed check re-runs the body.
-	// Looks up only the operator list of the first struct operand (host). Operators are
-	// indexed there when their symbol is checked, so this is O(overloads-on-type).
-	enum class OverloadResult { NOT_FOUND, FOUND, AMBIGUOUS };
+	// Match-and-commit overload resolution for n-ary operators.
+	// The match pass resolves each operand's natural (unhinted) type once, under
+	// suppressed errors, and tests candidates purely on types — no checkExpr per
+	// candidate, so scanning the remaining candidates for ambiguity cannot re-type
+	// an operand a previous candidate matched. Untyped numeric literals match a
+	// parameter their value fits. Typeless struct literals have no natural type, so
+	// they cannot select an overload. Once a unique candidate is confirmed, the
+	// commit pass re-checks the operands against its signature with
+	// errors enabled, pinning literal types in place. A function-literal operand
+	// checked during the match pass is safe because checkExpr clears its cached
+	// resolved_type when its body fails, so the commit or fallback re-check re-runs
+	// the body with errors enabled.
+	// Looks up only the operator list of the first struct operand (host). Operators
+	// are indexed there when their symbol is checked, so this is O(overloads-on-type).
+	// FAILED means a unique candidate matched but committing the operand types
+	// failed; diagnostics were already emitted.
+	enum class OverloadResult { NOT_FOUND, FOUND, AMBIGUOUS, FAILED };
 
 	static FunctionResolvedType* asFunctionType(ResolvedType* type) {
 		type = unwrapMeta(type);
@@ -1110,50 +1234,54 @@ struct Checker {
 		return call.resolved_type;
 	}
 
+	static bool operandMatchesParam(Expression& operand, ResolvedType* type, ResolvedType* param) {
+		if (!param) return false;
+		if (!type) return false;
+		if (typesEqual(type, param)) return true;
+		if (isUntypedNumeric(*type)) return canMaterializeUntyped(operand, *param);
+		return false;
+	}
+
 	OverloadResult resolveOperatorOverload(Unit& unit,
 		FunctionCheckContext* ctx,
 		Token::Type op,
 		i32 arity,
 		Expression** operands, // array of `arity` expression pointers
+		ResolvedType** operand_types,
+		StructExpression& host,
 		ResolvedType*& result_type,
-		FunctionExpression*& result_fn) {
-
-		// Find the host: first operand whose resolved type is a struct.
-		// Primitives and untyped literals are skipped; they cannot host operator lists.
-		StructExpression* host = nullptr;
-		for (i32 i = 0; i < arity && !host; ++i) {
-			++suppress_errors;
-			ResolvedType* t = checkExpr(unit, ctx, *operands[i], nullptr);
-			--suppress_errors;
-			if (t && t->kind == ResolvedType::STRUCT) host = static_cast<StructResolvedType*>(t)->decl;
-		}
-		if (!host) return OverloadResult::NOT_FOUND;
-
-
-		bool matched = false;
-		ResolvedType* matched_type = nullptr;
+		FunctionExpression*& result_fn
+	) {
+		FunctionResolvedType* matched_type = nullptr;
 		FunctionExpression* matched_fn = nullptr;
-		for (StructOperator& cand : host->operators) {
+		for (StructOperator& cand : host.operators) {
 			if (cand.op != op) continue;
-			FunctionResolvedType* fn_type = static_cast<FunctionResolvedType*>(cand.fn->resolved_type);
-			if (!fn_type || (i32)fn_type->param_types.size() != arity) continue;
 
-			++suppress_errors;
-			bool match = true;
+			FunctionResolvedType* fn_type = static_cast<FunctionResolvedType*>(cand.fn->resolved_type);
+			if (fn_type->param_types.size() != arity) continue;
+
+			bool match = operandMatchesParam(*operands[0], operand_types[0], fn_type->param_types[0]);
+			
 			for (i32 j = 0; j < arity && match; ++j) {
-				ResolvedType* t = checkExpr(unit, ctx, *operands[j], fn_type->param_types[(u32)j]);
-				if (!t || !typesEqual(t, fn_type->param_types[(u32)j])) match = false;
+				match = operandMatchesParam(*operands[j], operand_types[j], fn_type->param_types[(u32)j]);
 			}
-			--suppress_errors;
 			if (!match) continue;
-			if (matched) return OverloadResult::AMBIGUOUS;
-			matched = true;
-			matched_type = fn_type->return_type;
+			if (matched_fn) return OverloadResult::AMBIGUOUS;
+			matched_type = fn_type;
 			matched_fn = cand.fn;
 		}
 
-		if (!matched) return OverloadResult::NOT_FOUND;
-		result_type = matched_type;
+		if (!matched_fn) return OverloadResult::NOT_FOUND;
+
+		// Commit pass: pin untyped numeric operands to the winning signature.
+		for (i32 j = 0; j < arity; ++j) {
+			ResolvedType* param = matched_type->param_types[(u32)j];
+			if (!materializeUntyped(*operands[j], param)) {
+				errorLine(operands[j]->token, "Cannot convert operand ", j + 1, " of operator ", operatorSymbolName(op), " to ", param);
+				return OverloadResult::FAILED;
+			}
+		}
+		result_type = matched_type->return_type;
 		result_fn = matched_fn;
 		return OverloadResult::FOUND;
 	}
@@ -1182,87 +1310,36 @@ struct Checker {
 		while (ctx.locals.size() > mark) ctx.locals.pop_back();
 	}
 
-	Expression* resolveComptimeValue(Unit& unit, Expression* expr, ResolvedType* expected, TemplateBindings* bindings = nullptr) {
-		ASSERT(expected);
-		if (!expr || !expected) return nullptr;
-		if (expr->kind == Expression::IDENTIFIER) {
-			IdentifierExpression* id = static_cast<IdentifierExpression*>(expr);
-			if (TemplateBinding* binding = findTemplateBinding(bindings, id->name)) {
-				if (binding->arg.kind == TemplateArg::TYPE) return nullptr;
-				return cloneTemplateArgAsExpression(unit, binding->arg);
-			}
-			SymbolRef ref = resolveSymbol(unit, {}, id->name, LookupPolicy::Checked);
-			if (!ref || ref.symbol->storage != Symbol::COMPTIME) return nullptr;
-			return resolveComptimeValue(*ref.owner, ref.symbol->expression, expected);
-		}
-
-		switch (expr->kind) {
-			case Expression::INT_LITERAL:
-			case Expression::FLOAT_LITERAL:
-			case Expression::BOOL_LITERAL:
-			case Expression::STRING_LITERAL:
-			case Expression::UNARY: break;
-			default: return nullptr;
-		}
-
-		FunctionCheckContext comptime_ctx(*unit.arena.arena);
-		comptime_ctx.comptime_only = true;
-		ResolvedType* type = checkExprMaterialized(unit, &comptime_ctx, *expr, expected);
-		if (!type) return nullptr;
-		return typesEqual(type, expected) ? expr : nullptr;
-	}
-
-	bool expressionToTemplateArg(Unit& unit, Expression* expr, ResolvedType* expected, TemplateArg& out) {
+	bool expressionToTemplateArg(Unit& unit, Expression& expr, ResolvedType* expected, TemplateArg& out, TemplateBindings* bindings = nullptr) {
 		if (!expected) {
-			ResolvedType* type_arg = resolveTypeExpr(unit, expr);
+			ResolvedType* type_arg = resolveTypeExpr(unit, &expr);
 			if (!type_arg) return false;
 			out.kind = TemplateArg::TYPE;
 			out.type = type_arg;
 			return true;
 		}
 
-		Expression* value = resolveComptimeValue(unit, expr, expected);
-		if (!value || !value->resolved_type) return false;
-		switch (expected->kind) {
-			case ResolvedType::BOOL:
-				if (value->kind != Expression::BOOL_LITERAL) return false;
-				out.kind = TemplateArg::BOOL;
-				out.bool_value = static_cast<BoolLiteralExpression*>(value)->value;
-				return true;
-			case ResolvedType::STRING:
-				if (value->kind != Expression::STRING_LITERAL) return false;
+		// TODO what about `expected`?
+		ComptimeValue val = resolveComptimeValue(unit, &expr, bindings);
+		switch (val.kind) {
+			case ComptimeValue::INVALID:
+				return false;
+			case ComptimeValue::STRING:
 				out.kind = TemplateArg::STRING;
-				out.string_value = static_cast<StringLiteralExpression*>(value)->value;
-				return true;
-			case ResolvedType::F32:
-			case ResolvedType::F64:
-				if (value->kind != Expression::FLOAT_LITERAL) return false;
-				out.kind = TemplateArg::FLOAT;
-				out.float_value = static_cast<FloatLiteralExpression*>(value)->value;
-				return true;
-			default:
-				if (!isIntegerType(*expected)) return false;
-				i64 int_value = 0;
-				if (!resolveComptimeIntValue(unit, value, int_value)) return false;
+				out.string_value = val.string_value;
+				break;
+			case ComptimeValue::INT:
 				out.kind = TemplateArg::INT;
-				out.int_value = int_value;
-				return true;
-		}
-	}
-
-	bool buildTemplateArgs(Unit& unit, ExpArray<NamedDecl>& params, ExpArray<Expression*>& arg_exprs, ExpArray<TemplateArg>& out_args) { // TODO inline and remove
-		if (params.size() != arg_exprs.size()) return false;
-		for (i32 i = 0; i < params.size(); ++i) {
-			NamedDecl& param = params[i];
-			ResolvedType* expected = nullptr;
-			if (param.type_expr) {
-				expected = param.resolved_type ? param.resolved_type : resolveTypeExpr(unit, param.type_expr);
-				if (!isTemplateValueType(expected)) return false;
-				param.resolved_type = expected;
-			}
-			TemplateArg arg;
-			if (!expressionToTemplateArg(unit, arg_exprs[i], expected, arg)) return false;
-			out_args.push(arg);
+				out.int_value = val.int_value;
+				break;
+			case ComptimeValue::FLOAT:
+				out.kind = TemplateArg::FLOAT;
+				out.float_value = val.float_value;
+				break;
+			case ComptimeValue::BOOL:
+				out.kind = TemplateArg::BOOL;
+				out.bool_value = val.bool_value;
+				break;
 		}
 		return true;
 	}
@@ -1296,21 +1373,35 @@ struct Checker {
 		return true;
 	}
 
-	StructResolvedType* instantiateStructTemplate(Unit& unit, StructExpression& st, ExpArray<Expression*>& arg_exprs) {
+	StructResolvedType* instantiateStructTemplate(Unit& unit, StructExpression& st, ExpArray<Expression*>& arg_exprs, Unit* argument_unit = nullptr) {
 		if (st.comptime_params.empty()) return nullptr;
-		ExpArray<TemplateArg> args(*unit.arena.arena); // TODO review
-		if (!buildTemplateArgs(unit, st.comptime_params, arg_exprs, args)) return nullptr;
-		for (TemplateStructInstance& instance : st.template_struct_instances) {
-			if (instance.args.size() == args.size()) {
-				bool equal = true;
-				for (i32 i = 0; i < args.size(); ++i) {
-					if (!templateArgsEqual(instance.args[i], args[i])) {
-						equal = false;
-						break;
-					}
-				}
-				if (equal) return instance.check_failed ? nullptr : instance.type;
+		ExpArray<TemplateArg> args(*unit.arena.arena);
+		Unit& arg_unit = argument_unit ? *argument_unit : unit;
+		if (st.comptime_params.size() != arg_exprs.size()) {
+			errorLine(st.token, "Template struct expects ", st.comptime_params.size(), " arguments, but got ", arg_exprs.size());
+			return nullptr;
+		}
+		args.resize(st.comptime_params.size());
+
+		for (i32 i = 0; i < st.comptime_params.size(); ++i) {
+			NamedDecl& param = st.comptime_params[i];
+			if (param.type_expr && !param.resolved_type) {
+				param.resolved_type = resolveTypeExpr(arg_unit, param.type_expr);
 			}
+			TemplateArg arg;
+			if (!expressionToTemplateArg(arg_unit, *arg_exprs[i], param.resolved_type, arg)) return nullptr;
+			args[i] = arg;
+		}
+		for (TemplateStructInstance& instance : st.template_struct_instances) {
+			ASSERT(instance.args.size() == args.size());
+			bool equal = true;
+			for (i32 i = 0; i < args.size(); ++i) {
+				if (!templateArgsEqual(instance.args[i], args[i])) {
+					equal = false;
+					break;
+				}
+			}
+			if (equal) return instance.check_failed ? nullptr : instance.type;
 		}
 
 		TemplateStructInstance& new_instance = st.template_struct_instances.emplace_back(*unit.arena.arena);
@@ -1460,7 +1551,7 @@ struct Checker {
 		clone->body = cloneStatement(unit, fn.body, &bindings);
 		instance.instance = clone;
 
-		fn_type = buildFunctionType(unit, *clone, true);
+		fn_type = buildFunctionType(unit, *clone);
 		if (!fn_type) {
 			errorLine(fn.token, "Could not build template function signature");
 		}
@@ -1504,9 +1595,8 @@ struct Checker {
 			sym.resolved_type = nullptr;
 			return LS_RESULT_OK;
 		}
-		FunctionResolvedType* fn_type = buildFunctionType(unit, fn, true);
-		if (!fn_type) return LS_RESULT_FAILURE;
-		sym.resolved_type = fn_type;
+		// Signature was built and published by checkSymbol before dispatching here.
+		FunctionResolvedType* fn_type = static_cast<FunctionResolvedType*>(fn.resolved_type);
 		if (const Token::Type op_token = tokenFromOperatorName(sym.name); op_token != Token::ERROR) {
 			const i32 arity = (i32)fn_type->param_types.size();
 			if ((op_token == Token::MINUS ? (arity != 1 && arity != 2) : arity != 2)) {
@@ -1567,7 +1657,7 @@ struct Checker {
 			for (NamedDecl& param : st.comptime_params) {
 				if (!param.type_expr) continue;
 				ResolvedType* param_type = resolveTypeExpr(unit, param.type_expr);
-				if (!isTemplateValueType(param_type)) {
+				if (!(param_type && param_type->kind >= ResolvedType::BOOL && param_type->kind <= ResolvedType::STRING)) {
 					errorLine(sym.token, "Struct template value comptime parameters must be primitive values");
 					return LS_RESULT_FAILURE;
 				}
@@ -1627,28 +1717,22 @@ struct Checker {
 
 		if (expr->kind == Expression::UNDEFINED) {
 			if (!annotation) {
+				// var a = undefined; - no way to know the type
 				errorLine(sym.token, "'undefined' initializer requires an explicit type annotation: ", sym.name);
 				return LS_RESULT_FAILURE;
 			}
 			if (sym.storage == Symbol::CONST) {
+				// const a : i32 = undefined; - not useful
 				errorLine(sym.token, "const cannot be initialized with 'undefined': ", sym.name);
 				return LS_RESULT_FAILURE;
 			}
 		}
 
-		if (expr->kind == Expression::FUNCTION) {
-			FunctionExpression& fn = static_cast<FunctionExpression&>(*expr);
-			FunctionResolvedType* fn_type = buildFunctionType(unit, fn, true);
-			if (!fn_type) return LS_RESULT_FAILURE;
-			if (annotation && !canImplicitlyConvert(fn_type, annotation)) {
-				errorLine(sym.token, "Type mismatch in initializer for: ", sym.name);
-				return LS_RESULT_FAILURE;
-			}
-			// Preserve the declared type when one exists so nullable function globals
-			// stay nullable after initialization.
-			sym.resolved_type = annotation ? annotation : fn_type;
-			if (!checkFunctionBody(unit, fn)) return LS_RESULT_FAILURE;
-			return LS_RESULT_OK;
+		if (expr->kind == Expression::FUNCTION && !static_cast<FunctionExpression&>(*expr).is_template) {
+			// checkSymbol already published the signature as the symbol's type; the body
+			// must be checked here because checkExpr treats the pre-built signature as an
+			// already-checked cache entry and skips the body.
+			if (!checkFunctionBody(unit, static_cast<FunctionExpression&>(*expr))) return LS_RESULT_FAILURE;
 		}
 
 		ResolvedType* expr_type = checkExprAndPin(unit, nullptr, *expr, annotation);
@@ -1663,8 +1747,8 @@ struct Checker {
 
 	// Instantiate and check a template function. Returns the instantiated function expression on
 	// success, nullptr on failure. Assumes fn.is_template is true.
-	FunctionExpression* instantiateAndCheckTemplate(Unit& unit, FunctionCheckContext* ctx, Expression& call_expr, CallExpression& call, Unit& template_unit, FunctionExpression& fn, ResolvedType* hint, u32 ufcs_param_offset = 0) {
-		TemplateBindings bindings(*unit.arena.arena);
+	FunctionExpression* instantiateAndCheckTemplate(Unit& unit, FunctionCheckContext* ctx, Expression& call_expr, CallExpression& call, Unit& template_unit, FunctionExpression& fn, u32 ufcs_param_offset = 0) {
+		TemplateBindings bindings(*unit.arena.arena); // TODO reuse?
 		auto inferenceFailed = [&]() -> FunctionExpression* {
 			errorLine(call_expr.token, "Could not infer template arguments for ", fn.token.value);
 			return nullptr;
@@ -1674,14 +1758,9 @@ struct Checker {
 		}
 		if (ufcs_param_offset) {
 			MemberExpression& mem = static_cast<MemberExpression&>(*call.callee);
-			if (!mem.expression || !mem.expression->resolved_type
-				|| !inferTemplateType(template_unit, bindings, *fn.params[0].type_expr, *mem.expression->resolved_type))
-			{
+			if (!mem.expression || !mem.expression->resolved_type || !inferTemplateType(template_unit, bindings, *fn.params[0].type_expr, *mem.expression->resolved_type)) {
 				return inferenceFailed();
 			}
-		}
-		if (hint && !inferTemplateType(template_unit, bindings, *fn.return_type, *hint)) {
-			errorLine(call.token, "Template return hint did not match");
 		}
 
 		for (u32 i = 0; i < call.args.size(); ++i) {
@@ -1691,7 +1770,6 @@ struct Checker {
 
 			ResolvedType* expected = nullptr;
 			if (param.is_comptime
-				&& param.type_expr
 				&& param.type_expr->kind == Expression::TYPE_LITERAL
 				&& static_cast<TypeLiteralExpression*>(param.type_expr)->type == ResolvedType::META)
 			{
@@ -1702,7 +1780,7 @@ struct Checker {
 
 			if (param.is_comptime) {
 				TemplateArg template_arg;
-				if (!expressionToTemplateArg(unit, arg, expected, template_arg)) {
+				if (!expressionToTemplateArg(unit, *arg, expected, template_arg, &bindings)) {
 					errorLine(arg->token, "Could not resolve comptime template argument");
 					return inferenceFailed();
 				}
@@ -1748,7 +1826,7 @@ struct Checker {
 		return instance;
 	}
 
-	ResolvedType* checkCallExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr, ResolvedType* hint) {
+	ResolvedType* checkCallExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr) {
 		CallExpression& call = static_cast<CallExpression&>(expr);
 
 		// length(slice | array)
@@ -1795,7 +1873,7 @@ struct Checker {
 				return nullptr;
 			}
 			if (fn->is_template) {
-				FunctionExpression* instance = instantiateAndCheckTemplate(unit, ctx, expr, call, *sym.owner, *fn, hint);
+				FunctionExpression* instance = instantiateAndCheckTemplate(unit, ctx, expr, call, *sym.owner, *fn);
 				if (!instance) return nullptr; // TODO silent fail - error already emitted by instantiateAndCheckTemplate
 				if (call.callee->kind == Expression::IDENTIFIER) static_cast<IdentifierExpression*>(call.callee)->symbol = sym.symbol;
 				FunctionResolvedType* fn_type = asFunctionType(instance->resolved_type);
@@ -1834,7 +1912,7 @@ struct Checker {
 
 		FunctionExpression* fn = asFunctionExpression(*ref.symbol);
 		if (fn && fn->is_template) {
-			FunctionExpression* instance = instantiateAndCheckTemplate(unit, ctx, expr, call, *ref.owner, *fn, hint, 1);
+			FunctionExpression* instance = instantiateAndCheckTemplate(unit, ctx, expr, call, *ref.owner, *fn, 1);
 			if (!instance) return nullptr;
 			fn = instance;
 		}
@@ -1852,68 +1930,56 @@ struct Checker {
 	// Pin an untyped numeric expression to a concrete type.
 	// A concrete `concrete` range-checks leaf literals; a null/non-numeric `concrete`
 	// uses the literal's default inferred width.
-	ResolvedType* materializeUntyped(Expression& expr, ResolvedType* concrete) {
-		if (expr.resolved_type->kind == ResolvedType::UNTYPED_INT) {
-			if (concrete && isNumericType(*concrete)) return materializeUntyped(expr, concrete, true);
-			// No target: pin to the narrowest default integer width that holds the value.
-			ResolvedType::Kind kind = ResolvedType::I32;
-			if (expr.kind == Expression::INT_LITERAL) {
-				const u64 value = static_cast<IntLiteralExpression&>(expr).value;
-				if (value > 9223372036854775807ull)
-					kind = ResolvedType::U64;
-				else if (value > 2147483647u)
-					kind = ResolvedType::I64;
-			} else if (expr.kind == Expression::UNARY) {
-				UnaryExpression& un = static_cast<UnaryExpression&>(expr);
-				if (un.op == Token::MINUS && un.expression && un.expression->kind == Expression::INT_LITERAL) {
-					const u64 magnitude = static_cast<IntLiteralExpression*>(un.expression)->value;
-					if (magnitude > 9223372036854775808ull) {
-						errorLine(expr.token, "Integer literal does not fit in any integer type");
-						return nullptr;
-					}
-					if (magnitude > 2147483648u) kind = ResolvedType::I64;
-				}
-			}
-			return materializeUntyped(expr, primitiveType(kind), false);
-		}
-		if (expr.resolved_type->kind == ResolvedType::UNTYPED_FLOAT) {
-			if (concrete && isFloatType(*concrete)) return materializeUntyped(expr, concrete, true);
-			return materializeUntyped(expr, primitiveType(ResolvedType::F64), false);
-		}
-		return expr.resolved_type;
-	}
-
-	// TODO review check_fit
-	ResolvedType* materializeUntyped(Expression& expr, ResolvedType* concrete, bool check_fit) {
-		if (!expr.resolved_type) return nullptr;
+	// Pin an untyped numeric expression to a concrete type. With no compatible
+	// target, choose the expression's default type; recursive calls pass false
+	// after the target has already been selected.
+	ResolvedType* materializeUntyped(Expression& expr, ResolvedType* concrete, bool check_fit = true) {
 		if (!isUntypedNumeric(*expr.resolved_type)) return expr.resolved_type;
+		if (check_fit) {
+			const bool compatible_target = concrete && ((expr.resolved_type->kind == ResolvedType::UNTYPED_INT && isNumericType(*concrete)) ||
+														   (expr.resolved_type->kind == ResolvedType::UNTYPED_FLOAT && isFloatType(*concrete)));
+			if (!compatible_target) {
+				if (expr.resolved_type->kind == ResolvedType::UNTYPED_INT) {
+					// No target: pin to the narrowest default integer width that holds the value.
+					ResolvedType::Kind kind = ResolvedType::I32;
+					if (expr.kind == Expression::INT_LITERAL) {
+						const u64 value = static_cast<IntLiteralExpression&>(expr).value;
+						if (value > 9223372036854775807ull)
+							kind = ResolvedType::U64;
+						else if (value > 2147483647u)
+							kind = ResolvedType::I64;
+					} else if (expr.kind == Expression::UNARY) {
+						UnaryExpression& un = static_cast<UnaryExpression&>(expr);
+						if (un.op == Token::MINUS && un.expression && un.expression->kind == Expression::INT_LITERAL) {
+							const u64 magnitude = static_cast<IntLiteralExpression*>(un.expression)->value;
+							if (magnitude > 9223372036854775808ull) {
+								errorLine(expr.token, "Integer literal does not fit in any integer type");
+								return nullptr;
+							}
+							if (magnitude > 2147483648u) kind = ResolvedType::I64;
+						}
+					}
+					concrete = primitiveType(kind);
+				} else {
+					concrete = primitiveType(ResolvedType::F64);
+				}
+				check_fit = false;
+			}
+		}
+		if (check_fit && !canMaterializeUntyped(expr, *concrete)) {
+			errorLine(expr.token, "Untyped expression does not fit in ", concrete);
+			return nullptr;
+		}
 		switch (expr.kind) {
 			case Expression::INT_LITERAL: {
-				const u64 value = static_cast<IntLiteralExpression&>(expr).value;
-				if (check_fit && !intLiteralFitsType(value, concrete->kind)) {
-					errorLine(expr.token, "Integer literal does not fit in ", concrete);
-					return nullptr;
-				}
 				expr.resolved_type = concrete;
 				return concrete;
 			}
 			case Expression::SIZEOF: {
-				const u64 value = static_cast<SizeofExpression&>(expr).value;
-				if (check_fit && !intLiteralFitsType(value, concrete->kind)) {
-					errorLine(expr.token, "Constant does not fit in ", concrete);
-					return nullptr;
-				}
 				expr.resolved_type = concrete;
 				return concrete;
 			}
 			case Expression::FLOAT_LITERAL: {
-				const double value = static_cast<FloatLiteralExpression&>(expr).value;
-				if (check_fit && concrete->kind == ResolvedType::F32) {
-					if (value > (double)FLT_MAX || value < -(double)FLT_MAX) {
-						errorLine(expr.token, "Float literal does not fit in f32");
-						return nullptr;
-					}
-				}
 				expr.resolved_type = concrete;
 				return concrete;
 			}
@@ -1921,23 +1987,18 @@ struct Checker {
 				UnaryExpression& un = static_cast<UnaryExpression&>(expr);
 				// A negated integer literal range-checks against the target width.
 				if (un.op == Token::MINUS && un.expression && un.expression->kind == Expression::INT_LITERAL) {
-					const u64 magnitude = static_cast<IntLiteralExpression*>(un.expression)->value;
-					if (check_fit && !negatedIntLiteralFitsType(magnitude, concrete->kind)) {
-						errorLine(expr.token, "Integer literal does not fit in type ", concrete);
-						return nullptr;
-					}
 					un.expression->resolved_type = concrete;
 					expr.resolved_type = concrete;
 					return concrete;
 				}
-				if (un.expression && !materializeUntyped(*un.expression, concrete, check_fit)) return nullptr;
+				if (un.expression && !materializeUntyped(*un.expression, concrete, false)) return nullptr;
 				expr.resolved_type = concrete;
 				return concrete;
 			}
 			case Expression::BINARY: {
 				BinaryExpression& bin = static_cast<BinaryExpression&>(expr);
-				if (bin.lhs && !materializeUntyped(*bin.lhs, concrete, check_fit)) return nullptr;
-				if (bin.rhs && !materializeUntyped(*bin.rhs, concrete, check_fit)) return nullptr;
+				if (bin.lhs && !materializeUntyped(*bin.lhs, concrete, false)) return nullptr;
+				if (bin.rhs && !materializeUntyped(*bin.rhs, concrete, false)) return nullptr;
 				expr.resolved_type = concrete;
 				return concrete;
 			}
@@ -1965,20 +2026,22 @@ struct Checker {
 			expr.resolved_type = lit->resolved_type;
 			return expr.resolved_type;
 		}
-		ResolvedType* overload_result = nullptr;
-		FunctionExpression* overload_fn = nullptr;
-		OverloadResult unary_result = OverloadResult::NOT_FOUND;
-		if (un.op == Token::MINUS) {
-			Expression* un_operands[1] = {un.expression};
-			unary_result = resolveOperatorOverload(unit, ctx, un.op, 1, un_operands, overload_result, overload_fn);
-		}
-		switch (unary_result) {
-			case OverloadResult::FOUND: un.resolved_fn = overload_fn; expr.resolved_type = overload_result; return overload_result;
-			case OverloadResult::AMBIGUOUS: errorLine(expr.token, "Ambiguous operator ", operatorSymbolName(un.op), " overload"); return nullptr;
-			case OverloadResult::NOT_FOUND: break;
-		}
 		ResolvedType* inner = checkExpr(unit, ctx, *un.expression, hint);
 		if (!inner) return nullptr;
+
+		if (un.op == Token::MINUS && inner->kind == ResolvedType::STRUCT) {
+			ResolvedType* overload_result = nullptr;
+			FunctionExpression* overload_fn = nullptr;
+			StructExpression* host = static_cast<StructResolvedType*>(inner)->decl;
+			OverloadResult unary_result = resolveOperatorOverload(unit, ctx, un.op, 1, &un.expression, &inner, *host, overload_result, overload_fn);
+			switch (unary_result) {
+				case OverloadResult::FOUND: un.resolved_fn = overload_fn; expr.resolved_type = overload_result; return overload_result;
+				case OverloadResult::AMBIGUOUS: errorLine(expr.token, "Ambiguous operator ", operatorSymbolName(un.op), " overload"); return nullptr;
+				case OverloadResult::FAILED: return nullptr;
+				case OverloadResult::NOT_FOUND: errorLine(expr.token, "No matching operator ", operatorSymbolName(un.op), " overload"); return nullptr;
+			}
+		}
+
 		switch (un.op) {
 			case Token::MINUS: {
 				if (!isNumericOrUntyped(*inner)) {
@@ -2011,26 +2074,45 @@ struct Checker {
 
 	ResolvedType* checkBinaryExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr, ResolvedType* hint) {
 		BinaryExpression& bin = static_cast<BinaryExpression&>(expr);
-		ResolvedType* overload_result = nullptr;
-		FunctionExpression* overload_fn = nullptr;
-		Expression* bin_operands[2] = {bin.lhs, bin.rhs};
-		const OverloadResult bin_overload = operatorSymbolName(bin.op) ? resolveOperatorOverload(unit, ctx, bin.op, 2, bin_operands, overload_result, overload_fn) : OverloadResult::NOT_FOUND;
-		switch (bin_overload) {
-			case OverloadResult::FOUND: bin.resolved_fn = overload_fn; expr.resolved_type = overload_result; return overload_result;
-			case OverloadResult::AMBIGUOUS: errorLine(expr.token, "Ambiguous operator ", operatorSymbolName(bin.op), " overload"); return nullptr;
-			case OverloadResult::NOT_FOUND: break;
-		}
-		// The hint describes the result of the whole expression, not the operands, so we do not
-		// forward it blindly. lhs is checked first; rhs then takes lhs as its hint so a literal
-		// operand can adopt the other side's type. Operands that stay untyped are unified
-		// below (which makes operand inference symmetric, e.g. `3 == x` / `1.5 == x`).
+		// Check operands once before choosing custom or built-in semantics. lhs is
+		// probed first because context-dependent syntax may need rhs as its hint.
+		// e.g. .Idle == e
 		++suppress_errors;
 		ResolvedType* lhs = checkExpr(unit, ctx, *bin.lhs, nullptr);
 		--suppress_errors;
-		ResolvedType* rhs = checkExpr(unit, ctx, *bin.rhs, lhs ? lhs : hint);
-		// If lhs failed but rhs resolved (e.g. `.Idle == state`), retry lhs with rhs type as hint.
-		if (!lhs && rhs) lhs = checkExpr(unit, ctx, *bin.lhs, rhs);
-		if (!lhs || !rhs) return nullptr;
+		// typeless struct literals are not allowed in operators
+		// so we can't use structs as hints
+		const bool lhs_is_struct = lhs && lhs->kind == ResolvedType::STRUCT;
+		ResolvedType* rhs = checkExpr(unit, ctx, *bin.rhs, lhs_is_struct ? nullptr : (lhs ? lhs : hint));
+		if (!rhs) return nullptr;
+		// Retry the lhs once the rhs gives it a non-struct contextual type.
+		// try to use rhs's type as hint for lhs, e.g. 2 * v, or .Idle == e
+		if (!lhs) lhs = checkExpr(unit, ctx, *bin.lhs, rhs->kind == ResolvedType::STRUCT ? nullptr : rhs);
+		if (!lhs) return nullptr;
+
+		// operator overload, at least one of operands must be struct
+		if (lhs_is_struct || rhs->kind == ResolvedType::STRUCT) {
+			if (!operatorSymbolName(bin.op)) {
+				// TODO can we even get here?
+				return nullptr;
+			}
+			ResolvedType* overload_result = nullptr;
+			FunctionExpression* overload_fn = nullptr;
+			Expression* bin_operands[2] = {bin.lhs, bin.rhs};
+
+			ResolvedType* operand_types[2] = {lhs, rhs};
+			StructExpression* host =
+				lhs->kind == ResolvedType::STRUCT
+					? static_cast<StructResolvedType*>(lhs)->decl
+					: static_cast<StructResolvedType*>(rhs)->decl;
+			OverloadResult bin_overload = resolveOperatorOverload(unit, ctx, bin.op, 2, bin_operands, operand_types, *host, overload_result, overload_fn);
+			switch (bin_overload) {
+				case OverloadResult::FOUND: bin.resolved_fn = overload_fn; expr.resolved_type = overload_result; return overload_result;
+				case OverloadResult::AMBIGUOUS: errorLine(expr.token, "Ambiguous operator ", operatorSymbolName(bin.op), " overload"); return nullptr;
+				case OverloadResult::FAILED: return nullptr;
+				case OverloadResult::NOT_FOUND: errorLine(expr.token, "No matching operator ", operatorSymbolName(bin.op), " overload"); return nullptr;
+			}
+		}
 
 		// Resolve a numeric operator: unify the operands and pin both to the result type.
 		enum class NumericMode { ARITHMETIC, INTEGER, COMPARISON };
@@ -2458,8 +2540,9 @@ struct Checker {
 			}
 			case Expression::SIZEOF: {
 				SizeofExpression& sz = static_cast<SizeofExpression&>(expr);
-				i64 v = 0;
+				ComptimeValue v;
 				if (!resolveSizeofValue(unit, sz, v)) return nullptr;
+				
 				ResolvedType* int_hint = unwrapNullable(hint);
 				if (int_hint && isNumericType(*int_hint)) {
 					if (!intLiteralFitsType(sz.value, int_hint->kind)) {
@@ -2476,7 +2559,7 @@ struct Checker {
 			case Expression::STRING_LITERAL: expr.resolved_type = primitiveType(ResolvedType::STRING); return expr.resolved_type;
 			case Expression::NULL_LITERAL:
 				if (!hint) {
-					// TODO error msg
+					errorLine(expr.token, "Cannot use null literal without a type hint");
 					return nullptr;
 				}
 				if (hint->kind != ResolvedType::NULLABLE && hint->kind != ResolvedType::SLICE) {
@@ -2518,6 +2601,11 @@ struct Checker {
 					return nullptr;
 				}
 				id.symbol = ref.symbol;
+
+				/* handle something like 
+					fn identity(a : $T) : T { return a; }
+					fn get_identity() : fn(i32) : i32 { return identity; }
+				*/
 				if (hint && hint->kind == ResolvedType::FUNCTION && ref.symbol->expression && ref.symbol->expression->kind == Expression::FUNCTION) {
 					FunctionExpression* fn = static_cast<FunctionExpression*>(ref.symbol->expression);
 					if (fn->is_template) {
@@ -2546,27 +2634,24 @@ struct Checker {
 				return expr.resolved_type;
 			}
 			case Expression::FUNCTION: {
+				// stuff like const foo = fn() : i32 { return 1; };
 				FunctionExpression& fn = static_cast<FunctionExpression&>(expr);
 				if (fn.resolved_type) return fn.resolved_type;
-				FunctionResolvedType* fn_type = buildFunctionType(unit, fn, true);
-				if (!fn_type) {
-					// TODO error msg
-					return nullptr;
-				}
+				FunctionResolvedType* fn_type = buildFunctionType(unit, fn);
+				if (!fn_type) return nullptr;
+				
 				// resolved_type must be set before checkFunctionBody (it reads the return
 				// type from it), but a body checked under suppressed errors that fails must
 				// not stay cached: clearing it lets a later non-suppressed check re-run the
 				// body and surface the real diagnostic.
 				expr.resolved_type = fn_type;
-				if (fn.body) {
-					if (!checkFunctionBody(unit, fn)) {
-						expr.resolved_type = nullptr;
-						return nullptr;
-					}
+				if (!checkFunctionBody(unit, fn)) {
+					expr.resolved_type = nullptr;
+					return nullptr;
 				}
 				return fn_type;
 			}
-			case Expression::CALL: return checkCallExpr(unit, ctx, expr, hint);
+			case Expression::CALL: return checkCallExpr(unit, ctx, expr);
 			case Expression::UNARY: return checkUnaryExpr(unit, ctx, expr, hint);
 			case Expression::BINARY: return checkBinaryExpr(unit, ctx, expr, hint);
 			case Expression::CAST: return checkCastExpr(unit, ctx, expr);
@@ -2687,51 +2772,43 @@ struct Checker {
 	// run zero times) and `match` is only credited when it has a fallback arm
 	// (exhaustiveness for enum-only matches is intentionally not special-cased
 	// here to keep this analysis simple).
-	static bool statementAlwaysReturns(Statement* st) {
-		if (!st) return false;
-		switch (st->kind) {
-			case Statement::RETURN:
-				return true;
-			case Statement::BLOCK:
-				return blockAlwaysReturns(static_cast<BlockStatement*>(st));
+	static bool statementAlwaysReturns(Statement& st) {
+		switch (st.kind) {
+			case Statement::RETURN: return true;
+			case Statement::BLOCK: return blockAlwaysReturns(static_cast<BlockStatement&>(st));
+			case Statement::LABEL: return statementAlwaysReturns(*static_cast<LabelStatement&>(st).statement);
 			case Statement::IF: {
-				IfStatement* ifst = static_cast<IfStatement*>(st);
-				if (!ifst->else_branch) return false;
-				return blockAlwaysReturns(ifst->body) && statementAlwaysReturns(ifst->else_branch);
+				IfStatement& ifst = static_cast<IfStatement&>(st);
+				if (!ifst.else_branch) return false;
+				return blockAlwaysReturns(*ifst.body) && statementAlwaysReturns(*ifst.else_branch);
 			}
 			case Statement::MATCH: {
-				MatchStatement* ms = static_cast<MatchStatement*>(st);
+				MatchStatement& ms = static_cast<MatchStatement&>(st);
 				bool has_fallback = false;
-				for (MatchArm& arm : ms->arms) {
+				for (MatchArm& arm : ms.arms) {
 					if (arm.is_fallback) has_fallback = true;
-					if (!blockAlwaysReturns(arm.body)) return false;
+					if (!blockAlwaysReturns(*arm.body)) return false;
 				}
 				return has_fallback;
 			}
-			case Statement::LABEL:
-				return statementAlwaysReturns(static_cast<LabelStatement*>(st)->statement);
-			default:
-				return false;
+			default: return false;
 		}
 	}
 
-	static bool blockAlwaysReturns(BlockStatement* block) {
-		if (!block) return false;
-		for (Statement* st : block->statements) {
-			if (statementAlwaysReturns(st)) return true;
+	static bool blockAlwaysReturns(BlockStatement& block) {
+		for (Statement* st : block.statements) {
+			if (statementAlwaysReturns(*st)) return true;
 		}
 		return false;
 	}
 
 	bool checkFunctionBody(Unit& unit, FunctionExpression& fn) {
 		if (!fn.body) return true;
-		if (fn.body->kind != Statement::BLOCK) {
-			// TODO error msg
-			return false;
-		}
+		ASSERT(fn.body->kind == Statement::BLOCK);
 
-		ResolvedType* return_type = fn.resolved_type ? static_cast<FunctionResolvedType*>(fn.resolved_type)->return_type : nullptr;
-		FunctionCheckContext ctx(*unit.arena.arena);
+		ResolvedType* return_type = static_cast<FunctionResolvedType*>(fn.resolved_type)->return_type;
+		ASSERT(return_type);
+		FunctionCheckContext ctx(*unit.arena.arena); // TODO reuse?
 		pushScope(ctx);
 		for (FunctionParam& param : fn.params) {
 			if (findSymbol(unit, param.name)) {
@@ -2750,7 +2827,7 @@ struct Checker {
 			if (!checkStatement(unit, ctx, st, return_type, {})) return false;
 		}
 
-		if (return_type && return_type->kind != ResolvedType::VOID && !blockAlwaysReturns(body)) {
+		if (return_type->kind != ResolvedType::VOID && !blockAlwaysReturns(*body)) {
 			errorLine(fn.token, "Function must return a value on all code paths");
 			return false;
 		}
@@ -2845,9 +2922,17 @@ struct Checker {
 																			   : Token::SLASH;
 				Expression* operands[2] = {assign.lhs, assign.rhs};
 				FunctionExpression* op_fn = nullptr;
-				switch (resolveOperatorOverload(unit, &ctx, base_op, 2, operands, op_result, op_fn)) {
+				ResolvedType* operand_types[2] = {lhs_type, rhs_type};
+				StructExpression* host = lhs_type->kind == ResolvedType::STRUCT ? static_cast<StructResolvedType*>(lhs_type)->decl
+					: rhs_type->kind == ResolvedType::STRUCT ? static_cast<StructResolvedType*>(rhs_type)->decl : nullptr;
+				if (!host) {
+					errorLine(assign.token, "No matching operator overload for compound assignment on type ", lhs_type);
+					return false;
+				}
+				switch (resolveOperatorOverload(unit, &ctx, base_op, 2, operands, operand_types, *host, op_result, op_fn)) {
 					case OverloadResult::FOUND: assign.resolved_op_fn = op_fn; break;
 					case OverloadResult::AMBIGUOUS: errorLine(assign.token, "Ambiguous operator overload for compound assignment on type ", lhs_type); return false;
+					case OverloadResult::FAILED: return false;
 					case OverloadResult::NOT_FOUND: errorLine(assign.token, "No matching operator overload for compound assignment on type ", lhs_type); return false;
 				}
 				assign.lhs = operands[0];
@@ -3234,7 +3319,7 @@ struct Checker {
 				if (!sym.expression || sym.expression->kind != Expression::FUNCTION) continue;
 				FunctionExpression& fn = static_cast<FunctionExpression&>(*sym.expression);
 				if (fn.is_template) continue;
-				FunctionResolvedType* fn_type = buildFunctionType(unit, fn, false);
+				FunctionResolvedType* fn_type = buildFunctionType(unit, fn);
 				if (!fn_type) return LS_RESULT_FAILURE;
 				for (ResolvedType* param : fn_type->param_types) {
 					if (param->kind != ResolvedType::STRUCT) continue;
@@ -3300,6 +3385,24 @@ struct Checker {
 		}
 
 		sym.check_state = Symbol::CHECKING;
+
+		// Publish a function symbol's signature before any expression or body is
+		// checked: identifier resolution reads sym.resolved_type directly, so
+		// recursive and mutual references only resolve if the type is available up
+		// front. An explicit annotation wins so e.g. nullable function globals stay
+		// nullable.
+		if (sym.expression && sym.expression->kind == Expression::FUNCTION) {
+			FunctionExpression& fn = static_cast<FunctionExpression&>(*sym.expression);
+			if (!fn.is_template) {
+				ResolvedType* annotation = sym.storage == Symbol::COMPTIME ? nullptr : resolveTypeExpr(unit, sym.type_expr);
+				FunctionResolvedType* fn_type = buildFunctionType(unit, fn);
+				if (!fn_type) {
+					sym.check_state = Symbol::FAILED;
+					return LS_RESULT_FAILURE;
+				}
+				sym.resolved_type = annotation ? annotation : fn_type;
+			}
+		}
 
 		if (sym.storage == Symbol::COMPTIME && sym.expression) { // TODO why if sym.expression
 			if (checkComptimeSymbol(unit, sym) == LS_RESULT_FAILURE) {

@@ -174,7 +174,11 @@ JIT is intentionally out of scope for the first version.
 		- enums are labels, not values to compute with; arithmetic on them is semantically odd
 		- every modern language that designed enums carefully (Rust, Swift, Kotlin, Zig) keeps arithmetic off enums and handles bit-flag patterns through a separate mechanism (wrapper struct, macro, or protocol)
 		- bit-flag use cases are served by wrapping the integer in a struct
-		- allowing enum operators creates resolution complexity (shorthand `.Foo` in probe-and-commit overload resolution) for no practical gain
+		- allowing enum operators creates resolution complexity (shorthand `.Foo` in match-and-commit overload resolution) for no practical gain
+	- typeless struct literals do not participate in operator overload resolution
+		- expected-type inference remains useful when one destination type is already known, such as an annotated variable, return, or function argument
+		- using a candidate parameter as that expected type makes overload selection recursive and creates surprising ambiguities
+		- requiring `Type { ... }` at an operator boundary keeps resolution based on natural operand types and avoids candidate-specific AST typing
 
 - undefined behavior
 	- compared to C or C++, try to define as much behavior as possible
@@ -573,7 +577,7 @@ comptime identity = fn(a : $T) : T {
 }
 ```
 
-The compiler infers type parameters from argument types:
+The compiler infers type parameters from argument types only:
 
 ```cpp
 fn default_value(fallback : $T) : T {
@@ -589,6 +593,18 @@ fn main() : void {
 	swap(ref a, ref b);                          // T inferred as i32
 
 	const v = default_value(0);                  // T inferred as i32
+}
+```
+
+Type parameters cannot be inferred from the return type context. Type parameters that cannot be inferred from arguments must be passed as explicit compile-time type parameters:
+
+```cpp
+fn make(T : comptime type) : T {
+	return undefined;
+}
+
+fn main() : void {
+	const x : i32 = make(i32);  // T must be explicit
 }
 ```
 
@@ -689,7 +705,9 @@ Rules:
 - `and` and `or` remain built-in short-circuit operators and are not overloaded
 - declaring an operator overload for a built-in primitive signature, such as `operator +(f32, f32)`, is a compile-time error
 - declaring an operator overload where any parameter is an enum type is a compile-time error; use a wrapper struct for bit-flag patterns instead
-- overload resolution uses exact type matching
+- overload resolution uses exact type matching on the operands' natural types
+- an untyped numeric expression matches a parameter when all of its literals fit and adopts that parameter type
+- a typeless struct literal operand `{ ... }` cannot select an operator overload; write its type explicitly, such as `Vec2 { ... }`
 - no implicit casts are performed to make an operator applicable
 - imported modules participate in operator lookup
 - if multiple declarations match equally well, the expression is ambiguous and is a compile-time error

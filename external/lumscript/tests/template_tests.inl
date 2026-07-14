@@ -25,7 +25,7 @@ TEST(TemplateFunctionIdentityF32) {
 		}
 
 		fn main() : f32 {
-			return identity(1.5);
+			return identity(1.5 as f32);
 		}
 	)";
 	EXPECT_COMPILE(source);
@@ -101,7 +101,7 @@ TEST(TemplateFunctionLoopBodyIsClonedPerInstantiation) {
 	return true;
 }
 
-TEST(TemplateFunctionNullableReturnContextCompiles) {
+TEST(TemplateFunctionNullableReturnContextSuccess) {
 	const char* source = R"(
 		fn identity(a : $T) : T {
 			return a;
@@ -346,6 +346,18 @@ TEST(TemplateFunctionUnresolvedTypeParamFails) {
 
 		fn main() : void {
 			make();
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(TemplateTypeArgumentCannotBeUsedAsComptimeValueFails) {
+	const char* source = R"(
+		fn bad(T : comptime type, value : comptime i32) : void {}
+
+		fn main() : void {
+			bad(i32, T);
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
@@ -600,7 +612,7 @@ TEST(TemplateFunctionImportedTwoInstantiations) {
 
 		fn main() : f32 {
 			const a = lib.identity(42);
-			const b : f32 = lib.identity(1.5);
+			const b : f32 = lib.identity(1.5 as f32);
 			return b;
 		}
 	)";
@@ -1774,6 +1786,28 @@ TEST(TemplateStructValueParamWrongTypeFails) {
 	return true;
 }
 
+TEST(TemplateStructValueParamUnsupportedExpressionFails) {
+	const char* source = R"(
+		struct StaticArray[T, N : i32] {
+			values : [N]T;
+		}
+
+		fn main() : void {
+			var values : StaticArray[i32, undefined] = undefined;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(TemplateStructValueParamTypeFails) {
+	const char* source = R"(
+		struct S[t : type] {}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(TemplateStructValueParamMissingArgFails) {
 	const char* source = R"(
 		struct StaticArray[T, N : i32] {
@@ -1846,6 +1880,40 @@ TEST(ComptimeFunctionParameterBasicRuntime) {
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(15, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+
+TEST(ComptimeFloatBinaryOp) {
+	const char* source = R"(
+		fn choose(n : comptime f32) : f32 {
+			return n;
+		}
+
+		fn main() : f32 {
+			return choose(2.5 + 3.2);
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ComptimeIntBinaryOp) {
+	const char* source = R"(
+		fn choose(n : comptime i32) : i32 {
+			return n;
+		}
+
+		fn main() : i32 {
+			return choose(2 + 2);
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(4, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -2153,7 +2221,8 @@ TEST(TemplateFunctionSliceOfTParamRuntime) {
 			arr[0] = 42;
 			arr[1] = 1;
 			arr[2] = 2;
-			return first(arr[:]);
+			const s : []i32 = arr[:];
+			return first(s);
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
@@ -2270,6 +2339,19 @@ TEST(ComptimeFunctionParameterDependentArraySizeRuntime) {
 	return true;
 }
 
+TEST(VarGlobalAsComptimeFunctionParameterFails) {
+	const char* source = R"(
+		fn repeat(text : string, count : comptime i32) : void {}
+		
+		var n : i32 = 5;
+		fn main() : void {
+			repeat("hi", n);
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(ComptimeFunctionParameterNonConstantArgumentFails) {
 	const char* source = R"(
 		fn repeat(text : string, count : comptime i32) : void {}
@@ -2328,7 +2410,8 @@ TEST(TemplateFunctionBodySliceDefaultBounds) {
 		fn main() : i32 {
 			var arr : [1]i32 = undefined;
 			arr[0] = 42;
-			return first(arr[:]);
+			const s : []i32 = arr[:];
+			return first(s);
 		}
 	)";
 	EXPECT_COMPILE(source);

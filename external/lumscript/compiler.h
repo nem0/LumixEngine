@@ -87,7 +87,7 @@ struct Import {
 	Unit* unit = nullptr; // cached resolved unit pointer, set during import resolution
 };
 
-// Returns the symbol name used to store an operator overload, e.g. Token::PLUS → "+".
+// Returns the symbol name used to store an operator overload, e.g. Token::PLUS -> "+".
 // Operator names are non-identifier strings, so they cannot collide with user symbols.
 // Returns nullptr for non-overloadable tokens.
 inline const char* operatorSymbolName(Token::Type op) {

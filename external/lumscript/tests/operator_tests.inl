@@ -242,6 +242,35 @@ TEST(RejectedOperatorCandidateDoesNotRetypeOperands) {
 	return true;
 }
 
+TEST(RejectedSameHostOperatorCandidateDoesNotRetypeOperands) {
+	// Both candidates are stored on Box. The rejected candidate must not undo the
+	// i32 type selected for the literal by the winning overload.
+	const char* source = R"(
+		struct Box { value : i32; }
+		struct Other { value : i32; }
+
+		operator +(a : Box, b : i32) : i32 {
+			return a.value + b;
+		}
+
+		operator +(a : Box, b : Other) : i32 {
+			return 0;
+		}
+
+		fn main() : i32 {
+			return Box { 40 } + 2;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(PrimitiveCompoundAssignmentIgnoresOperatorOverloadCompiles) {
 	const char* source = R"(
 		struct Vec2 {
@@ -692,8 +721,7 @@ TEST(EnumUnaryOperatorDeclarationFails) {
 
 TEST(FunctionLiteralOperatorOperandFails) {
 	// A function value can never match a struct operator parameter; resolution
-	// must reject it cleanly. The literal's body is probed under suppressed errors,
-	// so this also guards that a function operand doesn't crash or hang resolution.
+	// must reject it cleanly without repeatedly checking the literal's body.
 	const char* source = R"(
 		struct Box { value : i32; }
 
@@ -841,8 +869,8 @@ TEST(OperatorUsingAnotherOperator) {
 
 TEST(FunctionLiteralOperandBodyErrorIsReported) {
 	// The function literal's body has a real type error (string returned as i32).
-	// It is checked under suppressed errors during the failed operator probe; the
-	// fix clears its cached resolved_type on failure so the error still surfaces.
+	// Operator resolution checks operands normally before inspecting candidates, so
+	// the body error must be reported.
 	const char* source = R"(
 		struct Box { value : i32; }
 
@@ -927,6 +955,38 @@ TEST(BracketCompoundAssignmentWithOperatorRuntime) {
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_FLOAT_EQ(11.0f, ls_to_f32(runtime, -1));
 	CAPI_END(module);
+	return true;
+}
+
+TEST(TypelessStructLiteralOperatorOperandFails) {
+	// Operator overload resolution never supplies a contextual struct type.
+	const char* source = R"(
+		struct Vec2 {
+			x : f32;
+			y : f32;
+		}
+
+		operator +(a : Vec2, b : Vec2) : Vec2 {
+			return Vec2 { a.x + b.x, a.y + b.y };
+		}
+
+		fn main() : f32 {
+			const v = Vec2 { 1.0, 2.0 };
+			const r = v + { 3.0, 4.0 };
+			return r.y;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(TypelessStructLiteralLhsOperatorOperandFails) {
+	const char* source = R"(
+		struct Vec2 { x : f32; y : f32; }
+		operator +(a : Vec2, b : Vec2) : Vec2 { return a; }
+		fn main() : Vec2 { return { 1.0, 2.0 } + Vec2 { 3.0, 4.0 }; }
+	)";
+	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
 
