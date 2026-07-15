@@ -2,8 +2,9 @@
 
 # TODO
 
+* use ls_call_frame in engine integration
+
 * use case - comptime string hash
-* comptime parameters `fn repeat(count : comptime i32) : void` 
 * how should user implement print-s?
 	fn print(v : varargs) : void {
 		for x in v {
@@ -22,7 +23,7 @@
 
 * getter/setter?
 * traits/interfaces?
-* with/when/where?
+* with/when/where/using?
 * context object?
 * multiple returns?
 * comptime reflection/introspection?
@@ -712,9 +713,10 @@ Rules:
 - imported modules participate in operator lookup
 - if multiple declarations match equally well, the expression is ambiguous and is a compile-time error
 - primitive built-in operator behavior still applies when no overload is involved
-- compound assignment on a non-primitive type uses the corresponding binary operator, for example `x += y` behaves like `x = x + y`
+- compound assignment on a non-primitive left-hand target uses the corresponding binary operator, for example `x += y` behaves like `x = x + y`
 - compound assignment evaluates the left-hand side once // TODO test
-- primitive compound assignment keeps its built-in behavior and cannot be overridden
+- primitive compound assignment means the left-hand target has a primitive type; it keeps the built-in behavior and cannot be overridden
+- for primitive compound assignment, the right-hand operand must be implicitly convertible to the left-hand target type; for example, `5 *= Vec2 { 1, 2 }` is invalid because `Vec2` cannot be converted to the integer type of `5`
 
 ### Ref parameters
 
@@ -1433,7 +1435,7 @@ not ready
 If an operator is used with non-builtin value types, the compiler may resolve it to a matching `operator` declaration instead of a built-in primitive rule.
 Primitive operands keep their built-in semantics and cannot be overridden by `operator` declarations.
 `and` and `or` keep their built-in short-circuit semantics and are not candidates for operator declarations.
-Compound assignment follows the same rule: custom types use the corresponding binary operator, while primitive compound assignment stays built in.
+Compound assignment follows the same rule: a non-primitive left-hand target uses the corresponding binary operator, while a primitive left-hand target stays on the built-in path. In the latter case, the right-hand operand must be implicitly convertible to the left-hand target type; an expression such as `5 *= Vec2 { 1, 2 }` is therefore invalid.
 
 ### Calls
 

@@ -251,7 +251,7 @@ static u8* runtime_frame_ptr(ls_runtime* runtime, u32 offset) {
 		TYPE value__ = 0; \
 		u8* ptr__ = runtime_frame_ptr(runtime, offset__); \
 		memcpy(&value__, ptr__, sizeof(TYPE)); \
-		value__ = (TYPE)-value__; \
+		value__ = (TYPE)(0 - value__); \
 		memcpy(ptr__, &value__, sizeof(TYPE)); \
 	} while (0)
 

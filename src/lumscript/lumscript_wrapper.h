@@ -105,7 +105,7 @@ static void callImpl(ls_runtime* runtime, R (*f)(Args...), Indices<I...>) {
 	}
 }
 
-template <auto f> static void wrap(ls_runtime* runtime) {
+template <auto f> static void wrap(ls_runtime* runtime, ls_call_frame frame) {
 	using Traits = FunctionTraits<decltype(f)>;
 	callImpl(runtime, f, typename BuildIndices<-1, Traits::arity>::result{});
 }

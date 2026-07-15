@@ -215,7 +215,7 @@ struct FunctionCompiler {
 	ls_function_bc& out;
 	ByteArray code;
 	ExpArray<Statement*> deferreds;
-	ExpArray<u32> defer_marks;
+	ExpArray<i32> defer_marks;
 	ExpArray<LoopBinding> loops;
 	// Locals and temporaries share one absolute frame offset space. `next_local_offset`
 	// is the floor below which temporaries must not be rewound, while `temp_top`
@@ -228,7 +228,7 @@ struct FunctionCompiler {
 	// identifier expressions can read the location back without a lookup;
 	// temporaries pass no slot.
 	u32 addLocal(ResolvedType* type, ls_type_kind kind, bool preserve_temp_top = false, StorageSlot* slot = nullptr) {
-		u32 byte_size = type ? typeByteSize(*type) : typeKindByteSize(kind);
+		u32 byte_size = u32(type ? typeByteSize(*type) : typeKindByteSize(kind));
 		if (byte_size == 0u) byte_size = 1u;
 		const bool has_live_temps = temp_top > next_local_offset;
 		const u32 offset = has_live_temps ? temp_top : next_local_offset;
@@ -247,12 +247,12 @@ struct FunctionCompiler {
 	}
 
 	void pushScope() {
-		defer_marks.push((u32)deferreds.size());
+		defer_marks.push(deferreds.size());
 	}
 
 	void popScope(ls_type_kind return_kind, ls_string_view current_label) {
 		if (defer_marks.empty()) return;
-		const u32 defer_mark = defer_marks.back();
+		const i32 defer_mark = defer_marks.back();
 		emitDeferredStatements(*this, defer_mark, return_kind, current_label);
 		while (deferreds.size() > defer_mark) deferreds.pop_back();
 		defer_marks.pop_back();
@@ -277,7 +277,7 @@ static ls_type_kind valueKindForType(ResolvedType& type) {
 
 static u64 enumMemberValue(EnumResolvedType& en, ls_string_view name) {
 	u64 implicit_value = 0;
-	for (u32 i = 0; i < en.decl->members.size(); ++i) {
+	for (i32 i = 0; i < en.decl->members.size(); ++i) {
 		if (equalStrings(en.decl->members[i].name, name)) {
 			if (en.decl->members[i].value) {
 				ASSERT(en.decl->members[i].value->kind == Expression::INT_LITERAL);
@@ -298,29 +298,29 @@ static u64 enumMemberValue(EnumResolvedType& en, ls_string_view name) {
 
 static u32 structFieldByteOffset(StructResolvedType& st, ls_string_view name, ResolvedType*& out_type) {
 	u32 offset = 0u;
-	for (u32 i = 0; i < st.decl->fields.size(); ++i) {
+	for (i32 i = 0; i < st.decl->fields.size(); ++i) {
 		NamedDecl& field = st.decl->fields[i];
 		ResolvedType* field_type = i < st.field_types.size() ? st.field_types[i] : field.resolved_type;
 		if (equalStrings(field.name, name)) {
 			out_type = field_type;
 			return offset;
 		}
-		offset += typeByteSize(*field_type);
+		offset += u32(typeByteSize(*field_type));
 	}
 	ASSERT(false);
 	return 0xffFFffFF;
 }
 
 static bool paramIsRef(const FunctionResolvedType& fn_type, u32 param_index) {
-	return fn_type.decl && param_index < fn_type.decl->params.size() && fn_type.decl->params[param_index].is_ref;
+	return fn_type.decl && param_index < (u32)fn_type.decl->params.size() && fn_type.decl->params[param_index].is_ref;
 }
 
 static bool paramIsComptime(const FunctionResolvedType& fn_type, u32 param_index) {
-	return fn_type.decl && param_index < fn_type.decl->params.size() && fn_type.decl->params[param_index].is_comptime;
+	return fn_type.decl && param_index < (u32)fn_type.decl->params.size() && fn_type.decl->params[param_index].is_comptime;
 }
 
 static void compileCallArgs(FunctionCompiler& ctx, CallExpression& expr, const FunctionResolvedType& fn_type, u32 arg_offset) {
-	for (u32 i = 0; i < expr.args.size(); ++i) {
+	for (i32 i = 0; i < expr.args.size(); ++i) {
 		const u32 param_index = arg_offset + i;
 		ResolvedType* param_type = fn_type.param_types[param_index];
 		if (paramIsComptime(fn_type, param_index)) continue;
@@ -339,9 +339,9 @@ static void compileCallArgs(FunctionCompiler& ctx, CallExpression& expr, const F
 // (reference parameters occupy a pointer, everything else its value width).
 static u32 callArgWindowSize(const FunctionResolvedType& fn_type) {
 	u32 total = 0u;
-	for (u32 i = 0; i < fn_type.param_types.size(); ++i) {
+	for (i32 i = 0; i < fn_type.param_types.size(); ++i) {
 		if (paramIsComptime(fn_type, i)) continue;
-		const u32 byte_size = paramIsRef(fn_type, i) ? typeKindByteSize(LS_TYPE_CPTR) : typeByteSize(*fn_type.param_types[i]);
+		const u32 byte_size = u32(paramIsRef(fn_type, i) ? typeKindByteSize(LS_TYPE_CPTR) : typeByteSize(*fn_type.param_types[i]));
 		total += byte_size == 0u ? 1u : byte_size;
 	}
 	return total;
@@ -1490,9 +1490,9 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 			if (type->kind == ResolvedType::STRUCT) {
 				StructResolvedType* st = static_cast<StructResolvedType*>(type);
 				for (i32 i = 0; i < lit.values.size(); ++i) {
-					ResolvedType* field_type = (u32)i < st->field_types.size()
-						? st->field_types[(u32)i]
-						: st->decl->fields[(u32)i].resolved_type;
+					ResolvedType* field_type = i < st->field_types.size()
+						? st->field_types[i]
+						: st->decl->fields[i].resolved_type;
 					compileExpressionAsType(ctx, *lit.values[i], *field_type);
 				}
 			}

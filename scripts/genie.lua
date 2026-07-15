@@ -591,7 +591,7 @@ if plugin "lua" then
 end
 
 if plugin "lumscript" then
-	files { "../src/lumscript/**.h", "../src/lumscript/**.cpp", "../external/lumscript/**.cpp", "../external/lumscript/**.h" }
+	files { "../src/lumscript/**.h", "../src/lumscript/**.cpp", "../external/lumscript/**.cpp", "../external/lumscript/**.c", "../external/lumscript/**.h" }
 	excludes { "../external/lumscript/lumc.c", "../external/lumscript/tests/*.cpp" }
 	includedirs { "../src", "../src/lumscript" }
 	defines { "BUILDING_LUMSCRIPT" }

@@ -18,6 +18,25 @@ TEST(TemplateFunctionInferredThroughUFCS) {
 	return true;
 }
 
+TEST(TemplateFunctionUFCSReceiverInferenceMismatchFails) {
+	const char* source = R"(
+		struct Value {
+			data : i32;
+		}
+
+		fn identity(a : [1]$T) : T {
+			return a[0];
+		}
+
+		fn main() : void {
+			const value = Value { 42 };
+			value.identity();
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(TemplateFunctionIdentityF32) {
 	const char* source = R"(
 		fn identity(a : $T) : T {
@@ -29,6 +48,19 @@ TEST(TemplateFunctionIdentityF32) {
 		}
 	)";
 	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(TemplateFunctionRefArgumentRejectsUnassignableExpression) {
+	const char* source = R"(
+		fn increment(v : ref $T) : void {
+		}
+
+		fn main() : void {
+			increment(ref 1);
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
 
@@ -200,6 +232,21 @@ TEST(TemplateFunctionMultipleParamsMismatchFails) {
 	return true;
 }
 
+TEST(TemplateFunctionRepeatedTypeParamMismatchFailsDuringInference) {
+	const char* source = R"(
+		fn same_type(a : $T, b : T) : T {
+			return a;
+		}
+
+		fn main() : void {
+			const value : f32 = 1.5;
+			same_type(42, value);
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(TemplateFunctionSwapMismatchedTypesFails) {
 	const char* source = R"(
 		fn swap(a : ref $T, b : ref T) : void {
@@ -227,6 +274,20 @@ TEST(TemplateFunctionRefArgumentRequiresRefSyntaxFails) {
 			var x : i32 = 1;
 			var y : i32 = 2;
 			swap(x, ref y);
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(TemplateFunctionRefArgumentRejectsNonRefUnaryFails) {
+	const char* source = R"(
+		fn increment(v : ref $T) : void {
+		}
+
+		fn main() : void {
+			var x : i32 = 1;
+			increment(-x);
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
@@ -326,6 +387,20 @@ TEST(TemplateDuplicateTypeParamNameFails) {
 	return true;
 }
 
+TEST(TemplateConflictingComptimeArgumentFails) {
+	const char* source = R"(
+		fn choose(value : $T, T : comptime i32) : T {
+			return value;
+		}
+
+		fn main() : void {
+			choose(42, 7);
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(TemplateStructDuplicateTypeParamNameFails) {
 	const char* source = R"(
 		struct Bad[T, T] {
@@ -399,6 +474,48 @@ TEST(TemplateFunctionInstantiatedAsFirstClassValueRuntime) {
 	return true;
 }
 
+TEST(TemplateFunctionFirstClassValueParameterInferenceMismatchFails) {
+	const char* source = R"(
+		fn same_type(a : $T, b : T) : T {
+			return a;
+		}
+
+		fn get_same_type() : fn(i32, f32) : i32 {
+			return same_type;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(TemplateFunctionTargetHasTooManyParametersFails) {
+	const char* source = R"(
+		fn identity(a : $T) : T {
+			return a;
+		}
+
+		fn main() : void {
+			const f : fn(i32, i32) : i32 = identity;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(TemplateFunctionWithComptimeParameterAsFirstClassValueFails) {
+	const char* source = R"(
+		fn identity(T : comptime type, value : T) : T {
+			return value;
+		}
+
+		fn main() : void {
+			const f : fn(i32) : i32 = identity;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(TemplateFunctionInstantiatedPassedAsArgumentRuntime) {
 	const char* source = R"(
 		fn identity(a : $T) : T {
@@ -430,6 +547,20 @@ TEST(TemplateFunctionInstantiatedTypeMismatchFails) {
 
 		fn main() : void {
 			const f : fn(f32) : f32 = add_one;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(TemplateFunctionFailedInstantiationAsFirstClassValueFails) {
+	const char* source = R"(
+		fn bad(a : $T) : T {
+			return a + "invalid";
+		}
+
+		fn main() : void {
+			const f : fn(i32) : i32 = bad;
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
@@ -747,6 +878,30 @@ TEST(TemplateStructImportedAcceptsCallerValueArgument) {
 		}
 	)";
 	const char* lib_source = R"(
+		struct Fixed[N : i32] {
+			values : [N]i32;
+		}
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("lib"), toLs(lib_source) },
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_COMPILE_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
+TEST(TemplateStructImportedAcceptsQualifiedValueArgument) {
+	const char* main_source = R"(
+		import "lib" as lib
+
+		fn main() : i32 {
+			var value : lib.Fixed[lib.COUNT] = undefined;
+			return 42;
+		}
+	)";
+	const char* lib_source = R"(
+		comptime COUNT = 4;
+
 		struct Fixed[N : i32] {
 			values : [N]i32;
 		}
@@ -1884,6 +2039,34 @@ TEST(ComptimeFunctionParameterBasicRuntime) {
 	return true;
 }
 
+TEST(ComptimeFunctionParameterFloatToIntFails) {
+	const char* source = R"(
+		fn choose(n : comptime i32) : i32 {
+			return n;
+		}
+
+		fn main() : void {
+			choose(1.5);
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ComptimeFunctionParameterWrongTypeFails) {
+	const char* source = R"(
+		fn choose(n : comptime i32) : i32 {
+			return n;
+		}
+
+		fn main() : void {
+			choose(true);
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 
 TEST(ComptimeFloatBinaryOp) {
 	const char* source = R"(
@@ -2159,6 +2342,35 @@ TEST(TemplateFunctionReturnedAsFirstClassValueRuntime) {
 	return true;
 }
 
+TEST(TemplateFunctionFirstClassValueNullableParameterMismatchFails) {
+	const char* source = R"(
+		fn identity(a : $T) : T {
+			return a;
+		}
+
+		fn get_identity() : fn(?i32) : i32 {
+			return identity;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+// Reject a template function with more runtime parameters than its target function type.
+TEST(TemplateFunctionTooManyParametersForTarget) {
+	const char* source = R"(
+		fn first(a : $T, b : $U) : T {
+			return a;
+		}
+
+		fn get_first() : fn(i32) : i32 {
+			return first;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 // Inferred type argument on a ref-parameter template function.
 TEST(TemplateFunctionInferredInstantiationRefParamsRuntime) {
 	const char* source = R"(
@@ -2231,6 +2443,21 @@ TEST(TemplateFunctionSliceOfTParamRuntime) {
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 	CAPI_END(module);
+	return true;
+}
+
+// An untyped undefined value cannot provide an inferred template argument type.
+TEST(TemplateFunctionUndefinedArgumentFails) {
+	const char* source = R"(
+		fn identity(value : $T) : T {
+			return value;
+		}
+
+		fn main() : void {
+			identity(undefined);
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
 
@@ -2359,6 +2586,30 @@ TEST(ComptimeFunctionParameterNonConstantArgumentFails) {
 		fn main() : void {
 			var n : i32 = 5;
 			repeat("hi", n);
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(DuplicatedTemplateTypeArgFails) {
+	const char* source = R"(
+		fn repeat(a : $T, b : $T) : void {}
+
+		fn main() : void {
+			repeat(i32, f32);
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(DuplicatedTemplateValueArgFails) {
+	const char* source = R"(
+		fn repeat(count : comptime i32, count : comptime i32) : void {}
+
+		fn main() : void {
+			repeat(4, 5);
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);

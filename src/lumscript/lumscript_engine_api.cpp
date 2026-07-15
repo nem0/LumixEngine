@@ -148,7 +148,7 @@ static bool lumscript_world_hasEntity(LumScriptEntity entity) {
 	return entity.entity.index >= 0 && entity.world->hasEntity(entity.entity);
 }
 
-static void lumscript_world_findByName(ls_runtime* runtime) {
+static void lumscript_world_findByName(ls_runtime* runtime, ls_call_frame frame) {
 	World* world = (World*)ls_to_ptr(runtime, -2);
 	char name[128];
 	ls_string_view name_sv = ls_to_string(runtime, -1);

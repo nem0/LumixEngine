@@ -65,7 +65,7 @@ struct OutputFormatter {
 	const ls_host* host = nullptr;
 	bool has_error = false;
 
-	void print(int v);
+	void print(i32 v);
 	void print(const char* s) { print(makeStringView(s)); }
 	void print(ls_string_view s) {
 		if (!host->print) return;

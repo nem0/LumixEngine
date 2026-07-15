@@ -94,27 +94,34 @@ struct NullableResolvedType : ResolvedType {
 	ResolvedType* inner = nullptr;
 };
 
-struct TemplateArg {
-	enum Kind {
-		TYPE,
-		INT,
-		FLOAT,
-		BOOL,
-		STRING,
+// A compile-time constant: a template argument or the result of comptime
+// evaluation. Types are comptime values too (TYPE kind).
+struct ComptimeValue {
+	enum Kind { INVALID, TYPE, INT, FLOAT, BOOL, STRING } kind;
+	union {
+		ResolvedType* type;
+		i64 int_value;
+		double float_value;
+		bool bool_value;
 	};
+	ls_string_view string_value;
 
-	Kind kind = TYPE;
-	ResolvedType* type = nullptr;
-	i64 int_value = 0;
-	double float_value = 0;
-	bool bool_value = false;
-	ls_string_view string_value = {};
+	ComptimeValue() : kind(INVALID), int_value(0) {}
+	ComptimeValue(ResolvedType* t) : kind(TYPE), type(t) {}
+	ComptimeValue(i64 i) : kind(INT), int_value(i) {}
+	ComptimeValue(double f) : kind(FLOAT), float_value(f) {}
+	ComptimeValue(bool b) : kind(BOOL), bool_value(b) {}
+	ComptimeValue(ls_string_view s) : kind(STRING), string_value(s) {}
+
+	double asFloat() const { return kind == FLOAT ? float_value : (double)int_value; }
+	i64 asInt() const { return kind == INT ? int_value : (i64)float_value; }
+	bool asBool() const { return kind == BOOL ? bool_value : (bool)int_value; }
 };
 
 struct TemplateStructInstance {
 	TemplateStructInstance(ls_arena& arena) : args(arena) {}
 
-	ExpArray<TemplateArg> args;
+	ExpArray<ComptimeValue> args;
 	StructResolvedType* type = nullptr;
 	bool check_failed = false;
 };
@@ -122,11 +129,11 @@ struct TemplateStructInstance {
 struct TemplateFunctionInstance {
 	TemplateFunctionInstance(ls_arena& arena) : args(arena) {}
 
-	ExpArray<TemplateArg> args;
+	ExpArray<ComptimeValue> args;
 	FunctionExpression* instance = nullptr;
 	FunctionResolvedType* type = nullptr;
 	bool check_failed = false;
 };
 
 
-i64 typeByteSize(const ResolvedType& t);
+u32 typeByteSize(const ResolvedType& t);

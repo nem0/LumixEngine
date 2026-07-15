@@ -453,7 +453,7 @@ void appendPropertyWrapperName(OutputStream& out, Component& c, Property& p, boo
 void serializeLumScriptWrapper(OutputStream& out, Module& m, Component& c, Function& f, i32 idx) {
 	out.add("static void ");
 	appendWrapperName(out, c, f, idx);
-	L("(ls_runtime* runtime) {");
+	L("(ls_runtime* runtime, ls_call_frame frame) {");
 	L("auto* module = static_cast<", m.name, "*>(ls_to_ptr(runtime, -1));");
 
 	i32 total_slots = 0;
@@ -492,7 +492,7 @@ void serializeLumScriptPropertyWrapper(OutputStream& out, Module& m, Component& 
 	StringView accessor_args = is_setter ? p.setter_args : p.getter_args;
 	out.add("static void ");
 	appendPropertyWrapperName(out, c, p, is_setter, idx);
-	L("(ls_runtime* runtime) {");
+	L("(ls_runtime* runtime, ls_call_frame frame) {");
 	L("auto* module = static_cast<", m.name, "*>(ls_to_ptr(runtime, -1));");
 
 	i32 total_slots = 0;
@@ -550,7 +550,7 @@ void appendModuleWrapperName(OutputStream& out, Module& m, Function& f, i32 idx)
 void serializeLumScriptModuleWrapper(OutputStream& out, Module& m, Function& f, i32 idx) {
 	out.add("static void ");
 	appendModuleWrapperName(out, m, f, idx);
-	L("(ls_runtime* runtime) {");
+	L("(ls_runtime* runtime, ls_call_frame frame) {");
 	L("auto* module = static_cast<", m.name, "*>(ls_to_ptr(runtime, -1));");
 
 	i32 total_slots = 0;
@@ -591,7 +591,7 @@ void serializeLumScriptModuleWrapper(OutputStream& out, Module& m, Function& f, 
 void serializeLumScriptArrayCountWrapper(OutputStream& out, Module& m, Component& c, ArrayProperty& a, i32 idx) {
 	out.add("static void ");
 	appendArrayCountWrapperName(out, c, a, idx);
-	L("(ls_runtime* runtime) {");
+	L("(ls_runtime* runtime, ls_call_frame frame) {");
 	L("auto* module = static_cast<", m.name, "*>(ls_to_ptr(runtime, -1));");
 	L("const i32 count = module->get", a.name, "Count(EntityRef(ls_to_i32(runtime, -2)));");
 	L("ls_push_i32(runtime, count);");
@@ -602,7 +602,7 @@ void serializeLumScriptArrayCountWrapper(OutputStream& out, Module& m, Component
 void serializeLumScriptArrayItemWrapper(OutputStream& out, Module& m, Component& c, ArrayProperty& a, i32 idx) {
 	out.add("static void ");
 	appendArrayItemWrapperName(out, c, a, idx);
-	L("(ls_runtime* runtime) {");
+	L("(ls_runtime* runtime, ls_call_frame frame) {");
 	L("auto* module = static_cast<", m.name, "*>(ls_to_ptr(runtime, -2));");
 	L("const i32 count = module->get", a.name, "Count(EntityRef(ls_to_i32(runtime, -3)));");
 	L("if (ls_to_i32(runtime, -1) < 0 || ls_to_i32(runtime, -1) >= count) {");
@@ -620,7 +620,7 @@ void serializeLumScriptArrayChildWrapper(OutputStream& out, Module& m, Component
 	StringView accessor_args = is_setter ? p.setter_args : p.getter_args;
 	out.add("static void ");
 	appendArrayChildWrapperName(out, c, a, p, is_setter, idx);
-	L("(ls_runtime* runtime) {");
+	L("(ls_runtime* runtime, ls_call_frame frame) {");
 	i32 total_slots = 3;
 	forEachArg(accessor_args, [&](const Arg& arg, bool) { total_slots += getLumScriptArgStackSlots(arg); });
 	L("auto* module = static_cast<", m.name, "*>(ls_to_ptr(runtime, ", -total_slots + 2, "));");
@@ -692,7 +692,7 @@ void emitGeneratedWorldModuleAccessors(OutputStream& out, MetaData& data) {
 		if (m.components.size == 0) continue;
 		Component& first_component = m.components[0];
 		out.add("static void lumscript_world_", m.id);
-		L("(ls_runtime* runtime) {");
+		L("(ls_runtime* runtime, ls_call_frame frame) {");
 		L("World* world = (World*)ls_to_ptr(runtime, -1);");
 		L("IModule* module = world->getModule(reflection::getComponentType(\"", first_component.id, "\"));");
 		L("if (!module) { ls_push_null(runtime); return; }");
@@ -705,7 +705,7 @@ void emitGeneratedWorldModuleAccessors(OutputStream& out, MetaData& data) {
 void emitGeneratedComponentEntityAccessors(OutputStream& out, MetaData& data) {
 	for (Module& m : data.modules) {
 		for (Component& c : m.components) {
-			L("static void lumscript_entity_", c.id, "(ls_runtime* runtime) {");
+			L("static void lumscript_entity_", c.id, "(ls_runtime* runtime, ls_call_frame frame) {");
 			L("World* world = (World*)ls_to_ptr(runtime, -1);");
 			L("i32 entity_idx = ls_to_i32(runtime, -2);");
 			L("const ComponentType component_type = reflection::getComponentType(\"", c.id, "\");");
