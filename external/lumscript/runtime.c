@@ -11,6 +11,12 @@ typedef struct ls_string_box {
 	ls_string_view value;
 } ls_string_box;
 
+ls_string_view ls_arg_read_string(ls_call_frame* frame) {
+	ls_string_box* box = NULL;
+	memcpy(&box, ls_arg_read(frame, sizeof(box)), sizeof(box));
+	return box ? box->value : (ls_string_view){NULL, NULL};
+}
+
 static int string_equals(ls_string_view a, ls_string_view b) {
 	const ptrdiff_t a_size = (ptrdiff_t)(a.end - a.begin);
 	const ptrdiff_t b_size = (ptrdiff_t)(b.end - b.begin);

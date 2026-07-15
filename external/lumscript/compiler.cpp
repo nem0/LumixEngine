@@ -245,9 +245,7 @@ struct Checker {
 		error(ls_string_view{cursor, end});
 	}
 
-
 	void error(ResolvedType* type) { error(static_cast<const ResolvedType*>(type)); }
-
 
 	void error(const ComptimeValue::Kind kind) {
 		switch (kind) {

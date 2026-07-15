@@ -234,6 +234,65 @@ TEST(BytecodeStringLiteralArgumentShouldCompile) {
 	return true;
 }
 
+TEST(NativeStringArgument) {
+	const char* source = R"(
+		extern fn inspect(text : string, value : i32) : i32;
+
+		fn main() : i32 {
+			return inspect("testor", 42);
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	auto inspect = [](ls_runtime* runtime, ls_call_frame frame) -> void {
+		(void)runtime;
+		LS_STRING_ARG(frame, text);
+		LS_ARG(frame, i32, value);
+		const bool matches = text.end - text.begin == 6 && memcmp(text.begin, "testor", 6) == 0;
+		LS_RESULT(frame, i32, matches && value == 42 ? 1 : 0);
+	};
+
+	CAPI_RUNTIME(module, runtime);
+	const i32 fn_idx = ls_module_get_native_function_index(module, toLs("inspect"));
+	EXPECT_TRUE(ls_runtime_set_native_function_callback(runtime, fn_idx, inspect) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(1, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(NativeTwoStringArguments) {
+	const char* source = R"(
+		extern fn inspect(first : string, second : string) : i32;
+
+		fn main() : i32 {
+			return inspect("first", "second");
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	auto inspect = [](ls_runtime* runtime, ls_call_frame frame) -> void {
+		(void)runtime;
+		LS_STRING_ARG(frame, first);
+		LS_STRING_ARG(frame, second);
+		const bool first_matches = first.end - first.begin == 5 && memcmp(first.begin, "first", 5) == 0;
+		const bool second_matches = second.end - second.begin == 6 && memcmp(second.begin, "second", 6) == 0;
+		LS_RESULT(frame, i32, first_matches && second_matches ? 1 : 0);
+	};
+
+	CAPI_RUNTIME(module, runtime);
+	const i32 fn_idx = ls_module_get_native_function_index(module, toLs("inspect"));
+	EXPECT_TRUE(ls_runtime_set_native_function_callback(runtime, fn_idx, inspect) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(1, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(BytecodeTemporaryMemberAccessFrameSize) {
 	const char* source = R"(
 		struct Pair {

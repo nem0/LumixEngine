@@ -101,11 +101,15 @@ static inline const u8* ls_arg_read(ls_call_frame* frame, size_t size) {
 	return val;
 }
 
+ls_string_view ls_arg_read_string(ls_call_frame* frame);
+
 #define LS_ARG(frame, type, name) type name; \
 	do { \
 		const u8* _ls_ptr = ls_arg_read(&(frame), sizeof(type)); \
 		memcpy(&(name), _ls_ptr, sizeof(type)); \
 	} while(0)
+
+#define LS_STRING_ARG(frame, name) ls_string_view name = ls_arg_read_string(&(frame))
 
 #define LS_RESULT(frame, type, value) do { \
 	type _ls_val = (value); \
