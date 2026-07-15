@@ -1,0 +1,5 @@
+extern fn print(value : string) : void;
+
+fn main() : void {
+	print("lumc smoke test");
+}

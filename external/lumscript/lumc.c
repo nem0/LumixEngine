@@ -105,6 +105,7 @@ static void lumc_diagnostics_print(void* userdata, ls_string_view msg) {
 }
 
 static void lumc_native_print(ls_runtime* runtime, ls_call_frame frame) {
+	(void)frame;
 	lumc_print_string(stdout, ls_to_string(runtime, -1));
 	putchar('\n');
 }
@@ -158,22 +159,6 @@ int main(int argc, char** argv) {
 		goto cleanup;
 	}
 
-	int native_print = -1;
-	{
-		const ls_type params[1] = {ls_type_make(LS_TYPE_STRING)};
-		native_print = ls_module_add_native_function(
-			ctx.module,
-			ls_from_cstr("print"),
-			ls_type_make(LS_TYPE_VOID),
-			params,
-			1
-		);
-		if (native_print < 0) {
-			fprintf(stderr, "Error: Failed to register native print\n");
-			goto cleanup;
-		}
-	}
-
 	if (!ls_module_compile(
 		ctx.module,
 		ls_from_cstr(ctx.source),
@@ -182,6 +167,12 @@ int main(int argc, char** argv) {
 		NULL
 	)) {
 		fprintf(stderr, "Compile error\n");
+		goto cleanup;
+	}
+
+	int native_print = ls_module_get_native_function_index(ctx.module, ls_from_cstr("print"));
+	if (native_print < 0) {
+		fprintf(stderr, "Error: Script must declare extern fn print(string) : void\n");
 		goto cleanup;
 	}
 
