@@ -95,25 +95,30 @@ typedef struct ls_call_frame {
 	u8* result;
 } ls_call_frame;
 
-static inline const u8* ls_arg_read(ls_call_frame* frame, size_t size) {
-	const u8* val = frame->args;
-	frame->args += size;
-	return val;
-}
-
 ls_string_view ls_arg_read_string(ls_call_frame* frame);
+
+// Writes a string result into a native call frame. The bytes are copied into
+// runtime-owned storage, so `value` only needs to remain valid for this call.
+void ls_result_string(ls_runtime* runtime, ls_call_frame* frame, ls_string_view value);
 
 #define LS_ARG(frame, type, name) type name; \
 	do { \
-		const u8* _ls_ptr = ls_arg_read(&(frame), sizeof(type)); \
-		memcpy(&(name), _ls_ptr, sizeof(type)); \
+		memcpy(&(name), (frame).args, sizeof(type)); \
+		(frame).args += sizeof(type); \
 	} while(0)
 
 #define LS_STRING_ARG(frame, name) ls_string_view name = ls_arg_read_string(&(frame))
 
-#define LS_RESULT(frame, type, value) do { \
+#define LS_RESULT(frame, value) do { \
+	auto _ls_val = (value); \
+	memcpy((frame).result, &_ls_val, sizeof(_ls_val)); \
+	(frame).result += sizeof(_ls_val); \
+} while(0)
+
+#define LS_TYPED_RESULT(frame, type, value) do { \
 	type _ls_val = (value); \
-	memcpy((frame).result, &_ls_val, sizeof(type)); \
+	memcpy((frame).result, &_ls_val, sizeof(_ls_val)); \
+	(frame).result += sizeof(_ls_val); \
 } while(0)
 
 // Native function callback used by `ls_runtime_set_native_function_callback`.

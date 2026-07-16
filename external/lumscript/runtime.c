@@ -13,7 +13,8 @@ typedef struct ls_string_box {
 
 ls_string_view ls_arg_read_string(ls_call_frame* frame) {
 	ls_string_box* box = NULL;
-	memcpy(&box, ls_arg_read(frame, sizeof(box)), sizeof(box));
+	memcpy(&box, frame->args, sizeof(box));
+	frame->args += sizeof(box);
 	return box ? box->value : (ls_string_view){NULL, NULL};
 }
 
@@ -88,6 +89,29 @@ static ls_string_box* runtime_make_string_box(ls_runtime* runtime, ls_string_vie
 	return box;
 }
 
+static ls_string_box* runtime_copy_string_box(ls_runtime* runtime, ls_string_view value) {
+	static const char empty[] = "";
+	const ptrdiff_t size = value.begin && value.end && value.end >= value.begin ? value.end - value.begin : 0;
+	char* copy = NULL;
+	if (runtime && runtime->arena && runtime->arena->allocate) {
+		copy = (char*)runtime->arena->allocate(runtime->arena->user_data, (size_t)size + 1u, 1u);
+	}
+	else {
+		copy = (char*)malloc((size_t)size + 1u);
+	}
+	if (!copy) return NULL;
+	if (size > 0) memcpy(copy, value.begin, (size_t)size);
+	copy[size] = '\0';
+	return runtime_make_string_box(runtime, (ls_string_view){size > 0 ? copy : empty, (size > 0 ? copy : empty) + size});
+}
+
+void ls_result_string(ls_runtime* runtime, ls_call_frame* frame, ls_string_view value) {
+	void* box = runtime_copy_string_box(runtime, value);
+	if (!box) return;
+	memcpy(frame->result, &box, sizeof(box));
+	frame->result += sizeof(box);
+}
+
 static void runtime_push_bytes(ls_runtime* runtime, const void* value, u32 size) {
 	if (runtime->stack_top + size > runtime->stack_capacity) return;
 	memcpy(runtime->stack + runtime->stack_top, value, size);
@@ -104,16 +128,19 @@ static int runtime_string_equals_cstr(ls_string_view value, const char* cstr) {
 	return a == value.end && *b == '\0';
 }
 
-static void runtime_native_sin_f32(ls_runtime* runtime, ls_call_frame frame) { LS_RESULT(frame, f32, sinf(ls_to_f32(runtime, -1))); }
-static void runtime_native_cos_f32(ls_runtime* runtime, ls_call_frame frame) { LS_RESULT(frame, f32, cosf(ls_to_f32(runtime, -1))); }
-static void runtime_native_sqrt_f32(ls_runtime* runtime, ls_call_frame frame) { LS_RESULT(frame, f32, sqrtf(ls_to_f32(runtime, -1))); }
-static void runtime_native_sin_f64(ls_runtime* runtime, ls_call_frame frame) { LS_RESULT(frame, f64, sin(ls_to_f64(runtime, -1))); }
-static void runtime_native_cos_f64(ls_runtime* runtime, ls_call_frame frame) { LS_RESULT(frame, f64, cos(ls_to_f64(runtime, -1))); }
-static void runtime_native_sqrt_f64(ls_runtime* runtime, ls_call_frame frame) { LS_RESULT(frame, f64, sqrt(ls_to_f64(runtime, -1))); }
+static void runtime_native_sin_f32(ls_runtime* runtime, ls_call_frame frame) { (void)runtime; LS_ARG(frame, f32, value); LS_TYPED_RESULT(frame, f32, sinf(value)); }
+static void runtime_native_cos_f32(ls_runtime* runtime, ls_call_frame frame) { (void)runtime; LS_ARG(frame, f32, value); LS_TYPED_RESULT(frame, f32, cosf(value)); }
+static void runtime_native_sqrt_f32(ls_runtime* runtime, ls_call_frame frame) { (void)runtime; LS_ARG(frame, f32, value); LS_TYPED_RESULT(frame, f32, sqrtf(value)); }
+static void runtime_native_sin_f64(ls_runtime* runtime, ls_call_frame frame) { (void)runtime; LS_ARG(frame, f64, value); LS_TYPED_RESULT(frame, f64, sin(value)); }
+static void runtime_native_cos_f64(ls_runtime* runtime, ls_call_frame frame) { (void)runtime; LS_ARG(frame, f64, value); LS_TYPED_RESULT(frame, f64, cos(value)); }
+static void runtime_native_sqrt_f64(ls_runtime* runtime, ls_call_frame frame) { (void)runtime; LS_ARG(frame, f64, value); LS_TYPED_RESULT(frame, f64, sqrt(value)); }
 
 /* std:mem alloc(size, align) : byte[]. Allocates `size` bytes of heap memory. */
 static void runtime_native_alloc(ls_runtime* runtime, ls_call_frame frame) {
-	const i64 size = ls_to_i64(runtime, -2);
+	(void)runtime;
+	LS_ARG(frame, i64, size);
+	LS_ARG(frame, i64, align);
+	(void)align;
 	void* ptr = size > 0 ? malloc((size_t)size) : NULL;
 	i64 actual = ptr ? size : 0;
 	memcpy(frame.result, &ptr, sizeof(ptr));
@@ -122,7 +149,11 @@ static void runtime_native_alloc(ls_runtime* runtime, ls_call_frame frame) {
 
 /* std:mem free(memory : byte[]) : void. */
 static void runtime_native_free(ls_runtime* runtime, ls_call_frame frame) {
-	free(ls_to_ptr(runtime, -2));
+	(void)runtime;
+	LS_ARG(frame, void*, ptr);
+	LS_ARG(frame, i64, size);
+	(void)size;
+	free(ptr);
 }
 
 static void runtime_bind_builtin_callbacks(ls_runtime* runtime) {
@@ -362,7 +393,7 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 			case LS_OP_LOAD_CONST_STRING: {
 				const u32 dst = runtime_read_u32(fn->code, &pc);
 				const u32 index = runtime_read_u32(fn->code, &pc);
-				void* value = runtime_make_string_box(runtime, runtime->bytecode->strings[index]);
+				void* value = runtime_copy_string_box(runtime, runtime->bytecode->strings[index]);
 				u8* out = runtime_frame_ptr(runtime, dst);
 				memcpy(out, &value, sizeof(value));
 				break;
@@ -626,6 +657,27 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 					case LS_TYPE_F64: { f64 v = runtime_numeric_to_double(src_ptr, src_kind); memcpy(out, &v, 8u); break; }
 					default: break; // should not happen
 				}
+				break;
+			}
+			case LS_OP_STRING_TO_CSTR: {
+				const u32 dst = runtime_read_u32(fn->code, &pc);
+				const u32 src = runtime_read_u32(fn->code, &pc);
+				ls_string_box* box = NULL;
+				memcpy(&box, runtime_frame_ptr(runtime, src), sizeof(box));
+				if (!box || memchr(box->value.begin, '\0', (size_t)(box->value.end - box->value.begin))) { runtime->frame_base = saved_frame_base; return 0; }
+				const char* value = box->value.begin;
+				memcpy(runtime_frame_ptr(runtime, dst), &value, sizeof(value));
+				break;
+			}
+			case LS_OP_CSTR_TO_STRING: {
+				const u32 dst = runtime_read_u32(fn->code, &pc);
+				const u32 src = runtime_read_u32(fn->code, &pc);
+				const char* value = NULL;
+				memcpy(&value, runtime_frame_ptr(runtime, src), sizeof(value));
+				if (!value) { runtime->frame_base = saved_frame_base; return 0; }
+				ls_string_box* box = runtime_copy_string_box(runtime, (ls_string_view){value, value + strlen(value)});
+				if (!box) { runtime->frame_base = saved_frame_base; return 0; }
+				memcpy(runtime_frame_ptr(runtime, dst), &box, sizeof(box));
 				break;
 			}
 			case LS_OP_NEG_I8: LS_REG_NEGOP(i8); break;

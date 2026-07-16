@@ -140,6 +140,7 @@ struct Tokenizer {
 						break;
 					}
 					case 'p': return checkKeyword("tr", 2, 2, Token::CPTR);
+					case 's': return checkKeyword("tr", 2, 2, Token::CSTR);
 				}
 				return checkKeyword("ontinue", 1, 7, Token::CONTINUE);
 			}

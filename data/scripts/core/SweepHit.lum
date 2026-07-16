@@ -7,5 +7,5 @@ struct SweepHit {
 	normal : Vec3;
 	entity : Entity;
 	distance : f32;
-};
+}
 

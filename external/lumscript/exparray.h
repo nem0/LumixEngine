@@ -207,13 +207,15 @@ private:
 	static i32 binIndex(i32 index) {
 		ASSERT(index >= 0);
 		unsigned long msb = 0;
-		ASSERT(_BitScanReverse(&msb, (unsigned long)index + 4));
+		const unsigned char found = _BitScanReverse(&msb, (unsigned long)index + 4);
+		ASSERT(found);
 		return (i32)msb - 2;
 	}
 
 	static i32 innerIndex(i32 index) {
 		unsigned long msb = 0;
-		ASSERT(_BitScanReverse(&msb, (unsigned long)index + 4));
+		const unsigned char found = _BitScanReverse(&msb, (unsigned long)index + 4);
+		ASSERT(found);
 		return index + 4 - (1 << msb);
 	}
 

@@ -135,6 +135,7 @@ struct Parser {
 			case Token::F32: return "f32";
 			case Token::F64: return "f64";
 			case Token::CPTR: return "cptr";
+			case Token::CSTR: return "cstr";
 			case Token::BYTE: return "byte";
 			case Token::SIZEOF: return "sizeof";
 			case Token::ALIGNOF: return "alignof";
@@ -289,6 +290,7 @@ struct Parser {
 			case Token::F64:
 			case Token::STRING_KW:
 			case Token::CPTR:
+			case Token::CSTR:
 			case Token::BYTE:
 			case Token::TYPE_KW:
 				return makeExpr<TypeLiteralExpression>(token, primitiveKindFromToken(token.type));
@@ -537,6 +539,7 @@ struct Parser {
 			case Token::F32: return ResolvedType::F32;
 			case Token::F64: return ResolvedType::F64;
 			case Token::CPTR: return ResolvedType::CPTR;
+			case Token::CSTR: return ResolvedType::CSTR;
 			case Token::BYTE: return ResolvedType::BYTE;
 			// META stands for the `type` keyword.
 			case Token::TYPE_KW: return ResolvedType::META;

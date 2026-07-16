@@ -33,6 +33,7 @@ static ls_type_kind toTypeKind(const ResolvedType& type) {
 		case ResolvedType::F32: return LS_TYPE_F32;
 		case ResolvedType::F64: return LS_TYPE_F64;
 		case ResolvedType::STRING: return LS_TYPE_STRING;
+		case ResolvedType::CSTR: return LS_TYPE_CPTR;
 		case ResolvedType::CPTR: return LS_TYPE_CPTR;
 		case ResolvedType::BYTE: return LS_TYPE_U8;
 		case ResolvedType::FUNCTION: return LS_TYPE_FUNCTION;
@@ -576,6 +577,20 @@ static void emitCast(FunctionCompiler& ctx, ls_type_kind src_kind, ls_type_kind 
 	setTempTop(ctx, src + typeKindByteSize(dst_kind));
 }
 
+static void emitStringToCStr(FunctionCompiler& ctx) {
+	const u32 src = ctx.temp_top - typeKindByteSize(LS_TYPE_STRING);
+	emitOp(ctx.code, LS_OP_STRING_TO_CSTR);
+	emitTempReg(ctx, src);
+	emitTempReg(ctx, src);
+}
+
+static void emitCStrToString(FunctionCompiler& ctx) {
+	const u32 src = ctx.temp_top - typeKindByteSize(LS_TYPE_CPTR);
+	emitOp(ctx.code, LS_OP_CSTR_TO_STRING);
+	emitTempReg(ctx, src);
+	emitTempReg(ctx, src);
+}
+
 // Discard the top `byte_size` bytes of temporaries (compile-time only).
 static void emitPop(FunctionCompiler& ctx, u32 byte_size) {
 	ctx.temp_top -= byte_size;
@@ -873,6 +888,11 @@ static void compileExpressionAsType(FunctionCompiler& ctx, Expression& expr, Res
 			return;
 		}
 	}
+	if (expected_type.kind == ResolvedType::CSTR && expr.resolved_type && expr.resolved_type->kind == ResolvedType::STRING) {
+		compileExpression(ctx, expr, LS_TYPE_STRING);
+		emitStringToCStr(ctx);
+		return;
+	}
 	if (expr.kind == Expression::UNDEFINED) {
 		emitZeroBytes(ctx, typeByteSize(expected_type));
 		return;
@@ -1169,7 +1189,11 @@ static ls_type_kind compileCall(FunctionCompiler& ctx, CallExpression& expr, ls_
 
 	if (expr.callee->kind == Expression::IDENTIFIER) {
 		IdentifierExpression* id = static_cast<IdentifierExpression*>(expr.callee);
-		if (equalStrings(id->name, makeStringView("length"))) {
+		if (equalStrings(id->name, makeStringView("length"))
+			&& expr.args.size() == 1
+			&& expr.args[0]->resolved_type
+			&& (expr.args[0]->resolved_type->kind == ResolvedType::ARRAY || expr.args[0]->resolved_type->kind == ResolvedType::SLICE))
+		{
 			ResolvedType* arg_type = expr.args[0]->resolved_type;
 			if (arg_type->kind == ResolvedType::ARRAY) {
 				emitConst8(ctx, (u64)static_cast<ArrayResolvedType*>(arg_type)->size);
@@ -1394,6 +1418,12 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 			CastExpression& cast = static_cast<CastExpression&>(expr);
 			const ls_type_kind dst_kind = toTypeKind(*expr.resolved_type);
 			const ls_type_kind src_kind = compileExpression(ctx, *cast.expression, toTypeKind(*cast.expression->resolved_type));
+			if (cast.expression->resolved_type->kind == ResolvedType::STRING && expr.resolved_type->kind == ResolvedType::CSTR) {
+				emitStringToCStr(ctx); return dst_kind;
+			}
+			if (cast.expression->resolved_type->kind == ResolvedType::CSTR && expr.resolved_type->kind == ResolvedType::STRING) {
+				emitCStrToString(ctx); return dst_kind;
+			}
 			// Slice reinterpret (`byte[] as T[]` / `T[] as byte[]`) keeps the same backing
 			// reference (base offset). The length is in elements, so it rescales by the ratio
 			// of element offset counts: new_len = old_len * src_size / dst_size. One side is
@@ -1414,6 +1444,7 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 				}
 				return dst_kind;
 			}
+			if (src_kind == dst_kind) return dst_kind;
 			emitCast(ctx, src_kind, dst_kind);
 			return dst_kind;
 		}

@@ -14,5 +14,5 @@ struct Viewport {
 	near : f32;
 	far : f32;
 	pixel_offset : Vec2;
-};
+}
 

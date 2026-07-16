@@ -33,6 +33,7 @@ u32 typeByteSize(const ResolvedType& t) {
 		case ResolvedType::ISIZE:
 		case ResolvedType::F64:
 		case ResolvedType::STRING:
+		case ResolvedType::CSTR:
 		case ResolvedType::CPTR:
 			return 8;
 		case ResolvedType::NULLABLE: return 1 + typeByteSize(*static_cast<const NullableResolvedType&>(t).inner);
@@ -104,7 +105,7 @@ struct Checker {
 	}
 
 	static const char* primitiveTypeName(ResolvedType::Kind kind) {
-		static const char* names[] = {"void", "bool", "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "isize", "f32", "f64", "string", "cptr", "byte"};
+		static const char* names[] = {"void", "bool", "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "isize", "f32", "f64", "string", "cstr", "cptr", "byte"};
 		ASSERT(kind >= ResolvedType::VOID && kind <= ResolvedType::BYTE);
 		return names[kind - ResolvedType::VOID];
 	}
@@ -146,6 +147,7 @@ struct Checker {
 	static bool canImplicitlyConvert(const ResolvedType* src, const ResolvedType* dst) {
 		if (typesEqual(src, dst)) return true;
 		if (!src || !dst) return false;
+		if (src->kind == ResolvedType::STRING && dst->kind == ResolvedType::CSTR) return true;
 		// An untyped literal converts to any concrete numeric type (its width is chosen at the
 		// materialization point). This is only a safety net; callers materialize first.
 		if (src->kind == ResolvedType::UNTYPED_INT) return isNumericType(*dst);
@@ -353,6 +355,9 @@ struct Checker {
 	bool resolveSizeofValue(Unit& unit, SizeofExpression& sz, ComptimeValue& out, TemplateBindings* bindings = nullptr) {
 		ResolvedType* measured = resolveTypeExpr(unit, *sz.type_expr, bindings);
 		if (!measured) return false;
+		// Preserve the concrete operand for backends that need to emit a native
+		// sizeof/alignof expression instead of using the folded integer value.
+		sz.type_expr->resolved_type = measured;
 
 		const i64 size = typeByteSize(*measured);
 		out = ComptimeValue(sz.is_align ? (size >= 8 ? 8 : size >= 4 ? 4 : size >= 2 ? 2 : 1) : size);
@@ -1843,7 +1848,6 @@ struct Checker {
 					expr.resolved_type = primitiveType(ResolvedType::ISIZE);
 					return expr.resolved_type;
 				}
-				return nullptr;
 			}
 		}
 
@@ -2233,7 +2237,9 @@ struct Checker {
 			slice_reinterpret = src_byte != dst_byte;
 		}
 		// bool->bool (and any other same-type cast) is covered by the trailing typesEqual.
-		const bool valid_cast = (src_numeric && dst_numeric) || (src_enum && dst_integer) || (src_integer && dst_enum) || slice_reinterpret || typesEqual(src_type, dst_type);
+		const bool string_cstr_cast = (src_type->kind == ResolvedType::STRING && dst_type->kind == ResolvedType::CSTR)
+			|| (src_type->kind == ResolvedType::CSTR && dst_type->kind == ResolvedType::STRING);
+		const bool valid_cast = (src_numeric && dst_numeric) || (src_enum && dst_integer) || (src_integer && dst_enum) || slice_reinterpret || string_cstr_cast || typesEqual(src_type, dst_type);
 		if (!valid_cast) {
 			errorLine(expr.token, "Cannot cast ", src_type, " to ", dst_type);
 			return nullptr;
@@ -2633,7 +2639,7 @@ struct Checker {
 					errorLine(expr.token, "Cannot use null literal without a type hint");
 					return nullptr;
 				}
-				if (hint->kind != ResolvedType::NULLABLE && hint->kind != ResolvedType::SLICE) {
+				if (hint->kind != ResolvedType::NULLABLE && hint->kind != ResolvedType::SLICE && hint->kind != ResolvedType::CPTR) {
 					errorLine(expr.token, "Cannot use null literal as ", hint);
 					return nullptr;
 				}

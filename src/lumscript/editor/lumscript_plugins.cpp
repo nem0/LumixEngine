@@ -16,6 +16,7 @@
 #include "core/array.h"
 #include "core/stream.h"
 #include "../../external/lumscript/capi.h"
+#include "../../external/lumscript/arena.h"
 
 namespace Lumix {
 
@@ -209,6 +210,8 @@ struct LumScriptEditorWindow final : AssetEditorWindow {
 		ImportContext import_ctx(m_app.getEngine().getFileSystem(), m_app.getAllocator());
 		ImportResolverContext resolver_ctx = {};
 		ls_host host = {};
+		host.create_arena = &ls_default_arena_create;
+		host.destroy_arena = &ls_default_arena_destroy;
 		host.diagnostics_userdata = &diagnostics_message;
 		host.print = [](void* userdata, ls_string_view msg) {
 			((String*)userdata)->append(StringView(msg.begin, msg.end));

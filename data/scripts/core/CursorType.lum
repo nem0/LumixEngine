@@ -9,5 +9,5 @@ enum CursorType {
 	TEXT_INPUT = 5,
 	HAND = 6,
 	UNDEFINED = 7
-};
+}
 

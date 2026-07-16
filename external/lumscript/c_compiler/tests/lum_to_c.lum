@@ -1,0 +1,155 @@
+enum State {
+	Idle,
+	Running = 7
+}
+
+struct Value {
+	amount : i32;
+	state : State;
+}
+
+struct Vec {
+	value : i32;
+}
+
+struct Pair[T] {
+	first : T;
+	second : T;
+}
+
+operator +(a : Vec, b : Vec) : Vec {
+	return Vec { a.value + b.value };
+}
+
+operator -(a : Vec) : Vec {
+	return Vec { -a.value };
+}
+
+const adjustment : i32 = 2;
+var global_value : i32 = 3;
+var deferred_calls : i32 = 0;
+const value_layout : i32 = sizeof(Value) + alignof(i32);
+
+extern fn print(msg : string) : void;
+extern fn MessageBoxA(window : cptr, text : cstr, caption : cstr, flags : u32) : i32;
+
+fn cleanup() : void {
+	deferred_calls += 1;
+}
+
+fn add(a : i32, b : i32) : i32 {
+	var sum : i32 = a + b;
+	if sum > 10 {
+		return sum;
+	}
+	return sum + 1;
+}
+
+fn multiply(a : i32, b : i32) : i32 {
+	return a * b;
+}
+
+fn scale(v : Value, factor : i32) : i32 {
+	return v.amount * factor;
+}
+
+fn twice(a : $T) : T {
+	return a + a;
+}
+
+fn echo(value : string) : string {
+	return value;
+}
+
+fn apply(f : fn(i32, i32) : i32, a : i32, b : i32) : i32 {
+	return f(a, b);
+}
+
+fn increment(v : ref i32) : void {
+	v += 1;
+}
+
+fn main() : i32 {
+	defer cleanup();
+	var message : string = echo("Lum");
+	print(message);
+	if 0 == 1 {
+		MessageBoxA(null, "Hello from LumScript", "lum_to_c", 0);
+	}
+	if message != "Lum" {
+		return 8;
+	}
+	if message == "not Lum" {
+		return 9;
+	}
+	const local_add : fn(i32) : i32 = fn(v : i32) : i32 {
+		return v + 1;
+	};
+	var item = Value { 4, State.Running };
+	var value : i32 = local_add(add(item.amount, item.state as i32) + adjustment + global_value + apply(multiply, 2, 3));
+	value += item.scale(2);
+	var pair : Pair[i32] = Pair[i32] { 10, 20 };
+	value += pair.first + pair.second;
+	value += twice(5);
+	var compound : i32 = 12;
+	compound -= 2;
+	compound *= 3;
+	compound /= 5;
+	value += compound;
+	var vector = -(Vec { 2 } + Vec { 3 });
+	vector += Vec { 1 };
+	value += vector.value;
+	var ref_value : i32 = 0;
+	increment(ref ref_value);
+	value += ref_value;
+	match ref_value {
+		case 0:
+			return 4;
+		case 1..2, 99:
+			value += 0;
+		else:
+			return 5;
+	}
+	var values : [4]i32 = undefined;
+	values[0] = 5;
+	values[1] = 8;
+	values[2] = 11;
+	values[3] = 13;
+	var view : []i32 = values[0:2];
+	view[1] = view[0] + 3;
+	var z : []i32 = values[0:4];
+	var z2 : []i32 = z[2:4];
+	z2[0] = z[0] + 4;
+	if length(values) != 4 {
+		return 6;
+	}
+	if length(z2) != 2 {
+		return 7;
+	}
+	match item.state {
+		case .Idle:
+			return 1;
+		case .Running:
+			value += 0;
+	}
+	outer: for i = 0..1 {
+		continue outer;
+	}
+	stop: while true {
+		break stop;
+	}
+	var optional : ?i32 = null;
+	if optional != null {
+		return optional;
+	}
+	if item.state == State.Idle {
+		return 2;
+	}
+	else if item.state == State.Running {
+		value += 1;
+	}
+	else {
+		return 3;
+	}
+	return value + view[1] - 83;
+}

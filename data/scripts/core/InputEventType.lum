@@ -7,5 +7,5 @@ enum InputEventType {
 	TEXT_INPUT = 3,
 	DEVICE_ADDED = 4,
 	DEVICE_REMOVED = 5
-};
+}
 

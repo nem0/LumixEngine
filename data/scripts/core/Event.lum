@@ -10,5 +10,5 @@ struct Event {
 	key_code : i32;
 	text_utf8 : i32;
 	wheel_y : f32;
-};
+}
 

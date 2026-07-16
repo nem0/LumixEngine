@@ -2,8 +2,7 @@
 
 # TODO
 
-* use ls_call_frame in engine integration
-
+* make range exclusive, so `for i = 0..count {` does not include `count`
 * use case - comptime string hash
 * how should user implement print-s?
 	fn print(v : varargs) : void {
@@ -16,8 +15,9 @@
 	}
 * tagged unions
 * debugger
+* AST API in lumscript
 * string interpolation
-* jit/llvm
+* jit/llvm/AOT
 
 ---
 
@@ -774,6 +774,8 @@ Built-in and user types:
 - `byte`
 - `f32`, `f64`
 - `string`
+- `cstr`
+- `cptr`
 - `type` (compile-time only)
 - user-defined `struct` types
 - user-defined `enum` types
@@ -879,6 +881,44 @@ fn greet(name : string) : string {
 - string literals produce `string`
 - concatenation uses `+`
 - string interpolation is not implemented
+
+`string` is LumScript's normal counted-string type. It carries a byte length, so it can represent arbitrary byte sequences, including embedded null bytes.
+
+`cstr` is a distinct borrowed, NUL-terminated C string type for native interop. It maps to `const char*` in C and is intended for declarations such as:
+
+```cpp
+extern fn puts(text : cstr) : i32;
+
+fn main() : void {
+	puts("hello");
+}
+```
+
+`string` converts implicitly to `cstr` without copying, including when passing a normal string to a native function or initializing a `cstr` variable. The generated string storage is NUL-terminated:
+
+```cpp
+var text : string = getMessage();
+var native_text : cstr = text;
+```
+
+The conversion requires NUL-terminated storage and rejects strings containing an embedded null byte; C APIs conventionally stop at the first null and cannot otherwise observe the full LumScript string. The resulting `cstr` is borrowed: it is valid only while the source string remains alive and is not mutated or released. `cstr` has no ownership or freeing behavior.
+
+Conversion in the other direction is also explicit and copies the C string into normal LumScript-owned string storage:
+
+```cpp
+var native_text : cstr = getNativeMessage();
+var text : string = native_text as string;
+```
+
+`cstr as string` scans up to the first null byte and copies those bytes. It is therefore `O(n)` and the resulting `string` remains valid if the native library later mutates or releases the original buffer. Converting a null `cstr` requires a nullable check first.
+
+`cptr` is a separate opaque raw native pointer type. Use it for handles, raw memory, and dynamic-library symbol lookup; do not use it for C text when a `cstr` parameter is available. The `null` literal is valid wherever a `cptr` is expected and represents a null native pointer:
+
+```cpp
+extern fn MessageBoxA(window : cptr, text : cstr, caption : cstr, flags : u32) : i32;
+
+MessageBoxA(null, "Hello", "LumScript", 0);
+```
 
 ### Function types
 

@@ -279,3 +279,28 @@ TEST(IndirectByValueStructRecursionFails) {
 	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
+
+TEST(NullCanInitializeCPtr) {
+	const char* source = R"(
+		fn main() : cptr {
+			return null;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(NullCPtrRuntime) {
+	const char* source = R"(
+		fn main() : cptr {
+			return null;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_TRUE(ls_to_ptr(runtime, -1) == nullptr);
+	CAPI_END(module);
+	return true;
+}

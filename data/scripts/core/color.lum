@@ -3,4 +3,4 @@ struct Color {
 	g : i32;
 	b : i32;
 	a : i32;
-};
+}

@@ -24,6 +24,7 @@ struct ResolvedType {
 		F32,
 		F64,
 		STRING,
+		CSTR,
 		CPTR,
 		BYTE,
 		UNTYPED_INT,

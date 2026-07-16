@@ -846,7 +846,7 @@ TEST(ExternImport) {
 	auto sumfn = [](ls_runtime* runtime, ls_call_frame frame) -> void {
 		LS_ARG(frame, i32, a);
 		LS_ARG(frame, i32, b);
-		LS_RESULT(frame, i32, a + b);
+		LS_RESULT(frame, a + b);
 	};
 
 	ls_runtime* runtime = ls_runtime_create(bytecode);
@@ -1066,11 +1066,11 @@ TEST(ExternFnSecondImportCorrectIndex) {
 	EXPECT_TRUE(runtime != nullptr);
 	ls_runtime_set_native_function_callback(runtime, add_idx, [](ls_runtime* rt, ls_call_frame frame) {
 		LS_ARG(frame, i32, a); LS_ARG(frame, i32, b);
-		LS_RESULT(frame, i32, a + b);
+		LS_RESULT(frame, a + b);
 	});
 	ls_runtime_set_native_function_callback(runtime, mul_idx, [](ls_runtime* rt, ls_call_frame frame) {
 		LS_ARG(frame, i32, a); LS_ARG(frame, i32, b);
-		LS_RESULT(frame, i32, a * b);
+		LS_RESULT(frame, a * b);
 	});
 
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));

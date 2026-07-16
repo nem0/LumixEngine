@@ -192,12 +192,12 @@ TEST(Extern) {
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	auto nativefn = [](ls_runtime* runtime, ls_call_frame frame) -> void {
-		LS_RESULT(frame, i32, 41);
+		LS_RESULT(frame, i32(41));
 	};
 
 	auto nativefn2 = [](ls_runtime* runtime, ls_call_frame frame) -> void {
 		LS_ARG(frame, i32, v); v += 1;
-		LS_RESULT(frame, i32, v);
+		LS_RESULT(frame, v);
 	};
 
 	CAPI_RUNTIME(module, runtime);
@@ -251,7 +251,7 @@ TEST(NativeStringArgument) {
 		LS_STRING_ARG(frame, text);
 		LS_ARG(frame, i32, value);
 		const bool matches = text.end - text.begin == 6 && memcmp(text.begin, "testor", 6) == 0;
-		LS_RESULT(frame, i32, matches && value == 42 ? 1 : 0);
+		LS_RESULT(frame, i32(matches && value == 42 ? 1 : 0));
 	};
 
 	CAPI_RUNTIME(module, runtime);
@@ -281,7 +281,7 @@ TEST(NativeTwoStringArguments) {
 		LS_STRING_ARG(frame, second);
 		const bool first_matches = first.end - first.begin == 5 && memcmp(first.begin, "first", 5) == 0;
 		const bool second_matches = second.end - second.begin == 6 && memcmp(second.begin, "second", 6) == 0;
-		LS_RESULT(frame, i32, first_matches && second_matches ? 1 : 0);
+		LS_RESULT(frame, i32(first_matches && second_matches ? 1 : 0));
 	};
 
 	CAPI_RUNTIME(module, runtime);
@@ -289,6 +289,36 @@ TEST(NativeTwoStringArguments) {
 	EXPECT_TRUE(ls_runtime_set_native_function_callback(runtime, fn_idx, inspect) == LS_RESULT_OK);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(1, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(NativeStringResult) {
+	const char* source = R"(
+		extern fn getText() : string;
+
+		fn main() : i32 {
+			if getText() == "native result" {
+				return 42;
+			}
+			return 0;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	auto get_text = [](ls_runtime* runtime, ls_call_frame frame) -> void {
+		char temporary[] = "native result";
+		ls_result_string(runtime, &frame, ls_string_view{temporary, temporary + sizeof(temporary) - 1});
+		memset(temporary, 0, sizeof(temporary));
+	};
+
+	CAPI_RUNTIME(module, runtime);
+	const i32 fn_idx = ls_module_get_native_function_index(module, toLs("getText"));
+	EXPECT_TRUE(ls_runtime_set_native_function_callback(runtime, fn_idx, get_text) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }

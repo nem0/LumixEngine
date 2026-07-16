@@ -4,5 +4,5 @@ enum GrassRotationMode {
 	Y_UP = 0,
 	ALL_RANDOM = 1,
 	COUNT = 2
-};
+}
 

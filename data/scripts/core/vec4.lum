@@ -3,7 +3,7 @@ struct Vec4 {
 	y : f32;
 	z : f32;
 	w : f32;
-};
+}
 
 operator +(a : Vec4, b : Vec4) : Vec4 {
 	return Vec4 {

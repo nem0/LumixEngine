@@ -7,6 +7,14 @@
 #include "core/stream.h"
 #include "engine/reflection.h"
 #include "engine/world.h"
+
+#define LS_ENTITY_ARG(frame, name, world) \
+LS_ARG(frame, i32, name##_index); \
+LS_ARG(frame, World*, world)
+#define LS_COMPONENT_ARG(frame, type, name, context) \
+LS_ARG(frame, i32, name##_index); \
+LS_ARG(frame, type, context)
+
 #include "animation/animation_module.h"
 #include "audio/audio_module.h"
 #include "engine/core.h"
@@ -19,2517 +27,2685 @@
 namespace Lumix::LumScript::generated {
 	
 	static void lumscript_world_animation(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
+		LS_ARG(frame, World*, world);
 		IModule* module = world->getModule(reflection::getComponentType("property_animator"));
-		if (!module) { ls_push_null(runtime); return; }
-		ls_push_ptr(runtime, module);
+		if (!module) { LS_RESULT(frame, u8(0)); return; }
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_world_audio(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
+		LS_ARG(frame, World*, world);
 		IModule* module = world->getModule(reflection::getComponentType("echo_zone"));
-		if (!module) { ls_push_null(runtime); return; }
-		ls_push_ptr(runtime, module);
+		if (!module) { LS_RESULT(frame, u8(0)); return; }
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_world_core(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
+		LS_ARG(frame, World*, world);
 		IModule* module = world->getModule(reflection::getComponentType("spline"));
-		if (!module) { ls_push_null(runtime); return; }
-		ls_push_ptr(runtime, module);
+		if (!module) { LS_RESULT(frame, u8(0)); return; }
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_world_lua_script(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
+		LS_ARG(frame, World*, world);
 		IModule* module = world->getModule(reflection::getComponentType("lua_script"));
-		if (!module) { ls_push_null(runtime); return; }
-		ls_push_ptr(runtime, module);
+		if (!module) { LS_RESULT(frame, u8(0)); return; }
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_world_navigation(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
+		LS_ARG(frame, World*, world);
 		IModule* module = world->getModule(reflection::getComponentType("navmesh_zone"));
-		if (!module) { ls_push_null(runtime); return; }
-		ls_push_ptr(runtime, module);
+		if (!module) { LS_RESULT(frame, u8(0)); return; }
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_world_physics(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
+		LS_ARG(frame, World*, world);
 		IModule* module = world->getModule(reflection::getComponentType("physical_heightfield"));
-		if (!module) { ls_push_null(runtime); return; }
-		ls_push_ptr(runtime, module);
+		if (!module) { LS_RESULT(frame, u8(0)); return; }
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_world_renderer(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
+		LS_ARG(frame, World*, world);
 		IModule* module = world->getModule(reflection::getComponentType("camera"));
-		if (!module) { ls_push_null(runtime); return; }
-		ls_push_ptr(runtime, module);
+		if (!module) { LS_RESULT(frame, u8(0)); return; }
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_world_ui(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
+		LS_ARG(frame, World*, world);
 		IModule* module = world->getModule(reflection::getComponentType("ui_3d"));
-		if (!module) { ls_push_null(runtime); return; }
-		ls_push_ptr(runtime, module);
+		if (!module) { LS_RESULT(frame, u8(0)); return; }
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_property_animator(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("property_animator");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_animator(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("animator");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_animable(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("animable");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_echo_zone(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("echo_zone");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_chorus_zone(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("chorus_zone");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_audio_listener(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("audio_listener");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_ambient_sound(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("ambient_sound");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_spline(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("spline");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_signal(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("signal");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_lua_script(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("lua_script");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_lua_script_inline(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("lua_script_inline");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_navmesh_zone(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("navmesh_zone");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_navmesh_agent(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("navmesh_agent");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_physical_heightfield(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("physical_heightfield");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_d6_joint(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("d6_joint");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_distance_joint(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("distance_joint");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_hinge_joint(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("hinge_joint");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_spherical_joint(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("spherical_joint");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_physical_controller(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("physical_controller");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_rigid_actor(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("rigid_actor");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_wheel(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("wheel");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_vehicle(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("vehicle");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_physical_instanced_cube(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("physical_instanced_cube");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_physical_instanced_mesh(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("physical_instanced_mesh");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_camera(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("camera");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_decal(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("decal");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_environment(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("environment");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_point_light(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("point_light");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_reflection_probe(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("reflection_probe");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_environment_probe(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("environment_probe");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_bone_attachment(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("bone_attachment");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_particle_emitter(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("particle_emitter");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_instanced_model(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("instanced_model");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_model_instance(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("model_instance");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_curve_decal(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("curve_decal");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_terrain(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("terrain");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_procedural_geom(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("procedural_geom");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_entity_ui_3d(ls_runtime* runtime, ls_call_frame frame) {
-		World* world = (World*)ls_to_ptr(runtime, -1);
-		i32 entity_idx = ls_to_i32(runtime, -2);
+		LS_ENTITY_ARG(frame, entity, world);
 		const ComponentType component_type = reflection::getComponentType("ui_3d");
 		IModule* module = world->getModule(component_type);
-		if (!module || !world->hasComponent(EntityRef(entity_idx), component_type)) {
-			ls_push_null(runtime);
+		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, entity_idx);
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_audio_setMasterVolume_0(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<AudioModule*>(ls_to_ptr(runtime, -1));
-		module->setMasterVolume(ls_to_f32(runtime, -1));
+		LS_ARG(frame, AudioModule*, module);
+		LS_ARG(frame, float, volume);
+		module->setMasterVolume(volume);
 	}
 	
 	static void lumscript_physics_raycast_1(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->raycast(Vec3(ls_to_f32(runtime, -9), ls_to_f32(runtime, -8), ls_to_f32(runtime, -7)), Vec3(ls_to_f32(runtime, -6), ls_to_f32(runtime, -5), ls_to_f32(runtime, -4)), ls_to_f32(runtime, -3), EntityPtr(ls_to_i32(runtime, -2)));
-		ls_push_i32(runtime, ret.index);
-		ls_push_ptr(runtime, &module->getWorld());
+		LS_ARG(frame, PhysicsModule*, module);
+		LS_ARG(frame, Vec3, origin);
+		LS_ARG(frame, Vec3, dir);
+		LS_ARG(frame, float, distance);
+		LS_ENTITY_ARG(frame, ignore_entity, ignore_entity_world);
+		auto ret = module->raycast(origin, dir, distance, EntityPtr(ignore_entity_index));
+		LS_RESULT(frame, ret.index);
+		LS_RESULT(frame, &module->getWorld());
 	}
 	
 	static void lumscript_physics_setGravity_2(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setGravity(Vec3(ls_to_f32(runtime, -3), ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
+		LS_ARG(frame, PhysicsModule*, module);
+		LS_ARG(frame, Vec3, gravity);
+		module->setGravity(gravity);
 	}
 	
 	static void lumscript_renderer_addDebugTriangle_3(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->addDebugTriangle(DVec3(ls_to_f64(runtime, -13), ls_to_f64(runtime, -12), ls_to_f64(runtime, -11)), DVec3(ls_to_f64(runtime, -10), ls_to_f64(runtime, -9), ls_to_f64(runtime, -8)), DVec3(ls_to_f64(runtime, -7), ls_to_f64(runtime, -6), ls_to_f64(runtime, -5)), Color(u8(ls_to_i32(runtime, -4)), u8(ls_to_i32(runtime, -3)), u8(ls_to_i32(runtime, -2)), u8(ls_to_i32(runtime, -1))));
+		LS_ARG(frame, RenderModule*, module);
+		LS_ARG(frame, DVec3, p0);
+		LS_ARG(frame, DVec3, p1);
+		LS_ARG(frame, DVec3, p2);
+		LS_ARG(frame, i32, color_r);
+		LS_ARG(frame, i32, color_g);
+		LS_ARG(frame, i32, color_b);
+		LS_ARG(frame, i32, color_a);
+		module->addDebugTriangle(p0, p1, p2, Color(u8(color_r), u8(color_g), u8(color_b), u8(color_a)));
 	}
 	
 	static void lumscript_renderer_addDebugLine_4(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->addDebugLine(DVec3(ls_to_f64(runtime, -10), ls_to_f64(runtime, -9), ls_to_f64(runtime, -8)), DVec3(ls_to_f64(runtime, -7), ls_to_f64(runtime, -6), ls_to_f64(runtime, -5)), Color(u8(ls_to_i32(runtime, -4)), u8(ls_to_i32(runtime, -3)), u8(ls_to_i32(runtime, -2)), u8(ls_to_i32(runtime, -1))));
+		LS_ARG(frame, RenderModule*, module);
+		LS_ARG(frame, DVec3, from);
+		LS_ARG(frame, DVec3, to);
+		LS_ARG(frame, i32, color_r);
+		LS_ARG(frame, i32, color_g);
+		LS_ARG(frame, i32, color_b);
+		LS_ARG(frame, i32, color_a);
+		module->addDebugLine(from, to, Color(u8(color_r), u8(color_g), u8(color_b), u8(color_a)));
 	}
 	
 	static void lumscript_renderer_addDebugCross_5(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->addDebugCross(DVec3(ls_to_f64(runtime, -8), ls_to_f64(runtime, -7), ls_to_f64(runtime, -6)), ls_to_f32(runtime, -5), Color(u8(ls_to_i32(runtime, -4)), u8(ls_to_i32(runtime, -3)), u8(ls_to_i32(runtime, -2)), u8(ls_to_i32(runtime, -1))));
+		LS_ARG(frame, RenderModule*, module);
+		LS_ARG(frame, DVec3, center);
+		LS_ARG(frame, float, size);
+		LS_ARG(frame, i32, color_r);
+		LS_ARG(frame, i32, color_g);
+		LS_ARG(frame, i32, color_b);
+		LS_ARG(frame, i32, color_a);
+		module->addDebugCross(center, size, Color(u8(color_r), u8(color_g), u8(color_b), u8(color_a)));
 	}
 	
 	static void lumscript_renderer_addDebugBone_6(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->addDebugBone(DVec3(ls_to_f64(runtime, -16), ls_to_f64(runtime, -15), ls_to_f64(runtime, -14)), Vec3(ls_to_f32(runtime, -13), ls_to_f32(runtime, -12), ls_to_f32(runtime, -11)), Vec3(ls_to_f32(runtime, -10), ls_to_f32(runtime, -9), ls_to_f32(runtime, -8)), Vec3(ls_to_f32(runtime, -7), ls_to_f32(runtime, -6), ls_to_f32(runtime, -5)), Color(u8(ls_to_i32(runtime, -4)), u8(ls_to_i32(runtime, -3)), u8(ls_to_i32(runtime, -2)), u8(ls_to_i32(runtime, -1))));
+		LS_ARG(frame, RenderModule*, module);
+		LS_ARG(frame, DVec3, pos);
+		LS_ARG(frame, Vec3, dir);
+		LS_ARG(frame, Vec3, up);
+		LS_ARG(frame, Vec3, right);
+		LS_ARG(frame, i32, color_r);
+		LS_ARG(frame, i32, color_g);
+		LS_ARG(frame, i32, color_b);
+		LS_ARG(frame, i32, color_a);
+		module->addDebugBone(pos, dir, up, right, Color(u8(color_r), u8(color_g), u8(color_b), u8(color_a)));
 	}
 	
 	static void lumscript_renderer_addDebugCube_7(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->addDebugCube(DVec3(ls_to_f64(runtime, -16), ls_to_f64(runtime, -15), ls_to_f64(runtime, -14)), Vec3(ls_to_f32(runtime, -13), ls_to_f32(runtime, -12), ls_to_f32(runtime, -11)), Vec3(ls_to_f32(runtime, -10), ls_to_f32(runtime, -9), ls_to_f32(runtime, -8)), Vec3(ls_to_f32(runtime, -7), ls_to_f32(runtime, -6), ls_to_f32(runtime, -5)), Color(u8(ls_to_i32(runtime, -4)), u8(ls_to_i32(runtime, -3)), u8(ls_to_i32(runtime, -2)), u8(ls_to_i32(runtime, -1))));
+		LS_ARG(frame, RenderModule*, module);
+		LS_ARG(frame, DVec3, pos);
+		LS_ARG(frame, Vec3, dir);
+		LS_ARG(frame, Vec3, up);
+		LS_ARG(frame, Vec3, right);
+		LS_ARG(frame, i32, color_r);
+		LS_ARG(frame, i32, color_g);
+		LS_ARG(frame, i32, color_b);
+		LS_ARG(frame, i32, color_a);
+		module->addDebugCube(pos, dir, up, right, Color(u8(color_r), u8(color_g), u8(color_b), u8(color_a)));
 	}
 	
 	static void lumscript_renderer_addDebugCubeSolid_8(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->addDebugCubeSolid(DVec3(ls_to_f64(runtime, -10), ls_to_f64(runtime, -9), ls_to_f64(runtime, -8)), DVec3(ls_to_f64(runtime, -7), ls_to_f64(runtime, -6), ls_to_f64(runtime, -5)), Color(u8(ls_to_i32(runtime, -4)), u8(ls_to_i32(runtime, -3)), u8(ls_to_i32(runtime, -2)), u8(ls_to_i32(runtime, -1))));
+		LS_ARG(frame, RenderModule*, module);
+		LS_ARG(frame, DVec3, from);
+		LS_ARG(frame, DVec3, max);
+		LS_ARG(frame, i32, color_r);
+		LS_ARG(frame, i32, color_g);
+		LS_ARG(frame, i32, color_b);
+		LS_ARG(frame, i32, color_a);
+		module->addDebugCubeSolid(from, max, Color(u8(color_r), u8(color_g), u8(color_b), u8(color_a)));
 	}
 	
 	static void lumscript_renderer_setActiveCamera_9(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->setActiveCamera(EntityRef(ls_to_i32(runtime, -2)));
+		LS_ARG(frame, RenderModule*, module);
+		LS_ENTITY_ARG(frame, camera, camera_world);
+		module->setActiveCamera(EntityRef(camera_index));
 	}
 	
 	static void lumscript_renderer_setActiveEnvironment_10(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->setActiveEnvironment(EntityRef(ls_to_i32(runtime, -2)));
+		LS_ARG(frame, RenderModule*, module);
+		LS_ENTITY_ARG(frame, entity, entity_world);
+		module->setActiveEnvironment(EntityRef(entity_index));
 	}
 	
 	static void lumscript_ui_load_11(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<UIModule*>(ls_to_ptr(runtime, -1));
-		ls_string_view lumscript_string_sv_1 = ls_to_string(runtime, -1);
-		char lumscript_string_arg_1[128];
-		copyString(Span(lumscript_string_arg_1), StringView{lumscript_string_sv_1.begin, lumscript_string_sv_1.end});
-		module->load(Path(lumscript_string_arg_1));
+		LS_ARG(frame, UIModule*, module);
+		LS_STRING_ARG(frame, path);
+		module->load(Path(StringView{path.begin, path.end}));
 	}
 	
 	static void lumscript_ui_isReady_12(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<UIModule*>(ls_to_ptr(runtime, -1));
+		LS_ARG(frame, UIModule*, module);
 		auto ret = module->isReady();
-		ls_push_bool(runtime, ret);
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_property_animator_isPropertyAnimatorEnabled_13(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<AnimationModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->isPropertyAnimatorEnabled(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_bool(runtime, ret);
+		LS_COMPONENT_ARG(frame, AnimationModule*, entity, module);
+		auto ret = module->isPropertyAnimatorEnabled(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_property_animator_enablePropertyAnimator_14(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<AnimationModule*>(ls_to_ptr(runtime, -1));
-		module->enablePropertyAnimator(EntityRef(ls_to_i32(runtime, -3)), bool(ls_to_bool(runtime, -1)));
+		LS_COMPONENT_ARG(frame, AnimationModule*, entity, module);
+		LS_ARG(frame, bool, enabled);
+		module->enablePropertyAnimator(EntityRef(entity_index), enabled);
 	}
 	
 	static void lumscript_property_animator_getPropertyAnimatorLooped_15(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<AnimationModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getPropertyAnimatorLooped(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_bool(runtime, ret);
+		LS_COMPONENT_ARG(frame, AnimationModule*, entity, module);
+		auto ret = module->getPropertyAnimatorLooped(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_property_animator_setPropertyAnimatorLooped_16(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<AnimationModule*>(ls_to_ptr(runtime, -1));
-		module->setPropertyAnimatorLooped(EntityRef(ls_to_i32(runtime, -3)), bool(ls_to_bool(runtime, -1)));
+		LS_COMPONENT_ARG(frame, AnimationModule*, entity, module);
+		LS_ARG(frame, bool, looped);
+		module->setPropertyAnimatorLooped(EntityRef(entity_index), looped);
 	}
 	
 	static void lumscript_property_animator_getPropertyAnimatorAnimation_17(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<AnimationModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getPropertyAnimatorAnimation(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_string(runtime, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		LS_COMPONENT_ARG(frame, AnimationModule*, entity, module);
+		auto ret = module->getPropertyAnimatorAnimation(EntityRef(entity_index));
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
 	}
 	
 	static void lumscript_property_animator_setPropertyAnimatorAnimation_18(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<AnimationModule*>(ls_to_ptr(runtime, -1));
-		ls_string_view lumscript_string_sv_1 = ls_to_string(runtime, -1);
-		char lumscript_string_arg_1[128];
-		copyString(Span(lumscript_string_arg_1), StringView{lumscript_string_sv_1.begin, lumscript_string_sv_1.end});
-		module->setPropertyAnimatorAnimation(EntityRef(ls_to_i32(runtime, -3)), Path(lumscript_string_arg_1));
+		LS_COMPONENT_ARG(frame, AnimationModule*, entity, module);
+		LS_STRING_ARG(frame, path);
+		module->setPropertyAnimatorAnimation(EntityRef(entity_index), Path(StringView{path.begin, path.end}));
 	}
 	
 	static void lumscript_animator_applySet_19(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<AnimationModule*>(ls_to_ptr(runtime, -1));
-		module->applyAnimatorSet(EntityRef(ls_to_i32(runtime, -3)), ls_to_u32(runtime, -1));
+		LS_COMPONENT_ARG(frame, AnimationModule*, entity, module);
+		LS_ARG(frame, u32, idx);
+		module->applyAnimatorSet(EntityRef(entity_index), idx);
 	}
 	
 	static void lumscript_animator_setBoolInput_20(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<AnimationModule*>(ls_to_ptr(runtime, -1));
-		module->setAnimatorInput(EntityRef(ls_to_i32(runtime, -4)), ls_to_u32(runtime, -2), bool(ls_to_bool(runtime, -1)));
+		LS_COMPONENT_ARG(frame, AnimationModule*, entity, module);
+		LS_ARG(frame, u32, input_idx);
+		LS_ARG(frame, bool, value);
+		module->setAnimatorInput(EntityRef(entity_index), input_idx, value);
 	}
 	
 	static void lumscript_animator_setFloatInput_21(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<AnimationModule*>(ls_to_ptr(runtime, -1));
-		module->setAnimatorInput(EntityRef(ls_to_i32(runtime, -4)), ls_to_u32(runtime, -2), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, AnimationModule*, entity, module);
+		LS_ARG(frame, u32, input_idx);
+		LS_ARG(frame, float, value);
+		module->setAnimatorInput(EntityRef(entity_index), input_idx, value);
 	}
 	
 	static void lumscript_animator_setVec3Input_22(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<AnimationModule*>(ls_to_ptr(runtime, -1));
-		module->setAnimatorInput(EntityRef(ls_to_i32(runtime, -6)), ls_to_u32(runtime, -4), Vec3(ls_to_f32(runtime, -3), ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
+		LS_COMPONENT_ARG(frame, AnimationModule*, entity, module);
+		LS_ARG(frame, u32, input_idx);
+		LS_ARG(frame, Vec3, value);
+		module->setAnimatorInput(EntityRef(entity_index), input_idx, value);
 	}
 	
 	static void lumscript_animator_getInputIndex_23(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<AnimationModule*>(ls_to_ptr(runtime, -1));
-		ls_string_view lumscript_string_sv_1 = ls_to_string(runtime, -1);
-		char lumscript_string_arg_1[128];
-		copyString(Span(lumscript_string_arg_1), StringView{lumscript_string_sv_1.begin, lumscript_string_sv_1.end});
-		auto ret = module->getAnimatorInputIndex(EntityRef(ls_to_i32(runtime, -3)), lumscript_string_arg_1);
-		ls_push_i32(runtime, (i32)ret);
+		LS_COMPONENT_ARG(frame, AnimationModule*, entity, module);
+		LS_STRING_ARG(frame, name);
+		char lumscript_string_arg_name[128];
+		copyString(Span(lumscript_string_arg_name), StringView{name.begin, name.end});
+		auto ret = module->getAnimatorInputIndex(EntityRef(entity_index), lumscript_string_arg_name);
+		LS_RESULT(frame, (i32)ret);
 	}
 	
 	static void lumscript_animator_getAnimatorSource_24(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<AnimationModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getAnimatorSource(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_string(runtime, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		LS_COMPONENT_ARG(frame, AnimationModule*, entity, module);
+		auto ret = module->getAnimatorSource(EntityRef(entity_index));
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
 	}
 	
 	static void lumscript_animator_setAnimatorSource_25(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<AnimationModule*>(ls_to_ptr(runtime, -1));
-		ls_string_view lumscript_string_sv_1 = ls_to_string(runtime, -1);
-		char lumscript_string_arg_1[128];
-		copyString(Span(lumscript_string_arg_1), StringView{lumscript_string_sv_1.begin, lumscript_string_sv_1.end});
-		module->setAnimatorSource(EntityRef(ls_to_i32(runtime, -3)), Path(lumscript_string_arg_1));
+		LS_COMPONENT_ARG(frame, AnimationModule*, entity, module);
+		LS_STRING_ARG(frame, path);
+		module->setAnimatorSource(EntityRef(entity_index), Path(StringView{path.begin, path.end}));
 	}
 	
 	static void lumscript_animator_getAnimatorUseRootMotion_26(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<AnimationModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getAnimatorUseRootMotion(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_bool(runtime, ret);
+		LS_COMPONENT_ARG(frame, AnimationModule*, entity, module);
+		auto ret = module->getAnimatorUseRootMotion(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_animator_setAnimatorUseRootMotion_27(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<AnimationModule*>(ls_to_ptr(runtime, -1));
-		module->setAnimatorUseRootMotion(EntityRef(ls_to_i32(runtime, -3)), bool(ls_to_bool(runtime, -1)));
+		LS_COMPONENT_ARG(frame, AnimationModule*, entity, module);
+		LS_ARG(frame, bool, value);
+		module->setAnimatorUseRootMotion(EntityRef(entity_index), value);
 	}
 	
 	static void lumscript_animator_getAnimatorDefaultSet_28(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<AnimationModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getAnimatorDefaultSet(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_i32(runtime, (i32)ret);
+		LS_COMPONENT_ARG(frame, AnimationModule*, entity, module);
+		auto ret = module->getAnimatorDefaultSet(EntityRef(entity_index));
+		LS_RESULT(frame, (i32)ret);
 	}
 	
 	static void lumscript_animator_setAnimatorDefaultSet_29(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<AnimationModule*>(ls_to_ptr(runtime, -1));
-		module->setAnimatorDefaultSet(EntityRef(ls_to_i32(runtime, -3)), ls_to_u32(runtime, -1));
+		LS_COMPONENT_ARG(frame, AnimationModule*, entity, module);
+		LS_ARG(frame, u32, idx);
+		module->setAnimatorDefaultSet(EntityRef(entity_index), idx);
 	}
 	
 	static void lumscript_animable_getAnimableAnimation_30(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<AnimationModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getAnimableAnimation(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_string(runtime, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		LS_COMPONENT_ARG(frame, AnimationModule*, entity, module);
+		auto ret = module->getAnimableAnimation(EntityRef(entity_index));
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
 	}
 	
 	static void lumscript_animable_setAnimableAnimation_31(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<AnimationModule*>(ls_to_ptr(runtime, -1));
-		ls_string_view lumscript_string_sv_1 = ls_to_string(runtime, -1);
-		char lumscript_string_arg_1[128];
-		copyString(Span(lumscript_string_arg_1), StringView{lumscript_string_sv_1.begin, lumscript_string_sv_1.end});
-		module->setAnimableAnimation(EntityRef(ls_to_i32(runtime, -3)), Path(lumscript_string_arg_1));
+		LS_COMPONENT_ARG(frame, AnimationModule*, entity, module);
+		LS_STRING_ARG(frame, path);
+		module->setAnimableAnimation(EntityRef(entity_index), Path(StringView{path.begin, path.end}));
 	}
 	
 	static void lumscript_ambient_sound_pause_32(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<AudioModule*>(ls_to_ptr(runtime, -1));
-		module->pauseAmbientSound(EntityRef(ls_to_i32(runtime, -2)));
+		LS_COMPONENT_ARG(frame, AudioModule*, entity, module);
+		module->pauseAmbientSound(EntityRef(entity_index));
 	}
 	
 	static void lumscript_ambient_sound_resume_33(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<AudioModule*>(ls_to_ptr(runtime, -1));
-		module->resumeAmbientSound(EntityRef(ls_to_i32(runtime, -2)));
+		LS_COMPONENT_ARG(frame, AudioModule*, entity, module);
+		module->resumeAmbientSound(EntityRef(entity_index));
 	}
 	
 	static void lumscript_ambient_sound_getAmbientSoundClip_34(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<AudioModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getAmbientSoundClip(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_string(runtime, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		LS_COMPONENT_ARG(frame, AudioModule*, entity, module);
+		auto ret = module->getAmbientSoundClip(EntityRef(entity_index));
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
 	}
 	
 	static void lumscript_ambient_sound_setAmbientSoundClip_35(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<AudioModule*>(ls_to_ptr(runtime, -1));
-		ls_string_view lumscript_string_sv_1 = ls_to_string(runtime, -1);
-		char lumscript_string_arg_1[128];
-		copyString(Span(lumscript_string_arg_1), StringView{lumscript_string_sv_1.begin, lumscript_string_sv_1.end});
-		module->setAmbientSoundClip(EntityRef(ls_to_i32(runtime, -3)), Path(lumscript_string_arg_1));
+		LS_COMPONENT_ARG(frame, AudioModule*, entity, module);
+		LS_STRING_ARG(frame, clip);
+		module->setAmbientSoundClip(EntityRef(entity_index), Path(StringView{clip.begin, clip.end}));
 	}
 	
 	static void lumscript_ambient_sound_isAmbientSound3D_36(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<AudioModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->isAmbientSound3D(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_bool(runtime, ret);
+		LS_COMPONENT_ARG(frame, AudioModule*, entity, module);
+		auto ret = module->isAmbientSound3D(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_ambient_sound_setAmbientSound3D_37(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<AudioModule*>(ls_to_ptr(runtime, -1));
-		module->setAmbientSound3D(EntityRef(ls_to_i32(runtime, -3)), bool(ls_to_bool(runtime, -1)));
+		LS_COMPONENT_ARG(frame, AudioModule*, entity, module);
+		LS_ARG(frame, bool, is_3d);
+		module->setAmbientSound3D(EntityRef(entity_index), is_3d);
 	}
 	
 	static void lumscript_lua_script_scripts_count_38(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<LuaScriptModule*>(ls_to_ptr(runtime, -1));
-		const i32 count = module->getScriptCount(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_i32(runtime, count);
+		LS_COMPONENT_ARG(frame, LuaScriptModule*, entity, module);
+		const i32 count = module->getScriptCount(EntityRef(entity_index));
+		LS_RESULT(frame, count);
 	}
 	
 	static void lumscript_lua_script_scripts_item_39(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<LuaScriptModule*>(ls_to_ptr(runtime, -2));
-		const i32 count = module->getScriptCount(EntityRef(ls_to_i32(runtime, -3)));
-		if (ls_to_i32(runtime, -1) < 0 || ls_to_i32(runtime, -1) >= count) {
-			ls_push_null(runtime);
+		LS_COMPONENT_ARG(frame, LuaScriptModule*, entity, module);
+		LS_ARG(frame, i32, item_idx);
+		const i32 count = module->getScriptCount(EntityRef(entity_index));
+		if (item_idx < 0 || item_idx >= count) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, ls_to_i32(runtime, -2));
-		ls_push_i64(runtime, ls_to_i32(runtime, -1));
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, item_idx);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_lua_script_scripts_isScriptEnabled_40(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<LuaScriptModule*>(ls_to_ptr(runtime, -4));
-		auto ret = module->isScriptEnabled(EntityRef(ls_to_i32(runtime, -6)), (i32)ls_to_i64(runtime, -5));
-		ls_push_bool(runtime, ret);
+		LS_ARG(frame, i32, entity_idx);
+		LS_ARG(frame, i32, item_idx);
+		LS_ARG(frame, LuaScriptModule*, module);
+		auto ret = module->isScriptEnabled(EntityRef(entity_idx), item_idx);
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_lua_script_scripts_enableScript_41(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<LuaScriptModule*>(ls_to_ptr(runtime, -5));
-		module->enableScript(EntityRef(ls_to_i32(runtime, -7)), (i32)ls_to_i64(runtime, -6), bool(ls_to_bool(runtime, -4)));
+		LS_ARG(frame, i32, entity_idx);
+		LS_ARG(frame, i32, item_idx);
+		LS_ARG(frame, LuaScriptModule*, module);
+		LS_ARG(frame, bool, enable);
+		module->enableScript(EntityRef(entity_idx), item_idx, enable);
 	}
 	
 	static void lumscript_lua_script_scripts_getScriptPath_42(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<LuaScriptModule*>(ls_to_ptr(runtime, -4));
-		auto ret = module->getScriptPath(EntityRef(ls_to_i32(runtime, -6)), (i32)ls_to_i64(runtime, -5));
-		ls_push_string(runtime, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		LS_ARG(frame, i32, entity_idx);
+		LS_ARG(frame, i32, item_idx);
+		LS_ARG(frame, LuaScriptModule*, module);
+		auto ret = module->getScriptPath(EntityRef(entity_idx), item_idx);
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
 	}
 	
 	static void lumscript_lua_script_scripts_setScriptPath_43(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<LuaScriptModule*>(ls_to_ptr(runtime, -5));
-		ls_string_view lumscript_string_sv_1 = ls_to_string(runtime, -4);
-		char lumscript_string_arg_1[128];
-		copyString(Span(lumscript_string_arg_1), StringView{lumscript_string_sv_1.begin, lumscript_string_sv_1.end});
-		module->setScriptPath(EntityRef(ls_to_i32(runtime, -7)), (i32)ls_to_i64(runtime, -6), Path(lumscript_string_arg_1));
+		LS_ARG(frame, i32, entity_idx);
+		LS_ARG(frame, i32, item_idx);
+		LS_ARG(frame, LuaScriptModule*, module);
+		LS_STRING_ARG(frame, path);
+		module->setScriptPath(EntityRef(entity_idx), item_idx, Path(StringView{path.begin, path.end}));
 	}
 	
 	static void lumscript_lua_script_inline_setInlineScriptCode_44(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<LuaScriptModule*>(ls_to_ptr(runtime, -1));
-		ls_string_view lumscript_string_sv_1 = ls_to_string(runtime, -1);
-		char lumscript_string_arg_1[128];
-		copyString(Span(lumscript_string_arg_1), StringView{lumscript_string_sv_1.begin, lumscript_string_sv_1.end});
-		module->setInlineScriptCode(EntityRef(ls_to_i32(runtime, -3)), lumscript_string_arg_1);
+		LS_COMPONENT_ARG(frame, LuaScriptModule*, entity, module);
+		LS_STRING_ARG(frame, value);
+		char lumscript_string_arg_value[128];
+		copyString(Span(lumscript_string_arg_value), StringView{value.begin, value.end});
+		module->setInlineScriptCode(EntityRef(entity_index), lumscript_string_arg_value);
 	}
 	
 	static void lumscript_navmesh_zone_load_45(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<NavigationModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->loadZone(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_bool(runtime, ret);
+		LS_COMPONENT_ARG(frame, NavigationModule*, zone_entity, module);
+		auto ret = module->loadZone(EntityRef(zone_entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_navmesh_zone_drawNavmesh_46(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<NavigationModule*>(ls_to_ptr(runtime, -1));
-		module->debugDrawNavmesh(EntityRef(ls_to_i32(runtime, -8)), DVec3(ls_to_f64(runtime, -6), ls_to_f64(runtime, -5), ls_to_f64(runtime, -4)), bool(ls_to_bool(runtime, -3)), bool(ls_to_bool(runtime, -2)), bool(ls_to_bool(runtime, -1)));
+		LS_COMPONENT_ARG(frame, NavigationModule*, zone, module);
+		LS_ARG(frame, DVec3, pos);
+		LS_ARG(frame, bool, inner_boundaries);
+		LS_ARG(frame, bool, outer_boundaries);
+		LS_ARG(frame, bool, portals);
+		module->debugDrawNavmesh(EntityRef(zone_index), pos, inner_boundaries, outer_boundaries, portals);
 	}
 	
 	static void lumscript_navmesh_zone_drawCompactHeightfield_47(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<NavigationModule*>(ls_to_ptr(runtime, -1));
-		module->debugDrawCompactHeightfield(EntityRef(ls_to_i32(runtime, -2)));
+		LS_COMPONENT_ARG(frame, NavigationModule*, zone, module);
+		module->debugDrawCompactHeightfield(EntityRef(zone_index));
 	}
 	
 	static void lumscript_navmesh_zone_drawHeightfield_48(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<NavigationModule*>(ls_to_ptr(runtime, -1));
-		module->debugDrawHeightfield(EntityRef(ls_to_i32(runtime, -2)));
+		LS_COMPONENT_ARG(frame, NavigationModule*, zone, module);
+		module->debugDrawHeightfield(EntityRef(zone_index));
 	}
 	
 	static void lumscript_navmesh_zone_drawContours_49(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<NavigationModule*>(ls_to_ptr(runtime, -1));
-		module->debugDrawContours(EntityRef(ls_to_i32(runtime, -2)));
+		LS_COMPONENT_ARG(frame, NavigationModule*, zone, module);
+		module->debugDrawContours(EntityRef(zone_index));
 	}
 	
 	static void lumscript_navmesh_zone_saveZone_50(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<NavigationModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->saveZone(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_bool(runtime, ret);
+		LS_COMPONENT_ARG(frame, NavigationModule*, zone_entity, module);
+		auto ret = module->saveZone(EntityRef(zone_entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_navmesh_zone_getZoneAutoload_51(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<NavigationModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getZoneAutoload(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_bool(runtime, ret);
+		LS_COMPONENT_ARG(frame, NavigationModule*, entity, module);
+		auto ret = module->getZoneAutoload(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_navmesh_zone_setZoneAutoload_52(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<NavigationModule*>(ls_to_ptr(runtime, -1));
-		module->setZoneAutoload(EntityRef(ls_to_i32(runtime, -3)), bool(ls_to_bool(runtime, -1)));
+		LS_COMPONENT_ARG(frame, NavigationModule*, entity, module);
+		LS_ARG(frame, bool, value);
+		module->setZoneAutoload(EntityRef(entity_index), value);
 	}
 	
 	static void lumscript_navmesh_zone_getZoneDetailed_53(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<NavigationModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getZoneDetailed(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_bool(runtime, ret);
+		LS_COMPONENT_ARG(frame, NavigationModule*, entity, module);
+		auto ret = module->getZoneDetailed(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_navmesh_zone_setZoneDetailed_54(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<NavigationModule*>(ls_to_ptr(runtime, -1));
-		module->setZoneDetailed(EntityRef(ls_to_i32(runtime, -3)), bool(ls_to_bool(runtime, -1)));
+		LS_COMPONENT_ARG(frame, NavigationModule*, entity, module);
+		LS_ARG(frame, bool, value);
+		module->setZoneDetailed(EntityRef(entity_index), value);
 	}
 	
 	static void lumscript_navmesh_agent_navigate_55(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<NavigationModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->navigate(EntityRef(ls_to_i32(runtime, -7)), DVec3(ls_to_f64(runtime, -5), ls_to_f64(runtime, -4), ls_to_f64(runtime, -3)), ls_to_f32(runtime, -2), ls_to_f32(runtime, -1));
-		ls_push_bool(runtime, ret);
+		LS_COMPONENT_ARG(frame, NavigationModule*, entity, module);
+		LS_ARG(frame, DVec3, dest);
+		LS_ARG(frame, float, speed);
+		LS_ARG(frame, float, stop_distance);
+		auto ret = module->navigate(EntityRef(entity_index), dest, speed, stop_distance);
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_navmesh_agent_cancelNavigation_56(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<NavigationModule*>(ls_to_ptr(runtime, -1));
-		module->cancelNavigation(EntityRef(ls_to_i32(runtime, -2)));
+		LS_COMPONENT_ARG(frame, NavigationModule*, entity, module);
+		module->cancelNavigation(EntityRef(entity_index));
 	}
 	
 	static void lumscript_navmesh_agent_drawPath_57(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<NavigationModule*>(ls_to_ptr(runtime, -1));
-		module->debugDrawPath(EntityRef(ls_to_i32(runtime, -3)), bool(ls_to_bool(runtime, -1)));
+		LS_COMPONENT_ARG(frame, NavigationModule*, agent_entity, module);
+		LS_ARG(frame, bool, include_polygons);
+		module->debugDrawPath(EntityRef(agent_entity_index), include_polygons);
 	}
 	
 	static void lumscript_navmesh_agent_getAgentRadius_58(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<NavigationModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getAgentRadius(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, NavigationModule*, entity, module);
+		auto ret = module->getAgentRadius(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_navmesh_agent_setAgentRadius_59(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<NavigationModule*>(ls_to_ptr(runtime, -1));
-		module->setAgentRadius(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, NavigationModule*, entity, module);
+		LS_ARG(frame, float, radius);
+		module->setAgentRadius(EntityRef(entity_index), radius);
 	}
 	
 	static void lumscript_navmesh_agent_getAgentHeight_60(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<NavigationModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getAgentHeight(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, NavigationModule*, entity, module);
+		auto ret = module->getAgentHeight(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_navmesh_agent_setAgentHeight_61(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<NavigationModule*>(ls_to_ptr(runtime, -1));
-		module->setAgentHeight(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, NavigationModule*, entity, module);
+		LS_ARG(frame, float, height);
+		module->setAgentHeight(EntityRef(entity_index), height);
 	}
 	
 	static void lumscript_navmesh_agent_getAgentMoveEntity_62(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<NavigationModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getAgentMoveEntity(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_bool(runtime, ret);
+		LS_COMPONENT_ARG(frame, NavigationModule*, entity, module);
+		auto ret = module->getAgentMoveEntity(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_navmesh_agent_setAgentMoveEntity_63(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<NavigationModule*>(ls_to_ptr(runtime, -1));
-		module->setAgentMoveEntity(EntityRef(ls_to_i32(runtime, -3)), bool(ls_to_bool(runtime, -1)));
+		LS_COMPONENT_ARG(frame, NavigationModule*, entity, module);
+		LS_ARG(frame, bool, value);
+		module->setAgentMoveEntity(EntityRef(entity_index), value);
 	}
 	
 	static void lumscript_navmesh_agent_getAgentSpeed_64(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<NavigationModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getAgentSpeed(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, NavigationModule*, entity, module);
+		auto ret = module->getAgentSpeed(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_physical_heightfield_getHeightfieldSource_65(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getHeightfieldSource(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_string(runtime, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getHeightfieldSource(EntityRef(entity_index));
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
 	}
 	
 	static void lumscript_physical_heightfield_setHeightfieldSource_66(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		ls_string_view lumscript_string_sv_1 = ls_to_string(runtime, -1);
-		char lumscript_string_arg_1[128];
-		copyString(Span(lumscript_string_arg_1), StringView{lumscript_string_sv_1.begin, lumscript_string_sv_1.end});
-		module->setHeightfieldSource(EntityRef(ls_to_i32(runtime, -3)), Path(lumscript_string_arg_1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_STRING_ARG(frame, path);
+		module->setHeightfieldSource(EntityRef(entity_index), Path(StringView{path.begin, path.end}));
 	}
 	
 	static void lumscript_physical_heightfield_getHeightfieldXZScale_67(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getHeightfieldXZScale(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getHeightfieldXZScale(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_physical_heightfield_setHeightfieldXZScale_68(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setHeightfieldXZScale(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, float, scale);
+		module->setHeightfieldXZScale(EntityRef(entity_index), scale);
 	}
 	
 	static void lumscript_physical_heightfield_getHeightfieldYScale_69(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getHeightfieldYScale(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getHeightfieldYScale(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_physical_heightfield_setHeightfieldYScale_70(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setHeightfieldYScale(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, float, scale);
+		module->setHeightfieldYScale(EntityRef(entity_index), scale);
 	}
 	
 	static void lumscript_physical_heightfield_getHeightfieldLayer_71(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getHeightfieldLayer(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_i32(runtime, (i32)ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getHeightfieldLayer(EntityRef(entity_index));
+		LS_RESULT(frame, (i32)ret);
 	}
 	
 	static void lumscript_physical_heightfield_setHeightfieldLayer_72(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setHeightfieldLayer(EntityRef(ls_to_i32(runtime, -3)), ls_to_u32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, u32, layer);
+		module->setHeightfieldLayer(EntityRef(entity_index), layer);
 	}
 	
 	static void lumscript_d6_joint_getD6JointXMotion_73(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getD6JointXMotion(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_i32(runtime, (i32)ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getD6JointXMotion(EntityRef(entity_index));
+		LS_RESULT(frame, (i32)ret);
 	}
 	
 	static void lumscript_d6_joint_setD6JointXMotion_74(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setD6JointXMotion(EntityRef(ls_to_i32(runtime, -3)), (PhysicsModule::D6Motion)ls_to_i32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, i32, motion_value);
+		module->setD6JointXMotion(EntityRef(entity_index), (PhysicsModule::D6Motion)motion_value);
 	}
 	
 	static void lumscript_d6_joint_getD6JointYMotion_75(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getD6JointYMotion(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_i32(runtime, (i32)ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getD6JointYMotion(EntityRef(entity_index));
+		LS_RESULT(frame, (i32)ret);
 	}
 	
 	static void lumscript_d6_joint_setD6JointYMotion_76(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setD6JointYMotion(EntityRef(ls_to_i32(runtime, -3)), (PhysicsModule::D6Motion)ls_to_i32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, i32, motion_value);
+		module->setD6JointYMotion(EntityRef(entity_index), (PhysicsModule::D6Motion)motion_value);
 	}
 	
 	static void lumscript_d6_joint_getD6JointZMotion_77(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getD6JointZMotion(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_i32(runtime, (i32)ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getD6JointZMotion(EntityRef(entity_index));
+		LS_RESULT(frame, (i32)ret);
 	}
 	
 	static void lumscript_d6_joint_setD6JointZMotion_78(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setD6JointZMotion(EntityRef(ls_to_i32(runtime, -3)), (PhysicsModule::D6Motion)ls_to_i32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, i32, motion_value);
+		module->setD6JointZMotion(EntityRef(entity_index), (PhysicsModule::D6Motion)motion_value);
 	}
 	
 	static void lumscript_d6_joint_getD6JointSwing1Motion_79(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getD6JointSwing1Motion(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_i32(runtime, (i32)ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getD6JointSwing1Motion(EntityRef(entity_index));
+		LS_RESULT(frame, (i32)ret);
 	}
 	
 	static void lumscript_d6_joint_setD6JointSwing1Motion_80(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setD6JointSwing1Motion(EntityRef(ls_to_i32(runtime, -3)), (PhysicsModule::D6Motion)ls_to_i32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, i32, motion_value);
+		module->setD6JointSwing1Motion(EntityRef(entity_index), (PhysicsModule::D6Motion)motion_value);
 	}
 	
 	static void lumscript_d6_joint_getD6JointSwing2Motion_81(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getD6JointSwing2Motion(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_i32(runtime, (i32)ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getD6JointSwing2Motion(EntityRef(entity_index));
+		LS_RESULT(frame, (i32)ret);
 	}
 	
 	static void lumscript_d6_joint_setD6JointSwing2Motion_82(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setD6JointSwing2Motion(EntityRef(ls_to_i32(runtime, -3)), (PhysicsModule::D6Motion)ls_to_i32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, i32, motion_value);
+		module->setD6JointSwing2Motion(EntityRef(entity_index), (PhysicsModule::D6Motion)motion_value);
 	}
 	
 	static void lumscript_d6_joint_getD6JointTwistMotion_83(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getD6JointTwistMotion(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_i32(runtime, (i32)ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getD6JointTwistMotion(EntityRef(entity_index));
+		LS_RESULT(frame, (i32)ret);
 	}
 	
 	static void lumscript_d6_joint_setD6JointTwistMotion_84(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setD6JointTwistMotion(EntityRef(ls_to_i32(runtime, -3)), (PhysicsModule::D6Motion)ls_to_i32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, i32, motion_value);
+		module->setD6JointTwistMotion(EntityRef(entity_index), (PhysicsModule::D6Motion)motion_value);
 	}
 	
 	static void lumscript_d6_joint_getD6JointLinearLimit_85(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getD6JointLinearLimit(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getD6JointLinearLimit(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_d6_joint_setD6JointLinearLimit_86(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setD6JointLinearLimit(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, float, limit);
+		module->setD6JointLinearLimit(EntityRef(entity_index), limit);
 	}
 	
 	static void lumscript_d6_joint_getD6JointTwistLimit_87(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getD6JointTwistLimit(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret.x);
-		ls_push_f32(runtime, ret.y);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getD6JointTwistLimit(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_d6_joint_setD6JointTwistLimit_88(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setD6JointTwistLimit(EntityRef(ls_to_i32(runtime, -4)), Vec2(ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, Vec2, limit);
+		module->setD6JointTwistLimit(EntityRef(entity_index), limit);
 	}
 	
 	static void lumscript_d6_joint_getD6JointSwingLimit_89(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getD6JointSwingLimit(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret.x);
-		ls_push_f32(runtime, ret.y);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getD6JointSwingLimit(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_d6_joint_setD6JointSwingLimit_90(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setD6JointSwingLimit(EntityRef(ls_to_i32(runtime, -4)), Vec2(ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, Vec2, limit);
+		module->setD6JointSwingLimit(EntityRef(entity_index), limit);
 	}
 	
 	static void lumscript_d6_joint_getD6JointDamping_91(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getD6JointDamping(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getD6JointDamping(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_d6_joint_setD6JointDamping_92(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setD6JointDamping(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, float, value);
+		module->setD6JointDamping(EntityRef(entity_index), value);
 	}
 	
 	static void lumscript_d6_joint_getD6JointStiffness_93(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getD6JointStiffness(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getD6JointStiffness(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_d6_joint_setD6JointStiffness_94(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setD6JointStiffness(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, float, value);
+		module->setD6JointStiffness(EntityRef(entity_index), value);
 	}
 	
 	static void lumscript_d6_joint_getD6JointRestitution_95(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getD6JointRestitution(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getD6JointRestitution(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_d6_joint_setD6JointRestitution_96(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setD6JointRestitution(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, float, value);
+		module->setD6JointRestitution(EntityRef(entity_index), value);
 	}
 	
 	static void lumscript_d6_joint_getD6JointConnectedBody_97(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getD6JointConnectedBody(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_i32(runtime, ret.index);
-		ls_push_ptr(runtime, &module->getWorld());
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getD6JointConnectedBody(EntityRef(entity_index));
+		LS_RESULT(frame, ret.index);
+		LS_RESULT(frame, &module->getWorld());
 	}
 	
 	static void lumscript_d6_joint_setD6JointConnectedBody_98(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setD6JointConnectedBody(EntityRef(ls_to_i32(runtime, -4)), EntityPtr(ls_to_i32(runtime, -2)));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ENTITY_ARG(frame, connected_body, connected_body_world);
+		module->setD6JointConnectedBody(EntityRef(entity_index), EntityPtr(connected_body_index));
 	}
 	
 	static void lumscript_d6_joint_getD6JointAxisPosition_99(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getD6JointAxisPosition(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret.x);
-		ls_push_f32(runtime, ret.y);
-		ls_push_f32(runtime, ret.z);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getD6JointAxisPosition(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_d6_joint_setD6JointAxisPosition_100(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setD6JointAxisPosition(EntityRef(ls_to_i32(runtime, -5)), Vec3(ls_to_f32(runtime, -3), ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, Vec3, value);
+		module->setD6JointAxisPosition(EntityRef(entity_index), value);
 	}
 	
 	static void lumscript_d6_joint_getD6JointAxisDirection_101(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getD6JointAxisDirection(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret.x);
-		ls_push_f32(runtime, ret.y);
-		ls_push_f32(runtime, ret.z);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getD6JointAxisDirection(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_d6_joint_setD6JointAxisDirection_102(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setD6JointAxisDirection(EntityRef(ls_to_i32(runtime, -5)), Vec3(ls_to_f32(runtime, -3), ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, Vec3, value);
+		module->setD6JointAxisDirection(EntityRef(entity_index), value);
 	}
 	
 	static void lumscript_distance_joint_getDistanceJointConnectedBody_103(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getDistanceJointConnectedBody(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_i32(runtime, ret.index);
-		ls_push_ptr(runtime, &module->getWorld());
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getDistanceJointConnectedBody(EntityRef(entity_index));
+		LS_RESULT(frame, ret.index);
+		LS_RESULT(frame, &module->getWorld());
 	}
 	
 	static void lumscript_distance_joint_setDistanceJointConnectedBody_104(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setDistanceJointConnectedBody(EntityRef(ls_to_i32(runtime, -4)), EntityPtr(ls_to_i32(runtime, -2)));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ENTITY_ARG(frame, connected_body, connected_body_world);
+		module->setDistanceJointConnectedBody(EntityRef(entity_index), EntityPtr(connected_body_index));
 	}
 	
 	static void lumscript_distance_joint_getDistanceJointAxisPosition_105(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getDistanceJointAxisPosition(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret.x);
-		ls_push_f32(runtime, ret.y);
-		ls_push_f32(runtime, ret.z);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getDistanceJointAxisPosition(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_distance_joint_setDistanceJointAxisPosition_106(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setDistanceJointAxisPosition(EntityRef(ls_to_i32(runtime, -5)), Vec3(ls_to_f32(runtime, -3), ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, Vec3, value);
+		module->setDistanceJointAxisPosition(EntityRef(entity_index), value);
 	}
 	
 	static void lumscript_distance_joint_getDistanceJointDamping_107(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getDistanceJointDamping(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getDistanceJointDamping(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_distance_joint_setDistanceJointDamping_108(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setDistanceJointDamping(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, float, value);
+		module->setDistanceJointDamping(EntityRef(entity_index), value);
 	}
 	
 	static void lumscript_distance_joint_getDistanceJointStiffness_109(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getDistanceJointStiffness(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getDistanceJointStiffness(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_distance_joint_setDistanceJointStiffness_110(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setDistanceJointStiffness(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, float, value);
+		module->setDistanceJointStiffness(EntityRef(entity_index), value);
 	}
 	
 	static void lumscript_distance_joint_getDistanceJointTolerance_111(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getDistanceJointTolerance(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getDistanceJointTolerance(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_distance_joint_setDistanceJointTolerance_112(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setDistanceJointTolerance(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, float, value);
+		module->setDistanceJointTolerance(EntityRef(entity_index), value);
 	}
 	
 	static void lumscript_distance_joint_getDistanceJointLimits_113(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getDistanceJointLimits(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret.x);
-		ls_push_f32(runtime, ret.y);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getDistanceJointLimits(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_distance_joint_setDistanceJointLimits_114(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setDistanceJointLimits(EntityRef(ls_to_i32(runtime, -4)), Vec2(ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, Vec2, value);
+		module->setDistanceJointLimits(EntityRef(entity_index), value);
 	}
 	
 	static void lumscript_distance_joint_getDistanceJointLinearForce_115(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getDistanceJointLinearForce(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret.x);
-		ls_push_f32(runtime, ret.y);
-		ls_push_f32(runtime, ret.z);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getDistanceJointLinearForce(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_hinge_joint_getHingeJointConnectedBody_116(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getHingeJointConnectedBody(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_i32(runtime, ret.index);
-		ls_push_ptr(runtime, &module->getWorld());
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getHingeJointConnectedBody(EntityRef(entity_index));
+		LS_RESULT(frame, ret.index);
+		LS_RESULT(frame, &module->getWorld());
 	}
 	
 	static void lumscript_hinge_joint_setHingeJointConnectedBody_117(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setHingeJointConnectedBody(EntityRef(ls_to_i32(runtime, -4)), EntityPtr(ls_to_i32(runtime, -2)));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ENTITY_ARG(frame, connected_body, connected_body_world);
+		module->setHingeJointConnectedBody(EntityRef(entity_index), EntityPtr(connected_body_index));
 	}
 	
 	static void lumscript_hinge_joint_getHingeJointAxisPosition_118(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getHingeJointAxisPosition(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret.x);
-		ls_push_f32(runtime, ret.y);
-		ls_push_f32(runtime, ret.z);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getHingeJointAxisPosition(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_hinge_joint_setHingeJointAxisPosition_119(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setHingeJointAxisPosition(EntityRef(ls_to_i32(runtime, -5)), Vec3(ls_to_f32(runtime, -3), ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, Vec3, value);
+		module->setHingeJointAxisPosition(EntityRef(entity_index), value);
 	}
 	
 	static void lumscript_hinge_joint_getHingeJointAxisDirection_120(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getHingeJointAxisDirection(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret.x);
-		ls_push_f32(runtime, ret.y);
-		ls_push_f32(runtime, ret.z);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getHingeJointAxisDirection(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_hinge_joint_setHingeJointAxisDirection_121(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setHingeJointAxisDirection(EntityRef(ls_to_i32(runtime, -5)), Vec3(ls_to_f32(runtime, -3), ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, Vec3, value);
+		module->setHingeJointAxisDirection(EntityRef(entity_index), value);
 	}
 	
 	static void lumscript_hinge_joint_getHingeJointDamping_122(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getHingeJointDamping(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getHingeJointDamping(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_hinge_joint_setHingeJointDamping_123(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setHingeJointDamping(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, float, value);
+		module->setHingeJointDamping(EntityRef(entity_index), value);
 	}
 	
 	static void lumscript_hinge_joint_getHingeJointStiffness_124(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getHingeJointStiffness(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getHingeJointStiffness(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_hinge_joint_setHingeJointStiffness_125(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setHingeJointStiffness(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, float, value);
+		module->setHingeJointStiffness(EntityRef(entity_index), value);
 	}
 	
 	static void lumscript_hinge_joint_getHingeJointUseLimit_126(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getHingeJointUseLimit(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_bool(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getHingeJointUseLimit(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_hinge_joint_setHingeJointUseLimit_127(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setHingeJointUseLimit(EntityRef(ls_to_i32(runtime, -3)), bool(ls_to_bool(runtime, -1)));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, bool, use_limit);
+		module->setHingeJointUseLimit(EntityRef(entity_index), use_limit);
 	}
 	
 	static void lumscript_hinge_joint_getHingeJointLimit_128(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getHingeJointLimit(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret.x);
-		ls_push_f32(runtime, ret.y);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getHingeJointLimit(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_hinge_joint_setHingeJointLimit_129(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setHingeJointLimit(EntityRef(ls_to_i32(runtime, -4)), Vec2(ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, Vec2, limit);
+		module->setHingeJointLimit(EntityRef(entity_index), limit);
 	}
 	
 	static void lumscript_spherical_joint_getSphericalJointConnectedBody_130(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getSphericalJointConnectedBody(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_i32(runtime, ret.index);
-		ls_push_ptr(runtime, &module->getWorld());
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getSphericalJointConnectedBody(EntityRef(entity_index));
+		LS_RESULT(frame, ret.index);
+		LS_RESULT(frame, &module->getWorld());
 	}
 	
 	static void lumscript_spherical_joint_setSphericalJointConnectedBody_131(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setSphericalJointConnectedBody(EntityRef(ls_to_i32(runtime, -4)), EntityPtr(ls_to_i32(runtime, -2)));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ENTITY_ARG(frame, connected_body, connected_body_world);
+		module->setSphericalJointConnectedBody(EntityRef(entity_index), EntityPtr(connected_body_index));
 	}
 	
 	static void lumscript_spherical_joint_getSphericalJointAxisPosition_132(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getSphericalJointAxisPosition(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret.x);
-		ls_push_f32(runtime, ret.y);
-		ls_push_f32(runtime, ret.z);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getSphericalJointAxisPosition(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_spherical_joint_setSphericalJointAxisPosition_133(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setSphericalJointAxisPosition(EntityRef(ls_to_i32(runtime, -5)), Vec3(ls_to_f32(runtime, -3), ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, Vec3, value);
+		module->setSphericalJointAxisPosition(EntityRef(entity_index), value);
 	}
 	
 	static void lumscript_spherical_joint_getSphericalJointAxisDirection_134(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getSphericalJointAxisDirection(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret.x);
-		ls_push_f32(runtime, ret.y);
-		ls_push_f32(runtime, ret.z);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getSphericalJointAxisDirection(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_spherical_joint_setSphericalJointAxisDirection_135(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setSphericalJointAxisDirection(EntityRef(ls_to_i32(runtime, -5)), Vec3(ls_to_f32(runtime, -3), ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, Vec3, value);
+		module->setSphericalJointAxisDirection(EntityRef(entity_index), value);
 	}
 	
 	static void lumscript_spherical_joint_getSphericalJointUseLimit_136(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getSphericalJointUseLimit(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_bool(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getSphericalJointUseLimit(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_spherical_joint_setSphericalJointUseLimit_137(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setSphericalJointUseLimit(EntityRef(ls_to_i32(runtime, -3)), bool(ls_to_bool(runtime, -1)));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, bool, use_limit);
+		module->setSphericalJointUseLimit(EntityRef(entity_index), use_limit);
 	}
 	
 	static void lumscript_spherical_joint_getSphericalJointLimit_138(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getSphericalJointLimit(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret.x);
-		ls_push_f32(runtime, ret.y);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getSphericalJointLimit(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_spherical_joint_setSphericalJointLimit_139(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setSphericalJointLimit(EntityRef(ls_to_i32(runtime, -4)), Vec2(ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, Vec2, limit);
+		module->setSphericalJointLimit(EntityRef(entity_index), limit);
 	}
 	
 	static void lumscript_physical_controller_getGravitySpeed_140(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getGravitySpeed(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getGravitySpeed(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_physical_controller_move_141(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->moveController(EntityRef(ls_to_i32(runtime, -5)), Vec3(ls_to_f32(runtime, -3), ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, Vec3, v);
+		module->moveController(EntityRef(entity_index), v);
 	}
 	
 	static void lumscript_physical_controller_isCollisionDown_142(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->isControllerCollisionDown(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_bool(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->isControllerCollisionDown(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_physical_controller_resize_143(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->resizeController(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, float, height);
+		module->resizeController(EntityRef(entity_index), height);
 	}
 	
 	static void lumscript_physical_controller_getControllerLayer_144(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getControllerLayer(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_i32(runtime, (i32)ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getControllerLayer(EntityRef(entity_index));
+		LS_RESULT(frame, (i32)ret);
 	}
 	
 	static void lumscript_physical_controller_setControllerLayer_145(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setControllerLayer(EntityRef(ls_to_i32(runtime, -3)), ls_to_u32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, u32, layer);
+		module->setControllerLayer(EntityRef(entity_index), layer);
 	}
 	
 	static void lumscript_physical_controller_getControllerRadius_146(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getControllerRadius(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getControllerRadius(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_physical_controller_setControllerRadius_147(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setControllerRadius(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, float, radius);
+		module->setControllerRadius(EntityRef(entity_index), radius);
 	}
 	
 	static void lumscript_physical_controller_getControllerHeight_148(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getControllerHeight(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getControllerHeight(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_physical_controller_setControllerHeight_149(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setControllerHeight(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, float, height);
+		module->setControllerHeight(EntityRef(entity_index), height);
 	}
 	
 	static void lumscript_physical_controller_getControllerCustomGravity_150(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getControllerCustomGravity(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_bool(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getControllerCustomGravity(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_physical_controller_setControllerCustomGravity_151(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setControllerCustomGravity(EntityRef(ls_to_i32(runtime, -3)), bool(ls_to_bool(runtime, -1)));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, bool, gravity);
+		module->setControllerCustomGravity(EntityRef(entity_index), gravity);
 	}
 	
 	static void lumscript_physical_controller_getControllerCustomGravityAcceleration_152(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getControllerCustomGravityAcceleration(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getControllerCustomGravityAcceleration(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_physical_controller_setControllerCustomGravityAcceleration_153(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setControllerCustomGravityAcceleration(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, float, gravityacceleration);
+		module->setControllerCustomGravityAcceleration(EntityRef(entity_index), gravityacceleration);
 	}
 	
 	static void lumscript_physical_controller_getControllerUseRootMotion_154(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getControllerUseRootMotion(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_bool(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getControllerUseRootMotion(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_physical_controller_setControllerUseRootMotion_155(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setControllerUseRootMotion(EntityRef(ls_to_i32(runtime, -3)), bool(ls_to_bool(runtime, -1)));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, bool, enable);
+		module->setControllerUseRootMotion(EntityRef(entity_index), enable);
 	}
 	
 	static void lumscript_rigid_actor_putToSleep_156(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->putToSleep(EntityRef(ls_to_i32(runtime, -2)));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		module->putToSleep(EntityRef(entity_index));
 	}
 	
 	static void lumscript_rigid_actor_addForceAtPos_157(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->addForceAtPos(EntityRef(ls_to_i32(runtime, -8)), Vec3(ls_to_f32(runtime, -6), ls_to_f32(runtime, -5), ls_to_f32(runtime, -4)), Vec3(ls_to_f32(runtime, -3), ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, Vec3, force);
+		LS_ARG(frame, Vec3, pos);
+		module->addForceAtPos(EntityRef(entity_index), force, pos);
 	}
 	
 	static void lumscript_rigid_actor_applyForce_158(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->applyForceToActor(EntityRef(ls_to_i32(runtime, -5)), Vec3(ls_to_f32(runtime, -3), ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, Vec3, force);
+		module->applyForceToActor(EntityRef(entity_index), force);
 	}
 	
 	static void lumscript_rigid_actor_applyImpulse_159(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->applyImpulseToActor(EntityRef(ls_to_i32(runtime, -5)), Vec3(ls_to_f32(runtime, -3), ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, Vec3, force);
+		module->applyImpulseToActor(EntityRef(entity_index), force);
 	}
 	
 	static void lumscript_rigid_actor_getActorVelocity_160(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getActorVelocity(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret.x);
-		ls_push_f32(runtime, ret.y);
-		ls_push_f32(runtime, ret.z);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getActorVelocity(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_rigid_actor_getActorSpeed_161(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getActorSpeed(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getActorSpeed(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_rigid_actor_getActorLayer_162(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getActorLayer(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_i32(runtime, (i32)ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getActorLayer(EntityRef(entity_index));
+		LS_RESULT(frame, (i32)ret);
 	}
 	
 	static void lumscript_rigid_actor_setActorLayer_163(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setActorLayer(EntityRef(ls_to_i32(runtime, -3)), ls_to_u32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, u32, layer);
+		module->setActorLayer(EntityRef(entity_index), layer);
 	}
 	
 	static void lumscript_rigid_actor_getActorDynamicType_164(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getActorDynamicType(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_i32(runtime, (i32)ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getActorDynamicType(EntityRef(entity_index));
+		LS_RESULT(frame, (i32)ret);
 	}
 	
 	static void lumscript_rigid_actor_setActorDynamicType_165(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setActorDynamicType(EntityRef(ls_to_i32(runtime, -3)), (PhysicsModule::DynamicType)ls_to_i32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, i32, _value);
+		module->setActorDynamicType(EntityRef(entity_index), (PhysicsModule::DynamicType)_value);
 	}
 	
 	static void lumscript_rigid_actor_getActorIsTrigger_166(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getActorIsTrigger(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_bool(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getActorIsTrigger(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_rigid_actor_setActorIsTrigger_167(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setActorIsTrigger(EntityRef(ls_to_i32(runtime, -3)), bool(ls_to_bool(runtime, -1)));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, bool, is_trigger);
+		module->setActorIsTrigger(EntityRef(entity_index), is_trigger);
 	}
 	
 	static void lumscript_rigid_actor_getActorMesh_168(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getActorMesh(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_string(runtime, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getActorMesh(EntityRef(entity_index));
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
 	}
 	
 	static void lumscript_rigid_actor_setActorMesh_169(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		ls_string_view lumscript_string_sv_1 = ls_to_string(runtime, -1);
-		char lumscript_string_arg_1[128];
-		copyString(Span(lumscript_string_arg_1), StringView{lumscript_string_sv_1.begin, lumscript_string_sv_1.end});
-		module->setActorMesh(EntityRef(ls_to_i32(runtime, -3)), Path(lumscript_string_arg_1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_STRING_ARG(frame, path);
+		module->setActorMesh(EntityRef(entity_index), Path(StringView{path.begin, path.end}));
 	}
 	
 	static void lumscript_rigid_actor_getActorMaterial_170(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getActorMaterial(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_string(runtime, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getActorMaterial(EntityRef(entity_index));
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
 	}
 	
 	static void lumscript_rigid_actor_setActorMaterial_171(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		ls_string_view lumscript_string_sv_1 = ls_to_string(runtime, -1);
-		char lumscript_string_arg_1[128];
-		copyString(Span(lumscript_string_arg_1), StringView{lumscript_string_sv_1.begin, lumscript_string_sv_1.end});
-		module->setActorMaterial(EntityRef(ls_to_i32(runtime, -3)), Path(lumscript_string_arg_1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_STRING_ARG(frame, path);
+		module->setActorMaterial(EntityRef(entity_index), Path(StringView{path.begin, path.end}));
 	}
 	
 	static void lumscript_rigid_actor_getActorCCD_172(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getActorCCD(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_bool(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, e, module);
+		auto ret = module->getActorCCD(EntityRef(e_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_rigid_actor_setActorCCD_173(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setActorCCD(EntityRef(ls_to_i32(runtime, -3)), bool(ls_to_bool(runtime, -1)));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, e, module);
+		LS_ARG(frame, bool, is_ccd);
+		module->setActorCCD(EntityRef(e_index), is_ccd);
 	}
 	
 	static void lumscript_rigid_actor_boxes_count_174(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		const i32 count = module->getBoxCount(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_i32(runtime, count);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		const i32 count = module->getBoxCount(EntityRef(entity_index));
+		LS_RESULT(frame, count);
 	}
 	
 	static void lumscript_rigid_actor_boxes_item_175(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -2));
-		const i32 count = module->getBoxCount(EntityRef(ls_to_i32(runtime, -3)));
-		if (ls_to_i32(runtime, -1) < 0 || ls_to_i32(runtime, -1) >= count) {
-			ls_push_null(runtime);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, i32, item_idx);
+		const i32 count = module->getBoxCount(EntityRef(entity_index));
+		if (item_idx < 0 || item_idx >= count) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, ls_to_i32(runtime, -2));
-		ls_push_i64(runtime, ls_to_i32(runtime, -1));
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, item_idx);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_rigid_actor_boxes_getBoxHalfExtents_176(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -4));
-		auto ret = module->getBoxHalfExtents(EntityRef(ls_to_i32(runtime, -6)), (i32)ls_to_i64(runtime, -5));
-		ls_push_f32(runtime, ret.x);
-		ls_push_f32(runtime, ret.y);
-		ls_push_f32(runtime, ret.z);
+		LS_ARG(frame, i32, entity_idx);
+		LS_ARG(frame, i32, item_idx);
+		LS_ARG(frame, PhysicsModule*, module);
+		auto ret = module->getBoxHalfExtents(EntityRef(entity_idx), item_idx);
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_rigid_actor_boxes_setBoxHalfExtents_177(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -7));
-		module->setBoxHalfExtents(EntityRef(ls_to_i32(runtime, -9)), (i32)ls_to_i64(runtime, -8), Vec3(ls_to_f32(runtime, -6), ls_to_f32(runtime, -5), ls_to_f32(runtime, -4)));
+		LS_ARG(frame, i32, entity_idx);
+		LS_ARG(frame, i32, item_idx);
+		LS_ARG(frame, PhysicsModule*, module);
+		LS_ARG(frame, Vec3, size);
+		module->setBoxHalfExtents(EntityRef(entity_idx), item_idx, size);
 	}
 	
 	static void lumscript_rigid_actor_boxes_getBoxOffsetPosition_178(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -4));
-		auto ret = module->getBoxOffsetPosition(EntityRef(ls_to_i32(runtime, -6)), (i32)ls_to_i64(runtime, -5));
-		ls_push_f32(runtime, ret.x);
-		ls_push_f32(runtime, ret.y);
-		ls_push_f32(runtime, ret.z);
+		LS_ARG(frame, i32, entity_idx);
+		LS_ARG(frame, i32, item_idx);
+		LS_ARG(frame, PhysicsModule*, module);
+		auto ret = module->getBoxOffsetPosition(EntityRef(entity_idx), item_idx);
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_rigid_actor_boxes_setBoxOffsetPosition_179(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -7));
-		module->setBoxOffsetPosition(EntityRef(ls_to_i32(runtime, -9)), (i32)ls_to_i64(runtime, -8), Vec3(ls_to_f32(runtime, -6), ls_to_f32(runtime, -5), ls_to_f32(runtime, -4)));
+		LS_ARG(frame, i32, entity_idx);
+		LS_ARG(frame, i32, item_idx);
+		LS_ARG(frame, PhysicsModule*, module);
+		LS_ARG(frame, Vec3, pos);
+		module->setBoxOffsetPosition(EntityRef(entity_idx), item_idx, pos);
 	}
 	
 	static void lumscript_rigid_actor_boxes_getBoxOffsetRotation_180(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -4));
-		auto ret = module->getBoxOffsetRotation(EntityRef(ls_to_i32(runtime, -6)), (i32)ls_to_i64(runtime, -5));
-		ls_push_f32(runtime, ret.x);
-		ls_push_f32(runtime, ret.y);
-		ls_push_f32(runtime, ret.z);
+		LS_ARG(frame, i32, entity_idx);
+		LS_ARG(frame, i32, item_idx);
+		LS_ARG(frame, PhysicsModule*, module);
+		auto ret = module->getBoxOffsetRotation(EntityRef(entity_idx), item_idx);
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_rigid_actor_boxes_setBoxOffsetRotation_181(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -7));
-		module->setBoxOffsetRotation(EntityRef(ls_to_i32(runtime, -9)), (i32)ls_to_i64(runtime, -8), Vec3(ls_to_f32(runtime, -6), ls_to_f32(runtime, -5), ls_to_f32(runtime, -4)));
+		LS_ARG(frame, i32, entity_idx);
+		LS_ARG(frame, i32, item_idx);
+		LS_ARG(frame, PhysicsModule*, module);
+		LS_ARG(frame, Vec3, euler_angles);
+		module->setBoxOffsetRotation(EntityRef(entity_idx), item_idx, euler_angles);
 	}
 	
 	static void lumscript_rigid_actor_spheres_count_182(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		const i32 count = module->getSphereCount(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_i32(runtime, count);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		const i32 count = module->getSphereCount(EntityRef(entity_index));
+		LS_RESULT(frame, count);
 	}
 	
 	static void lumscript_rigid_actor_spheres_item_183(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -2));
-		const i32 count = module->getSphereCount(EntityRef(ls_to_i32(runtime, -3)));
-		if (ls_to_i32(runtime, -1) < 0 || ls_to_i32(runtime, -1) >= count) {
-			ls_push_null(runtime);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, i32, item_idx);
+		const i32 count = module->getSphereCount(EntityRef(entity_index));
+		if (item_idx < 0 || item_idx >= count) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, ls_to_i32(runtime, -2));
-		ls_push_i64(runtime, ls_to_i32(runtime, -1));
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, item_idx);
+		LS_RESULT(frame, module);
 	}
 	
 	static void lumscript_rigid_actor_spheres_getSphereRadius_184(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -4));
-		auto ret = module->getSphereRadius(EntityRef(ls_to_i32(runtime, -6)), (i32)ls_to_i64(runtime, -5));
-		ls_push_f32(runtime, ret);
+		LS_ARG(frame, i32, entity_idx);
+		LS_ARG(frame, i32, item_idx);
+		LS_ARG(frame, PhysicsModule*, module);
+		auto ret = module->getSphereRadius(EntityRef(entity_idx), item_idx);
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_rigid_actor_spheres_setSphereRadius_185(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -5));
-		module->setSphereRadius(EntityRef(ls_to_i32(runtime, -7)), (i32)ls_to_i64(runtime, -6), ls_to_f32(runtime, -4));
+		LS_ARG(frame, i32, entity_idx);
+		LS_ARG(frame, i32, item_idx);
+		LS_ARG(frame, PhysicsModule*, module);
+		LS_ARG(frame, float, size);
+		module->setSphereRadius(EntityRef(entity_idx), item_idx, size);
 	}
 	
 	static void lumscript_rigid_actor_spheres_getSphereOffsetPosition_186(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -4));
-		auto ret = module->getSphereOffsetPosition(EntityRef(ls_to_i32(runtime, -6)), (i32)ls_to_i64(runtime, -5));
-		ls_push_f32(runtime, ret.x);
-		ls_push_f32(runtime, ret.y);
-		ls_push_f32(runtime, ret.z);
+		LS_ARG(frame, i32, entity_idx);
+		LS_ARG(frame, i32, item_idx);
+		LS_ARG(frame, PhysicsModule*, module);
+		auto ret = module->getSphereOffsetPosition(EntityRef(entity_idx), item_idx);
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_rigid_actor_spheres_setSphereOffsetPosition_187(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -7));
-		module->setSphereOffsetPosition(EntityRef(ls_to_i32(runtime, -9)), (i32)ls_to_i64(runtime, -8), Vec3(ls_to_f32(runtime, -6), ls_to_f32(runtime, -5), ls_to_f32(runtime, -4)));
+		LS_ARG(frame, i32, entity_idx);
+		LS_ARG(frame, i32, item_idx);
+		LS_ARG(frame, PhysicsModule*, module);
+		LS_ARG(frame, Vec3, pos);
+		module->setSphereOffsetPosition(EntityRef(entity_idx), item_idx, pos);
 	}
 	
 	static void lumscript_wheel_getWheelSpringStrength_188(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getWheelSpringStrength(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getWheelSpringStrength(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_wheel_setWheelSpringStrength_189(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setWheelSpringStrength(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, float, str);
+		module->setWheelSpringStrength(EntityRef(entity_index), str);
 	}
 	
 	static void lumscript_wheel_getWheelSpringMaxCompression_190(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getWheelSpringMaxCompression(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getWheelSpringMaxCompression(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_wheel_setWheelSpringMaxCompression_191(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setWheelSpringMaxCompression(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, float, str);
+		module->setWheelSpringMaxCompression(EntityRef(entity_index), str);
 	}
 	
 	static void lumscript_wheel_getWheelSpringMaxDroop_192(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getWheelSpringMaxDroop(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getWheelSpringMaxDroop(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_wheel_setWheelSpringMaxDroop_193(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setWheelSpringMaxDroop(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, float, str);
+		module->setWheelSpringMaxDroop(EntityRef(entity_index), str);
 	}
 	
 	static void lumscript_wheel_getWheelSpringDamperRate_194(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getWheelSpringDamperRate(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getWheelSpringDamperRate(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_wheel_setWheelSpringDamperRate_195(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setWheelSpringDamperRate(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, float, rate);
+		module->setWheelSpringDamperRate(EntityRef(entity_index), rate);
 	}
 	
 	static void lumscript_wheel_getWheelRadius_196(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getWheelRadius(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getWheelRadius(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_wheel_setWheelRadius_197(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setWheelRadius(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, float, r);
+		module->setWheelRadius(EntityRef(entity_index), r);
 	}
 	
 	static void lumscript_wheel_getWheelWidth_198(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getWheelWidth(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getWheelWidth(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_wheel_setWheelWidth_199(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setWheelWidth(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, float, w);
+		module->setWheelWidth(EntityRef(entity_index), w);
 	}
 	
 	static void lumscript_wheel_getWheelMass_200(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getWheelMass(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getWheelMass(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_wheel_setWheelMass_201(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setWheelMass(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, float, w);
+		module->setWheelMass(EntityRef(entity_index), w);
 	}
 	
 	static void lumscript_wheel_getWheelMOI_202(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getWheelMOI(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getWheelMOI(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_wheel_setWheelMOI_203(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setWheelMOI(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, float, moi);
+		module->setWheelMOI(EntityRef(entity_index), moi);
 	}
 	
 	static void lumscript_wheel_getWheelSlot_204(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getWheelSlot(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_i32(runtime, (i32)ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getWheelSlot(EntityRef(entity_index));
+		LS_RESULT(frame, (i32)ret);
 	}
 	
 	static void lumscript_wheel_setWheelSlot_205(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setWheelSlot(EntityRef(ls_to_i32(runtime, -3)), (PhysicsModule::WheelSlot)ls_to_i32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, i32, s_value);
+		module->setWheelSlot(EntityRef(entity_index), (PhysicsModule::WheelSlot)s_value);
 	}
 	
 	static void lumscript_wheel_getWheelRPM_206(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getWheelRPM(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getWheelRPM(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_vehicle_getVehiclePeakTorque_207(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getVehiclePeakTorque(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getVehiclePeakTorque(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_vehicle_setVehiclePeakTorque_208(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setVehiclePeakTorque(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, float, value);
+		module->setVehiclePeakTorque(EntityRef(entity_index), value);
 	}
 	
 	static void lumscript_vehicle_getVehicleMaxRPM_209(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getVehicleMaxRPM(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getVehicleMaxRPM(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_vehicle_setVehicleMaxRPM_210(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setVehicleMaxRPM(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, float, value);
+		module->setVehicleMaxRPM(EntityRef(entity_index), value);
 	}
 	
 	static void lumscript_vehicle_getVehicleRPM_211(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getVehicleRPM(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getVehicleRPM(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_vehicle_getVehicleCurrentGear_212(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getVehicleCurrentGear(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_i32(runtime, (i32)ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getVehicleCurrentGear(EntityRef(entity_index));
+		LS_RESULT(frame, (i32)ret);
 	}
 	
 	static void lumscript_vehicle_getVehicleSpeed_213(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getVehicleSpeed(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getVehicleSpeed(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_vehicle_setVehicleAccel_214(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setVehicleAccel(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, float, accel);
+		module->setVehicleAccel(EntityRef(entity_index), accel);
 	}
 	
 	static void lumscript_vehicle_setVehicleSteer_215(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setVehicleSteer(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, float, value);
+		module->setVehicleSteer(EntityRef(entity_index), value);
 	}
 	
 	static void lumscript_vehicle_setVehicleBrake_216(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setVehicleBrake(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, float, value);
+		module->setVehicleBrake(EntityRef(entity_index), value);
 	}
 	
 	static void lumscript_vehicle_getVehicleChassis_217(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getVehicleChassis(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_string(runtime, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getVehicleChassis(EntityRef(entity_index));
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
 	}
 	
 	static void lumscript_vehicle_setVehicleChassis_218(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		ls_string_view lumscript_string_sv_1 = ls_to_string(runtime, -1);
-		char lumscript_string_arg_1[128];
-		copyString(Span(lumscript_string_arg_1), StringView{lumscript_string_sv_1.begin, lumscript_string_sv_1.end});
-		module->setVehicleChassis(EntityRef(ls_to_i32(runtime, -3)), Path(lumscript_string_arg_1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_STRING_ARG(frame, path);
+		module->setVehicleChassis(EntityRef(entity_index), Path(StringView{path.begin, path.end}));
 	}
 	
 	static void lumscript_vehicle_getVehicleMass_219(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getVehicleMass(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getVehicleMass(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_vehicle_setVehicleMass_220(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setVehicleMass(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, float, mass);
+		module->setVehicleMass(EntityRef(entity_index), mass);
 	}
 	
 	static void lumscript_vehicle_getVehicleMOIMultiplier_221(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getVehicleMOIMultiplier(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getVehicleMOIMultiplier(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_vehicle_setVehicleMOIMultiplier_222(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setVehicleMOIMultiplier(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, float, m);
+		module->setVehicleMOIMultiplier(EntityRef(entity_index), m);
 	}
 	
 	static void lumscript_vehicle_getVehicleCenterOfMass_223(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getVehicleCenterOfMass(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret.x);
-		ls_push_f32(runtime, ret.y);
-		ls_push_f32(runtime, ret.z);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getVehicleCenterOfMass(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_vehicle_setVehicleCenterOfMass_224(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setVehicleCenterOfMass(EntityRef(ls_to_i32(runtime, -5)), Vec3(ls_to_f32(runtime, -3), ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, Vec3, center);
+		module->setVehicleCenterOfMass(EntityRef(entity_index), center);
 	}
 	
 	static void lumscript_vehicle_getVehicleWheelsLayer_225(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getVehicleWheelsLayer(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_i32(runtime, (i32)ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getVehicleWheelsLayer(EntityRef(entity_index));
+		LS_RESULT(frame, (i32)ret);
 	}
 	
 	static void lumscript_vehicle_setVehicleWheelsLayer_226(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setVehicleWheelsLayer(EntityRef(ls_to_i32(runtime, -3)), ls_to_u32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, u32, layer);
+		module->setVehicleWheelsLayer(EntityRef(entity_index), layer);
 	}
 	
 	static void lumscript_vehicle_getVehicleChassisLayer_227(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getVehicleChassisLayer(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_i32(runtime, (i32)ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getVehicleChassisLayer(EntityRef(entity_index));
+		LS_RESULT(frame, (i32)ret);
 	}
 	
 	static void lumscript_vehicle_setVehicleChassisLayer_228(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setVehicleChassisLayer(EntityRef(ls_to_i32(runtime, -3)), ls_to_u32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, u32, layer);
+		module->setVehicleChassisLayer(EntityRef(entity_index), layer);
 	}
 	
 	static void lumscript_physical_instanced_cube_getInstancedCubeHalfExtents_229(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getInstancedCubeHalfExtents(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret.x);
-		ls_push_f32(runtime, ret.y);
-		ls_push_f32(runtime, ret.z);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getInstancedCubeHalfExtents(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_physical_instanced_cube_setInstancedCubeHalfExtents_230(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setInstancedCubeHalfExtents(EntityRef(ls_to_i32(runtime, -5)), Vec3(ls_to_f32(runtime, -3), ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, Vec3, half_extents);
+		module->setInstancedCubeHalfExtents(EntityRef(entity_index), half_extents);
 	}
 	
 	static void lumscript_physical_instanced_cube_getInstancedCubeLayer_231(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getInstancedCubeLayer(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_i32(runtime, (i32)ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getInstancedCubeLayer(EntityRef(entity_index));
+		LS_RESULT(frame, (i32)ret);
 	}
 	
 	static void lumscript_physical_instanced_cube_setInstancedCubeLayer_232(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setInstancedCubeLayer(EntityRef(ls_to_i32(runtime, -3)), ls_to_u32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, u32, layer);
+		module->setInstancedCubeLayer(EntityRef(entity_index), layer);
 	}
 	
 	static void lumscript_physical_instanced_mesh_getInstancedMeshLayer_233(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getInstancedMeshLayer(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_i32(runtime, (i32)ret);
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getInstancedMeshLayer(EntityRef(entity_index));
+		LS_RESULT(frame, (i32)ret);
 	}
 	
 	static void lumscript_physical_instanced_mesh_setInstancedMeshLayer_234(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		module->setInstancedMeshLayer(EntityRef(ls_to_i32(runtime, -3)), ls_to_u32(runtime, -1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_ARG(frame, u32, layer);
+		module->setInstancedMeshLayer(EntityRef(entity_index), layer);
 	}
 	
 	static void lumscript_physical_instanced_mesh_getInstancedMeshGeomPath_235(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getInstancedMeshGeomPath(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_string(runtime, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		auto ret = module->getInstancedMeshGeomPath(EntityRef(entity_index));
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
 	}
 	
 	static void lumscript_physical_instanced_mesh_setInstancedMeshGeomPath_236(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<PhysicsModule*>(ls_to_ptr(runtime, -1));
-		ls_string_view lumscript_string_sv_1 = ls_to_string(runtime, -1);
-		char lumscript_string_arg_1[128];
-		copyString(Span(lumscript_string_arg_1), StringView{lumscript_string_sv_1.begin, lumscript_string_sv_1.end});
-		module->setInstancedMeshGeomPath(EntityRef(ls_to_i32(runtime, -3)), Path(lumscript_string_arg_1));
+		LS_COMPONENT_ARG(frame, PhysicsModule*, entity, module);
+		LS_STRING_ARG(frame, path);
+		module->setInstancedMeshGeomPath(EntityRef(entity_index), Path(StringView{path.begin, path.end}));
 	}
 	
 	static void lumscript_camera_getRay_237(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getCameraRay(EntityRef(ls_to_i32(runtime, -4)), Vec2(ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
-		ls_push_f64(runtime, ret.origin.x);
-		ls_push_f64(runtime, ret.origin.y);
-		ls_push_f64(runtime, ret.origin.z);
-		ls_push_f32(runtime, ret.dir.x);
-		ls_push_f32(runtime, ret.dir.y);
-		ls_push_f32(runtime, ret.dir.z);
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, Vec2, screen_pos);
+		auto ret = module->getCameraRay(EntityRef(entity_index), screen_pos);
+		LS_RESULT(frame, ret.origin);
+		LS_RESULT(frame, ret.dir);
 	}
 	
 	static void lumscript_camera_getCameraScreenWidth_238(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getCameraScreenWidth(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->getCameraScreenWidth(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_camera_getCameraScreenHeight_239(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getCameraScreenHeight(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->getCameraScreenHeight(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_decal_getDecalMaterialPath_240(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getDecalMaterialPath(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_string(runtime, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->getDecalMaterialPath(EntityRef(entity_index));
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
 	}
 	
 	static void lumscript_decal_setDecalMaterialPath_241(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		ls_string_view lumscript_string_sv_1 = ls_to_string(runtime, -1);
-		char lumscript_string_arg_1[128];
-		copyString(Span(lumscript_string_arg_1), StringView{lumscript_string_sv_1.begin, lumscript_string_sv_1.end});
-		module->setDecalMaterialPath(EntityRef(ls_to_i32(runtime, -3)), Path(lumscript_string_arg_1));
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_STRING_ARG(frame, path);
+		module->setDecalMaterialPath(EntityRef(entity_index), Path(StringView{path.begin, path.end}));
 	}
 	
 	static void lumscript_decal_getDecalHalfExtents_242(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getDecalHalfExtents(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret.x);
-		ls_push_f32(runtime, ret.y);
-		ls_push_f32(runtime, ret.z);
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->getDecalHalfExtents(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_decal_setDecalHalfExtents_243(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->setDecalHalfExtents(EntityRef(ls_to_i32(runtime, -5)), Vec3(ls_to_f32(runtime, -3), ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, Vec3, value);
+		module->setDecalHalfExtents(EntityRef(entity_index), value);
 	}
 	
 	static void lumscript_environment_getEnvironmentCastShadows_244(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getEnvironmentCastShadows(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_bool(runtime, ret);
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->getEnvironmentCastShadows(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_environment_setEnvironmentCastShadows_245(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->setEnvironmentCastShadows(EntityRef(ls_to_i32(runtime, -3)), bool(ls_to_bool(runtime, -1)));
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, bool, enable);
+		module->setEnvironmentCastShadows(EntityRef(entity_index), enable);
 	}
 	
 	static void lumscript_environment_getEnvironmentSkyTexture_246(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getEnvironmentSkyTexture(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_string(runtime, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->getEnvironmentSkyTexture(EntityRef(entity_index));
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
 	}
 	
 	static void lumscript_environment_setEnvironmentSkyTexture_247(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		ls_string_view lumscript_string_sv_1 = ls_to_string(runtime, -1);
-		char lumscript_string_arg_1[128];
-		copyString(Span(lumscript_string_arg_1), StringView{lumscript_string_sv_1.begin, lumscript_string_sv_1.end});
-		module->setEnvironmentSkyTexture(EntityRef(ls_to_i32(runtime, -3)), Path(lumscript_string_arg_1));
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_STRING_ARG(frame, path);
+		module->setEnvironmentSkyTexture(EntityRef(entity_index), Path(StringView{path.begin, path.end}));
 	}
 	
 	static void lumscript_environment_getEnvironmentShadowmapCascades_248(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getEnvironmentShadowmapCascades(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret.x);
-		ls_push_f32(runtime, ret.y);
-		ls_push_f32(runtime, ret.z);
-		ls_push_f32(runtime, ret.w);
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->getEnvironmentShadowmapCascades(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_environment_setEnvironmentShadowmapCascades_249(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->setEnvironmentShadowmapCascades(EntityRef(ls_to_i32(runtime, -6)), Vec4(ls_to_f32(runtime, -4), ls_to_f32(runtime, -3), ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, Vec4, value);
+		module->setEnvironmentShadowmapCascades(EntityRef(entity_index), value);
 	}
 	
 	static void lumscript_point_light_getPointLightRange_250(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getPointLightRange(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->getPointLightRange(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_point_light_setPointLightRange_251(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->setPointLightRange(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, float, value);
+		module->setPointLightRange(EntityRef(entity_index), value);
 	}
 	
 	static void lumscript_point_light_getPointLightCastShadows_252(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getPointLightCastShadows(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_bool(runtime, ret);
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->getPointLightCastShadows(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_point_light_setPointLightCastShadows_253(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->setPointLightCastShadows(EntityRef(ls_to_i32(runtime, -3)), bool(ls_to_bool(runtime, -1)));
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, bool, value);
+		module->setPointLightCastShadows(EntityRef(entity_index), value);
 	}
 	
 	static void lumscript_point_light_getPointLightDynamic_254(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getPointLightDynamic(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_bool(runtime, ret);
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->getPointLightDynamic(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_point_light_setPointLightDynamic_255(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->setPointLightDynamic(EntityRef(ls_to_i32(runtime, -3)), bool(ls_to_bool(runtime, -1)));
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, bool, value);
+		module->setPointLightDynamic(EntityRef(entity_index), value);
 	}
 	
 	static void lumscript_reflection_probe_isReflectionProbeEnabled_256(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->isReflectionProbeEnabled(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_bool(runtime, ret);
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->isReflectionProbeEnabled(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_reflection_probe_enableReflectionProbe_257(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->enableReflectionProbe(EntityRef(ls_to_i32(runtime, -3)), bool(ls_to_bool(runtime, -1)));
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, bool, enable);
+		module->enableReflectionProbe(EntityRef(entity_index), enable);
 	}
 	
 	static void lumscript_environment_probe_isEnvironmentProbeEnabled_258(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->isEnvironmentProbeEnabled(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_bool(runtime, ret);
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->isEnvironmentProbeEnabled(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_environment_probe_enableEnvironmentProbe_259(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->enableEnvironmentProbe(EntityRef(ls_to_i32(runtime, -3)), bool(ls_to_bool(runtime, -1)));
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, bool, enable);
+		module->enableEnvironmentProbe(EntityRef(entity_index), enable);
 	}
 	
 	static void lumscript_bone_attachment_setRotation_260(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->setBoneAttachmentRotationQuat(EntityRef(ls_to_i32(runtime, -6)), Quat(ls_to_f32(runtime, -4), ls_to_f32(runtime, -3), ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, Quat, rot);
+		module->setBoneAttachmentRotationQuat(EntityRef(entity_index), rot);
 	}
 	
 	static void lumscript_bone_attachment_getBoneAttachmentParent_261(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getBoneAttachmentParent(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_i32(runtime, ret.index);
-		ls_push_ptr(runtime, &module->getWorld());
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->getBoneAttachmentParent(EntityRef(entity_index));
+		LS_RESULT(frame, ret.index);
+		LS_RESULT(frame, &module->getWorld());
 	}
 	
 	static void lumscript_bone_attachment_setBoneAttachmentParent_262(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->setBoneAttachmentParent(EntityRef(ls_to_i32(runtime, -4)), EntityPtr(ls_to_i32(runtime, -2)));
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ENTITY_ARG(frame, parent, parent_world);
+		module->setBoneAttachmentParent(EntityRef(entity_index), EntityPtr(parent_index));
 	}
 	
 	static void lumscript_bone_attachment_getBoneAttachmentBone_263(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getBoneAttachmentBone(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_i32(runtime, (i32)ret);
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->getBoneAttachmentBone(EntityRef(entity_index));
+		LS_RESULT(frame, (i32)ret);
 	}
 	
 	static void lumscript_bone_attachment_setBoneAttachmentBone_264(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->setBoneAttachmentBone(EntityRef(ls_to_i32(runtime, -3)), ls_to_i32(runtime, -1));
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, int, value);
+		module->setBoneAttachmentBone(EntityRef(entity_index), value);
 	}
 	
 	static void lumscript_bone_attachment_getBoneAttachmentPosition_265(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getBoneAttachmentPosition(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret.x);
-		ls_push_f32(runtime, ret.y);
-		ls_push_f32(runtime, ret.z);
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->getBoneAttachmentPosition(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_bone_attachment_setBoneAttachmentPosition_266(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->setBoneAttachmentPosition(EntityRef(ls_to_i32(runtime, -5)), Vec3(ls_to_f32(runtime, -3), ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, Vec3, pos);
+		module->setBoneAttachmentPosition(EntityRef(entity_index), pos);
 	}
 	
 	static void lumscript_bone_attachment_getBoneAttachmentRotation_267(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getBoneAttachmentRotation(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret.x);
-		ls_push_f32(runtime, ret.y);
-		ls_push_f32(runtime, ret.z);
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->getBoneAttachmentRotation(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_bone_attachment_setBoneAttachmentRotation_268(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->setBoneAttachmentRotation(EntityRef(ls_to_i32(runtime, -5)), Vec3(ls_to_f32(runtime, -3), ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, Vec3, rot);
+		module->setBoneAttachmentRotation(EntityRef(entity_index), rot);
 	}
 	
 	static void lumscript_particle_emitter_getGlobalID_269(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		ls_string_view lumscript_string_sv_1 = ls_to_string(runtime, -1);
-		char lumscript_string_arg_1[128];
-		copyString(Span(lumscript_string_arg_1), StringView{lumscript_string_sv_1.begin, lumscript_string_sv_1.end});
-		auto ret = module->getParticleEmitterGlobalID(EntityRef(ls_to_i32(runtime, -3)), lumscript_string_arg_1);
-		ls_push_i32(runtime, (i32)ret);
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_STRING_ARG(frame, name);
+		char lumscript_string_arg_name[128];
+		copyString(Span(lumscript_string_arg_name), StringView{name.begin, name.end});
+		auto ret = module->getParticleEmitterGlobalID(EntityRef(entity_index), lumscript_string_arg_name);
+		LS_RESULT(frame, (i32)ret);
 	}
 	
 	static void lumscript_particle_emitter_setFloatGlobal_270(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->setParticleEmitterGlobal(EntityRef(ls_to_i32(runtime, -4)), ls_to_i32(runtime, -2), ls_to_f32(runtime, -1));
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, i32, id);
+		LS_ARG(frame, float, value);
+		module->setParticleEmitterGlobal(EntityRef(entity_index), id, value);
 	}
 	
 	static void lumscript_particle_emitter_setVec3Global_271(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->setParticleEmitterGlobal(EntityRef(ls_to_i32(runtime, -6)), ls_to_i32(runtime, -4), Vec3(ls_to_f32(runtime, -3), ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, i32, id);
+		LS_ARG(frame, Vec3, value);
+		module->setParticleEmitterGlobal(EntityRef(entity_index), id, value);
 	}
 	
 	static void lumscript_particle_emitter_setVec4Global_272(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->setParticleEmitterGlobal(EntityRef(ls_to_i32(runtime, -7)), ls_to_i32(runtime, -5), Vec4(ls_to_f32(runtime, -4), ls_to_f32(runtime, -3), ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, i32, id);
+		LS_ARG(frame, Vec4, value);
+		module->setParticleEmitterGlobal(EntityRef(entity_index), id, value);
 	}
 	
 	static void lumscript_particle_emitter_emitRibbons_273(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->emitRibbons(EntityRef(ls_to_i32(runtime, -4)), ls_to_u32(runtime, -2), ls_to_u32(runtime, -1));
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, u32, emitter_index);
+		LS_ARG(frame, u32, num_ribbons);
+		module->emitRibbons(EntityRef(entity_index), emitter_index, num_ribbons);
 	}
 	
 	static void lumscript_particle_emitter_killRibbon_274(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->killRibbon(EntityRef(ls_to_i32(runtime, -4)), ls_to_u32(runtime, -2), ls_to_u32(runtime, -1));
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, u32, emitter_index);
+		LS_ARG(frame, u32, ribbon_index);
+		module->killRibbon(EntityRef(entity_index), emitter_index, ribbon_index);
 	}
 	
 	static void lumscript_particle_emitter_getParticleEmitterPath_275(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getParticleEmitterPath(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_string(runtime, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->getParticleEmitterPath(EntityRef(entity_index));
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
 	}
 	
 	static void lumscript_particle_emitter_setParticleEmitterPath_276(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		ls_string_view lumscript_string_sv_1 = ls_to_string(runtime, -1);
-		char lumscript_string_arg_1[128];
-		copyString(Span(lumscript_string_arg_1), StringView{lumscript_string_sv_1.begin, lumscript_string_sv_1.end});
-		module->setParticleEmitterPath(EntityRef(ls_to_i32(runtime, -3)), Path(lumscript_string_arg_1));
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_STRING_ARG(frame, path);
+		module->setParticleEmitterPath(EntityRef(entity_index), Path(StringView{path.begin, path.end}));
 	}
 	
 	static void lumscript_particle_emitter_getParticleEmitterAutodestroy_277(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getParticleEmitterAutodestroy(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_bool(runtime, ret);
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->getParticleEmitterAutodestroy(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_particle_emitter_setParticleEmitterAutodestroy_278(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->setParticleEmitterAutodestroy(EntityRef(ls_to_i32(runtime, -3)), bool(ls_to_bool(runtime, -1)));
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, bool, enable);
+		module->setParticleEmitterAutodestroy(EntityRef(entity_index), enable);
 	}
 	
 	static void lumscript_instanced_model_getInstancedModelPath_279(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getInstancedModelPath(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_string(runtime, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->getInstancedModelPath(EntityRef(entity_index));
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
 	}
 	
 	static void lumscript_instanced_model_setInstancedModelPath_280(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		ls_string_view lumscript_string_sv_1 = ls_to_string(runtime, -1);
-		char lumscript_string_arg_1[128];
-		copyString(Span(lumscript_string_arg_1), StringView{lumscript_string_sv_1.begin, lumscript_string_sv_1.end});
-		module->setInstancedModelPath(EntityRef(ls_to_i32(runtime, -3)), Path(lumscript_string_arg_1));
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_STRING_ARG(frame, path);
+		module->setInstancedModelPath(EntityRef(entity_index), Path(StringView{path.begin, path.end}));
 	}
 	
 	static void lumscript_model_instance_overrideMaterialVec4_281(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		ls_string_view lumscript_string_sv_1 = ls_to_string(runtime, -5);
-		char lumscript_string_arg_1[128];
-		copyString(Span(lumscript_string_arg_1), StringView{lumscript_string_sv_1.begin, lumscript_string_sv_1.end});
-		auto ret = module->overrideMaterialVec4(EntityRef(ls_to_i32(runtime, -8)), ls_to_u32(runtime, -6), lumscript_string_arg_1, Vec4(ls_to_f32(runtime, -4), ls_to_f32(runtime, -3), ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
-		ls_push_bool(runtime, ret);
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, u32, mesh_index);
+		LS_STRING_ARG(frame, uniform_name);
+		char lumscript_string_arg_uniform_name[128];
+		copyString(Span(lumscript_string_arg_uniform_name), StringView{uniform_name.begin, uniform_name.end});
+		LS_ARG(frame, Vec4, value);
+		auto ret = module->overrideMaterialVec4(EntityRef(entity_index), mesh_index, lumscript_string_arg_uniform_name, value);
+		LS_RESULT(frame, ret);
 	}
 	
 	static void lumscript_model_instance_setMaterialOverride_282(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		ls_string_view lumscript_string_sv_1 = ls_to_string(runtime, -1);
-		char lumscript_string_arg_1[128];
-		copyString(Span(lumscript_string_arg_1), StringView{lumscript_string_sv_1.begin, lumscript_string_sv_1.end});
-		module->setModelInstanceMaterialOverride(EntityRef(ls_to_i32(runtime, -4)), ls_to_u32(runtime, -2), Path(lumscript_string_arg_1));
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, u32, mesh_idx);
+		LS_STRING_ARG(frame, path);
+		module->setModelInstanceMaterialOverride(EntityRef(entity_index), mesh_idx, Path(StringView{path.begin, path.end}));
 	}
 	
-	static void lumscript_model_instance_isModelInstanceEnabled_283(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->isModelInstanceEnabled(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_bool(runtime, ret);
+	static void lumscript_model_instance_getMaterialOverride_283(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, u32, mesh_idx);
+		auto ret = module->getModelInstanceMaterialOverride(EntityRef(entity_index), mesh_idx);
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
 	}
 	
-	static void lumscript_model_instance_enableModelInstance_284(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->enableModelInstance(EntityRef(ls_to_i32(runtime, -3)), bool(ls_to_bool(runtime, -1)));
+	static void lumscript_model_instance_isModelInstanceEnabled_284(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->isModelInstanceEnabled(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
-	static void lumscript_model_instance_getModelInstancePath_285(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getModelInstancePath(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_string(runtime, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+	static void lumscript_model_instance_enableModelInstance_285(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, bool, enable);
+		module->enableModelInstance(EntityRef(entity_index), enable);
 	}
 	
-	static void lumscript_model_instance_setModelInstancePath_286(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		ls_string_view lumscript_string_sv_1 = ls_to_string(runtime, -1);
-		char lumscript_string_arg_1[128];
-		copyString(Span(lumscript_string_arg_1), StringView{lumscript_string_sv_1.begin, lumscript_string_sv_1.end});
-		module->setModelInstancePath(EntityRef(ls_to_i32(runtime, -3)), Path(lumscript_string_arg_1));
+	static void lumscript_model_instance_getModelInstancePath_286(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->getModelInstancePath(EntityRef(entity_index));
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
 	}
 	
-	static void lumscript_curve_decal_getCurveDecalMaterialPath_287(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getCurveDecalMaterialPath(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_string(runtime, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+	static void lumscript_model_instance_setModelInstancePath_287(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_STRING_ARG(frame, path);
+		module->setModelInstancePath(EntityRef(entity_index), Path(StringView{path.begin, path.end}));
 	}
 	
-	static void lumscript_curve_decal_setCurveDecalMaterialPath_288(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		ls_string_view lumscript_string_sv_1 = ls_to_string(runtime, -1);
-		char lumscript_string_arg_1[128];
-		copyString(Span(lumscript_string_arg_1), StringView{lumscript_string_sv_1.begin, lumscript_string_sv_1.end});
-		module->setCurveDecalMaterialPath(EntityRef(ls_to_i32(runtime, -3)), Path(lumscript_string_arg_1));
+	static void lumscript_curve_decal_getCurveDecalMaterialPath_288(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->getCurveDecalMaterialPath(EntityRef(entity_index));
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
 	}
 	
-	static void lumscript_curve_decal_getCurveDecalHalfExtents_289(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getCurveDecalHalfExtents(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+	static void lumscript_curve_decal_setCurveDecalMaterialPath_289(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_STRING_ARG(frame, path);
+		module->setCurveDecalMaterialPath(EntityRef(entity_index), Path(StringView{path.begin, path.end}));
 	}
 	
-	static void lumscript_curve_decal_setCurveDecalHalfExtents_290(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->setCurveDecalHalfExtents(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+	static void lumscript_curve_decal_getCurveDecalHalfExtents_290(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->getCurveDecalHalfExtents(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
-	static void lumscript_curve_decal_getCurveDecalUVScale_291(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getCurveDecalUVScale(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret.x);
-		ls_push_f32(runtime, ret.y);
+	static void lumscript_curve_decal_setCurveDecalHalfExtents_291(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, float, value);
+		module->setCurveDecalHalfExtents(EntityRef(entity_index), value);
 	}
 	
-	static void lumscript_curve_decal_setCurveDecalUVScale_292(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->setCurveDecalUVScale(EntityRef(ls_to_i32(runtime, -4)), Vec2(ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
+	static void lumscript_curve_decal_getCurveDecalUVScale_292(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->getCurveDecalUVScale(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
-	static void lumscript_curve_decal_getCurveDecalBezierP0_293(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getCurveDecalBezierP0(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret.x);
-		ls_push_f32(runtime, ret.y);
+	static void lumscript_curve_decal_setCurveDecalUVScale_293(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, Vec2, value);
+		module->setCurveDecalUVScale(EntityRef(entity_index), value);
 	}
 	
-	static void lumscript_curve_decal_setCurveDecalBezierP0_294(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->setCurveDecalBezierP0(EntityRef(ls_to_i32(runtime, -4)), Vec2(ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
+	static void lumscript_curve_decal_getCurveDecalBezierP0_294(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->getCurveDecalBezierP0(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
-	static void lumscript_curve_decal_getCurveDecalBezierP2_295(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getCurveDecalBezierP2(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret.x);
-		ls_push_f32(runtime, ret.y);
+	static void lumscript_curve_decal_setCurveDecalBezierP0_295(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, Vec2, value);
+		module->setCurveDecalBezierP0(EntityRef(entity_index), value);
 	}
 	
-	static void lumscript_curve_decal_setCurveDecalBezierP2_296(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->setCurveDecalBezierP2(EntityRef(ls_to_i32(runtime, -4)), Vec2(ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
+	static void lumscript_curve_decal_getCurveDecalBezierP2_296(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->getCurveDecalBezierP2(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
-	static void lumscript_terrain_getHeightAt_297(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getTerrainHeightAt(EntityRef(ls_to_i32(runtime, -4)), ls_to_f32(runtime, -2), ls_to_f32(runtime, -1));
-		ls_push_f32(runtime, ret);
+	static void lumscript_curve_decal_setCurveDecalBezierP2_297(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, Vec2, value);
+		module->setCurveDecalBezierP2(EntityRef(entity_index), value);
 	}
 	
-	static void lumscript_terrain_getNormalAt_298(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getTerrainNormalAt(EntityRef(ls_to_i32(runtime, -4)), ls_to_f32(runtime, -2), ls_to_f32(runtime, -1));
-		ls_push_f32(runtime, ret.x);
-		ls_push_f32(runtime, ret.y);
-		ls_push_f32(runtime, ret.z);
+	static void lumscript_terrain_getHeightAt_298(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, float, x);
+		LS_ARG(frame, float, z);
+		auto ret = module->getTerrainHeightAt(EntityRef(entity_index), x, z);
+		LS_RESULT(frame, ret);
 	}
 	
-	static void lumscript_terrain_getTerrainSize_299(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getTerrainSize(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret.x);
-		ls_push_f32(runtime, ret.y);
+	static void lumscript_terrain_getNormalAt_299(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, float, x);
+		LS_ARG(frame, float, z);
+		auto ret = module->getTerrainNormalAt(EntityRef(entity_index), x, z);
+		LS_RESULT(frame, ret);
 	}
 	
-	static void lumscript_terrain_getTerrainMaterialPath_300(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getTerrainMaterialPath(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_string(runtime, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+	static void lumscript_terrain_getTerrainSize_300(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->getTerrainSize(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
-	static void lumscript_terrain_setTerrainMaterialPath_301(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		ls_string_view lumscript_string_sv_1 = ls_to_string(runtime, -1);
-		char lumscript_string_arg_1[128];
-		copyString(Span(lumscript_string_arg_1), StringView{lumscript_string_sv_1.begin, lumscript_string_sv_1.end});
-		module->setTerrainMaterialPath(EntityRef(ls_to_i32(runtime, -3)), Path(lumscript_string_arg_1));
+	static void lumscript_terrain_getTerrainMaterialPath_301(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->getTerrainMaterialPath(EntityRef(entity_index));
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
 	}
 	
-	static void lumscript_terrain_getTerrainXZScale_302(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getTerrainXZScale(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+	static void lumscript_terrain_setTerrainMaterialPath_302(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_STRING_ARG(frame, path);
+		module->setTerrainMaterialPath(EntityRef(entity_index), Path(StringView{path.begin, path.end}));
 	}
 	
-	static void lumscript_terrain_setTerrainXZScale_303(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->setTerrainXZScale(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+	static void lumscript_terrain_getTerrainXZScale_303(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->getTerrainXZScale(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
-	static void lumscript_terrain_getTerrainTesselation_304(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getTerrainTesselation(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_i32(runtime, (i32)ret);
+	static void lumscript_terrain_setTerrainXZScale_304(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, float, scale);
+		module->setTerrainXZScale(EntityRef(entity_index), scale);
 	}
 	
-	static void lumscript_terrain_setTerrainTesselation_305(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->setTerrainTesselation(EntityRef(ls_to_i32(runtime, -3)), ls_to_u32(runtime, -1));
+	static void lumscript_terrain_getTerrainTesselation_305(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->getTerrainTesselation(EntityRef(entity_index));
+		LS_RESULT(frame, (i32)ret);
 	}
 	
-	static void lumscript_terrain_getTerrainBaseGridResolution_306(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getTerrainBaseGridResolution(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_i32(runtime, (i32)ret);
+	static void lumscript_terrain_setTerrainTesselation_306(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, u32, value);
+		module->setTerrainTesselation(EntityRef(entity_index), value);
 	}
 	
-	static void lumscript_terrain_setTerrainBaseGridResolution_307(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->setTerrainBaseGridResolution(EntityRef(ls_to_i32(runtime, -3)), ls_to_u32(runtime, -1));
+	static void lumscript_terrain_getTerrainBaseGridResolution_307(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->getTerrainBaseGridResolution(EntityRef(entity_index));
+		LS_RESULT(frame, (i32)ret);
 	}
 	
-	static void lumscript_terrain_getTerrainYScale_308(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getTerrainYScale(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret);
+	static void lumscript_terrain_setTerrainBaseGridResolution_308(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, u32, value);
+		module->setTerrainBaseGridResolution(EntityRef(entity_index), value);
 	}
 	
-	static void lumscript_terrain_setTerrainYScale_309(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		module->setTerrainYScale(EntityRef(ls_to_i32(runtime, -3)), ls_to_f32(runtime, -1));
+	static void lumscript_terrain_getTerrainYScale_309(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->getTerrainYScale(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
-	static void lumscript_terrain_grass_count_310(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		const i32 count = module->getGrassCount(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_i32(runtime, count);
+	static void lumscript_terrain_setTerrainYScale_310(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, float, scale);
+		module->setTerrainYScale(EntityRef(entity_index), scale);
 	}
 	
-	static void lumscript_terrain_grass_item_311(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -2));
-		const i32 count = module->getGrassCount(EntityRef(ls_to_i32(runtime, -3)));
-		if (ls_to_i32(runtime, -1) < 0 || ls_to_i32(runtime, -1) >= count) {
-			ls_push_null(runtime);
+	static void lumscript_terrain_grass_count_311(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		const i32 count = module->getGrassCount(EntityRef(entity_index));
+		LS_RESULT(frame, count);
+	}
+	
+	static void lumscript_terrain_grass_item_312(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_ARG(frame, i32, item_idx);
+		const i32 count = module->getGrassCount(EntityRef(entity_index));
+		if (item_idx < 0 || item_idx >= count) {
+			LS_RESULT(frame, u8(0));
 			return;
 		}
-		ls_push_i32(runtime, ls_to_i32(runtime, -2));
-		ls_push_i64(runtime, ls_to_i32(runtime, -1));
-		ls_push_ptr(runtime, module);
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, item_idx);
+		LS_RESULT(frame, module);
 	}
 	
-	static void lumscript_terrain_grass_getGrassRotationMode_312(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -4));
-		auto ret = module->getGrassRotationMode(EntityRef(ls_to_i32(runtime, -6)), (i32)ls_to_i64(runtime, -5));
-		ls_push_i32(runtime, (i32)ret);
+	static void lumscript_terrain_grass_getGrassRotationMode_313(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ARG(frame, i32, entity_idx);
+		LS_ARG(frame, i32, item_idx);
+		LS_ARG(frame, RenderModule*, module);
+		auto ret = module->getGrassRotationMode(EntityRef(entity_idx), item_idx);
+		LS_RESULT(frame, (i32)ret);
 	}
 	
-	static void lumscript_terrain_grass_setGrassRotationMode_313(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -5));
-		module->setGrassRotationMode(EntityRef(ls_to_i32(runtime, -7)), (i32)ls_to_i64(runtime, -6), (GrassRotationMode)ls_to_i32(runtime, -4));
+	static void lumscript_terrain_grass_setGrassRotationMode_314(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ARG(frame, i32, entity_idx);
+		LS_ARG(frame, i32, item_idx);
+		LS_ARG(frame, RenderModule*, module);
+		LS_ARG(frame, i32, value_value);
+		module->setGrassRotationMode(EntityRef(entity_idx), item_idx, (GrassRotationMode)value_value);
 	}
 	
-	static void lumscript_terrain_grass_getGrassDistance_314(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -4));
-		auto ret = module->getGrassDistance(EntityRef(ls_to_i32(runtime, -6)), (i32)ls_to_i64(runtime, -5));
-		ls_push_f32(runtime, ret);
+	static void lumscript_terrain_grass_getGrassDistance_315(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ARG(frame, i32, entity_idx);
+		LS_ARG(frame, i32, item_idx);
+		LS_ARG(frame, RenderModule*, module);
+		auto ret = module->getGrassDistance(EntityRef(entity_idx), item_idx);
+		LS_RESULT(frame, ret);
 	}
 	
-	static void lumscript_terrain_grass_setGrassDistance_315(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -5));
-		module->setGrassDistance(EntityRef(ls_to_i32(runtime, -7)), (i32)ls_to_i64(runtime, -6), ls_to_f32(runtime, -4));
+	static void lumscript_terrain_grass_setGrassDistance_316(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ARG(frame, i32, entity_idx);
+		LS_ARG(frame, i32, item_idx);
+		LS_ARG(frame, RenderModule*, module);
+		LS_ARG(frame, float, value);
+		module->setGrassDistance(EntityRef(entity_idx), item_idx, value);
 	}
 	
-	static void lumscript_terrain_grass_getGrassPath_316(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -4));
-		auto ret = module->getGrassPath(EntityRef(ls_to_i32(runtime, -6)), (i32)ls_to_i64(runtime, -5));
-		ls_push_string(runtime, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+	static void lumscript_terrain_grass_getGrassPath_317(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ARG(frame, i32, entity_idx);
+		LS_ARG(frame, i32, item_idx);
+		LS_ARG(frame, RenderModule*, module);
+		auto ret = module->getGrassPath(EntityRef(entity_idx), item_idx);
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
 	}
 	
-	static void lumscript_terrain_grass_setGrassPath_317(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -5));
-		ls_string_view lumscript_string_sv_1 = ls_to_string(runtime, -4);
-		char lumscript_string_arg_1[128];
-		copyString(Span(lumscript_string_arg_1), StringView{lumscript_string_sv_1.begin, lumscript_string_sv_1.end});
-		module->setGrassPath(EntityRef(ls_to_i32(runtime, -7)), (i32)ls_to_i64(runtime, -6), Path(lumscript_string_arg_1));
+	static void lumscript_terrain_grass_setGrassPath_318(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ARG(frame, i32, entity_idx);
+		LS_ARG(frame, i32, item_idx);
+		LS_ARG(frame, RenderModule*, module);
+		LS_STRING_ARG(frame, path);
+		module->setGrassPath(EntityRef(entity_idx), item_idx, Path(StringView{path.begin, path.end}));
 	}
 	
-	static void lumscript_terrain_grass_getGrassSpacing_318(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -4));
-		auto ret = module->getGrassSpacing(EntityRef(ls_to_i32(runtime, -6)), (i32)ls_to_i64(runtime, -5));
-		ls_push_f32(runtime, ret);
+	static void lumscript_terrain_grass_getGrassSpacing_319(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ARG(frame, i32, entity_idx);
+		LS_ARG(frame, i32, item_idx);
+		LS_ARG(frame, RenderModule*, module);
+		auto ret = module->getGrassSpacing(EntityRef(entity_idx), item_idx);
+		LS_RESULT(frame, ret);
 	}
 	
-	static void lumscript_terrain_grass_setGrassSpacing_319(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -5));
-		module->setGrassSpacing(EntityRef(ls_to_i32(runtime, -7)), (i32)ls_to_i64(runtime, -6), ls_to_f32(runtime, -4));
+	static void lumscript_terrain_grass_setGrassSpacing_320(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ARG(frame, i32, entity_idx);
+		LS_ARG(frame, i32, item_idx);
+		LS_ARG(frame, RenderModule*, module);
+		LS_ARG(frame, float, spacing);
+		module->setGrassSpacing(EntityRef(entity_idx), item_idx, spacing);
 	}
 	
-	static void lumscript_procedural_geom_getProceduralGeometryMaterial_320(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getProceduralGeometryMaterial(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_string(runtime, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+	static void lumscript_procedural_geom_getProceduralGeometryMaterial_321(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		auto ret = module->getProceduralGeometryMaterial(EntityRef(entity_index));
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
 	}
 	
-	static void lumscript_procedural_geom_setProceduralGeometryMaterial_321(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<RenderModule*>(ls_to_ptr(runtime, -1));
-		ls_string_view lumscript_string_sv_1 = ls_to_string(runtime, -1);
-		char lumscript_string_arg_1[128];
-		copyString(Span(lumscript_string_arg_1), StringView{lumscript_string_sv_1.begin, lumscript_string_sv_1.end});
-		module->setProceduralGeometryMaterial(EntityRef(ls_to_i32(runtime, -3)), Path(lumscript_string_arg_1));
+	static void lumscript_procedural_geom_setProceduralGeometryMaterial_322(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, RenderModule*, entity, module);
+		LS_STRING_ARG(frame, path);
+		module->setProceduralGeometryMaterial(EntityRef(entity_index), Path(StringView{path.begin, path.end}));
 	}
 	
-	static void lumscript_ui_3d_getUI3DPath_322(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<UIModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getUI3DPath(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_string(runtime, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+	static void lumscript_ui_3d_getUI3DPath_323(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, UIModule*, entity, module);
+		auto ret = module->getUI3DPath(EntityRef(entity_index));
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
 	}
 	
-	static void lumscript_ui_3d_setUI3DPath_323(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<UIModule*>(ls_to_ptr(runtime, -1));
-		ls_string_view lumscript_string_sv_1 = ls_to_string(runtime, -1);
-		char lumscript_string_arg_1[128];
-		copyString(Span(lumscript_string_arg_1), StringView{lumscript_string_sv_1.begin, lumscript_string_sv_1.end});
-		module->setUI3DPath(EntityRef(ls_to_i32(runtime, -3)), Path(lumscript_string_arg_1));
+	static void lumscript_ui_3d_setUI3DPath_324(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, UIModule*, entity, module);
+		LS_STRING_ARG(frame, path);
+		module->setUI3DPath(EntityRef(entity_index), Path(StringView{path.begin, path.end}));
 	}
 	
-	static void lumscript_ui_3d_getUI3DVirtualSize_324(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<UIModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getUI3DVirtualSize(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_f32(runtime, ret.x);
-		ls_push_f32(runtime, ret.y);
+	static void lumscript_ui_3d_getUI3DVirtualSize_325(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, UIModule*, entity, module);
+		auto ret = module->getUI3DVirtualSize(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
-	static void lumscript_ui_3d_setUI3DVirtualSize_325(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<UIModule*>(ls_to_ptr(runtime, -1));
-		module->setUI3DVirtualSize(EntityRef(ls_to_i32(runtime, -4)), Vec2(ls_to_f32(runtime, -2), ls_to_f32(runtime, -1)));
+	static void lumscript_ui_3d_setUI3DVirtualSize_326(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, UIModule*, entity, module);
+		LS_ARG(frame, Vec2, value);
+		module->setUI3DVirtualSize(EntityRef(entity_index), value);
 	}
 	
-	static void lumscript_ui_3d_getUI3DOrientToCamera_326(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<UIModule*>(ls_to_ptr(runtime, -1));
-		auto ret = module->getUI3DOrientToCamera(EntityRef(ls_to_i32(runtime, -2)));
-		ls_push_bool(runtime, ret);
+	static void lumscript_ui_3d_getUI3DOrientToCamera_327(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, UIModule*, entity, module);
+		auto ret = module->getUI3DOrientToCamera(EntityRef(entity_index));
+		LS_RESULT(frame, ret);
 	}
 	
-	static void lumscript_ui_3d_setUI3DOrientToCamera_327(ls_runtime* runtime, ls_call_frame frame) {
-		auto* module = static_cast<UIModule*>(ls_to_ptr(runtime, -1));
-		module->setUI3DOrientToCamera(EntityRef(ls_to_i32(runtime, -3)), bool(ls_to_bool(runtime, -1)));
+	static void lumscript_ui_3d_setUI3DOrientToCamera_328(ls_runtime* runtime, ls_call_frame frame) {
+		LS_COMPONENT_ARG(frame, UIModule*, entity, module);
+		LS_ARG(frame, bool, value);
+		module->setUI3DOrientToCamera(EntityRef(entity_index), value);
 	}
 	
 	static void registerGeneratedEngineImport(HashMap<StringView, ls_native_fn>& functions) {
@@ -2864,53 +3040,56 @@ namespace Lumix::LumScript::generated {
 		functions.insert(StringView("core:instanced_model.setInstancedModelPath"), &lumscript_instanced_model_setInstancedModelPath_280);
 		functions.insert(StringView("core:model_instance.overrideMaterialVec4"), &lumscript_model_instance_overrideMaterialVec4_281);
 		functions.insert(StringView("core:model_instance.setMaterialOverride"), &lumscript_model_instance_setMaterialOverride_282);
-		functions.insert(StringView("core:model_instance.isModelInstanceEnabled"), &lumscript_model_instance_isModelInstanceEnabled_283);
-		functions.insert(StringView("core:model_instance.enableModelInstance"), &lumscript_model_instance_enableModelInstance_284);
-		functions.insert(StringView("core:model_instance.getModelInstancePath"), &lumscript_model_instance_getModelInstancePath_285);
-		functions.insert(StringView("core:model_instance.setModelInstancePath"), &lumscript_model_instance_setModelInstancePath_286);
-		functions.insert(StringView("core:curve_decal.getCurveDecalMaterialPath"), &lumscript_curve_decal_getCurveDecalMaterialPath_287);
-		functions.insert(StringView("core:curve_decal.setCurveDecalMaterialPath"), &lumscript_curve_decal_setCurveDecalMaterialPath_288);
-		functions.insert(StringView("core:curve_decal.getCurveDecalHalfExtents"), &lumscript_curve_decal_getCurveDecalHalfExtents_289);
-		functions.insert(StringView("core:curve_decal.setCurveDecalHalfExtents"), &lumscript_curve_decal_setCurveDecalHalfExtents_290);
-		functions.insert(StringView("core:curve_decal.getCurveDecalUVScale"), &lumscript_curve_decal_getCurveDecalUVScale_291);
-		functions.insert(StringView("core:curve_decal.setCurveDecalUVScale"), &lumscript_curve_decal_setCurveDecalUVScale_292);
-		functions.insert(StringView("core:curve_decal.getCurveDecalBezierP0"), &lumscript_curve_decal_getCurveDecalBezierP0_293);
-		functions.insert(StringView("core:curve_decal.setCurveDecalBezierP0"), &lumscript_curve_decal_setCurveDecalBezierP0_294);
-		functions.insert(StringView("core:curve_decal.getCurveDecalBezierP2"), &lumscript_curve_decal_getCurveDecalBezierP2_295);
-		functions.insert(StringView("core:curve_decal.setCurveDecalBezierP2"), &lumscript_curve_decal_setCurveDecalBezierP2_296);
-		functions.insert(StringView("core:terrain.getHeightAt"), &lumscript_terrain_getHeightAt_297);
-		functions.insert(StringView("core:terrain.getNormalAt"), &lumscript_terrain_getNormalAt_298);
-		functions.insert(StringView("core:terrain.getTerrainSize"), &lumscript_terrain_getTerrainSize_299);
-		functions.insert(StringView("core:terrain.getTerrainMaterialPath"), &lumscript_terrain_getTerrainMaterialPath_300);
-		functions.insert(StringView("core:terrain.setTerrainMaterialPath"), &lumscript_terrain_setTerrainMaterialPath_301);
-		functions.insert(StringView("core:terrain.getTerrainXZScale"), &lumscript_terrain_getTerrainXZScale_302);
-		functions.insert(StringView("core:terrain.setTerrainXZScale"), &lumscript_terrain_setTerrainXZScale_303);
-		functions.insert(StringView("core:terrain.getTerrainTesselation"), &lumscript_terrain_getTerrainTesselation_304);
-		functions.insert(StringView("core:terrain.setTerrainTesselation"), &lumscript_terrain_setTerrainTesselation_305);
-		functions.insert(StringView("core:terrain.getTerrainBaseGridResolution"), &lumscript_terrain_getTerrainBaseGridResolution_306);
-		functions.insert(StringView("core:terrain.setTerrainBaseGridResolution"), &lumscript_terrain_setTerrainBaseGridResolution_307);
-		functions.insert(StringView("core:terrain.getTerrainYScale"), &lumscript_terrain_getTerrainYScale_308);
-		functions.insert(StringView("core:terrain.setTerrainYScale"), &lumscript_terrain_setTerrainYScale_309);
+		functions.insert(StringView("core:model_instance.getMaterialOverride"), &lumscript_model_instance_getMaterialOverride_283);
+		functions.insert(StringView("core:model_instance.isModelInstanceEnabled"), &lumscript_model_instance_isModelInstanceEnabled_284);
+		functions.insert(StringView("core:model_instance.enableModelInstance"), &lumscript_model_instance_enableModelInstance_285);
+		functions.insert(StringView("core:model_instance.getModelInstancePath"), &lumscript_model_instance_getModelInstancePath_286);
+		functions.insert(StringView("core:model_instance.setModelInstancePath"), &lumscript_model_instance_setModelInstancePath_287);
+		functions.insert(StringView("core:curve_decal.getCurveDecalMaterialPath"), &lumscript_curve_decal_getCurveDecalMaterialPath_288);
+		functions.insert(StringView("core:curve_decal.setCurveDecalMaterialPath"), &lumscript_curve_decal_setCurveDecalMaterialPath_289);
+		functions.insert(StringView("core:curve_decal.getCurveDecalHalfExtents"), &lumscript_curve_decal_getCurveDecalHalfExtents_290);
+		functions.insert(StringView("core:curve_decal.setCurveDecalHalfExtents"), &lumscript_curve_decal_setCurveDecalHalfExtents_291);
+		functions.insert(StringView("core:curve_decal.getCurveDecalUVScale"), &lumscript_curve_decal_getCurveDecalUVScale_292);
+		functions.insert(StringView("core:curve_decal.setCurveDecalUVScale"), &lumscript_curve_decal_setCurveDecalUVScale_293);
+		functions.insert(StringView("core:curve_decal.getCurveDecalBezierP0"), &lumscript_curve_decal_getCurveDecalBezierP0_294);
+		functions.insert(StringView("core:curve_decal.setCurveDecalBezierP0"), &lumscript_curve_decal_setCurveDecalBezierP0_295);
+		functions.insert(StringView("core:curve_decal.getCurveDecalBezierP2"), &lumscript_curve_decal_getCurveDecalBezierP2_296);
+		functions.insert(StringView("core:curve_decal.setCurveDecalBezierP2"), &lumscript_curve_decal_setCurveDecalBezierP2_297);
+		functions.insert(StringView("core:terrain.getHeightAt"), &lumscript_terrain_getHeightAt_298);
+		functions.insert(StringView("core:terrain.getNormalAt"), &lumscript_terrain_getNormalAt_299);
+		functions.insert(StringView("core:terrain.getTerrainSize"), &lumscript_terrain_getTerrainSize_300);
+		functions.insert(StringView("core:terrain.getTerrainMaterialPath"), &lumscript_terrain_getTerrainMaterialPath_301);
+		functions.insert(StringView("core:terrain.setTerrainMaterialPath"), &lumscript_terrain_setTerrainMaterialPath_302);
+		functions.insert(StringView("core:terrain.getTerrainXZScale"), &lumscript_terrain_getTerrainXZScale_303);
+		functions.insert(StringView("core:terrain.setTerrainXZScale"), &lumscript_terrain_setTerrainXZScale_304);
+		functions.insert(StringView("core:terrain.getTerrainTesselation"), &lumscript_terrain_getTerrainTesselation_305);
+		functions.insert(StringView("core:terrain.setTerrainTesselation"), &lumscript_terrain_setTerrainTesselation_306);
+		functions.insert(StringView("core:terrain.getTerrainBaseGridResolution"), &lumscript_terrain_getTerrainBaseGridResolution_307);
+		functions.insert(StringView("core:terrain.setTerrainBaseGridResolution"), &lumscript_terrain_setTerrainBaseGridResolution_308);
+		functions.insert(StringView("core:terrain.getTerrainYScale"), &lumscript_terrain_getTerrainYScale_309);
+		functions.insert(StringView("core:terrain.setTerrainYScale"), &lumscript_terrain_setTerrainYScale_310);
 		functions.insert(StringView("core:terrain.grassCount"), &
-		lumscript_terrain_grass_count_310);
+		lumscript_terrain_grass_count_311);
 		functions.insert(StringView("core:terrain.grass"), &
-		lumscript_terrain_grass_item_311);
-		functions.insert(StringView("core:terrain.getGrassRotationMode"), &lumscript_terrain_grass_getGrassRotationMode_312);
-		functions.insert(StringView("core:terrain.setGrassRotationMode"), &lumscript_terrain_grass_setGrassRotationMode_313);
-		functions.insert(StringView("core:terrain.getGrassDistance"), &lumscript_terrain_grass_getGrassDistance_314);
-		functions.insert(StringView("core:terrain.setGrassDistance"), &lumscript_terrain_grass_setGrassDistance_315);
-		functions.insert(StringView("core:terrain.getGrassPath"), &lumscript_terrain_grass_getGrassPath_316);
-		functions.insert(StringView("core:terrain.setGrassPath"), &lumscript_terrain_grass_setGrassPath_317);
-		functions.insert(StringView("core:terrain.getGrassSpacing"), &lumscript_terrain_grass_getGrassSpacing_318);
-		functions.insert(StringView("core:terrain.setGrassSpacing"), &lumscript_terrain_grass_setGrassSpacing_319);
-		functions.insert(StringView("core:procedural_geom.getProceduralGeometryMaterial"), &lumscript_procedural_geom_getProceduralGeometryMaterial_320);
-		functions.insert(StringView("core:procedural_geom.setProceduralGeometryMaterial"), &lumscript_procedural_geom_setProceduralGeometryMaterial_321);
-		functions.insert(StringView("core:ui_3d.getUI3DPath"), &lumscript_ui_3d_getUI3DPath_322);
-		functions.insert(StringView("core:ui_3d.setUI3DPath"), &lumscript_ui_3d_setUI3DPath_323);
-		functions.insert(StringView("core:ui_3d.getUI3DVirtualSize"), &lumscript_ui_3d_getUI3DVirtualSize_324);
-		functions.insert(StringView("core:ui_3d.setUI3DVirtualSize"), &lumscript_ui_3d_setUI3DVirtualSize_325);
-		functions.insert(StringView("core:ui_3d.getUI3DOrientToCamera"), &lumscript_ui_3d_getUI3DOrientToCamera_326);
-		functions.insert(StringView("core:ui_3d.setUI3DOrientToCamera"), &lumscript_ui_3d_setUI3DOrientToCamera_327);
+		lumscript_terrain_grass_item_312);
+		functions.insert(StringView("core:terrain.getGrassRotationMode"), &lumscript_terrain_grass_getGrassRotationMode_313);
+		functions.insert(StringView("core:terrain.setGrassRotationMode"), &lumscript_terrain_grass_setGrassRotationMode_314);
+		functions.insert(StringView("core:terrain.getGrassDistance"), &lumscript_terrain_grass_getGrassDistance_315);
+		functions.insert(StringView("core:terrain.setGrassDistance"), &lumscript_terrain_grass_setGrassDistance_316);
+		functions.insert(StringView("core:terrain.getGrassPath"), &lumscript_terrain_grass_getGrassPath_317);
+		functions.insert(StringView("core:terrain.setGrassPath"), &lumscript_terrain_grass_setGrassPath_318);
+		functions.insert(StringView("core:terrain.getGrassSpacing"), &lumscript_terrain_grass_getGrassSpacing_319);
+		functions.insert(StringView("core:terrain.setGrassSpacing"), &lumscript_terrain_grass_setGrassSpacing_320);
+		functions.insert(StringView("core:procedural_geom.getProceduralGeometryMaterial"), &lumscript_procedural_geom_getProceduralGeometryMaterial_321);
+		functions.insert(StringView("core:procedural_geom.setProceduralGeometryMaterial"), &lumscript_procedural_geom_setProceduralGeometryMaterial_322);
+		functions.insert(StringView("core:ui_3d.getUI3DPath"), &lumscript_ui_3d_getUI3DPath_323);
+		functions.insert(StringView("core:ui_3d.setUI3DPath"), &lumscript_ui_3d_setUI3DPath_324);
+		functions.insert(StringView("core:ui_3d.getUI3DVirtualSize"), &lumscript_ui_3d_getUI3DVirtualSize_325);
+		functions.insert(StringView("core:ui_3d.setUI3DVirtualSize"), &lumscript_ui_3d_setUI3DVirtualSize_326);
+		functions.insert(StringView("core:ui_3d.getUI3DOrientToCamera"), &lumscript_ui_3d_getUI3DOrientToCamera_327);
+		functions.insert(StringView("core:ui_3d.setUI3DOrientToCamera"), &lumscript_ui_3d_setUI3DOrientToCamera_328);
 	}
 	
 } // namespace Lumix::LumScript::generated
+#undef LS_ENTITY_ARG
+#undef LS_COMPONENT_ARG

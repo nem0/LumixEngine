@@ -85,6 +85,7 @@ struct Token {
 		F32,
 		F64,
 		CPTR,
+		CSTR,
 		BYTE,
 		SIZEOF,
 		ALIGNOF,

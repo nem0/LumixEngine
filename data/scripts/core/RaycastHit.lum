@@ -6,5 +6,5 @@ struct RaycastHit {
 	position : Vec3;
 	normal : Vec3;
 	entity : Entity;
-};
+}
 

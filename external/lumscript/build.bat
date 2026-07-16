@@ -6,6 +6,7 @@ REM
 REM Usage:
 REM   build.bat
 REM   build.bat tests
+REM   build.bat lum_to_c
 REM   build.bat clang
 REM   build.bat tests clang
 
@@ -20,6 +21,8 @@ set VSDEV_CMD=
 
 if /I "%~1"=="tests" set TARGET=tests
 if /I "%~2"=="tests" set TARGET=tests
+if /I "%~1"=="lum_to_c" set TARGET=lum_to_c
+if /I "%~2"=="lum_to_c" set TARGET=lum_to_c
 
 if /I "%~1"=="clang" set COMPILER=clang-cl
 if /I "%~1"=="clang-cl" set COMPILER=clang-cl
@@ -77,6 +80,8 @@ if /I "%TARGET%"=="tests" (
 
 if /I "%TARGET%"=="tests" (
     set LDFLAGS=/nologo /DEBUG /INCREMENTAL:NO /OUT:"%OUT_DIR%\tests.exe"
+) else if /I "%TARGET%"=="lum_to_c" (
+    set LDFLAGS=/nologo /DEBUG /INCREMENTAL:NO /OUT:"%OUT_DIR%\lum_to_c.exe"
 ) else (
     set LDFLAGS=/nologo /DEBUG /INCREMENTAL:NO /OUT:"%OUT_DIR%\lumc.exe"
 )
@@ -91,6 +96,12 @@ if /I "%TARGET%"=="tests" (
 	%COMPILER% %CFLAGS% /c "%SCRIPT_DIR%runtime.c"
 	if errorlevel 1 exit /b !errorlevel!
 	%COMPILER% "main.obj" "parser.obj" "compiler.obj" "bytecode_compiler.obj" "runtime.obj" "capi.obj" /link %LDFLAGS%
+) else if /I "%TARGET%"=="lum_to_c" (
+	%COMPILER% %CXXFLAGS% /c "%SCRIPT_DIR%c_compiler\lum_to_c.cpp" "%SCRIPT_DIR%parser.cpp" "%SCRIPT_DIR%compiler.cpp" "%SCRIPT_DIR%c_compiler\c_compiler.cpp" "%SCRIPT_DIR%capi.cpp"
+	if errorlevel 1 exit /b !errorlevel!
+	%COMPILER% %CFLAGS% /c "%SCRIPT_DIR%runtime.c"
+	if errorlevel 1 exit /b !errorlevel!
+	%COMPILER% "lum_to_c.obj" "parser.obj" "compiler.obj" "c_compiler.obj" "runtime.obj" "capi.obj" /link %LDFLAGS%
 ) else (
 	if /I "%USE_CLANG%"=="1" (
 		%COMPILER% %CFLAGS% /c "%SCRIPT_DIR%lumc.c"

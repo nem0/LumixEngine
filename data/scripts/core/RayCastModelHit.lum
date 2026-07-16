@@ -12,5 +12,5 @@ struct RayCastModelHit {
 	entity : Entity;
 	component_type : void;
 	subindex : i32;
-};
+}
 

@@ -12,5 +12,5 @@ enum EventType {
 	MOUSE_ENTER = 8,
 	MOUSE_LEAVE = 9,
 	INVALID = 10
-};
+}
 

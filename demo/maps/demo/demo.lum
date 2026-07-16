@@ -48,7 +48,7 @@ fn update(dt : f32) : void {
 				imgui.textUnformatted("2 clicks");
 			case 3:
 				imgui.textUnformatted("3 clicks");
-			case _:
+			else:
 				imgui.textUnformatted("many clicks");
 		}
 

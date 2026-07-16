@@ -465,6 +465,27 @@ TEST(FunctionNamedSinCompilesAndRuns) {
 	return true;
 }
 
+TEST(FunctionNamedLengthCompilesAndRuns) {
+	const char* source = R"(
+		fn length(v : i32) : i32 {
+			return v + 1;
+		}
+
+		fn main() : i32 {
+			return length(41);
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(ExternSinDoesNotAutoBindBuiltin) {
 	const char* source = R"(
 		extern fn sin(v : f32) : f32;

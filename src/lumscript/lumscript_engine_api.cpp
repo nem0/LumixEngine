@@ -15,17 +15,15 @@ struct LumScriptEntity {
 	EntityRef entity;
 };
 
-template <> struct StackSlots<LumScriptEntity> {
-	static constexpr int value = 2;
-};
-
-template <> inline LumScriptEntity checkArg<LumScriptEntity>(ls_runtime* runtime, int index) {
-	return {(World*)ls_to_ptr(runtime, index), EntityRef(ls_to_i32(runtime, index - 1))};
+template <> inline LumScriptEntity readArg<LumScriptEntity>(ls_call_frame& frame) {
+	LS_ARG(frame, i32, entity_index);
+	LS_ARG(frame, World*, world);
+	return {world, EntityRef(entity_index)};
 }
 
-inline void push(ls_runtime* runtime, const LumScriptEntity& value) {
-	ls_push_i32(runtime, value.entity.index);
-	ls_push_ptr(runtime, value.world);
+void writeResult(ls_runtime*, ls_call_frame& frame, const LumScriptEntity& value) {
+	LS_RESULT(frame, value.entity.index);
+	LS_RESULT(frame, value.world);
 }
 
 namespace {
@@ -148,29 +146,25 @@ static bool lumscript_world_hasEntity(LumScriptEntity entity) {
 	return entity.entity.index >= 0 && entity.world->hasEntity(entity.entity);
 }
 
-static void lumscript_world_findByName(ls_runtime* runtime, ls_call_frame frame) {
-	World* world = (World*)ls_to_ptr(runtime, -2);
+static void lumscript_world_findByName(ls_runtime*, ls_call_frame frame) {
+	LS_ARG(frame, World*, world);
 	char name[128];
-	ls_string_view name_sv = ls_to_string(runtime, -1);
+	LS_STRING_ARG(frame, name_sv);
 	const i32 name_len = (i32)(name_sv.end - name_sv.begin);
 	if (name_len >= (i32)sizeof(name)) {
-		ls_push_bool(runtime, false);
-		ls_push_i32(runtime, 0);
-		ls_push_ptr(runtime, nullptr);
+		LS_RESULT(frame, u8(0));
 		return;
 	}
 	if (name_len > 0) memcpy(name, name_sv.begin, (size_t)name_len);
 	name[name_len] = '\0';
 	const EntityPtr entity = world->findByName(INVALID_ENTITY, name);
 	if (!entity.isValid()) {
-		ls_push_bool(runtime, false);
-		ls_push_i32(runtime, 0);
-		ls_push_ptr(runtime, nullptr);
+		LS_RESULT(frame, u8(0));
 		return;
 	}
-	ls_push_bool(runtime, true);
-	ls_push_i32(runtime, entity.index);
-	ls_push_ptr(runtime, world);
+	LS_RESULT(frame, u8(1));
+	LS_RESULT(frame, entity.index);
+	LS_RESULT(frame, world);
 }
 
 static void lumscript_entity_destroy(LumScriptEntity entity) {

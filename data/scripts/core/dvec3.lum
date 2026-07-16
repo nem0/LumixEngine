@@ -2,7 +2,7 @@ struct DVec3 {
 	x : f64;
 	y : f64;
 	z : f64;
-};
+}
 
 operator +(a : DVec3, b : DVec3) : DVec3 {
 	return DVec3 {

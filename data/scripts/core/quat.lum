@@ -3,7 +3,7 @@ struct Quat {
 	y : f32;
 	z : f32;
 	w : f32;
-};
+}
 
 operator +(a : Quat, b : Quat) : Quat {
 	return Quat {

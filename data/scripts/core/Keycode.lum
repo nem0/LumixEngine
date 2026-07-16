@@ -187,5 +187,5 @@ enum Keycode {
 	Z = 90,
 	INVALID = 0,
 	MAX = 255
-};
+}
 
