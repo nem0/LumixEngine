@@ -518,7 +518,7 @@ TEST(ImportCycleFails) {
 	return true;
 }
 
-TEST(ADLLocalFunctionPreferredOverNamespace) {
+TEST(UFCSNamespacePreferredOverLocalFunction) {
 	const char* main_source = R"(
 		import "entity_mod" as entity
 		import "helper_mod" as e
@@ -555,14 +555,16 @@ TEST(ADLLocalFunctionPreferredOverNamespace) {
 	};
 	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
 
+	// e.destroy() = 2 (qualified), x.destroy() = 7 (method syntax prefers the
+	// receiver type's unit), destroy(x) = 3 (plain call stays lexical)
 	EXPECT_RUNTIME_WITH_IMPORTS(main_source, files, runtime,
 		EXPECT_TRUE(ls_call(runtime, toLs("main")));
-		EXPECT_EQ(8, ls_to_i32(runtime, -1));
+		EXPECT_EQ(12, ls_to_i32(runtime, -1));
 	);
 	return true;
 }
 
-TEST(UFCSADLPrefersLocalFunctionOverNamespace) {
+TEST(UFCSPrefersNamespaceOverLocalFunction) {
 	const char* main_source = R"(
 		import "entity_mod" as entity
 
@@ -591,9 +593,10 @@ TEST(UFCSADLPrefersLocalFunctionOverNamespace) {
 	};
 	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
 
+	// x.destroy() binds to entity_mod.destroy (receiver's unit), not the local fn
 	EXPECT_RUNTIME_WITH_IMPORTS(main_source, files, runtime,
 		EXPECT_TRUE(ls_call(runtime, toLs("main")));
-		EXPECT_EQ(3, ls_to_i32(runtime, -1));
+		EXPECT_EQ(7, ls_to_i32(runtime, -1));
 	);
 	return true;
 }
@@ -1072,6 +1075,37 @@ TEST(ExternFnSecondImportCorrectIndex) {
 	ls_runtime_destroy(runtime);
 	ls_bytecode_destroy(bytecode);
 	ls_module_destroy(module);
+	return true;
+}
+
+// A local fn whose first parameter cannot take the UFCS receiver must not
+// shadow the same-named fn from the receiver type's unit.
+TEST(UfcsNotShadowedByLocalFunctionWithSameName) {
+	const char* main_source = R"(
+		import "arr" as arr
+
+		fn init(x : i32) : void {}
+
+		fn main() : void {
+			var a : arr.Array[i32] = undefined;
+			a.init();
+			init(5);
+		}
+	)";
+	const char* arr_source = R"(
+		struct Array[T] {
+			size : isize;
+		}
+
+		fn init(array : ref Array[$T]) : void {
+			array.size = 0;
+		}
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("arr"), toLs(arr_source) },
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_COMPILE_WITH_IMPORTS(main_source, files);
 	return true;
 }
 

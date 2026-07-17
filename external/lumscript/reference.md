@@ -1539,7 +1539,7 @@ Rules:
 
 - if `x.foo(a, b)` is not resolved by other language features (enum, struct field, namespace), it's retried as `foo(x, a, b)`
 - if the resolved function takes its first parameter by `ref`, the receiver is passed by `ref`; `x.foo(a, b)` is then equivalent to `foo(ref x, a, b)`
-- ADL is tried with the transformed form
+- method syntax dispatches on the receiver: the declaring namespace of the receiver's type is searched first, and only if it has no match does lookup fall back to the current module and unaliased imports; a local function never shadows a same-named function from the receiver type's unit
 - does not apply to primitive receiver types, e.g. `4.foo(a, b)` is invalid
 - alias-qualified calls (`entity.destroy(e)`) are always unambiguous
 
@@ -1551,8 +1551,8 @@ import "engine:entity" as entity
 fn destroy(e : entity.Entity) : void {}
 
 fn example(e : entity.Entity) : void {
-	e.destroy();       // calls local destroy — local is preferred over namespace
-	destroy(e);        // calls local destroy — local is preferred over ADL
+	e.destroy();       // calls entity.destroy — method syntax prefers the receiver type's unit
+	destroy(e);        // calls local destroy — plain calls stay lexical, local is preferred over ADL
 	entity.destroy(e); // calls entity.destroy — explicit namespace, always unambiguous
 }
 ```

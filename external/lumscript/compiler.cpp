@@ -1921,8 +1921,18 @@ struct Checker {
 			return nullptr;
 		}
 
-		SymbolRef ref = resolveSymbol(unit, {}, mem.name, LookupPolicy::Checked, &receiver_type);
-		
+		// Method syntax dispatches on the receiver: the type's own unit wins over
+		// local and imported declarations, so e.g. a script's own `init` does not
+		// shadow `array.init` in `a.init()`. Lexical lookup is only a fallback.
+		SymbolRef ref;
+		if (Unit* namespace_unit = findTypeNamespaceUnit(receiver_type)) {
+			if (Symbol* candidate = findSymbol(*namespace_unit, mem.name)) {
+				ref = {namespace_unit, candidate};
+				if (checkSymbol(*namespace_unit, *candidate) == LS_RESULT_FAILURE) ref.check_failed = true;
+			}
+		}
+		if (!ref.symbol) ref = resolveSymbol(unit, {}, mem.name, LookupPolicy::Checked);
+
 		if (!ref) {
 			errorLine(expr.token, "Could not resolve member function: ", mem.name);
 			return nullptr;

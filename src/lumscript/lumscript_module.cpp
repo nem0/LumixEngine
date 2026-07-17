@@ -46,9 +46,11 @@ static void bindCoreFunctions(ls_module* module, ls_runtime* runtime, IAllocator
 	for (i32 unit_index = 0, unit_count = ls_module_get_unit_count(module); unit_index < unit_count; ++unit_index) {
 		ls_unit* unit = ls_module_get_unit(module, unit_index);
 		const ls_string_view path = ls_unit_get_path(unit);
+		const StringView unit_path(path.begin, path.end);
+		if (unit_path == "std:math" || unit_path == "std:mem") continue;
 		for (i32 function_index = 0, function_count = ls_unit_get_native_function_count(unit); function_index < function_count; ++function_index) {
 			const ls_string_view name = ls_unit_get_native_function_name(unit, function_index);
-			const NativeFunctionKey key{{path.begin, path.end}, {name.begin, name.end}};
+			const NativeFunctionKey key{unit_path, {name.begin, name.end}};
 			auto iter = functions.find(key);
 			if (!iter.isValid()) {
 				logError("LumScript : failed to bind native function ", key.unit_path, ".", key.name);
