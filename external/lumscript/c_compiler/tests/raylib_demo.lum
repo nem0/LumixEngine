@@ -41,7 +41,7 @@ var score : i32 = 0;
 var game_over : bool = false;
 
 fn set_piece_shape() : void {
-	for i = 0..15 {
+	for i = 0..16 {
 		piece[i] = 0;
 	}
 
@@ -85,7 +85,7 @@ fn set_piece_shape() : void {
 }
 
 fn can_move(dx : i32, dy : i32) : bool {
-	for i = 0..15 {
+	for i = 0..16 {
 		if piece[i] != 0 {
 			const local_x = i % 4;
 			const local_y = i / 4;
@@ -106,13 +106,13 @@ fn can_move(dx : i32, dy : i32) : bool {
 
 fn rotate_piece() : void {
 	var rotated : [16]i32 = undefined;
-	for y = 0..3 {
-		for x = 0..3 {
+	for y = 0..4 {
+		for x = 0..4 {
 			rotated[x * 4 + (3 - y)] = piece[y * 4 + x];
 		}
 	}
 
-	for i = 0..15 {
+	for i = 0..16 {
 		piece[i] = rotated[i];
 	}
 }
@@ -128,7 +128,7 @@ fn spawn_piece() : void {
 }
 
 fn lock_piece() : void {
-	for i = 0..15 {
+	for i = 0..16 {
 		if piece[i] != 0 {
 			const x = piece_x + (i % 4);
 			const y = piece_y + (i / 4);
@@ -143,7 +143,7 @@ fn clear_lines() : void {
 	var y = board_height - 1;
 	while y >= 0 {
 		var full = true;
-		for x = 0..9 {
+		for x = 0..10 {
 			if board[x + y * board_width] == 0 {
 				full = false;
 			}
@@ -156,12 +156,12 @@ fn clear_lines() : void {
 
 		var row = y;
 		while row > 0 {
-			for x = 0..9 {
+			for x = 0..10 {
 				board[x + row * board_width] = board[x + (row - 1) * board_width];
 			}
 			row -= 1;
 		}
-		for x = 0..9 {
+		for x = 0..10 {
 			board[x] = 0;
 		}
 		score += 100;
@@ -192,8 +192,8 @@ fn draw_block(x : i32, y : i32, kind : i32) : void {
 }
 
 fn draw_game() : void {
-	for x = 0..9 {
-		for y = 0..19 {
+	for x = 0..10 {
+		for y = 0..20 {
 			const value = board[x + y * board_width];
 			if value != 0 {
 				draw_block(x, y, value);
@@ -201,7 +201,7 @@ fn draw_game() : void {
 		}
 	}
 
-	for i = 0..15 {
+	for i = 0..16 {
 		if piece[i] != 0 {
 			draw_block(piece_x + (i % 4), piece_y + (i / 4), piece_kind + 1);
 		}
@@ -218,7 +218,7 @@ fn draw_game() : void {
 }
 
 fn reset_game() : void {
-	for i = 0..199 {
+	for i = 0..200 {
 		board[i] = 0;
 	}
 	score = 0;

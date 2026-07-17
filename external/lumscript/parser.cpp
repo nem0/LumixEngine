@@ -75,6 +75,7 @@ struct Parser {
 			case Token::COMMA: return ",";
 			case Token::DOT: return ".";
 			case Token::RANGE: return "..";
+			case Token::RANGE_INCLUSIVE: return "..=";
 			case Token::QUESTION: return "?";
 			case Token::DOLLAR: return "$";
 			case Token::PIPE: return "|";
@@ -893,6 +894,10 @@ struct Parser {
 		if (!pattern.begin) return false;
 
 		if (peekToken().type == Token::RANGE) {
+			m_output.errorAt(peekToken(), "Match range patterns must use ..= (inclusive), not .. (exclusive)");
+			return false;
+		}
+		if (peekToken().type == Token::RANGE_INCLUSIVE) {
 			consumeToken();
 			pattern.end = matchPatternExpression();
 			if (!pattern.end) return false;

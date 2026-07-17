@@ -21,6 +21,7 @@ struct Token {
 		COMMA,
 		DOT,
 		RANGE,
+		RANGE_INCLUSIVE,
 		QUESTION,
 		DOLLAR,
 		PIPE,

@@ -263,7 +263,12 @@ struct Tokenizer {
 			case ';': return makeToken(Token::SEMICOLON);
 			case ':': return makeToken(Token::COLON);
 			case ',': return makeToken(Token::COMMA);
-			case '.': return makeToken(match('.') ? Token::RANGE : Token::DOT);
+			case '.': {
+				if (match('.')) {
+					return makeToken(match('=') ? Token::RANGE_INCLUSIVE : Token::RANGE);
+				}
+				return makeToken(Token::DOT);
+			}
 			case '?': return makeToken(Token::QUESTION);
 			case '$': return makeToken(Token::DOLLAR);
 			case '|': return makeToken(Token::PIPE);

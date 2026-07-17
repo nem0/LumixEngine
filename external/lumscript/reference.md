@@ -2,7 +2,7 @@
 
 # TODO
 
-* make range exclusive, so `for i = 0..count {` does not include `count`
+* how can we push unions if we don't know the tag value of variants, i.e. U = A | B - we don't know if A's tag is 0 or 1
 * use case - comptime string hash
 * how should user implement print-s?
 	fn print(v : varargs) : void {
@@ -1285,7 +1285,7 @@ Supported patterns:
 
 - enum members
 - scalar literals
-- inclusive ranges (`a..b`)
+- ranges (`a..=b`, inclusive on both bounds)
 - member types, when matching a tagged union value (see [Tagged unions](#tagged-unions))
 - comma-separated alternatives
 - `else` fallback
@@ -1308,9 +1308,9 @@ match state {
 match score {
 	case 0:
 		log.logError("none");
-	case 1..9:
+	case 1..=9:
 		log.logError("low");
-	case 10..99:
+	case 10..=99:
 		log.logError("high");
 	else:
 		log.logError("overflow");
@@ -1346,23 +1346,23 @@ Conditions must be `bool`. Runtime enforces a configurable step budget to limit 
 ### For
 
 ```cpp
-for i = 0..9 {
+for i = 0..10 {
 	log.logError(i);
 }
 ```
 
-The `a..b` range is inclusive. The range expressions are evaluated once before the loop starts. The loop variable is introduced by the `for` statement and is immutable inside the loop body.
+The `a..b` range is exclusive on the upper bound. The range expressions are evaluated once before the loop starts. The loop variable is introduced by the `for` statement and is immutable inside the loop body.
 
-If the lower bound is greater than the upper bound, the loop body does not execute.
+If the lower bound is greater than or equal to the upper bound, the loop body does not execute.
 
 This is equivalent to evaluating the bounds once, then iterating upward with an internal counter:
 
 ```cpp
 const from = 0;
-const to = 9;
+const to = 10;
 var current = from;
-while current <= to {
-	const i = from;
+while current < to {
+	const i = current;
 	log.logError(i);
 	++current;
 }

@@ -19,7 +19,7 @@ TEST(MatchTypechecks) {
 			match score {
 				case 0:
 					return 0;
-				case 1..9, 99:
+				case 1..=9, 99:
 					return 1;
 				else:
 					return 2;
@@ -254,7 +254,7 @@ TEST(MatchRuntime) {
 			match score {
 				case 0:
 					return 0;
-				case 1..9, 99:
+				case 1..=9, 99:
 					return 1;
 				else:
 					return 2;

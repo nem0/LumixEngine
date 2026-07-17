@@ -624,7 +624,7 @@ struct CCompiler {
 				const auto* loop = static_cast<const ForStatement*>(value); if (loop_count == 64) { unsupported(); return; }
 				const i32 loop_index = loop_count++; const u32 id = next_loop_id++;
 				loop_defer_depths[loop_index] = deferred_scope_count; loop_labels[loop_index] = pending_loop_label; loop_ids[loop_index] = id; pending_loop_label = {};
-				text("for ("); if (!type(loop->begin->resolved_type)) { --loop_count; return; } text(" "); text(loop->loop_var); text(" = "); expression(loop->begin); text("; "); text(loop->loop_var); text(" <= "); expression(loop->end); text("; ++"); text(loop->loop_var); text(") {"); line(); ++indent;
+				text("for ("); if (!type(loop->begin->resolved_type)) { --loop_count; return; } text(" "); text(loop->loop_var); text(" = "); expression(loop->begin); text("; "); text(loop->loop_var); text(" < "); expression(loop->end); text("; ++"); text(loop->loop_var); text(") {"); line(); ++indent;
 				pad(); statement(loop->body); line(); pad(); loopLabel("continue", id); text(": ;"); line(); --indent; pad(); text("}"); line(); pad(); loopLabel("break", id); text(": ;"); --loop_count; return;
 			}
 			case Statement::BREAK: { const auto* br = static_cast<const BreakStatement*>(value); const i32 loop = findLoop(br->label); if (loop < 0) { unsupported(); return; } emitDeferredScopes(loop_defer_depths[loop]); pad(); if (empty(br->label)) text("break;"); else { text("goto "); loopLabel("break", loop_ids[loop]); text(";"); } return; }

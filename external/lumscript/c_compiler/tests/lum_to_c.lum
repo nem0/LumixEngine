@@ -105,7 +105,7 @@ fn main() : i32 {
 	match ref_value {
 		case 0:
 			return 4;
-		case 1..2, 99:
+		case 1..=2, 99:
 			value += 0;
 		else:
 			return 5;
@@ -132,7 +132,7 @@ fn main() : i32 {
 		case .Running:
 			value += 0;
 	}
-	outer: for i = 0..1 {
+	outer: for i = 0..2 {
 		continue outer;
 	}
 	stop: while true {

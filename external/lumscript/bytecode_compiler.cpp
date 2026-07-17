@@ -1887,7 +1887,7 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 			const u32 condition_pos = (u32)ctx.code.size();
 			emitLoadLocalBytes(ctx, loop_offset, byte_size);
 			emitLoadLocalBytes(ctx, end_offset, byte_size);
-			emitCompareOp(ctx, LS_OP_LE, value_kind);
+			emitCompareOp(ctx, LS_OP_LT, value_kind);
 			const u32 jump_false_pos = emitJumpPlaceholder(ctx, LS_OP_JUMP_IF_FALSE);
 
 			LoopBinding& loop = ctx.loops.emplace_back();

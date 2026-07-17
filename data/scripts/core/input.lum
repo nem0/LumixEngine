@@ -1,6 +1,7 @@
 import "core:inputdevicetype"
 
 struct InputSystem { system : cptr; }
+
 struct ButtonEvent {
 	device_type : InputDeviceType;
 	device_index : i32;
