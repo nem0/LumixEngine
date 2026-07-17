@@ -2044,16 +2044,12 @@ ls_bytecode* ls_bytecode_compile(
 	ls_module* module,
 	ls_host* host
 ) {
-	if (!module || !host) return nullptr;
+	if (!module || !host || !host->arena.allocate) return nullptr;
 
 	ls_bytecode* bytecode = static_cast<ls_bytecode*>(std::calloc(1, sizeof(ls_bytecode)));
 	if (!bytecode) return nullptr;
 	bytecode->host = host;
-	bytecode->arena = host->create_arena ? host->create_arena() : nullptr;
-	if (!bytecode->arena) {
-		std::free(bytecode);
-		return nullptr;
-	}
+	bytecode->arena = &host->arena;
 
 	ASSERT(bytecode->arena);
 	ls_arena* arena = bytecode->arena;
@@ -2133,7 +2129,6 @@ ls_bytecode* ls_bytecode_compile(
 
 void ls_bytecode_destroy(ls_bytecode* bytecode) {
 	if (!bytecode) return;
-	if (bytecode->host && bytecode->host->destroy_arena && bytecode->arena) bytecode->host->destroy_arena(bytecode->arena);
 	std::free(bytecode);
 }
 

@@ -35,11 +35,7 @@ int main(int argc, char** argv) {
 	}
 
 	ls_host host = {};
-	host.allocate = allocate;
-	host.deallocate = deallocate;
-	host.reallocate = reallocate;
-	host.create_arena = ls_default_arena_create;
-	host.destroy_arena = ls_default_arena_destroy;
+	ls_default_arena_create(&host.arena);
 	host.print = diagnostic;
 
 	const char* input_path = argv[1];
@@ -74,6 +70,7 @@ int main(int argc, char** argv) {
 	}
 
 	if (module) ls_module_destroy(module);
+	ls_default_arena_destroy(&host.arena);
 	deallocate(nullptr, source);
 	return result;
 }

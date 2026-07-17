@@ -1596,11 +1596,17 @@ Current runtime executes compiled bytecode through the public `ls_runtime` API.
 Example C++ shape:
 
 ```cpp
-ls_module* module = ls_module_create(&host);
-ls_module_compile(module, source, source_name, &host, nullptr, nullptr);
+ls_arena compile_arena;
+ls_default_arena_create(&compile_arena);
+ls_host compile_host = {compile_arena};
+ls_module* module = ls_module_create(&compile_host);
+ls_module_compile(module, source, source_name, nullptr, nullptr);
 
-ls_bytecode* bytecode = ls_bytecode_compile(module, &host);
-ls_runtime* runtime = bytecode ? ls_runtime_create(bytecode) : nullptr;
+ls_bytecode* bytecode = ls_bytecode_compile(module, &compile_host);
+ls_arena runtime_arena;
+ls_default_arena_create(&runtime_arena);
+ls_host runtime_host = {runtime_arena};
+ls_runtime* runtime = bytecode ? ls_runtime_create(bytecode, &runtime_host) : nullptr;
 if (runtime) {
 	ls_string_view main_name = { "main", "main" + 4 };
 	ls_call(runtime, main_name);
@@ -1612,39 +1618,41 @@ if (runtime) {
 
 ### Native functions
 
-Register native functions after parsing and before type checking:
+Declare native functions with `extern fn` in the script. After compiling the
+module, find the declaration in its unit and bind its unit-local index to the
+runtime callback:
 
 ```cpp
-static bool native_add(ls_runtime* runtime, size_t arg_count, size_t result_count, void*) {
-	if (arg_count < 2 || result_count < 1) return false;
-	ls_push_i32(runtime, ls_to_i32(runtime, -2) + ls_to_i32(runtime, -1));
-	return true;
+static void native_add(ls_runtime* runtime, ls_call_frame frame) {
+	LS_ARG(frame, i32, a);
+	LS_ARG(frame, i32, b);
+	LS_RESULT(frame, a + b);
 }
 
 ls_module* module = ls_module_create(&host);
-if (ls_module_parse(module, source, source_name, &host)) {
-	ls_type params[] = {
-		ls_type_make(LS_TYPE_I32),
-		ls_type_make(LS_TYPE_I32)
-	};
-
-	const int native_add_index = ls_module_add_native_function(
-		module,
-		"native_add",
-		ls_type_make(LS_TYPE_I32),
-		params,
-		2
-	);
-
+if (ls_module_compile(module, source, source_name, nullptr, nullptr) == LS_RESULT_OK) {
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &host);
-	ls_runtime* runtime = ls_runtime_create(bytecode);
-	ls_runtime_set_native_function_callback(runtime, native_add_index, &native_add, nullptr);
+	ls_runtime* runtime = bytecode ? ls_runtime_create(bytecode, &host) : nullptr;
+	ls_unit* unit = ls_module_get_unit(module, 0);
+	if (runtime && unit && ls_unit_get_native_function_count(unit) == 1) {
+		ls_runtime_set_native_function_callback(runtime, unit, 0, &native_add);
+	}
 }
+ls_runtime_destroy(runtime);
+ls_bytecode_destroy(bytecode);
+ls_module_destroy(module);
+ls_default_arena_destroy(&runtime_arena);
+ls_default_arena_destroy(&compile_arena);
 ```
+
+The caller owns each arena and must keep it alive until all modules, bytecode,
+and runtimes using that host have been destroyed.
 
 Script usage:
 
 ```cpp
+extern fn native_add(a : i32, b : i32) : i32;
+
 fn main() : i32 {
 	return native_add(20, 22);
 }
@@ -1652,13 +1660,11 @@ fn main() : i32 {
 
 ### Extern declarations
 
-`extern fn foo() : T;` is syntax sugar for a module-level `var foo = fn() : T = undefined;` declaration without a body.
-
 ```cpp
 extern fn native_add(a : i32, b : i32) : i32;
 ```
 
-`extern` declarations inform the compiler about a function's name and signature but do not provide an implementation. The host must register and bind a native function with the same qualified name (using `ls_runtime_set_native_function_callback`) before calling into script.
+`extern` declarations inform the compiler about a function's name and signature but do not provide an implementation. Each declaration is enumerated by `ls_unit_get_native_function_count` and `ls_unit_get_native_function_name`; bind it with `ls_runtime_set_native_function_callback` using the corresponding unit-local index. Use `ls_unit_get_path` to identify declarations from imported units.
 
 
 ## Diagnostic

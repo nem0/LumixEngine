@@ -60,7 +60,7 @@ TEST(StringEqualityAndInequalityRuntime) {
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
 
-	ls_runtime* runtime = ls_runtime_create(bytecode);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
@@ -158,8 +158,7 @@ TEST(CStrNativeArgumentRuntime) {
 		LS_RESULT(frame, i32(text && strcmp(text, "native cstr") == 0 ? 42 : 0));
 	};
 	CAPI_RUNTIME(module, runtime);
-	const i32 fn_idx = ls_module_get_native_function_index(module, toLs("inspect"));
-	EXPECT_TRUE(ls_runtime_set_native_function_callback(runtime, fn_idx, inspect) == LS_RESULT_OK);
+	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("inspect"), inspect) == LS_RESULT_OK);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 	CAPI_END(module);
@@ -187,8 +186,7 @@ TEST(CStrNativeResultRuntime) {
 		LS_RESULT(frame, text);
 	};
 	CAPI_RUNTIME(module, runtime);
-	const i32 fn_idx = ls_module_get_native_function_index(module, toLs("getNativeText"));
-	EXPECT_TRUE(ls_runtime_set_native_function_callback(runtime, fn_idx, get_native_text) == LS_RESULT_OK);
+	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("getNativeText"), get_native_text) == LS_RESULT_OK);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 	CAPI_END(module);

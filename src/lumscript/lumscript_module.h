@@ -6,6 +6,21 @@
 
 namespace Lumix {
 
+struct NativeFunctionKey {
+	StringView unit_path;
+	StringView name;
+
+	bool operator==(const NativeFunctionKey& rhs) const { return unit_path == rhs.unit_path && name == rhs.name; }
+};
+
+struct NativeFunctionKeyHash {
+	static u32 get(const NativeFunctionKey& key) {
+		const u32 unit_hash = RuntimeHash32(key.unit_path.begin, key.unit_path.size()).getHashValue();
+		const u32 name_hash = RuntimeHash32(key.name.begin, key.name.size()).getHashValue();
+		return unit_hash ^ (name_hash + 0x9e3779b9 + (unit_hash << 6) + (unit_hash >> 2));
+	}
+};
+
 struct LumScriptSystem : ISystem {
 	virtual void updateScripts(float time_delta) = 0;
 	virtual Engine& getEngine() = 0;

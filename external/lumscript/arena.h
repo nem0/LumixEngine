@@ -79,9 +79,8 @@ static inline void ls_default_arena_restore(void* userdata, void* ptr) {
 	arena->cursor = new_cursor;
 }
 
-static inline ls_arena* ls_default_arena_create() {
+inline void ls_default_arena_create(ls_arena* out) {
 	ls_default_arena* arena = (ls_default_arena*)malloc(sizeof(ls_default_arena));
-	if (!arena) return NULL;
 	SYSTEM_INFO info;
 	GetSystemInfo(&info);
 	arena->page_size = info.dwPageSize ? (size_t)info.dwPageSize : 4096;
@@ -89,14 +88,10 @@ static inline ls_arena* ls_default_arena_create() {
 	arena->committed_size = 0;
 	arena->cursor = 0;
 	arena->base = VirtualAlloc(NULL, arena->reserve_size, MEM_RESERVE, PAGE_NOACCESS);
-	if (!arena->base) {
-		free(arena);
-		return NULL;
-	}
 	arena->arena.allocate = &ls_default_arena_allocate;
 	arena->arena.restore = &ls_default_arena_restore;
 	arena->arena.user_data = arena;
-	return &arena->arena;
+	*out = arena->arena;
 }
 
 static inline void ls_default_arena_destroy(ls_arena* arena) {

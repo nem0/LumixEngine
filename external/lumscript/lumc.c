@@ -25,33 +25,30 @@ typedef struct lumc_context {
 	ls_runtime* runtime;
 } lumc_context;
 
-static void* lumc_allocate(void* userdata, size_t size, size_t align) {
-	(void)userdata;
-	return _aligned_malloc(size, align);
-}
-
-static void lumc_deallocate(void* userdata, void* ptr) {
-	(void)userdata;
-	_aligned_free(ptr);
-}
-
-static void* lumc_reallocate(void* userdata, void* ptr, size_t new_size, size_t old_size, size_t align) {
-	(void)userdata;
-	(void)old_size;
-	return _aligned_realloc(ptr, new_size, align);
-}
-
 static const ls_host g_host_template = {
+	{NULL, NULL, NULL},
 	NULL,
-	&lumc_allocate,
-	&lumc_deallocate,
-	&lumc_reallocate,
-	&ls_default_arena_create,
-	&ls_default_arena_destroy
+	NULL
 };
 
 static ls_string_view ls_from_cstr(const char* str) {
 	return (ls_string_view){str, str ? str + strlen(str) : NULL};
+}
+
+static ls_unit* lumc_find_native_function(ls_module* module, const char* name, int* out_function_index) {
+	const size_t name_size = strlen(name);
+	for (int unit_index = 0, unit_count = ls_module_get_unit_count(module); unit_index < unit_count; ++unit_index) {
+		ls_unit* unit = ls_module_get_unit(module, unit_index);
+		for (int function_index = 0, function_count = ls_unit_get_native_function_count(unit); function_index < function_count; ++function_index) {
+			const ls_string_view function_name = ls_unit_get_native_function_name(unit, function_index);
+			if ((size_t)(function_name.end - function_name.begin) != name_size) continue;
+			if (memcmp(function_name.begin, name, name_size) == 0) {
+				*out_function_index = function_index;
+				return unit;
+			}
+		}
+	}
+	return NULL;
 }
 
 static void lumc_print_string(FILE* out, ls_string_view value) {
@@ -122,6 +119,7 @@ int main(int argc, char** argv) {
 	lumc_context ctx;
 	memset(&ctx, 0, sizeof(ctx));
 	ctx.host = g_host_template;
+	ls_default_arena_create(&ctx.host.arena);
 	ctx.host.diagnostics_userdata = &ctx.host;
 	ctx.host.print = &lumc_diagnostics_print;
 
@@ -138,7 +136,7 @@ int main(int argc, char** argv) {
 			fclose(f);
 			ctx.source = NULL;
 		} else {
-			ctx.source = (char*)ctx.host.allocate(ctx.host.allocator_userdata, (size_t)size + 1, 1);
+			ctx.source = (char*)malloc((size_t)size + 1);
 			if (!ctx.source) {
 				fclose(f);
 			} else {
@@ -170,8 +168,9 @@ int main(int argc, char** argv) {
 		goto cleanup;
 	}
 
-	int native_print = ls_module_get_native_function_index(ctx.module, ls_from_cstr("print"));
-	if (native_print < 0) {
+	int native_print = -1;
+	ls_unit* native_print_unit = lumc_find_native_function(ctx.module, "print", &native_print);
+	if (!native_print_unit) {
 		fprintf(stderr, "Error: Script must declare extern fn print(string) : void\n");
 		goto cleanup;
 	}
@@ -182,12 +181,12 @@ int main(int argc, char** argv) {
 		goto cleanup;
 	}
 
-	ctx.runtime = ls_runtime_create(ctx.bytecode);
+	ctx.runtime = ls_runtime_create(ctx.bytecode, &ctx.host);
 	if (!ctx.runtime) {
 		fprintf(stderr, "Error: Failed to create bytecode runtime\n");
 		goto cleanup;
 	}
-	if (!ls_runtime_set_native_function_callback(ctx.runtime, native_print, &lumc_native_print)) {
+	if (!ls_runtime_set_native_function_callback(ctx.runtime, native_print_unit, native_print, &lumc_native_print)) {
 		fprintf(stderr, "Error: Failed to bind native print\n");
 		goto cleanup;
 	}
@@ -232,6 +231,7 @@ cleanup:
 	if (ctx.runtime) ls_runtime_destroy(ctx.runtime);
 	if (ctx.bytecode) ls_bytecode_destroy(ctx.bytecode);
 	if (ctx.module) ls_module_destroy(ctx.module);
-	if (ctx.source) ctx.host.deallocate(ctx.host.allocator_userdata, ctx.source);
+	free(ctx.source);
+	ls_default_arena_destroy(&ctx.host.arena);
 	return rc;
 }

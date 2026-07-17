@@ -61,26 +61,6 @@ inline bool symbolHasGlobalStorage(const Symbol& sym) {
 		&& sym.expression->kind != Expression::ENUM;
 }
 
-// so we can pass arenas to ExpArrays defined in the same struct as the arena
-struct ArenaOwner {
-	ArenaOwner(const ls_host* host)
-		: host(host) {
-		arena = host->create_arena();
-	}
-
-	~ArenaOwner() { host->destroy_arena(arena); }
-
-	void operator=(const ArenaOwner&) = delete;
-	void operator=(ArenaOwner&&) = delete;
-	ArenaOwner(const ArenaOwner&) = delete;
-	ArenaOwner(ArenaOwner&&) = delete;
-
-	operator ls_arena&() { return *arena; }
-
-	const ls_host* host;
-	ls_arena* arena;
-};
-
 struct Import {
 	ls_string_view path = {};
 	ls_string_view alias = {}; // empty when imported without `as`
@@ -138,35 +118,37 @@ inline bool isOperatorSymbol(ls_string_view name) {
 }
 
 struct Unit {
-	Unit(ls_string_view path, const ls_host* host)
-		: arena(host)
-		, symbols(arena)
-		, types(arena)
-		, imports(arena)
+	Unit(ls_string_view path, ls_arena& module_arena)
+		: arena(module_arena)
+		, symbols(module_arena)
+		, types(module_arena)
+		, imports(module_arena)
+		, native_symbols(module_arena)
 		, path(path) {}
 
 	enum ImportState { IMPORT_PENDING, IMPORT_RESOLVING, IMPORT_DONE };
 	ImportState import_state = IMPORT_PENDING;
 
 	ls_string_view path;
-	ArenaOwner arena;
+	ls_arena& arena;
 
 	ExpArray<Symbol> symbols;
 	ExpArray<ResolvedType> types;
 	ExpArray<Import> imports;
+	ExpArray<Symbol*> native_symbols;
 };
 
 struct ls_module {
-	ls_module(const ls_host* host)
+	ls_module(ls_host* host)
 		: host(host)
-		, arena(host)
+		, arena(host->arena)
 		, units(arena) {
 		for (i32 i = 0; i < ResolvedType::META; ++i)
 			primitives[i].kind = static_cast<ResolvedType::Kind>(i);
 	}
 
-	const ls_host* host;
-	ArenaOwner arena;
+	ls_host* host;
+	ls_arena& arena;
 	ExpArray<Unit> units;
 	// One canonical instance per primitive kind, indexed by ResolvedType::Kind.
 	// Pointer equality suffices for primitives; use typesEqual() for compound types.

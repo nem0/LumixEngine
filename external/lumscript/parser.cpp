@@ -16,7 +16,7 @@ struct Parser {
 
 	template <typename T, typename... Args>
 	T* make(Args&&... args) {
-		ls_arena& a = *m_unit.arena.arena;
+		ls_arena& a = m_unit.arena;
 		T* res = static_cast<T*>(a.allocate(a.user_data, sizeof(T), alignof(T)));
 		new (res) T(static_cast<Args&&>(args)...);
 		return res;
@@ -1372,7 +1372,7 @@ struct Parser {
 
 // Parse a module, e.g. `ls_module_parse(module, source, name)`.
 ls_result ls_module_parse(ls_module* module, ls_string_view source, ls_string_view source_name) {
-	Unit& unit = module->units.emplace_back(source_name, module->host);
+	Unit& unit = module->units.emplace_back(source_name, module->arena);
 	Parser parser(unit, module->host);
 	if (parser.parse(source, source_name) == LS_RESULT_FAILURE) return LS_RESULT_FAILURE;
 

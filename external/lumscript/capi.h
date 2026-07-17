@@ -133,20 +133,10 @@ typedef struct ls_arena {
 
 // Host bridge shared by module creation, parsing, compilation, and runtime.
 //
-// - allocator hooks are used for module/runtime-owned memory
+// - `arena` is used for every object created with this host
 // - diagnostics hooks are used for error output
-// - the two userdata pointers are kept separate so a host can route memory and
-//   diagnostics through different objects
-// - arena hooks are required; module/bytecode/runtime creation fails without
-//   them
 typedef struct ls_host {
-	void* allocator_userdata;
-	void* (*allocate)(void* userdata, size_t size, size_t align);
-	void (*deallocate)(void* userdata, void* ptr);
-	void* (*reallocate)(void* userdata, void* ptr, size_t new_size, size_t old_size, size_t align);
-	
-	ls_arena* (*create_arena)();
-	void (*destroy_arena)(ls_arena* arena);
+	ls_arena arena;
 
 	void* diagnostics_userdata;
 	ls_print_fn print;
@@ -157,13 +147,14 @@ typedef struct ls_host {
 // These are deliberately incomplete in the C ABI. Callers only pass pointers
 // around; all ownership and implementation details remain inside LumScript.
 typedef struct ls_module ls_module;
+typedef struct ls_unit ls_unit;
 typedef struct ls_bytecode ls_bytecode;
 
 // Module lifetime.
 //
 // Create one module per script bundle or compilation unit. Destroy it when the
 // compiled declarations and any runtime state are no longer needed.
-ls_module* ls_module_create(const ls_host* host);
+ls_module* ls_module_create(ls_host* host);
 void ls_module_destroy(ls_module* module);
 
 // Native registration.
@@ -171,9 +162,12 @@ void ls_module_destroy(ls_module* module);
 // Register custom native functions before typechecking or execution.
 // Native types let scripts talk about engine objects by name, while native
 // functions expose host behavior to scripts.
-int ls_module_get_native_function_index(ls_module* module, ls_string_view name);
-int ls_module_get_native_function_count(ls_module* module);
-ls_string_view ls_module_get_native_function_name(ls_module* module, int index);
+// Units and their native functions are available after a successful typecheck.
+int ls_module_get_unit_count(ls_module* module);
+ls_unit* ls_module_get_unit(ls_module* module, int index);
+ls_string_view ls_unit_get_path(ls_unit* unit);
+int ls_unit_get_native_function_count(ls_unit* unit);
+ls_string_view ls_unit_get_native_function_name(ls_unit* unit, int index);
 
 // Front-end pipeline helpers.
 //
@@ -210,11 +204,14 @@ void ls_bytecode_destroy(ls_bytecode* bytecode);
 // Bytecode runtime lifetime.
 //
 // Bind a runtime to compiled bytecode to call script functions repeatedly.
+// Pass a distinct host to use a separate runtime arena; null uses the bytecode host.
 // Destroy it when execution is finished.
-ls_runtime* ls_runtime_create(ls_bytecode* bytecode);
+ls_runtime* ls_runtime_create(ls_bytecode* bytecode, ls_host* host);
 void ls_runtime_destroy(ls_runtime* runtime);
+
 ls_result ls_runtime_set_native_function_callback(
 	ls_runtime* runtime,
+	ls_unit* unit,
 	int function_index,
 	ls_native_fn callback
 );

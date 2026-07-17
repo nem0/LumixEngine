@@ -207,7 +207,7 @@ typedef struct ls_function_bc {
 } ls_function_bc;
 
 typedef struct ls_bytecode {
-	const ls_host* host;
+	ls_host* host;
 	ls_arena* arena;
 
 	ls_function_bc* functions;
@@ -223,7 +223,7 @@ typedef struct ls_bytecode {
 } ls_bytecode;
 
 typedef struct ls_runtime {
-	const ls_host* host;
+	ls_host* host;
 	const ls_bytecode* bytecode;
 	ls_arena* arena;
 
@@ -240,10 +240,16 @@ typedef struct ls_runtime {
 	// invalidate it.
 	i32 result_function;
 
-	// Indexed by module/native-function index.
+	// Indexed by bytecode function index.
 	ls_native_fn* native_callbacks;
 	u32 native_callback_count;
 } ls_runtime;
+
+ls_result ls_runtime_set_native_function_callback_by_bytecode_index(
+	ls_runtime* runtime,
+	int bytecode_index,
+	ls_native_fn callback
+);
 
 #ifdef __cplusplus
 }

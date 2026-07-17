@@ -841,17 +841,15 @@ TEST(ExternImport) {
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &diagnostics.host);
 	EXPECT_TRUE(bytecode != nullptr);
 
-	const i32 sum_fn_idx = ls_module_get_native_function_index(module, toLs("math.sum"));
-
 	auto sumfn = [](ls_runtime* runtime, ls_call_frame frame) -> void {
 		LS_ARG(frame, i32, a);
 		LS_ARG(frame, i32, b);
 		LS_RESULT(frame, a + b);
 	};
 
-	ls_runtime* runtime = ls_runtime_create(bytecode);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	ls_runtime_set_native_function_callback(runtime, sum_fn_idx, sumfn);
+	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("math.sum"), sumfn) == LS_RESULT_OK);
 
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(63, ls_to_i32(runtime, -1));
@@ -1057,21 +1055,16 @@ TEST(ExternFnSecondImportCorrectIndex) {
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &diagnostics.host);
 	EXPECT_TRUE(bytecode != nullptr);
 
-	const i32 add_idx = ls_module_get_native_function_index(module, toLs("lib_a.add"));
-	const i32 mul_idx = ls_module_get_native_function_index(module, toLs("lib_b.mul"));
-	EXPECT_EQ(0, add_idx);
-	EXPECT_EQ(1, mul_idx);
-
-	ls_runtime* runtime = ls_runtime_create(bytecode);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	ls_runtime_set_native_function_callback(runtime, add_idx, [](ls_runtime* rt, ls_call_frame frame) {
+	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("lib_a.add"), [](ls_runtime* rt, ls_call_frame frame) {
 		LS_ARG(frame, i32, a); LS_ARG(frame, i32, b);
 		LS_RESULT(frame, a + b);
-	});
-	ls_runtime_set_native_function_callback(runtime, mul_idx, [](ls_runtime* rt, ls_call_frame frame) {
+	}) == LS_RESULT_OK);
+	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("lib_b.mul"), [](ls_runtime* rt, ls_call_frame frame) {
 		LS_ARG(frame, i32, a); LS_ARG(frame, i32, b);
 		LS_RESULT(frame, a * b);
-	});
+	}) == LS_RESULT_OK);
 
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(21, ls_to_i32(runtime, -1)); // 3 * 7 = 21, not 3 + 7 = 10

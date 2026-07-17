@@ -197,7 +197,7 @@ TEST(BytecodeTemporaryArrayIndexing) {
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
 
-	ls_runtime* runtime = ls_runtime_create(bytecode);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(32, ls_to_i32(runtime, -1));
@@ -252,7 +252,7 @@ TEST(BytecodeUndefinedArrayArgumentUsesFullByteSize) {
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
 
-	ls_runtime* runtime = ls_runtime_create(bytecode);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
@@ -285,7 +285,7 @@ TEST(BytecodeRefParameterArrayCall) {
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
 
-	ls_runtime* runtime = ls_runtime_create(bytecode);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
@@ -365,7 +365,7 @@ TEST(BytecodeMultiDimensionalStaticArrayIndexing) {
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
 
-	ls_runtime* runtime = ls_runtime_create(bytecode);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));

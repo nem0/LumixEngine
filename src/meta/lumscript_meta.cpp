@@ -644,43 +644,43 @@ void emitGeneratedComponentImportRegistrations(OutputStream& out, MetaData& data
 
 			for (Function& f : c.functions) {
 				if (!isSupportedLumScriptFunction(f)) continue;
-				out.add("functions.insert(StringView(\"core:", c.id, ".", functionScriptName(f), "\"), &");
+				out.add("functions.insert({StringView(\"core:", c.id, "\"), StringView(\"", functionScriptName(f), "\")}, &");
 				appendWrapperName(out, c, f, *wrapper_idx);
 				L(");");
 				++*wrapper_idx;
 			}
 			for (Property& p : c.properties) {
 				if (isSupportedLumScriptPropertyGetter(p)) {
-					out.add("functions.insert(StringView(\"core:", c.id, ".", p.getter_name, "\"), &");
+					out.add("functions.insert({StringView(\"core:", c.id, "\"), StringView(\"", p.getter_name, "\")}, &");
 					appendPropertyWrapperName(out, c, p, false, *wrapper_idx);
 					L(");");
 					++*wrapper_idx;
 				}
 				if (isSupportedLumScriptPropertySetter(p)) {
-					out.add("functions.insert(StringView(\"core:", c.id, ".", p.setter_name, "\"), &");
+					out.add("functions.insert({StringView(\"core:", c.id, "\"), StringView(\"", p.setter_name, "\")}, &");
 					appendPropertyWrapperName(out, c, p, true, *wrapper_idx);
 					L(");");
 					++*wrapper_idx;
 				}
 			}
 			for (ArrayProperty& a : c.arrays) {
-				L("functions.insert(StringView(\"core:", c.id, ".", a.id, "Count\"), &");
+				L("functions.insert({StringView(\"core:", c.id, "\"), StringView(\"", a.id, "Count\")}, &");
 				appendArrayCountWrapperName(out, c, a, *wrapper_idx);
 				L(");");
 				++*wrapper_idx;
-				L("functions.insert(StringView(\"core:", c.id, ".", a.id, "\"), &");
+				L("functions.insert({StringView(\"core:", c.id, "\"), StringView(\"", a.id, "\")}, &");
 				appendArrayItemWrapperName(out, c, a, *wrapper_idx);
 				L(");");
 				++*wrapper_idx;
 				for (Property& p : a.children) {
 					if (isSupportedLumScriptArrayChildGetter(p)) {
-						out.add("functions.insert(StringView(\"core:", c.id, ".", p.getter_name, "\"), &");
+						out.add("functions.insert({StringView(\"core:", c.id, "\"), StringView(\"", p.getter_name, "\")}, &");
 						appendArrayChildWrapperName(out, c, a, p, false, *wrapper_idx);
 						L(");");
 						++*wrapper_idx;
 					}
 					if (isSupportedLumScriptArrayChildSetter(p)) {
-						out.add("functions.insert(StringView(\"core:", c.id, ".", p.setter_name, "\"), &");
+						out.add("functions.insert({StringView(\"core:", c.id, "\"), StringView(\"", p.setter_name, "\")}, &");
 						appendArrayChildWrapperName(out, c, a, p, true, *wrapper_idx);
 						L(");");
 						++*wrapper_idx;
@@ -1107,10 +1107,10 @@ void serializeLumScriptMeta(MetaData& data) {
 	emitGeneratedModuleWrappers(out, data, &wrapper_idx);
 	emitGeneratedComponentWrappers(out, data, &wrapper_idx);
 
-	L("static void registerGeneratedEngineImport(HashMap<StringView, ls_native_fn>& functions) {");
+	L("static void registerGeneratedEngineImport(HashMap<NativeFunctionKey, ls_native_fn, NativeFunctionKeyHash>& functions) {");
 	for (Module& m : data.modules) {
 		for (Component& c : m.components) {
-			L("functions.insert(StringView(\"core:entity.", c.id, "\"), &lumscript_entity_", c.id, ");");
+			L("functions.insert({StringView(\"core:entity\"), StringView(\"", c.id, "\")}, &lumscript_entity_", c.id, ");");
 		}
 	}
 	wrapper_idx = 0;
@@ -1120,14 +1120,14 @@ void serializeLumScriptMeta(MetaData& data) {
 		bool any_function = false;
 		for (Function& f : m.functions) {
 			if (!isSupportedLumScriptFunction(f)) continue;
-			out.add("functions.insert(StringView(\"core:", m.id, ".", functionScriptName(f), "\"), &");
+			out.add("functions.insert({StringView(\"core:", m.id, "\"), StringView(\"", functionScriptName(f), "\")}, &");
 			appendModuleWrapperName(out, m, f, wrapper_idx);
 			L(");");
 			++wrapper_idx;
 			any_function = true;
 		}
 		if (any_function) {
-			L("functions.insert(StringView(\"core:world.", m.id, "\"), &lumscript_world_", m.id, ");");
+			L("functions.insert({StringView(\"core:world\"), StringView(\"", m.id, "\")}, &lumscript_world_", m.id, ");");
 		}
 	}
 	emitGeneratedComponentImportRegistrations(out, data, &wrapper_idx);

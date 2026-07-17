@@ -28,8 +28,7 @@ int main() {
     }
 
     ls_host host = {};
-    host.create_arena = &ls_default_arena_create;
-    host.destroy_arena = &ls_default_arena_destroy;
+    ls_default_arena_create(&host.arena);
     auto perfPrint = [](void* /*userdata*/, ls_string_view msg) {
         for (const char* c = msg.begin; c != msg.end; ++c) putchar(*c);
     };
@@ -61,5 +60,6 @@ int main() {
     std::printf("frontend=%lld ms, bytecode=%lld ms (fe=%d byte=%d)\n", ms_frontend, ms_byte, (int)rfe, (int)rbyte);
 
     ls_module_destroy(module);
+    ls_default_arena_destroy(&host.arena);
     return (rfe == LS_RESULT_OK && rbyte == LS_RESULT_OK) ? 0 : 1;
 }

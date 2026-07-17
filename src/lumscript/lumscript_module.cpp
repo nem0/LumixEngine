@@ -1,4 +1,5 @@
 #include "lumscript/lumscript_module.h"
+#include "../../external/lumscript/arena.h"
 #include "core/allocator.h"
 #include "core/array.h"
 #include "core/crt.h"
@@ -18,7 +19,7 @@
 namespace Lumix {
 
 namespace LumScript {
-void gatherCoreFunctions(HashMap<StringView, ls_native_fn>& functions);
+void gatherCoreFunctions(HashMap<NativeFunctionKey, ls_native_fn, NativeFunctionKeyHash>& functions);
 }
 
 struct LumScriptDiagnosticsContext {
@@ -40,37 +41,29 @@ static ls_string_view toLs(const char* value) {
 }
 
 static void bindCoreFunctions(ls_module* module, ls_runtime* runtime, IAllocator& allocator) {
-	HashMap<StringView, ls_native_fn> functions(allocator);
+	HashMap<NativeFunctionKey, ls_native_fn, NativeFunctionKeyHash> functions(allocator);
 	Lumix::LumScript::gatherCoreFunctions(functions);
-	const i32 count = ls_module_get_native_function_count(module);
-	for (i32 i = 0; i < count; ++i) {
-		const ls_string_view name = ls_module_get_native_function_name(module, i);
-		const StringView lname = StringView(name.begin, name.end);
-		const auto iter = functions.find(lname);
-		if (!iter.isValid()) {
-			logError("LumScript : failed to bind native function ", lname);
-			continue;
+	for (i32 unit_index = 0, unit_count = ls_module_get_unit_count(module); unit_index < unit_count; ++unit_index) {
+		ls_unit* unit = ls_module_get_unit(module, unit_index);
+		const ls_string_view path = ls_unit_get_path(unit);
+		for (i32 function_index = 0, function_count = ls_unit_get_native_function_count(unit); function_index < function_count; ++function_index) {
+			const ls_string_view name = ls_unit_get_native_function_name(unit, function_index);
+			const NativeFunctionKey key{{path.begin, path.end}, {name.begin, name.end}};
+			auto iter = functions.find(key);
+			if (!iter.isValid()) {
+				logError("LumScript : failed to bind native function ", key.unit_path, ".", key.name);
+				continue;
+			}
+			ls_runtime_set_native_function_callback(runtime, unit, function_index, iter.value());
 		}
-		ls_runtime_set_native_function_callback(runtime, i, iter.value());
 	}
-}
-
-static ls_host makeAllocatorHost(IAllocator& allocator) {
-	ls_host host = {};
-	host.allocator_userdata = &allocator;
-	host.allocate = [](void* userdata, size_t size, size_t align) -> void* { return ((IAllocator*)userdata)->allocate(size, align); };
-	host.deallocate = [](void* userdata, void* ptr) {
-		if (!ptr) return;
-		((IAllocator*)userdata)->deallocate(ptr);
-	};
-	host.reallocate = [](void* userdata, void* ptr, size_t new_size, size_t old_size, size_t align) -> void* { return ((IAllocator*)userdata)->reallocate(ptr, new_size, old_size, align); };
-	return host;
 }
 
 struct LumScriptModuleImpl : LumScriptModule {
 	struct Script {
 		Path path;
 		ls_module* module = nullptr;
+		ls_bytecode* bytecode = nullptr;
 		ls_runtime* runtime = nullptr;
 		LumScriptResource* resource = nullptr;
 		bool is_ready = false;
@@ -79,17 +72,13 @@ struct LumScriptModuleImpl : LumScriptModule {
 	LumScriptModuleImpl(World& world, ISystem& system)
 		: m_world(world)
 		, m_system(system)
-		, m_allocator(world.getAllocator()) {}
+		, m_allocator(world.getAllocator())
+	{
+		m_host.arena = {};
+	}
 
 	~LumScriptModuleImpl() {
-		if (m_script.runtime) {
-			ls_runtime_destroy(m_script.runtime);
-			m_script.runtime = nullptr;
-		}
-		if (m_script.module) {
-			ls_module_destroy(m_script.module);
-			m_script.module = nullptr;
-		}
+		destroyScript();
 		if (m_script.resource) {
 			m_script.resource->getObserverCb().unbind<&LumScriptModuleImpl::onResourceChanged>(this);
 			m_script.resource->decRefCount();
@@ -117,17 +106,9 @@ struct LumScriptModuleImpl : LumScriptModule {
 	void update(float time_delta) override {
 		if (!m_script.is_ready || !m_script.runtime) return;
 
-		// Call update function for world-level script
-		// TODO host as member?
-		String diagnostics(m_allocator);
-		ls_host host = makeAllocatorHost(m_allocator);
-		LumScriptDiagnosticsContext diag_ctx = {&diagnostics, &host};
-		host.diagnostics_userdata = &diag_ctx;
-		host.print = &printLumScriptMessage;
-
 		ls_push_f32(m_script.runtime, time_delta);
 		if (!ls_call(m_script.runtime, toLs("update"))) {
-			logError("LumScript update: ", diagnostics);
+			logError("LumScript update failed");
 		}
 	}
 
@@ -138,14 +119,7 @@ struct LumScriptModuleImpl : LumScriptModule {
 			m_script.resource->decRefCount();
 			m_script.resource = nullptr;
 		}
-		if (m_script.runtime) {
-			ls_runtime_destroy(m_script.runtime);
-			m_script.runtime = nullptr;
-		}
-		if (m_script.module) {
-			ls_module_destroy(m_script.module);
-			m_script.module = nullptr;
-		}
+		destroyScript();
 
 		m_script.path = path;
 		m_script.is_ready = false;
@@ -225,44 +199,68 @@ private:
 		}
 	}
 
-	bool compileAndRun() {
-		if (!m_script.resource) return false;
+	void destroyRuntime() {
+		if (m_script.runtime) {
+			ls_runtime_destroy(m_script.runtime);
+			m_script.runtime = nullptr;
+		}
+		if (m_script.bytecode) {
+			ls_bytecode_destroy(m_script.bytecode);
+			m_script.bytecode = nullptr;
+		}
+	}
 
-		String diagnostics(m_allocator);
-		ls_host host = makeAllocatorHost(m_allocator);
-		LumScriptDiagnosticsContext diag_ctx = {&diagnostics, &host};
-		host.diagnostics_userdata = &diag_ctx;
-		host.print = &printLumScriptMessage;
-
-		// Parse and compile the world script
+	void destroyScript() {
+		destroyRuntime();
 		if (m_script.module) {
 			ls_module_destroy(m_script.module);
 			m_script.module = nullptr;
 		}
-		m_script.module = ls_module_create(&host);
+		if (m_host.arena.allocate) {
+			ls_default_arena_destroy(&m_host.arena);
+			m_host.arena = {};
+		}
+	}
+
+	bool compileAndRun() {
+		if (!m_script.resource) return false;
+
+		String diagnostics(m_allocator);
+		LumScriptDiagnosticsContext diag_ctx = {&diagnostics, &m_host};
+		m_host.diagnostics_userdata = &diag_ctx;
+		m_host.print = &printLumScriptMessage;
+
+		// Parse and compile the world script
+		destroyScript();
+		ls_default_arena_create(&m_host.arena);
+		m_script.module = ls_module_create(&m_host);
 		if (!m_script.module) return false;
 
 		LumScriptSystem* lumscript_system = static_cast<LumScriptSystem*>(&m_system);
 		ImportContext import_ctx(m_script.module, m_world, lumscript_system->getEngine().getFileSystem(), m_allocator);
 		if (!ls_module_compile(m_script.module, toLs(m_script.resource->getSourceCode()), toLs(m_script.path.c_str()), &resolveImport, &import_ctx)) {
+			m_host.diagnostics_userdata = nullptr;
+			m_host.print = nullptr;
 			logError("LumScript compilation failed: ", diagnostics);
 			return false;
 		}
 
 		// Create runtime
-		if (m_script.runtime) {
-			ls_runtime_destroy(m_script.runtime);
-			m_script.runtime = nullptr;
-		}
-
-		ls_bytecode* bytecode = ls_bytecode_compile(m_script.module, &host);
-		if (!bytecode) {
+		m_script.bytecode = ls_bytecode_compile(m_script.module, &m_host);
+		if (!m_script.bytecode) {
+			m_host.diagnostics_userdata = nullptr;
+			m_host.print = nullptr;
 			logError("LumScript bytecode compilation failed: ", diagnostics);
 			return false;
 		}
+		m_host.diagnostics_userdata = nullptr;
+		m_host.print = nullptr;
 
-		m_script.runtime = ls_runtime_create(bytecode);
-		if (!m_script.runtime) return false;
+		m_script.runtime = ls_runtime_create(m_script.bytecode, &m_host);
+		if (!m_script.runtime) {
+			destroyRuntime();
+			return false;
+		}
 		bindCoreFunctions(m_script.module, m_script.runtime, m_allocator);
 
 		ls_push_ptr(m_script.runtime, &m_world);
@@ -278,6 +276,7 @@ private:
 	World& m_world;
 	ISystem& m_system;
 	IAllocator& m_allocator;
+	ls_host m_host;
 	Script m_script;
 };
 

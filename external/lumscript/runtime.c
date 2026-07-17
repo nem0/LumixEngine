@@ -778,27 +778,22 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 	return 0;
 }
 
-ls_runtime* ls_runtime_create(ls_bytecode* bytecode) {
+ls_runtime* ls_runtime_create(ls_bytecode* bytecode, ls_host* host) {
 	if (!bytecode) return NULL;
+	if (!host) host = bytecode->host;
+	if (!host || !host->arena.allocate) return NULL;
 
 	ls_runtime* runtime = (ls_runtime*)calloc(1, sizeof(ls_runtime));
 	if (!runtime) return NULL;
 
 	runtime->bytecode = bytecode;
-	runtime->host = bytecode->host;
+	runtime->host = host;
 	runtime->result_function = -1;
-	if (runtime->host && runtime->host->create_arena) {
-		runtime->arena = runtime->host->create_arena();
-		if (!runtime->arena) {
-			free(runtime);
-			return NULL;
-		}
-	}
+	runtime->arena = &host->arena;
 
 	runtime->stack_capacity = LS_STACK_CAPACITY_BYTES;
 	runtime->stack = (u8*)calloc(LS_STACK_CAPACITY_BYTES, 1u);
 	if (!runtime->stack) {
-		if (runtime->host && runtime->host->destroy_arena && runtime->arena) runtime->host->destroy_arena(runtime->arena);
 		free(runtime);
 		return NULL;
 	}
@@ -807,7 +802,6 @@ ls_runtime* ls_runtime_create(ls_bytecode* bytecode) {
 		runtime->native_callbacks = (ls_native_fn*)calloc((size_t)bytecode->function_count, sizeof(ls_native_fn));
 		if (!runtime->native_callbacks) {
 			free(runtime->stack);
-			if (runtime->host && runtime->host->destroy_arena && runtime->arena) runtime->host->destroy_arena(runtime->arena);
 			free(runtime);
 			return NULL;
 		}
@@ -830,22 +824,14 @@ void ls_runtime_destroy(ls_runtime* runtime) {
 	if (!runtime) return;
 	free(runtime->stack);
 	free(runtime->native_callbacks);
-	if (runtime->host && runtime->host->destroy_arena && runtime->arena) runtime->host->destroy_arena(runtime->arena);
 	free(runtime);
 }
 
-ls_result ls_runtime_set_native_function_callback(ls_runtime* runtime, int function_index, ls_native_fn callback) {
-	if (function_index < 0) return LS_RESULT_FAILURE;
-	i32 native_index = 0;
-	for (u32 i = 0; i < runtime->bytecode->function_count; ++i) {
-		if (runtime->bytecode->functions[i].kind != LS_FUNCTION_NATIVE) continue;
-		if (native_index == function_index) {
-			runtime->native_callbacks[i] = callback;
-			return LS_RESULT_OK;
-		}
-		++native_index;
-	}
-	return LS_RESULT_FAILURE;
+ls_result ls_runtime_set_native_function_callback_by_bytecode_index(ls_runtime* runtime, int bytecode_index, ls_native_fn callback) {
+	if (!runtime || bytecode_index < 0 || (u32)bytecode_index >= runtime->bytecode->function_count) return LS_RESULT_FAILURE;
+	if (runtime->bytecode->functions[bytecode_index].kind != LS_FUNCTION_NATIVE) return LS_RESULT_FAILURE;
+	runtime->native_callbacks[bytecode_index] = callback;
+	return LS_RESULT_OK;
 }
 
 void ls_push_bool(ls_runtime* runtime, int value) { u8 v = value ? 1u : 0u; runtime_push_bytes(runtime, &v, 1u); }

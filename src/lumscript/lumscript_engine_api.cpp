@@ -4,6 +4,7 @@
 #include "engine/world.h"
 #include "imgui/imgui.h"
 #include "lumscript/capi.h"
+#include "lumscript/lumscript_module.h"
 #include "lumscript/lumscript_capi.gen.h"
 #include "lumscript/lumscript_wrapper.h"
 #include <string.h>
@@ -27,6 +28,8 @@ void writeResult(ls_runtime*, ls_call_frame& frame, const LumScriptEntity& value
 }
 
 namespace {
+
+using NativeFunctionMap = HashMap<NativeFunctionKey, ls_native_fn, NativeFunctionKeyHash>;
 
 static void logLogError(ls_string_view v) {
 	logError(StringView(v.begin, v.end));
@@ -199,49 +202,49 @@ static Vec3 lumscript_entity_getScale(LumScriptEntity entity) {
 	return entity.world->getScale(entity.entity);
 }
 
-void registerImguiModule(HashMap<StringView, ls_native_fn>& functions) {
-	functions.insert(StringView("core:imgui.begin"), &wrap<imguiBegin>);
-	functions.insert(StringView("core:imgui.textUnformatted"), &wrap<imguiTextUnformatted>);
-	functions.insert(StringView("core:imgui.button"), &wrap<imguiButton>);
-	functions.insert(StringView("core:imgui.end"), &wrap<imguiEnd>);
+void registerImguiModule(NativeFunctionMap& functions) {
+	functions.insert({"core:imgui", "begin"}, &wrap<imguiBegin>);
+	functions.insert({"core:imgui", "textUnformatted"}, &wrap<imguiTextUnformatted>);
+	functions.insert({"core:imgui", "button"}, &wrap<imguiButton>);
+	functions.insert({"core:imgui", "end"}, &wrap<imguiEnd>);
 }
 
 } // namespace
 
-void gatherCoreFunctions(HashMap<StringView, ls_native_fn>& functions) {
+void gatherCoreFunctions(NativeFunctionMap& functions) {
 	generated::registerGeneratedEngineImport(functions);
 	registerImguiModule(functions);
 	// input
-	functions.insert(StringView("core:input.getEventCount"), &wrap<inputGetEventCount>);
-	functions.insert(StringView("core:input.getEvent"), &wrap<inputGetEvent>);
-	functions.insert(StringView("core:input.getType"), &wrap<inputGetType>);
-	functions.insert(StringView("core:input.getDeviceType"), &wrap<inputGetDeviceType>);
-	functions.insert(StringView("core:input.getDeviceIndex"), &wrap<inputGetDeviceIndex>);
-	functions.insert(StringView("core:input.getKeyId"), &wrap<inputGetKeyId>);
-	functions.insert(StringView("core:input.isDown"), &wrap<inputIsDown>);
-	functions.insert(StringView("core:input.isRepeat"), &wrap<inputIsRepeat>);
-	functions.insert(StringView("core:input.getX"), &wrap<inputGetX>);
-	functions.insert(StringView("core:input.getY"), &wrap<inputGetY>);
-	functions.insert(StringView("core:input.getValue"), &wrap<inputGetValue>);
-	functions.insert(StringView("core:input.getAxis"), &wrap<inputGetAxis>);
-	functions.insert(StringView("core:input.getText"), &wrap<inputGetText>);
+	functions.insert({"core:input", "getEventCount"}, &wrap<inputGetEventCount>);
+	functions.insert({"core:input", "getEvent"}, &wrap<inputGetEvent>);
+	functions.insert({"core:input", "getType"}, &wrap<inputGetType>);
+	functions.insert({"core:input", "getDeviceType"}, &wrap<inputGetDeviceType>);
+	functions.insert({"core:input", "getDeviceIndex"}, &wrap<inputGetDeviceIndex>);
+	functions.insert({"core:input", "getKeyId"}, &wrap<inputGetKeyId>);
+	functions.insert({"core:input", "isDown"}, &wrap<inputIsDown>);
+	functions.insert({"core:input", "isRepeat"}, &wrap<inputIsRepeat>);
+	functions.insert({"core:input", "getX"}, &wrap<inputGetX>);
+	functions.insert({"core:input", "getY"}, &wrap<inputGetY>);
+	functions.insert({"core:input", "getValue"}, &wrap<inputGetValue>);
+	functions.insert({"core:input", "getAxis"}, &wrap<inputGetAxis>);
+	functions.insert({"core:input", "getText"}, &wrap<inputGetText>);
 	// log
-	functions.insert(StringView("core:log.logError"), &wrap<logLogError>);
-	functions.insert(StringView("core:log.logInfo"), &wrap<logLogInfo>);
+	functions.insert({"core:log", "logError"}, &wrap<logLogError>);
+	functions.insert({"core:log", "logInfo"}, &wrap<logLogInfo>);
 	// entity
-	functions.insert(StringView("core:entity.destroy"), &wrap<lumscript_entity_destroy>);
-	functions.insert(StringView("core:entity.isValid"), &wrap<lumscript_entity_isValid>);
-	functions.insert(StringView("core:entity.getPosition"), &wrap<lumscript_entity_getPosition>);
-	functions.insert(StringView("core:entity.getRotation"), &wrap<lumscript_entity_getRotation>);
-	functions.insert(StringView("core:entity.getScale"), &wrap<lumscript_entity_getScale>);
-	functions.insert(StringView("core:entity.setPosition"), &wrap<lumscript_entity_setPosition>);
-	functions.insert(StringView("core:entity.setScale"), &wrap<lumscript_entity_setScale>);
-	functions.insert(StringView("core:entity.setRotation"), &wrap<lumscript_entity_setRotation>);
+	functions.insert({"core:entity", "destroy"}, &wrap<lumscript_entity_destroy>);
+	functions.insert({"core:entity", "isValid"}, &wrap<lumscript_entity_isValid>);
+	functions.insert({"core:entity", "getPosition"}, &wrap<lumscript_entity_getPosition>);
+	functions.insert({"core:entity", "getRotation"}, &wrap<lumscript_entity_getRotation>);
+	functions.insert({"core:entity", "getScale"}, &wrap<lumscript_entity_getScale>);
+	functions.insert({"core:entity", "setPosition"}, &wrap<lumscript_entity_setPosition>);
+	functions.insert({"core:entity", "setScale"}, &wrap<lumscript_entity_setScale>);
+	functions.insert({"core:entity", "setRotation"}, &wrap<lumscript_entity_setRotation>);
 	// world
-	functions.insert(StringView("core:world.createEntity"), &wrap<lumscript_world_createEntity>);
-	functions.insert(StringView("core:world.destroyEntity"), &wrap<lumscript_world_destroyEntity>);
-	functions.insert(StringView("core:world.findByName"), &lumscript_world_findByName);
-	functions.insert(StringView("core:world.hasEntity"), &wrap<lumscript_world_hasEntity>);
+	functions.insert({"core:world", "createEntity"}, &wrap<lumscript_world_createEntity>);
+	functions.insert({"core:world", "destroyEntity"}, &wrap<lumscript_world_destroyEntity>);
+	functions.insert({"core:world", "findByName"}, &lumscript_world_findByName);
+	functions.insert({"core:world", "hasEntity"}, &wrap<lumscript_world_hasEntity>);
 }
 
 } // namespace Lumix::LumScript

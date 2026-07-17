@@ -11,7 +11,7 @@ TEST(BytecodeExplicitCastNumeric) {
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
 
-	ls_runtime* runtime = ls_runtime_create(bytecode);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_FLOAT_EQ(1.0f, ls_to_f32(runtime, -1));
@@ -35,7 +35,7 @@ TEST(BytecodeExplicitCastLargeIntegerToI64) {
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
 
-	ls_runtime* runtime = ls_runtime_create(bytecode);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_TRUE(ls_to_i64(runtime, -1) == 2147483648ll);
@@ -68,7 +68,7 @@ TEST(BytecodeExplicitCastLargeIntegerToI64LocalAndArg) {
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
 
-	ls_runtime* runtime = ls_runtime_create(bytecode);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 	EXPECT_TRUE(ls_call(runtime, toLs("local")));
 	EXPECT_TRUE(ls_to_i64(runtime, -1) == 2147483648ll);
@@ -99,7 +99,7 @@ TEST(BytecodeExplicitCastEnumToInteger) {
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
 
-	ls_runtime* runtime = ls_runtime_create(bytecode);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(1, ls_to_i32(runtime, -1));

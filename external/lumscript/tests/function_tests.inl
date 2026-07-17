@@ -253,7 +253,7 @@ TEST(BytecodeFunctionValueLocal) {
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
 
-	ls_runtime* runtime = ls_runtime_create(bytecode);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
@@ -286,7 +286,7 @@ TEST(BytecodeIndirectFunctionCall) {
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
 
-	ls_runtime* runtime = ls_runtime_create(bytecode);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
@@ -321,7 +321,7 @@ TEST(BytecodeIndirectFunctionCallWithAggregateArgument) {
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
 
-	ls_runtime* runtime = ls_runtime_create(bytecode);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
@@ -352,7 +352,7 @@ TEST(BytecodeGlobalFunctionLiteral) {
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
 
-	ls_runtime* runtime = ls_runtime_create(bytecode);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
@@ -381,7 +381,7 @@ TEST(BytecodeGlobalFunctionVariable) {
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
 
-	ls_runtime* runtime = ls_runtime_create(bytecode);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
@@ -407,8 +407,7 @@ TEST(testNativeFunctionCall) {
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	const i32 native_add = ls_module_get_native_function_index(module, toLs("native_add"));
-	EXPECT_TRUE(ls_runtime_set_native_function_callback(runtime, native_add, &nativeAddC) == LS_RESULT_OK);
+	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("native_add"), &nativeAddC) == LS_RESULT_OK);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 	CAPI_END(module);
@@ -482,6 +481,25 @@ TEST(FunctionNamedLengthCompilesAndRuns) {
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(NativeFunctionsAreEnumeratedByUnit) {
+	const char* source = R"(
+		extern fn first() : void;
+		extern fn second(v : i32) : i32;
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	EXPECT_EQ(1, ls_module_get_unit_count(module));
+	ls_unit* unit = ls_module_get_unit(module, 0);
+	EXPECT_TRUE(unit);
+	EXPECT_TRUE(equalStrings(ls_unit_get_path(unit), __func__));
+	EXPECT_EQ(2, ls_unit_get_native_function_count(unit));
+	EXPECT_TRUE(equalStrings(ls_unit_get_native_function_name(unit, 0), "first"));
+	EXPECT_TRUE(equalStrings(ls_unit_get_native_function_name(unit, 1), "second"));
 	CAPI_END(module);
 	return true;
 }

@@ -140,11 +140,12 @@ static ls_string_view toLs(const char* value) {
 
 struct TestContext {
 	TestContext() {
-		host.create_arena = &ls_default_arena_create;
-		host.destroy_arena = &ls_default_arena_destroy;
+		ls_default_arena_create(&host.arena);
 		host.diagnostics_userdata = &diagnostics;
 		host.print = &testPrint;
 	}
+
+	~TestContext() { ls_default_arena_destroy(&host.arena); }
 
 	struct Diagnostics {
 		bool output_enabled = true;
@@ -158,7 +159,7 @@ struct RuntimeGuard {
 	// compiled bytecode and the runtime bound to it.
 	explicit RuntimeGuard(ls_module* module, ls_host* host)
 		: bytecode(ls_bytecode_compile(module, host))
-		, runtime(bytecode ? ls_runtime_create(bytecode) : nullptr)
+		, runtime(bytecode ? ls_runtime_create(bytecode, nullptr) : nullptr)
 	{}
 
 	~RuntimeGuard() {
@@ -215,6 +216,23 @@ static int resolveLumScriptImportC(void* userdata, ls_string_view path, ls_strin
 		}
 	}
 	return 0;
+}
+
+static ls_result setNativeFunctionCallback(ls_runtime* runtime, ls_module* module, ls_string_view name, ls_native_fn callback) {
+	for (int unit_index = 0, unit_count = ls_module_get_unit_count(module); unit_index < unit_count; ++unit_index) {
+		ls_unit* unit = ls_module_get_unit(module, unit_index);
+		const ls_string_view path = ls_unit_get_path(unit);
+		for (int function_index = 0, function_count = ls_unit_get_native_function_count(unit); function_index < function_count; ++function_index) {
+			const ls_string_view function_name = ls_unit_get_native_function_name(unit, function_index);
+			if (equalStrings(name, function_name)) return ls_runtime_set_native_function_callback(runtime, unit, function_index, callback);
+			if (size(name) != size(path) + 1u + size(function_name)) continue;
+			if (compareMemory(data(name), data(path), size(path)) != 0) continue;
+			if (data(name)[size(path)] != '.') continue;
+			if (compareMemory(data(name) + size(path) + 1u, data(function_name), size(function_name)) != 0) continue;
+			return ls_runtime_set_native_function_callback(runtime, unit, function_index, callback);
+		}
+	}
+	return LS_RESULT_FAILURE;
 }
 
 static void nativeAddC(ls_runtime* runtime, ls_call_frame frame) {

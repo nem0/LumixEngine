@@ -210,8 +210,7 @@ struct LumScriptEditorWindow final : AssetEditorWindow {
 		ImportContext import_ctx(m_app.getEngine().getFileSystem(), m_app.getAllocator());
 		ImportResolverContext resolver_ctx = {};
 		ls_host host = {};
-		host.create_arena = &ls_default_arena_create;
-		host.destroy_arena = &ls_default_arena_destroy;
+		ls_default_arena_create(&host.arena);
 		host.diagnostics_userdata = &diagnostics_message;
 		host.print = [](void* userdata, ls_string_view msg) {
 			((String*)userdata)->append(StringView(msg.begin, msg.end));
@@ -239,6 +238,7 @@ struct LumScriptEditorWindow final : AssetEditorWindow {
 			m_message = "Failed to allocate LumScript module";
 			logError("LumScript check failed: ", m_path, ": Failed to allocate LumScript module");
 		}
+		ls_default_arena_destroy(&host.arena);
 	}
 
 	void windowGUI() override {
