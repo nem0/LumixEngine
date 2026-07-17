@@ -1,19 +1,50 @@
-import "core:InputEventType"
+import "core:inputdevicetype"
 
 struct InputSystem { system : cptr; }
-struct InputEvent { event : cptr; }
+struct ButtonEvent {
+	device_type : InputDeviceType;
+	device_index : i32;
+	key_id : i32;
+	down : bool;
+	is_repeat : bool;
+	x : f32;
+	y : f32;
+}
+
+struct AxisEvent {
+	device_type : InputDeviceType;
+	device_index : i32;
+	x : f32;
+	y : f32;
+	x_abs : f32;
+	y_abs : f32;
+	axis : i32;
+}
+
+struct MouseWheelEvent {
+	device_type : InputDeviceType;
+	device_index : i32;
+	x : f32;
+	y : f32;
+}
+
+struct TextEvent {
+	device_type : InputDeviceType;
+	device_index : i32;
+	utf8 : i32;
+}
+
+struct DeviceAddedEvent {
+	device_type : InputDeviceType;
+	device_index : i32;
+}
+
+struct DeviceRemovedEvent {
+	device_type : InputDeviceType;
+	device_index : i32;
+}
+
+comptime InputEvent = ButtonEvent | AxisEvent | MouseWheelEvent | TextEvent | DeviceAddedEvent | DeviceRemovedEvent;
 
 extern fn getEventCount(system : InputSystem) : i32;
 extern fn getEvent(system: InputSystem, index : i32) : InputEvent;
-
-extern fn getType(event : InputEvent) : InputEventType;
-extern fn getDeviceType(event : InputEvent) : i32;
-extern fn getDeviceIndex(event : InputEvent) : i32;
-extern fn getKeyId(event : InputEvent) : i32;
-extern fn isDown(event : InputEvent) : bool;
-extern fn isRepeat(event : InputEvent) : bool;
-extern fn getX(event : InputEvent) : f32;
-extern fn getY(event : InputEvent) : f32;
-extern fn getValue(event : InputEvent) : f32;
-extern fn getAxis(event : InputEvent) : i32;
-extern fn getText(event : InputEvent) : i32;

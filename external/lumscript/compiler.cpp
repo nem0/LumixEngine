@@ -3357,7 +3357,22 @@ struct Checker {
 						errorLine(pattern.begin->token, "Range patterns are not valid for union matches");
 						return false;
 					}
-					ResolvedType* member = resolveTypeExpr(unit, *pattern.begin);
+					ResolvedType* member = nullptr;
+					if (pattern.begin->kind == Expression::IDENTIFIER) {
+						const ls_string_view name = static_cast<IdentifierExpression*>(pattern.begin)->name;
+						for (ResolvedType* candidate : subject_union->members) {
+							ls_string_view candidate_name = {};
+							if (candidate->kind == ResolvedType::STRUCT) candidate_name = static_cast<StructResolvedType*>(candidate)->decl->cached_name;
+							else if (candidate->kind == ResolvedType::ENUM) candidate_name = static_cast<EnumResolvedType*>(candidate)->decl->cached_name;
+							if (!equalStrings(name, candidate_name)) continue;
+							if (member && !typesEqual(member, candidate)) {
+								errorLine(pattern.begin->token, "Ambiguous union member type ", name);
+								return false;
+							}
+							member = candidate;
+						}
+					}
+					if (!member) member = resolveTypeExpr(unit, *pattern.begin);
 					if (!member) return false;
 					i32 member_index = -1;
 					for (i32 i = 0; i < subject_union->members.size(); ++i) {

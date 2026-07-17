@@ -43,80 +43,37 @@ static i32 inputGetEventCount(InputSystem* input) {
 	return input ? input->getEvents().length() : 0;
 }
 
-static const InputSystem::Event* inputGetEvent(InputSystem* input, i32 idx) {
-	const Span<const InputSystem::Event> events = input->getEvents();
-	return &events[idx];
-}
+static void inputGetEvent(ls_runtime*, ls_call_frame frame) {
+	LS_ARG(frame, InputSystem*, input);
+	LS_ARG(frame, i32, idx);
+	const InputSystem::Event& event = input->getEvents()[idx];
+	LS_RESULT(frame, (i32)event.type);
+	LS_RESULT(frame, (i32)event.device->type);
+	LS_RESULT(frame, (i32)event.device->index);
 
-static i32 inputGetType(const InputSystem::Event* event) {
-	return event ? (i32)event->type : -1;
-}
-
-static i32 inputGetDeviceType(const InputSystem::Event* event) {
-	return event && event->device ? (i32)event->device->type : -1;
-}
-
-static i32 inputGetDeviceIndex(const InputSystem::Event* event) {
-	return event && event->device ? (i32)event->device->index : -1;
-}
-
-static i32 inputGetKeyId(const InputSystem::Event* event) {
-	return event && event->type == InputEventType::BUTTON ? (i32)event->data.button.key_id : -1;
-}
-
-static bool inputIsDown(const InputSystem::Event* event) {
-	return event && event->type == InputEventType::BUTTON && event->data.button.down;
-}
-
-static bool inputIsRepeat(const InputSystem::Event* event) {
-	return event && event->type == InputEventType::BUTTON && event->data.button.is_repeat;
-}
-
-static float inputGetX(const InputSystem::Event* event) {
-	float value = 0;
-	if (event) {
-		switch (event->type) {
-			case InputEventType::BUTTON: value = event->data.button.x; break;
-			case InputEventType::AXIS: value = event->data.axis.x; break;
-			case InputEventType::MOUSE_WHEEL: value = event->data.mouse_wheel.x; break;
-			default: break;
-		}
+	switch (event.type) {
+		case InputEventType::BUTTON:
+			LS_RESULT(frame, (i32)event.data.button.key_id);
+			LS_RESULT(frame, event.data.button.down);
+			LS_RESULT(frame, event.data.button.is_repeat);
+			LS_RESULT(frame, event.data.button.x);
+			LS_RESULT(frame, event.data.button.y);
+			break;
+		case InputEventType::AXIS:
+			LS_RESULT(frame, event.data.axis.x);
+			LS_RESULT(frame, event.data.axis.y);
+			LS_RESULT(frame, event.data.axis.x_abs);
+			LS_RESULT(frame, event.data.axis.y_abs);
+			LS_RESULT(frame, (i32)event.data.axis.axis);
+			break;
+		case InputEventType::MOUSE_WHEEL:
+			LS_RESULT(frame, event.data.mouse_wheel.x);
+			LS_RESULT(frame, event.data.mouse_wheel.y);
+			break;
+		case InputEventType::TEXT_INPUT: LS_RESULT(frame, (i32)event.data.text.utf8); break;
+		case InputEventType::DEVICE_ADDED:
+		case InputEventType::DEVICE_REMOVED: break;
 	}
-	return value;
-}
-
-static float inputGetY(const InputSystem::Event* event) {
-	float value = 0;
-	if (event) {
-		switch (event->type) {
-			case InputEventType::BUTTON: value = event->data.button.y; break;
-			case InputEventType::AXIS: value = event->data.axis.y; break;
-			case InputEventType::MOUSE_WHEEL: value = event->data.mouse_wheel.y; break;
-			default: break;
-		}
-	}
-	return value;
-}
-
-static float inputGetValue(const InputSystem::Event* event) {
-	float value = 0;
-	if (event) {
-		switch (event->type) {
-			case InputEventType::AXIS: value = event->data.axis.y; break;
-			case InputEventType::MOUSE_WHEEL: value = event->data.mouse_wheel.y; break;
-			case InputEventType::BUTTON: value = event->data.button.down ? 1.0f : 0.0f; break;
-			default: break;
-		}
-	}
-	return value;
-}
-
-static i32 inputGetAxis(const InputSystem::Event* event) {
-	return event && event->type == InputEventType::AXIS ? (i32)event->data.axis.axis : -1;
-}
-
-static i32 inputGetText(const InputSystem::Event* event) {
-	return event && event->type == InputEventType::TEXT_INPUT ? (i32)event->data.text.utf8 : 0;
 }
 
 static bool imguiBegin(ls_string_view sv) {
@@ -216,18 +173,7 @@ void gatherCoreFunctions(NativeFunctionMap& functions) {
 	registerImguiModule(functions);
 	// input
 	functions.insert({"core:input", "getEventCount"}, &wrap<inputGetEventCount>);
-	functions.insert({"core:input", "getEvent"}, &wrap<inputGetEvent>);
-	functions.insert({"core:input", "getType"}, &wrap<inputGetType>);
-	functions.insert({"core:input", "getDeviceType"}, &wrap<inputGetDeviceType>);
-	functions.insert({"core:input", "getDeviceIndex"}, &wrap<inputGetDeviceIndex>);
-	functions.insert({"core:input", "getKeyId"}, &wrap<inputGetKeyId>);
-	functions.insert({"core:input", "isDown"}, &wrap<inputIsDown>);
-	functions.insert({"core:input", "isRepeat"}, &wrap<inputIsRepeat>);
-	functions.insert({"core:input", "getX"}, &wrap<inputGetX>);
-	functions.insert({"core:input", "getY"}, &wrap<inputGetY>);
-	functions.insert({"core:input", "getValue"}, &wrap<inputGetValue>);
-	functions.insert({"core:input", "getAxis"}, &wrap<inputGetAxis>);
-	functions.insert({"core:input", "getText"}, &wrap<inputGetText>);
+	functions.insert({"core:input", "getEvent"}, &inputGetEvent);
 	// log
 	functions.insert({"core:log", "logError"}, &wrap<logLogError>);
 	functions.insert({"core:log", "logInfo"}, &wrap<logLogInfo>);

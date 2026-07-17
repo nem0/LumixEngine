@@ -964,6 +964,7 @@ Rules:
 - a union match must be exhaustive unless `else` is present
 - duplicate member cases are compile-time errors
 - a case pattern that is not a member type of the subject is a compile-time error
+- an unqualified member type resolves against the union first, so `case ButtonEvent:` works even if the union was declared with `events.ButtonEvent`; qualify it only to disambiguate members with the same name
 - comma-separated alternatives (`case A, B:`) are allowed; the subject is not promoted in such a case since no single member type applies
 - promotion is flow-typing, same as nullable promotion: assigning to the subject inside a case (which may switch the active variant) is allowed and is not re-checked; the earlier promotion does not keep later uses safe (see [Nullable values](#nullable-values) for the analogous caveat)
 

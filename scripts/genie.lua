@@ -592,7 +592,7 @@ end
 
 if plugin "lumscript" then
 	files { "../src/lumscript/**.h", "../src/lumscript/**.cpp", "../external/lumscript/**.cpp", "../external/lumscript/**.c", "../external/lumscript/**.h" }
-	excludes { "../external/lumscript/lumc.c", "../external/lumscript/tests/*.cpp" }
+	excludes { "../external/lumscript/lumc.c", "../external/lumscript/tests/*.cpp", "../external/lumscript/c_compiler/**.*" }
 	includedirs { "../src", "../src/lumscript" }
 	defines { "BUILDING_LUMSCRIPT" }
 	dynamic_link_plugin { "core", "engine" }

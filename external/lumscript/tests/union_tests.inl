@@ -80,6 +80,37 @@ TEST(UnionExhaustiveMatch) {
 	return true;
 }
 
+TEST(UnionMatchImportedMemberWithoutNamespace) {
+	const char* source = R"(
+		import "events" as ns
+
+		comptime Event = ns.ButtonEvent | ns.AxisEvent;
+
+		fn main() : void {
+			var event : Event = ns.ButtonEvent { 1 };
+			match event {
+				case ButtonEvent:
+					var button : i32 = event.button;
+				case AxisEvent:
+					var axis : i32 = event.axis;
+			}
+		}
+	)";
+	const char* events_source = R"(
+		struct ButtonEvent {
+			button : i32;
+		}
+
+		struct AxisEvent {
+			axis : i32;
+		}
+	)";
+	LumScriptImportFile file = { toLs("events"), toLs(events_source) };
+	LumScriptImportFiles files = { &file, 1 };
+	EXPECT_COMPILE_WITH_IMPORTS(source, files);
+	return true;
+}
+
 TEST(UnionMatchWithElse) {
 	const char* source = R"(
 		struct A {

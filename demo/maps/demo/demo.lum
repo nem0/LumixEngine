@@ -59,27 +59,26 @@ fn update(dt : f32) : void {
 	const count = g_inputs.getEventCount();
 	while i < count {
 		const e = g_inputs.getEvent(i);
-		const t = e.getType();
 
-		match t {
-			case .BUTTON:
-				if (e.getKeyId() == Keycode.W as i32) {
+		match e {
+			case ButtonEvent:
+				if (e.key_id == Keycode.W as i32) {
 					log.logError("input W");
 				}
-				if e.isDown() {
+				if e.down {
 					log.logError("input button down");
 				} else {
 					log.logError("input button up");
 				}
-			case .AXIS:
+			case AxisEvent:
 				log.logError("input axis");
-			case .MOUSE_WHEEL:
+			case MouseWheelEvent:
 				log.logError("input mouse wheel");
-			case .TEXT_INPUT:
+			case TextEvent:
 				log.logError("input text");
-			case .DEVICE_ADDED:
+			case DeviceAddedEvent:
 				log.logError("input device added");
-			case .DEVICE_REMOVED:
+			case DeviceRemovedEvent:
 				log.logError("input device removed");
 		}
 
