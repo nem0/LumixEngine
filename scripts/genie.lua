@@ -1,3 +1,9 @@
+local separator = package.config:sub(1,1)
+local current_file = debug.getinfo(1, "S").source
+local script_dir = current_file:match("@(.*" .. separator .. ")")
+local root_path = script_dir .. "../"
+local external_path = root_path .. "external"
+
 -- simple options
 local simple_options = {
 	{ "plugins", "Add plugins to project, can be a comma-separated list, e.g. --plugins=pluginA,pluginB" },
@@ -52,8 +58,8 @@ local luau_dynamic = _OPTIONS["luau-dynamic"]
 local use_basisu =  _OPTIONS["with-basis-universal"]
 local dynamic_plugins = _OPTIONS["dynamic-plugins"]
 local split_projects = _OPTIONS["split-projects"] or dynamic_plugins
-local build_luau = os.isdir("../external/_repos/luau")
-local build_physx = os.isdir("../external/_repos/physx")
+local build_luau = os.isdir(external_path .. "/_repos/luau")
+local build_physx = os.isdir(external_path .. "/_repos/physx")
 
 if luau_dynamic and not build_luau then
 	printf("Luau source code not found, can't build Luau as dynamic library.")
@@ -136,7 +142,7 @@ function buildPluginDefines()
 end
 
 function defaultConfigurations()
-	configuration "Debug"
+	configuration "Debug and windows"
 		targetdir(BINARY_DIR .. "Debug")
 		defines { "NDEBUG", "LUMIX_DEBUG" }
 		flags { "Symbols", "ReleaseRuntime" }
@@ -238,12 +244,12 @@ detect_plugins()
 function linkLib(lib)
 	links {lib}
 
-	local use_prebuilt = not os.isdir("../external/_repos/" .. lib)
+	local use_prebuilt = not os.isdir(external_path .. "/_repos/" .. lib)
 	if use_prebuilt then
 		for platform,target_platform in pairs({win="windows", linux="linux", }) do
 			configuration { "x64", target_platform }
-				libdirs { "../external/" .. lib .. "/lib/" .. platform }
-				libdirs { "../external/" .. lib .. "/dll/" .. platform }
+				libdirs { external_path .. "/" .. lib .. "/lib/" .. platform }
+				libdirs { external_path .. "/" .. lib .. "/dll/" .. platform }
 		end
 		configuration {}
 	end
@@ -278,7 +284,7 @@ solution "LumixEngine"
 		"NoRTTI", 
 		"NoEditAndContinue"
 	}
-	includedirs {"../src", "../external" }
+	includedirs {"../src", external_path .. "" }
 	location(LOCATION)
 	language "C++"
 	startproject "studio"
@@ -377,7 +383,7 @@ lib_project "core"
 			"../src/core/**.cpp",
 			"../src/core/**.inl",
 			"genie.lua",
-			"../external/wyhash/**.*"
+			external_path .. "/wyhash/**.*"
 	}
 
 	configuration { "linux" }
@@ -388,7 +394,7 @@ lib_project "engine"
 	defines { "BUILDING_ENGINE" }
 	dynamic_link_plugin { "core" }
 	defaultConfigurations()
-	includedirs { "../src", "../external/freetype/include" }
+	includedirs { "../src", external_path .. "/freetype/include" }
 
 	if dynamic_plugins then
 		linkLib "freetype"
@@ -400,19 +406,19 @@ lib_project "engine"
 			"../src/engine/**.cpp",
 			"../src/engine/**.inl",
 			"genie.lua",
-			"../external/imgui/**.h",
-			"../external/imgui/**.cpp",
-			"../external/imgui/**.inl",
-			"../external/lz4/**.c",
-			"../external/lz4/**.h",
+			external_path .. "/imgui/**.h",
+			external_path .. "/imgui/**.cpp",
+			external_path .. "/imgui/**.inl",
+			external_path .. "/lz4/**.c",
+			external_path .. "/lz4/**.h",
 	}
 	excludes {
-		"../external/imgui/imgui_demo.cpp",
-		"../external/imgui/imgui.cpp",
-		"../external/imgui/imgui_tables.cpp",
-		"../external/imgui/imgui_draw.cpp",
-		"../external/imgui/imgui_widgets.cpp",
-		"../external/imgui/imgui_freetype.cpp",
+		external_path .. "/imgui/imgui_demo.cpp",
+		external_path .. "/imgui/imgui.cpp",
+		external_path .. "/imgui/imgui_tables.cpp",
+		external_path .. "/imgui/imgui_draw.cpp",
+		external_path .. "/imgui/imgui_widgets.cpp",
+		external_path .. "/imgui/imgui_freetype.cpp",
 	}
 
 	configuration { "linux" }
@@ -420,7 +426,7 @@ lib_project "engine"
 
 if plugin "physics" then
 	files { "../src/physics/**.h", "../src/physics/**.cpp" }
-	includedirs { "../external/physx/include/" }
+	includedirs { external_path .. "/physx/include/" }
 	defines { "BUILDING_PHYSICS", "LUMIX_STATIC_PHYSX" }
 	dynamic_link_plugin { "core", "engine", "renderer" }
 	linkPhysX()
@@ -434,36 +440,36 @@ if plugin "renderer" then
 	}
 	files { "../data/shaders/**.*" }
 	excludes { 
-		"../external/meshoptimizer/clusterizer.cpp",
-		"../external/meshoptimizer/overdrawanalyzer.cpp",
-		"../external/meshoptimizer/overdrawoptimizer.cpp",
-		"../external/meshoptimizer/spatialorder.cpp",
-		"../external/meshoptimizer/stripifier.cpp",
-		"../external/meshoptimizer/vcacheanalyzer.cpp",
-		"../external/meshoptimizer/vcacheoptimizer.cpp",
-		"../external/meshoptimizer/vertexcodec.cpp",
-		"../external/meshoptimizer/vertexfilter.cpp",
-		"../external/meshoptimizer/vfetchanalyzer.cpp",
-		"../external/meshoptimizer/vfetchoptimizer.cpp",
-		"../src/renderer/editor/voxelizer_ui.cpp",
+		external_path .. "/meshoptimizer/clusterizer.cpp",
+		external_path .. "/meshoptimizer/overdrawanalyzer.cpp",
+		external_path .. "/meshoptimizer/overdrawoptimizer.cpp",
+		external_path .. "/meshoptimizer/spatialorder.cpp",
+		external_path .. "/meshoptimizer/stripifier.cpp",
+		external_path .. "/meshoptimizer/vcacheanalyzer.cpp",
+		external_path .. "/meshoptimizer/vcacheoptimizer.cpp",
+		external_path .. "/meshoptimizer/vertexcodec.cpp",
+		external_path .. "/meshoptimizer/vertexfilter.cpp",
+		external_path .. "/meshoptimizer/vfetchanalyzer.cpp",
+		external_path .. "/meshoptimizer/vfetchoptimizer.cpp",
+		root_path .. "/src/renderer/editor/voxelizer_ui.cpp",
 	}
 	
 	if build_studio then
 		files {
-			"../external/meshoptimizer/**.*",
-			"../external/mikktspace/**.*",
-			"../external/openfbx/**.*",
+			external_path .. "/meshoptimizer/**.*",
+			external_path .. "/mikktspace/**.*",
+			external_path .. "/openfbx/**.*",
 		}
 	end
 
 	if use_basisu then
 		defines { "LUMIX_BASIS_UNIVERSAL" }
-		includedirs { "../external/basisu/include" }
+		includedirs { external_path .. "/basisu/include" }
 	end
-	includedirs { "../src", "../external/freetype/include", "../external/", "../external/dx12/", "../external/pix/include/WinPixEventRuntime" }
+	includedirs { root_path .. "/src", external_path .. "/freetype/include", external_path .. "/", external_path .. "/dx12/", external_path .. "/pix/include/WinPixEventRuntime" }
 	
 	defines { "BUILDING_RENDERER" }
-	libdirs { "../external/pix/bin/x64" }
+	libdirs { external_path .. "/pix/bin/x64" }
 	dynamic_link_plugin { "core", "engine" }
 
 	if build_studio and use_basisu then
@@ -490,7 +496,7 @@ if plugin "audio" then
 	files { 
 		"../src/audio/**.h",
 		"../src/audio/**.cpp",
-		"../external/stb/stb_vorbis.cpp"
+		external_path .. "/stb/stb_vorbis.cpp"
 	}
 
 	includedirs { "../src", "../src/audio" }
@@ -505,40 +511,40 @@ if plugin "navigation" then
 	files {
 		"../src/navigation/**.h",
 		"../src/navigation/**.cpp",
-		"../external/recast/src/**.cpp",
-		"../external/recast/include/**.h"
+		external_path .. "/recast/src/**.cpp",
+		external_path .. "/recast/include/**.h"
 	}
 
 	-- use unity build for recast
 	excludes {
-		"../external/recast/src/DetourAlloc.cpp",
-		"../external/recast/src/DetourAssert.cpp",
-		"../external/recast/src/DetourCommon.cpp",
-		"../external/recast/src/DetourCrowd.cpp",
-		"../external/recast/src/DetourLocalBoundary.cpp",
-		"../external/recast/src/DetourNavMesh.cpp",
-		"../external/recast/src/DetourNavMeshBuilder.cpp",
-		"../external/recast/src/DetourNavMeshQuery.cpp",
-		"../external/recast/src/DetourNode.cpp",
-		"../external/recast/src/DetourObstacleAvoidance.cpp",
-		"../external/recast/src/DetourPathCorridor.cpp",
-		"../external/recast/src/DetourPathQueue.cpp",
-		"../external/recast/src/DetourProximityGrid.cpp",
-		"../external/recast/src/Recast.cpp",
-		"../external/recast/src/RecastAlloc.cpp",
-		"../external/recast/src/RecastArea.cpp",
-		"../external/recast/src/RecastAssert.cpp",
-		"../external/recast/src/RecastFilter.cpp",
-		"../external/recast/src/RecastLayers.cpp",
-		"../external/recast/src/RecastMesh.cpp",
-		"../external/recast/src/RecastRasterization.cpp",
-		"../external/recast/src/RecastRegion.cpp",
+		external_path .. "/recast/src/DetourAlloc.cpp",
+		external_path .. "/recast/src/DetourAssert.cpp",
+		external_path .. "/recast/src/DetourCommon.cpp",
+		external_path .. "/recast/src/DetourCrowd.cpp",
+		external_path .. "/recast/src/DetourLocalBoundary.cpp",
+		external_path .. "/recast/src/DetourNavMesh.cpp",
+		external_path .. "/recast/src/DetourNavMeshBuilder.cpp",
+		external_path .. "/recast/src/DetourNavMeshQuery.cpp",
+		external_path .. "/recast/src/DetourNode.cpp",
+		external_path .. "/recast/src/DetourObstacleAvoidance.cpp",
+		external_path .. "/recast/src/DetourPathCorridor.cpp",
+		external_path .. "/recast/src/DetourPathQueue.cpp",
+		external_path .. "/recast/src/DetourProximityGrid.cpp",
+		external_path .. "/recast/src/Recast.cpp",
+		external_path .. "/recast/src/RecastAlloc.cpp",
+		external_path .. "/recast/src/RecastArea.cpp",
+		external_path .. "/recast/src/RecastAssert.cpp",
+		external_path .. "/recast/src/RecastFilter.cpp",
+		external_path .. "/recast/src/RecastLayers.cpp",
+		external_path .. "/recast/src/RecastMesh.cpp",
+		external_path .. "/recast/src/RecastRasterization.cpp",
+		external_path .. "/recast/src/RecastRegion.cpp",
 		-- don't include following files in unity build because they have conflicting symbols with RecastMesh.cpp and each other
-		--"../external/recast/src/RecastContour.cpp",
-		--"../external/recast/src/RecastMeshDetail.cpp",
+		--external_path .. "/recast/src/RecastContour.cpp",
+		--external_path .. "/recast/src/RecastMeshDetail.cpp",
 	}
 
-	includedirs { "../src", "../src/navigation", "../external/recast/include" }
+	includedirs { "../src", "../src/navigation", external_path .. "/recast/include" }
 	dynamic_link_plugin { "core", "engine", "renderer" }
 end
 
@@ -558,17 +564,17 @@ if plugin "lua" then
 	end
 
 	configuration { "vs20*" }
-		libdirs {  "../external/luau/lib/win" }
+		libdirs {  external_path .. "/luau/lib/win" }
 		linkLib "Luau"
 		
 	configuration { "linux" }
-		libdirs {  "../external/luau/lib/linux" }
+		libdirs {  external_path .. "/luau/lib/linux" }
 		linkLib "Luau"
 
 	configuration {}
 
 	files { "../src/lua/**.h", "../src/lua/**.cpp" }
-	includedirs { "../external/luau/include"
+	includedirs { external_path .. "/luau/include"
 		, "../src"
 		, "../src/lua"
 	}
@@ -606,10 +612,10 @@ for _, plugin in ipairs(plugins) do
 end
 
 function dbgHelp()
-	configuration { "windows" }
-		files { "../external/dbghelp/**.dll" }	
-		copy { "../external/dbghelp/**.dll" }
-	configuration {}
+	configuration "windows"
+		files { (external_path .. "/dbghelp/**.dll") }	
+		postbuildcommands { "copy (external_path .. /dbghelp/**.dll)" }
+	configuration { "linux" }
 end
 
 if build_app then
@@ -645,7 +651,7 @@ if build_app then
 		
 		configuration { "windows" }
 			kind "WindowedApp"
-			libdirs { "../external/pix/bin/x64" }
+			libdirs { external_path .. "/pix/bin/x64" }
 
 		linkLinuxLibs()
 		
@@ -672,7 +678,7 @@ if build_studio then
 		includedirs {
 			"../src",
 			"../src/editor",
-			"../external"
+			external_path .. ""
 		}
 
 		buildPluginDefines()
@@ -694,10 +700,10 @@ if build_studio then
 		defaultConfigurations()
 
 		if build_tests then
-			includedirs { "../external/imgui_test_engine", "../external/imgui" }
+			includedirs { external_path .. "/imgui_test_engine", external_path .. "/imgui" }
 			files {
-				"../external/imgui_test_engine/**.h",
-				"../external/imgui_test_engine/**.cpp",
+				external_path .. "/imgui_test_engine/**.h",
+				external_path .. "/imgui_test_engine/**.cpp",
 				"../src/tests/imgui**",
 			}
 		end
@@ -742,16 +748,16 @@ if build_studio then
 
 			linkWindowsLibs()
 
-			configuration { "vs*" }
-				libdirs { "../external/pix/bin/x64" }
-				files { "../external/pix/bin/x64/WinPixEventRuntime.dll" }
-				copy { "../external/pix/bin/x64/WinPixEventRuntime.dll" }
+			configuration { "windows and vs*" }
+				libdirs { external_path .. "/pix/bin/x64" }
+				files { external_path .. "/pix/bin/x64/WinPixEventRuntime.dll" }
+				postbuildcommands { "copy \"" .. external_path .. "/pix/bin/x64/WinPixEventRuntime.dll" .. "\"" }
 		end
 
-		configuration { "vs*" }
-			libdirs { "../external/pix/bin/x64" }
-			files { "../external/pix/bin/x64/WinPixEventRuntime.dll" }
-			copy { "../external/pix/bin/x64/WinPixEventRuntime.dll" }
+		configuration { "windows and vs*" }
+			libdirs { external_path .. "/pix/bin/x64" }
+			files { external_path .. "/pix/bin/x64/WinPixEventRuntime.dll" }
+			postbuildcommands { "copy \"" ..  external_path .. "/pix/bin/x64/WinPixEventRuntime.dll" .. "\"" }
 
 		configuration {}
 
@@ -761,8 +767,8 @@ if build_studio then
 		
 		if not build_luau or luau_dynamic then
 			configuration { "windows" }
-				files { "../external/luau/lib/win/Luau.dll" }
-				copy { "../external/luau/lib/win/Luau.dll" }
+				files { external_path .. "/luau/lib/win/Luau.dll" }
+				postbuildcommands { "copy \"" .. external_path .. "/luau/lib/win/Luau.dll" .. "\""}
 		end
 
 		configuration { "linux" }
@@ -776,63 +782,63 @@ if build_physx and hasPlugin("physics") then
 	printf("Using PhysX from external/_repos/physx (build from source code)")
 	project "PhysX"
 		kind "StaticLib"
-		files { "../external/_repos/physx/physx/source/**.cpp", "../external/_repos/physx/physx/include/**.h", "../external/_repos/physx/pxshared/**.h" }
+		files { external_path .. "/_repos/physx/physx/source/**.cpp", external_path .. "/_repos/physx/physx/include/**.h", external_path .. "/_repos/physx/pxshared/**.h" }
 		removefiles { "../**/unix/*", "../**/linux/*" }
-		includedirs { "../external/_repos/physx/physx/include"
-			, "../external/_repos/physx/pxshared/include"
+		includedirs { external_path .. "/_repos/physx/physx/include"
+			, external_path .. "/_repos/physx/pxshared/include"
 			
-			, "../external/_repos/physx/physx/source/common/include"
-			, "../external/_repos/physx/physx/source/fastxml/include"
-			, "../external/_repos/physx/physx/source/filebuf/include"
-			, "../external/_repos/physx/physx/source/foundation/include"
-			, "../external/_repos/physx/physx/source/geomutils/include"
-			, "../external/_repos/physx/physx/source/lowlevel/api/include"
-			, "../external/_repos/physx/physx/source/lowlevel/common/include"
-			, "../external/_repos/physx/physx/source/lowlevel/common/include/collision"
-			, "../external/_repos/physx/physx/source/lowlevel/common/include/pipeline"
-			, "../external/_repos/physx/physx/source/lowlevel/common/include/utils"
-			, "../external/_repos/physx/physx/source/lowlevel/software/include"
-			, "../external/_repos/physx/physx/source/lowlevelaabb/include"
-			, "../external/_repos/physx/physx/source/lowleveldynamics/include"
-			, "../external/_repos/physx/physx/source/physx/src"
-			, "../external/_repos/physx/physx/source/physx/src/buffering"
-			, "../external/_repos/physx/physx/source/physx/src/device"
-			, "../external/_repos/physx/physx/source/physx/src/gpu"
-			, "../external/_repos/physx/physx/source/physx/src/windows"
-			, "../external/_repos/physx/physx/source/physxgpu/include"
-			, "../external/_repos/physx/physx/source/physxmetadata/core/include"
-			, "../external/_repos/physx/physx/source/physxmetadata/extensions/include"
-			, "../external/_repos/physx/physx/source/physxvehicle/src/physxmetadata/include"
-			, "../external/_repos/physx/physx/source/pvd/include"
-			, "../external/_repos/physx/physx/source/scenequery/include"
-			, "../external/_repos/physx/physx/source/simulationcontroller/include"
+			, external_path .. "/_repos/physx/physx/source/common/include"
+			, external_path .. "/_repos/physx/physx/source/fastxml/include"
+			, external_path .. "/_repos/physx/physx/source/filebuf/include"
+			, external_path .. "/_repos/physx/physx/source/foundation/include"
+			, external_path .. "/_repos/physx/physx/source/geomutils/include"
+			, external_path .. "/_repos/physx/physx/source/lowlevel/api/include"
+			, external_path .. "/_repos/physx/physx/source/lowlevel/common/include"
+			, external_path .. "/_repos/physx/physx/source/lowlevel/common/include/collision"
+			, external_path .. "/_repos/physx/physx/source/lowlevel/common/include/pipeline"
+			, external_path .. "/_repos/physx/physx/source/lowlevel/common/include/utils"
+			, external_path .. "/_repos/physx/physx/source/lowlevel/software/include"
+			, external_path .. "/_repos/physx/physx/source/lowlevelaabb/include"
+			, external_path .. "/_repos/physx/physx/source/lowleveldynamics/include"
+			, external_path .. "/_repos/physx/physx/source/physx/src"
+			, external_path .. "/_repos/physx/physx/source/physx/src/buffering"
+			, external_path .. "/_repos/physx/physx/source/physx/src/device"
+			, external_path .. "/_repos/physx/physx/source/physx/src/gpu"
+			, external_path .. "/_repos/physx/physx/source/physx/src/windows"
+			, external_path .. "/_repos/physx/physx/source/physxgpu/include"
+			, external_path .. "/_repos/physx/physx/source/physxmetadata/core/include"
+			, external_path .. "/_repos/physx/physx/source/physxmetadata/extensions/include"
+			, external_path .. "/_repos/physx/physx/source/physxvehicle/src/physxmetadata/include"
+			, external_path .. "/_repos/physx/physx/source/pvd/include"
+			, external_path .. "/_repos/physx/physx/source/scenequery/include"
+			, external_path .. "/_repos/physx/physx/source/simulationcontroller/include"
 			
-			, "../external/_repos/physx/physx/source/physxcooking/src/"
-			, "../external/_repos/physx/physx/source/physxcooking/src/convex"
-			, "../external/_repos/physx/physx/source/physxcooking/src/mesh"
+			, external_path .. "/_repos/physx/physx/source/physxcooking/src/"
+			, external_path .. "/_repos/physx/physx/source/physxcooking/src/convex"
+			, external_path .. "/_repos/physx/physx/source/physxcooking/src/mesh"
 			
-			, "../external/_repos/physx/physx/source/physxextensions/src"
-			, "../external/_repos/physx/physx/source/physxextensions/src/serialization"
-			, "../external/_repos/physx/physx/source/physxextensions/src/serialization/Binary"
-			, "../external/_repos/physx/physx/source/physxextensions/src/serialization/File"
-			, "../external/_repos/physx/physx/source/physxextensions/src/serialization/Xml"
+			, external_path .. "/_repos/physx/physx/source/physxextensions/src"
+			, external_path .. "/_repos/physx/physx/source/physxextensions/src/serialization"
+			, external_path .. "/_repos/physx/physx/source/physxextensions/src/serialization/Binary"
+			, external_path .. "/_repos/physx/physx/source/physxextensions/src/serialization/File"
+			, external_path .. "/_repos/physx/physx/source/physxextensions/src/serialization/Xml"
 			
-			, "../external/_repos/physx/physx/source/physxvehicle/src"
+			, external_path .. "/_repos/physx/physx/source/physxvehicle/src"
 			
-			, "../external/_repos/physx/physx/source/simulationcontroller/src"
+			, external_path .. "/_repos/physx/physx/source/simulationcontroller/src"
 			
-			, "../external/_repos/physx/physx/source/foundation/src"
-			, "../external/_repos/physx/physx/source/common/src"
-			, "../external/_repos/physx/physx/source/fastxml/src"
-			, "../external/_repos/physx/physx/source/geomutils/src"
+			, external_path .. "/_repos/physx/physx/source/foundation/src"
+			, external_path .. "/_repos/physx/physx/source/common/src"
+			, external_path .. "/_repos/physx/physx/source/fastxml/src"
+			, external_path .. "/_repos/physx/physx/source/geomutils/src"
 
-			, "../external/_repos/physx/physx/source/geomutils/src/**"
+			, external_path .. "/_repos/physx/physx/source/geomutils/src/**"
 		}
 		defines { "NDEBUG", "PX_PHYSX_STATIC_LIB", "_WINSOCK_DEPRECATED_NO_WARNINGS", "_CRT_SECURE_NO_WARNINGS", "PX_COOKING" }
 		flags { "OptimizeSize", "ReleaseRuntime" }
 
 		configuration { "windows" }
-			targetdir "../external/physx/lib/win"
+			targetdir (external_path .. "/physx/lib/win")
 		
 		configuration { "vs20*" }
 			buildoptions { "/wd5055"}
@@ -847,62 +853,62 @@ if build_physx and hasPlugin("physics") then
 		end
 end
 
-if os.isdir("../external/_repos/freetype") then
+if os.isdir(external_path .. "/_repos/freetype") then
 	printf("Using FreeType from external/_repos/freetype (build from source code)")
 	lib_project "freetype"
 		kind "StaticLib"
 		files {
-			"../external/_repos/freetype/src/autofit/autofit.c",
-			"../external/_repos/freetype/src/base/ftbase.c",
-			"../external/_repos/freetype/src/base/ftbbox.c",
-			"../external/_repos/freetype/src/base/ftbdf.c",
-			"../external/_repos/freetype/src/base/ftbitmap.c",
-			"../external/_repos/freetype/src/base/ftcid.c",
-			"../external/_repos/freetype/src/base/ftfstype.c",
-			"../external/_repos/freetype/src/base/ftgasp.c",
-			"../external/_repos/freetype/src/base/ftglyph.c",
-			"../external/_repos/freetype/src/base/ftgxval.c",
-			"../external/_repos/freetype/src/base/ftinit.c",
-			"../external/_repos/freetype/src/base/ftmm.c",
-			"../external/_repos/freetype/src/base/ftotval.c",
-			"../external/_repos/freetype/src/base/ftpatent.c",
-			"../external/_repos/freetype/src/base/ftpfr.c",
-			"../external/_repos/freetype/src/base/ftstroke.c",
-			"../external/_repos/freetype/src/base/ftsynth.c",
-			"../external/_repos/freetype/src/base/ftsystem.c",
-			"../external/_repos/freetype/src/base/fttype1.c",
-			"../external/_repos/freetype/src/base/ftwinfnt.c",
-			"../external/_repos/freetype/src/bdf/bdf.c",
-			"../external/_repos/freetype/src/cache/ftcache.c",
-			"../external/_repos/freetype/src/cff/cff.c",
-			"../external/_repos/freetype/src/cid/type1cid.c",
-			"../external/_repos/freetype/src/gzip/ftgzip.c",
-			"../external/_repos/freetype/src/lzw/ftlzw.c",
-			"../external/_repos/freetype/src/pcf/pcf.c",
-			"../external/_repos/freetype/src/pfr/pfr.c",
-			"../external/_repos/freetype/src/psaux/psaux.c",
-			"../external/_repos/freetype/src/pshinter/pshinter.c",
-			"../external/_repos/freetype/src/psnames/psmodule.c",
-			"../external/_repos/freetype/src/raster/raster.c",
-			"../external/_repos/freetype/src/sfnt/sfnt.c",
-			"../external/_repos/freetype/src/smooth/smooth.c",
-			"../external/_repos/freetype/src/truetype/truetype.c",
-			"../external/_repos/freetype/src/type1/type1.c",
-			"../external/_repos/freetype/src/type42/type42.c",
-			"../external/_repos/freetype/src/winfonts/winfnt.c",
-			"../external/_repos/freetype/builds/windows/ftdebug.c"
+			external_path .. "/_repos/freetype/src/autofit/autofit.c",
+			external_path .. "/_repos/freetype/src/base/ftbase.c",
+			external_path .. "/_repos/freetype/src/base/ftbbox.c",
+			external_path .. "/_repos/freetype/src/base/ftbdf.c",
+			external_path .. "/_repos/freetype/src/base/ftbitmap.c",
+			external_path .. "/_repos/freetype/src/base/ftcid.c",
+			external_path .. "/_repos/freetype/src/base/ftfstype.c",
+			external_path .. "/_repos/freetype/src/base/ftgasp.c",
+			external_path .. "/_repos/freetype/src/base/ftglyph.c",
+			external_path .. "/_repos/freetype/src/base/ftgxval.c",
+			external_path .. "/_repos/freetype/src/base/ftinit.c",
+			external_path .. "/_repos/freetype/src/base/ftmm.c",
+			external_path .. "/_repos/freetype/src/base/ftotval.c",
+			external_path .. "/_repos/freetype/src/base/ftpatent.c",
+			external_path .. "/_repos/freetype/src/base/ftpfr.c",
+			external_path .. "/_repos/freetype/src/base/ftstroke.c",
+			external_path .. "/_repos/freetype/src/base/ftsynth.c",
+			external_path .. "/_repos/freetype/src/base/ftsystem.c",
+			external_path .. "/_repos/freetype/src/base/fttype1.c",
+			external_path .. "/_repos/freetype/src/base/ftwinfnt.c",
+			external_path .. "/_repos/freetype/src/bdf/bdf.c",
+			external_path .. "/_repos/freetype/src/cache/ftcache.c",
+			external_path .. "/_repos/freetype/src/cff/cff.c",
+			external_path .. "/_repos/freetype/src/cid/type1cid.c",
+			external_path .. "/_repos/freetype/src/gzip/ftgzip.c",
+			external_path .. "/_repos/freetype/src/lzw/ftlzw.c",
+			external_path .. "/_repos/freetype/src/pcf/pcf.c",
+			external_path .. "/_repos/freetype/src/pfr/pfr.c",
+			external_path .. "/_repos/freetype/src/psaux/psaux.c",
+			external_path .. "/_repos/freetype/src/pshinter/pshinter.c",
+			external_path .. "/_repos/freetype/src/psnames/psmodule.c",
+			external_path .. "/_repos/freetype/src/raster/raster.c",
+			external_path .. "/_repos/freetype/src/sfnt/sfnt.c",
+			external_path .. "/_repos/freetype/src/smooth/smooth.c",
+			external_path .. "/_repos/freetype/src/truetype/truetype.c",
+			external_path .. "/_repos/freetype/src/type1/type1.c",
+			external_path .. "/_repos/freetype/src/type42/type42.c",
+			external_path .. "/_repos/freetype/src/winfonts/winfnt.c",
+			external_path .. "/_repos/freetype/builds/windows/ftdebug.c"
 		}
-		includedirs { "../external/_repos/freetype/include" }
+		includedirs { external_path .. "/_repos/freetype/include" }
 		defines { "NDEBUG", "FT2_BUILD_LIBRARY", "_CRT_SECURE_NO_WARNINGS" }
 		flags { "ReleaseRuntime", "MinimumWarnings" }
 		targetname "freetype"
 		
 		-- TODO release/debug target dirs
 		configuration { "linux" }
-			targetdir "../external/freetype/lib/linux"
+			targetdir (external_path .. "/freetype/lib/linux")
 		
 		configuration { "windows" }
-			targetdir "../external/freetype/lib/win"
+			targetdir (external_path .. "/freetype/lib/win")
 
 		configuration { "vs20*" }
 			buildoptions { "/wd4312"}
@@ -920,36 +926,36 @@ if build_luau then
 		else
 			kind "StaticLib"
 		end
-		files { "../external/_repos/luau/Ast/src/**.cpp"
-			, "../external/_repos/luau/Ast/src/**.h"
-			, "../external/_repos/luau/CodeGen/src/**.cpp"
-			, "../external/_repos/luau/CodeGen/src/**.h"
-			, "../external/_repos/luau/Common/src/**.cpp"
-			, "../external/_repos/luau/Common/src/**.h"
-			, "../external/_repos/luau/Compiler/src/**.cpp"
-			, "../external/_repos/luau/Compiler/src/**.h"
-			, "../external/_repos/luau/VM/src/**.cpp"
-			, "../external/_repos/luau/VM/src/**.h"
+		files { external_path .. "/_repos/luau/Ast/src/**.cpp"
+			, external_path .. "/_repos/luau/Ast/src/**.h"
+			, external_path .. "/_repos/luau/CodeGen/src/**.cpp"
+			, external_path .. "/_repos/luau/CodeGen/src/**.h"
+			, external_path .. "/_repos/luau/Common/src/**.cpp"
+			, external_path .. "/_repos/luau/Common/src/**.h"
+			, external_path .. "/_repos/luau/Compiler/src/**.cpp"
+			, external_path .. "/_repos/luau/Compiler/src/**.h"
+			, external_path .. "/_repos/luau/VM/src/**.cpp"
+			, external_path .. "/_repos/luau/VM/src/**.h"
 		}
 
 		if not luau_dynamic then
-			files { "../external/_repos/luau/Analysis/src/**.cpp"
-				, "../external/_repos/luau/Analysis/src/**.h"
-				, "../external/_repos/luau/Config/src/**.cpp"
-				, "../external/_repos/luau/Config/src/**.h"
+			files { external_path .. "/_repos/luau/Analysis/src/**.cpp"
+				, external_path .. "/_repos/luau/Analysis/src/**.h"
+				, external_path .. "/_repos/luau/Config/src/**.cpp"
+				, external_path .. "/_repos/luau/Config/src/**.h"
 			}
 
-			includedirs { "../external/_repos/luau/Analysis/include/" 
-				, "../external/_repos/luau/Config/include/"
+			includedirs { external_path .. "/_repos/luau/Analysis/include/" 
+				, external_path .. "/_repos/luau/Config/include/"
 			}
 		end
 
-		includedirs { "../external/_repos/luau/Ast/include/"
-			, "../external/_repos/luau/CodeGen/include/"
-			, "../external/_repos/luau/Common/include/"
-			, "../external/_repos/luau/Compiler/include/"
-			, "../external/_repos/luau/VM/include/"
-			, "../external/_repos/luau/VM/src/"
+		includedirs { external_path .. "/_repos/luau/Ast/include/"
+			, external_path .. "/_repos/luau/CodeGen/include/"
+			, external_path .. "/_repos/luau/Common/include/"
+			, external_path .. "/_repos/luau/Compiler/include/"
+			, external_path .. "/_repos/luau/VM/include/"
+			, external_path .. "/_repos/luau/VM/src/"
 		}
 
 		removeflags { "NoExceptions", "NoRTTI" }
@@ -960,10 +966,10 @@ if build_luau then
 			flags { "OptimizeSize", "ReleaseRuntime", "Symbols" }
 
 		configuration { "linux"}
-			targetdir "../external/luau/lib/linux"
+			targetdir (external_path .. "/luau/lib/linux")
 
 		configuration { "windows" }
-			targetdir "../external/luau/lib/win"
+			targetdir (external_path .. "/luau/lib/win")
 			defines {
 				"_CRT_SECURE_NO_WARNINGS",
 				"LUA_API=__declspec(dllexport)",
@@ -1029,12 +1035,12 @@ if build_tests then
 	exe_project "tests"
 		kind "ConsoleApp"
 		defaultConfigurations()
-		includedirs { "../src", "../src/tests", "../external/imgui_test_engine", "../external/imgui" }
+		includedirs { "../src", "../src/tests", external_path .. "/imgui_test_engine", external_path .. "/imgui" }
 		files {
 			"../src/tests/**.cpp",
 			"../src/tests/**.h",
-			"../external/imgui_test_engine/**.cpp",
-			"../external/imgui_test_engine/**.h"
+			external_path .. "/imgui_test_engine/**.cpp",
+			external_path .. "/imgui_test_engine/**.h"
 		}
 	
 		if split_projects then
@@ -1051,7 +1057,7 @@ if build_tests then
 		if hasPlugin "physics" then linkPhysX() end
 		if hasPlugin "lua" then linkLib "Luau" end
 
-		libdirs { "../external/pix/bin/x64" }
+		libdirs { external_path .. "/pix/bin/x64" }
 		
 		debugdir "../data"
 		

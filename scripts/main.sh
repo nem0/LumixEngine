@@ -1,3 +1,4 @@
+SCRIPT_DIR=$(cd $(dirname ${BASH_SOURCE[0]}) && pwd)
 download_project()
 {
 	if [ ! -d "3rdparty" ]; then
@@ -33,17 +34,19 @@ download_plugin()
 
 build_recast()
 {
-	./genie --file=recastnavigation.lua gmake
-	pushd 3rdparty/recast/_project
+	$SCRIPT_DIR/genie --file=recastnavigation.lua gmake
+	pushd 3rdparty/recast/
+	cmake -B build -G "Unix Makefiles"
+	pushd build
 	make 
+	popd
 	popd
 }
 
 build_physx()
 {
 	pushd 3rdparty/physx/physx
-	sh generate_projects.sh lumix_gcc5
-	cd compiler/linux-release
+	sh generate_projects.sh linux
 	make
 	popd
 }
@@ -78,13 +81,13 @@ deploy_freetype()
 deploy_recast()
 {
 	mkdir -p ../external/recast/lib/linux64_gmake/release
-	cp 3rdparty/recast/_build/libRecast.a ../external/recast/lib/linux64_gmake/release/librecast.a
+	cp 3rdparty/recast/build/Recast/libRecast.a ../external/recast/lib/linux64_gmake/release/librecast.a
 }
 
 deploy_physx()
 {
 	mkdir -p ../external/physx/lib/linux64_gmake/release
-	cp 3rdparty/physx/physx/bin/linux.clang/release/*.a ../external/physx/lib/linux64_gmake/release/
+	cp 3rdparty/physx/physx/bin/linux.clang/release/*.so ../external/physx/lib/linux64_gmake/release/
 }
 
 deploy_3rdparty()
@@ -119,7 +122,8 @@ init_3rdparty()
 	download_project "freetype" "https://github.com/nem0/freetype2.git"
 	download_project "luau" "https://github.com/nem0/luau.git"
 	download_project "physx" "https://github.com/nem0/PhysX.git"
-	download_project "recast" "https://github.com/nem0/recastnavigation.git"
+	#download_project "recast" "https://github.com/nem0/recastnavigation.git"
+	download_project "recast" "https://github.com/recastnavigation/recastnavigation.git"
 
 	build_3rdparty "freetype"
 	build_3rdparty "physx"
@@ -174,11 +178,11 @@ push_to_itch_io()
 	git clean -f -x -d ../data/
 	rm -rf itch_io
 	mkdir itch_io
-	./genie gmake
-	cd tmp/gmake 
+	$SCRIPT_DIR/genie gmake
+	cd $SCRIPT_DIR/tmp/gmake 
 	make -j config=relwithdebinfo64
 	cd ../..
-	cp tmp/gmake/bin/RelWithDebInfo/studio itch_io/studio
+	cp $SCRIPT_DIR/tmp/gmake/bin/RelWithDebInfo/studio itch_io/studio
 	chmod +x itch_io/studio
 	cp -r ../data/* itch_io/
 	cp .itch.toml itch_io/
@@ -195,7 +199,7 @@ push_to_itch_io()
 
 build()
 {
-	cd tmp/gmake
+	cd $SCRIPT_DIR/tmp/gmake
 	make -j config=$1
 	cd ../..
 }
@@ -217,7 +221,7 @@ main_menu()
 	select opt in "${options[@]}"
 	do
 		case "$REPLY" in
-			1 ) ./genie gmake; pause; break;;
+			1 ) $SCRIPT_DIR/genie gmake; pause; break;;
 			2 ) build relwithdebinfo64; pause; break;;
 			3 ) build debug64; pause; break;;
 			4 ) thirdparty_menu; break;;
