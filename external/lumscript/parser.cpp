@@ -38,6 +38,7 @@ struct Parser {
 
 	static int precedence(Token::Type type) {
 		switch (type) {
+			case Token::PIPE: return 1;
 			case Token::OR: return 1;
 			case Token::AND: return 2;
 			case Token::EQUAL_EQUAL:
@@ -45,7 +46,8 @@ struct Parser {
 			case Token::GT:
 			case Token::LT:
 			case Token::GT_EQUAL:
-			case Token::LT_EQUAL: return 4;
+			case Token::LT_EQUAL:
+			case Token::IS: return 4;
 			case Token::PLUS:
 			case Token::MINUS: return 5;
 			case Token::STAR:
@@ -75,6 +77,7 @@ struct Parser {
 			case Token::RANGE: return "..";
 			case Token::QUESTION: return "?";
 			case Token::DOLLAR: return "$";
+			case Token::PIPE: return "|";
 			case Token::PLUS: return "+";
 			case Token::MINUS: return "-";
 			case Token::STAR: return "*";
@@ -132,6 +135,7 @@ struct Parser {
 			case Token::U32: return "u32";
 			case Token::U64: return "u64";
 			case Token::ISIZE: return "isize";
+			case Token::IS: return "is";
 			case Token::F32: return "f32";
 			case Token::F64: return "f64";
 			case Token::CPTR: return "cptr";
@@ -623,6 +627,18 @@ struct Parser {
 			}
 		}
 
+		if (peekToken().type == Token::PIPE) {
+			UnionTypeExpression* union_type = makeExpr<UnionTypeExpression>(res->token, m_unit.arena);
+			union_type->members.push(res);
+			while (peekToken().type == Token::PIPE) {
+				consumeToken();
+				Expression* member = type();
+				if (!member) return nullptr;
+				union_type->members.push(member);
+			}
+			return union_type;
+		}
+
 		return res;
 	}
 
@@ -653,7 +669,6 @@ struct Parser {
 				return array;
 			}
 		}
-
 		// Handle nullable
 		Token first = peekToken();
 		if (first.type == Token::QUESTION) {
@@ -699,6 +714,21 @@ struct Parser {
 			consumeToken();
 			Expression* rhs = binaryExpression(prec + 1, mode);
 			if (!rhs) return nullptr;
+			if (op.type == Token::PIPE) {
+				UnionTypeExpression* union_type = makeExpr<UnionTypeExpression>(op, m_unit.arena);
+				const auto append = [&](Expression* expr) {
+					if (expr->kind == Expression::UNION_TYPE) {
+						for (Expression* member : static_cast<UnionTypeExpression*>(expr)->members) union_type->members.push(member);
+					}
+					else {
+						union_type->members.push(expr);
+					}
+				};
+				append(lhs);
+				append(rhs);
+				lhs = union_type;
+				continue;
+			}
 
 			BinaryExpression* bin = makeExpr<BinaryExpression>(op);
 			bin->lhs = lhs;

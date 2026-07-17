@@ -1,3 +1,5 @@
+import "std:math" as math
+
 struct Vec3 {
 	x : f32;
 	y : f32;
@@ -109,4 +111,8 @@ fn lerp(a : Vec3, b : Vec3, t : f32) : Vec3 {
 		a.y + (b.y - a.y) * t,
 		a.z + (b.z - a.z) * t
 	};
+}
+
+fn yawToDir(value : f32) : Vec3 {
+	return { math.sin(value), 0.0, math.cos(value) };
 }

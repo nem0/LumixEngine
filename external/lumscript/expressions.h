@@ -96,6 +96,7 @@ struct Expression {
 		SLICE_TYPE,    // []T
 		NULLABLE_TYPE, // ?T
 		FUNCTION_TYPE, // fn(A, B) : R used as a type
+		UNION_TYPE,    // A | B used as a type
 		// A fully resolved type injected by template substitution during cloning.
 		RESOLVED_TYPE,
 	};
@@ -189,6 +190,12 @@ struct FunctionTypeExpression : Expression {
 
 	ExpArray<Expression*> params;
 	Expression* return_type = nullptr;
+};
+
+struct UnionTypeExpression : Expression {
+	UnionTypeExpression(ls_arena& arena) : Expression(UNION_TYPE), members(arena) {}
+
+	ExpArray<Expression*> members;
 };
 
 struct ResolvedTypeExpression : Expression {

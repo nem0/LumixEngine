@@ -23,6 +23,7 @@ struct Token {
 		RANGE,
 		QUESTION,
 		DOLLAR,
+		PIPE,
 
 		PLUS,
 		MINUS,
@@ -82,6 +83,7 @@ struct Token {
 		U32,
 		U64,
 		ISIZE,
+		IS,
 		F32,
 		F64,
 		CPTR,

@@ -257,6 +257,7 @@ static void nativeAddC(ls_runtime* runtime, ls_call_frame frame) {
 #include "control_flow_tests.inl"
 #include "enum_tests.inl"
 #include "nullable_tests.inl"
+#include "union_tests.inl"
 #include "ref_tests.inl"
 #include "match_tests.inl"
 #include "template_tests.inl"

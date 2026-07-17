@@ -56,6 +56,7 @@ struct Symbol {
 // ls_bytecode_compile's global layout pass must lay out exactly these symbols.
 inline bool symbolHasGlobalStorage(const Symbol& sym) {
 	return sym.expression
+		&& (!sym.resolved_type || sym.resolved_type->kind != ResolvedType::META)
 		&& sym.expression->kind != Expression::FUNCTION
 		&& sym.expression->kind != Expression::STRUCT
 		&& sym.expression->kind != Expression::ENUM;

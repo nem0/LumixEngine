@@ -201,6 +201,8 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 static bool tryEmitReference(FunctionCompiler& ctx, Expression& expr);
 static void emitCallDirect(FunctionCompiler& ctx, u32 callee_index, u32 arg_size, u32 return_size);
 static ls_type_kind compileMember(FunctionCompiler& ctx, MemberExpression& expr);
+static void patchJumpRelative(ByteArray& code, u32 operand_pos, u32 target_pos);
+static u32 emitJumpPlaceholder(FunctionCompiler& ctx, ls_op op);
 
 struct FunctionCompiler {
 	explicit FunctionCompiler(ls_bytecode* bytecode, ls_function_bc& out)
@@ -863,6 +865,66 @@ static bool tryEmitReferenceLoad(FunctionCompiler& ctx, Expression& expr, u32 by
 
 
 static void compileExpressionAsType(FunctionCompiler& ctx, Expression& expr, ResolvedType& expected_type) {
+	if (expected_type.kind == ResolvedType::UNION) {
+		UnionResolvedType& un = static_cast<UnionResolvedType&>(expected_type);
+		if (expr.resolved_type && expr.resolved_type->kind == ResolvedType::UNION) {
+			UnionResolvedType& source = static_cast<UnionResolvedType&>(*expr.resolved_type);
+			if (source.members.size() == un.members.size()) {
+				bool same_layout = true;
+				for (i32 i = 0; i < un.members.size(); ++i) {
+					if (source.members[i] != un.members[i]) { same_layout = false; break; }
+				}
+				if (same_layout) {
+					compileExpression(ctx, expr, valueKindForType(expected_type));
+					return;
+				}
+			}
+
+			const u32 source_size = typeByteSize(source);
+			const u32 source_offset = ctx.addLocal(&source, valueKindForType(source));
+			compileExpression(ctx, expr, valueKindForType(source));
+			emitStoreLocalBytes(ctx, source_offset, source_size);
+
+			const u32 result_top = ctx.temp_top;
+			ExpArray<u32> end_jumps(*ctx.bytecode->arena);
+			for (i32 i = 0; i < source.members.size(); ++i) {
+				i32 target_index = -1;
+				for (i32 j = 0; j < un.members.size(); ++j) {
+					if (source.members[i] == un.members[j]) { target_index = j; break; }
+				}
+				ASSERT(target_index >= 0);
+
+				emitLoadLocalBytes(ctx, source_offset, 4);
+				emitIntegerConstant(ctx, LS_TYPE_I32, i);
+				emitCompareOp(ctx, LS_OP_EQ, LS_TYPE_I32);
+				const u32 next_member_jump = emitJumpPlaceholder(ctx, LS_OP_JUMP_IF_FALSE);
+
+				emitIntegerConstant(ctx, LS_TYPE_I32, target_index);
+				const u32 member_size = typeByteSize(*source.members[i]);
+				emitLoadLocalBytes(ctx, source_offset + 4, member_size);
+				const u32 payload_size = typeByteSize(expected_type) - 4;
+				if (payload_size > member_size) emitZeroBytes(ctx, payload_size - member_size);
+				end_jumps.push(emitJumpPlaceholder(ctx, LS_OP_JUMP));
+
+				patchJumpRelative(ctx.code, next_member_jump, (u32)ctx.code.size());
+				ctx.temp_top = result_top;
+			}
+			emitZeroBytes(ctx, typeByteSize(expected_type));
+			const u32 end = (u32)ctx.code.size();
+			for (u32 jump : end_jumps) patchJumpRelative(ctx.code, jump, end);
+			return;
+		}
+		for (i32 i = 0; i < un.members.size(); ++i) {
+			if (expr.resolved_type != un.members[i]) continue;
+			emitIntegerConstant(ctx, LS_TYPE_I32, i);
+			compileExpressionAsType(ctx, expr, *un.members[i]);
+			const u32 payload_size = typeByteSize(expected_type) - 4;
+			const u32 member_size = typeByteSize(*un.members[i]);
+			if (payload_size > member_size) emitZeroBytes(ctx, payload_size - member_size);
+			return;
+		}
+		ASSERT(false);
+	}
 	if (expected_type.kind == ResolvedType::NULLABLE) {
 		NullableResolvedType& nullable = static_cast<NullableResolvedType&>(expected_type);
 		const bool is_null = expr.kind == Expression::NULL_LITERAL || expr.kind == Expression::UNDEFINED;
@@ -1119,6 +1181,23 @@ static ls_type_kind compileBinary(FunctionCompiler& ctx, BinaryExpression& expr,
 		emitCallDirect(ctx, fn.bytecode_index, callArgWindowSize(*fn_type), typeByteSize(*fn_type->return_type));
 		return valueKindForType(*fn_type->return_type);
 	}
+	if (expr.op == Token::IS) {
+		UnionResolvedType& source = static_cast<UnionResolvedType&>(*expr.lhs->resolved_type);
+		ResolvedType* member = static_cast<MetaType*>(expr.rhs->resolved_type)->inner;
+		i32 member_index = -1;
+		for (i32 i = 0; i < source.members.size(); ++i) {
+			if (source.members[i] == member) { member_index = i; break; }
+		}
+		ASSERT(member_index >= 0);
+		const u32 source_size = typeByteSize(source);
+		const u32 source_offset = ctx.addLocal(&source, valueKindForType(source));
+		compileExpression(ctx, *expr.lhs, valueKindForType(source));
+		emitStoreLocalBytes(ctx, source_offset, source_size);
+		emitLoadLocalBytes(ctx, source_offset, 4);
+		emitIntegerConstant(ctx, LS_TYPE_I32, member_index);
+		emitCompareOp(ctx, LS_OP_EQ, LS_TYPE_I32);
+		return LS_TYPE_BOOL;
+	}
 
 	// Null check: `nullable == null` or `nullable != null` — only check has_value offset.
 	if (expr.op == Token::EQUAL_EQUAL || expr.op == Token::BANG_EQUAL) {
@@ -1308,11 +1387,21 @@ static ls_type_kind compileMember(FunctionCompiler& ctx, MemberExpression& membe
 				value_type = member.expression->resolved_type;
 				value_offset = 1u;
 			}
+			else if (value_type->kind == ResolvedType::UNION) {
+				value_type = member.expression->resolved_type;
+				value_offset = 4u;
+			}
 			ASSERT(value_type->kind == ResolvedType::STRUCT);
 			StructResolvedType* st = static_cast<StructResolvedType*>(value_type);
 			ResolvedType* field_type = nullptr;
 			u32 offset = structFieldByteOffset(*st, member.name, field_type);
 			if (slot->storage == StorageSlot::LOCAL_REF) {
+				if (slot->type->kind == ResolvedType::UNION) {
+					emitLoadLocalBytes(ctx, slot->offset, typeKindByteSize(LS_TYPE_CPTR));
+					emitConst8(ctx, value_offset + offset);
+					emitLoadAt(ctx, 1u, 0, typeByteSize(*field_type));
+					return valueKindForType(*field_type);
+				}
 				tryEmitReferenceLoad(ctx, member, typeByteSize(*field_type));
 				return valueKindForType(*field_type);
 			}
@@ -1406,6 +1495,19 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 		case Expression::IDENTIFIER: {
 			IdentifierExpression& id = static_cast<IdentifierExpression&>(expr);
 			if (StorageSlot* slot = id.slot) {
+				if (slot->type && slot->type->kind == ResolvedType::UNION && expr.resolved_type->kind != ResolvedType::UNION) {
+					const u32 payload_size = typeByteSize(*expr.resolved_type);
+					switch (slot->storage) {
+						case StorageSlot::LOCAL: emitLoadLocalBytes(ctx, slot->offset + 4, payload_size); break;
+						case StorageSlot::GLOBAL: emitLoadGlobalBytes(ctx, slot->offset + 4, payload_size); break;
+						case StorageSlot::LOCAL_REF:
+							emitLoadLocalBytes(ctx, slot->offset, typeKindByteSize(LS_TYPE_CPTR));
+							emitConst8(ctx, 4u);
+							emitLoadAt(ctx, 1u, 0, payload_size);
+							break;
+					}
+					return valueKindForType(*expr.resolved_type);
+				}
 				if (slot->storage == StorageSlot::LOCAL_REF) {
 					tryEmitReferenceLoad(ctx, expr, typeByteSize(*slot->type));
 					return valueKindForType(*slot->type);
@@ -1421,6 +1523,24 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 		case Expression::BINARY: return compileBinary(ctx, static_cast<BinaryExpression&>(expr), hint);
 		case Expression::CAST: {
 			CastExpression& cast = static_cast<CastExpression&>(expr);
+			if (cast.expression->resolved_type->kind == ResolvedType::UNION && expr.resolved_type->kind == ResolvedType::NULLABLE) {
+				UnionResolvedType& source = static_cast<UnionResolvedType&>(*cast.expression->resolved_type);
+				NullableResolvedType& nullable = static_cast<NullableResolvedType&>(*expr.resolved_type);
+				i32 member_index = -1;
+				for (i32 i = 0; i < source.members.size(); ++i) {
+					if (source.members[i] == nullable.inner) { member_index = i; break; }
+				}
+				ASSERT(member_index >= 0);
+				const u32 source_size = typeByteSize(source);
+				const u32 source_offset = ctx.addLocal(&source, valueKindForType(source));
+				compileExpression(ctx, *cast.expression, valueKindForType(source));
+				emitStoreLocalBytes(ctx, source_offset, source_size);
+				emitLoadLocalBytes(ctx, source_offset, 4);
+				emitIntegerConstant(ctx, LS_TYPE_I32, member_index);
+				emitCompareOp(ctx, LS_OP_EQ, LS_TYPE_I32);
+				emitLoadLocalBytes(ctx, source_offset + 4, typeByteSize(*nullable.inner));
+				return LS_TYPE_NULL_VALUE;
+			}
 			const ls_type_kind dst_kind = toTypeKind(*expr.resolved_type);
 			const ls_type_kind src_kind = compileExpression(ctx, *cast.expression, toTypeKind(*cast.expression->resolved_type));
 			if (cast.expression->resolved_type->kind == ResolvedType::STRING && expr.resolved_type->kind == ResolvedType::CSTR) {
@@ -1591,7 +1711,7 @@ static void compileAssign(FunctionCompiler& ctx, AssignStatement& assign) {
 			if (assign.op == Token::EQUAL) {
 				emitLoadLocalBytes(ctx, slot->offset, ref_size);
 				emitConst8(ctx, 0u);
-				compileExpression(ctx, *assign.rhs, value_kind);
+				compileExpressionAsType(ctx, *assign.rhs, *value_type);
 				emitStoreAt(ctx, 1u, 0, value_size);
 				return;
 			}
@@ -1809,6 +1929,41 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 			compileExpression(ctx, *ms.subject, subject_kind);
 			const u32 subject_offset = ctx.addLocal(subject_type, subject_kind, true);
 			emitStoreLocalBytes(ctx, subject_offset, subject_byte_size);
+			if (subject_type->kind == ResolvedType::UNION) {
+				UnionResolvedType& subject_union = static_cast<UnionResolvedType&>(*subject_type);
+				ExpArray<u32> match_end_jumps(*ctx.bytecode->arena);
+				for (MatchArm& arm : ms.arms) {
+					if (arm.is_fallback) {
+						compileStatement(ctx, *arm.body, return_kind, current_label);
+						match_end_jumps.push(emitJumpPlaceholder(ctx, LS_OP_JUMP));
+						continue;
+					}
+
+					ExpArray<u32> arm_body_jumps(*ctx.bytecode->arena);
+					for (MatchPattern& pattern : arm.patterns) {
+						ResolvedType* member = static_cast<MetaType*>(pattern.begin->resolved_type)->inner;
+						i32 member_index = -1;
+						for (i32 i = 0; i < subject_union.members.size(); ++i) {
+							if (subject_union.members[i] == member) { member_index = i; break; }
+						}
+						ASSERT(member_index >= 0);
+						emitLoadLocalBytes(ctx, subject_offset, 4);
+						emitIntegerConstant(ctx, LS_TYPE_I32, member_index);
+						emitCompareOp(ctx, LS_OP_EQ, LS_TYPE_I32);
+						arm_body_jumps.push(emitJumpPlaceholder(ctx, LS_OP_JUMP_IF_TRUE));
+					}
+
+					const u32 skip_jump = emitJumpPlaceholder(ctx, LS_OP_JUMP);
+					const u32 body_start = (u32)ctx.code.size();
+					for (u32 jump : arm_body_jumps) patchJumpRelative(ctx.code, jump, body_start);
+					compileStatement(ctx, *arm.body, return_kind, current_label);
+					match_end_jumps.push(emitJumpPlaceholder(ctx, LS_OP_JUMP));
+					patchJumpRelative(ctx.code, skip_jump, (u32)ctx.code.size());
+				}
+				const u32 end = (u32)ctx.code.size();
+				for (u32 jump : match_end_jumps) patchJumpRelative(ctx.code, jump, end);
+				return;
+			}
 
 			ExpArray<u32> match_end_jumps(*ctx.bytecode->arena);
 			ExpArray<u32> pending_false_jumps(*ctx.bytecode->arena);

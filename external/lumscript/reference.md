@@ -13,14 +13,14 @@
 			}
 		}
 	}
-* tagged unions
 * debugger
-* AST API in lumscript
 * string interpolation
-* jit/llvm/AOT
+* MT typecheck
 
 ---
 
+* jit/llvm/AOT?
+* AST API in lumscript?
 * getter/setter?
 * traits/interfaces?
 * with/when/where/using?
@@ -64,6 +64,7 @@ LumScript is a small, statically typed scripting language for Lumix Engine.
 - [Types](#types)
 	- [Untyped literals](#untyped-literals)
 	- [Nullable values](#nullable-values)
+	- [Tagged unions](#tagged-unions)
 	- [Strings](#strings)
 	- [Function types](#function-types)
 	- [Static-sized arrays](#static-sized-arrays)
@@ -179,6 +180,16 @@ JIT is intentionally out of scope for the first version.
 		- expected-type inference remains useful when one destination type is already known, such as an annotated variable, return, or function argument
 		- using a candidate parameter as that expected type makes overload selection recursive and creates surprising ambiguities
 		- requiring `Type { ... }` at an operator boundary keeps resolution based on natural operand types and avoids candidate-specific AST typing
+
+- tagged unions
+	- the member type is the tag; no named variants (Rust-style `enum` payloads) keeps the feature small — two variants with the same payload type use wrapper structs
+		- var a : SomeUnion = SomeMember { 1, "foo" }; is possible and uses only existing language features
+	- structural set semantics (order-insensitive, flattening) so anonymous unions like `Error | ASTNode` compose across modules and call layers
+	- subset → superset widening is implicit so error unions propagate without manual re-wrapping; this leaves room for future propagation sugar (`try`-style)
+	- `as` yields `?Member` instead of trapping, reusing the forced-null-check machinery instead of adding a runtime abort path
+	- promotion in `match`/`is` is flow-typing with the same accepted unsoundness as nullable promotion — keeping the checker simple was preferred over a borrow-like aliasing rule
+	- excluded from ADL/UFCS because a structural type has no declaring namespace
+	- **open questions**: `if` statement lowering details, propagation sugar, canonical member order exposure
 
 - undefined behavior
 	- compared to C or C++, try to define as much behavior as possible
@@ -779,6 +790,7 @@ Built-in and user types:
 - user-defined `struct` types
 - user-defined `enum` types
 - function types
+- tagged union types (`A | B`)
 
 `isize` is the signed integer type used for memory sizes, slice lengths, and indices. It is signed and a fixed 64 bits on all targets (not platform/pointer-width dependent).
 
@@ -867,6 +879,114 @@ if a != null {
 	foo(a); // unsafe if `bar` can clear or replace `a`
 }
 ```
+
+### Tagged unions
+
+A union type is written as members separated by `|`. A union value holds exactly one of its member types at a time; a tag records which one (the active variant). The member type itself is the tag — there are no named variants.
+
+```cpp
+struct ButtonEvent {
+	button : Button;
+}
+
+struct MouseMoveEvent {
+	x : i32;
+	y : i32;
+}
+
+comptime InputEvent = ButtonEvent | MouseMoveEvent;
+
+var b : ButtonEvent = foo();
+var e : InputEvent = b;                        // active variant becomes ButtonEvent
+var e2 : InputEvent = MouseMoveEvent { 0, 1 }; // active variant becomes MouseMoveEvent
+e = MouseMoveEvent { 1, 0 };                   // e's active variant switches to MouseMoveEvent
+```
+
+Union type expressions are compile-time type values like any other type, so they can be bound with `comptime` or written anonymously anywhere a type is valid: variable declarations, parameters, return types, and struct fields.
+
+```cpp
+fn parse(source : Code) : Error | ASTNode;
+```
+
+**Identity**
+
+Unions are structural with set semantics:
+
+- member order does not matter: `A | B` and `B | A` are the same type
+- a union member that is itself a union flattens: if `comptime AB = A | B`, then `AB | C` is `A | B | C`
+- two union types with the same member set are the same type, regardless of how or where they were spelled
+- writing the same member twice directly (`A | A`, including through aliases) is a compile-time error
+- duplicates that arise from flattening composed unions silently collapse into the set: if `comptime AB = A | B` and `comptime BC = B | C`, then `AB | BC` is `A | B | C`
+
+**Members**
+
+Any concrete runtime type can be a member: structs, enums, primitives, and `string`. Excluded:
+
+- `void`
+- `null` — `null` as a member is a compile-time error
+- nullable types (`?T`); nullable union syntax (`?(A | B)`) is not supported
+- function types — use nullable function types (`?fn(...)` ) or wrap in a struct instead
+- unions (they flatten, see above)
+- slices (`[]T`) — a slice is a view without ownership; the union tag does not distinguish which backing storage a slice view represents
+- static arrays (`[N]T`) — use proper container types (structs, function-based interfaces) instead of unioning different array sizes
+
+All members must be pairwise distinct types. Because the member type is the tag, two semantically different variants with the same payload type require wrapper structs.
+
+**Coercion**
+
+- a member value coerces implicitly to any union containing its type: `var e : InputEvent = b;`
+- a union value coerces implicitly to any union whose member set is a superset (the tag is remapped at the coercion site): an `A | B` value can be assigned where `A | B | C` is expected — this is what lets error unions propagate across call layers
+- no other implicit conversions apply; narrowing (superset to subset, or union to member) is never implicit
+
+**Testing and extraction: `is` and `as`**
+
+- `e is ButtonEvent` evaluates to `bool`: whether the active variant is `ButtonEvent`
+- `if e is ButtonEvent { ... }` promotes `e` to `ButtonEvent` inside the branch, like nullable promotion in `if e != null`
+- `e as ButtonEvent` evaluates to `?ButtonEvent`: the payload when the active variant matches, `null` otherwise; the usual forced null check applies before use
+- there is no trapping variant cast
+- `is` / `as` with a type that is not a member of the union is a compile-time error
+
+**Match**
+
+`match` on a union value branches on the active variant. Cases are member types; the subject is promoted to the case's member type within that case.
+
+```cpp
+match e {
+	case ButtonEvent:
+		print(e.button); // e reads as ButtonEvent here
+	case MouseMoveEvent:
+		print(e.x, " ", e.y);
+}
+```
+
+Rules:
+
+- a union match must be exhaustive unless `else` is present
+- duplicate member cases are compile-time errors
+- a case pattern that is not a member type of the subject is a compile-time error
+- comma-separated alternatives (`case A, B:`) are allowed; the subject is not promoted in such a case since no single member type applies
+- promotion is flow-typing, same as nullable promotion: assigning to the subject inside a case (which may switch the active variant) is allowed and is not re-checked; the earlier promotion does not keep later uses safe (see [Nullable values](#nullable-values) for the analogous caveat)
+
+**Namespaces, ADL, and UFCS**
+
+A structural union has no declaring namespace. Union-typed values do not participate in [argument-dependent lookup](#argument-dependent-lookup), and method syntax on a union receiver resolves only against the current module and unaliased imports.
+
+**Initialization and literals**
+
+- `var e : InputEvent = undefined;` is allowed: the tag is zeroed (the active variant becomes the union's canonical-first member, which is implementation-defined) and the payload is undefined
+- a typeless struct literal cannot pick a variant: `var e : InputEvent = { 0, 1 };` is a compile-time error; write the member type explicitly (`MouseMoveEvent { 0, 1 }`)
+
+**Comparison**
+
+`==` and `!=` are not defined for union values; comparing two unions is a compile-time error. Narrow first (`is`, `as`, or `match`) and compare the payloads.
+
+**Layout**
+
+- storage is a tag followed by payload space sized for the largest member
+- the tag is an `i32` holding the member's index in the union's canonical member order; the canonical order is deterministic but implementation-defined (member sets are unordered at the language level)
+- `sizeof(A | B)` is `sizeof(i32) + max(sizeof(members))`
+- `alignof(A | B)` is `max(alignof(i32), alignof(members))`
+- the tag is not directly observable; there is no union-to-integer cast
 
 ### Strings
 
@@ -1165,6 +1285,7 @@ Supported patterns:
 - enum members
 - scalar literals
 - inclusive ranges (`a..b`)
+- member types, when matching a tagged union value (see [Tagged unions](#tagged-unions))
 - comma-separated alternatives
 - `else` fallback
 
@@ -1415,6 +1536,8 @@ Integer-to-enum cast does not validate membership.
 
 Struct casts are not supported.
 
+`as` on a tagged union value with a member type produces a nullable payload, for example `e as ButtonEvent` has type `?ButtonEvent` (see [Tagged unions](#tagged-unions)).
+
 Slice reinterpret casts convert between a byte slice and a typed slice:
 
 ```cpp
@@ -1450,7 +1573,7 @@ Rules:
 
 - the operand is a type, not a value
 - both produce an untyped integer constant, usable wherever a compile-time integer is required (array sizes, struct template value arguments, `comptime` parameters, other comptime expressions)
-- `sizeof(T)` is the size of `T` measured in `byte` units: `byte`, `bool`, `i8`, and `u8` are 1 byte; `i16`/`u16` are 2; `i32`/`u32`/`f32`/enums/function values are 4; `i64`/`u64`/`isize`/`f64`/strings/pointers are 8; a slice is a pointer plus an `i64` length; an array is `size * sizeof(element)`; and a struct is the sum of its field sizes
+- `sizeof(T)` is the size of `T` measured in `byte` units: `byte`, `bool`, `i8`, and `u8` are 1 byte; `i16`/`u16` are 2; `i32`/`u32`/`f32`/enums/function values are 4; `i64`/`u64`/`isize`/`f64`/strings/pointers are 8; a slice is a pointer plus an `i64` length; an array is `size * sizeof(element)`; a struct is the sum of its field sizes; and a tagged union is `sizeof(i32)` for the tag plus the size of its largest member
 - `alignof(T)` is derived from the byte size and capped at pointer alignment
 - they are most commonly used with the raw-memory allocator and slice reinterpret casts, for example `alloc(n * sizeof(i32), alignof(i32))`
 

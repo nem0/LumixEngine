@@ -37,6 +37,12 @@ u32 typeByteSize(const ResolvedType& t) {
 		case ResolvedType::CPTR:
 			return 8;
 		case ResolvedType::NULLABLE: return 1 + typeByteSize(*static_cast<const NullableResolvedType&>(t).inner);
+		case ResolvedType::UNION: {
+			const UnionResolvedType& un = static_cast<const UnionResolvedType&>(t);
+			u32 max_size = 0;
+			for (ResolvedType* member : un.members) max_size = max_size > typeByteSize(*member) ? max_size : typeByteSize(*member);
+			return 4 + max_size; // i32 tag followed by the largest member payload
+		}
 		case ResolvedType::SLICE: return 16;
 		case ResolvedType::ARRAY: {
 			const ArrayResolvedType& arr = static_cast<const ArrayResolvedType&>(t);
@@ -139,6 +145,17 @@ struct Checker {
 				const auto* nb = static_cast<const NullableResolvedType*>(b);
 				return typesEqual(na->inner, nb->inner);
 			}
+			case ResolvedType::UNION: {
+				const auto* ua = static_cast<const UnionResolvedType*>(a);
+				const auto* ub = static_cast<const UnionResolvedType*>(b);
+				if (ua->members.size() != ub->members.size()) return false;
+				for (ResolvedType* member : ua->members) {
+					bool found = false;
+					for (ResolvedType* other : ub->members) if (typesEqual(member, other)) { found = true; break; }
+					if (!found) return false;
+				}
+				return true;
+			}
 			// STRUCT/ENUM: one instance per declaration; a==b above is definitive.
 			default: return false;
 		}
@@ -147,6 +164,24 @@ struct Checker {
 	static bool canImplicitlyConvert(const ResolvedType* src, const ResolvedType* dst) {
 		if (typesEqual(src, dst)) return true;
 		if (!src || !dst) return false;
+		if (dst->kind == ResolvedType::UNION) {
+			const UnionResolvedType* un = static_cast<const UnionResolvedType*>(dst);
+			if (src->kind == ResolvedType::UNION) {
+				const UnionResolvedType* source = static_cast<const UnionResolvedType*>(src);
+				for (ResolvedType* source_member : source->members) {
+					bool found = false;
+					for (ResolvedType* member : un->members) {
+						if (typesEqual(source_member, member)) { found = true; break; }
+					}
+					if (!found) return false;
+				}
+				return true;
+			}
+			for (ResolvedType* member : un->members) {
+				if (typesEqual(src, member)) return true;
+			}
+			return false;
+		}
 		if (src->kind == ResolvedType::STRING && dst->kind == ResolvedType::CSTR) return true;
 		// An untyped literal converts to any concrete numeric type (its width is chosen at the
 		// materialization point). This is only a safety net; callers materialize first.
@@ -306,6 +341,14 @@ struct Checker {
 				error("?");
 				error(static_cast<const NullableResolvedType*>(type)->inner);
 				return;
+			case ResolvedType::UNION: {
+				const UnionResolvedType* un = static_cast<const UnionResolvedType*>(type);
+				for (i32 i = 0; i < un->members.size(); ++i) {
+					if (i > 0) error(" | ");
+					error(un->members[i]);
+				}
+				return;
+			}
 			default:
 				if (type->kind >= ResolvedType::VOID && type->kind <= ResolvedType::BYTE) {
 					error(primitiveTypeName(type->kind));
@@ -360,7 +403,16 @@ struct Checker {
 		sz.type_expr->resolved_type = measured;
 
 		const i64 size = typeByteSize(*measured);
-		out = ComptimeValue(sz.is_align ? (size >= 8 ? 8 : size >= 4 ? 4 : size >= 2 ? 2 : 1) : size);
+		i64 align = size >= 8 ? 8 : size >= 4 ? 4 : size >= 2 ? 2 : 1;
+		if (measured->kind == ResolvedType::UNION) {
+			align = 4;
+			for (ResolvedType* member : static_cast<UnionResolvedType*>(measured)->members) {
+				const i64 member_size = typeByteSize(*member);
+				const i64 member_align = member_size >= 8 ? 8 : member_size >= 4 ? 4 : member_size >= 2 ? 2 : 1;
+				if (member_align > align) align = member_align;
+			}
+		}
+		out = ComptimeValue(sz.is_align ? align : size);
 		sz.value = (u64)out.int_value;
 		return true;
 	}
@@ -433,6 +485,35 @@ struct Checker {
 				if (!resolved->inner) {
 					// TODO create a test to hit this
 					return {};
+				}
+				return ComptimeValue(resolved);
+			}
+			case Expression::UNION_TYPE: {
+				UnionTypeExpression& un = static_cast<UnionTypeExpression&>(expr);
+				UnionResolvedType* resolved = makeType<UnionResolvedType>(unit, unit.arena);
+				for (Expression* member_expr : un.members) {
+					ResolvedType* member = resolveTypeExpr(unit, *member_expr, bindings);
+					if (!member) return {};
+					const auto add_member = [&](auto&& self, ResolvedType* candidate, Token token, bool allow_duplicate) -> bool {
+						if (candidate->kind == ResolvedType::UNION) {
+							for (ResolvedType* nested : static_cast<UnionResolvedType*>(candidate)->members) if (!self(self, nested, token, true)) return false;
+							return true;
+						}
+						for (ResolvedType* existing : resolved->members) {
+							if (typesEqual(existing, candidate)) {
+								if (allow_duplicate) return true;
+								errorLine(token, "Duplicate union member");
+								return false;
+							}
+						}
+						if (candidate->kind == ResolvedType::NULLABLE || candidate->kind == ResolvedType::VOID) {
+							errorLine(token, "Invalid union member");
+							return false;
+						}
+						resolved->members.push(candidate);
+						return true;
+					};
+					if (!add_member(add_member, member, member_expr->token, false)) return {};
 				}
 				return ComptimeValue(resolved);
 			}
@@ -568,7 +649,6 @@ struct Checker {
 					// TODO create a test to hit this
 					return {};
 				}
-
 				bool lhs_float = lhs.kind == ComptimeValue::FLOAT;
 				bool rhs_float = rhs.kind == ComptimeValue::FLOAT;
 				bool result_float = lhs_float || rhs_float;
@@ -647,7 +727,22 @@ struct Checker {
 
 	ResolvedType* checkExprMaterialized(Unit& unit, FunctionCheckContext* ctx, Expression& expr, ResolvedType* target) {
 		ResolvedType* t = checkExpr(unit, ctx, expr, target);
-		if (t && isUntypedNumeric(*t)) t = materializeUntyped(expr, target);
+		if (t && isUntypedNumeric(*t) && target && target->kind == ResolvedType::UNION) {
+			UnionResolvedType& un = static_cast<UnionResolvedType&>(*target);
+			ResolvedType* member = nullptr;
+			for (ResolvedType* candidate : un.members) {
+				const bool compatible = t->kind == ResolvedType::UNTYPED_INT ? isIntegerType(*candidate) : isFloatType(*candidate);
+				if (!compatible) continue;
+				if (member) {
+					errorLine(expr.token, "Cannot infer union member type for numeric literal");
+					return nullptr;
+				}
+				member = candidate;
+			}
+			if (member) t = materializeUntyped(expr, member);
+		} else if (t && isUntypedNumeric(*t)) {
+			t = materializeUntyped(expr, target);
+		}
 		return t;
 	}
 
@@ -755,6 +850,13 @@ struct Checker {
 				IdentifierExpression* id = makeType<IdentifierExpression>(unit);
 				id->name = s->name;
 				out = id;
+				break;
+			}
+			case Expression::UNION_TYPE: {
+				UnionTypeExpression* s = static_cast<UnionTypeExpression*>(src);
+				UnionTypeExpression* un = makeType<UnionTypeExpression>(unit, unit.arena);
+				for (Expression* member : s->members) un->members.push(cloneExpression(unit, member, bindings));
+				out = un;
 				break;
 			}
 			case Expression::INT_LITERAL: {
@@ -1618,6 +1720,12 @@ struct Checker {
 		if (type.kind == ResolvedType::NULLABLE) {
 			return containsStructByValue(*static_cast<NullableResolvedType&>(type).inner, target, visited);
 		}
+		if (type.kind == ResolvedType::UNION) {
+			for (ResolvedType* member : static_cast<UnionResolvedType&>(type).members) {
+				if (containsStructByValue(*member, target, visited)) return true;
+			}
+			return false;
+		}
 		if (type.kind != ResolvedType::STRUCT) return false;
 		for (ResolvedType* seen : visited) {
 			if (seen == &type) return false;
@@ -1698,7 +1806,7 @@ struct Checker {
 			return LS_RESULT_FAILURE;
 		}
 
-		if (sym.expression && sym.expression->kind == Expression::TYPE_LITERAL) {
+		if (sym.expression && (sym.expression->kind == Expression::TYPE_LITERAL || sym.expression->kind == Expression::UNION_TYPE)) {
 			MetaType* meta = makeType<MetaType>(unit);
 			meta->inner = expr_type;
 			sym.resolved_type = meta;
@@ -2110,6 +2218,21 @@ struct Checker {
 		// try to use rhs's type as hint for lhs, e.g. 2 * v, or .Idle == e
 		if (!lhs) lhs = checkExpr(unit, ctx, *bin.lhs, rhs->kind == ResolvedType::STRUCT ? nullptr : rhs);
 		if (!lhs) return nullptr;
+		if (bin.op == Token::IS) {
+			if (lhs->kind != ResolvedType::UNION || rhs->kind != ResolvedType::META) {
+				errorLine(expr.token, "Union membership test requires a union value and member type");
+				return nullptr;
+			}
+			ResolvedType* member = unwrapMeta(rhs);
+			for (ResolvedType* candidate : static_cast<UnionResolvedType*>(lhs)->members) {
+				if (typesEqual(candidate, member)) {
+					expr.resolved_type = primitiveType(ResolvedType::BOOL);
+					return expr.resolved_type;
+				}
+			}
+			errorLine(expr.token, "Type ", member, " is not a member of union ", lhs);
+			return nullptr;
+		}
 
 		// operator overload, at least one of operands must be struct
 		if (lhs_is_struct || rhs->kind == ResolvedType::STRUCT) {
@@ -2190,6 +2313,10 @@ struct Checker {
 			case Token::PERCENT: result = resolveNumeric(NumericMode::INTEGER); break;
 			case Token::EQUAL_EQUAL:
 			case Token::BANG_EQUAL: {
+				if (lhs->kind == ResolvedType::UNION || rhs->kind == ResolvedType::UNION) {
+					errorLine(expr.token, "Cannot compare union values");
+					return nullptr;
+				}
 				// Equality also works on non-numerics (enums, strings); only unify when numeric.
 				if (isNumericOrUntyped(*lhs) || isNumericOrUntyped(*rhs)) {
 					if (!resolveNumeric(NumericMode::COMPARISON)) return nullptr;
@@ -2258,6 +2385,16 @@ struct Checker {
 		// bool->bool (and any other same-type cast) is covered by the trailing typesEqual.
 		const bool string_cstr_cast = (src_type->kind == ResolvedType::STRING && dst_type->kind == ResolvedType::CSTR)
 			|| (src_type->kind == ResolvedType::CSTR && dst_type->kind == ResolvedType::STRING);
+		if (src_type->kind == ResolvedType::UNION) {
+			const UnionResolvedType* un = static_cast<const UnionResolvedType*>(src_type);
+			for (ResolvedType* member : un->members) {
+				if (!typesEqual(member, dst_type)) continue;
+				NullableResolvedType* nullable = makeType<NullableResolvedType>(unit);
+				nullable->inner = dst_type;
+				expr.resolved_type = nullable;
+				return nullable;
+			}
+		}
 		const bool valid_cast = (src_numeric && dst_numeric) || (src_enum && dst_integer) || (src_integer && dst_enum) || slice_reinterpret || string_cstr_cast || typesEqual(src_type, dst_type);
 		if (!valid_cast) {
 			errorLine(expr.token, "Cannot cast ", src_type, " to ", dst_type);
@@ -2681,6 +2818,12 @@ struct Checker {
 				expr.resolved_type = t;
 				return t;
 			}
+			case Expression::UNION_TYPE: {
+				if (!ctx || !ctx->comptime_only) return nullptr; // TODO silent fail
+				ResolvedType* type = resolveTypeExpr(unit, expr);
+				expr.resolved_type = type;
+				return type;
+			}
 			case Expression::FUNCTION: {
 				// stuff like const foo = fn() : i32 { return 1; };
 				FunctionExpression& fn = static_cast<FunctionExpression&>(expr);
@@ -2964,6 +3107,20 @@ struct Checker {
 
 		ResolvedType* rhs_type = checkExprMaterialized(unit, &ctx, *assign.rhs, lhs_type);
 		if (!rhs_type) return false;
+		ResolvedType* assignment_target = lhs_type;
+		if (assign.lhs->kind == Expression::IDENTIFIER) {
+			IdentifierExpression* id = static_cast<IdentifierExpression*>(assign.lhs);
+			if (id->slot && id->slot->type && id->slot->type->kind == ResolvedType::UNION) assignment_target = id->slot->type;
+			if (id->slot) {
+				for (i32 i = (i32)ctx.locals.size() - 2; i >= 0; --i) {
+					SemanticLocalBinding& binding = ctx.locals[(u32)i];
+					if (equalStrings(binding.name, id->name) && binding.slot == id->slot && binding.type->kind == ResolvedType::UNION) {
+						assignment_target = binding.type;
+						break;
+					}
+				}
+			}
+		}
 
 		if (isNumericType(*lhs_type)) {
 			if (!canImplicitlyConvert(rhs_type, lhs_type)) {
@@ -2976,8 +3133,8 @@ struct Checker {
 		ResolvedType* op_result = nullptr;
 		switch (assign.op) {
 			case Token::EQUAL:
-				if (!canImplicitlyConvert(rhs_type, lhs_type)) {
-					errorLine(assign.token, "Cannot convert ", rhs_type, " to ", lhs_type, " for assignment");
+				if (!canImplicitlyConvert(rhs_type, assignment_target)) {
+					errorLine(assign.token, "Cannot convert ", rhs_type, " to ", assignment_target, " for assignment");
 					return false;
 				}
 				return true;
@@ -3059,6 +3216,22 @@ struct Checker {
 						}
 						narrow_in_true = (bin->op == Token::BANG_EQUAL);
 					}
+				}
+			}
+			else if (bin->op == Token::IS && bin->lhs && bin->lhs->kind == Expression::IDENTIFIER) {
+				ResolvedType* member = bin->rhs ? unwrapMeta(bin->rhs->resolved_type) : nullptr;
+				if (member) {
+					IdentifierExpression* id = static_cast<IdentifierExpression*>(bin->lhs);
+					narrowed_name = id->name;
+					narrowed_type = member;
+					if (SemanticLocalBinding* local = findLocal(ctx, id->name)) {
+						narrowed_is_immutable = local->is_immutable;
+						narrowed_slot = local->slot;
+					} else if (id->symbol) {
+						narrowed_is_immutable = id->symbol->storage != Symbol::VARIABLE;
+						narrowed_slot = id->slot;
+					}
+					narrow_in_true = true;
 				}
 			}
 		}
@@ -3153,7 +3326,8 @@ struct Checker {
 		const bool subject_is_numeric = isNumericType(*subject);
 		const bool subject_is_enum = subject->kind == ResolvedType::ENUM;
 		const bool subject_is_string = subject->kind == ResolvedType::STRING;
-		if (!subject_is_numeric && !subject_is_enum && !subject_is_string) {
+		const bool subject_is_union = subject->kind == ResolvedType::UNION;
+		if (!subject_is_numeric && !subject_is_enum && !subject_is_string && !subject_is_union) {
 			errorLine(ms.token, "Match statement subject must be a numeric type, enum, or string, got ", subject);
 			return false;
 		}
@@ -3164,6 +3338,10 @@ struct Checker {
 		ExpArray<bool> covered_enum_members(unit.arena);
 		if (subject_enum) covered_enum_members.resize(subject_enum->decl->members.size(), false);
 		u32 covered_enum_count = 0;
+		const UnionResolvedType* subject_union = subject_is_union ? static_cast<const UnionResolvedType*>(subject) : nullptr;
+		ExpArray<bool> covered_union_members(unit.arena);
+		if (subject_union) covered_union_members.resize(subject_union->members.size(), false);
+		u32 covered_union_count = 0;
 
 		for (MatchArm& arm : ms.arms) {
 			if (arm.is_fallback) {
@@ -3174,6 +3352,32 @@ struct Checker {
 				has_fallback = true;
 			}
 			for (MatchPattern& pattern : arm.patterns) {
+				if (subject_union) {
+					if (pattern.end) {
+						errorLine(pattern.begin->token, "Range patterns are not valid for union matches");
+						return false;
+					}
+					ResolvedType* member = resolveTypeExpr(unit, *pattern.begin);
+					if (!member) return false;
+					i32 member_index = -1;
+					for (i32 i = 0; i < subject_union->members.size(); ++i) {
+						if (typesEqual(subject_union->members[i], member)) { member_index = i; break; }
+					}
+					if (member_index < 0) {
+						errorLine(pattern.begin->token, "Type ", member, " is not a member of union ", subject);
+						return false;
+					}
+					if (covered_union_members[member_index]) {
+						errorLine(pattern.begin->token, "Duplicate match arm for union member ", member);
+						return false;
+					}
+					covered_union_members[member_index] = true;
+					++covered_union_count;
+					MetaType* meta = makeType<MetaType>(unit);
+					meta->inner = member;
+					pattern.begin->resolved_type = meta;
+					continue;
+				}
 				ResolvedType* begin = checkExpr(unit, &ctx, *pattern.begin, subject);
 				if (!begin || !typesEqual(begin, subject)) return false;
 				if (pattern.end) {
@@ -3200,7 +3404,34 @@ struct Checker {
 					}
 				}
 			}
-			if (!checkStatement(unit, ctx, arm.body, return_type, {})) return false;
+			ResolvedType* narrowed_union_member = nullptr;
+			if (subject_union && arm.patterns.size() == 1) {
+				narrowed_union_member = unwrapMeta(arm.patterns[0].begin->resolved_type);
+			}
+			else if (subject_union && arm.is_fallback && covered_union_count == (u32)subject_union->members.size() - 1u) {
+				for (i32 i = 0; i < subject_union->members.size(); ++i) {
+					if (!covered_union_members[i]) { narrowed_union_member = subject_union->members[i]; break; }
+				}
+			}
+			if (narrowed_union_member && ms.subject->kind == Expression::IDENTIFIER) {
+				IdentifierExpression* id = static_cast<IdentifierExpression*>(ms.subject);
+				SemanticLocalBinding* local = findLocal(ctx, id->name);
+				pushScope(ctx);
+				SemanticLocalBinding& narrowed = ctx.locals.emplace_back();
+				narrowed.name = id->name;
+				narrowed.type = narrowed_union_member;
+				if (local) {
+					narrowed.is_immutable = local->is_immutable;
+					narrowed.slot = local->slot;
+				} else {
+					narrowed.is_immutable = id->symbol && id->symbol->storage != Symbol::VARIABLE;
+					narrowed.slot = id->slot;
+				}
+				const bool ok = checkStatement(unit, ctx, arm.body, return_type, {});
+				popScope(ctx);
+				if (!ok) return false;
+			}
+			else if (!checkStatement(unit, ctx, arm.body, return_type, {})) return false;
 		}
 
 		// Enum match must cover all variants or have a fallback.
@@ -3209,6 +3440,10 @@ struct Checker {
 				errorLine(ms.token, "Match statement on enum is not exhaustive");
 				return false;
 			}
+		}
+		if (subject_union && !has_fallback && covered_union_count != (u32)subject_union->members.size()) {
+			errorLine(ms.token, "Match statement on union is not exhaustive");
+			return false;
 		}
 
 		return true;

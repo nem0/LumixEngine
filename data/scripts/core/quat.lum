@@ -1,3 +1,5 @@
+import "std:math" as math
+
 struct Quat {
 	x : f32;
 	y : f32;
@@ -66,4 +68,14 @@ operator *(a : Quat, b : Quat) : Quat {
 		a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
 		a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z
 	};
+}
+
+fn makeQuatFromYaw(value : f32) : Quat {
+	const half = value * 0.5;
+	return { 0.0, math.sin(half), 0.0, math.cos(half) };
+}
+
+fn makeQuatFromPitch(value : f32) : Quat {
+	const half = value * 0.5;
+	return { -math.sin(half), 0.0, 0.0, math.cos(half) };
 }

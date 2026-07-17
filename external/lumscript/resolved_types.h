@@ -36,6 +36,7 @@ struct ResolvedType {
 		ARRAY,
 		SLICE,
 		NULLABLE,
+		UNION,
 	};
 
 	explicit ResolvedType(Kind kind) : kind(kind) {}
@@ -93,6 +94,12 @@ struct NullableResolvedType : ResolvedType {
 	NullableResolvedType() : ResolvedType(NULLABLE) {}
 
 	ResolvedType* inner = nullptr;
+};
+
+struct UnionResolvedType : ResolvedType {
+	UnionResolvedType(ls_arena& arena) : ResolvedType(UNION), members(arena) {}
+
+	ExpArray<ResolvedType*> members;
 };
 
 // A compile-time constant: a template argument or the result of comptime

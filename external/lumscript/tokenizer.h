@@ -174,7 +174,9 @@ struct Tokenizer {
 					case '6': return checkKeyword("4", 2, 1, Token::I64);
 					case 'f': return checkKeyword("", 2, 0, Token::IF);
 					case 'm': return checkKeyword("port", 2, 4, Token::IMPORT);
-					case 's': return checkKeyword("ize", 2, 3, Token::ISIZE);
+					case 's':
+						if (u32(m_current - m_start_token) == 2) return checkKeyword("", 2, 0, Token::IS);
+						return checkKeyword("ize", 2, 3, Token::ISIZE);
 				}
 				break;
 			}
@@ -264,6 +266,7 @@ struct Tokenizer {
 			case '.': return makeToken(match('.') ? Token::RANGE : Token::DOT);
 			case '?': return makeToken(Token::QUESTION);
 			case '$': return makeToken(Token::DOLLAR);
+			case '|': return makeToken(Token::PIPE);
 			case '+': {
 				if (match('=')) return makeToken(Token::PLUS_EQUAL);
 				if (match('+')) return makeToken(Token::PLUS_PLUS);
