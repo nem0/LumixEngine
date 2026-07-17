@@ -351,10 +351,15 @@ static u32 callArgWindowSize(const FunctionResolvedType& fn_type) {
 static ls_type_kind emitDirectCall(FunctionCompiler& ctx, CallExpression& expr, FunctionExpression& fn, Expression* receiver, u32 arg_offset, ls_type_kind hint) {
 	FunctionResolvedType& fn_type = *static_cast<FunctionResolvedType*>(fn.resolved_type);
 	if (receiver) {
-		const ls_type_kind receiver_kind = !fn_type.param_types.empty()
-			? valueKindForType(*fn_type.param_types[0])
-			: LS_TYPE_INVALID;
-		compileExpression(ctx, *receiver, receiver_kind);
+		if (paramIsRef(fn_type, 0)) {
+			tryEmitReference(ctx, *receiver);
+		}
+		else {
+			const ls_type_kind receiver_kind = !fn_type.param_types.empty()
+				? valueKindForType(*fn_type.param_types[0])
+				: LS_TYPE_INVALID;
+			compileExpression(ctx, *receiver, receiver_kind);
+		}
 	}
 	compileCallArgs(ctx, expr, fn_type, arg_offset);
 	emitCallDirect(ctx, fn.bytecode_index, callArgWindowSize(fn_type), typeByteSize(*fn_type.return_type));

@@ -213,6 +213,32 @@ TEST(BytecodeRefParameterCall) {
 	return true;
 }
 
+TEST(UFCSRefReceiverRuntime) {
+	const char* source = R"(
+		struct Counter {
+			value : i32;
+		}
+
+		fn increment(counter : ref Counter, amount : i32) : void {
+			counter.value += amount;
+		}
+
+		fn main() : i32 {
+			var counter = Counter { 40 };
+			counter.increment(2);
+			return counter.value;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(RefParameterRejectsLiteral) {
 	const char* source = R"(
 		fn increment(v : ref i32) : void {

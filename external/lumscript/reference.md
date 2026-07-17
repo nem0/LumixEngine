@@ -166,7 +166,6 @@ JIT is intentionally out of scope for the first version.
 - ADL
 	- less noise `lib.foo(val)` -> `foo(val)`
 	- a way to have overloads without actual overloads
-	- only try ADL if no local function matches, i.e. prefer local - simpler/faster compiler
 
 - operators
 	- operators are clearly useful, why would we have them for primitive types otherwise
@@ -1539,6 +1538,7 @@ fn move_up(w : world.World, e : entity.Entity) : void {
 Rules:
 
 - if `x.foo(a, b)` is not resolved by other language features (enum, struct field, namespace), it's retried as `foo(x, a, b)`
+- if the resolved function takes its first parameter by `ref`, the receiver is passed by `ref`; `x.foo(a, b)` is then equivalent to `foo(ref x, a, b)`
 - ADL is tried with the transformed form
 - does not apply to primitive receiver types, e.g. `4.foo(a, b)` is invalid
 - alias-qualified calls (`entity.destroy(e)`) are always unambiguous
@@ -1554,6 +1554,18 @@ fn example(e : entity.Entity) : void {
 	e.destroy();       // calls local destroy — local is preferred over namespace
 	destroy(e);        // calls local destroy — local is preferred over ADL
 	entity.destroy(e); // calls entity.destroy — explicit namespace, always unambiguous
+}
+```
+
+This also permits mutable container operations without spelling `ref` at every call site:
+
+```cpp
+import "core:array" as array
+
+fn example() : void {
+	var values : array.Array[i32] = undefined;
+	values.init();
+	values.push(42);
 }
 ```
 

@@ -1199,6 +1199,14 @@ struct Checker {
 			if (!receiver_type || !canImplicitlyConvert(receiver_type, fn_type.param_types[0])) {
 				return nullptr;
 			}
+			if (fn_type.decl && fn_type.decl->params[0].is_ref) {
+				bool writable = false;
+				receiver_type = checkAssignableExpr(unit, ctx, *mem.expression, writable);
+				if (!receiver_type || !writable) {
+					errorLine(mem.expression->token, "Cannot pass non-writable UFCS receiver as ref argument");
+					return nullptr;
+				}
+			}
 		}
 
 		for (i32 i = 0; i < call.args.size(); ++i) {
@@ -1895,7 +1903,8 @@ struct Checker {
 
 		// UFCS: x.foo(a, b) -> foo(x, a, b)
 		if (call.callee->kind != Expression::MEMBER) {
-			// TODO silent fail - error msg
+			// check again without suppressed errors
+			checkExpr(unit, ctx, *call.callee, nullptr, first_arg_type);
 			return nullptr;
 		}
 
@@ -2524,6 +2533,11 @@ struct Checker {
 			}
 		}
 		SymbolRef ref = resolveSymbol(unit, {}, id.name, LookupPolicy::Checked, first_arg_type);
+		if (ref.ambiguous) {
+			// TODO list collisions 
+			errorLine(expr.token, "Ambiguous identifier ", id.name);
+			return nullptr;
+		}
 		if (!ref) {
 			errorLine(expr.token, "Unknown identifier ", id.name);
 			return nullptr;
