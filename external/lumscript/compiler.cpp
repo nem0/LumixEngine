@@ -708,6 +708,18 @@ struct Checker {
 				}
 				return out;
 			}
+			case Expression::TERNARY: {
+				TernaryExpression& tern = static_cast<TernaryExpression&>(expr);
+				ComptimeValue cond = resolveComptimeValue(unit, *tern.condition, bindings);
+				if (cond.kind == ComptimeValue::INVALID)
+					// TODO create a test to hit this
+					return {};
+
+				ComptimeValue result = cond.asInt() != 0
+					? resolveComptimeValue(unit, *tern.true_expr, bindings)
+					: resolveComptimeValue(unit, *tern.false_expr, bindings);
+				return result;
+			}
 			case Expression::UNDEFINED:
 				errorLine(expr.token, "Undefined expression cannot be used as a compile-time value");
 				return {};
@@ -960,6 +972,15 @@ struct Checker {
 				bin->lhs = cloneExpression(unit, s->lhs, bindings);
 				bin->rhs = cloneExpression(unit, s->rhs, bindings);
 				out = bin;
+				break;
+			}
+			case Expression::TERNARY: {
+				TernaryExpression* s = static_cast<TernaryExpression*>(src);
+				TernaryExpression* tern = makeType<TernaryExpression>(unit);
+				tern->condition = cloneExpression(unit, s->condition, bindings);
+				tern->true_expr = cloneExpression(unit, s->true_expr, bindings);
+				tern->false_expr = cloneExpression(unit, s->false_expr, bindings);
+				out = tern;
 				break;
 			}
 			case Expression::CAST: {
@@ -1241,6 +1262,11 @@ struct Checker {
 				const BinaryExpression& bin = static_cast<const BinaryExpression&>(expr);
 				return (!bin.lhs || canMaterializeUntyped(*bin.lhs, concrete))
 					&& (!bin.rhs || canMaterializeUntyped(*bin.rhs, concrete));
+			}
+			case Expression::TERNARY: {
+				const TernaryExpression& tern = static_cast<const TernaryExpression&>(expr);
+				return canMaterializeUntyped(*tern.true_expr, concrete)
+					&& canMaterializeUntyped(*tern.false_expr, concrete);
 			}
 			default: return true;
 		}
@@ -2132,6 +2158,13 @@ struct Checker {
 				expr.resolved_type = concrete;
 				return concrete;
 			}
+			case Expression::TERNARY: {
+				TernaryExpression& tern = static_cast<TernaryExpression&>(expr);
+				if (!materializeUntyped(*tern.true_expr, concrete, false)) return nullptr;
+				if (!materializeUntyped(*tern.false_expr, concrete, false)) return nullptr;
+				expr.resolved_type = concrete;
+				return concrete;
+			}
 			default: expr.resolved_type = concrete; return concrete;
 		}
 	}
@@ -2349,6 +2382,32 @@ struct Checker {
 		if (!result) return nullptr;
 		expr.resolved_type = result;
 		return result;
+	}
+
+	ResolvedType* checkTernaryExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr, ResolvedType* hint) {
+		TernaryExpression& tern = static_cast<TernaryExpression&>(expr);
+
+		ResolvedType* cond = checkExpr(unit, ctx, *tern.condition, nullptr);
+		if (!cond) return nullptr;
+
+		if (!typesEqual(cond, primitiveType(ResolvedType::BOOL))) {
+			errorLine(expr.token, "Ternary condition must be bool, got ", cond);
+			return nullptr;
+		}
+
+		ResolvedType* true_type = checkExpr(unit, ctx, *tern.true_expr, hint);
+		if (!true_type) return nullptr;
+
+		ResolvedType* false_type = checkExpr(unit, ctx, *tern.false_expr, hint);
+		if (!false_type) return nullptr;
+
+		if (!typesEqual(true_type, false_type)) {
+			errorLine(expr.token, "Ternary branches have different types: ", true_type, " and ", false_type);
+			return nullptr;
+		}
+
+		expr.resolved_type = true_type;
+		return true_type;
 	}
 
 	ResolvedType* checkCastExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr) {
@@ -2846,6 +2905,7 @@ struct Checker {
 			case Expression::CALL: return checkCallExpr(unit, ctx, expr);
 			case Expression::UNARY: return checkUnaryExpr(unit, ctx, expr, hint);
 			case Expression::BINARY: return checkBinaryExpr(unit, ctx, expr, hint);
+			case Expression::TERNARY: return checkTernaryExpr(unit, ctx, expr, hint);
 			case Expression::CAST: return checkCastExpr(unit, ctx, expr);
 			case Expression::MEMBER: return checkMemberExpr(unit, ctx, expr, hint);
 			case Expression::BRACKET: return checkBracketExpr(unit, ctx, expr, hint);

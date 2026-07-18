@@ -99,6 +99,8 @@ struct Expression {
 		UNION_TYPE,    // A | B used as a type
 		// A fully resolved type injected by template substitution during cloning.
 		RESOLVED_TYPE,
+		// Ternary conditional operator: `condition ? true_expr : false_expr`
+		TERNARY,
 	};
 
 	Expression() = default;
@@ -328,4 +330,12 @@ struct EnumExpression : Expression {
 	// Cached by symbol checking: name and owner unit for fast type printing.
 	ls_string_view cached_name = {};
 	struct Unit* cached_owner = nullptr;
+};
+
+struct TernaryExpression : Expression {
+	TernaryExpression() : Expression(TERNARY) {}
+
+	Expression* condition = nullptr;
+	Expression* true_expr = nullptr;
+	Expression* false_expr = nullptr;
 };

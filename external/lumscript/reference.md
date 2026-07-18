@@ -88,6 +88,7 @@ LumScript is a small, statically typed scripting language for Lumix Engine.
 	- [Casts](#casts)
 	- [Sizeof and alignof](#sizeof-and-alignof)
 	- [Comparison and boolean operators](#comparison-and-boolean-operators)
+	- [Ternary operator](#ternary-operator)
 	- [Calls](#calls)
 	- [Argument-dependent lookup](#argument-dependent-lookup)
 	- [UFCS](#ufcs)
@@ -1599,6 +1600,33 @@ If an operator is used with non-builtin value types, the compiler may resolve it
 Primitive operands keep their built-in semantics and cannot be overridden by `operator` declarations.
 `and` and `or` keep their built-in short-circuit semantics and are not candidates for operator declarations.
 Compound assignment follows the same rule: a non-primitive left-hand target uses the corresponding binary operator, while a primitive left-hand target stays on the built-in path. In the latter case, the right-hand operand must be implicitly convertible to the left-hand target type; an expression such as `5 *= Vec2 { 1, 2 }` is therefore invalid.
+
+### Ternary operator
+
+```cpp
+condition ? true_expr : false_expr
+```
+
+The ternary operator selects between two expressions based on a boolean condition:
+
+```cpp
+fn clamp(value : i32, min_val : i32, max_val : i32) : i32 {
+	return value < min_val ? min_val : (value > max_val ? max_val : value);
+}
+
+fn main() : void {
+	var x : i32 = 5;
+	var result : i32 = x > 3 ? 10 : 20;  // result = 10
+}
+```
+
+Rules:
+
+- condition must be `bool`; no implicit conversion
+- both true and false branches must have the same type
+- the operator is right-associative, enabling nested ternary: `a ? b ? c : d : e` parses as `a ? (b ? c : d) : e`
+- the operator has lower precedence than arithmetic and comparison operators, so `a > b ? 1 : 2` evaluates the comparison first
+- short-circuit evaluation: only the selected branch is evaluated, not both
 
 ### Calls
 

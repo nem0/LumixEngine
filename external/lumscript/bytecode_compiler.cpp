@@ -1252,6 +1252,24 @@ static ls_type_kind compileBinary(FunctionCompiler& ctx, BinaryExpression& expr,
 	}
 }
 
+static ls_type_kind compileTernary(FunctionCompiler& ctx, TernaryExpression& expr, ls_type_kind hint) {
+	compileExpression(ctx, *expr.condition, LS_TYPE_BOOL);
+	const u32 false_jump = emitJumpPlaceholder(ctx, LS_OP_JUMP_IF_FALSE);
+	const u32 result_top = ctx.temp_top;
+
+	ls_type_kind true_kind = compileExpression(ctx, *expr.true_expr, hint);
+	const u32 end_jump = emitJumpPlaceholder(ctx, LS_OP_JUMP);
+
+	patchJumpRelative(ctx.code, false_jump, (u32)ctx.code.size());
+	ctx.temp_top = result_top;
+	ls_type_kind false_kind = compileExpression(ctx, *expr.false_expr, hint);
+	patchJumpRelative(ctx.code, end_jump, (u32)ctx.code.size());
+
+	// Both branches should produce the same type (ensured by type checker)
+	ASSERT(true_kind == false_kind);
+	return true_kind;
+}
+
 static ls_type_kind compileCall(FunctionCompiler& ctx, CallExpression& expr, ls_type_kind hint) {
 	ASSERT(expr.callee);
 
@@ -1521,6 +1539,7 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 			return LS_TYPE_FUNCTION;
 		}
 		case Expression::BINARY: return compileBinary(ctx, static_cast<BinaryExpression&>(expr), hint);
+		case Expression::TERNARY: return compileTernary(ctx, static_cast<TernaryExpression&>(expr), hint);
 		case Expression::CAST: {
 			CastExpression& cast = static_cast<CastExpression&>(expr);
 			if (cast.expression->resolved_type->kind == ResolvedType::UNION && expr.resolved_type->kind == ResolvedType::NULLABLE) {

@@ -739,9 +739,34 @@ struct Parser {
 		}
 	}
 
-	// Parse an expression, e.g. `a + b * c`.
+	// Parse a ternary expression: `condition ? true_expr : false_expr`.
+	// The ternary operator has the lowest precedence and is right-associative.
+	Expression* ternaryExpression(ExprMode mode = ExprMode::FULL) {
+		Expression* cond = binaryExpression(1, mode);
+		if (!cond) return nullptr;
+
+		if (peekToken().type == Token::QUESTION) {
+			Token question = consumeToken();
+			Expression* true_expr = expression(mode);
+			if (!true_expr) return nullptr;
+			if (!consume(Token::COLON)) return nullptr;
+			
+			Expression* false_expr = expression(mode);
+			if (!false_expr) return nullptr;
+
+			TernaryExpression* ternary = makeExpr<TernaryExpression>(question);
+			ternary->condition = cond;
+			ternary->true_expr = true_expr;
+			ternary->false_expr = false_expr;
+			return ternary;
+		}
+
+		return cond;
+	}
+
+	// Parse an expression, e.g. `a + b * c` or `a ? b : c`.
 	Expression* expression(ExprMode mode = ExprMode::FULL) {
-		return binaryExpression(1, mode);
+		return ternaryExpression(mode);
 	}
 
 	// Parse a comptime declaration, e.g. `comptime x = expr;`.

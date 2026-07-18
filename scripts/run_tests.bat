@@ -20,7 +20,7 @@ if "%msbuild_cmd%"=="" (
 )
 :msbuild_found
 
-genie.exe --with-tests vs2022
+.\genie.exe --with-tests vs2022
 if not %errorlevel%==0 (
   echo Failed to generate solution.
   popd

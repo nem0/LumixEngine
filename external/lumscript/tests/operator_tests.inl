@@ -1,3 +1,57 @@
+TEST(TernaryOperatorBasic) {
+	const char* source = R"(
+		fn main() : i32 {
+			var x = 5;
+			return x > 3 ? 10 : 20;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(TernaryOperatorNested) {
+	const char* source = R"(
+		fn main() : i32 {
+			var x = 5;
+			return x > 10 ? 1 : x > 3 ? 2 : 3;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(TernaryOperatorWithBool) {
+	const char* source = R"(
+		fn main() : bool {
+			var cond = true;
+			return cond ? true : false;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(TernaryOperatorTypeMismatch) {
+	const char* source = R"(
+		fn main() : void {
+			var x = 5;
+			var result = x > 3 ? 10 : "string";
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(TernaryOperatorNonBoolCondition) {
+	const char* source = R"(
+		fn main() : void {
+			var result = 5 ? 10 : 20;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(OperatorOverloadsTypecheck) {
 	const char* source = R"(
 		struct Vec2 {
