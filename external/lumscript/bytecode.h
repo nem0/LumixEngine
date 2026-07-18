@@ -67,6 +67,8 @@
 // - refs: LOCAL_REF/GLOBAL_REF (`dst`, byte offset)
 // - arithmetic/logical/comparison ops carry explicit destination and source
 //   register operands; comparisons also carry a type byte
+// - comparison branches carry lhs/rhs registers, a type byte, and a signed
+//   relative jump offset; they do not materialize a boolean result
 // - address/slice ops carry explicit register operands plus existing scale,
 //   offset, and byte-size immediates
 // - calls carry explicit destination, callee/argument registers, argument size,
@@ -174,6 +176,10 @@ typedef enum ls_op {
 	LS_OP_LE,
 	LS_OP_GT,
 	LS_OP_GE,
+	LS_OP_EQ_JUMP_FALSE,
+	LS_OP_NE_JUMP_FALSE,
+	LS_OP_LT_JUMP_FALSE,
+	LS_OP_LE_JUMP_FALSE,
 
 	LS_OP_JUMP,
 	LS_OP_JUMP_IF_FALSE,

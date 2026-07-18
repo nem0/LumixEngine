@@ -4,6 +4,7 @@
 #include "utils.h"
 
 #include <cstdlib>
+#include <cstring>
 
 static u64 bitcastF64ToU64(double value) {
 	u64 raw = 0;
@@ -559,10 +560,18 @@ static void emitCompareOp(FunctionCompiler& ctx, ls_op op, ls_type_kind kind) {
 	const u32 size = typeKindByteSize(kind);
 	const u32 lhs = ctx.temp_top - size * 2u;
 	const u32 rhs = ctx.temp_top - size;
+	bool swap_operands = false;
+	if (op == LS_OP_GT) {
+		op = LS_OP_LT;
+		swap_operands = true;
+	} else if (op == LS_OP_GE) {
+		op = LS_OP_LE;
+		swap_operands = true;
+	}
 	emitOp(ctx.code, op);
 	emitTempReg(ctx, lhs);
-	emitTempReg(ctx, lhs);
-	emitTempReg(ctx, rhs);
+	emitTempReg(ctx, swap_operands ? rhs : lhs);
+	emitTempReg(ctx, swap_operands ? lhs : rhs);
 	emitU8(ctx.code, (u8)kind);
 	ctx.temp_top = lhs + 1u;
 }
@@ -1150,16 +1159,76 @@ static void patchJumpRelative(ByteArray& code, u32 operand_pos, u32 target_pos) 
 	patchI32(code, operand_pos, (i32)((i32)target_pos - (i32)(operand_pos + 4u)));
 }
 
+static ls_op compareJumpOp(ls_op compare_op, bool jump_if_true, bool& swap_operands) {
+	swap_operands = false;
+	if (jump_if_true) {
+		switch (compare_op) {
+			case LS_OP_EQ: compare_op = LS_OP_NE; break;
+			case LS_OP_NE: compare_op = LS_OP_EQ; break;
+			case LS_OP_LT: compare_op = LS_OP_LE; swap_operands = true; break;
+			case LS_OP_LE: compare_op = LS_OP_LT; swap_operands = true; break;
+			case LS_OP_GT: compare_op = LS_OP_LE; break;
+			case LS_OP_GE: compare_op = LS_OP_LT; break;
+			default: break;
+		}
+	}
+	else {
+		switch (compare_op) {
+			case LS_OP_GT: compare_op = LS_OP_LT; swap_operands = true; break;
+			case LS_OP_GE: compare_op = LS_OP_LE; swap_operands = true; break;
+			default: break;
+		}
+	}
+	const u32 base = (u32)LS_OP_EQ_JUMP_FALSE;
+	switch (compare_op) {
+		case LS_OP_EQ: return (ls_op)(base + 0u);
+		case LS_OP_NE: return (ls_op)(base + 1u);
+		case LS_OP_LT: return (ls_op)(base + 2u);
+		case LS_OP_LE: return (ls_op)(base + 3u);
+		case LS_OP_GT: return (ls_op)(base + 4u);
+		case LS_OP_GE: return (ls_op)(base + 5u);
+		default: return LS_OP_JUMP;
+	}
+}
+
+static bool tryFuseCompareJump(FunctionCompiler& ctx, ls_op jump_op, u32& operand_pos) {
+	if (ctx.code.size() < 14) return false;
+	if (jump_op != LS_OP_JUMP_IF_FALSE && jump_op != LS_OP_JUMP_IF_TRUE) return false;
+
+	const u32 compare_pos = (u32)ctx.code.size() - 14u;
+	const ls_op compare_op = (ls_op)ctx.code[compare_pos];
+	const bool jump_if_true = jump_op == LS_OP_JUMP_IF_TRUE;
+	bool swap_operands = false;
+	const ls_op fused_op = compareJumpOp(compare_op, jump_if_true, swap_operands);
+	if (fused_op == LS_OP_JUMP) return false;
+
+	ctx.code[compare_pos] = (u8)fused_op;
+	if (swap_operands) {
+		u8 temp[4];
+		memcpy(temp, ctx.code.data + compare_pos + 5u, sizeof(temp));
+		memcpy(ctx.code.data + compare_pos + 5u, ctx.code.data + compare_pos + 9u, sizeof(temp));
+		memcpy(ctx.code.data + compare_pos + 9u, temp, sizeof(temp));
+	}
+	memmove(ctx.code.data + compare_pos + 1u, ctx.code.data + compare_pos + 5u, 9u);
+	operand_pos = compare_pos + 10u;
+	patchI32(ctx.code, operand_pos, 0);
+	ctx.temp_top -= 1u;
+	return true;
+}
+
 // Emit a jump with a placeholder relative offset; returns the position of the
-// offset operand for later patching. Conditional jumps read (and consume) the
-// topmost boolean temporary.
+// offset operand for later patching. A comparison immediately before a
+// conditional jump is fused into a branch-comparison opcode.
 static u32 emitJumpPlaceholder(FunctionCompiler& ctx, ls_op op) {
+	u32 operand_pos = 0;
+	if (tryFuseCompareJump(ctx, op, operand_pos)) return operand_pos;
+
 	emitOp(ctx.code, op);
 	if (op == LS_OP_JUMP_IF_FALSE || op == LS_OP_JUMP_IF_TRUE) {
 		emitTempReg(ctx, ctx.temp_top - 1u);
 		ctx.temp_top -= 1u;
 	}
-	const u32 operand_pos = (u32)ctx.code.size();
+	operand_pos = (u32)ctx.code.size();
 	emitI32(ctx.code, 0);
 	return operand_pos;
 }
