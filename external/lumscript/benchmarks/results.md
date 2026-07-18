@@ -22,25 +22,25 @@ Measured 2026-07-18. Times are a single run; expect a few percent of noise.
 
 | Benchmark | Workload | Result | lumc | lua 5.4 | node --jitless | node | C /O2 |
 |---|---|---|---:|---:|---:|---:|---:|
-| recursion | fib(30) | 832040 | 50 ms | 31 ms | 45 ms | 5.1 ms | 2.7 ms |
-| mandel | 256x256, 255 iters | 1694719 | 169 ms | 85 ms | 134 ms | 7.0 ms | 4.0 ms |
-| fannkuch | n=9 | 30 | 629 ms | 158 ms | 262 ms | 18.7 ms | 13.3 ms |
-| nbodies | 500k steps | -0.169097 | 2753 ms | 730 ms | 1260 ms | 34.1 ms | 21.2 ms |
+| recursion | fib(30) | 832040 | 43 ms | 31 ms | 45 ms | 5.1 ms | 2.7 ms |
+| mandel | 256x256, 255 iters | 1694719 | 166 ms | 85 ms | 134 ms | 7.0 ms | 4.0 ms |
+| fannkuch | n=9 | 30 | 630 ms | 158 ms | 262 ms | 18.7 ms | 13.3 ms |
+| nbodies | 500k steps | -0.169097 | 2343 ms | 730 ms | 1260 ms | 34.1 ms | 21.2 ms |
 
 Relative to lumc (higher = faster than lumc):
 
 | Benchmark | lua 5.4 | node --jitless | node | C /O2 |
 |---|---:|---:|---:|---:|
-| recursion | 1.6x | 1.1x | 9.8x | 18.5x |
-| mandel | 2.0x | 1.3x | 25x | 42x |
+| recursion | 1.4x | 1.0x | 8.4x | 15.9x |
+| mandel | 2.0x | 1.2x | 24x | 42x |
 | fannkuch | 4.0x | 2.4x | 34x | 47x |
-| nbodies | 3.8x | 2.2x | 81x | 130x |
+| nbodies | 3.2x | 1.9x | 69x | 111x |
 
 ## Notes
 
 - The fairest interpreter-to-interpreter comparisons are lumc vs `node
-  --jitless` (V8's Ignition) and vs Lua 5.4: lumc is within 1.2-1.7x on
-  call-heavy and float-arithmetic code (recursion, mandel) and 2.4-4.2x behind
+  --jitless` (V8's Ignition) and vs Lua 5.4: lumc is within 1.0-1.4x on
+  call-heavy and float-arithmetic code (recursion, mandel) and 2.4-4.0x behind
   on array/struct-heavy code (fannkuch, nbodies). Lua's lead there comes from
   its word-sized dynamic values and single-op table access, versus lumc's raw
   byte-register frames where each element access decodes several operands and

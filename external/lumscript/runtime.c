@@ -604,6 +604,48 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				if (element_size > 0u) memmove(base + offset, value, element_size);
 				break;
 			}
+			case LS_OP_SLICE_LOAD_AT: {
+				const u32 slice_reg = runtime_read_u32(fn->code, &pc);
+				const u32 index_reg = runtime_read_u32(fn->code, &pc);
+				const u32 element_size = runtime_read_u32(fn->code, &pc);
+				const i32 field_offset = runtime_read_i32(fn->code, &pc);
+				const u32 field_size = runtime_read_u32(fn->code, &pc);
+				i64 index = 0;
+				i64 length = 0;
+				void* base_ptr = NULL;
+				u8* slice = runtime_frame_ptr(runtime, slice_reg);
+				u8* index_ptr = runtime_frame_ptr(runtime, index_reg);
+				memcpy(&base_ptr, slice, sizeof(base_ptr));
+				memcpy(&length, slice + sizeof(void*), 8u);
+				memcpy(&index, index_ptr, 8u);
+				if (!base_ptr || index < 0 || (u64)index >= (u64)length) goto runtime_execute_function_fail;
+				const u64 offset = (u64)index * element_size;
+				if (element_size != 0u && offset / element_size != (u64)index) goto runtime_execute_function_fail;
+				memmove(slice, (u8*)base_ptr + offset + field_offset, field_size);
+				break;
+			}
+			case LS_OP_SLICE_STORE_AT: {
+				const u32 slice_reg = runtime_read_u32(fn->code, &pc);
+				const u32 index_reg = runtime_read_u32(fn->code, &pc);
+				const u32 value_reg = runtime_read_u32(fn->code, &pc);
+				const u32 element_size = runtime_read_u32(fn->code, &pc);
+				const i32 field_offset = runtime_read_i32(fn->code, &pc);
+				const u32 field_size = runtime_read_u32(fn->code, &pc);
+				i64 index = 0;
+				i64 length = 0;
+				void* base_ptr = NULL;
+				u8* slice = runtime_frame_ptr(runtime, slice_reg);
+				u8* index_ptr = runtime_frame_ptr(runtime, index_reg);
+				u8* value = runtime_frame_ptr(runtime, value_reg);
+				memcpy(&base_ptr, slice, sizeof(base_ptr));
+				memcpy(&length, slice + sizeof(void*), 8u);
+				memcpy(&index, index_ptr, 8u);
+				if (!base_ptr || index < 0 || (u64)index >= (u64)length) goto runtime_execute_function_fail;
+				const u64 offset = (u64)index * element_size;
+				if (element_size != 0u && offset / element_size != (u64)index) goto runtime_execute_function_fail;
+				memmove((u8*)base_ptr + offset + field_offset, value, field_size);
+				break;
+			}
 			case LS_OP_SLICE_REF: {
 				/* The resulting pointer overwrites the slice value in place. */
 				const u32 slice_reg = runtime_read_u32(fn->code, &pc);

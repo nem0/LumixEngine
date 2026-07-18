@@ -712,6 +712,32 @@ static void emitSliceStore(FunctionCompiler& ctx, u32 element_size) {
 	ctx.temp_top = slice;
 }
 
+static void emitSliceLoadAt(FunctionCompiler& ctx, u32 element_size, i32 field_offset, u32 field_size) {
+	const u32 index = ctx.temp_top - typeKindByteSize(LS_TYPE_I64);
+	const u32 slice = index - typeKindByteSize(LS_TYPE_SLICE);
+	emitOp(ctx.code, LS_OP_SLICE_LOAD_AT);
+	emitTempReg(ctx, slice);
+	emitTempReg(ctx, index);
+	emitU32(ctx.code, element_size);
+	emitI32(ctx.code, field_offset);
+	emitU32(ctx.code, field_size);
+	setTempTop(ctx, slice + field_size);
+}
+
+static void emitSliceStoreAt(FunctionCompiler& ctx, u32 element_size, i32 field_offset, u32 field_size) {
+	const u32 value = ctx.temp_top - field_size;
+	const u32 index = value - typeKindByteSize(LS_TYPE_I64);
+	const u32 slice = index - typeKindByteSize(LS_TYPE_SLICE);
+	emitOp(ctx.code, LS_OP_SLICE_STORE_AT);
+	emitTempReg(ctx, slice);
+	emitTempReg(ctx, index);
+	emitTempReg(ctx, value);
+	emitU32(ctx.code, element_size);
+	emitI32(ctx.code, field_offset);
+	emitU32(ctx.code, field_size);
+	ctx.temp_top = slice;
+}
+
 static void emitSliceOp(FunctionCompiler& ctx, u32 element_size) {
 	const u32 end = ctx.temp_top - typeKindByteSize(LS_TYPE_I64);
 	const u32 begin = end - typeKindByteSize(LS_TYPE_I64);
@@ -791,6 +817,18 @@ static void emitStaticBoundsCheck(FunctionCompiler& ctx, ResolvedType& type) {
 	emitOp(ctx.code, LS_OP_BOUNDS_CHECK);
 	emitTempReg(ctx, ctx.temp_top - typeKindByteSize(LS_TYPE_I64));
 	emitU64(ctx.code, (u64)static_cast<ArrayResolvedType&>(type).size);
+}
+
+static bool getSliceMemberAccess(MemberExpression& member, BracketExpression*& bracket, u32& element_size, i32& field_offset, ResolvedType*& field_type) {
+	if (!member.expression || member.expression->kind != Expression::BRACKET) return false;
+	BracketExpression* br = static_cast<BracketExpression*>(member.expression);
+	if (!br->base->resolved_type || br->base->resolved_type->kind != ResolvedType::SLICE) return false;
+	if (!member.expression->resolved_type || member.expression->resolved_type->kind != ResolvedType::STRUCT) return false;
+	StructResolvedType* st = static_cast<StructResolvedType*>(member.expression->resolved_type);
+	field_offset = (i32)structFieldByteOffset(*st, member.name, field_type);
+	element_size = typeByteSize(*st);
+	bracket = br;
+	return true;
 }
 
 static bool tryEmitReference(FunctionCompiler& ctx, Expression& expr) {
@@ -1463,6 +1501,16 @@ static ls_type_kind compileMember(FunctionCompiler& ctx, MemberExpression& membe
 		emitIntegerConstant(ctx, kind, enum_value);
 		return kind;
 	}
+	BracketExpression* bracket = nullptr;
+	u32 element_size = 0;
+	i32 slice_field_offset = 0;
+	ResolvedType* slice_field_type = nullptr;
+	if (getSliceMemberAccess(member, bracket, element_size, slice_field_offset, slice_field_type)) {
+		compileExpression(ctx, *bracket->base, LS_TYPE_SLICE);
+		compileIndexExpression(ctx, *bracket->args[0]);
+		emitSliceLoadAt(ctx, element_size, slice_field_offset, typeByteSize(*slice_field_type));
+		return valueKindForType(*slice_field_type);
+	}
 	if (member.expression->kind == Expression::IDENTIFIER) {
 		IdentifierExpression* base = static_cast<IdentifierExpression*>(member.expression);
 		if (member.resolved_symbol && member.resolved_symbol->expression) {
@@ -1891,6 +1939,38 @@ static void compileAssign(FunctionCompiler& ctx, AssignStatement& assign) {
 	}
 	if (assign.lhs->kind == Expression::MEMBER) {
 		MemberExpression* member = static_cast<MemberExpression*>(assign.lhs);
+		BracketExpression* bracket = nullptr;
+		u32 element_size = 0;
+		i32 slice_field_offset = 0;
+		ResolvedType* slice_field_type = nullptr;
+		if (getSliceMemberAccess(*member, bracket, element_size, slice_field_offset, slice_field_type)) {
+			const u32 field_size = typeByteSize(*slice_field_type);
+			const ls_type_kind value_kind = valueKindForType(*slice_field_type);
+			if (assign.op == Token::EQUAL) {
+				compileExpression(ctx, *bracket->base, LS_TYPE_SLICE);
+				compileIndexExpression(ctx, *bracket->args[0]);
+				compileExpressionAsType(ctx, *assign.rhs, *slice_field_type);
+				emitSliceStoreAt(ctx, element_size, slice_field_offset, field_size);
+				return;
+			}
+			const u32 slice_offset = ctx.addLocal(bracket->base->resolved_type, LS_TYPE_SLICE);
+			const u32 index_offset = ctx.addLocal(nullptr, LS_TYPE_I64);
+			const u32 value_offset = ctx.addLocal(slice_field_type, value_kind);
+			compileExpression(ctx, *bracket->base, LS_TYPE_SLICE);
+			emitStoreLocalBytes(ctx, slice_offset, typeByteSize(*bracket->base->resolved_type));
+			compileIndexExpression(ctx, *bracket->args[0]);
+			emitStoreLocalBytes(ctx, index_offset, typeKindByteSize(LS_TYPE_I64));
+			emitLoadLocalBytes(ctx, slice_offset, typeByteSize(*bracket->base->resolved_type));
+			emitLoadLocalBytes(ctx, index_offset, typeKindByteSize(LS_TYPE_I64));
+			emitSliceLoadAt(ctx, element_size, slice_field_offset, field_size);
+			emitCompoundValue(ctx, *assign.rhs, value_kind, assign.op, assign.resolved_op_fn);
+			emitStoreLocalBytes(ctx, value_offset, field_size);
+			emitLoadLocalBytes(ctx, slice_offset, typeByteSize(*bracket->base->resolved_type));
+			emitLoadLocalBytes(ctx, index_offset, typeKindByteSize(LS_TYPE_I64));
+			emitLoadLocalBytes(ctx, value_offset, field_size);
+			emitSliceStoreAt(ctx, element_size, slice_field_offset, field_size);
+			return;
+		}
 		StructResolvedType* st = static_cast<StructResolvedType*>(member->expression->resolved_type);
 		ResolvedType* field_type = nullptr;
 		u32 field_offset = structFieldByteOffset(*st, member->name, field_type);

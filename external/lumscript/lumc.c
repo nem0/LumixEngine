@@ -166,6 +166,8 @@ static const char* lumc_opcode_name(ls_op op) {
 		case LS_OP_SLICE: return "SLICE";
 		case LS_OP_SLICE_LOAD: return "SLICE_LOAD";
 		case LS_OP_SLICE_STORE: return "SLICE_STORE";
+		case LS_OP_SLICE_LOAD_AT: return "SLICE_LOAD_AT";
+		case LS_OP_SLICE_STORE_AT: return "SLICE_STORE_AT";
 		case LS_OP_SLICE_REF: return "SLICE_REF";
 		case LS_OP_SLICE_LENGTH: return "SLICE_LENGTH";
 		case LS_OP_NOT: return "NOT";
@@ -304,9 +306,11 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode) {
 			case LS_OP_SLICE:
 			case LS_OP_SLICE_LOAD:
 			case LS_OP_SLICE_STORE:
+			case LS_OP_SLICE_LOAD_AT:
+			case LS_OP_SLICE_STORE_AT:
 			case LS_OP_SLICE_REF:
 			case LS_OP_SLICE_LENGTH: {
-				const u32 count = op == LS_OP_SLICE ? 4u : op == LS_OP_SLICE_STORE ? 4u : op == LS_OP_SLICE_LOAD || op == LS_OP_SLICE_REF ? 3u : 1u;
+				const u32 count = op == LS_OP_SLICE ? 4u : op == LS_OP_SLICE_STORE ? 4u : op == LS_OP_SLICE_LOAD_AT || op == LS_OP_SLICE_STORE_AT ? 5u : op == LS_OP_SLICE_LOAD || op == LS_OP_SLICE_REF ? 3u : 1u;
 				for (u32 i = 0; i < count; ++i) printf(" arg%u=%u", i, lumc_read_u32(fn->code, fn->code_size, &pc));
 				break;
 			}
