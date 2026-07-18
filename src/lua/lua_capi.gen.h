@@ -187,6 +187,70 @@ namespace Lumix::LuaWrapper {
 		lua_pop(L, 1);
 		return res;
 	}
+	void push(lua_State* L, const ControllerHitData& value) {
+		lua_newtable(L);
+		push(L, value.controller);
+		lua_setfield(L, -2, "controller");
+		push(L, value.hit_entity);
+		lua_setfield(L, -2, "hit_entity");
+	}
+	template <> ControllerHitData checkArg<ControllerHitData>(lua_State* L, int index) {
+		ControllerHitData res;
+		if (!lua_istable(L, index)) luaL_argerror(L, index, "expected table");
+		lua_getfield(L, index, "controller");
+		res.controller = checkArg<EntityRef>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "hit_entity");
+		res.hit_entity = checkArg<EntityRef>(L, -1);
+		lua_pop(L, 1);
+		return res;
+	}
+	void push(lua_State* L, const TriggerHitData& value) {
+		lua_newtable(L);
+		push(L, value.e1);
+		lua_setfield(L, -2, "e1");
+		push(L, value.e2);
+		lua_setfield(L, -2, "e2");
+		push(L, value.touch_lost);
+		lua_setfield(L, -2, "touch_lost");
+	}
+	template <> TriggerHitData checkArg<TriggerHitData>(lua_State* L, int index) {
+		TriggerHitData res;
+		if (!lua_istable(L, index)) luaL_argerror(L, index, "expected table");
+		lua_getfield(L, index, "e1");
+		res.e1 = checkArg<EntityRef>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "e2");
+		res.e2 = checkArg<EntityRef>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "touch_lost");
+		res.touch_lost = checkArg<bool>(L, -1);
+		lua_pop(L, 1);
+		return res;
+	}
+	void push(lua_State* L, const ContactHitData& value) {
+		lua_newtable(L);
+		push(L, value.e1);
+		lua_setfield(L, -2, "e1");
+		push(L, value.e2);
+		lua_setfield(L, -2, "e2");
+		push(L, value.position);
+		lua_setfield(L, -2, "position");
+	}
+	template <> ContactHitData checkArg<ContactHitData>(lua_State* L, int index) {
+		ContactHitData res;
+		if (!lua_istable(L, index)) luaL_argerror(L, index, "expected table");
+		lua_getfield(L, index, "e1");
+		res.e1 = checkArg<EntityRef>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "e2");
+		res.e2 = checkArg<EntityRef>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "position");
+		res.position = checkArg<Vec3>(L, -1);
+		lua_pop(L, 1);
+		return res;
+	}
 	void push(lua_State* L, const RayCastModelHit& value) {
 		lua_newtable(L);
 		push(L, value.is_hit);
@@ -1026,6 +1090,57 @@ namespace Lumix {
 		auto gravity = LuaWrapper::checkArg<Vec3>(L, 2);
 		module->setGravity(gravity);
 		return 0;
+	}
+	
+	int PhysicsModule_getNumControllerHits(lua_State* L) {
+		LuaWrapper::checkTableArg(L, 1);
+		PhysicsModule* module;
+		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+		LuaWrapper::push(L, 	module->getNumControllerHits());
+		return 1;
+	}
+	
+	int PhysicsModule_getControllerHit(lua_State* L) {
+		LuaWrapper::checkTableArg(L, 1);
+		PhysicsModule* module;
+		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+		auto index = LuaWrapper::checkArg<u32>(L, 2);
+		LuaWrapper::push(L, 	module->getControllerHit(index));
+		return 1;
+	}
+	
+	int PhysicsModule_getNumTriggerHits(lua_State* L) {
+		LuaWrapper::checkTableArg(L, 1);
+		PhysicsModule* module;
+		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+		LuaWrapper::push(L, 	module->getNumTriggerHits());
+		return 1;
+	}
+	
+	int PhysicsModule_getTriggerHit(lua_State* L) {
+		LuaWrapper::checkTableArg(L, 1);
+		PhysicsModule* module;
+		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+		auto index = LuaWrapper::checkArg<u32>(L, 2);
+		LuaWrapper::push(L, 	module->getTriggerHit(index));
+		return 1;
+	}
+	
+	int PhysicsModule_getNumContactHits(lua_State* L) {
+		LuaWrapper::checkTableArg(L, 1);
+		PhysicsModule* module;
+		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+		LuaWrapper::push(L, 	module->getNumContactHits());
+		return 1;
+	}
+	
+	int PhysicsModule_getContactHit(lua_State* L) {
+		LuaWrapper::checkTableArg(L, 1);
+		PhysicsModule* module;
+		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+		auto index = LuaWrapper::checkArg<u32>(L, 2);
+		LuaWrapper::push(L, 	module->getContactHit(index));
+		return 1;
 	}
 	
 	int physical_heightfield_getter(lua_State* L) {
@@ -2620,6 +2735,18 @@ namespace Lumix {
 			lua_setfield(L, -2, "raycast");
 			lua_pushcfunction(L, PhysicsModule_setGravity, "setGravity");
 			lua_setfield(L, -2, "setGravity");
+			lua_pushcfunction(L, PhysicsModule_getNumControllerHits, "getNumControllerHits");
+			lua_setfield(L, -2, "getNumControllerHits");
+			lua_pushcfunction(L, PhysicsModule_getControllerHit, "getControllerHit");
+			lua_setfield(L, -2, "getControllerHit");
+			lua_pushcfunction(L, PhysicsModule_getNumTriggerHits, "getNumTriggerHits");
+			lua_setfield(L, -2, "getNumTriggerHits");
+			lua_pushcfunction(L, PhysicsModule_getTriggerHit, "getTriggerHit");
+			lua_setfield(L, -2, "getTriggerHit");
+			lua_pushcfunction(L, PhysicsModule_getNumContactHits, "getNumContactHits");
+			lua_setfield(L, -2, "getNumContactHits");
+			lua_pushcfunction(L, PhysicsModule_getContactHit, "getContactHit");
+			lua_setfield(L, -2, "getContactHit");
 			lua_pop(L, 1);
 		}
 		{

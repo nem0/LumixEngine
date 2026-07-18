@@ -1,21 +1,25 @@
+import "core:world" as world
 import "core:input" as input
 import "core:inputdevicetype" as input_device_type
 import "core:entity" as entity
 import "core:animator" as animator
 import "core:physical_controller" as controller
 import "core:rigid_actor" as rigid_actor
+import "core:physics" as physics
 import "core:Keycode"
 import "core:quat" as quat
 import "core:vec3" as vec3
 import "std:math" as math
 
-var forward : i32 = 0;
-var backward : i32 = 0;
-var left : i32 = 0;
-var right : i32 = 0;
+var player : ?entity.Entity = null;
+var camera_pivot : ?entity.Entity = null;
+var forward : bool = false;
+var backward : bool = false;
+var left : bool = false;
+var right : bool = false;
 var yaw : f32 = 0.0;
 var pitch : f32 = 0.0;
-var sprint : i32 = 0;
+var sprint : bool = false;
 var speed_input_idx : i32 = -1;
 var falling_input_idx : i32 = -1;
 var aiming_input_idx : i32 = -1;
@@ -23,156 +27,118 @@ var dir_input_idx : i32 = -1;
 var stance_input_idx : i32 = -1;
 var crouched : bool = false;
 var aiming : bool = false;
-var camera_pivot : entity.Entity = undefined;
 var handle_input : bool = true;
+var input_system : input.InputSystem = undefined;
 
-fn onInputEvent(e : entity.Entity, event : input.InputEvent) : void {
-	if not handle_input {
-		return;
-	}
+fn processInputEvents() : void {
+	if not handle_input { return; }
 
-	match event {
-		case AxisEvent:
-			if event.device_type == input_device_type.InputDeviceType.MOUSE {
-				yaw = yaw + event.x * -0.01;
-				pitch = pitch + event.y * -0.01;
-			}
-		case ButtonEvent:
-			if event.device_type == input_device_type.InputDeviceType.MOUSE {
-				if event.down and event.key_id == 1 {
-					aiming = true;
-				} else {
-					aiming = false;
+	const event_count = input_system.getEventCount();
+	for i = 0..event_count {
+		const event = input_system.getEvent(i);
+		match event {
+			case AxisEvent:
+				if event.device_type == .MOUSE {
+					yaw = yaw + event.x * -0.01;
+					pitch = pitch + event.y * -0.01;
 				}
-			}
-			if event.device_type == input_device_type.InputDeviceType.KEYBOARD {
-				if event.key_id == Keycode.W as i32 {
-					if event.down {
-						forward = 1;
-					} else {
-						forward = 0;
+			case ButtonEvent:
+				if event.device_type == .MOUSE {
+					aiming = event.down and event.key_id == 1;
+				}
+				if event.device_type == .KEYBOARD {
+					match event.key_id as Keycode {
+						case .W: forward = event.down;
+						case .S: backward = event.down;
+						case .A: left = event.down;
+						case .D: right = event.down;
+						case .SHIFT: sprint = event.down;
+						case .C:
+							if event.down {
+								crouched = not crouched;
+							}
 					}
 				}
-				if event.key_id == Keycode.S as i32 {
-					if event.down {
-						backward = 1;
-					} else {
-						backward = 0;
-					}
-				}
-				if event.key_id == Keycode.C as i32 {
-					if event.down {
-						crouched = not crouched;
-					}
-				}
-				if event.key_id == Keycode.A as i32 {
-					if event.down {
-						left = 1;
-					} else {
-						left = 0;
-					}
-				}
-				if event.key_id == Keycode.D as i32 {
-					if event.down {
-						right = 1;
-					} else {
-						right = 0;
-					}
-				}
-				if event.key_id == Keycode.SHIFT as i32 {
-					if event.down {
-						sprint = 1;
-					} else {
-						sprint = 0;
-					}
-				}
-			}
+		}
 	}
 }
 
-fn onControllerHit(e : entity.Entity, obj : entity.Entity) : void {
-	const a = rigid_actor.rigid_actor(obj);
-	if a != null {
-		const force = vec3.yawToDir(yaw) * 50.0;
-		rigid_actor.applyForce(a, force);
+fn init(w : world.World, inp : input.InputSystem) : void {
+	player = w.findByName("player");
+	// camera_pivot = TODO
+	input_system = inp;
+
+	if player != null {
+		const anim = player.animator();
+		if anim != null {
+			speed_input_idx = anim.getInputIndex("speed_y");
+			dir_input_idx = anim.getInputIndex("speed_x");
+			stance_input_idx = anim.getInputIndex("stance");
+			falling_input_idx = anim.getInputIndex("is_falling");
+			aiming_input_idx = anim.getInputIndex("is_aiming");
+		}
 	}
 }
 
-fn start(e : entity.Entity) : void {
-	const anim = animator.animator(e);
-	if anim != null {
-		speed_input_idx = animator.getInputIndex(anim, "speed_y");
-		dir_input_idx = animator.getInputIndex(anim, "speed_x");
-		stance_input_idx = animator.getInputIndex(anim, "stance");
-		falling_input_idx = animator.getInputIndex(anim, "is_falling");
-		aiming_input_idx = animator.getInputIndex(anim, "is_aiming");
-	}
-}
+fn update(dt : f32) : void {
+	processInputEvents();
 
-fn update(e : entity.Entity, dt : f32) : void {
-	const anim = animator.animator(e);
-	if anim == null {
-		return;
+	const num_hits = physics.getNumControllerHits();
+	for i = 0..num_hits {
+		const hit = physics.getControllerHit(i);
+		const obj = world.getEntity(hit.hit_entity);
+		const a = obj.rigid_actor();
+		if a != null {
+			const force = vec3.yawToDir(yaw) * 50.0;
+			a.applyForce(force);
+		}
 	}
+
+	const anim = player.animator();
+	if anim == null { return; }
 
 	if speed_input_idx == -1 {
-		speed_input_idx = animator.getInputIndex(anim, "speed_y");
-		dir_input_idx = animator.getInputIndex(anim, "speed_x");
-		stance_input_idx = animator.getInputIndex(anim, "stance");
-		falling_input_idx = animator.getInputIndex(anim, "is_falling");
-		aiming_input_idx = animator.getInputIndex(anim, "is_aiming");
+		speed_input_idx = anim.getInputIndex("speed_y");
+		dir_input_idx = anim.getInputIndex("speed_x");
+		stance_input_idx = anim.getInputIndex("stance");
+		falling_input_idx = anim.getInputIndex("is_falling");
+		aiming_input_idx = anim.getInputIndex("is_aiming");
 	}
 
-	if pitch < -0.9 {
-		pitch = -0.9;
-	}
-	if pitch > 0.9 {
-		pitch = 0.9;
-	}
+	if pitch < -0.9 { pitch = -0.9; }
+	if pitch > 0.9 { pitch = 0.9; }
 
-	const phys_controller = controller.physical_controller(e);
+	const phys_controller = player.physical_controller();
 	var gravity_speed : f32 = 0.0;
 	if phys_controller != null {
-		gravity_speed = controller.getGravitySpeed(phys_controller);
+		gravity_speed = phys_controller.getGravitySpeed();
 	}
 
-	var speed_y : f32 = 0.0;
-	if forward == 1 {
-		speed_y = 3.0;
-	}
-	if backward == 1 {
-		speed_y = -3.0;
-	}
+	var speed_y : f32 = forward ? 3.0 :
+						backward ? -3.0 :
+						0;
 
-	var speed_x : f32 = 0.0;
-	if left != 0 {
-		speed_x = -3.0;
-	}
-	if right != 0 {
-		speed_x = 3.0;
-	}
-	if sprint == 1 {
+	var speed_x : f32 = left ? -3.0 :
+						right : 3.0 :
+						0;
+	if sprint {
 		speed_x = speed_x * 2.0;
 		speed_y = speed_y * 2.0;
 	}
 
-	animator.setFloatInput(anim, speed_input_idx, speed_y);
-	animator.setFloatInput(anim, dir_input_idx, speed_x);
+	anim.setFloatInput(speed_input_idx, speed_y);
+	anim.setFloatInput(dir_input_idx, speed_x);
 
-	if crouched {
-		animator.setFloatInput(anim, stance_input_idx, 1.0);
-	} else {
-		animator.setFloatInput(anim, stance_input_idx, 0.0);
-	}
+	anim.setFloatInput(stance_input_idx, crouched ? 1.0 : 0.0);
 
-	animator.setBoolInput(anim, falling_input_idx, gravity_speed < -4.0);
-	animator.setBoolInput(anim, aiming_input_idx, aiming);
+	anim.setBoolInput(falling_input_idx, gravity_speed < -4.0);
+	anim.setBoolInput(aiming_input_idx, aiming);
 
 	const yaw_rot = quat.makeQuatFromYaw(yaw);
 	const pitch_rot = quat.makeQuatFromPitch(pitch);
-	entity.setRotation(e, yaw_rot);
+	player.setRotation(yaw_rot);
 
-	if camera_pivot.index >= 0 {
-		entity.setRotation(camera_pivot, yaw_rot * pitch_rot);
+	if camera_pivot != null {
+		camera_pivot.setRotation(yaw_rot * pitch_rot);
 	}
 }

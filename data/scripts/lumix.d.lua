@@ -146,6 +146,23 @@ type SweepHit = {
 	distance: number,
 }
 
+type ControllerHitData = {
+	controller: Entity,
+	hit_entity: Entity,
+}
+
+type TriggerHitData = {
+	e1: Entity,
+	e2: Entity,
+	touch_lost: boolean,
+}
+
+type ContactHitData = {
+	e1: Entity,
+	e2: Entity,
+	position: Vec3,
+}
+
 type RayCastModelHit = {
 	is_hit: boolean,
 	t: number,
@@ -333,6 +350,12 @@ type navmesh_agent_component =  {
 type physics_module = {
 	raycast: (physics_module, Vec3, Vec3, number, Entity?) -> Entity?,
 	setGravity: (physics_module, Vec3) -> (),
+	getNumControllerHits: (physics_module) -> number,
+	getControllerHit: (physics_module, number) -> ControllerHitData,
+	getNumTriggerHits: (physics_module) -> number,
+	getTriggerHit: (physics_module, number) -> TriggerHitData,
+	getNumContactHits: (physics_module) -> number,
+	getContactHit: (physics_module, number) -> ContactHitData,
 }
 
 type physical_heightfield_component =  {
