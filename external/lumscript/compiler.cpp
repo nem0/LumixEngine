@@ -2977,8 +2977,15 @@ struct Checker {
 				BracketExpression& br = static_cast<BracketExpression&>(expr);
 				bool base_writable = false;
 				ResolvedType* base_type = checkAssignableExpr(unit, ctx, *br.base, base_writable);
-				if (!base_type || !base_writable) {
+				if (!base_type) {
 					is_writable = false;
+					return nullptr;
+				}
+				// A slice is a view: writing an element mutates the viewed storage, not
+				// the slice binding itself, so the binding's immutability does not apply.
+				if (!base_writable && base_type->kind != ResolvedType::SLICE) {
+					is_writable = false;
+					errorLine(expr.token, "Cannot assign to element of non-writable base expression");
 					return nullptr;
 				}
 				ResolvedType* value_type = checkExpr(unit, ctx, expr, nullptr);
@@ -2986,7 +2993,10 @@ struct Checker {
 				expr.resolved_type = value_type;
 				return value_type;
 			}
-			default: is_writable = false; return nullptr;
+			default:
+				errorLine(expr.token, "Expression is not assignable");
+				is_writable = false;
+				return nullptr;
 		}
 	}
 
@@ -3318,16 +3328,28 @@ struct Checker {
 
 	bool checkForStatement(Unit& unit, FunctionCheckContext& ctx, ForStatement& fs, ResolvedType* return_type, ls_string_view pending_label) {
 		// TODO collision with templates
-		// i32 is only a default for untyped bounds; concrete bounds can be any integer type
-		// as long as they match each other.
-		ResolvedType* begin_type = checkExprMaterialized(unit, &ctx, *fs.begin, primitiveType(ResolvedType::I32));
-		ResolvedType* end_type = checkExprMaterialized(unit, &ctx, *fs.end, begin_type ? begin_type : primitiveType(ResolvedType::I32));
+		// Bounds are checked without a forced hint first so an untyped bound can adopt
+		// the other bound's concrete type (`for i = 0..length(s)` iterates as isize).
+		// Two untyped bounds default to i32.
+		ResolvedType* begin_type = checkExpr(unit, &ctx, *fs.begin, nullptr);
+		ResolvedType* end_type = nullptr;
+		if (begin_type) {
+			end_type = checkExpr(unit, &ctx, *fs.end, isUntypedNumeric(*begin_type) ? nullptr : begin_type);
+		}
+		if (begin_type && end_type) {
+			if (begin_type->kind == ResolvedType::UNTYPED_INT) {
+				begin_type = materializeUntyped(*fs.begin, isIntegerType(*end_type) ? end_type : nullptr);
+			}
+			if (begin_type && end_type->kind == ResolvedType::UNTYPED_INT) {
+				end_type = materializeUntyped(*fs.end, isIntegerType(*begin_type) ? begin_type : nullptr);
+			}
+		}
 		if (!begin_type || !end_type || !isIntegerType(*begin_type) || !isIntegerType(*end_type)) {
 			errorLine(fs.token, "For loop bounds must be of integer type, got ", begin_type, " and ", end_type);
 			return false;
 		}
 		if (!typesEqual(begin_type, end_type)) {
-			// TODO error msg
+			errorLine(fs.token, "For loop bounds must have the same type, got ", begin_type, " and ", end_type);
 			return false;
 		}
 

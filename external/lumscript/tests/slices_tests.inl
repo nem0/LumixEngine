@@ -489,3 +489,107 @@ TEST(SliceRuntimeOutOfBoundsFails) {
 	CAPI_END(module);
 	return true;
 }
+
+TEST(SliceElementWriteThroughParameterRuntime) {
+	const char* source = R"(
+		fn fill(values : []i32) : void {
+			values[0] = 42;
+		}
+
+		fn main() : i32 {
+			var values : [4]i32 = undefined;
+			values[0] = 0;
+			fill(values);
+			return values[0];
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(SliceStructFieldReadRuntime) {
+	const char* source = R"(
+		struct Body {
+			x : i32;
+			y : i32;
+		}
+
+		fn main() : i32 {
+			var bodies : [3]Body = undefined;
+			bodies[0] = Body { 7, 3 };
+			bodies[1] = Body { 20, 30 };
+			var slice : []Body = bodies[:];
+			return slice[1].y + slice[0].x;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(37, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(SliceStructFieldWriteThroughParameterRuntime) {
+	const char* source = R"(
+		struct Body {
+			x : i32;
+			y : i32;
+		}
+
+		fn advance(bodies : []Body) : void {
+			for i = 0..length(bodies) {
+				bodies[i].x -= 1;
+				bodies[i].y = 100;
+			}
+		}
+
+		fn main() : i32 {
+			var bodies : [2]Body = undefined;
+			bodies[0] = Body { 10, 0 };
+			bodies[1] = Body { 20, 0 };
+			advance(bodies);
+			return bodies[0].x + bodies[1].x + bodies[1].y;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(128, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(SliceStructFieldRefOutOfBoundsFails) {
+	const char* source = R"(
+		struct Body {
+			x : i32;
+		}
+
+		fn main(i : i32) : i32 {
+			var bodies : [2]Body = undefined;
+			var slice : []Body = bodies[:];
+			slice[i].x = 1;
+			return slice[0].x;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	test_diagnostics.output_enabled = false;
+	ls_push_i32(runtime, 2);
+	EXPECT_TRUE(!ls_call(runtime, toLs("main")));
+	CAPI_END(module);
+	return true;
+}

@@ -1144,6 +1144,7 @@ Slice operations:
 - slices can be stored in variables, passed to functions, and returned from functions
 - assigning one slice to another copies only the pointer and length
 - a slice remains valid only while the backing storage remains alive and stable
+- writing an element through a slice mutates the viewed storage, not the slice binding, so element writes are allowed even when the binding itself is immutable (for example a function parameter of slice type)
 
 ```cpp
 fn sum(values : []i32) : i32 {
@@ -1353,6 +1354,8 @@ for i = 0..10 {
 ```
 
 The `a..b` range is exclusive on the upper bound. The range expressions are evaluated once before the loop starts. The loop variable is introduced by the `for` statement and is immutable inside the loop body.
+
+Both bounds must have the same integer type, which becomes the type of the loop variable. An untyped bound adopts the other bound's concrete type (`for i = 0..length(s)` iterates with an `isize` loop variable); if both bounds are untyped they default to `i32`.
 
 If the lower bound is greater than or equal to the upper bound, the loop body does not execute.
 

@@ -508,7 +508,7 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				break;
 			}
 			case LS_OP_SLICE: {
-				const u32 dst = runtime_read_u32(fn->code, &pc);
+				/* The resulting slice overwrites the source slice value in place. */
 				const u32 slice_reg = runtime_read_u32(fn->code, &pc);
 				const u32 begin_reg = runtime_read_u32(fn->code, &pc);
 				const u32 end_reg = runtime_read_u32(fn->code, &pc);
@@ -518,7 +518,7 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				u8* slice = runtime_frame_ptr(runtime, slice_reg);
 				u8* begin_ptr = runtime_frame_ptr(runtime, begin_reg);
 				u8* end_ptr = runtime_frame_ptr(runtime, end_reg);
-				u8* out = runtime_frame_ptr(runtime, dst);
+				u8* out = slice;
 				memcpy(&base_ptr, slice, sizeof(base_ptr));
 				memcpy(&length, slice + sizeof(void*), 8u);
 				memcpy(&begin, begin_ptr, 8u);
@@ -534,7 +534,7 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				break;
 			}
 			case LS_OP_SLICE_LOAD: {
-				const u32 dst = runtime_read_u32(fn->code, &pc);
+				/* The loaded element overwrites the slice value in place. */
 				const u32 slice_reg = runtime_read_u32(fn->code, &pc);
 				const u32 index_reg = runtime_read_u32(fn->code, &pc);
 				const u32 element_size = runtime_read_u32(fn->code, &pc);
@@ -543,7 +543,7 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				void* base_ptr = NULL;
 				u8* slice = runtime_frame_ptr(runtime, slice_reg);
 				u8* index_ptr = runtime_frame_ptr(runtime, index_reg);
-				u8* out = runtime_frame_ptr(runtime, dst);
+				u8* out = slice;
 				memcpy(&base_ptr, slice, sizeof(base_ptr));
 				memcpy(&length, slice + sizeof(void*), 8u);
 				memcpy(&index, index_ptr, 8u);
@@ -575,12 +575,34 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				if (element_size > 0u) memmove(base + offset, value, element_size);
 				break;
 			}
+			case LS_OP_SLICE_REF: {
+				/* The resulting pointer overwrites the slice value in place. */
+				const u32 slice_reg = runtime_read_u32(fn->code, &pc);
+				const u32 index_reg = runtime_read_u32(fn->code, &pc);
+				const u32 element_size = runtime_read_u32(fn->code, &pc);
+				i64 index = 0;
+				i64 length = 0;
+				void* base_ptr = NULL;
+				u8* slice = runtime_frame_ptr(runtime, slice_reg);
+				u8* index_ptr = runtime_frame_ptr(runtime, index_reg);
+				u8* out = slice;
+				memcpy(&base_ptr, slice, sizeof(base_ptr));
+				memcpy(&length, slice + sizeof(void*), 8u);
+				memcpy(&index, index_ptr, 8u);
+				u8* base = (u8*)base_ptr;
+				if (!base || index < 0 || (u64)index >= (u64)length) return 0;
+				const u64 offset = (u64)index * element_size;
+				if (element_size != 0u && offset / element_size != (u64)index) return 0;
+				void* ref = base + offset;
+				memcpy(out, &ref, sizeof(ref));
+				break;
+			}
 			case LS_OP_SLICE_LENGTH: {
-				const u32 dst = runtime_read_u32(fn->code, &pc);
+				/* The length overwrites the slice value in place. */
 				const u32 slice_reg = runtime_read_u32(fn->code, &pc);
 				i64 length = 0;
 				u8* slice = runtime_frame_ptr(runtime, slice_reg);
-				u8* out = runtime_frame_ptr(runtime, dst);
+				u8* out = slice;
 				memcpy(&length, slice + sizeof(void*), 8u);
 				memcpy(out, &length, 8u);
 				break;

@@ -33,6 +33,11 @@ if /I "%~2"=="/clang" set COMPILER=clang-cl
 
 if /I "%COMPILER%"=="clang-cl" set USE_CLANG=1
 
+set CONFIG=debug
+if /I "%~1"=="release" set CONFIG=release
+if /I "%~2"=="release" set CONFIG=release
+if /I "%~3"=="release" set CONFIG=release
+
 if not exist "%OUT_DIR%" mkdir "%OUT_DIR%"
 
 if "%USE_CLANG%"=="0" (
@@ -69,7 +74,7 @@ if /I "%TARGET%"=="tests" (
     set CFLAGS=%CFLAGS% /Od /MDd
     set CXXFLAGS=%CXXFLAGS% /Od /MDd
 ) else (
-    if /I "%~2"=="release" (
+    if /I "%CONFIG%"=="release" (
         set CFLAGS=%CFLAGS% /O2 /MD
         set CXXFLAGS=%CXXFLAGS% /O2 /MD
     ) else (

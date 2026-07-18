@@ -686,7 +686,6 @@ static void emitSliceLoad(FunctionCompiler& ctx, u32 element_size) {
 	const u32 slice = index - typeKindByteSize(LS_TYPE_SLICE);
 	emitOp(ctx.code, LS_OP_SLICE_LOAD);
 	emitTempReg(ctx, slice);
-	emitTempReg(ctx, slice);
 	emitTempReg(ctx, index);
 	emitU32(ctx.code, element_size);
 	setTempTop(ctx, slice + element_size);
@@ -710,17 +709,28 @@ static void emitSliceOp(FunctionCompiler& ctx, u32 element_size) {
 	const u32 slice = begin - typeKindByteSize(LS_TYPE_SLICE);
 	emitOp(ctx.code, LS_OP_SLICE);
 	emitTempReg(ctx, slice);
-	emitTempReg(ctx, slice);
 	emitTempReg(ctx, begin);
 	emitTempReg(ctx, end);
 	emitU32(ctx.code, element_size);
 	setTempTop(ctx, slice + typeKindByteSize(LS_TYPE_SLICE));
 }
 
+// Consumes a slice value and an index, produces a bounds-checked pointer to the
+// element. The pointer overwrites the slice value in place, so the op has no
+// separate destination operand.
+static void emitSliceRef(FunctionCompiler& ctx, u32 element_size) {
+	const u32 index = ctx.temp_top - typeKindByteSize(LS_TYPE_I64);
+	const u32 slice = index - typeKindByteSize(LS_TYPE_SLICE);
+	emitOp(ctx.code, LS_OP_SLICE_REF);
+	emitTempReg(ctx, slice);
+	emitTempReg(ctx, index);
+	emitU32(ctx.code, element_size);
+	setTempTop(ctx, slice + typeKindByteSize(LS_TYPE_CPTR));
+}
+
 static void emitSliceLength(FunctionCompiler& ctx) {
 	const u32 slice = ctx.temp_top - typeKindByteSize(LS_TYPE_SLICE);
 	emitOp(ctx.code, LS_OP_SLICE_LENGTH);
-	emitTempReg(ctx, slice);
 	emitTempReg(ctx, slice);
 	setTempTop(ctx, slice + typeKindByteSize(LS_TYPE_I64));
 }
@@ -801,6 +811,12 @@ static bool tryEmitReference(FunctionCompiler& ctx, Expression& expr) {
 		}
 		case Expression::BRACKET: {
 			BracketExpression* br = static_cast<BracketExpression*>(&expr);
+			if (br->base->resolved_type->kind == ResolvedType::SLICE) {
+				compileExpression(ctx, *br->base, LS_TYPE_SLICE);
+				compileIndexExpression(ctx, *br->args[0]);
+				emitSliceRef(ctx, typeByteSize(*br->resolved_type));
+				return true;
+			}
 			if (!tryEmitReference(ctx, *br->base)) return false;
 			compileIndexExpression(ctx, *br->args[0]);
 			emitStaticBoundsCheck(ctx, *br->base->resolved_type);

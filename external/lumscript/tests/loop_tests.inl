@@ -296,3 +296,46 @@ TEST(NamedLabelBreakContinueRuntime) {
 	CAPI_END(module);
 	return true;
 }
+
+TEST(ForLoopUntypedBoundAdoptsEndTypeRuntime) {
+	const char* source = R"(
+		fn count(values : []i32) : i32 {
+			var total : i32 = 0;
+			for i = 0..length(values) {
+				total += values[i];
+			}
+			return total;
+		}
+
+		fn main() : i32 {
+			var values : [3]i32 = undefined;
+			values[0] = 1;
+			values[1] = 2;
+			values[2] = 39;
+			return count(values);
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ForLoopMismatchedConcreteBoundsFail) {
+	const char* source = R"(
+		fn main() : i32 {
+			const from : i32 = 0;
+			const to : i64 = 10;
+			var total : i32 = 0;
+			for i = from..to {
+				total += 1;
+			}
+			return total;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}

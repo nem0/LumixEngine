@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include <malloc.h>
 
@@ -168,13 +169,6 @@ int main(int argc, char** argv) {
 		goto cleanup;
 	}
 
-	int native_print = -1;
-	ls_unit* native_print_unit = lumc_find_native_function(ctx.module, "print", &native_print);
-	if (!native_print_unit) {
-		fprintf(stderr, "Error: Script must declare extern fn print(string) : void\n");
-		goto cleanup;
-	}
-
 	ctx.bytecode = ls_bytecode_compile(ctx.module, &ctx.host);
 	if (!ctx.bytecode) {
 		fprintf(stderr, "Error: Failed to compile bytecode\n");
@@ -186,9 +180,14 @@ int main(int argc, char** argv) {
 		fprintf(stderr, "Error: Failed to create bytecode runtime\n");
 		goto cleanup;
 	}
-	if (!ls_runtime_set_native_function_callback(ctx.runtime, native_print_unit, native_print, &lumc_native_print)) {
-		fprintf(stderr, "Error: Failed to bind native print\n");
-		goto cleanup;
+
+	int native_print = -1;
+	ls_unit* native_print_unit = lumc_find_native_function(ctx.module, "print", &native_print);
+	if (native_print_unit) {
+		if (!ls_runtime_set_native_function_callback(ctx.runtime, native_print_unit, native_print, &lumc_native_print)) {
+			fprintf(stderr, "Error: Failed to bind native print\n");
+			goto cleanup;
+		}
 	}
 
 	size_t call_arg_count = argc > 3 ? (size_t)(argc - 3) : 0;
@@ -211,10 +210,14 @@ int main(int argc, char** argv) {
 				ls_push_string(ctx.runtime, ls_from_cstr(arg));
 			}
 		}
+
+		clock_t start = clock();
 		if (!ls_call(ctx.runtime, ls_from_cstr(function_name))) {
 			fprintf(stderr, "Runtime error\n");
 			goto cleanup;
 		}
+		clock_t end = clock();
+		double elapsed_ms = (double)(end - start) / CLOCKS_PER_SEC * 1000.0;
 
 		{
 			ls_type_kind result_kind = ls_bytecode_runtime_result_kind(ctx.runtime, ls_from_cstr(function_name));
@@ -223,6 +226,8 @@ int main(int argc, char** argv) {
 				putchar('\n');
 			}
 		}
+
+		fprintf(stderr, "Time: %.2f ms\n", elapsed_ms);
 	}
 
 	rc = 0;
