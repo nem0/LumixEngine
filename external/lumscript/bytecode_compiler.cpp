@@ -1159,7 +1159,26 @@ static void patchJumpRelative(ByteArray& code, u32 operand_pos, u32 target_pos) 
 	patchI32(code, operand_pos, (i32)((i32)target_pos - (i32)(operand_pos + 4u)));
 }
 
-static ls_op compareJumpOp(ls_op compare_op, bool jump_if_true, bool& swap_operands) {
+static ls_op compareJumpTypeBase(ls_type_kind kind) {
+	switch (kind) {
+		case LS_TYPE_BOOL: return LS_OP_EQ_JUMP_FALSE_BOOL;
+		case LS_TYPE_I8: return LS_OP_EQ_JUMP_FALSE_I8;
+		case LS_TYPE_U8: return LS_OP_EQ_JUMP_FALSE_U8;
+		case LS_TYPE_I16: return LS_OP_EQ_JUMP_FALSE_I16;
+		case LS_TYPE_U16: return LS_OP_EQ_JUMP_FALSE_U16;
+		case LS_TYPE_I32: return LS_OP_EQ_JUMP_FALSE_I32;
+		case LS_TYPE_U32: return LS_OP_EQ_JUMP_FALSE_U32;
+		case LS_TYPE_I64: return LS_OP_EQ_JUMP_FALSE_I64;
+		case LS_TYPE_U64: return LS_OP_EQ_JUMP_FALSE_U64;
+		case LS_TYPE_F32: return LS_OP_EQ_JUMP_FALSE_F32;
+		case LS_TYPE_F64: return LS_OP_EQ_JUMP_FALSE_F64;
+		case LS_TYPE_STRING: return LS_OP_EQ_JUMP_FALSE_STRING;
+		case LS_TYPE_ENUM: return LS_OP_EQ_JUMP_FALSE_ENUM;
+		default: return LS_OP_JUMP;
+	}
+}
+
+static ls_op compareJumpOp(ls_op compare_op, ls_type_kind kind, bool jump_if_true, bool& swap_operands) {
 	swap_operands = false;
 	if (jump_if_true) {
 		switch (compare_op) {
@@ -1179,14 +1198,14 @@ static ls_op compareJumpOp(ls_op compare_op, bool jump_if_true, bool& swap_opera
 			default: break;
 		}
 	}
-	const u32 base = (u32)LS_OP_EQ_JUMP_FALSE;
+	if ((kind == LS_TYPE_BOOL || kind == LS_TYPE_STRING || kind == LS_TYPE_ENUM) && compare_op != LS_OP_EQ && compare_op != LS_OP_NE) return LS_OP_JUMP;
+	const u32 base = (u32)compareJumpTypeBase(kind);
+	if (base == (u32)LS_OP_JUMP) return LS_OP_JUMP;
 	switch (compare_op) {
 		case LS_OP_EQ: return (ls_op)(base + 0u);
 		case LS_OP_NE: return (ls_op)(base + 1u);
 		case LS_OP_LT: return (ls_op)(base + 2u);
 		case LS_OP_LE: return (ls_op)(base + 3u);
-		case LS_OP_GT: return (ls_op)(base + 4u);
-		case LS_OP_GE: return (ls_op)(base + 5u);
 		default: return LS_OP_JUMP;
 	}
 }
@@ -1197,9 +1216,10 @@ static bool tryFuseCompareJump(FunctionCompiler& ctx, ls_op jump_op, u32& operan
 
 	const u32 compare_pos = (u32)ctx.code.size() - 14u;
 	const ls_op compare_op = (ls_op)ctx.code[compare_pos];
+	const ls_type_kind kind = (ls_type_kind)ctx.code[compare_pos + 13u];
 	const bool jump_if_true = jump_op == LS_OP_JUMP_IF_TRUE;
 	bool swap_operands = false;
-	const ls_op fused_op = compareJumpOp(compare_op, jump_if_true, swap_operands);
+	const ls_op fused_op = compareJumpOp(compare_op, kind, jump_if_true, swap_operands);
 	if (fused_op == LS_OP_JUMP) return false;
 
 	ctx.code[compare_pos] = (u8)fused_op;
@@ -1209,8 +1229,9 @@ static bool tryFuseCompareJump(FunctionCompiler& ctx, ls_op jump_op, u32& operan
 		memcpy(ctx.code.data + compare_pos + 5u, ctx.code.data + compare_pos + 9u, sizeof(temp));
 		memcpy(ctx.code.data + compare_pos + 9u, temp, sizeof(temp));
 	}
-	memmove(ctx.code.data + compare_pos + 1u, ctx.code.data + compare_pos + 5u, 9u);
-	operand_pos = compare_pos + 10u;
+	memmove(ctx.code.data + compare_pos + 1u, ctx.code.data + compare_pos + 5u, 8u);
+	ctx.code.count = compare_pos + 13u;
+	operand_pos = compare_pos + 9u;
 	patchI32(ctx.code, operand_pos, 0);
 	ctx.temp_top -= 1u;
 	return true;

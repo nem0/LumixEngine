@@ -323,28 +323,27 @@ static u8* runtime_frame_ptr(ls_runtime* runtime, u32 offset) {
 		*out__ = result__ ? 1u : 0u; \
 	} while (0)
 
-#define LS_REG_CMP_JUMP(OP, TAKE) \
+#define LS_REG_CMP_JUMP(TYPE, OP) \
 	do { \
 		const u32 lhs_offset__ = runtime_read_u32(fn->code, &pc); \
 		const u32 rhs_offset__ = runtime_read_u32(fn->code, &pc); \
-		const ls_type_kind kind__ = (ls_type_kind)fn->code[pc++]; \
 		const i32 jump_offset__ = runtime_read_i32(fn->code, &pc); \
-		u8* lhs_ptr__ = runtime_frame_ptr(runtime, lhs_offset__); \
-		u8* rhs_ptr__ = runtime_frame_ptr(runtime, rhs_offset__); \
-		int result__ = 0; \
-		if (kind__ == LS_TYPE_STRING) { \
-			void* lhs_string__ = NULL; void* rhs_string__ = NULL; \
-			memcpy(&lhs_string__, lhs_ptr__, sizeof(lhs_string__)); \
-			memcpy(&rhs_string__, rhs_ptr__, sizeof(rhs_string__)); \
-			if (lhs_string__ == rhs_string__) result__ = 1; \
-			else if (lhs_string__ && rhs_string__) result__ = string_equals(((ls_string_box*)lhs_string__)->value, ((ls_string_box*)rhs_string__)->value); \
-			result__ = result__ OP 1; \
-		} else if (kind__ == LS_TYPE_F32 || kind__ == LS_TYPE_F64) { \
-			result__ = runtime_numeric_to_double(lhs_ptr__, kind__) OP runtime_numeric_to_double(rhs_ptr__, kind__); \
-		} else { \
-			result__ = runtime_numeric_to_i64(lhs_ptr__, kind__) OP runtime_numeric_to_i64(rhs_ptr__, kind__); \
-		} \
-		if (TAKE) pc = (u32)((i32)pc + jump_offset__); \
+		TYPE lhs__; TYPE rhs__; \
+		memcpy(&lhs__, runtime_frame_ptr(runtime, lhs_offset__), sizeof(lhs__)); \
+		memcpy(&rhs__, runtime_frame_ptr(runtime, rhs_offset__), sizeof(rhs__)); \
+		if (!(lhs__ OP rhs__)) pc = (u32)((i32)pc + jump_offset__); \
+	} while (0)
+
+#define LS_REG_CMP_JUMP_STRING(OP) \
+	do { \
+		const u32 lhs_offset__ = runtime_read_u32(fn->code, &pc); \
+		const u32 rhs_offset__ = runtime_read_u32(fn->code, &pc); \
+		const i32 jump_offset__ = runtime_read_i32(fn->code, &pc); \
+		void* lhs__ = NULL; void* rhs__ = NULL; \
+		memcpy(&lhs__, runtime_frame_ptr(runtime, lhs_offset__), sizeof(lhs__)); \
+		memcpy(&rhs__, runtime_frame_ptr(runtime, rhs_offset__), sizeof(rhs__)); \
+		int equal__ = lhs__ == rhs__ || (lhs__ && rhs__ && string_equals(((ls_string_box*)lhs__)->value, ((ls_string_box*)rhs__)->value)); \
+		if (!(equal__ OP 1)) pc = (u32)((i32)pc + jump_offset__); \
 	} while (0)
 
 static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
@@ -832,10 +831,52 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 			case LS_OP_NE: LS_REG_CMP_NUMERIC(!=); break;
 			case LS_OP_LT: LS_REG_CMP_NUMERIC(<); break;
 			case LS_OP_LE: LS_REG_CMP_NUMERIC(<=); break;
-			case LS_OP_EQ_JUMP_FALSE: LS_REG_CMP_JUMP(==, !result__); break;
-			case LS_OP_NE_JUMP_FALSE: LS_REG_CMP_JUMP(!=, !result__); break;
-			case LS_OP_LT_JUMP_FALSE: LS_REG_CMP_JUMP(<, !result__); break;
-			case LS_OP_LE_JUMP_FALSE: LS_REG_CMP_JUMP(<=, !result__); break;
+			case LS_OP_EQ_JUMP_FALSE_BOOL: LS_REG_CMP_JUMP(u8, ==); break;
+			case LS_OP_NE_JUMP_FALSE_BOOL: LS_REG_CMP_JUMP(u8, !=); break;
+			case LS_OP_EQ_JUMP_FALSE_I8: LS_REG_CMP_JUMP(i8, ==); break;
+			case LS_OP_NE_JUMP_FALSE_I8: LS_REG_CMP_JUMP(i8, !=); break;
+			case LS_OP_LT_JUMP_FALSE_I8: LS_REG_CMP_JUMP(i8, <); break;
+			case LS_OP_LE_JUMP_FALSE_I8: LS_REG_CMP_JUMP(i8, <=); break;
+			case LS_OP_EQ_JUMP_FALSE_U8: LS_REG_CMP_JUMP(u8, ==); break;
+			case LS_OP_NE_JUMP_FALSE_U8: LS_REG_CMP_JUMP(u8, !=); break;
+			case LS_OP_LT_JUMP_FALSE_U8: LS_REG_CMP_JUMP(u8, <); break;
+			case LS_OP_LE_JUMP_FALSE_U8: LS_REG_CMP_JUMP(u8, <=); break;
+			case LS_OP_EQ_JUMP_FALSE_I16: LS_REG_CMP_JUMP(i16, ==); break;
+			case LS_OP_NE_JUMP_FALSE_I16: LS_REG_CMP_JUMP(i16, !=); break;
+			case LS_OP_LT_JUMP_FALSE_I16: LS_REG_CMP_JUMP(i16, <); break;
+			case LS_OP_LE_JUMP_FALSE_I16: LS_REG_CMP_JUMP(i16, <=); break;
+			case LS_OP_EQ_JUMP_FALSE_U16: LS_REG_CMP_JUMP(u16, ==); break;
+			case LS_OP_NE_JUMP_FALSE_U16: LS_REG_CMP_JUMP(u16, !=); break;
+			case LS_OP_LT_JUMP_FALSE_U16: LS_REG_CMP_JUMP(u16, <); break;
+			case LS_OP_LE_JUMP_FALSE_U16: LS_REG_CMP_JUMP(u16, <=); break;
+			case LS_OP_EQ_JUMP_FALSE_I32: LS_REG_CMP_JUMP(i32, ==); break;
+			case LS_OP_NE_JUMP_FALSE_I32: LS_REG_CMP_JUMP(i32, !=); break;
+			case LS_OP_LT_JUMP_FALSE_I32: LS_REG_CMP_JUMP(i32, <); break;
+			case LS_OP_LE_JUMP_FALSE_I32: LS_REG_CMP_JUMP(i32, <=); break;
+			case LS_OP_EQ_JUMP_FALSE_U32: LS_REG_CMP_JUMP(u32, ==); break;
+			case LS_OP_NE_JUMP_FALSE_U32: LS_REG_CMP_JUMP(u32, !=); break;
+			case LS_OP_LT_JUMP_FALSE_U32: LS_REG_CMP_JUMP(u32, <); break;
+			case LS_OP_LE_JUMP_FALSE_U32: LS_REG_CMP_JUMP(u32, <=); break;
+			case LS_OP_EQ_JUMP_FALSE_I64: LS_REG_CMP_JUMP(i64, ==); break;
+			case LS_OP_NE_JUMP_FALSE_I64: LS_REG_CMP_JUMP(i64, !=); break;
+			case LS_OP_LT_JUMP_FALSE_I64: LS_REG_CMP_JUMP(i64, <); break;
+			case LS_OP_LE_JUMP_FALSE_I64: LS_REG_CMP_JUMP(i64, <=); break;
+			case LS_OP_EQ_JUMP_FALSE_U64: LS_REG_CMP_JUMP(u64, ==); break;
+			case LS_OP_NE_JUMP_FALSE_U64: LS_REG_CMP_JUMP(u64, !=); break;
+			case LS_OP_LT_JUMP_FALSE_U64: LS_REG_CMP_JUMP(u64, <); break;
+			case LS_OP_LE_JUMP_FALSE_U64: LS_REG_CMP_JUMP(u64, <=); break;
+			case LS_OP_EQ_JUMP_FALSE_F32: LS_REG_CMP_JUMP(f32, ==); break;
+			case LS_OP_NE_JUMP_FALSE_F32: LS_REG_CMP_JUMP(f32, !=); break;
+			case LS_OP_LT_JUMP_FALSE_F32: LS_REG_CMP_JUMP(f32, <); break;
+			case LS_OP_LE_JUMP_FALSE_F32: LS_REG_CMP_JUMP(f32, <=); break;
+			case LS_OP_EQ_JUMP_FALSE_F64: LS_REG_CMP_JUMP(f64, ==); break;
+			case LS_OP_NE_JUMP_FALSE_F64: LS_REG_CMP_JUMP(f64, !=); break;
+			case LS_OP_LT_JUMP_FALSE_F64: LS_REG_CMP_JUMP(f64, <); break;
+			case LS_OP_LE_JUMP_FALSE_F64: LS_REG_CMP_JUMP(f64, <=); break;
+			case LS_OP_EQ_JUMP_FALSE_STRING: LS_REG_CMP_JUMP_STRING(==); break;
+			case LS_OP_NE_JUMP_FALSE_STRING: LS_REG_CMP_JUMP_STRING(!=); break;
+			case LS_OP_EQ_JUMP_FALSE_ENUM: LS_REG_CMP_JUMP(i32, ==); break;
+			case LS_OP_NE_JUMP_FALSE_ENUM: LS_REG_CMP_JUMP(i32, !=); break;
 			case LS_OP_JUMP: {
 				const i32 offset = runtime_read_i32(fn->code, &pc);
 				pc = (u32)((i32)pc + offset);

@@ -175,10 +175,28 @@ static const char* lumc_opcode_name(ls_op op) {
 		case LS_OP_LE: return "LE";
 		case LS_OP_GT: return "GT";
 		case LS_OP_GE: return "GE";
-		case LS_OP_EQ_JUMP_FALSE: return "EQ_JUMP_FALSE";
-		case LS_OP_NE_JUMP_FALSE: return "NE_JUMP_FALSE";
-		case LS_OP_LT_JUMP_FALSE: return "LT_JUMP_FALSE";
-		case LS_OP_LE_JUMP_FALSE: return "LE_JUMP_FALSE";
+		#define LS_COMPARE_JUMP_NAME(TYPE) \
+			case LS_OP_EQ_JUMP_FALSE_##TYPE: return "EQ_JUMP_FALSE_" #TYPE; \
+			case LS_OP_NE_JUMP_FALSE_##TYPE: return "NE_JUMP_FALSE_" #TYPE; \
+			case LS_OP_LT_JUMP_FALSE_##TYPE: return "LT_JUMP_FALSE_" #TYPE; \
+			case LS_OP_LE_JUMP_FALSE_##TYPE: return "LE_JUMP_FALSE_" #TYPE;
+		case LS_OP_EQ_JUMP_FALSE_BOOL: return "EQ_JUMP_FALSE_BOOL";
+		case LS_OP_NE_JUMP_FALSE_BOOL: return "NE_JUMP_FALSE_BOOL";
+		LS_COMPARE_JUMP_NAME(I8)
+		LS_COMPARE_JUMP_NAME(U8)
+		LS_COMPARE_JUMP_NAME(I16)
+		LS_COMPARE_JUMP_NAME(U16)
+		LS_COMPARE_JUMP_NAME(I32)
+		LS_COMPARE_JUMP_NAME(U32)
+		LS_COMPARE_JUMP_NAME(I64)
+		LS_COMPARE_JUMP_NAME(U64)
+		LS_COMPARE_JUMP_NAME(F32)
+		LS_COMPARE_JUMP_NAME(F64)
+		case LS_OP_EQ_JUMP_FALSE_STRING: return "EQ_JUMP_FALSE_STRING";
+		case LS_OP_NE_JUMP_FALSE_STRING: return "NE_JUMP_FALSE_STRING";
+		case LS_OP_EQ_JUMP_FALSE_ENUM: return "EQ_JUMP_FALSE_ENUM";
+		case LS_OP_NE_JUMP_FALSE_ENUM: return "NE_JUMP_FALSE_ENUM";
+		#undef LS_COMPARE_JUMP_NAME
 		case LS_OP_JUMP: return "JUMP";
 		case LS_OP_JUMP_IF_FALSE: return "JUMP_IF_FALSE";
 		case LS_OP_JUMP_IF_TRUE: return "JUMP_IF_TRUE";
@@ -316,15 +334,33 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode) {
 				printf(" dst=%u, lhs=%u, rhs=%u, type=%s", dst, lhs, rhs, lumc_type_name(kind));
 				break;
 			}
-			case LS_OP_EQ_JUMP_FALSE:
-			case LS_OP_NE_JUMP_FALSE:
-			case LS_OP_LT_JUMP_FALSE:
-			case LS_OP_LE_JUMP_FALSE: {
+			#define LS_COMPARE_JUMP_CASES(TYPE) \
+				case LS_OP_EQ_JUMP_FALSE_##TYPE: \
+				case LS_OP_NE_JUMP_FALSE_##TYPE: \
+				case LS_OP_LT_JUMP_FALSE_##TYPE: \
+				case LS_OP_LE_JUMP_FALSE_##TYPE:
+			case LS_OP_EQ_JUMP_FALSE_BOOL:
+			case LS_OP_NE_JUMP_FALSE_BOOL:
+			LS_COMPARE_JUMP_CASES(I8)
+			LS_COMPARE_JUMP_CASES(U8)
+			LS_COMPARE_JUMP_CASES(I16)
+			LS_COMPARE_JUMP_CASES(U16)
+			LS_COMPARE_JUMP_CASES(I32)
+			LS_COMPARE_JUMP_CASES(U32)
+			LS_COMPARE_JUMP_CASES(I64)
+			LS_COMPARE_JUMP_CASES(U64)
+			LS_COMPARE_JUMP_CASES(F32)
+			LS_COMPARE_JUMP_CASES(F64)
+			case LS_OP_EQ_JUMP_FALSE_STRING:
+			case LS_OP_NE_JUMP_FALSE_STRING:
+			case LS_OP_EQ_JUMP_FALSE_ENUM:
+			case LS_OP_NE_JUMP_FALSE_ENUM:
+			#undef LS_COMPARE_JUMP_CASES
+			{
 				const u32 lhs = lumc_read_u32(fn->code, fn->code_size, &pc);
 				const u32 rhs = lumc_read_u32(fn->code, fn->code_size, &pc);
-				const ls_type_kind kind = (ls_type_kind)fn->code[pc++];
 				const i32 jump_offset = lumc_read_i32(fn->code, fn->code_size, &pc);
-				printf(" lhs=%u, rhs=%u, type=%s, offset=%d (abs %d)", lhs, rhs, lumc_type_name(kind), jump_offset, (i32)pc + jump_offset);
+				printf(" lhs=%u, rhs=%u, offset=%d, target=%d", lhs, rhs, jump_offset, (i32)pc + jump_offset);
 				break;
 			}
 			case LS_OP_JUMP: {
