@@ -1,48 +1,51 @@
 @echo off
-setlocal
+setlocal enabledelayedexpansion
 
-REM Simple build+run script for the performance test (Release)
-
-REM Optional first argument overrides generated line count (PERFT_LINES)
-if not "%1"=="" set PERFT_LINES=%1
+REM Build and run performance test (fib(30))
 
 set SCRIPT_DIR=%~dp0
-set OUT_DIR=%SCRIPT_DIR%build
+set EXT_DIR=%SCRIPT_DIR%..
+set OUT_DIR=%EXT_DIR%\build
+set COMPILER=cl
+
 if not exist "%OUT_DIR%" mkdir "%OUT_DIR%"
 
-REM Find vcvarsall if available
-set "VCVARSALL="
-if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat" set "VCVARSALL=%ProgramFiles%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat"
-if exist "%ProgramFiles(x86)%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat" set "VCVARSALL=%ProgramFiles(x86)%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat"
-if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvarsall.bat" set "VCVARSALL=%ProgramFiles%\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvarsall.bat"
-if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" set "VCVARSALL=%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat"
-
-if defined VCVARSALL call "%VCVARSALL%" x64 >nul 2>&1
-
-REM Compiler flags (Release)
-set CFLAGS=/nologo /std:c++20 /EHsc /O2 /MD /I"%SCRIPT_DIR%.."
-
-set LDFLAGS=/nologo /OUT:"%OUT_DIR%\perftest.exe"
-
-echo Building perftest (Release)...
-
-cl %CFLAGS% "%SCRIPT_DIR%performance.cpp" "%SCRIPT_DIR%\..\parser.cpp" "%SCRIPT_DIR%\..\compiler.cpp" "%SCRIPT_DIR%\..\bytecode_compiler.cpp" "%SCRIPT_DIR%\..\runtime.cpp" "%SCRIPT_DIR%\..\capi.cpp" /link %LDFLAGS%
-
-if %ERRORLEVEL% NEQ 0 (
-    echo.
-    echo Build FAILED.
-    exit /b 1
+REM Find compiler
+where cl.exe >nul 2>&1
+if errorlevel 1 (
+	if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat" (
+		call "%ProgramFiles%\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat" -no_logo -arch=x64 -host_arch=x64
+	)
 )
 
-echo.
-echo Running perftest...
-"%OUT_DIR%\perftest.exe"
+REM Compile performance.cpp with other source files
+set COMMON_FLAGS=/nologo /EHsc /Zi /I"%EXT_DIR%"
+set CXXFLAGS=%COMMON_FLAGS% /std:c++20 /D_CRT_NONSTDC_NO_DEPRECATE /DSTATIC_PLUGINS /O2 /MD
+set LDFLAGS=/nologo /DEBUG /INCREMENTAL:NO /OUT:"%OUT_DIR%\performance.exe"
 
-endlocal
+echo Compiling performance test...
+%COMPILER% %CXXFLAGS% /c "%SCRIPT_DIR%performance.cpp" "%EXT_DIR%\parser.cpp" "%EXT_DIR%\compiler.cpp" "%EXT_DIR%\bytecode_compiler.cpp" "%EXT_DIR%\capi.cpp"
+if errorlevel 1 (
+	echo Compilation failed.
+	exit /b 1
+)
 
-REM Clean up intermediate files created by cl
-echo Cleaning intermediate object files...
-cmd /c "del /q /f "%SCRIPT_DIR%*.obj" >nul 2>&1 || rem no objs in tests"
-cmd /c "del /q /f "%SCRIPT_DIR%..\*.obj" >nul 2>&1 || rem no objs in parent"
-cmd /c "if exist "%SCRIPT_DIR%vc*.pdb" del /q "%SCRIPT_DIR%vc*.pdb" >nul 2>&1"
-cmd /c "if exist "%SCRIPT_DIR%..\vc*.pdb" del /q "%SCRIPT_DIR%..\vc*.pdb" >nul 2>&1"
+%COMPILER% %CXXFLAGS% /c "%EXT_DIR%\runtime.c"
+if errorlevel 1 (
+	echo Compilation failed.
+	exit /b 1
+)
+
+%COMPILER% "performance.obj" "parser.obj" "compiler.obj" "bytecode_compiler.obj" "runtime.obj" "capi.obj" /link %LDFLAGS%
+if errorlevel 1 (
+	echo Linking failed.
+	exit /b 1
+)
+
+if not exist "%OUT_DIR%\performance.exe" (
+	echo performance.exe not found!
+	exit /b 1
+)
+
+echo Running fib(30) performance test...
+"%OUT_DIR%\performance.exe"

@@ -1,65 +1,81 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <chrono>
-#include <string>
-#include <cstdio>
-#include <cstdlib>
-#include <iostream>
 
 #include "../arena.h"
-#include "../compiler.h"
-#include "../capi.h"
 #include "../utils.h"
+#include "../bytecode.h"
+#include "../capi.h"
 
-int main() {
-    const char* env_lines = std::getenv("PERFT_LINES");
-    const int LINES = env_lines ? std::atoi(env_lines) : 100000; // ~100k LOC target by default
-    std::string src;
-    src.reserve((size_t)LINES * 32);
+static void testPrint(void* userdata, ls_string_view msg) {
+	for (const char* c = msg.begin; c != msg.end; ++c) {
+		putchar(*c);
+	}
+}
 
-    // Add imports and a small main so the module has an entry point
-    src += "import \"std:math\" as math;\n";
-    src += "fn main() : void { var _ = math.sin(0.5); }\n";
+int main(int argc, char** argv) {
+	ls_host host = {};
+	host.print = &testPrint;
+	ls_default_arena_create(&host.arena);
 
-    for (int i = 0; i < LINES; ++i) {
-        src += "fn f_";
-        src += std::to_string(i);
-        src += "() : void { var x = ";
-        src += std::to_string(i);
-        src += "; var v = math.sin(1.0); if (x % 2 == 0) { var y = math.cos(2.0); } else { var y = math.sqrt(4.0); } }\n";
-    }
+	const char* source = R"(
+		fn fib(n : i32) : i32 {
+			if n <= 1 {
+				return n;
+			}
+			return fib(n - 1) + fib(n - 2);
+		}
 
-    ls_host host = {};
-    ls_default_arena_create(&host.arena);
-    auto perfPrint = [](void* /*userdata*/, ls_string_view msg) {
-        for (const char* c = msg.begin; c != msg.end; ++c) putchar(*c);
-    };
-    host.print = (ls_print_fn)perfPrint;
-    ls_module* module = ls_module_create(&host);
-    // Pre-reserve container capacities to avoid repeated allocations during compile
-    if (!module) {
-        std::fprintf(stderr, "Failed to create module\n");
-        return 2;
-    }
+		fn main() : i32 {
+			return fib(30);
+		}
+	)";
 
-    // Measure front-end (parse+imports+typecheck) and bytecode separately
-    auto fe0 = std::chrono::steady_clock::now();
-    ls_result rfe = ls_module_compile(module, makeStringView(src.c_str()), {}, nullptr, nullptr);
-    auto fe1 = std::chrono::steady_clock::now();
-    long long ms_frontend = std::chrono::duration_cast<std::chrono::milliseconds>(fe1 - fe0).count();
+	ls_module* module = ls_module_create(&host);
+	if (!module) {
+		printf("Failed to create module\n");
+		return -1;
+	}
 
-    long long ms_byte = 0;
-    ls_result rbyte = LS_RESULT_FAILURE;
-    if (rfe == LS_RESULT_OK) {
-        auto b0 = std::chrono::steady_clock::now();
-        ls_bytecode* bytecode = ls_bytecode_compile(module, &host);
-        auto b1 = std::chrono::steady_clock::now();
-        rbyte = bytecode ? LS_RESULT_OK : LS_RESULT_FAILURE;
-        ms_byte = std::chrono::duration_cast<std::chrono::milliseconds>(b1 - b0).count();
-        if (bytecode) ls_bytecode_destroy(bytecode);
-    }
+	if (!ls_module_compile(module, makeStringView(source), makeStringView("fib_perf"), nullptr, nullptr)) {
+		printf("Failed to compile module\n");
+		return -1;
+	}
 
-    std::printf("frontend=%lld ms, bytecode=%lld ms (fe=%d byte=%d)\n", ms_frontend, ms_byte, (int)rfe, (int)rbyte);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &host);
+	if (!bytecode) {
+		printf("Failed to compile bytecode\n");
+		return -1;
+	}
 
-    ls_module_destroy(module);
-    ls_default_arena_destroy(&host.arena);
-    return (rfe == LS_RESULT_OK && rbyte == LS_RESULT_OK) ? 0 : 1;
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
+	if (!runtime) {
+		printf("Failed to create runtime\n");
+		return -1;
+	}
+
+	printf("Running fib(30) performance test...\n");
+	const auto start_time = std::chrono::steady_clock::now();
+
+	ls_result result = ls_call(runtime, makeStringView("main"));
+
+	const auto end_time = std::chrono::steady_clock::now();
+	const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+	const auto elapsed_us = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
+
+	if (result == LS_RESULT_OK) {
+		i32 ret_value = ls_to_i32(runtime, -1);
+		printf("Result: %d\n", ret_value);
+		printf("Time: %lld ms (%lld us)\n", (long long)elapsed_ms, (long long)elapsed_us);
+	} else {
+		printf("Runtime error: %d\n", result);
+	}
+
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	ls_module_destroy(module);
+	ls_default_arena_destroy(&host.arena);
+
+	return result == LS_RESULT_OK ? 0 : -1;
 }
