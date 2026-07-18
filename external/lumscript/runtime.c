@@ -472,7 +472,7 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				memcpy(out, &ptr, sizeof(ptr));
 				break;
 			}
-			case LS_OP_LOAD_AT: {
+			case LS_OP_LOAD_INDEXED: {
 				const u32 dst = runtime_read_u32(fn->code, &pc);
 				const u32 base_reg = runtime_read_u32(fn->code, &pc);
 				const u32 index_reg = runtime_read_u32(fn->code, &pc);
@@ -491,7 +491,7 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				memmove(out, addr, size);
 				break;
 			}
-			case LS_OP_STORE_AT: {
+			case LS_OP_STORE_INDEXED: {
 				const u32 base_reg = runtime_read_u32(fn->code, &pc);
 				const u32 index_reg = runtime_read_u32(fn->code, &pc);
 				const u32 value_reg = runtime_read_u32(fn->code, &pc);
@@ -510,7 +510,7 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				memmove(addr, value, size);
 				break;
 			}
-			case LS_OP_LOAD_AT_LOCAL_I32: {
+			case LS_OP_LOAD_INDEXED_LOCAL_I32: {
 				const u32 dst = runtime_read_u32(fn->code, &pc);
 				const u32 base_offset = runtime_read_u32(fn->code, &pc);
 				const u32 index_reg = runtime_read_u32(fn->code, &pc);
@@ -526,7 +526,7 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				memmove(runtime->frame + dst, runtime->stack + address, size);
 				break;
 			}
-			case LS_OP_STORE_AT_LOCAL_I32: {
+			case LS_OP_STORE_INDEXED_LOCAL_I32: {
 				const u32 base_offset = runtime_read_u32(fn->code, &pc);
 				const u32 index_reg = runtime_read_u32(fn->code, &pc);
 				const u32 value_reg = runtime_read_u32(fn->code, &pc);
@@ -561,7 +561,7 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				memmove(runtime->stack + dst_address, runtime->stack + src_address, size);
 				break;
 			}
-			case LS_OP_REF_AT: {
+			case LS_OP_REF_INDEXED: {
 				const u32 dst = runtime_read_u32(fn->code, &pc);
 				const u32 base_reg = runtime_read_u32(fn->code, &pc);
 				const u32 index_reg = runtime_read_u32(fn->code, &pc);
@@ -612,48 +612,6 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				const i64 new_length = end - begin;
 				memcpy(out, &new_base, sizeof(new_base));
 				memcpy(out + sizeof(void*), &new_length, 8u);
-				break;
-			}
-			case LS_OP_SLICE_LOAD: {
-				/* The loaded element overwrites the slice value in place. */
-				const u32 slice_reg = runtime_read_u32(fn->code, &pc);
-				const u32 index_reg = runtime_read_u32(fn->code, &pc);
-				const u32 element_size = runtime_read_u32(fn->code, &pc);
-				i64 index = 0;
-				i64 length = 0;
-				void* base_ptr = NULL;
-				u8* slice = runtime->frame + slice_reg;
-				u8* index_ptr = runtime->frame + index_reg;
-				u8* out = slice;
-				memcpy(&base_ptr, slice, sizeof(base_ptr));
-				memcpy(&length, slice + sizeof(void*), 8u);
-				memcpy(&index, index_ptr, 8u);
-				u8* base = (u8*)base_ptr;
-				if (!base || index < 0 || (u64)index >= (u64)length) goto runtime_execute_function_fail;
-				const u64 offset = (u64)index * element_size;
-				if (element_size != 0u && offset / element_size != (u64)index) goto runtime_execute_function_fail;
-				if (element_size > 0u) memmove(out, base + offset, element_size);
-				break;
-			}
-			case LS_OP_SLICE_STORE: {
-				const u32 slice_reg = runtime_read_u32(fn->code, &pc);
-				const u32 index_reg = runtime_read_u32(fn->code, &pc);
-				const u32 value_reg = runtime_read_u32(fn->code, &pc);
-				const u32 element_size = runtime_read_u32(fn->code, &pc);
-				i64 index = 0;
-				i64 length = 0;
-				void* base_ptr = NULL;
-				u8* slice = runtime->frame + slice_reg;
-				u8* index_ptr = runtime->frame + index_reg;
-				u8* value = runtime->frame + value_reg;
-				memcpy(&base_ptr, slice, sizeof(base_ptr));
-				memcpy(&length, slice + sizeof(void*), 8u);
-				memcpy(&index, index_ptr, 8u);
-				u8* base = (u8*)base_ptr;
-				if (!base || index < 0 || (u64)index >= (u64)length) goto runtime_execute_function_fail;
-				const u64 offset = (u64)index * element_size;
-				if (element_size != 0u && offset / element_size != (u64)index) goto runtime_execute_function_fail;
-				if (element_size > 0u) memmove(base + offset, value, element_size);
 				break;
 			}
 			case LS_OP_SLICE_LOAD_LOCAL: {
@@ -734,48 +692,6 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				const u64 offset = (u64)(u32)index * element_size;
 				if (element_size != 0u && offset / element_size != (u64)(u32)index) goto runtime_execute_function_fail;
 				memmove((u8*)base_ptr + offset, value, element_size);
-				break;
-			}
-			case LS_OP_SLICE_LOAD_AT: {
-				const u32 slice_reg = runtime_read_u32(fn->code, &pc);
-				const u32 index_reg = runtime_read_u32(fn->code, &pc);
-				const u32 element_size = runtime_read_u32(fn->code, &pc);
-				const i32 field_offset = runtime_read_i32(fn->code, &pc);
-				const u32 field_size = runtime_read_u32(fn->code, &pc);
-				i64 index = 0;
-				i64 length = 0;
-				void* base_ptr = NULL;
-				u8* slice = runtime->frame + slice_reg;
-				u8* index_ptr = runtime->frame + index_reg;
-				memcpy(&base_ptr, slice, sizeof(base_ptr));
-				memcpy(&length, slice + sizeof(void*), 8u);
-				memcpy(&index, index_ptr, 8u);
-				if (!base_ptr || index < 0 || (u64)index >= (u64)length) goto runtime_execute_function_fail;
-				const u64 offset = (u64)index * element_size;
-				if (element_size != 0u && offset / element_size != (u64)index) goto runtime_execute_function_fail;
-				memmove(slice, (u8*)base_ptr + offset + field_offset, field_size);
-				break;
-			}
-			case LS_OP_SLICE_STORE_AT: {
-				const u32 slice_reg = runtime_read_u32(fn->code, &pc);
-				const u32 index_reg = runtime_read_u32(fn->code, &pc);
-				const u32 value_reg = runtime_read_u32(fn->code, &pc);
-				const u32 element_size = runtime_read_u32(fn->code, &pc);
-				const i32 field_offset = runtime_read_i32(fn->code, &pc);
-				const u32 field_size = runtime_read_u32(fn->code, &pc);
-				i64 index = 0;
-				i64 length = 0;
-				void* base_ptr = NULL;
-				u8* slice = runtime->frame + slice_reg;
-				u8* index_ptr = runtime->frame + index_reg;
-				u8* value = runtime->frame + value_reg;
-				memcpy(&base_ptr, slice, sizeof(base_ptr));
-				memcpy(&length, slice + sizeof(void*), 8u);
-				memcpy(&index, index_ptr, 8u);
-				if (!base_ptr || index < 0 || (u64)index >= (u64)length) goto runtime_execute_function_fail;
-				const u64 offset = (u64)index * element_size;
-				if (element_size != 0u && offset / element_size != (u64)index) goto runtime_execute_function_fail;
-				memmove((u8*)base_ptr + offset + field_offset, value, field_size);
 				break;
 			}
 			case LS_OP_SLICE_LOAD_AT_LOCAL: {

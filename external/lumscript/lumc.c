@@ -159,22 +159,18 @@ static const char* lumc_opcode_name(ls_op op) {
 		case LS_OP_GLOBAL_STORE: return "GLOBAL_STORE";
 		case LS_OP_LOCAL_REF: return "LOCAL_REF";
 		case LS_OP_GLOBAL_REF: return "GLOBAL_REF";
-		case LS_OP_LOAD_AT: return "LOAD_AT";
-		case LS_OP_STORE_AT: return "STORE_AT";
-		case LS_OP_LOAD_AT_LOCAL_I32: return "LOAD_AT_LOCAL_I32";
-		case LS_OP_STORE_AT_LOCAL_I32: return "STORE_AT_LOCAL_I32";
+		case LS_OP_LOAD_INDEXED: return "LOAD_INDEXED";
+		case LS_OP_STORE_INDEXED: return "STORE_INDEXED";
+		case LS_OP_LOAD_INDEXED_LOCAL_I32: return "LOAD_INDEXED_LOCAL_I32";
+		case LS_OP_STORE_INDEXED_LOCAL_I32: return "STORE_INDEXED_LOCAL_I32";
 		case LS_OP_COPY_AT_LOCAL_I32: return "COPY_AT_LOCAL_I32";
-		case LS_OP_REF_AT: return "REF_AT";
+		case LS_OP_REF_INDEXED: return "REF_INDEXED";
 		case LS_OP_BOUNDS_CHECK: return "BOUNDS_CHECK";
 		case LS_OP_SLICE: return "SLICE";
-		case LS_OP_SLICE_LOAD: return "SLICE_LOAD";
-		case LS_OP_SLICE_STORE: return "SLICE_STORE";
 		case LS_OP_SLICE_LOAD_LOCAL: return "SLICE_LOAD_LOCAL";
 		case LS_OP_SLICE_STORE_LOCAL: return "SLICE_STORE_LOCAL";
 		case LS_OP_SLICE_LOAD_LOCAL_I32: return "SLICE_LOAD_LOCAL_I32";
 		case LS_OP_SLICE_STORE_LOCAL_I32: return "SLICE_STORE_LOCAL_I32";
-		case LS_OP_SLICE_LOAD_AT: return "SLICE_LOAD_AT";
-		case LS_OP_SLICE_STORE_AT: return "SLICE_STORE_AT";
 		case LS_OP_SLICE_LOAD_AT_LOCAL: return "SLICE_LOAD_AT_LOCAL";
 		case LS_OP_SLICE_STORE_AT_LOCAL: return "SLICE_STORE_AT_LOCAL";
 		case LS_OP_SLICE_LOAD_AT_LOCAL_I32: return "SLICE_LOAD_AT_LOCAL_I32";
@@ -313,17 +309,17 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode) {
 				printf(" dst=%u, offset=%u", dst, offset);
 				break;
 			}
-			case LS_OP_LOAD_AT:
-			case LS_OP_STORE_AT:
-			case LS_OP_REF_AT: {
+			case LS_OP_LOAD_INDEXED:
+			case LS_OP_STORE_INDEXED:
+			case LS_OP_REF_INDEXED: {
 				const u32 a = lumc_read_u32(fn->code, fn->code_size, &pc);
 				const u32 b = lumc_read_u32(fn->code, fn->code_size, &pc);
 				const u32 c = lumc_read_u32(fn->code, fn->code_size, &pc);
 				const u32 scale = lumc_read_u32(fn->code, fn->code_size, &pc);
 				const i32 offset = lumc_read_i32(fn->code, fn->code_size, &pc);
-				const u32 value_size = op == LS_OP_REF_AT ? 0u : lumc_read_u32(fn->code, fn->code_size, &pc);
-				if (op == LS_OP_LOAD_AT) printf(" dst=%u, base=%u, index=%u, scale=%u, offset=%d, size=%u", a, b, c, scale, offset, value_size);
-				else if (op == LS_OP_STORE_AT) printf(" base=%u, index=%u, src=%u, scale=%u, offset=%d, size=%u", a, b, c, scale, offset, value_size);
+				const u32 value_size = op == LS_OP_REF_INDEXED ? 0u : lumc_read_u32(fn->code, fn->code_size, &pc);
+				if (op == LS_OP_LOAD_INDEXED) printf(" dst=%u, base=%u, index=%u, scale=%u, offset=%d, size=%u", a, b, c, scale, offset, value_size);
+				else if (op == LS_OP_STORE_INDEXED) printf(" base=%u, index=%u, src=%u, scale=%u, offset=%d, size=%u", a, b, c, scale, offset, value_size);
 				else printf(" dst=%u, base=%u, index=%u, scale=%u, offset=%d", a, b, c, scale, offset);
 				break;
 			}
@@ -334,14 +330,10 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode) {
 				break;
 			}
 			case LS_OP_SLICE:
-			case LS_OP_SLICE_LOAD:
-			case LS_OP_SLICE_STORE:
 			case LS_OP_SLICE_LOAD_LOCAL:
 			case LS_OP_SLICE_STORE_LOCAL:
 			case LS_OP_SLICE_LOAD_LOCAL_I32:
 			case LS_OP_SLICE_STORE_LOCAL_I32:
-			case LS_OP_SLICE_LOAD_AT:
-			case LS_OP_SLICE_STORE_AT:
 			case LS_OP_SLICE_LOAD_AT_LOCAL:
 			case LS_OP_SLICE_STORE_AT_LOCAL:
 			case LS_OP_SLICE_LOAD_AT_LOCAL_I32:
@@ -372,11 +364,11 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode) {
 					printf(" dst=%u, slice=%u", lumc_read_u32(fn->code, fn->code_size, &pc), lumc_read_u32(fn->code, fn->code_size, &pc));
 					break;
 				}
-				const u32 count = op == LS_OP_SLICE ? 4u : op == LS_OP_SLICE_STORE || op == LS_OP_SLICE_LOAD_LOCAL || op == LS_OP_SLICE_STORE_LOCAL || op == LS_OP_SLICE_LOAD_LOCAL_I32 || op == LS_OP_SLICE_STORE_LOCAL_I32 ? 4u : op == LS_OP_SLICE_LOAD_AT ? 5u : op == LS_OP_SLICE_STORE_AT || op == LS_OP_SLICE_LOAD_AT_LOCAL || op == LS_OP_SLICE_STORE_AT_LOCAL || op == LS_OP_SLICE_LOAD_AT_LOCAL_I32 || op == LS_OP_SLICE_STORE_AT_LOCAL_I32 ? 6u : op == LS_OP_SLICE_LOAD || op == LS_OP_SLICE_REF ? 3u : 1u;
+				const u32 count = op == LS_OP_SLICE ? 4u : op == LS_OP_SLICE_LOAD_LOCAL || op == LS_OP_SLICE_STORE_LOCAL || op == LS_OP_SLICE_LOAD_LOCAL_I32 || op == LS_OP_SLICE_STORE_LOCAL_I32 ? 4u : op == LS_OP_SLICE_LOAD_AT_LOCAL || op == LS_OP_SLICE_STORE_AT_LOCAL || op == LS_OP_SLICE_LOAD_AT_LOCAL_I32 || op == LS_OP_SLICE_STORE_AT_LOCAL_I32 ? 6u : op == LS_OP_SLICE_REF ? 3u : 1u;
 				for (u32 i = 0; i < count; ++i) printf(" arg%u=%u", i, lumc_read_u32(fn->code, fn->code_size, &pc));
 				break;
 			}
-			case LS_OP_LOAD_AT_LOCAL_I32: {
+			case LS_OP_LOAD_INDEXED_LOCAL_I32: {
 				const u32 dst = lumc_read_u32(fn->code, fn->code_size, &pc);
 				const u32 base = lumc_read_u32(fn->code, fn->code_size, &pc);
 				const u32 index = lumc_read_u32(fn->code, fn->code_size, &pc);
@@ -387,7 +379,7 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode) {
 				printf(" dst=%u, base=%u, index=%u, scale=%u, offset=%d, length=%u, size=%u", dst, base, index, scale, offset, length, size);
 				break;
 			}
-			case LS_OP_STORE_AT_LOCAL_I32: {
+			case LS_OP_STORE_INDEXED_LOCAL_I32: {
 				const u32 base = lumc_read_u32(fn->code, fn->code_size, &pc);
 				const u32 index = lumc_read_u32(fn->code, fn->code_size, &pc);
 				const u32 src = lumc_read_u32(fn->code, fn->code_size, &pc);

@@ -41,7 +41,7 @@
 //   stack helpers
 //
 // Addressing contract:
-// - `LOAD_AT` and `STORE_AT` copy an explicit byte width
+// - `LOAD_INDEXED` and `STORE_INDEXED` copy an explicit byte width
 // - they read explicit base reference, index, and value/result registers
 // - they compute `base + index * scale + offset`, then load/store bytes
 // - `scale` and `offset` are encoded as immediates
@@ -54,8 +54,8 @@
 // - `base` is an absolute runtime memory address, so slices can alias caller locals
 //   while passed to and returned from nested calls
 // - `SLICE` reads `base, length, begin, end` registers and writes a subslice
-// - `SLICE_LOAD` reads `base, length, index` registers
-// - `SLICE_STORE` reads `base, length, index, value` registers
+// - `SLICE_*_LOCAL` reads/writes slice, index, and value/result frame registers
+// - `SLICE_*_AT_LOCAL` additionally carries element and field byte ranges
 // - all slice bounds are checked by the runtime
 //
 // Opcode layout summary:
@@ -94,22 +94,18 @@ typedef enum ls_op {
 	LS_OP_LOCAL_REF,
 	LS_OP_GLOBAL_REF,
 
-	LS_OP_LOAD_AT,
-	LS_OP_STORE_AT,
-	LS_OP_LOAD_AT_LOCAL_I32,
-	LS_OP_STORE_AT_LOCAL_I32,
+	LS_OP_LOAD_INDEXED,
+	LS_OP_STORE_INDEXED,
+	LS_OP_LOAD_INDEXED_LOCAL_I32,
+	LS_OP_STORE_INDEXED_LOCAL_I32,
 	LS_OP_COPY_AT_LOCAL_I32,
-	LS_OP_REF_AT,
+	LS_OP_REF_INDEXED,
 	LS_OP_BOUNDS_CHECK,
 	LS_OP_SLICE,
-	LS_OP_SLICE_LOAD,
-	LS_OP_SLICE_STORE,
 	LS_OP_SLICE_LOAD_LOCAL,
 	LS_OP_SLICE_STORE_LOCAL,
 	LS_OP_SLICE_LOAD_LOCAL_I32,
 	LS_OP_SLICE_STORE_LOCAL_I32,
-	LS_OP_SLICE_LOAD_AT,
-	LS_OP_SLICE_STORE_AT,
 	LS_OP_SLICE_LOAD_AT_LOCAL,
 	LS_OP_SLICE_STORE_AT_LOCAL,
 	LS_OP_SLICE_LOAD_AT_LOCAL_I32,
